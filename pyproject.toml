@@ -11,4 +11,4 @@ adapters = [
 ]
 plugins = []
 plugin_dirs = ["plugins"]
-builtin_plugins = []
+builtin_plugins = ["echo"]
