@@ -22,8 +22,11 @@ class Base(DeclarativeBase):
     pass
 
 async def init_db():
+    print("🔄 正在初始化数据库...")
     async with engine.begin() as conn:
+        await conn.run_sync(Base.metadata.drop_all)
         await conn.run_sync(Base.metadata.create_all)
+    print("✅ 数据库初始化完成")
 
 @asynccontextmanager
 async def get_session() -> AsyncGenerator[AsyncSession, None]:

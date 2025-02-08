@@ -19,7 +19,7 @@ async def _(event: MessageEvent):
         await profile.finish("⛔ 你还没有创建角色")
     
     content = f"""
-    🌌 修士档案·{player.nickname} 🌌
+    🌌 修士档案·{player.nickname}（UID：{player.uid}）🌌
     ▰▰▰▰▰▰▰▰▰
     🧬 境界：{player.level}重天
     {format_hp_bar(player.hp, player.max_hp)}
