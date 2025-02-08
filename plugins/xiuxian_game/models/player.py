@@ -12,7 +12,7 @@ class Player(BaseModel):
     __tablename__ = "player"
     
     id: Mapped[str] = mapped_column(String(32), primary_key=True, index=True, comment="平台ID")
-    uid: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True, comment="自增UID")
+    uid: Mapped[int] = mapped_column(Integer, unique=True, autoincrement=True, comment="自增UID")
     nickname: Mapped[str] = mapped_column(String(24))
     level: Mapped[int] = mapped_column(Integer, default=1, server_default='1', comment="等级")
     sex: Mapped[Gender] = mapped_column(String(8), default=Gender.MALE, server_default='男', comment="性别")
