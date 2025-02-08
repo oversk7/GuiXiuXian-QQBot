@@ -1,4 +1,4 @@
-from sqlmodel import SQLModel
+from sqlalchemy.orm import DeclarativeBase
 
-class BaseModel(SQLModel):
-    id: int | None = None
+class BaseModel(DeclarativeBase):
+    pass
