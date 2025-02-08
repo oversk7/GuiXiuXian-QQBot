@@ -23,6 +23,8 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
         if not duration.isdigit():
             await cultivate.finish("⛔ 请输入有效的修炼时长（整数）")
         
+        duration = min(int(duration), plugin_config.cultivate.daily_limit)  # 限制最大时长
+        
         async with get_session() as session:
             # 使用SQLAlchemy核心查询
             result = await session.execute(
@@ -50,8 +52,8 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
             )
             player = result.scalars().first()
             
-            # 计算修炼收益（示例公式）
-            exp_gain = int(10 * int(duration) * plugin_config.exp_rate)
+            # 修改经验计算逻辑
+            exp_gain = plugin_config.cultivate.base_exp * int(duration) * (player.level ** 2)
             
             # 构建富文本消息
             content = f"""

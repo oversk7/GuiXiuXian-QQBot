@@ -1,9 +1,8 @@
-from sqlalchemy import Integer, String, DateTime
+from sqlalchemy import Integer, String, DateTime, func
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from datetime import datetime
 from .base import BaseModel
 from enum import Enum as PyEnum
-
 
 class Gender(str, PyEnum):
     MALE = "男"
@@ -12,11 +11,11 @@ class Gender(str, PyEnum):
 class Player(BaseModel):
     __tablename__ = "player"
     
-    id: Mapped[str] = mapped_column(String(32), primary_key=True, index=True)
-    uid: Mapped[str] = mapped_column(String(8), unique=True, index=True, autoincrement=True)
+    id: Mapped[str] = mapped_column(String(32), primary_key=True, index=True, comment="平台ID")
+    uid: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True, comment="自增UID")
     nickname: Mapped[str] = mapped_column(String(24))
     level: Mapped[int] = mapped_column(Integer, default=1, server_default='1', comment="等级")
-    sex: Mapped[Gender] = mapped_column(sa_type=String(8), default=Gender.MALE, server_default='男', comment="性别")
+    sex: Mapped[Gender] = mapped_column(String(8), default=Gender.MALE, server_default='男', comment="性别")
     exp: Mapped[int] = mapped_column(Integer, default=0, server_default='0', comment="经验")
     attribute_points: Mapped[int] = mapped_column(Integer, default=0, server_default='0', comment="可分配属性点")
     position: Mapped[str] = mapped_column(String(32), default="主城", server_default='主城', comment="位置")
@@ -36,7 +35,7 @@ class Player(BaseModel):
     gold2: Mapped[int] = mapped_column(Integer, default=0, server_default='0', comment="稀有货币")
     
     last_sign: Mapped[datetime] = mapped_column(DateTime, nullable=True, comment="上次签到日期")
-    created_at: Mapped[datetime] = mapped_column(DateTime, nullable=True, comment="创建时间")
+    created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now(), comment="创建时间")
     last_cultivation: Mapped[datetime] = mapped_column(DateTime, nullable=True, comment="上次修炼时间")
 
     inventory_capacity: Mapped[int] = mapped_column(Integer, default=10, server_default='10', nullable=False, comment="背包容量")
