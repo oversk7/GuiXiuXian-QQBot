@@ -1,9 +1,10 @@
 from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession, async_sessionmaker
 from sqlalchemy.orm import DeclarativeBase
 import os
-from ..models import Player
 from typing import AsyncGenerator
-from collections.abc import AsyncGenerator
+from contextlib import asynccontextmanager
+import asyncio
+
 
 engine = create_async_engine(
     "sqlite+aiosqlite:///" + os.path.join(os.path.dirname(__file__), "game.db"),
@@ -24,6 +25,10 @@ async def init_db():
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
 
+@asynccontextmanager
 async def get_session() -> AsyncGenerator[AsyncSession, None]:
     async with AsyncSessionLocal() as session:
         yield session 
+
+if __name__ == "__main__":
+    asyncio.run(init_db())

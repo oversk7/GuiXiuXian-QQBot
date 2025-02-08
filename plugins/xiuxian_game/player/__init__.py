@@ -1,3 +1,1 @@
-from .info import profile
-
-__all__ = ["profile"] 
+from . import info
