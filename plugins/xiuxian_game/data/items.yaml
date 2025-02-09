@@ -1,11 +1,18 @@
 items:
   consumables:  # 消耗品类
+    - item_id: "teleport"
+      name: "传送符"
+      description: "传送到指定地点"
+      type: "消耗品"
+      effect_type: "特殊效果"
+
     - item_id: "heal_potion"
       name: "回春散"
-      description: "恢复少量生命值（+50HP）"
+      description: "恢复少量生命值（+30HP）"
       type: "消耗品"
       effect_type: "恢复生命"
-      effect_params: {"value": 50}
+      effect_params: {"value": 30}
+
       
     - item_id: "spirit_herb"
       name: "凝神草"
@@ -23,7 +30,7 @@ items:
 
   materials:  # 材料类
     - item_id: "spirit_stone"
-      name: "灵石"
+      name: "传送卷"
       description: "修炼用的基础材料"
       type: "材料"
 

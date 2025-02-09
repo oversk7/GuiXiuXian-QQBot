@@ -33,7 +33,7 @@ async def init_db():
     from ..models.item import Item
     async with AsyncSessionLocal() as session:
         result = await session.execute(select(Item))
-        if not result.scalars().first():  # 仅当没有物品时加载
+        if not result.scalars().first() or True:  # 仅当没有物品时加载
             print("🔄 正在加载物品配置...")
             items_data = []
             # 合并所有分类的物品

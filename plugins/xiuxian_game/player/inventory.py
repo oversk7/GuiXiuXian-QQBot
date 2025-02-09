@@ -9,40 +9,9 @@ from ..utils import create_rich_message, paginate_items
 from sqlalchemy import select
 from .. import config
 
-inventory_cmd = on_command("背包", aliases={"查看背包"}, block=True, priority=5)
+inventory_cmd = on_command("背包", block=True, priority=5)
 use_item = on_command("使用物品", block=True, priority=5)
-item_detail = on_command("查背包", aliases={"查看物品"}, block=True, priority=5)
-
-@inventory_cmd.handle()
-async def handle_inventory(event: MessageEvent, args: Message = CommandArg()):
-    page = args.extract_plain_text().strip()
-    try:
-        page = int(page) if page else 1
-    except ValueError:
-        page = 1
-
-    async with safe_session() as session:
-        # 获取玩家背包数据
-        player = await session.get(Player, event.get_user_id())
-        if not player:
-            await inventory_cmd.finish("⛔ 请先创建角色")
-
-        result = await session.execute(
-            select(Inventory)
-            .where(Inventory.player_id == event.get_user_id())
-            .order_by(Inventory.item_id)
-        )
-        items = result.scalars().all()
-
-        if not items:
-            await inventory_cmd.finish("🎒 你的背包空无一物")
-
-        # 分页处理
-        total_pages = (len(items) - 1) // 10 + 1
-        page = max(1, min(page, total_pages))
-        
-        formatted = await paginate_items(items, page)
-        await inventory_cmd.finish(create_rich_message(formatted, event))
+item_detail = on_command("查背包", block=True, priority=5)
 
 @use_item.handle()
 async def handle_use_item(event: MessageEvent, args: Message = CommandArg()):
@@ -89,7 +58,6 @@ async def handle_use_item(event: MessageEvent, args: Message = CommandArg()):
                 player.hp = min(player.max_hp, player.hp + item.effect_params["value"] * quantity)
             elif item.effect_type == ItemEffectType.RESTORE_MP:
                 player.mp = min(player.max_mp, player.mp + item.effect_params["value"] * quantity)
-            
             # 更新背包数量
             inventory.quantity -= quantity
             if inventory.quantity <= 0:
@@ -103,6 +71,37 @@ async def handle_use_item(event: MessageEvent, args: Message = CommandArg()):
                                  f"当前理智：{player.mp}/{player.max_mp} 🧠")
         else:
             await use_item.finish("⛔ 该物品无法直接使用")
+
+@inventory_cmd.handle()
+async def handle_inventory(event: MessageEvent, args: Message = CommandArg()):
+    page = args.extract_plain_text().strip()
+    try:
+        page = int(page) if page else 1
+    except ValueError:
+        page = 1
+
+    async with safe_session() as session:
+        # 获取玩家背包数据
+        player = await session.get(Player, event.get_user_id())
+        if not player:
+            await inventory_cmd.finish("⛔ 请先创建角色")
+
+        result = await session.execute(
+            select(Inventory)
+            .where(Inventory.player_id == event.get_user_id())
+            .order_by(Inventory.item_id)
+        )
+        items = result.scalars().all()
+
+        if not items:
+            await inventory_cmd.finish("🎒 你的背包空无一物")
+
+        # 分页处理
+        total_pages = (len(items) - 1) // 10 + 1
+        page = max(1, min(page, total_pages))
+        
+        formatted = await paginate_items(items, page)
+        await inventory_cmd.finish(create_rich_message(formatted, event))
 
 @item_detail.handle()
 async def handle_item_detail(event: MessageEvent, args: Message = CommandArg()):

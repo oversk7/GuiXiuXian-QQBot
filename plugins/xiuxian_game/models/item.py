@@ -12,6 +12,8 @@ class ItemEffectType(str, PyEnum):
     RESTORE_HP = "恢复生命"
     RESTORE_MP = "恢复理智"
     BUFF = "增益效果"
+    SPECIAL = "特殊效果"
+
 
 class Item(BaseModel):
     __tablename__ = "items"
