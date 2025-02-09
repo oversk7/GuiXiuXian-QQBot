@@ -28,12 +28,12 @@ async def init_db():
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
         
-    # 加载物品配置（只在空数据库时加载）
+    # 加载物品配置
     from ..config import config
     from ..models.item import Item
     async with AsyncSessionLocal() as session:
         result = await session.execute(select(Item))
-        if not result.scalars().first():
+        if not result.scalars().first() or True:
             print("🔄 正在加载物品配置...")
             items_data = []
             # 合并所有分类的物品
