@@ -31,6 +31,7 @@ async def handle_cultivate(event: MessageEvent):
         # 冷却时间检查
         if player.last_cultivation and (datetime.now() - player.last_cultivation).seconds < cfg["cool_down"]:
             remaining = cfg["cool_down"] - (datetime.now() - player.last_cultivation).seconds
+
             await cultivate.finish(f"🕒 修炼调息中...（冷却剩余 {remaining//60}分{remaining%60}秒）")
         
         k = 5 if player.level <= 10 else 2
@@ -110,9 +111,11 @@ async def handle_breakthrough(event: MessageEvent):
         msg = (
                     f"✨ 突破成功！Lv.{player.level}→Lv.{player.level+1} ✨\n"
                     f"▫️ 获得属性点：+{config.game_config['game']['points_per_level']}✨"
+                    f"▫️ 剩余修为：{player.exp}"
                 )
         if player.level < cfg_break["change_level"]:
             player.exp -= required_exp
+
             player.level += 1
             player.attribute_points += config.game_config["game"]["points_per_level"]
         else:
