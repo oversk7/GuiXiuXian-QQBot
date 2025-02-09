@@ -1,0 +1,36 @@
+items:
+  consumables:  # 消耗品类
+    - item_id: "heal_potion"
+      name: "回春散"
+      description: "恢复少量生命值（+50HP）"
+      type: "消耗品"
+      effect_type: "恢复生命"
+      effect_params: {"value": 50}
+      
+    - item_id: "spirit_herb"
+      name: "凝神草"
+      description: "恢复少量理智值（+30MP）"
+      type: "消耗品"
+      effect_type: "恢复理智"
+      effect_params: {"value": 30}
+
+    - item_id: "elixir"
+      name: "九转金丹"
+      description: "瞬间恢复全部生命和理智"
+      type: "消耗品"
+      effect_type: "BUFF"
+      effect_params: {"hp": 100, "mp": 100}
+
+  materials:  # 材料类
+    - item_id: "spirit_stone"
+      name: "灵石"
+      description: "修炼用的基础材料"
+      type: "材料"
+
+  equipments:  # 装备类
+    - item_id: "weapon"
+      name: "武器"
+      description: "增加攻击力"
+      type: "装备"
+      effect_type: "增加攻击力"
+      effect_params: {"value": 10}

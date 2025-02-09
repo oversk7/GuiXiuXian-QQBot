@@ -65,3 +65,20 @@ async def generate_exp_table(max_level: int = 100) -> str:
     return str(output_path)
 
 
+async def paginate_items(items: list, page: int, page_size: int = 10) -> str:
+    """分页格式化背包物品"""
+    start = (page - 1) * page_size
+    end = start + page_size
+    current_page_items = items[start:end]
+    
+    lines = []
+    for idx, item in enumerate(current_page_items, start=1):
+        lines.append(
+            f"{idx}. {item.item.name} ✖️{item.quantity}\n"
+            f"   📝{item.item.description} [类型：{item.item.type.value}]"
+        )
+    
+    page_info = f"\n📖 第 {page} 页（共 {len(items)//page_size + 1} 页）"
+    return "🎒 你的背包\n" + "\n\n".join(lines) + page_info
+
+
