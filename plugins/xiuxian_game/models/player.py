@@ -43,7 +43,7 @@ class Player(BaseModel):
 
     
 
-async def get_player(uid: str):
+async def get_player_by_uid(uid: str):
     from sqlalchemy import select
     from ..data.db import get_session
     

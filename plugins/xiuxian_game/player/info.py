@@ -5,7 +5,7 @@ from ..data.db import safe_session
 from ..models.player import Player
 from sqlalchemy import select, func
 from ..models.player import Gender
-from ..utils import create_rich_message
+from ..utils import create_rich_message, calculate_level_up_exp
 
 profile = on_command("角色",aliases={"面板","状态"}, block=True, priority=5)
 register = on_command("注册", block=True, priority=5)
@@ -14,11 +14,8 @@ register = on_command("注册", block=True, priority=5)
 @profile.handle()
 async def _(event: MessageEvent):
     async with safe_session() as session:
-        result = await session.execute(
-            select(Player).where(Player.id == event.get_user_id())
-        )
-        player = result.scalars().first()
-    
+        player = await session.get(Player, event.get_user_id())
+
     if not player:
         await profile.finish("⛔ 你还没有创建角色")
     
@@ -26,7 +23,7 @@ async def _(event: MessageEvent):
 ┌─── 诡修面板 ───
 │ {player.nickname}[UID:{player.uid}]「{player.sex}」
 ├───────────
-│ Lv.{player.level} Exp：{player.exp}
+│ Lv.{player.level} Exp：{player.exp}/{calculate_level_up_exp(player.level)}
 │ 生命：{player.hp}/{player.max_hp} ❤️
 │ 理智：{player.mp}/{player.max_mp} 🧠
 │ 位置：{player.position} 

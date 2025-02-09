@@ -1,14 +1,22 @@
 from pydantic_settings import BaseSettings
-import os
+from pathlib import Path
 import yaml
-
-class GameConfig(BaseSettings):
-    max_level: int = 100
-    exp_curve: list = [10, 20, 40, 80, 160]
-
-class CultivateConfig(BaseSettings):
-    base_exp: int = 10
-    cooldown: int = 3600
+from functools import lru_cache
 
 class Config(BaseSettings):
-    cultivate: CultivateConfig = CultivateConfig()
+    data_dir: Path = Path(__file__).parent / "data"
+    config_file: Path = data_dir / "config.yaml"
+    
+    @property
+    def game_config(self) -> dict:
+        """获取游戏配置"""
+        return _load_config(self.config_file)
+
+@lru_cache(maxsize=None)
+def _load_config(config_file: Path) -> dict:
+    """独立配置加载函数"""
+    if not config_file.exists():
+        raise FileNotFoundError(f"配置文件 {config_file} 不存在")
+    with open(config_file, "r", encoding="utf8") as f:
+        return yaml.safe_load(f)
+        
