@@ -14,6 +14,7 @@ __plugin_meta__ = PluginMetadata(
 # 注册子模块
 from . import (
     player,
+    cultivate,
     # battle,
     # dungeon,
     # economy,

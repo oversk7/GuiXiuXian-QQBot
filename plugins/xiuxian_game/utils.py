@@ -1,9 +1,7 @@
 from nonebot.adapters.onebot.v11 import Message, MessageSegment, MessageEvent
 from typing import Optional
-from .config import Config
+from .config import config
 
-# 创建全局配置实例
-config = Config()
 
 def create_rich_message(content: str, event: Optional[MessageEvent] = None) -> Message:
     """
@@ -28,10 +26,42 @@ def calculate_level_up_exp(current_level: int) -> int:
     
     if current_level < curve["curve_change_level"]:
         # 前期：一次函数
-        return int(base + current_level * curve["early_multiplier"])
+        return int(base + (current_level-1) * curve["early_multiplier"])
     else:
         # 后期：二次函数
         level_diff = current_level - curve["curve_change_level"]
-        return int(base + (level_diff ** 2) * curve["late_multiplier"])
+        return int(calculate_level_up_exp(curve["curve_change_level"]-1) + (level_diff ** 1.8) * curve["late_multiplier"])
+
+
+
+async def generate_exp_table(max_level: int = 100) -> str:
+    """
+    生成经验表格并保存到文件
+    返回文件路径
+    """
+    import csv
+    from pathlib import Path
+    
+    cfg = config.game_config["game"]
+    table = []
+    total_exp = 0
+    
+    for level in range(1, max_level + 1):
+        required = calculate_level_up_exp(level)
+        total_exp += required
+        table.append({
+            "等级": level,
+            "升级所需经验": required,
+            "累计总经验": total_exp
+        })
+    
+    # 确保数据目录存在
+    output_path = config.data_dir / "level_exp_table.csv"
+    with open(output_path, "w", newline="", encoding="utf8") as f:
+        writer = csv.DictWriter(f, fieldnames=["等级", "升级所需经验", "累计总经验"])
+        writer.writeheader()
+        writer.writerows(table)
+    
+    return str(output_path)
 
 

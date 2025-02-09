@@ -19,4 +19,6 @@ def _load_config(config_file: Path) -> dict:
         raise FileNotFoundError(f"配置文件 {config_file} 不存在")
     with open(config_file, "r", encoding="utf8") as f:
         return yaml.safe_load(f)
+    
+config = Config()
         

@@ -5,11 +5,20 @@ game:
   points_per_level: 5  # 每次升级获得的属性点数
   exp_curve:
     early_multiplier: 100
-    late_multiplier: 80
+    late_multiplier: 50
     curve_change_level: 15
-  attributes_base:
-    max_hp: 10    # 体 (max_hp) 基础增量
-    max_mp: 10    # 智 (max_mp) 基础增量
-    attack: 10     # 力 (attack) 基础增量
-    defense: 8    # 防 (defense) 基础增量
-    agility: 2    # 敏 (agility) 基础增量
+
+
+# 修炼基础配置
+cultivate:
+    cool_down: 300  # 冷却时间（秒）
+    base_exp: 50   # 基础经验值
+    breakthrough:
+        change_level: 50  # 多高等级之后才可能失败
+        fail_keep_ratio: 0.7  # 失败保留经验比例
+    attributes_base:
+        max_hp: 10    # 体 (max_hp) 基础增量
+        max_mp: 10    # 智 (max_mp) 基础增量
+        attack: 10     # 力 (attack) 基础增量
+        defense: 8    # 防 (defense) 基础增量
+        agility: 2    # 敏 (agility) 基础增量
