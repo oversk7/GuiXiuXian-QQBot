@@ -11,8 +11,11 @@ import random
 
 cfg = config.game_config["cultivate"]
 cultivate = on_command("修炼", block=True, priority=5)
+seclusion = on_command("闭关", block=True, priority=5)
+out_seclusion = on_command("出关", block=True, priority=5)
 breakthrough = on_command("突破", block=True, priority=5)
 assign_points = on_command("加点",aliases={"分配"}, block=True, priority=5)
+
 
 
 @cultivate.handle()
@@ -42,6 +45,46 @@ async def handle_cultivate(event: MessageEvent):
         await session.commit()
         
         await cultivate.finish(f"🌀 运转周天完毕 🌀\n▫️ 获得修为：+{exp_gain}\n▫️ 当前经验：{player.exp}/{calculate_level_up_exp(player.level)}")
+
+@seclusion.handle()
+async def handle_seclusion(event: MessageEvent):
+    """闭关逻辑"""
+    user_id = event.get_user_id()
+    async with safe_session() as session:
+        player = await session.get(Player, user_id)
+        if not player:
+            await seclusion.finish("⛔ 请先使用【注册】命令创建角色")
+
+        if player.is_secluded:
+            await seclusion.finish("⛔ 你已经在闭关中")
+
+        player.is_secluded = True
+        player.seclusion_start_time = datetime.now()
+        session.add(player)
+        await session.commit()
+        await seclusion.finish(f"🏜️ {player.nickname} 进入闭关状态！")
+
+@out_seclusion.handle()
+async def handle_out_seclusion(event: MessageEvent):
+    """出关逻辑"""
+    user_id = event.get_user_id()
+    async with safe_session() as session:
+        player = await session.get(Player, user_id)
+        if not player:
+            await out_seclusion.finish("⛔ 请先使用【注册】命令创建角色")
+
+        if not player.is_secluded:
+            await out_seclusion.finish("⛔ 你不在闭关状态")
+
+        player.is_secluded = False
+        k = 5 if player.level <= 10 else 2
+        base_gain = cfg["base_exp"] * (1 + player.level / k)
+        exp_gain = (datetime.now() - player.seclusion_start_time).seconds / cfg["cool_down"] * base_gain * 0.6
+        player.exp += int(exp_gain)
+
+        session.add(player)
+        await session.commit()
+        await out_seclusion.finish(f"🏜️ {player.nickname} 出关成功！\n▫️ 共获得修为：+{exp_gain}\n▫️ 当前经验：{player.exp}/{calculate_level_up_exp(player.level)}")
 
 @breakthrough.handle()
 async def handle_breakthrough(event: MessageEvent):
