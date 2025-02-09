@@ -7,6 +7,7 @@ game:
     early_multiplier: 100
     late_multiplier: 50
     curve_change_level: 15
+  inventory_page_size: 10  # 背包每页显示物品数量
 
 
 # 修炼基础配置

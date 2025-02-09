@@ -7,9 +7,11 @@ from ..models.item import Inventory, Item
 from ..models.item import ItemType, ItemEffectType
 from ..utils import create_rich_message, paginate_items
 from sqlalchemy import select
+from .. import config
 
 inventory_cmd = on_command("背包", aliases={"查看背包"}, block=True, priority=5)
 use_item = on_command("使用物品", block=True, priority=5)
+item_detail = on_command("查背包", aliases={"查看物品"}, block=True, priority=5)
 
 @inventory_cmd.handle()
 async def handle_inventory(event: MessageEvent, args: Message = CommandArg()):
@@ -100,4 +102,67 @@ async def handle_use_item(event: MessageEvent, args: Message = CommandArg()):
                                  f"当前生命：{player.hp}/{player.max_hp} ❤️\n"
                                  f"当前理智：{player.mp}/{player.max_mp} 🧠")
         else:
-            await use_item.finish("⛔ 该物品无法直接使用") 
+            await use_item.finish("⛔ 该物品无法直接使用")
+
+@item_detail.handle()
+async def handle_item_detail(event: MessageEvent, args: Message = CommandArg()):
+    params = args.extract_plain_text().strip().split()
+    if len(params) != 2:
+        await item_detail.finish("⛔ 格式错误，正确格式：查背包 [页码] [序号]\n例：查背包 1 3")
+
+    try:
+        page = int(params[0])
+        index = int(params[1])
+        if page < 1 or index < 1:
+            raise ValueError
+    except ValueError:
+        await item_detail.finish("⛔ 页码和序号必须为正整数")
+
+    async with safe_session() as session:
+        # 获取玩家背包数据
+        player = await session.get(Player, event.get_user_id())
+        if not player:
+            await item_detail.finish("⛔ 请先创建角色")
+
+        result = await session.execute(
+            select(Inventory)
+            .where(Inventory.player_id == event.get_user_id())
+            .order_by(Inventory.item_id)
+        )
+        items = result.scalars().all()
+
+        if not items:
+            await item_detail.finish("🎒 你的背包空无一物")
+
+        # 从配置获取分页大小
+        page_size = config.game_config["game"]["inventory_page_size"]
+        total_pages = (len(items) - 1) // page_size + 1
+        
+        if page > total_pages:
+            await item_detail.finish(f"⛔ 最大页码为 {total_pages}")
+
+        start_idx = (page - 1) * page_size
+        end_idx = start_idx + page_size
+        page_items = items[start_idx:end_idx]
+
+        if index > len(page_items):
+            await item_detail.finish(f"⛔ 该页只有 {len(page_items)} 个物品")
+
+        target_item = page_items[index - 1].item
+        effect_info = ""
+        if target_item.effect_type and target_item.effect_params:
+            effects = {
+                "恢复生命": f"❤️ 恢复 {target_item.effect_params.get('value', 0)}点生命",
+                "恢复理智": f"🧠 恢复 {target_item.effect_params.get('value', 0)}点理智",
+                "增益效果": "✨ " + " ".join([f"{k}+{v}" for k,v in target_item.effect_params.items()])
+            }
+            effect_info = f"\n🔮 效果：{effects.get(target_item.effect_type.value, '特殊效果')}"
+
+        msg = (
+            f"📦 物品详情 [{page}-{index}]\n"
+            f"▫️ 名称：{target_item.name}\n"
+            f"▫️ 类型：{target_item.type.value}\n"
+            f"▫️ 描述：{target_item.description or '暂无描述'}"
+            f"{effect_info}"
+        )
+        await item_detail.finish(create_rich_message(msg, event)) 

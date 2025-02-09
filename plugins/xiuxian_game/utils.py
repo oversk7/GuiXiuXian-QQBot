@@ -65,11 +65,19 @@ async def generate_exp_table(max_level: int = 100) -> str:
     return str(output_path)
 
 
-async def paginate_items(items: list, page: int, page_size: int = 10) -> str:
+async def paginate_items(items: list, page: int, page_size: Optional[int] = None) -> str:
     """分页格式化背包物品"""
+    # 从配置获取分页大小
+    cfg_page_size = config.game_config["game"]["inventory_page_size"]
+    page_size = page_size or cfg_page_size
+    
     start = (page - 1) * page_size
     end = start + page_size
     current_page_items = items[start:end]
+    
+    # 计算总页数时使用实际分页大小
+    total_pages = (len(items) - 1) // page_size + 1
+    page_info = f"\n📖 第 {page} 页（共 {total_pages} 页）"
     
     lines = []
     for idx, item in enumerate(current_page_items, start=1):
@@ -78,7 +86,6 @@ async def paginate_items(items: list, page: int, page_size: int = 10) -> str:
             f"   📝{item.item.description} [类型：{item.item.type.value}]"
         )
     
-    page_info = f"\n📖 第 {page} 页（共 {len(items)//page_size + 1} 页）"
     return "🎒 你的背包\n" + "\n\n".join(lines) + page_info
 
 
