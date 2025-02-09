@@ -5,7 +5,7 @@ from typing import AsyncGenerator
 from contextlib import asynccontextmanager
 import asyncio
 from sqlalchemy.exc import SQLAlchemyError
-from sqlalchemy import select
+from sqlalchemy import select, delete
 
 
 engine = create_async_engine(
@@ -33,14 +33,17 @@ async def init_db():
     from ..models.item import Item
     async with AsyncSessionLocal() as session:
         result = await session.execute(select(Item))
-        if not result.scalars().first() or True:
+        if not result.scalars().first():  # 仅当没有物品时加载
             print("🔄 正在加载物品配置...")
             items_data = []
             # 合并所有分类的物品
             for category in config.items_config["items"].values():
                 items_data.extend(category)
             
-            # 加载后立即释放内存
+            # 先清空现有数据
+            await session.execute(delete(Item))
+            
+            # 批量插入新数据
             for item_data in items_data:
                 session.add(Item(**item_data))
             await session.commit()
