@@ -79,8 +79,10 @@ async def handle_out_seclusion(event: MessageEvent):
         player.is_secluded = False
         k = 5 if player.level <= 10 else 2
         base_gain = cfg["base_exp"] * (1 + player.level / k)
-        exp_gain = (datetime.now() - player.seclusion_start_time).seconds / cfg["cool_down"] * base_gain * 0.6
-        player.exp += int(exp_gain)
+        delta_time = (datetime.now() - player.seclusion_start_time).seconds
+        delta_time = delta_time if delta_time < 7 * 3600 else 7 * 3600
+        exp_gain = int(delta_time / cfg["cool_down"] * base_gain * 0.5)
+        player.exp += exp_gain
 
         session.add(player)
         await session.commit()
