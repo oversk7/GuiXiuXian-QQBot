@@ -107,22 +107,26 @@ async def handle_breakthrough(event: MessageEvent):
                 f"💢 修为不足！\n"
                 f"▫️ 需要修为：{player.exp}/{required_exp}"
             )
-        # 突破成功
-        msg = (
-                    f"✨ 突破成功！Lv.{player.level}→Lv.{player.level+1} ✨\n"
-                    f"▫️ 获得属性点：+{config.game_config['game']['points_per_level']}✨"
-                    f"▫️ 剩余修为：{player.exp}"
-                )
+
         if player.level < cfg_break["change_level"]:
             player.exp -= required_exp
-
             player.level += 1
             player.attribute_points += config.game_config["game"]["points_per_level"]
+            msg = (
+                f"✨ 突破成功！Lv.{player.level-1}→Lv.{player.level} ✨\n"
+                f"▫️ 获得属性点：+{config.game_config['game']['points_per_level']}✨\n"
+                f"▫️ 剩余修为：{player.exp}"
+            )
         else:
             if random.random() <= 0.8:
                 player.exp -= required_exp
                 player.level += 1
                 player.attribute_points += config.game_config["game"]["points_per_level"]
+                msg = (
+                    f"✨ 突破成功！Lv.{player.level-1}→Lv.{player.level} ✨\n"
+                    f"▫️ 获得属性点：+{config.game_config['game']['points_per_level']}✨\n"
+                    f"▫️ 剩余修为：{player.exp}"
+                )
             else:
                 # 突破失败
                 player.exp = round(player.exp * cfg_break["fail_keep_ratio"])

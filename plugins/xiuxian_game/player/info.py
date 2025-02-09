@@ -60,7 +60,7 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
         max_uid_result = await session.execute(
             select(func.max(Player.uid))
         )
-        max_uid = max_uid_result.scalar() or 100
+        max_uid = max_uid_result.scalar() or 99
         
         new_player = Player(
             id=event.get_user_id(),
@@ -75,6 +75,5 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
         content = f"""
         😇恭喜你踏上诡修之路！
         ▫️ 道号：{nickname}[UID:{new_player.uid}]「{new_player.sex}」
-        ▫️ 初始物品：回春散×3 凝神草×3
         """
         await register.finish(create_rich_message(content, event))
