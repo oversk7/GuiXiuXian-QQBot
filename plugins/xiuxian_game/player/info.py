@@ -5,8 +5,9 @@ from ..data.db import safe_session
 from ..models.player import Player
 from sqlalchemy import select, func
 from ..models.player import Gender
+from ..utils import create_rich_message
 
-profile = on_command("角色", block=True, priority=5)
+profile = on_command("角色",aliases={"面板","状态"}, block=True, priority=5)
 register = on_command("注册", block=True, priority=5)
 
 
@@ -36,7 +37,7 @@ async def _(event: MessageEvent):
 │ 金币：{player.gold}  | 属性点：{player.attribute_points}✨
 └───────────
 """
-    await profile.finish(content)
+    await profile.finish(create_rich_message(content, event))
 
 @register.handle()
 async def _(event: MessageEvent, args: Message = CommandArg()):
@@ -78,4 +79,4 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
         😇恭喜你踏上诡修之路！
         ▫️ 道号：{nickname}[UID:{new_player.uid}]「{new_player.sex}」
         """
-        await register.finish(content)
+        await register.finish(create_rich_message(content, event))
