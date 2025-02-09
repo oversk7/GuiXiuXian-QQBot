@@ -30,9 +30,10 @@ items:
 
   materials:  # 材料类
     - item_id: "spirit_stone"
-      name: "传送卷"
+      name: "灵石"
       description: "修炼用的基础材料"
       type: "材料"
+
 
   equipments:  # 装备类
     - item_id: "weapon"
