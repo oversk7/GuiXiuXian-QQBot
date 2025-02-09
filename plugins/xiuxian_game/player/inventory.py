@@ -159,7 +159,7 @@ async def handle_item_detail(event: MessageEvent, args: Message = CommandArg()):
             effect_info = f"\n🔮 效果：{effects.get(target_item.effect_type.value, '特殊效果')}"
 
         msg = (
-            f"📦 物品详情 [{page}-{index}]\n"
+            f"📦 物品详情 [页{page}-{index}]\n"
             f"▫️ 名称：{target_item.name}\n"
             f"▫️ 类型：{target_item.type.value}\n"
             f"▫️ 描述：{target_item.description or '暂无描述'}"
