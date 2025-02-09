@@ -12,7 +12,7 @@ class Player(BaseModel):
     __tablename__ = "player"
     
     id: Mapped[str] = mapped_column(String(32), primary_key=True, index=True, comment="平台ID")
-    uid: Mapped[int] = mapped_column(Integer, unique=True, autoincrement=True, comment="自增UID")
+    uid: Mapped[int] = mapped_column(Integer, unique=True, comment="自增UID")
     nickname: Mapped[str] = mapped_column(String(24))
     level: Mapped[int] = mapped_column(Integer, default=1, server_default='1', comment="等级")
     sex: Mapped[Gender] = mapped_column(String(8), default=Gender.MALE, server_default='男', comment="性别")
@@ -25,7 +25,7 @@ class Player(BaseModel):
     max_mp: Mapped[int] = mapped_column(Integer, default=100, server_default='100', comment="最大理智值")
     attack: Mapped[int] = mapped_column(Integer, default=25, server_default='25', comment="攻击力")
     defense: Mapped[int] = mapped_column(Integer, default=5, server_default='5', comment="物抗")
-    fear_resistance: Mapped[int] = mapped_column(Integer, default=0, server_default='0', comment="恐惧抗性")
+    fear_resistance: Mapped[int] = mapped_column(Integer, default=0, server_default='0', comment="恐惧抗性/魔抗")
     agility: Mapped[int] = mapped_column(Integer, default=5, server_default='5', comment="敏捷")
     stamina: Mapped[int] = mapped_column(Integer, default=100, server_default='100', comment="体力")
     luck: Mapped[int] = mapped_column(Integer, default=10, server_default='10', comment="运气")

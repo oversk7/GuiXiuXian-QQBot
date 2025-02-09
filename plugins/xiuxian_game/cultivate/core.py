@@ -1,6 +1,6 @@
 from nonebot import on_command
 from nonebot.params import CommandArg
-from nonebot.adapters.qq import MessageEvent, Message
+from nonebot.adapters.onebot.v11 import MessageEvent, Message
 from sqlalchemy import select, update
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.sql import func

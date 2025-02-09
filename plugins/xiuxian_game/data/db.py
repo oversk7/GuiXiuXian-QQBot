@@ -4,6 +4,7 @@ import os
 from typing import AsyncGenerator
 from contextlib import asynccontextmanager
 import asyncio
+from sqlalchemy.exc import SQLAlchemyError
 
 
 engine = create_async_engine(
@@ -31,6 +32,18 @@ async def init_db():
 async def get_session() -> AsyncGenerator[AsyncSession, None]:
     async with AsyncSessionLocal() as session:
         yield session 
+
+@asynccontextmanager
+async def safe_session():
+    """安全会话管理器（自动回滚+资源清理）"""
+    async with AsyncSessionLocal() as session:
+        try:
+            yield session
+        except SQLAlchemyError as e:
+            await session.rollback()
+            raise e
+        finally:
+            await session.close()
 
 if __name__ == "__main__":
     asyncio.run(init_db())
