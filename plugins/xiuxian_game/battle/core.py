@@ -22,10 +22,9 @@ attack_cmd = on_command("攻击", block=True, priority=5)
 use_item_cmd = on_command("使用", block=True, priority=5)
 escape_cmd = on_command("逃跑", block=True, priority=5)
 
-# 战斗缓存结构
-_active_battles: Dict[str, 'BattleInstance'] = {}  # 战斗ID到实例的映射
-_player_battle_map: Dict[str, str] = {}  # 玩家ID到战斗ID的映射
-_BATTLE_TIMEOUT = 120  # 2分钟无操作自动结束战斗
+# 斗缓存结构
+_player_battles: Dict[str, 'BattleInstance'] = {}  # 玩家ID映射到战斗实例
+_BATTLE_TIMEOUT = 120
 
 class BattleType(PyEnum):
     SOLO = "单人战斗"
@@ -73,12 +72,12 @@ class BattleInstance:
     
     def __init__(self, battle_type: BattleType, players: List[Player], enemies: List[Dict]):
         # 生成唯一战斗ID（包含所有参与者ID的哈希）
-        participants = [p.id for p in players] + [e['id'] for e in enemies]
+        participants = [p.id for p in players]
         self.battle_id = f"battle_{hash(frozenset(participants))}_{datetime.now().timestamp()}"
         
         # 注册玩家到战斗映射
         for p in players:
-            _player_battle_map[p.id] = self.battle_id
+            _player_battles[p.id] = self  # 直接存储实例引用
         
         self.battle_type = battle_type
         self.players = [BattleActor(p) for p in players]
@@ -120,7 +119,7 @@ class BattleInstance:
                 
                 # 执行攻击
                 if act_type == 'attack':
-                    target = next((e for e in (self.players + self.enemies) if e.id == target_id), None)
+                    target = next((e for e in self.enemies if e.id == target_id), None)
                     if not target:
                         continue
                     
@@ -186,7 +185,7 @@ async def handle_battle_start(event: MessageEvent, args: Message = CommandArg())
             )
             team_member = team_member.scalars().first()
             
-            if not team_member or team_member.team.status != TeamStatus.READY:
+            if not team_member:
                 await battle_start.finish("⛔ 你还没有准备好战斗的队伍")
                 
             # 获取所有队员
@@ -198,17 +197,18 @@ async def handle_battle_start(event: MessageEvent, args: Message = CommandArg())
             members = members.scalars().all()
             
             # 生成敌人
-            enemies = [generate_enemy("精英村民", max(m.level for m in members)) 
-                      for _ in range(len(members)+1)]
+            enemies = [generate_enemy("精英怪", max(m.level for m in members)),
+                       generate_enemy("精英怪1", max(m.level for m in members)),
+                       generate_enemy("精英怪2", max(m.level for m in members)),
+                       ]
             
             battle = BattleInstance(BattleType.TEAM, members, enemies)
-            _active_battles[battle.battle_id] = battle
             await send_battle_ui(battle, event)
 
 def generate_enemy(base_name: str, level: int) -> Dict:
     """根据玩家等级生成敌人"""
     return {
-        "name": f"{base_name} Lv.{level}",
+        "name": f"{base_name}",
         "max_hp": 50 + level * 10,
         "attack": 15 + level * 2,
         "defense": 5 + level,
@@ -217,6 +217,8 @@ def generate_enemy(base_name: str, level: int) -> Dict:
 
 async def send_battle_ui(battle: BattleInstance, event: MessageEvent):
     """生成美观的战斗界面"""
+    # 启动战斗循环
+    asyncio.create_task(battle_loop(battle, event))
     enemy_info = "\n".join([
         f"👹 {e.name} ❤️ {e.hp}/{e.max_hp} | ⚡ {e.agility}"
         for e in battle.enemies
@@ -240,24 +242,66 @@ async def send_battle_ui(battle: BattleInstance, event: MessageEvent):
     )
     await battle_start.finish(create_rich_message(msg, event))
 
+async def battle_loop(battle: BattleInstance, event: MessageEvent):
+    """战斗主循环"""
+    try:
+        while True:
+            # 处理回合
+            result, report = await battle.process_turn()
+            
+            # 发送回合报告
+            await battle_start.send(report)
+            
+            # 处理战斗结果
+            if result != "continue":
+                if result == "players_win":
+                    await battle_start.send(f"🎉 战斗胜利！")
+                else:
+                    await battle_start.send("💀 战斗失败，敌人获得了胜利...")
+                
+                # 清理缓存
+                for p in battle.players:
+                    _player_battles.pop(p.id, None)
+                return
+                
+            # 重置行动记录
+            battle.actions.clear()
+            
+            # 等待5秒后进入下一回合
+            await asyncio.sleep(5)
+            
+    except asyncio.CancelledError:
+        # 清理过期的战斗
+        for p in battle.players:
+            _player_battles.pop(p.id, None)
+
 @attack_cmd.handle()
 async def handle_attack(event: MessageEvent, args: Message = CommandArg()):
     user_id = event.get_user_id()
-    battle_id = _player_battle_map.get(user_id)
+    battle = _player_battles.get(user_id)
     
-    if not battle_id or (battle := _active_battles.get(battle_id)) is None:
+    if not battle or battle.is_expired:
         await attack_cmd.finish("⛔ 你当前没有参与战斗")
-    
+    if battle.actions[user_id]:
+        return
     # 解析攻击目标
     target_name = args.extract_plain_text().strip()
-    target = next((e for e in battle.enemies if e.name == target_name), None)
-    
-    if not target:
-        await attack_cmd.finish(f"⛔ 目标不存在，可用目标：{'/'.join(e.name for e in battle.enemies)}")
-    
-    # 记录行动
-    battle.actions[user_id] = ('attack', target.id)
-    await attack_cmd.finish("✅ 攻击指令已记录，等待回合结算")
+    if not target_name:  # 当参数为空时
+
+        if len(battle.enemies) > 0:
+            target = battle.enemies[0]  # 默认选择第一个敌人
+            battle.actions[user_id] = ('attack', target.id)
+            await attack_cmd.finish(f"⚔️ 已自动锁定首个目标：{target.name}")
+        else:
+            await attack_cmd.finish("⚠️ 战场上已无敌人")
+    else:
+        target = next((e for e in battle.enemies if e.name == target_name), None)
+        if not target:
+            await attack_cmd.finish(f"⛔ 目标不存在，可用目标：{'/'.join(e.name for e in battle.enemies)}")
+        
+        # 记录行动
+        battle.actions[user_id] = ('attack', target.id)
+        await attack_cmd.finish("✅ 攻击指令已记录，等待回合结算")
 
 @use_item_cmd.handle()
 async def handle_use_item(event: MessageEvent):
