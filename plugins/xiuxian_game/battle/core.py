@@ -10,22 +10,27 @@ from ..config import config
 from ..data.db import safe_session
 from ..models.player import Player
 from ..models.item import Inventory, Item
-from ..utils import create_rich_message, parse_uid
+from ..utils import create_rich_message
 from sqlalchemy.orm import joinedload
+from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy import select
+from ..models.team import Team, TeamMember
+
+# 战斗命令
+battle_start = on_command("战斗", aliases={"挑战"}, block=True, priority=5)
+attack_cmd = on_command("攻击", block=True, priority=5)
+use_item_cmd = on_command("使用", block=True, priority=5)
+escape_cmd = on_command("逃跑", block=True, priority=5)
 
 # 战斗缓存结构
 _active_battles: Dict[str, 'BattleInstance'] = {}  # 战斗ID到实例的映射
 _player_battle_map: Dict[str, str] = {}  # 玩家ID到战斗ID的映射
 _BATTLE_TIMEOUT = 120  # 2分钟无操作自动结束战斗
 
-# 组队系统缓存
-_team_invitations: Dict[str, Dict[str, datetime]] = {}  # {发起者ID: {受邀者ID: 过期时间}}
-_active_teams: Dict[str, List[str]] = {}  # {队伍ID: [成员UID列表]}
-
 class BattleType(PyEnum):
-    SOLO = "单人PVE"
-    TEAM = "组队PVE"
-    PVP = "多人PVP"
+    SOLO = "单人战斗"
+    TEAM = "组队战斗"
+    # PVP = "PVP战斗"
 
 
 class BattleActor:
@@ -88,14 +93,18 @@ class BattleInstance:
         return (datetime.now() - self.last_active).seconds > _BATTLE_TIMEOUT
 
     async def process_turn(self):
-        """处理战斗回合（新增多人协同）"""
+        """优化后的回合处理逻辑"""
         self.turn += 1
         self.last_active = datetime.now()
         
-        # 等待所有存活玩家提交行动
-        alive_players = [p.id for p in self.players if p.hp > 0]
-        while len(self.actions) < len(alive_players):
-            await asyncio.sleep(1)
+        # 等待存活玩家提交行动（最多等待30秒）
+        try:
+            await asyncio.wait_for(
+                self._wait_for_actions(),
+                timeout=30
+            )
+        except asyncio.TimeoutError:
+            self.logs.append("🕒 回合超时，自动结算")
         
         # 按敏捷排序行动顺序
         actors = sorted(
@@ -115,134 +124,121 @@ class BattleInstance:
                     if not target:
                         continue
                     
-                    # 计算伤害
-                    damage = max(0, actor.attack - target.defense)
-                    damage = int(damage * random.uniform(0.9, 1.1))
-                    target.hp = max(0, target.hp - damage)
+                    # 计算伤害（加入暴击和闪避判定）
+                    is_crit = random.random() < (actor.luck / 1000)
+                    is_dodge = random.random() < (target.agility / 1000)
                     
-                    log = f"{actor.name} ➔ {target.name} 造成{damage}点伤害！"
+                    if is_dodge:
+                        log = f"✨ {target.name} 灵巧地躲过了攻击！"
+                    else:
+                        damage = max(0, actor.attack - target.defense)
+                        if is_crit:
+                            damage = int(damage * 1.5)
+                        damage = int(damage * random.uniform(0.9, 1.1))
+                        target.hp = max(0, target.hp - damage)
+                        
+                        crit_mark = "💥 " if is_crit else ""
+                        log = f"{crit_mark}{actor.name} ➔ {target.name} 造成{damage}点伤害！"
+                    
                     battle_log.append(log)
         
-        # 清理行动记录
-        self.actions.clear()
-        
-        # 生成回合报告
-        report = (
+        # 生成更清晰的回合报告
+        report = create_rich_message(
             f"🌀 第{self.turn}回合结算：\n" +
             "\n".join(battle_log) + "\n\n" +
             "📊 当前状态：\n" +
-            "\n".join([f"{p.name} HP: {p.hp}/{p.max_hp}" for p in self.players]) + "\n" +
-            "\n".join([f"{e.name} HP: {e.hp}/{e.max_hp}" for e in self.enemies])
+            "👥 队友状态：\n" + 
+            "\n".join([f"{p.name} ❤️ {p.hp}/{p.max_hp} | 💧 {p.mp}/{p.max_mp}" for p in self.players]) + 
+            "\n👹 敌人状态：\n" +
+            "\n".join([f"{e.name} ❤️ {e.hp}/{e.max_hp}" for e in self.enemies])
         )
         
-        # 检查战斗结果
+        # 处理战斗结果
         if all(e.hp <= 0 for e in self.enemies):
+            # 发放奖励
             return "players_win", report
         if all(p.hp <= 0 for p in self.players):
             return "enemies_win", report
         return "continue", report
 
-# 战斗命令
-battle_start = on_command("战斗", aliases={"挑战"}, block=True, priority=5)
-attack_cmd = on_command("攻击", block=True, priority=5)
-use_item_cmd = on_command("使用", block=True, priority=5)
-escape_cmd = on_command("逃跑", block=True, priority=5)
+    async def _wait_for_actions(self):
+        """等待所有存活玩家提交行动"""
+        while True:
+            alive_players = [p.id for p in self.players if p.hp > 0]
+            if len(self.actions) >= len(alive_players):
+                return
+            await asyncio.sleep(1)
 
-# 组队命令
-team_cmd = on_command("组队", block=True, priority=5)
-join_cmd = on_command("加入队伍", block=True, priority=5)
 
-class TeamStatus(PyEnum):
-    FORMING = "组队中"
-    READY = "已就绪"
-
-class BattleTeam:
-    """组队管理器"""
-    __slots__ = ['leader', 'members', 'status', 'created_at']
-    
-    def __init__(self, leader_id: str):
-        self.leader = leader_id
-        self.members = [leader_id]
-        self.status = TeamStatus.FORMING
-        self.created_at = datetime.now()
-
-# 组队处理逻辑
-@team_cmd.handle()
-async def handle_team(event: MessageEvent, args: Message = CommandArg()):
-    """组队命令示例：组队邀请 100"""
-    args_text = args.extract_plain_text().strip()
-    user_id = event.get_user_id()
-    uid = args_text
-    
-    # 创建/更新邀请
-    _team_invitations.setdefault(user_id, {})
-    _team_invitations[user_id][uid] = datetime.now() + timedelta(minutes=5)
-
-    await team_cmd.finish(f"📨 已向玩家{uid}发送组队邀请，有效期5分钟")
-
-@join_cmd.handle()
-async def handle_join(event: MessageEvent, args: Message = CommandArg()):
-    """加入队伍 发起者UID"""
-    inviter_uid = parse_uid(args.extract_plain_text().strip())
-    user_id = event.get_user_id()
-    
-    if not inviter_uid or inviter_uid not in _team_invitations:
-        await join_cmd.finish("⛔ 无效的邀请码或邀请已过期")
-    
-    # 检查是否被邀请
-    if user_id not in _team_invitations[inviter_uid]:
-        await join_cmd.finish("⛔ 你没有收到该玩家的组队邀请")
-    
-    # 加入队伍
-    if inviter_uid not in _active_teams:
-        _active_teams[inviter_uid] = [inviter_uid]
-    _active_teams[inviter_uid].append(user_id)
-    
-    # 删除邀请
-    del _team_invitations[inviter_uid][user_id]
-    
-    await join_cmd.finish(f"🎉 成功加入{inviter_uid}的队伍！当前成员：{'、'.join(_active_teams[inviter_uid])}")
-
-# 修改战斗开始逻辑
+# 优化战斗开始逻辑
 @battle_start.handle()
-async def start_team_battle(event: MessageEvent):
+async def handle_battle_start(event: MessageEvent, args: Message = CommandArg()):
+    arg = args.extract_plain_text().strip()
     user_id = event.get_user_id()
-    
-    # 检查是否队长
-    if user_id not in _active_teams or _active_teams[user_id][0] != user_id:
-        await battle_start.finish("⛔ 只有队长可以开始战斗")
     
     async with safe_session() as session:
-        # 加载所有队员数据
-        members = await session.query(Player).filter(
-            Player.id.in_(_active_teams[user_id])
-        ).options(joinedload(Player.inventory)).all()
-        
-        # 生成敌人（根据队伍人数动态调整）
-        enemy_count = max(2, len(members))
-        enemies = [{
-            "name": f"变异村民#{i+1}",
-            "max_hp": 80,
-            "attack": 20,
-            "defense": 8,
-            "agility": 5
-        } for i in range(enemy_count)]
-        
-        # 创建战斗实例
-        battle = BattleInstance(BattleType.TEAM, members, enemies)
-        _active_battles[battle.battle_id] = battle
-        
-        # 生成战斗界面
-        enemy_status = "\n".join([f"{e.name} HP: {e.hp}/{e.max_hp}" for e in battle.enemies])
-        member_status = "\n".join([f"{m.name} HP: {m.hp}/{m.max_hp}" for m in battle.players])
-        
-        msg = (
-            f"⚔️ 团队战斗开始！\n"
-            f"👥 队友：\n{member_status}\n"
-            f"👹 敌人：\n{enemy_status}\n"
-            f"请使用【攻击 目标】或【使用 道具】指令"
-        )
-        await battle_start.finish(create_rich_message(msg, event))
+        if arg == "组队":
+            # 获取用户所在的队伍
+            team_member = await session.execute(
+                select(TeamMember)
+                .where(TeamMember.player_id == user_id)
+                .options(joinedload(TeamMember.team))
+            )
+            team_member = team_member.scalars().first()
+            
+            if not team_member or team_member.team.status != TeamStatus.READY:
+                await battle_start.finish("⛔ 你还没有准备好战斗的队伍")
+                
+            # 获取所有队员
+            members = await session.execute(
+                select(Player)
+                .join(TeamMember, TeamMember.player_id == Player.id)
+                .where(TeamMember.team_id == team_member.team.id)
+            )
+            members = members.scalars().all()
+            
+            # 生成敌人
+            enemies = [generate_enemy("精英村民", max(m.level for m in members)) 
+                      for _ in range(len(members)+1)]
+            
+            battle = BattleInstance(BattleType.TEAM, members, enemies)
+            _active_battles[battle.battle_id] = battle
+            await send_battle_ui(battle, event)
+
+def generate_enemy(base_name: str, level: int) -> Dict:
+    """根据玩家等级生成敌人"""
+    return {
+        "name": f"{base_name} Lv.{level}",
+        "max_hp": 50 + level * 10,
+        "attack": 15 + level * 2,
+        "defense": 5 + level,
+        "agility": 3 + level // 2
+    }
+
+async def send_battle_ui(battle: BattleInstance, event: MessageEvent):
+    """生成美观的战斗界面"""
+    enemy_info = "\n".join([
+        f"👹 {e.name} ❤️ {e.hp}/{e.max_hp} | ⚡ {e.agility}"
+        for e in battle.enemies
+    ])
+    player_info = "\n".join([
+        f"👤 {p.name} ❤️ {p.hp}/{p.max_hp} | 💧 {p.mp}/{p.max_mp}"
+        for p in battle.players
+    ])
+    
+    msg = (
+        f"⚔️ {'组队' if battle.battle_type == BattleType.TEAM else '单人'}战斗开始！\n"
+        f"------------------------\n"
+        f"{player_info}\n"
+        f"------------------------\n"
+        f"VS\n"
+        f"------------------------\n"
+        f"{enemy_info}\n"
+        f"------------------------\n"
+        f"可用指令：\n"
+        f"攻击 敌人名称 | 使用 道具名 | 逃跑"
+    )
+    await battle_start.finish(create_rich_message(msg, event))
 
 @attack_cmd.handle()
 async def handle_attack(event: MessageEvent, args: Message = CommandArg()):
@@ -268,29 +264,3 @@ async def handle_use_item(event: MessageEvent):
     # 调用现有背包系统
     async with safe_session() as session:
         inventory = await session.get(Inventory, event.get_user_id())
-
-# 清理过期战斗
-async def clean_expired_battles():
-    while True:
-        await asyncio.sleep(300)
-
-        expired_battles = [b for b in _active_battles.values() if b.is_expired]
-        for battle in expired_battles:
-            # 清理玩家映射
-            for p in battle.players:
-                if p.id in _player_battle_map:
-                    del _player_battle_map[p.id]
-            # 清理战斗实例
-            del _active_battles[battle.battle_id]
-
-# 清理过期邀请的定时任务
-async def clean_expired_invites():
-    while True:
-        await asyncio.sleep(60)
-        now = datetime.now()
-        for leader in list(_team_invitations.keys()):
-            expired = [uid for uid, t in _team_invitations[leader].items() if t < now]
-            for uid in expired:
-                del _team_invitations[leader][uid]
-            if not _team_invitations[leader]:
-                del _team_invitations[leader]
