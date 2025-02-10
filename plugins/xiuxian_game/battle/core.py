@@ -1,4 +1,4 @@
-from nonebot import on_command
+from nonebot import on_command, get_bot
 from nonebot.adapters.onebot.v11 import MessageEvent, Message
 from nonebot.params import CommandArg
 from typing import Dict, Any, List, Optional
@@ -12,7 +12,6 @@ from ..models.player import Player
 from ..models.item import Inventory, Item
 from ..utils import create_rich_message
 from sqlalchemy.orm import joinedload
-from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 from ..models.team import Team, TeamMember
 
@@ -22,7 +21,7 @@ attack_cmd = on_command("攻击", block=True, priority=5)
 use_item_cmd = on_command("使用", block=True, priority=5)
 escape_cmd = on_command("逃跑", block=True, priority=5)
 
-# 斗缓存结构
+# 战斗缓存结构
 _player_battles: Dict[str, 'BattleInstance'] = {}  # 玩家ID映射到战斗实例
 _BATTLE_TIMEOUT = 120
 
@@ -68,9 +67,9 @@ class BattleActor:
 class BattleInstance:
     """战斗实例管理"""
     __slots__ = ['battle_id', 'battle_type', 'players', 'enemies', 
-                'turn', 'last_active', 'actions', 'logs']
+                'turn', 'last_active', 'actions', 'logs', 'latest_event']
     
-    def __init__(self, battle_type: BattleType, players: List[Player], enemies: List[Dict]):
+    def __init__(self, battle_type: BattleType, players: List[Player], enemies: List[Dict], latest_event: MessageEvent):
         # 生成唯一战斗ID（包含所有参与者ID的哈希）
         participants = [p.id for p in players]
         self.battle_id = f"battle_{hash(frozenset(participants))}_{datetime.now().timestamp()}"
@@ -86,6 +85,7 @@ class BattleInstance:
         self.last_active = datetime.now()
         self.actions = {}
         self.logs = []
+        self.latest_event = latest_event
 
     @property
     def is_expired(self) -> bool:
@@ -202,7 +202,7 @@ async def handle_battle_start(event: MessageEvent, args: Message = CommandArg())
                        generate_enemy("精英怪2", max(m.level for m in members)),
                        ]
             
-            battle = BattleInstance(BattleType.TEAM, members, enemies)
+            battle = BattleInstance(BattleType.TEAM, members, enemies, event)
             await send_battle_ui(battle, event)
 
 def generate_enemy(base_name: str, level: int) -> Dict:
@@ -220,8 +220,8 @@ async def send_battle_ui(battle: BattleInstance, event: MessageEvent):
     # 启动战斗循环
     asyncio.create_task(battle_loop(battle, event))
     enemy_info = "\n".join([
-        f"👹 {e.name} ❤️ {e.hp}/{e.max_hp} | ⚡ {e.agility}"
-        for e in battle.enemies
+        f"{idx+1}. 👹 {e.name} ❤️ {e.hp}/{e.max_hp} | ⚡ {e.agility}"
+        for idx, e in enumerate(battle.enemies)
     ])
     player_info = "\n".join([
         f"👤 {p.name} ❤️ {p.hp}/{p.max_hp} | 💧 {p.mp}/{p.max_mp}"
@@ -238,27 +238,27 @@ async def send_battle_ui(battle: BattleInstance, event: MessageEvent):
         f"{enemy_info}\n"
         f"------------------------\n"
         f"可用指令：\n"
-        f"攻击 敌人名称 | 使用 道具名 | 逃跑"
+        f"攻击 序号 | 使用 道具名 | 逃跑"
     )
     await battle_start.finish(create_rich_message(msg, event))
 
 async def battle_loop(battle: BattleInstance, event: MessageEvent):
     """战斗主循环"""
     try:
+        bot = get_bot()
         while True:
             # 处理回合
             result, report = await battle.process_turn()
             
-            # 发送回合报告
-            await battle_start.send(report)
-            
+            # 发送回合报告到最新上下文
+            if battle.latest_event:
+                await bot.send(battle.latest_event, report)
+
             # 处理战斗结果
             if result != "continue":
-                if result == "players_win":
-                    await battle_start.send(f"🎉 战斗胜利！")
-                else:
-                    await battle_start.send("💀 战斗失败，敌人获得了胜利...")
-                
+                result_msg = "🎉 战斗胜利！" if result == "players_win" else "💀 战斗失败，敌人获得了胜利..."
+                await bot.send(battle.latest_event, result_msg)
+
                 # 清理缓存
                 for p in battle.players:
                     _player_battles.pop(p.id, None)
@@ -282,29 +282,47 @@ async def handle_attack(event: MessageEvent, args: Message = CommandArg()):
     
     if not battle or battle.is_expired:
         await attack_cmd.finish("⛔ 你当前没有参与战斗")
-    if battle.actions[user_id]:
+    if battle.actions.get(user_id, None):
         return
-    # 解析攻击目标
-    target_name = args.extract_plain_text().strip()
-    if not target_name:  # 当参数为空时
 
-        if len(battle.enemies) > 0:
-            target = battle.enemies[0]  # 默认选择第一个敌人
-            battle.actions[user_id] = ('attack', target.id)
-            await attack_cmd.finish(f"⚔️ 已自动锁定首个目标：{target.name}")
+    # 更新玩家最新消息上下文
+    battle.latest_event = event
+    
+    # 解析攻击目标（按序号）
+    arg = args.extract_plain_text().strip()
+    
+    try:
+        if not arg:  # 无参数时默认第一个
+            if not battle.enemies:
+                await attack_cmd.finish("⚠️ 战场上已无敌人")
+            target = battle.enemies[0]
         else:
-            await attack_cmd.finish("⚠️ 战场上已无敌人")
-    else:
-        target = next((e for e in battle.enemies if e.name == target_name), None)
-        if not target:
-            await attack_cmd.finish(f"⛔ 目标不存在，可用目标：{'/'.join(e.name for e in battle.enemies)}")
-        
-        # 记录行动
-        battle.actions[user_id] = ('attack', target.id)
-        await attack_cmd.finish("✅ 攻击指令已记录，等待回合结算")
+            # 尝试转换为数字序号
+            index = int(arg) - 1
+            if index < 0 or index >= len(battle.enemies):
+                raise ValueError
+            target = battle.enemies[index]
+            
+    except ValueError:
+        # 生成带序号的敌人列表提示
+        enemy_list = "\n".join([f"{i+1}. {e.name}" for i, e in enumerate(battle.enemies)])
+        await attack_cmd.finish(f"⛔ 请输入有效序号：\n{enemy_list}")
+
+    # 记录行动
+    battle.actions[user_id] = ('attack', target.id)
+    await attack_cmd.finish(f"✅ 已锁定目标 {target.name}，等待回合结算")
 
 @use_item_cmd.handle()
 async def handle_use_item(event: MessageEvent):
+    user_id = event.get_user_id()
+    battle = _player_battles.get(user_id)
+    
+    if not battle or battle.is_expired:
+        await use_item_cmd.finish("⛔ 你当前没有参与战斗")
+    
+    # 更新玩家最新消息上下文
+    battle.latest_event = event
+    
     # 调用现有背包系统
     async with safe_session() as session:
-        inventory = await session.get(Inventory, event.get_user_id())
+        inventory = await session.get(Inventory, user_id)
