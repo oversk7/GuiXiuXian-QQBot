@@ -281,6 +281,19 @@ async def handle_battle_start(event: MessageEvent, args: Message = CommandArg())
             
             battle = BattleInstance(BattleType.TEAM, members, enemies, event)
             await send_battle_ui(battle, event)
+        else:  # 单人战斗逻辑
+            # 获取当前玩家
+            player = await session.get(Player, user_id)
+            if not player:
+                await battle_start.finish("⛔ 请先创建角色后再进行战斗")
+            
+            # 生成适合玩家等级的敌人
+            enemy_level = player.level
+            enemies = [generate_enemy("试炼傀儡", enemy_level)]
+            
+            # 创建单人战斗实例
+            battle = BattleInstance(BattleType.SOLO, [player], enemies, event)
+            await send_battle_ui(battle, event)
 
 def generate_enemy(base_name: str, level: int) -> Dict:
     """根据玩家等级生成敌人（优化内存）"""
