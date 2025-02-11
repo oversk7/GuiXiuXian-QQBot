@@ -6,6 +6,7 @@ from ..models.player import Player
 from sqlalchemy import select, func
 from ..models.player import Gender
 from ..utils import create_rich_message, calculate_level_up_exp
+from datetime import datetime
 
 profile = on_command("角色",aliases={"面板","状态"}, block=True, priority=5)
 register = on_command("注册", block=True, priority=5)
@@ -66,7 +67,8 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
             id=event.get_user_id(),
             uid=max_uid + 1,
             nickname=nickname,
-            sex=gender
+            sex=gender,
+            created_at=datetime.now()
         )
         
         session.add(new_player)
@@ -74,6 +76,6 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
 
         content = f"""
         😇恭喜你踏上诡修之路！
-        ▫️ 道号：{nickname}[UID:{new_player.uid}]「{new_player.sex}」
+        道号：{nickname}[UID:{new_player.uid}]「{new_player.sex}」
         """
         await register.finish(create_rich_message(content, event))

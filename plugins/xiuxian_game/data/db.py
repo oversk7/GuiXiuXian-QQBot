@@ -9,7 +9,7 @@ from sqlalchemy import select, delete
 
 
 engine = create_async_engine(
-    "sqlite+aiosqlite:///" + os.path.join(os.path.dirname(__file__), "test.db"),
+    "sqlite+aiosqlite:///" + os.path.join(os.path.dirname(__file__), "game.db"),
     echo=False
 )
 

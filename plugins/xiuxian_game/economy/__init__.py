@@ -1,1 +1,1 @@
-from . import shop
+from . import shop, trade
