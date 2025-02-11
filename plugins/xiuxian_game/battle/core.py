@@ -314,6 +314,17 @@ async def battle_loop(battle: BattleInstance, event: MessageEvent):
 
             # 处理战斗结果
             if result != "continue":
+                async with safe_session() as session:
+                    # +++ 战斗结束前强制保存所有玩家状态 +++
+                    for actor in battle.players:
+                        player = await session.get(Player, actor.id)
+                        if player:
+                            player.hp = max(0, actor.hp)
+                            player.mp = max(0, actor.mp)
+                            session.add(player)
+                    await session.commit()
+                # +++ 保存结束 +++
+                
                 if result == "players_win":
                     # 修改后的奖励处理
                     total_exp, drops = await process_battle_rewards(battle)
