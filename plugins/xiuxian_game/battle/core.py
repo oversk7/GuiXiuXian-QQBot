@@ -647,8 +647,8 @@ team_cmd = on_command("队伍", block=True, priority=5)
 join_cmd = on_command("加入队伍", block=True, priority=5)
 disband_cmd = on_command("解散队伍", block=True, priority=5)
 leave_cmd = on_command("退出队伍", block=True, priority=5)
-kick_cmd = on_command("踢出", block=True, priority=5)
-mode_cmd = on_command("模式", block=True, priority=5)
+kick_cmd = on_command("踢出队员", block=True, priority=5)
+mode_cmd = on_command("探索模式", block=True, priority=5)
 
 # 组队系统缓存
 _team_invitations: Dict[int, Dict[str, datetime]] = {}  # {队伍ID: {受邀者ID: 过期时间}}
@@ -673,24 +673,32 @@ def _clean_expired_invitations():
 class TeamManager:
     """基于数据库的组队管理器"""
     async def create_team(self, session: AsyncSession, leader_id: str) -> Team:
-        # 检查唯一约束
-        existing = await session.execute(
+        # 检查玩家是否已经在其他队伍中
+        existing_member = await session.execute(
+            select(TeamMember).where(TeamMember.player_id == leader_id)
+        )
+        if existing_member.scalars().first():
+            raise ValueError("你已加入其他队伍，请先退出")
+
+        # 检查是否已创建过队伍
+        existing_team = await session.execute(
             select(Team).where(Team.leader_id == leader_id)
         )
-        if existing.scalars().first():
+        if existing_team.scalars().first():
             raise ValueError("每个玩家只能创建一个队伍")
         
+        # 创建新队伍
         new_team = Team(leader_id=leader_id)
         session.add(new_team)
         await session.flush()  # 获取自动生成的team_id
-        
+
         # 添加队长为成员
         session.add(TeamMember(team_id=new_team.id, player_id=leader_id))
         await session.commit()
         return new_team
 
     async def join_team(self, session: AsyncSession, team_id: int, member_id: str) -> bool:
-        # 新增检查：是否已加入其他队伍
+        # 检查：是否已加入其他队伍
         existing_member = await session.execute(
             select(TeamMember).where(TeamMember.player_id == member_id)
         )
@@ -699,9 +707,8 @@ class TeamManager:
 
         # 检查邀请有效性
         if not self._is_valid_invitation(team_id, member_id):
-            print(f"邀请无效: {team_id}, {member_id}")
             return False
-        
+
         # 检查是否已在队伍中
         existing = await session.execute(
             select(TeamMember).where(
@@ -711,17 +718,17 @@ class TeamManager:
         )
         if existing.scalars().first():
             return False
-        
+
         # 添加成员
         session.add(TeamMember(team_id=team_id, player_id=member_id))
         await session.commit()
-        
+
         # 加入成功后移除对应邀请
         if team_id in _team_invitations and member_id in _team_invitations[team_id]:
             del _team_invitations[team_id][member_id]
             if not _team_invitations[team_id]:
                 del _team_invitations[team_id]
-        
+
         return True
 
     async def get_team(self, session: AsyncSession, team_id: int) -> Optional[Team]:
@@ -820,7 +827,7 @@ async def handle_team(event: MessageEvent, args: Message = CommandArg()):
         if arg == "创建":
             try:
                 team = await team_manager.create_team(session, user_id)
-                msg = f"🎉 队伍创建成功！队伍ID：{team.id}"
+                msg = f"✅ 队伍创建成功！队伍ID：{team.id}"
             except ValueError as e:
                 msg = f"⛔ {str(e)}"
             await team_cmd.finish(msg)
@@ -934,3 +941,30 @@ async def handle_mode(event: MessageEvent, args: Message = CommandArg()):
         await session.commit()
         
     await mode_cmd.finish(f"✅ 已切换为【{mode}】探索模式")
+
+# 添加查看队伍信息的命令
+team_info_cmd = on_command("查看队伍", block=True, priority=5)
+
+@team_info_cmd.handle()
+async def handle_team_info(event: MessageEvent):
+    user_id = event.get_user_id()
+    async with safe_session() as session:
+        # 获取用户所在的队伍
+        team_member = await session.execute(
+            select(TeamMember)
+            .options(joinedload(TeamMember.team).joinedload(Team.members).joinedload(TeamMember.player))
+            .where(TeamMember.player_id == user_id)
+        )
+        team_member = team_member.scalars().first()
+        if not team_member:
+            await team_info_cmd.finish("⛔ 你当前没有加入任何队伍")
+            return
+        team = team_member.team
+        # 获取队伍成员信息
+        members = [f"{'队长' if m.player.id == team.leader_id else '队员'}：{m.player.nickname} (UID: {m.player.uid})" for m in team.members]
+        msg = (
+            f"🔍 队伍ID: {team.id}\n"
+            f"👥 成员列表：\n" +
+            "\n".join(members)
+        )
+        await team_info_cmd.finish(msg)
