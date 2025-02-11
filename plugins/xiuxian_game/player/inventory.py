@@ -148,9 +148,9 @@ async def handle_item_detail(event: MessageEvent, args: Message = CommandArg()):
         effect_info = ""
         if target_item.effect_type and target_item.effect_params:
             effects = {
-                "恢复生命": f"❤️ 恢复 {target_item.effect_params.get('value', 0)}点生命",
-                "恢复理智": f"🧠 恢复 {target_item.effect_params.get('value', 0)}点理智",
-                "增益效果": "✨ " + " ".join([f"{k}+{v}" for k,v in target_item.effect_params.items()])
+                "RESTORE_HP": f"❤️ 恢复 {target_item.effect_params.get('value', 0)}点生命",
+                "RESTORE_MP": f"🧠 恢复 {target_item.effect_params.get('value', 0)}点理智",
+                "BUFF": "✨ " + " ".join([f"{k}+{v}" for k,v in target_item.effect_params.items()])
             }
             effect_info = f"\n🔮 效果：{effects.get(target_item.effect_type.value, '特殊效果')}"
 

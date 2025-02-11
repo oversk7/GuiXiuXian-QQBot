@@ -26,8 +26,8 @@ def generate_daily_shop(player_uid: int) -> list:
     
     shop_items = []
     for item in selected:
-        # 价格波动 ±20%
-        fluctuation = random.uniform(0.8, 1.2)
+        # 价格波动
+        fluctuation = random.uniform(0.7, 1.5)
         current_price = max(1, int(item.price * fluctuation))
         shop_items.append((item, current_price))
     
@@ -38,10 +38,10 @@ async def format_shop(shop_items: list, player_gold: int) -> str:
     content = ["🛍️ 今日商店 | 你的金币：{} 💰".format(player_gold)]
     for idx, (item, price) in enumerate(shop_items, 1):
         content.append(
-            f"{idx}. {item.name} - {price}💰\n"
+            f"{idx}. {item.name} - {price}💰/个\n"
             f"   📜 {item.description}"
         )
-    content.append("\n使用【购买 序号】指令进行购买")
+    content.append("\n使用【购买 序号 [数量]】指令进行购买（单次最多50个）")
     return "\n".join(content)
 
 @daily_shop.handle()
@@ -60,10 +60,20 @@ async def _(event: MessageEvent):
 
 @buy_item.handle()
 async def _(event: MessageEvent, args: Message = CommandArg()):
-    arg = args.extract_plain_text().strip()
-    if not arg.isdigit():
-        await buy_item.finish("⛔ 请输入要购买的物品序号，例如：购买 2")
-    index = int(arg) - 1
+    arg_str = args.extract_plain_text().strip()
+    args_list = arg_str.split()
+    
+    # 参数校验
+    if len(args_list) < 1 or len(args_list) > 2:
+        await buy_item.finish("⛔ 格式错误，正确格式：购买 序号 [数量]\n例：购买 2 或 购买 3 5")
+    
+    try:
+        index = int(args_list[0]) - 1
+        quantity = int(args_list[1]) if len(args_list) > 1 else 1
+        if quantity < 1 or quantity > 50:  # 添加购买数量限制
+            raise ValueError
+    except ValueError:
+        await buy_item.finish("⛔ 数量必须为1-50之间的整数")
 
     async with safe_session() as session:
         player = await session.get(Player, event.get_user_id())
@@ -75,12 +85,13 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
             await buy_item.finish("⛔ 无效的商品序号")
         
         item_config, price = shop_items[index]
-        if player.gold < price:
-            await buy_item.finish(f"⛔ 金币不足，需要 {price}💰 当前拥有 {player.gold}💰")
+        total_price = price * quantity
         
-        # 扣除金币
-        player.gold -= price
-        # 添加物品
+        # 金币检查
+        if player.gold < total_price:
+            await buy_item.finish(f"⛔ 金币不足，需要 {total_price}💰 当前拥有 {player.gold}💰")
+        
+        # 持有量检查
         inv = await session.execute(
             select(Inventory).where(
                 Inventory.player_id == event.get_user_id(),
@@ -88,14 +99,22 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
             )
         )
         inv = inv.scalars().first()
+        current_quantity = inv.quantity if inv else 0
+        if current_quantity + quantity > 50:
+            await buy_item.finish(f"⛔ 该物品持有量已达上限（{current_quantity}/50）")
+        
+        # 扣除金币
+        player.gold -= total_price
+        
+        # 更新库存
         if inv:
-            inv.quantity += 1
+            inv.quantity += quantity
         else:
             session.add(Inventory(
                 player_id=event.get_user_id(),
                 item_id=item_config.item_id,
-                quantity=1
+                quantity=quantity
             ))
         
         await session.commit()
-        await buy_item.finish(f"✅ 成功购买 {item_config.name} ✖️1（花费 {price}💰）")
+        await buy_item.finish(f"✅ 成功购买 {item_config.name} ✖️{quantity}（总花费 {total_price}💰）")
