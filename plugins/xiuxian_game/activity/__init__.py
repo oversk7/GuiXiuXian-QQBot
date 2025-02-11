@@ -1,1 +1,1 @@
-from . import sign
+from . import sign, game
