@@ -3,7 +3,6 @@ from sqlalchemy.orm import Mapped, mapped_column, relationship
 from datetime import datetime
 from .base import BaseModel
 from enum import Enum as PyEnum
-from ..battle.core import BattleType
 
 
 class Gender(str, PyEnum):
@@ -44,7 +43,7 @@ class Player(BaseModel):
     is_secluded: Mapped[bool] = mapped_column(Boolean, default=False, server_default='False', comment="是否闭关")
     seclusion_start_time: Mapped[datetime] = mapped_column(DateTime, nullable=True, comment="闭关开始时间")
 
-    explore_mode: Mapped[BattleType] = mapped_column(String(16), default=BattleType.SOLO, comment="探索模式")
+    battle_mode: Mapped[str] = mapped_column(String(16), default="SOLO", comment="战斗模式，SOLO，TEAM")
 
     
 async def get_player_by_uid(uid: str):

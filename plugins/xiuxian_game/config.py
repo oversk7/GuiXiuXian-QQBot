@@ -2,7 +2,6 @@ from pydantic_settings import BaseSettings
 from pathlib import Path
 import yaml
 from functools import lru_cache
-from .models.inventory import ItemConfig
 
 class Config(BaseSettings):
     data_dir: Path = Path(__file__).parent / "data"
@@ -18,6 +17,7 @@ class Config(BaseSettings):
     @property
     def items_config(self) -> dict:
         """返回结构化物品配置"""
+        from .models.inventory import ItemConfig
         items = _load_config(self.items_file)
         # 建立双索引：ID和名称
         configs = {}
