@@ -547,9 +547,10 @@ async def process_battle_rewards(battle: BattleInstance) -> tuple:
     """处理战斗奖励（经验+掉落）"""
     from ..models.inventory import Inventory
     from ..models.player import Player
+    from ..config import config  # 添加导入
     
     total_exp = 0
-    all_drops = []
+    all_drops = {}  # 改为字典统计数量和名称
     alive_players = [p for p in battle.players if p.hp > 0]
     
     # 计算怪物平均等级
@@ -594,9 +595,18 @@ async def process_battle_rewards(battle: BattleInstance) -> tuple:
         # 处理掉落物
         for enemy in battle.enemies:
             for drop in enemy.drops:
+                # 获取物品配置
+                item_config = config.items_config["by_id"].get(drop["item_id"])
+                if not item_config:
+                    continue
+                
                 # 共享模式：全队获得相同掉落
                 if config.game_config["team"]["loot_strategy"] == "SHARED":
                     if random.random() <= drop["chance"]:
+                        # 统计总数量（存活玩家数 x 1）
+                        all_drops[item_config.name] = all_drops.get(item_config.name, 0) + len(alive_players)
+                        
+                        # 实际添加物品到背包
                         for actor in alive_players:
                             inv = await session.execute(
                                 select(Inventory)
@@ -613,12 +623,14 @@ async def process_battle_rewards(battle: BattleInstance) -> tuple:
                                     quantity=1
                                 )
                             session.add(inv)
-                        all_drops.append(drop["item_id"])
                 
                 # 随机模式：每个玩家独立判定
                 else:  
                     for actor in alive_players:
                         if random.random() <= drop["chance"]:
+                            # 统计数量
+                            all_drops[item_config.name] = all_drops.get(item_config.name, 0) + 1
+                            
                             inv = await session.execute(
                                 select(Inventory)
                                 .where(Inventory.player_id == actor.id)
@@ -634,13 +646,12 @@ async def process_battle_rewards(battle: BattleInstance) -> tuple:
                                     quantity=1
                                 )
                             session.add(inv)
-                            all_drops.append(drop["name"])
 
         await session.commit()
     
-    # 去重战利品列表
-    unique_drops = list(set(all_drops))
-    return int(total_exp), unique_drops
+    # 格式化掉落物显示
+    formatted_drops = [f"{name}×{count}" for name, count in all_drops.items()]
+    return int(total_exp), formatted_drops
 
 # 组队命令
 team_cmd = on_command("队伍", block=True, priority=5)
