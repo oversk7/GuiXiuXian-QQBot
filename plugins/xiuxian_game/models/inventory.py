@@ -23,6 +23,7 @@ class ItemConfig:
         self.description = data["description"]
         self.effect_type = ItemEffectType(data.get("effect_type", "BUFF"))
         self.effect_params = data.get("effect_params", {})
+        self.price = data.get("price", 0)
         
 
 class Inventory(BaseModel):
