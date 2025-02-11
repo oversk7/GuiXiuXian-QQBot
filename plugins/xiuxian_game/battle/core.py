@@ -720,6 +720,13 @@ class TeamManager:
         if not self._is_valid_invitation(team_id, member_id):
             return False
 
+        # 获取当前队伍人数
+        current_members = await session.execute(
+            select(TeamMember).where(TeamMember.team_id == team_id)
+        )
+        if current_members and len(current_members.scalars().all()) >= config.team["max_members"]:
+            raise ValueError(f"队伍人数已达上限（{config.team['max_members']}人）")
+
         # 检查是否已在队伍中
         existing = await session.execute(
             select(TeamMember).where(
@@ -887,13 +894,16 @@ async def handle_join(event: MessageEvent, args: Message = CommandArg()):
         team = await team_manager.get_team(session, team_id)
         if not team:
             await join_cmd.finish("⛔ 队伍不存在")
-            
-        if await team_manager.join_team(session, team_id, user_id):
-            # 获取队伍成员信息
-            members = [m.player.nickname for m in team.members]
-            await join_cmd.finish(f"✅ 成功加入队伍！队伍成员：{'、'.join(members)}")
-        else:
-            await join_cmd.finish("⛔ 加入失败，请确认邀请是否有效")
+        
+        try:
+            if await team_manager.join_team(session, team_id, user_id):
+                # 获取队伍成员信息
+                members = [m.player.nickname for m in team.members]
+                await join_cmd.finish(f"✅ 成功加入队伍！队伍成员：{'、'.join(members)}")
+            else:
+                await join_cmd.finish("⛔ 加入失败，请确认邀请是否有效")
+        except ValueError as e:
+            await join_cmd.finish(f"⛔ {str(e)}")
 
 @disband_cmd.handle()
 async def handle_disband(event: MessageEvent):
