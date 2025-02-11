@@ -1,4 +1,3 @@
-from ..models.player import get_player_by_uid
 from nonebot import on_command
 from nonebot.adapters.onebot.v11 import MessageEvent
 from nonebot.params import CommandArg
