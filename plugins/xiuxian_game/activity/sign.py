@@ -38,7 +38,7 @@ async def handle_sign(event: MessageEvent):
             # 赠送新手大礼包
             starter_pack = Inventory(
                 player_id=player.id,
-                item_id="heal_potion",  # 假设新手大礼包中有一瓶回春散
+                item_id="heal_potion",
                 quantity=5
             )
             session.add(starter_pack)
