@@ -8,6 +8,9 @@ game:
     late_multiplier: 50
     curve_change_level: 15
   inventory_page_size: 10  # 背包每页显示物品数量
+  team:
+    max_members: 4
+    exp_bonus: 0.2  # 组队经验加成
 
 
 # 修炼基础配置

@@ -14,9 +14,10 @@ from ..utils import create_rich_message
 from sqlalchemy.orm import joinedload
 from sqlalchemy import select
 from ..models.team import Team, TeamMember
+from ..battle.team import team_manager
 
 # 战斗命令
-battle_start = on_command("战斗", aliases={"挑战"}, block=True, priority=5)
+explore_cmd = on_command("探索", block=True, priority=5)
 attack_cmd = on_command("攻击", block=True, priority=5)
 use_item_cmd = on_command("使用", block=True, priority=5)
 escape_cmd = on_command("逃跑", block=True, priority=5)
@@ -25,7 +26,7 @@ escape_cmd = on_command("逃跑", block=True, priority=5)
 _player_battles: Dict[str, 'BattleInstance'] = {}  # 玩家ID映射到战斗实例
 _BATTLE_TIMEOUT = 600
 
-class BattleType(PyEnum):
+class BattleType(str, PyEnum):
     SOLO = "单人战斗"
     TEAM = "组队战斗"
     # PVP = "PVP战斗"
@@ -246,53 +247,6 @@ class BattleInstance:
             self.logs.pop(0)
         self.logs.append(log)
 
-
-# 优化战斗开始逻辑
-@battle_start.handle()
-async def handle_battle_start(event: MessageEvent, args: Message = CommandArg()):
-    arg = args.extract_plain_text().strip()
-    user_id = event.get_user_id()
-    
-    async with safe_session() as session:
-        if arg == "组队":
-            # 获取用户所在的队伍
-            team_member = await session.execute(
-                select(TeamMember)
-                .where(TeamMember.player_id == user_id)
-                .options(joinedload(TeamMember.team))
-            )
-            team_member = team_member.scalars().first()
-            
-            if not team_member:
-                await battle_start.finish("⛔ 你还没有准备好战斗的队伍")
-                
-            # 获取所有队员
-            members = await session.execute(
-                select(Player)
-                .join(TeamMember, TeamMember.player_id == Player.id)
-                .where(TeamMember.team_id == team_member.team.id)
-            )
-            members = members.scalars().all()
-            
-            # 生成敌人
-            enemies = await generate_enemy_by_region(team_member.team.name, max(m.level for m in members))
-            
-            battle = BattleInstance(BattleType.TEAM, members, enemies, event)
-            await send_battle_ui(battle, event)
-        else:  # 单人战斗逻辑
-            # 获取当前玩家
-            player = await session.get(Player, user_id)
-            if not player:
-                await battle_start.finish("⛔ 请先创建角色后再进行战斗")
-            
-            # 生成适合玩家等级的敌人
-            enemy_level = player.level
-            enemies = [generate_enemy("试炼傀儡", enemy_level)]
-            
-            # 创建单人战斗实例
-            battle = BattleInstance(BattleType.SOLO, [player], enemies, event)
-            await send_battle_ui(battle, event)
-
 async def generate_enemy_by_region(region_name: str, player_level: int) -> List[Dict]:
     """根据地区生成敌人"""
     from ..config import config
@@ -362,7 +316,7 @@ async def send_battle_ui(battle: BattleInstance, event: MessageEvent):
         f"可用指令：\n"
         f"攻击 序号 | 使用 道具名 | 逃跑"
     )
-    await battle_start.finish(create_rich_message(msg, event))
+    await explore_cmd.finish(create_rich_message(msg, event))
 
 async def battle_loop(battle: BattleInstance, event: MessageEvent):
     """优化后的战斗主循环"""
@@ -391,6 +345,7 @@ async def battle_loop(battle: BattleInstance, event: MessageEvent):
                 # 清理缓存
                 for p in battle.players:
                     _player_battles.pop(p.id, None)
+
                 return
                 
             # 重置行动记录
@@ -403,6 +358,64 @@ async def battle_loop(battle: BattleInstance, event: MessageEvent):
         # 清理过期的战斗
         for p in battle.players:
             _player_battles.pop(p.id, None)
+
+@explore_cmd.handle()
+async def handle_explore(event: MessageEvent):
+    user_id = event.get_user_id()
+    async with safe_session() as session:
+        player = await session.get(Player, user_id)
+        if not player:
+            await explore_cmd.finish("⛔ 请先创建角色")
+            
+        if player.explore_mode == BattleType.TEAM:
+            # 获取队伍信息
+            team_member = await session.execute(
+                select(TeamMember)
+                .options(joinedload(TeamMember.team).joinedload(Team.members))
+                .where(TeamMember.player_id == user_id)
+            )
+            team_member = team_member.scalars().first()
+            
+            if not team_member:
+                await explore_cmd.finish("⛔ 组队模式需要先加入队伍")
+                
+            if team_member.team.leader_id != user_id:
+                await explore_cmd.finish("⛔ 只有队长可以发起组队探索")
+                
+            if not await team_manager.can_start_team_explore(session, team_member.team.id):
+                await explore_cmd.finish("⛔ 队伍成员不满足条件：1.全部组队模式 2.不在战斗中 3.同一地区")
+                
+            # 检查队员是否在战斗中（通过缓存）
+            for member in team_member.team.members:
+                if member.player.id in _player_battles:
+                    await explore_cmd.finish(f"⛔ 队员 {member.player.nickname} 正在战斗中")
+            
+            # 生成基于队伍平均等级的敌人
+            members_level = [m.player.level for m in team_member.team.members]
+            avg_level = sum(members_level) // len(members_level)
+            enemies = await generate_enemy_by_region(player.position, avg_level)
+            
+            # 创建组队战斗
+            battle = BattleInstance(
+                BattleType.TEAM, 
+                [m.player for m in team_member.team.members],
+                enemies,
+                event
+            )
+            
+        else:  # 个人模式
+            if user_id in _player_battles:
+                await explore_cmd.finish("⛔ 你已经在战斗中")
+                
+            enemies = await generate_enemy_by_region(player.position, player.level)
+            battle = BattleInstance(BattleType.SOLO, [player], enemies, event)
+        
+        # 更新战斗状态
+        for p in battle.players:
+            p.in_battle = True
+        await session.commit()
+        
+        await send_battle_ui(battle, event)
 
 @attack_cmd.handle()
 async def handle_attack(event: MessageEvent, args: Message = CommandArg()):

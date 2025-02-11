@@ -11,6 +11,9 @@ from ..models.team import Team, TeamMember
 from nonebot_plugin_apscheduler import scheduler
 from nonebot.log import logger
 from ..models.player import get_player_by_uid
+from ..battle.core import BattleType
+from .core import _player_battles
+from ..models.player import Player
 
 # 组队命令
 team_cmd = on_command("队伍", block=True, priority=5)
@@ -18,6 +21,7 @@ join_cmd = on_command("加入队伍", block=True, priority=5)
 disband_cmd = on_command("解散队伍", block=True, priority=5)
 leave_cmd = on_command("退出队伍", block=True, priority=5)
 kick_cmd = on_command("踢出", block=True, priority=5)
+mode_cmd = on_command("模式", block=True, priority=5)
 
 # 组队系统缓存
 _team_invitations: Dict[int, Dict[str, datetime]] = {}  # {队伍ID: {受邀者ID: 过期时间}}
@@ -59,6 +63,13 @@ class TeamManager:
         return new_team
 
     async def join_team(self, session: AsyncSession, team_id: int, member_id: str) -> bool:
+        # 新增检查：是否已加入其他队伍
+        existing_member = await session.execute(
+            select(TeamMember).where(TeamMember.player_id == member_id)
+        )
+        if existing_member.scalars().first():
+            raise ValueError("你已加入其他队伍，请先退出")
+
         # 检查邀请有效性
         if not self._is_valid_invitation(team_id, member_id):
             print(f"邀请无效: {team_id}, {member_id}")
@@ -155,6 +166,21 @@ class TeamManager:
         await session.commit()
         return True
 
+    async def can_start_team_explore(self, session: AsyncSession, team_id: int) -> bool:
+        """检查队伍是否可以开始探索"""
+        team = await self.get_team(session, team_id)
+        if not team:
+            return False
+
+        # 检查所有队员状态
+        for member in team.members:
+            player = member.player
+            if (player.explore_mode != BattleType.TEAM or 
+                player.id in _player_battles or  # 通过缓存检查战斗状态
+                player.position != team.leader.position):
+                return False
+        return True
+
 team_manager = TeamManager()
 
 # 优化组队命令处理
@@ -188,7 +214,7 @@ async def handle_team(event: MessageEvent, args: Message = CommandArg()):
             # 存储到内存邀请缓存（保留3分钟）
             _team_invitations.setdefault(team.id, {})
             _team_invitations[team.id][target_player.id] = datetime.now() + timedelta(minutes=3)
-            await team_cmd.finish(f"📨 已向玩家 {target_uid} 发送组队邀请，有效期3分钟\n�� 队伍ID：{team.id}")
+            await team_cmd.finish(f"📨 已向玩家 {target_uid} 发送组队邀请，有效期3分钟\n 队伍ID：{team.id}")
 
         elif arg == "解散":
             # 获取用户队伍
@@ -263,3 +289,21 @@ async def handle_kick(event: MessageEvent, args: Message = CommandArg()):
             await kick_cmd.finish("⛔ 踢出失败，请确认你是队长且目标在队伍中")
             return
         await kick_cmd.finish(f"👢 已踢出玩家 {target_uid}")
+
+@mode_cmd.handle()
+async def handle_mode(event: MessageEvent, args: Message = CommandArg()):
+    mode_map = {
+        "个人": BattleType.SOLO,
+        "组队": BattleType.TEAM
+    }
+    
+    mode = args.extract_plain_text().strip()
+    if mode not in mode_map:
+        await mode_cmd.finish("⛔ 无效模式，可选：个人/组队")
+
+    async with safe_session() as session:
+        player = await session.get(Player, event.get_user_id())
+        player.explore_mode = mode_map[mode]
+        await session.commit()
+        
+    await mode_cmd.finish(f"✅ 已切换为【{mode}】探索模式")
