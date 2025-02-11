@@ -82,8 +82,8 @@ async def paginate_items(items: list, page: int, page_size: Optional[int] = None
     lines = []
     for idx, item in enumerate(current_page_items, start=1):
         lines.append(
-            f"{idx}. {item.item.name} ✖️{item.quantity}\n"
-            f"   📝{item.item.description} [类型：{item.item.type.value}]"
+            f"{idx}. {item.config.name} ✖️{item.quantity}\n"
+            f"   📝{item.config.description} [类型：{item.config.type.value}]"
         )
     
     return "🎒 你的背包\n" + "\n\n".join(lines) + page_info

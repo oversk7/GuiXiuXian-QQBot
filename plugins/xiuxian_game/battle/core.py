@@ -9,7 +9,7 @@ import asyncio
 from ..config import config
 from ..data.db import safe_session
 from ..models.player import Player
-from ..models.item import Inventory, Item
+from ..models.inventory import Inventory
 from ..utils import create_rich_message
 from sqlalchemy.orm import joinedload
 from sqlalchemy import select
@@ -275,9 +275,7 @@ async def handle_battle_start(event: MessageEvent, args: Message = CommandArg())
             members = members.scalars().all()
             
             # 生成敌人
-            enemies = [generate_enemy("精英怪", max(m.level for m in members)),
-                       generate_enemy("精英怪", max(m.level for m in members)),
-                       ]
+            enemies = await generate_enemy_by_region(team_member.team.name, max(m.level for m in members))
             
             battle = BattleInstance(BattleType.TEAM, members, enemies, event)
             await send_battle_ui(battle, event)
@@ -294,6 +292,32 @@ async def handle_battle_start(event: MessageEvent, args: Message = CommandArg())
             # 创建单人战斗实例
             battle = BattleInstance(BattleType.SOLO, [player], enemies, event)
             await send_battle_ui(battle, event)
+
+async def generate_enemy_by_region(region_name: str, player_level: int) -> List[Dict]:
+    """根据地区生成敌人"""
+    from ..config import config
+    
+    region = next((r for r in config.map_config["regions"] if r["name"] == region_name), None)
+    if not region:
+        raise ValueError(f"地区 {region_name} 不存在")
+    
+    enemies = []
+    for _ in range(random.randint(1, 3)):  # 随机1-3个敌人
+        monster = random.choice(region["monsters"])
+        level = min(max(player_level, region["level_range"][0]), region["level_range"][1])
+        
+        enemy = {
+            "name": f"{monster['name']}·{random.choice(['残', '凶', '煞'])}",
+            "max_hp": monster["base_hp"] + level * 5,
+            "attack": monster["base_attack"] + level * 2,
+            "defense": monster["base_defense"] + level,
+            "agility": monster["base_agility"] + level,
+            "skills": monster.get("skills", []),
+            "drops": monster.get("drops", []),
+            "action_weights": (70, 20, 10)  # 默认行动权重
+        }
+        enemies.append(enemy)
+    return enemies
 
 def generate_enemy(base_name: str, level: int) -> Dict:
     """根据玩家等级生成敌人（优化内存）"""
@@ -354,7 +378,14 @@ async def battle_loop(battle: BattleInstance, event: MessageEvent):
 
             # 处理战斗结果
             if result != "continue":
-                result_msg = "🎉 战斗胜利！" if result == "players_win" else "💀 战斗失败，敌人获得了胜利..."
+                # 添加掉落物处理
+                if result == "players_win":
+                    drops = await process_battle_drops(battle)
+                    result_msg = "🎉 战斗胜利！"
+                    result_msg += f"\n🎁 获得战利品：{', '.join(drops) if drops else '无'}"
+                else:
+                    result_msg = "💀 战斗失败，敌人获得了胜利..."
+                
                 await bot.send(battle.latest_event, result_msg)
 
                 # 清理缓存
@@ -430,3 +461,34 @@ async def handle_use_item(event: MessageEvent):
     # 调用现有背包系统
     async with safe_session() as session:
         inventory = await session.get(Inventory, user_id)
+
+async def process_battle_drops(battle: BattleInstance) -> list:
+    """处理战斗掉落"""
+    from ..models.inventory import Inventory
+    drops = []
+    
+    async with safe_session() as session:
+        for enemy in battle.enemies:
+            for drop in enemy.drops:
+                if random.random() <= drop["chance"]:
+                    # 添加物品到背包
+                    inv = await session.execute(
+                        select(Inventory)
+                        .where(Inventory.player_id == battle.players[0].id)
+                        .where(Inventory.item_id == drop["item_id"])
+                    )
+                    inv = inv.scalars().first()
+                    
+                    if inv:
+                        inv.quantity += 1
+                    else:
+                        inv = Inventory(
+                            player_id=battle.players[0].id,
+                            item_id=drop["item_id"],
+                            quantity=1
+                        )
+                    session.add(inv)
+                    drops.append(drop["item_id"])
+        
+        await session.commit()
+    return drops
