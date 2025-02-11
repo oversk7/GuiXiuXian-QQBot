@@ -377,7 +377,7 @@ async def battle_loop(battle: BattleInstance, event: MessageEvent):
                 # +++ 保存结束 +++
                 
                 if result == "players_win":
-                    # 修改后的奖励处理
+                    # 奖励处理
                     total_exp, drops = await process_battle_rewards(battle)
                     result_msg = (
                         "🎉 战斗胜利！\n"
@@ -634,7 +634,7 @@ async def process_battle_rewards(battle: BattleInstance) -> tuple:
                                     quantity=1
                                 )
                             session.add(inv)
-                            all_drops.append(drop["item_id"])
+                            all_drops.append(drop["name"])
 
         await session.commit()
     
