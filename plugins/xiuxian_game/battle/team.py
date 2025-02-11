@@ -6,15 +6,18 @@ from datetime import datetime, timedelta
 from ..data.db import safe_session
 from sqlalchemy.orm import joinedload
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select
+from sqlalchemy import select, delete
 from ..models.team import Team, TeamMember
 from nonebot_plugin_apscheduler import scheduler
 from nonebot.log import logger
 from ..models.player import get_player_by_uid
 
 # 组队命令
-team_cmd = on_command("组队", block=True, priority=5)
+team_cmd = on_command("队伍", block=True, priority=5)
 join_cmd = on_command("加入队伍", block=True, priority=5)
+disband_cmd = on_command("解散队伍", block=True, priority=5)
+leave_cmd = on_command("退出队伍", block=True, priority=5)
+kick_cmd = on_command("踢出", block=True, priority=5)
 
 # 组队系统缓存
 _team_invitations: Dict[int, Dict[str, datetime]] = {}  # {队伍ID: {受邀者ID: 过期时间}}
@@ -101,6 +104,56 @@ class TeamManager:
             _team_invitations[team_id][member_id] > now
         )
 
+    async def disband_team(self, session: AsyncSession, team_id: int):
+        """解散队伍"""
+        # 删除队伍和成员
+        await session.execute(delete(TeamMember).where(TeamMember.team_id == team_id))
+        await session.execute(delete(Team).where(Team.id == team_id))
+        # 清理邀请缓存
+        _team_invitations.pop(team_id, None)
+        await session.commit()
+
+    async def leave_team(self, session: AsyncSession, user_id: str) -> bool:
+        """退出队伍，返回是否成功"""
+        # 获取用户所在队伍
+        member = await session.execute(
+            select(TeamMember)
+            .options(joinedload(TeamMember.team))
+            .where(TeamMember.player_id == user_id)
+        )
+        member = member.scalars().first()
+        if not member:
+            return False
+
+        team = member.team
+        if team.leader_id == user_id:  # 队长退出等于解散队伍
+            await self.disband_team(session, team.id)
+            return True
+        else:  # 普通成员退出
+            await session.delete(member)
+            await session.commit()
+            return True
+
+    async def kick_member(self, session: AsyncSession, leader_id: str, target_uid: str) -> bool:
+        """踢出队员"""
+        # 验证操作者是队长
+        team = await session.execute(
+            select(Team).where(Team.leader_id == leader_id)
+        )
+        team = team.scalars().first()
+        if not team:
+            return False
+
+        # 删除目标成员
+        result = await session.execute(
+            delete(TeamMember)
+            .where(TeamMember.team_id == team.id)
+            .where(TeamMember.player_id == target_uid)
+        )
+        if result.rowcount == 0:
+            return False
+        await session.commit()
+        return True
 
 team_manager = TeamManager()
 
@@ -135,7 +188,20 @@ async def handle_team(event: MessageEvent, args: Message = CommandArg()):
             # 存储到内存邀请缓存（保留3分钟）
             _team_invitations.setdefault(team.id, {})
             _team_invitations[team.id][target_player.id] = datetime.now() + timedelta(minutes=3)
-            await team_cmd.finish(f"📨 已向玩家 {target_uid} 发送组队邀请，有效期3分钟\n🚩 队伍ID：{team.id}")
+            await team_cmd.finish(f"📨 已向玩家 {target_uid} 发送组队邀请，有效期3分钟\n�� 队伍ID：{team.id}")
+
+        elif arg == "解散":
+            # 获取用户队伍
+            team = await session.execute(
+                select(Team).where(Team.leader_id == user_id)
+            )
+            team = team.scalars().first()
+            if not team:
+                await team_cmd.finish("⛔ 你还没有创建队伍")
+                return
+            
+            await team_manager.disband_team(session, team.id)
+            await team_cmd.finish("🗑️ 队伍已解散")
 
 @join_cmd.handle()
 async def handle_join(event: MessageEvent, args: Message = CommandArg()):
@@ -157,3 +223,43 @@ async def handle_join(event: MessageEvent, args: Message = CommandArg()):
             await join_cmd.finish(f"✅ 成功加入队伍！队伍成员：{'、'.join(members)}")
         else:
             await join_cmd.finish("⛔ 加入失败，请确认邀请是否有效")
+
+@disband_cmd.handle()
+async def handle_disband(event: MessageEvent):
+    user_id = event.get_user_id()
+    async with safe_session() as session:
+        # 获取用户队伍
+        team = await session.execute(
+            select(Team).where(Team.leader_id == user_id)
+        )
+        team = team.scalars().first()
+        if not team:
+            await disband_cmd.finish("⛔ 你还没有创建队伍或不是队长")
+            return
+
+        await team_manager.disband_team(session, team.id)
+        await disband_cmd.finish("🗑️ 队伍已解散")
+
+@leave_cmd.handle()
+async def handle_leave(event: MessageEvent):
+    user_id = event.get_user_id()
+    async with safe_session() as session:
+        success = await team_manager.leave_team(session, user_id)
+        if not success:
+            await leave_cmd.finish("⛔ 你当前没有加入任何队伍")
+            return
+        await leave_cmd.finish("🚪 你已退出队伍")
+
+@kick_cmd.handle()
+async def handle_kick(event: MessageEvent, args: Message = CommandArg()):
+    target_uid = args.extract_plain_text().strip()
+    if not target_uid.isdigit():
+        await kick_cmd.finish("⛔ 请输入正确的UID")
+    
+    user_id = event.get_user_id()
+    async with safe_session() as session:
+        success = await team_manager.kick_member(session, user_id, target_uid)
+        if not success:
+            await kick_cmd.finish("⛔ 踢出失败，请确认你是队长且目标在队伍中")
+            return
+        await kick_cmd.finish(f"👢 已踢出玩家 {target_uid}")
