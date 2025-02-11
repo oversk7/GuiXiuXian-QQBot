@@ -273,24 +273,6 @@ async def generate_enemy_by_region(region_name: str, player_level: int) -> List[
         enemies.append(enemy)
     return enemies
 
-def generate_enemy(base_name: str, level: int) -> Dict:
-    """根据玩家等级生成敌人（优化内存）"""
-    # 不同类型敌人配置不同行动概率
-    action_config = {
-        "法师": (50, 30, 20),    # 普通50%，技能30%，异常20%
-        "刺客": (90, 10, 0)      # 普通攻击90%，技能10%
-    }.get(base_name, (100, 0, 0))  # 默认配置
-
-    return {
-        "name": f"{base_name}",
-        "max_hp": 50 + level * 10,
-        "attack": 15 + level * 2,
-        "defense": 5 + level,
-        "agility": 5 + level,
-        "action_weights": action_config,  # 添加行动概率配置
-        "skills": []
-    }
-
 async def send_battle_ui(battle: BattleInstance, event: MessageEvent):
     """生成美观的战斗界面"""
     # 启动战斗循环
