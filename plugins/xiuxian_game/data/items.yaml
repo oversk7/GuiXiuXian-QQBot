@@ -5,6 +5,7 @@ items:
       description: "传送到指定地点"
       type: "CONSUMABLE"
       effect_type: "SPECIAL"
+      price: 100
 
     - item_id: "heal_potion"
       name: "回春散"
@@ -12,6 +13,7 @@ items:
       type: "CONSUMABLE"
       effect_type: "RESTORE_HP"
       effect_params: {"value": 30}
+      price: 100
 
     - item_id: "spirit_herb"
       name: "凝神草"
@@ -19,3 +21,4 @@ items:
       type: "CONSUMABLE"
       effect_type: "RESTORE_MP"
       effect_params: {"value": 30}
+      price: 100

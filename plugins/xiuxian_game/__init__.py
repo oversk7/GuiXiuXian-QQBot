@@ -16,8 +16,8 @@ from . import (
     player,
     cultivate,
     battle,
-    activity
-    # economy,
+    activity,
+    economy,
     # social,
     # world
 )
