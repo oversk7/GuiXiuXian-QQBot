@@ -158,27 +158,27 @@ class BattleInstance:
                 return
             await asyncio.sleep(1)
 
-    async def _handle_player_action(self, actor, act_type, target_id, battle_log):
+    async def _handle_player_action(self, actor: BattleActor, act_type: str, target_id: str, battle_log: list):
         """玩家行动处理"""
         target = next((e for e in self.enemies if e.id == target_id), None)
         if not target:
             return
-        
-        # 计算伤害（加入暴击和闪避判定）
-        is_crit = random.random() < (actor.luck / 1000)
-        is_dodge = random.random() < (target.agility / 1000)
-        
-        if is_dodge:
-            log = f"✨ {target.name} 灵巧地躲过了攻击！"
-        else:
-            damage = max(0, actor.attack - target.defense)
-            if is_crit:
-                damage = int(damage * 1.5)
-            damage = int(damage * random.uniform(0.9, 1.1))
-            target.hp = max(0, target.hp - damage)
+        if act_type == "attack":
+            # 计算伤害（加入暴击和闪避判定）
+            is_crit = random.random() < (actor.luck / 1000)
+            is_dodge = random.random() < actor.calculate_hit_chance(target)
             
-            crit_mark = "💥 " if is_crit else ""
-            log = f"{crit_mark}{actor.name} ➔ {target.name} 造成{damage}点伤害！"
+            if is_dodge:
+                log = f"✨ {target.name} 灵巧地躲过了攻击！"
+            else:
+                actual_attack = actor.attack * random.uniform(0.8, 1.2)
+                damage = max(max(1,actual_attack * 0.1), actual_attack - target.defense)
+                if is_crit:
+                    damage = int(damage * 1.5)
+                target.hp = max(0, target.hp - damage)
+                
+                crit_mark = "💥触发暴击" if is_crit else ""
+                log = f"{crit_mark}{actor.name} ➔ {target.name} 造成{damage}点伤害！"
         
         battle_log.append(log)
 
@@ -206,14 +206,14 @@ class BattleInstance:
         else:
             await self._handle_debuff_attack(enemy, target, battle_log)
 
-    async def _handle_normal_attack(self, attacker, target, battle_log):
+    async def _handle_normal_attack(self, attacker: BattleActor, target: BattleActor, battle_log):
         """普通攻击处理"""
         hit_chance = attacker.calculate_hit_chance(target)
         if random.random() > hit_chance:
             battle_log.append(f"✨ {target.name} 灵巧地躲过了 {attacker.name} 的反击！")
             return
-            
-        damage = max(0, attacker.attack - target.defense)
+        actual_attack = attacker.attack * random.uniform(0.8, 1.2)
+        damage = max(max(1,actual_attack * 0.1), actual_attack - target.defense)
         target.hp = max(0, target.hp - damage)
         battle_log.append(f"👹 {attacker.name} 反击 {target.name} 造成 {damage} 伤害！")
 
@@ -260,7 +260,7 @@ async def generate_enemy_by_region(region_name: str, player_level: int) -> List[
         level = min(max(player_level, region["level_range"][0]), region["level_range"][1])
         
         enemy = {
-            "name": f"{monster['name']}·{random.choice(['残', '凶', '煞'])}",
+            "name": f"{monster['name']}",
             "level": level,
             "max_hp": monster["base_hp"] + level * 5,
             "attack": monster["base_attack"] + level * 2,
@@ -268,7 +268,7 @@ async def generate_enemy_by_region(region_name: str, player_level: int) -> List[
             "agility": monster["base_agility"] + level,
             "skills": monster.get("skills", []),
             "drops": monster.get("drops", []),
-            "action_weights": (70, 20, 10)  # 默认行动权重
+            "action_weights": (100, 0, 0)  # 默认行动权重
         }
         enemies.append(enemy)
     return enemies
