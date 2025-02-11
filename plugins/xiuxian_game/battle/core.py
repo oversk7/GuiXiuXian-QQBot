@@ -3,7 +3,6 @@ from nonebot.adapters.onebot.v11 import MessageEvent, Message
 from nonebot.params import CommandArg
 from typing import Dict, Any, List, Optional
 from datetime import datetime, timedelta
-from enum import Enum as PyEnum
 from nonebot_plugin_apscheduler import scheduler
 import random
 import asyncio
@@ -33,7 +32,7 @@ class BattleActor:
     """战斗参与者基类"""
     __slots__ = ['id', 'name', 'is_player', 'hp', 'max_hp', 'mp', 'max_mp', 
                 'attack', 'defense', 'agility', 'fear_resistance', 'luck',
-                'behavior', 'skills', 'action_weights']
+                'behavior', 'skills', 'action_weights','level', 'drops']
     
     def __init__(self, entity: Any, is_player: bool = True):
         self.id = str(id(entity)) if not is_player else entity.id
@@ -42,6 +41,7 @@ class BattleActor:
         
         # 玩家属性（从Player对象获取）
         if is_player:
+            self.level = entity.level
             self.hp = entity.hp
             self.max_hp = entity.max_hp
             self.mp = entity.mp
@@ -53,6 +53,7 @@ class BattleActor:
             self.luck = entity.luck
         # 敌人属性（从字典配置获取）
         else:
+            self.level = entity['level']
             self.max_hp = entity['max_hp']
             self.hp = entity.get('hp', self.max_hp)
             self.max_mp = entity.get('max_mp', 0)
@@ -65,6 +66,7 @@ class BattleActor:
             self.behavior = entity.get('behavior', 'normal')
             self.skills = entity.get('skills', [])
             self.action_weights = entity.get('action_weights', (70, 20, 10))  # 使用元组节省内存
+            self.drops = entity.get('drops', [])  # 添加掉落物属性
         
     def calculate_hit_chance(self, target) -> float:
         """根据双方敏捷计算命中率"""
@@ -259,6 +261,7 @@ async def generate_enemy_by_region(region_name: str, player_level: int) -> List[
         
         enemy = {
             "name": f"{monster['name']}·{random.choice(['残', '凶', '煞'])}",
+            "level": level,
             "max_hp": monster["base_hp"] + level * 5,
             "attack": monster["base_attack"] + level * 2,
             "defense": monster["base_defense"] + level,
@@ -311,11 +314,14 @@ async def battle_loop(battle: BattleInstance, event: MessageEvent):
 
             # 处理战斗结果
             if result != "continue":
-                # 添加掉落物处理
                 if result == "players_win":
-                    drops = await process_battle_drops(battle)
-                    result_msg = "🎉 战斗胜利！"
-                    result_msg += f"\n🎁 获得战利品：{', '.join(drops) if drops else '无'}"
+                    # 修改后的奖励处理
+                    total_exp, drops = await process_battle_rewards(battle)
+                    result_msg = (
+                        "🎉 战斗胜利！\n"
+                        f"📈 获得总经验：{total_exp}\n"
+                        f"🎁 获得战利品：{', '.join(drops) if drops else '无'}"
+                    )
                 else:
                     result_msg = "💀 战斗失败，敌人获得了胜利..."
                 
@@ -389,11 +395,7 @@ async def handle_explore(event: MessageEvent):
             enemies = await generate_enemy_by_region(player.position, player.level)
             battle = BattleInstance("SOLO", [player], enemies, event)
         
-        # 更新战斗状态
-        for p in battle.players:
-            p.in_battle = True
         await session.commit()
-        
         await send_battle_ui(battle, event)
 
 @attack_cmd.handle()
@@ -454,42 +456,104 @@ async def handle_use_item(event: MessageEvent):
     async with safe_session() as session:
         inventory = await session.get(Inventory, user_id)
 
-async def process_battle_drops(battle: BattleInstance) -> list:
-    """处理战斗掉落"""
+async def process_battle_rewards(battle: BattleInstance) -> tuple:
+    """处理战斗奖励（经验+掉落）"""
     from ..models.inventory import Inventory
-    drops = []
+    from ..models.player import Player
     
+    total_exp = 0
+    all_drops = []
+    alive_players = [p for p in battle.players if p.hp > 0]
+    
+    # 计算怪物平均等级
+    monster_levels = [e.level for e in battle.enemies]
+    avg_monster_level = sum(monster_levels) / len(monster_levels) if monster_levels else 0
+
     async with safe_session() as session:
+        # 处理经验分配
+        for enemy in battle.enemies:
+            # 基础经验 = 怪物等级 * 基础经验系数
+            base_exp = enemy.level * config.game_config["base_exp_per_level"]
+            
+            # 组队经验加成
+            if battle.battle_type == "TEAM":
+                base_exp *= (1 + config.game_config["team"]["team_exp_bonus"])
+            
+            total_exp += base_exp
+
+        # 按存活玩家数平均分配
+        per_player_exp = total_exp / len(alive_players) if alive_players else 0
+
+        # 更新玩家经验（考虑等级差衰减）
+        for actor in alive_players:
+            player = await session.get(Player, actor.id)
+            if not player:
+                continue
+            
+            # 计算等级差系数
+            level_diff = avg_monster_level - player.level
+            if level_diff < -config.game_config["team"]["max_level_diff"]:
+                exp_multiplier = config.game_config["team"]["min_exp_multiplier"]
+            else:
+                exp_multiplier = max(
+                    config.game_config["team"]["min_exp_multiplier"],
+                    1 - (max(level_diff, 0) / (config.game_config["team"]["max_level_diff"] * 2))
+                )
+            
+            gained_exp = int(per_player_exp * exp_multiplier)
+            player.exp += gained_exp
+            session.add(player)
+
+        # 处理掉落物
         for enemy in battle.enemies:
             for drop in enemy.drops:
-                if random.random() <= drop["chance"]:
-                    # 添加物品到背包
-                    inv = await session.execute(
-                        select(Inventory)
-                        .where(Inventory.player_id == battle.players[0].id)
-                        .where(Inventory.item_id == drop["item_id"])
-                    )
-                    inv = inv.scalars().first()
-                    
-                    if inv:
-                        inv.quantity += 1
-                    else:
-                        inv = Inventory(
-                            player_id=battle.players[0].id,
-                            item_id=drop["item_id"],
-                            quantity=1
-                        )
-                    session.add(inv)
-                    drops.append(drop["item_id"])
-        
+                # 共享模式：全队获得相同掉落
+                if config.game_config["team"]["loot_strategy"] == "SHARED":
+                    if random.random() <= drop["chance"]:
+                        for actor in alive_players:
+                            inv = await session.execute(
+                                select(Inventory)
+                                .where(Inventory.player_id == actor.id)
+                                .where(Inventory.item_id == drop["item_id"])
+                            )
+                            inv = inv.scalars().first()
+                            if inv:
+                                inv.quantity += 1
+                            else:
+                                inv = Inventory(
+                                    player_id=actor.id,
+                                    item_id=drop["item_id"],
+                                    quantity=1
+                                )
+                            session.add(inv)
+                        all_drops.append(drop["item_id"])
+                
+                # 随机模式：每个玩家独立判定
+                else:  
+                    for actor in alive_players:
+                        if random.random() <= drop["chance"]:
+                            inv = await session.execute(
+                                select(Inventory)
+                                .where(Inventory.player_id == actor.id)
+                                .where(Inventory.item_id == drop["item_id"])
+                            )
+                            inv = inv.scalars().first()
+                            if inv:
+                                inv.quantity += 1
+                            else:
+                                inv = Inventory(
+                                    player_id=actor.id,
+                                    item_id=drop["item_id"],
+                                    quantity=1
+                                )
+                            session.add(inv)
+                            all_drops.append(drop["item_id"])
+
         await session.commit()
-    return drops
-
-
-
-
-
-
+    
+    # 去重战利品列表
+    unique_drops = list(set(all_drops))
+    return int(total_exp), unique_drops
 
 # 组队命令
 team_cmd = on_command("队伍", block=True, priority=5)
@@ -502,7 +566,7 @@ mode_cmd = on_command("模式", block=True, priority=5)
 # 组队系统缓存
 _team_invitations: Dict[int, Dict[str, datetime]] = {}  # {队伍ID: {受邀者ID: 过期时间}}
 
-# 新增定时清理任务
+# 定时清理任务
 @scheduler.scheduled_job("interval", minutes=1)
 def _clean_expired_invitations():
     now = datetime.now()

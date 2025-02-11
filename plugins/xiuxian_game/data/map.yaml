@@ -12,10 +12,8 @@ regions:
             effect: "中毒"
             base_probability: 0.3
         drops:
-          - item_id: "spirit_stone"
-            base_chance: 0.5
-          - item_id: "heal_potion"
-            base_chance: 0.2
+          - item_id: "teleport"
+            chance: 0.8
 
   - name: "阴风洞"
     level_range: [11, 20]
@@ -30,5 +28,5 @@ regions:
             effect: "恐惧"
             base_probability: 0.4
         drops:
-          - item_id: "spirit_stone"
-            chance: 0.8
+          - item_id: "heal_potion"
+            chance: 0.2

@@ -8,9 +8,13 @@ game:
     late_multiplier: 50
     curve_change_level: 15
   inventory_page_size: 10  # 背包每页显示物品数量
-  team:
-    max_members: 4
-    exp_bonus: 0.2  # 组队经验加成
+team:
+  max_members: 4
+  team_exp_bonus: 0.3     # 组队经验加成百分比
+  max_level_diff: 15      # 有效等级差（超过此等级差经验衰减）
+  min_exp_multiplier: 0.2 # 最低经验系数
+  loot_strategy: "SHARED" # 战利品分配策略（SHARED-共享/RANDOM-随机）
+base_exp_per_level: 10  # 每级怪物提供的基础经验值
 
 
 # 修炼基础配置
