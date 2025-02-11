@@ -13,7 +13,6 @@ items:
       effect_type: "RESTORE_HP"
       effect_params: {"value": 30}
 
-      
     - item_id: "spirit_herb"
       name: "凝神草"
       description: "恢复少量理智值（+30MP）"

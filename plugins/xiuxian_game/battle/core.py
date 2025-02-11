@@ -16,6 +16,7 @@ from sqlalchemy import select, delete
 from ..models.team import Team, TeamMember
 from sqlalchemy.ext.asyncio import AsyncSession
 from ..models.player import get_player_by_uid
+from ..models.inventory import ItemType, ItemEffectType
 
 # 战斗命令
 explore_cmd = on_command("探索", block=True, priority=5)
@@ -124,8 +125,13 @@ class BattleInstance:
             # 玩家行动
             if actor.is_player:
                 if action := self.actions.get(actor.id):
-                    act_type, target_id = action
-                    await self._handle_player_action(actor, act_type, target_id, battle_log)
+                    act_type, value = action
+                    if act_type == "attack":
+                        target_id = value
+                        await self._handle_player_attack_action(actor, act_type, target_id, battle_log)
+                    elif act_type == "use_item":
+                        item_id = value
+                        await self._handle_use_item_action(actor, item_id, battle_log)
             # 敌人行动
             else:
                 await self._handle_enemy_action(actor, battle_log)
@@ -158,7 +164,7 @@ class BattleInstance:
                 return
             await asyncio.sleep(1)
 
-    async def _handle_player_action(self, actor: BattleActor, act_type: str, target_id: str, battle_log: list):
+    async def _handle_player_attack_action(self, actor: BattleActor, act_type: str, target_id: str, battle_log: list):
         """玩家行动处理"""
         target = next((e for e in self.enemies if e.id == target_id), None)
         if not target:
@@ -172,7 +178,7 @@ class BattleInstance:
                 log = f"✨ {target.name} 灵巧地躲过了攻击！"
             else:
                 actual_attack = actor.attack * random.uniform(0.8, 1.2)
-                damage = max(max(1,actual_attack * 0.1), actual_attack - target.defense)
+                damage = max(max(1,int(actual_attack * 0.1)), actual_attack - target.defense)
                 if is_crit:
                     damage = int(damage * 1.5)
                 target.hp = max(0, target.hp - damage)
@@ -213,7 +219,7 @@ class BattleInstance:
             battle_log.append(f"✨ {target.name} 灵巧地躲过了 {attacker.name} 的反击！")
             return
         actual_attack = attacker.attack * random.uniform(0.8, 1.2)
-        damage = max(max(1,actual_attack * 0.1), actual_attack - target.defense)
+        damage = max(max(1,int(actual_attack * 0.1)), actual_attack - target.defense)
         target.hp = max(0, target.hp - damage)
         battle_log.append(f"👹 {attacker.name} 反击 {target.name} 造成 {damage} 伤害！")
 
@@ -239,6 +245,51 @@ class BattleInstance:
         damage = int((attacker.attack * 1.5 - target.defense) * random.uniform(0.8, 1.2))
         target.hp = max(0, target.hp - damage)
         battle_log.append(f"🔥 {attacker.name} 发动技能攻击！对 {target.name} 造成 {damage} 伤害！")
+
+    async def _handle_use_item_action(self, actor: BattleActor, item_id: str, battle_log: list):
+        """处理玩家使用物品的行动"""
+        async with safe_session() as session:
+            # 获取物品配置
+            item_config = config.items_config["by_id"].get(item_id)
+            if not item_config:
+                battle_log.append(f"⛔ {actor.name} 使用了未知的物品")
+                return
+
+            # 从玩家背包中扣除物品
+            inventory = await session.execute(
+                select(Inventory)
+                .where(Inventory.player_id == actor.id)
+                .where(Inventory.item_id == item_id)
+            )
+            inventory = inventory.scalars().first()
+
+            if not inventory or inventory.quantity <= 0:
+                battle_log.append(f"⛔ {actor.name} 发现没有 {item_config.name}，无法使用")
+                return
+
+            # 应用物品效果
+            effect_type = item_config.effect_type
+            effect_params = item_config.effect_params
+
+            if effect_type == ItemEffectType.RESTORE_HP:
+                restore_amount = effect_params.get("value", 0)
+                actor.hp = min(actor.max_hp, actor.hp + restore_amount)
+                battle_log.append(f"💊 {actor.name} 使用了 {item_config.name}，恢复了 {restore_amount} 点生命值")
+            elif effect_type == ItemEffectType.RESTORE_MP:
+                restore_amount = effect_params.get("value", 0)
+                actor.mp = min(actor.max_mp, actor.mp + restore_amount)
+                battle_log.append(f"💊 {actor.name} 使用了 {item_config.name}，恢复了 {restore_amount} 点理智值")
+            else:
+                battle_log.append(f"⚠️ {actor.name} 使用了 {item_config.name}，但似乎没有任何效果")
+
+            # 扣除物品数量
+            inventory.quantity -= 1
+            if inventory.quantity <= 0:
+                await session.delete(inventory)
+            else:
+                session.add(inventory)
+
+            await session.commit()
 
     def _add_log(self, log: str):
         """优化日志存储"""
@@ -453,19 +504,44 @@ async def handle_attack(event: MessageEvent, args: Message = CommandArg()):
     await attack_cmd.finish(f"✅ 已锁定目标 {target.name}，等待回合结算")
 
 @use_item_cmd.handle()
-async def handle_use_item(event: MessageEvent):
+async def handle_use_item(event: MessageEvent, args: Message = CommandArg()):
     user_id = event.get_user_id()
     battle = _player_battles.get(user_id)
     
     if not battle or battle.is_expired:
         await use_item_cmd.finish("⛔ 你当前没有参与战斗")
+    if battle.actions.get(user_id, None):
+        await use_item_cmd.finish("⛔ 你已经提交了本回合的行动")
     
     # 更新玩家最新消息上下文
     battle.latest_event = event
     
-    # 调用现有背包系统
+    # 解析使用的物品名称
+    item_name = args.extract_plain_text().strip()
+    if not item_name:
+        await use_item_cmd.finish("⛔ 请输入要使用的物品名称")
+    
+    # 获取玩家背包中是否有该物品
     async with safe_session() as session:
-        inventory = await session.get(Inventory, user_id)
+        # 获取玩家背包
+        result = await session.execute(
+            select(Inventory)
+            .where(Inventory.player_id == user_id)
+        )
+        inventories = result.scalars().all()
+        inventory = next((inv for inv in inventories if inv.config.name == item_name), None)
+        
+        if not inventory or inventory.quantity <= 0:
+            await use_item_cmd.finish(f"⛔ 你的背包中没有 {item_name}")
+        
+        # 检查物品是否可在战斗中使用
+        item_config = inventory.config
+        if item_config.type != ItemType.CONSUMABLE:
+            await use_item_cmd.finish("⛔ 该物品无法在战斗中使用")
+        
+        # 记录玩家的使用物品行动
+        battle.actions[user_id] = ('use_item', item_config.item_id)
+        await use_item_cmd.finish(f"✅ 已选择使用 {item_name}，等待回合结算")
 
 async def process_battle_rewards(battle: BattleInstance) -> tuple:
     """处理战斗奖励（经验+掉落）"""
@@ -705,12 +781,12 @@ class TeamManager:
         team = team.scalars().first()
         if not team:
             return False
-
+        target = await get_player_by_uid(target_uid)
         # 删除目标成员
         result = await session.execute(
             delete(TeamMember)
             .where(TeamMember.team_id == team.id)
-            .where(TeamMember.player_id == target_uid)
+            .where(TeamMember.player_id == target.id)
         )
         if result.rowcount == 0:
             return False
