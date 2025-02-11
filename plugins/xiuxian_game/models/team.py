@@ -20,6 +20,7 @@ class Team(BaseModel):
     status: Mapped[TeamStatus] = mapped_column(String(16), default=TeamStatus.FORMING)
     created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
     
+    leader: Mapped["Player"] = relationship("Player", foreign_keys=[leader_id])
     members: Mapped[List["TeamMember"]] = relationship("TeamMember", back_populates="team")
 
 class TeamMember(BaseModel):
