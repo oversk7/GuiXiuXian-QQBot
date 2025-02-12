@@ -723,8 +723,8 @@ class TeamManager:
         current_members = await session.execute(
             select(TeamMember).where(TeamMember.team_id == team_id)
         )
-        if current_members and len(current_members.scalars().all()) >= config.team["max_members"]:
-            raise ValueError(f"队伍人数已达上限（{config.team['max_members']}人）")
+        if current_members and len(current_members.scalars().all()) >= config.game_config["team"]["max_members"]:
+            raise ValueError(f"队伍人数已达上限（{config.game_config['team']['max_members']}人）")
 
         # 检查是否已在队伍中
         existing = await session.execute(
