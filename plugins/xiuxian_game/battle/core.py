@@ -1,4 +1,4 @@
-from nonebot import on_command, get_bot, logger
+from nonebot import on_command, get_bot, logger, on_keyword
 from nonebot.adapters.qq import MessageEvent, Message
 from nonebot.params import CommandArg
 from typing import Dict, Any, List, Optional
@@ -1009,7 +1009,7 @@ async def handle_team_info(event: MessageEvent):
         )
         await team_info_cmd.finish(msg)
 
-revive_cmd = on_command("复活", block=True, priority=5)
+revive_cmd = on_keyword({"复活"}, block=True, priority=5)
 
 @revive_cmd.handle()
 async def handle_revive(event: MessageEvent):
