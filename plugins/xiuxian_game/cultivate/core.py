@@ -82,7 +82,7 @@ async def handle_out_seclusion(event: MessageEvent):
             await out_seclusion.finish("⛔ 你不在闭关状态")
 
         player.is_secluded = False
-        k = 5 if player.level <= 10 else 2
+        k = 5 if player.level <= 10 else 4
         base_gain = cfg["base_exp"] * (1 + player.level / k)
         delta_time = (datetime.now() - player.seclusion_start_time).seconds
         delta_time = delta_time if delta_time < 7 * 3600 else 7 * 3600
