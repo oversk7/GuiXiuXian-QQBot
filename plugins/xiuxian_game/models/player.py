@@ -45,6 +45,8 @@ class Player(Base):
 
     battle_mode: Mapped[str] = mapped_column(String(16), default="SOLO", comment="战斗模式，SOLO，TEAM")
 
+    is_dead: Mapped[bool] = mapped_column(Boolean, default=False, server_default='False', comment="是否死亡")
+
     
 async def get_player_by_uid(uid: str):
     from sqlalchemy import select

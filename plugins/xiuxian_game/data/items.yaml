@@ -40,6 +40,13 @@ items:
       effect_params: {"value": 100}
       price: 400
       
+    - item_id: "revive_potion"
+      name: "还魂丹"
+      description: "使用后可以立即原地复活。"
+      type: "CONSUMABLE"
+      effect_type: "REVIVE"
+      price: 1000
+
   materials:  # 材料类
     - item_id: "rotten_core"
       name: "腐坏的内丹"

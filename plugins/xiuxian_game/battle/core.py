@@ -384,6 +384,26 @@ async def battle_loop(battle: BattleInstance, event: MessageEvent):
                         f"🎁 获得战利品：{', '.join(drops) if drops else '无'}"
                     )
                 else:
+                    # 遍历所有玩家，检查是否死亡
+                    async with safe_session() as session:
+                        for actor in battle.players:
+                            if actor.hp <= 0:
+                                player = await session.get(Player, actor.id)
+                                if player:
+                                    # 计算复活代价
+                                    gold_loss = int(player.gold * 0.05)
+                                    exp_loss = int(player.exp * 0.05)
+                                    player.gold -= gold_loss
+                                    player.exp -= exp_loss
+                                    # 设置玩家为死亡状态，需要复活
+                                    player.is_dead = True
+                                    session.add(player)
+                                    await bot.send(
+                                        battle.latest_event,
+                                        f"💀 {player.nickname} 已战败！损失 {gold_loss}💰 和 {exp_loss} 修为。\n" +
+                                        "👉 输入指令【复活】选择复活方式。"
+                                    )
+                        session.commit()
                     result_msg = "💀 战斗失败，敌人获得了胜利..."
                 
                 await bot.send(battle.latest_event, result_msg)
@@ -988,3 +1008,41 @@ async def handle_team_info(event: MessageEvent):
             "\n".join(members)
         )
         await team_info_cmd.finish(msg)
+
+revive_cmd = on_command("复活", block=True, priority=5)
+
+@revive_cmd.handle()
+async def handle_revive(event: MessageEvent):
+    user_id = event.get_user_id()
+    async with safe_session() as session:
+        player = await session.get(Player, user_id)
+        if not player or not player.is_dead:
+            await revive_cmd.finish("⚠️ 你当前不需要复活。")
+
+        args = event.get_plaintext().strip()
+        if args == "原地复活":
+            # 检查玩家是否有足够的金币或复活道具
+            revival_cost = 500  # 假设原地复活需要500金币
+            if player.gold >= revival_cost:
+                player.gold -= revival_cost
+                player.hp = player.max_hp
+                player.mp = player.max_mp
+                player.is_dead = False
+                session.add(player)
+                await session.commit()
+                await revive_cmd.finish(f"✨ 你支付了 {revival_cost}💰，原地满状态复活！")
+            else:
+                await revive_cmd.finish("💰 金币不足，无法原地复活。")
+
+        elif args == "复活点复活":
+            # 设置玩家状态，传送回主城，并设置冷却时间
+            player.hp = int(player.max_hp * 0.5)
+            player.mp = int(player.max_mp * 0.5)
+            player.position = "主城"
+            player.is_dead = False
+            session.add(player)
+            await session.commit()
+            await revive_cmd.finish("🏙️ 你在复活点复活，生命值和理智值恢复50%，已被传送回主城。")
+        else:
+            await revive_cmd.finish("📝 请输入复活方式：原地复活 或 复活点复活。")
+        
