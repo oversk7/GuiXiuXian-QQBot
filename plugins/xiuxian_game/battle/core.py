@@ -140,11 +140,10 @@ class BattleInstance:
         report = create_rich_message(
             f"🌀 第{self.turn}回合结算：\n" +
             "\n".join(battle_log) + "\n\n" +
-            "📊 当前状态：\n" +
-            "👥 队友状态：\n" + 
-            "\n".join([f"{'💀' if p.hp <=0 else '👤'} {p.name} ❤️ {p.hp if p.hp>0 else 0}/{p.max_hp} | 💧 {p.mp}/{p.max_mp}" 
+            "👥 己方状态：\n" + 
+            "\n".join([f"{'💀' if p.hp <=0 else '👤'} {p.name} ❤️ {p.hp if p.hp>0 else 0}/{p.max_hp}\n🔵 {p.mp}/{p.max_mp}" 
                       for p in self.players]) + 
-            "\n👹 敌人状态：\n" +
+            "\n👹 敌方状态：\n" +
             "\n".join([f"{'💀' if e.hp <=0 else '👹'} {e.name} ❤️ {e.hp if e.hp>0 else 0}/{e.max_hp}" 
                       for e in self.enemies])
         )
@@ -177,7 +176,7 @@ class BattleInstance:
             if is_dodge:
                 log = f"✨ {target.name} 灵巧地躲过了攻击！"
             else:
-                actual_attack = actor.attack * random.uniform(0.8, 1.2)
+                actual_attack = int(actor.attack * random.uniform(0.8, 1.2))
                 damage = max(max(1,int(actual_attack * 0.1)), actual_attack - target.defense)
                 if is_crit:
                     damage = int(damage * 1.5)
@@ -218,7 +217,7 @@ class BattleInstance:
         if random.random() > hit_chance:
             battle_log.append(f"✨ {target.name} 灵巧地躲过了 {attacker.name} 的反击！")
             return
-        actual_attack = attacker.attack * random.uniform(0.8, 1.2)
+        actual_attack = int(attacker.attack * random.uniform(0.8, 1.2))
         damage = max(max(1,int(actual_attack * 0.1)), actual_attack - target.defense)
         target.hp = max(0, target.hp - damage)
         battle_log.append(f"👹 {attacker.name} 反击 {target.name} 造成 {damage} 伤害！")
@@ -333,7 +332,7 @@ async def send_battle_ui(battle: BattleInstance, event: MessageEvent):
         for idx, e in enumerate(battle.enemies)
     ])
     player_info = "\n".join([
-        f"{'💀' if p.hp <=0 else '👤'} {p.name} ❤️ {p.hp if p.hp>0 else 0}/{p.max_hp} | 💧 {p.mp}/{p.max_mp}"
+        f"{'💀' if p.hp <=0 else '👤'} {p.name} ❤️ {p.hp if p.hp>0 else 0}/{p.max_hp}\n🔵 {p.mp}/{p.max_mp}"
         for p in battle.players
     ])
     
@@ -347,7 +346,7 @@ async def send_battle_ui(battle: BattleInstance, event: MessageEvent):
         f"{enemy_info}\n"
         f"------------------------\n"
         f"可用指令：\n"
-        f"攻击 序号 | 使用 道具名 | 逃跑"
+        f"攻击 序号 | 使用 道具名"
     )
     await explore_cmd.finish(create_rich_message(msg, event))
 

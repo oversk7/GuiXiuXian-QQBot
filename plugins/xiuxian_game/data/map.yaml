@@ -30,3 +30,12 @@ regions:
         drops:
           - item_id: "heal_potion"
             chance: 0.2
+  - name: "绝望之城"
+    level_range: [21, 30]
+    monsters:
+      - name: "人头气球"
+        base_hp: 120
+        base_attack: 35
+        base_defense: 12
+        base_agility: 15
+
