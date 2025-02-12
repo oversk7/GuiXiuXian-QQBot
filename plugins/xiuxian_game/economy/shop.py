@@ -111,15 +111,15 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
         if not player:
             await buy_item.finish("⛔ 请先创建角色")
         
-        shop_data = generate_daily_shop(player.uid)
-        total_items = len(shop_data[0]) + len(shop_data[1])
+        # 获取商店数据（拆分为出售列表和收购列表）
+        sell_list, buy_list = generate_daily_shop(player.uid)
         
-        if index < 0 or index >= total_items:
-            await buy_item.finish("⛔ 无效的商品序号")
+        # 检查是否是出售列表的序号
+        if index < 0 or index >= len(sell_list):
+            await buy_item.finish("⛔ 无效的出售序号（请使用商店左侧的出售商品序号）")
         
-        # 获取收购物品
-        buy_index = index - len(shop_data[0])
-        item_config, price = shop_data[1][buy_index]
+        # 获取出售物品（从出售列表中获取）
+        item_config, price = sell_list[index]
         total_price = price * quantity
         
         # 金币检查
@@ -152,7 +152,7 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
             ))
         
         await session.commit()
-        await buy_item.finish(f"✅ 成功购买 {item_config.name} ✖️{quantity}（总花费 {total_price}💰）")
+        await buy_item.finish(f"✅ 成功购买 {item_config.name} ✖️{quantity}（单价 {price}💰 总花费 {total_price}💰）")
 
 @sell_item.handle()
 async def _(event: MessageEvent, args: Message = CommandArg()):
@@ -179,9 +179,9 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
         sell_list, buy_list = generate_daily_shop(player.uid)
         total_items = len(sell_list) + len(buy_list)
         
-        # 检查是否是收购列表的序号
-        if index < len(sell_list) or index >= total_items:
-            await sell_item.finish("⛔ 无效的收购序号")
+        # 检查是否是收购列表的序号（6-8号商品）
+        if index < len(sell_list) or index >= (len(sell_list) + len(buy_list)):
+            await sell_item.finish("⛔ 无效的收购序号（请使用商店右侧的收购商品序号）")
         
         # 获取收购物品
         buy_index = index - len(sell_list)
