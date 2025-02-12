@@ -1,6 +1,6 @@
 from sqlalchemy import String, Integer
 from sqlalchemy.orm import Mapped, mapped_column
-from .base import BaseModel
+from ..data.db import Base
 from enum import Enum as PyEnum
 
 class ItemType(str,PyEnum):
@@ -26,7 +26,7 @@ class ItemConfig:
         self.price = data.get("price", 0)
         
 
-class Inventory(BaseModel):
+class Inventory(Base):
     __tablename__ = "inventory"
     
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)

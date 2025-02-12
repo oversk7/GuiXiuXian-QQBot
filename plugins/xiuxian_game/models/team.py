@@ -1,7 +1,7 @@
 from sqlalchemy import String, Integer, ForeignKey, DateTime
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from datetime import datetime
-from .base import BaseModel
+from ..data.db import Base
 from enum import Enum as PyEnum
 from typing import List
 from sqlalchemy import func
@@ -12,7 +12,7 @@ class TeamStatus(str, PyEnum):
     READY = "已就绪"
     IN_BATTLE = "战斗中"
 
-class Team(BaseModel):
+class Team(Base):
     __tablename__ = "teams"
     
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
@@ -23,7 +23,7 @@ class Team(BaseModel):
     leader: Mapped["Player"] = relationship("Player", foreign_keys=[leader_id])
     members: Mapped[List["TeamMember"]] = relationship("TeamMember", back_populates="team")
 
-class TeamMember(BaseModel):
+class TeamMember(Base):
     __tablename__ = "team_members"
     
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)

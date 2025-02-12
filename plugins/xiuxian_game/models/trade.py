@@ -1,11 +1,11 @@
 from datetime import datetime
 from sqlalchemy import ForeignKey, Integer, String
 from sqlalchemy.orm import Mapped, mapped_column, relationship
-from .base import BaseModel
+from ..data.db import Base
 from .player import Player
 from .inventory import ItemConfig
 
-class TradeItem(BaseModel):
+class TradeItem(Base):
     __tablename__ = "trade_items"
     
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)

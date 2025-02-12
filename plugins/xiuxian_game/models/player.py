@@ -1,7 +1,7 @@
 from sqlalchemy import Integer, String, DateTime, func, Boolean
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from datetime import datetime
-from .base import BaseModel
+from ..data.db import Base
 from enum import Enum as PyEnum
 
 
@@ -9,7 +9,7 @@ class Gender(str, PyEnum):
     MALE = "男"
     FEMALE = "女"
 
-class Player(BaseModel):
+class Player(Base):
     __tablename__ = "player"
     
     id: Mapped[str] = mapped_column(String(32), primary_key=True, index=True, comment="平台ID")
