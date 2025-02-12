@@ -1,1 +1,1 @@
-from . import info, inventory
+from . import info, inventory, help
