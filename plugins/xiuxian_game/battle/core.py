@@ -7,7 +7,7 @@ from nonebot_plugin_apscheduler import scheduler
 import random
 import asyncio
 from ..config import config
-from ..data.db import safe_session
+from ..models.db import safe_session
 from ..models.player import Player
 from ..models.inventory import Inventory
 from ..utils import create_rich_message

@@ -1,7 +1,7 @@
 from sqlalchemy import select
 from sqlalchemy.orm import selectinload
 from datetime import datetime
-from ..data.db import safe_session
+from ..models.db import safe_session
 from ..models.quest import Quest, PlayerQuest
 from ..models.player import Player
 from ..models.inventory import Inventory

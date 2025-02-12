@@ -1,6 +1,6 @@
 from enum import Enum
 from sqlalchemy import JSON
-from ..data.db import Base
+from .db import Base
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from datetime import datetime
 from sqlalchemy import ForeignKey

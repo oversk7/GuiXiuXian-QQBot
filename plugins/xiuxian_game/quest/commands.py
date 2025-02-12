@@ -1,7 +1,7 @@
 from nonebot import on_command
 from nonebot.adapters.qq import MessageEvent, Message
 from nonebot.params import CommandArg
-from ..data.db import safe_session
+from ..models.db import safe_session
 from sqlalchemy import select
 from sqlalchemy.orm import selectinload
 from ..models.quest import PlayerQuest, Quest

@@ -1,7 +1,7 @@
 from datetime import datetime
 from sqlalchemy import ForeignKey, Integer, String
 from sqlalchemy.orm import Mapped, mapped_column, relationship
-from ..data.db import Base
+from .db import Base
 from .player import Player
 from .inventory import ItemConfig
 

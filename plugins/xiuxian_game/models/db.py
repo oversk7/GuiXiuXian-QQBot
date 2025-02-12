@@ -11,7 +11,7 @@ from sqlalchemy import select
 
 
 engine = create_async_engine(
-    "sqlite+aiosqlite:///" + os.path.join(os.path.dirname(__file__), "game.db"),
+    "sqlite+aiosqlite:///" + os.path.join(os.path.dirname(__file__), "../data/game.db"),
     echo=False
 )
 
@@ -23,6 +23,9 @@ AsyncSessionLocal = sessionmaker(
 )
 
 Base = declarative_base()
+def get_base():
+    import models
+    return Base
 
 async def init_db():
     print("🔄 正在初始化数据库...")
@@ -31,7 +34,7 @@ async def init_db():
         
     # 新增任务配置初始化
     from ..config import config
-    from ..models.quest import Quest
+    from .quest import Quest
     quests_config = config.quests_config  # 从本地文件读取
     
     async with AsyncSessionLocal() as session:

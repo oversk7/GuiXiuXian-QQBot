@@ -3,7 +3,7 @@ from nonebot.adapters.qq import MessageEvent
 from datetime import datetime
 from sqlalchemy import select
 from ..models import Player, Inventory
-from ..data.db import get_session
+from ..models.db import get_session
 import random
 from ..quest.core import check_daily_quests
 

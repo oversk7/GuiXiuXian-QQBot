@@ -1,7 +1,7 @@
 from sqlalchemy import Integer, String, DateTime, func, Boolean
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from datetime import datetime
-from ..data.db import Base
+from .db import Base
 from enum import Enum as PyEnum
 
 
@@ -50,7 +50,7 @@ class Player(Base):
     
 async def get_player_by_uid(uid: str):
     from sqlalchemy import select
-    from ..data.db import get_session
+    from .db import get_session
     
     async with get_session() as session:
         result = await session.execute(select(Player).where(Player.uid == uid))

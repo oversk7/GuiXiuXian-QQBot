@@ -1,11 +1,11 @@
 from sqlalchemy import String, Integer, ForeignKey, DateTime
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from datetime import datetime
-from ..data.db import Base
+from .db import Base
 from enum import Enum as PyEnum
 from typing import List
 from sqlalchemy import func
-from ..models.player import Player
+from .player import Player
 
 class TeamStatus(str, PyEnum):
     FORMING = "组队中"

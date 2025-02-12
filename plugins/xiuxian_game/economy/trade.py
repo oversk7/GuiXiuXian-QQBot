@@ -2,7 +2,7 @@ from nonebot import on_command
 from nonebot.adapters.qq import MessageEvent, Message
 from nonebot.params import CommandArg
 from sqlalchemy import select, delete, func
-from ..data.db import safe_session
+from ..models.db import safe_session
 from ..models import Player, Inventory, TradeItem
 from ..config import config
 from ..utils import create_rich_message

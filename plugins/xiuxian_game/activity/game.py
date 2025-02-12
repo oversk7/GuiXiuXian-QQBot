@@ -2,7 +2,7 @@ from nonebot import on_command
 from nonebot.adapters.qq import MessageEvent
 from nonebot.params import CommandArg
 from nonebot.adapters.qq import Message
-from ..data.db import safe_session
+from ..models.db import safe_session
 from ..models.player import Player
 from ..utils import create_rich_message
 import random

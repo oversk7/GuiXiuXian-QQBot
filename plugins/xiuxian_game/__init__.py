@@ -2,7 +2,7 @@ from nonebot.plugin import PluginMetadata
 from nonebot import get_driver
 
 from .config import Config
-from .data.db import init_db
+from .models.db import init_db
 
 __plugin_meta__ = PluginMetadata(
     name="诡修仙",

@@ -1,6 +1,6 @@
 from sqlalchemy import String, Integer
 from sqlalchemy.orm import Mapped, mapped_column
-from ..data.db import Base
+from .db import Base
 from enum import Enum as PyEnum
 
 class ItemType(str,PyEnum):

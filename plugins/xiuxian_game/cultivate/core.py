@@ -2,7 +2,7 @@ from nonebot import on_command
 from nonebot.adapters.qq import MessageEvent, Message
 from nonebot.params import CommandArg
 from ..utils import  create_rich_message, calculate_level_up_exp
-from ..data.db import safe_session
+from ..models.db import safe_session
 from ..models.player import Player
 from ..config import config
 from datetime import datetime
