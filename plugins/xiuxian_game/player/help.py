@@ -82,4 +82,21 @@ async def handle_ren_wu(event: MessageEvent, args: Message = CommandArg()):
     )
     await ren_wu_cmd.finish(Message(msg))
 
+# 交易系统
+trade_cmd = on_command("交易系统", priority=4, block=True)
+@trade_cmd.handle()
+async def handle_trade(event: MessageEvent, args: Message = CommandArg()):
+    msg = (
+        "✨ 交易系统帮助 ✨\n"
+        "【交易市场】 查看玩家出售物品\n"
+        "【上架 [名称] [数量] [单价]】 出售背包内物品\n"
+        "【下架 [上架ID] [数量]】 下架指定商品\n"
+        "【交易 [上架ID] [数量]】 购买指定商品\n"
+        "【我的店铺】 查看自己上架的商品\n"
+        "═══════════════\n"
+        "◈ 上架示例：/上架 传送符 5 80"
+    )
+    await trade_cmd.finish(Message(msg))
+
+
 
