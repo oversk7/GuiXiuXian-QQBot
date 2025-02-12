@@ -8,10 +8,6 @@ from contextlib import asynccontextmanager
 import asyncio
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy import select
-from datetime import datetime
-import shutil
-from pathlib import Path
-from nonebot_plugin_apscheduler import scheduler
 
 
 engine = create_async_engine(
@@ -28,26 +24,8 @@ AsyncSessionLocal = sessionmaker(
 
 Base = declarative_base()
 
-# 自动备份配置
-BACKUP_DIR = Path(__file__).parent / "backups"
-BACKUP_DIR.mkdir(exist_ok=True)
-MAX_BACKUPS = 7  # 保留最近7天备份
-
-async def create_backup():
-    """创建数据库备份"""
-    backup_file = BACKUP_DIR / f"game_{datetime.now().strftime('%Y%m%d_%H%M')}.db"
-    source = Path(__file__).parent / "game.db"
-    shutil.copy(source, backup_file)
-    
-    # 清理旧备份
-    backups = sorted(BACKUP_DIR.glob("game_*.db"), reverse=True)
-    for old in backups[MAX_BACKUPS:]:
-        old.unlink()
-
 async def init_db():
     print("🔄 正在初始化数据库...")
-    # 每天凌晨执行备份
-    scheduler.add_job(create_backup, 'cron', hour=0, minute=0)
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
         
