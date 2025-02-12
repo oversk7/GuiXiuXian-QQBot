@@ -146,7 +146,7 @@ async def handle_item_detail(event: MessageEvent, args: Message = CommandArg()):
         if index > len(page_items):
             await item_detail.finish(f"⛔ 该页只有 {len(page_items)} 个物品")
 
-        target_item = page_items[index - 1].item
+        target_item = page_items[index - 1].config
         effect_info = ""
         if target_item.effect_type and target_item.effect_params:
             effects = {
