@@ -38,7 +38,7 @@ async def handle_market(event: MessageEvent):
         ]
         msg.append("\n".join(item_line))
 
-    msg.append("━━━━━━━━━━\n📥 购买：/交易 售卖ID 数量（税率：1w以上5%）")
+    msg.append("━━━━━━━━━━\n📥 购买：/交易 售卖ID 数量（1w以上交易卖家需缴纳5%税费）")
     await market.finish(create_rich_message("\n".join(msg), event))
 
 # 上架物品
@@ -113,17 +113,23 @@ async def handle_trade_command(event: MessageEvent, args: Message = CommandArg()
         if not trade_item:
             await trade_command.finish("❌ 商品不存在")
 
-        total = trade_item.price * quantity
-        if total >= 10000:
-            total = int(total * 1.05)
+        original_total = trade_item.price * quantity
+        tax = 0
+        
+        # 计算税费（当原始交易额≥1w时收取5%）
+        if original_total >= 10000:
+            tax = int(original_total * 0.05)
+        
+        seller_gain = original_total - tax
 
         buyer = await session.get(Player, buyer_id)
-        if buyer.gold < total:
-            await trade_command.finish(f"❌ 金币不足，需要：{total}（当前：{buyer.gold}）")
+        if buyer.gold < original_total:  # 买家需要支付原始总价
+            await trade_command.finish(f"❌ 金币不足，需要：{original_total}（当前：{buyer.gold}）")
 
-        buyer.gold -= total
+        # 更新金币
+        buyer.gold -= original_total
         seller = await session.get(Player, trade_item.seller_id)
-        seller.gold += trade_item.price * quantity
+        seller.gold += seller_gain  # 卖家获得税后金额
 
         inv = await session.execute(
             select(Inventory)
@@ -144,8 +150,20 @@ async def handle_trade_command(event: MessageEvent, args: Message = CommandArg()
         if trade_item.quantity <= 0:
             session.delete(trade_item)
 
+        # 构建交易结果消息
+        item_cfg = config.items_config["by_id"][trade_item.item_id]
+        tax_info = f"📝 税费：{tax}金币（5%）" if tax else ""
+        seller_uid = (await _get_user_display(trade_item.seller_id))[0]
+        
+        result_msg = [
+            f"✅ 购买 {item_cfg.name} ×{quantity} 成功！",
+            f"💸 支付总额：{original_total}金币",
+            f"🏦 卖家 [UID:{seller_uid}] 到账：{seller_gain}金币",
+            tax_info
+        ]
+        
         await session.commit()
-        await trade_command.finish(f"✅ 购买成功！获得 {trade_item.item.name}×{quantity}")
+        await trade_command.finish("\n".join(filter(None, result_msg)))
 
 my_shop = on_command("我的店铺", priority=5, block=True)
 @my_shop.handle()
