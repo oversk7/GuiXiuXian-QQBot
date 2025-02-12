@@ -20,3 +20,66 @@ async def handle_help(event: MessageEvent, args: Message = CommandArg()):
         "💡 官群：962494679，官群签到奖励更多"
     )
     await help_cmd.finish(Message(msg))
+
+# 修炼系统
+xiu_lian_cmd = on_command("修炼系统", priority=4, block=True)
+
+@xiu_lian_cmd.handle()
+async def handle_xiu_lian(event: MessageEvent, args: Message = CommandArg()):
+    msg = (
+        "✨ 修炼系统帮助 ✨\n"
+        "【修炼】 获取经验，冷却时间5分钟"
+        "【闭关】 闭关修炼，挂机升级，但效率减半"
+        "【出关】 出关后可继续修炼"
+        "【突破】 突破境界，经验足够时使用"
+        "【加点】 分配突破获得的属性点，增强实力"
+    )
+    await xiu_lian_cmd.finish(Message(msg))
+
+
+# 活动系统
+huo_dong_cmd = on_command("活动系统", priority=4, block=True)
+
+@huo_dong_cmd.handle()
+async def handle_huo_dong(event: MessageEvent, args: Message = CommandArg()):
+    msg = (
+        "✨ 活动系统帮助 ✨\n"
+        "【签到】 每日签到，获取奖励"
+        "【猜拳】 猜拳游戏，猜赢翻倍"
+    )
+    await huo_dong_cmd.finish(Message(msg))
+
+# 背包系统
+bag_cmd = on_command("背包系统", priority=4, block=True)
+@bag_cmd.handle()
+async def handle_bag(event: MessageEvent, args: Message = CommandArg()):
+    msg = (
+        "✨ 背包系统帮助 ✨\n"
+        "【背包 [页码]】 查看背包内所有物品\n"
+        "【查背包 [页码] [序号]】 查询物品详细信息\n"
+        "【使用物品 [物品名]】 使用指定道具\n"
+        "═══════════════\n"
+        "◈ 使用传送符示例：/传送 [地点]"
+    )
+    await bag_cmd.finish(Message(msg))
+
+# 任务系统
+ren_wu_cmd = on_command("任务系统", priority=4, block=True)
+@ren_wu_cmd.handle()
+async def handle_ren_wu(event: MessageEvent, args: Message = CommandArg()):
+    msg = (
+        "✨ 任务系统帮助 ✨\n"
+        "【任务】 查看当前任务"
+        "【传送 [地点]】 传送到指定地点"
+        "【地图】 查看当前可探索的地点"
+        "【探索】 探索玩家所在地点"
+        "【队伍邀请 [UID]】 邀请玩家加入队伍"
+        "【队伍创建/解散】 创建/解散队伍"
+        "【踢出队员 [UID]】"
+        "【加入队伍 [队伍ID]】用于被邀请后同意"
+        "【退出队伍】"
+        "【探索模式 个人/组队】 切换单人/组队探索模式"
+    )
+    await ren_wu_cmd.finish(Message(msg))
+
+
