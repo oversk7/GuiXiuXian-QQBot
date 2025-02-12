@@ -171,7 +171,7 @@ class BattleInstance:
         if act_type == "attack":
             # 计算伤害（加入暴击和闪避判定）
             is_crit = random.random() < (actor.luck / 1000)
-            is_dodge = random.random() < actor.calculate_hit_chance(target)
+            is_dodge = random.random() > actor.calculate_hit_chance(target)
             
             if is_dodge:
                 log = f"✨ {target.name} 灵巧地躲过了攻击！"
