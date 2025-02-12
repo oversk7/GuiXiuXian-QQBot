@@ -113,6 +113,12 @@ async def handle_trade_command(event: MessageEvent, args: Message = CommandArg()
         if not trade_item:
             await trade_command.finish("❌ 商品不存在")
 
+        # 数量校验（防止购买数量超过库存）
+        if quantity > trade_item.quantity:
+            await trade_command.finish(f"❌ 购买数量超过库存（当前库存：{trade_item.quantity}）")
+        if quantity <= 0:
+            await trade_command.finish("❌ 购买数量必须大于0")
+
         original_total = trade_item.price * quantity
         tax = 0
         
