@@ -44,7 +44,7 @@ async def handle_use_item(event: MessageEvent, args: Message = CommandArg()):
         inv_result = await session.execute(
             select(Inventory)
             .where(Inventory.player_id == event.get_user_id())
-            .where(Inventory.item_id == item_config["item_id"])
+            .where(Inventory.item_id == item_config.item_id)
         )
         inventory = inv_result.scalars().first()
         
@@ -52,11 +52,11 @@ async def handle_use_item(event: MessageEvent, args: Message = CommandArg()):
             await use_item.finish(f"⛔ {item_name} 数量不足")
 
         # 应用物品效果
-        if item_config["type"] == ItemType.CONSUMABLE:
-            if item_config["effect_type"] == ItemEffectType.RESTORE_HP:
-                player.hp = min(player.max_hp, player.hp + item_config["effect_params"]["value"] * quantity)
-            elif item_config["effect_type"] == ItemEffectType.RESTORE_MP:
-                player.mp = min(player.max_mp, player.mp + item_config["effect_params"]["value"] * quantity)
+        if item_config.type == ItemType.CONSUMABLE:
+            if item_config.effect_type == ItemEffectType.RESTORE_HP:
+                player.hp = min(player.max_hp, player.hp + item_config.effect_params.value * quantity)
+            elif item_config.effect_type == ItemEffectType.RESTORE_MP:
+                player.mp = min(player.max_mp, player.mp + item_config.effect_params.value * quantity)
             # 更新背包数量
             inventory.quantity -= quantity
             if inventory.quantity <= 0:
