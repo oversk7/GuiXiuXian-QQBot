@@ -1,0 +1,11 @@
+quests:
+  - id: 1
+    type: DAILY
+    title: "每日修行"
+    description: "完成5次修炼"
+    condition_type: "CULTIVATE"
+    required: 5
+    rewards:
+      gold: 200
+      exp: 150
+    repeatable: true 
