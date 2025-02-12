@@ -1,5 +1,5 @@
 from nonebot import on_command, get_bot, logger
-from nonebot.adapters.onebot.v11 import MessageEvent, Message
+from nonebot.adapters.qq import MessageEvent, Message
 from nonebot.params import CommandArg
 from typing import Dict, Any, List, Optional
 from datetime import datetime, timedelta

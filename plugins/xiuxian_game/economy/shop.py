@@ -1,6 +1,6 @@
 from nonebot import on_command
 from nonebot.params import CommandArg
-from nonebot.adapters.onebot.v11 import MessageEvent, Message
+from nonebot.adapters.qq import MessageEvent, Message
 import random
 from datetime import datetime
 from ..data.db import safe_session

@@ -1,5 +1,5 @@
 from nonebot import on_command
-from nonebot.adapters.onebot.v11 import MessageEvent, Message
+from nonebot.adapters.qq import MessageEvent, Message
 from nonebot.params import CommandArg
 from ..data.db import safe_session
 from sqlalchemy import select

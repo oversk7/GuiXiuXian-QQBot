@@ -1,4 +1,4 @@
-from nonebot.adapters.onebot.v11 import Message, MessageSegment, MessageEvent
+from nonebot.adapters.qq import Message, MessageSegment, MessageEvent
 from typing import Optional
 from .config import config
 
@@ -7,11 +7,11 @@ def create_rich_message(content: str, event: Optional[MessageEvent] = None) -> M
     """
     创建带格式的富文本消息，自动添加@用户
     """
-    msg = Message()
-    if event:
-        msg.append(MessageSegment.at(event.get_user_id()))
-    msg.append(MessageSegment.text(f"\n{content.strip()}"))
-    return msg
+    # msg = Message()
+    # if event:
+    #     msg.append(MessageSegment.at(event.get_user_id()))
+    # msg.append(MessageSegment.text(f"\n{content.strip()}"))
+    return Message(content)
 
 
 

@@ -1,6 +1,6 @@
 from nonebot import on_command
 from nonebot.params import CommandArg
-from nonebot.adapters.onebot.v11 import MessageEvent, Message
+from nonebot.adapters.qq import MessageEvent, Message
 from ..data.db import safe_session
 from ..models.player import Player
 from sqlalchemy import select, func

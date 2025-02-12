@@ -1,5 +1,5 @@
 import nonebot
-from nonebot.adapters.onebot.v11 import Adapter
+from nonebot.adapters.qq import Adapter
 
 
 
