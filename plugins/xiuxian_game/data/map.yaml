@@ -7,6 +7,9 @@ regions:
         base_attack: 1
         base_defense: 1
         base_agility: 1
+        drops:
+          - item_id: "teleport"
+            chance: 0.2
   - name: "乱葬岗"
     level_range: [5, 10]
     monsters:
@@ -21,7 +24,7 @@ regions:
             base_probability: 0.3
         drops:
           - item_id: "teleport"
-            chance: 0.8
+            chance: 0.5
 
   - name: "阴风洞"
     level_range: [11, 20]
