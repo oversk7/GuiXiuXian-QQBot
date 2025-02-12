@@ -7,6 +7,7 @@ from ..models.player import Player
 from ..config import config
 from datetime import datetime
 import random
+from ..quest.core import check_quest_progress, check_daily_quests
 
 
 cfg = config.game_config["cultivate"]
@@ -44,7 +45,7 @@ async def handle_cultivate(event: MessageEvent):
         player.exp += exp_gain
         session.add(player)
         await session.commit()
-        
+        await check_quest_progress(str(user_id), "CULTIVATE")
         await cultivate.finish(f"🌀 运转周天完毕 🌀\n▫️ 获得修为：+{exp_gain}\n▫️ 当前经验：{player.exp}/{calculate_level_up_exp(player.level)}")
 
 @seclusion.handle()

@@ -8,6 +8,7 @@ class Config(BaseSettings):
     config_file: Path = data_dir / "config.yaml"
     items_file: Path = data_dir / "items.yaml"
     map_file: Path = data_dir / "map.yaml"
+    quests_file: Path = data_dir / "quests.yaml"
     
     @property
     def game_config(self) -> dict:
@@ -32,6 +33,11 @@ class Config(BaseSettings):
     @property
     def map_config(self) -> dict:
         return _load_config(self.map_file)
+
+    @property
+    def quests_config(self) -> dict:
+        return _load_config(self.quests_file)
+
 
 @lru_cache(maxsize=None)
 def _load_config(config_file: Path) -> dict:

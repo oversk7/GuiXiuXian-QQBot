@@ -5,6 +5,8 @@ from sqlalchemy import select
 from ..models import Player, Inventory
 from ..data.db import get_session
 import random
+from ..quest.core import check_daily_quests
+
 sign = on_command("签到", block=True, priority=5)
 
 @sign.handle()
@@ -39,11 +41,12 @@ async def handle_sign(event: MessageEvent):
             starter_pack = Inventory(
                 player_id=player.id,
                 item_id="heal_potion",
-                quantity=5
+                quantity=3
             )
             session.add(starter_pack)
-            await sign.send(f"签到成功！获得 {gold_reward} 金币，并领取了新手大礼包！🎁")
+            await sign.send(f"签到成功！获得 {gold_reward} 金币，并领取了 回春散x3！🎁")
         else:
             await sign.send(f"签到成功！获得 {gold_reward} 金币！✨")
         
         await session.commit()
+        await check_daily_quests(str(user_id))  # 检查每日任务

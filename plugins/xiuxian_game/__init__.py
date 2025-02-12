@@ -18,6 +18,7 @@ from . import (
     battle,
     activity,
     economy,
+    quest,
     # social,
     # world
 )
