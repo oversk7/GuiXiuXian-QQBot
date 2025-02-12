@@ -7,11 +7,12 @@ from ..models.inventory import Inventory
 from ..models.inventory import ItemType, ItemEffectType
 from ..utils import create_rich_message, paginate_items
 from sqlalchemy import select
-from .. import config
+from ..config import config
 
 inventory_cmd = on_command("背包", block=True, priority=5)
 use_item = on_command("使用物品", block=True, priority=5)
 item_detail = on_command("查背包", block=True, priority=5)
+teleport_cmd = on_command("传送", block=True, priority=5)
 
 @use_item.handle()
 async def handle_use_item(event: MessageEvent, args: Message = CommandArg()):
@@ -161,4 +162,45 @@ async def handle_item_detail(event: MessageEvent, args: Message = CommandArg()):
             f"▫️ 描述：{target_item.description or '暂无描述'}"
             f"{effect_info}"
         )
-        await item_detail.finish(create_rich_message(msg, event)) 
+        await item_detail.finish(create_rich_message(msg, event))
+
+@teleport_cmd.handle()
+async def handle_teleport(event: MessageEvent, args: Message = CommandArg()):
+    """处理传送指令"""
+    target_location = args.extract_plain_text().strip()
+    if not target_location:
+        await teleport_cmd.finish("⛔ 请指定传送地点，例：传送 阴风洞")
+
+    async with safe_session() as session:
+        # 获取玩家和地图配置
+        player = await session.get(Player, event.get_user_id())
+        if not player:
+            await teleport_cmd.finish("⛔ 请先创建角色")
+
+        # 验证目标地点是否存在
+        valid_locations = [region["name"] for region in config.map_config["regions"]]
+        if target_location not in valid_locations:
+            await teleport_cmd.finish(f"⛔ 无效地点，可选：{'/'.join(valid_locations)}")
+
+        # 检查传送符数量
+        teleport_item = config.items_config["by_name"]["传送符"]
+        inv_result = await session.execute(
+            select(Inventory)
+            .where(Inventory.player_id == event.get_user_id())
+            .where(Inventory.item_id == teleport_item.item_id)
+        )
+        inventory = inv_result.scalars().first()
+
+        if not inventory or inventory.quantity < 1:
+            await teleport_cmd.finish("⛔ 传送符数量不足")
+
+        # 扣除物品并传送
+        inventory.quantity -= 1
+        if inventory.quantity <= 0:
+            await session.delete(inventory)
+        
+        player.position = target_location
+        session.add(player)
+        await session.commit()
+
+        await teleport_cmd.finish(f"🌀 消耗1个传送符，已成功传送至【{target_location}】\n当前位置：{target_location} 📍") 

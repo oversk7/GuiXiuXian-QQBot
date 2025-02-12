@@ -1,6 +1,14 @@
 regions:
+  - name: "主城"
+    level_range: [1, 2]
+    monsters:
+      - name: "狗"
+        base_hp: 10
+        base_attack: 1
+        base_defense: 1
+        base_agility: 1
   - name: "乱葬岗"
-    level_range: [1, 10]
+    level_range: [5, 10]
     monsters:
       - name: "腐尸"
         base_hp: 50
