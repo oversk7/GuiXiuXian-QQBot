@@ -6,6 +6,7 @@ items:
       type: "CONSUMABLE"
       effect_type: "SPECIAL"
       price: 100
+      sell_ratio: 0.3
 
     - item_id: "heal_potion"
       name: "回春散"
@@ -38,3 +39,36 @@ items:
       effect_type: "RESTORE_MP"
       effect_params: {"value": 100}
       price: 400
+      
+  materials:  # 材料类
+    - item_id: "rotten_core"
+      name: "腐坏的内丹"
+      description: "从腐尸体内取出的浑浊内丹，散发着腐臭气息 🦠"
+      type: "MATERIAL"
+      price: 80
+      sell_ratio: 0.5
+
+    - item_id: "ghost_tears"
+      name: "鬼泪"
+      description: "厉鬼哭泣时凝结的冰晶，触之刺骨 ❄️"
+      type: "MATERIAL"
+      price: 150
+
+    - item_id: "cursed_silk"
+      name: "诅咒丝线"
+      description: "沾染怨念的红色丝线，隐约能听到哀嚎声 🧵"
+      type: "MATERIAL"
+      price: 200
+
+    - item_id: "spirit_bone"
+      name: "灵骨"
+      description: "蕴含微弱灵力的兽骨，可用于炼制法器 💀"
+      type: "MATERIAL"
+      price: 50
+
+    - item_id: "yin_essence"
+      name: "阴煞精华"
+      description: "极阴之地凝聚的黑色结晶，表面泛着幽光 🔮"
+      type: "MATERIAL"
+      price: 300
+

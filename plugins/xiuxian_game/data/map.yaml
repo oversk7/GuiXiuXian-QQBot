@@ -10,6 +10,8 @@ regions:
         drops:
           - item_id: "teleport"
             chance: 0.2
+          - item_id: "spirit_bone"
+            chance: 0.4
   - name: "乱葬岗"
     level_range: [5, 10]
     monsters:
@@ -25,7 +27,8 @@ regions:
         drops:
           - item_id: "teleport"
             chance: 0.5
-
+          - item_id: "rotten_core"
+            chance: 0.3
   - name: "阴风洞"
     level_range: [11, 20]
     monsters:
@@ -41,6 +44,8 @@ regions:
         drops:
           - item_id: "heal_potion"
             chance: 0.2
+          - item_id: "ghost_tears"
+            chance: 0.25
   - name: "绝望之城"
     level_range: [21, 30]
     monsters:
@@ -49,4 +54,9 @@ regions:
         base_attack: 35
         base_defense: 12
         base_agility: 15
+        drops:
+          - item_id: "cursed_silk"
+            chance: 0.35
+          - item_id: "yin_essence"
+            chance: 0.15
 
