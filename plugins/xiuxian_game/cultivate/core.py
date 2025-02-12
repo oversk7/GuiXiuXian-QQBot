@@ -29,13 +29,16 @@ async def handle_cultivate(event: MessageEvent):
         if not player:
             await cultivate.finish("⛔ 请先使用【注册】命令创建角色")
         
+        # 闭关状态检查
+        if player.is_secluded:
+            await cultivate.finish("⛔ 闭关期间无法进行普通修炼，请先【出关】或完成闭关")
+        
         # 冷却时间检查
         if player.last_cultivation and (datetime.now() - player.last_cultivation).seconds < cfg["cool_down"]:
             remaining = cfg["cool_down"] - (datetime.now() - player.last_cultivation).seconds
-
             await cultivate.finish(f"🕒 修炼调息中...（冷却剩余 {remaining//60}分{remaining%60}秒）")
         
-        k = 5 if player.level <= 10 else 2
+        k = 5 if player.level <= 10 else 4
         # 基础收益计算
         base_gain = cfg["base_exp"] * (1 + player.level / k)
         exp_gain = round(base_gain * random.uniform(0.8, 1.2))
