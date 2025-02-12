@@ -8,7 +8,6 @@ from contextlib import asynccontextmanager
 import asyncio
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy import select
-from sqlalchemy import event
 from datetime import datetime
 import shutil
 from pathlib import Path
@@ -84,29 +83,12 @@ async def get_session() -> AsyncGenerator[AsyncSession, None]:
 
 @asynccontextmanager
 async def safe_session():
-    """安全会话管理器（自动回滚+资源清理+操作审计）"""
+    """安全会话管理器（自动回滚+资源清理）"""
     async with AsyncSessionLocal() as session:
         try:
-            # 添加审计钩子
-            @event.listens_for(session.sync_session, 'before_flush')
-            def before_flush(session, flush_context, instances):
-                """数据变更前校验"""
-                for obj in session.dirty | session.new:
-                    if isinstance(obj, Player):
-                        # 数值合法性校验
-                        if obj.gold < 0 or obj.gold > 10**9:  # 设置合理上限
-                            raise ValueError(f"异常金币值 {obj.gold}")
-                        if obj.level < 1 or obj.level > config.game_config["game"]["max_level"]:
-                            raise ValueError(f"异常等级 {obj.level}")
-                    elif isinstance(obj, Inventory):
-                        if obj.quantity < 0 or obj.quantity > 1000:  # 单物品数量上限
-                            raise ValueError(f"异常物品数量 {obj.quantity}")
-            
             yield session
-            await session.commit()
-        except (SQLAlchemyError, ValueError) as e:
+        except SQLAlchemyError as e:
             await session.rollback()
-            logger.error(f"数据操作异常：{str(e)}")
             raise e
         finally:
             await session.close()
