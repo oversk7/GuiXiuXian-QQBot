@@ -72,3 +72,15 @@ items:
       type: "MATERIAL"
       price: 300
 
+    - item_id: "nightmare_silk"
+      name: "梦魇丝线"
+      description: "从梦境中提取的透明丝线，触碰时会浮现幻象 🕸️"
+      type: "MATERIAL"
+      price: 450
+
+    - item_id: "flesh_crystal"
+      name: "血肉结晶"
+      description: "不断搏动的红色晶石，内部似有生命在孕育 ❤️"
+      type: "MATERIAL"
+      price: 600
+

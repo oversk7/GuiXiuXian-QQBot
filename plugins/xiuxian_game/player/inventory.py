@@ -13,6 +13,7 @@ inventory_cmd = on_command("背包", block=True, priority=5)
 use_item = on_command("使用物品", block=True, priority=5)
 item_detail = on_command("查背包", block=True, priority=5)
 teleport_cmd = on_command("传送", block=True, priority=5)
+teleport_list = on_command("地图", block=True, priority=5)
 
 @use_item.handle()
 async def handle_use_item(event: MessageEvent, args: Message = CommandArg()):
@@ -180,7 +181,7 @@ async def handle_teleport(event: MessageEvent, args: Message = CommandArg()):
         # 验证目标地点是否存在
         valid_locations = [region["name"] for region in config.map_config["regions"]]
         if target_location not in valid_locations:
-            await teleport_cmd.finish(f"⛔ 无效地点，可选：{'/'.join(valid_locations)}")
+            await teleport_cmd.finish(f"⛔ 无效地点，发送/地图 查看所有可传送地点")
 
         # 检查传送符数量
         teleport_item = config.items_config["by_name"]["传送符"]
@@ -203,4 +204,26 @@ async def handle_teleport(event: MessageEvent, args: Message = CommandArg()):
         session.add(player)
         await session.commit()
 
-        await teleport_cmd.finish(f"🌀 消耗1个传送符，已成功传送至【{target_location}】\n当前位置：{target_location} 📍") 
+        await teleport_cmd.finish(f"🌀 消耗1个传送符，已成功传送至【{target_location}】\n当前位置：{target_location} 📍")
+
+@teleport_list.handle()
+async def handle_teleport_list(event: MessageEvent):
+    """显示所有可传送的地点"""
+    async with safe_session() as session:
+        # 检查玩家是否存在
+        player = await session.get(Player, event.get_user_id())
+        if not player:
+            await teleport_list.finish("⛔ 请先创建角色")
+
+        # 获取所有可传送地点
+        locations = [f"• {region['name']} 🌐" for region in config.map_config["regions"]]
+        
+        # 格式化消息
+        msg = (
+            "🪐 可传送地点列表：\n"
+            + "\n".join(locations)
+            + "\n\n📌 使用方式：传送 [地点名称]\n"
+            "📦 需要消耗：传送符 ✖1"
+        )
+        
+        await teleport_list.finish(create_rich_message(msg, event)) 
