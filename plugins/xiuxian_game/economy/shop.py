@@ -134,9 +134,6 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
             )
         )
         inv = inv.scalars().first()
-        current_quantity = inv.quantity if inv else 0
-        if current_quantity + quantity > 50:
-            await buy_item.finish(f"⛔ 该物品持有量已达上限（{current_quantity}/50）")
         
         # 扣除金币
         player.gold -= total_price

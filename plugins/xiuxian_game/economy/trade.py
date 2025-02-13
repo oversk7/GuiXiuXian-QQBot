@@ -154,7 +154,7 @@ async def handle_trade_command(event: MessageEvent, args: Message = CommandArg()
 
         trade_item.quantity -= quantity
         if trade_item.quantity <= 0:
-            session.delete(trade_item)
+            await session.delete(trade_item)
 
         # 构建交易结果消息
         item_cfg = config.items_config["by_id"][trade_item.item_id]
