@@ -6,7 +6,6 @@ items:
       type: "CONSUMABLE"
       effect_type: "SPECIAL"
       price: 100
-      sell_ratio: 0.3
 
     - item_id: "heal_potion"
       name: "回春散"
@@ -47,13 +46,19 @@ items:
       effect_type: "REVIVE"
       price: 1000
 
+    - item_id: "rename_card"
+      name: "改名卡"
+      description: "可修改一次角色名称 ✍️  使用方法：/改名 新名字"
+      type: "CONSUMABLE"
+      effect_type: "SPECIAL"
+      price: 500
+
   materials:  # 材料类
     - item_id: "rotten_core"
       name: "腐坏的内丹"
       description: "从腐尸体内取出的浑浊内丹，散发着腐臭气息 🦠"
       type: "MATERIAL"
       price: 80
-      sell_ratio: 0.5
 
     - item_id: "ghost_tears"
       name: "鬼泪"

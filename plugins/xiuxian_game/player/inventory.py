@@ -14,6 +14,7 @@ use_item = on_command("使用物品", block=True, priority=5)
 item_detail = on_command("查背包", block=True, priority=5)
 teleport_cmd = on_command("传送", block=True, priority=5)
 teleport_list = on_command("地图", block=True, priority=5)
+rename_cmd = on_command("改名", block=True, priority=5)
 
 @use_item.handle()
 async def handle_use_item(event: MessageEvent, args: Message = CommandArg()):
@@ -68,6 +69,8 @@ async def handle_use_item(event: MessageEvent, args: Message = CommandArg()):
             await use_item.finish(f"✅ 成功使用 {item_name} ✖️{quantity}\n"
                                  f"当前生命：{player.hp}/{player.max_hp} ❤️\n"
                                  f"当前理智：{player.mp}/{player.max_mp} 🧠")
+        elif item_config.effect_type == ItemEffectType.CHANGE_NAME:
+            await use_item.finish("🪄 请使用指令进行改名：/改名 新名字")
         else:
             await use_item.finish("⛔ 该物品无法直接使用")
 
@@ -226,4 +229,39 @@ async def handle_teleport_list(event: MessageEvent):
             "📦 需要消耗：传送符 ✖1"
         )
         
-        await teleport_list.finish(create_rich_message(msg, event)) 
+        await teleport_list.finish(create_rich_message(msg, event))
+
+@rename_cmd.handle()
+async def handle_rename(event: MessageEvent, args: Message = CommandArg()):
+    new_name = args.extract_plain_text().strip()
+    if not new_name or len(new_name) > 12:
+        await rename_cmd.finish("⛔ 名称不能为空且最长12个字符")
+
+    async with safe_session() as session:
+        # 获取玩家和改名卡信息
+        player = await session.get(Player, event.get_user_id())
+        if not player:
+            await rename_cmd.finish("⛔ 请先创建角色")
+
+        rename_item = config.items_config["by_name"]["改名卡"]
+        inv_result = await session.execute(
+            select(Inventory)
+            .where(Inventory.player_id == event.get_user_id())
+            .where(Inventory.item_id == rename_item.item_id)
+        )
+        inventory = inv_result.scalars().first()
+
+        if not inventory or inventory.quantity < 1:
+            await rename_cmd.finish("⛔ 改名卡数量不足")
+
+        # 执行改名操作
+        inventory.quantity -= 1
+        if inventory.quantity <= 0:
+            await session.delete(inventory)
+        
+        player.nickname = new_name
+        session.add(player)
+        await session.commit()
+
+        await rename_cmd.finish(f"🎉 成功修改角色名为：{new_name}\n"
+                               f"剩余改名卡：{inventory.quantity-1 if inventory else 0}张") 
