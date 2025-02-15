@@ -403,7 +403,7 @@ async def battle_loop(battle: BattleInstance, event: MessageEvent):
                                         f"💀 {player.nickname} 已战败！损失 {gold_loss}💰 和 {exp_loss} 修为。\n" +
                                         "👉 输入指令【复活】选择复活方式。"
                                     )
-                        session.commit()
+                        await session.commit()
                     result_msg = "💀 战斗失败，敌人获得了胜利..."
                 
                 await bot.send(battle.latest_event, result_msg)
