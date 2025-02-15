@@ -122,8 +122,8 @@ async def handle_trade_command(event: MessageEvent, args: Message = CommandArg()
         original_total = trade_item.price * quantity
         tax = 0
         
-        # 计算税费（当原始交易额≥1w时收取5%）
-        if original_total >= 10000:
+        # 计算税费（当原始交易额>1w时收取5%）
+        if original_total > 10000:
             tax = int(original_total * 0.05)
         
         seller_gain = original_total - tax
