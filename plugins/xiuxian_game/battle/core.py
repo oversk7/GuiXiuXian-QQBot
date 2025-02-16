@@ -470,8 +470,11 @@ async def handle_explore(event: MessageEvent):
             )
             
         else:  # 个人模式
-            if user_id in _player_battles:
-                await explore_cmd.finish("⛔ 你已经在战斗中")
+            if battle := _player_battles.get(user_id):
+                if battle.is_expired:
+                    _player_battles.pop(user_id, None)
+                else:
+                    await explore_cmd.finish("⚔️ 你已经在战斗中，请先完成战斗！")
                 
             enemies = await generate_enemy_by_region(player.position, player.level)
             battle = BattleInstance("SOLO", [player], enemies, event)
