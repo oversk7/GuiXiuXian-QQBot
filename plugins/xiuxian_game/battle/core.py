@@ -157,9 +157,12 @@ class BattleInstance:
 
     async def _wait_for_actions(self):
         """等待所有存活玩家提交行动（无超时）"""
+        alive_players = [p.id for p in self.players if p.hp > 0]
         while True:
-            alive_players = [p.id for p in self.players if p.hp > 0]
             if len(self.actions) >= len(alive_players):
+                return
+            # 如果没有存活的玩家，直接返回
+            if not alive_players:
                 return
             await asyncio.sleep(1)
 
@@ -459,6 +462,7 @@ async def handle_explore(event: MessageEvent):
             # 生成基于队伍平均等级的敌人
             members_level = [m.player.level for m in team_member.team.members]
             avg_level = sum(members_level) // len(members_level)
+            
             enemies = await generate_enemy_by_region(player.position, avg_level)
             
             # 创建组队战斗
@@ -490,8 +494,8 @@ async def handle_attack(event: MessageEvent, args: Message = CommandArg()):
     if not battle or battle.is_expired:
         await attack_cmd.finish("⛔ 你当前没有参与战斗")
     if battle.actions.get(user_id, None):
-        return
-
+        await attack_cmd.finish("⛔ 你已经提交了本回合的行动")
+    
     # 更新玩家最新消息上下文
     battle.latest_event = event
     
@@ -1048,4 +1052,3 @@ async def handle_revive(event: MessageEvent):
             await revive_cmd.finish("🏙️ 你在复活点复活，生命值和理智值恢复50%，已被传送回主城。")
         else:
             await revive_cmd.finish("📝 请输入复活方式：原地复活 或 复活点复活。")
-        
