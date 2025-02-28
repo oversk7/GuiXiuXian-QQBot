@@ -15,7 +15,7 @@ regions:
   - name: "乱葬岗"
     level_range: [5, 10]
     monsters:
-      - name: "腐尸"
+      - name: "腐士"
         base_hp: 50
         base_attack: 15
         base_defense: 5
