@@ -30,10 +30,12 @@ async def handle_sign(event: MessageEvent):
             await sign.send("您今天已经签到过了，请勿重复签到！")
             return
         
+        player.last_sign = now
+        await session.flush()
+        
         # 签到奖励
         gold_reward = random.randint(100, 500)
         player.gold += gold_reward
-        player.last_sign = now
         
         # 检查是否为创建账号的同一天
         if player.created_at.date() == today:
