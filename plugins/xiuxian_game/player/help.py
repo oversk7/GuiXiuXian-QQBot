@@ -1,6 +1,9 @@
 from nonebot import on_command
-from nonebot.adapters.qq import MessageEvent, Message
+from nonebot.adapters.qq import MessageEvent, Message, MessageSegment
+from nonebot.adapters.qq.message import MessageKeyboard,MessageArk
+from nonebot.adapters.qq.models import MessageArkKv, MessageArk, MessageArkObj, MessageArkObjKv
 from nonebot.params import CommandArg
+import os
 
 # 注册"帮助"指令
 help_cmd = on_command("帮助", aliases={"help","菜单"}, priority=5, block=True)
@@ -14,7 +17,7 @@ async def handle_help(event: MessageEvent, args: Message = CommandArg()):
         "🧘 修炼系统  🎪 活动系统\n"
         "🎭 玩家系统  🎒 背包系统\n"
         "🛒 每日商店  📦 交易系统\n"
-        "🗓️ 任务系统"
+        "🗓️ 任务系统\n"
         "═════════════\n"
         "💡 输入系统名称查看详细指令\n"
         "💡 教程及反馈请查看此链接：https://tz.nevermonarch.cn/url/?url=https://www.yuque.com/rixingyinyao-dx2t6/gs55vv/rz0e9fsw7c7sggwe \n"
@@ -98,6 +101,87 @@ async def handle_trade(event: MessageEvent, args: Message = CommandArg()):
         "◈ 上架示例：/上架 传送符 5 80"
     )
     await trade_cmd.finish(Message(msg))
+
+button_test_cmd = on_command("测试", priority=4, block=True)
+@button_test_cmd.handle()
+async def handle_button_test(event: MessageEvent, args: Message = CommandArg()):
+    btn_json = {
+        "rows": [
+            {
+                "buttons": [
+                    {
+                        "id": "1",
+                        "render_data": {
+                            "label": "修炼",
+                            "visited_label": "",
+                            "style": 0
+                        },
+                        "action": {
+                            "type": 2,
+                            "permission": {
+                                "type": 2
+                            },
+                            "data": "/修炼",
+                            "unsupport_tips": "不支持该操作",
+                            "reply": False,
+                            "enter": False
+                        }
+                    }
+                ]
+            }
+        ]
+    }
+    keyboard = MessageKeyboard(id="102499345_1738493417",content=btn_json)
+    await button_test_cmd.finish(MessageSegment.keyboard(keyboard))
+
+
+# 图片测试
+img_test_cmd = on_command("图片测试", priority=4, block=True)
+@img_test_cmd.handle()
+async def handle_img_test(event: MessageEvent, args: Message = CommandArg()):
+    # 获取当前文件所在目录
+    cur_dir = os.path.dirname(__file__)
+    img_path = os.path.join(cur_dir, "../test.png")
+    img_path = os.path.abspath(img_path)  # 转为绝对路径
+    with open(img_path, "rb") as f:
+        import base64
+        base64_img = base64.b64encode(f.read()).decode("utf-8")
+    await img_test_cmd.finish(MessageSegment.file_image(base64_img))
+
+# Ark天气测试
+ark_weather_test_cmd = on_command("ark测试", priority=4, block=True)
+@ark_weather_test_cmd.handle()
+async def handle_ark_weather_test(event: MessageEvent, args: Message = CommandArg()):
+    # 模拟天气数据
+    weather_dict = {
+        "result": {
+            "citynm": "杭州",
+            "weather": "晴",
+            "days": "2024-04-01",
+            "week": "星期一",
+            "temperature": "10~20℃",
+            "temperature_curr": "18℃",
+            "humidity": "60%"
+        }
+    }
+
+    async def _create_ark_obj_list(weather_dict):
+        return [
+            MessageArkObj(obj_kv=[MessageArkObjKv(key="desc", value=f"{weather_dict['result']['citynm']} {weather_dict['result']['weather']} {weather_dict['result']['days']} {weather_dict['result']['week']}")]),
+            MessageArkObj(obj_kv=[MessageArkObjKv(key="desc", value=f"当日温度区间：{weather_dict['result']['temperature']}")]),
+            MessageArkObj(obj_kv=[MessageArkObjKv(key="desc", value=f"当前温度：{weather_dict['result']['temperature_curr']}")]),
+            MessageArkObj(obj_kv=[MessageArkObjKv(key="desc", value=f"当前湿度：{weather_dict['result']['humidity']}")])
+        ]
+
+    ark = MessageArk(
+        template_id=23,
+        kv=[
+            MessageArkKv(key="#DESC#", value="🌤️ 天气播报"),
+            MessageArkKv(key="#PROMPT#", value="今日天气一览"),
+            MessageArkKv(key="#LIST#", obj=await _create_ark_obj_list(weather_dict))
+        ]
+    )
+    await ark_weather_test_cmd.finish(MessageSegment.ark(ark))
 
 
 
