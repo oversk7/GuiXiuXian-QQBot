@@ -5,7 +5,6 @@ from sqlalchemy import select
 from ..models import Player, Inventory
 from ..models.db import get_session
 import random
-from ..quest.core import check_daily_quests
 
 sign = on_command("签到", block=True, priority=5)
 

@@ -7,7 +7,6 @@ from ..models.player import Player
 from ..config import config
 from datetime import datetime
 import random
-from ..quest.core import check_quest_progress, check_daily_quests
 
 
 cfg = config.game_config["cultivate"]

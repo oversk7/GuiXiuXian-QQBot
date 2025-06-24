@@ -1,152 +1,55 @@
 regions:
-  - name: "主城"
+  主城:
     level_range: [1, 2]
     monsters:
-      - name: "狗"
-        base_hp: 10
-        base_attack: 1
-        base_defense: 1
-        base_agility: 1
-        drops:
-          - item_id: "teleport"
-            chance: 0.2
-          - item_id: "spirit_bone"
-            chance: 0.4
-  - name: "乱葬岗"
+      - "诡修亡魂"
+      - "纸人"
+  乱葬岗:
     level_range: [5, 10]
     monsters:
-      - name: "腐士"
-        base_hp: 50
-        base_attack: 15
-        base_defense: 5
-        base_agility: 3
-        skills:
-          - name: "尸毒"
-            effect: "中毒"
-            base_probability: 0.3
-        drops:
-          - item_id: "teleport"
-            chance: 0.5
-          - item_id: "rotten_core"
-            chance: 0.3
-  - name: "阴风洞"
+      - "腐士"
+      - "游魂"
+      - "人面犬"
+  阴风洞:
     level_range: [11, 20]
     monsters:
-      - name: "厉鬼"
-        base_hp: 80
-        base_attack: 25
-        base_defense: 8
-        base_agility: 5
-        skills:
-          - name: "鬼哭"
-            effect: "恐惧"
-            base_probability: 0.4
-        drops:
-          - item_id: "heal_potion"
-            chance: 0.2
-          - item_id: "ghost_tears"
-            chance: 0.25
-  - name: "绝望之城"
+      - "厉鬼"
+      - "哭墙"
+      - "鬼面蝠"
+  绝望之城:
     level_range: [21, 30]
     monsters:
-      - name: "人头气球"
-        base_hp: 120
-        base_attack: 35
-        base_defense: 12
-        base_agility: 15
-        drops:
-          - item_id: "cursed_silk"
-            chance: 0.35
-          - item_id: "yin_essence"
-            chance: 0.15
-  - name: "漩涡沼泽"
+      - "人头气球"
+      - "缝合巨人"
+      - "哭泣雕像"
+  漩涡沼泽:
     level_range: [31, 40]
     monsters:
-      - name: "漩涡感染者"
-        base_hp: 150
-        base_attack: 45
-        base_defense: 18
-        base_agility: 20
-        skills:
-          - name: "螺旋吞噬"
-            effect: "缴械"
-            base_probability: 0.4
-        drops:
-          - item_id: "yin_essence"
-            chance: 0.3
-          - item_id: "cursed_silk"
-            chance: 0.45
-        description: "身体扭曲成螺旋状的村民，眼窝深陷着不断旋转的黑色漩涡🌀"
-  - name: "肉殖回廊"
+      - "漩涡感染者"
+      - "泥沼尸"
+      - "溺水女"
+  肉殖回廊:
     level_range: [41, 50]
     monsters:
-      - name: "蛞蝓女郎"
-        base_hp: 180
-        base_attack: 55
-        base_defense: 22
-        base_agility: 25
-        skills:
-          - name: "黏液喷射"
-            effect: "减速"
-            base_probability: 0.5
-        drops:
-          - item_id: "ghost_tears"
-            chance: 0.35
-          - item_id: "rotten_core"
-            chance: 0.4
-        description: "半人半蛞蝓的诡异生物，身后拖着闪亮的黏液痕迹🐌"
-  - name: "发丝深井"
+      - "蛞蝓女郎"
+      - "肉芽虫"
+      - "血眼蛙"
+  发丝深井:
     level_range: [51, 60]
     monsters:
-      - name: "发鬼"
-        base_hp: 220
-        base_attack: 65
-        base_defense: 28
-        base_agility: 30
-        skills:
-          - name: "三千烦恼丝"
-            effect: "束缚"
-            base_probability: 0.6
-        drops:
-          - item_id: "cursed_silk"
-            chance: 0.5
-          - item_id: "yin_essence"
-            chance: 0.25
-        description: "井中涌出的黑色发海，发丝间浮动着无数惨白的面孔👩🦱"
-  - name: "长梦客栈"
+      - "发鬼"
+      - "缠绕手"
+      - "井底人"
+  长梦客栈:
     level_range: [61, 70]
     monsters:
-      - name: "梦魇蛛妖"
-        base_hp: 260
-        base_attack: 75
-        base_defense: 35
-        base_agility: 35
-        skills:
-          - name: "无尽梦境"
-            effect: "沉睡"
-            base_probability: 0.4
-        drops:
-          - item_id: "spirit_bone"
-            chance: 0.6
-          - item_id: "ghost_tears"
-            chance: 0.3
-        description: "腹部生长着人脸图案的巨型蜘蛛，纺出的丝线会编织梦境🕸️"
-  - name: "永眠回廊"
+      - "梦魇蛛妖"
+      - "梦游者"
+      - "织梦人"
+  永眠回廊:
     level_range: [71, 80]
     monsters:
-      - name: "永生者"
-        base_hp: 300
-        base_attack: 90
-        base_defense: 40
-        base_agility: 40
-        skills:
-          - name: "细胞增殖"
-            effect: "自愈"
-            base_probability: 0.5
-        drops:
-          - item_id: "yin_essence"
-            chance: 0.4
-          - item_id: "rotten_core"
-            chance: 0.35
-        description: "全身长满肉瘤的不死生物，伤口会瞬间增生出新的器官🧬"
+      - "永生者"
+      - "不死蛆"
+      - "肉瘤灵"
 

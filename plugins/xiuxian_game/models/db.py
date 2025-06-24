@@ -11,7 +11,7 @@ from sqlalchemy import select
 
 
 engine = create_async_engine(
-    "sqlite+aiosqlite:///" + os.path.join(os.path.dirname(__file__), "../data/game.db"),
+    "sqlite+aiosqlite:///" + os.path.join(os.path.dirname(__file__), "../data/data.db"),
     echo=False
 )
 
@@ -31,30 +31,6 @@ async def init_db():
     print("🔄 正在初始化数据库...")
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
-        
-    # 新增任务配置初始化
-    from ..config import config
-    from .quest import Quest
-    quests_config = config.quests_config  # 从本地文件读取
-    
-    async with AsyncSessionLocal() as session:
-        # 检查是否已有任务配置
-        existing = (await session.execute(select(Quest))).scalars().first()
-        if not existing:
-            for q in quests_config["quests"]:
-                session.add(Quest(
-                    id=q["id"],
-                    quest_type=q["type"],
-                    title=q["title"],
-                    description=q["description"],
-                    condition_type=q["condition_type"],
-                    condition_params={"required": q["required"]},
-                    rewards=q["rewards"],
-                    repeatable=q.get("repeatable", False),
-                    min_level=q.get("min_level", 1)
-                ))
-            await session.commit()
-    
     print("✅ 数据库初始化完成")
 
 @asynccontextmanager

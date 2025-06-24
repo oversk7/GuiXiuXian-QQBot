@@ -9,7 +9,7 @@ class ItemType(str,PyEnum):
     EQUIPMENT = "EQUIPMENT"
 
 class ItemEffectType(str, PyEnum):
-    RESTORE_HP = "RESTORE_HP"
+    RESTORE_HP = "RESTORE_HP" 
     RESTORE_MP = "RESTORE_MP"
     BUFF = "BUFF"
     SPECIAL = "SPECIAL"

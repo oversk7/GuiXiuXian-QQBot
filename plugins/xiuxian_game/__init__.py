@@ -15,12 +15,9 @@ __plugin_meta__ = PluginMetadata(
 from . import (
     player,
     cultivate,
-    battle,
     activity,
     economy,
-    quest,
-    # social,
-    # world
+    world
 )
 
 driver = get_driver()

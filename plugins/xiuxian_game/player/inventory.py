@@ -182,7 +182,7 @@ async def handle_teleport(event: MessageEvent, args: Message = CommandArg()):
             await teleport_cmd.finish("⛔ 请先创建角色")
 
         # 验证目标地点是否存在
-        valid_locations = [region["name"] for region in config.map_config["regions"]]
+        valid_locations = list(config.map_config["regions"].keys())
         if target_location not in valid_locations:
             await teleport_cmd.finish(f"⛔ 无效地点，发送/地图 查看所有可传送地点")
 
@@ -219,7 +219,7 @@ async def handle_teleport_list(event: MessageEvent):
             await teleport_list.finish("⛔ 请先创建角色")
 
         # 获取所有可传送地点
-        locations = [f"• {region['name']} 🌐" for region in config.map_config["regions"]]
+        locations = [f"• {name} 🌐" for name in config.map_config["regions"].keys()]
         
         # 格式化消息
         msg = (
