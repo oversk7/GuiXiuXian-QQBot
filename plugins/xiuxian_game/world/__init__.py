@@ -62,8 +62,8 @@ async def get_or_create_tile(session, region: str, x: int, y: int) -> WorldTile:
         tile.seed = f"{region}:{x}:{y}:{today.isoformat()}"
         rng = random.Random(hash(tile.seed))
         tile.event_type = rng.choices(
-            ["MATERIAL", "TREASURE", "EMPTY"],
-            weights=[20, 5, 75],
+            ["MATERIAL", "TREASURE", "EMPTY", "REST"],
+            weights=[15, 5, 75, 5],
             k=1
         )[0]
         tile.state = {}
@@ -87,7 +87,7 @@ async def get_or_create_tile(session, region: str, x: int, y: int) -> WorldTile:
                 "quantity": rng.randint(1, 3),
                 "looted": False,
             }
-        tile = await session.merge(tile)  # 合并返回持久化实例，避免重复插入
+        tile = await session.merge(tile)
         await session.flush()
     return tile
 
@@ -112,7 +112,7 @@ async def _(event: MessageEvent):
         dx, dy = DIRECTIONS[direction]
         new_x, new_y = player.x + dx, player.y + dy
         player.x, player.y = new_x, new_y
-        
+
         # 扣体力暂定
         # player.stamina -= 1
         # player.mp -= random.randint(0, 2)
@@ -141,6 +141,8 @@ async def _(event: MessageEvent):
             elif t.event_type == "EMPTY":
                 monster = t.state.get("name")
                 return f"🌫️ 四周弥漫着诡异的静谧，似乎潜伏着 {monster} 的气息。若想冒险，可输入 [探索] 进行调查。"
+            elif t.event_type == "REST":
+                return "🌫️ 你发现这里有一张床，也许输入 [休息] 能恢复状态。"
             return "⁉️ 未知事件。"
 
         event_desc = describe_tile(tile)
@@ -149,7 +151,7 @@ async def _(event: MessageEvent):
     await move_cmd.finish(message_add_head(f"{header}\n{event_desc}", event))
 
 # ----------------- 指令：战斗 -----------------
-explore_cmd = on_command("探索", aliases={"战斗", "收集"}, block=True, priority=5)
+explore_cmd = on_command("探索", aliases={"战斗", "收集", "休息"}, block=True, priority=5)
 
 # 事件处理器映射
 async def _handle_material(session, tile: WorldTile, player: Player) -> str:
@@ -290,11 +292,18 @@ async def _handle_personal_monster(session, tile: WorldTile, player: Player) -> 
     await session.flush()
     return log
 
+async def _handle_rest(session, tile: WorldTile, player: Player) -> str:
+    player.hp = player.max_hp
+    session.add(player)
+    await session.flush()
+    return "🌫️ 你在这里休息了一晚，恢复了体力。"
+
 
 EVENT_HANDLERS = {
     "MATERIAL": _handle_material,
     "TREASURE": _handle_treasure,
     "EMPTY": _handle_empty,
+    "REST": _handle_rest,
 }
 
 

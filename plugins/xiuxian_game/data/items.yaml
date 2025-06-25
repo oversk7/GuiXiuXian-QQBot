@@ -41,9 +41,10 @@ items:
       
     - item_id: "revive_potion"
       name: "还魂丹"
-      description: "使用后可以立即原地复活。"
+      description: "使用后可以立即原地复活。（复活率100%）"
       type: "CONSUMABLE"
       effect_type: "REVIVE"
+      effect_params: {"rate": 1.0}
       price: 1000
 
     - item_id: "rename_card"

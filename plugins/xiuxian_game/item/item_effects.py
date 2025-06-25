@@ -73,7 +73,7 @@ async def _restore_mp(player: Player, cfg: ItemConfig, qty: int, ctx: str) -> Tu
     player.mp = min(player.max_mp, player.mp + value)
     return True, f"🧠 恢复 {value} 点理智 (当前 {player.mp}/{player.max_mp})"
 
-
+# 原地复活，与复活指令效果不同
 @register(ItemEffectType.REVIVE)
 async def _revive(player: Player, cfg: ItemConfig, qty: int, ctx: str) -> Tuple[bool, str]:
     if player.hp > 0:
