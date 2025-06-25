@@ -7,7 +7,7 @@ from __future__ import annotations
 """
 
 from nonebot import on_command, on_regex
-from nonebot.adapters.qq import MessageEvent, Message
+from nonebot.adapters.qq import MessageEvent, Message, MessageSegment
 from nonebot.params import CommandArg
 from typing import Tuple, Dict
 from datetime import datetime, date
@@ -19,6 +19,10 @@ from ..models.inventory import Inventory
 from ..models.world_tile import WorldTile
 from ..config import config
 from ..utils import message_add_head
+from io import BytesIO
+import base64
+from PIL import Image, ImageDraw, ImageFont
+from pathlib import Path
 
 # ----------------- 常量 -----------------
 DIRECTIONS: Dict[str, Tuple[int, int]] = {
@@ -124,16 +128,14 @@ async def _(event: MessageEvent):
                 qty = t.state.get("quantity", "?")
                 if t.state.get("looted"):
                     return f"🪨 这里曾经散落着 {item_name} ✖️{qty}，但已被搜刮一空。"
-                return f"✨ 你发现地面闪烁着 {item_name} ✖️{qty} 的微光，可输入 [探索] 采集。"
+                return f"✨ 你发现地面闪烁着 {item_name} ✖️{qty} 的微光，可输入 [收集] 获取。"
             elif t.event_type == "TREASURE":
                 if t.state.get("looted"):
                     return "🪨 破碎的宝箱静静躺在尘埃中，没有任何价值。"
                 return "🎁 你注意到一个尘封宝箱，也许输入 [探索] 能打开它。"
             elif t.event_type == "EMPTY":
                 monster = t.state.get("name")
-                if monster:
-                    return f"🌫️ 四周弥漫着诡异的静谧，似乎潜伏着 {monster} 的气息。若想冒险，可输入 [探索] 进行调查。"
-                return "🌫️ 这里空无一物。"
+                return f"🌫️ 四周弥漫着诡异的静谧，似乎潜伏着 {monster} 的气息。若想冒险，可输入 [探索] 进行调查。"
             return "⁉️ 未知事件。"
 
         event_desc = describe_tile(tile)
@@ -142,7 +144,7 @@ async def _(event: MessageEvent):
     await move_cmd.finish(message_add_head(f"{header}\n{event_desc}", event))
 
 # ----------------- 指令：战斗 -----------------
-explore_cmd = on_command("探索", aliases={"战斗", "攻击"}, block=True, priority=5)
+explore_cmd = on_command("探索", aliases={"战斗", "收集"}, block=True, priority=5)
 
 # 事件处理器映射
 async def _handle_material(session, tile: WorldTile, player: Player) -> str:
@@ -212,7 +214,7 @@ async def _handle_empty(session, tile: WorldTile, player: Player) -> str:
     # empty格有70%可能遇到个人的怪物，但不会影响公共事件
     if random.random() < 0.7:
         return await _handle_personal_monster(session, tile, player)
-    return "🌫️ 除了回声，只有潮湿气味……"
+    return "🌫️ 什么都没有发现，除了回声……"
 
 
 async def _handle_personal_monster(session, tile: WorldTile, player: Player) -> str:
@@ -303,4 +305,156 @@ async def _(event: MessageEvent):
         await session.commit()
 
     header = f"🧭位置 {player.region} ({player.x},{player.y})"
-    await explore_cmd.finish(f"{header}\n{log}") 
+    await explore_cmd.finish(f"{header}\n{log}")
+
+# ----------------- 指令：区域小地图 -----------------
+region_map_cmd = on_command("区域图", aliases={"小地图", "区域地图"}, block=True, priority=5)
+
+# 小地图颜色配置
+_TILE_COLORS = {
+    "MATERIAL": (76, 175, 80),   # 绿色
+    "TREASURE": (255, 193, 7),   # 黄色
+    "EMPTY": (158, 158, 158),    # 灰色
+}
+_PLAYER_COLOR = (244, 67, 54)    # 红色
+
+# ----------------- 内部工具：字体加载 -----------------
+
+def _load_font(size: int = 24) -> ImageFont.ImageFont:
+    """尝试加载支持中文的系统字体，若失败则回退默认字体。"""
+    candidates = [
+        Path("C:/Windows/Fonts/msyh.ttc"),  # 微软雅黑
+        Path("C:/Windows/Fonts/simhei.ttf"),  # 黑体
+        Path("C:/Windows/Fonts/simsun.ttc"),  # 宋体
+        Path("/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf"),  # 常见 Linux 字体
+    ]
+    for p in candidates:
+        if p.exists():
+            try:
+                return ImageFont.truetype(str(p), size=size)
+            except Exception:
+                continue
+    return ImageFont.load_default()
+
+@region_map_cmd.handle()
+async def _(event: MessageEvent):
+    async with safe_session() as session:
+        player: Player | None = await session.get(Player, event.get_user_id())
+        if not player:
+            await region_map_cmd.finish("⛔ 请先创建角色")
+
+        # 获取当前区域已生成的所有格子
+        result = await session.execute(
+            select(WorldTile).where(WorldTile.region == player.region)
+        )
+        tiles = result.scalars().all()
+
+        # 若尚无任何格子，则确保包含玩家当前所在格
+        if not tiles:
+            tile = await get_or_create_tile(session, player.region, player.x, player.y)
+            tiles.append(tile)
+
+        # 统计边界范围
+        xs = [t.x for t in tiles] + [player.x]
+        ys = [t.y for t in tiles] + [player.y]
+        min_x, max_x = min(xs), max(xs)
+        min_y, max_y = min(ys), max(ys)
+
+        # 绘图参数
+        cell_size = 60
+        padding = 6
+        cols = max_x - min_x + 1
+        rows = max_y - min_y + 1
+        legend_height = 80  # 图例区域高度
+        title_height = 40   # 标题区域高度
+
+        img_w = cols * cell_size + (cols + 1) * padding
+        img_h = rows * cell_size + (rows + 1) * padding + legend_height + title_height
+
+        bg_color = (245, 245, 245)
+        img = Image.new("RGBA", (img_w, img_h), bg_color)
+        draw = ImageDraw.Draw(img)
+        font = _load_font(24)
+        small_font = _load_font(20)
+
+        # 绘制标题
+        title_text = f"『{player.region}』区域小地图"
+        bbox = draw.textbbox((0, 0), title_text, font=font)
+        draw.text(((img_w - (bbox[2] - bbox[0])) / 2, 10), title_text, fill=(33, 33, 33), font=font)
+
+        # 起始 y 偏移（跳过标题区域）
+        origin_y = title_height + padding
+        origin_x = padding
+
+        tile_map = {(t.x, t.y): t for t in tiles}
+
+        for x in range(min_x, max_x + 1):
+            for y in range(min_y, max_y + 1):
+                # 将游戏坐标转换为图像坐标（y 轴向上为正）
+                left = origin_x + (x - min_x) * (cell_size + padding)
+                top = origin_y + (max_y - y) * (cell_size + padding)
+                right = left + cell_size
+                bottom = top + cell_size
+
+                if (x, y) == (player.x, player.y):
+                    fill_color = _PLAYER_COLOR
+                    text = "你"
+                elif (x, y) in tile_map:
+                    event_type = tile_map[(x, y)].event_type
+                    fill_color = _TILE_COLORS.get(event_type, (200, 200, 200))
+                    text = {
+                        "MATERIAL": "材",
+                        "TREASURE": "宝",
+                        "EMPTY": "",
+                    }.get(event_type, "")
+                else:
+                    fill_color = (230, 230, 230)
+                    text = ""
+
+                # 绘制圆角矩形
+                try:
+                    draw.rounded_rectangle([left, top, right, bottom], radius=8, fill=fill_color, outline=(120, 120, 120))
+                except AttributeError:
+                    # Pillow 9 及以下无 rounded_rectangle
+                    draw.rectangle([left, top, right, bottom], fill=fill_color, outline=(120, 120, 120))
+
+                if text:
+                    # Pillow>=10 移除 textsize，改用 textbbox 计算文本尺寸
+                    bbox = draw.textbbox((0, 0), text, font=font)
+                    w, h = bbox[2] - bbox[0], bbox[3] - bbox[1]
+                    draw.text(
+                        (left + (cell_size - w) / 2, top + (cell_size - h) / 2),
+                        text,
+                        fill=(255, 255, 255) if (x, y) == (player.x, player.y) else (33, 33, 33),
+                        font=font,
+                    )
+
+        # 绘制图例
+        legend_top = img_h - legend_height + 15
+        legend_items = [
+            ("你", _PLAYER_COLOR, "玩家位置"),
+            ("材", _TILE_COLORS["MATERIAL"], "材料"),
+            ("宝", _TILE_COLORS["TREASURE"], "宝箱"),
+        ]
+        legend_padding = 20
+        cur_x = legend_padding
+        for symbol, color, label in legend_items:
+            rect_w = rect_h = 30
+            draw.rounded_rectangle([cur_x, legend_top, cur_x + rect_w, legend_top + rect_h], radius=6, fill=color, outline=(120, 120, 120))
+            # 符号
+            bbox = draw.textbbox((0, 0), symbol, font=small_font)
+            sx = cur_x + (rect_w - (bbox[2] - bbox[0])) / 2
+            sy = legend_top + (rect_h - (bbox[3] - bbox[1])) / 2
+            draw.text((sx, sy), symbol, fill=(255, 255, 255) if symbol == "你" else (33, 33, 33), font=small_font)
+            # 文字
+            draw.text((cur_x + rect_w + 8, legend_top + 5), label, fill=(33, 33, 33), font=small_font)
+            cur_x += rect_w + 8 + draw.textlength(label, font=small_font) + 32
+
+        buf = BytesIO()
+        img.save(buf, format="PNG")
+        base64_img = base64.b64encode(buf.getvalue()).decode("utf-8")
+
+    msg = Message()
+    msg += MessageSegment.text(f"🗺️ 当前区域：{player.region}\n")
+    msg += MessageSegment.file_image(base64_img)
+    await region_map_cmd.finish(msg) 
