@@ -15,7 +15,6 @@ __plugin_meta__ = PluginMetadata(
 from . import (
     player,
     cultivate,
-    activity,
     economy,
     world,
     item,
