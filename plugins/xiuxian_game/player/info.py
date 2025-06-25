@@ -29,7 +29,8 @@ async def _(event: MessageEvent):
 │ 理智：{player.mp}/{player.max_mp} 🧠
 │ 位置：{player.region} ({player.x},{player.y}) 
 ├──【属性】──
-│ ⚔力 {player.attack}  🛡防 {player.defense}  👟敏 {player.agility}  🍀运 {player.luck}
+│ ⚔力 {player.attack}  🛡防 {player.defense} 
+│ 👟敏 {player.agility}  🍀运 {player.luck}
 ├──【资源】──
 │ 金币：{player.gold}  | 点数：{player.attribute_points}✨
 └───────────
