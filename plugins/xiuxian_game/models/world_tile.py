@@ -17,6 +17,10 @@ class WorldTile(Base):
     seed: Mapped[str] = mapped_column(String(64), comment="生成种子", nullable=True)
     state: Mapped[dict] = mapped_column(MutableDict.as_mutable(JSON), default=dict, server_default='{}', comment="事件状态JSON")
 
+    # 添加唯一约束，确保同一区域同一坐标只能有一条记录
+    __table_args__ = (
+        UniqueConstraint('region', 'x', 'y', name='uq_region_coordinates'),
+    )
 
     def __repr__(self) -> str:
         return f"<WorldTile {self.region} ({self.x},{self.y}) {self.event_type}>" 

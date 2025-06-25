@@ -1,7 +1,7 @@
 from nonebot import on_command
 from nonebot.adapters.qq import MessageEvent, Message
 from nonebot.params import CommandArg
-from ..utils import  create_rich_message, calculate_level_up_exp
+from ..utils import  message_add_head, calculate_level_up_exp
 from ..models.db import safe_session
 from ..models.player import Player
 from ..config import config
@@ -47,7 +47,6 @@ async def handle_cultivate(event: MessageEvent):
         player.exp += exp_gain
         session.add(player)
         await session.commit()
-        await check_quest_progress(str(user_id), "CULTIVATE")
         await cultivate.finish(f"🌀 运转周天完毕 🌀\n▫️ 获得修为：+{exp_gain}\n▫️ 当前经验：{player.exp}/{calculate_level_up_exp(player.level)}")
 
 @seclusion.handle()
@@ -140,14 +139,13 @@ async def handle_breakthrough(event: MessageEvent):
 
         session.add(player)
         await session.commit()
-        await breakthrough.finish(create_rich_message(msg, event))
+        await breakthrough.finish(message_add_head(msg, event))
 
 # 基础属性映射表
 ATTRIBUTE_MAP = {
     "体": "max_hp",
     "智": "max_mp",
     "力": "attack",
-    "防": "defense",
     "敏": "agility",
 }
 
@@ -156,7 +154,7 @@ async def handle_assign(event: MessageEvent, args: Message = CommandArg()):
     """分配属性点"""
     params = args.extract_plain_text().strip().split()
     if len(params) != 2:
-        await assign_points.finish("⛔ 格式错误，正确格式：加点 [属性] [点数]\n例：加点 力 5\n可选属性：体/智/力/防/敏")
+        await assign_points.finish("⛔ 格式错误，正确格式：加点 [属性] [点数]\n例：加点 力 5\n可选属性：体/智/力/敏")
     
     attr_name, points = params
     try:
@@ -188,4 +186,4 @@ async def handle_assign(event: MessageEvent, args: Message = CommandArg()):
             f"▫️ 当前{attr_name}：{getattr(player, attr_field)}\n"
             f"▫️ 剩余属性点：{player.attribute_points}✨"
         )
-        await assign_points.finish(create_rich_message(msg, event))
+        await assign_points.finish(message_add_head(msg, event))

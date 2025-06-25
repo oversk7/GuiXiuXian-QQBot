@@ -5,7 +5,7 @@ from sqlalchemy import select, delete, func
 from ..models.db import safe_session
 from ..models import Player, Inventory, TradeItem
 from ..config import config
-from ..utils import create_rich_message
+from ..utils import message_add_head
 
 # 辅助函数：获取玩家显示信息
 async def _get_user_display(user_id: str) -> tuple:
@@ -39,7 +39,7 @@ async def handle_market(event: MessageEvent):
         msg.append("\n".join(item_line))
 
     msg.append("━━━━━━━━━━\n📥 购买：/交易 售卖ID 数量（1w以上交易卖家需缴纳5%税费）")
-    await market.finish(create_rich_message("\n".join(msg), event))
+    await market.finish(message_add_head("\n".join(msg), event))
 
 # 上架物品
 list_item = on_command("上架", priority=5, block=True)
@@ -193,7 +193,7 @@ async def handle_my_shop(event: MessageEvent):
         uid, nickname = await _get_user_display(item.seller_id)
         item_cfg = config.items_config["by_id"].get(item.item_id)
         msg.append(f"🆔{item.id}│{item_cfg.name}×{item.quantity}\n💰 单价：{item.price}金币")
-    await my_shop.finish(create_rich_message("\n".join(msg), event))
+    await my_shop.finish(message_add_head("\n".join(msg), event))
 
 # 新增下架命令
 down_item = on_command("下架", priority=5, block=True)

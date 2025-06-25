@@ -5,23 +5,24 @@ from ..models.db import safe_session
 from ..models.player import Player
 from ..models.inventory import Inventory
 from ..models.inventory import ItemType, ItemEffectType
-from ..utils import create_rich_message, paginate_items
+from ..utils import message_add_head, paginate_items
 from sqlalchemy import select
 from ..config import config
 from .item_effects import apply_effect
 
 inventory_cmd = on_command("背包", block=True, priority=5)
-use_item = on_command("使用物品", block=True, priority=5)
+use_item = on_command("使用", block=True, priority=5)
 item_detail = on_command("查背包", block=True, priority=5)
-teleport_cmd = on_command("传送", block=True, priority=5)
 teleport_list = on_command("地图", block=True, priority=5)
+
+teleport_cmd = on_command("传送", block=True, priority=5)
 rename_cmd = on_command("改名", block=True, priority=5)
 
 @use_item.handle()
 async def handle_use_item(event: MessageEvent, args: Message = CommandArg()):
     params = args.extract_plain_text().strip().split()
     if len(params) != 2:
-        await use_item.finish("⛔ 格式错误，正确格式：使用物品 [物品名称] [数量]")
+        await use_item.finish("⛔ 格式错误，正确格式：使用 [物品名称] [数量]")
 
     item_name, quantity = params
     try:
@@ -53,7 +54,7 @@ async def handle_use_item(event: MessageEvent, args: Message = CommandArg()):
         if not inventory or inventory.quantity < quantity:
             await use_item.finish(f"⛔ {item_name} 数量不足")
 
-        # 特殊改名卡提示，直接跳转改名指令
+        # 特殊道具直接跳转对应指令
         if item_config.effect_type == ItemEffectType.CHANGE_NAME:
             await use_item.finish("🪄 请使用指令进行改名：/改名 新名字")
         elif item_config.effect_type == ItemEffectType.TELEPORT:
@@ -106,7 +107,7 @@ async def handle_inventory(event: MessageEvent, args: Message = CommandArg()):
         page = max(1, min(page, total_pages))
         
         formatted = await paginate_items(items, page)
-        await inventory_cmd.finish(create_rich_message(formatted, event))
+        await inventory_cmd.finish(message_add_head(formatted, event))
 
 @item_detail.handle()
 async def handle_item_detail(event: MessageEvent, args: Message = CommandArg()):
@@ -169,50 +170,52 @@ async def handle_item_detail(event: MessageEvent, args: Message = CommandArg()):
             f"▫️ 描述：{target_item.description or '暂无描述'}"
             f"{effect_info}"
         )
-        await item_detail.finish(create_rich_message(msg, event))
+        await item_detail.finish(message_add_head(msg, event))
 
 @teleport_cmd.handle()
-async def handle_teleport(event: MessageEvent, args: Message = CommandArg()):
-    """处理传送指令"""
-    target_location = args.extract_plain_text().strip()
-    if not target_location:
-        await teleport_cmd.finish("⛔ 请指定传送地点，例：传送 阴风洞")
+async def _(event: MessageEvent, args: Message = CommandArg()):
+    target_region = args.extract_plain_text().strip()
+    if not target_region:
+        await teleport_cmd.finish("⛔ 请指定目标区域，例如：传送 美少年路口")
+
+    # 验证区域
+    valid_regions = list(config.map_config["regions"].keys())
+    if target_region not in valid_regions:
+        await teleport_cmd.finish("⛔ 目的地不存在，可发送 /地图 查看全部区域")
 
     async with safe_session() as session:
-        # 获取玩家和地图配置
         player = await session.get(Player, event.get_user_id())
         if not player:
             await teleport_cmd.finish("⛔ 请先创建角色")
 
-        # 验证目标地点是否存在
-        valid_locations = list(config.map_config["regions"].keys())
-        if target_location not in valid_locations:
-            await teleport_cmd.finish(f"⛔ 无效地点，发送/地图 查看所有可传送地点")
-
-        # 检查传送符数量
-        teleport_item = config.items_config["by_name"]["传送符"]
-        inv_result = await session.execute(
+        # 检查传送符
+        legend_ticket_cfg = config.items_config["by_name"].get("传送符")
+        if not legend_ticket_cfg:
+            await teleport_cmd.finish("⚠️ 配置缺少 传送符")
+        result = await session.execute(
             select(Inventory)
-            .where(Inventory.player_id == event.get_user_id())
-            .where(Inventory.item_id == teleport_item.item_id)
+            .where(Inventory.player_id == player.id)
+            .where(Inventory.item_id == legend_ticket_cfg.item_id)
         )
-        inventory = inv_result.scalars().first()
+        ticket = result.scalars().first()
+        if not ticket or ticket.quantity < 1:
+            await teleport_cmd.finish("⛔ 传送符不足，无法启程")
 
-        if not inventory or inventory.quantity < 1:
-            await teleport_cmd.finish("⛔ 传送符数量不足")
-
-        # 扣除物品并传送
-        inventory.quantity -= 1
-        if inventory.quantity <= 0:
-            await session.delete(inventory)
-        
-        player.region = target_location
+        # 扣除并移动
+        ticket.quantity -= 1
+        if ticket.quantity <= 0:
+            await session.delete(ticket)
+        player.region = target_region
         player.x = 0
         player.y = 0
-        session.add(player)
+        session.add_all([player])
         await session.commit()
 
-        await teleport_cmd.finish(f"🌀 消耗1个传送符，已成功传送至【{target_location}】\n当前位置：{target_location}(0,0) 📍")
+    msg = (
+        f"🪄 你使用了一张传送符，穿过层层迷雾抵达『{target_region}』！\n"
+        f"当前位置：{target_region} ({player.x},{player.y})"
+    )
+    await teleport_cmd.finish(message_add_head(msg, event))
 
 @teleport_list.handle()
 async def handle_teleport_list(event: MessageEvent):
@@ -228,13 +231,13 @@ async def handle_teleport_list(event: MessageEvent):
         
         # 格式化消息
         msg = (
-            "🪐 可传送地点列表：\n"
+            "🪐 可传送区域列表：\n"
             + "\n".join(locations)
-            + "\n\n📌 使用方式：传送 [地点名称]\n"
+            + "\n\n📌 使用方式：传送 [区域]\n"
             "📦 需要消耗：传送符 ✖1"
         )
         
-        await teleport_list.finish(create_rich_message(msg, event))
+        await teleport_list.finish(message_add_head(msg, event))
 
 @rename_cmd.handle()
 async def handle_rename(event: MessageEvent, args: Message = CommandArg()):
@@ -254,7 +257,7 @@ async def handle_rename(event: MessageEvent, args: Message = CommandArg()):
             .where(Inventory.player_id == event.get_user_id())
             .where(Inventory.item_id == rename_item.item_id)
         )
-        inventory = inv_result.scalars().first()
+        inventory: Inventory = inv_result.scalars().first()
 
         if not inventory or inventory.quantity < 1:
             await rename_cmd.finish("⛔ 改名卡数量不足")

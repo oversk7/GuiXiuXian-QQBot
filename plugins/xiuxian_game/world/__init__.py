@@ -6,19 +6,19 @@ from __future__ import annotations
 3. get_or_create_tile: 按天刷新、确定性种子生成事件（暂占位）
 """
 
-from nonebot import on_command
+from nonebot import on_command, on_regex
 from nonebot.adapters.qq import MessageEvent, Message
 from nonebot.params import CommandArg
 from typing import Tuple, Dict
 from datetime import datetime, date
 import random
-from sqlalchemy import select
+from sqlalchemy import select, func
 from ..models.db import safe_session
 from ..models.player import Player
 from ..models.inventory import Inventory
 from ..models.world_tile import WorldTile
 from ..config import config
-from ..utils import create_rich_message
+from ..utils import message_add_head
 
 # ----------------- 常量 -----------------
 DIRECTIONS: Dict[str, Tuple[int, int]] = {
@@ -57,7 +57,7 @@ async def get_or_create_tile(session, region: str, x: int, y: int) -> WorldTile:
         tile.seed = f"{region}:{x}:{y}:{today.isoformat()}"
         rng = random.Random(hash(tile.seed))
         tile.event_type = rng.choices(
-            ["ELITE", "TREASURE", "EMPTY"],
+            ["MATERIAL", "TREASURE", "EMPTY"],
             weights=[20, 5, 75],
             k=1
         )[0]
@@ -76,107 +76,125 @@ async def get_or_create_tile(session, region: str, x: int, y: int) -> WorldTile:
         elif tile.event_type == "TREASURE":
             tile.state = {"looted": False}
         elif tile.event_type == "MATERIAL":
+            item_id = rng.choice(config.items_config["by_type"]["MATERIAL"])
             tile.state = {
-                
+                "item_id": item_id,
+                "quantity": rng.randint(1, 3),
+                "looted": False,
             }
-        await session.merge(tile)
+        tile = await session.merge(tile)  # 合并返回持久化实例，避免重复插入
         await session.flush()
     return tile
 
-travel_cmd = on_command("传送", block=True, priority=5)
-
-@travel_cmd.handle()
-async def _(event: MessageEvent, args: Message = CommandArg()):
-    target_region = args.extract_plain_text().strip()
-    if not target_region:
-        await travel_cmd.finish("⛔ 请指定目标区域，例如：传送 旧港雾巢")
-
-    # 验证区域
-    valid_regions = list(config.map_config["regions"].keys())
-    if target_region not in valid_regions:
-        await travel_cmd.finish("⛔ 目的地不存在，可发送 /地图 查看全部区域")
-
-    async with safe_session() as session:
-        player = await session.get(Player, event.get_user_id())
-        if not player:
-            await travel_cmd.finish("⛔ 请先创建角色")
-
-        # 检查传送符
-        legend_ticket_cfg = config.items_config["by_name"].get("传送符")
-        if not legend_ticket_cfg:
-            await travel_cmd.finish("⚠️ 配置缺少 传送符")
-        result = await session.execute(
-            select(Inventory)
-            .where(Inventory.player_id == player.id)
-            .where(Inventory.item_id == legend_ticket_cfg.item_id)
-        )
-        ticket = result.scalars().first()
-        if not ticket or ticket.quantity < 1:
-            await travel_cmd.finish("⛔ 传送符不足，无法启程")
-
-        # 扣除并移动
-        ticket.quantity -= 1
-        if ticket.quantity <= 0:
-            await session.delete(ticket)
-        player.region = target_region
-        player.x = 0
-        player.y = 0
-        session.add_all([player])
-        await session.commit()
-
-    msg = (
-        f"🪄 你使用了一张传送符，穿过层层迷雾抵达『{target_region}』！\n"
-        f"当前位置：({player.x},{player.y})"
-    )
-    await travel_cmd.finish(create_rich_message(msg, event))
 
 # ----------------- 指令：移动 -----------------
-move_cmd = on_command("移动", block=True, priority=5)
+move_cmd = on_regex(r"^(上|下|左|右)$", block=True, priority=5)
 
 @move_cmd.handle()
-async def _(event: MessageEvent, args: Message = CommandArg()):
-    arg = args.extract_plain_text().strip()
-    if not arg:
-        await move_cmd.finish("⛔ 请输入方向（上/下/左/右）或目标坐标 x,y")
-
+async def _(event: MessageEvent):
+    direction = event.get_plaintext().strip()
+    
     async with safe_session() as session:
         player: Player | None = await session.get(Player, event.get_user_id())
         if not player:
             await move_cmd.finish("⛔ 请先创建角色")
 
-        # 解析
-        if arg in DIRECTIONS:
-            dx, dy = DIRECTIONS[arg]
-            new_x, new_y = player.x + dx, player.y + dy
-        else:
-            try:
-                parts = arg.split(",")
-                new_x, new_y = int(parts[0]), int(parts[1])
-            except Exception:
-                await move_cmd.finish("⛔ 格式错误，示例：前往 上  或  前往 3,5")
+        # 解析方向
+        if direction not in DIRECTIONS:
+            await move_cmd.finish("⛔ 无效的方向")
+        
+        dx, dy = DIRECTIONS[direction]
+        new_x, new_y = player.x + dx, player.y + dy
 
         # 可加入边界检查 / 体力消耗
         player.x, player.y = new_x, new_y
-        session.add(player)
+
+        # 获取当前位置事件格
+        tile = await get_or_create_tile(session, player.region, player.x, player.y)
+
+        session.add_all([player, tile])
         await session.commit()
 
-    await move_cmd.finish(create_rich_message(f"🚶 已移动至 ({new_x},{new_y})", event))
+        # 构造事件描述
+        def describe_tile(t: WorldTile) -> str:
+            """根据 tile 类型生成可读描述，在移动后提示玩家下一步操作。"""
+            if t.event_type == "MATERIAL":
+                item_cfg = config.items_config["by_id"].get(t.state.get("item_id"))
+                item_name = item_cfg.name if item_cfg else "未知材料"
+                qty = t.state.get("quantity", "?")
+                if t.state.get("looted"):
+                    return f"🪨 这里曾经散落着 {item_name} ✖️{qty}，但已被搜刮一空。"
+                return f"✨ 你发现地面闪烁着 {item_name} ✖️{qty} 的微光，可输入 [探索] 采集。"
+            elif t.event_type == "TREASURE":
+                if t.state.get("looted"):
+                    return "🪨 破碎的宝箱静静躺在尘埃中，没有任何价值。"
+                return "🎁 你注意到一个尘封宝箱，也许输入 [探索] 能打开它。"
+            elif t.event_type == "EMPTY":
+                monster = t.state.get("name")
+                if monster:
+                    return f"🌫️ 四周弥漫着诡异的静谧，似乎潜伏着 {monster} 的气息。若想冒险，可输入 [探索] 进行调查。"
+                return "🌫️ 这里空无一物。"
+            return "⁉️ 未知事件。"
 
-# ----------------- 指令：探索 -----------------
-explore_cmd = on_command("探索", block=True, priority=5)
+        event_desc = describe_tile(tile)
+
+    header = f"🚶 已移动至 ({new_x},{new_y})"
+    await move_cmd.finish(message_add_head(f"{header}\n{event_desc}", event))
+
+# ----------------- 指令：战斗 -----------------
+explore_cmd = on_command("探索", aliases={"战斗", "攻击"}, block=True, priority=5)
 
 # 事件处理器映射
 async def _handle_material(session, tile: WorldTile, player: Player) -> str:
     if tile.state.get("looted"):
-        return "🪨 雕塑的暗格已被掏空，徒留潮湿指印。"
-    rng = random.Random(hash(tile.seed))
-    gold_gain = rng.randint(50, 150)
-    player.gold += gold_gain
-    tile.state["looted"] = True
-    session.add_all([player, tile])
-    await session.flush()
-    return f"🔑 你在龟裂神像内抠出 {gold_gain}💰！"
+        return "🪨 这里什么都没有了。"
     
+    # 获取物品配置
+    item_id = tile.state.get("item_id")
+    item_cfg = config.items_config["by_id"].get(item_id)
+    if not item_cfg:
+        return "⚠️ 错误：未知的物品。"
+    
+    quantity = tile.state.get("quantity", 1)
+    
+    # 检查背包容量
+    result = await session.execute(
+        select(func.count(Inventory.id)).where(Inventory.player_id == player.id)
+    )
+    current_items = result.scalar() or 0
+    
+    # 检查是否已有该物品
+    result = await session.execute(
+        select(Inventory).where(
+            Inventory.player_id == player.id,
+            Inventory.item_id == item_id
+        )
+    )
+    existing_item = result.scalars().first()
+    
+    # 如果是新物品且背包已满，则无法拾取
+    if not existing_item and current_items >= player.inventory_capacity:
+        return f"⚠️ 你的背包已满（{current_items}/{player.inventory_capacity}），无法拾取 {item_cfg.name}。"
+    
+    # 更新或创建物品记录
+    if existing_item:
+        existing_item.quantity += quantity
+        session.add(existing_item)
+    else:
+        new_item = Inventory(
+            player_id=player.id,
+            item_id=item_id,
+            quantity=quantity
+        )
+        session.add(new_item)
+    
+    # 标记为已拾取
+    tile.state["looted"] = True
+    session.add(tile)
+    await session.flush()
+    
+    return f"✨ 你采集到了 {item_cfg.name} ✖️{quantity}！"
+
 
 async def _handle_treasure(session, tile: WorldTile, player: Player) -> str:
     if tile.state.get("looted"):
@@ -224,7 +242,7 @@ async def _handle_personal_monster(session, tile: WorldTile, player: Player) -> 
             nonlocal monster_hp
             dmg = max(1, int(player.attack * rng.uniform(0.8, 1.1)))
             crit = False
-            if rng.random() < player.luck / 1000:
+            if rng.random() < player.luck / 100:
                 dmg = int(dmg*1.5)
                 crit = True
             monster_hp = max(0, monster_hp - dmg)

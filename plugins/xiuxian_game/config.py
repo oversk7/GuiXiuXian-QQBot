@@ -17,17 +17,20 @@ class Config(BaseSettings):
     @property
     def items_config(self) -> dict:
         """返回结构化物品配置"""
-        from .models.inventory import ItemConfig
+        from .models.inventory import ItemConfig, ItemType
         items = _load_config(self.items_file)
-        # 建立双索引：ID和名称
+        # 建立双索引：ID和名称，并按类型分组
         configs = {}
         name_index = {}
+        type_index = {t.value: [] for t in ItemType}
         for category in items["items"].values():
             for item in category:
                 config = ItemConfig(item)
                 configs[item["item_id"]] = config
                 name_index[item["name"]] = config  # 名称唯一索引
-        return {"by_id": configs, "by_name": name_index}
+                # 按类型收集 item_id，便于随机掉落
+                type_index[config.type.value].append(config.item_id)
+        return {"by_id": configs, "by_name": name_index, "by_type": type_index}
 
     @property
     def map_config(self) -> dict:

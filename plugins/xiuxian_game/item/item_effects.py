@@ -102,10 +102,3 @@ async def _buff(player: Player, cfg: ItemConfig, qty: int, ctx: str) -> Tuple[bo
     if not changed:
         return False, "⛔ 增益属性无效"
     return True, "✨ 获得增益：" + ", ".join(changed)
-
-
-@register(ItemEffectType.SPECIAL)
-async def _special(player: Player, cfg: ItemConfig, qty: int, ctx: str) -> Tuple[bool, str]:
-    # 由 cfg.effect_params["hint"] 提示用途
-    hint = cfg.effect_params.get("hint", "需要特殊场景使用，当前无法生效")
-    return False, f"❗ {hint}" 

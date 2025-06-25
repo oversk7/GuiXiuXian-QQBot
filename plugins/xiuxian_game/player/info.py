@@ -5,7 +5,7 @@ from ..models.db import safe_session
 from ..models.player import Player
 from sqlalchemy import select, func
 from ..models.player import Gender
-from ..utils import create_rich_message, calculate_level_up_exp
+from ..utils import message_add_head, calculate_level_up_exp
 from datetime import datetime
 
 profile = on_command("角色",aliases={"面板","状态"}, block=True, priority=5)
@@ -29,12 +29,12 @@ async def _(event: MessageEvent):
 │ 理智：{player.mp}/{player.max_mp} 🧠
 │ 位置：{player.region} ({player.x},{player.y}) 
 ├──【属性】──
-│ ⚔力 {player.attack}  🛡防 {player.defense}  👟敏 {player.agility}  🍀幸运 {player.luck}
+│ ⚔力 {player.attack}  🛡防 {player.defense}  👟敏 {player.agility}  🍀运 {player.luck}
 ├──【资源】──
-│ 金币：{player.gold}  | 属性点：{player.attribute_points}✨
+│ 金币：{player.gold}  | 点数：{player.attribute_points}✨
 └───────────
 """
-    await profile.finish(create_rich_message(content, event))
+    await profile.finish(message_add_head(content, event))
 
 @register.handle()
 async def _(event: MessageEvent, args: Message = CommandArg()):
@@ -77,4 +77,4 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
         😇恭喜你踏上诡修之路！
 道号：{nickname}[UID:{new_player.uid}]「{new_player.sex.value}」
         """
-        await register.finish(create_rich_message(content, event))
+        await register.finish(message_add_head(content, event))

@@ -1,6 +1,6 @@
 # 游戏基础配置
 game:
-  max_level: 200  # 最大等级
+  max_level: 1000  # 最大等级
   base_exp: 100   # 基础经验值（1级到2级所需经验）
   points_per_level: 5  # 每次升级获得的属性点数
   exp_curve:
@@ -18,8 +18,8 @@ cultivate:
         change_level: 50  # 多高等级之后才可能失败
         fail_keep_ratio: 0.7  # 失败保留经验比例
     attributes_base:
-        max_hp: 10    # 体 (max_hp) 基础增量
-        max_mp: 10    # 智 (max_mp) 基础增量
-        attack: 10     # 力 (attack) 基础增量
-        defense: 8    # 防 (defense) 基础增量
-        agility: 2    # 敏 (agility) 基础增量
+        max_hp: 1    # 体 (max_hp) 基础增量
+        max_mp: 1    # 智 (max_mp) 基础增量
+        attack: 1     # 力 (attack) 基础增量
+        defense: 1    # 防 (defense) 基础增量
+        agility: 1    # 敏 (agility) 基础增量

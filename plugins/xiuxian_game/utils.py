@@ -3,14 +3,10 @@ from typing import Optional
 from .config import config
 
 
-def create_rich_message(content: str, event: Optional[MessageEvent] = None) -> Message:
+def message_add_head(content: str, event: Optional[MessageEvent] = None) -> Message:
     """
-    创建带格式的富文本消息，自动添加@用户
+    后续可能添加统一的消息头
     """
-    # msg = Message()
-    # if event:
-    #     msg.append(MessageSegment.at(event.get_user_id()))
-    # msg.append(MessageSegment.text(f"\n{content.strip()}"))
     return Message(content)
 
 

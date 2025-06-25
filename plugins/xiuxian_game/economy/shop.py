@@ -7,7 +7,7 @@ from ..models.db import safe_session
 from ..models.player import Player
 from ..models.inventory import Inventory
 from ..config import config
-from ..utils import create_rich_message
+from ..utils import message_add_head
 from sqlalchemy import select
 
 daily_shop = on_command("每日商店", aliases={"商店"}, block=True, priority=5)
@@ -86,7 +86,7 @@ async def _(event: MessageEvent):
         # 生成当日商店
         shop_data = generate_daily_shop(player.uid)
         await daily_shop.finish(
-            create_rich_message(await format_shop(shop_data, player.gold), event)
+            message_add_head(await format_shop(shop_data, player.gold), event)
         )
 
 @buy_item.handle()

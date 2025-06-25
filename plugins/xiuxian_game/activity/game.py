@@ -4,7 +4,7 @@ from nonebot.params import CommandArg
 from nonebot.adapters.qq import Message
 from ..models.db import safe_session
 from ..models.player import Player
-from ..utils import create_rich_message
+from ..utils import message_add_head
 import random
 
 # 猜拳功能
@@ -74,4 +74,4 @@ async def handle_fist_game(event: MessageEvent, args: Message = CommandArg()):
             f"▫️ 结果：{result_msg}\n"
             f"💰 当前金币：{player.gold}"
         )
-        await guess_fist.finish(create_rich_message(result, event)) 
+        await guess_fist.finish(message_add_head(result, event)) 
