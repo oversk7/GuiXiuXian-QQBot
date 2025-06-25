@@ -284,6 +284,9 @@ async def handle_revive(event: MessageEvent):
         if player.hp > 0:
             await revive_cmd.finish("⛔ 你尚未死亡，无需复活")
         player.hp = player.max_hp
+        player.region = "主城"
+        player.x = 0
+        player.y = 0
         session.add(player)
         await session.commit()
-        await revive_cmd.finish("✨ 你死而复生，继续前进吧！")
+        await revive_cmd.finish("✨ 你在主城复活，继续前进吧！")
