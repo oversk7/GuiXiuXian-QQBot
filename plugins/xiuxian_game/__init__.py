@@ -18,7 +18,8 @@ from . import (
     activity,
     economy,
     world,
-    item
+    item,
+    entertainment
 )
 
 driver = get_driver()
