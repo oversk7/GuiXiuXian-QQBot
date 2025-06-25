@@ -107,12 +107,16 @@ async def _(event: MessageEvent):
         # 解析方向
         if direction not in DIRECTIONS:
             await move_cmd.finish("⛔ 无效的方向")
-        
+        if player.stamina <= 0:
+            await move_cmd.finish("⛔ 体力不足，无法移动")
         dx, dy = DIRECTIONS[direction]
         new_x, new_y = player.x + dx, player.y + dy
-
-        # 可加入边界检查 / 体力消耗
         player.x, player.y = new_x, new_y
+        
+        # 扣体力暂定
+        # player.stamina -= 1
+        # player.mp -= random.randint(0, 2)
+        # player.mp = max(0, player.mp)
 
         # 获取当前位置事件格
         tile = await get_or_create_tile(session, player.region, player.x, player.y)

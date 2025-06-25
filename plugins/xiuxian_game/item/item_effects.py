@@ -55,9 +55,8 @@ async def apply_effect(player: Player, item_cfg: ItemConfig, quantity: int = 1, 
 @register(ItemEffectType.RESTORE_HP)
 async def _restore_hp(player: Player, cfg: ItemConfig, qty: int, ctx: str) -> Tuple[bool, str]:
     value = int(cfg.effect_params.get("value", 0)) * qty
-    if value <= 0:
-        return False, "⛔ 道具配置异常，无法恢复生命"
-    # 已满则不生效
+    if player.hp <= 0:
+        return False, "🧐 你已经死亡，无法恢复生命"
     if player.hp >= player.max_hp:
         return False, "🧐 你的生命值已满，不需要使用此物品"
     player.hp = min(player.max_hp, player.hp + value)
@@ -67,8 +66,8 @@ async def _restore_hp(player: Player, cfg: ItemConfig, qty: int, ctx: str) -> Tu
 @register(ItemEffectType.RESTORE_MP)
 async def _restore_mp(player: Player, cfg: ItemConfig, qty: int, ctx: str) -> Tuple[bool, str]:
     value = int(cfg.effect_params.get("value", 0)) * qty
-    if value <= 0:
-        return False, "⛔ 道具配置异常，无法恢复理智"
+    if player.hp <= 0:
+        return False, "🧐 你已经死亡，无法恢复理智"
     if player.mp >= player.max_mp:
         return False, "🧐 你的理智值已满，不需要使用此物品"
     player.mp = min(player.max_mp, player.mp + value)

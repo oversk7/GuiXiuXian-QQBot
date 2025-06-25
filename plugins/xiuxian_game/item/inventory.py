@@ -17,6 +17,7 @@ teleport_list = on_command("地图", block=True, priority=5)
 
 teleport_cmd = on_command("传送", block=True, priority=5)
 rename_cmd = on_command("改名", block=True, priority=5)
+revive_cmd = on_command("复活", block=True, priority=5)
 
 @use_item.handle()
 async def handle_use_item(event: MessageEvent, args: Message = CommandArg()):
@@ -272,4 +273,17 @@ async def handle_rename(event: MessageEvent, args: Message = CommandArg()):
         await session.commit()
 
         await rename_cmd.finish(f"🎉 成功修改角色名为：{new_name}\n"
-                               f"剩余改名卡：{inventory.quantity-1 if inventory else 0}张") 
+                               f"剩余改名卡：{inventory.quantity-1 if inventory else 0}张")
+
+@revive_cmd.handle()
+async def handle_revive(event: MessageEvent):
+    async with safe_session() as session:
+        player = await session.get(Player, event.get_user_id())
+        if not player:
+            await revive_cmd.finish("⛔ 请先创建角色")
+        if player.hp > 0:
+            await revive_cmd.finish("⛔ 你尚未死亡，无需复活")
+        player.hp = player.max_hp
+        session.add(player)
+        await session.commit()
+        await revive_cmd.finish("✨ 你死而复生，继续前进吧！")
