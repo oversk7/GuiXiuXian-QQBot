@@ -17,7 +17,7 @@ async def handle_help(event: MessageEvent, args: Message = CommandArg()):
         "🧘 修炼系统  🎪 活动系统\n"
         "🎭 玩家系统  🎒 背包系统\n"
         "🛒 每日商店  📦 交易系统\n"
-        "🗓️ 任务系统\n"
+        "🗓️ 世界系统\n"
         "═════════════\n"
         "💡 输入系统名称查看详细指令\n"
         "💡 教程及反馈请查看此链接：https://tz.nevermonarch.cn/url/?url=https://www.yuque.com/rixingyinyao-dx2t6/gs55vv/rz0e9fsw7c7sggwe \n"
@@ -61,28 +61,22 @@ async def handle_bag(event: MessageEvent, args: Message = CommandArg()):
         "✨ 背包系统帮助 ✨\n"
         "【背包 [页码]】 查看背包内所有物品\n"
         "【查背包 [页码] [序号]】 查询物品详细信息\n"
-        "【使用物品 [物品名]】 使用指定道具\n"
+        "【使用 [物品名]】 使用指定道具\n"
         "═══════════════\n"
         "◈ 使用传送符示例：/传送 [地点]"
     )
     await bag_cmd.finish(Message(msg))
 
 # 任务系统
-ren_wu_cmd = on_command("任务系统", priority=4, block=True)
+ren_wu_cmd = on_command("世界系统", priority=4, block=True)
 @ren_wu_cmd.handle()
 async def handle_ren_wu(event: MessageEvent, args: Message = CommandArg()):
     msg = (
-        "✨ 任务系统帮助 ✨\n"
-        "【任务】 查看当前任务\n"
+        "✨ 世界系统帮助 ✨\n"
         "【传送 [地点]】 传送到指定地点\n"
         "【地图】 查看当前可探索的地点\n"
         "【探索】 探索玩家所在地点\n"
-        "【队伍邀请 [UID]】 邀请玩家加入队伍\n"
-        "【队伍创建/解散】 创建/解散队伍\n"
-        "【踢出队员 [UID]】\n"
-        "【加入队伍 [队伍ID]】用于被邀请后同意\n"
-        "【退出队伍】\n"
-        "【探索模式 个人/组队】 切换单人/组队探索模式"
+        "【[上|下|左|右]】 向指定方向移动一格\n"
     )
     await ren_wu_cmd.finish(Message(msg))
 
