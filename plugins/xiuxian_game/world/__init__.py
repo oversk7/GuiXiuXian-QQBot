@@ -23,6 +23,7 @@ from io import BytesIO
 import base64
 from PIL import Image, ImageDraw, ImageFont
 from pathlib import Path
+import os
 
 # ----------------- 常量 -----------------
 DIRECTIONS: Dict[str, Tuple[int, int]] = {
@@ -323,11 +324,27 @@ _PLAYER_COLOR = (244, 67, 54)    # 红色
 def _load_font(size: int = 24) -> ImageFont.ImageFont:
     """尝试加载支持中文的系统字体，若失败则回退默认字体。"""
     candidates = [
+        # Windows 常见中文字体
         Path("C:/Windows/Fonts/msyh.ttc"),  # 微软雅黑
         Path("C:/Windows/Fonts/simhei.ttf"),  # 黑体
         Path("C:/Windows/Fonts/simsun.ttc"),  # 宋体
-        Path("/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf"),  # 常见 Linux 字体
+
+        # Linux 常见中文字体
+        Path("/usr/share/fonts/truetype/wqy/wqy-zenhei.ttc"),
+        Path("/usr/share/fonts/truetype/wqy/wqy-microhei.ttc"),
+        Path("/usr/share/fonts/opentype/noto/NotoSansCJK-Regular.ttc"),
+        Path("/usr/share/fonts/truetype/noto/NotoSansCJK-Regular.ttc"),
+        Path("/usr/share/fonts/truetype/noto/NotoSansCJK.ttc"),
+
+        # 通用 sans 字体
+        Path("/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf"),
     ]
+
+    # 若用户自定义字体路径，可通过环境变量 FONT_PATH 指定
+    env_font = os.getenv("FONT_PATH")
+    if env_font:
+        candidates.insert(0, Path(env_font))
+
     for p in candidates:
         if p.exists():
             try:
