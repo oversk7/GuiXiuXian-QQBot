@@ -4,7 +4,7 @@ items:
       name: "传送符"
       description: "传送到指定地点"
       type: "CONSUMABLE"
-      effect_type: "SPECIAL"
+      effect_type: "TELEPORT"
       price: 100
 
     - item_id: "heal_potion"
@@ -50,7 +50,7 @@ items:
       name: "改名卡"
       description: "可修改一次角色名称 ✍️  使用方法：/改名 新名字"
       type: "CONSUMABLE"
-      effect_type: "SPECIAL"
+      effect_type: "CHANGE_NAME"
       price: 500
 
   materials:  # 材料类

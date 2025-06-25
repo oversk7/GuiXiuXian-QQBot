@@ -12,8 +12,10 @@ class ItemEffectType(str, PyEnum):
     RESTORE_HP = "RESTORE_HP" 
     RESTORE_MP = "RESTORE_MP"
     BUFF = "BUFF"
-    SPECIAL = "SPECIAL"
     REVIVE = "REVIVE"
+    # 以下类型不使用 apply_effect 处理
+    CHANGE_NAME = "CHANGE_NAME"
+    TELEPORT = "TELEPORT"
 
 class ItemConfig:
     def __init__(self, data: dict):

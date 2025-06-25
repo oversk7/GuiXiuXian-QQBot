@@ -8,6 +8,7 @@ from ..models.inventory import ItemType, ItemEffectType
 from ..utils import create_rich_message, paginate_items
 from sqlalchemy import select
 from ..config import config
+from .item_effects import apply_effect
 
 inventory_cmd = on_command("背包", block=True, priority=5)
 use_item = on_command("使用物品", block=True, priority=5)
@@ -52,27 +53,29 @@ async def handle_use_item(event: MessageEvent, args: Message = CommandArg()):
         if not inventory or inventory.quantity < quantity:
             await use_item.finish(f"⛔ {item_name} 数量不足")
 
-        # 应用物品效果
-        if item_config.type == ItemType.CONSUMABLE:
-            if item_config.effect_type == ItemEffectType.RESTORE_HP:
-                player.hp = min(player.max_hp, player.hp + item_config.effect_params["value"] * quantity)
-            elif item_config.effect_type == ItemEffectType.RESTORE_MP:
-                player.mp = min(player.max_mp, player.mp + item_config.effect_params["value"] * quantity)
-            # 更新背包数量
-            inventory.quantity -= quantity
-            if inventory.quantity <= 0:
-                await session.delete(inventory)
-            
-            session.add(player)
-            await session.commit()
-            
-            await use_item.finish(f"✅ 成功使用 {item_name} ✖️{quantity}\n"
-                                 f"当前生命：{player.hp}/{player.max_hp} ❤️\n"
-                                 f"当前理智：{player.mp}/{player.max_mp} 🧠")
-        elif item_config.effect_type == ItemEffectType.CHANGE_NAME:
+        # 特殊改名卡提示，直接跳转改名指令
+        if item_config.effect_type == ItemEffectType.CHANGE_NAME:
             await use_item.finish("🪄 请使用指令进行改名：/改名 新名字")
-        else:
-            await use_item.finish("⛔ 该物品无法直接使用")
+        elif item_config.effect_type == ItemEffectType.TELEPORT:
+            await use_item.finish("🪄 请使用指令进行传送：/传送 地点名称")
+
+        # 调用统一效果执行器
+        success, msg = await apply_effect(player, item_config, quantity, ctx="world")
+
+        if not success:
+            # 未生效，不扣除物品
+            await session.rollback()
+            await use_item.finish(msg)
+
+        # 扣除物品数量
+        inventory.quantity -= quantity
+        if inventory.quantity <= 0:
+            await session.delete(inventory)
+
+        session.add(player)
+        await session.commit()
+
+        await use_item.finish(f"✅ 成功使用 {item_name} ✖️{quantity}\n" + msg)
 
 @inventory_cmd.handle()
 async def handle_inventory(event: MessageEvent, args: Message = CommandArg()):
@@ -203,11 +206,13 @@ async def handle_teleport(event: MessageEvent, args: Message = CommandArg()):
         if inventory.quantity <= 0:
             await session.delete(inventory)
         
-        player.position = target_location
+        player.region = target_location
+        player.x = 0
+        player.y = 0
         session.add(player)
         await session.commit()
 
-        await teleport_cmd.finish(f"🌀 消耗1个传送符，已成功传送至【{target_location}】\n当前位置：{target_location} 📍")
+        await teleport_cmd.finish(f"🌀 消耗1个传送符，已成功传送至【{target_location}】\n当前位置：{target_location}(0,0) 📍")
 
 @teleport_list.handle()
 async def handle_teleport_list(event: MessageEvent):

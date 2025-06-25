@@ -75,13 +75,9 @@ async def get_or_create_tile(session, region: str, x: int, y: int) -> WorldTile:
             }
         elif tile.event_type == "TREASURE":
             tile.state = {"looted": False}
-        elif tile.event_type == "ELITE":
+        elif tile.event_type == "MATERIAL":
             tile.state = {
-                "name": "精英怪",
-                "level": monster_level,
-                "hp": rng.randint(10, 20) * monster_level,
-                "attack": rng.randint(1, 5) * monster_level,
-                "agility": rng.randint(1, 5) * monster_level + 10,
+                
             }
         await session.merge(tile)
         await session.flush()
@@ -105,10 +101,10 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
         if not player:
             await travel_cmd.finish("⛔ 请先创建角色")
 
-        # 检查传说券
-        legend_ticket_cfg = config.items_config["by_name"].get("传说券")
+        # 检查传送符
+        legend_ticket_cfg = config.items_config["by_name"].get("传送符")
         if not legend_ticket_cfg:
-            await travel_cmd.finish("⚠️ 配置缺少 传送券")
+            await travel_cmd.finish("⚠️ 配置缺少 传送符")
         result = await session.execute(
             select(Inventory)
             .where(Inventory.player_id == player.id)
@@ -116,7 +112,7 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
         )
         ticket = result.scalars().first()
         if not ticket or ticket.quantity < 1:
-            await travel_cmd.finish("⛔ 传送券不足，无法启程")
+            await travel_cmd.finish("⛔ 传送符不足，无法启程")
 
         # 扣除并移动
         ticket.quantity -= 1
@@ -129,13 +125,13 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
         await session.commit()
 
     msg = (
-        f"🪄 你使用了一张传送券，穿过层层迷雾抵达『{target_region}』！\n"
+        f"🪄 你使用了一张传送符，穿过层层迷雾抵达『{target_region}』！\n"
         f"当前位置：({player.x},{player.y})"
     )
     await travel_cmd.finish(create_rich_message(msg, event))
 
-# ----------------- 指令：前往 -----------------
-move_cmd = on_command("前往", block=True, priority=5)
+# ----------------- 指令：移动 -----------------
+move_cmd = on_command("移动", block=True, priority=5)
 
 @move_cmd.handle()
 async def _(event: MessageEvent, args: Message = CommandArg()):
@@ -170,101 +166,17 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
 explore_cmd = on_command("探索", block=True, priority=5)
 
 # 事件处理器映射
-async def _handle_elite(session, tile: WorldTile, player: Player) -> str:
-    """精英怪属于公共事件，自动战斗，直到一方死亡，输出完整战报"""
-    rng = random.Random(hash(f"{tile.seed}:{player.id}:{datetime.utcnow().timestamp()}"))
-    monster_hp = tile.state.get("hp", 0)
-    monster_name = tile.state.get("name", "未知诡影")
-    if monster_hp <= 0:
-        return f"⚠️ 这里残留着 {monster_name} 的破碎尸壳…已经被人捷足先登。"
-
-    # 玩家属性
-    attack_score = player.attack * 0.7 + player.agility * 0.3
-    defense_score = player.defense * 0.7 + player.agility * 0.2 + player.luck * 0.1
-    player_hp = player.hp
-    max_round = 100  # 上限 100 回合
-    battle_log = []
-    contributors: dict = tile.state.setdefault("contributors", {})
-    uid = str(player.uid)
-    total_dmg = 0
-
-    # 怪物属性（若无则默认）
-    monster_attack_stat = tile.state.get("attack", rng.randint(10, 30))
-    monster_agility = tile.state.get("agility", rng.randint(5, 20))
-    monster_level = tile.state.get("level", 1)
-    monster_display = f"{monster_name}(Lv{monster_level})"
-
-    def record(round_idx: int, text: str, force: bool=False):
-        """根据需求选择性记录日志"""
-        if force or round_idx == 1 or round_idx % 10 == 0:
-            battle_log.append(text)
-
-    for round_num in range(1, max_round + 1):
-        if monster_hp <= 0 or player_hp <= 0:
-            break
-
-        # 计算先手：概率由敏捷决定
-        player_first = rng.random() < (player.agility / (player.agility + monster_agility))
-
-        def player_attack(r_idx):
-            nonlocal monster_hp, total_dmg
-            hit_rate = max(0.3, min(0.95, attack_score / (attack_score + defense_score + 1)))
-            if rng.random() > hit_rate:
-                record(r_idx, f"[回合{r_idx}] 你挥舞兵刃，未命中 {monster_display}。")
-                return
-            base_dmg = attack_score * rng.uniform(0.8, 1.2)
-            dmg = max(1, int(base_dmg))
-            crit = False
-            if rng.random() < player.luck / 1000:
-                dmg = int(dmg * 1.5)
-                crit = True
-            monster_hp = max(0, monster_hp - dmg)
-            total_dmg += dmg
-            record(r_idx, f"[回合{r_idx}] {'💥 暴击！' if crit else ''}你对 {monster_display} 造成 {dmg} 伤害！", force=(crit or monster_hp==0))
-
-        def monster_attack_fn(r_idx):
-            nonlocal player_hp
-            dmg = rng.randint(int(monster_attack_stat*0.8), int(monster_attack_stat*1.2))
-            player_hp = max(0, player_hp - dmg)
-            record(r_idx, f"[回合{r_idx}] {monster_display} 攻击你，造成 {dmg} 伤害！", force=(player_hp==0))
-
-        if player_first:
-            player_attack(round_num)
-            if monster_hp > 0:
-                monster_attack_fn(round_num)
-        else:
-            monster_attack_fn(round_num)
-            if player_hp > 0:
-                player_attack(round_num)
-
-    # 更新贡献
-    contributors[uid] = contributors.get(uid, 0) + total_dmg
-    tile.state["hp"] = monster_hp
-    player.hp = player_hp
-
-    # 添加总结行
-    battle_log.append(f"📊 总计 {round_num} 回合，你造成 {total_dmg} 伤害，剩余HP {player_hp}/{player.max_hp}，{monster_display} HP {monster_hp}/{monster_hp + total_dmg}。")
-
-    # 结算
-    if monster_hp == 0:
-        exp_gain = 100
-        player.exp += exp_gain
-        reward_text = f"🎉 你终结了 {monster_display}！获得 {exp_gain} EXP"
-        tile.event_type = "EMPTY"
-        tile.state = {}
-        session.add(player)
-        await session.flush()
-        return "\n".join(battle_log) + "\n" + reward_text
-    elif player_hp == 0:
-        tile.state["hp"] = monster_hp
-        session.add_all([player, tile])
-        await session.flush()
-        return "\n".join(battle_log)
-    else:
-        session.add_all([player, tile])
-        await session.flush()
-        return "\n".join(battle_log)
-
+async def _handle_material(session, tile: WorldTile, player: Player) -> str:
+    if tile.state.get("looted"):
+        return "🪨 雕塑的暗格已被掏空，徒留潮湿指印。"
+    rng = random.Random(hash(tile.seed))
+    gold_gain = rng.randint(50, 150)
+    player.gold += gold_gain
+    tile.state["looted"] = True
+    session.add_all([player, tile])
+    await session.flush()
+    return f"🔑 你在龟裂神像内抠出 {gold_gain}💰！"
+    
 
 async def _handle_treasure(session, tile: WorldTile, player: Player) -> str:
     if tile.state.get("looted"):
@@ -355,7 +267,7 @@ async def _handle_personal_monster(session, tile: WorldTile, player: Player) -> 
 
 
 EVENT_HANDLERS = {
-    "ELITE": _handle_elite,
+    "MATERIAL": _handle_material,
     "TREASURE": _handle_treasure,
     "EMPTY": _handle_empty,
 }
@@ -373,4 +285,4 @@ async def _(event: MessageEvent):
         await session.commit()
 
     header = f"🧭位置 {player.region} ({player.x},{player.y})"
-    await explore_cmd.finish(f"{header}\n{log}", event) 
+    await explore_cmd.finish(f"{header}\n{log}") 

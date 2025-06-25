@@ -17,7 +17,8 @@ from . import (
     cultivate,
     activity,
     economy,
-    world
+    world,
+    item
 )
 
 driver = get_driver()

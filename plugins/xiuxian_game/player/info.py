@@ -27,10 +27,9 @@ async def _(event: MessageEvent):
 │ Lv.{player.level} Exp：{player.exp}/{calculate_level_up_exp(player.level)}
 │ 生命：{player.hp}/{player.max_hp} ❤️
 │ 理智：{player.mp}/{player.max_mp} 🧠
-│ 位置：{player.position} 
+│ 位置：{player.region} ({player.x},{player.y}) 
 ├──【属性】──
-│ ⚔力 {player.attack}  🛡防 {player.defense}  👟敏 {player.agility}
-│ 😱恐抗 {player.fear_resistance}  🍀幸运 {player.luck}
+│ ⚔力 {player.attack}  🛡防 {player.defense}  👟敏 {player.agility}  🍀幸运 {player.luck}
 ├──【资源】──
 │ 金币：{player.gold}  | 属性点：{player.attribute_points}✨
 └───────────
