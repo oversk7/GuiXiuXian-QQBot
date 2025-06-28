@@ -80,9 +80,12 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
 
         # 结算
         if total == 7:
-            # 庄家全收，玩家已扣款无需额外处理
-            result_text = "🎲 点数为 7，庄家通吃！"
-            icon = "💥"
+            # 幸运 7：无论押大押小都算玩家获胜，给予 3 倍奖励
+            multiplier = 3
+            reward = bet * multiplier
+            player.gold += reward
+            result_text = f"🍀 幸运数字 7！奖励 ×{multiplier}，获得 {reward} 金币"
+            icon = "🍀"
         elif win:
             multiplier = 5 if jackpot else 2
             reward = bet * multiplier
