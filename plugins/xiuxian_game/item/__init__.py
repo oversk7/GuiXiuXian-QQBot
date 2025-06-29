@@ -1,1 +1,1 @@
-from . import inventory, item_effects
+from . import inventory, item_effects, equipment_commands

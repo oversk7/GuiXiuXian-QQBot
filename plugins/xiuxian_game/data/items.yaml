@@ -97,3 +97,22 @@ items:
       type: "MATERIAL"
       price: 600
 
+  equipment:
+    - item_id: "swim_coat"
+      name: "溺水者外衣"
+      description: "溺水者外衣"
+      type: "EQUIPMENT"
+      price: 100
+      durability: 100
+      attr_bonus: {"hp": 10}
+      attr_ratio: {"hp": 1.0}
+
+    - item_id: "lucky_scissors"
+      name: "幸运剪刀"
+      description: "幸运剪刀"
+      type: "EQUIPMENT"
+      price: 100
+      durability: 100
+      attr_bonus: {"luck": 10}
+      attr_ratio: {"luck": 1.0}
+      

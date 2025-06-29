@@ -26,6 +26,9 @@ class ItemConfig:
         self.effect_type = ItemEffectType(data.get("effect_type", "BUFF"))
         self.effect_params = data.get("effect_params", {})
         self.price = data.get("price", 0)
+        self.durability = data.get("durability", 0)
+        self.attr_bonus = data.get("attr_bonus", {})
+        self.attr_ratio = data.get("attr_ratio", {})
         
 
 class Inventory(Base):
