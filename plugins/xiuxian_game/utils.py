@@ -76,9 +76,10 @@ async def paginate_items(items: list, page: int, page_size: Optional[int] = None
     page_info = f"\n📖 第 {page} 页（共 {total_pages} 页）"
     
     lines = []
-    for idx, item in enumerate(current_page_items, start=1):
+    for offset, item in enumerate(current_page_items, start=1):
+        global_idx = start + offset  # 背包全局序号
         lines.append(
-            f"{idx}. {item.config.name} ✖️{item.quantity}\n"
+            f"{global_idx}. {item.config.name} ✖️{item.quantity}\n"
         )
     
     return "🎒 你的背包\n" + "".join(lines) + page_info

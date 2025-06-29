@@ -50,4 +50,3 @@ async def handle_sign(event: MessageEvent):
             await sign.send(f"签到成功！获得 {gold_reward} 金币！✨")
         
         await session.commit()
-        await check_daily_quests(str(user_id))  # 检查每日任务

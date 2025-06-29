@@ -8,7 +8,7 @@ from ..utils import message_add_head
 
 import random
 
-# 🎲 骰子比大小：/押大小 金币数 大/小  (aliases 支持顺序互换)
+# 🎲 骰子比大小：/押大小 金币数 大/小
 dice_cmd = on_command(
     "押大小",
     aliases={"押大", "押小", "dice"},

@@ -147,14 +147,22 @@ async def handle_item_detail(event: MessageEvent, args: Message = CommandArg()):
         if page > total_pages:
             await item_detail.finish(f"⛔ 最大页码为 {total_pages}")
 
-        start_idx = (page - 1) * page_size
-        end_idx = start_idx + page_size
-        page_items = items[start_idx:end_idx]
+        # 支持全局索引与页内索引两种模式
+        # 如果输入的 index 超过当前页大小，则按全局序号处理
+        if index > page_size:
+            if index > len(items):
+                await item_detail.finish(f"⛔ 背包仅有 {len(items)} 个格子")
+            target_item = items[index - 1].config  # 全局序号
+        else:
+            start_idx = (page - 1) * page_size
+            end_idx = start_idx + page_size
+            page_items = items[start_idx:end_idx]
 
-        if index > len(page_items):
-            await item_detail.finish(f"⛔ 该页只有 {len(page_items)} 个物品")
+            if index > len(page_items):
+                await item_detail.finish(f"⛔ 该页只有 {len(page_items)} 个物品")
 
-        target_item = page_items[index - 1].config
+            target_item = page_items[index - 1].config
+
         effect_info = ""
         if target_item.effect_type and target_item.effect_params:
             effects = {

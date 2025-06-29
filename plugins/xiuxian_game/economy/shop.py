@@ -40,9 +40,9 @@ async def format_shop(shop_sell: list, player_gold: int) -> str:
     # 操作说明
     content.extend([
         "\n📝 操作指南：",
-        "购买 [物品序号] [数量] - 购买商品",
-        "出售 [材料名称] [数量] - 出售材料",
-        "（单次购买/出售数量 1-50）"
+        "购买 [商品序号|名称] [数量] - 购买商品",
+        "出售 [背包序号|名称] [数量] - 出售材料",
+        "（数量需为正整数）"
     ])
     return "\n".join(content)
 
@@ -67,15 +67,20 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
     
     # 参数校验
     if len(args_list) < 1 or len(args_list) > 2:
-        await buy_item.finish("⛔ 格式错误，正确格式：购买 序号 [数量]\n例：购买 2 或 购买 3 5")
+        await buy_item.finish(
+            "⛔ 格式错误，正确示例：购买 2 3 或 购买 传送符 2"
+        )
     
+    # 解析数量（默认 1）
     try:
-        index = int(args_list[0]) - 1
-        quantity = int(args_list[1]) if len(args_list) > 1 else 1
-        if quantity < 1 or quantity > 50:  # 添加购买数量限制
+        quantity = int(args_list[1]) if len(args_list) == 2 else 1
+        if quantity < 1:
             raise ValueError
     except ValueError:
-        await buy_item.finish("⛔ 数量必须为1-50之间的整数")
+        await buy_item.finish("⛔ 数量必须为正整数")
+
+    # 判断数字序号还是商品名称
+    is_index_mode = args_list[0].isdigit()
 
     async with safe_session() as session:
         player = await session.get(Player, event.get_user_id())
@@ -85,17 +90,41 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
         # 获取商店商品列表
         sell_list = generate_common_shop()
         
-        # 检查序号
-        if index < 0 or index >= len(sell_list):
-            await buy_item.finish("⛔ 无效的物品序号")
-        
-        # 获取出售物品（从出售列表中获取）
-        item_config, price = sell_list[index]
+        if is_index_mode:
+            # -------------------------------
+            #   序号购买模式
+            # -------------------------------
+            try:
+                index = int(args_list[0]) - 1
+                if index < 0:
+                    raise ValueError
+            except ValueError:
+                await buy_item.finish("⛔ 无效的商品序号")
+
+            if index >= len(sell_list):
+                await buy_item.finish("⛔ 无效的商品序号")
+
+            item_config, price = sell_list[index]
+        else:
+            # -------------------------------
+            #   名称购买模式
+            # -------------------------------
+            item_name = args_list[0]
+            match = next(
+                ((cfg, pr) for cfg, pr in sell_list if cfg.name == item_name),
+                None,
+            )
+            if not match:
+                await buy_item.finish("⛔ 无效的商品名称，或当前未上架")
+            item_config, price = match
+
         total_price = price * quantity
         
         # 金币检查
         if player.gold < total_price:
-            await buy_item.finish(f"⛔ 金币不足，需要 {total_price}💰 当前拥有 {player.gold}💰")
+            await buy_item.finish(
+                f"⛔ 金币不足，需要 {total_price}💰 当前拥有 {player.gold}💰"
+            )
         
         # 持有量检查
         inv = await session.execute(
@@ -132,50 +161,96 @@ sell_item = on_command("出售", block=True, priority=5)
 
 @sell_item.handle()
 async def _(event: MessageEvent, args: Message = CommandArg()):
-    """玩家出售材料换取金币，格式：出售 材料名 [数量]"""
+    """玩家出售材料换取金币，格式：出售 背包序号|材料名称 [数量]"""
     arg_str = args.extract_plain_text().strip()
     parts = arg_str.split()
 
     # 参数校验
     if not parts or len(parts) > 2:
-        await sell_item.finish("⛔ 格式错误，正确示例：出售 鬼泪 3")
+        await sell_item.finish("⛔ 格式错误，正确示例：出售 5 3 或 出售 鬼泪 3")
 
-    item_name = parts[0]
+    # 解析数量
     try:
         quantity = int(parts[1]) if len(parts) == 2 else 1
-        if quantity < 1 or quantity > 50:
+        if quantity < 1:
             raise ValueError
     except ValueError:
-        await sell_item.finish("⛔ 数量必须为 1-50 的整数")
+        await sell_item.finish("⛔ 数量必须为正整数")
 
-    # 获取物品配置
-    item_cfg = config.items_config["by_name"].get(item_name)
-    if not item_cfg or item_cfg.type.value != "MATERIAL":
-        await sell_item.finish("⛔ 仅可出售材料类物品！")
+    # 判断首参数是背包序号还是物品名
+    is_index_mode = parts[0].isdigit()
 
+    # 根据模式获取物品配置与库存记录
     async with safe_session() as session:
         player = await session.get(Player, event.get_user_id())
         if not player:
             await sell_item.finish("⛔ 请先创建角色")
 
-        # 检查玩家背包
-        inv_stmt = select(Inventory).where(
-            Inventory.player_id == event.get_user_id(),
-            Inventory.item_id == item_cfg.item_id
-        )
-        inv = (await session.execute(inv_stmt)).scalars().first()
+        if is_index_mode:
+            # -------------------------------
+            #   序号出售模式
+            # -------------------------------
+            try:
+                target_index = int(parts[0])
+                if target_index < 1:
+                    raise ValueError
+            except ValueError:
+                await sell_item.finish("⛔ 无效的背包序号")
 
-        if not inv or inv.quantity < quantity:
-            await sell_item.finish(f"⛔ {item_cfg.name} 数量不足（当前持有：{inv.quantity if inv else 0}）")
+            # 获取该玩家所有背包物品（按 item_id 排序，保证与背包指令一致）
+            inv_stmt = (
+                select(Inventory)
+                .where(Inventory.player_id == event.get_user_id())
+                .order_by(Inventory.item_id)
+            )
+            inv_items = (await session.execute(inv_stmt)).scalars().all()
+
+            if not inv_items or target_index > len(inv_items):
+                await sell_item.finish("⛔ 无效的背包序号")
+
+            target_inv = inv_items[target_index - 1]
+            item_cfg = target_inv.config
+
+            # 仅允许出售材料
+            if item_cfg.type.value != "MATERIAL":
+                await sell_item.finish("⛔ 仅可出售材料类物品！")
+
+        else:
+            # -------------------------------
+            #   名称出售模式（保留原逻辑）
+            # -------------------------------
+            item_name = parts[0]
+            item_cfg = config.items_config["by_name"].get(item_name)
+            if not item_cfg or item_cfg.type.value != "MATERIAL":
+                await sell_item.finish("⛔ 仅可出售材料类物品！")
+
+            # 检查玩家背包中是否拥有该物品
+            inv_stmt = select(Inventory).where(
+                Inventory.player_id == event.get_user_id(),
+                Inventory.item_id == item_cfg.item_id,
+            )
+            target_inv = (await session.execute(inv_stmt)).scalars().first()
+
+            if not target_inv:
+                await sell_item.finish(f"⛔ {item_cfg.name} 数量不足（当前持有：0）")
+
+        # -------------------------------
+        #   通用检查 & 结算流程
+        # -------------------------------
+
+        if target_inv.quantity < quantity:
+            await sell_item.finish(
+                f"⛔ {target_inv.config.name} 数量不足（当前持有：{target_inv.quantity}）"
+            )
 
         # 计算收益
         unit_price = max(1, int(item_cfg.price * SELL_RATIO))
         total_gain = unit_price * quantity
 
         # 更新库存 & 金币
-        inv.quantity -= quantity
-        if inv.quantity == 0:
-            await session.delete(inv)
+        target_inv.quantity -= quantity
+        if target_inv.quantity == 0:
+            await session.delete(target_inv)
 
         player.gold += total_gain
 
