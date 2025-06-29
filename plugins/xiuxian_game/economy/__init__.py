@@ -1,1 +1,1 @@
-from . import shop, trade
+from . import shop, trade, equip_trade

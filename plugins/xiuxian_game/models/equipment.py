@@ -27,6 +27,7 @@ class EquipmentInstance(Base):
     template_id: Mapped[str] = mapped_column(String(32), index=True, comment="items.yaml 内物品模板 ID")
     durability: Mapped[int] = mapped_column(Integer, default=0, comment="当前耐久度")
     equipped: Mapped[bool] = mapped_column(Boolean, default=False, server_default="0", comment="是否已穿戴")
+    on_market: Mapped[bool] = mapped_column(Boolean, default=False, server_default="0", comment="是否已上架交易市场")
     extra_attrs: Mapped[dict] = mapped_column(JSON, default=dict, comment="强化等附加属性")
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.now, comment="获得时间")
 

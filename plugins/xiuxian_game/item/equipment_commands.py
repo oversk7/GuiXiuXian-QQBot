@@ -26,7 +26,7 @@ async def _(event: MessageEvent):
         lines = ["🎽 𝗘𝗾𝘂𝗶𝗽𝗺𝗲𝗻𝘁", "━━━"]
         for eq in equips:
             tpl = eq.template
-            equip_state = "🟢已装备" if eq.equipped else "🔘未装备"
+            equip_state = "🟢已装备" if eq.equipped else ("🛒在售" if eq.on_market else "🔘未装备")
             lines.append(
                 f"🆔{eq.id}│{tpl.name} Dur {eq.durability}/{tpl.durability} {equip_state}"
             )
@@ -49,6 +49,9 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
 
         if equip.equipped:
             await wear_equipment.finish("🧐 该装备已处于穿戴状态")
+
+        if equip.on_market:
+            await wear_equipment.finish("❌ 该装备已上架市场，无法穿戴")
 
         # 暂不区分装备槽，直接将其标记为已穿戴
         equip.equipped = True
