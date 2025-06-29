@@ -8,7 +8,7 @@ from ..config import config
 from ..utils import message_add_head
 from sqlalchemy import select
 
-daily_shop = on_command("商店", aliases={"每日商店", "商城", "店铺"}, block=True, priority=5)
+daily_shop = on_command("商店", aliases={"商店系统", "商城", "店铺"}, block=True, priority=5)
 buy_item = on_command("购买", block=True, priority=5)
 
 def generate_common_shop() -> list:

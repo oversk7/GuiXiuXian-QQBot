@@ -16,12 +16,12 @@ async def handle_help(event: MessageEvent, args: Message = CommandArg()):
         "═════════════\n"
         "🧘 修炼系统  🎪 活动系统\n"
         "🎭 玩家系统  🎒 背包系统\n"
-        "🛒 每日商店  📦 交易系统\n"
+        "🛒 商店系统  📦 交易系统\n"
         "🗓️ 世界系统\n"
         "═════════════\n"
         "💡 输入系统名称查看详细指令\n"
-        "💡 教程及反馈请查看此链接：https://tz.nevermonarch.cn/url/?url=https://www.yuque.com/rixingyinyao-dx2t6/gs55vv/rz0e9fsw7c7sggwe \n"
-        "💡 官群：962494679，官群签到奖励更多"
+        "💡 教程及反馈请去gitee搜索TheWestTutorial项目\n"
+        "💡 官群：962494679，官群签到奖励翻倍"
     )
     await help_cmd.finish(Message(msg))
 
@@ -50,6 +50,8 @@ async def handle_huo_dong(event: MessageEvent, args: Message = CommandArg()):
         "✨ 活动系统帮助 ✨\n"
         "【签到】 每日签到，获取奖励"
         "【猜拳】 猜拳游戏，猜赢翻倍"
+        "【押大小】 押大小游戏，押赢翻倍"
+        "直接发送活动名称查看详细指令"
     )
     await huo_dong_cmd.finish(Message(msg))
 
@@ -61,7 +63,7 @@ async def handle_bag(event: MessageEvent, args: Message = CommandArg()):
         "✨ 背包系统帮助 ✨\n"
         "【背包 [页码]】 查看背包内所有物品\n"
         "【查背包 [页码] [序号]】 查询物品详细信息\n"
-        "【使用 [物品名]】 使用指定道具\n"
+        "【使用 [物品名] [数量]】 使用指定道具\n"
         "═══════════════\n"
         "◈ 使用传送符示例：/传送 [地点]"
     )
