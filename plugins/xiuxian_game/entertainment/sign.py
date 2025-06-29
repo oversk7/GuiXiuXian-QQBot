@@ -13,8 +13,6 @@ async def handle_sign(event: MessageEvent):
     user_id = event.get_user_id()
     now = datetime.now()
     group_id = event.group_id
-    await sign.send(f"group_id: {group_id}")
-    return
     async with get_session() as session:
         stmt = select(Player).where(Player.id == user_id)
         result = await session.execute(stmt)
@@ -35,7 +33,12 @@ async def handle_sign(event: MessageEvent):
         await session.flush()
         
         # 签到奖励
-        gold_reward = random.randint(100, 500)
+        if group_id == 'A147FA35C340F858A66260FB4ADBB46D':
+            gold_reward = random.randint(100, 500)
+            await sign.send(f"签到成功！检测到为官群，获得 {gold_reward} 金币！✨")
+        else:
+            gold_reward = random.randint(10, 50)
+            await sign.send(f"签到成功！获得 {gold_reward} 金币！")
         player.gold += gold_reward
         
         # 检查是否为创建账号的同一天
@@ -47,8 +50,4 @@ async def handle_sign(event: MessageEvent):
                 quantity=3
             )
             session.add(starter_pack)
-            await sign.send(f"签到成功！获得 {gold_reward} 金币，并领取了 回春散x3！🎁")
-        else:
-            await sign.send(f"签到成功！获得 {gold_reward} 金币！✨")
-        
         await session.commit()
