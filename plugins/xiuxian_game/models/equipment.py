@@ -60,4 +60,9 @@ class EquipmentInstance(Base):
         # 额外属性（强化）
         for k, v in (self.extra_attrs or {}).items():
             attrs[k] = attrs.get(k, 0) + int(v)
-        return attrs 
+        return attrs
+
+    def lose_durability(self, amount: int = 1) -> bool:
+        """扣除耐久。返回 True 如果装备已损坏并应销毁。"""
+        self.durability = max(0, self.durability - amount)
+        return self.durability == 0 

@@ -24,6 +24,8 @@ import base64
 from PIL import Image, ImageDraw, ImageFont
 from pathlib import Path
 import os
+from sqlalchemy import select as _select
+from ..models.equipment import EquipmentInstance as _Equip
 
 # ----------------- 常量 -----------------
 DIRECTIONS: Dict[str, Tuple[int, int]] = {
@@ -287,6 +289,19 @@ async def _handle_personal_monster(session, tile: WorldTile, player: Player) -> 
         log += f"\n💀 你被 {monster_display} 击败，快去恢复吧！"
     else:
         log += f"\n👁️ {monster_display} 剩余 {monster_hp} HP"
+
+    # ---------------- 扣除装备耐久 ----------------
+    result_eq = await session.execute(
+        _select(_Equip).where(_Equip.player_id == player.id, _Equip.equipped == True)
+    )
+    equipped_items = result_eq.scalars().all()
+    broken_msgs = []
+    for eq in equipped_items:
+        if eq.lose_durability(1):
+            broken_msgs.append(f"💔 {eq.template.name} 耐久耗尽，化为尘埃！")
+            await session.delete(eq)
+    if broken_msgs:
+        log += "\n" + "\n".join(broken_msgs)
 
     session.add_all([player, tile])
     await session.flush()
