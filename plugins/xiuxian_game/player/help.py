@@ -1,4 +1,5 @@
 from nonebot import on_command
+from nonebot.permission import SUPERUSER
 from nonebot.adapters.qq import MessageEvent, Message, MessageSegment
 from nonebot.adapters.qq.message import MessageKeyboard,MessageArk
 from nonebot.adapters.qq.models import MessageArkKv, MessageArk, MessageArkObj, MessageArkObjKv
@@ -182,17 +183,11 @@ async def handle_ark_weather_test(event: MessageEvent, args: Message = CommandAr
     )
     await ark_weather_test_cmd.finish(MessageSegment.ark(ark))
 
-# ------------------- 管理员：发装备 -------------------
-ADMIN_IDS = {"10828B7EC666EF1E868F52B96FE5F265"}  # TODO: 修改为实际管理员 QQ 加密ID
 
-give_equip_cmd = on_command("发装备", aliases={"发装", "给装"}, priority=2, block=True)
+give_equip_cmd = on_command("发装备", aliases={"发装", "给装"}, priority=2, block=True,permission=SUPERUSER)
 
 @give_equip_cmd.handle()
 async def _(event: MessageEvent, args: Message = CommandArg()):
-    # 权限校验
-    if event.get_user_id() not in ADMIN_IDS:
-        await give_equip_cmd.finish("⛔ 无权限执行该命令！")
-
     parts = args.extract_plain_text().strip().split(maxsplit=1)
     if len(parts) != 2:
         await give_equip_cmd.finish("格式：发装备 UID 装备名称")
