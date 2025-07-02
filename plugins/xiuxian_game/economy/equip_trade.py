@@ -2,6 +2,7 @@ from nonebot import on_command
 from nonebot.adapters.qq import MessageEvent, Message
 from nonebot.params import CommandArg
 from sqlalchemy import select, delete, func
+from sqlalchemy.orm import selectinload
 from ..models.db import safe_session
 from ..models import Player, EquipmentInstance, TradeEquip
 from ..utils import message_add_head
@@ -14,23 +15,28 @@ async def _(event: MessageEvent):
     async with safe_session() as session:
         stmt = (
             select(TradeEquip)
+            .options(
+                selectinload(TradeEquip.equip),
+                selectinload(TradeEquip.seller)
+            )
             .order_by(TradeEquip.created_at.desc())
             .limit(20)
         )
         rows = (await session.execute(stmt)).scalars().all()
 
-    if not rows:
-        await market_equip.finish("🛒 装备市场空无一物～")
+        if not rows:
+            await market_equip.finish("🛒 装备市场空无一物～")
 
-    lines = ["⚔️ 𝗘𝗾𝘂𝗶𝗽 𝗠𝗮𝗿𝗸𝗲𝘁", "━━━━━━━━━"]
-    for r in rows:
-        tpl = r.equip.template
-        seller_uid = r.seller.uid if r.seller else "?"
-        lines.append(
-            f"🆔{r.id}│{tpl.name} Dur {r.equip.durability}/{tpl.durability}\n💰{r.price}│卖家UID:{seller_uid}"
-        )
-    lines.append("━━━━━━━━━\n📥 购装：/购装 交易ID")
-    await market_equip.finish(message_add_head("\n".join(lines), event))
+        lines = ["⚔️ 𝗘𝗾𝘂𝗶𝗽 𝗠𝗮𝗿𝗸𝗲𝘁", "━━━━━━━━━"]
+        for r in rows:
+            tpl = r.equip.template  # 在会话内先访问，避免 DetachedInstanceError
+            seller_uid = r.seller.uid if r.seller else "?"
+            lines.append(
+                f"🆔{r.id}│{tpl.name} Dur {r.equip.durability}/{tpl.durability}\n💰{r.price}│卖家UID:{seller_uid}"
+            )
+        lines.append("━━━━━━━━━\n📥 购装：/购装 交易ID")
+
+        await market_equip.finish(message_add_head("\n".join(lines), event))
 
 # ---------------- 上架装备 ----------------
 list_equip_cmd = on_command("装备上架", block=True, priority=5)
@@ -132,7 +138,8 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
         trade_row = await session.get(TradeEquip, trade_id)
         if not trade_row or trade_row.seller_id != event.get_user_id():
             await remove_equip_cmd.finish("❌ 交易不存在或没有权限")
-        equip = trade_row.equip
+        # 避免懒加载 equip 关系
+        equip = await session.get(EquipmentInstance, trade_row.equip_id)
         equip.on_market = False
         await session.delete(trade_row)
         await session.commit()

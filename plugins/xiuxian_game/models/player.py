@@ -31,6 +31,7 @@ class Player(Base):
     agility: Mapped[int] = mapped_column(Integer, default=5, server_default='5', comment="敏捷")
     stamina: Mapped[int] = mapped_column(Integer, default=10, server_default='10', comment="体力")
     luck: Mapped[int] = mapped_column(Integer, default=1, server_default='1', comment="运气")
+    resentment: Mapped[int] = mapped_column(Integer, default=0, server_default='0', comment="怨念值")
     
     vip: Mapped[int] = mapped_column(Integer, default=0, server_default='0', comment="VIP等级")
     gold: Mapped[int] = mapped_column(Integer, default=0, server_default='0', comment="货币")

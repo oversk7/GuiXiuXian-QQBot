@@ -29,6 +29,8 @@ class ItemConfig:
         self.durability = data.get("durability", 0)
         self.attr_bonus = data.get("attr_bonus", {})
         self.attr_ratio = data.get("attr_ratio", {})
+        # 部分材料可拥有怨念值，用于献祭
+        self.grudge_value = data.get("grudge_value", 0)
         
 
 class Inventory(Base):

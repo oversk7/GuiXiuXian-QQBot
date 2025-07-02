@@ -17,6 +17,7 @@ cultivate:
     breakthrough:
         change_level: 50  # 多高等级之后才可能失败
         fail_keep_ratio: 0.7  # 失败保留经验比例
+        guardian_cost: 50  # 怨念值护航消耗
     attributes_base:
         max_hp: 1    # 体 (max_hp) 基础增量
         max_mp: 1    # 智 (max_mp) 基础增量
