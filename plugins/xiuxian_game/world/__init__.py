@@ -83,7 +83,11 @@ async def get_or_create_tile(session, region: str, x: int, y: int) -> WorldTile:
         elif tile.event_type == "TREASURE":
             tile.state = {"looted": False}
         elif tile.event_type == "MATERIAL":
-            item_id = rng.choice(config.items_config["by_type"]["MATERIAL"])
+            # 优先选择当前区域的特产材料，如无则回退到全局材料列表
+            region_cfg = config.map_config["regions"].get(region, {})
+            candidate_materials = region_cfg.get("materials") or config.items_config["by_type"]["MATERIAL"]
+            # 若配置中写的是 ItemConfig 列表，需要转为 id；此处假设直接存放 item_id 字符串
+            item_id = rng.choice(candidate_materials)
             tile.state = {
                 "item_id": item_id,
                 "quantity": rng.randint(1, 3),

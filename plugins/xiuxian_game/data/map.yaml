@@ -3,53 +3,53 @@ regions:
     level_range: [1, 2]
     monsters:
       - "诡修亡魂"
-      - "纸人"
-  乱葬岗:
+      - "伥鬼"
+  东岗水库:
     level_range: [5, 10]
     monsters:
-      - "腐士"
-      - "游魂"
-      - "人面犬"
-  阴风洞:
-    level_range: [11, 20]
+      - "水鬼"
+    materials:
+      - "drowned_scale"
+  第三病栋:
+    level_range: [15, 20]
     monsters:
-      - "厉鬼"
-      - "哭墙"
-      - "鬼面蝠"
+      - "碎颅医生"
+      - "无脸护士"
+      - "人面犬"
   绝望之城:
     level_range: [21, 30]
     monsters:
       - "人头气球"
       - "缝合巨人"
       - "哭泣雕像"
-  漩涡沼泽:
+  通灵鬼校:
     level_range: [31, 40]
     monsters:
-      - "漩涡感染者"
-      - "泥沼尸"
-      - "溺水女"
+      - "红衣舞者"
+      - "笔仙"
+      - "霸凌者"
   肉殖回廊:
     level_range: [41, 50]
     monsters:
       - "蛞蝓女郎"
       - "肉芽虫"
       - "血眼蛙"
-  发丝深井:
+  活棺村:
     level_range: [51, 60]
     monsters:
+      - "红嫁衣"
       - "发鬼"
-      - "缠绕手"
-      - "井底人"
+      - "白无常"
   长梦客栈:
     level_range: [61, 70]
     monsters:
       - "梦魇蛛妖"
       - "梦游者"
       - "织梦人"
-  永眠回廊:
+  十字路口:
     level_range: [71, 80]
     monsters:
-      - "永生者"
-      - "不死蛆"
-      - "肉瘤灵"
+      - "美少年"
+      - "绝命灵车"
+      - "104路末班车"
 

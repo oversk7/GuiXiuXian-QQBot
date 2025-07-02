@@ -45,6 +45,7 @@ async def _(event: MessageEvent):
 │ 👟敏 {agi_str}  🍀运 {luk_str}
 ├──【资源】──
 │ 金币：{player.gold}  | 点数：{player.attribute_points}✨
+│ 怨念：{player.resentment}
 └───────────
 """
     await profile.finish(message_add_head(content, event))

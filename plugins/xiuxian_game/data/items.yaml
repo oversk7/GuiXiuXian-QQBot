@@ -103,6 +103,14 @@ items:
       price: 600
       grudge_value: 20
 
+    # ---- 东岗水库特产 ----
+    - item_id: "drowned_scale"
+      name: "溺水者"
+      description: "常见于东岗水库"
+      type: "MATERIAL"
+      price: 220
+      grudge_value: 8
+
   equipment:
     - item_id: "swim_coat"
       name: "溺水者外衣"

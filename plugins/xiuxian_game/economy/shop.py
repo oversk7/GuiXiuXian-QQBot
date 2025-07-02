@@ -23,7 +23,7 @@ def generate_common_shop() -> list:
 async def format_shop(shop_sell: list, player_gold: int) -> str:
     """普通商店展示格式"""
     content = [
-        "🏪 凡人镇 · 常驻商店",
+        "🏪 常驻商店",
         f"▃▃▃▃▃▃▃▃▃▃▃▃▃",
         f"💰 你的金币：{player_gold}",
         "",
