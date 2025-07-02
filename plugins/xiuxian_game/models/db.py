@@ -11,7 +11,7 @@ from sqlalchemy import select
 
 
 engine = create_async_engine(
-    "sqlite+aiosqlite:///" + os.path.join(os.path.dirname(__file__), "../data/game.db"),
+    "sqlite+aiosqlite:///" + os.path.join(os.path.dirname(__file__), "../data/test1.db"),
     echo=False
 )
 

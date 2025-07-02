@@ -105,7 +105,7 @@ items:
       price: 100
       durability: 100
       attr_bonus: {"hp": 10}
-      attr_ratio: {"hp": 1.0}
+      attr_ratio: {"hp": 0.2}
 
     - item_id: "lucky_scissors"
       name: "幸运剪刀"
@@ -114,5 +114,5 @@ items:
       price: 100
       durability: 100
       attr_bonus: {"luck": 10}
-      attr_ratio: {"luck": 1.0}
+      attr_ratio: {"luck": 0}
       

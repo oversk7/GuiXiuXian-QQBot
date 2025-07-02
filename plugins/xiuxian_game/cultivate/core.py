@@ -7,6 +7,8 @@ from ..models.player import Player
 from ..config import config
 from datetime import datetime
 import random
+from sqlalchemy import select as _sel
+from ..models.equipment import EquipmentInstance as _Equip
 
 
 cfg = config.game_config["cultivate"]
@@ -176,9 +178,56 @@ async def handle_assign(event: MessageEvent, args: Message = CommandArg()):
             await assign_points.finish(f"💢 属性点不足！当前剩余：{player.attribute_points}✨")
         
         attr_field = ATTRIBUTE_MAP[attr_name]
-        setattr(player, attr_field, getattr(player, attr_field) + points*cfg["attributes_base"][attr_field])
+        inc_val = points * cfg["attributes_base"][attr_field]
+
+        # -------- 撤销旧装备 bonus --------
+        result_eq = await session.execute(
+            _sel(_Equip).where(_Equip.player_id == player.id, _Equip.equipped == True)
+        )
+        equipped_items = result_eq.scalars().all()
+
+        for eq in equipped_items:
+            delta_prev = (eq.extra_attrs or {}).get("_persist_bonus", {})
+            for k, v in delta_prev.items():
+                setattr(player, k, getattr(player, k) - v)
+            # 清空记录，待会重新计算
+            if eq.extra_attrs:
+                eq.extra_attrs["_persist_bonus"] = {}
+
+        # -------- 更新基础属性 --------
+        setattr(player, attr_field, getattr(player, attr_field) + inc_val)
         player.attribute_points -= points
-        
+
+        # -------- 重新计算装备 bonus 根据新基础 --------
+        base_attrs_snapshot = {
+            "attack": player.attack,
+            "defense": player.defense,
+            "agility": player.agility,
+            "luck": player.luck,
+            "max_hp": player.max_hp,
+            "max_mp": player.max_mp,
+        }
+
+        for eq in equipped_items:
+            attrs_temp = base_attrs_snapshot.copy()
+            eq.apply_attr_bonus(attrs_temp)
+            new_delta = {k: attrs_temp[k] - base_attrs_snapshot[k] for k in attrs_temp if attrs_temp[k] != base_attrs_snapshot[k]}
+
+            # 应用新 delta
+            for k, v in new_delta.items():
+                setattr(player, k, getattr(player, k) + v)
+
+            # 保存
+            extra = eq.extra_attrs or {}
+            extra["_persist_bonus"] = new_delta
+            eq.extra_attrs = extra
+
+        # 修正 HP/MP 不超过新上限
+        if player.hp > player.max_hp:
+            player.hp = player.max_hp
+        if player.mp > player.max_mp:
+            player.mp = player.max_mp
+
         session.add(player)
         await session.commit()
         msg = (

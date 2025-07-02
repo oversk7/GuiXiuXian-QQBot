@@ -53,8 +53,33 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
         if equip.on_market:
             await wear_equipment.finish("❌ 该装备已上架市场，无法穿戴")
 
-        # 暂不区分装备槽，直接将其标记为已穿戴
+        # 计算并持久化属性增量
+        player = await session.get(Player, event.get_user_id())
+
+        # 先标记为已装备，以便 apply_attr_bonus 生效
         equip.equipped = True
+
+        base_attrs = {
+            "attack": player.attack,
+            "defense": player.defense,
+            "agility": player.agility,
+            "luck": player.luck,
+            "max_hp": player.max_hp,
+            "max_mp": player.max_mp,
+        }
+        new_attrs = base_attrs.copy()
+        equip.apply_attr_bonus(new_attrs)
+        delta = {k: new_attrs[k] - base_attrs[k] for k in new_attrs if new_attrs[k] != base_attrs[k]}
+
+        # 应用到玩家本体
+        for k, v in delta.items():
+            setattr(player, k, getattr(player, k) + v)
+
+        # 保存 delta 到 extra_attrs 便于卸下时恢复
+        extra_old = equip.extra_attrs or {}
+        extra_new = {**extra_old, "_persist_bonus": delta}
+        equip.extra_attrs = extra_new
+
         await session.commit()
         await wear_equipment.finish(f"✅ 成功穿戴 {equip.template.name}")
 
@@ -75,6 +100,23 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
 
         if not equip.equipped:
             await unwear_equipment.finish("🧐 该装备当前未穿戴")
+
+        # 恢复玩家属性
+        player = await session.get(Player, event.get_user_id())
+        delta = (equip.extra_attrs or {}).get("_persist_bonus", {})
+        for k, v in delta.items():
+            setattr(player, k, getattr(player, k) - v)
+
+        # 修正生命/理智不超过新上限
+        if player.hp > player.max_hp:
+            player.hp = player.max_hp
+        if player.mp > player.max_mp:
+            player.mp = player.max_mp
+
+        # 清除持久化记录并标记未穿戴
+        if "_persist_bonus" in (equip.extra_attrs or {}):
+            extra_new = {k: v for k, v in equip.extra_attrs.items() if k != "_persist_bonus"}
+            equip.extra_attrs = extra_new
 
         equip.equipped = False
         await session.commit()

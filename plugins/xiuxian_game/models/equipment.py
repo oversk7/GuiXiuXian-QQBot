@@ -52,13 +52,27 @@ class EquipmentInstance(Base):
         if not tpl or not self.equipped:
             return
         # 固定值
+        key_map = {"hp": "max_hp", "mp": "max_mp"}
         for k, v in (tpl.attr_bonus or {}).items():
-            attrs[k] = attrs.get(k, 0) + int(v)
+            key = key_map.get(k, k)
+            attrs[key] = attrs.get(key, 0) + int(v)
         # 百分比
         for k, r in (tpl.attr_ratio or {}).items():
-            attrs[k] = int(attrs.get(k, 0) * (1 + float(r)))
+            key = key_map.get(k, k)
+            attrs[key] = int(attrs.get(key, 0) * (1 + float(r)))
         # 额外属性（强化）
         for k, v in (self.extra_attrs or {}).items():
+            if k.startswith("_"):
+                continue  # 跳过内部字段，如 _persist_bonus
+            if not isinstance(v, (int, float)):
+                continue
+            attrs[k] = attrs.get(k, 0) + int(v)
+
+        # 叠加持久化 bonus（如果存在）
+        persist = (self.extra_attrs or {}).get("_persist_bonus", {})
+        for k, v in persist.items():
+            if not isinstance(v, (int, float)):
+                continue
             attrs[k] = attrs.get(k, 0) + int(v)
         return attrs
 

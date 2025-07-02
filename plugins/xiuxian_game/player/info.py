@@ -7,6 +7,7 @@ from sqlalchemy import select, func
 from ..models.player import Gender
 from ..utils import message_add_head, calculate_level_up_exp
 from datetime import datetime
+from ..models.equipment import EquipmentInstance
 
 profile = on_command("角色",aliases={"面板","状态"}, block=True, priority=5)
 register = on_command("注册", block=True, priority=5)
@@ -16,21 +17,32 @@ register = on_command("注册", block=True, priority=5)
 async def _(event: MessageEvent):
     async with safe_session() as session:
         player = await session.get(Player, event.get_user_id())
-
     if not player:
         await profile.finish("⛔ 你还没有创建角色")
     
+    # 读取已穿戴装备，计算最终属性
+    atk_str = str(player.attack)
+    def_str = str(player.defense)
+    agi_str = str(player.agility)
+    luk_str = str(player.luck)
+    hp_max_str = str(player.max_hp)
+    mp_max_str = str(player.max_mp)
+
+    # 若当前 HP/MP 超出新上限，则修正显示
+    cur_hp = player.hp
+    cur_mp = player.mp
+
     content = f"""
 ┌─── 诡修面板 ───
 │ {player.nickname}[UID:{player.uid}]「{player.sex}」
 ├───────────
 │ Lv.{player.level} Exp：{player.exp}/{calculate_level_up_exp(player.level)}
-│ 生命：{player.hp}/{player.max_hp} ❤️
-│ 理智：{player.mp}/{player.max_mp} 🧠
+│ 生命：{cur_hp}/{hp_max_str} ❤️
+│ 理智：{cur_mp}/{mp_max_str} 🧠
 │ 位置：{player.region} ({player.x},{player.y}) 
 ├──【属性】──
-│ ⚔力 {player.attack}  🛡防 {player.defense} 
-│ 👟敏 {player.agility}  🍀运 {player.luck}
+│ ⚔力 {atk_str}  🛡防 {def_str} 
+│ 👟敏 {agi_str}  🍀运 {luk_str}
 ├──【资源】──
 │ 金币：{player.gold}  | 点数：{player.attribute_points}✨
 └───────────

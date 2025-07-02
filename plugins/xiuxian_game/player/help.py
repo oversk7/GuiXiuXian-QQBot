@@ -4,6 +4,9 @@ from nonebot.adapters.qq.message import MessageKeyboard,MessageArk
 from nonebot.adapters.qq.models import MessageArkKv, MessageArk, MessageArkObj, MessageArkObjKv
 from nonebot.params import CommandArg
 import os
+from ..models import Player, EquipmentInstance
+from ..models.db import safe_session
+from ..config import config
 
 # 注册"帮助"指令
 help_cmd = on_command("帮助", aliases={"help","菜单"}, priority=5, block=True)
@@ -178,6 +181,50 @@ async def handle_ark_weather_test(event: MessageEvent, args: Message = CommandAr
         ]
     )
     await ark_weather_test_cmd.finish(MessageSegment.ark(ark))
+
+# ------------------- 管理员：发装备 -------------------
+ADMIN_IDS = {"10828B7EC666EF1E868F52B96FE5F265"}  # TODO: 修改为实际管理员 QQ 加密ID
+
+give_equip_cmd = on_command("发装备", aliases={"发装", "给装"}, priority=2, block=True)
+
+@give_equip_cmd.handle()
+async def _(event: MessageEvent, args: Message = CommandArg()):
+    # 权限校验
+    if event.get_user_id() not in ADMIN_IDS:
+        await give_equip_cmd.finish("⛔ 无权限执行该命令！")
+
+    parts = args.extract_plain_text().strip().split(maxsplit=1)
+    if len(parts) != 2:
+        await give_equip_cmd.finish("格式：发装备 UID 装备名称")
+
+    uid_str, item_name = parts
+    if not uid_str.isdigit():
+        await give_equip_cmd.finish("UID 必须为数字")
+
+    target_uid = int(uid_str)
+
+    async with safe_session() as session:
+        # 查找目标玩家
+        from sqlalchemy import select
+        result = await session.execute(select(Player).where(Player.uid == target_uid))
+        player = result.scalars().first()
+        if not player:
+            await give_equip_cmd.finish(f"❌ 未找到 UID 为 {target_uid} 的玩家")
+
+        # 检查物品模板
+        tpl = config.items_config["by_name"].get(item_name)
+        if not tpl or tpl.type.value != "EQUIPMENT":
+            await give_equip_cmd.finish("❌ 装备名称不存在或该物品不是装备")
+
+        # 创建装备实例
+        equip = EquipmentInstance(
+            player_id=player.id,
+            template_id=tpl.item_id,
+            durability=tpl.durability,
+        )
+        session.add(equip)
+        await session.commit()
+        await give_equip_cmd.finish(f"✅ 已给予 UID:{target_uid} 装备 {tpl.name} Dur {tpl.durability}")
 
 
 

@@ -298,8 +298,17 @@ async def _handle_personal_monster(session, tile: WorldTile, player: Player) -> 
     broken_msgs = []
     for eq in equipped_items:
         if eq.lose_durability(1):
+            # 还原玩家属性
+            delta = (eq.extra_attrs or {}).get("_persist_bonus", {})
+            for k, v in delta.items():
+                setattr(player, k, getattr(player, k) - v)
             broken_msgs.append(f"💔 {eq.template.name} 耐久耗尽，化为尘埃！")
             await session.delete(eq)
+            # 修正HP/MP不超过上限
+            if player.hp > player.max_hp:
+                player.hp = player.max_hp
+            if player.mp > player.max_mp:
+                player.mp = player.max_mp
     if broken_msgs:
         log += "\n" + "\n".join(broken_msgs)
 
