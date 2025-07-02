@@ -8,7 +8,7 @@ from ..config import config
 from ..utils import message_add_head
 
 # ---------------- 指令：装备列表 ----------------
-list_equipment = on_command("装备列表", aliases={"装备"}, block=True, priority=5)
+list_equipment = on_command("我的装备", aliases={"装备"}, block=True, priority=5)
 
 @list_equipment.handle()
 async def _(event: MessageEvent):

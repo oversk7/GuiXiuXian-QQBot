@@ -21,13 +21,26 @@ async def handle_help(event: MessageEvent, args: Message = CommandArg()):
         "🧘 修炼系统  🎪 活动系统\n"
         "🎭 玩家系统  🎒 背包系统\n"
         "🛒 商店系统  📦 交易系统\n"
-        "🗓️ 世界系统\n"
+        "🗓️ 世界系统  🛒 装备系统\n"
         "═════════════\n"
         "💡 输入系统名称查看详细指令\n"
         "💡 教程及反馈请去gitee搜索TheWestTutorial项目\n"
         "💡 官群：962494679，官群签到奖励翻倍"
     )
     await help_cmd.finish(Message(msg))
+
+# 装备系统
+equip_cmd = on_command("装备系统", priority=4, block=True)
+@equip_cmd.handle()
+async def handle_equip(event: MessageEvent, args: Message = CommandArg()):
+    msg = (
+        "✨ 装备系统帮助 ✨\n"
+        "【我的装备】 查看自己装备\n"
+        "【装备市场】 查看装备市场\n"
+        "【穿戴 [装备ID]】 穿戴指定装备\n"
+        "【卸下 [装备ID]】 卸下指定装备"
+    )
+    await equip_cmd.finish(Message(msg))
 
 # 修炼系统
 xiu_lian_cmd = on_command("修炼系统", priority=4, block=True)
@@ -40,7 +53,8 @@ async def handle_xiu_lian(event: MessageEvent, args: Message = CommandArg()):
         "【闭关】 闭关修炼，挂机升级，但效率减半\n"
         "【出关】 出关后可继续修炼\n"
         "【突破】 突破境界，经验足够时使用\n"
-        "【加点】 分配突破获得的属性点，增强实力"
+        "【加点】 分配突破获得的属性点，增强实力\n"
+        "【献祭】 献祭材料以获取怨念值，用于为突破护航"
     )
     await xiu_lian_cmd.finish(Message(msg))
 
@@ -97,6 +111,10 @@ async def handle_trade(event: MessageEvent, args: Message = CommandArg()):
         "【下架 [上架ID] [数量]】 下架指定商品\n"
         "【交易 [上架ID] [数量]】 购买指定商品\n"
         "【我的店铺】 查看自己上架的商品\n"
+        "【装备市场】 查看装备市场\n"
+        "【购装 [上架ID]】 购买指定商品\n"
+        "【装备上架 [装备ID] [价格]】 上架装备\n"
+        "【装备下架 [上架ID]】 下架装备\n"
         "═══════════════\n"
         "◈ 上架示例：/上架 传送符 5 80"
     )
