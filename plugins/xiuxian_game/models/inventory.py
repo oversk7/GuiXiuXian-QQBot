@@ -16,6 +16,7 @@ class ItemEffectType(str, PyEnum):
     # 以下类型不使用 apply_effect 处理
     CHANGE_NAME = "CHANGE_NAME"
     TELEPORT = "TELEPORT"
+    APPOINT_PRESIDENT = "APPOINT_PRESIDENT"
 
 class ItemConfig:
     def __init__(self, data: dict):
