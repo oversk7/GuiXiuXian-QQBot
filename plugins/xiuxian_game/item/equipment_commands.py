@@ -7,6 +7,9 @@ from ..models import Player, EquipmentInstance
 from ..config import config
 from ..utils import message_add_head
 
+# 最多可装备数量（可调整或改为读取配置）
+MAX_EQUIPPED = 3  # TODO: 后续可写入 config.game_config
+
 # ---------------- 指令：装备列表 ----------------
 list_equipment = on_command("我的装备", aliases={"装备"}, block=True, priority=5)
 
@@ -52,6 +55,16 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
 
         if equip.on_market:
             await wear_equipment.finish("❌ 该装备已上架市场，无法穿戴")
+
+        # ----- 上限检查 -----
+        cur_equipped = (await session.execute(
+            select(EquipmentInstance).where(
+                EquipmentInstance.player_id == event.get_user_id(),
+                EquipmentInstance.equipped == True
+            )
+        )).scalars().all()
+        if len(cur_equipped) >= MAX_EQUIPPED:
+            await wear_equipment.finish(f"⛔ 你已穿戴 {len(cur_equipped)} 件装备，已达到上限 ({MAX_EQUIPPED})，请先卸下一件后再穿戴")
 
         # 计算并持久化属性增量
         player = await session.get(Player, event.get_user_id())
