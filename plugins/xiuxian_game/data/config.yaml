@@ -1,11 +1,11 @@
 # 游戏基础配置
 game:
   max_level: 1000  # 最大等级
-  base_exp: 100   # 基础经验值（1级到2级所需经验）
-  points_per_level: 5  # 每次升级获得的属性点数
+  base_exp: 10   # 基础经验值（1级到2级所需经验）
+  points_per_level: 4  # 每次升级获得的属性点数
   exp_curve:
-    early_multiplier: 100
-    late_multiplier: 50
+    early_multiplier: 10
+    late_multiplier: 5
     curve_change_level: 15
   inventory_page_size: 10  # 背包每页显示物品数量
 
@@ -15,7 +15,7 @@ cultivate:
     cool_down: 300  # 冷却时间（秒）
     base_exp: 50   # 基础经验值
     breakthrough:
-        change_level: 50  # 多高等级之后才可能失败
+        change_level: 30  # 多高等级之后才可能失败
         fail_keep_ratio: 0.7  # 失败保留经验比例
         guardian_cost: 50  # 怨念值护航消耗
     attributes_base:

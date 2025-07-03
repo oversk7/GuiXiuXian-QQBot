@@ -25,7 +25,8 @@ async def handle_help(event: MessageEvent, args: Message = CommandArg()):
         "═════════════\n"
         "💡 输入系统名称查看详细指令\n"
         "💡 教程及反馈请去gitee搜索TheWestTutorial项目\n"
-        "💡 官群：962494679，官群签到奖励翻倍"
+        "💡 官群：962494679，官群签到奖励翻倍\n"
+        "💡 发送/邀请码 邀请好友获得上万金币，获得启动资金"
     )
     await help_cmd.finish(Message(msg))
 
@@ -115,6 +116,7 @@ async def handle_ren_wu(event: MessageEvent, args: Message = CommandArg()):
         "✨ 世界系统帮助 ✨\n"
         "【传送 [地点]】 传送到指定地点\n"
         "【地图】 查看当前可探索的地点\n"
+        "【附近玩家】 查看附近玩家\n"
         "【探索】 探索玩家所在地点\n"
         "【[上|下|左|右]】 向指定方向移动一格\n"
         "【跳跃 [x] [y]】 跳跃到指定坐标，仅在驿站可使用\n"

@@ -13,7 +13,6 @@ from .item_effects import apply_effect
 inventory_cmd = on_command("背包", block=True, priority=5)
 use_item = on_command("使用", block=True, priority=5)
 item_detail = on_command("查背包", block=True, priority=5)
-teleport_list = on_command("地图", block=True, priority=5)
 
 teleport_cmd = on_command("传送", block=True, priority=5)
 rename_cmd = on_command("改名", block=True, priority=5)
@@ -225,28 +224,6 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
         f"当前位置：{target_region} ({player.x},{player.y})"
     )
     await teleport_cmd.finish(message_add_head(msg, event))
-
-@teleport_list.handle()
-async def handle_teleport_list(event: MessageEvent):
-    """显示所有可传送的地点"""
-    async with safe_session() as session:
-        # 检查玩家是否存在
-        player = await session.get(Player, event.get_user_id())
-        if not player:
-            await teleport_list.finish("⛔ 请先创建角色")
-
-        # 获取所有可传送地点
-        locations = [f"• {name} 🌐" for name in config.map_config["regions"].keys()]
-        
-        # 格式化消息
-        msg = (
-            "🪐 可传送区域列表：\n"
-            + "\n".join(locations)
-            + "\n\n📌 使用方式：传送 [区域]\n"
-            "📦 需要消耗：传送符 ✖1"
-        )
-        
-        await teleport_list.finish(message_add_head(msg, event))
 
 @rename_cmd.handle()
 async def handle_rename(event: MessageEvent, args: Message = CommandArg()):
