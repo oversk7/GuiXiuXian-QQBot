@@ -18,7 +18,7 @@ from ..models.player import Player
 from ..models.inventory import Inventory
 from ..models.world_tile import WorldTile
 from ..config import config
-from ..utils import message_add_head
+from ..utils import message_add_head, luck_prob
 from io import BytesIO
 import base64
 from PIL import Image, ImageDraw, ImageFont
@@ -172,6 +172,12 @@ async def _handle_material(session, tile: WorldTile, player: Player) -> str:
     
     quantity = tile.state.get("quantity", 1)
     
+    # Luck: 采集加成判定
+    luck_bonus = 0
+    if random.random() < luck_prob(player.luck):
+        luck_bonus = quantity  # 翻倍
+        quantity *= 2
+    
     # 检查背包容量
     result = await session.execute(
         select(func.count(Inventory.id)).where(Inventory.player_id == player.id)
@@ -208,19 +214,28 @@ async def _handle_material(session, tile: WorldTile, player: Player) -> str:
     session.add(tile)
     await session.flush()
     
-    return f"✨ 你采集到了 {item_cfg.name} ✖️{quantity}！"
+    base_msg = f"✨ 你采集到了 {item_cfg.name} ✖️{quantity}!"
+    if luck_bonus:
+        base_msg += "\n🍀 幸运闪现！材料翻倍。"
+    return base_msg
 
 
 async def _handle_treasure(session, tile: WorldTile, player: Player) -> str:
     if tile.state.get("looted"):
         return "🪨 雕塑的暗格已被掏空，徒留潮湿指印。"
     rng = random.Random(hash(tile.seed))
-    gold_gain = rng.randint(50, 150)
+    base_gold = rng.randint(100, 1000)
+    from ..utils import luck_prob
+    multiplier = 1 + luck_prob(player.luck)  # 1~2 倍区间
+    gold_gain = int(base_gold * multiplier)
     player.gold += gold_gain
     tile.state["looted"] = True
     session.add_all([player, tile])
     await session.flush()
-    return f"🔑 你在龟裂神像内抠出 {gold_gain}💰！"
+    msg = f"🔑 你在龟裂神像内抠出 {gold_gain}💰！"
+    if multiplier > 1.01:
+        msg += "\n🍀 幸运加成！宝箱更丰厚。"
+    return msg
 
 
 async def _handle_empty(session, tile: WorldTile, player: Player) -> str:
@@ -257,7 +272,8 @@ async def _handle_personal_monster(session, tile: WorldTile, player: Player) -> 
             nonlocal monster_hp
             dmg = max(1, int(player.attack * rng.uniform(0.8, 1.1)))
             crit = False
-            if rng.random() < player.luck / 100:
+            from ..utils import luck_prob
+            if rng.random() < luck_prob(player.luck):
                 dmg = int(dmg*1.5)
                 crit = True
             monster_hp = max(0, monster_hp - dmg)

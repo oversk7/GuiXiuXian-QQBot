@@ -1,6 +1,7 @@
 from nonebot.adapters.qq import Message, MessageSegment, MessageEvent
 from typing import Optional
 from .config import config
+import math
 
 
 def message_add_head(content: str, event: Optional[MessageEvent] = None) -> Message:
@@ -83,5 +84,18 @@ async def paginate_items(items: list, page: int, page_size: Optional[int] = None
         )
     
     return "🎒 你的背包\n" + "".join(lines) + page_info
+
+
+# ---------------- Luck 概率曲线 ----------------
+
+def luck_prob(luck_value: int | float, scale: int = 60) -> float:
+    """根据 Luck 值计算触发概率（软上限）。
+
+    概率 = 1 - e^(-luck/scale)，Luck 越高越接近 1，但边际收益递减。
+    scale 控制曲线斜率，数值越大增长越慢。
+    """
+    if luck_value <= 0:
+        return 0.0
+    return 1 - math.exp(-float(luck_value) / float(scale))
 
 

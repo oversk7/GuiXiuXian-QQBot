@@ -31,6 +31,10 @@ class ItemConfig:
         self.attr_ratio = data.get("attr_ratio", {})
         # 部分材料可拥有怨念值，用于献祭
         self.grudge_value = data.get("grudge_value", 0)
+        # 装备锻造配方：{"materials": {"item_id": qty, ...}, "gold": 1000}
+        self.recipe = data.get("recipe")
+        # 装备修复单价（每 1 点耐久消耗金币数），若为空则默认按 price/durability 计算
+        self.repair_cost = data.get("repair_cost")
         
 
 class Inventory(Base):

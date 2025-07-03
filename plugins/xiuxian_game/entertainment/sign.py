@@ -5,6 +5,7 @@ from sqlalchemy import select
 from ..models import Player, Inventory
 from ..models.db import get_session
 import random
+from ..utils import luck_prob
 
 sign = on_command("签到", block=True, priority=5)
 
@@ -35,10 +36,17 @@ async def handle_sign(event: MessageEvent):
         # 签到奖励
         if group_id == 'A147FA35C340F858A66260FB4ADBB46D':
             gold_reward = random.randint(100, 500)
-            await sign.send(f"签到成功！检测到为官群，获得 {gold_reward} 金币！✨")
         else:
             gold_reward = random.randint(10, 50)
-            await sign.send(f"签到成功！获得 {gold_reward} 金币！")
+
+        # Luck 翻倍判定
+        if random.random() < luck_prob(player.luck):
+            gold_reward *= 2
+            lucky_msg = "🍀 幸运加成！奖励翻倍！"
+        else:
+            lucky_msg = ""
+
+        await sign.send(f"签到成功！获得 {gold_reward} 金币！{lucky_msg}")
         player.gold += gold_reward
         
         # 检查是否为创建账号的同一天

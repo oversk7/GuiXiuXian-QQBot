@@ -38,7 +38,11 @@ async def handle_equip(event: MessageEvent, args: Message = CommandArg()):
         "【我的装备】 查看自己装备\n"
         "【装备市场】 查看装备市场\n"
         "【穿戴 [装备ID]】 穿戴指定装备\n"
-        "【卸下 [装备ID]】 卸下指定装备"
+        "【卸下 [装备ID]】 卸下指定装备\n"
+        "【锻造列表】 查看锻造列表\n"
+        "【配方 [装备名称]】 查看锻造配方\n"
+        "【锻造 [装备名称]】 锻造指定装备\n"
+        "【修复 [装备ID]】 修复指定装备"
     )
     await equip_cmd.finish(Message(msg))
 

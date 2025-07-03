@@ -116,17 +116,31 @@ items:
       name: "溺水者外衣"
       description: "溺水者外衣"
       type: "EQUIPMENT"
-      price: 100
+      price: 1000
       durability: 100
       attr_bonus: {"hp": 10}
       attr_ratio: {"hp": 0.2}
+      recipe:
+        materials:
+          drowned_scale: 10
+          cursed_silk: 5
+          flesh_crystal: 3
+        gold: 1500
+      repair_cost: 10        # 可选：每 1 点耐久 5 金币
 
     - item_id: "lucky_scissors"
       name: "幸运剪刀"
       description: "幸运剪刀"
       type: "EQUIPMENT"
-      price: 100
+      price: 800
       durability: 100
       attr_bonus: {"luck": 10}
       attr_ratio: {"luck": 0}
+      recipe:
+        materials:
+          cursed_silk: 8
+          nightmare_silk: 5
+          flesh_crystal: 1
+        gold: 1200
+      repair_cost: 8
       
