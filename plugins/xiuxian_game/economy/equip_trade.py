@@ -86,7 +86,13 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
     trade_id = int(arg_text)
 
     async with safe_session() as session:
-        trade_row = await session.get(TradeEquip, trade_id)
+        # 通过 select + selectinload 预加载 equip 避免懒加载导致 MissingGreenlet
+        stmt = (
+            select(TradeEquip)
+            .options(selectinload(TradeEquip.equip))
+            .where(TradeEquip.id == trade_id)
+        )
+        trade_row = (await session.execute(stmt)).scalars().first()
         if not trade_row:
             await buy_equip_cmd.finish("❌ 交易不存在")
         if trade_row.seller_id == event.get_user_id():
@@ -105,7 +111,7 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
         seller.gold += seller_gain
 
         # 转移装备所有权
-        equip = trade_row.equip
+        equip = trade_row.equip  # 已预加载，可直接使用
         equip.player_id = event.get_user_id()
         equip.on_market = False
         equip.equipped = False

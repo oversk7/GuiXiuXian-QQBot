@@ -29,6 +29,20 @@ async def handle_help(event: MessageEvent, args: Message = CommandArg()):
     )
     await help_cmd.finish(Message(msg))
 
+# 玩家系统
+player_cmd = on_command("玩家系统", priority=4, block=True)
+@player_cmd.handle()
+async def handle_player(event: MessageEvent, args: Message = CommandArg()):
+    msg = (
+        "✨ 玩家系统帮助 ✨\n"
+        "【面板 [UID]】 查看指定玩家面板\n"
+        "【财富榜】 查看财富榜\n"
+        "【注册】 注册角色\n"
+        "【改名 [新名字]】 改名\n"
+        "【复活】 复活到主城\n"
+    )
+    await player_cmd.finish(Message(msg))
+
 # 装备系统
 equip_cmd = on_command("装备系统", priority=4, block=True)
 @equip_cmd.handle()
@@ -86,6 +100,7 @@ async def handle_bag(event: MessageEvent, args: Message = CommandArg()):
         "【背包 [页码]】 查看背包内所有物品\n"
         "【查背包 [页码] [序号]】 查询物品详细信息\n"
         "【使用 [物品名] [数量]】 使用指定道具\n"
+        "【图鉴 [关键词]】 查看物品或装备描述\n"
         "═══════════════\n"
         "◈ 使用传送符示例：/传送 [地点]"
     )

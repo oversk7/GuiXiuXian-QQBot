@@ -53,6 +53,13 @@ items:
       type: "CONSUMABLE"
       effect_type: "CHANGE_NAME"
       price: 500
+    
+    - item_id: "president_letter"
+      name: "会长委任书"
+      description: "当我走在黑夜当中，那我就是这座城市最恐怖的怪谈。"
+      type: "CONSUMABLE"
+      effect_type: "APPOINT_PRESIDENT"
+      price: 100000
 
   materials:  # 材料类
     - item_id: "rotten_core"
@@ -102,6 +109,13 @@ items:
       type: "MATERIAL"
       price: 600
       grudge_value: 20
+    
+    - item_id: "wanted_poster"
+      name: "寻人启事"
+      description: "我每天都在寻找那个被自己杀死的人，我将她杀死了一遍又一遍，可她似乎总能找到我。每当天亮，我睁开双眼的时候，她的东西总会出现在我的床上。我明明把她砌进了墙里，可她却好像钻进了我的心里……"
+      type: "MATERIAL"
+      price: 5
+      grudge_value: 100
 
     # ---- 东岗水库特产 ----
     - item_id: "drowned_scale"
@@ -114,7 +128,7 @@ items:
   equipment:
     - item_id: "swim_coat"
       name: "溺水者外衣"
-      description: "溺水者外衣"
+      description: "水下有东西，它们慢慢爬进了我的衣服，将我拖入深水当中。"
       type: "EQUIPMENT"
       price: 1000
       durability: 100
@@ -126,21 +140,32 @@ items:
           cursed_silk: 5
           flesh_crystal: 3
         gold: 1500
-      repair_cost: 10        # 可选：每 1 点耐久 5 金币
+      repair_cost: 10      # 可选：每 1 点耐久 10 金币
 
+    - item_id: "self_awareness_key"
+      name: "自知力钥匙"
+      description: "精神病人大多存在不同程度的自知力缺陷，他们无法察觉自己精神状态的改变，对精神状态丧失判断，否认病情，拒绝治疗。当你出现类似的症状时，这把钥匙可以帮你一次。"
+      type: "EQUIPMENT"
+      price: 1000
+      durability: 100
+      attr_bonus: {"mp": 10}
+      attr_ratio: {"mp": 0.1}
+      recipe:
+        materials:
+          spirit_bone: 10
+          flesh_crystal: 3
+        gold: 1000
+      repair_cost: 10   # 不可锻造
+
+    # 不可锻造
     - item_id: "lucky_scissors"
       name: "幸运剪刀"
-      description: "幸运剪刀"
+      description: "这把血迹斑斑的剪刀和幸运完全沾不上边，可它就是被命名为幸运。（开膛手系列）"
       type: "EQUIPMENT"
       price: 800
       durability: 100
       attr_bonus: {"luck": 10}
-      attr_ratio: {"luck": 0}
-      recipe:
-        materials:
-          cursed_silk: 8
-          nightmare_silk: 5
-          flesh_crystal: 1
-        gold: 1200
-      repair_cost: 8
+      attr_ratio: {"luck": 0.5}
+      repair_cost: 8   # 不可锻造
+
       

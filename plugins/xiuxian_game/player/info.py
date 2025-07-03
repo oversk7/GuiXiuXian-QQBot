@@ -14,9 +14,25 @@ register = on_command("注册", block=True, priority=5)
 
 
 @profile.handle()
-async def _(event: MessageEvent):
+async def _(event: MessageEvent, args: Message = CommandArg()):
     async with safe_session() as session:
-        player = await session.get(Player, event.get_user_id())
+        arg_text = args.extract_plain_text().strip()
+        # 如果提供了 UID，则查询对应玩家面板
+        target_uid: int | None = None
+        if arg_text:
+            try:
+                target_uid = int(arg_text)
+            except ValueError:
+                await profile.finish("⛔ UID 必须为数字")
+
+        if target_uid is not None:
+            stmt = select(Player).where(Player.uid == target_uid)
+            result = await session.execute(stmt)
+            player = result.scalars().first()
+            if not player:
+                await profile.finish("⛔ 未找到该 UID")
+        else:
+            player = await session.get(Player, event.get_user_id())
     if not player:
         await profile.finish("⛔ 你还没有创建角色")
     

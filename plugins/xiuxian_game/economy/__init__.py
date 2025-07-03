@@ -1,1 +1,1 @@
-from . import shop, trade, equip_trade
+from . import shop, trade, equip_trade, wealth_rank
