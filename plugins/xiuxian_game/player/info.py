@@ -8,6 +8,7 @@ from ..models.player import Gender
 from ..utils import message_add_head, calculate_level_up_exp
 from datetime import datetime
 from ..models.equipment import EquipmentInstance
+from collections import defaultdict
 
 profile = on_command("角色",aliases={"面板","状态"}, block=True, priority=5)
 register = on_command("注册", block=True, priority=5)
@@ -36,13 +37,31 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
     if not player:
         await profile.finish("⛔ 你还没有创建角色")
     
-    # 读取已穿戴装备，计算最终属性
-    atk_str = str(player.attack)
-    def_str = str(player.defense)
-    agi_str = str(player.agility)
-    luk_str = str(player.luck)
-    hp_max_str = str(player.max_hp)
-    mp_max_str = str(player.max_mp)
+    # ------- 统计装备加成 -------
+    bonus = defaultdict(int)
+    async with safe_session() as session2:
+        from sqlalchemy import select as sel
+        eq_stmt = sel(EquipmentInstance).where(
+            EquipmentInstance.player_id == player.id,
+            EquipmentInstance.equipped == True
+        )
+        equiped_list = (await session2.execute(eq_stmt)).scalars().all()
+        for eq in equiped_list:
+            delta = (eq.extra_attrs or {}).get("_persist_bonus", {})
+            for k, v in delta.items():
+                bonus[k] += int(v)
+
+    # 读取属性并拼接加成
+    def fmt(attr_key: str, value: int):
+        inc = bonus.get(attr_key, 0)
+        return f"{value} (+{inc})" if inc else str(value)
+
+    atk_str = fmt("attack", player.attack)
+    def_str = fmt("defense", player.defense)
+    agi_str = fmt("agility", player.agility)
+    luk_str = fmt("luck", player.luck)
+    hp_max_str = fmt("max_hp", player.max_hp)
+    mp_max_str = fmt("max_mp", player.max_mp)
 
     # 若当前 HP/MP 超出新上限，则修正显示
     cur_hp = player.hp

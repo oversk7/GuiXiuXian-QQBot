@@ -47,7 +47,20 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
         mats = {**mats, "flesh_crystal": 1}
     gold_cost = item_cfg.recipe.get("gold", 0)
 
-    mat_lines = [f"{config.items_config['by_id'][mid].name} ✖️{qty}" for mid, qty in mats.items()]
+    # -------- 构建材料 -> 地图 映射 --------
+    _region_material_map: dict[str, list[str]] = {}
+    for _region, _info in config.map_config.get("regions", {}).items():
+        for _mat in _info.get("materials", []) or []:
+            _region_material_map.setdefault(_mat, []).append(_region)
+
+    mat_lines = []
+    for mid, qty in mats.items():
+        mat_cfg = config.items_config['by_id'][mid]
+        region_note = ""
+        if mid in _region_material_map:
+            region_note = f"（{ '、'.join(_region_material_map[mid]) } 特产）"
+        mat_lines.append(f"{mat_cfg.name}{region_note} ✖️{qty}")
+
     lines = [f"📝 {item_cfg.name} 锻造配方", "━━━━━━━━━"]
     lines.extend(mat_lines)
     lines.append(f"💰 金币 {gold_cost}")
