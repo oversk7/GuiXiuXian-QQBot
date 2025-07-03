@@ -105,9 +105,9 @@ async def handle_breakthrough(event: MessageEvent, args: Message = CommandArg())
         cfg_break = cfg["breakthrough"]
         required_exp = calculate_level_up_exp(player.level)
         
-        # 解析参数，若包含"护航"则启用保驾护航模式
+        # 解析参数，若包含"镇厄"则启用保驾护航模式
         arg_text = args.extract_plain_text().strip() if isinstance(args, Message) else ""
-        use_guardian = arg_text == "护航" or arg_text.lower() == "h"  # 支持简写
+        use_guardian = arg_text == "镇厄" or arg_text.lower() == "镇"  # 支持简写
 
         guardian_cost = cfg_break.get("guardian_cost", 50)
         
@@ -120,7 +120,7 @@ async def handle_breakthrough(event: MessageEvent, args: Message = CommandArg())
 
         # 如果启用护航，检查怨念值是否足够
         if use_guardian and player.resentment < guardian_cost:
-            await breakthrough.finish(f"⛔ 怨念值不足，护航需要 {guardian_cost}，当前 {player.resentment}")
+            await breakthrough.finish(f"⛔ 怨念值不足，镇厄需要 {guardian_cost}，当前 {player.resentment}")
 
         # 消耗怨念值（如果启用护航）
         if use_guardian:
