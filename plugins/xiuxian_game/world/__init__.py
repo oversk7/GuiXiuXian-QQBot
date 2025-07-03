@@ -148,7 +148,7 @@ async def _(event: MessageEvent):
                 monster = t.state.get("name")
                 return f"🌫️ 四周弥漫着诡异的静谧，似乎潜伏着 {monster} 的气息。若想冒险，可输入 [探索] 进行调查。"
             elif t.event_type == "REST":
-                return "🌫️ 你发现这里有一张床，也许输入 [休息] 能恢复状态。"
+                return "🌫️ 你发现了一家驿站，也许输入 [休息] 能恢复状态。"
             return "⁉️ 未知事件。"
 
         event_desc = describe_tile(tile)
@@ -531,4 +531,58 @@ async def _(event: MessageEvent):
     msg = Message()
     msg += MessageSegment.text(f"🗺️ 当前区域：{player.region}\n")
     msg += MessageSegment.file_image(base64_img)
-    await region_map_cmd.finish(msg) 
+    await region_map_cmd.finish(msg)
+
+# ----------------- 指令：跳跃（驿站快速移动） -----------------
+
+# 仅在当前坐标为 REST(驿站) 时可使用。格式：跳跃 x y   或 跳跃 x,y
+
+jump_cmd = on_command("跳跃", aliases={"瞬移", "传送坐标"}, block=True, priority=5)
+
+
+@jump_cmd.handle()
+async def _(event: MessageEvent, args: Message = CommandArg()):
+    arg_text = args.extract_plain_text().strip().replace(",", " ")
+    parts = [p for p in arg_text.split() if p]
+    if len(parts) != 2 or not all(p.lstrip("-+ ").isdigit() for p in parts):
+        await jump_cmd.finish("⛔ 格式：跳跃 x y  （示例：跳跃 3 -2）")
+
+    target_x, target_y = map(int, parts)
+
+    async with safe_session() as session:
+        player: Player | None = await session.get(Player, event.get_user_id())
+        if not player:
+            await jump_cmd.finish("⛔ 请先创建角色")
+
+        # 确认当前格子为驿站
+        current_tile = await get_or_create_tile(session, player.region, player.x, player.y)
+        if current_tile.event_type != "REST":
+            await jump_cmd.finish("⛔ 只有在驿站才能使用 [跳跃] 指令！")
+
+        # 执行跳跃
+        player.x = target_x
+        player.y = target_y
+
+        # 获取目标格事件，若首次则生成
+        target_tile = await get_or_create_tile(session, player.region, player.x, player.y)
+
+        # 构造描述复用 describe_tile 内部逻辑
+        def _desc_tile(t: WorldTile) -> str:
+            if t.event_type == "MATERIAL":
+                item_cfg = config.items_config["by_id"].get(t.state.get("item_id"))
+                item_name = item_cfg.name if item_cfg else "未知材料"
+                qty = t.state.get("quantity", "?")
+                return f"✨ 你抵达后发现 {item_name} ✖️{qty} 的微光。输入 [收集] 获取。"
+            elif t.event_type == "TREASURE":
+                return "🎁 你抵达后看见一个尘封宝箱，输入 [探索] 调查。"
+            elif t.event_type == "EMPTY":
+                monster = t.state.get("name", "未知")
+                return f"🌫️ 周围寂静，似乎潜伏着 {monster}。"
+            elif t.event_type == "REST":
+                return "🏠 你抵达另一家驿站，可输入 [休息] 恢复。"
+            return "⁉️ 未知事件。"
+
+        session.add(player)
+        await session.commit()
+
+        await jump_cmd.finish(message_add_head(f"🚀 已跳跃至 ({target_x},{target_y})\n{_desc_tile(target_tile)}", event)) 

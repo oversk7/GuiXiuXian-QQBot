@@ -101,6 +101,7 @@ async def handle_ren_wu(event: MessageEvent, args: Message = CommandArg()):
         "【地图】 查看当前可探索的地点\n"
         "【探索】 探索玩家所在地点\n"
         "【[上|下|左|右]】 向指定方向移动一格\n"
+        "【跳跃 [x] [y]】 跳跃到指定坐标，仅在驿站可使用\n"
     )
     await ren_wu_cmd.finish(Message(msg))
 

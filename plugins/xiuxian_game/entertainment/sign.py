@@ -46,7 +46,20 @@ async def handle_sign(event: MessageEvent):
         else:
             lucky_msg = ""
 
-        await sign.send(f"签到成功！获得 {gold_reward} 金币！{lucky_msg}")
+        bonus_msg = ""
+        # 官群额外奖励传送符
+        if group_id == 'A147FA35C340F858A66260FB4ADBB46D':
+            bonus_msg = "\n🎁 官群额外奖励 传送符 ✖️5"
+            # 发放传送符
+            stmt_tp = select(Inventory).where(Inventory.player_id == player.id, Inventory.item_id == "teleport")
+            tp_inv = (await session.execute(stmt_tp)).scalars().first()
+            if tp_inv:
+                tp_inv.quantity += 5
+            else:
+                session.add(Inventory(player_id=player.id, item_id="teleport", quantity=5))
+        else:
+            bonus_msg = "\n官群签到送大量传送符！发送/帮助 查看群号~"
+        await sign.send(f"签到成功！获得 {gold_reward} 金币！{lucky_msg}{bonus_msg}")
         player.gold += gold_reward
         
         # 检查是否为创建账号的同一天
