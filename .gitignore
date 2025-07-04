@@ -2,6 +2,7 @@
 # Created by https://www.toptal.com/developers/gitignore/api/python
 # Edit at https://www.toptal.com/developers/gitignore?templates=python
 plugins/xiuxian_game/models/db.py
+plugins/xiuxian_game/data/invite_records.yaml
 *.db
 ### Python ###
 # Byte-compiled / optimized / DLL files
