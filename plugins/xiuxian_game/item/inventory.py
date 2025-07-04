@@ -18,6 +18,8 @@ teleport_cmd = on_command("传送", block=True, priority=5)
 rename_cmd = on_command("改名", block=True, priority=5)
 revive_cmd = on_command("复活", block=True, priority=5)
 
+drop_item = on_command("丢弃", aliases={"抛弃", "drop"}, block=True, priority=5)
+
 @use_item.handle()
 async def handle_use_item(event: MessageEvent, args: Message = CommandArg()):
     params = args.extract_plain_text().strip().split()
@@ -275,3 +277,55 @@ async def handle_revive(event: MessageEvent):
         session.add(player)
         await session.commit()
         await revive_cmd.finish("✨ 你在主城复活，继续前进吧！")
+
+@drop_item.handle()
+async def handle_drop_item(event: MessageEvent, args: Message = CommandArg()):
+    """丢弃背包中的物品
+
+    用法：丢弃 [物品名称] [数量]
+    示例：丢弃 回春散 2
+    """
+    params = args.extract_plain_text().strip().split()
+    if len(params) != 2:
+        await drop_item.finish("⛔ 格式错误，正确格式：丢弃 [物品名称] [数量]")
+
+    item_name, qty_str = params
+    # 参数校验
+    try:
+        quantity = int(qty_str)
+        if quantity <= 0:
+            raise ValueError
+    except ValueError:
+        await drop_item.finish("⛔ 数量必须为正整数")
+
+    async with safe_session() as session:
+        # 获取玩家
+        player = await session.get(Player, event.get_user_id())
+        if not player:
+            await drop_item.finish("⛔ 请先创建角色")
+
+        # 通过名称查找物品模板
+        item_cfg = config.items_config["by_name"].get(item_name)
+        if not item_cfg:
+            await drop_item.finish(f"⛔ 不存在物品：{item_name}")
+
+        # 查询玩家背包中的该物品
+        inv_stmt = select(Inventory).where(
+            Inventory.player_id == event.get_user_id(),
+            Inventory.item_id == item_cfg.item_id
+        )
+        inv = (await session.execute(inv_stmt)).scalars().first()
+
+        if not inv or inv.quantity < quantity:
+            await drop_item.finish(f"⛔ {item_name} 数量不足")
+
+        # 扣除 / 删除库存记录
+        inv.quantity -= quantity
+        if inv.quantity <= 0:
+            await session.delete(inv)
+        else:
+            session.add(inv)
+
+        await session.commit()
+
+    await drop_item.finish(f"🗑️ 已丢弃 {item_name} ✖️{quantity}")
