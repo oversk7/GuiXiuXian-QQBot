@@ -271,6 +271,7 @@ async def _handle_personal_monster(session, tile: WorldTile, player: Player) -> 
     player_hp = player.hp
     max_round = 100
     battle_log = []
+    dodge_count = 0  # 记录成功闪避次数
 
     def record_p(r_idx, text, force=False):
         if force or r_idx == 1 or r_idx % 5 == 0:
@@ -294,9 +295,23 @@ async def _handle_personal_monster(session, tile: WorldTile, player: Player) -> 
 
         def m_atk(r_idx):
             nonlocal player_hp
-            dmg = rng.randint(int(monster_attack*0.8), int(monster_attack*1.2))
-            player_hp = max(0, player_hp - dmg)
-            record_p(r_idx, f"[回合{r_idx}] {monster_display} 反击你，造成 {dmg} 伤害！", force=(player_hp==0))
+            # 计算闪避：概率基于敏捷
+            dodge_chance = player.agility / (player.agility + monster_agility + 20)  # +20 抑制极端
+            if rng.random() < dodge_chance:
+                nonlocal dodge_count
+                dodge_count += 1
+                record_p(r_idx, f"[回合{r_idx}] ⚡ 你敏捷地闪避了 {monster_display} 的攻击！")
+                return
+
+            dmg_raw = rng.randint(int(monster_attack*0.8), int(monster_attack*1.2))
+            # 防御减伤：效果递减，且至少造成1点伤害
+            dmg_after = max(1, int(dmg_raw * 100 / (100 + player.defense)))
+            blocked = dmg_raw - dmg_after
+            player_hp = max(0, player_hp - dmg_after)
+            if blocked > 0:
+                record_p(r_idx, f"[回合{r_idx}] {monster_display} 反击你，造成 {dmg_after} 伤害！（格挡 {blocked}）", force=(player_hp==0))
+            else:
+                record_p(r_idx, f"[回合{r_idx}] {monster_display} 反击你，造成 {dmg_after} 伤害！", force=(player_hp==0))
 
         if player_first:
             p_atk(round_num)
@@ -308,6 +323,8 @@ async def _handle_personal_monster(session, tile: WorldTile, player: Player) -> 
                 p_atk(round_num)
 
     battle_log.append(f"📊 总计 {round_num} 回合，你剩余HP {player_hp}/{player.max_hp}，{monster_display} HP {monster_hp}/{tile.state.get('hp', 0)}。")
+    if dodge_count:
+        battle_log.append(f"🌀 其中你成功闪避 {dodge_count} 次攻击！")
     log = "\n".join(battle_log)
 
     # 更新

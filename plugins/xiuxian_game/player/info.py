@@ -10,6 +10,20 @@ from datetime import datetime
 from ..models.equipment import EquipmentInstance
 from collections import defaultdict
 
+# 每10级对应一个境界，诡异修仙风格
+REALM_NAMES = [
+    "腐体境",  # 1-10
+    "血咒境",  # 11-20
+    "怨魂境",  # 21-30
+    "阴祟境",  # 31-40
+    "鬼啸境",  # 41-50
+    "恐魇境",  # 51-60
+    "噬神境",  # 61-70
+    "诡天境",  # 71-80
+    "灾厄境",  # 81-90
+    "绝念境",  # 91-100
+]
+
 profile = on_command("角色",aliases={"面板","状态"}, block=True, priority=5)
 register = on_command("注册", block=True, priority=5)
 
@@ -67,11 +81,17 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
     cur_hp = player.hp
     cur_mp = player.mp
 
+    idx = (player.level - 1) // 10
+    if idx < len(REALM_NAMES):
+        realm_name = REALM_NAMES[idx]
+    else:
+        realm_name = REALM_NAMES[-1] + "+"
+
     content = f"""
 ┌─── 诡修面板 ───
 │ {player.nickname}[UID:{player.uid}]「{player.sex}」
 ├───────────
-│ Lv.{player.level} Exp：{player.exp}/{calculate_level_up_exp(player.level)}
+│ Lv.{player.level}『{realm_name}』Exp：{player.exp}/{calculate_level_up_exp(player.level)}
 │ 生命：{cur_hp}/{hp_max_str} ❤️
 │ 理智：{cur_mp}/{mp_max_str} 🧠
 │ 位置：{player.region} ({player.x},{player.y}) 
