@@ -18,6 +18,9 @@ cultivate:
         change_level: 30  # 多高等级之后才可能失败
         fail_keep_ratio: 0.7  # 失败保留经验比例
         guardian_cost: 50  # 怨念值护航消耗
+        base_success_rate: 0.8  # change_level 时的基础成功率
+        decay_per_level: 0.005   # 每提高一级成功率递减值
+        min_success_rate: 0.1    # 最低成功率下限
     attributes_base:
         max_hp: 1    # 体 (max_hp) 基础增量
         max_mp: 1    # 智 (max_mp) 基础增量

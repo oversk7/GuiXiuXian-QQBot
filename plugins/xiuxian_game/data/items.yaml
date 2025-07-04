@@ -66,21 +66,21 @@ items:
       name: "腐坏的内丹"
       description: "从腐尸体内取出的浑浊内丹，散发着腐臭气息 🦠"
       type: "MATERIAL"
-      price: 80
+      price: 20
       grudge_value: 5
 
     - item_id: "ghost_tears"
       name: "鬼泪"
       description: "厉鬼哭泣时凝结的冰晶，触之刺骨 ❄️"
       type: "MATERIAL"
-      price: 150
+      price: 20
       grudge_value: 8
 
     - item_id: "cursed_silk"
       name: "诅咒丝线"
       description: "沾染怨念的红色丝线，隐约能听到哀嚎声 🧵"
       type: "MATERIAL"
-      price: 200
+      price: 20
       grudge_value: 10
 
     - item_id: "spirit_bone"
@@ -93,26 +93,33 @@ items:
       name: "阴煞精华"
       description: "极阴之地凝聚的黑色结晶，表面泛着幽光 🔮"
       type: "MATERIAL"
-      price: 300
+      price: 150
       grudge_value: 12
 
     - item_id: "nightmare_silk"
       name: "梦魇丝线"
       description: "从梦境中提取的透明丝线，触碰时会浮现幻象 🕸️"
       type: "MATERIAL"
-      price: 450
+      price: 300
       grudge_value: 15
 
     - item_id: "flesh_crystal"
       name: "血肉结晶"
       description: "不断搏动的红色晶石，内部似有生命在孕育 ❤️"
       type: "MATERIAL"
-      price: 600
+      price: 400
       grudge_value: 20
     
     - item_id: "wanted_poster"
       name: "寻人启事"
       description: "我每天都在寻找那个被自己杀死的人，我将她杀死了一遍又一遍，可她似乎总能找到我。每当天亮，我睁开双眼的时候，她的东西总会出现在我的床上。我明明把她砌进了墙里，可她却好像钻进了我的心里……"
+      type: "MATERIAL"
+      price: 5
+      grudge_value: 100
+
+    - item_id: "medical_record"
+      name: "病例单"
+      description: "我不明白自己为什么会变成这个样子，我那么认真的去迎合，明明只是想做个人而已。"
       type: "MATERIAL"
       price: 5
       grudge_value: 100

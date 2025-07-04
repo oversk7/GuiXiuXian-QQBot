@@ -106,11 +106,24 @@ async def handle_breakthrough(event: MessageEvent, args: Message = CommandArg())
         required_exp = calculate_level_up_exp(player.level)
         
         # 解析参数，若包含"镇厄"则启用保驾护航模式
-        arg_text = args.extract_plain_text().strip() if isinstance(args, Message) else ""
-        use_guardian = arg_text == "镇厄" or arg_text.lower() == "镇"  # 支持简写
+        arg_text = args.extract_plain_text().strip().lower() if isinstance(args, Message) else ""
+        use_guardian = arg_text in {"护", "镇厄", "镇"}
 
         guardian_cost = cfg_break.get("guardian_cost", 50)
         
+        # 计算成功率
+        if player.level < cfg_break["change_level"]:
+            success_chance = 1.0
+        else:
+            base_rate = cfg_break.get("base_success_rate", 0.8)
+            decay = cfg_break.get("decay_per_level", 0.005)
+            min_rate = cfg_break.get("min_success_rate", 0.1)
+            success_chance = max(min_rate, base_rate - decay * (player.level - cfg_break["change_level"]))
+
+        # 护航则必定成功
+        if use_guardian:
+            success_chance = 1.0
+
         # 检查经验是否足够
         if player.exp < required_exp:
             await breakthrough.finish(
@@ -134,10 +147,10 @@ async def handle_breakthrough(event: MessageEvent, args: Message = CommandArg())
                 f"✨ 突破成功！Lv.{player.level-1}→Lv.{player.level} ✨\n"
                 f"▫️ 获得属性点：+{config.game_config['game']['points_per_level']}✨\n"
                 f"▫️ 剩余修为：{player.exp}\n"
+                f"▫️ 本次成功率：{int(success_chance*100)}%\n"
                 + (f"▫️ 消耗怨念值：{guardian_cost} (剩余{player.resentment})" if use_guardian else "")
             )
         else:
-            success_chance = 1.0 if use_guardian else 0.8
             if random.random() <= success_chance:
                 player.exp -= required_exp
                 player.level += 1
@@ -146,6 +159,7 @@ async def handle_breakthrough(event: MessageEvent, args: Message = CommandArg())
                     f"✨ 突破成功！Lv.{player.level-1}→Lv.{player.level} ✨\n"
                     f"▫️ 获得属性点：+{config.game_config['game']['points_per_level']}✨\n"
                     f"▫️ 剩余修为：{player.exp}\n"
+                    f"▫️ 本次成功率：{int(success_chance*100)}%\n"
                     + (f"▫️ 消耗怨念值：{guardian_cost} (剩余{player.resentment})" if use_guardian else "")
                 )
             else:
@@ -154,6 +168,7 @@ async def handle_breakthrough(event: MessageEvent, args: Message = CommandArg())
                 msg = (
                     f"💥 突破失败！修为反噬\n"
                     f"▫️ 剩余修为：{player.exp}\n"
+                    f"▫️ 本次成功率：{int(success_chance*100)}%\n"
                 )
 
         session.add(player)
