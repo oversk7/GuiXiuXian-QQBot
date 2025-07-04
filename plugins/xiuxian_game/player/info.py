@@ -92,7 +92,7 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
 │ {player.nickname}[UID:{player.uid}]「{player.sex}」
 │ Lv.{player.level}『{realm_name}』
 ├───────────
-│ Exp：{player.exp}/{calculate_level_up_exp(player.level)}
+│ 经验：{player.exp}/{calculate_level_up_exp(player.level)} ⚡
 │ 生命：{cur_hp}/{hp_max_str} ❤️
 │ 理智：{cur_mp}/{mp_max_str} 🧠
 │ 位置：{player.region} ({player.x},{player.y}) 
@@ -101,7 +101,7 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
 │ 👟敏 {agi_str}  🍀运 {luk_str}
 ├──【资源】──
 │ 金币：{player.gold}  | 点数：{player.attribute_points}✨
-│ 怨念：{player.resentment}
+│ 怨念：{player.resentment} 💀
 └───────────
 """
     await profile.finish(message_add_head(content, event))
