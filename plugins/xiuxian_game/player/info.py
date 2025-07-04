@@ -90,8 +90,9 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
     content = f"""
 ┌─── 诡修面板 ───
 │ {player.nickname}[UID:{player.uid}]「{player.sex}」
+│ Lv.{player.level}『{realm_name}』
 ├───────────
-│ Lv.{player.level}『{realm_name}』Exp：{player.exp}/{calculate_level_up_exp(player.level)}
+│ Exp：{player.exp}/{calculate_level_up_exp(player.level)}
 │ 生命：{cur_hp}/{hp_max_str} ❤️
 │ 理智：{cur_mp}/{mp_max_str} 🧠
 │ 位置：{player.region} ({player.x},{player.y}) 

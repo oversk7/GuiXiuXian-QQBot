@@ -6,6 +6,7 @@ from sqlalchemy import select
 from ..models.db import safe_session
 from ..models.player import Player
 from ..utils import message_add_head
+from .info import REALM_NAMES  # 复用境界名称映射
 
 level_rank_cmd = on_command("修为榜", aliases={"等级榜"}, block=True, priority=5)
 
@@ -21,6 +22,8 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
 
     lines = ["📈 修为排行榜", "▃▃▃▃▃▃▃▃▃▃"]
     for idx, p in enumerate(players, 1):
-        lines.append(f"{idx}. {p.nickname}[UID:{p.uid}] - Lv.{p.level} ({p.exp} EXP)")
+        realm_idx = (p.level - 1) // 10
+        realm_name = REALM_NAMES[realm_idx] if realm_idx < len(REALM_NAMES) else REALM_NAMES[-1] + "+"
+        lines.append(f"{idx}. {p.nickname}[UID:{p.uid}] - Lv.{p.level}『{realm_name}』 ({p.exp} EXP)")
 
     await level_rank_cmd.finish(message_add_head("\n".join(lines), event)) 

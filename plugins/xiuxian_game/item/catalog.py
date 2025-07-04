@@ -52,11 +52,27 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
         extra_info = ""
         # 若为装备，附加属性加成信息
         if cfg.type.value == "EQUIPMENT":
+            ATTR_CN = {
+                "attack": "力",
+                "defense": "防",
+                "agility": "敏",
+                "luck": "运",
+                "max_hp": "体",
+                "max_mp": "智",
+                "hp": "体",
+                "mp": "智",
+            }
+
             bonus_parts = []
             if cfg.attr_bonus:
-                bonus_parts.extend([f"{k}+{v}" for k, v in cfg.attr_bonus.items()])
+                for k, v in cfg.attr_bonus.items():
+                    cn = ATTR_CN.get(k, k)
+                    bonus_parts.append(f"{cn}+{v}")
             if cfg.attr_ratio:
-                bonus_parts.extend([f"{k}+{int(v*100)}%" for k, v in cfg.attr_ratio.items() if v])
+                for k, v in cfg.attr_ratio.items():
+                    if v:
+                        cn = ATTR_CN.get(k, k)
+                        bonus_parts.append(f"{cn}+{int(v*100)}%")
             if bonus_parts:
                 extra_info = "\n🔧 属性加成：" + " 、".join(bonus_parts)
 
