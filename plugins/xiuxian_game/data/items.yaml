@@ -127,7 +127,7 @@ items:
     # ---- 东岗水库特产 ----
     - item_id: "drowned_scale"
       name: "溺水者"
-      description: "常见于东岗水库"
+      description: "姐姐把石头绑在了我的腿上，身体在下沉，我看见水库里面有很多黑乎乎的水草"
       type: "MATERIAL"
       price: 220
       grudge_value: 8
@@ -162,17 +162,33 @@ items:
           spirit_bone: 10
           flesh_crystal: 3
         gold: 1000
-      repair_cost: 10   # 不可锻造
+      repair_cost: 10
 
     # 不可锻造
     - item_id: "lucky_scissors"
       name: "幸运剪刀"
-      description: "这把血迹斑斑的剪刀和幸运完全沾不上边，可它就是被命名为幸运。（开膛手系列）"
+      description: "这把血迹斑斑的剪刀和幸运完全沾不上边，可它就是被命名为幸运。（开膛手套装）"
       type: "EQUIPMENT"
       price: 800
       durability: 100
       attr_bonus: {"luck": 10}
       attr_ratio: {"luck": 0.5}
       repair_cost: 8   # 不可锻造
+
+    - item_id: "black_envelope"
+      name: "黑色信封"
+      description: "开膛手曾留下署名，将死者的器官装入信封，寄送给当地的报社。（开膛手套装）"
+      type: "EQUIPMENT"
+      price: 1000
+      durability: 100
+      attr_ratio: {"attack": 0.5}
+
+    - item_id: "fog_coat"
+      name: "雾都风衣"
+      description: "这件风衣可以遮住你的面容，隐藏你的体型，掩盖你犯下的所有罪行。（开膛手套装）"
+      type: "EQUIPMENT"
+      price: 1000
+      durability: 100
+      attr_ratio: {"agility": 0.5}
 
       

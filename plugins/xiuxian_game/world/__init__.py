@@ -36,6 +36,15 @@ DIRECTIONS: Dict[str, Tuple[int, int]] = {
     "右": (1, 0),
 }
 
+# -------- 预计算通用材料列表 --------
+_all_materials = set(config.items_config["by_type"]["MATERIAL"])
+_special_mats = set()
+for _reg_info in config.map_config.get("regions", {}).values():
+    _special_mats.update(_reg_info.get("materials", []) or [])
+
+# 不在任何区域作为特产出现的材料视为通用材料
+COMMON_MATERIALS = list(_all_materials - _special_mats)
+
 # ----------------- 工具函数 -----------------
 async def get_or_create_tile(session, region: str, x: int, y: int) -> WorldTile:
     """获取或创建今日坐标格，并在创建时生成事件"""
@@ -86,8 +95,11 @@ async def get_or_create_tile(session, region: str, x: int, y: int) -> WorldTile:
         elif tile.event_type == "MATERIAL":
             # 优先选择当前区域的特产材料，如无则回退到全局材料列表
             region_cfg = config.map_config["regions"].get(region, {})
-            candidate_materials = region_cfg.get("materials") or config.items_config["by_type"]["MATERIAL"]
+            region_materials = region_cfg.get("materials") or []
+            # 仅使用通用材料 + 本区域特产材料
+            candidate_materials = COMMON_MATERIALS + region_materials
             # 若配置中写的是 ItemConfig 列表，需要转为 id；此处假设直接存放 item_id 字符串
+            candidate_materials = list(dict.fromkeys(candidate_materials))
             item_id = rng.choice(candidate_materials)
             tile.state = {
                 "item_id": item_id,

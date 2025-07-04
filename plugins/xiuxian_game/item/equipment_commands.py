@@ -8,7 +8,7 @@ from ..config import config
 from ..utils import message_add_head
 
 # 最多可装备数量（可调整或改为读取配置）
-MAX_EQUIPPED = 3  # TODO: 后续可写入 config.game_config
+MAX_EQUIPPED = 4  # TODO: 后续可写入 config.game_config
 
 # ---------------- 指令：装备列表 ----------------
 list_equipment = on_command("我的装备", aliases={"装备"}, block=True, priority=5)

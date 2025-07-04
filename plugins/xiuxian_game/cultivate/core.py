@@ -109,7 +109,9 @@ async def handle_breakthrough(event: MessageEvent, args: Message = CommandArg())
         arg_text = args.extract_plain_text().strip().lower() if isinstance(args, Message) else ""
         use_guardian = arg_text in {"护", "镇厄", "镇"}
 
-        guardian_cost = cfg_break.get("guardian_cost", 50)
+        base_cost = cfg_break.get("guardian_cost_base", cfg_break.get("guardian_cost", 50))
+        per_level_inc = cfg_break.get("guardian_cost_per_level", 1)
+        guardian_cost = base_cost + player.level * per_level_inc
         
         # 计算成功率
         if player.level < cfg_break["change_level"]:

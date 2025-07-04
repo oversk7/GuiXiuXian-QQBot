@@ -37,9 +37,29 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
     if len(matches) > 6:
         await catalog_cmd.finish(f"⚠️ 匹配到 {len(matches)} 条记录，请输入更精确的名称")
 
-    # 构造回复
-    lines = ["📖 物品 & 装备图鉴", "▃▃▃▃▃▃▃▃▃▃"]
+    # 类型映射
+    TYPE_NAME_MAP = {
+        "CONSUMABLE": "消耗品",
+        "MATERIAL": "材料",
+        "EQUIPMENT": "装备",
+    }
+
+    lines = ["📖 物品 & 装备图鉴 ✨", "━━━━━━━━━━"]
+
     for cfg in matches:
-        lines.append(f"{cfg.name} ({cfg.type.value})\n{cfg.description}")
+        type_cn = TYPE_NAME_MAP.get(cfg.type.value, cfg.type.value)
+
+        extra_info = ""
+        # 若为装备，附加属性加成信息
+        if cfg.type.value == "EQUIPMENT":
+            bonus_parts = []
+            if cfg.attr_bonus:
+                bonus_parts.extend([f"{k}+{v}" for k, v in cfg.attr_bonus.items()])
+            if cfg.attr_ratio:
+                bonus_parts.extend([f"{k}+{int(v*100)}%" for k, v in cfg.attr_ratio.items() if v])
+            if bonus_parts:
+                extra_info = "\n🔧 属性加成：" + " 、".join(bonus_parts)
+
+        lines.append(f"✨ {cfg.name} ✨  [{type_cn}]\n{cfg.description}{extra_info}\n")
 
     await catalog_cmd.finish(message_add_head("\n".join(lines), event)) 
