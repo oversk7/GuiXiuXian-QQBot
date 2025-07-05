@@ -9,7 +9,8 @@ def message_add_head(content: str, event: Optional[MessageEvent] = None) -> Mess
     """
     后续可能添加统一的消息头
     """
-    return Message(content)
+    head = "『诡修仙』\n"
+    return Message(head + content)
 
 
 
