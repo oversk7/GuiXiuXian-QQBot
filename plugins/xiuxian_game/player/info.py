@@ -114,7 +114,7 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
 │ 怨念：{player.resentment} 💀
 └───────────
 """
-    await profile.finish(message_add_head(content, event))
+    await profile.finish(content)
 
 @register.handle()
 async def _(event: MessageEvent, args: Message = CommandArg()):
