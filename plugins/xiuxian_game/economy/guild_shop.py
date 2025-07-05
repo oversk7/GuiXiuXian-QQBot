@@ -66,7 +66,7 @@ def generate_guild_shop(guild: Guild) -> list[tuple]:
     craftable, uncraftable = _split_equipments()
 
     # 计算展示数量 x = 3 + level
-    total_count = 3 + guild.level
+    total_count = 2 + (guild.level if guild.level < 9 else 8)
 
     # 高级（不可锻造）装备出现比例
     high_ratio = min(0.1 * guild.level, 0.8)  # 每级 +10% 上限 80%
