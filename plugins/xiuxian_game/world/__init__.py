@@ -161,7 +161,7 @@ async def _(event: MessageEvent):
                 monster = t.state.get("name")
                 return f"🌫️ 四周弥漫着诡异的静谧，似乎潜伏着 {monster} 的气息。若想冒险，可输入 [探索] 进行调查。"
             elif t.event_type == "REST":
-                return "🌫️ 你发现了一家驿站，也许输入 [休息] 能恢复状态。"
+                return "🌫️ 你发现了一家驿站，可输入 [休息] 恢复状态，或 [跳跃] 快速移动。"
             return "⁉️ 未知事件。"
 
         event_desc = describe_tile(tile)
