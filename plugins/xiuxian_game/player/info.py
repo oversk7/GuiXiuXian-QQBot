@@ -9,6 +9,7 @@ from ..utils import message_add_head, calculate_level_up_exp
 from datetime import datetime
 from ..models.equipment import EquipmentInstance
 from collections import defaultdict
+from ..models.guild import Guild
 
 # 每10级对应一个境界，诡异修仙风格
 REALM_NAMES = [
@@ -81,6 +82,14 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
     cur_hp = player.hp
     cur_mp = player.mp
 
+    # 公会名称
+    guild_name = "无所属"
+    if player.guild_id:
+        async with safe_session() as session_g:
+            g_obj = await session_g.get(Guild, player.guild_id)
+            if g_obj:
+                guild_name = g_obj.name
+
     idx = (player.level - 1) // 10
     if idx < len(REALM_NAMES):
         realm_name = REALM_NAMES[idx]
@@ -96,6 +105,7 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
 │ 生命：{cur_hp}/{hp_max_str} ❤️
 │ 理智：{cur_mp}/{mp_max_str} 🧠
 │ 位置：{player.region} ({player.x},{player.y}) 
+│ 公会：{guild_name}
 ├──【属性】──
 │ ⚔力 {atk_str}  🛡防 {def_str} 
 │ 👟敏 {agi_str}  🍀运 {luk_str}

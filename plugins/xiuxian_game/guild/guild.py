@@ -130,6 +130,13 @@ async def handle_join_guild(event: MessageEvent, args: Message = CommandArg()):
         if not guild_obj:
             await join_guild_cmd.finish("⛔ 未找到该公会")
 
+        # 容量检查
+        def _capacity(lv: int) -> int:
+            return 10 + (lv - 1) * 5
+        member_cnt = (await session.execute(select(_func.count(Player.id)).where(Player.guild_id == guild_obj.id))).scalar_one()
+        if member_cnt >= _capacity(guild_obj.level):
+            await join_guild_cmd.finish("⛔ 该公会人数已满，无法加入")
+
         # 直接加入（后期可改为申请制）
         player.guild_id = guild_obj.id
         session.add(player)
@@ -200,4 +207,152 @@ async def handle_dissolve_guild(event: MessageEvent):
         await session.delete(guild_obj)
         await session.commit()
 
-        await dissolve_guild_cmd.finish(message_add_head("⚠️ 公会已解散，江湖再见", event)) 
+        await dissolve_guild_cmd.finish(message_add_head("⚠️ 公会已解散，江湖再见", event))
+
+# ==================== 公会成员列表 ====================
+member_list_cmd = on_command("公会成员", aliases={"成员列表"}, block=True, priority=5)
+
+@member_list_cmd.handle()
+async def handle_member_list(event: MessageEvent):
+    async with safe_session() as session:
+        player = await session.get(Player, event.get_user_id())
+        if not player or player.guild_id is None:
+            await member_list_cmd.finish("⛔ 你未加入任何公会")
+        guild_obj = await session.get(Guild, player.guild_id)
+        if not guild_obj:
+            await member_list_cmd.finish("⚠️ 公会数据异常")
+
+        stmt = select(Player).where(Player.guild_id == guild_obj.id).order_by(Player.guild_contribution.desc(), Player.level.desc())
+        members = (await session.execute(stmt)).scalars().all()
+        lines = [f"👥 公会成员『{guild_obj.name}』({len(members)}人)", "━━━━━━━━━━"]
+        for idx, m in enumerate(members, 1):
+            mark = "👑" if m.id == guild_obj.president_id else ""
+            lines.append(f"{idx}. {m.nickname}{mark} Lv.{m.level} 贡:{m.guild_contribution}")
+        await member_list_cmd.finish(message_add_head("\n".join(lines), event))
+
+# ==================== 捐献金币 ====================
+donate_cmd = on_command("捐献金币", aliases={"捐款", "捐献"}, block=True, priority=5)
+
+@donate_cmd.handle()
+async def handle_donate(event: MessageEvent, args: Message = CommandArg()):
+    amt_str = args.extract_plain_text().strip()
+    if not amt_str:
+        await donate_cmd.finish("⛔ 格式错误，示例：捐献金币 1000")
+    try:
+        amt = int(amt_str)
+        if amt <= 0:
+            raise ValueError
+    except ValueError:
+        await donate_cmd.finish("⛔ 金额必须为正整数")
+
+    async with safe_session() as session:
+        player = await session.get(Player, event.get_user_id())
+        if not player or player.guild_id is None:
+            await donate_cmd.finish("⛔ 你未加入任何公会")
+        if player.gold < amt:
+            await donate_cmd.finish("⛔ 金币不足")
+
+        guild_obj = await session.get(Guild, player.guild_id)
+        if not guild_obj:
+            await donate_cmd.finish("⚠️ 公会数据异常")
+
+        # 计算贡献和公会经验
+        player.gold -= amt
+        player.guild_contribution += amt
+        guild_obj.exp += amt
+
+        # 升级检查：每级需要 level * 1000 经验
+        up_need = guild_obj.level * 1000
+        leveled = False
+        while guild_obj.exp >= up_need:
+            guild_obj.exp -= up_need
+            guild_obj.level += 1
+            leveled = True
+            up_need = guild_obj.level * 1000
+        session.add_all([player, guild_obj])
+        await session.commit()
+
+        msg = (
+            f"💰 捐献成功！金币 -{amt}\n"
+            f"▫️ 个人贡献：{player.guild_contribution}\n"
+            f"▫️ 公会经验：{guild_obj.exp}/{guild_obj.level*1000}\n"
+        )
+        if leveled:
+            msg += f"🎉 公会等级提升至 Lv.{guild_obj.level}!"
+        await donate_cmd.finish(message_add_head(msg, event))
+
+# ==================== 转让会长 ====================
+transfer_cmd = on_command("转让会长", block=True, priority=5)
+
+@transfer_cmd.handle()
+async def handle_transfer(event: MessageEvent, args: Message = CommandArg()):
+    uid_str = args.extract_plain_text().strip()
+    if not uid_str:
+        await transfer_cmd.finish("⛔ 格式错误，示例：转让会长 123")
+    try:
+        target_uid = int(uid_str)
+    except ValueError:
+        await transfer_cmd.finish("⛔ UID 必须是数字")
+
+    async with safe_session() as session:
+        player = await session.get(Player, event.get_user_id())
+        if not player or player.guild_id is None:
+            await transfer_cmd.finish("⛔ 你未加入公会")
+        guild_obj = await session.get(Guild, player.guild_id)
+        if guild_obj.president_id != player.id:
+            await transfer_cmd.finish("⛔ 只有会长才能转让职位")
+
+        target_player_stmt = select(Player).where(Player.uid == target_uid, Player.guild_id == guild_obj.id)
+        target_player = (await session.execute(target_player_stmt)).scalars().first()
+        if not target_player:
+            await transfer_cmd.finish("⛔ 未找到目标成员或对方不在本公会")
+
+        guild_obj.president_id = target_player.id
+        session.add(guild_obj)
+        await session.commit()
+        msg = f"👑 会长职位已转让给 {target_player.nickname}[UID:{target_player.uid}]"
+        await transfer_cmd.finish(message_add_head(msg, event))
+
+# ==================== 公会列表 ====================
+list_guilds_cmd = on_command("公会列表", aliases={"公会排行"}, block=True, priority=5)
+
+@list_guilds_cmd.handle()
+async def handle_list_guilds(event: MessageEvent, args: Message = CommandArg()):
+    page_size = 10
+    arg = args.extract_plain_text().strip()
+    try:
+        page = int(arg) if arg else 1
+    except ValueError:
+        page = 1
+    page = max(1, page)
+
+    async with safe_session() as session:
+        # 统计总数
+        total = (await session.execute(select(_func.count(Guild.id)))).scalar_one()
+        if total == 0:
+            await list_guilds_cmd.finish("暂无公会")
+        total_pages = (total - 1) // page_size + 1
+        page = min(page, total_pages)
+
+        offset = (page - 1) * page_size
+        stmt = (
+            select(Guild)
+            .order_by(Guild.level.desc(), Guild.exp.desc())
+            .offset(offset)
+            .limit(page_size)
+        )
+        guilds = (await session.execute(stmt)).scalars().all()
+
+    # 容量计算公式：基础10人，每级 +5 人
+    def _capacity(lv: int) -> int:
+        return 10 + (lv - 1) * 5
+
+    lines = [f"🏰 公会排行榜 (第{page}/{total_pages}页)", "━━━━━━━━━━"]
+    start_idx = offset + 1
+    # 统计成员数量
+    for idx, g in enumerate(guilds, start_idx):
+        cnt = (await session.execute(select(_func.count(Player.id)).where(Player.guild_id == g.id))).scalar_one()
+        cap = _capacity(g.level)
+        lines.append(f"{idx}. 『{g.name}』 Lv.{g.level} {cnt}/{cap} Exp:{g.exp}")
+
+    await list_guilds_cmd.finish(message_add_head("\n".join(lines), event)) 

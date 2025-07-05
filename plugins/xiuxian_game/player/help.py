@@ -25,6 +25,7 @@ async def handle_help(event: MessageEvent, args: Message = CommandArg()):
         "🎭 玩家系统  🎒 背包系统\n"
         "🛒 商店系统  📦 交易系统\n"
         "🗓️ 世界系统  🛒 装备系统\n"
+        "🎮 公会系统\n"
         "═════════════\n"
         "💡 输入系统名称查看详细指令\n"
         f"💡 教程及反馈：{safe_url}\n"
@@ -146,6 +147,25 @@ async def handle_trade(event: MessageEvent, args: Message = CommandArg()):
         "◈ 上架示例：/上架 传送符 5 80"
     )
     await trade_cmd.finish(Message(msg))
+
+# 公会系统
+guild_help_cmd = on_command("公会系统", priority=4, block=True)
+
+@guild_help_cmd.handle()
+async def handle_guild_help(event: MessageEvent, args: Message = CommandArg()):
+    msg = (
+        "✨ 公会系统帮助 ✨\n"
+        "【创建公会 公会名】 创建公会（消耗会长委任书）\n"
+        "【公会】 查看公会信息\n"
+        "【公会成员】 查看成员列表\n"
+        "【公会列表 [页码]】 查看公会排行榜\n"
+        "【加入公会 公会ID】 加入公会\n"
+        "【捐献金币 金额】 捐献金币提升贡献/公会经验\n"
+        "【转让会长 UID】 转让会长职位\n"
+        "【退会】 退出公会\n"
+        "【解散公会】 解散公会（仅会长）"
+    )
+    await guild_help_cmd.finish(Message(msg))
 
 button_test_cmd = on_command("测试", priority=4, block=True)
 @button_test_cmd.handle()
