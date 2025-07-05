@@ -353,6 +353,6 @@ async def handle_list_guilds(event: MessageEvent, args: Message = CommandArg()):
     for idx, g in enumerate(guilds, start_idx):
         cnt = (await session.execute(select(_func.count(Player.id)).where(Player.guild_id == g.id))).scalar_one()
         cap = _capacity(g.level)
-        lines.append(f"{idx}. 『{g.name}』 Lv.{g.level} {cnt}/{cap} Exp:{g.exp}")
+        lines.append(f"{idx}. 『{g.name}』 Lv.{g.level} ({cnt}/{cap}) Exp:{g.exp}")
 
     await list_guilds_cmd.finish(message_add_head("\n".join(lines), event)) 

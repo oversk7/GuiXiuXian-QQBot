@@ -104,8 +104,8 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
 │ 经验：{player.exp}/{calculate_level_up_exp(player.level)} ⚡
 │ 生命：{cur_hp}/{hp_max_str} ❤️
 │ 理智：{cur_mp}/{mp_max_str} 🧠
+│ 公会：{guild_name} ☯
 │ 位置：{player.region} ({player.x},{player.y}) 
-│ 公会：{guild_name}
 ├──【属性】──
 │ ⚔力 {atk_str}  🛡防 {def_str} 
 │ 👟敏 {agi_str}  🍀运 {luk_str}
