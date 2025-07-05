@@ -16,6 +16,8 @@ bank_balance_cmd = on_command("余额", aliases={"冥行账单"}, block=True, pr
 bank_deposit_cmd = on_command("存", aliases={"存款"}, block=True, priority=5)
 bank_withdraw_cmd = on_command("取", aliases={"取款"}, block=True, priority=5)
 
+# ==================== 存款排行榜 ====================
+deposit_rank_cmd = on_command("存款榜", aliases={"冥行榜"}, block=True, priority=5)
 
 def _apply_interest(acc: BankAccount):
     now = datetime.now()
@@ -105,4 +107,32 @@ async def handle_withdraw(event: MessageEvent, args: Message = CommandArg()):
         player.gold += amt
         session.add_all([player, acc])
         await session.commit()
-        await bank_withdraw_cmd.finish(message_add_head(f"💰 取出 {amt} 金币，剩余存款 {acc.balance}", event)) 
+        await bank_withdraw_cmd.finish(message_add_head(f"💰 取出 {amt} 金币，剩余存款 {acc.balance}", event))
+
+
+@deposit_rank_cmd.handle()
+async def handle_deposit_rank(event: MessageEvent):
+    async with safe_session() as session:
+        # 先取前20余额账号，再结息，避免遍历全库
+        from sqlalchemy import func as _func
+        sub_stmt = select(BankAccount).order_by(BankAccount.balance.desc()).limit(20)
+        accounts = (await session.execute(sub_stmt)).scalars().all()
+        if not accounts:
+            await deposit_rank_cmd.finish("暂无存款数据")
+        rows = []
+        for acc in accounts:
+            _apply_interest(acc)
+            rows.append(acc)
+        # 按更新后余额排序取10
+        rows.sort(key=lambda x: x.balance, reverse=True)
+        top10 = rows[:10]
+        # 自动提交利息写回
+        session.add_all(top10)
+        await session.commit()
+        lines = ["🏦 存款排行榜", "▃▃▃▃▃▃▃▃▃▃"]
+        for idx, acc in enumerate(top10, 1):
+            p = await session.get(Player, acc.player_id)
+            if not p:
+                continue
+            lines.append(f"{idx}. {p.nickname}[UID:{p.uid}] - {acc.balance}💰")
+        await deposit_rank_cmd.finish(message_add_head("\n".join(lines), event)) 

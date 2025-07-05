@@ -39,7 +39,8 @@ async def handle_bank(event: MessageEvent, args: Message = CommandArg()):
         "✨ 银行系统帮助 ✨\n"
         "【存 金额】 存入银行\n"
         "【取 金额】 从银行取出\n"
-        "【余额】 查询银行存款及利息\n"
+        "【余额】 查询冥行存款及利息\n"
+        "【存款榜】 查看冥行存款排行榜\n"
     )
     await bank_cmd.finish(Message(msg))
 
