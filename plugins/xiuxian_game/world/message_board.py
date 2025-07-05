@@ -13,6 +13,9 @@ from ..utils import message_add_head
 leave_msg_cmd = on_command("留言", block=True, priority=5)
 view_board_cmd = on_command("留言板", block=True, priority=5)
 
+# ==================== 最近更新 ====================
+latest_update_cmd = on_command("更新",aliases={"最近更新"}, block=True, priority=5)
+
 MAX_LEN = 120
 PAGE_SIZE = 10
 
@@ -86,4 +89,20 @@ async def handle_view_board(event: MessageEvent, args: Message = CommandArg()):
                 continue
             time_str = rec.created_at.strftime("%m-%d %H:%M")
             lines.append(f">{p.nickname}[UID:{p.uid}] ({time_str})\n{rec.content}")
-        await view_board_cmd.finish(message_add_head("\n".join(lines), event)) 
+        await view_board_cmd.finish(message_add_head("\n".join(lines), event))
+
+@latest_update_cmd.handle()
+async def handle_latest_update(event: MessageEvent):
+    async with safe_session() as session:
+        rec = (await session.execute(
+            select(WorldMessage).where(WorldMessage.player_id == 'D6A7BB606845F1AFF40ADA517F7BF306').order_by(WorldMessage.created_at.desc()).limit(1)
+        )).scalars().first()
+        if not rec:
+            await latest_update_cmd.finish("暂无更新记录")
+        player = await session.get(Player, rec.player_id)
+        time_str = rec.created_at.strftime("%m-%d %H:%M")
+        msg = (
+            f"📜 最近更新 ({time_str})\n"
+            f"{player.nickname if player else '未知'}：{rec.content}"
+        )
+        await latest_update_cmd.finish(message_add_head(msg, event)) 
