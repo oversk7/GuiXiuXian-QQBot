@@ -171,6 +171,7 @@ async def handle_breakthrough(event: MessageEvent, args: Message = CommandArg())
                     f"💥 突破失败！修为反噬\n"
                     f"▫️ 剩余修为：{player.exp}\n"
                     f"▫️ 本次成功率：{int(success_chance*100)}%\n"
+                    f"▫️ 建议使用【/突破 镇厄】保驾护航"
                 )
 
         session.add(player)
