@@ -9,7 +9,7 @@ from ..models.player import Player
 from ..models.bank_account import BankAccount
 from ..utils import message_add_head
 
-INTEREST_RATE_PER_HOUR = 0.0005  # 0.05% 每小时
+INTEREST_RATE_PER_HOUR = 0.001  # 0.1% 每小时
 
 # 命令
 bank_balance_cmd = on_command("余额", aliases={"冥行账单"}, block=True, priority=5)
