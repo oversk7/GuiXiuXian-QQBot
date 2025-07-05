@@ -165,7 +165,6 @@ async def _(event: MessageEvent):
             return "⁉️ 未知事件。"
 
         event_desc = describe_tile(tile)
-
     header = f"🚶 已移动至 ({new_x},{new_y})"
     await move_cmd.finish(message_add_head(f"{header}\n{event_desc}", event))
 

@@ -160,10 +160,12 @@ async def handle_guild_help(event: MessageEvent, args: Message = CommandArg()):
         "【公会成员】 查看成员列表\n"
         "【公会列表 [页码]】 查看公会排行榜\n"
         "【加入公会 公会ID】 加入公会\n"
+        "【申请列表】 查看待处理申请（会长）\n"
+        "【同意入会 UID】/【拒绝入会 UID】 审核入会（会长）\n"
         "【捐献金币 金额】 捐献金币提升贡献/公会经验\n"
         "【转让会长 UID】 转让会长职位\n"
         "【退会】 退出公会\n"
-        "【解散公会】 解散公会（仅会长）"
+        "【解散公会】 解散公会（会长）"
     )
     await guild_help_cmd.finish(Message(msg))
 
