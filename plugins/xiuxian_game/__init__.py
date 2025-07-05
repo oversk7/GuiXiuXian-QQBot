@@ -1,6 +1,5 @@
 from nonebot.plugin import PluginMetadata
 from nonebot import get_driver
-
 from .config import Config
 from .models.db import init_db
 
@@ -18,7 +17,8 @@ from . import (
     economy,
     world,
     item,
-    entertainment
+    entertainment,
+    guild
 )
 
 driver = get_driver()

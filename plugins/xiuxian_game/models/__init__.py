@@ -4,7 +4,8 @@ from .trade import TradeItem
 from .world_tile import WorldTile
 from .equipment import EquipmentInstance
 from .trade_equip import TradeEquip
+from .guild import Guild
 
 __all__ = [
-    "Player", "Team", "TeamMember", "Inventory", "TradeItem", "PlayerQuest", "Quest", "WorldTile", "EquipmentInstance", "TradeEquip"
+    "Player", "Guild", "Team", "TeamMember", "Inventory", "TradeItem", "PlayerQuest", "Quest", "WorldTile", "EquipmentInstance", "TradeEquip"
 ]

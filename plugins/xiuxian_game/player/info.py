@@ -104,11 +104,6 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
 │ 怨念：{player.resentment} 💀
 └───────────
 """
-    if player.id == '0AD23D5F9951AC6C020A116563AB87A1':
-        content += f"""
-        娃娃哥，加官群了没？
-        111速来
-        """
     await profile.finish(message_add_head(content, event))
 
 @register.handle()
