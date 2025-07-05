@@ -184,6 +184,7 @@ ATTRIBUTE_MAP = {
     "智": "max_mp",
     "力": "attack",
     "敏": "agility",
+    "运": "luck",
 }
 
 @assign_points.handle()
