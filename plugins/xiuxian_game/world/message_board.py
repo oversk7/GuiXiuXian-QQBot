@@ -100,9 +100,9 @@ async def handle_latest_update(event: MessageEvent):
         if not rec:
             await latest_update_cmd.finish("暂无更新记录")
         player = await session.get(Player, rec.player_id)
-        time_str = rec.created_at.strftime("%m-%d %H:%M")
+        time_str = rec.created_at.strftime("%m-%d")
         msg = (
             f"📜 最近更新 ({time_str})\n"
-            f"{player.nickname if player else '未知'}：{rec.content}"
+            f"{rec.content}"
         )
         await latest_update_cmd.finish(message_add_head(msg, event)) 
