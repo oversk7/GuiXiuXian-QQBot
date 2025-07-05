@@ -31,7 +31,29 @@ async def handle_leave_msg(event: MessageEvent, args: Message = CommandArg()):
         msg_rec = WorldMessage(player_id=player.id, content=content, created_at=datetime.now())
         session.add(msg_rec)
         await session.commit()
-    await leave_msg_cmd.finish(message_add_head("✅ 留言已发布！", event))
+
+    # 第一条：确认
+    await leave_msg_cmd.send(message_add_head("✅ 留言已发布！", event))
+
+    # 第二条：刷新第一页留言板
+    async with safe_session() as session:
+        total = (await session.execute(select(_func.count(WorldMessage.id)))).scalar_one()
+        total_pages = (total - 1) // PAGE_SIZE + 1
+        page = 1
+        stmt = (
+            select(WorldMessage).order_by(WorldMessage.created_at.desc()).limit(PAGE_SIZE)
+        )
+        records = (await session.execute(stmt)).scalars().all()
+
+        lines = [f"🗒️ 世界留言板 (第{page}/{total_pages}页)", "━━━━━━━━━━"]
+        for rec in records:
+            p = await session.get(Player, rec.player_id)
+            if not p:
+                continue
+            time_str = rec.created_at.strftime("%m-%d %H:%M")
+            lines.append(f">{p.nickname}[UID:{p.uid}] ({time_str})\n{rec.content}")
+
+    await leave_msg_cmd.finish(message_add_head("\n".join(lines), event))
 
 @view_board_cmd.handle()
 async def handle_view_board(event: MessageEvent, args: Message = CommandArg()):
@@ -63,5 +85,5 @@ async def handle_view_board(event: MessageEvent, args: Message = CommandArg()):
             if not p:
                 continue
             time_str = rec.created_at.strftime("%m-%d %H:%M")
-            lines.append(f"{p.nickname}[UID:{p.uid}] ({time_str})\n{rec.content}")
+            lines.append(f">{p.nickname}[UID:{p.uid}] ({time_str})\n{rec.content}")
         await view_board_cmd.finish(message_add_head("\n".join(lines), event)) 
