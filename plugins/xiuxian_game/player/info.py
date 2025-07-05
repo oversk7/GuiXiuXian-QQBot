@@ -117,7 +117,7 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
 │ 👟敏 {agi_str}  🍀运 {luk_str}
 ├──【资源】──
 │ 金币：{player.gold}  | 点数：{player.attribute_points}✨
-│ 怨念：{player.resentment} 💀
+│ 积分：{player.gold2}  | 怨念：{player.resentment} 💀
 └───────────
 """
     await profile.finish(content)

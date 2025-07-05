@@ -37,7 +37,7 @@ class Player(Base):
     
     vip: Mapped[int] = mapped_column(Integer, default=0, server_default='0', comment="VIP等级")
     gold: Mapped[int] = mapped_column(Integer, default=0, server_default='0', comment="货币")
-    gold2: Mapped[int] = mapped_column(Integer, default=0, server_default='0', comment="稀有货币")
+    gold2: Mapped[int] = mapped_column(Integer, default=0, server_default='0', comment="积分")
     
     last_sign: Mapped[datetime] = mapped_column(DateTime, nullable=True, comment="上次签到日期")
     created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now(), comment="创建时间")

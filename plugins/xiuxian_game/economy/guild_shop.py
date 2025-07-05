@@ -96,12 +96,12 @@ def generate_guild_shop(guild: Guild) -> list[tuple]:
     return [(cfg, cfg.price) for cfg in selected]
 
 
-async def format_guild_shop(shop_sell: list, player_contrib: int, guild: Guild) -> str:
+async def format_guild_shop(shop_sell: list, player_points: int, guild: Guild) -> str:
     """公会商店展示格式"""
     content: list[str] = [
         f"🏛️ 公会商店 (Lv.{guild.level})",
         "▃" * 12,
-        f"✨ 你的贡献：{player_contrib}",
+        f"✨ 你的积分：{player_points}",
         "",
         "🛒 可兑换装备：",
     ]
@@ -138,7 +138,7 @@ async def _(event: MessageEvent):
 
         shop_sell = generate_guild_shop(guild)
         await guild_shop_cmd.finish(
-            message_add_head(await format_guild_shop(shop_sell, player.guild_contribution, guild), event)
+            message_add_head(await format_guild_shop(shop_sell, player.gold2, guild), event)
         )
 
 
@@ -193,9 +193,9 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
             item_cfg, price = match
 
         total_cost = price * quantity
-        if player.guild_contribution < total_cost:
+        if player.gold2 < total_cost:
             await guild_buy_cmd.finish(
-                f"⛔ 贡献不足，需要 {total_cost}✨ 当前拥有 {player.guild_contribution}✨"
+                f"⛔ 积分不足，需要 {total_cost}✨ 当前拥有 {player.gold2}✨"
             )
 
         # 查看库存
@@ -207,8 +207,8 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
         )
         inv = inv.scalars().first()
 
-        # 扣除贡献
-        player.guild_contribution -= total_cost
+        # 扣除积分
+        player.gold2 -= total_cost
 
         # 更新库存
         if inv:

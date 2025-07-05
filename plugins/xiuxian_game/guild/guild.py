@@ -2,7 +2,7 @@ from nonebot import on_command
 from nonebot.adapters.qq import MessageEvent, Message
 from nonebot.params import CommandArg
 from sqlalchemy import select, func as _func
-from datetime import datetime
+from datetime import datetime, date
 
 from ..models.db import safe_session
 from ..models.player import Player
@@ -11,6 +11,7 @@ from ..models.guild import Guild
 from ..config import config
 from ..utils import message_add_head
 from ..models.guild_application import GuildApplication as _GA
+from ..models.donation_log import PlayerDonationLog
 
 # ===== 工具函数 =====
 # 翻译大数字为 w（万）单位，保留 1 位小数，10w 以下不显示 w
@@ -26,6 +27,10 @@ def _need_exp_for_level(level: int) -> int:
         return 1000 * (5 ** (level - 1))
     else:
         return 1000 * 250 * (level - 5)
+
+# ---------------- 捐献金币配置 ----------------
+_DONATE_DAILY_LIMIT = 70_000                 # 每人每日可捐最大金币
+_DONATE_GOLD_TO_POINT_RATIO = 0.8           # 金币转积分折扣率
 
 create_guild_cmd = on_command("创建公会", block=True, priority=5)
 
@@ -282,16 +287,33 @@ async def handle_donate(event: MessageEvent, args: Message = CommandArg()):
         if player.gold < amt:
             await donate_cmd.finish("⛔ 金币不足")
 
+        # 当日捐献额度校验
+        donated_today_stmt = select(_func.coalesce(_func.sum(PlayerDonationLog.amount), 0)).where(
+            PlayerDonationLog.player_id == player.id,
+            PlayerDonationLog.donate_date == date.today(),
+        )
+        donated_today = (await session.execute(donated_today_stmt)).scalar_one()
+        if donated_today + amt > _DONATE_DAILY_LIMIT:
+            remain = _DONATE_DAILY_LIMIT - donated_today
+            await donate_cmd.finish(f"⛔ 今日还可捐献 {remain} 金币（每日上限 {_DONATE_DAILY_LIMIT}）")
+
         guild_obj = await session.get(Guild, player.guild_id)
         if not guild_obj:
             await donate_cmd.finish("⚠️ 公会数据异常")
 
-        # 计算贡献和公会经验
+        # ---------------- 扣款 & 积分 ----------------
         player.gold -= amt
+        donate_points = int(amt * _DONATE_GOLD_TO_POINT_RATIO)
+        player.gold2 += donate_points  # 积分增加
+
+        # 贡献与公会经验累计（贡献不再消耗）
         player.guild_contribution += amt
         guild_obj.exp += amt
 
-        # 升级检查：非线性经验表
+        # 写入捐献日志
+        session.add(PlayerDonationLog(player_id=player.id, donate_date=date.today(), amount=amt))
+
+        # 升级检查
         up_need = _need_exp_for_level(guild_obj.level)
         leveled = False
         while guild_obj.exp >= up_need:
@@ -299,15 +321,16 @@ async def handle_donate(event: MessageEvent, args: Message = CommandArg()):
             guild_obj.level += 1
             leveled = True
             up_need = _need_exp_for_level(guild_obj.level)
+
         session.add_all([player, guild_obj])
         await session.commit()
 
-        # 经验显示修正：使用非线性经验表并转 w 单位
         exp_current = _fmt_w(guild_obj.exp)
         exp_need = _fmt_w(_need_exp_for_level(guild_obj.level))
 
         msg = (
             f"💰 捐献成功！金币 -{amt}\n"
+            f"✨ 获得积分：+{donate_points}\n"
             f"▫️ 个人贡献：{_fmt_w(player.guild_contribution)}\n"
             f"▫️ 公会经验：{_fmt_w(exp_current)}/{_fmt_w(exp_need)}\n"
         )
