@@ -19,7 +19,7 @@ market = on_command("交易市场", priority=5, block=True)
 async def handle_market(event: MessageEvent):
     async with safe_session() as session:
         result = await session.execute(
-            select(TradeItem)
+            select(TradeItem).where(TradeItem.quantity > 0)
             .order_by(TradeItem.created_at.desc())
             .limit(20)  # 最多显示20条
         )
@@ -56,10 +56,13 @@ async def handle_list_item(event: MessageEvent, args: Message = CommandArg()):
 
     item_name, quantity_str, price_str = parts
     if not (quantity_str.isdigit() and price_str.isdigit()):
-        await list_item.finish("❌ 数量/价格需为整数！")
+        await list_item.finish("❌ 数量/价格需为正整数！")
 
     quantity = int(quantity_str)
     price = int(price_str)
+    if quantity <= 0 or price <= 0:
+        await list_item.finish("❌ 数量和价格必须大于0")
+
     item = config.items_config["by_name"].get(item_name)
     if not item:
         await list_item.finish("❌ 物品不存在")

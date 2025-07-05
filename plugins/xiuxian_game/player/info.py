@@ -12,18 +12,28 @@ from collections import defaultdict
 from ..models.guild import Guild
 
 # 每10级对应一个境界，诡异修仙风格
+# 境界名称与等级区间映射（10,10,20,20,20,20,30,30,30,50 累积）
 REALM_NAMES = [
     "腐体境",  # 1-10
     "血咒境",  # 11-20
-    "怨魂境",  # 21-30
-    "阴祟境",  # 31-40
-    "鬼啸境",  # 41-50
-    "恐魇境",  # 51-60
-    "噬神境",  # 61-70
-    "诡天境",  # 71-80
-    "灾厄境",  # 81-90
-    "绝念境",  # 91-100
+    "怨魂境",  # 21-40
+    "阴祟境",  # 41-60
+    "鬼啸境",  # 61-80
+    "恐魇境",  # 81-100
+    "噬神境",  # 101-130
+    "诡天境",  # 131-160
+    "灾厄境",  # 161-190
+    "绝念境",  # 191-240
 ]
+
+REALM_THRESHOLDS = [10, 20, 40, 60, 80, 100, 130, 160, 190, 240]
+
+def realm_by_level(level: int) -> str:
+    """根据等级返回境界名称"""
+    for idx, cap in enumerate(REALM_THRESHOLDS):
+        if level <= cap:
+            return REALM_NAMES[idx]
+    return REALM_NAMES[-1] + "+"
 
 profile = on_command("角色",aliases={"面板","状态"}, block=True, priority=5)
 register = on_command("注册", block=True, priority=5)
@@ -90,11 +100,7 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
             if g_obj:
                 guild_name = g_obj.name
 
-    idx = (player.level - 1) // 10
-    if idx < len(REALM_NAMES):
-        realm_name = REALM_NAMES[idx]
-    else:
-        realm_name = REALM_NAMES[-1] + "+"
+    realm_name = realm_by_level(player.level)
 
     content = f"""
 ┌─── 诡修面板 ───
