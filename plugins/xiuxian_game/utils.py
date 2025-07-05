@@ -2,6 +2,7 @@ from nonebot.adapters.qq import Message, MessageSegment, MessageEvent
 from typing import Optional
 from .config import config
 import math
+import re  # 用于正则匹配域名
 
 
 def message_add_head(content: str, event: Optional[MessageEvent] = None) -> Message:
@@ -97,5 +98,78 @@ def luck_prob(luck_value: int | float, scale: int = 60) -> float:
     if luck_value <= 0:
         return 0.0
     return 1 - math.exp(-float(luck_value) / float(scale))
+
+
+# ---------------- URL 转义工具 ----------------
+
+def bypass_urls(
+    text: str,
+    mode: str = "unicode",
+    whitelist: list[str] | None = None,
+) -> str:
+    """在文本中查找英文域名并根据不同 *mode* 进行转义。
+
+    参数说明
+    ----------
+    text: str
+        待处理文本。
+    mode: str
+        转义模式，可选值
+        ``unicode``      : 在点号前插入不可见字符 ``\u200E``（默认）
+        ``space``        : 在点号前插入空格
+        ``fullStop``     : 将半角点号替换为中文句号 ``。``
+        ``remove``       : 直接删除匹配到的域名
+        ``uppercase``    : 整个域名转为大写
+        ``tldUppercase`` : 仅将顶级域名 TLD 转为大写
+    whitelist: list[str] | None
+        白名单域名列表，命中后将保持原样，不做任何处理。
+
+    返回值
+    -------
+    str
+        处理后的文本。
+
+    Notes
+    -----
+    1. 为了保持依赖最小化，这里并未引入第三方库获取 "全部" 顶级域名列表，而是使用
+       一个正则 ``([A-Za-z0-9-]+\.)+[A-Za-z]{2,63}`` 来粗略匹配"看起来像"域名的串。
+       在大多数常见场景下已足够；如需严格匹配，可替换为公开的 TLD 列表。
+    2. 该函数 **不会** 主动发送消息，也不包含任何异步操作，可安全在任何上下文中调用。
+    """
+
+    whitelist = whitelist or []
+
+    # 点号替换映射
+    dot_replacer_map: dict[str, str] = {
+        "unicode": "\u200E.",  # U+200E (LRM) + '.'
+        "space": " .",
+        "fullStop": "。",
+    }
+
+    # 用于匹配英文域名的正则表达式：<sub>.<domain>.<tld>
+    domain_pattern = re.compile(r"((?:[A-Za-z0-9-]+\.)+[A-Za-z]{2,63})(?=[^A-Za-z0-9-]|$)")
+
+    def _replace(match: re.Match[str]) -> str:
+        domain = match.group(1)
+
+        # 白名单直接放行
+        if domain in whitelist:
+            return domain
+
+        # 各模式处理
+        if mode == "remove":
+            return ""
+        if mode == "uppercase":
+            return domain.upper()
+        if mode == "tldUppercase":
+            parts = domain.split(".")
+            if len(parts) > 1:
+                parts[-1] = parts[-1].upper()
+            return ".".join(parts)
+        # 默认走点号替换类模式（unicode / space / fullStop）
+        replacer = dot_replacer_map.get(mode, "\u200E.")
+        return domain.replace(".", replacer)
+
+    return domain_pattern.sub(_replace, text)
 
 

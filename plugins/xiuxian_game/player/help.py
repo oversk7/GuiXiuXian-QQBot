@@ -8,6 +8,7 @@ import os
 from ..models import Player, EquipmentInstance
 from ..models.db import safe_session
 from ..config import config
+from ..utils import bypass_urls
 
 # 注册"帮助"指令
 help_cmd = on_command("帮助", aliases={"help","菜单"}, priority=5, block=True)
@@ -15,6 +16,8 @@ help_cmd = on_command("帮助", aliases={"help","菜单"}, priority=5, block=Tru
 
 @help_cmd.handle()
 async def handle_help(event: MessageEvent, args: Message = CommandArg()):
+    safe_url = bypass_urls("https://gitee.com/ling-gtq/TheWestTutorial/issues", mode="unicode")
+
     msg = (
         "✨ 欢迎使用帮助系统 ✨\n"
         "═════════════\n"
@@ -24,7 +27,7 @@ async def handle_help(event: MessageEvent, args: Message = CommandArg()):
         "🗓️ 世界系统  🛒 装备系统\n"
         "═════════════\n"
         "💡 输入系统名称查看详细指令\n"
-        "💡 教程及反馈请去gitee搜索TheWestTutorial项目\n"
+        f"💡 教程及反馈：{safe_url}\n"
         "💡 官群：962494679，官群签到奖励翻倍\n"
         "💡 发送/邀请码 邀请好友获得上万金币，获得启动资金"
     )
