@@ -86,9 +86,9 @@ async def get_or_create_tile(session, region: str, x: int, y: int) -> WorldTile:
             tile.state = {
                 "name": monster,
                 "level": monster_level,
-                "hp": rng.randint(10, 20) * monster_level,
-                "attack": rng.randint(1, 5) * monster_level,
-                "agility": rng.randint(1, 5) * monster_level,
+                "hp": rng.randint(1, 3) * monster_level,
+                "attack": rng.randint(1, 2) * monster_level,
+                "agility": rng.randint(1, 2) * monster_level,
             }
         elif tile.event_type == "TREASURE":
             tile.state = {"looted": False}

@@ -23,13 +23,25 @@ async def handle_help(event: MessageEvent, args: Message = CommandArg()):
         "🎭 玩家系统  🎒 背包系统\n"
         "🛒 商店系统  📦 交易系统\n"
         "🗓️ 世界系统  🛒 装备系统\n"
-        "🎮 公会系统\n"
+        "🎮 公会系统  💰 银行系统\n"
         "═════════════\n"
         "💡 发送/系统名称 查看详细指令，/更新 查看最近更新内容\n"
         "💡 教程及反馈请加官群：962494679，官群签到奖励翻倍\n"
         "💡 发送/邀请码 邀请好友获得上万金币，获得启动资金"
     )
     await help_cmd.finish(Message(msg))
+
+# 银行系统
+bank_cmd = on_command("银行系统", priority=4, block=True)
+@bank_cmd.handle()
+async def handle_bank(event: MessageEvent, args: Message = CommandArg()):
+    msg = (
+        "✨ 银行系统帮助 ✨\n"
+        "【存 金额】 存入银行\n"
+        "【取 金额】 从银行取出\n"
+        "【余额】 查询银行存款及利息\n"
+    )
+    await bank_cmd.finish(Message(msg))
 
 # 玩家系统
 player_cmd = on_command("玩家系统", priority=4, block=True)
