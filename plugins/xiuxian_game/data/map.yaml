@@ -32,6 +32,8 @@ regions:
       - "红衣舞者"
       - "笔仙"
       - "霸凌者"
+    materials:
+      - "kissed_phone_number"
   肉殖回廊:
     level_range: [41, 50]
     monsters:

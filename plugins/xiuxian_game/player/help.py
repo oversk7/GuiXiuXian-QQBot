@@ -180,6 +180,7 @@ async def handle_guild_help(event: MessageEvent, args: Message = CommandArg()):
         "【转让会长 UID】 转让会长职位\n"
         "【退会】 退出公会\n"
         "【解散公会】 解散公会（会长）"
+        "【公会商店】 查看公会商店"
     )
     await guild_help_cmd.finish(Message(msg))
 

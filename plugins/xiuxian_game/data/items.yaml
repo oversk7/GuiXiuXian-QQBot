@@ -67,7 +67,6 @@ items:
       description: "从腐尸体内取出的浑浊内丹，散发着腐臭气息 🦠"
       type: "MATERIAL"
       price: 20
-      grudge_value: 5
 
     - item_id: "ghost_tears"
       name: "鬼泪"
@@ -124,6 +123,13 @@ items:
       price: 5
       grudge_value: 100
 
+    - item_id: "kissed_phone_number"
+      name: "被死者亲吻的电话号码"
+      description: "警察发现，每一位死者在生前的最后一段时间，都拨打了这个电话。"
+      type: "MATERIAL"
+      price: 5
+      grudge_value: 80
+
     # ---- 东岗水库特产 ----
     - item_id: "drowned_scale"
       name: "溺水者"
@@ -137,7 +143,7 @@ items:
       name: "溺水者外衣"
       description: "水下有东西，它们慢慢爬进了我的衣服，将我拖入深水当中。"
       type: "EQUIPMENT"
-      price: 1000
+      price: 10000
       durability: 100
       attr_bonus: {"hp": 10}
       attr_ratio: {"hp": 0.2}
@@ -147,39 +153,71 @@ items:
           cursed_silk: 5
           flesh_crystal: 3
         gold: 1500
-      repair_cost: 10      # 可选：每 1 点耐久 10 金币
+      repair_cost: 100      # 可选：每 1 点耐久 100 金币
 
     - item_id: "self_awareness_key"
       name: "自知力钥匙"
       description: "精神病人大多存在不同程度的自知力缺陷，他们无法察觉自己精神状态的改变，对精神状态丧失判断，否认病情，拒绝治疗。当你出现类似的症状时，这把钥匙可以帮你一次。"
       type: "EQUIPMENT"
-      price: 1000
+      price: 10000
       durability: 100
       attr_bonus: {"mp": 10}
       attr_ratio: {"mp": 0.1}
       recipe:
         materials:
-          spirit_bone: 10
+          spirit_bone: 15
           flesh_crystal: 3
         gold: 1000
-      repair_cost: 10
+      repair_cost: 100
+
+    - item_id: "crying_tape"
+      name: "哭泣的磁带"
+      description: "他第一次听这盘磁带时就发现了问题，空白的磁带里有一段无法消除的杂音，他尝试各种办法最终还原出了杂音的内容。原来，那是他临死时挣扎求救的声音。"
+      type: "EQUIPMENT"
+      price: 30000
+      durability: 100
+      recipe:
+        materials:
+          ghost_tears: 50
+          cursed_silk: 35
+          flesh_crystal: 10
+          kissed_phone_number: 2
+        gold: 10000
+      repair_cost: 100
+      attr_ratio: {"mp": 0.8}
+      attr_bonus: {"luck": 7}
+
+    - item_id: "drawer"
+      name: "抽屉"
+      description: "我总觉有人在偷看我，他可能就藏在这个房间里，但是我找遍了所有能够藏人的地方都没有找到它。我越来越害怕，每当我背对客厅坐在桌边工作时，那种被窥伺的感觉就会冒出来。他一定在看着我，我很担心他在我背对客厅时，悄悄走到我的身后。为了防身，我在书桌的抽屉里藏了一把刀。某天深夜，那种被窥伺的感觉又出现了，我忍无可忍打开抽屉想要拿出那把刀。可等我打开抽屉的时候才发现，原来那个人并不是藏在客厅里"
+      type: "EQUIPMENT"
+      price: 60000
+      durability: 100
+      attr_ratio: {"hp": 0.8}
+      recipe:
+        materials:
+          spirit_bone: 45
+          nightmare_silk: 20
+          flesh_crystal: 10
+          wanted_poster: 2
+        gold: 10000
+      repair_cost: 150
 
     # 不可锻造
     - item_id: "lucky_scissors"
       name: "幸运剪刀"
       description: "这把血迹斑斑的剪刀和幸运完全沾不上边，可它就是被命名为幸运。（开膛手套装）"
       type: "EQUIPMENT"
-      price: 800
+      price: 80000
       durability: 100
-      attr_bonus: {"luck": 10}
       attr_ratio: {"luck": 0.5}
-      repair_cost: 8   # 不可锻造
+      repair_cost: 200   # 不可锻造
 
     - item_id: "black_envelope"
       name: "黑色信封"
       description: "开膛手曾留下署名，将死者的器官装入信封，寄送给当地的报社。（开膛手套装）"
       type: "EQUIPMENT"
-      price: 1000
+      price: 100000
       durability: 100
       attr_ratio: {"attack": 0.5}
 
@@ -187,8 +225,41 @@ items:
       name: "雾都风衣"
       description: "这件风衣可以遮住你的面容，隐藏你的体型，掩盖你犯下的所有罪行。（开膛手套装）"
       type: "EQUIPMENT"
-      price: 1000
+      price: 30000
       durability: 100
       attr_ratio: {"agility": 0.5}
+
+    - item_id: "skull_suit"
+      name: "碎颅制服"
+      description: "克劳瑞在精神病院里工作了二十年，长时间接触患者让他的精神饱受折磨，终于有一天他决定结束这一切。病态和疯狂浸透入骨髓，他手持铁锤想要从根本上治疗好自己的患者！"
+      type: "EQUIPMENT"
+      price: 150000
+      durability: 100
+      attr_ratio: {"attack": 0.8}
+
+    - item_id: "faceless_suit"
+      name: "无脸制服"
+      description: "珍妮是碎颅医生克劳瑞的妻子，那天晚上她亲眼目睹丈夫手持铁锤走入病室，她不清楚自己最爱的丈夫想要做什么，直到那高高举起的铁锤砸向她的脸时，她才反应过来。"
+      type: "EQUIPMENT"
+      price: 120000
+      durability: 100
+      attr_bonus: {"agility": 10}
+      attr_ratio: {"mp": 0.5}
+    
+    - item_id: "wedding_dress"
+      name: "嫁衣"
+      description: "我用我的骨做针，用我的血做线，用我的皮做衣，希望你不会嫌弃我这件血红色的嫁衣。"
+      type: "EQUIPMENT"
+      price: 100000
+      durability: 100
+      attr_ratio: {"attack": 1.0}
+      recipe:
+        materials:
+          spirit_bone: 100
+          flesh_crystal: 50
+          nightmare_silk: 20
+        gold: 50000
+      repair_cost: 200
+
 
       
