@@ -4,7 +4,7 @@ from nonebot.params import CommandArg
 
 from ..models.db import safe_session
 from ..models.player import Player
-from ..utils import message_add_head
+from ..utils import message_add_head, luck_prob
 
 import random
 
@@ -16,6 +16,8 @@ dice_cmd = on_command(
     priority=5,
 )
 
+# 庄家隐藏优势概率（0~1）
+DEALER_EDGE: float = 0
 
 @dice_cmd.handle()
 async def _(event: MessageEvent, args: Message = CommandArg()):
@@ -61,47 +63,69 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
         player.gold -= bet
         session.add(player)
 
-        # 掷骰子
-        die1 = random.randint(1, 6)
-        die2 = random.randint(1, 6)
-        total = die1 + die2
+        # 使用硬编码的庄家优势
+        dealer_edge: float = DEALER_EDGE
 
-        outcome = "大" if total >= 8 else "小" if total <= 6 else "7"
+        # ---------- 掷骰子（暗中控胜率） ----------
+        cheat = dealer_edge > 0 and random.random() < dealer_edge
 
-        win = False
-        jackpot = False  # 爆点 2 或 12
+        while True:
+            die1 = random.randint(1, 6)
+            die2 = random.randint(1, 6)
+            total = die1 + die2
+            outcome = "大" if total >= 8 else "小" if total <= 6 else "7"
 
-        if total in {2, 12}:
-            jackpot = True
+            if not cheat:
+                break  # 未触发作弊，直接接受结果
 
-        # 判断胜负
-        if outcome in {"大", "小"} and outcome == ("大" if guess in {"大", "big"} else "小"):
-            win = True
+            # 触发作弊：必须让玩家输
+            if total == 7:
+                continue  # 7 会让玩家赢，重掷
 
-        # 结算
+            player_guess_is_big = guess in {"大", "big"}
+            outcome_is_big = outcome == "大"
+
+            # 如果玩家会赢钱，则重掷；否则接受
+            if player_guess_is_big == outcome_is_big:
+                continue  # 仍然会赢，继续重掷
+            break
+
+        # ---------- 奖励计算（先不发放） ----------
         if total == 7:
-            # 幸运 7：无论押大押小都算玩家获胜，给予 3 倍奖励
-            multiplier = 3
+            # 幸运 7：需要足够高的 Luck 才能获胜（高门槛）
+            win_by_luck = random.random() < luck_prob(player.luck) ** 2
+            if win_by_luck:
+                multiplier = 3
+                reward = bet * multiplier
+                icon = "🍀"
+                result_text = (
+                    f"🍀 幸运数字 7！运气爆棚 ×{multiplier}，获得 {reward} 金币"
+                )
+            else:
+                multiplier = 0
+                reward = 0
+                icon = "💸"
+                result_text = "😖 数字7，不大不小，判定运气...运气不足！庄家笑纳金币"
+        elif outcome in {"大", "小"} and outcome == ("大" if guess in {"大", "big"} else "小"):
+            multiplier = 5 if total in {2, 12} else 2
             reward = bet * multiplier
-            player.gold += reward
-            result_text = f"🍀 幸运数字 7！奖励 ×{multiplier}，获得 {reward} 金币"
-            icon = "🍀"
-        elif win:
-            multiplier = 5 if jackpot else 2
-            reward = bet * multiplier
-            player.gold += reward
-            result_text = (
-                "🎉 胜利！" + ("🎁 爆点 ×5！" if jackpot else "") + f" 获得 {reward} 金币"
-            )
             icon = "✨"
+            result_text = (
+                "🎉 胜利！" + ("🎁 爆点 ×5！" if total in {2, 12} else "") + f" 获得 {reward} 金币"
+            )
         else:
-            # 玩家失败
-            result_text = "💔 押注失败，金币已被庄家收走"
+            multiplier = 0
+            reward = 0
             icon = "💸"
+            result_text = "💔 押注失败，金币已被庄家收走"
+
+        # ---------- 发放（或扣除）金币并提交 ----------
+        if reward:
+            player.gold += reward
 
         await session.commit()
 
-        # 构造消息
+        # 构造消息（确保使用最终结果文本）
         msg_lines = [
             f"{icon} 骰子比大小结果",
             "━━━━━━━━━━",

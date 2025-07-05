@@ -12,6 +12,21 @@ from ..config import config
 from ..utils import message_add_head
 from ..models.guild_application import GuildApplication as _GA
 
+# ===== 工具函数 =====
+# 翻译大数字为 w（万）单位，保留 1 位小数，10w 以下不显示 w
+def _fmt_w(num: int | float) -> str:
+    if num < 100000:
+        return f"{num}"
+    return f"{num / 10000:.1f}w"
+
+# ---- 公会升级经验表 ----
+def _need_exp_for_level(level: int) -> int:
+    """返回当前等级升到下一等级所需经验"""
+    if level <= 5:
+        return 1000 * (5 ** (level - 1))
+    else:
+        return 1000 * 250 * (level - 5)
+
 create_guild_cmd = on_command("创建公会", block=True, priority=5)
 
 @create_guild_cmd.handle()
@@ -101,11 +116,16 @@ async def handle_guild_info(event: MessageEvent):
         def _capacity(lv: int) -> int:
             return 10 + (lv - 1) * 5
         capacity = _capacity(guild_obj.level)
+        # 经验显示：当前 / 升级所需（均转换为 w 单位一位小数）
+        exp_current = _fmt_w(guild_obj.exp)
+        exp_need = _fmt_w(_need_exp_for_level(guild_obj.level))
+
         msg = (
             f"🏰 公会面板\n"
             f"▫️『{guild_obj.name}』[ID:{guild_obj.id}]\n"
             f"▫️ 会长：{president.nickname if president else '未知'}\n"
             f"▫️ 人数：{member_count}/{capacity}\n"
+            f"▫️ 经验：{exp_current}/{exp_need}\n"
             f"▫️ 创建时间：{guild_obj.created_at.strftime('%Y-%m-%d')}\n"
             f"▫️ 公告：{guild_obj.notice or '暂无公告'}"
         )
@@ -237,7 +257,7 @@ async def handle_member_list(event: MessageEvent):
         lines = [f"👥 公会成员『{guild_obj.name}』({len(members)}人)", "━━━━━━━━━━"]
         for idx, m in enumerate(members, 1):
             mark = "👑" if m.id == guild_obj.president_id else ""
-            lines.append(f"{idx}. {m.nickname}{mark} Lv.{m.level} 贡:{m.guild_contribution}")
+            lines.append(f"{idx}. {m.nickname}{mark} Lv.{m.level} 贡:{_fmt_w(m.guild_contribution)}")
         await member_list_cmd.finish(message_add_head("\n".join(lines), event))
 
 # ==================== 捐献金币 ====================
@@ -271,21 +291,25 @@ async def handle_donate(event: MessageEvent, args: Message = CommandArg()):
         player.guild_contribution += amt
         guild_obj.exp += amt
 
-        # 升级检查：每级需要 level * 1000 经验
-        up_need = guild_obj.level * 1000
+        # 升级检查：非线性经验表
+        up_need = _need_exp_for_level(guild_obj.level)
         leveled = False
         while guild_obj.exp >= up_need:
             guild_obj.exp -= up_need
             guild_obj.level += 1
             leveled = True
-            up_need = guild_obj.level * 1000
+            up_need = _need_exp_for_level(guild_obj.level)
         session.add_all([player, guild_obj])
         await session.commit()
 
+        # 经验显示修正：使用非线性经验表并转 w 单位
+        exp_current = _fmt_w(guild_obj.exp)
+        exp_need = _fmt_w(_need_exp_for_level(guild_obj.level))
+
         msg = (
             f"💰 捐献成功！金币 -{amt}\n"
-            f"▫️ 个人贡献：{player.guild_contribution}\n"
-            f"▫️ 公会经验：{guild_obj.exp}/{guild_obj.level*1000}\n"
+            f"▫️ 个人贡献：{_fmt_w(player.guild_contribution)}\n"
+            f"▫️ 公会经验：{_fmt_w(exp_current)}/{_fmt_w(exp_need)}\n"
         )
         if leveled:
             msg += f"🎉 公会等级提升至 Lv.{guild_obj.level}!"
@@ -363,7 +387,7 @@ async def handle_list_guilds(event: MessageEvent, args: Message = CommandArg()):
     for idx, g in enumerate(guilds, start_idx):
         cnt = (await session.execute(select(_func.count(Player.id)).where(Player.guild_id == g.id))).scalar_one()
         cap = _capacity(g.level)
-        lines.append(f"{idx}. 『{g.name}』 Lv.{g.level} ({cnt}/{cap}) Exp:{g.exp}")
+        lines.append(f"{idx}. 『{g.name}』 Lv.{g.level} ({cnt}/{cap})")
 
     await list_guilds_cmd.finish(message_add_head("\n".join(lines), event))
 

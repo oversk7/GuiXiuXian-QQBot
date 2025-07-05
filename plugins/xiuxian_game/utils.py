@@ -90,7 +90,7 @@ async def paginate_items(items: list, page: int, page_size: Optional[int] = None
 
 # ---------------- Luck 概率曲线 ----------------
 
-def luck_prob(luck_value: int | float, scale: int = 60) -> float:
+def luck_prob(luck_value: int | float, scale: int = 38) -> float:
     """根据 Luck 值计算触发概率（软上限）。
 
     概率 = 1 - e^(-luck/scale)，Luck 越高越接近 1，但边际收益递减。
