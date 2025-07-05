@@ -106,7 +106,8 @@ async def handle_guild_info(event: MessageEvent):
             f"▫️『{guild_obj.name}』[ID:{guild_obj.id}]\n"
             f"▫️ 会长：{president.nickname if president else '未知'}\n"
             f"▫️ 人数：{member_count}/{capacity}\n"
-            f"▫️ 创建时间：{guild_obj.created_at.strftime('%Y-%m-%d')}"
+            f"▫️ 创建时间：{guild_obj.created_at.strftime('%Y-%m-%d')}\n"
+            f"▫️ 公告：{guild_obj.notice or '暂无公告'}"
         )
         await guild_info_cmd.finish(message_add_head(msg, event))
 
@@ -460,4 +461,35 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
 
 @reject_cmd.handle()
 async def _(event: MessageEvent, args: Message = CommandArg()):
-    await _process_application(event, args, False) 
+    await _process_application(event, args, False)
+
+# ==================== 公会公告 ====================
+notice_cmd = on_command("公会公告", aliases={"公告"}, block=True, priority=5)
+
+@notice_cmd.handle()
+async def handle_notice(event: MessageEvent, args: Message = CommandArg()):
+    text = args.extract_plain_text().strip()
+    async with safe_session() as session:
+        player = await session.get(Player, event.get_user_id())
+        if not player or player.guild_id is None:
+            await notice_cmd.finish("⛔ 你未加入公会")
+        guild_obj = await session.get(Guild, player.guild_id)
+        if not text:
+            await notice_cmd.finish(message_add_head(f"📰 当前公告：{guild_obj.notice or '暂无公告'}", event))
+
+        # 设置公告，需会长权限
+        if guild_obj.president_id != player.id:
+            await notice_cmd.finish("⛔ 只有会长可以修改公告")
+
+        if len(text) > 120:
+            await notice_cmd.finish("⛔ 公告不能超过120字符")
+
+        if text in {"清空", "删除", "无"}:
+            guild_obj.notice = None
+            action_msg = "已清空公会公告"
+        else:
+            guild_obj.notice = text
+            action_msg = "公告已更新"
+        session.add(guild_obj)
+        await session.commit()
+        await notice_cmd.finish(message_add_head(f"✅ {action_msg}", event)) 
