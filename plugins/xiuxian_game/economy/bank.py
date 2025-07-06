@@ -59,7 +59,7 @@ async def handle_balance(event: MessageEvent):
         gain = _apply_interest(acc)
         session.add(acc)
         await session.commit()
-        msg = f"🏦 冥行票据\n▫️ 本次利息：{gain} 金币\n▫️ 当前存款：{acc.balance} 金币"
+        msg = f"🏦 冥行票据\n▫️ 本次利息：{gain} 金币\n▫️ 当前存款：{acc.balance} 金币\n▫️ 阶梯利率，当存款超过100w时不再产生利息"
         await bank_balance_cmd.finish(message_add_head(msg, event))
 
 
