@@ -266,7 +266,7 @@ async def handle_member_list(event: MessageEvent):
         await member_list_cmd.finish(message_add_head("\n".join(lines), event))
 
 # ==================== 捐献金币 ====================
-donate_cmd = on_command("捐献金币", aliases={"捐款", "捐献"}, block=True, priority=5)
+donate_cmd = on_command("捐献金币", aliases={"贡献", "捐献","上供"}, block=True, priority=5)
 
 @donate_cmd.handle()
 async def handle_donate(event: MessageEvent, args: Message = CommandArg()):
