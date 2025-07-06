@@ -9,6 +9,7 @@ from ..models import Player, EquipmentInstance
 from ..models.db import safe_session
 from ..config import config
 from ..utils import bypass_urls
+from ..models.inventory import Inventory
 
 # 注册"帮助"指令
 help_cmd = on_command("帮助", aliases={"help","菜单"}, priority=5, block=True)
@@ -302,6 +303,53 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
         session.add(equip)
         await session.commit()
         await give_equip_cmd.finish(f"✅ 已给予 UID:{target_uid} 装备 {tpl.name} Dur {tpl.durability}")
+
+# ------------------ 管理员：发物品 ------------------
+
+give_item_cmd = on_command("发物品", aliases={"给物", "发道具"}, priority=2, block=True, permission=SUPERUSER)
+
+
+@give_item_cmd.handle()
+async def _(event: MessageEvent, args: Message = CommandArg()):
+    """管理员指令：发物品 UID 物品名 [数量]"""
+    parts = args.extract_plain_text().strip().split()
+    if len(parts) < 2 or len(parts) > 3:
+        await give_item_cmd.finish("格式：发物品 UID 物品名称 [数量]")
+
+    uid_str, item_name = parts[0], parts[1]
+    qty = 1
+    if len(parts) == 3:
+        if not parts[2].isdigit() or int(parts[2]) < 1:
+            await give_item_cmd.finish("数量必须为正整数")
+        qty = int(parts[2])
+
+    if not uid_str.isdigit():
+        await give_item_cmd.finish("UID 必须为数字")
+    target_uid = int(uid_str)
+
+    async with safe_session() as session:
+        from sqlalchemy import select
+        player = (await session.execute(select(Player).where(Player.uid == target_uid))).scalars().first()
+        if not player:
+            await give_item_cmd.finish(f"❌ 未找到 UID 为 {target_uid} 的玩家")
+
+        # 查配置
+        tpl = config.items_config["by_name"].get(item_name)
+        if not tpl:
+            await give_item_cmd.finish("❌ 未找到该物品配置")
+        if tpl.type.value == "EQUIPMENT":
+            await give_item_cmd.finish("❌ 该物品为装备，请使用 /发装备 指令")
+
+        # 更新背包
+        stmt = select(Inventory).where(Inventory.player_id == player.id, Inventory.item_id == tpl.item_id)
+        inv = (await session.execute(stmt)).scalars().first()
+        if inv:
+            inv.quantity += qty
+        else:
+            session.add(Inventory(player_id=player.id, item_id=tpl.item_id, quantity=qty))
+
+        await session.commit()
+        await give_item_cmd.finish(f"✅ 已给予 UID:{target_uid} {tpl.name} ✖️{qty}")
 
 
 

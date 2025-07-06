@@ -82,7 +82,7 @@ async def handle_out_seclusion(event: MessageEvent):
             await out_seclusion.finish("⛔ 你不在闭关状态")
 
         player.is_secluded = False
-        k = 5 if player.level <= 10 else 4
+        k = 7 if player.level <= 10 else 6
         base_gain = cfg["base_exp"] * (1 + player.level / k)
         delta_time = (datetime.now() - player.seclusion_start_time).seconds
         delta_time = delta_time if delta_time < 7 * 3600 else 7 * 3600
@@ -119,7 +119,7 @@ async def handle_breakthrough(event: MessageEvent, args: Message = CommandArg())
         else:
             base_rate = cfg_break.get("base_success_rate", 0.8)
             decay = cfg_break.get("decay_per_level", 0.005)
-            min_rate = cfg_break.get("min_success_rate", 0.1)
+            min_rate = cfg_break.get("min_success_rate", 0.05)
             success_chance = max(min_rate, base_rate - decay * (player.level - cfg_break["change_level"]))
 
         # 护航则必定成功

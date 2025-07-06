@@ -433,7 +433,7 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
     arg_text = args.extract_plain_text().strip().replace(",", " ")
     parts = [p for p in arg_text.split() if p]
     if len(parts) != 2 or not all(p.lstrip("-+ ").isdigit() for p in parts):
-        await jump_cmd.finish("⛔ 格式：跳跃 x y  （示例：跳跃 3 -2）")
+        await jump_cmd.finish("⛔ 格式：跳跃 x y  （示例：跳跃 3 2）")
 
     target_x, target_y = map(int, parts)
 
