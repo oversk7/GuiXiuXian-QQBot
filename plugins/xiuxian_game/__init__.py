@@ -20,6 +20,7 @@ from . import (
     entertainment,
     guild,
     alchemy,
+    log_uid,
 )
 
 driver = get_driver()
