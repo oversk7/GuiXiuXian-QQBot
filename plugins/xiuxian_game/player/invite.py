@@ -94,7 +94,7 @@ async def _(event: MessageEvent):
             f"📮 你的邀请码：{code}\n"
             f"🎉 已成功邀请：{invite_count} 人\n"
             f"📈 下一位好友成功绑定你将获得：{next_reward} 金币\n"
-            "将该码发送给好友，让 TA 使用 '绑定邀请码 <邀请码>' 双方均可获得奖励！"
+            f"将该码发送给好友，让 TA 发送 '/绑定邀请码 {code}' 双方均可获得奖励！"
         )
         await invite_cmd.finish(message_add_head(msg, event))
 
