@@ -29,3 +29,4 @@ cultivate:
         attack: 1     # 力 (attack) 基础增量
         defense: 1    # 防 (defense) 基础增量
         agility: 1    # 敏 (agility) 基础增量
+        luck: 1       # 运 (luck) 基础增量
