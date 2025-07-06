@@ -14,6 +14,7 @@ class ItemEffectType(str, PyEnum):
     BUFF = "BUFF"
     REVIVE = "REVIVE"
     GAIN_EXP = "GAIN_EXP"
+    RESET_ATTR = "RESET_ATTR"
     # 以下类型不使用 apply_effect 处理
     CHANGE_NAME = "CHANGE_NAME"
     TELEPORT = "TELEPORT"

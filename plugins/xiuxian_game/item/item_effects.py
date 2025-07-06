@@ -8,6 +8,7 @@ from __future__ import annotations
 from typing import Callable, Awaitable, Dict, Tuple
 from ..models.player import Player
 from ..models.inventory import ItemEffectType, ItemConfig
+from ..models.equipment import EquipmentInstance
 
 # 类型别名
 EffectHandler = Callable[[Player, ItemConfig, int, str], Awaitable[Tuple[bool, str]]]
@@ -110,3 +111,47 @@ async def _gain_exp(player: Player, cfg: ItemConfig, qty: int, ctx: str) -> Tupl
         return False, "⛔ 该丹药配置错误"
     player.exp += value
     return True, f"📚 获得 {value} 点经验"
+
+# ---------------- 重置属性 ----------------
+
+@register(ItemEffectType.RESET_ATTR)
+async def _reset_attr(player: Player, cfg: ItemConfig, qty: int, ctx: str):
+    """重置已分配属性点，保留装备加成。仅允许 qty=1。"""
+    if qty != 1:
+        return False, "⛔ 重启符一次只能使用 1 个"
+
+    from ..config import config as gcfg
+    # 初始基础属性
+    INIT = {
+        "max_hp": 20,
+        "max_mp": 20,
+        "attack": 1,
+        "defense": 5,
+        "agility": 5,
+        "luck": 1,
+    }
+
+    # 累计装备 bonus
+    bonus = {k: 0 for k in INIT}
+    for eq in getattr(player, "equip_instances", []):
+        if eq.equipped:
+            delta = (eq.extra_attrs or {}).get("_persist_bonus", {})
+            for k, v in delta.items():
+                if k in bonus:
+                    bonus[k] += int(v)
+
+    # 重置属性为基础 + 装备 bonus
+    for k, base_v in INIT.items():
+        setattr(player, k, base_v + bonus.get(k, 0))
+
+    # 重新计算可分配点
+    pts_per_lvl = gcfg.game_config["game"]["points_per_level"]
+    player.attribute_points = (player.level - 1) * pts_per_lvl
+
+    # 保证当前 HP/MP 不超上限
+    if player.hp > player.max_hp:
+        player.hp = player.max_hp
+    if player.mp > player.max_mp:
+        player.mp = player.max_mp
+
+    return True, "🔄 属性已重置，所有点数已退还，可重新分配"

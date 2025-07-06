@@ -61,6 +61,13 @@ items:
       effect_type: "APPOINT_PRESIDENT"
       price: 100000
 
+    - item_id: "reset_scroll"
+      name: "重启符"
+      description: "神秘的符篆，蕴含着诡域的力量，可重启时间，返还属性点。"
+      type: "CONSUMABLE"
+      effect_type: "RESET_ATTR"
+      price: 15000
+
   materials:  # 材料类
     - item_id: "rotten_core"
       name: "腐坏的内丹"
