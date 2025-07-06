@@ -3,7 +3,7 @@ from nonebot.params import CommandArg
 from nonebot.adapters.qq import MessageEvent, Message
 from ..models.db import safe_session
 from ..models.player import Player
-from ..models.inventory import Inventory
+from ..models.inventory import Inventory, ItemEffectType
 from ..config import config
 from ..utils import message_add_head
 from sqlalchemy import select
@@ -16,7 +16,8 @@ def generate_common_shop() -> list:
     consumable_ids = config.items_config["by_type"].get("CONSUMABLE", [])
     # 过滤掉无价格物品并按价格排序
     items = [config.items_config["by_id"][iid] for iid in consumable_ids]
-    items = [i for i in items if i.price and i.price > 0]
+    # 排除丹药（GAIN_EXP等非卖品）
+    items = [i for i in items if i.price and i.price > 0 and i.effect_type != ItemEffectType.GAIN_EXP]
     items.sort(key=lambda x: x.price)
     return [(item, item.price) for item in items]
 
