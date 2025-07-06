@@ -192,7 +192,7 @@ async def handle_assign(event: MessageEvent, args: Message = CommandArg()):
     """分配属性点"""
     params = args.extract_plain_text().strip().split()
     if len(params) != 2:
-        await assign_points.finish("⛔ 格式错误，正确格式：加点 [属性] [点数]\n例：加点 力 5\n可选属性：体/智/力/敏")
+        await assign_points.finish("⛔ 格式错误，正确格式：加点 [属性] [点数]\n例：加点 力 5\n可选属性：体/智/力/敏/运")
     
     attr_name, points = params
     try:
