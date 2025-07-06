@@ -13,6 +13,7 @@ from ..models.db import safe_session
 from ..models.player import Player
 from ..models.guild import Guild
 from ..models.inventory import Inventory
+from ..models.equipment import EquipmentInstance
 from ..utils import message_add_head
 
 __all__ = [
@@ -197,29 +198,39 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
                 f"⛔ 积分不足，需要 {total_cost}✨ 当前拥有 {player.gold2}✨"
             )
 
-        # 查看库存
-        inv = await session.execute(
-            select(Inventory).where(
-                Inventory.player_id == event.get_user_id(),
-                Inventory.item_id == item_cfg.item_id,
-            )
-        )
-        inv = inv.scalars().first()
-
         # 扣除积分
         player.gold2 -= total_cost
 
-        # 更新库存
-        if inv:
-            inv.quantity += quantity
-        else:
-            session.add(
-                Inventory(
-                    player_id=event.get_user_id(),
-                    item_id=item_cfg.item_id,
-                    quantity=quantity,
+        if item_cfg.type.value == "EQUIPMENT":
+            # 逐件创建装备实例
+            for _ in range(quantity):
+                session.add(
+                    EquipmentInstance(
+                        player_id=event.get_user_id(),
+                        template_id=item_cfg.item_id,
+                        durability=item_cfg.durability,
+                    )
                 )
-            )
+        else:
+            # 非装备统一存入背包
+            inv = (
+                await session.execute(
+                    select(Inventory).where(
+                        Inventory.player_id == event.get_user_id(),
+                        Inventory.item_id == item_cfg.item_id,
+                    )
+                )
+            ).scalars().first()
+            if inv:
+                inv.quantity += quantity
+            else:
+                session.add(
+                    Inventory(
+                        player_id=event.get_user_id(),
+                        item_id=item_cfg.item_id,
+                        quantity=quantity,
+                    )
+                )
 
         await session.commit()
         await guild_buy_cmd.finish(
