@@ -9,7 +9,20 @@ from ..models.player import Player
 from ..models.bank_account import BankAccount
 from ..utils import message_add_head
 
-INTEREST_RATE_PER_HOUR = 0.001  # 0.1% 每小时
+# ---- 阶梯利率设置 ----
+# (上限, 利率/小时)
+_TIERS = [
+    (100_000, 0.001),   # 10w 以内 0.1%
+    (500_000, 0.0005),  # 10w-50w 0.05%
+    (1_000_000, 0.0001),# 50w-100w 0.01%
+    (float("inf"), 0.0) # 100w 以上无利息
+]
+
+def _tier_rate(balance: int) -> float:
+    for limit, rate in _TIERS:
+        if balance <= limit:
+            return rate
+    return 0.0
 
 # 命令
 bank_balance_cmd = on_command("余额", aliases={"冥行账单"}, block=True, priority=5)
@@ -25,7 +38,7 @@ def _apply_interest(acc: BankAccount):
     if delta_hours <= 0 or acc.balance <= 0:
         acc.last_interest = now
         return 0
-    gain = int(acc.balance * INTEREST_RATE_PER_HOUR * delta_hours)
+    gain = int(acc.balance * _tier_rate(acc.balance) * delta_hours)
     if gain > 0:
         acc.balance += gain
     acc.last_interest = now
