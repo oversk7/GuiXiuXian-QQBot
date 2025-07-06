@@ -76,6 +76,12 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
             if bonus_parts:
                 extra_info = "\n🔧 属性加成：" + " 、".join(bonus_parts)
 
+        # 若为材料，展示价格和怨念值
+        elif cfg.type.value == "MATERIAL":
+            price_info = f"💰 市场价：{cfg.price} 金币"
+            grudge_info = f"😈 怨念值：{cfg.grudge_value}" if cfg.grudge_value else ""
+            extra_info = "\n" + "  ".join(filter(bool, [price_info, grudge_info]))
+
         lines.append(f"✨ {cfg.name} ✨  [{type_cn}]\n{cfg.description}{extra_info}\n")
 
     await catalog_cmd.finish(message_add_head("\n".join(lines), event)) 

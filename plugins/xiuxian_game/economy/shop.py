@@ -155,7 +155,7 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
 # 出售（材料）
 # -----------------------------------------------------------
 
-SELL_RATIO: float = 0.5  # 收购价 = 配置价 × 0.5，可根据需要调整
+SELL_RATIO: float = 1.0  # 可根据需要调整
 
 sell_item = on_command("出售", block=True, priority=5)
 

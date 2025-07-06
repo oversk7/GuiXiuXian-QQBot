@@ -109,7 +109,6 @@ async def format_guild_shop(shop_sell: list, player_points: int, guild: Guild) -
     for idx, (item, price) in enumerate(shop_sell, 1):
         content.append(
             f"{idx}. {item.name} - {price}✨/件\n"
-            f"   📜 {item.description}"
         )
 
     content.extend([
