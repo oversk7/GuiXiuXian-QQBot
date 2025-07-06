@@ -1,19 +1,19 @@
 regions:
   主城:
-    level_range: [1, 2]
+    level_range: [1, 10]
     monsters:
       - "诡修亡魂"
       - "伥鬼"
     materials:
       - "wanted_poster"
   东岗水库:
-    level_range: [5, 10]
+    level_range: [11, 20]
     monsters:
       - "水鬼"
     materials:
       - "drowned_scale"
   第三病栋:
-    level_range: [15, 20]
+    level_range: [20, 45]
     monsters:
       - "碎颅医生"
       - "无脸护士"
@@ -21,13 +21,13 @@ regions:
     materials:
       - "medical_record"
   绝望之城:
-    level_range: [21, 30]
+    level_range: [46, 60]
     monsters:
       - "人头气球"
       - "缝合巨人"
       - "哭泣雕像"
   通灵鬼校:
-    level_range: [31, 40]
+    level_range: [60, 100]
     monsters:
       - "红衣舞者"
       - "笔仙"
@@ -35,25 +35,25 @@ regions:
     materials:
       - "kissed_phone_number"
   肉殖回廊:
-    level_range: [41, 50]
+    level_range: [101, 130]
     monsters:
       - "蛞蝓女孩"
       - "肉芽虫"
       - "血眼蛙"
   活棺村:
-    level_range: [51, 60]
+    level_range: [131, 150]
     monsters:
       - "红嫁衣"
       - "发诡"
       - "檐诡"
   血色世界:
-    level_range: [61, 70]
+    level_range: [151, 170]
     monsters:
       - "捉迷藏"
       - "上帝之眼"
       - "人面蜈蚣"
   十字路口:
-    level_range: [71, 80]
+    level_range: [171, 200]
     monsters:
       - "美少年"
       - "绝命灵车"
