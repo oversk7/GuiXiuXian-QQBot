@@ -325,14 +325,14 @@ async def handle_donate(event: MessageEvent, args: Message = CommandArg()):
         session.add_all([player, guild_obj])
         await session.commit()
 
-        exp_current = _fmt_w(guild_obj.exp)
-        exp_need = _fmt_w(_need_exp_for_level(guild_obj.level))
+        exp_current_str = _fmt_w(guild_obj.exp)
+        exp_need_str = _fmt_w(_need_exp_for_level(guild_obj.level))
 
         msg = (
             f"💰 捐献成功！金币 -{amt}\n"
             f"✨ 获得积分：+{donate_points}\n"
             f"▫️ 个人贡献：{_fmt_w(player.guild_contribution)}\n"
-            f"▫️ 公会经验：{_fmt_w(exp_current)}/{_fmt_w(exp_need)}\n"
+            f"▫️ 公会经验：{exp_current_str}/{exp_need_str}\n"
         )
         if leveled:
             msg += f"🎉 公会等级提升至 Lv.{guild_obj.level}!"
