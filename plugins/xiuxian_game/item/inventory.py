@@ -9,6 +9,8 @@ from ..utils import message_add_head, paginate_items
 from sqlalchemy import select
 from ..config import config
 from .item_effects import apply_effect
+from datetime import date
+from ..models.elixir_usage import ElixirUsageLog
 
 inventory_cmd = on_command("背包", block=True, priority=5)
 use_item = on_command("使用", block=True, priority=5)
@@ -62,6 +64,20 @@ async def handle_use_item(event: MessageEvent, args: Message = CommandArg()):
         elif item_config.effect_type == ItemEffectType.TELEPORT:
             await use_item.finish("🪄 请使用指令进行传送：/传送 地点名称")
 
+        # ---------------- 每日丹药使用限制 ----------------
+        ELIXIR_DAILY_LIMIT = 5
+        is_elixir = item_config.item_id.endswith("_elixir")
+        if is_elixir:
+            usage_stmt = select(ElixirUsageLog).where(
+                ElixirUsageLog.player_id == player.id,
+                ElixirUsageLog.item_id == item_config.item_id,
+                ElixirUsageLog.use_date == date.today(),
+            )
+            log_row = (await session.execute(usage_stmt)).scalars().first()
+            used_today = log_row.quantity if log_row else 0
+            if used_today + quantity > ELIXIR_DAILY_LIMIT:
+                await use_item.finish(f"⛔ 每日最多可服用 {ELIXIR_DAILY_LIMIT} 颗丹药，今日已用 {used_today} 颗")
+
         # 调用统一效果执行器
         success, msg = await apply_effect(player, item_config, quantity, ctx="world")
 
@@ -76,6 +92,14 @@ async def handle_use_item(event: MessageEvent, args: Message = CommandArg()):
             await session.delete(inventory)
 
         session.add(player)
+
+        # 更新使用日志
+        if is_elixir:
+            if log_row:
+                log_row.quantity += quantity
+            else:
+                session.add(ElixirUsageLog(player_id=player.id, item_id=item_config.item_id, use_date=date.today(), quantity=quantity))
+
         await session.commit()
 
         await use_item.finish(f"✅ 成功使用 {item_name} ✖️{quantity}\n" + msg)

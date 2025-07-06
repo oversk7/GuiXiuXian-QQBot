@@ -43,7 +43,6 @@ async def format_shop(shop_sell: list, player_gold: int) -> str:
         "\n📝 操作指南：",
         "购买 [商品序号|名称] [数量] - 购买商品",
         "出售 [背包序号|名称] [数量] - 出售材料",
-        "（数量需为正整数）"
     ])
     return "\n".join(content)
 

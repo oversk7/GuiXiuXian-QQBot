@@ -25,12 +25,28 @@ async def handle_help(event: MessageEvent, args: Message = CommandArg()):
         "🛒 商店系统  📦 交易系统\n"
         "🗓️ 世界系统  🛒 装备系统\n"
         "🎮 公会系统  💰 银行系统\n"
+        "🔮 炼丹系统\n"
         "═════════════\n"
         "💡 发送/系统名称 查看详细指令，/更新 查看最近更新内容\n"
         "💡 教程及反馈请加官群：962494679，官群签到奖励翻倍\n"
         "💡 发送/邀请码 邀请好友获得上万金币，获得启动资金"
     )
     await help_cmd.finish(Message(msg))
+
+# 炼丹系统
+alchemy_cmd = on_command("炼丹系统", priority=4, block=True)
+
+@alchemy_cmd.handle()
+async def handle_alchemy(event: MessageEvent, args: Message = CommandArg()):
+    msg = (
+        "✨ 炼丹系统帮助 ✨\n"
+        "【丹方】 查看炼丹配方\n"
+        "【炼丹状态】 查看炼丹状态\n"
+        "【炼丹 [炉ID] [丹方序号|名称] [数量]】 消耗炉子、材料，获得丹药\n"
+        "═══════════════\n"
+        "◈ 丹炉属于装备，炉ID即装备ID"
+    )
+    await alchemy_cmd.finish(Message(msg))
 
 # 银行系统
 bank_cmd = on_command("银行系统", priority=4, block=True)

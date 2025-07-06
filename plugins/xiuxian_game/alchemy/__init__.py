@@ -7,13 +7,14 @@ from nonebot.params import CommandArg
 from typing import Dict
 from sqlalchemy import select
 import random
-import math
+from datetime import datetime, timedelta
 
 from ..config import config
 from ..models.db import safe_session
 from ..models.player import Player
 from ..models.inventory import Inventory
 from ..models.equipment import EquipmentInstance
+from ..models.alchemy_task import AlchemyTask
 from ..utils import message_add_head
 
 # ---------------- 常量 ----------------
@@ -171,34 +172,33 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
 
         # 扣除炉子耐久并检查损坏
         broken = furnace_inst.lose_durability(total_dura_need)
+        furnace_note = "（炉子已损坏）" if broken else f"（剩余耐久 {furnace_inst.durability})"
         if broken:
             await session.delete(furnace_inst)
-            furnace_note = "（炉子已损坏）"
-        else:
-            furnace_note = f"（剩余耐久 {furnace_inst.durability}）"
 
-        # 成功判定
+        # 创建定时任务
         success_rate = min(0.95, recipe["base_success"] * coeff)
-        success_count = 0
-        for _ in range(qty):
-            if random.random() < success_rate:
-                success_count += 1
+        base_time_min = 5  # 每炉基础耗时 5 分钟，可配置
+        finish_at = datetime.now() + timedelta(minutes=base_time_min * qty)
 
-        # 产物
-        if success_count:
-            elixir_cfg = config.items_config["by_id"][recipe["produce_item_id"]]
-            inv = next((i for i in invs if i.item_id == elixir_cfg.item_id), None)
-            if inv:
-                inv.quantity += success_count * recipe.get("quantity",1)
-            else:
-                session.add(Inventory(player_id=player.id, item_id=elixir_cfg.item_id, quantity=success_count * recipe.get("quantity",1)))
-
+        task = AlchemyTask(
+            player_id=player.id,
+            furnace_id=None if broken else furnace_inst.id,
+            recipe_key=list(recipes_dict.keys())[recipes.index(recipe)] if isinstance(recipes_dict, dict) else "?",
+            qty=qty,
+            success_rate=success_rate,
+            produce_item_id=recipe["produce_item_id"],
+            produce_per=recipe.get("quantity", 1),
+            finish_at=finish_at,
+        )
+        session.add(task)
         await session.commit()
 
         prod_name = config.items_config["by_id"][recipe["produce_item_id"]].name
         msg = (
-            f"🔥 炼丹完成：{prod_name} ✖️{qty}\n"
-            f"✅ 成功 {success_count} 炉，❌ 失败 {qty-success_count} 炉\n"
+            f"🕰️ 炼丹开始：{prod_name} ✖️{qty} 炉\n"
+            f"🎯 理论成功率：{int(success_rate*100)}%\n"
+            f"⏳ 预计完成时间：{finish_at.strftime('%H:%M:%S')}\n"
             f"🔧 炉子状况 {furnace_note}"
         )
         await start_cmd.finish(message_add_head(msg, event))
@@ -206,4 +206,46 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
 
 @status_cmd.handle()
 async def _(event: MessageEvent):
-    await status_cmd.finish("⛔ 当前版本为即时炼丹，无进行中任务") 
+    async with safe_session() as session:
+        tasks = (await session.execute(
+            select(AlchemyTask).where(AlchemyTask.player_id == event.get_user_id())
+        )).scalars().all()
+
+        if not tasks:
+            await status_cmd.finish("📭 当前没有炼丹任务")
+
+        lines = ["📋 炼丹任务", "━"*10]
+        now = datetime.now()
+
+        for t in tasks:
+            prod_cfg = config.items_config["by_id"][t.produce_item_id]
+            if not t.delivered and now >= t.finish_at:
+                # 结算
+                rng = random.Random(t.id)
+                success_count = 0
+                for _ in range(t.qty):
+                    if rng.random() < t.success_rate:
+                        success_count += 1
+                if success_count:
+                    inv = await session.execute(
+                        select(Inventory).where(Inventory.player_id==t.player_id, Inventory.item_id==t.produce_item_id)
+                    )
+                    inv = inv.scalars().first()
+                    total_qty = success_count * t.produce_per
+                    if inv:
+                        inv.quantity += total_qty
+                    else:
+                        session.add(Inventory(player_id=t.player_id, item_id=t.produce_item_id, quantity=total_qty))
+                t.delivered = True
+                await session.commit()
+                result_msg = f"✅ 已完成，成功 {success_count}/{t.qty} 炉，共得 {success_count*t.produce_per} 颗"
+            else:
+                if t.delivered:
+                    result_msg = "✅ 已领取"
+                else:
+                    remain = int((t.finish_at - now).total_seconds())
+                    result_msg = f"⏳ 剩余 {remain//60}分{remain%60}秒"
+
+            lines.append(f"• {prod_cfg.name} ✖️{t.qty} 炉  {result_msg}")
+
+        await status_cmd.finish(message_add_head("\n".join(lines), event)) 

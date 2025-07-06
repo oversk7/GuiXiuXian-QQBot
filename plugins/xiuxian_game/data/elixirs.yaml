@@ -5,4 +5,28 @@ elixirs:
       spirit_bone: 10
       yin_essence: 5
     quantity: 1
-    base_success: 0.6 
+    base_success: 0.6
+
+  blood_heart:
+    produce_item_id: "blood_heart_elixir"
+    materials:
+      flesh_crystal: 10
+      spirit_bone: 8
+    quantity: 1
+    base_success: 0.55
+
+  night_soul:
+    produce_item_id: "night_soul_elixir"
+    materials:
+      nightmare_silk: 12
+      yin_essence: 6
+    quantity: 1
+    base_success: 0.5
+
+  void_eye:
+    produce_item_id: "void_eye_elixir"
+    materials:
+      ghost_tears: 15
+      cursed_silk: 10
+    quantity: 1
+    base_success: 0.45 
