@@ -42,7 +42,8 @@ async def _(event: MessageEvent):
         header = f"📍 当前位置：{player.region} ({player.x},{player.y})"
         lines = [header, "🧑‍🤝‍🧑 附近玩家："]
         for idx, p in enumerate(top5, 1):
-            gender_icon = "♂" if p.sex.value == "男" else "♀"
+            gender_val = p.sex.value if hasattr(p.sex, "value") else str(p.sex)
+            gender_icon = "♂" if gender_val == "男" else "♀"
             lines.append(
                 f"{idx}. {p.nickname} {gender_icon} Lv.{p.level}  UID:{p.uid}  距离:{_dist(p)}"
             )
