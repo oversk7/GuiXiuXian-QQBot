@@ -2,8 +2,9 @@ elixirs:
   spirit_pill:
     produce_item_id: "spirit_elixir"
     materials:
-      spirit_bone: 10
-      yin_essence: 5
+      spirit_bone: 50
+      yin_essence: 8
+      drowned_scale: 10
     quantity: 1
     base_success: 0.6
 
@@ -11,22 +12,25 @@ elixirs:
     produce_item_id: "blood_heart_elixir"
     materials:
       flesh_crystal: 10
-      spirit_bone: 8
+      medical_record: 5
+      drowned_scale: 20
     quantity: 1
     base_success: 0.55
 
   night_soul:
     produce_item_id: "night_soul_elixir"
     materials:
-      nightmare_silk: 12
+      nightmare_silk: 50
       yin_essence: 6
+      kissed_phone_number: 3
     quantity: 1
     base_success: 0.5
 
   void_eye:
     produce_item_id: "void_eye_elixir"
     materials:
-      ghost_tears: 15
-      cursed_silk: 10
+      ghost_tears: 50
+      wanted_poster: 20
+      drowned_scale: 10
     quantity: 1
     base_success: 0.45 
