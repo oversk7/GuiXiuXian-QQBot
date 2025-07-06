@@ -331,7 +331,7 @@ async def _handle_personal_monster(session, tile: WorldTile, player: Player) -> 
 
     # 结算
     if monster_hp <= 0:
-        exp_gain = rng.randint(20, 30) * monster_level
+        exp_gain = rng.randint(10, 20) * monster_level * (monster_level/player.level)
         player.exp += exp_gain
         log += f"\n🎉 你击杀了 {monster_display}，获得 {exp_gain} EXP"
     elif player_hp <= 0:
