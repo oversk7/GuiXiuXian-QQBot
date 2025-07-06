@@ -109,13 +109,12 @@ async def format_guild_shop(shop_sell: list, player_points: int, guild: Guild) -
 
     for idx, (item, price) in enumerate(shop_sell, 1):
         content.append(
-            f"{idx}. {item.name} - {price}✨/件\n"
+            f"{idx}. {item.name} - {price}✨/件"
         )
 
     content.extend([
         "\n📝 操作指南：",
         "公会购买 [序号|名称] [数量] - 兑换装备",
-        "（数量需为正整数）",
     ])
     return "\n".join(content)
 

@@ -1,0 +1,8 @@
+elixirs:
+  spirit_pill:
+    produce_item_id: "spirit_elixir"
+    materials:
+      spirit_bone: 10
+      yin_essence: 5
+    quantity: 1
+    base_success: 0.6 

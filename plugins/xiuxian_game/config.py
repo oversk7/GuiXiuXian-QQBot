@@ -8,6 +8,7 @@ class Config(BaseSettings):
     config_file: Path = data_dir / "config.yaml"
     items_file: Path = data_dir / "items.yaml"
     map_file: Path = data_dir / "map.yaml"
+    elixirs_file: Path = data_dir / "elixirs.yaml"
     
     @property
     def game_config(self) -> dict:
@@ -35,6 +36,11 @@ class Config(BaseSettings):
     @property
     def map_config(self) -> dict:
         return _load_config(self.map_file)
+
+    @property
+    def elixirs_config(self) -> dict:
+        """返回丹方配置"""
+        return _load_config(self.elixirs_file)
 
 
 @lru_cache(maxsize=None)

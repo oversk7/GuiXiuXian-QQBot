@@ -261,5 +261,49 @@ items:
         gold: 50000
       repair_cost: 200
 
+    - item_id: "furnace_white"
+      name: "简陋炼丹炉"
+      description: "生锈且漏风的炉子，仅适合练手"
+      type: "EQUIPMENT"
+      price: 3000
+      durability: 50
+
+    - item_id: "furnace_green"
+      name: "普通炼丹炉"
+      description: "常见炼丹炉，成功率一般"
+      type: "EQUIPMENT"
+      price: 8000
+      durability: 80
+
+    - item_id: "furnace_blue"
+      name: "精良炼丹炉"
+      description: "做工精良，成丹率不错"
+      type: "EQUIPMENT"
+      price: 20000
+      durability: 100
+
+    - item_id: "furnace_purple"
+      name: "稀有炼丹炉"
+      description: "符阵加持，成功率大幅提升"
+      type: "EQUIPMENT"
+      price: 50000
+      durability: 120
+
+    - item_id: "furnace_gold"
+      name: "传奇炼丹炉"
+      description: "传说中的丹炉，几乎不会失败"
+      type: "EQUIPMENT"
+      price: 150000
+      durability: 150
+
+  elixirs:
+    - item_id: "spirit_elixir"
+      name: "升灵丹"
+      description: "服用后立即获得 5000 经验"
+      type: "CONSUMABLE"
+      effect_type: "GAIN_EXP"
+      effect_params: {"value": 5000}
+      price: 10000
+
 
       

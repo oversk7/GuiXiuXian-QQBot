@@ -13,6 +13,7 @@ class ItemEffectType(str, PyEnum):
     RESTORE_MP = "RESTORE_MP"
     BUFF = "BUFF"
     REVIVE = "REVIVE"
+    GAIN_EXP = "GAIN_EXP"
     # 以下类型不使用 apply_effect 处理
     CHANGE_NAME = "CHANGE_NAME"
     TELEPORT = "TELEPORT"

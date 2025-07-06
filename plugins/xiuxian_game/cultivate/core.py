@@ -39,7 +39,7 @@ async def handle_cultivate(event: MessageEvent):
             remaining = cfg["cool_down"] - (datetime.now() - player.last_cultivation).seconds
             await cultivate.finish(f"🕒 修炼调息中...（冷却剩余 {remaining//60}分{remaining%60}秒）")
         
-        k = 5 if player.level <= 10 else 4
+        k = 7 if player.level <= 10 else 6
         # 基础收益计算
         base_gain = cfg["base_exp"] * (1 + player.level / k)
         exp_gain = round(base_gain * random.uniform(0.8, 1.2))

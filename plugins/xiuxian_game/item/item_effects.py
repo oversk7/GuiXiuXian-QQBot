@@ -101,3 +101,12 @@ async def _buff(player: Player, cfg: ItemConfig, qty: int, ctx: str) -> Tuple[bo
     if not changed:
         return False, "⛔ 增益属性无效"
     return True, "✨ 获得增益：" + ", ".join(changed)
+
+@register(ItemEffectType.GAIN_EXP)
+async def _gain_exp(player: Player, cfg: ItemConfig, qty: int, ctx: str) -> Tuple[bool, str]:
+    """直接获得经验值，道具参数 value 指定单份经验量。"""
+    value = int(cfg.effect_params.get("value", 0)) * qty
+    if value <= 0:
+        return False, "⛔ 该丹药配置错误"
+    player.exp += value
+    return True, f"📚 获得 {value} 点经验"

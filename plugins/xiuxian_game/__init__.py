@@ -18,7 +18,8 @@ from . import (
     world,
     item,
     entertainment,
-    guild
+    guild,
+    alchemy,
 )
 
 driver = get_driver()
