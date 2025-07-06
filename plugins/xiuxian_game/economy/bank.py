@@ -113,26 +113,26 @@ async def handle_withdraw(event: MessageEvent, args: Message = CommandArg()):
 @deposit_rank_cmd.handle()
 async def handle_deposit_rank(event: MessageEvent):
     async with safe_session() as session:
+        # 先取前20余额账号，再结息，避免遍历全库
         from sqlalchemy import func as _func
-        # 扩大检索范围，避免因部分玩家数据缺失导致展示不足
-        sub_stmt = select(BankAccount).order_by(BankAccount.balance.desc()).limit(100)
+        sub_stmt = select(BankAccount).order_by(BankAccount.balance.desc()).limit(20)
         accounts = (await session.execute(sub_stmt)).scalars().all()
         if not accounts:
             await deposit_rank_cmd.finish("暂无存款数据")
-
-        rows: list[tuple[BankAccount, Player]] = []
+        rows = []
         for acc in accounts:
             _apply_interest(acc)
-            player_obj = await session.get(Player, acc.player_id)
-            if player_obj:
-                rows.append((acc, player_obj))
-        # 排序并取前10有效玩家
-        rows.sort(key=lambda t: t[0].balance, reverse=True)
-        top_rows = rows[:10]
-        # 写回利息
-        session.add_all([acc for acc, _ in top_rows])
+            rows.append(acc)
+        # 按更新后余额排序取10
+        rows.sort(key=lambda x: x.balance, reverse=True)
+        top10 = rows[:10]
+        # 自动提交利息写回
+        session.add_all(top10)
         await session.commit()
-        lines = ["🏦 存款排行榜", "▃"*10]
-        for idx, (acc, p) in enumerate(top_rows, 1):
+        lines = ["🏦 存款排行榜", "▃▃▃▃▃▃▃▃▃▃"]
+        for idx, acc in enumerate(top10, 1):
+            p = await session.get(Player, acc.player_id)
+            if not p:
+                continue
             lines.append(f"{idx}. {p.nickname}[UID:{p.uid}] - {acc.balance}💰")
         await deposit_rank_cmd.finish(message_add_head("\n".join(lines), event)) 
