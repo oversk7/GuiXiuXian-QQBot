@@ -132,10 +132,11 @@ async def _(event: MessageEvent):
         new_x, new_y = player.x + dx, player.y + dy
         player.x, player.y = new_x, new_y
 
-        # 扣体力暂定
-        # player.stamina -= 1
-        # player.mp -= random.randint(0, 2)
-        # player.mp = max(0, player.mp)
+        # 扣除资源：体力、理智
+        # player.stamina -= 1  # 体力系统待启用
+        player.mp = max(0, player.mp - 1)
+        if player.mp == 0 and player.hp > 0:
+            player.hp = 0  # 理智耗尽即"疯狂身亡"
 
         # 获取当前位置事件格
         tile = await get_or_create_tile(session, player.region, player.x, player.y)
@@ -385,6 +386,8 @@ async def _(event: MessageEvent):
         player: Player | None = await session.get(Player, event.get_user_id())
         if not player:
             await explore_cmd.finish("⛔ 请先创建角色")
+        if player.hp <= 0:
+            await explore_cmd.finish("💀 你已死亡，请先复活或休息后再探索！")
 
         tile = await get_or_create_tile(session, player.region, player.x, player.y)
         log = await EVENT_HANDLERS[tile.event_type](session, tile, player)
