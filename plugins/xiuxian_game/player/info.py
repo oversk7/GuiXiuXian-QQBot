@@ -167,6 +167,6 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
 ③/商店 查看日常商店
 ④/交易市场 查看别人在卖什么
 ⑤/图鉴 [名称] 查询任一物品的信息，如：/图鉴 抽屉
-更多指令请在输入 /帮助 查看，所有斜杠可以省略
+更多指令请输入 /帮助 查看，所有斜杠可以省略
         """
         await register.finish(message_add_head(content, event))
