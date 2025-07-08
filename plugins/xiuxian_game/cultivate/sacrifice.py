@@ -64,8 +64,12 @@ async def handle_sacrifice(event: MessageEvent, args: Message = CommandArg()):
         await session.commit()
 
         msg = (
-            f"⚙️ 你将 {item_name} ✖ {qty} 投入幽暗祭坛，黑雾涌动！\n"
-            f"▫️ 获得怨念值：+{gained}\n"
-            f"▫️ 当前怨念值：{player.resentment}"
+            f"⚙️ 祭品坠入幽冥，磷火噬啮骨肉。\n"
+            "━━━━━━━━━━━━━\n"
+            f"✧ 怨念值 + {gained}↑\n"
+            f"✧ 当前怨念值 {player.resentment}\n"
+            "━━━━━━━━━━━━━\n"
+            "⬇️ 【献祭】继续投喂祭坛\n"
+            "⬇️ 【突破 [镇厄]】以怨念护体突破"
         )
         await sacrifice_cmd.finish(message_add_head(msg, event)) 
