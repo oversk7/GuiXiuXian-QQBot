@@ -268,6 +268,15 @@ items:
         gold: 50000
       repair_cost: 200
 
+    - item_id: "soul_flag"
+      name: "镇魂幡"
+      description: "幡不动，魂不散。幡若动，是谁在召唤？"
+      type: "EQUIPMENT"
+      price: 120000
+      durability: 100
+      attr_bonus: {"mp": 35}
+      attr_ratio: {"attack": 0.5}
+
     - item_id: "furnace_white"
       name: "简陋炼丹炉"
       description: "生锈且漏风的炉子，仅适合练手"

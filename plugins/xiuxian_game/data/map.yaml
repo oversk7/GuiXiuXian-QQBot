@@ -1,5 +1,5 @@
 regions:
-  主城:
+  富安公寓:
     level_range: [1, 10]
     monsters:
       - "诡修亡魂"

@@ -26,7 +26,7 @@ from pathlib import Path
 import os
 from sqlalchemy import select as _select
 from ..models.equipment import EquipmentInstance as _Equip
-from . import nearby_players, message_board
+from . import nearby_players, message_board, navigation
 
 # ----------------- 常量 -----------------
 DIRECTIONS: Dict[str, Tuple[int, int]] = {
