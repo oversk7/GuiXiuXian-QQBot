@@ -118,9 +118,11 @@ async def handle_inventory(event: MessageEvent, args: Message = CommandArg()):
         if not player:
             await inventory_cmd.finish("⛔ 请先创建角色")
 
+        # 仅展示数量大于 0 的物品，防止数量为 0 仍然出现在背包
         result = await session.execute(
             select(Inventory)
             .where(Inventory.player_id == event.get_user_id())
+            .where(Inventory.quantity > 0)
             .order_by(Inventory.item_id)
         )
         items = result.scalars().all()
@@ -155,9 +157,11 @@ async def handle_item_detail(event: MessageEvent, args: Message = CommandArg()):
         if not player:
             await item_detail.finish("⛔ 请先创建角色")
 
+        # 同样过滤掉数量为 0 的记录
         result = await session.execute(
             select(Inventory)
             .where(Inventory.player_id == event.get_user_id())
+            .where(Inventory.quantity > 0)
             .order_by(Inventory.item_id)
         )
         items = result.scalars().all()
