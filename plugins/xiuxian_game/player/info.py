@@ -103,25 +103,27 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
 
     realm_name = realm_by_level(player.level)
 
-    content = f"""
-┌─── 诡修面板 ───
-│ {player.nickname}[UID:{player.uid}]「{player.sex}」
-│ Lv.{player.level}『{realm_name}』
-├───────────
-│ 经验：{player.exp}/{calculate_level_up_exp(player.level)} ⚡
-│ 生命：{cur_hp}/{hp_max_str} ❤️
-│ 理智：{cur_mp}/{mp_max_str} 🧠
-│ 公会：{guild_name} ☯
-│ 位置：{player.region} ({player.x},{player.y}) 
-├──【属性】──
-│ ⚔力 {atk_str}  🛡防 {def_str} 
-│ 👟敏 {agi_str}  🍀运 {luk_str}
-├──【资源】──
-│ 金币：{player.gold}  | 点数：{player.attribute_points}✨
-│ 积分：{player.gold2}  | 怨念：{player.resentment} 💀
-└───────────
-"""
-    await profile.finish(content)
+    exp_max = calculate_level_up_exp(player.level)
+
+    content = (
+        f"┏━━ 信息 ━━━━\n"
+        f"┃{player.nickname}[UID:{player.uid}]「{player.sex}」\n"
+        f"┃ Lv.{player.level} · {realm_name}\n"
+        f"┃ Exp {player.exp}/{exp_max}\n"
+        "┣━━ 状态 ━━━━\n"
+        f"┃ ❤️生命 {cur_hp}/{hp_max_str}\n"
+        f"┃ 🧠理智 {cur_mp}/{mp_max_str}\n"
+        f"┃ ⚔力 {atk_str}   🛡防 {def_str}\n"
+        f"┃ 👟敏 {agi_str}   🍀运 {luk_str}\n"
+        "┣━━ 其他 ━━━━\n"
+        f"┃ 🪙金币 {player.gold}\n"
+        f"┃ 💀怨念 {player.resentment} ✨点数 {player.attribute_points}\n"
+        f"┃ ☯公会 {guild_name}\n"
+        f"┃ 📍位置 {player.region} ({player.x},{player.y})\n"
+        "┣━━━━━━━━━\n"
+        "┃☞【装备】"
+    )
+    await profile.finish(message_add_head(content, event))
 
 @register.handle()
 async def _(event: MessageEvent, args: Message = CommandArg()):
