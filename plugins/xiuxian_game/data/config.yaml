@@ -2,7 +2,7 @@
 game:
   max_level: 1000  # 最大等级
   base_exp: 10   # 基础经验值（1级到2级所需经验）
-  points_per_level: 4  # 每次升级获得的属性点数
+  points_per_level: 10  # 每次升级获得的属性点数
   exp_curve:
     early_multiplier: 10
     late_multiplier: 5

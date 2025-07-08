@@ -37,7 +37,10 @@ async def handle_cultivate(event: MessageEvent):
         # 冷却时间检查
         if player.last_cultivation and (datetime.now() - player.last_cultivation).seconds < cfg["cool_down"]:
             remaining = cfg["cool_down"] - (datetime.now() - player.last_cultivation).seconds
-            await cultivate.finish(f"🕒 修炼调息中...（冷却剩余 {remaining//60}分{remaining%60}秒）")
+            await cultivate.finish(message_add_head(
+                f"🕒 血火仍在灼烧…剩余 {remaining//60}分{remaining%60}秒，之后再尝试修炼。",
+                event
+            ))
         
         k = 7 if player.level <= 10 else 6
         # 基础收益计算
@@ -49,7 +52,17 @@ async def handle_cultivate(event: MessageEvent):
         player.exp += exp_gain
         session.add(player)
         await session.commit()
-        await cultivate.finish(f"🌀 运转周天完毕 🌀\n▫️ 获得修为：+{exp_gain}\n▫️ 当前经验：{player.exp}/{calculate_level_up_exp(player.level)}")
+        exp_max = calculate_level_up_exp(player.level)
+        msg = (
+            "你在黑焰里看见自己的影子喘息。\n"
+            "━━━━━━━━━━━━━\n"
+            f"✧ 汲取怨炁 + {exp_gain}↑\n"
+            f"✧ 修为残烛 {player.exp}↑/{exp_max} {f'(可突破)' if player.exp> exp_max else ''}\n"
+            "━━━━━━━━━━━━━\n"
+            "⬇️ 【突破】倾听骨骼断裂\n"
+            "⬇️ 【加点】缝合裂隙，塑形新肉"
+        )
+        await cultivate.finish(message_add_head(msg, event))
 
 @seclusion.handle()
 async def handle_seclusion(event: MessageEvent):
@@ -67,7 +80,14 @@ async def handle_seclusion(event: MessageEvent):
         player.seclusion_start_time = datetime.now()
         session.add(player)
         await session.commit()
-        await seclusion.finish(f"🏜️ {player.nickname} 进入闭关状态！")
+        msg_secl = (
+            f"🕯️{player.nickname} 躺入破棺，将最后一枚钉子钉入。\n"
+            "━━━━━━━━━━━━━\n"
+            "✧ 离线修炼进行中，期间无法普通修炼\n"
+            "━━━━━━━━━━━━━\n"
+            "⬇️ 【出关】推开棺盖"
+        )
+        await seclusion.finish(message_add_head(msg_secl, event))
 
 @out_seclusion.handle()
 async def handle_out_seclusion(event: MessageEvent):
@@ -79,7 +99,7 @@ async def handle_out_seclusion(event: MessageEvent):
             await out_seclusion.finish("⛔ 请先使用【注册】命令创建角色")
 
         if not player.is_secluded:
-            await out_seclusion.finish("⛔ 你不在闭关状态")
+            await out_seclusion.finish("⛔ 你不在闭棺状态")
 
         player.is_secluded = False
         k = 7 if player.level <= 10 else 6
@@ -91,7 +111,17 @@ async def handle_out_seclusion(event: MessageEvent):
 
         session.add(player)
         await session.commit()
-        await out_seclusion.finish(f"🏜️ {player.nickname} 出关成功！\n▫️ 共获得修为：+{exp_gain}\n▫️ 当前经验：{player.exp}/{calculate_level_up_exp(player.level)}")
+        exp_max2 = calculate_level_up_exp(player.level)
+        msg_out = (
+            "🔓你推开棺盖，阴灰散落。\n"
+            "━━━━━━━━━━━━━\n"
+            f"✧ 累积怨炁 + {exp_gain}↑\n"
+            f"✧ 修为残烛 {player.exp}↑/{exp_max2} {('(可突破)' if player.exp>exp_max2 else '')}\n"
+            "━━━━━━━━━━━━━\n"
+            "⬇️ 【修炼】继续喂养怨炁\n"
+            "⬇️ 【突破】倾听骨骼断裂"
+        )
+        await out_seclusion.finish(message_add_head(msg_out, event))
 
 @breakthrough.handle()
 async def handle_breakthrough(event: MessageEvent, args: Message = CommandArg()):
@@ -146,11 +176,14 @@ async def handle_breakthrough(event: MessageEvent, args: Message = CommandArg())
             player.level += 1
             player.attribute_points += config.game_config["game"]["points_per_level"]
             msg = (
-                f"✨ 突破成功！Lv.{player.level-1}→Lv.{player.level} ✨\n"
-                f"▫️ 获得属性点：+{config.game_config['game']['points_per_level']}✨\n"
-                f"▫️ 剩余修为：{player.exp}\n"
-                f"▫️ 本次成功率：{int(success_chance*100)}%\n"
-                + (f"▫️ 消耗怨念值：{guardian_cost} (剩余{player.resentment})" if use_guardian else "")
+                f"⛓️‍💥骨裂声回荡，已突破至Lv.{player.level}↑\n"
+                "━━━━━━━━━━━━━\n"
+                f"✧ 获得属性点 + {config.game_config['game']['points_per_level']}\n"
+                f"✧ 剩余修为 {player.exp}\n"
+                + (f"✧ 消耗怨念值 {guardian_cost} (剩余{player.resentment})\n" if use_guardian else "") +
+                "━━━━━━━━━━━━━\n"
+                "⬇️ 【加点】缝合裂隙\n"
+                "⬇️ 【修炼】继续喂养怨炁"
             )
         else:
             if random.random() <= success_chance:
@@ -158,20 +191,25 @@ async def handle_breakthrough(event: MessageEvent, args: Message = CommandArg())
                 player.level += 1
                 player.attribute_points += config.game_config["game"]["points_per_level"]
                 msg = (
-                    f"✨ 突破成功！Lv.{player.level-1}→Lv.{player.level} ✨\n"
-                    f"▫️ 获得属性点：+{config.game_config['game']['points_per_level']}✨\n"
-                    f"▫️ 剩余修为：{player.exp}\n"
-                    f"▫️ 本次成功率：{int(success_chance*100)}%\n"
-                    + (f"▫️ 消耗怨念值：{guardian_cost} (剩余{player.resentment})" if use_guardian else "")
+                    f"⛓️‍💥骨裂声回荡，已突破至Lv.{player.level}↑\n"
+                    "━━━━━━━━━━━━━\n"
+                    f"✧ 获得属性点 + {config.game_config['game']['points_per_level']}\n"
+                    f"✧ 剩余修为 {player.exp}\n"
+                    + (f"✧ 消耗怨念值 {guardian_cost} (剩余{player.resentment})\n" if use_guardian else "") +
+                    "━━━━━━━━━━━━━\n"
+                    "⬇️ 【加点】缝合裂隙\n"
+                    "⬇️ 【修炼】继续喂养怨炁"
                 )
             else:
                 # 突破失败
                 player.exp = round(player.exp * cfg_break["fail_keep_ratio"])
                 msg = (
-                    f"💥 突破失败！修为反噬\n"
-                    f"▫️ 剩余修为：{player.exp}\n"
-                    f"▫️ 本次成功率：{int(success_chance*100)}%\n"
-                    f"▫️ 建议使用【/突破 镇厄】保驾护航"
+                    "💥 镇厄崩散，修为反噬席卷脏腑。\n"
+                    "━━━━━━━━━━━━━\n"
+                    f"✧ 剩余修为 {player.exp}\n"
+                    f"✧ 本次理论成功率 {int(success_chance*100)}%\n"
+                    "━━━━━━━━━━━━━\n"
+                    "⬇️ 建议【突破 [镇厄]】以怨念护体"
                 )
 
         session.add(player)
@@ -267,8 +305,11 @@ async def handle_assign(event: MessageEvent, args: Message = CommandArg()):
         session.add(player)
         await session.commit()
         msg = (
-            f"✨ {attr_name} 分配成功！\n"
-            f"▫️ 当前{attr_name}：{getattr(player, attr_field)}\n"
-            f"▫️ 剩余属性点：{player.attribute_points}✨"
+            "🩸 裂隙缝合\n"
+            f"✧ {attr_name} +{points} → {getattr(player, attr_field)}\n"
+            "━━━━━━━━━━━━━\n"
+            f"✧ 剩余属性点 {player.attribute_points}\n"
+            "━━━━━━━━━━━━━\n"
+            "⬇️ 【面板】检查残骸"
         )
         await assign_points.finish(message_add_head(msg, event))

@@ -10,6 +10,7 @@ from datetime import datetime
 from ..models.equipment import EquipmentInstance
 from collections import defaultdict
 from ..models.guild import Guild
+import random
 
 # 每10级对应一个境界，诡异修仙风格
 # 境界名称与等级区间映射（10,10,20,20,20,20,30,30,30,50 累积）
@@ -126,8 +127,15 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
 async def _(event: MessageEvent, args: Message = CommandArg()):
     params = args.extract_plain_text().strip().split()
     if len(params) < 2:
-        await register.finish("⛔ 请输入道号和性别，例如：/注册 道爷 男")
-
+        await register.finish(
+            message_add_head(
+                "🀄️ 新人指引  ──────────\n"
+                "> 注册格式:【注册 [昵称] [性别]】\n"
+                "> 示       例: 注册 道爷 男\n"
+                "> 性别可选: 男 / 女\n"
+                "💡 后续所有指令都可省略斜杠",
+                event)
+            )
     nickname, gender = params[0], params[1]
     try:
         gender = Gender(gender)
@@ -158,15 +166,17 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
         
         session.add(new_player)
         await session.commit()
-
-        content = f"""
-        😇恭喜你踏上诡修之路！
-道号：{nickname}[UID:{new_player.uid}]「{new_player.sex.value}」
-①/面板 查看自己信息
-②/世界系统 查看如何杀诡和资源获取
-③/商店 查看日常商店
-④/交易市场 查看别人在卖什么
-⑤/图鉴 [名称] 查询任一物品的信息，如：/图鉴 抽屉
-更多指令请输入 /帮助 查看，所有斜杠可以省略
-        """
+        card_type = random.choice(('🎲','🀄️','🀃','🀅','🀆','🀀','🀁','🀂','🀒','🀚','🀣'))
+        content = (
+            "⚰️ 棺盖移位，黑暗替你呼吸——欢迎回到人间。\n"
+            "━━━━━━━━━━━━━\n"
+            f"┌── 🃏新牌出世🃏 ──┐\n"
+            f"🪬 道号  : {card_type}{nickname}\n"
+            f"🆔 UID   : 100\n"
+            f"⚧️ 性别  : 男\n"
+            "━━━━━━━━━━━━━\n"
+            "⬇️ 【修炼】割下第一缕血丝\n"
+            "⬇️ 【面板】窥视自己的残骸\n"
+            "💡 更多指令请输入【帮助】"
+        )
         await register.finish(message_add_head(content, event))
