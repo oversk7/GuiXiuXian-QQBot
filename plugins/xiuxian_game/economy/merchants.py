@@ -11,7 +11,7 @@ from __future__ import annotations
 4. 指令：
    • 商店            查看当前坐标市场价格表
    • 购买 物品 数量   消耗金币购买
-   • 卖出 物品 数量   将背包物品卖给市场
+   • 出售 物品 数量   将背包物品卖给市场
 5. 必须玩家坐标与市场坐标一致才可交易。
 """
 
@@ -119,7 +119,7 @@ async def _(event: MessageEvent):
             lines = ["🏪 可交易地点一览", "━━━━━━━━━━━━━"]
             for m in MARKETS:
                 lines.append(f"• {m.name} ({m.x},{m.y})")
-            lines.append("━━━━━━━━━━━━━\n🧭 前往对应坐标后输入 [商店] 进行交易")
+            lines.append("━━━━━━━━━━━━━\n🧭 前往对应坐标后输入【商店】联系当地商人")
             await shop_cmd.finish(message_add_head("\n".join(lines), event))
 
         lines = [f"🏪 {market.name} ({market.x},{market.y})", "━━━━━━━━━━━━━"]
@@ -127,11 +127,11 @@ async def _(event: MessageEvent):
             item_cfg = config.items_config["by_id"].get(iid)
             sell_p, buy_p = _price_for(market, iid)
             lines.append(f"{item_cfg.name}│买 {sell_p}│卖 {buy_p}")
-        lines.append("━━━━━━━━━━━━━\n⬇️ 【购买 物品 数量】或【卖出 物品 数量】")
+        lines.append("━━━━━━━━━━━━━\n⬇️【购买 [物品] [数量]】\n⬇️【出售 [物品] [数量]】")
         await shop_cmd.finish(message_add_head("\n".join(lines), event))
 
 # -------- 购买 --------
-buy_cmd = on_command("购买", block=True, priority=5)
+buy_cmd = on_command("购买",aliases={"买"}, block=True, priority=5)
 
 @buy_cmd.handle()
 async def _(event: MessageEvent, args: Message = CommandArg()):
@@ -150,7 +150,7 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
         player: Player | None = await session.get(Player, event.get_user_id())
         if not player:
             await buy_cmd.finish("⛔ 请先创建角色")
-        if player.region != "大都市":
+        if player.region != "大都会":
             await buy_cmd.finish("⛔ 诡域中无法与商人交易")
         market = MARKET_BY_COORD.get((player.x, player.y))
         if not market:
@@ -187,14 +187,14 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
             f"✅ 购买 {item_cfg.name}×{qty} 成功！\n💸 花费 {total_cost} 金币", event))
 
 # -------- 卖出 --------
-sell_cmd = on_command("卖出", aliases={"出售"}, block=True, priority=5)
+sell_cmd = on_command("出售", aliases={"卖"}, block=True, priority=5)
 
 @sell_cmd.handle()
 async def _(event: MessageEvent, args: Message = CommandArg()):
     arg_text = args.extract_plain_text().strip()
     parts = arg_text.split()
     if len(parts) != 2:
-        await sell_cmd.finish("📦 格式：卖出 物品名 数量")
+        await sell_cmd.finish("📦 格式：出售 物品名 数量")
     item_name, qty_str = parts
     if not qty_str.isdigit():
         await sell_cmd.finish("❌ 数量需为正整数")
@@ -206,7 +206,7 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
         player: Player | None = await session.get(Player, event.get_user_id())
         if not player:
             await sell_cmd.finish("⛔ 请先创建角色")
-        if player.region != "大都市":
+        if player.region != "大都会":
             await sell_cmd.finish("⛔ 诡域中无法与商人交易！")
         market = MARKET_BY_COORD.get((player.x, player.y))
         if not market:
