@@ -142,9 +142,18 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
             disp_x = round(disp_x, 1)
             disp_y = round(disp_y, 1)
 
+            # 速度 & 预计剩余时间
+            speed_now = _tiles_per_second(player.agility)
+            rem_steps = max(abs(target_x - player.x), abs(target_y - player.y))
+            eta_sec = rem_steps / speed_now if speed_now > 0 else 0
+            from datetime import timedelta
+            eta_td = timedelta(seconds=int(eta_sec))
+
             await session.commit()
             await nav_cmd.finish(message_add_head(
-                f"🧭 导航中 → 目标 ({target_x},{target_y})\n▶️ 当前坐标 ({disp_x},{disp_y})", event))
+                f"🧭 导航中 → 目标 ({target_x},{target_y})\n"
+                f"▶️ 当前坐标 ({disp_x},{disp_y})\n"
+                f"🕒 速度 {speed_now:.2f} 格/秒  预计剩余 {str(eta_td)}", event))
 
         # 若提供坐标，则尝试开启/重设导航
         if len(parts) != 2 or not all(p.lstrip("-+").isdigit() for p in parts):
@@ -160,9 +169,18 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
         else:
             task = NavigationTask(player_id=player.id, target_x=tx, target_y=ty, last_update=datetime.now())
             session.add(task)
+        # 速度与预计时间
+        speed_now = _tiles_per_second(player.agility)
+        rem_steps = max(abs(tx - player.x), abs(ty - player.y))
+        eta_td = timedelta(seconds=int(rem_steps / speed_now)) if speed_now>0 else timedelta(seconds=0)
+
         await session.commit()
         await nav_cmd.finish(message_add_head(
-            f"⚙️ 指针静默旋转，已开始导航至 ({tx},{ty})。\n━━━━━━━━━━━━━\n✧ 当前坐标 ({player.x},{player.y})\n━━━━━━━━━━━━━\n⬇️ 【中断导航】停止前进", event))
+            f"⚙️ 指针静默旋转，已开始导航至 ({tx},{ty})。\n"
+            "━━━━━━━━━━━━━\n"
+            f"✧ 当前坐标 ({player.x},{player.y})\n"
+            f"🕒 速度 {speed_now:.2f} 格/秒  预计耗时 {str(eta_td)}\n"
+            "━━━━━━━━━━━━━\n⬇️ 【中断导航】停止前进", event))
 
 
 @stop_nav_cmd.handle()

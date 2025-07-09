@@ -53,16 +53,17 @@ def _goods_for_merchant(idx: int, slice_size: int = 5) -> List[str]:
 
 # 市场基础信息（id, 显示名, 坐标）
 _PROFILE_DATA = [
-    ("merchant1", "荔湾镇", (120, 200)),
-    ("merchant2", "摩配镇", (80, 140)),
-    ("merchant3", "北郊", (100, 460)),
-    ("merchant4", "东郊", (390, 50)),
-    ("merchant5", "西郊", (-420, 140)),
-    ("merchant6", "南郊", (-100, -480)),
-    ("merchant7", "上京", (0, 0)),
-    ("merchant8", "金陵", (220, -350)),
-    ("merchant9", "云岭", (-250, 490)),
-    ("merchant10", "郸城", (120, 120)),
+    ("merchant1", "上京", (0, 0)),
+    ("merchant2", "北郊", (100, 460)),
+    ("merchant3", "东郊", (390, 50)),
+    ("merchant4", "西郊", (-420, 140)),
+    ("merchant5", "南郊", (-100, -480)),
+    ("merchant6", "金陵", (220, -350)),
+    ("merchant7", "云岭", (-250, 490)),
+    ("merchant8", "郸城", (120, 120)),
+    ("merchant9", "荔湾镇", (120, 200)),
+    ("merchant10", "摩配镇", (80, 140)),
+    ("merchant11", "风雪镇", (-5, 390)),
 ]
 
 
@@ -106,6 +107,12 @@ market_cmd = on_command("市集", aliases={"商店", "市场"}, block=True, prio
 
 list_market_cmd = on_command("市集列表", aliases={"市场列表", "全部市集"}, block=True, priority=5)
 
+# 查看指定市集商品
+detail_market_cmd = on_command("市集详情", aliases={"市集价格", "市场报价"}, block=True, priority=5)
+
+# 查看某物品在各市集的买/卖价
+price_compare_cmd = on_command("市价", aliases={"物价", "比价"}, block=True, priority=5)
+
 @market_cmd.handle()
 async def _(event: MessageEvent):
     async with safe_session() as session:
@@ -128,7 +135,7 @@ async def _(event: MessageEvent):
         for iid in market.items:
             item_cfg = config.items_config["by_id"].get(iid)
             sell_p, buy_p = _price_for(market, iid)
-            lines.append(f"{item_cfg.name}│买 {sell_p}│卖 {buy_p}")
+            lines.append(f"{item_cfg.name}│售 {sell_p}│收 {buy_p}")
         lines.append("━━━━━━━━━━━━━\n⬇️【购买 [物品] [数量]】\n⬇️【出售 [物品] [数量]】")
         await market_cmd.finish(message_add_head("\n".join(lines), event))
 
@@ -251,4 +258,52 @@ async def _(event: MessageEvent):
     for m in MARKETS:
         lines.append(f"• {m.name} ({m.x},{m.y})")
     lines.append("━━━━━━━━━━━━━\n🧭 到达坐标后发送【市集】进行交易")
-    await list_market_cmd.finish(message_add_head("\n".join(lines), event)) 
+    await list_market_cmd.finish(message_add_head("\n".join(lines), event))
+
+# -------- 市集详情 --------
+
+@detail_market_cmd.handle()
+async def _(event: MessageEvent, args: Message = CommandArg()):
+    market_name = args.extract_plain_text().strip()
+    if not market_name:
+        await detail_market_cmd.finish("⛔ 格式：市集详情 市集名称  （示例：市集详情 荔湾镇）")
+
+    market = next((m for m in MARKETS if m.name == market_name), None)
+    if not market:
+        names = "、".join(m.name for m in MARKETS)
+        await detail_market_cmd.finish(f"⛔ 未找到市集：{market_name}。可选：{names}")
+
+    lines = [f"🏪 {market.name} ({market.x},{market.y})", "━━━━━━━━━━━━━"]
+    for iid in market.items:
+        item_cfg = config.items_config["by_id"].get(iid)
+        sell_p, buy_p = _price_for(market, iid)
+        lines.append(f"{item_cfg.name}│售 {sell_p}│收 {buy_p}")
+    lines.append("━━━━━━━━━━━━━\n🧭 到达坐标后发送【市集】进行交易")
+
+    await detail_market_cmd.finish(message_add_head("\n".join(lines), event))
+
+# -------- 市价 --------
+
+@price_compare_cmd.handle()
+async def _(event: MessageEvent, args: Message = CommandArg()):
+    item_name = args.extract_plain_text().strip()
+    if not item_name:
+        await price_compare_cmd.finish("⛔ 格式：市价 物品名称  （示例：市价 回春散）")
+
+    item_cfg = config.items_config["by_name"].get(item_name)
+    if not item_cfg:
+        await price_compare_cmd.finish(f"⛔ 未找到物品：{item_name}")
+
+    lines = [f"💹 {item_cfg.name} 各市集价格", "━━━━━━━━━━━━━"]
+    found = False
+    for m in MARKETS:
+        if item_cfg.item_id not in m.items:
+            continue
+        sell_p, buy_p = _price_for(m, item_cfg.item_id)
+        lines.append(f"{m.name}│售 {sell_p}│收 {buy_p}")
+        found = True
+
+    if not found:
+        await price_compare_cmd.finish("ℹ️ 暂无市集出售该物品")
+
+    await price_compare_cmd.finish(message_add_head("\n".join(lines), event)) 

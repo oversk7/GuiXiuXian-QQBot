@@ -11,6 +11,8 @@ from ..models.equipment import EquipmentInstance
 from collections import defaultdict
 from ..models.guild import Guild
 import random
+from ..models.navigation_task import NavigationTask
+from ..world.navigation import _update_nav_position
 
 # 每10级对应一个境界，诡异修仙风格
 # 境界名称与等级区间映射（10,10,20,20,20,20,30,30,30,50 累积）
@@ -62,7 +64,16 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
             player = await session.get(Player, event.get_user_id())
     if not player:
         await profile.finish("⛔ 你还没有创建角色")
-    
+
+    # -------- 更新坐标（若在自动导航） --------
+    async with safe_session() as session_nav:
+        task = await session_nav.get(NavigationTask, player.id)
+        if task:
+            reached = _update_nav_position(player, task)
+            if reached:
+                await session_nav.delete(task)
+            await session_nav.commit()
+
     # ------- 统计装备加成 -------
     bonus = defaultdict(int)
     async with safe_session() as session2:
