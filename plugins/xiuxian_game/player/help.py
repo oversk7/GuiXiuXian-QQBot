@@ -11,10 +11,16 @@ from ..config import config
 from ..utils import bypass_urls
 from ..models.inventory import Inventory
 
-# 注册"帮助"指令
+# 生成经验表
+generate_exp_table_cmd = on_command("生成经验表", priority=4, block=True, permission=SUPERUSER)
+@generate_exp_table_cmd.handle()
+async def handle_generate_exp_table(event: MessageEvent, args: Message = CommandArg()):
+    from ..utils import generate_exp_table
+    await generate_exp_table_cmd.finish(await generate_exp_table())
+
+
+# 帮助
 help_cmd = on_command("帮助", aliases={"help","菜单"}, priority=5, block=True)
-
-
 @help_cmd.handle()
 async def handle_help(event: MessageEvent, args: Message = CommandArg()):
     msg = (

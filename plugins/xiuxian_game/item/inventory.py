@@ -222,7 +222,7 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
     if target_region not in valid_regions:
         await teleport_cmd.finish("⛔ 目的地不存在，可发送 /地图 查看全部区域")
 
-    STAM_COST = 10  # 体力消耗
+    STAM_COST = 1  # 体力消耗（统一用体力，取消传送符消耗）
 
     async with safe_session() as session:
         player = await session.get(Player, event.get_user_id())

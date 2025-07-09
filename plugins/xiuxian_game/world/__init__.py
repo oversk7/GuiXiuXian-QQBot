@@ -86,9 +86,9 @@ async def get_or_create_tile(session, region: str, x: int, y: int) -> WorldTile:
             tile.state = {
                 "name": monster,
                 "level": monster_level,
-                "hp": rng.randint(1, 3) * monster_level,
-                "attack": rng.randint(1, 2) * monster_level,
-                "agility": rng.randint(1, 2) * monster_level,
+                "hp": rng.randint(3, 6) * monster_level,
+                "attack": rng.randint(3, 5) * monster_level,
+                "agility": rng.randint(3, 5) * monster_level,
             }
         elif tile.event_type == "TREASURE":
             tile.state = {"looted": False}
@@ -126,14 +126,11 @@ async def _(event: MessageEvent):
         # 解析方向
         if direction not in DIRECTIONS:
             await move_cmd.finish("⛔ 无效的方向")
-        if player.stamina <= 0:
-            await move_cmd.finish("⛔ 体力不足，无法移动")
         dx, dy = DIRECTIONS[direction]
         new_x, new_y = player.x + dx, player.y + dy
         player.x, player.y = new_x, new_y
 
-        # 扣除资源：体力、理智
-        # player.stamina -= 1  # 体力系统待启用
+        # 扣除理智
         player.mp = max(0, player.mp - 1)
         if player.mp == 0 and player.hp > 0:
             player.hp = 0  # 理智耗尽即"疯狂身亡"
@@ -311,14 +308,24 @@ async def _handle_personal_monster(session, tile: WorldTile, player: Player) -> 
             else:
                 record_p(r_idx, f"[回合{r_idx}] {monster_display} 反击你，造成 {dmg_after} 伤害！", force=(player_hp==0))
 
-        if player_first:
-            p_atk(round_num)
-            if monster_hp>0:
-                m_atk(round_num)
-        else:
-            m_atk(round_num)
-            if player_hp>0:
+        if round_num == 1:
+            # 第一回合双方必定各攻击一次，顺序依敏捷决定
+            if player_first:
                 p_atk(round_num)
+                m_atk(round_num)
+            else:
+                m_atk(round_num)
+                p_atk(round_num)
+        else:
+            # 其余回合体现先手：若先手击杀则后手无法行动
+            if player_first:
+                p_atk(round_num)
+                if monster_hp > 0:
+                    m_atk(round_num)
+            else:
+                m_atk(round_num)
+                if player_hp > 0:
+                    p_atk(round_num)
 
     battle_log.append(f"📊 总计 {round_num} 回合，你剩余HP {player_hp}/{player.max_hp}，{monster_display} HP {monster_hp}/{tile.state.get('hp', 0)}。")
     if dodge_count:
@@ -332,11 +339,8 @@ async def _handle_personal_monster(session, tile: WorldTile, player: Player) -> 
     if monster_hp <= 0:
         exp_gain = rng.randint(1, 3) * monster_level * (monster_level / player.level)
         exp_gain = int(round(exp_gain))
-        gold_gain = rng.randint(1, 50) * (monster_level / player.level)
-        gold_gain = int(round(gold_gain))
         player.exp += exp_gain
-        player.gold += gold_gain
-        log += f"\n🎉 你击杀了 {monster_display}，获得 {exp_gain} EXP 和 {gold_gain} 金币"
+        log += f"\n🎉 你击杀了 {monster_display}，获得 {exp_gain} EXP"
     elif player_hp <= 0:
         log += f"\n💀 你被 {monster_display} 击败，快去恢复吧！"
     else:

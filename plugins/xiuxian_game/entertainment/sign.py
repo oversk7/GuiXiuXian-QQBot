@@ -59,8 +59,11 @@ async def handle_sign(event: MessageEvent):
                 session.add(Inventory(player_id=player.id, item_id="teleport", quantity=5))
         else:
             bonus_msg = "\n官群签到送大量传送符！发送/帮助 查看群号~"
-        await sign.send(f"签到成功！获得 {gold_reward} 金币！{lucky_msg}{bonus_msg}")
-        player.gold += gold_reward
+
+        # 每日刷新体力
+        player.stamina = 10  # 可改为配置或与等级相关
+        stamina_msg = "\n💪 体力已恢复至 10/10"
+        await sign.send(f"签到成功！获得 {gold_reward} 金币！{lucky_msg}{bonus_msg}{stamina_msg}")
         
         # 检查是否为创建账号的同一天
         if player.created_at.date() == today:
