@@ -35,7 +35,7 @@ stop_nav_cmd = on_command("中断导航", aliases={"停止导航", "取消导航
 
 
 def _tiles_per_second(agility: int) -> float:
-    return max(0.01, agility / 1500)
+    return max(0.01, agility / 2500)
 
 
 def _step_towards(curr_x: int, curr_y: int, target_x: int, target_y: int, steps: int) -> Tuple[int, int]:

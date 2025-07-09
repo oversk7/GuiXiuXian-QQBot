@@ -1,6 +1,7 @@
 from .player import Player
 from .inventory import Inventory
 from .trade import TradeItem
+from .purchase_request import PurchaseRequest
 from .navigation_task import NavigationTask
 from .world_tile import WorldTile
 from .equipment import EquipmentInstance

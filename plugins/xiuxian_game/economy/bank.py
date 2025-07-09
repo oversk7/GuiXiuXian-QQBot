@@ -39,6 +39,10 @@ def _apply_interest(acc: BankAccount):
         acc.last_interest = now
         return 0
     gain = int(acc.balance * _tier_rate(acc.balance) * delta_hours)
+    # 单次结息上限 1w
+    cap = 10_000
+    if gain > cap:
+        gain = cap
     if gain > 0:
         acc.balance += gain
     acc.last_interest = now

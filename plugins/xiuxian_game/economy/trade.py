@@ -3,7 +3,7 @@ from nonebot.adapters.qq import MessageEvent, Message
 from nonebot.params import CommandArg
 from sqlalchemy import select, delete, func
 from ..models.db import safe_session
-from ..models import Player, Inventory, TradeItem
+from ..models import Player, Inventory, TradeItem, PurchaseRequest
 from ..config import config
 from ..utils import message_add_head
 
@@ -233,3 +233,105 @@ async def handle_remove_trade(event: MessageEvent, args: Message = CommandArg())
         
         await session.commit()
         await down_item.finish(f"✅ 成功下架 {trade_item.item.name} ×{quantity}")
+
+# ----------------- 悬赏收购系统 -----------------
+
+request_cmd = on_command("悬赏", aliases={"求购"}, priority=5, block=True)
+
+@request_cmd.handle()
+async def _(event: MessageEvent, args: Message = CommandArg()):
+    user_id = event.get_user_id()
+    parts = args.extract_plain_text().strip().split()
+    if len(parts) != 3:
+        await request_cmd.finish("📦 格式：悬赏 物品名 数量 价格")
+    item_name, qty_str, price_str = parts
+    if not (qty_str.isdigit() and price_str.isdigit()):
+        await request_cmd.finish("❌ 数量/价格需为正整数！")
+    qty = int(qty_str)
+    price = int(price_str)
+    if qty<=0 or price<=0:
+        await request_cmd.finish("❌ 数量和价格必须大于0！")
+
+    item_cfg = config.items_config["by_name"].get(item_name)
+    if not item_cfg:
+        await request_cmd.finish("❌ 物品不存在")
+
+    async with safe_session() as session:
+        player = await session.get(Player, user_id)
+        total_cost = qty * price
+        if player.gold < total_cost:
+            await request_cmd.finish(f"💰 金币不足，需要 {total_cost} (当前 {player.gold})")
+
+        player.gold -= total_cost  # 扣押赏金
+        req = PurchaseRequest(requester_id=user_id, item_id=item_cfg.item_id, quantity=qty, price=price)
+        session.add(req)
+        await session.commit()
+        await request_cmd.finish(f"✅ 已发布悬赏 {item_cfg.name} ×{qty}，单价 {price}，总赏金 {total_cost}")
+
+# 悬赏列表
+request_list_cmd = on_command("悬赏列表", aliases={"求购列表"}, priority=5, block=True)
+
+@request_list_cmd.handle()
+async def _(event: MessageEvent):
+    async with safe_session() as session:
+        reqs = (await session.execute(select(PurchaseRequest).where(PurchaseRequest.quantity>0).order_by(PurchaseRequest.created_at.desc()).limit(20))).scalars().all()
+
+    if not reqs:
+        await request_list_cmd.finish("📭 暂无求购信息")
+
+    lines=["📜 𝗕𝗼𝘂𝗻𝘁𝗶𝗲𝘀","━━━━━━━━━━"]
+    for r in reqs:
+        uid,_ = await _get_user_display(r.requester_id)
+        name=config.items_config["by_id"][r.item_id].name
+        lines.append(f"🆔{r.id}│{name}×{r.quantity}\n💰{r.price}│🎯UID:{uid}")
+    lines.append("━━━━━━━━━━\n🚚 接单：/接单 悬赏ID 数量")
+    await request_list_cmd.finish(message_add_head("\n".join(lines), event))
+
+# 接单
+supply_cmd = on_command("接单", aliases={"供货"}, priority=5, block=True)
+
+@supply_cmd.handle()
+async def _(event: MessageEvent, args: Message = CommandArg()):
+    supplier_id = event.get_user_id()
+    parts = args.extract_plain_text().strip().split()
+    if len(parts)!=2 or not all(p.isdigit() for p in parts):
+        await supply_cmd.finish("🚚 格式：接单 悬赏ID 数量")
+    req_id=int(parts[0]); qty=int(parts[1])
+    if qty<=0:
+        await supply_cmd.finish("❌ 数量必须>0")
+
+    async with safe_session() as session:
+        req = await session.get(PurchaseRequest, req_id)
+        if not req or req.quantity<=0:
+            await supply_cmd.finish("❌ 悬赏不存在或已完成")
+        if qty>req.quantity:
+            await supply_cmd.finish(f"❌ 悬赏剩余 {req.quantity}")
+
+        # 检查库存
+        inv_rows = (await session.execute(select(Inventory).where(Inventory.player_id==supplier_id, Inventory.item_id==req.item_id))).scalars().all()
+        have=sum(i.quantity for i in inv_rows)
+        if have<qty:
+            await supply_cmd.finish("❌ 背包数量不足")
+
+        # 扣除物品
+        success = await Inventory.consume_item(session, supplier_id, req.item_id, qty)
+        if not success:
+            await session.rollback()
+            await supply_cmd.finish("❌ 扣除失败")
+
+        # 支付赏金
+        reward = qty * req.price
+        supplier = await session.get(Player, supplier_id)
+        supplier.gold += reward
+
+        # 给请求者物品
+        await Inventory.add_item(session, req.requester_id, req.item_id, qty)
+
+        # 更新求购数量
+        req.quantity -= qty
+        if req.quantity<=0:
+            await session.delete(req)
+
+        await session.commit()
+        item_name=config.items_config["by_id"][req.item_id].name
+        await supply_cmd.finish(f"✅ 已完成悬赏，交付 {item_name}×{qty}，获得 {reward} 金币！")
