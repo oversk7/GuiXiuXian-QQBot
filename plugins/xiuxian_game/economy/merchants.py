@@ -102,16 +102,18 @@ def _price_for(market: Market, item_id: str) -> Tuple[int, int]:
     return sell_price, buy_price
 
 # ------------------- 指令 -------------------
-shop_cmd = on_command("商店", aliases={"商人"}, block=True, priority=5)
+market_cmd = on_command("市集", aliases={"商店", "市场"}, block=True, priority=5)
 
-@shop_cmd.handle()
+list_market_cmd = on_command("市集列表", aliases={"市场列表", "全部市集"}, block=True, priority=5)
+
+@market_cmd.handle()
 async def _(event: MessageEvent):
     async with safe_session() as session:
         player: Player | None = await session.get(Player, event.get_user_id())
         if not player:
-            await shop_cmd.finish("⛔ 请先创建角色")
+            await market_cmd.finish("⛔ 请先创建角色")
         if player.region != "大都会":
-            await shop_cmd.finish("⛔ 诡域中没有安全商人！")
+            await market_cmd.finish("⛔ 诡域中没有安全商人！")
 
         market = MARKET_BY_COORD.get((player.x, player.y))
         if not market:
@@ -119,8 +121,8 @@ async def _(event: MessageEvent):
             lines = ["🏪 可交易地点一览", "━━━━━━━━━━━━━"]
             for m in MARKETS:
                 lines.append(f"• {m.name} ({m.x},{m.y})")
-            lines.append("━━━━━━━━━━━━━\n🧭 前往对应坐标后输入【商店】联系当地商人")
-            await shop_cmd.finish(message_add_head("\n".join(lines), event))
+            lines.append("━━━━━━━━━━━━━\n🧭 前往对应坐标后输入【市集】联系当地商人")
+            await market_cmd.finish(message_add_head("\n".join(lines), event))
 
         lines = [f"🏪 {market.name} ({market.x},{market.y})", "━━━━━━━━━━━━━"]
         for iid in market.items:
@@ -128,7 +130,7 @@ async def _(event: MessageEvent):
             sell_p, buy_p = _price_for(market, iid)
             lines.append(f"{item_cfg.name}│买 {sell_p}│卖 {buy_p}")
         lines.append("━━━━━━━━━━━━━\n⬇️【购买 [物品] [数量]】\n⬇️【出售 [物品] [数量]】")
-        await shop_cmd.finish(message_add_head("\n".join(lines), event))
+        await market_cmd.finish(message_add_head("\n".join(lines), event))
 
 # -------- 购买 --------
 buy_cmd = on_command("购买",aliases={"买"}, block=True, priority=5)
@@ -238,4 +240,15 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
         player.gold += total_gain
         await session.commit()
         await sell_cmd.finish(message_add_head(
-            f"💰 卖出 {item_cfg.name}×{qty} 成功！\n🪙 获得 {total_gain} 金币", event)) 
+            f"💰 卖出 {item_cfg.name}×{qty} 成功！\n🪙 获得 {total_gain} 金币", event))
+
+# -------- 市集列表 --------
+
+@list_market_cmd.handle()
+async def _(event: MessageEvent):
+    """显示所有市集坐标列表（无论玩家当前位置）。"""
+    lines = ["🏪 全部市集坐标", "━━━━━━━━━━━━━"]
+    for m in MARKETS:
+        lines.append(f"• {m.name} ({m.x},{m.y})")
+    lines.append("━━━━━━━━━━━━━\n🧭 到达坐标后发送【市集】进行交易")
+    await list_market_cmd.finish(message_add_head("\n".join(lines), event)) 
