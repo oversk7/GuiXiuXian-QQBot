@@ -72,7 +72,6 @@ async def handle_player(event: MessageEvent, args: Message = CommandArg()):
         "【修为榜】 查看修为榜\n"
         "【注册】 注册角色\n"
         "【改名 [新名字]】 改名\n"
-        "【返回】 返回现实世界并满状态\n"
     )
     await player_cmd.finish(Message(msg))
 
@@ -146,15 +145,16 @@ ren_wu_cmd = on_command("世界系统", priority=4, block=True)
 async def handle_ren_wu(event: MessageEvent, args: Message = CommandArg()):
     msg = (
         "✨ 世界系统帮助 ✨\n"
-        "【传送 [地点]】 传送到指定地点\n"
-        "【地图】 查看当前可探索的地点\n"
+        "【传送 [诡域]】 进入指定诡域\n"
+        "【诡域】 查看当前可探索的诡域\n"
+        "【[上|下|左|右]】 向指定方向移动一格\n"
+        "【跳跃 [x] [y]】 跳跃到指定坐标，仅在驿站可使用\n"
+        "【返回】 返回现实世界并满状态\n"
         "【附近玩家】 查看附近玩家\n"
         "【探索】 探索玩家所在地点\n"
         "【留言 内容】 在世界留言板发布信息\n"
         "【留言板 [页码]】 查看世界留言板\n"
         "【更新】 查看最近一次更新公告\n"
-        "【[上|下|左|右]】 向指定方向移动一格\n"
-        "【跳跃 [x] [y]】 跳跃到指定坐标，仅在驿站可使用\n"
     )
     await ren_wu_cmd.finish(Message(msg))
 
