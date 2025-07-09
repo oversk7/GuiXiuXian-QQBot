@@ -2,6 +2,9 @@ from sqlalchemy import String, Integer
 from sqlalchemy.orm import Mapped, mapped_column
 from .db import Base
 from enum import Enum as PyEnum
+from math import ceil
+
+STACK_SIZE = 100  # 每个背包格可堆叠的最大数量
 
 class ItemType(str,PyEnum):
     CONSUMABLE = "CONSUMABLE"
@@ -50,6 +53,83 @@ class Inventory(Base):
     quantity: Mapped[int] = mapped_column(Integer, default=1)
     
     @property
+    def slot_count(self) -> int:
+        """当前记录占用的背包格数（向上取整）"""
+        return ceil(self.quantity / STACK_SIZE)
+
+    @property
+    def available_space(self) -> int:
+        """当前这格剩余可放置数量（0~STACK_SIZE）"""
+        remainder = self.quantity % STACK_SIZE
+        return STACK_SIZE - remainder if remainder else STACK_SIZE
+    
+    @property
     def config(self) -> ItemConfig:
         from ..config import config
         return config.items_config["by_id"].get(self.item_id) 
+
+    # ---------------------- 工具方法 ----------------------
+    @staticmethod
+    async def add_item(session, player_id: str, item_id: str, quantity: int):
+        """向玩家背包添加物品，自动处理堆叠和超出 STACK_SIZE 拆分。"""
+        if quantity <= 0:
+            return
+        from sqlalchemy import select
+        # 先填充未满堆叠
+        result = await session.execute(
+            select(Inventory)
+            .where(Inventory.player_id == player_id, Inventory.item_id == item_id)
+            .order_by(Inventory.id)
+        )
+        stacks = result.scalars().all()
+        # 按顺序填充
+        for inv in stacks:
+            if quantity == 0:
+                break
+            space = inv.available_space
+            if space <= 0:
+                continue
+            take = min(space, quantity)
+            inv.quantity += take
+            quantity -= take
+            session.add(inv)
+        # 剩余数量分新堆
+        while quantity > 0:
+            put_qty = min(STACK_SIZE, quantity)
+            session.add(Inventory(player_id=player_id, item_id=item_id, quantity=put_qty))
+            quantity -= put_qty 
+
+    @staticmethod
+    async def consume_item(session, player_id: str, item_id: str, quantity: int) -> bool:
+        """从玩家背包扣除物品，优先消耗未满堆叠；数量不足时返回 False。
+
+        扣除逻辑：
+        1. 查询所有同类物品堆叠，按数量升序（小堆在前）。
+        2. 逐堆扣除，若堆数量归零则删除该记录。
+        3. 最终确认累计扣除达到 *quantity*。
+        """
+        if quantity <= 0:
+            return True
+
+        from sqlalchemy import select
+        result = await session.execute(
+            select(Inventory)
+            .where(Inventory.player_id == player_id, Inventory.item_id == item_id)
+            .order_by(Inventory.quantity.asc())
+        )
+        stacks = result.scalars().all()
+
+        remaining = quantity
+        for inv in stacks:
+            if remaining <= 0:
+                break
+            take = min(inv.quantity, remaining)
+            inv.quantity -= take
+            remaining -= take
+            if inv.quantity <= 0:
+                await session.delete(inv)
+            else:
+                session.add(inv)
+
+        # 成功：remaining == 0
+        return remaining == 0 

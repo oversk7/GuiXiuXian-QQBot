@@ -41,24 +41,25 @@ async def handle_sacrifice(event: MessageEvent, args: Message = CommandArg()):
         if not player:
             await sacrifice_cmd.finish("⛔ 请先创建角色")
 
-        # 查询背包
-        result = await session.execute(
+        # 查询背包 (聚合)
+        inv_rows = (await session.execute(
             select(Inventory).where(
                 Inventory.player_id == player.id,
                 Inventory.item_id == item_cfg.item_id
             )
-        )
-        inv = result.scalars().first()
-        if not inv or inv.quantity < qty:
+        )).scalars().all()
+        total_have = sum(r.quantity for r in inv_rows)
+        if total_have < qty:
             await sacrifice_cmd.finish("⛔ 背包数量不足！")
 
         gained = item_cfg.grudge_value * qty
         player.resentment += gained
 
-        # 扣除物品
-        inv.quantity -= qty
-        if inv.quantity <= 0:
-            await session.delete(inv)
+        # 扣除物品（优先小堆）
+        success_consume = await Inventory.consume_item(session, player.id, item_cfg.item_id, qty)
+        if not success_consume:
+            await session.rollback()
+            await sacrifice_cmd.finish("⛔ 扣除物品失败")
 
         session.add(player)
         await session.commit()

@@ -158,17 +158,17 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
         # 检查材料
         mats_required = {mid: q*qty for mid,q in recipe["materials"].items()}
         for mid, need in mats_required.items():
-            inv = next((i for i in invs if i.item_id == mid), None)
-            if not inv or inv.quantity < need:
+            total_have = sum(i.quantity for i in invs if i.item_id == mid)
+            if total_have < need:
                 name = config.items_config["by_id"][mid].name
                 await start_cmd.finish(f"⛔ 材料不足：{name}✖️{need}")
 
         # 扣材料
         for mid, need in mats_required.items():
-            inv = next(i for i in invs if i.item_id == mid)
-            inv.quantity -= need
-            if inv.quantity == 0:
-                await session.delete(inv)
+            success_consume = await Inventory.consume_item(session, player.id, mid, need)
+            if not success_consume:
+                await session.rollback()
+                await start_cmd.finish("⛔ 扣除材料失败")
 
         # 扣除炉子耐久并检查损坏
         broken = furnace_inst.lose_durability(total_dura_need)
@@ -227,15 +227,8 @@ async def _(event: MessageEvent):
                     if rng.random() < t.success_rate:
                         success_count += 1
                 if success_count:
-                    inv = await session.execute(
-                        select(Inventory).where(Inventory.player_id==t.player_id, Inventory.item_id==t.produce_item_id)
-                    )
-                    inv = inv.scalars().first()
                     total_qty = success_count * t.produce_per
-                    if inv:
-                        inv.quantity += total_qty
-                    else:
-                        session.add(Inventory(player_id=t.player_id, item_id=t.produce_item_id, quantity=total_qty))
+                    await Inventory.add_item(session, t.player_id, t.produce_item_id, total_qty)
                 t.delivered = True
                 await session.commit()
                 result_msg = f"✅ 已完成，成功 {success_count}/{t.qty} 炉，共得 {success_count*t.produce_per} 颗"

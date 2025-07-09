@@ -47,15 +47,15 @@ async def handle_use_item(event: MessageEvent, args: Message = CommandArg()):
         if not item_config:
             await use_item.finish(f"⛔ 不存在物品：{item_name}")
 
-        # 检查背包中是否有该物品
-        inv_result = await session.execute(
+        # 检查背包中是否有该物品 (聚合数量)
+        inv_rows = (await session.execute(
             select(Inventory)
             .where(Inventory.player_id == event.get_user_id())
             .where(Inventory.item_id == item_config.item_id)
-        )
-        inventory = inv_result.scalars().first()
-        
-        if not inventory or inventory.quantity < quantity:
+        )).scalars().all()
+        total_qty = sum(r.quantity for r in inv_rows)
+
+        if total_qty < quantity:
             await use_item.finish(f"⛔ {item_name} 数量不足")
 
         # 特殊道具直接跳转对应指令
@@ -86,10 +86,11 @@ async def handle_use_item(event: MessageEvent, args: Message = CommandArg()):
             await session.rollback()
             await use_item.finish(msg)
 
-        # 扣除物品数量
-        inventory.quantity -= quantity
-        if inventory.quantity <= 0:
-            await session.delete(inventory)
+        # 扣除物品数量，优先消耗未满堆叠
+        success_consume = await Inventory.consume_item(session, player.id, item_config.item_id, quantity)
+        if not success_consume:
+            await session.rollback()
+            await use_item.finish("⛔ 扣除物品失败，请重试")
 
         session.add(player)
 

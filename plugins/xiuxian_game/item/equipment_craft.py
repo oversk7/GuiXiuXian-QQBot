@@ -104,29 +104,24 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
 
         # 材料校验
         lacking_msgs = []
-        material_records: dict[str, Inventory] = {}
-        for item_id, qty in req_materials.items():
-            stmt = select(Inventory).where(
-                Inventory.player_id == event.get_user_id(),
-                Inventory.item_id == item_id,
-            )
-            inv = (await session.execute(stmt)).scalars().first()
-            have_qty = inv.quantity if inv else 0
-            if have_qty < qty:
+        for item_id, req_qty in req_materials.items():
+            rows = (await session.execute(
+                select(Inventory).where(Inventory.player_id == player.id, Inventory.item_id == item_id)
+            )).scalars().all()
+            have_qty = sum(r.quantity for r in rows)
+            if have_qty < req_qty:
                 cfg = config.items_config["by_id"].get(item_id)
                 name = cfg.name if cfg else item_id
-                lacking_msgs.append(f"{name} ✖️{qty} (缺{qty-have_qty})")
-            else:
-                material_records[item_id] = inv
+                lacking_msgs.append(f"{name} ✖️{req_qty} (缺{req_qty-have_qty})")
         if lacking_msgs:
             await craft_cmd.finish("⛔ 材料不足：\n" + "\n".join(lacking_msgs))
 
         # 扣除材料 & 金币
         for item_id, need_qty in req_materials.items():
-            inv = material_records[item_id]
-            inv.quantity -= need_qty
-            if inv.quantity == 0:
-                await session.delete(inv)
+            success_consume = await Inventory.consume_item(session, player.id, item_id, need_qty)
+            if not success_consume:
+                await session.rollback()
+                await craft_cmd.finish("⛔ 扣除材料失败")
         player.gold -= req_gold
 
         # 创建装备实例

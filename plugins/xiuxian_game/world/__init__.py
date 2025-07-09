@@ -191,12 +191,13 @@ async def _handle_material(session, tile: WorldTile, player: Player) -> str:
         luck_bonus = quantity  # 翻倍
         quantity *= 2
     
-    # 检查背包容量
-    result = await session.execute(
-        select(func.count(Inventory.id)).where(Inventory.player_id == player.id)
-    )
-    current_items = result.scalar() or 0
-    
+    # 背包容量检查（按堆叠上限计算占用格数）
+    from ..models.inventory import STACK_SIZE
+    inv_rows = (await session.execute(
+        select(Inventory).where(Inventory.player_id == player.id)
+    )).scalars().all()
+    current_slots = sum(row.slot_count for row in inv_rows)
+
     # 检查是否已有该物品
     result = await session.execute(
         select(Inventory).where(
@@ -205,22 +206,19 @@ async def _handle_material(session, tile: WorldTile, player: Player) -> str:
         )
     )
     existing_item = result.scalars().first()
-    
-    # 如果是新物品且背包已满，则无法拾取
-    if not existing_item and current_items >= player.inventory_capacity:
-        return f"⚠️ 你的背包已满（{current_items}/{player.inventory_capacity}），无法拾取 {item_cfg.name}。"
+
+    import math
+    # 计算本次操作需要新增的格子数
+    if existing_item:
+        added_slots = math.ceil((existing_item.quantity + quantity) / STACK_SIZE) - existing_item.slot_count
+    else:
+        added_slots = math.ceil(quantity / STACK_SIZE)
+
+    if current_slots + added_slots > player.inventory_capacity:
+        return f"⚠️ 你的背包已满（{current_slots}/{player.inventory_capacity}），无法拾取 {item_cfg.name}。"
     
     # 更新或创建物品记录
-    if existing_item:
-        existing_item.quantity += quantity
-        session.add(existing_item)
-    else:
-        new_item = Inventory(
-            player_id=player.id,
-            item_id=item_id,
-            quantity=quantity
-        )
-        session.add(new_item)
+    await Inventory.add_item(session, player.id, item_id, quantity)
     
     # 标记为已拾取
     tile.state["looted"] = True

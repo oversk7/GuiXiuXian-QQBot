@@ -164,24 +164,27 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
         if player.gold < total_cost:
             await buy_cmd.finish(f"💰 金币不足，需要 {total_cost} (当前 {player.gold})")
 
-        # 背包容量检查
-        result = await session.execute(
+        # 背包容量检查（考虑单格上限）
+        from ..models.inventory import STACK_SIZE
+        inv_rows = (await session.execute(
             select(Inventory).where(Inventory.player_id == player.id)
-        )
-        item_count = len(result.scalars().all())
-        inv_record = await session.execute(
-            select(Inventory).where(Inventory.player_id == player.id, Inventory.item_id == item_cfg.item_id)
-        )
-        inv_item = inv_record.scalars().first()
-        if not inv_item and item_count >= player.inventory_capacity:
+        )).scalars().all()
+        current_slots = sum(r.slot_count for r in inv_rows)
+
+        inv_item = next((r for r in inv_rows if r.item_id == item_cfg.item_id), None)
+
+        import math
+        if inv_item:
+            added_slots = math.ceil((inv_item.quantity + qty) / STACK_SIZE) - inv_item.slot_count
+        else:
+            added_slots = math.ceil(qty / STACK_SIZE)
+
+        if current_slots + added_slots > player.inventory_capacity:
             await buy_cmd.finish("🎒 背包已满，无法购买新物品！")
 
         # 扣款 & 添物
         player.gold -= total_cost
-        if inv_item:
-            inv_item.quantity += qty
-        else:
-            session.add(Inventory(player_id=player.id, item_id=item_cfg.item_id, quantity=qty))
+        await Inventory.add_item(session, player.id, item_cfg.item_id, qty)
         await session.commit()
         await buy_cmd.finish(message_add_head(
             f"✅ 购买 {item_cfg.name}×{qty} 成功！\n💸 花费 {total_cost} 金币", event))
@@ -215,21 +218,23 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
         if not item_cfg or item_cfg.item_id not in market.items:
             await sell_cmd.finish("⛔ 商人不收购该物品")
 
-        # 检查库存
-        inv_q = await session.execute(
+        # 检查库存（聚合数量）
+        inv_rows = (await session.execute(
             select(Inventory).where(Inventory.player_id == player.id, Inventory.item_id == item_cfg.item_id)
-        )
-        inv_item = inv_q.scalars().first()
-        if not inv_item or inv_item.quantity < qty:
+        )).scalars().all()
+        total_qty = sum(r.quantity for r in inv_rows)
+        if total_qty < qty:
             await sell_cmd.finish("❌ 背包数量不足")
 
         _, buy_price = _price_for(market, item_cfg.item_id)
         total_gain = buy_price * qty
 
-        # 更新
-        inv_item.quantity -= qty
-        if inv_item.quantity <= 0:
-            await session.delete(inv_item)
+        # 更新：优先扣未满堆叠
+        success_consume = await Inventory.consume_item(session, player.id, item_cfg.item_id, qty)
+        if not success_consume:
+            await session.rollback()
+            await sell_cmd.finish("❌ 扣除物品失败")
+
         player.gold += total_gain
         await session.commit()
         await sell_cmd.finish(message_add_head(
