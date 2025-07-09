@@ -18,7 +18,7 @@ item_detail = on_command("查背包", block=True, priority=5)
 
 teleport_cmd = on_command("传送", block=True, priority=5)
 rename_cmd = on_command("改名", block=True, priority=5)
-revive_cmd = on_command("复活", block=True, priority=5)
+revive_cmd = on_command("返回", aliases={"复活"}, block=True, priority=5)
 
 drop_item = on_command("丢弃", aliases={"抛弃", "drop"}, block=True, priority=5)
 
@@ -221,36 +221,26 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
     if target_region not in valid_regions:
         await teleport_cmd.finish("⛔ 目的地不存在，可发送 /地图 查看全部区域")
 
+    STAM_COST = 10  # 体力消耗
+
     async with safe_session() as session:
         player = await session.get(Player, event.get_user_id())
         if not player:
             await teleport_cmd.finish("⛔ 请先创建角色")
 
-        # 检查传送符
-        legend_ticket_cfg = config.items_config["by_name"].get("传送符")
-        if not legend_ticket_cfg:
-            await teleport_cmd.finish("⚠️ 配置缺少 传送符")
-        result = await session.execute(
-            select(Inventory)
-            .where(Inventory.player_id == player.id)
-            .where(Inventory.item_id == legend_ticket_cfg.item_id)
-        )
-        ticket = result.scalars().first()
-        if not ticket or ticket.quantity < 1:
-            await teleport_cmd.finish("⛔ 传送符不足，无法启程")
+        if player.stamina < STAM_COST:
+            await teleport_cmd.finish(f"⛔ 体力不足，传送需要 {STAM_COST}，当前 {player.stamina}")
 
-        # 扣除并移动
-        ticket.quantity -= 1
-        if ticket.quantity <= 0:
-            await session.delete(ticket)
+        # 扣除体力并移动
+        player.stamina -= STAM_COST
         player.region = target_region
         player.x = 0
         player.y = 0
-        session.add_all([player])
+        session.add(player)
         await session.commit()
 
     msg = (
-        f"🪄 你使用了一张传送符，穿过层层迷雾抵达『{target_region}』！\n"
+        f"🚪 你耗费 {STAM_COST} 体力跨越裂隙，抵达『{target_region}』\n"
         f"当前位置：{target_region} ({player.x},{player.y})"
     )
     await teleport_cmd.finish(message_add_head(msg, event))
@@ -296,15 +286,11 @@ async def handle_revive(event: MessageEvent):
         player = await session.get(Player, event.get_user_id())
         if not player:
             await revive_cmd.finish("⛔ 请先创建角色")
-        if player.hp > 0:
-            await revive_cmd.finish("⛔ 你尚未死亡，无需复活")
         player.hp = player.max_hp
-        player.region = "主城"
-        player.x = 0
-        player.y = 0
+        player.region = "大都会"
         session.add(player)
         await session.commit()
-        await revive_cmd.finish("✨ 你在主城复活，继续前进吧！")
+        await revive_cmd.finish("✨ 已返回现实世界，恢复满状态！")
 
 @drop_item.handle()
 async def handle_drop_item(event: MessageEvent, args: Message = CommandArg()):

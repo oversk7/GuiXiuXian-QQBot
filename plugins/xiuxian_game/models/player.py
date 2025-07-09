@@ -19,7 +19,7 @@ class Player(Base):
     sex: Mapped[Gender] = mapped_column(String(8), default=Gender.MALE, server_default='男', comment="性别")
     exp: Mapped[int] = mapped_column(Integer, default=0, server_default='0', comment="经验")
     attribute_points: Mapped[int] = mapped_column(Integer, default=0, server_default='0', comment="可分配属性点")
-    region: Mapped[str] = mapped_column(String(32), default="大都市", server_default='大都市', comment="区域")
+    region: Mapped[str] = mapped_column(String(32), default="大都会", server_default='大都会', comment="区域")
     x: Mapped[int] = mapped_column(Integer, default=0, server_default='0', comment="坐标X")
     y: Mapped[int] = mapped_column(Integer, default=0, server_default='0', comment="坐标Y")
     hp: Mapped[int] = mapped_column(Integer, default=20, server_default='20', comment="生命值")

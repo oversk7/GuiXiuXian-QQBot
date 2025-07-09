@@ -7,6 +7,7 @@ class ItemType(str,PyEnum):
     CONSUMABLE = "CONSUMABLE"
     MATERIAL = "MATERIAL"
     EQUIPMENT = "EQUIPMENT"
+    GOODS = "GOODS"
 
 class ItemEffectType(str, PyEnum):
     RESTORE_HP = "RESTORE_HP" 

@@ -25,19 +25,19 @@ items:
 
     - item_id: "blood_pact"
       name: "血契丹"
-      description: "以精血为引的丹药，恢复生命值（+100HP）"
+      description: "以精血为引的丹药，恢复生命值（+120HP）"
       type: "CONSUMABLE"
       effect_type: "RESTORE_HP"
-      effect_params: {"value": 100}
-      price: 400
+      effect_params: {"value": 120}
+      price: 299
      
     - item_id: "yin_grass"
       name: "阴冥草"
-      description: "生长在极阴之地的药草，服用后恢复理智值（+100MP）"
+      description: "生长在极阴之地的药草，服用后恢复理智值（+120MP）"
       type: "CONSUMABLE"
       effect_type: "RESTORE_MP"
-      effect_params: {"value": 100}
-      price: 400
+      effect_params: {"value": 120}
+      price: 299
       
     - item_id: "revive_potion"
       name: "还魂丹"
@@ -74,6 +74,7 @@ items:
       description: "从腐尸体内取出的浑浊内丹，散发着腐臭气息 🦠"
       type: "MATERIAL"
       price: 20
+      grudge_value: 10
 
     - item_id: "ghost_tears"
       name: "鬼泪"
@@ -340,6 +341,97 @@ items:
       type: "CONSUMABLE"
       effect_type: "BUFF"
       effect_params: {"luck": 5, "attack": 2}
+
+  goods:  # 仅用于跑商系统倒卖的奢侈品
+    - item_id: "lux_perfume"
+      name: "香水"
+      description: "晶莹香气，弥散奢华"
+      type: "GOODS"
+      price: 800
+
+    - item_id: "red_wine"
+      name: "红酒"
+      description: "醇厚酒液折射暗红烛光"
+      type: "GOODS"
+      price: 600
+
+    - item_id: "gold_watch"
+      name: "金表"
+      description: "秒针滴答，时间也显得贵重"
+      type: "GOODS"
+      price: 2000
+
+    - item_id: "diamond_ring"
+      name: "钻戒"
+      description: "切割星光的锋芒，象征欲望"
+      type: "GOODS"
+      price: 3000
+
+    - item_id: "silk_scarf"
+      name: "丝巾"
+      description: "轻盈触感，缠绕颈间的柔软"
+      type: "GOODS"
+      price: 500
+
+    - item_id: "dslr_camera"
+      name: "相机"
+      description: "捕捉瞬息，也捕捉灵魂"
+      type: "GOODS"
+      price: 1500
+
+    - item_id: "smartphone"
+      name: "手机"
+      description: "光滑镜面映出焦躁面孔"
+      type: "GOODS"
+      price: 1800
+
+    - item_id: "gaming_console"
+      name: "游戏机"
+      description: "像素与欢笑的高价袖珍梦"
+      type: "GOODS"
+      price: 1200
+
+    - item_id: "designer_bag"
+      name: "手袋"
+      description: "缝线里藏着高傲标签"
+      type: "GOODS"
+      price: 1600
+
+    - item_id: "luxury_chocolate"
+      name: "巧克力"
+      description: "入口即化，甜得发疯"
+      type: "GOODS"
+      price: 400
+
+    - item_id: "art_book"
+      name: "画册"
+      description: "沉默的色块与怪诞线条"
+      type: "GOODS"
+      price: 300
+
+    - item_id: "concert_ticket"
+      name: "门票"
+      description: "印着日期，却不一定等来那一天"
+      type: "GOODS"
+      price: 350
+
+    - item_id: "fountain_pen"
+      name: "钢笔"
+      description: "墨水在纸上留下永恒伤口"
+      type: "GOODS"
+      price: 450
+
+    - item_id: "sneakers"
+      name: "球鞋"
+      description: "脚步与尘土的昂贵浪漫"
+      type: "GOODS"
+      price: 700
+
+    - item_id: "noise_headphones"
+      name: "耳机"
+      description: "隔绝噪音，放大心声"
+      type: "GOODS"
+      price: 900
 
 
       

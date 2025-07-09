@@ -16,18 +16,18 @@ from nonebot import on_command
 from nonebot.adapters.qq import MessageEvent, Message
 from nonebot.params import CommandArg
 from datetime import datetime
-from typing import Dict, Any, Tuple
+from typing import Tuple
 from ..models.db import safe_session
 from ..models.player import Player
 from ..utils import message_add_head
+from ..models.navigation_task import NavigationTask
 
-# ----------------- 全局导航状态 -----------------
-# { player_id: {"target":(tx,ty), "last":datetime } }
-NAV_STATES: Dict[str, Dict[str, Any]] = {}
+# ----------------- 持久化模型 -----------------
 
 # ----------------- 常量 -----------------
-MAX_COORD = 1000
-REAL_WORLD = "大都市"
+# 坐标正负范围
+MAX_COORD = 500
+REAL_WORLD = "大都会"
 
 # ----------------- 指令：导航 -----------------
 nav_cmd = on_command("导航", block=True, priority=5)
@@ -66,14 +66,13 @@ def _step_towards(curr_x: int, curr_y: int, target_x: int, target_y: int, steps:
     return x, y
 
 
-def _update_nav_position(player: Player) -> bool:
-    """根据经过时间更新玩家坐标，返回是否到达目标。"""
-    state = NAV_STATES.get(player.id)
-    if not state:
+def _update_nav_position(player: Player, task: NavigationTask | None) -> bool:
+    """根据经过时间更新玩家坐标，返回是否到达目标。若无任务返回 False."""
+    if not task:
         return False
 
     now = datetime.now()
-    elapsed = (now - state["last"]).total_seconds()
+    elapsed = (now - task.last_update).total_seconds()
     if elapsed <= 0:
         return False
 
@@ -83,15 +82,14 @@ def _update_nav_position(player: Player) -> bool:
         return False
 
     cx, cy = player.x, player.y
-    tx, ty = state["target"]
+    tx, ty = task.target_x, task.target_y
     new_x, new_y = _step_towards(cx, cy, tx, ty, movable)
 
     player.x, player.y = new_x, new_y
-    state["last"] = now
+    task.last_update = now
 
     # 判断是否抵达
     if new_x == tx and new_y == ty:
-        NAV_STATES.pop(player.id, None)
         return True
     return False
 
@@ -111,18 +109,21 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
             await nav_cmd.finish("⛔ 诡域中迷雾缭绕，无法使用导航！请使用 [移动] 或 [探索]。")
 
         # 处理已有导航：先更新位置
-        reached = _update_nav_position(player)
+        task: NavigationTask | None = await session.get(NavigationTask, player.id)
+        reached = _update_nav_position(player, task)
+        if reached and task:
+            # 已到达则删除任务记录
+            await session.delete(task)
 
         # 若未提供坐标 && 有导航，则只是查看进度
         if not parts:
-            if player.id not in NAV_STATES:
+            if not task:
                 await nav_cmd.finish(message_add_head(f"🧭 当前位置 {player.region} ({player.x},{player.y})\n暂无导航目标。", event))
-            target_x, target_y = NAV_STATES[player.id]["target"]
+            target_x, target_y = task.target_x, task.target_y
 
             # -------- 计算带小数的展示坐标 --------
-            state = NAV_STATES[player.id]
             now_p = datetime.now()
-            elapsed_p = (now_p - state["last"]).total_seconds()
+            elapsed_p = (now_p - task.last_update).total_seconds()
             speed_p = _tiles_per_second(player.agility)
             frac_move = elapsed_p * speed_p  # 可能小于1
 
@@ -146,13 +147,19 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
                 f"🧭 导航中 → 目标 ({target_x},{target_y})\n▶️ 当前坐标 ({disp_x},{disp_y})", event))
 
         # 若提供坐标，则尝试开启/重设导航
-        if len(parts) != 2 or not all(p.isdigit() for p in parts):
+        if len(parts) != 2 or not all(p.lstrip("-+").isdigit() for p in parts):
             await nav_cmd.finish("⛔ 格式错误，正确用法：导航 x y  （示例：导航 100 200）")
         tx, ty = map(int, parts)
-        if not (0 <= tx <= MAX_COORD and 0 <= ty <= MAX_COORD):
-            await nav_cmd.finish(f"⛔ 坐标必须在 0~{MAX_COORD} 范围内！")
+        if not (-MAX_COORD <= tx <= MAX_COORD and -MAX_COORD <= ty <= MAX_COORD):
+            await nav_cmd.finish(f"⛔ 坐标必须在 { -MAX_COORD }~{ MAX_COORD } 范围内！")
 
-        NAV_STATES[player.id] = {"target": (tx, ty), "last": datetime.now()}
+        if task:
+            task.target_x = tx
+            task.target_y = ty
+            task.last_update = datetime.now()
+        else:
+            task = NavigationTask(player_id=player.id, target_x=tx, target_y=ty, last_update=datetime.now())
+            session.add(task)
         await session.commit()
         await nav_cmd.finish(message_add_head(
             f"⚙️ 指针静默旋转，已开始导航至 ({tx},{ty})。\n━━━━━━━━━━━━━\n✧ 当前坐标 ({player.x},{player.y})\n━━━━━━━━━━━━━\n⬇️ 【中断导航】停止前进", event))
@@ -161,15 +168,14 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
 @stop_nav_cmd.handle()
 async def _(event: MessageEvent):
     pid = event.get_user_id()
-    if pid in NAV_STATES:
-        async with safe_session() as session:
-            player = await session.get(Player, pid)
-            # 先根据经过时间更新一次坐标，走多少算多少
-            _update_nav_position(player)
-            # 移除导航状态
-            NAV_STATES.pop(pid, None)
-            await session.commit()
+    async with safe_session() as session:
+        player = await session.get(Player, pid)
+        task: NavigationTask | None = await session.get(NavigationTask, pid)
+        if not task:
+            await stop_nav_cmd.finish("ℹ️ 当前未在导航中。")
+
+        _update_nav_position(player, task)
+        await session.delete(task)
+        await session.commit()
         await stop_nav_cmd.finish(message_add_head(
-            f"🛑 指针折断，你停在 ({player.x},{player.y})", event))
-    else:
-        await stop_nav_cmd.finish("ℹ️ 当前未在导航中。") 
+            f"🛑 指针折断，你停在 ({player.x},{player.y})", event)) 
