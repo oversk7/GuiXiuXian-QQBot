@@ -335,6 +335,7 @@ async def _handle_personal_monster(session, tile: WorldTile, player: Player) -> 
         exp_gain = rng.randint(1, 3) * monster_level * (monster_level / player.level)
         exp_gain = int(round(exp_gain))
         gold_gain = rng.randint(1, 50) * (monster_level / player.level)
+        gold_gain = int(round(gold_gain))
         player.exp += exp_gain
         player.gold += gold_gain
         log += f"\n🎉 你击杀了 {monster_display}，获得 {exp_gain} EXP 和 {gold_gain} 金币"
