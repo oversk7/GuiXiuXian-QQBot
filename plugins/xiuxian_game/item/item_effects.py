@@ -133,12 +133,14 @@ async def _reset_attr(player: Player, cfg: ItemConfig, qty: int, ctx: str):
 
     # 累计装备 bonus
     bonus = {k: 0 for k in INIT}
-    for eq in getattr(player, "equip_instances", []):
-        if eq.equipped:
-            delta = (eq.extra_attrs or {}).get("_persist_bonus", {})
-            for k, v in delta.items():
-                if k in bonus:
-                    bonus[k] += int(v)
+    eq_list = player.__dict__.get("equip_instances")  # 避免触发懒加载 I/O
+    if eq_list:
+        for eq in eq_list:
+            if getattr(eq, "equipped", False):
+                delta = (eq.extra_attrs or {}).get("_persist_bonus", {})
+                for k, v in delta.items():
+                    if k in bonus:
+                        bonus[k] += int(v)
 
     # 重置属性为基础 + 装备 bonus
     for k, base_v in INIT.items():
