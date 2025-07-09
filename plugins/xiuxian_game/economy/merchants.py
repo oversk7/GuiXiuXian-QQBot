@@ -17,6 +17,7 @@ from __future__ import annotations
 
 from datetime import datetime, time, timedelta, date
 import random
+import hashlib
 from typing import Dict, Tuple, List
 
 from nonebot import on_command
@@ -94,44 +95,35 @@ def _get_rng(merchant_id: str, item_id: str) -> random.Random:
 
 def _price_for(market: Market, item_id: str) -> Tuple[int, int]:
     """返回 (sell_price, buy_price)。
-
-    价格 = base × item_factor × (1 + local_delta)
-    • item_factor ：同一天内全世界统一，体现全球行情波动。
-    • local_delta ：基于市集 + item 哈希的微调（-15% ~ +15%），平衡不同市集差价，避免全部偏高/偏低。
     """
     item_cfg = config.items_config["by_id"].get(item_id)
     base_price = item_cfg.price or 1
 
-    # -------- 全球行情：仅由 item_id + 日期 决定 --------
-    day_seed = hash(f"{item_id}:{_current_seed_day().isoformat()}")
-    rng_global = random.Random(day_seed)
-    item_factor = rng_global.uniform(0.9, 1.1)  # 全局  ±10%
+    # -------- 单一随机波动（市集 × 物品 × 日期） --------
+    seed_str = f"{market.id}:{item_id}:{_current_seed_day().isoformat()}"
+    seed_int = int(hashlib.md5(seed_str.encode()).hexdigest(), 16)
+    rng_local = random.Random(seed_int)
+    factor = rng_local.uniform(0.85, 1.15)  # ±15% 浮动
 
-    # -------- 当地浮动：市集间差价 --------
-    local_seed = hash(f"{market.id}:{item_id}:{_current_seed_day().isoformat()}")
-    rng_local = random.Random(local_seed)
-    local_delta = rng_local.uniform(-0.15, 0.15)  # ±15%
+    sell_price = max(1, int(base_price * factor))
 
-    sell_price = max(1, int(base_price * item_factor * (1 + local_delta)))
-
-    # 市集收购价：在本市集卖给商人，可基于当地浮动略高，便于跨市集倒卖。
-    # 公式：sell_price * (0.9 + local_delta/3)  
-    # • 基准 0.9 确保有利差可赚（<=10% 毛利）
-    # • local_delta/3 使高价市集收购价更高，低价市集更低，形成空间差。
-    buy_ratio = 0.9 + local_delta / 3  # 范围约 0.85~0.95
-    buy_price = max(1, int(sell_price * buy_ratio))
+    # 收购价：保证存在套利空间，但差距不至于过大
+    # 固定系数 0.85，与 sell_price 保持约 15% 毛利
+    buy_price = max(1, int(sell_price * 0.85))
     return sell_price, buy_price
 
 # ------------------- 指令 -------------------
 market_cmd = on_command("市集", aliases={"商店", "市场"}, block=True, priority=5)
 
 list_market_cmd = on_command("市集列表", aliases={"市场列表", "全部市集"}, block=True, priority=5)
-
 # 查看指定市集商品
 detail_market_cmd = on_command("市集详情", aliases={"市集价格", "市场报价"}, block=True, priority=5)
 
 # 查看某物品在各市集的买/卖价
 price_compare_cmd = on_command("市价", aliases={"物价", "比价"}, block=True, priority=5)
+
+# 跑商推荐：列出可获利的买卖路线
+trade_advise_cmd = on_command("跑商推荐", aliases={"套利", "赚差价"}, block=True, priority=5)
 
 @market_cmd.handle()
 async def _(event: MessageEvent):
@@ -326,4 +318,55 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
     if not found:
         await price_compare_cmd.finish("ℹ️ 暂无市集出售该物品")
 
-    await price_compare_cmd.finish(message_add_head("\n".join(lines), event)) 
+    await price_compare_cmd.finish(message_add_head("\n".join(lines), event))
+
+# -------- 跑商推荐 --------
+
+@trade_advise_cmd.handle()
+async def _(event: MessageEvent):
+    """遍历市集与商品，列出正利润路线（购买→售出）。"""
+    opportunities = []
+    for src in MARKETS:
+        for iid in src.items:
+            sell_p_src, _ = _price_for(src, iid)
+            for dst in MARKETS:
+                if dst is src or iid not in dst.items:
+                    continue
+                _, buy_p_dst = _price_for(dst, iid)
+                profit = buy_p_dst - sell_p_src
+                if profit > 0:
+                    item_cfg = config.items_config["by_id"].get(iid)
+                    margin = profit / sell_p_src if sell_p_src else 0
+                    opportunities.append({
+                        "item": item_cfg.name,
+                        "from": src.name,
+                        "to": dst.name,
+                        "buy": sell_p_src,
+                        "sell": buy_p_dst,
+                        "profit": profit,
+                        "margin": margin,
+                    })
+
+    if not opportunities:
+        await trade_advise_cmd.finish("ℹ️ 今日暂无明显差价，明天再来看看吧！")
+
+    # 按利润降序，先过滤掉最暴利的前三条，剩余随机挑 5 条
+    opportunities.sort(key=lambda d: d["profit"], reverse=True)
+    if len(opportunities) > 3:
+        candidates = opportunities[3:]
+    else:
+        candidates = opportunities
+
+    import random as _rnd
+    sample = _rnd.sample(candidates, min(5, len(candidates)))
+
+    lines = ["💹 跑商盈利机会 (随机推荐)", "━━━━━━━━━━━━━"]
+    for op in sample:
+        lines.append(
+            f"📦 {op['item']}\n🛒 {op['from']} → {op['to']}  "+
+            f"💸 {op['buy']} → 💰 {op['sell']}  "+
+            f"📈 +{op['profit']} ({op['margin']*100:.0f}%)"
+        )
+        lines.append("──────────")
+
+    await trade_advise_cmd.finish(message_add_head("\n".join(lines), event)) 
