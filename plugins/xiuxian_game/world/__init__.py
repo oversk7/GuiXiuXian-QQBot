@@ -19,6 +19,7 @@ from ..models.inventory import Inventory
 from ..models.world_tile import WorldTile
 from ..config import config
 from ..utils import message_add_head, luck_prob
+from collections import defaultdict
 from io import BytesIO
 import base64
 from PIL import Image, ImageDraw, ImageFont
@@ -44,6 +45,9 @@ for _reg_info in config.map_config.get("regions", {}).values():
 
 # 不在任何区域作为特产出现的材料视为通用材料
 COMMON_MATERIALS = list(_all_materials - _special_mats)
+
+# -------- 背包常量 --------
+MAX_STACK = 100  # 单格最大数量，与背包限制配合
 
 # ----------------- 工具函数 -----------------
 async def get_or_create_tile(session, region: str, x: int, y: int) -> WorldTile:
@@ -191,11 +195,11 @@ async def _handle_material(session, tile: WorldTile, player: Player) -> str:
         luck_bonus = quantity  # 翻倍
         quantity *= 2
     
-    # 检查背包容量
+    # 检查背包容量（按格子计）
     result = await session.execute(
         select(func.count(Inventory.id)).where(Inventory.player_id == player.id)
     )
-    current_items = result.scalar() or 0
+    current_slots = result.scalar() or 0
     
     # 检查是否已有该物品
     result = await session.execute(
@@ -206,21 +210,29 @@ async def _handle_material(session, tile: WorldTile, player: Player) -> str:
     )
     existing_item = result.scalars().first()
     
-    # 如果是新物品且背包已满，则无法拾取
-    if not existing_item and current_items >= player.inventory_capacity:
-        return f"⚠️ 你的背包已满（{current_items}/{player.inventory_capacity}），无法拾取 {item_cfg.name}。"
-    
-    # 更新或创建物品记录
+    # 如果需要新格子且背包已满，则无法拾取
+    need_new_slots = 0
+    remaining_qty = quantity
     if existing_item:
-        existing_item.quantity += quantity
+        space = MAX_STACK - existing_item.quantity
+        remaining_qty = max(0, quantity - space)
+    need_new_slots = (remaining_qty + MAX_STACK -1)//MAX_STACK if remaining_qty>0 else 0
+    if current_slots + (0 if existing_item else 0) + need_new_slots > player.inventory_capacity:
+        return f"⚠️ 背包空间不足（{current_slots}/{player.inventory_capacity}），无法拾取 {item_cfg.name}。"
+    
+    # 更新或创建物品记录，考虑 MAX_STACK
+    if existing_item:
+        space = MAX_STACK - existing_item.quantity
+        take = min(space, quantity)
+        if take > 0:
+            existing_item.quantity += take
+            quantity -= take
         session.add(existing_item)
-    else:
-        new_item = Inventory(
-            player_id=player.id,
-            item_id=item_id,
-            quantity=quantity
-        )
-        session.add(new_item)
+    # 创建新格子递归
+    while quantity > 0:
+        stack_qty = min(quantity, MAX_STACK)
+        session.add(Inventory(player_id=player.id, item_id=item_id, quantity=stack_qty))
+        quantity -= stack_qty
     
     # 标记为已拾取
     tile.state["looted"] = True

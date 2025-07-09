@@ -16,6 +16,7 @@ from __future__ import annotations
 """
 
 from datetime import datetime, time, timedelta, date
+from collections import defaultdict
 import random
 from typing import Dict, Tuple, List
 
@@ -30,6 +31,15 @@ from ..models.inventory import Inventory
 from ..utils import message_add_head
 from ..config import config
 
+# ------------------- 每日交易限额 -------------------
+TRADE_LIMIT_PER_ITEM_PER_DAY = 50  # 单玩家·单物品·每日可买/卖上限
+MAX_STACK = 100  # 单格上限
+
+# { (yyyy-mm-dd_str, player_id, item_id): qty_bought }
+_DAILY_BUY_RECORD: defaultdict[tuple, int] = defaultdict(int)
+# { (yyyy-mm-dd_str, player_id, item_id): qty_sold }
+_DAILY_SELL_RECORD: defaultdict[tuple, int] = defaultdict(int)
+
 # ------------------- 市场配置 -------------------
 class Market:
     def __init__(self, mid: str, name: str, coord: Tuple[int, int], items: List[str]):
@@ -39,9 +49,10 @@ class Market:
         self.items = items
 
 goods_ids = [
-    "lux_perfume", "red_wine", "gold_watch", "diamond_ring", "silk_scarf",
-    "dslr_camera", "smartphone", "gaming_console", "designer_bag", "luxury_chocolate",
-    "art_book", "concert_ticket", "fountain_pen", "sneakers", "noise_headphones"
+    "lux_perfume", "red_wine", "yin_grass","gold_watch", "diamond_ring", "silk_scarf",
+    "dslr_camera", "smartphone", "blood_pact", "gaming_console", "designer_bag", "luxury_chocolate",
+    "art_book", "concert_ticket", "fountain_pen", "sneakers", "noise_headphones",
+    "heal_potion", "spirit_herb"
 ]
 
 # 生成重叠商品列表：每个市场拥有 5 个商品，起始索引按 3 步进，形成交叠
@@ -109,7 +120,7 @@ async def _(event: MessageEvent):
         player: Player | None = await session.get(Player, event.get_user_id())
         if not player:
             await shop_cmd.finish("⛔ 请先创建角色")
-        if player.region != "大都市":
+        if player.region != "大都会":
             await shop_cmd.finish("⛔ 诡域中没有安全商人！")
 
         market = MARKET_BY_COORD.get((player.x, player.y))
@@ -167,16 +178,32 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
             select(Inventory).where(Inventory.player_id == player.id, Inventory.item_id == item_cfg.item_id)
         )
         inv_item = inv_record.scalars().first()
-        if not inv_item and item_count >= player.inventory_capacity:
-            await buy_cmd.finish("🎒 背包已满，无法购买新物品！")
+
+        # -------- 计算堆叠与格子需求 --------
+        remaining = qty
+        if inv_item:
+            space = MAX_STACK - inv_item.quantity
+            take = min(space, remaining)
+            inv_item.quantity += take
+            remaining -= take
+
+        # 新开格子数量需求
+        new_slots_needed = (remaining + MAX_STACK - 1) // MAX_STACK if remaining > 0 else 0
+        if item_count + (0 if inv_item else 0) + new_slots_needed > player.inventory_capacity:
+            await buy_cmd.finish("🎒 背包格子不足，无法容纳这么多物品！")
 
         # 扣款 & 添物
         player.gold -= total_cost
-        if inv_item:
-            inv_item.quantity += qty
-        else:
-            session.add(Inventory(player_id=player.id, item_id=item_cfg.item_id, quantity=qty))
+
+        # 创建新的格子
+        while remaining > 0:
+            stack_qty = min(remaining, MAX_STACK)
+            session.add(Inventory(player_id=player.id, item_id=item_cfg.item_id, quantity=stack_qty))
+            remaining -= stack_qty
         await session.commit()
+
+        today_key = (datetime.now().date().isoformat(), player.id, item_cfg.item_id)
+        _DAILY_BUY_RECORD[today_key] += qty
         await buy_cmd.finish(message_add_head(
             f"✅ 购买 {item_cfg.name}×{qty} 成功！\n💸 花费 {total_cost} 金币", event))
 
@@ -217,14 +244,33 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
         if not inv_item or inv_item.quantity < qty:
             await sell_cmd.finish("❌ 背包数量不足")
 
+        # 限制 sold qty implicitly by inventory check; no need stack check here
+
+        today_key = (datetime.now().date().isoformat(), player.id, item_cfg.item_id)
+        if _DAILY_SELL_RECORD[today_key] + qty > TRADE_LIMIT_PER_ITEM_PER_DAY:
+            allowed = TRADE_LIMIT_PER_ITEM_PER_DAY - _DAILY_SELL_RECORD[today_key]
+            await sell_cmd.finish(f"⛔ 每日限售 {TRADE_LIMIT_PER_ITEM_PER_DAY} 件，该物品今日剩余可售 {max(allowed,0)} 件")
+
         _, buy_price = _price_for(market, item_cfg.item_id)
         total_gain = buy_price * qty
 
         # 更新
-        inv_item.quantity -= qty
-        if inv_item.quantity <= 0:
-            await session.delete(inv_item)
+        to_remove = qty
+        # 可能存在多格相同物品，逐格扣除
+        inv_items_list = await session.execute(
+            select(Inventory).where(Inventory.player_id == player.id, Inventory.item_id == item_cfg.item_id)
+        )
+        for itm in inv_items_list.scalars().all():
+            if to_remove <= 0:
+                break
+            deduct = min(itm.quantity, to_remove)
+            itm.quantity -= deduct
+            to_remove -= deduct
+            if itm.quantity <= 0:
+                await session.delete(itm)
         player.gold += total_gain
         await session.commit()
+
+        _DAILY_SELL_RECORD[today_key] += qty
         await sell_cmd.finish(message_add_head(
             f"💰 卖出 {item_cfg.name}×{qty} 成功！\n🪙 获得 {total_gain} 金币", event)) 
