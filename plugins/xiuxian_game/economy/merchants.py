@@ -9,7 +9,7 @@ from __future__ import annotations
    - 出售价 = base_price * rand(0.8,1.2)
    - 收购价 = 出售价 * 0.7（向上取整）
 4. 指令：
-   • 商店            查看当前坐标市场价格表
+   • 市集            查看当前坐标市场价格表
    • 购买 物品 数量   消耗金币购买
    • 出售 物品 数量   将背包物品卖给市场
 5. 必须玩家坐标与市场坐标一致才可交易。
@@ -93,13 +93,33 @@ def _get_rng(merchant_id: str, item_id: str) -> random.Random:
 
 
 def _price_for(market: Market, item_id: str) -> Tuple[int, int]:
-    """返回 (sell_price,buy_price) 整数金币"""
+    """返回 (sell_price, buy_price)。
+
+    价格 = base × item_factor × (1 + local_delta)
+    • item_factor ：同一天内全世界统一，体现全球行情波动。
+    • local_delta ：基于市集 + item 哈希的微调（-15% ~ +15%），平衡不同市集差价，避免全部偏高/偏低。
+    """
     item_cfg = config.items_config["by_id"].get(item_id)
     base_price = item_cfg.price or 1
-    rng = _get_rng(market.id, item_id)
-    factor = rng.uniform(0.8, 1.2)
-    sell_price = max(1, int(base_price * factor))
-    buy_price = max(1, int(sell_price * 0.7))
+
+    # -------- 全球行情：仅由 item_id + 日期 决定 --------
+    day_seed = hash(f"{item_id}:{_current_seed_day().isoformat()}")
+    rng_global = random.Random(day_seed)
+    item_factor = rng_global.uniform(0.9, 1.1)  # 全局  ±10%
+
+    # -------- 当地浮动：市集间差价 --------
+    local_seed = hash(f"{market.id}:{item_id}:{_current_seed_day().isoformat()}")
+    rng_local = random.Random(local_seed)
+    local_delta = rng_local.uniform(-0.15, 0.15)  # ±15%
+
+    sell_price = max(1, int(base_price * item_factor * (1 + local_delta)))
+
+    # 市集收购价：在本市集卖给商人，可基于当地浮动略高，便于跨市集倒卖。
+    # 公式：sell_price * (0.9 + local_delta/3)  
+    # • 基准 0.9 确保有利差可赚（<=10% 毛利）
+    # • local_delta/3 使高价市集收购价更高，低价市集更低，形成空间差。
+    buy_ratio = 0.9 + local_delta / 3  # 范围约 0.85~0.95
+    buy_price = max(1, int(sell_price * buy_ratio))
     return sell_price, buy_price
 
 # ------------------- 指令 -------------------

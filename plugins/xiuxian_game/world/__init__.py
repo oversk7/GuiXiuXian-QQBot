@@ -403,7 +403,7 @@ async def _(event: MessageEvent):
     await explore_cmd.finish(f"{header}\n{log}")
 
 
-teleport_list = on_command("地图", block=True, priority=5)
+teleport_list = on_command("诡域", aliases={"地图"}, block=True, priority=5)
 @teleport_list.handle()
 async def handle_teleport_list(event: MessageEvent):
     """显示所有可传送的地点"""

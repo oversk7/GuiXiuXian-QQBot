@@ -15,7 +15,7 @@ from __future__ import annotations
 from nonebot import on_command
 from nonebot.adapters.qq import MessageEvent, Message
 from nonebot.params import CommandArg
-from datetime import datetime
+from datetime import datetime, timedelta
 from typing import Tuple
 from ..models.db import safe_session
 from ..models.player import Player
@@ -146,7 +146,6 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
             speed_now = _tiles_per_second(player.agility)
             rem_steps = max(abs(target_x - player.x), abs(target_y - player.y))
             eta_sec = rem_steps / speed_now if speed_now > 0 else 0
-            from datetime import timedelta
             eta_td = timedelta(seconds=int(eta_sec))
 
             await session.commit()
