@@ -159,7 +159,7 @@ async def handle_bag(event: MessageEvent, args: Message = CommandArg()):
         "【丢弃 [物品名] [数量]】 丢弃指定道具\n"
         "【图鉴 [关键词]】 查看物品或装备描述\n"
         "═══════════════\n"
-        "◈ 使用传送符示例：/传送 [地点]"
+        "◈ 使用示例：/使用 凝神草 1"
     )
     await bag_cmd.finish(Message(msg))
 
@@ -212,7 +212,7 @@ async def handle_trade(event: MessageEvent, args: Message = CommandArg()):
         "【装备上架 [装备ID] [价格]】 上架装备\n"
         "【装备下架 [上架ID]】 下架装备\n"
         "═══════════════\n"
-        "◈ 上架示例：/上架 传送符 5 80"
+        "◈ 上架示例：/上架 凝神草 5 80"
     )
     await trade_cmd.finish(Message(msg))
 

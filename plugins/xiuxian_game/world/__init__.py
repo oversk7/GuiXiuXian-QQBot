@@ -421,7 +421,7 @@ async def handle_teleport_list(event: MessageEvent):
             "🪐 可传送区域列表：\n"
             + "\n".join(locations)
             + "\n\n📌 使用方式：传送 [区域]\n"
-            "📦 需要消耗：传送符 ✖1"
+            "📦 需要消耗体力1点"
         )
         
         await teleport_list.finish(message_add_head(msg, event))

@@ -47,7 +47,7 @@ async def handle_sign(event: MessageEvent):
             lucky_msg = ""
 
         bonus_msg = ""
-        # 官群额外奖励传送符
+        # 官群额外奖励
         if group_id == 'A147FA35C340F858A66260FB4ADBB46D':
             bonus_msg = "\n🎁 官群额外奖励 怨念值+10 ↑"
             # 发放怨念值
