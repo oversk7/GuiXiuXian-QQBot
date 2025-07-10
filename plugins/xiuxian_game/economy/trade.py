@@ -63,31 +63,24 @@ async def handle_list_item(event: MessageEvent, args: Message = CommandArg()):
     if quantity <= 0 or price <= 0:
         await list_item.finish("❌ 数量和价格必须大于0")
 
-    item = config.items_config["by_name"].get(item_name)
-    if not item:
+    item_cfg = config.items_config["by_name"].get(item_name)
+    if not item_cfg:
         await list_item.finish("❌ 物品不存在")
     async with safe_session() as session:
-        item = await session.execute(
-            select(Inventory)
-            .where(Inventory.player_id == user_id)
-            .where(Inventory.item_id == item.item_id)
-        )
-        item = item.scalars().first()
-
-        if not item or item.quantity < quantity:
+        # 先尝试扣除物品（跨堆叠）
+        success = await Inventory.consume_item(session, user_id, item_cfg.item_id, quantity)
+        if not success:
+            await session.rollback()
             await list_item.finish(f"❌ {item_name} 数量不足")
 
+        # 创建上架记录
         trade_item = TradeItem(
             seller_id=user_id,
-            item_id=item.item_id,
+            item_id=item_cfg.item_id,
             quantity=quantity,
             price=price
         )
         session.add(trade_item)
-
-        item.quantity -= quantity
-        if item.quantity <= 0:
-            session.delete(item)
 
         await session.commit()
         await list_item.finish(f"✅ 成功上架 {item_name} ×{quantity}\n💰 单价：{price}金币")

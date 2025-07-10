@@ -151,6 +151,12 @@ class Inventory(Base):
         )
         stacks = result.scalars().all()
 
+        # ------- 先行校验：总量是否足够 -------
+        total_qty = sum(inv.quantity for inv in stacks)
+        if total_qty < quantity:
+            return False
+
+        # ------- 扣除逻辑 -------
         remaining = quantity
         for inv in stacks:
             if remaining <= 0:
@@ -163,5 +169,4 @@ class Inventory(Base):
             else:
                 session.add(inv)
 
-        # 成功：remaining == 0
-        return remaining == 0 
+        return True 

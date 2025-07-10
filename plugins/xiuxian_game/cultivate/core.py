@@ -223,6 +223,7 @@ ATTRIBUTE_MAP = {
     "力": "attack",
     "敏": "agility",
     "运": "luck",
+    "防": "defense",
 }
 
 @assign_points.handle()
