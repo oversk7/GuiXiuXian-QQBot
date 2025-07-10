@@ -288,10 +288,21 @@ async def handle_revive(event: MessageEvent):
         if not player:
             await revive_cmd.finish("⛔ 请先创建角色")
         player.hp = player.max_hp
+        player.mp = player.max_mp
         player.region = "大都会"
         session.add(player)
         await session.commit()
-        await revive_cmd.finish("✨ 已返回现实世界，恢复满状态！")
+        msg = (
+            "✨ 你从破碎的黑梦中惊醒，踏入『现实世界』。\n"
+            "━━━━━━━━━━━━━\n"
+            "✧ 生命与理智完全恢复\n"
+            "✧ 但你的精神状态可能不太好...\n"
+            f"✧ 当前坐标：({player.x},{player.y})\n"
+            "━━━━━━━━━━━━━\n"
+            "⬇️ 【修炼】继续喂养怨炁"
+        )
+
+        await revive_cmd.finish(message_add_head(msg, event))
 
 @drop_item.handle()
 async def handle_drop_item(event: MessageEvent, args: Message = CommandArg()):
