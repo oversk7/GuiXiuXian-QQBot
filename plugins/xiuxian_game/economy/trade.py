@@ -277,7 +277,7 @@ async def _(event: MessageEvent):
         reqs = (await session.execute(select(PurchaseRequest).where(PurchaseRequest.quantity>0).order_by(PurchaseRequest.created_at.desc()).limit(20))).scalars().all()
 
     if not reqs:
-        await request_list_cmd.finish("📭 暂无求购信息")
+        await request_list_cmd.finish("📭 暂无悬赏信息")
 
     lines=["📜 𝗕𝗼𝘂𝗻𝘁𝗶𝗲𝘀","━━━━━━━━━━"]
     for r in reqs:
@@ -318,14 +318,16 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
         if not success:
             await session.rollback()
             await supply_cmd.finish("❌ 扣除失败")
-
         # 支付赏金
         reward = qty * req.price
         supplier = await session.get(Player, supplier_id)
         supplier.gold += reward
 
         # 给请求者物品
-        await Inventory.add_item(session, req.requester_id, req.item_id, qty)
+        success = await Inventory.add_item(session, req.requester_id, req.item_id, qty)
+        if not success:
+            await session.rollback()
+            await supply_cmd.finish("❌ 悬赏者背包容量不足")
 
         # 更新求购数量
         req.quantity -= qty
