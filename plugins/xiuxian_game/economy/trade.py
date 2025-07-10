@@ -226,13 +226,21 @@ async def handle_remove_trade(event: MessageEvent, args: Message = CommandArg())
         
         if trade_item.quantity < quantity:
             await down_item.finish(f"❌ {trade_item.item.name} 数量不足")
-        
+
+        # 尝试将物品放回卖家背包，先检测容量
+        success = await Inventory.add_item(session, seller_id, trade_item.item_id, quantity)
+        if not success:
+            await session.rollback()
+            await down_item.finish("❌ 背包容量不足，无法下架该物品")
+
+        # 更新交易记录
         trade_item.quantity -= quantity
         if trade_item.quantity <= 0:
             session.delete(trade_item)
-        
+
         await session.commit()
-        await down_item.finish(f"✅ 成功下架 {trade_item.item.name} ×{quantity}")
+        item_name = config.items_config["by_id"].get(trade_item.item_id).name
+        await down_item.finish(f"✅ 成功下架 {item_name} ×{quantity}")
 
 # ----------------- 悬赏收购系统 -----------------
 

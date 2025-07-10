@@ -70,12 +70,42 @@ class Inventory(Base):
 
     # ---------------------- 工具方法 ----------------------
     @staticmethod
-    async def add_item(session, player_id: str, item_id: str, quantity: int):
-        """向玩家背包添加物品，自动处理堆叠和超出 STACK_SIZE 拆分。"""
+    async def add_item(session, player_id: str, item_id: str, quantity: int) -> bool:
+        """向玩家背包添加物品，自动处理堆叠和超出 STACK_SIZE 拆分。
+
+        当背包容量不足时，将返回 **False** 且**不会**对数据库做出任何修改；
+        成功添加时返回 **True**。
+        """
         if quantity <= 0:
-            return
+            return True  # 无需添加视为成功
+
         from sqlalchemy import select
-        # 先填充未满堆叠
+        from .player import Player  # 运行时导入避免循环
+        from math import ceil
+
+        # ------- 背包容量检查 -------
+        player: Player | None = await session.get(Player, player_id)
+        if not player:
+            return False  # 未找到玩家视为失败
+
+        result_inv = await session.execute(
+            select(Inventory).where(Inventory.player_id == player_id)
+        )
+        stacks_all = result_inv.scalars().all()
+
+        used_slots = sum(inv.slot_count for inv in stacks_all)
+        existing_qty = sum(inv.quantity for inv in stacks_all if inv.item_id == item_id)
+
+        # 计算添加后需要的新背包格
+        new_total_qty = existing_qty + quantity
+        new_slot_cnt = ceil(new_total_qty / STACK_SIZE)
+        current_slot_cnt = ceil(existing_qty / STACK_SIZE) if existing_qty else 0
+        extra_slots_needed = new_slot_cnt - current_slot_cnt
+
+        if used_slots + extra_slots_needed > player.inventory_capacity:
+            return False  # 背包空间不足
+
+        # ------- 开始执行添加逻辑 -------
         result = await session.execute(
             select(Inventory)
             .where(Inventory.player_id == player_id, Inventory.item_id == item_id)
@@ -98,6 +128,8 @@ class Inventory(Base):
             put_qty = min(STACK_SIZE, quantity)
             session.add(Inventory(player_id=player_id, item_id=item_id, quantity=put_qty))
             quantity -= put_qty 
+
+        return True
 
     @staticmethod
     async def consume_item(session, player_id: str, item_id: str, quantity: int) -> bool:
