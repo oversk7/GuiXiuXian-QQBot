@@ -33,7 +33,8 @@ async def handle_cultivate(event: MessageEvent):
         # 闭关状态检查
         if player.is_secluded:
             await cultivate.finish(message_add_head(
-                "⚰️ 钉子阻隔冥修 ──────────\n"
+                "⚰️ 钉子阻隔冥修\n"
+                "━━━━━━━━━━━━━\n"
                 "闭棺期间无法普通修炼。\n"
                 "━━━━━━━━━━━━━\n"
                 "⬇️ 【出关】推开棺盖 或 等待结算",
@@ -80,7 +81,8 @@ async def handle_seclusion(event: MessageEvent):
 
         if player.is_secluded:
             await seclusion.finish(message_add_head(
-                "⚰️ 棺材已封 ──────────\n"
+                "⚰️ 棺材已封\n"
+                "━━━━━━━━━━━━━\n"
                 "你已在闭棺中。\n"
                 "━━━━━━━━━━━━━\n"
                 "⬇️ 【出关】推开棺盖",
@@ -110,7 +112,8 @@ async def handle_out_seclusion(event: MessageEvent):
 
         if not player.is_secluded:
             await out_seclusion.finish(message_add_head(
-                "🕳️ 棺盖早已打开 ──────────\n"
+                "🕳️ 棺盖早已打开\n"
+                "━━━━━━━━━━━━━\n"
                 "你当前并未闭棺。\n"
                 "━━━━━━━━━━━━━\n"
                 "⬇️ 【闭关】钉上棺盖",
