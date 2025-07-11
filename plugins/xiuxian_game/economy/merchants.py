@@ -136,7 +136,7 @@ async def _(event: MessageEvent):
                 "💀 诡域之中皆不可信 ──────────\n"
                 "此地没有安全商人。\n"
                 "━━━━━━━━━━━━━\n"
-                "⬇️ 【返还】脱离诡域，返回现实", event))
+                "⬇️ 【返回】脱离诡域，返回现实", event))
 
         market = MARKET_BY_COORD.get((player.x, player.y))
         if not market:
@@ -180,7 +180,7 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
                 "💀 诡域之中皆不可信 ──────────\n"
                 "此地没有安全商人。\n"
                 "━━━━━━━━━━━━━\n"
-                "⬇️ 【返还】脱离诡域，返回现实", event))
+                "⬇️ 【返回】脱离诡域，返回现实", event))
         market = MARKET_BY_COORD.get((player.x, player.y))
         if not market:
             await buy_cmd.finish("⛔ 这里没有商人")
@@ -243,7 +243,7 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
                 "💀 诡域之中皆不可信 ──────────\n"
                 "此地没有安全商人。\n"
                 "━━━━━━━━━━━━━\n"
-                "⬇️ 【返还】脱离诡域，返回现实", event))
+                "⬇️ 【返回】脱离诡域，返回现实", event))
         market = MARKET_BY_COORD.get((player.x, player.y))
         if not market:
             await sell_cmd.finish("⛔ 这里只有风～没有商人")
