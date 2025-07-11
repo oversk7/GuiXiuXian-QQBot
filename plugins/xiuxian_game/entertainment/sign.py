@@ -13,7 +13,7 @@ sign = on_command("签到", block=True, priority=5)
 async def handle_sign(event: MessageEvent):
     user_id = event.get_user_id()
     now = datetime.now()
-    group_id = event.group_id
+    group_id = getattr(event, "group_id", None)
     async with get_session() as session:
         stmt = select(Player).where(Player.id == user_id)
         result = await session.execute(stmt)
