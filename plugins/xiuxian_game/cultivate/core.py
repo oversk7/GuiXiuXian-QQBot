@@ -32,7 +32,12 @@ async def handle_cultivate(event: MessageEvent):
         
         # 闭关状态检查
         if player.is_secluded:
-            await cultivate.finish("⛔ 闭关期间无法进行普通修炼，请先【出关】或完成闭关")
+            await cultivate.finish(message_add_head(
+                "⚰️ 钉子阻隔冥修 ──────────\n"
+                "闭棺期间无法普通修炼。\n"
+                "━━━━━━━━━━━━━\n"
+                "⬇️ 【出关】推开棺盖 或 等待结算",
+                event))
         
         # 冷却时间检查
         if player.last_cultivation and (datetime.now() - player.last_cultivation).seconds < cfg["cool_down"]:
@@ -74,7 +79,12 @@ async def handle_seclusion(event: MessageEvent):
             await seclusion.finish("⛔ 请先使用【注册】命令创建角色")
 
         if player.is_secluded:
-            await seclusion.finish("⛔ 你已经在闭关中")
+            await seclusion.finish(message_add_head(
+                "⚰️ 棺材已封 ──────────\n"
+                "你已在闭棺中。\n"
+                "━━━━━━━━━━━━━\n"
+                "⬇️ 【出关】推开棺盖",
+                event))
 
         player.is_secluded = True
         player.seclusion_start_time = datetime.now()
@@ -99,7 +109,12 @@ async def handle_out_seclusion(event: MessageEvent):
             await out_seclusion.finish("⛔ 请先使用【注册】命令创建角色")
 
         if not player.is_secluded:
-            await out_seclusion.finish("⛔ 你不在闭棺状态")
+            await out_seclusion.finish(message_add_head(
+                "🕳️ 棺盖早已打开 ──────────\n"
+                "你当前并未闭棺。\n"
+                "━━━━━━━━━━━━━\n"
+                "⬇️ 【闭关】钉上棺盖",
+                event))
 
         player.is_secluded = False
         k = 7 if player.level <= 10 else 6
@@ -231,7 +246,7 @@ async def handle_assign(event: MessageEvent, args: Message = CommandArg()):
     """分配属性点"""
     params = args.extract_plain_text().strip().split()
     if len(params) != 2:
-        await assign_points.finish("⛔ 格式错误，正确格式：加点 [属性] [点数]\n例：加点 力 5\n可选属性：体/智/力/敏/运")
+        await assign_points.finish("指令说明：加点 [属性] [点数]\n例：加点 力 5\n可选属性：体/智/力/敏/防/运")
     
     attr_name, points = params
     try:
