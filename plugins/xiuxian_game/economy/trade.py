@@ -321,9 +321,12 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
             await session.rollback()
             await supply_cmd.finish("❌ 扣除失败")
         # 支付赏金
-        reward = qty * req.price
+        original_reward = qty * req.price  # 原始赏金
+        tax = int(original_reward * 0.05) if original_reward > 10000 else 0  # 税费（5%）
+        supplier_gain = original_reward - tax  # 实际到账
+
         supplier = await session.get(Player, supplier_id)
-        supplier.gold += reward
+        supplier.gold += supplier_gain
 
         # 给请求者物品
         success = await Inventory.add_item(session, req.requester_id, req.item_id, qty)
@@ -337,8 +340,11 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
             await session.delete(req)
 
         await session.commit()
-        item_name=config.items_config["by_id"][req.item_id].name
-        await supply_cmd.finish(f"✅ 已完成悬赏，交付 {item_name}×{qty}，获得 {reward} 金币！")
+        item_name = config.items_config["by_id"][req.item_id].name
+        tax_info = f"\n📝 税费 {tax}金币 (5%)" if tax else ""
+        await supply_cmd.finish(
+            f"✅ 已完成悬赏，交付 {item_name}×{qty}，到账 {supplier_gain} 金币！{tax_info}"
+        )
 
 # 取消悬赏
 cancel_request_cmd = on_command("取消悬赏", aliases={"撤销悬赏", "撤销求购"}, priority=5, block=True)

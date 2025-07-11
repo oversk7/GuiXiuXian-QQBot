@@ -45,7 +45,7 @@ items:
       type: "CONSUMABLE"
       effect_type: "REVIVE"
       effect_params: {"rate": 1.0}
-      price: 1000
+      price: 5000
 
     - item_id: "rename_card"
       name: "改名卡"
