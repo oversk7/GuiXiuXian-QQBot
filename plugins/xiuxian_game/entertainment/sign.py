@@ -50,7 +50,7 @@ async def handle_sign(event: MessageEvent):
         # Luck 翻倍判定
         if random.random() < luck_prob(player.luck):
             gold_reward *= 2
-            lucky_msg = "🍀 幸运加成！奖励翻倍！"
+            lucky_msg = f"🍀 幸运加成！奖励翻倍，改写为{gold_reward}金币"
         else:
             lucky_msg = ""
 
@@ -73,7 +73,7 @@ async def handle_sign(event: MessageEvent):
         stamina_msg = "\n💪 体力已恢复至 10/10"
 
         await sign.send(
-            f"✅ 连续签到 {streak} 天！获得 {gold_reward} 金币！{lucky_msg}{bonus_msg}{stamina_msg}")
+            f"✅ 连续签到 {streak} 天！获得 {gold_reward} 金币！\n{lucky_msg}{bonus_msg}{stamina_msg}")
         
         # 检查是否为创建账号的同一天
         if player.created_at.date() == today:
