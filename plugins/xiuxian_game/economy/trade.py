@@ -286,6 +286,7 @@ async def _(event: MessageEvent):
         name=config.items_config["by_id"][r.item_id].name
         lines.append(f"🆔{r.id}│{name}×{r.quantity}\n💰{r.price}│🎯UID:{uid}")
     lines.append("━━━━━━━━━━\n🚚 接单：/接单 悬赏ID 数量")
+    lines.append("🛑 取消：/取消悬赏 悬赏ID [数量]")
     await request_list_cmd.finish(message_add_head("\n".join(lines), event))
 
 # 接单
@@ -338,3 +339,44 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
         await session.commit()
         item_name=config.items_config["by_id"][req.item_id].name
         await supply_cmd.finish(f"✅ 已完成悬赏，交付 {item_name}×{qty}，获得 {reward} 金币！")
+
+# 取消悬赏
+cancel_request_cmd = on_command("取消悬赏", aliases={"撤销悬赏", "撤销求购"}, priority=5, block=True)
+
+@cancel_request_cmd.handle()
+async def _(event: MessageEvent, args: Message = CommandArg()):
+    user_id = event.get_user_id()
+    parts = args.extract_plain_text().strip().split()
+    if len(parts) not in (1, 2) or not parts[0].isdigit() or (len(parts) == 2 and not parts[1].isdigit()):
+        await cancel_request_cmd.finish("🛑 格式：取消悬赏 悬赏ID [数量] （数量留空则全部取消）")
+
+    req_id = int(parts[0])
+    cancel_qty = int(parts[1]) if len(parts) == 2 else None
+
+    async with safe_session() as session:
+        req = await session.get(PurchaseRequest, req_id)
+        if not req or req.quantity <= 0:
+            await cancel_request_cmd.finish("❌ 悬赏不存在或已完成")
+
+        if req.requester_id != user_id:
+            await cancel_request_cmd.finish("❌ 只能取消自己发布的悬赏")
+
+        if cancel_qty is None:
+            cancel_qty = req.quantity
+        if cancel_qty <= 0 or cancel_qty > req.quantity:
+            await cancel_request_cmd.finish(f"❌ 可取消数量范围 1~{req.quantity}")
+
+        # 返还金币
+        refund = cancel_qty * req.price
+        player = await session.get(Player, user_id)
+        player.gold += refund
+
+        # 更新/删除悬赏
+        req.quantity -= cancel_qty
+        if req.quantity <= 0:
+            await session.delete(req)
+
+        await session.commit()
+
+        item_name = config.items_config["by_id"][req.item_id].name
+        await cancel_request_cmd.finish(f"✅ 已取消 {item_name}×{cancel_qty} 悬赏，返还 {refund} 金币")

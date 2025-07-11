@@ -207,6 +207,7 @@ async def handle_trade(event: MessageEvent, args: Message = CommandArg()):
         "【悬赏 [物品名] [数量] [价格]】 发布悬赏\n"
         "【悬赏列表】 查看悬赏列表\n"
         "【接单 [悬赏ID] [数量]】 接单悬赏\n"
+        "【撤销悬赏 [悬赏ID] [数量]】 不填数量则撤销全部\n"
         "【装备市场】 查看装备市场\n"
         "【购装 [上架ID]】 购买指定商品\n"
         "【装备上架 [装备ID] [价格]】 上架装备\n"
