@@ -26,12 +26,12 @@ async def handle_help(event: MessageEvent, args: Message = CommandArg()):
     msg = (
         "✨ 欢迎使用帮助系统 ✨\n"
         "═════════════\n"
-        "🧘 修炼系统  🎪 活动系统\n"
+        "🧘 修炼系统  🏪 跑商系统\n"
         "🎭 玩家系统  🎒 背包系统\n"
         "🛒 商店系统  📦 交易系统\n"
         "🗓️ 世界系统  🛒 装备系统\n"
         "🎮 公会系统  💰 银行系统\n"
-        "🔮 炼丹系统  🏪 跑商系统\n"
+        "🔮 炼丹系统  🎮 活动系统\n"
         "🏰 副本系统\n"
         "═════════════\n"
         "💡 发送/系统名称 查看详细指令，/更新 查看最近更新内容\n"
@@ -41,7 +41,7 @@ async def handle_help(event: MessageEvent, args: Message = CommandArg()):
     await help_cmd.finish(Message(msg))
 
 # 跑商系统
-market_cmd = on_command("跑商系统", block=True, priority=5)
+market_cmd = on_command("跑商系统",aliases={"跑商帮助"}, block=True, priority=5)
 @market_cmd.handle()
 async def handle_market(event: MessageEvent, args: Message = CommandArg()):
     msg = (
@@ -58,7 +58,7 @@ async def handle_market(event: MessageEvent, args: Message = CommandArg()):
     )
     await market_cmd.finish(Message(msg))
 # 炼丹系统
-alchemy_cmd = on_command("炼丹系统", priority=4, block=True)
+alchemy_cmd = on_command("炼丹系统",aliases={"炼丹帮助"}, priority=4, block=True)
 
 @alchemy_cmd.handle()
 async def handle_alchemy(event: MessageEvent, args: Message = CommandArg()):
@@ -73,7 +73,7 @@ async def handle_alchemy(event: MessageEvent, args: Message = CommandArg()):
     await alchemy_cmd.finish(Message(msg))
 
 # 银行系统
-bank_cmd = on_command("银行系统", priority=4, block=True)
+bank_cmd = on_command("银行系统",aliases={"银行帮助"}, priority=4, block=True)
 @bank_cmd.handle()
 async def handle_bank(event: MessageEvent, args: Message = CommandArg()):
     msg = (
@@ -100,7 +100,7 @@ async def handle_player(event: MessageEvent, args: Message = CommandArg()):
     await player_cmd.finish(Message(msg))
 
 # 装备系统
-equip_cmd = on_command("装备系统", priority=4, block=True)
+equip_cmd = on_command("装备系统", aliases={"装备帮助"}, priority=4, block=True)
 @equip_cmd.handle()
 async def handle_equip(event: MessageEvent, args: Message = CommandArg()):
     msg = (
@@ -117,7 +117,7 @@ async def handle_equip(event: MessageEvent, args: Message = CommandArg()):
     await equip_cmd.finish(Message(msg))
 
 # 修炼系统
-xiu_lian_cmd = on_command("修炼系统", priority=4, block=True)
+xiu_lian_cmd = on_command("修炼系统", aliases={"修炼帮助"}, priority=4, block=True)
 
 @xiu_lian_cmd.handle()
 async def handle_xiu_lian(event: MessageEvent, args: Message = CommandArg()):
@@ -134,7 +134,7 @@ async def handle_xiu_lian(event: MessageEvent, args: Message = CommandArg()):
 
 
 # 活动系统
-huo_dong_cmd = on_command("活动系统", priority=4, block=True)
+huo_dong_cmd = on_command("活动系统", aliases={"活动帮助"}, priority=4, block=True)
 
 @huo_dong_cmd.handle()
 async def handle_huo_dong(event: MessageEvent, args: Message = CommandArg()):
@@ -142,13 +142,12 @@ async def handle_huo_dong(event: MessageEvent, args: Message = CommandArg()):
         "✨ 活动系统帮助 ✨\n"
         "【签到】 每日签到，获取奖励"
         "【猜拳】 猜拳游戏，猜赢翻倍"
-        "【押大小】 押大小游戏，押赢翻倍"
         "直接发送活动名称查看详细指令"
     )
     await huo_dong_cmd.finish(Message(msg))
 
 # 背包系统
-bag_cmd = on_command("背包系统", priority=4, block=True)
+bag_cmd = on_command("背包系统", aliases={"背包帮助"}, priority=4, block=True)
 @bag_cmd.handle()
 async def handle_bag(event: MessageEvent, args: Message = CommandArg()):
     msg = (
@@ -164,7 +163,7 @@ async def handle_bag(event: MessageEvent, args: Message = CommandArg()):
     await bag_cmd.finish(Message(msg))
 
 # 任务系统
-ren_wu_cmd = on_command("世界系统", priority=4, block=True)
+ren_wu_cmd = on_command("世界系统", aliases={"世界帮助"}, priority=4, block=True)
 @ren_wu_cmd.handle()
 async def handle_ren_wu(event: MessageEvent, args: Message = CommandArg()):
     msg = (
@@ -179,7 +178,7 @@ async def handle_ren_wu(event: MessageEvent, args: Message = CommandArg()):
     await ren_wu_cmd.finish(Message(msg))
 
 # 副本系统
-fan_ben_cmd = on_command("副本系统", priority=4, block=True)
+fan_ben_cmd = on_command("副本系统", aliases={"副本帮助"}, priority=4, block=True)
 @fan_ben_cmd.handle()
 async def handle_fan_ben(event: MessageEvent, args: Message = CommandArg()):
     msg = (
@@ -194,7 +193,7 @@ async def handle_fan_ben(event: MessageEvent, args: Message = CommandArg()):
     await fan_ben_cmd.finish(Message(msg))
 
 # 交易系统
-trade_cmd = on_command("交易系统", priority=4, block=True)
+trade_cmd = on_command("交易系统", aliases={"交易帮助"}, priority=4, block=True)
 @trade_cmd.handle()
 async def handle_trade(event: MessageEvent, args: Message = CommandArg()):
     msg = (
@@ -218,7 +217,7 @@ async def handle_trade(event: MessageEvent, args: Message = CommandArg()):
     await trade_cmd.finish(Message(msg))
 
 # 公会系统
-guild_help_cmd = on_command("公会系统", priority=4, block=True)
+guild_help_cmd = on_command("公会系统", aliases={"公会帮助"}, priority=4, block=True)
 
 @guild_help_cmd.handle()
 async def handle_guild_help(event: MessageEvent, args: Message = CommandArg()):

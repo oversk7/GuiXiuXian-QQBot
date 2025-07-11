@@ -1,1 +1,1 @@
-from . import dice_duel, finger_guessing, sign
+from . import finger_guessing, sign
