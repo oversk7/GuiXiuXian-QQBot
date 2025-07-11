@@ -104,7 +104,8 @@ async def get_or_create_tile(session, region: str, x: int, y: int) -> WorldTile:
             tile.state = {
                 "item_id": item_id,
                 "quantity": rng.randint(1, 3),
-                "looted": False,
+                # 个人事件：记录已拾取玩家ID，避免相互影响
+                "looted_by": [],
             }
         tile = await session.merge(tile)
         await session.flush()
@@ -148,7 +149,8 @@ async def _(event: MessageEvent):
                 item_cfg = config.items_config["by_id"].get(t.state.get("item_id"))
                 item_name = item_cfg.name if item_cfg else "未知材料"
                 qty = t.state.get("quantity", "?")
-                if t.state.get("looted"):
+                looted_by = t.state.get("looted_by", [])
+                if player.id in looted_by or t.state.get("looted"):
                     return f"🪨 这里曾经散落着 {item_name} ✖️{qty}，但已被搜刮一空。"
                 return f"✨ 你发现了材料 {item_name} ✖️{qty}，可输入 [收集] 获取。"
             elif t.event_type == "TREASURE":
@@ -171,8 +173,9 @@ explore_cmd = on_command("探索", aliases={"战斗", "收集", "休息"}, block
 
 # 事件处理器映射
 async def _handle_material(session, tile: WorldTile, player: Player) -> str:
-    if tile.state.get("looted"):
-        return "🪨 这里什么都没有了。"
+    # 个人事件：仅当当前玩家已拾取时才视为已搜刮
+    if player.id in tile.state.get("looted_by", []) or tile.state.get("looted"):
+        return "🪨 这的材料已经被拿了，起码在你的视角是这样。"
     
     # 获取物品配置
     item_id = tile.state.get("item_id")
@@ -217,8 +220,8 @@ async def _handle_material(session, tile: WorldTile, player: Player) -> str:
     # 更新或创建物品记录
     await Inventory.add_item(session, player.id, item_id, quantity)
     
-    # 标记为已拾取
-    tile.state["looted"] = True
+    # 标记为已拾取（个人事件）
+    tile.state.setdefault("looted_by", []).append(player.id)
     session.add(tile)
     await session.flush()
     
@@ -337,8 +340,12 @@ async def _handle_personal_monster(session, tile: WorldTile, player: Player) -> 
 
     # 结算
     if monster_hp <= 0:
-        exp_gain = rng.randint(1, 3) * monster_level * (monster_level / player.level)
-        exp_gain = int(round(exp_gain))
+        # 经验结算：新手(<10级)不受等级差影响
+        base_exp = rng.randint(1, 3) * monster_level
+        if player.level < 10:
+            exp_gain = base_exp
+        else:
+            exp_gain = int(round(base_exp * (monster_level / player.level)))
         player.exp += exp_gain
         log += f"\n🎉 你击杀了 {monster_display}，获得 {exp_gain} EXP"
     elif player_hp <= 0:
@@ -392,6 +399,8 @@ async def _(event: MessageEvent):
         player: Player | None = await session.get(Player, event.get_user_id())
         if not player:
             await explore_cmd.finish("⛔ 请先创建角色")
+        if player.region != "大都会":
+            await explore_cmd.finish("⛔ 你已经返回现实")
         if player.hp <= 0:
             await explore_cmd.finish("💀 你已死亡，请先复活或休息后再探索！")
 
@@ -465,6 +474,9 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
                 item_cfg = config.items_config["by_id"].get(t.state.get("item_id"))
                 item_name = item_cfg.name if item_cfg else "未知材料"
                 qty = t.state.get("quantity", "?")
+                looted_by = t.state.get("looted_by", [])
+                if player.id in looted_by or t.state.get("looted"):
+                    return f"🪨 这里曾经散落着 {item_name} ✖️{qty}，但已被搜刮一空。"
                 return f"✨ 你抵达后发现 {item_name} ✖️{qty} 的微光。输入 [收集] 获取。"
             elif t.event_type == "TREASURE":
                 return "🎁 你抵达后看见一个尘封宝箱，输入 [探索] 调查。"

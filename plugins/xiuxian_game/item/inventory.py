@@ -11,6 +11,7 @@ from ..config import config
 from .item_effects import apply_effect
 from datetime import date
 from ..models.elixir_usage import ElixirUsageLog
+from ..models.navigation_task import NavigationTask
 
 inventory_cmd = on_command("背包", block=True, priority=5)
 use_item = on_command("使用", block=True, priority=5)
@@ -232,18 +233,28 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
         if player.stamina < STAM_COST:
             await teleport_cmd.finish(f"⛔ 体力不足，传送需要 {STAM_COST}，当前 {player.stamina}")
 
+        # 查询是否存在导航任务
+        nav_task: NavigationTask | None = await session.get(NavigationTask, player.id)
+
         # 扣除体力并移动
         player.stamina -= STAM_COST
         player.region = target_region
         player.x = 0
         player.y = 0
         session.add(player)
+        # 若有导航则删除
+        if nav_task:
+            await session.delete(nav_task)
+
         await session.commit()
 
-    msg = (
-        f"🚪 你耗费 {STAM_COST} 体力跨越裂隙，抵达『{target_region}』\n"
-        f"当前位置：{target_region} ({player.x},{player.y})"
-    )
+    msg_lines = [
+        f"🚪 你耗费 {STAM_COST} 体力跨越裂隙，抵达『{target_region}』",
+        f"当前位置：{target_region} ({player.x},{player.y})",
+    ]
+    if nav_task:
+        msg_lines.insert(1, "🛑 原导航任务已中断")
+    msg = "\n".join(msg_lines)
     await teleport_cmd.finish(message_add_head(msg, event))
 
 @rename_cmd.handle()
