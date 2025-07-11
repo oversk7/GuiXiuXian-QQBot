@@ -1,13 +1,13 @@
 regions:
   富安公寓:
-    level_range: [10, 20]
+    level_range: [1, 5]
     monsters:
       - "诡修亡魂"
       - "伥鬼"
     materials:
       - "wanted_poster"
   东岗水库:
-    level_range: [21, 40]
+    level_range: [5, 20]
     monsters:
       - "水鬼"
     materials:
