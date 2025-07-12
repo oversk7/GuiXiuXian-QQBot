@@ -73,7 +73,7 @@ class ItemInstance(Base):
     def config(self) -> ItemConfig:
         """返回 YAML 中的 ItemConfig 模板"""
         from ..config import config
-        return config.items_config["by_id"].get(self.template_id)
+        return config.items_config["by_id"].get(self.item_id)
     
     @property
     def is_equipment(self) -> bool:
@@ -181,7 +181,7 @@ class ItemInstance(Base):
             return True
 
         # 普通物品处理
-        existing_qty = sum(inv.quantity for inv in stacks_all if inv.template_id == template_id)
+        existing_qty = sum(inv.quantity for inv in stacks_all if inv.item_id == template_id)
         new_total_qty = existing_qty + quantity
         new_slot_cnt = ceil(new_total_qty / STACK_SIZE)
         current_slot_cnt = ceil(existing_qty / STACK_SIZE) if existing_qty else 0
@@ -193,7 +193,7 @@ class ItemInstance(Base):
         # 填充已有堆叠
         result = await session.execute(
             select(ItemInstance)
-            .where(ItemInstance.player_id == player_id, ItemInstance.template_id == template_id)
+            .where(ItemInstance.player_id == player_id, ItemInstance.item_id == template_id)
             .order_by(ItemInstance.id)
         )
         stacks: list[ItemInstance] = result.scalars().all()
@@ -227,7 +227,7 @@ class ItemInstance(Base):
         from sqlalchemy import select
         result = await session.execute(
             select(ItemInstance)
-            .where(ItemInstance.player_id == player_id, ItemInstance.template_id == template_id)
+            .where(ItemInstance.player_id == player_id, ItemInstance.item_id == template_id)
             .order_by(ItemInstance.quantity.asc())
         )
         stacks: list[ItemInstance] = result.scalars().all()
