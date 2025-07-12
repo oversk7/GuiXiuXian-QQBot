@@ -399,7 +399,7 @@ async def _(event: MessageEvent):
         player: Player | None = await session.get(Player, event.get_user_id())
         if not player:
             await explore_cmd.finish("⛔ 请先创建角色")
-        if player.region != "大都会":
+        if player.region == "大都会":
             await explore_cmd.finish("⛔ 你已经返回现实")
         if player.hp <= 0:
             await explore_cmd.finish("💀 你已死亡，请先复活或休息后再探索！")
