@@ -65,26 +65,35 @@ async def generate_exp_table(max_level: int = 100) -> str:
 
 
 async def paginate_items(items: list, page: int, page_size: Optional[int] = None) -> str:
-    """分页格式化背包物品"""
+    """分页格式化背包物品
+
+    • 普通物品显示数量：✖️{qty}
+    • 装备显示耐久：🛠️Dur {cur}/{max}
+    """
     # 从配置获取分页大小
     cfg_page_size = config.game_config["game"]["inventory_page_size"]
     page_size = page_size or cfg_page_size
-    
     start = (page - 1) * page_size
     end = start + page_size
     current_page_items = items[start:end]
-    
+
     # 计算总页数时使用实际分页大小
     total_pages = (len(items) - 1) // page_size + 1
-    page_info = f"\n📖 第 {page} 页（共 {total_pages} 页）"
-    
-    lines = []
-    for offset, item in enumerate(current_page_items, start=1):
-        global_idx = start + offset  # 背包全局序号
-        lines.append(
-            f"{global_idx}. {item.config.name} ✖️{item.quantity}\n"
-        )
-    
+    page_info = f"\n📖 第 {page} 页（共 {total_pages} 页)"
+
+    lines: list[str] = []
+    for offset, inst in enumerate(current_page_items, start=1):
+        global_idx = start + offset  # 背包全局序号 (从1开始)
+        if getattr(inst, "is_equipment", False):
+            tpl = inst.config
+            lines.append(
+                f"{global_idx}. {tpl.name} 🛠️Dur {inst.durability}/{tpl.durability}\n"
+            )
+        else:
+            lines.append(
+                f"{global_idx}. {inst.config.name} ✖️{inst.quantity}\n"
+            )
+
     return "🎒 你的背包\n" + "".join(lines) + page_info
 
 

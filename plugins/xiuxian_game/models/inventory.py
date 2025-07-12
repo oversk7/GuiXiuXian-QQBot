@@ -174,7 +174,7 @@ class ItemInstance(Base):
             for _ in range(quantity):
                 session.add(ItemInstance(
                     player_id=player_id,
-                    template_id=template_id,
+                    item_id=template_id,
                     quantity=1,
                     durability=equip_durability
                 ))
@@ -211,7 +211,7 @@ class ItemInstance(Base):
         # 剩余数量分新堆
         while quantity > 0:
             put_qty = min(STACK_SIZE, quantity)
-            session.add(ItemInstance(player_id=player_id, template_id=template_id, quantity=put_qty))
+            session.add(ItemInstance(player_id=player_id, item_id=template_id, quantity=put_qty))
             quantity -= put_qty
         return True
 

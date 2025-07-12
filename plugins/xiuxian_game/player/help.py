@@ -5,11 +5,11 @@ from nonebot.adapters.qq.message import MessageKeyboard,MessageArk
 from nonebot.adapters.qq.models import MessageArkKv, MessageArk, MessageArkObj, MessageArkObjKv
 from nonebot.params import CommandArg
 import os
-from ..models import Player, EquipmentInstance
+from ..models import Player
+from ..models.inventory import ItemInstance, ItemType
 from ..models.db import safe_session
 from ..config import config
 from ..utils import bypass_urls
-from ..models.inventory import ItemInstance
 
 # 生成经验表
 generate_exp_table_cmd = on_command("生成经验表", priority=4, block=True, permission=SUPERUSER)
@@ -152,13 +152,13 @@ bag_cmd = on_command("背包系统", aliases={"背包帮助"}, priority=4, block
 async def handle_bag(event: MessageEvent, args: Message = CommandArg()):
     msg = (
         "✨ 背包系统帮助 ✨\n"
-        "【背包 [页码]】 查看背包内所有物品\n"
-        "【查背包 [页码] [序号]】 查询物品详细信息\n"
+        "【背包 [类别] [页码]】 类别用于过滤，页码用于翻页，不填则查看所有\n"
         "【使用 [物品名] [数量]】 使用指定道具\n"
         "【丢弃 [物品名] [数量]】 丢弃指定道具\n"
         "【图鉴 [关键词]】 查看物品或装备描述\n"
         "═══════════════\n"
-        "◈ 使用示例：/使用 凝神草 1"
+        "◈ 使用示例：/背包 消耗品 1"
+        "◈ 类别可选：消耗品、材料、商品、丹药、装备"
     )
     await bag_cmd.finish(Message(msg))
 
@@ -325,38 +325,40 @@ give_equip_cmd = on_command("发装备", aliases={"发装", "给装"}, priority=
 
 @give_equip_cmd.handle()
 async def _(event: MessageEvent, args: Message = CommandArg()):
-    parts = args.extract_plain_text().strip().split(maxsplit=1)
-    if len(parts) != 2:
-        await give_equip_cmd.finish("格式：发装备 UID 装备名称")
+    parts = args.extract_plain_text().strip().split()
+    if len(parts) < 2 or len(parts) > 3:
+        await give_equip_cmd.finish("格式：发装备 UID 装备名称 [数量]")
 
-    uid_str, item_name = parts
+    uid_str, item_name = parts[0], parts[1]
+    qty = 1
+    if len(parts) == 3:
+        if not parts[2].isdigit() or int(parts[2]) < 1:
+            await give_equip_cmd.finish("数量必须为正整数")
+        qty = int(parts[2])
+
     if not uid_str.isdigit():
         await give_equip_cmd.finish("UID 必须为数字")
-
     target_uid = int(uid_str)
 
     async with safe_session() as session:
         # 查找目标玩家
         from sqlalchemy import select
-        result = await session.execute(select(Player).where(Player.uid == target_uid))
-        player = result.scalars().first()
+        player = (await session.execute(select(Player).where(Player.uid == target_uid))).scalars().first()
         if not player:
             await give_equip_cmd.finish(f"❌ 未找到 UID 为 {target_uid} 的玩家")
 
-        # 检查物品模板
+        # 物品模板校验
         tpl = config.items_config["by_name"].get(item_name)
-        if not tpl or tpl.type.value != "EQUIPMENT":
+        if not tpl or tpl.type != ItemType.EQUIPMENT:
             await give_equip_cmd.finish("❌ 装备名称不存在或该物品不是装备")
 
-        # 创建装备实例
-        equip = EquipmentInstance(
-            player_id=player.id,
-            template_id=tpl.item_id,
-            durability=tpl.durability,
-        )
-        session.add(equip)
-        await session.commit()
-        await give_equip_cmd.finish(f"✅ 已给予 UID:{target_uid} 装备 {tpl.name} Dur {tpl.durability}")
+        try:
+            await ItemInstance.add_item(session, player.id, tpl.item_id, quantity=qty)
+            await session.commit()
+        except ValueError as e:
+            await give_equip_cmd.finish(f"❌ 失败：{e}")
+
+        await give_equip_cmd.finish(f"✅ 已给予 UID:{target_uid} 装备 {tpl.name} ✖️{qty}")
 
 # ------------------ 管理员：发物品 ------------------
 
@@ -391,18 +393,15 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
         tpl = config.items_config["by_name"].get(item_name)
         if not tpl:
             await give_item_cmd.finish("❌ 未找到该物品配置")
-        if tpl.type.value == "EQUIPMENT":
+        if tpl.type == ItemType.EQUIPMENT:
             await give_item_cmd.finish("❌ 该物品为装备，请使用 /发装备 指令")
 
-        # 更新背包
-        stmt = select(ItemInstance).where(ItemInstance.player_id == player.id, ItemInstance.item_id == tpl.item_id)
-        inv = (await session.execute(stmt)).scalars().first()
-        if inv:
-            inv.quantity += qty
-        else:
-            session.add(ItemInstance(player_id=player.id, item_id=tpl.item_id, quantity=qty))
+        try:
+            await ItemInstance.add_item(session, player.id, tpl.item_id, quantity=qty)
+            await session.commit()
+        except ValueError as e:
+            await give_item_cmd.finish(f"❌ 失败：{e}")
 
-        await session.commit()
         await give_item_cmd.finish(f"✅ 已给予 UID:{target_uid} {tpl.name} ✖️{qty}")
 
 

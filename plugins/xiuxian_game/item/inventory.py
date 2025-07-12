@@ -15,13 +15,31 @@ from ..models.navigation_task import NavigationTask
 
 inventory_cmd = on_command("背包", block=True, priority=5)
 use_item = on_command("使用", block=True, priority=5)
-item_detail = on_command("查背包", block=True, priority=5)
 
 teleport_cmd = on_command("传送", block=True, priority=5)
 rename_cmd = on_command("改名", block=True, priority=5)
 revive_cmd = on_command("返回", aliases={"复活"}, block=True, priority=5)
 
 drop_item = on_command("丢弃", aliases={"抛弃", "drop"}, block=True, priority=5)
+
+# ---------------- 背包类别映射 ----------------
+# 用户输入 → 内部标识
+CATEGORY_MAPPING = {
+    "消耗品": "CONSUMABLE",
+    "材料": "MATERIAL",
+    "商品": "GOODS",
+    "装备": "EQUIPMENT",
+    "丹药": "ELIXIR",  # 特殊标记，实质为 CONSUMABLE 下的一类
+}
+
+# 默认展示顺序（决定排序权重）
+CATEGORY_ORDER = [
+    "CONSUMABLE_NON_ELIXIR",  # 普通消耗品（不含丹药）
+    "MATERIAL",
+    "GOODS",
+    "ELIXIR",                # 丹药（item_id 以 _elixir 结尾）
+    "EQUIPMENT",
+]
 
 @use_item.handle()
 async def handle_use_item(event: MessageEvent, args: Message = CommandArg()):
@@ -108,109 +126,88 @@ async def handle_use_item(event: MessageEvent, args: Message = CommandArg()):
 
 @inventory_cmd.handle()
 async def handle_inventory(event: MessageEvent, args: Message = CommandArg()):
-    page = args.extract_plain_text().strip()
-    try:
-        page = int(page) if page else 1
-    except ValueError:
-        page = 1
+    # 解析参数：/背包 [类型] [页数]
+    params = args.extract_plain_text().strip().split()
+    category_key: str | None = None  # 内部标识（CATEGORY_MAPPING 的 value）
+    page: int = 1
 
+    if len(params) == 1:
+        # 可能是类型或页码
+        if params[0] in CATEGORY_MAPPING:
+            category_key = CATEGORY_MAPPING[params[0]]
+        else:
+            try:
+                page = int(params[0])
+                if page < 1:
+                    raise ValueError
+            except ValueError:
+                await inventory_cmd.finish("⛔ 格式错误，正确格式：背包 [类型] [页数] 或 背包 [页数]")
+    elif len(params) == 2:
+        # 类型 + 页码
+        type_str, page_str = params
+        category_key = CATEGORY_MAPPING.get(type_str)
+        if not category_key:
+            await inventory_cmd.finish(f"⛔ 无效背包类型：{type_str}")
+        try:
+            page = int(page_str)
+            if page < 1:
+                raise ValueError
+        except ValueError:
+            await inventory_cmd.finish("⛔ 页码必须为正整数")
+    elif len(params) > 2:
+        await inventory_cmd.finish("⛔ 格式错误，正确格式：背包 [类型] [页数]")
+
+    # --- 获取背包数据 ---
     async with safe_session() as session:
-        # 获取玩家背包数据
         player = await session.get(Player, event.get_user_id())
         if not player:
             await inventory_cmd.finish("⛔ 请先创建角色")
 
-        # 仅展示数量大于 0 的物品，防止数量为 0 仍然出现在背包
         result = await session.execute(
             select(ItemInstance)
             .where(ItemInstance.player_id == event.get_user_id())
             .where(ItemInstance.quantity > 0)
-            .order_by(ItemInstance.item_id)
         )
-        items = result.scalars().all()
+        items: list[ItemInstance] = result.scalars().all()
 
         if not items:
             await inventory_cmd.finish("🎒 你的背包空无一物")
 
-        # 分页处理
-        total_pages = (len(items) - 1) // 10 + 1
-        page = max(1, min(page, total_pages))
-        
-        formatted = await paginate_items(items, page)
-        await inventory_cmd.finish(message_add_head(formatted, event))
+        # ----------- Python 端分类过滤 -----------
+        def _is_elixir(inst: ItemInstance) -> bool:
+            return inst.config.item_id.endswith("_elixir")
 
-@item_detail.handle()
-async def handle_item_detail(event: MessageEvent, args: Message = CommandArg()):
-    params = args.extract_plain_text().strip().split()
-    if len(params) != 2:
-        await item_detail.finish("⛔ 格式错误，正确格式：查背包 [页码] [序号]\n例：查背包 1 3")
+        def _category_id(inst: ItemInstance) -> str:
+            if inst.config.type == ItemType.CONSUMABLE:
+                return "ELIXIR" if _is_elixir(inst) else "CONSUMABLE_NON_ELIXIR"
+            return inst.config.type.value  # MATERIAL / GOODS / EQUIPMENT
 
-    try:
-        page = int(params[0])
-        index = int(params[1])
-        if page < 1 or index < 1:
-            raise ValueError
-    except ValueError:
-        await item_detail.finish("⛔ 页码和序号必须为正整数")
+        if category_key:
+            if category_key == "ELIXIR":
+                items = [it for it in items if _is_elixir(it)]
+            elif category_key == "CONSUMABLE":
+                items = [it for it in items if it.config.type == ItemType.CONSUMABLE and not _is_elixir(it)]
+            else:
+                items = [it for it in items if it.config.type.value == category_key]
 
-    async with safe_session() as session:
-        # 获取玩家背包数据
-        player = await session.get(Player, event.get_user_id())
-        if not player:
-            await item_detail.finish("⛔ 请先创建角色")
+            if not items:
+                await inventory_cmd.finish("🎒 该分类下暂无物品")
 
-        # 同样过滤掉数量为 0 的记录
-        result = await session.execute(
-            select(ItemInstance)
-            .where(ItemInstance.player_id == event.get_user_id())
-            .where(ItemInstance.quantity > 0)
-            .order_by(ItemInstance.item_id)
-        )
-        items = result.scalars().all()
+        # 排序（仅全背包视图按固定顺序）
+        if not category_key:
+            order_map = {k: i for i, k in enumerate(CATEGORY_ORDER)}
+            items.sort(key=lambda it: (order_map.get(_category_id(it), 99), it.config.name))
+        else:
+            # 指定分类时按名称排序即可
+            items.sort(key=lambda it: it.config.name)
 
-        if not items:
-            await item_detail.finish("🎒 你的背包空无一物")
-
-        # 从配置获取分页大小
+        # ---------- 分页 ----------
         page_size = config.game_config["game"]["inventory_page_size"]
         total_pages = (len(items) - 1) // page_size + 1
-        
-        if page > total_pages:
-            await item_detail.finish(f"⛔ 最大页码为 {total_pages}")
+        page = max(1, min(page, total_pages))
 
-        # 支持全局索引与页内索引两种模式
-        # 如果输入的 index 超过当前页大小，则按全局序号处理
-        if index > page_size:
-            if index > len(items):
-                await item_detail.finish(f"⛔ 背包仅有 {len(items)} 个格子")
-            target_item = items[index - 1].config  # 全局序号
-        else:
-            start_idx = (page - 1) * page_size
-            end_idx = start_idx + page_size
-            page_items = items[start_idx:end_idx]
-
-            if index > len(page_items):
-                await item_detail.finish(f"⛔ 该页只有 {len(page_items)} 个物品")
-
-            target_item = page_items[index - 1].config
-
-        effect_info = ""
-        if target_item.effect_type and target_item.effect_params:
-            effects = {
-                "RESTORE_HP": f"❤️ 恢复 {target_item.effect_params.get('value', 0)}点生命",
-                "RESTORE_MP": f"🧠 恢复 {target_item.effect_params.get('value', 0)}点理智",
-                "BUFF": "✨ " + " ".join([f"{k}+{v}" for k,v in target_item.effect_params.items()])
-            }
-            effect_info = f"\n🔮 效果：{effects.get(target_item.effect_type.value, '特殊效果')}"
-
-        msg = (
-            f"📦 物品详情 [页{page}-{index}]\n"
-            f"▫️ 名称：{target_item.name}\n"
-            f"▫️ 类型：{target_item.type.value}\n"
-            f"▫️ 描述：{target_item.description or '暂无描述'}"
-            f"{effect_info}"
-        )
-        await item_detail.finish(message_add_head(msg, event))
+        formatted = await paginate_items(items, page, page_size=page_size)
+        await inventory_cmd.finish(message_add_head(formatted, event))
 
 @teleport_cmd.handle()
 async def _(event: MessageEvent, args: Message = CommandArg()):
