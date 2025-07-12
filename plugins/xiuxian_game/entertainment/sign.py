@@ -73,7 +73,7 @@ async def handle_sign(event: MessageEvent):
         stamina_msg = "\n💪 体力已恢复至 10/10"
 
         await sign.send(
-            f"✅ 连续签到 {streak} 天！获得 {gold_reward} 金币！\n{lucky_msg}{bonus_msg}{stamina_msg}")
+            f"✅ 连续签到 {streak} 天！获得 {int(gold_reward/2)} 金币！\n{lucky_msg}{bonus_msg}{stamina_msg}")
         
         # 检查是否为创建账号的同一天
         if player.created_at.date() == today:
