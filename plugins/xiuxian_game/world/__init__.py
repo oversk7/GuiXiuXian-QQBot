@@ -243,9 +243,9 @@ async def _handle_treasure(session, tile: WorldTile, player: Player) -> str:
     tile.state["looted"] = True
     session.add_all([player, tile])
     await session.flush()
-    msg = f"🔑 你在龟裂神像内抠出 {gold_gain}💰！"
+    msg = f"🔑 你在龟裂神像内抠出 {base_gold}💰！"
     if multiplier > 1.01:
-        msg += "\n🍀 幸运加成！宝箱更丰厚。"
+        msg += f"\n🍀幸运改写中...金币变为{gold_gain}！"
     return msg
 
 
@@ -342,10 +342,10 @@ async def _handle_personal_monster(session, tile: WorldTile, player: Player) -> 
     if monster_hp <= 0:
         # 经验结算：新手(<10级)不受等级差影响
         base_exp = rng.randint(1, 3) * monster_level
-        if player.level < 10:
+        if player.level <= 10:
             exp_gain = base_exp
         else:
-            exp_gain = int(round(base_exp * (monster_level / player.level)))
+            exp_gain = int(round(base_exp * (monster_level / (player.level-9))))
         player.exp += exp_gain
         log += f"\n🎉 你击杀了 {monster_display}，获得 {exp_gain} EXP"
     elif player_hp <= 0:
@@ -402,7 +402,7 @@ async def _(event: MessageEvent):
         if player.region == "大都会":
             await explore_cmd.finish("⛔ 你已经返回现实")
         if player.hp <= 0:
-            await explore_cmd.finish("💀 你已死亡，请先复活或休息后再探索！")
+            await explore_cmd.finish("💀 你已死亡，返回现实吧，或者你有复活道具...")
 
         tile = await get_or_create_tile(session, player.region, player.x, player.y)
         log = await EVENT_HANDLERS[tile.event_type](session, tile, player)

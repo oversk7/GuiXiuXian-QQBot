@@ -81,6 +81,7 @@ async def _revive(player: Player, cfg: ItemConfig, qty: int, ctx: str) -> Tuple[
         return False, "🧐 你尚未死亡，无需复活"
     ratio = float(cfg.effect_params.get("rate", 1.0))
     player.hp = max(1, int(player.max_hp * ratio))
+    player.mp = max(1, int(player.max_mp * ratio))
     return True, "✨ 你死而复生，继续前进吧！"
 
 

@@ -90,15 +90,43 @@ async def paginate_items(items: list, page: int, page_size: Optional[int] = None
 
 # ---------------- Luck 概率曲线 ----------------
 
-def luck_prob(luck_value: int | float, scale: int = 60) -> float:
-    """根据 Luck 值计算触发概率（软上限）。
+# Luck 值采用 S 型（Logistic）曲线：
+# 先稳增长 → 急剧提升 → 最后趋于平缓
+#
+#   prob = 1 / (1 + e ^(-(luck - midpoint) / steepness))
+#
+# • midpoint  决定曲线中点（Luck≈midpoint 时概率≈0.5）
+# • steepness 控制斜率，值越小曲线越陡
+#
+# 默认参数以 Luck≈60 达到 50% 触发率，Luck≈90 时≈88%，Luck≈120 时>98%。
 
-    概率 = 1 - e^(-luck/scale)，Luck 越高越接近 1，但边际收益递减。
-    scale 控制曲线斜率，数值越大增长越慢。
+def luck_prob(
+    luck_value: int | float,
+    midpoint: float = 60,
+    steepness: float = 30,
+) -> float:
+    """根据 *Luck* 值返回 0‒1 之间的触发概率，符合“先稳后急再缓”的 S 型。
+
+    参数
+    ------
+    luck_value : int | float
+        玩家当前 Luck 值。
+    midpoint : float, 可选
+        曲线的中点，Luck≈midpoint 时概率≈0.5。
+    steepness : float, 可选
+        斜率参数，数值越小，中段上升越陡。
     """
-    if luck_value <= 0:
+
+    # 基础保护
+    lv = float(luck_value)
+    if lv <= 0:
         return 0.0
-    return 1 - math.exp(-float(luck_value) / float(scale))
+
+    # Logistic 曲线
+    prob = 1.0 / (1.0 + math.exp(-(lv - midpoint) / steepness))
+
+    # 理论上已在 (0,1) 内，这里做硬裁剪避免浮点误差
+    return max(0.0, min(prob, 1.0))
 
 
 # ---------------- URL 转义工具 ----------------
