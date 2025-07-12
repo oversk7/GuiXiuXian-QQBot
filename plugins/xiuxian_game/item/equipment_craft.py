@@ -4,7 +4,7 @@ from nonebot.params import CommandArg
 from nonebot.adapters.qq import MessageEvent, Message
 from sqlalchemy import select
 from ..models.db import safe_session
-from ..models import Player, Inventory, EquipmentInstance
+from ..models import Player, ItemInstance, EquipmentInstance
 from ..config import config
 from ..utils import message_add_head
 
@@ -106,7 +106,7 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
         lacking_msgs = []
         for item_id, req_qty in req_materials.items():
             rows = (await session.execute(
-                select(Inventory).where(Inventory.player_id == player.id, Inventory.item_id == item_id)
+                select(ItemInstance).where(ItemInstance.player_id == player.id, ItemInstance.item_id == item_id)
             )).scalars().all()
             have_qty = sum(r.quantity for r in rows)
             if have_qty < req_qty:
@@ -118,7 +118,7 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
 
         # 扣除材料 & 金币
         for item_id, need_qty in req_materials.items():
-            success_consume = await Inventory.consume_item(session, player.id, item_id, need_qty)
+            success_consume = await ItemInstance.consume_item(session, player.id, item_id, need_qty)
             if not success_consume:
                 await session.rollback()
                 await craft_cmd.finish("⛔ 扣除材料失败")

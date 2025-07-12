@@ -27,7 +27,7 @@ from sqlalchemy import select
 
 from ..models.db import safe_session
 from ..models.player import Player
-from ..models.inventory import Inventory
+from ..models.inventory import ItemInstance
 from ..utils import message_add_head
 from ..config import config
 
@@ -193,27 +193,9 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
         if player.gold < total_cost:
             await buy_cmd.finish(f"💰 金币不足，需要 {total_cost} (当前 {player.gold})")
 
-        # 背包容量检查（考虑单格上限）
-        from ..models.inventory import STACK_SIZE
-        inv_rows = (await session.execute(
-            select(Inventory).where(Inventory.player_id == player.id)
-        )).scalars().all()
-        current_slots = sum(r.slot_count for r in inv_rows)
-
-        inv_item = next((r for r in inv_rows if r.item_id == item_cfg.item_id), None)
-
-        import math
-        if inv_item:
-            added_slots = math.ceil((inv_item.quantity + qty) / STACK_SIZE) - inv_item.slot_count
-        else:
-            added_slots = math.ceil(qty / STACK_SIZE)
-
-        if current_slots + added_slots > player.inventory_capacity:
-            await buy_cmd.finish("🎒 背包已满，无法购买新物品！")
-
         # 扣款 & 添物
         player.gold -= total_cost
-        await Inventory.add_item(session, player.id, item_cfg.item_id, qty)
+        await ItemInstance.add_item(session, player.id, item_cfg.item_id, qty)
         await session.commit()
         await buy_cmd.finish(message_add_head(
             f"✅ 购买 {item_cfg.name}×{qty} 成功！\n💸 花费 {total_cost} 金币", event))
@@ -253,7 +235,7 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
 
         # 检查库存（聚合数量）
         inv_rows = (await session.execute(
-            select(Inventory).where(Inventory.player_id == player.id, Inventory.item_id == item_cfg.item_id)
+            select(ItemInstance).where(ItemInstance.player_id == player.id, ItemInstance.item_id == item_cfg.item_id)
         )).scalars().all()
         total_qty = sum(r.quantity for r in inv_rows)
         if total_qty < qty:
@@ -263,7 +245,7 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
         total_gain = buy_price * qty
 
         # 更新：优先扣未满堆叠
-        success_consume = await Inventory.consume_item(session, player.id, item_cfg.item_id, qty)
+        success_consume = await ItemInstance.consume_item(session, player.id, item_cfg.item_id, qty)
         if not success_consume:
             await session.rollback()
             await sell_cmd.finish("❌ 扣除物品失败")

@@ -6,7 +6,7 @@ from datetime import datetime, date
 
 from ..models.db import safe_session
 from ..models.player import Player
-from ..models.inventory import Inventory
+from ..models.inventory import ItemInstance
 from ..models.guild import Guild
 from ..config import config
 from ..utils import message_add_head
@@ -57,9 +57,9 @@ async def handle_create_guild(event: MessageEvent, args: Message = CommandArg())
             await create_guild_cmd.finish("⚠️ 配置缺少 会长委任书")
 
         result = await session.execute(
-            select(Inventory).where(
-                Inventory.player_id == player.id,
-                Inventory.item_id == president_cfg.item_id
+            select(ItemInstance).where(
+                ItemInstance.player_id == player.id,
+                ItemInstance.item_id == president_cfg.item_id
             )
         )
         inv = result.scalars().first()

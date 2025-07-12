@@ -1,5 +1,5 @@
 from .player import Player
-from .inventory import Inventory
+from .inventory import ItemInstance
 from .trade import TradeItem
 from .purchase_request import PurchaseRequest
 from .navigation_task import NavigationTask
@@ -12,5 +12,5 @@ from .world_message import WorldMessage
 from .bank_account import BankAccount
 
 __all__ = [
-    "Player", "Guild", "GuildApplication", "WorldMessage", "BankAccount", "Team", "TeamMember", "Inventory", "TradeItem", "PlayerQuest", "Quest", "WorldTile", "EquipmentInstance", "TradeEquip", "NavigationTask", "AlchemyTask"
+    "Player", "Guild", "GuildApplication", "WorldMessage", "BankAccount", "Team", "TeamMember", "ItemInstance", "TradeItem", "PlayerQuest", "Quest", "WorldTile", "EquipmentInstance", "TradeEquip", "NavigationTask", "AlchemyTask"
 ]

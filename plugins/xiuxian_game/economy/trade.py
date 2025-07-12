@@ -3,7 +3,7 @@ from nonebot.adapters.qq import MessageEvent, Message
 from nonebot.params import CommandArg
 from sqlalchemy import select, delete, func
 from ..models.db import safe_session
-from ..models import Player, Inventory, TradeItem, PurchaseRequest
+from ..models import Player, ItemInstance, TradeItem, PurchaseRequest
 from ..config import config
 from ..utils import message_add_head
 
@@ -68,7 +68,7 @@ async def handle_list_item(event: MessageEvent, args: Message = CommandArg()):
         await list_item.finish("❌ 物品不存在")
     async with safe_session() as session:
         # 先尝试扣除物品（跨堆叠）
-        success = await Inventory.consume_item(session, user_id, item_cfg.item_id, quantity)
+        success = await ItemInstance.consume_item(session, user_id, item_cfg.item_id, quantity)
         if not success:
             await session.rollback()
             await list_item.finish(f"❌ {item_name} 数量不足")
@@ -134,15 +134,15 @@ async def handle_trade_command(event: MessageEvent, args: Message = CommandArg()
         seller.gold += seller_gain  # 卖家获得税后金额
 
         inv = await session.execute(
-            select(Inventory)
-            .where(Inventory.player_id == buyer_id)
-            .where(Inventory.item_id == trade_item.item_id)
+            select(ItemInstance)
+            .where(ItemInstance.player_id == buyer_id)
+            .where(ItemInstance.item_id == trade_item.item_id)
         )
         inv = inv.scalars().first()
         if inv:
             inv.quantity += quantity
         else:
-            session.add(Inventory(
+            session.add(ItemInstance(
                 player_id=buyer_id,
                 item_id=trade_item.item_id,
                 quantity=quantity
@@ -221,10 +221,10 @@ async def handle_remove_trade(event: MessageEvent, args: Message = CommandArg())
             await down_item.finish(f"❌ {trade_item.item.name} 数量不足")
 
         # 尝试将物品放回卖家背包，先检测容量
-        success = await Inventory.add_item(session, seller_id, trade_item.item_id, quantity)
-        if not success:
-            await session.rollback()
-            await down_item.finish("❌ 背包容量不足，无法下架该物品")
+        try:
+            await ItemInstance.add_item(session, seller_id, trade_item.item_id, quantity)
+        except ValueError as e:
+            await down_item.finish(f"❌ {e}")
 
         # 更新交易记录
         trade_item.quantity -= quantity
@@ -310,13 +310,13 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
             await supply_cmd.finish(f"❌ 悬赏剩余 {req.quantity}")
 
         # 检查库存
-        inv_rows = (await session.execute(select(Inventory).where(Inventory.player_id==supplier_id, Inventory.item_id==req.item_id))).scalars().all()
+        inv_rows = (await session.execute(select(ItemInstance).where(ItemInstance.player_id==supplier_id, ItemInstance.item_id==req.item_id))).scalars().all()
         have=sum(i.quantity for i in inv_rows)
         if have<qty:
             await supply_cmd.finish("❌ 背包数量不足")
 
         # 扣除物品
-        success = await Inventory.consume_item(session, supplier_id, req.item_id, qty)
+        success = await ItemInstance.consume_item(session, supplier_id, req.item_id, qty)
         if not success:
             await session.rollback()
             await supply_cmd.finish("❌ 扣除失败")
@@ -329,7 +329,7 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
         supplier.gold += supplier_gain
 
         # 给请求者物品
-        success = await Inventory.add_item(session, req.requester_id, req.item_id, qty)
+        success = await ItemInstance.add_item(session, req.requester_id, req.item_id, qty)
         if not success:
             await session.rollback()
             await supply_cmd.finish("❌ 悬赏者背包容量不足")

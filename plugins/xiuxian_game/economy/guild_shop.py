@@ -12,7 +12,7 @@ from ..config import config
 from ..models.db import safe_session
 from ..models.player import Player
 from ..models.guild import Guild
-from ..models.inventory import Inventory
+from ..models.inventory import ItemInstance
 from ..models.equipment import EquipmentInstance
 from ..utils import message_add_head
 
@@ -214,9 +214,9 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
             # 非装备统一存入背包
             inv = (
                 await session.execute(
-                    select(Inventory).where(
-                        Inventory.player_id == event.get_user_id(),
-                        Inventory.item_id == item_cfg.item_id,
+                    select(ItemInstance).where(
+                        ItemInstance.player_id == event.get_user_id(),
+                        ItemInstance.item_id == item_cfg.item_id,
                     )
                 )
             ).scalars().first()
@@ -224,7 +224,7 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
                 inv.quantity += quantity
             else:
                 session.add(
-                    Inventory(
+                    ItemInstance(
                         player_id=event.get_user_id(),
                         item_id=item_cfg.item_id,
                         quantity=quantity,

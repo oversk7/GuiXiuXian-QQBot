@@ -12,7 +12,7 @@ from datetime import datetime, timedelta
 from ..config import config
 from ..models.db import safe_session
 from ..models.player import Player
-from ..models.inventory import Inventory
+from ..models.inventory import ItemInstance
 from ..models.equipment import EquipmentInstance
 from ..models.alchemy_task import AlchemyTask
 from ..utils import message_add_head
@@ -148,7 +148,7 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
         coeff, dura_cost_base = _FURNACE_QUALITIES[furnace_inst.template_id]
 
         # 获取背包材料信息
-        invs = (await session.execute(select(Inventory).where(Inventory.player_id == player.id))).scalars().all()
+        invs = (await session.execute(select(ItemInstance).where(ItemInstance.player_id == player.id))).scalars().all()
 
         # 检查耐久
         total_dura_need = dura_cost_base * qty
@@ -165,7 +165,7 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
 
         # 扣材料
         for mid, need in mats_required.items():
-            success_consume = await Inventory.consume_item(session, player.id, mid, need)
+            success_consume = await ItemInstance.consume_item(session, player.id, mid, need)
             if not success_consume:
                 await session.rollback()
                 await start_cmd.finish("⛔ 扣除材料失败")
@@ -228,7 +228,7 @@ async def _(event: MessageEvent):
                         success_count += 1
                 if success_count:
                     total_qty = success_count * t.produce_per
-                    await Inventory.add_item(session, t.player_id, t.produce_item_id, total_qty)
+                    await ItemInstance.add_item(session, t.player_id, t.produce_item_id, total_qty)
                 t.delivered = True
                 await session.commit()
                 result_msg = f"✅ 已完成，成功 {success_count}/{t.qty} 炉，共得 {success_count*t.produce_per} 颗"

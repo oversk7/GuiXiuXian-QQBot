@@ -5,7 +5,7 @@ from sqlalchemy import select
 
 from ..models.db import safe_session
 from ..models.player import Player
-from ..models.inventory import Inventory
+from ..models.inventory import ItemInstance
 from ..utils import message_add_head
 from ..config import config
 
@@ -43,9 +43,9 @@ async def handle_sacrifice(event: MessageEvent, args: Message = CommandArg()):
 
         # 查询背包 (聚合)
         inv_rows = (await session.execute(
-            select(Inventory).where(
-                Inventory.player_id == player.id,
-                Inventory.item_id == item_cfg.item_id
+            select(ItemInstance).where(
+                ItemInstance.player_id == player.id,
+                ItemInstance.item_id == item_cfg.item_id
             )
         )).scalars().all()
         total_have = sum(r.quantity for r in inv_rows)
@@ -56,7 +56,7 @@ async def handle_sacrifice(event: MessageEvent, args: Message = CommandArg()):
         player.resentment += gained
 
         # 扣除物品（优先小堆）
-        success_consume = await Inventory.consume_item(session, player.id, item_cfg.item_id, qty)
+        success_consume = await ItemInstance.consume_item(session, player.id, item_cfg.item_id, qty)
         if not success_consume:
             await session.rollback()
             await sacrifice_cmd.finish("⛔ 扣除物品失败")

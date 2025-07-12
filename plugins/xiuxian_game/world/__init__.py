@@ -15,7 +15,7 @@ import random
 from sqlalchemy import select, func
 from ..models.db import safe_session
 from ..models.player import Player
-from ..models.inventory import Inventory
+from ..models.inventory import ItemInstance
 from ..models.world_tile import WorldTile
 from ..config import config
 from ..utils import message_add_head, luck_prob
@@ -191,34 +191,11 @@ async def _handle_material(session, tile: WorldTile, player: Player) -> str:
         luck_bonus = quantity  # 翻倍
         quantity *= 2
     
-    # 背包容量检查（按堆叠上限计算占用格数）
-    from ..models.inventory import STACK_SIZE
-    inv_rows = (await session.execute(
-        select(Inventory).where(Inventory.player_id == player.id)
-    )).scalars().all()
-    current_slots = sum(row.slot_count for row in inv_rows)
-
-    # 检查是否已有该物品
-    result = await session.execute(
-        select(Inventory).where(
-            Inventory.player_id == player.id,
-            Inventory.item_id == item_id
-        )
-    )
-    existing_item = result.scalars().first()
-
-    import math
-    # 计算本次操作需要新增的格子数
-    if existing_item:
-        added_slots = math.ceil((existing_item.quantity + quantity) / STACK_SIZE) - existing_item.slot_count
-    else:
-        added_slots = math.ceil(quantity / STACK_SIZE)
-
-    if current_slots + added_slots > player.inventory_capacity:
-        return f"⚠️ 你的背包已满（{current_slots}/{player.inventory_capacity}），无法拾取 {item_cfg.name}。"
-    
     # 更新或创建物品记录
-    await Inventory.add_item(session, player.id, item_id, quantity)
+    try:
+        await ItemInstance.add_item(session, player.id, item_id, quantity)
+    except ValueError as e:
+        return f"⚠️ 错误：{e}"
     
     # 标记为已拾取（个人事件）
     tile.state.setdefault("looted_by", []).append(player.id)

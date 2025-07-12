@@ -9,7 +9,7 @@ from ..models import Player, EquipmentInstance
 from ..models.db import safe_session
 from ..config import config
 from ..utils import bypass_urls
-from ..models.inventory import Inventory
+from ..models.inventory import ItemInstance
 
 # 生成经验表
 generate_exp_table_cmd = on_command("生成经验表", priority=4, block=True, permission=SUPERUSER)
@@ -395,12 +395,12 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
             await give_item_cmd.finish("❌ 该物品为装备，请使用 /发装备 指令")
 
         # 更新背包
-        stmt = select(Inventory).where(Inventory.player_id == player.id, Inventory.item_id == tpl.item_id)
+        stmt = select(ItemInstance).where(ItemInstance.player_id == player.id, ItemInstance.item_id == tpl.item_id)
         inv = (await session.execute(stmt)).scalars().first()
         if inv:
             inv.quantity += qty
         else:
-            session.add(Inventory(player_id=player.id, item_id=tpl.item_id, quantity=qty))
+            session.add(ItemInstance(player_id=player.id, item_id=tpl.item_id, quantity=qty))
 
         await session.commit()
         await give_item_cmd.finish(f"✅ 已给予 UID:{target_uid} {tpl.name} ✖️{qty}")

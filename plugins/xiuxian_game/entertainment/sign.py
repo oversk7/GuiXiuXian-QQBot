@@ -2,7 +2,7 @@ from nonebot import on_command
 from nonebot.adapters.qq import MessageEvent
 from datetime import datetime, timedelta
 from sqlalchemy import select
-from ..models import Player, Inventory
+from ..models import Player, ItemInstance
 from ..models.db import get_session
 import random
 from ..utils import luck_prob
@@ -78,7 +78,7 @@ async def handle_sign(event: MessageEvent):
         # 检查是否为创建账号的同一天
         if player.created_at.date() == today:
             # 赠送新手大礼包
-            starter_pack = Inventory(
+            starter_pack = ItemInstance(
                 player_id=player.id,
                 item_id="heal_potion",
                 quantity=3

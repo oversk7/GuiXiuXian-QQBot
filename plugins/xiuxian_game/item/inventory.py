@@ -3,7 +3,7 @@ from nonebot.params import CommandArg
 from nonebot.adapters.qq import MessageEvent, Message
 from ..models.db import safe_session
 from ..models.player import Player
-from ..models.inventory import Inventory
+from ..models.inventory import ItemInstance
 from ..models.inventory import ItemType, ItemEffectType
 from ..utils import message_add_head, paginate_items
 from sqlalchemy import select
@@ -50,9 +50,9 @@ async def handle_use_item(event: MessageEvent, args: Message = CommandArg()):
 
         # 检查背包中是否有该物品 (聚合数量)
         inv_rows = (await session.execute(
-            select(Inventory)
-            .where(Inventory.player_id == event.get_user_id())
-            .where(Inventory.item_id == item_config.item_id)
+            select(ItemInstance)
+            .where(ItemInstance.player_id == event.get_user_id())
+            .where(ItemInstance.item_id == item_config.item_id)
         )).scalars().all()
         total_qty = sum(r.quantity for r in inv_rows)
 
@@ -88,7 +88,7 @@ async def handle_use_item(event: MessageEvent, args: Message = CommandArg()):
             await use_item.finish(msg)
 
         # 扣除物品数量，优先消耗未满堆叠
-        success_consume = await Inventory.consume_item(session, player.id, item_config.item_id, quantity)
+        success_consume = await ItemInstance.consume_item(session, player.id, item_config.item_id, quantity)
         if not success_consume:
             await session.rollback()
             await use_item.finish("⛔ 扣除物品失败，请重试")
@@ -122,10 +122,10 @@ async def handle_inventory(event: MessageEvent, args: Message = CommandArg()):
 
         # 仅展示数量大于 0 的物品，防止数量为 0 仍然出现在背包
         result = await session.execute(
-            select(Inventory)
-            .where(Inventory.player_id == event.get_user_id())
-            .where(Inventory.quantity > 0)
-            .order_by(Inventory.item_id)
+            select(ItemInstance)
+            .where(ItemInstance.player_id == event.get_user_id())
+            .where(ItemInstance.quantity > 0)
+            .order_by(ItemInstance.item_id)
         )
         items = result.scalars().all()
 
@@ -161,10 +161,10 @@ async def handle_item_detail(event: MessageEvent, args: Message = CommandArg()):
 
         # 同样过滤掉数量为 0 的记录
         result = await session.execute(
-            select(Inventory)
-            .where(Inventory.player_id == event.get_user_id())
-            .where(Inventory.quantity > 0)
-            .order_by(Inventory.item_id)
+            select(ItemInstance)
+            .where(ItemInstance.player_id == event.get_user_id())
+            .where(ItemInstance.quantity > 0)
+            .order_by(ItemInstance.item_id)
         )
         items = result.scalars().all()
 
@@ -271,11 +271,11 @@ async def handle_rename(event: MessageEvent, args: Message = CommandArg()):
 
         rename_item = config.items_config["by_name"]["改名卡"]
         inv_result = await session.execute(
-            select(Inventory)
-            .where(Inventory.player_id == event.get_user_id())
-            .where(Inventory.item_id == rename_item.item_id)
+            select(ItemInstance)
+            .where(ItemInstance.player_id == event.get_user_id())
+            .where(ItemInstance.item_id == rename_item.item_id)
         )
-        inventory: Inventory = inv_result.scalars().first()
+        inventory: ItemInstance = inv_result.scalars().first()
 
         if not inventory or inventory.quantity < 1:
             await rename_cmd.finish("⛔ 改名卡数量不足")
@@ -347,9 +347,9 @@ async def handle_drop_item(event: MessageEvent, args: Message = CommandArg()):
             await drop_item.finish(f"⛔ 不存在物品：{item_name}")
 
         # 查询玩家背包中的该物品
-        inv_stmt = select(Inventory).where(
-            Inventory.player_id == event.get_user_id(),
-            Inventory.item_id == item_cfg.item_id
+        inv_stmt = select(ItemInstance).where(
+            ItemInstance.player_id == event.get_user_id(),
+            ItemInstance.item_id == item_cfg.item_id
         )
         inv = (await session.execute(inv_stmt)).scalars().first()
 
