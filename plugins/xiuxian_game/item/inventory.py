@@ -346,23 +346,10 @@ async def handle_drop_item(event: MessageEvent, args: Message = CommandArg()):
         if not item_cfg:
             await drop_item.finish(f"⛔ 不存在物品：{item_name}")
 
-        # 查询玩家背包中的该物品
-        inv_stmt = select(ItemInstance).where(
-            ItemInstance.player_id == event.get_user_id(),
-            ItemInstance.item_id == item_cfg.item_id
-        )
-        inv = (await session.execute(inv_stmt)).scalars().first()
-
-        if not inv or inv.quantity < quantity:
-            await drop_item.finish(f"⛔ {item_name} 数量不足")
-
-        # 扣除 / 删除库存记录
-        inv.quantity -= quantity
-        if inv.quantity <= 0:
-            await session.delete(inv)
-        else:
-            session.add(inv)
-
+        try:
+            await ItemInstance.consume_item(session, player.id, item_cfg.item_id, quantity)
+        except ValueError as e:
+            await drop_item.finish(f"⛔ 丢弃失败：{e}")
         await session.commit()
 
     await drop_item.finish(f"🗑️ 已丢弃 {item_name} ✖️{quantity}")
