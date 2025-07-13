@@ -227,8 +227,8 @@ async def _handle_treasure(session, tile: WorldTile, player: Player) -> str:
 
 
 async def _handle_empty(session, tile: WorldTile, player: Player) -> str:
-    # empty格有70%可能遇到个人的怪物，但不会影响公共事件
-    if random.random() < 0.7:
+    # empty格有80%可能遇到个人的怪物，但不会影响公共事件
+    if random.random() < 0.8:
         return await _handle_personal_monster(session, tile, player)
     return "🌫️ 什么都没有发现，除了回声……"
 

@@ -198,6 +198,7 @@ trade_cmd = on_command("交易系统", aliases={"交易帮助"}, priority=4, blo
 async def handle_trade(event: MessageEvent, args: Message = CommandArg()):
     msg = (
         "✨ 交易系统帮助 ✨\n"
+        "【交易清单 [页数]】 当前所有在售与求购物品总览\n"
         "【查牌 <物品名> [页数]】 查看物品在自由市场的买卖价格\n"
         "【挂牌 <出售/收购> <物品名> <单价> <数量>】 最多挂6个牌子\n"
         "【撤牌 <挂牌ID>】\n"

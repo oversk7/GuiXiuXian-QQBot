@@ -183,6 +183,88 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
 
         await view_cmd.finish(message_add_head("\n".join(lines), event))
 
+overview_cmd = on_command("交易清单", block=True, priority=5)
+
+@overview_cmd.handle()
+async def _(event: MessageEvent, args: Message = CommandArg()):
+    """交易清单 [页数] - 展示当前所有在售与求购物品总览"""
+    page_str = args.extract_plain_text().strip()
+    page = 1
+    if page_str:
+        try:
+            page = int(page_str)
+            if page < 1:
+                raise ValueError
+        except ValueError:
+            await overview_cmd.finish("⛔ 页数必须为正整数")
+
+    async with safe_session() as session:
+        # 聚合在售（SELL）信息：最低价与总数量
+        stmt_sell = (
+            select(
+                MarketOrder.item_id,
+                func.sum(MarketOrder.quantity).label("qty"),
+                func.min(MarketOrder.price).label("min_price"),
+            )
+            .where(MarketOrder.side == OrderSide.SELL)
+            .group_by(MarketOrder.item_id)
+        )
+        # 聚合求购（BUY）信息：最高价与总数量
+        stmt_buy = (
+            select(
+                MarketOrder.item_id,
+                func.sum(MarketOrder.quantity).label("qty"),
+                func.max(MarketOrder.price).label("max_price"),
+            )
+            .where(MarketOrder.side == OrderSide.BUY)
+            .group_by(MarketOrder.item_id)
+        )
+
+        sells = (await session.execute(stmt_sell)).all()
+        buys = (await session.execute(stmt_buy)).all()
+
+        def _fmt_sell(row):
+            item_cfg = config.items_config["by_id"].get(row.item_id)
+            if not item_cfg:
+                return None
+            return f"{item_cfg.name} {row.min_price}💰 ✖️{row.qty}"
+
+        def _fmt_buy(row):
+            item_cfg = config.items_config["by_id"].get(row.item_id)
+            if not item_cfg:
+                return None
+            return f"{item_cfg.name} {row.max_price}💰 ✖️{row.qty}"
+
+        sell_lines_raw: list[str] = list(filter(None, (_fmt_sell(r) for r in sells)))
+        buy_lines_raw: list[str] = list(filter(None, (_fmt_buy(r) for r in buys)))
+
+        PAGE_SIZE = 10
+
+        def _paginate(lst: list[str]):
+            total_pages = (len(lst) - 1) // PAGE_SIZE + 1 if lst else 1
+            p = max(1, min(page, total_pages))
+            start = (p - 1) * PAGE_SIZE
+            end = start + PAGE_SIZE
+            return lst[start:end], total_pages, p
+
+        sell_page, total_pages_sell, cur_page = _paginate(sell_lines_raw)
+        buy_page, total_pages_buy, _ = _paginate(buy_lines_raw)
+        total_pages = max(total_pages_sell, total_pages_buy)
+
+        lines: list[str] = [f"📊 市场总览 第{cur_page}/{total_pages}页"]
+        lines.append("━━ 在售 ━━")
+        if sell_page:
+            lines.extend(sell_page)
+        else:
+            lines.append("(空)")
+        lines.append("━━ 求购 ━━")
+        if buy_page:
+            lines.extend(buy_page)
+        else:
+            lines.append("(空)")
+
+        await overview_cmd.finish(message_add_head("\n".join(lines), event))
+
 # ======= 辅助函数 =======
 async def _try_auto_match(session, new_order: MarketOrder, player: Player, same_price_only: bool = False) -> str:
     """自动撮合逻辑，返回描述信息（可能为空）。"""
