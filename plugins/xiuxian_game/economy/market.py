@@ -198,7 +198,7 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
 
         await view_cmd.finish(message_add_head("\n".join(lines), event))
 
-overview_cmd = on_command("交易清单", block=True, priority=5)
+overview_cmd = on_command("交易清单", aliases={"交易市场"}, block=True, priority=5)
 
 @overview_cmd.handle()
 async def _(event: MessageEvent, args: Message = CommandArg()):
@@ -277,7 +277,7 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
             lines.extend(buy_page)
         else:
             lines.append("(空)")
-
+        lines.append("⬇️ 【查牌 <物品名> [页数]】 查看物品买卖行情")
         await overview_cmd.finish(message_add_head("\n".join(lines), event))
 
 # ======= 辅助函数 =======
