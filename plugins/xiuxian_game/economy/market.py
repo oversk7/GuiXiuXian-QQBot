@@ -18,7 +18,7 @@ EMOJI_BUY = "📥"   # 求购标识
 
 def format_order_line(order_id: int, price: int, qty: int, uid: int) -> str:
     """统一的市场订单行格式，便于排版对齐"""
-    return f"🆔{str(order_id).rjust(4)}┃💰{str(price).rjust(6)}┃📦{str(qty).rjust(4)}┃UID{uid}"
+    return f"🆔{str(order_id).rjust(3)}┃💰{str(price).rjust(8)}┃📦{qty}"
 
 
 def heavy_divider(title: str) -> str:
