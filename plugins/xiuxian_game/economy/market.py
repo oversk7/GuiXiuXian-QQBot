@@ -186,13 +186,11 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
 
         lines = [f"📋 {item_cfg.name} 市场牌子 · 第{cur_page}/{sell_total}页"]
         lines.append(heavy_divider(f"{EMOJI_SELL} 出售"))
-        lines.append("🆔┃💰┃📦┃UID")
         if sell_page:
             lines.extend(_fmt(o) for o in sell_page)
         else:
             lines.append("(空)")
         lines.append(heavy_divider(f"{EMOJI_BUY} 求购"))
-        lines.append("🆔┃💰┃📦┃UID")
         if buy_page:
             lines.extend(_fmt(o) for o in buy_page)
         else:

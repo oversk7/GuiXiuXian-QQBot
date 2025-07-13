@@ -31,12 +31,12 @@ async def _(event: MessageEvent):
         if not equips:
             await list_equipment.finish("🎒 你的装备栏空空如也")
 
-        lines = ["🎽 𝗘𝗾𝘂𝗶𝗽𝗺𝗲𝗻𝘁", "━━━"]
+        lines = ["🎽 装备栏", "━━━"]
         for eq in equips:
             tpl = eq.config
             equip_state = "🟢已装备" if eq.equipped else "🔘未装备"
             lines.append(
-                f"🆔{eq.id}│{tpl.name} Dur {eq.durability}/{tpl.durability} {equip_state}"
+                f"🆔{eq.id}│{tpl.name} 🛠️ {eq.durability}/{tpl.durability} {equip_state}"
             )
         await list_equipment.finish(message_add_head("\n".join(lines), event))
 

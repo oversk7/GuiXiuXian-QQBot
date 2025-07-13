@@ -68,7 +68,7 @@ async def paginate_items(items: list, page: int, page_size: Optional[int] = None
     """分页格式化背包物品
 
     • 普通物品显示数量：✖️{qty}
-    • 装备显示耐久：🛠️Dur {cur}/{max}
+    • 装备显示耐久：🛠️ {cur}/{max}
     """
     # 从配置获取分页大小
     cfg_page_size = config.game_config["game"]["inventory_page_size"]
@@ -87,7 +87,7 @@ async def paginate_items(items: list, page: int, page_size: Optional[int] = None
         if getattr(inst, "is_equipment", False):
             tpl = inst.config
             lines.append(
-                f"{global_idx}. {tpl.name} 🛠️Dur {inst.durability}/{tpl.durability}\n"
+                f"{global_idx}. {tpl.name} 🛠️ {inst.durability}/{tpl.durability}\n"
             )
         else:
             lines.append(
