@@ -216,7 +216,7 @@ class ItemInstance(Base):
         return True
 
     @staticmethod
-    async def consume_item(session, player_id: str, template_id: str, quantity: int = 1) -> bool:
+    async def consume_item(session, player_id: str, template_id: str, quantity: int = 1, durability: int = None) -> bool:
         """从玩家背包扣除物品，优先消耗未满堆叠；数量不足时返回 False。
 
         扣除逻辑：
@@ -225,6 +225,28 @@ class ItemInstance(Base):
         3. 最终确认累计扣除达到quantity。
         """
         from sqlalchemy import select
+        from ..config import config
+
+        item_config: ItemConfig | None = config.items_config["by_id"].get(template_id)
+        if not item_config:
+            raise ValueError(f"物品模板 {template_id} 不存在")
+        is_equipment = item_config.type == ItemType.EQUIPMENT
+
+        if is_equipment:
+            equip_durability = durability if durability is not None else item_config.durability
+            result = await session.execute(
+                select(ItemInstance)
+                .where(ItemInstance.player_id == player_id, ItemInstance.item_id == template_id, ItemInstance.durability == equip_durability)
+            )
+            stacks: list[ItemInstance] = result.scalars().all()
+            if len(stacks) < quantity:
+                raise ValueError(f"完整耐久度的装备数量不足")
+
+            for _ in range(quantity):
+                await session.delete(stacks[0])
+            return True
+
+        # 普通物品处理
         result = await session.execute(
             select(ItemInstance)
             .where(ItemInstance.player_id == player_id, ItemInstance.item_id == template_id)

@@ -8,7 +8,7 @@ from ..config import config
 from datetime import datetime
 import random
 from sqlalchemy import select as _sel
-from ..models.equipment import EquipmentInstance as _Equip
+from ..models.inventory import ItemInstance as _Equip, ItemType
 
 
 cfg = config.game_config["cultivate"]
@@ -275,7 +275,10 @@ async def handle_assign(event: MessageEvent, args: Message = CommandArg()):
 
         # -------- 撤销旧装备 bonus --------
         result_eq = await session.execute(
-            _sel(_Equip).where(_Equip.player_id == player.id, _Equip.equipped == True)
+            _sel(_Equip).where(
+                _Equip.player_id == player.id, _Equip.equipped == True,
+                _Equip.item_id.in_(config.items_config["by_type"]["EQUIPMENT"])
+            )
         )
         equipped_items = result_eq.scalars().all()
 

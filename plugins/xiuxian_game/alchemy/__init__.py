@@ -13,7 +13,7 @@ from ..config import config
 from ..models.db import safe_session
 from ..models.player import Player
 from ..models.inventory import ItemInstance
-from ..models.equipment import EquipmentInstance
+from ..models.inventory import ItemInstance as EquipInst
 from ..models.alchemy_task import AlchemyTask
 from ..utils import message_add_head
 
@@ -51,17 +51,17 @@ def _format_recipes(page: int = 1, page_size: int = 5) -> str:
     return "\n".join(lines)
 
 
-async def _pickup_furnace(session, player_id: str) -> EquipmentInstance | None:
-    stmt = select(EquipmentInstance).where(
-        EquipmentInstance.player_id == player_id,
-        EquipmentInstance.template_id.in_(_FURNACE_QUALITIES.keys()),
-        EquipmentInstance.on_market == False,
+async def _pickup_furnace(session, player_id: str) -> EquipInst | None:
+    stmt = select(EquipInst).where(
+        EquipInst.player_id == player_id,
+        EquipInst.item_id.in_(_FURNACE_QUALITIES.keys()),
+        EquipInst.on_market == False,
     )
     furnaces = (await session.execute(stmt)).scalars().all()
     if not furnaces:
         return None
     # 按品质系数、耐久排序
-    furnaces.sort(key=lambda inst: (_FURNACE_QUALITIES[inst.template_id][0], inst.durability), reverse=True)
+    furnaces.sort(key=lambda inst: (_FURNACE_QUALITIES[inst.item_id][0], inst.durability), reverse=True)
     return furnaces[0]
 
 # ---------------- 指令 ----------------
@@ -137,15 +137,15 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
             await start_cmd.finish("⛔ 请先创建角色")
 
         # --- 获取炉子实例 ----
-        furnace_inst = await session.get(EquipmentInstance, equip_id)
-        if not furnace_inst or furnace_inst.player_id != player.id:
+        furnace_inst = await session.get(EquipInst, equip_id)
+        if not furnace_inst or furnace_inst.player_id != player.id or furnace_inst.config.type.value != "EQUIPMENT":
             await start_cmd.finish("⛔ 未找到对应炼丹炉或非本人所有")
-        if furnace_inst.template_id not in _FURNACE_QUALITIES:
+        if furnace_inst.item_id not in _FURNACE_QUALITIES:
             await start_cmd.finish("⛔ 该装备不是炼丹炉，请指定正确的炉子ID")
         if furnace_inst.on_market:
             await start_cmd.finish("⛔ 该炉子已上架交易，无法使用")
 
-        coeff, dura_cost_base = _FURNACE_QUALITIES[furnace_inst.template_id]
+        coeff, dura_cost_base = _FURNACE_QUALITIES[furnace_inst.item_id]
 
         # 获取背包材料信息
         invs = (await session.execute(select(ItemInstance).where(ItemInstance.player_id == player.id))).scalars().all()

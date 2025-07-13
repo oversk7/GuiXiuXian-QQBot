@@ -7,12 +7,13 @@ from sqlalchemy import select, func
 from ..models.player import Gender
 from ..utils import message_add_head, calculate_level_up_exp
 from datetime import datetime
-from ..models.equipment import EquipmentInstance
+from ..models.inventory import ItemInstance, ItemType
 from collections import defaultdict
 from ..models.guild import Guild
 import random
 from ..models.navigation_task import NavigationTask
 from ..world.navigation import _update_nav_position
+from ..config import config
 
 # 每10级对应一个境界，诡异修仙风格
 # 境界名称与等级区间映射（10,10,20,20,20,20,30,30,30,50 累积）
@@ -78,9 +79,11 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
     bonus = defaultdict(int)
     async with safe_session() as session2:
         from sqlalchemy import select as sel
-        eq_stmt = sel(EquipmentInstance).where(
-            EquipmentInstance.player_id == player.id,
-            EquipmentInstance.equipped == True
+        equip_ids = config.items_config["by_type"]["EQUIPMENT"]
+        eq_stmt = sel(ItemInstance).where(
+            ItemInstance.player_id == player.id,
+            ItemInstance.equipped == True,
+            ItemInstance.item_id.in_(equip_ids)
         )
         equiped_list = (await session2.execute(eq_stmt)).scalars().all()
         for eq in equiped_list:

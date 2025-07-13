@@ -220,7 +220,7 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
     if target_region not in valid_regions:
         await teleport_cmd.finish("⛔ 目的地不存在，可发送 /地图 查看全部区域")
 
-    STAM_COST = 1  # 体力消耗
+    STAM_COST = 1  # 咒抗消耗
 
     async with safe_session() as session:
         player = await session.get(Player, event.get_user_id())
@@ -228,16 +228,14 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
             await teleport_cmd.finish("⛔ 请先创建角色")
 
         if player.stamina < STAM_COST:
-            await teleport_cmd.finish(f"⛔ 体力不足，传送需要 {STAM_COST}，当前 {player.stamina}")
+            await teleport_cmd.finish(f"⛔ 你的咒抗不足以在传送过程中维持清醒，需要 {STAM_COST}，当前 {player.stamina}")
 
         # 查询是否存在导航任务
         nav_task: NavigationTask | None = await session.get(NavigationTask, player.id)
 
-        # 扣除体力并移动
+        # 扣除咒抗并移动
         player.stamina -= STAM_COST
         player.region = target_region
-        player.x = 0
-        player.y = 0
         session.add(player)
         # 若有导航则删除
         if nav_task:
@@ -246,7 +244,7 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
         await session.commit()
 
     msg_lines = [
-        f"🚪 你耗费 {STAM_COST} 体力跨越裂隙，抵达『{target_region}』",
+        f"🚪 你耗费 {STAM_COST} 咒抗跨越裂隙，抵达『{target_region}』",
         f"当前位置：{target_region} ({player.x},{player.y})",
     ]
     if nav_task:

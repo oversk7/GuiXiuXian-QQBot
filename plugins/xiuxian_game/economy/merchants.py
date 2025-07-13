@@ -120,7 +120,7 @@ list_market_cmd = on_command("市集列表", aliases={"市场列表", "全部市
 detail_market_cmd = on_command("市集详情", aliases={"市集价格", "市场报价"}, block=True, priority=5)
 
 # 查看某物品在各市集的买/卖价
-price_compare_cmd = on_command("市价", aliases={"物价", "比价"}, block=True, priority=5)
+price_compare_cmd = on_command("市价", block=True, priority=5)
 
 # 跑商推荐：列出可获利的买卖路线
 trade_advise_cmd = on_command("跑商推荐", aliases={"套利", "赚差价"}, block=True, priority=5)

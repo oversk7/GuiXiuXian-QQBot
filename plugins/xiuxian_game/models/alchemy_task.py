@@ -10,7 +10,7 @@ class AlchemyTask(Base):
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
     player_id: Mapped[str] = mapped_column(String(32), index=True)
-    furnace_id: Mapped[int | None] = mapped_column(Integer, ForeignKey("equipment_instances.id", ondelete="SET NULL"))
+    furnace_id: Mapped[int | None] = mapped_column(Integer, ForeignKey("inventory.id", ondelete="SET NULL"))
 
     recipe_key: Mapped[str] = mapped_column(String(64))
     qty: Mapped[int] = mapped_column(Integer)

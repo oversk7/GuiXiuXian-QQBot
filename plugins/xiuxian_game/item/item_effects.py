@@ -7,8 +7,7 @@ from __future__ import annotations
 
 from typing import Callable, Awaitable, Dict, Tuple
 from ..models.player import Player
-from ..models.inventory import ItemEffectType, ItemConfig
-from ..models.equipment import EquipmentInstance
+from ..models.inventory import ItemEffectType, ItemConfig, ItemInstance, ItemType
 
 # 类型别名
 EffectHandler = Callable[[Player, ItemConfig, int, str], Awaitable[Tuple[bool, str]]]
@@ -134,10 +133,11 @@ async def _reset_attr(player: Player, cfg: ItemConfig, qty: int, ctx: str):
 
     # 累计装备 bonus
     bonus = {k: 0 for k in INIT}
-    eq_list = player.__dict__.get("equip_instances")  # 避免触发懒加载 I/O
+    # 从 Session 中预加载玩家装备
+    eq_list = player.__dict__.get("item_instances")
     if eq_list:
         for eq in eq_list:
-            if getattr(eq, "equipped", False):
+            if getattr(eq, "equipped", False) and eq.config and eq.config.type == ItemType.EQUIPMENT:
                 delta = (eq.extra_attrs or {}).get("_persist_bonus", {})
                 for k, v in delta.items():
                     if k in bonus:

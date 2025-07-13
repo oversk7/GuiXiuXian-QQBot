@@ -13,7 +13,6 @@ from ..models.db import safe_session
 from ..models.player import Player
 from ..models.guild import Guild
 from ..models.inventory import ItemInstance
-from ..models.equipment import EquipmentInstance
 from ..utils import message_add_head
 
 __all__ = [
@@ -201,15 +200,11 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
         player.gold2 -= total_cost
 
         if item_cfg.type.value == "EQUIPMENT":
-            # 逐件创建装备实例
-            for _ in range(quantity):
-                session.add(
-                    EquipmentInstance(
-                        player_id=event.get_user_id(),
-                        template_id=item_cfg.item_id,
-                        durability=item_cfg.durability,
-                    )
-                )
+            try:
+                await ItemInstance.add_item(session, player.id, item_cfg.item_id, quantity=quantity, durability=item_cfg.durability)
+            except ValueError as e:
+                await session.rollback()
+                await guild_buy_cmd.finish(f"⛔ {e}")
         else:
             # 非装备统一存入背包
             inv = (

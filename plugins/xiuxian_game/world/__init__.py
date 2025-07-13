@@ -25,7 +25,7 @@ from PIL import Image, ImageDraw, ImageFont
 from pathlib import Path
 import os
 from sqlalchemy import select as _select
-from ..models.equipment import EquipmentInstance as _Equip
+from ..models.inventory import ItemInstance as _Equip
 from . import nearby_players, message_board, navigation
 
 # ----------------- 常量 -----------------
@@ -332,7 +332,10 @@ async def _handle_personal_monster(session, tile: WorldTile, player: Player) -> 
 
     # ---------------- 扣除装备耐久 ----------------
     result_eq = await session.execute(
-        _select(_Equip).where(_Equip.player_id == player.id, _Equip.equipped == True)
+        _select(_Equip).where(
+            _Equip.player_id == player.id, _Equip.equipped == True,
+            _Equip.item_id.in_(config.items_config["by_type"]["EQUIPMENT"])
+        )
     )
     equipped_items = result_eq.scalars().all()
     broken_msgs = []
@@ -342,7 +345,7 @@ async def _handle_personal_monster(session, tile: WorldTile, player: Player) -> 
             delta = (eq.extra_attrs or {}).get("_persist_bonus", {})
             for k, v in delta.items():
                 setattr(player, k, getattr(player, k) - v)
-            broken_msgs.append(f"💔 {eq.template.name} 耐久耗尽，化为尘埃！")
+            broken_msgs.append(f"💔 {eq.config.name} 耐久耗尽，化为尘埃！")
             await session.delete(eq)
             # 修正HP/MP不超过上限
             if player.hp > player.max_hp:
@@ -360,7 +363,7 @@ async def _handle_rest(session, tile: WorldTile, player: Player) -> str:
     player.hp = player.max_hp
     session.add(player)
     await session.flush()
-    return "🌫️ 你在这里休息了一晚，恢复了体力。"
+    return "🌫️ 你在这里休息了一晚，恢复了咒抗。"
 
 
 EVENT_HANDLERS = {
@@ -407,7 +410,7 @@ async def handle_teleport_list(event: MessageEvent):
             "🪐 可传送区域列表：\n"
             + "\n".join(locations)
             + "\n\n📌 使用方式：传送 [区域]\n"
-            "📦 需要消耗体力1点"
+            "📦 需要消耗咒抗1点"
         )
         
         await teleport_list.finish(message_add_head(msg, event))

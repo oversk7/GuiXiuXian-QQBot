@@ -3,12 +3,13 @@ from nonebot.params import CommandArg
 from nonebot.adapters.qq import MessageEvent, Message
 from sqlalchemy import select
 from ..models.db import safe_session
-from ..models import Player, EquipmentInstance
+from ..models import Player, ItemInstance
 from ..config import config
 from ..utils import message_add_head
 
 # 最多可装备数量（可调整或改为读取配置）
 MAX_EQUIPPED = 4  # TODO: 后续可写入 config.game_config
+EQUIP_ITEM_IDS = config.items_config["by_type"]["EQUIPMENT"]
 
 # ---------------- 指令：装备列表 ----------------
 list_equipment = on_command("我的装备", aliases={"装备"}, block=True, priority=5)
@@ -20,7 +21,11 @@ async def _(event: MessageEvent):
         if not player:
             await list_equipment.finish("⛔ 请先创建角色")
 
-        stmt = select(EquipmentInstance).where(EquipmentInstance.player_id == event.get_user_id())
+        # 查询玩家所有装备条目
+        stmt = select(ItemInstance).where(
+            ItemInstance.player_id == event.get_user_id(),
+            ItemInstance.item_id.in_(EQUIP_ITEM_IDS)
+        )
         equips = (await session.execute(stmt)).scalars().all()
 
         if not equips:
@@ -28,7 +33,7 @@ async def _(event: MessageEvent):
 
         lines = ["🎽 𝗘𝗾𝘂𝗶𝗽𝗺𝗲𝗻𝘁", "━━━"]
         for eq in equips:
-            tpl = eq.template
+            tpl = eq.config
             equip_state = "🟢已装备" if eq.equipped else ("🛒在售" if eq.on_market else "🔘未装备")
             lines.append(
                 f"🆔{eq.id}│{tpl.name} Dur {eq.durability}/{tpl.durability} {equip_state}"
@@ -46,8 +51,8 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
     equip_id = int(arg)
 
     async with safe_session() as session:
-        equip = await session.get(EquipmentInstance, equip_id)
-        if not equip or equip.player_id != event.get_user_id():
+        equip = await session.get(ItemInstance, equip_id)
+        if not equip or equip.player_id != event.get_user_id() or equip.config.type.value != "EQUIPMENT":
             await wear_equipment.finish("⛔ 无效装备 ID 或非本人所有")
 
         if equip.equipped:
@@ -58,9 +63,10 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
 
         # ----- 上限检查 -----
         cur_equipped = (await session.execute(
-            select(EquipmentInstance).where(
-                EquipmentInstance.player_id == event.get_user_id(),
-                EquipmentInstance.equipped == True
+            select(ItemInstance).where(
+                ItemInstance.player_id == event.get_user_id(),
+                ItemInstance.equipped == True,
+                ItemInstance.item_id.in_(EQUIP_ITEM_IDS)
             )
         )).scalars().all()
         if len(cur_equipped) >= MAX_EQUIPPED:
@@ -94,7 +100,7 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
         equip.extra_attrs = extra_new
 
         await session.commit()
-        await wear_equipment.finish(f"✅ 成功穿戴 {equip.template.name}")
+        await wear_equipment.finish(f"✅ 成功穿戴 {equip.config.name}")
 
 # ---------------- 指令：卸下装备 ----------------
 unwear_equipment = on_command("卸下", block=True, priority=5)
@@ -107,8 +113,8 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
     equip_id = int(arg)
 
     async with safe_session() as session:
-        equip = await session.get(EquipmentInstance, equip_id)
-        if not equip or equip.player_id != event.get_user_id():
+        equip = await session.get(ItemInstance, equip_id)
+        if not equip or equip.player_id != event.get_user_id() or equip.config.type.value != "EQUIPMENT":
             await unwear_equipment.finish("⛔ 无效装备 ID 或非本人所有")
 
         if not equip.equipped:
@@ -133,4 +139,4 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
 
         equip.equipped = False
         await session.commit()
-        await unwear_equipment.finish(f"🔻 已卸下 {equip.template.name}") 
+        await unwear_equipment.finish(f"🔻 已卸下 {equip.config.name}") 

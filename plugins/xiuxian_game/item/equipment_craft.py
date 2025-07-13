@@ -4,7 +4,7 @@ from nonebot.params import CommandArg
 from nonebot.adapters.qq import MessageEvent, Message
 from sqlalchemy import select
 from ..models.db import safe_session
-from ..models import Player, ItemInstance, EquipmentInstance
+from ..models import Player, ItemInstance
 from ..config import config
 from ..utils import message_add_head
 
@@ -124,13 +124,12 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
                 await craft_cmd.finish("⛔ 扣除材料失败")
         player.gold -= req_gold
 
-        # 创建装备实例
-        equip_inst = EquipmentInstance(
-            player_id=event.get_user_id(),
-            template_id=item_cfg.item_id,
-            durability=item_cfg.durability,
-        )
-        session.add(equip_inst)
+        # 通过统一接口添加装备（不可堆叠，每件占1格）
+        try:
+            await ItemInstance.add_item(session, player.id, item_cfg.item_id, quantity=1, durability=item_cfg.durability)
+        except ValueError as e:
+            await session.rollback()
+            await craft_cmd.finish(f"⛔ {e}")
 
         await session.commit()
 
@@ -152,10 +151,10 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
     equip_id = int(arg_text)
 
     async with safe_session() as session:
-        equip = await session.get(EquipmentInstance, equip_id)
+        equip = await session.get(ItemInstance, equip_id)
         if not equip or equip.player_id != event.get_user_id():
             await repair_cmd.finish("⛔ 无效装备ID或非本人所有")
-        tpl = equip.template
+        tpl = equip.config
         if equip.durability >= tpl.durability:
             await repair_cmd.finish("🧐 该装备耐久已满，无需修复")
 
