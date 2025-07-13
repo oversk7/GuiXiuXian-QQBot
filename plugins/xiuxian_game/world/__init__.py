@@ -445,6 +445,8 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
             await jump_cmd.finish("⛔ 只有在驿站才能使用 [跳跃] 指令！")
 
         # 执行跳跃
+        if target_x > 1000 or target_y > 1000:
+            await jump_cmd.finish("⛔ 跳跃坐标超出范围")
         player.x = target_x
         player.y = target_y
 
