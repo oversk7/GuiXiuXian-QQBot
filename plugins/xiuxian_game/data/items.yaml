@@ -1,12 +1,5 @@
 items:
   consumables:  # 消耗品类
-    - item_id: "teleport"
-      name: "传送符"
-      description: "传送到指定地点"
-      type: "CONSUMABLE"
-      effect_type: "TELEPORT"
-      price: 100
-
     - item_id: "heal_potion"
       name: "回春散"
       description: "恢复少量生命值（+40HP）"
@@ -432,6 +425,5 @@ items:
       description: "隔绝噪音，放大心声"
       type: "GOODS"
       price: 900
-
 
       
