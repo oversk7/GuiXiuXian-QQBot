@@ -6,6 +6,7 @@ from .guild import Guild
 from .guild_application import GuildApplication
 from .world_message import WorldMessage
 from .bank_account import BankAccount
+from .alchemy_task import AlchemyTask
 from .market_order import MarketOrder
 
 __all__ = [

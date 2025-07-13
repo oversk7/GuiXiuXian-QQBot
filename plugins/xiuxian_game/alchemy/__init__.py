@@ -55,7 +55,6 @@ async def _pickup_furnace(session, player_id: str) -> EquipInst | None:
     stmt = select(EquipInst).where(
         EquipInst.player_id == player_id,
         EquipInst.item_id.in_(_FURNACE_QUALITIES.keys()),
-        EquipInst.on_market == False,
     )
     furnaces = (await session.execute(stmt)).scalars().all()
     if not furnaces:
@@ -142,8 +141,6 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
             await start_cmd.finish("⛔ 未找到对应炼丹炉或非本人所有")
         if furnace_inst.item_id not in _FURNACE_QUALITIES:
             await start_cmd.finish("⛔ 该装备不是炼丹炉，请指定正确的炉子ID")
-        if furnace_inst.on_market:
-            await start_cmd.finish("⛔ 该炉子已上架交易，无法使用")
 
         coeff, dura_cost_base = _FURNACE_QUALITIES[furnace_inst.item_id]
 
