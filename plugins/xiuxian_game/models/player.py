@@ -44,7 +44,7 @@ class Player(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now(), comment="创建时间")
     last_cultivation: Mapped[datetime] = mapped_column(DateTime, nullable=True, comment="上次修炼时间")
 
-    inventory_capacity: Mapped[int] = mapped_column(Integer, default=20, server_default='20', nullable=False, comment="背包容量")
+    inventory_capacity: Mapped[int] = mapped_column(Integer, default=30, server_default='30', nullable=False, comment="背包容量")
     is_secluded: Mapped[bool] = mapped_column(Boolean, default=False, server_default='False', comment="是否闭关")
     seclusion_start_time: Mapped[datetime] = mapped_column(DateTime, nullable=True, comment="闭关开始时间")
 
