@@ -205,6 +205,7 @@ async def _handle_material(session, tile: WorldTile, player: Player) -> str:
     base_msg = f"✨ 你采集到了 {item_cfg.name} ✖️{quantity}!"
     if luck_bonus:
         base_msg += "\n🍀 幸运闪现！材料翻倍。"
+    base_msg += "\n⬇️ 【图鉴 <物品名>】 查看描述"
     return base_msg
 
 
@@ -326,7 +327,7 @@ async def _handle_personal_monster(session, tile: WorldTile, player: Player) -> 
         player.exp += exp_gain
         log += f"\n🎉 你击杀了 {monster_display}，获得 {exp_gain} EXP"
     elif player_hp <= 0:
-        log += f"\n💀 你被 {monster_display} 击败，快去恢复吧！"
+        log += f"\n💀 你被 {monster_display} 击败，很遗憾，你已死亡"
     else:
         log += f"\n👁️ {monster_display} 剩余 {monster_hp} HP"
 
@@ -382,7 +383,9 @@ async def _(event: MessageEvent):
         if player.region == "大都会":
             await explore_cmd.finish("⛔ 你已经返回现实")
         if player.hp <= 0:
-            await explore_cmd.finish("💀 你已死亡，返回现实吧，或者你有复活道具...")
+            await explore_cmd.finish("💀 你已死亡，返回现实吧，或者你有复活道具..."
+                                     "\n⬇️ 【返回】 退出副本"
+                                     "\n⬇️ 【使用 还魂丹】 原地复活，继续副本")
 
         tile = await get_or_create_tile(session, player.region, player.x, player.y)
         log = await EVENT_HANDLERS[tile.event_type](session, tile, player)
@@ -407,9 +410,9 @@ async def handle_teleport_list(event: MessageEvent):
         
         # 格式化消息
         msg = (
-            "🪐 可传送区域列表：\n"
+            "🪐 可传送诡域列表：\n"
             + "\n".join(locations)
-            + "\n\n📌 使用方式：传送 [区域]\n"
+            + "\n\n📌 使用方式：传送 <诡域名>\n"
             "📦 需要消耗咒抗1点"
         )
         

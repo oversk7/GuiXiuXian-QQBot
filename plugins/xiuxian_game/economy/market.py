@@ -12,6 +12,18 @@ from ..utils import message_add_head
 
 MAX_LISTINGS = 6  # 每位玩家最大挂牌数
 AUTO_MATCH = True
+# === 输出格式辅助 ===
+EMOJI_SELL = "📤"  # 出售标识
+EMOJI_BUY = "📥"   # 求购标识
+
+def format_order_line(order_id: int, price: int, qty: int, uid: int) -> str:
+    """统一的市场订单行格式，便于排版对齐"""
+    return f"🆔{str(order_id).rjust(4)}┃💰{str(price).rjust(6)}┃📦{str(qty).rjust(4)}┃UID{uid}"
+
+
+def heavy_divider(title: str) -> str:
+    """返回带有粗线分隔符的标题"""
+    return f"━━ {title} ━━"
 
 # ---------------- 指令：挂牌 ----------------
 list_cmd = on_command("挂牌", block=True, priority=5)
@@ -87,7 +99,10 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
 
         await session.commit()
 
-    result_msg = f"📈 成功挂牌 #{new_order.id} {mode_str}{item_cfg.name} ✖️{quantity} @{price}💰" + ("\n" + fill_msg if fill_msg else "")
+    result_msg = (
+        f"📈 成功挂牌 🆔{new_order.id}┃{mode_str}{item_cfg.name}┃💰{price}┃📦{quantity}"
+        + ("\n" + fill_msg if fill_msg else "")
+    )
     await list_cmd.finish(message_add_head(result_msg, event))
 
 # ---------------- 指令：撤牌 ----------------
@@ -156,7 +171,7 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
         buys = (await session.execute(stmt_buy)).scalars().all()
 
         def _fmt(order: MarketOrder):
-            return f"#{order.id} {order.price}💰 ✖️{order.quantity} (UID {order.player.uid})"
+            return format_order_line(order.id, order.price, order.quantity, order.player.uid)
 
         PAGE_SIZE = 10
         def _paginate(lst: list[MarketOrder]):
@@ -169,13 +184,15 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
         sell_page, sell_total, cur_page = _paginate(sells)
         buy_page, _, _ = _paginate(buys)
 
-        lines = [f"💰 市场牌子 · {item_cfg.name} 第{cur_page}/{sell_total}页"]
-        lines.append("━━ 出售 ━━")
+        lines = [f"📋 {item_cfg.name} 市场牌子 · 第{cur_page}/{sell_total}页"]
+        lines.append(heavy_divider(f"{EMOJI_SELL} 出售"))
+        lines.append("🆔┃💰┃📦┃UID")
         if sell_page:
             lines.extend(_fmt(o) for o in sell_page)
         else:
             lines.append("(空)")
-        lines.append("━━ 收购 ━━")
+        lines.append(heavy_divider(f"{EMOJI_BUY} 求购"))
+        lines.append("🆔┃💰┃📦┃UID")
         if buy_page:
             lines.extend(_fmt(o) for o in buy_page)
         else:
@@ -227,13 +244,13 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
             item_cfg = config.items_config["by_id"].get(row.item_id)
             if not item_cfg:
                 return None
-            return f"{item_cfg.name} {row.min_price}💰 ✖️{row.qty}"
+            return f"{EMOJI_SELL} {item_cfg.name} 💰{row.min_price} 📦{row.qty}"
 
         def _fmt_buy(row):
             item_cfg = config.items_config["by_id"].get(row.item_id)
             if not item_cfg:
                 return None
-            return f"{item_cfg.name} {row.max_price}💰 ✖️{row.qty}"
+            return f"{EMOJI_BUY} {item_cfg.name} 💰{row.max_price} 📦{row.qty}"
 
         sell_lines_raw: list[str] = list(filter(None, (_fmt_sell(r) for r in sells)))
         buy_lines_raw: list[str] = list(filter(None, (_fmt_buy(r) for r in buys)))
@@ -252,12 +269,12 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
         total_pages = max(total_pages_sell, total_pages_buy)
 
         lines: list[str] = [f"📊 市场总览 第{cur_page}/{total_pages}页"]
-        lines.append("━━ 在售 ━━")
+        lines.append(heavy_divider(f"{EMOJI_SELL} 在售"))
         if sell_page:
             lines.extend(sell_page)
         else:
             lines.append("(空)")
-        lines.append("━━ 求购 ━━")
+        lines.append(heavy_divider(f"{EMOJI_BUY} 求购"))
         if buy_page:
             lines.extend(buy_page)
         else:
@@ -318,7 +335,7 @@ async def _try_auto_match(session, new_order: MarketOrder, player: Player, same_
         remaining -= trade_qty
         if new_order.side == OrderSide.BUY:
             total_spent += trade_price * trade_qty
-        trade_lines.append(f"⚖️ 成交 {trade_qty} 个 @{trade_price}💰")
+        trade_lines.append(f"✅ 成交 📦{trade_qty} @{trade_price}💰")
 
     # 更新当前单剩余
     new_order.quantity = remaining
