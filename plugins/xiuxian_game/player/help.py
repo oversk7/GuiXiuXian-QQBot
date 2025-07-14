@@ -151,6 +151,7 @@ async def handle_huo_dong(event: MessageEvent, args: Message = CommandArg()):
         "每日签到获取奖励，参与各种活动\n"
         "━━━━━━━━━━━━━\n"
         "【签到】 每日签到，获取奖励\n"
+        "【井字棋】 井字棋游戏，战胜AI获得奖励\n"
         "直接发送活动名称查看详细指令"
     )
     await huo_dong_cmd.finish(Message(msg))
