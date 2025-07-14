@@ -46,15 +46,15 @@ market_cmd = on_command("跑商系统",aliases={"跑商帮助"}, block=True, pri
 async def handle_market(event: MessageEvent, args: Message = CommandArg()):
     msg = (
         "✨ 跑商系统帮助 ✨\n"
+        "利用不同坐标的差价赚取金币，每日早9点刷新价格\n"
+        "━━━━━━━━━━━━━\n"
         "【市集】 查看当前坐标市场价格表\n"
         "【市集列表】 查看全部市集坐标\n"
         "【市集详情 [市集名称]】 查看指定市集商品\n"
         "【市价 [物品名称]】 查看某物品在各市集的买/卖价\n"
         "【购买 [物品] [数量]】 消耗金币购买\n"
         "【出售 [物品] [数量]】 将背包物品卖给市场\n"
-        "【跑商推荐】 查看利润最高的买卖路线\n"
-        "═══════════════\n"
-        "◈ 玩法：利用差价赚取金币，每日早9点刷新价格"
+        "【跑商推荐】 查看利润最高的买卖路线"
     )
     await market_cmd.finish(Message(msg))
 # 炼丹系统
@@ -64,12 +64,12 @@ alchemy_cmd = on_command("炼丹系统",aliases={"炼丹帮助"}, priority=4, bl
 async def handle_alchemy(event: MessageEvent, args: Message = CommandArg()):
     msg = (
         "✨ 炼丹系统帮助 ✨\n"
+        "消耗材料，获得丹药，丹炉属于装备，炉ID即装备ID\n"
+        "━━━━━━━━━━━━━\n"
         "【丹方】 查看炼丹配方\n"
         "【炼丹状态】 查看炼丹状态\n"
         "【炼丹 [炉ID] [丹方序号|名称] [数量]】 消耗炉子、材料，获得丹药\n"
-        "【收获丹药】\n"
-        "═══════════════\n"
-        "◈ 丹炉属于装备，炉ID即装备ID"
+        "【收获丹药】"
     )
     await alchemy_cmd.finish(Message(msg))
 
@@ -79,10 +79,12 @@ bank_cmd = on_command("银行系统",aliases={"银行帮助"}, priority=4, block
 async def handle_bank(event: MessageEvent, args: Message = CommandArg()):
     msg = (
         "✨ 银行系统帮助 ✨\n"
+        "冥行存取金币，查询余额时自动利滚利\n"
+        "━━━━━━━━━━━━━\n"
         "【存 金额】 存入冥行\n"
         "【取 金额】 从冥行取出\n"
         "【余额】 查询冥行存款并进行利滚利\n"
-        "【存款榜】 查看冥行存款排行榜\n"
+        "【存款榜】 查看冥行存款排行榜"
     )
     await bank_cmd.finish(Message(msg))
 
@@ -92,11 +94,13 @@ player_cmd = on_command("玩家系统", priority=4, block=True)
 async def handle_player(event: MessageEvent, args: Message = CommandArg()):
     msg = (
         "✨ 玩家系统帮助 ✨\n"
+        "查看玩家信息、排行榜，注册角色和改名\n"
+        "━━━━━━━━━━━━━\n"
         "【面板 [UID]】 查看指定玩家面板\n"
         "【财富榜】 查看财富榜\n"
         "【修为榜】 查看修为榜\n"
         "【注册】 注册角色\n"
-        "【改名 [新名字]】 改名\n"
+        "【改名 [新名字]】 改名"
     )
     await player_cmd.finish(Message(msg))
 
@@ -106,6 +110,8 @@ equip_cmd = on_command("装备系统", aliases={"装备帮助"}, priority=4, blo
 async def handle_equip(event: MessageEvent, args: Message = CommandArg()):
     msg = (
         "✨ 装备系统帮助 ✨\n"
+        "穿戴装备提升属性，用材料锻造新装备，修装备需要金币\n"
+        "━━━━━━━━━━━━━\n"
         "【装备栏】 查看自己装备\n"
         "【装备 [装备ID/名称]】 穿戴指定装备\n"
         "【卸下 [装备ID/名称]】 卸下指定装备\n"
@@ -123,6 +129,8 @@ xiu_lian_cmd = on_command("修炼系统", aliases={"修炼帮助"}, priority=4, 
 async def handle_xiu_lian(event: MessageEvent, args: Message = CommandArg()):
     msg = (
         "✨ 修炼系统帮助 ✨\n"
+        "突破境界获得属性点，献祭材料获取怨念保驾护航\n"
+        "━━━━━━━━━━━━━\n"
         "【修炼】 获取经验，冷却时间5分钟\n"
         "【闭关】 闭关修炼，挂机升级，但效率减半\n"
         "【出关】 出关后可继续修炼\n"
@@ -140,7 +148,9 @@ huo_dong_cmd = on_command("活动系统", aliases={"活动帮助"}, priority=4, 
 async def handle_huo_dong(event: MessageEvent, args: Message = CommandArg()):
     msg = (
         "✨ 活动系统帮助 ✨\n"
-        "【签到】 每日签到，获取奖励"
+        "每日签到获取奖励，参与各种活动\n"
+        "━━━━━━━━━━━━━\n"
+        "【签到】 每日签到，获取奖励\n"
         "直接发送活动名称查看详细指令"
     )
     await huo_dong_cmd.finish(Message(msg))
@@ -151,13 +161,12 @@ bag_cmd = on_command("背包系统", aliases={"背包帮助"}, priority=4, block
 async def handle_bag(event: MessageEvent, args: Message = CommandArg()):
     msg = (
         "✨ 背包系统帮助 ✨\n"
+        "管理物品，使用道具，查看图鉴。类别可选：消耗品、材料、商品、丹药、装备\n"
+        "━━━━━━━━━━━━━\n"
         "【背包 [类别] [页码]】 类别用于过滤，页码用于翻页，不填则查看所有\n"
         "【使用 [物品名] [数量]】 使用指定道具\n"
         "【丢弃 [物品名] [数量]】 丢弃指定道具\n"
-        "【图鉴 [关键词]】 查看物品或装备描述\n"
-        "═══════════════\n"
-        "◈ 使用示例：/背包 消耗品 1"
-        "◈ 类别可选：消耗品、材料、商品、丹药、装备"
+        "【图鉴 [关键词]】 查看物品或装备描述"
     )
     await bag_cmd.finish(Message(msg))
 
@@ -167,12 +176,14 @@ ren_wu_cmd = on_command("世界系统", aliases={"世界帮助"}, priority=4, bl
 async def handle_ren_wu(event: MessageEvent, args: Message = CommandArg()):
     msg = (
         "✨ 世界系统帮助 ✨\n"
+        "依赖敏捷进行坐标移动，可搭配跑商玩法赚钱\n"
+        "━━━━━━━━━━━━━\n"
         "【导航 [x] [y]】 开启/查看导航进度\n"
         "【中断导航】 取消当前导航\n"
         "【附近玩家】 查看附近玩家\n"
         "【留言 内容】 在世界留言板发布信息\n"
         "【留言板 [页码]】 查看世界留言板\n"
-        "【更新】 查看最近一次更新公告\n"
+        "【更新】 查看最近一次更新公告"
     )
     await ren_wu_cmd.finish(Message(msg))
 
@@ -182,12 +193,14 @@ fan_ben_cmd = on_command("副本系统", aliases={"副本帮助"}, priority=4, b
 async def handle_fan_ben(event: MessageEvent, args: Message = CommandArg()):
     msg = (
         "✨ 副本系统帮助 ✨\n"
+        "每日耗费咒抗进入诡域探索，进入后尽可能拿到更多的经验和材料\n"
+        "━━━━━━━━━━━━━\n"
         "【传送 [诡域]】 进入指定诡域\n"
         "【诡域】 查看当前可探索的诡域\n"
         "【[上|下|左|右]】 向指定方向移动一格\n"
         "【跳跃 [x] [y]】 跳跃到指定坐标，仅在驿站可使用\n"
         "【返回】 返回现实世界并满状态\n"
-        "【探索】 探索玩家所在地点\n"
+        "【探索】 探索玩家所在地点"
     )
     await fan_ben_cmd.finish(Message(msg))
 
@@ -197,6 +210,8 @@ trade_cmd = on_command("交易系统", aliases={"交易帮助"}, priority=4, blo
 async def handle_trade(event: MessageEvent, args: Message = CommandArg()):
     msg = (
         "✨ 交易系统帮助 ✨\n"
+        "初始6个牌子，玩家可用于出售或者收购物品，挂牌后自动以最优价成交\n"
+        "━━━━━━━━━━━━━\n"
         "【交易清单 [页数]】 当前所有在售与求购物品总览\n"
         "【查牌 <物品名> [页数]】 查看物品在自由市场的买卖价格\n"
         "【挂牌 <出售/收购> <物品名> <单价> <数量>】 最多挂6个牌子\n"
@@ -211,6 +226,8 @@ guild_help_cmd = on_command("公会系统", aliases={"公会帮助"}, priority=4
 async def handle_guild_help(event: MessageEvent, args: Message = CommandArg()):
     msg = (
         "✨ 公会系统帮助 ✨\n"
+        "公会商店有特殊装备和道具\n"
+        "━━━━━━━━━━━━━\n"
         "【创建公会 公会名】 创建公会（消耗会长委任书）\n"
         "【我的公会】 查看公会信息\n"
         "【公会成员】 查看成员列表\n"
