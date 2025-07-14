@@ -1,6 +1,7 @@
 from datetime import datetime, timedelta
 from sqlalchemy import Integer, String, DateTime, Float, Boolean, ForeignKey
 from sqlalchemy.orm import Mapped, mapped_column
+from sqlalchemy.sql import func
 from .db import Base
 import random
 from typing import Tuple
@@ -25,7 +26,7 @@ class AlchemyRecord(Base):
     duration_minutes: Mapped[int] = mapped_column(Integer)  # 总耗时(分钟)
 
     # 时间记录
-    started_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.now)
+    started_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.now, server_default=func.now())
     claimed: Mapped[bool] = mapped_column(Boolean, default=False, server_default="0")
 
     def is_finished(self) -> bool:
@@ -58,4 +59,6 @@ class AlchemyRecord(Base):
 
     def get_finish_time(self) -> datetime:
         """获取完成时间"""
+        if not self.started_at:
+            self.started_at = datetime.now()
         return self.started_at + timedelta(minutes=self.duration_minutes)
