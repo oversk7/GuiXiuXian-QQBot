@@ -6,6 +6,7 @@ from enum import Enum as PyEnum
 from math import ceil
 from datetime import datetime
 from sqlalchemy.sql import func
+from sqlalchemy.ext.mutable import MutableDict
 
 STACK_SIZE = 100  # 每个背包格可堆叠的最大数量
 
@@ -63,7 +64,7 @@ class ItemInstance(Base):
     quantity: Mapped[int] = mapped_column(Integer, default=1, server_default="1", comment="数量（装备固定为1）")
     durability: Mapped[int] = mapped_column(Integer, default=0, server_default="0",comment="当前耐久度（仅装备有效）")
     equipped: Mapped[bool] = mapped_column(Boolean, default=False, server_default="0", comment="是否已穿戴（仅装备有效）")
-    extra_attrs: Mapped[dict] = mapped_column(JSON, default=dict, server_default="{}", comment="强化等附加属性")
+    extra_attrs: Mapped[dict] = mapped_column(MutableDict.as_mutable(JSON), default=dict, server_default="{}", comment="强化等附加属性")
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.now, server_default="2025-01-01 00:00:00", comment="获得时间")
     
     owner: Mapped["Player"] = relationship("Player", backref="item_instances")
