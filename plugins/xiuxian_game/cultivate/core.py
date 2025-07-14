@@ -273,6 +273,10 @@ async def handle_assign(event: MessageEvent, args: Message = CommandArg()):
         attr_field = ATTRIBUTE_MAP[attr_name]
         inc_val = points * cfg["attributes_base"][attr_field]
 
+        # 记录分配前是否满血满蓝（仅在分配体/智属性时需要）
+        was_hp_full = player.hp >= player.max_hp
+        was_mp_full = player.mp >= player.max_mp
+
         # -------- 撤销旧装备 bonus --------
         result_eq = await session.execute(
             _sel(_Equip).where(
@@ -323,11 +327,17 @@ async def handle_assign(event: MessageEvent, args: Message = CommandArg()):
             eq.extra_attrs = extra
             session.add(eq)  # 确保装备的修改被保存
 
-        # 修正 HP/MP 不超过新上限
-        if player.hp > player.max_hp:
+        # 如果分配前是满血满蓝，分配后也应该保持满状态
+        if attr_field == "max_hp" and was_hp_full:
             player.hp = player.max_hp
-        if player.mp > player.max_mp:
+        elif attr_field == "max_mp" and was_mp_full:
             player.mp = player.max_mp
+        else:
+            # 修正 HP/MP 不超过新上限
+            if player.hp > player.max_hp:
+                player.hp = player.max_hp
+            if player.mp > player.max_mp:
+                player.mp = player.max_mp
 
         session.add(player)
         await session.commit()

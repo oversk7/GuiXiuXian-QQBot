@@ -95,6 +95,10 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
         # 计算并持久化属性增量
         player = await session.get(Player, event.get_user_id())
 
+        # 记录穿戴前是否满血满蓝
+        was_hp_full = player.hp >= player.max_hp
+        was_mp_full = player.mp >= player.max_mp
+
         # 先标记为已装备，以便 apply_attr_bonus 生效
         equip.equipped = True
 
@@ -113,6 +117,12 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
         # 应用到玩家本体
         for k, v in delta.items():
             setattr(player, k, getattr(player, k) + v)
+
+        # 如果穿戴前是满血满蓝，穿戴后也应该保持满状态
+        if was_hp_full and "max_hp" in delta:
+            player.hp = player.max_hp
+        if was_mp_full and "max_mp" in delta:
+            player.mp = player.max_mp
 
         # 保存 delta 到 extra_attrs 便于卸下时恢复
         extra_old = equip.extra_attrs or {}
