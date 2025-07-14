@@ -1,1 +1,1 @@
-from . import sign
+from . import sign, finger_guessing, fishing, treasure_hunt, farming, number_guess, lottery

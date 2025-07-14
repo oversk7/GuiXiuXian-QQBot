@@ -39,7 +39,7 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
     try:
         furnace_id = int(params[0])
     except ValueError:
-        await start_cmd.finish("⛔ 炉ID 必须是数字，可通过背包/装备列表查询")
+        await start_cmd.finish("⛔ 炉ID 必须是数字，可通过背包/装备栏查询")
 
     target = params[1]
 

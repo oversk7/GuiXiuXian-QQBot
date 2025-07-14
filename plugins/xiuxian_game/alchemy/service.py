@@ -161,7 +161,7 @@ class AlchemyService:
         msg = (
             f"🕰️ 炼丹开始：{prod_name} ✖️{qty} 炉\n"
             f"🎯 理论成功率：{int(success_rate*100)}%\n"
-            f"⏳ 预计完成时间：{finish_time.strftime('%H:%M:%S')}\n"
+            f"⏳ 预计完成时间点：{finish_time.strftime('%H:%M:%S')}\n"
             f"🔧 炉子状况 {furnace_note}"
         )
         
@@ -189,7 +189,10 @@ class AlchemyService:
         success_count, total_produce = record.calculate_result()
         
         if total_produce > 0:
-            await ItemInstance.add_item(session, record.player_id, record.produce_item_id, total_produce)
+            try:
+                await ItemInstance.add_item(session, record.player_id, record.produce_item_id, total_produce)
+            except ValueError as e:
+                return False, f"⛔ 领取失败：{e}"
         
         record.claimed = True
         

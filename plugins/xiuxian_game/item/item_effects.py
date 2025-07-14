@@ -91,6 +91,14 @@ async def _buff(player: Player, cfg: ItemConfig, qty: int, ctx: str) -> Tuple[bo
     if not attrs:
         return False, "⛔ 该道具没有任何增益"
     # 简单累加
+    ATTRIBUTE_MAP = {
+        "max_hp": "体",
+        "max_mp": "智",
+        "attack": "力",
+        "agility": "敏",
+        "luck": "运",
+        "defense": "防",
+    }
     changed = []
     for k, v in attrs.items():
         if not hasattr(player, k):
@@ -98,7 +106,7 @@ async def _buff(player: Player, cfg: ItemConfig, qty: int, ctx: str) -> Tuple[bo
         old = getattr(player, k)
         new_val = old + int(v) * qty
         setattr(player, k, new_val)
-        changed.append(f"{k}+{int(v)*qty}")
+        changed.append(f"{ATTRIBUTE_MAP[k]}+{int(v)*qty}")
     if not changed:
         return False, "⛔ 增益属性无效"
     return True, "✨ 获得增益：" + ", ".join(changed)
