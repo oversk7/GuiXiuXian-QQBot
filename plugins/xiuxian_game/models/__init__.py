@@ -6,9 +6,9 @@ from .guild import Guild
 from .guild_application import GuildApplication
 from .world_message import WorldMessage
 from .bank_account import BankAccount
-from .alchemy_task import AlchemyTask
+from .alchemy_task import AlchemyRecord
 from .market_order import MarketOrder
 
 __all__ = [
-    "Player", "Guild", "GuildApplication", "WorldMessage", "BankAccount", "ItemInstance", "WorldTile", "NavigationTask", "AlchemyTask", "MarketOrder"
+    "Player", "Guild", "GuildApplication", "WorldMessage", "BankAccount", "ItemInstance", "WorldTile", "NavigationTask", "AlchemyRecord", "MarketOrder"
 ]
