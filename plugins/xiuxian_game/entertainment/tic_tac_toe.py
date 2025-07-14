@@ -70,41 +70,45 @@ class TicTacToeGame:
     
     def ai_move(self) -> int:
         """AI下棋，返回选择的位置(1-9)"""
-        # 简单AI策略：
-        # 1. 如果能获胜，直接获胜
-        # 2. 如果玩家下一步能获胜，阻止
-        # 3. 优先选择中心
-        # 4. 随机选择
-        
-        # 检查AI是否能获胜
-        for i in range(9):
-            if self.board[i] == 0:
-                self.board[i] = 2
-                if self.check_winner() == 2:
+        # 平衡的AI策略，让玩家有更多获胜机会：
+        # 1. 90%概率检查能否获胜（AI还是要争取获胜）
+        # 2. 50%概率阻止玩家获胜（经常漏掉玩家的获胜机会）
+        # 3. 30%概率选择最优位置（经常下出不太好的棋）
+        # 4. 其他情况随机选择
+
+        # 90%概率检查AI是否能获胜（AI不会放弃明显的获胜机会）
+        if random.random() < 0.9:
+            for i in range(9):
+                if self.board[i] == 0:
+                    self.board[i] = 2
+                    if self.check_winner() == 2:
+                        self.board[i] = 0
+                        return i + 1
                     self.board[i] = 0
-                    return i + 1
-                self.board[i] = 0
-        
-        # 检查是否需要阻止玩家获胜
-        for i in range(9):
-            if self.board[i] == 0:
-                self.board[i] = 1
-                if self.check_winner() == 1:
+
+        # 只有50%概率阻止玩家获胜（经常漏掉防守）
+        if random.random() < 0.5:
+            for i in range(9):
+                if self.board[i] == 0:
+                    self.board[i] = 1
+                    if self.check_winner() == 1:
+                        self.board[i] = 0
+                        return i + 1
                     self.board[i] = 0
-                    return i + 1
-                self.board[i] = 0
-        
-        # 优先选择中心
-        if self.board[4] == 0:
-            return 5
-        
-        # 选择角落
-        corners = [0, 2, 6, 8]
-        available_corners = [i for i in corners if self.board[i] == 0]
-        if available_corners:
-            return random.choice(available_corners) + 1
-        
-        # 随机选择剩余位置
+
+        # 只有30%概率选择最优位置（经常下出随意的棋）
+        if random.random() < 0.3:
+            # 优先选择中心
+            if self.board[4] == 0:
+                return 5
+
+            # 选择角落
+            corners = [0, 2, 6, 8]
+            available_corners = [i for i in corners if self.board[i] == 0]
+            if available_corners:
+                return random.choice(available_corners) + 1
+
+        # 随机选择剩余位置（70%的情况下会随机下棋）
         available = [i for i in range(9) if self.board[i] == 0]
         return random.choice(available) + 1
 
