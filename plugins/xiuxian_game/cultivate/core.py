@@ -305,6 +305,10 @@ async def handle_assign(event: MessageEvent, args: Message = CommandArg()):
         }
 
         for eq in equipped_items:
+            # 确保装备状态正确（应该已经是equipped=True，但为了安全起见）
+            if not eq.equipped:
+                continue
+
             attrs_temp = base_attrs_snapshot.copy()
             eq.apply_attr_bonus(attrs_temp)
             new_delta = {k: attrs_temp[k] - base_attrs_snapshot[k] for k in attrs_temp if attrs_temp[k] != base_attrs_snapshot[k]}
@@ -313,10 +317,11 @@ async def handle_assign(event: MessageEvent, args: Message = CommandArg()):
             for k, v in new_delta.items():
                 setattr(player, k, getattr(player, k) + v)
 
-            # 保存
+            # 保存新的持久化bonus
             extra = eq.extra_attrs or {}
             extra["_persist_bonus"] = new_delta
             eq.extra_attrs = extra
+            session.add(eq)  # 确保装备的修改被保存
 
         # 修正 HP/MP 不超过新上限
         if player.hp > player.max_hp:

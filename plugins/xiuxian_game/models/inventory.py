@@ -97,14 +97,17 @@ class ItemInstance(Base):
     def apply_attr_bonus(self, attrs: dict):
         """将此装备的属性加成应用到 attrs（就地修改）。
         attrs: 形如 {"hp": 100, "attack": 10} 的玩家基础属性 dict
+
+        注意：此方法只计算装备的理论属性加成，不包含已持久化的bonus。
+        已持久化的bonus(_persist_bonus)已经应用到玩家属性上，不应重复计算。
         """
         if not self.is_equipment or not self.equipped:
             return
-        
+
         tpl = self.config
         if not tpl:
             return
-            
+
         # 固定值
         key_map = {"hp": "max_hp", "mp": "max_mp"}
         for k, v in (tpl.attr_bonus or {}).items():
@@ -118,13 +121,6 @@ class ItemInstance(Base):
         for k, v in (self.extra_attrs or {}).items():
             if k.startswith("_"):
                 continue  # 跳过内部字段，如 _persist_bonus
-            if not isinstance(v, (int, float)):
-                continue
-            attrs[k] = attrs.get(k, 0) + int(v)
-
-        # 叠加持久化 bonus（如果存在）
-        persist = (self.extra_attrs or {}).get("_persist_bonus", {})
-        for k, v in persist.items():
             if not isinstance(v, (int, float)):
                 continue
             attrs[k] = attrs.get(k, 0) + int(v)
