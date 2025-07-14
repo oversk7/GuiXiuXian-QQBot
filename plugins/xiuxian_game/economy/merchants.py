@@ -133,7 +133,8 @@ async def _(event: MessageEvent):
             await market_cmd.finish("⛔ 请先创建角色")
         if player.region != "大都会":
             await market_cmd.finish(message_add_head(
-                "💀 诡域之中皆不可信 ──────────\n"
+                "💀 诡域之中皆不可信\n"
+                "━━━━━━━━━━━━━\n"
                 "此地没有安全商人。\n"
                 "━━━━━━━━━━━━━\n"
                 "⬇️ 【返回】脱离诡域，返回现实", event))
