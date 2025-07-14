@@ -10,7 +10,7 @@ from ..utils import message_add_head
 
 # ---------------- 指令：锻造列表 ----------------
 # 列出所有可锻造装备
-list_craft_cmd = on_command("锻造列表", aliases={"可锻造", "装备列表"}, block=True, priority=5)
+list_craft_cmd = on_command("锻造列表", aliases={"装备列表"}, block=True, priority=5)
 
 @list_craft_cmd.handle()
 async def _(event: MessageEvent):
@@ -140,20 +140,45 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
         )
         await craft_cmd.finish(message_add_head(reply, event))
 
-# ---------------- 指令：装备修复 ----------------
-repair_cmd = on_command("修复", aliases={"装备修复"}, block=True, priority=5)
+repair_cmd = on_command("修复", aliases={"修理","装备修理"}, block=True, priority=5)
 
 @repair_cmd.handle()
 async def _(event: MessageEvent, args: Message = CommandArg()):
     arg_text = args.extract_plain_text().strip()
-    if not arg_text or not arg_text.isdigit():
-        await repair_cmd.finish("⛔ 格式：修复 装备ID")
-    equip_id = int(arg_text)
+    if not arg_text:
+        await repair_cmd.finish("⛔ 格式：修理 装备ID/名称")
 
     async with safe_session() as session:
-        equip = await session.get(ItemInstance, equip_id)
-        if not equip or equip.player_id != event.get_user_id():
-            await repair_cmd.finish("⛔ 无效装备ID或非本人所有")
+        equip = None
+
+        # 尝试按ID查找
+        if arg_text.isdigit():
+            equip_id = int(arg_text)
+            equip = await session.get(ItemInstance, equip_id)
+            if not equip or equip.player_id != event.get_user_id() or equip.config.type.value != "EQUIPMENT":
+                await repair_cmd.finish("⛔ 无效装备ID或非本人所有")
+        else:
+            # 按名称查找，优先选择耐久度最低的装备
+            item_config = config.items_config["by_name"].get(arg_text)
+            if not item_config or item_config.type.value != "EQUIPMENT":
+                await repair_cmd.finish("⛔ 未找到对应装备名称，或该物品不是装备")
+
+            # 查找玩家所有该名称的装备，按耐久度升序排列，只选择需要修复的
+            stmt = select(ItemInstance).where(
+                ItemInstance.player_id == event.get_user_id(),
+                ItemInstance.item_id == item_config.item_id
+            ).order_by(ItemInstance.durability.asc())
+
+            all_items = (await session.execute(stmt)).scalars().all()
+            # 过滤出需要修复的装备（耐久度未满的）
+            repairable_items = [item for item in all_items if item.durability < item.config.durability]
+
+            if not repairable_items:
+                await repair_cmd.finish(f"⛔ 你没有需要修复的 {arg_text}")
+
+            # 选择耐久度最低的那件
+            equip = repairable_items[0]
+
         tpl = equip.config
         if equip.durability >= tpl.durability:
             await repair_cmd.finish("🧐 该装备耐久已满，无需修复")
@@ -172,4 +197,6 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
         equip.durability = tpl.durability
         await session.commit()
 
-        await repair_cmd.finish(message_add_head(f"🔧 已修复 {tpl.name}，耗费 {total_cost}💰 (恢复 {missing} 耐久)", event)) 
+        # 显示修复的装备信息，包括ID和修复前后的耐久度
+        durability_info = f" (ID:{equip.id}, {equip.durability - missing}→{equip.durability}/{tpl.durability})"
+        await repair_cmd.finish(message_add_head(f"🔧 已修复 {tpl.name}{durability_info}，耗费 {total_cost}💰", event))

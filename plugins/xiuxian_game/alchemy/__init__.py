@@ -14,7 +14,7 @@ from .service import AlchemyService
 recipe_cmd = on_command("丹方", aliases={"炼丹配方"}, block=True, priority=5)
 start_cmd = on_command("炼丹", block=True, priority=5)
 status_cmd = on_command("炼丹状态", block=True, priority=5)
-claim_cmd = on_command("领取炼丹", aliases={"炼丹领取"}, block=True, priority=5)
+claim_cmd = on_command("收获丹药", aliases={"领取丹药"}, block=True, priority=5)
 
 
 @recipe_cmd.handle()
@@ -95,7 +95,7 @@ async def _(event: MessageEvent):
                 result_msg = "✅ 已领取"
             elif record.is_finished():
                 success_count, total_produce = record.calculate_result()
-                result_msg = f"🎉 已完成！成功 {success_count}/{record.qty} 炉，共得 {total_produce} 颗 (输入'领取炼丹'领取)"
+                result_msg = f"🎉 已完成！成功 {success_count}/{record.qty} 炉，共得 {total_produce} 颗 (输入'收获丹药'领取)"
             else:
                 remain = record.get_remaining_seconds()
                 result_msg = f"⏳ 剩余 {remain//60}分{remain%60}秒"

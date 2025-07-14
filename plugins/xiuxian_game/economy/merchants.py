@@ -195,7 +195,10 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
 
         # 扣款 & 添物
         player.gold -= total_cost
-        await ItemInstance.add_item(session, player.id, item_cfg.item_id, qty)
+        try:
+            await ItemInstance.add_item(session, player.id, item_cfg.item_id, qty)
+        except ValueError as e:
+            await buy_cmd.finish(f"❌ {e}")
         await session.commit()
         await buy_cmd.finish(message_add_head(
             f"✅ 购买 {item_cfg.name}×{qty} 成功！\n💸 花费 {total_cost} 金币", event))

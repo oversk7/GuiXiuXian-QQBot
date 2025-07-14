@@ -12,7 +12,7 @@ MAX_EQUIPPED = 4  # TODO: 后续可写入 config.game_config
 EQUIP_ITEM_IDS = config.items_config["by_type"]["EQUIPMENT"]
 
 # ---------------- 指令：装备列表 ----------------
-list_equipment = on_command("我的装备", aliases={"装备"}, block=True, priority=5)
+list_equipment = on_command("我的装备", aliases={"装备栏"}, block=True, priority=5)
 
 @list_equipment.handle()
 async def _(event: MessageEvent):
@@ -41,19 +41,42 @@ async def _(event: MessageEvent):
         await list_equipment.finish(message_add_head("\n".join(lines), event))
 
 # ---------------- 指令：穿戴装备 ----------------
-wear_equipment = on_command("穿戴", block=True, priority=5)
+wear_equipment = on_command("穿戴", aliases={"携带","装备"}, block=True, priority=5)
 
 @wear_equipment.handle()
 async def _(event: MessageEvent, args: Message = CommandArg()):
     arg = args.extract_plain_text().strip()
-    if not arg or not arg.isdigit():
-        await wear_equipment.finish("⛔ 格式：穿戴 装备ID（整数）")
-    equip_id = int(arg)
+    if not arg:
+        await wear_equipment.finish("⛔ 格式：装备 装备ID/名称")
 
     async with safe_session() as session:
-        equip = await session.get(ItemInstance, equip_id)
-        if not equip or equip.player_id != event.get_user_id() or equip.config.type.value != "EQUIPMENT":
-            await wear_equipment.finish("⛔ 无效装备 ID 或非本人所有")
+        equip = None
+
+        # 尝试按ID查找
+        if arg.isdigit():
+            equip_id = int(arg)
+            equip = await session.get(ItemInstance, equip_id)
+            if not equip or equip.player_id != event.get_user_id() or equip.config.type.value != "EQUIPMENT":
+                await wear_equipment.finish("⛔ 无效装备 ID 或非本人所有")
+        else:
+            # 按名称查找，优先选择耐久度最高的未装备装备
+            item_config = config.items_config["by_name"].get(arg)
+            if not item_config or item_config.type.value != "EQUIPMENT":
+                await wear_equipment.finish("⛔ 未找到对应装备名称，或该物品不是装备")
+
+            # 查找玩家所有该名称的未装备装备，按耐久度降序排列
+            stmt = select(ItemInstance).where(
+                ItemInstance.player_id == event.get_user_id(),
+                ItemInstance.item_id == item_config.item_id,
+                ItemInstance.equipped == False
+            ).order_by(ItemInstance.durability.desc())
+
+            unequipped_items = (await session.execute(stmt)).scalars().all()
+            if not unequipped_items:
+                await wear_equipment.finish(f"⛔ 你没有未穿戴的 {arg}")
+
+            # 选择耐久度最高的那件
+            equip = unequipped_items[0]
 
         if equip.equipped:
             await wear_equipment.finish("🧐 该装备已处于穿戴状态")
@@ -97,7 +120,10 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
         equip.extra_attrs = extra_new
 
         await session.commit()
-        await wear_equipment.finish(f"✅ 成功穿戴 {equip.config.name}")
+
+        # 显示穿戴的装备信息，包括ID和耐久度
+        durability_info = f" (ID:{equip.id}, 耐久:{equip.durability}/{equip.config.durability})"
+        await wear_equipment.finish(f"✅ 成功穿戴 {equip.config.name}{durability_info}")
 
 # ---------------- 指令：卸下装备 ----------------
 unwear_equipment = on_command("卸下", block=True, priority=5)
@@ -105,14 +131,38 @@ unwear_equipment = on_command("卸下", block=True, priority=5)
 @unwear_equipment.handle()
 async def _(event: MessageEvent, args: Message = CommandArg()):
     arg = args.extract_plain_text().strip()
-    if not arg or not arg.isdigit():
-        await unwear_equipment.finish("⛔ 格式：卸下 装备ID（整数）")
-    equip_id = int(arg)
+    if not arg:
+        await unwear_equipment.finish("⛔ 格式：卸下 装备ID/名称")
 
     async with safe_session() as session:
-        equip = await session.get(ItemInstance, equip_id)
-        if not equip or equip.player_id != event.get_user_id() or equip.config.type.value != "EQUIPMENT":
-            await unwear_equipment.finish("⛔ 无效装备 ID 或非本人所有")
+        equip = None
+
+        # 尝试按ID查找
+        if arg.isdigit():
+            equip_id = int(arg)
+            equip = await session.get(ItemInstance, equip_id)
+            if not equip or equip.player_id != event.get_user_id() or equip.config.type.value != "EQUIPMENT":
+                await unwear_equipment.finish("⛔ 无效装备 ID 或非本人所有")
+        else:
+            # 按名称查找，优先选择耐久度最低的已装备装备
+            from ..config import config
+            item_config = config.items_config["by_name"].get(arg)
+            if not item_config or item_config.type.value != "EQUIPMENT":
+                await unwear_equipment.finish("⛔ 未找到对应装备名称，或该物品不是装备")
+
+            # 查找玩家所有该名称的已装备装备，按耐久度升序排列
+            stmt = select(ItemInstance).where(
+                ItemInstance.player_id == event.get_user_id(),
+                ItemInstance.item_id == item_config.item_id,
+                ItemInstance.equipped == True
+            ).order_by(ItemInstance.durability.asc())
+
+            equipped_items = (await session.execute(stmt)).scalars().all()
+            if not equipped_items:
+                await unwear_equipment.finish(f"⛔ 你没有穿戴任何 {arg}")
+
+            # 选择耐久度最低的那件
+            equip = equipped_items[0]
 
         if not equip.equipped:
             await unwear_equipment.finish("🧐 该装备当前未穿戴")
@@ -136,4 +186,7 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
 
         equip.equipped = False
         await session.commit()
-        await unwear_equipment.finish(f"🔻 已卸下 {equip.config.name}") 
+
+        # 显示卸下的装备信息，包括ID和耐久度
+        durability_info = f" (ID:{equip.id}, 耐久:{equip.durability}/{equip.config.durability})"
+        await unwear_equipment.finish(f"🔻 已卸下 {equip.config.name}{durability_info}")

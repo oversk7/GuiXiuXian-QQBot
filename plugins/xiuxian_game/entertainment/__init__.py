@@ -1,1 +1,1 @@
-from . import finger_guessing, sign
+from . import sign

@@ -67,6 +67,7 @@ async def handle_alchemy(event: MessageEvent, args: Message = CommandArg()):
         "【丹方】 查看炼丹配方\n"
         "【炼丹状态】 查看炼丹状态\n"
         "【炼丹 [炉ID] [丹方序号|名称] [数量]】 消耗炉子、材料，获得丹药\n"
+        "【收获丹药】\n"
         "═══════════════\n"
         "◈ 丹炉属于装备，炉ID即装备ID"
     )
@@ -105,14 +106,13 @@ equip_cmd = on_command("装备系统", aliases={"装备帮助"}, priority=4, blo
 async def handle_equip(event: MessageEvent, args: Message = CommandArg()):
     msg = (
         "✨ 装备系统帮助 ✨\n"
-        "【我的装备】 查看自己装备\n"
-        "【装备市场】 查看装备市场\n"
-        "【穿戴 [装备ID]】 穿戴指定装备\n"
-        "【卸下 [装备ID]】 卸下指定装备\n"
+        "【装备栏】 查看自己装备\n"
+        "【装备 [装备ID/名称]】 穿戴指定装备\n"
+        "【卸下 [装备ID/名称]】 卸下指定装备\n"
         "【锻造列表】 查看锻造列表\n"
         "【配方 [装备名称]】 查看锻造配方\n"
         "【锻造 [装备名称]】 锻造指定装备\n"
-        "【修复 [装备ID]】 修复指定装备"
+        "【修理 [装备ID/名称]】 修理指定装备"
     )
     await equip_cmd.finish(Message(msg))
 
@@ -141,7 +141,6 @@ async def handle_huo_dong(event: MessageEvent, args: Message = CommandArg()):
     msg = (
         "✨ 活动系统帮助 ✨\n"
         "【签到】 每日签到，获取奖励"
-        "【猜拳】 猜拳游戏，猜赢翻倍"
         "直接发送活动名称查看详细指令"
     )
     await huo_dong_cmd.finish(Message(msg))

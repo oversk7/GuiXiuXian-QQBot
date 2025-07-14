@@ -125,7 +125,7 @@ items:
       grudge_value: 100
 
     - item_id: "kissed_phone_number"
-      name: "被死者亲吻的电话号码"
+      name: "被死者亲吻的号码"
       description: "警察发现，每一位死者在生前的最后一段时间，都拨打了这个电话。"
       type: "MATERIAL"
       price: 5
