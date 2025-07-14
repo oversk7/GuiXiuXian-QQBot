@@ -32,7 +32,7 @@ async def handle_help(event: MessageEvent, args: Message = CommandArg()):
         "🗓️ 世界系统  🛒 装备系统\n"
         "🎮 公会系统  💰 银行系统\n"
         "🔮 炼丹系统  🎮 活动系统\n"
-        "🏰 副本系统\n"
+        "💕 社交系统  🏰 副本系统\n"
         "═════════════\n"
         "💡 发送/系统名称 查看详细指令，/更新 查看最近更新内容\n"
         "💡 教程及反馈请加官群：962494679，官群签到奖励翻倍\n"
@@ -244,6 +244,45 @@ async def handle_guild_help(event: MessageEvent, args: Message = CommandArg()):
         "【公会商店】 查看公会商店"
     )
     await guild_help_cmd.finish(Message(msg))
+
+# 社交系统
+social_help_cmd = on_command("社交系统", aliases={"社交帮助"}, priority=4, block=True)
+
+@social_help_cmd.handle()
+async def handle_social_help(event: MessageEvent, args: Message = CommandArg()):
+    msg = (
+        "✨ 社交系统帮助 ✨\n"
+        "结婚生子，师徒传承，互送礼物增进感情\n"
+        "━━━━━━━━━━━━━\n"
+        "💒 婚姻系统：\n"
+        "【求婚 UID】 向指定玩家求婚\n"
+        "【求婚申请】 查看收到的求婚申请\n"
+        "【同意求婚 申请ID】 同意求婚申请\n"
+        "【拒绝求婚 申请ID】 拒绝求婚申请\n"
+        "【配偶】 查看配偶信息\n"
+        "【离婚】 解除婚姻关系\n"
+        "\n"
+        "🎓 师徒系统：\n"
+        "【拜师 UID】 向指定玩家拜师\n"
+        "【拜师申请】 查看收到的拜师申请\n"
+        "【收徒 申请ID】 同意拜师申请\n"
+        "【拒绝收徒 申请ID】 拒绝拜师申请\n"
+        "【师父】 查看师父信息\n"
+        "【徒弟】 查看徒弟列表\n"
+        "【逐出徒弟 UID】 逐出指定徒弟\n"
+        "【脱离师门】 脱离师父\n"
+        "\n"
+        "🎁 礼物系统：\n"
+        "【送礼 UID 物品名称 数量】 向配偶/师父/徒弟送礼\n"
+        "【送礼记录】 查看送礼历史\n"
+        "【收礼记录】 查看收礼历史\n"
+        "\n"
+        "🏆 排行榜：\n"
+        "【恩爱榜】 查看夫妻恩爱值排行榜\n"
+        "【恩师榜】 查看师父恩师点排行榜\n"
+        "【社交统计】 查看社交系统统计信息"
+    )
+    await social_help_cmd.finish(Message(msg))
 
 button_test_cmd = on_command("测试", priority=4, block=True)
 @button_test_cmd.handle()

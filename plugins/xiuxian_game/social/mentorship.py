@@ -1,0 +1,213 @@
+from nonebot import on_command
+from nonebot.adapters.qq import MessageEvent, Message
+from nonebot.params import CommandArg
+from sqlalchemy import select
+
+from ..models.db import safe_session
+from ..models.player import Player
+from ..utils import message_add_head
+from .mentorship_service import MentorshipService
+
+
+# ==================== 拜师 ====================
+worship_cmd = on_command("拜师", block=True, priority=5)
+
+@worship_cmd.handle()
+async def handle_worship(event: MessageEvent, args: Message = CommandArg()):
+    uid_str = args.extract_plain_text().strip()
+    if not uid_str:
+        await worship_cmd.finish("格式：拜师 UID")
+    
+    try:
+        master_uid = int(uid_str)
+    except ValueError:
+        await worship_cmd.finish("UID 必须为数字")
+    
+    async with safe_session() as session:
+        # 获取申请人
+        applicant = await session.get(Player, event.get_user_id())
+        if not applicant:
+            await worship_cmd.finish("⛔ 请先创建角色")
+        
+        # 获取目标师父
+        master = (await session.execute(select(Player).where(Player.uid == master_uid))).scalars().first()
+        if not master:
+            await worship_cmd.finish("⛔ 未找到该 UID 的玩家")
+        
+        # 检查是否可以拜师
+        can_worship, reason = await MentorshipService.can_become_disciple(session, applicant.id, master.id)
+        if not can_worship:
+            await worship_cmd.finish(f"⛔ {reason}")
+        
+        # 创建拜师申请
+        await MentorshipService.create_mentorship_application(session, applicant.id, master.id)
+        
+        await worship_cmd.finish(message_add_head(
+            f"🙏 已向 {master.nickname}[UID:{master.uid}] 发送拜师申请，等待对方回复", 
+            event
+        ))
+
+
+# ==================== 查看拜师申请 ====================
+mentorship_applications_cmd = on_command("拜师申请", aliases={"师徒申请"}, block=True, priority=5)
+
+@mentorship_applications_cmd.handle()
+async def handle_mentorship_applications(event: MessageEvent):
+    async with safe_session() as session:
+        player = await session.get(Player, event.get_user_id())
+        if not player:
+            await mentorship_applications_cmd.finish("⛔ 请先创建角色")
+        
+        applications = await MentorshipService.get_pending_mentorship_applications(session, player.id)
+        if not applications:
+            await mentorship_applications_cmd.finish("暂无待处理的拜师申请")
+        
+        lines = ["📜 待处理拜师申请", "━━━━━━━━━━"]
+        for app in applications:
+            applicant = await session.get(Player, app.applicant_id)
+            lines.append(f"ID:{app.id} {applicant.nickname}[UID:{applicant.uid}] Lv.{applicant.level}")
+        
+        lines.append("\n使用「收徒 申请ID」或「拒绝收徒 申请ID」来处理")
+        await mentorship_applications_cmd.finish(message_add_head("\n".join(lines), event))
+
+
+# ==================== 收徒 ====================
+accept_disciple_cmd = on_command("收徒", block=True, priority=5)
+
+@accept_disciple_cmd.handle()
+async def handle_accept_disciple(event: MessageEvent, args: Message = CommandArg()):
+    app_id_str = args.extract_plain_text().strip()
+    if not app_id_str:
+        await accept_disciple_cmd.finish("格式：收徒 申请ID")
+    
+    try:
+        app_id = int(app_id_str)
+    except ValueError:
+        await accept_disciple_cmd.finish("申请ID 必须为数字")
+    
+    async with safe_session() as session:
+        player = await session.get(Player, event.get_user_id())
+        if not player:
+            await accept_disciple_cmd.finish("⛔ 请先创建角色")
+        
+        success, message = await MentorshipService.accept_mentorship_application(session, app_id, player.id)
+        if success:
+            await accept_disciple_cmd.finish(message_add_head(f"🎓 {message}", event))
+        else:
+            await accept_disciple_cmd.finish(f"⛔ {message}")
+
+
+# ==================== 拒绝收徒 ====================
+reject_disciple_cmd = on_command("拒绝收徒", block=True, priority=5)
+
+@reject_disciple_cmd.handle()
+async def handle_reject_disciple(event: MessageEvent, args: Message = CommandArg()):
+    app_id_str = args.extract_plain_text().strip()
+    if not app_id_str:
+        await reject_disciple_cmd.finish("格式：拒绝收徒 申请ID")
+    
+    try:
+        app_id = int(app_id_str)
+    except ValueError:
+        await reject_disciple_cmd.finish("申请ID 必须为数字")
+    
+    async with safe_session() as session:
+        player = await session.get(Player, event.get_user_id())
+        if not player:
+            await reject_disciple_cmd.finish("⛔ 请先创建角色")
+        
+        success, message = await MentorshipService.reject_mentorship_application(session, app_id, player.id)
+        if success:
+            await reject_disciple_cmd.finish(message_add_head(f"❌ {message}", event))
+        else:
+            await reject_disciple_cmd.finish(f"⛔ {message}")
+
+
+# ==================== 查看师父 ====================
+master_cmd = on_command("师父", aliases={"师傅"}, block=True, priority=5)
+
+@master_cmd.handle()
+async def handle_master(event: MessageEvent):
+    async with safe_session() as session:
+        player = await session.get(Player, event.get_user_id())
+        if not player:
+            await master_cmd.finish("⛔ 请先创建角色")
+        
+        master = await MentorshipService.get_master(session, player.id)
+        if not master:
+            await master_cmd.finish("🚫 你还没有师父")
+        
+        lines = [
+            "👨‍🏫 师父信息",
+            "━━━━━━━━━━",
+            f"👤 姓名：{master.nickname}[UID:{master.uid}]",
+            f"⚡ 等级：Lv.{master.level}",
+            f"🏆 境界：{master.level}"  # 这里可以根据需要添加境界显示
+        ]
+        
+        await master_cmd.finish(message_add_head("\n".join(lines), event))
+
+
+# ==================== 查看徒弟 ====================
+disciples_cmd = on_command("徒弟", aliases={"弟子"}, block=True, priority=5)
+
+@disciples_cmd.handle()
+async def handle_disciples(event: MessageEvent):
+    async with safe_session() as session:
+        player = await session.get(Player, event.get_user_id())
+        if not player:
+            await disciples_cmd.finish("⛔ 请先创建角色")
+        
+        disciples = await MentorshipService.get_disciples(session, player.id)
+        if not disciples:
+            await disciples_cmd.finish("🚫 你还没有徒弟")
+        
+        lines = ["👥 徒弟列表", "━━━━━━━━━━"]
+        for disciple in disciples:
+            lines.append(f"👤 {disciple.nickname}[UID:{disciple.uid}] Lv.{disciple.level}")
+        
+        lines.append("\n使用「逐出徒弟 UID」可以逐出徒弟")
+        await disciples_cmd.finish(message_add_head("\n".join(lines), event))
+
+
+# ==================== 逐出徒弟 ====================
+dismiss_disciple_cmd = on_command("逐出徒弟", aliases={"逐出弟子"}, block=True, priority=5)
+
+@dismiss_disciple_cmd.handle()
+async def handle_dismiss_disciple(event: MessageEvent, args: Message = CommandArg()):
+    uid_str = args.extract_plain_text().strip()
+    if not uid_str:
+        await dismiss_disciple_cmd.finish("格式：逐出徒弟 UID")
+    
+    try:
+        disciple_uid = int(uid_str)
+    except ValueError:
+        await dismiss_disciple_cmd.finish("UID 必须为数字")
+    
+    async with safe_session() as session:
+        player = await session.get(Player, event.get_user_id())
+        if not player:
+            await dismiss_disciple_cmd.finish("⛔ 请先创建角色")
+        
+        success, message = await MentorshipService.dismiss_disciple(session, player.id, disciple_uid)
+        if success:
+            await dismiss_disciple_cmd.finish(message_add_head(f"⚡ {message}", event))
+        else:
+            await dismiss_disciple_cmd.finish(f"⛔ {message}")
+
+
+# ==================== 脱离师门 ====================
+leave_master_cmd = on_command("脱离师门", aliases={"叛师"}, block=True, priority=5)
+
+@leave_master_cmd.handle()
+async def handle_leave_master(event: MessageEvent):
+    async with safe_session() as session:
+        player = await session.get(Player, event.get_user_id())
+        if not player:
+            await leave_master_cmd.finish("⛔ 请先创建角色")
+        
+        success, message = await MentorshipService.leave_master(session, player.id)
+        if success:
+            await leave_master_cmd.finish(message_add_head(f"💔 {message}", event))
+        else:
+            await leave_master_cmd.finish(f"⛔ {message}")

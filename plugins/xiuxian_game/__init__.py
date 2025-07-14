@@ -20,6 +20,7 @@ from . import (
     entertainment,
     guild,
     alchemy,
+    social,
     log_uid,
 )
 

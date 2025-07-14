@@ -190,9 +190,15 @@ async def handle_breakthrough(event: MessageEvent, args: Message = CommandArg())
             player.resentment -= guardian_cost
 
         if player.level < cfg_break["change_level"]:
+            old_level = player.level
             player.exp -= required_exp
             player.level += 1
             player.attribute_points += config.game_config["game"]["points_per_level"]
+
+            # 触发升级钩子
+            from ..social.level_hooks import on_player_level_up
+            await on_player_level_up(session, player.id, old_level, player.level)
+
             msg = (
                 f"⛓️‍💥骨裂声回荡，已突破至Lv.{player.level}↑\n"
                 "━━━━━━━━━━━━━\n"
@@ -205,9 +211,15 @@ async def handle_breakthrough(event: MessageEvent, args: Message = CommandArg())
             )
         else:
             if random.random() <= success_chance:
+                old_level = player.level
                 player.exp -= required_exp
                 player.level += 1
                 player.attribute_points += config.game_config["game"]["points_per_level"]
+
+                # 触发升级钩子
+                from ..social.level_hooks import on_player_level_up
+                await on_player_level_up(session, player.id, old_level, player.level)
+
                 msg = (
                     f"⛓️‍💥骨裂声回荡，已突破至Lv.{player.level}↑\n"
                     "━━━━━━━━━━━━━\n"

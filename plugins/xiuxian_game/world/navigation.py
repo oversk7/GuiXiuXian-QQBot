@@ -106,7 +106,7 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
 
         # 如非现实世界，提示不可导航
         if player.region != REAL_WORLD:
-            await nav_cmd.finish("⛔ 诡域中迷雾缭绕，无法使用导航！请使用 [移动] 或 [探索]。")
+            await nav_cmd.finish("⛔ 诡域中迷雾缭绕，无法使用导航！请【返回】现实世界。")
 
         # 处理已有导航：先更新位置
         task: NavigationTask | None = await session.get(NavigationTask, player.id)
