@@ -12,8 +12,9 @@ from .marriage import Marriage
 from .mentorship import Mentorship
 from .social_application import SocialApplication
 from .gift_record import GiftRecord
+from .story_session import StorySession
 
 __all__ = [
     "Player", "Guild", "GuildApplication", "WorldMessage", "BankAccount", "ItemInstance", "WorldTile", "NavigationTask", "AlchemyRecord", "MarketOrder",
-    "Marriage", "Mentorship", "SocialApplication", "GiftRecord"
+    "Marriage", "Mentorship", "SocialApplication", "GiftRecord", "StorySession"
 ]

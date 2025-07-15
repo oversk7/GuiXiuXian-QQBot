@@ -21,6 +21,7 @@ from . import (
     guild,
     alchemy,
     social,
+    story,
     log_uid,
 )
 
