@@ -280,6 +280,70 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
         lines.append("⬇️ 【查牌 <物品名> [页数]】 查看物品买卖行情")
         await overview_cmd.finish(message_add_head("\n".join(lines), event))
 
+# ---------------- 指令：我的挂牌 ----------------
+my_orders_cmd = on_command("我的挂牌", aliases={"查看我的挂牌", "我的牌子"}, block=True, priority=5)
+
+@my_orders_cmd.handle()
+async def _(event: MessageEvent, args: Message = CommandArg()):
+    """我的挂牌 [页数] - 查看玩家自己的所有挂牌订单"""
+    page_str = args.extract_plain_text().strip()
+    page = 1
+    if page_str:
+        try:
+            page = int(page_str)
+            if page < 1:
+                raise ValueError
+        except ValueError:
+            await my_orders_cmd.finish("⛔ 页数必须为正整数")
+
+    async with safe_session() as session:
+        player: Player | None = await session.get(Player, event.get_user_id())
+        if not player:
+            await my_orders_cmd.finish("⛔ 请先创建角色")
+
+        # 查询玩家的所有挂牌订单
+        stmt = select(MarketOrder).where(
+            MarketOrder.player_id == player.id
+        ).order_by(desc(MarketOrder.created_at))
+
+        orders = (await session.execute(stmt)).scalars().all()
+
+        if not orders:
+            await my_orders_cmd.finish(message_add_head("📋 你还没有挂牌任何物品", event))
+
+        PAGE_SIZE = 8
+        total_pages = (len(orders) - 1) // PAGE_SIZE + 1 if orders else 1
+        page = max(1, min(page, total_pages))
+        start = (page - 1) * PAGE_SIZE
+        end = start + PAGE_SIZE
+        page_orders = orders[start:end]
+
+        lines = [f"📋 我的挂牌 · 第{page}/{total_pages}页 ({len(orders)}个)"]
+        lines.append(heavy_divider("📤 出售订单"))
+
+        sell_orders = [o for o in page_orders if o.side == OrderSide.SELL]
+        if sell_orders:
+            for order in sell_orders:
+                item_cfg = config.items_config["by_id"].get(order.item_id)
+                if item_cfg:
+                    lines.append(f"🆔{str(order.id).rjust(3)}┃{item_cfg.name}┃💰{order.price}┃📦{order.quantity}")
+        else:
+            lines.append("(空)")
+
+        lines.append(heavy_divider("📥 求购订单"))
+
+        buy_orders = [o for o in page_orders if o.side == OrderSide.BUY]
+        if buy_orders:
+            for order in buy_orders:
+                item_cfg = config.items_config["by_id"].get(order.item_id)
+                if item_cfg:
+                    lines.append(f"🆔{str(order.id).rjust(3)}┃{item_cfg.name}┃💰{order.price}┃📦{order.quantity}")
+        else:
+            lines.append("(空)")
+
+        lines.append("⬇️ 【撤牌 <牌子ID>】 撤回指定牌子")
+        await my_orders_cmd.finish(message_add_head("\n".join(lines), event))
+
 # ======= 辅助函数 =======
 async def _try_auto_match(session, new_order: MarketOrder, player: Player, same_price_only: bool = False) -> str:
     """自动撮合逻辑，返回描述信息（可能为空）。"""
