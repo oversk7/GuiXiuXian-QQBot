@@ -132,6 +132,26 @@
 }
 ```
 
+## 📸 配图功能
+
+### 在节点中添加图片
+```json
+{
+  "start": {
+    "type": "story",
+    "content": "故事内容...",
+    "image": "images/scene1.png",
+    "next": "next_node"
+  }
+}
+```
+
+### 图片路径规则
+- 路径相对于 `plugins/xiuxian_game/data/stories/` 目录
+- 推荐使用 `images/` 子目录组织图片
+- 支持格式：PNG、JPEG、GIF、WebP
+- 如果图片不存在，会跳过图片显示
+
 ## 📋 支持的操作符
 
 ### 条件判断操作符
@@ -157,11 +177,12 @@
 
 ## 💡 使用示例
 
-### 完整的节点示例
+### 完整的节点示例（带配图）
 ```json
 "example_node": {
   "type": "choice",
   "content": "🏠 {player_name}，你现在在{current_room}。\n\n你的状态：\n💰 金币：{player_gold}\n❤️ 生命：{player_hp}/{player_max_hp}\n🧠 理智：{player_mp}/{player_max_mp}\n⚔️ 攻击：{player_attack}\n\n恐惧值：{fear_level}/10",
+  "image": "images/room_scene.png",
   "options": [
     {
       "id": 1,
@@ -182,6 +203,33 @@
       }
     }
   ]
+}
+```
+
+### 不同类型节点的配图示例
+```json
+// 普通故事节点
+"story_node": {
+  "type": "story",
+  "content": "你走进了一个神秘的房间...",
+  "image": "images/mysterious_room.png",
+  "next": "next_scene"
+}
+
+// 选择节点
+"choice_node": {
+  "type": "choice",
+  "content": "你面前出现了三条路...",
+  "image": "images/three_paths.png",
+  "options": [...]
+}
+
+// 结束节点
+"end_node": {
+  "type": "end",
+  "content": "试炼完成！",
+  "image": "images/victory_scene.png",
+  "effects": {"rewards": {...}}
 }
 ```
 

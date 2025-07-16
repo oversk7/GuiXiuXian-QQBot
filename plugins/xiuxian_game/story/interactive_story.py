@@ -2,7 +2,7 @@
 互动试炼系统 - 基于状态机的恐怖试炼体验
 """
 from nonebot import on_command, on_regex
-from nonebot.adapters.qq import MessageEvent, Message
+from nonebot.adapters.qq import MessageEvent, Message, MessageSegment
 from nonebot.params import CommandArg
 from sqlalchemy import select
 from ..models.db import safe_session
@@ -11,6 +11,9 @@ from ..models.story_session import StorySession
 from ..utils import message_add_head
 from .engine import StoryEngine
 import re
+import os
+import base64
+from pathlib import Path
 
 # 创建试炼引擎实例
 story_engine = StoryEngine()
@@ -93,7 +96,7 @@ async def handle_start_story(event: MessageEvent, args: Message = CommandArg()):
         await session.commit()
         
         # 显示试炼开始信息
-        msg = format_story_node(story, current_node)
+        msg = await format_story_node(story, current_node)
         await start_story_cmd.finish(message_add_head(msg, event))
 
 
@@ -119,7 +122,7 @@ async def handle_story_status(event: MessageEvent):
             await story_status_cmd.finish("❌ 当前节点不存在")
         
         # 显示当前试炼状态
-        msg = format_story_node(story, current_node)
+        msg = await format_story_node(story, current_node)
         await story_status_cmd.finish(message_add_head(msg, event))
 
 
@@ -180,7 +183,7 @@ async def handle_choice(event: MessageEvent):
         
         # 显示下一个节点
         story = story_engine.get_story(story_session.story_id)
-        msg = format_story_node(story, next_node)
+        msg = await format_story_node(story, next_node)
         
         # 如果是结束节点，自动结束试炼
         if next_node.get("type") == "end":
@@ -238,7 +241,7 @@ async def handle_continue(event: MessageEvent):
 
         # 显示下一个节点
         story = story_engine.get_story(story_session.story_id)
-        msg = format_story_node(story, next_node)
+        msg = await format_story_node(story, next_node)
 
         # 如果是结束节点，自动结束试炼
         if next_node.get("type") == "end":
@@ -249,23 +252,23 @@ async def handle_continue(event: MessageEvent):
         await continue_handler.finish(message_add_head(msg, event))
 
 
-def format_story_node(story: dict, node: dict) -> str:
-    """格式化试炼节点显示"""
+async def format_story_node(story: dict, node: dict) -> Message:
+    """格式化试炼节点显示，支持图片"""
     lines = []
-    
+
     # 试炼标题
     lines.append(f"📖 {story.get('title', '未命名试炼')}")
     lines.append("━━━━━━━━━━━━━")
-    
+
     # 节点内容
     content = node.get("content", "")
     if content:
         lines.append(content)
         lines.append("")
-    
+
     # 根据节点类型显示不同内容
     node_type = node.get("type", "story")
-    
+
     if node_type == "choice":
         # 选择节点 - 显示选项
         options = node.get("options", [])
@@ -277,7 +280,7 @@ def format_story_node(story: dict, node: dict) -> str:
                 lines.append(f"{option_id}. {option_text}")
             lines.append("")
             lines.append("💡 发送数字序号进行选择")
-    
+
     elif node_type == "end":
         # 结束节点
         lines.append("🎭 试炼结束")
@@ -286,10 +289,31 @@ def format_story_node(story: dict, node: dict) -> str:
             lines.append("🎁 获得奖励：")
             for reward, amount in effects["rewards"].items():
                 lines.append(f"▫️ {reward}: {amount}")
-    
+
     else:
         # 普通试炼节点
         lines.append("📝 发送任意消息继续...")
-    
+
     lines.append("━━━━━━━━━━━━━")
-    return "\n".join(lines)
+    text_content = "\n".join(lines)
+
+    # 构建消息
+    message = Message()
+
+    # 检查是否有配图
+    image_path = node.get("image")
+    if image_path:
+        # 处理图片路径
+        story_dir = Path(__file__).parent.parent / "data" / "stories"
+        full_image_path = os.path.join(story_dir, image_path)
+        try:
+            with open(full_image_path, "rb") as f:
+                base64_img = base64.b64encode(f.read()).decode("utf-8")
+            message.append(MessageSegment.file_image(base64_img))
+        except Exception as e:
+            print(f"❌ 加载故事配图失败 {full_image_path}: {e}")
+
+    # 添加文本内容
+    message.append(MessageSegment.text(text_content))
+
+    return message
