@@ -45,7 +45,7 @@ items:
       description: "可修改一次角色名称 ✍️  使用方法：/改名 新名字"
       type: "CONSUMABLE"
       effect_type: "CHANGE_NAME"
-      price: 500
+      price: 10000
     
     - item_id: "president_letter"
       name: "会长委任书"
@@ -59,7 +59,7 @@ items:
       description: "神秘的符篆，蕴含着诡域的力量，可重启时间，返还属性点。"
       type: "CONSUMABLE"
       effect_type: "RESET_ATTR"
-      price: 15000
+      price: 500000
 
   materials:  # 材料类
     - item_id: "rotten_core"

@@ -183,14 +183,20 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
                 "━━━━━━━━━━━━━\n"
                 "⬇️ 【返回】脱离诡域，返回现实", event))
         market = MARKET_BY_COORD.get((player.x, player.y))
-        if not market:
-            await buy_cmd.finish("⛔ 这里没有商人")
         item_cfg = config.items_config["by_name"].get(item_name)
-        if not item_cfg or item_cfg.item_id not in market.items:
-            await buy_cmd.finish("⛔ 商人不出售该物品")
-
-        sell_p, _ = _price_for(market, item_cfg.item_id)
-        total_cost = sell_p * qty
+        if not item_cfg:
+            await buy_cmd.finish("⛔ 不存在该物品")
+            
+        # 检查是否在市集商品中
+        if market and item_cfg.item_id in market.items:
+            sell_p, _ = _price_for(market, item_cfg.item_id)
+            total_cost = sell_p * qty
+        # 检查是否在普通商店中
+        elif item_cfg.item_id in SHOP_ITEMS:
+            total_cost = item_cfg.price * qty
+        else:
+            await buy_cmd.finish("⛔ 此处无法购买该物品")
+            
         if player.gold < total_cost:
             await buy_cmd.finish(f"💰 金币不足，需要 {total_cost} (当前 {player.gold})")
 
@@ -367,4 +373,29 @@ async def _(event: MessageEvent):
         )
         lines.append("──────────")
 
-    await trade_advise_cmd.finish(message_add_head("\n".join(lines), event)) 
+    await trade_advise_cmd.finish(message_add_head("\n".join(lines), event))
+
+# 普通商店商品（只卖不收的特殊消耗品）
+SHOP_ITEMS = [
+    "revive_potion", "rename_card", "president_letter"
+]
+
+# 普通商店指令
+shop_cmd = on_command("万事屋", aliases={"特殊商店"}, block=True, priority=5)
+
+@shop_cmd.handle()
+async def _(event: MessageEvent):
+    async with safe_session() as session:
+        player: Player | None = await session.get(Player, event.get_user_id())
+        if not player:
+            await shop_cmd.finish("⛔ 请先创建角色")
+        if player.region != "大都会":
+            await shop_cmd.finish(message_add_head(
+                "💀 诡域之中皆不可信\n此地没有安全商人。", event))
+
+        lines = ["🏬 万事屋", "━━━━━━━━━━━━━"]
+        for item_id in SHOP_ITEMS:
+            item_cfg = config.items_config["by_id"].get(item_id)
+            lines.append(f"{item_cfg.name}│{item_cfg.price} 金币")
+        lines.append("━━━━━━━━━━━━━\n⬇️【购买 [物品] [数量]】")
+        await shop_cmd.finish(message_add_head("\n".join(lines), event)) 
