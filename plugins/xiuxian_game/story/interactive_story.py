@@ -49,7 +49,7 @@ async def handle_story_list(event: MessageEvent):
         msg_lines.extend([
             "━━━━━━━━━━━━━",
             "💡 使用方法：",
-            "▫️ 开始试炼 [试炼ID] - 开始指定试炼",
+            "▫️ 开始试炼 [试炼名称] - 开始指定试炼",
             "▫️ 试炼状态 - 查看当前试炼进度",
             "▫️ 退出试炼 - 结束当前试炼"
         ])
