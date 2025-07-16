@@ -33,7 +33,6 @@ async def handle_help(event: MessageEvent, args: Message = CommandArg()):
         "🎮 公会系统  💰 银行系统\n"
         "🔮 炼丹系统  🎮 活动系统\n"
         "💕 社交系统  🏰 副本系统\n"
-        "📖 剧情系统  🎭 互动故事\n"
         "═════════════\n"
         "💡 发送/系统名称 查看详细指令，/更新 查看最近更新内容\n"
         "💡 教程及反馈请加官群：962494679，官群签到奖励翻倍\n"
@@ -157,31 +156,6 @@ async def handle_huo_dong(event: MessageEvent, args: Message = CommandArg()):
         "直接发送活动名称查看详细指令"
     )
     await huo_dong_cmd.finish(Message(msg))
-
-
-# 剧情系统
-story_help_cmd = on_command("剧情系统", aliases={"剧情帮助", "互动故事"}, priority=4, block=True)
-
-@story_help_cmd.handle()
-async def handle_story_help(event: MessageEvent, args: Message = CommandArg()):
-    msg = (
-        "✨ 剧情系统帮助 ✨\n"
-        "体验恐怖互动剧情，获得驾驭鬼怪的力量\n"
-        "━━━━━━━━━━━━━\n"
-        "【剧情列表】 查看所有可用剧情\n"
-        "【开始剧情 剧情ID】 开始指定剧情\n"
-        "【剧情状态】 查看当前剧情进度\n"
-        "【退出剧情】 结束当前剧情\n"
-        "━━━━━━━━━━━━━\n"
-        "🎮 游戏玩法：\n"
-        "▫️ 在剧情中发送数字选择选项\n"
-        "▫️ 在普通剧情节点发送任意消息继续\n"
-        "▫️ 不同选择会影响剧情走向和结局\n"
-        "▫️ 完成剧情可获得经验、道具等奖励\n"
-        "━━━━━━━━━━━━━\n"
-        "💡 推荐剧情：hell_app_puzzle（地狱APP灵异拼图）"
-    )
-    await story_help_cmd.finish(Message(msg))
 
 # 背包系统
 bag_cmd = on_command("背包系统", aliases={"背包帮助"}, priority=4, block=True)
