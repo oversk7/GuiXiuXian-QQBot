@@ -92,6 +92,13 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
         if len(cur_equipped) >= MAX_EQUIPPED:
             await wear_equipment.finish(f"⛔ 你已穿戴 {len(cur_equipped)} 件装备，已达到上限 ({MAX_EQUIPPED})，请先卸下一件后再穿戴")
 
+        # ----- 同名装备检查 -----
+        # 检查是否已经穿戴了同名装备
+        equip_name = equip.config.name
+        for equipped_item in cur_equipped:
+            if equipped_item.config.name == equip_name:
+                await wear_equipment.finish(f"⛔ 你已经穿戴了 {equip_name}，同一名称的装备不能重复穿戴")
+
         # 计算并持久化属性增量
         player = await session.get(Player, event.get_user_id())
 

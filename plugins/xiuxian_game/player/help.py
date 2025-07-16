@@ -118,7 +118,9 @@ async def handle_equip(event: MessageEvent, args: Message = CommandArg()):
         "【锻造列表】 查看锻造列表\n"
         "【配方 [装备名称]】 查看锻造配方\n"
         "【锻造 [装备名称]】 锻造指定装备\n"
-        "【修理 [装备ID/名称]】 修理指定装备"
+        "【修理 [装备ID/名称]】 修理指定装备\n"
+        "━━━━━━━━━━━━━\n"
+        "⚠️ 装备限制：最多穿戴4件装备，且不能重复穿戴"
     )
     await equip_cmd.finish(Message(msg))
 
