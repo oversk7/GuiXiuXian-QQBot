@@ -71,17 +71,16 @@ async def handle_sign(event: MessageEvent):
 
         player.stamina = 10  # 可改为配置或与等级相关
         stamina_msg = "\n💪 咒抗已恢复至 10/10"
-
-        await sign.send(
-            f"✅ 连续签到 {streak} 天！获得 {int(gold_reward/2)} 金币！\n{lucky_msg}{bonus_msg}{stamina_msg}")
-        
+        new_msg = ""
         # 检查是否为创建账号的同一天
         if player.created_at.date() == today:
             # 赠送新手大礼包
-            starter_pack = ItemInstance(
-                player_id=player.id,
-                item_id="heal_potion",
-                quantity=3
-            )
-            session.add(starter_pack)
+            await ItemInstance.add_item(session, user_id,"spirit_herbs", quantity=5)
+            await ItemInstance.add_item(session, user_id,"heal_potion", quantity=5)
+            new_msg = "\n🎁 获得新手大礼包：回春散*5 凝神草*5"
+
+        await sign.send(
+            f"✅ 连续签到 {streak} 天！获得 {int(gold_reward/2)} 金币！\n{lucky_msg}{bonus_msg}{stamina_msg}{new_msg}")
+        
+        
         await session.commit()
