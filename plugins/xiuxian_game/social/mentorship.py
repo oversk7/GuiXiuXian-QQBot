@@ -65,9 +65,9 @@ async def handle_mentorship_applications(event: MessageEvent):
         lines = ["📜 待处理拜师申请", "━━━━━━━━━━"]
         for app in applications:
             applicant = await session.get(Player, app.applicant_id)
-            lines.append(f"ID:{app.id} {applicant.nickname}[UID:{applicant.uid}] Lv.{applicant.level}")
+            lines.append(f"{applicant.nickname}[UID:{applicant.uid}] Lv.{applicant.level}")
         
-        lines.append("\n使用「收徒 申请ID」或「拒绝收徒 申请ID」来处理")
+        lines.append("\n使用「收徒 UID」或「拒绝收徒 UID」来处理")
         await mentorship_applications_cmd.finish(message_add_head("\n".join(lines), event))
 
 
@@ -76,21 +76,26 @@ accept_disciple_cmd = on_command("收徒", block=True, priority=5)
 
 @accept_disciple_cmd.handle()
 async def handle_accept_disciple(event: MessageEvent, args: Message = CommandArg()):
-    app_id_str = args.extract_plain_text().strip()
-    if not app_id_str:
-        await accept_disciple_cmd.finish("格式：收徒 申请ID")
+    uid_str = args.extract_plain_text().strip()
+    if not uid_str:
+        await accept_disciple_cmd.finish("格式：收徒 UID")
     
     try:
-        app_id = int(app_id_str)
+        applicant_uid = int(uid_str)
     except ValueError:
-        await accept_disciple_cmd.finish("申请ID 必须为数字")
+        await accept_disciple_cmd.finish("UID 必须为数字")
     
     async with safe_session() as session:
         player = await session.get(Player, event.get_user_id())
         if not player:
             await accept_disciple_cmd.finish("⛔ 请先创建角色")
         
-        success, message = await MentorshipService.accept_mentorship_application(session, app_id, player.id)
+        # 根据UID查找申请人
+        applicant = (await session.execute(select(Player).where(Player.uid == applicant_uid))).scalars().first()
+        if not applicant:
+            await accept_disciple_cmd.finish("⛔ 未找到该 UID 的玩家")
+        
+        success, message = await MentorshipService.accept_mentorship_application_by_uid(session, applicant.id, player.id)
         if success:
             await accept_disciple_cmd.finish(message_add_head(f"🎓 {message}", event))
         else:
@@ -102,21 +107,26 @@ reject_disciple_cmd = on_command("拒绝收徒", block=True, priority=5)
 
 @reject_disciple_cmd.handle()
 async def handle_reject_disciple(event: MessageEvent, args: Message = CommandArg()):
-    app_id_str = args.extract_plain_text().strip()
-    if not app_id_str:
-        await reject_disciple_cmd.finish("格式：拒绝收徒 申请ID")
+    uid_str = args.extract_plain_text().strip()
+    if not uid_str:
+        await reject_disciple_cmd.finish("格式：拒绝收徒 UID")
     
     try:
-        app_id = int(app_id_str)
+        applicant_uid = int(uid_str)
     except ValueError:
-        await reject_disciple_cmd.finish("申请ID 必须为数字")
+        await reject_disciple_cmd.finish("UID 必须为数字")
     
     async with safe_session() as session:
         player = await session.get(Player, event.get_user_id())
         if not player:
             await reject_disciple_cmd.finish("⛔ 请先创建角色")
         
-        success, message = await MentorshipService.reject_mentorship_application(session, app_id, player.id)
+        # 根据UID查找申请人
+        applicant = (await session.execute(select(Player).where(Player.uid == applicant_uid))).scalars().first()
+        if not applicant:
+            await reject_disciple_cmd.finish("⛔ 未找到该 UID 的玩家")
+        
+        success, message = await MentorshipService.reject_mentorship_application_by_uid(session, applicant.id, player.id)
         if success:
             await reject_disciple_cmd.finish(message_add_head(f"❌ {message}", event))
         else:
@@ -208,6 +218,6 @@ async def handle_leave_master(event: MessageEvent):
         
         success, message = await MentorshipService.leave_master(session, player.id)
         if success:
-            await leave_master_cmd.finish(message_add_head(f"💔 {message}", event))
+            await leave_master_cmd.finish(message_add_head(f"🚪 {message}", event))
         else:
             await leave_master_cmd.finish(f"⛔ {message}")

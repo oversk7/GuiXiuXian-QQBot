@@ -104,7 +104,7 @@ class MentorshipService:
     
     @staticmethod
     async def accept_mentorship_application(session: AsyncSession, application_id: int, master_id: str) -> Tuple[bool, str]:
-        """接受拜师申请"""
+        """接受拜师申请（通过申请ID）"""
         # 获取申请
         application = await session.get(SocialApplication, application_id)
         if not application or application.target_id != master_id:
@@ -150,11 +150,92 @@ class MentorshipService:
         return True, "师徒关系建立成功！"
     
     @staticmethod
+    async def accept_mentorship_application_by_uid(session: AsyncSession, applicant_id: str, master_id: str) -> Tuple[bool, str]:
+        """通过UID接受拜师申请"""
+        # 查找对应的申请
+        stmt = select(SocialApplication).where(
+            and_(
+                SocialApplication.applicant_id == applicant_id,
+                SocialApplication.target_id == master_id,
+                SocialApplication.application_type == ApplicationType.MENTORSHIP,
+                SocialApplication.status == ApplicationStatus.PENDING
+            )
+        )
+        application = (await session.execute(stmt)).scalars().first()
+        
+        if not application:
+            return False, "未找到该玩家的拜师申请"
+        
+        if not application.is_pending():
+            return False, "申请已被处理"
+        
+        # 简化检查：只检查基本条件，不检查重复申请
+        if application.applicant_id == master_id:
+            return False, "不能拜自己为师"
+        
+        # 检查申请人是否已有师父
+        if await MentorshipService.has_master(session, application.applicant_id):
+            return False, "该玩家已经有师父了"
+        
+        # 检查目标是否已经是申请人的徒弟（防止循环师徒关系）
+        existing_mentorship = await MentorshipService.get_mentorship(session, application.applicant_id, master_id)
+        if existing_mentorship:
+            return False, "不能拜自己的徒弟为师"
+        
+        # 获取徒弟当前等级
+        disciple = await session.get(Player, application.applicant_id)
+        if not disciple:
+            return False, "徒弟不存在"
+        
+        # 创建师徒关系
+        mentorship = Mentorship(
+            master_id=master_id,
+            disciple_id=application.applicant_id,
+            disciple_start_level=disciple.level
+        )
+        session.add(mentorship)
+        
+        # 更新申请状态
+        application.status = ApplicationStatus.APPROVED
+        application.processed_at = datetime.now()
+        
+        # 拒绝该徒弟的其他拜师申请
+        await MentorshipService._reject_other_mentorship_applications(session, application.applicant_id)
+        
+        await session.commit()
+        return True, "师徒关系建立成功！"
+    
+    @staticmethod
     async def reject_mentorship_application(session: AsyncSession, application_id: int, master_id: str) -> Tuple[bool, str]:
-        """拒绝拜师申请"""
+        """拒绝拜师申请（通过申请ID）"""
         application = await session.get(SocialApplication, application_id)
         if not application or application.target_id != master_id:
             return False, "申请不存在或无权限"
+        
+        if not application.is_pending():
+            return False, "申请已被处理"
+        
+        application.status = ApplicationStatus.REJECTED
+        application.processed_at = datetime.now()
+        await session.commit()
+        return True, "已拒绝拜师申请"
+    
+    @staticmethod
+    async def reject_mentorship_application_by_uid(session: AsyncSession, applicant_id: str, master_id: str) -> Tuple[bool, str]:
+        """通过UID拒绝拜师申请"""
+        # 查找对应的申请
+        stmt = select(SocialApplication).where(
+            and_(
+                SocialApplication.applicant_id == applicant_id,
+                SocialApplication.target_id == master_id,
+                SocialApplication.application_type == ApplicationType.MENTORSHIP,
+                SocialApplication.status == ApplicationStatus.PENDING
+            )
+        )
+        application = (await session.execute(stmt)).scalars().first()
+        
+        if not application:
+            return False, "未找到该玩家的拜师申请"
         
         if not application.is_pending():
             return False, "申请已被处理"
@@ -204,15 +285,13 @@ class MentorshipService:
     
     @staticmethod
     async def get_mentor_points_ranking(session: AsyncSession, limit: int = 10) -> List[Tuple[Player, int]]:
-        """获取恩师点排行榜"""
-        # 按恩师点数排序，获取前N名师父
+        """获取恩师点数排行榜"""
         stmt = select(Mentorship.master_id, func.sum(Mentorship.mentor_points).label('total_points')).group_by(
             Mentorship.master_id
         ).order_by(func.sum(Mentorship.mentor_points).desc()).limit(limit)
         
         result = await session.execute(stmt)
         rankings = []
-        
         for master_id, total_points in result:
             master = await session.get(Player, master_id)
             if master:
@@ -222,7 +301,7 @@ class MentorshipService:
     
     @staticmethod
     async def _reject_other_mentorship_applications(session: AsyncSession, disciple_id: str):
-        """拒绝徒弟的其他拜师申请"""
+        """拒绝该徒弟的其他拜师申请"""
         stmt = select(SocialApplication).where(
             and_(
                 SocialApplication.applicant_id == disciple_id,

@@ -95,7 +95,7 @@ class MarriageService:
     
     @staticmethod
     async def accept_proposal(session: AsyncSession, application_id: int, target_id: str) -> Tuple[bool, str]:
-        """接受求婚申请"""
+        """接受求婚申请（通过申请ID）"""
         # 获取申请
         application = await session.get(SocialApplication, application_id)
         if not application or application.target_id != target_id:
@@ -133,11 +133,84 @@ class MarriageService:
         return True, "恭喜你们结为夫妻！"
     
     @staticmethod
+    async def accept_proposal_by_uid(session: AsyncSession, proposer_id: str, target_id: str) -> Tuple[bool, str]:
+        """通过UID接受求婚申请"""
+        # 查找对应的申请
+        stmt = select(SocialApplication).where(
+            and_(
+                SocialApplication.applicant_id == proposer_id,
+                SocialApplication.target_id == target_id,
+                SocialApplication.application_type == ApplicationType.MARRIAGE,
+                SocialApplication.status == ApplicationStatus.PENDING
+            )
+        )
+        application = (await session.execute(stmt)).scalars().first()
+        
+        if not application:
+            return False, "未找到该玩家的求婚申请"
+        
+        if not application.is_pending():
+            return False, "申请已被处理"
+        
+        # 简化检查：只检查基本条件，不检查重复申请
+        if application.applicant_id == target_id:
+            return False, "不能向自己求婚"
+        
+        # 检查双方是否已婚
+        if await MarriageService.is_married(session, application.applicant_id):
+            return False, "对方已经结婚了"
+        
+        if await MarriageService.is_married(session, target_id):
+            return False, "你已经结婚了"
+        
+        # 创建婚姻关系
+        marriage = Marriage(
+            player1_id=application.applicant_id,
+            player2_id=target_id
+        )
+        session.add(marriage)
+        
+        # 更新申请状态
+        application.status = ApplicationStatus.APPROVED
+        application.processed_at = datetime.now()
+        
+        # 拒绝其他相关的求婚申请
+        await MarriageService._reject_other_proposals(session, application.applicant_id, target_id)
+        
+        await session.commit()
+        return True, "恭喜你们结为夫妻！"
+    
+    @staticmethod
     async def reject_proposal(session: AsyncSession, application_id: int, target_id: str) -> Tuple[bool, str]:
-        """拒绝求婚申请"""
+        """拒绝求婚申请（通过申请ID）"""
         application = await session.get(SocialApplication, application_id)
         if not application or application.target_id != target_id:
             return False, "申请不存在或无权限"
+        
+        if not application.is_pending():
+            return False, "申请已被处理"
+        
+        application.status = ApplicationStatus.REJECTED
+        application.processed_at = datetime.now()
+        await session.commit()
+        return True, "已拒绝求婚申请"
+    
+    @staticmethod
+    async def reject_proposal_by_uid(session: AsyncSession, proposer_id: str, target_id: str) -> Tuple[bool, str]:
+        """通过UID拒绝求婚申请"""
+        # 查找对应的申请
+        stmt = select(SocialApplication).where(
+            and_(
+                SocialApplication.applicant_id == proposer_id,
+                SocialApplication.target_id == target_id,
+                SocialApplication.application_type == ApplicationType.MARRIAGE,
+                SocialApplication.status == ApplicationStatus.PENDING
+            )
+        )
+        application = (await session.execute(stmt)).scalars().first()
+        
+        if not application:
+            return False, "未找到该玩家的求婚申请"
         
         if not application.is_pending():
             return False, "申请已被处理"

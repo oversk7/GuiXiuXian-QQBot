@@ -65,9 +65,9 @@ async def handle_marriage_applications(event: MessageEvent):
         lines = ["💌 待处理求婚申请", "━━━━━━━━━━"]
         for proposal in proposals:
             proposer = await session.get(Player, proposal.applicant_id)
-            lines.append(f"ID:{proposal.id} {proposer.nickname}[UID:{proposer.uid}] Lv.{proposer.level}")
+            lines.append(f"{proposer.nickname}[UID:{proposer.uid}] Lv.{proposer.level}")
         
-        lines.append("\n使用「同意求婚 申请ID」或「拒绝求婚 申请ID」来处理")
+        lines.append("\n使用「同意求婚 UID」或「拒绝求婚 UID」来处理")
         await marriage_applications_cmd.finish(message_add_head("\n".join(lines), event))
 
 
@@ -76,21 +76,26 @@ accept_proposal_cmd = on_command("同意求婚", block=True, priority=5)
 
 @accept_proposal_cmd.handle()
 async def handle_accept_proposal(event: MessageEvent, args: Message = CommandArg()):
-    app_id_str = args.extract_plain_text().strip()
-    if not app_id_str:
-        await accept_proposal_cmd.finish("格式：同意求婚 申请ID")
+    uid_str = args.extract_plain_text().strip()
+    if not uid_str:
+        await accept_proposal_cmd.finish("格式：同意求婚 UID")
     
     try:
-        app_id = int(app_id_str)
+        proposer_uid = int(uid_str)
     except ValueError:
-        await accept_proposal_cmd.finish("申请ID 必须为数字")
+        await accept_proposal_cmd.finish("UID 必须为数字")
     
     async with safe_session() as session:
         player = await session.get(Player, event.get_user_id())
         if not player:
             await accept_proposal_cmd.finish("⛔ 请先创建角色")
         
-        success, message = await MarriageService.accept_proposal(session, app_id, player.id)
+        # 根据UID查找申请人
+        proposer = (await session.execute(select(Player).where(Player.uid == proposer_uid))).scalars().first()
+        if not proposer:
+            await accept_proposal_cmd.finish("⛔ 未找到该 UID 的玩家")
+        
+        success, message = await MarriageService.accept_proposal_by_uid(session, proposer.id, player.id)
         if success:
             await accept_proposal_cmd.finish(message_add_head(f"💒 {message}", event))
         else:
@@ -102,21 +107,26 @@ reject_proposal_cmd = on_command("拒绝求婚", block=True, priority=5)
 
 @reject_proposal_cmd.handle()
 async def handle_reject_proposal(event: MessageEvent, args: Message = CommandArg()):
-    app_id_str = args.extract_plain_text().strip()
-    if not app_id_str:
-        await reject_proposal_cmd.finish("格式：拒绝求婚 申请ID")
+    uid_str = args.extract_plain_text().strip()
+    if not uid_str:
+        await reject_proposal_cmd.finish("格式：拒绝求婚 UID")
     
     try:
-        app_id = int(app_id_str)
+        proposer_uid = int(uid_str)
     except ValueError:
-        await reject_proposal_cmd.finish("申请ID 必须为数字")
+        await reject_proposal_cmd.finish("UID 必须为数字")
     
     async with safe_session() as session:
         player = await session.get(Player, event.get_user_id())
         if not player:
             await reject_proposal_cmd.finish("⛔ 请先创建角色")
         
-        success, message = await MarriageService.reject_proposal(session, app_id, player.id)
+        # 根据UID查找申请人
+        proposer = (await session.execute(select(Player).where(Player.uid == proposer_uid))).scalars().first()
+        if not proposer:
+            await reject_proposal_cmd.finish("⛔ 未找到该 UID 的玩家")
+        
+        success, message = await MarriageService.reject_proposal_by_uid(session, proposer.id, player.id)
         if success:
             await reject_proposal_cmd.finish(message_add_head(f"💔 {message}", event))
         else:
