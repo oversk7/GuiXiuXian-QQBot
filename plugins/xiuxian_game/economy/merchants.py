@@ -178,7 +178,8 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
             await buy_cmd.finish("⛔ 请先创建角色")
         if player.region != "大都会":
             await buy_cmd.finish(message_add_head(
-                "💀 诡域之中皆不可信 ──────────\n"
+                "💀 诡域之中皆不可信\n"
+                "━━━━━━━━━━━━━\n"
                 "此地没有安全商人。\n"
                 "━━━━━━━━━━━━━\n"
                 "⬇️ 【返回】脱离诡域，返回现实", event))
@@ -232,7 +233,8 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
             await sell_cmd.finish("⛔ 请先创建角色")
         if player.region != "大都会":
             await sell_cmd.finish(message_add_head(
-                "💀 诡域之中皆不可信 ──────────\n"
+                "💀 诡域之中皆不可信\n"
+                "━━━━━━━━━━━━━\n"
                 "此地没有安全商人。\n"
                 "━━━━━━━━━━━━━\n"
                 "⬇️ 【返回】脱离诡域，返回现实", event))
@@ -391,7 +393,11 @@ async def _(event: MessageEvent):
             await shop_cmd.finish("⛔ 请先创建角色")
         if player.region != "大都会":
             await shop_cmd.finish(message_add_head(
-                "💀 诡域之中皆不可信\n此地没有安全商人。", event))
+                "💀 诡域之中皆不可信\n"
+                "━━━━━━━━━━━━━\n"
+                "此地没有安全商人。\n"
+                "━━━━━━━━━━━━━\n"
+                "⬇️ 【返回】脱离诡域，返回现实", event))
 
         lines = ["🏬 万事屋", "━━━━━━━━━━━━━"]
         for item_id in SHOP_ITEMS:
