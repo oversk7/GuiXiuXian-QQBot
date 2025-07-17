@@ -88,6 +88,7 @@ items:
       description: "蕴含微弱灵力的兽骨，可用于炼制法器 💀"
       type: "MATERIAL"
       price: 50
+      grudge_value: 5
 
     - item_id: "yin_essence"
       name: "阴煞精华"
@@ -146,8 +147,8 @@ items:
       type: "EQUIPMENT"
       price: 10000
       durability: 100
-      attr_bonus: {"hp": 10}
-      attr_ratio: {"hp": 0.2}
+      attr_bonus: {"hp": 50}
+      attr_ratio: {"hp": 0.01}
       recipe:
         materials:
           drowned_scale: 10
@@ -162,8 +163,8 @@ items:
       type: "EQUIPMENT"
       price: 10000
       durability: 100
-      attr_bonus: {"mp": 10}
-      attr_ratio: {"mp": 0.1}
+      attr_bonus: {"mp": 50}
+      attr_ratio: {"mp": 0.01}
       recipe:
         materials:
           spirit_bone: 15
@@ -185,7 +186,7 @@ items:
           kissed_phone_number: 2
         gold: 10000
       repair_cost: 100
-      attr_ratio: {"mp": 0.8}
+      attr_ratio: {"mp": 0.4}
       attr_bonus: {"luck": 7}
 
     - item_id: "drawer"
@@ -194,7 +195,7 @@ items:
       type: "EQUIPMENT"
       price: 60000
       durability: 100
-      attr_ratio: {"hp": 0.8}
+      attr_ratio: {"hp": 0.5}
       recipe:
         materials:
           spirit_bone: 45
@@ -211,7 +212,7 @@ items:
       type: "EQUIPMENT"
       price: 80000
       durability: 100
-      attr_ratio: {"luck": 0.5}
+      attr_ratio: {"luck": 0.3}
       repair_cost: 200   # 不可锻造
 
     - item_id: "black_envelope"
@@ -220,7 +221,7 @@ items:
       type: "EQUIPMENT"
       price: 100000
       durability: 100
-      attr_ratio: {"attack": 0.5}
+      attr_ratio: {"attack": 0.4}
 
     - item_id: "fog_coat"
       name: "雾都风衣"
@@ -228,7 +229,8 @@ items:
       type: "EQUIPMENT"
       price: 30000
       durability: 100
-      attr_ratio: {"agility": 0.5}
+      attr_ratio: {"agility": 0.3}
+      attr_bonus: {"luck": 10}
 
     - item_id: "skull_suit"
       name: "碎颅制服"
@@ -236,7 +238,7 @@ items:
       type: "EQUIPMENT"
       price: 150000
       durability: 100
-      attr_ratio: {"attack": 0.8}
+      attr_ratio: {"attack": 0.6}
 
     - item_id: "faceless_suit"
       name: "无脸制服"
@@ -244,7 +246,7 @@ items:
       type: "EQUIPMENT"
       price: 120000
       durability: 100
-      attr_bonus: {"agility": 10}
+      attr_bonus: {"agility": 50}
       attr_ratio: {"mp": 0.5}
     
     - item_id: "wedding_dress"
@@ -253,7 +255,7 @@ items:
       type: "EQUIPMENT"
       price: 100000
       durability: 100
-      attr_ratio: {"attack": 1.0}
+      attr_ratio: {"attack": 0.7}
       recipe:
         materials:
           spirit_bone: 100
@@ -266,10 +268,10 @@ items:
       name: "镇魂幡"
       description: "幡不动，魂不散。幡若动，是谁在召唤？"
       type: "EQUIPMENT"
-      price: 120000
+      price: 80000
       durability: 100
       attr_bonus: {"mp": 35}
-      attr_ratio: {"attack": 0.5}
+      attr_ratio: {"attack": 0.2}
 
     - item_id: "furnace_white"
       name: "简陋炼丹炉"
@@ -330,10 +332,10 @@ items:
 
     - item_id: "void_eye_elixir"
       name: "虚眼丹"
-      description: "凝聚亡者之眼，服用后视万象虚妄，运势与攻击提升。"
+      description: "凝聚亡者之眼，服用后视万象虚妄，运势与攻击永久提升。"
       type: "CONSUMABLE"
       effect_type: "BUFF"
-      effect_params: {"luck": 5, "attack": 2}
+      effect_params: {"luck": 5, "attack": 5}
 
   goods:  # 仅用于跑商系统倒卖的奢侈品
     - item_id: "lux_perfume"
