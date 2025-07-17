@@ -360,7 +360,7 @@ async def _handle_rest(session, tile: WorldTile, player: Player) -> str:
     player.hp = player.max_hp
     session.add(player)
     await session.flush()
-    return "🌫️ 你在这里休息了一晚，恢复了咒抗。"
+    return "🌫️ 你在这里休息了一晚，恢复了体力，生命++。"
 
 
 EVENT_HANDLERS = {
