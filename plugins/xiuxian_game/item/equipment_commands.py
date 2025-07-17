@@ -6,6 +6,7 @@ from ..models.db import safe_session
 from ..models import Player, ItemInstance
 from ..config import config
 from ..utils import message_add_head
+import random
 
 # 最多可装备数量（可调整或改为读取配置）
 MAX_EQUIPPED = 4  # TODO: 后续可写入 config.game_config
@@ -207,3 +208,132 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
         # 显示卸下的装备信息，包括ID和耐久度
         durability_info = f" (ID:{equip.id}, 耐久:{equip.durability}/{equip.config.durability})"
         await unwear_equipment.finish(f"🔻 已卸下 {equip.config.name}{durability_info}")
+
+# ---------------- 指令：装备分解 ----------------
+decompose_equipment = on_command("分解", aliases={"装备分解"}, block=True, priority=5)
+
+@decompose_equipment.handle()
+async def _(event: MessageEvent, args: Message = CommandArg()):
+    arg = args.extract_plain_text().strip()
+    if not arg:
+        await decompose_equipment.finish("⛔ 格式：分解 装备ID/名称")
+
+    async with safe_session() as session:
+        equip = None
+
+        # 尝试按ID查找
+        if arg.isdigit():
+            equip_id = int(arg)
+            equip = await session.get(ItemInstance, equip_id)
+            if not equip or equip.player_id != event.get_user_id() or not equip.is_equipment:
+                await decompose_equipment.finish("⛔ 无效装备 ID 或非本人所有")
+        else:
+            # 按名称查找，优先选择耐久度最低的未装备装备
+            item_config = config.items_config["by_name"].get(arg)
+            if not item_config or item_config.type.value != "EQUIPMENT":
+                await decompose_equipment.finish("⛔ 未找到对应装备名称，或该物品不是装备")
+
+            # 查找玩家所有该名称的未装备装备，按耐久度升序排列
+            stmt = select(ItemInstance).where(
+                ItemInstance.player_id == event.get_user_id(),
+                ItemInstance.item_id == item_config.item_id,
+                ItemInstance.equipped == False
+            ).order_by(ItemInstance.durability.asc())
+
+            unequipped_items = (await session.execute(stmt)).scalars().all()
+            if not unequipped_items:
+                await decompose_equipment.finish(f"⛔ 你没有未装备的 {arg}")
+
+            # 选择耐久度最低的那件
+            equip = unequipped_items[0]
+
+        # 检查是否已装备
+        if equip.equipped:
+            await decompose_equipment.finish("⛔ 请先卸下装备再进行分解")
+
+        # 获取玩家信息
+        player = await session.get(Player, event.get_user_id())
+
+        # 检查装备是否有配方
+        recipe_materials = {}
+        if equip.config.recipe:
+            recipe_materials = equip.config.recipe.get("materials", {})
+
+        # 计算耐久度比例，用于损失率计算
+        durability_ratio = equip.durability / equip.config.durability if equip.config.durability > 0 else 0
+        base_loss_rate = 0.4  # 基础损失率40%
+        durability_bonus = durability_ratio * 0.2  # 耐久度越高，损失越少，最多减少20%损失
+        final_loss_rate = max(0.2, base_loss_rate - durability_bonus)  # 最少损失20%
+
+        decompose_results = []
+
+        if recipe_materials:
+            # 有配方的装备：分解获得材料
+            materials_to_add = []
+
+            # 先计算所有要获得的材料，不立即添加到背包
+            for material_id, original_qty in recipe_materials.items():
+                # 计算实际获得数量（有随机性）
+                min_gain = max(1, int(original_qty * (1 - final_loss_rate) * 0.8))
+                max_gain = max(1, int(original_qty * (1 - final_loss_rate) * 1.2))
+                gained_qty = random.randint(min_gain, max_gain)
+
+                if gained_qty > 0:
+                    materials_to_add.append((material_id, gained_qty))
+
+            # 尝试添加所有材料到背包（事务性操作）
+            for material_id, gained_qty in materials_to_add:
+                try:
+                    await ItemInstance.add_item(session, event.get_user_id(), material_id, gained_qty)
+                    material_config = config.items_config["by_id"].get(material_id)
+                    material_name = material_config.name if material_config else material_id
+                    decompose_results.append(f"{material_name} ✖️{gained_qty}")
+                except ValueError as e:
+                    # 如果背包空间不足，回滚事务
+                    await session.rollback()
+                    await decompose_equipment.finish(f"⛔ 背包空间不足：{e}")
+        else:
+            # 没有配方的装备：分解获得金币
+            # 基础金币 = 装备价格 * 耐久度比例 * (1 - 损失率) * 随机系数
+            base_gold = int(equip.config.price * durability_ratio * (1 - final_loss_rate))
+            # 添加随机性 ±20%
+            min_gold = max(1, int(base_gold * 0.8))
+            max_gold = max(1, int(base_gold * 1.2))
+            gained_gold = random.randint(min_gold, max_gold)
+
+            # 添加金币
+            player.gold += gained_gold
+            decompose_results.append(f"金币 ✖️{gained_gold}")
+
+        # 删除装备
+        await session.delete(equip)
+        await session.commit()
+
+        # 构建结果消息
+        durability_info = f"耐久:{equip.durability}/{equip.config.durability}"
+        loss_rate_display = f"{final_loss_rate:.0%}"
+
+        if recipe_materials:
+            # 有配方的装备分解结果
+            if decompose_results:
+                materials_msg = "、".join(decompose_results)
+                result_msg = (
+                    f"🔨 成功分解 {equip.config.name} (ID:{equip.id}, {durability_info})\n"
+                    f"📦 获得材料：{materials_msg}\n"
+                    f"💔 材料损失率：{loss_rate_display}"
+                )
+            else:
+                result_msg = f"🔨 分解了 {equip.config.name}，但没有获得任何材料"
+        else:
+            # 没有配方的装备分解结果
+            if decompose_results:
+                gold_msg = "、".join(decompose_results)
+                result_msg = (
+                    f"🔨 成功分解 {equip.config.name} (ID:{equip.id}, {durability_info})\n"
+                    f"� 获得：{gold_msg}\n"
+                    f"💔 回收损失率：{loss_rate_display}"
+                )
+            else:
+                result_msg = f"🔨 分解了 {equip.config.name}，但没有获得任何金币"
+
+        await decompose_equipment.finish(message_add_head(result_msg, event))

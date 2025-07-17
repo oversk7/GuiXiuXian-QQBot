@@ -305,7 +305,9 @@ async def handle_revive(event: MessageEvent):
             "✧ 但你的精神状态可能不太好...\n"
             f"✧ 当前坐标：({player.x},{player.y})\n"
             "━━━━━━━━━━━━━\n"
-            "⬇️ 【修炼】继续喂养怨炁"
+            "⬇️ 【导航 <x> <y>】劳逸结合，现实经商\n"
+            "⬇️ 【传送 <诡域>】这诡何时能杀绝？"
+
         )
 
         await revive_cmd.finish(message_add_head(msg, event))
