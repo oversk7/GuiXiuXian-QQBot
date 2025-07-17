@@ -104,10 +104,16 @@ class MarriageService:
         if not application.is_pending():
             return False, "申请已被处理"
         
-        # 再次检查双方是否可以结婚
-        can_marry, reason = await MarriageService.can_propose(session, application.applicant_id, target_id)
-        if not can_marry:
-            return False, reason
+        # 简化检查：只检查基本条件，不检查重复申请
+        if application.applicant_id == target_id:
+            return False, "不能向自己求婚"
+        
+        # 检查双方是否已婚
+        if await MarriageService.is_married(session, application.applicant_id):
+            return False, "对方已经结婚了"
+        
+        if await MarriageService.is_married(session, target_id):
+            return False, "你已经结婚了"
         
         # 创建婚姻关系
         marriage = Marriage(
@@ -180,3 +186,4 @@ class MarriageService:
         if marriage and marriage.involves_player(player2_id):
             marriage.total_gift_value += value
             await session.commit()
+

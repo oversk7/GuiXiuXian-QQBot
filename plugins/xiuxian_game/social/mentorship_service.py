@@ -113,12 +113,18 @@ class MentorshipService:
         if not application.is_pending():
             return False, "申请已被处理"
         
-        # 再次检查是否可以建立师徒关系
-        can_accept, reason = await MentorshipService.can_become_disciple(
-            session, application.applicant_id, master_id
-        )
-        if not can_accept:
-            return False, reason
+        # 简化检查：只检查基本条件，不检查重复申请
+        if application.applicant_id == master_id:
+            return False, "不能拜自己为师"
+        
+        # 检查申请人是否已有师父
+        if await MentorshipService.has_master(session, application.applicant_id):
+            return False, "该玩家已经有师父了"
+        
+        # 检查目标是否已经是申请人的徒弟（防止循环师徒关系）
+        existing_mentorship = await MentorshipService.get_mentorship(session, application.applicant_id, master_id)
+        if existing_mentorship:
+            return False, "不能拜自己的徒弟为师"
         
         # 获取徒弟当前等级
         disciple = await session.get(Player, application.applicant_id)
@@ -228,3 +234,4 @@ class MentorshipService:
         for app in applications:
             app.status = ApplicationStatus.REJECTED
             app.processed_at = datetime.now()
+
