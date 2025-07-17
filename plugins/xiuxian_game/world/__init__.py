@@ -269,16 +269,16 @@ async def _handle_personal_monster(session, tile: WorldTile, player: Player) -> 
             monster_hp = max(0, monster_hp - dmg)
             record_p(r_idx, f"[回合{r_idx}] {'💥 暴击！' if crit else ''}你斩击 {monster_display}，造成 {dmg} 伤害。", force=(crit or monster_hp==0))
 
-        def m_atk(r_idx):
+        def m_atk(r_idx, force_hit=False):
             nonlocal player_hp
             # 计算闪避：概率基于敏捷
-            dodge_chance = player.agility / (player.agility + monster_agility + 20)  # +20 抑制极端
-            if rng.random() < dodge_chance:
-                nonlocal dodge_count
-                dodge_count += 1
-                record_p(r_idx, f"[回合{r_idx}] ⚡ 你敏捷地闪避了 {monster_display} 的攻击！")
-                return
-
+            if not force_hit:
+                dodge_chance = player.agility / (player.agility + monster_agility + 20)  # +20 抑制极端
+                if rng.random() < dodge_chance:
+                    nonlocal dodge_count
+                    dodge_count += 1
+                    record_p(r_idx, f"[回合{r_idx}] ⚡ 你敏捷地闪避了 {monster_display} 的攻击！")
+                    return
             dmg_raw = rng.randint(int(monster_attack*0.8), int(monster_attack*1.2))
             # 防御减伤：效果递减，且至少造成1点伤害
             dmg_after = max(1, int(dmg_raw * 100 / (100 + player.defense)))
@@ -290,12 +290,12 @@ async def _handle_personal_monster(session, tile: WorldTile, player: Player) -> 
                 record_p(r_idx, f"[回合{r_idx}] {monster_display} 反击你，造成 {dmg_after} 伤害！", force=(player_hp==0))
 
         if round_num == 1:
-            # 第一回合双方必定各攻击一次，顺序依敏捷决定
+            # 第一回合双方必定各攻击一次，顺序依敏捷决定，且怪物攻击必定命中
             if player_first:
                 p_atk(round_num)
-                m_atk(round_num)
+                m_atk(round_num, force_hit=True)
             else:
-                m_atk(round_num)
+                m_atk(round_num, force_hit=True)
                 p_atk(round_num)
         else:
             # 其余回合体现先手：若先手击杀则后手无法行动
