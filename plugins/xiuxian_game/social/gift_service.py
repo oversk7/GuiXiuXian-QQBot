@@ -4,7 +4,7 @@ from typing import Tuple, Optional
 from datetime import datetime
 
 from ..models.player import Player
-from ..models.inventory import ItemInstance
+from ..models.inventory import ItemInstance, ItemType
 from ..models.gift_record import GiftRecord, GiftType
 from ..config import config
 from .marriage_service import MarriageService
@@ -71,34 +71,47 @@ class GiftService:
         sender_item = (await session.execute(stmt)).scalars().first()
         if not sender_item:
             return False, f"你没有足够的「{item_name}」"
-        
+
         # 计算礼物总价值
         total_value = item_config.price * quantity
-        
+
+        # 保存装备的耐久度信息（如果是装备的话）
+        equipment_durability = None
+        if item_config.type == ItemType.EQUIPMENT:
+            equipment_durability = sender_item.durability
+
         # 扣除发送者的物品
         if sender_item.quantity == quantity:
             await session.delete(sender_item)
         else:
             sender_item.quantity -= quantity
-        
+
         # 给接收者添加物品
-        stmt = select(ItemInstance).where(
-            and_(
-                ItemInstance.player_id == receiver.id,
-                ItemInstance.item_id == item_config.item_id
-            )
-        )
-        receiver_item = (await session.execute(stmt)).scalars().first()
-        
-        if receiver_item:
-            receiver_item.quantity += quantity
+        if item_config.type == ItemType.EQUIPMENT:
+            # 装备需要保持原有耐久度
+            try:
+                await ItemInstance.add_item(session, receiver.id, item_config.item_id, quantity, equipment_durability)
+            except ValueError as e:
+                return False, f"添加物品失败：{e}"
         else:
-            new_item = ItemInstance(
-                player_id=receiver.id,
-                item_id=item_config.item_id,
-                quantity=quantity
+            # 普通物品按原逻辑处理
+            stmt = select(ItemInstance).where(
+                and_(
+                    ItemInstance.player_id == receiver.id,
+                    ItemInstance.item_id == item_config.item_id
+                )
             )
-            session.add(new_item)
+            receiver_item = (await session.execute(stmt)).scalars().first()
+
+            if receiver_item:
+                receiver_item.quantity += quantity
+            else:
+                new_item = ItemInstance(
+                    player_id=receiver.id,
+                    item_id=item_config.item_id,
+                    quantity=quantity
+                )
+                session.add(new_item)
         
         # 记录礼物
         gift_record = GiftRecord(

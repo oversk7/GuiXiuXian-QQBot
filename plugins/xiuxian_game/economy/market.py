@@ -386,8 +386,15 @@ async def _try_auto_match(session, new_order: MarketOrder, player: Player, same_
 
         # 物品给买家
         await ItemInstance.add_item(session, buyer.id, item_cfg.item_id, trade_qty)
-        # 金币给卖家
-        seller.gold += trade_price * trade_qty
+
+        # 计算交易金额和税收
+        trade_amount = trade_price * trade_qty
+        tax = 0
+        if trade_amount > 10000:
+            tax = int(trade_amount * 0.02)  # 2%税收
+
+        # 金币给卖家（扣除税收）
+        seller.gold += trade_amount - tax
 
         # 更新对手单
         opp.quantity -= trade_qty
@@ -397,7 +404,12 @@ async def _try_auto_match(session, new_order: MarketOrder, player: Player, same_
         remaining -= trade_qty
         if new_order.side == OrderSide.BUY:
             total_spent += trade_price * trade_qty
-        trade_lines.append(f"✅ 成交 📦{trade_qty} @{trade_price}💰")
+
+        # 生成交易消息（包含税收信息）
+        trade_msg = f"✅ 成交 📦{trade_qty} @{trade_price}💰"
+        if tax > 0:
+            trade_msg += f"（税收：{tax}💰）"
+        trade_lines.append(trade_msg)
 
     # 更新当前单剩余
     new_order.quantity = remaining
