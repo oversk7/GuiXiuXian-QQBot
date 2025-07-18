@@ -12,6 +12,8 @@ from ..config import config
 from ..utils import message_add_head
 from ..models.guild_application import GuildApplication as _GA
 from ..models.donation_log import PlayerDonationLog
+from ..models.guild_teleport_log import GuildTeleportLog
+from ..models.navigation_task import NavigationTask
 
 # ===== 工具函数 =====
 # 翻译大数字为 w（万）单位，保留 1 位小数，10w 以下不显示 w
@@ -125,6 +127,13 @@ async def handle_guild_info(event: MessageEvent):
         exp_current = _fmt_w(guild_obj.exp)
         exp_need = _fmt_w(_need_exp_for_level(guild_obj.level))
 
+        # 基地信息
+        base_info = ""
+        if guild_obj.base_x is not None and guild_obj.base_y is not None:
+            base_info = f"▫️ 基地坐标：({guild_obj.base_x}, {guild_obj.base_y})\n"
+        elif guild_obj.level >= 5:
+            base_info = f"▫️ 基地坐标：未设置（可使用【设置基地】命令）\n"
+
         msg = (
             f"🏰 公会面板\n"
             f"▫️『{guild_obj.name}』[ID:{guild_obj.id}]\n"
@@ -132,6 +141,7 @@ async def handle_guild_info(event: MessageEvent):
             f"▫️ 人数：{member_count}/{capacity}\n"
             f"▫️ 经验：{exp_current}/{exp_need}\n"
             f"▫️ 创建时间：{guild_obj.created_at.strftime('%Y-%m-%d')}\n"
+            f"{base_info}"
             f"▫️ 公告：{guild_obj.notice or '暂无公告'}"
         )
         await guild_info_cmd.finish(message_add_head(msg, event))
@@ -230,9 +240,6 @@ async def handle_dissolve_guild(event: MessageEvent):
             await dissolve_guild_cmd.finish("⛔ 只有会长才能解散公会")
 
         # 将所有成员 guild_id 置空
-        await session.execute(
-            select(Player).where(Player.guild_id == guild_obj.id)
-        )  # We'll fetch players first
         members = (await session.execute(select(Player).where(Player.guild_id == guild_obj.id))).scalars().all()
         for m in members:
             m.guild_id = None
@@ -539,4 +546,125 @@ async def handle_notice(event: MessageEvent, args: Message = CommandArg()):
             action_msg = "公告已更新"
         session.add(guild_obj)
         await session.commit()
-        await notice_cmd.finish(message_add_head(f"✅ {action_msg}", event)) 
+        await notice_cmd.finish(message_add_head(f"✅ {action_msg}", event))
+
+# ==================== 设置公会基地 ====================
+set_base_cmd = on_command("设置基地", block=True, priority=5)
+
+@set_base_cmd.handle()
+async def handle_set_base(event: MessageEvent, args: Message = CommandArg()):
+    """会长设置公会基地坐标：设置基地 x y"""
+    arg_text = args.extract_plain_text().strip().replace(",", " ")
+    parts = [p for p in arg_text.split() if p]
+
+    if len(parts) != 2 or not all(p.lstrip("-+").isdigit() for p in parts):
+        await set_base_cmd.finish("⛔ 格式错误，正确格式：设置基地 x y （示例：设置基地 100 200）")
+
+    base_x, base_y = map(int, parts)
+
+    # 坐标范围检查（与导航系统保持一致）
+    MAX_COORD = 500
+    if not (-MAX_COORD <= base_x <= MAX_COORD and -MAX_COORD <= base_y <= MAX_COORD):
+        await set_base_cmd.finish(f"⛔ 坐标必须在 {-MAX_COORD}~{MAX_COORD} 范围内！")
+
+    async with safe_session() as session:
+        player = await session.get(Player, event.get_user_id())
+        if not player or player.guild_id is None:
+            await set_base_cmd.finish("⛔ 你未加入任何公会")
+
+        guild_obj = await session.get(Guild, player.guild_id)
+        if not guild_obj:
+            await set_base_cmd.finish("⚠️ 公会数据异常")
+
+        # 检查是否为会长
+        if guild_obj.president_id != player.id:
+            await set_base_cmd.finish("⛔ 只有会长才能设置公会基地")
+
+        # 检查公会等级
+        if guild_obj.level < 5:
+            await set_base_cmd.finish(f"⛔ 公会等级需达到5级才能设置基地，当前等级：{guild_obj.level}")
+
+        # 检查是否已经设置过基地
+        if guild_obj.base_x is not None and guild_obj.base_y is not None:
+            await set_base_cmd.finish(f"⛔ 公会基地已设置在坐标({guild_obj.base_x}, {guild_obj.base_y})，不允许重复设置")
+
+        # 设置基地坐标
+        guild_obj.base_x = base_x
+        guild_obj.base_y = base_y
+        session.add(guild_obj)
+        await session.commit()
+
+        msg = (
+            f"🏰 公会基地设置成功！\n"
+            f"▫️ 基地坐标：({base_x}, {base_y})\n"
+            f"▫️ 公会成员现在可以使用【传送 公会】传送到基地"
+        )
+        await set_base_cmd.finish(message_add_head(msg, event))
+
+# ==================== 公会传送 ====================
+guild_teleport_cmd = on_command("传送", block=False, priority=4)
+
+@guild_teleport_cmd.handle()
+async def handle_guild_teleport(event: MessageEvent, args: Message = CommandArg()):
+    """公会成员传送到基地，每日限使用一次"""
+    target = args.extract_plain_text().strip()
+
+    # 只处理 "传送 公会" 的情况，其他情况不处理（让其他传送指令处理）
+    if target != "公会":
+        return
+
+    async with safe_session() as session:
+        player = await session.get(Player, event.get_user_id())
+        if not player or player.guild_id is None:
+            await guild_teleport_cmd.finish("⛔ 你未加入任何公会")
+
+        guild_obj = await session.get(Guild, player.guild_id)
+        if not guild_obj:
+            await guild_teleport_cmd.finish("⚠️ 公会数据异常")
+
+        # 检查公会是否设置了基地
+        if guild_obj.base_x is None or guild_obj.base_y is None:
+            await guild_teleport_cmd.finish("⛔ 公会尚未设置基地，请联系会长设置基地坐标")
+
+        # 检查今日是否已使用过传送
+        today = date.today()
+        usage_stmt = select(GuildTeleportLog).where(
+            GuildTeleportLog.player_id == player.id,
+            GuildTeleportLog.teleport_date == today
+        )
+        usage_log = (await session.execute(usage_stmt)).scalars().first()
+
+        if usage_log:
+            await guild_teleport_cmd.finish("⛔ 你今日已使用过传送公会，每日限使用一次")
+
+        # 检查玩家是否在现实世界
+        if player.region != "大都会":
+            await guild_teleport_cmd.finish("⛔ 只能在现实世界使用传送公会")
+
+        # 执行传送
+        player.x = guild_obj.base_x
+        player.y = guild_obj.base_y
+        session.add(player)
+
+        # 清除导航任务（如果有的话）
+        nav_task = await session.get(NavigationTask, player.id)
+        if nav_task:
+            await session.delete(nav_task)
+
+        # 记录使用日志
+        teleport_log = GuildTeleportLog(
+            player_id=player.id,
+            guild_id=guild_obj.id,
+            teleport_date=today
+        )
+        session.add(teleport_log)
+
+        await session.commit()
+
+        msg = (
+            f"🌟 传送成功！\n"
+            f"▫️ 已传送到公会『{guild_obj.name}』基地\n"
+            f"▫️ 当前坐标：({guild_obj.base_x}, {guild_obj.base_y})\n"
+            f"▫️ 已停止导航任务，今日不可再传送公会"
+        )
+        await guild_teleport_cmd.finish(message_add_head(msg, event))
