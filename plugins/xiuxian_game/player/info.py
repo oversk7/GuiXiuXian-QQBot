@@ -137,7 +137,7 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
         f"┃ ☯公会 {guild_name}\n"
         f"┃ 📍位置 {player.region} ({player.x},{player.y})\n"
         "┣━━━━━━━━━\n"
-        "┃☞【装备】"
+        "┃☞【装备栏】【社交系统】"
     )
     await profile.finish(message_add_head(content, event))
 
