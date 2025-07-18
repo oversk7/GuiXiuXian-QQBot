@@ -130,6 +130,7 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
         f"┃ 🧠理智 {cur_mp}/{mp_max_str}\n"
         f"┃ ⚔力 {atk_str}   🛡防 {def_str}\n"
         f"┃ 👟敏 {agi_str}   🍀运 {luk_str}\n"
+        f"┃ 🔮咒抗 {player.stamina}\n"
         "┣━━ 其他 ━━━━\n"
         f"┃ 🪙金币 {player.gold}\n"
         f"┃ 💀怨念 {player.resentment} ✨点数 {player.attribute_points}\n"
