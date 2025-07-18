@@ -41,6 +41,7 @@ def realm_by_level(level: int) -> str:
 
 profile = on_command("角色",aliases={"面板","状态"}, block=True, priority=5)
 register = on_command("注册", block=True, priority=5)
+change_gender = on_command("改性别", aliases={"修改性别"}, block=True, priority=5)
 
 
 @profile.handle()
@@ -150,43 +151,26 @@ async def _(event: MessageEvent, state: T_State, args: Message = CommandArg()):
             await register.finish("⛔ 你已经创建过角色了")
 
     # 获取参数
-    params = args.extract_plain_text().strip().split()
+    nickname = args.extract_plain_text().strip()
 
-    # 如果有完整参数，直接处理
-    if len(params) >= 2:
-        nickname, gender_str = params[0], params[1]
-        try:
-            gender = Gender(gender_str)
-            # 直接创建角色
-            result = await create_player(event, nickname, gender)
-            await register.finish(message_add_head(result, event))
-        except ValueError:
-            await register.finish(f"⛔ 无效的性别，可选：{Gender.MALE.value}/{Gender.FEMALE.value}")
+    # 如果直接提供了昵称，直接创建角色（默认性别为男）
+    if nickname:
+        # 直接创建角色，默认性别为男
+        result = await create_player(event, nickname, Gender.MALE)
+        await register.finish(message_add_head(result, event))
 
     # 开始分步注册流程，保存用户ID到状态中
     state["user_id"] = event.get_user_id()
 
 
 @register.got("nickname", prompt="🀄️ 新人指引  ──────────\n✨ 欢迎来到诡修仙世界！\n👤 请输入你的角色昵称：")
-async def _(state: T_State, nickname: str = ArgPlainText()):
+async def _(event: MessageEvent, nickname: str = ArgPlainText()):
     if not nickname.strip():
         await register.reject("⛔ 昵称不能为空，请重新输入")
 
-    # 保存昵称到状态
-    state["nickname"] = nickname.strip()
-
-
-@register.got("gender", prompt="👤 已设置昵称：{nickname}\n⚧️ 请选择性别（输入 男 或 女）：")
-async def _(event: MessageEvent, state: T_State, gender_str: str = ArgPlainText()):
-    try:
-        gender = Gender(gender_str.strip())
-        nickname = state.get("nickname", "")
-
-        # 创建角色
-        result = await create_player(event, nickname, gender)
-        await register.finish(message_add_head(result, event))
-    except ValueError:
-        await register.reject(f"⛔ 无效的性别，请输入：{Gender.MALE.value} 或 {Gender.FEMALE.value}")
+    # 创建角色，默认性别为男
+    result = await create_player(event, nickname.strip(), Gender.MALE)
+    await register.finish(message_add_head(result, event))
 
 
 async def create_player(event: MessageEvent, nickname: str, gender: Gender) -> str:
@@ -226,6 +210,41 @@ async def create_player(event: MessageEvent, nickname: str, gender: Gender) -> s
             "━━━━━━━━━━━━━\n"
             "⬇️ 【修炼】割下第一缕血丝\n"
             "⬇️ 【面板】窥视自己的残骸\n"
+            "⬇️ 【改性别 女】女孩子？\n"
             "💡 更多指令请输入【帮助】"
         )
         return content
+
+
+@change_gender.handle()
+async def _(event: MessageEvent, args: Message = CommandArg()):
+    """修改角色性别"""
+    gender_str = args.extract_plain_text().strip()
+
+    if not gender_str:
+        await change_gender.finish("⛔ 请指定性别，格式：改性别 男/女")
+
+    try:
+        gender = Gender(gender_str)
+    except ValueError:
+        await change_gender.finish(f"⛔ 无效的性别，可选：{Gender.MALE.value}/{Gender.FEMALE.value}")
+
+    async with safe_session() as session:
+        player = await session.get(Player, event.get_user_id())
+        if not player:
+            await change_gender.finish("⛔ 请先创建角色")
+
+        if player.sex == gender:
+            await change_gender.finish(f"⛔ 你的性别已经是{gender.value}了")
+
+        old_gender = player.sex.value
+        player.sex = gender
+        session.add(player)
+        await session.commit()
+
+        await change_gender.finish(message_add_head(
+            f"✨ 性别修改成功！\n"
+            f"🔄 {old_gender} → {gender.value}\n"
+            f"👤 {player.nickname}[UID:{player.uid}]",
+            event
+        ))
