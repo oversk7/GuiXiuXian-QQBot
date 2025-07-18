@@ -44,16 +44,19 @@ CATEGORY_ORDER = [
 @use_item.handle()
 async def handle_use_item(event: MessageEvent, args: Message = CommandArg()):
     params = args.extract_plain_text().strip().split()
-    if len(params) != 2:
+    if not params:
         await use_item.finish("⛔ 格式错误，正确格式：使用 [物品名称] [数量]")
 
-    item_name, quantity = params
-    try:
-        quantity = int(quantity)
-        if quantity <= 0:
-            raise ValueError
-    except ValueError:
-        await use_item.finish("⛔ 数量必须为正整数")
+    item_name = params[0]
+    quantity = 1
+    
+    if len(params) > 1:
+        try:
+            quantity = int(params[1])
+            if quantity <= 0:
+                raise ValueError
+        except ValueError:
+            await use_item.finish("⛔ 数量必须为正整数")
 
     async with safe_session() as session:
         # 获取玩家和物品信息

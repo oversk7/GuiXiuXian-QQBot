@@ -36,7 +36,7 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
         await list_cmd.finish("⛔ 格式错误：挂牌 出售/收购 物品名 单价 数量")
 
     mode_str, item_name, price_str, qty_str = params
-    if mode_str not in ("出售", "收购"):
+    if mode_str not in ("出售","购买", "收购", "求购"):
         await list_cmd.finish("⛔ 挂牌类型必须为 出售 或 收购")
 
     side = OrderSide.SELL if mode_str == "出售" else OrderSide.BUY
@@ -272,7 +272,7 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
             lines.extend(sell_page)
         else:
             lines.append("(空)")
-        lines.append(heavy_divider(f"{EMOJI_BUY} 求购"))
+        lines.append(heavy_divider(f"{EMOJI_BUY} 收购"))
         if buy_page:
             lines.extend(buy_page)
         else:
