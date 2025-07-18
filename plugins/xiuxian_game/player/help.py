@@ -99,8 +99,11 @@ async def handle_player(event: MessageEvent, args: Message = CommandArg()):
         "【面板 [UID]】 查看指定玩家面板\n"
         "【财富榜】 查看财富榜\n"
         "【修为榜】 查看修为榜\n"
-        "【注册】 注册角色\n"
-        "【改名 [新名字]】 改名"
+        "【注册】 注册角色（支持分步引导）\n"
+        "【改名 [新名字]】 改名\n"
+        "━━━━━━━━━━━━━\n"
+        "💡 新手注册：直接发送【注册】，系统会引导你分步输入昵称和性别\n"
+        "💡 快速注册：发送【注册 昵称 性别】，如：注册 道爷 男"
     )
     await player_cmd.finish(Message(msg))
 

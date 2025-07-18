@@ -1,6 +1,7 @@
-from nonebot import on_command
-from nonebot.params import CommandArg
+from nonebot import on_command, on_message
+from nonebot.params import CommandArg, State
 from nonebot.adapters.qq import MessageEvent, Message
+from nonebot.typing import T_State
 from ..models.db import safe_session
 from ..models.player import Player
 from sqlalchemy import select, func
@@ -40,6 +41,9 @@ def realm_by_level(level: int) -> str:
 
 profile = on_command("角色",aliases={"面板","状态"}, block=True, priority=5)
 register = on_command("注册", block=True, priority=5)
+
+# 注册流程的消息处理器
+register_handler = on_message(priority=6, block=False)
 
 
 @profile.handle()
@@ -139,38 +143,104 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
     await profile.finish(message_add_head(content, event))
 
 @register.handle()
-async def _(event: MessageEvent, args: Message = CommandArg()):
-    params = args.extract_plain_text().strip().split()
-    if len(params) < 2:
-        await register.finish(
-            message_add_head(
-                "🀄️ 新人指引  ──────────\n"
-                "> 注册格式:【注册 [昵称] [性别]】\n"
-                "> 示       例: 注册 道爷 男\n"
-                "> 性别可选: 男 / 女\n"
-                "💡 后续所有指令都可省略斜杠",
-                event)
-            )
-    nickname, gender = params[0], params[1]
-    try:
-        gender = Gender(gender)
-    except ValueError:
-        await register.finish(f"⛔ 无效的性别，可选：{Gender.MALE.value}/{Gender.FEMALE.value}")
-
+async def _(event: MessageEvent, args: Message = CommandArg(), state: T_State = State()):
+    # 检查是否已有角色
     async with safe_session() as session:
-        # 检查是否已有角色
         result = await session.execute(
             select(Player).where(Player.id == event.get_user_id())
         )
         if result.scalars().first():
             await register.finish("⛔ 你已经创建过角色了")
-        
+
+    # 获取参数
+    params = args.extract_plain_text().strip().split()
+
+    # 如果有完整参数，直接处理
+    if len(params) >= 2:
+        nickname, gender_str = params[0], params[1]
+        try:
+            gender = Gender(gender_str)
+            # 直接创建角色
+            result = await create_player(event, nickname, gender)
+            await register.finish(message_add_head(result, event))
+            return
+        except ValueError:
+            await register.finish(f"⛔ 无效的性别，可选：{Gender.MALE.value}/{Gender.FEMALE.value}")
+
+    # 开始分步注册流程
+    state["register"] = True
+    state["step"] = "nickname"
+    await register.finish(
+        message_add_head(
+            "🀄️ 新人指引  ──────────\n"
+            "✨ 欢迎来到诡修仙世界！\n"
+            "👤 请输入你的角色昵称：",
+            event)
+        )
+
+
+@register_handler.handle()
+async def handle_register_steps(event: MessageEvent, state: T_State = State()):
+    # 只处理注册状态的消息
+    if not state.get("register", False):
+        return
+
+    user_input = event.get_plaintext().strip()
+
+    # 处理昵称输入
+    if state.get("step") == "nickname":
+        if not user_input:
+            await register_handler.finish("⛔ 昵称不能为空，请重新输入")
+            return
+
+        # 保存昵称，进入下一步
+        state["nickname"] = user_input
+        state["step"] = "gender"
+        await register_handler.finish(
+            message_add_head(
+                f"👤 已设置昵称：{user_input}\n"
+                f"⚧️ 请选择性别（输入 男 或 女）：",
+                event)
+            )
+        return
+
+    # 处理性别输入
+    if state.get("step") == "gender":
+        try:
+            gender = Gender(user_input)
+            nickname = state.get("nickname", "")
+            # 清除会话状态
+            state.pop("register", None)
+            state.pop("step", None)
+            state.pop("nickname", None)
+
+            # 创建角色
+            result = await create_player(event, nickname, gender)
+            await register_handler.finish(message_add_head(result, event))
+        except ValueError:
+            await register_handler.finish(
+                message_add_head(
+                    f"⛔ 无效的性别，请输入：{Gender.MALE.value} 或 {Gender.FEMALE.value}",
+                    event)
+                )
+
+
+async def create_player(event: MessageEvent, nickname: str, gender: Gender) -> str:
+    """创建新玩家角色，返回成功消息"""
+    async with safe_session() as session:
+        # 再次检查是否已有角色（防止在会话过程中创建）
+        result = await session.execute(
+            select(Player).where(Player.id == event.get_user_id())
+        )
+        if result.scalars().first():
+            return "⛔ 你已经创建过角色了"
+
         # 获取当前最大UID
         max_uid_result = await session.execute(
             select(func.max(Player.uid))
         )
         max_uid = max_uid_result.scalar() or 99
-        
+
         new_player = Player(
             id=event.get_user_id(),
             uid=max_uid + 1,
@@ -178,7 +248,7 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
             sex=gender,
             created_at=datetime.now()
         )
-        
+
         session.add(new_player)
         await session.commit()
         card_type = random.choice(('🎲','🀄️','🀃','🀅','🀆','🀀','🀁','🀂','🀒','🀚','🀣'))
@@ -194,4 +264,4 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
             "⬇️ 【面板】窥视自己的残骸\n"
             "💡 更多指令请输入【帮助】"
         )
-        await register.finish(message_add_head(content, event))
+        return content

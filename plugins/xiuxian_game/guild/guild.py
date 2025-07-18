@@ -139,7 +139,7 @@ async def handle_guild_info(event: MessageEvent):
 
         msg = (
             f"🏰 公会面板\n"
-            f"▫️『{guild_obj.name}』[ID:{guild_obj.id}]\n"
+            f"▫️『{guild_obj.name}』[ID:{guild_obj.id}] Lv.{guild_obj.level}\n"
             f"▫️ 会长：{president.nickname if president else '未知'}\n"
             f"▫️ 人数：{member_count}/{capacity}\n"
             f"▫️ 经验：{exp_current}/{exp_need}\n"
