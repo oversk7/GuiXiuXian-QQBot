@@ -238,7 +238,7 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
         if player.sex == gender:
             await change_gender.finish(f"⛔ 你的性别已经是{gender.value}了")
 
-        old_gender = player.sex.value
+        old_gender = player.sex
         player.sex = gender
         session.add(player)
         await session.commit()
