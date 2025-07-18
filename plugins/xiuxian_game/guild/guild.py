@@ -624,21 +624,16 @@ async def handle_set_base(event: MessageEvent, args: Message = CommandArg()):
             f"🏰 公会基地设置成功！\n"
             f"▫️ 基地坐标：({base_x}, {base_y})\n"
             f"▫️ 势力范围：{guild_obj.territory_range}×{guild_obj.territory_range}\n"
-            f"▫️ 公会成员现在可以使用【传送 公会】传送到基地"
+            f"▫️ 公会成员现在可以使用【传送公会】或【传送 公会】传送到基地"
         )
         await set_base_cmd.finish(message_add_head(msg, event))
 
 # ==================== 公会传送 ====================
-guild_teleport_cmd = on_command("传送", block=False, priority=4)
+guild_teleport_cmd = on_command("传送公会", aliases={"公会传送"}, block=True, priority=4)
 
 @guild_teleport_cmd.handle()
-async def handle_guild_teleport(event: MessageEvent, args: Message = CommandArg()):
+async def handle_guild_teleport(event: MessageEvent):
     """公会成员传送到基地，每日限使用一次"""
-    target = args.extract_plain_text().strip()
-
-    # 只处理 "传送 公会" 的情况，其他情况不处理（让其他传送指令处理）
-    if target != "公会":
-        return
 
     async with safe_session() as session:
         player = await session.get(Player, event.get_user_id())
@@ -695,3 +690,19 @@ async def handle_guild_teleport(event: MessageEvent, args: Message = CommandArg(
             f"▫️ 已停止导航任务，今日不可再传送公会"
         )
         await guild_teleport_cmd.finish(message_add_head(msg, event))
+
+
+# ==================== 兼容性：传送 公会 ====================
+legacy_guild_teleport_cmd = on_command("传送", block=False, priority=3)
+
+@legacy_guild_teleport_cmd.handle()
+async def handle_legacy_guild_teleport(event: MessageEvent, args: Message = CommandArg()):
+    """兼容旧的"传送 公会"指令格式"""
+    target = args.extract_plain_text().strip()
+
+    # 只处理 "传送 公会" 的情况，其他情况不处理（让其他传送指令处理）
+    if target != "公会":
+        return
+
+    # 调用公会传送处理逻辑
+    await handle_guild_teleport(event)

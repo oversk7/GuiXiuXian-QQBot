@@ -267,7 +267,7 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
     # 验证区域
     valid_regions = list(config.map_config["regions"].keys())
     if target_region not in valid_regions:
-        await teleport_cmd.finish("⛔ 目的地不存在，可发送 /地图 查看全部区域")
+        await teleport_cmd.finish("⛔ 目的地不存在，可发送 /诡域 查看全部诡域（副本）")
 
     STAM_COST = 1  # 咒抗消耗
 
