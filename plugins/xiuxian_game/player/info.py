@@ -1,5 +1,5 @@
-from nonebot import on_command, on_message
-from nonebot.params import CommandArg, State
+from nonebot import on_command
+from nonebot.params import CommandArg, ArgPlainText
 from nonebot.adapters.qq import MessageEvent, Message
 from nonebot.typing import T_State
 from ..models.db import safe_session
@@ -41,9 +41,6 @@ def realm_by_level(level: int) -> str:
 
 profile = on_command("角色",aliases={"面板","状态"}, block=True, priority=5)
 register = on_command("注册", block=True, priority=5)
-
-# 注册流程的消息处理器
-register_handler = on_message(priority=6, block=False)
 
 
 @profile.handle()
@@ -143,7 +140,7 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
     await profile.finish(message_add_head(content, event))
 
 @register.handle()
-async def _(event: MessageEvent, args: Message = CommandArg(), state: T_State = State()):
+async def _(event: MessageEvent, state: T_State, args: Message = CommandArg()):
     # 检查是否已有角色
     async with safe_session() as session:
         result = await session.execute(
@@ -163,66 +160,33 @@ async def _(event: MessageEvent, args: Message = CommandArg(), state: T_State = 
             # 直接创建角色
             result = await create_player(event, nickname, gender)
             await register.finish(message_add_head(result, event))
-            return
         except ValueError:
             await register.finish(f"⛔ 无效的性别，可选：{Gender.MALE.value}/{Gender.FEMALE.value}")
 
-    # 开始分步注册流程
-    state["register"] = True
-    state["step"] = "nickname"
-    await register.finish(
-        message_add_head(
-            "🀄️ 新人指引  ──────────\n"
-            "✨ 欢迎来到诡修仙世界！\n"
-            "👤 请输入你的角色昵称：",
-            event)
-        )
+    # 开始分步注册流程，保存用户ID到状态中
+    state["user_id"] = event.get_user_id()
 
 
-@register_handler.handle()
-async def handle_register_steps(event: MessageEvent, state: T_State = State()):
-    # 只处理注册状态的消息
-    if not state.get("register", False):
-        return
+@register.got("nickname", prompt="🀄️ 新人指引  ──────────\n✨ 欢迎来到诡修仙世界！\n👤 请输入你的角色昵称：")
+async def _(state: T_State, nickname: str = ArgPlainText()):
+    if not nickname.strip():
+        await register.reject("⛔ 昵称不能为空，请重新输入")
 
-    user_input = event.get_plaintext().strip()
+    # 保存昵称到状态
+    state["nickname"] = nickname.strip()
 
-    # 处理昵称输入
-    if state.get("step") == "nickname":
-        if not user_input:
-            await register_handler.finish("⛔ 昵称不能为空，请重新输入")
-            return
 
-        # 保存昵称，进入下一步
-        state["nickname"] = user_input
-        state["step"] = "gender"
-        await register_handler.finish(
-            message_add_head(
-                f"👤 已设置昵称：{user_input}\n"
-                f"⚧️ 请选择性别（输入 男 或 女）：",
-                event)
-            )
-        return
+@register.got("gender", prompt="👤 已设置昵称：{nickname}\n⚧️ 请选择性别（输入 男 或 女）：")
+async def _(event: MessageEvent, state: T_State, gender_str: str = ArgPlainText()):
+    try:
+        gender = Gender(gender_str.strip())
+        nickname = state.get("nickname", "")
 
-    # 处理性别输入
-    if state.get("step") == "gender":
-        try:
-            gender = Gender(user_input)
-            nickname = state.get("nickname", "")
-            # 清除会话状态
-            state.pop("register", None)
-            state.pop("step", None)
-            state.pop("nickname", None)
-
-            # 创建角色
-            result = await create_player(event, nickname, gender)
-            await register_handler.finish(message_add_head(result, event))
-        except ValueError:
-            await register_handler.finish(
-                message_add_head(
-                    f"⛔ 无效的性别，请输入：{Gender.MALE.value} 或 {Gender.FEMALE.value}",
-                    event)
-                )
+        # 创建角色
+        result = await create_player(event, nickname, gender)
+        await register.finish(message_add_head(result, event))
+    except ValueError:
+        await register.reject(f"⛔ 无效的性别，请输入：{Gender.MALE.value} 或 {Gender.FEMALE.value}")
 
 
 async def create_player(event: MessageEvent, nickname: str, gender: Gender) -> str:
