@@ -130,7 +130,10 @@ async def handle_guild_info(event: MessageEvent):
         # 基地信息
         base_info = ""
         if guild_obj.base_x is not None and guild_obj.base_y is not None:
-            base_info = f"▫️ 基地坐标：({guild_obj.base_x}, {guild_obj.base_y})\n"
+            base_info = (
+                f"▫️ 基地坐标：({guild_obj.base_x}, {guild_obj.base_y})\n"
+                f"▫️ 势力范围：{guild_obj.territory_range}×{guild_obj.territory_range}\n"
+            )
         elif guild_obj.level >= 5:
             base_info = f"▫️ 基地坐标：未设置（可使用【设置基地】命令）\n"
 
@@ -417,7 +420,10 @@ async def handle_list_guilds(event: MessageEvent, args: Message = CommandArg()):
     for idx, g in enumerate(guilds, start_idx):
         cnt = (await session.execute(select(_func.count(Player.id)).where(Player.guild_id == g.id))).scalar_one()
         cap = _capacity(g.level)
-        lines.append(f"{idx}. 『{g.name}』 Lv.{g.level} ({cnt}/{cap})")
+        base_info = ""
+        if g.base_x is not None and g.base_y is not None:
+            base_info = f" 基地:({g.base_x},{g.base_y}) 势力:{g.territory_range}"
+        lines.append(f"{idx}. 『{g.name}』 Lv.{g.level} ({cnt}/{cap}){base_info}")
 
     await list_guilds_cmd.finish(message_add_head("\n".join(lines), event))
 
@@ -588,6 +594,26 @@ async def handle_set_base(event: MessageEvent, args: Message = CommandArg()):
         if guild_obj.base_x is not None and guild_obj.base_y is not None:
             await set_base_cmd.finish(f"⛔ 公会基地已设置在坐标({guild_obj.base_x}, {guild_obj.base_y})，不允许重复设置")
 
+        # 检查势力范围冲突
+        territory_range = guild_obj.territory_range
+        conflict_stmt = select(Guild).where(
+            Guild.id != guild_obj.id,
+            Guild.base_x.isnot(None),
+            Guild.base_y.isnot(None),
+            # 检查两个正方形是否重叠：如果两个中心点的距离小于等于两个势力范围之和的一半，则重叠
+            (_func.abs(Guild.base_x - base_x) <= (Guild.territory_range + territory_range) / 2) &
+            (_func.abs(Guild.base_y - base_y) <= (Guild.territory_range + territory_range) / 2)
+        )
+        conflict_guild = (await session.execute(conflict_stmt)).scalars().first()
+        if conflict_guild:
+            await set_base_cmd.finish(
+                f"⛔ 坐标({base_x}, {base_y})与公会『{conflict_guild.name}』的势力范围冲突！\n"
+                f"▫️ 冲突公会基地：({conflict_guild.base_x}, {conflict_guild.base_y})\n"
+                f"▫️ 冲突公会势力范围：{conflict_guild.territory_range}\n"
+                f"▫️ 本公会势力范围：{territory_range}\n"
+                f"▫️ 请选择其他坐标设置基地"
+            )
+
         # 设置基地坐标
         guild_obj.base_x = base_x
         guild_obj.base_y = base_y
@@ -597,6 +623,7 @@ async def handle_set_base(event: MessageEvent, args: Message = CommandArg()):
         msg = (
             f"🏰 公会基地设置成功！\n"
             f"▫️ 基地坐标：({base_x}, {base_y})\n"
+            f"▫️ 势力范围：{guild_obj.territory_range}×{guild_obj.territory_range}\n"
             f"▫️ 公会成员现在可以使用【传送 公会】传送到基地"
         )
         await set_base_cmd.finish(message_add_head(msg, event))

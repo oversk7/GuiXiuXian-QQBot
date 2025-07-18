@@ -13,4 +13,5 @@ class Guild(Base):
     notice: Mapped[str | None] = mapped_column(String(128), nullable=True, comment="公会公告")
     base_x: Mapped[int | None] = mapped_column(Integer, nullable=True, comment="公会基地X坐标")
     base_y: Mapped[int | None] = mapped_column(Integer, nullable=True, comment="公会基地Y坐标")
+    territory_range: Mapped[int] = mapped_column(Integer, default=3, server_default='3', comment="势力范围（以基地为中心的正方形边长）")
     created_at: Mapped[DateTime] = mapped_column(DateTime, server_default=func.now(), comment="创建时间")

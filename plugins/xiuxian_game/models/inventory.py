@@ -17,12 +17,13 @@ class ItemType(str,PyEnum):
     GOODS = "GOODS"
 
 class ItemEffectType(str, PyEnum):
-    RESTORE_HP = "RESTORE_HP" 
+    RESTORE_HP = "RESTORE_HP"
     RESTORE_MP = "RESTORE_MP"
     BUFF = "BUFF"
     REVIVE = "REVIVE"
     GAIN_EXP = "GAIN_EXP"
     RESET_ATTR = "RESET_ATTR"
+    EXPAND_TERRITORY = "EXPAND_TERRITORY"
     # 以下类型不使用 apply_effect 处理
     CHANGE_NAME = "CHANGE_NAME"
     TELEPORT = "TELEPORT"

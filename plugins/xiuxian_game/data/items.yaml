@@ -54,6 +54,14 @@ items:
       effect_type: "APPOINT_PRESIDENT"
       price: 100000
 
+    - item_id: "territory_expansion_scroll"
+      name: "公会扩张令"
+      description: "古老的卷轴，记载着扩张势力范围的秘法。使用后可永久增加公会势力范围+1。"
+      type: "CONSUMABLE"
+      effect_type: "EXPAND_TERRITORY"
+      effect_params: {"value": 1}
+      price: 50000
+
     - item_id: "reset_scroll"
       name: "重启符"
       description: "神秘的符篆，蕴含着诡域的力量，可重启时间，返还属性点。"

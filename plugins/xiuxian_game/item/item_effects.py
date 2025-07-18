@@ -166,3 +166,15 @@ async def _reset_attr(player: Player, cfg: ItemConfig, qty: int, ctx: str):
         player.mp = player.max_mp
 
     return True, "🔄 属性已重置，所有点数已退还，可重新分配"
+
+
+@register(ItemEffectType.EXPAND_TERRITORY)
+async def _expand_territory(player: Player, cfg: ItemConfig, qty: int, ctx: str) -> Tuple[bool, str]:
+    """扩张公会势力范围 - 这个效果需要特殊处理，因为需要修改Guild对象"""
+    # 检查玩家是否加入公会
+    if not player.guild_id:
+        return False, "⛔ 你尚未加入任何公会，无法使用公会扩张令"
+
+    # 这个效果需要在调用处特殊处理，因为需要访问Guild对象
+    # 返回特殊标记，让调用方知道需要特殊处理
+    return False, "EXPAND_TERRITORY_SPECIAL_HANDLING"

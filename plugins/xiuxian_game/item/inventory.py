@@ -12,6 +12,45 @@ from .item_effects import apply_effect
 from datetime import date
 from ..models.elixir_usage import ElixirUsageLog
 from ..models.navigation_task import NavigationTask
+from ..models.guild import Guild
+
+async def _handle_expand_territory(session, player: Player, item_config, quantity: int):
+    """处理公会扩张令的特殊逻辑"""
+    # 检查玩家是否加入公会
+    if not player.guild_id:
+        return False, "⛔ 你尚未加入任何公会，无法使用公会扩张令"
+
+    # 获取公会信息
+    guild = await session.get(Guild, player.guild_id)
+    if not guild:
+        return False, "⛔ 公会数据异常"
+
+    # 检查是否为会长
+    if guild.president_id != player.id:
+        return False, "⛔ 只有会长才能使用公会扩张令"
+
+    # 检查公会是否已设置基地
+    if guild.base_x is None or guild.base_y is None:
+        return False, "⛔ 公会尚未设置基地，无法扩张势力范围"
+
+    # 扩张势力范围
+    expand_value = int(item_config.effect_params.get("value", 1)) * quantity
+    old_range = guild.territory_range
+    guild.territory_range += expand_value
+
+    # 设置合理的上限
+    MAX_TERRITORY_RANGE = 20
+    if guild.territory_range > MAX_TERRITORY_RANGE:
+        guild.territory_range = MAX_TERRITORY_RANGE
+        actual_expand = MAX_TERRITORY_RANGE - old_range
+        if actual_expand <= 0:
+            return False, f"⛔ 公会势力范围已达到上限({MAX_TERRITORY_RANGE})，无法继续扩张"
+        session.add(guild)
+        return True, f"🏰 公会势力范围扩张成功！{old_range} → {guild.territory_range} (已达上限)"
+
+    session.add(guild)
+    return True, f"🏰 公会势力范围扩张成功！{old_range} → {guild.territory_range}"
+
 
 inventory_cmd = on_command("背包", block=True, priority=5)
 use_item = on_command("使用", block=True, priority=5)
@@ -102,6 +141,13 @@ async def handle_use_item(event: MessageEvent, args: Message = CommandArg()):
 
         # 调用统一效果执行器
         success, msg = await apply_effect(player, item_config, quantity, ctx="world")
+
+        # 特殊处理：公会扩张令
+        if not success and msg == "EXPAND_TERRITORY_SPECIAL_HANDLING":
+            success, msg = await _handle_expand_territory(session, player, item_config, quantity)
+            if not success:
+                await session.rollback()
+                await use_item.finish(msg)
 
         if not success:
             # 未生效，不扣除物品
