@@ -486,41 +486,6 @@ items:
       price: 500
       grudge_value: 10
 
-    - item_id: "kayako_fragment"
-      name: "伽椰子的投影"
-      description: "伽椰子的怨念碎片，能听到微弱的呻吟声 👻✨"
-      type: "MATERIAL"
-      price: 450
-      grudge_value: 9
-
-    - item_id: "toshio_fragment"
-      name: "俊雄的投影"
-      description: "俊雄的怨念碎片，偶尔传出猫叫声 🐱✨"
-      type: "MATERIAL"
-      price: 350
-      grudge_value: 7
-
-    - item_id: "hanako_fragment"
-      name: "花子的投影"
-      description: "花子的怨念碎片，带着淡淡的血腥味 ✂️✨"
-      type: "MATERIAL"
-      price: 300
-      grudge_value: 6
-
-    - item_id: "kuchisake_fragment"
-      name: "裂口女的投影"
-      description: "裂口女的怨念碎片，散发着恐怖的气息 😱✨"
-      type: "MATERIAL"
-      price: 400
-      grudge_value: 8
-
-    - item_id: "onryo_fragment"
-      name: "怨灵的投影"
-      description: "普通怨灵的碎片，最常见的怨念结晶 👻✨"
-      type: "MATERIAL"
-      price: 200
-      grudge_value: 5
-
   ghost_tools:  # 镇压道具
     - item_id: "coffin_nail"
       name: "棺材钉"
