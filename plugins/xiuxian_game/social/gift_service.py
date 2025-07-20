@@ -59,7 +59,12 @@ class GiftService:
         item_config = config.items_config["by_name"].get(item_name)
         if not item_config:
             return False, f"物品「{item_name}」不存在"
-        
+
+        # 检查商品类物品的送礼限制
+        if item_config.type == ItemType.GOODS:
+            if gift_type == GiftType.MENTORSHIP:
+                return False, "师徒之间禁止送商品类物品"
+
         # 检查发送者是否有足够的物品
         stmt = select(ItemInstance).where(
             and_(
@@ -86,32 +91,35 @@ class GiftService:
         else:
             sender_item.quantity -= quantity
 
-        # 给接收者添加物品
-        if item_config.type == ItemType.EQUIPMENT:
-            # 装备需要保持原有耐久度
-            try:
-                await ItemInstance.add_item(session, receiver.id, item_config.item_id, quantity, equipment_durability)
-            except ValueError as e:
-                return False, f"添加物品失败：{e}"
-        else:
-            # 普通物品按原逻辑处理
-            stmt = select(ItemInstance).where(
-                and_(
-                    ItemInstance.player_id == receiver.id,
-                    ItemInstance.item_id == item_config.item_id
-                )
-            )
-            receiver_item = (await session.execute(stmt)).scalars().first()
+        # 给接收者添加物品（夫妻送商品时不给物品）
+        is_marriage_goods = (gift_type == GiftType.MARRIAGE and item_config.type == ItemType.GOODS)
 
-            if receiver_item:
-                receiver_item.quantity += quantity
+        if not is_marriage_goods:
+            if item_config.type == ItemType.EQUIPMENT:
+                # 装备需要保持原有耐久度
+                try:
+                    await ItemInstance.add_item(session, receiver.id, item_config.item_id, quantity, equipment_durability)
+                except ValueError as e:
+                    return False, f"添加物品失败：{e}"
             else:
-                new_item = ItemInstance(
-                    player_id=receiver.id,
-                    item_id=item_config.item_id,
-                    quantity=quantity
+                # 普通物品按原逻辑处理
+                stmt = select(ItemInstance).where(
+                    and_(
+                        ItemInstance.player_id == receiver.id,
+                        ItemInstance.item_id == item_config.item_id
+                    )
                 )
-                session.add(new_item)
+                receiver_item = (await session.execute(stmt)).scalars().first()
+
+                if receiver_item:
+                    receiver_item.quantity += quantity
+                else:
+                    new_item = ItemInstance(
+                        player_id=receiver.id,
+                        item_id=item_config.item_id,
+                        quantity=quantity
+                    )
+                    session.add(new_item)
         
         # 记录礼物
         gift_record = GiftRecord(
@@ -130,8 +138,12 @@ class GiftService:
             await MarriageService.update_gift_value(session, sender_id, receiver.id, total_value)
         
         await session.commit()
-        
-        return True, f"成功向 {receiver.nickname} 送出 {quantity}个「{item_name}」，价值 {total_value} 金币"
+
+        # 根据情况返回不同的消息
+        if is_marriage_goods:
+            return True, f"成功向配偶 {receiver.nickname} 送出 {quantity}个「{item_name}」，增加恩爱值 {total_value}（商品未实际转移）"
+        else:
+            return True, f"成功向 {receiver.nickname} 送出 {quantity}个「{item_name}」，价值 {total_value} 金币"
     
     @staticmethod
     async def get_gift_history(session: AsyncSession, player_id: str, limit: int = 10) -> list[GiftRecord]:
