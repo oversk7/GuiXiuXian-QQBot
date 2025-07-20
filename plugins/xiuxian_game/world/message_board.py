@@ -4,11 +4,27 @@ from nonebot.params import CommandArg
 from sqlalchemy import select
 from datetime import datetime
 from sqlalchemy import func as _func
+import re
 
 from ..models.db import safe_session
 from ..models.player import Player
 from ..models.world_message import WorldMessage
 from ..utils import message_add_head
+
+
+def clean_message_content(content: str) -> str:
+    """清理消息内容，移除QQ表情源码"""
+    # 移除QQ表情源码，格式如：<faceType=1,faceId="13",ext="eyJ0ZXh0Ijoi5ZGy54mZIn0=">
+    content = re.sub(r'<faceType=\d+,faceId="[^"]*",ext="[^"]*">', '', content)
+
+    # 移除其他可能的表情源码格式
+    content = re.sub(r'<[^>]*faceType[^>]*>', '', content)
+    content = re.sub(r'<[^>]*faceId[^>]*>', '', content)
+
+    # 清理多余的空格
+    content = re.sub(r'\s+', ' ', content).strip()
+
+    return content
 
 
 async def has_unread_messages(player_id: str) -> bool:
@@ -52,7 +68,10 @@ PAGE_SIZE = 10
 
 @leave_msg_cmd.handle()
 async def handle_leave_msg(event: MessageEvent, args: Message = CommandArg()):
-    content = args.extract_plain_text().strip()
+    raw_content = args.extract_plain_text().strip()
+    # 清理表情源码
+    content = clean_message_content(raw_content)
+
     if not content:
         await leave_msg_cmd.finish("⛔ 请输入留言内容，例如：留言 今天好开心！")
     if len(content) > MAX_LEN:
