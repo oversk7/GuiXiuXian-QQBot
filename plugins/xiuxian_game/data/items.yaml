@@ -457,27 +457,6 @@ items:
       price: 5000
       grudge_value: 100
 
-    - item_id: "ghost_kayako"
-      name: "伽椰子"
-      description: "发出诡异呻吟声的怨灵，拖着破碎的身躯缓缓爬行 👻"
-      type: "MATERIAL"
-      price: 4500
-      grudge_value: 90
-
-    - item_id: "ghost_toshio"
-      name: "俊雄"
-      description: "永远长不大的孩童怨灵，发出猫叫般的诡异声音 🐱"
-      type: "MATERIAL"
-      price: 3500
-      grudge_value: 70
-
-    - item_id: "ghost_hanako"
-      name: "花子"
-      description: "厕所里的红衣少女，手持剪刀，眼神空洞 ✂️"
-      type: "MATERIAL"
-      price: 3000
-      grudge_value: 60
-
   ghost_fragments:  # 鬼怪碎片
     - item_id: "sadako_fragment"
       name: "贞子的投影"
