@@ -56,7 +56,7 @@ items:
 
     - item_id: "territory_expansion_scroll"
       name: "公会扩张令"
-      description: "古老的卷轴，记载着扩张势力范围的秘法。使用后可永久增加公会势力范围+1。"
+      description: "古老的卷轴，记载着扩张势力范围的秘法。使用后可永久增加公会势力范围+1（上限20）。"
       type: "CONSUMABLE"
       effect_type: "EXPAND_TERRITORY"
       effect_params: {"value": 1}
