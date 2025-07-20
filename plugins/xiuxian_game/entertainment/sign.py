@@ -75,12 +75,17 @@ async def handle_sign(event: MessageEvent):
         # 检查是否为创建账号的同一天
         if player.created_at.date() == today:
             # 赠送新手大礼包
-            await ItemInstance.add_item(session, user_id,"spirit_herbs", quantity=5)
-            await ItemInstance.add_item(session, user_id,"heal_potion", quantity=5)
-            new_msg = "\n🎁 获得新手大礼包：回春散*5 凝神草*5"
+            try:
+                await ItemInstance.add_item(session, user_id, "spirit_herb", quantity=5)
+                await ItemInstance.add_item(session, user_id, "heal_potion", quantity=5)
+                new_msg = "\n🎁 获得新手大礼包：回春散*5 凝神草*5"
+            except ValueError as e:
+                # 如果添加物品失败，记录错误但不影响签到
+                new_msg = f"\n⚠️ 新手大礼包发放失败：{e}"
 
+        # 先提交数据库事务，确保数据保存成功
+        await session.commit()
+
+        # 然后发送响应消息
         await sign.send(
             f"✅ 连续签到 {streak} 天！获得 {int(gold_reward/2)} 金币！\n{lucky_msg}{bonus_msg}{stamina_msg}{new_msg}")
-        
-        
-        await session.commit()
