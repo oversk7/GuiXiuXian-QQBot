@@ -13,8 +13,9 @@ from .mentorship import Mentorship
 from .social_application import SocialApplication
 from .gift_record import GiftRecord
 from .story_session import StorySession
+from .donation_log import PlayerDonationLog
 
 __all__ = [
     "Player", "Guild", "GuildApplication", "WorldMessage", "BankAccount", "ItemInstance", "WorldTile", "NavigationTask", "AlchemyRecord", "MarketOrder",
-    "Marriage", "Mentorship", "SocialApplication", "GiftRecord", "StorySession"
+    "Marriage", "Mentorship", "SocialApplication", "GiftRecord", "StorySession", "PlayerDonationLog"
 ]
