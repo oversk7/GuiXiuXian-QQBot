@@ -219,6 +219,8 @@ async def create_player(event: MessageEvent, nickname: str, gender: Gender) -> s
             "⬇️ 【修炼】割下第一缕血丝\n"
             "⬇️ 【面板】窥视自己的残骸\n"
             "⬇️ 【改性别 女】女孩子？\n"
+            "⬇️ 【签到】领取新手礼包\n"
+            "💡 注意【】括号里的才是指令，外面是指令说明！！！\n"
             "💡 更多指令请输入【帮助】"
         )
         return content
