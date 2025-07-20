@@ -14,8 +14,10 @@ from .social_application import SocialApplication
 from .gift_record import GiftRecord
 from .story_session import StorySession
 from .donation_log import PlayerDonationLog
+from .elixir_usage import ElixirUsageLog
+from .guild_teleport_log import GuildTeleportLog
 
 __all__ = [
     "Player", "Guild", "GuildApplication", "WorldMessage", "BankAccount", "ItemInstance", "WorldTile", "NavigationTask", "AlchemyRecord", "MarketOrder",
-    "Marriage", "Mentorship", "SocialApplication", "GiftRecord", "StorySession", "PlayerDonationLog"
+    "Marriage", "Mentorship", "SocialApplication", "GiftRecord", "StorySession", "PlayerDonationLog", "ElixirUsageLog", "GuildTeleportLog"
 ]
