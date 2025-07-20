@@ -100,6 +100,7 @@ async def handle_player(event: MessageEvent, args: Message = CommandArg()):
         "【面板 [UID]】 查看指定玩家面板\n"
         "【财富榜】 查看财富榜\n"
         "【修为榜】 查看修为榜\n"
+        "【幸运榜】 查看幸运榜\n"
         "【注册】 注册角色\n"
         "【改名 <新名字>】 改名\n"
         "【改性别 <男/女>】 修改角色性别\n"

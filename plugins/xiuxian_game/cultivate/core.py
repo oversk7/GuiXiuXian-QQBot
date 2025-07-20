@@ -401,4 +401,6 @@ async def handle_assign(event: MessageEvent, args: Message = CommandArg()):
             "━━━━━━━━━━━━━\n"
             "⬇️ 【面板】检查残骸"
         )
+        if attr_name == '运':
+            msg += "\n⬇️ 【幸运榜】查看运气排名"
         await assign_points.finish(message_add_head(msg, event))
