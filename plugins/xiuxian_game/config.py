@@ -9,6 +9,7 @@ class Config(BaseSettings):
     items_file: Path = data_dir / "items.yaml"
     map_file: Path = data_dir / "map.yaml"
     elixirs_file: Path = data_dir / "elixirs.yaml"
+    ghosts_file: Path = data_dir / "ghosts.yaml"
     
     @property
     def game_config(self) -> dict:
@@ -41,6 +42,16 @@ class Config(BaseSettings):
     def elixirs_config(self) -> dict:
         """返回丹方配置"""
         return _load_config(self.elixirs_file)
+
+    @property
+    def ghosts_config(self) -> dict:
+        """返回鬼怪配置"""
+        ghosts_data = _load_config(self.ghosts_file)
+        # 建立ID索引
+        ghosts_by_id = {}
+        for ghost in ghosts_data.get("ghosts", []):
+            ghosts_by_id[ghost["ghost_id"]] = ghost
+        return {"by_id": ghosts_by_id, "all": ghosts_data.get("ghosts", [])}
 
 
 @lru_cache(maxsize=None)

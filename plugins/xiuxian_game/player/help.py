@@ -33,6 +33,7 @@ async def handle_help(event: MessageEvent, args: Message = CommandArg()):
         "🎮 公会系统  💰 银行系统\n"
         "🔮 炼丹系统  🎮 活动系统\n"
         "💕 社交系统  🏰 副本系统\n"
+        "👻 镇压系统  🔥 鬼怪驾驭\n"
         "═════════════\n"
         "💡 发送/系统名称 查看详细指令，/更新 查看最近更新内容\n"
         "💡 【】括号里是指令，<>里是必填，[]里是选填\n"
@@ -302,6 +303,39 @@ async def handle_social_help(event: MessageEvent, args: Message = CommandArg()):
         "【社交统计】 查看社交系统统计信息"
     )
     await social_help_cmd.finish(Message(msg))
+
+# 镇压系统
+ghost_suppression_help_cmd = on_command("镇压系统", aliases={"镇压帮助", "鬼怪帮助"}, priority=4, block=True)
+
+@ghost_suppression_help_cmd.handle()
+async def handle_ghost_suppression_help(event: MessageEvent, args: Message = CommandArg()):
+    msg = (
+        "✨ 鬼怪镇压系统帮助 ✨\n"
+        "驾驭鬼怪镇压入侵现实世界的野生鬼，获得碎片合成更强鬼怪\n"
+        "━━━━━━━━━━━━━\n"
+        "🔍 查看入侵：\n"
+        "【鬼怪入侵】 查看今日鬼怪入侵列表\n"
+        "\n"
+        "⚔️ 镇压战斗：\n"
+        "【镇压】 镇压当前位置的鬼怪（需先移动到入侵坐标）\n"
+        "【镇压 棺材钉】 使用棺材钉强制压制威压规则\n"
+        "\n"
+        "👻 鬼怪管理：\n"
+        "【驾驭】 查看当前驾驭状态和可用鬼怪列表\n"
+        "【驾驭 <鬼怪名称>】 切换驾驭的鬼怪\n"
+        "【合成鬼怪】 查看可合成的鬼怪列表\n"
+        "【合成鬼怪 <鬼怪名称>】 使用碎片合成完整鬼怪\n"
+        "━━━━━━━━━━━━━\n"
+        "📋 镇压流程：\n"
+        "1️⃣ 威压判定：比较双方威压等级，不足可用棺材钉\n"
+        "2️⃣ 数值战斗：基于属性进行自动战斗计算\n"
+        "3️⃣ 战利品：镇压成功后有概率获得鬼怪碎片\n"
+        "━━━━━━━━━━━━━\n"
+        "⚠️ 威压机制：鬼怪威压等级由玩家属性决定\n"
+        "⚠️ 贞子/伽椰子需要理智，俊雄需要敏捷，花子需要攻击力\n"
+        "⚠️ 每日系统随机生成1-3只鬼入侵到现实世界随机坐标"
+    )
+    await ghost_suppression_help_cmd.finish(Message(msg))
 
 button_test_cmd = on_command("测试", priority=4, block=True)
 @button_test_cmd.handle()

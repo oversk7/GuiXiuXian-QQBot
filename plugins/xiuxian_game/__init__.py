@@ -23,6 +23,7 @@ from . import (
     social,
     story,
     log_uid,
+    ghost_suppression,
 )
 
 driver = get_driver()

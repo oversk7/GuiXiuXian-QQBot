@@ -1,0 +1,108 @@
+# 鬼怪配置文件
+ghosts:
+  - ghost_id: "sadako"
+    name: "贞子"
+    description: "从电视机中爬出的怨灵，长发遮面，散发着诅咒的气息。她的怨念来自于被推入井中的痛苦经历。"
+    hp: 800
+    attack: 120
+    defense: 80
+    agility: 90
+    base_prestige_level: 2
+    required_attribute: "mp"  # 理智
+    attribute_per_level: 50
+    fragment_item_id: "sadako_fragment"
+    fragment_drop_rate: 0.3
+    fragments_to_complete: 10
+    rarity: "epic"
+    special_abilities:
+      curse_video: "有概率在战斗中播放诅咒录像，降低对手理智"
+      well_emergence: "从井中爬出时获得额外攻击力加成"
+
+  - ghost_id: "kayako"
+    name: "伽椰子"
+    description: "发出诡异呻吟声的怨灵，拖着破碎的身躯缓缓爬行。她的怨念源于被丈夫杀害的悲惨遭遇。"
+    hp: 750
+    attack: 110
+    defense: 70
+    agility: 85
+    base_prestige_level: 2
+    required_attribute: "mp"  # 理智
+    attribute_per_level: 50
+    fragment_item_id: "kayako_fragment"
+    fragment_drop_rate: 0.3
+    fragments_to_complete: 10
+    rarity: "epic"
+    special_abilities:
+      death_rattle: "发出死亡呻吟，有概率使对手恐惧"
+      crawling_pursuit: "爬行追击时获得敏捷加成"
+
+  - ghost_id: "toshio"
+    name: "俊雄"
+    description: "永远长不大的孩童怨灵，发出猫叫般的诡异声音。他是伽椰子的儿子，同样死于家庭悲剧。"
+    hp: 600
+    attack: 90
+    defense: 60
+    agility: 110
+    base_prestige_level: 1
+    required_attribute: "agility"  # 敏捷
+    attribute_per_level: 40
+    fragment_item_id: "toshio_fragment"
+    fragment_drop_rate: 0.35
+    fragments_to_complete: 8
+    rarity: "rare"
+    special_abilities:
+      cat_cry: "发出猫叫声，干扰对手的判断"
+      child_innocence: "童真外表下隐藏着恶意"
+
+  - ghost_id: "hanako"
+    name: "花子"
+    description: "厕所里的红衣少女，手持剪刀，眼神空洞。她是学校七大不可思议之一，守护着第三间厕所。"
+    hp: 500
+    attack: 80
+    defense: 50
+    agility: 95
+    base_prestige_level: 1
+    required_attribute: "attack"  # 攻击力
+    attribute_per_level: 35
+    fragment_item_id: "hanako_fragment"
+    fragment_drop_rate: 0.4
+    fragments_to_complete: 6
+    rarity: "rare"
+    special_abilities:
+      scissors_attack: "使用剪刀进行精准攻击"
+      toilet_domain: "在厕所环境中获得主场优势"
+
+  - ghost_id: "kuchisake_onna"
+    name: "裂口女"
+    description: "嘴角被撕裂至耳根的女性怨灵，手持剪刀或刀具，会询问路人'我美吗？'"
+    hp: 650
+    attack: 100
+    defense: 65
+    agility: 100
+    base_prestige_level: 1
+    required_attribute: "defense"  # 防御
+    attribute_per_level: 45
+    fragment_item_id: "kuchisake_fragment"
+    fragment_drop_rate: 0.35
+    fragments_to_complete: 8
+    rarity: "rare"
+    special_abilities:
+      beauty_question: "询问'我美吗？'，根据回答产生不同效果"
+      mouth_tear: "撕裂攻击，造成持续伤害"
+
+  - ghost_id: "onryo_spirit"
+    name: "怨灵"
+    description: "普通的怨念聚合体，是最常见的鬼怪类型，实力较弱但数量众多。"
+    hp: 300
+    attack: 50
+    defense: 30
+    agility: 60
+    base_prestige_level: 1
+    required_attribute: "mp"  # 理智
+    attribute_per_level: 30
+    fragment_item_id: "onryo_fragment"
+    fragment_drop_rate: 0.5
+    fragments_to_complete: 5
+    rarity: "common"
+    special_abilities:
+      grudge_aura: "散发怨念气息，轻微降低对手属性"
