@@ -12,6 +12,18 @@ from ..models.inventory import ItemInstance as _Equip, ItemType
 
 
 cfg = config.game_config["cultivate"]
+
+
+async def get_coffin_nail_count(session, player_id: str) -> int:
+    """获取玩家背包中棺材钉的数量"""
+    result = await session.execute(
+        _sel(_Equip).where(
+            _Equip.player_id == player_id,
+            _Equip.item_id == "coffin_nail"
+        )
+    )
+    coffin_nails = result.scalars().all()
+    return sum(nail.quantity for nail in coffin_nails)
 cultivate = on_command("修炼", block=True, priority=5)
 seclusion = on_command("闭关", block=True, priority=5)
 out_seclusion = on_command("出关", block=True, priority=5)
@@ -88,14 +100,25 @@ async def handle_seclusion(event: MessageEvent):
                 "⬇️ 【出关】推开棺盖",
                 event))
 
+        # 计算棺材钉数量和效率加成
+        coffin_nail_count = await get_coffin_nail_count(session, player.id)
+        efficiency_bonus = coffin_nail_count * 0.5  # 每个棺材钉提升0.5%效率
+
         player.is_secluded = True
         player.seclusion_start_time = datetime.now()
         session.add(player)
         await session.commit()
+
+        # 构建闭关消息，包含棺材钉效率提示
+        efficiency_msg = ""
+        if coffin_nail_count > 0:
+            efficiency_msg = f"\n✧ 棺材钉 ⚰️ ✖️{coffin_nail_count} 提升效率 +{efficiency_bonus:.1f}%"
+
         msg_secl = (
             f"🕯️{player.nickname} 躺入破棺，将最后一枚钉子钉入。\n"
             "━━━━━━━━━━━━━\n"
-            "✧ 离线修炼进行中，期间无法普通修炼\n"
+            "✧ 离线修炼进行中，期间无法普通修炼"
+            f"{efficiency_msg}\n"
             "━━━━━━━━━━━━━\n"
             "⬇️ 【出关】推开棺盖"
         )
@@ -119,21 +142,38 @@ async def handle_out_seclusion(event: MessageEvent):
                 "⬇️ 【闭关】钉上棺盖",
                 event))
 
+        # 计算棺材钉数量和效率加成
+        coffin_nail_count = await get_coffin_nail_count(session, player.id)
+        efficiency_multiplier = 1.0 + (coffin_nail_count * 0.005)  # 每个棺材钉提升0.5%效率
+
         player.is_secluded = False
         k = 7 if player.level <= 10 else 6
         base_gain = cfg["base_exp"] * (1 + player.level / k)
         delta_time = int((datetime.now() - player.seclusion_start_time).total_seconds())
         delta_time = delta_time if delta_time < 7 * 3600 else 7 * 3600
-        exp_gain = int(delta_time / cfg["cool_down"] * base_gain * 0.5)
+
+        # 应用棺材钉效率加成
+        base_exp_gain = int(delta_time / cfg["cool_down"] * base_gain * 0.5)
+        exp_gain = int(base_exp_gain * efficiency_multiplier)
+        bonus_exp = exp_gain - base_exp_gain
+
         player.exp += exp_gain
 
         session.add(player)
         await session.commit()
         exp_max2 = calculate_level_up_exp(player.level)
+
+        # 构建出关消息，包含棺材钉效率提示
+        efficiency_msg = ""
+        if coffin_nail_count > 0:
+            efficiency_bonus = coffin_nail_count * 0.5
+            efficiency_msg = f"\n✧ 棺材钉 ⚰️ ✖️{coffin_nail_count} 额外获得 +{bonus_exp} 怨炁 (+{efficiency_bonus:.1f}%)"
+
         msg_out = (
             "🔓你推开棺盖，阴灰散落。\n"
             "━━━━━━━━━━━━━\n"
-            f"✧ 累积怨炁 + {exp_gain}↑\n"
+            f"✧ 累积怨炁 + {exp_gain}↑"
+            f"{efficiency_msg}\n"
             f"✧ 修为残烛 {player.exp}↑/{exp_max2} {('(可突破)' if player.exp>exp_max2 else '')}\n"
             "━━━━━━━━━━━━━\n"
             "⬇️ 【修炼】继续喂养怨炁\n"

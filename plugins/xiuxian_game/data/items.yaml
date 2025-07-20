@@ -148,6 +148,14 @@ items:
       price: 220
       grudge_value: 8
 
+    # ---- 闭关特殊材料 ----
+    - item_id: "coffin_nail"
+      name: "棺材钉"
+      description: "锈迹斑斑的铁钉，由上世纪驭鬼者所制，可以大幅度压制灵异力量。持有越多，闭关效率越高 ⚰️"
+      type: "MATERIAL"
+      price: 100000
+      grudge_value: 1
+
   equipment:
     - item_id: "swim_coat"
       name: "溺水者外衣"
