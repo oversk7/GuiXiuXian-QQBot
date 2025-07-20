@@ -321,6 +321,7 @@ items:
       name: "升灵丹"
       description: "服用后立即获得 3000 经验"
       type: "CONSUMABLE"
+      price: 30000
       effect_type: "GAIN_EXP"
       effect_params: {"value": 3000}
 
@@ -328,6 +329,7 @@ items:
       name: "血心丹"
       description: "以凶兽心血炼制，服用可大幅提升修为，伴随阵阵心跳声。服用后立即获得 8000 经验"
       type: "CONSUMABLE"
+      price: 50000
       effect_type: "GAIN_EXP"
       effect_params: {"value": 8000}
 
@@ -335,6 +337,7 @@ items:
       name: "夜魂丹"
       description: "月蚀之夜炼成，黑雾缭绕，能快速提升修为却染上寒意。服用后立即获得 12000 经验"
       type: "CONSUMABLE"
+      price: 100000
       effect_type: "GAIN_EXP"
       effect_params: {"value": 12000}
 
@@ -342,6 +345,7 @@ items:
       name: "虚眼丹"
       description: "凝聚亡者之眼，服用后视万象虚妄，运势与攻击永久提升。"
       type: "CONSUMABLE"
+      price: 200000
       effect_type: "BUFF"
       effect_params: {"luck": 5, "attack": 5}
 

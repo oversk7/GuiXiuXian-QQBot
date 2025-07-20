@@ -228,6 +228,9 @@ async def handle_trade(event: MessageEvent, args: Message = CommandArg()):
         "【挂牌 <出售/收购> <物品名> <单价> <数量>】 最多挂6个牌子\n"
         "【我的挂牌 [页数]】 查看自己的所有挂牌订单\n"
         "【撤牌 <挂牌ID>】 撤回指定牌子\n"
+        "【税率】 查看当前阶梯交易税率\n"
+        "━━━━━━━━━━━━━\n"
+        "⚠️ 交易税收：5000金币以下免税，超出部分按阶梯税率征收\n"
     )
     await trade_cmd.finish(Message(msg))
 

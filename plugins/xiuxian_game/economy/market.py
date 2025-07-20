@@ -25,6 +25,27 @@ def heavy_divider(title: str) -> str:
     """返回带有粗线分隔符的标题"""
     return f"━━ {title} ━━"
 
+
+def calculate_transaction_tax(amount: int) -> int:
+    """
+    计算阶梯交易税率
+    5000以下免税
+    5000-20000: 5%
+    20000-50000: 10%
+    50000-100000: 15%
+    100000以上: 20%
+    """
+    if amount <= 5000:
+        return 0
+    elif amount <= 20000:
+        return int(amount * 0.05)
+    elif amount <= 50000:
+        return int(amount * 0.10)
+    elif amount <= 100000:
+        return int(amount * 0.15)
+    else:
+        return int(amount * 0.20)
+
 # ---------------- 指令：挂牌 ----------------
 list_cmd = on_command("挂牌", block=True, priority=5)
 
@@ -344,6 +365,26 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
         lines.append("⬇️ 【撤牌 <牌子ID>】 撤回指定牌子")
         await my_orders_cmd.finish(message_add_head("\n".join(lines), event))
 
+# ---------------- 指令：查看税率 ----------------
+tax_info_cmd = on_command("税率", aliases={"交易税率", "查看税率"}, block=True, priority=5)
+
+@tax_info_cmd.handle()
+async def _(event: MessageEvent):
+    """查看当前的阶梯交易税率"""
+    lines = [
+        "💰 交易税率表",
+        heavy_divider("阶梯税率"),
+        "💚 5,000金币以下：免税 (0%)",
+        "💛 5,001-20,000金币：5%",
+        "🧡 20,001-50,000金币：10%",
+        "❤️ 50,001-100,000金币：15%",
+        "💜 100,001金币以上：20%",
+        "",
+        "📝 说明：税收从卖家收入中扣除",
+        "⚠️ 高价交易将产生大量税收损失"
+    ]
+    await tax_info_cmd.finish(message_add_head("\n".join(lines), event))
+
 # ======= 辅助函数 =======
 async def _try_auto_match(session, new_order: MarketOrder, player: Player, same_price_only: bool = False) -> str:
     """自动撮合逻辑，返回描述信息（可能为空）。"""
@@ -387,11 +428,9 @@ async def _try_auto_match(session, new_order: MarketOrder, player: Player, same_
         # 物品给买家
         await ItemInstance.add_item(session, buyer.id, item_cfg.item_id, trade_qty)
 
-        # 计算交易金额和税收
+        # 计算交易金额和阶梯税收
         trade_amount = trade_price * trade_qty
-        tax = 0
-        if trade_amount > 10000:
-            tax = int(trade_amount * 0.02)  # 2%税收
+        tax = calculate_transaction_tax(trade_amount)
 
         # 金币给卖家（扣除税收）
         seller.gold += trade_amount - tax
