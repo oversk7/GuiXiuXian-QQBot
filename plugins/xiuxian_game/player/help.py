@@ -314,7 +314,7 @@ async def handle_ghost_suppression_help(event: MessageEvent, args: Message = Com
         "驾驭鬼怪镇压入侵现实世界的野生鬼，获得碎片合成更强鬼怪\n"
         "━━━━━━━━━━━━━\n"
         "🔍 查看入侵：\n"
-        "【鬼怪入侵】 查看今日鬼怪入侵列表\n"
+        "【入侵事件】 查看今日鬼怪入侵列表\n"
         "\n"
         "⚔️ 镇压战斗：\n"
         "【镇压】 镇压当前位置的鬼怪（需先移动到入侵坐标）\n"
@@ -325,6 +325,8 @@ async def handle_ghost_suppression_help(event: MessageEvent, args: Message = Com
         "【驾驭 <鬼怪名称>】 切换驾驭的鬼怪\n"
         "【合成鬼怪】 查看可合成的鬼怪列表\n"
         "【合成鬼怪 <鬼怪名称>】 使用碎片合成完整鬼怪\n"
+        "【升级鬼怪】 查看可升级的鬼怪列表\n"
+        "【升级鬼怪 <鬼怪名称>】 消耗怨念值升级鬼怪\n"
         "━━━━━━━━━━━━━\n"
         "📋 镇压流程：\n"
         "1️⃣ 威压判定：比较双方威压等级，不足可用棺材钉\n"
@@ -332,8 +334,8 @@ async def handle_ghost_suppression_help(event: MessageEvent, args: Message = Com
         "3️⃣ 战利品：镇压成功后有概率获得鬼怪碎片\n"
         "━━━━━━━━━━━━━\n"
         "⚠️ 威压机制：鬼怪威压等级由玩家属性决定\n"
-        "⚠️ 贞子/伽椰子需要理智，俊雄需要敏捷，花子需要攻击力\n"
-        "⚠️ 每日系统随机生成1-3只鬼入侵到现实世界随机坐标"
+        "⚠️ 升级机制：鬼怪等级影响属性，升级消耗怨念值\n"
+        "⚠️ 每日刷新鬼怪入侵现实"
     )
     await ghost_suppression_help_cmd.finish(Message(msg))
 

@@ -3,6 +3,7 @@ from sqlalchemy.orm import Mapped, mapped_column, relationship
 from sqlalchemy.sql import func
 from datetime import datetime
 from .db import Base
+from . import Player
 
 
 class PlayerGhost(Base):
@@ -36,3 +37,32 @@ class PlayerGhost(Base):
     def deactivate(self) -> None:
         """取消激活"""
         self.is_active = False
+
+    def get_config(self) -> dict:
+        """获取鬼怪配置"""
+        from ..ghost_suppression.ghost_utils import GhostUtils
+        return GhostUtils.get_ghost_config(self.ghost_id)
+
+    def get_actual_attributes(self) -> dict:
+        """获取当前等级下的实际属性"""
+        from ..ghost_suppression.ghost_utils import GhostUtils
+        ghost_config = self.get_config()
+        return GhostUtils.calculate_ghost_attributes(ghost_config, self.level)
+
+    def get_upgrade_cost(self) -> int:
+        """获取升级到下一级所需的怨念值"""
+        from ..ghost_suppression.ghost_utils import GhostUtils
+        ghost_config = self.get_config()
+        rarity = ghost_config.get("rarity", "common")
+        return GhostUtils.get_upgrade_cost(self.level, rarity)
+
+    def can_upgrade(self, player_resentment: int) -> bool:
+        """检查是否可以升级"""
+        return player_resentment >= self.get_upgrade_cost()
+
+    def upgrade(self) -> int:
+        """升级鬼怪，返回消耗的怨念值"""
+        cost = self.get_upgrade_cost()
+        self.level += 1
+        self.experience = 0  # 重置经验
+        return cost
