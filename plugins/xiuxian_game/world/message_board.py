@@ -10,6 +10,37 @@ from ..models.player import Player
 from ..models.world_message import WorldMessage
 from ..utils import message_add_head
 
+
+async def has_unread_messages(player_id: str) -> bool:
+    """检查玩家是否有未读留言"""
+    async with safe_session() as session:
+        player = await session.get(Player, player_id)
+        if not player:
+            return False
+
+        # 如果玩家从未查看过留言板，则检查是否有任何留言
+        if not player.last_message_board_check:
+            total_messages = (await session.execute(select(_func.count(WorldMessage.id)))).scalar_one()
+            return total_messages > 0
+
+        # 检查是否有比最后查看时间更新的留言
+        newer_messages = (await session.execute(
+            select(_func.count(WorldMessage.id)).where(
+                WorldMessage.created_at > player.last_message_board_check
+            )
+        )).scalar_one()
+
+        return newer_messages > 0
+
+
+async def mark_messages_as_read(player_id: str):
+    """标记玩家已读留言板"""
+    async with safe_session() as session:
+        player = await session.get(Player, player_id)
+        if player:
+            player.last_message_board_check = datetime.now()
+            await session.commit()
+
 leave_msg_cmd = on_command("留言", block=True, priority=5)
 view_board_cmd = on_command("留言板", block=True, priority=5)
 
@@ -34,6 +65,9 @@ async def handle_leave_msg(event: MessageEvent, args: Message = CommandArg()):
         msg_rec = WorldMessage(player_id=player.id, content=content, created_at=datetime.now())
         session.add(msg_rec)
         await session.commit()
+
+    # 标记玩家已读留言板（因为会显示留言板内容）
+    await mark_messages_as_read(event.get_user_id())
 
     # 第一条：确认
     await leave_msg_cmd.send(message_add_head("✅ 留言已发布！", event))
@@ -60,6 +94,9 @@ async def handle_leave_msg(event: MessageEvent, args: Message = CommandArg()):
 
 @view_board_cmd.handle()
 async def handle_view_board(event: MessageEvent, args: Message = CommandArg()):
+    # 标记玩家已读留言板
+    await mark_messages_as_read(event.get_user_id())
+
     # 解析页码
     page_text = args.extract_plain_text().strip()
     try:

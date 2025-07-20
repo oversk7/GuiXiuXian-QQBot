@@ -47,6 +47,7 @@ class Player(Base):
     inventory_capacity: Mapped[int] = mapped_column(Integer, default=30, server_default='30', nullable=False, comment="背包容量")
     is_secluded: Mapped[bool] = mapped_column(Boolean, default=False, server_default='False', comment="是否闭关")
     seclusion_start_time: Mapped[datetime] = mapped_column(DateTime, nullable=True, comment="闭关开始时间")
+    last_message_board_check: Mapped[datetime] = mapped_column(DateTime, nullable=True, comment="最后查看留言板时间")
 
 
 async def get_player_by_uid(uid: str):

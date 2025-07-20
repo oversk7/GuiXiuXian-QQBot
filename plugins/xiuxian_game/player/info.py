@@ -15,6 +15,7 @@ import random
 from ..models.navigation_task import NavigationTask
 from ..world.navigation import _update_nav_position
 from ..config import config
+from ..world.message_board import has_unread_messages
 
 REALM_NAMES = [
     "凡人"
@@ -120,6 +121,12 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
 
     exp_max = calculate_level_up_exp(player.level)
 
+    # 检查是否有未读留言
+    has_unread = await has_unread_messages(player.id)
+    unread_notice = ""
+    if has_unread:
+        unread_notice = "\n┃📬 有新留言未读！输入【留言板】查看"
+
     content = (
         f"┏━━ 信息 ━━━━\n"
         f"┃{player.nickname}[UID:{player.uid}]「{player.sex}」\n"
@@ -137,7 +144,7 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
         f"┃ ☯公会 {guild_name}\n"
         f"┃ 📍位置 {player.region} ({player.x},{player.y})\n"
         "┣━━━━━━━━━\n"
-        "┃☞【装备栏】【社交系统】"
+        f"┃☞【装备栏】【社交系统】{unread_notice}"
     )
     await profile.finish(message_add_head(content, event))
 
