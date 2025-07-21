@@ -120,6 +120,109 @@ async def _gain_exp(player: Player, cfg: ItemConfig, qty: int, ctx: str) -> Tupl
     player.exp += value
     return True, f"📚 获得 {value} 点经验"
 
+@register(ItemEffectType.SWEEP_DUNGEON)
+async def _sweep_dungeon(player: Player, cfg: ItemConfig, qty: int, ctx: str) -> Tuple[bool, str]:
+    """扫荡当前诡域，获得经验和材料奖励"""
+    import random
+    from ..config import config
+    from ..models.inventory import ItemInstance
+    from ..utils import luck_prob
+    from sqlalchemy.ext.asyncio import AsyncSession
+
+    # 检查是否在诡域中
+    if player.region == "大都会":
+        return False, "⛔ 你在现实世界中，无法使用扫荡令"
+
+    # 检查咒抗是否足够
+    if player.stamina < qty:
+        return False, f"⛔ 咒抗不足，需要 {qty} 点咒抗"
+
+    # 获取当前诡域配置
+    region_config = config.map_config["regions"].get(player.region)
+    if not region_config:
+        return False, "⛔ 未知的诡域，无法扫荡"
+
+    # 消耗咒抗
+    player.stamina -= qty
+
+    # 霸气宣言
+    sweep_declarations = [
+        "⚡ 「此地诡异，皆为我所驭！」",
+        "⚡ 「区区邪祟，岂敢阻我道路！」",
+        "⚡ 「天地万物，尽在掌握之中！」",
+        "⚡ 「诡域之力，为我所用！」",
+        "⚡ 「鬼神退避，唯我独尊！」"
+    ]
+    declaration = random.choice(sweep_declarations)
+
+    results = [declaration, ""]
+
+    # 计算奖励（受玩家理智、生命影响）
+    level_range = region_config["level_range"]
+    avg_level = (level_range[0] + level_range[1]) // 2
+
+    # 基础经验计算（类似正常刷副本）
+    base_exp = random.randint(1, 3) * avg_level * qty
+    # 理智影响经验获得（理智越高，扫荡效率越高）
+    sanity_bonus = 1 + (player.mp / player.max_mp) * 0.5  # 最多1.5倍
+    # 生命影响经验获得（生命越高，扫荡持续时间越长）
+    hp_bonus = 1 + (player.hp / player.max_hp) * 0.3  # 最多1.3倍
+
+    final_exp = int(base_exp * sanity_bonus * hp_bonus)
+    player.exp += final_exp
+    results.append(f"📚 扫荡获得经验: {final_exp}")
+
+    # 材料掉落（基于诡域材料概率和玩家属性）
+    materials_gained = []
+
+    # 获取诡域特产材料
+    region_materials = region_config.get("materials", [])
+    # 获取通用材料（排除鬼怪碎片）
+    common_materials = [mat for mat in config.items_config["by_type"]["MATERIAL"]
+                       if "fragment" not in mat]
+
+    # 合并材料池
+    all_materials = region_materials + common_materials[:5]  # 限制通用材料数量
+
+    if all_materials:
+        # 扫荡可能获得多种材料
+        material_count = random.randint(1, min(3, len(all_materials))) * qty
+
+        for _ in range(material_count):
+            # 优先掉落区域特产
+            if region_materials and random.random() < 0.7:
+                material_id = random.choice(region_materials)
+            else:
+                material_id = random.choice(all_materials)
+
+            # 数量受幸运值影响
+            base_quantity = random.randint(1, 2)
+            if random.random() < luck_prob(player.luck):
+                base_quantity *= 2  # 幸运翻倍
+
+            materials_gained.append((material_id, base_quantity))
+
+    # 添加材料到背包
+    if materials_gained:
+        # 需要获取session来添加物品，这里需要特殊处理
+        # 由于这是在effect处理器中，我们返回特殊标记让调用方处理
+        material_info = []
+        for material_id, quantity in materials_gained:
+            item_config = config.items_config["by_id"].get(material_id)
+            if item_config:
+                material_info.append(f"{item_config.name} ✖️{quantity}")
+
+        if material_info:
+            results.append(f"💎 扫荡获得材料: {', '.join(material_info)}")
+            # 将材料信息存储到player的临时属性中，供调用方处理
+            if not hasattr(player, '_sweep_materials'):
+                player._sweep_materials = []
+            player._sweep_materials.extend(materials_gained)
+
+    results.append(f"⚡ 消耗咒抗: {qty} (剩余: {player.stamina})")
+
+    return True, "\n".join(results)
+
 # ---------------- 重置属性 ----------------
 
 @register(ItemEffectType.RESET_ATTR)

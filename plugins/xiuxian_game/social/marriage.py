@@ -149,11 +149,15 @@ async def handle_spouse(event: MessageEvent):
         
         marriage = await MarriageService.get_marriage(session, player.id)
         
+        # 导入境界映射函数
+        from ..player.info import realm_by_level
+
         lines = [
             "💕 配偶信息",
             "━━━━━━━━━━",
             f"👤 姓名：{spouse.nickname}[UID:{spouse.uid}]",
             f"⚡ 等级：Lv.{spouse.level}",
+            f"🏆 境界：{realm_by_level(spouse.level)}",
             f"🎁 恩爱值：{marriage.total_gift_value}",
             f"💒 结婚时间：{marriage.married_at.strftime('%Y-%m-%d %H:%M')}"
         ]

@@ -61,12 +61,15 @@ async def handle_mentorship_applications(event: MessageEvent):
         applications = await MentorshipService.get_pending_mentorship_applications(session, player.id)
         if not applications:
             await mentorship_applications_cmd.finish("暂无待处理的拜师申请")
-        
+
+        # 导入境界映射函数
+        from ..player.info import realm_by_level
+
         lines = ["📜 待处理拜师申请", "━━━━━━━━━━"]
         for app in applications:
             applicant = await session.get(Player, app.applicant_id)
-            lines.append(f"{applicant.nickname}[UID:{applicant.uid}] Lv.{applicant.level}")
-        
+            lines.append(f"{applicant.nickname}[UID:{applicant.uid}] Lv.{applicant.level} {realm_by_level(applicant.level)}")
+
         lines.append("\n使用「收徒 UID」或「拒绝收徒 UID」来处理")
         await mentorship_applications_cmd.finish(message_add_head("\n".join(lines), event))
 
@@ -142,19 +145,22 @@ async def handle_master(event: MessageEvent):
         player = await session.get(Player, event.get_user_id())
         if not player:
             await master_cmd.finish("⛔ 请先创建角色")
-        
+
         master = await MentorshipService.get_master(session, player.id)
         if not master:
             await master_cmd.finish("🚫 你还没有师父")
-        
+
+        # 导入境界映射函数
+        from ..player.info import realm_by_level
+
         lines = [
             "👨‍🏫 师父信息",
             "━━━━━━━━━━",
             f"👤 姓名：{master.nickname}[UID:{master.uid}]",
             f"⚡ 等级：Lv.{master.level}",
-            f"🏆 境界：{master.level}"  # 这里可以根据需要添加境界显示
+            f"🏆 境界：{realm_by_level(master.level)}"
         ]
-        
+
         await master_cmd.finish(message_add_head("\n".join(lines), event))
 
 
@@ -167,15 +173,18 @@ async def handle_disciples(event: MessageEvent):
         player = await session.get(Player, event.get_user_id())
         if not player:
             await disciples_cmd.finish("⛔ 请先创建角色")
-        
+
         disciples = await MentorshipService.get_disciples(session, player.id)
         if not disciples:
             await disciples_cmd.finish("🚫 你还没有徒弟")
-        
+
+        # 导入境界映射函数
+        from ..player.info import realm_by_level
+
         lines = ["👥 徒弟列表", "━━━━━━━━━━"]
         for disciple in disciples:
-            lines.append(f"👤 {disciple.nickname}[UID:{disciple.uid}] Lv.{disciple.level}")
-        
+            lines.append(f"👤 {disciple.nickname}[UID:{disciple.uid}] Lv.{disciple.level} {realm_by_level(disciple.level)}")
+
         lines.append("\n使用「逐出徒弟 UID」可以逐出徒弟")
         await disciples_cmd.finish(message_add_head("\n".join(lines), event))
 

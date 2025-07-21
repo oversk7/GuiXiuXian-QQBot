@@ -61,17 +61,20 @@ async def handle_mentor_ranking(event: MessageEvent):
         if not rankings:
             await mentor_ranking_cmd.finish("暂无恩师榜数据")
         
+        # 导入境界映射函数
+        from ..player.info import realm_by_level
+
         lines = ["🎓 恩师排行榜", "▃▃▃▃▃▃▃▃▃▃"]
-        
+
         for idx, (master, total_points) in enumerate(rankings, 1):
             # 获取该师父的徒弟数量
             disciples = await MentorshipService.get_disciples(session, master.id)
             disciple_count = len(disciples)
-            
+
             # 使用emoji装饰
             rank_emoji = "🥇" if idx == 1 else "🥈" if idx == 2 else "🥉" if idx == 3 else f"{idx}."
-            
-            lines.append(f"{rank_emoji} {master.nickname}[UID:{master.uid}] Lv.{master.level}")
+
+            lines.append(f"{rank_emoji} {master.nickname}[UID:{master.uid}] Lv.{master.level} {realm_by_level(master.level)}")
             lines.append(f"   ⭐ 恩师点：{total_points}")
             lines.append(f"   👥 徒弟数：{disciple_count}")
             lines.append("")  # 空行分隔

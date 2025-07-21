@@ -69,6 +69,13 @@ items:
       effect_type: "RESET_ATTR"
       price: 500000
 
+    - item_id: "sweep_token"
+      name: "扫荡令"
+      description: "古老的令牌，蕴含着强大的诡异力量。使用后可扫荡当前诡域，获得经验和材料奖励。消耗1点咒抗。⚡"
+      type: "CONSUMABLE"
+      effect_type: "SWEEP_DUNGEON"
+      price: 100000
+
   materials:  # 材料类
     - item_id: "rotten_core"
       name: "腐坏的内丹"

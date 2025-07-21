@@ -18,13 +18,13 @@ from ..config import config
 from ..world.message_board import has_unread_messages
 
 REALM_NAMES = [
-    "凡人"
-    "腐体境", 
-    "血咒境", 
-    "怨魂境", 
-    "阴祟境", 
-    "鬼啸境", 
-    "恐魇境", 
+    "凡人",
+    "腐体境",
+    "血咒境",
+    "怨魂境",
+    "阴祟境",
+    "鬼啸境",
+    "恐魇境",
     "绝念境",
     "诡天境",
     "灾厄境",

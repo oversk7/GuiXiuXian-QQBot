@@ -214,7 +214,8 @@ async def handle_fan_ben(event: MessageEvent, args: Message = CommandArg()):
         "【诡域】 查看当前可探索的诡域\n"
         "【上|下|左|右】 向指定方向移动一格\n"
         "【返回】 返回现实世界并满状态\n"
-        "【探索】 探索玩家所在地点"
+        "【探索】 探索玩家所在地点\n"
+        "【使用 扫荡令】 扫荡当前诡域，消耗1点咒抗获得经验和材料"
     )
     await fan_ben_cmd.finish(Message(msg))
 
