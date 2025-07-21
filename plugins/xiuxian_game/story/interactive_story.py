@@ -184,13 +184,30 @@ async def handle_choice(event: MessageEvent):
         # 显示下一个节点
         story = story_engine.get_story(story_session.story_id)
         msg = await format_story_node(story, next_node)
-        
-        # 如果是结束节点，自动结束试炼
+
+        # 如果是结束节点，处理试炼结束逻辑
+        reward_message = ""
         if next_node.get("type") == "end":
             story_session.is_active = False
-            session.add(story_session)
-            await session.commit()
-        
+
+            # 应用结束节点的特殊效果（如首次试炼奖励）
+            if "effects" in next_node:
+                variables = story_session.get_variables()
+                player, variables, reward_msg = await story_engine.apply_special_effects(
+                    next_node["effects"], player, variables, session
+                )
+                story_session.set_variables(variables)
+                reward_message = reward_msg
+
+        # 更新数据库
+        session.add(story_session)
+        session.add(player)
+        await session.commit()
+
+        # 添加奖励消息到显示内容
+        if reward_message:
+            msg = Message(str(msg) + reward_message)
+
         await choice_handler.finish(message_add_head(msg, event))
 
 
