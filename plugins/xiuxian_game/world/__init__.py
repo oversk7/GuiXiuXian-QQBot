@@ -42,8 +42,16 @@ _special_mats = set()
 for _reg_info in config.map_config.get("regions", {}).values():
     _special_mats.update(_reg_info.get("materials", []) or [])
 
-# 不在任何区域作为特产出现的材料视为通用材料
-COMMON_MATERIALS = list(_all_materials - _special_mats)
+# 排除鬼怪碎片（鬼怪碎片只能通过镇压鬼怪获得，不应在副本探索中掉落）
+# 这确保了鬼怪碎片的稀有性和获取途径的唯一性
+_ghost_fragments = set()
+for item_id in _all_materials:
+    item_config = config.items_config["by_id"].get(item_id)
+    if item_config and "fragment" in item_id:  # 鬼怪碎片的item_id都包含"fragment"
+        _ghost_fragments.add(item_id)
+
+# 不在任何区域作为特产出现的材料视为通用材料，但排除鬼怪碎片
+COMMON_MATERIALS = list(_all_materials - _special_mats - _ghost_fragments)
 
 # ----------------- 工具函数 -----------------
 async def get_or_create_tile(session, region: str, x: int, y: int) -> WorldTile:
@@ -96,7 +104,9 @@ async def get_or_create_tile(session, region: str, x: int, y: int) -> WorldTile:
             # 优先选择当前区域的特产材料，如无则回退到全局材料列表
             region_cfg = config.map_config["regions"].get(region, {})
             region_materials = region_cfg.get("materials") or []
-            # 仅使用通用材料 + 本区域特产材料
+            # 过滤掉区域特产中可能存在的鬼怪碎片
+            region_materials = [mat for mat in region_materials if "fragment" not in mat]
+            # 仅使用通用材料 + 本区域特产材料（已排除鬼怪碎片）
             candidate_materials = COMMON_MATERIALS + region_materials
             # 若配置中写的是 ItemConfig 列表，需要转为 id；此处假设直接存放 item_id 字符串
             candidate_materials = list(dict.fromkeys(candidate_materials))
