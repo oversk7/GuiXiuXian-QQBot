@@ -166,6 +166,7 @@ async def handle_huo_dong(event: MessageEvent, args: Message = CommandArg()):
         "【井字棋】 井字棋游戏，战胜AI获得奖励\n"
         "【试炼列表】 查看可用的互动剧情\n"
         "【月卡】 查看月卡状态和权益\n"
+        "💳 月卡权益：修炼效率提升、闭关时长增加、背包扩容、签到获得扫荡令等\n"
         "直接发送活动名称查看详细指令"
     )
     await huo_dong_cmd.finish(Message(msg))

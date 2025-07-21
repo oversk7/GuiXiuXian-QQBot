@@ -83,6 +83,19 @@ async def handle_sign(event: MessageEvent):
             stamina_msg = f"\n💪 咒抗已恢复至 {stamina_limit}/{stamina_limit} (月卡+{benefits['sign_stamina_bonus']})"
         else:
             stamina_msg = f"\n💪 咒抗已恢复至 {stamina_limit}/{stamina_limit}"
+
+        # 月卡权利：签到时发放扫荡令
+        monthly_card_msg = ""
+        from ..models.monthly_card import MonthlyCard
+        active_cards = await MonthlyCard.get_all_active_cards(session, player.id)
+        if active_cards:
+            try:
+                await ItemInstance.add_item(session, user_id, "sweep_token", quantity=1)
+                monthly_card_msg = "\n🎫 月卡权利：获得扫荡令*1"
+            except ValueError as e:
+                # 如果添加物品失败，记录错误但不影响签到
+                monthly_card_msg = f"\n⚠️ 月卡扫荡令发放失败：{e}"
+
         new_msg = ""
         # 检查是否为创建账号的同一天
         if player.created_at.date() == today:
@@ -100,4 +113,4 @@ async def handle_sign(event: MessageEvent):
 
         # 然后发送响应消息
         await sign.send(
-            f"✅ 连续签到 {streak} 天！获得 {int(gold_reward/2)} 金币！\n{lucky_msg}{bonus_msg}{stamina_msg}{new_msg}")
+            f"✅ 连续签到 {streak} 天！获得 {int(gold_reward/2)} 金币！\n{lucky_msg}{bonus_msg}{stamina_msg}{monthly_card_msg}{new_msg}")
