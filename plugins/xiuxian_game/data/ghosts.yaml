@@ -2,11 +2,11 @@
 ghosts:
   - ghost_id: "sadako"
     name: "贞子"
-    description: "从电视机中爬出的怨灵，长发遮面，散发着诅咒的气息。她的怨念来自于被推入井中的痛苦经历。"
-    hp: 800
-    attack: 120
-    defense: 80
-    agility: 90
+    description: "从电视机中爬出的怨灵，长发遮面，散发着诅咒的气息。"
+    hp: 600
+    attack: 85
+    defense: 120
+    agility: 75
     base_prestige_level: 2
     required_attribute: "mp"
     attribute_per_level: 50
@@ -14,51 +14,63 @@ ghosts:
     fragment_drop_rate: 0.3
     fragments_to_complete: 10
     rarity: "epic"
-  
+
   - ghost_id: "black_dog"
     name: "黑犬"
     description: "其拥有九成狗的灵魂和一成人的灵魂，是在某种外力干预下形成的特殊厉鬼，特殊能力为狂犬。"
-    hp: 800
-    attack: 120
-    defense: 80
-    agility: 90
+    hp: 550
+    attack: 140
+    defense: 60
+    agility: 110
     base_prestige_level: 2
     required_attribute: "attack"
     attribute_per_level: 50
     fragment_item_id: "black_dog_fragment"
+    fragment_drop_rate: 0.3
+    fragments_to_complete: 10
+    rarity: "epic"
 
   - ghost_id: "wang_mei"
     name: "王梅"
     description: "她患有一种精神疾病，越是狭小的空间，越能带给她安全感。她的死因是个迷，警察在桌子下面一个木盒当中发现了她的尸体，没人知道她是怎么进去的，现场没有检测到除她之外第二个人的指纹，特殊能力为变形。"
-    hp: 800
-    attack: 120
-    defense: 80
-    agility: 90
+    hp: 750
+    attack: 70
+    defense: 150
+    agility: 60
     base_prestige_level: 2
     required_attribute: "defense"
     attribute_per_level: 50
     fragment_item_id: "wang_mei_fragment"
+    fragment_drop_rate: 0.3
+    fragments_to_complete: 10
+    rarity: "epic"
 
   - ghost_id: "he_bei_bei"
     name: "何贝贝"
     description: "被小区里高空坠落的水杯砸中脑袋，不幸身亡，怨气很重，苦于无法找到杀害自己的元凶，只能躲在杯子下面，当人喝水时，她会从被子底部观察那人，特殊能力为透视。"
-    hp: 800
-    attack: 120
-    defense: 80
-    agility: 90
+    hp: 500
+    attack: 95
+    defense: 70
+    agility: 160
     base_prestige_level: 2
     required_attribute: "agility"
     attribute_per_level: 50
     fragment_item_id: "he_bei_bei_fragment"
-  
-  - ghost_id: "se_gui"
-    name: "色鬼"
+    fragment_drop_rate: 0.3
+    fragments_to_complete: 10
+    rarity: "epic"
+
+  - ghost_id: "geng_gui"
+    name: "耿鬼"
     description: "色字头上一把刀，在淋浴上安装摄像头时，触电而死，特殊能力为霉运，能影响自己和周边之人的运气。"
-    hp: 800
-    attack: 120
-    defense: 80
-    agility: 90
+    hp: 650
+    attack: 100
+    defense: 90
+    agility: 95
     base_prestige_level: 2
     required_attribute: "luck"
     attribute_per_level: 50
-    fragment_item_id: "li_gui_fragment"
+    fragment_item_id: "geng_gui_fragment"
+    fragment_drop_rate: 0.3
+    fragments_to_complete: 10
+    rarity: "epic"
