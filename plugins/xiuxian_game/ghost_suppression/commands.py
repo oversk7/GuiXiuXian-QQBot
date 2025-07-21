@@ -80,7 +80,7 @@ async def handle_suppress_ghost(event: MessageEvent, args: Message = CommandArg(
             coffin_nail_item = result.scalars().first()
             
             if not coffin_nail_item:
-                await suppress_ghost_cmd.finish("⛔ 你没有棺材钉，无法强制压制灵异规则")
+                await suppress_ghost_cmd.finish("⛔ 你没有棺材钉，无法强行压制灵异规则")
             
             # 消耗棺材钉
             coffin_nail_item.quantity -= 1
@@ -102,7 +102,9 @@ async def handle_suppress_ghost(event: MessageEvent, args: Message = CommandArg(
 
         # 第二阶段：战斗阶段
         battle_result = await GhostSuppressionService.execute_battle_phase(
-            session, player, invasion
+            session, player, invasion,
+            prestige_result["player_ghost"],
+            prestige_result["wild_ghost_config"]
         )
 
         await session.commit()

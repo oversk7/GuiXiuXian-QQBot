@@ -5,48 +5,61 @@ from nonebot.params import CommandArg
 from ..config import config
 from ..utils import message_add_head
 
-# 图鉴命令：查询单个/关键字匹配的物品或装备描述
-catalog_cmd = on_command("图鉴", aliases={"物品图鉴", "装备图鉴", "物品列表"}, block=True, priority=5)
+# 图鉴命令：查询物品、装备和鬼怪的详细信息
+catalog_cmd = on_command("图鉴", aliases={"查看","查看物品","详情"}, block=True, priority=5)
 
 
 @catalog_cmd.handle()
 async def _(event: MessageEvent, args: Message = CommandArg()):
-    """展示 items.yaml 中全部物品与装备的名称和描述，可选参数 name 用于关键字过滤"""
+    """展示物品、装备和鬼怪的名称和描述，可选参数 name 用于关键字过滤"""
     keyword = args.extract_plain_text().strip()
 
     # 必须提供关键字，否则提醒
     if not keyword:
-        await catalog_cmd.finish("⛔ 请提供要查询的物品名称，例如：图鉴 回春散")
+        await catalog_cmd.finish("⛔ 请提供要查询的名称，例如：图鉴 回春散 或 图鉴 贞子")
 
+    # 搜索物品
+    item_matches = []
     by_id = config.items_config["by_id"]
-    # 1. 先尝试精确匹配名称
+    # 1. 先尝试精确匹配物品名称
     exact_cfg = config.items_config["by_name"].get(keyword)
-    matches = []
     if exact_cfg:
-        matches.append(exact_cfg)
+        item_matches.append(exact_cfg)
     else:
-        # 2. 子串模糊匹配名称或描述
+        # 2. 子串模糊匹配物品名称或描述
         for cfg in by_id.values():
             if keyword in cfg.name or keyword in cfg.description:
-                matches.append(cfg)
+                item_matches.append(cfg)
 
-    if not matches:
-        await catalog_cmd.finish("⛔ 未找到符合条件的物品/装备")
+    # 搜索鬼怪
+    ghost_matches = []
+    for ghost_config in config.ghosts_config["all"]:
+        if (keyword in ghost_config.get("name", "") or
+            keyword in ghost_config.get("description", "") or
+            keyword == ghost_config.get("ghost_id", "")):
+            ghost_matches.append(ghost_config)
+
+    # 检查是否有匹配结果
+    total_matches = len(item_matches) + len(ghost_matches)
+    if total_matches == 0:
+        await catalog_cmd.finish("⛔ 未找到符合条件的物品/装备/鬼怪")
 
     # 若匹配过多（>6），让用户缩小范围
-    if len(matches) > 6:
-        await catalog_cmd.finish(f"⚠️ 匹配到 {len(matches)} 条记录，请输入更精确的名称")
+    if total_matches > 6:
+        await catalog_cmd.finish(f"⚠️ 匹配到 {total_matches} 条记录，请输入更精确的名称")
 
     # 类型映射
     TYPE_NAME_MAP = {
         "CONSUMABLE": "消耗品",
         "MATERIAL": "材料",
         "EQUIPMENT": "装备",
+        "GOODS": "商品",
     }
 
-    lines = ["📖 物品 & 装备图鉴 ✨", "━━━━━━━━━━"]
+    lines = ["📖 图鉴查询结果 ✨", "━━━━━━━━━━"]
 
-    for cfg in matches:
+    # 显示物品匹配结果
+    for cfg in item_matches:
         type_cn = TYPE_NAME_MAP.get(cfg.type.value, cfg.type.value)
 
         extra_info = ""
@@ -83,4 +96,40 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
 
         lines.append(f"✨ {cfg.name} ✨  [{type_cn}]\n{cfg.description}{extra_info}\n")
 
-    await catalog_cmd.finish(message_add_head("\n".join(lines), event)) 
+    # 显示鬼怪匹配结果
+    for ghost_config in ghost_matches:
+        name = ghost_config.get("name", "未知鬼怪")
+        description = ghost_config.get("description", "暂无描述")
+
+        # 鬼怪属性信息
+        hp = ghost_config.get("hp", 0)
+        attack = ghost_config.get("attack", 0)
+        defense = ghost_config.get("defense", 0)
+        agility = ghost_config.get("agility", 0)
+        prestige_level = ghost_config.get("base_prestige_level", 1)
+        rarity = ghost_config.get("rarity", "common")
+
+        # 稀有度映射
+        rarity_map = {
+            "common": "普通",
+            "rare": "稀有",
+            "epic": "史诗",
+            "legendary": "传说"
+        }
+        rarity_cn = rarity_map.get(rarity, rarity)
+
+        # 合成信息
+        fragment_id = ghost_config.get("fragment_item_id", "")
+        fragments_needed = ghost_config.get("fragments_to_complete", 0)
+        fragment_config = config.items_config["by_id"].get(fragment_id)
+        fragment_name = fragment_config.name if fragment_config else "未知碎片"
+
+        extra_info = (
+            f"\n👻 属性：体{hp} 力{attack} 防{defense} 敏{agility}"
+            f"\n🔥 基础威压：{prestige_level}  ⭐ 稀有度：{rarity_cn}"
+            f"\n🧩 合成需要：{fragment_name} x{fragments_needed}"
+        )
+
+        lines.append(f"👻 {name} 👻  [鬼怪]\n{description}{extra_info}\n")
+
+    await catalog_cmd.finish(message_add_head("\n".join(lines), event))

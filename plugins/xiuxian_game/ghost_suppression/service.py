@@ -203,36 +203,35 @@ class GhostSuppressionService:
         return victory, "\n".join(battle_summary), total_damage
     
     @staticmethod
-    async def attempt_suppression(
-        session: AsyncSession, 
-        player: Player, 
+    async def check_prestige_phase(
+        session: AsyncSession,
+        player: Player,
         invasion: GhostInvasion,
         use_coffin_nail: bool = False
-    ) -> Tuple[bool, str, Optional[List[str]]]:
+    ) -> dict:
         """
-        尝试镇压鬼怪
-        返回: (是否成功, 详细描述, 掉落物品列表)
+        威压判定阶段
+        返回: {"success": bool, "message": str, "player_ghost": PlayerGhost, "wild_ghost_config": dict}
         """
         # 获取鬼怪配置
         wild_ghost_config = config.ghosts_config["by_id"].get(invasion.ghost_id)
         if not wild_ghost_config:
-            return False, "❌ 未知的鬼怪类型", None
-        
+            return {"success": False, "message": "❌ 未知的鬼怪类型"}
+
         # 获取玩家当前驾驭的鬼怪
         player_ghost = await GhostSuppressionService.get_player_active_ghost(session, player.id)
         if not player_ghost:
-            return False, "❌ 你没有驾驭任何鬼，能对付鬼的只有鬼，请先通过【试炼】领取鬼", None
-        
+            return {"success": False, "message": "❌ 你没有驾驭任何鬼，能对付鬼的只有鬼，请先通过【试炼】领取鬼"}
+
         player_ghost_config = player_ghost.get_config()
         if not player_ghost_config:
-            return False, "❌ 你驾驭的鬼怪配置异常", None
+            return {"success": False, "message": "❌ 你驾驭的鬼怪配置异常"}
 
-        result_messages = []
-
-        # 第一阶段：威压判定
+        # 威压判定
         player_prestige = GhostSuppressionService.calculate_prestige_level(player_ghost_config, player)
         wild_prestige = wild_ghost_config["base_prestige_level"]
 
+        result_messages = []
         result_messages.append(f"🔥 威压对决：")
         result_messages.append(f"你的{player_ghost_config['name']}(Lv.{player_ghost.level}) 威压等级: {player_prestige}")
         result_messages.append(f"野生{wild_ghost_config['name']} 威压等级: {wild_prestige}")
@@ -246,22 +245,42 @@ class GhostSuppressionService:
             prestige_passed = True
         else:
             result_messages.append("❌ 威压不足，无法压制对方的灵异规则！")
-            return False, "\n".join(result_messages), None
 
-        # 第二阶段：数值战斗
-        result_messages.append("\n⚔️ 进入战斗阶段：")
+        return {
+            "success": prestige_passed,
+            "message": "\n".join(result_messages),
+            "player_ghost": player_ghost if prestige_passed else None,
+            "wild_ghost_config": wild_ghost_config if prestige_passed else None
+        }
+
+    @staticmethod
+    async def execute_battle_phase(
+        session: AsyncSession,
+        player: Player,
+        invasion: GhostInvasion,
+        player_ghost: PlayerGhost,
+        wild_ghost_config: dict
+    ) -> dict:
+        """
+        战斗阶段
+        返回: {"success": bool, "message": str, "drops": Optional[List[str]]}
+        """
+        result_messages = []
+
+        # 数值战斗
+        result_messages.append("⚔️ 进入战斗阶段：")
         victory, battle_desc, damage = GhostSuppressionService.simulate_battle(
             player_ghost, player, wild_ghost_config
         )
         result_messages.append(battle_desc)
-        
+
         if not victory:
-            return False, "\n".join(result_messages), None
-        
-        # 第三阶段：战利品获取
+            return {"success": False, "message": "\n".join(result_messages), "drops": None}
+
+        # 战利品获取
         result_messages.append("\n💎 战利品获取：")
         drops = []
-        
+
         # 计算碎片掉落
         from .ghost_utils import GhostUtils
 
@@ -272,7 +291,7 @@ class GhostSuppressionService:
             drop_count = GhostUtils.get_fragment_drop_count(rarity)
 
             drops.append(fragment_id)
-            
+
             # 添加到玩家背包
             try:
                 await ItemInstance.add_item(session, player.id, fragment_id, drop_count)
@@ -283,9 +302,9 @@ class GhostSuppressionService:
                 result_messages.append(f"⚠️ 背包空间不足，无法获得战利品")
         else:
             result_messages.append("💔 很遗憾，这次没有获得任何碎片")
-        
+
         # 标记入侵事件为已镇压
         invasion.suppress(player.id)
         session.add(invasion)
-        
-        return True, "\n".join(result_messages), drops
+
+        return {"success": True, "message": "\n".join(result_messages), "drops": drops}

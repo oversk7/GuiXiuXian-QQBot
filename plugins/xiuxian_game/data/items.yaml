@@ -448,19 +448,17 @@ items:
       type: "GOODS"
       price: 900
 
-  # 鬼怪相关物品
-  ghosts:  # 鬼怪本体
-    - item_id: "ghost_sadako"
-      name: "贞子"
-      description: "从电视机中爬出的怨灵，长发遮面，散发着诅咒的气息 📺"
-      type: "MATERIAL"
-      price: 5000
-      grudge_value: 100
+    - item_id: "tv"
+      name: "电视"
+      description: "电视"
+      type: "GOODS"
+      price: 1000
 
-  ghost_fragments:  # 鬼怪碎片
+  # 鬼怪碎片（用于合成完整鬼怪）
+  ghost_fragments:
     - item_id: "sadako_fragment"
       name: "贞子的投影"
       description: "贞子留下的怨念碎片，散发着电磁干扰 📺✨"
       type: "MATERIAL"
-      price: 500
+      price: 200000
       grudge_value: 10
