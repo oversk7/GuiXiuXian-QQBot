@@ -34,18 +34,18 @@ items:
       
     - item_id: "revive_potion"
       name: "还魂丹"
-      description: "使用后可以立即原地复活。（复活率100%）"
+      description: "使用后可以立即原地复活。（复活率80%）"
       type: "CONSUMABLE"
       effect_type: "REVIVE"
-      effect_params: {"rate": 1.0}
-      price: 5000
+      effect_params: {"rate": 0.8}
+      price: 50000
 
     - item_id: "rename_card"
       name: "改名卡"
       description: "可修改一次角色名称 ✍️  使用方法：/改名 新名字"
       type: "CONSUMABLE"
       effect_type: "CHANGE_NAME"
-      price: 10000
+      price: 100000
     
     - item_id: "president_letter"
       name: "会长委任书"

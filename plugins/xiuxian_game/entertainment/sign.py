@@ -69,8 +69,20 @@ async def handle_sign(event: MessageEvent):
         # 更新签到日期
         player.last_sign = now
 
-        player.stamina = 10  # 可改为配置或与等级相关
-        stamina_msg = "\n💪 咒抗已恢复至 10/10"
+        # 获取月卡权益
+        from ..models.monthly_card import get_player_card_benefits
+        benefits = await get_player_card_benefits(session, player.id)
+
+        # 计算咒抗上限（基础10 + 月卡加成）
+        base_stamina = 10
+        stamina_limit = base_stamina + benefits["sign_stamina_bonus"]
+        player.stamina = stamina_limit
+
+        # 构建咒抗恢复消息
+        if benefits["sign_stamina_bonus"] > 0:
+            stamina_msg = f"\n💪 咒抗已恢复至 {stamina_limit}/{stamina_limit} (月卡+{benefits['sign_stamina_bonus']})"
+        else:
+            stamina_msg = f"\n💪 咒抗已恢复至 {stamina_limit}/{stamina_limit}"
         new_msg = ""
         # 检查是否为创建账号的同一天
         if player.created_at.date() == today:

@@ -126,7 +126,10 @@ async def handle_check_monthly_card(event: MessageEvent):
         
         if benefits["auto_collect"]:
             msg_lines.append("🤖 材料自动采集")
-        
+
+        if benefits["sign_stamina_bonus"] > 0:
+            msg_lines.append(f"💪 签到咒抗上限 +{benefits['sign_stamina_bonus']}")
+
         msg_lines.append("━━━━━━━━━━━━━")
         
         await check_monthly_card_cmd.finish(message_add_head("\n".join(msg_lines), event))

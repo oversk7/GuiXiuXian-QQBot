@@ -17,6 +17,7 @@ from ..models.db import safe_session
 from ..models.player import Player
 from ..models.inventory import ItemInstance
 from ..models.world_tile import WorldTile
+from ..models.monthly_card import get_player_card_benefits
 from ..config import config
 from ..utils import message_add_head, luck_prob
 from io import BytesIO
@@ -128,7 +129,7 @@ move_cmd = on_regex(r"^(上|下|左|右)$", block=True, priority=5)
 @move_cmd.handle()
 async def _(event: MessageEvent):
     direction = event.get_plaintext().strip()
-    
+
     async with safe_session() as session:
         player: Player | None = await session.get(Player, event.get_user_id())
         if not player:
@@ -148,6 +149,25 @@ async def _(event: MessageEvent):
 
         # 获取当前位置事件格
         tile = await get_or_create_tile(session, player.region, player.x, player.y)
+
+        # 检查月卡权限是否支持自动采集
+        benefits = await get_player_card_benefits(session, player.id)
+        auto_collect = benefits.get("auto_collect", False)
+
+        auto_collect_msg = ""
+
+        # 如果有月卡自动采集权限，自动触发收集
+        if auto_collect:
+            if tile.event_type == "MATERIAL":
+                # 自动采集材料
+                if player.id not in tile.state.get("looted_by", []) and not tile.state.get("looted"):
+                    collect_result = await _handle_material(session, tile, player)
+                    auto_collect_msg = f"\n💳 月卡自动采集：\n{collect_result}"
+            elif tile.event_type == "TREASURE":
+                # 自动收集宝藏
+                if not tile.state.get("looted"):
+                    collect_result = await _handle_treasure(session, tile, player)
+                    auto_collect_msg = f"\n💳 月卡自动收集：\n{collect_result}"
 
         session.add_all([player, tile])
         await session.commit()
@@ -176,7 +196,7 @@ async def _(event: MessageEvent):
 
         event_desc = describe_tile(tile)
     header = f"🚶 已移动至 ({new_x},{new_y})"
-    await move_cmd.finish(message_add_head(f"{header}\n{event_desc}", event))
+    await move_cmd.finish(message_add_head(f"{header}\n{event_desc}{auto_collect_msg}", event))
 
 # ----------------- 指令：战斗 -----------------
 explore_cmd = on_command("探索", aliases={"战斗", "收集", "休息"}, block=True, priority=5)

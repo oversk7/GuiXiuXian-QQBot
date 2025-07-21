@@ -123,6 +123,7 @@ def get_monthly_card_config():
             "seclusion_efficiency": monthly_config.get("basic", {}).get("seclusion_efficiency", 0.2),
             "inventory_bonus": monthly_config.get("basic", {}).get("inventory_bonus", 5),
             "auto_collect": monthly_config.get("basic", {}).get("auto_collect", False),
+            "sign_stamina_bonus": monthly_config.get("basic", {}).get("sign_stamina_bonus", 0),
         },
         CardType.PREMIUM: {
             "name": monthly_config.get("premium", {}).get("name", "高级月卡"),
@@ -131,6 +132,7 @@ def get_monthly_card_config():
             "seclusion_efficiency": monthly_config.get("premium", {}).get("seclusion_efficiency", 0.5),
             "inventory_bonus": monthly_config.get("premium", {}).get("inventory_bonus", 20),
             "auto_collect": monthly_config.get("premium", {}).get("auto_collect", True),
+            "sign_stamina_bonus": monthly_config.get("premium", {}).get("sign_stamina_bonus", 0),
         }
     }
 
@@ -148,6 +150,7 @@ async def get_player_card_benefits(session, player_id: str) -> dict:
         "seclusion_efficiency": 0.0,
         "inventory_bonus": 0,
         "auto_collect": False,
+        "sign_stamina_bonus": 0,  # 签到咒抗上限增加
     }
 
     active_cards = await MonthlyCard.get_all_active_cards(session, player_id)
@@ -162,6 +165,7 @@ async def get_player_card_benefits(session, player_id: str) -> dict:
         benefits["cultivation_efficiency"] += card_benefits.get("cultivation_efficiency", 0)
         benefits["seclusion_efficiency"] += card_benefits.get("seclusion_efficiency", 0)
         benefits["inventory_bonus"] += card_benefits.get("inventory_bonus", 0)
+        benefits["sign_stamina_bonus"] += card_benefits.get("sign_stamina_bonus", 0)
 
         # 取最大值的权益
         benefits["seclusion_time_limit"] = max(
