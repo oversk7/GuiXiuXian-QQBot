@@ -62,8 +62,8 @@ class DailyGhostRefresh:
             ghost_config = random.choice(ghost_configs)
 
             # 随机生成坐标（在现实世界大都会的合理范围内）
-            x = random.randint(-50, 50)
-            y = random.randint(-50, 50)
+            x = random.randint(-500, 500)
+            y = random.randint(-500, 500)
 
             # 创建入侵事件
             invasion = GhostInvasion(
@@ -120,8 +120,13 @@ class DailyGhostRefresh:
             )
 
             if invasion.is_suppressed and invasion.suppressed_by:
-                # 这里可以添加镇压者信息，但需要查询玩家表
-                summary_lines.append(f"   镇压者: UID-{invasion.suppressed_by}")
+                # 查询镇压者的UID信息
+                from ..models.player import Player
+                suppressor = await session.get(Player, invasion.suppressed_by)
+                if suppressor:
+                    summary_lines.append(f"   镇压者: {suppressor.nickname}[UID:{suppressor.uid}]")
+                else:
+                    summary_lines.append(f"   镇压者: 未知玩家")
 
         summary_lines.append("━━━━━━━━━━━━━")
         active_count = sum(1 for inv in invasions if not inv.is_suppressed)
