@@ -52,9 +52,9 @@ async def handle_story_list(event: MessageEvent):
         msg_lines.extend([
             "━━━━━━━━━━━━━",
             "💡 使用方法：",
-            "▫️ 开始试炼 [试炼名称] - 开始指定试炼",
-            "▫️ 试炼状态 - 查看当前试炼进度",
-            "▫️ 退出试炼 - 结束当前试炼"
+            "▫️ 【开始试炼 <试炼名称>】 - 开始指定试炼",
+            "▫️ 【试炼状态】 - 查看当前试炼进度",
+            "▫️ 【退出试炼】 - 结束当前试炼"
         ])
         
         await story_list_cmd.finish(message_add_head("\n".join(msg_lines), event))
@@ -70,7 +70,7 @@ async def handle_start_story(event: MessageEvent, args: Message = CommandArg()):
         
         story_id = args.extract_plain_text().strip()
         if not story_id:
-            await start_story_cmd.finish("📝 格式：开始试炼 [试炼ID]")
+            await start_story_cmd.finish("📝 格式：开始试炼 <试炼名称>")
         
         # 检查试炼是否存在
         story = story_engine.get_story(story_id)

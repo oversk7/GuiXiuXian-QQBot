@@ -178,9 +178,3 @@ async def _expand_territory(player: Player, cfg: ItemConfig, qty: int, ctx: str)
     # 这个效果需要在调用处特殊处理，因为需要访问Guild对象
     # 返回特殊标记，让调用方知道需要特殊处理
     return False, "EXPAND_TERRITORY_SPECIAL_HANDLING"
-
-
-@register(ItemEffectType.GHOST_SUPPRESS)
-async def _ghost_suppress(player: Player, cfg: ItemConfig, qty: int, ctx: str) -> Tuple[bool, str]:
-    """镇压道具效果 - 这些道具在镇压系统中特殊处理，不能直接使用"""
-    return False, "⛔ 镇压道具只能在镇压鬼怪时使用，请使用【镇压 棺材钉】等指令"

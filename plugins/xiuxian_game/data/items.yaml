@@ -464,29 +464,3 @@ items:
       type: "MATERIAL"
       price: 500
       grudge_value: 10
-
-  ghost_tools:  # 镇压道具
-    - item_id: "coffin_nail"
-      name: "棺材钉"
-      description: "用于镇压灵异的特殊道具，可强制压制鬼怪的威压规则 ⚰️"
-      type: "CONSUMABLE"
-      effect_type: "GHOST_SUPPRESS"
-      effect_params: {"prestige_boost": 1}
-      price: 1000
-
-    - item_id: "exorcism_charm"
-      name: "驱邪符"
-      description: "道士手绘的驱邪符咒，能够增强镇压成功率 📜"
-      type: "CONSUMABLE"
-      effect_type: "GHOST_SUPPRESS"
-      effect_params: {"success_boost": 0.2}
-      price: 800
-
-    - item_id: "holy_water"
-      name: "圣水"
-      description: "经过祝福的圣水，对邪灵有强烈的克制作用 💧"
-      type: "CONSUMABLE"
-      effect_type: "GHOST_SUPPRESS"
-      effect_params: {"damage_boost": 0.3}
-      price: 600
-    

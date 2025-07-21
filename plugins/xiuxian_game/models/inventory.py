@@ -24,7 +24,6 @@ class ItemEffectType(str, PyEnum):
     GAIN_EXP = "GAIN_EXP"
     RESET_ATTR = "RESET_ATTR"
     EXPAND_TERRITORY = "EXPAND_TERRITORY"
-    GHOST_SUPPRESS = "GHOST_SUPPRESS"
     # 以下类型不使用 apply_effect 处理
     CHANGE_NAME = "CHANGE_NAME"
     TELEPORT = "TELEPORT"
