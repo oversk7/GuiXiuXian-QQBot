@@ -213,7 +213,6 @@ async def handle_fan_ben(event: MessageEvent, args: Message = CommandArg()):
         "【传送 <诡域>】 进入指定诡域\n"
         "【诡域】 查看当前可探索的诡域\n"
         "【上|下|左|右】 向指定方向移动一格\n"
-        "【跳跃 <x> <y>】 跳跃到指定坐标，仅在驿站可使用\n"
         "【返回】 返回现实世界并满状态\n"
         "【探索】 探索玩家所在地点"
     )
