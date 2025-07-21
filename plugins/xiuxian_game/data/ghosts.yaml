@@ -7,7 +7,7 @@ ghosts:
     attack: 85
     defense: 120
     agility: 75
-    base_prestige_level: 2
+    base_prestige_level: 3
     required_attribute: "mp"
     attribute_per_level: 30
     fragment_item_id: "insurance_man_fragment"
@@ -37,7 +37,7 @@ ghosts:
     attack: 70
     defense: 150
     agility: 60
-    base_prestige_level: 2
+    base_prestige_level: 1
     required_attribute: "defense"
     attribute_per_level: 50
     fragment_item_id: "wang_mei_fragment"
@@ -60,17 +60,32 @@ ghosts:
     fragments_to_complete: 10
     rarity: "rare"
 
-  - ghost_id: "geng_gui"
-    name: "耿鬼"
+  - ghost_id: "se_gui"
+    name: "色鬼"
     description: "色字头上一把刀，在淋浴上安装摄像头时，触电而死，特殊能力为霉运，能影响自己和周边之人的运气。"
     hp: 650
     attack: 100
     defense: 90
     agility: 95
-    base_prestige_level: 2
+    base_prestige_level: 1
     required_attribute: "luck"
     attribute_per_level: 50
-    fragment_item_id: "geng_gui_fragment"
+    fragment_item_id: "se_gui_fragment"
     fragment_drop_rate: 0.6
     fragments_to_complete: 10
     rarity: "common"
+  
+  - ghost_id: "geng_gui"
+    name: "耿鬼"
+    description: "生前是个沉默寡言的老裁缝，他最终被发现死在昏暗的裁缝店里，身体蜷缩在存放寿衣的樟木箱中，手里紧握着那把巨大的裁衣剪——剪刀刃上沾满了干涸的、深褐色的污迹。没人知道他是怎么把自己关进去的，或者是谁帮他关上的。\n强烈的孤独和对自己‘无用’的偏执怨恨，让他化作了厉鬼。他不再修补布料，而是执着于‘修补’他认为‘有瑕疵’的灵魂。他会潜藏在老宅的阴影、衣柜深处或是任何能容纳他冰冷躯体的狭小空间里，用那把锈迹斑斑的巨剪，悄无声息地靠近目标，试图将他们的灵魂剪下来‘修补’到自己身上。受害者会感到莫名的寒冷、失语，或者发现自己映在墙上的影子缺了一块……\n‘嘘……别动……你这里……有点多余……’\n‘让我帮你……修修……就完整了……’"
+    hp: 580
+    attack: 90
+    defense: 80
+    agility: 105
+    base_prestige_level: 2
+    required_attribute: "luck"
+    attribute_per_level: 45
+    fragment_item_id: "geng_gui_fragment"
+    fragment_drop_rate: 0.5
+    fragments_to_complete: 10
+    rarity: "rare"  # 因其独特恐怖机制，提升为稀有
