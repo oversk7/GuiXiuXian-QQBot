@@ -255,7 +255,17 @@ async def handle_inventory(event: MessageEvent, args: Message = CommandArg()):
         total_pages = (len(items) - 1) // page_size + 1
         page = max(1, min(page, total_pages))
 
-        formatted = await paginate_items(items, page, page_size=page_size)
+        # 获取容量信息（包含月卡加成）
+        effective_capacity = await player.get_effective_inventory_capacity(session)
+        used_slots = len(items)
+        capacity_info = f"📦 容量：{used_slots}/{effective_capacity}"
+
+        # 如果有月卡加成，显示详细信息
+        if effective_capacity > player.inventory_capacity:
+            bonus = effective_capacity - player.inventory_capacity
+            capacity_info += f" (💳+{bonus})"
+
+        formatted = await paginate_items(items, page, page_size=page_size, capacity_info=capacity_info)
         await inventory_cmd.finish(message_add_head(formatted, event))
 
 @teleport_cmd.handle()

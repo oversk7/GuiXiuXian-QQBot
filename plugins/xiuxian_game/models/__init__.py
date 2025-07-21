@@ -16,6 +16,7 @@ from .story_session import StorySession
 from .donation_log import PlayerDonationLog
 from .elixir_usage import ElixirUsageLog
 from .guild_teleport_log import GuildTeleportLog
+from .monthly_card import MonthlyCard
 # Ghost配置直接从YAML读取，工具类移至ghost_suppression模块
 from .ghost_invasion import GhostInvasion
 from .player_ghost import PlayerGhost

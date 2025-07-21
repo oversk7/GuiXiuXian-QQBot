@@ -163,9 +163,12 @@ class ItemInstance(Base):
         stacks_all: list[ItemInstance] = result_inv.scalars().all()
         used_slots = len(stacks_all)
 
+        # 获取有效背包容量（包含月卡加成）
+        effective_capacity = await player.get_effective_inventory_capacity(session)
+
         if is_equipment:
             # 装备每个占1格
-            if used_slots + quantity > player.inventory_capacity:
+            if used_slots + quantity > effective_capacity:
                 raise ValueError(f"背包空间不足")
             equip_durability = durability if durability is not None else item_config.durability
             for _ in range(quantity):
@@ -184,7 +187,7 @@ class ItemInstance(Base):
         current_slot_cnt = ceil(existing_qty / STACK_SIZE) if existing_qty else 0
         extra_slots_needed = new_slot_cnt - current_slot_cnt
 
-        if used_slots + extra_slots_needed > player.inventory_capacity:
+        if used_slots + extra_slots_needed > effective_capacity:
             raise ValueError(f"背包空间不足")
 
         # 填充已有堆叠

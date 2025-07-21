@@ -64,7 +64,7 @@ async def generate_exp_table(max_level: int = 100) -> str:
     return str(output_path)
 
 
-async def paginate_items(items: list, page: int, page_size: Optional[int] = None) -> str:
+async def paginate_items(items: list, page: int, page_size: Optional[int] = None, capacity_info: str = None) -> str:
     """分页格式化背包物品
 
     • 普通物品显示数量：✖️{qty}
@@ -80,6 +80,10 @@ async def paginate_items(items: list, page: int, page_size: Optional[int] = None
     # 计算总页数时使用实际分页大小
     total_pages = (len(items) - 1) // page_size + 1
     page_info = f"\n📖 第 {page} 页（共 {total_pages} 页)"
+
+    # 添加容量信息
+    if capacity_info:
+        page_info = f"\n{capacity_info}" + page_info
 
     lines: list[str] = []
     for offset, inst in enumerate(current_page_items, start=1):

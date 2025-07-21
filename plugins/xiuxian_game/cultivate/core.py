@@ -63,18 +63,35 @@ async def handle_cultivate(event: MessageEvent):
         k = 7 if player.level <= 10 else 6
         # 基础收益计算
         base_gain = cfg["base_exp"] * (1 + player.level / k)
-        exp_gain = round(base_gain * random.uniform(0.8, 1.2))
-        
+        base_exp_gain = round(base_gain * random.uniform(0.8, 1.2))
+
+        # 获取月卡权益
+        from ..models.monthly_card import get_player_card_benefits
+        benefits = await get_player_card_benefits(session, player.id)
+
+        # 应用月卡修炼效率加成
+        cultivation_multiplier = 1.0 + benefits["cultivation_efficiency"]
+        exp_gain = int(base_exp_gain * cultivation_multiplier)
+        bonus_exp = exp_gain - base_exp_gain
+  
         # 更新数据
         player.last_cultivation = datetime.now()
         player.exp += exp_gain
         session.add(player)
         await session.commit()
         exp_max = calculate_level_up_exp(player.level)
+
+        # 构建修炼消息，包含月卡加成提示
+        bonus_msg = ""
+        if bonus_exp > 0:
+            efficiency_percent = benefits["cultivation_efficiency"] * 100
+            bonus_msg = f"\n✧ 月卡加成 💳 +{bonus_exp} 怨炁 (+{efficiency_percent:.0f}%)"
+
         msg = (
             "你在黑焰里看见自己的影子喘息。\n"
             "━━━━━━━━━━━━━\n"
-            f"✧ 汲取怨炁 + {exp_gain}↑\n"
+            f"✧ 汲取怨炁 + {exp_gain}↑"
+            f"{bonus_msg}\n"
             f"✧ 修为残烛 {player.exp}↑/{exp_max} {f'(可突破)' if player.exp> exp_max else ''}\n"
             "━━━━━━━━━━━━━\n"
             "⬇️ 【突破】倾听骨骼断裂\n"
@@ -100,6 +117,10 @@ async def handle_seclusion(event: MessageEvent):
                 "⬇️ 【出关】推开棺盖",
                 event))
 
+        # 获取月卡权益
+        from ..models.monthly_card import get_player_card_benefits
+        benefits = await get_player_card_benefits(session, player.id)
+
         # 计算棺材钉数量和效率加成
         coffin_nail_count = await get_coffin_nail_count(session, player.id)
         efficiency_bonus = coffin_nail_count * 0.5  # 每个棺材钉提升0.5%效率
@@ -109,16 +130,24 @@ async def handle_seclusion(event: MessageEvent):
         session.add(player)
         await session.commit()
 
-        # 构建闭关消息，包含棺材钉效率提示
+        # 构建闭关消息，包含棺材钉和月卡效率提示
         efficiency_msg = ""
         if coffin_nail_count > 0:
-            efficiency_msg = f"\n✧ 棺材钉 ⚰️ ✖️{coffin_nail_count} 提升效率 +{efficiency_bonus:.1f}%"
+            efficiency_msg += f"\n✧ 棺材钉 ⚰️ ✖️{coffin_nail_count} 提升效率 +{efficiency_bonus:.1f}%"
+
+        if benefits["seclusion_efficiency"] > 0:
+            card_efficiency = benefits["seclusion_efficiency"] * 100
+            efficiency_msg += f"\n✧ 月卡加成 💳 提升效率 +{card_efficiency:.0f}%"
+
+        seclusion_hours = benefits["seclusion_time_limit"] // 3600
+        time_limit_msg = f"\n✧ 闭关时长上限 ⏰ {seclusion_hours}小时"
 
         msg_secl = (
             f"🕯️{player.nickname} 躺入破棺，将最后一枚钉子钉入。\n"
             "━━━━━━━━━━━━━\n"
             "✧ 离线修炼进行中，期间无法普通修炼"
-            f"{efficiency_msg}\n"
+            f"{efficiency_msg}"
+            f"{time_limit_msg}\n"
             "━━━━━━━━━━━━━\n"
             "⬇️ 【出关】推开棺盖"
         )
@@ -142,20 +171,34 @@ async def handle_out_seclusion(event: MessageEvent):
                 "⬇️ 【闭关】钉上棺盖",
                 event))
 
+        # 获取月卡权益
+        from ..models.monthly_card import get_player_card_benefits
+        benefits = await get_player_card_benefits(session, player.id)
+
         # 计算棺材钉数量和效率加成
         coffin_nail_count = await get_coffin_nail_count(session, player.id)
-        efficiency_multiplier = 1.0 + (coffin_nail_count * 0.005)  # 每个棺材钉提升0.5%效率
+        coffin_nail_multiplier = 1.0 + (coffin_nail_count * 0.005)  # 每个棺材钉提升0.5%效率
 
         player.is_secluded = False
         k = 7 if player.level <= 10 else 6
         base_gain = cfg["base_exp"] * (1 + player.level / k)
         delta_time = int((datetime.now() - player.seclusion_start_time).total_seconds())
-        delta_time = delta_time if delta_time < 7 * 3600 else 7 * 3600
+
+        # 应用月卡时长限制
+        max_seclusion_time = benefits["seclusion_time_limit"]
+        delta_time = min(delta_time, max_seclusion_time)
+
+        # 计算基础经验
+        base_exp_gain = int(delta_time / cfg["cool_down"] * base_gain * 0.5)
 
         # 应用棺材钉效率加成
-        base_exp_gain = int(delta_time / cfg["cool_down"] * base_gain * 0.5)
-        exp_gain = int(base_exp_gain * efficiency_multiplier)
-        bonus_exp = exp_gain - base_exp_gain
+        exp_after_coffin_nail = int(base_exp_gain * coffin_nail_multiplier)
+        coffin_nail_bonus = exp_after_coffin_nail - base_exp_gain
+
+        # 应用月卡闭关效率加成
+        card_multiplier = 1.0 + benefits["seclusion_efficiency"]
+        exp_gain = int(exp_after_coffin_nail * card_multiplier)
+        card_bonus = exp_gain - exp_after_coffin_nail
 
         player.exp += exp_gain
 
@@ -163,11 +206,15 @@ async def handle_out_seclusion(event: MessageEvent):
         await session.commit()
         exp_max2 = calculate_level_up_exp(player.level)
 
-        # 构建出关消息，包含棺材钉效率提示
+        # 构建出关消息，包含棺材钉和月卡效率提示
         efficiency_msg = ""
         if coffin_nail_count > 0:
             efficiency_bonus = coffin_nail_count * 0.5
-            efficiency_msg = f"\n✧ 棺材钉 ⚰️ ✖️{coffin_nail_count} 额外获得 +{bonus_exp} 怨炁 (+{efficiency_bonus:.1f}%)"
+            efficiency_msg += f"\n✧ 棺材钉 ⚰️ ✖️{coffin_nail_count} 额外获得 +{coffin_nail_bonus} 怨炁 (+{efficiency_bonus:.1f}%)"
+
+        if card_bonus > 0:
+            card_efficiency = benefits["seclusion_efficiency"] * 100
+            efficiency_msg += f"\n✧ 月卡加成 💳 额外获得 +{card_bonus} 怨炁 (+{card_efficiency:.0f}%)"
 
         msg_out = (
             "🔓你推开棺盖，阴灰散落。\n"

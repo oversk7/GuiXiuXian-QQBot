@@ -30,3 +30,20 @@ cultivate:
         defense: 1    # 防 (defense) 基础增量
         agility: 1    # 敏 (agility) 基础增量
         luck: 1       # 运 (luck) 基础增量
+
+# 月卡配置
+monthly_card:
+  basic:
+    name: "基础月卡"
+    cultivation_efficiency: 0.2      # 修炼效率+20%
+    seclusion_time_limit: 9          # 闭关时长上限9小时
+    seclusion_efficiency: 0.2        # 闭关效率+20%
+    inventory_bonus: 5               # 背包格子+5
+    auto_collect: false              # 不自动采集
+  premium:
+    name: "高级月卡"
+    cultivation_efficiency: 0.5      # 修炼效率
+    seclusion_time_limit: 12         # 闭关时长上限12小时
+    seclusion_efficiency: 0.5        # 闭关效率+50%
+    inventory_bonus: 20              # 背包格子+20
+    auto_collect: true               # 自动采集材料
