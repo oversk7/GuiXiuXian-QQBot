@@ -33,7 +33,7 @@ async def handle_help(event: MessageEvent, args: Message = CommandArg()):
         "🎮 公会系统  💰 银行系统\n"
         "🔮 炼丹系统  🎮 活动系统\n"
         "💕 社交系统  🏰 副本系统\n"
-        "👻 镇压系统  🔥 鬼怪驾驭\n"
+        "👻 鬼怪系统\n"
         "═════════════\n"
         "💡 发送/系统名称 查看详细指令，/更新 查看最近更新内容\n"
         "💡 【】括号里是指令，<>里是必填，[]里是选填\n"
@@ -304,8 +304,7 @@ async def handle_social_help(event: MessageEvent, args: Message = CommandArg()):
     )
     await social_help_cmd.finish(Message(msg))
 
-# 镇压系统
-ghost_suppression_help_cmd = on_command("镇压系统", aliases={"镇压帮助", "鬼怪帮助"}, priority=4, block=True)
+ghost_suppression_help_cmd = on_command("鬼怪系统", aliases={"镇压系统", "鬼怪帮助"}, priority=4, block=True)
 
 @ghost_suppression_help_cmd.handle()
 async def handle_ghost_suppression_help(event: MessageEvent, args: Message = CommandArg()):
@@ -317,16 +316,12 @@ async def handle_ghost_suppression_help(event: MessageEvent, args: Message = Com
         "【入侵事件】 查看今日鬼怪入侵列表\n"
         "\n"
         "⚔️ 镇压战斗：\n"
-        "【镇压】 镇压当前位置的鬼怪（需先移动到入侵坐标）\n"
-        "【镇压 棺材钉】 使用棺材钉强制压制威压规则\n"
+        "【镇压 [棺材钉]】 镇压当前位置的鬼怪（需先移动到事件坐标）\n"
         "\n"
         "👻 鬼怪管理：\n"
-        "【驾驭】 查看当前驾驭状态和可用鬼怪列表\n"
-        "【驾驭 <鬼怪名称>】 切换驾驭的鬼怪\n"
-        "【合成鬼怪】 查看可合成的鬼怪列表\n"
-        "【合成鬼怪 <鬼怪名称>】 使用碎片合成完整鬼怪\n"
-        "【升级鬼怪】 查看可升级的鬼怪列表\n"
-        "【升级鬼怪 <鬼怪名称>】 消耗怨念值升级鬼怪\n"
+        "【驾驭 [鬼怪名称]】 切换驾驭的鬼怪，不填则查看当前驾驭状态\n"
+        "【合成 [鬼怪名称]】 使用碎片合成完整鬼怪，不填则查看可合成列表\n"
+        "【升级 [鬼怪名称]】 消耗怨念值升级鬼怪，不填则查看可升级列表\n"
         "━━━━━━━━━━━━━\n"
         "📋 镇压流程：\n"
         "1️⃣ 威压判定：比较双方威压等级，不足可用棺材钉\n"

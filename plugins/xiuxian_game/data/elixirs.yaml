@@ -2,11 +2,11 @@ elixirs:
   spirit_pill:
     produce_item_id: "spirit_elixir"
     materials:
-      spirit_bone: 50
+      spirit_bone: 20
       yin_essence: 8
       drowned_scale: 10
     quantity: 1
-    base_success: 0.6
+    base_success: 0.9
 
   blood_heart:
     produce_item_id: "blood_heart_elixir"
@@ -15,7 +15,7 @@ elixirs:
       medical_record: 5
       drowned_scale: 20
     quantity: 1
-    base_success: 0.55
+    base_success: 0.8
 
   night_soul:
     produce_item_id: "night_soul_elixir"
@@ -24,7 +24,7 @@ elixirs:
       yin_essence: 6
       kissed_phone_number: 3
     quantity: 1
-    base_success: 0.5
+    base_success: 0.7
 
   void_eye:
     produce_item_id: "void_eye_elixir"
@@ -33,4 +33,4 @@ elixirs:
       wanted_poster: 20
       drowned_scale: 10
     quantity: 1
-    base_success: 0.45 
+    base_success: 0.5 

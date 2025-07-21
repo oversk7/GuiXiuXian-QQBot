@@ -462,3 +462,31 @@ items:
       type: "MATERIAL"
       price: 200000
       grudge_value: 10
+
+    - item_id: "black_dog_fragment"
+      name: "黑犬的投影"
+      description: "黑犬留下的怨念碎片 🐶💉"
+      type: "MATERIAL"
+      price: 200000
+      grudge_value: 10
+
+    - item_id: "wang_mei_fragment"
+      name: "王梅的投影"
+      description: "王梅留下的怨念碎片🧠💊"
+      type: "MATERIAL"
+      price: 200000
+      grudge_value: 10
+
+    - item_id: "he_bei_bei_fragment"
+      name: "何贝贝的投影"
+      description: "何贝贝留下的怨念碎片🔍💫"
+      type: "MATERIAL"
+      price: 200000
+      grudge_value: 10
+
+    - item_id: "se_gui_fragment"
+      name: "色鬼的投影"
+      description: "色鬼留下的怨念碎片 💣🔍"
+      type: "MATERIAL"
+      price: 200000
+      grudge_value: 10
