@@ -241,7 +241,7 @@ class GhostSuppressionService:
             result_messages.append("⚰️ 使用棺材钉强制压制灵异规则！")
             prestige_passed = True
         elif player_prestige >= wild_prestige:
-            result_messages.append("✅ 威压判定通过！")
+            result_messages.append("✅ 威压判定通过，你的规则凌驾于它之上！")
             prestige_passed = True
         else:
             result_messages.append("❌ 威压不足，无法压制对方的灵异规则！")

@@ -39,6 +39,17 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
             keyword == ghost_config.get("ghost_id", "")):
             ghost_matches.append(ghost_config)
 
+    # 如果找到了鬼怪匹配，则从物品匹配中移除对应的鬼怪碎片
+    if ghost_matches:
+        ghost_fragment_ids = set()
+        for ghost_config in ghost_matches:
+            fragment_id = ghost_config.get("fragment_item_id", "")
+            if fragment_id:
+                ghost_fragment_ids.add(fragment_id)
+
+        # 过滤掉鬼怪碎片
+        item_matches = [cfg for cfg in item_matches if cfg.item_id not in ghost_fragment_ids]
+
     # 检查是否有匹配结果
     total_matches = len(item_matches) + len(ghost_matches)
     if total_matches == 0:

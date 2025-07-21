@@ -456,9 +456,9 @@ items:
 
   # 鬼怪碎片（用于合成完整鬼怪）
   ghost_fragments:
-    - item_id: "sadako_fragment"
-      name: "贞子的投影"
-      description: "贞子留下的怨念碎片，散发着电磁干扰 📺✨"
+    - item_id: "insurance_man_fragment"
+      name: "保险鬼的投影"
+      description: "幸福人寿保险员工留下的怨念碎片 📺✨"
       type: "MATERIAL"
       price: 200000
       grudge_value: 10

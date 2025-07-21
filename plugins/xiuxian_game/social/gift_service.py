@@ -95,31 +95,11 @@ class GiftService:
         is_marriage_goods = (gift_type == GiftType.MARRIAGE and item_config.type == ItemType.GOODS)
 
         if not is_marriage_goods:
-            if item_config.type == ItemType.EQUIPMENT:
-                # 装备需要保持原有耐久度
-                try:
-                    await ItemInstance.add_item(session, receiver.id, item_config.item_id, quantity, equipment_durability)
-                except ValueError as e:
-                    return False, f"添加物品失败：{e}"
-            else:
-                # 普通物品按原逻辑处理
-                stmt = select(ItemInstance).where(
-                    and_(
-                        ItemInstance.player_id == receiver.id,
-                        ItemInstance.item_id == item_config.item_id
-                    )
-                )
-                receiver_item = (await session.execute(stmt)).scalars().first()
-
-                if receiver_item:
-                    receiver_item.quantity += quantity
-                else:
-                    new_item = ItemInstance(
-                        player_id=receiver.id,
-                        item_id=item_config.item_id,
-                        quantity=quantity
-                    )
-                    session.add(new_item)
+            # 统一使用 ItemInstance.add_item 方法处理物品添加，确保正确处理叠加限制
+            try:
+                await ItemInstance.add_item(session, receiver.id, item_config.item_id, quantity, equipment_durability)
+            except ValueError as e:
+                return False, f"添加物品失败：{e}"
         
         # 记录礼物
         gift_record = GiftRecord(

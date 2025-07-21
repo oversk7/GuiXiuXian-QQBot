@@ -1,16 +1,16 @@
 # 鬼怪配置文件
 ghosts:
-  - ghost_id: "sadako"
-    name: "贞子"
-    description: "从电视机中爬出的怨灵，长发遮面，散发着诅咒的气息。"
+  - ghost_id: "insurance_man"
+    name: "保险鬼"
+    description: "一位通体漆黑的西装男子，强制要求你购买生存保险，即买保险的人必须活到到保单规定的时间，才能够领取保险金。假如买保险的人中途死亡，他就不能领回自己交的保险费，而保险公司许诺的保险金，也与他无关，谁让他活不到约定好的年龄呢。\n“买保险，嘻嘻嘻……我要买保险！”\n“我要买九十九年！”\n“我买一百年！”"
     hp: 600
     attack: 85
     defense: 120
     agility: 75
     base_prestige_level: 2
     required_attribute: "mp"
-    attribute_per_level: 50
-    fragment_item_id: "sadako_fragment"
+    attribute_per_level: 30
+    fragment_item_id: "insurance_man_fragment"
     fragment_drop_rate: 0.3
     fragments_to_complete: 10
     rarity: "epic"
@@ -26,9 +26,9 @@ ghosts:
     required_attribute: "attack"
     attribute_per_level: 50
     fragment_item_id: "black_dog_fragment"
-    fragment_drop_rate: 0.3
+    fragment_drop_rate: 0.6
     fragments_to_complete: 10
-    rarity: "epic"
+    rarity: "common"
 
   - ghost_id: "wang_mei"
     name: "王梅"
@@ -43,7 +43,7 @@ ghosts:
     fragment_item_id: "wang_mei_fragment"
     fragment_drop_rate: 0.3
     fragments_to_complete: 10
-    rarity: "epic"
+    rarity: "rare"
 
   - ghost_id: "he_bei_bei"
     name: "何贝贝"
@@ -58,7 +58,7 @@ ghosts:
     fragment_item_id: "he_bei_bei_fragment"
     fragment_drop_rate: 0.3
     fragments_to_complete: 10
-    rarity: "epic"
+    rarity: "rare"
 
   - ghost_id: "geng_gui"
     name: "耿鬼"
@@ -71,6 +71,6 @@ ghosts:
     required_attribute: "luck"
     attribute_per_level: 50
     fragment_item_id: "geng_gui_fragment"
-    fragment_drop_rate: 0.3
+    fragment_drop_rate: 0.6
     fragments_to_complete: 10
-    rarity: "epic"
+    rarity: "common"
