@@ -131,8 +131,8 @@ async def handle_check_monthly_card(event: MessageEvent):
             msg_lines.append(f"💪 签到咒抗上限 +{benefits['sign_stamina_bonus']}")
 
         # 添加扫荡令权益说明
-        if active_cards:  # 只要有有效月卡就显示
-            msg_lines.append("🎫 签到获得扫荡令*1")
+        if benefits["sign_sweep_tokens"] > 0:
+            msg_lines.append(f"🎫 签到获得扫荡令*{benefits['sign_sweep_tokens']}")
 
         msg_lines.append("━━━━━━━━━━━━━")
         

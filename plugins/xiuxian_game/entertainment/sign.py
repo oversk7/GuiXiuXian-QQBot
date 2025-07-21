@@ -86,12 +86,11 @@ async def handle_sign(event: MessageEvent):
 
         # 月卡权利：签到时发放扫荡令
         monthly_card_msg = ""
-        from ..models.monthly_card import MonthlyCard
-        active_cards = await MonthlyCard.get_all_active_cards(session, player.id)
-        if active_cards:
+        sweep_tokens = benefits["sign_sweep_tokens"]
+        if sweep_tokens > 0:
             try:
-                await ItemInstance.add_item(session, user_id, "sweep_token", quantity=1)
-                monthly_card_msg = "\n🎫 月卡权利：获得扫荡令*1"
+                await ItemInstance.add_item(session, user_id, "sweep_token", quantity=sweep_tokens)
+                monthly_card_msg = f"\n🎫 月卡权利：获得扫荡令*{sweep_tokens}"
             except ValueError as e:
                 # 如果添加物品失败，记录错误但不影响签到
                 monthly_card_msg = f"\n⚠️ 月卡扫荡令发放失败：{e}"
