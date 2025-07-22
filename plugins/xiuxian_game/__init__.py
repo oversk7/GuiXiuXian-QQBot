@@ -12,6 +12,7 @@ __plugin_meta__ = PluginMetadata(
 
 # 注册子模块
 from . import (
+    log,
     player,
     cultivate,
     economy,
@@ -22,7 +23,6 @@ from . import (
     alchemy,
     social,
     story,
-    log_uid,
     ghost_suppression,
     backup,
 )
