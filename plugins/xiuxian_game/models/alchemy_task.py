@@ -1,10 +1,11 @@
 from datetime import datetime, timedelta
-from sqlalchemy import Integer, String, DateTime, Float, Boolean, ForeignKey
+from sqlalchemy import Integer, String, DateTime, Float, Boolean, ForeignKey, Text
 from sqlalchemy.orm import Mapped, mapped_column
 from sqlalchemy.sql import func
 from .db import Base
 import random
-from typing import Tuple
+import json
+from typing import Tuple, Dict
 
 class AlchemyRecord(Base):
     """炼丹记录 - 简化版本，基于时间差计算"""
@@ -24,6 +25,7 @@ class AlchemyRecord(Base):
     qty: Mapped[int] = mapped_column(Integer)  # 炉数
     success_rate: Mapped[float] = mapped_column(Float)  # 成功率
     duration_minutes: Mapped[int] = mapped_column(Integer)  # 总耗时(分钟)
+    materials_used: Mapped[str] = mapped_column(Text, default="{}")  # 使用的材料JSON格式 {"item_id": quantity}
 
     # 时间记录
     started_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.now, server_default=func.now())
@@ -62,3 +64,14 @@ class AlchemyRecord(Base):
         if not self.started_at:
             self.started_at = datetime.now()
         return self.started_at + timedelta(minutes=self.duration_minutes)
+
+    def get_materials_dict(self) -> Dict[str, int]:
+        """获取使用的材料字典"""
+        try:
+            return json.loads(self.materials_used or "{}")
+        except (json.JSONDecodeError, TypeError):
+            return {}
+
+    def set_materials_dict(self, materials: Dict[str, int]):
+        """设置使用的材料字典"""
+        self.materials_used = json.dumps(materials)

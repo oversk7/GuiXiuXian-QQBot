@@ -143,7 +143,10 @@ class AlchemyService:
         # 创建炼丹记录
         success_rate = min(0.95, recipe["base_success"] * coeff)
         duration_minutes = cls.BASE_TIME_MINUTES * qty
-        
+
+        # 记录使用的材料
+        materials_used = {mid: q * qty for mid, q in recipe["materials"].items()}
+
         record = AlchemyRecord(
             player_id=player_id,
             furnace_id=None if broken else furnace.id,
@@ -154,6 +157,7 @@ class AlchemyService:
             success_rate=success_rate,
             duration_minutes=duration_minutes,
         )
+        record.set_materials_dict(materials_used)
         session.add(record)
         
         prod_name = config.items_config["by_id"][recipe["produce_item_id"]].name
@@ -187,18 +191,42 @@ class AlchemyService:
             return False, "⛔ 炼丹尚未完成"
         
         success_count, total_produce = record.calculate_result()
-        
+        failed_count = record.qty - success_count
+
+        # 发放成功产出的丹药
         if total_produce > 0:
             try:
                 await ItemInstance.add_item(session, record.player_id, record.produce_item_id, total_produce)
             except ValueError as e:
                 return False, f"⛔ 领取失败：{e}"
-        
+
+        # 失败时返还50%材料（向上取整）
+        returned_materials = []
+        if failed_count > 0:
+            materials_dict = record.get_materials_dict()
+            for material_id, total_used in materials_dict.items():
+                # 计算失败炉数对应的材料用量
+                failed_material_used = (total_used * failed_count) // record.qty
+                # 返还50%，向上取整
+                return_amount = (failed_material_used + 1) // 2
+                if return_amount > 0:
+                    try:
+                        await ItemInstance.add_item(session, record.player_id, material_id, return_amount)
+                        material_name = config.items_config["by_id"][material_id].name
+                        returned_materials.append(f"{material_name}✖️{return_amount}")
+                    except ValueError:
+                        # 如果添加失败，忽略该材料的返还
+                        pass
+
         record.claimed = True
-        
+
         prod_name = config.items_config["by_id"][record.produce_item_id].name
         msg = f"✅ 炼丹完成！成功 {success_count}/{record.qty} 炉，共得 {prod_name} ✖️{total_produce}"
-        
+
+        # 添加材料返还信息
+        if returned_materials:
+            msg += f"\n🔄 失败返还：{', '.join(returned_materials)}"
+
         return True, msg
     
     @classmethod

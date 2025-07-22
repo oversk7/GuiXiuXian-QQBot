@@ -67,6 +67,7 @@ async def handle_alchemy(event: MessageEvent, args: Message = CommandArg()):
     msg = (
         "✨ 炼丹系统帮助 ✨\n"
         "消耗材料，获得丹药，丹炉属于装备，炉ID即装备ID\n"
+        "炼丹失败时会返还50%材料（向上取整）\n"
         "━━━━━━━━━━━━━\n"
         "【丹方】 查看炼丹配方\n"
         "【炼丹状态】 查看炼丹状态\n"
