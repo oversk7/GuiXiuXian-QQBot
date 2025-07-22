@@ -33,11 +33,11 @@ items:
       price: 299
       
     - item_id: "revive_potion"
-      name: "还魂丹"
-      description: "使用后可以立即原地复活。（复活率80%）"
+      name: "仿制还魂丹"
+      description: "使用后可以立即原地复活。（复活率50%）"
       type: "CONSUMABLE"
       effect_type: "REVIVE"
-      effect_params: {"rate": 0.8}
+      effect_params: {"rate": 0.5}
       price: 50000
 
     - item_id: "rename_card"
@@ -361,6 +361,54 @@ items:
       price: 200000
       effect_type: "BUFF"
       effect_params: {"luck": 5, "attack": 5}
+
+    - item_id: "life_recovery_elixir"
+      name: "回生丹"
+      description: "以珍贵药材炼制，服用后可恢复30%最大生命值。"
+      type: "CONSUMABLE"
+      price: 80000
+      effect_type: "RESTORE_HP_PERCENT"
+      effect_params: {"percent": 0.3}
+
+    - item_id: "soul_recovery_elixir"
+      name: "凝魂丹"
+      description: "凝聚魂魄精华，服用后可恢复30%最大理智值。"
+      type: "CONSUMABLE"
+      price: 80000
+      effect_type: "RESTORE_MP_PERCENT"
+      effect_params: {"percent": 0.3}
+
+    - item_id: "great_life_recovery_elixir"
+      name: "大回生丹"
+      description: "顶级回血丹药，服用后可恢复60%最大生命值。"
+      type: "CONSUMABLE"
+      price: 150000
+      effect_type: "RESTORE_HP_PERCENT"
+      effect_params: {"percent": 0.6}
+
+    - item_id: "great_soul_recovery_elixir"
+      name: "大凝魂丹"
+      description: "顶级回理智丹药，服用后可恢复60%最大理智值。"
+      type: "CONSUMABLE"
+      price: 150000
+      effect_type: "RESTORE_MP_PERCENT"
+      effect_params: {"percent": 0.6}
+
+    - item_id: "perfect_revive_elixir"
+      name: "完美还魂丹"
+      description: "以天材地宝炼制的极品复活丹，使用后可以立即原地复活。（复活率95%）"
+      type: "CONSUMABLE"
+      price: 200000
+      effect_type: "REVIVE"
+      effect_params: {"rate": 0.95}
+
+    - item_id: "supreme_revive_elixir"
+      name: "真还魂丹"
+      description: "传说中的复活神丹，死而复生如获新生。使用后可以立即原地复活。（复活率100%）"
+      type: "CONSUMABLE"
+      price: 500000
+      effect_type: "REVIVE"
+      effect_params: {"rate": 1.0}
 
   goods:  # 仅用于跑商系统倒卖的奢侈品
     - item_id: "lux_perfume"

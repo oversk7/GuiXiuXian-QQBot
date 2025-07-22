@@ -20,6 +20,8 @@ class ItemType(str,PyEnum):
 class ItemEffectType(str, PyEnum):
     RESTORE_HP = "RESTORE_HP"
     RESTORE_MP = "RESTORE_MP"
+    RESTORE_HP_PERCENT = "RESTORE_HP_PERCENT"
+    RESTORE_MP_PERCENT = "RESTORE_MP_PERCENT"
     BUFF = "BUFF"
     REVIVE = "REVIVE"
     GAIN_EXP = "GAIN_EXP"

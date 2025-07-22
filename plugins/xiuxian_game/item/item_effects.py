@@ -73,6 +73,34 @@ async def _restore_mp(player: Player, cfg: ItemConfig, qty: int, ctx: str) -> Tu
     player.mp = min(player.max_mp, player.mp + value)
     return True, f"🧠 恢复 {value} 点理智 (当前 {player.mp}/{player.max_mp})"
 
+
+@register(ItemEffectType.RESTORE_HP_PERCENT)
+async def _restore_hp_percent(player: Player, cfg: ItemConfig, qty: int, ctx: str) -> Tuple[bool, str]:
+    percent = float(cfg.effect_params.get("percent", 0)) * qty
+    if player.hp <= 0:
+        return False, "🧐 你已经死亡，无法恢复生命"
+    if player.hp >= player.max_hp:
+        return False, "🧐 你的生命值已满，不需要使用此物品"
+
+    value = int(player.max_hp * percent)
+    player.hp = min(player.max_hp, player.hp + value)
+    percent_display = int(percent * 100)
+    return True, f"❤️ 恢复 {percent_display}% 生命值 ({value}点) (当前 {player.hp}/{player.max_hp})"
+
+
+@register(ItemEffectType.RESTORE_MP_PERCENT)
+async def _restore_mp_percent(player: Player, cfg: ItemConfig, qty: int, ctx: str) -> Tuple[bool, str]:
+    percent = float(cfg.effect_params.get("percent", 0)) * qty
+    if player.hp <= 0:
+        return False, "🧐 你已经死亡，无法恢复理智"
+    if player.mp >= player.max_mp:
+        return False, "🧐 你的理智值已满，不需要使用此物品"
+
+    value = int(player.max_mp * percent)
+    player.mp = min(player.max_mp, player.mp + value)
+    percent_display = int(percent * 100)
+    return True, f"🧠 恢复 {percent_display}% 理智值 ({value}点) (当前 {player.mp}/{player.max_mp})"
+
 # 原地复活，与复活指令效果不同
 @register(ItemEffectType.REVIVE)
 async def _revive(player: Player, cfg: ItemConfig, qty: int, ctx: str) -> Tuple[bool, str]:

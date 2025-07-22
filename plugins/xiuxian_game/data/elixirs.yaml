@@ -33,4 +33,65 @@ elixirs:
       wanted_poster: 20
       drowned_scale: 10
     quantity: 1
-    base_success: 0.5 
+    base_success: 0.5
+
+  life_recovery:
+    produce_item_id: "life_recovery_elixir"
+    materials:
+      flesh_crystal: 8
+      spirit_bone: 15
+      rotten_core: 10
+    quantity: 1
+    base_success: 0.85
+
+  soul_recovery:
+    produce_item_id: "soul_recovery_elixir"
+    materials:
+      yin_essence: 12
+      ghost_tears: 20
+      cursed_silk: 8
+    quantity: 1
+    base_success: 0.85
+
+  great_life_recovery:
+    produce_item_id: "great_life_recovery_elixir"
+    materials:
+      flesh_crystal: 20
+      rotten_core: 30
+      drowned_scale: 25
+      medical_record: 3
+    quantity: 1
+    base_success: 0.75
+
+  great_soul_recovery:
+    produce_item_id: "great_soul_recovery_elixir"
+    materials:
+      yin_essence: 25
+      ghost_tears: 40
+      wanted_poster: 5
+      kissed_phone_number: 2
+    quantity: 1
+    base_success: 0.75
+
+  perfect_revive:
+    produce_item_id: "perfect_revive_elixir"
+    materials:
+      flesh_crystal: 30
+      nightmare_silk: 25
+      wanted_poster: 10
+      medical_record: 8
+      rotten_core: 5
+    quantity: 1
+    base_success: 0.6
+
+  supreme_revive:
+    produce_item_id: "supreme_revive_elixir"
+    materials:
+      flesh_crystal: 50
+      nightmare_silk: 40
+      yin_essence: 30
+      wanted_poster: 20
+      medical_record: 15
+      kissed_phone_number: 10
+    quantity: 1
+    base_success: 0.4
