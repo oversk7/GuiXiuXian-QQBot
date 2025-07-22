@@ -24,6 +24,7 @@ from . import (
     story,
     log_uid,
     ghost_suppression,
+    backup,
 )
 
 driver = get_driver()

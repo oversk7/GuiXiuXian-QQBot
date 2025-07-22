@@ -33,7 +33,7 @@ async def handle_help(event: MessageEvent, args: Message = CommandArg()):
         "🎮 公会系统  💰 银行系统\n"
         "🔮 炼丹系统  🎮 活动系统\n"
         "💕 社交系统  🏰 副本系统\n"
-        "👻 鬼怪系统\n"
+        "👻 鬼怪系统"
         "═════════════\n"
         "💡 发送/系统名称 查看详细指令，/更新 查看最近更新内容\n"
         "💡 【】括号里是指令，<>里是必填，[]里是选填\n"
@@ -336,7 +336,31 @@ async def handle_ghost_suppression_help(event: MessageEvent, args: Message = Com
     )
     await ghost_suppression_help_cmd.finish(Message(msg))
 
-button_test_cmd = on_command("测试", priority=4, block=True)
+
+# 备份系统
+backup_help_cmd = on_command("备份系统", aliases={"备份帮助"}, priority=4, block=True)
+
+@backup_help_cmd.handle()
+async def handle_backup_help(event: MessageEvent, args: Message = CommandArg()):
+    msg = (
+        "✨ 数据库备份系统帮助 ✨\n"
+        "自动备份游戏数据，确保数据安全（仅限超级用户）\n"
+        "━━━━━━━━━━━━━\n"
+        "🔄 自动备份：每小时自动执行一次\n"
+        "📦 保留策略：只保留最近3个备份文件\n"
+        "📁 备份位置：项目根目录\n"
+        "\n"
+        "🛠️ 管理命令（超级用户专用）：\n"
+        "【手动备份】 立即创建数据库备份\n"
+        "【备份状态】 查看备份文件列表和状态\n"
+        "【恢复备份 <文件名>】 从指定备份恢复数据库\n"
+        "━━━━━━━━━━━━━\n"
+        "⚠️ 恢复操作具有破坏性，请谨慎使用！\n"
+        "💡 备份文件命名格式：game_backup_YYYYMMDD_HHMMSS.db"
+    )
+    await backup_help_cmd.finish(Message(msg))
+
+button_test_cmd = on_command("按钮测试", priority=4, block=True)
 @button_test_cmd.handle()
 async def handle_button_test(event: MessageEvent, args: Message = CommandArg()):
     btn_json = {
