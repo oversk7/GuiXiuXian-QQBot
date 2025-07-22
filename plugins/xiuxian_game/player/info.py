@@ -171,7 +171,7 @@ async def _(event: MessageEvent, state: T_State, args: Message = CommandArg()):
     state["user_id"] = event.get_user_id()
 
 
-@register.got("nickname", prompt="🀄️ 新人指引  ──────────\n✨ 欢迎来到诡修仙世界！\n👤 请输入你的角色昵称：")
+@register.got("nickname", prompt="🀄️ 新人指引  ──────────\n✨ 欢迎来到诡修仙世界！\n👤 请输入你的角色昵称（直接发名字，不要带多余的字，请谨慎对待）：")
 async def _(event: MessageEvent, nickname: str = ArgPlainText()):
     if not nickname.strip():
         await register.reject("⛔ 昵称不能为空，请重新输入")
