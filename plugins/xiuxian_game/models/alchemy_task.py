@@ -25,7 +25,7 @@ class AlchemyRecord(Base):
     qty: Mapped[int] = mapped_column(Integer)  # 炉数
     success_rate: Mapped[float] = mapped_column(Float)  # 成功率
     duration_minutes: Mapped[int] = mapped_column(Integer)  # 总耗时(分钟)
-    materials_used: Mapped[str] = mapped_column(Text, default="{}")  # 使用的材料JSON格式 {"item_id": quantity}
+    materials_used: Mapped[str | None] = mapped_column(Text, nullable=True, default="{}")  # 使用的材料JSON格式 {"item_id": quantity}
 
     # 时间记录
     started_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.now, server_default=func.now())
