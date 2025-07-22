@@ -501,12 +501,6 @@ items:
       type: "GOODS"
       price: 900
 
-    - item_id: "tv"
-      name: "电视"
-      description: "电视"
-      type: "GOODS"
-      price: 1000
-
   # 鬼怪碎片（用于合成完整鬼怪）
   ghost_fragments:
     - item_id: "insurance_man_fragment"

@@ -25,6 +25,7 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
     except ValueError:
         page = 1
     content = AlchemyService.format_recipes(page)
+    content += ("\n⬇️ 【丹方 [页数]】")
     await recipe_cmd.finish(message_add_head(content, event))
 
 
