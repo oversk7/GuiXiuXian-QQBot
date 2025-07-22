@@ -177,9 +177,9 @@ async def _sweep_dungeon(player: Player, cfg: ItemConfig, qty: int, ctx: str) ->
 
     # 获取诡域特产材料
     region_materials = region_config.get("materials", [])
-    # 获取通用材料（排除鬼怪碎片）
+    # 获取通用材料（排除鬼怪碎片和特殊道具如棺材钉）
     common_materials = [mat for mat in config.items_config["by_type"]["MATERIAL"]
-                       if "fragment" not in mat]
+                       if "fragment" not in mat and mat != "coffin_nail"]
 
     # 合并材料池
     all_materials = region_materials + common_materials[:5]  # 限制通用材料数量
