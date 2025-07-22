@@ -122,12 +122,17 @@ async def _gain_exp(player: Player, cfg: ItemConfig, qty: int, ctx: str) -> Tupl
 
 @register(ItemEffectType.SWEEP_DUNGEON)
 async def _sweep_dungeon(player: Player, cfg: ItemConfig, qty: int, ctx: str) -> Tuple[bool, str]:
-    """扫荡当前诡域，获得经验和材料奖励"""
+    """扫荡当前诡域，获得经验和材料奖励
+
+    扫荡逻辑：
+    1. 玩家理智决定能移动的格子数
+    2. 按格子概率分配经验、材料、金币格子
+    3. 单个格子经验取决于区域怪物等级
+    4. 材料受幸运加成影响
+    """
     import random
     from ..config import config
-    from ..models.inventory import ItemInstance
     from ..utils import luck_prob
-    from sqlalchemy.ext.asyncio import AsyncSession
 
     # 检查是否在诡域中
     if player.region == "大都会":
@@ -157,67 +162,97 @@ async def _sweep_dungeon(player: Player, cfg: ItemConfig, qty: int, ctx: str) ->
 
     results = [declaration, ""]
 
-    # 计算奖励（受玩家理智、生命影响）
+    # 计算能移动的格子数
     level_range = region_config["level_range"]
     avg_level = (level_range[0] + level_range[1]) // 2
+    hp_limit = player.hp//(avg_level * 3)
+    total_tiles = min(player.mp,hp_limit) * qty  # 每个扫荡令可探索的格子数等于理智值
 
-    # 基础经验计算（类似正常刷副本）
-    base_exp = random.randint(1, 3) * avg_level * qty
-    # 理智影响经验获得（理智越高，扫荡效率越高）
-    sanity_bonus = 1 + (player.mp / player.max_mp) * 0.5  # 最多1.5倍
-    # 生命影响经验获得（生命越高，扫荡持续时间越长）
-    hp_bonus = 1 + (player.hp / player.max_hp) * 0.3  # 最多1.3倍
+    results.append(f"🗺️ 探索格子共计: {total_tiles}个")
 
-    final_exp = int(base_exp * sanity_bonus * hp_bonus)
-    player.exp += final_exp
-    results.append(f"📚 扫荡获得经验: {final_exp}")
+    # 按世界地图格子概率分配格子类型
+    tile_weights = [15, 5, 75, 5]  # 材料、宝藏、怪物(避开)、休息
+    tile_types = ["MATERIAL", "TREASURE", "EMPTY", "REST"]
 
-    # 材料掉落（基于诡域材料概率和玩家属性）
+    # 分配各类型格子数量
+    material_tiles = tile_weights[0] * total_tiles // 100
+    treasure_tiles = tile_weights[1] * total_tiles // 100
+    monster_tiles = tile_weights[2] * total_tiles // 100
+    rest_tiles = tile_weights[3] * total_tiles // 100
+
+    # 探索经验
+    exploration_exp = monster_tiles * random.randint(1, 4) * avg_level
+    player.exp += exploration_exp
+    results.append(f"📚 探索获得经验: {exploration_exp} (探索格子×{monster_tiles})")
+
+    # 计算材料奖励
     materials_gained = []
+    if material_tiles > 0:
+        # 获取诡域特产材料和通用材料，前7个是通用材料
+        region_materials = region_config.get("materials", [])
+        common_materials = config.items_config["by_type"]["MATERIAL"][:7]
+        all_materials = region_materials + common_materials
 
-    # 获取诡域特产材料
-    region_materials = region_config.get("materials", [])
-    # 获取通用材料（排除鬼怪碎片和特殊道具如棺材钉）
-    common_materials = [mat for mat in config.items_config["by_type"]["MATERIAL"]
-                       if "fragment" not in mat and mat != "coffin_nail"]
+        if all_materials:
+            for _ in range(material_tiles):
+                # 优先掉落区域特产
+                if region_materials and random.random() < 0.7:
+                    material_id = random.choice(region_materials)
+                else:
+                    material_id = random.choice(all_materials)
 
-    # 合并材料池
-    all_materials = region_materials + common_materials[:5]  # 限制通用材料数量
+                # 基础数量1-3个
+                base_quantity = random.randint(1, 3)
 
-    if all_materials:
-        # 扫荡可能获得多种材料
-        material_count = random.randint(1, min(3, len(all_materials))) * qty
+                # 幸运加成
+                if random.random() < luck_prob(player.luck):
+                    base_quantity = int(base_quantity * 1.5)  # 幸运1.5倍
 
-        for _ in range(material_count):
-            # 优先掉落区域特产
-            if region_materials and random.random() < 0.7:
-                material_id = random.choice(region_materials)
-            else:
-                material_id = random.choice(all_materials)
+                materials_gained.append((material_id, base_quantity))
 
-            # 数量受幸运值影响
-            base_quantity = random.randint(1, 2)
+    # 计算金币奖励（来自宝藏格子）
+    total_gold = 0
+    if treasure_tiles > 0:
+        for _ in range(treasure_tiles):
+            # 单个宝藏格子金币
+            base_gold = random.randint(50, 200)
+            # 幸运加成
             if random.random() < luck_prob(player.luck):
-                base_quantity *= 2  # 幸运翻倍
+                base_gold = int(base_gold * 1.3)  # 幸运1.3倍
+            total_gold += base_gold
 
-            materials_gained.append((material_id, base_quantity))
+        player.gold += total_gold
+        results.append(f"💰 发现宝藏获得金币: {total_gold} (宝藏格子×{treasure_tiles})")
 
-    # 添加材料到背包
+    # 处理材料奖励 - 合并相同材料
     if materials_gained:
-        # 需要获取session来添加物品，这里需要特殊处理
-        # 由于这是在effect处理器中，我们返回特殊标记让调用方处理
-        material_info = []
+        # 合并相同材料的数量
+        material_summary = {}
         for material_id, quantity in materials_gained:
+            if material_id in material_summary:
+                material_summary[material_id] += quantity
+            else:
+                material_summary[material_id] = quantity
+
+        # 生成显示信息
+        material_info = []
+        merged_materials = []
+        for material_id, total_quantity in material_summary.items():
             item_config = config.items_config["by_id"].get(material_id)
             if item_config:
-                material_info.append(f"{item_config.name} ✖️{quantity}")
+                material_info.append(f"{item_config.name} ✖️{total_quantity}")
+                merged_materials.append((material_id, total_quantity))
 
         if material_info:
-            results.append(f"💎 扫荡获得材料: {', '.join(material_info)}")
-            # 将材料信息存储到player的临时属性中，供调用方处理
+            results.append(f"💎 采集材料: {', '.join(material_info)} (材料格子×{material_tiles})")
+            # 将合并后的材料信息存储到player的临时属性中，供调用方处理
             if not hasattr(player, '_sweep_materials'):
                 player._sweep_materials = []
-            player._sweep_materials.extend(materials_gained)
+            player._sweep_materials.extend(merged_materials)
+
+    # 休息格子只展示数量，因为扫荡本就不耗状态
+    if rest_tiles > 0:
+        results.append(f"🛌 (遇到驿站×{rest_tiles}次)")
 
     results.append(f"⚡ 消耗咒抗: {qty} (剩余: {player.stamina})")
 

@@ -76,6 +76,13 @@ items:
       effect_type: "SWEEP_DUNGEON"
       price: 100000
 
+    - item_id: "coffin_nail"
+      name: "棺材钉"
+      description: "锈迹斑斑的铁钉，由上世纪驭鬼者所制，可以大幅度压制灵异力量。持有越多，闭关效率越高 ⚰️"
+      type: "CONSUMABLE"
+      price: 100000
+      grudge_value: 1
+
   materials:  # 材料类
     - item_id: "rotten_core"
       name: "腐坏的内丹"
@@ -147,21 +154,12 @@ items:
       price: 5
       grudge_value: 80
 
-    # ---- 东岗水库特产 ----
     - item_id: "drowned_scale"
       name: "溺水者"
       description: "姐姐把石头绑在了我的腿上，身体在下沉，我看见水库里面有很多黑乎乎的水草"
       type: "MATERIAL"
       price: 220
       grudge_value: 8
-
-    # ---- 闭关特殊材料 ----
-    - item_id: "coffin_nail"
-      name: "棺材钉"
-      description: "锈迹斑斑的铁钉，由上世纪驭鬼者所制，可以大幅度压制灵异力量。持有越多，闭关效率越高 ⚰️"
-      type: "MATERIAL"
-      price: 100000
-      grudge_value: 1
 
   equipment:
     - item_id: "swim_coat"
@@ -466,41 +464,41 @@ items:
     - item_id: "insurance_man_fragment"
       name: "保险鬼的投影"
       description: "幸福人寿保险员工留下的怨念碎片 📺✨"
-      type: "MATERIAL"
+      type: "GHOST_FRAGMENT"
       price: 200000
       grudge_value: 10
 
     - item_id: "black_dog_fragment"
       name: "黑犬的投影"
       description: "黑犬留下的怨念碎片 🐶💉"
-      type: "MATERIAL"
+      type: "GHOST_FRAGMENT"
       price: 200000
       grudge_value: 10
 
     - item_id: "wang_mei_fragment"
       name: "王梅的投影"
       description: "王梅留下的怨念碎片🧠💊"
-      type: "MATERIAL"
+      type: "GHOST_FRAGMENT"
       price: 200000
       grudge_value: 10
 
     - item_id: "he_bei_bei_fragment"
       name: "何贝贝的投影"
       description: "何贝贝留下的怨念碎片🔍💫"
-      type: "MATERIAL"
+      type: "GHOST_FRAGMENT"
       price: 200000
       grudge_value: 10
 
     - item_id: "se_gui_fragment"
       name: "色鬼的投影"
       description: "色鬼留下的怨念碎片 💣🔍"
-      type: "MATERIAL"
+      type: "GHOST_FRAGMENT"
       price: 200000
       grudge_value: 10
     
     - item_id: "geng_gui_fragment"
       name: "耿鬼的投影"
       description: "耿鬼留下的怨念碎片 🪓👻"
-      type: "MATERIAL"
+      type: "GHOST_FRAGMENT"
       price: 200000
       grudge_value: 10

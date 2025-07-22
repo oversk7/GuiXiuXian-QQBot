@@ -65,6 +65,7 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
         "MATERIAL": "材料",
         "EQUIPMENT": "装备",
         "GOODS": "商品",
+        "GHOST_FRAGMENT": "鬼怪投影"
     }
 
     lines = ["📖 图鉴查询结果 ✨", "━━━━━━━━━━"]

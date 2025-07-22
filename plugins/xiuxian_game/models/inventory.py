@@ -15,6 +15,7 @@ class ItemType(str,PyEnum):
     MATERIAL = "MATERIAL"
     EQUIPMENT = "EQUIPMENT"
     GOODS = "GOODS"
+    GHOST_FRAGMENT = "GHOST_FRAGMENT"
 
 class ItemEffectType(str, PyEnum):
     RESTORE_HP = "RESTORE_HP"

@@ -69,6 +69,7 @@ CATEGORY_MAPPING = {
     "商品": "GOODS",
     "装备": "EQUIPMENT",
     "丹药": "ELIXIR",  # 特殊标记，实质为 CONSUMABLE 下的一类
+    "鬼怪碎片": "GHOST_FRAGMENT",
 }
 
 # 默认展示顺序（决定排序权重）
@@ -78,6 +79,7 @@ CATEGORY_ORDER = [
     "GOODS",
     "ELIXIR",                # 丹药（item_id 以 _elixir 结尾）
     "EQUIPMENT",
+    "GHOST_FRAGMENT",        # 鬼怪碎片
 ]
 
 @use_item.handle()
