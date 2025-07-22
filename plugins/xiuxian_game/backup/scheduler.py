@@ -13,6 +13,12 @@ driver = get_driver()
 async def setup_backup_scheduler():
     """设置数据库备份定时任务"""
     try:
+        # 检查任务是否已存在，避免重复设置
+        existing_job = scheduler.get_job("database_backup")
+        if existing_job:
+            logger.info("⚠️ 数据库备份定时任务已存在，跳过设置")
+            return
+
         # 添加每小时执行一次的备份任务
         scheduler.add_job(
             func=perform_backup,
@@ -23,12 +29,13 @@ async def setup_backup_scheduler():
             max_instances=1,  # 最多同时运行1个实例
             coalesce=True,  # 如果有多个任务堆积，只执行最新的一个
         )
-        
+
         logger.info("✅ 数据库备份定时任务已设置 - 每小时执行一次")
-        
-        # 启动时立即执行一次备份
-        perform_backup()
-        
+
+        # 移除启动时立即执行备份，避免频繁备份
+        # 如果需要立即备份，可以使用【手动备份】命令
+        logger.info("💡 如需立即备份，请使用【手动备份】命令")
+
     except Exception as e:
         logger.error(f"❌ 设置数据库备份定时任务失败: {e}")
 
