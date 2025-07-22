@@ -195,8 +195,8 @@ async def _sweep_dungeon(player: Player, cfg: ItemConfig, qty: int, ctx: str) ->
 
         if all_materials:
             for _ in range(material_tiles):
-                # 优先掉落区域特产
-                if region_materials and random.random() < 0.7:
+                # 平衡掉落区域特产和通用材料
+                if region_materials and random.random() < 0.4:
                     material_id = random.choice(region_materials)
                 else:
                     material_id = random.choice(all_materials)
