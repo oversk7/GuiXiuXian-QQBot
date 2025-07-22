@@ -2,9 +2,9 @@ elixirs:
   spirit_pill:
     produce_item_id: "spirit_elixir"
     materials:
-      spirit_bone: 20
+      rotten_core: 20
       yin_essence: 8
-      drowned_scale: 10
+      drowned_scale: 5
     quantity: 1
     base_success: 0.9
 
