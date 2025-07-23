@@ -115,105 +115,113 @@ class TicTacToeGame:
 @tic_tac_toe.handle()
 async def handle_tic_tac_toe(event: MessageEvent, args: Message = CommandArg()):
     """处理井字棋游戏"""
+    # 先获取玩家信息，然后立即释放数据库连接
     async with safe_session() as session:
-        # 获取玩家信息
         player = await session.get(Player, event.get_user_id())
         if not player:
             await tic_tac_toe.finish("⛔ 请先创建角色")
 
-        args_text = args.extract_plain_text().strip()
-        
-        # 如果没有参数，显示游戏说明
-        if not args_text:
-            help_msg = (
-                "🎮 井字棋游戏\n"
-                "━━━━━━━━━━━━━\n"
-                "🎯 游戏规则：\n"
-                "▫️ 你是 ❌，AI是 ⭕\n"
-                "▫️ 三个相同符号连成一线即获胜\n"
-                "▫️ 胜利奖励100~300💰，失败扣除50💰\n"
-                "▫️ 平局不扣除金币\n"
-                "━━━━━━━━━━━━━\n"
-                "📝 使用方法：\n"
-                "▫️ 【井字棋 开始】 - 开始新游戏\n"
-                "▫️ 【井字棋 [1-9]】 - 选择位置下棋\n"
-                "▫️ 【井字棋 放弃】 - 放弃当前游戏\n"
-                "━━━━━━━━━━━━━\n"
-                "💡 位置编号参考：\n"
-                "┃  1️⃣  ┃  2️⃣  ┃  3️⃣  ┃\n"
-                "┃  4️⃣  ┃  5️⃣  ┃  6️⃣  ┃\n"
-                "┃  7️⃣  ┃  8️⃣  ┃  9️⃣  ┃\n"
-                "━━━━━━━━━━━━━\n"
-            )
-            await tic_tac_toe.finish(message_add_head(help_msg, event))
-        
-        # 检查金币（失败时需要扣除50金币）
-        if player.gold < 50:
-            await tic_tac_toe.finish("❌ 金币不足！需要至少50💰才能开始游戏")
+        # 复制玩家信息，避免会话关闭后无法访问
+        player_gold = player.gold
 
-        user_id = event.get_user_id()
+    args_text = args.extract_plain_text().strip()
 
-        # 开始新游戏
-        if args_text == "开始":
-            game = TicTacToeGame()
-            game_sessions[user_id] = game
+    # 如果没有参数，显示游戏说明
+    if not args_text:
+        help_msg = (
+            "🎮 井字棋游戏\n"
+            "━━━━━━━━━━━━━\n"
+            "🎯 游戏规则：\n"
+            "▫️ 你是 ❌，AI是 ⭕\n"
+            "▫️ 三个相同符号连成一线即获胜\n"
+            "▫️ 胜利奖励100~300💰，失败扣除50💰\n"
+            "▫️ 平局不扣除金币\n"
+            "━━━━━━━━━━━━━\n"
+            "📝 使用方法：\n"
+            "▫️ 【井字棋 开始】 - 开始新游戏\n"
+            "▫️ 【井字棋 [1-9]】 - 选择位置下棋\n"
+            "▫️ 【井字棋 放弃】 - 放弃当前游戏\n"
+            "━━━━━━━━━━━━━\n"
+            "💡 位置编号参考：\n"
+            "┃  1️⃣  ┃  2️⃣  ┃  3️⃣  ┃\n"
+            "┃  4️⃣  ┃  5️⃣  ┃  6️⃣  ┃\n"
+            "┃  7️⃣  ┃  8️⃣  ┃  9️⃣  ┃\n"
+            "━━━━━━━━━━━━━\n"
+        )
+        await tic_tac_toe.finish(message_add_head(help_msg, event))
 
-            result_msg = (
-                "🎮 井字棋游戏开始！\n"
-                "━━━━━━━━━━━━━\n"
-                f"{game.display_board()}\n"
-                "━━━━━━━━━━━━━\n"
-                "💡 你是 ❌，请选择位置 1-9\n"
-                "📝 使用：井字棋 [数字] 下棋"
-            )
-            await tic_tac_toe.finish(message_add_head(result_msg, event))
+    # 检查金币（失败时需要扣除50金币）
+    if player_gold < 50:
+        await tic_tac_toe.finish("❌ 金币不足！需要至少50💰才能开始游戏")
 
-        # 处理放弃游戏
-        if args_text == "放弃":
-            if user_id in game_sessions:
-                del game_sessions[user_id]
-                await tic_tac_toe.finish(message_add_head("🏳️ 已放弃当前游戏", event))
-            else:
-                await tic_tac_toe.finish(message_add_head("❌ 没有进行中的游戏", event))
+    user_id = event.get_user_id()
 
-        # 处理下棋
-        try:
-            position = int(args_text)
-            if position < 1 or position > 9:
-                raise ValueError
-        except ValueError:
-            await tic_tac_toe.finish("⚠️ 请输入 1-9 的数字选择位置")
+    # 开始新游戏
+    if args_text == "开始":
+        game = TicTacToeGame()
+        game_sessions[user_id] = game
 
-        # 获取当前游戏状态
-        if user_id not in game_sessions:
-            await tic_tac_toe.finish("❌ 没有进行中的游戏，请先使用 '井字棋 开始' 开始新游戏")
+        result_msg = (
+            "🎮 井字棋游戏开始！\n"
+            "━━━━━━━━━━━━━\n"
+            f"{game.display_board()}\n"
+            "━━━━━━━━━━━━━\n"
+            "💡 你是 ❌，请选择位置 1-9\n"
+            "📝 使用：井字棋 [数字] 下棋"
+        )
+        await tic_tac_toe.finish(message_add_head(result_msg, event))
 
-        game = game_sessions[user_id]
-        
-        # 玩家下棋
-        if not game.make_move(position, 1):
-            await tic_tac_toe.finish("❌ 该位置已被占用，请选择其他位置")
-        
-        # 检查玩家是否获胜
-        winner = game.check_winner()
-        if winner == 1:
-            gold_gain = random.randint(100, 300)
+    # 处理放弃游戏
+    if args_text == "放弃":
+        if user_id in game_sessions:
+            del game_sessions[user_id]
+            await tic_tac_toe.finish(message_add_head("🏳️ 已放弃当前游戏", event))
+        else:
+            await tic_tac_toe.finish(message_add_head("❌ 没有进行中的游戏", event))
+
+    # 处理下棋
+    try:
+        position = int(args_text)
+        if position < 1 or position > 9:
+            raise ValueError
+    except ValueError:
+        await tic_tac_toe.finish("⚠️ 请输入 1-9 的数字选择位置")
+
+    # 获取当前游戏状态
+    if user_id not in game_sessions:
+        await tic_tac_toe.finish("❌ 没有进行中的游戏，请先使用 '井字棋 开始' 开始新游戏")
+
+    game = game_sessions[user_id]
+
+    # 玩家下棋
+    if not game.make_move(position, 1):
+        await tic_tac_toe.finish("❌ 该位置已被占用，请选择其他位置")
+
+    # 检查玩家是否获胜
+    winner = game.check_winner()
+    if winner == 1:
+        gold_gain = random.randint(100, 300)
+
+        # 只在需要时使用数据库会话
+        async with safe_session() as session:
+            player = await session.get(Player, event.get_user_id())
             player.gold += gold_gain
             session.add(player)
             await session.commit()
+            new_gold = player.gold
 
-            # 清除游戏状态
-            del game_sessions[user_id]
+        # 清除游戏状态
+        del game_sessions[user_id]
 
-            result_msg = (
-                "🎉 恭喜获胜！\n"
-                "━━━━━━━━━━━━━\n"
-                f"{game.display_board()}\n"
-                "━━━━━━━━━━━━━\n"
-                f"✨ 奖励：+{gold_gain}💰\n"
-                f"💰 当前金币：{player.gold}"
-            )
-            await tic_tac_toe.finish(message_add_head(result_msg, event))
+        result_msg = (
+            "🎉 恭喜获胜！\n"
+            "━━━━━━━━━━━━━\n"
+            f"{game.display_board()}\n"
+            "━━━━━━━━━━━━━\n"
+            f"✨ 奖励：+{gold_gain}💰\n"
+            f"💰 当前金币：{new_gold}"
+        )
+        await tic_tac_toe.finish(message_add_head(result_msg, event))
         
         if winner == 3:
             # 清除游戏状态
@@ -227,53 +235,57 @@ async def handle_tic_tac_toe(event: MessageEvent, args: Message = CommandArg()):
                 "💰 金币无变化"
             )
             await tic_tac_toe.finish(message_add_head(result_msg, event))
-        
-        # AI下棋
-        ai_position = game.ai_move()
-        game.make_move(ai_position, 2)
-        
-        # 检查AI是否获胜
-        winner = game.check_winner()
-        if winner == 2:
+
+    # AI下棋
+    ai_position = game.ai_move()
+    game.make_move(ai_position, 2)
+
+    # 检查AI是否获胜
+    winner = game.check_winner()
+    if winner == 2:
+        # 只在需要时使用数据库会话
+        async with safe_session() as session:
+            player = await session.get(Player, event.get_user_id())
             player.gold -= 50
             session.add(player)
             await session.commit()
+            new_gold = player.gold
 
-            # 清除游戏状态
-            del game_sessions[user_id]
+        # 清除游戏状态
+        del game_sessions[user_id]
 
-            result_msg = (
-                "💔 AI获胜！\n"
-                "━━━━━━━━━━━━━\n"
-                f"{game.display_board()}\n"
-                "━━━━━━━━━━━━━\n"
-                f"💸 扣除：-50💰 (AI选择了位置{ai_position})\n"
-                f"💰 当前金币：{player.gold}"
-            )
-            await tic_tac_toe.finish(message_add_head(result_msg, event))
-        
-        if winner == 3:
-            # 清除游戏状态
-            del game_sessions[user_id]
-
-            result_msg = (
-                "🤝 平局！\n"
-                "━━━━━━━━━━━━━\n"
-                f"{game.display_board()}\n"
-                "━━━━━━━━━━━━━\n"
-                f"🤖 AI选择了位置{ai_position}\n"
-                "💰 金币无变化"
-            )
-            await tic_tac_toe.finish(message_add_head(result_msg, event))
-        
-        # 游戏继续
         result_msg = (
-            "🎮 游戏继续\n"
+            "💔 AI获胜！\n"
+            "━━━━━━━━━━━━━\n"
+            f"{game.display_board()}\n"
+            "━━━━━━━━━━━━━\n"
+            f"💸 扣除：-50💰 (AI选择了位置{ai_position})\n"
+            f"💰 当前金币：{new_gold}"
+        )
+        await tic_tac_toe.finish(message_add_head(result_msg, event))
+        
+    if winner == 3:
+        # 清除游戏状态
+        del game_sessions[user_id]
+
+        result_msg = (
+            "🤝 平局！\n"
             "━━━━━━━━━━━━━\n"
             f"{game.display_board()}\n"
             "━━━━━━━━━━━━━\n"
             f"🤖 AI选择了位置{ai_position}\n"
-            "💡 轮到你了，请选择位置 1-9\n"
-            "📝 使用：井字棋 [数字] 下棋"
+            "💰 金币无变化"
         )
         await tic_tac_toe.finish(message_add_head(result_msg, event))
+
+    # 游戏继续
+    result_msg = (
+        "🎮 游戏继续\n"
+        "━━━━━━━━━━━━━\n"
+        f"{game.display_board()}\n"
+        "━━━━━━━━━━━━━\n"
+        f"🤖 AI选择了位置{ai_position}\n"
+        "💡 轮到你了，请选择位置 1-9\n"
+        "📝 使用：井字棋 [数字] 下棋"
+    )
+    await tic_tac_toe.finish(message_add_head(result_msg, event))
