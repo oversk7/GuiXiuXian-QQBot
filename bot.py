@@ -3,7 +3,7 @@ from nonebot.adapters.qq import Adapter
 from nonebot import logger
 
 # 添加日志文件输出
-logger.add("logs/command_log.txt", level="INFO", rotation="1 day", retention="30 days", encoding="utf-8")
+logger.add("logs/command_log.txt", level="INFO", rotation="12h", retention="3 days", encoding="utf-8")
 
 nonebot.init()
 
