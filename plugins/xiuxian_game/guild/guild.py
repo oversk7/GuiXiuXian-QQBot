@@ -10,10 +10,11 @@ from ..models.inventory import ItemInstance
 from ..models.guild import Guild
 from ..config import config
 from ..utils import message_add_head
-from ..models.guild_application import GuildApplication as _GA
+from ..models.social_application import SocialApplication, ApplicationType, ApplicationStatus
 from ..models.donation_log import PlayerDonationLog
 from ..models.guild_teleport_log import GuildTeleportLog
 from ..models.navigation_task import NavigationTask
+from .guild_application_service import GuildApplicationService
 
 # ===== 工具函数 =====
 # 翻译大数字为 w（万）单位，保留 1 位小数，10w 以下不显示 w
@@ -166,33 +167,17 @@ async def handle_join_guild(event: MessageEvent, args: Message = CommandArg()):
         player = await session.get(Player, event.get_user_id())
         if not player:
             await join_guild_cmd.finish("⛔ 请先创建角色")
-        if player.guild_id is not None:
-            await join_guild_cmd.finish("⛔ 你已经加入公会，无法再次加入")
 
+        # 检查是否可以申请加入公会
+        can_apply, reason = await GuildApplicationService.can_apply_guild(session, player.id, guild_id)
+        if not can_apply:
+            await join_guild_cmd.finish(f"⛔ {reason}")
+
+        # 获取公会信息
         guild_obj = await session.get(Guild, guild_id)
-        if not guild_obj:
-            await join_guild_cmd.finish("⛔ 未找到该公会")
-
-        # 容量计算函数
-        def _capacity(lv: int) -> int:
-            return 10 + (lv - 1) * 5
-
-        # 是否已申请
-        exist_app = (await session.execute(
-            select(_GA).where(_GA.player_id == player.id, _GA.guild_id == guild_obj.id, _GA.status == "PENDING")
-        )).scalars().first()
-        if exist_app:
-            await join_guild_cmd.finish("⚠️ 你已提交申请，请等待会长审核")
-
-        # 容量预检查：如果已满，拒绝申请
-        member_cnt = (await session.execute(select(_func.count(Player.id)).where(Player.guild_id == guild_obj.id))).scalar_one()
-        if member_cnt >= _capacity(guild_obj.level):
-            await join_guild_cmd.finish("⛔ 该公会人数已满，无法申请")
 
         # 创建申请记录
-        app = _GA(guild_id=guild_obj.id, player_id=player.id)
-        session.add(app)
-        await session.commit()
+        await GuildApplicationService.create_guild_application(session, player.id, guild_id)
 
         await join_guild_cmd.finish(message_add_head(f"✅ 已向『{guild_obj.name}』提交入会申请，等待审核", event))
 
@@ -440,15 +425,13 @@ async def handle_app_list(event: MessageEvent):
         if guild_obj.president_id != player.id:
             await application_list_cmd.finish("⛔ 只有会长可查看申请列表")
 
-        apps = (await session.execute(
-            select(_GA).where(_GA.guild_id == guild_obj.id, _GA.status == "PENDING")
-        )).scalars().all()
+        apps = await GuildApplicationService.get_pending_applications(session, guild_obj.id)
         if not apps:
             await application_list_cmd.finish("暂无待处理申请")
 
         lines = ["📑 待处理入会申请", "━━━━━━━━━━"]
         for a in apps:
-            applicant = await session.get(Player, a.player_id)
+            applicant = await session.get(Player, a.applicant_id)
             lines.append(f"UID:{applicant.uid} {applicant.nickname} Lv.{applicant.level} 贡献:{applicant.guild_contribution}")
         await application_list_cmd.finish(message_add_head("\n".join(lines), event))
 
@@ -477,42 +460,19 @@ async def _process_application(event: MessageEvent, args: Message, approve: bool
         if not applicant:
             await (approve_cmd if approve else reject_cmd).finish("⛔ 未找到该 UID")
 
-        app = (await session.execute(
-            select(_GA).where(_GA.guild_id == guild_obj.id, _GA.player_id == applicant.id, _GA.status == "PENDING")
-        )).scalars().first()
+        app = await GuildApplicationService.get_application_by_player_and_guild(session, applicant.id, guild_obj.id)
         if not app:
             await (approve_cmd if approve else reject_cmd).finish("⛔ 无待处理申请")
 
         if approve:
-            # 若申请人已加入其他公会，则不能同意
-            if applicant.guild_id is not None and applicant.guild_id != guild_obj.id:
-                app.status = "REJECTED"
-                session.add(app)
-                await session.commit()
-                await (approve_cmd if approve else reject_cmd).finish(message_add_head("⛔ 该玩家已加入其他公会，无法同意", event))
-
-            # 容量检查
-            def _capacity(lv:int):
-                return 10 + (lv - 1) * 5
-            cnt = (await session.execute(select(_func.count(Player.id)).where(Player.guild_id == guild_obj.id))).scalar_one()
-            if cnt >= _capacity(guild_obj.level):
-                await (approve_cmd if approve else reject_cmd).finish("⛔ 公会人数已满，无法同意")
-            applicant.guild_id = guild_obj.id
-            app.status = "APPROVED"
-
-            # 将该玩家其他待处理申请全部标记为 REJECTED
-            await session.execute(
-                _GA.__table__.update()
-                .where(_GA.player_id == applicant.id, _GA.status == "PENDING", _GA.id != app.id)
-                .values(status="REJECTED")
-            )
-
+            success, reason = await GuildApplicationService.approve_application(session, app, guild_obj)
+            if not success:
+                await (approve_cmd if approve else reject_cmd).finish(message_add_head(f"⛔ {reason}", event))
             result_msg = f"✅ 已同意 {applicant.nickname}[UID:{target_uid}] 加入公会"
         else:
-            app.status = "REJECTED"
+            await GuildApplicationService.reject_application(session, app)
             result_msg = f"🚫 已拒绝 {applicant.nickname}[UID:{target_uid}] 的申请"
-        session.add_all([app, applicant])
-        await session.commit()
+
         await (approve_cmd if approve else reject_cmd).finish(message_add_head(result_msg, event))
 
 @approve_cmd.handle()

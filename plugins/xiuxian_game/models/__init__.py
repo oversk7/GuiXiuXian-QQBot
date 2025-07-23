@@ -3,7 +3,6 @@ from .inventory import ItemInstance
 from .navigation_task import NavigationTask
 from .world_tile import WorldTile
 from .guild import Guild
-from .guild_application import GuildApplication
 from .world_message import WorldMessage
 from .bank_account import BankAccount
 from .alchemy_task import AlchemyRecord
@@ -22,7 +21,7 @@ from .ghost_invasion import GhostInvasion
 from .player_ghost import PlayerGhost
 
 __all__ = [
-    "Player", "Guild", "GuildApplication", "WorldMessage", "BankAccount", "ItemInstance", "WorldTile", "NavigationTask", "AlchemyRecord", "MarketOrder",
+    "Player", "Guild", "WorldMessage", "BankAccount", "ItemInstance", "WorldTile", "NavigationTask", "AlchemyRecord", "MarketOrder",
     "Marriage", "Mentorship", "SocialApplication", "GiftRecord", "StorySession", "PlayerDonationLog", "ElixirUsageLog", "GuildTeleportLog",
     "GhostInvasion", "PlayerGhost"
 ]

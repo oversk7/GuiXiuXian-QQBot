@@ -9,6 +9,7 @@ class ApplicationType(str, PyEnum):
     """申请类型"""
     MARRIAGE = "marriage"  # 求婚申请
     MENTORSHIP = "mentorship"  # 拜师申请
+    GUILD_JOIN = "guild_join"  # 公会入会申请
 
 
 class ApplicationStatus(str, PyEnum):
@@ -19,12 +20,13 @@ class ApplicationStatus(str, PyEnum):
 
 
 class SocialApplication(Base):
-    """社交申请记录表（求婚、拜师等）"""
+    """社交申请记录表（求婚、拜师、公会入会等）"""
     __tablename__ = "social_application"
-    
+
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
     applicant_id: Mapped[str] = mapped_column(String(32), index=True, comment="申请人 ID")
     target_id: Mapped[str] = mapped_column(String(32), index=True, comment="目标玩家 ID")
+    guild_id: Mapped[int | None] = mapped_column(Integer, nullable=True, index=True, comment="公会 ID（仅公会申请使用）")
     application_type: Mapped[ApplicationType] = mapped_column(String(16), index=True, comment="申请类型")
     status: Mapped[ApplicationStatus] = mapped_column(String(16), default=ApplicationStatus.PENDING, server_default='pending', comment="申请状态")
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.now, server_default=func.now(), comment="申请时间")
