@@ -107,7 +107,7 @@ async def handle_player(event: MessageEvent, args: Message = CommandArg()):
         "【改名 <新名字>】 改名\n"
         "【改性别 <男/女>】 修改角色性别\n"
         "━━━━━━━━━━━━━\n"
-        "💡 新手注册：直接发送【注册】，系统会引导你输入昵称\n"
+        "💡 新手注册：发送【注册】，系统会引导你输入昵称\n"
         "💡 快速注册：发送【注册 昵称】，如：注册 道爷"
     )
     await player_cmd.finish(Message(msg))

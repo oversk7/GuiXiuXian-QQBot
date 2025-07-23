@@ -163,9 +163,27 @@ async def _(event: MessageEvent, state: T_State, args: Message = CommandArg()):
 
     # 如果直接提供了昵称，直接创建角色（默认性别为男）
     if nickname:
-        # 直接创建角色，默认性别为男
-        result = await create_player(event, nickname, Gender.MALE)
-        await register.finish(message_add_head(result, event))
+        # 清理可能的误输入
+        cleaned_nickname = _clean_nickname_input(nickname)
+
+        # 检查清理后的昵称是否有效
+        if not cleaned_nickname or len(cleaned_nickname) < 2:
+            await register.finish(
+                "⛔ 昵称格式错误\n"
+                "💡 正确格式：/注册 [昵称] 或直接发送 /注册 然后按提示输入\n"
+                "📝 例如：/注册 张三\n"
+                "⚠️ 昵称长度至少2个字符"
+            )
+
+        # 如果清理了输入，给出提示
+        if cleaned_nickname != nickname:
+            result = await create_player(event, cleaned_nickname, Gender.MALE)
+            success_msg = f"✅ 已自动识别并清理输入，你的角色昵称为：{cleaned_nickname}\n{result}"
+            await register.finish(message_add_head(success_msg, event))
+        else:
+            # 正常情况，直接创建角色
+            result = await create_player(event, cleaned_nickname, Gender.MALE)
+            await register.finish(message_add_head(result, event))
 
     # 开始分步注册流程，保存用户ID到状态中
     state["user_id"] = event.get_user_id()
@@ -173,12 +191,62 @@ async def _(event: MessageEvent, state: T_State, args: Message = CommandArg()):
 
 @register.got("nickname", prompt="🀄️ 新人指引  ──────────\n✨ 欢迎来到诡修仙世界！\n👤 请输入你的角色昵称（直接发名字，不要带多余的字，请谨慎对待）：")
 async def _(event: MessageEvent, nickname: str = ArgPlainText()):
-    if not nickname.strip():
+    nickname = nickname.strip()
+
+    if not nickname:
         await register.reject("⛔ 昵称不能为空，请重新输入")
 
-    # 创建角色，默认性别为男
-    result = await create_player(event, nickname.strip(), Gender.MALE)
+    # 检查并处理常见的误输入情况
+    cleaned_nickname = _clean_nickname_input(nickname)
+    if cleaned_nickname != nickname:
+        # 如果清理后的昵称为空或过短，提示重新输入
+        if not cleaned_nickname or len(cleaned_nickname) < 2:
+            await register.reject(
+                "⛔ 检测到你可能误输入了指令前缀\n"
+                "💡 请只输入角色昵称，不要包含 /注册 等指令前缀\n"
+                "📝 例如：直接输入「张三」而不是「/注册 张三」\n"
+                "🔄 请重新输入你的角色昵称："
+            )
+        else:
+            # 提示用户我们已经自动清理了输入
+            result = await create_player(event, cleaned_nickname, Gender.MALE)
+            success_msg = f"✅ 已自动识别并清理输入，你的角色昵称为：{cleaned_nickname}\n{result}"
+            await register.finish(message_add_head(success_msg, event))
+
+    # 正常情况，直接创建角色
+    result = await create_player(event, nickname, Gender.MALE)
     await register.finish(message_add_head(result, event))
+
+
+def _clean_nickname_input(nickname: str) -> str:
+    """清理昵称输入，移除常见的误输入前缀"""
+    nickname = nickname.strip()
+
+    # 常见的误输入模式
+    patterns_to_remove = [
+        "/注册",
+        "注册",
+        "/修炼系统",
+        "/世界系统",
+        "/帮助",
+        "/面板",
+        "/修炼"
+    ]
+
+    # 移除这些前缀（不区分大小写）
+    for pattern in patterns_to_remove:
+        if nickname.lower().startswith(pattern.lower()):
+            nickname = nickname[len(pattern):].strip()
+            break
+
+    # 移除可能的分隔符
+    separators = [" ", "　", "\t", "-", "_", ":", "：", "|", "｜"]
+    for sep in separators:
+        if nickname.startswith(sep):
+            nickname = nickname[1:].strip()
+            break
+
+    return nickname
 
 
 async def create_player(event: MessageEvent, nickname: str, gender: Gender) -> str:
