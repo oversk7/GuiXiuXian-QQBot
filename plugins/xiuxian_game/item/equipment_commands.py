@@ -188,7 +188,6 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
         # 检查是否为炼丹炉，如果是则处理进行中的炼丹任务
         from ..alchemy.service import AlchemyService
         from ..models.alchemy_task import AlchemyRecord
-        from ..models.inventory import ItemInstance
 
         furnace_ids = list(AlchemyService.FURNACE_QUALITIES.keys())
         failed_tasks = []  # 初始化失败任务列表
