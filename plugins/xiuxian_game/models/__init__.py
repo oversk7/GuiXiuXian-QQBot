@@ -23,5 +23,5 @@ from .player_ghost import PlayerGhost
 __all__ = [
     "Player", "Guild", "WorldMessage", "BankAccount", "ItemInstance", "WorldTile", "NavigationTask", "AlchemyRecord", "MarketOrder",
     "Marriage", "Mentorship", "SocialApplication", "GiftRecord", "StorySession", "PlayerDonationLog", "ElixirUsageLog", "GuildTeleportLog",
-    "GhostInvasion", "PlayerGhost"
+    "MonthlyCard", "GhostInvasion", "PlayerGhost"
 ]

@@ -3,7 +3,6 @@ from sqlalchemy.orm import Mapped, mapped_column, relationship
 from datetime import datetime
 from .db import Base
 from enum import Enum as PyEnum
-from .monthly_card import MonthlyCard
 
 
 class Gender(str, PyEnum):

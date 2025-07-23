@@ -1,7 +1,6 @@
 from sqlalchemy import String, Integer, DateTime, ForeignKey, Enum as SQLEnum
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from .db import Base
-from .player import Player
 from enum import Enum as PyEnum
 from datetime import datetime, timedelta
 from sqlalchemy.sql import func
