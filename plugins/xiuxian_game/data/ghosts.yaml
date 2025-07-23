@@ -31,7 +31,7 @@ ghosts:
     rarity: "common"
 
   - ghost_id: "wang_mei"
-    name: "王梅"
+    name: "变形鬼"
     description: "她患有一种精神疾病，越是狭小的空间，越能带给她安全感。她的死因是个迷，警察在桌子下面一个木盒当中发现了她的尸体，没人知道她是怎么进去的，现场没有检测到除她之外第二个人的指纹，特殊能力为变形。"
     hp: 750
     attack: 70
@@ -46,7 +46,7 @@ ghosts:
     rarity: "rare"
 
   - ghost_id: "he_bei_bei"
-    name: "何贝贝"
+    name: "透视鬼"
     description: "被小区里高空坠落的水杯砸中脑袋，不幸身亡，怨气很重，苦于无法找到杀害自己的元凶，只能躲在杯子下面，当人喝水时，她会从被子底部观察那人，特殊能力为透视。"
     hp: 500
     attack: 95
@@ -88,4 +88,4 @@ ghosts:
     fragment_item_id: "geng_gui_fragment"
     fragment_drop_rate: 0.5
     fragments_to_complete: 10
-    rarity: "rare"  # 因其独特恐怖机制，提升为稀有
+    rarity: "rare"

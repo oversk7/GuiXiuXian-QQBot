@@ -218,6 +218,7 @@ class AlchemyService:
                         # 如果添加失败，忽略该材料的返还
                         pass
 
+        # 标记为已领取（为了确保消息生成正确）
         record.claimed = True
 
         prod_name = config.items_config["by_id"][record.produce_item_id].name
@@ -226,6 +227,9 @@ class AlchemyService:
         # 添加材料返还信息
         if returned_materials:
             msg += f"\n🔄 失败返还：{', '.join(returned_materials)}"
+
+        # 领取成功后删除记录，避免记录一直保留
+        await session.delete(record)
 
         return True, msg
     

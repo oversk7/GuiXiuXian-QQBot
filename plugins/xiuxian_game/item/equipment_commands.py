@@ -185,6 +185,51 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
         if not equip.equipped:
             await unwear_equipment.finish("🧐 该装备当前未穿戴")
 
+        # 检查是否为炼丹炉，如果是则处理进行中的炼丹任务
+        from ..alchemy.service import AlchemyService
+        from ..models.alchemy_task import AlchemyRecord
+        from ..models.inventory import ItemInstance
+
+        furnace_ids = list(AlchemyService.FURNACE_QUALITIES.keys())
+        failed_tasks = []  # 初始化失败任务列表
+
+        if equip.item_id in furnace_ids:
+            # 查找使用该炼丹炉的进行中任务
+            from sqlalchemy import select, and_
+            stmt = select(AlchemyRecord).where(
+                and_(
+                    AlchemyRecord.player_id == event.get_user_id(),
+                    AlchemyRecord.furnace_id == equip.id,
+                    AlchemyRecord.claimed == False
+                )
+            )
+            alchemy_records = (await session.execute(stmt)).scalars().all()
+
+            # 处理进行中的炼丹任务
+            for record in alchemy_records:
+                if not record.is_finished():
+                    # 任务未完成，按失败处理，返还材料
+                    materials_dict = record.get_materials_dict()
+                    returned_materials = []
+
+                    for material_id, total_used in materials_dict.items():
+                        try:
+                            await ItemInstance.add_item(session, record.player_id, material_id, total_used)
+                            from ..config import config
+                            material_name = config.items_config["by_id"][material_id].name
+                            returned_materials.append(f"{material_name}✖️{total_used}")
+                        except ValueError:
+                            # 如果添加失败，忽略该材料的返还
+                            pass
+
+                    # 删除失败的炼丹记录
+                    await session.delete(record)
+
+                    if returned_materials:
+                        failed_tasks.append(f"返还材料：{', '.join(returned_materials)}")
+                    else:
+                        failed_tasks.append("炼丹任务已取消")
+
         # 恢复玩家属性
         player = await session.get(Player, event.get_user_id())
         delta = (equip.extra_attrs or {}).get("_persist_bonus", {})
@@ -207,7 +252,15 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
 
         # 显示卸下的装备信息，包括ID和耐久度
         durability_info = f" (ID:{equip.id}, 耐久:{equip.durability}/{equip.config.durability})"
-        await unwear_equipment.finish(f"🔻 已卸下 {equip.config.name}{durability_info}")
+        result_msg = f"🔻 已卸下 {equip.config.name}{durability_info}"
+
+        # 如果是炼丹炉且有失败的任务，添加相关信息
+        if equip.item_id in furnace_ids and failed_tasks:
+            result_msg += f"\n⚠️ 炼丹炉被卸下，{len(failed_tasks)}个进行中的炼丹任务已取消："
+            for task_info in failed_tasks:
+                result_msg += f"\n🔄 {task_info}"
+
+        await unwear_equipment.finish(result_msg)
 
 # ---------------- 指令：装备分解 ----------------
 decompose_equipment = on_command("分解", aliases={"装备分解"}, block=True, priority=5)
