@@ -33,12 +33,12 @@ async def handle_help(event: MessageEvent, args: Message = CommandArg()):
         "🎮 公会系统  💰 银行系统\n"
         "🔮 炼丹系统  🎮 活动系统\n"
         "💕 社交系统  🏰 副本系统\n"
-        "👻 鬼怪系统"
+        "👻 鬼怪系统\n"
         "═════════════\n"
-        "💡 发送/系统名称 查看详细指令，/更新 查看最近更新内容\n"
+        "💡 发送/系统名称 查看详细指令，/赞助 支持诡修仙\n"
         "💡 【】括号里是指令，<>里是必填，[]里是选填\n"
         "💡 教程及反馈请加官群：962494679，官群签到奖励翻倍\n"
-        "💡 发送/邀请码 邀请好友获得上万金币，获得启动资金"
+        "💡 发送/邀请码 邀请好友获得上万金币，获得启动资金\n"
     )
     await help_cmd.finish(Message(msg))
 
@@ -394,18 +394,49 @@ async def handle_button_test(event: MessageEvent, args: Message = CommandArg()):
     await button_test_cmd.finish(MessageSegment.keyboard(keyboard))
 
 
-# 图片测试
-img_test_cmd = on_command("图片测试", priority=4, block=True)
-@img_test_cmd.handle()
-async def handle_img_test(event: MessageEvent, args: Message = CommandArg()):
+# 赞助码
+support_cmd = on_command("赞助", aliases={"赞赏","充值","打赏","氪金"}, priority=4, block=True)
+@support_cmd.handle()
+async def handle_support(event: MessageEvent, args: Message = CommandArg()):
+    msg = (
+        "✨ 赞助码系统帮助 ✨\n"
+        "支持游戏发展，获得月卡权益和背包扩容\n"
+        "━━━━━━━━━━━━━\n"
+        "💳 赞助码类型：\n"
+        "🔸 8.8元 - 基础月卡（30天）\n"
+        "   • 修炼闭关效率+20%\n"
+        "   • 闭关上限增加至9小时\n"
+        "   • 背包扩容+5格\n"
+        "   • 签到获得扫荡令*1，咒抗+5\n"
+        "\n"
+        "🔸 28.8元 - 高级月卡（30天）\n"
+        "   • 修炼闭关效率+50%\n"
+        "   • 闭关上限增加至12小时\n"
+        "   • 背包扩容+20格\n"
+        "   • 副本遇到材料和宝藏自动采集\n"
+        "   • 签到获得扫荡令*3，咒抗+5\n"
+        "\n"
+        "🔸 5元 - 永久背包扩容+5格\n"
+        "   • 永久增加背包容量5格\n"
+        "   • 可重复购买叠加效果\n"
+        "━━━━━━━━━━━━━\n"
+        "📝 注意：支付时请备注UID + 联系方式（可选）\n"
+        "💡 发送【月卡】查看当前权益\n"
+        "━━━━━━━━━━━━━\n"
+        "🙏 感谢您对游戏的支持！"
+    )
+
     # 获取当前文件所在目录
     cur_dir = os.path.dirname(__file__)
-    img_path = os.path.join(cur_dir, "../test.png")
+    img_path = os.path.join(cur_dir, "../sponsor.jpg")
     img_path = os.path.abspath(img_path)  # 转为绝对路径
     with open(img_path, "rb") as f:
         import base64
         base64_img = base64.b64encode(f.read()).decode("utf-8")
-    await img_test_cmd.finish(MessageSegment.file_image(base64_img))
+
+    img = MessageSegment.file_image(base64_img)
+    msg = Message(msg).append(img)
+    await support_cmd.finish(msg)
 
 # Ark天气测试
 ark_weather_test_cmd = on_command("ark测试", priority=4, block=True)
