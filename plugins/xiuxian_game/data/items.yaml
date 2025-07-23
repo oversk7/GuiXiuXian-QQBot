@@ -34,7 +34,7 @@ items:
       
     - item_id: "revive_potion"
       name: "仿制还魂丹"
-      description: "使用后可以立即原地复活。（复活率30%）"
+      description: "民间根据传说仿制的复活丹药。（恢复30%状态）"
       type: "CONSUMABLE"
       effect_type: "REVIVE"
       effect_params: {"rate": 0.3}
@@ -396,7 +396,7 @@ items:
 
     - item_id: "perfect_revive_elixir"
       name: "完美还魂丹"
-      description: "以天材地宝炼制的极品复活丹，使用后可以立即原地复活。（复活率95%）"
+      description: "以天材地宝炼制的极品复活丹。（恢复95%状态）"
       type: "CONSUMABLE"
       price: 200000
       effect_type: "REVIVE"
@@ -404,7 +404,7 @@ items:
 
     - item_id: "supreme_revive_elixir"
       name: "真还魂丹"
-      description: "传说中的复活神丹，死而复生如获新生。使用后可以立即原地复活。（复活率100%）"
+      description: "传说中的复活神丹，死而复生如获新生。（恢复100%状态）"
       type: "CONSUMABLE"
       price: 500000
       effect_type: "REVIVE"
