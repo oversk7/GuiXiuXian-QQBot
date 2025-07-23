@@ -30,7 +30,7 @@ regions:
     level_range: [81, 100]
     monsters:
       - "红衣舞者"
-      - "笔仙"
+      - "笔佡"
       - "霸凌者"
     materials:
       - "kissed_phone_number"

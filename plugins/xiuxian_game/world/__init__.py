@@ -13,7 +13,7 @@ from typing import Tuple, Dict
 from datetime import datetime, date
 import random
 from sqlalchemy import select, func
-from ..models.db import safe_session
+from ..models.db import safe_session, retry_session
 from ..models.player import Player
 from ..models.inventory import ItemInstance
 from ..models.world_tile import WorldTile
@@ -50,27 +50,24 @@ COMMON_MATERIALS = list(_all_materials - _special_mats)
 async def get_or_create_tile(session, region: str, x: int, y: int) -> WorldTile:
     """获取或创建今日坐标格，并在创建时生成事件"""
     today = date.today()
-    # 查询并锁行，防止并发写
+
+    # 先尝试简单查询，避免使用 with_for_update() 造成锁定
     result = await session.execute(
         select(WorldTile)
         .where(WorldTile.region == region, WorldTile.x == x, WorldTile.y == y)
-        .with_for_update()
     )
     tile = result.scalars().first()
 
     # 若不存在或已过期（日期变化）则重新生成
     if (not tile) or (tile.refreshed_at.date() != today):
         if not tile:
-            # 再查一次，防止并发唯一冲突
-            result2 = await session.execute(
-                select(WorldTile)
-                .where(WorldTile.region == region, WorldTile.x == x, WorldTile.y == y)
-            )
-            tile = result2.scalars().first()
-            if tile:
-                return tile
+            # 创建新的tile
             tile = WorldTile(region=region, x=x, y=y)
+            session.add(tile)
+
+        # 更新tile信息
         tile.refreshed_at = datetime.now()
+
         # 生成事件
         tile.seed = f"{region}:{x}:{y}:{today.isoformat()}"
         rng = random.Random(hash(tile.seed))
@@ -80,6 +77,7 @@ async def get_or_create_tile(session, region: str, x: int, y: int) -> WorldTile:
             k=1
         )[0]
         tile.state = {}
+
         if tile.event_type == "EMPTY":
             map_info = config.map_config["regions"][region]
             monster = rng.choice(map_info["monsters"])
@@ -108,8 +106,26 @@ async def get_or_create_tile(session, region: str, x: int, y: int) -> WorldTile:
                 # 个人事件：记录已拾取玩家ID，避免相互影响
                 "looted_by": [],
             }
-        tile = await session.merge(tile)
-        await session.flush()
+
+        # 使用 merge 来处理可能的并发冲突
+        try:
+            await session.flush()
+        except Exception:
+            # 如果出现冲突，重新查询最新的tile
+            await session.rollback()
+            result = await session.execute(
+                select(WorldTile)
+                .where(WorldTile.region == region, WorldTile.x == x, WorldTile.y == y)
+            )
+            tile = result.scalars().first()
+            if not tile:
+                # 如果还是没有，说明出现了异常情况，创建一个基本的tile
+                tile = WorldTile(region=region, x=x, y=y, refreshed_at=datetime.now())
+                tile.event_type = "EMPTY"
+                tile.state = {}
+                session.add(tile)
+                await session.flush()
+
     return tile
 
 
@@ -120,73 +136,77 @@ move_cmd = on_regex(r"^(上|下|左|右)$", block=True, priority=5)
 async def _(event: MessageEvent):
     direction = event.get_plaintext().strip()
 
-    async with safe_session() as session:
-        player: Player | None = await session.get(Player, event.get_user_id())
-        if not player:
-            await move_cmd.finish("⛔ 请先创建角色")
+    try:
+        async with retry_session() as session:
+            player: Player | None = await session.get(Player, event.get_user_id())
+            if not player:
+                await move_cmd.finish("⛔ 请先创建角色")
 
-        # 解析方向
-        if direction not in DIRECTIONS:
-            await move_cmd.finish("⛔ 无效的方向")
-        dx, dy = DIRECTIONS[direction]
-        new_x, new_y = player.x + dx, player.y + dy
-        player.x, player.y = new_x, new_y
+            # 解析方向
+            if direction not in DIRECTIONS:
+                await move_cmd.finish("⛔ 无效的方向")
+            dx, dy = DIRECTIONS[direction]
+            new_x, new_y = player.x + dx, player.y + dy
+            player.x, player.y = new_x, new_y
 
-        # 扣除理智
-        player.mp = max(0, player.mp - 1)
-        if player.mp == 0 and player.hp > 0:
-            player.hp = 0  # 理智耗尽即"疯狂身亡"
+            # 扣除理智
+            player.mp = max(0, player.mp - 1)
+            if player.mp == 0 and player.hp > 0:
+                player.hp = 0  # 理智耗尽即"疯狂身亡"
 
-        # 获取当前位置事件格
-        tile = await get_or_create_tile(session, player.region, player.x, player.y)
+            # 获取当前位置事件格
+            tile = await get_or_create_tile(session, player.region, player.x, player.y)
 
-        # 检查月卡权限是否支持自动采集
-        benefits = await get_player_card_benefits(session, player.id)
-        auto_collect = benefits.get("auto_collect", False)
+            # 检查月卡权限是否支持自动采集
+            benefits = await get_player_card_benefits(session, player.id)
+            auto_collect = benefits.get("auto_collect", False)
 
-        auto_collect_msg = ""
+            auto_collect_msg = ""
 
-        # 如果有月卡自动采集权限，自动触发收集
-        if auto_collect:
-            if tile.event_type == "MATERIAL":
-                # 自动采集材料
-                if player.id not in tile.state.get("looted_by", []) and not tile.state.get("looted"):
-                    collect_result = await _handle_material(session, tile, player)
-                    auto_collect_msg = f"\n💳 月卡自动采集：\n{collect_result}"
-            elif tile.event_type == "TREASURE":
-                # 自动收集宝藏
-                if not tile.state.get("looted"):
-                    collect_result = await _handle_treasure(session, tile, player)
-                    auto_collect_msg = f"\n💳 月卡自动收集：\n{collect_result}"
+            # 如果有月卡自动采集权限，自动触发收集
+            if auto_collect:
+                if tile.event_type == "MATERIAL":
+                    # 自动采集材料
+                    if player.id not in tile.state.get("looted_by", []) and not tile.state.get("looted"):
+                        collect_result = await _handle_material(session, tile, player)
+                        auto_collect_msg = f"\n💳 月卡自动采集：\n{collect_result}"
+                elif tile.event_type == "TREASURE":
+                    # 自动收集宝藏
+                    if not tile.state.get("looted"):
+                        collect_result = await _handle_treasure(session, tile, player)
+                        auto_collect_msg = f"\n💳 月卡自动收集：\n{collect_result}"
 
-        session.add_all([player, tile])
-        await session.commit()
+            session.add_all([player, tile])
 
-        # 构造事件描述
-        def describe_tile(t: WorldTile) -> str:
-            """根据 tile 类型生成可读描述，在移动后提示玩家下一步操作。"""
-            if t.event_type == "MATERIAL":
-                item_cfg = config.items_config["by_id"].get(t.state.get("item_id"))
-                item_name = item_cfg.name if item_cfg else "未知材料"
-                qty = t.state.get("quantity", "?")
-                looted_by = t.state.get("looted_by", [])
-                if player.id in looted_by or t.state.get("looted"):
-                    return f"🪨 这里曾经散落着 {item_name} ✖️{qty}，但已被搜刮一空。"
-                return f"✨ 你发现了材料 {item_name} ✖️{qty}，可输入 [收集] 获取。"
-            elif t.event_type == "TREASURE":
-                if t.state.get("looted"):
-                    return "🪨 破碎的宝箱静静躺在尘埃中，没有任何价值。"
-                return "🎁 你注意到一个尘封宝箱，也许输入 [探索] 能打开它。"
-            elif t.event_type == "EMPTY":
-                monster = t.state.get("name")
-                return f"🌫️ 四周弥漫着诡异的静谧，似乎潜伏着 {monster} 的气息。若想冒险，可输入 [探索] 进行调查。"
-            elif t.event_type == "REST":
-                return "🌫️ 你发现了一家驿站，可输入 [休息] 恢复生命，但精神上的压抑似乎难以去除。"
-            return "⁉️ 未知事件。"
+            # 构造事件描述
+            def describe_tile(t: WorldTile) -> str:
+                """根据 tile 类型生成可读描述，在移动后提示玩家下一步操作。"""
+                if t.event_type == "MATERIAL":
+                    item_cfg = config.items_config["by_id"].get(t.state.get("item_id"))
+                    item_name = item_cfg.name if item_cfg else "未知材料"
+                    qty = t.state.get("quantity", "?")
+                    looted_by = t.state.get("looted_by", [])
+                    if player.id in looted_by or t.state.get("looted"):
+                        return f"🪨 这里曾经散落着 {item_name} ✖️{qty}，但已被搜刮一空。"
+                    return f"✨ 你发现了材料 {item_name} ✖️{qty}，可输入 [收集] 获取。"
+                elif t.event_type == "TREASURE":
+                    if t.state.get("looted"):
+                        return "🪨 破碎的宝箱静静躺在尘埃中，没有任何价值。"
+                    return "🎁 你注意到一个尘封宝箱，也许输入 [探索] 能打开它。"
+                elif t.event_type == "EMPTY":
+                    monster = t.state.get("name")
+                    return f"🌫️ 四周弥漫着诡异的静谧，似乎潜伏着 {monster} 的气息。若想冒险，可输入 [探索] 进行调查。"
+                elif t.event_type == "REST":
+                    return "🌫️ 你发现了一家驿站，可输入 [休息] 恢复生命，但精神上的压抑似乎难以去除。"
+                return "⁉️ 未知事件。"
 
-        event_desc = describe_tile(tile)
-    header = f"🚶 已移动至 ({new_x},{new_y})"
-    await move_cmd.finish(message_add_head(f"{header}\n{event_desc}{auto_collect_msg}", event))
+            event_desc = describe_tile(tile)
+            header = f"🚶 已移动至 ({new_x},{new_y})"
+            await move_cmd.finish(message_add_head(f"{header}\n{event_desc}{auto_collect_msg}", event))
+
+    except Exception as e:
+        # 如果数据库操作失败，返回友好的错误信息
+        await move_cmd.finish(f"⚠️ 移动失败，请稍后重试。错误信息：{str(e)}")
 
 # ----------------- 指令：战斗 -----------------
 explore_cmd = on_command("探索", aliases={"战斗", "收集", "休息"}, block=True, priority=5)
