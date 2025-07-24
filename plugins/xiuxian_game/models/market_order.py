@@ -1,5 +1,5 @@
 from datetime import datetime
-from sqlalchemy import String, Integer, DateTime, Enum as SAEnum, ForeignKey, func
+from sqlalchemy import String, Integer, BigInteger, DateTime, Enum as SAEnum, ForeignKey, func
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from enum import Enum as PyEnum
 from .db import Base
@@ -18,7 +18,7 @@ class MarketOrder(Base):
     player_id: Mapped[str] = mapped_column(String(32), ForeignKey("player.id"), index=True)
     side: Mapped[OrderSide] = mapped_column(SAEnum(OrderSide), index=True)
     item_id: Mapped[str] = mapped_column(String(32), index=True)
-    price: Mapped[int] = mapped_column(Integer)
+    price: Mapped[int] = mapped_column(BigInteger)
     quantity: Mapped[int] = mapped_column(Integer)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.now, server_default=func.now())
 

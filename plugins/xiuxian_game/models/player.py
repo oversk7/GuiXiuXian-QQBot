@@ -1,4 +1,4 @@
-from sqlalchemy import Integer, String, DateTime, func, Boolean
+from sqlalchemy import Integer, BigInteger, String, DateTime, func, Boolean
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from datetime import datetime
 from .db import Base
@@ -33,11 +33,11 @@ class Player(Base):
     luck: Mapped[int] = mapped_column(Integer, default=1, server_default='1', comment="运气")
     resentment: Mapped[int] = mapped_column(Integer, default=0, server_default='0', comment="怨念值")
     guild_id: Mapped[int | None] = mapped_column(Integer, nullable=True, comment="所属公会ID")
-    guild_contribution: Mapped[int] = mapped_column(Integer, default=0, server_default='0', comment="公会贡献值")
+    guild_contribution: Mapped[int] = mapped_column(BigInteger, default=0, server_default='0', comment="公会贡献值")
     
     vip: Mapped[int] = mapped_column(Integer, default=0, server_default='0', comment="VIP等级")
-    gold: Mapped[int] = mapped_column(Integer, default=1000, server_default='1000', comment="货币")
-    gold2: Mapped[int] = mapped_column(Integer, default=0, server_default='0', comment="积分")
+    gold: Mapped[int] = mapped_column(BigInteger, default=1000, server_default='1000', comment="货币")
+    gold2: Mapped[int] = mapped_column(BigInteger, default=0, server_default='0', comment="积分")
     
     last_sign: Mapped[datetime] = mapped_column(DateTime, nullable=True, comment="上次签到日期")
     sign_streak: Mapped[int] = mapped_column(Integer, default=0, server_default='0', comment="连续签到天数")
