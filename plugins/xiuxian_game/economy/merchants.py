@@ -206,6 +206,7 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
         try:
             await ItemInstance.add_item(session, player.id, item_cfg.item_id, qty)
         except ValueError as e:
+            await session.rollback()
             await buy_cmd.finish(f"❌ {e}")
         await session.commit()
         await buy_cmd.finish(message_add_head(
