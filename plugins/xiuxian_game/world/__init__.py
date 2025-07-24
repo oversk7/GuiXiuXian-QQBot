@@ -136,77 +136,72 @@ move_cmd = on_regex(r"^(上|下|左|右)$", block=True, priority=5)
 async def _(event: MessageEvent):
     direction = event.get_plaintext().strip()
 
-    try:
-        async with retry_session() as session:
-            player: Player | None = await session.get(Player, event.get_user_id())
-            if not player:
-                await move_cmd.finish("⛔ 请先创建角色")
+    async with retry_session() as session:
+        player: Player | None = await session.get(Player, event.get_user_id())
+        if not player:
+            await move_cmd.finish("⛔ 请先创建角色")
 
-            # 解析方向
-            if direction not in DIRECTIONS:
-                await move_cmd.finish("⛔ 无效的方向")
-            dx, dy = DIRECTIONS[direction]
-            new_x, new_y = player.x + dx, player.y + dy
-            player.x, player.y = new_x, new_y
+        # 解析方向
+        if direction not in DIRECTIONS:
+            await move_cmd.finish("⛔ 无效的方向")
+        dx, dy = DIRECTIONS[direction]
+        new_x, new_y = player.x + dx, player.y + dy
+        player.x, player.y = new_x, new_y
 
-            # 扣除理智
-            player.mp = max(0, player.mp - 1)
-            if player.mp == 0 and player.hp > 0:
-                player.hp = 0  # 理智耗尽即"疯狂身亡"
+        # 扣除理智
+        player.mp = max(0, player.mp - 1)
+        if player.mp == 0 and player.hp > 0:
+            player.hp = 0  # 理智耗尽即"疯狂身亡"
 
-            # 获取当前位置事件格
-            tile = await get_or_create_tile(session, player.region, player.x, player.y)
+        # 获取当前位置事件格
+        tile = await get_or_create_tile(session, player.region, player.x, player.y)
 
-            # 检查月卡权限是否支持自动采集
-            benefits = await get_player_card_benefits(session, player.id)
-            auto_collect = benefits.get("auto_collect", False)
+        # 检查月卡权限是否支持自动采集
+        benefits = await get_player_card_benefits(session, player.id)
+        auto_collect = benefits.get("auto_collect", False)
 
-            auto_collect_msg = ""
+        auto_collect_msg = ""
 
-            # 如果有月卡自动采集权限，自动触发收集
-            if auto_collect:
-                if tile.event_type == "MATERIAL":
-                    # 自动采集材料
-                    if player.id not in tile.state.get("looted_by", []) and not tile.state.get("looted"):
-                        collect_result = await _handle_material(session, tile, player)
-                        auto_collect_msg = f"\n💳 月卡自动采集：\n{collect_result}"
-                elif tile.event_type == "TREASURE":
-                    # 自动收集宝藏
-                    if not tile.state.get("looted"):
-                        collect_result = await _handle_treasure(session, tile, player)
-                        auto_collect_msg = f"\n💳 月卡自动收集：\n{collect_result}"
+        # 如果有月卡自动采集权限，自动触发收集
+        if auto_collect:
+            if tile.event_type == "MATERIAL":
+                # 自动采集材料
+                if player.id not in tile.state.get("looted_by", []) and not tile.state.get("looted"):
+                    collect_result = await _handle_material(session, tile, player)
+                    auto_collect_msg = f"\n💳 月卡自动采集：\n{collect_result}"
+            elif tile.event_type == "TREASURE":
+                # 自动收集宝藏
+                if not tile.state.get("looted"):
+                    collect_result = await _handle_treasure(session, tile, player)
+                    auto_collect_msg = f"\n💳 月卡自动收集：\n{collect_result}"
 
-            session.add_all([player, tile])
+        session.add_all([player, tile])
 
-            # 构造事件描述
-            def describe_tile(t: WorldTile) -> str:
-                """根据 tile 类型生成可读描述，在移动后提示玩家下一步操作。"""
-                if t.event_type == "MATERIAL":
-                    item_cfg = config.items_config["by_id"].get(t.state.get("item_id"))
-                    item_name = item_cfg.name if item_cfg else "未知材料"
-                    qty = t.state.get("quantity", "?")
-                    looted_by = t.state.get("looted_by", [])
-                    if player.id in looted_by or t.state.get("looted"):
-                        return f"🪨 这里曾经散落着 {item_name} ✖️{qty}，但已被搜刮一空。"
-                    return f"✨ 你发现了材料 {item_name} ✖️{qty}，可输入 [收集] 获取。"
-                elif t.event_type == "TREASURE":
-                    if t.state.get("looted"):
-                        return "🪨 破碎的宝箱静静躺在尘埃中，没有任何价值。"
-                    return "🎁 你注意到一个尘封宝箱，也许输入 [探索] 能打开它。"
-                elif t.event_type == "EMPTY":
-                    monster = t.state.get("name")
-                    return f"🌫️ 四周弥漫着诡异的静谧，似乎潜伏着 {monster} 的气息。若想冒险，可输入 [探索] 进行调查。"
-                elif t.event_type == "REST":
-                    return "🌫️ 你发现了一家驿站，可输入 [休息] 恢复生命，但精神上的压抑似乎难以去除。"
-                return "⁉️ 未知事件。"
+        # 构造事件描述
+        def describe_tile(t: WorldTile) -> str:
+            """根据 tile 类型生成可读描述，在移动后提示玩家下一步操作。"""
+            if t.event_type == "MATERIAL":
+                item_cfg = config.items_config["by_id"].get(t.state.get("item_id"))
+                item_name = item_cfg.name if item_cfg else "未知材料"
+                qty = t.state.get("quantity", "?")
+                looted_by = t.state.get("looted_by", [])
+                if player.id in looted_by or t.state.get("looted"):
+                    return f"🪨 这里曾经散落着 {item_name} ✖️{qty}，但已被搜刮一空。"
+                return f"✨ 你发现了材料 {item_name} ✖️{qty}，可输入 [收集] 获取。"
+            elif t.event_type == "TREASURE":
+                if t.state.get("looted"):
+                    return "🪨 破碎的宝箱静静躺在尘埃中，没有任何价值。"
+                return "🎁 你注意到一个尘封宝箱，也许输入 [探索] 能打开它。"
+            elif t.event_type == "EMPTY":
+                monster = t.state.get("name")
+                return f"🌫️ 四周弥漫着诡异的静谧，似乎潜伏着 {monster} 的气息。若想冒险，可输入 [探索] 进行调查。"
+            elif t.event_type == "REST":
+                return "🌫️ 你发现了一家驿站，可输入 [休息] 恢复生命，但精神上的压抑似乎难以去除。"
+            return "⁉️ 未知事件。"
 
-            event_desc = describe_tile(tile)
-            header = f"🚶 已移动至 ({new_x},{new_y})"
-            await move_cmd.finish(message_add_head(f"{header}\n{event_desc}{auto_collect_msg}", event))
-
-    except Exception as e:
-        # 如果数据库操作失败，返回友好的错误信息
-        await move_cmd.finish(f"⚠️ 移动失败，请稍后重试。错误信息：{str(e)}")
+        event_desc = describe_tile(tile)
+        header = f"🚶 已移动至 ({new_x},{new_y})"
+        await move_cmd.finish(message_add_head(f"{header}\n{event_desc}{auto_collect_msg}", event))
 
 # ----------------- 指令：战斗 -----------------
 explore_cmd = on_command("探索", aliases={"战斗", "收集", "休息"}, block=True, priority=5)
