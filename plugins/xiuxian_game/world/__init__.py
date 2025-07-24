@@ -138,8 +138,8 @@ async def _(event: MessageEvent):
 
     async with retry_session() as session:
         player: Player | None = await session.get(Player, event.get_user_id())
-        if not player:
-            await move_cmd.finish("⛔ 请先创建角色")
+        if not player or player.region == "大都会":
+            await move_cmd.finish("⛔ 单格移动只能在诡域使用")
 
         # 解析方向
         if direction not in DIRECTIONS:
