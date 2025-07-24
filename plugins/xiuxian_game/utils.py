@@ -1,8 +1,11 @@
 from nonebot.adapters.qq import Message, MessageSegment, MessageEvent
-from typing import Optional
+from typing import Optional, Dict
 from .config import config
 import math
 import re  # 用于正则匹配域名
+import time
+from collections import defaultdict, deque
+from dataclasses import dataclass
 
 
 def message_add_head(content: str, event: Optional[MessageEvent] = None) -> Message:
@@ -213,5 +216,111 @@ def bypass_urls(
         return domain.replace(".", replacer)
 
     return domain_pattern.sub(_replace, text)
+
+
+# ============== 频率限制系统 ==============
+
+@dataclass
+class RateLimitConfig:
+    """频率限制配置"""
+    max_requests: int  # 最大请求数
+    time_window: float  # 时间窗口（秒）
+    cooldown: float = 0.0  # 单次操作最小间隔（秒）
+
+
+class RateLimiter:
+    """频率限制器
+
+    支持两种限制模式：
+    1. 滑动窗口：在指定时间窗口内限制最大请求数
+    2. 冷却时间：两次操作之间的最小间隔
+    """
+
+    def __init__(self):
+        # 用户请求历史记录 {user_id: deque[timestamp]}
+        self._request_history: Dict[str, deque] = defaultdict(lambda: deque())
+        # 用户最后请求时间 {user_id: timestamp}
+        self._last_request_time: Dict[str, float] = {}
+        # 不同操作的配置
+        self._configs: Dict[str, RateLimitConfig] = {}
+
+    def register_action(self, action: str, config: RateLimitConfig):
+        """注册操作的频率限制配置"""
+        self._configs[action] = config
+
+    def check_rate_limit(self, user_id: str, action: str) -> tuple[bool, Optional[str]]:
+        """检查是否超过频率限制
+
+        Returns:
+            (是否允许, 错误消息)
+        """
+        if action not in self._configs:
+            return True, None
+
+        config = self._configs[action]
+        current_time = time.time()
+
+        # 检查冷却时间
+        if config.cooldown > 0:
+            last_time = self._last_request_time.get(user_id, 0)
+            if current_time - last_time < config.cooldown:
+                remaining = config.cooldown - (current_time - last_time)
+                return False, f"⏳ 操作过于频繁，请等待 {remaining:.1f} 秒后再试"
+
+        # 检查滑动窗口
+        if config.max_requests > 0 and config.time_window > 0:
+            history = self._request_history[user_id]
+
+            # 清理过期记录
+            cutoff_time = current_time - config.time_window
+            while history and history[0] < cutoff_time:
+                history.popleft()
+
+            # 检查是否超过限制
+            if len(history) >= config.max_requests:
+                return False, f"⚠️ 操作过于频繁，请在 {config.time_window} 秒内最多操作 {config.max_requests} 次"
+
+        return True, None
+
+    def record_request(self, user_id: str, action: str):
+        """记录用户请求"""
+        if action not in self._configs:
+            return
+
+        current_time = time.time()
+        config = self._configs[action]
+
+        # 记录请求时间
+        self._last_request_time[user_id] = current_time
+
+        # 记录到滑动窗口
+        if config.max_requests > 0 and config.time_window > 0:
+            self._request_history[user_id].append(current_time)
+
+
+# 全局频率限制器实例
+rate_limiter = RateLimiter()
+
+# 注册默认的操作限制 - 防止高频刷材料
+rate_limiter.register_action("move", RateLimitConfig(
+    max_requests=30,
+    time_window=30.0,
+    cooldown=0.8  # 每次移动间隔0.8秒，有效防止每秒5次的高频操作
+))
+
+rate_limiter.register_action("explore", RateLimitConfig(
+    max_requests=30,  # 60秒内最多探索30次
+    time_window=60.0,
+    cooldown=0.5  # 每次探索间隔0.5秒
+))
+
+def check_action_limit(user_id: str, action: str) -> tuple[bool, Optional[str]]:
+    """便捷函数：检查操作限制"""
+    return rate_limiter.check_rate_limit(user_id, action)
+
+
+def record_action(user_id: str, action: str):
+    """便捷函数：记录操作"""
+    rate_limiter.record_request(user_id, action)
 
 

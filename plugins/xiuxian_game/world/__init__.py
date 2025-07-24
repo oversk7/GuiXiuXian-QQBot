@@ -12,6 +12,7 @@ from nonebot.params import CommandArg
 from typing import Tuple, Dict
 from datetime import datetime, date
 import random
+
 from sqlalchemy import select, func
 from ..models.db import safe_session, retry_session
 from ..models.player import Player
@@ -19,7 +20,7 @@ from ..models.inventory import ItemInstance
 from ..models.world_tile import WorldTile
 from ..models.monthly_card import get_player_card_benefits
 from ..config import config
-from ..utils import message_add_head, luck_prob
+from ..utils import message_add_head, luck_prob, check_action_limit, record_action
 from io import BytesIO
 import base64
 from PIL import Image, ImageDraw, ImageFont
@@ -36,6 +37,8 @@ DIRECTIONS: Dict[str, Tuple[int, int]] = {
     "左": (-1, 0),
     "右": (1, 0),
 }
+
+
 
 # -------- 预计算通用材料列表 --------
 _all_materials = set(config.items_config["by_type"]["MATERIAL"])
@@ -135,6 +138,15 @@ move_cmd = on_regex(r"^(上|下|左|右)$", block=True, priority=5)
 @move_cmd.handle()
 async def _(event: MessageEvent):
     direction = event.get_plaintext().strip()
+    user_id = event.get_user_id()
+
+    # 频率限制检查
+    allowed, error_msg = check_action_limit(user_id, "move")
+    if not allowed:
+        await move_cmd.finish(error_msg)
+
+    # 记录操作
+    record_action(user_id, "move")
 
     async with retry_session() as session:
         player: Player | None = await session.get(Player, event.get_user_id())
@@ -405,6 +417,16 @@ EVENT_HANDLERS = {
 
 @explore_cmd.handle()
 async def _(event: MessageEvent):
+    user_id = event.get_user_id()
+
+    # 频率限制检查
+    allowed, error_msg = check_action_limit(user_id, "explore")
+    if not allowed:
+        await explore_cmd.finish(error_msg)
+
+    # 记录操作
+    record_action(user_id, "explore")
+
     async with safe_session() as session:
         player: Player | None = await session.get(Player, event.get_user_id())
         if not player:
