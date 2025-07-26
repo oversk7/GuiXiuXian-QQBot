@@ -6,13 +6,7 @@ from __future__ import annotations
 1. 仅限现实世界（region == "大都会"）。
 2. 市场坐标固定；列表见 MARKETS。
 3. 价格：每天 09:00 刷新，基于日期+市场ID+item_id 生成哈希随机数。
-   - 出售价 = base_price * rand(0.8,1.2)
-   - 收购价 = 出售价 * 0.7（向上取整）
-4. 指令：
-   • 市集            查看当前坐标市场价格表
-   • 购买 物品 数量   消耗金币购买
-   • 出售 物品 数量   将背包物品卖给市场
-5. 必须玩家坐标与市场坐标一致才可交易。
+4. 必须玩家坐标与市场坐标一致才可交易。
 """
 
 from datetime import datetime, time, timedelta, date
@@ -201,12 +195,13 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
         if player.gold < total_cost:
             await buy_cmd.finish(f"💰 金币不足，需要 {total_cost} (当前 {player.gold})")
 
-        # 扣款 & 添物
+        # 扣款并添加物品
         player.gold -= total_cost
         try:
             await ItemInstance.add_item(session, player.id, item_cfg.item_id, qty)
         except ValueError as e:
-            await session.rollback()
+            # 背包空间不足，恢复金币
+            player.gold += total_cost
             await buy_cmd.finish(f"❌ {e}")
         await session.commit()
         await buy_cmd.finish(message_add_head(

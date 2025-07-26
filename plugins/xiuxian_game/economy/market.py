@@ -144,8 +144,11 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
         player = await session.get(Player, event.get_user_id())
 
         if order.side == OrderSide.SELL:
-            # 退回剩余物品
-            await ItemInstance.add_item(session, player.id, order.item_id, order.quantity)
+            # 退回剩余物品，先检查背包空间
+            try:
+                await ItemInstance.add_item(session, player.id, order.item_id, order.quantity)
+            except ValueError as e:
+                await cancel_cmd.finish(f"⛔ 撤牌失败：{e}")
         else:
             # 退回剩余金币
             player.gold += order.price * order.quantity
@@ -425,8 +428,12 @@ async def _try_auto_match(session, new_order: MarketOrder, player: Player, same_
         seller: Player = await session.get(Player, seller_id)
         item_cfg = new_order.item
 
-        # 物品给买家
-        await ItemInstance.add_item(session, buyer.id, item_cfg.item_id, trade_qty)
+        # 物品给买家，检查背包空间
+        try:
+            await ItemInstance.add_item(session, buyer.id, item_cfg.item_id, trade_qty)
+        except ValueError:
+            # 买家背包空间不足，停止撮合
+            break
 
         # 计算交易金额和阶梯税收
         trade_amount = trade_price * trade_qty

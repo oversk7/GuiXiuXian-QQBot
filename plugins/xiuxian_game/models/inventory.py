@@ -171,9 +171,10 @@ class ItemInstance(Base):
         effective_capacity = await player.get_effective_inventory_capacity(session)
 
         if is_equipment:
-            # 装备每个占1格
+            # 装备每个占1格 - 先检查空间
             if used_slots + quantity > effective_capacity:
                 raise ValueError(f"背包空间不足")
+            # 空间足够，添加装备
             equip_durability = durability if durability is not None else item_config.durability
             for _ in range(quantity):
                 session.add(ItemInstance(
@@ -184,7 +185,7 @@ class ItemInstance(Base):
                 ))
             return True
 
-        # 普通物品处理
+        # 普通物品处理 - 先检查空间
         existing_qty = sum(inv.quantity for inv in stacks_all if inv.item_id == template_id)
         new_total_qty = existing_qty + quantity
         new_slot_cnt = ceil(new_total_qty / STACK_SIZE)
@@ -194,6 +195,7 @@ class ItemInstance(Base):
         if used_slots + extra_slots_needed > effective_capacity:
             raise ValueError(f"背包空间不足")
 
+        # 空间足够，开始添加物品
         # 填充已有堆叠
         result = await session.execute(
             select(ItemInstance)
@@ -201,22 +203,30 @@ class ItemInstance(Base):
             .order_by(ItemInstance.id)
         )
         stacks: list[ItemInstance] = result.scalars().all()
-        # 整理并填充已有堆叠
+
+        # 记录原始数量，以便在出错时恢复
+        original_quantities = {}
         for inv in stacks:
-            if quantity == 0:
+            original_quantities[inv.id] = inv.quantity
+
+        # 整理并填充已有堆叠
+        remaining_qty = quantity
+        for inv in stacks:
+            if remaining_qty == 0:
                 break
             space = inv.available_space
             if space == 0:
                 continue
-            take = min(space, quantity)
+            take = min(space, remaining_qty)
             inv.quantity += take
-            quantity -= take
+            remaining_qty -= take
             session.add(inv)
+
         # 剩余数量分新堆
-        while quantity > 0:
-            put_qty = min(STACK_SIZE, quantity)
+        while remaining_qty > 0:
+            put_qty = min(STACK_SIZE, remaining_qty)
             session.add(ItemInstance(player_id=player_id, item_id=template_id, quantity=put_qty))
-            quantity -= put_qty
+            remaining_qty -= put_qty
         return True
 
     @staticmethod

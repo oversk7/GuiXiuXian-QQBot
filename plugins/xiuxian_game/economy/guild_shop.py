@@ -196,35 +196,18 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
                 f"⛔ 积分不足，需要 {total_cost}✨ 当前拥有 {player.gold2}✨"
             )
 
-        # 扣除积分
+        # 扣除积分并添加物品
         player.gold2 -= total_cost
 
-        if item_cfg.type.value == "EQUIPMENT":
-            try:
+        try:
+            if item_cfg.type.value == "EQUIPMENT":
                 await ItemInstance.add_item(session, player.id, item_cfg.item_id, quantity=quantity, durability=item_cfg.durability)
-            except ValueError as e:
-                await session.rollback()
-                await guild_buy_cmd.finish(f"⛔ {e}")
-        else:
-            # 非装备统一存入背包
-            inv = (
-                await session.execute(
-                    select(ItemInstance).where(
-                        ItemInstance.player_id == event.get_user_id(),
-                        ItemInstance.item_id == item_cfg.item_id,
-                    )
-                )
-            ).scalars().first()
-            if inv:
-                inv.quantity += quantity
             else:
-                session.add(
-                    ItemInstance(
-                        player_id=event.get_user_id(),
-                        item_id=item_cfg.item_id,
-                        quantity=quantity,
-                    )
-                )
+                await ItemInstance.add_item(session, player.id, item_cfg.item_id, quantity)
+        except ValueError as e:
+            # 背包空间不足，恢复积分
+            player.gold2 += total_cost
+            await guild_buy_cmd.finish(f"⛔ {e}")
 
         await session.commit()
         await guild_buy_cmd.finish(

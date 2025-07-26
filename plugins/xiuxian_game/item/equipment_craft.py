@@ -117,17 +117,21 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
             await craft_cmd.finish("⛔ 材料不足：\n" + "\n".join(lacking_msgs))
 
         # 扣除材料 & 金币
+        consumed_materials = {}  # 记录已扣除的材料，用于回滚
         for item_id, need_qty in req_materials.items():
             success_consume = await ItemInstance.consume_item(session, player.id, item_id, need_qty)
             if not success_consume:
                 await session.rollback()
                 await craft_cmd.finish("⛔ 扣除材料失败")
+            consumed_materials[item_id] = need_qty
         player.gold -= req_gold
 
-        # 通过统一接口添加装备（不可堆叠，每件占1格）
+        # 添加装备到背包
         try:
             await ItemInstance.add_item(session, player.id, item_cfg.item_id, quantity=1, durability=item_cfg.durability)
         except ValueError as e:
+            # 背包空间不足，恢复金币（材料已通过 rollback 恢复）
+            player.gold += req_gold
             await session.rollback()
             await craft_cmd.finish(f"⛔ {e}")
 
