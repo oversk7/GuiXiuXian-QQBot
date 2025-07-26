@@ -8,8 +8,7 @@ from __future__ import annotations
    • 导航 x y      → 开启/查看导航进度
    • 中断导航      → 取消当前导航
 3. 导航过程中不会主动推送消息，位置更新在玩家下一次触发相关指令时计算。
-4. 速度公式：tiles_per_second = max(0.2, player.agility / 30)
-5. 坐标范围限制：0 ≤ x,y ≤ 1000
+4. 坐标范围限制：-500 ≤ x,y ≤ 500
 """
 
 from nonebot import on_command
@@ -38,32 +37,31 @@ def _tiles_per_second(agility: int) -> float:
     return max(0.01, agility / 2500)
 
 
-def _step_towards(curr_x: int, curr_y: int, target_x: int, target_y: int, steps: int) -> Tuple[int, int]:
-    """沿两点连线方向移动 steps 格，使用 Bresenham 算法近似直线。"""
-    x, y = curr_x, curr_y
-    if steps <= 0:
-        return x, y
+def _euclidean_distance(x1: int, y1: int, x2: int, y2: int) -> float:
+    """计算欧几里得距离，用于准确的时间预估"""
+    return ((x2 - x1) ** 2 + (y2 - y1) ** 2) ** 0.5
 
-    dx_total = abs(target_x - x)
-    dy_total = abs(target_y - y)
-    sx = 1 if target_x > x else -1 if target_x < x else 0
-    sy = 1 if target_y > y else -1 if target_y < y else 0
 
-    err = dx_total - dy_total
 
-    while steps > 0 and (x != target_x or y != target_y):
-        e2 = err * 2
-        if e2 > -dy_total:
-            err -= dy_total
-            x += sx
-            steps -= 1
-            if steps == 0 or (x == target_x and y == target_y):
-                break
-        if e2 < dx_total and steps > 0:
-            err += dx_total
-            y += sy
-            steps -= 1
-    return x, y
+def _move_towards(curr_x: int, curr_y: int, target_x: int, target_y: int, distance: float) -> Tuple[int, int]:
+    """沿两点连线方向移动指定距离，返回新的整数坐标。"""
+    if distance <= 0:
+        return curr_x, curr_y
+
+    dx = target_x - curr_x
+    dy = target_y - curr_y
+    current_distance = (dx * dx + dy * dy) ** 0.5
+
+    # 如果已经到达或距离很近，直接返回目标
+    if current_distance <= distance:
+        return target_x, target_y
+
+    # 计算移动比例
+    ratio = distance / current_distance
+    new_x = curr_x + dx * ratio
+    new_y = curr_y + dy * ratio
+
+    return round(new_x), round(new_y)
 
 
 def _update_nav_position(player: Player, task: NavigationTask | None) -> bool:
@@ -77,13 +75,13 @@ def _update_nav_position(player: Player, task: NavigationTask | None) -> bool:
         return False
 
     speed = _tiles_per_second(player.agility)
-    movable = int(elapsed * speed)
-    if movable <= 0:
+    movable_distance = elapsed * speed
+    if movable_distance <= 0:
         return False
 
     cx, cy = player.x, player.y
     tx, ty = task.target_x, task.target_y
-    new_x, new_y = _step_towards(cx, cy, tx, ty, movable)
+    new_x, new_y = _move_towards(cx, cy, tx, ty, movable_distance)
 
     player.x, player.y = new_x, new_y
     task.last_update = now
@@ -121,31 +119,32 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
                 await nav_cmd.finish(message_add_head(f"🧭 当前位置 {player.region} ({player.x},{player.y})\n暂无导航目标。", event))
             target_x, target_y = task.target_x, task.target_y
 
-            # -------- 计算带小数的展示坐标 --------
+            # -------- 计算实时展示坐标 --------
             now_p = datetime.now()
             elapsed_p = (now_p - task.last_update).total_seconds()
             speed_p = _tiles_per_second(player.agility)
-            frac_move = elapsed_p * speed_p  # 可能小于1
+            move_distance = elapsed_p * speed_p
 
             disp_x, disp_y = float(player.x), float(player.y)
-            if frac_move > 0 and (player.x != target_x or player.y != target_y):
-                dx_r = target_x - player.x
-                dy_r = target_y - player.y
-                steps_rem = max(abs(dx_r), abs(dy_r))
-                if steps_rem > 0:
-                    unit_x = dx_r / steps_rem
-                    unit_y = dy_r / steps_rem
+            if move_distance > 0 and (player.x != target_x or player.y != target_y):
+                dx = target_x - player.x
+                dy = target_y - player.y
+                current_distance = (dx * dx + dy * dy) ** 0.5
+
+                if current_distance > 0:
                     # 不超越目标
-                    move_dist = min(frac_move, steps_rem)
-                    disp_x += unit_x * move_dist
-                    disp_y += unit_y * move_dist
+                    actual_move = min(move_distance, current_distance)
+                    ratio = actual_move / current_distance
+                    disp_x += dx * ratio
+                    disp_y += dy * ratio
+
             disp_x = round(disp_x, 1)
             disp_y = round(disp_y, 1)
 
-            # 速度 & 预计剩余时间
+            # 速度 & 预计剩余时间（使用欧几里得距离）
             speed_now = _tiles_per_second(player.agility)
-            rem_steps = max(abs(target_x - player.x), abs(target_y - player.y))
-            eta_sec = rem_steps / speed_now if speed_now > 0 else 0
+            rem_distance = _euclidean_distance(player.x, player.y, target_x, target_y)
+            eta_sec = rem_distance / speed_now if speed_now > 0 else 0
             eta_td = timedelta(seconds=int(eta_sec))
 
             await session.commit()
@@ -168,10 +167,10 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
         else:
             task = NavigationTask(player_id=player.id, target_x=tx, target_y=ty, last_update=datetime.now())
             session.add(task)
-        # 速度与预计时间
+        # 速度与预计时间（使用欧几里得距离）
         speed_now = _tiles_per_second(player.agility)
-        rem_steps = max(abs(tx - player.x), abs(ty - player.y))
-        eta_td = timedelta(seconds=int(rem_steps / speed_now)) if speed_now>0 else timedelta(seconds=0)
+        rem_distance = _euclidean_distance(player.x, player.y, tx, ty)
+        eta_td = timedelta(seconds=int(rem_distance / speed_now)) if speed_now > 0 else timedelta(seconds=0)
 
         await session.commit()
         await nav_cmd.finish(message_add_head(
