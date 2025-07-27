@@ -121,7 +121,7 @@ elixirs:
   divine_blessing:
     produce_item_id: "divine_blessing_elixir"
     materials:
-      god_tear: 1           # 橙色材料
+      god_tear: 2          # 橙色材料
       void_essence: 2       # 紫色材料
       demon_heart: 3        # 紫色材料
       cursed_mirror_shard: 5 # 蓝色材料
@@ -132,8 +132,8 @@ elixirs:
   world_power:
     produce_item_id: "world_power_elixir"
     materials:
-      world_fragment: 1     # 橙色材料
-      time_dust: 1          # 橙色材料
+      world_fragment: 2     # 橙色材料
+      time_dust: 3          # 橙色材料
       void_essence: 3       # 紫色材料
       demon_heart: 2        # 紫色材料
     quantity: 1

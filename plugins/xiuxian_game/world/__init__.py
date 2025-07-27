@@ -277,13 +277,13 @@ async def get_or_create_tile(session, region: str, x: int, y: int) -> WorldTile:
 
         if tier <= 2:
             # 低级诡域：基础事件为主
-            event_weights = [15, 5, 65, 5, 8, 2]  # MATERIAL, TREASURE, EMPTY, REST, MERCHANT, ELITE
+            event_weights = [15, 5, 70, 5, 2, 3]  # MATERIAL, TREASURE, EMPTY, REST, MERCHANT, ELITE
         elif tier <= 4:
             # 中级诡域：增加商人和精英怪
-            event_weights = [12, 4, 60, 4, 12, 8]
+            event_weights = [12, 5, 70, 7, 2, 4]
         else:
             # 高级诡域：更多特殊事件
-            event_weights = [10, 3, 55, 3, 15, 14]
+            event_weights = [10, 5, 70, 5, 4, 6]
 
         tile.event_type = rng.choices(
             ["MATERIAL", "TREASURE", "EMPTY", "REST", "MERCHANT", "ELITE"],
@@ -788,6 +788,11 @@ async def handle_buy(event: MessageEvent, args: Message = CommandArg()):
         if player.id not in tile.state.get("visited_by", []):
             await buy_cmd.finish("⛔ 你还没有与卖货郎交谈，请先【探索】")
 
+        # 检查玩家是否已经购买过商品
+        purchased_by = tile.state.get("purchased_by", [])
+        if player.id in purchased_by:
+            await buy_cmd.finish("⛔ 你已经从这个卖货郎处购买过商品了，每人只能购买一次")
+
         goods = tile.state.get("goods", [])
         if not goods or item_index < 1 or item_index > len(goods):
             await buy_cmd.finish("⛔ 商品序号无效")
@@ -811,6 +816,9 @@ async def handle_buy(event: MessageEvent, args: Message = CommandArg()):
             goods.pop(item_index - 1)
             tile.state["goods"] = goods
 
+            # 标记玩家已购买，防止重复购买
+            tile.state.setdefault("purchased_by", []).append(player.id)
+
             session.add_all([player, tile])
             await session.commit()
 
@@ -818,7 +826,8 @@ async def handle_buy(event: MessageEvent, args: Message = CommandArg()):
                 f"💰 购买成功！\n"
                 f"▫️ 获得：{item_config.get_display_name()} ✖️{good['quantity']}\n"
                 f"▫️ 花费：{good['price']}💰\n"
-                f"▫️ 剩余金币：{player.gold}💰"
+                f"▫️ 剩余金币：{player.gold}💰\n"
+                f"⚠️ 你已经从这个卖货郎处购买过商品，无法再次购买"
             )
             await buy_cmd.finish(message_add_head(msg, event))
 

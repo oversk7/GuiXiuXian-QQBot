@@ -10,6 +10,66 @@ from ..models.db import safe_session
 from ..models.player import Player
 from ..models.elixir_usage import ElixirUsageLog
 
+
+def _get_material_obtain_methods(item_id: str, rarity: str) -> str:
+    """获取材料的获取方式信息"""
+    methods = []
+
+    # 检查是否在市集中出售
+    from ..economy.merchants import goods_ids
+    if item_id in goods_ids:
+        methods.append("市集购买")
+
+    # 检查是否在万事屋中出售
+    from ..economy.merchants import SHOP_ITEMS
+    if item_id in SHOP_ITEMS:
+        methods.append("万事屋购买")
+
+    # 检查区域信息
+    map_config = config.map_config
+    merchant_regions = []
+    basic_regions = []
+
+    for region_name, region_config in map_config.get("regions", {}).items():
+        # 检查商人材料
+        merchant_materials = region_config.get("merchant_materials", [])
+        if item_id in merchant_materials:
+            merchant_regions.append(region_name)
+
+        # 检查基础材料
+        basic_materials = region_config.get("basic_materials", [])
+        if item_id in basic_materials:
+            basic_regions.append(region_name)
+
+    # 根据稀有度添加获取方式
+    if rarity == "white":
+        methods.append("材料格子采集")
+        if basic_regions:
+            regions_str = "、".join(basic_regions[:3])  # 最多显示3个区域
+            if len(basic_regions) > 3:
+                regions_str += "等"
+            methods.append(f"探索({regions_str})")
+
+    if rarity in ["green", "blue", "purple", "orange"]:
+        methods.append("战斗掉落")
+        if merchant_regions:
+            regions_str = "、".join(merchant_regions[:3])
+            if len(merchant_regions) > 3:
+                regions_str += "等"
+            methods.append(f"副本商人({regions_str})")
+
+    # 根据稀有度添加通用获取方式
+    if rarity in ["green", "blue"]:
+        methods.append("中高级怪物掉落")
+    elif rarity in ["purple", "orange"]:
+        methods.append("高级/顶级怪物掉落")
+
+    # 扫荡令获取（主要是基础材料）
+    if rarity == "white":
+        methods.append("扫荡令扫荡")
+
+    return "、".join(methods) if methods else "暂无获取途径"
+
 # 图鉴命令：查询物品、装备和鬼怪的详细信息
 catalog_cmd = on_command("图鉴", aliases={"查看","查看物品","详情"}, block=True, priority=5)
 
@@ -120,10 +180,15 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
             if bonus_parts:
                 extra_info = "\n🔧 属性加成：" + " 、".join(bonus_parts)
 
-        # 若为材料，展示价格和怨念值
+        # 若为材料，展示价格、怨念值和获取方式
         elif cfg.type.value == "MATERIAL":
             grudge_info = f"😈 怨念值：{cfg.grudge_value}" if cfg.grudge_value else ""
-            extra_info = "\n" + "  ".join(filter(bool, [grudge_info]))
+
+            # 获取材料获取方式
+            obtain_methods = _get_material_obtain_methods(cfg.item_id, cfg.rarity)
+            obtain_info = f"📍 获取方式：{obtain_methods}" if obtain_methods else ""
+
+            extra_info = "\n" + "\n".join(filter(bool, [grudge_info, obtain_info]))
 
         # 若为丹药，展示每日使用限制和当前状态
         elif cfg.item_id.endswith("_elixir"):
