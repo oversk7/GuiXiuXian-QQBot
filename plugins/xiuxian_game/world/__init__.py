@@ -446,7 +446,7 @@ async def _(event: MessageEvent):
                 looted_by = t.state.get("looted_by", [])
                 if player.id in looted_by or t.state.get("looted"):
                     return f"🪨 这里曾经散落着 {item_name} ✖️{qty}，但已被搜刮一空。"
-                return f"✨ 你发现了材料 {item_name} ✖️{qty}，可输入 [探索] 获取。"
+                return f"✨ 你发现了材料 {item_name} ✖️{qty}，可输入 [收集] 获取。"
             elif t.event_type == "TREASURE":
                 if t.state.get("looted"):
                     return "🪨 破碎的宝箱静静躺在尘埃中，没有任何价值。"

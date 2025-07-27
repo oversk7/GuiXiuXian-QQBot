@@ -180,15 +180,27 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
             if bonus_parts:
                 extra_info = "\n🔧 属性加成：" + " 、".join(bonus_parts)
 
-        # 若为材料，展示价格、怨念值和获取方式
+        # 若为材料，展示稀有度、价格、怨念值和获取方式
         elif cfg.type.value == "MATERIAL":
+            # 稀有度信息
+            rarity_display = cfg.get_rarity_display()
+            rarity_map = {
+                "white": "普通",
+                "green": "优秀",
+                "blue": "稀有",
+                "purple": "史诗",
+                "orange": "传说"
+            }
+            rarity_name = rarity_map.get(cfg.rarity, cfg.rarity)
+            rarity_info = f"⭐ 稀有度：{rarity_display}{rarity_name}"
+
             grudge_info = f"😈 怨念值：{cfg.grudge_value}" if cfg.grudge_value else ""
 
             # 获取材料获取方式
             obtain_methods = _get_material_obtain_methods(cfg.item_id, cfg.rarity)
             obtain_info = f"📍 获取方式：{obtain_methods}" if obtain_methods else ""
 
-            extra_info = "\n" + "\n".join(filter(bool, [grudge_info, obtain_info]))
+            extra_info = "\n" + "\n".join(filter(bool, [rarity_info, grudge_info, obtain_info]))
 
         # 若为丹药，展示每日使用限制和当前状态
         elif cfg.item_id.endswith("_elixir"):
