@@ -54,6 +54,9 @@ class ItemConfig:
         # 材料稀有度
         self.rarity = data.get("rarity", "white")
 
+        # 丹药每日使用限制
+        self.daily_limit = data.get("daily_limit", 0)  # 每日服用上限，0表示无限制
+
     def get_rarity_display(self) -> str:
         """获取稀有度显示文本"""
         rarity_map = {

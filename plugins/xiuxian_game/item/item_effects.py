@@ -8,9 +8,11 @@ from __future__ import annotations
 from typing import Callable, Awaitable, Dict, Tuple
 from ..models.player import Player
 from ..models.inventory import ItemEffectType, ItemConfig, ItemInstance, ItemType
+from ..models.elixir_usage import ElixirUsageLog
+from datetime import date
 
 # 类型别名
-EffectHandler = Callable[[Player, ItemConfig, int, str], Awaitable[Tuple[bool, str]]]
+EffectHandler = Callable[[Player, ItemConfig, int, str, object], Awaitable[Tuple[bool, str]]]
 
 # 注册表
 _REGISTRY: Dict[ItemEffectType, EffectHandler] = {}
@@ -24,7 +26,7 @@ def register(effect_type: ItemEffectType):
     return decorator
 
 
-async def apply_effect(player: Player, item_cfg: ItemConfig, quantity: int = 1, ctx: str = "world") -> Tuple[bool, str]:
+async def apply_effect(player: Player, item_cfg: ItemConfig, quantity: int = 1, ctx: str = "world", session=None) -> Tuple[bool, str]:
     """根据 item_cfg 调用对应处理器
 
     参数
@@ -37,6 +39,8 @@ async def apply_effect(player: Player, item_cfg: ItemConfig, quantity: int = 1, 
         使用数量
     ctx : str
         使用场景。可选示例："world"、"battle"、"death" 等
+    session : AsyncSession
+        数据库会话，用于耐药性处理
 
     返回值
     ------
@@ -47,13 +51,28 @@ async def apply_effect(player: Player, item_cfg: ItemConfig, quantity: int = 1, 
     if not handler:
         # 未实现效果
         return False, "❓ 该道具效果尚未实现"
-    return await handler(player, item_cfg, quantity, ctx)
+    return await handler(player, item_cfg, quantity, ctx, session)
+
+
+async def update_elixir_usage(session, player: Player, item_cfg: ItemConfig, quantity: int = 1):
+    """更新丹药使用记录
+
+    Args:
+        session: 数据库会话
+        player: 玩家对象
+        item_cfg: 物品配置
+        quantity: 使用数量
+    """
+    # 只有丹药才需要记录使用量
+    if item_cfg.item_id.endswith("_elixir"):
+        log = await ElixirUsageLog.get_or_create_log(session, player.id, item_cfg.item_id)
+        log.quantity += quantity
 
 
 # ---------------- 具体效果实现 ----------------
 
 @register(ItemEffectType.RESTORE_HP)
-async def _restore_hp(player: Player, cfg: ItemConfig, qty: int, ctx: str) -> Tuple[bool, str]:
+async def _restore_hp(player: Player, cfg: ItemConfig, qty: int, ctx: str, session=None) -> Tuple[bool, str]:
     value = int(cfg.effect_params.get("value", 0)) * qty
     if player.hp <= 0:
         return False, "🧐 你已经死亡，无法恢复生命"
@@ -64,7 +83,7 @@ async def _restore_hp(player: Player, cfg: ItemConfig, qty: int, ctx: str) -> Tu
 
 
 @register(ItemEffectType.RESTORE_MP)
-async def _restore_mp(player: Player, cfg: ItemConfig, qty: int, ctx: str) -> Tuple[bool, str]:
+async def _restore_mp(player: Player, cfg: ItemConfig, qty: int, ctx: str, session=None) -> Tuple[bool, str]:
     value = int(cfg.effect_params.get("value", 0)) * qty
     if player.hp <= 0:
         return False, "🧐 你已经死亡，无法恢复理智"
@@ -75,35 +94,47 @@ async def _restore_mp(player: Player, cfg: ItemConfig, qty: int, ctx: str) -> Tu
 
 
 @register(ItemEffectType.RESTORE_HP_PERCENT)
-async def _restore_hp_percent(player: Player, cfg: ItemConfig, qty: int, ctx: str) -> Tuple[bool, str]:
-    percent = float(cfg.effect_params.get("percent", 0)) * qty
+async def _restore_hp_percent(player: Player, cfg: ItemConfig, qty: int, ctx: str, session=None) -> Tuple[bool, str]:
     if player.hp <= 0:
         return False, "🧐 你已经死亡，无法恢复生命"
     if player.hp >= player.max_hp:
         return False, "🧐 你的生命值已满，不需要使用此物品"
 
+    # 计算恢复量（效果不减弱）
+    percent = float(cfg.effect_params.get("percent", 0)) * qty
     value = int(player.max_hp * percent)
     player.hp = min(player.max_hp, player.hp + value)
+
+    # 更新使用记录
+    if session:
+        await update_elixir_usage(session, player, cfg, qty)
+
     percent_display = int(percent * 100)
     return True, f"❤️ 恢复 {percent_display}% 生命值 ({value}点) (当前 {player.hp}/{player.max_hp})"
 
 
 @register(ItemEffectType.RESTORE_MP_PERCENT)
-async def _restore_mp_percent(player: Player, cfg: ItemConfig, qty: int, ctx: str) -> Tuple[bool, str]:
-    percent = float(cfg.effect_params.get("percent", 0)) * qty
+async def _restore_mp_percent(player: Player, cfg: ItemConfig, qty: int, ctx: str, session=None) -> Tuple[bool, str]:
     if player.hp <= 0:
         return False, "🧐 你已经死亡，无法恢复理智"
     if player.mp >= player.max_mp:
         return False, "🧐 你的理智值已满，不需要使用此物品"
 
+    # 计算恢复量（效果不减弱）
+    percent = float(cfg.effect_params.get("percent", 0)) * qty
     value = int(player.max_mp * percent)
     player.mp = min(player.max_mp, player.mp + value)
+
+    # 更新使用记录
+    if session:
+        await update_elixir_usage(session, player, cfg, qty)
+
     percent_display = int(percent * 100)
     return True, f"🧠 恢复 {percent_display}% 理智值 ({value}点) (当前 {player.mp}/{player.max_mp})"
 
 # 原地复活，与复活指令效果不同
 @register(ItemEffectType.REVIVE)
-async def _revive(player: Player, cfg: ItemConfig, qty: int, ctx: str) -> Tuple[bool, str]:
+async def _revive(player: Player, cfg: ItemConfig, qty: int, ctx: str, session=None) -> Tuple[bool, str]:
     if player.hp > 0:
         return False, "🧐 你尚未死亡，无需复活"
     ratio = float(cfg.effect_params.get("rate", 1.0))
@@ -113,12 +144,13 @@ async def _revive(player: Player, cfg: ItemConfig, qty: int, ctx: str) -> Tuple[
 
 
 @register(ItemEffectType.BUFF)
-async def _buff(player: Player, cfg: ItemConfig, qty: int, ctx: str) -> Tuple[bool, str]:
+async def _buff(player: Player, cfg: ItemConfig, qty: int, ctx: str, session=None) -> Tuple[bool, str]:
     """临时 BUFF：直接把属性累加到玩家本体上。复杂持续时间逻辑以后实现。"""
     attrs = cfg.effect_params or {}
     if not attrs:
         return False, "⛔ 该道具没有任何增益"
-    # 简单累加
+
+    # 简单累加（效果不减弱）
     ATTRIBUTE_MAP = {
         "max_hp": "体",
         "max_mp": "智",
@@ -127,6 +159,7 @@ async def _buff(player: Player, cfg: ItemConfig, qty: int, ctx: str) -> Tuple[bo
         "luck": "运",
         "defense": "防",
     }
+
     changed = []
     for k, v in attrs.items():
         if not hasattr(player, k):
@@ -134,22 +167,35 @@ async def _buff(player: Player, cfg: ItemConfig, qty: int, ctx: str) -> Tuple[bo
         old = getattr(player, k)
         new_val = old + int(v) * qty
         setattr(player, k, new_val)
-        changed.append(f"{ATTRIBUTE_MAP[k]}+{int(v)*qty}")
+        changed.append(f"{ATTRIBUTE_MAP.get(k, k)}+{int(v)*qty}")
+
+    # 更新使用记录
+    if session:
+        await update_elixir_usage(session, player, cfg, qty)
+
     if not changed:
         return False, "⛔ 增益属性无效"
-    return True, "✨ 获得增益：" + ", ".join(changed)
+    return True, f"✨ 获得增益：{', '.join(changed)}"
 
 @register(ItemEffectType.GAIN_EXP)
-async def _gain_exp(player: Player, cfg: ItemConfig, qty: int, ctx: str) -> Tuple[bool, str]:
+async def _gain_exp(player: Player, cfg: ItemConfig, qty: int, ctx: str, session=None) -> Tuple[bool, str]:
     """直接获得经验值，道具参数 value 指定单份经验量。"""
-    value = int(cfg.effect_params.get("value", 0)) * qty
-    if value <= 0:
+    base_value = int(cfg.effect_params.get("value", 0))
+    if base_value <= 0:
         return False, "⛔ 该丹药配置错误"
-    player.exp += value
-    return True, f"📚 获得 {value} 点经验"
+
+    # 计算经验值（效果不减弱）
+    actual_value = base_value * qty
+    player.exp += actual_value
+
+    # 更新使用记录
+    if session:
+        await update_elixir_usage(session, player, cfg, qty)
+
+    return True, f"📚 获得 {actual_value} 点经验"
 
 @register(ItemEffectType.SWEEP_DUNGEON)
-async def _sweep_dungeon(player: Player, cfg: ItemConfig, qty: int, ctx: str) -> Tuple[bool, str]:
+async def _sweep_dungeon(player: Player, cfg: ItemConfig, qty: int, ctx: str, session=None) -> Tuple[bool, str]:
     """扫荡当前诡域，获得经验和材料奖励
 
     扫荡逻辑：
@@ -295,7 +341,7 @@ async def _sweep_dungeon(player: Player, cfg: ItemConfig, qty: int, ctx: str) ->
 # ---------------- 重置属性 ----------------
 
 @register(ItemEffectType.RESET_ATTR)
-async def _reset_attr(player: Player, cfg: ItemConfig, qty: int, ctx: str):
+async def _reset_attr(player: Player, cfg: ItemConfig, qty: int, ctx: str, session=None):
     """重置已分配属性点，保留装备加成。仅允许 qty=1。"""
     if qty != 1:
         return False, "⛔ 重启符一次只能使用 1 个"
@@ -341,7 +387,7 @@ async def _reset_attr(player: Player, cfg: ItemConfig, qty: int, ctx: str):
 
 
 @register(ItemEffectType.EXPAND_TERRITORY)
-async def _expand_territory(player: Player, cfg: ItemConfig, qty: int, ctx: str) -> Tuple[bool, str]:
+async def _expand_territory(player: Player, cfg: ItemConfig, qty: int, ctx: str, session=None) -> Tuple[bool, str]:
     """扩张公会势力范围 - 这个效果需要特殊处理，因为需要修改Guild对象"""
     # 检查玩家是否加入公会
     if not player.guild_id:

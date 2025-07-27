@@ -54,6 +54,7 @@ async def _handle_expand_territory(session, player: Player, item_config, quantit
 
 inventory_cmd = on_command("背包", block=True, priority=5)
 use_item = on_command("使用", block=True, priority=5)
+elixir_tolerance_cmd = on_command("耐药性", aliases={"丹药耐药性"}, block=True, priority=5)
 
 teleport_cmd = on_command("传送", block=True, priority=5)
 rename_cmd = on_command("改名", block=True, priority=5)
@@ -127,10 +128,11 @@ async def handle_use_item(event: MessageEvent, args: Message = CommandArg()):
         elif item_config.effect_type == ItemEffectType.TELEPORT:
             await use_item.finish("🪄 请使用指令进行传送：/传送 地点名称")
 
-        # ---------------- 每日丹药使用限制 ----------------
-        ELIXIR_DAILY_LIMIT = 5
+        # ---------------- 丹药使用限制检查 ----------------
         is_elixir = item_config.item_id.endswith("_elixir")
         if is_elixir:
+            # 检查每日使用限制
+            daily_limit = item_config.daily_limit if item_config.daily_limit > 0 else 999
             usage_stmt = select(ElixirUsageLog).where(
                 ElixirUsageLog.player_id == player.id,
                 ElixirUsageLog.item_id == item_config.item_id,
@@ -138,11 +140,11 @@ async def handle_use_item(event: MessageEvent, args: Message = CommandArg()):
             )
             log_row = (await session.execute(usage_stmt)).scalars().first()
             used_today = log_row.quantity if log_row else 0
-            if used_today + quantity > ELIXIR_DAILY_LIMIT:
-                await use_item.finish(f"⛔ 每日最多可服用 {ELIXIR_DAILY_LIMIT} 颗丹药，今日已用 {used_today} 颗")
+            if used_today + quantity > daily_limit:
+                await use_item.finish(f"⛔ {item_config.name} 每日最多可服用 {daily_limit} 颗，今日已用 {used_today} 颗")
 
-        # 调用统一效果执行器
-        success, msg = await apply_effect(player, item_config, quantity, ctx="world")
+        # 调用统一效果执行器（传递session以支持耐药性）
+        success, msg = await apply_effect(player, item_config, quantity, ctx="world", session=session)
 
         # 特殊处理：公会扩张令
         if not success and msg == "EXPAND_TERRITORY_SPECIAL_HANDLING":
@@ -174,17 +176,54 @@ async def handle_use_item(event: MessageEvent, args: Message = CommandArg()):
             delattr(player, '_sweep_materials')
 
         session.add(player)
-
-        # 更新使用日志
-        if is_elixir:
-            if log_row:
-                log_row.quantity += quantity
-            else:
-                session.add(ElixirUsageLog(player_id=player.id, item_id=item_config.item_id, use_date=date.today(), quantity=quantity))
-
         await session.commit()
 
         await use_item.finish(f"✅ 成功使用 {item_name} ✖️{quantity}\n" + msg)
+
+
+@elixir_tolerance_cmd.handle()
+async def handle_elixir_tolerance(event: MessageEvent, args: Message = CommandArg()):
+    """查看丹药使用状态"""
+    async with safe_session() as session:
+        player = await session.get(Player, event.get_user_id())
+        if not player:
+            await elixir_tolerance_cmd.finish("⛔ 请先创建角色")
+
+        # 获取所有丹药的使用记录
+        from sqlalchemy import select
+        stmt = select(ElixirUsageLog).where(
+            ElixirUsageLog.player_id == player.id,
+            ElixirUsageLog.use_date == date.today()
+        )
+        logs = (await session.execute(stmt)).scalars().all()
+
+        if not logs:
+            await elixir_tolerance_cmd.finish("📊 今日尚未服用任何丹药")
+
+        # 构建使用状态报告
+        lines = ["📊 今日丹药使用状态", "=" * 30]
+
+        for log in logs:
+            item_config = config.items_config["by_id"].get(log.item_id)
+            if not item_config:
+                continue
+
+            # 计算剩余可用次数
+            remaining = max(0, item_config.daily_limit - log.quantity)
+
+            # 状态显示
+            if remaining > 0:
+                status = f"🟢 可用 {remaining} 次"
+            else:
+                status = "🔴 已达上限"
+
+            lines.append(f"{item_config.name}")
+            lines.append(f"  今日使用：{log.quantity}/{item_config.daily_limit}")
+            lines.append(f"  状态：{status}")
+            lines.append("")
+
+        result = "\n".join(lines)
+        await elixir_tolerance_cmd.finish(result)
 
 @inventory_cmd.handle()
 async def handle_inventory(event: MessageEvent, args: Message = CommandArg()):

@@ -5,8 +5,8 @@ game:
   points_per_level: 10  # 每次升级获得的属性点数
   exp_curve:
     early_multiplier: 10
-    late_multiplier: 5
-    curve_change_level: 15
+    late_multiplier: 6
+    curve_change_level: 10
   inventory_page_size: 10  # 背包每页显示物品数量
 
 # 资源控制配置

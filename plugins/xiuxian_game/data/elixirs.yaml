@@ -1,97 +1,140 @@
 elixirs:
+  # ========== 初级丹药 (1-20级) - 主要使用白色材料 ==========
+
+  # 基础经验丹药 - 升灵丹 (3000经验)
   spirit_pill:
     produce_item_id: "spirit_elixir"
     materials:
-      rotten_core: 20
-      yin_essence: 8
-      drowned_scale: 5
+      rotten_core: 8        # 白色材料
+      ghost_tears: 5        # 白色材料
+      spirit_bone: 3        # 白色材料
     quantity: 1
     base_success: 0.9
 
-  blood_heart:
-    produce_item_id: "blood_heart_elixir"
-    materials:
-      flesh_crystal: 10
-      medical_record: 5
-      drowned_scale: 20
-    quantity: 1
-    base_success: 0.8
-
-  night_soul:
-    produce_item_id: "night_soul_elixir"
-    materials:
-      nightmare_silk: 50
-      yin_essence: 6
-      kissed_phone_number: 3
-    quantity: 1
-    base_success: 0.7
-
-  void_eye:
-    produce_item_id: "void_eye_elixir"
-    materials:
-      ghost_tears: 50
-      wanted_poster: 20
-      drowned_scale: 10
-    quantity: 1
-    base_success: 0.5
-
+  # 基础回血丹药 - 回生丹 (30%血量)
   life_recovery:
     produce_item_id: "life_recovery_elixir"
     materials:
-      flesh_crystal: 8
-      spirit_bone: 15
-      rotten_core: 10
+      spirit_bone: 10       # 白色材料
+      bone_fragment: 15     # 白色材料
+      ash_powder: 8         # 白色材料
     quantity: 1
-    base_success: 0.85
+    base_success: 0.9
 
+  # 基础回蓝丹药 - 凝魂丹 (30%理智)
   soul_recovery:
     produce_item_id: "soul_recovery_elixir"
     materials:
-      yin_essence: 12
-      ghost_tears: 20
-      cursed_silk: 8
+      ghost_tears: 12       # 白色材料
+      cursed_silk: 8        # 白色材料
+      grave_soil: 6         # 白色材料
     quantity: 1
-    base_success: 0.85
+    base_success: 0.9
 
+  # ========== 中级丹药 (21-60级) - 白色+绿色材料 ==========
+
+  # 中级经验丹药 - 血心丹 (8000经验)
+  blood_heart:
+    produce_item_id: "blood_heart_elixir"
+    materials:
+      yin_essence: 6        # 绿色材料
+      corrupted_bandage: 4  # 绿色材料
+      rotten_core: 15       # 白色材料
+      iron_rust: 10         # 白色材料
+    quantity: 1
+    base_success: 0.8
+
+  # 中级回血丹药 - 大回生丹 (60%血量)
   great_life_recovery:
     produce_item_id: "great_life_recovery_elixir"
     materials:
-      flesh_crystal: 20
-      rotten_core: 30
-      drowned_scale: 25
-      medical_record: 3
+      drowned_scale: 5      # 绿色材料
+      spirit_bone: 20       # 白色材料
+      bone_fragment: 25     # 白色材料
+      ash_powder: 15        # 白色材料
     quantity: 1
-    base_success: 0.75
+    base_success: 0.8
 
+  # 中级回蓝丹药 - 大凝魂丹 (60%理智)
   great_soul_recovery:
     produce_item_id: "great_soul_recovery_elixir"
     materials:
-      yin_essence: 25
-      ghost_tears: 40
-      wanted_poster: 5
-      kissed_phone_number: 2
+      yin_essence: 8        # 绿色材料
+      withered_flower: 3    # 绿色材料
+      ghost_tears: 25       # 白色材料
+      cursed_silk: 18       # 白色材料
+    quantity: 1
+    base_success: 0.8
+
+  # ========== 高级丹药 (61-100级) - 绿色+蓝色材料 ==========
+
+  # 高级经验丹药 - 夜魂丹 (12000经验)
+  night_soul:
+    produce_item_id: "night_soul_elixir"
+    materials:
+      flesh_crystal: 3      # 蓝色材料
+      nightmare_silk: 8     # 绿色材料
+      school_bell_fragment: 5 # 绿色材料
+      yin_essence: 6        # 绿色材料
     quantity: 1
     base_success: 0.75
 
+  # 高级复活丹药 - 完美还魂丹 (95%复活)
   perfect_revive:
     produce_item_id: "perfect_revive_elixir"
     materials:
-      flesh_crystal: 30
-      nightmare_silk: 25
-      wanted_poster: 10
-      medical_record: 8
-      rotten_core: 5
+      soul_crystal: 2       # 蓝色材料
+      nightmare_silk: 12    # 绿色材料
+      drowned_scale: 8      # 绿色材料
+      corrupted_bandage: 6  # 绿色材料
+    quantity: 1
+    base_success: 0.7
+
+  # ========== 顶级丹药 (101-150级) - 蓝色+紫色材料 ==========
+
+  # 属性提升丹药 - 虚眼丹 (永久+5运气+5攻击)
+  void_eye:
+    produce_item_id: "void_eye_elixir"
+    materials:
+      cursed_mirror_shard: 2  # 蓝色材料
+      medical_record: 1       # 紫色材料
+      phantom_thread: 3       # 蓝色材料
+      nightmare_silk: 15      # 绿色材料
     quantity: 1
     base_success: 0.6
 
+  # 终极复活丹药 - 真还魂丹 (100%复活)
   supreme_revive:
     produce_item_id: "supreme_revive_elixir"
     materials:
-      flesh_crystal: 50
-      nightmare_silk: 40
-      yin_essence: 30
-      wanted_poster: 20
-      medical_record: 15
-      kissed_phone_number: 10
+      demon_heart: 1        # 紫色材料
+      soul_crystal: 4       # 蓝色材料
+      flesh_crystal: 6      # 蓝色材料
+      phantom_thread: 8     # 蓝色材料
+      nightmare_silk: 20    # 绿色材料
+    quantity: 1
+    base_success: 0.5
+
+  # ========== 传说丹药 (151+级) - 紫色+橙色材料 ==========
+
+  # 传说经验丹药 - 神明恩赐丹 (25000经验)
+  divine_blessing:
+    produce_item_id: "divine_blessing_elixir"
+    materials:
+      god_tear: 1           # 橙色材料
+      void_essence: 2       # 紫色材料
+      demon_heart: 3        # 紫色材料
+      cursed_mirror_shard: 5 # 蓝色材料
     quantity: 1
     base_success: 0.4
+
+  # 传说属性丹药 - 世界之力丹 (永久+10全属性)
+  world_power:
+    produce_item_id: "world_power_elixir"
+    materials:
+      world_fragment: 1     # 橙色材料
+      time_dust: 1          # 橙色材料
+      void_essence: 3       # 紫色材料
+      demon_heart: 2        # 紫色材料
+    quantity: 1
+    base_success: 0.3

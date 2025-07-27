@@ -301,87 +301,238 @@ items:
       grudge_value: 500
 
   equipment:
+    # ========== 初级装备 (1-20级) - 主要数值加成，使用白色材料 ==========
+
+    - item_id: "bone_armor"
+      name: "白骨护甲"
+      description: "用兽骨拼接而成的简陋护甲，能提供基础防护。"
+      type: "EQUIPMENT"
+      price: 3000
+      durability: 80
+      attr_bonus: {"hp": 80, "defense": 15}
+      recipe:
+        materials:
+          spirit_bone: 20
+          bone_fragment: 30
+          grave_soil: 15
+        gold: 500
+      repair_cost: 50
+
+    - item_id: "ghost_tear_pendant"
+      name: "鬼泪吊坠"
+      description: "用鬼泪制成的吊坠，能稍微安抚心神。"
+      type: "EQUIPMENT"
+      price: 2500
+      durability: 60
+      attr_bonus: {"mp": 60, "luck": 8}
+      recipe:
+        materials:
+          ghost_tears: 25
+          cursed_silk: 15
+          ash_powder: 10
+        gold: 400
+      repair_cost: 40
+
+    - item_id: "rusty_blade"
+      name: "锈蚀刀刃"
+      description: "锈迹斑斑的刀刃，虽然破旧但仍有杀伤力。"
+      type: "EQUIPMENT"
+      price: 2800
+      durability: 70
+      attr_bonus: {"attack": 25, "agility": 10}
+      recipe:
+        materials:
+          iron_rust: 20
+          bone_fragment: 15
+          ash_powder: 12
+        gold: 450
+      repair_cost: 45
+
+    # ========== 中级装备 (21-60级) - 数值+少量比例，白色+绿色材料 ==========
+
     - item_id: "swim_coat"
       name: "溺水者外衣"
       description: "水下有东西，它们慢慢爬进了我的衣服，将我拖入深水当中。"
       type: "EQUIPMENT"
-      price: 10000
+      price: 8000
       durability: 100
-      attr_bonus: {"hp": 50}
-      attr_ratio: {"hp": 0.01}
+      attr_bonus: {"hp": 120}
+      attr_ratio: {"hp": 0.05}
       recipe:
         materials:
-          drowned_scale: 10
-          cursed_silk: 5
-          flesh_crystal: 3
-        gold: 1500
-      repair_cost: 100      # 可选：每 1 点耐久 100 金币
+          drowned_scale: 8
+          cursed_silk: 20
+          spirit_bone: 15
+        gold: 1200
+      repair_cost: 80
 
     - item_id: "self_awareness_key"
       name: "自知力钥匙"
       description: "精神病人大多存在不同程度的自知力缺陷，他们无法察觉自己精神状态的改变，对精神状态丧失判断，否认病情，拒绝治疗。当你出现类似的症状时，这把钥匙可以帮你一次。"
       type: "EQUIPMENT"
-      price: 10000
+      price: 7500
       durability: 100
-      attr_bonus: {"mp": 50}
-      attr_ratio: {"mp": 0.01}
+      attr_bonus: {"mp": 100}
+      attr_ratio: {"mp": 0.05}
       recipe:
         materials:
-          spirit_bone: 15
-          flesh_crystal: 3
+          yin_essence: 5
+          spirit_bone: 25
+          ghost_tears: 20
         gold: 1000
-      repair_cost: 100
+      repair_cost: 75
+
+    - item_id: "corrupted_bandage_wrap"
+      name: "污血绷带"
+      description: "沾满污血的绷带，散发着不详的气息，但能提供一定保护。"
+      type: "EQUIPMENT"
+      price: 9500
+      durability: 120
+      attr_bonus: {"defense": 35, "hp": 80}
+      attr_ratio: {"defense": 0.08}
+      recipe:
+        materials:
+          corrupted_bandage: 6
+          withered_flower: 4
+          iron_rust: 25
+        gold: 1500
+      repair_cost: 90
+
+    # ========== 高级装备 (61-100级) - 比例加成为主，绿色+蓝色材料 ==========
 
     - item_id: "crying_tape"
       name: "哭泣的磁带"
       description: "他第一次听这盘磁带时就发现了问题，空白的磁带里有一段无法消除的杂音，他尝试各种办法最终还原出了杂音的内容。原来，那是他临死时挣扎求救的声音。"
       type: "EQUIPMENT"
-      price: 30000
-      durability: 100
+      price: 25000
+      durability: 120
+      attr_bonus: {"luck": 15}
+      attr_ratio: {"mp": 0.15}
       recipe:
         materials:
-          ghost_tears: 50
-          cursed_silk: 35
-          flesh_crystal: 10
-          kissed_phone_number: 2
-        gold: 10000
-      repair_cost: 100
-      attr_ratio: {"mp": 0.4}
-      attr_bonus: {"luck": 7}
+          soul_crystal: 2
+          nightmare_silk: 12
+          school_bell_fragment: 8
+        gold: 5000
+      repair_cost: 120
+
+    - item_id: "mirror_shard_armor"
+      name: "镜片战甲"
+      description: "用诅咒镜片拼接而成的战甲，映照出敌人的恐惧。"
+      type: "EQUIPMENT"
+      price: 35000
+      durability: 140
+      attr_bonus: {"defense": 25}
+      attr_ratio: {"hp": 0.2, "defense": 0.12}
+      recipe:
+        materials:
+          cursed_mirror_shard: 3
+          flesh_crystal: 2
+          nightmare_silk: 15
+        gold: 8000
+      repair_cost: 150
+
+    - item_id: "phantom_cloak"
+      name: "幽魂斗篷"
+      description: "由幽魂丝线编织的斗篷，穿戴者如鬼魅般难以捉摸。"
+      type: "EQUIPMENT"
+      price: 32000
+      durability: 130
+      attr_bonus: {"agility": 20}
+      attr_ratio: {"agility": 0.18, "luck": 0.1}
+      recipe:
+        materials:
+          phantom_thread: 4
+          withered_flower: 8
+          drowned_scale: 12
+        gold: 7000
+      repair_cost: 140
+
+    # ========== 顶级装备 (101-150级) - 高比例加成，蓝色+紫色材料 ==========
 
     - item_id: "drawer"
       name: "抽屉"
       description: "我总觉有人在偷看我，他可能就藏在这个房间里，但是我找遍了所有能够藏人的地方都没有找到它。我越来越害怕，每当我背对客厅坐在桌边工作时，那种被窥伺的感觉就会冒出来。他一定在看着我，我很担心他在我背对客厅时，悄悄走到我的身后。为了防身，我在书桌的抽屉里藏了一把刀。某天深夜，那种被窥伺的感觉又出现了，我忍无可忍打开抽屉想要拿出那把刀。可等我打开抽屉的时候才发现，原来那个人并不是藏在客厅里"
       type: "EQUIPMENT"
       price: 60000
-      durability: 100
-      attr_ratio: {"hp": 0.5}
+      durability: 150
+      attr_ratio: {"hp": 0.25, "attack": 0.15}
       recipe:
         materials:
-          spirit_bone: 45
+          medical_record: 1
+          flesh_crystal: 8
+          soul_crystal: 5
           nightmare_silk: 20
-          flesh_crystal: 10
-          wanted_poster: 2
-        gold: 10000
-      repair_cost: 150
+        gold: 15000
+      repair_cost: 200
 
-    # 不可锻造
-    - item_id: "lucky_scissors"
-      name: "幸运剪刀"
-      description: "这把血迹斑斑的剪刀和幸运完全沾不上边，可它就是被命名为幸运。（开膛手套装）"
+    - item_id: "wedding_dress"
+      name: "嫁衣"
+      description: "我用我的骨做针，用我的血做线，用我的皮做衣，希望你不会嫌弃我这件血红色的嫁衣。"
       type: "EQUIPMENT"
       price: 80000
-      durability: 100
-      attr_ratio: {"luck": 0.3}
-      repair_cost: 200   # 不可锻造
+      durability: 160
+      attr_ratio: {"attack": 0.35, "agility": 0.2}
+      recipe:
+        materials:
+          demon_heart: 1
+          cursed_mirror_shard: 6
+          phantom_thread: 10
+          nightmare_silk: 25
+        gold: 20000
+      repair_cost: 250
 
-    - item_id: "black_envelope"
-      name: "黑色信封"
-      description: "开膛手曾留下署名，将死者的器官装入信封，寄送给当地的报社。（开膛手套装）"
+    - item_id: "void_essence_crown"
+      name: "虚无之冠"
+      description: "凝聚虚无精华制成的王冠，佩戴者将感受到存在的虚无与力量。"
       type: "EQUIPMENT"
       price: 100000
-      durability: 100
-      attr_ratio: {"attack": 0.4}
+      durability: 180
+      attr_ratio: {"mp": 0.3, "luck": 0.25, "attack": 0.2}
+      recipe:
+        materials:
+          void_essence: 2
+          demon_heart: 2
+          cursed_mirror_shard: 8
+          soul_crystal: 6
+        gold: 30000
+      repair_cost: 300
+
+    # ========== 传说装备 (151+级) - 极高比例加成，紫色+橙色材料 ==========
+
+    - item_id: "god_tear_amulet"
+      name: "神泪护符"
+      description: "用神明之泪制成的护符，蕴含着无尽的慈悲与力量。"
+      type: "EQUIPMENT"
+      price: 200000
+      durability: 200
+      attr_ratio: {"hp": 0.4, "mp": 0.4, "defense": 0.3}
+      recipe:
+        materials:
+          god_tear: 1
+          void_essence: 3
+          demon_heart: 4
+          cursed_mirror_shard: 10
+        gold: 50000
+      repair_cost: 500
+
+    - item_id: "world_fragment_blade"
+      name: "世界碎片之刃"
+      description: "用世界碎片锻造的神兵，每一击都能撕裂现实。"
+      type: "EQUIPMENT"
+      price: 300000
+      durability: 220
+      attr_ratio: {"attack": 0.5, "agility": 0.35, "luck": 0.3}
+      recipe:
+        materials:
+          world_fragment: 1
+          time_dust: 1
+          void_essence: 4
+          demon_heart: 3
+        gold: 80000
+      repair_cost: 800
+
+    # ========== 可锻造的特殊装备 ==========
 
     - item_id: "fog_coat"
       name: "雾都风衣"
@@ -391,38 +542,13 @@ items:
       durability: 100
       attr_ratio: {"agility": 0.3}
       attr_bonus: {"luck": 10}
-
-    - item_id: "skull_suit"
-      name: "碎颅制服"
-      description: "克劳瑞在精神病院里工作了二十年，长时间接触患者让他的精神饱受折磨，终于有一天他决定结束这一切。病态和疯狂浸透入骨髓，他手持铁锤想要从根本上治疗好自己的患者！"
-      type: "EQUIPMENT"
-      price: 150000
-      durability: 100
-      attr_ratio: {"attack": 0.6}
-
-    - item_id: "faceless_suit"
-      name: "无脸制服"
-      description: "珍妮是碎颅医生克劳瑞的妻子，那天晚上她亲眼目睹丈夫手持铁锤走入病室，她不清楚自己最爱的丈夫想要做什么，直到那高高举起的铁锤砸向她的脸时，她才反应过来。"
-      type: "EQUIPMENT"
-      price: 120000
-      durability: 100
-      attr_bonus: {"agility": 50}
-      attr_ratio: {"mp": 0.5}
-    
-    - item_id: "wedding_dress"
-      name: "嫁衣"
-      description: "我用我的骨做针，用我的血做线，用我的皮做衣，希望你不会嫌弃我这件血红色的嫁衣。"
-      type: "EQUIPMENT"
-      price: 100000
-      durability: 100
-      attr_ratio: {"attack": 0.7}
       recipe:
         materials:
-          spirit_bone: 100
-          flesh_crystal: 50
-          nightmare_silk: 20
-        gold: 50000
-      repair_cost: 200
+          nightmare_silk: 15
+          withered_flower: 8
+          yin_essence: 6
+        gold: 8000
+      repair_cost: 150
 
     - item_id: "soul_flag"
       name: "镇魂幡"
@@ -432,6 +558,55 @@ items:
       durability: 100
       attr_bonus: {"mp": 35}
       attr_ratio: {"attack": 0.2}
+      recipe:
+        materials:
+          soul_crystal: 3
+          phantom_thread: 6
+          cursed_mirror_shard: 2
+          nightmare_silk: 20
+        gold: 12000
+      repair_cost: 180
+
+    # ========== Boss掉落专属装备（不可锻造）==========
+
+    - item_id: "lucky_scissors"
+      name: "幸运剪刀"
+      description: "这把血迹斑斑的剪刀和幸运完全沾不上边，可它就是被命名为幸运。（开膛手套装）⚠️ Boss掉落专属"
+      type: "EQUIPMENT"
+      price: 80000
+      durability: 100
+      attr_ratio: {"luck": 0.3}
+      repair_cost: 200   # Boss掉落，不可锻造
+
+    - item_id: "black_envelope"
+      name: "黑色信封"
+      description: "开膛手曾留下署名，将死者的器官装入信封，寄送给当地的报社。（开膛手套装）⚠️ Boss掉落专属"
+      type: "EQUIPMENT"
+      price: 100000
+      durability: 100
+      attr_ratio: {"attack": 0.4}
+      repair_cost: 250   # Boss掉落，不可锻造
+
+    - item_id: "skull_suit"
+      name: "碎颅制服"
+      description: "克劳瑞在精神病院里工作了二十年，长时间接触患者让他的精神饱受折磨，终于有一天他决定结束这一切。病态和疯狂浸透入骨髓，他手持铁锤想要从根本上治疗好自己的患者！⚠️ Boss掉落专属"
+      type: "EQUIPMENT"
+      price: 150000
+      durability: 100
+      attr_ratio: {"attack": 0.6}
+      repair_cost: 300   # Boss掉落，不可锻造
+
+    - item_id: "faceless_suit"
+      name: "无脸制服"
+      description: "珍妮是碎颅医生克劳瑞的妻子，那天晚上她亲眼目睹丈夫手持铁锤走入病室，她不清楚自己最爱的丈夫想要做什么，直到那高高举起的铁锤砸向她的脸时，她才反应过来。⚠️ Boss掉落专属"
+      type: "EQUIPMENT"
+      price: 120000
+      durability: 100
+      attr_bonus: {"agility": 50}
+      attr_ratio: {"mp": 0.5}
+      repair_cost: 280   # Boss掉落，不可锻造
+
+    # ========== 炼丹炉系列 ==========
 
     - item_id: "furnace_white"
       name: "简陋炼丹炉"
@@ -439,6 +614,13 @@ items:
       type: "EQUIPMENT"
       price: 3000
       durability: 50
+      recipe:
+        materials:
+          iron_rust: 30
+          ash_powder: 20
+          grave_soil: 15
+        gold: 800
+      repair_cost: 60
 
     - item_id: "furnace_green"
       name: "普通炼丹炉"
@@ -446,6 +628,14 @@ items:
       type: "EQUIPMENT"
       price: 8000
       durability: 80
+      recipe:
+        materials:
+          yin_essence: 5
+          spirit_bone: 25
+          iron_rust: 40
+          ash_powder: 30
+        gold: 2000
+      repair_cost: 100
 
     - item_id: "furnace_blue"
       name: "精良炼丹炉"
@@ -453,6 +643,14 @@ items:
       type: "EQUIPMENT"
       price: 20000
       durability: 100
+      recipe:
+        materials:
+          flesh_crystal: 3
+          nightmare_silk: 8
+          yin_essence: 12
+          spirit_bone: 35
+        gold: 5000
+      repair_cost: 150
 
     - item_id: "furnace_purple"
       name: "稀有炼丹炉"
@@ -460,6 +658,14 @@ items:
       type: "EQUIPMENT"
       price: 50000
       durability: 120
+      recipe:
+        materials:
+          soul_crystal: 2
+          cursed_mirror_shard: 1
+          flesh_crystal: 6
+          nightmare_silk: 15
+        gold: 12000
+      repair_cost: 200
 
     - item_id: "furnace_gold"
       name: "传奇炼丹炉"
@@ -467,31 +673,42 @@ items:
       type: "EQUIPMENT"
       price: 150000
       durability: 150
+      recipe:
+        materials:
+          demon_heart: 1
+          void_essence: 1
+          soul_crystal: 5
+          cursed_mirror_shard: 3
+        gold: 30000
+      repair_cost: 300
 
   elixirs:  # 丹药类不可售卖
     - item_id: "spirit_elixir"
       name: "升灵丹"
-      description: "服用后立即获得 3000 经验"
+      description: "服用后立即获得 8000 经验"
       type: "CONSUMABLE"
       price: 30000
       effect_type: "GAIN_EXP"
-      effect_params: {"value": 3000}
+      effect_params: {"value": 8000}
+      daily_limit: 3
 
     - item_id: "blood_heart_elixir"
       name: "血心丹"
-      description: "以凶兽心血炼制，服用可大幅提升修为，伴随阵阵心跳声。服用后立即获得 8000 经验"
+      description: "以凶兽心血炼制，服用可大幅提升修为，伴随阵阵心跳声。服用后立即获得 25000 经验"
       type: "CONSUMABLE"
       price: 50000
       effect_type: "GAIN_EXP"
-      effect_params: {"value": 8000}
+      effect_params: {"value": 25000}
+      daily_limit: 2
 
     - item_id: "night_soul_elixir"
       name: "夜魂丹"
-      description: "月蚀之夜炼成，黑雾缭绕，能快速提升修为却染上寒意。服用后立即获得 12000 经验"
+      description: "月蚀之夜炼成，黑雾缭绕，能快速提升修为却染上寒意。服用后立即获得 50000 经验"
       type: "CONSUMABLE"
       price: 100000
       effect_type: "GAIN_EXP"
-      effect_params: {"value": 12000}
+      effect_params: {"value": 50000}
+      daily_limit: 1
 
     - item_id: "void_eye_elixir"
       name: "虚眼丹"
@@ -500,6 +717,7 @@ items:
       price: 200000
       effect_type: "BUFF"
       effect_params: {"luck": 5, "attack": 5}
+      daily_limit: 1
 
     - item_id: "life_recovery_elixir"
       name: "回生丹"
@@ -508,6 +726,7 @@ items:
       price: 80000
       effect_type: "RESTORE_HP_PERCENT"
       effect_params: {"percent": 0.3}
+      daily_limit: 5
 
     - item_id: "soul_recovery_elixir"
       name: "凝魂丹"
@@ -516,6 +735,7 @@ items:
       price: 80000
       effect_type: "RESTORE_MP_PERCENT"
       effect_params: {"percent": 0.3}
+      daily_limit: 5
 
     - item_id: "great_life_recovery_elixir"
       name: "大回生丹"
@@ -524,6 +744,7 @@ items:
       price: 150000
       effect_type: "RESTORE_HP_PERCENT"
       effect_params: {"percent": 0.6}
+      daily_limit: 3
 
     - item_id: "great_soul_recovery_elixir"
       name: "大凝魂丹"
@@ -532,6 +753,7 @@ items:
       price: 150000
       effect_type: "RESTORE_MP_PERCENT"
       effect_params: {"percent": 0.6}
+      daily_limit: 3
 
     - item_id: "perfect_revive_elixir"
       name: "完美还魂丹"
@@ -540,6 +762,7 @@ items:
       price: 200000
       effect_type: "REVIVE"
       effect_params: {"rate": 0.95}
+      daily_limit: 1
 
     - item_id: "supreme_revive_elixir"
       name: "真还魂丹"
@@ -548,6 +771,25 @@ items:
       price: 500000
       effect_type: "REVIVE"
       effect_params: {"rate": 1.0}
+      daily_limit: 1
+
+    - item_id: "divine_blessing_elixir"
+      name: "神明恩赐丹"
+      description: "蕴含神明恩泽的传说丹药，服用后可获得大量修为。服用后立即获得 80000 经验"
+      type: "CONSUMABLE"
+      price: 300000
+      effect_type: "GAIN_EXP"
+      effect_params: {"value": 80000}
+      daily_limit: 1
+
+    - item_id: "world_power_elixir"
+      name: "世界之力丹"
+      description: "凝聚世界本源之力的至高丹药，服用后全属性永久提升。"
+      type: "CONSUMABLE"
+      price: 800000
+      effect_type: "BUFF"
+      effect_params: {"hp": 10, "mp": 10, "attack": 10, "defense": 10, "agility": 10, "luck": 10}
+      daily_limit: 1
 
   goods:  # 仅用于跑商系统倒卖的奢侈品
     - item_id: "lux_perfume"

@@ -123,41 +123,32 @@ async def format_guild_shop(shop_sell: list, player_points: int, guild: Guild) -
 
 @guild_shop_cmd.handle()
 async def _(event: MessageEvent):
-    async with safe_session() as session:
-        player = await session.get(Player, event.get_user_id())
-        if not player:
-            await guild_shop_cmd.finish("⛔ 请先创建角色")
-        if not player.guild_id:
-            await guild_shop_cmd.finish("⛔ 你还未加入任何公会")
-
-        guild = await session.get(Guild, player.guild_id)
-        if not guild:
-            await guild_shop_cmd.finish("⛔ 公会数据缺失，请联系管理员")
-
-        shop_sell = generate_guild_shop(guild)
-        await guild_shop_cmd.finish(
-            message_add_head(await format_guild_shop(shop_sell, player.gold2, guild), event)
-        )
+    # 暂时下架公会商店
+    await guild_shop_cmd.finish(
+        "🚧 公会商店暂时关闭维护中\n"
+        "━━━━━━━━━━━━━\n"
+        "为了平衡游戏经济，公会商店暂时下架。\n"
+        "装备获取方式已调整为：\n"
+        "• 🔨 锻造系统 - 收集材料制作装备\n"
+        "• 👹 击败Boss - 掉落稀有装备\n"
+        "• 🎁 特殊活动 - 限时获得传说装备\n"
+        "━━━━━━━━━━━━━\n"
+        "感谢您的理解与支持！"
+    )
 
 
 @guild_buy_cmd.handle()
 async def _(event: MessageEvent, args: Message = CommandArg()):
-    arg_str = args.extract_plain_text().strip()
-    parts = arg_str.split()
-
-    # 参数校验
-    if not parts or len(parts) > 2:
-        await guild_buy_cmd.finish("⛔ 格式错误，正确示例：公会购买 2 3 或 公会购买 幸运剪刀 1")
-
-    # 解析数量
-    try:
-        quantity = int(parts[1]) if len(parts) == 2 else 1
-        if quantity < 1:
-            raise ValueError
-    except ValueError:
-        await guild_buy_cmd.finish("⛔ 数量必须为正整数")
-
-    is_index_mode = parts[0].isdigit()
+    # 暂时下架公会商店
+    await guild_buy_cmd.finish(
+        "🚧 公会商店暂时关闭维护中\n"
+        "━━━━━━━━━━━━━\n"
+        "请使用以下方式获取装备：\n"
+        "• 🔨 /锻造 装备名 - 制作装备\n"
+        "• 📝 /配方 装备名 - 查看配方\n"
+        "• 📋 /可锻造装备 - 查看所有可制作装备\n"
+        "━━━━━━━━━━━━━"
+    )
 
     async with safe_session() as session:
         player = await session.get(Player, event.get_user_id())

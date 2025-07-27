@@ -1,9 +1,14 @@
 from nonebot import on_command
 from nonebot.adapters.qq import MessageEvent, Message
 from nonebot.params import CommandArg
+from sqlalchemy import select
+from datetime import date
 
 from ..config import config
 from ..utils import message_add_head
+from ..models.db import safe_session
+from ..models.player import Player
+from ..models.elixir_usage import ElixirUsageLog
 
 # 图鉴命令：查询物品、装备和鬼怪的详细信息
 catalog_cmd = on_command("图鉴", aliases={"查看","查看物品","详情"}, block=True, priority=5)
@@ -17,6 +22,20 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
     # 必须提供关键字，否则提醒
     if not keyword:
         await catalog_cmd.finish("⛔ 请提供要查询的名称，例如：图鉴 回春散 或 图鉴 贞子")
+
+    # 获取玩家信息（用于查询丹药使用状态）
+    player = None
+    elixir_usage_map = {}
+    async with safe_session() as session:
+        player = await session.get(Player, event.get_user_id())
+        if player:
+            # 获取今日所有丹药使用记录
+            stmt = select(ElixirUsageLog).where(
+                ElixirUsageLog.player_id == player.id,
+                ElixirUsageLog.use_date == date.today()
+            )
+            logs = (await session.execute(stmt)).scalars().all()
+            elixir_usage_map = {log.item_id: log.quantity for log in logs}
 
     # 搜索物品
     item_matches = []
@@ -105,6 +124,30 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
         elif cfg.type.value == "MATERIAL":
             grudge_info = f"😈 怨念值：{cfg.grudge_value}" if cfg.grudge_value else ""
             extra_info = "\n" + "  ".join(filter(bool, [grudge_info]))
+
+        # 若为丹药，展示每日使用限制和当前状态
+        elif cfg.item_id.endswith("_elixir"):
+            limit_info = []
+            if cfg.daily_limit > 0:
+                limit_info.append(f"💊 每日限制：最多可服用 {cfg.daily_limit} 颗")
+
+                # 如果玩家已创建角色，显示今日使用状态
+                if player:
+                    used_today = elixir_usage_map.get(cfg.item_id, 0)
+                    remaining = max(0, cfg.daily_limit - used_today)
+
+                    if remaining > 0:
+                        status = f"🟢 今日可用 {remaining} 次"
+                    else:
+                        status = "🔴 今日已达上限"
+
+                    limit_info.append(f"📊 使用状态：{used_today}/{cfg.daily_limit} ({status})")
+                else:
+                    limit_info.append("💡 创建角色后可查看使用状态")
+            else:
+                limit_info.append("💊 每日限制：无限制")
+
+            extra_info = "\n" + "\n".join(limit_info)
 
         lines.append(f"✨ {cfg.name} ✨  [{type_cn}]\n{cfg.description}{extra_info}\n")
 
