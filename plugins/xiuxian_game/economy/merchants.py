@@ -195,14 +195,15 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
         if player.gold < total_cost:
             await buy_cmd.finish(f"💰 金币不足，需要 {total_cost} (当前 {player.gold})")
 
-        # 扣款并添加物品
-        player.gold -= total_cost
+        # 先检查背包空间，再扣款
         try:
             await ItemInstance.add_item(session, player.id, item_cfg.item_id, qty)
         except ValueError as e:
-            # 背包空间不足，恢复金币
-            player.gold += total_cost
+            # 背包空间不足，不扣款
             await buy_cmd.finish(f"❌ {e}")
+
+        # 背包空间足够，扣款并提交事务
+        player.gold -= total_cost
         await session.commit()
         await buy_cmd.finish(message_add_head(
             f"✅ 购买 {item_cfg.name}×{qty} 成功！\n💸 花费 {total_cost} 金币", event))
