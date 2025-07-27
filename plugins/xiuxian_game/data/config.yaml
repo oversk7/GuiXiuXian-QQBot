@@ -9,6 +9,26 @@ game:
     curve_change_level: 15
   inventory_page_size: 10  # 背包每页显示物品数量
 
+# 资源控制配置
+resource_control:
+  # 材料掉落基础概率（会根据等级和稀有度调整）
+  base_drop_rates:
+    white: 0.30    # 白色材料基础掉落率
+    green: 0.15    # 绿色材料基础掉落率
+    blue: 0.08     # 蓝色材料基础掉落率
+    purple: 0.03   # 紫色材料基础掉落率
+    orange: 0.01   # 橙色材料基础掉落率
+
+  # 不同等级段的资源获取倍率
+  level_multipliers:
+    1-20: 1.0      # 新手期：正常获取
+    21-60: 0.9     # 成长期：略微减少，鼓励探索高级区域
+    61-100: 0.8    # 进阶期：进一步减少低级材料获取
+    101+: 0.7      # 高手期：大幅减少低级材料，专注高级材料
+
+  # 商人价格倍率（相对于基础价格）
+  merchant_price_range: [1.2, 1.5]  # 商人价格为基础价格的1.2-1.5倍
+
 
 # 修炼基础配置
 cultivate:
@@ -19,10 +39,10 @@ cultivate:
         fail_keep_ratio: 0.7  # 失败保留经验比例
         guardian_cost: 50  # 怨念值护航消耗
         guardian_cost_base: 50  # 护航基础怨念值消耗
-        guardian_cost_per_level: 5  # 每级额外消耗
+        guardian_cost_per_level: 10  # 每级额外消耗
         base_success_rate: 0.8  # change_level 时的基础成功率
         decay_per_level: 0.005   # 每提高一级成功率递减值
-        min_success_rate: 0.1    # 最低成功率下限
+        min_success_rate: 0.05    # 最低成功率下限
     attributes_base:
         max_hp: 1    # 体 (max_hp) 基础增量
         max_mp: 1    # 智 (max_mp) 基础增量

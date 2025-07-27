@@ -51,6 +51,23 @@ class ItemConfig:
         self.recipe = data.get("recipe")
         # 装备修复单价（每 1 点耐久消耗金币数），若为空则默认按 price/durability 计算
         self.repair_cost = data.get("repair_cost")
+        # 材料稀有度
+        self.rarity = data.get("rarity", "white")
+
+    def get_rarity_display(self) -> str:
+        """获取稀有度显示文本"""
+        rarity_map = {
+            "white": "⚪",
+            "green": "🟢",
+            "blue": "🔵",
+            "purple": "🟣",
+            "orange": "🟠"
+        }
+        return rarity_map.get(self.rarity, "⚪")
+
+    def get_display_name(self) -> str:
+        """获取带稀有度标识的物品名称"""
+        return f"{self.get_rarity_display()}{self.name}"
 
 class ItemInstance(Base):
     """统一的物品实例模型

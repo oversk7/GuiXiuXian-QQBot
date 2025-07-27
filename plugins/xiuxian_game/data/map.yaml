@@ -1,61 +1,153 @@
 regions:
   富安公寓:
     level_range: [1, 3]
+    required_level: 1      # 进入所需最低等级
+    tier: 1               # 诡域等级（影响理智消耗）
+    mp_cost: 1           # 移动理智消耗
     monsters:
       - "诡修亡魂"
       - "伥鬼"
-    materials:
-      - "wanted_poster"
+    # 商人特产材料（高价值）
+    merchant_materials:
+      - "wanted_poster"    # 紫色特产
+    # 材料格子只掉落基础材料
+    basic_materials:
+      - "grave_soil"       # 墓土
+      - "bone_fragment"    # 骨片
+      - "rotten_core"      # 腐坏的内丹
   东岗水库:
     level_range: [5, 20]
+    required_level: 1
+    tier: 1
+    mp_cost: 1
     monsters:
       - "水鬼"
-    materials:
-      - "drowned_scale"
+    merchant_materials:
+      - "drowned_scale"    # 绿色特产
+    basic_materials:
+      - "grave_soil"
+      - "ash_powder"       # 灰烬粉末
+      - "ghost_tears"      # 鬼泪
   第三病栋:
     level_range: [41, 60]
+    required_level: 21    # 21级才能进入
+    tier: 2
+    mp_cost: 2           # 移动消耗2点理智
     monsters:
       - "碎颅医生"
       - "无脸护士"
       - "笑面狗"
-    materials:
-      - "medical_record"
+    merchant_materials:
+      - "medical_record"   # 紫色特产 - 病例单
+      - "corrupted_bandage" # 绿色特产 - 污血布条
+      - "yin_essence"      # 绿色 - 阴煞精华
+    basic_materials:
+      - "spirit_bone"      # 白色 - 灵骨
+      - "iron_rust"        # 白色 - 铁锈碎屑
+      - "cursed_silk"      # 白色 - 诅咒丝线
   绝望之城:
     level_range: [61, 80]
+    required_level: 61
+    tier: 3
+    mp_cost: 3
     monsters:
       - "人头气球"
       - "缝合巨人"
       - "哭泣雕像"
+    merchant_materials:
+      - "withered_flower"  # 绿色特产
+      - "nightmare_silk"   # 绿色
+      - "flesh_crystal"    # 蓝色
+    basic_materials:
+      - "grave_soil"
+      - "bone_fragment"
+      - "ash_powder"
   通灵鬼校:
     level_range: [81, 100]
+    required_level: 61    # 与绝望之城同等级要求
+    tier: 3
+    mp_cost: 3
     monsters:
       - "红衣舞者"
       - "笔佡"
       - "霸凌者"
-    materials:
-      - "kissed_phone_number"
+    merchant_materials:
+      - "kissed_phone_number" # 紫色特产
+      - "school_bell_fragment" # 绿色特产
+      - "soul_crystal"     # 蓝色
+      - "cursed_mirror_shard" # 蓝色
+    basic_materials:
+      - "spirit_bone"
+      - "ghost_tears"
+      - "rotten_core"
   肉殖回廊:
     level_range: [131, 150]
+    required_level: 101
+    tier: 4
+    mp_cost: 4
     monsters:
       - "蛞蝓女孩"
       - "肉芽虫"
       - "血眼蛙"
+    merchant_materials:
+      - "phantom_thread"    # 蓝色特产
+      - "flesh_crystal"     # 蓝色
+      - "demon_heart"       # 紫色
+    basic_materials:
+      - "iron_rust"
+      - "ash_powder"
+      - "spirit_bone"
   活棺村:
     level_range: [151, 170]
+    required_level: 151
+    tier: 5
+    mp_cost: 5
     monsters:
       - "红嫁衣"
       - "发诡"
       - "檐诡"
+    merchant_materials:
+      - "void_essence"      # 紫色特产
+      - "soul_crystal"      # 蓝色
+      - "demon_heart"       # 紫色
+    basic_materials:
+      - "grave_soil"
+      - "bone_fragment"
+      - "cursed_silk"
   血色世界:
     level_range: [171, 200]
+    required_level: 151   # 与活棺村同等级要求
+    tier: 5
+    mp_cost: 5
     monsters:
       - "捉迷藏"
       - "上帝之眼"
       - "人面蜈蚣"
-  十字路口:
+    merchant_materials:
+      - "cursed_mirror_shard" # 蓝色特产
+      - "phantom_thread"    # 蓝色
+      - "void_essence"      # 紫色
+    basic_materials:
+      - "ghost_tears"
+      - "rotten_core"
+      - "iron_rust"
+  深渊禁域:
     level_range: [201, 250]
+    required_level: 201
+    tier: 6
+    mp_cost: 6
     monsters:
       - "美少年"
-      - "绝命灵车"
-      - "104路末班车"
+      - "104路灵车"
+      - "邪神分身"
+    merchant_materials:
+      - "god_tear"          # 橙色特产
+      - "world_fragment"    # 橙色特产
+      - "time_dust"         # 橙色
+      - "demon_heart"       # 紫色
+      - "void_essence"      # 紫色
+    basic_materials:
+      - "ash_powder"
+      - "grave_soil"
+      - "spirit_bone"
 

@@ -213,30 +213,36 @@ async def _sweep_dungeon(player: Player, cfg: ItemConfig, qty: int, ctx: str) ->
     player.exp += exploration_exp
     results.append(f"📚 探索获得经验: {exploration_exp} (探索格子×{monster_tiles})")
 
-    # 计算材料奖励
+    # 计算材料奖励 - 扫荡主要获得基础材料
     materials_gained = []
     if material_tiles > 0:
-        # 获取诡域特产材料和通用材料，前7个是通用材料
-        region_materials = region_config.get("materials", [])
-        common_materials = config.items_config["by_type"]["MATERIAL"][:7]
-        all_materials = region_materials + common_materials
+        from ..world import get_region_materials, get_materials_by_rarity
 
-        if all_materials:
+        region_materials = get_region_materials(player.region)
+        basic_materials = region_materials["basic"]
+
+        if basic_materials:
             for _ in range(material_tiles):
-                # 平衡掉落区域特产和通用材料
-                if region_materials and random.random() < 0.4:
-                    material_id = random.choice(region_materials)
-                else:
-                    material_id = random.choice(all_materials)
+                material_id = random.choice(basic_materials)
 
-                # 基础数量1-3个
-                base_quantity = random.randint(1, 3)
+                # 基础数量2-4个（扫荡效率更高）
+                base_quantity = random.randint(2, 4)
 
                 # 幸运加成
                 if random.random() < luck_prob(player.luck):
                     base_quantity = int(base_quantity * 1.5)  # 幸运1.5倍
 
                 materials_gained.append((material_id, base_quantity))
+        else:
+            # 如果没有配置基础材料，从白色材料中随机选择
+            white_materials = get_materials_by_rarity("white")
+            for _ in range(material_tiles):
+                if white_materials:
+                    material_id = random.choice(white_materials)
+                    base_quantity = random.randint(2, 4)
+                    if random.random() < luck_prob(player.luck):
+                        base_quantity = int(base_quantity * 1.5)
+                    materials_gained.append((material_id, base_quantity))
 
     # 计算金币奖励（来自宝藏格子）
     total_gold = 0
@@ -268,7 +274,7 @@ async def _sweep_dungeon(player: Player, cfg: ItemConfig, qty: int, ctx: str) ->
         for material_id, total_quantity in material_summary.items():
             item_config = config.items_config["by_id"].get(material_id)
             if item_config:
-                material_info.append(f"{item_config.name} ✖️{total_quantity}")
+                material_info.append(f"{item_config.get_display_name()} ✖️{total_quantity}")
                 merged_materials.append((material_id, total_quantity))
 
         if material_info:

@@ -299,6 +299,13 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
         if not player:
             await teleport_cmd.finish("⛔ 请先创建角色")
 
+        # 检查诡域等级限制
+        region_config = config.map_config["regions"].get(target_region)
+        if region_config:
+            required_level = region_config.get("required_level", 1)
+            if player.level < required_level:
+                await teleport_cmd.finish(f"⛔ 你的修为不足以进入『{target_region}』，需要达到 Lv.{required_level}")
+
         if player.stamina < STAM_COST:
             await teleport_cmd.finish(f"⛔ 你的咒抗不足以在传送过程中维持清醒，需要 {STAM_COST}，当前 {player.stamina}")
 

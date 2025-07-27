@@ -84,82 +84,221 @@ items:
       grudge_value: 1
 
   materials:  # 材料类
+    # ========== 白色（普通）材料 ==========
     - item_id: "rotten_core"
       name: "腐坏的内丹"
       description: "从腐尸体内取出的浑浊内丹，散发着腐臭气息 🦠"
       type: "MATERIAL"
-      price: 20
+      rarity: "white"
+      price: 100
       grudge_value: 10
 
     - item_id: "ghost_tears"
       name: "鬼泪"
       description: "厉鬼哭泣时凝结的冰晶，触之刺骨 ❄️"
       type: "MATERIAL"
-      price: 20
+      rarity: "white"
+      price: 100
       grudge_value: 8
 
     - item_id: "cursed_silk"
       name: "诅咒丝线"
       description: "沾染怨念的红色丝线，隐约能听到哀嚎声 🧵"
       type: "MATERIAL"
-      price: 20
+      rarity: "white"
+      price: 100
       grudge_value: 10
 
     - item_id: "spirit_bone"
       name: "灵骨"
       description: "蕴含微弱灵力的兽骨，可用于炼制法器 💀"
       type: "MATERIAL"
+      rarity: "white"
+      price: 100
+      grudge_value: 5
+
+    - item_id: "grave_soil"
+      name: "墓土"
+      description: "来自古老墓地的黑色泥土，是建造诡异建筑的基础材料 ⚫"
+      type: "MATERIAL"
+      rarity: "white"
+      price: 100
+      grudge_value: 3
+
+    - item_id: "bone_fragment"
+      name: "骨片"
+      description: "破碎的骨头碎片，虽然普通但用途广泛 🦴"
+      type: "MATERIAL"
+      rarity: "white"
+      price: 50
+      grudge_value: 2
+
+    - item_id: "ash_powder"
+      name: "灰烬"
+      description: "燃烧后留下的细腻灰烬，常用于炼制基础道具 🌫️"
+      type: "MATERIAL"
+      rarity: "white"
+      price: 50
+      grudge_value: 4
+
+    - item_id: "iron_rust"
+      name: "铁锈"
+      description: "古老铁器上的锈迹，蕴含着时间的力量 🔩"
+      type: "MATERIAL"
+      rarity: "white"
       price: 50
       grudge_value: 5
 
+    # ========== 绿色（高级）材料 ==========
     - item_id: "yin_essence"
       name: "阴煞精华"
       description: "极阴之地凝聚的黑色结晶，表面泛着幽光 🔮"
       type: "MATERIAL"
-      price: 150
+      rarity: "green"
+      price: 250
       grudge_value: 12
 
     - item_id: "nightmare_silk"
       name: "梦魇丝线"
       description: "从梦境中提取的透明丝线，触碰时会浮现幻象 🕸️"
       type: "MATERIAL"
-      price: 300
+      rarity: "green"
+      price: 350
       grudge_value: 15
 
+    # ========== 蓝色（稀有）材料 ==========
     - item_id: "flesh_crystal"
       name: "血肉结晶"
       description: "不断搏动的红色晶石，内部似有生命在孕育 ❤️"
       type: "MATERIAL"
-      price: 400
+      rarity: "blue"
+      price: 600
       grudge_value: 20
-    
+
+    # ========== 紫色（史诗）材料 ==========
     - item_id: "wanted_poster"
       name: "寻人启事"
       description: "我每天都在寻找那个被自己杀死的人，我将她杀死了一遍又一遍，可她似乎总能找到我。每当天亮，我睁开双眼的时候，她的东西总会出现在我的床上。我明明把她砌进了墙里，可她却好像钻进了我的心里……"
       type: "MATERIAL"
-      price: 5
+      rarity: "purple"
+      price: 1500
       grudge_value: 100
 
     - item_id: "medical_record"
       name: "病例单"
       description: "我不明白自己为什么会变成这个样子，我那么认真的去迎合，明明只是想做个人而已。"
       type: "MATERIAL"
-      price: 5
+      rarity: "purple"
+      price: 1500
       grudge_value: 100
 
     - item_id: "kissed_phone_number"
       name: "被死者亲吻的号码"
       description: "警察发现，每一位死者在生前的最后一段时间，都拨打了这个电话。"
       type: "MATERIAL"
-      price: 5
+      rarity: "purple"
+      price: 1800
       grudge_value: 80
 
+    # ========== 绿色（高级）材料 - 诡域特产 ==========
     - item_id: "drowned_scale"
       name: "溺水者"
       description: "姐姐把石头绑在了我的腿上，身体在下沉，我看见水库里面有很多黑乎乎的水草"
       type: "MATERIAL"
-      price: 220
+      rarity: "green"
+      price: 320
       grudge_value: 8
+
+    - item_id: "corrupted_bandage"
+      name: "污血布条"
+      description: "沾满黑血的破旧布条，散发着消毒水和腐肉的混合气味 🩹"
+      type: "MATERIAL"
+      rarity: "green"
+      price: 280
+      grudge_value: 15
+
+    - item_id: "school_bell_fragment"
+      name: "校钟碎片"
+      description: "破碎的校钟残片，每当午夜时分仍会发出微弱的钟声 🔔"
+      type: "MATERIAL"
+      rarity: "green"
+      price: 300
+      grudge_value: 18
+
+    - item_id: "withered_flower"
+      name: "枯萎花束"
+      description: "永远不会凋零的黑色花朵，据说是用死者的眼泪浇灌而成 🥀"
+      type: "MATERIAL"
+      rarity: "green"
+      price: 280
+      grudge_value: 12
+
+    # ========== 更多蓝色（稀有）材料 ==========
+    - item_id: "soul_crystal"
+      name: "魂魄结晶"
+      description: "凝聚了无数怨魂的透明晶体，内部游荡着模糊的人影 👻"
+      type: "MATERIAL"
+      rarity: "blue"
+      price: 700
+      grudge_value: 25
+
+    - item_id: "cursed_mirror_shard"
+      name: "诅咒镜片"
+      description: "破碎的魔镜碎片，映照出的不是你的容貌，而是你的恐惧 🪞"
+      type: "MATERIAL"
+      rarity: "blue"
+      price: 800
+      grudge_value: 30
+
+    - item_id: "phantom_thread"
+      name: "幽魂丝线"
+      description: "由游魂编织而成的无形丝线，只有在月圆之夜才能看见 🌕"
+      type: "MATERIAL"
+      rarity: "blue"
+      price: 650
+      grudge_value: 22
+
+    # ========== 更多紫色（史诗）材料 ==========
+    - item_id: "demon_heart"
+      name: "恶魔之心"
+      description: "跳动着邪恶力量的黑色心脏，每一次跳动都伴随着痛苦的呻吟 💜"
+      type: "MATERIAL"
+      rarity: "purple"
+      price: 2000
+      grudge_value: 50
+
+    - item_id: "void_essence"
+      name: "虚无精华"
+      description: "来自虚无深渊的纯粹黑暗，触碰者将感受到存在的虚无 🕳️"
+      type: "MATERIAL"
+      rarity: "purple"
+      price: 2200
+      grudge_value: 60
+
+    # ========== 橙色（传说）材料 ==========
+    - item_id: "god_tear"
+      name: "神明之泪"
+      description: "传说中神明为人间疾苦而流下的眼泪，蕴含着无尽的慈悲与力量 ✨"
+      type: "MATERIAL"
+      rarity: "orange"
+      price: 5000
+      grudge_value: 200
+
+    - item_id: "world_fragment"
+      name: "世界碎片"
+      description: "破碎世界的残片，据说收集足够多的碎片可以重塑现实 🌍"
+      type: "MATERIAL"
+      rarity: "orange"
+      price: 8000
+      grudge_value: 300
+
+    - item_id: "time_dust"
+      name: "时光尘埃"
+      description: "时间流逝时留下的微尘，每一粒都承载着无数个瞬间的记忆 ⏳"
+      type: "MATERIAL"
+      rarity: "orange"
+      price: 10000
+      grudge_value: 500
 
   equipment:
     - item_id: "swim_coat"
