@@ -150,15 +150,14 @@ async def _(event: MessageEvent):
         lines.append("━━━━━━━━━━━━━\n⬇️【购买 [物品] [数量]】\n⬇️【出售 [物品] [数量]】")
         await market_cmd.finish(message_add_head("\n".join(lines), event))
 
-# -------- 购买 --------
-buy_cmd = on_command("购买",aliases={"买"}, block=True, priority=5)
+buy_cmd = on_command("购买", block=True, priority=5)
 
 @buy_cmd.handle()
 async def _(event: MessageEvent, args: Message = CommandArg()):
     arg_text = args.extract_plain_text().strip()
     parts = arg_text.split()
     if len(parts) != 2:
-        await buy_cmd.finish("📦 格式：购买 物品名 数量")
+        return
     item_name, qty_str = parts
     if not qty_str.isdigit():
         await buy_cmd.finish("❌ 数量需为正整数")

@@ -758,7 +758,7 @@ async def handle_buy(event: MessageEvent, args: Message = CommandArg()):
     try:
         item_index = int(args.extract_plain_text().strip())
     except ValueError:
-        await buy_cmd.finish("⛔ 请输入正确的商品序号，例如：购买 1")
+        return
 
     async with safe_session() as session:
         player = await session.get(Player, event.get_user_id())
