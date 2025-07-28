@@ -181,41 +181,39 @@ async def handle_disciples(event: MessageEvent):
         # 导入境界映射函数
         from ..player.info import realm_by_level
 
-        lines = ["👥 徒弟列表", "━━━━━━━━━━"]
+        lines = [f"👥 徒弟列表 ({len(disciples)}/5)", "━━━━━━━━━━"]
         for disciple in disciples:
             lines.append(f"👤 {disciple.nickname}[UID:{disciple.uid}] Lv.{disciple.level} {realm_by_level(disciple.level)}")
 
         lines.append("\n使用「逐出徒弟 UID」可以逐出徒弟")
+        lines.append("使用「出师 UID」可以让徒弟出师")
         await disciples_cmd.finish(message_add_head("\n".join(lines), event))
 
 
-# ==================== 逐出徒弟 ====================
-dismiss_disciple_cmd = on_command("逐出徒弟", aliases={"逐出弟子"}, block=True, priority=5)
-
-@dismiss_disciple_cmd.handle()
-async def handle_dismiss_disciple(event: MessageEvent, args: Message = CommandArg()):
+graduation_cmd = on_command("出师", block=True, priority=5)
+@graduation_cmd.handle()
+async def handle_graduation(event: MessageEvent, args: Message = CommandArg()):
     uid_str = args.extract_plain_text().strip()
     if not uid_str:
-        await dismiss_disciple_cmd.finish("格式：逐出徒弟 UID")
-    
+        await graduation_cmd.finish("格式：出师 UID")
+
     try:
         disciple_uid = int(uid_str)
     except ValueError:
-        await dismiss_disciple_cmd.finish("UID 必须为数字")
-    
+        await graduation_cmd.finish("UID 必须为数字")
+
     async with safe_session() as session:
         player = await session.get(Player, event.get_user_id())
         if not player:
-            await dismiss_disciple_cmd.finish("⛔ 请先创建角色")
-        
-        success, message = await MentorshipService.dismiss_disciple(session, player.id, disciple_uid)
+            await graduation_cmd.finish("⛔ 请先创建角色")
+
+        success, message = await MentorshipService.dismiss_disciple(session, player.id, disciple_uid, is_graduation=True)
         if success:
-            await dismiss_disciple_cmd.finish(message_add_head(f"⚡ {message}", event))
+            await graduation_cmd.finish(message_add_head(f"🎓 {message}", event))
         else:
-            await dismiss_disciple_cmd.finish(f"⛔ {message}")
+            await graduation_cmd.finish(f"⛔ {message}")
 
 
-# ==================== 脱离师门 ====================
 leave_master_cmd = on_command("脱离师门", aliases={"叛师"}, block=True, priority=5)
 
 @leave_master_cmd.handle()

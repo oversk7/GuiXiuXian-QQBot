@@ -1,9 +1,9 @@
 from __future__ import annotations
 
 """世界与坐标系统
-1. 传送 <区域名> 切换区域并把坐标重置为 (0,0)
+1. 传送 <区域名> 切换区域，但坐标与现实世界相同
 2. 前往 <上|下|左|右|x,y> 改变坐标（同区域内移动）
-3. get_or_create_tile: 按天刷新、确定性种子生成事件（暂占位）
+3. get_or_create_tile: 按天刷新、确定性种子生成事件
 """
 
 from nonebot import on_command, on_regex

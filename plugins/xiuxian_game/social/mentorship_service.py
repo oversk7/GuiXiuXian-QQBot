@@ -25,13 +25,20 @@ class MentorshipService:
         """获取师父的所有徒弟"""
         stmt = select(Mentorship).where(Mentorship.master_id == master_id)
         mentorships = (await session.execute(stmt)).scalars().all()
-        
+
         disciples = []
         for mentorship in mentorships:
             disciple = await session.get(Player, mentorship.disciple_id)
             if disciple:
                 disciples.append(disciple)
         return disciples
+
+    @staticmethod
+    async def get_disciples_count(session: AsyncSession, master_id: str) -> int:
+        """获取师父的徒弟数量"""
+        stmt = select(func.count(Mentorship.id)).where(Mentorship.master_id == master_id)
+        result = await session.execute(stmt)
+        return result.scalar() or 0
     
     @staticmethod
     async def get_mentorship(session: AsyncSession, master_id: str, disciple_id: str) -> Optional[Mentorship]:
@@ -109,22 +116,27 @@ class MentorshipService:
         application = await session.get(SocialApplication, application_id)
         if not application or application.target_id != master_id:
             return False, "申请不存在或无权限"
-        
+
         if not application.is_pending():
             return False, "申请已被处理"
-        
+
         # 简化检查：只检查基本条件，不检查重复申请
         if application.applicant_id == master_id:
             return False, "不能拜自己为师"
-        
+
         # 检查申请人是否已有师父
         if await MentorshipService.has_master(session, application.applicant_id):
             return False, "该玩家已经有师父了"
-        
+
         # 检查目标是否已经是申请人的徒弟（防止循环师徒关系）
         existing_mentorship = await MentorshipService.get_mentorship(session, application.applicant_id, master_id)
         if existing_mentorship:
             return False, "不能拜自己的徒弟为师"
+
+        # 检查师父的徒弟数量限制
+        disciples_count = await MentorshipService.get_disciples_count(session, master_id)
+        if disciples_count >= 5:
+            return False, "你的徒弟已达上限（5人），请先让一名徒弟出师"
         
         # 获取徒弟当前等级
         disciple = await session.get(Player, application.applicant_id)
@@ -162,25 +174,30 @@ class MentorshipService:
             )
         )
         application = (await session.execute(stmt)).scalars().first()
-        
+
         if not application:
             return False, "未找到该玩家的拜师申请"
-        
+
         if not application.is_pending():
             return False, "申请已被处理"
-        
+
         # 简化检查：只检查基本条件，不检查重复申请
         if application.applicant_id == master_id:
             return False, "不能拜自己为师"
-        
+
         # 检查申请人是否已有师父
         if await MentorshipService.has_master(session, application.applicant_id):
             return False, "该玩家已经有师父了"
-        
+
         # 检查目标是否已经是申请人的徒弟（防止循环师徒关系）
         existing_mentorship = await MentorshipService.get_mentorship(session, application.applicant_id, master_id)
         if existing_mentorship:
             return False, "不能拜自己的徒弟为师"
+
+        # 检查师父的徒弟数量限制
+        disciples_count = await MentorshipService.get_disciples_count(session, master_id)
+        if disciples_count >= 5:
+            return False, "你的徒弟已达上限（5人），请先让一名徒弟出师"
         
         # 获取徒弟当前等级
         disciple = await session.get(Player, application.applicant_id)
@@ -246,21 +263,25 @@ class MentorshipService:
         return True, "已拒绝拜师申请"
     
     @staticmethod
-    async def dismiss_disciple(session: AsyncSession, master_id: str, disciple_uid: int) -> Tuple[bool, str]:
-        """逐出徒弟"""
+    async def dismiss_disciple(session: AsyncSession, master_id: str, disciple_uid: int, is_graduation: bool = False) -> Tuple[bool, str]:
+        """逐出徒弟或让徒弟出师"""
         # 根据UID查找徒弟
         disciple = (await session.execute(select(Player).where(Player.uid == disciple_uid))).scalars().first()
         if not disciple:
             return False, "未找到该UID的玩家"
-        
+
         # 检查师徒关系
         mentorship = await MentorshipService.get_mentorship(session, master_id, disciple.id)
         if not mentorship:
             return False, "该玩家不是你的徒弟"
-        
+
         await session.delete(mentorship)
         await session.commit()
-        return True, f"已将 {disciple.nickname} 逐出师门"
+
+        if is_graduation:
+            return True, f"恭喜 {disciple.nickname} 出师！愿你前程似锦，修行路上勇猛精进！"
+        else:
+            return True, f"已将 {disciple.nickname} 逐出师门"
     
     @staticmethod
     async def leave_master(session: AsyncSession, disciple_id: str) -> Tuple[bool, str]:

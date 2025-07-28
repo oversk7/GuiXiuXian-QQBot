@@ -14,7 +14,7 @@ async def _(event: MessageEvent):
             player = await session.get(Player, event.get_user_id())
         uid = player.uid if player else "未注册"
         nickname = player.nickname if player else "未注册"
-        command = event.get_plaintext().strip().split()[0] if event.get_plaintext().strip() else "未知指令"
-        logger.info(f"UID:{uid} 昵称:{nickname} 指令:{command} 状态:成功")
+        command = event.get_plaintext().strip() if event.get_plaintext().strip() else "未知指令"
+        logger.info(f"UID:{uid} 昵称:{nickname} 指令:{command}")
     except Exception as e:
         logger.error(f"UID:未知 昵称:未知 指令:未知 状态:失败 错误:{str(e)}")

@@ -297,7 +297,7 @@ async def handle_social_help(event: MessageEvent, args: Message = CommandArg()):
         "【拒绝收徒 <UID>】 拒绝拜师申请\n"
         "【师父】 查看师父信息\n"
         "【徒弟】 查看徒弟列表\n"
-        "【逐出徒弟 <UID>】 逐出指定徒弟\n"
+        "【出师 <UID>】 逐出指定徒弟\n"
         "【脱离师门】 脱离师父\n"
         "\n"
         "🎁 礼物系统：\n"
