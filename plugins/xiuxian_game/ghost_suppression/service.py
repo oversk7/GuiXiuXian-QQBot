@@ -153,9 +153,9 @@ class GhostSuppressionService:
 
                 # 伤害计算
                 base_damage = rng.randint(int(wild_attack * 0.8), int(wild_attack * 1.2))
-                # 防御减伤：效果递减，免伤率上限70%
-                damage_reduction = player_defense / (100 + player_defense)
-                damage_reduction = min(damage_reduction, 0.7)  # 免伤率上限70%
+                # 防御减伤：使用统一的免伤率计算函数
+                from ..utils import damage_reduction_rate
+                damage_reduction = damage_reduction_rate(player_defense)
                 damage = max(1, int(base_damage * (1 - damage_reduction)))
                 blocked = base_damage - damage
 

@@ -584,9 +584,9 @@ async def _handle_personal_monster(session, tile: WorldTile, player: Player) -> 
                     record_p(r_idx, f"[回合{r_idx}] ⚡ 你敏捷地闪避了 {monster_display} 的攻击！")
                     return
             dmg_raw = rng.randint(int(monster_attack*0.8), int(monster_attack*1.2))
-            # 防御减伤：效果递减，且至少造成1点伤害，免伤率上限70%
-            damage_reduction = player.defense / (100 + player.defense)
-            damage_reduction = min(damage_reduction, 0.7)  # 免伤率上限70%
+            # 防御减伤：使用统一的免伤率计算函数
+            from ..utils import damage_reduction_rate
+            damage_reduction = damage_reduction_rate(player.defense)
             dmg_after = max(1, int(dmg_raw * (1 - damage_reduction)))
             blocked = dmg_raw - dmg_after
             player_hp = max(0, player_hp - dmg_after)
