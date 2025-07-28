@@ -788,7 +788,7 @@ items:
       type: "CONSUMABLE"
       price: 800000
       effect_type: "BUFF"
-      effect_params: {"hp": 10, "mp": 5, "attack": 10, "defense": 5, "agility": 5, "luck": 5}
+      effect_params: {"max_hp": 10, "max_mp": 5, "attack": 10, "defense": 5, "agility": 5, "luck": 5}
       daily_limit: 1
 
   goods:  # 仅用于跑商系统倒卖的奢侈品
