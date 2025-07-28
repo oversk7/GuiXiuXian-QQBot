@@ -559,7 +559,7 @@ async def _handle_personal_monster(session, tile: WorldTile, player: Player) -> 
     for round_num in range(1, max_round + 1):
         if monster_hp <= 0 or player_hp <= 0:
             break
-        player_first = rng.random() < (player.agility / (player.agility + monster_agility))
+        # 怪物始终先手攻击
 
         def p_atk(r_idx):
             nonlocal monster_hp
@@ -574,17 +574,20 @@ async def _handle_personal_monster(session, tile: WorldTile, player: Player) -> 
 
         def m_atk(r_idx, force_hit=False):
             nonlocal player_hp
-            # 计算闪避：概率基于敏捷
+            # 计算闪避：概率基于敏捷，上限60%
             if not force_hit:
                 dodge_chance = player.agility / (player.agility + monster_agility + 20)  # +20 抑制极端
+                dodge_chance = min(dodge_chance, 0.6)  # 闪避率上限60%
                 if rng.random() < dodge_chance:
                     nonlocal dodge_count
                     dodge_count += 1
                     record_p(r_idx, f"[回合{r_idx}] ⚡ 你敏捷地闪避了 {monster_display} 的攻击！")
                     return
             dmg_raw = rng.randint(int(monster_attack*0.8), int(monster_attack*1.2))
-            # 防御减伤：效果递减，且至少造成1点伤害
-            dmg_after = max(1, int(dmg_raw * 100 / (100 + player.defense)))
+            # 防御减伤：效果递减，且至少造成1点伤害，免伤率上限70%
+            damage_reduction = player.defense / (100 + player.defense)
+            damage_reduction = min(damage_reduction, 0.7)  # 免伤率上限70%
+            dmg_after = max(1, int(dmg_raw * (1 - damage_reduction)))
             blocked = dmg_raw - dmg_after
             player_hp = max(0, player_hp - dmg_after)
             if blocked > 0:
@@ -592,24 +595,10 @@ async def _handle_personal_monster(session, tile: WorldTile, player: Player) -> 
             else:
                 record_p(r_idx, f"[回合{r_idx}] {monster_display} 反击你，造成 {dmg_after} 伤害！", force=(player_hp==0))
 
-        if round_num == 1:
-            # 第一回合双方必定各攻击一次，顺序依敏捷决定，且怪物攻击必定命中
-            if player_first:
-                p_atk(round_num)
-                m_atk(round_num, force_hit=True)
-            else:
-                m_atk(round_num, force_hit=True)
-                p_atk(round_num)
-        else:
-            # 其余回合体现先手：若先手击杀则后手无法行动
-            if player_first:
-                p_atk(round_num)
-                if monster_hp > 0:
-                    m_atk(round_num)
-            else:
-                m_atk(round_num)
-                if player_hp > 0:
-                    p_atk(round_num)
+        # 怪物始终先手攻击，若击杀玩家则玩家无法反击
+        m_atk(round_num)
+        if player_hp > 0:
+            p_atk(round_num)
 
     battle_log.append(f"📊 总计 {round_num} 回合，你剩余HP {player_hp}/{player.max_hp}，{monster_display} HP {monster_hp}/{tile.state.get('hp', 0)}。")
     if dodge_count:
