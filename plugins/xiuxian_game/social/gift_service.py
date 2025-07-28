@@ -1,7 +1,6 @@
 from sqlalchemy import select, and_
 from sqlalchemy.ext.asyncio import AsyncSession
 from typing import Tuple, Optional
-from datetime import datetime
 
 from ..models.player import Player
 from ..models.inventory import ItemInstance, ItemType
@@ -60,52 +59,27 @@ class GiftService:
         if not item_config:
             return False, f"物品「{item_name}」不存在"
 
-        # 检查商品类物品的送礼限制
+        # 检查物品类型的送礼限制
+        if item_config.type == ItemType.MATERIAL:
+            return False, "禁止送材料类物品"
+
         if item_config.type == ItemType.GOODS:
             if gift_type == GiftType.MENTORSHIP:
                 return False, "师徒之间禁止送商品类物品"
 
-        # 检查发送者是否有足够的物品
-        if item_config.type == ItemType.EQUIPMENT:
-            # 装备类物品：优先选择未装备的，如果没有未装备的则不能送
-            stmt = select(ItemInstance).where(
-                and_(
-                    ItemInstance.player_id == sender_id,
-                    ItemInstance.item_id == item_config.item_id,
-                    ItemInstance.equipped == False  # 只选择未装备的
-                )
-            ).order_by(ItemInstance.durability.desc())  # 按耐久度降序排列
+        # 只允许送消耗品，夫妻间还可以送商品（但商品会被消耗转换为恩爱值）
+        if item_config.type not in [ItemType.CONSUMABLE, ItemType.GOODS]:
+            return False, "只能送消耗品类物品"
 
-            sender_items = (await session.execute(stmt)).scalars().all()
-            if len(sender_items) < quantity:
-                equipped_count = (await session.execute(
-                    select(ItemInstance).where(
-                        and_(
-                            ItemInstance.player_id == sender_id,
-                            ItemInstance.item_id == item_config.item_id,
-                            ItemInstance.equipped == True
-                        )
-                    )
-                )).scalars().all()
-                equipped_count = len(equipped_count)
-                total_count = len(sender_items) + equipped_count
-                if total_count >= quantity:
-                    return False, f"你有 {total_count} 个「{item_name}」，但其中 {equipped_count} 个已装备，无法送出。请先卸下装备再送礼"
-                else:
-                    return False, f"你只有 {total_count} 个「{item_name}」，不足 {quantity} 个"
-
-            # 选择要送出的装备（优先耐久度高的）
-            sender_item = sender_items[0] if sender_items else None
-        else:
-            # 非装备类物品：按原逻辑处理
-            stmt = select(ItemInstance).where(
-                and_(
-                    ItemInstance.player_id == sender_id,
-                    ItemInstance.item_id == item_config.item_id,
-                    ItemInstance.quantity >= quantity
-                )
+        # 检查发送者是否有足够的物品（只处理消耗品和商品）
+        stmt = select(ItemInstance).where(
+            and_(
+                ItemInstance.player_id == sender_id,
+                ItemInstance.item_id == item_config.item_id,
+                ItemInstance.quantity >= quantity
             )
-            sender_item = (await session.execute(stmt)).scalars().first()
+        )
+        sender_item = (await session.execute(stmt)).scalars().first()
 
         if not sender_item:
             return False, f"你没有足够的「{item_name}」"
@@ -113,31 +87,11 @@ class GiftService:
         # 计算礼物总价值
         total_value = item_config.price * quantity
 
-        # 保存装备的耐久度信息（如果是装备的话）
-        equipment_durability = None
-        if item_config.type == ItemType.EQUIPMENT:
-            equipment_durability = sender_item.durability
-
-        # 扣除发送者的物品
-        if item_config.type == ItemType.EQUIPMENT:
-            # 装备类物品：需要删除多个装备实例
-            stmt = select(ItemInstance).where(
-                and_(
-                    ItemInstance.player_id == sender_id,
-                    ItemInstance.item_id == item_config.item_id,
-                    ItemInstance.equipped == False
-                )
-            ).order_by(ItemInstance.durability.desc()).limit(quantity)
-
-            items_to_delete = (await session.execute(stmt)).scalars().all()
-            for item in items_to_delete:
-                await session.delete(item)
+        # 扣除发送者的物品（只处理消耗品和商品）
+        if sender_item.quantity == quantity:
+            await session.delete(sender_item)
         else:
-            # 非装备类物品：按原逻辑处理
-            if sender_item.quantity == quantity:
-                await session.delete(sender_item)
-            else:
-                sender_item.quantity -= quantity
+            sender_item.quantity -= quantity
 
         # 给接收者添加物品（夫妻送商品时不给物品）
         is_marriage_goods = (gift_type == GiftType.MARRIAGE and item_config.type == ItemType.GOODS)
@@ -145,7 +99,7 @@ class GiftService:
         if not is_marriage_goods:
             # 统一使用 ItemInstance.add_item 方法处理物品添加，确保正确处理叠加限制
             try:
-                await ItemInstance.add_item(session, receiver.id, item_config.item_id, quantity, equipment_durability)
+                await ItemInstance.add_item(session, receiver.id, item_config.item_id, quantity)
             except ValueError as e:
                 return False, f"添加物品失败：{e}"
         
@@ -163,14 +117,22 @@ class GiftService:
         
         # 更新相关系统的数值
         if gift_type == GiftType.MARRIAGE:
-            await MarriageService.update_gift_value(session, sender_id, receiver.id, total_value)
+            # 夫妻间送礼，所有物品都按价值的1%转换为恩爱值
+            love_value = max(1, total_value // 100)  # 至少增加1点恩爱值
+            await MarriageService.update_gift_value(session, sender_id, receiver.id, love_value)
         
         await session.commit()
 
         # 根据情况返回不同的消息
-        if is_marriage_goods:
-            return True, f"成功向配偶 {receiver.nickname} 送出 {quantity}个「{item_name}」，增加恩爱值 {total_value}（商品未实际转移）"
+        if gift_type == GiftType.MARRIAGE:
+            # 夫妻间送礼，统一显示恩爱值增加
+            love_value = max(1, total_value // 100)
+            if is_marriage_goods:
+                return True, f"成功向配偶 {receiver.nickname} 送出 {quantity}个「{item_name}」，增加恩爱值 {love_value}（商品已消耗）"
+            else:
+                return True, f"成功向配偶 {receiver.nickname} 送出 {quantity}个「{item_name}」，增加恩爱值 {love_value}"
         else:
+            # 师徒间送礼或其他情况
             return True, f"成功向 {receiver.nickname} 送出 {quantity}个「{item_name}」，价值 {total_value} 金币"
     
     @staticmethod

@@ -717,7 +717,7 @@ items:
       price: 200000
       effect_type: "BUFF"
       effect_params: {"luck": 5, "attack": 5}
-      daily_limit: 1
+      daily_limit: 2
 
     - item_id: "life_recovery_elixir"
       name: "回生丹"
@@ -726,7 +726,7 @@ items:
       price: 80000
       effect_type: "RESTORE_HP_PERCENT"
       effect_params: {"percent": 0.3}
-      daily_limit: 5
+      daily_limit: 100
 
     - item_id: "soul_recovery_elixir"
       name: "凝魂丹"
@@ -735,7 +735,7 @@ items:
       price: 80000
       effect_type: "RESTORE_MP_PERCENT"
       effect_params: {"percent": 0.3}
-      daily_limit: 5
+      daily_limit: 100
 
     - item_id: "great_life_recovery_elixir"
       name: "大回生丹"
@@ -744,7 +744,7 @@ items:
       price: 150000
       effect_type: "RESTORE_HP_PERCENT"
       effect_params: {"percent": 0.6}
-      daily_limit: 3
+      daily_limit: 100
 
     - item_id: "great_soul_recovery_elixir"
       name: "大凝魂丹"
@@ -753,7 +753,7 @@ items:
       price: 150000
       effect_type: "RESTORE_MP_PERCENT"
       effect_params: {"percent": 0.6}
-      daily_limit: 3
+      daily_limit: 100
 
     - item_id: "perfect_revive_elixir"
       name: "完美还魂丹"
@@ -762,7 +762,7 @@ items:
       price: 200000
       effect_type: "REVIVE"
       effect_params: {"rate": 0.95}
-      daily_limit: 1
+      daily_limit: 50
 
     - item_id: "supreme_revive_elixir"
       name: "真还魂丹"
@@ -771,7 +771,7 @@ items:
       price: 500000
       effect_type: "REVIVE"
       effect_params: {"rate": 1.0}
-      daily_limit: 1
+      daily_limit: 10
 
     - item_id: "divine_blessing_elixir"
       name: "神明恩赐丹"
@@ -784,11 +784,11 @@ items:
 
     - item_id: "world_power_elixir"
       name: "世界之力丹"
-      description: "凝聚世界本源之力的至高丹药，服用后全属性永久提升。"
+      description: "凝聚世界本源之力的至高丹药，服用后全属性永久提升5~10。"
       type: "CONSUMABLE"
       price: 800000
       effect_type: "BUFF"
-      effect_params: {"hp": 10, "mp": 10, "attack": 10, "defense": 10, "agility": 10, "luck": 10}
+      effect_params: {"hp": 10, "mp": 5, "attack": 10, "defense": 5, "agility": 5, "luck": 5}
       daily_limit: 1
 
   goods:  # 仅用于跑商系统倒卖的奢侈品
