@@ -28,6 +28,32 @@ from pathlib import Path
 import os
 from sqlalchemy import select as _select
 from ..models.inventory import ItemInstance as _Equip
+
+
+async def check_equipment_durability(session, player_id: str) -> str:
+    """检查玩家装备耐久度，如果有装备耐久度低于10，返回提醒消息"""
+    # 查询玩家所有已装备的装备
+    result_eq = await session.execute(
+        _select(_Equip).where(
+            _Equip.player_id == player_id,
+            _Equip.equipped == True,
+            _Equip.item_id.in_(config.items_config["by_type"]["EQUIPMENT"])
+        )
+    )
+    equipped_items = result_eq.scalars().all()
+
+    low_durability_items = []
+    for eq in equipped_items:
+        if eq.durability < 10:
+            low_durability_items.append(f"{eq.config.name}(ID:{eq.id}, 耐久:{eq.durability}/{eq.config.durability})")
+
+    if low_durability_items:
+        warning_msg = "⚠️ 装备耐久度警告！以下装备耐久度过低，建议及时修理：\n"
+        warning_msg += "\n".join([f"🔧 {item}" for item in low_durability_items])
+        warning_msg += "\n💡 使用【修理 装备ID/名称】命令进行修理"
+        return warning_msg
+
+    return ""
 from . import nearby_players, message_board, navigation
 
 # ----------------- 常量 -----------------
@@ -652,6 +678,11 @@ async def _handle_personal_monster(session, tile: WorldTile, player: Player) -> 
                 player.mp = player.max_mp
     if broken_msgs:
         log += "\n" + "\n".join(broken_msgs)
+
+    # ---------------- 检查装备耐久度并提醒 ----------------
+    durability_warning = await check_equipment_durability(session, player.id)
+    if durability_warning:
+        log += f"\n{durability_warning}"
 
     session.add_all([player, tile])
     await session.flush()
