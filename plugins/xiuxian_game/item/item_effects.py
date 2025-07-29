@@ -199,14 +199,16 @@ async def _sweep_dungeon(player: Player, cfg: ItemConfig, qty: int, ctx: str, se
     """扫荡当前诡域，获得经验和材料奖励
 
     扫荡逻辑：
-    1. 玩家理智决定能移动的格子数
+    1. 根据玩家mp、hp、装备耐久度计算能探索的格子数
     2. 按格子概率分配经验、材料、金币格子
     3. 单个格子经验取决于区域怪物等级
-    4. 材料受幸运加成影响
+    4. 材料受幸运加成影响，增加高级奖励估算
     """
     import random
     from ..config import config
-    from ..utils import luck_prob
+    from ..utils import luck_prob, damage_reduction_rate
+    from ..models.inventory import ItemInstance
+    from sqlalchemy import select as _select
 
     # 检查是否在诡域中
     if player.region == "大都会":
@@ -236,13 +238,63 @@ async def _sweep_dungeon(player: Player, cfg: ItemConfig, qty: int, ctx: str, se
 
     results = [declaration, ""]
 
-    # 计算能移动的格子数
+    # 获取诡域基础信息
     level_range = region_config["level_range"]
     avg_level = (level_range[0] + level_range[1]) // 2
-    hp_limit = player.hp//(avg_level * 3)
-    total_tiles = min(player.mp,hp_limit) * qty  # 每个扫荡令可探索的格子数等于理智值
+    mp_cost_per_tile = region_config.get("mp_cost", 1)  # 每格理智消耗
+
+    # 计算怪物格子比例 (x)
+    tile_weights = [15, 5, 75, 5]  # 材料、宝藏、怪物、休息
+    monster_ratio = tile_weights[2] / 100  # 怪物格子比例 x = 0.75
+
+    # 计算怪物平均伤害
+    from ..world import calculate_monster_attributes
+    monster_attrs = calculate_monster_attributes(avg_level, is_elite=False)
+    monster_damage = monster_attrs["attack"]
+
+    # 计算免伤率
+    damage_reduction = damage_reduction_rate(player.defense)
+    actual_damage_per_hit = max(1, int(monster_damage * (1 - damage_reduction)))
+
+    # 计算各种限制下的最大格子数
+    # 1. 理智限制：player.mp / 每格mp消耗
+    mp_limit = player.mp // mp_cost_per_tile
+
+    # 2. 血量限制：player.hp / (怪物单次伤害 * (1-免伤率)) / x
+    hp_limit = int(player.hp / actual_damage_per_hit / monster_ratio) if monster_ratio > 0 else float('inf')
+
+    # 3. 装备耐久度限制：查询已装备装备的最低耐久度 / x
+    # 注意：装备耐久度不能低于5，避免装备意外损坏
+    durability_limit = float('inf')
+    if session:
+        result_eq = await session.execute(
+            _select(ItemInstance).where(
+                ItemInstance.player_id == player.id,
+                ItemInstance.equipped == True,
+                ItemInstance.item_id.in_(config.items_config["by_type"]["EQUIPMENT"])
+            )
+        )
+        equipped_items = result_eq.scalars().all()
+        if equipped_items:
+            min_durability = min(eq.durability for eq in equipped_items)
+            # 确保装备耐久度不会低于5，所以可用耐久度 = min_durability - 5
+            available_durability = max(0, min_durability - 5)
+            durability_limit = int(available_durability / monster_ratio) if monster_ratio > 0 and available_durability > 0 else 0
+
+    # 取最小值作为实际能探索的格子数，再乘以扫荡令数量
+    base_tiles = min(mp_limit, hp_limit, durability_limit)
+    total_tiles = base_tiles * qty
+
+    # 检查是否因为装备耐久度过低而无法扫荡
+    if durability_limit == 0 and equipped_items:
+        min_durability = min(eq.durability for eq in equipped_items)
+        return False, f"⛔ 装备耐久度过低，无法进行扫荡！最低装备耐久度为{min_durability}，建议修理后再使用扫荡令"
+
+    # 确保至少有1个格子
+    total_tiles = max(1, total_tiles)
 
     results.append(f"🗺️ 探索格子共计: {total_tiles}个")
+    results.append(f"📊 限制因素: MP({mp_limit}) HP({hp_limit}) 耐久({durability_limit if durability_limit != float('inf') else '∞'})")
 
     # 按世界地图格子概率分配格子类型
     tile_weights = [15, 5, 75, 5]  # 材料、宝藏、怪物(避开)、休息
@@ -258,6 +310,54 @@ async def _sweep_dungeon(player: Player, cfg: ItemConfig, qty: int, ctx: str, se
     exploration_exp = monster_tiles * random.randint(1, 4) * avg_level
     player.exp += exploration_exp
     results.append(f"📚 探索获得经验: {exploration_exp} (探索格子×{monster_tiles})")
+
+    # 估算打怪获得的高级奖励（基于怪物格子数）
+    high_grade_rewards = []
+    if monster_tiles > 0:
+        from ..world import get_materials_by_rarity
+
+        # 模拟打怪掉落，估算高级材料获得
+        estimated_drops = {}
+
+        # 根据怪物等级确定掉落概率
+        if avg_level <= 20:
+            drop_rates = {"white": 0.30, "green": 0.10}
+        elif avg_level <= 60:
+            drop_rates = {"white": 0.40, "green": 0.20, "blue": 0.05}
+        elif avg_level <= 100:
+            drop_rates = {"white": 0.30, "green": 0.25, "blue": 0.15, "purple": 0.03}
+        else:
+            drop_rates = {"white": 0.20, "green": 0.20, "blue": 0.20, "purple": 0.08, "orange": 0.01}
+
+        # 估算每种稀有度材料的获得数量
+        for rarity, base_rate in drop_rates.items():
+            if rarity == "white":  # 白色材料不算高级奖励
+                continue
+
+            # 考虑幸运值影响
+            final_rate = base_rate * (1 + luck_prob(player.luck))
+            expected_count = int(monster_tiles * final_rate)
+
+            if expected_count > 0:
+                # 随机选择该稀有度的材料
+                rarity_materials = get_materials_by_rarity(rarity)
+                if rarity_materials:
+                    material_id = random.choice(rarity_materials)
+                    estimated_drops[material_id] = expected_count
+
+        # 添加估算的高级材料到背包
+        for material_id, count in estimated_drops.items():
+            try:
+                await ItemInstance.add_item(session, player.id, material_id, count)
+                material_config = config.items_config["by_id"].get(material_id)
+                if material_config:
+                    high_grade_rewards.append(f"{material_config.get_display_name()} ✖️{count}")
+            except ValueError:
+                # 背包满了，跳过
+                pass
+
+        if high_grade_rewards:
+            results.append(f"✨ 打怪获得高级奖励: {', '.join(high_grade_rewards)}")
 
     # 计算材料奖励 - 扫荡主要获得基础材料
     materials_gained = []
@@ -334,7 +434,47 @@ async def _sweep_dungeon(player: Player, cfg: ItemConfig, qty: int, ctx: str, se
     if rest_tiles > 0:
         results.append(f"🛌 (遇到驿站×{rest_tiles}次)")
 
+    # 扣除装备耐久度（基于怪物格子数）
+    # 注意：装备耐久度不能低于5，避免装备意外损坏
+    if session and monster_tiles > 0:
+        result_eq = await session.execute(
+            _select(ItemInstance).where(
+                ItemInstance.player_id == player.id,
+                ItemInstance.equipped == True,
+                ItemInstance.item_id.in_(config.items_config["by_type"]["EQUIPMENT"])
+            )
+        )
+        equipped_items = result_eq.scalars().all()
+        durability_warnings = []
+
+        for eq in equipped_items:
+            # 每个怪物格子消耗1点耐久度，但不能让耐久度低于5
+            durability_loss = monster_tiles
+            max_loss = max(0, eq.durability - 5)  # 最多只能扣到剩余5点耐久
+            actual_loss = min(durability_loss, max_loss)
+
+            if actual_loss > 0:
+                eq.durability -= actual_loss
+                if eq.durability <= 10:  # 耐久度警告阈值
+                    durability_warnings.append(f"⚠️ {eq.config.name} 耐久度较低({eq.durability}/{eq.config.durability})，建议及时修理")
+
+        if durability_warnings:
+            results.extend(durability_warnings)
+
+    # 扣除理智值（基于总格子数和每格消耗）
+    mp_consumed = total_tiles * mp_cost_per_tile
+    player.mp = max(0, player.mp - mp_consumed)
+    if player.mp == 0 and player.hp > 0:
+        player.hp = 0  # 理智耗尽即"疯狂身亡"
+        results.append("💀 理智耗尽，陷入疯狂！")
+
+    # 扣除血量（基于怪物格子数和实际伤害）
+    hp_consumed = monster_tiles * actual_damage_per_hit
+    player.hp = max(0, player.hp - hp_consumed)
+
     results.append(f"⚡ 消耗咒抗: {qty} (剩余: {player.stamina})")
+    results.append(f"🧠 消耗理智: {mp_consumed} (剩余: {player.mp})")
+    results.append(f"❤️ 消耗血量: {hp_consumed} (剩余: {player.hp})")
 
     return True, "\n".join(results)
 
