@@ -200,7 +200,7 @@ async def handle_tic_tac_toe(event: MessageEvent, args: Message = CommandArg()):
     # 检查玩家是否获胜
     winner = game.check_winner()
     if winner == 1:
-        gold_gain = random.randint(100, 300)
+        gold_gain = random.randint(30, 150)
 
         # 只在需要时使用数据库会话
         async with safe_session() as session:
