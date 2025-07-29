@@ -887,17 +887,5 @@ async def handle_guild_tasks(event: MessageEvent):
         msg = "\n".join(lines)
         await guild_tasks_cmd.finish(message_add_head(msg, event))
 
-guild_sign_cmd = on_command("公会签到", block=True, priority=5)
 
-@guild_sign_cmd.handle()
-async def handle_guild_sign(event: MessageEvent):
-    """公会每日签到"""
-    async with safe_session() as session:
-        success, message, result = await GuildTaskService.guild_daily_sign(session, event.get_user_id())
-
-        if not success:
-            await guild_sign_cmd.finish(f"⛔ {message}")
-
-        await session.commit()
-        await guild_sign_cmd.finish(message_add_head(f"✅ {message}", event))
 

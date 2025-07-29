@@ -107,9 +107,32 @@ async def handle_sign(event: MessageEvent):
                 # 如果添加物品失败，记录错误但不影响签到
                 new_msg = f"\n⚠️ 新手大礼包发放失败：{e}"
 
+        # 公会签到奖励
+        guild_msg = ""
+        if player.guild_id:
+            # 导入公会相关服务
+            from ..guild.guild_economy_service import GuildEconomyService
+            from ..guild.guild_task_service import GuildTaskService
+
+            # 获取公会签到任务配置
+            task_config = GuildTaskService.DAILY_TASKS["daily_sign"]
+            points_reward = task_config["points_reward"]
+            base_exp = task_config["base_exp"]
+
+            # 发放公会积分和贡献
+            player.gold2 += points_reward
+            player.guild_contribution += points_reward
+
+            # 添加公会经验（会根据公会建筑倍率动态计算）
+            guild_exp_gained = await GuildEconomyService.add_guild_experience(
+                session, player.guild_id, base_exp
+            )
+
+            guild_msg = f"\n🏰 公会奖励：积分+{points_reward} 公会经验+{guild_exp_gained}"
+
         # 先提交数据库事务，确保数据保存成功
         await session.commit()
 
         # 然后发送响应消息
         await sign.send(
-            f"✅ 连续签到 {streak} 天！获得 {int(gold_reward/2)} 金币！\n{lucky_msg}{bonus_msg}{stamina_msg}{monthly_card_msg}{new_msg}")
+            f"✅ 连续签到 {streak} 天！获得 {gold_reward} 金币！\n{lucky_msg}{bonus_msg}{stamina_msg}{monthly_card_msg}{new_msg}{guild_msg}")

@@ -194,3 +194,78 @@ async def handle_admin_check_card(event: MessageEvent, args: Message = CommandAr
         msg_lines.append(f"📊 有效月卡数量：{active_count}")
         
         await admin_check_card_cmd.finish("\n".join(msg_lines))
+
+
+# ==================== 管理员指令：增加背包容量 ====================
+add_inventory_cmd = on_command("增加背包", aliases={"加背包", "扩背包"}, block=True, priority=2, permission=SUPERUSER)
+
+@add_inventory_cmd.handle()
+async def handle_add_inventory(event: MessageEvent, args: Message = CommandArg()):
+    """管理员指令：增加背包 UID 容量"""
+    parts = args.extract_plain_text().strip().split()
+    if len(parts) != 2:
+        await add_inventory_cmd.finish(
+            "格式：增加背包 UID 容量\n"
+            "例如：增加背包 1001 10"
+        )
+
+    uid_str, capacity_str = parts
+
+    # 验证UID
+    if not uid_str.isdigit():
+        await add_inventory_cmd.finish("⛔ UID必须为数字")
+    target_uid = int(uid_str)
+
+    # 验证容量
+    if not capacity_str.isdigit():
+        await add_inventory_cmd.finish("⛔ 容量必须为正整数")
+    capacity_add = int(capacity_str)
+
+    if capacity_add <= 0:
+        await add_inventory_cmd.finish("⛔ 容量必须大于0")
+
+    if capacity_add > 100:
+        await add_inventory_cmd.finish("⛔ 单次增加容量不能超过100")
+
+    async with safe_session() as session:
+        # 查找目标玩家
+        result = await session.execute(select(Player).where(Player.uid == target_uid))
+        target_player = result.scalars().first()
+
+        if not target_player:
+            await add_inventory_cmd.finish(f"⛔ 找不到UID为 {target_uid} 的玩家")
+
+        # 记录原始容量
+        old_capacity = target_player.inventory_capacity
+
+        # 增加背包容量
+        target_player.inventory_capacity += capacity_add
+
+        # 设置合理上限（防止过度增加）
+        MAX_INVENTORY_CAPACITY = 200
+        if target_player.inventory_capacity > MAX_INVENTORY_CAPACITY:
+            target_player.inventory_capacity = MAX_INVENTORY_CAPACITY
+            actual_add = MAX_INVENTORY_CAPACITY - old_capacity
+        else:
+            actual_add = capacity_add
+
+        session.add(target_player)
+        await session.commit()
+
+        # 获取有效背包容量（包含月卡加成）
+        effective_capacity = await target_player.get_effective_inventory_capacity(session)
+
+        msg = (
+            f"✅ 背包容量增加成功\n"
+            f"━━━━━━━━━━━━━\n"
+            f"👤 玩家：{target_player.nickname}[UID:{target_player.uid}]\n"
+            f"📦 原容量：{old_capacity}\n"
+            f"📦 新容量：{target_player.inventory_capacity} (+{actual_add})\n"
+            f"💎 有效容量：{effective_capacity} (含月卡加成)\n"
+            f"━━━━━━━━━━━━━"
+        )
+
+        if actual_add < capacity_add:
+            msg += f"\n⚠️ 已达到容量上限({MAX_INVENTORY_CAPACITY})，实际增加{actual_add}"
+
+        await add_inventory_cmd.finish(msg)

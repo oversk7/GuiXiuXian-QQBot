@@ -16,8 +16,8 @@ class GuildTaskService:
     # 任务配置
     DAILY_TASKS = {
         "daily_sign": {
-            "name": "公会签到",
-            "description": "每日在公会中签到一次",
+            "name": "每日签到",
+            "description": "每日签到一次（已整合到普通签到中）",
             "points_reward": 100,
             "base_exp": 100,  # 基础经验，会根据公会倍率动态计算
             "max_per_day": 1
@@ -66,44 +66,7 @@ class GuildTaskService:
         }
     }
     
-    @staticmethod
-    async def guild_daily_sign(session: AsyncSession, player_id: str) -> Tuple[bool, str, Dict]:
-        """公会每日签到"""
-        player = await session.get(Player, player_id)
-        if not player or not player.guild_id:
-            return False, "你未加入任何公会", {}
-        
-        # 检查今日是否已签到
-        today = date.today()
-        # 这里简化处理，实际应该有专门的签到记录表
-        # 暂时使用last_sign字段判断
-        if player.last_sign and player.last_sign.date() == today:
-            return False, "今日已完成公会签到", {}
-        
-        # 获取任务奖励
-        task_config = GuildTaskService.DAILY_TASKS["daily_sign"]
-        points_reward = task_config["points_reward"]
-        base_exp = task_config["base_exp"]
 
-        # 更新玩家数据
-        player.gold2 += points_reward
-        player.guild_contribution += points_reward  # 累计贡献增加
-        player.last_sign = datetime.now()
-
-        # 添加公会经验（会根据公会建筑倍率动态计算）
-        guild_exp_gained = await GuildEconomyService.add_guild_experience(
-            session, player.guild_id, base_exp
-        )
-
-        session.add(player)
-
-        result = {
-            "points_gained": points_reward,
-            "guild_exp_gained": guild_exp_gained,
-            "task_name": task_config["name"]
-        }
-
-        return True, f"公会签到成功！获得{points_reward}积分，公会经验+{guild_exp_gained}", result
     
     @staticmethod
     async def complete_exploration_task(session: AsyncSession, player_id: str, exploration_count: int) -> Tuple[bool, str, Dict]:
