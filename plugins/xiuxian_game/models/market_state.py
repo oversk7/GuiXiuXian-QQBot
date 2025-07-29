@@ -3,6 +3,7 @@ from sqlalchemy.orm import Mapped, mapped_column
 from datetime import datetime, date
 from .db import Base
 from typing import Dict, Any
+import random
 
 
 class MarketState(Base):
@@ -14,8 +15,8 @@ class MarketState(Base):
     item_id: Mapped[str] = mapped_column(String(32), index=True, comment="商品ID")
     
     # 库存相关
-    current_stock: Mapped[int] = mapped_column(Integer, default=100, comment="当前库存")
-    max_stock: Mapped[int] = mapped_column(Integer, default=100, comment="最大库存")
+    current_stock: Mapped[int] = mapped_column(Integer, default=lambda: random.randint(500, 1000), comment="当前库存")
+    max_stock: Mapped[int] = mapped_column(Integer, default=lambda: random.randint(500, 1000), comment="最大库存")
     daily_sold: Mapped[int] = mapped_column(Integer, default=0, comment="今日已售出数量")
     daily_bought: Mapped[int] = mapped_column(Integer, default=0, comment="今日已收购数量")
     
@@ -46,12 +47,13 @@ class MarketState(Base):
         market_state = result.scalar_one_or_none()
         
         if market_state is None:
-            # 创建新记录
+            # 创建新记录，使用500-1000的随机库存
+            initial_stock = random.randint(500, 1000)
             market_state = cls(
                 market_id=market_id,
                 item_id=item_id,
-                current_stock=100,  # 默认库存
-                max_stock=100,
+                current_stock=initial_stock,  # 随机库存500-1000
+                max_stock=initial_stock,
                 daily_sold=0,
                 daily_bought=0,
                 demand_factor=1.0,
@@ -85,8 +87,8 @@ class MarketState(Base):
         self.daily_sold = 0
         self.daily_bought = 0
         
-        # 库存恢复（部分恢复，不是完全重置）
-        stock_recovery = min(20, self.max_stock - self.current_stock)  # 每日恢复20个或补满
+        # 库存恢复（增加恢复量，提高市场活跃度）
+        stock_recovery = min(50, self.max_stock - self.current_stock)  # 每日恢复50个或补满
         self.current_stock = min(self.max_stock, self.current_stock + stock_recovery)
         
         # 价格因子衰减（逐渐回归1.0）
@@ -108,14 +110,14 @@ class MarketState(Base):
         self.daily_sold += quantity
 
         # 推高需求因子（购买越多，需求越高，价格越高）
-        # 降低影响强度，避免价格波动过大
-        demand_increase = quantity * 0.005  # 每购买1个商品，需求因子增加0.005
-        self.demand_factor = min(1.3, self.demand_factor + demand_increase)  # 最高1.3倍
+        # 增加影响强度，提高价格波动
+        demand_increase = quantity * 0.01  # 每购买1个商品，需求因子增加0.01
+        self.demand_factor = min(1.6, self.demand_factor + demand_increase)  # 最高1.6倍
 
         # 降低供给因子（库存减少，供给紧张，价格上涨）
         if self.current_stock < self.max_stock * 0.3:  # 库存低于30%时
-            supply_decrease = quantity * 0.003  # 降低影响
-            self.supply_factor = max(0.8, self.supply_factor - supply_decrease)  # 最低0.8倍
+            supply_decrease = quantity * 0.008  # 增加影响
+            self.supply_factor = max(0.6, self.supply_factor - supply_decrease)  # 最低0.6倍
 
         self.updated_at = datetime.now()
     
@@ -128,13 +130,13 @@ class MarketState(Base):
         self.daily_bought += quantity
 
         # 降低需求因子（出售越多，市场饱和，价格下降）
-        demand_decrease = quantity * 0.004  # 每出售1个商品，需求因子减少0.004
-        self.demand_factor = max(0.8, self.demand_factor - demand_decrease)  # 最低0.8倍
+        demand_decrease = quantity * 0.008  # 每出售1个商品，需求因子减少0.008
+        self.demand_factor = max(0.6, self.demand_factor - demand_decrease)  # 最低0.6倍
 
         # 提高供给因子（库存增加，供给充足，价格下降）
         if self.current_stock > self.max_stock * 0.7:  # 库存高于70%时
-            supply_increase = quantity * 0.002  # 降低影响
-            self.supply_factor = min(1.2, self.supply_factor + supply_increase)  # 最高1.2倍
+            supply_increase = quantity * 0.005  # 增加影响
+            self.supply_factor = min(1.6, self.supply_factor + supply_increase)  # 最高1.6倍
 
         self.updated_at = datetime.now()
     
@@ -145,8 +147,8 @@ class MarketState(Base):
         # 需求低 + 供给高 = 价格低
         multiplier = (self.demand_factor / self.supply_factor)
 
-        # 限制在更保守的范围内 (0.8 - 1.25)，减少极端价格波动
-        return max(0.8, min(1.25, multiplier))
+        # 扩大价格波动范围 (0.5 - 2.0)，增加跑商机会
+        return max(0.5, min(2.0, multiplier))
     
     def can_purchase(self, quantity: int) -> bool:
         """检查是否可以购买指定数量"""

@@ -84,17 +84,18 @@ def _current_seed_day() -> date:
     return day
 
 
-def _get_rng(merchant_id: str, item_id: str) -> random.Random:
-    seed_str = f"{merchant_id}:{item_id}:{_current_seed_day().isoformat()}"
-    return random.Random(hash(seed_str))
-
 
 async def _price_for(session, market: Market, item_id: str) -> Tuple[int, int]:
-    """返回 (sell_price, buy_price) - 新的动态价格系统
+    """返回 (sell_price, buy_price) - 优化的动态价格系统
 
     价格计算逻辑：
-    1. 基础价格 × 随机波动(±20%) × 供需因子
-    2. 收购价 = 售价 × 0.88 (降低利润率从15%到12%)
+    1. 基础价格 × 随机波动(±40%) × 供需因子(0.5-2.0倍)
+    2. 收购价 = 售价 × 75%-85% (利润率15%-25%)
+
+    改进内容：
+    - 扩大价格波动范围，增加套利机会
+    - 提高利润率，增加跑商收益
+    - 增强供需因子影响，让市场更动态
     """
     item_cfg = config.items_config["by_id"].get(item_id)
     base_price = item_cfg.price or 1
@@ -105,11 +106,11 @@ async def _price_for(session, market: Market, item_id: str) -> Tuple[int, int]:
     # 检查是否需要每日刷新
     await market_state.check_daily_refresh(session)
 
-    # -------- 基础随机波动（适度扩大到±25%） --------
+    # -------- 基础随机波动（扩大到±40%，增加价格差异） --------
     seed_str = f"{market.id}:{item_id}:{_current_seed_day().isoformat()}"
     seed_int = int(hashlib.md5(seed_str.encode()).hexdigest(), 16)
     rng_local = random.Random(seed_int)
-    random_factor = rng_local.uniform(0.75, 1.25)  # ±25% 浮动
+    random_factor = rng_local.uniform(0.6, 1.4)  # ±40% 浮动，增加价格差异
 
     # -------- 动态供需因子 --------
     supply_demand_factor = market_state.get_price_multiplier()
@@ -118,8 +119,8 @@ async def _price_for(session, market: Market, item_id: str) -> Tuple[int, int]:
     final_factor = random_factor * supply_demand_factor
     sell_price = max(1, int(base_price * final_factor))
 
-    # 收购价：进一步降低利润率到约8-10%
-    buy_price_ratio = rng_local.uniform(0.90, 0.92)  # 90%-92%，平均91%
+    # 收购价：提高利润率到15-25%
+    buy_price_ratio = rng_local.uniform(0.75, 0.85)  # 75%-85%，平均80%，利润率15-25%
     buy_price = max(1, int(sell_price * buy_price_ratio))
 
     return sell_price, buy_price
@@ -320,15 +321,15 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
         if total_qty < qty:
             await sell_cmd.finish("❌ 背包数量不足")
 
-        # 检查是否违反同地点交易限制
-        can_sell = await TradeRecord.can_sell_at_market(session, player.id, market.id, item_cfg.item_id, hours=8)
+        # 检查是否违反同地点交易限制（减少到4小时）
+        can_sell = await TradeRecord.can_sell_at_market(session, player.id, market.id, item_cfg.item_id, hours=4)
         if not can_sell:
             # 获取最近的购买记录用于提示
-            recent_purchases = await TradeRecord.get_recent_purchases_at_market(session, player.id, market.id, item_cfg.item_id, hours=8)
+            recent_purchases = await TradeRecord.get_recent_purchases_at_market(session, player.id, market.id, item_cfg.item_id, hours=4)
             if recent_purchases:
                 latest_purchase = recent_purchases[0]
                 from datetime import timedelta
-                unlock_time = latest_purchase.trade_time + timedelta(hours=8)
+                unlock_time = latest_purchase.trade_time + timedelta(hours=4)
                 await sell_cmd.finish(message_add_head(
                     f"⛔ 同地点交易限制！\n"
                     f"你在 {latest_purchase.trade_time.strftime('%H:%M')} 于此地购买了 {item_cfg.name}\n"
@@ -348,8 +349,19 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
             await session.rollback()
             await sell_cmd.finish("❌ 扣除物品失败")
 
+        # 计算跑商奖励（异地出售奖励）
+        bonus = 0
+        bonus_msg = ""
+        # 检查是否为跨市场交易（在不同市场出售）
+        recent_purchases = await TradeRecord.get_recent_purchases_at_market(session, player.id, market.id, item_cfg.item_id, hours=24)
+        if not recent_purchases:  # 没有在本地购买记录，说明是从其他地方运来的
+            # 给予5%的跑商奖励
+            bonus = int(total_gain * 0.05)
+            if bonus > 0:
+                bonus_msg = f"\n🎁 跨市场交易奖励：+{bonus} 金币"
+
         # 更新玩家金币和市场状态
-        player.gold += total_gain
+        player.gold += total_gain + bonus
         market_state.apply_sale(qty)
 
         # 记录交易
@@ -368,7 +380,7 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
         await session.commit()
 
         await sell_cmd.finish(message_add_head(
-            f"💰 卖出 {item_cfg.name}×{qty} 成功！\n🪙 获得 {total_gain} 金币\n"
+            f"💰 卖出 {item_cfg.name}×{qty} 成功！\n🪙 获得 {total_gain + bonus} 金币{bonus_msg}\n"
             f"📦 市场库存：{market_state.current_stock}", event))
 
 # -------- 市集列表 --------
