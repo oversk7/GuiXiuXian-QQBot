@@ -16,6 +16,7 @@ from .donation_log import PlayerDonationLog
 from .elixir_usage import ElixirUsageLog
 from .monthly_card import MonthlyCard
 from .market_state import MarketState
+from .trade_record import TradeRecord
 # Ghost配置直接从YAML读取，工具类移至ghost_suppression模块
 from .ghost_invasion import GhostInvasion
 from .player_ghost import PlayerGhost

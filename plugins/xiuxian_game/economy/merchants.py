@@ -23,6 +23,7 @@ from ..models.db import safe_session
 from ..models.player import Player
 from ..models.inventory import ItemInstance
 from ..models.market_state import MarketState
+from ..models.trade_record import TradeRecord, TradeType
 from ..utils import message_add_head
 from ..config import config
 
@@ -133,6 +134,9 @@ detail_market_cmd = on_command("市集详情", aliases={"市集价格", "市场�
 # 查看某物品在各市集的买/卖价
 price_compare_cmd = on_command("市价", block=True, priority=5)
 
+# 交易记录：查看玩家的交易历史
+trade_history_cmd = on_command("交易记录", block=True, priority=5)
+
 # 跑商推荐：列出可获利的买卖路线
 trade_advise_cmd = on_command("跑商推荐", aliases={"套利", "赚差价"}, block=True, priority=5)
 
@@ -170,7 +174,7 @@ async def _(event: MessageEvent):
             stock_info = f"({market_state.current_stock})"
 
             lines.append(f"{item_cfg.name}│售 {sell_p}│收 {buy_p}│库存{stock_info}{stock_status}")
-        lines.append("━━━━━━━━━━━━━\n� 购买和出售功能已恢复！\n💡 价格受供需影响，库存有限先到先得")
+        lines.append("━━━━━━━━━━━━━\n💡 价格受供需影响，库存有限先到先得")
         await market_cmd.finish(message_add_head("\n".join(lines), event))
 
 buy_cmd = on_command("购买", block=True, priority=5)
@@ -232,6 +236,18 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
             # 扣款并更新市场状态
             player.gold -= total_cost
             market_state.apply_purchase(qty)
+
+            # 记录交易
+            await TradeRecord.record_trade(
+                session=session,
+                player_id=player.id,
+                trade_type=TradeType.BUY,
+                market_id=market.id,
+                item_id=item_cfg.item_id,
+                quantity=qty,
+                unit_price=sell_price,
+                total_amount=total_cost
+            )
 
             session.add_all([player, market_state])
             await session.commit()
@@ -304,6 +320,21 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
         if total_qty < qty:
             await sell_cmd.finish("❌ 背包数量不足")
 
+        # 检查是否违反同地点交易限制
+        can_sell = await TradeRecord.can_sell_at_market(session, player.id, market.id, item_cfg.item_id, hours=8)
+        if not can_sell:
+            # 获取最近的购买记录用于提示
+            recent_purchases = await TradeRecord.get_recent_purchases_at_market(session, player.id, market.id, item_cfg.item_id, hours=8)
+            if recent_purchases:
+                latest_purchase = recent_purchases[0]
+                from datetime import timedelta
+                unlock_time = latest_purchase.trade_time + timedelta(hours=8)
+                await sell_cmd.finish(message_add_head(
+                    f"⛔ 同地点交易限制！\n"
+                    f"你在 {latest_purchase.trade_time.strftime('%H:%M')} 于此地购买了 {item_cfg.name}\n"
+                    f"需要等到 {unlock_time.strftime('%H:%M')} 才能在此地出售\n"
+                    f"💡 建议：前往其他市集出售该商品", event))
+
         # 获取市场状态和当前价格
         market_state = await MarketState.get_or_create(session, market.id, item_cfg.item_id)
         await market_state.check_daily_refresh(session)
@@ -320,6 +351,18 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
         # 更新玩家金币和市场状态
         player.gold += total_gain
         market_state.apply_sale(qty)
+
+        # 记录交易
+        await TradeRecord.record_trade(
+            session=session,
+            player_id=player.id,
+            trade_type=TradeType.SELL,
+            market_id=market.id,
+            item_id=item_cfg.item_id,
+            quantity=qty,
+            unit_price=buy_price,
+            total_amount=total_gain
+        )
 
         session.add_all([player, market_state])
         await session.commit()
@@ -399,6 +442,62 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
             await price_compare_cmd.finish("ℹ️ 暂无市集出售该物品")
 
         await price_compare_cmd.finish(message_add_head("\n".join(lines), event))
+
+# -------- 交易记录 --------
+
+@trade_history_cmd.handle()
+async def _(event: MessageEvent, args: Message = CommandArg()):
+    """查看玩家的交易记录"""
+    args_text = args.extract_plain_text().strip()
+    page = 1
+    if args_text:
+        try:
+            page = int(args_text)
+            if page < 1:
+                page = 1
+        except ValueError:
+            pass
+
+    async with safe_session() as session:
+        player: Player | None = await session.get(Player, event.get_user_id())
+        if not player:
+            await trade_history_cmd.finish("⛔ 请先创建角色")
+
+        # 查询交易记录
+        from sqlalchemy import select, desc
+        stmt = select(TradeRecord).where(
+            TradeRecord.player_id == player.id
+        ).order_by(desc(TradeRecord.trade_time)).limit(10).offset((page - 1) * 10)
+
+        result = await session.execute(stmt)
+        records = result.scalars().all()
+
+        if not records:
+            await trade_history_cmd.finish("📋 暂无交易记录")
+
+        lines = [f"📋 交易记录 (第{page}页)", "━━━━━━━━━━━━━"]
+
+        for record in records:
+            # 获取商品和市场信息
+            item_cfg = config.items_config["by_id"].get(record.item_id)
+            market = next((m for m in MARKETS if m.id == record.market_id), None)
+
+            trade_type_emoji = "🛒" if record.trade_type == TradeType.BUY else "💰"
+            trade_type_text = "购买" if record.trade_type == TradeType.BUY else "出售"
+
+            item_name = item_cfg.name if item_cfg else record.item_id
+            market_name = market.name if market else record.market_id
+
+            lines.append(
+                f"{trade_type_emoji} {trade_type_text} {item_name}×{record.quantity}\n"
+                f"   📍 {market_name} | 💰 {record.total_amount}金币\n"
+                f"   🕐 {record.trade_time.strftime('%m-%d %H:%M')}"
+            )
+
+        lines.append("━━━━━━━━━━━━━")
+        lines.append("💡 使用【交易记录 页数】查看更多")
+
+        await trade_history_cmd.finish(message_add_head("\n".join(lines), event))
 
 # -------- 跑商推荐 --------
 

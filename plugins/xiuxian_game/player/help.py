@@ -56,7 +56,10 @@ async def handle_market(event: MessageEvent, args: Message = CommandArg()):
         "【市价 <物品名称>】 查看某物品在各市集的买/卖价\n"
         "【购买 <物品> <数量>】 消耗金币购买\n"
         "【出售 <物品> <数量>】 将背包物品卖给市场\n"
-        "【跑商推荐】 查看利润最高的买卖路线"
+        "【交易记录 [页数]】 查看个人交易历史\n"
+        "【跑商推荐】 查看利润最高的买卖路线\n"
+        "━━━━━━━━━━━━━\n"
+        "⚠️ 防刷钱：在某地购买的商品，8小时内不可在同地出售"
     )
     await market_cmd.finish(Message(msg))
 # 炼丹系统
