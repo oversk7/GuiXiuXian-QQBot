@@ -535,14 +535,56 @@ async def _reset_attr(player: Player, cfg: ItemConfig, qty: int, ctx: str, sessi
                     if attr in elixir_bonus:
                         elixir_bonus[attr] += int(value) * total_qty
 
-    # 重置属性为基础 + 装备 bonus + 丹药 bonus
+    # 重置属性为基础值 + 丹药 bonus（先不加装备加成）
     for k, base_v in INIT.items():
-        total_bonus = equipment_bonus.get(k, 0) + elixir_bonus.get(k, 0)
-        setattr(player, k, base_v + total_bonus)
+        setattr(player, k, base_v + elixir_bonus.get(k, 0))
 
     # 重新计算可分配点
     pts_per_lvl = gcfg.game_config["game"]["points_per_level"]
     player.attribute_points = (player.level - 1) * pts_per_lvl
+
+    # 重新计算装备加成（基于新的基础属性）
+    if session:
+        from sqlalchemy import select
+        from ..models.inventory import ItemInstance
+
+        # 获取所有已装备的装备
+        stmt = select(ItemInstance).where(
+            ItemInstance.player_id == player.id,
+            ItemInstance.equipped == True,
+            ItemInstance.item_id.in_(gcfg.items_config["by_type"]["EQUIPMENT"])
+        )
+        equipped_items = (await session.execute(stmt)).scalars().all()
+
+        # 清理旧的持久化加成并重新计算
+        for eq in equipped_items:
+            # 清空旧的持久化加成记录
+            if eq.extra_attrs:
+                eq.extra_attrs["_persist_bonus"] = {}
+
+            # 计算新的装备加成
+            base_attrs_snapshot = {
+                "attack": player.attack,
+                "defense": player.defense,
+                "agility": player.agility,
+                "luck": player.luck,
+                "max_hp": player.max_hp,
+                "max_mp": player.max_mp,
+            }
+
+            attrs_temp = base_attrs_snapshot.copy()
+            eq.apply_attr_bonus(attrs_temp)
+            new_delta = {k: attrs_temp[k] - base_attrs_snapshot[k] for k in attrs_temp if attrs_temp[k] != base_attrs_snapshot[k]}
+
+            # 应用新的装备加成到玩家属性
+            for k, v in new_delta.items():
+                setattr(player, k, getattr(player, k) + v)
+
+            # 保存新的持久化加成
+            extra = eq.extra_attrs or {}
+            extra["_persist_bonus"] = new_delta
+            eq.extra_attrs = extra
+            session.add(eq)
 
     # 保证当前 HP/MP 不超上限
     if player.hp > player.max_hp:
@@ -552,8 +594,26 @@ async def _reset_attr(player: Player, cfg: ItemConfig, qty: int, ctx: str, sessi
 
     # 生成详细的重置信息
     bonus_info = []
-    if any(equipment_bonus.values()):
+
+    # 检查是否有装备加成（重新计算后的）
+    has_equipment_bonus = False
+    if session:
+        # 重新获取装备加成信息用于显示
+        stmt = select(ItemInstance).where(
+            ItemInstance.player_id == player.id,
+            ItemInstance.equipped == True,
+            ItemInstance.item_id.in_(gcfg.items_config["by_type"]["EQUIPMENT"])
+        )
+        equipped_items = (await session.execute(stmt)).scalars().all()
+        for eq in equipped_items:
+            delta = (eq.extra_attrs or {}).get("_persist_bonus", {})
+            if any(delta.values()):
+                has_equipment_bonus = True
+                break
+
+    if has_equipment_bonus:
         bonus_info.append("装备加成已保留")
+
     if any(elixir_bonus.values()):
         elixir_details = []
         for k, v in elixir_bonus.items():

@@ -48,7 +48,7 @@ market_cmd = on_command("跑商系统",aliases={"跑商帮助"}, block=True, pri
 async def handle_market(event: MessageEvent, args: Message = CommandArg()):
     msg = (
         "✨ 跑商系统帮助 ✨\n"
-        "利用不同坐标的差价赚取金币，每日早9点刷新价格\n"
+        "利用不同坐标的差价赚取金币，每日早9点刷新基础价格，一天内的价格受供需波动，及时查看市价避免亏损\n"
         "━━━━━━━━━━━━━\n"
         "【市集】 查看当前坐标市场价格表\n"
         "【市集列表】 查看全部市集坐标\n"

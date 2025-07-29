@@ -437,17 +437,15 @@ async def _(event: MessageEvent):
         if not opportunities:
             await trade_advise_cmd.finish("ℹ️ 今日暂无明显差价或库存不足，明天再来看看吧！")
 
-        # 按利润降序，先过滤掉最暴利的前三条，剩余随机挑 5 条
+        # 按利润降序排序，随机挑选前10条中的5条进行推荐
         opportunities.sort(key=lambda d: d["profit"], reverse=True)
-        if len(opportunities) > 3:
-            candidates = opportunities[3:]
-        else:
-            candidates = opportunities
 
+        # 从前10条中随机选择5条，如果不足10条则全部选择
         import random as _rnd
-        sample = _rnd.sample(candidates, min(5, len(candidates)))
+        top_opportunities = opportunities[:10]  # 取前10条
+        sample = _rnd.sample(top_opportunities, min(5, len(top_opportunities)))
 
-        lines = ["💹 跑商盈利机会 (随机推荐)", "━━━━━━━━━━━━━"]
+        lines = ["💹 跑商盈利机会 (优质推荐)", "━━━━━━━━━━━━━"]
         for op in sample:
             lines.append(
                 f"📦 {op['item']} (库存:{op['src_stock']})\n🛒 {op['from']} → {op['to']}  "+
