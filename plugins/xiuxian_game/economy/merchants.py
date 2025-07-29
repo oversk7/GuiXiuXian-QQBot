@@ -134,8 +134,8 @@ detail_market_cmd = on_command("市集详情", aliases={"市集价格", "市场�
 # 查看某物品在各市集的买/卖价
 price_compare_cmd = on_command("市价", block=True, priority=5)
 
-# 交易记录：查看玩家的交易历史
-trade_history_cmd = on_command("交易记录", block=True, priority=5)
+# 跑商记录：查看玩家的交易历史
+trade_history_cmd = on_command("跑商记录", block=True, priority=5)
 
 # 跑商推荐：列出可获利的买卖路线
 trade_advise_cmd = on_command("跑商推荐", aliases={"套利", "赚差价"}, block=True, priority=5)
