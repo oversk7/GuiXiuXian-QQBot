@@ -605,10 +605,68 @@ async def handle_notice(event: MessageEvent, args: Message = CommandArg()):
         await session.commit()
         await notice_cmd.finish(message_add_head(f"✅ {action_msg}", event))
 
-# 注意：公会基地和传送功能已移除，后续将通过公会建筑实现传送功能
+# ==================== 公会基地管理 ====================
+set_base_cmd = on_command("设置基地", block=True, priority=5)
 
+@set_base_cmd.handle()
+async def handle_set_base(event: MessageEvent):
+    """设置公会基地：设置基地"""
+    async with safe_session() as session:
+        player = await session.get(Player, event.get_user_id())
+        if not player or not player.guild_id:
+            await set_base_cmd.finish("⛔ 你未加入任何公会")
 
+        # 检查权限（只有会长可以设置基地）
+        guild = await session.get(Guild, player.guild_id)
+        if not guild:
+            await set_base_cmd.finish("⛔ 公会数据异常")
 
+        if guild.president_id != player.id:
+            await set_base_cmd.finish("⛔ 只有会长才能设置公会基地")
+
+        # 检查公会等级（3级以上才能设置基地）
+        if guild.level < 3:
+            await set_base_cmd.finish(f"⛔ 公会等级不足，需要达到3级才能设置基地（当前{guild.level}级）")
+
+        # 检查是否在现实世界
+        if player.region != "大都会":
+            await set_base_cmd.finish("⛔ 只能在现实世界（大都会）设置公会基地")
+
+        # 检查坐标范围（使用导航系统的坐标限制）
+        MAX_COORD = 500
+        if not (-MAX_COORD <= player.x <= MAX_COORD and -MAX_COORD <= player.y <= MAX_COORD):
+            await set_base_cmd.finish(f"⛔ 当前坐标超出有效范围（{-MAX_COORD}~{MAX_COORD}）")
+
+        # 检查是否已有其他公会在此位置设置基地
+        stmt = select(Guild).where(
+            Guild.base_x == player.x,
+            Guild.base_y == player.y,
+            Guild.id != guild.id
+        )
+        existing_guild = (await session.execute(stmt)).scalars().first()
+        if existing_guild:
+            await set_base_cmd.finish(f"⛔ 坐标({player.x}, {player.y})已被公会『{existing_guild.name}』占据")
+
+        # 设置基地坐标
+        old_base_info = ""
+        if guild.base_x is not None and guild.base_y is not None:
+            old_base_info = f"原基地坐标：({guild.base_x}, {guild.base_y})\n"
+
+        guild.base_x = player.x
+        guild.base_y = player.y
+        session.add(guild)
+        await session.commit()
+
+        msg = (
+            f"🏰 公会基地设立成功！\n"
+            f"━━━━━━━━━━━━━\n"
+            f"{old_base_info}"
+            f"▫️ 新基地坐标：({guild.base_x}, {guild.base_y})\n"
+            f"▫️ 势力范围：{guild.territory_range}×{guild.territory_range}\n"
+            f"━━━━━━━━━━━━━\n"
+            f"💡 公会成员可以使用【公会传送】传送到基地（功能开发中）"
+        )
+        await set_base_cmd.finish(message_add_head(msg, event))
 
 # ==================== 公会职位管理 ====================
 set_position_cmd = on_command("设置职位", block=True, priority=5)
