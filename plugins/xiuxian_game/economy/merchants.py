@@ -22,6 +22,7 @@ from sqlalchemy import select
 from ..models.db import safe_session
 from ..models.player import Player
 from ..models.inventory import ItemInstance
+from ..models.market_state import MarketState
 from ..utils import message_add_head
 from ..config import config
 
@@ -34,8 +35,8 @@ class Market:
         self.items = items
 
 goods_ids = [
-    "lux_perfume", "red_wine", "yin_grass","gold_watch", "diamond_ring", "silk_scarf",
-    "dslr_camera", "smartphone", "blood_pact", "gaming_console", "designer_bag", "luxury_chocolate",
+    "lux_perfume", "red_wine","gold_watch", "diamond_ring", "silk_scarf",
+    "dslr_camera", "smartphone", "gaming_console", "designer_bag", "luxury_chocolate",
     "art_book", "concert_ticket", "fountain_pen", "sneakers", "noise_headphones",
     "heal_potion", "spirit_herb"
 ]
@@ -87,23 +88,39 @@ def _get_rng(merchant_id: str, item_id: str) -> random.Random:
     return random.Random(hash(seed_str))
 
 
-def _price_for(market: Market, item_id: str) -> Tuple[int, int]:
-    """返回 (sell_price, buy_price)。
+async def _price_for(session, market: Market, item_id: str) -> Tuple[int, int]:
+    """返回 (sell_price, buy_price) - 新的动态价格系统
+
+    价格计算逻辑：
+    1. 基础价格 × 随机波动(±20%) × 供需因子
+    2. 收购价 = 售价 × 0.88 (降低利润率从15%到12%)
     """
     item_cfg = config.items_config["by_id"].get(item_id)
     base_price = item_cfg.price or 1
 
-    # -------- 单一随机波动（市集 × 物品 × 日期） --------
+    # 获取或创建市场状态
+    market_state = await MarketState.get_or_create(session, market.id, item_id)
+
+    # 检查是否需要每日刷新
+    await market_state.check_daily_refresh(session)
+
+    # -------- 基础随机波动（适度扩大到±25%） --------
     seed_str = f"{market.id}:{item_id}:{_current_seed_day().isoformat()}"
     seed_int = int(hashlib.md5(seed_str.encode()).hexdigest(), 16)
     rng_local = random.Random(seed_int)
-    factor = rng_local.uniform(0.85, 1.15)  # ±15% 浮动
+    random_factor = rng_local.uniform(0.75, 1.25)  # ±25% 浮动
 
-    sell_price = max(1, int(base_price * factor))
+    # -------- 动态供需因子 --------
+    supply_demand_factor = market_state.get_price_multiplier()
 
-    # 收购价：保证存在套利空间，但差距不至于过大
-    # 固定系数 0.85，与 sell_price 保持约 15% 毛利
-    buy_price = max(1, int(sell_price * 0.85))
+    # -------- 最终价格计算 --------
+    final_factor = random_factor * supply_demand_factor
+    sell_price = max(1, int(base_price * final_factor))
+
+    # 收购价：进一步降低利润率到约8-10%
+    buy_price_ratio = rng_local.uniform(0.90, 0.92)  # 90%-92%，平均91%
+    buy_price = max(1, int(sell_price * buy_price_ratio))
+
     return sell_price, buy_price
 
 # ------------------- 指令 -------------------
@@ -145,16 +162,21 @@ async def _(event: MessageEvent):
         lines = [f"🏪 {market.name} ({market.x},{market.y})", "━━━━━━━━━━━━━"]
         for iid in market.items:
             item_cfg = config.items_config["by_id"].get(iid)
-            sell_p, buy_p = _price_for(market, iid)
-            lines.append(f"{item_cfg.name}│售 {sell_p}│收 {buy_p}")
-        lines.append("━━━━━━━━━━━━━\n🚧 跑商系统暂时关闭维护中\n━━━━━━━━━━━━━\n市集购买和出售功能暂时停用\n等待系统调整，感谢理解！")
+            sell_p, buy_p = await _price_for(session, market, iid)
+
+            # 获取库存状态
+            market_state = await MarketState.get_or_create(session, market.id, iid)
+            stock_status = market_state.get_stock_status()
+            stock_info = f"({market_state.current_stock})"
+
+            lines.append(f"{item_cfg.name}│售 {sell_p}│收 {buy_p}│库存{stock_info}{stock_status}")
+        lines.append("━━━━━━━━━━━━━\n� 购买和出售功能已恢复！\n💡 价格受供需影响，库存有限先到先得")
         await market_cmd.finish(message_add_head("\n".join(lines), event))
 
 buy_cmd = on_command("购买", block=True, priority=5)
 
 @buy_cmd.handle()
 async def _(event: MessageEvent, args: Message = CommandArg()):
-    # 跑商玩法暂停，禁用市集购买功能
     arg_text = args.extract_plain_text().strip()
     parts = arg_text.split()
     if len(parts) != 2:
@@ -178,50 +200,70 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
                 "━━━━━━━━━━━━━\n"
                 "⬇️ 【返回】脱离诡域，返回现实", event))
 
-        # 检查是否为市集购买（跑商功能暂停）
+        # 检查是否为市集购买
         market = MARKET_BY_COORD.get((player.x, player.y))
         item_cfg = config.items_config["by_name"].get(item_name)
         if not item_cfg:
             await buy_cmd.finish("⛔ 不存在该物品")
 
-        # 如果是市集商品，禁用购买
+        # 市集购买逻辑
         if market and item_cfg.item_id in market.items:
-            await buy_cmd.finish(message_add_head(
-                "🚧 跑商系统暂时关闭维护中\n"
-                "━━━━━━━━━━━━━\n"
-                "市集购买功能暂时停用，等待系统调整。\n"
-                "您仍可以在万事屋购买特殊物品。\n"
-                "━━━━━━━━━━━━━\n"
-                "感谢您的理解与支持！", event))
+            # 获取市场状态
+            market_state = await MarketState.get_or_create(session, market.id, item_cfg.item_id)
+            await market_state.check_daily_refresh(session)
 
-        # 检查是否在普通商店中（万事屋功能保留）
+            # 检查库存
+            if not market_state.can_purchase(qty):
+                await buy_cmd.finish(f"❌ 库存不足！当前库存：{market_state.current_stock}，需要：{qty}")
+
+            # 获取当前价格
+            sell_price, _ = await _price_for(session, market, item_cfg.item_id)
+            total_cost = sell_price * qty
+
+            if player.gold < total_cost:
+                await buy_cmd.finish(f"❌ 金币不足，需要 {total_cost} (当前 {player.gold})")
+
+            # 先检查背包空间，再扣款
+            try:
+                await ItemInstance.add_item(session, player.id, item_cfg.item_id, qty)
+            except ValueError as e:
+                await buy_cmd.finish(f"❌ {e}")
+
+            # 扣款并更新市场状态
+            player.gold -= total_cost
+            market_state.apply_purchase(qty)
+
+            session.add_all([player, market_state])
+            await session.commit()
+
+            await buy_cmd.finish(message_add_head(
+                f"✅ 购买 {item_cfg.name}×{qty} 成功！\n💸 花费 {total_cost} 金币\n"
+                f"📦 剩余库存：{market_state.current_stock}", event))
+
+        # 万事屋购买逻辑（保持不变）
         elif item_cfg.item_id in SHOP_ITEMS:
             total_cost = item_cfg.price * qty
+
+            if player.gold < total_cost:
+                await buy_cmd.finish(f"💰 金币不足，需要 {total_cost} (当前 {player.gold})")
+
+            try:
+                await ItemInstance.add_item(session, player.id, item_cfg.item_id, qty)
+            except ValueError as e:
+                await buy_cmd.finish(f"❌ {e}")
+
+            player.gold -= total_cost
+            await session.commit()
+            await buy_cmd.finish(message_add_head(
+                f"✅ 购买 {item_cfg.name}×{qty} 成功！\n💸 花费 {total_cost} 金币", event))
         else:
             await buy_cmd.finish("⛔ 此处无法购买该物品")
-
-        if player.gold < total_cost:
-            await buy_cmd.finish(f"💰 金币不足，需要 {total_cost} (当前 {player.gold})")
-
-        # 先检查背包空间，再扣款
-        try:
-            await ItemInstance.add_item(session, player.id, item_cfg.item_id, qty)
-        except ValueError as e:
-            # 背包空间不足，不扣款
-            await buy_cmd.finish(f"❌ {e}")
-
-        # 背包空间足够，扣款并提交事务
-        player.gold -= total_cost
-        await session.commit()
-        await buy_cmd.finish(message_add_head(
-            f"✅ 购买 {item_cfg.name}×{qty} 成功！\n💸 花费 {total_cost} 金币", event))
 
 # -------- 卖出 --------
 sell_cmd = on_command("出售", aliases={"卖"}, block=True, priority=5)
 
 @sell_cmd.handle()
 async def _(event: MessageEvent, args: Message = CommandArg()):
-    # 跑商玩法暂停，禁用市集出售功能
     arg_text = args.extract_plain_text().strip()
     parts = arg_text.split()
     if len(parts) != 2:
@@ -245,22 +287,11 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
                 "━━━━━━━━━━━━━\n"
                 "⬇️ 【返回】脱离诡域，返回现实", event))
 
-        # 检查是否在市集（跑商功能暂停）
+        # 检查是否在市集
         market = MARKET_BY_COORD.get((player.x, player.y))
-        if market:
-            # 市集出售功能暂停
-            await sell_cmd.finish(message_add_head(
-                "🚧 跑商系统暂时关闭维护中\n"
-                "━━━━━━━━━━━━━\n"
-                "市集出售功能暂时停用，等待系统调整。\n"
-                "您可以通过其他方式处理物品。\n"
-                "━━━━━━━━━━━━━\n"
-                "感谢您的理解与支持！", event))
+        if not market:
+            await sell_cmd.finish("⛔ 这里只有风～没有商人")
 
-        # 如果不在市集，提示没有商人
-        await sell_cmd.finish("⛔ 这里只有风～没有商人")
-
-        # 以下代码暂时不可达，保留原逻辑以便将来恢复
         item_cfg = config.items_config["by_name"].get(item_name)
         if not item_cfg or item_cfg.item_id not in market.items:
             await sell_cmd.finish("⛔ 商人不收购该物品")
@@ -273,7 +304,11 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
         if total_qty < qty:
             await sell_cmd.finish("❌ 背包数量不足")
 
-        _, buy_price = _price_for(market, item_cfg.item_id)
+        # 获取市场状态和当前价格
+        market_state = await MarketState.get_or_create(session, market.id, item_cfg.item_id)
+        await market_state.check_daily_refresh(session)
+
+        _, buy_price = await _price_for(session, market, item_cfg.item_id)
         total_gain = buy_price * qty
 
         # 更新：优先扣未满堆叠
@@ -282,10 +317,16 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
             await session.rollback()
             await sell_cmd.finish("❌ 扣除物品失败")
 
+        # 更新玩家金币和市场状态
         player.gold += total_gain
+        market_state.apply_sale(qty)
+
+        session.add_all([player, market_state])
         await session.commit()
+
         await sell_cmd.finish(message_add_head(
-            f"💰 卖出 {item_cfg.name}×{qty} 成功！\n🪙 获得 {total_gain} 金币", event))
+            f"💰 卖出 {item_cfg.name}×{qty} 成功！\n🪙 获得 {total_gain} 金币\n"
+            f"📦 市场库存：{market_state.current_stock}", event))
 
 # -------- 市集列表 --------
 
@@ -311,14 +352,21 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
         names = "、".join(m.name for m in MARKETS)
         await detail_market_cmd.finish(f"⛔ 未找到市集：{market_name}。可选：{names}")
 
-    lines = [f"🏪 {market.name} ({market.x},{market.y})", "━━━━━━━━━━━━━"]
-    for iid in market.items:
-        item_cfg = config.items_config["by_id"].get(iid)
-        sell_p, buy_p = _price_for(market, iid)
-        lines.append(f"{item_cfg.name}│售 {sell_p}│收 {buy_p}")
-    lines.append("━━━━━━━━━━━━━\n🧭 到达坐标后发送【市集】进行交易")
+    async with safe_session() as session:
+        lines = [f"🏪 {market.name} ({market.x},{market.y})", "━━━━━━━━━━━━━"]
+        for iid in market.items:
+            item_cfg = config.items_config["by_id"].get(iid)
+            sell_p, buy_p = await _price_for(session, market, iid)
 
-    await detail_market_cmd.finish(message_add_head("\n".join(lines), event))
+            # 获取库存状态
+            market_state = await MarketState.get_or_create(session, market.id, iid)
+            stock_status = market_state.get_stock_status()
+            stock_info = f"({market_state.current_stock})"
+
+            lines.append(f"{item_cfg.name}│售 {sell_p}│收 {buy_p}│库存{stock_info}{stock_status}")
+        lines.append("━━━━━━━━━━━━━\n🧭 到达坐标后发送【市集】进行交易")
+
+        await detail_market_cmd.finish(message_add_head("\n".join(lines), event))
 
 # -------- 市价 --------
 
@@ -332,74 +380,87 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
     if not item_cfg:
         await price_compare_cmd.finish(f"⛔ 未找到物品：{item_name}")
 
-    lines = [f"💹 {item_cfg.name} 各市集价格", "━━━━━━━━━━━━━"]
-    found = False
-    for m in MARKETS:
-        if item_cfg.item_id not in m.items:
-            continue
-        sell_p, buy_p = _price_for(m, item_cfg.item_id)
-        lines.append(f"{m.name}│售 {sell_p}│收 {buy_p}")
-        found = True
+    async with safe_session() as session:
+        lines = [f"💹 {item_cfg.name} 各市集价格", "━━━━━━━━━━━━━"]
+        found = False
+        for m in MARKETS:
+            if item_cfg.item_id not in m.items:
+                continue
+            sell_p, buy_p = await _price_for(session, m, item_cfg.item_id)
 
-    if not found:
-        await price_compare_cmd.finish("ℹ️ 暂无市集出售该物品")
+            # 获取库存状态
+            market_state = await MarketState.get_or_create(session, m.id, item_cfg.item_id)
+            stock_info = f"({market_state.current_stock})"
 
-    await price_compare_cmd.finish(message_add_head("\n".join(lines), event))
+            lines.append(f"{m.name}│售 {sell_p}│收 {buy_p}│库存{stock_info}")
+            found = True
+
+        if not found:
+            await price_compare_cmd.finish("ℹ️ 暂无市集出售该物品")
+
+        await price_compare_cmd.finish(message_add_head("\n".join(lines), event))
 
 # -------- 跑商推荐 --------
 
 @trade_advise_cmd.handle()
 async def _(event: MessageEvent):
     """遍历市集与商品，列出正利润路线（购买→售出）。"""
-    opportunities = []
-    for src in MARKETS:
-        for iid in src.items:
-            sell_p_src, _ = _price_for(src, iid)
-            for dst in MARKETS:
-                if dst is src or iid not in dst.items:
+    async with safe_session() as session:
+        opportunities = []
+        for src in MARKETS:
+            for iid in src.items:
+                # 检查源市场库存
+                src_state = await MarketState.get_or_create(session, src.id, iid)
+                if not src_state.can_purchase(1):  # 至少要有1个库存
                     continue
-                _, buy_p_dst = _price_for(dst, iid)
-                profit = buy_p_dst - sell_p_src
-                if profit > 0:
-                    item_cfg = config.items_config["by_id"].get(iid)
-                    margin = profit / sell_p_src if sell_p_src else 0
-                    opportunities.append({
-                        "item": item_cfg.name,
-                        "from": src.name,
-                        "to": dst.name,
-                        "buy": sell_p_src,
-                        "sell": buy_p_dst,
-                        "profit": profit,
-                        "margin": margin,
-                    })
 
-    if not opportunities:
-        await trade_advise_cmd.finish("ℹ️ 今日暂无明显差价，明天再来看看吧！")
+                sell_p_src, _ = await _price_for(session, src, iid)
+                for dst in MARKETS:
+                    if dst is src or iid not in dst.items:
+                        continue
+                    _, buy_p_dst = await _price_for(session, dst, iid)
+                    profit = buy_p_dst - sell_p_src
+                    if profit > 0:
+                        item_cfg = config.items_config["by_id"].get(iid)
+                        margin = profit / sell_p_src if sell_p_src else 0
+                        opportunities.append({
+                            "item": item_cfg.name,
+                            "from": src.name,
+                            "to": dst.name,
+                            "buy": sell_p_src,
+                            "sell": buy_p_dst,
+                            "profit": profit,
+                            "margin": margin,
+                            "src_stock": src_state.current_stock,
+                        })
 
-    # 按利润降序，先过滤掉最暴利的前三条，剩余随机挑 5 条
-    opportunities.sort(key=lambda d: d["profit"], reverse=True)
-    if len(opportunities) > 3:
-        candidates = opportunities[3:]
-    else:
-        candidates = opportunities
+        if not opportunities:
+            await trade_advise_cmd.finish("ℹ️ 今日暂无明显差价或库存不足，明天再来看看吧！")
 
-    import random as _rnd
-    sample = _rnd.sample(candidates, min(5, len(candidates)))
+        # 按利润降序，先过滤掉最暴利的前三条，剩余随机挑 5 条
+        opportunities.sort(key=lambda d: d["profit"], reverse=True)
+        if len(opportunities) > 3:
+            candidates = opportunities[3:]
+        else:
+            candidates = opportunities
 
-    lines = ["💹 跑商盈利机会 (随机推荐)", "━━━━━━━━━━━━━"]
-    for op in sample:
-        lines.append(
-            f"📦 {op['item']}\n🛒 {op['from']} → {op['to']}  "+
-            f"💸 {op['buy']} → 💰 {op['sell']}  "+
-            f"📈 +{op['profit']} ({op['margin']*100:.0f}%)"
-        )
-        lines.append("──────────")
+        import random as _rnd
+        sample = _rnd.sample(candidates, min(5, len(candidates)))
 
-    await trade_advise_cmd.finish(message_add_head("\n".join(lines), event))
+        lines = ["💹 跑商盈利机会 (随机推荐)", "━━━━━━━━━━━━━"]
+        for op in sample:
+            lines.append(
+                f"📦 {op['item']} (库存:{op['src_stock']})\n🛒 {op['from']} → {op['to']}  "+
+                f"💸 {op['buy']} → 💰 {op['sell']}  "+
+                f"📈 +{op['profit']} ({op['margin']*100:.0f}%)"
+            )
+            lines.append("──────────")
+
+        await trade_advise_cmd.finish(message_add_head("\n".join(lines), event))
 
 # 普通商店商品（只卖不收的特殊消耗品）
 SHOP_ITEMS = [
-    "revive_potion", "rename_card", "president_letter", "territory_expansion_scroll","coffin_nail"
+    "revive_potion", "rename_card", "president_letter", "territory_expansion_scroll","spirit_herb","blood_pact"
 ]
 
 # 普通商店指令

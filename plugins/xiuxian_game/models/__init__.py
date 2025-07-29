@@ -15,6 +15,7 @@ from .story_session import StorySession
 from .donation_log import PlayerDonationLog
 from .elixir_usage import ElixirUsageLog
 from .monthly_card import MonthlyCard
+from .market_state import MarketState
 # Ghost配置直接从YAML读取，工具类移至ghost_suppression模块
 from .ghost_invasion import GhostInvasion
 from .player_ghost import PlayerGhost
@@ -22,5 +23,5 @@ from .player_ghost import PlayerGhost
 __all__ = [
     "Player", "Guild", "GuildMember", "GuildBuilding", "GuildPosition", "BuildingType", "WorldMessage", "BankAccount", "ItemInstance", "WorldTile", "NavigationTask", "AlchemyRecord", "MarketOrder",
     "Marriage", "Mentorship", "SocialApplication", "GiftRecord", "StorySession", "PlayerDonationLog", "ElixirUsageLog", "GuildTeleportLog",
-    "MonthlyCard", "GhostInvasion", "PlayerGhost"
+    "MonthlyCard", "MarketState", "GhostInvasion", "PlayerGhost"
 ]
