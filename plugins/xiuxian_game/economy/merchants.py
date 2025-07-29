@@ -458,7 +458,7 @@ async def _(event: MessageEvent):
 
 # 普通商店商品（只卖不收的特殊消耗品）
 SHOP_ITEMS = [
-    "revive_potion", "rename_card", "president_letter", "territory_expansion_scroll","spirit_herb","blood_pact"
+    "revive_potion", "rename_card", "president_letter", "territory_expansion_scroll","yin_grass","blood_pact"
 ]
 
 # 普通商店指令
