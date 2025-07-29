@@ -342,11 +342,14 @@ async def _sweep_dungeon(player: Player, cfg: ItemConfig, qty: int, ctx: str, se
 
 @register(ItemEffectType.RESET_ATTR)
 async def _reset_attr(player: Player, cfg: ItemConfig, qty: int, ctx: str, session=None):
-    """重置已分配属性点，保留装备加成。仅允许 qty=1。"""
+    """重置已分配属性点，保留装备加成和丹药加成。仅允许 qty=1。"""
     if qty != 1:
         return False, "⛔ 重启符一次只能使用 1 个"
 
     from ..config import config as gcfg
+    from sqlalchemy import select
+    from ..models.elixir_usage import ElixirUsageLog
+
     # 初始基础属性
     INIT = {
         "max_hp": 20,
@@ -358,7 +361,7 @@ async def _reset_attr(player: Player, cfg: ItemConfig, qty: int, ctx: str, sessi
     }
 
     # 累计装备 bonus
-    bonus = {k: 0 for k in INIT}
+    equipment_bonus = {k: 0 for k in INIT}
     # 从 Session 中预加载玩家装备
     eq_list = player.__dict__.get("item_instances")
     if eq_list:
@@ -366,12 +369,36 @@ async def _reset_attr(player: Player, cfg: ItemConfig, qty: int, ctx: str, sessi
             if getattr(eq, "equipped", False) and eq.config and eq.config.type == ItemType.EQUIPMENT:
                 delta = (eq.extra_attrs or {}).get("_persist_bonus", {})
                 for k, v in delta.items():
-                    if k in bonus:
-                        bonus[k] += int(v)
+                    if k in equipment_bonus:
+                        equipment_bonus[k] += int(v)
 
-    # 重置属性为基础 + 装备 bonus
+    # 计算丹药加成
+    elixir_bonus = {k: 0 for k in INIT}
+    if session:
+        # 获取所有丹药使用记录（不限日期，因为丹药效果是永久的）
+        stmt = select(ElixirUsageLog).where(ElixirUsageLog.player_id == player.id)
+        logs = (await session.execute(stmt)).scalars().all()
+
+        # 统计每种丹药的总使用量
+        elixir_usage_total = {}
+        for log in logs:
+            if log.item_id not in elixir_usage_total:
+                elixir_usage_total[log.item_id] = 0
+            elixir_usage_total[log.item_id] += log.quantity
+
+        # 计算丹药属性加成
+        for item_id, total_qty in elixir_usage_total.items():
+            item_cfg = gcfg.items_config["by_id"].get(item_id)
+            if item_cfg and item_cfg.effect_type == ItemEffectType.BUFF:
+                effect_params = item_cfg.effect_params or {}
+                for attr, value in effect_params.items():
+                    if attr in elixir_bonus:
+                        elixir_bonus[attr] += int(value) * total_qty
+
+    # 重置属性为基础 + 装备 bonus + 丹药 bonus
     for k, base_v in INIT.items():
-        setattr(player, k, base_v + bonus.get(k, 0))
+        total_bonus = equipment_bonus.get(k, 0) + elixir_bonus.get(k, 0)
+        setattr(player, k, base_v + total_bonus)
 
     # 重新计算可分配点
     pts_per_lvl = gcfg.game_config["game"]["points_per_level"]
@@ -383,7 +410,21 @@ async def _reset_attr(player: Player, cfg: ItemConfig, qty: int, ctx: str, sessi
     if player.mp > player.max_mp:
         player.mp = player.max_mp
 
-    return True, "🔄 属性已重置，所有点数已退还，可重新分配"
+    # 生成详细的重置信息
+    bonus_info = []
+    if any(equipment_bonus.values()):
+        bonus_info.append("装备加成已保留")
+    if any(elixir_bonus.values()):
+        elixir_details = []
+        for k, v in elixir_bonus.items():
+            if v > 0:
+                attr_name = {"max_hp": "体", "max_mp": "智", "attack": "力", "defense": "防", "agility": "敏", "luck": "运"}.get(k, k)
+                elixir_details.append(f"{attr_name}+{v}")
+        if elixir_details:
+            bonus_info.append(f"丹药加成已保留({', '.join(elixir_details)})")
+
+    bonus_msg = f"，{', '.join(bonus_info)}" if bonus_info else ""
+    return True, f"🔄 属性已重置，所有点数已退还，可重新分配{bonus_msg}"
 
 
 @register(ItemEffectType.EXPAND_TERRITORY)
