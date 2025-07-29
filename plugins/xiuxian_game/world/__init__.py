@@ -331,6 +331,7 @@ async def get_or_create_tile(session, region: str, x: int, y: int) -> WorldTile:
                 "hp": monster_attrs["hp"],
                 "attack": monster_attrs["attack"],
                 "agility": monster_attrs["agility"],
+                "defeated_by": []  # 记录击败过的玩家，避免原地无限刷
             }
         elif tile.event_type == "TREASURE":
             tile.state = {"looted": False}
@@ -478,6 +479,8 @@ async def _(event: MessageEvent):
                     return "🪨 破碎的宝箱静静躺在尘埃中，没有任何价值。"
                 return "🎁 你注意到一个尘封宝箱，输入 [探索] 能打开它。"
             elif t.event_type == "EMPTY":
+                if player.id in t.state.get("defeated_by", []):
+                    return "🪨 这里只剩下怪物的残骸，散发着淡淡的血腥味。"
                 monster = t.state.get("name")
                 return f"🌫️ 四周弥漫着诡异的静谧，似乎潜伏着 {monster} 的气息。若想冒险，可输入 [探索] 进行调查。"
             elif t.event_type == "REST":
@@ -557,6 +560,10 @@ async def _handle_treasure(session, tile: WorldTile, player: Player) -> str:
 
 
 async def _handle_empty(session, tile: WorldTile, player: Player) -> str:
+    # 检查玩家是否已经击败过这个小怪
+    if player.id in tile.state.get("defeated_by", []):
+        return "🪨 这里只剩下怪物的残骸，散发着淡淡的血腥味。"
+
     # empty格有80%可能遇到个人的怪物，但不会影响公共事件
     if random.random() < 0.8:
         return await _handle_personal_monster(session, tile, player)
@@ -645,9 +652,8 @@ async def _handle_personal_monster(session, tile: WorldTile, player: Player) -> 
         if drop_result:
             log += f"\n{drop_result}"
 
-        # 如果是精英怪，标记为已击败
-        if is_elite:
-            tile.state.setdefault("defeated_by", []).append(player.id)
+        # 标记为已击败（无论是精英怪还是普通小怪）
+        tile.state.setdefault("defeated_by", []).append(player.id)
 
     elif player_hp <= 0:
         log += f"\n💀 你被 {monster_display} 击败，很遗憾，你已死亡"
