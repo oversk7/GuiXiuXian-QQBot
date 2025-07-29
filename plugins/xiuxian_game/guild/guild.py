@@ -514,7 +514,7 @@ async def handle_app_list(event: MessageEvent):
         lines = ["📑 待处理入会申请", "━━━━━━━━━━"]
         for a in apps:
             applicant = await session.get(Player, a.applicant_id)
-            lines.append(f"UID:{applicant.uid} {applicant.nickname} Lv.{applicant.level} 贡献:{applicant.guild_contribution}")
+            lines.append(f"UID:{applicant.uid} {applicant.nickname} Lv.{applicant.level}")
         await application_list_cmd.finish(message_add_head("\n".join(lines), event))
 
 # ==================== 同意/拒绝申请 ====================
