@@ -69,9 +69,16 @@ async def handle_cultivate(event: MessageEvent):
         from ..models.monthly_card import get_player_card_benefits
         benefits = await get_player_card_benefits(session, player.id)
 
-        # 应用月卡修炼效率加成
-        cultivation_multiplier = 1.0 + benefits["cultivation_efficiency"]
-        exp_gain = int(base_exp_gain * cultivation_multiplier)
+        # 获取公会修为加成
+        guild_cultivation_bonus = 0.0
+        if player.guild_id:
+            from ..guild.guild_building_service import GuildBuildingService
+            guild_bonuses = await GuildBuildingService.get_guild_bonuses(session, player.guild_id)
+            guild_cultivation_bonus = guild_bonuses.get("cultivation_bonus", 0.0)
+
+        # 应用月卡和公会修炼效率加成
+        total_cultivation_multiplier = 1.0 + benefits["cultivation_efficiency"] + guild_cultivation_bonus
+        exp_gain = int(base_exp_gain * total_cultivation_multiplier)
         bonus_exp = exp_gain - base_exp_gain
   
         # 更新数据
@@ -81,11 +88,20 @@ async def handle_cultivate(event: MessageEvent):
         await session.commit()
         exp_max = calculate_level_up_exp(player.level)
 
-        # 构建修炼消息，包含月卡加成提示
+        # 构建修炼消息，包含月卡和公会加成提示
         bonus_msg = ""
         if bonus_exp > 0:
-            efficiency_percent = benefits["cultivation_efficiency"] * 100
-            bonus_msg = f"\n✧ 月卡加成 💳 +{bonus_exp} 怨炁 (+{efficiency_percent:.0f}%)"
+            # 分别计算月卡和公会加成
+            card_bonus = int(base_exp_gain * benefits["cultivation_efficiency"])
+            guild_bonus = int(base_exp_gain * guild_cultivation_bonus)
+
+            if card_bonus > 0:
+                efficiency_percent = benefits["cultivation_efficiency"] * 100
+                bonus_msg += f"\n✧ 月卡加成 💳 +{card_bonus} 怨炁 (+{efficiency_percent:.0f}%)"
+
+            if guild_bonus > 0:
+                guild_percent = guild_cultivation_bonus * 100
+                bonus_msg += f"\n✧ 公会加成 🏰 +{guild_bonus} 怨炁 (+{guild_percent:.1f}%)"
 
         msg = (
             "你在黑焰里看见自己的影子喘息。\n"
@@ -121,6 +137,13 @@ async def handle_seclusion(event: MessageEvent):
         from ..models.monthly_card import get_player_card_benefits
         benefits = await get_player_card_benefits(session, player.id)
 
+        # 获取公会修为加成
+        guild_cultivation_bonus = 0.0
+        if player.guild_id:
+            from ..guild.guild_building_service import GuildBuildingService
+            guild_bonuses = await GuildBuildingService.get_guild_bonuses(session, player.guild_id)
+            guild_cultivation_bonus = guild_bonuses.get("cultivation_bonus", 0.0)
+
         # 计算棺材钉数量和效率加成
         coffin_nail_count = await get_coffin_nail_count(session, player.id)
         efficiency_bonus = coffin_nail_count * 0.5  # 每个棺材钉提升0.5%效率
@@ -130,7 +153,7 @@ async def handle_seclusion(event: MessageEvent):
         session.add(player)
         await session.commit()
 
-        # 构建闭关消息，包含棺材钉和月卡效率提示
+        # 构建闭关消息，包含棺材钉、月卡和公会效率提示
         efficiency_msg = ""
         if coffin_nail_count > 0:
             efficiency_msg += f"\n✧ 棺材钉 ⚰️ ✖️{coffin_nail_count} 提升效率 +{efficiency_bonus:.1f}%"
@@ -138,6 +161,10 @@ async def handle_seclusion(event: MessageEvent):
         if benefits["seclusion_efficiency"] > 0:
             card_efficiency = benefits["seclusion_efficiency"] * 100
             efficiency_msg += f"\n✧ 月卡加成 💳 提升效率 +{card_efficiency:.0f}%"
+
+        if guild_cultivation_bonus > 0:
+            guild_efficiency = guild_cultivation_bonus * 100
+            efficiency_msg += f"\n✧ 公会加成 🏰 提升效率 +{guild_efficiency:.1f}%"
 
         seclusion_hours = benefits["seclusion_time_limit"] // 3600
         time_limit_msg = f"\n✧ 闭关时长上限 ⏰ {seclusion_hours}小时"
@@ -175,6 +202,13 @@ async def handle_out_seclusion(event: MessageEvent):
         from ..models.monthly_card import get_player_card_benefits
         benefits = await get_player_card_benefits(session, player.id)
 
+        # 获取公会修为加成
+        guild_cultivation_bonus = 0.0
+        if player.guild_id:
+            from ..guild.guild_building_service import GuildBuildingService
+            guild_bonuses = await GuildBuildingService.get_guild_bonuses(session, player.guild_id)
+            guild_cultivation_bonus = guild_bonuses.get("cultivation_bonus", 0.0)
+
         # 计算棺材钉数量和效率加成
         coffin_nail_count = await get_coffin_nail_count(session, player.id)
         coffin_nail_multiplier = 1.0 + (coffin_nail_count * 0.005)  # 每个棺材钉提升0.5%效率
@@ -197,8 +231,13 @@ async def handle_out_seclusion(event: MessageEvent):
 
         # 应用月卡闭关效率加成
         card_multiplier = 1.0 + benefits["seclusion_efficiency"]
-        exp_gain = int(exp_after_coffin_nail * card_multiplier)
-        card_bonus = exp_gain - exp_after_coffin_nail
+        exp_after_card = int(exp_after_coffin_nail * card_multiplier)
+        card_bonus = exp_after_card - exp_after_coffin_nail
+
+        # 应用公会修为加成
+        guild_multiplier = 1.0 + guild_cultivation_bonus
+        exp_gain = int(exp_after_card * guild_multiplier)
+        guild_bonus = exp_gain - exp_after_card
 
         player.exp += exp_gain
 
@@ -206,7 +245,7 @@ async def handle_out_seclusion(event: MessageEvent):
         await session.commit()
         exp_max2 = calculate_level_up_exp(player.level)
 
-        # 构建出关消息，包含棺材钉和月卡效率提示
+        # 构建出关消息，包含棺材钉、月卡和公会效率提示
         efficiency_msg = ""
         if coffin_nail_count > 0:
             efficiency_bonus = coffin_nail_count * 0.5
@@ -215,6 +254,10 @@ async def handle_out_seclusion(event: MessageEvent):
         if card_bonus > 0:
             card_efficiency = benefits["seclusion_efficiency"] * 100
             efficiency_msg += f"\n✧ 月卡加成 💳 额外获得 +{card_bonus} 怨炁 (+{card_efficiency:.0f}%)"
+
+        if guild_bonus > 0:
+            guild_efficiency = guild_cultivation_bonus * 100
+            efficiency_msg += f"\n✧ 公会加成 🏰 额外获得 +{guild_bonus} 怨炁 (+{guild_efficiency:.1f}%)"
 
         msg_out = (
             "🔓你推开棺盖，阴灰散落。\n"

@@ -300,6 +300,23 @@ items:
       price: 10000
       grudge_value: 500
 
+    # ========== 公会建筑专用材料 ==========
+    - item_id: "strange_stone"
+      name: "诡异石"
+      description: "散发着诡异气息的黑色石头，是建造高级公会建筑的重要材料 🪨"
+      type: "MATERIAL"
+      rarity: "blue"
+      price: 800
+      grudge_value: 25
+
+    - item_id: "spirit_stone"
+      name: "灵石"
+      description: "蕴含纯净灵力的珍贵晶石，只有在特殊诡域中才能找到 💎"
+      type: "MATERIAL"
+      rarity: "purple"
+      price: 2000
+      grudge_value: 80
+
   equipment:
     # ========== 初级装备 (1-20级) - 主要数值加成，使用白色材料 ==========
 

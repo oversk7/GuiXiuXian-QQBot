@@ -1,6 +1,17 @@
-from sqlalchemy import Integer, BigInteger, String, DateTime, func
-from sqlalchemy.orm import Mapped, mapped_column
+from sqlalchemy import Integer, BigInteger, String, DateTime, func, ForeignKey, Enum as SQLEnum
+from sqlalchemy.orm import Mapped, mapped_column, relationship
 from .db import Base
+from enum import Enum as PyEnum
+from datetime import datetime
+
+
+class GuildPosition(str, PyEnum):
+    """公会职位枚举"""
+    PRESIDENT = "PRESIDENT"      # 会长
+    VICE_PRESIDENT = "VICE_PRESIDENT"  # 副会长
+    CORE_MEMBER = "CORE_MEMBER"  # 核心成员
+    MEMBER = "MEMBER"            # 普通成员
+
 
 class Guild(Base):
     __tablename__ = "guild"
@@ -10,8 +21,59 @@ class Guild(Base):
     president_id: Mapped[str] = mapped_column(String(32), comment="会长的玩家平台ID")
     level: Mapped[int] = mapped_column(Integer, default=1, server_default='1', comment="公会等级")
     exp: Mapped[int] = mapped_column(BigInteger, default=0, server_default='0', comment="公会经验/活跃度")
+    treasury: Mapped[int] = mapped_column(BigInteger, default=0, server_default='0', comment="公会资金库")
     notice: Mapped[str | None] = mapped_column(String(128), nullable=True, comment="公会公告")
     base_x: Mapped[int | None] = mapped_column(Integer, nullable=True, comment="公会基地X坐标")
     base_y: Mapped[int | None] = mapped_column(Integer, nullable=True, comment="公会基地Y坐标")
     territory_range: Mapped[int] = mapped_column(Integer, default=3, server_default='3', comment="势力范围（以基地为中心的正方形边长）")
-    created_at: Mapped[DateTime] = mapped_column(DateTime, server_default=func.now(), comment="创建时间")
+    created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now(), comment="创建时间")
+
+    # 关联关系
+    members: Mapped[list["GuildMember"]] = relationship("GuildMember", back_populates="guild", cascade="all, delete-orphan")
+    buildings: Mapped[list["GuildBuilding"]] = relationship("GuildBuilding", back_populates="guild", cascade="all, delete-orphan")
+
+
+class GuildMember(Base):
+    """公会成员职位表"""
+    __tablename__ = "guild_member"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    guild_id: Mapped[int] = mapped_column(Integer, ForeignKey("guild.id"), comment="公会ID")
+    player_id: Mapped[str] = mapped_column(String(32), comment="玩家ID")
+    position: Mapped[GuildPosition] = mapped_column(SQLEnum(GuildPosition), default=GuildPosition.MEMBER, comment="职位")
+    joined_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.now, server_default=func.now(), comment="加入时间")
+
+    # 关联关系
+    guild: Mapped["Guild"] = relationship("Guild", back_populates="members")
+
+    # 唯一约束：一个玩家只能在一个公会中
+    __table_args__ = (
+        {"comment": "公会成员职位表"}
+    )
+
+
+class BuildingType(str, PyEnum):
+    """公会建筑类型枚举"""
+    EXPERIENCE_SHRINE = "EXPERIENCE_SHRINE"  # 经验神龛 - 提升经验转换倍率
+    TREASURY_VAULT = "TREASURY_VAULT"        # 资金金库 - 增加资金上限
+    TRAINING_GROUND = "TRAINING_GROUND"      # 训练场 - 提升成员修为加成
+    SPIRIT_TOWER = "SPIRIT_TOWER"           # 灵塔 - 提升公会整体属性
+    DEFENSE_WALL = "DEFENSE_WALL"           # 防御城墙 - 提升公会防御力
+
+
+class GuildBuilding(Base):
+    """公会建筑表"""
+    __tablename__ = "guild_building"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    guild_id: Mapped[int] = mapped_column(Integer, ForeignKey("guild.id"), comment="公会ID")
+    building_type: Mapped[BuildingType] = mapped_column(SQLEnum(BuildingType), comment="建筑类型")
+    level: Mapped[int] = mapped_column(Integer, default=1, server_default='1', comment="建筑等级")
+    built_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.now, server_default=func.now(), comment="建造时间")
+
+    # 关联关系
+    guild: Mapped["Guild"] = relationship("Guild", back_populates="buildings")
+
+    __table_args__ = (
+        {"comment": "公会建筑表"}
+    )

@@ -7,14 +7,18 @@ from datetime import datetime, date
 from ..models.db import safe_session
 from ..models.player import Player
 from ..models.inventory import ItemInstance
-from ..models.guild import Guild
+from ..models.guild import Guild, GuildMember, GuildPosition, BuildingType
 from ..config import config
 from ..utils import message_add_head
 from ..models.social_application import SocialApplication, ApplicationType, ApplicationStatus
 from ..models.donation_log import PlayerDonationLog
-from ..models.guild_teleport_log import GuildTeleportLog
 from ..models.navigation_task import NavigationTask
 from .guild_application_service import GuildApplicationService
+from .guild_service import GuildService
+from .guild_permission import GuildPermission
+from .guild_economy_service import GuildEconomyService
+from .guild_building_service import GuildBuildingService
+from .guild_task_service import GuildTaskService
 
 # ===== 工具函数 =====
 # 翻译大数字为 w（万）单位，保留 1 位小数，10w 以下不显示 w
@@ -74,14 +78,11 @@ async def handle_create_guild(event: MessageEvent, args: Message = CommandArg())
         if (await session.execute(exist_stmt)).scalars().first():
             await create_guild_cmd.finish("⛔ 已存在同名公会")
 
-        # 创建公会
-        new_guild = Guild(name=guild_name, president_id=player.id, created_at=datetime.now())
-        session.add(new_guild)
-        await session.flush()  # 使 new_guild.id 获得值
+        # 使用新的公会服务创建公会
+        success, message, new_guild = await GuildService.create_guild(session, player.id, guild_name)
 
-        # 更新玩家
-        player.guild_id = new_guild.id
-        session.add(player)
+        if not success:
+            await create_guild_cmd.finish(f"⛔ {message}")
 
         # 扣除委任书
         inv.quantity -= 1
@@ -93,7 +94,8 @@ async def handle_create_guild(event: MessageEvent, args: Message = CommandArg())
         msg = (
             f"🏰 公会『{guild_name}』正式成立！\n"
             f"▫️ 会长：{player.nickname}\n"
-            f"▫️ 公会 ID：{new_guild.id}"
+            f"▫️ 公会 ID：{new_guild.id}\n"
+            f"▫️ 职位：{GuildPermission.get_position_display_name(GuildPosition.PRESIDENT)}"
         )
         await create_guild_cmd.finish(message_add_head(msg, event))
 
@@ -115,18 +117,29 @@ async def handle_guild_info(event: MessageEvent):
             await session.commit()
             await guild_info_cmd.finish("⚠️ 公会数据异常，请稍后重试")
 
-        # 会长
+        # 获取玩家职位
+        player_position = await GuildPermission.get_member_position(session, player.id, guild_obj.id)
+        position_name = GuildPermission.get_position_display_name(player_position) if player_position else "未知"
+
+        # 会长信息
         president = await session.get(Player, guild_obj.president_id)
+
         # 成员统计
-        count_stmt = select(_func.count(Player.id)).where(Player.guild_id == guild_obj.id)
-        member_count = (await session.execute(count_stmt)).scalar_one()
-        # 容量计算函数
-        def _capacity(lv: int) -> int:
-            return 10 + (lv - 1) * 5
-        capacity = _capacity(guild_obj.level)
-        # 经验显示：当前 / 升级所需（均转换为 w 单位一位小数）
-        exp_current = _fmt_w(guild_obj.exp)
-        exp_need = _fmt_w(_need_exp_for_level(guild_obj.level))
+        member_count = await GuildService.get_member_count(session, guild_obj.id)
+        capacity = GuildService.get_guild_capacity(guild_obj.level)
+
+        # 经验和升级信息
+        exp_current = GuildEconomyService.format_large_number(guild_obj.exp)
+        upgrade_cost = GuildEconomyService.get_guild_upgrade_cost(guild_obj.level)
+        exp_need = GuildEconomyService.format_large_number(upgrade_cost["exp"])
+
+        # 资金信息
+        treasury = GuildEconomyService.format_large_number(guild_obj.treasury)
+
+        # 建筑加成信息
+        bonuses = await GuildBuildingService.get_guild_bonuses(session, guild_obj.id)
+        exp_multiplier = bonuses.get("exp_multiplier", 1.0)
+        cultivation_bonus = bonuses.get("cultivation_bonus", 0.0)
 
         # 基地信息
         base_info = ""
@@ -138,17 +151,79 @@ async def handle_guild_info(event: MessageEvent):
         elif guild_obj.level >= 5:
             base_info = f"▫️ 基地坐标：未设置（可使用【设置基地】命令）\n"
 
+        # 加成信息
+        bonus_info = f"▫️ 经验倍率：{exp_multiplier:.1f}x\n"
+        if cultivation_bonus > 0:
+            bonus_info += f"▫️ 修为加成：+{cultivation_bonus*100:.1f}%\n"
+
         msg = (
             f"🏰 公会面板\n"
             f"▫️『{guild_obj.name}』[ID:{guild_obj.id}] Lv.{guild_obj.level}\n"
             f"▫️ 会长：{president.nickname if president else '未知'}\n"
+            f"▫️ 你的职位：{position_name}\n"
             f"▫️ 人数：{member_count}/{capacity}\n"
             f"▫️ 经验：{exp_current}/{exp_need}\n"
+            f"▫️ 资金库：{treasury}\n"
+            f"{bonus_info}"
             f"▫️ 创建时间：{guild_obj.created_at.strftime('%Y-%m-%d')}\n"
             f"{base_info}"
             f"▫️ 公告：{guild_obj.notice or '暂无公告'}"
         )
         await guild_info_cmd.finish(message_add_head(msg, event))
+
+# ==================== 公会加成 ====================
+guild_bonuses_cmd = on_command("公会加成", aliases={"加成效果"}, block=True, priority=5)
+
+@guild_bonuses_cmd.handle()
+async def handle_guild_bonuses(event: MessageEvent):
+    """查看公会建筑提供的所有加成效果"""
+    async with safe_session() as session:
+        player = await session.get(Player, event.get_user_id())
+        if not player or not player.guild_id:
+            await guild_bonuses_cmd.finish("⛔ 你未加入任何公会")
+
+        guild = await session.get(Guild, player.guild_id)
+        bonuses = await GuildBuildingService.get_guild_bonuses(session, player.guild_id)
+
+        lines = [f"🎯 公会『{guild.name}』加成效果", "━━━━━━━━━━"]
+
+        # 经验倍率
+        exp_multiplier = bonuses.get("exp_multiplier", 1.0)
+        if exp_multiplier > 1.0:
+            lines.append(f"✨ 公会经验倍率：{exp_multiplier:.1f}x")
+        else:
+            lines.append(f"✨ 公会经验倍率：{exp_multiplier:.1f}x（基础）")
+
+        # 修为加成
+        cultivation_bonus = bonuses.get("cultivation_bonus", 0.0)
+        if cultivation_bonus > 0:
+            lines.append(f"🏋️ 修炼效率加成：+{cultivation_bonus*100:.1f}%")
+        else:
+            lines.append(f"🏋️ 修炼效率加成：无")
+
+        # 资金上限
+        treasury_limit = bonuses.get("treasury_limit", 100000)
+        lines.append(f"💰 资金库上限：{GuildEconomyService.format_large_number(treasury_limit)}")
+
+        # 全属性加成
+        all_attributes = bonuses.get("all_attributes", 0.0)
+        if all_attributes > 0:
+            lines.append(f"⚔️ 全属性加成：+{all_attributes*100:.1f}%")
+        else:
+            lines.append(f"⚔️ 全属性加成：无")
+
+        # 防御加成
+        defense_bonus = bonuses.get("defense_bonus", 0.0)
+        if defense_bonus > 0:
+            lines.append(f"🛡️ 防御力加成：+{defense_bonus*100:.1f}%")
+        else:
+            lines.append(f"🛡️ 防御力加成：无")
+
+        lines.append("━━━━━━━━━━")
+        lines.append("💡 建造更多建筑可获得更强加成")
+
+        msg = "\n".join(lines)
+        await guild_bonuses_cmd.finish(message_add_head(msg, event))
 
 # ==================== 加入公会 ====================
 join_guild_cmd = on_command("加入公会", block=True, priority=5)
@@ -192,19 +267,16 @@ async def handle_quit_guild(event: MessageEvent):
             await quit_guild_cmd.finish("⛔ 你未加入任何公会")
 
         guild_obj = await session.get(Guild, player.guild_id)
-        if not guild_obj:
-            player.guild_id = None
-            session.add(player)
-            await session.commit()
-            await quit_guild_cmd.finish("⚠️ 公会数据异常，已自动脱离")
+        guild_name = guild_obj.name if guild_obj else "未知公会"
 
-        if guild_obj.president_id == player.id:
-            await quit_guild_cmd.finish("⛔ 你是会长，不能直接退会，可使用【解散公会】或将会长转让后再退会")
+        # 使用新的公会服务退出公会
+        success, message = await GuildService.leave_guild(session, player.id)
 
-        player.guild_id = None
-        session.add(player)
+        if not success:
+            await quit_guild_cmd.finish(f"⛔ {message}")
+
         await session.commit()
-        await quit_guild_cmd.finish(message_add_head(f"🚪 你已退出公会『{guild_obj.name}』", event))
+        await quit_guild_cmd.finish(message_add_head(f"🚪 你已退出公会『{guild_name}』，个人积分和贡献已清空", event))
 
 # ==================== 解散公会 ====================
 
@@ -252,12 +324,27 @@ async def handle_member_list(event: MessageEvent):
         if not guild_obj:
             await member_list_cmd.finish("⚠️ 公会数据异常")
 
-        stmt = select(Player).where(Player.guild_id == guild_obj.id).order_by(Player.guild_contribution.desc(), Player.level.desc())
-        members = (await session.execute(stmt)).scalars().all()
+        # 使用新的公会服务获取成员列表
+        members = await GuildService.get_guild_members(session, guild_obj.id)
+
         lines = [f"👥 公会成员『{guild_obj.name}』({len(members)}人)", "━━━━━━━━━━"]
-        for idx, m in enumerate(members, 1):
-            mark = "👑" if m.id == guild_obj.president_id else ""
-            lines.append(f"{idx}. {m.nickname}{mark} Lv.{m.level} 贡:{_fmt_w(m.guild_contribution)}")
+        for idx, member in enumerate(members, 1):
+            # 职位图标
+            position_icons = {
+                GuildPosition.PRESIDENT: "👑",
+                GuildPosition.VICE_PRESIDENT: "⭐",
+                GuildPosition.CORE_MEMBER: "🔸",
+                GuildPosition.MEMBER: ""
+            }
+            icon = position_icons.get(member["position"], "")
+
+            lines.append(
+                f"{idx}. {member['nickname']}{icon} "
+                f"Lv.{member['level']} "
+                f"{member['position_name']} "
+                f"贡:{GuildEconomyService.format_large_number(member['contribution'])}"
+            )
+
         await member_list_cmd.finish(message_add_head("\n".join(lines), event))
 
 # ==================== 捐献金币 ====================
@@ -276,62 +363,57 @@ async def handle_donate(event: MessageEvent, args: Message = CommandArg()):
         await donate_cmd.finish("⛔ 金额必须为正整数")
 
     async with safe_session() as session:
-        player = await session.get(Player, event.get_user_id())
-        if not player or player.guild_id is None:
-            await donate_cmd.finish("⛔ 你未加入任何公会")
-        if player.gold < amt:
-            await donate_cmd.finish("⛔ 金币不足")
+        # 使用新的经济服务处理捐献
+        success, message, result = await GuildEconomyService.donate_gold(session, event.get_user_id(), amt)
 
-        # 当日捐献额度校验
-        donated_today_stmt = select(_func.coalesce(_func.sum(PlayerDonationLog.amount), 0)).where(
-            PlayerDonationLog.player_id == player.id,
-            PlayerDonationLog.donate_date == date.today(),
-        )
-        donated_today = (await session.execute(donated_today_stmt)).scalar_one()
-        if donated_today + amt > _DONATE_DAILY_LIMIT:
-            remain = _DONATE_DAILY_LIMIT - donated_today
-            await donate_cmd.finish(f"⛔ 今日还可捐献 {remain} 金币（每日上限 {_DONATE_DAILY_LIMIT}）")
+        if not success:
+            await donate_cmd.finish(f"⛔ {message}")
 
-        guild_obj = await session.get(Guild, player.guild_id)
-        if not guild_obj:
-            await donate_cmd.finish("⚠️ 公会数据异常")
+        # 检查并完成每日捐献任务
+        task_success, task_message, task_result = await GuildTaskService.complete_daily_donation_task(session, event.get_user_id())
 
-        # ---------------- 扣款 & 积分 ----------------
-        player.gold -= amt
-        donate_points = int(amt * _DONATE_GOLD_TO_POINT_RATIO)
-        player.gold2 += donate_points  # 积分增加
-
-        # 贡献与公会经验累计（贡献不再消耗）
-        player.guild_contribution += amt
-        guild_obj.exp += amt
-
-        # 写入捐献日志
-        session.add(PlayerDonationLog(player_id=player.id, donate_date=date.today(), amount=amt))
-
-        # 升级检查
-        up_need = _need_exp_for_level(guild_obj.level)
-        leveled = False
-        while guild_obj.exp >= up_need:
-            guild_obj.exp -= up_need
-            guild_obj.level += 1
-            leveled = True
-            up_need = _need_exp_for_level(guild_obj.level)
-
-        session.add_all([player, guild_obj])
         await session.commit()
 
-        exp_current_str = _fmt_w(guild_obj.exp)
-        exp_need_str = _fmt_w(_need_exp_for_level(guild_obj.level))
+        # 构建返回消息
+        msg_lines = [
+            f"💰 捐献成功！金币 -{amt}",
+            f"✨ 获得积分：+{result['points_gained']}",
+            f"🏰 公会经验：+{result['exp_gained']}",
+            f"💎 资金库：+{result['treasury_added']}",
+            f"▫️ 个人贡献：{GuildEconomyService.format_large_number(result['new_contribution'])}",
+            f"▫️ 公会经验：{GuildEconomyService.format_large_number(result['guild_exp'])}"
+        ]
 
-        msg = (
-            f"💰 捐献成功！金币 -{amt}\n"
-            f"✨ 获得积分：+{donate_points}\n"
-            f"▫️ 个人贡献：{_fmt_w(player.guild_contribution)}\n"
-            f"▫️ 公会经验：{exp_current_str}/{exp_need_str}\n"
-        )
-        if leveled:
-            msg += f"🎉 公会等级提升至 Lv.{guild_obj.level}!"
+        # 如果完成了每日捐献任务，添加任务奖励信息
+        if task_success:
+            msg_lines.append(f"🎁 {task_message}")
+
+        # 检查是否可以升级
+        if result['can_upgrade']:
+            cost = result['upgrade_cost']
+            msg_lines.append(f"🎯 公会可升级！需要经验{cost['exp']}、资金{cost['gold']}")
+
+        msg = "\n".join(msg_lines)
         await donate_cmd.finish(message_add_head(msg, event))
+
+# ==================== 公会升级 ====================
+guild_upgrade_cmd = on_command("公会升级", aliases={"升级公会"}, block=True, priority=5)
+
+@guild_upgrade_cmd.handle()
+async def handle_guild_upgrade(event: MessageEvent):
+    """公会升级"""
+    async with safe_session() as session:
+        player = await session.get(Player, event.get_user_id())
+        if not player or not player.guild_id:
+            await guild_upgrade_cmd.finish("⛔ 你未加入任何公会")
+
+        success, message = await GuildEconomyService.upgrade_guild(session, player.guild_id, player.id)
+
+        if not success:
+            await guild_upgrade_cmd.finish(f"⛔ {message}")
+
+        await session.commit()
+        await guild_upgrade_cmd.finish(message_add_head(f"🎉 {message}", event))
 
 # ==================== 转让会长 ====================
 transfer_cmd = on_command("转让会长", block=True, priority=5)
@@ -465,14 +547,23 @@ async def _process_application(event: MessageEvent, args: Message, approve: bool
             await (approve_cmd if approve else reject_cmd).finish("⛔ 无待处理申请")
 
         if approve:
-            success, reason = await GuildApplicationService.approve_application(session, app, guild_obj)
+            # 使用新的公会服务加入公会
+            success, reason = await GuildService.join_guild(session, applicant.id, guild_obj.id)
             if not success:
                 await (approve_cmd if approve else reject_cmd).finish(message_add_head(f"⛔ {reason}", event))
+
+            # 标记申请为已批准
+            app.status = ApplicationStatus.APPROVED
+            app.processed_at = datetime.now()
+            session.add(app)
+
             result_msg = f"✅ 已同意 {applicant.nickname}[UID:{target_uid}] 加入公会"
         else:
             await GuildApplicationService.reject_application(session, app)
             result_msg = f"🚫 已拒绝 {applicant.nickname}[UID:{target_uid}] 的申请"
 
+        # 提交事务
+        await session.commit()
         await (approve_cmd if approve else reject_cmd).finish(message_add_head(result_msg, event))
 
 @approve_cmd.handle()
@@ -514,155 +605,219 @@ async def handle_notice(event: MessageEvent, args: Message = CommandArg()):
         await session.commit()
         await notice_cmd.finish(message_add_head(f"✅ {action_msg}", event))
 
-# ==================== 设置公会基地 ====================
-set_base_cmd = on_command("设置基地", block=True, priority=5)
+# 注意：公会基地和传送功能已移除，后续将通过公会建筑实现传送功能
 
-@set_base_cmd.handle()
-async def handle_set_base(event: MessageEvent, args: Message = CommandArg()):
-    """会长设置公会基地坐标：设置基地 x y"""
-    arg_text = args.extract_plain_text().strip().replace(",", " ")
-    parts = [p for p in arg_text.split() if p]
 
-    if len(parts) != 2 or not all(p.lstrip("-+").isdigit() for p in parts):
-        await set_base_cmd.finish("⛔ 格式错误，正确格式：设置基地 x y （示例：设置基地 100 200）")
 
-    base_x, base_y = map(int, parts)
 
-    # 坐标范围检查（与导航系统保持一致）
-    MAX_COORD = 500
-    if not (-MAX_COORD <= base_x <= MAX_COORD and -MAX_COORD <= base_y <= MAX_COORD):
-        await set_base_cmd.finish(f"⛔ 坐标必须在 {-MAX_COORD}~{MAX_COORD} 范围内！")
+# ==================== 公会职位管理 ====================
+set_position_cmd = on_command("设置职位", block=True, priority=5)
 
-    async with safe_session() as session:
-        player = await session.get(Player, event.get_user_id())
-        if not player or player.guild_id is None:
-            await set_base_cmd.finish("⛔ 你未加入任何公会")
+@set_position_cmd.handle()
+async def handle_set_position(event: MessageEvent, args: Message = CommandArg()):
+    """设置成员职位：设置职位 UID 职位名"""
+    args_text = args.extract_plain_text().strip()
+    if not args_text:
+        await set_position_cmd.finish("⛔ 格式错误，正确格式：设置职位 [UID] [职位名]\n可用职位：副会长、核心成员、普通成员")
 
-        guild_obj = await session.get(Guild, player.guild_id)
-        if not guild_obj:
-            await set_base_cmd.finish("⚠️ 公会数据异常")
+    parts = args_text.split()
+    if len(parts) != 2:
+        await set_position_cmd.finish("⛔ 格式错误，正确格式：设置职位 [UID] [职位名]")
 
-        # 检查是否为会长
-        if guild_obj.president_id != player.id:
-            await set_base_cmd.finish("⛔ 只有会长才能设置公会基地")
+    target_uid, position_name = parts
 
-        # 检查公会等级
-        if guild_obj.level < 5:
-            await set_base_cmd.finish(f"⛔ 公会等级需达到5级才能设置基地，当前等级：{guild_obj.level}")
+    # 职位名映射
+    position_map = {
+        "副会长": GuildPosition.VICE_PRESIDENT,
+        "核心成员": GuildPosition.CORE_MEMBER,
+        "普通成员": GuildPosition.MEMBER
+    }
 
-        # 检查是否已经设置过基地
-        if guild_obj.base_x is not None and guild_obj.base_y is not None:
-            await set_base_cmd.finish(f"⛔ 公会基地已设置在坐标({guild_obj.base_x}, {guild_obj.base_y})，不允许重复设置")
+    if position_name not in position_map:
+        await set_position_cmd.finish("⛔ 无效的职位名，可用职位：副会长、核心成员、普通成员")
 
-        # 检查势力范围冲突
-        territory_range = guild_obj.territory_range
-        conflict_stmt = select(Guild).where(
-            Guild.id != guild_obj.id,
-            Guild.base_x.isnot(None),
-            Guild.base_y.isnot(None),
-            # 检查两个正方形是否重叠：如果两个中心点的距离小于等于两个势力范围之和的一半，则重叠
-            (_func.abs(Guild.base_x - base_x) <= (Guild.territory_range + territory_range) / 2) &
-            (_func.abs(Guild.base_y - base_y) <= (Guild.territory_range + territory_range) / 2)
-        )
-        conflict_guild = (await session.execute(conflict_stmt)).scalars().first()
-        if conflict_guild:
-            await set_base_cmd.finish(
-                f"⛔ 坐标({base_x}, {base_y})与公会『{conflict_guild.name}』的势力范围冲突！\n"
-                f"▫️ 冲突公会基地：({conflict_guild.base_x}, {conflict_guild.base_y})\n"
-                f"▫️ 冲突公会势力范围：{conflict_guild.territory_range}\n"
-                f"▫️ 本公会势力范围：{territory_range}\n"
-                f"▫️ 请选择其他坐标设置基地"
-            )
-
-        # 设置基地坐标
-        guild_obj.base_x = base_x
-        guild_obj.base_y = base_y
-        session.add(guild_obj)
-        await session.commit()
-
-        msg = (
-            f"🏰 公会基地设置成功！\n"
-            f"▫️ 基地坐标：({base_x}, {base_y})\n"
-            f"▫️ 势力范围：{guild_obj.territory_range}×{guild_obj.territory_range}\n"
-            f"▫️ 公会成员现在可以使用【传送公会】或【传送 公会】传送到基地"
-        )
-        await set_base_cmd.finish(message_add_head(msg, event))
-
-# ==================== 公会传送 ====================
-guild_teleport_cmd = on_command("传送公会", aliases={"公会传送"}, block=True, priority=4)
-
-@guild_teleport_cmd.handle()
-async def handle_guild_teleport(event: MessageEvent):
-    """公会成员传送到基地，每日限使用一次"""
+    new_position = position_map[position_name]
 
     async with safe_session() as session:
         player = await session.get(Player, event.get_user_id())
-        if not player or player.guild_id is None:
-            await guild_teleport_cmd.finish("⛔ 你未加入任何公会")
+        if not player or not player.guild_id:
+            await set_position_cmd.finish("⛔ 你未加入任何公会")
 
-        guild_obj = await session.get(Guild, player.guild_id)
-        if not guild_obj:
-            await guild_teleport_cmd.finish("⚠️ 公会数据异常")
+        # 查找目标玩家
+        target_stmt = select(Player).where(Player.uid == int(target_uid))
+        target_player = (await session.execute(target_stmt)).scalars().first()
+        if not target_player:
+            await set_position_cmd.finish("⛔ 未找到该UID的玩家")
 
-        # 检查公会是否设置了基地
-        if guild_obj.base_x is None or guild_obj.base_y is None:
-            await guild_teleport_cmd.finish("⛔ 公会尚未设置基地，请联系会长设置基地坐标")
+        if target_player.guild_id != player.guild_id:
+            await set_position_cmd.finish("⛔ 该玩家不在你的公会中")
 
-        # 检查今日是否已使用过传送
-        today = date.today()
-        usage_stmt = select(GuildTeleportLog).where(
-            GuildTeleportLog.player_id == player.id,
-            GuildTeleportLog.teleport_date == today
+        # 设置职位
+        success, message = await GuildService.set_member_position(
+            session, player.id, player.guild_id, target_player.id, new_position
         )
-        usage_log = (await session.execute(usage_stmt)).scalars().first()
 
-        if usage_log:
-            await guild_teleport_cmd.finish("⛔ 你今日已使用过传送公会，每日限使用一次")
-
-        # 检查玩家是否在现实世界
-        if player.region != "大都会":
-            await guild_teleport_cmd.finish("⛔ 只能在现实世界使用传送公会")
-
-        # 执行传送
-        player.x = guild_obj.base_x
-        player.y = guild_obj.base_y
-        session.add(player)
-
-        # 清除导航任务（如果有的话）
-        nav_task = await session.get(NavigationTask, player.id)
-        if nav_task:
-            await session.delete(nav_task)
-
-        # 记录使用日志
-        teleport_log = GuildTeleportLog(
-            player_id=player.id,
-            guild_id=guild_obj.id,
-            teleport_date=today
-        )
-        session.add(teleport_log)
+        if not success:
+            await set_position_cmd.finish(f"⛔ {message}")
 
         await session.commit()
+        await set_position_cmd.finish(message_add_head(f"✅ {message}", event))
 
-        msg = (
-            f"🌟 传送成功！\n"
-            f"▫️ 已传送到公会『{guild_obj.name}』基地\n"
-            f"▫️ 当前坐标：({guild_obj.base_x}, {guild_obj.base_y})\n"
-            f"▫️ 已停止导航任务，今日不可再传送公会"
+# ==================== 公会建筑管理 ====================
+guild_buildings_cmd = on_command("公会建筑", aliases={"建筑列表"}, block=True, priority=5)
+
+@guild_buildings_cmd.handle()
+async def handle_guild_buildings(event: MessageEvent):
+    """查看公会建筑列表"""
+    async with safe_session() as session:
+        player = await session.get(Player, event.get_user_id())
+        if not player or not player.guild_id:
+            await guild_buildings_cmd.finish("⛔ 你未加入任何公会")
+
+        guild = await session.get(Guild, player.guild_id)
+        buildings = await GuildBuildingService.get_guild_buildings(session, player.guild_id)
+
+        if not buildings:
+            msg = f"🏗️ 公会『{guild.name}』建筑列表\n━━━━━━━━━━\n暂无建筑"
+        else:
+            lines = [f"🏗️ 公会『{guild.name}』建筑列表", "━━━━━━━━━━"]
+            for building in buildings:
+                effects_str = ", ".join([f"{k}:{v}" for k, v in building["effects"].items()])
+                lines.append(f"▫️ {building['name']} Lv.{building['level']}/{building['max_level']}")
+                lines.append(f"   效果：{effects_str}")
+            msg = "\n".join(lines)
+
+        await guild_buildings_cmd.finish(message_add_head(msg, event))
+
+build_cmd = on_command("建造", aliases={"升级建筑"}, block=True, priority=5)
+
+@build_cmd.handle()
+async def handle_build(event: MessageEvent, args: Message = CommandArg()):
+    """建造或升级建筑：建造 建筑名"""
+    building_name = args.extract_plain_text().strip()
+    if not building_name:
+        await build_cmd.finish("⛔ 格式错误，正确格式：建造 [建筑名]\n可建造：经验神龛、资金金库、训练场")
+
+    # 建筑名映射（灵塔和防御城墙暂时下架）
+    building_map = {
+        "经验神龛": BuildingType.EXPERIENCE_SHRINE,
+        "资金金库": BuildingType.TREASURY_VAULT,
+        "训练场": BuildingType.TRAINING_GROUND,
+        # "灵塔": BuildingType.SPIRIT_TOWER,  # 暂时下架
+        # "防御城墙": BuildingType.DEFENSE_WALL  # 暂时下架
+    }
+
+    if building_name not in building_map:
+        await build_cmd.finish("⛔ 无效的建筑名，可建造：经验神龛、资金金库、训练场")
+
+    building_type = building_map[building_name]
+
+    async with safe_session() as session:
+        player = await session.get(Player, event.get_user_id())
+        if not player or not player.guild_id:
+            await build_cmd.finish("⛔ 你未加入任何公会")
+
+        # 获取建造成本
+        cost = await GuildBuildingService.get_build_cost(session, player.guild_id, building_type)
+        if not cost:
+            await build_cmd.finish("⛔ 该建筑已达到最高等级")
+
+        # 显示成本信息
+        materials_str = ", ".join([f"{k}×{v}" for k, v in cost["materials"].items()])
+        cost_msg = f"建造{building_name}需要：\n▫️ 金币：{cost['gold']}\n▫️ 材料：{materials_str}\n\n确认建造请使用命令：确认建造 {building_name}"
+
+        await build_cmd.send(message_add_head(cost_msg, event))
+
+# ==================== 确认建造 ====================
+confirm_build_cmd = on_command("确认", block=True, priority=5)
+
+@confirm_build_cmd.handle()
+async def handle_confirm_build(event: MessageEvent):
+    """确认建造建筑"""
+    async with safe_session() as session:
+        player = await session.get(Player, event.get_user_id())
+        if not player or not player.guild_id:
+            await confirm_build_cmd.finish("⛔ 你未加入任何公会")
+
+        # 这里需要一个临时存储机制来记住用户要建造的建筑类型
+        # 由于没有会话状态管理，我们需要重新设计这个流程
+        # 暂时返回提示信息，建议用户使用完整命令
+        await confirm_build_cmd.finish("⛔ 请使用完整命令格式：确认建造 [建筑名]")
+
+# ==================== 确认建造（带建筑名） ====================
+confirm_build_with_name_cmd = on_command("确认建造", block=True, priority=5)
+
+@confirm_build_with_name_cmd.handle()
+async def handle_confirm_build_with_name(event: MessageEvent, args: Message = CommandArg()):
+    """确认建造指定建筑"""
+    building_name = args.extract_plain_text().strip()
+    if not building_name:
+        await confirm_build_with_name_cmd.finish("⛔ 格式错误，正确格式：确认建造 [建筑名]")
+
+    # 建筑名映射（灵塔和防御城墙暂时下架）
+    building_map = {
+        "经验神龛": BuildingType.EXPERIENCE_SHRINE,
+        "资金金库": BuildingType.TREASURY_VAULT,
+        "训练场": BuildingType.TRAINING_GROUND,
+        # "灵塔": BuildingType.SPIRIT_TOWER,  # 暂时下架
+        # "防御城墙": BuildingType.DEFENSE_WALL  # 暂时下架
+    }
+
+    if building_name not in building_map:
+        await confirm_build_with_name_cmd.finish("⛔ 无效的建筑名，可建造：经验神龛、资金金库、训练场")
+
+    building_type = building_map[building_name]
+
+    async with safe_session() as session:
+        player = await session.get(Player, event.get_user_id())
+        if not player or not player.guild_id:
+            await confirm_build_with_name_cmd.finish("⛔ 你未加入任何公会")
+
+        # 执行建造
+        success, message = await GuildBuildingService.build_or_upgrade(
+            session, player.guild_id, building_type, player.id
         )
-        await guild_teleport_cmd.finish(message_add_head(msg, event))
 
+        if success:
+            await session.commit()
+            await confirm_build_with_name_cmd.finish(message_add_head(f"🏗️ {message}", event))
+        else:
+            await confirm_build_with_name_cmd.finish(message_add_head(f"⛔ {message}", event))
 
-# ==================== 兼容性：传送 公会 ====================
-legacy_guild_teleport_cmd = on_command("传送", block=False, priority=3)
+# ==================== 公会任务系统 ====================
+guild_tasks_cmd = on_command("公会任务", aliases={"任务列表"}, block=True, priority=5)
 
-@legacy_guild_teleport_cmd.handle()
-async def handle_legacy_guild_teleport(event: MessageEvent, args: Message = CommandArg()):
-    """兼容旧的"传送 公会"指令格式"""
-    target = args.extract_plain_text().strip()
+@guild_tasks_cmd.handle()
+async def handle_guild_tasks(event: MessageEvent):
+    """查看公会任务列表"""
+    async with safe_session() as session:
+        player = await session.get(Player, event.get_user_id())
+        if not player or not player.guild_id:
+            await guild_tasks_cmd.finish("⛔ 你未加入任何公会")
 
-    # 只处理 "传送 公会" 的情况，其他情况不处理（让其他传送指令处理）
-    if target != "公会":
-        return
+        tasks = await GuildTaskService.get_available_tasks(session, player.id)
 
-    # 调用公会传送处理逻辑
-    await handle_guild_teleport(event)
+        lines = ["📋 公会任务列表", "━━━━━━━━━━"]
+        for task in tasks:
+            status = "✅已完成" if task["completed"] else "⏳进行中"
+            lines.append(f"▫️ {task['name']} ({task['type']}) {status}")
+            lines.append(f"   {task['description']}")
+            lines.append(f"   奖励：{task['points_reward']}积分")
+
+        msg = "\n".join(lines)
+        await guild_tasks_cmd.finish(message_add_head(msg, event))
+
+guild_sign_cmd = on_command("公会签到", block=True, priority=5)
+
+@guild_sign_cmd.handle()
+async def handle_guild_sign(event: MessageEvent):
+    """公会每日签到"""
+    async with safe_session() as session:
+        success, message, result = await GuildTaskService.guild_daily_sign(session, event.get_user_id())
+
+        if not success:
+            await guild_sign_cmd.finish(f"⛔ {message}")
+
+        await session.commit()
+        await guild_sign_cmd.finish(message_add_head(f"✅ {message}", event))
+

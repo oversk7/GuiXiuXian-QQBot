@@ -147,13 +147,14 @@ async def _(event: MessageEvent):
             item_cfg = config.items_config["by_id"].get(iid)
             sell_p, buy_p = _price_for(market, iid)
             lines.append(f"{item_cfg.name}│售 {sell_p}│收 {buy_p}")
-        lines.append("━━━━━━━━━━━━━\n⬇️【购买 [物品] [数量]】\n⬇️【出售 [物品] [数量]】")
+        lines.append("━━━━━━━━━━━━━\n🚧 跑商系统暂时关闭维护中\n━━━━━━━━━━━━━\n市集购买和出售功能暂时停用\n等待系统调整，感谢理解！")
         await market_cmd.finish(message_add_head("\n".join(lines), event))
 
 buy_cmd = on_command("购买", block=True, priority=5)
 
 @buy_cmd.handle()
 async def _(event: MessageEvent, args: Message = CommandArg()):
+    # 跑商玩法暂停，禁用市集购买功能
     arg_text = args.extract_plain_text().strip()
     parts = arg_text.split()
     if len(parts) != 2:
@@ -176,21 +177,29 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
                 "此地没有安全商人。\n"
                 "━━━━━━━━━━━━━\n"
                 "⬇️ 【返回】脱离诡域，返回现实", event))
+
+        # 检查是否为市集购买（跑商功能暂停）
         market = MARKET_BY_COORD.get((player.x, player.y))
         item_cfg = config.items_config["by_name"].get(item_name)
         if not item_cfg:
             await buy_cmd.finish("⛔ 不存在该物品")
-            
-        # 检查是否在市集商品中
+
+        # 如果是市集商品，禁用购买
         if market and item_cfg.item_id in market.items:
-            sell_p, _ = _price_for(market, item_cfg.item_id)
-            total_cost = sell_p * qty
-        # 检查是否在普通商店中
+            await buy_cmd.finish(message_add_head(
+                "🚧 跑商系统暂时关闭维护中\n"
+                "━━━━━━━━━━━━━\n"
+                "市集购买功能暂时停用，等待系统调整。\n"
+                "您仍可以在万事屋购买特殊物品。\n"
+                "━━━━━━━━━━━━━\n"
+                "感谢您的理解与支持！", event))
+
+        # 检查是否在普通商店中（万事屋功能保留）
         elif item_cfg.item_id in SHOP_ITEMS:
             total_cost = item_cfg.price * qty
         else:
             await buy_cmd.finish("⛔ 此处无法购买该物品")
-            
+
         if player.gold < total_cost:
             await buy_cmd.finish(f"💰 金币不足，需要 {total_cost} (当前 {player.gold})")
 
@@ -212,6 +221,7 @@ sell_cmd = on_command("出售", aliases={"卖"}, block=True, priority=5)
 
 @sell_cmd.handle()
 async def _(event: MessageEvent, args: Message = CommandArg()):
+    # 跑商玩法暂停，禁用市集出售功能
     arg_text = args.extract_plain_text().strip()
     parts = arg_text.split()
     if len(parts) != 2:
@@ -234,9 +244,23 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
                 "此地没有安全商人。\n"
                 "━━━━━━━━━━━━━\n"
                 "⬇️ 【返回】脱离诡域，返回现实", event))
+
+        # 检查是否在市集（跑商功能暂停）
         market = MARKET_BY_COORD.get((player.x, player.y))
-        if not market:
-            await sell_cmd.finish("⛔ 这里只有风～没有商人")
+        if market:
+            # 市集出售功能暂停
+            await sell_cmd.finish(message_add_head(
+                "🚧 跑商系统暂时关闭维护中\n"
+                "━━━━━━━━━━━━━\n"
+                "市集出售功能暂时停用，等待系统调整。\n"
+                "您可以通过其他方式处理物品。\n"
+                "━━━━━━━━━━━━━\n"
+                "感谢您的理解与支持！", event))
+
+        # 如果不在市集，提示没有商人
+        await sell_cmd.finish("⛔ 这里只有风～没有商人")
+
+        # 以下代码暂时不可达，保留原逻辑以便将来恢复
         item_cfg = config.items_config["by_name"].get(item_name)
         if not item_cfg or item_cfg.item_id not in market.items:
             await sell_cmd.finish("⛔ 商人不收购该物品")
