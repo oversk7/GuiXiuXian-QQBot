@@ -150,20 +150,49 @@ repair_cmd = on_command("修复", aliases={"修理","装备修理"}, block=True,
 async def _(event: MessageEvent, args: Message = CommandArg()):
     arg_text = args.extract_plain_text().strip()
     if not arg_text:
-        await repair_cmd.finish("⛔ 格式：修理 装备ID/名称")
+        await repair_cmd.finish("⛔ 格式：修理 装备ID/名称 [金币比例:怨念比例]\n💡 示例：修理 白骨护甲 3:2 或 3：2（金币怨念按3:2分配）\n💡 不指定比例则默认使用金币")
+
+    # 解析参数
+    parts = arg_text.split()
+    equipment_arg = parts[0]
+    gold_ratio = None
+    resentment_ratio = None
+
+    if len(parts) == 2:
+        ratio_text = parts[1]
+        # 支持英文冒号和中文冒号
+        if ':' in ratio_text or '：' in ratio_text:
+            try:
+                # 统一替换为英文冒号进行分割
+                normalized_ratio = ratio_text.replace('：', ':')
+                ratio_parts = normalized_ratio.split(':')
+                if len(ratio_parts) != 2:
+                    await repair_cmd.finish("⛔ 比例格式错误，应为 金币比例:怨念比例，如 3:2 或 3：2")
+                gold_ratio = int(ratio_parts[0])
+                resentment_ratio = int(ratio_parts[1])
+                if gold_ratio < 0 or resentment_ratio < 0:
+                    await repair_cmd.finish("⛔ 比例不能为负数")
+                if gold_ratio == 0 and resentment_ratio == 0:
+                    await repair_cmd.finish("⛔ 比例不能都为0")
+            except ValueError:
+                await repair_cmd.finish("⛔ 比例必须是数字，格式如 3:2 或 3：2")
+        else:
+            await repair_cmd.finish("⛔ 比例格式错误，应为 金币比例:怨念比例，如 3:2 或 3：2")
+    elif len(parts) > 2:
+        await repair_cmd.finish("⛔ 参数过多，格式：修理 装备ID/名称 [金币比例:怨念比例]")
 
     async with safe_session() as session:
         equip = None
 
         # 尝试按ID查找
-        if arg_text.isdigit():
-            equip_id = int(arg_text)
+        if equipment_arg.isdigit():
+            equip_id = int(equipment_arg)
             equip = await session.get(ItemInstance, equip_id)
             if not equip or equip.player_id != event.get_user_id() or equip.config.type.value != "EQUIPMENT":
                 await repair_cmd.finish("⛔ 无效装备ID或非本人所有")
         else:
             # 按名称查找，优先选择耐久度最低的装备
-            item_config = config.items_config["by_name"].get(arg_text)
+            item_config = config.items_config["by_name"].get(equipment_arg)
             if not item_config or item_config.type.value != "EQUIPMENT":
                 await repair_cmd.finish("⛔ 未找到对应装备名称，或该物品不是装备")
 
@@ -178,7 +207,7 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
             repairable_items = [item for item in all_items if item.durability < item.config.durability]
 
             if not repairable_items:
-                await repair_cmd.finish(f"⛔ 你没有需要修复的 {arg_text}")
+                await repair_cmd.finish(f"⛔ 你没有需要修复的 {equipment_arg}")
 
             # 选择耐久度最低的那件
             equip = repairable_items[0]
@@ -187,20 +216,65 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
         if equip.durability >= tpl.durability:
             await repair_cmd.finish("🧐 该装备耐久已满，无需修复")
 
-        # 计算费用
+        # 计算总费用
         missing = tpl.durability - equip.durability
         cost_per = tpl.repair_cost if tpl.repair_cost is not None else max(1, int(tpl.price / max(1, tpl.durability)))
         total_cost = cost_per * missing
 
         player = await session.get(Player, event.get_user_id())
-        if player.gold < total_cost:
-            await repair_cmd.finish(f"⛔ 金币不足，修复费用 {total_cost}💰，当前 {player.gold}💰")
+
+        # 如果用户指定了比例
+        if gold_ratio is not None and resentment_ratio is not None:
+            # 约分比例（求最大公约数）
+            def gcd(a, b):
+                if b == 0:
+                    return a if a > 0 else 1
+                while b:
+                    a, b = b, a % b
+                return a
+
+            common_divisor = gcd(gold_ratio, resentment_ratio)
+            if common_divisor > 0:
+                gold_ratio //= common_divisor
+                resentment_ratio //= common_divisor
+
+            # 按比例计算实际使用的金币和怨念
+            total_ratio = gold_ratio + resentment_ratio
+            used_gold = (total_cost * gold_ratio) // total_ratio
+            used_resentment = total_cost - used_gold  # 剩余部分用怨念
+
+            # 检查玩家是否有足够的资源
+            if player.gold < used_gold:
+                await repair_cmd.finish(f"⛔ 金币不足，按比例 {gold_ratio}:{resentment_ratio} 需要金币 {used_gold}💰，当前 {player.gold}💰")
+            if player.resentment < used_resentment:
+                await repair_cmd.finish(f"⛔ 怨念不足，按比例 {gold_ratio}:{resentment_ratio} 需要怨念 {used_resentment}👻，当前 {player.resentment}👻")
+        else:
+            # 自动分配：默认全部使用金币
+            used_gold = total_cost
+            used_resentment = 0
+
+            # 检查金币是否足够
+            if player.gold < used_gold:
+                await repair_cmd.finish(f"⛔ 金币不足，修复费用 {total_cost}💰，当前 {player.gold}💰\n💡 可使用比例分配，如：修理 {equipment_arg} 1:1 或 1：1（金币怨念各一半）")
 
         # 扣费并修复
-        player.gold -= total_cost
+        player.gold -= used_gold
+        player.resentment -= used_resentment
         equip.durability = tpl.durability
         await session.commit()
 
         # 显示修复的装备信息，包括ID和修复前后的耐久度
         durability_info = f" (ID:{equip.id}, {equip.durability - missing}→{equip.durability}/{tpl.durability})"
-        await repair_cmd.finish(message_add_head(f"🔧 已修复 {tpl.name}{durability_info}，耗费 {total_cost}💰", event))
+
+        # 构建费用信息
+        cost_info = f"总费用 {total_cost}，实际耗费 {used_gold}💰"
+        if used_resentment > 0:
+            cost_info += f" + {used_resentment}👻"
+
+        # 如果使用了比例，显示实际比例
+        if gold_ratio is not None and resentment_ratio is not None:
+            cost_info += f"（按比例 {gold_ratio}:{resentment_ratio}）"
+        elif used_resentment == 0:
+            cost_info += "（默认使用金币）"
+
+        await repair_cmd.finish(message_add_head(f"🔧 已修复 {tpl.name}{durability_info}，{cost_info}", event))
