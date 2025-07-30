@@ -13,6 +13,7 @@ from ..models.player import Player
 from ..utils import message_add_head
 from .russian_roulette_service import RussianRouletteService
 from .russian_roulette_core import RussianRouletteCore, ItemType
+from .russian_roulette_cleanup import RussianRouletteCleanup
 
 
 # ==================== 房间管理指令 ====================
@@ -767,3 +768,23 @@ async def handle_view_items(event: MessageEvent):
         item_lines.append("📝 使用：使用道具 [道具名]")
 
         await view_items_cmd.finish(message_add_head("\n".join(item_lines), event))
+
+
+# 手动清理房间（管理员指令）
+cleanup_rooms_cmd = on_command("清理轮盘房间", block=True, priority=5)
+
+@cleanup_rooms_cmd.handle()
+async def handle_cleanup_rooms(event: MessageEvent):
+    """手动清理无活动的俄罗斯轮盘房间"""
+    user_id = event.get_user_id()
+
+    # 简单的管理员检查（可以根据需要调整）
+    admin_users = ["your_admin_qq_id"]  # 替换为实际的管理员QQ号
+    if user_id not in admin_users:
+        await cleanup_rooms_cmd.finish("⛔ 只有管理员可以使用此命令")
+
+    try:
+        await RussianRouletteCleanup.cleanup_inactive_rooms()
+        await cleanup_rooms_cmd.finish("✅ 俄罗斯轮盘房间清理完成")
+    except Exception as e:
+        await cleanup_rooms_cmd.finish(f"❌ 清理失败: {str(e)}")
