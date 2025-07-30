@@ -182,6 +182,11 @@ async def handle_create_room(event: MessageEvent, args: Message = CommandArg()):
                 display = RussianRouletteCore.get_game_display(game_state, room_info, player_names)
                 recommended = RussianRouletteCore.get_recommended_commands(game_state, room.player1_id)
 
+                # 显示初始弹药配置
+                bullets = json.loads(game.bullets)
+                live_count = sum(1 for b in bullets if b)
+                blank_count = sum(1 for b in bullets if not b)
+
                 result_msg = (
                     f"{display}\n"
                     f"━━━━━━━━━━━━━\n"
@@ -189,6 +194,7 @@ async def handle_create_room(event: MessageEvent, args: Message = CommandArg()):
                     f"  🔴 {player1.nickname}[UID:{player1.uid}]\n"
                     f"  🔵 {player2.nickname}[UID:{player2.uid}]\n"
                     f"━━━━━━━━━━━━━\n"
+                    f"💥 本轮配置：{live_count}发实弹 + {blank_count}发空包弹\n"
                     f"🎯 {player1.nickname} 先手！\n"
                     f"{recommended}"
                 )
@@ -274,6 +280,23 @@ async def handle_shoot(event: MessageEvent, args: Message = CommandArg()):
         game.player2_hp = game_state[f"{room.player2_id}_hp"]
         game.is_sawed_off = game_state["is_sawed_off"]
         game.handcuffed_player_id = game_state.get("handcuffed_player_id")
+
+        # 检查是否需要重新装弹（在游戏未结束的情况下）
+        reload_msg = ""
+        if not game_over:
+            reloaded, reload_msg = RussianRouletteCore.check_and_reload(
+                game_state, room.player1_id, room.player2_id
+            )
+            if reloaded:
+                # 更新重新装弹后的游戏状态
+                game.bullets = game_state["bullets"]
+                game.current_bullet_index = game_state["current_bullet_index"]
+                game.player1_items = game_state[f"{room.player1_id}_items"]
+                game.player2_items = game_state[f"{room.player2_id}_items"]
+                game.is_sawed_off = game_state["is_sawed_off"]
+                game.handcuffed_player_id = game_state.get("handcuffed_player_id")
+                game.magnifier_info = game_state.get("magnifier_info")
+                game.phone_info = game_state.get("phone_info")
         
         # 获取玩家信息用于显示
         player1 = await session.get(Player, room.player1_id)
@@ -290,6 +313,8 @@ async def handle_shoot(event: MessageEvent, args: Message = CommandArg()):
 
         # 构建基础消息
         result_msg = f"🎯 {player.nickname} 对{target}开枪\n{shoot_msg}"
+        if reload_msg:
+            result_msg += f"\n{reload_msg}"
 
         if game_over:
             # 游戏结束
@@ -467,38 +492,27 @@ async def handle_use_item(event: MessageEvent, args: Message = CommandArg()):
         game.magnifier_info = game_state.get("magnifier_info")
         game.phone_info = game_state.get("phone_info")
 
+        # 检查是否需要重新装弹
+        reloaded, reload_msg = RussianRouletteCore.check_and_reload(
+            game_state, room.player1_id, room.player2_id
+        )
+        if reloaded:
+            # 更新重新装弹后的游戏状态
+            game.bullets = game_state["bullets"]
+            game.current_bullet_index = game_state["current_bullet_index"]
+            game.player1_items = game_state[f"{room.player1_id}_items"]
+            game.player2_items = game_state[f"{room.player2_id}_items"]
+            game.is_sawed_off = game_state["is_sawed_off"]
+            game.handcuffed_player_id = game_state.get("handcuffed_player_id")
+            game.magnifier_info = game_state.get("magnifier_info")
+            game.phone_info = game_state.get("phone_info")
+
         await session.commit()
 
-        # 获取玩家信息用于显示
-        player1 = await session.get(Player, room.player1_id)
-        player2 = await session.get(Player, room.player2_id)
-        player_names = {
-            room.player1_id: player1.nickname,
-            room.player2_id: player2.nickname
-        }
-
-        room_info = {
-            "player1_id": room.player1_id,
-            "player2_id": room.player2_id
-        }
-
-        # 构建完整的游戏状态用于显示
-        display_game_state = {
-            "bullets": game.bullets,
-            "current_bullet_index": game.current_bullet_index,
-            f"{room.player1_id}_hp": game.player1_hp,
-            f"{room.player2_id}_hp": game.player2_hp,
-            "is_sawed_off": game.is_sawed_off,
-            "handcuffed_player_id": game.handcuffed_player_id,
-            f"{room.player1_id}_items": game.player1_items,
-            f"{room.player2_id}_items": game.player2_items
-        }
-
-        # 显示详细状态
-        game_display = RussianRouletteCore.get_game_display(display_game_state, room_info, player_names)
-        recommended = RussianRouletteCore.get_recommended_commands(display_game_state, player.id)
-
-        final_msg = f"🎒 {player.nickname} 使用了{item_name}\n{result_msg}\n\n{game_display}\n{recommended}"
+        # 使用道具后只显示简单的结果信息，不显示完整游戏状态避免刷屏
+        final_msg = f"🎒 {player.nickname} 使用了{item_name}\n{result_msg}"
+        if reload_msg:
+            final_msg += f"\n{reload_msg}"
         await use_item_cmd.finish(message_add_head(final_msg, event))
 
 
@@ -620,12 +634,11 @@ async def handle_room_status(event: MessageEvent):
                 current_player = await session.get(Player, game.current_player_id)
                 status_lines.append(f"🎯 当前回合：{current_player.nickname}")
 
-                # 显示剩余弹药
+                # 显示剩余弹药（不显示具体实弹和空包弹数量，防止逆转器漏洞）
                 bullets = json.loads(game.bullets)
                 remaining = bullets[game.current_bullet_index:]
-                live_count = sum(1 for b in remaining if b)
-                blank_count = sum(1 for b in remaining if not b)
-                status_lines.append(f"🔫 剩余弹药：{live_count}实弹 + {blank_count}空包弹")
+                total_remaining = len(remaining)
+                status_lines.append(f"🔫 剩余弹药：{total_remaining}发（实弹和空包弹混合）")
 
         await room_status_cmd.finish(message_add_head("\n".join(status_lines), event))
 

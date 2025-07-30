@@ -37,8 +37,17 @@ class RussianRouletteCore:
     }
     
     @staticmethod
-    def generate_bullets(live_count: int, blank_count: int) -> List[bool]:
+    def generate_bullets(live_count: int = None, blank_count: int = None) -> List[bool]:
         """生成随机弹药序列"""
+        # 如果没有指定数量，则从预设配置中随机选择
+        if live_count is None or blank_count is None:
+            bullet_configs = [
+                (2, 4),  # 2实弹 + 4空包弹
+                (3, 3),  # 3实弹 + 3空包弹
+                (4, 2),  # 4实弹 + 2空包弹
+            ]
+            live_count, blank_count = random.choice(bullet_configs)
+
         bullets = [True] * live_count + [False] * blank_count
         random.shuffle(bullets)
         return bullets
@@ -202,38 +211,79 @@ class RussianRouletteCore:
         """
         bullets = json.loads(game_state["bullets"])
         current_index = game_state["current_bullet_index"]
-        
+
         if current_index >= len(bullets):
             return False, "弹夹已空，无法射击", False
-        
+
         current_bullet = bullets[current_index]
         is_sawed_off = game_state.get("is_sawed_off", False)
-        
+
         # 推进弹药
         game_state["current_bullet_index"] = current_index + 1
-        
+
         if current_bullet:  # 实弹
             damage = 2 if is_sawed_off else 1
             current_hp = game_state.get(f"{target_id}_hp", 0)
             new_hp = max(0, current_hp - damage)
             game_state[f"{target_id}_hp"] = new_hp
-            
+
             # 重置小刀状态
             game_state["is_sawed_off"] = False
-            
+
             damage_msg = f"造成{damage}点伤害" if damage > 1 else "造成1点伤害"
             result_msg = f"💥 实弹命中！{damage_msg}"
-            
+
             # 检查游戏是否结束
             game_over = new_hp <= 0
             if game_over:
                 result_msg += f"\n🏆 {shooter_id} 获胜！"
-            
+
             return True, result_msg, game_over
         else:  # 空包弹
             # 重置小刀状态（即使是空包弹也会消耗小刀效果）
             game_state["is_sawed_off"] = False
             return False, "🔫 空包弹！没有造成伤害", False
+
+    @staticmethod
+    def check_and_reload(game_state: dict, player1_id: str, player2_id: str) -> Tuple[bool, str]:
+        """
+        检查是否需要重新装弹，如果需要则重新装弹并补满道具
+        返回: (是否重新装弹, 消息)
+        """
+        bullets = json.loads(game_state["bullets"])
+        current_index = game_state["current_bullet_index"]
+
+        # 检查是否所有子弹都用完了
+        if current_index >= len(bullets):
+            # 检查是否有玩家死亡
+            player1_hp = game_state.get(f"{player1_id}_hp", 0)
+            player2_hp = game_state.get(f"{player2_id}_hp", 0)
+
+            if player1_hp > 0 and player2_hp > 0:
+                # 双方都还活着，重新装弹（随机选择弹药配置）
+                new_bullets = RussianRouletteCore.generate_bullets()
+                game_state["bullets"] = json.dumps(new_bullets)
+                game_state["current_bullet_index"] = 0
+
+                # 计算新弹药配置
+                live_count = sum(1 for b in new_bullets if b)
+                blank_count = sum(1 for b in new_bullets if not b)
+
+                # 补满道具（每人4个）
+                player1_items = RussianRouletteCore.generate_items(4)
+                player2_items = RussianRouletteCore.generate_items(4)
+                game_state[f"{player1_id}_items"] = json.dumps([item.value for item in player1_items])
+                game_state[f"{player2_id}_items"] = json.dumps([item.value for item in player2_items])
+
+                # 清除特殊状态
+                game_state["is_sawed_off"] = False
+                game_state["handcuffed_player_id"] = None
+                game_state["magnifier_info"] = None
+                game_state["phone_info"] = None
+
+                return True, f"🔄 弹夹已空！重新装填弹药并补充道具\n💥 本轮配置：{live_count}发实弹 + {blank_count}发空包弹"
+
+        return False, ""
     
     @staticmethod
     def get_game_display(game_state: dict, room_info: dict, player_names: dict = None) -> str:
@@ -241,10 +291,9 @@ class RussianRouletteCore:
         bullets = json.loads(game_state["bullets"])
         current_index = game_state["current_bullet_index"]
 
-        # 计算剩余弹药
+        # 计算剩余弹药总数（不显示具体的实弹和空包弹数量，防止逆转器漏洞）
         remaining = bullets[current_index:]
-        live_count = sum(1 for b in remaining if b)
-        blank_count = sum(1 for b in remaining if not b)
+        total_remaining = len(remaining)
 
         # 获取玩家信息
         player1_id = room_info["player1_id"]
@@ -264,7 +313,7 @@ class RussianRouletteCore:
         display = [
             "🎮 恶魔轮盘赌",
             "━━━━━━━━━━━━━",
-            f"🔫 剩余弹药：{live_count}发实弹 + {blank_count}发空包弹",
+            f"🔫 剩余弹药：{total_remaining}发（实弹和空包弹混合）",
             f"❤️ 血量状态：",
             f"  {player1_name}: {'❤️' * player1_hp}{'🖤' * (3 - player1_hp)}",
             f"  {player2_name}: {'❤️' * player2_hp}{'🖤' * (3 - player2_hp)}",

@@ -162,7 +162,7 @@ class RussianRouletteService:
                 await ItemInstance.consume_item(session, room.player2_id, item_id, 1)
         
         # 生成游戏状态
-        bullets = RussianRouletteCore.generate_bullets(live_count=2, blank_count=4)  # 2实弹4空包弹
+        bullets = RussianRouletteCore.generate_bullets()  # 随机选择弹药配置(2+4, 3+3, 4+2)
         player1_items = RussianRouletteCore.generate_items(4)
         player2_items = RussianRouletteCore.generate_items(4)
         
