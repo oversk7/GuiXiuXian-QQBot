@@ -158,20 +158,20 @@ async def handle_xiu_lian(event: MessageEvent, args: Message = CommandArg()):
 
 
 # 活动系统
-huo_dong_cmd = on_command("活动系统", aliases={"活动帮助"}, priority=4, block=True)
+huo_dong_cmd = on_command("娱乐系统", aliases={"娱乐帮助"}, priority=4, block=True)
 
 @huo_dong_cmd.handle()
 async def handle_huo_dong(event: MessageEvent, args: Message = CommandArg()):
     msg = (
-        "✨ 活动系统帮助 ✨\n"
-        "每日签到获取奖励，参与各种活动\n"
+        "✨ 娱乐系统 ✨\n"
+        "杂七杂八的小游戏和活动\n"
         "━━━━━━━━━━━━━\n"
         "【签到】 每日签到，获取奖励\n"
         "【井字棋】 井字棋游戏，战胜AI获得奖励\n"
+        "【恶魔轮盘帮助】 俄罗斯轮盘游戏，战胜对手获得奖励\n"
         "【试炼列表】 查看可用的互动剧情\n"
         "【月卡】 查看月卡状态和权益\n"
         "💳 月卡权益：修炼效率提升、闭关时长增加、背包扩容、签到获得扫荡令等\n"
-        "直接发送活动名称查看详细指令"
     )
     await huo_dong_cmd.finish(Message(msg))
 
