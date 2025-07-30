@@ -20,9 +20,10 @@ from .trade_record import TradeRecord
 # Ghost配置直接从YAML读取，工具类移至ghost_suppression模块
 from .ghost_invasion import GhostInvasion
 from .player_ghost import PlayerGhost
+from .russian_roulette import RussianRouletteRoom, RussianRouletteGame
 
 __all__ = [
     "Player", "Guild", "GuildMember", "GuildBuilding", "GuildPosition", "BuildingType", "WorldMessage", "BankAccount", "ItemInstance", "WorldTile", "NavigationTask", "AlchemyRecord", "MarketOrder",
     "Marriage", "Mentorship", "SocialApplication", "GiftRecord", "StorySession", "PlayerDonationLog", "ElixirUsageLog", "GuildTeleportLog",
-    "MonthlyCard", "MarketState", "GhostInvasion", "PlayerGhost"
+    "MonthlyCard", "MarketState", "GhostInvasion", "PlayerGhost", "RussianRouletteRoom", "RussianRouletteGame"
 ]
