@@ -503,11 +503,14 @@ async def handle_app_list(event: MessageEvent):
         player = await session.get(Player, event.get_user_id())
         if not player or player.guild_id is None:
             await application_list_cmd.finish("⛔ 你未加入公会")
-        guild_obj = await session.get(Guild, player.guild_id)
-        if guild_obj.president_id != player.id:
-            await application_list_cmd.finish("⛔ 只有会长可查看申请列表")
 
-        apps = await GuildApplicationService.get_pending_applications(session, guild_obj.id)
+        # 检查是否有管理权限（会长和副会长）
+        from .guild_permission import GuildPermission
+        can_manage, reason = await GuildPermission.can_manage_guild(session, player.id, player.guild_id)
+        if not can_manage:
+            await application_list_cmd.finish(f"⛔ {reason}")
+
+        apps = await GuildApplicationService.get_pending_applications(session, player.guild_id)
         if not apps:
             await application_list_cmd.finish("暂无待处理申请")
 
@@ -534,10 +537,14 @@ async def _process_application(event: MessageEvent, args: Message, approve: bool
         player = await session.get(Player, event.get_user_id())
         if not player or player.guild_id is None:
             await (approve_cmd if approve else reject_cmd).finish("⛔ 你未加入公会")
-        guild_obj = await session.get(Guild, player.guild_id)
-        if guild_obj.president_id != player.id:
-            await (approve_cmd if approve else reject_cmd).finish("⛔ 只有会长可操作")
 
+        # 检查是否有管理权限（会长和副会长）
+        from .guild_permission import GuildPermission
+        can_manage, reason = await GuildPermission.can_manage_guild(session, player.id, player.guild_id)
+        if not can_manage:
+            await (approve_cmd if approve else reject_cmd).finish(f"⛔ {reason}")
+
+        guild_obj = await session.get(Guild, player.guild_id)
         applicant = (await session.execute(select(Player).where(Player.uid == target_uid))).scalars().first()
         if not applicant:
             await (approve_cmd if approve else reject_cmd).finish("⛔ 未找到该 UID")
@@ -588,9 +595,10 @@ async def handle_notice(event: MessageEvent, args: Message = CommandArg()):
         if not text:
             await notice_cmd.finish(message_add_head(f"📰 当前公告：{guild_obj.notice or '暂无公告'}", event))
 
-        # 设置公告，需会长权限
-        if guild_obj.president_id != player.id:
-            await notice_cmd.finish("⛔ 只有会长可以修改公告")
+        # 设置公告，需管理权限（会长和副会长）
+        can_manage, reason = await GuildPermission.can_manage_guild(session, player.id, player.guild_id)
+        if not can_manage:
+            await notice_cmd.finish(f"⛔ {reason}")
 
         if len(text) > 120:
             await notice_cmd.finish("⛔ 公告不能超过120字符")
