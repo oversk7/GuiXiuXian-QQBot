@@ -76,8 +76,10 @@ async def handle_cultivate(event: MessageEvent):
             guild_bonuses = await GuildBuildingService.get_guild_bonuses(session, player.guild_id)
             guild_cultivation_bonus = guild_bonuses.get("cultivation_bonus", 0.0)
 
-        # 应用月卡和公会修炼效率加成
-        total_cultivation_multiplier = 1.0 + benefits["cultivation_efficiency"] + guild_cultivation_bonus
+        # 应用月卡、公会和转数修炼效率加成
+        from ..reincarnation.service import ReincarnationService
+        reincarnation_bonus = ReincarnationService.get_cultivation_efficiency_bonus(player.reincarnation_level)
+        total_cultivation_multiplier = 1.0 + benefits["cultivation_efficiency"] + guild_cultivation_bonus + reincarnation_bonus
         exp_gain = int(base_exp_gain * total_cultivation_multiplier)
         bonus_exp = exp_gain - base_exp_gain
   
@@ -234,10 +236,17 @@ async def handle_out_seclusion(event: MessageEvent):
         exp_after_card = int(exp_after_coffin_nail * card_multiplier)
         card_bonus = exp_after_card - exp_after_coffin_nail
 
+        # 应用转数闭关效率加成
+        from ..reincarnation.service import ReincarnationService
+        reincarnation_bonus = ReincarnationService.get_seclusion_efficiency_bonus(player.reincarnation_level)
+        reincarnation_multiplier = 1.0 + reincarnation_bonus
+        exp_after_reincarnation = int(exp_after_card * reincarnation_multiplier)
+        reincarnation_exp_bonus = exp_after_reincarnation - exp_after_card
+
         # 应用公会修为加成
         guild_multiplier = 1.0 + guild_cultivation_bonus
-        exp_gain = int(exp_after_card * guild_multiplier)
-        guild_bonus = exp_gain - exp_after_card
+        exp_gain = int(exp_after_reincarnation * guild_multiplier)
+        guild_bonus = exp_gain - exp_after_reincarnation
 
         player.exp += exp_gain
 
@@ -254,6 +263,10 @@ async def handle_out_seclusion(event: MessageEvent):
         if card_bonus > 0:
             card_efficiency = benefits["seclusion_efficiency"] * 100
             efficiency_msg += f"\n✧ 月卡加成 💳 额外获得 +{card_bonus} 怨炁 (+{card_efficiency:.0f}%)"
+
+        if reincarnation_exp_bonus > 0:
+            reincarnation_efficiency = reincarnation_bonus * 100
+            efficiency_msg += f"\n✧ 转数加成 🌟 额外获得 +{reincarnation_exp_bonus} 怨炁 (+{reincarnation_efficiency:.0f}%)"
 
         if guild_bonus > 0:
             guild_efficiency = guild_cultivation_bonus * 100
@@ -304,6 +317,21 @@ async def handle_breakthrough(event: MessageEvent, args: Message = CommandArg())
         if use_guardian:
             success_chance = 1.0
 
+        # 检查是否达到冥返要求等级，如果达到则提示冥返
+        from ..reincarnation.service import ReincarnationService
+        required_level = ReincarnationService.get_required_level_for_reincarnation(player.reincarnation_level)
+        if player.level >= required_level:
+            reincarnation_count = player.reincarnation_level + 1
+            await breakthrough.finish(
+                f"🌟 你已达到冥返要求 Lv.{required_level}！\n"
+                "━━━━━━━━━━━━━\n"
+                f"✧ 可进行第{reincarnation_count}次冥返轮回\n"
+                "✧ 冥返将重塑根基，获得更强潜力\n"
+                "━━━━━━━━━━━━━\n"
+                "⬇️ 【冥返】踏入轮回，重铸道基\n"
+                "⬇️ 【冥返信息】查看详细信息"
+            )
+
         # 检查经验是否足够
         if player.exp < required_exp:
             await breakthrough.finish(
@@ -323,7 +351,11 @@ async def handle_breakthrough(event: MessageEvent, args: Message = CommandArg())
             old_level = player.level
             player.exp -= required_exp
             player.level += 1
-            player.attribute_points += config.game_config["game"]["points_per_level"]
+
+            # 根据转数计算属性点获得
+            from ..reincarnation.service import ReincarnationService
+            points_gained = ReincarnationService.get_attribute_points_per_level(player.reincarnation_level)
+            player.attribute_points += points_gained
 
             # 触发升级钩子
             from ..social.level_hooks import on_player_level_up
@@ -332,7 +364,7 @@ async def handle_breakthrough(event: MessageEvent, args: Message = CommandArg())
             msg = (
                 f"⛓️‍💥骨裂声回荡，已突破至Lv.{player.level}↑\n"
                 "━━━━━━━━━━━━━\n"
-                f"✧ 获得属性点 + {config.game_config['game']['points_per_level']}\n"
+                f"✧ 获得属性点 + {points_gained}" + (f" (转数加成)" if player.reincarnation_level > 0 else "") + "\n"
                 f"✧ 剩余修为 {player.exp}\n"
                 + (f"✧ 消耗怨念值 {guardian_cost} (剩余{player.resentment})\n" if use_guardian else "") +
                 "━━━━━━━━━━━━━\n"
@@ -344,7 +376,11 @@ async def handle_breakthrough(event: MessageEvent, args: Message = CommandArg())
                 old_level = player.level
                 player.exp -= required_exp
                 player.level += 1
-                player.attribute_points += config.game_config["game"]["points_per_level"]
+
+                # 根据转数计算属性点获得
+                from ..reincarnation.service import ReincarnationService
+                points_gained = ReincarnationService.get_attribute_points_per_level(player.reincarnation_level)
+                player.attribute_points += points_gained
 
                 # 触发升级钩子
                 from ..social.level_hooks import on_player_level_up
@@ -353,7 +389,7 @@ async def handle_breakthrough(event: MessageEvent, args: Message = CommandArg())
                 msg = (
                     f"⛓️‍💥骨裂声回荡，已突破至Lv.{player.level}↑\n"
                     "━━━━━━━━━━━━━\n"
-                    f"✧ 获得属性点 + {config.game_config['game']['points_per_level']}\n"
+                    f"✧ 获得属性点 + {points_gained}" + (f" (转数加成)" if player.reincarnation_level > 0 else "") + "\n"
                     f"✧ 剩余修为 {player.exp}\n"
                     + (f"✧ 消耗怨念值 {guardian_cost} (剩余{player.resentment})\n" if use_guardian else "") +
                     "━━━━━━━━━━━━━\n"

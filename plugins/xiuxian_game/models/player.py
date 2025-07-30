@@ -32,6 +32,7 @@ class Player(Base):
     stamina: Mapped[int] = mapped_column(Integer, default=10, server_default='10', comment="咒抗")
     luck: Mapped[int] = mapped_column(Integer, default=1, server_default='1', comment="运气")
     resentment: Mapped[int] = mapped_column(Integer, default=0, server_default='0', comment="怨念值")
+    reincarnation_level: Mapped[int] = mapped_column(Integer, default=0, server_default='0', comment="转数")
     guild_id: Mapped[int | None] = mapped_column(Integer, nullable=True, comment="所属公会ID")
     guild_contribution: Mapped[int] = mapped_column(BigInteger, default=0, server_default='0', comment="公会贡献值")
     

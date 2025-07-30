@@ -1,6 +1,6 @@
 # 游戏基础配置
 game:
-  max_level: 1000  # 最大等级
+  max_level: 300  # 最大等级
   base_exp: 10   # 基础经验值（1级到2级所需经验）
   points_per_level: 10  # 每次升级获得的属性点数
   exp_curve:
@@ -8,6 +8,11 @@ game:
     late_multiplier: 6
     curve_change_level: 10
   inventory_page_size: 10  # 背包每页显示物品数量
+
+  # 冥返机制配置
+  reincarnation:
+    cultivation_efficiency_bonus: 0.5  # 每转修炼效率加成（50%*转数）
+    seclusion_efficiency_bonus: 0.5   # 每转闭关效率加成（50%*转数）
 
 # 资源控制配置
 resource_control:

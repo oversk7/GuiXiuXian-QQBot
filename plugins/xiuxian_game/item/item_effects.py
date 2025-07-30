@@ -539,8 +539,9 @@ async def _reset_attr(player: Player, cfg: ItemConfig, qty: int, ctx: str, sessi
     for k, base_v in INIT.items():
         setattr(player, k, base_v + elixir_bonus.get(k, 0))
 
-    # 重新计算可分配点
-    pts_per_lvl = gcfg.game_config["game"]["points_per_level"]
+    # 重新计算可分配点（考虑转数加成）
+    from ..reincarnation.service import ReincarnationService
+    pts_per_lvl = ReincarnationService.get_attribute_points_per_level(player.reincarnation_level)
     player.attribute_points = (player.level - 1) * pts_per_lvl
 
     # 重新计算装备加成（基于新的基础属性）

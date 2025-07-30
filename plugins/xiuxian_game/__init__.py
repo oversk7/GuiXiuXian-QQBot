@@ -25,6 +25,7 @@ from . import (
     story,
     ghost_suppression,
     backup,
+    reincarnation,
 )
 
 driver = get_driver()

@@ -28,10 +28,63 @@ REALM_NAMES = [
     "绝念境",
     "诡天境",
     "灾厄境",
-    "噬神境",
 ]
 
-REALM_THRESHOLDS = [20, 40, 60, 80, 100, 130, 160, 190, 250, 300, 500]
+REALM_THRESHOLDS = [20, 40, 60, 80, 100, 130, 160, 190, 250, 300]
+
+def number_to_chinese(num: int) -> str:
+    """将阿拉伯数字转换为中文数字"""
+    if num == 0:
+        return "零"
+
+    # 中文数字映射
+    chinese_digits = ["零", "一", "二", "三", "四", "五", "六", "七", "八", "九"]
+
+    if num < 10:
+        return chinese_digits[num]
+    elif num < 20:
+        if num == 10:
+            return "十"
+        else:
+            return "十" + chinese_digits[num % 10]
+    elif num < 100:
+        tens = num // 10
+        ones = num % 10
+        if ones == 0:
+            return chinese_digits[tens] + "十"
+        else:
+            return chinese_digits[tens] + "十" + chinese_digits[ones]
+    elif num < 1000:
+        hundreds = num // 100
+        remainder = num % 100
+        result = chinese_digits[hundreds] + "百"
+        if remainder == 0:
+            return result
+        elif remainder < 10:
+            return result + "零" + chinese_digits[remainder]
+        else:
+            return result + number_to_chinese(remainder)
+    elif num < 10000:
+        thousands = num // 1000
+        remainder = num % 1000
+        result = chinese_digits[thousands] + "千"
+        if remainder == 0:
+            return result
+        elif remainder < 100:
+            return result + "零" + number_to_chinese(remainder)
+        else:
+            return result + number_to_chinese(remainder)
+    else:
+        # 处理万以上的数字
+        wan = num // 10000
+        remainder = num % 10000
+        result = number_to_chinese(wan) + "万"
+        if remainder == 0:
+            return result
+        elif remainder < 1000:
+            return result + "零" + number_to_chinese(remainder)
+        else:
+            return result + number_to_chinese(remainder)
 
 def realm_by_level(level: int) -> str:
     """根据等级返回境界名称"""
@@ -127,10 +180,16 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
     if has_unread:
         unread_notice = "\n┃📬 有新留言未读！输入【留言板】查看"
 
+    # 转数信息（只有冥返过才显示）
+    reincarnation_info = ""
+    if player.reincarnation_level > 0:
+        chinese_reincarnation = number_to_chinese(player.reincarnation_level)
+        reincarnation_info = f" · {chinese_reincarnation}转"
+
     content = (
         f"┏━━ 信息 ━━━━\n"
         f"┃{player.nickname}[UID:{player.uid}]「{player.sex}」\n"
-        f"┃ Lv.{player.level} · {realm_name}\n"
+        f"┃ Lv.{player.level}{reincarnation_info} · {realm_name}\n"
         f"┃ Exp {player.exp}/{exp_max}\n"
         "┣━━ 状态 ━━━━\n"
         f"┃ ❤️生命 {cur_hp}/{hp_max_str}\n"
