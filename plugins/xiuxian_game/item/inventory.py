@@ -55,6 +55,7 @@ async def _handle_expand_territory(session, player: Player, item_config, quantit
 inventory_cmd = on_command("背包", block=True, priority=5)
 use_item = on_command("使用", block=True, priority=5)
 elixir_tolerance_cmd = on_command("耐药性", aliases={"丹药耐药性"}, block=True, priority=5)
+elixir_bonus_cmd = on_command("丹药加成", aliases={"丹药总加成", "丹药效果"}, block=True, priority=5)
 
 teleport_cmd = on_command("传送", block=True, priority=5)
 rename_cmd = on_command("改名", block=True, priority=5)
@@ -224,6 +225,107 @@ async def handle_elixir_tolerance(event: MessageEvent, args: Message = CommandAr
 
         result = "\n".join(lines)
         await elixir_tolerance_cmd.finish(result)
+
+
+@elixir_bonus_cmd.handle()
+async def handle_elixir_bonus(event: MessageEvent):
+    """查看丹药总加成"""
+    async with safe_session() as session:
+        player = await session.get(Player, event.get_user_id())
+        if not player:
+            await elixir_bonus_cmd.finish("⛔ 请先创建角色")
+
+        # 获取所有丹药使用记录（不限日期，因为丹药效果是永久的）
+        from sqlalchemy import select
+        stmt = select(ElixirUsageLog).where(ElixirUsageLog.player_id == player.id)
+        logs = (await session.execute(stmt)).scalars().all()
+
+        if not logs:
+            await elixir_bonus_cmd.finish("📊 你还没有服用过任何丹药")
+
+        # 统计每种丹药的总使用量
+        elixir_usage_total = {}
+        for log in logs:
+            if log.item_id not in elixir_usage_total:
+                elixir_usage_total[log.item_id] = 0
+            elixir_usage_total[log.item_id] += log.quantity
+
+        # 计算总属性加成
+        total_bonus = {
+            "max_hp": 0,
+            "max_mp": 0,
+            "attack": 0,
+            "agility": 0,
+            "luck": 0,
+            "defense": 0
+        }
+
+        # 构建详细报告
+        lines = ["💊 丹药总加成统计", "=" * 30]
+
+        # 按丹药分类显示
+        for item_id, total_qty in elixir_usage_total.items():
+            item_config = config.items_config["by_id"].get(item_id)
+            if not item_config or item_config.effect_type != ItemEffectType.BUFF:
+                continue
+
+            effect_params = item_config.effect_params or {}
+            if not effect_params:
+                continue
+
+            lines.append(f"🔹 {item_config.name}")
+            lines.append(f"  总服用次数：{total_qty}")
+
+            # 计算该丹药的属性加成
+            elixir_bonus = []
+            for attr, value in effect_params.items():
+                if attr in total_bonus:
+                    bonus_value = int(value) * total_qty
+                    total_bonus[attr] += bonus_value
+
+                    # 属性名称映射
+                    attr_names = {
+                        "max_hp": "体质",
+                        "max_mp": "智力",
+                        "attack": "力量",
+                        "agility": "敏捷",
+                        "luck": "幸运",
+                        "defense": "防御"
+                    }
+                    attr_name = attr_names.get(attr, attr)
+                    elixir_bonus.append(f"{attr_name}+{bonus_value}")
+
+            if elixir_bonus:
+                lines.append(f"  属性加成：{', '.join(elixir_bonus)}")
+            lines.append("")
+
+        # 显示总计
+        lines.append("🌟 总计加成")
+        lines.append("-" * 20)
+
+        total_display = []
+        attr_names = {
+            "max_hp": "体质",
+            "max_mp": "智力",
+            "attack": "力量",
+            "agility": "敏捷",
+            "luck": "幸运",
+            "defense": "防御"
+        }
+
+        for attr, total_value in total_bonus.items():
+            if total_value > 0:
+                attr_name = attr_names.get(attr, attr)
+                total_display.append(f"{attr_name}+{total_value}")
+
+        if total_display:
+            lines.append(f"✨ {', '.join(total_display)}")
+        else:
+            lines.append("暂无属性加成")
+
+        result = "\n".join(lines)
+        await elixir_bonus_cmd.finish(message_add_head(result, event))
+
 
 @inventory_cmd.handle()
 async def handle_inventory(event: MessageEvent, args: Message = CommandArg()):

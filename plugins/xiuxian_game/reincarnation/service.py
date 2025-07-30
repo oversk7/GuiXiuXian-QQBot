@@ -113,8 +113,8 @@ class ReincarnationService:
         equipment_bonus = {}
         for item in equipped_items:
             item_config = item.config
-            if "attributes" in item_config:
-                for attr_name, bonus in item_config["attributes"].items():
+            if item_config and item_config.attr_bonus:
+                for attr_name, bonus in item_config.attr_bonus.items():
                     equipment_bonus[attr_name] = equipment_bonus.get(attr_name, 0) + bonus
         
         # 应用装备加成
