@@ -2,7 +2,7 @@ from datetime import date
 from sqlalchemy import Integer, String, Date, func
 from sqlalchemy.orm import Mapped, mapped_column
 from .db import Base
-from .. import config
+from ..config import config
 from .inventory import ItemEffectType
 
 class ElixirUsageLog(Base):
