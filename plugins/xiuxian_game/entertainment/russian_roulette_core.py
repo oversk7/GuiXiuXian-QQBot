@@ -295,6 +295,11 @@ class RussianRouletteCore:
         remaining = bullets[current_index:]
         total_remaining = len(remaining)
 
+        # 计算已经打出的子弹统计
+        fired_bullets = bullets[:current_index]
+        fired_live_count = sum(1 for b in fired_bullets if b)
+        fired_blank_count = sum(1 for b in fired_bullets if not b)
+
         # 获取玩家信息
         player1_id = room_info["player1_id"]
         player2_id = room_info["player2_id"]
@@ -313,11 +318,18 @@ class RussianRouletteCore:
         display = [
             "🎮 恶魔轮盘赌",
             "━━━━━━━━━━━━━",
-            f"🔫 剩余弹药：{total_remaining}发（实弹和空包弹混合）",
+            f"🔫 剩余弹药：{total_remaining}发",
+        ]
+
+        # 显示已打出子弹统计（如果有的话）
+        if fired_live_count > 0 or fired_blank_count > 0:
+            display.append(f"📊 已打出：{fired_live_count}发实弹 + {fired_blank_count}发空包弹")
+
+        display.extend([
             f"❤️ 血量状态：",
             f"  {player1_name}: {'❤️' * player1_hp}{'🖤' * (3 - player1_hp)}",
             f"  {player2_name}: {'❤️' * player2_hp}{'🖤' * (3 - player2_hp)}",
-        ]
+        ])
 
         # 显示道具信息
         player1_items = json.loads(game_state.get(f"{player1_id}_items", "[]"))

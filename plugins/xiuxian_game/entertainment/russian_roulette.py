@@ -638,7 +638,14 @@ async def handle_room_status(event: MessageEvent):
                 bullets = json.loads(game.bullets)
                 remaining = bullets[game.current_bullet_index:]
                 total_remaining = len(remaining)
-                status_lines.append(f"🔫 剩余弹药：{total_remaining}发（实弹和空包弹混合）")
+                status_lines.append(f"🔫 剩余弹药：{total_remaining}发")
+
+                # 显示已打出子弹统计
+                fired_bullets = bullets[:game.current_bullet_index]
+                if fired_bullets:  # 只有在有已打出子弹时才显示
+                    fired_live_count = sum(1 for b in fired_bullets if b)
+                    fired_blank_count = sum(1 for b in fired_bullets if not b)
+                    status_lines.append(f"📊 已打出：{fired_live_count}发实弹 + {fired_blank_count}发空包弹")
 
         await room_status_cmd.finish(message_add_head("\n".join(status_lines), event))
 
