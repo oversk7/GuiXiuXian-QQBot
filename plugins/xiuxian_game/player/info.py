@@ -161,29 +161,37 @@ async def _(event: MessageEvent, state: T_State, args: Message = CommandArg()):
     # 获取参数
     nickname = args.extract_plain_text().strip()
 
-    # 如果直接提供了昵称，直接创建角色（默认性别为男）
+    # 如果直接提供了昵称，直接创建角色
     if nickname:
+        # 检查是否为旧格式：昵称 性别
+        parsed_nickname, parsed_gender = _parse_nickname_and_gender(nickname)
+
         # 清理可能的误输入
-        cleaned_nickname = _clean_nickname_input(nickname)
+        cleaned_nickname = _clean_nickname_input(parsed_nickname)
 
         # 检查清理后的昵称是否有效
         if not cleaned_nickname or len(cleaned_nickname) < 2:
             await register.finish(
                 "⛔ 昵称格式错误\n"
-                "💡 正确格式：/注册 [昵称] 或直接发送 /注册 然后按提示输入\n"
-                "📝 例如：/注册 张三\n"
+                "💡 正确格式：/注册 [昵称] 或 /注册 [昵称] [男/女] 或直接发送 /注册 然后按提示输入\n"
+                "📝 例如：/注册 张三 或 /注册 张三 女\n"
                 "⚠️ 昵称长度至少2个字符"
             )
 
         # 如果清理了输入，给出提示
-        if cleaned_nickname != nickname:
-            result = await create_player(event, cleaned_nickname, Gender.MALE)
-            success_msg = f"✅ 已自动识别并清理输入，你的角色昵称为：{cleaned_nickname}\n{result}"
+        if cleaned_nickname != parsed_nickname:
+            result = await create_player(event, cleaned_nickname, parsed_gender)
+            success_msg = f"✅ 已自动识别并清理输入，你的角色昵称为：{cleaned_nickname}，性别：{parsed_gender.value}\n{result}"
             await register.finish(message_add_head(success_msg, event))
         else:
             # 正常情况，直接创建角色
-            result = await create_player(event, cleaned_nickname, Gender.MALE)
-            await register.finish(message_add_head(result, event))
+            result = await create_player(event, cleaned_nickname, parsed_gender)
+            # 如果检测到了性别参数，给出提示
+            if parsed_gender != Gender.MALE or ' ' in nickname:
+                success_msg = f"✅ 角色创建成功！昵称：{cleaned_nickname}，性别：{parsed_gender.value}\n{result}"
+                await register.finish(message_add_head(success_msg, event))
+            else:
+                await register.finish(message_add_head(result, event))
 
     # 开始分步注册流程，保存用户ID到状态中
     state["user_id"] = event.get_user_id()
@@ -216,6 +224,38 @@ async def _(event: MessageEvent, nickname: str = ArgPlainText()):
     # 正常情况，直接创建角色
     result = await create_player(event, nickname, Gender.MALE)
     await register.finish(message_add_head(result, event))
+
+
+def _parse_nickname_and_gender(input_text: str) -> tuple[str, Gender]:
+    """解析输入文本，分离昵称和性别
+
+    支持格式：
+    - "昵称 男" -> ("昵称", Gender.MALE)
+    - "昵称 女" -> ("昵称", Gender.FEMALE)
+    - "昵称" -> ("昵称", Gender.MALE)  # 默认男性
+
+    Args:
+        input_text: 用户输入的文本
+
+    Returns:
+        tuple: (昵称, 性别)
+    """
+    input_text = input_text.strip()
+
+    # 检查是否包含空格
+    if ' ' in input_text:
+        parts = input_text.split()
+        if len(parts) >= 2:
+            # 最后一个部分可能是性别
+            potential_gender = parts[-1]
+            if potential_gender in ['男', '女']:
+                # 昵称是除了最后一个部分的所有内容
+                nickname = ' '.join(parts[:-1])
+                gender = Gender.MALE if potential_gender == '男' else Gender.FEMALE
+                return nickname, gender
+
+    # 如果没有检测到性别，返回原文本和默认性别
+    return input_text, Gender.MALE
 
 
 def _clean_nickname_input(nickname: str) -> str:
