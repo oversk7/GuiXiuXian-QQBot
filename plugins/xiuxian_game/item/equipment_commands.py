@@ -4,6 +4,7 @@ from nonebot.adapters.qq import MessageEvent, Message
 from sqlalchemy import select
 from ..models.db import safe_session
 from ..models import Player, ItemInstance
+from ..models.monthly_card import MonthlyCard, CardType
 from ..config import config
 from ..utils import message_add_head
 import random
@@ -389,3 +390,142 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
                 result_msg = f"🔨 分解了 {equip.config.name}，但没有获得任何金币"
 
         await decompose_equipment.finish(message_add_head(result_msg, event))
+
+# ---------------- 指令：一键修复所有装备（高级月卡专享） ----------------
+repair_all_equipment = on_command("一键修复", aliases={"修复全部", "全部修复"}, block=True, priority=5)
+
+@repair_all_equipment.handle()
+async def _(event: MessageEvent, args: Message = CommandArg()):
+    arg_text = args.extract_plain_text().strip()
+
+    # 解析参数（可选的金币:怨念比例）
+    gold_ratio = None
+    resentment_ratio = None
+
+    if arg_text:
+        # 支持 3:2 或 3：2 格式
+        ratio_text = arg_text.replace("：", ":")
+        if ":" in ratio_text:
+            try:
+                parts = ratio_text.split(":")
+                if len(parts) == 2:
+                    gold_ratio = int(parts[0])
+                    resentment_ratio = int(parts[1])
+                    if gold_ratio < 0 or resentment_ratio < 0:
+                        await repair_all_equipment.finish("⛔ 比例必须为非负整数")
+                    if gold_ratio == 0 and resentment_ratio == 0:
+                        await repair_all_equipment.finish("⛔ 比例不能都为0")
+            except ValueError:
+                await repair_all_equipment.finish("⛔ 比例格式错误，请使用 金币:怨念 格式，如 3:2")
+        else:
+            await repair_all_equipment.finish("⛔ 格式：一键修复 [金币比例:怨念比例]\n💡 示例：一键修复 3:2 或 3：2（金币怨念按3:2分配）\n💡 不指定比例则默认使用金币")
+
+    async with safe_session() as session:
+        player = await session.get(Player, event.get_user_id())
+        if not player:
+            await repair_all_equipment.finish("⛔ 请先创建角色")
+
+        # 检查是否有高级月卡
+        premium_card = await MonthlyCard.get_active_card(session, event.get_user_id(), CardType.PREMIUM)
+        if not premium_card:
+            await repair_all_equipment.finish("⛔ 一键修复功能仅限高级月卡用户使用\n💡 请联系管理员购买高级月卡")
+
+        # 查询玩家所有装备
+        stmt = select(ItemInstance).where(
+            ItemInstance.player_id == event.get_user_id(),
+            ItemInstance.item_id.in_(EQUIP_ITEM_IDS)
+        )
+        all_equipment = (await session.execute(stmt)).scalars().all()
+
+        if not all_equipment:
+            await repair_all_equipment.finish("🎒 你没有任何装备")
+
+        # 筛选出需要修复的装备（耐久度未满的）
+        repairable_equipment = []
+        for equip in all_equipment:
+            if equip.durability < equip.config.durability:
+                repairable_equipment.append(equip)
+
+        if not repairable_equipment:
+            await repair_all_equipment.finish("✨ 你的所有装备都已满耐久，无需修复")
+
+        # 计算总修复费用
+        total_cost = 0
+        repair_details = []
+
+        for equip in repairable_equipment:
+            tpl = equip.config
+            missing = tpl.durability - equip.durability
+            cost_per = tpl.repair_cost if tpl.repair_cost is not None else max(1, int(tpl.price / max(1, tpl.durability)))
+            equip_cost = cost_per * missing
+            total_cost += equip_cost
+
+            repair_details.append({
+                'equip': equip,
+                'missing': missing,
+                'cost': equip_cost
+            })
+
+        # 计算金币和怨念的分配
+        if gold_ratio is None and resentment_ratio is None:
+            # 默认全部使用金币
+            used_gold = total_cost
+            used_resentment = 0
+        else:
+            # 按比例分配
+            total_ratio = gold_ratio + resentment_ratio
+            used_gold = int(total_cost * gold_ratio / total_ratio)
+            used_resentment = total_cost - used_gold
+
+        # 检查资源是否足够
+        if player.gold < used_gold:
+            await repair_all_equipment.finish(f"⛔ 金币不足，需要 {used_gold}💰，当前仅有 {player.gold}💰")
+        if player.resentment < used_resentment:
+            await repair_all_equipment.finish(f"⛔ 怨念不足，需要 {used_resentment}👻，当前仅有 {player.resentment}👻")
+
+        # 执行修复
+        repaired_count = 0
+        repaired_list = []
+
+        for detail in repair_details:
+            equip = detail['equip']
+            equip.durability = equip.config.durability
+            repaired_count += 1
+            repaired_list.append(f"🔧 {equip.config.name} (ID:{equip.id})")
+
+        # 扣除费用
+        player.gold -= used_gold
+        player.resentment -= used_resentment
+
+        await session.commit()
+
+        # 构建结果消息
+        result_lines = [
+            f"✅ 一键修复完成！共修复 {repaired_count} 件装备",
+            "━━━━━━━━━━━━━"
+        ]
+
+        # 显示修复的装备列表（最多显示10件，超过则省略）
+        if len(repaired_list) <= 10:
+            result_lines.extend(repaired_list)
+        else:
+            result_lines.extend(repaired_list[:8])
+            result_lines.append(f"... 以及其他 {len(repaired_list) - 8} 件装备")
+
+        result_lines.append("━━━━━━━━━━━━━")
+
+        # 费用信息
+        cost_info = f"💰 总费用 {total_cost}，实际耗费 {used_gold}💰"
+        if used_resentment > 0:
+            cost_info += f" + {used_resentment}👻"
+
+        # 如果使用了比例，显示实际比例
+        if gold_ratio is not None and resentment_ratio is not None:
+            cost_info += f"（按比例 {gold_ratio}:{resentment_ratio}）"
+        elif used_resentment == 0:
+            cost_info += "（默认使用金币）"
+
+        result_lines.append(cost_info)
+        result_lines.append("🎉 高级月卡专享功能")
+
+        await repair_all_equipment.finish(message_add_head("\n".join(result_lines), event))
