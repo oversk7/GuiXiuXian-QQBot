@@ -60,7 +60,7 @@ async def handle_gift_history(event: MessageEvent):
         lines = ["🎁 送礼记录", "━━━━━━━━━━"]
         for gift in gifts:
             receiver = await session.get(Player, gift.receiver_id)
-            gift_type_emoji = "💕" if gift.gift_type.value == "marriage" else "🎓"
+            gift_type_emoji = "💕" if gift.gift_type == "marriage" else "🎓"
             lines.append(
                 f"{gift_type_emoji} 向 {receiver.nickname}[UID:{receiver.uid}] "
                 f"送出 {gift.quantity}个「{gift.item_name}」(价值{gift.total_value})"
@@ -87,7 +87,7 @@ async def handle_received_gifts(event: MessageEvent):
         lines = ["🎁 收礼记录", "━━━━━━━━━━"]
         for gift in gifts:
             sender = await session.get(Player, gift.sender_id)
-            gift_type_emoji = "💕" if gift.gift_type.value == "marriage" else "🎓"
+            gift_type_emoji = "💕" if gift.gift_type == "marriage" else "🎓"
             lines.append(
                 f"{gift_type_emoji} {sender.nickname}[UID:{sender.uid}] "
                 f"送来 {gift.quantity}个「{gift.item_name}」(价值{gift.total_value})"
