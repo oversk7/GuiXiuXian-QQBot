@@ -42,7 +42,7 @@ class StockService:
             stmt = select(Stock).where(Stock.symbol == stock_symbol, Stock.is_active == True)
             stock = (await session.execute(stmt)).scalars().first()
             if not stock:
-                return False, f"股票 {stock_symbol} 不存在或已停牌"
+                return False, f"灵石项目 {stock_symbol} 不存在或已停止投资"
             
             # 验证交易数量
             if shares <= 0:
@@ -93,8 +93,8 @@ class StockService:
             
             await session.commit()
             
-            return True, f"成功买入 {stock.name}({stock_symbol}) {shares}股，" \
-                        f"成交价 {unit_price} 金币/股，手续费 {commission} 金币"
+            return True, f"成功投资 {stock.name}({stock_symbol}) {shares}份，" \
+                        f"成交价 {unit_price} 金币/份，手续费 {commission} 金币"
     
     @classmethod
     async def sell_stock(cls, player_id: str, stock_symbol: str, shares: int, 
@@ -110,7 +110,7 @@ class StockService:
             stmt = select(Stock).where(Stock.symbol == stock_symbol, Stock.is_active == True)
             stock = (await session.execute(stmt)).scalars().first()
             if not stock:
-                return False, f"股票 {stock_symbol} 不存在或已停牌"
+                return False, f"灵石项目 {stock_symbol} 不存在或已停止投资"
             
             # 获取持仓信息
             holding_stmt = select(StockHolding).where(
@@ -119,7 +119,7 @@ class StockService:
             holding = (await session.execute(holding_stmt)).scalars().first()
             
             if not holding or holding.shares < shares:
-                return False, f"持仓不足，当前持有 {holding.shares if holding else 0} 股"
+                return False, f"投资不足，当前持有 {holding.shares if holding else 0} 份"
             
             # 验证交易数量
             if shares <= 0:
@@ -167,8 +167,8 @@ class StockService:
             
             await session.commit()
             
-            return True, f"成功卖出 {stock.name}({stock_symbol}) {shares}股，" \
-                        f"成交价 {unit_price} 金币/股，手续费 {commission} 金币，净收入 {net_proceeds} 金币"
+            return True, f"成功出售 {stock.name}({stock_symbol}) {shares}份，" \
+                        f"成交价 {unit_price} 金币/份，手续费 {commission} 金币，净收入 {net_proceeds} 金币"
     
     @classmethod
     async def get_player_holdings(cls, player_id: str) -> List[Dict]:
