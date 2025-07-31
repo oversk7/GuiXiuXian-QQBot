@@ -19,6 +19,8 @@ from .guild_permission import GuildPermission
 from .guild_economy_service import GuildEconomyService
 from .guild_building_service import GuildBuildingService
 from .guild_task_service import GuildTaskService
+from .guild_facility_service import GuildFacilityService
+from .guild_daily_tasks import GuildDailyTasks
 
 # ===== 工具函数 =====
 # 翻译大数字为 w（万）单位，保留 1 位小数，10w 以下不显示 w
@@ -116,6 +118,9 @@ async def handle_guild_info(event: MessageEvent):
             session.add(player)
             await session.commit()
             await guild_info_cmd.finish("⚠️ 公会数据异常，请稍后重试")
+
+        # 触发公会每日刷新（静默执行，不显示结果）
+        await GuildDailyTasks.trigger_guild_daily_refresh(session, player.guild_id)
 
         # 获取玩家职位
         player_position = await GuildPermission.get_member_position(session, player.id, guild_obj.id)
@@ -218,6 +223,28 @@ async def handle_guild_bonuses(event: MessageEvent):
             lines.append(f"🛡️ 防御力加成：+{defense_bonus*100:.1f}%")
         else:
             lines.append(f"🛡️ 防御力加成：无")
+
+        # 传送阵效果
+        teleport_range = bonuses.get("teleport_range", 0)
+        daily_teleport_uses = bonuses.get("daily_teleport_uses", 0)
+        if teleport_range > 0:
+            lines.append(f"✨ 传送范围：{teleport_range}格，每日{daily_teleport_uses}次")
+        else:
+            lines.append(f"✨ 传送功能：无")
+
+        # 丹房效果
+        daily_alchemy = bonuses.get("daily_alchemy_production", 0)
+        if daily_alchemy > 0:
+            lines.append(f"🧪 丹房产出：每日{daily_alchemy}个丹药")
+        else:
+            lines.append(f"🧪 丹房产出：无")
+
+        # 仓库容量
+        warehouse_capacity = bonuses.get("warehouse_capacity", 0)
+        if warehouse_capacity > 0:
+            lines.append(f"📦 仓库格子：{warehouse_capacity}格")
+        else:
+            lines.append(f"📦 仓库格子：无")
 
         lines.append("━━━━━━━━━━")
         lines.append("💡 建造更多建筑可获得更强加成")
@@ -339,7 +366,7 @@ async def handle_member_list(event: MessageEvent):
             icon = position_icons.get(member["position"], "")
 
             lines.append(
-                f"{idx}. {member['nickname']}{icon} "
+                f"{idx}. {member['nickname']}[{member['uid']}]{icon} "
                 f"Lv.{member['level']} "
                 f"{member['position_name']} "
                 f"贡:{GuildEconomyService.format_large_number(member['contribution'])}"
@@ -635,16 +662,16 @@ async def handle_set_base(event: MessageEvent):
         if guild.president_id != player.id:
             await set_base_cmd.finish("⛔ 只有会长才能设置公会基地")
 
-        # 检查公会等级（3级以上才能设置基地）
-        if guild.level < 3:
-            await set_base_cmd.finish(f"⛔ 公会等级不足，需要达到3级才能设置基地（当前{guild.level}级）")
+        # 检查公会等级
+        if guild.level < 2:
+            await set_base_cmd.finish(f"⛔ 公会等级不足，需要达到2级才能设置基地（当前{guild.level}级）")
 
         # 检查是否在现实世界
         if player.region != "大都会":
             await set_base_cmd.finish("⛔ 只能在现实世界（大都会）设置公会基地")
 
         # 检查坐标范围（使用导航系统的坐标限制）
-        MAX_COORD = 500
+        MAX_COORD = 1000
         if not (-MAX_COORD <= player.x <= MAX_COORD and -MAX_COORD <= player.y <= MAX_COORD):
             await set_base_cmd.finish(f"⛔ 当前坐标超出有效范围（{-MAX_COORD}~{MAX_COORD}）")
 
@@ -787,19 +814,22 @@ async def handle_build(event: MessageEvent, args: Message = CommandArg()):
     """建造或升级建筑：建造 建筑名"""
     building_name = args.extract_plain_text().strip()
     if not building_name:
-        await build_cmd.finish("⛔ 格式错误，正确格式：建造 [建筑名]\n可建造：经验神龛、资金金库、训练场")
+        await build_cmd.finish("⛔ 格式错误，正确格式：建造 [建筑名]\n可建造：经验神龛、资金金库、训练场、传送阵、丹房、公会仓库")
 
     # 建筑名映射（灵塔和防御城墙暂时下架）
     building_map = {
         "经验神龛": BuildingType.EXPERIENCE_SHRINE,
         "资金金库": BuildingType.TREASURY_VAULT,
         "训练场": BuildingType.TRAINING_GROUND,
+        "传送阵": BuildingType.TELEPORT_ARRAY,
+        "丹房": BuildingType.ALCHEMY_ROOM,
+        "公会仓库": BuildingType.GUILD_WAREHOUSE,
         # "灵塔": BuildingType.SPIRIT_TOWER,  # 暂时下架
         # "防御城墙": BuildingType.DEFENSE_WALL  # 暂时下架
     }
 
     if building_name not in building_map:
-        await build_cmd.finish("⛔ 无效的建筑名，可建造：经验神龛、资金金库、训练场")
+        await build_cmd.finish("⛔ 无效的建筑名，可建造：经验神龛、资金金库、训练场、传送阵、丹房、公会仓库")
 
     building_type = building_map[building_name]
 
@@ -850,12 +880,15 @@ async def handle_confirm_build_with_name(event: MessageEvent, args: Message = Co
         "经验神龛": BuildingType.EXPERIENCE_SHRINE,
         "资金金库": BuildingType.TREASURY_VAULT,
         "训练场": BuildingType.TRAINING_GROUND,
+        "传送阵": BuildingType.TELEPORT_ARRAY,
+        "丹房": BuildingType.ALCHEMY_ROOM,
+        "公会仓库": BuildingType.GUILD_WAREHOUSE,
         # "灵塔": BuildingType.SPIRIT_TOWER,  # 暂时下架
         # "防御城墙": BuildingType.DEFENSE_WALL  # 暂时下架
     }
 
     if building_name not in building_map:
-        await confirm_build_with_name_cmd.finish("⛔ 无效的建筑名，可建造：经验神龛、资金金库、训练场")
+        await confirm_build_with_name_cmd.finish("⛔ 无效的建筑名，可建造：经验神龛、资金金库、训练场、传送阵、丹房、公会仓库")
 
     building_type = building_map[building_name]
 
@@ -897,6 +930,270 @@ async def handle_guild_tasks(event: MessageEvent):
 
         msg = "\n".join(lines)
         await guild_tasks_cmd.finish(message_add_head(msg, event))
+
+# ==================== 公会传送阵 ====================
+guild_teleport_cmd = on_command("公会传送", aliases={"传送到公会"}, block=True, priority=5)
+
+@guild_teleport_cmd.handle()
+async def handle_guild_teleport(event: MessageEvent):
+    """使用传送阵传送到公会基地"""
+    async with safe_session() as session:
+        player = await session.get(Player, event.get_user_id())
+        if not player or not player.guild_id:
+            await guild_teleport_cmd.finish("⛔ 你未加入任何公会")
+
+        # 检查是否在现实世界
+        if player.region != "大都会":
+            await guild_teleport_cmd.finish("⛔ 只能在现实世界使用传送阵")
+
+        success, message = await GuildFacilityService.teleport_to_guild(session, player.id, player.guild_id)
+
+        if success:
+            await session.commit()
+            await guild_teleport_cmd.finish(message_add_head(f"✨ {message}", event))
+        else:
+            await guild_teleport_cmd.finish(message_add_head(f"⛔ {message}", event))
+
+# ==================== 公会丹房 ====================
+guild_alchemy_cmd = on_command("公会丹房", aliases={"丹房", "丹药兑换"}, block=True, priority=5)
+
+@guild_alchemy_cmd.handle()
+async def handle_guild_alchemy(event: MessageEvent):
+    """查看公会丹房产出"""
+    async with safe_session() as session:
+        player = await session.get(Player, event.get_user_id())
+        if not player or not player.guild_id:
+            await guild_alchemy_cmd.finish("⛔ 你未加入任何公会")
+
+        guild = await session.get(Guild, player.guild_id)
+
+        # 触发丹房产出检查和生成
+        refresh_result = await GuildDailyTasks.trigger_guild_daily_refresh(session, player.guild_id)
+
+        productions = await GuildFacilityService.get_alchemy_production(session, player.guild_id)
+
+        # 提交丹房产出的更改
+        await session.commit()
+
+        if not productions:
+            msg = f"🧪 公会『{guild.name}』丹房\n━━━━━━━━━━\n暂无可兑换的丹药"
+            # 如果有新产出，显示提示
+            if refresh_result["alchemy_generated"] > 0:
+                msg += f"\n✨ {refresh_result['message']}"
+        else:
+            lines = [f"🧪 公会『{guild.name}』丹房", "━━━━━━━━━━"]
+            lines.append(f"💰 你的积分：{player.gold2}")
+
+            # 如果有新产出，显示提示
+            if refresh_result["alchemy_generated"] > 0:
+                lines.append(f"✨ {refresh_result['message']}")
+
+            lines.append("━━━━━━━━━━")
+
+            for idx, prod in enumerate(productions, 1):
+                # 根据丹药价值计算积分成本
+                item_config = config.items_config["by_id"].get(prod["item_id"])
+                if item_config:
+                    points_cost = max(1, item_config.price // 100)  # 价格的1%作为积分成本
+                    lines.append(f"{idx}. {prod['item_name']}×{prod['quantity']} - {points_cost}积分")
+
+            lines.append("━━━━━━━━━━")
+            lines.append("💡 使用【兑换丹药 序号】来兑换")
+            msg = "\n".join(lines)
+
+        await guild_alchemy_cmd.finish(message_add_head(msg, event))
+
+# ==================== 兑换丹药 ====================
+exchange_pill_cmd = on_command("兑换丹药", block=True, priority=5)
+
+@exchange_pill_cmd.handle()
+async def handle_exchange_pill(event: MessageEvent, args: Message = CommandArg()):
+    """兑换丹房产出的丹药"""
+    index_str = args.extract_plain_text().strip()
+    if not index_str:
+        await exchange_pill_cmd.finish("⛔ 格式错误，正确格式：兑换丹药 [序号]")
+
+    try:
+        index = int(index_str)
+    except ValueError:
+        await exchange_pill_cmd.finish("⛔ 序号必须是数字")
+
+    async with safe_session() as session:
+        player = await session.get(Player, event.get_user_id())
+        if not player or not player.guild_id:
+            await exchange_pill_cmd.finish("⛔ 你未加入任何公会")
+
+        # 触发丹房产出检查和生成
+        await GuildDailyTasks.trigger_guild_daily_refresh(session, player.guild_id)
+
+        productions = await GuildFacilityService.get_alchemy_production(session, player.guild_id)
+
+        if not productions or index < 1 or index > len(productions):
+            await exchange_pill_cmd.finish("⛔ 无效的序号")
+
+        selected_prod = productions[index - 1]
+
+        # 计算积分成本
+        item_config = config.items_config["by_id"].get(selected_prod["item_id"])
+        if not item_config:
+            await exchange_pill_cmd.finish("⛔ 物品配置错误")
+
+        points_cost = max(1, item_config.price // 100)
+
+        success, message = await GuildFacilityService.claim_alchemy_item(
+            session, player.id, player.guild_id, selected_prod["id"], points_cost
+        )
+
+        if success:
+            await session.commit()
+            await exchange_pill_cmd.finish(message_add_head(f"✅ {message}", event))
+        else:
+            await exchange_pill_cmd.finish(message_add_head(f"⛔ {message}", event))
+
+# ==================== 公会仓库 ====================
+guild_warehouse_cmd = on_command("公会仓库", aliases={"仓库"}, block=True, priority=5)
+
+@guild_warehouse_cmd.handle()
+async def handle_guild_warehouse(event: MessageEvent):
+    """查看公会仓库"""
+    async with safe_session() as session:
+        player = await session.get(Player, event.get_user_id())
+        if not player or not player.guild_id:
+            await guild_warehouse_cmd.finish("⛔ 你未加入任何公会")
+
+        # 检查是否在公会基地
+        guild = await session.get(Guild, player.guild_id)
+        if not guild.base_x or not guild.base_y:
+            await guild_warehouse_cmd.finish("⛔ 公会尚未设置基地")
+
+        if player.x != guild.base_x or player.y != guild.base_y:
+            await guild_warehouse_cmd.finish("⛔ 只有在公会基地才能访问仓库")
+
+        capacity = await GuildFacilityService.get_warehouse_capacity(session, player.guild_id)
+        if capacity == 0:
+            await guild_warehouse_cmd.finish("⛔ 公会尚未建造仓库")
+
+        items = await GuildFacilityService.get_warehouse_items(session, player.guild_id)
+        current_slots_used = len(items)  # 格子数等于不同物品的种类数
+
+        if not items:
+            msg = f"📦 公会『{guild.name}』仓库\n━━━━━━━━━━\n格子：{current_slots_used}/{capacity}\n暂无物品"
+        else:
+            lines = [f"📦 公会『{guild.name}』仓库", "━━━━━━━━━━"]
+            lines.append(f"格子：{current_slots_used}/{capacity}")
+            lines.append("━━━━━━━━━━")
+
+            for idx, item in enumerate(items, 1):
+                lines.append(f"{idx}. {item['item_name']}×{item['quantity']} (存入者:{item['deposited_by']})")
+
+            lines.append("━━━━━━━━━━")
+            lines.append("💡 使用【存入仓库 物品名 数量】存入物品")
+            lines.append("💡 使用【取出仓库 序号 数量】取出物品")
+            msg = "\n".join(lines)
+
+        await guild_warehouse_cmd.finish(message_add_head(msg, event))
+
+# ==================== 存入仓库 ====================
+deposit_warehouse_cmd = on_command("存入仓库", block=True, priority=5)
+
+@deposit_warehouse_cmd.handle()
+async def handle_deposit_warehouse(event: MessageEvent, args: Message = CommandArg()):
+    """存入物品到公会仓库"""
+    args_text = args.extract_plain_text().strip()
+    if not args_text:
+        await deposit_warehouse_cmd.finish("⛔ 格式错误，正确格式：存入仓库 [物品名] [数量]")
+
+    parts = args_text.split()
+    if len(parts) < 2:
+        await deposit_warehouse_cmd.finish("⛔ 格式错误，正确格式：存入仓库 [物品名] [数量]")
+
+    item_name = parts[0]
+    try:
+        quantity = int(parts[1])
+        if quantity <= 0:
+            raise ValueError
+    except ValueError:
+        await deposit_warehouse_cmd.finish("⛔ 数量必须是正整数")
+
+    async with safe_session() as session:
+        player = await session.get(Player, event.get_user_id())
+        if not player or not player.guild_id:
+            await deposit_warehouse_cmd.finish("⛔ 你未加入任何公会")
+
+        # 检查是否在公会基地
+        guild = await session.get(Guild, player.guild_id)
+        if not guild.base_x or not guild.base_y:
+            await deposit_warehouse_cmd.finish("⛔ 公会尚未设置基地")
+
+        if player.x != guild.base_x or player.y != guild.base_y:
+            await deposit_warehouse_cmd.finish("⛔ 只有在公会基地才能访问仓库")
+
+        # 查找物品ID
+        item_config = config.items_config["by_name"].get(item_name)
+        if not item_config:
+            await deposit_warehouse_cmd.finish("⛔ 未找到该物品")
+
+        success, message = await GuildFacilityService.deposit_to_warehouse(
+            session, player.id, player.guild_id, item_config.item_id, quantity
+        )
+
+        if success:
+            await session.commit()
+            await deposit_warehouse_cmd.finish(message_add_head(f"✅ {message}", event))
+        else:
+            await deposit_warehouse_cmd.finish(message_add_head(f"⛔ {message}", event))
+
+# ==================== 取出仓库 ====================
+withdraw_warehouse_cmd = on_command("取出仓库", block=True, priority=5)
+
+@withdraw_warehouse_cmd.handle()
+async def handle_withdraw_warehouse(event: MessageEvent, args: Message = CommandArg()):
+    """从公会仓库取出物品"""
+    args_text = args.extract_plain_text().strip()
+    if not args_text:
+        await withdraw_warehouse_cmd.finish("⛔ 格式错误，正确格式：取出仓库 [序号] [数量]")
+
+    parts = args_text.split()
+    if len(parts) < 2:
+        await withdraw_warehouse_cmd.finish("⛔ 格式错误，正确格式：取出仓库 [序号] [数量]")
+
+    try:
+        index = int(parts[0])
+        quantity = int(parts[1])
+        if index <= 0 or quantity <= 0:
+            raise ValueError
+    except ValueError:
+        await withdraw_warehouse_cmd.finish("⛔ 序号和数量必须是正整数")
+
+    async with safe_session() as session:
+        player = await session.get(Player, event.get_user_id())
+        if not player or not player.guild_id:
+            await withdraw_warehouse_cmd.finish("⛔ 你未加入任何公会")
+
+        # 检查是否在公会基地
+        guild = await session.get(Guild, player.guild_id)
+        if not guild.base_x or not guild.base_y:
+            await withdraw_warehouse_cmd.finish("⛔ 公会尚未设置基地")
+
+        if player.x != guild.base_x or player.y != guild.base_y:
+            await withdraw_warehouse_cmd.finish("⛔ 只有在公会基地才能访问仓库")
+
+        items = await GuildFacilityService.get_warehouse_items(session, player.guild_id)
+
+        if not items or index > len(items):
+            await withdraw_warehouse_cmd.finish("⛔ 无效的序号")
+
+        selected_item = items[index - 1]
+
+        success, message = await GuildFacilityService.withdraw_from_warehouse(
+            session, player.id, player.guild_id, selected_item["id"], quantity
+        )
+
+        if success:
+            await session.commit()
+            await withdraw_warehouse_cmd.finish(message_add_head(f"✅ {message}", event))
+        else:
+            await withdraw_warehouse_cmd.finish(message_add_head(f"⛔ {message}", event))
 
 
 

@@ -50,6 +50,41 @@ class GuildBuildingService:
                 4: {"cultivation_bonus": 0.15},
                 5: {"cultivation_bonus": 0.20}
             }
+        },
+        BuildingType.TELEPORT_ARRAY: {
+            "name": "传送阵",
+            "description": "允许公会成员传送到基地",
+            "max_level": 3,
+            "base_cost": {"gold": 100000, "materials": {"墓土": 300, "诡异石": 80, "灵石": 50}},
+            "effects": {
+                1: {"teleport_range": 50, "daily_uses": 1},
+                2: {"teleport_range": 100, "daily_uses": 1},
+                3: {"teleport_range": 200, "daily_uses": 2}
+            }
+        },
+        BuildingType.ALCHEMY_ROOM: {
+            "name": "丹房",
+            "description": "每日随机产出丹药",
+            "max_level": 5,
+            "base_cost": {"gold": 80000, "materials": {"墓土": 200, "阴煞精华": 60, "腐坏的内丹": 40}},
+            "effects": {
+                1: {"daily_production": 5, "pill_quality": "basic"},
+                2: {"daily_production": 10, "pill_quality": "basic"},
+                3: {"daily_production": 8, "pill_quality": "intermediate"},
+                4: {"daily_production": 12, "pill_quality": "intermediate"},
+                5: {"daily_production": 10, "pill_quality": "advanced"}
+            }
+        },
+        BuildingType.GUILD_WAREHOUSE: {
+            "name": "公会仓库",
+            "description": "提供公共空间存放物品",
+            "max_level": 3,
+            "base_cost": {"gold": 70000, "materials": {"墓土": 250, "灵石": 50, "诅咒丝线": 30, "铁锈": 30}},
+            "effects": {
+                1: {"storage_slots": 30},
+                2: {"storage_slots": 50},
+                3: {"storage_slots": 100}
+            }
         }
         # 注意：灵塔和防御城墙暂时下架，功能还不稳定
         # BuildingType.SPIRIT_TOWER: {
@@ -238,18 +273,30 @@ class GuildBuildingService:
             "treasury_limit": 100000,  # 基础资金上限
             "cultivation_bonus": 0.0,
             "all_attributes": 0.0,
-            "defense_bonus": 0.0
+            "defense_bonus": 0.0,
+            "teleport_range": 0,
+            "daily_teleport_uses": 0,
+            "daily_alchemy_production": 0,
+            "warehouse_capacity": 0
         }
         
         for building in buildings:
             effects = building["effects"]
             for effect_type, value in effects.items():
                 if effect_type in bonuses:
-                    if effect_type == "exp_multiplier":
+                    if effect_type in ["exp_multiplier", "treasury_limit", "teleport_range", "warehouse_capacity"]:
+                        # 这些效果取最大值
                         bonuses[effect_type] = max(bonuses[effect_type], value)
-                    elif effect_type == "treasury_limit":
-                        bonuses[effect_type] = max(bonuses[effect_type], value)
+                    elif effect_type in ["daily_uses", "daily_production"]:
+                        # 特殊处理：传送次数和丹药产出
+                        if effect_type == "daily_uses":
+                            bonuses["daily_teleport_uses"] = max(bonuses["daily_teleport_uses"], value)
+                        elif effect_type == "daily_production":
+                            bonuses["daily_alchemy_production"] = max(bonuses["daily_alchemy_production"], value)
+                    elif effect_type == "storage_slots":
+                        bonuses["warehouse_capacity"] = max(bonuses["warehouse_capacity"], value)
                     else:
+                        # 其他效果累加
                         bonuses[effect_type] += value
         
         return bonuses

@@ -1,4 +1,4 @@
-from sqlalchemy import Integer, BigInteger, String, DateTime, func, ForeignKey, Enum as SQLEnum
+from sqlalchemy import Integer, BigInteger, String, DateTime, Boolean, func, ForeignKey, Enum as SQLEnum
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from .db import Base
 from enum import Enum as PyEnum
@@ -59,6 +59,9 @@ class BuildingType(str, PyEnum):
     TRAINING_GROUND = "TRAINING_GROUND"      # 训练场 - 提升成员修为加成
     SPIRIT_TOWER = "SPIRIT_TOWER"           # 灵塔 - 提升公会整体属性
     DEFENSE_WALL = "DEFENSE_WALL"           # 防御城墙 - 提升公会防御力
+    TELEPORT_ARRAY = "TELEPORT_ARRAY"       # 传送阵 - 允许成员传送到公会基地
+    ALCHEMY_ROOM = "ALCHEMY_ROOM"           # 丹房 - 随机产出低级丹药
+    GUILD_WAREHOUSE = "GUILD_WAREHOUSE"     # 公会仓库 - 存放诡异道具
 
 
 class GuildBuilding(Base):
@@ -76,4 +79,56 @@ class GuildBuilding(Base):
 
     __table_args__ = (
         {"comment": "公会建筑表"}
+    )
+
+
+class GuildWarehouseItem(Base):
+    """公会仓库物品表"""
+    __tablename__ = "guild_warehouse_item"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    guild_id: Mapped[int] = mapped_column(Integer, ForeignKey("guild.id"), comment="公会ID")
+    item_id: Mapped[str] = mapped_column(String(32), comment="物品ID")
+    quantity: Mapped[int] = mapped_column(Integer, default=1, comment="数量")
+    deposited_by: Mapped[str] = mapped_column(String(32), comment="存入者玩家ID")
+    deposited_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.now, server_default=func.now(), comment="存入时间")
+
+    __table_args__ = (
+        {"comment": "公会仓库物品表"}
+    )
+
+
+class GuildAlchemyProduction(Base):
+    """公会丹房产出记录表"""
+    __tablename__ = "guild_alchemy_production"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    guild_id: Mapped[int] = mapped_column(Integer, ForeignKey("guild.id"), comment="公会ID")
+    item_id: Mapped[str] = mapped_column(String(32), comment="产出的丹药ID")
+    quantity: Mapped[int] = mapped_column(Integer, default=1, comment="数量")
+    produced_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.now, server_default=func.now(), comment="产出时间")
+    claimed: Mapped[bool] = mapped_column(Boolean, default=False, comment="是否已被领取")
+    claimed_by: Mapped[str | None] = mapped_column(String(32), nullable=True, comment="领取者玩家ID")
+    claimed_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True, comment="领取时间")
+
+    __table_args__ = (
+        {"comment": "公会丹房产出记录表"}
+    )
+
+
+class GuildTeleportLog(Base):
+    """公会传送记录表"""
+    __tablename__ = "guild_teleport_log"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    guild_id: Mapped[int] = mapped_column(Integer, ForeignKey("guild.id"), comment="公会ID")
+    player_id: Mapped[str] = mapped_column(String(32), comment="传送者玩家ID")
+    from_x: Mapped[int] = mapped_column(Integer, comment="传送前X坐标")
+    from_y: Mapped[int] = mapped_column(Integer, comment="传送前Y坐标")
+    to_x: Mapped[int] = mapped_column(Integer, comment="传送后X坐标")
+    to_y: Mapped[int] = mapped_column(Integer, comment="传送后Y坐标")
+    teleported_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.now, server_default=func.now(), comment="传送时间")
+
+    __table_args__ = (
+        {"comment": "公会传送记录表"}
     )

@@ -2,7 +2,7 @@ from .player import Player
 from .inventory import ItemInstance
 from .navigation_task import NavigationTask
 from .world_tile import WorldTile
-from .guild import Guild, GuildMember, GuildBuilding, GuildPosition, BuildingType
+from .guild import Guild, GuildMember, GuildBuilding, GuildPosition, BuildingType, GuildWarehouseItem, GuildAlchemyProduction, GuildTeleportLog
 from .world_message import WorldMessage
 from .bank_account import BankAccount
 from .alchemy_task import AlchemyRecord
