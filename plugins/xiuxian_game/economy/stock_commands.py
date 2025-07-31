@@ -28,6 +28,7 @@ stock_sell_cmd = on_command("出售灵石", aliases={"卖出灵石"}, block=True
 stock_holdings_cmd = on_command("我的投资", aliases={"灵石持有", "投资持仓"}, block=True, priority=5)
 stock_transactions_cmd = on_command("投资记录", aliases={"灵石记录"}, block=True, priority=5)
 stock_init_cmd = on_command("初始化灵石", block=True, priority=5)
+stock_test_cmd = on_command("测试灵石", block=True, priority=5)
 
 
 @stock_list_cmd.handle()
@@ -216,9 +217,12 @@ async def handle_stock_init(event: MessageEvent, permission=SUPERUSER):
     """初始化灵石投资数据（仅管理员）"""
     async with safe_session() as session:
         # 检查是否已有灵石数据
-        existing_stocks = (await session.execute(select(Stock))).scalars().all()
-        if existing_stocks:
-            await stock_init_cmd.finish("⛔ 灵石投资数据已存在，无需重复初始化")
+        try:
+            existing_stocks = (await session.execute(select(Stock))).scalars().all()
+            if existing_stocks:
+                await stock_init_cmd.finish("⛔ 灵石投资数据已存在，无需重复初始化")
+        except Exception as e:
+            await stock_init_cmd.finish(f"⛔ 检查数据失败：{e}")
 
         # 初始灵石投资数据
         initial_stocks = [
@@ -263,3 +267,20 @@ async def handle_stock_init(event: MessageEvent, permission=SUPERUSER):
 
         await session.commit()
         await stock_init_cmd.finish("✅ 灵石投资数据初始化完成！共创建了12个投资项目")
+
+
+@stock_test_cmd.handle()
+async def handle_stock_test(event: MessageEvent):
+    """测试灵石系统是否正常"""
+    try:
+        # 测试获取持仓
+        holdings = await StockService.get_player_holdings(event.get_user_id())
+
+        # 测试获取交易记录
+        transactions = await StockService.get_player_transactions(event.get_user_id(), 5)
+
+        msg = f"✅ 灵石系统测试成功！\n持仓数量：{len(holdings)}\n交易记录：{len(transactions)}"
+        await stock_test_cmd.finish(message_add_head(msg, event))
+
+    except Exception as e:
+        await stock_test_cmd.finish(message_add_head(f"❌ 灵石系统测试失败：{e}", event))

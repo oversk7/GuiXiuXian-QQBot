@@ -8,7 +8,7 @@
 5. 手续费计算
 """
 
-from typing import Tuple, Optional, List, Dict
+from typing import Tuple, List, Dict
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, and_
 from datetime import datetime
@@ -17,7 +17,7 @@ from ..models.player import Player
 from ..models.bank_account import BankAccount
 from ..models.stock import Stock, StockHolding, StockTransaction, TransactionType
 from ..models.db import safe_session
-from .stock_price_engine import StockPriceEngine
+# from .stock_price_engine import StockPriceEngine  # 暂时不使用
 
 
 class StockService:
@@ -174,12 +174,14 @@ class StockService:
     async def get_player_holdings(cls, player_id: str) -> List[Dict]:
         """获取玩家持仓"""
         async with safe_session() as session:
-            stmt = select(StockHolding).join(Stock).where(
+            # 使用 join 和 options 来避免懒加载
+            from sqlalchemy.orm import selectinload
+            stmt = select(StockHolding).options(selectinload(StockHolding.stock)).where(
                 StockHolding.player_id == player_id,
                 StockHolding.shares > 0
             )
             holdings = (await session.execute(stmt)).scalars().all()
-            
+
             result = []
             for holding in holdings:
                 stock = holding.stock
@@ -194,19 +196,21 @@ class StockService:
                     "profit_loss": holding.profit_loss,
                     "profit_loss_rate": holding.profit_loss_rate
                 })
-            
+
             return result
     
     @classmethod
     async def get_player_transactions(cls, player_id: str, limit: int = 20) -> List[Dict]:
         """获取玩家交易记录"""
         async with safe_session() as session:
-            stmt = select(StockTransaction).join(Stock).where(
+            # 使用 selectinload 来避免懒加载
+            from sqlalchemy.orm import selectinload
+            stmt = select(StockTransaction).options(selectinload(StockTransaction.stock)).where(
                 StockTransaction.player_id == player_id
             ).order_by(StockTransaction.created_at.desc()).limit(limit)
-            
+
             transactions = (await session.execute(stmt)).scalars().all()
-            
+
             result = []
             for trans in transactions:
                 stock = trans.stock
@@ -220,7 +224,7 @@ class StockService:
                     "commission": trans.commission,
                     "created_at": trans.created_at
                 })
-            
+
             return result
     
     @classmethod
@@ -260,10 +264,10 @@ class StockService:
             session.add(holding)
     
     @classmethod
-    async def _update_holding_sell(cls, session: AsyncSession, holding: StockHolding, 
+    async def _update_holding_sell(cls, session: AsyncSession, holding: StockHolding,
                                   shares: int, unit_price: int, total_amount: int):
         """更新卖出持仓"""
-        # 计算卖出成本
+        # 计算卖出成本（按比例）
         sold_cost = (holding.total_cost * shares) // holding.shares
         
         # 更新持仓
