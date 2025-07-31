@@ -779,7 +779,9 @@ async def handle_guild_buildings(event: MessageEvent):
             "treasury_limit": "资金上限",
             "cultivation_bonus": "修为加成",
             "all_attributes": "全属性加成",
-            "defense_bonus": "防御加成"
+            "defense_bonus": "防御加成",
+            "daily_production":"日产",
+            "pill_quality": "丹药品质"
         }
 
         if not buildings:
