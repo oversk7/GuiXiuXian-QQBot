@@ -262,6 +262,114 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
 
         await unwear_equipment.finish(result_msg)
 
+# ---------------- 指令：一键卸下全部装备 ----------------
+unwear_all_equipment = on_command("一键卸下", aliases={"卸下全部", "全部卸下"}, block=True, priority=5)
+
+@unwear_all_equipment.handle()
+async def _(event: MessageEvent):
+    async with safe_session() as session:
+        # 查询玩家所有已装备的装备
+        stmt = select(ItemInstance).where(
+            ItemInstance.player_id == event.get_user_id(),
+            ItemInstance.equipped == True,
+            ItemInstance.item_id.in_(EQUIP_ITEM_IDS)
+        )
+        equipped_items = (await session.execute(stmt)).scalars().all()
+
+        if not equipped_items:
+            await unwear_all_equipment.finish("🧐 你当前没有穿戴任何装备")
+
+        player = await session.get(Player, event.get_user_id())
+        if not player:
+            await unwear_all_equipment.finish("⛔ 请先创建角色")
+
+        # 处理炼丹炉相关逻辑
+        from ..alchemy.service import AlchemyService
+        from ..models.alchemy_task import AlchemyRecord
+        from sqlalchemy import and_
+
+        furnace_ids = list(AlchemyService.FURNACE_QUALITIES.keys())
+        all_failed_tasks = []  # 所有失败的炼丹任务
+
+        unworn_equipment = []  # 记录卸下的装备信息
+
+        # 逐个卸下装备
+        for equip in equipped_items:
+            # 检查是否为炼丹炉，如果是则处理进行中的炼丹任务
+            failed_tasks = []
+            if equip.item_id in furnace_ids:
+                # 查找使用该炼丹炉的进行中任务
+                stmt = select(AlchemyRecord).where(
+                    and_(
+                        AlchemyRecord.player_id == event.get_user_id(),
+                        AlchemyRecord.furnace_id == equip.id,
+                        AlchemyRecord.claimed == False
+                    )
+                )
+                alchemy_records = (await session.execute(stmt)).scalars().all()
+
+                # 处理进行中的炼丹任务
+                for record in alchemy_records:
+                    if not record.is_finished():
+                        # 任务未完成，按失败处理，返还材料
+                        materials_dict = record.get_materials_dict()
+                        returned_materials = []
+
+                        for material_id, total_used in materials_dict.items():
+                            try:
+                                await ItemInstance.add_item(session, record.player_id, material_id, total_used)
+                                material_name = config.items_config["by_id"][material_id].name
+                                returned_materials.append(f"{material_name}✖️{total_used}")
+                            except ValueError:
+                                # 如果添加失败，忽略该材料的返还
+                                pass
+
+                        # 删除失败的炼丹记录
+                        await session.delete(record)
+
+                        if returned_materials:
+                            failed_tasks.append(f"{equip.config.name}: 返还材料：{', '.join(returned_materials)}")
+                        else:
+                            failed_tasks.append(f"{equip.config.name}: 炼丹任务已取消")
+
+                all_failed_tasks.extend(failed_tasks)
+
+            # 恢复玩家属性
+            delta = (equip.extra_attrs or {}).get("_persist_bonus", {})
+            for k, v in delta.items():
+                setattr(player, k, getattr(player, k) - v)
+
+            # 清除持久化记录并标记未穿戴
+            if "_persist_bonus" in (equip.extra_attrs or {}):
+                extra_new = {k: v for k, v in equip.extra_attrs.items() if k != "_persist_bonus"}
+                equip.extra_attrs = extra_new
+
+            equip.equipped = False
+
+            # 记录卸下的装备信息
+            durability_info = f" (ID:{equip.id}, 耐久:{equip.durability}/{equip.config.durability})"
+            unworn_equipment.append(f"🔻 {equip.config.name}{durability_info}")
+
+        # 修正生命/理智不超过新上限
+        if player.hp > player.max_hp:
+            player.hp = player.max_hp
+        if player.mp > player.max_mp:
+            player.mp = player.max_mp
+
+        await session.commit()
+
+        # 构建返回消息
+        result_msg = f"✅ 已成功卸下 {len(equipped_items)} 件装备：\n"
+        result_msg += "\n".join(unworn_equipment)
+
+        # 如果有炼丹炉相关的失败任务，添加相关信息
+        if all_failed_tasks:
+            result_msg += f"\n\n⚠️ 炼丹炉被卸下，{len(all_failed_tasks)}个进行中的炼丹任务已取消："
+            for task_info in all_failed_tasks:
+                result_msg += f"\n🔄 {task_info}"
+
+        await unwear_all_equipment.finish(result_msg)
+
 # ---------------- 指令：装备分解 ----------------
 decompose_equipment = on_command("分解", aliases={"装备分解"}, block=True, priority=5)
 
