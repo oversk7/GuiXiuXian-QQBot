@@ -87,43 +87,68 @@ class RussianRouletteService:
         return True, "成功加入房间！现在可以设置筹码"
     
     @staticmethod
-    async def set_bet(session: AsyncSession, player_id: str, room_id: str, gold: int, items: List[str]) -> Tuple[bool, str]:
+    async def set_bet(session: AsyncSession, player_id: str, room_id: str, gold: int, item_bets: List[dict]) -> Tuple[bool, str, dict]:
         """设置筹码"""
+        from ..config import config
+
         # 查找房间
         room = await RussianRouletteService.get_room_by_id(session, room_id)
         if not room or room.status != RoomStatus.BETTING.value:
-            return False, "房间不存在或不在筹码设置阶段"
-        
+            return False, "房间不存在或不在筹码设置阶段", {}
+
         if not room.is_player_in_room(player_id):
-            return False, "你不在这个房间中"
-        
+            return False, "你不在这个房间中", {}
+
         # 检查玩家资源
         player = await session.get(Player, player_id)
         if not player:
-            return False, "玩家不存在"
-        
+            return False, "玩家不存在", {}
+
         if player.gold < gold:
-            return False, f"金币不足！你有{player.gold}金币，需要{gold}金币"
-        
-        # 检查道具
-        if items:
-            for item_id in items:
-                item_count = await ItemInstance.get_item_count(session, player_id, item_id)
-                if item_count <= 0:
-                    return False, f"道具不足：{item_id}"
-        
+            return False, f"金币不足！你有{player.gold}金币，需要{gold}金币", {}
+
+        # 检查和转换道具
+        validated_items = []
+        if item_bets:
+            for item_bet in item_bets:
+                item_name = item_bet["name"]
+                quantity = item_bet["quantity"]
+
+                # 通过名称查找道具配置
+                item_config = config.items_config["by_name"].get(item_name)
+                if not item_config:
+                    return False, f"未知道具：{item_name}", {}
+
+                # 检查玩家是否有足够的道具
+                item_count = await ItemInstance.get_item_count(session, player_id, item_config.item_id)
+                if item_count < quantity:
+                    return False, f"道具不足：{item_name}（需要{quantity}个，你有{item_count}个）", {}
+
+                validated_items.append({
+                    "item_id": item_config.item_id,
+                    "name": item_name,
+                    "quantity": quantity
+                })
+
         # 设置筹码
-        items_json = json.dumps(items) if items else None
-        
+        items_json = json.dumps(validated_items) if validated_items else None
+
         if room.player1_id == player_id:
             room.player1_gold_bet = gold
             room.player1_items_bet = items_json
         elif room.player2_id == player_id:
             room.player2_gold_bet = gold
             room.player2_items_bet = items_json
-        
+
         await session.commit()
-        return True, "筹码设置成功！"
+
+        # 返回详细信息用于显示
+        bet_details = {
+            "gold": gold,
+            "items": validated_items
+        }
+
+        return True, "筹码设置成功！", bet_details
     
     @staticmethod
     async def start_game(session: AsyncSession, room_id: str) -> Tuple[bool, str, Optional[RussianRouletteGame]]:
@@ -153,13 +178,27 @@ class RussianRouletteService:
         # 扣除道具
         if room.player1_items_bet:
             items = json.loads(room.player1_items_bet)
-            for item_id in items:
-                await ItemInstance.consume_item(session, room.player1_id, item_id, 1)
-        
+            for item_data in items:
+                if isinstance(item_data, dict):
+                    # 新格式：{"item_id": "xxx", "name": "xxx", "quantity": n}
+                    item_id = item_data["item_id"]
+                    quantity = item_data["quantity"]
+                    await ItemInstance.consume_item(session, room.player1_id, item_id, quantity)
+                else:
+                    # 兼容旧格式：直接是item_id字符串
+                    await ItemInstance.consume_item(session, room.player1_id, item_data, 1)
+
         if room.player2_items_bet:
             items = json.loads(room.player2_items_bet)
-            for item_id in items:
-                await ItemInstance.consume_item(session, room.player2_id, item_id, 1)
+            for item_data in items:
+                if isinstance(item_data, dict):
+                    # 新格式：{"item_id": "xxx", "name": "xxx", "quantity": n}
+                    item_id = item_data["item_id"]
+                    quantity = item_data["quantity"]
+                    await ItemInstance.consume_item(session, room.player2_id, item_id, quantity)
+                else:
+                    # 兼容旧格式：直接是item_id字符串
+                    await ItemInstance.consume_item(session, room.player2_id, item_data, 1)
         
         # 生成游戏状态
         bullets = RussianRouletteCore.generate_bullets()  # 随机选择弹药配置(2+4, 3+3, 4+2)
@@ -229,29 +268,45 @@ class RussianRouletteService:
         # 计算总奖励
         total_gold = room.player1_gold_bet + room.player2_gold_bet
         total_items = []
-        
+
         if room.player1_items_bet:
-            total_items.extend(json.loads(room.player1_items_bet))
+            player1_items = json.loads(room.player1_items_bet)
+            total_items.extend(player1_items)
         if room.player2_items_bet:
-            total_items.extend(json.loads(room.player2_items_bet))
-        
+            player2_items = json.loads(room.player2_items_bet)
+            total_items.extend(player2_items)
+
         # 分配奖励给获胜者
         winner = await session.get(Player, winner_id)
         if winner:
             winner.gold += total_gold
-            
-            # 分配道具
-            for item_id in total_items:
-                await ItemInstance.add_item(session, winner_id, item_id, 1)
-        
+
+            # 分配道具（新格式包含item_id、name和quantity）
+            for item_data in total_items:
+                if isinstance(item_data, dict):
+                    # 新格式：{"item_id": "xxx", "name": "xxx", "quantity": n}
+                    item_id = item_data["item_id"]
+                    quantity = item_data["quantity"]
+                    await ItemInstance.add_item(session, winner_id, item_id, quantity)
+                else:
+                    # 兼容旧格式：直接是item_id字符串
+                    await ItemInstance.add_item(session, winner_id, item_data, 1)
+
         # 更新状态
         room.status = RoomStatus.FINISHED.value
         game.status = GameStatus.FINISHED.value
-        
+
         await session.commit()
-        
+
+        # 构建奖励消息
         reward_msg = f"🏆 获胜奖励：{total_gold}金币"
         if total_items:
-            reward_msg += f" + {len(total_items)}个道具"
-        
+            reward_msg += "\n🎒 道具奖励："
+            for item_data in total_items:
+                if isinstance(item_data, dict):
+                    reward_msg += f"\n  • {item_data['name']} x{item_data['quantity']}"
+                else:
+                    # 兼容旧格式
+                    reward_msg += f"\n  • {item_data} x1"
+
         return True, reward_msg
