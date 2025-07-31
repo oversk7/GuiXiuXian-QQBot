@@ -199,10 +199,21 @@ class GuildService:
     @staticmethod
     async def get_guild_members(session: AsyncSession, guild_id: int) -> List[dict]:
         """获取公会成员列表"""
+        from sqlalchemy import case
+
+        # 定义职位优先级：会长 > 副会长 > 核心成员 > 普通成员
+        position_priority = case(
+            (GuildMember.position == GuildPosition.PRESIDENT, 1),
+            (GuildMember.position == GuildPosition.VICE_PRESIDENT, 2),
+            (GuildMember.position == GuildPosition.CORE_MEMBER, 3),
+            (GuildMember.position == GuildPosition.MEMBER, 4),
+            else_=5
+        )
+
         stmt = select(GuildMember, Player).join(
             Player, GuildMember.player_id == Player.id
         ).where(GuildMember.guild_id == guild_id).order_by(
-            GuildMember.position.asc(), Player.guild_contribution.desc(), Player.level.desc()
+            position_priority.asc(), Player.guild_contribution.desc(), Player.level.desc()
         )
         
         results = (await session.execute(stmt)).all()

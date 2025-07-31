@@ -518,6 +518,9 @@ async def handle_app_list(event: MessageEvent):
         for a in apps:
             applicant = await session.get(Player, a.applicant_id)
             lines.append(f"UID:{applicant.uid} {applicant.nickname} Lv.{applicant.level}")
+        lines.append("━━━━━━━━━━━━━\n"
+            "⬇️ 【同意入会 <UID>】\n"
+            "❌ 【拒绝入会 <UID>】")
         await application_list_cmd.finish(message_add_head("\n".join(lines), event))
 
 # ==================== 同意/拒绝申请 ====================

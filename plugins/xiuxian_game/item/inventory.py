@@ -449,7 +449,8 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
 
         if player.stamina < STAM_COST:
             await teleport_cmd.finish(f"⛔ 你的咒抗不足以在传送过程中维持清醒，需要 {STAM_COST}，当前 {player.stamina}")
-
+        if player.hp < 5:
+            await teleport_cmd.finish(f"⛔ 你的生命值不足过低：当前 {player.hp}/{player.max_hp}")
         # 查询是否存在导航任务
         nav_task: NavigationTask | None = await session.get(NavigationTask, player.id)
 
