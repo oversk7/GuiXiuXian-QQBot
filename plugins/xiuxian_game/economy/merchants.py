@@ -38,8 +38,7 @@ class Market:
 goods_ids = [
     "lux_perfume", "red_wine","gold_watch", "diamond_ring", "silk_scarf",
     "dslr_camera", "smartphone", "gaming_console", "designer_bag", "luxury_chocolate",
-    "art_book", "concert_ticket", "fountain_pen", "sneakers", "noise_headphones",
-    "heal_potion", "spirit_herb"
+    "art_book", "concert_ticket", "fountain_pen", "sneakers", "noise_headphones","yin_grass","blood_pact"
 ]
 
 # 生成重叠商品列表：每个市场拥有 5 个商品，起始索引按 3 步进，形成交叠
@@ -569,7 +568,7 @@ async def _(event: MessageEvent):
 
 # 普通商店商品（只卖不收的特殊消耗品）
 SHOP_ITEMS = [
-    "revive_potion", "rename_card", "president_letter", "territory_expansion_scroll","yin_grass"
+    "revive_potion", "rename_card", "president_letter", "territory_expansion_scroll","heal_potion","spirit_herb"
 ]
 
 # 普通商店指令

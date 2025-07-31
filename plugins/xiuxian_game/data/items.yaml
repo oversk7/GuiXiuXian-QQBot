@@ -22,7 +22,7 @@ items:
       type: "CONSUMABLE"
       effect_type: "RESTORE_HP"
       effect_params: {"value": 120}
-      price: 299
+      price: 1000
      
     - item_id: "yin_grass"
       name: "阴冥草"
@@ -30,7 +30,7 @@ items:
       type: "CONSUMABLE"
       effect_type: "RESTORE_MP"
       effect_params: {"value": 120}
-      price: 299
+      price: 500
       
     - item_id: "revive_potion"
       name: "仿制还魂丹"
