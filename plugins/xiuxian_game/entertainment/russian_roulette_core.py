@@ -101,7 +101,7 @@ class RussianRouletteCore:
         }
         game_state["magnifier_info"] = json.dumps(magnifier_info)
         
-        return True, f"🔍 放大镜已使用！请私聊机器人查看结果"
+        return True, f"🔍 放大镜已使用！请私聊机器人，发送【预知】查看结果"
     
     @staticmethod
     def use_beer(game_state: dict) -> Tuple[bool, str]:
@@ -201,7 +201,7 @@ class RussianRouletteCore:
         }
         game_state["phone_info"] = json.dumps(phone_info)
         
-        return True, f"📞 电话已使用！请私聊机器人查看预知结果"
+        return True, f"📞 电话已使用！请私聊机器人，发送【预知】查看结果"
     
     @staticmethod
     def shoot(game_state: dict, shooter_id: str, target_id: str) -> Tuple[bool, str, bool]:
@@ -235,8 +235,6 @@ class RussianRouletteCore:
 
             # 检查游戏是否结束
             game_over = new_hp <= 0
-            if game_over:
-                result_msg += f"\n🏆 {shooter_id} 获胜！"
 
             return True, result_msg, game_over
         else:  # 空包弹
