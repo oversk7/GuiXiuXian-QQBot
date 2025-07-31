@@ -134,7 +134,7 @@ async def handle_tic_tac_toe(event: MessageEvent, args: Message = CommandArg()):
             "🎯 游戏规则：\n"
             "▫️ 你是 ❌，AI是 ⭕\n"
             "▫️ 三个相同符号连成一线即获胜\n"
-            "▫️ 胜利奖励100~300💰，失败扣除50💰\n"
+            "▫️ 胜利奖励30~150💰，失败扣除50💰\n"
             "▫️ 平局不扣除金币\n"
             "━━━━━━━━━━━━━\n"
             "📝 使用方法：\n"
@@ -167,7 +167,7 @@ async def handle_tic_tac_toe(event: MessageEvent, args: Message = CommandArg()):
             f"{game.display_board()}\n"
             "━━━━━━━━━━━━━\n"
             "💡 你是 ❌，请选择位置 1-9\n"
-            "📝 使用：井字棋 [数字] 下棋"
+            "📝 下棋方式：【井字棋 <位置序号>】"
         )
         await tic_tac_toe.finish(message_add_head(result_msg, event))
 
@@ -189,7 +189,7 @@ async def handle_tic_tac_toe(event: MessageEvent, args: Message = CommandArg()):
 
     # 获取当前游戏状态
     if user_id not in game_sessions:
-        await tic_tac_toe.finish("❌ 没有进行中的游戏，请先使用 '井字棋 开始' 开始新游戏")
+        await tic_tac_toe.finish("❌ 没有进行中的游戏，请先使用【井字棋 开始】开始新游戏")
 
     game = game_sessions[user_id]
 
@@ -286,6 +286,6 @@ async def handle_tic_tac_toe(event: MessageEvent, args: Message = CommandArg()):
         "━━━━━━━━━━━━━\n"
         f"🤖 AI选择了位置{ai_position}\n"
         "💡 轮到你了，请选择位置 1-9\n"
-        "📝 使用：井字棋 [数字] 下棋"
+        "📝 下棋方式：【井字棋 <位置序号>】"
     )
     await tic_tac_toe.finish(message_add_head(result_msg, event))

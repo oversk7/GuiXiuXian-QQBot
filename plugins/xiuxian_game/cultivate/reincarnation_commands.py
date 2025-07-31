@@ -6,7 +6,7 @@ from nonebot.adapters.qq import MessageEvent
 from ..models.db import safe_session
 from ..models.player import Player
 from ..utils import message_add_head
-from .service import ReincarnationService
+from .reincarnation import ReincarnationService
 
 
 reincarnate_cmd = on_command("冥返", aliases={"轮回", "重生"}, block=True, priority=5)

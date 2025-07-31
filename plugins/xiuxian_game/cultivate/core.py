@@ -77,7 +77,7 @@ async def handle_cultivate(event: MessageEvent):
             guild_cultivation_bonus = guild_bonuses.get("cultivation_bonus", 0.0)
 
         # 应用月卡、公会和转数修炼效率加成
-        from ..reincarnation.service import ReincarnationService
+        from .reincarnation import ReincarnationService
         reincarnation_bonus = ReincarnationService.get_cultivation_efficiency_bonus(player.reincarnation_level)
         total_cultivation_multiplier = 1.0 + benefits["cultivation_efficiency"] + guild_cultivation_bonus + reincarnation_bonus
         exp_gain = int(base_exp_gain * total_cultivation_multiplier)
@@ -237,7 +237,7 @@ async def handle_out_seclusion(event: MessageEvent):
         card_bonus = exp_after_card - exp_after_coffin_nail
 
         # 应用转数闭关效率加成
-        from ..reincarnation.service import ReincarnationService
+        from .reincarnation import ReincarnationService
         reincarnation_bonus = ReincarnationService.get_seclusion_efficiency_bonus(player.reincarnation_level)
         reincarnation_multiplier = 1.0 + reincarnation_bonus
         exp_after_reincarnation = int(exp_after_card * reincarnation_multiplier)
@@ -318,7 +318,7 @@ async def handle_breakthrough(event: MessageEvent, args: Message = CommandArg())
             success_chance = 1.0
 
         # 检查是否达到冥返要求等级，如果达到则提示冥返
-        from ..reincarnation.service import ReincarnationService
+        from .reincarnation import ReincarnationService
         required_level = ReincarnationService.get_required_level_for_reincarnation(player.reincarnation_level)
         if player.level >= required_level:
             reincarnation_count = player.reincarnation_level + 1
@@ -353,7 +353,7 @@ async def handle_breakthrough(event: MessageEvent, args: Message = CommandArg())
             player.level += 1
 
             # 根据转数计算属性点获得
-            from ..reincarnation.service import ReincarnationService
+            from .reincarnation import ReincarnationService
             points_gained = ReincarnationService.get_attribute_points_per_level(player.reincarnation_level)
             player.attribute_points += points_gained
 
@@ -378,7 +378,7 @@ async def handle_breakthrough(event: MessageEvent, args: Message = CommandArg())
                 player.level += 1
 
                 # 根据转数计算属性点获得
-                from ..reincarnation.service import ReincarnationService
+                from .reincarnation import ReincarnationService
                 points_gained = ReincarnationService.get_attribute_points_per_level(player.reincarnation_level)
                 player.attribute_points += points_gained
 

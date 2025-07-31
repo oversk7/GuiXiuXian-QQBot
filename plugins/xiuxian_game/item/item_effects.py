@@ -540,7 +540,7 @@ async def _reset_attr(player: Player, cfg: ItemConfig, qty: int, ctx: str, sessi
         setattr(player, k, base_v + elixir_bonus.get(k, 0))
 
     # 重新计算可分配点（考虑转数加成）
-    from ..reincarnation.service import ReincarnationService
+    from ..cultivate.reincarnation import ReincarnationService
     pts_per_lvl = ReincarnationService.get_attribute_points_per_level(player.reincarnation_level)
     player.attribute_points = (player.level - 1) * pts_per_lvl
 
