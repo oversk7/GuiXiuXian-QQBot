@@ -21,9 +21,12 @@ from .trade_record import TradeRecord
 from .ghost_invasion import GhostInvasion
 from .player_ghost import PlayerGhost
 from .russian_roulette import RussianRouletteRoom, RussianRouletteGame
+# 股票系统模型
+from .stock import Stock, StockHolding, StockTransaction, StockPriceHistory
 
 __all__ = [
     "Player", "Guild", "GuildMember", "GuildBuilding", "GuildPosition", "BuildingType", "WorldMessage", "BankAccount", "ItemInstance", "WorldTile", "NavigationTask", "AlchemyRecord", "MarketOrder",
     "Marriage", "Mentorship", "SocialApplication", "GiftRecord", "StorySession", "PlayerDonationLog", "ElixirUsageLog", "GuildTeleportLog",
-    "MonthlyCard", "MarketState", "GhostInvasion", "PlayerGhost", "RussianRouletteRoom", "RussianRouletteGame"
+    "MonthlyCard", "MarketState", "GhostInvasion", "PlayerGhost", "RussianRouletteRoom", "RussianRouletteGame",
+    "Stock", "StockHolding", "StockTransaction", "StockPriceHistory"
 ]

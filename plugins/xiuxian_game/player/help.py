@@ -33,7 +33,7 @@ async def handle_help(event: MessageEvent, args: Message = CommandArg()):
         "🎮 公会系统  💰 银行系统\n"
         "🔮 炼丹系统  🎮 娱乐系统\n"
         "💕 社交系统  🏰 副本系统\n"
-        "👻 鬼怪系统\n"
+        "📈 股票系统\n"
         "═════════════\n"
         "💡 发送对应系统查看详细指令，【赞助】支持诡修仙\n"
         "💡 【】括号里是指令，<>里是必填，[]里是选填\n"
@@ -90,9 +90,39 @@ async def handle_bank(event: MessageEvent, args: Message = CommandArg()):
         "【存 <金额>】 存入冥行\n"
         "【取 <金额>】 从冥行取出\n"
         "【余额】 查询冥行存款并进行利滚利\n"
-        "【存款榜】 查看冥行存款排行榜"
+        "【存款榜】 查看冥行存款排行榜\n"
+        "【银行投资】 查看投资理财选项"
     )
     await bank_cmd.finish(Message(msg))
+
+# 股票系统
+stock_cmd = on_command("股票系统",aliases={"股票帮助"}, priority=4, block=True)
+@stock_cmd.handle()
+async def handle_stock(event: MessageEvent, args: Message = CommandArg()):
+    msg = (
+        "✨ 股票系统帮助 ✨\n"
+        "投资股票，体验金融市场的刺激与风险\n"
+        "━━━━━━━━━━━━━\n"
+        "【股票列表】 查看所有可交易股票\n"
+        "【买股票 <代码> <数量>】 买入股票（使用现金）\n"
+        "【买股票 <代码> <数量> 银行】 买入股票（使用银行资金）\n"
+        "【卖股票 <代码> <数量>】 卖出股票（收入到现金）\n"
+        "【卖股票 <代码> <数量> 银行】 卖出股票（收入到银行）\n"
+        "【我的股票】 查看持仓情况\n"
+        "【股票记录】 查看交易记录\n"
+        "━━━━━━━━━━━━━\n"
+        "💡 股票类型：\n"
+        "🔬 科技股 - 高波动，高风险高收益\n"
+        "🏦 金融股 - 相对稳定\n"
+        "⚡ 能源股 - 中等波动\n"
+        "🛒 消费股 - 较为稳定\n"
+        "🏥 医疗股 - 中等波动\n"
+        "🏗️ 材料股 - 较高波动\n"
+        "━━━━━━━━━━━━━\n"
+        "⚠️ 风险提示：股票投资有风险，投资需谨慎！\n"
+        "💸 手续费：交易金额的0.1%（最低1金币，最高100金币）"
+    )
+    await stock_cmd.finish(Message(msg))
 
 # 玩家系统
 player_cmd = on_command("玩家系统", priority=4, block=True)

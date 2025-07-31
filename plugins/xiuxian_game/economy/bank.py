@@ -28,6 +28,7 @@ def _tier_rate(balance: int) -> float:
 bank_balance_cmd = on_command("余额", aliases={"冥行账单"}, block=True, priority=5)
 bank_deposit_cmd = on_command("存", aliases={"存款"}, block=True, priority=5)
 bank_withdraw_cmd = on_command("取", aliases={"取款"}, block=True, priority=5)
+bank_invest_cmd = on_command("银行投资", aliases={"投资理财"}, block=True, priority=5)
 
 # ==================== 存款排行榜 ====================
 deposit_rank_cmd = on_command("存款榜", aliases={"冥行榜"}, block=True, priority=5)
@@ -63,7 +64,7 @@ async def handle_balance(event: MessageEvent):
         gain = _apply_interest(acc)
         session.add(acc)
         await session.commit()
-        msg = f"🏦 冥行票据\n▫️ 本次利息：{gain} 金币\n▫️ 当前存款：{acc.balance} 金币\n▫️ 阶梯利率，当存款超过100w时不再产生利息"
+        msg = f"🏦 冥行票据\n▫️ 本次利息：{gain} 金币\n▫️ 当前存款：{acc.balance} 金币\n▫️ 阶梯利率，当存款超过100w时不再产生利息\n\n💡 使用「银行投资」查看投资理财选项"
         await bank_balance_cmd.finish(message_add_head(msg, event))
 
 
@@ -152,4 +153,45 @@ async def handle_deposit_rank(event: MessageEvent):
             if not p:
                 continue
             lines.append(f"{idx}. {p.nickname}[UID:{p.uid}] - {acc.balance}💰")
-        await deposit_rank_cmd.finish(message_add_head("\n".join(lines), event)) 
+        await deposit_rank_cmd.finish(message_add_head("\n".join(lines), event))
+
+
+@bank_invest_cmd.handle()
+async def handle_bank_invest(event: MessageEvent):
+    """银行投资理财"""
+    async with safe_session() as session:
+        player = await session.get(Player, event.get_user_id())
+        if not player:
+            await bank_invest_cmd.finish("⛔ 请先创建角色")
+
+        acc = await session.get(BankAccount, player.id)
+        if not acc:
+            acc = BankAccount(player_id=player.id, balance=0, last_interest=datetime.now())
+            session.add(acc)
+            await session.commit()
+
+        # 应用利息
+        gain = _apply_interest(acc)
+        session.add(acc)
+        await session.commit()
+
+        msg = (
+            "🏦 冥界银行投资理财中心\n"
+            "▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃\n"
+            f"💰 当前存款：{acc.balance:,} 金币\n"
+            f"💎 本次利息：{gain} 金币\n\n"
+            "📈 投资产品：\n"
+            "1️⃣ 股票投资 - 高风险高收益\n"
+            "   • 使用「股票列表」查看可投资股票\n"
+            "   • 使用「买股票 代码 数量 银行」从银行账户购买\n"
+            "   • 使用「卖股票 代码 数量 银行」卖出后存入银行\n\n"
+            "2️⃣ 定期存款 - 稳定收益\n"
+            "   • 当前阶梯利率：\n"
+            "   • 10万以内：0.1%/小时\n"
+            "   • 10-50万：0.05%/小时\n"
+            "   • 50-100万：0.01%/小时\n"
+            "   • 100万以上：无利息\n\n"
+            "💡 风险提示：股票投资有风险，投资需谨慎！"
+        )
+
+        await bank_invest_cmd.finish(message_add_head(msg, event))
