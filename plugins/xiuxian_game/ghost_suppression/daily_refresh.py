@@ -25,7 +25,7 @@ class DailyGhostRefresh:
             return False
 
         # 检查是否已过18点
-        refresh_time = time(17, 0)  # 18:00
+        refresh_time = time(18, 0)
         current_time = now.time()
 
         return current_time >= refresh_time
