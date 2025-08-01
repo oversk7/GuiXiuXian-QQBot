@@ -74,7 +74,7 @@ async def handle_stock_list(event: MessageEvent):
                 
                 lines.append(
                     f"{stock.symbol} {stock.name}\n"
-                    f"  💰 {stock.current_price} 金币 {change_symbol} {change_rate:+.2f}%"
+                    f"  💰 {stock.current_price} 金币 {change_symbol}"
                 )
         
         lines.append("\n💡 使用「投资灵石 代码 数量」进行投资")
