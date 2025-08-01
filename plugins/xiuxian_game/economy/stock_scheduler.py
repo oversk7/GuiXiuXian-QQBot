@@ -24,7 +24,7 @@ async def setup_stock_scheduler():
             scheduler.add_job(
                 func=perform_hourly_update,
                 trigger="interval",
-                hours=1,  # 每小时执行一次
+                hours=3,
                 id="stock_hourly_update",
                 replace_existing=True,
                 max_instances=1,

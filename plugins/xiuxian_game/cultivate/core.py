@@ -464,13 +464,19 @@ async def handle_assign(event: MessageEvent, args: Message = CommandArg()):
         )
         equipped_items = result_eq.scalars().all()
 
+        # 1. 先卸下所有装备，恢复基础属性
         for eq in equipped_items:
+            # 恢复玩家属性
             delta_prev = (eq.extra_attrs or {}).get("_persist_bonus", {})
             for k, v in delta_prev.items():
                 setattr(player, k, getattr(player, k) - v)
-            # 清空记录，待会重新计算
-            if eq.extra_attrs:
-                eq.extra_attrs["_persist_bonus"] = {}
+            
+            # 清除持久化记录并标记未穿戴
+            if "_persist_bonus" in (eq.extra_attrs or {}):
+                extra_new = {k: v for k, v in eq.extra_attrs.items() if k != "_persist_bonus"}
+                eq.extra_attrs = extra_new
+            
+            eq.equipped = False
 
         # -------- 更新基础属性 --------
         setattr(player, attr_field, getattr(player, attr_field) + inc_val)
@@ -486,11 +492,12 @@ async def handle_assign(event: MessageEvent, args: Message = CommandArg()):
             "max_mp": player.max_mp,
         }
 
+        # 2. 重新穿戴所有装备，每件都基于基础属性计算
         for eq in equipped_items:
-            # 确保装备状态正确（应该已经是equipped=True，但为了安全起见）
-            if not eq.equipped:
-                continue
-
+            # 标记为已装备
+            eq.equipped = True
+            
+            # 基于基础属性计算装备加成
             attrs_temp = base_attrs_snapshot.copy()
             eq.apply_attr_bonus(attrs_temp)
             new_delta = {k: attrs_temp[k] - base_attrs_snapshot[k] for k in attrs_temp if attrs_temp[k] != base_attrs_snapshot[k]}

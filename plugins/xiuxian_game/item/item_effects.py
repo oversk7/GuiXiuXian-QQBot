@@ -557,30 +557,44 @@ async def _reset_attr(player: Player, cfg: ItemConfig, qty: int, ctx: str, sessi
         )
         equipped_items = (await session.execute(stmt)).scalars().all()
 
-        # 清理旧的持久化加成并重新计算
+        # 1. 先卸下所有装备，恢复基础属性
         for eq in equipped_items:
-            # 清空旧的持久化加成记录
-            if eq.extra_attrs:
-                eq.extra_attrs["_persist_bonus"] = {}
+            # 恢复玩家属性
+            delta = (eq.extra_attrs or {}).get("_persist_bonus", {})
+            for k, v in delta.items():
+                setattr(player, k, getattr(player, k) - v)
+            
+            # 清除持久化记录并标记未穿戴
+            if "_persist_bonus" in (eq.extra_attrs or {}):
+                extra_new = {k: v for k, v in eq.extra_attrs.items() if k != "_persist_bonus"}
+                eq.extra_attrs = extra_new
+            
+            eq.equipped = False
 
-            # 计算新的装备加成
-            base_attrs_snapshot = {
-                "attack": player.attack,
-                "defense": player.defense,
-                "agility": player.agility,
-                "luck": player.luck,
-                "max_hp": player.max_hp,
-                "max_mp": player.max_mp,
-            }
+        # 2. 获取玩家基础属性（无装备加成）
+        base_attrs = {
+            "attack": player.attack,
+            "defense": player.defense,
+            "agility": player.agility,
+            "luck": player.luck,
+            "max_hp": player.max_hp,
+            "max_mp": player.max_mp,
+        }
 
-            attrs_temp = base_attrs_snapshot.copy()
+        # 3. 重新穿戴所有装备，每件都基于基础属性计算
+        for eq in equipped_items:
+            # 标记为已装备
+            eq.equipped = True
+            
+            # 基于基础属性计算装备加成
+            attrs_temp = base_attrs.copy()
             eq.apply_attr_bonus(attrs_temp)
-            new_delta = {k: attrs_temp[k] - base_attrs_snapshot[k] for k in attrs_temp if attrs_temp[k] != base_attrs_snapshot[k]}
-
-            # 应用新的装备加成到玩家属性
+            new_delta = {k: attrs_temp[k] - base_attrs[k] for k in attrs_temp if attrs_temp[k] != base_attrs[k]}
+            
+            # 应用到玩家属性
             for k, v in new_delta.items():
                 setattr(player, k, getattr(player, k) + v)
-
+            
             # 保存新的持久化加成
             extra = eq.extra_attrs or {}
             extra["_persist_bonus"] = new_delta

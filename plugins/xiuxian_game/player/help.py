@@ -120,7 +120,7 @@ async def handle_stock(event: MessageEvent, args: Message = CommandArg()):
         "🏗️ 材料灵石 - 较高波动\n"
         "━━━━━━━━━━━━━\n"
         "⚠️ 风险提示：灵石投资有风险，投资需谨慎！\n"
-        "💸 手续费：交易金额的0.1%（最低1金币，最高100金币）"
+        "💸 手续费：交易金额的3%"
     )
     await stock_cmd.finish(Message(msg))
 

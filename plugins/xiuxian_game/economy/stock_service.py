@@ -24,9 +24,9 @@ class StockService:
     """股票交易服务"""
     
     # 手续费配置
-    COMMISSION_RATE = 0.001  # 0.1% 手续费
-    MIN_COMMISSION = 1       # 最低手续费 1 金币
-    MAX_COMMISSION = 100     # 最高手续费 100 金币
+    COMMISSION_RATE = 0.03
+    MIN_COMMISSION = 1 
+    MAX_COMMISSION = 1000000 
     
     @classmethod
     async def buy_stock(cls, player_id: str, stock_symbol: str, shares: int, 
