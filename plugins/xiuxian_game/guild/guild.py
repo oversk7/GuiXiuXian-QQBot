@@ -37,10 +37,6 @@ def _need_exp_for_level(level: int) -> int:
     else:
         return 1000 * 250 * (level - 5)
 
-# ---------------- 捐献金币配置 ----------------
-_DONATE_DAILY_LIMIT = 70_000                 # 每人每日可捐最大金币
-_DONATE_GOLD_TO_POINT_RATIO = 0.8           # 金币转积分折扣率
-
 create_guild_cmd = on_command("创建公会", block=True, priority=5)
 
 @create_guild_cmd.handle()
@@ -1089,8 +1085,8 @@ async def handle_guild_warehouse(event: MessageEvent):
                 lines.append(f"{idx}. {item['item_name']}×{item['quantity']} (存入者:{item['deposited_by']})")
 
             lines.append("━━━━━━━━━━")
-            lines.append("💡 使用【存入仓库 物品名 数量】存入物品")
-            lines.append("💡 使用【取出仓库 序号 数量】取出物品")
+            lines.append("💡 使用【存入仓库 <物品名> <数量>】存入物品")
+            lines.append("💡 使用【取出仓库 <序号> <数量>】取出物品")
             msg = "\n".join(lines)
 
         await guild_warehouse_cmd.finish(message_add_head(msg, event))
