@@ -153,7 +153,7 @@ async def handle_guild_info(event: MessageEvent):
                 f"▫️ 基地坐标：({guild_obj.base_x}, {guild_obj.base_y})\n"
                 f"▫️ 势力范围：{guild_obj.territory_range}×{guild_obj.territory_range}\n"
             )
-        elif guild_obj.level >= 5:
+        elif guild_obj.level >= 2:
             base_info = f"▫️ 基地坐标：未设置（可使用【设置基地】命令）\n"
 
         # 加成信息
@@ -684,12 +684,12 @@ async def handle_set_base(event: MessageEvent):
         existing_guild = (await session.execute(stmt)).scalars().first()
         if existing_guild:
             await set_base_cmd.finish(f"⛔ 坐标({player.x}, {player.y})已被公会『{existing_guild.name}』占据")
+        
+        # 检查是否已经设置过基地
+        if guild.base_x is not None and guild.base_y is not None:
+            await set_base_cmd.finish(f"⛔ 公会基地已经设置，无法更改\n当前基地坐标：({guild.base_x}, {guild.base_y})")
 
         # 设置基地坐标
-        old_base_info = ""
-        if guild.base_x is not None and guild.base_y is not None:
-            old_base_info = f"原基地坐标：({guild.base_x}, {guild.base_y})\n"
-
         guild.base_x = player.x
         guild.base_y = player.y
         session.add(guild)
@@ -698,11 +698,11 @@ async def handle_set_base(event: MessageEvent):
         msg = (
             f"🏰 公会基地设立成功！\n"
             f"━━━━━━━━━━━━━\n"
-            f"{old_base_info}"
-            f"▫️ 新基地坐标：({guild.base_x}, {guild.base_y})\n"
+            f"▫️ 基地坐标：({guild.base_x}, {guild.base_y})\n"
             f"▫️ 势力范围：{guild.territory_range}×{guild.territory_range}\n"
             f"━━━━━━━━━━━━━\n"
-            f"💡 公会成员可以使用【公会传送】传送到基地（功能开发中）"
+            f"💡 公会成员可以使用【公会传送】在一定范围内传送到基地\n"
+            f"⚠️ 基地位置一旦设置无法更改，请谨慎选择"
         )
         await set_base_cmd.finish(message_add_head(msg, event))
 
