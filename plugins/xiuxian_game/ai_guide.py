@@ -378,5 +378,4 @@ def format_commands_for_ai() -> str:
         formatted += "指令：\n"
         for cmd in info['commands']:
             formatted += f"  {cmd}\n"
-    print(formatted)
     return formatted
