@@ -1072,10 +1072,10 @@ async def handle_guild_warehouse(event: MessageEvent):
             await guild_warehouse_cmd.finish("⛔ 公会尚未建造仓库")
 
         items = await GuildFacilityService.get_warehouse_items(session, player.guild_id)
-        current_slots_used = len(items)  # 格子数等于不同物品的种类数
+        current_slots_used = len(items)  # 格子数等于实际的堆叠数量
 
         if not items:
-            msg = f"📦 公会『{guild.name}』仓库\n━━━━━━━━━━\n格子：{current_slots_used}/{capacity}\n暂无物品"
+            msg = f"📦 公会『{guild.name}』仓库\n━━━━━━━━━━\n格子：{current_slots_used}/{capacity}\n暂无物品\n━━━━━━━━━━\n使用【存入仓库 <物品名> <数量>】存入物品"
         else:
             lines = [f"📦 公会『{guild.name}』仓库", "━━━━━━━━━━"]
             lines.append(f"格子：{current_slots_used}/{capacity}")
@@ -1176,15 +1176,8 @@ async def handle_withdraw_warehouse(event: MessageEvent, args: Message = Command
         if player.x != guild.base_x or player.y != guild.base_y:
             await withdraw_warehouse_cmd.finish("⛔ 只有在公会基地才能访问仓库")
 
-        items = await GuildFacilityService.get_warehouse_items(session, player.guild_id)
-
-        if not items or index > len(items):
-            await withdraw_warehouse_cmd.finish("⛔ 无效的序号")
-
-        selected_item = items[index - 1]
-
         success, message = await GuildFacilityService.withdraw_from_warehouse(
-            session, player.id, player.guild_id, selected_item["id"], quantity
+            session, player.id, player.guild_id, index, quantity
         )
 
         if success:

@@ -262,47 +262,58 @@ class GuildFacilityService:
 
     @staticmethod
     async def get_warehouse_items(session: AsyncSession, guild_id: int) -> List[Dict]:
-        """获取公会仓库物品列表"""
+        """获取公会仓库物品列表，合并显示相同物品的多个堆叠"""
         stmt = select(GuildWarehouseItem).where(GuildWarehouseItem.guild_id == guild_id).order_by(GuildWarehouseItem.deposited_at.desc())
         items = (await session.execute(stmt)).scalars().all()
 
-        result = []
+        # 按物品ID分组合并
+        item_groups = {}
         for item in items:
             item_config = config.items_config["by_id"].get(item.item_id)
             if item_config:
-                depositor = await session.get(Player, item.deposited_by)
-                result.append({
-                    "id": item.id,
-                    "item_id": item.item_id,
-                    "item_name": item_config.name,
-                    "quantity": item.quantity,
-                    "deposited_by": depositor.nickname if depositor else "未知",
-                    "deposited_at": item.deposited_at
-                })
+                if item.item_id not in item_groups:
+                    # 找到最早的存入者作为代表
+                    depositor = await session.get(Player, item.deposited_by)
+                    item_groups[item.item_id] = {
+                        "item_id": item.item_id,
+                        "item_name": item_config.name,
+                        "quantity": 0,
+                        "deposited_by": depositor.nickname if depositor else "未知",
+                        "deposited_at": item.deposited_at,
+                        "stack_ids": []  # 记录所有堆叠的ID，用于取出时的处理
+                    }
+
+                item_groups[item.item_id]["quantity"] += item.quantity
+                item_groups[item.item_id]["stack_ids"].append(item.id)
+                # 保持最早的存入时间
+                if item.deposited_at < item_groups[item.item_id]["deposited_at"]:
+                    item_groups[item.item_id]["deposited_at"] = item.deposited_at
+
+        # 转换为列表并按存入时间排序
+        result = list(item_groups.values())
+        result.sort(key=lambda x: x["deposited_at"], reverse=True)
+
+        # 为每个合并的物品组分配一个虚拟ID（用于取出时的索引）
+        for idx, item_group in enumerate(result):
+            item_group["id"] = f"group_{idx}"
 
         return result
 
     @staticmethod
     async def deposit_to_warehouse(session: AsyncSession, player_id: str, guild_id: int, item_id: str, quantity: int) -> Tuple[bool, str]:
         """存入物品到公会仓库"""
+        from math import ceil
+        from ..models.inventory import STACK_SIZE
+
         # 检查是否有仓库
         capacity = await GuildFacilityService.get_warehouse_capacity(session, guild_id)
         if capacity == 0:
             return False, "公会尚未建造仓库"
 
-        # 检查仓库格子数（不同物品占用不同格子）
-        stmt = select(func.count(GuildWarehouseItem.id)).where(GuildWarehouseItem.guild_id == guild_id)
-        current_slots_used = (await session.execute(stmt)).scalar_one() or 0
-
-        # 检查是否已有该物品（如果有，不占用新格子）
-        stmt = select(GuildWarehouseItem).where(
-            and_(GuildWarehouseItem.guild_id == guild_id, GuildWarehouseItem.item_id == item_id)
-        )
-        existing_item = (await session.execute(stmt)).scalars().first()
-
-        # 如果是新物品且仓库已满，则拒绝
-        if not existing_item and current_slots_used >= capacity:
-            return False, f"仓库格子已满，当前{current_slots_used}/{capacity}格，无法存入新物品"
+        # 检查物品是否为诡异道具（材料类型）
+        item_config = config.items_config["by_id"].get(item_id)
+        if not item_config or item_config.type.value != "MATERIAL":
+            return False, "只能存入诡异道具（材料类型）"
 
         # 检查玩家是否有该物品（需要统计所有堆叠的总数量）
         stmt = select(ItemInstance).where(
@@ -314,10 +325,27 @@ class GuildFacilityService:
         if total_quantity < quantity:
             return False, f"你没有足够的该物品（拥有{total_quantity}，需要{quantity}）"
 
-        # 检查物品是否为诡异道具（材料类型）
-        item_config = config.items_config["by_id"].get(item_id)
-        if not item_config or item_config.type.value != "MATERIAL":
-            return False, "只能存入诡异道具（材料类型）"
+        # 获取仓库中该物品的现有堆叠
+        stmt = select(GuildWarehouseItem).where(
+            and_(GuildWarehouseItem.guild_id == guild_id, GuildWarehouseItem.item_id == item_id)
+        ).order_by(GuildWarehouseItem.id)
+        existing_stacks = (await session.execute(stmt)).scalars().all()
+
+        # 计算现有数量和格子数
+        existing_quantity = sum(stack.quantity for stack in existing_stacks)
+        new_total_quantity = existing_quantity + quantity
+
+        # 计算需要的格子数（按照玩家背包的堆叠规则）
+        new_slots_needed = ceil(new_total_quantity / STACK_SIZE)
+        current_slots_for_this_item = len(existing_stacks)
+        additional_slots_needed = new_slots_needed - current_slots_for_this_item
+
+        # 检查仓库总格子数
+        stmt = select(func.count(GuildWarehouseItem.id)).where(GuildWarehouseItem.guild_id == guild_id)
+        current_total_slots = (await session.execute(stmt)).scalar_one() or 0
+
+        if current_total_slots + additional_slots_needed > capacity:
+            return False, f"仓库格子不足，当前{current_total_slots}/{capacity}格，存入{quantity}个需要额外{additional_slots_needed}格"
 
         # 扣除玩家物品（使用统一的消耗方法处理多个堆叠）
         try:
@@ -327,54 +355,76 @@ class GuildFacilityService:
         except ValueError as e:
             return False, f"扣除物品失败：{str(e)}"
 
-        # 检查仓库是否已有该物品
-        stmt = select(GuildWarehouseItem).where(
-            and_(GuildWarehouseItem.guild_id == guild_id, GuildWarehouseItem.item_id == item_id)
-        )
-        existing_item = (await session.execute(stmt)).scalars().first()
+        # 按照堆叠规则存入仓库
+        remaining_quantity = quantity
 
-        if existing_item:
-            # 增加数量到现有格子
-            existing_item.quantity += quantity
-            session.add(existing_item)
-        else:
-            # 新增物品（占用新格子）
+        # 先填充现有的未满堆叠
+        for stack in existing_stacks:
+            if remaining_quantity <= 0:
+                break
+            available_space = STACK_SIZE - stack.quantity
+            if available_space > 0:
+                add_to_stack = min(available_space, remaining_quantity)
+                stack.quantity += add_to_stack
+                remaining_quantity -= add_to_stack
+                session.add(stack)
+
+        # 剩余数量创建新堆叠
+        while remaining_quantity > 0:
+            stack_quantity = min(STACK_SIZE, remaining_quantity)
             warehouse_item = GuildWarehouseItem(
                 guild_id=guild_id,
                 item_id=item_id,
-                quantity=quantity,
+                quantity=stack_quantity,
                 deposited_by=player_id
             )
             session.add(warehouse_item)
+            remaining_quantity -= stack_quantity
 
         return True, f"成功存入{item_config.name}×{quantity}"
 
     @staticmethod
-    async def withdraw_from_warehouse(session: AsyncSession, player_id: str, guild_id: int, warehouse_item_id: int, quantity: int) -> Tuple[bool, str]:
+    async def withdraw_from_warehouse(session: AsyncSession, player_id: str, guild_id: int, item_index: int, quantity: int) -> Tuple[bool, str]:
         """从公会仓库取出物品"""
-        # 检查仓库物品
-        warehouse_item = await session.get(GuildWarehouseItem, warehouse_item_id)
-        if not warehouse_item or warehouse_item.guild_id != guild_id:
-            return False, "仓库物品不存在"
+        # 获取仓库物品列表（合并显示的）
+        items = await GuildFacilityService.get_warehouse_items(session, guild_id)
 
-        if warehouse_item.quantity < quantity:
-            return False, f"仓库中该物品数量不足（仅有{warehouse_item.quantity}个）"
+        if item_index < 1 or item_index > len(items):
+            return False, "无效的物品序号"
+
+        selected_item = items[item_index - 1]
+
+        if selected_item["quantity"] < quantity:
+            return False, f"仓库中该物品数量不足（仅有{selected_item['quantity']}个）"
 
         # 检查玩家背包容量
-        player = await session.get(Player, player_id)
         try:
-            await ItemInstance.add_item(session, player_id, warehouse_item.item_id, quantity)
+            await ItemInstance.add_item(session, player_id, selected_item["item_id"], quantity)
         except ValueError as e:
             return False, f"背包空间不足：{str(e)}"
 
-        # 扣除仓库物品
-        warehouse_item.quantity -= quantity
-        if warehouse_item.quantity <= 0:
-            await session.delete(warehouse_item)
-        else:
-            session.add(warehouse_item)
+        # 从实际的堆叠中扣除物品（按照堆叠顺序，优先扣除较小的堆叠）
+        stmt = select(GuildWarehouseItem).where(
+            and_(GuildWarehouseItem.guild_id == guild_id, GuildWarehouseItem.item_id == selected_item["item_id"])
+        ).order_by(GuildWarehouseItem.quantity.asc())  # 按数量升序，优先扣除小堆叠
 
-        item_config = config.items_config["by_id"].get(warehouse_item.item_id)
-        item_name = item_config.name if item_config else warehouse_item.item_id
+        warehouse_stacks = (await session.execute(stmt)).scalars().all()
+
+        remaining_to_withdraw = quantity
+        for stack in warehouse_stacks:
+            if remaining_to_withdraw <= 0:
+                break
+
+            withdraw_from_stack = min(stack.quantity, remaining_to_withdraw)
+            stack.quantity -= withdraw_from_stack
+            remaining_to_withdraw -= withdraw_from_stack
+
+            if stack.quantity <= 0:
+                await session.delete(stack)
+            else:
+                session.add(stack)
+
+        item_config = config.items_config["by_id"].get(selected_item["item_id"])
+        item_name = item_config.name if item_config else selected_item["item_id"]
 
         return True, f"成功取出{item_name}×{quantity}"
