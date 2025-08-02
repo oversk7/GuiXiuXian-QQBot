@@ -158,9 +158,9 @@ class ArrayBreakingGame:
         lines = []
 
         # 添加列标题
-        header = "    " + "".join(f" {i+1:2} " for i in range(self.size))
+        header = "      " + "".join(f"  {i+1:2} " for i in range(self.size))
         lines.append(header)
-        lines.append("   " + "━" * (self.size * 4 + 1))
+        lines.append("━━━━━━━━━━━━━")
 
         for i, row in enumerate(self.matrix):
             # 高亮当前可选择的行或列
@@ -172,8 +172,6 @@ class ArrayBreakingGame:
                     row_display += f" {code} "
             row_display += "┃"
             lines.append(row_display)
-
-        lines.append("   " + "━" * (self.size * 4 + 1))
         return "\n".join(lines)
     
     def _can_select_position(self, row: int, col: int) -> bool:
@@ -225,9 +223,9 @@ class ArrayBreakingGame:
         """获取游戏状态"""
         lines = []
         lines.append("� 阵法破解 - 天干地支阵")
-        lines.append("━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
+        lines.append("━━━━━━━━━━━━━")
         lines.append(self.display_matrix())
-        lines.append("━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
+        lines.append("━━━━━━━━━━━━━")
 
         # 显示目标序列
         lines.append("🎯 破阵目标:")
@@ -236,7 +234,7 @@ class ArrayBreakingGame:
             seq_str = " → ".join(target.sequence)
             lines.append(f"  {status} {target.name}: {seq_str} (+{target.reward}💰)")
 
-        lines.append("━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
+        lines.append("━━━━━━━━━━━━━")
 
         # 显示当前状态
         if self.selected_codes:
@@ -290,20 +288,20 @@ async def handle_array_breaking(event: MessageEvent, args: Message = CommandArg(
     if not args_text:
         help_msg = (
             "� 天干地支阵法破解\n"
-            "━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
+            "━━━━━━━━━━━━━\n"
             "🎮 游戏规则：\n"
             "▫️ 在天干地支阵中寻找目标符文序列\n"
             "▫️ 只能按行列交替选择（横纵交替）\n"
             "▫️ 第一步只能选择第一行\n"
             "▫️ 有限的灵力步数（6步）\n"
             "▫️ 完成更多符文序列获得更多奖励\n"
-            "━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
+            "━━━━━━━━━━━━━\n"
             "📝 使用方法：\n"
             "▫️ 【阵法破解 开始】 - 开始5x5阵法\n"
             "▫️ 【阵法破解 困难】 - 开始6x6阵法\n"
             "▫️ 【阵法破解 <行> <列>】 - 选择位置\n"
             "▫️ 【阵法破解 放弃】 - 放弃当前游戏\n"
-            "━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
+            "━━━━━━━━━━━━━\n"
             "💰 费用：100💰 (5x5) / 150💰 (6x6)\n"
             "💡 例如：【阵法破解 1 3】选择第1行第3列\n"
             "🎯 目标：在灵力用完前完成尽可能多的符文序列"
