@@ -37,7 +37,7 @@ async def handle_help(event: MessageEvent, args: Message = CommandArg()):
         "═════════════\n"
         "💡 发送对应系统查看详细指令，【赞助】支持诡修仙\n"
         "💡 【】括号里是指令，<>里是必填，[]里是选填\n"
-        "💡 教程及反馈请加官群：962494679，官群签到奖励翻倍\n"
+        "💡 官群：962494679，不会玩直接问机器人或者加群\n"
         "💡 发送/邀请码 邀请好友获得上万金币，获得启动资金\n"
     )
     await help_cmd.finish(Message(msg))

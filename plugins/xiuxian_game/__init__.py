@@ -25,6 +25,7 @@ from . import (
     story,
     ghost_suppression,
     backup,
+    ai_guide,  # AI引导系统
 )
 
 driver = get_driver()
