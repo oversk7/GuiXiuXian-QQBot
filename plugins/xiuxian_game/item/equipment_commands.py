@@ -111,7 +111,8 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
         # 先标记为已装备，以便 apply_attr_bonus 生效
         equip.equipped = True
 
-        base_attrs = {
+        # 获取玩家当前属性（包含其他装备加成）
+        current_attrs = {
             "attack": player.attack,
             "defense": player.defense,
             "agility": player.agility,
@@ -119,9 +120,18 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
             "max_hp": player.max_hp,
             "max_mp": player.max_mp,
         }
-        new_attrs = base_attrs.copy()
-        equip.apply_attr_bonus(new_attrs)
-        delta = {k: new_attrs[k] - base_attrs[k] for k in new_attrs if new_attrs[k] != base_attrs[k]}
+
+        # 计算基础属性（减去其他装备的加成）
+        base_attrs = current_attrs.copy()
+        for equipped_item in cur_equipped:
+            delta_old = (equipped_item.extra_attrs or {}).get("_persist_bonus", {})
+            for k, v in delta_old.items():
+                base_attrs[k] = base_attrs.get(k, 0) - v
+
+        # 基于基础属性计算新装备的加成
+        new_attrs = current_attrs.copy()
+        equip.apply_attr_bonus(new_attrs, base_attrs)
+        delta = {k: new_attrs[k] - current_attrs[k] for k in new_attrs if new_attrs[k] != current_attrs[k]}
 
         # 应用到玩家本体
         for k, v in delta.items():

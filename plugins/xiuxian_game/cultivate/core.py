@@ -499,7 +499,7 @@ async def handle_assign(event: MessageEvent, args: Message = CommandArg()):
             
             # 基于基础属性计算装备加成
             attrs_temp = base_attrs_snapshot.copy()
-            eq.apply_attr_bonus(attrs_temp)
+            eq.apply_attr_bonus(attrs_temp, base_attrs_snapshot)
             new_delta = {k: attrs_temp[k] - base_attrs_snapshot[k] for k in attrs_temp if attrs_temp[k] != base_attrs_snapshot[k]}
 
             # 应用新 delta

@@ -119,9 +119,11 @@ class ItemInstance(Base):
             return 0
         return STACK_SIZE - self.quantity
     
-    def apply_attr_bonus(self, attrs: dict):
+    def apply_attr_bonus(self, attrs: dict, base_attrs: dict = None):
         """将此装备的属性加成应用到 attrs（就地修改）。
-        attrs: 形如 {"hp": 100, "attack": 10} 的玩家基础属性 dict
+        attrs: 形如 {"hp": 100, "attack": 10} 的玩家当前属性 dict
+        base_attrs: 形如 {"hp": 100, "attack": 10} 的玩家基础属性 dict（无装备加成）
+                   如果提供，百分比加成将基于此计算；否则基于 attrs 计算
 
         注意：此方法只计算装备的理论属性加成，不包含已持久化的bonus。
         已持久化的bonus(_persist_bonus)已经应用到玩家属性上，不应重复计算。
@@ -138,10 +140,15 @@ class ItemInstance(Base):
         for k, v in (tpl.attr_bonus or {}).items():
             key = key_map.get(k, k)
             attrs[key] = attrs.get(key, 0) + int(v)
-        # 百分比
+
+        # 百分比 - 基于基础属性计算
+        ratio_base = base_attrs if base_attrs else attrs
         for k, r in (tpl.attr_ratio or {}).items():
             key = key_map.get(k, k)
-            attrs[key] = int(attrs.get(key, 0) * (1 + float(r)))
+            base_value = ratio_base.get(key, 0)
+            ratio_bonus = int(base_value * float(r))
+            attrs[key] = attrs.get(key, 0) + ratio_bonus
+
         # 额外属性（强化）
         for k, v in (self.extra_attrs or {}).items():
             if k.startswith("_"):

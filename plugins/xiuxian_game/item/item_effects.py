@@ -588,7 +588,7 @@ async def _reset_attr(player: Player, cfg: ItemConfig, qty: int, ctx: str, sessi
             
             # 基于基础属性计算装备加成
             attrs_temp = base_attrs.copy()
-            eq.apply_attr_bonus(attrs_temp)
+            eq.apply_attr_bonus(attrs_temp, base_attrs)
             new_delta = {k: attrs_temp[k] - base_attrs[k] for k in attrs_temp if attrs_temp[k] != base_attrs[k]}
             
             # 应用到玩家属性
