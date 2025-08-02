@@ -337,8 +337,8 @@ async def get_ai_guidance(user_message: str, player: Player) -> str:
 回复格式：
 🤖 [简短回答]
 推荐指令：
-• 【指令】- 简短说明
-• 【指令】- 简短说明
+• 【指令1 <必选参数> [可选参数]】简要说明
+• 【指令2】...
 
 请根据玩家问题提供帮助："""
 
