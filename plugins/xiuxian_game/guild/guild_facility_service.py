@@ -304,26 +304,28 @@ class GuildFacilityService:
         if not existing_item and current_slots_used >= capacity:
             return False, f"仓库格子已满，当前{current_slots_used}/{capacity}格，无法存入新物品"
 
-        # 检查玩家是否有该物品
+        # 检查玩家是否有该物品（需要统计所有堆叠的总数量）
         stmt = select(ItemInstance).where(
             and_(ItemInstance.player_id == player_id, ItemInstance.item_id == item_id)
         )
-        player_item = (await session.execute(stmt)).scalars().first()
+        player_items = (await session.execute(stmt)).scalars().all()
+        total_quantity = sum(item.quantity for item in player_items)
 
-        if not player_item or player_item.quantity < quantity:
-            return False, "你没有足够的该物品"
+        if total_quantity < quantity:
+            return False, f"你没有足够的该物品（拥有{total_quantity}，需要{quantity}）"
 
         # 检查物品是否为诡异道具（材料类型）
         item_config = config.items_config["by_id"].get(item_id)
         if not item_config or item_config.type.value != "MATERIAL":
             return False, "只能存入诡异道具（材料类型）"
 
-        # 扣除玩家物品
-        player_item.quantity -= quantity
-        if player_item.quantity <= 0:
-            await session.delete(player_item)
-        else:
-            session.add(player_item)
+        # 扣除玩家物品（使用统一的消耗方法处理多个堆叠）
+        try:
+            success_consume = await ItemInstance.consume_item(session, player_id, item_id, quantity)
+            if not success_consume:
+                return False, "扣除物品失败"
+        except ValueError as e:
+            return False, f"扣除物品失败：{str(e)}"
 
         # 检查仓库是否已有该物品
         stmt = select(GuildWarehouseItem).where(
