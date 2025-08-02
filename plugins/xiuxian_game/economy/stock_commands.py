@@ -27,6 +27,7 @@ stock_buy_cmd = on_command("投资灵石", aliases={"购买灵石"}, block=True,
 stock_sell_cmd = on_command("出售灵石", aliases={"卖出灵石"}, block=True, priority=5)
 stock_holdings_cmd = on_command("我的投资", aliases={"灵石持有", "投资持仓"}, block=True, priority=5)
 stock_transactions_cmd = on_command("投资记录", aliases={"灵石记录"}, block=True, priority=5)
+stock_refresh_time_cmd = on_command("灵石刷新时间", aliases={"投资刷新时间", "价格刷新时间"}, block=True, priority=5)
 stock_init_cmd = on_command("初始化灵石", block=True, priority=5)
 stock_update_cmd = on_command("更新灵石价格", aliases={"刷新灵石价格"}, block=True, priority=5)
 
@@ -45,24 +46,40 @@ async def handle_stock_list(event: MessageEvent):
         # 获取所有活跃股票
         stmt = select(Stock).where(Stock.is_active == True).order_by(Stock.symbol)
         stocks = (await session.execute(stmt)).scalars().all()
-        
+
         if not stocks:
             await stock_list_cmd.finish("💎 当前没有可投资的灵石")
-        
+
         # 按类型分组显示
         type_groups = {}
         for stock in stocks:
             if stock.stock_type not in type_groups:
                 type_groups[stock.stock_type] = []
             type_groups[stock.stock_type].append(stock)
-        
+
         # 构建消息
         lines = ["💎 灵石投资行情", "▃▃▃▃▃▃▃▃▃▃"]
 
-        # 如果价格刚更新，显示提示
+        # 计算下次刷新时间
+        latest_stock = max(stocks, key=lambda s: s.updated_at)
+        next_update_time = latest_stock.updated_at + StockService.PRICE_UPDATE_INTERVAL
+        now = datetime.now()
+        time_until_update = next_update_time - now
+
+        # 显示刷新时间信息
         if price_updated:
             lines.append("🔄 价格已更新")
-            lines.append("")
+        else:
+            if time_until_update.total_seconds() > 0:
+                hours = int(time_until_update.total_seconds() // 3600)
+                minutes = int((time_until_update.total_seconds() % 3600) // 60)
+                if hours > 0:
+                    lines.append(f"⏰ 下次刷新：{hours}小时{minutes}分钟后")
+                else:
+                    lines.append(f"⏰ 下次刷新：{minutes}分钟后")
+            else:
+                lines.append("⏰ 即将刷新价格...")
+        lines.append("")
         
         type_names = {
             StockType.TECH: "🔬 法宝灵石",
@@ -159,7 +176,7 @@ async def handle_stock_sell(event: MessageEvent, args: Message = CommandArg()):
 async def handle_stock_holdings(event: MessageEvent):
     """查看灵石投资持仓"""
     # 被动触发价格更新
-    await StockService.check_and_update_prices()
+    price_updated = await StockService.check_and_update_prices()
 
     holdings = await StockService.get_player_holdings(event.get_user_id())
 
@@ -167,6 +184,30 @@ async def handle_stock_holdings(event: MessageEvent):
         await stock_holdings_cmd.finish(message_add_head("� 您当前没有投资", event))
 
     lines = ["� 我的灵石投资", "▃▃▃▃▃▃▃▃▃▃"]
+
+    # 获取刷新时间信息
+    async with safe_session() as session:
+        stmt = select(Stock).where(Stock.is_active == True).order_by(Stock.updated_at.desc()).limit(1)
+        latest_stock = (await session.execute(stmt)).scalars().first()
+
+        if latest_stock:
+            next_update_time = latest_stock.updated_at + StockService.PRICE_UPDATE_INTERVAL
+            now = datetime.now()
+            time_until_update = next_update_time - now
+
+            if price_updated:
+                lines.append("🔄 价格已更新")
+            else:
+                if time_until_update.total_seconds() > 0:
+                    hours = int(time_until_update.total_seconds() // 3600)
+                    minutes = int((time_until_update.total_seconds() % 3600) // 60)
+                    if hours > 0:
+                        lines.append(f"⏰ 下次刷新：{hours}小时{minutes}分钟后")
+                    else:
+                        lines.append(f"⏰ 下次刷新：{minutes}分钟后")
+                else:
+                    lines.append("⏰ 即将刷新价格...")
+            lines.append("")
     
     total_value = 0
     total_cost = 0
@@ -300,3 +341,58 @@ async def handle_stock_update(event: MessageEvent):
 
     except Exception as e:
         await stock_update_cmd.finish(message_add_head(f"❌ 更新灵石价格失败：{e}", event))
+
+
+@stock_refresh_time_cmd.handle()
+async def handle_stock_refresh_time(event: MessageEvent):
+    """查看灵石价格刷新时间"""
+    async with safe_session() as session:
+        player = await session.get(Player, event.get_user_id())
+        if not player:
+            await stock_refresh_time_cmd.finish("⛔ 请先创建角色")
+
+        # 获取最近更新的股票
+        stmt = select(Stock).where(Stock.is_active == True).order_by(Stock.updated_at.desc()).limit(1)
+        latest_stock = (await session.execute(stmt)).scalars().first()
+
+        if not latest_stock:
+            await stock_refresh_time_cmd.finish("💎 当前没有可投资的灵石")
+
+        now = datetime.now()
+        last_update_time = latest_stock.updated_at
+        next_update_time = last_update_time + StockService.PRICE_UPDATE_INTERVAL
+        time_until_update = next_update_time - now
+        time_since_update = now - last_update_time
+
+        lines = ["⏰ 灵石价格刷新时间", "▃▃▃▃▃▃▃▃▃▃"]
+
+        # 上次更新时间
+        hours_since = int(time_since_update.total_seconds() // 3600)
+        minutes_since = int((time_since_update.total_seconds() % 3600) // 60)
+        if hours_since > 0:
+            lines.append(f"📅 上次更新：{hours_since}小时{minutes_since}分钟前")
+        else:
+            lines.append(f"📅 上次更新：{minutes_since}分钟前")
+
+        lines.append(f"🕐 更新时间：{last_update_time.strftime('%m-%d %H:%M:%S')}")
+
+        # 下次更新时间
+        if time_until_update.total_seconds() > 0:
+            hours_until = int(time_until_update.total_seconds() // 3600)
+            minutes_until = int((time_until_update.total_seconds() % 3600) // 60)
+            if hours_until > 0:
+                lines.append(f"⏳ 下次更新：{hours_until}小时{minutes_until}分钟后")
+            else:
+                lines.append(f"⏳ 下次更新：{minutes_until}分钟后")
+            lines.append(f"🎯 预计时间：{next_update_time.strftime('%m-%d %H:%M:%S')}")
+        else:
+            lines.append("⏳ 下次更新：即将刷新...")
+
+        lines.append("")
+        lines.append("💡 刷新规则说明：")
+        lines.append("• 🔄 被动刷新：查看行情时自动检查")
+        lines.append("• ⏰ 刷新间隔：每1小时更新一次")
+        lines.append("• 🌅 每日更新：每天9点市场开盘")
+        lines.append("• 🔧 备用机制：每12小时自动更新")
+
+        await stock_refresh_time_cmd.finish(message_add_head("\n".join(lines), event))
