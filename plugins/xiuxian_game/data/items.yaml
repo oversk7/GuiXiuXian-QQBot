@@ -78,7 +78,7 @@ items:
 
     - item_id: "coffin_nail"
       name: "棺材钉"
-      description: "锈迹斑斑的铁钉，由上世纪驭鬼者所制，可以大幅度压制灵异力量。持有越多，闭关效率越高 ⚰️"
+      description: "锈迹斑斑的铁钉，由上世纪驭鬼者所制，可以大幅度压制灵异力量，帮助突破。持有越多，闭关效率越高(最多100根，50%加成)⚰️。"
       type: "CONSUMABLE"
       price: 100000
       grudge_value: 1

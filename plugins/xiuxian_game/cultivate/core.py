@@ -146,9 +146,10 @@ async def handle_seclusion(event: MessageEvent):
             guild_bonuses = await GuildBuildingService.get_guild_bonuses(session, player.guild_id)
             guild_cultivation_bonus = guild_bonuses.get("cultivation_bonus", 0.0)
 
-        # 计算棺材钉数量和效率加成
+        # 计算棺材钉数量和效率加成（最多100根，50%加成）
         coffin_nail_count = await get_coffin_nail_count(session, player.id)
-        efficiency_bonus = coffin_nail_count * 0.5  # 每个棺材钉提升0.5%效率
+        effective_coffin_nail_count = min(coffin_nail_count, 100)  # 最多100根有效
+        efficiency_bonus = effective_coffin_nail_count * 0.5  # 每个棺材钉提升0.5%效率
 
         player.is_secluded = True
         player.seclusion_start_time = datetime.now()
@@ -158,7 +159,10 @@ async def handle_seclusion(event: MessageEvent):
         # 构建闭关消息，包含棺材钉、月卡和公会效率提示
         efficiency_msg = ""
         if coffin_nail_count > 0:
-            efficiency_msg += f"\n✧ 棺材钉 ⚰️ ✖️{coffin_nail_count} 提升效率 +{efficiency_bonus:.1f}%"
+            if coffin_nail_count > 100:
+                efficiency_msg += f"\n✧ 棺材钉 ⚰️ ✖️{coffin_nail_count}(有效{effective_coffin_nail_count}) 提升效率 +{efficiency_bonus:.1f}%"
+            else:
+                efficiency_msg += f"\n✧ 棺材钉 ⚰️ ✖️{coffin_nail_count} 提升效率 +{efficiency_bonus:.1f}%"
 
         if benefits["seclusion_efficiency"] > 0:
             card_efficiency = benefits["seclusion_efficiency"] * 100
@@ -211,9 +215,10 @@ async def handle_out_seclusion(event: MessageEvent):
             guild_bonuses = await GuildBuildingService.get_guild_bonuses(session, player.guild_id)
             guild_cultivation_bonus = guild_bonuses.get("cultivation_bonus", 0.0)
 
-        # 计算棺材钉数量和效率加成
+        # 计算棺材钉数量和效率加成（最多100根，50%加成）
         coffin_nail_count = await get_coffin_nail_count(session, player.id)
-        coffin_nail_multiplier = 1.0 + (coffin_nail_count * 0.005)  # 每个棺材钉提升0.5%效率
+        effective_coffin_nail_count = min(coffin_nail_count, 100)  # 最多100根有效
+        coffin_nail_multiplier = 1.0 + (effective_coffin_nail_count * 0.005)  # 每个棺材钉提升0.5%效率
 
         player.is_secluded = False
         k = 7 if player.level <= 10 else 6
@@ -257,8 +262,11 @@ async def handle_out_seclusion(event: MessageEvent):
         # 构建出关消息，包含棺材钉、月卡和公会效率提示
         efficiency_msg = ""
         if coffin_nail_count > 0:
-            efficiency_bonus = coffin_nail_count * 0.5
-            efficiency_msg += f"\n✧ 棺材钉 ⚰️ ✖️{coffin_nail_count} 额外获得 +{coffin_nail_bonus} 怨炁 (+{efficiency_bonus:.1f}%)"
+            efficiency_bonus = effective_coffin_nail_count * 0.5
+            if coffin_nail_count > 100:
+                efficiency_msg += f"\n✧ 棺材钉 ⚰️ ✖️{coffin_nail_count}(有效{effective_coffin_nail_count}) 额外获得 +{coffin_nail_bonus} 怨炁 (+{efficiency_bonus:.1f}%)"
+            else:
+                efficiency_msg += f"\n✧ 棺材钉 ⚰️ ✖️{coffin_nail_count} 额外获得 +{coffin_nail_bonus} 怨炁 (+{efficiency_bonus:.1f}%)"
 
         if card_bonus > 0:
             card_efficiency = benefits["seclusion_efficiency"] * 100
@@ -296,9 +304,10 @@ async def handle_breakthrough(event: MessageEvent, args: Message = CommandArg())
         cfg_break = cfg["breakthrough"]
         required_exp = calculate_level_up_exp(player.level)
         
-        # 解析参数，若包含"镇厄"则启用保驾护航模式
+        # 解析参数，若包含"镇厄"则启用保驾护航模式，若包含"棺材钉"则使用棺材钉
         arg_text = args.extract_plain_text().strip().lower() if isinstance(args, Message) else ""
         use_guardian = arg_text in {"护", "镇厄", "镇"}
+        use_coffin_nail = "棺材钉" in arg_text
 
         base_cost = cfg_break.get("guardian_cost_base", cfg_break.get("guardian_cost", 50))
         per_level_inc = cfg_break.get("guardian_cost_per_level", 1)
@@ -313,8 +322,8 @@ async def handle_breakthrough(event: MessageEvent, args: Message = CommandArg())
             min_rate = cfg_break.get("min_success_rate", 0.05)
             success_chance = max(min_rate, base_rate - decay * (player.level - cfg_break["change_level"]))
 
-        # 护航则必定成功
-        if use_guardian:
+        # 护航或使用棺材钉则必定成功
+        if use_guardian or use_coffin_nail:
             success_chance = 1.0
 
         # 检查是否达到冥返要求等级，如果达到则提示冥返
@@ -343,9 +352,32 @@ async def handle_breakthrough(event: MessageEvent, args: Message = CommandArg())
         if use_guardian and player.resentment < guardian_cost:
             await breakthrough.finish(f"⛔ 怨念值不足，镇厄需要 {guardian_cost}，当前 {player.resentment}")
 
-        # 消耗怨念值（如果启用护航）
+        # 如果使用棺材钉，检查是否有足够的棺材钉
+        coffin_nail_item = None
+        if use_coffin_nail:
+            from sqlalchemy import select as _sel
+            from ..models.inventory import ItemInstance
+            result = await session.execute(
+                _sel(ItemInstance).where(
+                    ItemInstance.player_id == player.id,
+                    ItemInstance.item_id == "coffin_nail",
+                    ItemInstance.quantity > 0
+                )
+            )
+            coffin_nail_item = result.scalars().first()
+            if not coffin_nail_item:
+                await breakthrough.finish("⛔ 你没有棺材钉，无法使用棺材钉镇厄")
+
+        # 消耗怨念值（如果启用护航）或棺材钉
         if use_guardian:
             player.resentment -= guardian_cost
+        elif use_coffin_nail:
+            # 消耗一根棺材钉
+            coffin_nail_item.quantity -= 1
+            if coffin_nail_item.quantity <= 0:
+                await session.delete(coffin_nail_item)
+            else:
+                session.add(coffin_nail_item)
 
         if player.level < cfg_break["change_level"]:
             old_level = player.level
@@ -361,12 +393,18 @@ async def handle_breakthrough(event: MessageEvent, args: Message = CommandArg())
             from ..social.level_hooks import on_player_level_up
             await on_player_level_up(session, player.id, old_level, player.level)
 
+            cost_msg = ""
+            if use_guardian:
+                cost_msg = f"✧ 消耗怨念值 {guardian_cost} (剩余{player.resentment})\n"
+            elif use_coffin_nail:
+                cost_msg = f"✧ 消耗棺材钉 1根 ⚰️\n"
+
             msg = (
                 f"⛓️‍💥骨裂声回荡，已突破至Lv.{player.level}↑\n"
                 "━━━━━━━━━━━━━\n"
                 f"✧ 获得属性点 + {points_gained}" + (f" (转数加成)" if player.reincarnation_level > 0 else "") + "\n"
                 f"✧ 剩余修为 {player.exp}\n"
-                + (f"✧ 消耗怨念值 {guardian_cost} (剩余{player.resentment})\n" if use_guardian else "") +
+                + cost_msg +
                 "━━━━━━━━━━━━━\n"
                 "⬇️ 【加点】缝合裂隙\n"
                 "⬇️ 【修炼】继续喂养怨炁"
@@ -386,12 +424,18 @@ async def handle_breakthrough(event: MessageEvent, args: Message = CommandArg())
                 from ..social.level_hooks import on_player_level_up
                 await on_player_level_up(session, player.id, old_level, player.level)
 
+                cost_msg = ""
+                if use_guardian:
+                    cost_msg = f"✧ 消耗怨念值 {guardian_cost} (剩余{player.resentment})\n"
+                elif use_coffin_nail:
+                    cost_msg = f"✧ 消耗棺材钉 1根⚰️，邪祟之力被压制，万千冤魂俯首称臣\n"
+
                 msg = (
                     f"⛓️‍💥骨裂声回荡，已突破至Lv.{player.level}↑\n"
                     "━━━━━━━━━━━━━\n"
                     f"✧ 获得属性点 + {points_gained}" + (f" (转数加成)" if player.reincarnation_level > 0 else "") + "\n"
                     f"✧ 剩余修为 {player.exp}\n"
-                    + (f"✧ 消耗怨念值 {guardian_cost} (剩余{player.resentment})\n" if use_guardian else "") +
+                    + cost_msg +
                     "━━━━━━━━━━━━━\n"
                     "⬇️ 【加点】缝合裂隙\n"
                     "⬇️ 【修炼】继续喂养怨炁"
@@ -405,7 +449,8 @@ async def handle_breakthrough(event: MessageEvent, args: Message = CommandArg())
                     f"✧ 剩余修为 {player.exp}\n"
                     f"✧ 本次理论成功率 {int(success_chance*100)}%\n"
                     "━━━━━━━━━━━━━\n"
-                    "⬇️ 建议【突破 [镇厄]】以怨念护体"
+                    "⬇️ 建议【突破 镇厄】以怨念护体\n"
+                    "⬇️ 或者【突破 棺材钉】消耗棺材钉"
                 )
 
         session.add(player)
