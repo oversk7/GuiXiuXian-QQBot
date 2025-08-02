@@ -1120,7 +1120,7 @@ async def handle_deposit_warehouse(event: MessageEvent, args: Message = CommandA
 
         # 检查是否在公会基地
         guild = await session.get(Guild, player.guild_id)
-        if not guild.base_x or not guild.base_y:
+        if guild.base_x is None or guild.base_y is None:
             await deposit_warehouse_cmd.finish("⛔ 公会尚未设置基地")
 
         if player.x != guild.base_x or player.y != guild.base_y:
@@ -1170,7 +1170,7 @@ async def handle_withdraw_warehouse(event: MessageEvent, args: Message = Command
 
         # 检查是否在公会基地
         guild = await session.get(Guild, player.guild_id)
-        if not guild.base_x or not guild.base_y:
+        if guild.base_x is None or guild.base_y is None:
             await withdraw_warehouse_cmd.finish("⛔ 公会尚未设置基地")
 
         if player.x != guild.base_x or player.y != guild.base_y:
