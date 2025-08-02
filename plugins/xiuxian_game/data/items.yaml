@@ -333,7 +333,7 @@ items:
           bone_fragment: 30
           grave_soil: 15
         gold: 500
-      repair_cost: 50
+      repair_cost: 5
 
     - item_id: "ghost_tear_pendant"
       name: "鬼泪吊坠"
@@ -348,7 +348,7 @@ items:
           cursed_silk: 15
           ash_powder: 10
         gold: 400
-      repair_cost: 40
+      repair_cost: 5
 
     - item_id: "rusty_blade"
       name: "锈蚀刀刃"
@@ -363,7 +363,7 @@ items:
           bone_fragment: 15
           ash_powder: 12
         gold: 450
-      repair_cost: 45
+      repair_cost: 5
 
     # ========== 中级装备 (21-60级) - 数值+少量比例，白色+绿色材料 ==========
 
@@ -381,7 +381,7 @@ items:
           cursed_silk: 20
           spirit_bone: 15
         gold: 1200
-      repair_cost: 80
+      repair_cost: 10
 
     - item_id: "self_awareness_key"
       name: "自知力钥匙"
@@ -397,7 +397,7 @@ items:
           spirit_bone: 25
           ghost_tears: 20
         gold: 1000
-      repair_cost: 75
+      repair_cost: 10
 
     - item_id: "corrupted_bandage_wrap"
       name: "污血绷带"
@@ -413,7 +413,7 @@ items:
           withered_flower: 4
           iron_rust: 25
         gold: 1500
-      repair_cost: 90
+      repair_cost: 10
 
     # ========== 高级装备 (61-100级) - 比例加成为主，绿色+蓝色材料 ==========
 
@@ -431,7 +431,7 @@ items:
           nightmare_silk: 12
           school_bell_fragment: 8
         gold: 5000
-      repair_cost: 120
+      repair_cost: 20
 
     - item_id: "mirror_shard_armor"
       name: "镜片战甲"
@@ -447,7 +447,7 @@ items:
           flesh_crystal: 2
           nightmare_silk: 15
         gold: 8000
-      repair_cost: 150
+      repair_cost: 20
 
     - item_id: "phantom_cloak"
       name: "幽魂斗篷"
@@ -463,7 +463,7 @@ items:
           withered_flower: 8
           drowned_scale: 12
         gold: 7000
-      repair_cost: 140
+      repair_cost: 20
 
     # ========== 顶级装备 (101-150级) - 高比例加成，蓝色+紫色材料 ==========
 
@@ -481,7 +481,7 @@ items:
           soul_crystal: 5
           nightmare_silk: 20
         gold: 15000
-      repair_cost: 200
+      repair_cost: 50
 
     - item_id: "wedding_dress"
       name: "嫁衣"
@@ -497,7 +497,7 @@ items:
           phantom_thread: 10
           nightmare_silk: 25
         gold: 20000
-      repair_cost: 250
+      repair_cost: 50
 
     - item_id: "void_essence_crown"
       name: "虚无之冠"
@@ -513,7 +513,7 @@ items:
           cursed_mirror_shard: 8
           soul_crystal: 6
         gold: 30000
-      repair_cost: 300
+      repair_cost: 50
 
     # ========== 传说装备 (151+级) - 极高比例加成，紫色+橙色材料 ==========
 
@@ -531,7 +531,7 @@ items:
           demon_heart: 4
           cursed_mirror_shard: 10
         gold: 50000
-      repair_cost: 500
+      repair_cost: 100
 
     - item_id: "world_fragment_blade"
       name: "世界碎片之刃"
@@ -547,7 +547,7 @@ items:
           void_essence: 4
           demon_heart: 3
         gold: 80000
-      repair_cost: 800
+      repair_cost: 100
 
     # ========== 可锻造的特殊装备 ==========
 
@@ -565,7 +565,7 @@ items:
           withered_flower: 8
           yin_essence: 6
         gold: 8000
-      repair_cost: 150
+      repair_cost: 100
 
     - item_id: "soul_flag"
       name: "镇魂幡"
@@ -582,7 +582,7 @@ items:
           cursed_mirror_shard: 2
           nightmare_silk: 20
         gold: 12000
-      repair_cost: 180
+      repair_cost: 150
 
     # ========== Boss掉落专属装备（不可锻造）==========
 
@@ -593,7 +593,7 @@ items:
       price: 80000
       durability: 100
       attr_ratio: {"luck": 0.3}
-      repair_cost: 200   # Boss掉落，不可锻造
+      repair_cost: 100   # Boss掉落，不可锻造
 
     - item_id: "black_envelope"
       name: "黑色信封"
@@ -602,7 +602,7 @@ items:
       price: 100000
       durability: 100
       attr_ratio: {"attack": 0.4}
-      repair_cost: 250   # Boss掉落，不可锻造
+      repair_cost: 150   # Boss掉落，不可锻造
 
     - item_id: "skull_suit"
       name: "碎颅制服"
@@ -611,7 +611,7 @@ items:
       price: 150000
       durability: 100
       attr_ratio: {"attack": 0.6}
-      repair_cost: 300   # Boss掉落，不可锻造
+      repair_cost: 100   # Boss掉落，不可锻造
 
     - item_id: "faceless_suit"
       name: "无脸制服"
@@ -621,7 +621,7 @@ items:
       durability: 100
       attr_bonus: {"agility": 50}
       attr_ratio: {"mp": 0.5}
-      repair_cost: 280   # Boss掉落，不可锻造
+      repair_cost: 180   # Boss掉落，不可锻造
 
     # ========== 炼丹炉系列 ==========
 
@@ -637,7 +637,7 @@ items:
           ash_powder: 20
           grave_soil: 15
         gold: 800
-      repair_cost: 60
+      repair_cost: 5
 
     - item_id: "furnace_green"
       name: "普通炼丹炉"
@@ -652,7 +652,7 @@ items:
           iron_rust: 40
           ash_powder: 30
         gold: 2000
-      repair_cost: 100
+      repair_cost: 5
 
     - item_id: "furnace_blue"
       name: "精良炼丹炉"
@@ -667,7 +667,7 @@ items:
           yin_essence: 12
           spirit_bone: 35
         gold: 5000
-      repair_cost: 150
+      repair_cost: 5
 
     - item_id: "furnace_purple"
       name: "稀有炼丹炉"
@@ -682,7 +682,7 @@ items:
           flesh_crystal: 6
           nightmare_silk: 15
         gold: 12000
-      repair_cost: 200
+      repair_cost: 50
 
     - item_id: "furnace_gold"
       name: "传奇炼丹炉"
@@ -697,7 +697,7 @@ items:
           soul_crystal: 5
           cursed_mirror_shard: 3
         gold: 30000
-      repair_cost: 300
+      repair_cost: 80
 
   elixirs:  # 丹药类不可售卖
     - item_id: "spirit_elixir"
