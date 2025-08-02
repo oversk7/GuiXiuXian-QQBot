@@ -18,19 +18,19 @@ async def setup_stock_scheduler():
         existing_daily_job = scheduler.get_job("stock_daily_update")
         
         if existing_hourly_job:
-            logger.info("⚠️ 股票每小时更新定时任务已存在，跳过设置")
+            logger.info("⚠️ 股票备用更新定时任务已存在，跳过设置")
         else:
-            # 添加每小时执行一次的价格更新任务
+            # 添加备用价格更新任务（降低频率，作为被动触发的备用机制）
             scheduler.add_job(
-                func=perform_hourly_update,
+                func=perform_backup_update,
                 trigger="interval",
-                hours=3,
+                hours=12,  # 改为12小时执行一次，作为备用机制
                 id="stock_hourly_update",
                 replace_existing=True,
                 max_instances=1,
                 coalesce=True,
             )
-            logger.info("✅ 股票每小时价格更新定时任务已设置")
+            logger.info("✅ 股票备用价格更新定时任务已设置（12小时间隔）")
 
         if existing_daily_job:
             logger.info("⚠️ 股票每日更新定时任务已存在，跳过设置")
@@ -51,22 +51,22 @@ async def setup_stock_scheduler():
         logger.error(f"❌ 设置股票价格更新定时任务失败: {e}")
 
 
-async def perform_hourly_update():
-    """执行每小时股票价格更新"""
+async def perform_backup_update():
+    """执行备用股票价格更新（降低频率的备用机制）"""
     try:
-        logger.info("🔄 开始执行股票每小时价格更新...")
+        logger.info("🔄 开始执行股票备用价格更新...")
         results = await StockMarketScheduler.hourly_market_update()
-        
+
         # 统计更新结果
         total_stocks = len(results)
         up_count = sum(1 for r in results.values() if r["change_amount"] > 0)
         down_count = sum(1 for r in results.values() if r["change_amount"] < 0)
         flat_count = total_stocks - up_count - down_count
-        
-        logger.info(f"✅ 股票价格更新完成: 共{total_stocks}只股票, 上涨{up_count}只, 下跌{down_count}只, 平盘{flat_count}只")
-        
+
+        logger.info(f"✅ 股票备用价格更新完成: 共{total_stocks}只股票, 上涨{up_count}只, 下跌{down_count}只, 平盘{flat_count}只")
+
     except Exception as e:
-        logger.error(f"❌ 股票每小时价格更新失败: {e}")
+        logger.error(f"❌ 股票备用价格更新失败: {e}")
 
 
 async def perform_daily_update():
@@ -96,7 +96,7 @@ async def cleanup_stock_scheduler():
     try:
         if scheduler.get_job("stock_hourly_update"):
             scheduler.remove_job("stock_hourly_update")
-            logger.info("🧹 股票每小时更新定时任务已清理")
+            logger.info("🧹 股票备用更新定时任务已清理")
         
         if scheduler.get_job("stock_daily_update"):
             scheduler.remove_job("stock_daily_update")

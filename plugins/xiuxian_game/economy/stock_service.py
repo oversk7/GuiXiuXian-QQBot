@@ -6,30 +6,72 @@
 3. 持仓管理
 4. 交易记录
 5. 手续费计算
+6. 被动价格更新（玩家查看时触发）
 """
 
 from typing import Tuple, List, Dict
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, and_
-from datetime import datetime
+from datetime import datetime, timedelta
 
 from ..models.player import Player
 from ..models.bank_account import BankAccount
 from ..models.stock import Stock, StockHolding, StockTransaction, TransactionType
 from ..models.db import safe_session
-# from .stock_price_engine import StockPriceEngine  # 暂时不使用
+from .stock_price_engine import StockPriceEngine
 
 
 class StockService:
     """股票交易服务"""
-    
+
     # 手续费配置
     COMMISSION_RATE = 0.03
-    MIN_COMMISSION = 1 
-    MAX_COMMISSION = 1000000 
+    MIN_COMMISSION = 1
+    MAX_COMMISSION = 1000000
+
+    # 价格刷新配置
+    PRICE_UPDATE_INTERVAL = timedelta(hours=1)  # 被动触发更新间隔：1小时
     
     @classmethod
-    async def buy_stock(cls, player_id: str, stock_symbol: str, shares: int, 
+    async def check_and_update_prices(cls, force_update: bool = False) -> bool:
+        """检查并更新股票价格（被动触发）
+
+        只有满足以下条件之一才会执行更新：
+        1. force_update=True（管理员强制更新）
+        2. 距离上次更新时间 >= PRICE_UPDATE_INTERVAL（1小时）
+
+        Args:
+            force_update: 是否强制更新，忽略时间间隔
+
+        Returns:
+            bool: 是否执行了价格更新
+        """
+        async with safe_session() as session:
+            # 获取最近更新的股票，检查是否需要更新
+            stmt = select(Stock).where(Stock.is_active == True).order_by(Stock.updated_at.desc()).limit(1)
+            latest_stock = (await session.execute(stmt)).scalars().first()
+
+            if not latest_stock:
+                return False
+
+            now = datetime.now()
+            time_since_update = now - latest_stock.updated_at
+
+            # 判断是否需要更新
+            should_update = (
+                force_update or
+                time_since_update >= cls.PRICE_UPDATE_INTERVAL
+            )
+
+            if should_update:
+                # 执行价格更新
+                await StockPriceEngine.update_all_prices()
+                return True
+
+            return False
+
+    @classmethod
+    async def buy_stock(cls, player_id: str, stock_symbol: str, shares: int,
                        use_bank: bool = False) -> Tuple[bool, str]:
         """买入股票"""
         async with safe_session() as session:

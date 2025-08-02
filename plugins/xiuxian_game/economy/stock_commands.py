@@ -28,17 +28,20 @@ stock_sell_cmd = on_command("出售灵石", aliases={"卖出灵石"}, block=True
 stock_holdings_cmd = on_command("我的投资", aliases={"灵石持有", "投资持仓"}, block=True, priority=5)
 stock_transactions_cmd = on_command("投资记录", aliases={"灵石记录"}, block=True, priority=5)
 stock_init_cmd = on_command("初始化灵石", block=True, priority=5)
-stock_test_cmd = on_command("测试灵石", block=True, priority=5)
+stock_update_cmd = on_command("更新灵石价格", aliases={"刷新灵石价格"}, block=True, priority=5)
 
 
 @stock_list_cmd.handle()
 async def handle_stock_list(event: MessageEvent):
     """查看灵石投资行情"""
+    # 被动触发价格更新
+    price_updated = await StockService.check_and_update_prices()
+
     async with safe_session() as session:
         player = await session.get(Player, event.get_user_id())
         if not player:
             await stock_list_cmd.finish("⛔ 请先创建角色")
-        
+
         # 获取所有活跃股票
         stmt = select(Stock).where(Stock.is_active == True).order_by(Stock.symbol)
         stocks = (await session.execute(stmt)).scalars().all()
@@ -55,6 +58,11 @@ async def handle_stock_list(event: MessageEvent):
         
         # 构建消息
         lines = ["💎 灵石投资行情", "▃▃▃▃▃▃▃▃▃▃"]
+
+        # 如果价格刚更新，显示提示
+        if price_updated:
+            lines.append("🔄 价格已更新")
+            lines.append("")
         
         type_names = {
             StockType.TECH: "🔬 法宝灵石",
@@ -150,6 +158,9 @@ async def handle_stock_sell(event: MessageEvent, args: Message = CommandArg()):
 @stock_holdings_cmd.handle()
 async def handle_stock_holdings(event: MessageEvent):
     """查看灵石投资持仓"""
+    # 被动触发价格更新
+    await StockService.check_and_update_prices()
+
     holdings = await StockService.get_player_holdings(event.get_user_id())
 
     if not holdings:
@@ -213,8 +224,11 @@ async def handle_stock_transactions(event: MessageEvent):
 
 
 @stock_init_cmd.handle()
-async def handle_stock_init(event: MessageEvent, permission=SUPERUSER):
+async def handle_stock_init(event: MessageEvent):
     """初始化灵石投资数据（仅管理员）"""
+    # 检查权限
+    if not await SUPERUSER(event):
+        await stock_init_cmd.finish("⛔ 仅管理员可使用此命令")
     async with safe_session() as session:
         # 检查是否已有灵石数据
         try:
@@ -268,19 +282,21 @@ async def handle_stock_init(event: MessageEvent, permission=SUPERUSER):
         await session.commit()
         await stock_init_cmd.finish("✅ 灵石投资数据初始化完成！共创建了12个投资项目")
 
+@stock_update_cmd.handle()
+async def handle_stock_update(event: MessageEvent):
+    """手动更新灵石价格（仅管理员）"""
+    # 检查权限
+    if not await SUPERUSER(event):
+        await stock_update_cmd.finish("⛔ 仅管理员可使用此命令")
 
-@stock_test_cmd.handle()
-async def handle_stock_test(event: MessageEvent):
-    """测试灵石系统是否正常"""
     try:
-        # 测试获取持仓
-        holdings = await StockService.get_player_holdings(event.get_user_id())
+        # 强制更新价格
+        updated = await StockService.check_and_update_prices(force_update=True)
 
-        # 测试获取交易记录
-        transactions = await StockService.get_player_transactions(event.get_user_id(), 5)
-
-        msg = f"✅ 灵石系统测试成功！\n持仓数量：{len(holdings)}\n交易记录：{len(transactions)}"
-        await stock_test_cmd.finish(message_add_head(msg, event))
+        if updated:
+            await stock_update_cmd.finish(message_add_head("✅ 灵石价格已强制更新", event))
+        else:
+            await stock_update_cmd.finish(message_add_head("⚠️ 价格更新失败或无需更新", event))
 
     except Exception as e:
-        await stock_test_cmd.finish(message_add_head(f"❌ 灵石系统测试失败：{e}", event))
+        await stock_update_cmd.finish(message_add_head(f"❌ 更新灵石价格失败：{e}", event))
