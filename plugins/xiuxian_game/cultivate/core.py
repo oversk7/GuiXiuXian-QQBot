@@ -397,7 +397,7 @@ async def handle_breakthrough(event: MessageEvent, args: Message = CommandArg())
             if use_guardian:
                 cost_msg = f"✧ 消耗怨念值 {guardian_cost} (剩余{player.resentment})\n"
             elif use_coffin_nail:
-                cost_msg = f"✧ 消耗棺材钉 1根 ⚰️\n"
+                cost_msg = f"✧ 消耗棺材钉 1根⚰️，躁动的灵异被强制稳定，万千冤魂俯首称臣！\n"
 
             msg = (
                 f"⛓️‍💥骨裂声回荡，已突破至Lv.{player.level}↑\n"
@@ -428,7 +428,7 @@ async def handle_breakthrough(event: MessageEvent, args: Message = CommandArg())
                 if use_guardian:
                     cost_msg = f"✧ 消耗怨念值 {guardian_cost} (剩余{player.resentment})\n"
                 elif use_coffin_nail:
-                    cost_msg = f"✧ 消耗棺材钉 1根⚰️，邪祟之力被压制，万千冤魂俯首称臣\n"
+                    cost_msg = f"✧ 消耗棺材钉 1根⚰️，躁动的灵异被强制稳定，万千冤魂俯首称臣！\n"
 
                 msg = (
                     f"⛓️‍💥骨裂声回荡，已突破至Lv.{player.level}↑\n"
