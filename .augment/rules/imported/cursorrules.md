@@ -1,5 +1,5 @@
 ---
-type: "manual"
+type: "always_apply"
 ---
 
 这是一个基于Nonebot2+QQAdapter的官方QQ群机器人文字游戏项目。

@@ -35,7 +35,17 @@ class GuildFacilityService:
             {"item_id": "void_eye_elixir", "weight": 20},
         ]
     }
-    
+
+    @staticmethod
+    def get_pill_quality_chinese(quality: str) -> str:
+        """获取丹药品质的中文名称"""
+        quality_map = {
+            "basic": "初级",
+            "intermediate": "中级",
+            "advanced": "高级"
+        }
+        return quality_map.get(quality, quality)
+
     @staticmethod
     async def can_use_teleport(session: AsyncSession, player_id: str, guild_id: int) -> Tuple[bool, str]:
         """检查玩家是否可以使用传送阵"""

@@ -769,36 +769,13 @@ async def handle_guild_buildings(event: MessageEvent):
         guild = await session.get(Guild, player.guild_id)
         buildings = await GuildBuildingService.get_guild_buildings(session, player.guild_id)
 
-        # 效果名称中文映射
-        effect_name_map = {
-            "exp_multiplier": "经验倍率",
-            "treasury_limit": "资金上限",
-            "cultivation_bonus": "修为加成",
-            "all_attributes": "全属性加成",
-            "defense_bonus": "防御加成",
-            "daily_production":"日产",
-            "pill_quality": "丹药品质"
-        }
-
         if not buildings:
             msg = f"🏗️ 公会『{guild.name}』建筑列表\n━━━━━━━━━━\n暂无建筑"
         else:
             lines = [f"🏗️ 公会『{guild.name}』建筑列表", "━━━━━━━━━━"]
             for building in buildings:
-                # 将英文效果名转换为中文，并格式化数值
-                effects_list = []
-                for k, v in building["effects"].items():
-                    chinese_name = effect_name_map.get(k, k)
-                    if k == "exp_multiplier":
-                        effects_list.append(f"{chinese_name} {v:.1f}x")
-                    elif k == "treasury_limit":
-                        effects_list.append(f"{chinese_name} {v:,}")
-                    elif k in ["cultivation_bonus", "all_attributes", "defense_bonus"]:
-                        effects_list.append(f"{chinese_name} +{v*100:.1f}%")
-                    else:
-                        effects_list.append(f"{chinese_name} {v}")
-
-                effects_str = ", ".join(effects_list)
+                # 使用建筑服务的格式化方法
+                effects_str = GuildBuildingService.format_building_effects(building["effects"])
                 lines.append(f"▫️ {building['name']} Lv.{building['level']}/{building['max_level']}")
                 lines.append(f"   效果：{effects_str}")
             msg = "\n".join(lines)

@@ -300,3 +300,52 @@ class GuildBuildingService:
                         bonuses[effect_type] += value
         
         return bonuses
+
+    @staticmethod
+    def format_building_effects(effects: Dict) -> str:
+        """格式化建筑效果为中文显示"""
+        # 效果名称中文映射
+        effect_name_map = {
+            "exp_multiplier": "经验倍率",
+            "treasury_limit": "资金上限",
+            "cultivation_bonus": "修为加成",
+            "all_attributes": "全属性加成",
+            "defense_bonus": "防御加成",
+            "daily_production": "日产",
+            "pill_quality": "丹药品质",
+            "teleport_range": "传送范围",
+            "daily_uses": "每日次数",
+            "storage_slots": "仓库格子"
+        }
+
+        # 丹药品质中文映射
+        pill_quality_map = {
+            "basic": "初级",
+            "intermediate": "中级",
+            "advanced": "高级"
+        }
+
+        effects_list = []
+        for k, v in effects.items():
+            chinese_name = effect_name_map.get(k, k)
+            if k == "exp_multiplier":
+                effects_list.append(f"{chinese_name} {v:.1f}x")
+            elif k == "treasury_limit":
+                effects_list.append(f"{chinese_name} {v:,}")
+            elif k in ["cultivation_bonus", "all_attributes", "defense_bonus"]:
+                effects_list.append(f"{chinese_name} +{v*100:.1f}%")
+            elif k == "teleport_range":
+                effects_list.append(f"{chinese_name} {v}格")
+            elif k == "daily_uses":
+                effects_list.append(f"{chinese_name} {v}次")
+            elif k == "storage_slots":
+                effects_list.append(f"{chinese_name} {v}格")
+            elif k == "pill_quality":
+                chinese_quality = pill_quality_map.get(v, v)
+                effects_list.append(f"{chinese_name} {chinese_quality}")
+            elif k == "daily_production":
+                effects_list.append(f"{chinese_name} {v}个")
+            else:
+                effects_list.append(f"{chinese_name} {v}")
+
+        return ", ".join(effects_list)
