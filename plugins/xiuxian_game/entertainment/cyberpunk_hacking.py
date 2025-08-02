@@ -61,19 +61,19 @@ class ArrayBreakingGame:
     
     def _generate_target_sequences(self):
         """生成目标序列"""
-        # 根据矩阵大小调整序列难度
+        # 重新设计序列，包含不同长度的挑战
         if self.size == 5:
             sequences = [
-                (["甲", "子", "丙"], 120, "五行生克"),
-                (["乙", "丑"], 60, "阴阳调和"),
-                (["丁", "寅", "己"], 100, "天地人合"),
+                (["甲", "子", "丙"], 120, "三才归一"),
+                (["子", "丙"], 60, "阴阳相合"),
+                (["丙", "丁"], 50, "火木相生"),
             ]
         else:  # 6x6
             sequences = [
-                (["甲", "子", "丙", "午"], 150, "四象归位"),
-                (["乙", "丑"], 60, "阴阳调和"),
-                (["丁", "寅", "己", "申"], 180, "八卦演化"),
-                (["庚", "辰"], 40, "金木相克"),
+                (["甲", "子", "丙", "丁"], 150, "四象轮转"),
+                (["子", "丙"], 60, "阴阳相合"),
+                (["丙", "丁"], 50, "火木相生"),
+                (["丁", "戊"], 40, "土火相克"),
             ]
 
         self.target_sequences = []
@@ -82,39 +82,214 @@ class ArrayBreakingGame:
 
     def _generate_main_solution_path(self) -> List[Tuple[int, int]]:
         """生成一条包含所有目标序列的主要解决路径"""
-        # 将所有目标序列合并成一个长序列
-        all_codes = []
-        for target in self.target_sequences:
-            all_codes.extend(target.sequence)
+        # 尝试多次生成，找到最优解
+        best_solution = None
+        best_coverage = 0
 
-        # 去重但保持顺序
-        seen = set()
-        unique_codes = []
-        for code in all_codes:
-            if code not in seen:
-                unique_codes.append(code)
-                seen.add(code)
+        for _ in range(50):  # 尝试50次
+            solution = self._try_generate_solution()
+            if solution:
+                coverage = self._calculate_sequence_coverage(solution)
+                if coverage > best_coverage:
+                    best_coverage = coverage
+                    best_solution = solution
+                    # 如果找到了包含所有序列的解，直接返回
+                    if coverage == len(self.target_sequences):
+                        break
 
-        # 确保路径长度不超过缓冲区
-        if len(unique_codes) > self.buffer_size:
-            unique_codes = unique_codes[:self.buffer_size]
+        return best_solution if best_solution else self._generate_fallback_path()
 
-        # 生成路径
+    def _try_generate_solution(self) -> List[Tuple[int, int]]:
+        """尝试生成一个解决方案"""
+        # 创建一个包含所有目标序列的最优符文序列
+        optimal_sequence = self._create_optimal_sequence()
+
+        if len(optimal_sequence) > self.buffer_size:
+            return None
+
+        # 生成对应的路径
+        return self._generate_path_for_sequence(optimal_sequence)
+
+    def _create_optimal_sequence(self) -> List[str]:
+        """创建包含尽可能多目标序列的最优符文序列"""
+        sequences = [target.sequence for target in self.target_sequences]
+
+        # 尝试多种组合策略
+        best_sequence = None
+        best_coverage = 0
+
+        # 策略1: 尝试直接连接序列
+        for perm in self._get_sequence_permutations(sequences):
+            combined = self._combine_sequences(perm)
+            if len(combined) <= self.buffer_size:
+                coverage = self._count_contained_sequences(combined, sequences)
+                if coverage > best_coverage:
+                    best_coverage = coverage
+                    best_sequence = combined
+
+        # 策略2: 如果没有找到好的组合，使用贪心算法
+        if not best_sequence:
+            best_sequence = self._greedy_sequence_build(sequences)
+
+        return best_sequence[:self.buffer_size]
+
+    def _get_sequence_permutations(self, sequences: List[List[str]]) -> List[List[List[str]]]:
+        """获取序列的不同排列组合（限制数量避免过度计算）"""
+        import itertools
+        # 只尝试前几种排列，避免计算量过大
+        return list(itertools.permutations(sequences))[:6]
+
+    def _combine_sequences(self, sequences: List[List[str]]) -> List[str]:
+        """尝试智能组合多个序列，寻找重叠部分"""
+        if not sequences:
+            return []
+
+        result = sequences[0].copy()
+
+        for seq in sequences[1:]:
+            # 寻找最佳连接点
+            best_overlap = 0
+            best_connection = len(result)
+
+            # 检查是否可以重叠连接
+            for i in range(len(result)):
+                for j in range(len(seq)):
+                    overlap_len = min(len(result) - i, len(seq) - j)
+                    if result[i:i+overlap_len] == seq[j:j+overlap_len]:
+                        if overlap_len > best_overlap:
+                            best_overlap = overlap_len
+                            best_connection = i
+
+            # 如果找到重叠，智能连接
+            if best_overlap > 0:
+                # 找到seq中对应的位置
+                for j in range(len(seq)):
+                    if seq[j:j+best_overlap] == result[best_connection:best_connection+best_overlap]:
+                        # 添加seq中重叠部分之后的内容
+                        result.extend(seq[j+best_overlap:])
+                        break
+            else:
+                # 没有重叠，直接连接
+                result.extend(seq)
+
+        return result
+
+    def _greedy_sequence_build(self, sequences: List[List[str]]) -> List[str]:
+        """使用贪心算法构建序列"""
+        result = []
+        active_sequences = [(seq, 0) for seq in sequences]  # (序列, 当前位置)
+
+        while active_sequences and len(result) < self.buffer_size:
+            # 统计每个字符能推进多少个序列
+            char_scores = {}
+            for seq, pos in active_sequences:
+                if pos < len(seq):
+                    char = seq[pos]
+                    char_scores[char] = char_scores.get(char, 0) + 1
+
+            if not char_scores:
+                break
+
+            # 选择得分最高的字符
+            best_char = max(char_scores.keys(), key=lambda c: char_scores[c])
+            result.append(best_char)
+
+            # 更新活跃序列
+            new_active = []
+            for seq, pos in active_sequences:
+                if pos < len(seq) and seq[pos] == best_char:
+                    new_pos = pos + 1
+                    if new_pos < len(seq):  # 序列还没完成
+                        new_active.append((seq, new_pos))
+                else:
+                    new_active.append((seq, pos))  # 保持原位置
+
+            active_sequences = new_active
+
+        return result
+
+    def _count_contained_sequences(self, combined: List[str], sequences: List[List[str]]) -> int:
+        """计算组合序列中包含多少个目标序列"""
+        combined_str = "".join(combined)
+        count = 0
+        for seq in sequences:
+            seq_str = "".join(seq)
+            if seq_str in combined_str:
+                count += 1
+        return count
+
+    def _generate_path_for_sequence(self, sequence: List[str]) -> List[Tuple[int, int]]:
+        """为给定的符文序列生成路径"""
+        if not sequence:
+            return []
+
         path = []
-        current_row = 0  # 从第一行开始
+        current_row = 0
         current_col = random.randint(0, self.size - 1)
         path.append((current_row, current_col))
 
         is_horizontal = True
-        for _ in range(1, len(unique_codes)):
+        for _ in range(1, len(sequence)):
             if is_horizontal:
-                # 水平移动：在同一行选择不同列
+                # 水平移动
+                available_cols = [c for c in range(self.size) if c != current_col]
+                if available_cols:
+                    current_col = random.choice(available_cols)
+                    path.append((current_row, current_col))
+                else:
+                    return None  # 无法继续
+            else:
+                # 垂直移动
+                available_rows = [r for r in range(self.size) if r != current_row]
+                if available_rows:
+                    current_row = random.choice(available_rows)
+                    path.append((current_row, current_col))
+                else:
+                    return None  # 无法继续
+
+            is_horizontal = not is_horizontal
+
+        return path
+
+    def _calculate_sequence_coverage(self, path: List[Tuple[int, int]]) -> int:
+        """计算路径能覆盖多少个目标序列"""
+        if not path:
+            return 0
+
+        # 模拟在路径上放置符文
+        temp_matrix = [["" for _ in range(self.size)] for _ in range(self.size)]
+        optimal_sequence = self._create_optimal_sequence()
+
+        for i, (row, col) in enumerate(path):
+            if i < len(optimal_sequence):
+                temp_matrix[row][col] = optimal_sequence[i]
+
+        # 检查能匹配多少个目标序列
+        path_sequence = "".join(optimal_sequence[:len(path)])
+        coverage = 0
+
+        for target in self.target_sequences:
+            target_str = "".join(target.sequence)
+            if target_str in path_sequence:
+                coverage += 1
+
+        return coverage
+
+    def _generate_fallback_path(self) -> List[Tuple[int, int]]:
+        """生成备用路径（确保至少有一个解）"""
+        path = []
+        current_row = 0
+        current_col = random.randint(0, self.size - 1)
+        path.append((current_row, current_col))
+
+        is_horizontal = True
+        for _ in range(1, min(self.buffer_size, 4)):  # 至少生成4步路径
+            if is_horizontal:
                 available_cols = [c for c in range(self.size) if c != current_col]
                 if available_cols:
                     current_col = random.choice(available_cols)
                     path.append((current_row, current_col))
             else:
-                # 垂直移动：在同一列选择不同行
                 available_rows = [r for r in range(self.size) if r != current_row]
                 if available_rows:
                     current_row = random.choice(available_rows)
@@ -125,24 +300,17 @@ class ArrayBreakingGame:
         return path
 
     def _place_codes_on_path(self, path: List[Tuple[int, int]]):
-        """在路径上放置代码，确保包含所有目标序列"""
-        # 将所有目标序列合并
-        all_codes = []
-        for target in self.target_sequences:
-            all_codes.extend(target.sequence)
+        """在路径上放置符文，确保包含尽可能多的目标序列"""
+        if not path:
+            return
 
-        # 去重但保持顺序
-        seen = set()
-        unique_codes = []
-        for code in all_codes:
-            if code not in seen:
-                unique_codes.append(code)
-                seen.add(code)
+        # 生成最优符文序列
+        optimal_sequence = self._create_optimal_sequence()
 
-        # 在路径上放置代码
+        # 在路径上放置符文
         for i, (row, col) in enumerate(path):
-            if i < len(unique_codes):
-                self.matrix[row][col] = unique_codes[i]
+            if i < len(optimal_sequence):
+                self.matrix[row][col] = optimal_sequence[i]
     
 
     

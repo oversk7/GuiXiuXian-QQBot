@@ -91,11 +91,62 @@ class TradeRecord(Base):
         return result.scalars().all()
     
     @classmethod
-    async def record_trade(cls, session, player_id: str, trade_type: TradeType, market_id: str, 
+    async def can_list_item(cls, session, player_id: str, item_id: str, hours: int = 8) -> tuple[bool, str]:
+        """
+        检查玩家是否可以挂牌指定商品
+        规则：8小时内购买的商品不允许挂牌
+
+        Args:
+            session: 数据库会话
+            player_id: 玩家ID
+            item_id: 商品ID
+            hours: 限制时间（小时）
+
+        Returns:
+            tuple[bool, str]: (是否可以挂牌, 错误信息)
+        """
+        from sqlalchemy import select, and_
+        from datetime import timedelta
+
+        # 计算时间限制
+        time_limit = datetime.now() - timedelta(hours=hours)
+
+        # 查询玩家在指定时间内购买该商品的记录（任何市场）
+        stmt = select(cls).where(
+            and_(
+                cls.player_id == player_id,
+                cls.item_id == item_id,
+                cls.trade_type == TradeType.BUY,
+                cls.trade_time > time_limit
+            )
+        ).order_by(cls.trade_time.desc())
+
+        result = await session.execute(stmt)
+        recent_purchases = result.scalars().all()
+
+        # 如果有最近的购买记录，则不允许挂牌
+        if recent_purchases:
+            latest_purchase = recent_purchases[0]
+            unlock_time = latest_purchase.trade_time + timedelta(hours=hours)
+            from ..config import config
+            item_cfg = config.items_config["by_id"].get(item_id)
+            item_name = item_cfg.name if item_cfg else item_id
+
+            return False, (
+                f"⛔ 挂牌限制！\n"
+                f"你在 {latest_purchase.trade_time.strftime('%m-%d %H:%M')} 购买了 {item_name}\n"
+                f"需要等到 {unlock_time.strftime('%m-%d %H:%M')} 才能挂牌\n"
+                f"💡 此限制防止通过挂牌给小号来规避跑商机制"
+            )
+
+        return True, ""
+
+    @classmethod
+    async def record_trade(cls, session, player_id: str, trade_type: TradeType, market_id: str,
                           item_id: str, quantity: int, unit_price: int, total_amount: int):
         """
         记录一笔交易
-        
+
         Args:
             session: 数据库会话
             player_id: 玩家ID

@@ -92,6 +92,12 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
 
         # 资源冻结
         if side == OrderSide.SELL:
+            # 检查是否可以挂牌（8小时内购买的商品不能挂牌）
+            from ..models.trade_record import TradeRecord
+            can_list, error_msg = await TradeRecord.can_list_item(session, player.id, item_cfg.item_id, hours=8)
+            if not can_list:
+                await list_cmd.finish(error_msg)
+
             try:
                 await ItemInstance.consume_item(session, player.id, item_cfg.item_id, quantity)
             except ValueError as e:
