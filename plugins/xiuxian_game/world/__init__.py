@@ -669,6 +669,9 @@ async def _handle_personal_monster(session, tile: WorldTile, player: Player) -> 
     )
     equipped_items = result_eq.scalars().all()
     broken_msgs = []
+    hp_loss_from_equipment = 0  # 记录因装备损坏导致的HP损失
+    mp_loss_from_equipment = 0  # 记录因装备损坏导致的MP损失
+
     for eq in equipped_items:
         if eq.lose_durability(1):
             # 还原玩家属性
@@ -677,13 +680,27 @@ async def _handle_personal_monster(session, tile: WorldTile, player: Player) -> 
                 setattr(player, k, getattr(player, k) - v)
             broken_msgs.append(f"💔 {eq.config.name} 耐久耗尽，化为尘埃！")
             await session.delete(eq)
-            # 修正HP/MP不超过上限
-            if player.hp > player.max_hp:
+
+            # 记录因装备损坏导致的属性损失，并在战报中显示
+            if "max_hp" in delta and player.hp > player.max_hp:
+                hp_before_adjust = player.hp
                 player.hp = player.max_hp
-            if player.mp > player.max_mp:
+                hp_loss = hp_before_adjust - player.hp
+                hp_loss_from_equipment += hp_loss
+
+            if "max_mp" in delta and player.mp > player.max_mp:
+                mp_before_adjust = player.mp
                 player.mp = player.max_mp
+                mp_loss = mp_before_adjust - player.mp
+                mp_loss_from_equipment += mp_loss
+
     if broken_msgs:
         log += "\n" + "\n".join(broken_msgs)
+        # 如果有因装备损坏导致的HP/MP损失，在战报中显示
+        if hp_loss_from_equipment > 0:
+            log += f"\n💔 装备损坏导致体质下降，失去 {hp_loss_from_equipment} HP"
+        if mp_loss_from_equipment > 0:
+            log += f"\n💔 装备损坏导致智力下降，失去 {mp_loss_from_equipment} MP"
 
     # ---------------- 检查装备耐久度并提醒 ----------------
     durability_warning = await check_equipment_durability(session, player.id)
