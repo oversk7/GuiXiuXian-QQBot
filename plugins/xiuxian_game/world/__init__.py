@@ -636,6 +636,9 @@ async def _handle_personal_monster(session, tile: WorldTile, player: Player) -> 
     # 先设置玩家HP，但暂不生成最终战报（因为装备损坏可能影响max_hp）
     player.hp = player_hp
 
+    # 先生成基础战报，后续会添加装备损坏信息
+    log = "\n".join(battle_log)
+
     # 结算
     if monster_hp <= 0:
         exp_gain = rng.randint(1, 4) * monster_level
@@ -698,11 +701,22 @@ async def _handle_personal_monster(session, tile: WorldTile, player: Player) -> 
         if mp_loss_from_equipment > 0:
             broken_msgs.append(f"💔 装备损坏导致智力下降，失去 {mp_loss_from_equipment} MP")
 
-    # 现在生成完整的战报（包含正确的max_hp）
-    battle_log.append(f"📊 总计 {round_num} 回合，你剩余HP {player.hp}/{player.max_hp}，{monster_display} HP {monster_hp}/{tile.state.get('hp', 0)}。")
-    if dodge_count:
-        battle_log.append(f"🌀 其中你成功闪避 {dodge_count} 次攻击！")
-    log = "\n".join(battle_log)
+    # 现在更新战报中的HP信息（使用装备损坏后的正确数值）
+    # 找到并替换战报中的HP信息
+    updated_battle_log = []
+    for line in battle_log:
+        if line.startswith("📊 总计"):
+            # 重新生成这一行，使用最新的HP和max_hp
+            updated_line = f"📊 总计 {round_num} 回合，你剩余HP {player.hp}/{player.max_hp}，{monster_display} HP {monster_hp}/{tile.state.get('hp', 0)}。"
+            updated_battle_log.append(updated_line)
+        else:
+            updated_battle_log.append(line)
+
+    # 如果还没有添加闪避信息，现在添加
+    if dodge_count and not any("成功闪避" in line for line in updated_battle_log):
+        updated_battle_log.append(f"🌀 其中你成功闪避 {dodge_count} 次攻击！")
+
+    log = "\n".join(updated_battle_log)
 
     if broken_msgs:
         log += "\n" + "\n".join(broken_msgs)
