@@ -633,11 +633,7 @@ async def _handle_personal_monster(session, tile: WorldTile, player: Player) -> 
         if player_hp > 0:
             p_atk(round_num)
 
-    battle_log.append(f"📊 总计 {round_num} 回合，你剩余HP {player_hp}/{player.max_hp}，{monster_display} HP {monster_hp}/{tile.state.get('hp', 0)}。")
-    if dodge_count:
-        battle_log.append(f"🌀 其中你成功闪避 {dodge_count} 次攻击！")
-    log = "\n".join(battle_log)
-
+    # 先设置玩家HP，但暂不生成最终战报（因为装备损坏可能影响max_hp）
     player.hp = player_hp
 
     # 结算
@@ -698,9 +694,18 @@ async def _handle_personal_monster(session, tile: WorldTile, player: Player) -> 
         log += "\n" + "\n".join(broken_msgs)
         # 如果有因装备损坏导致的HP/MP损失，在战报中显示
         if hp_loss_from_equipment > 0:
-            log += f"\n💔 装备损坏导致体质下降，失去 {hp_loss_from_equipment} HP"
+            broken_msgs.append(f"💔 装备损坏导致体质下降，失去 {hp_loss_from_equipment} HP")
         if mp_loss_from_equipment > 0:
-            log += f"\n💔 装备损坏导致智力下降，失去 {mp_loss_from_equipment} MP"
+            broken_msgs.append(f"💔 装备损坏导致智力下降，失去 {mp_loss_from_equipment} MP")
+
+    # 现在生成完整的战报（包含正确的max_hp）
+    battle_log.append(f"📊 总计 {round_num} 回合，你剩余HP {player.hp}/{player.max_hp}，{monster_display} HP {monster_hp}/{tile.state.get('hp', 0)}。")
+    if dodge_count:
+        battle_log.append(f"🌀 其中你成功闪避 {dodge_count} 次攻击！")
+    log = "\n".join(battle_log)
+
+    if broken_msgs:
+        log += "\n" + "\n".join(broken_msgs)
 
     # ---------------- 检查装备耐久度并提醒 ----------------
     durability_warning = await check_equipment_durability(session, player.id)
