@@ -563,11 +563,8 @@ async def _handle_empty(session, tile: WorldTile, player: Player) -> str:
     # 检查玩家是否已经击败过这个小怪
     if player.id in tile.state.get("defeated_by", []):
         return "🪨 这里只剩下怪物的残骸，散发着淡淡的血腥味。"
-
-    # empty格有80%可能遇到个人的怪物，但不会影响公共事件
-    if random.random() < 0.8:
-        return await _handle_personal_monster(session, tile, player)
-    return "🌫️ 什么都没有发现，除了回声……"
+    # empty格有遇到个人的怪物，但不会影响公共事件
+    return await _handle_personal_monster(session, tile, player)
 
 
 async def _handle_personal_monster(session, tile: WorldTile, player: Player) -> str:
@@ -636,28 +633,44 @@ async def _handle_personal_monster(session, tile: WorldTile, player: Player) -> 
     # 先设置玩家HP，但暂不生成最终战报（因为装备损坏可能影响max_hp）
     player.hp = player_hp
 
-    # 先生成基础战报，后续会添加装备损坏信息
-    log = "\n".join(battle_log)
+    # 生成完整的战斗报告
+    battle_summary = []
+
+    # 添加关键战斗日志（最多显示5条）
+    if len(battle_log) > 5:
+        battle_summary.extend(battle_log[:2])  # 前两回合
+        battle_summary.append("...")
+        battle_summary.extend(battle_log[-2:])  # 最后两回合
+    else:
+        battle_summary.extend(battle_log)
+
+    # 战斗统计
+    initial_monster_hp = tile.state.get("hp", 0)
+    battle_summary.append(f"📊 总计 {round_num} 回合，你剩余HP {player_hp}/{player.max_hp}，{monster_display} HP {monster_hp}/{initial_monster_hp}")
+
+    # 闪避统计
+    if dodge_count > 0:
+        battle_summary.append(f"🌀 其中你成功闪避 {dodge_count} 次攻击！")
 
     # 结算
     if monster_hp <= 0:
         exp_gain = rng.randint(1, 4) * monster_level
         player.exp += exp_gain
-        log += f"\n🎉 你击杀了 {monster_display}，获得 {exp_gain} EXP"
+        battle_summary.append(f"🎉 你击杀了 {monster_display}，获得 {exp_gain} EXP")
 
         # 怪物掉落材料机制
         is_elite = tile.state.get("is_elite", False)
         drop_result = await handle_monster_drops(session, player, monster_level, player.region, rng, is_elite)
         if drop_result:
-            log += f"\n{drop_result}"
+            battle_summary.append(drop_result)
 
         # 标记为已击败（无论是精英怪还是普通小怪）
         tile.state.setdefault("defeated_by", []).append(player.id)
 
     elif player_hp <= 0:
-        log += f"\n💀 你被 {monster_display} 击败，很遗憾，你已死亡"
+        battle_summary.append(f"💀 你被 {monster_display} 击败，很遗憾，你已死亡")
     else:
-        log += f"\n👁️ {monster_display} 剩余 {monster_hp} HP"
+        battle_summary.append(f"👁️ {monster_display} 剩余 {monster_hp} HP")
 
     # ---------------- 扣除装备耐久 ----------------
     result_eq = await session.execute(
@@ -693,33 +706,30 @@ async def _handle_personal_monster(session, tile: WorldTile, player: Player) -> 
                 mp_loss = mp_before_adjust - player.mp
                 mp_loss_from_equipment += mp_loss
 
+    # 如果有装备损坏，需要更新战报中的HP信息
     if broken_msgs:
-        log += "\n" + "\n".join(broken_msgs)
+        # 更新战报中的HP统计信息
+        updated_battle_summary = []
+        for line in battle_summary:
+            if line.startswith("📊 总计"):
+                # 重新生成这一行，使用装备损坏后的正确HP和max_hp
+                updated_line = f"📊 总计 {round_num} 回合，你剩余HP {player.hp}/{player.max_hp}，{monster_display} HP {monster_hp}/{initial_monster_hp}"
+                updated_battle_summary.append(updated_line)
+            else:
+                updated_battle_summary.append(line)
+
+        # 添加装备损坏信息
+        updated_battle_summary.extend(broken_msgs)
+
         # 如果有因装备损坏导致的HP/MP损失，在战报中显示
         if hp_loss_from_equipment > 0:
-            broken_msgs.append(f"💔 装备损坏导致体质下降，失去 {hp_loss_from_equipment} HP")
+            updated_battle_summary.append(f"💔 装备损坏导致体质下降，失去 {hp_loss_from_equipment} HP")
         if mp_loss_from_equipment > 0:
-            broken_msgs.append(f"💔 装备损坏导致智力下降，失去 {mp_loss_from_equipment} MP")
+            updated_battle_summary.append(f"💔 装备损坏导致智力下降，失去 {mp_loss_from_equipment} MP")
 
-    # 现在更新战报中的HP信息（使用装备损坏后的正确数值）
-    # 找到并替换战报中的HP信息
-    updated_battle_log = []
-    for line in battle_log:
-        if line.startswith("📊 总计"):
-            # 重新生成这一行，使用最新的HP和max_hp
-            updated_line = f"📊 总计 {round_num} 回合，你剩余HP {player.hp}/{player.max_hp}，{monster_display} HP {monster_hp}/{tile.state.get('hp', 0)}。"
-            updated_battle_log.append(updated_line)
-        else:
-            updated_battle_log.append(line)
-
-    # 如果还没有添加闪避信息，现在添加
-    if dodge_count and not any("成功闪避" in line for line in updated_battle_log):
-        updated_battle_log.append(f"🌀 其中你成功闪避 {dodge_count} 次攻击！")
-
-    log = "\n".join(updated_battle_log)
-
-    if broken_msgs:
-        log += "\n" + "\n".join(broken_msgs)
+        log = "\n".join(updated_battle_summary)
+    else:
+        log = "\n".join(battle_summary)
 
     # ---------------- 检查装备耐久度并提醒 ----------------
     durability_warning = await check_equipment_durability(session, player.id)
