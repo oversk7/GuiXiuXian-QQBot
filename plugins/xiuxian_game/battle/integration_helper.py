@@ -207,19 +207,20 @@ class BattleIntegrationHelper:
 
         if compact_log:
             # 紧凑格式的结果显示
+            remaining_player_hp = player_hp
             if victory:
-                battle_log.append(f"🎉 胜利！{round_num}回合，受伤{damage_taken}")
+                battle_log.append(f"🎉 胜利！{round_num}回合，剩余{remaining_player_hp}血")
             else:
                 # 显示失败原因和剩余血量
                 remaining_monster_hp = monster_hp
-                battle_log.append(f"💀 战败！{round_num}回合，受伤{damage_taken}，敌剩{remaining_monster_hp}血")
+                battle_log.append(f"💀 战败！{round_num}回合，剩余{remaining_player_hp}血，敌剩{remaining_monster_hp}血")
         else:
             # 详细格式的结果显示
             if victory:
                 battle_log.append(f"🎉 {player.nickname} 获得胜利！")
             else:
                 battle_log.append(f"💀 {player.nickname} 战败...")
-            battle_log.append(f"战斗统计: 总计{round_num}回合，受到伤害{damage_taken}")
+            battle_log.append(f"战斗统计: 总计{round_num}回合，剩余血量{player_hp}/{player.max_hp}")
 
         return victory, battle_log, damage_taken
     
@@ -304,8 +305,8 @@ class BattleIntegrationHelper:
         # 战斗统计
         summary_lines.append("")
         summary_lines.append("📊 战斗统计:")
-        summary_lines.append(f"受到伤害: {damage_taken}")
         summary_lines.append(f"剩余血量: {player.hp}/{player.max_hp}")
+        summary_lines.append(f"受到伤害: {damage_taken}")
         
         if exp_gain > 0:
             summary_lines.append(f"获得经验: {exp_gain}")
