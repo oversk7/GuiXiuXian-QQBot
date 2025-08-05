@@ -52,7 +52,7 @@ async def handle_battle_info(event: MessageEvent, args: Message = CommandArg()):
 
 
 # 查看属性详情命令
-battle_detail = on_command("属性详情", aliases={"战斗详情", "属性说明"}, block=True, priority=5)
+battle_detail = on_command("属性说明", aliases={"属性介绍"}, block=True, priority=5)
 
 
 @battle_detail.handle()
