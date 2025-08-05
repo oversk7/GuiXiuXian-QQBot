@@ -117,11 +117,15 @@ class GhostSuppressionService:
             if force or round_num == 1 or round_num % 3 == 0:
                 battle_log.append(text)
 
+        # 判定先后手（基于敏捷）
+        from ..battle.battle_attributes import BattleAttributeCalculator
+        player_first = BattleAttributeCalculator.determine_turn_order(
+            player_agility, wild_agility, rng
+        )
+
         for round_num in range(1, max_rounds + 1):
             if player_hp <= 0 or wild_hp <= 0:
                 break
-
-            # 野生鬼怪始终先手攻击
 
             def player_attack_turn(r_num):
                 nonlocal wild_hp
@@ -143,9 +147,10 @@ class GhostSuppressionService:
             def wild_attack_turn(r_num):
                 nonlocal player_hp, dodge_count
 
-                # 闪避判定，上限60%
-                dodge_chance = player_agility / (player_agility + wild_agility + 30)
-                dodge_chance = min(dodge_chance, 0.6)  # 闪避率上限60%
+                # 闪避判定（基于玩家装备闪避率，敏捷不再影响闪避）
+                from ..battle.battle_attributes import BattleAttributeCalculator
+                player_attrs = BattleAttributeCalculator.calculate_effective_attributes(player)
+                dodge_chance = player_attrs["dodge_rate"] / 100.0  # 转换为0-1的概率
                 if rng.random() < dodge_chance:
                     dodge_count += 1
                     record_battle(r_num, f"[回合{r_num}] ⚡ 你的{player_ghost_config['name']}敏捷地闪避了攻击！")
@@ -166,10 +171,18 @@ class GhostSuppressionService:
                 else:
                     record_battle(r_num, f"[回合{r_num}] 野生{wild_ghost_config['name']}造成 {damage} 伤害", force=(player_hp == 0))
 
-            # 野生鬼怪始终先手攻击，若击杀玩家则玩家无法反击
-            wild_attack_turn(round_num)
-            if player_hp > 0:
-                player_attack_turn(round_num)
+            # 根据先后手判定执行攻击顺序
+            if player_first:
+                # 玩家先手
+                if player_hp > 0:
+                    player_attack_turn(round_num)
+                if wild_hp > 0 and player_hp > 0:
+                    wild_attack_turn(round_num)
+            else:
+                # 野生鬼怪先手
+                wild_attack_turn(round_num)
+                if player_hp > 0 and wild_hp > 0:
+                    player_attack_turn(round_num)
 
         victory = wild_hp <= 0
         total_damage = initial_wild_hp - max(0, wild_hp)

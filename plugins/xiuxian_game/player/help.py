@@ -137,6 +137,8 @@ async def handle_player(event: MessageEvent, args: Message = CommandArg()):
         "【财富榜】 查看财富榜\n"
         "【修为榜】 查看修为榜\n"
         "【幸运榜】 查看幸运榜\n"
+        "【战力】 查看自身完整属性\n"
+        "【属性说明】 查看各项属性的作用\n"
         "【注册】 注册角色\n"
         "【改名 <新名字>】 改名\n"
         "【改性别 <男/女>】 修改角色性别\n"
