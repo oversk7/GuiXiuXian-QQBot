@@ -48,22 +48,6 @@ async def handle_battle_info(event: MessageEvent, args: Message = CommandArg()):
         
         # 组合完整信息
         full_info = "\n".join(basic_info) + battle_attr_display
-        
-        # 添加属性说明
-        explanation = [
-            "",
-            "📖 属性说明:",
-            "💥 暴击率: 普通攻击触发暴击的概率",
-            "🔄 连击率: 在回合内连续普攻的概率",
-            "🛡️ 反击率: 被攻击时自动反击的概率",
-            "⚡ 闪避率: 闪避敌方攻击的概率",
-            "🎯 命中率: 攻击命中敌方的概率",
-            "✨ 灵爆率: 技能攻击触发暴击的概率",
-            "🗡️ 穿透率: 无视敌方防御的比例"
-        ]
-        
-        full_info += "\n".join(explanation)
-        
         await battle_info.finish(full_info)
 
 
