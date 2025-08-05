@@ -170,7 +170,7 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
             equipment_info = []
 
             # 等级要求
-            if hasattr(cfg, 'required_level') and cfg.required_level > 1:
+            if hasattr(cfg, 'required_level'):
                 equipment_info.append(f"📊 等级要求：Lv.{cfg.required_level}")
 
             # 稀有度信息
