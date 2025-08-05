@@ -487,6 +487,9 @@ items:
           iron_rust: 25
         gold: 1500
       repair_cost: 10
+      required_level: 35
+      gem_slots: 2
+      rarity: "green"
 
     # ========== 高级装备 (61-100级) - 比例加成为主，绿色+蓝色材料 ==========
 
@@ -543,6 +546,9 @@ items:
           drowned_scale: 12
         gold: 7000
       repair_cost: 20
+      required_level: 75
+      gem_slots: 3
+      rarity: "blue"
 
     # ========== 顶级装备 (101-150级) - 高比例加成，蓝色+紫色材料 ==========
 
@@ -599,6 +605,9 @@ items:
           soul_crystal: 6
         gold: 30000
       repair_cost: 50
+      required_level: 140
+      gem_slots: 4
+      rarity: "purple"
 
     # ========== 传说装备 (151+级) - 极高比例加成，紫色+橙色材料 ==========
 
@@ -617,6 +626,9 @@ items:
           cursed_mirror_shard: 10
         gold: 50000
       repair_cost: 100
+      required_level: 180
+      gem_slots: 4
+      rarity: "orange"
 
     - item_id: "world_fragment_blade"
       name: "世界碎片之刃"
@@ -633,6 +645,9 @@ items:
           demon_heart: 3
         gold: 80000
       repair_cost: 100
+      required_level: 220
+      gem_slots: 5
+      rarity: "orange"
 
     # ========== 可锻造的特殊装备 ==========
 
@@ -651,6 +666,9 @@ items:
           yin_essence: 6
         gold: 8000
       repair_cost: 100
+      required_level: 80
+      gem_slots: 3
+      rarity: "blue"
 
     - item_id: "soul_flag"
       name: "镇魂幡"
@@ -668,6 +686,9 @@ items:
           nightmare_silk: 20
         gold: 12000
       repair_cost: 150
+      required_level: 90
+      gem_slots: 3
+      rarity: "blue"
 
     # ========== Boss掉落专属装备（不可锻造）==========
 
@@ -679,6 +700,9 @@ items:
       durability: 100
       attr_ratio: {"luck": 0.3}
       repair_cost: 100   # Boss掉落，不可锻造
+      required_level: 85
+      gem_slots: 3
+      rarity: "blue"
 
     - item_id: "black_envelope"
       name: "黑色信封"
@@ -688,6 +712,9 @@ items:
       durability: 100
       attr_ratio: {"attack": 0.4}
       repair_cost: 150   # Boss掉落，不可锻造
+      required_level: 100
+      gem_slots: 3
+      rarity: "purple"
 
     - item_id: "skull_suit"
       name: "碎颅制服"
@@ -697,6 +724,9 @@ items:
       durability: 100
       attr_ratio: {"attack": 0.6}
       repair_cost: 100   # Boss掉落，不可锻造
+      required_level: 130
+      gem_slots: 4
+      rarity: "purple"
 
     - item_id: "faceless_suit"
       name: "无脸制服"
@@ -707,6 +737,9 @@ items:
       attr_bonus: {"agility": 50}
       attr_ratio: {"mp": 0.5}
       repair_cost: 180   # Boss掉落，不可锻造
+      required_level: 120
+      gem_slots: 4
+      rarity: "purple"
 
     # ========== 炼丹炉系列 ==========
 
@@ -723,6 +756,9 @@ items:
           grave_soil: 15
         gold: 800
       repair_cost: 5
+      required_level: 15
+      gem_slots: 0
+      rarity: "white"
 
     - item_id: "furnace_green"
       name: "普通炼丹炉"
@@ -738,6 +774,9 @@ items:
           ash_powder: 30
         gold: 2000
       repair_cost: 5
+      required_level: 40
+      gem_slots: 0
+      rarity: "green"
 
     - item_id: "furnace_blue"
       name: "精良炼丹炉"
@@ -753,6 +792,9 @@ items:
           spirit_bone: 35
         gold: 5000
       repair_cost: 5
+      required_level: 70
+      gem_slots: 0
+      rarity: "blue"
 
     - item_id: "furnace_purple"
       name: "稀有炼丹炉"
@@ -768,6 +810,9 @@ items:
           nightmare_silk: 15
         gold: 12000
       repair_cost: 50
+      required_level: 110
+      gem_slots: 0
+      rarity: "purple"
 
     - item_id: "furnace_gold"
       name: "传奇炼丹炉"
@@ -783,6 +828,9 @@ items:
           cursed_mirror_shard: 3
         gold: 30000
       repair_cost: 80
+      required_level: 160
+      gem_slots: 0
+      rarity: "orange"
 
   elixirs:  # 丹药类不可售卖
     - item_id: "spirit_elixir"
