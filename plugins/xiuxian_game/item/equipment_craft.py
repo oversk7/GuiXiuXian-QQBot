@@ -144,7 +144,7 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
         )
         await craft_cmd.finish(message_add_head(reply, event))
 
-repair_cmd = on_command("修复", aliases={"修理","装备修理"}, block=True, priority=5)
+repair_cmd = on_command("修复", aliases={"修理"}, block=True, priority=5)
 
 @repair_cmd.handle()
 async def _(event: MessageEvent, args: Message = CommandArg()):

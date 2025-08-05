@@ -7,7 +7,6 @@
 3. 穿戴装备
 4. 卸下装备
 5. 一键卸下
-6. 装备修理
 """
 
 from nonebot import on_command
@@ -371,7 +370,6 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
         # 检查是否为炼丹炉，如果是则处理进行中的炼丹任务
         from ..alchemy.service import AlchemyService
         from ..models.alchemy_task import AlchemyRecord
-        from sqlalchemy import and_, select
 
         furnace_ids = list(AlchemyService.FURNACE_QUALITIES.keys())
         failed_tasks = []
@@ -452,7 +450,6 @@ async def _(event: MessageEvent):
         # 处理炼丹炉相关的任务
         from ..alchemy.service import AlchemyService
         from ..models.alchemy_task import AlchemyRecord
-        from sqlalchemy import and_
 
         furnace_ids = list(AlchemyService.FURNACE_QUALITIES.keys())
         all_failed_tasks = []  # 所有失败的炼丹任务
@@ -521,98 +518,4 @@ async def _(event: MessageEvent):
         await unwear_all_equipment.finish(result_msg)
 
 
-# ---------------- 指令：装备修理 ----------------
-repair_equipment = on_command("修理", aliases={"装备修理"}, block=True, priority=5)
 
-@repair_equipment.handle()
-async def _(event: MessageEvent, args: Message = CommandArg()):
-    params = args.extract_plain_text().strip().split()
-    if len(params) < 1:
-        await repair_equipment.finish("⛔ 格式：修理 装备ID/名称 [金币比例:怨念比例]")
-
-    arg = params[0]
-    ratio_str = params[1] if len(params) > 1 else "1:0"
-
-    # 解析比例
-    try:
-        if ":" in ratio_str:
-            gold_ratio, grudge_ratio = map(int, ratio_str.split(":"))
-        else:
-            gold_ratio, grudge_ratio = int(ratio_str), 0
-
-        if gold_ratio < 0 or grudge_ratio < 0 or (gold_ratio + grudge_ratio) == 0:
-            raise ValueError
-    except ValueError:
-        await repair_equipment.finish("⛔ 比例格式错误，例如：1:0 (纯金币) 或 1:1 (金币:怨念)")
-
-    async with safe_session() as session:
-        equip = None
-
-        # 尝试按ID查找
-        if arg.isdigit():
-            equip_id = int(arg)
-            equip = await session.get(ItemInstance, equip_id)
-            if not equip or equip.player_id != event.get_user_id() or not equip.is_equipment:
-                await repair_equipment.finish("⛔ 无效装备 ID 或非本人所有")
-        else:
-            # 按名称查找，优先选择耐久度最低的装备
-            item_config = config.items_config["by_name"].get(arg)
-            if not item_config or item_config.type.value != "EQUIPMENT":
-                await repair_equipment.finish("⛔ 未找到对应装备名称，或该物品不是装备")
-
-            # 查找玩家所有该名称的装备，按耐久度升序排列
-            stmt = select(ItemInstance).where(
-                ItemInstance.player_id == event.get_user_id(),
-                ItemInstance.item_id == item_config.item_id
-            ).order_by(ItemInstance.durability.asc())
-
-            items = (await session.execute(stmt)).scalars().all()
-            if not items:
-                await repair_equipment.finish(f"⛔ 你没有 {arg}")
-
-            # 选择耐久度最低的那件
-            equip = items[0]
-
-        # 检查是否需要修理
-        if equip.durability >= equip.config.durability:
-            await repair_equipment.finish("⛔ 该装备无需修理")
-
-        # 获取玩家信息
-        player = await session.get(Player, event.get_user_id())
-
-        # 计算修理费用
-        repair_needed = equip.config.durability - equip.durability
-        base_cost = int(equip.config.price * 0.1 * (repair_needed / equip.config.durability))
-
-        # 根据比例计算金币和怨念消耗
-        total_ratio = gold_ratio + grudge_ratio
-        gold_cost = int(base_cost * gold_ratio / total_ratio)
-        grudge_cost = int(base_cost * grudge_ratio / total_ratio)
-
-        # 检查资源是否足够
-        if player.gold < gold_cost:
-            await repair_equipment.finish(f"⛔ 金币不足，需要 {gold_cost} 金币")
-
-        if player.resentment < grudge_cost:
-            await repair_equipment.finish(f"⛔ 怨念不足，需要 {grudge_cost} 怨念")
-
-        # 执行修理
-        player.gold -= gold_cost
-        player.resentment -= grudge_cost
-        equip.durability = equip.config.durability
-
-        session.add(player)
-        session.add(equip)
-        await session.commit()
-
-        # 构建结果消息
-        cost_info = []
-        if gold_cost > 0:
-            cost_info.append(f"{gold_cost} 金币")
-        if grudge_cost > 0:
-            cost_info.append(f"{grudge_cost} 怨念")
-
-        cost_str = " + ".join(cost_info)
-        result_msg = f"🔧 成功修理 {equip.config.name} (ID:{equip.id})\n💰 消耗：{cost_str}"
-
-        await repair_equipment.finish(message_add_head(result_msg, event))
