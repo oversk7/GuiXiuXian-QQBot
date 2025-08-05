@@ -1,20 +1,29 @@
+"""
+装备系统命令模块
+
+提供装备相关的用户交互命令：
+1. 查看装备栏
+2. 装备详情查看
+3. 穿戴装备
+4. 卸下装备
+5. 一键卸下
+6. 装备修理
+"""
+
 from nonebot import on_command
 from nonebot.params import CommandArg
 from nonebot.adapters.qq import MessageEvent, Message
-from sqlalchemy import select
+from sqlalchemy import select, and_
 from ..models.db import safe_session
 from ..models import Player, ItemInstance
-from ..models.monthly_card import MonthlyCard, CardType
 from ..config import config
 from ..utils import message_add_head
-import random
 
-# 最多可装备数量（可调整或改为读取配置）
-MAX_EQUIPPED = 4  # TODO: 后续可写入 config.game_config
+# 获取所有装备物品ID
 EQUIP_ITEM_IDS = config.items_config["by_type"]["EQUIPMENT"]
 
-# ---------------- 指令：装备列表 ----------------
-list_equipment = on_command("我的装备", aliases={"装备栏"}, block=True, priority=5)
+# ---------------- 指令：查看装备栏 ----------------
+list_equipment = on_command("装备栏", aliases={"装备", "我的装备"}, block=True, priority=5)
 
 @list_equipment.handle()
 async def _(event: MessageEvent):
@@ -48,15 +57,11 @@ async def _(event: MessageEvent):
             if eq.upgrade_level > 0:
                 info_parts.append(f"⭐+{eq.upgrade_level}")
 
-            # 等级要求
-            if tpl and tpl.required_level > 1:
-                info_parts.append(f"📊Lv.{tpl.required_level}")
-
             # 耐久度
             info_parts.append(f"🛠️{eq.durability}/{tpl.durability}")
 
             # 宝石镶嵌信息
-            if eq.used_gem_slots > 0:
+            if eq.available_gem_slots > 0:
                 info_parts.append(f"💎{eq.used_gem_slots}/{eq.available_gem_slots}")
 
             # 装备状态
@@ -65,6 +70,7 @@ async def _(event: MessageEvent):
             lines.append(" ".join(info_parts))
 
         await list_equipment.finish(message_add_head("\n".join(lines), event))
+
 
 # ---------------- 指令：装备详情 ----------------
 equipment_detail = on_command("装备详情", aliases={"装备信息", "查看装备"}, block=True, priority=5)
@@ -82,7 +88,7 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
 
         # 查找装备
         equip = None
-
+        
         # 尝试按ID查找
         if arg.isdigit():
             equip_id = int(arg)
@@ -104,7 +110,7 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
             items = (await session.execute(stmt)).scalars().all()
             if not items:
                 await equipment_detail.finish(f"⛔ 你没有 {arg}")
-
+            
             equip = items[0]
 
         # 获取装备配置
@@ -130,53 +136,53 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
         # 基础属性
         if tpl.attr_bonus or tpl.attr_ratio:
             lines.append("📈 基础属性：")
-
+            
             # 获取升阶加成倍率
             upgrade_multiplier = equip.get_upgrade_bonus_multiplier()
-
+            
             # 固定值属性
             if tpl.attr_bonus:
                 for k, v in tpl.attr_bonus.items():
                     base_value = int(v)
                     current_value = int(v * upgrade_multiplier)
                     bonus = current_value - base_value
-
+                    
                     attr_name = {
                         "attack": "攻击力", "defense": "防御力", "agility": "敏捷",
                         "luck": "运气", "hp": "生命值", "mp": "理智值",
                         "max_hp": "最大生命值", "max_mp": "最大理智值"
                     }.get(k, k)
-
+                    
                     if bonus > 0:
                         lines.append(f"  • {attr_name}：{base_value} → {current_value} (+{bonus})")
                     else:
                         lines.append(f"  • {attr_name}：{base_value}")
-
+            
             # 百分比属性
             if tpl.attr_ratio:
                 for k, r in tpl.attr_ratio.items():
                     base_ratio = float(r) * 100
                     current_ratio = float(r) * upgrade_multiplier * 100
                     bonus_ratio = current_ratio - base_ratio
-
+                    
                     attr_name = {
                         "attack": "攻击力", "defense": "防御力", "agility": "敏捷",
                         "luck": "运气", "hp": "生命值", "mp": "理智值",
                         "max_hp": "最大生命值", "max_mp": "最大理智值"
                     }.get(k, k)
-
+                    
                     if bonus_ratio > 0:
                         lines.append(f"  • {attr_name}：{base_ratio:.1f}% → {current_ratio:.1f}% (+{bonus_ratio:.1f}%)")
                     else:
                         lines.append(f"  • {attr_name}：{base_ratio:.1f}%")
-
+            
             lines.append("")
 
         # 宝石镶嵌信息
         if equip.available_gem_slots > 0:
             lines.append("💎 宝石镶嵌：")
             lines.append(f"  • 孔位：{equip.used_gem_slots}/{equip.available_gem_slots}")
-
+            
             if equip.used_gem_slots > 0:
                 from .gem_socket_service import GemSocketService
                 gem_info = await GemSocketService.get_equipment_gem_info(equip)
@@ -186,7 +192,7 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
                         gem_name = slot_info["gem_name"]
                         gem_type = slot_info["gem_type"]
                         lines.append(f"  • 孔位{slot_num}：{gem_type} - {gem_name}")
-
+            
             lines.append("")
 
         # 升阶提升说明
@@ -205,7 +211,7 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
 
 
 # ---------------- 指令：穿戴装备 ----------------
-wear_equipment = on_command("穿戴", aliases={"携带","装备"}, block=True, priority=5)
+wear_equipment = on_command("装备", aliases={"穿戴", "佩戴"}, block=True, priority=5)
 
 @wear_equipment.handle()
 async def _(event: MessageEvent, args: Message = CommandArg()):
@@ -220,7 +226,7 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
         if arg.isdigit():
             equip_id = int(arg)
             equip = await session.get(ItemInstance, equip_id)
-            if not equip or equip.player_id != event.get_user_id() or equip.config.type.value != "EQUIPMENT":
+            if not equip or equip.player_id != event.get_user_id() or not equip.is_equipment:
                 await wear_equipment.finish("⛔ 无效装备 ID 或非本人所有")
         else:
             # 按名称查找，优先选择耐久度最高的未装备装备
@@ -237,89 +243,52 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
 
             unequipped_items = (await session.execute(stmt)).scalars().all()
             if not unequipped_items:
-                await wear_equipment.finish(f"⛔ 你没有未穿戴的 {arg}")
+                await wear_equipment.finish(f"⛔ 你没有未装备的 {arg}")
 
             # 选择耐久度最高的那件
             equip = unequipped_items[0]
 
+        # 检查是否已装备
         if equip.equipped:
-            await wear_equipment.finish("🧐 该装备已处于穿戴状态")
+            await wear_equipment.finish("⛔ 该装备已经穿戴")
 
-        # ----- 上限检查 -----
-        cur_equipped = (await session.execute(
-            select(ItemInstance).where(
-                ItemInstance.player_id == event.get_user_id(),
-                ItemInstance.equipped == True,
-                ItemInstance.item_id.in_(EQUIP_ITEM_IDS)
-            )
-        )).scalars().all()
-        if len(cur_equipped) >= MAX_EQUIPPED:
-            await wear_equipment.finish(f"⛔ 你已穿戴 {len(cur_equipped)} 件装备，已达到上限 ({MAX_EQUIPPED})，请先卸下一件后再穿戴")
-
-        # ----- 同名装备检查 -----
-        # 检查是否已经穿戴了同名装备
-        equip_name = equip.config.name
-        for equipped_item in cur_equipped:
-            if equipped_item.config.name == equip_name:
-                await wear_equipment.finish(f"⛔ 你已经穿戴了 {equip_name}，同一名称的装备不能重复穿戴")
-
-        # 获取玩家信息用于等级检查
+        # 获取玩家信息
         player = await session.get(Player, event.get_user_id())
 
-        # ----- 等级要求检查 -----
-        required_level = equip.config.required_level if equip.config else 1
-        if player.level < required_level:
-            await wear_equipment.finish(f"⛔ {equip_name} 需要等级 {required_level}，你当前等级 {player.level}")
+        # 检查等级要求
+        if equip.config.required_level > player.level:
+            await wear_equipment.finish(f"⛔ 等级不足，需要 Lv.{equip.config.required_level}")
 
-        # 计算并持久化属性增量
+        # 检查是否有同类型装备已装备，如果有则先卸下
+        same_type_stmt = select(ItemInstance).where(
+            ItemInstance.player_id == event.get_user_id(),
+            ItemInstance.item_id == equip.item_id,
+            ItemInstance.equipped == True
+        )
+        same_type_equipped = (await session.execute(same_type_stmt)).scalars().all()
 
-        # 记录穿戴前是否满血满蓝
-        was_hp_full = player.hp >= player.max_hp
-        was_mp_full = player.mp >= player.max_mp
+        for old_equip in same_type_equipped:
+            old_equip.equipped = False
+            # 移除旧装备的属性加成
+            old_delta = (old_equip.extra_attrs or {}).get("_persist_bonus", {})
+            for k, v in old_delta.items():
+                current_value = getattr(player, k, 0)
+                setattr(player, k, max(0, current_value - v))
+            session.add(old_equip)
 
-        # 先标记为已装备，以便 apply_attr_bonus 生效
+        # 穿戴新装备
         equip.equipped = True
 
-        # 获取玩家当前属性（包含其他装备加成）
-        current_attrs = {
-            "attack": player.attack,
-            "defense": player.defense,
-            "agility": player.agility,
-            "luck": player.luck,
-            "max_hp": player.max_hp,
-            "max_mp": player.max_mp,
-            # 战斗属性
-            "critical_rate": player.critical_rate,
-            "critical_power": player.critical_power,
-            "combo_rate": player.combo_rate,
-            "counter_rate": player.counter_rate,
-            "dodge_rate": player.dodge_rate,
-            "accuracy_rate": player.accuracy_rate,
-            "skill_crit_rate": player.skill_crit_rate,
-            "penetration_rate": player.penetration_rate,
-        }
+        # 计算并应用属性加成
+        from ..item.item_effects import ItemEffectService
+        delta = await ItemEffectService.calculate_equipment_bonus(equip, player)
 
-        # 计算基础属性（减去其他装备的加成）
-        base_attrs = current_attrs.copy()
-        for equipped_item in cur_equipped:
-            delta_old = (equipped_item.extra_attrs or {}).get("_persist_bonus", {})
-            for k, v in delta_old.items():
-                base_attrs[k] = base_attrs.get(k, 0) - v
-
-        # 基于基础属性计算新装备的加成
-        new_attrs = current_attrs.copy()
-        equip.apply_attr_bonus(new_attrs, base_attrs)
-        delta = {k: new_attrs[k] - current_attrs.get(k, 0) for k in new_attrs if new_attrs[k] != current_attrs.get(k, 0)}
-
-        # 应用到玩家本体
+        # 应用属性加成到玩家
         for k, v in delta.items():
-            setattr(player, k, getattr(player, k) + v)
+            current_value = getattr(player, k, 0)
+            setattr(player, k, current_value + v)
 
-        # 如果穿戴前是满血满蓝，穿戴后也应该保持满状态
-        if was_hp_full and "max_hp" in delta:
-            player.hp = player.max_hp
-        if was_mp_full and "max_mp" in delta:
-            player.mp = player.max_mp
+        session.add(player)
 
         # 保存 delta 到 extra_attrs 便于卸下时恢复
         extra_old = equip.extra_attrs or {}
@@ -331,6 +300,7 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
         # 显示穿戴的装备信息，包括ID和耐久度
         durability_info = f" (ID:{equip.id}, 耐久:{equip.durability}/{equip.config.durability})"
         await wear_equipment.finish(f"✅ 成功穿戴 {equip.config.name}{durability_info}")
+
 
 # ---------------- 指令：卸下装备 ----------------
 unwear_equipment = on_command("卸下", block=True, priority=5)
@@ -348,43 +318,45 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
         if arg.isdigit():
             equip_id = int(arg)
             equip = await session.get(ItemInstance, equip_id)
-            if not equip or equip.player_id != event.get_user_id() or equip.config.type.value != "EQUIPMENT":
+            if not equip or equip.player_id != event.get_user_id() or not equip.is_equipment:
                 await unwear_equipment.finish("⛔ 无效装备 ID 或非本人所有")
         else:
-            # 按名称查找，优先选择耐久度最低的已装备装备
-            from ..config import config
+            # 按名称查找，优先选择已装备的
             item_config = config.items_config["by_name"].get(arg)
             if not item_config or item_config.type.value != "EQUIPMENT":
                 await unwear_equipment.finish("⛔ 未找到对应装备名称，或该物品不是装备")
 
-            # 查找玩家所有该名称的已装备装备，按耐久度升序排列
+            # 查找玩家所有该名称的已装备装备，按升阶等级降序排列
             from sqlalchemy import select
             stmt = select(ItemInstance).where(
                 ItemInstance.player_id == event.get_user_id(),
                 ItemInstance.item_id == item_config.item_id,
                 ItemInstance.equipped == True
-            ).order_by(ItemInstance.durability.asc())
+            ).order_by(ItemInstance.upgrade_level.desc())
 
             equipped_items = (await session.execute(stmt)).scalars().all()
             if not equipped_items:
-                await unwear_equipment.finish(f"⛔ 你没有穿戴任何 {arg}")
+                await unwear_equipment.finish(f"⛔ 你没有已装备的 {arg}")
 
-            # 选择耐久度最低的那件
+            # 选择升阶等级最高的那件
             equip = equipped_items[0]
 
+        # 检查是否已装备
         if not equip.equipped:
-            await unwear_equipment.finish("🧐 该装备当前未穿戴")
+            await unwear_equipment.finish("⛔ 该装备未穿戴")
+
+        # 获取玩家信息
+        player = await session.get(Player, event.get_user_id())
 
         # 检查是否为炼丹炉，如果是则处理进行中的炼丹任务
-        from ..alchemy.service import AlchemyService
-        from ..models.alchemy_task import AlchemyRecord
+        from ..alchemy.alchemy_service import AlchemyService
+        from ..models.alchemy_record import AlchemyRecord
+        from sqlalchemy import and_, select
 
         furnace_ids = list(AlchemyService.FURNACE_QUALITIES.keys())
-        failed_tasks = []  # 初始化失败任务列表
-
+        failed_tasks = []
         if equip.item_id in furnace_ids:
             # 查找使用该炼丹炉的进行中任务
-            from sqlalchemy import and_
             stmt = select(AlchemyRecord).where(
                 and_(
                     AlchemyRecord.player_id == event.get_user_id(),
@@ -398,66 +370,55 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
             for record in alchemy_records:
                 if not record.is_finished():
                     # 任务未完成，按失败处理，返还材料
-                    materials_dict = record.get_materials_dict()
-                    returned_materials = []
+                    failed_tasks.append(f"炼丹任务失败，返还材料")
 
-                    for material_id, total_used in materials_dict.items():
+                    # 返还材料
+                    for material_id, quantity in record.materials.items():
                         try:
-                            await ItemInstance.add_item(session, record.player_id, material_id, total_used)
-                            from ..config import config
-                            material_name = config.items_config["by_id"][material_id].name
-                            returned_materials.append(f"{material_name}✖️{total_used}")
+                            await ItemInstance.add_item(session, player.id, material_id, quantity)
                         except ValueError:
-                            # 如果添加失败，忽略该材料的返还
-                            pass
+                            # 背包满了，转换为金币
+                            material_config = config.items_config["by_id"].get(material_id)
+                            if material_config:
+                                gold_value = material_config.price * quantity
+                                player.gold += gold_value
+                                failed_tasks.append(f"背包已满，{material_config.name}×{quantity} 转为 {gold_value} 金币")
 
-                    # 删除失败的炼丹记录
-                    await session.delete(record)
+                # 删除炼丹记录
+                await session.delete(record)
 
-                    if returned_materials:
-                        failed_tasks.append(f"返还材料：{', '.join(returned_materials)}")
-                    else:
-                        failed_tasks.append("炼丹任务已取消")
+        # 卸下装备
+        equip.equipped = False
 
-        # 恢复玩家属性
-        player = await session.get(Player, event.get_user_id())
+        # 移除装备的属性加成
         delta = (equip.extra_attrs or {}).get("_persist_bonus", {})
         for k, v in delta.items():
-            setattr(player, k, getattr(player, k) - v)
+            current_value = getattr(player, k, 0)
+            setattr(player, k, max(0, current_value - v))
 
-        # 修正生命/理智不超过新上限
-        if player.hp > player.max_hp:
-            player.hp = player.max_hp
-        if player.mp > player.max_mp:
-            player.mp = player.max_mp
-
-        # 清除持久化记录并标记未穿戴
-        if "_persist_bonus" in (equip.extra_attrs or {}):
-            extra_new = {k: v for k, v in equip.extra_attrs.items() if k != "_persist_bonus"}
-            equip.extra_attrs = extra_new
-
-        equip.equipped = False
+        session.add(player)
+        session.add(equip)
         await session.commit()
 
-        # 显示卸下的装备信息，包括ID和耐久度
-        durability_info = f" (ID:{equip.id}, 耐久:{equip.durability}/{equip.config.durability})"
-        result_msg = f"🔻 已卸下 {equip.config.name}{durability_info}"
+        # 构建结果消息
+        result_msg = f"✅ 成功卸下 {equip.config.name} (ID:{equip.id})"
+        if failed_tasks:
+            result_msg += "\n" + "\n".join([f"🔄 {task}" for task in failed_tasks])
 
-        # 如果是炼丹炉且有失败的任务，添加相关信息
-        if equip.item_id in furnace_ids and failed_tasks:
-            result_msg += f"\n⚠️ 炼丹炉被卸下，{len(failed_tasks)}个进行中的炼丹任务已取消："
-            for task_info in failed_tasks:
-                result_msg += f"\n🔄 {task_info}"
+        await unwear_equipment.finish(message_add_head(result_msg, event))
 
-        await unwear_equipment.finish(result_msg)
 
-# ---------------- 指令：一键卸下全部装备 ----------------
+# ---------------- 指令：一键卸下 ----------------
 unwear_all_equipment = on_command("一键卸下", aliases={"卸下全部", "全部卸下"}, block=True, priority=5)
 
 @unwear_all_equipment.handle()
 async def _(event: MessageEvent):
     async with safe_session() as session:
-        # 查询玩家所有已装备的装备
+        player = await session.get(Player, event.get_user_id())
+        if not player:
+            await unwear_all_equipment.finish("⛔ 请先创建角色")
+
+        # 查找所有已装备的装备
         stmt = select(ItemInstance).where(
             ItemInstance.player_id == event.get_user_id(),
             ItemInstance.equipped == True,
@@ -466,16 +427,12 @@ async def _(event: MessageEvent):
         equipped_items = (await session.execute(stmt)).scalars().all()
 
         if not equipped_items:
-            await unwear_all_equipment.finish("🧐 你当前没有穿戴任何装备")
+            await unwear_all_equipment.finish("⛔ 你没有穿戴任何装备")
 
-        player = await session.get(Player, event.get_user_id())
-        if not player:
-            await unwear_all_equipment.finish("⛔ 请先创建角色")
-
-        # 处理炼丹炉相关逻辑
-        from ..alchemy.service import AlchemyService
-        from ..models.alchemy_task import AlchemyRecord
-        from sqlalchemy import and_, select
+        # 处理炼丹炉相关的任务
+        from ..alchemy.alchemy_service import AlchemyService
+        from ..models.alchemy_record import AlchemyRecord
+        from sqlalchemy import and_
 
         furnace_ids = list(AlchemyService.FURNACE_QUALITIES.keys())
         all_failed_tasks = []  # 所有失败的炼丹任务
@@ -501,72 +458,72 @@ async def _(event: MessageEvent):
                 for record in alchemy_records:
                     if not record.is_finished():
                         # 任务未完成，按失败处理，返还材料
-                        materials_dict = record.get_materials_dict()
-                        returned_materials = []
+                        failed_tasks.append(f"{equip.config.name}(ID:{equip.id}) 炼丹任务失败，返还材料")
 
-                        for material_id, total_used in materials_dict.items():
+                        # 返还材料
+                        for material_id, quantity in record.materials.items():
                             try:
-                                await ItemInstance.add_item(session, record.player_id, material_id, total_used)
-                                material_name = config.items_config["by_id"][material_id].name
-                                returned_materials.append(f"{material_name}✖️{total_used}")
+                                await ItemInstance.add_item(session, player.id, material_id, quantity)
                             except ValueError:
-                                # 如果添加失败，忽略该材料的返还
-                                pass
+                                # 背包满了，转换为金币
+                                material_config = config.items_config["by_id"].get(material_id)
+                                if material_config:
+                                    gold_value = material_config.price * quantity
+                                    player.gold += gold_value
+                                    failed_tasks.append(f"背包已满，{material_config.name}×{quantity} 转为 {gold_value} 金币")
 
-                        # 删除失败的炼丹记录
-                        await session.delete(record)
+                    # 删除炼丹记录
+                    await session.delete(record)
 
-                        if returned_materials:
-                            failed_tasks.append(f"{equip.config.name}: 返还材料：{', '.join(returned_materials)}")
-                        else:
-                            failed_tasks.append(f"{equip.config.name}: 炼丹任务已取消")
-
-                all_failed_tasks.extend(failed_tasks)
-
-            # 恢复玩家属性
-            delta = (equip.extra_attrs or {}).get("_persist_bonus", {})
-            for k, v in delta.items():
-                setattr(player, k, getattr(player, k) - v)
-
-            # 清除持久化记录并标记未穿戴
-            if "_persist_bonus" in (equip.extra_attrs or {}):
-                extra_new = {k: v for k, v in equip.extra_attrs.items() if k != "_persist_bonus"}
-                equip.extra_attrs = extra_new
-
+            # 卸下装备
             equip.equipped = False
 
-            # 记录卸下的装备信息
-            durability_info = f" (ID:{equip.id}, 耐久:{equip.durability}/{equip.config.durability})"
-            unworn_equipment.append(f"🔻 {equip.config.name}{durability_info}")
+            # 移除装备的属性加成
+            delta = (equip.extra_attrs or {}).get("_persist_bonus", {})
+            for k, v in delta.items():
+                current_value = getattr(player, k, 0)
+                setattr(player, k, max(0, current_value - v))
 
-        # 修正生命/理智不超过新上限
-        if player.hp > player.max_hp:
-            player.hp = player.max_hp
-        if player.mp > player.max_mp:
-            player.mp = player.max_mp
+            session.add(equip)
+            unworn_equipment.append(f"{equip.config.name}(ID:{equip.id})")
+            all_failed_tasks.extend(failed_tasks)
 
+        session.add(player)
         await session.commit()
 
-        # 构建返回消息
-        result_msg = f"✅ 已成功卸下 {len(equipped_items)} 件装备：\n"
-        result_msg += "\n".join(unworn_equipment)
+        # 构建结果消息
+        result_msg = f"✅ 成功卸下 {len(unworn_equipment)} 件装备：\n" + "、".join(unworn_equipment)
 
-        # 如果有炼丹炉相关的失败任务，添加相关信息
         if all_failed_tasks:
-            result_msg += f"\n\n⚠️ 炼丹炉被卸下，{len(all_failed_tasks)}个进行中的炼丹任务已取消："
             for task_info in all_failed_tasks:
                 result_msg += f"\n🔄 {task_info}"
 
         await unwear_all_equipment.finish(result_msg)
 
-# ---------------- 指令：装备分解 ----------------
-decompose_equipment = on_command("分解", aliases={"装备分解"}, block=True, priority=5)
 
-@decompose_equipment.handle()
+# ---------------- 指令：装备修理 ----------------
+repair_equipment = on_command("修理", aliases={"装备修理"}, block=True, priority=5)
+
+@repair_equipment.handle()
 async def _(event: MessageEvent, args: Message = CommandArg()):
-    arg = args.extract_plain_text().strip()
-    if not arg:
-        await decompose_equipment.finish("⛔ 格式：分解 装备ID/名称")
+    params = args.extract_plain_text().strip().split()
+    if len(params) < 1:
+        await repair_equipment.finish("⛔ 格式：修理 装备ID/名称 [金币比例:怨念比例]")
+
+    arg = params[0]
+    ratio_str = params[1] if len(params) > 1 else "1:0"
+
+    # 解析比例
+    try:
+        if ":" in ratio_str:
+            gold_ratio, grudge_ratio = map(int, ratio_str.split(":"))
+        else:
+            gold_ratio, grudge_ratio = int(ratio_str), 0
+
+        if gold_ratio < 0 or grudge_ratio < 0 or (gold_ratio + grudge_ratio) == 0:
+            raise ValueError
+    except ValueError:
+        await repair_equipment.finish("⛔ 比例格式错误，例如：1:0 (纯金币) 或 1:1 (金币:怨念)")
 
     async with safe_session() as session:
         equip = None
@@ -576,253 +533,66 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
             equip_id = int(arg)
             equip = await session.get(ItemInstance, equip_id)
             if not equip or equip.player_id != event.get_user_id() or not equip.is_equipment:
-                await decompose_equipment.finish("⛔ 无效装备 ID 或非本人所有")
+                await repair_equipment.finish("⛔ 无效装备 ID 或非本人所有")
         else:
-            # 按名称查找，优先选择耐久度最低的未装备装备
+            # 按名称查找，优先选择耐久度最低的装备
             item_config = config.items_config["by_name"].get(arg)
             if not item_config or item_config.type.value != "EQUIPMENT":
-                await decompose_equipment.finish("⛔ 未找到对应装备名称，或该物品不是装备")
+                await repair_equipment.finish("⛔ 未找到对应装备名称，或该物品不是装备")
 
-            # 查找玩家所有该名称的未装备装备，按耐久度升序排列
+            # 查找玩家所有该名称的装备，按耐久度升序排列
             stmt = select(ItemInstance).where(
                 ItemInstance.player_id == event.get_user_id(),
-                ItemInstance.item_id == item_config.item_id,
-                ItemInstance.equipped == False
+                ItemInstance.item_id == item_config.item_id
             ).order_by(ItemInstance.durability.asc())
 
-            unequipped_items = (await session.execute(stmt)).scalars().all()
-            if not unequipped_items:
-                await decompose_equipment.finish(f"⛔ 你没有未装备的 {arg}")
+            items = (await session.execute(stmt)).scalars().all()
+            if not items:
+                await repair_equipment.finish(f"⛔ 你没有 {arg}")
 
             # 选择耐久度最低的那件
-            equip = unequipped_items[0]
+            equip = items[0]
 
-        # 检查是否已装备
-        if equip.equipped:
-            await decompose_equipment.finish("⛔ 请先卸下装备再进行分解")
+        # 检查是否需要修理
+        if equip.durability >= equip.config.durability:
+            await repair_equipment.finish("⛔ 该装备无需修理")
 
         # 获取玩家信息
         player = await session.get(Player, event.get_user_id())
 
-        # 检查装备是否有配方
-        recipe_materials = {}
-        if equip.config.recipe:
-            recipe_materials = equip.config.recipe.get("materials", {})
+        # 计算修理费用
+        repair_needed = equip.config.durability - equip.durability
+        base_cost = int(equip.config.price * 0.1 * (repair_needed / equip.config.durability))
 
-        # 计算耐久度比例，用于损失率计算
-        durability_ratio = equip.durability / equip.config.durability if equip.config.durability > 0 else 0
-        base_loss_rate = 0.4  # 基础损失率40%
-        durability_bonus = durability_ratio * 0.2  # 耐久度越高，损失越少，最多减少20%损失
-        final_loss_rate = max(0.2, base_loss_rate - durability_bonus)  # 最少损失20%
-
-        decompose_results = []
-
-        if recipe_materials:
-            # 有配方的装备：分解获得材料
-            materials_to_add = []
-
-            # 先计算所有要获得的材料，不立即添加到背包
-            for material_id, original_qty in recipe_materials.items():
-                # 计算实际获得数量（有随机性）
-                min_gain = max(1, int(original_qty * (1 - final_loss_rate) * 0.8))
-                max_gain = max(1, int(original_qty * (1 - final_loss_rate) * 1.2))
-                gained_qty = random.randint(min_gain, max_gain)
-
-                if gained_qty > 0:
-                    materials_to_add.append((material_id, gained_qty))
-
-            # 尝试添加所有材料到背包（事务性操作）
-            for material_id, gained_qty in materials_to_add:
-                try:
-                    await ItemInstance.add_item(session, event.get_user_id(), material_id, gained_qty)
-                    material_config = config.items_config["by_id"].get(material_id)
-                    material_name = material_config.name if material_config else material_id
-                    decompose_results.append(f"{material_name} ✖️{gained_qty}")
-                except ValueError as e:
-                    # 如果背包空间不足，回滚事务
-                    await session.rollback()
-                    await decompose_equipment.finish(f"⛔ 背包空间不足：{e}")
-        else:
-            # 没有配方的装备：分解获得金币
-            # 基础金币 = 装备价格 * 耐久度比例 * (1 - 损失率) * 随机系数
-            base_gold = int(equip.config.price * durability_ratio * (1 - final_loss_rate))
-            # 添加随机性 ±20%
-            min_gold = max(1, int(base_gold * 0.8))
-            max_gold = max(1, int(base_gold * 1.2))
-            gained_gold = random.randint(min_gold, max_gold)
-
-            # 添加金币
-            player.gold += gained_gold
-            decompose_results.append(f"金币 ✖️{gained_gold}")
-
-        # 删除装备
-        await session.delete(equip)
-        await session.commit()
-
-        # 构建结果消息
-        durability_info = f"耐久:{equip.durability}/{equip.config.durability}"
-        loss_rate_display = f"{final_loss_rate:.0%}"
-
-        if recipe_materials:
-            # 有配方的装备分解结果
-            if decompose_results:
-                materials_msg = "、".join(decompose_results)
-                result_msg = (
-                    f"🔨 成功分解 {equip.config.name} (ID:{equip.id}, {durability_info})\n"
-                    f"📦 获得材料：{materials_msg}\n"
-                    f"💔 材料损失率：{loss_rate_display}"
-                )
-            else:
-                result_msg = f"🔨 分解了 {equip.config.name}，但没有获得任何材料"
-        else:
-            # 没有配方的装备分解结果
-            if decompose_results:
-                gold_msg = "、".join(decompose_results)
-                result_msg = (
-                    f"🔨 成功分解 {equip.config.name} (ID:{equip.id}, {durability_info})\n"
-                    f"� 获得：{gold_msg}\n"
-                    f"💔 回收损失率：{loss_rate_display}"
-                )
-            else:
-                result_msg = f"🔨 分解了 {equip.config.name}，但没有获得任何金币"
-
-        await decompose_equipment.finish(message_add_head(result_msg, event))
-
-# ---------------- 指令：一键修复所有装备（高级月卡专享） ----------------
-repair_all_equipment = on_command("一键修复", aliases={"修复全部", "全部修复"}, block=True, priority=5)
-
-@repair_all_equipment.handle()
-async def _(event: MessageEvent, args: Message = CommandArg()):
-    arg_text = args.extract_plain_text().strip()
-
-    # 解析参数（可选的金币:怨念比例）
-    gold_ratio = None
-    resentment_ratio = None
-
-    if arg_text:
-        # 支持 3:2 或 3：2 格式
-        ratio_text = arg_text.replace("：", ":")
-        if ":" in ratio_text:
-            try:
-                parts = ratio_text.split(":")
-                if len(parts) == 2:
-                    gold_ratio = int(parts[0])
-                    resentment_ratio = int(parts[1])
-                    if gold_ratio < 0 or resentment_ratio < 0:
-                        await repair_all_equipment.finish("⛔ 比例必须为非负整数")
-                    if gold_ratio == 0 and resentment_ratio == 0:
-                        await repair_all_equipment.finish("⛔ 比例不能都为0")
-            except ValueError:
-                await repair_all_equipment.finish("⛔ 比例格式错误，请使用 金币:怨念 格式，如 3:2")
-        else:
-            await repair_all_equipment.finish("⛔ 格式：一键修复 [金币比例:怨念比例]\n💡 示例：一键修复 3:2 或 3：2（金币怨念按3:2分配）\n💡 不指定比例则默认使用金币")
-
-    async with safe_session() as session:
-        player = await session.get(Player, event.get_user_id())
-        if not player:
-            await repair_all_equipment.finish("⛔ 请先创建角色")
-
-        # 检查是否有高级月卡
-        premium_card = await MonthlyCard.get_active_card(session, event.get_user_id(), CardType.PREMIUM)
-        if not premium_card:
-            await repair_all_equipment.finish("⛔ 一键修复功能仅限高级月卡用户使用\n💡 请联系管理员购买高级月卡")
-
-        # 查询玩家所有装备
-        stmt = select(ItemInstance).where(
-            ItemInstance.player_id == event.get_user_id(),
-            ItemInstance.item_id.in_(EQUIP_ITEM_IDS)
-        )
-        all_equipment = (await session.execute(stmt)).scalars().all()
-
-        if not all_equipment:
-            await repair_all_equipment.finish("🎒 你没有任何装备")
-
-        # 筛选出需要修复的装备（耐久度未满的）
-        repairable_equipment = []
-        for equip in all_equipment:
-            if equip.durability < equip.config.durability:
-                repairable_equipment.append(equip)
-
-        if not repairable_equipment:
-            await repair_all_equipment.finish("✨ 你的所有装备都已满耐久，无需修复")
-
-        # 计算总修复费用
-        total_cost = 0
-        repair_details = []
-
-        for equip in repairable_equipment:
-            tpl = equip.config
-            missing = tpl.durability - equip.durability
-            cost_per = tpl.repair_cost if tpl.repair_cost is not None else max(1, int(tpl.price / max(1, tpl.durability)))
-            equip_cost = cost_per * missing
-            total_cost += equip_cost
-
-            repair_details.append({
-                'equip': equip,
-                'missing': missing,
-                'cost': equip_cost
-            })
-
-        # 计算金币和怨念的分配
-        if gold_ratio is None and resentment_ratio is None:
-            # 默认全部使用金币
-            used_gold = total_cost
-            used_resentment = 0
-        else:
-            # 按比例分配
-            total_ratio = gold_ratio + resentment_ratio
-            used_gold = int(total_cost * gold_ratio / total_ratio)
-            used_resentment = total_cost - used_gold
+        # 根据比例计算金币和怨念消耗
+        total_ratio = gold_ratio + grudge_ratio
+        gold_cost = int(base_cost * gold_ratio / total_ratio)
+        grudge_cost = int(base_cost * grudge_ratio / total_ratio)
 
         # 检查资源是否足够
-        if player.gold < used_gold:
-            await repair_all_equipment.finish(f"⛔ 金币不足，需要 {used_gold}💰，当前仅有 {player.gold}💰")
-        if player.resentment < used_resentment:
-            await repair_all_equipment.finish(f"⛔ 怨念不足，需要 {used_resentment}👻，当前仅有 {player.resentment}👻")
+        if player.gold < gold_cost:
+            await repair_equipment.finish(f"⛔ 金币不足，需要 {gold_cost} 金币")
 
-        # 执行修复
-        repaired_count = 0
-        repaired_list = []
+        if player.grudge < grudge_cost:
+            await repair_equipment.finish(f"⛔ 怨念不足，需要 {grudge_cost} 怨念")
 
-        for detail in repair_details:
-            equip = detail['equip']
-            equip.durability = equip.config.durability
-            repaired_count += 1
-            repaired_list.append(f"🔧 {equip.config.name} (ID:{equip.id})")
+        # 执行修理
+        player.gold -= gold_cost
+        player.grudge -= grudge_cost
+        equip.durability = equip.config.durability
 
-        # 扣除费用
-        player.gold -= used_gold
-        player.resentment -= used_resentment
-
+        session.add(player)
+        session.add(equip)
         await session.commit()
 
         # 构建结果消息
-        result_lines = [
-            f"✅ 一键修复完成！共修复 {repaired_count} 件装备",
-            "━━━━━━━━━━━━━"
-        ]
+        cost_info = []
+        if gold_cost > 0:
+            cost_info.append(f"{gold_cost} 金币")
+        if grudge_cost > 0:
+            cost_info.append(f"{grudge_cost} 怨念")
 
-        # 显示修复的装备列表（最多显示10件，超过则省略）
-        if len(repaired_list) <= 10:
-            result_lines.extend(repaired_list)
-        else:
-            result_lines.extend(repaired_list[:8])
-            result_lines.append(f"... 以及其他 {len(repaired_list) - 8} 件装备")
+        cost_str = " + ".join(cost_info)
+        result_msg = f"🔧 成功修理 {equip.config.name} (ID:{equip.id})\n💰 消耗：{cost_str}"
 
-        result_lines.append("━━━━━━━━━━━━━")
-
-        # 费用信息
-        cost_info = f"💰 总费用 {total_cost}，实际耗费 {used_gold}💰"
-        if used_resentment > 0:
-            cost_info += f" + {used_resentment}👻"
-
-        # 如果使用了比例，显示实际比例
-        if gold_ratio is not None and resentment_ratio is not None:
-            cost_info += f"（按比例 {gold_ratio}:{resentment_ratio}）"
-        elif used_resentment == 0:
-            cost_info += "（默认使用金币）"
-
-        result_lines.append(cost_info)
-        result_lines.append("🎉 高级月卡专享功能")
-
-        await repair_all_equipment.finish(message_add_head("\n".join(result_lines), event))
+        await repair_equipment.finish(message_add_head(result_msg, event))

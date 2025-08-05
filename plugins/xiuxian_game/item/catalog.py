@@ -154,7 +154,7 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
         type_cn = TYPE_NAME_MAP.get(cfg.type.value, cfg.type.value)
 
         extra_info = ""
-        # 若为装备，附加属性加成信息
+        # 若为装备，附加等级要求、属性加成、稀有度等信息
         if cfg.type.value == "EQUIPMENT":
             ATTR_CN = {
                 "attack": "力",
@@ -167,6 +167,28 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
                 "mp": "智",
             }
 
+            equipment_info = []
+
+            # 等级要求
+            if hasattr(cfg, 'required_level') and cfg.required_level > 1:
+                equipment_info.append(f"📊 等级要求：Lv.{cfg.required_level}")
+
+            # 稀有度信息
+            rarity_display = cfg.get_rarity_display()
+            rarity_map = {
+                "white": "普通",
+                "green": "优秀",
+                "blue": "稀有",
+                "purple": "史诗",
+                "orange": "传说"
+            }
+            rarity_name = rarity_map.get(cfg.rarity, cfg.rarity)
+            equipment_info.append(f"⭐ 稀有度：{rarity_display}{rarity_name}")
+
+            # 价格信息
+            equipment_info.append(f"💰 价值：{cfg.price:,} 金币")
+
+            # 属性加成
             bonus_parts = []
             if cfg.attr_bonus:
                 for k, v in cfg.attr_bonus.items():
@@ -178,7 +200,14 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
                         cn = ATTR_CN.get(k, k)
                         bonus_parts.append(f"{cn}+{int(v*100)}%")
             if bonus_parts:
-                extra_info = "\n🔧 属性加成：" + " 、".join(bonus_parts)
+                equipment_info.append("🔧 属性加成：" + " 、".join(bonus_parts))
+
+            # 宝石孔位信息
+            if hasattr(cfg, 'gem_slots') and cfg.gem_slots > 0:
+                equipment_info.append(f"💎 宝石孔位：{cfg.gem_slots}个")
+
+            if equipment_info:
+                extra_info = "\n" + "\n".join(equipment_info)
 
         # 若为材料，展示稀有度、价格、怨念值和获取方式
         elif cfg.type.value == "MATERIAL":

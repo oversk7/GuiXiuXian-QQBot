@@ -46,29 +46,42 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
             await upgrade_info_cmd.finish(f"✨ {equip.config.name} 已达最高等级 (+{current_level}阶)")
 
         target_level = current_level + 1
+        required_equipment_count = EquipmentUpgradeService.get_equipment_requirements(current_level)
         required_materials = EquipmentUpgradeService.get_upgrade_materials(current_level)
         required_gold = EquipmentUpgradeService.get_upgrade_gold_cost(current_level)
+
+        # 获取可用装备数量
+        available_equipment = await EquipmentUpgradeService.get_available_equipment_for_upgrade(
+            session, player.id, equip.item_id, current_level
+        )
         success_rate = EquipmentUpgradeService.get_success_rate(current_level)
         success_rate_with_protection = EquipmentUpgradeService.get_success_rate(current_level, True)
 
         # 构建信息显示
         lines = [
-            f"⚔️ 装备升阶信息",
+            f"⚔️ 装备升阶信息（装备合成模式）",
             f"━━━━━━━━━━━━━",
             f"🎯 装备：{equip.config.name} (ID:{equip.id})",
             f"📊 当前等级：+{current_level}阶 → +{target_level}阶",
             f"💰 金币消耗：{required_gold:,}",
             f"📈 成功率：{success_rate:.1%}",
-            f"🛡️ 护身符加成：{success_rate_with_protection:.1%}",
+            f"💎 稳定水晶加成：{success_rate_with_protection:.1%}",
             "",
-            "📦 所需材料："
+            "🔧 装备合成需求："
         ]
 
-        # 显示材料需求和拥有情况
+        # 显示装备需求
+        equipment_status = "✅" if len(available_equipment) >= required_equipment_count else "❌"
+        lines.append(f"{equipment_status} {equip.config.name} +{current_level}阶: {len(available_equipment)}/{required_equipment_count}")
+
+        lines.append("")
+        lines.append("📦 升阶石需求：")
+
+        # 显示升阶石需求和拥有情况
         for material_id, required_qty in required_materials.items():
             material_config = config.items_config["by_id"].get(material_id)
             material_name = material_config.name if material_config else material_id
-            
+
             # 查询拥有数量
             stmt = select(ItemInstance.quantity).where(
                 ItemInstance.player_id == event.get_user_id(),
@@ -76,7 +89,7 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
             )
             result = await session.execute(stmt)
             owned_qty = sum(result.scalars().all())
-            
+
             status = "✅" if owned_qty >= required_qty else "❌"
             lines.append(f"{status} {material_name}: {owned_qty}/{required_qty}")
 
@@ -84,7 +97,12 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
             "",
             "💡 使用方法：",
             f"• 升阶 {arg}",
-            f"• 升阶 {arg} 护身符"
+            f"• 升阶 {arg} 稳定水晶",
+            "",
+            "📝 说明：",
+            f"• 需要消耗 {required_equipment_count-1} 个相同装备作为材料",
+            "• 只有未装备的装备才能用于合成",
+            "• 优先消耗耐久度较低的装备"
         ])
 
         await upgrade_info_cmd.finish(message_add_head("\n".join(lines), event))
@@ -97,12 +115,12 @@ upgrade_equipment_cmd = on_command("升阶", aliases={"装备升阶"}, block=Tru
 async def _(event: MessageEvent, args: Message = CommandArg()):
     arg_text = args.extract_plain_text().strip()
     if not arg_text:
-        await upgrade_equipment_cmd.finish("⛔ 格式：升阶 装备ID/名称 [护身符]")
+        await upgrade_equipment_cmd.finish("⛔ 格式：升阶 装备ID/名称 [稳定水晶]")
 
     # 解析参数
     parts = arg_text.split()
     equipment_arg = parts[0]
-    use_protection = len(parts) > 1 and "护身符" in parts[1]
+    use_protection = len(parts) > 1 and ("稳定水晶" in parts[1] or "护身符" in parts[1])
 
     async with safe_session() as session:
         player = await session.get(Player, event.get_user_id())
@@ -126,6 +144,10 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
         
         if result_info:
             # 显示消耗信息
+            consumed_equipment = result_info.get("consumed_equipment", [])
+            if consumed_equipment:
+                result_lines.append(f"🔧 消耗装备：{', '.join(consumed_equipment)}")
+
             consumed_materials = result_info.get("consumed_materials", {})
             if consumed_materials:
                 material_list = []
@@ -133,8 +155,8 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
                     material_config = config.items_config["by_id"].get(material_id)
                     material_name = material_config.name if material_config else material_id
                     material_list.append(f"{material_name}×{qty}")
-                result_lines.append(f"💸 消耗：{', '.join(material_list)}")
-            
+                result_lines.append(f"💎 消耗升阶石：{', '.join(material_list)}")
+
             consumed_gold = result_info.get("consumed_gold", 0)
             if consumed_gold > 0:
                 result_lines.append(f"💰 消耗金币：{consumed_gold:,}")

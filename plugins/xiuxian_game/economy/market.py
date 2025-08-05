@@ -1,7 +1,8 @@
-from nonebot import on_command
+from nonebot import on_command, on_message
 from nonebot.params import CommandArg
 from nonebot.adapters.qq import MessageEvent, Message
-from sqlalchemy import select, func, asc, desc
+from nonebot.rule import to_me
+from sqlalchemy import select, func, asc, desc, and_
 from sqlalchemy.orm import selectinload
 from ..models.db import safe_session
 from ..models.market_order import MarketOrder, OrderSide
@@ -9,12 +10,29 @@ from ..models.player import Player
 from ..models.inventory import ItemInstance
 from ..config import config
 from ..utils import message_add_head
+from .equipment_trade_service import EquipmentTradeService
 
 MAX_LISTINGS = 6  # 每位玩家最大挂牌数
 AUTO_MATCH = True
 # === 输出格式辅助 ===
 EMOJI_SELL = "📤"  # 出售标识
 EMOJI_BUY = "📥"   # 求购标识
+
+# === 装备选择状态管理 ===
+equipment_selection_state = {}  # {user_id: {"equipment_list": [...], "item_cfg": ..., "price": ...}}
+
+def _cleanup_expired_states():
+    """清理过期的装备选择状态（超过5分钟）"""
+    import time
+    current_time = time.time()
+    expired_users = []
+
+    for user_id, state in equipment_selection_state.items():
+        if current_time - state.get("timestamp", 0) > 300:  # 5分钟过期
+            expired_users.append(user_id)
+
+    for user_id in expired_users:
+        del equipment_selection_state[user_id]
 
 def format_order_line(order_id: int, price: int, qty: int, uid: int) -> str:
     """统一的市场订单行格式，便于排版对齐"""
@@ -51,16 +69,19 @@ list_cmd = on_command("挂牌", block=True, priority=5)
 
 @list_cmd.handle()
 async def _(event: MessageEvent, args: Message = CommandArg()):
-    """挂牌 出售/收购 物品名 单价 数量"""
+    """挂牌 出售/收购 物品名 单价 [数量]"""
     params = args.extract_plain_text().strip().split()
-    if len(params) != 4:
-        await list_cmd.finish("⛔ 格式错误：挂牌 出售/收购 物品名 单价 数量")
+    if len(params) < 3:
+        await list_cmd.finish("⛔ 格式错误：挂牌 出售/收购 物品名 单价 [数量]")
 
-    mode_str, item_name, price_str, qty_str = params
+    mode_str, item_name, price_str = params[:3]
+    qty_str = params[3] if len(params) > 3 else "1"
+
     if mode_str not in ("出售","购买", "收购", "求购"):
         await list_cmd.finish("⛔ 挂牌类型必须为 出售 或 收购")
 
     side = OrderSide.SELL if mode_str == "出售" else OrderSide.BUY
+
     # 参数校验
     try:
         price = int(price_str)
@@ -74,6 +95,15 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
     item_cfg = config.items_config["by_name"].get(item_name)
     if not item_cfg:
         await list_cmd.finish(f"⛔ 不存在物品：{item_name}")
+
+    # 装备交易特殊处理
+    is_equipment = EquipmentTradeService.is_equipment_trade(item_cfg.item_id)
+    if is_equipment and side == OrderSide.SELL:
+        if quantity != 1:
+            await list_cmd.finish("⛔ 装备只能单件出售")
+        # 装备出售需要选择具体实例，转到装备选择流程
+        await _handle_equipment_listing(event, item_cfg, price)
+        return
 
     async with safe_session() as session:
         player: Player | None = await session.get(Player, event.get_user_id())
@@ -98,6 +128,7 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
             if not can_list:
                 await list_cmd.finish(error_msg)
 
+            # 非装备物品按原有逻辑处理
             try:
                 await ItemInstance.consume_item(session, player.id, item_cfg.item_id, quantity)
             except ValueError as e:
@@ -109,13 +140,14 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
             player.gold -= cost
             session.add(player)
 
-        # 创建新订单
+        # 创建新订单（非装备）
         new_order = MarketOrder(
             player_id=player.id,
             side=side,
             item_id=item_cfg.item_id,
             price=price,
             quantity=quantity,
+            is_instance_trade=False
         )
         session.add(new_order)
 
@@ -131,6 +163,157 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
         + ("\n" + fill_msg if fill_msg else "")
     )
     await list_cmd.finish(message_add_head(result_msg, event))
+
+
+async def _handle_equipment_listing(event: MessageEvent, item_cfg, price: int):
+    """处理装备挂牌选择"""
+    async with safe_session() as session:
+        player = await session.get(Player, event.get_user_id())
+        if not player:
+            await list_cmd.finish("⛔ 请先创建角色")
+
+        # 获取玩家的装备列表
+        equipment_list = await EquipmentTradeService.get_player_equipment_list(
+            session, player.id, item_cfg.item_id
+        )
+
+        if not equipment_list:
+            await list_cmd.finish(f"⛔ 你没有可挂牌的 {item_cfg.name}")
+
+        if len(equipment_list) == 1:
+            # 只有一件装备，直接挂牌
+            await _create_equipment_order(session, player, equipment_list[0], price, event)
+            return
+
+        # 多件装备，保存状态并让玩家选择
+        import time
+        user_id = event.get_user_id()
+
+        # 只保存装备ID列表和基本信息，避免数据库会话问题
+        equipment_ids = [eq.id for eq in equipment_list]
+        equipment_summaries = [EquipmentTradeService.generate_equipment_summary(eq) for eq in equipment_list]
+
+        equipment_selection_state[user_id] = {
+            "equipment_ids": equipment_ids,
+            "equipment_summaries": equipment_summaries,
+            "item_id": item_cfg.item_id,
+            "item_name": item_cfg.name,
+            "price": price,
+            "timestamp": time.time()  # 添加时间戳，用于状态过期
+        }
+
+        lines = [
+            f"📋 选择要挂牌的 {item_cfg.name}：",
+            "━━━━━━━━━━━━━"
+        ]
+
+        # 使用保存的摘要信息显示装备列表
+        for i, (eq_id, summary) in enumerate(zip(equipment_ids, equipment_summaries), 1):
+            lines.append(f"{i}. 🆔{eq_id} {summary}")
+
+        lines.extend([
+            "",
+            "💡 请直接回复序号选择装备（如：1），或回复 取消"
+        ])
+
+        await list_cmd.finish(message_add_head("\n".join(lines), event))
+
+
+async def _create_equipment_order(session, player, equipment: ItemInstance, price: int, event: MessageEvent):
+    """创建装备订单"""
+    # 冻结装备
+    if not await EquipmentTradeService.freeze_equipment(session, equipment):
+        await list_cmd.finish("⛔ 该装备无法挂牌（可能已在交易中或已装备）")
+
+    # 生成装备摘要
+    summary = EquipmentTradeService.generate_equipment_summary(equipment)
+
+    # 创建装备订单
+    new_order = MarketOrder(
+        player_id=player.id,
+        side=OrderSide.SELL,
+        item_id=equipment.item_id,
+        price=price,
+        quantity=1,
+        is_instance_trade=True,
+        item_instance_id=equipment.id,
+        equipment_summary=summary
+    )
+    session.add(new_order)
+
+    await session.flush()  # 获取订单ID
+
+    # 自动撮合
+    fill_msg = await _try_auto_match(session, new_order, player, same_price_only=not AUTO_MATCH)
+
+    await session.commit()
+
+    result_msg = f"📈 成功挂牌装备 🆔{new_order.id}┃{summary}┃💰{price:,}"
+    if fill_msg:
+        result_msg += "\n" + fill_msg
+
+    await list_cmd.finish(message_add_head(result_msg, event))
+
+# ---------------- 装备选择消息处理器 ----------------
+equipment_selection_handler = on_message(priority=10, block=False)
+
+@equipment_selection_handler.handle()
+async def _(event: MessageEvent):
+    """处理装备选择的数字回复"""
+    # 清理过期状态
+    _cleanup_expired_states()
+
+    user_id = event.get_user_id()
+
+    # 检查是否有待处理的装备选择状态
+    if user_id not in equipment_selection_state:
+        return
+
+    message_text = event.get_message().extract_plain_text().strip()
+
+    # 处理取消操作
+    if message_text in ["取消", "cancel", "0"]:
+        del equipment_selection_state[user_id]
+        await equipment_selection_handler.finish("❌ 已取消装备挂牌")
+
+    # 检查是否为数字
+    if not message_text.isdigit():
+        return  # 不是数字，不处理
+
+    try:
+        index = int(message_text) - 1  # 转换为0基索引
+        if index < 0:
+            raise ValueError
+    except ValueError:
+        return  # 无效数字，不处理
+
+    # 获取状态信息
+    state = equipment_selection_state[user_id]
+    equipment_ids = state["equipment_ids"]
+    price = state["price"]
+
+    # 检查序号有效性
+    if index >= len(equipment_ids):
+        await equipment_selection_handler.finish("⛔ 无效的装备序号，请重新选择")
+
+    # 获取选中装备的ID
+    equipment_id = equipment_ids[index]
+
+    # 清除状态
+    del equipment_selection_state[user_id]
+
+    async with safe_session() as session:
+        player = await session.get(Player, user_id)
+        if not player:
+            await equipment_selection_handler.finish("⛔ 请先创建角色")
+
+        # 在新会话中重新获取装备对象
+        equipment = await session.get(ItemInstance, equipment_id)
+        if not equipment or equipment.player_id != user_id:
+            await equipment_selection_handler.finish("⛔ 装备不存在或不属于你")
+
+        await _create_equipment_order(session, player, equipment, price, event)
+
 
 # ---------------- 指令：撤牌 ----------------
 cancel_cmd = on_command("撤牌", block=True, priority=5)
@@ -150,11 +333,19 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
         player = await session.get(Player, event.get_user_id())
 
         if order.side == OrderSide.SELL:
-            # 退回剩余物品，先检查背包空间
-            try:
-                await ItemInstance.add_item(session, player.id, order.item_id, order.quantity)
-            except ValueError as e:
-                await cancel_cmd.finish(f"⛔ 撤牌失败：{e}")
+            if order.is_equipment_trade:
+                # 装备交易：解冻装备
+                equipment = await EquipmentTradeService.get_equipment_by_instance_id(
+                    session, order.item_instance_id
+                )
+                if equipment:
+                    await EquipmentTradeService.unfreeze_equipment(session, equipment)
+            else:
+                # 普通物品：退回剩余物品
+                try:
+                    await ItemInstance.add_item(session, player.id, order.item_id, order.quantity)
+                except ValueError as e:
+                    await cancel_cmd.finish(f"⛔ 撤牌失败：{e}")
         else:
             # 退回剩余金币
             player.gold += order.price * order.quantity
@@ -201,7 +392,12 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
         buys = (await session.execute(stmt_buy)).scalars().all()
 
         def _fmt(order: MarketOrder):
-            return format_order_line(order.id, order.price, order.quantity, order.player.uid)
+            if order.is_equipment_trade:
+                # 装备显示格式：🆔001┃💰50,000┃⭐+5阶 [💎2/3] 耐久160/160
+                return f"🆔{str(order.id).rjust(3)}┃💰{str(order.price).rjust(8)}┃{order.equipment_summary}"
+            else:
+                # 普通物品显示格式
+                return format_order_line(order.id, order.price, order.quantity, order.player.uid)
 
         PAGE_SIZE = 10
         def _paginate(lst: list[MarketOrder]):
@@ -394,6 +590,85 @@ async def _(event: MessageEvent):
     ]
     await tax_info_cmd.finish(message_add_head("\n".join(lines), event))
 
+
+# ---------------- 指令：装备估价 ----------------
+equipment_appraise_cmd = on_command("估价", aliases={"装备估价"}, block=True, priority=5)
+
+@equipment_appraise_cmd.handle()
+async def _(event: MessageEvent, args: Message = CommandArg()):
+    """估价 装备ID"""
+    arg = args.extract_plain_text().strip()
+    if not arg.isdigit():
+        await equipment_appraise_cmd.finish("⛔ 格式：估价 装备ID")
+
+    equipment_id = int(arg)
+
+    async with safe_session() as session:
+        player = await session.get(Player, event.get_user_id())
+        if not player:
+            await equipment_appraise_cmd.finish("⛔ 请先创建角色")
+
+        # 获取装备
+        equipment = await session.get(ItemInstance, equipment_id)
+        if not equipment or equipment.player_id != player.id or not equipment.is_equipment:
+            await equipment_appraise_cmd.finish("⛔ 无效装备ID或非本人所有")
+
+        # 计算估价
+        min_price, max_price = EquipmentTradeService.calculate_equipment_value_range(equipment)
+        summary = EquipmentTradeService.generate_equipment_summary(equipment)
+
+        # 获取市场参考价格
+        stmt = select(MarketOrder).where(
+            and_(
+                MarketOrder.item_id == equipment.item_id,
+                MarketOrder.side == OrderSide.SELL,
+                MarketOrder.is_instance_trade == True
+            )
+        ).order_by(MarketOrder.price.asc()).limit(5)
+
+        market_orders = (await session.execute(stmt)).scalars().all()
+
+        lines = [
+            f"💰 装备估价报告",
+            f"━━━━━━━━━━━━━",
+            f"🎯 装备：{summary}",
+            f"🆔 ID：{equipment.id}",
+            "",
+            f"📊 估价分析：",
+            f"• 基础价值：{equipment.config.price:,} 金币",
+        ]
+
+        if equipment.upgrade_level > 0:
+            upgrade_bonus = (equipment.get_upgrade_bonus_multiplier() - 1) * 100
+            lines.append(f"• 升阶加成：+{upgrade_bonus:.0f}% ({equipment.upgrade_level}阶)")
+
+        if equipment.used_gem_slots > 0:
+            gem_value = 0
+            for gem_item_id in equipment.gem_slots_data.values():
+                gem_config = config.items_config["by_id"].get(gem_item_id)
+                if gem_config:
+                    gem_value += gem_config.price
+            lines.append(f"• 宝石价值：{gem_value:,} 金币")
+
+        durability_ratio = equipment.durability / equipment.config.durability if equipment.config.durability > 0 else 1.0
+        if durability_ratio < 1.0:
+            lines.append(f"• 耐久影响：{durability_ratio:.1%}")
+
+        lines.extend([
+            "",
+            f"💎 建议售价：{min_price:,} - {max_price:,} 金币",
+            ""
+        ])
+
+        if market_orders:
+            lines.append("📈 市场参考：")
+            for order in market_orders:
+                lines.append(f"• {order.equipment_summary} - {order.price:,} 金币")
+        else:
+            lines.append("📈 市场参考：暂无同类装备在售")
+
+        await equipment_appraise_cmd.finish(message_add_head("\n".join(lines), event))
+
 # ======= 辅助函数 =======
 async def _try_auto_match(session, new_order: MarketOrder, player: Player, same_price_only: bool = False) -> str:
     """自动撮合逻辑，返回描述信息（可能为空）。"""
@@ -434,12 +709,28 @@ async def _try_auto_match(session, new_order: MarketOrder, player: Player, same_
         seller: Player = await session.get(Player, seller_id)
         item_cfg = new_order.item
 
-        # 物品给买家，检查背包空间
-        try:
-            await ItemInstance.add_item(session, buyer.id, item_cfg.item_id, trade_qty)
-        except ValueError:
-            # 买家背包空间不足，停止撮合
-            break
+        # 处理物品转移
+        if new_order.side == OrderSide.SELL and new_order.is_equipment_trade:
+            # 卖方是装备，转移装备实例
+            equipment = await EquipmentTradeService.get_equipment_by_instance_id(
+                session, new_order.item_instance_id
+            )
+            if not equipment or not await EquipmentTradeService.transfer_equipment(session, equipment, buyer.id):
+                break  # 装备转移失败，停止撮合
+        elif opp.side == OrderSide.SELL and opp.is_equipment_trade:
+            # 对手方是装备，转移装备实例
+            equipment = await EquipmentTradeService.get_equipment_by_instance_id(
+                session, opp.item_instance_id
+            )
+            if not equipment or not await EquipmentTradeService.transfer_equipment(session, equipment, buyer.id):
+                break  # 装备转移失败，停止撮合
+        else:
+            # 普通物品交易，检查背包空间
+            try:
+                await ItemInstance.add_item(session, buyer.id, item_cfg.item_id, trade_qty)
+            except ValueError:
+                # 买家背包空间不足，停止撮合
+                break
 
         # 计算交易金额和阶梯税收
         trade_amount = trade_price * trade_qty
