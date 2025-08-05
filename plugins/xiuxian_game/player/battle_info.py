@@ -65,7 +65,6 @@ async def handle_battle_detail(event: MessageEvent, args: Message = CommandArg()
         "💥 暴击率 (Critical Rate)",
         "• 普通攻击触发暴击的概率",
         "• 暴击伤害为1.5倍基础伤害",
-        "• 可通过装备和等级提升",
         "",
         "🔄 连击率 (Combo Rate)",
         "• 在自己回合内连续普攻的概率",
@@ -84,7 +83,7 @@ async def handle_battle_detail(event: MessageEvent, args: Message = CommandArg()
         "",
         "🎯 命中率 (Accuracy Rate)",
         "• 攻击命中敌方的概率",
-        "• 与敌方闪避率对抗",
+        "• 敌方闪避率可抵消",
         "• 最终命中率不高于95%",
         "",
         "✨ 灵爆率 (Skill Critical Rate)",
@@ -94,18 +93,6 @@ async def handle_battle_detail(event: MessageEvent, args: Message = CommandArg()
         "",
         "🗡️ 穿透率 (Penetration Rate)",
         "• 无视敌方防御的比例",
-        "• 穿透率即为无视防御的百分比",
-        "• 高级战斗属性，成长较慢",
-        "",
-        "📈 属性成长:",
-        "• 等级提升会小幅增加各项属性",
-        "• 装备是属性的主要来源",
-        "• 各属性都有上限，避免过于强势",
-        "",
-        "⚖️ 平衡设计:",
-        "• 暴击率和连击率不会同时过高",
-        "• 闪避率和反击率形成防御体系",
-        "• 穿透率作为稀有属性控制获取"
     ]
     
     await battle_detail.send(event, "\n".join(detail_info))
