@@ -37,9 +37,33 @@ async def _(event: MessageEvent):
         for eq in equips:
             tpl = eq.config
             equip_state = "🟢已装备" if eq.equipped else "🔘未装备"
-            lines.append(
-                f"🆔{eq.id}│{tpl.name} 🛠️ {eq.durability}/{tpl.durability} {equip_state}"
-            )
+
+            # 构建装备信息
+            info_parts = []
+
+            # 基础信息
+            info_parts.append(f"🆔{eq.id}│{tpl.name}")
+
+            # 升阶等级
+            if eq.upgrade_level > 0:
+                info_parts.append(f"⭐+{eq.upgrade_level}")
+
+            # 等级要求
+            if tpl and tpl.required_level > 1:
+                info_parts.append(f"📊Lv.{tpl.required_level}")
+
+            # 耐久度
+            info_parts.append(f"🛠️{eq.durability}/{tpl.durability}")
+
+            # 宝石镶嵌信息
+            if eq.used_gem_slots > 0:
+                info_parts.append(f"💎{eq.used_gem_slots}/{eq.available_gem_slots}")
+
+            # 装备状态
+            info_parts.append(equip_state)
+
+            lines.append(" ".join(info_parts))
+
         await list_equipment.finish(message_add_head("\n".join(lines), event))
 
 # ---------------- 指令：穿戴装备 ----------------
@@ -101,8 +125,15 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
             if equipped_item.config.name == equip_name:
                 await wear_equipment.finish(f"⛔ 你已经穿戴了 {equip_name}，同一名称的装备不能重复穿戴")
 
-        # 计算并持久化属性增量
+        # 获取玩家信息用于等级检查
         player = await session.get(Player, event.get_user_id())
+
+        # ----- 等级要求检查 -----
+        required_level = equip.config.required_level if equip.config else 1
+        if player.level < required_level:
+            await wear_equipment.finish(f"⛔ {equip_name} 需要等级 {required_level}，你当前等级 {player.level}")
+
+        # 计算并持久化属性增量
 
         # 记录穿戴前是否满血满蓝
         was_hp_full = player.hp >= player.max_hp
@@ -119,6 +150,15 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
             "luck": player.luck,
             "max_hp": player.max_hp,
             "max_mp": player.max_mp,
+            # 战斗属性
+            "critical_rate": player.critical_rate,
+            "critical_power": player.critical_power,
+            "combo_rate": player.combo_rate,
+            "counter_rate": player.counter_rate,
+            "dodge_rate": player.dodge_rate,
+            "accuracy_rate": player.accuracy_rate,
+            "skill_crit_rate": player.skill_crit_rate,
+            "penetration_rate": player.penetration_rate,
         }
 
         # 计算基础属性（减去其他装备的加成）
@@ -131,7 +171,7 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
         # 基于基础属性计算新装备的加成
         new_attrs = current_attrs.copy()
         equip.apply_attr_bonus(new_attrs, base_attrs)
-        delta = {k: new_attrs[k] - current_attrs[k] for k in new_attrs if new_attrs[k] != current_attrs[k]}
+        delta = {k: new_attrs[k] - current_attrs.get(k, 0) for k in new_attrs if new_attrs[k] != current_attrs.get(k, 0)}
 
         # 应用到玩家本体
         for k, v in delta.items():
@@ -180,6 +220,7 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
                 await unwear_equipment.finish("⛔ 未找到对应装备名称，或该物品不是装备")
 
             # 查找玩家所有该名称的已装备装备，按耐久度升序排列
+            from sqlalchemy import select
             stmt = select(ItemInstance).where(
                 ItemInstance.player_id == event.get_user_id(),
                 ItemInstance.item_id == item_config.item_id,
@@ -205,7 +246,7 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
 
         if equip.item_id in furnace_ids:
             # 查找使用该炼丹炉的进行中任务
-            from sqlalchemy import select, and_
+            from sqlalchemy import and_
             stmt = select(AlchemyRecord).where(
                 and_(
                     AlchemyRecord.player_id == event.get_user_id(),
@@ -296,7 +337,7 @@ async def _(event: MessageEvent):
         # 处理炼丹炉相关逻辑
         from ..alchemy.service import AlchemyService
         from ..models.alchemy_task import AlchemyRecord
-        from sqlalchemy import and_
+        from sqlalchemy import and_, select
 
         furnace_ids = list(AlchemyService.FURNACE_QUALITIES.keys())
         all_failed_tasks = []  # 所有失败的炼丹任务

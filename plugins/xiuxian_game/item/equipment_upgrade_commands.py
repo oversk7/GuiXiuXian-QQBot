@@ -1,0 +1,221 @@
+"""
+装备升阶命令模块
+
+提供装备升阶相关的用户交互命令：
+1. 查看升阶信息
+2. 执行升阶操作
+3. 升阶预览
+"""
+
+from nonebot import on_command
+from nonebot.params import CommandArg
+from nonebot.adapters.qq import MessageEvent, Message
+from sqlalchemy import select
+from ..models.db import safe_session
+from ..models import Player, ItemInstance
+from ..config import config
+from ..utils import message_add_head
+from .equipment_upgrade_service import EquipmentUpgradeService
+
+
+# ---------------- 指令：查看升阶信息 ----------------
+upgrade_info_cmd = on_command("升阶信息", aliases={"升阶预览"}, block=True, priority=5)
+
+@upgrade_info_cmd.handle()
+async def _(event: MessageEvent, args: Message = CommandArg()):
+    arg = args.extract_plain_text().strip()
+    if not arg:
+        await upgrade_info_cmd.finish("⛔ 格式：升阶信息 装备ID/名称")
+
+    async with safe_session() as session:
+        player = await session.get(Player, event.get_user_id())
+        if not player:
+            await upgrade_info_cmd.finish("⛔ 请先创建角色")
+
+        # 查找装备
+        equip = await _find_equipment(session, event.get_user_id(), arg)
+        if not equip:
+            await upgrade_info_cmd.finish("⛔ 未找到指定装备")
+
+        if not equip.is_equipment:
+            await upgrade_info_cmd.finish("⛔ 该物品不是装备")
+
+        # 获取升阶信息
+        current_level = equip.upgrade_level
+        if current_level >= 10:
+            await upgrade_info_cmd.finish(f"✨ {equip.config.name} 已达最高等级 (+{current_level}阶)")
+
+        target_level = current_level + 1
+        required_materials = EquipmentUpgradeService.get_upgrade_materials(current_level)
+        required_gold = EquipmentUpgradeService.get_upgrade_gold_cost(current_level)
+        success_rate = EquipmentUpgradeService.get_success_rate(current_level)
+        success_rate_with_protection = EquipmentUpgradeService.get_success_rate(current_level, True)
+
+        # 构建信息显示
+        lines = [
+            f"⚔️ 装备升阶信息",
+            f"━━━━━━━━━━━━━",
+            f"🎯 装备：{equip.config.name} (ID:{equip.id})",
+            f"📊 当前等级：+{current_level}阶 → +{target_level}阶",
+            f"💰 金币消耗：{required_gold:,}",
+            f"📈 成功率：{success_rate:.1%}",
+            f"🛡️ 护身符加成：{success_rate_with_protection:.1%}",
+            "",
+            "📦 所需材料："
+        ]
+
+        # 显示材料需求和拥有情况
+        for material_id, required_qty in required_materials.items():
+            material_config = config.items_config["by_id"].get(material_id)
+            material_name = material_config.name if material_config else material_id
+            
+            # 查询拥有数量
+            stmt = select(ItemInstance.quantity).where(
+                ItemInstance.player_id == event.get_user_id(),
+                ItemInstance.item_id == material_id
+            )
+            result = await session.execute(stmt)
+            owned_qty = sum(result.scalars().all())
+            
+            status = "✅" if owned_qty >= required_qty else "❌"
+            lines.append(f"{status} {material_name}: {owned_qty}/{required_qty}")
+
+        lines.extend([
+            "",
+            "💡 使用方法：",
+            f"• 升阶 {arg}",
+            f"• 升阶 {arg} 护身符"
+        ])
+
+        await upgrade_info_cmd.finish(message_add_head("\n".join(lines), event))
+
+
+# ---------------- 指令：装备升阶 ----------------
+upgrade_equipment_cmd = on_command("升阶", aliases={"装备升阶"}, block=True, priority=5)
+
+@upgrade_equipment_cmd.handle()
+async def _(event: MessageEvent, args: Message = CommandArg()):
+    arg_text = args.extract_plain_text().strip()
+    if not arg_text:
+        await upgrade_equipment_cmd.finish("⛔ 格式：升阶 装备ID/名称 [护身符]")
+
+    # 解析参数
+    parts = arg_text.split()
+    equipment_arg = parts[0]
+    use_protection = len(parts) > 1 and "护身符" in parts[1]
+
+    async with safe_session() as session:
+        player = await session.get(Player, event.get_user_id())
+        if not player:
+            await upgrade_equipment_cmd.finish("⛔ 请先创建角色")
+
+        # 查找装备
+        equip = await _find_equipment(session, event.get_user_id(), equipment_arg)
+        if not equip:
+            await upgrade_equipment_cmd.finish("⛔ 未找到指定装备")
+
+        # 执行升阶
+        success, message, result_info = await EquipmentUpgradeService.perform_upgrade(
+            session, equip, player, use_protection
+        )
+
+        await session.commit()
+
+        # 构建结果消息
+        result_lines = [message]
+        
+        if result_info:
+            # 显示消耗信息
+            consumed_materials = result_info.get("consumed_materials", {})
+            if consumed_materials:
+                material_list = []
+                for material_id, qty in consumed_materials.items():
+                    material_config = config.items_config["by_id"].get(material_id)
+                    material_name = material_config.name if material_config else material_id
+                    material_list.append(f"{material_name}×{qty}")
+                result_lines.append(f"💸 消耗：{', '.join(material_list)}")
+            
+            consumed_gold = result_info.get("consumed_gold", 0)
+            if consumed_gold > 0:
+                result_lines.append(f"💰 消耗金币：{consumed_gold:,}")
+
+        await upgrade_equipment_cmd.finish(message_add_head("\n".join(result_lines), event))
+
+
+# ---------------- 指令：升阶列表 ----------------
+upgrade_list_cmd = on_command("升阶列表", aliases={"可升阶装备"}, block=True, priority=5)
+
+@upgrade_list_cmd.handle()
+async def _(event: MessageEvent):
+    async with safe_session() as session:
+        player = await session.get(Player, event.get_user_id())
+        if not player:
+            await upgrade_list_cmd.finish("⛔ 请先创建角色")
+
+        # 查询所有装备
+        equip_item_ids = config.items_config["by_type"]["EQUIPMENT"]
+        stmt = select(ItemInstance).where(
+            ItemInstance.player_id == event.get_user_id(),
+            ItemInstance.item_id.in_(equip_item_ids),
+            ItemInstance.equipped == False  # 只显示未装备的
+        )
+        equips = (await session.execute(stmt)).scalars().all()
+
+        if not equips:
+            await upgrade_list_cmd.finish("🎒 你没有可升阶的装备")
+
+        lines = ["⚔️ 可升阶装备列表", "━━━━━━━━━━━━━"]
+        
+        for equip in equips:
+            if equip.upgrade_level >= 10:
+                continue  # 跳过已满级装备
+            
+            current_level = equip.upgrade_level
+            target_level = current_level + 1
+            success_rate = EquipmentUpgradeService.get_success_rate(current_level)
+            
+            lines.append(
+                f"🆔{equip.id} │ {equip.config.name} "
+                f"+{current_level}→+{target_level} "
+                f"({success_rate:.1%})"
+            )
+
+        if len(lines) == 2:  # 只有标题
+            await upgrade_list_cmd.finish("✨ 所有装备都已达到最高等级")
+
+        lines.append("")
+        lines.append("💡 使用 /升阶信息 装备ID 查看详细信息")
+
+        await upgrade_list_cmd.finish(message_add_head("\n".join(lines), event))
+
+
+# ---------------- 辅助函数 ----------------
+async def _find_equipment(session, player_id: str, arg: str) -> ItemInstance | None:
+    """查找装备的辅助函数"""
+    equip = None
+    
+    # 尝试按ID查找
+    if arg.isdigit():
+        equip_id = int(arg)
+        equip = await session.get(ItemInstance, equip_id)
+        if not equip or equip.player_id != player_id or not equip.is_equipment:
+            return None
+    else:
+        # 按名称查找
+        item_config = config.items_config["by_name"].get(arg)
+        if not item_config or item_config.type.value != "EQUIPMENT":
+            return None
+
+        # 查找玩家所有该名称的装备，优先选择等级最低的
+        stmt = select(ItemInstance).where(
+            ItemInstance.player_id == player_id,
+            ItemInstance.item_id == item_config.item_id
+        ).order_by(ItemInstance.upgrade_level.asc())
+
+        items = (await session.execute(stmt)).scalars().all()
+        if not items:
+            return None
+        
+        equip = items[0]
+    
+    return equip

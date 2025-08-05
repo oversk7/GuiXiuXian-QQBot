@@ -16,6 +16,7 @@ class ItemType(str,PyEnum):
     EQUIPMENT = "EQUIPMENT"
     GOODS = "GOODS"
     GHOST_FRAGMENT = "GHOST_FRAGMENT"
+    GEM = "GEM"
 
 class ItemEffectType(str, PyEnum):
     RESTORE_HP = "RESTORE_HP"
@@ -57,6 +58,11 @@ class ItemConfig:
         # 丹药每日使用限制
         self.daily_limit = data.get("daily_limit", 0)  # 每日服用上限，0表示无限制
 
+        # 装备扩展属性
+        self.required_level = data.get("required_level", 1)  # 装备等级要求
+        self.gem_slots = data.get("gem_slots", 0)  # 宝石孔位数量
+        self.max_upgrade_level = data.get("max_upgrade_level", 10)  # 最大升阶等级
+
     def get_rarity_display(self) -> str:
         """获取稀有度显示文本"""
         rarity_map = {
@@ -91,6 +97,10 @@ class ItemInstance(Base):
     equipped: Mapped[bool] = mapped_column(Boolean, default=False, server_default="0", comment="是否已穿戴（仅装备有效）")
     extra_attrs: Mapped[dict] = mapped_column(MutableDict.as_mutable(JSON), default=dict, server_default="{}", comment="强化等附加属性")
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.now, server_default="2025-01-01 00:00:00", comment="获得时间")
+
+    # 装备扩展字段
+    upgrade_level: Mapped[int] = mapped_column(Integer, default=0, server_default="0", comment="装备升阶等级（0-10阶）")
+    gem_slots_data: Mapped[dict] = mapped_column(MutableDict.as_mutable(JSON), default=dict, server_default="{}", comment="宝石孔位数据：{slot_index: gem_item_id}")
     
     owner: Mapped["Player"] = relationship("Player", backref="item_instances")
     
@@ -135,18 +145,22 @@ class ItemInstance(Base):
         if not tpl:
             return
 
-        # 固定值
+        # 获取升阶加成倍率
+        upgrade_multiplier = self.get_upgrade_bonus_multiplier()
+
+        # 固定值（考虑升阶加成）
         key_map = {"hp": "max_hp", "mp": "max_mp"}
         for k, v in (tpl.attr_bonus or {}).items():
             key = key_map.get(k, k)
-            attrs[key] = attrs.get(key, 0) + int(v)
+            bonus_value = int(v * upgrade_multiplier)
+            attrs[key] = attrs.get(key, 0) + bonus_value
 
-        # 百分比 - 基于基础属性计算
+        # 百分比 - 基于基础属性计算（考虑升阶加成）
         ratio_base = base_attrs if base_attrs else attrs
         for k, r in (tpl.attr_ratio or {}).items():
             key = key_map.get(k, k)
             base_value = ratio_base.get(key, 0)
-            ratio_bonus = int(base_value * float(r))
+            ratio_bonus = int(base_value * float(r) * upgrade_multiplier)
             attrs[key] = attrs.get(key, 0) + ratio_bonus
 
         # 额外属性（强化）
@@ -156,7 +170,37 @@ class ItemInstance(Base):
             if not isinstance(v, (int, float)):
                 continue
             attrs[k] = attrs.get(k, 0) + int(v)
+
+        # 宝石镶嵌属性加成
+        self._apply_gem_bonus(attrs, base_attrs)
+
         return attrs
+
+    def _apply_gem_bonus(self, attrs: dict, base_attrs: dict = None):
+        """应用宝石镶嵌的属性加成"""
+        if not self.is_equipment or not self.gem_slots_data:
+            return
+
+        from ..config import config
+
+        for slot_index, gem_item_id in self.gem_slots_data.items():
+            gem_config = config.items_config["by_id"].get(gem_item_id)
+            if not gem_config:
+                continue
+
+            # 应用宝石的固定属性加成
+            key_map = {"hp": "max_hp", "mp": "max_mp"}
+            for k, v in (gem_config.attr_bonus or {}).items():
+                key = key_map.get(k, k)
+                attrs[key] = attrs.get(key, 0) + int(v)
+
+            # 应用宝石的百分比属性加成
+            ratio_base = base_attrs if base_attrs else attrs
+            for k, r in (gem_config.attr_ratio or {}).items():
+                key = key_map.get(k, k)
+                base_value = ratio_base.get(key, 0)
+                ratio_bonus = int(base_value * float(r))
+                attrs[key] = attrs.get(key, 0) + ratio_bonus
 
     def lose_durability(self, amount: int = 1) -> bool:
         """扣除耐久。返回 True 如果装备已损坏并应销毁。"""
@@ -164,6 +208,51 @@ class ItemInstance(Base):
             return False
         self.durability = max(0, self.durability - amount)
         return self.durability == 0
+
+    @property
+    def available_gem_slots(self) -> int:
+        """获取可用的宝石孔位数量"""
+        if not self.is_equipment:
+            return 0
+        return self.config.gem_slots if self.config else 0
+
+    @property
+    def used_gem_slots(self) -> int:
+        """获取已使用的宝石孔位数量"""
+        if not self.is_equipment:
+            return 0
+        return len(self.gem_slots_data or {})
+
+    @property
+    def free_gem_slots(self) -> int:
+        """获取剩余可用的宝石孔位数量"""
+        return max(0, self.available_gem_slots - self.used_gem_slots)
+
+    def get_gem_in_slot(self, slot_index: int) -> str | None:
+        """获取指定孔位中的宝石ID"""
+        if not self.is_equipment:
+            return None
+        return (self.gem_slots_data or {}).get(str(slot_index))
+
+    def set_gem_in_slot(self, slot_index: int, gem_item_id: str | None):
+        """在指定孔位设置宝石"""
+        if not self.is_equipment:
+            return
+        if self.gem_slots_data is None:
+            self.gem_slots_data = {}
+        if gem_item_id is None:
+            # 移除宝石
+            self.gem_slots_data.pop(str(slot_index), None)
+        else:
+            # 设置宝石
+            self.gem_slots_data[str(slot_index)] = gem_item_id
+
+    def get_upgrade_bonus_multiplier(self) -> float:
+        """获取升阶等级的属性加成倍率"""
+        if not self.is_equipment or self.upgrade_level <= 0:
+            return 1.0
+        # 每阶提升20%属性
+        return 1.0 + (self.upgrade_level * 0.2)
 
     # ---------------------- 静态工具方法 ----------------------
     @staticmethod

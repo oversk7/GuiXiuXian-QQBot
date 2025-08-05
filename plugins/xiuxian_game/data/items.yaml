@@ -317,6 +317,64 @@ items:
       price: 2000
       grudge_value: 80
 
+    # ========== 装备升阶专用材料 ==========
+    - item_id: "upgrade_stone_low"
+      name: "初级升阶石"
+      description: "蕴含微弱能量的升阶石，可用于装备1-3阶升级 ⬆️"
+      type: "MATERIAL"
+      rarity: "white"
+      price: 500
+      grudge_value: 5
+
+    - item_id: "upgrade_stone_mid"
+      name: "中级升阶石"
+      description: "蕴含中等能量的升阶石，可用于装备4-6阶升级 ⬆️"
+      type: "MATERIAL"
+      rarity: "green"
+      price: 2000
+      grudge_value: 20
+
+    - item_id: "upgrade_stone_high"
+      name: "高级升阶石"
+      description: "蕴含强大能量的升阶石，可用于装备7-9阶升级 ⬆️"
+      type: "MATERIAL"
+      rarity: "blue"
+      price: 8000
+      grudge_value: 80
+
+    - item_id: "upgrade_stone_supreme"
+      name: "至尊升阶石"
+      description: "蕴含极致能量的升阶石，可用于装备10阶升级 ⬆️"
+      type: "MATERIAL"
+      rarity: "purple"
+      price: 30000
+      grudge_value: 300
+
+    - item_id: "protection_charm"
+      name: "护身符"
+      description: "神秘的护身符，可在装备升阶失败时保护装备不降级 🛡️"
+      type: "MATERIAL"
+      rarity: "blue"
+      price: 5000
+      grudge_value: 50
+
+
+
+    # ========== 镶嵌工具 ==========
+    - item_id: "gem_hammer"
+      name: "镶嵌锤"
+      description: "专用于宝石镶嵌的精密工具，每次镶嵌消耗1个 🔨"
+      type: "MATERIAL"
+      rarity: "white"
+      price: 200
+
+    - item_id: "gem_chisel"
+      name: "拆卸凿"
+      description: "专用于拆卸镶嵌物的精密工具，每次拆卸消耗1个 ⛏️"
+      type: "MATERIAL"
+      rarity: "green"
+      price: 500
+
   equipment:
     # ========== 初级装备 (1-20级) - 主要数值加成，使用白色材料 ==========
 
@@ -334,6 +392,9 @@ items:
           grave_soil: 15
         gold: 500
       repair_cost: 5
+      required_level: 1
+      gem_slots: 1
+      rarity: "white"
 
     - item_id: "ghost_tear_pendant"
       name: "鬼泪吊坠"
@@ -349,6 +410,9 @@ items:
           ash_powder: 10
         gold: 400
       repair_cost: 5
+      required_level: 5
+      gem_slots: 1
+      rarity: "white"
 
     - item_id: "rusty_blade"
       name: "锈蚀刀刃"
@@ -364,6 +428,9 @@ items:
           ash_powder: 12
         gold: 450
       repair_cost: 5
+      required_level: 10
+      gem_slots: 1
+      rarity: "white"
 
     # ========== 中级装备 (21-60级) - 数值+少量比例，白色+绿色材料 ==========
 
@@ -382,6 +449,9 @@ items:
           spirit_bone: 15
         gold: 1200
       repair_cost: 10
+      required_level: 25
+      gem_slots: 2
+      rarity: "green"
 
     - item_id: "self_awareness_key"
       name: "自知力钥匙"
@@ -398,6 +468,9 @@ items:
           ghost_tears: 20
         gold: 1000
       repair_cost: 10
+      required_level: 30
+      gem_slots: 2
+      rarity: "green"
 
     - item_id: "corrupted_bandage_wrap"
       name: "污血绷带"
@@ -432,6 +505,9 @@ items:
           school_bell_fragment: 8
         gold: 5000
       repair_cost: 20
+      required_level: 65
+      gem_slots: 3
+      rarity: "blue"
 
     - item_id: "mirror_shard_armor"
       name: "镜片战甲"
@@ -448,6 +524,9 @@ items:
           nightmare_silk: 15
         gold: 8000
       repair_cost: 20
+      required_level: 70
+      gem_slots: 3
+      rarity: "blue"
 
     - item_id: "phantom_cloak"
       name: "幽魂斗篷"
@@ -482,6 +561,9 @@ items:
           nightmare_silk: 20
         gold: 15000
       repair_cost: 50
+      required_level: 105
+      gem_slots: 3
+      rarity: "purple"
 
     - item_id: "wedding_dress"
       name: "嫁衣"
@@ -498,6 +580,9 @@ items:
           nightmare_silk: 25
         gold: 20000
       repair_cost: 50
+      required_level: 120
+      gem_slots: 3
+      rarity: "purple"
 
     - item_id: "void_essence_crown"
       name: "虚无之冠"
@@ -942,3 +1027,92 @@ items:
       type: "GHOST_FRAGMENT"
       price: 200000
       grudge_value: 10
+
+  gems:  # 宝石类镶嵌物品
+    # ========== 宝石类镶嵌物品 ==========
+    - item_id: "strength_gem"
+      name: "力量宝石"
+      description: "蕴含纯粹力量的红色宝石，镶嵌后增加攻击力 💪"
+      type: "GEM"
+      rarity: "green"
+      price: 1000
+      attr_bonus: {"attack": 15}
+
+    - item_id: "agility_gem"
+      name: "敏捷宝石"
+      description: "蕴含迅捷之力的绿色宝石，镶嵌后增加敏捷 🏃"
+      type: "GEM"
+      rarity: "green"
+      price: 1000
+      attr_bonus: {"agility": 15}
+
+    - item_id: "vitality_gem"
+      name: "体质宝石"
+      description: "蕴含生命之力的蓝色宝石，镶嵌后增加生命值 ❤️"
+      type: "GEM"
+      rarity: "green"
+      price: 1000
+      attr_bonus: {"hp": 100}
+
+    - item_id: "defense_gem"
+      name: "防御宝石"
+      description: "蕴含坚固之力的黄色宝石，镶嵌后增加防御力 🛡️"
+      type: "GEM"
+      rarity: "green"
+      price: 1000
+      attr_bonus: {"defense": 20}
+
+    # ========== 佛珠类镶嵌物品 ==========
+    - item_id: "critical_bead"
+      name: "暴击佛珠"
+      description: "蕴含杀意的血红佛珠，镶嵌后增加暴击率 💥"
+      type: "GEM"
+      rarity: "blue"
+      price: 3000
+      attr_bonus: {"critical_rate": 8}
+
+    - item_id: "combo_bead"
+      name: "连击佛珠"
+      description: "蕴含连绵之力的金色佛珠，镶嵌后增加连击率 🔄"
+      type: "GEM"
+      rarity: "blue"
+      price: 3000
+      attr_bonus: {"combo_rate": 6}
+
+    - item_id: "dodge_bead"
+      name: "闪避佛珠"
+      description: "蕴含虚无之力的透明佛珠，镶嵌后增加闪避率 👻"
+      type: "GEM"
+      rarity: "blue"
+      price: 3000
+      attr_bonus: {"dodge_rate": 8}
+
+    - item_id: "accuracy_bead"
+      name: "命中佛珠"
+      description: "蕴含精准之力的白色佛珠，镶嵌后增加命中率 🎯"
+      type: "GEM"
+      rarity: "blue"
+      price: 3000
+      attr_bonus: {"accuracy_rate": 10}
+
+    # ========== 符文类镶嵌物品 ==========
+    - item_id: "vampire_rune"
+      name: "吸血符文"
+      description: "刻有古老咒文的血色符文，镶嵌后攻击时有概率回复生命 🧛"
+      type: "GEM"
+      rarity: "purple"
+      price: 8000
+
+    - item_id: "reflect_rune"
+      name: "反伤符文"
+      description: "刻有反击咒文的黑色符文，镶嵌后受到攻击时有概率反伤 ⚡"
+      type: "GEM"
+      rarity: "purple"
+      price: 8000
+
+    - item_id: "immunity_rune"
+      name: "免疫符文"
+      description: "刻有净化咒文的白色符文，镶嵌后有概率免疫负面状态 ✨"
+      type: "GEM"
+      rarity: "purple"
+      price: 8000
