@@ -60,6 +60,8 @@ class Player(Base):
     seclusion_start_time: Mapped[datetime] = mapped_column(DateTime, nullable=True, comment="闭关开始时间")
     last_message_board_check: Mapped[datetime] = mapped_column(DateTime, nullable=True, comment="最后查看留言板时间")
 
+    monthly_cards: Mapped[list["MonthlyCard"]] = relationship("MonthlyCard", back_populates="player")
+    
     async def get_effective_inventory_capacity(self, session) -> int:
         """获取有效背包容量（包含月卡加成）"""
         from .monthly_card import get_player_card_benefits
