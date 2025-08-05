@@ -140,7 +140,9 @@ class BattleEngine:
         
         # 应用暴击
         if is_critical:
-            final_damage = BattleAttributeCalculator.calculate_critical_damage(final_damage)
+            final_damage = BattleAttributeCalculator.calculate_critical_damage(
+                final_damage, attacker_attrs["critical_power"]
+            )
             result["effects"].append("CRITICAL")
         
         # 应用穿透和防御

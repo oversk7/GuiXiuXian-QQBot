@@ -325,9 +325,13 @@ class BattleIntegrationHelper:
         from .battle_attributes import BattleAttributeCalculator
         attrs = BattleAttributeCalculator.calculate_effective_attributes(player)
         
+        # 计算暴击倍数显示（基础1.5倍 + 暴击力*0.1倍）
+        crit_multiplier = 1.5 + (attrs['critical_power'] * 0.1)
+
         lines = [
             "⚔️ 战斗属性 ⚔️",
             f"💥 暴击率: {attrs['critical_rate']:.1f}%",
+            f"💢 暴击力: {crit_multiplier:.1f}倍",
             f"🔄 连击率: {attrs['combo_rate']:.1f}%",
             f"🛡️ 反击率: {attrs['counter_rate']:.1f}%",
             f"⚡ 闪避率: {attrs['dodge_rate']:.1f}%",

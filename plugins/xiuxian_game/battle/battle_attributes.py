@@ -50,6 +50,7 @@ class BattleAttributeCalculator:
         # 基础属性名称映射
         base_attrs = {
             "critical_rate": player.critical_rate,
+            "critical_power": player.critical_power,
             "combo_rate": player.combo_rate,
             "counter_rate": player.counter_rate,
             "dodge_rate": player.dodge_rate,
@@ -280,7 +281,9 @@ class BattleEffectProcessor:
         
         # 应用暴击
         if is_critical:
-            final_damage = BattleAttributeCalculator.calculate_critical_damage(final_damage)
+            final_damage = BattleAttributeCalculator.calculate_critical_damage(
+                final_damage, attacker_attrs["critical_power"]
+            )
             result["effects"].append("CRITICAL")
         
         # 应用穿透

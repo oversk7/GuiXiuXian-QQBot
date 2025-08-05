@@ -36,6 +36,7 @@ class Player(Base):
 
     # 新增战斗属性
     critical_rate: Mapped[int] = mapped_column(Integer, default=5, server_default='5', comment="暴击率(百分比)")
+    critical_power: Mapped[int] = mapped_column(Integer, default=15, server_default='15', comment="暴击力(每点增加0.1倍伤害)")
     combo_rate: Mapped[int] = mapped_column(Integer, default=0, server_default='0', comment="连击率(百分比)")
     counter_rate: Mapped[int] = mapped_column(Integer, default=0, server_default='0', comment="反击率(百分比)")
     dodge_rate: Mapped[int] = mapped_column(Integer, default=0, server_default='0', comment="闪避率(百分比)")
@@ -76,6 +77,7 @@ class Player(Base):
         # 基础属性值
         base_attrs = {
             "critical_rate": self.critical_rate,
+            "critical_power": self.critical_power,
             "combo_rate": self.combo_rate,
             "counter_rate": self.counter_rate,
             "dodge_rate": self.dodge_rate,
@@ -109,9 +111,13 @@ class Player(Base):
         """格式化显示战斗属性"""
         attrs = self.get_effective_battle_attributes()
 
+        # 计算暴击倍数显示（基础1.5倍 + 暴击力*0.1倍）
+        crit_multiplier = 1.5 + (attrs['critical_power'] * 0.1)
+
         lines = [
             "⚔️ 战斗属性 ⚔️",
             f"💥 暴击率: {attrs['critical_rate']}%",
+            f"💢 暴击力: {crit_multiplier:.1f}倍",
             f"🔄 连击率: {attrs['combo_rate']}%",
             f"🛡️ 反击率: {attrs['counter_rate']}%",
             f"⚡ 闪避率: {attrs['dodge_rate']}%",
