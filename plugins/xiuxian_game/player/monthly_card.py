@@ -136,6 +136,11 @@ async def handle_check_monthly_card(event: MessageEvent):
         if benefits["sign_revival_elixirs"] > 0:
             msg_lines.append(f"💊 签到获得真还魂丹*{benefits['sign_revival_elixirs']}")
 
+        # 添加突破保护权益说明
+        if benefits["breakthrough_protection"] > 0:
+            protection_percent = int(benefits["breakthrough_protection"] * 100)
+            msg_lines.append(f"🛡️ 突破失败修为保留{protection_percent}%")
+
         msg_lines.append("━━━━━━━━━━━━━")
         
         await check_monthly_card_cmd.finish(message_add_head("\n".join(msg_lines), event))

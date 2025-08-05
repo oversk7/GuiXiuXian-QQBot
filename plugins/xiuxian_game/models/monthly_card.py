@@ -153,6 +153,7 @@ async def get_player_card_benefits(session, player_id: str) -> dict:
         "auto_collect": False,
         "sign_stamina_bonus": 0,  # 签到咒抗上限增加
         "sign_revival_elixirs": 0,  # 签到获得真还魂丹数量
+        "breakthrough_protection": 0.0,  # 突破失败保护（修为保留比例）
     }
 
     active_cards = await MonthlyCard.get_all_active_cards(session, player_id)
@@ -169,6 +170,12 @@ async def get_player_card_benefits(session, player_id: str) -> dict:
         benefits["inventory_bonus"] += card_benefits.get("inventory_bonus", 0)
         benefits["sign_stamina_bonus"] += card_benefits.get("sign_stamina_bonus", 0)
         benefits["sign_revival_elixirs"] += card_benefits.get("sign_revival_elixirs", 0)
+
+        # 突破保护取最大值
+        benefits["breakthrough_protection"] = max(
+            benefits["breakthrough_protection"],
+            card_benefits.get("breakthrough_protection", 0)
+        )
 
         # 取最大值的权益
         benefits["seclusion_time_limit"] = max(

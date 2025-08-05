@@ -9,6 +9,7 @@ from datetime import datetime
 import random
 from sqlalchemy import select as _sel
 from ..models.inventory import ItemInstance as _Equip, ItemType
+from ..models.monthly_card import get_player_card_benefits
 
 
 cfg = config.game_config["cultivate"]
@@ -446,16 +447,34 @@ async def handle_breakthrough(event: MessageEvent, args: Message = CommandArg())
                 )
             else:
                 # 突破失败
-                player.exp = round(player.exp * cfg_break["fail_keep_ratio"])
-                msg = (
-                    "💥 镇厄崩散，修为反噬席卷脏腑。\n"
-                    "━━━━━━━━━━━━━\n"
-                    f"✧ 剩余修为 {player.exp}\n"
-                    f"✧ 本次理论成功率 {int(success_chance*100)}%\n"
-                    "━━━━━━━━━━━━━\n"
-                    "⬇️ 建议【突破 镇厄】以怨念护体\n"
+                # 检查月卡权益
+                card_benefits = await get_player_card_benefits(session, player.id)
+                breakthrough_protection = card_benefits.get("breakthrough_protection", 0)
+
+                # 确定修为保留比例
+                if breakthrough_protection > 0:
+                    # 有月卡保护，使用月卡的保留比例
+                    keep_ratio = breakthrough_protection
+                    protection_msg = "💳 月卡保护生效！"
+                else:
+                    # 没有月卡保护，使用默认比例
+                    keep_ratio = cfg_break["fail_keep_ratio"]
+                    protection_msg = ""
+
+                player.exp = round(player.exp * keep_ratio)
+
+                msg_lines = ["💥 镇厄崩散，修为反噬席卷脏腑。", "━━━━━━━━━━━━━"]
+                if protection_msg:
+                    msg_lines.append(protection_msg)
+                msg_lines.extend([
+                    f"✧ 剩余修为 {player.exp}",
+                    f"✧ 修为保留 {int(keep_ratio*100)}%",
+                    f"✧ 本次理论成功率 {int(success_chance*100)}%",
+                    "━━━━━━━━━━━━━",
+                    "⬇️ 建议【突破 镇厄】以怨念护体",
                     "⬇️ 或者【突破 棺材钉】消耗棺材钉"
-                )
+                ])
+                msg = "\n".join(msg_lines)
 
         session.add(player)
         await session.commit()

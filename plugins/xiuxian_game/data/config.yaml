@@ -67,6 +67,7 @@ monthly_card:
     auto_collect: false              # 不自动采集
     sign_stamina_bonus: 5            # 签到咒抗上限增加+5
     sign_revival_elixirs: 1          # 签到获得真还魂丹数量
+    breakthrough_protection: 0.8     # 突破失败时修为保留比例80%
   premium:
     name: "高级月卡"
     cultivation_efficiency: 0.5      # 修炼效率+50%
@@ -76,3 +77,4 @@ monthly_card:
     auto_collect: true               # 自动采集材料
     sign_stamina_bonus: 5            # 签到咒抗上限增加+5
     sign_revival_elixirs: 3          # 签到获得真还魂丹数量
+    breakthrough_protection: 0.8     # 突破失败时修为保留比例80%
