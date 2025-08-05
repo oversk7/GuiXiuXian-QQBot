@@ -66,6 +66,144 @@ async def _(event: MessageEvent):
 
         await list_equipment.finish(message_add_head("\n".join(lines), event))
 
+# ---------------- 指令：装备详情 ----------------
+equipment_detail = on_command("装备详情", aliases={"装备信息", "查看装备"}, block=True, priority=5)
+
+@equipment_detail.handle()
+async def _(event: MessageEvent, args: Message = CommandArg()):
+    arg = args.extract_plain_text().strip()
+    if not arg:
+        await equipment_detail.finish("⛔ 格式：装备详情 装备ID/名称")
+
+    async with safe_session() as session:
+        player = await session.get(Player, event.get_user_id())
+        if not player:
+            await equipment_detail.finish("⛔ 请先创建角色")
+
+        # 查找装备
+        equip = None
+
+        # 尝试按ID查找
+        if arg.isdigit():
+            equip_id = int(arg)
+            equip = await session.get(ItemInstance, equip_id)
+            if not equip or equip.player_id != event.get_user_id() or not equip.is_equipment:
+                await equipment_detail.finish("⛔ 无效装备 ID 或非本人所有")
+        else:
+            # 按名称查找，优先选择已装备的
+            item_config = config.items_config["by_name"].get(arg)
+            if not item_config or item_config.type.value != "EQUIPMENT":
+                await equipment_detail.finish("⛔ 未找到对应装备名称，或该物品不是装备")
+
+            # 查找玩家所有该名称的装备，优先选择已装备的
+            stmt = select(ItemInstance).where(
+                ItemInstance.player_id == event.get_user_id(),
+                ItemInstance.item_id == item_config.item_id
+            ).order_by(ItemInstance.equipped.desc(), ItemInstance.upgrade_level.desc())
+
+            items = (await session.execute(stmt)).scalars().all()
+            if not items:
+                await equipment_detail.finish(f"⛔ 你没有 {arg}")
+
+            equip = items[0]
+
+        # 获取装备配置
+        tpl = equip.config
+        if not tpl:
+            await equipment_detail.finish("⛔ 装备配置错误")
+
+        # 构建详细信息
+        lines = [
+            f"⚔️ 装备详情",
+            f"━━━━━━━━━━━━━",
+            f"🎯 名称：{tpl.name}",
+            f"🆔 ID：{equip.id}",
+            f"📊 等级要求：Lv.{tpl.required_level}",
+            f"⭐ 升阶等级：+{equip.upgrade_level}阶",
+            f"🛠️ 耐久度：{equip.durability}/{tpl.durability}",
+            f"💰 价值：{tpl.price:,} 金币",
+            f"🎨 品质：{tpl.rarity}",
+            f"👕 状态：{'🟢已装备' if equip.equipped else '🔘未装备'}",
+            ""
+        ]
+
+        # 基础属性
+        if tpl.attr_bonus or tpl.attr_ratio:
+            lines.append("📈 基础属性：")
+
+            # 获取升阶加成倍率
+            upgrade_multiplier = equip.get_upgrade_bonus_multiplier()
+
+            # 固定值属性
+            if tpl.attr_bonus:
+                for k, v in tpl.attr_bonus.items():
+                    base_value = int(v)
+                    current_value = int(v * upgrade_multiplier)
+                    bonus = current_value - base_value
+
+                    attr_name = {
+                        "attack": "攻击力", "defense": "防御力", "agility": "敏捷",
+                        "luck": "运气", "hp": "生命值", "mp": "理智值",
+                        "max_hp": "最大生命值", "max_mp": "最大理智值"
+                    }.get(k, k)
+
+                    if bonus > 0:
+                        lines.append(f"  • {attr_name}：{base_value} → {current_value} (+{bonus})")
+                    else:
+                        lines.append(f"  • {attr_name}：{base_value}")
+
+            # 百分比属性
+            if tpl.attr_ratio:
+                for k, r in tpl.attr_ratio.items():
+                    base_ratio = float(r) * 100
+                    current_ratio = float(r) * upgrade_multiplier * 100
+                    bonus_ratio = current_ratio - base_ratio
+
+                    attr_name = {
+                        "attack": "攻击力", "defense": "防御力", "agility": "敏捷",
+                        "luck": "运气", "hp": "生命值", "mp": "理智值",
+                        "max_hp": "最大生命值", "max_mp": "最大理智值"
+                    }.get(k, k)
+
+                    if bonus_ratio > 0:
+                        lines.append(f"  • {attr_name}：{base_ratio:.1f}% → {current_ratio:.1f}% (+{bonus_ratio:.1f}%)")
+                    else:
+                        lines.append(f"  • {attr_name}：{base_ratio:.1f}%")
+
+            lines.append("")
+
+        # 宝石镶嵌信息
+        if equip.available_gem_slots > 0:
+            lines.append("💎 宝石镶嵌：")
+            lines.append(f"  • 孔位：{equip.used_gem_slots}/{equip.available_gem_slots}")
+
+            if equip.used_gem_slots > 0:
+                from .gem_socket_service import GemSocketService
+                gem_info = await GemSocketService.get_equipment_gem_info(equip)
+                for slot_info in gem_info:
+                    if not slot_info["is_empty"]:
+                        slot_num = slot_info["slot_number"]
+                        gem_name = slot_info["gem_name"]
+                        gem_type = slot_info["gem_type"]
+                        lines.append(f"  • 孔位{slot_num}：{gem_type} - {gem_name}")
+
+            lines.append("")
+
+        # 升阶提升说明
+        if equip.upgrade_level > 0:
+            lines.append("⭐ 升阶加成：")
+            lines.append(f"  • 当前等阶：+{equip.upgrade_level}阶")
+            lines.append(f"  • 属性倍率：{upgrade_multiplier:.1f}x")
+            lines.append(f"  • 总提升：+{(upgrade_multiplier - 1) * 100:.0f}%")
+            lines.append("")
+
+        # 描述
+        lines.append("📝 描述：")
+        lines.append(f"  {tpl.description}")
+
+        await equipment_detail.finish(message_add_head("\n".join(lines), event))
+
+
 # ---------------- 指令：穿戴装备 ----------------
 wear_equipment = on_command("穿戴", aliases={"携带","装备"}, block=True, priority=5)
 

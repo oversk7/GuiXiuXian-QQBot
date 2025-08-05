@@ -158,6 +158,7 @@ async def handle_equip(event: MessageEvent, args: Message = CommandArg()):
         "━━━━━━━━━━━━━\n"
         "🎽 基础功能：\n"
         "【装备栏】 查看自己装备\n"
+        "【装备详情 <装备ID/名称>】 查看装备详细信息和升阶效果\n"
         "【装备 <装备ID/名称>】 穿戴指定装备\n"
         "【卸下 <装备ID/名称>】 卸下指定装备\n"
         "【一键卸下】 卸下全部装备\n"
