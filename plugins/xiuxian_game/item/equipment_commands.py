@@ -23,7 +23,7 @@ from ..utils import message_add_head
 EQUIP_ITEM_IDS = config.items_config["by_type"]["EQUIPMENT"]
 
 # ---------------- 指令：查看装备栏 ----------------
-list_equipment = on_command("装备栏", aliases={"装备", "我的装备"}, block=True, priority=5)
+list_equipment = on_command("装备栏", aliases={"我的装备"}, block=True, priority=5)
 
 @list_equipment.handle()
 async def _(event: MessageEvent):
@@ -349,8 +349,8 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
         player = await session.get(Player, event.get_user_id())
 
         # 检查是否为炼丹炉，如果是则处理进行中的炼丹任务
-        from ..alchemy.alchemy_service import AlchemyService
-        from ..models.alchemy_record import AlchemyRecord
+        from ..alchemy.service import AlchemyService
+        from ..models.alchemy_task import AlchemyRecord
         from sqlalchemy import and_, select
 
         furnace_ids = list(AlchemyService.FURNACE_QUALITIES.keys())
@@ -430,8 +430,8 @@ async def _(event: MessageEvent):
             await unwear_all_equipment.finish("⛔ 你没有穿戴任何装备")
 
         # 处理炼丹炉相关的任务
-        from ..alchemy.alchemy_service import AlchemyService
-        from ..models.alchemy_record import AlchemyRecord
+        from ..alchemy.service import AlchemyService
+        from ..models.alchemy_task import AlchemyRecord
         from sqlalchemy import and_
 
         furnace_ids = list(AlchemyService.FURNACE_QUALITIES.keys())
