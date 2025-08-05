@@ -16,7 +16,7 @@ from datetime import datetime
 from nonebot.permission import SUPERUSER
 from ..models.db import safe_session
 from ..models.player import Player
-from ..models.stock import Stock, StockType
+from ..models.stock import Stock, StockType, StockPriceHistory
 from ..utils import message_add_head
 from .stock_service import StockService
 
@@ -28,8 +28,10 @@ stock_sell_cmd = on_command("出售灵石", aliases={"卖出灵石"}, block=True
 stock_holdings_cmd = on_command("我的投资", aliases={"灵石持有", "投资持仓"}, block=True, priority=5)
 stock_transactions_cmd = on_command("投资记录", aliases={"灵石记录"}, block=True, priority=5)
 stock_refresh_time_cmd = on_command("灵石刷新时间", aliases={"投资刷新时间", "价格刷新时间"}, block=True, priority=5)
-stock_init_cmd = on_command("初始化灵石", block=True, priority=5)
-stock_update_cmd = on_command("更新灵石价格", aliases={"刷新灵石价格"}, block=True, priority=5)
+stock_history_cmd = on_command("灵石历史", aliases={"价格历史"}, block=True, priority=5)
+stock_analysis_cmd = on_command("灵石分析", aliases={"投资分析"}, block=True, priority=5)
+stock_init_cmd = on_command("初始化灵石", block=True, priority=5, permission=SUPERUSER)
+stock_update_cmd = on_command("更新灵石价格", aliases={"刷新灵石价格"}, block=True, priority=5, permission=SUPERUSER)
 
 
 @stock_list_cmd.handle()
@@ -268,8 +270,6 @@ async def handle_stock_transactions(event: MessageEvent):
 async def handle_stock_init(event: MessageEvent):
     """初始化灵石投资数据（仅管理员）"""
     # 检查权限
-    if not await SUPERUSER(event):
-        await stock_init_cmd.finish("⛔ 仅管理员可使用此命令")
     async with safe_session() as session:
         # 检查是否已有灵石数据
         try:
@@ -396,3 +396,140 @@ async def handle_stock_refresh_time(event: MessageEvent):
         lines.append("• 🔧 备用机制：每12小时自动更新")
 
         await stock_refresh_time_cmd.finish(message_add_head("\n".join(lines), event))
+
+
+@stock_history_cmd.handle()
+async def handle_stock_history(event: MessageEvent, args: Message = CommandArg()):
+    """查看特定股票的价格历史"""
+    args_text = args.extract_plain_text().strip()
+    if not args_text:
+        await stock_history_cmd.finish("⛔ 格式：灵石历史 <灵石代码> [天数]")
+
+    parts = args_text.split()
+    symbol = parts[0].upper()
+    days = 7  # 默认7天
+
+    if len(parts) > 1:
+        try:
+            days = int(parts[1])
+            if days < 1 or days > 30:
+                days = 7
+        except ValueError:
+            days = 7
+
+    async with safe_session() as session:
+        player = await session.get(Player, event.get_user_id())
+        if not player:
+            await stock_history_cmd.finish("⛔ 请先创建角色")
+
+        # 获取股票信息
+        stmt = select(Stock).where(Stock.symbol == symbol, Stock.is_active == True)
+        stock = (await session.execute(stmt)).scalars().first()
+        if not stock:
+            await stock_history_cmd.finish(f"⛔ 灵石项目 {symbol} 不存在")
+
+        # 获取价格历史
+        from datetime import timedelta
+        start_date = datetime.now() - timedelta(days=days)
+        history_stmt = select(StockPriceHistory).where(
+            StockPriceHistory.stock_id == stock.id,
+            StockPriceHistory.recorded_at >= start_date
+        ).order_by(StockPriceHistory.recorded_at.desc()).limit(days * 24)
+
+        price_history = (await session.execute(history_stmt)).scalars().all()
+
+        if not price_history:
+            await stock_history_cmd.finish(f"📊 {stock.name}({symbol}) 暂无历史数据")
+
+        lines = [f"📊 {stock.name}({symbol}) 价格历史", "▃▃▃▃▃▃▃▃▃▃"]
+        lines.append(f"📅 查询范围：最近{days}天")
+        lines.append(f"💰 基础价格：{stock.base_price} 金币")
+        lines.append(f"💎 当前价格：{stock.current_price} 金币")
+
+        # 计算总体统计
+        prices = [h.price for h in price_history]
+        if prices:
+            max_price = max(prices)
+            min_price = min(prices)
+            avg_price = sum(prices) // len(prices)
+
+            lines.append(f"📈 最高价格：{max_price} 金币")
+            lines.append(f"📉 最低价格：{min_price} 金币")
+            lines.append(f"📊 平均价格：{avg_price} 金币")
+            lines.append("")
+
+        # 显示最近的价格变化（最多10条）
+        lines.append("🕐 最近价格变化：")
+        recent_history = list(reversed(price_history))[:10]
+
+        for record in recent_history:
+            change_symbol = "📈" if record.change_rate > 0 else "📉" if record.change_rate < 0 else "➡️"
+            time_str = record.recorded_at.strftime("%m-%d %H:%M")
+            lines.append(
+                f"  {time_str} {change_symbol} {record.price} 金币 "
+                f"({record.change_rate:+.2f}%)"
+            )
+
+        lines.append("\n💡 使用「灵石分析」查看随机性说明")
+        await stock_history_cmd.finish(message_add_head("\n".join(lines), event))
+
+
+@stock_analysis_cmd.handle()
+async def handle_stock_analysis(event: MessageEvent):
+    """解释股票价格波动的随机性原理"""
+    async with safe_session() as session:
+        player = await session.get(Player, event.get_user_id())
+        if not player:
+            await stock_analysis_cmd.finish("⛔ 请先创建角色")
+
+        # 获取所有股票的统计数据
+        stmt = select(Stock).where(Stock.is_active == True)
+        stocks = (await session.execute(stmt)).scalars().all()
+
+        if not stocks:
+            await stock_analysis_cmd.finish("💎 当前没有可投资的灵石")
+
+        lines = ["🔬 灵石价格波动原理分析", "▃▃▃▃▃▃▃▃▃▃▃▃▃▃"]
+
+        lines.append("📊 **为什么有些股票一直涨/跌？**")
+        lines.append("")
+        lines.append("🎲 **这是正常的随机现象！**")
+        lines.append("就像抛硬币，连续出现正面或反面都是可能的")
+        lines.append("")
+
+        lines.append("🧮 **价格计算公式：**")
+        lines.append("新价格 = 当前价格 × (1 + 综合变化率)")
+        lines.append("")
+        lines.append("综合变化率 = 随机因子 + 市场情绪 + 回归因子")
+        lines.append("")
+
+        lines.append("🔍 **各因子说明：**")
+        lines.append("• 🎯 随机因子：正态分布随机数（-20%~+20%）")
+        lines.append("• 🌊 市场情绪：全局影响（牛市+2%，熊市-2%）")
+        lines.append("• 🔄 回归因子：防止偏离基础价格太远")
+        lines.append("")
+
+        lines.append("📈 **为什么会出现连续涨跌？**")
+        lines.append("1. 随机数的聚集效应（正常统计现象）")
+        lines.append("2. 市场情绪的短期持续影响")
+        lines.append("3. 但回归因子会逐渐拉回基础价格")
+        lines.append("")
+
+        # 显示当前各股票相对基础价格的偏离情况
+        lines.append("📊 **当前价格偏离情况：**")
+        for stock in stocks:
+            deviation = ((stock.current_price - stock.base_price) / stock.base_price) * 100
+            if abs(deviation) > 10:  # 只显示偏离超过10%的
+                direction = "高于" if deviation > 0 else "低于"
+                lines.append(f"• {stock.symbol} {direction}基础价格 {abs(deviation):.1f}%")
+
+        lines.append("")
+        lines.append("🔒 **系统保证：**")
+        lines.append("• ✅ 完全随机算法，无人工干预")
+        lines.append("• ✅ 价格有下限保护（基础价格20%）")
+        lines.append("• ✅ 单次变化限制（±20%）")
+        lines.append("• ✅ 长期会回归基础价格")
+        lines.append("")
+        lines.append("💡 使用「灵石历史 代码」查看具体股票历史")
+
+        await stock_analysis_cmd.finish(message_add_head("\n".join(lines), event))
