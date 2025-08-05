@@ -66,7 +66,7 @@ monthly_card:
     inventory_bonus: 5               # 背包格子+5
     auto_collect: false              # 不自动采集
     sign_stamina_bonus: 5            # 签到咒抗上限增加+5
-    sign_sweep_tokens: 1             # 签到获得扫荡令数量
+    sign_revival_elixirs: 1          # 签到获得真还魂丹数量
   premium:
     name: "高级月卡"
     cultivation_efficiency: 0.5      # 修炼效率+50%
@@ -75,4 +75,4 @@ monthly_card:
     inventory_bonus: 20              # 背包格子+20
     auto_collect: true               # 自动采集材料
     sign_stamina_bonus: 5            # 签到咒抗上限增加+5
-    sign_sweep_tokens: 3             # 签到获得扫荡令数量
+    sign_revival_elixirs: 3          # 签到获得真还魂丹数量

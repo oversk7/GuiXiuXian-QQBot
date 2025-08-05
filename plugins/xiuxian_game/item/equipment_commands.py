@@ -280,8 +280,28 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
         equip.equipped = True
 
         # 计算并应用属性加成
-        from ..item.item_effects import ItemEffectService
-        delta = await ItemEffectService.calculate_equipment_bonus(equip, player)
+        # 获取玩家基础属性（无装备加成）
+        base_attrs = {
+            "attack": player.attack,
+            "defense": player.defense,
+            "agility": player.agility,
+            "luck": player.luck,
+            "max_hp": player.max_hp,
+            "max_mp": player.max_mp,
+        }
+
+        # 创建临时属性字典用于计算装备加成
+        temp_attrs = base_attrs.copy()
+
+        # 使用装备的 apply_attr_bonus 方法计算加成
+        equip.apply_attr_bonus(temp_attrs, base_attrs)
+
+        # 计算差值（即装备提供的加成）
+        delta = {}
+        for attr, new_value in temp_attrs.items():
+            base_value = base_attrs[attr]
+            if new_value != base_value:
+                delta[attr] = new_value - base_value
 
         # 应用属性加成到玩家
         for k, v in delta.items():

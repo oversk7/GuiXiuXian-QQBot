@@ -26,6 +26,7 @@ def register(effect_type: ItemEffectType):
     return decorator
 
 
+
 async def apply_effect(player: Player, item_cfg: ItemConfig, quantity: int = 1, ctx: str = "world", session=None) -> Tuple[bool, str]:
     """根据 item_cfg 调用对应处理器
 

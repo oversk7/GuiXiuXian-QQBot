@@ -84,16 +84,16 @@ async def handle_sign(event: MessageEvent):
         else:
             stamina_msg = f"\n💪 咒抗已恢复至 {stamina_limit}/{stamina_limit}"
 
-        # 月卡权利：签到时发放扫荡令
+        # 月卡权利：签到时发放真还魂丹
         monthly_card_msg = ""
-        sweep_tokens = benefits["sign_sweep_tokens"]
-        if sweep_tokens > 0:
+        revival_elixirs = benefits["sign_revival_elixirs"]
+        if revival_elixirs > 0:
             try:
-                await ItemInstance.add_item(session, user_id, "sweep_token", quantity=sweep_tokens)
-                monthly_card_msg = f"\n🎫 月卡权利：获得扫荡令*{sweep_tokens}"
+                await ItemInstance.add_item(session, user_id, "supreme_revive_elixir", quantity=revival_elixirs)
+                monthly_card_msg = f"\n💊 月卡权利：获得真还魂丹*{revival_elixirs}"
             except ValueError as e:
                 # 如果添加物品失败，记录错误但不影响签到
-                monthly_card_msg = f"\n⚠️ 月卡扫荡令发放失败：{e}"
+                monthly_card_msg = f"\n⚠️ 月卡真还魂丹发放失败：{e}"
 
         new_msg = ""
         # 检查是否为创建账号的同一天
