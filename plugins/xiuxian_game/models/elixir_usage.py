@@ -2,7 +2,14 @@ from datetime import date
 from sqlalchemy import Integer, String, Date, func
 from sqlalchemy.orm import Mapped, mapped_column
 from .db import Base
-from ..config import config
+
+# 使用绝对导入避免相对导入问题
+try:
+    from config import config
+except ImportError:
+    # 如果在 alembic 环境中运行，使用相对导入
+    from ..config import config
+
 from .inventory import ItemEffectType
 
 class ElixirUsageLog(Base):
