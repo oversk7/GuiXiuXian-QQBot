@@ -274,7 +274,7 @@ async def handle_add_inventory(event: MessageEvent, args: Message = CommandArg()
 
 
 # ==================== 月卡权益：一键修复装备 ====================
-repair_all_equipment_cmd = on_command("一键修复", aliases={"修复所有", "全部修复"}, block=True, priority=5)
+repair_all_equipment_cmd = on_command("一键修复", aliases={"一键修理", "全部修复"}, block=True, priority=5)
 
 @repair_all_equipment_cmd.handle()
 async def handle_repair_all_equipment(event: MessageEvent, args: Message = CommandArg()):
@@ -364,15 +364,15 @@ async def handle_repair_all_equipment(event: MessageEvent, args: Message = Comma
                 event
             ))
 
-        if player.grudge < grudge_cost:
+        if player.resentment < grudge_cost:
             await repair_all_equipment_cmd.finish(message_add_head(
-                f"⛔ 怨念不足，需要 {grudge_cost} 怨念，当前 {player.grudge} 怨念",
+                f"⛔ 怨念不足，需要 {grudge_cost} 怨念，当前 {player.resentment} 怨念",
                 event
             ))
 
         # 执行修理
         player.gold -= gold_cost
-        player.grudge -= grudge_cost
+        player.resentment -= grudge_cost
 
         repaired_equipment = []
         for detail in repair_details:

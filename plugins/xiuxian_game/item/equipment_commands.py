@@ -593,12 +593,12 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
         if player.gold < gold_cost:
             await repair_equipment.finish(f"⛔ 金币不足，需要 {gold_cost} 金币")
 
-        if player.grudge < grudge_cost:
+        if player.resentment < grudge_cost:
             await repair_equipment.finish(f"⛔ 怨念不足，需要 {grudge_cost} 怨念")
 
         # 执行修理
         player.gold -= gold_cost
-        player.grudge -= grudge_cost
+        player.resentment -= grudge_cost
         equip.durability = equip.config.durability
 
         session.add(player)

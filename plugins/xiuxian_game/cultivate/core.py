@@ -76,13 +76,20 @@ async def handle_cultivate(event: MessageEvent):
             guild_bonuses = await GuildBuildingService.get_guild_bonuses(session, player.guild_id)
             guild_cultivation_bonus = guild_bonuses.get("cultivation_bonus", 0.0)
 
-        # 应用月卡、公会和转数修炼效率加成
+        # 分别计算各种加成（都基于基础经验）
         from .reincarnation import ReincarnationService
-        reincarnation_bonus = ReincarnationService.get_cultivation_efficiency_bonus(player.reincarnation_level)
-        total_cultivation_multiplier = 1.0 + benefits["cultivation_efficiency"] + guild_cultivation_bonus + reincarnation_bonus
-        exp_gain = int(base_exp_gain * total_cultivation_multiplier)
-        bonus_exp = exp_gain - base_exp_gain
-  
+        reincarnation_bonus_rate = ReincarnationService.get_cultivation_efficiency_bonus(player.reincarnation_level)
+
+        # 月卡加成
+        card_bonus = int(base_exp_gain * benefits["cultivation_efficiency"])
+        # 转数加成
+        reincarnation_bonus = int(base_exp_gain * reincarnation_bonus_rate)
+        # 公会加成
+        guild_bonus = int(base_exp_gain * guild_cultivation_bonus)
+
+        # 总经验 = 基础经验 + 各种加成
+        exp_gain = base_exp_gain + card_bonus + reincarnation_bonus + guild_bonus
+
         # 更新数据
         player.last_cultivation = datetime.now()
         player.exp += exp_gain
@@ -90,20 +97,19 @@ async def handle_cultivate(event: MessageEvent):
         await session.commit()
         exp_max = calculate_level_up_exp(player.level)
 
-        # 构建修炼消息，包含月卡和公会加成提示
+        # 构建修炼消息，包含各种加成提示
         bonus_msg = ""
-        if bonus_exp > 0:
-            # 分别计算月卡和公会加成
-            card_bonus = int(base_exp_gain * benefits["cultivation_efficiency"])
-            guild_bonus = int(base_exp_gain * guild_cultivation_bonus)
+        if card_bonus > 0:
+            efficiency_percent = benefits["cultivation_efficiency"] * 100
+            bonus_msg += f"\n✧ 月卡加成 💳 +{card_bonus} 怨炁 (+{efficiency_percent:.0f}%)"
 
-            if card_bonus > 0:
-                efficiency_percent = benefits["cultivation_efficiency"] * 100
-                bonus_msg += f"\n✧ 月卡加成 💳 +{card_bonus} 怨炁 (+{efficiency_percent:.0f}%)"
+        if reincarnation_bonus > 0:
+            reincarnation_percent = reincarnation_bonus_rate * 100
+            bonus_msg += f"\n✧ 转数加成 🌟 +{reincarnation_bonus} 怨炁 (+{reincarnation_percent:.0f}%)"
 
-            if guild_bonus > 0:
-                guild_percent = guild_cultivation_bonus * 100
-                bonus_msg += f"\n✧ 公会加成 🏰 +{guild_bonus} 怨炁 (+{guild_percent:.1f}%)"
+        if guild_bonus > 0:
+            guild_percent = guild_cultivation_bonus * 100
+            bonus_msg += f"\n✧ 公会加成 🏰 +{guild_bonus} 怨炁 (+{guild_percent:.1f}%)"
 
         msg = (
             "你在黑焰里看见自己的影子喘息。\n"
@@ -232,26 +238,24 @@ async def handle_out_seclusion(event: MessageEvent):
         # 计算基础经验
         base_exp_gain = int(delta_time / cfg["cool_down"] * base_gain * 0.5)
 
-        # 应用棺材钉效率加成
-        exp_after_coffin_nail = int(base_exp_gain * coffin_nail_multiplier)
-        coffin_nail_bonus = exp_after_coffin_nail - base_exp_gain
+        # 分别计算各种加成（都基于基础经验）
+        # 棺材钉加成
+        coffin_nail_efficiency = (effective_coffin_nail_count * 0.005)  # 每个棺材钉提升0.5%效率
+        coffin_nail_bonus = int(base_exp_gain * coffin_nail_efficiency)
 
-        # 应用月卡闭关效率加成
-        card_multiplier = 1.0 + benefits["seclusion_efficiency"]
-        exp_after_card = int(exp_after_coffin_nail * card_multiplier)
-        card_bonus = exp_after_card - exp_after_coffin_nail
+        # 月卡闭关效率加成
+        card_bonus = int(base_exp_gain * benefits["seclusion_efficiency"])
 
-        # 应用转数闭关效率加成
+        # 转数闭关效率加成
         from .reincarnation import ReincarnationService
-        reincarnation_bonus = ReincarnationService.get_seclusion_efficiency_bonus(player.reincarnation_level)
-        reincarnation_multiplier = 1.0 + reincarnation_bonus
-        exp_after_reincarnation = int(exp_after_card * reincarnation_multiplier)
-        reincarnation_exp_bonus = exp_after_reincarnation - exp_after_card
+        reincarnation_bonus_rate = ReincarnationService.get_seclusion_efficiency_bonus(player.reincarnation_level)
+        reincarnation_exp_bonus = int(base_exp_gain * reincarnation_bonus_rate)
 
-        # 应用公会修为加成
-        guild_multiplier = 1.0 + guild_cultivation_bonus
-        exp_gain = int(exp_after_reincarnation * guild_multiplier)
-        guild_bonus = exp_gain - exp_after_reincarnation
+        # 公会修为加成
+        guild_bonus = int(base_exp_gain * guild_cultivation_bonus)
+
+        # 总经验 = 基础经验 + 各种加成
+        exp_gain = base_exp_gain + coffin_nail_bonus + card_bonus + reincarnation_exp_bonus + guild_bonus
 
         player.exp += exp_gain
 
@@ -273,7 +277,7 @@ async def handle_out_seclusion(event: MessageEvent):
             efficiency_msg += f"\n✧ 月卡加成 💳 额外获得 +{card_bonus} 怨炁 (+{card_efficiency:.0f}%)"
 
         if reincarnation_exp_bonus > 0:
-            reincarnation_efficiency = reincarnation_bonus * 100
+            reincarnation_efficiency = reincarnation_bonus_rate * 100
             efficiency_msg += f"\n✧ 转数加成 🌟 额外获得 +{reincarnation_exp_bonus} 怨炁 (+{reincarnation_efficiency:.0f}%)"
 
         if guild_bonus > 0:
