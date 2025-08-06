@@ -95,30 +95,36 @@ def get_region_materials(region: str) -> dict:
 def calculate_monster_attributes(monster_level: int, is_elite: bool = False) -> dict:
     """
     计算怪物属性，适配实际玩家水平
-    目标：玩家能刷十几个小怪，精英怪只能刷一个
+    目标：同等级玩家能连续刷5个同等级小怪而不需要治疗药
+
+    基于196级玩家反馈调整：
+    - 生命2125，攻击1256，防御854（60%免伤）
+    - 目标：怪物攻击造成约100-150伤害，玩家能连续打5个不死
     """
     import random
 
-    # 基础属性计算 - 大幅降低强度
+    # 基础属性计算 - 平衡调整，确保5个同级怪物的挑战度
     if monster_level <= 50:
         # 前期线性增长（1-50级）
-        base_hp = 1.5 * monster_level + 20
-        base_attack = 0.8 * monster_level + 10
+        base_hp = 1.2 * monster_level + 15
+        base_attack = 0.6 * monster_level + 10
         base_agility = 0.6 * monster_level + 8
     elif monster_level <= 100:
         # 中期增长（51-100级）
-        base_hp = 2.0 * monster_level + 50
-        base_attack = 1.2 * monster_level + 30
+        base_hp = 1.5 * monster_level + 40
+        base_attack = 0.8 * monster_level + 25
         base_agility = 0.8 * monster_level + 20
     elif monster_level <= 150:
         # 高期增长（101-150级）
-        base_hp = 2.5 * monster_level + 100
-        base_attack = 1.5 * monster_level + 50
+        base_hp = 1.8 * monster_level + 80
+        base_attack = 1.0 * monster_level + 40
         base_agility = 1.0 * monster_level + 30
     else:
         # 终极期适度增长（151+级）
-        base_hp = 3.0 * monster_level + 200
-        base_attack = 2.0 * monster_level + 100
+        # 目标：196级玩家能连续打5个同级怪物
+        # 每个怪物应造成约350-400伤害，5个怪物总伤害1750-2000
+        base_hp = 2.2 * monster_level + 100
+        base_attack = 3.2 * monster_level + 250
         base_agility = 1.2 * monster_level + 50
 
     # 添加随机波动（±10%，减少波动范围）
@@ -131,7 +137,7 @@ def calculate_monster_attributes(monster_level: int, is_elite: bool = False) -> 
     attack = int(base_attack * attack_variation)
     agility = int(base_agility * agility_variation)
 
-    # 精英怪属性提升 - 降低倍率
+    # 精英怪属性提升 - 保持现有倍率
     if is_elite:
         if monster_level <= 50:
             elite_multiplier = 1.8  # 前期精英怪1.8倍属性
