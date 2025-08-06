@@ -108,24 +108,22 @@ def calculate_monster_attributes(monster_level: int, is_elite: bool = False) -> 
         # 前期线性增长（1-50级）
         base_hp = 1.2 * monster_level + 15
         base_attack = 0.6 * monster_level + 10
-        base_agility = 0.6 * monster_level + 8
+        base_agility = 0.5 * monster_level + 8
     elif monster_level <= 100:
         # 中期增长（51-100级）
         base_hp = 1.5 * monster_level + 40
-        base_attack = 0.8 * monster_level + 25
-        base_agility = 0.8 * monster_level + 20
+        base_attack = 0.7 * monster_level + 25
+        base_agility = 0.5 * monster_level + 20
     elif monster_level <= 150:
         # 高期增长（101-150级）
-        base_hp = 1.8 * monster_level + 80
-        base_attack = 1.0 * monster_level + 40
-        base_agility = 1.0 * monster_level + 30
+        base_hp = 1.7 * monster_level + 80
+        base_attack = 0.9 * monster_level + 40
+        base_agility = 0.8 * monster_level + 30
     else:
         # 终极期适度增长（151+级）
-        # 目标：196级玩家能连续打5个同级怪物
-        # 每个怪物应造成约350-400伤害，5个怪物总伤害1750-2000
-        base_hp = 2.2 * monster_level + 100
-        base_attack = 3.2 * monster_level + 250
-        base_agility = 1.2 * monster_level + 50
+        base_hp = 2.1 * monster_level + 100
+        base_attack = 2.7 * monster_level + 250
+        base_agility = 1.1 * monster_level + 50
 
     # 添加随机波动（±10%，减少波动范围）
     rng = random.Random()
