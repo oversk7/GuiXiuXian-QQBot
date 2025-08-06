@@ -945,7 +945,7 @@ async def handle_guild_alchemy(event: MessageEvent):
         # 触发丹房产出检查和生成
         refresh_result = await GuildDailyTasks.trigger_guild_daily_refresh(session, player.guild_id)
 
-        productions = await GuildFacilityService.get_alchemy_production(session, player.guild_id)
+        productions = await GuildFacilityService.get_alchemy_production_grouped(session, player.guild_id)
 
         # 提交丹房产出的更改
         await session.commit()
@@ -966,14 +966,12 @@ async def handle_guild_alchemy(event: MessageEvent):
             lines.append("━━━━━━━━━━")
 
             for idx, prod in enumerate(productions, 1):
-                # 根据丹药价值计算积分成本
-                item_config = config.items_config["by_id"].get(prod["item_id"])
-                if item_config:
-                    points_cost = max(1, item_config.price // 100)  # 价格的1%作为积分成本
-                    lines.append(f"{idx}. {prod['item_name']}×{prod['quantity']} - {points_cost}积分")
+                # 显示丹药名称、总数量和单价
+                lines.append(f"{idx}. {prod['item_name']}×{prod['total_quantity']} - {prod['points_cost']}积分/个")
 
             lines.append("━━━━━━━━━━")
-            lines.append("💡 使用【兑换丹药 序号】来兑换")
+            lines.append("💡 使用【兑换丹药 丹药名称 数量】来兑换")
+            lines.append("💡 例如：兑换丹药 仿制还魂丹 5")
             msg = "\n".join(lines)
 
         await guild_alchemy_cmd.finish(message_add_head(msg, event))
@@ -984,14 +982,9 @@ exchange_pill_cmd = on_command("兑换丹药", block=True, priority=5)
 @exchange_pill_cmd.handle()
 async def handle_exchange_pill(event: MessageEvent, args: Message = CommandArg()):
     """兑换丹房产出的丹药"""
-    index_str = args.extract_plain_text().strip()
-    if not index_str:
-        await exchange_pill_cmd.finish("⛔ 格式错误，正确格式：兑换丹药 [序号]")
-
-    try:
-        index = int(index_str)
-    except ValueError:
-        await exchange_pill_cmd.finish("⛔ 序号必须是数字")
+    params = args.extract_plain_text().strip().split()
+    if not params:
+        await exchange_pill_cmd.finish("⛔ 格式错误，正确格式：兑换丹药 [丹药名称] [数量]")
 
     async with safe_session() as session:
         player = await session.get(Player, event.get_user_id())
@@ -1001,23 +994,45 @@ async def handle_exchange_pill(event: MessageEvent, args: Message = CommandArg()
         # 触发丹房产出检查和生成
         await GuildDailyTasks.trigger_guild_daily_refresh(session, player.guild_id)
 
-        productions = await GuildFacilityService.get_alchemy_production(session, player.guild_id)
+        # 兼容旧格式（纯数字序号）
+        if len(params) == 1 and params[0].isdigit():
+            try:
+                index = int(params[0])
+                productions = await GuildFacilityService.get_alchemy_production(session, player.guild_id)
 
-        if not productions or index < 1 or index > len(productions):
-            await exchange_pill_cmd.finish("⛔ 无效的序号")
+                if not productions or index < 1 or index > len(productions):
+                    await exchange_pill_cmd.finish("⛔ 无效的序号")
 
-        selected_prod = productions[index - 1]
+                selected_prod = productions[index - 1]
 
-        # 计算积分成本
-        item_config = config.items_config["by_id"].get(selected_prod["item_id"])
-        if not item_config:
-            await exchange_pill_cmd.finish("⛔ 物品配置错误")
+                # 计算积分成本
+                item_config = config.items_config["by_id"].get(selected_prod["item_id"])
+                if not item_config:
+                    await exchange_pill_cmd.finish("⛔ 物品配置错误")
 
-        points_cost = max(1, item_config.price // 100)
+                points_cost = max(1, item_config.price // 100)
 
-        success, message = await GuildFacilityService.claim_alchemy_item(
-            session, player.id, player.guild_id, selected_prod["id"], points_cost
-        )
+                success, message = await GuildFacilityService.claim_alchemy_item(
+                    session, player.id, player.guild_id, selected_prod["id"], points_cost
+                )
+            except ValueError:
+                await exchange_pill_cmd.finish("⛔ 序号必须是数字")
+        else:
+            # 新格式：丹药名称 + 数量
+            if len(params) < 2:
+                await exchange_pill_cmd.finish("⛔ 格式错误，正确格式：兑换丹药 [丹药名称] [数量]")
+
+            item_name = params[0]
+            try:
+                quantity = int(params[1])
+                if quantity <= 0:
+                    raise ValueError
+            except ValueError:
+                await exchange_pill_cmd.finish("⛔ 数量必须是正整数")
+
+            success, message = await GuildFacilityService.claim_alchemy_item_by_name(
+                session, player.id, player.guild_id, item_name, quantity
+            )
 
         if success:
             await session.commit()

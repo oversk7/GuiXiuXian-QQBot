@@ -133,9 +133,9 @@ class GuildFacilityService:
         stmt = select(GuildAlchemyProduction).where(
             and_(GuildAlchemyProduction.guild_id == guild_id, GuildAlchemyProduction.claimed == False)
         ).order_by(GuildAlchemyProduction.produced_at.desc())
-        
+
         productions = (await session.execute(stmt)).scalars().all()
-        
+
         result = []
         for prod in productions:
             item_config = config.items_config["by_id"].get(prod.item_id)
@@ -147,7 +147,45 @@ class GuildFacilityService:
                     "quantity": prod.quantity,
                     "produced_at": prod.produced_at
                 })
-        
+
+        return result
+
+    @staticmethod
+    async def get_alchemy_production_grouped(session: AsyncSession, guild_id: int) -> List[Dict]:
+        """获取丹房产出列表（按物品类型分组）"""
+        stmt = select(GuildAlchemyProduction).where(
+            and_(GuildAlchemyProduction.guild_id == guild_id, GuildAlchemyProduction.claimed == False)
+        ).order_by(GuildAlchemyProduction.produced_at.desc())
+
+        productions = (await session.execute(stmt)).scalars().all()
+
+        # 按物品ID分组统计
+        grouped = {}
+        production_ids = {}  # 记录每种物品对应的产出记录ID列表
+
+        for prod in productions:
+            item_config = config.items_config["by_id"].get(prod.item_id)
+            if item_config:
+                if prod.item_id not in grouped:
+                    grouped[prod.item_id] = {
+                        "item_id": prod.item_id,
+                        "item_name": item_config.name,
+                        "total_quantity": 0,
+                        "points_cost": max(1, item_config.price // 100)  # 单个积分成本
+                    }
+                    production_ids[prod.item_id] = []
+
+                grouped[prod.item_id]["total_quantity"] += prod.quantity
+                production_ids[prod.item_id].append(prod.id)
+
+        # 转换为列表并添加产出记录ID
+        result = []
+        for item_id, data in grouped.items():
+            data["production_ids"] = production_ids[item_id]
+            result.append(data)
+
+        # 按物品名称排序
+        result.sort(key=lambda x: x["item_name"])
         return result
     
     @staticmethod
@@ -157,35 +195,91 @@ class GuildFacilityService:
         production = await session.get(GuildAlchemyProduction, production_id)
         if not production or production.guild_id != guild_id:
             return False, "产出记录不存在"
-        
+
         if production.claimed:
             return False, "该物品已被领取"
-        
+
         # 检查玩家积分
         player = await session.get(Player, player_id)
         if player.gold2 < points_cost:
             return False, f"积分不足，需要{points_cost}积分"
-        
+
         # 扣除积分
         player.gold2 -= points_cost
         session.add(player)
-        
+
         # 添加物品到玩家背包
         try:
             await ItemInstance.add_item(session, player_id, production.item_id, production.quantity)
         except ValueError as e:
             return False, f"背包空间不足：{str(e)}"
-        
+
         # 标记为已领取
         production.claimed = True
         production.claimed_by = player_id
         production.claimed_at = datetime.now()
         session.add(production)
-        
+
         item_config = config.items_config["by_id"].get(production.item_id)
         item_name = item_config.name if item_config else production.item_id
-        
+
         return True, f"成功兑换{item_name}×{production.quantity}，消耗{points_cost}积分"
+
+    @staticmethod
+    async def claim_alchemy_item_by_name(session: AsyncSession, player_id: str, guild_id: int, item_name: str, quantity: int) -> Tuple[bool, str]:
+        """按名称和数量兑换丹房产出的丹药"""
+        # 获取分组后的产出列表
+        grouped_productions = await GuildFacilityService.get_alchemy_production_grouped(session, guild_id)
+
+        # 查找指定名称的丹药
+        target_item = None
+        for item in grouped_productions:
+            if item["item_name"] == item_name:
+                target_item = item
+                break
+
+        if not target_item:
+            return False, f"未找到丹药：{item_name}"
+
+        if quantity > target_item["total_quantity"]:
+            return False, f"数量不足，{item_name}库存只有{target_item['total_quantity']}个"
+
+        if quantity <= 0:
+            return False, "兑换数量必须大于0"
+
+        # 计算总积分成本
+        total_points_cost = target_item["points_cost"] * quantity
+
+        # 检查玩家积分
+        player = await session.get(Player, player_id)
+        if player.gold2 < total_points_cost:
+            return False, f"积分不足，需要{total_points_cost}积分，当前拥有{player.gold2}积分"
+
+        # 扣除积分
+        player.gold2 -= total_points_cost
+        session.add(player)
+
+        # 添加物品到玩家背包
+        try:
+            await ItemInstance.add_item(session, player_id, target_item["item_id"], quantity)
+        except ValueError as e:
+            return False, f"背包空间不足：{str(e)}"
+
+        # 标记对应数量的产出记录为已领取
+        claimed_count = 0
+        for production_id in target_item["production_ids"]:
+            if claimed_count >= quantity:
+                break
+
+            production = await session.get(GuildAlchemyProduction, production_id)
+            if production and not production.claimed:
+                production.claimed = True
+                production.claimed_by = player_id
+                production.claimed_at = datetime.now()
+                session.add(production)
+                claimed_count += production.quantity
+
+        return True, f"成功兑换{item_name}×{quantity}，消耗{total_points_cost}积分"
     
     @staticmethod
     async def generate_daily_alchemy_production(session: AsyncSession, guild_id: int) -> int:
