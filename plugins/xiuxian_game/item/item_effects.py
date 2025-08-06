@@ -195,6 +195,20 @@ async def _gain_exp(player: Player, cfg: ItemConfig, qty: int, ctx: str, session
 
     return True, f"📚 获得 {actual_value} 点经验"
 
+
+@register(ItemEffectType.GAIN_RESENTMENT)
+async def _gain_resentment(player: Player, cfg: ItemConfig, qty: int, ctx: str, session=None) -> Tuple[bool, str]:
+    """直接获得怨念值，道具参数 value 指定单份怨念量。"""
+    base_value = int(cfg.effect_params.get("value", 0))
+    if base_value <= 0:
+        return False, "⛔ 该道具配置错误"
+
+    # 计算怨念值（效果不减弱）
+    actual_value = base_value * qty
+    player.resentment += actual_value
+
+    return True, f"💀 获得 {actual_value} 点怨念值 (当前 {player.resentment})"
+
 @register(ItemEffectType.SWEEP_DUNGEON)
 async def _sweep_dungeon(player: Player, cfg: ItemConfig, qty: int, ctx: str, session=None) -> Tuple[bool, str]:
     """扫荡当前诡域，获得经验和材料奖励

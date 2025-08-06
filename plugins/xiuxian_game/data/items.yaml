@@ -83,6 +83,15 @@ items:
       price: 100000
       grudge_value: 1
 
+    - item_id: "resentment_crystal"
+      name: "哭坟帽"
+      description: "传说此帽曾戴于百具枉死之人之首，将其献于血坛，可引来不知名的哭灵，换取大量怨念值。💀⚡【赞助感谢】"
+      type: "CONSUMABLE"
+      effect_type: "GAIN_RESENTMENT"
+      effect_params: {"value": 10000}
+      price: 500000
+      grudge_value: 10000
+
   materials:  # 材料类
     # ========== 白色（普通）材料 ==========
     - item_id: "rotten_core"
