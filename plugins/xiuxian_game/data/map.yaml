@@ -96,6 +96,7 @@ regions:
       - "flesh_crystal"     # 蓝色
       - "demon_heart"       # 紫色
       - "spirit_stone"      # 紫色 - 灵石
+      - "time_dust"         # 橙色 - 时光尘埃
     basic_materials:
       - "iron_rust"
       - "ash_powder"
@@ -114,6 +115,7 @@ regions:
       - "soul_crystal"      # 蓝色
       - "demon_heart"       # 紫色
       - "spirit_stone"      # 紫色 - 灵石
+      - "world_fragment"    # 橙色 - 世界碎片
     basic_materials:
       - "grave_soil"
       - "bone_fragment"
@@ -131,6 +133,7 @@ regions:
       - "cursed_mirror_shard" # 蓝色特产
       - "phantom_thread"    # 蓝色
       - "void_essence"      # 紫色
+      - "god_tear"          # 橙色 - 神明之泪
     basic_materials:
       - "ghost_tears"
       - "rotten_core"
