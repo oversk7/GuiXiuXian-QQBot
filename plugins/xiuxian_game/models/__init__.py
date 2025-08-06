@@ -23,10 +23,13 @@ from .player_ghost import PlayerGhost
 from .russian_roulette import RussianRouletteRoom, RussianRouletteGame
 # 股票系统模型
 from .stock import Stock, StockHolding, StockTransaction, StockPriceHistory
+# 打工系统模型
+from .part_time_job import PartTimeJob, JobLocation, PlayerJobStats
 
 __all__ = [
     "Player", "Guild", "GuildMember", "GuildBuilding", "GuildPosition", "BuildingType", "WorldMessage", "BankAccount", "ItemInstance", "WorldTile", "NavigationTask", "AlchemyRecord", "MarketOrder",
     "Marriage", "Mentorship", "SocialApplication", "GiftRecord", "StorySession", "PlayerDonationLog", "ElixirUsageLog", "GuildTeleportLog",
     "MonthlyCard", "MarketState", "GhostInvasion", "PlayerGhost", "RussianRouletteRoom", "RussianRouletteGame",
-    "Stock", "StockHolding", "StockTransaction", "StockPriceHistory"
+    "Stock", "StockHolding", "StockTransaction", "StockPriceHistory", "TradeRecord",
+    "PartTimeJob", "JobLocation", "PlayerJobStats"
 ]

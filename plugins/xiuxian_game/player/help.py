@@ -33,7 +33,7 @@ async def handle_help(event: MessageEvent, args: Message = CommandArg()):
         "🎮 公会系统  💰 银行系统\n"
         "🔮 炼丹系统  🎮 娱乐系统\n"
         "💕 社交系统  🏰 副本系统\n"
-        "📈 投资系统\n"
+        "📈 投资系统  💼 打工系统\n"
         "═════════════\n"
         "💡 发送对应系统查看详细指令，【赞助】支持诡修仙\n"
         "💡 【】括号里是指令，<>里是必填，[]里是选填\n"
@@ -124,6 +124,50 @@ async def handle_stock(event: MessageEvent, args: Message = CommandArg()):
         "💸 手续费：交易金额的3%"
     )
     await stock_cmd.finish(Message(msg))
+
+# 打工系统
+part_time_job_cmd = on_command("打工系统", aliases={"打工帮助"}, priority=4, block=True)
+@part_time_job_cmd.handle()
+async def handle_part_time_job(event: MessageEvent, args: Message = CommandArg()):
+    msg = (
+        "✨ 打工系统帮助 ✨\n"
+        "新手赚钱玩法，快节奏高回报\n"
+        "━━━━━━━━━━━━━\n"
+        "📍 基本流程：\n"
+        "1. 前往工作地点坐标\n"
+        "2. 使用【打工】查看可用工作\n"
+        "3. 使用【打工 工作名称】开始工作\n"
+        "4. 等待工作完成后使用【收工】获得奖励\n"
+        "\n"
+        "🏢 工作地点：\n"
+        "• 上京商业中心 (0,0) - 服务业工作\n"
+        "• 制造工业区 (100,200) - 体力工作\n"
+        "• 休闲娱乐街区 (-50,150) - 轻松工作\n"
+        "• 物流配送中心 (200,-100) - 物流工作\n"
+        "\n"
+        "• 工作时长：30分钟-1小时\n"
+        "• 工资：150-300金币/次\n"
+        "\n"
+        "📋 相关命令：\n"
+        "【打工】 查看当前位置工作\n"
+        "【打工 <工作名>】 开始工作\n"
+        "【收工】 完成工作获得奖励\n"
+        "【工作状态】 查看当前工作状态\n"
+        "【工作地点】 查看所有工作地点\n"
+        "【打工记录】 查看打工历史\n"
+        "【打工统计】 查看打工数据\n"
+        "\n"
+        "💰 收入计算：\n"
+        "基础收入 + 等级加成 + 运气加成 + 连续奖励 + 特殊事件\n"
+        "\n"
+        "💡 小贴士：\n"
+        "• 连续打工可获得额外奖励\n"
+        "• 运气值影响收入和特殊事件\n"
+        "• 不同工作有不同的等级要求\n"
+        "• 特殊事件可能带来额外收入\n"
+        "• 适合碎片化时间，随时开始!"
+    )
+    await part_time_job_cmd.finish(Message(msg))
 
 # 玩家系统
 player_cmd = on_command("玩家系统", priority=4, block=True)
@@ -217,11 +261,11 @@ async def handle_huo_dong(event: MessageEvent, args: Message = CommandArg()):
         "杂七杂八的小游戏和活动\n"
         "━━━━━━━━━━━━━\n"
         "【签到】 每日签到，获取奖励\n"
-        "【井字棋】 井字棋游戏，战胜AI获得奖励\n"
         "【恶魔轮盘帮助】 PVP对战，可以获得对方的赌注（金币、物品）\n"
         "【试炼列表】 查看可用的互动剧情\n"
         "【月卡】 查看月卡状态和权益\n"
         "💳 月卡权益：修炼效率提升、闭关时长增加、背包扩容、签到获得扫荡令等\n"
+        "💼 打工系统：前往指定坐标打工赚钱，详见【打工系统】\n"
     )
     await huo_dong_cmd.finish(Message(msg))
 
