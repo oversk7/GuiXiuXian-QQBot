@@ -36,7 +36,7 @@ class Player(Base):
 
     # 新增特殊属性
     critical_rate: Mapped[int] = mapped_column(Integer, default=5, server_default='5', comment="暴击率(百分比)")
-    critical_power: Mapped[int] = mapped_column(Integer, default=15, server_default='15', comment="暴击力(每点增加0.1倍伤害)")
+    critical_power: Mapped[int] = mapped_column(Integer, default=0, server_default='0', comment="暴击力(每点增加0.1倍伤害)")
     combo_rate: Mapped[int] = mapped_column(Integer, default=0, server_default='0', comment="连击率(百分比)")
     counter_rate: Mapped[int] = mapped_column(Integer, default=0, server_default='0', comment="反击率(百分比)")
     dodge_rate: Mapped[int] = mapped_column(Integer, default=0, server_default='0', comment="闪避率(百分比)")
