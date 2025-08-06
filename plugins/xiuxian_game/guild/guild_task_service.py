@@ -49,8 +49,8 @@ class GuildTaskService:
     
     WEEKLY_TASKS = {
         "weekly_contribution": {
-            "name": "周贡献达人",
-            "description": "一周内累计贡献达到50000",
+            "name": "以恶鬼身，行菩萨事",
+            "description": "一周内累计镇压鬼怪5个",
             "points_reward": 500,
             "base_exp": 500,  # 基础经验，会根据公会倍率动态计算
             "max_per_week": 1,
