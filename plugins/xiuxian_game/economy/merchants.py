@@ -572,7 +572,7 @@ SHOP_ITEMS = [
 ]
 
 # 普通商店指令
-shop_cmd = on_command("万事屋", aliases={"特殊商店"}, block=True, priority=5)
+shop_cmd = on_command("系统商店", aliases={"特殊商店"}, block=True, priority=5)
 
 @shop_cmd.handle()
 async def _(event: MessageEvent):
@@ -588,7 +588,7 @@ async def _(event: MessageEvent):
                 "━━━━━━━━━━━━━\n"
                 "⬇️ 【返回】脱离诡域，返回现实", event))
 
-        lines = ["🏬 万事屋", "━━━━━━━━━━━━━"]
+        lines = ["🏬 系统商店", "━━━━━━━━━━━━━"]
         for item_id in SHOP_ITEMS:
             item_cfg = config.items_config["by_id"].get(item_id)
             lines.append(f"{item_cfg.name}│{item_cfg.price} 金币")

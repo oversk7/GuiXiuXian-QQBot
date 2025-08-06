@@ -28,7 +28,7 @@ async def handle_help(event: MessageEvent, args: Message = CommandArg()):
         "═════════════\n"
         "🧘 修炼系统  🏪 跑商系统\n"
         "🎭 玩家系统  🎒 背包系统\n"
-        "🛒 特殊商店  📦 交易系统\n"
+        "🛒 系统商店  📦 交易系统\n"
         "🗓️ 世界系统  🛒 装备系统\n"
         "🎮 公会系统  💰 银行系统\n"
         "🔮 炼丹系统  🎮 娱乐系统\n"
