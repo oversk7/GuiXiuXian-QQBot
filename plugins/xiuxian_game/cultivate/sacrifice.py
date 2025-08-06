@@ -30,8 +30,9 @@ async def handle_sacrifice(event: MessageEvent, args: Message = CommandArg()):
     if not item_cfg:
         await sacrifice_cmd.finish(f"⛔ 未找到物品：{item_name}")
 
-    if item_cfg.type.value != "MATERIAL":
-        await sacrifice_cmd.finish("⛔ 只能献祭材料类物品！")
+    # 允许材料类物品和有怨念值的消耗品献祭
+    if item_cfg.type.value not in ["MATERIAL", "CONSUMABLE"]:
+        await sacrifice_cmd.finish("⛔ 只能献祭材料类或特殊消耗品！")
 
     if item_cfg.grudge_value <= 0:
         await sacrifice_cmd.finish("⛔ 该材料未蕴含怨念，无法献祭")

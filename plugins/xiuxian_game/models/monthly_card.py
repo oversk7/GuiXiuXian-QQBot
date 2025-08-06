@@ -124,6 +124,7 @@ def get_monthly_card_config():
             "auto_collect": monthly_config.get("basic", {}).get("auto_collect", False),
             "sign_stamina_bonus": monthly_config.get("basic", {}).get("sign_stamina_bonus", 0),
             "sign_revival_elixirs": monthly_config.get("basic", {}).get("sign_revival_elixirs", 1),
+            "breakthrough_protection": monthly_config.get("basic", {}).get("breakthrough_protection", 0.0),
         },
         CardType.PREMIUM: {
             "name": monthly_config.get("premium", {}).get("name", "高级月卡"),
@@ -134,6 +135,7 @@ def get_monthly_card_config():
             "auto_collect": monthly_config.get("premium", {}).get("auto_collect", True),
             "sign_stamina_bonus": monthly_config.get("premium", {}).get("sign_stamina_bonus", 0),
             "sign_revival_elixirs": monthly_config.get("premium", {}).get("sign_revival_elixirs", 3),
+            "breakthrough_protection": monthly_config.get("premium", {}).get("breakthrough_protection", 0.0),
         }
     }
 
