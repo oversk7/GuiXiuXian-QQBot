@@ -170,7 +170,7 @@ async def get_player_card_benefits(session, player_id: str) -> dict:
         benefits["inventory_bonus"] += card_benefits.get("inventory_bonus", 0)
         benefits["sign_stamina_bonus"] += card_benefits.get("sign_stamina_bonus", 0)
         benefits["sign_revival_elixirs"] += card_benefits.get("sign_revival_elixirs", 0)
-        print(card_benefits.get("sign_stamina_bonus"))
+
         # 突破保护取最大值
         benefits["breakthrough_protection"] = max(
             benefits["breakthrough_protection"],
