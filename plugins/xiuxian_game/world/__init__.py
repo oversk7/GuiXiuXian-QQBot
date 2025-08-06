@@ -586,9 +586,9 @@ async def _handle_personal_monster(session, tile: WorldTile, player: Player) -> 
     # 创建战斗种子
     seed = f"P_{tile.seed}:{player.id}"
 
-    # 执行增强战斗（使用紧凑日志格式）
+    # 执行增强战斗
     victory, battle_log, damage_taken = BattleIntegrationHelper.enhanced_player_vs_monster_battle(
-        player, monster_stats, monster_display, seed=seed, max_rounds=100, compact_log=True
+        player, monster_stats, monster_display, seed=seed, max_rounds=100
     )
 
     # 更新玩家血量
