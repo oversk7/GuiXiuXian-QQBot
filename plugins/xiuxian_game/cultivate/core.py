@@ -461,7 +461,7 @@ async def handle_breakthrough(event: MessageEvent, args: Message = CommandArg())
                     keep_ratio = cfg_break["fail_keep_ratio"]
                     protection_msg = ""
 
-                player.exp = round(player.exp * keep_ratio)
+                player.exp = round(player.exp - required_exp*(1-keep_ratio))
 
                 msg_lines = ["💥 镇厄崩散，修为反噬席卷脏腑。", "━━━━━━━━━━━━━"]
                 if protection_msg:
