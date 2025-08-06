@@ -329,7 +329,7 @@ items:
     # ========== 装备升阶专用材料 ==========
     - item_id: "upgrade_stone_low"
       name: "初级升阶石"
-      description: "蕴含微弱能量的升阶石，可用于装备1-3阶升级 ⬆️"
+      description: "蕴含微弱能量的升阶石，可用于装备和镶嵌物1-3阶升级 ⬆️"
       type: "CONSUMABLE"
       rarity: "white"
       price: 500
@@ -337,7 +337,7 @@ items:
 
     - item_id: "upgrade_stone_mid"
       name: "中级升阶石"
-      description: "蕴含中等能量的升阶石，可用于装备4-6阶升级 ⬆️"
+      description: "蕴含中等能量的升阶石，可用于装备和镶嵌物4-6阶升级 ⬆️"
       type: "CONSUMABLE"
       rarity: "green"
       price: 2000
@@ -345,7 +345,7 @@ items:
 
     - item_id: "upgrade_stone_high"
       name: "高级升阶石"
-      description: "蕴含强大能量的升阶石，可用于装备7-9阶升级 ⬆️"
+      description: "蕴含强大能量的升阶石，可用于装备和镶嵌物7-9阶升级 ⬆️"
       type: "CONSUMABLE"
       rarity: "blue"
       price: 8000
@@ -353,7 +353,7 @@ items:
 
     - item_id: "upgrade_stone_supreme"
       name: "至尊升阶石"
-      description: "蕴含极致能量的升阶石，可用于装备10阶升级 ⬆️"
+      description: "蕴含极致能量的升阶石，可用于装备和镶嵌物10阶升级 ⬆️"
       type: "CONSUMABLE"
       rarity: "purple"
       price: 30000
@@ -1086,68 +1086,650 @@ items:
       grudge_value: 10
 
   gems:  # 宝石类镶嵌物品
-    # ========== 宝石类镶嵌物品 ==========
-    - item_id: "strength_gem"
-      name: "力量宝石"
-      description: "蕴含纯粹力量的红色宝石，镶嵌后增加100攻击力 💪"
-      type: "GEM"
-      rarity: "green"
-      price: 15000
-      attr_bonus: {"attack": 100}
-
-    - item_id: "agility_gem"
-      name: "敏捷宝石"
-      description: "蕴含迅捷之力的绿色宝石，镶嵌后增加50敏捷 🏃"
-      type: "GEM"
-      rarity: "green"
-      price: 15000
-      attr_bonus: {"agility": 50}
-
-    - item_id: "vitality_gem"
-      name: "体质宝石"
-      description: "蕴含生命之力的蓝色宝石，镶嵌后增加100生命值 ❤️"
-      type: "GEM"
-      rarity: "green"
-      price: 15000
-      attr_bonus: {"hp": 100}
-
-    - item_id: "defense_gem"
-      name: "防御宝石"
-      description: "蕴含坚固之力的黄色宝石，镶嵌后增加50防御力 🛡️"
-      type: "GEM"
-      rarity: "green"
-      price: 15000
-      attr_bonus: {"defense": 50}
-
-    # ========== 佛珠类镶嵌物品 ==========
-    - item_id: "critical_bead"
+    # ========== 暴击佛珠系列（1-10级）==========
+    - item_id: "critical_bead_1"
       name: "暴击佛珠"
-      description: "蕴含杀意的血红佛珠，镶嵌后增加暴击率 💥"
+      description: "蕴含微弱杀意的血红佛珠，镶嵌后增加2%暴击率 💥"
+      type: "GEM"
+      rarity: "white"
+      price: 20000
+      attr_bonus: {"critical_rate": 2}
+
+    - item_id: "critical_bead_2"
+      name: "二级暴击佛珠"
+      description: "蕴含微弱杀意的血红佛珠，镶嵌后增加3%暴击率 💥"
+      type: "GEM"
+      rarity: "white"
+      price: 40000
+      attr_bonus: {"critical_rate": 3}
+
+    - item_id: "critical_bead_3"
+      name: "三级暴击佛珠"
+      description: "蕴含微弱杀意的血红佛珠，镶嵌后增加4%暴击率 💥"
+      type: "GEM"
+      rarity: "white"
+      price: 60000
+      attr_bonus: {"critical_rate": 4}
+
+    - item_id: "critical_bead_4"
+      name: "四级暴击佛珠"
+      description: "蕴含一般杀意的血红佛珠，镶嵌后增加6%暴击率 💥"
+      type: "GEM"
+      rarity: "green"
+      price: 80000
+      attr_bonus: {"critical_rate": 6}
+
+    - item_id: "critical_bead_5"
+      name: "五级暴击佛珠"
+      description: "蕴含一般杀意的血红佛珠，镶嵌后增加8%暴击率 💥"
+      type: "GEM"
+      rarity: "green"
+      price: 100000
+      attr_bonus: {"critical_rate": 8}
+
+    - item_id: "critical_bead_6"
+      name: "六级暴击佛珠"
+      description: "蕴含一般杀意的血红佛珠，镶嵌后增加10%暴击率 💥"
+      type: "GEM"
+      rarity: "green"
+      price: 120000
+      attr_bonus: {"critical_rate": 10}
+
+    - item_id: "critical_bead_7"
+      name: "七级暴击佛珠"
+      description: "蕴含强大杀意的血红佛珠，镶嵌后增加12%暴击率 💥"
       type: "GEM"
       rarity: "blue"
-      price: 100000
-      attr_bonus: {"critical_rate": 5}
+      price: 140000
+      attr_bonus: {"critical_rate": 12}
 
-    - item_id: "combo_bead"
+    - item_id: "critical_bead_8"
+      name: "八级暴击佛珠"
+      description: "蕴含强大杀意的血红佛珠，镶嵌后增加14%暴击率 💥"
+      type: "GEM"
+      rarity: "blue"
+      price: 160000
+      attr_bonus: {"critical_rate": 14}
+
+    - item_id: "critical_bead_9"
+      name: "九级暴击佛珠"
+      description: "蕴含强大杀意的血红佛珠，镶嵌后增加16%暴击率 💥"
+      type: "GEM"
+      rarity: "blue"
+      price: 180000
+      attr_bonus: {"critical_rate": 16}
+
+    - item_id: "critical_bead_10"
+      name: "十级暴击佛珠"
+      description: "蕴含极致杀意的血红佛珠，镶嵌后增加20%暴击率 💥"
+      type: "GEM"
+      rarity: "purple"
+      price: 200000
+      attr_bonus: {"critical_rate": 20}
+
+    # ========== 连击佛珠系列（1-10级）==========
+    - item_id: "combo_bead_1"
       name: "连击佛珠"
-      description: "蕴含连绵之力的金色佛珠，镶嵌后增加连击率 🔄"
+      description: "蕴含微弱连绵之力的金色佛珠，镶嵌后增加1%连击率 🔄"
       type: "GEM"
-      rarity: "blue"
-      price: 100000
-      attr_bonus: {"combo_rate": 3}
+      rarity: "white"
+      price: 20000
+      attr_bonus: {"combo_rate": 1}
 
-    - item_id: "dodge_bead"
-      name: "闪避佛珠"
-      description: "蕴含虚无之力的透明佛珠，镶嵌后增加闪避率 👻"
+    - item_id: "combo_bead_2"
+      name: "二级连击佛珠"
+      description: "蕴含微弱连绵之力的金色佛珠，镶嵌后增加2%连击率 🔄"
+      type: "GEM"
+      rarity: "white"
+      price: 40000
+      attr_bonus: {"combo_rate": 2}
+
+    - item_id: "combo_bead_3"
+      name: "三级连击佛珠"
+      description: "蕴含微弱连绵之力的金色佛珠，镶嵌后增加5%连击率 🔄"
+      type: "GEM"
+      rarity: "white"
+      price: 60000
+      attr_bonus: {"combo_rate": 5}
+
+    - item_id: "combo_bead_4"
+      name: "四级连击佛珠"
+      description: "蕴含一般连绵之力的金色佛珠，镶嵌后增加6%连击率 🔄"
+      type: "GEM"
+      rarity: "green"
+      price: 80000
+      attr_bonus: {"combo_rate": 6}
+
+    - item_id: "combo_bead_5"
+      name: "五级连击佛珠"
+      description: "蕴含一般连绵之力的金色佛珠，镶嵌后增加7%连击率 🔄"
+      type: "GEM"
+      rarity: "green"
+      price: 100000
+      attr_bonus: {"combo_rate": 7}
+
+    - item_id: "combo_bead_6"
+      name: "六级连击佛珠"
+      description: "蕴含一般连绵之力的金色佛珠，镶嵌后增加8%连击率 🔄"
+      type: "GEM"
+      rarity: "green"
+      price: 120000
+      attr_bonus: {"combo_rate": 8}
+
+    - item_id: "combo_bead_7"
+      name: "七级连击佛珠"
+      description: "蕴含强大连绵之力的金色佛珠，镶嵌后增加10%连击率 🔄"
       type: "GEM"
       rarity: "blue"
+      price: 140000
+      attr_bonus: {"combo_rate": 10}
+
+    - item_id: "combo_bead_8"
+      name: "八级连击佛珠"
+      description: "蕴含强大连绵之力的金色佛珠，镶嵌后增加12%连击率 🔄"
+      type: "GEM"
+      rarity: "blue"
+      price: 160000
+      attr_bonus: {"combo_rate": 12}
+
+    - item_id: "combo_bead_9"
+      name: "九级连击佛珠"
+      description: "蕴含强大连绵之力的金色佛珠，镶嵌后增加15%连击率 🔄"
+      type: "GEM"
+      rarity: "blue"
+      price: 180000
+      attr_bonus: {"combo_rate": 15}
+
+    - item_id: "combo_bead_10"
+      name: "十级连击佛珠"
+      description: "蕴含极致连绵之力的金色佛珠，镶嵌后增加20%连击率 🔄"
+      type: "GEM"
+      rarity: "purple"
+      price: 200000
+      attr_bonus: {"combo_rate": 20}
+
+    # ========== 闪避佛珠系列（1-10级）==========
+    - item_id: "dodge_bead_1"
+      name: "闪避佛珠"
+      description: "蕴含微弱虚无之力的透明佛珠，镶嵌后增加1%闪避率 👻"
+      type: "GEM"
+      rarity: "white"
+      price: 20000
+      attr_bonus: {"dodge_rate": 1}
+
+    - item_id: "dodge_bead_2"
+      name: "二级闪避佛珠"
+      description: "蕴含微弱虚无之力的透明佛珠，镶嵌后增加2%闪避率 👻"
+      type: "GEM"
+      rarity: "white"
+      price: 40000
+      attr_bonus: {"dodge_rate": 2}
+
+    - item_id: "dodge_bead_3"
+      name: "三级闪避佛珠"
+      description: "蕴含微弱虚无之力的透明佛珠，镶嵌后增加3%闪避率 👻"
+      type: "GEM"
+      rarity: "white"
+      price: 60000
+      attr_bonus: {"dodge_rate": 3}
+
+    - item_id: "dodge_bead_4"
+      name: "四级闪避佛珠"
+      description: "蕴含一般虚无之力的透明佛珠，镶嵌后增加4%闪避率 👻"
+      type: "GEM"
+      rarity: "green"
+      price: 80000
+      attr_bonus: {"dodge_rate": 4}
+
+    - item_id: "dodge_bead_5"
+      name: "五级闪避佛珠"
+      description: "蕴含一般虚无之力的透明佛珠，镶嵌后增加5%闪避率 👻"
+      type: "GEM"
+      rarity: "green"
       price: 100000
       attr_bonus: {"dodge_rate": 5}
 
-    - item_id: "accuracy_bead"
-      name: "命中佛珠"
-      description: "蕴含精准之力的白色佛珠，镶嵌后增加命中率 🎯"
+    - item_id: "dodge_bead_6"
+      name: "六级闪避佛珠"
+      description: "蕴含一般虚无之力的透明佛珠，镶嵌后增加6%闪避率 👻"
+      type: "GEM"
+      rarity: "green"
+      price: 120000
+      attr_bonus: {"dodge_rate": 6}
+
+    - item_id: "dodge_bead_7"
+      name: "七级闪避佛珠"
+      description: "蕴含强大虚无之力的透明佛珠，镶嵌后增加7%闪避率 👻"
       type: "GEM"
       rarity: "blue"
+      price: 140000
+      attr_bonus: {"dodge_rate": 7}
+
+    - item_id: "dodge_bead_8"
+      name: "八级闪避佛珠"
+      description: "蕴含强大虚无之力的透明佛珠，镶嵌后增加8%闪避率 👻"
+      type: "GEM"
+      rarity: "blue"
+      price: 160000
+      attr_bonus: {"dodge_rate": 8}
+
+    - item_id: "dodge_bead_9"
+      name: "九级闪避佛珠"
+      description: "蕴含强大虚无之力的透明佛珠，镶嵌后增加9%闪避率 👻"
+      type: "GEM"
+      rarity: "blue"
+      price: 180000
+      attr_bonus: {"dodge_rate": 9}
+
+    - item_id: "dodge_bead_10"
+      name: "十级闪避佛珠"
+      description: "蕴含极致虚无之力的透明佛珠，镶嵌后增加10%闪避率 👻"
+      type: "GEM"
+      rarity: "purple"
+      price: 200000
+      attr_bonus: {"dodge_rate": 10}
+
+    # ========== 命中佛珠系列（1-10级）==========
+    - item_id: "accuracy_bead_1"
+      name: "命中佛珠"
+      description: "蕴含微弱精准之力的白色佛珠，镶嵌后增加0.6%命中率 🎯"
+      type: "GEM"
+      rarity: "white"
+      price: 20000
+      attr_bonus: {"accuracy_rate": 0.6}
+
+    - item_id: "accuracy_bead_2"
+      name: "二级命中佛珠"
+      description: "蕴含微弱精准之力的白色佛珠，镶嵌后增加1.2%命中率 🎯"
+      type: "GEM"
+      rarity: "white"
+      price: 40000
+      attr_bonus: {"accuracy_rate": 1.2}
+
+    - item_id: "accuracy_bead_3"
+      name: "三级命中佛珠"
+      description: "蕴含微弱精准之力的白色佛珠，镶嵌后增加1.8%命中率 🎯"
+      type: "GEM"
+      rarity: "white"
+      price: 60000
+      attr_bonus: {"accuracy_rate": 1.8}
+
+    - item_id: "accuracy_bead_4"
+      name: "四级命中佛珠"
+      description: "蕴含一般精准之力的白色佛珠，镶嵌后增加2.4%命中率 🎯"
+      type: "GEM"
+      rarity: "green"
+      price: 80000
+      attr_bonus: {"accuracy_rate": 2.4}
+
+    - item_id: "accuracy_bead_5"
+      name: "五级命中佛珠"
+      description: "蕴含一般精准之力的白色佛珠，镶嵌后增加3%命中率 🎯"
+      type: "GEM"
+      rarity: "green"
       price: 100000
       attr_bonus: {"accuracy_rate": 3}
+
+    - item_id: "accuracy_bead_6"
+      name: "六级命中佛珠"
+      description: "蕴含一般精准之力的白色佛珠，镶嵌后增加3.6%命中率 🎯"
+      type: "GEM"
+      rarity: "green"
+      price: 120000
+      attr_bonus: {"accuracy_rate": 3.6}
+
+    - item_id: "accuracy_bead_7"
+      name: "七级命中佛珠"
+      description: "蕴含强大精准之力的白色佛珠，镶嵌后增加4.2%命中率 🎯"
+      type: "GEM"
+      rarity: "blue"
+      price: 140000
+      attr_bonus: {"accuracy_rate": 4.2}
+
+    - item_id: "accuracy_bead_8"
+      name: "八级命中佛珠"
+      description: "蕴含强大精准之力的白色佛珠，镶嵌后增加4.8%命中率 🎯"
+      type: "GEM"
+      rarity: "blue"
+      price: 160000
+      attr_bonus: {"accuracy_rate": 4.8}
+
+    - item_id: "accuracy_bead_9"
+      name: "九级命中佛珠"
+      description: "蕴含强大精准之力的白色佛珠，镶嵌后增加5.4%命中率 🎯"
+      type: "GEM"
+      rarity: "blue"
+      price: 180000
+      attr_bonus: {"accuracy_rate": 5.4}
+
+    - item_id: "accuracy_bead_10"
+      name: "十级命中佛珠"
+      description: "蕴含极致精准之力的白色佛珠，镶嵌后增加6%命中率 🎯"
+      type: "GEM"
+      rarity: "purple"
+      price: 200000
+      attr_bonus: {"accuracy_rate": 6}
+
+    # ========== 反击翡翠系列（1-10级）==========
+    - item_id: "counter_jade_1"
+      name: "反击翡翠"
+      description: "蕴含微弱反击之力的翠绿宝石，镶嵌后增加1%反击率 🔄"
+      type: "GEM"
+      rarity: "white"
+      price: 25000
+      attr_bonus: {"counter_rate": 1}
+
+    - item_id: "counter_jade_2"
+      name: "二级反击翡翠"
+      description: "蕴含微弱反击之力的翠绿宝石，镶嵌后增加2%反击率 🔄"
+      type: "GEM"
+      rarity: "white"
+      price: 50000
+      attr_bonus: {"counter_rate": 2}
+
+    - item_id: "counter_jade_3"
+      name: "三级反击翡翠"
+      description: "蕴含微弱反击之力的翠绿宝石，镶嵌后增加3%反击率 🔄"
+      type: "GEM"
+      rarity: "white"
+      price: 75000
+      attr_bonus: {"counter_rate": 3}
+
+    - item_id: "counter_jade_4"
+      name: "四级反击翡翠"
+      description: "蕴含一般反击之力的翠绿宝石，镶嵌后增加4%反击率 🔄"
+      type: "GEM"
+      rarity: "green"
+      price: 100000
+      attr_bonus: {"counter_rate": 4}
+
+    - item_id: "counter_jade_5"
+      name: "五级反击翡翠"
+      description: "蕴含一般反击之力的翠绿宝石，镶嵌后增加5%反击率 🔄"
+      type: "GEM"
+      rarity: "green"
+      price: 125000
+      attr_bonus: {"counter_rate": 5}
+
+    - item_id: "counter_jade_6"
+      name: "六级反击翡翠"
+      description: "蕴含一般反击之力的翠绿宝石，镶嵌后增加6%反击率 🔄"
+      type: "GEM"
+      rarity: "green"
+      price: 150000
+      attr_bonus: {"counter_rate": 6}
+
+    - item_id: "counter_jade_7"
+      name: "七级反击翡翠"
+      description: "蕴含强大反击之力的翠绿宝石，镶嵌后增加7%反击率 🔄"
+      type: "GEM"
+      rarity: "blue"
+      price: 175000
+      attr_bonus: {"counter_rate": 7}
+
+    - item_id: "counter_jade_8"
+      name: "八级反击翡翠"
+      description: "蕴含强大反击之力的翠绿宝石，镶嵌后增加8%反击率 🔄"
+      type: "GEM"
+      rarity: "blue"
+      price: 200000
+      attr_bonus: {"counter_rate": 8}
+
+    - item_id: "counter_jade_9"
+      name: "九级反击翡翠"
+      description: "蕴含强大反击之力的翠绿宝石，镶嵌后增加9%反击率 🔄"
+      type: "GEM"
+      rarity: "blue"
+      price: 225000
+      attr_bonus: {"counter_rate": 9}
+
+    - item_id: "counter_jade_10"
+      name: "十级反击翡翠"
+      description: "蕴含极致反击之力的翠绿宝石，镶嵌后增加10%反击率 🔄"
+      type: "GEM"
+      rarity: "purple"
+      price: 250000
+      attr_bonus: {"counter_rate": 10}
+
+    # ========== 暴击力玛瑙系列（1-10级）==========
+    - item_id: "critical_power_agate_1"
+      name: "暴击力玛瑙"
+      description: "蕴含微弱暴击之力的红色玛瑙，镶嵌后增加5%暴击力 💢"
+      type: "GEM"
+      rarity: "white"
+      price: 25000
+      attr_bonus: {"critical_power": 5}
+
+    - item_id: "critical_power_agate_2"
+      name: "二级暴击力玛瑙"
+      description: "蕴含微弱暴击之力的红色玛瑙，镶嵌后增加10%暴击力 💢"
+      type: "GEM"
+      rarity: "white"
+      price: 50000
+      attr_bonus: {"critical_power": 10}
+
+    - item_id: "critical_power_agate_3"
+      name: "三级暴击力玛瑙"
+      description: "蕴含微弱暴击之力的红色玛瑙，镶嵌后增加15%暴击力 💢"
+      type: "GEM"
+      rarity: "white"
+      price: 75000
+      attr_bonus: {"critical_power": 15}
+
+    - item_id: "critical_power_agate_4"
+      name: "四级暴击力玛瑙"
+      description: "蕴含一般暴击之力的红色玛瑙，镶嵌后增加20%暴击力 💢"
+      type: "GEM"
+      rarity: "green"
+      price: 100000
+      attr_bonus: {"critical_power": 20}
+
+    - item_id: "critical_power_agate_5"
+      name: "五级暴击力玛瑙"
+      description: "蕴含一般暴击之力的红色玛瑙，镶嵌后增加25%暴击力 💢"
+      type: "GEM"
+      rarity: "green"
+      price: 125000
+      attr_bonus: {"critical_power": 25}
+
+    - item_id: "critical_power_agate_6"
+      name: "六级暴击力玛瑙"
+      description: "蕴含一般暴击之力的红色玛瑙，镶嵌后增加30%暴击力 💢"
+      type: "GEM"
+      rarity: "green"
+      price: 150000
+      attr_bonus: {"critical_power": 30}
+
+    - item_id: "critical_power_agate_7"
+      name: "七级暴击力玛瑙"
+      description: "蕴含强大暴击之力的红色玛瑙，镶嵌后增加35%暴击力 💢"
+      type: "GEM"
+      rarity: "blue"
+      price: 175000
+      attr_bonus: {"critical_power": 35}
+
+    - item_id: "critical_power_agate_8"
+      name: "八级暴击力玛瑙"
+      description: "蕴含强大暴击之力的红色玛瑙，镶嵌后增加40%暴击力 💢"
+      type: "GEM"
+      rarity: "blue"
+      price: 200000
+      attr_bonus: {"critical_power": 40}
+
+    - item_id: "critical_power_agate_9"
+      name: "九级暴击力玛瑙"
+      description: "蕴含强大暴击之力的红色玛瑙，镶嵌后增加45%暴击力 💢"
+      type: "GEM"
+      rarity: "blue"
+      price: 225000
+      attr_bonus: {"critical_power": 45}
+
+    - item_id: "critical_power_agate_10"
+      name: "十级暴击力玛瑙"
+      description: "蕴含极致暴击之力的红色玛瑙，镶嵌后增加50%暴击力 💢"
+      type: "GEM"
+      rarity: "purple"
+      price: 250000
+      attr_bonus: {"critical_power": 50}
+
+    # ========== 穿透水晶系列（1-10级）==========
+    - item_id: "penetration_crystal_1"
+      name: "穿透水晶"
+      description: "蕴含微弱穿透之力的透明水晶，镶嵌后增加2%穿透率 🔹"
+      type: "GEM"
+      rarity: "white"
+      price: 25000
+      attr_bonus: {"penetration_rate": 2}
+
+    - item_id: "penetration_crystal_2"
+      name: "二级穿透水晶"
+      description: "蕴含微弱穿透之力的透明水晶，镶嵌后增加4%穿透率 🔹"
+      type: "GEM"
+      rarity: "white"
+      price: 50000
+      attr_bonus: {"penetration_rate": 4}
+
+    - item_id: "penetration_crystal_3"
+      name: "三级穿透水晶"
+      description: "蕴含微弱穿透之力的透明水晶，镶嵌后增加6%穿透率 🔹"
+      type: "GEM"
+      rarity: "white"
+      price: 75000
+      attr_bonus: {"penetration_rate": 6}
+
+    - item_id: "penetration_crystal_4"
+      name: "四级穿透水晶"
+      description: "蕴含一般穿透之力的透明水晶，镶嵌后增加8%穿透率 🔹"
+      type: "GEM"
+      rarity: "green"
+      price: 100000
+      attr_bonus: {"penetration_rate": 8}
+
+    - item_id: "penetration_crystal_5"
+      name: "五级穿透水晶"
+      description: "蕴含一般穿透之力的透明水晶，镶嵌后增加10%穿透率 🔹"
+      type: "GEM"
+      rarity: "green"
+      price: 125000
+      attr_bonus: {"penetration_rate": 10}
+
+    - item_id: "penetration_crystal_6"
+      name: "六级穿透水晶"
+      description: "蕴含一般穿透之力的透明水晶，镶嵌后增加12%穿透率 🔹"
+      type: "GEM"
+      rarity: "green"
+      price: 150000
+      attr_bonus: {"penetration_rate": 12}
+
+    - item_id: "penetration_crystal_7"
+      name: "七级穿透水晶"
+      description: "蕴含强大穿透之力的透明水晶，镶嵌后增加14%穿透率 🔹"
+      type: "GEM"
+      rarity: "blue"
+      price: 175000
+      attr_bonus: {"penetration_rate": 14}
+
+    - item_id: "penetration_crystal_8"
+      name: "八级穿透水晶"
+      description: "蕴含强大穿透之力的透明水晶，镶嵌后增加16%穿透率 🔹"
+      type: "GEM"
+      rarity: "blue"
+      price: 200000
+      attr_bonus: {"penetration_rate": 16}
+
+    - item_id: "penetration_crystal_9"
+      name: "九级穿透水晶"
+      description: "蕴含强大穿透之力的透明水晶，镶嵌后增加18%穿透率 🔹"
+      type: "GEM"
+      rarity: "blue"
+      price: 225000
+      attr_bonus: {"penetration_rate": 18}
+
+    - item_id: "penetration_crystal_10"
+      name: "十级穿透水晶"
+      description: "蕴含极致穿透之力的透明水晶，镶嵌后增加20%穿透率 🔹"
+      type: "GEM"
+      rarity: "purple"
+      price: 250000
+      attr_bonus: {"penetration_rate": 20}
+
+    # ========== 灵爆紫晶系列（1-10级）==========
+    - item_id: "spirit_burst_amethyst_1"
+      name: "灵爆紫晶"
+      description: "蕴含微弱灵爆之力的紫色水晶，镶嵌后增加1%灵爆率 💜"
+      type: "GEM"
+      rarity: "white"
+      price: 30000
+      attr_bonus: {"spirit_burst_rate": 1}
+
+    - item_id: "spirit_burst_amethyst_2"
+      name: "二级灵爆紫晶"
+      description: "蕴含微弱灵爆之力的紫色水晶，镶嵌后增加2%灵爆率 💜"
+      type: "GEM"
+      rarity: "white"
+      price: 60000
+      attr_bonus: {"spirit_burst_rate": 2}
+
+    - item_id: "spirit_burst_amethyst_3"
+      name: "三级灵爆紫晶"
+      description: "蕴含微弱灵爆之力的紫色水晶，镶嵌后增加3%灵爆率 💜"
+      type: "GEM"
+      rarity: "white"
+      price: 90000
+      attr_bonus: {"spirit_burst_rate": 3}
+
+    - item_id: "spirit_burst_amethyst_4"
+      name: "四级灵爆紫晶"
+      description: "蕴含一般灵爆之力的紫色水晶，镶嵌后增加4%灵爆率 💜"
+      type: "GEM"
+      rarity: "green"
+      price: 120000
+      attr_bonus: {"spirit_burst_rate": 4}
+
+    - item_id: "spirit_burst_amethyst_5"
+      name: "五级灵爆紫晶"
+      description: "蕴含一般灵爆之力的紫色水晶，镶嵌后增加5%灵爆率 💜"
+      type: "GEM"
+      rarity: "green"
+      price: 150000
+      attr_bonus: {"spirit_burst_rate": 5}
+
+    - item_id: "spirit_burst_amethyst_6"
+      name: "六级灵爆紫晶"
+      description: "蕴含一般灵爆之力的紫色水晶，镶嵌后增加6%灵爆率 💜"
+      type: "GEM"
+      rarity: "green"
+      price: 180000
+      attr_bonus: {"spirit_burst_rate": 6}
+
+    - item_id: "spirit_burst_amethyst_7"
+      name: "七级灵爆紫晶"
+      description: "蕴含强大灵爆之力的紫色水晶，镶嵌后增加7%灵爆率 💜"
+      type: "GEM"
+      rarity: "blue"
+      price: 210000
+      attr_bonus: {"spirit_burst_rate": 7}
+
+    - item_id: "spirit_burst_amethyst_8"
+      name: "八级灵爆紫晶"
+      description: "蕴含强大灵爆之力的紫色水晶，镶嵌后增加8%灵爆率 💜"
+      type: "GEM"
+      rarity: "blue"
+      price: 240000
+      attr_bonus: {"spirit_burst_rate": 8}
+
+    - item_id: "spirit_burst_amethyst_9"
+      name: "九级灵爆紫晶"
+      description: "蕴含强大灵爆之力的紫色水晶，镶嵌后增加9%灵爆率 💜"
+      type: "GEM"
+      rarity: "blue"
+      price: 270000
+      attr_bonus: {"spirit_burst_rate": 9}
+
+    - item_id: "spirit_burst_amethyst_10"
+      name: "十级灵爆紫晶"
+      description: "蕴含极致灵爆之力的紫色水晶，镶嵌后增加10%灵爆率 💜"
+      type: "GEM"
+      rarity: "purple"
+      price: 300000
+      attr_bonus: {"spirit_burst_rate": 10}

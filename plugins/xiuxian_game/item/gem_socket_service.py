@@ -48,10 +48,34 @@ class GemSocketService:
     @classmethod
     def get_gem_type(cls, item_id: str) -> str:
         """获取镶嵌物品类型"""
-        if item_id.endswith("_gem"):
+        # 处理等级化镶嵌物（如 strength_gem_1）
+        if "_gem_" in item_id:
+            return "宝石"
+        elif "_bead_" in item_id:
+            return "佛珠"
+        elif "_jade_" in item_id:
+            return "翡翠"
+        elif "_agate_" in item_id:
+            return "玛瑙"
+        elif "_crystal_" in item_id:
+            return "水晶"
+        elif "_amethyst_" in item_id:
+            return "紫晶"
+        elif "_rune_" in item_id:
+            return "符文"
+        # 兼容旧格式
+        elif item_id.endswith("_gem"):
             return "宝石"
         elif item_id.endswith("_bead"):
             return "佛珠"
+        elif item_id.endswith("_jade"):
+            return "翡翠"
+        elif item_id.endswith("_agate"):
+            return "玛瑙"
+        elif item_id.endswith("_crystal"):
+            return "水晶"
+        elif item_id.endswith("_amethyst"):
+            return "紫晶"
         elif item_id.endswith("_rune"):
             return "符文"
         return "未知"
