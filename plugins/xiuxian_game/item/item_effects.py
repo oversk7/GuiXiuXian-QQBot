@@ -344,6 +344,10 @@ async def _sweep_dungeon(player: Player, cfg: ItemConfig, qty: int, ctx: str, se
         else:
             drop_rates = {"white": 0.20, "green": 0.20, "blue": 0.20, "purple": 0.08, "orange": 0.01}
 
+        # 获取当前区域材料配置
+        from ..world import get_region_materials, get_materials_by_rarity
+        region_materials = get_region_materials(player.region)
+
         # 估算每种稀有度材料的获得数量
         for rarity, base_rate in drop_rates.items():
             if rarity == "white":  # 白色材料不算高级奖励
@@ -354,10 +358,19 @@ async def _sweep_dungeon(player: Player, cfg: ItemConfig, qty: int, ctx: str, se
             expected_count = int(monster_tiles * final_rate)
 
             if expected_count > 0:
-                # 随机选择该稀有度的材料
-                rarity_materials = get_materials_by_rarity(rarity)
-                if rarity_materials:
-                    material_id = random.choice(rarity_materials)
+                # 优先从区域商人材料中选择（与战斗掉落逻辑一致）
+                candidate_materials = []
+                for material_id in region_materials["merchant"]:
+                    item_config = config.items_config["by_id"].get(material_id)
+                    if item_config and item_config.rarity == rarity:
+                        candidate_materials.append(material_id)
+
+                # 如果区域没有对应稀有度的材料，从全局材料中选择
+                if not candidate_materials:
+                    candidate_materials = get_materials_by_rarity(rarity)
+
+                if candidate_materials:
+                    material_id = random.choice(candidate_materials)
                     estimated_drops[material_id] = expected_count
 
         # 添加估算的高级材料到背包

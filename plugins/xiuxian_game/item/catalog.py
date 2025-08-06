@@ -49,24 +49,32 @@ def _get_material_obtain_methods(item_id: str, rarity: str) -> str:
             if len(basic_regions) > 3:
                 regions_str += "等"
             methods.append(f"探索({regions_str})")
+        methods.append("扫荡令扫荡")
 
+    # 战斗掉落说明
     if rarity in ["green", "blue", "purple", "orange"]:
-        methods.append("战斗掉落")
+        # 根据稀有度添加具体的掉落说明
+        if rarity == "green":
+            methods.append("战斗掉落(21级+怪物)")
+        elif rarity == "blue":
+            methods.append("战斗掉落(61级+怪物)")
+        elif rarity == "purple":
+            methods.append("战斗掉落(101级+怪物)")
+        elif rarity == "orange":
+            methods.append("战斗掉落(101级+顶级怪物)")
+
+        # 扫荡系统也能获得高级材料
+        methods.append("扫荡令扫荡(概率获得)")
+
+        # 精英怪特殊掉落
+        methods.append("精英怪(高概率)")
+
+        # 区域商人材料
         if merchant_regions:
             regions_str = "、".join(merchant_regions[:3])
             if len(merchant_regions) > 3:
                 regions_str += "等"
             methods.append(f"副本商人({regions_str})")
-
-    # 根据稀有度添加通用获取方式
-    if rarity in ["green", "blue"]:
-        methods.append("中高级怪物掉落")
-    elif rarity in ["purple", "orange"]:
-        methods.append("高级/顶级怪物掉落")
-
-    # 扫荡令获取（主要是基础材料）
-    if rarity == "white":
-        methods.append("扫荡令扫荡")
 
     return "、".join(methods) if methods else "暂无获取途径"
 
