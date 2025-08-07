@@ -110,7 +110,7 @@ class BattleEngine:
         hit_chance = max(0.1, min(0.95, hit_chance))
         
         if self.rng.random() > hit_chance:
-            result["effects"].append("MISS")
+            result["effects"].append("被闪避")
             return result
         
         result["hit"] = True

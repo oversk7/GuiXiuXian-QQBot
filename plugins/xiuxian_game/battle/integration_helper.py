@@ -269,7 +269,7 @@ class BattleIntegrationHelper:
                         player_hp = max(0, player_hp - monster_attack_result["damage"])
                         # 紧凑模式：显示伤害和格挡信息
                         if monster_attack_result["blocked"] > 0:
-                            round_actions.append(f"{monster_name}→{monster_attack_result['damage']}🛡️{monster_attack_result['blocked']}")
+                            round_actions.append(f"{monster_name}→{monster_attack_result['damage']}🛡️挡{monster_attack_result['blocked']}")
                         else:
                             round_actions.append(f"{monster_name}→{monster_attack_result['damage']}")
                     else:
@@ -284,7 +284,7 @@ class BattleIntegrationHelper:
                     player_hp = max(0, player_hp - monster_attack_result["damage"])
                     # 紧凑模式：显示伤害和格挡信息
                     if monster_attack_result["blocked"] > 0:
-                        round_actions.append(f"{monster_name}→{monster_attack_result['damage']}🛡️{monster_attack_result['blocked']}")
+                        round_actions.append(f"{monster_name}→{monster_attack_result['damage']}🛡️挡{monster_attack_result['blocked']}")
                     else:
                         round_actions.append(f"{monster_name}→{monster_attack_result['damage']}")
 
@@ -401,7 +401,13 @@ class BattleIntegrationHelper:
                             effects.append("🗡️")
 
                         effect_text = "".join(effects)
-                        round_actions.append(f"{effect_text}{player1.nickname}→{damage}")
+
+                        # 计算格挡伤害（基础攻击力 - 实际伤害）
+                        blocked_damage = player1.attack - damage
+                        if blocked_damage > 0:
+                            round_actions.append(f"{effect_text}{player1.nickname}→{damage}🛡️挡{blocked_damage}")
+                        else:
+                            round_actions.append(f"{effect_text}{player1.nickname}→{damage}")
                     else:
                         round_actions.append(f"{player1.nickname}→MISS")
 
@@ -424,7 +430,13 @@ class BattleIntegrationHelper:
                             effects.append("🗡️")
 
                         effect_text = "".join(effects)
-                        round_actions.append(f"{effect_text}{player2.nickname}→{damage}")
+
+                        # 计算格挡伤害（基础攻击力 - 实际伤害）
+                        blocked_damage = player2.attack - damage
+                        if blocked_damage > 0:
+                            round_actions.append(f"{effect_text}{player2.nickname}→{damage}🛡️挡{blocked_damage}")
+                        else:
+                            round_actions.append(f"{effect_text}{player2.nickname}→{damage}")
                     else:
                         round_actions.append(f"{player2.nickname}→MISS")
             else:
@@ -447,7 +459,13 @@ class BattleIntegrationHelper:
                             effects.append("🗡️")
 
                         effect_text = "".join(effects)
-                        round_actions.append(f"{effect_text}{player2.nickname}→{damage}")
+
+                        # 计算格挡伤害（基础攻击力 - 实际伤害）
+                        blocked_damage = player2.attack - damage
+                        if blocked_damage > 0:
+                            round_actions.append(f"{effect_text}{player2.nickname}→{damage}🛡️挡{blocked_damage}")
+                        else:
+                            round_actions.append(f"{effect_text}{player2.nickname}→{damage}")
                     else:
                         round_actions.append(f"{player2.nickname}→MISS")
 
@@ -470,7 +488,13 @@ class BattleIntegrationHelper:
                             effects.append("🗡️")
 
                         effect_text = "".join(effects)
-                        round_actions.append(f"{effect_text}{player1.nickname}→{damage}")
+
+                        # 计算格挡伤害（基础攻击力 - 实际伤害）
+                        blocked_damage = player1.attack - damage
+                        if blocked_damage > 0:
+                            round_actions.append(f"{effect_text}{player1.nickname}→{damage}🛡️挡{blocked_damage}")
+                        else:
+                            round_actions.append(f"{effect_text}{player1.nickname}→{damage}")
                     else:
                         round_actions.append(f"{player1.nickname}→MISS")
 

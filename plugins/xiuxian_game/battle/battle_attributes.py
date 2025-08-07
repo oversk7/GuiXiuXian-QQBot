@@ -251,7 +251,7 @@ class BattleEffectProcessor:
         )
         
         if rng.random() > hit_chance:
-            result["effects"].append("MISS")
+            result["effects"].append("被闪避")
             return result
         
         result["hit"] = True
