@@ -548,7 +548,10 @@ async def _handle_material(session, tile: WorldTile, player: Player) -> str:
 async def _handle_treasure(session, tile: WorldTile, player: Player) -> str:
     if tile.state.get("looted"):
         return "🪨 雕塑的暗格已被掏空，徒留潮湿指印。"
-    rng = random.Random(hash(tile.seed))
+    # 添加时间戳确保每次开启宝箱都有不同的奖励
+    import time
+    treasure_timestamp = int(time.time() * 1000)
+    rng = random.Random(hash(f"{tile.seed}:{player.id}:{treasure_timestamp}"))
     base_gold = rng.randint(100, 1000)
     from ..utils import luck_prob
     multiplier = 1 + luck_prob(player.luck)  # 1~2 倍区间
@@ -587,8 +590,10 @@ async def _handle_personal_monster(session, tile: WorldTile, player: Player) -> 
     # 使用新战斗系统
     from ..battle.integration_helper import BattleIntegrationHelper
 
-    # 创建战斗种子
-    seed = f"P_{tile.seed}:{player.id}"
+    # 创建战斗种子 - 添加时间戳确保每次战斗都有不同的随机序列
+    import time
+    battle_timestamp = int(time.time() * 1000)  # 毫秒级时间戳
+    seed = f"P_{tile.seed}:{player.id}:{battle_timestamp}"
 
     # 执行增强战斗
     victory, battle_log, damage_taken = BattleIntegrationHelper.enhanced_player_vs_monster_battle(
@@ -603,9 +608,10 @@ async def _handle_personal_monster(session, tile: WorldTile, player: Player) -> 
 
     # 处理战斗结果
     if victory:
-        # 胜利处理
+        # 胜利处理 - 使用新的时间戳确保每次掉落都不同
         import random
-        rng = random.Random(hash(f"P_{tile.seed}:{player.id}"))
+        drop_timestamp = int(time.time() * 1000)  # 毫秒级时间戳
+        rng = random.Random(hash(f"P_{tile.seed}:{player.id}:{drop_timestamp}"))
         exp_gain = rng.randint(1, 4) * monster_level
         player.exp += exp_gain
         battle_summary.append(f"🎉 你击杀了 {monster_display}，获得 {exp_gain} EXP")

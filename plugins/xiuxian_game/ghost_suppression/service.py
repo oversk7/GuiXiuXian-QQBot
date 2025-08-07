@@ -103,9 +103,11 @@ class GhostSuppressionService:
         initial_player_hp = player_hp
         initial_wild_hp = wild_hp
 
-        # 使用确定性随机数生成器
+        # 使用随机数生成器 - 添加时间戳确保每次战斗都有不同的随机序列
         import hashlib
-        seed = f"{player_ghost.id}:{wild_ghost_config['ghost_id']}:{player.id}"
+        import time
+        battle_timestamp = int(time.time() * 1000)  # 毫秒级时间戳
+        seed = f"{player_ghost.id}:{wild_ghost_config['ghost_id']}:{player.id}:{battle_timestamp}"
         rng = random.Random(hashlib.md5(seed.encode()).hexdigest())
 
         battle_log = []
