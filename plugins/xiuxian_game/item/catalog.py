@@ -136,7 +136,7 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
         "MATERIAL": "材料",
         "EQUIPMENT": "装备",
         "GOODS": "商品",
-
+        "GEM": "镶嵌物"
     }
 
     lines = ["📖 图鉴查询结果 ✨", "━━━━━━━━━━"]
