@@ -262,22 +262,22 @@ class DailyTaskService:
             # 整体降低难度，让委托任务更容易完成
             if relative_strength > 1.5:
                 # 玩家很强，敌人减弱50%
-                difficulty_multiplier = 0.5
+                difficulty_multiplier = 1.1
             elif relative_strength > 1.2:
                 # 玩家较强，敌人减弱40%
-                difficulty_multiplier = 0.6
+                difficulty_multiplier = 1
             elif relative_strength > 1.0:
                 # 玩家正常，敌人减弱30%
-                difficulty_multiplier = 0.7
+                difficulty_multiplier = 0.8
             elif relative_strength > 0.8:
                 # 玩家较弱，敌人减弱20%
-                difficulty_multiplier = 0.8
+                difficulty_multiplier = 0.7
             elif relative_strength > 0.6:
                 # 玩家弱，敌人减弱15%
-                difficulty_multiplier = 0.85
+                difficulty_multiplier = 0.7
             else:
                 # 玩家很弱，敌人减弱10%
-                difficulty_multiplier = 0.9
+                difficulty_multiplier = 0.7
 
         # 应用难度调整
         base_hp = int(base_hp * difficulty_multiplier)
