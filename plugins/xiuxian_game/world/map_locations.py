@@ -85,8 +85,7 @@ async def _(event: MessageEvent):
             "• 【导航 x y】- 自动导航到指定坐标",
             "• 【市集】- 查看当前位置市场",
             "• 【打工】- 查看当前位置工作",
-            "• 【传送 诡域名】- 传送到诡域",
-            "• 【诡域】- 查看所有诡域列表"
+            "• 【总部商店】- 前往总部兑换升阶材料"
         ])
         
         await map_cmd.finish(message_add_head("\n".join(lines), event))
