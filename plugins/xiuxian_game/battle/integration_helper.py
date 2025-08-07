@@ -338,7 +338,162 @@ class BattleIntegrationHelper:
             battle_log.append(f"💀 战败！{round_num}回合，剩余{remaining_player_hp}血，敌剩{remaining_monster_hp}血")
 
         return victory, battle_log, damage_taken
-    
+
+    @staticmethod
+    def compact_player_vs_player_battle(
+        player1: Player,
+        player2: Player,
+        seed: Optional[str] = None,
+        max_rounds: int = 30
+    ) -> Tuple[bool, List[str], int, int]:
+        """简洁版玩家vs玩家战斗（PVP切磋）- 使用与副本相同的简洁格式
+
+        Args:
+            player1: 挑战者玩家
+            player2: 被挑战者玩家
+            seed: 随机种子
+            max_rounds: 最大回合数
+
+        Returns:
+            (player1是否胜利, 战斗日志, player1受到的伤害, player2受到的伤害)
+        """
+        engine = BattleEngine(seed)
+        battle_log = []
+
+        # 初始化战斗状态
+        player1_hp = player1.hp
+        player2_hp = player2.hp
+        initial_player1_hp = player1_hp
+        initial_player2_hp = player2_hp
+
+        battle_log.append(f"⚔️ {player1.nickname} VS {player2.nickname}")
+
+        # 判定先后手（基于敏捷）
+        from .battle_attributes import BattleAttributeCalculator
+        player1_first = BattleAttributeCalculator.determine_turn_order(
+            player1.agility, player2.agility, engine.rng
+        )
+
+        for round_num in range(1, max_rounds + 1):
+            if player1_hp <= 0 or player2_hp <= 0:
+                break
+
+            round_actions = []  # 紧凑模式的单行显示
+
+            # 根据先后手判定执行攻击顺序
+            if player1_first:
+                # 玩家1先手
+                if player1_hp > 0 and player2_hp > 0:
+                    attack_result = engine.execute_player_turn(
+                        player1, player2, player1.attack, is_skill=False
+                    )
+
+                    if attack_result["hit"]:
+                        damage = attack_result["damage"]
+                        player2_hp = max(0, player2_hp - damage)
+                        # 紧凑格式：显示效果和伤害
+                        effects = []
+                        if attack_result.get("is_critical"):
+                            effects.append("💥")
+                        if attack_result.get("combo_count", 1) > 1:
+                            effects.append(f"🔄x{attack_result['combo_count']}")
+                        if attack_result.get("is_penetration", False):
+                            effects.append("🗡️")
+
+                        effect_text = "".join(effects)
+                        round_actions.append(f"{effect_text}{player1.nickname}→{damage}")
+                    else:
+                        round_actions.append(f"{player1.nickname}→MISS")
+
+                # 玩家2反击（如果存活）
+                if player2_hp > 0 and player1_hp > 0:
+                    attack_result = engine.execute_player_turn(
+                        player2, player1, player2.attack, is_skill=False
+                    )
+
+                    if attack_result["hit"]:
+                        damage = attack_result["damage"]
+                        player1_hp = max(0, player1_hp - damage)
+                        # 紧凑格式：显示效果和伤害
+                        effects = []
+                        if attack_result.get("is_critical"):
+                            effects.append("💥")
+                        if attack_result.get("combo_count", 1) > 1:
+                            effects.append(f"🔄x{attack_result['combo_count']}")
+                        if attack_result.get("is_penetration", False):
+                            effects.append("🗡️")
+
+                        effect_text = "".join(effects)
+                        round_actions.append(f"{effect_text}{player2.nickname}→{damage}")
+                    else:
+                        round_actions.append(f"{player2.nickname}→MISS")
+            else:
+                # 玩家2先手
+                if player2_hp > 0 and player1_hp > 0:
+                    attack_result = engine.execute_player_turn(
+                        player2, player1, player2.attack, is_skill=False
+                    )
+
+                    if attack_result["hit"]:
+                        damage = attack_result["damage"]
+                        player1_hp = max(0, player1_hp - damage)
+                        # 紧凑格式：显示效果和伤害
+                        effects = []
+                        if attack_result.get("is_critical"):
+                            effects.append("💥")
+                        if attack_result.get("combo_count", 1) > 1:
+                            effects.append(f"🔄x{attack_result['combo_count']}")
+                        if attack_result.get("is_penetration", False):
+                            effects.append("🗡️")
+
+                        effect_text = "".join(effects)
+                        round_actions.append(f"{effect_text}{player2.nickname}→{damage}")
+                    else:
+                        round_actions.append(f"{player2.nickname}→MISS")
+
+                # 玩家1反击（如果存活）
+                if player1_hp > 0 and player2_hp > 0:
+                    attack_result = engine.execute_player_turn(
+                        player1, player2, player1.attack, is_skill=False
+                    )
+
+                    if attack_result["hit"]:
+                        damage = attack_result["damage"]
+                        player2_hp = max(0, player2_hp - damage)
+                        # 紧凑格式：显示效果和伤害
+                        effects = []
+                        if attack_result.get("is_critical"):
+                            effects.append("💥")
+                        if attack_result.get("combo_count", 1) > 1:
+                            effects.append(f"🔄x{attack_result['combo_count']}")
+                        if attack_result.get("is_penetration", False):
+                            effects.append("🗡️")
+
+                        effect_text = "".join(effects)
+                        round_actions.append(f"{effect_text}{player1.nickname}→{damage}")
+                    else:
+                        round_actions.append(f"{player1.nickname}→MISS")
+
+            # 将回合动作合并为一行
+            if round_actions:
+                battle_log.append(f"R{round_num}: " + " | ".join(round_actions))
+
+        # 计算伤害
+        player1_damage_taken = initial_player1_hp - player1_hp
+        player2_damage_taken = initial_player2_hp - player2_hp
+        player1_victory = player2_hp <= 0
+
+        # 紧凑格式的结果显示
+        if player1_victory:
+            battle_log.append(f"🎉 {player1.nickname}胜利！{round_num}回合，剩余{player1_hp}血")
+        elif player1_hp <= 0:
+            battle_log.append(f"🎉 {player2.nickname}胜利！{round_num}回合，剩余{player2_hp}血")
+        else:
+            # 平局或超时
+            battle_log.append(f"⏰ 战斗超时，平局！{round_num}回合，{player1.nickname}剩{player1_hp}血，{player2.nickname}剩{player2_hp}血")
+
+        return player1_victory, battle_log, player1_damage_taken, player2_damage_taken
+
     @staticmethod
     def _monster_attack_player(monster_stats: Dict, player: Player, engine: BattleEngine) -> Dict:
         """怪物攻击玩家的简化逻辑

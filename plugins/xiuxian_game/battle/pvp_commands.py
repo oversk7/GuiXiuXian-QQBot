@@ -85,9 +85,9 @@ async def handle_pvp(event: MessageEvent, args: Message = CommandArg()):
         battle_timestamp = int(time.time() * 1000)
         seed = f"PVP_{challenger.id}_{target_player.id}_{battle_timestamp}"
         
-        # 执行PVP战斗
+        # 执行PVP战斗（使用简洁格式）
         try:
-            victory, battle_log, challenger_damage, target_damage = BattleIntegrationHelper.enhanced_player_vs_player_battle(
+            victory, battle_log, challenger_damage, target_damage = BattleIntegrationHelper.compact_player_vs_player_battle(
                 challenger, target_player, seed=seed, max_rounds=30
             )
             
@@ -108,7 +108,7 @@ async def handle_pvp(event: MessageEvent, args: Message = CommandArg()):
                 "━━━━━━━━━━━━━"
             ])
             
-            # 显示完整的战斗日志
+            # 显示简洁的战斗日志
             result_lines.extend(battle_log)
             
             result_lines.extend([
@@ -179,9 +179,9 @@ async def handle_simulate(event: MessageEvent, args: Message = CommandArg()):
         battle_timestamp = int(time.time() * 1000)
         seed = f"SIMULATE_{player1.id}_{player2.id}_{battle_timestamp}"
         
-        # 执行模拟战斗
+        # 执行模拟战斗（使用简洁格式）
         try:
-            _, battle_log, _, _ = BattleIntegrationHelper.enhanced_player_vs_player_battle(
+            _, battle_log, _, _ = BattleIntegrationHelper.compact_player_vs_player_battle(
                 player1, player2, seed=seed, max_rounds=30
             )
 
@@ -202,7 +202,7 @@ async def handle_simulate(event: MessageEvent, args: Message = CommandArg()):
                 "━━━━━━━━━━━━━"
             ])
 
-            # 显示完整的战斗日志
+            # 显示简洁的战斗日志
             result_lines.extend(battle_log)
             
             result_lines.extend([
