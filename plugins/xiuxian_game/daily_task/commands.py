@@ -23,7 +23,8 @@ async def handle_daily_task(event: MessageEvent):
         player = await session.get(Player, event.get_user_id())
         if not player:
             await daily_task_cmd.finish("⛔ 请先创建角色")
-        
+        if player.level < 30:
+            await daily_task_cmd.finish("⛔ 该功能仅对Lv.30以上角色开放")
         # 获取或生成今日任务（会自动被动清理过期任务）
         task = await DailyTaskService.generate_daily_task(session, player)
         await session.commit()

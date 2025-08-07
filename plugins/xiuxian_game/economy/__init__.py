@@ -1,6 +1,5 @@
 from . import wealth_rank, merchants
 from . import bank
-from . import guild_shop
 from . import market
 from . import stock_commands
 from . import stock_service
