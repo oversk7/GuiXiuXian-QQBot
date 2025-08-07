@@ -37,7 +37,7 @@ async def handle_moyu_calendar(event: MessageEvent):
             import base64
             base64_img = base64.b64encode(response.content).decode("utf-8")
             img_segment = MessageSegment.file_image(base64_img)
-            msg = Message("📅 今日摸鱼日历来啦！\n").append(img_segment)
+            msg = Message("📅 今日摸鱼日历来啦！").append(img_segment)
             await moyu_calendar.finish(msg)
         else:
             await moyu_calendar.finish("❌ 摸鱼日历获取失败，请稍后再试")
@@ -71,7 +71,7 @@ async def handle_moyu_daily(event: MessageEvent):
             import base64
             base64_img = base64.b64encode(response.content).decode("utf-8")
             img_segment = MessageSegment.file_image(base64_img)
-            msg = Message("📰 今日摸鱼日报新鲜出炉！\n").append(img_segment)
+            msg = Message("📰 今日摸鱼日报新鲜出炉！").append(img_segment)
             await moyu_daily.finish(msg)
         else:
             await moyu_daily.finish("❌ 摸鱼日报获取失败，请稍后再试")
