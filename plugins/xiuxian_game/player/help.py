@@ -497,6 +497,8 @@ async def handle_daily_task_help(event: MessageEvent, args: Message = CommandArg
         "\n"
         "⚔️ 战斗说明：\n"
         "• 自动分配与玩家近似等级的敌人\n"
+        "• 敌人强度根据玩家总战力智能调整\n"
+        "• 玩家越强，敌人相对越弱，确保合理挑战性\n"
         "\n"
         "📅 刷新机制：\n"
         "• 每日0点自动生成新的委托任务\n"

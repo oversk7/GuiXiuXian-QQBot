@@ -56,9 +56,9 @@ class DailyTaskService:
         task_descriptions = DailyTaskService._get_task_descriptions_by_type(selected_task_type, city_name, ghost_name)
         description = random.choice(task_descriptions)
 
-        # 根据玩家等级计算敌人属性
+        # 根据玩家等级和总战力计算敌人属性
         enemy_level = max(1, player.level + random.randint(-5, 5))
-        enemy_stats = DailyTaskService._calculate_enemy_stats(enemy_level)
+        enemy_stats = DailyTaskService._calculate_enemy_stats(enemy_level, player)
 
         # 计算奖励
         rewards = DailyTaskService._calculate_rewards(player.level, enemy_level, selected_task_type)
@@ -194,20 +194,109 @@ class DailyTaskService:
         return int(base_guild_exp * multiplier)
     
     @staticmethod
-    def _calculate_enemy_stats(enemy_level: int) -> Dict[str, int]:
-        """计算敌人属性"""
-        # 基础属性计算，确保与玩家等级匹配
+    def _calculate_player_power_score(player) -> float:
+        """计算玩家的综合战力评分
+
+        Args:
+            player: 玩家对象
+
+        Returns:
+            玩家的综合战力评分
+        """
+        # 基础属性权重
+        base_score = (
+            player.attack * 2.0 +      # 攻击力权重最高
+            player.defense * 1.5 +     # 防御力次之
+            player.max_hp * 0.5 +      # 血量
+            player.agility * 1.2 +     # 敏捷
+            player.luck * 0.8          # 运气
+        )
+
+        # 战斗属性加成（这些属性对战斗力影响很大）
+        battle_bonus = (
+            player.critical_rate * 3.0 +      # 暴击率
+            player.critical_power * 5.0 +     # 暴击力
+            player.combo_rate * 2.5 +         # 连击率
+            player.counter_rate * 2.0 +       # 反击率
+            player.dodge_rate * 2.0 +         # 闪避率
+            (player.accuracy_rate - 80) * 1.5 + # 命中率（基础80，超出部分有价值）
+            player.skill_crit_rate * 2.5 +    # 灵爆率
+            player.penetration_rate * 3.0     # 穿透率
+        )
+
+        # 等级加成
+        level_bonus = player.level * 10
+
+        return base_score + battle_bonus + level_bonus
+
+    @staticmethod
+    def _calculate_enemy_stats(enemy_level: int, player=None) -> Dict[str, int]:
+        """计算敌人属性
+
+        Args:
+            enemy_level: 敌人等级
+            player: 玩家对象（用于计算难度调整）
+
+        Returns:
+            敌人属性字典
+        """
+        # 基础属性计算
         base_hp = 100 + enemy_level * 15
         base_attack = 20 + enemy_level * 8
         base_defense = 10 + enemy_level * 5
         base_agility = 15 + enemy_level * 3
-        
-        # 添加随机波动（±20%）
-        hp = int(base_hp * random.uniform(0.8, 1.2))
-        attack = int(base_attack * random.uniform(0.8, 1.2))
-        defense = int(base_defense * random.uniform(0.8, 1.2))
-        agility = int(base_agility * random.uniform(0.8, 1.2))
-        
+
+        # 如果提供了玩家信息，根据玩家战力调整敌人强度
+        difficulty_multiplier = 1.0
+        if player:
+            player_power = DailyTaskService._calculate_player_power_score(player)
+            # 根据玩家战力计算期望的同等级战力
+            # 调整期望战力，让它更符合实际玩家的战力水平
+            expected_power = player.level * 20  # 降低基础期望战力
+
+            # 计算玩家相对强度（战力/期望战力）
+            relative_strength = player_power / max(expected_power, 1)
+
+            # 根据相对强度调整敌人难度
+            # 玩家越强，敌人相对越弱（降低难度）
+            # 整体降低难度，让委托任务更容易完成
+            if relative_strength > 1.5:
+                # 玩家很强，敌人减弱50%
+                difficulty_multiplier = 0.5
+            elif relative_strength > 1.2:
+                # 玩家较强，敌人减弱40%
+                difficulty_multiplier = 0.6
+            elif relative_strength > 1.0:
+                # 玩家正常，敌人减弱30%
+                difficulty_multiplier = 0.7
+            elif relative_strength > 0.8:
+                # 玩家较弱，敌人减弱20%
+                difficulty_multiplier = 0.8
+            elif relative_strength > 0.6:
+                # 玩家弱，敌人减弱15%
+                difficulty_multiplier = 0.85
+            else:
+                # 玩家很弱，敌人减弱10%
+                difficulty_multiplier = 0.9
+
+        # 应用难度调整
+        base_hp = int(base_hp * difficulty_multiplier)
+        base_attack = int(base_attack * difficulty_multiplier)
+        base_defense = int(base_defense * difficulty_multiplier)
+        base_agility = int(base_agility * difficulty_multiplier)
+
+        # 添加随机波动（±15%，比原来的20%稍微减少一些）
+        hp = int(base_hp * random.uniform(0.85, 1.15))
+        attack = int(base_attack * random.uniform(0.85, 1.15))
+        defense = int(base_defense * random.uniform(0.85, 1.15))
+        agility = int(base_agility * random.uniform(0.85, 1.15))
+
+        # 确保最小值
+        hp = max(hp, 10)
+        attack = max(attack, 5)
+        defense = max(defense, 1)
+        agility = max(agility, 5)
+
         return {
             "hp": hp,
             "attack": attack,
