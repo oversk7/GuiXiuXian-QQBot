@@ -26,6 +26,7 @@ from . import (
     daily_task,  # 每日任务系统
     backup,
     ai_guide,  # AI引导系统
+    battle,  # 战斗系统（包含PVP切磋）
 )
 
 driver = get_driver()

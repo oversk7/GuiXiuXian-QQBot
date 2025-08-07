@@ -12,7 +12,144 @@ from .battle_engine import BattleEngine
 
 class BattleIntegrationHelper:
     """战斗系统集成助手"""
-    
+
+    @staticmethod
+    def enhanced_player_vs_player_battle(
+        player1: Player,
+        player2: Player,
+        seed: Optional[str] = None,
+        max_rounds: int = 30
+    ) -> Tuple[bool, List[str], int, int]:
+        """增强版玩家vs玩家战斗（PVP切磋）
+
+        Args:
+            player1: 挑战者玩家
+            player2: 被挑战者玩家
+            seed: 随机种子
+            max_rounds: 最大回合数
+
+        Returns:
+            (player1是否胜利, 战斗日志, player1受到的伤害, player2受到的伤害)
+        """
+        engine = BattleEngine(seed)
+        battle_log = []
+
+        # 初始化战斗状态
+        player1_hp = player1.hp
+        player2_hp = player2.hp
+        initial_player1_hp = player1_hp
+        initial_player2_hp = player2_hp
+
+        battle_log.append(f"⚔️ {player1.nickname} VS {player2.nickname}")
+
+        # 判定先后手（基于敏捷）
+        from .battle_attributes import BattleAttributeCalculator
+        player1_first = BattleAttributeCalculator.determine_turn_order(
+            player1.agility, player2.agility, engine.rng
+        )
+
+        for round_num in range(1, max_rounds + 1):
+            if player1_hp <= 0 or player2_hp <= 0:
+                break
+
+            round_actions = []  # 紧凑模式的单行显示
+
+            # 确定回合顺序
+            if player1_first:
+                first_player, second_player = player1, player2
+                first_hp_ref = [player1_hp]
+                second_hp_ref = [player2_hp]
+            else:
+                first_player, second_player = player2, player1
+                first_hp_ref = [player2_hp]
+                second_hp_ref = [player1_hp]
+
+            # 第一个玩家攻击
+            if first_hp_ref[0] > 0 and second_hp_ref[0] > 0:
+                attack_result = engine.execute_player_turn(
+                    first_player, second_player, first_player.attack, False
+                )
+
+                if attack_result["hit"]:
+                    damage = attack_result["damage"]
+                    second_hp_ref[0] = max(0, second_hp_ref[0] - damage)
+
+                    # 构建攻击描述
+                    action_desc = f"{first_player.nickname}攻击"
+                    if attack_result.get("is_critical"):
+                        action_desc += "💥"
+                    if attack_result.get("combo_count", 1) > 1:
+                        action_desc += f"x{attack_result['combo_count']}"
+                    action_desc += f"({damage})"
+                    round_actions.append(action_desc)
+
+                    # 检查反击
+                    if second_hp_ref[0] > 0:
+                        counter_result = engine.check_counter_attack(second_player, first_player)
+                        if counter_result and counter_result.get("hit"):
+                            counter_damage = counter_result["damage"]
+                            first_hp_ref[0] = max(0, first_hp_ref[0] - counter_damage)
+                            counter_desc = f"{second_player.nickname}反击({counter_damage})"
+                            round_actions.append(counter_desc)
+                else:
+                    round_actions.append(f"{first_player.nickname}未命中")
+
+            # 第二个玩家攻击（如果还活着且第一个玩家也还活着）
+            if second_hp_ref[0] > 0 and first_hp_ref[0] > 0:
+                attack_result = engine.execute_player_turn(
+                    second_player, first_player, second_player.attack, False
+                )
+
+                if attack_result["hit"]:
+                    damage = attack_result["damage"]
+                    first_hp_ref[0] = max(0, first_hp_ref[0] - damage)
+
+                    # 构建攻击描述
+                    action_desc = f"{second_player.nickname}攻击"
+                    if attack_result.get("is_critical"):
+                        action_desc += "💥"
+                    if attack_result.get("combo_count", 1) > 1:
+                        action_desc += f"x{attack_result['combo_count']}"
+                    action_desc += f"({damage})"
+                    round_actions.append(action_desc)
+
+                    # 检查反击
+                    if first_hp_ref[0] > 0:
+                        counter_result = engine.check_counter_attack(first_player, second_player)
+                        if counter_result and counter_result.get("hit"):
+                            counter_damage = counter_result["damage"]
+                            second_hp_ref[0] = max(0, second_hp_ref[0] - counter_damage)
+                            counter_desc = f"{first_player.nickname}反击({counter_damage})"
+                            round_actions.append(counter_desc)
+                else:
+                    round_actions.append(f"{second_player.nickname}未命中")
+
+            # 更新实际血量变量
+            if player1_first:
+                player1_hp, player2_hp = first_hp_ref[0], second_hp_ref[0]
+            else:
+                player2_hp, player1_hp = first_hp_ref[0], second_hp_ref[0]
+
+            # 将回合动作合并为一行
+            if round_actions:
+                battle_log.append(f"R{round_num}: " + " | ".join(round_actions))
+
+        # 战斗结果
+        player1_victory = player2_hp <= 0
+        player1_damage_taken = initial_player1_hp - player1_hp
+        player2_damage_taken = initial_player2_hp - player2_hp
+
+        # 紧凑格式的结果显示
+        if player1_victory:
+            battle_log.append(f"🎉 {player1.nickname}胜利！{round_num}回合，剩余{player1_hp}血")
+        elif player1_hp <= 0:
+            battle_log.append(f"🎉 {player2.nickname}胜利！{round_num}回合，剩余{player2_hp}血")
+        else:
+            # 平局或超时
+            battle_log.append(f"⏰ 战斗超时！{round_num}回合，{player1.nickname}剩{player1_hp}血，{player2.nickname}剩{player2_hp}血")
+
+        return player1_victory, battle_log, player1_damage_taken, player2_damage_taken
+
     @staticmethod
     def enhanced_player_vs_monster_battle(
         player: Player,

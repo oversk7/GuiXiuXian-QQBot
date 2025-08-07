@@ -274,6 +274,8 @@ async def handle_huo_dong(event: MessageEvent, args: Message = CommandArg()):
         "━━━━━━━━━━━━━\n"
         "🎯 基础功能：\n"
         "【签到】 每日签到，获取奖励\n"
+        "【切磋 UID】 PVP切磋，无损失的玩家对战\n"
+        "【模拟战斗 UID1 UID2】 观看两个玩家的模拟战斗\n"
         "【恶魔轮盘帮助】 PVP对战，可以获得对方的赌注（金币、物品）\n"
         "【试炼列表】 查看可用的互动剧情\n"
         "【月卡】 查看月卡状态和权益\n"
