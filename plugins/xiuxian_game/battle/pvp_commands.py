@@ -108,16 +108,8 @@ async def handle_pvp(event: MessageEvent, args: Message = CommandArg()):
                 "━━━━━━━━━━━━━"
             ])
             
-            # 添加关键战斗日志（最多显示8条）
-            key_logs = [log for log in battle_log if any(keyword in log for keyword in 
-                       ["暴击", "连击", "反击", "穿透", "闪避", "胜利", "战败", "回合", "超时", "VS"])]
-            
-            if len(key_logs) > 10:
-                result_lines.extend(key_logs[:4])
-                result_lines.append("...")
-                result_lines.extend(key_logs[-4:])
-            else:
-                result_lines.extend(key_logs)
+            # 显示完整的战斗日志
+            result_lines.extend(battle_log)
             
             result_lines.extend([
                 "━━━━━━━━━━━━━",
@@ -126,7 +118,7 @@ async def handle_pvp(event: MessageEvent, args: Message = CommandArg()):
             
             await pvp_cmd.finish(message_add_head("\n".join(result_lines), event))
             
-        except Exception as e:
+        except ValueError as e:
             await pvp_cmd.finish(f"⛔ 战斗过程中发生错误：{str(e)}")
 
 
@@ -189,37 +181,29 @@ async def handle_simulate(event: MessageEvent, args: Message = CommandArg()):
         
         # 执行模拟战斗
         try:
-            victory, battle_log, p1_damage, p2_damage = BattleIntegrationHelper.enhanced_player_vs_player_battle(
+            _, battle_log, _, _ = BattleIntegrationHelper.enhanced_player_vs_player_battle(
                 player1, player2, seed=seed, max_rounds=30
             )
-            
+
             # 构建战斗结果消息
             result_lines = [
                 "🎮 模拟战斗结果 🎮",
                 "━━━━━━━━━━━━━"
             ]
-            
+
             # 添加玩家信息
             from ..player.info import realm_by_level
             p1_realm = realm_by_level(player1.level)
             p2_realm = realm_by_level(player2.level)
-            
+
             result_lines.extend([
                 f"🔥 {player1.nickname}[UID:{player1.uid}] Lv.{player1.level} {p1_realm}",
                 f"🆚 {player2.nickname}[UID:{player2.uid}] Lv.{player2.level} {p2_realm}",
                 "━━━━━━━━━━━━━"
             ])
-            
-            # 添加关键战斗日志
-            key_logs = [log for log in battle_log if any(keyword in log for keyword in 
-                       ["暴击", "连击", "反击", "穿透", "闪避", "胜利", "战败", "回合", "超时", "VS"])]
-            
-            if len(key_logs) > 10:
-                result_lines.extend(key_logs[:4])
-                result_lines.append("...")
-                result_lines.extend(key_logs[-4:])
-            else:
-                result_lines.extend(key_logs)
+
+            # 显示完整的战斗日志
+            result_lines.extend(battle_log)
             
             result_lines.extend([
                 "━━━━━━━━━━━━━",
@@ -228,5 +212,5 @@ async def handle_simulate(event: MessageEvent, args: Message = CommandArg()):
             
             await simulate_cmd.finish(message_add_head("\n".join(result_lines), event))
             
-        except Exception as e:
+        except ValueError as e:
             await simulate_cmd.finish(f"⛔ 模拟战斗过程中发生错误：{str(e)}")

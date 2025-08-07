@@ -52,7 +52,7 @@ class BattleIntegrationHelper:
             if player1_hp <= 0 or player2_hp <= 0:
                 break
 
-            round_actions = []  # 紧凑模式的单行显示
+            battle_log.append(f"━━━ 第{round_num}回合 ━━━")
 
             # 确定回合顺序
             if player1_first:
@@ -74,14 +74,26 @@ class BattleIntegrationHelper:
                     damage = attack_result["damage"]
                     second_hp_ref[0] = max(0, second_hp_ref[0] - damage)
 
-                    # 构建攻击描述
-                    action_desc = f"{first_player.nickname}攻击"
+                    # 构建详细攻击描述
+                    action_desc = f"⚔️ {first_player.nickname} 攻击 {second_player.nickname}"
+
+                    # 添加特效标识
+                    effects = []
                     if attack_result.get("is_critical"):
-                        action_desc += "💥"
+                        effects.append("💥暴击")
+                    if attack_result.get("is_penetration"):
+                        effects.append("🗡️穿透")
                     if attack_result.get("combo_count", 1) > 1:
-                        action_desc += f"x{attack_result['combo_count']}"
-                    action_desc += f"({damage})"
-                    round_actions.append(action_desc)
+                        effects.append(f"🔄连击x{attack_result['combo_count']}")
+
+                    if effects:
+                        action_desc += f" ({' '.join(effects)})"
+
+                    action_desc += f" 造成 {damage} 点伤害"
+                    battle_log.append(action_desc)
+
+                    # 显示血量变化
+                    battle_log.append(f"   {second_player.nickname} 血量: {second_hp_ref[0]}")
 
                     # 检查反击
                     if second_hp_ref[0] > 0:
@@ -89,10 +101,15 @@ class BattleIntegrationHelper:
                         if counter_result and counter_result.get("hit"):
                             counter_damage = counter_result["damage"]
                             first_hp_ref[0] = max(0, first_hp_ref[0] - counter_damage)
-                            counter_desc = f"{second_player.nickname}反击({counter_damage})"
-                            round_actions.append(counter_desc)
+
+                            counter_desc = f"🛡️ {second_player.nickname} 反击 {first_player.nickname}"
+                            if counter_result.get("is_critical"):
+                                counter_desc += " (💥暴击)"
+                            counter_desc += f" 造成 {counter_damage} 点伤害"
+                            battle_log.append(counter_desc)
+                            battle_log.append(f"   {first_player.nickname} 血量: {first_hp_ref[0]}")
                 else:
-                    round_actions.append(f"{first_player.nickname}未命中")
+                    battle_log.append(f"⚡ {first_player.nickname} 攻击 {second_player.nickname}，但被敏捷地闪避了！")
 
             # 第二个玩家攻击（如果还活着且第一个玩家也还活着）
             if second_hp_ref[0] > 0 and first_hp_ref[0] > 0:
@@ -104,14 +121,26 @@ class BattleIntegrationHelper:
                     damage = attack_result["damage"]
                     first_hp_ref[0] = max(0, first_hp_ref[0] - damage)
 
-                    # 构建攻击描述
-                    action_desc = f"{second_player.nickname}攻击"
+                    # 构建详细攻击描述
+                    action_desc = f"⚔️ {second_player.nickname} 攻击 {first_player.nickname}"
+
+                    # 添加特效标识
+                    effects = []
                     if attack_result.get("is_critical"):
-                        action_desc += "💥"
+                        effects.append("💥暴击")
+                    if attack_result.get("is_penetration"):
+                        effects.append("🗡️穿透")
                     if attack_result.get("combo_count", 1) > 1:
-                        action_desc += f"x{attack_result['combo_count']}"
-                    action_desc += f"({damage})"
-                    round_actions.append(action_desc)
+                        effects.append(f"🔄连击x{attack_result['combo_count']}")
+
+                    if effects:
+                        action_desc += f" ({' '.join(effects)})"
+
+                    action_desc += f" 造成 {damage} 点伤害"
+                    battle_log.append(action_desc)
+
+                    # 显示血量变化
+                    battle_log.append(f"   {first_player.nickname} 血量: {first_hp_ref[0]}")
 
                     # 检查反击
                     if first_hp_ref[0] > 0:
@@ -119,10 +148,15 @@ class BattleIntegrationHelper:
                         if counter_result and counter_result.get("hit"):
                             counter_damage = counter_result["damage"]
                             second_hp_ref[0] = max(0, second_hp_ref[0] - counter_damage)
-                            counter_desc = f"{first_player.nickname}反击({counter_damage})"
-                            round_actions.append(counter_desc)
+
+                            counter_desc = f"🛡️ {first_player.nickname} 反击 {second_player.nickname}"
+                            if counter_result.get("is_critical"):
+                                counter_desc += " (💥暴击)"
+                            counter_desc += f" 造成 {counter_damage} 点伤害"
+                            battle_log.append(counter_desc)
+                            battle_log.append(f"   {second_player.nickname} 血量: {second_hp_ref[0]}")
                 else:
-                    round_actions.append(f"{second_player.nickname}未命中")
+                    battle_log.append(f"⚡ {second_player.nickname} 攻击 {first_player.nickname}，但被敏捷地闪避了！")
 
             # 更新实际血量变量
             if player1_first:
@@ -130,23 +164,32 @@ class BattleIntegrationHelper:
             else:
                 player2_hp, player1_hp = first_hp_ref[0], second_hp_ref[0]
 
-            # 将回合动作合并为一行
-            if round_actions:
-                battle_log.append(f"R{round_num}: " + " | ".join(round_actions))
-
         # 战斗结果
         player1_victory = player2_hp <= 0
         player1_damage_taken = initial_player1_hp - player1_hp
         player2_damage_taken = initial_player2_hp - player2_hp
 
-        # 紧凑格式的结果显示
+        # 详细的结果显示
+        battle_log.append("━━━━━━━━━━━━━")
         if player1_victory:
-            battle_log.append(f"🎉 {player1.nickname}胜利！{round_num}回合，剩余{player1_hp}血")
+            battle_log.append(f"🎉 {player1.nickname} 获得胜利！")
+            battle_log.append(f"📊 战斗统计：")
+            battle_log.append(f"   回合数：{round_num}")
+            battle_log.append(f"   {player1.nickname} 剩余血量：{player1_hp}/{initial_player1_hp}")
+            battle_log.append(f"   {player2.nickname} 受到伤害：{player2_damage_taken}")
         elif player1_hp <= 0:
-            battle_log.append(f"🎉 {player2.nickname}胜利！{round_num}回合，剩余{player2_hp}血")
+            battle_log.append(f"🎉 {player2.nickname} 获得胜利！")
+            battle_log.append(f"📊 战斗统计：")
+            battle_log.append(f"   回合数：{round_num}")
+            battle_log.append(f"   {player2.nickname} 剩余血量：{player2_hp}/{initial_player2_hp}")
+            battle_log.append(f"   {player1.nickname} 受到伤害：{player1_damage_taken}")
         else:
             # 平局或超时
-            battle_log.append(f"⏰ 战斗超时！{round_num}回合，{player1.nickname}剩{player1_hp}血，{player2.nickname}剩{player2_hp}血")
+            battle_log.append(f"⏰ 战斗超时，平局！")
+            battle_log.append(f"📊 战斗统计：")
+            battle_log.append(f"   回合数：{round_num}")
+            battle_log.append(f"   {player1.nickname} 剩余血量：{player1_hp}/{initial_player1_hp}")
+            battle_log.append(f"   {player2.nickname} 剩余血量：{player2_hp}/{initial_player2_hp}")
 
         return player1_victory, battle_log, player1_damage_taken, player2_damage_taken
 
