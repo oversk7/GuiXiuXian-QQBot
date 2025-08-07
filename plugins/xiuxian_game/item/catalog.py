@@ -247,8 +247,6 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
 
             extra_info = "\n" + "\n".join(limit_info)
 
-        lines.append(f"✨ {cfg.name} ✨  [{type_cn}]\n{cfg.description}{extra_info}\n")
-
-    # 鬼怪系统已移除，不再显示鬼怪信息
+        lines.append(f"✨ {cfg.name} ✨  [{type_cn}]\n{cfg.description}{extra_info}")
 
     await catalog_cmd.finish(message_add_head("\n".join(lines), event))
