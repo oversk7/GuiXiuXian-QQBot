@@ -152,7 +152,7 @@ def _format_fortune_result(fortune_text: str, draw_time: str, question: str = ""
     if parts.get("gua_name"):
         msg_lines.extend([
             f"📿 卦象：{parts['gua_name']}",
-            f"🔸 等级：{parts.get('level', '未知')}",
+            f"🔸 符号：{parts.get('level', '未知')}",
             ""
         ])
 
@@ -203,17 +203,11 @@ def _parse_fortune_text(text: str) -> dict:
     if gua_match:
         result["gua_name"] = gua_match.group(1).strip()
 
-    # 提取等级符号
+    # 提取等级符号，直接显示原文符号
     level_match = re.search(r'◎+', text)
     if level_match:
         level_symbols = level_match.group()
-        level_count = len(level_symbols)
-        if level_count >= 3:
-            result["level"] = "上上签 ⭐⭐⭐"
-        elif level_count == 2:
-            result["level"] = "上签 ⭐⭐"
-        else:
-            result["level"] = "中签 ⭐"
+        result["level"] = level_symbols
 
     # 提取签诗（四句诗）
     # 先找到◎符号后的内容，然后提取四句诗
