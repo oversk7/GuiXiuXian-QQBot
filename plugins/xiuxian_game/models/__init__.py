@@ -17,9 +17,8 @@ from .elixir_usage import ElixirUsageLog
 from .monthly_card import MonthlyCard
 from .market_state import MarketState
 from .trade_record import TradeRecord
-# Ghost配置直接从YAML读取，工具类移至ghost_suppression模块
-from .ghost_invasion import GhostInvasion
-from .player_ghost import PlayerGhost
+# 每日任务系统
+from .daily_task import DailyTask, TaskType, TaskStatus
 from .russian_roulette import RussianRouletteRoom, RussianRouletteGame
 # 股票系统模型
 from .stock import Stock, StockHolding, StockTransaction, StockPriceHistory
@@ -29,7 +28,8 @@ from .part_time_job import PartTimeJob, JobLocation, PlayerJobStats
 __all__ = [
     "Player", "Guild", "GuildMember", "GuildBuilding", "GuildPosition", "BuildingType", "WorldMessage", "BankAccount", "ItemInstance", "WorldTile", "NavigationTask", "AlchemyRecord", "MarketOrder",
     "Marriage", "Mentorship", "SocialApplication", "GiftRecord", "StorySession", "PlayerDonationLog", "ElixirUsageLog", "GuildTeleportLog",
-    "MonthlyCard", "MarketState", "GhostInvasion", "PlayerGhost", "RussianRouletteRoom", "RussianRouletteGame",
+    "MonthlyCard", "MarketState", "RussianRouletteRoom", "RussianRouletteGame",
     "Stock", "StockHolding", "StockTransaction", "StockPriceHistory", "TradeRecord",
-    "PartTimeJob", "JobLocation", "PlayerJobStats"
+    "PartTimeJob", "JobLocation", "PlayerJobStats",
+    "DailyTask", "TaskType", "TaskStatus"
 ]

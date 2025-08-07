@@ -118,29 +118,13 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
             if keyword in cfg.name or keyword in cfg.description:
                 item_matches.append(cfg)
 
-    # 搜索鬼怪
+    # 鬼怪系统已移除，不再搜索鬼怪
     ghost_matches = []
-    for ghost_config in config.ghosts_config["all"]:
-        if (keyword in ghost_config.get("name", "") or
-            keyword in ghost_config.get("description", "") or
-            keyword == ghost_config.get("ghost_id", "")):
-            ghost_matches.append(ghost_config)
-
-    # 如果找到了鬼怪匹配，则从物品匹配中移除对应的鬼怪碎片
-    if ghost_matches:
-        ghost_fragment_ids = set()
-        for ghost_config in ghost_matches:
-            fragment_id = ghost_config.get("fragment_item_id", "")
-            if fragment_id:
-                ghost_fragment_ids.add(fragment_id)
-
-        # 过滤掉鬼怪碎片
-        item_matches = [cfg for cfg in item_matches if cfg.item_id not in ghost_fragment_ids]
 
     # 检查是否有匹配结果
-    total_matches = len(item_matches) + len(ghost_matches)
+    total_matches = len(item_matches)
     if total_matches == 0:
-        await catalog_cmd.finish("⛔ 未找到符合条件的物品/装备/鬼怪")
+        await catalog_cmd.finish("⛔ 未找到符合条件的物品/装备")
 
     # 若匹配过多（>6），让用户缩小范围
     if total_matches > 6:
@@ -152,7 +136,7 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
         "MATERIAL": "材料",
         "EQUIPMENT": "装备",
         "GOODS": "商品",
-        "GHOST_FRAGMENT": "鬼怪投影"
+
     }
 
     lines = ["📖 图鉴查询结果 ✨", "━━━━━━━━━━"]
@@ -265,40 +249,6 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
 
         lines.append(f"✨ {cfg.name} ✨  [{type_cn}]\n{cfg.description}{extra_info}\n")
 
-    # 显示鬼怪匹配结果
-    for ghost_config in ghost_matches:
-        name = ghost_config.get("name", "未知鬼怪")
-        description = ghost_config.get("description", "暂无描述")
-
-        # 鬼怪属性信息
-        hp = ghost_config.get("hp", 0)
-        attack = ghost_config.get("attack", 0)
-        defense = ghost_config.get("defense", 0)
-        agility = ghost_config.get("agility", 0)
-        prestige_level = ghost_config.get("base_prestige_level", 1)
-        rarity = ghost_config.get("rarity", "common")
-
-        # 稀有度映射
-        rarity_map = {
-            "common": "普通",
-            "rare": "稀有",
-            "epic": "史诗",
-            "legendary": "传说"
-        }
-        rarity_cn = rarity_map.get(rarity, rarity)
-
-        # 合成信息
-        fragment_id = ghost_config.get("fragment_item_id", "")
-        fragments_needed = ghost_config.get("fragments_to_complete", 0)
-        fragment_config = config.items_config["by_id"].get(fragment_id)
-        fragment_name = fragment_config.name if fragment_config else "未知碎片"
-
-        extra_info = (
-            f"\n👻 属性：体{hp} 力{attack} 防{defense} 敏{agility}"
-            f"\n🔥 基础威压：{prestige_level}  ⭐ 稀有度：{rarity_cn}"
-            f"\n🧩 合成需要：{fragment_name} x{fragments_needed}"
-        )
-
-        lines.append(f"👻 {name} 👻  [鬼怪]\n{description}{extra_info}\n")
+    # 鬼怪系统已移除，不再显示鬼怪信息
 
     await catalog_cmd.finish(message_add_head("\n".join(lines), event))

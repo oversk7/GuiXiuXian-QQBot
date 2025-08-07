@@ -23,7 +23,7 @@ from . import (
     alchemy,
     social,
     story,
-    ghost_suppression,
+    daily_task,  # 每日任务系统
     backup,
     ai_guide,  # AI引导系统
 )

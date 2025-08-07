@@ -10,7 +10,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from ..models.story_session import StorySession
 from ..models.player import Player
-from ..models.player_ghost import PlayerGhost
+
 from ..config import config
 
 
@@ -148,40 +148,9 @@ class StoryEngine:
         return player, variables, reward_message
 
     async def _handle_first_trial_reward(self, session: AsyncSession, player: Player) -> str:
-        """处理首次试炼奖励 - 给没有鬼怪的玩家随机一只鬼"""
-        # 检查玩家是否已有鬼怪
-        result = await session.execute(
-            select(PlayerGhost).where(PlayerGhost.player_id == player.id)
-        )
-        existing_ghosts = result.scalars().all()
-
-        if existing_ghosts:
-            # 玩家已有鬼怪，不给奖励
-            return ""
-
-        # 获取所有可用的鬼怪配置
-        ghost_configs = config.ghosts_config["all"]
-        if not ghost_configs:
-            return ""
-
-        # 随机选择一只鬼怪
-        selected_ghost = random.choice(ghost_configs)
-
-        # 创建玩家鬼怪记录
-        new_ghost = PlayerGhost(
-            player_id=player.id,
-            ghost_id=selected_ghost["ghost_id"],
-            is_active=True  # 第一只鬼怪自动激活
-        )
-        session.add(new_ghost)
-
-        # 返回奖励消息
-        ghost_name = selected_ghost.get("name", selected_ghost["ghost_id"])
-        return (
-            f"🎉 首次试炼完成奖励！\n"
-            f"👻 获得鬼怪: {ghost_name}\n"
-            f"💡 现在你可以使用【镇压】指令来镇压入侵的鬼怪了！"
-        )
+        """处理首次试炼奖励 - 已移除鬼怪系统"""
+        # 鬼怪系统已下架，不再给予鬼怪奖励
+        return ""
 
     def format_content(self, content: str, player: Player, variables: Dict[str, Any]) -> str:
         """格式化内容，替换变量"""
