@@ -54,7 +54,7 @@ async def check_equipment_durability(session, player_id: str) -> str:
         return warning_msg
 
     return ""
-from . import nearby_players, message_board, navigation
+from . import nearby_players, message_board, navigation, map_locations
 
 # ----------------- 常量 -----------------
 DIRECTIONS: Dict[str, Tuple[int, int]] = {
@@ -850,7 +850,7 @@ async def handle_buy(event: MessageEvent, args: Message = CommandArg()):
             await buy_cmd.finish(f"⛔ 购买失败：{e}")
 
 
-teleport_list = on_command("诡域", aliases={"地图"}, block=True, priority=5)
+teleport_list = on_command("诡域", aliases={"副本列表"}, block=True, priority=5)
 @teleport_list.handle()
 async def handle_teleport_list(event: MessageEvent):
     """显示所有可传送的地点"""

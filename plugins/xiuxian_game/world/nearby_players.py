@@ -10,7 +10,7 @@ from ..utils import message_add_head
 
 # ----------------- 指令：附近玩家 -----------------
 # 查看当前区域距离自己最近的前 5 位玩家
-nearby_cmd = on_command("附近玩家", aliases={"附近", "附近人"}, block=True, priority=5)
+nearby_cmd = on_command("附近玩家", aliases={"附近人"}, block=True, priority=5)
 
 
 @nearby_cmd.handle()

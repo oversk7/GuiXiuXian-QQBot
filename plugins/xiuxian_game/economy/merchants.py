@@ -1,12 +1,17 @@
 from __future__ import annotations
 
-"""跑商系统
+"""跑商系统 & 缉邪司总部商店
 
-规则：
+跑商系统规则：
 1. 仅限现实世界（region == "大都会"）。
 2. 市场坐标固定；列表见 MARKETS。
 3. 价格：每天 09:00 刷新，基于日期+市场ID+item_id 生成哈希随机数。
 4. 必须玩家坐标与市场坐标一致才可交易。
+
+缉邪司总部规则：
+1. 位于风雪镇(-5,390)
+2. 使用公会积分兑换装备升阶相关特殊物品
+3. 即使没有所属公会也可以使用（如果有积分）
 """
 
 from datetime import datetime, time, timedelta, date
@@ -566,7 +571,7 @@ async def _(event: MessageEvent):
 
         await trade_advise_cmd.finish(message_add_head("\n".join(lines), event))
 
-# 普通商店商品（只卖不收的特殊消耗品）
+# 系统商店商品
 SHOP_ITEMS = [
     "revive_potion", "rename_card", "president_letter", "territory_expansion_scroll","heal_potion","spirit_herb"
 ]
@@ -593,4 +598,151 @@ async def _(event: MessageEvent):
             item_cfg = config.items_config["by_id"].get(item_id)
             lines.append(f"{item_cfg.name}│{item_cfg.price} 金币")
         lines.append("━━━━━━━━━━━━━\n⬇️【购买 [物品] [数量]】")
-        await shop_cmd.finish(message_add_head("\n".join(lines), event)) 
+        await shop_cmd.finish(message_add_head("\n".join(lines), event))
+
+
+# ==================== 缉邪司总部商店系统 ====================
+
+# 缉邪司总部坐标
+HEADQUARTERS_COORD = (-5, 390)
+
+# 缉邪司总部商品配置（物品ID: 积分价格）
+HEADQUARTERS_ITEMS = {
+    "upgrade_stone_low": 300,        # 初级升阶石
+    "upgrade_stone_mid": 2000,       # 中级升阶石
+    "stabilizer_crystal": 10000,      # 稳定水晶
+    "gem_hammer": 300,               # 镶嵌锤
+    "gem_chisel": 300,               # 拆卸凿
+    "accuracy_bead_1": 500
+}
+
+# 缉邪司总部商店指令
+headquarters_cmd = on_command("缉邪司总部", aliases={"总部商店", "总部"}, block=True, priority=5)
+
+@headquarters_cmd.handle()
+async def _(event: MessageEvent):
+    """缉邪司总部商店"""
+    async with safe_session() as session:
+        player: Player | None = await session.get(Player, event.get_user_id())
+        if not player:
+            await headquarters_cmd.finish("⛔ 请先创建角色")
+
+        if player.region != "大都会":
+            await headquarters_cmd.finish(message_add_head(
+                "💀 诡域之中皆不可信\n"
+                "━━━━━━━━━━━━━\n"
+                "此地没有安全商人。\n"
+                "━━━━━━━━━━━━━\n"
+                "⬇️ 【返回】脱离诡域，返回现实", event))
+
+        # 检查是否在缉邪司总部坐标
+        if (player.x, player.y) != HEADQUARTERS_COORD:
+            await headquarters_cmd.finish(message_add_head(
+                "🏛️ 缉邪司总部商店\n"
+                "━━━━━━━━━━━━━\n"
+                f"📍 总部位置：风雪镇 {HEADQUARTERS_COORD}\n"
+                f"📍 当前位置：({player.x},{player.y})\n"
+                "━━━━━━━━━━━━━\n"
+                "🧭 请前往风雪镇缉邪司总部", event))
+
+        # 显示商店界面
+        lines = [
+            "🏛️ 缉邪司总部商店",
+            "━━━━━━━━━━━━━",
+            f"💎 当前积分：{player.gold2}",
+            "━━━━━━━━━━━━━",
+            "📦 装备升阶专用物品："
+        ]
+
+        for item_id, points_cost in HEADQUARTERS_ITEMS.items():
+            item_cfg = config.items_config["by_id"].get(item_id)
+            if item_cfg:
+                lines.append(f"• {item_cfg.name} - {points_cost}✨积分")
+
+        lines.extend([
+            "━━━━━━━━━━━━━",
+            "💡 使用方法：【总部兑换 物品名称 数量】",
+            "💡 即使没有公会也可以使用积分兑换",
+            "💡 积分可通过公会捐献、签到等方式获得"
+        ])
+
+        await headquarters_cmd.finish(message_add_head("\n".join(lines), event))
+
+
+# 缉邪司总部兑换指令
+headquarters_exchange_cmd = on_command("总部兑换", aliases={"缉邪司兑换"}, block=True, priority=5)
+
+@headquarters_exchange_cmd.handle()
+async def _(event: MessageEvent, args: Message = CommandArg()):
+    """缉邪司总部兑换物品"""
+    arg_text = args.extract_plain_text().strip()
+    if not arg_text:
+        await headquarters_exchange_cmd.finish("⛔ 格式：总部兑换 物品名称 [数量]")
+
+    parts = arg_text.split()
+    item_name = parts[0]
+    quantity = 1
+
+    if len(parts) > 1:
+        try:
+            quantity = int(parts[1])
+            if quantity <= 0:
+                await headquarters_exchange_cmd.finish("⛔ 数量必须大于0")
+        except ValueError:
+            await headquarters_exchange_cmd.finish("⛔ 数量必须是正整数")
+
+    async with safe_session() as session:
+        player: Player | None = await session.get(Player, event.get_user_id())
+        if not player:
+            await headquarters_exchange_cmd.finish("⛔ 请先创建角色")
+
+        if player.region != "大都会":
+            await headquarters_exchange_cmd.finish("⛔ 诡域中无法使用缉邪司服务")
+
+        # 检查是否在缉邪司总部坐标
+        if (player.x, player.y) != HEADQUARTERS_COORD:
+            await headquarters_exchange_cmd.finish("⛔ 请前往风雪镇(-5,390)缉邪司总部")
+
+        # 查找物品配置
+        item_cfg = config.items_config["by_name"].get(item_name)
+        if not item_cfg:
+            await headquarters_exchange_cmd.finish(f"⛔ 未找到物品：{item_name}")
+
+        # 检查是否为总部商品
+        if item_cfg.item_id not in HEADQUARTERS_ITEMS:
+            available_items = "、".join([
+                config.items_config["by_id"][iid].name
+                for iid in HEADQUARTERS_ITEMS.keys()
+                if iid in config.items_config["by_id"]
+            ])
+            await headquarters_exchange_cmd.finish(
+                f"⛔ 缉邪司总部不出售该物品\n"
+                f"📦 可兑换物品：{available_items}")
+
+        # 计算总积分消耗
+        unit_cost = HEADQUARTERS_ITEMS[item_cfg.item_id]
+        total_cost = unit_cost * quantity
+
+        # 检查积分是否足够
+        if player.gold2 < total_cost:
+            await headquarters_exchange_cmd.finish(
+                f"⛔ 积分不足\n"
+                f"💎 需要：{total_cost}积分\n"
+                f"💎 拥有：{player.gold2}积分\n"
+                f"💎 缺少：{total_cost - player.gold2}积分")
+
+        # 检查背包空间并添加物品
+        try:
+            await ItemInstance.add_item(session, player.id, item_cfg.item_id, quantity)
+        except ValueError as e:
+            await headquarters_exchange_cmd.finish(f"⛔ {e}")
+
+        # 扣除积分
+        player.gold2 -= total_cost
+        await session.commit()
+
+        await headquarters_exchange_cmd.finish(message_add_head(
+            f"✅ 兑换成功！\n"
+            f"📦 获得：{item_cfg.name} ×{quantity}\n"
+            f"💎 消耗：{total_cost}积分\n"
+            f"💎 剩余：{player.gold2}积分", event))
