@@ -257,7 +257,7 @@ class BattleIntegrationHelper:
                         effect_text = "".join(effects)
                         round_actions.append(f"{effect_text}{player.nickname}→{player_attack_result['total_damage']}")
                     else:
-                        round_actions.append(f"{player.nickname}→MISS")
+                        round_actions.append(f"{player.nickname}→被闪避")
 
                 # 怪物反击（如果存活）
                 if monster_hp > 0 and player_hp > 0:
@@ -273,7 +273,7 @@ class BattleIntegrationHelper:
                         else:
                             round_actions.append(f"{monster_name}→{monster_attack_result['damage']}")
                     else:
-                        round_actions.append(f"{monster_name}→MISS")
+                        round_actions.append(f"{monster_name}→被闪避")
             else:
                 # 怪物先手攻击
                 monster_attack_result = BattleIntegrationHelper._monster_attack_player(
@@ -295,7 +295,7 @@ class BattleIntegrationHelper:
                             monster_hp = max(0, monster_hp - counter_result["total_damage"])
                             round_actions.append(f"🛡️反击→{counter_result['total_damage']}")
                 else:
-                    round_actions.append(f"{monster_name}→MISS")
+                    round_actions.append(f"{monster_name}→被闪避")
 
                 # 玩家反击（如果存活且怪物未死）
                 if player_hp > 0 and monster_hp > 0:
@@ -317,7 +317,7 @@ class BattleIntegrationHelper:
                         effect_text = "".join(effects)
                         round_actions.append(f"{effect_text}{player.nickname}→{player_attack_result['total_damage']}")
                     else:
-                        round_actions.append(f"{player.nickname}→MISS")
+                        round_actions.append(f"{player.nickname}→被闪避")
 
 
             # 将回合动作合并为一行
@@ -409,7 +409,7 @@ class BattleIntegrationHelper:
                         else:
                             round_actions.append(f"{effect_text}{player1.nickname}→{damage}")
                     else:
-                        round_actions.append(f"{player1.nickname}→MISS")
+                        round_actions.append(f"{player1.nickname}→被闪避")
 
                 # 玩家2反击（如果存活）
                 if player2_hp > 0 and player1_hp > 0:
@@ -438,7 +438,7 @@ class BattleIntegrationHelper:
                         else:
                             round_actions.append(f"{effect_text}{player2.nickname}→{damage}")
                     else:
-                        round_actions.append(f"{player2.nickname}→MISS")
+                        round_actions.append(f"{player2.nickname}→被闪避")
             else:
                 # 玩家2先手
                 if player2_hp > 0 and player1_hp > 0:
@@ -467,7 +467,7 @@ class BattleIntegrationHelper:
                         else:
                             round_actions.append(f"{effect_text}{player2.nickname}→{damage}")
                     else:
-                        round_actions.append(f"{player2.nickname}→MISS")
+                        round_actions.append(f"{player2.nickname}→被闪避")
 
                 # 玩家1反击（如果存活）
                 if player1_hp > 0 and player2_hp > 0:
@@ -496,7 +496,7 @@ class BattleIntegrationHelper:
                         else:
                             round_actions.append(f"{effect_text}{player1.nickname}→{damage}")
                     else:
-                        round_actions.append(f"{player1.nickname}→MISS")
+                        round_actions.append(f"{player1.nickname}→被闪避")
 
             # 将回合动作合并为一行
             if round_actions:
