@@ -241,10 +241,10 @@ class DailyTaskService:
             敌人属性字典
         """
         # 基础属性计算
-        base_hp = 100 + enemy_level * 15
-        base_attack = 20 + enemy_level * 8
-        base_defense = 10 + enemy_level * 5
-        base_agility = 15 + enemy_level * 3
+        base_hp = 100 + enemy_level * 4
+        base_attack = 20 + enemy_level * 2
+        base_defense = 10 + enemy_level * 2
+        base_agility = 15 + enemy_level * 2
 
         # 如果提供了玩家信息，根据玩家战力调整敌人强度
         difficulty_multiplier = 1.0
