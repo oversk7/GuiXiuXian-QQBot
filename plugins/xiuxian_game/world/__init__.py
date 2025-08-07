@@ -616,6 +616,11 @@ async def _handle_personal_monster(session, tile: WorldTile, player: Player) -> 
         player.exp += exp_gain
         battle_summary.append(f"🎉 你击杀了 {monster_display}，获得 {exp_gain} EXP")
 
+        # 更新战斗胜利统计（用于公会任务）
+        if player.guild_id:
+            from ..guild.guild_task_service import GuildTaskService
+            await GuildTaskService.update_combat_victory_stats(session, player.id)
+
         # 怪物掉落材料机制
         is_elite = tile.state.get("is_elite", False)
         drop_result = await handle_monster_drops(session, player, monster_level, player.region, rng, is_elite)
@@ -770,6 +775,17 @@ async def _(event: MessageEvent):
 
         tile = await get_or_create_tile(session, player.region, player.x, player.y)
         log = await EVENT_HANDLERS[tile.event_type](session, tile, player)
+
+        # 更新探索统计（用于公会任务）
+        if player.guild_id:
+            from ..guild.guild_task_service import GuildTaskService
+            await GuildTaskService.update_exploration_stats(session, player.id)
+
+            # 尝试自动完成任务
+            completed_tasks = await GuildTaskService.try_auto_complete_tasks(session, player.id)
+            if completed_tasks:
+                log += "\n\n🎉 公会任务完成：\n" + "\n".join(completed_tasks)
+
         await session.commit()
 
     header = f"🧭位置 {player.region} ({player.x},{player.y})"

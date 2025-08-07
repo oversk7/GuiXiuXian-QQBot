@@ -159,8 +159,13 @@ async def handle_complete_task(event: MessageEvent):
         if victory:
             # 战斗胜利，完成任务
             success, message, rewards = await DailyTaskService.complete_task(session, player, task)
-            
+
             if success:
+                # 更新委托完成统计（用于公会任务）
+                if player.guild_id:
+                    from ..guild.guild_task_service import GuildTaskService
+                    await GuildTaskService.update_commission_stats(session, player.id)
+
                 await session.commit()
                 
                 # 构建胜利消息

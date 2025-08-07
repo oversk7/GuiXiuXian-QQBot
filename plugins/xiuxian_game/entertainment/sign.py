@@ -113,6 +113,7 @@ async def handle_sign(event: MessageEvent):
             # 导入公会相关服务
             from ..guild.guild_economy_service import GuildEconomyService
             from ..guild.guild_task_service import GuildTaskService
+            from ..models.guild_task_record import GuildTaskType
 
             # 获取公会签到任务配置
             task_config = GuildTaskService.DAILY_TASKS["daily_sign"]
@@ -127,6 +128,15 @@ async def handle_sign(event: MessageEvent):
             guild_exp_gained = await GuildEconomyService.add_guild_experience(
                 session, player.guild_id, base_exp
             )
+
+            # 记录签到任务完成
+            await GuildTaskService.record_task_completion(
+                session, player.id, player.guild_id, GuildTaskType.DAILY_SIGN,
+                points_reward, guild_exp_gained
+            )
+
+            # 更新日常任务完成统计
+            await GuildTaskService.update_daily_task_completion_stats(session, player.id)
 
             guild_msg = f"\n🏰 公会奖励：积分+{points_reward} 公会经验+{guild_exp_gained}"
 

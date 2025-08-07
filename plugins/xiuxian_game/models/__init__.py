@@ -19,6 +19,8 @@ from .market_state import MarketState
 from .trade_record import TradeRecord
 # 每日任务系统
 from .daily_task import DailyTask, TaskType, TaskStatus
+# 公会任务系统
+from .guild_task_record import GuildTaskRecord, GuildTaskType, PlayerTaskStats
 from .russian_roulette import RussianRouletteRoom, RussianRouletteGame
 # 股票系统模型
 from .stock import Stock, StockHolding, StockTransaction, StockPriceHistory
@@ -31,5 +33,6 @@ __all__ = [
     "MonthlyCard", "MarketState", "RussianRouletteRoom", "RussianRouletteGame",
     "Stock", "StockHolding", "StockTransaction", "StockPriceHistory", "TradeRecord",
     "PartTimeJob", "JobLocation", "PlayerJobStats",
-    "DailyTask", "TaskType", "TaskStatus"
+    "DailyTask", "TaskType", "TaskStatus",
+    "GuildTaskRecord", "GuildTaskType", "PlayerTaskStats"
 ]

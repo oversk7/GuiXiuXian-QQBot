@@ -883,28 +883,7 @@ async def handle_confirm_build_with_name(event: MessageEvent, args: Message = Co
         else:
             await confirm_build_with_name_cmd.finish(message_add_head(f"⛔ {message}", event))
 
-# ==================== 公会任务系统 ====================
-guild_tasks_cmd = on_command("公会任务", aliases={"任务列表"}, block=True, priority=5)
 
-@guild_tasks_cmd.handle()
-async def handle_guild_tasks(event: MessageEvent):
-    """查看公会任务列表"""
-    async with safe_session() as session:
-        player = await session.get(Player, event.get_user_id())
-        if not player or not player.guild_id:
-            await guild_tasks_cmd.finish("⛔ 你未加入任何公会")
-
-        tasks = await GuildTaskService.get_available_tasks(session, player.id)
-
-        lines = ["📋 公会任务列表", "━━━━━━━━━━"]
-        for task in tasks:
-            status = "✅已完成" if task["completed"] else "⏳进行中"
-            lines.append(f"▫️ {task['name']} ({task['type']}) {status}")
-            lines.append(f"   {task['description']}")
-            lines.append(f"   奖励：{task['points_reward']}积分")
-
-        msg = "\n".join(lines)
-        await guild_tasks_cmd.finish(message_add_head(msg, event))
 
 # ==================== 公会传送阵 ====================
 guild_teleport_cmd = on_command("公会传送", aliases={"传送到公会"}, block=True, priority=5)
