@@ -544,7 +544,7 @@ async def handle_support(event: MessageEvent, args: Message = CommandArg()):
         "   • 修炼闭关效率+50%\n"
         "   • 闭关上限增加至12小时，突破失败损失减少\n"
         "   • 背包扩容+20格\n"
-        "   • 副本自动采集、装备一键修理\n"
+        "   • 副本自动采集、装备一键修理、一键嗑药\n"
         "   • 签到获得扫荡令*3，咒抗+5\n"
         "\n"
         "🔸 5元 - 永久背包扩容+5格\n"

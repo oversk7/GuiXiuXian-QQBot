@@ -129,6 +129,11 @@ async def handle_check_monthly_card(event: MessageEvent):
         if benefits["auto_collect"]:
             msg_lines.append("🤖 材料自动采集")
         msg_lines.append("🤖 【一键修复 [金币:怨念]】修复所有装备，可指定比例")
+
+        # 检查是否有高级月卡，显示一键嗑药功能
+        has_premium = any(card.card_type == CardType.PREMIUM for card in active_cards)
+        if has_premium:
+            msg_lines.append("💊 【一键嗑药】自动使用回春散和凝神草补满状态")
         if benefits["sign_stamina_bonus"] > 0:
             msg_lines.append(f"💪 签到咒抗上限 +{benefits['sign_stamina_bonus']}")
 
@@ -277,6 +282,145 @@ async def handle_add_inventory(event: MessageEvent, args: Message = CommandArg()
             msg += f"\n⚠️ 已达到容量上限({MAX_INVENTORY_CAPACITY})，实际增加{actual_add}"
 
         await add_inventory_cmd.finish(msg)
+
+
+# ==================== 月卡权益：一键嗑药 ====================
+auto_use_medicine_cmd = on_command("一键嗑药", aliases={"一键用药", "自动嗑药"}, block=True, priority=5)
+
+@auto_use_medicine_cmd.handle()
+async def handle_auto_use_medicine(event: MessageEvent, args: Message = CommandArg()):
+    """高级月卡权益：一键嗑药 - 自动使用适量的回春散和凝神草补满血量和法力值"""
+    user_id = event.get_user_id()
+
+    async with safe_session() as session:
+        player = await session.get(Player, user_id)
+        if not player:
+            await auto_use_medicine_cmd.finish("⛔ 请先创建角色")
+
+        # 检查是否有高级月卡权益
+        premium_card = await MonthlyCard.get_active_card(session, player.id, CardType.PREMIUM)
+        if not premium_card:
+            await auto_use_medicine_cmd.finish(message_add_head(
+                "⛔ 一键嗑药是高级月卡专属功能，请先购买高级月卡",
+                event
+            ))
+
+        # 检查玩家是否已死亡
+        if player.hp <= 0:
+            await auto_use_medicine_cmd.finish(message_add_head(
+                "💀 你已经死亡，无法使用药品，请先复活",
+                event
+            ))
+
+        # 检查是否需要补血和补蓝
+        hp_needed = player.max_hp - player.hp
+        mp_needed = player.max_mp - player.mp
+
+        if hp_needed <= 0 and mp_needed <= 0:
+            await auto_use_medicine_cmd.finish(message_add_head(
+                "✨ 你的血量和法力值都已满，无需嗑药",
+                event
+            ))
+
+        # 获取背包中的回春散和凝神草数量
+        heal_potion_stmt = select(ItemInstance).where(
+            ItemInstance.player_id == user_id,
+            ItemInstance.item_id == "heal_potion"
+        )
+        heal_potions = (await session.execute(heal_potion_stmt)).scalars().all()
+        heal_potion_count = sum(item.quantity for item in heal_potions)
+
+        spirit_herb_stmt = select(ItemInstance).where(
+            ItemInstance.player_id == user_id,
+            ItemInstance.item_id == "spirit_herb"
+        )
+        spirit_herbs = (await session.execute(spirit_herb_stmt)).scalars().all()
+        spirit_herb_count = sum(item.quantity for item in spirit_herbs)
+
+        # 计算需要使用的药品数量
+        heal_potion_needed = 0
+        spirit_herb_needed = 0
+
+        if hp_needed > 0:
+            # 回春散每个恢复40HP
+            heal_potion_needed = (hp_needed + 39) // 40  # 向上取整
+            heal_potion_needed = min(heal_potion_needed, heal_potion_count)
+
+        if mp_needed > 0:
+            # 凝神草每个恢复40MP
+            spirit_herb_needed = (mp_needed + 39) // 40  # 向上取整
+            spirit_herb_needed = min(spirit_herb_needed, spirit_herb_count)
+
+        # 检查是否有足够的药品
+        if heal_potion_needed == 0 and spirit_herb_needed == 0:
+            missing_items = []
+            if hp_needed > 0:
+                missing_items.append("回春散")
+            if mp_needed > 0:
+                missing_items.append("凝神草")
+
+            await auto_use_medicine_cmd.finish(message_add_head(
+                f"⛔ 背包中没有足够的药品：{' 和 '.join(missing_items)}",
+                event
+            ))
+
+        # 开始使用药品
+        used_items = []
+        total_hp_restored = 0
+        total_mp_restored = 0
+
+        # 使用回春散
+        if heal_potion_needed > 0 and hp_needed > 0:
+            from ..item.item_effects import apply_effect
+            heal_config = config.items_config["by_id"]["heal_potion"]
+
+            success, msg = await apply_effect(player, heal_config, heal_potion_needed, ctx="world", session=session)
+            if success:
+                # 扣除物品
+                await ItemInstance.consume_item(session, player.id, "heal_potion", heal_potion_needed)
+                used_items.append(f"回春散*{heal_potion_needed}")
+                total_hp_restored = min(heal_potion_needed * 40, hp_needed)
+
+        # 使用凝神草
+        if spirit_herb_needed > 0 and mp_needed > 0:
+            from ..item.item_effects import apply_effect
+            spirit_config = config.items_config["by_id"]["spirit_herb"]
+
+            success, msg = await apply_effect(player, spirit_config, spirit_herb_needed, ctx="world", session=session)
+            if success:
+                # 扣除物品
+                await ItemInstance.consume_item(session, player.id, "spirit_herb", spirit_herb_needed)
+                used_items.append(f"凝神草*{spirit_herb_needed}")
+                total_mp_restored = min(spirit_herb_needed * 40, mp_needed)
+
+        if not used_items:
+            await auto_use_medicine_cmd.finish(message_add_head(
+                "⛔ 药品使用失败，请重试",
+                event
+            ))
+
+        session.add(player)
+        await session.commit()
+
+        # 构建结果消息
+        result_msg = [
+            "💊 一键嗑药完成",
+            "━━━━━━━━━━━━━",
+            f"🎯 使用药品：{' + '.join(used_items)}"
+        ]
+
+        if total_hp_restored > 0:
+            result_msg.append(f"❤️ 恢复生命值：{total_hp_restored}")
+
+        if total_mp_restored > 0:
+            result_msg.append(f"💙 恢复法力值：{total_mp_restored}")
+
+        result_msg.extend([
+            f"📊 当前状态：{player.hp}/{player.max_hp} HP | {player.mp}/{player.max_mp} MP",
+            "━━━━━━━━━━━━━"
+        ])
+
+        await auto_use_medicine_cmd.finish(message_add_head("\n".join(result_msg), event))
 
 
 # ==================== 月卡权益：一键修复装备 ====================
