@@ -145,4 +145,4 @@ async def handle_sign(event: MessageEvent):
 
         # 然后发送响应消息
         await sign.send(
-            f"✅ 连续签到 {streak} 天！获得 {gold_reward} 金币！\n{lucky_msg}{bonus_msg}{stamina_msg}{monthly_card_msg}{new_msg}{guild_msg}")
+            f"{player.nickname}[{player.uid}] 连续签到 {streak} 天！获得 {gold_reward} 金币！\n{lucky_msg}{bonus_msg}{stamina_msg}{monthly_card_msg}{new_msg}{guild_msg}")
