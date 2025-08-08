@@ -285,7 +285,7 @@ async def handle_add_inventory(event: MessageEvent, args: Message = CommandArg()
 
 
 # ==================== 月卡权益：一键嗑药 ====================
-auto_use_medicine_cmd = on_command("一键嗑药", aliases={"一键用药", "自动嗑药"}, block=True, priority=5)
+auto_use_medicine_cmd = on_command("一键嗑药", aliases={"一键磕药", "自动嗑药"}, block=True, priority=5)
 
 @auto_use_medicine_cmd.handle()
 async def handle_auto_use_medicine(event: MessageEvent, args: Message = CommandArg()):
