@@ -26,6 +26,8 @@ from .russian_roulette import RussianRouletteRoom, RussianRouletteGame
 from .stock import Stock, StockHolding, StockTransaction, StockPriceHistory
 # 打工系统模型
 from .part_time_job import PartTimeJob, JobLocation, PlayerJobStats
+# 世界BOSS系统模型
+from .world_boss import WorldBossCycle, WorldBossDamage
 
 __all__ = [
     "Player", "Guild", "GuildMember", "GuildBuilding", "GuildPosition", "BuildingType", "WorldMessage", "BankAccount", "ItemInstance", "WorldTile", "NavigationTask", "AlchemyRecord", "MarketOrder",
@@ -34,5 +36,6 @@ __all__ = [
     "Stock", "StockHolding", "StockTransaction", "StockPriceHistory", "TradeRecord",
     "PartTimeJob", "JobLocation", "PlayerJobStats",
     "DailyTask", "TaskType", "TaskStatus",
-    "GuildTaskRecord", "GuildTaskType", "PlayerTaskStats"
+    "GuildTaskRecord", "GuildTaskType", "PlayerTaskStats",
+    "WorldBossCycle", "WorldBossDamage"
 ]

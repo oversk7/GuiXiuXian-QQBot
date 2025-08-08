@@ -27,6 +27,7 @@ from . import (
     backup,
     ai_guide,  # AI引导系统
     battle,  # 战斗系统（包含PVP切磋）
+    world_boss
 )
 
 driver = get_driver()

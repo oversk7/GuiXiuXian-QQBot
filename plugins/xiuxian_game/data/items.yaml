@@ -384,6 +384,61 @@ items:
       rarity: "green"
       price: 500
 
+    # ========== 世界BOSS宝箱系列 ==========
+    - item_id: "abyss_overlord_chest"
+      name: "深渊霸主宝箱"
+      description: "散发着深渊霸主气息的神秘宝箱，内含极其珍贵的奖励。只有最强的勇士才能获得。"
+      type: "CONSUMABLE"
+      effect_type: "WORLD_BOSS_CHEST"
+      effect_params: {"tier": "overlord"}
+      price: 0
+      rarity: "orange"
+
+    - item_id: "abyss_king_chest"
+      name: "深渊王者宝箱"
+      description: "蕴含深渊王者力量的宝箱，内藏稀有的镶嵌物和升阶道具。"
+      type: "CONSUMABLE"
+      effect_type: "WORLD_BOSS_CHEST"
+      effect_params: {"tier": "king"}
+      price: 0
+      rarity: "purple"
+
+    - item_id: "abyss_warrior_chest"
+      name: "深渊勇士宝箱"
+      description: "深渊勇士的荣誉象征，内含珍贵的战斗道具和镶嵌物。"
+      type: "CONSUMABLE"
+      effect_type: "WORLD_BOSS_CHEST"
+      effect_params: {"tier": "warrior"}
+      price: 0
+      rarity: "blue"
+
+    - item_id: "abyss_explorer_chest"
+      name: "深渊探索者宝箱"
+      description: "深渊探索者的收获，内含有用的镶嵌物和材料。"
+      type: "CONSUMABLE"
+      effect_type: "WORLD_BOSS_CHEST"
+      effect_params: {"tier": "explorer"}
+      price: 0
+      rarity: "green"
+
+    - item_id: "abyss_challenger_chest"
+      name: "深渊挑战者宝箱"
+      description: "挑战深渊的勇气奖励，内含基础的镶嵌物和材料。"
+      type: "CONSUMABLE"
+      effect_type: "WORLD_BOSS_CHEST"
+      effect_params: {"tier": "challenger"}
+      price: 0
+      rarity: "white"
+
+    - item_id: "abyss_participant_chest"
+      name: "深渊参与者宝箱"
+      description: "参与深渊挑战的纪念品，内含少量镶嵌物和材料。"
+      type: "CONSUMABLE"
+      effect_type: "WORLD_BOSS_CHEST"
+      effect_params: {"tier": "participant"}
+      price: 0
+      rarity: "white"
+
   equipment:
     # ========== 初级装备 (1-20级) - 主要数值加成，使用白色材料 ==========
 

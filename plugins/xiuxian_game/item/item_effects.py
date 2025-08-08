@@ -680,3 +680,185 @@ async def _expand_territory(player: Player, cfg: ItemConfig, qty: int, ctx: str,
     # 这个效果需要在调用处特殊处理，因为需要访问Guild对象
     # 返回特殊标记，让调用方知道需要特殊处理
     return False, "EXPAND_TERRITORY_SPECIAL_HANDLING"
+
+
+@register(ItemEffectType.WORLD_BOSS_CHEST)
+async def _world_boss_chest(player: Player, cfg: ItemConfig, qty: int, ctx: str, session=None) -> Tuple[bool, str]:
+    """世界BOSS宝箱开启效果"""
+    import random
+    from datetime import datetime
+
+    if not session:
+        return False, "⛔ 系统错误：缺少数据库会话"
+
+    tier = cfg.effect_params.get("tier", "participant")
+
+    # 不同等级宝箱的奖励池
+    reward_pools = {
+        "overlord": {  # 深渊霸主宝箱
+            "gems": [
+                ("critical_bead_4", 1, 0.1),
+                ("combo_bead_4", 1, 0.1),
+                ("dodge_bead_4", 1, 0.1),
+                ("counter_jade_4", 1, 0.1),
+                ("critical_power_agate_4", 1, 0.1),
+                ("penetration_crystal_4", 1, 0.1),
+                ("spirit_burst_amethyst_4", 1, 0.1),
+            ],
+            "materials": [
+                ("upgrade_stone_supreme", 3, 0.3),
+                ("stabilizer_crystal", 5, 0.1),
+            ],
+            "gold": (20000, 50000)
+        },
+        "king": {  # 深渊王者宝箱
+            "gems": [
+                ("critical_bead_3", 1, 0.1),
+                ("combo_bead_3", 1, 0.1),
+                ("dodge_bead_3", 1, 0.1),
+                ("counter_jade_3", 1, 0.1),
+                ("critical_power_agate_3", 1, 0.1),
+                ("penetration_crystal_3", 1, 0.1),
+                ("spirit_burst_amethyst_3", 1, 0.1),
+            ],
+            "materials": [
+                ("upgrade_stone_supreme", 2, 0.3),
+                ("stabilizer_crystal", 3, 0.1),
+            ],
+            "gold": (10000, 20000)
+        },
+        "warrior": {  # 深渊勇士宝箱
+            "gems": [
+                ("critical_bead_2", 1, 0.1),
+                ("combo_bead_2", 1, 0.1),
+                ("dodge_bead_2", 1, 0.1),
+                ("counter_jade_2", 1, 0.1),
+                ("critical_power_agate_2", 1, 0.1),
+                ("penetration_crystal_2", 1, 0.1),
+                ("spirit_burst_amethyst_2", 1, 0.1),
+            ],
+            "materials": [
+                ("upgrade_stone_supreme", 1, 0.1),
+                ("stabilizer_crystal", 2, 0.1),
+            ],
+            "gold": (10000, 20000)
+        },
+        "explorer": {  # 深渊探索者宝箱
+            "gems": [
+                ("critical_bead_1", 1, 0.1),
+                ("combo_bead_1", 1, 0.1),
+                ("accuracy_bead_1", 1, 0.1),
+                ("counter_jade_1", 1, 0.1),
+                ("penetration_crystal_1", 1, 0.1),
+            ],
+            "materials": [
+                ("stabilizer_crystal", 1, 0.5),
+            ],
+            "gold": (10000, 20000)
+        },
+        "challenger": {  # 深渊挑战者宝箱
+            "gems": [
+                ("critical_bead_1", 1, 0.1),
+                ("accuracy_bead_1", 1, 0.1),
+                ("dodge_bead_1", 1, 0.1),
+                ("counter_jade_1", 1, 0.1),
+                ("critical_power_agate_1", 1, 0.2),
+            ],
+            "gold": (5000, 15000)
+        },
+        "participant": {  # 深渊参与者宝箱
+            "gems": [
+                ("critical_bead_1", 1, 0.1),
+                ("accuracy_bead_1", 1, 0.1),
+            ],
+            "materials": [
+                ("upgrade_stone_low", 1, 0.2),
+            ],
+            "gold": (2000, 8000)
+        }
+    }
+
+    pool = reward_pools.get(tier, reward_pools["participant"])
+    rewards = []
+
+    # 处理多个宝箱
+    for _ in range(qty):
+        # 金币奖励（必得）
+        gold_min, gold_max = pool["gold"]
+        gold_reward = random.randint(gold_min, gold_max)
+        player.gold += gold_reward
+        rewards.append(f"💰 {gold_reward:,} 金币")
+
+        # 镶嵌物奖励
+        if "gems" in pool:
+            for gem_id, gem_qty, probability in pool["gems"]:
+                if random.random() < probability:
+                    # 创建镶嵌物实例
+                    gem_item = ItemInstance(
+                        player_id=player.id,
+                        item_id=gem_id,
+                        quantity=gem_qty,
+                        created_at=datetime.now()
+                    )
+                    session.add(gem_item)
+
+                    # 获取物品配置以显示名称
+                    from ..config import config
+                    gem_config = config.items_config["by_id"].get(gem_id)
+                    if gem_config:
+                        rewards.append(f"💎 {gem_config.get_display_name()} x{gem_qty}")
+
+        # 材料奖励
+        if "materials" in pool:
+            for material_id, material_qty, probability in pool["materials"]:
+                if random.random() < probability:
+                    # 创建材料实例
+                    material_item = ItemInstance(
+                        player_id=player.id,
+                        item_id=material_id,
+                        quantity=material_qty,
+                        created_at=datetime.now()
+                    )
+                    session.add(material_item)
+
+                    # 获取物品配置以显示名称
+                    from ..config import config
+                    material_config = config.items_config["by_id"].get(material_id)
+                    if material_config:
+                        rewards.append(f"🔮 {material_config.get_display_name()} x{material_qty}")
+
+    if not rewards:
+        rewards.append("💰 少量金币")
+
+    # 构建结果消息
+    chest_names = {
+        "overlord": "深渊霸主宝箱",
+        "king": "深渊王者宝箱",
+        "warrior": "深渊勇士宝箱",
+        "explorer": "深渊探索者宝箱",
+        "challenger": "深渊挑战者宝箱",
+        "participant": "深渊参与者宝箱"
+    }
+
+    chest_name = chest_names.get(tier, "神秘宝箱")
+    qty_text = f" x{qty}" if qty > 1 else ""
+
+    result_lines = [
+        f"🎁 开启 {chest_name}{qty_text}",
+        "✨ 获得奖励：",
+        *[f"  {reward}" for reward in rewards]
+    ]
+
+    # 添加一些克苏鲁风格的描述
+    flavor_texts = [
+        "🌀 宝箱中散发出深渊的气息，仿佛在低语着古老的秘密...",
+        "👁️ 无数眼球在宝箱内闪烁，见证着你的收获...",
+        "🔮 扭曲的能量从宝箱中涌出，化作珍贵的奖励...",
+        "⚡ 虚空的力量凝聚成实体，成为你战斗的助力...",
+        "🌊 深渊的馈赠降临，带来不可名状的力量..."
+    ]
+
+    result_lines.append("")
+    result_lines.append(random.choice(flavor_texts))
+
+    return True, "\n".join(result_lines)

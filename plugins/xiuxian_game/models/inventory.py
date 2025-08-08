@@ -30,6 +30,7 @@ class ItemEffectType(str, PyEnum):
     RESET_ATTR = "RESET_ATTR"
     EXPAND_TERRITORY = "EXPAND_TERRITORY"
     SWEEP_DUNGEON = "SWEEP_DUNGEON"
+    WORLD_BOSS_CHEST = "WORLD_BOSS_CHEST"
     # 以下类型不使用 apply_effect 处理
     CHANGE_NAME = "CHANGE_NAME"
     TELEPORT = "TELEPORT"
