@@ -333,7 +333,7 @@ async def handle_ren_wu(event: MessageEvent, args: Message = CommandArg()):
         "━━━━━━━━━━━━━\n"
         "🌟 世界BOSS：\n"
         "【世界BOSS】 查看当前BOSS信息与规则\n"
-        "【攻击BOSS】 对当前BOSS发起攻击（每日3次）\n"
+        "【讨伐BOSS】 对当前BOSS发起攻击（每日3次）\n"
         "【BOSS排行】 查看本期累计伤害排行榜\n"
         "【开启深渊宝箱】 开启获得的深渊宝箱奖励\n"
         "━━━━━━━━━━━━━\n"

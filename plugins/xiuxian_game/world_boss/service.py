@@ -306,7 +306,7 @@ class WorldBossService:
 
     @staticmethod
     async def attack_boss(session: AsyncSession, cycle: WorldBossCycle, player: Player) -> Tuple[bool, str]:
-        """攻击BOSS
+        """讨伐BOSS
 
         Returns:
             (是否成功, 结果消息)
@@ -427,7 +427,7 @@ class WorldBossService:
                 
             battle_log.append(f"━━━ 第{round_num}回合 ━━━")
             
-            # 玩家攻击BOSS（造成伤害）
+            # 玩家讨伐BOSS（造成伤害）
             player_damage = WorldBossService._calculate_player_damage(player, boss_stats, rng)
             battle_log.append(f"⚔️ {player.nickname} 攻击 {boss_name}，造成 {player_damage} 点伤害")
             

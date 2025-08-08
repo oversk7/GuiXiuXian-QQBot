@@ -4,7 +4,7 @@ from __future__ import annotations
 
 指令：
   - 世界BOSS / 世界Boss / worldboss：查看当前BOSS信息与规则
-  - 攻击BOSS：对当前BOSS发起一次攻击（每日3次，冷却1秒）
+  - 讨伐BOSS：对当前BOSS发起一次攻击（每日3次，冷却1秒）
   - BOSS排行 / 世界BOSS排行：查看本期累计伤害排行榜与奖励区间
 
 战斗机制：
