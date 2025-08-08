@@ -65,7 +65,6 @@ async def handle_guild_task(event: MessageEvent):
         msg_lines.extend([
             "\n━━━━━━━━━━━━━",
             "💡 提示：",
-            "• 探索和战斗任务会自动检测完成",
             "• 使用【完成公会任务】手动领取奖励",
             "• 签到和捐献任务会自动完成"
         ])

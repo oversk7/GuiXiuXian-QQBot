@@ -31,16 +31,16 @@ class GuildTaskService:
             "max_per_day": 1
         },
         "exploration": {
-            "name": "世界探索",
-            "description": "在世界地图中探索20个格子",
+            "name": "诡域探索",
+            "description": "在任意诡域中探索20个格子",
             "points_reward": 50,
             "base_exp": 50,  # 基础经验，会根据公会倍率动态计算
             "max_per_day": 1,
             "requirement": 20
         },
         "combat_victory": {
-            "name": "战斗胜利",
-            "description": "在战斗中获得10次胜利",
+            "name": "杀诡达人",
+            "description": "在诡域战斗中获得10次胜利",
             "points_reward": 100,
             "base_exp": 100,  # 基础经验，会根据公会倍率动态计算
             "max_per_day": 1,
