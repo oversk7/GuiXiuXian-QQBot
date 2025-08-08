@@ -545,7 +545,7 @@ async def handle_array_breaking(event: MessageEvent, args: Message = CommandArg(
         # 生成结果消息
         result_lines = []
         result_lines.append("� 阵法破解完成！")
-        result_lines.append("━━━━━━━━━━━━━━━━━━━━")
+        result_lines.append("━━━━━━━━━━━━━")
 
         if game.completed_sequences:
             result_lines.append("✅ 成功破解的符文序列：")
@@ -555,7 +555,7 @@ async def handle_array_breaking(event: MessageEvent, args: Message = CommandArg(
         else:
             result_lines.append("❌ 未能破解任何符文序列")
         
-        result_lines.append("━━━━━━━━━━━━━━━━━━━━")
+        result_lines.append("━━━━━━━━━━━━━")
         result_lines.append(f"💰 总奖励: {reward}💰")
         result_lines.append(f"💸 阵法成本: -{cost}💰")
         result_lines.append(f"📊 净收益: {net_gain:+d}💰")

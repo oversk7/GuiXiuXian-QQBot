@@ -255,7 +255,7 @@ class WorldBossService:
         lines = [
             f"🌟 世界BOSS：{cycle.boss_name}",
             f"👑 {cycle.boss_title}",
-            "━━━━━━━━━━━━━━━━━━━━",
+            "━━━━━━━━━━━━━",
             f"📖 {description}",
             "",
             f"⚔️ 你的累计伤害：{damage_record.total_damage:,}",
@@ -554,7 +554,7 @@ class WorldBossService:
         lines = [
             f"🌟 世界BOSS：{cycle.boss_name}",
             f"👑 {cycle.boss_title}",
-            "━━━━━━━━━━━━━━━━━━━━",
+            "━━━━━━━━━━━━━",
             "🏆 伤害排行榜",
             ""
         ]
