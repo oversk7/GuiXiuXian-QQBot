@@ -486,38 +486,26 @@ class GuildTaskService:
         completed_tasks = []
 
         # 检查探索任务
-        try:
-            success, message, _ = await GuildTaskService.complete_exploration_task(session, player_id)
-            if success:
-                completed_tasks.append(f"🗺️ {message}")
-                await GuildTaskService.update_daily_task_completion_stats(session, player_id)
-        except Exception:
-            pass
+        success, message, _ = await GuildTaskService.complete_exploration_task(session, player_id)
+        if success:
+            completed_tasks.append(f"🗺️ {message}")
+            await GuildTaskService.update_daily_task_completion_stats(session, player_id)
 
         # 检查战斗任务
-        try:
-            success, message, _ = await GuildTaskService.complete_combat_task(session, player_id)
-            if success:
-                completed_tasks.append(f"⚔️ {message}")
-                await GuildTaskService.update_daily_task_completion_stats(session, player_id)
-        except Exception:
-            pass
+        success, message, _ = await GuildTaskService.complete_combat_task(session, player_id)
+        if success:
+            completed_tasks.append(f"⚔️ {message}")
+            await GuildTaskService.update_daily_task_completion_stats(session, player_id)
 
         # 检查周活跃任务
-        try:
-            success, message, _ = await GuildTaskService.complete_weekly_active_task(session, player_id)
-            if success:
-                completed_tasks.append(f"📅 {message}")
-        except Exception:
-            pass
+        success, message, _ = await GuildTaskService.complete_weekly_active_task(session, player_id)
+        if success:
+            completed_tasks.append(f"📅 {message}")
 
         # 检查周委托任务
-        try:
-            success, message, _ = await GuildTaskService.complete_weekly_commission_task(session, player_id)
-            if success:
-                completed_tasks.append(f"📋 {message}")
-        except Exception:
-            pass
+        success, message, _ = await GuildTaskService.complete_weekly_commission_task(session, player_id)
+        if success:
+            completed_tasks.append(f"📋 {message}")
 
         return completed_tasks
 
