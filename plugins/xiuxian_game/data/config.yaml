@@ -78,3 +78,8 @@ monthly_card:
     sign_stamina_bonus: 5            # 签到咒抗上限增加+5
     sign_sweep_tokens: 3             # 签到获得扫荡令数量
     breakthrough_protection: 0.8     # 突破失败时修为保留比例80%
+
+# 管理员配置
+admin:
+  # 管理员QQ号列表（加密ID）
+  admin_ids: ['D6A7BB606845F1AFF40ADA517F7BF306']

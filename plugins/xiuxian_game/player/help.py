@@ -34,7 +34,7 @@ async def handle_help(event: MessageEvent, args: Message = CommandArg()):
         "🔮 炼丹系统  🎮 娱乐系统\n"
         "💕 社交系统  🏰 副本系统\n"
         "📈 投资系统  💼 打工系统\n"
-        "🏛️ 委托系统\n"
+        "🏛️ 委托系统  🤖 管理员系统\n"
         "═════════════\n"
         "💡 发送对应系统查看详细指令，【赞助】支持诡修仙\n"
         "💡 【】括号里是指令，<>里是必填，[]里是选填\n"
@@ -517,6 +517,65 @@ async def handle_daily_task_help(event: MessageEvent, args: Message = CommandArg
     await daily_task_help_cmd.finish(Message(msg))
 
 
+# 管理员系统
+admin_help_cmd = on_command("管理员系统", aliases={"管理员帮助"}, priority=4, block=True)
+
+@admin_help_cmd.handle()
+async def handle_admin_help(event: MessageEvent, args: Message = CommandArg()):
+    msg = (
+        "✨ 管理员系统帮助 ✨\n"
+        "通过AI自然语言查询和修改数据库信息（仅限管理员）\n"
+        "━━━━━━━━━━━━━\n"
+        "🤖 智能操作模式：\n"
+        "管理员可以直接用自然语言提问或修改，无需特定指令前缀\n"
+        "系统会自动识别并处理数据库查询和修改请求\n"
+        "\n"
+        "📊 查询示例：\n"
+        "• 等级最高的玩家是谁？\n"
+        "• 哪个公会成员最多\n"
+        "• 金币最多的前10名玩家\n"
+        "• 今天攻击世界BOSS最多的玩家\n"
+        "• 结婚的玩家有多少对\n"
+        "• 银行存款最多的玩家\n"
+        "• 查询所有公会的资金排行\n"
+        "• 统计师徒关系数量\n"
+        "\n"
+        "🔧 修改示例：\n"
+        "• 将道爷的坐标改为100,200\n"
+        "• 修改UID1001的金币为50000\n"
+        "• 设置某某玩家的等级为100\n"
+        "• 调整天道盟的公会资金为1000000\n"
+        "• 更改玩家的攻击力为500\n"
+        "• 传送道爷到坐标0,0\n"
+        "\n"
+        "🔧 系统特性：\n"
+        "• 🎯 无需指令前缀，直接自然语言操作\n"
+        "• 🤖 AI自动识别查询/修改意图并生成SQL\n"
+        "• 📊 智能格式化查询结果\n"
+        "• 🔗 支持复杂多表关联查询\n"
+        "• ✏️ 支持UPDATE修改操作\n"
+        "• 🛡️ 自动安全检查，禁止DELETE等危险操作\n"
+        "• ⚡ 实时显示操作进度\n"
+        "\n"
+        "⚠️ 权限说明：\n"
+        "• 仅配置的管理员ID可使用此功能\n"
+        "• 查询结果可能包含敏感信息，请谨慎分享\n"
+        "• 修改操作会直接影响游戏数据，请谨慎使用\n"
+        "• 系统会自动过滤DELETE等危险SQL操作\n"
+        "\n"
+        "📋 支持查询的数据表：\n"
+        "• player: 玩家信息（等级、金币、属性等）\n"
+        "• guild: 公会信息（名称、等级、资金等）\n"
+        "• marriage: 婚姻关系\n"
+        "• mentorship: 师徒关系\n"
+        "• bank_account: 银行账户\n"
+        "• world_boss_damage: 世界BOSS伤害记录\n"
+        "\n"
+        "💡 使用提示：\n"
+        "• 查询：直接发送问题，如\"等级最高的玩家是谁\"\n"
+        "• 修改：直接发送修改需求，如\"将道爷的坐标改为100,200\""
+    )
+    await admin_help_cmd.finish(Message(msg))
 
 
 # 备份系统

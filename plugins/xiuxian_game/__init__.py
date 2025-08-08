@@ -25,7 +25,7 @@ from . import (
     story,
     daily_task,  # 每日任务系统
     backup,
-    ai_guide,  # AI引导系统
+    ai_guide,  # AI引导系统（包含管理员数据库查询）
     battle,  # 战斗系统（包含PVP切磋）
     world_boss
 )

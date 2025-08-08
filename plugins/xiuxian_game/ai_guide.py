@@ -2,14 +2,24 @@
 AI引导系统 - 为玩家提供游戏帮助和指令推荐
 """
 import requests
+import re
+from typing import List, Dict, Any
 from nonebot import on_message, on_command
 from nonebot.adapters.qq import MessageEvent
+from sqlalchemy import text
 from .models.db import safe_session
 from .models.player import Player
 from .models.story_session import StorySession
 from .utils import message_add_head
+from .config import Config
 
-def call_zhipu_api(messages, model="GLM-4-Flash-250414"):
+def is_admin(user_id: str) -> bool:
+    """检查用户是否为管理员"""
+    config = Config()
+    admin_ids = config.game_config.get("admin", {}).get("admin_ids", [])
+    return user_id in admin_ids
+
+def call_zhipu_api(messages, model="GLM-4.5-Flash"):
     """调用智谱AI API"""
     url = "https://open.bigmodel.cn/api/paas/v4/chat/completions"
 
@@ -21,8 +31,8 @@ def call_zhipu_api(messages, model="GLM-4-Flash-250414"):
     data = {
         "model": model,
         "messages": messages,
-        "temperature": 0.6,
-        # "thinking.type": "disabled"
+        "temperature": 0.7,
+        "thinking.type": "disabled"
     }
 
     response = requests.post(url, headers=headers, json=data)
@@ -31,6 +41,289 @@ def call_zhipu_api(messages, model="GLM-4-Flash-250414"):
         return response.json()
     else:
         raise requests.RequestException(f"API调用失败: {response.status_code}, {response.text}")
+
+# 数据库表结构信息，用于AI理解
+DATABASE_SCHEMA = """
+数据库表结构信息：
+
+1. player表（玩家信息）：
+   - id: 玩家平台ID（主键）
+   - uid: 自增UID（唯一）
+   - nickname: 昵称
+   - level: 等级
+   - sex: 性别（男/女）
+   - exp: 经验值
+   - gold: 金币
+   - guild_id: 所属公会ID
+   - guild_contribution: 公会贡献值
+   - reincarnation_level: 转数
+   - attack, defense, agility, luck: 基础属性
+   - x, y: 坐标位置
+   - created_at: 创建时间
+
+2. guild表（公会信息）：
+   - id: 公会ID（主键）
+   - name: 公会名称
+   - president_id: 会长玩家ID
+   - level: 公会等级
+   - exp: 公会经验
+   - treasury: 公会资金
+   - created_at: 创建时间
+
+3. guild_member表（公会成员）：
+   - guild_id: 公会ID
+   - player_id: 玩家ID
+   - position: 职位（PRESIDENT/VICE_PRESIDENT/CORE_MEMBER/MEMBER）
+   - joined_at: 加入时间
+
+4. marriage表（婚姻关系）：
+   - player1_id, player2_id: 结婚双方ID
+   - married_at: 结婚时间
+   - total_gift_value: 互送礼物总价值
+
+5. mentorship表（师徒关系）：
+   - master_id: 师父ID
+   - disciple_id: 徒弟ID
+   - established_at: 建立时间
+   - mentor_points: 恩师点数
+
+6. bank_account表（银行账户）：
+   - player_id: 玩家ID
+   - balance: 余额
+   - last_interest_time: 上次利息时间
+
+7. world_boss_damage表（世界BOSS伤害）：
+   - cycle_id: 周期ID
+   - player_id: 玩家ID
+   - total_damage: 累计伤害
+   - attacks_today: 今日攻击次数
+
+常用查询示例：
+- 等级最高的玩家：SELECT * FROM player ORDER BY level DESC LIMIT 1
+- 公会成员数量：SELECT g.name, COUNT(gm.player_id) as member_count FROM guild g LEFT JOIN guild_member gm ON g.id = gm.guild_id GROUP BY g.id
+- 财富排行：SELECT nickname, gold FROM player ORDER BY gold DESC LIMIT 10
+
+常用修改示例：
+- 修改玩家坐标：UPDATE player SET x = 100, y = 200 WHERE nickname = '玩家昵称'
+- 修改玩家金币：UPDATE player SET gold = 50000 WHERE uid = 1001
+- 修改玩家等级：UPDATE player SET level = 100 WHERE id = 'player_id'
+- 修改公会资金：UPDATE guild SET treasury = 1000000 WHERE name = '公会名称'
+- 修改玩家属性：UPDATE player SET attack = 500, defense = 300 WHERE nickname = '玩家昵称'
+"""
+
+async def generate_sql_from_natural_language(query_text: str) -> str:
+    """使用AI将自然语言转换为SQL查询"""
+    try:
+        system_prompt = f"""你是一个SQL查询生成专家，专门将自然语言转换为SQL查询语句。
+
+{DATABASE_SCHEMA}
+
+规则：
+1. 只返回SQL语句，不要任何解释或格式化
+2. 使用标准SQL语法，兼容SQLite
+3. 查询结果限制在100条以内（使用LIMIT）
+4. 优先使用JOIN而不是子查询
+5. 对于排行类查询，使用ORDER BY + LIMIT
+6. 支持SELECT查询和UPDATE修改操作，禁止DELETE、DROP等危险操作
+7. 如果涉及公会信息，记得JOIN相关表
+8. 玩家昵称显示时优先使用nickname字段
+9. UPDATE操作时要使用WHERE条件限制影响范围，避免全表更新
+10. 修改玩家数据时，可以通过nickname、uid或id来定位玩家
+
+用户查询：{query_text}
+
+请生成对应的SQL查询语句："""
+
+        messages = [
+            {"role": "system", "content": system_prompt},
+            {"role": "user", "content": query_text}
+        ]
+
+        result = call_zhipu_api(messages)
+        sql_content = result['choices'][0]['message']['content'].strip()
+
+        # 提取SQL语句（去除可能的markdown格式）
+        sql_match = re.search(r'```sql\s*(.*?)\s*```', sql_content, re.DOTALL | re.IGNORECASE)
+        if sql_match:
+            sql_query = sql_match.group(1).strip()
+        else:
+            # 如果没有markdown格式，直接使用内容
+            sql_query = sql_content.strip()
+
+        # 安全检查：确保不包含危险操作（允许UPDATE，禁止DELETE等）
+        dangerous_keywords = ['DELETE', 'DROP', 'INSERT', 'ALTER', 'CREATE', 'TRUNCATE']
+        sql_upper = sql_query.upper()
+        for keyword in dangerous_keywords:
+            if keyword in sql_upper:
+                raise ValueError(f"检测到危险操作：{keyword}")
+
+        return sql_query
+
+    except Exception as e:
+        print(f"AI生成SQL失败: {e}")
+        return ""
+
+async def execute_sql_query(sql_query: str) -> List[Dict[str, Any]]:
+    """执行SQL查询或修改并返回结果"""
+    async with safe_session() as session:
+        try:
+            result = await session.execute(text(sql_query))
+
+            # 如果是UPDATE操作，需要提交事务
+            if sql_query.upper().startswith('UPDATE'):
+                await session.commit()
+                # UPDATE操作返回空列表，表示成功
+                return []
+
+            # SELECT操作处理
+            rows = result.fetchall()
+
+            # 转换为字典列表，便于处理
+            if rows:
+                columns = result.keys()
+                return [dict(zip(columns, row)) for row in rows]
+            return []
+
+        except Exception as e:
+            await session.rollback()
+            raise Exception(f"SQL执行错误：{str(e)}")
+
+async def format_query_result(original_query: str, sql_query: str, result_data: List[Dict[str, Any]]) -> str:
+    """使用AI格式化查询结果"""
+    try:
+        # 限制结果数量，避免消息过长
+        display_data = result_data[:20]  # 最多显示20条
+
+        system_prompt = f"""你是一个数据分析专家，负责将SQL查询结果格式化为易读的中文报告。
+
+原始查询：{original_query}
+SQL语句：{sql_query}
+查询结果数量：{len(result_data)}条
+
+格式要求：
+1. 用中文回答，语言简洁明了
+2. 使用表格或列表形式展示数据
+3. 突出重要信息（如排名、数值等）
+4. 如果结果超过20条，说明只显示前20条
+5. 添加适当的emoji增强可读性
+6. 对于UID，显示为"UID:{uid}"格式
+7. 对于金币等数值，添加适当的单位
+
+请将以下查询结果格式化为用户友好的报告："""
+
+        messages = [
+            {"role": "system", "content": system_prompt},
+            {"role": "user", "content": str(display_data)}
+        ]
+
+        result = call_zhipu_api(messages)
+        formatted_content = result['choices'][0]['message']['content'].strip()
+
+        # 添加查询统计信息
+        stats_info = f"\n\n📊 查询统计：共找到 {len(result_data)} 条记录"
+        if len(result_data) > 20:
+            stats_info += "，仅显示前20条"
+
+        return formatted_content + stats_info
+
+    except Exception as e:
+        # AI格式化失败时，使用简单格式
+        formatted_result = f"📊 查询结果（共{len(result_data)}条）：\n\n"
+
+        for i, row in enumerate(result_data[:10], 1):  # 最多显示10条
+            formatted_result += f"{i}. "
+            for key, value in row.items():
+                formatted_result += f"{key}: {value} | "
+            formatted_result = formatted_result.rstrip(" | ") + "\n"
+
+        if len(result_data) > 10:
+            formatted_result += f"\n... 还有 {len(result_data) - 10} 条记录"
+
+        return formatted_result
+
+def is_database_query(user_message: str) -> bool:
+    """判断用户消息是否可能是数据库查询或修改请求"""
+    # 数据库查询关键词
+    query_keywords = [
+        "查询", "查看", "统计", "排行", "排名", "最高", "最多", "最少", "最大", "最小",
+        "有多少", "多少个", "哪个", "哪些", "什么", "谁", "前", "名", "榜",
+        "玩家", "公会", "等级", "金币", "财富", "修为", "结婚", "师徒", "银行",
+        "存款", "攻击", "伤害", "BOSS", "今天", "昨天", "最近"
+    ]
+
+    # 数据库修改关键词
+    modify_keywords = [
+        "修改", "更改", "设置", "改为", "调整", "变更", "更新", "改成",
+        "坐标改为", "等级改为", "金币改为", "属性改为", "位置改为",
+        "传送到", "移动到", "设为", "调为"
+    ]
+
+    # 检查是否包含查询关键词
+    for keyword in query_keywords:
+        if keyword in user_message:
+            return True
+
+    # 检查是否包含修改关键词
+    for keyword in modify_keywords:
+        if keyword in user_message:
+            return True
+
+    # 检查是否是疑问句
+    question_patterns = ["？", "?", "吗", "呢", "啊"]
+    for pattern in question_patterns:
+        if pattern in user_message:
+            return True
+
+    return False
+
+async def handle_admin_database_query(user_message: str, event):
+    """处理管理员数据库查询和修改"""
+    try:
+        # 判断是查询还是修改操作
+        is_modify = any(keyword in user_message for keyword in [
+            "修改", "更改", "设置", "改为", "调整", "变更", "更新", "改成",
+            "坐标改为", "等级改为", "金币改为", "属性改为", "位置改为",
+            "传送到", "移动到", "设为", "调为"
+        ])
+
+        if is_modify:
+            await ai_guide.send(message_add_head("🔧 管理员修改模式：正在分析您的修改需求...", event))
+        else:
+            await ai_guide.send(message_add_head("🔍 管理员查询模式：正在分析您的查询需求...", event))
+
+        # 调用AI生成SQL
+        sql_query = await generate_sql_from_natural_language(user_message)
+
+        if not sql_query:
+            await ai_guide.finish(message_add_head("❌ 无法理解需求，请重新描述或使用游戏指令", event))
+
+        # 执行SQL
+        if is_modify:
+            await ai_guide.send(message_add_head("⚡ 正在执行修改操作...", event))
+        else:
+            await ai_guide.send(message_add_head("⚡ 正在执行查询...", event))
+
+        result = await execute_sql_query(sql_query)
+
+        # 处理不同类型的结果
+        if sql_query.upper().startswith('UPDATE'):
+            # UPDATE操作的结果处理
+            await ai_guide.finish(message_add_head("✅ 修改操作执行成功！", event))
+        else:
+            # SELECT操作的结果处理
+            if not result:
+                await ai_guide.finish(message_add_head("📭 查询完成，但没有找到匹配的数据", event))
+
+            # 调用AI整理结果
+            formatted_result = await format_query_result(user_message, sql_query, result)
+
+            # 添加管理员标识
+            admin_result = f"🛡️ 管理员查询结果\n\n{formatted_result}"
+
+            await ai_guide.finish(message_add_head(admin_result, event))
+
+    except ValueError as e:
+        await ai_guide.finish(message_add_head(f"❌ 操作执行失败：{str(e)}", event))
 
 # 预先格式化的AI指令知识库字符串常量 - 避免每次调用时重新拼接
 AI_COMMANDS_TEXT = """
@@ -111,7 +404,7 @@ AI_COMMANDS_TEXT = """
   【跑商推荐】 查看利润最高的买卖路线
 
 交易系统：
-描述：初始6个牌子，玩家可用于出售或者收购物品，挂牌后自动以最优价成交。交易税收：5000金币以下免税，超出部分按阶梯税率征收。装备交易：支持升阶、镶嵌等个性化属性，按实例交易
+描述：初始6个牌子，玩家可用于出售或者收购物品，挂牌后自动以最优价撮合。交易税收：5000金币以下免税，超出部分按阶梯税率征收。装备交易：支持升阶、镶嵌等个性化属性，按实例交易
 指令：
   【交易清单 [页数]】 当前所有在售与求购物品总览
   【查牌 <物品名> [页数]】 查看物品在自由市场的买卖价格
@@ -278,17 +571,25 @@ async def handle_ai_guide(event: MessageEvent):
             
         async with safe_session() as session:
             player = await session.get(Player, event.get_user_id())
-            if not player:
-                return  # 未注册玩家不处理
-                
             # 检查是否在剧情状态中
             story_session = await StorySession.get_active_session(session, player.id)
             if story_session:
                 return  # 剧情状态中不处理AI引导
-                
+
+            # 检查是否为管理员，如果是则尝试数据库查询
+            if is_admin(event.get_user_id()):
+                # 判断是否可能是数据库查询请求
+                if is_database_query(user_message):
+                    await handle_admin_database_query(user_message, event)
+                    return
+
+            # 先发送搜索提示，缓解玩家焦虑
+            await ai_guide.send(message_add_head("未检测到正确指令，正在思考您的问题...", event))
+
             # 调用AI进行引导
             response = await get_ai_guidance(user_message, player)
             if response:
+                response += "\n━━━━━━━━━━━━━\n【】括号里的才是指令，外面是指令说明"
                 await ai_guide.finish(message_add_head(response, event))
                 
     except ValueError:
@@ -298,7 +599,7 @@ async def get_ai_guidance(user_message: str, player: Player) -> str:
     """获取AI引导回复"""
     try:
         # 构建系统提示
-        system_prompt = f"""你是《诡修仙》QQ机器人文字游戏的AI助手，专门为玩家提供游戏帮助。
+        system_prompt = f"""你是《诡修仙》QQ机器人文游的AI助手，专门为玩家提供游戏帮助。
 
 玩家信息：
 - 昵称：{player.nickname}[UID：{player.uid}]
@@ -309,7 +610,7 @@ async def get_ai_guidance(user_message: str, player: Player) -> str:
 
 回复规则：
 1. 只回答游戏相关问题，对于游戏外话题直接回复"该话题未检索到结果"
-2. 根据玩家问题推荐最相关的指令，优先推荐2-3个核心指令
+2. 根据玩家问题推荐最相关的指令，优先推荐2-3个核心指令，尽可能先帮玩家填一些已知参数
 3. 如果你收到了一条疑似指令的消息，请你告知玩家正确的指令
 4. 回复要简洁明了，控制在150字以内
 5. 用简短语言解释指令作用，不要长篇大论
