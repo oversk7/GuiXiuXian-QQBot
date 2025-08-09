@@ -910,7 +910,7 @@ async def handle_teleport_list(event: MessageEvent):
 region_overview_cmd = on_command("俯瞰", aliases={"感知"}, block=True, priority=5)
 
 
-async def generate_region_overview_image(region: str, session) -> tuple[bytes, tuple[int, int, int, int]]:
+async def generate_region_overview_image(region: str, session, player_x: int = None, player_y: int = None) -> tuple[bytes, tuple[int, int, int, int]]:
     """生成指定诡域的今日探索概览图片"""
     today = date.today()
 
@@ -1031,6 +1031,18 @@ async def generate_region_overview_image(region: str, session) -> tuple[bytes, t
                     g = int(color[3:5], 16) // 3
                     b = int(color[5:7], 16) // 3
                     color = f'#{r:02x}{g:02x}{b:02x}'
+                else:
+                    # 如果格子存在但未被消耗，说明已经被探索过了
+                    # 但由于格子可能在今天被重置过，我们需要稍微调暗颜色来表示"已探索但未消耗"
+                    # 这样可以区分"完全未探索"和"已探索但资源未被消耗"
+                    r = int(color[1:3], 16)
+                    g = int(color[3:5], 16)
+                    b = int(color[5:7], 16)
+                    # 稍微调暗，但不像消耗后那么暗
+                    r = max(0, r - 30)
+                    g = max(0, g - 30)
+                    b = max(0, b - 30)
+                    color = f'#{r:02x}{g:02x}{b:02x}'
 
             else:
                 # 未探索的区域使用深灰色
@@ -1041,6 +1053,33 @@ async def generate_region_overview_image(region: str, session) -> tuple[bytes, t
                 pixel_x, pixel_y,
                 pixel_x + cell_width - 1, pixel_y + cell_height - 1
             ], fill=color, outline='#555555')
+
+    # 绘制玩家位置标记
+    if player_x is not None and player_y is not None:
+        # 检查玩家位置是否在当前显示范围内
+        if min_x <= player_x <= max_x and min_y <= player_y <= max_y:
+            # 计算玩家位置的像素坐标
+            player_grid_x = player_x - min_x
+            player_grid_y = player_y - min_y
+            player_pixel_x = margin + player_grid_x * cell_width
+            player_pixel_y = margin + player_grid_y * cell_height
+
+            # 绘制玩家位置标记 - 使用亮黄色圆形
+            center_x = player_pixel_x + cell_width // 2
+            center_y = player_pixel_y + cell_height // 2
+            radius = min(cell_width, cell_height) // 3
+
+            # 绘制外圈（白色边框）
+            draw.ellipse([
+                center_x - radius - 2, center_y - radius - 2,
+                center_x + radius + 2, center_y + radius + 2
+            ], fill='#FFFFFF', outline='#FFFFFF')
+
+            # 绘制内圈（亮黄色）
+            draw.ellipse([
+                center_x - radius, center_y - radius,
+                center_x + radius, center_y + radius
+            ], fill='#FFFF00', outline='#FFD700')
 
     # 绘制坐标轴数字
     if font:
@@ -1096,8 +1135,12 @@ async def handle_region_overview(event: MessageEvent, args: Message = CommandArg
                 await region_overview_cmd.finish("⛔ 未知的诡域名称")
 
         try:
-            # 生成概览图片
-            img_data, (min_x, max_x, min_y, max_y) = await generate_region_overview_image(region, session)
+            # 生成概览图片，传入玩家坐标（如果玩家在当前诡域）
+            player_x, player_y = None, None
+            if player.region == region:
+                player_x, player_y = player.x, player.y
+
+            img_data, (min_x, max_x, min_y, max_y) = await generate_region_overview_image(region, session, player_x, player_y)
 
             # 转换为base64
             img_b64 = base64.b64encode(img_data).decode('utf-8')
@@ -1107,23 +1150,32 @@ async def handle_region_overview(event: MessageEvent, args: Message = CommandArg
             tier = region_config.get("tier", 1)
             level_range = region_config.get("level_range", [1, 1])
 
-            msg_text = (
-                f"🗺️ {region} 今日探索小地图\n"
-                f"━━━━━━━━━━━━━\n"
-                f"📊 诡域等级：Tier {tier}\n"
-                f"⚔️ 怪物等级：{level_range[0]}-{level_range[1]}级\n"
-                f"📍 坐标范围：X({min_x}~{max_x}) Y({min_y}~{max_y})\n"
-                f"━━━━━━━━━━━━━\n"
-                f"🟢 绿色：材料格子\n"
-                f"🟡 金色：宝藏格子\n"
-                f"🔴 红色：怪物格子\n"
-                f"🔵 蓝色：休息格子\n"
-                f"🟣 紫色：商人格子\n"
-                f"🟠 橙色：精英怪格子\n"
-                f"⚫ 暗色：已探索/消耗\n"
-                f"⬛ 灰色：未探索区域\n"
-                f"🔢 图片边缘显示坐标数字"
-            )
+            # 构建说明文字
+            msg_lines = [
+                f"🗺️ {region} 今日探索小地图",
+                "━━━━━━━━━━━━━",
+                f"📊 诡域等级：Tier {tier}",
+                f"⚔️ 怪物等级：{level_range[0]}-{level_range[1]}级",
+                f"📍 坐标范围：X({min_x}~{max_x}) Y({min_y}~{max_y})",
+                "━━━━━━━━━━━━━",
+                "🟢 绿色：材料格子",
+                "🟡 金色：宝藏格子",
+                "🔴 红色：怪物格子",
+                "🔵 蓝色：休息格子",
+                "🟣 紫色：商人格子",
+                "🟠 橙色：精英怪格子",
+                "🌫️ 稍暗：已探索但未消耗",
+                "⚫ 很暗：已探索且已消耗",
+                "⬛ 灰色：完全未探索区域"
+            ]
+
+            # 如果玩家在当前诡域，添加位置说明
+            if player.region == region:
+                msg_lines.append(f"🟡 亮黄圆圈：你的位置 ({player.x},{player.y})")
+
+            msg_lines.append("🔢 图片边缘显示坐标数字")
+
+            msg_text = "\n".join(msg_lines)
 
             # 发送图片和文字
             img_segment = MessageSegment.file_image(img_b64)
