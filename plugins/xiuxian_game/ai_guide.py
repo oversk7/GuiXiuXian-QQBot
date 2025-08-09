@@ -1,7 +1,8 @@
 """
 AI引导系统 - 为玩家提供游戏帮助和指令推荐
 """
-import requests
+import aiohttp
+import asyncio
 import re
 from typing import List, Dict, Any
 from nonebot import on_message, on_command
@@ -19,8 +20,8 @@ def is_admin(user_id: str) -> bool:
     admin_ids = config.game_config.get("admin", {}).get("admin_ids", [])
     return user_id in admin_ids
 
-def call_zhipu_api(messages, model="GLM-4.5-Flash"):
-    """调用智谱AI API"""
+async def call_zhipu_api(messages, model="GLM-4.5-Flash", timeout=30):
+    """调用智谱AI API（异步版本）"""
     url = "https://open.bigmodel.cn/api/paas/v4/chat/completions"
 
     headers = {
@@ -35,12 +36,23 @@ def call_zhipu_api(messages, model="GLM-4.5-Flash"):
         "thinking.type": "disabled"
     }
 
-    response = requests.post(url, headers=headers, json=data)
-
-    if response.status_code == 200:
-        return response.json()
-    else:
-        raise requests.RequestException(f"API调用失败: {response.status_code}, {response.text}")
+    try:
+        async with aiohttp.ClientSession(timeout=aiohttp.ClientTimeout(total=timeout)) as session:
+            async with session.post(url, headers=headers, json=data) as response:
+                if response.status == 200:
+                    return await response.json()
+                else:
+                    response_text = await response.text()
+                    raise aiohttp.ClientResponseError(
+                        request_info=response.request_info,
+                        history=response.history,
+                        status=response.status,
+                        message=f"API调用失败: {response.status}, {response_text}"
+                    )
+    except asyncio.TimeoutError:
+        raise TimeoutError(f"AI API调用超时（{timeout}秒）")
+    except aiohttp.ClientError as e:
+        raise aiohttp.ClientError(f"网络请求失败: {str(e)}")
 
 # 数据库表结构信息，用于AI理解
 DATABASE_SCHEMA = """
@@ -482,7 +494,7 @@ async def generate_sql_from_natural_language(query_text: str) -> str:
             {"role": "user", "content": query_text}
         ]
 
-        result = call_zhipu_api(messages)
+        result = await call_zhipu_api(messages)
         sql_content = result['choices'][0]['message']['content'].strip()
 
         # 提取SQL语句（去除可能的markdown格式）
@@ -502,6 +514,15 @@ async def generate_sql_from_natural_language(query_text: str) -> str:
 
         return sql_query
 
+    except TimeoutError as e:
+        print(f"AI生成SQL超时: {e}")
+        return ""
+    except (aiohttp.ClientError, aiohttp.ClientResponseError) as e:
+        print(f"AI API网络错误: {e}")
+        return ""
+    except ValueError as e:
+        # 危险操作检测，重新抛出
+        raise e
     except Exception as e:
         print(f"AI生成SQL失败: {e}")
         return ""
@@ -559,7 +580,7 @@ SQL语句：{sql_query}
             {"role": "user", "content": str(display_data)}
         ]
 
-        result = call_zhipu_api(messages)
+        result = await call_zhipu_api(messages)
         formatted_content = result['choices'][0]['message']['content'].strip()
 
         # 添加查询统计信息
@@ -665,8 +686,15 @@ async def handle_admin_database_query(user_message: str, event):
 
             await ai_guide.finish(message_add_head(admin_result, event))
 
+    except TimeoutError:
+        await ai_guide.finish(message_add_head("⏰ AI分析超时，请稍后重试或使用游戏指令", event))
+    except (aiohttp.ClientError, aiohttp.ClientResponseError):
+        await ai_guide.finish(message_add_head("🌐 网络连接失败，请稍后重试", event))
     except ValueError as e:
         await ai_guide.finish(message_add_head(f"❌ 操作执行失败：{str(e)}", event))
+    except Exception as e:
+        print(f"管理员查询处理异常: {e}")
+        await ai_guide.finish(message_add_head("❌ 系统处理异常，请稍后重试", event))
 
 # 预先格式化的AI指令知识库字符串常量 - 避免每次调用时重新拼接
 AI_COMMANDS_TEXT = """
@@ -971,7 +999,7 @@ async def get_ai_guidance(user_message: str, player: Player) -> str:
             {"role": "user", "content": user_message}
         ]
         
-        result = call_zhipu_api(messages)
+        result = await call_zhipu_api(messages)
         return result['choices'][0]['message']['content']
 
     except Exception:
