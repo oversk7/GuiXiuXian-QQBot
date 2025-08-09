@@ -15,7 +15,7 @@ import random
 
 
 # ==================== 查看每日任务 ====================
-daily_task_cmd = on_command("每日任务", aliases={"任务", "日常任务"}, block=True, priority=5)
+daily_task_cmd = on_command("每日委托", aliases={"任务", "每日任务"}, block=True, priority=5)
 
 @daily_task_cmd.handle()
 async def handle_daily_task(event: MessageEvent):
@@ -79,7 +79,7 @@ async def handle_daily_task(event: MessageEvent):
 
 
 # ==================== 接取任务 ====================
-accept_task_cmd = on_command("接取任务", aliases={"接取委托", "接任务"}, block=True, priority=5)
+accept_task_cmd = on_command("接取委托", aliases={"接取任务", "接收委托"}, block=True, priority=5)
 
 @accept_task_cmd.handle()
 async def handle_accept_task(event: MessageEvent):
