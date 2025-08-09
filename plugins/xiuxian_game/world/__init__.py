@@ -931,12 +931,18 @@ async def generate_region_overview_image(region: str, session, player_x: int = N
     result = await session.execute(stmt)
     today_tiles = result.scalars().all()
 
+    # 过滤掉x或y绝对值大于600的格子，避免图片上格子太小
+    today_tiles = [tile for tile in today_tiles if abs(tile.x) <= 600 and abs(tile.y) <= 600]
+
     # 如果今天没有格子数据，查询历史格子数据作为参考来确定地图范围
     if not today_tiles:
         # 查询该区域的所有历史格子
         stmt_all = select(WorldTile).where(WorldTile.region == region)
         result_all = await session.execute(stmt_all)
         all_tiles = result_all.scalars().all()
+
+        # 同样过滤历史格子数据
+        all_tiles = [tile for tile in all_tiles if abs(tile.x) <= 600 and abs(tile.y) <= 600]
 
         if all_tiles:
             # 使用历史格子的坐标范围，但不生成新格子
