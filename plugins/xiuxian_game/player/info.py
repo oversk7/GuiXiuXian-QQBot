@@ -96,6 +96,7 @@ def realm_by_level(level: int) -> str:
 profile = on_command("角色",aliases={"面板","状态"}, block=True, priority=5)
 register = on_command("注册", block=True, priority=5)
 change_gender = on_command("改性别", aliases={"修改性别"}, block=True, priority=5)
+newbie_guide = on_command("新手指引", aliases={"指令格式", "指令帮助", "新手教程"}, block=True, priority=5)
 
 
 @profile.handle()
@@ -383,11 +384,16 @@ async def create_player(event: MessageEvent, nickname: str, gender: Gender) -> s
             f"🆔 UID   : {new_player.uid}\n"
             f"⚧️ 性别  : {new_player.sex.value}\n"
             "━━━━━━━━━━━━━\n"
+            "🔰 新手必读 - 指令格式说明：\n"
+            "💡 【】括号里的才是指令，外面是指令说明！\n"
+            "💡 括号不要一起发出来，有的空格不能少！\n"
+            "💡 例如'加点 力 5'表示给力量属性加5点\n"
+            "━━━━━━━━━━━━━\n"
             "⬇️ 【修炼】割下第一缕血丝\n"
             "⬇️ 【面板】窥视自己的残骸\n"
             "⬇️ 【改性别 女】女孩子？\n"
             "⬇️ 【签到】领取新手礼包\n"
-            "💡 注意【】括号里的才是指令，外面是指令说明！！！\n"
+            "⬇️ 【新手指引】还不会用指令？\n"
             "💡 更多指令请输入【帮助】"
         )
         return content
@@ -425,3 +431,50 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
             f"👤 {player.nickname}[UID:{player.uid}]",
             event
         ))
+
+
+@newbie_guide.handle()
+async def _(event: MessageEvent):
+    """新手指引 - 教会新手如何正确使用指令格式"""
+
+    # 检查是否已有角色
+    async with safe_session() as session:
+        player = await session.get(Player, event.get_user_id())
+        if not player:
+            await newbie_guide.finish("⛔ 请先创建角色，发送【注册】开始游戏")
+
+    content = (
+        "🔰 新手指引 - 指令格式详解\n"
+        "━━━━━━━━━━━━━━━━━━━\n"
+        "📖 基础知识：\n"
+        "• 【】方括号里的是指令名称\n"
+        "• <> 尖括号表示必填参数\n"
+        "• [] 方括号表示选填参数\n"
+        "• 指令和参数之间用空格分隔\n"
+        "\n"
+        "🎯 常见错误示例：\n"
+        "❌ 加点运5 (缺少空格)\n"
+        "❌ 加点［属性］［点数］加点运5 (照抄帮助格式)\n"
+        "❌ 加点[属性运][点数5] (照抄帮助格式)\n"
+        "❌ 【加点 运 5】(不要输入方括号)\n"
+        "\n"
+        "✅ 正确示例：\n"
+        "✅ 加点 运 5 (给运气加5点)\n"
+        "✅ 加点 力 3 (给力量加3点)\n"
+        "✅ 面板 560 (查看UID为560的玩家)\n"
+        "✅ 面板 (查看自己的面板)\n"
+        "\n"
+        "🎮 实战练习：\n"
+        "现在试试发送：加点 运 1\n"
+        "如果你有属性点的话，这会给你的运气+1\n"
+        "\n"
+        "💡 记住：看到帮助文档中的【指令 <参数>】格式时\n"
+        "只需要输入：指令 参数值 (中间用空格分开)\n"
+        "\n"
+        "🆘 如果还是不会，可以：\n"
+        "• 发送【修炼系统】查看修炼相关指令\n"
+        "• 发送【帮助】查看所有系统\n"
+        "• 加入官群：962494679 询问其他玩家"
+    )
+
+    await newbie_guide.finish(message_add_head(content, event))

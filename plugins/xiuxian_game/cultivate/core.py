@@ -493,9 +493,35 @@ ATTRIBUTE_MAP = {
 @assign_points.handle()
 async def handle_assign(event: MessageEvent, args: Message = CommandArg()):
     """分配属性点"""
-    params = args.extract_plain_text().strip().split()
+    user_input = args.extract_plain_text().strip()
+    params = user_input.split()
+
     if len(params) != 2:
-        await assign_points.finish("指令说明：加点 [属性] [点数]\n例：加点 力 5\n可选属性：体/智/力/敏/防/运")
+        # 检测常见的新手错误输入
+        error_msg = "⛔ 加点指令格式错误！\n\n"
+
+        if not user_input:
+            error_msg += "🎯 正确格式：加点 属性 点数\n"
+        elif len(params) == 1:
+            # 可能是连在一起写的，如"运5"
+            if any(char.isdigit() for char in params[0]):
+                error_msg += "💡 检测到你可能把属性和点数连在一起了\n"
+                error_msg += f"❌ 你输入的：{user_input}\n"
+                error_msg += "✅ 正确格式：加点 运 5 (中间要有空格)\n"
+            else:
+                error_msg += f"❌ 你输入的：{user_input}\n"
+                error_msg += "✅ 正确格式：加点 运 5 (缺少点数)\n"
+        elif len(params) > 2:
+            error_msg += f"❌ 你输入的：{user_input}\n"
+            error_msg += "✅ 正确格式：加点 运 5 (参数太多了)\n"
+
+        error_msg += "\n📖 使用说明：\n"
+        error_msg += "• 格式：加点 属性 点数\n"
+        error_msg += "• 例子：加点 力 5 (给力量加5点)\n"
+        error_msg += "• 可选属性：体/智/力/敏/防/运\n"
+        error_msg += "\n💡 发送【新手指引】学习指令格式"
+
+        await assign_points.finish(error_msg)
     
     attr_name, points = params
     try:
@@ -503,7 +529,14 @@ async def handle_assign(event: MessageEvent, args: Message = CommandArg()):
         if points <= 0:
             raise ValueError
     except ValueError:
-        await assign_points.finish("⛔ 点数必须为正整数")
+        error_msg = f"⛔ 点数格式错误！\n\n"
+        error_msg += f"❌ 你输入的点数：{params[1]}\n"
+        error_msg += f"✅ 点数必须是正整数（1, 2, 3...）\n\n"
+        error_msg += f"💡 正确例子：\n"
+        error_msg += f"• 加点 运 1 (加1点)\n"
+        error_msg += f"• 加点 力 10 (加10点)\n"
+        error_msg += f"• 加点 体 5 (加5点)"
+        await assign_points.finish(error_msg)
 
     async with safe_session() as session:
         player = await session.get(Player, event.get_user_id())
@@ -511,7 +544,19 @@ async def handle_assign(event: MessageEvent, args: Message = CommandArg()):
             await assign_points.finish("⛔ 请先创建角色")
         
         if attr_name not in ATTRIBUTE_MAP:
-            await assign_points.finish(f"⛔ 无效属性，可用属性：{'/'.join(ATTRIBUTE_MAP.keys())}")
+            # 提供更友好的属性错误提示
+            error_msg = f"⛔ 属性名称错误！\n\n"
+            error_msg += f"❌ 你输入的属性：{attr_name}\n"
+            error_msg += f"✅ 可用属性：{'/'.join(ATTRIBUTE_MAP.keys())}\n\n"
+            error_msg += "📖 属性说明：\n"
+            error_msg += "• 体 = 生命值上限\n"
+            error_msg += "• 智 = 理智值上限\n"
+            error_msg += "• 力 = 攻击力\n"
+            error_msg += "• 敏 = 敏捷度\n"
+            error_msg += "• 防 = 防御力\n"
+            error_msg += "• 运 = 幸运值\n\n"
+            error_msg += "💡 例子：加点 运 5 (给幸运值加5点)"
+            await assign_points.finish(error_msg)
         
         if player.attribute_points < points:
             await assign_points.finish(f"💢 属性点不足！当前剩余：{player.attribute_points}✨")
