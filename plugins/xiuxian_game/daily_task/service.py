@@ -395,12 +395,13 @@ class DailyTaskService:
             player.gold += task.gold_reward
             rewards_given["gold"] = task.gold_reward
         
-        # 公会积分奖励（只有加入公会的玩家才能获得）
-        if task.guild_points_reward > 0 and player.guild_id:
+        # 积分奖励（无论是否有公会都给予）
+        if task.guild_points_reward > 0:
             player.gold2 += task.guild_points_reward
             rewards_given["guild_points"] = task.guild_points_reward
 
-            # 添加公会经验奖励（基于任务类型给予不同的公会经验）
+        # 公会经验奖励（只有加入公会的玩家才能获得）
+        if task.guild_points_reward > 0 and player.guild_id:
             from ..guild.guild_economy_service import GuildEconomyService
             base_guild_exp = DailyTaskService._calculate_guild_exp_reward(task.task_type, task.enemy_level)
             guild_exp_gained = await GuildEconomyService.add_guild_experience(

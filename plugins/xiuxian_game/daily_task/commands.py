@@ -52,7 +52,7 @@ async def handle_daily_task(event: MessageEvent):
         lines.append(f"{status_emoji} 【{task.title}】")
         lines.append(f"📍 目标位置：{task.location_str}")
         lines.append(f"👹 目标敌人：{task.enemy_name} Lv.{task.enemy_level}")
-        lines.append(f"💰 任务奖励：{task.get_reward_summary()}")
+        lines.append(f"💰 任务奖励：{task.get_reward_summary(bool(player.guild_id))}")
         lines.append(f"📊 任务状态：{status_text}")
         lines.append("")
         
@@ -105,7 +105,7 @@ async def handle_accept_task(event: MessageEvent):
                 f"📋 任务：{task.title}\n"
                 f"📍 目标：{task.location_str}\n"
                 f"👹 敌人：{task.enemy_name} Lv.{task.enemy_level}\n"
-                f"💰 奖励：{task.get_reward_summary()}\n"
+                f"💰 奖励：{task.get_reward_summary(bool(player.guild_id))}\n"
                 f"━━━━━━━━━━━━━\n"
                 f"💡 请前往目标位置，使用【完成任务】与敌人战斗"
             )
@@ -176,7 +176,7 @@ async def handle_complete_task(event: MessageEvent):
                 if "gold" in rewards:
                     reward_lines.append(f"金币+{rewards['gold']}")
                 if "guild_points" in rewards:
-                    reward_lines.append(f"公会积分+{rewards['guild_points']}")
+                    reward_lines.append(f"积分+{rewards['guild_points']}")
                 if "guild_exp" in rewards:
                     reward_lines.append(f"公会经验+{rewards['guild_exp']}")
                 
@@ -255,6 +255,6 @@ async def handle_task_stats(event: MessageEvent):
             lines.append("📋 今日任务：尚未生成")
         
         lines.append("")
-        lines.append("💡 每日完成委托可获得经验、金币和公会积分奖励")
+        lines.append("💡 每日完成委托可获得经验、金币和积分奖励，有公会还可获得公会经验")
         
         await task_stats_cmd.finish(message_add_head("\n".join(lines), event))

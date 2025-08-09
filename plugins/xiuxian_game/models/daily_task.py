@@ -115,14 +115,22 @@ class DailyTask(Base):
             "agility": self.enemy_agility
         }
     
-    def get_reward_summary(self) -> str:
-        """获取奖励摘要"""
+    def get_reward_summary(self, has_guild: bool = None) -> str:
+        """获取奖励摘要
+
+        Args:
+            has_guild: 玩家是否有公会，如果为None则显示通用信息
+        """
         rewards = []
         if self.exp_reward > 0:
             rewards.append(f"经验+{self.exp_reward}")
         if self.gold_reward > 0:
             rewards.append(f"金币+{self.gold_reward}")
         if self.guild_points_reward > 0:
-            rewards.append(f"公会积分+{self.guild_points_reward}")
-            rewards.append("公会经验+额外")  # 公会经验是动态计算的
+            rewards.append(f"积分+{self.guild_points_reward}")
+            # 只有有公会的玩家才显示公会经验
+            if has_guild is True:
+                rewards.append("公会经验+额外")  # 公会经验是动态计算的
+            elif has_guild is None:
+                rewards.append("公会经验+额外(需加入公会)")  # 通用显示
         return " ".join(rewards) if rewards else "无奖励"
