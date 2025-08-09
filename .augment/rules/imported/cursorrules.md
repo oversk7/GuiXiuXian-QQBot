@@ -12,5 +12,5 @@ type: "always_apply"
 6. event.get_session_id()在私聊时为friend_<userId>，在群聊时为group_<groupId>_<userId>，可判断是否私聊
 7. event的msg_id大概三分钟就过期，不能再回复触发者，所以这样发: bot.send(latest_event,message)
 8. 代码结构需要易懂容易维护，不要只为了炫技
-9. 作为文字游戏，输出内容需要注意美观，有良好的交互体验，可以利用emoji排版
+9. 作为文字游戏，输出内容需要注意美观，有良好的交互体验，可以利用emoji排版，所有分割线均使用这个长度“━━━━━━━━━━━━━”
 10. 更新指令后需要及时同步到help文件中
