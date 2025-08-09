@@ -338,7 +338,15 @@ async def handle_dissolve_guild(event: MessageEvent):
 member_list_cmd = on_command("公会成员", aliases={"成员列表"}, block=True, priority=5)
 
 @member_list_cmd.handle()
-async def handle_member_list(event: MessageEvent):
+async def handle_member_list(event: MessageEvent, args: Message = CommandArg()):
+    page_size = 20
+    arg = args.extract_plain_text().strip()
+    try:
+        page = int(arg) if arg else 1
+    except ValueError:
+        page = 1
+    page = max(1, page)
+
     async with safe_session() as session:
         player = await session.get(Player, event.get_user_id())
         if not player or player.guild_id is None:
@@ -348,10 +356,23 @@ async def handle_member_list(event: MessageEvent):
             await member_list_cmd.finish("⚠️ 公会数据异常")
 
         # 使用新的公会服务获取成员列表
-        members = await GuildService.get_guild_members(session, guild_obj.id)
+        all_members = await GuildService.get_guild_members(session, guild_obj.id)
 
-        lines = [f"👥 公会成员『{guild_obj.name}』({len(members)}人)", "━━━━━━━━━━"]
-        for idx, member in enumerate(members, 1):
+        # 计算分页
+        total_members = len(all_members)
+        if total_members == 0:
+            await member_list_cmd.finish("⛔ 公会暂无成员")
+
+        total_pages = (total_members - 1) // page_size + 1
+        page = min(page, total_pages)
+
+        # 获取当前页的成员
+        start_idx = (page - 1) * page_size
+        end_idx = start_idx + page_size
+        members = all_members[start_idx:end_idx]
+
+        lines = [f"👥 公会成员『{guild_obj.name}』({total_members}人) 第{page}/{total_pages}页", "━━━━━━━━━━━━━"]
+        for idx, member in enumerate(members, start_idx + 1):
             # 职位图标
             position_icons = {
                 GuildPosition.PRESIDENT: "👑",
@@ -367,6 +388,11 @@ async def handle_member_list(event: MessageEvent):
                 f"{member['position_name']} "
                 f"贡:{GuildEconomyService.format_large_number(member['contribution'])}"
             )
+
+        # 添加分页提示
+        if total_pages > 1:
+            lines.append("━━━━━━━━━━━━━")
+            lines.append(f"💡 使用「公会成员 页码」查看其他页面")
 
         await member_list_cmd.finish(message_add_head("\n".join(lines), event))
 
