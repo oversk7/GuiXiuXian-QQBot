@@ -10,8 +10,13 @@ from nonebot import on_command, on_regex
 from nonebot.adapters.qq import MessageEvent, Message, MessageSegment
 from nonebot.params import CommandArg
 from typing import Tuple, Dict
-from datetime import datetime, date
+from datetime import datetime, date, timedelta
 import random
+import base64
+import io
+import os
+from pathlib import Path
+from PIL import Image, ImageDraw
 
 from sqlalchemy import select, func
 from ..models.db import safe_session, retry_session
@@ -21,23 +26,16 @@ from ..models.world_tile import WorldTile
 from ..models.monthly_card import get_player_card_benefits
 from ..config import config
 from ..utils import message_add_head, luck_prob, check_action_limit, record_action
-from io import BytesIO
-import base64
-from PIL import Image, ImageDraw, ImageFont
-from pathlib import Path
-import os
-from sqlalchemy import select as _select
-from ..models.inventory import ItemInstance as _Equip
 
 
 async def check_equipment_durability(session, player_id: str) -> str:
     """检查玩家装备耐久度，如果有装备耐久度低于10，返回提醒消息"""
     # 查询玩家所有已装备的装备
     result_eq = await session.execute(
-        _select(_Equip).where(
-            _Equip.player_id == player_id,
-            _Equip.equipped == True,
-            _Equip.item_id.in_(config.items_config["by_type"]["EQUIPMENT"])
+        select(ItemInstance).where(
+            ItemInstance.player_id == player_id,
+            ItemInstance.equipped == True,
+            ItemInstance.item_id.in_(config.items_config["by_type"]["EQUIPMENT"])
         )
     )
     equipped_items = result_eq.scalars().all()
@@ -906,4 +904,197 @@ async def handle_teleport_list(event: MessageEvent):
         )
 
         await teleport_list.finish(message_add_head(msg, event))
-        
+
+
+# ==================== 诡域探索概览图片生成 ====================
+region_overview_cmd = on_command("俯瞰", aliases={"感知"}, block=True, priority=5)
+
+
+async def generate_region_overview_image(region: str, session) -> bytes:
+    """生成指定诡域的今日探索概览图片"""
+    today = date.today()
+
+    # 获取今日该诡域的所有格子数据
+    from sqlalchemy import and_
+
+    # 计算今日的开始和结束时间
+    today_start = datetime.combine(today, datetime.min.time())
+    tomorrow_start = today_start + timedelta(days=1)
+
+    stmt = select(WorldTile).where(
+        and_(
+            WorldTile.region == region,
+            WorldTile.refreshed_at >= today_start,
+            WorldTile.refreshed_at < tomorrow_start
+        )
+    )
+    result = await session.execute(stmt)
+    tiles = result.scalars().all()
+
+    if not tiles:
+        # 如果没有数据，生成一个空的概览图
+        tiles = []
+
+    # 计算坐标范围
+    if tiles:
+        min_x = min(tile.x for tile in tiles)
+        max_x = max(tile.x for tile in tiles)
+        min_y = min(tile.y for tile in tiles)
+        max_y = max(tile.y for tile in tiles)
+
+        # 扩展范围以显示更多区域
+        range_x = max_x - min_x + 1
+        range_y = max_y - min_y + 1
+
+        # 确保最小显示范围
+        if range_x < 20:
+            center_x = (min_x + max_x) // 2
+            min_x = center_x - 10
+            max_x = center_x + 10
+        if range_y < 20:
+            center_y = (min_y + max_y) // 2
+            min_y = center_y - 10
+            max_y = center_y + 10
+    else:
+        # 默认显示范围
+        min_x, max_x = -10, 10
+        min_y, max_y = -10, 10
+
+    # 创建图片
+    img_width = 1000
+    img_height = 1000
+    img = Image.new('RGB', (img_width, img_height), color='#1a1a1a')  # 深色背景
+    draw = ImageDraw.Draw(img)
+
+    # 计算格子大小
+    grid_width = max_x - min_x + 1
+    grid_height = max_y - min_y + 1
+    cell_width = img_width // grid_width
+    cell_height = img_height // grid_height
+
+    # 事件类型颜色映射
+    event_colors = {
+        'MATERIAL': '#4CAF50',    # 绿色 - 材料
+        'TREASURE': '#FFD700',    # 金色 - 宝藏
+        'EMPTY': '#F44336',       # 红色 - 怪物
+        'REST': '#2196F3',        # 蓝色 - 休息点
+        'MERCHANT': '#9C27B0',    # 紫色 - 商人
+        'ELITE': '#FF5722',       # 深橙色 - 精英怪
+    }
+
+    # 创建格子坐标到tile的映射
+    tile_map = {(tile.x, tile.y): tile for tile in tiles}
+
+    # 绘制格子
+    for grid_x in range(grid_width):
+        for grid_y in range(grid_height):
+            world_x = min_x + grid_x
+            world_y = min_y + grid_y
+
+            # 计算像素坐标
+            pixel_x = grid_x * cell_width
+            pixel_y = grid_y * cell_height
+
+            tile = tile_map.get((world_x, world_y))
+
+            if tile:
+                # 根据事件类型选择颜色
+                color = event_colors.get(tile.event_type, '#666666')
+
+                # 检查是否已被探索/消耗
+                is_consumed = False
+                if tile.event_type == 'MATERIAL':
+                    is_consumed = bool(tile.state.get('looted_by')) or tile.state.get('looted', False)
+                elif tile.event_type == 'TREASURE':
+                    is_consumed = tile.state.get('looted', False)
+                elif tile.event_type == 'EMPTY':
+                    is_consumed = bool(tile.state.get('defeated_by'))
+                elif tile.event_type == 'MERCHANT':
+                    is_consumed = bool(tile.state.get('visited_by'))
+                elif tile.event_type == 'ELITE':
+                    is_consumed = bool(tile.state.get('defeated_by'))
+
+                # 如果已被消耗，使用暗色
+                if is_consumed:
+                    # 将颜色变暗
+                    r = int(color[1:3], 16) // 3
+                    g = int(color[3:5], 16) // 3
+                    b = int(color[5:7], 16) // 3
+                    color = f'#{r:02x}{g:02x}{b:02x}'
+
+            else:
+                # 未探索的区域使用深灰色
+                color = '#333333'
+
+            # 绘制格子
+            draw.rectangle([
+                pixel_x, pixel_y,
+                pixel_x + cell_width - 1, pixel_y + cell_height - 1
+            ], fill=color, outline='#555555')
+
+    # 将图片转换为字节流
+    img_buffer = io.BytesIO()
+    img.save(img_buffer, format='PNG')
+    img_buffer.seek(0)
+    return img_buffer.getvalue()
+
+
+@region_overview_cmd.handle()
+async def handle_region_overview(event: MessageEvent, args: Message = CommandArg()):
+    """生成诡域探索概览图片"""
+    async with safe_session() as session:
+        player = await session.get(Player, event.get_user_id())
+        if not player:
+            await region_overview_cmd.finish("⛔ 请先创建角色")
+
+        # 获取参数
+        arg_text = args.extract_plain_text().strip()
+
+        # 如果没有指定诡域，使用当前诡域
+        if not arg_text:
+            if player.region == "大都会":
+                await region_overview_cmd.finish("⛔ 请指定要查看的诡域名称，或先传送到诡域中")
+            region = player.region
+        else:
+            region = arg_text
+            # 检查诡域是否存在
+            if region not in config.map_config["regions"]:
+                await region_overview_cmd.finish("⛔ 未知的诡域名称")
+
+        try:
+            # 生成概览图片
+            img_data = await generate_region_overview_image(region, session)
+
+            # 转换为base64
+            img_b64 = base64.b64encode(img_data).decode('utf-8')
+
+            # 构建消息
+            region_config = config.map_config["regions"].get(region, {})
+            tier = region_config.get("tier", 1)
+            level_range = region_config.get("level_range", [1, 1])
+
+            msg_text = (
+                f"🗺️ {region} 今日探索概览\n"
+                f"━━━━━━━━━━━━━\n"
+                f"📊 诡域等级：Tier {tier}\n"
+                f"⚔️ 怪物等级：{level_range[0]}-{level_range[1]}级\n"
+                f"━━━━━━━━━━━━━\n"
+                f"🟢 绿色：材料格子\n"
+                f"🟡 金色：宝藏格子\n"
+                f"🔴 红色：怪物格子\n"
+                f"🔵 蓝色：休息格子\n"
+                f"🟣 紫色：商人格子\n"
+                f"🟠 橙色：精英怪格子\n"
+                f"⚫ 暗色：已探索/消耗\n"
+                f"⬛ 灰色：未探索区域"
+            )
+
+            # 发送图片和文字
+            img_segment = MessageSegment.file_image(img_b64)
+            message = Message(msg_text).append(img_segment)
+
+            await region_overview_cmd.finish(message_add_head(message, event))
+
+        except ValueError as e:
+            await region_overview_cmd.finish(f"⛔ 生成概览图片失败：{str(e)}")
+
