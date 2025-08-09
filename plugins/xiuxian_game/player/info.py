@@ -97,6 +97,7 @@ profile = on_command("角色",aliases={"面板","状态"}, block=True, priority=
 register = on_command("注册", block=True, priority=5)
 change_gender = on_command("改性别", aliases={"修改性别"}, block=True, priority=5)
 newbie_guide = on_command("新手指引", aliases={"指令格式", "指令帮助", "新手教程"}, block=True, priority=5)
+attribute_guide = on_command("加点帮助", aliases={"属性帮助", "加点指南", "属性指南"}, block=True, priority=5)
 
 
 @profile.handle()
@@ -391,6 +392,7 @@ async def create_player(event: MessageEvent, nickname: str, gender: Gender) -> s
             "━━━━━━━━━━━━━\n"
             "⬇️ 【修炼】割下第一缕血丝\n"
             "⬇️ 【面板】窥视自己的残骸\n"
+            "⬇️ 【加点帮助】了解属性加点\n"
             "⬇️ 【改性别 女】女孩子？\n"
             "⬇️ 【签到】领取新手礼包\n"
             "⬇️ 【新手指引】还不会用指令？\n"
@@ -465,16 +467,85 @@ async def _(event: MessageEvent):
         "✅ 面板 (查看自己的面板)\n"
         "\n"
         "🎮 实战练习：\n"
-        "现在试试发送：加点 运 1\n"
-        "如果你有属性点的话，这会给你的运气+1\n"
+        "现在试试发送：加点 智 1\n"
+        "如果你有属性点的话，这会给你的理智+1\n"
         "\n"
         "💡 记住：看到帮助文档中的【指令 <参数>】格式时\n"
         "只需要输入：指令 参数值 (中间用空格分开)\n"
         "\n"
         "🆘 如果还是不会，可以：\n"
+        "• 发送【加点帮助】查看属性加点指南\n"
         "• 发送【修炼系统】查看修炼相关指令\n"
         "• 发送【帮助】查看所有系统\n"
         "• 加入官群：962494679 询问其他玩家"
     )
 
     await newbie_guide.finish(message_add_head(content, event))
+
+
+@attribute_guide.handle()
+async def _(event: MessageEvent):
+    """加点帮助 - 详细说明各个属性的作用和推荐加点方案"""
+
+    # 检查是否已有角色
+    async with safe_session() as session:
+        player = await session.get(Player, event.get_user_id())
+        if not player:
+            await attribute_guide.finish("⛔ 请先创建角色，发送【注册】开始游戏")
+
+    content = (
+        "🔮 加点帮助 - 属性详解与推荐\n"
+        "━━━━━━━━━━━━━\n"
+        "📊 基础属性说明：\n"
+        "\n"
+        "🩸 体力 (体)：\n"
+        "• 作用：增加生命值上限\n"
+        "• 每点+1生命值上限\n"
+        "• 重要性：★★★★☆\n"
+        "• 适合：新手、坦克流、生存流\n"
+        "\n"
+        "🧠 理智 (智)：\n"
+        "• 作用：增加理智值上限\n"
+        "• 每点+1理智值上限\n"
+        "• 重要性：★★★★★\n"
+        "• 适合：探索流、副本流\n"
+        "• 说明：理智用于诡域探索移动，讨伐世界boss\n"
+        "\n"
+        "⚔️ 力量 (力)：\n"
+        "• 作用：增加攻击力\n"
+        "• 每点+1攻击力\n"
+        "• 重要性：★★★★☆\n"
+        "• 适合：输出流、PVP流、刷怪流\n"
+        "• 说明：战斗核心属性，影响伤害\n"
+        "\n"
+        "🛡️ 防御 (防)：\n"
+        "• 作用：减少受到的伤害\n"
+        "• 每点+1防御力\n"
+        "• 重要性：★★★☆☆\n"
+        "• 适合：坦克流、生存流\n"
+        "• 说明：防御越高，免伤率越高\n"
+        "\n"
+        "👟 敏捷 (敏)：\n"
+        "• 作用：影响移动速度和战斗顺序\n"
+        "• 每点+1敏捷度\n"
+        "• 重要性：★★★★☆\n"
+        "• 适合：跑商流、探索流\n"
+        "• 说明：影响导航速度和先后手，与闪避无关\n"
+        "\n"
+        "🍀 运气 (运)：\n"
+        "• 作用：影响发现材料时的翻倍率，签到奖励翻倍率\n"
+        "• 每点+1运气值\n"
+        "• 重要性：★\n"
+        "• 适合：所有流派\n"
+        "• 说明：影响收益，前期不推荐\n"
+        "\n"
+        "━━━━━━━━━━━━━\n"
+        "🎮 相关指令：\n"
+        "• 【加点 智 5】- 给力量加5点\n"
+        "• 【面板】- 查看当前属性\n"
+        "• 【战力】- 查看详细战斗属性\n"
+        "\n"
+        "🆘 需要帮助？发送【新手指引】学习指令格式"
+    )
+
+    await attribute_guide.finish(message_add_head(content, event))

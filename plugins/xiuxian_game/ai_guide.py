@@ -692,9 +692,6 @@ async def handle_admin_database_query(user_message: str, event):
         await ai_guide.finish(message_add_head("🌐 网络连接失败，请稍后重试", event))
     except ValueError as e:
         await ai_guide.finish(message_add_head(f"❌ 操作执行失败：{str(e)}", event))
-    except Exception as e:
-        print(f"管理员查询处理异常: {e}")
-        await ai_guide.finish(message_add_head("❌ 系统处理异常，请稍后重试", event))
 
 # 预先格式化的AI指令知识库字符串常量 - 避免每次调用时重新拼接
 AI_COMMANDS_TEXT = """
@@ -725,6 +722,7 @@ AI_COMMANDS_TEXT = """
   【突破 [镇厄|棺材钉]】 突破境界，可消耗怨念或者棺材钉来确保成功
   【冥返】 300级满级后，成为一转高手，从零开始，但每级获得更多属性点，修炼效率增加
   【加点】 分配突破获得的属性点，增强实力
+  【加点帮助】 查看属性详解和推荐加点方案
   【献祭】 献祭材料以获取怨念值，用于为突破护航
 
 背包系统：

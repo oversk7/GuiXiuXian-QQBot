@@ -543,7 +543,8 @@ async def handle_assign(event: MessageEvent, args: Message = CommandArg()):
         error_msg += "• 格式：加点 属性 点数\n"
         error_msg += "• 例子：加点 力 5 (给力量加5点)\n"
         error_msg += "• 可选属性：体/智/力/敏/防/运\n"
-        error_msg += "\n💡 发送【新手指引】学习指令格式"
+        error_msg += "\n💡 发送【加点帮助】查看属性详解\n"
+        error_msg += "💡 发送【新手指引】学习指令格式"
 
         await assign_points.finish(error_msg)
     
@@ -579,7 +580,8 @@ async def handle_assign(event: MessageEvent, args: Message = CommandArg()):
             error_msg += "• 敏 = 敏捷度\n"
             error_msg += "• 防 = 防御力\n"
             error_msg += "• 运 = 幸运值\n\n"
-            error_msg += "💡 例子：加点 运 5 (给幸运值加5点)"
+            error_msg += "💡 例子：加点 运 5 (给幸运值加5点)\n"
+            error_msg += "💡 发送【加点帮助】查看详细属性指南"
             await assign_points.finish(error_msg)
         
         if player.attribute_points < points:
@@ -681,4 +683,9 @@ async def handle_assign(event: MessageEvent, args: Message = CommandArg()):
         )
         if attr_name == '运':
             msg += "\n⬇️ 【幸运榜】查看运气排名"
+
+        # 如果还有属性点，提示查看加点帮助
+        if player.attribute_points > 0:
+            msg += "\n💡 【加点帮助】查看属性指南"
+
         await assign_points.finish(message_add_head(msg, event))

@@ -93,6 +93,10 @@ async def handle_battle_detail(event: MessageEvent, args: Message = CommandArg()
         "",
         "🗡️ 穿透率",
         "• 无视敌方防御的比例",
+        "",
+        "━━━━━━━━━━━━━",
+        "💡 想了解基础属性加点？发送【加点帮助】",
+        "💡 查看当前战斗属性？发送【战力】"
     ]
-    
+
     await battle_detail.send(event, "\n".join(detail_info))
