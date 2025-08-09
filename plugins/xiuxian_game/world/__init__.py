@@ -93,11 +93,7 @@ def get_region_materials(region: str) -> dict:
 def calculate_monster_attributes(monster_level: int, is_elite: bool = False) -> dict:
     """
     计算怪物属性，适配实际玩家水平
-    目标：同等级玩家能连续刷5个同等级小怪而不需要治疗药
-
-    基于196级玩家反馈调整：
-    - 生命2125，攻击1256，防御854（60%免伤）
-    - 目标：怪物攻击造成约100-150伤害，玩家能连续打5个不死
+    目标：同等级玩家能连续刷10个同等级小怪而不需要治疗药
     """
     import random
 
@@ -105,8 +101,8 @@ def calculate_monster_attributes(monster_level: int, is_elite: bool = False) -> 
     if monster_level <= 50:
         # 前期线性增长（1-50级）
         base_hp = 1.2 * monster_level + 15
-        base_attack = 0.6 * monster_level + 10
-        base_agility = 0.5 * monster_level + 8
+        base_attack = 0.6 * monster_level + 2
+        base_agility = 0.5 * monster_level
     elif monster_level <= 100:
         # 中期增长（51-100级）
         base_hp = 1.5 * monster_level + 40
