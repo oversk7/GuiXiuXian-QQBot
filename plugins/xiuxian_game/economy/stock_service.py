@@ -84,7 +84,7 @@ class StockService:
             stmt = select(Stock).where(Stock.symbol == stock_symbol, Stock.is_active == True)
             stock = (await session.execute(stmt)).scalars().first()
             if not stock:
-                return False, f"灵石项目 {stock_symbol} 不存在或已停止投资"
+                return False, f"气运项目 {stock_symbol} 不存在或已停止投资"
             
             # 验证交易数量
             if shares <= 0:
@@ -152,7 +152,7 @@ class StockService:
             stmt = select(Stock).where(Stock.symbol == stock_symbol, Stock.is_active == True)
             stock = (await session.execute(stmt)).scalars().first()
             if not stock:
-                return False, f"灵石项目 {stock_symbol} 不存在或已停止投资"
+                return False, f"气运项目 {stock_symbol} 不存在或已停止投资"
             
             # 获取持仓信息
             holding_stmt = select(StockHolding).where(

@@ -21,22 +21,22 @@ from ..utils import message_add_head
 from .stock_service import StockService
 
 
-# 灵石投资相关命令
-stock_list_cmd = on_command("灵石行情", aliases={"投资行情", "灵石市场"}, block=True, priority=5)
-stock_buy_cmd = on_command("投资灵石", aliases={"购买灵石"}, block=True, priority=5)
-stock_sell_cmd = on_command("出售灵石", aliases={"卖出灵石"}, block=True, priority=5)
-stock_holdings_cmd = on_command("我的投资", aliases={"灵石持有", "投资持仓"}, block=True, priority=5)
-stock_transactions_cmd = on_command("投资记录", aliases={"灵石记录"}, block=True, priority=5)
-stock_refresh_time_cmd = on_command("灵石刷新时间", aliases={"投资刷新时间", "价格刷新时间"}, block=True, priority=5)
-stock_history_cmd = on_command("灵石历史", aliases={"价格历史"}, block=True, priority=5)
-stock_analysis_cmd = on_command("灵石分析", aliases={"投资分析"}, block=True, priority=5)
-stock_init_cmd = on_command("初始化灵石", block=True, priority=5, permission=SUPERUSER)
-stock_update_cmd = on_command("更新灵石价格", aliases={"刷新灵石价格"}, block=True, priority=5, permission=SUPERUSER)
+# 气运投资相关命令
+stock_list_cmd = on_command("气运行情", aliases={"投资行情", "灵石行情"}, block=True, priority=5)
+stock_buy_cmd = on_command("投资气运", aliases={"投资灵石"}, block=True, priority=5)
+stock_sell_cmd = on_command("出售气运", aliases={"出售灵石"}, block=True, priority=5)
+stock_holdings_cmd = on_command("我的投资", aliases={"我的气运"}, block=True, priority=5)
+stock_transactions_cmd = on_command("投资记录", aliases={"气运记录"}, block=True, priority=5)
+stock_refresh_time_cmd = on_command("气运刷新时间", aliases={"投资刷新时间", "价格刷新时间"}, block=True, priority=5)
+stock_history_cmd = on_command("气运历史", aliases={"价格历史"}, block=True, priority=5)
+stock_analysis_cmd = on_command("气运分析", aliases={"投资分析"}, block=True, priority=5)
+stock_init_cmd = on_command("初始化气运", block=True, priority=5, permission=SUPERUSER)
+stock_update_cmd = on_command("更新气运价格", aliases={"刷新气运价格"}, block=True, priority=5, permission=SUPERUSER)
 
 
 @stock_list_cmd.handle()
 async def handle_stock_list(event: MessageEvent):
-    """查看灵石投资行情"""
+    """查看气运投资行情"""
     # 被动触发价格更新
     price_updated = await StockService.check_and_update_prices()
 
@@ -50,7 +50,7 @@ async def handle_stock_list(event: MessageEvent):
         stocks = (await session.execute(stmt)).scalars().all()
 
         if not stocks:
-            await stock_list_cmd.finish("💎 当前没有可投资的灵石")
+            await stock_list_cmd.finish("💎 当前没有可投资的气运")
 
         # 按类型分组显示
         type_groups = {}
@@ -60,7 +60,7 @@ async def handle_stock_list(event: MessageEvent):
             type_groups[stock.stock_type].append(stock)
 
         # 构建消息
-        lines = ["💎 灵石投资行情", "▃▃▃▃▃▃▃▃▃▃"]
+        lines = ["💎 气运投资行情", "▃▃▃▃▃▃▃▃▃▃"]
 
         # 计算下次刷新时间
         latest_stock = max(stocks, key=lambda s: s.updated_at)
@@ -84,12 +84,12 @@ async def handle_stock_list(event: MessageEvent):
         lines.append("")
         
         type_names = {
-            StockType.TECH: "🔬 法宝灵石",
-            StockType.FINANCE: "🏦 金融灵石",
-            StockType.ENERGY: "⚡ 灵气灵石",
-            StockType.CONSUMER: "🛒 丹药灵石",
-            StockType.HEALTHCARE: "🏥 医道灵石",
-            StockType.MATERIALS: "🏗️ 材料灵石"
+            StockType.TECH: "🔬 法宝气运",
+            StockType.FINANCE: "🏦 金融气运",
+            StockType.ENERGY: "⚡ 灵气气运",
+            StockType.CONSUMER: "🛒 丹药气运",
+            StockType.HEALTHCARE: "🏥 医道气运",
+            StockType.MATERIALS: "🏗️ 材料气运"
         }
         
         for stock_type, stocks_in_type in type_groups.items():
@@ -104,22 +104,22 @@ async def handle_stock_list(event: MessageEvent):
                     f"  💰 {stock.current_price} 金币 {change_symbol}"
                 )
         
-        lines.append("\n💡 使用「投资灵石 代码 数量」进行投资")
-        lines.append("💡 使用「投资灵石 代码 数量 银行」从银行账户扣款")
+        lines.append("\n💡 使用「投资气运 代码 数量」进行投资")
+        lines.append("💡 使用「投资气运 代码 数量 银行」从银行账户扣款")
         
         await stock_list_cmd.finish(message_add_head("\n".join(lines), event))
 
 
 @stock_buy_cmd.handle()
 async def handle_stock_buy(event: MessageEvent, args: Message = CommandArg()):
-    """投资灵石"""
+    """投资气运"""
     args_text = args.extract_plain_text().strip()
     if not args_text:
-        await stock_buy_cmd.finish("⛔ 格式：投资灵石 <灵石代码> <数量> [银行]")
+        await stock_buy_cmd.finish("⛔ 格式：投资气运 <气运代码> <数量> [银行]")
 
     parts = args_text.split()
     if len(parts) < 2:
-        await stock_buy_cmd.finish("⛔ 格式：投资灵石 <灵石代码> <数量> [银行]")
+        await stock_buy_cmd.finish("⛔ 格式：投资气运 <气运代码> <数量> [银行]")
     
     symbol = parts[0].upper()
     try:
@@ -127,7 +127,7 @@ async def handle_stock_buy(event: MessageEvent, args: Message = CommandArg()):
         if shares <= 0:
             raise ValueError
     except ValueError:
-        await stock_buy_cmd.finish("⛔ 灵石数量必须为正整数")
+        await stock_buy_cmd.finish("⛔ 气运数量必须为正整数")
     
     use_bank = len(parts) > 2 and parts[2] in ["银行", "bank"]
     
@@ -144,14 +144,14 @@ async def handle_stock_buy(event: MessageEvent, args: Message = CommandArg()):
 
 @stock_sell_cmd.handle()
 async def handle_stock_sell(event: MessageEvent, args: Message = CommandArg()):
-    """出售灵石"""
+    """出售气运"""
     args_text = args.extract_plain_text().strip()
     if not args_text:
-        await stock_sell_cmd.finish("⛔ 格式：出售灵石 <灵石代码> <数量> [银行]")
+        await stock_sell_cmd.finish("⛔ 格式：出售气运 <气运代码> <数量> [银行]")
 
     parts = args_text.split()
     if len(parts) < 2:
-        await stock_sell_cmd.finish("⛔ 格式：出售灵石 <灵石代码> <数量> [银行]")
+        await stock_sell_cmd.finish("⛔ 格式：出售气运 <气运代码> <数量> [银行]")
     
     symbol = parts[0].upper()
     try:
@@ -159,7 +159,7 @@ async def handle_stock_sell(event: MessageEvent, args: Message = CommandArg()):
         if shares <= 0:
             raise ValueError
     except ValueError:
-        await stock_sell_cmd.finish("⛔ 灵石数量必须为正整数")
+        await stock_sell_cmd.finish("⛔ 气运数量必须为正整数")
     
     to_bank = len(parts) > 2 and parts[2] in ["银行", "bank"]
     
@@ -176,7 +176,7 @@ async def handle_stock_sell(event: MessageEvent, args: Message = CommandArg()):
 
 @stock_holdings_cmd.handle()
 async def handle_stock_holdings(event: MessageEvent):
-    """查看灵石投资持仓"""
+    """查看气运投资持仓"""
     # 被动触发价格更新
     price_updated = await StockService.check_and_update_prices()
 
@@ -185,7 +185,7 @@ async def handle_stock_holdings(event: MessageEvent):
     if not holdings:
         await stock_holdings_cmd.finish(message_add_head("� 您当前没有投资", event))
 
-    lines = ["� 我的灵石投资", "▃▃▃▃▃▃▃▃▃▃"]
+    lines = ["� 我的气运投资", "▃▃▃▃▃▃▃▃▃▃"]
 
     # 获取刷新时间信息
     async with safe_session() as session:
@@ -268,45 +268,39 @@ async def handle_stock_transactions(event: MessageEvent):
 
 @stock_init_cmd.handle()
 async def handle_stock_init(event: MessageEvent):
-    """初始化灵石投资数据（仅管理员）"""
+    """初始化气运投资数据（仅管理员）"""
     # 检查权限
     async with safe_session() as session:
-        # 检查是否已有灵石数据
+        # 检查是否已有气运数据
         try:
             existing_stocks = (await session.execute(select(Stock))).scalars().all()
             if existing_stocks:
-                await stock_init_cmd.finish("⛔ 灵石投资数据已存在，无需重复初始化")
+                await stock_init_cmd.finish("⛔ 气运投资数据已存在，无需重复初始化")
         except Exception as e:
             await stock_init_cmd.finish(f"⛔ 检查数据失败：{e}")
 
-        # 初始灵石投资数据
+        # 初始气运投资数据
         initial_stocks = [
-            # 法宝灵石
             {"symbol": "TECH01", "name": "法宝工坊", "type": StockType.TECH, "base_price": 100, "volatility": 0.08},
             {"symbol": "TECH02", "name": "阵法研究", "type": StockType.TECH, "base_price": 150, "volatility": 0.10},
             {"symbol": "TECH03", "name": "符箓制作", "type": StockType.TECH, "base_price": 80, "volatility": 0.09},
 
-            # 金融灵石
             {"symbol": "FIN01", "name": "冥界钱庄", "type": StockType.FINANCE, "base_price": 200, "volatility": 0.04},
             {"symbol": "FIN02", "name": "仙界商会", "type": StockType.FINANCE, "base_price": 120, "volatility": 0.05},
 
-            # 灵气灵石
             {"symbol": "ENE01", "name": "灵脉开采", "type": StockType.ENERGY, "base_price": 180, "volatility": 0.06},
             {"symbol": "ENE02", "name": "雷电收集", "type": StockType.ENERGY, "base_price": 90, "volatility": 0.07},
 
-            # 丹药灵石
             {"symbol": "CON01", "name": "丹药坊", "type": StockType.CONSUMER, "base_price": 60, "volatility": 0.03},
             {"symbol": "CON02", "name": "灵草种植", "type": StockType.CONSUMER, "base_price": 110, "volatility": 0.04},
 
-            # 医道灵石
             {"symbol": "MED01", "name": "医仙堂", "type": StockType.HEALTHCARE, "base_price": 140, "volatility": 0.05},
 
-            # 材料灵石
             {"symbol": "MAT01", "name": "矿石开采", "type": StockType.MATERIALS, "base_price": 70, "volatility": 0.07},
             {"symbol": "MAT02", "name": "炼器材料", "type": StockType.MATERIALS, "base_price": 95, "volatility": 0.08},
         ]
 
-        # 创建灵石投资项目
+        # 创建气运投资项目
         for stock_data in initial_stocks:
             stock = Stock(
                 symbol=stock_data["symbol"],
@@ -321,11 +315,11 @@ async def handle_stock_init(event: MessageEvent):
             session.add(stock)
 
         await session.commit()
-        await stock_init_cmd.finish("✅ 灵石投资数据初始化完成！共创建了12个投资项目")
+        await stock_init_cmd.finish("✅ 气运投资数据初始化完成！共创建了12个投资项目")
 
 @stock_update_cmd.handle()
 async def handle_stock_update(event: MessageEvent):
-    """手动更新灵石价格（仅管理员）"""
+    """手动更新气运价格（仅管理员）"""
     # 检查权限
     if not await SUPERUSER(event):
         await stock_update_cmd.finish("⛔ 仅管理员可使用此命令")
@@ -335,17 +329,17 @@ async def handle_stock_update(event: MessageEvent):
         updated = await StockService.check_and_update_prices(force_update=True)
 
         if updated:
-            await stock_update_cmd.finish(message_add_head("✅ 灵石价格已强制更新", event))
+            await stock_update_cmd.finish(message_add_head("✅ 气运价格已强制更新", event))
         else:
             await stock_update_cmd.finish(message_add_head("⚠️ 价格更新失败或无需更新", event))
 
     except Exception as e:
-        await stock_update_cmd.finish(message_add_head(f"❌ 更新灵石价格失败：{e}", event))
+        await stock_update_cmd.finish(message_add_head(f"❌ 更新气运价格失败：{e}", event))
 
 
 @stock_refresh_time_cmd.handle()
 async def handle_stock_refresh_time(event: MessageEvent):
-    """查看灵石价格刷新时间"""
+    """查看气运价格刷新时间"""
     async with safe_session() as session:
         player = await session.get(Player, event.get_user_id())
         if not player:
@@ -356,7 +350,7 @@ async def handle_stock_refresh_time(event: MessageEvent):
         latest_stock = (await session.execute(stmt)).scalars().first()
 
         if not latest_stock:
-            await stock_refresh_time_cmd.finish("💎 当前没有可投资的灵石")
+            await stock_refresh_time_cmd.finish("💎 当前没有可投资的气运")
 
         now = datetime.now()
         last_update_time = latest_stock.updated_at
@@ -364,7 +358,7 @@ async def handle_stock_refresh_time(event: MessageEvent):
         time_until_update = next_update_time - now
         time_since_update = now - last_update_time
 
-        lines = ["⏰ 灵石价格刷新时间", "▃▃▃▃▃▃▃▃▃▃"]
+        lines = ["⏰ 气运价格刷新时间", "▃▃▃▃▃▃▃▃▃▃"]
 
         # 上次更新时间
         hours_since = int(time_since_update.total_seconds() // 3600)
@@ -403,7 +397,7 @@ async def handle_stock_history(event: MessageEvent, args: Message = CommandArg()
     """查看特定股票的价格历史"""
     args_text = args.extract_plain_text().strip()
     if not args_text:
-        await stock_history_cmd.finish("⛔ 格式：灵石历史 <灵石代码> [天数]")
+        await stock_history_cmd.finish("⛔ 格式：气运历史 <气运代码> [天数]")
 
     parts = args_text.split()
     symbol = parts[0].upper()
@@ -426,7 +420,7 @@ async def handle_stock_history(event: MessageEvent, args: Message = CommandArg()
         stmt = select(Stock).where(Stock.symbol == symbol, Stock.is_active == True)
         stock = (await session.execute(stmt)).scalars().first()
         if not stock:
-            await stock_history_cmd.finish(f"⛔ 灵石项目 {symbol} 不存在")
+            await stock_history_cmd.finish(f"⛔ 气运项目 {symbol} 不存在")
 
         # 获取价格历史
         from datetime import timedelta
@@ -470,7 +464,7 @@ async def handle_stock_history(event: MessageEvent, args: Message = CommandArg()
                 f"({record.change_rate:+.2f}%)"
             )
 
-        lines.append("\n💡 使用「灵石分析」查看随机性说明")
+        lines.append("\n💡 使用「气运分析」查看随机性说明")
         await stock_history_cmd.finish(message_add_head("\n".join(lines), event))
 
 
@@ -487,9 +481,9 @@ async def handle_stock_analysis(event: MessageEvent):
         stocks = (await session.execute(stmt)).scalars().all()
 
         if not stocks:
-            await stock_analysis_cmd.finish("💎 当前没有可投资的灵石")
+            await stock_analysis_cmd.finish("💎 当前没有可投资的气运")
 
-        lines = ["🔬 灵石价格波动原理分析", "▃▃▃▃▃▃▃▃▃▃▃▃▃▃"]
+        lines = ["🔬 气运价格波动原理分析", "▃▃▃▃▃▃▃▃▃▃▃▃▃▃"]
 
         lines.append("📊 **为什么有些股票一直涨/跌？**")
         lines.append("")
@@ -530,6 +524,6 @@ async def handle_stock_analysis(event: MessageEvent):
         lines.append("• ✅ 单次变化限制（±20%）")
         lines.append("• ✅ 长期会回归基础价格")
         lines.append("")
-        lines.append("💡 使用「灵石历史 代码」查看具体股票历史")
+        lines.append("💡 使用「气运历史 代码」查看具体股票历史")
 
         await stock_analysis_cmd.finish(message_add_head("\n".join(lines), event))
