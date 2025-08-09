@@ -24,13 +24,13 @@ from ..utils import luck_prob
 class PartTimeJobService:
     """打工系统核心服务类"""
 
-    # 工作类型配置
+    # 工作类型配置 - 针对年轻玩家优化，大幅缩短工作时间
     JOB_TYPES = {
         "cashier": {
             "name": "便利店收银员",
             "description": "在便利店负责收银和简单服务工作",
             "base_reward": 80,
-            "duration_hours": 3,
+            "duration_hours": 0.5,  # 30分钟
             "required_level": 1,
             "emoji": "🏪",
             "special_events": [
@@ -42,7 +42,7 @@ class PartTimeJobService:
             "name": "快递分拣员",
             "description": "在快递站负责包裹分拣工作",
             "base_reward": 120,
-            "duration_hours": 4,
+            "duration_hours": 1,  # 1小时
             "required_level": 1,
             "emoji": "📦",
             "special_events": [
@@ -54,7 +54,7 @@ class PartTimeJobService:
             "name": "咖啡店服务员",
             "description": "在咖啡店为顾客提供服务",
             "base_reward": 100,
-            "duration_hours": 3,
+            "duration_hours": 0.75,  # 45分钟
             "required_level": 5,
             "emoji": "☕",
             "special_events": [
@@ -66,7 +66,7 @@ class PartTimeJobService:
             "name": "工厂流水线工人",
             "description": "在工厂流水线上进行重复性工作",
             "base_reward": 150,
-            "duration_hours": 4,
+            "duration_hours": 1,  # 1小时
             "required_level": 1,
             "emoji": "🔧",
             "special_events": [
@@ -78,7 +78,7 @@ class PartTimeJobService:
             "name": "安全屋建造",
             "description": "负责使用黄金建造安全屋，隔绝灵异力量，用于临时避难",
             "base_reward": 180,
-            "duration_hours": 4,
+            "duration_hours": 1,  # 1小时
             "required_level": 3,
             "emoji": "🚛",
             "special_events": [
@@ -91,7 +91,7 @@ class PartTimeJobService:
             "name": "质检员",
             "description": "负责产品质量检查工作",
             "base_reward": 140,
-            "duration_hours": 3,
+            "duration_hours": 0.75,  # 45分钟
             "required_level": 8,
             "emoji": "🔍",
             "special_events": [
@@ -103,7 +103,7 @@ class PartTimeJobService:
             "name": "网吧管理员",
             "description": "负责网吧的日常管理工作",
             "base_reward": 90,
-            "duration_hours": 2,
+            "duration_hours": 0.5,  # 30分钟
             "required_level": 1,
             "emoji": "🎮",
             "special_events": [
@@ -115,7 +115,7 @@ class PartTimeJobService:
             "name": "电影院检票员",
             "description": "在电影院负责检票和引导工作",
             "base_reward": 85,
-            "duration_hours": 3,
+            "duration_hours": 0.75,  # 45分钟
             "required_level": 1,
             "emoji": "🍿",
             "special_events": [
@@ -127,7 +127,7 @@ class PartTimeJobService:
             "name": "街头表演助手",
             "description": "协助街头艺人进行表演",
             "base_reward": 60,
-            "duration_hours": 2,
+            "duration_hours": 0.5,  # 30分钟
             "required_level": 1,
             "emoji": "🎪",
             "special_events": [
@@ -310,7 +310,14 @@ class PartTimeJobService:
         session.add(new_job)
         await session.commit()
 
-        return True, f"开始工作：{job_config['name']}，预计{job_config['duration_hours']}小时后完成", new_job
+        # 格式化时间显示
+        duration = job_config['duration_hours']
+        if duration < 1:
+            time_str = f"{int(duration * 60)}分钟"
+        else:
+            time_str = f"{duration}小时"
+
+        return True, f"开始工作：{job_config['name']}，预计{time_str}后完成", new_job
 
     @classmethod
     async def complete_job(cls, session: AsyncSession, player: Player) -> Tuple[bool, str, Optional[Dict]]:

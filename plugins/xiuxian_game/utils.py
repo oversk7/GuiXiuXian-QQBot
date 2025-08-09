@@ -346,6 +346,13 @@ rate_limiter.register_action("explore", RateLimitConfig(
     cooldown=0.5  # 每次探索间隔0.5秒
 ))
 
+# 打工系统频率限制 - 防止过度刷金币
+rate_limiter.register_action("start_work", RateLimitConfig(
+    max_requests=10,  # 每小时最多开始10次工作
+    time_window=3600.0,  # 1小时时间窗口
+    cooldown=60.0  # 每次开始工作间隔1分钟
+))
+
 def check_action_limit(user_id: str, action: str) -> tuple[bool, Optional[str]]:
     """便捷函数：检查操作限制"""
     return rate_limiter.check_rate_limit(user_id, action)

@@ -19,7 +19,7 @@ from datetime import datetime, timedelta
 
 from ..models.db import safe_session
 from ..models.player import Player
-from ..utils import message_add_head
+from ..utils import message_add_head, check_action_limit, record_action
 from .part_time_job_service import PartTimeJobService
 
 
@@ -58,9 +58,16 @@ async def handle_work(event: MessageEvent, args: Message = CommandArg()):
             # 构建工作列表消息
             lines = [f"💼 {msg}", "━━━━━━━━━━━━━"]
             for i, job in enumerate(jobs, 1):
+                # 格式化时间显示
+                duration = job['duration_hours']
+                if duration < 1:
+                    time_str = f"{int(duration * 60)}分钟"
+                else:
+                    time_str = f"{duration}小时"
+
                 lines.append(f"{job['emoji']} {i}. {job['name']}")
                 lines.append(f"   💰 基础收入：{job['base_reward']}金币")
-                lines.append(f"   ⏰ 工作时长：{job['duration_hours']}小时")
+                lines.append(f"   ⏰ 工作时长：{time_str}")
                 lines.append(f"   📝 {job['description']}")
                 if i < len(jobs):
                     lines.append("")
@@ -75,6 +82,11 @@ async def handle_work(event: MessageEvent, args: Message = CommandArg()):
 
         else:
             # 开始指定工作
+            # 检查频率限制
+            can_work, limit_msg = check_action_limit(event.get_user_id(), "start_work")
+            if not can_work:
+                await work_cmd.finish(message_add_head(f"❌ {limit_msg}", event))
+
             # 先尝试通过工作名称匹配
             job_type = None
             for jtype, jconfig in PartTimeJobService.JOB_TYPES.items():
@@ -90,15 +102,26 @@ async def handle_work(event: MessageEvent, args: Message = CommandArg()):
             if not success:
                 await work_cmd.finish(message_add_head(f"❌ {msg}", event))
 
+            # 记录操作
+            record_action(event.get_user_id(), "start_work")
+
             job_config = PartTimeJobService.JOB_TYPES[job_type]
             end_time_str = job.end_time.strftime("%H:%M")
+
+            # 格式化工作时长显示
+            duration = job_config['duration_hours']
+            if duration < 1:
+                duration_str = f"{int(duration * 60)}分钟"
+            else:
+                duration_str = f"{duration}小时"
 
             result_msg = (
                 f"✅ {msg}\n"
                 f"━━━━━━━━━━━━━\n"
                 f"{job_config['emoji']} 工作：{job_config['name']}\n"
                 f"💰 预期收入：{job_config['base_reward']}+ 金币\n"
-                f"⏰ 完成时间：{end_time_str}\n"
+                f"⏰ 工作时长：{duration_str}\n"
+                f"🕐 完成时间：{end_time_str}\n"
                 f"━━━━━━━━━━━━━\n"
                 f"💡 使用【收工】完成工作并获得奖励"
             )
@@ -301,8 +324,9 @@ async def handle_work_help(event: MessageEvent):
         "\n"
         "⚡ 快节奏体验：\n"
         "• 工作时长：30分钟-1小时 (大幅缩短!)\n"
-        "• 高工资：150-300金币/次 (显著提高!)\n"
-        "• 特殊事件奖励丰厚，最高500金币!\n"
+        "• 高工资：60-180金币/次 + 特殊事件奖励\n"
+        "• 特殊事件奖励丰厚，最高300金币!\n"
+        "• 频率限制：每小时最多10次，每次间隔1分钟\n"
         "\n"
         "💰 收入计算：\n"
         "基础收入 + 等级加成 + 运气加成 + 连续奖励 + 特殊事件\n"
