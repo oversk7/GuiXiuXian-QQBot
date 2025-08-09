@@ -931,7 +931,7 @@ async def generate_region_overview_image(region: str, session, player_x: int = N
     result = await session.execute(stmt)
     today_tiles = result.scalars().all()
 
-    # 如果今天没有格子数据，查询历史格子数据作为参考
+    # 如果今天没有格子数据，查询历史格子数据作为参考来确定地图范围
     if not today_tiles:
         # 查询该区域的所有历史格子
         stmt_all = select(WorldTile).where(WorldTile.region == region)
@@ -939,37 +939,39 @@ async def generate_region_overview_image(region: str, session, player_x: int = N
         all_tiles = result_all.scalars().all()
 
         if all_tiles:
-            # 使用历史格子数据，但需要重新生成今天的事件
-            tiles = []
-            for old_tile in all_tiles:
-                # 为每个历史坐标生成今天的格子
-                new_tile = await get_or_create_tile(session, region, old_tile.x, old_tile.y)
-                tiles.append(new_tile)
-            await session.commit()  # 提交新生成的格子
+            # 使用历史格子的坐标范围，但不生成新格子
+            # 只是为了确定地图显示范围
+            min_x = min(tile.x for tile in all_tiles)
+            max_x = max(tile.x for tile in all_tiles)
+            min_y = min(tile.y for tile in all_tiles)
+            max_y = max(tile.y for tile in all_tiles)
+            tiles = today_tiles  # 保持为空列表，表示今天没有格子
         else:
-            # 如果完全没有历史数据，生成一个小范围的探索区域
-            tiles = []
+            # 如果完全没有历史数据，使用玩家位置作为中心生成小范围
             center_x, center_y = 0, 0  # 默认中心点
             if player_x is not None and player_y is not None:
                 center_x, center_y = player_x, player_y
 
-            # 生成玩家周围5x5的区域
-            for dx in range(-2, 3):
-                for dy in range(-2, 3):
-                    tile = await get_or_create_tile(session, region, center_x + dx, center_y + dy)
-                    tiles.append(tile)
-            await session.commit()  # 提交新生成的格子
+            # 设置一个小范围的坐标
+            min_x, max_x = center_x - 2, center_x + 2
+            min_y, max_y = center_y - 2, center_y + 2
+            tiles = today_tiles  # 保持为空列表
     else:
         tiles = today_tiles
-
-    # 计算坐标范围
-    if tiles:
+        # 计算坐标范围
         min_x = min(tile.x for tile in tiles)
         max_x = max(tile.x for tile in tiles)
         min_y = min(tile.y for tile in tiles)
         max_y = max(tile.y for tile in tiles)
 
-        # 扩展范围以显示更多区域
+    # 验证和修正坐标范围
+    if min_x > max_x:
+        min_x, max_x = max_x, min_x
+    if min_y > max_y:
+        min_y, max_y = max_y, min_y
+
+    # 扩展范围以显示更多区域（如果有格子的话）
+    if tiles:
         range_x = max_x - min_x + 1
         range_y = max_y - min_y + 1
 
@@ -982,10 +984,12 @@ async def generate_region_overview_image(region: str, session, player_x: int = N
             center_y = (min_y + max_y) // 2
             min_y = center_y - 10
             max_y = center_y + 10
-    else:
-        # 默认显示范围
-        min_x, max_x = -10, 10
-        min_y, max_y = -10, 10
+
+    # 最终验证坐标范围的有效性
+    if min_x >= max_x:
+        max_x = min_x + 20
+    if min_y >= max_y:
+        max_y = min_y + 20
 
     # 创建图片 - 为坐标轴预留空间
     margin = 40  # 边缘留白用于显示坐标
@@ -1006,8 +1010,21 @@ async def generate_region_overview_image(region: str, session, player_x: int = N
     grid_height = max_y - min_y + 1
     available_width = img_width - 2 * margin
     available_height = img_height - 2 * margin
+
+    # 防止除零错误
+    if grid_width <= 0:
+        grid_width = 1
+    if grid_height <= 0:
+        grid_height = 1
+
     cell_width = available_width // grid_width
     cell_height = available_height // grid_height
+
+    # 确保格子大小至少为1像素
+    if cell_width <= 0:
+        cell_width = 1
+    if cell_height <= 0:
+        cell_height = 1
 
     # 事件类型颜色映射
     event_colors = {
@@ -1035,51 +1052,25 @@ async def generate_region_overview_image(region: str, session, player_x: int = N
             tile = tile_map.get((world_x, world_y))
 
             if tile:
-                # 根据事件类型选择颜色
+                # 根据事件类型选择颜色，不区分消耗状态
                 color = event_colors.get(tile.event_type, '#666666')
-
-                # 检查是否已被探索/消耗
-                is_consumed = False
-                if tile.event_type == 'MATERIAL':
-                    is_consumed = bool(tile.state.get('looted_by')) or tile.state.get('looted', False)
-                elif tile.event_type == 'TREASURE':
-                    is_consumed = tile.state.get('looted', False)
-                elif tile.event_type == 'EMPTY':
-                    is_consumed = bool(tile.state.get('defeated_by'))
-                elif tile.event_type == 'MERCHANT':
-                    is_consumed = bool(tile.state.get('visited_by'))
-                elif tile.event_type == 'ELITE':
-                    is_consumed = bool(tile.state.get('defeated_by'))
-
-                # 如果已被消耗，使用暗色
-                if is_consumed:
-                    # 将颜色变暗
-                    r = int(color[1:3], 16) // 3
-                    g = int(color[3:5], 16) // 3
-                    b = int(color[5:7], 16) // 3
-                    color = f'#{r:02x}{g:02x}{b:02x}'
-                else:
-                    # 如果格子存在但未被消耗，说明已经被探索过了
-                    # 但由于格子可能在今天被重置过，我们需要稍微调暗颜色来表示"已探索但未消耗"
-                    # 这样可以区分"完全未探索"和"已探索但资源未被消耗"
-                    r = int(color[1:3], 16)
-                    g = int(color[3:5], 16)
-                    b = int(color[5:7], 16)
-                    # 稍微调暗，但不像消耗后那么暗
-                    r = max(0, r - 30)
-                    g = max(0, g - 30)
-                    b = max(0, b - 30)
-                    color = f'#{r:02x}{g:02x}{b:02x}'
-
             else:
                 # 未探索的区域使用深灰色
                 color = '#333333'
 
-            # 绘制格子
-            draw.rectangle([
-                pixel_x, pixel_y,
-                pixel_x + cell_width - 1, pixel_y + cell_height - 1
-            ], fill=color, outline='#555555')
+            # 绘制格子 - 确保坐标正确
+            x1 = pixel_x
+            y1 = pixel_y
+            x2 = pixel_x + cell_width - 1
+            y2 = pixel_y + cell_height - 1
+
+            # 确保 x2 >= x1 和 y2 >= y1
+            if x2 < x1:
+                x1, x2 = x2, x1
+            if y2 < y1:
+                y1, y2 = y2, y1
+
+            draw.rectangle([x1, y1, x2, y2], fill=color, outline='#555555')
 
     # 绘制玩家位置标记
     if player_x is not None and player_y is not None:
@@ -1191,9 +1182,7 @@ async def handle_region_overview(event: MessageEvent, args: Message = CommandArg
                 "🔵 蓝色：休息格子",
                 "🟣 紫色：商人格子",
                 "🟠 橙色：精英怪格子",
-                "🌫️ 稍暗：已探索但未消耗",
-                "⚫ 很暗：已探索且已消耗",
-                "⬛ 灰色：完全未探索区域"
+                "⬛ 灰色：未探索区域"
             ]
 
             # 如果玩家在当前诡域，添加位置说明
@@ -1212,79 +1201,3 @@ async def handle_region_overview(event: MessageEvent, args: Message = CommandArg
 
         except ValueError as e:
             await region_overview_cmd.finish(f"⛔ 生成概览图片失败：{str(e)}")
-
-
-# ==================== 调试命令 ====================
-debug_tiles_cmd = on_command("调试格子", block=True, priority=5)
-
-@debug_tiles_cmd.handle()
-async def handle_debug_tiles(event: MessageEvent, args: Message = CommandArg()):
-    """调试格子数据"""
-    # 只允许管理员使用
-    if event.get_user_id() != "D6A7BB606845F1AFF40ADA517F7BF306":
-        await debug_tiles_cmd.finish("⛔ 权限不足")
-
-    arg_text = args.extract_plain_text().strip()
-    region = arg_text if arg_text else "第三病栋"
-
-    today = date.today()
-
-    async with safe_session() as session:
-        # 查询今天的格子
-        today_start = datetime.combine(today, datetime.min.time())
-        tomorrow_start = today_start + timedelta(days=1)
-
-        stmt = select(WorldTile).where(
-            and_(
-                WorldTile.region == region,
-                WorldTile.refreshed_at >= today_start,
-                WorldTile.refreshed_at < tomorrow_start
-            )
-        )
-        today_tiles = (await session.execute(stmt)).scalars().all()
-
-        # 查询所有格子
-        stmt_all = select(WorldTile).where(WorldTile.region == region)
-        all_tiles = (await session.execute(stmt_all)).scalars().all()
-
-        # 查询当前在该区域的玩家
-        stmt_players = select(Player).where(Player.region == region)
-        players = (await session.execute(stmt_players)).scalars().all()
-
-        msg_lines = [
-            f"🔍 调试 {region} 格子数据",
-            "━━━━━━━━━━━━━",
-            f"📅 今天: {today}",
-            f"📊 今天刷新的格子: {len(today_tiles)}个",
-            f"📊 历史总格子: {len(all_tiles)}个",
-            f"👥 当前玩家: {len(players)}个",
-            ""
-        ]
-
-        if today_tiles:
-            msg_lines.append("🔥 今天的格子:")
-            for i, tile in enumerate(today_tiles[:5]):  # 只显示前5个
-                state_info = ""
-                if tile.event_type == "MATERIAL" and tile.state.get("looted_by"):
-                    state_info = f" (已被{len(tile.state['looted_by'])}人收集)"
-                elif tile.event_type == "EMPTY" and tile.state.get("defeated_by"):
-                    state_info = f" (已被{len(tile.state['defeated_by'])}人击败)"
-                elif tile.event_type == "MERCHANT" and tile.state.get("visited_by"):
-                    state_info = f" (已被{len(tile.state['visited_by'])}人访问)"
-
-                msg_lines.append(f"  {i+1}. ({tile.x},{tile.y}) {tile.event_type}{state_info}")
-                msg_lines.append(f"     刷新: {tile.refreshed_at.strftime('%H:%M:%S')}")
-
-            if len(today_tiles) > 5:
-                msg_lines.append(f"  ... 还有{len(today_tiles)-5}个格子")
-        else:
-            msg_lines.append("❌ 今天没有刷新的格子！")
-
-        if players:
-            msg_lines.append("")
-            msg_lines.append("👤 当前玩家:")
-            for player in players[:3]:  # 只显示前3个
-                msg_lines.append(f"  {player.nickname}[{player.uid}] ({player.x},{player.y})")
-
-        await debug_tiles_cmd.finish(message_add_head("\n".join(msg_lines), event))
-
