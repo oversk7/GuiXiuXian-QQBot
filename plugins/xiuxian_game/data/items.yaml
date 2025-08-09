@@ -1387,83 +1387,83 @@ items:
     # ========== 命中佛珠系列（1-10级）==========
     - item_id: "accuracy_bead_1"
       name: "命中佛珠"
-      description: "蕴含微弱精准之力的白色佛珠，镶嵌后增加0.6%命中率 🎯"
+      description: "蕴含微弱精准之力的白色佛珠，镶嵌后增加1%命中率 🎯"
       type: "GEM"
       rarity: "white"
       price: 20000
-      attr_bonus: {"accuracy_rate": 0.6}
+      attr_bonus: {"accuracy_rate": 1}
 
     - item_id: "accuracy_bead_2"
       name: "二级命中佛珠"
-      description: "蕴含微弱精准之力的白色佛珠，镶嵌后增加1.2%命中率 🎯"
+      description: "蕴含微弱精准之力的白色佛珠，镶嵌后增加2%命中率 🎯"
       type: "GEM"
       rarity: "white"
       price: 40000
-      attr_bonus: {"accuracy_rate": 1.2}
+      attr_bonus: {"accuracy_rate": 2}
 
     - item_id: "accuracy_bead_3"
       name: "三级命中佛珠"
-      description: "蕴含微弱精准之力的白色佛珠，镶嵌后增加1.8%命中率 🎯"
+      description: "蕴含微弱精准之力的白色佛珠，镶嵌后增加3%命中率 🎯"
       type: "GEM"
       rarity: "white"
       price: 60000
-      attr_bonus: {"accuracy_rate": 1.8}
+      attr_bonus: {"accuracy_rate": 3}
 
     - item_id: "accuracy_bead_4"
       name: "四级命中佛珠"
-      description: "蕴含一般精准之力的白色佛珠，镶嵌后增加2.4%命中率 🎯"
+      description: "蕴含一般精准之力的白色佛珠，镶嵌后增加4%命中率 🎯"
       type: "GEM"
       rarity: "green"
       price: 80000
-      attr_bonus: {"accuracy_rate": 2.4}
+      attr_bonus: {"accuracy_rate": 4}
 
     - item_id: "accuracy_bead_5"
       name: "五级命中佛珠"
-      description: "蕴含一般精准之力的白色佛珠，镶嵌后增加3%命中率 🎯"
+      description: "蕴含一般精准之力的白色佛珠，镶嵌后增加5%命中率 🎯"
       type: "GEM"
       rarity: "green"
       price: 100000
-      attr_bonus: {"accuracy_rate": 3}
+      attr_bonus: {"accuracy_rate": 5}
 
     - item_id: "accuracy_bead_6"
       name: "六级命中佛珠"
-      description: "蕴含一般精准之力的白色佛珠，镶嵌后增加3.6%命中率 🎯"
+      description: "蕴含一般精准之力的白色佛珠，镶嵌后增加6%命中率 🎯"
       type: "GEM"
       rarity: "green"
       price: 120000
-      attr_bonus: {"accuracy_rate": 3.6}
+      attr_bonus: {"accuracy_rate": 6}
 
     - item_id: "accuracy_bead_7"
       name: "七级命中佛珠"
-      description: "蕴含强大精准之力的白色佛珠，镶嵌后增加4.2%命中率 🎯"
+      description: "蕴含强大精准之力的白色佛珠，镶嵌后增加7%命中率 🎯"
       type: "GEM"
       rarity: "blue"
       price: 140000
-      attr_bonus: {"accuracy_rate": 4.2}
+      attr_bonus: {"accuracy_rate": 7}
 
     - item_id: "accuracy_bead_8"
       name: "八级命中佛珠"
-      description: "蕴含强大精准之力的白色佛珠，镶嵌后增加4.8%命中率 🎯"
+      description: "蕴含强大精准之力的白色佛珠，镶嵌后增加8%命中率 🎯"
       type: "GEM"
       rarity: "blue"
       price: 160000
-      attr_bonus: {"accuracy_rate": 4.8}
+      attr_bonus: {"accuracy_rate": 8}
 
     - item_id: "accuracy_bead_9"
       name: "九级命中佛珠"
-      description: "蕴含强大精准之力的白色佛珠，镶嵌后增加5.4%命中率 🎯"
+      description: "蕴含强大精准之力的白色佛珠，镶嵌后增加9%命中率 🎯"
       type: "GEM"
       rarity: "blue"
       price: 180000
-      attr_bonus: {"accuracy_rate": 5.4}
+      attr_bonus: {"accuracy_rate": 9}
 
     - item_id: "accuracy_bead_10"
       name: "十级命中佛珠"
-      description: "蕴含极致精准之力的白色佛珠，镶嵌后增加6%命中率 🎯"
+      description: "蕴含极致精准之力的白色佛珠，镶嵌后增加10%命中率 🎯"
       type: "GEM"
       rarity: "purple"
       price: 200000
-      attr_bonus: {"accuracy_rate": 6}
+      attr_bonus: {"accuracy_rate": 10}
 
     # ========== 反击翡翠系列（1-10级）==========
     - item_id: "counter_jade_1"
