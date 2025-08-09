@@ -633,9 +633,9 @@ async def _handle_personal_monster(session, tile: WorldTile, player: Player) -> 
 
     # ---------------- 扣除装备耐久 ----------------
     result_eq = await session.execute(
-        _select(_Equip).where(
-            _Equip.player_id == player.id, _Equip.equipped == True,
-            _Equip.item_id.in_(config.items_config["by_type"]["EQUIPMENT"])
+        select(ItemInstance).where(
+            ItemInstance.player_id == player.id, ItemInstance.equipped == True,
+            ItemInstance.item_id.in_(config.items_config["by_type"]["EQUIPMENT"])
         )
     )
     equipped_items = result_eq.scalars().all()
