@@ -202,7 +202,7 @@ async def handle_player(event: MessageEvent, args: Message = CommandArg()):
     await player_cmd.finish(Message(msg))
 
 # 装备系统
-equip_cmd = on_command("装备系统", aliases={"装备帮助"}, priority=4, block=True)
+equip_cmd = on_command("装备系统", aliases={"装备帮助"}, priority=4, block=True, force_whitespace=True)
 @equip_cmd.handle()
 async def handle_equip(event: MessageEvent, args: Message = CommandArg()):
     msg = (

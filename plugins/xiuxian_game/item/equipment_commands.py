@@ -72,7 +72,7 @@ async def _(event: MessageEvent):
 
 
 # ---------------- 指令：装备详情 ----------------
-equipment_detail = on_command("装备详情", aliases={"装备信息", "查看装备"}, block=True, priority=5)
+equipment_detail = on_command("装备详情", aliases={"装备信息", "查看装备"}, block=True, priority=5, force_whitespace=True)
 
 @equipment_detail.handle()
 async def _(event: MessageEvent, args: Message = CommandArg()):
@@ -210,7 +210,7 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
 
 
 # ---------------- 指令：穿戴装备 ----------------
-wear_equipment = on_command("装备", aliases={"穿戴", "佩戴"}, block=True, priority=5)
+wear_equipment = on_command("装备", aliases={"穿戴", "佩戴"}, block=True, priority=5, force_whitespace=True)
 
 @wear_equipment.handle()
 async def _(event: MessageEvent, args: Message = CommandArg()):
@@ -298,9 +298,15 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
         # 计算差值（即装备提供的加成）
         delta = {}
         for attr, new_value in temp_attrs.items():
-            base_value = base_attrs[attr]
-            if new_value != base_value:
-                delta[attr] = new_value - base_value
+            # 只处理base_attrs中存在的属性，避免KeyError
+            if attr in base_attrs:
+                base_value = base_attrs[attr]
+                if new_value != base_value:
+                    delta[attr] = new_value - base_value
+            else:
+                # 对于base_attrs中不存在的属性（如战斗属性），直接使用新值作为加成
+                if new_value != 0:
+                    delta[attr] = new_value
 
         # 应用属性加成到玩家
         for k, v in delta.items():

@@ -109,7 +109,7 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
 
 
 # ---------------- 指令：装备升阶 ----------------
-upgrade_equipment_cmd = on_command("升阶", aliases={"装备升阶"}, block=True, priority=5)
+upgrade_equipment_cmd = on_command("升阶", aliases={"装备升阶"}, block=True, priority=5, force_whitespace=True)
 
 @upgrade_equipment_cmd.handle()
 async def _(event: MessageEvent, args: Message = CommandArg()):

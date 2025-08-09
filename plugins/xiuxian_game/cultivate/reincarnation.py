@@ -141,7 +141,15 @@ class ReincarnationService:
             # 基于基础属性计算装备加成
             attrs_temp = base_attrs.copy()
             eq.apply_attr_bonus(attrs_temp, base_attrs)
-            new_delta = {k: attrs_temp[k] - base_attrs[k] for k in attrs_temp if attrs_temp[k] != base_attrs[k]}
+            new_delta = {}
+            for k in attrs_temp:
+                if k in base_attrs:
+                    if attrs_temp[k] != base_attrs[k]:
+                        new_delta[k] = attrs_temp[k] - base_attrs[k]
+                else:
+                    # 对于base_attrs中不存在的属性，直接使用新值作为加成
+                    if attrs_temp[k] != 0:
+                        new_delta[k] = attrs_temp[k]
             
             # 应用到玩家属性
             for k, v in new_delta.items():

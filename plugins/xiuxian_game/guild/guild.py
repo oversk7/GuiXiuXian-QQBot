@@ -98,7 +98,7 @@ async def handle_create_guild(event: MessageEvent, args: Message = CommandArg())
         await create_guild_cmd.finish(message_add_head(msg, event))
 
 # ==================== 公会信息 ====================
-guild_info_cmd = on_command("公会", aliases={"我的公会", "公会信息"}, block=True, priority=5)
+guild_info_cmd = on_command("公会", aliases={"我的公会", "公会信息"}, block=True, priority=5,force_whitespace=True)
 
 @guild_info_cmd.handle()
 async def handle_guild_info(event: MessageEvent):
