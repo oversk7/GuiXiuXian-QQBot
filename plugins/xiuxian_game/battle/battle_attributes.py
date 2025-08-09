@@ -95,8 +95,7 @@ class BattleAttributeCalculator:
         """
         hit_chance = (attacker_accuracy - defender_dodge) / 100.0
         
-        # 命中率限制在10%-95%之间
-        hit_chance = max(0.1, min(0.95, hit_chance))
+        hit_chance = max(0.1, min(1.0, hit_chance))
         
         return hit_chance
     

@@ -544,8 +544,8 @@ class BattleIntegrationHelper:
             "effects": []
         }
 
-        # 命中判定（怪物命中率固定85%，玩家闪避率来自装备）
-        monster_accuracy = 85.0
+        # 命中判定（怪物命中率固定80%，玩家闪避率来自装备）
+        monster_accuracy = 80.0
         hit_chance = BattleAttributeCalculator.calculate_hit_chance(
             monster_accuracy, player_attrs["dodge_rate"]
         )

@@ -106,8 +106,9 @@ class BattleEngine:
         # 命中判定（怪物闪避率固定为0，敏捷只影响先后手）
         monster_dodge_rate = 0.0  # 怪物闪避率固定为0
 
-        hit_chance = (attacker_attrs["accuracy_rate"] / 100.0) - monster_dodge_rate
-        hit_chance = max(0.1, min(0.95, hit_chance))
+        hit_chance = BattleAttributeCalculator.calculate_hit_chance(
+            attacker_attrs["accuracy_rate"], monster_dodge_rate
+        )
         
         if self.rng.random() > hit_chance:
             result["effects"].append("被闪避")
