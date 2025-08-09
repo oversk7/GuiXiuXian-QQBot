@@ -112,12 +112,12 @@ def calculate_monster_attributes(monster_level: int, is_elite: bool = False) -> 
         # 高期增长（101-150级）
         base_hp = 1.7 * monster_level + 80
         base_attack = 0.9 * monster_level + 40
-        base_agility = 0.8 * monster_level + 30
+        base_agility = 0.5 * monster_level + 30
     else:
         # 终极期适度增长（151+级）
-        base_hp = 2.1 * monster_level + 100
-        base_attack = 2.7 * monster_level + 250
-        base_agility = 1.1 * monster_level + 50
+        base_hp = 2 * monster_level + 100
+        base_attack = 2.5 * monster_level + 250
+        base_agility = 0.8 * monster_level + 50
 
     # 添加随机波动（±10%，减少波动范围）
     rng = random.Random()
