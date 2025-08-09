@@ -8,3 +8,4 @@ from . import stock_scheduler
 from . import token_exchange
 from . import part_time_job_commands
 from . import part_time_job_init
+from . import part_time_job_notifier

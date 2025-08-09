@@ -20,7 +20,9 @@ from datetime import datetime, timedelta
 from ..models.db import safe_session
 from ..models.player import Player
 from ..utils import message_add_head, check_action_limit, record_action
+from .event_manager import event_manager
 from .part_time_job_service import PartTimeJobService
+from .part_time_job_notifier import ensure_notifier_started
 
 
 # ==================== 命令定义 ====================
@@ -61,7 +63,8 @@ async def handle_work(event: MessageEvent, args: Message = CommandArg()):
                 # 格式化时间显示
                 duration = job['duration_hours']
                 if duration < 1:
-                    time_str = f"{int(duration * 60)}分钟"
+                    minutes = int(duration * 60)
+                    time_str = f"{minutes}分钟"
                 else:
                     time_str = f"{duration}小时"
 
@@ -105,13 +108,20 @@ async def handle_work(event: MessageEvent, args: Message = CommandArg()):
             # 记录操作
             record_action(event.get_user_id(), "start_work")
 
+            # 存储玩家最新事件，用于主动通知
+            event_manager.store_event(event.get_user_id(), event)
+
+            # 确保通知服务已启动
+            ensure_notifier_started()
+
             job_config = PartTimeJobService.JOB_TYPES[job_type]
             end_time_str = job.end_time.strftime("%H:%M")
 
             # 格式化工作时长显示
             duration = job_config['duration_hours']
             if duration < 1:
-                duration_str = f"{int(duration * 60)}分钟"
+                minutes = int(duration * 60)
+                duration_str = f"{minutes}分钟"
             else:
                 duration_str = f"{duration}小时"
 
@@ -322,11 +332,12 @@ async def handle_work_help(event: MessageEvent):
         "• 休闲娱乐街区 (-50,150) - 轻松工作\n"
         "• 物流配送中心 (200,-100) - 物流工作\n"
         "\n"
-        "⚡ 快节奏体验：\n"
-        "• 工作时长：30分钟-1小时 (大幅缩短!)\n"
+        "⚡ 超快节奏体验：\n"
+        "• 工作时长：2-3分钟 (极速完成!)\n"
         "• 高工资：60-180金币/次 + 特殊事件奖励\n"
         "• 特殊事件奖励丰厚，最高300金币!\n"
         "• 频率限制：每小时最多10次，每次间隔1分钟\n"
+        "• 🔔 工作完成后自动通知，无需等待!\n"
         "\n"
         "💰 收入计算：\n"
         "基础收入 + 等级加成 + 运气加成 + 连续奖励 + 特殊事件\n"
