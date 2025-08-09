@@ -33,6 +33,7 @@ class Player(Base):
     luck: Mapped[int] = mapped_column(Integer, default=1, server_default='1', comment="运气")
     resentment: Mapped[int] = mapped_column(Integer, default=0, server_default='0', comment="怨念值")
     reincarnation_level: Mapped[int] = mapped_column(Integer, default=0, server_default='0', comment="转数")
+    breakthrough_fail_count: Mapped[int] = mapped_column(Integer, default=0, server_default='0', comment="当前连续突破失败次数")
 
     # 新增特殊属性
     critical_rate: Mapped[int] = mapped_column(Integer, default=5, server_default='5', comment="暴击率(百分比)")

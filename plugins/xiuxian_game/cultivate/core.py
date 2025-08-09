@@ -327,6 +327,16 @@ async def handle_breakthrough(event: MessageEvent, args: Message = CommandArg())
             min_rate = cfg_break.get("min_success_rate", 0.05)
             success_chance = max(min_rate, base_rate - decay * (player.level - cfg_break["change_level"]))
 
+            # 失败累加机制
+            if cfg_break.get("fail_bonus_enabled", True):
+                fail_bonus_rate = cfg_break.get("fail_bonus_rate", 0.01)
+                fail_bonus = player.breakthrough_fail_count * fail_bonus_rate
+                success_chance += fail_bonus
+
+                # 应用成功率上限
+                max_rate = cfg_break.get("fail_bonus_max_rate", 0.95)
+                success_chance = min(success_chance, max_rate)
+
         # 护航或使用棺材钉则必定成功
         if use_guardian or use_coffin_nail:
             success_chance = 1.0
@@ -420,6 +430,9 @@ async def handle_breakthrough(event: MessageEvent, args: Message = CommandArg())
                 player.exp -= required_exp
                 player.level += 1
 
+                # 突破成功，重置失败次数
+                player.breakthrough_fail_count = 0
+
                 # 根据转数计算属性点获得
                 from .reincarnation import ReincarnationService
                 points_gained = ReincarnationService.get_attribute_points_per_level(player.reincarnation_level)
@@ -447,6 +460,9 @@ async def handle_breakthrough(event: MessageEvent, args: Message = CommandArg())
                 )
             else:
                 # 突破失败
+                # 增加失败次数
+                player.breakthrough_fail_count += 1
+
                 # 检查月卡权益
                 card_benefits = await get_player_card_benefits(session, player.id)
                 breakthrough_protection = card_benefits.get("breakthrough_protection", 0)
@@ -463,6 +479,12 @@ async def handle_breakthrough(event: MessageEvent, args: Message = CommandArg())
 
                 player.exp = round(player.exp - required_exp*(1-keep_ratio))
 
+                # 计算下次成功率加成
+                next_bonus = 0
+                if cfg_break.get("fail_bonus_enabled", True):
+                    fail_bonus_rate = cfg_break.get("fail_bonus_rate", 0.01)
+                    next_bonus = player.breakthrough_fail_count * fail_bonus_rate
+
                 msg_lines = ["💥 镇厄崩散，修为反噬席卷脏腑。", "━━━━━━━━━━━━━"]
                 if protection_msg:
                     msg_lines.append(protection_msg)
@@ -470,6 +492,8 @@ async def handle_breakthrough(event: MessageEvent, args: Message = CommandArg())
                     f"✧ 剩余修为 {player.exp}",
                     f"✧ 修为保留 {int(keep_ratio*100)}%",
                     f"✧ 本次理论成功率 {int(success_chance*100)}%",
+                    f"✧ 连续失败 {player.breakthrough_fail_count} 次",
+                    f"✧ 下次成功率加成 +{int(next_bonus*100)}%",
                     "━━━━━━━━━━━━━",
                     "⬇️ 建议【突破 镇厄】以怨念护体",
                     "⬇️ 或者【突破 棺材钉】消耗棺材钉"

@@ -47,7 +47,11 @@ cultivate:
         guardian_cost_per_level: 15  # 每级额外消耗
         base_success_rate: 0.8  # change_level 时的基础成功率
         decay_per_level: 0.005   # 每提高一级成功率递减值
-        min_success_rate: 0.05    # 最低成功率下限
+        min_success_rate: 0.1    # 最低成功率下限
+        # 失败累加机制
+        fail_bonus_enabled: true  # 是否启用失败累加机制
+        fail_bonus_rate: 0.01     # 每次失败增加的成功率(1%)
+        fail_bonus_max_rate: 0.95 # 成功率上限(95%)
     attributes_base:
         max_hp: 1    # 体 (max_hp) 基础增量
         max_mp: 1    # 智 (max_mp) 基础增量
