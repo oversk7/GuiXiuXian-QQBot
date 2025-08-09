@@ -171,7 +171,7 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
                     }.get(k, k)
                     
                     if bonus_ratio > 0:
-                        lines.append(f"  • {attr_name}：{base_ratio:.1f}% → {current_ratio:.1f}% (+{bonus_ratio:.1f}%)")
+                        lines.append(f"  • {attr_name}：{base_ratio:.1f}% → 现在{current_ratio:.1f}% (+{bonus_ratio:.1f}%)")
                     else:
                         lines.append(f"  • {attr_name}：{base_ratio:.1f}%")
             

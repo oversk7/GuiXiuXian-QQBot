@@ -18,7 +18,7 @@ import os
 from pathlib import Path
 from PIL import Image, ImageDraw, ImageFont
 
-from sqlalchemy import select, func
+from sqlalchemy import select, func, and_
 from ..models.db import safe_session, retry_session
 from ..models.player import Player
 from ..models.inventory import ItemInstance
@@ -929,11 +929,38 @@ async def generate_region_overview_image(region: str, session, player_x: int = N
         )
     )
     result = await session.execute(stmt)
-    tiles = result.scalars().all()
+    today_tiles = result.scalars().all()
 
-    if not tiles:
-        # 如果没有数据，生成一个空的概览图
-        tiles = []
+    # 如果今天没有格子数据，查询历史格子数据作为参考
+    if not today_tiles:
+        # 查询该区域的所有历史格子
+        stmt_all = select(WorldTile).where(WorldTile.region == region)
+        result_all = await session.execute(stmt_all)
+        all_tiles = result_all.scalars().all()
+
+        if all_tiles:
+            # 使用历史格子数据，但需要重新生成今天的事件
+            tiles = []
+            for old_tile in all_tiles:
+                # 为每个历史坐标生成今天的格子
+                new_tile = await get_or_create_tile(session, region, old_tile.x, old_tile.y)
+                tiles.append(new_tile)
+            await session.commit()  # 提交新生成的格子
+        else:
+            # 如果完全没有历史数据，生成一个小范围的探索区域
+            tiles = []
+            center_x, center_y = 0, 0  # 默认中心点
+            if player_x is not None and player_y is not None:
+                center_x, center_y = player_x, player_y
+
+            # 生成玩家周围5x5的区域
+            for dx in range(-2, 3):
+                for dy in range(-2, 3):
+                    tile = await get_or_create_tile(session, region, center_x + dx, center_y + dy)
+                    tiles.append(tile)
+            await session.commit()  # 提交新生成的格子
+    else:
+        tiles = today_tiles
 
     # 计算坐标范围
     if tiles:
@@ -1185,4 +1212,79 @@ async def handle_region_overview(event: MessageEvent, args: Message = CommandArg
 
         except ValueError as e:
             await region_overview_cmd.finish(f"⛔ 生成概览图片失败：{str(e)}")
+
+
+# ==================== 调试命令 ====================
+debug_tiles_cmd = on_command("调试格子", block=True, priority=5)
+
+@debug_tiles_cmd.handle()
+async def handle_debug_tiles(event: MessageEvent, args: Message = CommandArg()):
+    """调试格子数据"""
+    # 只允许管理员使用
+    if event.get_user_id() != "D6A7BB606845F1AFF40ADA517F7BF306":
+        await debug_tiles_cmd.finish("⛔ 权限不足")
+
+    arg_text = args.extract_plain_text().strip()
+    region = arg_text if arg_text else "第三病栋"
+
+    today = date.today()
+
+    async with safe_session() as session:
+        # 查询今天的格子
+        today_start = datetime.combine(today, datetime.min.time())
+        tomorrow_start = today_start + timedelta(days=1)
+
+        stmt = select(WorldTile).where(
+            and_(
+                WorldTile.region == region,
+                WorldTile.refreshed_at >= today_start,
+                WorldTile.refreshed_at < tomorrow_start
+            )
+        )
+        today_tiles = (await session.execute(stmt)).scalars().all()
+
+        # 查询所有格子
+        stmt_all = select(WorldTile).where(WorldTile.region == region)
+        all_tiles = (await session.execute(stmt_all)).scalars().all()
+
+        # 查询当前在该区域的玩家
+        stmt_players = select(Player).where(Player.region == region)
+        players = (await session.execute(stmt_players)).scalars().all()
+
+        msg_lines = [
+            f"🔍 调试 {region} 格子数据",
+            "━━━━━━━━━━━━━",
+            f"📅 今天: {today}",
+            f"📊 今天刷新的格子: {len(today_tiles)}个",
+            f"📊 历史总格子: {len(all_tiles)}个",
+            f"👥 当前玩家: {len(players)}个",
+            ""
+        ]
+
+        if today_tiles:
+            msg_lines.append("🔥 今天的格子:")
+            for i, tile in enumerate(today_tiles[:5]):  # 只显示前5个
+                state_info = ""
+                if tile.event_type == "MATERIAL" and tile.state.get("looted_by"):
+                    state_info = f" (已被{len(tile.state['looted_by'])}人收集)"
+                elif tile.event_type == "EMPTY" and tile.state.get("defeated_by"):
+                    state_info = f" (已被{len(tile.state['defeated_by'])}人击败)"
+                elif tile.event_type == "MERCHANT" and tile.state.get("visited_by"):
+                    state_info = f" (已被{len(tile.state['visited_by'])}人访问)"
+
+                msg_lines.append(f"  {i+1}. ({tile.x},{tile.y}) {tile.event_type}{state_info}")
+                msg_lines.append(f"     刷新: {tile.refreshed_at.strftime('%H:%M:%S')}")
+
+            if len(today_tiles) > 5:
+                msg_lines.append(f"  ... 还有{len(today_tiles)-5}个格子")
+        else:
+            msg_lines.append("❌ 今天没有刷新的格子！")
+
+        if players:
+            msg_lines.append("")
+            msg_lines.append("👤 当前玩家:")
+            for player in players[:3]:  # 只显示前3个
+                msg_lines.append(f"  {player.nickname}[{player.uid}] ({player.x},{player.y})")
+
+        await debug_tiles_cmd.finish(message_add_head("\n".join(msg_lines), event))
 
