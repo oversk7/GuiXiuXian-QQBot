@@ -16,7 +16,7 @@ import base64
 import io
 import os
 from pathlib import Path
-from PIL import Image, ImageDraw
+from PIL import Image, ImageDraw, ImageFont
 
 from sqlalchemy import select, func
 from ..models.db import safe_session, retry_session
@@ -910,7 +910,7 @@ async def handle_teleport_list(event: MessageEvent):
 region_overview_cmd = on_command("俯瞰", aliases={"感知"}, block=True, priority=5)
 
 
-async def generate_region_overview_image(region: str, session) -> bytes:
+async def generate_region_overview_image(region: str, session) -> tuple[bytes, tuple[int, int, int, int]]:
     """生成指定诡域的今日探索概览图片"""
     today = date.today()
 
@@ -960,17 +960,27 @@ async def generate_region_overview_image(region: str, session) -> bytes:
         min_x, max_x = -10, 10
         min_y, max_y = -10, 10
 
-    # 创建图片
+    # 创建图片 - 为坐标轴预留空间
+    margin = 40  # 边缘留白用于显示坐标
     img_width = 1000
     img_height = 1000
     img = Image.new('RGB', (img_width, img_height), color='#1a1a1a')  # 深色背景
     draw = ImageDraw.Draw(img)
 
-    # 计算格子大小
+    # 尝试加载字体，如果失败则使用默认字体
+    try:
+        # 使用系统默认字体
+        font = ImageFont.load_default()
+    except Exception:
+        font = None
+
+    # 计算格子大小 - 减去边缘空间
     grid_width = max_x - min_x + 1
     grid_height = max_y - min_y + 1
-    cell_width = img_width // grid_width
-    cell_height = img_height // grid_height
+    available_width = img_width - 2 * margin
+    available_height = img_height - 2 * margin
+    cell_width = available_width // grid_width
+    cell_height = available_height // grid_height
 
     # 事件类型颜色映射
     event_colors = {
@@ -991,9 +1001,9 @@ async def generate_region_overview_image(region: str, session) -> bytes:
             world_x = min_x + grid_x
             world_y = min_y + grid_y
 
-            # 计算像素坐标
-            pixel_x = grid_x * cell_width
-            pixel_y = grid_y * cell_height
+            # 计算像素坐标 - 加上边距偏移
+            pixel_x = margin + grid_x * cell_width
+            pixel_y = margin + grid_y * cell_height
 
             tile = tile_map.get((world_x, world_y))
 
@@ -1032,11 +1042,35 @@ async def generate_region_overview_image(region: str, session) -> bytes:
                 pixel_x + cell_width - 1, pixel_y + cell_height - 1
             ], fill=color, outline='#555555')
 
+    # 绘制坐标轴数字
+    if font:
+        # 绘制X轴坐标（顶部和底部）
+        step_x = max(1, grid_width // 10)  # 最多显示10个X坐标
+        for i in range(0, grid_width, step_x):
+            world_x = min_x + i
+            pixel_x = margin + i * cell_width + cell_width // 2
+
+            # 顶部X坐标
+            draw.text((pixel_x, 5), str(world_x), fill='#FFFFFF', font=font, anchor='mt')
+            # 底部X坐标
+            draw.text((pixel_x, img_height - 20), str(world_x), fill='#FFFFFF', font=font, anchor='mb')
+
+        # 绘制Y轴坐标（左侧和右侧）
+        step_y = max(1, grid_height // 10)  # 最多显示10个Y坐标
+        for i in range(0, grid_height, step_y):
+            world_y = min_y + i
+            pixel_y = margin + i * cell_height + cell_height // 2
+
+            # 左侧Y坐标
+            draw.text((5, pixel_y), str(world_y), fill='#FFFFFF', font=font, anchor='lm')
+            # 右侧Y坐标
+            draw.text((img_width - 5, pixel_y), str(world_y), fill='#FFFFFF', font=font, anchor='rm')
+
     # 将图片转换为字节流
     img_buffer = io.BytesIO()
     img.save(img_buffer, format='PNG')
     img_buffer.seek(0)
-    return img_buffer.getvalue()
+    return img_buffer.getvalue(), (min_x, max_x, min_y, max_y)
 
 
 @region_overview_cmd.handle()
@@ -1063,7 +1097,7 @@ async def handle_region_overview(event: MessageEvent, args: Message = CommandArg
 
         try:
             # 生成概览图片
-            img_data = await generate_region_overview_image(region, session)
+            img_data, (min_x, max_x, min_y, max_y) = await generate_region_overview_image(region, session)
 
             # 转换为base64
             img_b64 = base64.b64encode(img_data).decode('utf-8')
@@ -1074,10 +1108,11 @@ async def handle_region_overview(event: MessageEvent, args: Message = CommandArg
             level_range = region_config.get("level_range", [1, 1])
 
             msg_text = (
-                f"🗺️ {region} 今日探索概览\n"
+                f"🗺️ {region} 今日探索小地图\n"
                 f"━━━━━━━━━━━━━\n"
                 f"📊 诡域等级：Tier {tier}\n"
                 f"⚔️ 怪物等级：{level_range[0]}-{level_range[1]}级\n"
+                f"📍 坐标范围：X({min_x}~{max_x}) Y({min_y}~{max_y})\n"
                 f"━━━━━━━━━━━━━\n"
                 f"🟢 绿色：材料格子\n"
                 f"🟡 金色：宝藏格子\n"
@@ -1086,7 +1121,8 @@ async def handle_region_overview(event: MessageEvent, args: Message = CommandArg
                 f"🟣 紫色：商人格子\n"
                 f"🟠 橙色：精英怪格子\n"
                 f"⚫ 暗色：已探索/消耗\n"
-                f"⬛ 灰色：未探索区域"
+                f"⬛ 灰色：未探索区域\n"
+                f"🔢 图片边缘显示坐标数字"
             )
 
             # 发送图片和文字
