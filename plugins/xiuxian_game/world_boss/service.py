@@ -346,8 +346,8 @@ class WorldBossService:
             player, boss_stats, f"{cycle.boss_name}·{cycle.boss_title}", seed=seed, max_rounds=30
         )
 
-        # 计算造成的伤害（基于战斗过程）
-        damage_dealt = WorldBossService._calculate_damage_from_battle(battle_log, player, boss_stats)
+        # 从战斗日志中提取总伤害
+        damage_dealt = WorldBossService._extract_damage_from_battle_log(battle_log)
 
         # 更新玩家状态（理智削减）
         original_mp = player.mp
@@ -394,64 +394,99 @@ class WorldBossService:
         return True, "\n".join(lines)
 
     @staticmethod
-    def _execute_sanity_battle(player: Player, boss_stats: Dict, boss_name: str, 
+    def _execute_sanity_battle(player: Player, boss_stats: Dict, boss_name: str,
                               seed: str = None, max_rounds: int = 30) -> Tuple[bool, List[str], int]:
-        """执行理智战斗（新的战斗机制）
-        
+        """执行理智战斗（使用完整战斗属性系统）
+
         Args:
             player: 玩家对象
             boss_stats: BOSS属性
             boss_name: BOSS名称
             seed: 随机种子
             max_rounds: 最大回合数
-            
+
         Returns:
             (是否胜利, 战斗日志, 理智损失)
         """
-        import random
-        if seed:
-            import hashlib
-            rng = random.Random(hashlib.md5(seed.encode()).hexdigest())
-        else:
-            rng = random.Random()
-        
+        from ..battle.battle_engine import BattleEngine
+        from ..battle.battle_attributes import BattleAttributeCalculator
+
+        # 初始化战斗引擎
+        engine = BattleEngine(seed)
         battle_log = []
         sanity_damage = 0
-        
+        total_damage_dealt = 0
+
         battle_log.append(f"⚔️ {player.nickname} VS {boss_name}")
-        
+        battle_log.append("")
+
         # 执行战斗回合
         for round_num in range(1, max_rounds + 1):
             if player.mp <= 0:
                 break
-                
+
             battle_log.append(f"━━━ 第{round_num}回合 ━━━")
-            
-            # 玩家讨伐BOSS（造成伤害）
-            player_damage = WorldBossService._calculate_player_damage(player, boss_stats, rng)
-            battle_log.append(f"⚔️ {player.nickname} 攻击 {boss_name}，造成 {player_damage} 点伤害")
-            
-            # BOSS反击（削减理智）
-            round_sanity_damage = WorldBossService._calculate_sanity_damage(player, rng)
+
+            # 玩家攻击BOSS（使用完整战斗属性系统）
+            base_attack = max(1, player.attack - boss_stats["defense"] // 2)
+            attack_result = engine._process_monster_attack(player, boss_stats, base_attack, False)
+
+            if attack_result["hit"]:
+                damage = attack_result["damage"]
+                total_damage_dealt += damage
+
+                # 构建攻击描述
+                attack_desc = f"⚔️ {player.nickname} 攻击 {boss_name}"
+
+                # 添加效果描述
+                effects = []
+                if attack_result["is_critical"]:
+                    effects.append("💥暴击")
+                if attack_result["is_penetration"]:
+                    effects.append("🔥穿透")
+                if attack_result["combo_count"] > 1:
+                    effects.append(f"⚡连击x{attack_result['combo_count']}")
+
+                if effects:
+                    attack_desc += f"({' '.join(effects)})"
+
+                attack_desc += f"，造成 {damage:,} 点伤害"
+                battle_log.append(attack_desc)
+
+                # 连击额外伤害
+                if attack_result["combo_count"] > 1:
+                    combo_damage = damage * (attack_result["combo_count"] - 1)
+                    total_damage_dealt += combo_damage
+                    battle_log.append(f"   ⚡ 连击追加伤害：{combo_damage:,}")
+            else:
+                battle_log.append(f"💨 {player.nickname} 的攻击被 {boss_name} 闪避了")
+
+            # BOSS反击（固定理智削减）
+            round_sanity_damage = WorldBossService._calculate_sanity_damage(player, engine.rng)
             sanity_damage += round_sanity_damage
-            
+
             if round_sanity_damage > 0:
                 battle_log.append(f"🧠 {boss_name} 的攻击侵蚀了你的理智，损失 {round_sanity_damage} 点理智")
-                battle_log.append(f"   当前理智：{player.mp - sanity_damage}")
-            
+                battle_log.append(f"   当前理智：{max(0, player.mp - sanity_damage)}")
+
             # 检查理智是否归零
             if player.mp - sanity_damage <= 0:
                 battle_log.append("💀 你的理智彻底崩溃，陷入了永恒的疯狂...")
                 break
-        
+
+            battle_log.append("")
+
         # 战斗结果
         victory = player.mp - sanity_damage > 0
-        
+
         if victory:
             battle_log.append(f"🎉 你成功抵抗了 {boss_name} 的疯狂侵蚀！")
         else:
             battle_log.append(f"💀 你被 {boss_name} 的疯狂力量彻底击垮...")
-        
+
+        battle_log.append("")
+        battle_log.append(f"📊 本次讨伐总伤害：{total_damage_dealt:,}")
+
         return victory, battle_log, sanity_damage
 
     @staticmethod
@@ -478,20 +513,21 @@ class WorldBossService:
             return max(1, int(player.max_mp * damage_percent))
 
     @staticmethod
-    def _calculate_player_damage(player: Player, boss_stats: Dict, rng: random.Random) -> int:
-        """计算玩家对BOSS造成的伤害"""
-        # 基础伤害计算（基于玩家攻击力和BOSS防御）
-        base_damage = max(1, player.attack - boss_stats["defense"] // 2)
-        
-        # 添加随机波动
-        damage_variance = rng.randint(-base_damage // 4, base_damage // 4)
-        final_damage = max(1, base_damage + damage_variance)
-        
-        # 运气加成
-        luck_bonus = player.luck * 2
-        final_damage += luck_bonus
-        
-        return final_damage
+    def _extract_damage_from_battle_log(battle_log: List[str]) -> int:
+        """从战斗日志中提取总伤害"""
+        import re
+        total_damage = 0
+
+        for line in battle_log:
+            # 查找包含总伤害的行
+            if "本次讨伐总伤害：" in line:
+                match = re.search(r"本次讨伐总伤害：([\d,]+)", line)
+                if match:
+                    damage_str = match.group(1).replace(",", "")
+                    total_damage = int(damage_str)
+                    break
+
+        return total_damage
 
     @staticmethod
     async def _calculate_boss_stats(session: AsyncSession, cycle: WorldBossCycle) -> Dict[str, int]:
@@ -519,21 +555,7 @@ class WorldBossService:
             "level": "???"  # 等级显示为???
         }
 
-    @staticmethod
-    def _calculate_damage_from_battle(battle_log: List[str], player: Player, boss_stats: Dict[str, int]) -> int:
-        """从战斗日志中计算造成的伤害"""
-        # 基础伤害计算（基于玩家属性和BOSS防御）
-        base_damage = max(1, player.attack - boss_stats["defense"] // 2)
 
-        # 添加随机波动
-        damage_variance = random.randint(-base_damage // 4, base_damage // 4)
-        final_damage = max(1, base_damage + damage_variance)
-
-        # 运气加成
-        luck_bonus = player.luck * 2
-        final_damage += luck_bonus
-
-        return final_damage
 
     @staticmethod
     async def build_ranking_view(session: AsyncSession, cycle: WorldBossCycle) -> str:

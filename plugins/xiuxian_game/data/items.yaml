@@ -1715,7 +1715,7 @@ items:
       type: "GEM"
       rarity: "white"
       price: 30000
-      attr_bonus: {"spirit_burst_rate": 1}
+      attr_bonus: {"skill_crit_rate": 1}
 
     - item_id: "spirit_burst_amethyst_2"
       name: "二级灵爆紫晶"
@@ -1723,7 +1723,7 @@ items:
       type: "GEM"
       rarity: "white"
       price: 60000
-      attr_bonus: {"spirit_burst_rate": 2}
+      attr_bonus: {"skill_crit_rate": 2}
 
     - item_id: "spirit_burst_amethyst_3"
       name: "三级灵爆紫晶"
@@ -1731,7 +1731,7 @@ items:
       type: "GEM"
       rarity: "white"
       price: 90000
-      attr_bonus: {"spirit_burst_rate": 3}
+      attr_bonus: {"skill_crit_rate": 3}
 
     - item_id: "spirit_burst_amethyst_4"
       name: "四级灵爆紫晶"
@@ -1739,7 +1739,7 @@ items:
       type: "GEM"
       rarity: "green"
       price: 120000
-      attr_bonus: {"spirit_burst_rate": 4}
+      attr_bonus: {"skill_crit_rate": 4}
 
     - item_id: "spirit_burst_amethyst_5"
       name: "五级灵爆紫晶"
@@ -1747,7 +1747,7 @@ items:
       type: "GEM"
       rarity: "green"
       price: 150000
-      attr_bonus: {"spirit_burst_rate": 5}
+      attr_bonus: {"skill_crit_rate": 5}
 
     - item_id: "spirit_burst_amethyst_6"
       name: "六级灵爆紫晶"
@@ -1755,7 +1755,7 @@ items:
       type: "GEM"
       rarity: "green"
       price: 180000
-      attr_bonus: {"spirit_burst_rate": 6}
+      attr_bonus: {"skill_crit_rate": 6}
 
     - item_id: "spirit_burst_amethyst_7"
       name: "七级灵爆紫晶"
@@ -1763,7 +1763,7 @@ items:
       type: "GEM"
       rarity: "blue"
       price: 210000
-      attr_bonus: {"spirit_burst_rate": 7}
+      attr_bonus: {"skill_crit_rate": 7}
 
     - item_id: "spirit_burst_amethyst_8"
       name: "八级灵爆紫晶"
@@ -1771,7 +1771,7 @@ items:
       type: "GEM"
       rarity: "blue"
       price: 240000
-      attr_bonus: {"spirit_burst_rate": 8}
+      attr_bonus: {"skill_crit_rate": 8}
 
     - item_id: "spirit_burst_amethyst_9"
       name: "九级灵爆紫晶"
@@ -1779,7 +1779,7 @@ items:
       type: "GEM"
       rarity: "blue"
       price: 270000
-      attr_bonus: {"spirit_burst_rate": 9}
+      attr_bonus: {"skill_crit_rate": 9}
 
     - item_id: "spirit_burst_amethyst_10"
       name: "十级灵爆紫晶"
@@ -1787,4 +1787,4 @@ items:
       type: "GEM"
       rarity: "purple"
       price: 300000
-      attr_bonus: {"spirit_burst_rate": 10}
+      attr_bonus: {"skill_crit_rate": 10}
