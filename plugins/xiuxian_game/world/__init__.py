@@ -932,7 +932,7 @@ async def generate_region_overview_image(region: str, session, player_x: int = N
     today_tiles = result.scalars().all()
 
     # 过滤掉x或y绝对值大于600的格子，避免图片上格子太小
-    today_tiles = [tile for tile in today_tiles if abs(tile.x) <= 600 and abs(tile.y) <= 600]
+    today_tiles = [tile for tile in today_tiles if abs(tile.x) <= 500 and abs(tile.y) <= 500]
 
     # 如果今天没有格子数据，查询历史格子数据作为参考来确定地图范围
     if not today_tiles:
@@ -942,16 +942,15 @@ async def generate_region_overview_image(region: str, session, player_x: int = N
         all_tiles = result_all.scalars().all()
 
         # 同样过滤历史格子数据
-        all_tiles = [tile for tile in all_tiles if abs(tile.x) <= 600 and abs(tile.y) <= 600]
+        all_tiles = [tile for tile in all_tiles if abs(tile.x) <= 500 and abs(tile.y) <= 500]
 
         if all_tiles:
-            # 使用历史格子的坐标范围，但不生成新格子
-            # 只是为了确定地图显示范围
+            # 使用历史格子数据进行显示
             min_x = min(tile.x for tile in all_tiles)
             max_x = max(tile.x for tile in all_tiles)
             min_y = min(tile.y for tile in all_tiles)
             max_y = max(tile.y for tile in all_tiles)
-            tiles = today_tiles  # 保持为空列表，表示今天没有格子
+            tiles = all_tiles  # 使用历史格子数据进行显示
         else:
             # 如果完全没有历史数据，使用玩家位置作为中心生成小范围
             center_x, center_y = 0, 0  # 默认中心点
@@ -961,7 +960,7 @@ async def generate_region_overview_image(region: str, session, player_x: int = N
             # 设置一个小范围的坐标
             min_x, max_x = center_x - 2, center_x + 2
             min_y, max_y = center_y - 2, center_y + 2
-            tiles = today_tiles  # 保持为空列表
+            tiles = []  # 空列表，所有格子都显示为未探索
     else:
         tiles = today_tiles
         # 计算坐标范围
@@ -1026,26 +1025,31 @@ async def generate_region_overview_image(region: str, session, player_x: int = N
     cell_width = available_width // grid_width
     cell_height = available_height // grid_height
 
-    # 确保格子大小至少为1像素
-    if cell_width <= 0:
-        cell_width = 1
-    if cell_height <= 0:
-        cell_height = 1
+    # 确保格子大小至少为2像素，避免太小无法显示
+    if cell_width <= 1:
+        cell_width = 2
+    if cell_height <= 1:
+        cell_height = 2
 
-    # 事件类型颜色映射
+
+
+    # 事件类型颜色映射 - 使用RGB元组确保兼容性
     event_colors = {
-        'MATERIAL': '#4CAF50',    # 绿色 - 材料
-        'TREASURE': '#FFD700',    # 金色 - 宝藏
-        'EMPTY': '#F44336',       # 红色 - 怪物
-        'REST': '#2196F3',        # 蓝色 - 休息点
-        'MERCHANT': '#9C27B0',    # 紫色 - 商人
-        'ELITE': '#FF5722',       # 深橙色 - 精英怪
+        'MATERIAL': (76, 175, 80),     # 绿色 - 材料
+        'TREASURE': (255, 215, 0),     # 金色 - 宝藏
+        'EMPTY': (244, 67, 54),        # 红色 - 怪物
+        'REST': (33, 150, 243),        # 蓝色 - 休息点
+        'MERCHANT': (156, 39, 176),    # 紫色 - 商人
+        'ELITE': (255, 87, 34),        # 深橙色 - 精英怪
     }
 
     # 创建格子坐标到tile的映射
     tile_map = {(tile.x, tile.y): tile for tile in tiles}
 
+
+
     # 绘制格子
+    colored_tiles_count = 0
     for grid_x in range(grid_width):
         for grid_y in range(grid_height):
             world_x = min_x + grid_x
@@ -1059,24 +1063,21 @@ async def generate_region_overview_image(region: str, session, player_x: int = N
 
             if tile:
                 # 根据事件类型选择颜色，不区分消耗状态
-                color = event_colors.get(tile.event_type, '#666666')
+                color = event_colors.get(tile.event_type, (102, 102, 102))  # 默认灰色
+                colored_tiles_count += 1
             else:
                 # 未探索的区域使用深灰色
-                color = '#333333'
+                color = (51, 51, 51)  # 深灰色
 
-            # 绘制格子 - 确保坐标正确
+            # 绘制格子 - 使用更简单的坐标计算
             x1 = pixel_x
             y1 = pixel_y
-            x2 = pixel_x + cell_width - 1
-            y2 = pixel_y + cell_height - 1
+            x2 = pixel_x + cell_width
+            y2 = pixel_y + cell_height
 
-            # 确保 x2 >= x1 和 y2 >= y1
-            if x2 < x1:
-                x1, x2 = x2, x1
-            if y2 < y1:
-                y1, y2 = y2, y1
-
-            draw.rectangle([x1, y1, x2, y2], fill=color, outline='#555555')
+            # 确保坐标有效并绘制格子
+            if x2 > x1 and y2 > y1:
+                draw.rectangle([x1, y1, x2, y2], fill=color, outline=(85, 85, 85))  # 使用RGB格式的边框色
 
     # 绘制玩家位置标记
     if player_x is not None and player_y is not None:
@@ -1097,13 +1098,34 @@ async def generate_region_overview_image(region: str, session, player_x: int = N
             draw.ellipse([
                 center_x - radius - 2, center_y - radius - 2,
                 center_x + radius + 2, center_y + radius + 2
-            ], fill='#FFFFFF', outline='#FFFFFF')
+            ], fill=(255, 255, 255), outline=(255, 255, 255))
 
             # 绘制内圈（亮黄色）
             draw.ellipse([
                 center_x - radius, center_y - radius,
                 center_x + radius, center_y + radius
-            ], fill='#FFFF00', outline='#FFD700')
+            ], fill=(255, 255, 0), outline=(255, 215, 0))
+
+    # 绘制坐标轴十字细线
+    # 绘制中心十字线（如果坐标范围包含原点）
+    if min_x <= 0 <= max_x and min_y <= 0 <= max_y:
+        # 计算原点(0,0)的像素坐标
+        origin_grid_x = 0 - min_x
+        origin_grid_y = 0 - min_y
+        origin_pixel_x = margin + origin_grid_x * cell_width
+        origin_pixel_y = margin + origin_grid_y * cell_height
+
+        # 绘制垂直线（Y轴）
+        draw.line([
+            (origin_pixel_x + cell_width // 2, margin),
+            (origin_pixel_x + cell_width // 2, img_height - margin)
+        ], fill=(128, 128, 128), width=1)
+
+        # 绘制水平线（X轴）
+        draw.line([
+            (margin, origin_pixel_y + cell_height // 2),
+            (img_width - margin, origin_pixel_y + cell_height // 2)
+        ], fill=(128, 128, 128), width=1)
 
     # 绘制坐标轴数字
     if font:
@@ -1114,9 +1136,9 @@ async def generate_region_overview_image(region: str, session, player_x: int = N
             pixel_x = margin + i * cell_width + cell_width // 2
 
             # 顶部X坐标
-            draw.text((pixel_x, 5), str(world_x), fill='#FFFFFF', font=font, anchor='mt')
+            draw.text((pixel_x, 5), str(world_x), fill=(255, 255, 255), font=font, anchor='mt')
             # 底部X坐标
-            draw.text((pixel_x, img_height - 20), str(world_x), fill='#FFFFFF', font=font, anchor='mb')
+            draw.text((pixel_x, img_height - 20), str(world_x), fill=(255, 255, 255), font=font, anchor='mb')
 
         # 绘制Y轴坐标（左侧和右侧）
         step_y = max(1, grid_height // 10)  # 最多显示10个Y坐标
@@ -1125,9 +1147,9 @@ async def generate_region_overview_image(region: str, session, player_x: int = N
             pixel_y = margin + i * cell_height + cell_height // 2
 
             # 左侧Y坐标
-            draw.text((5, pixel_y), str(world_y), fill='#FFFFFF', font=font, anchor='lm')
+            draw.text((5, pixel_y), str(world_y), fill=(255, 255, 255), font=font, anchor='lm')
             # 右侧Y坐标
-            draw.text((img_width - 5, pixel_y), str(world_y), fill='#FFFFFF', font=font, anchor='rm')
+            draw.text((img_width - 5, pixel_y), str(world_y), fill=(255, 255, 255), font=font, anchor='rm')
 
     # 将图片转换为字节流
     img_buffer = io.BytesIO()
