@@ -93,12 +93,13 @@ async def _price_for(session, market: Market, item_id: str) -> Tuple[int, int]:
     """返回 (sell_price, buy_price) - 优化的动态价格系统
 
     价格计算逻辑：
-    1. 基础价格 × 随机波动(±40%) × 供需因子(0.5-2.0倍)
+    1. 基础价格 × 随机波动(±30%) × 供需因子(0.5-2.0倍)
     2. 收购价 = 售价 × 75%-85% (利润率15%-25%)
+    3. 限制最大利润率不超过100%
 
     改进内容：
-    - 扩大价格波动范围，增加套利机会
-    - 提高利润率，增加跑商收益
+    - 适度价格波动范围，平衡套利机会与游戏平衡
+    - 合理利润率，增加跑商收益但不过度
     - 增强供需因子影响，让市场更动态
     """
     item_cfg = config.items_config["by_id"].get(item_id)
@@ -110,20 +111,25 @@ async def _price_for(session, market: Market, item_id: str) -> Tuple[int, int]:
     # 检查是否需要每日刷新
     await market_state.check_daily_refresh(session)
 
-    # -------- 基础随机波动（扩大到±40%，增加价格差异） --------
+    # -------- 基础随机波动（调整到±30%，平衡价格差异与游戏平衡） --------
     seed_str = f"{market.id}:{item_id}:{_current_seed_day().isoformat()}"
     seed_int = int(hashlib.md5(seed_str.encode()).hexdigest(), 16)
     rng_local = random.Random(seed_int)
-    random_factor = rng_local.uniform(0.6, 1.4)  # ±40% 浮动，增加价格差异
+    random_factor = rng_local.uniform(0.7, 1.3)  # ±30% 浮动，适度价格差异
 
     # -------- 动态供需因子 --------
     supply_demand_factor = market_state.get_price_multiplier()
 
     # -------- 最终价格计算 --------
     final_factor = random_factor * supply_demand_factor
+
+    # 限制最终因子，确保价格不会过于极端
+    final_factor = min(final_factor, 2.0)  # 最大不超过基础价格的2倍
+    final_factor = max(final_factor, 0.5)  # 最小不低于基础价格的0.5倍
+
     sell_price = max(1, int(base_price * final_factor))
 
-    # 收购价：提高利润率到15-25%
+    # 收购价：保持利润率在15-25%
     buy_price_ratio = rng_local.uniform(0.75, 0.85)  # 75%-85%，平均80%，利润率15-25%
     buy_price = max(1, int(sell_price * buy_price_ratio))
 
@@ -538,6 +544,14 @@ async def _(event: MessageEvent):
                     if profit > 0:
                         item_cfg = config.items_config["by_id"].get(iid)
                         margin = profit / sell_p_src if sell_p_src else 0
+
+                        # 限制利润率不超过100%
+                        if margin > 1.0:  # 利润率超过100%
+                            # 调整收购价，使利润率刚好为100%
+                            buy_p_dst = sell_p_src * 2  # 100%利润率
+                            profit = buy_p_dst - sell_p_src
+                            margin = 1.0
+
                         opportunities.append({
                             "item": item_cfg.name,
                             "from": src.name,
