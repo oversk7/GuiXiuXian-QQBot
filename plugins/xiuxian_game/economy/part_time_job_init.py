@@ -13,8 +13,6 @@ from ..models.db import safe_session
 from ..models.player import Player
 from ..utils import message_add_head
 from .part_time_job_service import PartTimeJobService
-# 导入通知器以确保自动启动
-from . import part_time_job_notifier
 
 
 # 管理员命令：初始化打工系统
