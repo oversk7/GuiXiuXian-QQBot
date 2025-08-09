@@ -41,7 +41,10 @@ async def _(event: MessageEvent):
         if not equips:
             await list_equipment.finish("🎒 你的装备栏空空如也")
 
-        lines = ["🎽 装备栏", "━━━"]
+        # 统计已装备数量
+        equipped_count = sum(1 for eq in equips if eq.equipped)
+
+        lines = [f"🎽 装备栏 ({equipped_count}/4)", "━━━━━━━━━━━━━"]
         for eq in equips:
             tpl = eq.config
             equip_state = "🟢已装备" if eq.equipped else "🔘未装备"
@@ -258,7 +261,7 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
         if equip.config.required_level > player.level:
             await wear_equipment.finish(f"⛔ 等级不足，需要 Lv.{equip.config.required_level}")
 
-        # 检查是否有同类型装备已装备，如果有则先卸下
+        # 检查是否有同名装备已装备
         same_type_stmt = select(ItemInstance).where(
             ItemInstance.player_id == event.get_user_id(),
             ItemInstance.item_id == equip.item_id,
@@ -266,14 +269,19 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
         )
         same_type_equipped = (await session.execute(same_type_stmt)).scalars().all()
 
-        for old_equip in same_type_equipped:
-            old_equip.equipped = False
-            # 移除旧装备的属性加成
-            old_delta = (old_equip.extra_attrs or {}).get("_persist_bonus", {})
-            for k, v in old_delta.items():
-                current_value = getattr(player, k, 0)
-                setattr(player, k, max(0, current_value - v))
-            session.add(old_equip)
+        if same_type_equipped:
+            await wear_equipment.finish(f"⛔ 已装备同名装备 {equip.config.name}，不能重复穿戴")
+
+        # 检查装备数量限制（最多4件）
+        all_equipped_stmt = select(ItemInstance).where(
+            ItemInstance.player_id == event.get_user_id(),
+            ItemInstance.equipped == True,
+            ItemInstance.item_id.in_(EQUIP_ITEM_IDS)
+        )
+        all_equipped = (await session.execute(all_equipped_stmt)).scalars().all()
+
+        if len(all_equipped) >= 4:
+            await wear_equipment.finish("⛔ 装备栏已满，最多只能穿戴4件装备，请先卸下其他装备")
 
         # 穿戴新装备
         equip.equipped = True

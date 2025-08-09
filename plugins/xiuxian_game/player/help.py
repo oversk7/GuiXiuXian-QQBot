@@ -398,7 +398,7 @@ guild_help_cmd = on_command("公会系统", aliases={"公会帮助"}, priority=4
 async def handle_guild_help(event: MessageEvent, args: Message = CommandArg()):
     msg = (
         "✨ 公会系统帮助 ✨\n"
-        "全新职位体系，建筑加成，任务系统\n"
+        "加入公会可以获得公会建筑福利\n"
         "━━━━━━━━━━━━━\n"
         "🏰 基础功能\n"
         "【创建公会 <公会名>】 创建公会（消耗会长委任书）\n"
