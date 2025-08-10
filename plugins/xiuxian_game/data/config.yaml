@@ -71,7 +71,7 @@ monthly_card:
     auto_collect: false              # 不自动采集
     sign_stamina_bonus: 5            # 签到咒抗上限增加+5
     sign_sweep_tokens: 1             # 签到获得扫荡令数量
-    breakthrough_protection: 0.8     # 突破失败时修为保留比例80%
+    breakthrough_protection: 0.75     # 突破失败时修为保留比例75%
   premium:
     name: "高级月卡"
     cultivation_efficiency: 0.5      # 修炼效率+50%
