@@ -262,7 +262,6 @@ async def handle_xiu_lian(event: MessageEvent, args: Message = CommandArg()):
         "【加点 <属性> <点数>】 分配突破获得的属性点，增强实力\n"
         "【加点帮助】 查看属性详解和推荐加点方案\n"
         "【献祭】 献祭材料以获取怨念值，用于为突破护航\n"
-        "【使用 怨念结晶】 氪金道具，直接获得大量怨念值"
     )
     await xiu_lian_cmd.finish(Message(msg))
 
