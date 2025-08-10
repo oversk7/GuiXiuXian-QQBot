@@ -67,8 +67,8 @@ class WorldBossService:
     # 理智削减配置
     SANITY_DAMAGE_CONFIG = {
         "low_level_threshold": 50,  # 低等级阈值
-        "low_level_fixed_damage": (40, 80),  # 低等级固定伤害范围
-        "high_level_percentage": (0.10, 0.20),  # 高等级百分比伤害范围
+        "low_level_fixed_damage": (20, 40),  # 低等级固定伤害范围
+        "high_level_percentage": (0.09, 0.15),  # 高等级百分比伤害范围
     }
     
     # 奖励区间配置（按累计伤害排名）
@@ -250,13 +250,19 @@ class WorldBossService:
         result = (await session.execute(stmt)).first()
         total_participants = result[0] or 0
         total_damage = result[1] or 0
-        
+
+        # 获取BOSS当前属性
+        boss_stats = await WorldBossService._calculate_boss_stats(session, cycle)
+
         # 构建消息
         lines = [
             f"🌟 世界BOSS：{cycle.boss_name}",
             f"👑 {cycle.boss_title}",
             "━━━━━━━━━━━━━",
             f"📖 {description}",
+            "",
+            f"🛡️ 当前防御：{boss_stats['defense']:,}",
+            f"⚡ 当前敏捷：{boss_stats['agility']:,}",
             "",
             f"⚔️ 你的累计伤害：{damage_record.total_damage:,}",
             f"🎯 今日剩余攻击次数：{remaining_attacks}/{WorldBossService.DAILY_ATTACK_LIMIT}",
@@ -531,27 +537,26 @@ class WorldBossService:
 
     @staticmethod
     async def _calculate_boss_stats(session: AsyncSession, cycle: WorldBossCycle) -> Dict[str, int]:
-        """计算BOSS属性（基于最高等级玩家）"""
+        """计算BOSS属性（基础属性受最高等级玩家影响但有独立的计算逻辑）"""
         # 获取最高等级玩家
         stmt = select(Player).order_by(desc(Player.level)).limit(1)
         top_player = (await session.execute(stmt)).scalars().first()
-        
+
         if not top_player:
-            # 如果没有玩家，使用默认值
+            # 如果没有玩家，使用默认基础值
             base_defense = 100
             base_agility = 80
         else:
-            # 基于最高等级玩家的属性
-            base_defense = top_player.defense
-            base_agility = top_player.agility
-        
-        # 添加随机波动（±10%）
-        defense_variance = random.uniform(0.9, 1.1)
-        agility_variance = random.uniform(0.9, 1.1)
-        
+            # BOSS基础属性受最高玩家等级影响，但有独立的计算公式
+            # 防御力：基础值 + 玩家等级影响 + 玩家防御力的一定比例
+            base_defense = 10 + int(top_player.defense * 0.3)
+
+            # 敏捷：基础值 + 玩家等级影响 + 玩家敏捷的一定比例
+            base_agility = 10 + int(top_player.agility * 0.25)
+
         return {
-            "defense": int(base_defense * defense_variance),
-            "agility": int(base_agility * agility_variance),
+            "defense": int(base_defense),
+            "agility": int(base_agility),
             "level": "???"  # 等级显示为???
         }
 
