@@ -17,10 +17,10 @@ class BattleAttributeCalculator:
         "critical_rate": 75,      # 暴击率上限75%
         "combo_rate": 60,         # 连击率上限60%
         "counter_rate": 80,       # 反击率上限80%
-        "dodge_rate": 85,         # 闪避率上限85%
-        "accuracy_rate": 95,      # 命中率上限95%
+        "dodge_rate": 500,         # 闪避率
+        "accuracy_rate": 500,     # 命中率能和闪避率抵消，所以可以超过100
         "skill_crit_rate": 70,    # 灵爆率上限70%
-        "penetration_rate": 70    # 穿透率上限70%
+        "penetration_rate": 100    # 穿透率
     }
     
     # 等级加成配置（移除等级加成，改为装备驱动）

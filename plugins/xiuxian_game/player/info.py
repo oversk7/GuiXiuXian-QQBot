@@ -97,7 +97,7 @@ profile = on_command("角色",aliases={"面板","状态"}, block=True, priority=
 register = on_command("注册", block=True, priority=5)
 change_gender = on_command("改性别", aliases={"修改性别"}, block=True, priority=5)
 newbie_guide = on_command("新手指引", aliases={"指令格式", "指令帮助", "新手教程"}, block=True, priority=5)
-attribute_guide = on_command("加点帮助", aliases={"属性帮助", "加点指南", "属性指南"}, block=True, priority=5)
+attribute_guide = on_command("加点帮助", aliases={"属性帮助", "加点指南", "属性说明"}, block=True, priority=5)
 
 
 @profile.handle()

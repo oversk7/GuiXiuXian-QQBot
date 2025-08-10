@@ -52,7 +52,7 @@ async def handle_battle_info(event: MessageEvent, args: Message = CommandArg()):
 
 
 # 查看属性详情命令
-battle_detail = on_command("属性说明", aliases={"属性介绍"}, block=True, priority=5)
+battle_detail = on_command("战力说明", aliases={"战力介绍"}, block=True, priority=5)
 
 
 @battle_detail.handle()
@@ -84,7 +84,6 @@ async def handle_battle_detail(event: MessageEvent, args: Message = CommandArg()
         "🎯 命中率",
         "• 攻击命中敌方的概率",
         "• 敌方闪避率可抵消",
-        "• 最终命中率不高于95%",
         "",
         "✨ 灵爆率",
         "• 技能攻击的暴击概率",
