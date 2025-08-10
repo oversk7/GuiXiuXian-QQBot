@@ -657,7 +657,7 @@ async def handle_admin_database_query(user_message: str, event):
 
         # 调用AI生成SQL
         sql_query = await generate_sql_from_natural_language(user_message)
-
+        print(sql_query)
         if not sql_query:
             await ai_guide.finish(message_add_head("❌ 无法理解需求，请重新描述或使用游戏指令", event))
 

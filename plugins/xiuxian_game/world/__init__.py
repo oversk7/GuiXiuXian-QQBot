@@ -906,6 +906,191 @@ async def handle_teleport_list(event: MessageEvent):
 region_overview_cmd = on_command("俯瞰", aliases={"感知"}, block=True, priority=5)
 
 
+async def generate_player_centered_overview_image(region: str, session, center_x: int, center_y: int, width: int, height: int) -> tuple[bytes, tuple[int, int, int, int]]:
+    """生成以玩家为中心的固定大小俯瞰图片"""
+    # 计算坐标范围
+    half_width = width // 2
+    half_height = height // 2
+    min_x = center_x - half_width
+    max_x = center_x + half_width
+    min_y = center_y - half_height
+    max_y = center_y + half_height
+
+    # 获取该区域内的所有格子数据
+    from sqlalchemy import and_
+
+    stmt = select(WorldTile).where(
+        and_(
+            WorldTile.region == region,
+            WorldTile.x >= min_x,
+            WorldTile.x <= max_x,
+            WorldTile.y >= min_y,
+            WorldTile.y <= max_y
+        )
+    )
+    result = await session.execute(stmt)
+    tiles = result.scalars().all()
+
+    # 创建图片 - 为坐标轴预留空间（完全按照原有方式）
+    margin = 40  # 边缘留白用于显示坐标
+    img_width = 1000
+    img_height = 1000
+    img = Image.new('RGB', (img_width, img_height), color='#1a1a1a')  # 深色背景
+    draw = ImageDraw.Draw(img)
+
+    # 尝试加载字体，如果失败则使用默认字体
+    try:
+        # 使用系统默认字体
+        font = ImageFont.load_default()
+    except Exception:
+        font = None
+
+    # 计算格子大小 - 减去边缘空间（完全按照原有方式）
+    grid_width = max_x - min_x + 1
+    grid_height = max_y - min_y + 1
+    available_width = img_width - 2 * margin
+    available_height = img_height - 2 * margin
+
+    # 防止除零错误
+    if grid_width <= 0:
+        grid_width = 1
+    if grid_height <= 0:
+        grid_height = 1
+
+    cell_width = available_width // grid_width
+    cell_height = available_height // grid_height
+
+    # 确保格子大小至少为2像素，避免太小无法显示
+    if cell_width <= 1:
+        cell_width = 2
+    if cell_height <= 1:
+        cell_height = 2
+
+    # 事件类型颜色映射 - 使用RGB元组确保兼容性（完全按照原有方式）
+    event_colors = {
+        'MATERIAL': (76, 175, 80),     # 绿色 - 材料
+        'TREASURE': (255, 215, 0),     # 金色 - 宝藏
+        'EMPTY': (244, 67, 54),        # 红色 - 怪物
+        'REST': (33, 150, 243),        # 蓝色 - 休息点
+        'MERCHANT': (156, 39, 176),    # 紫色 - 商人
+        'ELITE': (255, 87, 34),        # 深橙色 - 精英怪
+    }
+
+    # 创建格子坐标到tile的映射
+    tile_map = {(tile.x, tile.y): tile for tile in tiles}
+
+    # 绘制格子（完全按照原有方式）
+    colored_tiles_count = 0
+    for grid_x in range(grid_width):
+        for grid_y in range(grid_height):
+            world_x = min_x + grid_x
+            world_y = min_y + grid_y
+
+            # 计算像素坐标 - 加上边距偏移
+            pixel_x = margin + grid_x * cell_width
+            pixel_y = margin + grid_y * cell_height
+
+            tile = tile_map.get((world_x, world_y))
+
+            if tile:
+                # 根据事件类型选择颜色，不区分消耗状态
+                color = event_colors.get(tile.event_type, (102, 102, 102))  # 默认灰色
+                colored_tiles_count += 1
+            else:
+                # 未探索的区域使用深灰色
+                color = (51, 51, 51)  # 深灰色
+
+            # 绘制格子 - 使用更简单的坐标计算
+            x1 = pixel_x
+            y1 = pixel_y
+            x2 = pixel_x + cell_width
+            y2 = pixel_y + cell_height
+
+            # 确保坐标有效并绘制格子
+            if x2 > x1 and y2 > y1:
+                draw.rectangle([x1, y1, x2, y2], fill=color, outline=(85, 85, 85))  # 使用RGB格式的边框色
+
+    # 绘制玩家位置标记（完全按照原有方式）
+    player_x = center_x
+    player_y = center_y
+    if player_x is not None and player_y is not None:
+        # 检查玩家位置是否在当前显示范围内
+        if min_x <= player_x <= max_x and min_y <= player_y <= max_y:
+            # 计算玩家位置的像素坐标
+            player_grid_x = player_x - min_x
+            player_grid_y = player_y - min_y
+            player_pixel_x = margin + player_grid_x * cell_width
+            player_pixel_y = margin + player_grid_y * cell_height
+
+            # 绘制玩家位置标记 - 使用亮黄色圆形
+            center_x_pixel = player_pixel_x + cell_width // 2
+            center_y_pixel = player_pixel_y + cell_height // 2
+            radius = min(cell_width, cell_height) // 3
+
+            # 绘制外圈（白色边框）
+            draw.ellipse([
+                center_x_pixel - radius - 2, center_y_pixel - radius - 2,
+                center_x_pixel + radius + 2, center_y_pixel + radius + 2
+            ], fill=(255, 255, 255), outline=(255, 255, 255))
+
+            # 绘制内圈（亮黄色）
+            draw.ellipse([
+                center_x_pixel - radius, center_y_pixel - radius,
+                center_x_pixel + radius, center_y_pixel + radius
+            ], fill=(255, 255, 0), outline=(255, 215, 0))
+
+    # 绘制坐标轴十字细线（完全按照原有方式）
+    # 绘制中心十字线（如果坐标范围包含原点）
+    if min_x <= 0 <= max_x and min_y <= 0 <= max_y:
+        # 计算原点(0,0)的像素坐标
+        origin_grid_x = 0 - min_x
+        origin_grid_y = 0 - min_y
+        origin_pixel_x = margin + origin_grid_x * cell_width
+        origin_pixel_y = margin + origin_grid_y * cell_height
+
+        # 绘制垂直线（Y轴）
+        draw.line([
+            (origin_pixel_x + cell_width // 2, margin),
+            (origin_pixel_x + cell_width // 2, img_height - margin)
+        ], fill=(128, 128, 128), width=1)
+
+        # 绘制水平线（X轴）
+        draw.line([
+            (margin, origin_pixel_y + cell_height // 2),
+            (img_width - margin, origin_pixel_y + cell_height // 2)
+        ], fill=(128, 128, 128), width=1)
+
+    # 绘制坐标轴数字（完全按照原有方式）
+    if font:
+        # 绘制X轴坐标（顶部和底部）
+        step_x = max(1, grid_width // 10)  # 最多显示10个X坐标
+        for i in range(0, grid_width, step_x):
+            world_x = min_x + i
+            pixel_x = margin + i * cell_width + cell_width // 2
+
+            # 顶部X坐标
+            draw.text((pixel_x, 5), str(world_x), fill=(255, 255, 255), font=font, anchor='mt')
+            # 底部X坐标
+            draw.text((pixel_x, img_height - 20), str(world_x), fill=(255, 255, 255), font=font, anchor='mb')
+
+        # 绘制Y轴坐标（左侧和右侧）
+        step_y = max(1, grid_height // 10)  # 最多显示10个Y坐标
+        for i in range(0, grid_height, step_y):
+            world_y = min_y + i
+            pixel_y = margin + i * cell_height + cell_height // 2
+
+            # 左侧Y坐标
+            draw.text((5, pixel_y), str(world_y), fill=(255, 255, 255), font=font, anchor='lm')
+            # 右侧Y坐标
+            draw.text((img_width - 5, pixel_y), str(world_y), fill=(255, 255, 255), font=font, anchor='rm')
+
+    # 将图片转换为字节流
+    img_buffer = io.BytesIO()
+    img.save(img_buffer, format='PNG')
+    img_buffer.seek(0)
+    return img_buffer.getvalue(), (min_x, max_x, min_y, max_y)
+
+
 async def generate_region_overview_image(region: str, session, player_x: int = None, player_y: int = None) -> tuple[bytes, tuple[int, int, int, int]]:
     """生成指定诡域的今日探索概览图片"""
     today = date.today()
@@ -1165,63 +1350,98 @@ async def handle_region_overview(event: MessageEvent, args: Message = CommandArg
         # 获取参数
         arg_text = args.extract_plain_text().strip()
 
-        # 如果没有指定诡域，使用当前诡域
+        # 如果没有指定诡域，以自身为中心生成500x500的俯瞰图
         if not arg_text:
-            if player.region == "大都会":
-                await region_overview_cmd.finish("⛔ 请指定要查看的诡域名称，或先传送到诡域中")
-            region = player.region
+            try:
+                # 以玩家位置为中心生成500x500的俯瞰图
+                img_data, (min_x, max_x, min_y, max_y) = await generate_player_centered_overview_image(
+                    player.region, session, player.x, player.y, 500, 500
+                )
+
+                # 转换为base64
+                img_b64 = base64.b64encode(img_data).decode('utf-8')
+
+                # 构建说明文字
+                msg_lines = [
+                    f"🗺️ {player.region} 以你为中心的俯瞰图",
+                    "━━━━━━━━━━━━━",
+                    f"📍 中心位置：({player.x},{player.y})",
+                    f"📍 坐标范围：X({min_x}~{max_x}) Y({min_y}~{max_y})",
+                    "━━━━━━━━━━━━━",
+                    "🟢 绿色：材料格子",
+                    "🟡 金色：宝藏格子",
+                    "🔴 红色：怪物格子",
+                    "🔵 蓝色：休息格子",
+                    "🟣 紫色：商人格子",
+                    "🟠 橙色：精英怪格子",
+                    "⬛ 灰色：未探索区域",
+                    f"🟡 亮黄圆圈：你的位置 ({player.x},{player.y})",
+                    "🔢 图片边缘显示坐标数字"
+                ]
+
+                msg_text = "\n".join(msg_lines)
+
+                # 发送图片和文字
+                img_segment = MessageSegment.file_image(img_b64)
+                message = Message(msg_text).append(img_segment)
+
+                await region_overview_cmd.finish(message_add_head(message, event))
+
+            except ValueError as e:
+                await region_overview_cmd.finish(f"⛔ 生成俯瞰图失败：{str(e)}")
         else:
+            # 指定了诡域名称，使用原有逻辑
             region = arg_text
             # 检查诡域是否存在
             if region not in config.map_config["regions"]:
                 await region_overview_cmd.finish("⛔ 未知的诡域名称")
 
-        try:
-            # 生成概览图片，传入玩家坐标（如果玩家在当前诡域）
-            player_x, player_y = None, None
-            if player.region == region:
-                player_x, player_y = player.x, player.y
+            try:
+                # 生成概览图片，传入玩家坐标（如果玩家在当前诡域）
+                player_x, player_y = None, None
+                if player.region == region:
+                    player_x, player_y = player.x, player.y
 
-            img_data, (min_x, max_x, min_y, max_y) = await generate_region_overview_image(region, session, player_x, player_y)
+                img_data, (min_x, max_x, min_y, max_y) = await generate_region_overview_image(region, session, player_x, player_y)
 
-            # 转换为base64
-            img_b64 = base64.b64encode(img_data).decode('utf-8')
+                # 转换为base64
+                img_b64 = base64.b64encode(img_data).decode('utf-8')
 
-            # 构建消息
-            region_config = config.map_config["regions"].get(region, {})
-            tier = region_config.get("tier", 1)
-            level_range = region_config.get("level_range", [1, 1])
+                # 构建消息
+                region_config = config.map_config["regions"].get(region, {})
+                tier = region_config.get("tier", 1)
+                level_range = region_config.get("level_range", [1, 1])
 
-            # 构建说明文字
-            msg_lines = [
-                f"🗺️ {region} 今日探索小地图",
-                "━━━━━━━━━━━━━",
-                f"📊 诡域等级：Tier {tier}",
-                f"⚔️ 怪物等级：{level_range[0]}-{level_range[1]}级",
-                f"📍 坐标范围：X({min_x}~{max_x}) Y({min_y}~{max_y})",
-                "━━━━━━━━━━━━━",
-                "🟢 绿色：材料格子",
-                "🟡 金色：宝藏格子",
-                "🔴 红色：怪物格子",
-                "🔵 蓝色：休息格子",
-                "🟣 紫色：商人格子",
-                "🟠 橙色：精英怪格子",
-                "⬛ 灰色：未探索区域"
-            ]
+                # 构建说明文字
+                msg_lines = [
+                    f"🗺️ {region} 今日探索小地图",
+                    "━━━━━━━━━━━━━",
+                    f"📊 诡域等级：Tier {tier}",
+                    f"⚔️ 怪物等级：{level_range[0]}-{level_range[1]}级",
+                    f"📍 坐标范围：X({min_x}~{max_x}) Y({min_y}~{max_y})",
+                    "━━━━━━━━━━━━━",
+                    "🟢 绿色：材料格子",
+                    "🟡 金色：宝藏格子",
+                    "🔴 红色：怪物格子",
+                    "🔵 蓝色：休息格子",
+                    "🟣 紫色：商人格子",
+                    "🟠 橙色：精英怪格子",
+                    "⬛ 灰色：未探索区域"
+                ]
 
-            # 如果玩家在当前诡域，添加位置说明
-            if player.region == region:
-                msg_lines.append(f"🟡 亮黄圆圈：你的位置 ({player.x},{player.y})")
+                # 如果玩家在当前诡域，添加位置说明
+                if player.region == region:
+                    msg_lines.append(f"🟡 亮黄圆圈：你的位置 ({player.x},{player.y})")
 
-            msg_lines.append("🔢 图片边缘显示坐标数字")
+                msg_lines.append("🔢 图片边缘显示坐标数字")
 
-            msg_text = "\n".join(msg_lines)
+                msg_text = "\n".join(msg_lines)
 
-            # 发送图片和文字
-            img_segment = MessageSegment.file_image(img_b64)
-            message = Message(msg_text).append(img_segment)
+                # 发送图片和文字
+                img_segment = MessageSegment.file_image(img_b64)
+                message = Message(msg_text).append(img_segment)
 
-            await region_overview_cmd.finish(message_add_head(message, event))
+                await region_overview_cmd.finish(message_add_head(message, event))
 
-        except ValueError as e:
-            await region_overview_cmd.finish(f"⛔ 生成概览图片失败：{str(e)}")
+            except ValueError as e:
+                await region_overview_cmd.finish(f"⛔ 生成概览图片失败：{str(e)}")
