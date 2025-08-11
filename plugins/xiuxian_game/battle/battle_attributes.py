@@ -14,7 +14,7 @@ class BattleAttributeCalculator:
     
     # 属性上限配置
     ATTRIBUTE_CAPS = {
-        "critical_rate": 75,      # 暴击率上限75%
+        "critical_rate": 100,      # 暴击率
         "combo_rate": 60,         # 连击率上限60%
         "counter_rate": 80,       # 反击率上限80%
         "dodge_rate": 500,         # 闪避率
