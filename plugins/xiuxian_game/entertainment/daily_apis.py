@@ -142,6 +142,76 @@ def _parse_fortune_text(text: str) -> dict:
 # 摸鱼日历（合并日历和日报）
 moyu_calendar = on_command("摸鱼日历", aliases={"摸鱼", "日历", "摸鱼日报", "日报"}, block=True, priority=5)
 
+async def _get_moyu_calendar_from_backup() -> tuple[bool, str]:
+    """
+    从备用源获取摸鱼日历
+    返回: (成功标志, base64图片数据或错误信息)
+    """
+    try:
+        headers = {
+            'Content-Type': 'application/x-www-form-urlencoded;charset:utf-8;'
+        }
+        api_url = "https://www.52api.cn/api/moyu"
+        params = {
+            'key': '3VgDmAiNNGpjLRvjhvmLMTDGxk'
+        }
+
+        logger.info(f"请求备用源: {api_url} with params: {params}")
+        response = requests.get(api_url, params=params, headers=headers, timeout=15)
+
+        logger.info(f"备用源响应状态: {response.status_code}")
+        logger.info(f"备用源响应Content-Type: {response.headers.get('content-type', 'unknown')}")
+
+        if response.status_code == 200:
+            # 检查Content-Type，如果是图片则直接处理
+            content_type = response.headers.get('content-type', '').lower()
+
+            if 'image/' in content_type:
+                # 直接返回图片的base64编码
+                logger.info("备用源直接返回图片数据")
+                if response.content:
+                    calendar_b64 = base64.b64encode(response.content).decode("utf-8")
+                    return True, calendar_b64
+                else:
+                    return False, "备用源返回空图片数据"
+
+            elif 'application/json' in content_type:
+                # 如果是JSON格式，按原逻辑处理
+                try:
+                    data = response.json()
+                    logger.info(f"备用源JSON解析成功: {data}")
+
+                    if data.get("code") == 200:
+                        # 备用API返回的是图片URL，需要再次请求获取图片
+                        image_url = data.get("data")
+                        if image_url:
+                            logger.info(f"获取到图片URL: {image_url}")
+                            img_response = requests.get(image_url, timeout=15)
+                            if img_response.status_code == 200:
+                                calendar_b64 = base64.b64encode(img_response.content).decode("utf-8")
+                                return True, calendar_b64
+                            else:
+                                return False, f"备用源图片下载失败: {img_response.status_code}"
+                        else:
+                            return False, "备用源未返回图片URL"
+                    else:
+                        return False, f"备用源API错误: {data.get('msg', '未知错误')}"
+                except json.JSONDecodeError as e:
+                    logger.error(f"备用源JSON解析失败: {e}")
+                    return False, f"备用源数据解析失败: {str(e)}"
+
+            else:
+                # 未知的Content-Type
+                logger.warning(f"备用源返回未知Content-Type: {content_type}")
+                return False, f"备用源返回未知格式: {content_type}"
+        else:
+            return False, f"备用源请求失败: {response.status_code}"
+
+    except requests.RequestException as e:
+        logger.error(f"备用源网络请求异常: {e}")
+        return False, f"备用源网络请求失败: {str(e)}"
+
+
 @moyu_calendar.handle()
 async def handle_moyu_calendar(event: MessageEvent):
     """获取摸鱼日历和日报图片"""
@@ -151,26 +221,41 @@ async def handle_moyu_calendar(event: MessageEvent):
     allowed, error_msg = check_action_limit(user_id, "daily_api")
     if not allowed:
         await moyu_calendar.finish(error_msg)
-
+    await moyu_calendar.send("📅 正在获取摸鱼日历与日报，请耐心等待10s...")
     try:
         # 记录操作
         record_action(user_id, "daily_api")
 
         messages = []
 
-        # 直接获取日历图片
+        # 获取日历图片 - 主源 + 备用源
+        calendar_success = False
         try:
-            response = requests.get("https://www.yviii.com/moyu/moyu.php", timeout=10)
+            # 尝试主源
+            response = requests.get("https://www.yviii.com/moyu/moyu.php", timeout=15)
             if response.status_code == 200:
                 calendar_b64 = base64.b64encode(response.content).decode("utf-8")
                 calendar_img = MessageSegment.file_image(calendar_b64)
                 messages.append(Message("📅 今日摸鱼日历来啦！").append(calendar_img))
+                calendar_success = True
             else:
-                messages.append(Message("❌ 摸鱼日历获取失败"))
-        except requests.RequestException:
-            messages.append(Message("❌ 摸鱼日历网络请求失败"))
+                logger.warning(f"主源摸鱼日历获取失败: {response.status_code}")
+        except requests.RequestException as e:
+            logger.warning(f"主源摸鱼日历网络请求失败: {e}")
 
-        # 直接获取日报图片
+        # 如果主源失败，尝试备用源
+        if not calendar_success:
+            logger.info("尝试使用备用源获取摸鱼日历")
+            backup_success, backup_result = await _get_moyu_calendar_from_backup()
+            if backup_success:
+                calendar_img = MessageSegment.file_image(backup_result)
+                messages.append(Message("📅 今日摸鱼日历来啦！").append(calendar_img))
+                calendar_success = True
+            else:
+                logger.error(f"备用源摸鱼日历获取失败: {backup_result}")
+                messages.append(Message("❌ 摸鱼日历获取失败"))
+
+        # 获取日报图片 - 仅主源
         try:
             response = requests.get("https://www.yviii.com/moyu/moyu2.php", timeout=10)
             if response.status_code == 200:
