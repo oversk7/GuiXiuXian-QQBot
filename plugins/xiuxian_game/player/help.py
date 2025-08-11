@@ -340,6 +340,7 @@ async def handle_ren_wu(event: MessageEvent, args: Message = CommandArg()):
         "【附近玩家】 查看附近玩家\n"
         "【留言 <内容>】 在世界留言板发布信息\n"
         "【留言板 [页码]】 查看世界留言板\n"
+        "⚠️ 请不要发布敏感内容，严重者销号！\n"
         "━━━━━━━━━━━━━\n"
         "🌟 世界BOSS：\n"
         "【世界BOSS】 查看当前BOSS信息与规则\n"

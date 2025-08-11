@@ -12,6 +12,45 @@ from ..models.world_message import WorldMessage
 from ..utils import message_add_head
 
 
+# 违禁词列表 - 可根据需要扩展
+BANNED_WORDS = [
+    # 常见敏感词（精简版，避免过度过滤）
+    "色情", "黄色", "裸体", "性交", "做爱", "约炮", "援交", "卖淫", "嫖娼",
+    "赌博", "赌钱", "赌场", "博彩", "下注", "投注",
+    "毒品", "大麻", "海洛因", "冰毒", "吸毒", "贩毒",
+    "诈骗", "骗钱", "传销", "洗钱", "假币",
+    "杀人", "谋杀", "自杀", "爆炸", "炸弹", "恐怖",
+    "法轮功", "邪教", "反政府", "颠覆",
+    "翻墙", "VPN", "科学上网","傻逼","傻比","煞笔"
+]
+
+
+def filter_banned_words(content: str) -> str:
+    """过滤违禁词，将违禁词替换为**
+
+    Args:
+        content: 原始内容
+
+    Returns:
+        过滤后的内容
+    """
+    if not content:
+        return content
+
+    filtered_content = content
+
+    # 遍历违禁词列表，进行替换（不区分大小写）
+    for banned_word in BANNED_WORDS:
+        # 使用正则表达式进行不区分大小写的替换
+        pattern = re.compile(re.escape(banned_word), re.IGNORECASE)
+        if pattern.search(filtered_content):
+            # 将违禁词替换为相同长度的*号
+            replacement = "*" * len(banned_word)
+            filtered_content = pattern.sub(replacement, filtered_content)
+
+    return filtered_content
+
+
 def clean_message_content(content: str) -> str:
     """清理消息内容，移除QQ表情源码"""
     # 移除QQ表情源码，格式如：<faceType=1,faceId="13",ext="eyJ0ZXh0Ijoi5ZGy54mZIn0=">
@@ -77,11 +116,18 @@ async def handle_leave_msg(event: MessageEvent, args: Message = CommandArg()):
     if len(content) > MAX_LEN:
         await leave_msg_cmd.finish(f"⛔ 留言不能超过 {MAX_LEN} 字符")
 
+    # 过滤违禁词
+    filtered_content = filter_banned_words(content)
+
+    # 如果内容被过滤了，提醒用户
+    if filtered_content != content:
+        await leave_msg_cmd.send(message_add_head("⚠️ 检测到敏感词汇，已自动过滤", event))
+
     async with safe_session() as session:
         player = await session.get(Player, event.get_user_id())
         if not player:
             await leave_msg_cmd.finish("⛔ 请先创建角色")
-        msg_rec = WorldMessage(player_id=player.id, content=content, created_at=datetime.now())
+        msg_rec = WorldMessage(player_id=player.id, content=filtered_content, created_at=datetime.now())
         session.add(msg_rec)
         await session.commit()
 
