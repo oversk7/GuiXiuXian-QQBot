@@ -614,7 +614,8 @@ async def handle_support(event: MessageEvent, args: Message = CommandArg()):
         "📝 注意：支付时请备注UID + 方案 + 联系方式（可选）\n"
         "💡 发送【月卡】查看当前权益\n"
         "━━━━━━━━━━━━━\n"
-        f"赞助链接：{url}"
+        f"赞助链接：{url}\n"
+        "或者闲鱼搜索:guixiuxian\n"
         "🙏 感谢您对游戏的支持！"
     )
 
