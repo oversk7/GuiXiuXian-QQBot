@@ -587,7 +587,6 @@ async def handle_button_test(event: MessageEvent, args: Message = CommandArg()):
 support_cmd = on_command("赞助", aliases={"赞赏","充值","打赏","氪金"}, priority=4, block=True)
 @support_cmd.handle()
 async def handle_support(event: MessageEvent, args: Message = CommandArg()):
-    url = bypass_urls("https://m.tb.cn/h.hJOvS0t?tk=YAPF4icaJqy")
     msg = (
         "✨ 赞助系统 ✨\n"
         "支持游戏发展，获得作者的回馈\n"
@@ -608,27 +607,25 @@ async def handle_support(event: MessageEvent, args: Message = CommandArg()):
         "   • 永久增加背包容量5格，可重复购买\n"
         "🔸 2元 - 哭坟帽\n"
         "   • 使用后直接获得1w怨念值\n"
-        "🔸 50元 - 当前财富榜第一名的1/10金币（限购1次）\n"
-        "🔸 20元 - 自选十级宝石一颗\n"
+        "🔸 100元 - 当前财富榜第一名的1/10金币（限购1次）\n"
+        "🔸 20元 - 随机十级宝石一颗\n"
         "━━━━━━━━━━━━━\n"
-        "📝 注意：支付时请备注UID + 方案 + 联系方式（可选）\n"
+        "📝 注意：支付时请备注UID + 联系方式（可选）\n"
         "💡 发送【月卡】查看当前权益\n"
         "━━━━━━━━━━━━━\n"
-        f"赞助链接：{url}\n"
-        "或者闲鱼搜索:guixiuxian\n"
         "🙏 感谢您对游戏的支持！"
     )
 
     # 获取当前文件所在目录
-    # cur_dir = os.path.dirname(__file__)
-    # img_path = os.path.join(cur_dir, "../sponsor.jpg")
-    # img_path = os.path.abspath(img_path)  # 转为绝对路径
-    # with open(img_path, "rb") as f:
-    #     import base64
-    #     base64_img = base64.b64encode(f.read()).decode("utf-8")
+    cur_dir = os.path.dirname(__file__)
+    img_path = os.path.join(cur_dir, "../sponsor.jpg")
+    img_path = os.path.abspath(img_path)  # 转为绝对路径
+    with open(img_path, "rb") as f:
+        import base64
+        base64_img = base64.b64encode(f.read()).decode("utf-8")
 
-    # img = MessageSegment.file_image(base64_img)
-    # msg = Message(msg).append(img)
+    img = MessageSegment.file_image(base64_img)
+    msg = Message(msg).append(img)
     await support_cmd.finish(msg)
 
 # Ark天气测试
