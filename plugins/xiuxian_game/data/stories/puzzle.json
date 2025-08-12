@@ -21,10 +21,12 @@
       "content": "你的手机震动，屏幕上显示血红的文字：\n【☠️本轮游戏为'灵异拼图'。房间内藏有四幅打乱的拼图，找到并完成任意一幅即可通关游戏。本轮游戏时长为三十分钟，三十分钟内未完成拼图视为游戏失败。】\n【规则：一、玩家不得想方设法逃出这件屋子。二、拼图需在方桌前操作，完成拼图期间不得离开方桌。三、完成拼图后，将有五分钟滞留时间，五分钟结束后点击手机上的'回归'按钮才可离开游戏。】",
       "next": "发现锤子",
       "effects": {
-        "shuzhuo_ss": false,
-        "yichu_ss": false,
-        "shipin_ss": false,
-        "diaodeng_ss": false
+        "variables": {
+          "shuzhuo_ss": false,
+          "yichu_ss": false,
+          "shipin_ss": false,
+          "diaodeng_ss": false
+        }
       }
     },
     "发现锤子": {
