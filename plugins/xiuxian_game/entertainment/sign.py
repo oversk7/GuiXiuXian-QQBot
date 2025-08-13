@@ -45,23 +45,25 @@ async def handle_sign(event: MessageEvent):
         else:
             base_gold = random.randint(50, 150)
 
-        gold_reward = min(2000, base_gold * streak)
+        gold_reward = min(3000, base_gold * streak)
+        base_reward = gold_reward
 
         # Luck 翻倍判定
         if random.random() < luck_prob(player.luck):
             gold_reward *= 2
-            lucky_msg = f"🍀 幸运加成！奖励翻倍，改写为{gold_reward}金币"
+            lucky_msg = f"🍀 触发幸运判定！奖励翻倍，改写为{gold_reward}金币"
         else:
             lucky_msg = ""
 
         bonus_msg = ""
+        resentment_reward = random.randint(10, 50)
         # 官群额外奖励
         if group_id == 'A147FA35C340F858A66260FB4ADBB46D':
-            bonus_msg = "\n🎁 官群额外奖励 怨念值+10 ↑"
+            bonus_msg = f"\n🎁 官群额外奖励 怨念值+{resentment_reward} ↑"
             # 发放怨念值
-            player.resentment += 10
+            player.resentment += resentment_reward
         else:
-            bonus_msg = "\n官群签到送大量怨念！发送/帮助 查看群号~"
+            bonus_msg = "\n官群签到送怨念！发送/帮助 查看群号~"
 
         # 发放奖励
         player.gold += gold_reward
@@ -145,4 +147,4 @@ async def handle_sign(event: MessageEvent):
 
         # 然后发送响应消息
         await sign.send(
-            f"{player.nickname}[{player.uid}] 连续签到 {streak} 天！获得 {gold_reward} 金币！\n{lucky_msg}{bonus_msg}{stamina_msg}{monthly_card_msg}{new_msg}{guild_msg}")
+            f"🛞{player.nickname}[{player.uid}] 连续签到 {streak} 天！获得 {base_reward} 金币！\n{lucky_msg}{bonus_msg}{stamina_msg}{monthly_card_msg}{new_msg}{guild_msg}")
