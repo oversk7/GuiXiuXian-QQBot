@@ -67,7 +67,8 @@ async def handle_market(event: MessageEvent, args: Message = CommandArg()):
         "• 专售装备升阶相关特殊物品\n"
         "• 使用公会积分兑换，无需加入公会\n"
         "━━━━━━━━━━━━━\n"
-        "⚠️ 防刷钱：在某地购买的商品，8小时内不可在同地出售"
+        "⚠️ 防刷钱：在某地购买的商品，8小时内不可在同地出售\n"
+        "⚖️ 携带限制：背包中商品总量不能超过500个，防止垄断库存"
     )
     await market_cmd.finish(Message(msg))
 # 炼丹系统
