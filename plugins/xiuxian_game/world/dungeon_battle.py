@@ -350,7 +350,13 @@ async def get_or_create_tile(session, region: str, x: int, y: int) -> WorldTile:
             # 新的层级制诡域
             try:
                 level = int(region.replace("层诡域", ""))
-                region_config = config.map_config.get("dungeon_levels", {}).get(level, {})
+                # 优先从预生成配置获取，如果不存在则动态生成（支持无限层）
+                region_config = config.map_config.get("dungeon_levels", {}).get(level)
+                if not region_config:
+                    # 动态生成超过100层的配置
+                    region_config = config._generate_dungeon_level_config(
+                        level, config.map_config.get("dungeon_generation_rules", {})
+                    )
                 tier = region_config.get("tier", level)  # 层级即为tier
             except ValueError:
                 pass
@@ -540,7 +546,12 @@ async def _(event: MessageEvent):
             await move_cmd.finish(f"⛔ 无法向{direction}移动，已到达诡域边界\n📍 当前坐标范围：(-5,-5) 到 (5,5)")
 
         # 根据诡域层级获取配置并扣除理智
-        dungeon_config = config.map_config.get("dungeon_levels", {}).get(player.dungeon_level, {})
+        dungeon_config = config.map_config.get("dungeon_levels", {}).get(player.dungeon_level)
+        if not dungeon_config:
+            # 动态生成超过100层的配置
+            dungeon_config = config._generate_dungeon_level_config(
+                player.dungeon_level, config.map_config.get("dungeon_generation_rules", {})
+            )
         mp_cost = dungeon_config.get("mp_cost", 1)  # 默认消耗1点理智
 
         if player.mp < mp_cost:
@@ -1657,9 +1668,13 @@ async def handle_region_overview(event: MessageEvent, args: Message = CommandArg
                 try:
                     level_str = region.replace("层诡域", "")
                     dungeon_level = int(level_str)
+                    # 优先从预生成配置获取，如果不存在则动态生成（支持无限层）
                     dungeon_config = config.map_config.get("dungeon_levels", {}).get(dungeon_level)
                     if not dungeon_config:
-                        await region_overview_cmd.finish(f"⛔ {dungeon_level}层诡域尚未开放")
+                        # 动态生成超过100层的配置
+                        dungeon_config = config._generate_dungeon_level_config(
+                            dungeon_level, config.map_config.get("dungeon_generation_rules", {})
+                        )
                 except ValueError:
                     await region_overview_cmd.finish("⛔ 诡域层级格式错误，请使用：俯瞰 1层诡域")
             else:
