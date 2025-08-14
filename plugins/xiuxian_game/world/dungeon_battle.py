@@ -1161,7 +1161,7 @@ async def handle_teleport_list(event: MessageEvent):
 region_overview_cmd = on_command("俯瞰", aliases={"感知"}, block=True, priority=5)
 
 
-async def generate_player_centered_overview_image(region: str, session, center_x: int, center_y: int, width: int, height: int) -> tuple[bytes, tuple[int, int, int, int]]:
+async def generate_player_centered_overview_image(region: str, session, center_x: int, center_y: int, width: int, height: int, player_x: int = None, player_y: int = None) -> tuple[bytes, tuple[int, int, int, int]]:
     """生成以玩家为中心的固定大小俯瞰图片"""
     # 计算坐标范围
     half_width = width // 2
@@ -1266,9 +1266,10 @@ async def generate_player_centered_overview_image(region: str, session, center_x
             if x2 > x1 and y2 > y1:
                 draw.rectangle([x1, y1, x2, y2], fill=color, outline=(85, 85, 85))  # 使用RGB格式的边框色
 
-    # 绘制玩家位置标记（完全按照原有方式）
-    player_x = center_x
-    player_y = center_y
+    # 绘制玩家位置标记（使用传入的玩家坐标，如果没有则使用中心坐标）
+    if player_x is None or player_y is None:
+        player_x = center_x
+        player_y = center_y
     if player_x is not None and player_y is not None:
         # 检查玩家位置是否在当前显示范围内
         if min_x <= player_x <= max_x and min_y <= player_y <= max_y:
@@ -1621,9 +1622,9 @@ async def handle_region_overview(event: MessageEvent, args: Message = CommandArg
 
                 # 检查当前区域是否为诡域（层级制诡域）
                 if current_region.endswith("层诡域"):
-                    # 诡域内：生成固定的10x10地图（-5到5的范围）
+                    # 诡域内：生成固定的10x10地图（-5到5的范围），以(0,0)为中心但显示玩家实际位置
                     img_data, (min_x, max_x, min_y, max_y) = await generate_player_centered_overview_image(
-                        current_region, session, 0, 0, 11, 11  # 以(0,0)为中心的11x11地图，覆盖-5到5
+                        current_region, session, 0, 0, 11, 11, current_x, current_y  # 以(0,0)为中心的11x11地图，但显示玩家在(current_x,current_y)的位置
                     )
                     map_desc = f"🗺️ {current_region} 完整地图"
                     coord_desc = f"📍 你的位置：({current_x},{current_y})"
@@ -1631,7 +1632,7 @@ async def handle_region_overview(event: MessageEvent, args: Message = CommandArg
                 else:
                     # 现实世界：生成以玩家为中心的大范围俯瞰图
                     img_data, (min_x, max_x, min_y, max_y) = await generate_player_centered_overview_image(
-                        current_region, session, current_x, current_y, 500, 500
+                        current_region, session, current_x, current_y, 500, 500, current_x, current_y
                     )
                     map_desc = f"🗺️ {current_region} 以你为中心的俯瞰图"
                     coord_desc = f"📍 中心位置：({current_x},{current_y})"
@@ -1701,9 +1702,12 @@ async def handle_region_overview(event: MessageEvent, args: Message = CommandArg
 
                 # 检查是否为诡域，如果是则使用固定范围
                 if region.endswith("层诡域"):
-                    # 诡域使用固定的10x10范围（-5到5）
+                    # 诡域使用固定的10x10范围（-5到5），如果玩家在当前诡域则以玩家为中心
+                    center_x, center_y = 0, 0  # 默认以(0,0)为中心
+                    if current_region == region and player_x is not None and player_y is not None:
+                        center_x, center_y = player_x, player_y  # 如果玩家在当前诡域，以玩家位置为中心
                     img_data, (min_x, max_x, min_y, max_y) = await generate_player_centered_overview_image(
-                        region, session, 0, 0, 11, 11  # 以(0,0)为中心的11x11地图，覆盖-5到5
+                        region, session, center_x, center_y, 11, 11, player_x, player_y  # 以计算出的中心位置生成11x11地图，显示玩家实际位置
                     )
                 else:
                     # 其他区域使用原有的今日探索逻辑
