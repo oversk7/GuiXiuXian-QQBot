@@ -7,6 +7,10 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from ..models.player import Player
 from ..models.daily_task import DailyTask, TaskType, TaskStatus
+from ..models.location import Location
+from ..models.npc import NPC, NPCType
+from ..world.location_service import LocationService
+from ..world.npc_service import NPCService
 from ..config import config
 
 
@@ -90,6 +94,10 @@ class DailyTaskService:
         )
 
         session.add(task)
+
+        # 创建鬼怪NPC到目标地点
+        await DailyTaskService.create_ghost_npc_for_task(session, task)
+
         return task
 
     @staticmethod
@@ -495,3 +503,71 @@ class DailyTaskService:
         DailyTaskService._last_cleanup_date = today
 
         return expired_count
+
+    @staticmethod
+    async def create_ghost_npc_for_task(session: AsyncSession, task: DailyTask) -> Optional[NPC]:
+        """为委托任务创建鬼怪NPC"""
+        try:
+            # 查找或创建目标地点
+            location = await LocationService.get_location_by_coordinates(
+                session, task.target_x, task.target_y, task.target_region
+            )
+
+            if not location:
+                # 创建临时地点
+                location = await LocationService.create_location(
+                    session,
+                    location_id=f"task_location_{task.target_x}_{task.target_y}",
+                    name=f"荒野({task.target_x},{task.target_y})",
+                    x=task.target_x,
+                    y=task.target_y,
+                    location_type="normal",
+                    description="这里出现了异常的鬼怪活动...",
+                    region=task.target_region
+                )
+
+            # 创建鬼怪NPC
+            ghost_npc = await NPCService.create_ghost_npc(
+                session,
+                npc_id=f"ghost_task_{task.id}",
+                name=task.enemy_name,
+                location_id=location.id,
+                level=task.enemy_level,
+                hp=task.enemy_hp,
+                attack=task.enemy_attack,
+                defense=task.enemy_defense,
+                agility=task.enemy_agility
+            )
+
+            # 设置任务关联
+            if ghost_npc.extra_data is None:
+                ghost_npc.extra_data = {}
+            ghost_npc.extra_data["task_id"] = task.id
+            ghost_npc.extra_data["task_type"] = task.task_type.value
+
+            return ghost_npc
+
+        except Exception as e:
+            # 如果创建失败，不影响任务生成
+            print(f"创建鬼怪NPC失败: {e}")
+            return None
+
+    @staticmethod
+    async def find_task_ghost_npc(session: AsyncSession, task: DailyTask) -> Optional[NPC]:
+        """查找任务对应的鬼怪NPC"""
+        # 查找目标地点
+        location = await LocationService.get_location_by_coordinates(
+            session, task.target_x, task.target_y, task.target_region
+        )
+
+        if not location:
+            return None
+
+        # 查找鬼怪NPC
+        npcs = await NPCService.get_npcs_by_location(session, location.id, NPCType.GHOST)
+
+        for npc in npcs:
+            if npc.extra_data and npc.extra_data.get("task_id") == task.id:
+                return npc
+
+        return None

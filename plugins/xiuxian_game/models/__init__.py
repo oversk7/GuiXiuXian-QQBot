@@ -32,6 +32,9 @@ from .world_boss import WorldBossCycle, WorldBossDamage
 from .invite_reward import InviteReward
 # 深渊探索者宝箱记录模型
 from .dungeon_chest_record import DungeonChestRecord
+# 地点和NPC管理系统模型
+from .location import Location
+from .npc import NPC, NPCType, NPCStatus
 
 __all__ = [
     "Player", "Guild", "GuildMember", "GuildBuilding", "GuildPosition", "BuildingType", "WorldMessage", "BankAccount", "ItemInstance", "WorldTile", "NavigationTask", "AlchemyRecord", "MarketOrder",
@@ -42,5 +45,6 @@ __all__ = [
     "DailyTask", "TaskType", "TaskStatus",
     "GuildTaskRecord", "GuildTaskType", "PlayerTaskStats",
     "WorldBossCycle", "WorldBossDamage",
-    "InviteReward", "DungeonChestRecord"
+    "InviteReward", "DungeonChestRecord",
+    "Location", "NPC", "NPCType", "NPCStatus"
 ]
