@@ -65,7 +65,14 @@ def _move_towards(curr_x: int, curr_y: int, target_x: int, target_y: int, distan
 
 
 def _update_nav_position(player: Player, task: NavigationTask | None) -> bool:
-    """根据经过时间更新玩家坐标，返回是否到达目标。若无任务返回 False."""
+    """根据经过时间推进现实世界导航进度，返回是否到达目标。
+
+    设计要点：
+    - 导航只作用于现实世界坐标。
+    - 若玩家在诡域中，则读取/写入 real_world_x, real_world_y，不影响诡域内坐标。
+    - 若玩家在现实世界，则更新 x,y，同时同步 real_world_x, real_world_y。
+    - 若无任务或无有效时间推进则返回 False。
+    """
     if not task:
         return False
 
@@ -79,17 +86,30 @@ def _update_nav_position(player: Player, task: NavigationTask | None) -> bool:
     if movable_distance <= 0:
         return False
 
-    cx, cy = player.x, player.y
+    # 读取当前用于导航的“现实世界坐标”
+    if getattr(player, "is_in_dungeon") and player.is_in_dungeon():
+        cx = (player.real_world_x or 0)
+        cy = (player.real_world_y or 0)
+    else:
+        cx = player.x
+        cy = player.y
+
     tx, ty = task.target_x, task.target_y
     new_x, new_y = _move_towards(cx, cy, tx, ty, movable_distance)
 
-    player.x, player.y = new_x, new_y
+    # 写回：在诡域中只写 real_world_*；在现实世界写 x,y 并同步 real_world_*
+    if getattr(player, "is_in_dungeon") and player.is_in_dungeon():
+        player.real_world_x = new_x
+        player.real_world_y = new_y
+    else:
+        player.x, player.y = new_x, new_y
+        player.real_world_x = new_x
+        player.real_world_y = new_y
+
     task.last_update = now
 
     # 判断是否抵达
-    if new_x == tx and new_y == ty:
-        return True
-    return False
+    return new_x == tx and new_y == ty
 
 
 @nav_cmd.handle()
@@ -102,9 +122,7 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
         if not player:
             await nav_cmd.finish("⛔ 请先创建角色")
 
-        # 如非现实世界，提示不可导航
-        if player.region != REAL_WORLD:
-            await nav_cmd.finish("⛔ 诡域中迷雾缭绕，无法使用导航！请使用【上|下|左|右】移动，或【返回】现实世界")
+        # 允许在诡域中自由设置与查看导航（导航仅作用于现实世界坐标）
 
         # 处理已有导航：先更新位置
         task: NavigationTask | None = await session.get(NavigationTask, player.id)
@@ -113,22 +131,32 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
             # 已到达则删除任务记录
             await session.delete(task)
 
-        # 若未提供坐标 && 有导航，则只是查看进度
+        # 若未提供坐标 && 有导航，则只是查看进度（在诡域时展示现实坐标）
         if not parts:
+            # 选取用于展示的现实坐标
+            def _real_coords(p: Player) -> tuple[float, float]:
+                if getattr(p, "is_in_dungeon") and p.is_in_dungeon():
+                    return float(p.real_world_x or 0), float(p.real_world_y or 0)
+                return float(p.x), float(p.y)
+
             if not task:
-                await nav_cmd.finish(message_add_head(f"🧭 当前位置 {player.region} ({player.x},{player.y})\n暂无导航目标。", event))
+                rx, ry = _real_coords(player)
+                await nav_cmd.finish(message_add_head(
+                    f"🧭 现实导航未设置\n当前现实坐标 ({rx:.1f},{ry:.1f})", event))
+
             target_x, target_y = task.target_x, task.target_y
 
-            # -------- 计算实时展示坐标 --------
+            # -------- 计算实时展示坐标（现实世界） --------
             now_p = datetime.now()
             elapsed_p = (now_p - task.last_update).total_seconds()
             speed_p = _tiles_per_second(player.agility)
             move_distance = elapsed_p * speed_p
 
-            disp_x, disp_y = float(player.x), float(player.y)
-            if move_distance > 0 and (player.x != target_x or player.y != target_y):
-                dx = target_x - player.x
-                dy = target_y - player.y
+            base_x, base_y = _real_coords(player)
+            disp_x, disp_y = base_x, base_y
+            if move_distance > 0 and ((base_x != target_x) or (base_y != target_y)):
+                dx = target_x - base_x
+                dy = target_y - base_y
                 current_distance = (dx * dx + dy * dy) ** 0.5
 
                 if current_distance > 0:
@@ -141,16 +169,16 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
             disp_x = round(disp_x, 1)
             disp_y = round(disp_y, 1)
 
-            # 速度 & 预计剩余时间（使用欧几里得距离）
+            # 速度 & 预计剩余时间（使用欧几里得距离，基于现实坐标）
             speed_now = _tiles_per_second(player.agility)
-            rem_distance = _euclidean_distance(player.x, player.y, target_x, target_y)
+            rem_distance = _euclidean_distance(base_x, base_y, target_x, target_y)
             eta_sec = rem_distance / speed_now if speed_now > 0 else 0
             eta_td = timedelta(seconds=int(eta_sec))
 
             await session.commit()
             await nav_cmd.finish(message_add_head(
                 f"🧭 导航中 → 目标 ({target_x},{target_y})\n"
-                f"▶️ 当前坐标 ({disp_x},{disp_y})\n"
+                f"▶️ 当前现实坐标 ({disp_x},{disp_y})\n"
                 f"🕒 速度 {speed_now:.2f} 格/秒  预计剩余 {str(eta_td)}", event))
 
         # 若提供坐标，则尝试开启/重设导航
@@ -167,16 +195,20 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
         else:
             task = NavigationTask(player_id=player.id, target_x=tx, target_y=ty, last_update=datetime.now())
             session.add(task)
-        # 速度与预计时间（使用欧几里得距离）
+        # 速度与预计时间（使用欧几里得距离，基于现实坐标）
         speed_now = _tiles_per_second(player.agility)
-        rem_distance = _euclidean_distance(player.x, player.y, tx, ty)
+        # 基于现实坐标计算剩余距离
+        base_x, base_y = (float(player.real_world_x or 0), float(player.real_world_y or 0)) if (getattr(player, "is_in_dungeon") and player.is_in_dungeon()) else (float(player.x), float(player.y))
+        rem_distance = _euclidean_distance(base_x, base_y, tx, ty)
         eta_td = timedelta(seconds=int(rem_distance / speed_now)) if speed_now > 0 else timedelta(seconds=0)
 
         await session.commit()
+        # 展示当前现实坐标
+        rx, ry = ((player.real_world_x or 0), (player.real_world_y or 0)) if (getattr(player, "is_in_dungeon") and player.is_in_dungeon()) else (player.x, player.y)
         await nav_cmd.finish(message_add_head(
             f"⚙️ 指针静默旋转，已开始导航至 ({tx},{ty})。\n"
             "━━━━━━━━━━━━━\n"
-            f"✧ 当前坐标 ({player.x},{player.y})\n"
+            f"✧ 当前现实坐标 ({rx},{ry})\n"
             f"🕒 速度 {speed_now:.2f} 格/秒  预计耗时 {str(eta_td)}\n"
             "━━━━━━━━━━━━━\n⬇️ 【中断导航】停止前进", event))
 
@@ -193,5 +225,7 @@ async def _(event: MessageEvent):
         _update_nav_position(player, task)
         await session.delete(task)
         await session.commit()
+        # 展示现实坐标
+        rx, ry = ((player.real_world_x or 0), (player.real_world_y or 0)) if (getattr(player, "is_in_dungeon") and player.is_in_dungeon()) else (player.x, player.y)
         await stop_nav_cmd.finish(message_add_head(
-            f"🛑 指针折断，你停在 ({player.x},{player.y})", event)) 
+            f"🛑 指针折断，你停在现实坐标 ({rx},{ry})", event))

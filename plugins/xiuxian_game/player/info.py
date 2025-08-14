@@ -125,12 +125,19 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
 
     # -------- 更新坐标（若在自动导航） --------
     async with safe_session() as session_nav:
+        player_upd = await session_nav.get(Player, player.id)
         task = await session_nav.get(NavigationTask, player.id)
-        if task:
-            reached = _update_nav_position(player, task)
+        if player_upd and task:
+            reached = _update_nav_position(player_upd, task)
             if reached:
                 await session_nav.delete(task)
             await session_nav.commit()
+            # 同步内存对象用于展示（不改变诡域内 x,y）
+            player.x = player_upd.x
+            player.y = player_upd.y
+            if hasattr(player, "real_world_x"):
+                player.real_world_x = player_upd.real_world_x
+                player.real_world_y = player_upd.real_world_y
 
     # ------- 统计装备加成 -------
     bonus = defaultdict(int)

@@ -110,12 +110,18 @@ async def _handle_teleport_logic(event: MessageEvent, target_region: str, cmd_ha
         # 查询是否存在导航任务
         nav_task: NavigationTask | None = await session.get(NavigationTask, player.id)
 
+        # 在进入诡域前，若存在导航，则推进至当前时间（作用于现实世界坐标）
+        if nav_task:
+            from ..world.navigation import _update_nav_position
+            _update_nav_position(player, nav_task)
+            # 不删除任务，保留以便返回后继续/完成
+
         # 扣除咒抗
         player.stamina -= STAM_COST
-        
+
         # 使用新的双层坐标系统
         if dungeon_level:
-            # 进入层级诡域
+            # 进入层级诡域（enter_dungeon 会保存当前现实世界坐标至 real_world_x/y）
             player.enter_dungeon(dungeon_level)
             target_name = f"{dungeon_level}层诡域"
             current_pos = f"({player.dungeon_x},{player.dungeon_y})"
@@ -124,13 +130,8 @@ async def _handle_teleport_logic(event: MessageEvent, target_region: str, cmd_ha
             player.region = target_region
             target_name = target_region
             current_pos = f"({player.x},{player.y})"
-        
-        session.add(player)
-        
-        # 若有导航则删除
-        if nav_task:
-            await session.delete(nav_task)
 
+        session.add(player)
         await session.commit()
 
     msg_lines = [
@@ -138,8 +139,8 @@ async def _handle_teleport_logic(event: MessageEvent, target_region: str, cmd_ha
         f"当前位置：{target_name} {current_pos}",
     ]
     if nav_task:
-        msg_lines.insert(1, "🛑 原导航任务已中断")
-    
+        msg_lines.insert(1, "🧭 现实世界导航仍在静默进行中")
+
     if dungeon_level:
         msg_lines.append("━━━━━━━━━━━━━")
         msg_lines.append("🌀 你穿越了空间裂隙，进入了里世界")
@@ -187,8 +188,17 @@ async def handle_revive(event: MessageEvent):
         player.mp = player.max_mp
         
         # 使用新的双层坐标系统退出诡域
+        # 退出前推进现实世界的导航进度，使返回位置为“导航后的最新位置”
+        from ..models.navigation_task import NavigationTask
+        from ..world.navigation import _update_nav_position
+        nav_task = await session.get(NavigationTask, player.id)
+        if nav_task:
+            reached = _update_nav_position(player, nav_task)
+            if reached:
+                await session.delete(nav_task)
+
         player.exit_dungeon()
-        
+
         session.add(player)
         await session.commit()
         
