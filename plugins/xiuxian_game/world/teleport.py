@@ -162,7 +162,7 @@ async def _handle_teleport_logic(event: MessageEvent, target_region: str, cmd_ha
 
             if not existing_record:
                 msg_lines.append("━━━━━━━━━━━━━")
-                msg_lines.append("🎁 恭喜！你可以领取深渊探索者宝箱了！")
+                msg_lines.append("🎁 征服这层就可以再领取一个探索者宝箱了！")
                 msg_lines.append("💎 【领取宝箱】一键领取所有可领取的宝箱")
     
     msg = "\n".join(msg_lines)

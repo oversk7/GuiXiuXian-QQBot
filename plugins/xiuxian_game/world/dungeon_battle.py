@@ -1161,6 +1161,164 @@ async def handle_teleport_list(event: MessageEvent):
 region_overview_cmd = on_command("俯瞰", aliases={"感知"}, block=True, priority=5)
 
 
+async def generate_dungeon_fixed_overview_image(region: str, session, player_x: int, player_y: int) -> tuple[bytes, tuple[int, int, int, int]]:
+    """生成诡域固定10x10范围的俯瞰图片（-5到5）"""
+    # 诡域固定范围
+    min_x, max_x = -5, 5
+    min_y, max_y = -5, 5
+
+    # 获取该区域内的所有格子数据
+    from sqlalchemy import and_
+
+    stmt = select(WorldTile).where(
+        and_(
+            WorldTile.region == region,
+            WorldTile.x >= min_x,
+            WorldTile.x <= max_x,
+            WorldTile.y >= min_y,
+            WorldTile.y <= max_y
+        )
+    )
+    result = await session.execute(stmt)
+    tiles = result.scalars().all()
+
+    # 创建图片
+    margin = 40  # 边缘留白用于显示坐标
+    img_width = 1000
+    img_height = 1000
+    img = Image.new('RGB', (img_width, img_height), color='#1a1a1a')  # 深色背景
+    draw = ImageDraw.Draw(img)
+
+    # 尝试加载字体
+    try:
+        font = ImageFont.load_default()
+    except Exception:
+        font = None
+
+    # 计算格子大小
+    grid_width = max_x - min_x + 1  # 11格
+    grid_height = max_y - min_y + 1  # 11格
+    available_width = img_width - 2 * margin
+    available_height = img_height - 2 * margin
+
+    cell_width = available_width // grid_width
+    cell_height = available_height // grid_height
+
+    # 事件类型颜色映射
+    event_colors = {
+        "材料": (0, 255, 0),      # 绿色
+        "宝藏": (255, 215, 0),    # 金色
+        "诡异": (255, 0, 0),      # 红色
+        "休息": (0, 100, 255),    # 蓝色
+        "商人": (128, 0, 128),    # 紫色
+        "精英怪": (255, 165, 0),  # 橙色
+    }
+
+    # 创建格子坐标到tile的映射
+    tile_map = {(tile.x, tile.y): tile for tile in tiles}
+
+    # 绘制格子
+    for grid_x in range(grid_width):
+        for grid_y in range(grid_height):
+            world_x = min_x + grid_x
+            # Y轴从下到上递增（数学坐标系）
+            world_y = max_y - grid_y
+
+            # 计算像素坐标
+            pixel_x = margin + grid_x * cell_width
+            pixel_y = margin + grid_y * cell_height
+
+            tile = tile_map.get((world_x, world_y))
+
+            if tile:
+                # 根据事件类型选择颜色
+                color = event_colors.get(tile.event_type, (102, 102, 102))  # 默认灰色
+            else:
+                # 未探索的区域使用深灰色
+                color = (51, 51, 51)  # 深灰色
+
+            # 绘制格子
+            x1 = pixel_x
+            y1 = pixel_y
+            x2 = pixel_x + cell_width
+            y2 = pixel_y + cell_height
+
+            if x2 > x1 and y2 > y1:
+                draw.rectangle([x1, y1, x2, y2], fill=color, outline=(85, 85, 85))
+
+    # 绘制玩家位置标记
+    if player_x is not None and player_y is not None:
+        # 计算玩家位置的像素坐标
+        player_grid_x = player_x - min_x
+        player_grid_y = max_y - player_y  # Y轴从下到上递增
+        player_pixel_x = margin + player_grid_x * cell_width
+        player_pixel_y = margin + player_grid_y * cell_height
+
+        # 绘制玩家位置标记 - 使用亮黄色圆形
+        center_x_pixel = player_pixel_x + cell_width // 2
+        center_y_pixel = player_pixel_y + cell_height // 2
+        radius = min(cell_width, cell_height) // 3
+
+        # 绘制外圈（白色边框）
+        draw.ellipse([
+            center_x_pixel - radius - 2, center_y_pixel - radius - 2,
+            center_x_pixel + radius + 2, center_y_pixel + radius + 2
+        ], fill=(255, 255, 255), outline=(255, 255, 255))
+
+        # 绘制内圈（亮黄色）
+        draw.ellipse([
+            center_x_pixel - radius, center_y_pixel - radius,
+            center_x_pixel + radius, center_y_pixel + radius
+        ], fill=(255, 255, 0), outline=(255, 215, 0))
+
+    # 绘制坐标轴十字细线（原点在中心）
+    # 计算原点(0,0)的像素坐标
+    origin_grid_x = 0 - min_x  # 5
+    origin_grid_y = max_y - 0  # 5
+    origin_pixel_x = margin + origin_grid_x * cell_width
+    origin_pixel_y = margin + origin_grid_y * cell_height
+
+    # 绘制垂直线（Y轴）
+    draw.line([
+        (origin_pixel_x + cell_width // 2, margin),
+        (origin_pixel_x + cell_width // 2, img_height - margin)
+    ], fill=(128, 128, 128), width=1)
+
+    # 绘制水平线（X轴）
+    draw.line([
+        (margin, origin_pixel_y + cell_height // 2),
+        (img_width - margin, origin_pixel_y + cell_height // 2)
+    ], fill=(128, 128, 128), width=1)
+
+    # 绘制坐标轴数字
+    if font:
+        # 绘制X轴坐标（顶部和底部）
+        for i in range(0, grid_width, 2):  # 每隔2格显示一个坐标
+            world_x = min_x + i
+            pixel_x = margin + i * cell_width + cell_width // 2
+
+            # 顶部X坐标
+            draw.text((pixel_x, 5), str(world_x), fill=(255, 255, 255), font=font, anchor='mt')
+            # 底部X坐标
+            draw.text((pixel_x, img_height - 20), str(world_x), fill=(255, 255, 255), font=font, anchor='mb')
+
+        # 绘制Y轴坐标（左侧和右侧）
+        for i in range(0, grid_height, 2):  # 每隔2格显示一个坐标
+            world_y = max_y - i  # Y轴从下到上递增
+            pixel_y = margin + i * cell_height + cell_height // 2
+
+            # 左侧Y坐标
+            draw.text((5, pixel_y), str(world_y), fill=(255, 255, 255), font=font, anchor='lm')
+            # 右侧Y坐标
+            draw.text((img_width - 5, pixel_y), str(world_y), fill=(255, 255, 255), font=font, anchor='rm')
+
+    # 将图片转换为字节流
+    img_buffer = io.BytesIO()
+    img.save(img_buffer, format='PNG')
+    img_buffer.seek(0)
+    return img_buffer.getvalue(), (min_x, max_x, min_y, max_y)
+
+
 async def generate_player_centered_overview_image(region: str, session, center_x: int, center_y: int, width: int, height: int) -> tuple[bytes, tuple[int, int, int, int]]:
     """生成以玩家为中心的固定大小俯瞰图片"""
     # 计算坐标范围
@@ -1620,11 +1778,11 @@ async def handle_region_overview(event: MessageEvent, args: Message = CommandArg
                 current_region = player.get_current_region()
 
                 if player.is_in_dungeon():
-                    # 诡域内：生成完整的10x10小地图
-                    img_data, (min_x, max_x, min_y, max_y) = await generate_player_centered_overview_image(
-                        current_region, session, current_x, current_y, 11, 11  # 10x10地图，稍微扩大一点
+                    # 诡域内：生成固定的10x10完整地图（-5到5）
+                    img_data, (min_x, max_x, min_y, max_y) = await generate_dungeon_fixed_overview_image(
+                        current_region, session, current_x, current_y
                     )
-                    map_desc = f"🗺️ {current_region} 完整小地图"
+                    map_desc = f"🗺️ {current_region} 完整地图"
                     coord_desc = f"📍 你的位置：({current_x},{current_y})"
                     range_desc = f"📍 诡域范围：(-5,-5) 到 (5,5)"
                 else:
@@ -1698,7 +1856,11 @@ async def handle_region_overview(event: MessageEvent, args: Message = CommandArg
                 if current_region == region:
                     player_x, player_y = player.get_current_coordinates()
 
-                img_data, (min_x, max_x, min_y, max_y) = await generate_region_overview_image(region, session, player_x, player_y)
+                # 层级诡域使用固定10x10地图，其他诡域使用今日探索地图
+                if region.endswith("层诡域"):
+                    img_data, (min_x, max_x, min_y, max_y) = await generate_dungeon_fixed_overview_image(region, session, player_x, player_y)
+                else:
+                    img_data, (min_x, max_x, min_y, max_y) = await generate_region_overview_image(region, session, player_x, player_y)
 
                 # 转换为base64
                 img_b64 = base64.b64encode(img_data).decode('utf-8')
@@ -1708,17 +1870,22 @@ async def handle_region_overview(event: MessageEvent, args: Message = CommandArg
                 level_range = dungeon_config.get("level_range", [1, 1])
 
                 # 构建说明文字
-                msg_lines = [
-                    f"🗺️ {region} 今日探索小地图",
-                    "━━━━━━━━━━━━━",
-                    f"📊 诡域等级：Tier {tier}",
-                    f"⚔️ 诡异等级：{level_range[0]}-{level_range[1]}级",
-                ]
-
                 if region.endswith("层诡域"):
-                    msg_lines.append("📍 诡域范围：(-5,-5) 到 (5,5)")
+                    msg_lines = [
+                        f"🗺️ {region} 完整地图",
+                        "━━━━━━━━━━━━━",
+                        f"📊 诡域等级：Tier {tier}",
+                        f"⚔️ 诡异等级：{level_range[0]}-{level_range[1]}级",
+                        "📍 诡域范围：(-5,-5) 到 (5,5)"
+                    ]
                 else:
-                    msg_lines.append(f"📍 坐标范围：X({min_x}~{max_x}) Y({min_y}~{max_y})")
+                    msg_lines = [
+                        f"🗺️ {region} 今日探索小地图",
+                        "━━━━━━━━━━━━━",
+                        f"📊 诡域等级：Tier {tier}",
+                        f"⚔️ 诡异等级：{level_range[0]}-{level_range[1]}级",
+                        f"📍 坐标范围：X({min_x}~{max_x}) Y({min_y}~{max_y})"
+                    ]
 
                 msg_lines.extend([
                     "━━━━━━━━━━━━━",
