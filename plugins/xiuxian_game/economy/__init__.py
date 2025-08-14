@@ -1,4 +1,4 @@
-from . import wealth_rank, merchants
+from . import merchants
 from . import bank
 from . import market
 from . import stock_commands
