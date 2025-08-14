@@ -86,19 +86,19 @@ def _get_material_obtain_methods(item_id: str, rarity: str) -> str:
     if rarity in ["green", "blue", "purple", "orange"]:
         # 根据稀有度添加具体的掉落说明
         if rarity == "green":
-            methods.append("战斗掉落(21级+守护者)")
+            methods.append("战斗掉落(21级+诡异)")
         elif rarity == "blue":
-            methods.append("战斗掉落(61级+守护者)")
+            methods.append("战斗掉落(61级+诡异)")
         elif rarity == "purple":
-            methods.append("战斗掉落(101级+守护者)")
+            methods.append("战斗掉落(101级+诡异)")
         elif rarity == "orange":
-            methods.append("战斗掉落(101级+顶级守护者)")
+            methods.append("战斗掉落(101级+恐怖诡异)")
 
         # 扫荡系统也能获得高级材料
         methods.append("扫荡令扫荡(概率获得)")
 
-        # 精英守护者特殊掉落
-        methods.append("精英守护者(高概率)")
+        # 精英诡异特殊掉落
+        methods.append("精英诡异(高概率)")
 
         # 里世界商人材料
         if merchant_tiers:

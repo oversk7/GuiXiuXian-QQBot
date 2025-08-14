@@ -89,7 +89,7 @@ async def _handle_teleport_logic(event: MessageEvent, target_region: str, cmd_ha
                     f"📊 当前最深探索：第{max_level}重里世界\n"
                     f"🔓 可进入深度：{accessible_levels}\n"
                     f"━━━━━━━━━━━━━\n"
-                    f"💡 需要逐重击败守护者解锁更深的里世界\n"
+                    f"💡 需要逐重击败诡异解锁更深的里世界\n"
                     f"⬇️ 【进入 {max_level + 1}层诡域】探索下一重空间"
                 )
         else:

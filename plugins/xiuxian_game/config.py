@@ -55,18 +55,18 @@ class Config(BaseSettings):
         """生成单个里世界深度的配置"""
         import random
 
-        # 计算守护者等级
-        base_monster_level = level * 5  # 里世界深度 * 5
+        # 计算诡异等级
+        base_creature_level = level * 5  # 里世界深度 * 5
         variance = rules.get("monster_level_variance", 2)
-        monster_level_min = max(1, base_monster_level - variance)
-        monster_level_max = base_monster_level + variance
+        creature_level_min = max(1, base_creature_level - variance)
+        creature_level_max = base_creature_level + variance
 
         # 计算理智消耗（每10重+1）
         mp_cost = max(1, 1 + (level - 1) // 10)
 
-        # 随机选择守护者名称
-        monster_names = rules.get("monster_names", ["未知守护者"])
-        selected_monsters = random.sample(monster_names, min(3, len(monster_names)))
+        # 随机选择诡异名称
+        creature_names = rules.get("monster_names", ["未知诡异"])
+        selected_creatures = random.sample(creature_names, min(3, len(creature_names)))
 
         # 根据深度选择材料
         merchant_materials, basic_materials = self._get_materials_for_level(level, rules)
@@ -76,8 +76,8 @@ class Config(BaseSettings):
             "required_level": 1,  # 里世界系统不限制玩家等级，只限制深度解锁
             "tier": min(10, (level - 1) // 10 + 1),  # 每10重一个tier
             "mp_cost": mp_cost,
-            "level_range": [monster_level_min, monster_level_max],
-            "monsters": selected_monsters,
+            "level_range": [creature_level_min, creature_level_max],
+            "monsters": selected_creatures,
             "merchant_materials": merchant_materials,
             "basic_materials": basic_materials
         }

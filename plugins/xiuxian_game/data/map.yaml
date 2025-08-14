@@ -1,7 +1,7 @@
 # 无限重诡域里世界系统配置
 # 每重诡域都是独立的10x10小地图，坐标范围-5到5
 # 支持无限重扩展，适应等级无上限的玩家（300+级）
-# 怪物等级逐重增长，需要逐重解锁
+# 诡异等级逐重增长，需要逐重解锁
 
 # 动态里世界生成规则
 dungeon_generation_rules:
@@ -9,11 +9,11 @@ dungeon_generation_rules:
   base_mp_cost: 1                    # 基础理智消耗
   mp_cost_increment: 0.1             # 每重理智消耗增量（每10重+1）
 
-  # 怪物等级计算规则
-  monster_level_formula: "level * 5"  # 怪物等级 = 里世界深度 * 5
-  monster_level_variance: 2           # 怪物等级随机波动范围
+  # 诡异等级计算规则
+  monster_level_formula: "level * 5"  # 诡异等级 = 里世界深度 * 5
+  monster_level_variance: 2           # 诡异等级随机波动范围
 
-  # 怪物名称池（随机选择）
+  # 诡异名称池（随机选择）
   monster_names:
     - "诡修亡魂"
     - "伥鬼"
@@ -22,7 +22,7 @@ dungeon_generation_rules:
     - "无脸护士"
     - "笑面狗"
     - "血色触手"
-    - "深渊守卫"
+    - "深渊恶鬼"
     - "噬魂蛛"
     - "虚空行者"
     - "梦魇使者"
@@ -35,7 +35,7 @@ dungeon_generation_rules:
     - "虚无吞噬者"
     - "时空裂隙"
     - "终极毁灭者"
-    - "永恒守护者"
+    - "永恒诅咒"
     - "无名恐惧"
     - "深渊霸主"
     - "末日使徒"

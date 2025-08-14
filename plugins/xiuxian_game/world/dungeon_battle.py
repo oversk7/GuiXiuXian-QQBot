@@ -91,8 +91,8 @@ def get_region_materials(region: str) -> dict:
 
 def calculate_monster_attributes(monster_level: int, is_elite: bool = False) -> dict:
     """
-    计算怪物属性，支持无限层级（300+级）
-    爬塔系统：怪物强度逐层递增，保持挑战性
+    计算诡异属性，支持无限层级（300+级）
+    爬塔系统：诡异强度逐层递增，保持挑战性
     """
     import random
 
@@ -133,7 +133,7 @@ def calculate_monster_attributes(monster_level: int, is_elite: bool = False) -> 
     attack = int(base_attack * attack_variation)
     agility = int(base_agility * agility_variation)
 
-    # 精英怪属性提升
+    # 精英诡异属性提升
     if is_elite:
         if monster_level <= 100:
             elite_multiplier = 1.8
@@ -146,7 +146,7 @@ def calculate_monster_attributes(monster_level: int, is_elite: bool = False) -> 
         attack = int(attack * elite_multiplier)
         agility = int(agility * elite_multiplier)
 
-    # 为300级以后的怪物添加特殊战斗属性
+    # 为300级以后的诡异添加特殊战斗属性
     special_attributes = {}
     if monster_level >= 300:
         # 基础特殊属性计算（基于层级）
@@ -164,9 +164,9 @@ def calculate_monster_attributes(monster_level: int, is_elite: bool = False) -> 
         # 抗暴率：300级起8%，每100级+2%，最高20%（适度降低）
         anti_crit_rate = min(20, 8 + level_factor * 2)
 
-        # 精英怪物特殊属性加成（适度调整）
+        # 精英诡异特殊属性加成（适度调整）
         if is_elite:
-            crit_rate = min(18, crit_rate * 1.4)      # 精英怪暴击率1.4倍，上限18%
+            crit_rate = min(18, crit_rate * 1.4)      # 精英诡异暴击率1.4倍，上限18%
             combo_rate = min(12, combo_rate * 1.2)    # 精英怪连击率1.2倍，上限12%
             counter_rate = min(20, counter_rate * 1.3) # 精英怪反击率1.3倍，上限20%
             anti_crit_rate = min(28, anti_crit_rate * 1.3) # 精英怪抗暴率1.3倍，上限28%
@@ -234,22 +234,22 @@ def generate_merchant_goods(region: str, tier: int, rng) -> list:
     return goods
 
 async def handle_monster_drops(session, player: Player, monster_level: int, region: str, rng, is_elite: bool = False) -> str:
-    """处理怪物掉落材料"""
+    """处理诡异掉落材料"""
     from ..models.inventory import ItemInstance
     from ..utils import luck_prob
 
-    # 根据怪物等级确定掉落概率和稀有度
+    # 根据诡异等级确定掉落概率和稀有度
     if monster_level <= 20:
-        # 低级怪物：30%掉落白色，10%绿色
+        # 低级诡异：30%掉落白色，10%绿色
         drop_rates = {"white": 0.30, "green": 0.10}
     elif monster_level <= 60:
-        # 中级怪物：40%白色，20%绿色，5%蓝色
+        # 中级诡异：40%白色，20%绿色，5%蓝色
         drop_rates = {"white": 0.40, "green": 0.20, "blue": 0.05}
     elif monster_level <= 100:
-        # 高级怪物：30%白色，25%绿色，15%蓝色，3%紫色
+        # 高级诡异：30%白色，25%绿色，15%蓝色，3%紫色
         drop_rates = {"white": 0.30, "green": 0.25, "blue": 0.15, "purple": 0.03}
     else:
-        # 顶级怪物：20%白色，20%绿色，20%蓝色，8%紫色，1%橙色
+        # 顶级诡异：20%白色，20%绿色，20%蓝色，8%紫色，1%橙色
         drop_rates = {"white": 0.20, "green": 0.20, "blue": 0.20, "purple": 0.08, "orange": 0.01}
 
     # 精英怪掉落率翻倍，并且有更高概率掉落稀有材料
@@ -274,7 +274,7 @@ async def handle_monster_drops(session, player: Player, monster_level: int, regi
             # 选择掉落的材料
             candidate_materials = []
 
-            # 怪物掉落优先从商人材料中选择（更有价值）
+            # 诡异掉落优先从商人材料中选择（更有价值）
             if rarity != "white":  # 白色材料从基础材料中选择
                 for material_id in region_materials["merchant"]:
                     item_config = config.items_config["by_id"].get(material_id)
@@ -385,7 +385,7 @@ async def get_or_create_tile(session, region: str, x: int, y: int) -> WorldTile:
                 level_range = region_config.get("level_range", [1, 10])
                 monster_level = random.randint(level_range[0], level_range[1])
 
-                # 使用新的怪物属性计算函数
+                # 使用新的诡异属性计算函数
                 monster_attrs = calculate_monster_attributes(monster_level, is_elite=False)
                 tile.state = {
                     "name": monster,
@@ -396,7 +396,7 @@ async def get_or_create_tile(session, region: str, x: int, y: int) -> WorldTile:
                     "defeated_by": []  # 记录击败过的玩家，避免原地无限刷
                 }
 
-                # 为300级以后的怪物添加特殊属性
+                # 为300级以后的诡异添加特殊属性
                 if monster_level >= 300:
                     tile.state.update({
                         "crit_rate": monster_attrs.get("crit_rate", 0),
@@ -405,7 +405,7 @@ async def get_or_create_tile(session, region: str, x: int, y: int) -> WorldTile:
                         "anti_crit_rate": monster_attrs.get("anti_crit_rate", 0)
                     })
             else:
-                # 默认怪物配置
+                # 默认诡异配置
                 tile.state = {
                     "name": "未知诡影",
                     "level": 1,
@@ -441,13 +441,13 @@ async def get_or_create_tile(session, region: str, x: int, y: int) -> WorldTile:
                 "goods": generate_merchant_goods(region, tier, rng)
             }
         elif tile.event_type == "ELITE":
-            # 精英怪：强化版怪物
+            # 精英诡异：强化版诡异
             if region_config and region_config.get("monsters"):
                 monster = rng.choice(region_config["monsters"])
                 level_range = region_config.get("level_range", [1, 10])
                 monster_level = rng.randint(level_range[0], level_range[1])
 
-                # 使用新的怪物属性计算函数（精英版）
+                # 使用新的诡异属性计算函数（精英版）
                 monster_attrs = calculate_monster_attributes(monster_level, is_elite=True)
                 tile.state = {
                     "name": f"精英·{monster}",
@@ -459,7 +459,7 @@ async def get_or_create_tile(session, region: str, x: int, y: int) -> WorldTile:
                     "defeated_by": []  # 记录击败过的玩家
                 }
 
-                # 为300级以后的精英怪物添加特殊属性
+                # 为300级以后的精英诡异添加特殊属性
                 if monster_level >= 300:
                     tile.state.update({
                         "crit_rate": monster_attrs.get("crit_rate", 0),
@@ -595,11 +595,11 @@ async def _(event: MessageEvent):
                 return "🎁 你注意到一个尘封宝箱，输入 [探索] 能打开它。"
             elif t.event_type == "EMPTY":
                 if player.id in t.state.get("defeated_by", []):
-                    return "🪨 这里只剩下怪物的残骸，散发着淡淡的血腥味。"
+                    return "🪨 这里只剩下诡异的残骸，散发着淡淡的血腥味。"
                 monster = t.state.get("name")
                 monster_level = t.state.get("level", 1)
 
-                # 为300级以后的怪物显示特殊属性提示
+                # 为300级以后的诡异显示特殊属性提示
                 special_info = ""
                 if monster_level >= 300:
                     special_attrs = []
@@ -615,7 +615,7 @@ async def _(event: MessageEvent):
                     if special_attrs:
                         special_info = f"\n🔥 特殊能力：{' '.join(special_attrs)}"
 
-                return f"🌫️ 空间扭曲中传来异响，似乎有 {monster}(Lv{monster_level}) 在此守护。{special_info}\n若想挑战，可输入 [探索] 进行调查。"
+                return f"🌫️ 空间扭曲中传来异响，似乎有 {monster}(Lv{monster_level}) 在此游荡。{special_info}\n若想挑战，可输入 [探索] 进行调查。"
             elif t.event_type == "REST":
                 return "🌫️ 你发现了一家驿站，可输入 [探索] 恢复生命。"
             elif t.event_type == "MERCHANT":
@@ -624,11 +624,11 @@ async def _(event: MessageEvent):
                 return "🏪 你遇到了神秘卖货郎，输入 [探索] 查看他的商品。"
             elif t.event_type == "ELITE":
                 if player.id in t.state.get("defeated_by", []):
-                    return "⚰️ 精英怪的残骸散落一地，散发着不祥的气息。"
-                monster_name = t.state.get("name", "精英怪物")
+                    return "⚰️ 精英诡异的残骸散落一地，散发着不祥的气息。"
+                monster_name = t.state.get("name", "精英诡异")
                 monster_level = t.state.get("level", 1)
 
-                # 为300级以后的精英怪物显示特殊属性提示
+                # 为300级以后的精英诡异显示特殊属性提示
                 special_info = ""
                 if monster_level >= 300:
                     special_attrs = []
@@ -644,7 +644,7 @@ async def _(event: MessageEvent):
                     if special_attrs:
                         special_info = f"\n🔥 特殊能力：{' '.join(special_attrs)}"
 
-                return f"⚔️ 空间深处传来强大的威压，{monster_name}(Lv{monster_level}) 作为这重里世界的守护者正注视着你！{special_info}\n输入 [探索] 迎战。"
+                return f"⚔️ 空间深处传来恶意的窥视，{monster_name}(Lv{monster_level}) 作为这重里世界的诡异存在正盯着你！{special_info}\n输入 [探索] 迎战。"
             return "⁉️ 未知事件。"
 
         event_desc = describe_tile(tile)
@@ -716,22 +716,22 @@ async def _handle_treasure(session, tile: WorldTile, player: Player) -> str:
 async def _handle_empty(session, tile: WorldTile, player: Player) -> str:
     # 检查玩家是否已经击败过这个小怪
     if player.id in tile.state.get("defeated_by", []):
-        return "🪨 这里只剩下怪物的残骸，散发着淡淡的血腥味。"
-    # empty格有遇到个人的怪物，但不会影响公共事件
+        return "🪨 这里只剩下诡异的残骸，散发着淡淡的血腥味。"
+    # empty格有遇到个人的诡异，但不会影响公共事件
     return await _handle_personal_monster(session, tile, player)
 
 
 async def _handle_personal_monster(session, tile: WorldTile, player: Player) -> str:
-    """小怪属于个人事件，使用新战斗系统进行战斗。"""
-    # 获取怪物信息
+    """诡异属于个人事件，使用新战斗系统进行战斗。"""
+    # 获取诡异信息
     monster_stats = {
         "hp": tile.state.get("hp", 0),
         "attack": tile.state.get("attack", 0),
         "agility": tile.state.get("agility", 0),
-        "defense": 0  # 怪物默认无防御
+        "defense": 0  # 诡异默认无防御
     }
 
-    # 为300级以后的怪物添加特殊属性
+    # 为300级以后的诡异添加特殊属性
     monster_level = tile.state.get("level", 1)
     if monster_level >= 300:
         monster_stats.update({
@@ -744,7 +744,7 @@ async def _handle_personal_monster(session, tile: WorldTile, player: Player) -> 
     monster_name = tile.state.get("name", "未知诡影")
     monster_display = f"{monster_name}(Lv{monster_level})"
 
-    # 为300级以后的怪物显示特殊属性信息
+    # 为300级以后的诡异显示特殊属性信息
     if monster_level >= 300:
         special_attrs = []
         if monster_stats.get("crit_rate", 0) > 0:
@@ -793,7 +793,7 @@ async def _handle_personal_monster(session, tile: WorldTile, player: Player) -> 
             from ..guild.guild_task_service import GuildTaskService
             await GuildTaskService.update_combat_victory_stats(session, player.id)
 
-        # 怪物掉落材料机制
+        # 诡异掉落材料机制
         is_elite = tile.state.get("is_elite", False)
         drop_result = await handle_monster_drops(session, player, monster_level, player.region, rng, is_elite)
         if drop_result:
@@ -802,7 +802,7 @@ async def _handle_personal_monster(session, tile: WorldTile, player: Player) -> 
         # 标记为已击败（无论是精英怪还是普通小怪）
         tile.state.setdefault("defeated_by", []).append(player.id)
 
-        # 爬塔系统：击败怪物后解锁下一层
+        # 爬塔系统：击败诡异后解锁下一层
         if player.is_in_dungeon():
             old_max_level = player.max_dungeon_level or 0
             player.unlock_next_dungeon_level()
@@ -918,9 +918,9 @@ async def _handle_merchant(session, tile: WorldTile, player: Player) -> str:
 async def _handle_elite(session, tile: WorldTile, player: Player) -> str:
     """处理精英怪事件"""
     if player.id in tile.state.get("defeated_by", []):
-        return "⚰️ 精英怪的残骸散落一地，散发着不祥的气息。"
+        return "⚰️ 精英诡异的残骸散落一地，散发着不祥的气息。"
 
-    # 使用与普通怪物相同的战斗逻辑，但精英怪更强
+    # 使用与普通诡异相同的战斗逻辑，但精英诡异更强
     return await _handle_personal_monster(session, tile, player)
 
 
@@ -1093,7 +1093,7 @@ async def handle_teleport_list(event: MessageEvent):
             # 当前所在层级
             current_marker = " 📍当前" if level == current_level else ""
 
-            locations.append(f"{status} {level}层诡域 (理智-{mp_cost} 怪物Lv.{level_range[0]}-{level_range[1]}){current_marker}")
+            locations.append(f"{status} {level}层诡域 (理智-{mp_cost} 诡异Lv.{level_range[0]}-{level_range[1]}){current_marker}")
 
         # 格式化消息
         msg_lines = [
@@ -1110,8 +1110,8 @@ async def handle_teleport_list(event: MessageEvent):
         msg_lines.extend([
             "━━━━━━━━━━━━━",
             "🌀 每重里世界都是独立的10x10空间",
-            "⚔️ 守护者等级 = 里世界深度 × 5（±2波动）",
-            "🔓 击败守护者解锁更深的里世界",
+            "⚔️ 诡异等级 = 里世界深度 × 5（±2波动）",
+            "🔓 击败诡异解锁更深的里世界",
             "━━━━━━━━━━━━━"
         ])
 
@@ -1199,7 +1199,7 @@ async def generate_player_centered_overview_image(region: str, session, center_x
     event_colors = {
         'MATERIAL': (76, 175, 80),     # 绿色 - 材料
         'TREASURE': (255, 215, 0),     # 金色 - 宝藏
-        'EMPTY': (244, 67, 54),        # 红色 - 怪物
+        'EMPTY': (244, 67, 54),        # 红色 - 诡异
         'REST': (33, 150, 243),        # 蓝色 - 休息点
         'MERCHANT': (156, 39, 176),    # 紫色 - 商人
         'ELITE': (255, 87, 34),        # 深橙色 - 精英怪
@@ -1447,7 +1447,7 @@ async def generate_region_overview_image(region: str, session, player_x: int = N
     event_colors = {
         'MATERIAL': (76, 175, 80),     # 绿色 - 材料
         'TREASURE': (255, 215, 0),     # 金色 - 宝藏
-        'EMPTY': (244, 67, 54),        # 红色 - 怪物
+        'EMPTY': (244, 67, 54),        # 红色 - 诡异
         'REST': (33, 150, 243),        # 蓝色 - 休息点
         'MERCHANT': (156, 39, 176),    # 紫色 - 商人
         'ELITE': (255, 87, 34),        # 深橙色 - 精英怪
@@ -1614,7 +1614,7 @@ async def handle_region_overview(event: MessageEvent, args: Message = CommandArg
                     "━━━━━━━━━━━━━",
                     "🟢 绿色：材料格子",
                     "🟡 金色：宝藏格子",
-                    "🔴 红色：怪物格子",
+                    "🔴 红色：诡异格子",
                     "🔵 蓝色：休息格子",
                     "🟣 紫色：商人格子",
                     "🟠 橙色：精英怪格子",
@@ -1674,7 +1674,7 @@ async def handle_region_overview(event: MessageEvent, args: Message = CommandArg
                     f"🗺️ {region} 今日探索小地图",
                     "━━━━━━━━━━━━━",
                     f"📊 诡域等级：Tier {tier}",
-                    f"⚔️ 怪物等级：{level_range[0]}-{level_range[1]}级",
+                    f"⚔️ 诡异等级：{level_range[0]}-{level_range[1]}级",
                 ]
 
                 if region.endswith("层诡域"):
@@ -1686,7 +1686,7 @@ async def handle_region_overview(event: MessageEvent, args: Message = CommandArg
                     "━━━━━━━━━━━━━",
                     "🟢 绿色：材料格子",
                     "🟡 金色：宝藏格子",
-                    "🔴 红色：怪物格子",
+                    "🔴 红色：诡异格子",
                     "🔵 蓝色：休息格子",
                     "🟣 紫色：商人格子",
                     "🟠 橙色：精英怪格子",
