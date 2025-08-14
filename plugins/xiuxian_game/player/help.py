@@ -477,6 +477,7 @@ async def handle_guild_help(event: MessageEvent, args: Message = CommandArg()):
         "【公会建筑】 查看建筑列表\n"
         "【建造 <建筑名>】 建造或升级建筑（会长）\n"
         "【公会属性】 查看建筑提供的加成效果\n"
+        "【公会传送】 传送到公会基地（要求传送阵）\n"
         "━━━━━━━━━━━━━\n"
         "📋 任务系统\n"
         "【公会任务】 查看任务列表和进度\n"

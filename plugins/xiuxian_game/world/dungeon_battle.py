@@ -309,7 +309,7 @@ async def handle_monster_drops(session, player: Player, monster_level: int, regi
     if drops:
         return f"💎 战利品：{', '.join(drops)}"
     else:
-        return "💔 这次没有获得任何材料"
+        return ""
 
 # ----------------- 工具函数 -----------------
 async def get_or_create_tile(session, region: str, x: int, y: int) -> WorldTile:
