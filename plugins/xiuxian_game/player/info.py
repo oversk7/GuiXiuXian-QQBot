@@ -14,6 +14,20 @@ from ..models.guild import Guild
 import random
 from ..models.navigation_task import NavigationTask
 from ..world.navigation import _update_nav_position
+
+
+def _format_player_location(player: Player) -> str:
+    """格式化玩家位置信息，区分现实世界和诡域坐标"""
+    if player.is_in_dungeon():
+        # 在诡域中：显示诡域坐标和现实世界坐标
+        dungeon_x, dungeon_y = player.get_current_coordinates()
+        real_x = player.real_world_x or 0
+        real_y = player.real_world_y or 0
+        return f"{player.get_current_region()} ({dungeon_x},{dungeon_y}) | 现实 ({real_x},{real_y})"
+    else:
+        # 在现实世界：只显示现实世界坐标
+        real_x, real_y = player.get_current_coordinates()
+        return f"{player.get_current_region()} ({real_x},{real_y})"
 from ..config import config
 from ..world.message_board import has_unread_messages
 
@@ -210,7 +224,7 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
         f"┃ 🪙金币 {player.gold}\n"
         f"┃ 💀怨念 {player.resentment} ✨点数 {player.attribute_points}\n"
         f"┃ ☯公会 {guild_name}\n"
-        f"┃ 📍位置 {player.region} ({player.x},{player.y})\n"
+        f"┃ 📍位置 {_format_player_location(player)}\n"
         "┣━━━━━━━━━\n"
         f"┃☞【装备栏】【社交系统】{unread_notice}"
     )
