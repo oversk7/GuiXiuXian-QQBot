@@ -86,11 +86,11 @@ async def _handle_teleport_logic(event: MessageEvent, target_region: str, cmd_ha
             if not player.can_enter_dungeon_level(dungeon_level):
                 max_level = player.max_dungeon_level or 0
                 await cmd_handler.finish(
-                    f"⛔ 无法进入第{dungeon_level}重里世界！\n"
+                    f"⛔ 无法进入第{dungeon_level}重诡域！\n"
                     f"━━━━━━━━━━━━━\n"
-                    f"📊 当前最深探索：第{max_level}重里世界\n"
+                    f"📊 当前最深探索：第{max_level}重诡域\n"
                     f"━━━━━━━━━━━━━\n"
-                    f"💡 需要逐重击败诡异解锁更深的里世界\n"
+                    f"💡 需要逐重击败诡异解锁更深的诡域\n"
                     f"⬇️ 【进入 {max_level + 1}层诡域】探索下一重空间"
                 )
         else:
@@ -141,12 +141,12 @@ async def _handle_teleport_logic(event: MessageEvent, target_region: str, cmd_ha
 
     if dungeon_level:
         msg_lines.append("━━━━━━━━━━━━━")
-        msg_lines.append("🌀 你穿越了空间裂隙，进入了里世界")
+        msg_lines.append("🌀 你穿越了空间裂隙，进入了诡域")
         msg_lines.append("🗺️ 这是一个10x10的独立空间")
         msg_lines.append("📍 坐标范围：(-5,-5) 到 (5,5)")
         msg_lines.append("🧭 使用【上下左右】移动，【探索】调查")
-        msg_lines.append("⬆️ 【上一层】切换到更浅的里世界")
-        msg_lines.append("⬇️ 【下一层】切换到更深的里世界")
+        msg_lines.append("⬆️ 【上一层】切换到更浅的诡域")
+        msg_lines.append("⬇️ 【下一层】切换到更深的诡域")
         msg_lines.append("🏠 【返回】穿越回表世界")
 
         # 检查是否有可领取的深渊探索者宝箱
@@ -208,7 +208,7 @@ async def handle_revive(event: MessageEvent):
         ]
         
         if was_in_dungeon:
-            msg_lines.append(f"✧ 已从第{dungeon_level}重里世界穿越回表世界")
+            msg_lines.append(f"✧ 已从第{dungeon_level}重诡域穿越回表世界")
             msg_lines.append(f"✧ 恢复表世界坐标：({player.x},{player.y})")
         else:
             msg_lines.append("✧ 但你的精神状态可能不太好...")
@@ -217,7 +217,7 @@ async def handle_revive(event: MessageEvent):
         msg_lines.extend([
             "━━━━━━━━━━━━━",
             "⬇️ 【导航 <x> <y>】劳逸结合，现实经商",
-            "⬇️ 【进入 N层诡域】探索更深的里世界"
+            "⬇️ 【进入 N层诡域】探索更深的诡域"
         ])
         
         msg = "\n".join(msg_lines)
@@ -241,11 +241,11 @@ async def handle_prev_level(event: MessageEvent):
 
         # 检查是否已经在第1层
         if target_level < 1:
-            await prev_level_cmd.finish("⛔ 你已经在第1重里世界，无法再向上")
+            await prev_level_cmd.finish("⛔ 你已经在第1重诡域，无法再向上")
 
         # 检查是否可以进入目标层级
         if not player.can_enter_dungeon_level(target_level):
-            await prev_level_cmd.finish(f"⛔ 无法进入第{target_level}重里世界，你尚未解锁该层级")
+            await prev_level_cmd.finish(f"⛔ 无法进入第{target_level}重诡域，你尚未解锁该层级")
 
         # 切换到目标层级
         player.enter_dungeon(target_level)
@@ -253,14 +253,14 @@ async def handle_prev_level(event: MessageEvent):
         await session.commit()
 
         msg_lines = [
-            f"🌀 你穿越空间裂隙，从第{current_level}重里世界来到第{target_level}重里世界",
+            f"🌀 你穿越空间裂隙，从第{current_level}重诡域来到第{target_level}重诡域",
             f"📍 当前位置：{target_level}层诡域 ({player.dungeon_x},{player.dungeon_y})",
             "━━━━━━━━━━━━━",
             "🗺️ 这是一个10x10的独立空间",
             "📍 坐标范围：(-5,-5) 到 (5,5)",
             "🧭 使用【上下左右】移动，【探索】调查",
-            "⬆️ 【上一层】切换到更浅的里世界",
-            "⬇️ 【下一层】切换到更深的里世界",
+            "⬆️ 【上一层】切换到更浅的诡域",
+            "⬇️ 【下一层】切换到更深的诡域",
             "🏠 【返回】穿越回表世界"
         ]
 
@@ -287,11 +287,11 @@ async def handle_next_level(event: MessageEvent):
         if not player.can_enter_dungeon_level(target_level):
             max_level = player.max_dungeon_level or 0
             await next_level_cmd.finish(
-                f"⛔ 无法进入第{target_level}重里世界！\n"
+                f"⛔ 无法进入第{target_level}重诡域！\n"
                 f"━━━━━━━━━━━━━\n"
-                f"📊 当前最深探索：第{max_level}重里世界\n"
+                f"📊 当前最深探索：第{max_level}重诡域\n"
                 f"━━━━━━━━━━━━━\n"
-                f"💡 需要在当前层击败诡异解锁更深的里世界"
+                f"💡 需要在当前层击败诡异解锁更深的诡域"
             )
 
         # 切换到目标层级
@@ -300,14 +300,14 @@ async def handle_next_level(event: MessageEvent):
         await session.commit()
 
         msg_lines = [
-            f"🌀 你穿越空间裂隙，从第{current_level}重里世界来到第{target_level}重里世界",
+            f"🌀 你穿越空间裂隙，从第{current_level}重诡域来到第{target_level}重诡域",
             f"📍 当前位置：{target_level}层诡域 ({player.dungeon_x},{player.dungeon_y})",
             "━━━━━━━━━━━━━",
             "🗺️ 这是一个10x10的独立空间",
             "📍 坐标范围：(-5,-5) 到 (5,5)",
             "🧭 使用【上下左右】移动，【探索】调查",
-            "⬆️ 【上一层】切换到更浅的里世界",
-            "⬇️ 【下一层】切换到更深的里世界",
+            "⬆️ 【上一层】切换到更浅的诡域",
+            "⬇️ 【下一层】切换到更深的诡域",
             "🏠 【返回】穿越回表世界"
         ]
 

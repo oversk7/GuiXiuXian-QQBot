@@ -43,7 +43,7 @@ async def handle_dungeon_chest_info(event: MessageEvent):
         msg_lines = [
             "🎁 深渊探索者宝箱系统",
             "━━━━━━━━━━━━━",
-            f"📊 当前最深探索：第{player.max_dungeon_level or 0}重里世界",
+            f"📊 当前最深探索：第{player.max_dungeon_level or 0}重诡域",
             "",
             "🏆 宝箱领取规则：",
             "• 每探索到第10、20、30...层时可领取一个深渊探索者宝箱",
@@ -139,7 +139,7 @@ async def handle_claim_chest(event: MessageEvent):
             "🔮 宝箱内含珍贵的镶嵌物和材料",
             "",
             "💡 使用【开宝箱 深渊探索者宝箱】开启宝箱",
-            "🏆 继续探索更深的里世界获得更多奖励！"
+            "🏆 继续探索更深的诡域获得更多奖励！"
         ]
 
         msg = "\n".join(msg_lines)

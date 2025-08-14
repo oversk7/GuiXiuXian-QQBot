@@ -655,7 +655,7 @@ async def _(event: MessageEvent):
                     if special_attrs:
                         special_info = f"\n🔥 特殊能力：{' '.join(special_attrs)}"
 
-                return f"⚔️ 空间深处传来恶意的窥视，{monster_name}(Lv{monster_level}) 作为这重里世界的诡异存在正盯着你！{special_info}\n输入 [探索] 迎战。"
+                return f"⚔️ 空间深处传来恶意的窥视，{monster_name}(Lv{monster_level}) 作为这重诡域的诡异存在正盯着你！{special_info}\n输入 [探索] 迎战。"
             return "⁉️ 未知事件。"
 
         event_desc = describe_tile(tile)
@@ -819,10 +819,10 @@ async def _handle_personal_monster(session, tile: WorldTile, player: Player) -> 
             player.unlock_next_dungeon_level()
             new_max_level = player.max_dungeon_level or 0
 
-            # 如果解锁了新的里世界，给予提示
+            # 如果解锁了新的诡域，给予提示
             if new_max_level > old_max_level:
-                battle_summary.append(f"🎉 恭喜！解锁了第{new_max_level + 1}重里世界")
-                battle_summary.append(f"🔓 现在可以探索更深层的里世界了！")
+                battle_summary.append(f"🎉 恭喜！解锁了第{new_max_level + 1}重诡域")
+                battle_summary.append(f"🔓 现在可以探索更深层的诡域了！")
 
                 # 检查是否可以领取深渊探索者宝箱
                 if new_max_level % 10 == 0:
@@ -1123,21 +1123,21 @@ async def handle_teleport_list(event: MessageEvent):
 
         # 格式化消息
         msg_lines = [
-            "🌀 无限重里世界探索系统",
+            "🌀 无限重诡域探索系统",
             "━━━━━━━━━━━━━",
-            f"🏆 当前最深探索：第{max_level}重里世界",
-            f"🎯 下一个目标：第{max_level + 1}重里世界",
+            f"🏆 当前最深探索：第{max_level}重诡域",
+            f"🎯 下一个目标：第{max_level + 1}重诡域",
             f"📊 总可访问深度：{len(accessible_levels)}重",
         ]
 
         if current_level > 0:
-            msg_lines.append(f"📍 当前位置：第{current_level}重里世界")
+            msg_lines.append(f"📍 当前位置：第{current_level}重诡域")
 
         msg_lines.extend([
             "━━━━━━━━━━━━━",
-            "🌀 每重里世界都是独立的10x10空间",
-            "⚔️ 诡异等级 = 里世界深度 × 5（±2波动）",
-            "🔓 击败诡异解锁更深的里世界",
+            "🌀 每重诡域都是独立的10x10空间",
+            "⚔️ 诡异等级 = 诡域深度 × 5（±2波动）",
+            "🔓 击败诡异解锁更深的诡域",
             "━━━━━━━━━━━━━"
         ])
 

@@ -6,7 +6,7 @@ from __future__ import annotations
 """
 
 from nonebot import on_command
-from nonebot.adapters.qq import MessageEvent
+from nonebot.adapters.qq import MessageEvent, MessageSegment, Message
 from sqlalchemy import select
 
 from ..models.db import safe_session
@@ -31,6 +31,9 @@ def _show_default_job_locations(lines):
 
 # 地图指令
 map_cmd = on_command("地图", aliases={"地点", "地点列表", "坐标"}, block=True, priority=5)
+
+# 可视化地图指令
+visual_map_cmd = on_command("可视化地图", aliases={"地图图片", "地图可视化", "图形地图"}, block=True, priority=5)
 
 @map_cmd.handle()
 async def _(event: MessageEvent):
@@ -189,3 +192,81 @@ async def _(event: MessageEvent):
         ])
         
         await nearby_locations_cmd.finish(message_add_head("\n".join(lines), event))
+
+
+@visual_map_cmd.handle()
+async def _(event: MessageEvent):
+    """生成可视化地图"""
+    async with safe_session() as session:
+        player: Player | None = await session.get(Player, event.get_user_id())
+        if not player:
+            await visual_map_cmd.finish("⛔ 请先创建角色")
+
+        try:
+            # 导入地图可视化器
+            from .map_visualizer import MapVisualizer
+            from ..economy.merchants import MARKETS, HEADQUARTERS_COORD
+            import base64
+
+            # 生成地图
+            visualizer = MapVisualizer()
+            map_image_bytes = await visualizer.generate_map(session, player.id)
+
+            # 将图片转换为base64编码
+            base64_img = base64.b64encode(map_image_bytes).decode("utf-8")
+
+            # 创建详细的坐标信息
+            coord_info = []
+            coord_info.append("📍 地点坐标详情：")
+            coord_info.append("━━━━━━━━━━━━━")
+
+            # 市集坐标
+            coord_info.append("🟠 市集地点：")
+            for market in MARKETS:
+                coord_info.append(f"   • {market.name} ({market.x},{market.y})")
+
+            # 缉邪司总部
+            hq_x, hq_y = HEADQUARTERS_COORD
+            coord_info.append("🟡 特殊地点：")
+            coord_info.append(f"   • 缉邪司总部 ({hq_x},{hq_y})")
+
+            # 打工地点
+            try:
+                from ..economy.part_time_job_service import PartTimeJobService
+                coord_info.append("🟣 打工地点：")
+                for location_data in PartTimeJobService.JOB_LOCATIONS.values():
+                    coord_info.append(f"   • {location_data['name']} ({location_data['x']},{location_data['y']})")
+            except ImportError:
+                coord_info.append("🟣 打工地点：")
+                coord_info.append("   • 上京商业中心 (0,0)")
+                coord_info.append("   • 制造工业区 (100,200)")
+                coord_info.append("   • 休闲娱乐街区 (-50,150)")
+                coord_info.append("   • 物流配送中心 (200,-100)")
+
+            # 当前玩家位置
+            coord_info.append("🔴 你的位置：")
+            coord_info.append(f"   • {player.nickname} ({player.x},{player.y})")
+
+            coord_info.append("━━━━━━━━━━━━━")
+            coord_info.append("💡 使用【导航 x y】可前往指定坐标")
+
+            # 创建图片消息
+            img = MessageSegment.file_image(base64_img)
+            text_msg = message_add_head("🗺️ 大都会地图全览\n" + "\n".join(coord_info), event)
+            msg = Message(text_msg).append(img)
+
+            await visual_map_cmd.finish(msg)
+
+        except ImportError as e:
+            await visual_map_cmd.finish(message_add_head(
+                "❌ 地图可视化功能不可用\n"
+                "━━━━━━━━━━━━━\n"
+                "缺少必要的图像处理库 PIL\n"
+                "请管理员安装：pip install Pillow\n"
+                "━━━━━━━━━━━━━\n"
+                "💡 可使用【地图】查看文字版地图", event))
+        except Exception as e:
+            await visual_map_cmd.finish(message_add_head(
+                f"❌ 生成地图失败：{str(e)}\n"
+                "━━━━━━━━━━━━━\n"
+                "💡 可使用【地图】查看文字版地图", event))

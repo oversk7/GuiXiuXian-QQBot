@@ -25,12 +25,12 @@ def _get_material_obtain_methods(item_id: str, rarity: str) -> str:
     if item_id in SHOP_ITEMS:
         methods.append("万事屋购买")
 
-    # 检查里世界材料配置
+    # 检查诡域材料配置
     map_config = config.map_config
     merchant_tiers = []
     basic_tiers = []
 
-    # 检查动态里世界材料配置
+    # 检查动态诡域材料配置
     dungeon_rules = map_config.get("dungeon_generation_rules", {})
     material_tiers = dungeon_rules.get("material_tiers", {})
 
@@ -68,12 +68,12 @@ def _get_material_obtain_methods(item_id: str, rarity: str) -> str:
     if rarity == "white":
         methods.append("材料格子采集")
 
-        # 优先显示里世界深度信息
+        # 优先显示诡域深度信息
         if basic_tiers:
             tiers_str = "、".join(basic_tiers[:3])  # 最多显示3个深度范围
             if len(basic_tiers) > 3:
                 tiers_str += "等"
-            methods.append(f"里世界探索({tiers_str}重)")
+            methods.append(f"诡域探索({tiers_str}重)")
         elif basic_regions:
             regions_str = "、".join(basic_regions[:3])  # 兼容旧区域
             if len(basic_regions) > 3:
@@ -100,12 +100,12 @@ def _get_material_obtain_methods(item_id: str, rarity: str) -> str:
         # 精英诡异特殊掉落
         methods.append("精英诡异(高概率)")
 
-        # 里世界商人材料
+        # 诡域商人材料
         if merchant_tiers:
             tiers_str = "、".join(merchant_tiers[:3])
             if len(merchant_tiers) > 3:
                 tiers_str += "等"
-            methods.append(f"里世界商人({tiers_str}重)")
+            methods.append(f"诡域商人({tiers_str}重)")
         elif merchant_regions:
             regions_str = "、".join(merchant_regions[:3])
             if len(merchant_regions) > 3:

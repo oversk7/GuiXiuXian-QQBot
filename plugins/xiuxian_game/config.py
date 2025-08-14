@@ -41,7 +41,7 @@ class Config(BaseSettings):
         return config_data
 
     def _generate_infinite_dungeon_levels(self) -> dict:
-        """动态生成无限重里世界配置"""
+        """动态生成无限重诡域配置"""
         rules = _load_config(self.map_file).get("dungeon_generation_rules", {})
 
         # 预生成前100重的配置（按需可扩展到更多）
@@ -52,11 +52,11 @@ class Config(BaseSettings):
         return levels
 
     def _generate_dungeon_level_config(self, level: int, rules: dict) -> dict:
-        """生成单个里世界深度的配置"""
+        """生成单个诡域深度的配置"""
         import random
 
         # 计算诡异等级
-        base_creature_level = level * 5  # 里世界深度 * 5
+        base_creature_level = level * 5  # 诡域深度 * 5
         variance = rules.get("monster_level_variance", 2)
         creature_level_min = max(1, base_creature_level - variance)
         creature_level_max = base_creature_level + variance
@@ -73,7 +73,7 @@ class Config(BaseSettings):
 
         return {
             "name": f"{level}层诡域",
-            "required_level": 1,  # 里世界系统不限制玩家等级，只限制深度解锁
+            "required_level": 1,  # 诡域系统不限制玩家等级，只限制深度解锁
             "tier": min(10, (level - 1) // 10 + 1),  # 每10重一个tier
             "mp_cost": mp_cost,
             "level_range": [creature_level_min, creature_level_max],
@@ -83,7 +83,7 @@ class Config(BaseSettings):
         }
 
     def _get_materials_for_level(self, level: int, rules: dict) -> tuple[list, list]:
-        """根据里世界深度获取材料配置"""
+        """根据诡域深度获取材料配置"""
         material_tiers = rules.get("material_tiers", {})
 
         # 查找匹配的材料深度
