@@ -275,14 +275,14 @@ async def init_special_locations(session) -> int:
 
     # 检查是否已有管理员NPC
     existing_admin = await NPCService.get_npc_by_name(
-        session, "司长张三", location.id
+        session, "司长曹延华", location.id
     )
 
     if not existing_admin:
         # 创建总部管理员NPC
         admin_npc = NPC(
             npc_id="headquarters_admin",
-            name="司长张三",
+            name="司长曹延华",
             description="缉邪司司长，负责积分兑换和升阶材料管理",
             npc_type=NPCType.SPECIAL_VENDOR,
             location_id=location.id,
