@@ -2,11 +2,14 @@ from nonebot import on_command
 from nonebot.adapters.qq import MessageEvent, Message
 from nonebot.params import CommandArg
 from pathlib import Path
-from typing import Dict
+from typing import Dict, Tuple
+from datetime import datetime
 import yaml
 from ..models.db import safe_session
 from ..models.player import Player
+from ..models.invite_reward import InviteReward
 from ..utils import message_add_head
+from .invite_reward_service import InviteRewardService
 from sqlalchemy import select
 
 # ---------------- 配置常量 ----------------
@@ -68,15 +71,17 @@ def save_records(data: Dict[str, int]):
 
 invite_cmd = on_command("邀请码", aliases={"我的邀请码"}, block=True, priority=5)
 bind_cmd = on_command("绑定邀请码", aliases={"使用邀请码"}, block=True, priority=5)
+invite_status_cmd = on_command("邀请状态", aliases={"邀请奖励状态"}, block=True, priority=5)
 
-# 奖励配置
+# 旧版奖励配置（保留用于显示邀请码信息）
 # 邀请者：首邀 10000，每多 1 人 +5000，单次奖励最高 30000
 BASE_INVITER_REWARD = 10_000
 INVITER_REWARD_STEP = 5_000
 INVITER_REWARD_MAX = 30_000
 
-# 受邀者固定奖励
-INVITEE_REWARD_GOLD = 5_000
+# 初始绑定奖励（立即发放）
+INITIAL_INVITEE_REWARD = 2000
+INITIAL_INVITER_REWARD = 5000
 
 
 @invite_cmd.handle()
@@ -87,15 +92,32 @@ async def _(event: MessageEvent):
             await invite_cmd.finish("⛔ 请先创建角色")
 
         code = generate_invite_code(player.uid)
-        records = load_records()
-        invite_count = sum(1 for v in records.values() if v == player.uid)
-        next_reward = min(BASE_INVITER_REWARD + invite_count * INVITER_REWARD_STEP, INVITER_REWARD_MAX)
+
+        # 获取邀请状态信息
+        invite_status = await InviteRewardService.get_invite_status(session, player.uid)
+        invite_count = invite_status["invited_count"]
+
+        # 获取待发放奖励信息
+        pending_rewards = await InviteRewardService.get_pending_rewards_info(session, player.uid)
+
         msg = (
             f"📮 你的邀请码：{code}\n"
             f"🎉 已成功邀请：{invite_count} 人\n"
-            f"📈 下一位好友成功绑定你将获得：{next_reward} 金币\n"
-            f"将该码发送给好友，让 TA 发送 '/绑定邀请码 {code}' 双方均可获得奖励！"
+            "━━━━━━━━━━━━━\n"
+            "🎁 分级奖励说明：\n"
+            "• 绑定时：邀请者+5000金币，被邀请者+2000金币\n"
+            "• 1级时：邀请者+3000金币，被邀请者+1000金币\n"
+            "• 10级时：邀请者+8000金币，被邀请者+3000金币\n"
+            "• 50级时：邀请者+20000金币，被邀请者+8000金币\n"
         )
+
+        if pending_rewards:
+            msg += "━━━━━━━━━━━━━\n🎁 待发放奖励：\n"
+            for reward in pending_rewards:
+                msg += f"• {reward['invitee_name']}({reward['invitee_level']}级) - {reward['reward_level']}级奖励：+{reward['inviter_gold']}金币\n"
+
+        msg += f"\n将该码发送给好友，让 TA 发送 '/绑定邀请码 {code}' 双方均可获得奖励！"
+
         await invite_cmd.finish(message_add_head(msg, event))
 
 
@@ -110,7 +132,15 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
         if not player:
             await bind_cmd.finish("⛔ 请先创建角色")
 
-        # 判断是否已绑定
+        # 判断是否已绑定（检查新的数据库记录）
+        existing_record_stmt = select(InviteReward).where(InviteReward.invitee_uid == player.uid)
+        existing_record_result = await session.execute(existing_record_stmt)
+        existing_record = existing_record_result.scalars().first()
+
+        if existing_record:
+            await bind_cmd.finish("⛔ 你已绑定过邀请码，无法重复绑定")
+
+        # 兼容旧版记录检查
         records = load_records()
         if str(player.uid) in records:
             await bind_cmd.finish("⛔ 你已绑定过邀请码，无法重复绑定")
@@ -127,23 +157,119 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
         if not inviter:
             await bind_cmd.finish("⛔ 邀请码无效或邀请者不存在")
 
-        # ---------------- 结算奖励 ----------------
-        invite_count_before = sum(1 for v in records.values() if v == inviter_uid)
-        inviter_reward = min(BASE_INVITER_REWARD + invite_count_before * INVITER_REWARD_STEP,
-                             INVITER_REWARD_MAX)
+        # ---------------- 创建邀请记录并发放初始奖励 ----------------
+        # 创建新的邀请记录
+        invite_record = await InviteRewardService.create_invite_record(session, player.uid, inviter_uid)
 
-        player.gold += INVITEE_REWARD_GOLD
-        inviter.gold += inviter_reward
+        # 发放初始绑定奖励
+        player.gold += INITIAL_INVITEE_REWARD
+        inviter.gold += INITIAL_INVITER_REWARD
+
+        # 如果玩家已经达到1级，立即发放1级奖励
+        level_1_reward_msg = ""
+        if player.level >= 1:
+            level_1_reward = InviteRewardService.LEVEL_REWARDS[1]
+            player.gold += level_1_reward["invitee_gold"]
+            inviter.gold += level_1_reward["inviter_gold"]
+            invite_record.level_1_rewarded = True
+            invite_record.level_1_rewarded_at = datetime.now()
+            level_1_reward_msg = f"\n🎉 1级奖励同时发放：邀请者+{level_1_reward['inviter_gold']}，被邀请者+{level_1_reward['invitee_gold']}"
+
         await session.commit()
 
-        # 写入记录文件
+        # 兼容性：写入旧版记录文件
         records[str(player.uid)] = inviter_uid
         save_records(records)
 
         await bind_cmd.finish(
             message_add_head(
-                f"✅ 绑定成功！\n已获得 💰{INVITEE_REWARD_GOLD} 金币奖励\n"
-                f"🎁 邀请者 {inviter.nickname} 获得 💰{inviter_reward} 金币！",
+                f"✅ 绑定成功！\n"
+                f"🎁 被邀请者 {player.nickname} 获得 💰{INITIAL_INVITEE_REWARD} 金币\n"
+                f"🎁 邀请者 {inviter.nickname} 获得 💰{INITIAL_INVITER_REWARD} 金币"
+                + level_1_reward_msg +
+                f"\n━━━━━━━━━━━━━\n"
+                f"📈 后续奖励将在达到10级、50级时自动发放！",
                 event,
             )
-        ) 
+        )
+
+
+@invite_status_cmd.handle()
+async def _(event: MessageEvent):
+    """查看邀请奖励状态"""
+    async with safe_session() as session:
+        player = await session.get(Player, event.get_user_id())
+        if not player:
+            await invite_status_cmd.finish("⛔ 请先创建角色")
+
+        # 获取邀请状态信息
+        invite_status = await InviteRewardService.get_invite_status(session, player.uid)
+
+        msg = f"📊 {player.nickname} 的邀请状态\n━━━━━━━━━━━━━\n"
+
+        # 作为邀请者的信息
+        if invite_status["invited_count"] > 0:
+            msg += f"👥 已邀请玩家：{invite_status['invited_count']} 人\n"
+
+            # 显示每个被邀请者的奖励状态
+            for record in invite_status["inviter_records"]:
+                # 获取被邀请者信息
+                invitee_stmt = select(Player).where(Player.uid == record.invitee_uid)
+                invitee_result = await session.execute(invitee_stmt)
+                invitee = invitee_result.scalars().first()
+
+                if invitee:
+                    status_icons = []
+                    if record.level_1_rewarded:
+                        status_icons.append("✅1级")
+                    else:
+                        status_icons.append("❌1级")
+
+                    if record.level_10_rewarded:
+                        status_icons.append("✅10级")
+                    elif invitee.level >= 10:
+                        status_icons.append("🎁10级")
+                    else:
+                        status_icons.append("❌10级")
+
+                    if record.level_50_rewarded:
+                        status_icons.append("✅50级")
+                    elif invitee.level >= 50:
+                        status_icons.append("🎁50级")
+                    else:
+                        status_icons.append("❌50级")
+
+                    msg += f"  • {invitee.nickname}(Lv.{invitee.level}) {' '.join(status_icons)}\n"
+        else:
+            msg += "👥 尚未邀请任何玩家\n"
+
+        # 作为被邀请者的信息
+        if invite_status["invitee_record"]:
+            record = invite_status["invitee_record"]
+            inviter_stmt = select(Player).where(Player.uid == record.inviter_uid)
+            inviter_result = await session.execute(inviter_stmt)
+            inviter = inviter_result.scalars().first()
+
+            if inviter:
+                msg += f"━━━━━━━━━━━━━\n"
+                msg += f"🎯 被 {inviter.nickname} 邀请\n"
+
+                status_msg = []
+                if record.level_1_rewarded:
+                    status_msg.append("✅1级奖励已领取")
+                if record.level_10_rewarded:
+                    status_msg.append("✅10级奖励已领取")
+                elif player.level >= 10:
+                    status_msg.append("🎁10级奖励待发放")
+                if record.level_50_rewarded:
+                    status_msg.append("✅50级奖励已领取")
+                elif player.level >= 50:
+                    status_msg.append("🎁50级奖励待发放")
+
+                if status_msg:
+                    msg += "  " + "\n  ".join(status_msg)
+
+        msg += "\n━━━━━━━━━━━━━\n"
+        msg += "💡 说明：✅已领取 🎁待发放 ❌未达成"
+
+        await invite_status_cmd.finish(message_add_head(msg, event))

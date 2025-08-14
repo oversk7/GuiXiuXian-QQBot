@@ -28,6 +28,8 @@ from .stock import Stock, StockHolding, StockTransaction, StockPriceHistory
 from .part_time_job import PartTimeJob, JobLocation, PlayerJobStats
 # 世界BOSS系统模型
 from .world_boss import WorldBossCycle, WorldBossDamage
+# 邀请奖励系统模型
+from .invite_reward import InviteReward
 
 __all__ = [
     "Player", "Guild", "GuildMember", "GuildBuilding", "GuildPosition", "BuildingType", "WorldMessage", "BankAccount", "ItemInstance", "WorldTile", "NavigationTask", "AlchemyRecord", "MarketOrder",
@@ -37,5 +39,6 @@ __all__ = [
     "PartTimeJob", "JobLocation", "PlayerJobStats",
     "DailyTask", "TaskType", "TaskStatus",
     "GuildTaskRecord", "GuildTaskType", "PlayerTaskStats",
-    "WorldBossCycle", "WorldBossDamage"
+    "WorldBossCycle", "WorldBossDamage",
+    "InviteReward"
 ]

@@ -406,7 +406,7 @@ async def handle_breakthrough(event: MessageEvent, args: Message = CommandArg())
 
             # 触发升级钩子
             from ..social.level_hooks import on_player_level_up
-            await on_player_level_up(session, player.id, old_level, player.level)
+            reward_messages = await on_player_level_up(session, player.id, old_level, player.level)
 
             cost_msg = ""
             if use_guardian:
@@ -414,12 +414,18 @@ async def handle_breakthrough(event: MessageEvent, args: Message = CommandArg())
             elif use_coffin_nail:
                 cost_msg = f"✧ 消耗棺材钉 1根⚰️，躁动的灵异被强制稳定，万千冤魂俯首称臣！\n"
 
+            # 构建升级消息
+            reward_msg = ""
+            if reward_messages:
+                reward_msg = "\n" + "\n".join(reward_messages) + "\n"
+
             msg = (
                 f"⛓️‍💥骨裂声回荡，已突破至Lv.{player.level}↑\n"
                 "━━━━━━━━━━━━━\n"
                 f"✧ 获得属性点 + {points_gained}" + (f" (转数加成)" if player.reincarnation_level > 0 else "") + "\n"
                 f"✧ 剩余修为 {player.exp}\n"
                 + cost_msg +
+                reward_msg +
                 "━━━━━━━━━━━━━\n"
                 "⬇️ 【加点】缝合裂隙\n"
                 "⬇️ 【修炼】继续喂养怨炁"
@@ -440,7 +446,7 @@ async def handle_breakthrough(event: MessageEvent, args: Message = CommandArg())
 
                 # 触发升级钩子
                 from ..social.level_hooks import on_player_level_up
-                await on_player_level_up(session, player.id, old_level, player.level)
+                reward_messages = await on_player_level_up(session, player.id, old_level, player.level)
 
                 cost_msg = ""
                 if use_guardian:
@@ -448,12 +454,18 @@ async def handle_breakthrough(event: MessageEvent, args: Message = CommandArg())
                 elif use_coffin_nail:
                     cost_msg = f"✧ 消耗棺材钉 1根⚰️，躁动的灵异被强制稳定，万千冤魂俯首称臣！\n"
 
+                # 构建升级消息
+                reward_msg = ""
+                if reward_messages:
+                    reward_msg = "\n" + "\n".join(reward_messages) + "\n"
+
                 msg = (
                     f"⛓️‍💥骨裂声回荡，已突破至Lv.{player.level}↑\n"
                     "━━━━━━━━━━━━━\n"
                     f"✧ 获得属性点 + {points_gained}" + (f" (转数加成)" if player.reincarnation_level > 0 else "") + "\n"
                     f"✧ 剩余修为 {player.exp}\n"
                     + cost_msg +
+                    reward_msg +
                     "━━━━━━━━━━━━━\n"
                     "⬇️ 【加点】缝合裂隙\n"
                     "⬇️ 【修炼】继续喂养怨炁"

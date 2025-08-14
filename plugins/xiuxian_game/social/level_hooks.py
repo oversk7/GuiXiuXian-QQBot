@@ -3,12 +3,13 @@
 """
 from sqlalchemy.ext.asyncio import AsyncSession
 from .mentorship_service import MentorshipService
+from ..player.invite_reward_service import InviteRewardService
 
 
 async def on_player_level_up(session: AsyncSession, player_id: str, old_level: int, new_level: int):
     """
     玩家升级时的钩子函数
-    
+
     Args:
         session: 数据库会话
         player_id: 玩家ID
@@ -19,3 +20,11 @@ async def on_player_level_up(session: AsyncSession, player_id: str, old_level: i
     if level_increase > 0:
         # 更新师父的恩师点
         await MentorshipService.update_mentor_points(session, player_id, level_increase)
+
+        # 检查并发放邀请奖励
+        reward_messages = await InviteRewardService.check_and_grant_level_rewards(session, player_id, new_level)
+
+        # 返回奖励消息，供调用方使用
+        return reward_messages
+
+    return []
