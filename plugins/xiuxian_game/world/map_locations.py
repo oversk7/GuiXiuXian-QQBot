@@ -265,7 +265,7 @@ async def _(event: MessageEvent):
                 "请管理员安装：pip install Pillow\n"
                 "━━━━━━━━━━━━━\n"
                 "💡 可使用【地图】查看文字版地图", event))
-        except Exception as e:
+        except ValueError as e:
             await visual_map_cmd.finish(message_add_head(
                 f"❌ 生成地图失败：{str(e)}\n"
                 "━━━━━━━━━━━━━\n"

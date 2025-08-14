@@ -351,7 +351,7 @@ async def handle_migrate_data(event: MessageEvent):
             
             await migrate_data_cmd.finish(message_add_head(result_msg, event))
             
-    except Exception as e:
+    except ValueError as e:
         await migrate_data_cmd.finish(f"❌ 迁移失败：{str(e)}")
 
 
@@ -383,5 +383,5 @@ async def handle_cleanup_npcs(event: MessageEvent):
             
             await cleanup_npcs_cmd.finish(message_add_head(result_msg, event))
             
-    except Exception as e:
+    except ValueError as e:
         await cleanup_npcs_cmd.finish(f"❌ 清理失败：{str(e)}")

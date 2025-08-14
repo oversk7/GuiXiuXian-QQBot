@@ -266,18 +266,6 @@ class MapVisualizer:
         # 绘制图例
         self._draw_legend(draw)
         
-        # 绘制标题（放在底部避免与地点重叠）
-        title = "大都会地图"
-        title_bbox = draw.textbbox((0, 0), title, font=self.fonts['title'])
-        title_width = title_bbox[2] - title_bbox[0]
-        title_x = (self.map_width - title_width) // 2
-        title_y = self.map_height - 35  # 放在底部
-
-        # 绘制标题背景
-        draw.rectangle([title_x - 10, title_y - 5, title_x + title_width + 10, title_y + 25],
-                      fill='#FFFFFF', outline=self.colors['border'], width=1)
-        draw.text((title_x, title_y), title, fill=self.colors['location_text'], font=self.fonts['title'])
-        
         # 将图片转换为字节流
         img_buffer = io.BytesIO()
         image.save(img_buffer, format='PNG', quality=95)
