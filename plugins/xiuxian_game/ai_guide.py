@@ -67,7 +67,11 @@ DATABASE_SCHEMA = """
    - exp: 经验值
    - attribute_points: 可分配属性点
    - region: 区域
-   - x, y: 坐标位置
+   - x, y: 旧版本坐标位置
+   - real_world_x, real_world_y: 现实世界坐标位置
+   - dungeon_level: 当前诡域层级(0=现实世界)
+   - dungeon_x, dungeon_y: 诡域内坐标(-5到5)
+   - max_dungeon_level: 到达过的最高诡域层级
    - hp, max_hp: 生命值/最大生命值
    - mp, max_mp: 理智值/最大理智值
    - attack, defense, agility, luck, stamina: 基础属性
