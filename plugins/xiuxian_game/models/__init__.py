@@ -30,6 +30,8 @@ from .part_time_job import PartTimeJob, JobLocation, PlayerJobStats
 from .world_boss import WorldBossCycle, WorldBossDamage
 # 邀请奖励系统模型
 from .invite_reward import InviteReward
+# 深渊探索者宝箱记录模型
+from .dungeon_chest_record import DungeonChestRecord
 
 __all__ = [
     "Player", "Guild", "GuildMember", "GuildBuilding", "GuildPosition", "BuildingType", "WorldMessage", "BankAccount", "ItemInstance", "WorldTile", "NavigationTask", "AlchemyRecord", "MarketOrder",
@@ -40,5 +42,5 @@ __all__ = [
     "DailyTask", "TaskType", "TaskStatus",
     "GuildTaskRecord", "GuildTaskType", "PlayerTaskStats",
     "WorldBossCycle", "WorldBossDamage",
-    "InviteReward"
+    "InviteReward", "DungeonChestRecord"
 ]

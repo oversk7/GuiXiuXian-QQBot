@@ -149,6 +149,22 @@ async def _handle_teleport_logic(event: MessageEvent, target_region: str, cmd_ha
         msg_lines.append("⬆️ 【上一层】切换到更浅的里世界")
         msg_lines.append("⬇️ 【下一层】切换到更深的里世界")
         msg_lines.append("🏠 【返回】穿越回表世界")
+
+        # 检查是否有可领取的深渊探索者宝箱
+        if dungeon_level % 10 == 0:
+            from ..models.dungeon_chest_record import DungeonChestRecord
+            from sqlalchemy import select
+
+            stmt = select(DungeonChestRecord).where(
+                DungeonChestRecord.player_id == player.id,
+                DungeonChestRecord.dungeon_level == dungeon_level
+            )
+            existing_record = (await session.execute(stmt)).scalar_one_or_none()
+
+            if not existing_record:
+                msg_lines.append("━━━━━━━━━━━━━")
+                msg_lines.append("🎁 恭喜！你可以领取深渊探索者宝箱了！")
+                msg_lines.append("💎 【领取宝箱】一键领取所有可领取的宝箱")
     
     msg = "\n".join(msg_lines)
     await cmd_handler.finish(message_add_head(msg, event))

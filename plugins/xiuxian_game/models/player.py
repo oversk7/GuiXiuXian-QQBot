@@ -156,6 +156,15 @@ class Player(Base):
         max_level = self.max_dungeon_level or 0
         return list(range(1, max_level + 2))  # 1到最高层+1
 
+    def get_available_explorer_chest_levels(self) -> list[int]:
+        """获取可以领取深渊探索者宝箱的层级列表"""
+        max_level = self.max_dungeon_level or 0
+        # 每10层可以领取一个宝箱，从第10层开始
+        available_levels = []
+        for level in range(10, max_level + 1, 10):
+            available_levels.append(level)
+        return available_levels
+
     inventory_capacity: Mapped[int] = mapped_column(Integer, default=50, server_default='50', nullable=False, comment="背包容量")
     is_secluded: Mapped[bool] = mapped_column(Boolean, default=False, server_default='False', comment="是否闭关")
     seclusion_start_time: Mapped[datetime] = mapped_column(DateTime, nullable=True, comment="闭关开始时间")

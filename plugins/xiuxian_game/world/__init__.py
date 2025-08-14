@@ -1,1 +1,1 @@
-from . import nearby_players, message_board, navigation, map_locations, dungeon_battle, teleport
+from . import nearby_players, message_board, navigation, map_locations, dungeon_battle, teleport, dungeon_chest

@@ -813,6 +813,21 @@ async def _handle_personal_monster(session, tile: WorldTile, player: Player) -> 
                 battle_summary.append(f"🎉 恭喜！解锁了第{new_max_level + 1}重里世界")
                 battle_summary.append(f"🔓 现在可以探索更深层的里世界了！")
 
+                # 检查是否可以领取深渊探索者宝箱
+                if new_max_level % 10 == 0:
+                    from ..models.dungeon_chest_record import DungeonChestRecord
+
+                    stmt = select(DungeonChestRecord).where(
+                        DungeonChestRecord.player_id == player.id,
+                        DungeonChestRecord.dungeon_level == new_max_level
+                    )
+                    existing_record = (await session.execute(stmt)).scalar_one_or_none()
+
+                    if not existing_record:
+                        battle_summary.append("━━━━━━━━━━━━━")
+                        battle_summary.append("🎁 恭喜！你可以领取深渊探索者宝箱了！")
+                        battle_summary.append("💎 【领取宝箱】一键领取所有可领取的宝箱")
+
     elif player.hp <= 0:
         battle_summary.append(f"💀 你被 {monster_display} 击败，很遗憾，你已死亡")
 
