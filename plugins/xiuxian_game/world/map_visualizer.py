@@ -11,6 +11,7 @@ from __future__ import annotations
 
 import io
 import math
+import os
 from typing import List, Tuple, Dict, Any, Optional
 from PIL import Image, ImageDraw, ImageFont
 from sqlalchemy import select
@@ -56,12 +57,32 @@ class MapVisualizer:
                 'C:/Windows/Fonts/msyh.ttc',      # 微软雅黑
                 'C:/Windows/Fonts/simhei.ttf',    # 黑体
                 'C:/Windows/Fonts/simsun.ttc',    # 宋体
-                # Linux 中文字体
-                '/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf',
+                'C:/Windows/Fonts/msyhbd.ttc',    # 微软雅黑粗体
+
+                # Linux 中文字体 - 常见路径
+                '/usr/share/fonts/truetype/wqy/wqy-microhei.ttc',           # 文泉驿微米黑
+                '/usr/share/fonts/truetype/wqy/wqy-zenhei.ttc',             # 文泉驿正黑
+                '/usr/share/fonts/truetype/arphic/ukai.ttc',                # AR PL UKai CN
+                '/usr/share/fonts/truetype/arphic/uming.ttc',               # AR PL UMing CN
+                '/usr/share/fonts/opentype/noto/NotoSansCJK-Regular.ttc',   # Noto Sans CJK
+                '/usr/share/fonts/truetype/droid/DroidSansFallbackFull.ttf', # Droid Sans Fallback
                 '/usr/share/fonts/truetype/liberation/LiberationSans-Regular.ttf',
-                '/System/Library/Fonts/PingFang.ttc',  # macOS
+                '/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf',
+
+                # Ubuntu/Debian 特定路径
+                '/usr/share/fonts/truetype/noto/NotoSansCJK-Regular.ttc',
+                '/usr/share/fonts/truetype/fonts-noto-cjk/NotoSansCJK-Regular.ttc',
+
+                # CentOS/RHEL 特定路径
+                '/usr/share/fonts/wqy-microhei/wqy-microhei.ttc',
+                '/usr/share/fonts/wqy-zenhei/wqy-zenhei.ttc',
+
+                # macOS 中文字体
+                '/System/Library/Fonts/PingFang.ttc',
+                '/System/Library/Fonts/Hiragino Sans GB.ttc',
+                '/Library/Fonts/Arial Unicode MS.ttf',
             ]
-            
+
             # 加载不同大小的字体
             for size, name in [(12, 'small'), (14, 'medium'), (16, 'large'), (20, 'title')]:
                 font_loaded = False
@@ -69,18 +90,46 @@ class MapVisualizer:
                     try:
                         self.fonts[name] = ImageFont.truetype(font_path, size)
                         font_loaded = True
+                        print(f"✓ 成功加载字体: {os.path.basename(font_path)} (大小: {size})")
                         break
-                    except (OSError, IOError):
+                    except (OSError, IOError) as e:
                         continue
-                
+
                 if not font_loaded:
-                    # 使用默认字体
-                    self.fonts[name] = ImageFont.load_default()
-                    
-        except Exception:
+                    # 尝试使用系统默认字体，但指定大小
+                    try:
+                        # 尝试使用 DejaVu Sans 作为回退字体
+                        self.fonts[name] = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf", size)
+                        print(f"使用回退字体 DejaVu Sans (大小: {size})")
+                    except (OSError, IOError):
+                        # 最后使用默认字体
+                        self.fonts[name] = ImageFont.load_default()
+                        print(f"警告: 无法找到任何字体，使用系统默认字体 (大小: {size})")
+
+        except Exception as e:
             # 全部使用默认字体
+            print(f"字体加载异常: {e}")
             for name in ['small', 'medium', 'large', 'title']:
                 self.fonts[name] = ImageFont.load_default()
+
+    def _check_font_support(self, text: str = "测试") -> bool:
+        """检查当前字体是否支持中文显示"""
+        try:
+            # 创建一个小的测试图片
+            test_img = Image.new('RGB', (50, 20), color='white')
+            test_draw = ImageDraw.Draw(test_img)
+
+            # 尝试绘制中文文字
+            test_draw.text((5, 5), text, fill='black', font=self.fonts.get('small'))
+
+            # 检查是否有实际内容（简单检查像素变化）
+            pixels = list(test_img.getdata())
+            non_white_pixels = sum(1 for pixel in pixels if pixel != (255, 255, 255))
+
+            return non_white_pixels > 10  # 如果有足够的非白色像素，说明字体工作正常
+
+        except Exception:
+            return False
     
     def _game_to_pixel(self, x: int, y: int) -> Tuple[int, int]:
         """将游戏坐标转换为像素坐标"""
@@ -148,24 +197,35 @@ class MapVisualizer:
     
     def _draw_players(self, draw: ImageDraw.Draw, players: List[Player], current_player_id: str = None):
         """绘制玩家位置"""
+        # 先绘制所有其他玩家（小红点）
         for player in players:
+            if current_player_id and player.id == current_player_id:
+                continue  # 跳过当前玩家，稍后单独绘制
+
             pixel_x, pixel_y = self._game_to_pixel(player.x, player.y)
 
             # 确保在地图范围内
             if not (0 <= pixel_x <= self.map_width and 0 <= pixel_y <= self.map_height):
                 continue
 
-            # 根据是否为当前玩家决定点的大小
-            if current_player_id and player.id == current_player_id:
-                # 当前玩家：粗红点
-                size = 6
-                draw.ellipse([pixel_x - size, pixel_y - size, pixel_x + size, pixel_y + size],
-                            fill=self.colors['player'], outline='#FFFFFF', width=2)
-            else:
-                # 其他玩家：特别小的红点（1-2像素）
-                size = 1
-                draw.ellipse([pixel_x - size, pixel_y - size, pixel_x + size, pixel_y + size],
-                            fill=self.colors['player'], outline=None, width=0)
+            # 其他玩家：特别小的红点（1-2像素）
+            size = 1
+            draw.ellipse([pixel_x - size, pixel_y - size, pixel_x + size, pixel_y + size],
+                        fill=self.colors['player'], outline=None, width=0)
+
+        # 最后绘制当前玩家（粗红点），确保显示在最上层
+        if current_player_id:
+            for player in players:
+                if player.id == current_player_id:
+                    pixel_x, pixel_y = self._game_to_pixel(player.x, player.y)
+
+                    # 确保在地图范围内
+                    if 0 <= pixel_x <= self.map_width and 0 <= pixel_y <= self.map_height:
+                        # 当前玩家：粗红点
+                        size = 6
+                        draw.ellipse([pixel_x - size, pixel_y - size, pixel_x + size, pixel_y + size],
+                                    fill=self.colors['player'], outline='#FFFFFF', width=2)
+                    break
     
     def _draw_legend(self, draw: ImageDraw.Draw):
         """绘制图例"""
@@ -173,28 +233,41 @@ class MapVisualizer:
         legend_y = 20
         legend_width = 200
         legend_height = 120
-        
+
         # 绘制图例背景
-        draw.rectangle([legend_x, legend_y, legend_x + legend_width, legend_y + legend_height], 
+        draw.rectangle([legend_x, legend_y, legend_x + legend_width, legend_y + legend_height],
                       fill='#FFFFFF', outline=self.colors['border'], width=2)
-        
+
+        # 检查字体是否支持中文
+        font_supports_chinese = self._check_font_support("图例")
+
         # 图例标题
-        draw.text((legend_x + 10, legend_y + 10), "图例", fill=self.colors['location_text'], font=self.fonts['large'])
-        
-        # 图例项目
-        legend_items = [
-            ("🔴 玩家位置", self.colors['player']),
-            ("🟠 市集交易", self.colors['market']),
-            ("🟣 打工地点", self.colors['job']),
-            ("🟡 特殊地点", self.colors['special']),
-        ]
-        
+        title = "图例" if font_supports_chinese else "Legend"
+        draw.text((legend_x + 10, legend_y + 10), title, fill=self.colors['location_text'], font=self.fonts['large'])
+
+        # 图例项目 - 根据字体支持情况选择文字
+        if font_supports_chinese:
+            legend_items = [
+                ("🔴 玩家位置", self.colors['player']),
+                ("🟠 市集交易", self.colors['market']),
+                ("🟣 打工地点", self.colors['job']),
+                ("🟡 特殊地点", self.colors['special']),
+            ]
+        else:
+            legend_items = [
+                ("● Players", self.colors['player']),
+                ("● Markets", self.colors['market']),
+                ("● Jobs", self.colors['job']),
+                ("● Special", self.colors['special']),
+            ]
+
         for i, (text, color) in enumerate(legend_items):
             item_y = legend_y + 35 + i * 20
             # 绘制颜色标记
             draw.ellipse([legend_x + 15, item_y, legend_x + 25, item_y + 10], fill=color)
             # 绘制文字
-            draw.text((legend_x + 35, item_y - 2), text[2:], fill=self.colors['location_text'], font=self.fonts['small'])
+            display_text = text[2:] if text.startswith(("🔴", "🟠", "🟣", "🟡")) else text
+            draw.text((legend_x + 35, item_y - 2), display_text, fill=self.colors['location_text'], font=self.fonts['small'])
     
     async def generate_map(self, session: AsyncSession, current_player_id: str = None) -> bytes:
         """生成地图图片"""
@@ -252,10 +325,11 @@ class MapVisualizer:
             if current_player:
                 pixel_x, pixel_y = self._game_to_pixel(current_player.x, current_player.y)
                 if 0 <= pixel_x <= self.map_width and 0 <= pixel_y <= self.map_height:
-                    # 绘制高亮圆圈
-                    size = 12
-                    draw.ellipse([pixel_x - size, pixel_y - size, pixel_x + size, pixel_y + size],
-                                fill=None, outline='#FFFF00', width=3)
+                    # 绘制高亮圆圈（只有边框，不填充）
+                    highlight_size = 10
+                    draw.ellipse([pixel_x - highlight_size, pixel_y - highlight_size,
+                                 pixel_x + highlight_size, pixel_y + highlight_size],
+                                outline='#FFFF00', width=2)
                     # 绘制玩家昵称
                     text_x = pixel_x + 8
                     text_y = pixel_y - 8
