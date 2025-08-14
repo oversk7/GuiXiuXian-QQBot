@@ -85,12 +85,10 @@ async def _handle_teleport_logic(event: MessageEvent, target_region: str, cmd_ha
         if dungeon_level:
             if not player.can_enter_dungeon_level(dungeon_level):
                 max_level = player.max_dungeon_level or 0
-                accessible_levels = player.get_accessible_dungeon_levels()
                 await cmd_handler.finish(
                     f"⛔ 无法进入第{dungeon_level}重里世界！\n"
                     f"━━━━━━━━━━━━━\n"
                     f"📊 当前最深探索：第{max_level}重里世界\n"
-                    f"🔓 可进入深度：{accessible_levels}\n"
                     f"━━━━━━━━━━━━━\n"
                     f"💡 需要逐重击败诡异解锁更深的里世界\n"
                     f"⬇️ 【进入 {max_level + 1}层诡域】探索下一重空间"
@@ -288,12 +286,10 @@ async def handle_next_level(event: MessageEvent):
         # 检查是否可以进入目标层级
         if not player.can_enter_dungeon_level(target_level):
             max_level = player.max_dungeon_level or 0
-            accessible_levels = player.get_accessible_dungeon_levels()
             await next_level_cmd.finish(
                 f"⛔ 无法进入第{target_level}重里世界！\n"
                 f"━━━━━━━━━━━━━\n"
                 f"📊 当前最深探索：第{max_level}重里世界\n"
-                f"🔓 可进入深度：{accessible_levels}\n"
                 f"━━━━━━━━━━━━━\n"
                 f"💡 需要在当前层击败诡异解锁更深的里世界"
             )
