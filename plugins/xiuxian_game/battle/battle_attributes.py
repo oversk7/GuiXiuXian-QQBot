@@ -56,7 +56,8 @@ class BattleAttributeCalculator:
             "dodge_rate": player.dodge_rate,
             "accuracy_rate": player.accuracy_rate,
             "skill_crit_rate": player.skill_crit_rate,
-            "penetration_rate": player.penetration_rate
+            "penetration_rate": player.penetration_rate,
+            "anti_crit_rate": player.anti_crit_rate
         }
         
         for attr_name, base_value in base_attrs.items():

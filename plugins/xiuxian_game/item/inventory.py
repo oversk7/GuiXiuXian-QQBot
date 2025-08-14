@@ -11,7 +11,7 @@ from ..config import config
 from .item_effects import apply_effect
 from datetime import date
 from ..models.elixir_usage import ElixirUsageLog
-from ..models.navigation_task import NavigationTask
+
 from ..models.guild import Guild
 
 async def _handle_expand_territory(session, player: Player, item_config, quantity: int):
@@ -56,11 +56,7 @@ inventory_cmd = on_command("背包", block=True, priority=5)
 use_item = on_command("使用", block=True, priority=5)
 elixir_tolerance_cmd = on_command("耐药性", aliases={"丹药耐药性"}, block=True, priority=5)
 elixir_bonus_cmd = on_command("丹药加成", aliases={"丹药总加成", "丹药效果"}, block=True, priority=5)
-
-teleport_cmd = on_command("传送", block=True, priority=5)
 rename_cmd = on_command("改名", block=True, priority=5)
-revive_cmd = on_command("返回", aliases={"复活"}, block=True, priority=5)
-
 drop_item = on_command("丢弃", aliases={"抛弃", "drop"}, block=True, priority=5)
 
 # ---------------- 背包类别映射 ----------------
@@ -126,8 +122,6 @@ async def handle_use_item(event: MessageEvent, args: Message = CommandArg()):
         # 特殊道具直接跳转对应指令
         if item_config.effect_type == ItemEffectType.CHANGE_NAME:
             await use_item.finish("🪄 请使用指令进行改名：/改名 新名字")
-        elif item_config.effect_type == ItemEffectType.TELEPORT:
-            await use_item.finish("🪄 请使用指令进行传送：/传送 地点名称")
 
         # ---------------- 丹药使用限制检查 ----------------
         is_elixir = item_config.item_id.endswith("_elixir")
@@ -422,56 +416,7 @@ async def handle_inventory(event: MessageEvent, args: Message = CommandArg()):
         formatted = await paginate_items(items, page, page_size=page_size, capacity_info=capacity_info)
         await inventory_cmd.finish(message_add_head(formatted, event))
 
-@teleport_cmd.handle()
-async def _(event: MessageEvent, args: Message = CommandArg()):
-    target_region = args.extract_plain_text().strip()
-    if not target_region:
-        await teleport_cmd.finish("⛔ 请指定目标区域，例如：传送 美少年路口")
 
-    # 验证区域
-    valid_regions = list(config.map_config["regions"].keys())
-    if target_region not in valid_regions:
-        await teleport_cmd.finish("⛔ 目的地不存在，可发送 /诡域 查看全部诡域（副本）")
-
-    STAM_COST = 1  # 咒抗消耗
-
-    async with safe_session() as session:
-        player = await session.get(Player, event.get_user_id())
-        if not player:
-            await teleport_cmd.finish("⛔ 请先创建角色")
-
-        # 检查诡域等级限制
-        region_config = config.map_config["regions"].get(target_region)
-        if region_config:
-            required_level = region_config.get("required_level", 1)
-            if player.level < required_level:
-                await teleport_cmd.finish(f"⛔ 你的修为不足以进入『{target_region}』，需要达到 Lv.{required_level}")
-
-        if player.stamina < STAM_COST:
-            await teleport_cmd.finish(f"⛔ 你的咒抗不足以在传送过程中维持清醒，需要 {STAM_COST}，当前 {player.stamina}")
-        if player.hp < 5:
-            await teleport_cmd.finish(f"⛔ 你的生命值不足过低：当前 {player.hp}/{player.max_hp}")
-        # 查询是否存在导航任务
-        nav_task: NavigationTask | None = await session.get(NavigationTask, player.id)
-
-        # 扣除咒抗并移动
-        player.stamina -= STAM_COST
-        player.region = target_region
-        session.add(player)
-        # 若有导航则删除
-        if nav_task:
-            await session.delete(nav_task)
-
-        await session.commit()
-
-    msg_lines = [
-        f"🚪 你耗费 {STAM_COST} 咒抗跨越裂隙，抵达『{target_region}』",
-        f"当前位置：{target_region} ({player.x},{player.y})",
-    ]
-    if nav_task:
-        msg_lines.insert(1, "🛑 原导航任务已中断")
-    msg = "\n".join(msg_lines)
-    await teleport_cmd.finish(message_add_head(msg, event))
 
 @rename_cmd.handle()
 async def handle_rename(event: MessageEvent, args: Message = CommandArg()):
@@ -508,30 +453,7 @@ async def handle_rename(event: MessageEvent, args: Message = CommandArg()):
         await rename_cmd.finish(f"🎉 成功修改角色名为：{new_name}\n"
                                f"剩余改名卡：{inventory.quantity-1 if inventory else 0}张")
 
-@revive_cmd.handle()
-async def handle_revive(event: MessageEvent):
-    async with safe_session() as session:
-        player = await session.get(Player, event.get_user_id())
-        if not player:
-            await revive_cmd.finish("⛔ 请先创建角色")
-        player.hp = player.max_hp
-        player.mp = player.max_mp
-        player.region = "大都会"
-        session.add(player)
-        await session.commit()
-        msg = (
-            "✨ 你从破碎的黑梦中惊醒，踏入『现实世界』。\n"
-            "━━━━━━━━━━━━━\n"
-            "✧ 生命与理智完全恢复\n"
-            "✧ 但你的精神状态可能不太好...\n"
-            f"✧ 当前坐标：({player.x},{player.y})\n"
-            "━━━━━━━━━━━━━\n"
-            "⬇️ 【导航 <x> <y>】劳逸结合，现实经商\n"
-            "⬇️ 【传送 <诡域>】这诡何时能杀绝？"
 
-        )
-
-        await revive_cmd.finish(message_add_head(msg, event))
 
 @drop_item.handle()
 async def handle_drop_item(event: MessageEvent, args: Message = CommandArg()):

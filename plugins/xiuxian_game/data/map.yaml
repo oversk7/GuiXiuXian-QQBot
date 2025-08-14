@@ -1,161 +1,72 @@
-regions:
-  富安公寓:
-    level_range: [1, 3]
-    required_level: 1      # 进入所需最低等级
-    tier: 1               # 诡域等级（影响理智消耗）
-    mp_cost: 1           # 移动理智消耗
-    monsters:
-      - "诡修亡魂"
-      - "伥鬼"
-    # 商人特产材料（高价值）
-    merchant_materials:
-      - "wanted_poster"    # 紫色特产
-    # 材料格子只掉落基础材料
-    basic_materials:
-      - "grave_soil"       # 墓土
-      - "bone_fragment"    # 骨片
-      - "rotten_core"      # 腐坏的内丹
-  东岗水库:
-    level_range: [5, 20]
-    required_level: 1
-    tier: 1
-    mp_cost: 1
-    monsters:
-      - "水鬼"
-    merchant_materials:
-      - "drowned_scale"    # 绿色特产
-    basic_materials:
-      - "grave_soil"
-      - "ash_powder"       # 灰烬粉末
-      - "ghost_tears"      # 鬼泪
-  第三病栋:
-    level_range: [41, 60]
-    required_level: 21    # 21级才能进入
-    tier: 2
-    mp_cost: 2           # 移动消耗2点理智
-    monsters:
-      - "碎颅医生"
-      - "无脸护士"
-      - "笑面狗"
-    merchant_materials:
-      - "medical_record"   # 紫色特产 - 病例单
-      - "corrupted_bandage" # 绿色特产 - 污血布条
-      - "yin_essence"      # 绿色 - 阴煞精华
-    basic_materials:
-      - "spirit_bone"      # 白色 - 灵骨
-      - "iron_rust"        # 白色 - 铁锈碎屑
-      - "cursed_silk"      # 白色 - 诅咒丝线
-  绝望之城:
-    level_range: [61, 80]
-    required_level: 61
-    tier: 3
-    mp_cost: 3
-    monsters:
-      - "人头气球"
-      - "缝合巨人"
-      - "哭泣雕像"
-    merchant_materials:
-      - "withered_flower"  # 绿色特产
-      - "nightmare_silk"   # 绿色
-      - "flesh_crystal"    # 蓝色
-      - "strange_stone"    # 蓝色 - 诡异石
-    basic_materials:
-      - "grave_soil"
-      - "bone_fragment"
-      - "ash_powder"
-  通灵鬼校:
-    level_range: [81, 100]
-    required_level: 61    # 与绝望之城同等级要求
-    tier: 3
-    mp_cost: 3
-    monsters:
-      - "红衣舞者"
-      - "笔佡"
-      - "霸凌者"
-    merchant_materials:
-      - "kissed_phone_number" # 紫色特产
-      - "school_bell_fragment" # 绿色特产
-      - "soul_crystal"     # 蓝色
-      - "cursed_mirror_shard" # 蓝色
-      - "strange_stone"    # 蓝色 - 诡异石
-    basic_materials:
-      - "spirit_bone"
-      - "ghost_tears"
-      - "rotten_core"
-  肉殖回廊:
-    level_range: [131, 150]
-    required_level: 101
-    tier: 4
-    mp_cost: 4
-    monsters:
-      - "蛞蝓女孩"
-      - "肉芽虫"
-      - "血眼蛙"
-    merchant_materials:
-      - "phantom_thread"    # 蓝色特产
-      - "flesh_crystal"     # 蓝色
-      - "demon_heart"       # 紫色
-      - "spirit_stone"      # 紫色 - 灵石
-      - "time_dust"         # 橙色 - 时光尘埃
-    basic_materials:
-      - "iron_rust"
-      - "ash_powder"
-      - "spirit_bone"
-  活棺村:
-    level_range: [151, 170]
-    required_level: 151
-    tier: 5
-    mp_cost: 5
-    monsters:
-      - "红嫁衣"
-      - "发诡"
-      - "檐诡"
-    merchant_materials:
-      - "void_essence"      # 紫色特产
-      - "soul_crystal"      # 蓝色
-      - "demon_heart"       # 紫色
-      - "spirit_stone"      # 紫色 - 灵石
-      - "world_fragment"    # 橙色 - 世界碎片
-    basic_materials:
-      - "grave_soil"
-      - "bone_fragment"
-      - "cursed_silk"
-  血色世界:
-    level_range: [171, 200]
-    required_level: 151   # 与活棺村同等级要求
-    tier: 5
-    mp_cost: 5
-    monsters:
-      - "捉迷藏"
-      - "上帝之眼"
-      - "人面蜈蚣"
-    merchant_materials:
-      - "cursed_mirror_shard" # 蓝色特产
-      - "phantom_thread"    # 蓝色
-      - "void_essence"      # 紫色
-      - "god_tear"          # 橙色 - 神明之泪
-    basic_materials:
-      - "ghost_tears"
-      - "rotten_core"
-      - "iron_rust"
-  深渊禁域:
-    level_range: [201, 250]
-    required_level: 201
-    tier: 6
-    mp_cost: 6
-    monsters:
-      - "美少年"
-      - "104路灵车"
-      - "邪神分身"
-    merchant_materials:
-      - "god_tear"          # 橙色特产
-      - "world_fragment"    # 橙色特产
-      - "time_dust"         # 橙色
-      - "demon_heart"       # 紫色
-      - "void_essence"      # 紫色
-      - "spirit_stone"      # 紫色 - 灵石
-    basic_materials:
-      - "ash_powder"
-      - "grave_soil"
-      - "spirit_bone"
+# 无限重诡域里世界系统配置
+# 每重诡域都是独立的10x10小地图，坐标范围-5到5
+# 支持无限重扩展，适应等级无上限的玩家（300+级）
+# 怪物等级逐重增长，需要逐重解锁
 
+# 动态里世界生成规则
+dungeon_generation_rules:
+  # 基础配置
+  base_mp_cost: 1                    # 基础理智消耗
+  mp_cost_increment: 0.1             # 每重理智消耗增量（每10重+1）
+
+  # 怪物等级计算规则
+  monster_level_formula: "level * 5"  # 怪物等级 = 里世界深度 * 5
+  monster_level_variance: 2           # 怪物等级随机波动范围
+
+  # 怪物名称池（随机选择）
+  monster_names:
+    - "诡修亡魂"
+    - "伥鬼"
+    - "水鬼"
+    - "碎颅医生"
+    - "无脸护士"
+    - "笑面狗"
+    - "血色触手"
+    - "深渊守卫"
+    - "噬魂蛛"
+    - "虚空行者"
+    - "梦魇使者"
+    - "腐朽巨人"
+    - "影子刺客"
+    - "骨龙"
+    - "恶魔领主"
+    - "上古邪神"
+    - "混沌之子"
+    - "虚无吞噬者"
+    - "时空裂隙"
+    - "终极毁灭者"
+    - "永恒守护者"
+    - "无名恐惧"
+    - "深渊霸主"
+    - "末日使徒"
+    - "禁忌存在"
+
+  # 材料配置（按里世界深度范围）
+  material_tiers:
+    1-20:     # 1-20重里世界
+      merchant_materials: ["wanted_poster", "drowned_scale"]
+      basic_materials: ["grave_soil", "bone_fragment", "rotten_core"]
+    21-50:    # 21-50重里世界
+      merchant_materials: ["medical_record", "bloody_bandage"]
+      basic_materials: ["ash_powder", "ghost_tears", "corrupted_essence"]
+    51-100:   # 51-100重里世界
+      merchant_materials: ["void_crystal", "nightmare_core"]
+      basic_materials: ["shadow_dust", "void_fragment", "spirit_bone"]
+    101-200:  # 101-200重里世界
+      merchant_materials: ["demon_heart", "world_fragment"]
+      basic_materials: ["cursed_silk", "iron_rust", "time_dust"]
+    201-999:  # 201重以上里世界
+      merchant_materials: ["god_tear", "chaos_essence"]
+      basic_materials: ["divine_fragment", "eternal_dust", "void_essence"]
+
+# 保留原有regions配置以兼容现有代码，但标记为废弃
+# 新系统将逐步迁移到dungeon_levels
+regions:
+  大都会:
+    level_range: [1, 1]
+    required_level: 1
+    tier: 0
+    mp_cost: 0
+    monsters: []
+    merchant_materials: []
+    basic_materials: []

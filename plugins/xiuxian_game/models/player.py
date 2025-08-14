@@ -22,6 +22,14 @@ class Player(Base):
     region: Mapped[str] = mapped_column(String(32), default="大都会", server_default='大都会', comment="区域")
     x: Mapped[int] = mapped_column(Integer, default=0, server_default='0', comment="坐标X")
     y: Mapped[int] = mapped_column(Integer, default=0, server_default='0', comment="坐标Y")
+
+    # 双层坐标系统字段
+    real_world_x: Mapped[int] = mapped_column(Integer, default=0, server_default='0', comment="现实世界X坐标")
+    real_world_y: Mapped[int] = mapped_column(Integer, default=0, server_default='0', comment="现实世界Y坐标")
+    dungeon_level: Mapped[int] = mapped_column(Integer, default=0, server_default='0', comment="当前诡域层级(0=现实世界)")
+    dungeon_x: Mapped[int] = mapped_column(Integer, default=0, server_default='0', comment="诡域内小坐标X(-5到5)")
+    dungeon_y: Mapped[int] = mapped_column(Integer, default=0, server_default='0', comment="诡域内小坐标Y(-5到5)")
+    max_dungeon_level: Mapped[int] = mapped_column(Integer, default=0, server_default='0', comment="到达过的最高诡域层级")
     hp: Mapped[int] = mapped_column(Integer, default=20, server_default='20', comment="生命值")
     max_hp: Mapped[int] = mapped_column(Integer, default=20, server_default='20', comment="最大生命值")
     mp: Mapped[int] = mapped_column(Integer, default=20, server_default='20', comment="理智值")
@@ -44,6 +52,7 @@ class Player(Base):
     accuracy_rate: Mapped[int] = mapped_column(Integer, default=80, server_default='80', comment="命中率(百分比)")
     skill_crit_rate: Mapped[int] = mapped_column(Integer, default=0, server_default='0', comment="灵爆率(百分比)")
     penetration_rate: Mapped[int] = mapped_column(Integer, default=0, server_default='0', comment="穿透率(百分比)")
+    anti_crit_rate: Mapped[int] = mapped_column(Integer, default=0, server_default='0', comment="抗暴率(百分比)")
     guild_id: Mapped[int | None] = mapped_column(Integer, nullable=True, comment="所属公会ID")
     guild_contribution: Mapped[int] = mapped_column(BigInteger, default=0, server_default='0', comment="公会贡献值")
     
@@ -55,6 +64,97 @@ class Player(Base):
     sign_streak: Mapped[int] = mapped_column(Integer, default=0, server_default='0', comment="连续签到天数")
     created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now(), comment="创建时间")
     last_cultivation: Mapped[datetime] = mapped_column(DateTime, nullable=True, comment="上次修炼时间")
+
+    # 双层坐标系统辅助方法
+    def is_in_dungeon(self) -> bool:
+        """判断是否在诡域中"""
+        return (self.dungeon_level or 0) > 0
+
+    def get_current_coordinates(self) -> tuple[int, int]:
+        """获取当前活跃坐标"""
+        if self.is_in_dungeon():
+            return (self.dungeon_x or 0, self.dungeon_y or 0)
+        else:
+            return (self.real_world_x or 0, self.real_world_y or 0)
+
+    def get_current_region(self) -> str:
+        """获取当前区域名称"""
+        if self.is_in_dungeon():
+            return f"{self.dungeon_level or 0}层诡域"
+        else:
+            return "大都会"
+
+    def enter_dungeon(self, level: int):
+        """进入指定层级诡域"""
+        # 保存现实世界坐标
+        self.real_world_x = self.x or 0
+        self.real_world_y = self.y or 0
+
+        # 设置诡域信息
+        self.dungeon_level = level
+        self.dungeon_x = 0
+        self.dungeon_y = 0
+
+        # 更新兼容字段
+        self.region = f"{level}层诡域"
+        self.x = 0
+        self.y = 0
+
+    def exit_dungeon(self):
+        """退出诡域，返回现实世界"""
+        # 恢复现实世界坐标
+        self.x = self.real_world_x or 0
+        self.y = self.real_world_y or 0
+
+        # 清除诡域信息
+        self.dungeon_level = 0
+        self.dungeon_x = 0
+        self.dungeon_y = 0
+
+        # 更新兼容字段
+        self.region = "大都会"
+
+    def move_in_current_world(self, dx: int, dy: int):
+        """在当前世界移动"""
+        if self.is_in_dungeon():
+            # 诡域内移动，限制范围-5到5
+            current_x = self.dungeon_x or 0
+            current_y = self.dungeon_y or 0
+            new_x = max(-5, min(5, current_x + dx))
+            new_y = max(-5, min(5, current_y + dy))
+            self.dungeon_x = new_x
+            self.dungeon_y = new_y
+            self.x = new_x
+            self.y = new_y
+        else:
+            # 现实世界移动，无限制
+            current_x = self.real_world_x or 0
+            current_y = self.real_world_y or 0
+            self.real_world_x = current_x + dx
+            self.real_world_y = current_y + dy
+            self.x = self.real_world_x
+            self.y = self.real_world_y
+
+    def can_enter_dungeon_level(self, level: int) -> bool:
+        """检查是否可以进入指定层级诡域"""
+        if level <= 0:
+            return False
+        if level == 1:
+            return True  # 第1层总是可以进入
+        return level <= (self.max_dungeon_level or 0) + 1  # 只能进入已通过层级+1
+
+    def unlock_next_dungeon_level(self):
+        """解锁下一层诡域（击败当前层怪物后调用）"""
+        if self.is_in_dungeon():
+            current_level = self.dungeon_level or 0
+            max_level = self.max_dungeon_level or 0
+            if current_level > max_level:
+                self.max_dungeon_level = current_level
+
+    def get_accessible_dungeon_levels(self) -> list[int]:
+        """获取可访问的诡域层级列表"""
+        max_level = self.max_dungeon_level or 0
+        return list(range(1, max_level + 2))  # 1到最高层+1
 
     inventory_capacity: Mapped[int] = mapped_column(Integer, default=50, server_default='50', nullable=False, comment="背包容量")
     is_secluded: Mapped[bool] = mapped_column(Boolean, default=False, server_default='False', comment="是否闭关")

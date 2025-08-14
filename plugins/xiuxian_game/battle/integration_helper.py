@@ -267,11 +267,12 @@ class BattleIntegrationHelper:
 
                     if monster_attack_result["hit"]:
                         player_hp = max(0, player_hp - monster_attack_result["damage"])
-                        # 紧凑模式：显示伤害和格挡信息
+                        # 紧凑模式：显示伤害、特殊效果和格挡信息
+                        effects = "".join(monster_attack_result.get("effects", []))
                         if monster_attack_result["blocked"] > 0:
-                            round_actions.append(f"{monster_name}→{monster_attack_result['damage']}🛡️挡{monster_attack_result['blocked']}")
+                            round_actions.append(f"{effects}{monster_name}→{monster_attack_result['damage']}🛡️挡{monster_attack_result['blocked']}")
                         else:
-                            round_actions.append(f"{monster_name}→{monster_attack_result['damage']}")
+                            round_actions.append(f"{effects}{monster_name}→{monster_attack_result['damage']}")
                     else:
                         round_actions.append(f"{monster_name}→被闪避")
             else:
@@ -282,18 +283,32 @@ class BattleIntegrationHelper:
 
                 if monster_attack_result["hit"]:
                     player_hp = max(0, player_hp - monster_attack_result["damage"])
-                    # 紧凑模式：显示伤害和格挡信息
+                    # 紧凑模式：显示伤害、特殊效果和格挡信息
+                    effects = "".join(monster_attack_result.get("effects", []))
                     if monster_attack_result["blocked"] > 0:
-                        round_actions.append(f"{monster_name}→{monster_attack_result['damage']}🛡️挡{monster_attack_result['blocked']}")
+                        round_actions.append(f"{effects}{monster_name}→{monster_attack_result['damage']}🛡️挡{monster_attack_result['blocked']}")
                     else:
-                        round_actions.append(f"{monster_name}→{monster_attack_result['damage']}")
+                        round_actions.append(f"{effects}{monster_name}→{monster_attack_result['damage']}")
 
-                    # 检查反击
+                    # 检查玩家反击
                     if player_hp > 0:
                         counter_result = engine.check_counter_attack(player, monster_stats)
                         if counter_result:
                             monster_hp = max(0, monster_hp - counter_result["total_damage"])
                             round_actions.append(f"🛡️反击→{counter_result['total_damage']}")
+
+                    # 检查怪物反击（300级以后的怪物才有反击）
+                    if monster_hp > 0 and player_hp > 0:
+                        monster_counter_rate = monster_stats.get("counter_rate", 0)
+                        if engine.rng.random() < (monster_counter_rate / 100):
+                            # 怪物反击伤害为攻击力的70%
+                            counter_damage = max(1, int(monster_stats["attack"] * 0.7))
+                            from ..utils import damage_reduction_rate
+                            damage_reduction = damage_reduction_rate(player.defense)
+                            final_counter_damage = max(1, int(counter_damage * (1 - damage_reduction)))
+
+                            player_hp = max(0, player_hp - final_counter_damage)
+                            round_actions.append(f"⚡{monster_name}反击→{final_counter_damage}")
                 else:
                     round_actions.append(f"{monster_name}→被闪避")
 
@@ -520,10 +535,10 @@ class BattleIntegrationHelper:
 
     @staticmethod
     def _monster_attack_player(monster_stats: Dict, player: Player, engine: BattleEngine) -> Dict:
-        """怪物攻击玩家的简化逻辑
+        """怪物攻击玩家的增强逻辑（支持300级以后怪物的特殊属性）
 
         Args:
-            monster_stats: 怪物属性
+            monster_stats: 怪物属性（包含特殊属性）
             player: 玩家对象
             engine: 战斗引擎
 
@@ -540,7 +555,10 @@ class BattleIntegrationHelper:
         result = {
             "hit": False,
             "damage": 0,
-            "blocked": 0,  # 新增：格挡伤害
+            "blocked": 0,
+            "is_critical": False,
+            "is_combo": False,
+            "combo_count": 1,
             "effects": []
         }
 
@@ -555,13 +573,46 @@ class BattleIntegrationHelper:
 
         result["hit"] = True
 
+        # 怪物暴击判定（300级以后的怪物才有）
+        monster_crit_rate = monster_stats.get("crit_rate", 0)
+        player_anti_crit_rate = player_attrs.get("anti_crit_rate", 0)  # 玩家抗暴率（如果有的话）
+
+        # 计算实际暴击率（怪物暴击率 - 玩家抗暴率，但玩家目前没有抗暴率）
+        effective_crit_rate = max(0, monster_crit_rate - player_anti_crit_rate)
+        is_critical = engine.rng.random() < (effective_crit_rate / 100)
+        result["is_critical"] = is_critical
+
+        # 怪物连击判定（300级以后的怪物才有）
+        monster_combo_rate = monster_stats.get("combo_rate", 0)
+        combo_count = 1
+        if engine.rng.random() < (monster_combo_rate / 100):
+            combo_count = 2  # 怪物连击固定为2次
+            result["is_combo"] = True
+        result["combo_count"] = combo_count
+
+        # 计算基础伤害
+        current_damage = base_damage
+
+        # 暴击伤害加成
+        if is_critical:
+            current_damage = int(current_damage * 1.5)  # 怪物暴击1.5倍伤害
+            result["effects"].append("💥暴击")
+
         # 防御减伤计算
         from ..utils import damage_reduction_rate
         damage_reduction = damage_reduction_rate(player.defense)
-        final_damage = max(1, int(base_damage * (1 - damage_reduction)))
-        blocked_damage = base_damage - final_damage
+        final_damage = max(1, int(current_damage * (1 - damage_reduction)))
+        blocked_damage = current_damage - final_damage
 
-        result["damage"] = final_damage
+        # 连击处理
+        total_damage = final_damage
+        if combo_count > 1:
+            # 第二次连击伤害为85%
+            combo_damage = max(1, int(final_damage * 0.85))
+            total_damage += combo_damage
+            result["effects"].append(f"🔄连击x{combo_count}")
+
+        result["damage"] = total_damage
         result["blocked"] = blocked_damage
         return result
     

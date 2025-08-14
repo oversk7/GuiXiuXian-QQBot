@@ -25,12 +25,35 @@ def _get_material_obtain_methods(item_id: str, rarity: str) -> str:
     if item_id in SHOP_ITEMS:
         methods.append("万事屋购买")
 
-    # 检查区域信息
+    # 检查里世界材料配置
     map_config = config.map_config
+    merchant_tiers = []
+    basic_tiers = []
+
+    # 检查动态里世界材料配置
+    dungeon_rules = map_config.get("dungeon_generation_rules", {})
+    material_tiers = dungeon_rules.get("material_tiers", {})
+
+    for tier_range, materials in material_tiers.items():
+        # 检查商人材料
+        merchant_materials = materials.get("merchant_materials", [])
+        if item_id in merchant_materials:
+            merchant_tiers.append(tier_range)
+
+        # 检查基础材料
+        basic_materials = materials.get("basic_materials", [])
+        if item_id in basic_materials:
+            basic_tiers.append(tier_range)
+
+    # 兼容旧区域配置（如果还有的话）
     merchant_regions = []
     basic_regions = []
 
     for region_name, region_config in map_config.get("regions", {}).items():
+        # 跳过大都会等非诡域区域
+        if region_name == "大都会":
+            continue
+
         # 检查商人材料
         merchant_materials = region_config.get("merchant_materials", [])
         if item_id in merchant_materials:
@@ -44,33 +67,46 @@ def _get_material_obtain_methods(item_id: str, rarity: str) -> str:
     # 根据稀有度添加获取方式
     if rarity == "white":
         methods.append("材料格子采集")
-        if basic_regions:
-            regions_str = "、".join(basic_regions[:3])  # 最多显示3个区域
+
+        # 优先显示里世界深度信息
+        if basic_tiers:
+            tiers_str = "、".join(basic_tiers[:3])  # 最多显示3个深度范围
+            if len(basic_tiers) > 3:
+                tiers_str += "等"
+            methods.append(f"里世界探索({tiers_str}重)")
+        elif basic_regions:
+            regions_str = "、".join(basic_regions[:3])  # 兼容旧区域
             if len(basic_regions) > 3:
                 regions_str += "等"
             methods.append(f"探索({regions_str})")
+
         methods.append("扫荡令扫荡")
 
     # 战斗掉落说明
     if rarity in ["green", "blue", "purple", "orange"]:
         # 根据稀有度添加具体的掉落说明
         if rarity == "green":
-            methods.append("战斗掉落(21级+怪物)")
+            methods.append("战斗掉落(21级+守护者)")
         elif rarity == "blue":
-            methods.append("战斗掉落(61级+怪物)")
+            methods.append("战斗掉落(61级+守护者)")
         elif rarity == "purple":
-            methods.append("战斗掉落(101级+怪物)")
+            methods.append("战斗掉落(101级+守护者)")
         elif rarity == "orange":
-            methods.append("战斗掉落(101级+顶级怪物)")
+            methods.append("战斗掉落(101级+顶级守护者)")
 
         # 扫荡系统也能获得高级材料
         methods.append("扫荡令扫荡(概率获得)")
 
-        # 精英怪特殊掉落
-        methods.append("精英怪(高概率)")
+        # 精英守护者特殊掉落
+        methods.append("精英守护者(高概率)")
 
-        # 区域商人材料
-        if merchant_regions:
+        # 里世界商人材料
+        if merchant_tiers:
+            tiers_str = "、".join(merchant_tiers[:3])
+            if len(merchant_tiers) > 3:
+                tiers_str += "等"
+            methods.append(f"里世界商人({tiers_str}重)")
+        elif merchant_regions:
             regions_str = "、".join(merchant_regions[:3])
             if len(merchant_regions) > 3:
                 regions_str += "等"

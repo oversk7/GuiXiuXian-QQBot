@@ -124,9 +124,13 @@ class BattleEngine:
             result["is_penetration"] = True
             result["penetration_ratio"] = penetration_ratio
         
-        # 暴击判定
+        # 暴击判定（考虑怪物抗暴率）
         crit_rate = attacker_attrs["skill_crit_rate"] if is_skill else attacker_attrs["critical_rate"]
-        is_critical = BattleAttributeCalculator.roll_critical_hit(crit_rate, self.rng)
+        monster_anti_crit_rate = monster_stats.get("anti_crit_rate", 0)
+
+        # 计算实际暴击率（玩家暴击率 - 怪物抗暴率）
+        effective_crit_rate = max(0, crit_rate - monster_anti_crit_rate)
+        is_critical = BattleAttributeCalculator.roll_critical_hit(effective_crit_rate, self.rng)
         result["is_critical"] = is_critical
         
         # 连击判定（仅普攻）

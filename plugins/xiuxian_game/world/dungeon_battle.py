@@ -91,12 +91,12 @@ def get_region_materials(region: str) -> dict:
 
 def calculate_monster_attributes(monster_level: int, is_elite: bool = False) -> dict:
     """
-    计算怪物属性，适配实际玩家水平
-    目标：同等级玩家能连续刷10个同等级小怪而不需要治疗药
+    计算怪物属性，支持无限层级（300+级）
+    爬塔系统：怪物强度逐层递增，保持挑战性
     """
     import random
 
-    # 基础属性计算 - 平衡调整，确保5个同级怪物的挑战度
+    # 优化的属性计算，支持高等级
     if monster_level <= 50:
         # 前期线性增长（1-50级）
         base_hp = 1.2 * monster_level + 15
@@ -107,45 +107,88 @@ def calculate_monster_attributes(monster_level: int, is_elite: bool = False) -> 
         base_hp = 1.5 * monster_level + 40
         base_attack = 0.7 * monster_level + 25
         base_agility = 0.5 * monster_level + 20
-    elif monster_level <= 150:
-        # 高期增长（101-150级）
-        base_hp = 1.7 * monster_level + 80
-        base_attack = 0.9 * monster_level + 40
-        base_agility = 0.5 * monster_level + 30
+    elif monster_level <= 200:
+        # 高期增长（101-200级）
+        base_hp = 2.0 * monster_level + 80
+        base_attack = 1.0 * monster_level + 50
+        base_agility = 0.6 * monster_level + 30
+    elif monster_level <= 500:
+        # 超高期增长（201-500级）
+        base_hp = 2.5 * monster_level + 200
+        base_attack = 1.2 * monster_level + 100
+        base_agility = 0.7 * monster_level + 50
     else:
-        # 终极期适度增长（151+级）
-        base_hp = 2 * monster_level + 100
-        base_attack = 2.5 * monster_level + 250
-        base_agility = 0.8 * monster_level + 50
+        # 终极期（501+级）- 支持无限扩展
+        base_hp = 3.0 * monster_level + 500
+        base_attack = 1.5 * monster_level + 200
+        base_agility = 0.8 * monster_level + 100
 
-    # 添加随机波动（±10%，减少波动范围）
+    # 添加随机波动（±5%，减少波动保持平衡）
     rng = random.Random()
-    hp_variation = rng.uniform(0.9, 1.1)
-    attack_variation = rng.uniform(0.9, 1.1)
-    agility_variation = rng.uniform(0.9, 1.1)
+    hp_variation = rng.uniform(0.95, 1.05)
+    attack_variation = rng.uniform(0.95, 1.05)
+    agility_variation = rng.uniform(0.95, 1.05)
 
     hp = int(base_hp * hp_variation)
     attack = int(base_attack * attack_variation)
     agility = int(base_agility * agility_variation)
 
-    # 精英怪属性提升 - 保持现有倍率
+    # 精英怪属性提升
     if is_elite:
-        if monster_level <= 50:
-            elite_multiplier = 1.8  # 前期精英怪1.8倍属性
-        elif monster_level <= 100:
-            elite_multiplier = 2.0  # 中期精英怪2倍属性
+        if monster_level <= 100:
+            elite_multiplier = 1.8
+        elif monster_level <= 300:
+            elite_multiplier = 2.0
         else:
-            elite_multiplier = 2.2  # 高期精英怪2.2倍属性
+            elite_multiplier = 2.2
 
         hp = int(hp * elite_multiplier)
         attack = int(attack * elite_multiplier)
         agility = int(agility * elite_multiplier)
 
-    return {
+    # 为300级以后的怪物添加特殊战斗属性
+    special_attributes = {}
+    if monster_level >= 300:
+        # 基础特殊属性计算（基于层级）
+        level_factor = (monster_level - 300) / 100  # 每100级为一个档次
+
+        # 暴击率：300级起3%，每100级+1.5%，最高12%（适度降低）
+        crit_rate = min(12, 3 + level_factor * 1.5)
+
+        # 连击率：300级起2%，每100级+1%，最高8%（适度降低）
+        combo_rate = min(8, 2 + level_factor * 1)
+
+        # 反击率：300级起5%，每100级+1.5%，最高15%（适度降低）
+        counter_rate = min(15, 5 + level_factor * 1.5)
+
+        # 抗暴率：300级起8%，每100级+2%，最高20%（适度降低）
+        anti_crit_rate = min(20, 8 + level_factor * 2)
+
+        # 精英怪物特殊属性加成（适度调整）
+        if is_elite:
+            crit_rate = min(18, crit_rate * 1.4)      # 精英怪暴击率1.4倍，上限18%
+            combo_rate = min(12, combo_rate * 1.2)    # 精英怪连击率1.2倍，上限12%
+            counter_rate = min(20, counter_rate * 1.3) # 精英怪反击率1.3倍，上限20%
+            anti_crit_rate = min(28, anti_crit_rate * 1.3) # 精英怪抗暴率1.3倍，上限28%
+
+        special_attributes = {
+            "crit_rate": round(crit_rate, 1),           # 暴击率
+            "combo_rate": round(combo_rate, 1),         # 连击率
+            "counter_rate": round(counter_rate, 1),     # 反击率
+            "anti_crit_rate": round(anti_crit_rate, 1), # 抗暴率
+        }
+
+    result = {
         "hp": hp,
         "attack": attack,
         "agility": agility
     }
+
+    # 如果有特殊属性，添加到结果中
+    if special_attributes:
+        result.update(special_attributes)
+
+    return result
 
 def generate_merchant_goods(region: str, tier: int, rng) -> list:
     """生成商人商品列表 - 专门出售高价值材料"""
@@ -290,14 +333,34 @@ async def get_or_create_tile(session, region: str, x: int, y: int) -> WorldTile:
         # 更新tile信息
         tile.refreshed_at = datetime.now()
 
-        # 生成事件 - 增加新的事件类型
+        # 生成事件 - 支持双层坐标系统
         tile.seed = f"{region}:{x}:{y}:{today.isoformat()}"
         rng = random.Random(hash(tile.seed))
 
-        # 根据诡域等级调整事件权重
-        region_config = config.map_config["regions"].get(region, {})
-        tier = region_config.get("tier", 1)
+        # 获取区域配置（支持新旧两种配置格式）
+        region_config = None
+        tier = 1
 
+        if region == "大都会":
+            # 现实世界不生成事件
+            tile.event_type = "EMPTY"
+            tile.state = {}
+            return tile
+        elif "层诡域" in region:
+            # 新的层级制诡域
+            try:
+                level = int(region.replace("层诡域", ""))
+                region_config = config.map_config.get("dungeon_levels", {}).get(level, {})
+                tier = region_config.get("tier", level)  # 层级即为tier
+            except ValueError:
+                pass
+
+        if not region_config:
+            # 兼容旧的命名诡域
+            region_config = config.map_config.get("regions", {}).get(region, {})
+            tier = region_config.get("tier", 1)
+
+        # 根据诡域层级调整事件权重
         if tier <= 2:
             # 低级诡域：基础事件为主
             event_weights = [15, 5, 70, 5, 2, 3]  # MATERIAL, TREASURE, EMPTY, REST, MERCHANT, ELITE
@@ -316,20 +379,41 @@ async def get_or_create_tile(session, region: str, x: int, y: int) -> WorldTile:
         tile.state = {}
 
         if tile.event_type == "EMPTY":
-            map_info = config.map_config["regions"][region]
-            monster = rng.choice(map_info["monsters"])
-            monster_level = random.randint(map_info["level_range"][0], map_info["level_range"][1])
+            # 使用获取到的region_config
+            if region_config and region_config.get("monsters"):
+                monster = rng.choice(region_config["monsters"])
+                level_range = region_config.get("level_range", [1, 10])
+                monster_level = random.randint(level_range[0], level_range[1])
 
-            # 使用新的怪物属性计算函数
-            monster_attrs = calculate_monster_attributes(monster_level, is_elite=False)
-            tile.state = {
-                "name": monster,
-                "level": monster_level,
-                "hp": monster_attrs["hp"],
-                "attack": monster_attrs["attack"],
-                "agility": monster_attrs["agility"],
-                "defeated_by": []  # 记录击败过的玩家，避免原地无限刷
-            }
+                # 使用新的怪物属性计算函数
+                monster_attrs = calculate_monster_attributes(monster_level, is_elite=False)
+                tile.state = {
+                    "name": monster,
+                    "level": monster_level,
+                    "hp": monster_attrs["hp"],
+                    "attack": monster_attrs["attack"],
+                    "agility": monster_attrs["agility"],
+                    "defeated_by": []  # 记录击败过的玩家，避免原地无限刷
+                }
+
+                # 为300级以后的怪物添加特殊属性
+                if monster_level >= 300:
+                    tile.state.update({
+                        "crit_rate": monster_attrs.get("crit_rate", 0),
+                        "combo_rate": monster_attrs.get("combo_rate", 0),
+                        "counter_rate": monster_attrs.get("counter_rate", 0),
+                        "anti_crit_rate": monster_attrs.get("anti_crit_rate", 0)
+                    })
+            else:
+                # 默认怪物配置
+                tile.state = {
+                    "name": "未知诡影",
+                    "level": 1,
+                    "hp": 20,
+                    "attack": 5,
+                    "agility": 1,
+                    "defeated_by": []
+                }
         elif tile.event_type == "TREASURE":
             tile.state = {"looted": False}
         elif tile.event_type == "MATERIAL":
@@ -358,21 +442,42 @@ async def get_or_create_tile(session, region: str, x: int, y: int) -> WorldTile:
             }
         elif tile.event_type == "ELITE":
             # 精英怪：强化版怪物
-            map_info = config.map_config["regions"][region]
-            monster = rng.choice(map_info["monsters"])
-            monster_level = rng.randint(map_info["level_range"][0], map_info["level_range"][1])
+            if region_config and region_config.get("monsters"):
+                monster = rng.choice(region_config["monsters"])
+                level_range = region_config.get("level_range", [1, 10])
+                monster_level = rng.randint(level_range[0], level_range[1])
 
-            # 使用新的怪物属性计算函数（精英版）
-            monster_attrs = calculate_monster_attributes(monster_level, is_elite=True)
-            tile.state = {
-                "name": f"精英·{monster}",
-                "level": monster_level,
-                "hp": monster_attrs["hp"],
-                "attack": monster_attrs["attack"],
-                "agility": monster_attrs["agility"],
-                "is_elite": True,
-                "defeated_by": []  # 记录击败过的玩家
-            }
+                # 使用新的怪物属性计算函数（精英版）
+                monster_attrs = calculate_monster_attributes(monster_level, is_elite=True)
+                tile.state = {
+                    "name": f"精英·{monster}",
+                    "level": monster_level,
+                    "hp": monster_attrs["hp"],
+                    "attack": monster_attrs["attack"],
+                    "agility": monster_attrs["agility"],
+                    "is_elite": True,
+                    "defeated_by": []  # 记录击败过的玩家
+                }
+
+                # 为300级以后的精英怪物添加特殊属性
+                if monster_level >= 300:
+                    tile.state.update({
+                        "crit_rate": monster_attrs.get("crit_rate", 0),
+                        "combo_rate": monster_attrs.get("combo_rate", 0),
+                        "counter_rate": monster_attrs.get("counter_rate", 0),
+                        "anti_crit_rate": monster_attrs.get("anti_crit_rate", 0)
+                    })
+            else:
+                # 默认精英怪配置
+                tile.state = {
+                    "name": "精英·未知诡影",
+                    "level": 5,
+                    "hp": 100,
+                    "attack": 20,
+                    "agility": 5,
+                    "is_elite": True,
+                    "defeated_by": []
+                }
 
         # 使用 merge 来处理可能的并发冲突
         try:
@@ -414,21 +519,34 @@ async def _(event: MessageEvent):
 
     async with retry_session() as session:
         player: Player | None = await session.get(Player, event.get_user_id())
-        if not player or player.region == "大都会":
-            await move_cmd.finish("⛔ 单格移动只能在诡域使用")
+        if not player:
+            await move_cmd.finish("⛔ 请先创建角色")
+
+        if not player.is_in_dungeon():
+            await move_cmd.finish("⛔ 单格移动只能在诡域使用\n⬇️ 【导航 <x> <y>】在现实世界移动")
 
         # 解析方向
         if direction not in DIRECTIONS:
             await move_cmd.finish("⛔ 无效的方向")
         dx, dy = DIRECTIONS[direction]
-        new_x, new_y = player.x + dx, player.y + dy
-        player.x, player.y = new_x, new_y
 
-        # 根据诡域等级扣除理智
-        region_config = config.map_config["regions"].get(player.region, {})
-        mp_cost = region_config.get("mp_cost", 1)  # 默认消耗1点理智
+        # 使用新的移动系统（自动处理坐标限制）
+        old_x, old_y = player.dungeon_x, player.dungeon_y
+        player.move_in_current_world(dx, dy)
+        new_x, new_y = player.dungeon_x, player.dungeon_y
+
+        # 检查是否真的移动了（可能被边界限制）
+        if old_x == new_x and old_y == new_y:
+            await move_cmd.finish(f"⛔ 无法向{direction}移动，已到达诡域边界\n📍 当前坐标范围：(-5,-5) 到 (5,5)")
+
+        # 根据诡域层级获取配置并扣除理智
+        dungeon_config = config.map_config.get("dungeon_levels", {}).get(player.dungeon_level, {})
+        mp_cost = dungeon_config.get("mp_cost", 1)  # 默认消耗1点理智
 
         if player.mp < mp_cost:
+            # 移动失败，恢复原坐标
+            player.dungeon_x, player.dungeon_y = old_x, old_y
+            player.x, player.y = old_x, old_y
             await move_cmd.finish(f"⛔ 理智不足以在此诡域移动，需要 {mp_cost} 点理智，当前 {player.mp}")
 
         player.mp = max(0, player.mp - mp_cost)
@@ -436,7 +554,7 @@ async def _(event: MessageEvent):
             player.hp = 0  # 理智耗尽即"疯狂身亡"
 
         # 获取当前位置事件格
-        tile = await get_or_create_tile(session, player.region, player.x, player.y)
+        tile = await get_or_create_tile(session, player.get_current_region(), new_x, new_y)
 
         # 检查月卡权限是否支持自动采集
         benefits = await get_player_card_benefits(session, player.id)
@@ -479,7 +597,25 @@ async def _(event: MessageEvent):
                 if player.id in t.state.get("defeated_by", []):
                     return "🪨 这里只剩下怪物的残骸，散发着淡淡的血腥味。"
                 monster = t.state.get("name")
-                return f"🌫️ 四周弥漫着诡异的静谧，似乎潜伏着 {monster} 的气息。若想冒险，可输入 [探索] 进行调查。"
+                monster_level = t.state.get("level", 1)
+
+                # 为300级以后的怪物显示特殊属性提示
+                special_info = ""
+                if monster_level >= 300:
+                    special_attrs = []
+                    if t.state.get("crit_rate", 0) > 0:
+                        special_attrs.append(f"💥暴击{t.state['crit_rate']:.1f}%")
+                    if t.state.get("combo_rate", 0) > 0:
+                        special_attrs.append(f"🔄连击{t.state['combo_rate']:.1f}%")
+                    if t.state.get("counter_rate", 0) > 0:
+                        special_attrs.append(f"⚡反击{t.state['counter_rate']:.1f}%")
+                    if t.state.get("anti_crit_rate", 0) > 0:
+                        special_attrs.append(f"🛡️抗暴{t.state['anti_crit_rate']:.1f}%")
+
+                    if special_attrs:
+                        special_info = f"\n🔥 特殊能力：{' '.join(special_attrs)}"
+
+                return f"🌫️ 空间扭曲中传来异响，似乎有 {monster}(Lv{monster_level}) 在此守护。{special_info}\n若想挑战，可输入 [探索] 进行调查。"
             elif t.event_type == "REST":
                 return "🌫️ 你发现了一家驿站，可输入 [探索] 恢复生命。"
             elif t.event_type == "MERCHANT":
@@ -490,11 +626,29 @@ async def _(event: MessageEvent):
                 if player.id in t.state.get("defeated_by", []):
                     return "⚰️ 精英怪的残骸散落一地，散发着不祥的气息。"
                 monster_name = t.state.get("name", "精英怪物")
-                return f"⚔️ 你感受到强大的威压，{monster_name} 正虎视眈眈地盯着你！输入 [探索] 迎战。"
+                monster_level = t.state.get("level", 1)
+
+                # 为300级以后的精英怪物显示特殊属性提示
+                special_info = ""
+                if monster_level >= 300:
+                    special_attrs = []
+                    if t.state.get("crit_rate", 0) > 0:
+                        special_attrs.append(f"💥暴击{t.state['crit_rate']:.1f}%")
+                    if t.state.get("combo_rate", 0) > 0:
+                        special_attrs.append(f"🔄连击{t.state['combo_rate']:.1f}%")
+                    if t.state.get("counter_rate", 0) > 0:
+                        special_attrs.append(f"⚡反击{t.state['counter_rate']:.1f}%")
+                    if t.state.get("anti_crit_rate", 0) > 0:
+                        special_attrs.append(f"🛡️抗暴{t.state['anti_crit_rate']:.1f}%")
+
+                    if special_attrs:
+                        special_info = f"\n🔥 特殊能力：{' '.join(special_attrs)}"
+
+                return f"⚔️ 空间深处传来强大的威压，{monster_name}(Lv{monster_level}) 作为这重里世界的守护者正注视着你！{special_info}\n输入 [探索] 迎战。"
             return "⁉️ 未知事件。"
 
         event_desc = describe_tile(tile)
-        header = f"🚶 已移动至 ({new_x},{new_y})"
+        header = f"🚶 已移动至 {player.get_current_region()} ({new_x},{new_y})"
         await move_cmd.finish(message_add_head(f"{header}\n{event_desc}{auto_collect_msg}", event))
 
 # ----------------- 指令：战斗 -----------------
@@ -576,9 +730,34 @@ async def _handle_personal_monster(session, tile: WorldTile, player: Player) -> 
         "agility": tile.state.get("agility", 0),
         "defense": 0  # 怪物默认无防御
     }
-    monster_name = tile.state.get("name", "未知诡影")
+
+    # 为300级以后的怪物添加特殊属性
     monster_level = tile.state.get("level", 1)
+    if monster_level >= 300:
+        monster_stats.update({
+            "crit_rate": tile.state.get("crit_rate", 0),
+            "combo_rate": tile.state.get("combo_rate", 0),
+            "counter_rate": tile.state.get("counter_rate", 0),
+            "anti_crit_rate": tile.state.get("anti_crit_rate", 0)
+        })
+
+    monster_name = tile.state.get("name", "未知诡影")
     monster_display = f"{monster_name}(Lv{monster_level})"
+
+    # 为300级以后的怪物显示特殊属性信息
+    if monster_level >= 300:
+        special_attrs = []
+        if monster_stats.get("crit_rate", 0) > 0:
+            special_attrs.append(f"💥{monster_stats['crit_rate']:.1f}%")
+        if monster_stats.get("combo_rate", 0) > 0:
+            special_attrs.append(f"🔄{monster_stats['combo_rate']:.1f}%")
+        if monster_stats.get("counter_rate", 0) > 0:
+            special_attrs.append(f"⚡{monster_stats['counter_rate']:.1f}%")
+        if monster_stats.get("anti_crit_rate", 0) > 0:
+            special_attrs.append(f"🛡️{monster_stats['anti_crit_rate']:.1f}%")
+
+        if special_attrs:
+            monster_display += f" [{' '.join(special_attrs)}]"
 
     # 使用新战斗系统
     from ..battle.integration_helper import BattleIntegrationHelper
@@ -622,6 +801,17 @@ async def _handle_personal_monster(session, tile: WorldTile, player: Player) -> 
 
         # 标记为已击败（无论是精英怪还是普通小怪）
         tile.state.setdefault("defeated_by", []).append(player.id)
+
+        # 爬塔系统：击败怪物后解锁下一层
+        if player.is_in_dungeon():
+            old_max_level = player.max_dungeon_level or 0
+            player.unlock_next_dungeon_level()
+            new_max_level = player.max_dungeon_level or 0
+
+            # 如果解锁了新的里世界，给予提示
+            if new_max_level > old_max_level:
+                battle_summary.append(f"🎉 恭喜！解锁了第{new_max_level + 1}重里世界")
+                battle_summary.append(f"🔓 现在可以探索更深层的里世界了！")
 
     elif player.hp <= 0:
         battle_summary.append(f"💀 你被 {monster_display} 击败，很遗憾，你已死亡")
@@ -759,14 +949,19 @@ async def _(event: MessageEvent):
         player: Player | None = await session.get(Player, event.get_user_id())
         if not player:
             await explore_cmd.finish("⛔ 请先创建角色")
-        if player.region == "大都会":
-            await explore_cmd.finish("⛔ 你已经返回现实")
+
+        if not player.is_in_dungeon():
+            await explore_cmd.finish("⛔ 你已经返回现实\n⬇️ 【进入 N层诡域】进入诡域探索")
+
         if player.hp <= 0:
             await explore_cmd.finish("💀 你已死亡，返回现实吧，或者你有复活道具..."
                                      "\n⬇️ 【返回】 退出副本"
                                      "\n⬇️ 【使用 还魂丹】 原地复活，继续副本")
 
-        tile = await get_or_create_tile(session, player.region, player.x, player.y)
+        # 使用新的坐标系统获取当前位置
+        current_x, current_y = player.get_current_coordinates()
+        current_region = player.get_current_region()
+        tile = await get_or_create_tile(session, current_region, current_x, current_y)
         log = await EVENT_HANDLERS[tile.event_type](session, tile, player)
 
         # 更新探索统计（用于公会任务）
@@ -781,7 +976,7 @@ async def _(event: MessageEvent):
 
         await session.commit()
 
-    header = f"🧭位置 {player.region} ({player.x},{player.y})"
+    header = f"🧭位置 {current_region} ({current_x},{current_y})"
     await explore_cmd.finish(f"{header}\n{log}")
 
 # ==================== 购买指令 ====================
@@ -862,42 +1057,77 @@ async def handle_buy(event: MessageEvent, args: Message = CommandArg()):
 teleport_list = on_command("诡域", aliases={"副本列表"}, block=True, priority=5)
 @teleport_list.handle()
 async def handle_teleport_list(event: MessageEvent):
-    """显示所有可传送的地点"""
+    """显示无限层诡域爬塔进度"""
     async with safe_session() as session:
         # 检查玩家是否存在
         player = await session.get(Player, event.get_user_id())
         if not player:
             await teleport_list.finish("⛔ 请先创建角色")
 
-        # 获取所有可传送地点，按等级要求排序
-        regions = config.map_config["regions"]
-        sorted_regions = sorted(regions.items(), key=lambda x: x[1].get("required_level", 1))
+        # 获取玩家爬塔进度
+        max_level = player.max_dungeon_level or 0
+        accessible_levels = player.get_accessible_dungeon_levels()
+        current_level = player.dungeon_level if player.is_in_dungeon() else 0
+
+        # 显示当前可访问的层级（最多显示10层）
+        display_levels = accessible_levels[-10:] if len(accessible_levels) > 10 else accessible_levels
 
         locations = []
-        for name, region_config in sorted_regions:
-            required_level = region_config.get("required_level", 1)
-            tier = region_config.get("tier", 1)
-            mp_cost = region_config.get("mp_cost", 1)
+        for level in display_levels:
+            # 动态生成层级配置
+            dungeon_config = config._generate_dungeon_level_config(
+                level, config.map_config.get("dungeon_generation_rules", {})
+            )
 
-            # 检查玩家是否满足等级要求
-            if player.level >= required_level:
-                status = "✅"
+            mp_cost = dungeon_config.get("mp_cost", 1)
+            level_range = dungeon_config.get("level_range", [level*5-2, level*5+2])
+
+            # 状态标识
+            if level <= max_level:
+                status = "✅"  # 已通过
+            elif level == max_level + 1:
+                status = "🎯"  # 下一个挑战
             else:
-                status = "🔒"
+                status = "🔒"  # 未解锁
 
-            locations.append(f"{status} {name} (Lv.{required_level}+ 理智-{mp_cost})")
+            # 当前所在层级
+            current_marker = " 📍当前" if level == current_level else ""
+
+            locations.append(f"{status} {level}层诡域 (理智-{mp_cost} 怪物Lv.{level_range[0]}-{level_range[1]}){current_marker}")
 
         # 格式化消息
-        msg = (
-            "🪐 诡域传送列表：\n"
-            "━━━━━━━━━━━━━\n"
-            + "\n".join(locations)
-            + "\n━━━━━━━━━━━━━\n"
-            "📌 使用方式：传送 <诡域名>\n"
-            "📦 需要消耗咒抗1点\n"
-            "✅可进入 🔒等级不足"
-        )
+        msg_lines = [
+            "🌀 无限重里世界探索系统",
+            "━━━━━━━━━━━━━",
+            f"🏆 当前最深探索：第{max_level}重里世界",
+            f"🎯 下一个目标：第{max_level + 1}重里世界",
+            f"📊 总可访问深度：{len(accessible_levels)}重",
+        ]
 
+        if current_level > 0:
+            msg_lines.append(f"📍 当前位置：第{current_level}重里世界")
+
+        msg_lines.extend([
+            "━━━━━━━━━━━━━",
+            "🌀 每重里世界都是独立的10x10空间",
+            "⚔️ 守护者等级 = 里世界深度 × 5（±2波动）",
+            "🔓 击败守护者解锁更深的里世界",
+            "━━━━━━━━━━━━━"
+        ])
+
+        if locations:
+            msg_lines.append("📋 可访问深度（最近10重）：")
+            msg_lines.extend(locations)
+
+        msg_lines.extend([
+            "━━━━━━━━━━━━━",
+            "📌 使用方式：进入 N层诡域",
+            "📦 需要消耗咒抗1点",
+            "✅已探索 🎯下一目标 🔒未解锁",
+            "🏠 使用【返回】穿越回表世界"
+        ])
+
+        msg = "\n".join(msg_lines)
         await teleport_list.finish(message_add_head(msg, event))
 
 
@@ -1349,23 +1579,38 @@ async def handle_region_overview(event: MessageEvent, args: Message = CommandArg
         # 获取参数
         arg_text = args.extract_plain_text().strip()
 
-        # 如果没有指定诡域，以自身为中心生成500x500的俯瞰图
+        # 如果没有指定诡域，以自身为中心生成俯瞰图
         if not arg_text:
             try:
-                # 以玩家位置为中心生成500x500的俯瞰图
-                img_data, (min_x, max_x, min_y, max_y) = await generate_player_centered_overview_image(
-                    player.region, session, player.x, player.y, 500, 500
-                )
+                current_x, current_y = player.get_current_coordinates()
+                current_region = player.get_current_region()
+
+                if player.is_in_dungeon():
+                    # 诡域内：生成完整的10x10小地图
+                    img_data, (min_x, max_x, min_y, max_y) = await generate_player_centered_overview_image(
+                        current_region, session, current_x, current_y, 11, 11  # 10x10地图，稍微扩大一点
+                    )
+                    map_desc = f"🗺️ {current_region} 完整小地图"
+                    coord_desc = f"📍 你的位置：({current_x},{current_y})"
+                    range_desc = f"📍 诡域范围：(-5,-5) 到 (5,5)"
+                else:
+                    # 现实世界：生成以玩家为中心的大范围俯瞰图
+                    img_data, (min_x, max_x, min_y, max_y) = await generate_player_centered_overview_image(
+                        current_region, session, current_x, current_y, 500, 500
+                    )
+                    map_desc = f"🗺️ {current_region} 以你为中心的俯瞰图"
+                    coord_desc = f"📍 中心位置：({current_x},{current_y})"
+                    range_desc = f"📍 坐标范围：X({min_x}~{max_x}) Y({min_y}~{max_y})"
 
                 # 转换为base64
                 img_b64 = base64.b64encode(img_data).decode('utf-8')
 
                 # 构建说明文字
                 msg_lines = [
-                    f"🗺️ {player.region} 以你为中心的俯瞰图",
+                    map_desc,
                     "━━━━━━━━━━━━━",
-                    f"📍 中心位置：({player.x},{player.y})",
-                    f"📍 坐标范围：X({min_x}~{max_x}) Y({min_y}~{max_y})",
+                    coord_desc,
+                    range_desc,
                     "━━━━━━━━━━━━━",
                     "🟢 绿色：材料格子",
                     "🟡 金色：宝藏格子",
@@ -1374,7 +1619,7 @@ async def handle_region_overview(event: MessageEvent, args: Message = CommandArg
                     "🟣 紫色：商人格子",
                     "🟠 橙色：精英怪格子",
                     "⬛ 灰色：未探索区域",
-                    f"🟡 亮黄圆圈：你的位置 ({player.x},{player.y})",
+                    f"🟡 亮黄圆圈：你的位置 ({current_x},{current_y})",
                     "🔢 图片边缘显示坐标数字"
                 ]
 
@@ -1389,17 +1634,31 @@ async def handle_region_overview(event: MessageEvent, args: Message = CommandArg
             except ValueError as e:
                 await region_overview_cmd.finish(f"⛔ 生成俯瞰图失败：{str(e)}")
         else:
-            # 指定了诡域名称，使用原有逻辑
+            # 指定了诡域名称，支持层级制诡域
             region = arg_text
-            # 检查诡域是否存在
-            if region not in config.map_config["regions"]:
-                await region_overview_cmd.finish("⛔ 未知的诡域名称")
+
+            # 检查是否为层级诡域格式
+            if region.endswith("层诡域"):
+                try:
+                    level_str = region.replace("层诡域", "")
+                    dungeon_level = int(level_str)
+                    dungeon_config = config.map_config.get("dungeon_levels", {}).get(dungeon_level)
+                    if not dungeon_config:
+                        await region_overview_cmd.finish(f"⛔ {dungeon_level}层诡域尚未开放")
+                except ValueError:
+                    await region_overview_cmd.finish("⛔ 诡域层级格式错误，请使用：俯瞰 1层诡域")
+            else:
+                # 兼容旧的命名诡域
+                if region not in config.map_config.get("regions", {}):
+                    await region_overview_cmd.finish("⛔ 未知的诡域名称，请使用：俯瞰 N层诡域")
+                dungeon_config = config.map_config["regions"].get(region, {})
 
             try:
                 # 生成概览图片，传入玩家坐标（如果玩家在当前诡域）
                 player_x, player_y = None, None
-                if player.region == region:
-                    player_x, player_y = player.x, player.y
+                current_region = player.get_current_region()
+                if current_region == region:
+                    player_x, player_y = player.get_current_coordinates()
 
                 img_data, (min_x, max_x, min_y, max_y) = await generate_region_overview_image(region, session, player_x, player_y)
 
@@ -1407,9 +1666,8 @@ async def handle_region_overview(event: MessageEvent, args: Message = CommandArg
                 img_b64 = base64.b64encode(img_data).decode('utf-8')
 
                 # 构建消息
-                region_config = config.map_config["regions"].get(region, {})
-                tier = region_config.get("tier", 1)
-                level_range = region_config.get("level_range", [1, 1])
+                tier = dungeon_config.get("tier", 1)
+                level_range = dungeon_config.get("level_range", [1, 1])
 
                 # 构建说明文字
                 msg_lines = [
@@ -1417,7 +1675,14 @@ async def handle_region_overview(event: MessageEvent, args: Message = CommandArg
                     "━━━━━━━━━━━━━",
                     f"📊 诡域等级：Tier {tier}",
                     f"⚔️ 怪物等级：{level_range[0]}-{level_range[1]}级",
-                    f"📍 坐标范围：X({min_x}~{max_x}) Y({min_y}~{max_y})",
+                ]
+
+                if region.endswith("层诡域"):
+                    msg_lines.append("📍 诡域范围：(-5,-5) 到 (5,5)")
+                else:
+                    msg_lines.append(f"📍 坐标范围：X({min_x}~{max_x}) Y({min_y}~{max_y})")
+
+                msg_lines.extend([
                     "━━━━━━━━━━━━━",
                     "🟢 绿色：材料格子",
                     "🟡 金色：宝藏格子",
@@ -1426,11 +1691,12 @@ async def handle_region_overview(event: MessageEvent, args: Message = CommandArg
                     "🟣 紫色：商人格子",
                     "🟠 橙色：精英怪格子",
                     "⬛ 灰色：未探索区域"
-                ]
+                ])
 
                 # 如果玩家在当前诡域，添加位置说明
-                if player.region == region:
-                    msg_lines.append(f"🟡 亮黄圆圈：你的位置 ({player.x},{player.y})")
+                if current_region == region:
+                    current_x, current_y = player.get_current_coordinates()
+                    msg_lines.append(f"🟡 亮黄圆圈：你的位置 ({current_x},{current_y})")
 
                 msg_lines.append("🔢 图片边缘显示坐标数字")
 
