@@ -20,6 +20,9 @@ from ..utils import message_add_head
 teleport_cmd = on_command("传送", block=True, priority=5)
 enter_cmd = on_command("进入", block=True, priority=5)
 revive_cmd = on_command("返回", aliases={"复活"}, block=True, priority=5)
+# 层级切换指令
+prev_level_cmd = on_command("上一层", aliases={"上层"}, block=True, priority=5)
+next_level_cmd = on_command("下一层", aliases={"下层"}, block=True, priority=5)
 
 
 @teleport_cmd.handle()
@@ -143,7 +146,9 @@ async def _handle_teleport_logic(event: MessageEvent, target_region: str, cmd_ha
         msg_lines.append("🗺️ 这是一个10x10的独立空间")
         msg_lines.append("📍 坐标范围：(-5,-5) 到 (5,5)")
         msg_lines.append("🧭 使用【上下左右】移动，【探索】调查")
-        msg_lines.append("🏠 使用【返回】穿越回表世界")
+        msg_lines.append("⬆️ 【上一层】切换到更浅的里世界")
+        msg_lines.append("⬇️ 【下一层】切换到更深的里世界")
+        msg_lines.append("🏠 【返回】穿越回表世界")
     
     msg = "\n".join(msg_lines)
     await cmd_handler.finish(message_add_head(msg, event))
@@ -193,3 +198,96 @@ async def handle_revive(event: MessageEvent):
         
         msg = "\n".join(msg_lines)
         await revive_cmd.finish(message_add_head(msg, event))
+
+
+@prev_level_cmd.handle()
+async def handle_prev_level(event: MessageEvent):
+    """处理上一层指令，切换到上一层诡域"""
+    async with safe_session() as session:
+        player = await session.get(Player, event.get_user_id())
+        if not player:
+            await prev_level_cmd.finish("⛔ 请先创建角色")
+
+        # 检查是否在诡域中
+        if not player.is_in_dungeon():
+            await prev_level_cmd.finish("⛔ 你不在诡域中，无法使用层级切换功能\n💡 请先【进入 N层诡域】进入任意层诡域")
+
+        current_level = player.dungeon_level or 0
+        target_level = current_level - 1
+
+        # 检查是否已经在第1层
+        if target_level < 1:
+            await prev_level_cmd.finish("⛔ 你已经在第1重里世界，无法再向上")
+
+        # 检查是否可以进入目标层级
+        if not player.can_enter_dungeon_level(target_level):
+            await prev_level_cmd.finish(f"⛔ 无法进入第{target_level}重里世界，你尚未解锁该层级")
+
+        # 切换到目标层级
+        player.enter_dungeon(target_level)
+        session.add(player)
+        await session.commit()
+
+        msg_lines = [
+            f"🌀 你穿越空间裂隙，从第{current_level}重里世界来到第{target_level}重里世界",
+            f"📍 当前位置：{target_level}层诡域 ({player.dungeon_x},{player.dungeon_y})",
+            "━━━━━━━━━━━━━",
+            "🗺️ 这是一个10x10的独立空间",
+            "📍 坐标范围：(-5,-5) 到 (5,5)",
+            "🧭 使用【上下左右】移动，【探索】调查",
+            "⬆️ 【上一层】切换到更浅的里世界",
+            "⬇️ 【下一层】切换到更深的里世界",
+            "🏠 【返回】穿越回表世界"
+        ]
+
+        msg = "\n".join(msg_lines)
+        await prev_level_cmd.finish(message_add_head(msg, event))
+
+
+@next_level_cmd.handle()
+async def handle_next_level(event: MessageEvent):
+    """处理下一层指令，切换到下一层诡域"""
+    async with safe_session() as session:
+        player = await session.get(Player, event.get_user_id())
+        if not player:
+            await next_level_cmd.finish("⛔ 请先创建角色")
+
+        # 检查是否在诡域中
+        if not player.is_in_dungeon():
+            await next_level_cmd.finish("⛔ 你不在诡域中，无法使用层级切换功能\n💡 请先【进入 N层诡域】进入任意层诡域")
+
+        current_level = player.dungeon_level or 0
+        target_level = current_level + 1
+
+        # 检查是否可以进入目标层级
+        if not player.can_enter_dungeon_level(target_level):
+            max_level = player.max_dungeon_level or 0
+            accessible_levels = player.get_accessible_dungeon_levels()
+            await next_level_cmd.finish(
+                f"⛔ 无法进入第{target_level}重里世界！\n"
+                f"━━━━━━━━━━━━━\n"
+                f"📊 当前最深探索：第{max_level}重里世界\n"
+                f"🔓 可进入深度：{accessible_levels}\n"
+                f"━━━━━━━━━━━━━\n"
+                f"💡 需要在当前层击败诡异解锁更深的里世界"
+            )
+
+        # 切换到目标层级
+        player.enter_dungeon(target_level)
+        session.add(player)
+        await session.commit()
+
+        msg_lines = [
+            f"🌀 你穿越空间裂隙，从第{current_level}重里世界来到第{target_level}重里世界",
+            f"📍 当前位置：{target_level}层诡域 ({player.dungeon_x},{player.dungeon_y})",
+            "━━━━━━━━━━━━━",
+            "🗺️ 这是一个10x10的独立空间",
+            "📍 坐标范围：(-5,-5) 到 (5,5)",
+            "🧭 使用【上下左右】移动，【探索】调查",
+            "⬆️ 【上一层】切换到更浅的里世界",
+            "⬇️ 【下一层】切换到更深的里世界",
+            "🏠 【返回】穿越回表世界"
+        ]
+
+        msg = "\n".join(msg_lines)
+        await next_level_cmd.finish(message_add_head(msg, event))
