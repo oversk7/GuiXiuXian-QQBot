@@ -753,14 +753,14 @@ async def _world_boss_chest(player: Player, cfg: ItemConfig, qty: int, ctx: str,
         },
         "explorer": {  # 深渊探索者宝箱
             "gems": [
-                ("critical_bead_1", 1, 0.1),
-                ("combo_bead_1", 1, 0.1),
-                ("accuracy_bead_1", 1, 0.1),
-                ("counter_jade_1", 1, 0.1),
-                ("penetration_crystal_1", 1, 0.1),
+                ("critical_bead_1", 1, 0.2),
+                ("combo_bead_1", 1, 0.2),
+                ("accuracy_bead_1", 1, 0.2),
+                ("counter_jade_1", 1, 0.2),
+                ("penetration_crystal_1", 1, 0.2),
             ],
             "materials": [
-                ("stabilizer_crystal", 1, 0.5),
+                ("stabilizer_crystal", 1, 0.1),
             ],
             "gold": (10000, 20000)
         },
