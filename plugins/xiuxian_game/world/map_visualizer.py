@@ -146,7 +146,7 @@ class MapVisualizer:
         draw.ellipse([pixel_x - size, pixel_y - size, pixel_x + size, pixel_y + size],
                     fill=color, outline='#000000', width=2)
     
-    def _draw_players(self, draw: ImageDraw.Draw, players: List[Player]):
+    def _draw_players(self, draw: ImageDraw.Draw, players: List[Player], current_player_id: str = None):
         """绘制玩家位置"""
         for player in players:
             pixel_x, pixel_y = self._game_to_pixel(player.x, player.y)
@@ -155,10 +155,17 @@ class MapVisualizer:
             if not (0 <= pixel_x <= self.map_width and 0 <= pixel_y <= self.map_height):
                 continue
 
-            # 只绘制玩家红点，不显示任何文字
-            size = 6
-            draw.ellipse([pixel_x - size, pixel_y - size, pixel_x + size, pixel_y + size],
-                        fill=self.colors['player'], outline='#FFFFFF', width=2)
+            # 根据是否为当前玩家决定点的大小
+            if current_player_id and player.id == current_player_id:
+                # 当前玩家：粗红点
+                size = 6
+                draw.ellipse([pixel_x - size, pixel_y - size, pixel_x + size, pixel_y + size],
+                            fill=self.colors['player'], outline='#FFFFFF', width=2)
+            else:
+                # 其他玩家：特别小的红点（1-2像素）
+                size = 1
+                draw.ellipse([pixel_x - size, pixel_y - size, pixel_x + size, pixel_y + size],
+                            fill=self.colors['player'], outline=None, width=0)
     
     def _draw_legend(self, draw: ImageDraw.Draw):
         """绘制图例"""
@@ -231,37 +238,29 @@ class MapVisualizer:
         result = await session.execute(stmt)
         players = result.scalars().all()
         
-        # 如果指定了当前玩家，将其放在最后绘制（显示在最上层）
+        # 绘制所有玩家，当前玩家会显示为粗红点，其他玩家显示为小红点
+        self._draw_players(draw, players, current_player_id)
+
+        # 如果指定了当前玩家，额外绘制高亮效果和昵称
         if current_player_id:
             current_player = None
-            other_players = []
             for player in players:
                 if player.id == current_player_id:
                     current_player = player
-                else:
-                    other_players.append(player)
-            
-            # 先绘制其他玩家
-            self._draw_players(draw, other_players)
-            # 再绘制当前玩家（高亮显示）
+                    break
+
             if current_player:
                 pixel_x, pixel_y = self._game_to_pixel(current_player.x, current_player.y)
                 if 0 <= pixel_x <= self.map_width and 0 <= pixel_y <= self.map_height:
                     # 绘制高亮圆圈
                     size = 12
-                    draw.ellipse([pixel_x - size, pixel_y - size, pixel_x + size, pixel_y + size], 
+                    draw.ellipse([pixel_x - size, pixel_y - size, pixel_x + size, pixel_y + size],
                                 fill=None, outline='#FFFF00', width=3)
-                    # 绘制玩家点
-                    size = 8
-                    draw.ellipse([pixel_x - size, pixel_y - size, pixel_x + size, pixel_y + size], 
-                                fill=self.colors['player'], outline='#FFFFFF', width=2)
                     # 绘制玩家昵称
-                    text_x = pixel_x + size + 3
+                    text_x = pixel_x + 8
                     text_y = pixel_y - 8
-                    draw.text((text_x, text_y), f"{current_player.nickname}(你)", 
+                    draw.text((text_x, text_y), f"{current_player.nickname}(你)",
                              fill=self.colors['player'], font=self.fonts['medium'])
-        else:
-            self._draw_players(draw, players)
         
         # 绘制图例
         self._draw_legend(draw)
