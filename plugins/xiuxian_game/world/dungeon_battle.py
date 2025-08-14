@@ -1239,7 +1239,8 @@ async def generate_player_centered_overview_image(region: str, session, center_x
     for grid_x in range(grid_width):
         for grid_y in range(grid_height):
             world_x = min_x + grid_x
-            world_y = min_y + grid_y
+            # 修复Y轴坐标：从下到上递增（数学坐标系）
+            world_y = max_y - grid_y
 
             # 计算像素坐标 - 加上边距偏移
             pixel_x = margin + grid_x * cell_width
@@ -1273,7 +1274,8 @@ async def generate_player_centered_overview_image(region: str, session, center_x
         if min_x <= player_x <= max_x and min_y <= player_y <= max_y:
             # 计算玩家位置的像素坐标
             player_grid_x = player_x - min_x
-            player_grid_y = player_y - min_y
+            # 修复Y轴玩家位置计算：从下到上递增（数学坐标系）
+            player_grid_y = max_y - player_y
             player_pixel_x = margin + player_grid_x * cell_width
             player_pixel_y = margin + player_grid_y * cell_height
 
@@ -1299,7 +1301,8 @@ async def generate_player_centered_overview_image(region: str, session, center_x
     if min_x <= 0 <= max_x and min_y <= 0 <= max_y:
         # 计算原点(0,0)的像素坐标
         origin_grid_x = 0 - min_x
-        origin_grid_y = 0 - min_y
+        # 修复Y轴原点计算：从下到上递增（数学坐标系）
+        origin_grid_y = max_y - 0
         origin_pixel_x = margin + origin_grid_x * cell_width
         origin_pixel_y = margin + origin_grid_y * cell_height
 
@@ -1331,7 +1334,8 @@ async def generate_player_centered_overview_image(region: str, session, center_x
         # 绘制Y轴坐标（左侧和右侧）
         step_y = max(1, grid_height // 10)  # 最多显示10个Y坐标
         for i in range(0, grid_height, step_y):
-            world_y = min_y + i
+            # 修复Y轴坐标标签：从下到上递增（数学坐标系）
+            world_y = max_y - i
             pixel_y = margin + i * cell_height + cell_height // 2
 
             # 左侧Y坐标
@@ -1489,7 +1493,8 @@ async def generate_region_overview_image(region: str, session, player_x: int = N
     for grid_x in range(grid_width):
         for grid_y in range(grid_height):
             world_x = min_x + grid_x
-            world_y = min_y + grid_y
+            # 修复Y轴坐标：从下到上递增（数学坐标系）
+            world_y = max_y - grid_y
 
             # 计算像素坐标 - 加上边距偏移
             pixel_x = margin + grid_x * cell_width
@@ -1521,7 +1526,8 @@ async def generate_region_overview_image(region: str, session, player_x: int = N
         if min_x <= player_x <= max_x and min_y <= player_y <= max_y:
             # 计算玩家位置的像素坐标
             player_grid_x = player_x - min_x
-            player_grid_y = player_y - min_y
+            # 修复Y轴玩家位置计算：从下到上递增（数学坐标系）
+            player_grid_y = max_y - player_y
             player_pixel_x = margin + player_grid_x * cell_width
             player_pixel_y = margin + player_grid_y * cell_height
 
@@ -1547,7 +1553,8 @@ async def generate_region_overview_image(region: str, session, player_x: int = N
     if min_x <= 0 <= max_x and min_y <= 0 <= max_y:
         # 计算原点(0,0)的像素坐标
         origin_grid_x = 0 - min_x
-        origin_grid_y = 0 - min_y
+        # 修复Y轴原点计算：从下到上递增（数学坐标系）
+        origin_grid_y = max_y - 0
         origin_pixel_x = margin + origin_grid_x * cell_width
         origin_pixel_y = margin + origin_grid_y * cell_height
 
@@ -1579,7 +1586,8 @@ async def generate_region_overview_image(region: str, session, player_x: int = N
         # 绘制Y轴坐标（左侧和右侧）
         step_y = max(1, grid_height // 10)  # 最多显示10个Y坐标
         for i in range(0, grid_height, step_y):
-            world_y = min_y + i
+            # 修复Y轴坐标标签：从下到上递增（数学坐标系）
+            world_y = max_y - i
             pixel_y = margin + i * cell_height + cell_height // 2
 
             # 左侧Y坐标
