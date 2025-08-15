@@ -148,7 +148,7 @@ async def handle_attack(event: MessageEvent, args: Message = CommandArg()):
             "━━━━━━━━━━━━━\n"
             "🏘️ 城镇 vs 荒野/诡域：\n"
             "• 城镇（市集/总部/打工地点附近5格）：安全切磋，无损失\n"
-            "• 荒野/诡域（其他区域）：真实死斗，败者掉落部分物品\n"
+            "• 荒野/诡域（其他区域）：真实死斗，双方都会受伤，败者掉落物品\n"
             "━━━━━━━━━━━━━\n"
             "🔍 智能匹配：\n"
             "• 支持部分名称匹配\n"
@@ -156,7 +156,9 @@ async def handle_attack(event: MessageEvent, args: Message = CommandArg()):
             "• 【攻击 邪教徒】可匹配【邪教徒·乔强】\n"
             "━━━━━━━━━━━━━\n"
             "⚠️ 注意事项：\n"
+            "• 攻击距离：最多允许2格距离，无需精确坐标\n"
             "• 荒野/诡域攻击有真实风险，请谨慎选择！\n"
+            "• 死斗中双方都会根据战斗伤害损失血量\n"
             "• 败者只掉落消耗品、材料、商品，不掉落装备\n"
             "• 不会掉落珍贵材料（紫色及以上稀有度）\n"
             "• 攻击NPC可能导致其死亡\n"
@@ -320,9 +322,14 @@ async def handle_player_attack(session, attacker: Player, target: Player, event:
     if attacker.id == target.id:
         await attack_cmd.finish("⛔ 你不能攻击自己")
 
-    # 检查目标是否在同一位置
-    if attacker.x != target.x or attacker.y != target.y or attacker.region != target.region:
-        await attack_cmd.finish("⛔ 目标不在当前位置")
+    # 检查目标是否在附近（允许1-2格的距离差）
+    if attacker.region != target.region:
+        await attack_cmd.finish("⛔ 目标不在同一区域")
+
+    # 计算距离（曼哈顿距离）
+    distance = abs(attacker.x - target.x) + abs(attacker.y - target.y)
+    if distance > 2:
+        await attack_cmd.finish(f"⛔ 目标距离过远（{distance}格），最多允许2格距离")
 
     # 判断是否在城镇中
     current_x, current_y = attacker.get_current_coordinates()
@@ -334,7 +341,7 @@ async def handle_player_attack(session, attacker: Player, target: Player, event:
     seed = f"PVP_{attacker.id}_{target.id}_{battle_timestamp}"
 
     try:
-        victory, battle_log, _, _ = BattleIntegrationHelper.compact_player_vs_player_battle(
+        victory, battle_log, attacker_damage, target_damage = BattleIntegrationHelper.enhanced_player_vs_player_battle(
             attacker, target, seed=seed, max_rounds=30
         )
 
@@ -371,8 +378,23 @@ async def handle_player_attack(session, attacker: Player, target: Player, event:
 
         result_lines.append("━━━━━━━━━━━━━")
 
-        # 处理荒野死斗的物品掉落
+        # 处理死斗的状态损耗和物品掉落
         if not in_town:
+            # 双方都会受到战斗伤害（状态损耗）
+            attacker.hp = max(0, attacker.hp - attacker_damage)
+            target.hp = max(0, target.hp - target_damage)
+
+            # 显示状态损耗信息
+            damage_info = []
+            if attacker_damage > 0:
+                damage_info.append(f"💔 {attacker.nickname} 损失 {attacker_damage} 血量")
+            if target_damage > 0:
+                damage_info.append(f"💔 {target.nickname} 损失 {target_damage} 血量")
+
+            if damage_info:
+                result_lines.extend(damage_info)
+
+            # 处理败者的物品掉落
             loser = target if victory else attacker
             drop_msg = await handle_wilderness_drops(session, loser)
             if drop_msg:
