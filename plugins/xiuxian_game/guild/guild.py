@@ -782,6 +782,37 @@ async def handle_set_position(event: MessageEvent, args: Message = CommandArg())
         await session.commit()
         await set_position_cmd.finish(message_add_head(f"✅ {message}", event))
 
+# ==================== 踢出公会成员 ====================
+kick_member_cmd = on_command("踢出公会", aliases={"踢出成员"}, block=True, priority=5)
+
+@kick_member_cmd.handle()
+async def handle_kick_member(event: MessageEvent, args: Message = CommandArg()):
+    """踢出公会成员：踢出公会 UID"""
+    uid_str = args.extract_plain_text().strip()
+    if not uid_str:
+        await kick_member_cmd.finish("⛔ 格式错误，正确格式：踢出公会 [UID]")
+
+    try:
+        target_uid = int(uid_str)
+    except ValueError:
+        await kick_member_cmd.finish("⛔ UID 必须是数字")
+
+    async with safe_session() as session:
+        player = await session.get(Player, event.get_user_id())
+        if not player or not player.guild_id:
+            await kick_member_cmd.finish("⛔ 你未加入任何公会")
+
+        # 踢出成员
+        success, message = await GuildService.kick_member(
+            session, player.id, player.guild_id, target_uid
+        )
+
+        if not success:
+            await kick_member_cmd.finish(f"⛔ {message}")
+
+        await session.commit()
+        await kick_member_cmd.finish(message_add_head(f"🚪 {message}", event))
+
 # ==================== 公会建筑管理 ====================
 guild_buildings_cmd = on_command("公会建筑", aliases={"建筑列表"}, block=True, priority=5)
 

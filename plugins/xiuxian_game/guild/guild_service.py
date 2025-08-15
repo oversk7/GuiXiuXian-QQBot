@@ -197,6 +197,38 @@ class GuildService:
         return 10 + (level - 1) * 5
     
     @staticmethod
+    async def kick_member(session: AsyncSession, operator_id: str, guild_id: int, target_uid: int) -> Tuple[bool, str]:
+        """踢出公会成员"""
+        # 根据UID查找目标玩家
+        target_stmt = select(Player).where(Player.uid == target_uid)
+        target_player = (await session.execute(target_stmt)).scalars().first()
+        if not target_player:
+            return False, "未找到该UID的玩家"
+
+        # 检查目标是否在同一公会
+        if target_player.guild_id != guild_id:
+            return False, "该玩家不在你的公会中"
+
+        # 权限检查
+        can_kick, reason = await GuildPermission.can_kick_member(session, operator_id, guild_id, target_player.id)
+        if not can_kick:
+            return False, reason
+
+        # 删除成员记录
+        stmt = delete(GuildMember).where(
+            and_(GuildMember.player_id == target_player.id, GuildMember.guild_id == guild_id)
+        )
+        await session.execute(stmt)
+
+        # 清空玩家公会相关数据
+        target_player.guild_id = None
+        target_player.guild_contribution = 0  # 清空累计贡献值
+        target_player.gold2 = 0  # 清空个人积分
+        session.add(target_player)
+
+        return True, f"已将 {target_player.nickname}[UID:{target_uid}] 踢出公会"
+
+    @staticmethod
     async def get_guild_members(session: AsyncSession, guild_id: int) -> List[dict]:
         """获取公会成员列表"""
         from sqlalchemy import case
@@ -215,10 +247,10 @@ class GuildService:
         ).where(GuildMember.guild_id == guild_id).order_by(
             position_priority.asc(), Player.guild_contribution.desc(), Player.level.desc()
         )
-        
+
         results = (await session.execute(stmt)).all()
         members = []
-        
+
         for member, player in results:
             members.append({
                 "player_id": player.id,
@@ -230,5 +262,5 @@ class GuildService:
                 "contribution": player.guild_contribution,
                 "joined_at": member.joined_at
             })
-        
+
         return members
