@@ -71,8 +71,9 @@ class GuildFacilityService:
         if guild.base_x is None or guild.base_y is None:
             return False, "公会尚未设置基地坐标"
         
-        # 计算距离
-        distance = math.sqrt((player.x - guild.base_x) ** 2 + (player.y - guild.base_y) ** 2)
+        # 计算距离 - 使用正确的当前坐标
+        current_x, current_y = player.get_current_coordinates()
+        distance = math.sqrt((current_x - guild.base_x) ** 2 + (current_y - guild.base_y) ** 2)
         if distance > teleport_range:
             return False, f"距离公会基地太远，传送阵范围为{teleport_range}格（当前距离{distance:.1f}格）"
         

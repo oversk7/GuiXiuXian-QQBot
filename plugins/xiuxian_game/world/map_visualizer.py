@@ -202,7 +202,9 @@ class MapVisualizer:
             if current_player_id and player.id == current_player_id:
                 continue  # 跳过当前玩家，稍后单独绘制
 
-            pixel_x, pixel_y = self._game_to_pixel(player.x, player.y)
+            # 使用正确的当前坐标
+            player_x, player_y = player.get_current_coordinates()
+            pixel_x, pixel_y = self._game_to_pixel(player_x, player_y)
 
             # 确保在地图范围内
             if not (0 <= pixel_x <= self.map_width and 0 <= pixel_y <= self.map_height):
@@ -217,7 +219,9 @@ class MapVisualizer:
         if current_player_id:
             for player in players:
                 if player.id == current_player_id:
-                    pixel_x, pixel_y = self._game_to_pixel(player.x, player.y)
+                    # 使用正确的当前坐标
+                    player_x, player_y = player.get_current_coordinates()
+                    pixel_x, pixel_y = self._game_to_pixel(player_x, player_y)
 
                     # 确保在地图范围内
                     if 0 <= pixel_x <= self.map_width and 0 <= pixel_y <= self.map_height:
@@ -323,7 +327,9 @@ class MapVisualizer:
                     break
 
             if current_player:
-                pixel_x, pixel_y = self._game_to_pixel(current_player.x, current_player.y)
+                # 使用正确的当前坐标
+                player_x, player_y = current_player.get_current_coordinates()
+                pixel_x, pixel_y = self._game_to_pixel(player_x, player_y)
                 if 0 <= pixel_x <= self.map_width and 0 <= pixel_y <= self.map_height:
                     # 绘制高亮圆圈（只有边框，不填充）
                     highlight_size = 10

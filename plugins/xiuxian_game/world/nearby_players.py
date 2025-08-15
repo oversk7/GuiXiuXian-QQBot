@@ -31,9 +31,12 @@ async def _(event: MessageEvent):
         if not others:
             await nearby_cmd.finish(message_add_head("📭 附近暂无其他玩家", event))
 
-        # 按曼哈顿距离排序
+        # 按曼哈顿距离排序 - 使用正确的当前坐标
+        current_x, current_y = player.get_current_coordinates()
         def _dist(p: Player) -> int:
-            return abs(p.x - player.x) + abs(p.y - player.y)
+            # 其他玩家也需要使用正确的坐标进行比较
+            other_x, other_y = p.get_current_coordinates()
+            return abs(other_x - current_x) + abs(other_y - current_y)
 
         others.sort(key=_dist)
         top5 = others[:5]
@@ -41,8 +44,10 @@ async def _(event: MessageEvent):
         # 导入境界映射函数
         from ..player.info import realm_by_level
 
-        # 构造回复
-        header = f"📍 当前位置：{player.region} ({player.x},{player.y})"
+        # 构造回复 - 使用正确的当前坐标
+        current_x, current_y = player.get_current_coordinates()
+        current_region = player.get_current_region()
+        header = f"📍 当前位置：{current_region} ({current_x},{current_y})"
         lines = [header, "🧑‍🤝‍🧑 附近玩家："]
         for idx, p in enumerate(top5, 1):
             gender_val = p.sex.value if hasattr(p.sex, "value") else str(p.sex)

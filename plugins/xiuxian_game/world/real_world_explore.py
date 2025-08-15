@@ -45,28 +45,28 @@ async def handle_real_world_explore(event: MessageEvent):
         
         if location:
             # 有地点，显示地点信息
-            await show_location_info(session, player, location, event)
+            await show_location_info(session, player, location, current_x, current_y, event)
         else:
             # 没有地点，显示基本位置信息
             await show_basic_location_info(session, player, current_x, current_y, current_region, event)
 
 
-async def show_location_info(session: AsyncSession, player: Player, location, event: MessageEvent):
+async def show_location_info(session: AsyncSession, player: Player, location, current_x: int, current_y: int, event: MessageEvent):
     """显示地点详细信息"""
     # 获取地点摘要
     location_summary = await LocationService.get_location_summary(session, location)
-    
+
     # 获取附近玩家
     nearby_players = await LocationService.get_nearby_players(
-        session, location.x, location.y, location.region, 
+        session, location.x, location.y, location.region,
         max_distance=0, exclude_player_id=player.id  # 只显示同一坐标的玩家
     )
-    
-    # 格式化显示信息
+
+    # 格式化显示信息 - 使用正确的当前坐标
     info_text = LocationService.format_location_info(
-        location_summary, player.x, player.y, nearby_players
+        location_summary, current_x, current_y, nearby_players
     )
-    
+
     await real_explore_cmd.finish(message_add_head(info_text, event))
 
 

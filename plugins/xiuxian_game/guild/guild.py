@@ -692,28 +692,29 @@ async def handle_set_base(event: MessageEvent):
         if player.region != "大都会":
             await set_base_cmd.finish("⛔ 只能在现实世界（大都会）设置公会基地")
 
-        # 检查坐标范围（使用导航系统的坐标限制）
+        # 检查坐标范围（使用导航系统的坐标限制） - 使用正确的当前坐标
+        current_x, current_y = player.get_current_coordinates()
         MAX_COORD = 1000
-        if not (-MAX_COORD <= player.x <= MAX_COORD and -MAX_COORD <= player.y <= MAX_COORD):
+        if not (-MAX_COORD <= current_x <= MAX_COORD and -MAX_COORD <= current_y <= MAX_COORD):
             await set_base_cmd.finish(f"⛔ 当前坐标超出有效范围（{-MAX_COORD}~{MAX_COORD}）")
 
         # 检查是否已有其他公会在此位置设置基地
         stmt = select(Guild).where(
-            Guild.base_x == player.x,
-            Guild.base_y == player.y,
+            Guild.base_x == current_x,
+            Guild.base_y == current_y,
             Guild.id != guild.id
         )
         existing_guild = (await session.execute(stmt)).scalars().first()
         if existing_guild:
-            await set_base_cmd.finish(f"⛔ 坐标({player.x}, {player.y})已被公会『{existing_guild.name}』占据")
+            await set_base_cmd.finish(f"⛔ 坐标({current_x}, {current_y})已被公会『{existing_guild.name}』占据")
         
         # 检查是否已经设置过基地
         if guild.base_x is not None and guild.base_y is not None:
             await set_base_cmd.finish(f"⛔ 公会基地已经设置，无法更改\n当前基地坐标：({guild.base_x}, {guild.base_y})")
 
-        # 设置基地坐标
-        guild.base_x = player.x
-        guild.base_y = player.y
+        # 设置基地坐标 - 使用正确的当前坐标
+        guild.base_x = current_x
+        guild.base_y = current_y
         session.add(guild)
         await session.commit()
 

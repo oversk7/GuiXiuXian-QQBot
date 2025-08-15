@@ -209,11 +209,12 @@ class PartTimeJobService:
         if player.region != "大都会":
             return False, "只有在大都会才能打工", []
 
-        # 查找当前坐标的工作地点
+        # 查找当前坐标的工作地点 - 使用正确的当前坐标
+        current_x, current_y = player.get_current_coordinates()
         stmt = select(JobLocation).where(
             and_(
-                JobLocation.x == player.x,
-                JobLocation.y == player.y,
+                JobLocation.x == current_x,
+                JobLocation.y == current_y,
                 JobLocation.is_active == True
             )
         )
@@ -278,11 +279,12 @@ class PartTimeJobService:
         if not job_available:
             return False, "当前位置没有这个工作", None
 
-        # 获取工作地点
+        # 获取工作地点 - 使用正确的当前坐标
+        current_x, current_y = player.get_current_coordinates()
         stmt = select(JobLocation).where(
             and_(
-                JobLocation.x == player.x,
-                JobLocation.y == player.y,
+                JobLocation.x == current_x,
+                JobLocation.y == current_y,
                 JobLocation.is_active == True
             )
         )

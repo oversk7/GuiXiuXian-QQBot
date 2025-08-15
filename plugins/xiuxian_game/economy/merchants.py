@@ -165,7 +165,9 @@ async def _(event: MessageEvent):
                 "━━━━━━━━━━━━━\n"
                 "⬇️ 【返回】脱离诡域，返回现实", event))
 
-        market = MARKET_BY_COORD.get((player.x, player.y))
+        # 使用正确的当前坐标
+        current_x, current_y = player.get_current_coordinates()
+        market = MARKET_BY_COORD.get((current_x, current_y))
         if not market:
             # 展示所有市场坐标
             lines = ["🏪 可交易地点一览", "━━━━━━━━━━━━━"]
@@ -215,8 +217,9 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
                 "━━━━━━━━━━━━━\n"
                 "⬇️ 【返回】脱离诡域，返回现实", event))
 
-        # 检查是否为市集购买
-        market = MARKET_BY_COORD.get((player.x, player.y))
+        # 检查是否为市集购买 - 使用正确的当前坐标
+        current_x, current_y = player.get_current_coordinates()
+        market = MARKET_BY_COORD.get((current_x, current_y))
         item_cfg = config.items_config["by_name"].get(item_name)
         if not item_cfg:
             await buy_cmd.finish("⛔ 不存在该物品")
@@ -334,8 +337,9 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
                 "━━━━━━━━━━━━━\n"
                 "⬇️ 【返回】脱离诡域，返回现实", event))
 
-        # 检查是否在市集
-        market = MARKET_BY_COORD.get((player.x, player.y))
+        # 检查是否在市集 - 使用正确的当前坐标
+        current_x, current_y = player.get_current_coordinates()
+        market = MARKET_BY_COORD.get((current_x, current_y))
         if not market:
             await sell_cmd.finish("⛔ 这里只有风～没有商人")
 
@@ -669,13 +673,14 @@ async def _(event: MessageEvent):
                 "━━━━━━━━━━━━━\n"
                 "⬇️ 【返回】脱离诡域，返回现实", event))
 
-        # 检查是否在缉邪司总部坐标
-        if (player.x, player.y) != HEADQUARTERS_COORD:
+        # 检查是否在缉邪司总部坐标 - 使用正确的当前坐标
+        current_x, current_y = player.get_current_coordinates()
+        if (current_x, current_y) != HEADQUARTERS_COORD:
             await headquarters_cmd.finish(message_add_head(
                 "🏛️ 缉邪司总部商店\n"
                 "━━━━━━━━━━━━━\n"
                 f"📍 总部位置：风雪镇 {HEADQUARTERS_COORD}\n"
-                f"📍 当前位置：({player.x},{player.y})\n"
+                f"📍 当前位置：({current_x},{current_y})\n"
                 "━━━━━━━━━━━━━\n"
                 "🧭 请前往风雪镇缉邪司总部", event))
 
@@ -733,8 +738,9 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
         if player.region != "大都会":
             await headquarters_exchange_cmd.finish("⛔ 诡域中无法使用缉邪司服务")
 
-        # 检查是否在缉邪司总部坐标
-        if (player.x, player.y) != HEADQUARTERS_COORD:
+        # 检查是否在缉邪司总部坐标 - 使用正确的当前坐标
+        current_x, current_y = player.get_current_coordinates()
+        if (current_x, current_y) != HEADQUARTERS_COORD:
             await headquarters_exchange_cmd.finish("⛔ 请前往风雪镇(-5,390)缉邪司总部")
 
         # 查找物品配置

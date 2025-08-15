@@ -43,10 +43,13 @@ async def _(event: MessageEvent):
         if not player:
             await map_cmd.finish("⛔ 请先创建角色")
         
+        # 获取当前正确的坐标
+        current_x, current_y = player.get_current_coordinates()
+
         lines = [
             "🗺️ 大都会地点一览",
             "━━━━━━━━━━━━━",
-            f"📍 当前位置：({player.x},{player.y})",
+            f"📍 当前位置：({current_x},{current_y})",
             "━━━━━━━━━━━━━"
         ]
         
@@ -114,10 +117,13 @@ async def _(event: MessageEvent):
         
         nearby_places = []
         
+        # 获取当前正确的坐标
+        current_x, current_y = player.get_current_coordinates()
+
         # 1. 检查市集
         from ..economy.merchants import MARKETS
         for market in MARKETS:
-            distance = calculate_distance(player.x, player.y, market.x, market.y)
+            distance = calculate_distance(current_x, current_y, market.x, market.y)
             if distance <= 100:  # 100格内
                 nearby_places.append({
                     "name": f"🏪 {market.name}",
@@ -128,7 +134,7 @@ async def _(event: MessageEvent):
         
         # 2. 检查缉邪司总部
         from ..economy.merchants import HEADQUARTERS_COORD
-        hq_distance = calculate_distance(player.x, player.y, HEADQUARTERS_COORD[0], HEADQUARTERS_COORD[1])
+        hq_distance = calculate_distance(current_x, current_y, HEADQUARTERS_COORD[0], HEADQUARTERS_COORD[1])
         if hq_distance <= 100:
             nearby_places.append({
                 "name": "🏛️ 缉邪司总部",
@@ -143,7 +149,7 @@ async def _(event: MessageEvent):
             job_locations = (await session.execute(stmt)).scalars().all()
             
             for location in job_locations:
-                distance = calculate_distance(player.x, player.y, location.x, location.y)
+                distance = calculate_distance(current_x, current_y, location.x, location.y)
                 if distance <= 100:
                     nearby_places.append({
                         "name": f"💼 {location.name}",
@@ -156,7 +162,7 @@ async def _(event: MessageEvent):
             try:
                 from ..economy.part_time_job_service import PartTimeJobService
                 for location_data in PartTimeJobService.JOB_LOCATIONS.values():
-                    distance = calculate_distance(player.x, player.y, location_data['x'], location_data['y'])
+                    distance = calculate_distance(current_x, current_y, location_data['x'], location_data['y'])
                     if distance <= 100:
                         nearby_places.append({
                             "name": f"💼 {location_data['name']}",
@@ -170,7 +176,7 @@ async def _(event: MessageEvent):
         
         if not nearby_places:
             await nearby_locations_cmd.finish(message_add_head(
-                f"📍 当前位置：({player.x},{player.y})\n"
+                f"📍 当前位置：({current_x},{current_y})\n"
                 "🔍 附近100格内暂无重要地点\n"
                 "💡 使用【地图】查看所有地点", event))
         
@@ -178,7 +184,7 @@ async def _(event: MessageEvent):
         nearby_places.sort(key=lambda x: x["distance"])
         
         lines = [
-            f"📍 当前位置：({player.x},{player.y})",
+            f"📍 当前位置：({current_x},{current_y})",
             "🔍 附近地点 (100格内)：",
             "━━━━━━━━━━━━━"
         ]
@@ -243,9 +249,10 @@ async def _(event: MessageEvent):
                 coord_info.append("   • 休闲娱乐街区 (-50,150)")
                 coord_info.append("   • 物流配送中心 (200,-100)")
 
-            # 当前玩家位置
+            # 当前玩家位置 - 使用正确的当前坐标
+            current_x, current_y = player.get_current_coordinates()
             coord_info.append("🔴 你的位置：")
-            coord_info.append(f"   • {player.nickname} ({player.x},{player.y})")
+            coord_info.append(f"   • {player.nickname} ({current_x},{current_y})")
 
             coord_info.append("━━━━━━━━━━━━━")
             coord_info.append("💡 使用【导航 x y】可前往指定坐标")

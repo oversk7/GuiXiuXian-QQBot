@@ -1024,8 +1024,9 @@ async def handle_buy(event: MessageEvent, args: Message = CommandArg()):
         if player.region == "大都会":
             await buy_cmd.finish("⛔ 现实世界没有卖货郎")
 
-        # 获取当前位置的格子
-        tile = await get_or_create_tile(session, player.region, player.x, player.y)
+        # 获取当前位置的格子 - 使用正确的当前坐标
+        current_x, current_y = player.get_current_coordinates()
+        tile = await get_or_create_tile(session, player.region, current_x, current_y)
 
         if tile.event_type != "MERCHANT":
             await buy_cmd.finish("⛔ 这里没有卖货郎")

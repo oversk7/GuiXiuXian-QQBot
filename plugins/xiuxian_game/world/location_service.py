@@ -209,7 +209,7 @@ class LocationService:
                 lines.append(f"⛹️附近玩家({player_count}): {' '.join(player_names)}")
                 if player_count > 20:
                     lines.append(f"...等{player_count}个玩家")
-                lines.append("👉攻击 <玩家|NPC>")
+                lines.append("⬇️ 攻击 <玩家|NPC>")
                 lines.append("")
         
         # 显示NPC
@@ -223,22 +223,22 @@ class LocationService:
                     hint = npc.get_interaction_hint()
                     lines.append(f"{npc.get_display_name()}{hint}")
             
-            lines.append("👉交互 <NPC>")
+            lines.append("⬇️ 交互 <NPC>")
             lines.append("")
         
         # 显示地点功能
         functions = location_summary["functions"]
         if "part_time_job" in functions:
-            lines.append(f"💼工作地点(1): {location.name}")
+            lines.append(f"💼工作地点: {location.name}")
         
         if "market" in functions:
-            lines.append(f"🏬 市集(1)：{location.name}")
+            lines.append(f"🏬 市集：{location.name}")
         
         if "forge" in functions:
-            lines.append(f"⚒️ 工坊(1)：{location.name}")
+            lines.append(f"⚒️ 工坊：{location.name}")
         
         if "special_shop" in functions:
-            lines.append(f"🏛️ 特殊商店(1)：{location.name}")
+            lines.append(f"🏛️ 特殊商店：{location.name}")
         
         return "\n".join(lines)
     
