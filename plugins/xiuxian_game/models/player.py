@@ -87,8 +87,11 @@ class Player(Base):
     def enter_dungeon(self, level: int):
         """进入指定层级诡域"""
         # 保存现实世界坐标
-        self.real_world_x = self.x or 0
-        self.real_world_y = self.y or 0
+        if not self.is_in_dungeon():
+            # 从现实世界进入副本：保存当前现实世界坐标
+            self.real_world_x = self.real_world_x or self.x or 0
+            self.real_world_y = self.real_world_y or self.y or 0
+        # 如果已经在副本中，不要修改real_world坐标，保持原有的现实世界位置
 
         # 设置诡域信息
         self.dungeon_level = level

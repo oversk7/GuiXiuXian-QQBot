@@ -146,9 +146,12 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
             if reached:
                 await session_nav.delete(task)
             await session_nav.commit()
-            # 同步内存对象用于展示（不改变诡域内 x,y）
-            player.x = player_upd.x
-            player.y = player_upd.y
+            # 同步内存对象用于展示
+            # 只有在现实世界时才同步x,y坐标，在副本中保持副本坐标
+            if not player.is_in_dungeon():
+                player.x = player_upd.x
+                player.y = player_upd.y
+            # 始终同步现实世界坐标
             if hasattr(player, "real_world_x"):
                 player.real_world_x = player_upd.real_world_x
                 player.real_world_y = player_upd.real_world_y

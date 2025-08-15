@@ -179,9 +179,10 @@ class StoryEngine:
         content = content.replace("{player_gold2}", str(player.gold2))
         content = content.replace("{player_vip}", str(player.vip))
 
-        # 替换玩家位置
-        content = content.replace("{player_x}", str(player.x))
-        content = content.replace("{player_y}", str(player.y))
+        # 替换玩家位置（使用当前活跃坐标）
+        current_x, current_y = player.get_current_coordinates()
+        content = content.replace("{player_x}", str(current_x))
+        content = content.replace("{player_y}", str(current_y))
 
         # 替换公会信息
         content = content.replace("{player_guild_id}", str(player.guild_id or "无"))

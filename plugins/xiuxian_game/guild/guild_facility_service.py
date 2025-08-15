@@ -107,10 +107,16 @@ class GuildFacilityService:
         player = await session.get(Player, player_id)
         guild = await session.get(Guild, guild_id)
         
-        # 记录传送前位置
-        from_x, from_y = player.x, player.y
-        
-        # 传送到公会基地
+        # 记录传送前位置（使用当前活跃坐标）
+        from_x, from_y = player.get_current_coordinates()
+
+        # 传送到公会基地（只能在现实世界使用）
+        if player.is_in_dungeon():
+            return False, "⛔ 在诡域中无法使用公会传送功能"
+
+        # 更新现实世界坐标
+        player.real_world_x = guild.base_x
+        player.real_world_y = guild.base_y
         player.x = guild.base_x
         player.y = guild.base_y
         session.add(player)
