@@ -977,7 +977,7 @@ async def _(event: MessageEvent):
             await explore_cmd.finish("⛔ 请先创建角色")
 
         if not player.is_in_dungeon():
-            await explore_cmd.finish("⛔ 你已经返回现实\n⬇️ 【进入 N层诡域】进入诡域探索")
+            await explore_cmd.finish("⛔ 你已经返回现实\n⬇️ 【传送 N层诡域】进入诡域探索")
 
         if player.hp <= 0:
             await explore_cmd.finish("💀 你已死亡，返回现实吧，或者你有复活道具..."
@@ -1148,7 +1148,7 @@ async def handle_teleport_list(event: MessageEvent):
 
         msg_lines.extend([
             "━━━━━━━━━━━━━",
-            "📌 使用方式：进入 N层诡域",
+            "📌 使用方式：【传送 N层诡域】",
             "📦 需要消耗咒抗1点",
             "✅已探索 🎯下一目标 🔒未解锁",
             "🏠 使用【返回】穿越回表世界"

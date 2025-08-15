@@ -217,7 +217,7 @@ async def handle_revive(event: MessageEvent):
         msg_lines.extend([
             "━━━━━━━━━━━━━",
             "⬇️ 【导航 <x> <y>】劳逸结合，现实经商",
-            "⬇️ 【进入 N层诡域】探索更深的诡域"
+            "⬇️ 【传送 N层诡域】知诡才能制诡，继续探索"
         ])
         
         msg = "\n".join(msg_lines)
