@@ -255,7 +255,7 @@ async def handle_add_inventory(event: MessageEvent, args: Message = CommandArg()
         target_player.inventory_capacity += capacity_add
 
         # 设置合理上限（防止过度增加）
-        MAX_INVENTORY_CAPACITY = 200
+        MAX_INVENTORY_CAPACITY = 1000
         if target_player.inventory_capacity > MAX_INVENTORY_CAPACITY:
             target_player.inventory_capacity = MAX_INVENTORY_CAPACITY
             actual_add = MAX_INVENTORY_CAPACITY - old_capacity
