@@ -185,7 +185,7 @@ async def handle_stock_holdings(event: MessageEvent):
     if not holdings:
         await stock_holdings_cmd.finish(message_add_head("� 您当前没有投资", event))
 
-    lines = ["� 我的气运投资", "▃▃▃▃▃▃▃▃▃▃"]
+    lines = ["🗠 我的气运投资", "▃▃▃▃▃▃▃▃▃▃"]
 
     # 获取刷新时间信息
     async with safe_session() as session:
@@ -222,7 +222,7 @@ async def handle_stock_holdings(event: MessageEvent):
         
         lines.append(
             f"\n{holding['symbol']} {holding['name']}\n"
-            f"  � 持有：{holding['shares']} 份\n"
+            f"  🗠 持有：{holding['shares']} 份\n"
             f"  💰 成本：{holding['avg_cost']} 金币/份\n"
             f"  ✨ 现价：{holding['current_price']} 金币/份\n"
             f"  💵 价值：{holding['current_value']} 金币\n"
@@ -233,7 +233,7 @@ async def handle_stock_holdings(event: MessageEvent):
     total_profit_rate = (total_profit / total_cost * 100) if total_cost > 0 else 0
     profit_symbol = "📈" if total_profit > 0 else "📉" if total_profit < 0 else "➡️"
     
-    lines.append(f"\n� 总价值：{total_value} 金币")
+    lines.append(f"\n💰 总价值：{total_value} 金币")
     lines.append(f"💰 总成本：{total_cost} 金币")
     lines.append(f"{profit_symbol} 总盈亏：{total_profit:+} 金币 ({total_profit_rate:+.2f}%)")
     

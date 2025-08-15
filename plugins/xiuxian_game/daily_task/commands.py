@@ -61,8 +61,8 @@ async def handle_daily_task(event: MessageEvent):
                     status_text = "已过期"
 
                 lines.append(f"{status_emoji} 【委托{i}】{task.title}")
-                lines.append(f"� 任务描述：{task.description}")
-                lines.append(f"�📍 目标位置：{task.location_str}")
+                lines.append(f"🔳 任务描述：{task.description}")
+                lines.append(f"📍 目标位置：{task.location_str}")
                 lines.append(f"👹 目标敌人：{task.enemy_name} Lv.{task.enemy_level}")
                 lines.append(f"💰 任务奖励：{task.get_reward_summary(bool(player.guild_id))}")
                 lines.append(f"📊 任务状态：{status_text}")
@@ -141,8 +141,8 @@ async def handle_accept_task(event: MessageEvent, args: Message = CommandArg()):
                 f"🏛️ 缉邪司委托接取成功！\n"
                 f"━━━━━━━━━━━━━\n"
                 f"📋 委托{task_index}：{task.title}\n"
-                f"� 任务描述：{task.description}\n"
-                f"�📍 目标：{task.location_str}\n"
+                f"🔳 任务描述：{task.description}\n"
+                f"📍 目标：{task.location_str}\n"
                 f"👹 敌人：{task.enemy_name} Lv.{task.enemy_level}\n"
                 f"💰 奖励：{task.get_reward_summary(bool(player.guild_id))}\n"
                 f"━━━━━━━━━━━━━\n"
@@ -301,8 +301,8 @@ async def handle_refresh_task(event: MessageEvent):
             f"🏛️ 缉邪司新委托生成！\n"
             f"━━━━━━━━━━━━━\n"
             f"📋 委托{len(tasks) + 1}：{new_task.title}\n"
-            f"� 任务描述：{new_task.description}\n"
-            f"�📍 目标：{new_task.location_str}\n"
+            f"🔳 任务描述：{new_task.description}\n"
+            f"📍 目标：{new_task.location_str}\n"
             f"👹 敌人：{new_task.enemy_name} Lv.{new_task.enemy_level}\n"
             f"💰 奖励：{new_task.get_reward_summary(bool(player.guild_id))}\n"
             f"━━━━━━━━━━━━━\n"
