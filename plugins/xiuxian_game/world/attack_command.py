@@ -156,7 +156,7 @@ async def handle_attack(event: MessageEvent, args: Message = CommandArg()):
             "• 【攻击 邪教徒】可匹配【邪教徒·乔强】\n"
             "━━━━━━━━━━━━━\n"
             "⚠️ 注意事项：\n"
-            "• 攻击距离：最多允许2格距离，无需精确坐标\n"
+            "• 攻击距离：最多允许2格距离（已修复坐标系统问题）\n"
             "• 荒野/诡域攻击有真实风险，请谨慎选择！\n"
             "• 死斗中双方都会根据战斗伤害损失血量\n"
             "• 败者只掉落消耗品、材料、商品，不掉落装备\n"
@@ -217,29 +217,65 @@ async def handle_attack(event: MessageEvent, args: Message = CommandArg()):
 
 async def parse_attack_target(session, target_name: str, x: int, y: int, region: str):
     """解析攻击目标"""
+    from sqlalchemy import select, and_
+
     target_player = None
     target_npc = None
 
     # 尝试按UID查找玩家
     if target_name.isdigit():
         uid = int(target_name)
-        # 查找附近的玩家
-        nearby_players = await LocationService.get_nearby_players(
-            session, x, y, region, max_distance=0
-        )
-        for p in nearby_players:
-            if p.uid == uid:
-                target_player = p
-                break
+        # 查找所有同区域的玩家，然后手动筛选距离
+        stmt = select(Player).where(Player.uid == uid)
+        result = await session.execute(stmt)
+        candidate = result.scalar_one_or_none()
+
+        if candidate:
+            # 检查是否在同一区域且距离合适
+            candidate_region = candidate.get_current_region()
+            if candidate_region == region:
+                candidate_x, candidate_y = candidate.get_current_coordinates()
+                distance = abs(candidate_x - x) + abs(candidate_y - y)
+                if distance <= 2:  # 攻击距离限制
+                    target_player = candidate
     else:
-        # 按名称查找玩家
-        nearby_players = await LocationService.get_nearby_players(
-            session, x, y, region, max_distance=0
-        )
-        for p in nearby_players:
-            if p.nickname == target_name:
-                target_player = p
-                break
+        # 按名称查找玩家 - 查找所有同区域的玩家
+        if region == "大都会":
+            # 现实世界中的玩家
+            stmt = select(Player).where(
+                and_(
+                    Player.nickname == target_name,
+                    Player.dungeon_level == 0  # 在现实世界
+                )
+            )
+        else:
+            # 诡域中的玩家 - 需要解析层级
+            if "层诡域" in region:
+                try:
+                    dungeon_level = int(region.replace("层诡域", ""))
+                    stmt = select(Player).where(
+                        and_(
+                            Player.nickname == target_name,
+                            Player.dungeon_level == dungeon_level
+                        )
+                    )
+                except ValueError:
+                    stmt = select(Player).where(Player.nickname == target_name)
+            else:
+                stmt = select(Player).where(Player.nickname == target_name)
+
+        result = await session.execute(stmt)
+        candidates = result.scalars().all()
+
+        # 从候选者中找到距离合适的
+        for candidate in candidates:
+            candidate_region = candidate.get_current_region()
+            if candidate_region == region:
+                candidate_x, candidate_y = candidate.get_current_coordinates()
+                distance = abs(candidate_x - x) + abs(candidate_y - y)
+                if distance <= 2:  # 攻击距离限制
+                    target_player = candidate
+                    break
 
         # 如果没找到玩家，查找NPC
         if not target_player:
@@ -322,12 +358,16 @@ async def handle_player_attack(session, attacker: Player, target: Player, event:
     if attacker.id == target.id:
         await attack_cmd.finish("⛔ 你不能攻击自己")
 
-    # 检查目标是否在附近（允许1-2格的距离差）
-    if attacker.region != target.region:
+    # 检查目标是否在同一区域
+    attacker_region = attacker.get_current_region()
+    target_region = target.get_current_region()
+    if attacker_region != target_region:
         await attack_cmd.finish("⛔ 目标不在同一区域")
 
-    # 计算距离（曼哈顿距离）
-    distance = abs(attacker.x - target.x) + abs(attacker.y - target.y)
+    # 获取正确的当前坐标并计算距离（曼哈顿距离）
+    attacker_x, attacker_y = attacker.get_current_coordinates()
+    target_x, target_y = target.get_current_coordinates()
+    distance = abs(attacker_x - target_x) + abs(attacker_y - target_y)
     if distance > 2:
         await attack_cmd.finish(f"⛔ 目标距离过远（{distance}格），最多允许2格距离")
 
