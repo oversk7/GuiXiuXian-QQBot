@@ -223,6 +223,7 @@ async def _sweep_dungeon(player: Player, cfg: ItemConfig, qty: int, ctx: str, se
     from ..config import config
     from ..utils import luck_prob, damage_reduction_rate
     from ..models.inventory import ItemInstance
+    from ..world.dungeon_battle import calculate_monster_attributes, get_region_materials, get_materials_by_rarity
     from sqlalchemy import select as _select
 
     # 检查是否在诡域中
@@ -280,7 +281,6 @@ async def _sweep_dungeon(player: Player, cfg: ItemConfig, qty: int, ctx: str, se
     monster_ratio = tile_weights[2] / 100  # 怪物格子比例 x = 0.75
 
     # 计算怪物平均伤害
-    from ..world import calculate_monster_attributes
     monster_attrs = calculate_monster_attributes(avg_level, is_elite=False)
     monster_damage = monster_attrs["attack"]
 
@@ -346,7 +346,6 @@ async def _sweep_dungeon(player: Player, cfg: ItemConfig, qty: int, ctx: str, se
     # 估算打怪获得的高级奖励（基于怪物格子数）
     high_grade_rewards = []
     if monster_tiles > 0:
-        from ..world import get_materials_by_rarity
 
         # 模拟打怪掉落，估算高级材料获得
         estimated_drops = {}
@@ -362,7 +361,6 @@ async def _sweep_dungeon(player: Player, cfg: ItemConfig, qty: int, ctx: str, se
             drop_rates = {"white": 0.20, "green": 0.20, "blue": 0.20, "purple": 0.08, "orange": 0.01}
 
         # 获取当前区域材料配置
-        from ..world import get_region_materials, get_materials_by_rarity
         region_materials = get_region_materials(player.region)
 
         # 估算每种稀有度材料的获得数量
@@ -407,7 +405,6 @@ async def _sweep_dungeon(player: Player, cfg: ItemConfig, qty: int, ctx: str, se
     # 计算材料奖励 - 扫荡主要获得基础材料
     materials_gained = []
     if material_tiles > 0:
-        from ..world import get_region_materials, get_materials_by_rarity
 
         region_materials = get_region_materials(player.region)
         basic_materials = region_materials["basic"]
