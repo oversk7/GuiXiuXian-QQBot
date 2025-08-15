@@ -19,6 +19,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from ..models.player import Player
 from ..models.part_time_job import JobLocation
+from ..models.navigation_task import NavigationTask
 from ..economy.merchants import MARKETS, HEADQUARTERS_COORD
 
 
@@ -43,6 +44,8 @@ class MapVisualizer:
             'special': '#FF44FF',     # 特殊地点粉色
             'border': '#4488CC',      # 边框颜色
             'location_text': '#333333',  # 地点文字颜色
+            'navigation_line': '#00FF00',  # 导航连线绿色
+            'navigation_target': '#FFFF00',  # 导航目标黄色
         }
         
         # 字体配置（将在运行时加载）
@@ -230,13 +233,97 @@ class MapVisualizer:
                         draw.ellipse([pixel_x - size, pixel_y - size, pixel_x + size, pixel_y + size],
                                     fill=self.colors['player'], outline='#FFFFFF', width=2)
                     break
-    
+
+    def _draw_navigation_line(self, draw: ImageDraw.Draw, player: Player, nav_task: NavigationTask):
+        """绘制导航连线和目标点"""
+        # 获取玩家当前现实世界坐标（导航基于现实世界坐标）
+        player_x = player.real_world_x or 0
+        player_y = player.real_world_y or 0
+
+        # 获取目标坐标
+        target_x = nav_task.target_x
+        target_y = nav_task.target_y
+
+        # 转换为像素坐标
+        player_pixel_x, player_pixel_y = self._game_to_pixel(player_x, player_y)
+        target_pixel_x, target_pixel_y = self._game_to_pixel(target_x, target_y)
+
+        # 检查坐标是否在地图范围内
+        player_in_bounds = (0 <= player_pixel_x <= self.map_width and
+                           0 <= player_pixel_y <= self.map_height)
+        target_in_bounds = (0 <= target_pixel_x <= self.map_width and
+                           0 <= target_pixel_y <= self.map_height)
+
+        # 如果至少有一个点在地图范围内，就绘制连线
+        if player_in_bounds or target_in_bounds:
+            # 绘制导航连线（虚线效果）
+            self._draw_dashed_line(draw, player_pixel_x, player_pixel_y,
+                                 target_pixel_x, target_pixel_y,
+                                 self.colors['navigation_line'], width=2)
+
+        # 绘制目标点（如果在地图范围内）
+        if target_in_bounds:
+            # 绘制目标点标记（黄色圆圈）
+            target_size = 8
+            draw.ellipse([target_pixel_x - target_size, target_pixel_y - target_size,
+                         target_pixel_x + target_size, target_pixel_y + target_size],
+                        fill=self.colors['navigation_target'], outline='#000000', width=2)
+
+            # 在目标点下方显示坐标（使用深色文字便于阅读）
+            text_x = target_pixel_x - 30  # 向左偏移一些，让文字居中
+            text_y = target_pixel_y + 12  # 放在标点下方
+            draw.text((text_x, text_y), f"目标({target_x},{target_y})",
+                     fill='#000000', font=self.fonts['small'])
+
+    def _draw_dashed_line(self, draw: ImageDraw.Draw, x1: int, y1: int, x2: int, y2: int,
+                         color: str, width: int = 1, dash_length: int = 10):
+        """绘制虚线"""
+        import math
+
+        # 计算线段长度和方向
+        dx = x2 - x1
+        dy = y2 - y1
+        distance = math.sqrt(dx * dx + dy * dy)
+
+        if distance == 0:
+            return
+
+        # 单位向量
+        unit_x = dx / distance
+        unit_y = dy / distance
+
+        # 绘制虚线段
+        current_distance = 0
+        is_dash = True
+
+        while current_distance < distance:
+            # 计算当前段的起点
+            start_x = x1 + unit_x * current_distance
+            start_y = y1 + unit_y * current_distance
+
+            # 计算当前段的长度
+            remaining = distance - current_distance
+            segment_length = min(dash_length, remaining)
+
+            # 计算当前段的终点
+            end_x = start_x + unit_x * segment_length
+            end_y = start_y + unit_y * segment_length
+
+            # 如果是实线段，则绘制
+            if is_dash:
+                draw.line([int(start_x), int(start_y), int(end_x), int(end_y)],
+                         fill=color, width=width)
+
+            # 切换到下一段
+            current_distance += segment_length
+            is_dash = not is_dash
+
     def _draw_legend(self, draw: ImageDraw.Draw):
         """绘制图例"""
         legend_x = 20
         legend_y = 20
         legend_width = 200
-        legend_height = 120
+        legend_height = 160  # 增加高度以容纳导航项目
 
         # 绘制图例背景
         draw.rectangle([legend_x, legend_y, legend_x + legend_width, legend_y + legend_height],
@@ -256,6 +343,8 @@ class MapVisualizer:
                 ("🟠 市集交易", self.colors['market']),
                 ("🟣 打工地点", self.colors['job']),
                 ("🟡 特殊地点", self.colors['special']),
+                ("🟢 导航路线", self.colors['navigation_line']),
+                ("🟨 导航目标", self.colors['navigation_target']),
             ]
         else:
             legend_items = [
@@ -263,6 +352,8 @@ class MapVisualizer:
                 ("● Markets", self.colors['market']),
                 ("● Jobs", self.colors['job']),
                 ("● Special", self.colors['special']),
+                ("● Navigation", self.colors['navigation_line']),
+                ("● Target", self.colors['navigation_target']),
             ]
 
         for i, (text, color) in enumerate(legend_items):
@@ -318,29 +409,39 @@ class MapVisualizer:
         # 绘制所有玩家，当前玩家会显示为粗红点，其他玩家显示为小红点
         self._draw_players(draw, players, current_player_id)
 
-        # 如果指定了当前玩家，额外绘制高亮效果和昵称
+        # 如果指定了当前玩家，检查是否有导航任务并绘制导航连线
+        current_player = None
+        nav_task = None
         if current_player_id:
-            current_player = None
+            # 查询当前玩家的导航任务
+            nav_task = await session.get(NavigationTask, current_player_id)
+
+            # 找到当前玩家对象
             for player in players:
                 if player.id == current_player_id:
                     current_player = player
                     break
 
-            if current_player:
-                # 使用正确的当前坐标
-                player_x, player_y = current_player.get_current_coordinates()
-                pixel_x, pixel_y = self._game_to_pixel(player_x, player_y)
-                if 0 <= pixel_x <= self.map_width and 0 <= pixel_y <= self.map_height:
-                    # 绘制高亮圆圈（只有边框，不填充）
-                    highlight_size = 10
-                    draw.ellipse([pixel_x - highlight_size, pixel_y - highlight_size,
-                                 pixel_x + highlight_size, pixel_y + highlight_size],
-                                outline='#FFFF00', width=2)
-                    # 绘制玩家昵称
-                    text_x = pixel_x + 8
-                    text_y = pixel_y - 8
-                    draw.text((text_x, text_y), f"{current_player.nickname}(你)",
-                             fill=self.colors['player'], font=self.fonts['medium'])
+            # 如果有导航任务，绘制导航连线
+            if nav_task and current_player:
+                self._draw_navigation_line(draw, current_player, nav_task)
+
+        # 如果指定了当前玩家，额外绘制高亮效果和昵称
+        if current_player_id and current_player:
+            # 使用正确的当前坐标
+            player_x, player_y = current_player.get_current_coordinates()
+            pixel_x, pixel_y = self._game_to_pixel(player_x, player_y)
+            if 0 <= pixel_x <= self.map_width and 0 <= pixel_y <= self.map_height:
+                # 绘制高亮圆圈（只有边框，不填充）
+                highlight_size = 10
+                draw.ellipse([pixel_x - highlight_size, pixel_y - highlight_size,
+                             pixel_x + highlight_size, pixel_y + highlight_size],
+                            outline='#FFFF00', width=2)
+                # 绘制玩家昵称（放在标点下方）
+                text_x = pixel_x - 20  # 向左偏移一些，让文字居中
+                text_y = pixel_y + 12  # 放在标点下方
+                draw.text((text_x, text_y), f"{current_player.nickname}(你)",
+                         fill=self.colors['player'], font=self.fonts['medium'])
         
         # 绘制图例
         self._draw_legend(draw)
