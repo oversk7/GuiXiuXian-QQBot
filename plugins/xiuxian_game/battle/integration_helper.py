@@ -686,7 +686,8 @@ class BattleIntegrationHelper:
             f"⚡ 闪避率: {attrs['dodge_rate']:.1f}%",
             f"🎯 命中率: {attrs['accuracy_rate']:.1f}%",
             f"✨ 灵爆率: {attrs['skill_crit_rate']:.1f}%",
-            f"🗡️ 穿透率: {attrs['penetration_rate']:.1f}%"
+            f"🗡️ 穿透率: {attrs['penetration_rate']:.1f}%",
+            f"🛡️ 抗暴率: {attrs['anti_crit_rate']:.1f}%"
         ]
         
         return "\n".join(lines)

@@ -651,7 +651,13 @@ HEADQUARTERS_ITEMS = {
     "stabilizer_crystal": 10000,      # 稳定水晶
     "gem_hammer": 300,               # 镶嵌锤
     "gem_chisel": 300,               # 拆卸凿
-    "accuracy_bead_1": 500
+    "accuracy_bead_1": 500,          # 一级命中佛珠
+    # 抗暴符文系列
+    "anti_crit_rune_1": 600,         # 一级抗暴符文
+    "anti_crit_rune_2": 1200,        # 二级抗暴符文
+    "anti_crit_rune_3": 2400,        # 三级抗暴符文
+    "anti_crit_rune_4": 4800,        # 四级抗暴符文
+    "anti_crit_rune_5": 9600         # 五级抗暴符文
 }
 
 # 缉邪司总部商店指令
@@ -693,10 +699,46 @@ async def _(event: MessageEvent):
             "📦 装备升阶专用物品："
         ]
 
-        for item_id, points_cost in HEADQUARTERS_ITEMS.items():
-            item_cfg = config.items_config["by_id"].get(item_id)
-            if item_cfg:
-                lines.append(f"• {item_cfg.name} - {points_cost}✨积分")
+        # 分类显示商品
+        upgrade_items = ["upgrade_stone_low", "upgrade_stone_mid", "stabilizer_crystal"]
+        tool_items = ["gem_hammer", "gem_chisel"]
+        gem_items = ["accuracy_bead_1"]
+        anti_crit_items = ["anti_crit_rune_1", "anti_crit_rune_2", "anti_crit_rune_3",
+                          "anti_crit_rune_4", "anti_crit_rune_5"]
+
+        # 升阶材料
+        for item_id in upgrade_items:
+            if item_id in HEADQUARTERS_ITEMS:
+                item_cfg = config.items_config["by_id"].get(item_id)
+                if item_cfg:
+                    lines.append(f"• {item_cfg.name} - {HEADQUARTERS_ITEMS[item_id]}✨积分")
+
+        lines.append("")
+        lines.append("🔨 镶嵌工具：")
+
+        # 镶嵌工具
+        for item_id in tool_items:
+            if item_id in HEADQUARTERS_ITEMS:
+                item_cfg = config.items_config["by_id"].get(item_id)
+                if item_cfg:
+                    lines.append(f"• {item_cfg.name} - {HEADQUARTERS_ITEMS[item_id]}✨积分")
+
+        lines.append("")
+        lines.append("💎 镶嵌物品：")
+
+        # 普通镶嵌物
+        for item_id in gem_items:
+            if item_id in HEADQUARTERS_ITEMS:
+                item_cfg = config.items_config["by_id"].get(item_id)
+                if item_cfg:
+                    lines.append(f"• {item_cfg.name} - {HEADQUARTERS_ITEMS[item_id]}✨积分")
+
+        # 抗暴符文
+        for item_id in anti_crit_items:
+            if item_id in HEADQUARTERS_ITEMS:
+                item_cfg = config.items_config["by_id"].get(item_id)
+                if item_cfg:
+                    lines.append(f"• {item_cfg.name} - {HEADQUARTERS_ITEMS[item_id]}✨积分")
 
         lines.extend([
             "━━━━━━━━━━━━━",

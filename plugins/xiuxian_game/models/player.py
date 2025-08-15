@@ -192,7 +192,8 @@ class Player(Base):
             "dodge_rate": self.dodge_rate,
             "accuracy_rate": self.accuracy_rate,
             "skill_crit_rate": self.skill_crit_rate,
-            "penetration_rate": self.penetration_rate
+            "penetration_rate": self.penetration_rate,
+            "anti_crit_rate": self.anti_crit_rate
         }
 
         # TODO: 后续添加装备加成计算
@@ -212,7 +213,8 @@ class Player(Base):
             "dodge_rate": 85,
             "accuracy_rate": 95,
             "skill_crit_rate": 70,
-            "penetration_rate": 70
+            "penetration_rate": 70,
+            "anti_crit_rate": 80
         }
         return caps.get(attr_name, 100)
 
@@ -232,7 +234,8 @@ class Player(Base):
             f"⚡ 闪避率: {attrs['dodge_rate']}%",
             f"🎯 命中率: {attrs['accuracy_rate']}%",
             f"✨ 灵爆率: {attrs['skill_crit_rate']}%",
-            f"🗡️ 穿透率: {attrs['penetration_rate']}%"
+            f"🗡️ 穿透率: {attrs['penetration_rate']}%",
+            f"🛡️ 抗暴率: {attrs['anti_crit_rate']}%"
         ]
 
         return "\n".join(lines)

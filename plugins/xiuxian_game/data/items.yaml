@@ -1796,3 +1796,84 @@ items:
       rarity: "purple"
       price: 300000
       attr_bonus: {"skill_crit_rate": 10}
+
+    # ========== 抗暴符文系列（1-10级）==========
+    - item_id: "anti_crit_rune_1"
+      name: "抗暴符文"
+      description: "蕴含微弱防护之力的银色符文，镶嵌后增加2%抗暴率 🛡️"
+      type: "GEM"
+      rarity: "white"
+      price: 20000
+      attr_bonus: {"anti_crit_rate": 2}
+
+    - item_id: "anti_crit_rune_2"
+      name: "二级抗暴符文"
+      description: "蕴含微弱防护之力的银色符文，镶嵌后增加3%抗暴率 🛡️"
+      type: "GEM"
+      rarity: "white"
+      price: 40000
+      attr_bonus: {"anti_crit_rate": 3}
+
+    - item_id: "anti_crit_rune_3"
+      name: "三级抗暴符文"
+      description: "蕴含微弱防护之力的银色符文，镶嵌后增加4%抗暴率 🛡️"
+      type: "GEM"
+      rarity: "white"
+      price: 60000
+      attr_bonus: {"anti_crit_rate": 4}
+
+    - item_id: "anti_crit_rune_4"
+      name: "四级抗暴符文"
+      description: "蕴含一般防护之力的银色符文，镶嵌后增加5%抗暴率 🛡️"
+      type: "GEM"
+      rarity: "green"
+      price: 80000
+      attr_bonus: {"anti_crit_rate": 5}
+
+    - item_id: "anti_crit_rune_5"
+      name: "五级抗暴符文"
+      description: "蕴含一般防护之力的银色符文，镶嵌后增加6%抗暴率 🛡️"
+      type: "GEM"
+      rarity: "green"
+      price: 100000
+      attr_bonus: {"anti_crit_rate": 6}
+
+    - item_id: "anti_crit_rune_6"
+      name: "六级抗暴符文"
+      description: "蕴含一般防护之力的银色符文，镶嵌后增加7%抗暴率 🛡️"
+      type: "GEM"
+      rarity: "green"
+      price: 120000
+      attr_bonus: {"anti_crit_rate": 7}
+
+    - item_id: "anti_crit_rune_7"
+      name: "七级抗暴符文"
+      description: "蕴含强大防护之力的银色符文，镶嵌后增加8%抗暴率 🛡️"
+      type: "GEM"
+      rarity: "blue"
+      price: 140000
+      attr_bonus: {"anti_crit_rate": 8}
+
+    - item_id: "anti_crit_rune_8"
+      name: "八级抗暴符文"
+      description: "蕴含强大防护之力的银色符文，镶嵌后增加9%抗暴率 🛡️"
+      type: "GEM"
+      rarity: "blue"
+      price: 180000
+      attr_bonus: {"anti_crit_rate": 9}
+
+    - item_id: "anti_crit_rune_9"
+      name: "九级抗暴符文"
+      description: "蕴含强大防护之力的银色符文，镶嵌后增加10%抗暴率 🛡️"
+      type: "GEM"
+      rarity: "blue"
+      price: 240000
+      attr_bonus: {"anti_crit_rate": 10}
+
+    - item_id: "anti_crit_rune_10"
+      name: "十级抗暴符文"
+      description: "蕴含极致防护之力的银色符文，镶嵌后增加12%抗暴率 🛡️"
+      type: "GEM"
+      rarity: "purple"
+      price: 300000
+      attr_bonus: {"anti_crit_rate": 12}

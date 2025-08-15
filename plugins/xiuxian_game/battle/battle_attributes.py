@@ -14,13 +14,14 @@ class BattleAttributeCalculator:
     
     # 属性上限配置
     ATTRIBUTE_CAPS = {
-        "critical_rate": 100,      # 暴击率
+        "critical_rate": 95,      # 暴击率
         "combo_rate": 60,         # 连击率上限60%
         "counter_rate": 80,       # 反击率上限80%
         "dodge_rate": 500,         # 闪避率
         "accuracy_rate": 500,     # 命中率能和闪避率抵消，所以可以超过100
         "skill_crit_rate": 70,    # 灵爆率上限70%
-        "penetration_rate": 100    # 穿透率
+        "penetration_rate": 100,   # 穿透率
+        "anti_crit_rate": 95     # 抗暴率上限
     }
     
     # 等级加成配置（移除等级加成，改为装备驱动）
@@ -264,9 +265,13 @@ class BattleEffectProcessor:
             result["is_penetration"] = True
             result["penetration_ratio"] = penetration_ratio
         
-        # 3. 暴击判定
+        # 3. 暴击判定（考虑防御方抗暴率）
         crit_rate = attacker_attrs["skill_crit_rate"] if is_skill else attacker_attrs["critical_rate"]
-        is_critical = BattleAttributeCalculator.roll_critical_hit(crit_rate, rng)
+        defender_anti_crit_rate = defender_attrs["anti_crit_rate"]
+
+        # 计算实际暴击率（攻击方暴击率 - 防御方抗暴率）
+        effective_crit_rate = max(0, crit_rate - defender_anti_crit_rate)
+        is_critical = BattleAttributeCalculator.roll_critical_hit(effective_crit_rate, rng)
         result["is_critical"] = is_critical
         
         # 4. 连击判定（仅普攻）
