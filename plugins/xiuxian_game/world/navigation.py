@@ -217,9 +217,9 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
         # 如果在诡域中，显示当前诡域位置
         if player.is_in_dungeon():
             dungeon_x, dungeon_y = player.get_current_coordinates()
-            nav_msg += f"� 当前位置 {player.get_current_region()} ({dungeon_x},{dungeon_y})\n"
+            nav_msg += f"🌏 当前位置 {player.get_current_region()} ({dungeon_x},{dungeon_y})\n"
 
-        nav_msg += f"�🕒 速度 {speed_now:.2f} 格/秒  预计耗时 {str(eta_td)}\n"
+        nav_msg += f"🕒 速度 {speed_now:.2f} 格/秒  预计耗时 {str(eta_td)}\n"
         nav_msg += "━━━━━━━━━━━━━\n⬇️ 【中断导航】停止前进"
 
         await nav_cmd.finish(message_add_head(nav_msg, event))
