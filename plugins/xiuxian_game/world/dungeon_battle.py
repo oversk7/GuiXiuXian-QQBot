@@ -1163,7 +1163,7 @@ region_overview_cmd = on_command("俯瞰", aliases={"感知"}, block=True, prior
 
 
 async def generate_player_centered_overview_image(region: str, session, center_x: int, center_y: int, width: int, height: int, player_x: int = None, player_y: int = None) -> tuple[bytes, tuple[int, int, int, int]]:
-    """生成以玩家为中心的固定大小俯瞰图片"""
+    """生成以玩家为中心的固定大小俯瞰图片，只显示今日刷新的格子"""
     # 计算坐标范围
     half_width = width // 2
     half_height = height // 2
@@ -1172,8 +1172,13 @@ async def generate_player_centered_overview_image(region: str, session, center_x
     min_y = center_y - half_height
     max_y = center_y + half_height
 
-    # 获取该区域内的所有格子数据
+    # 获取该区域内今日刷新的格子数据
     from sqlalchemy import and_
+    today = date.today()
+
+    # 计算今日的开始和结束时间
+    today_start = datetime.combine(today, datetime.min.time())
+    tomorrow_start = today_start + timedelta(days=1)
 
     stmt = select(WorldTile).where(
         and_(
@@ -1181,7 +1186,9 @@ async def generate_player_centered_overview_image(region: str, session, center_x
             WorldTile.x >= min_x,
             WorldTile.x <= max_x,
             WorldTile.y >= min_y,
-            WorldTile.y <= max_y
+            WorldTile.y <= max_y,
+            WorldTile.refreshed_at >= today_start,
+            WorldTile.refreshed_at < tomorrow_start
         )
     )
     result = await session.execute(stmt)
@@ -1376,33 +1383,17 @@ async def generate_region_overview_image(region: str, session, player_x: int = N
     # 过滤掉x或y绝对值大于600的格子，避免图片上格子太小
     today_tiles = [tile for tile in today_tiles if abs(tile.x) <= 500 and abs(tile.y) <= 500]
 
-    # 如果今天没有格子数据，查询历史格子数据作为参考来确定地图范围
+    # 如果今天没有格子数据，使用玩家位置作为中心生成小范围
     if not today_tiles:
-        # 查询该区域的所有历史格子
-        stmt_all = select(WorldTile).where(WorldTile.region == region)
-        result_all = await session.execute(stmt_all)
-        all_tiles = result_all.scalars().all()
+        # 使用玩家位置作为中心生成小范围
+        center_x, center_y = 0, 0  # 默认中心点
+        if player_x is not None and player_y is not None:
+            center_x, center_y = player_x, player_y
 
-        # 同样过滤历史格子数据
-        all_tiles = [tile for tile in all_tiles if abs(tile.x) <= 500 and abs(tile.y) <= 500]
-
-        if all_tiles:
-            # 使用历史格子数据进行显示
-            min_x = min(tile.x for tile in all_tiles)
-            max_x = max(tile.x for tile in all_tiles)
-            min_y = min(tile.y for tile in all_tiles)
-            max_y = max(tile.y for tile in all_tiles)
-            tiles = all_tiles  # 使用历史格子数据进行显示
-        else:
-            # 如果完全没有历史数据，使用玩家位置作为中心生成小范围
-            center_x, center_y = 0, 0  # 默认中心点
-            if player_x is not None and player_y is not None:
-                center_x, center_y = player_x, player_y
-
-            # 设置一个小范围的坐标
-            min_x, max_x = center_x - 2, center_x + 2
-            min_y, max_y = center_y - 2, center_y + 2
-            tiles = []  # 空列表，所有格子都显示为未探索
+        # 设置一个小范围的坐标
+        min_x, max_x = center_x - 2, center_x + 2
+        min_y, max_y = center_y - 2, center_y + 2
+        tiles = []  # 空列表，所有格子都显示为未探索
     else:
         tiles = today_tiles
         # 计算坐标范围
@@ -1627,7 +1618,7 @@ async def handle_region_overview(event: MessageEvent, args: Message = CommandArg
                     img_data, (min_x, max_x, min_y, max_y) = await generate_player_centered_overview_image(
                         current_region, session, 0, 0, 11, 11, current_x, current_y  # 以(0,0)为中心的11x11地图，但显示玩家在(current_x,current_y)的位置
                     )
-                    map_desc = f"🗺️ {current_region} 完整地图"
+                    map_desc = f"🗺️ {current_region} 今日探索情况"
                     coord_desc = f"📍 你的位置：({current_x},{current_y})"
                     range_desc = f"📍 诡域范围：(-5,-5) 到 (5,5)"
                 else:
@@ -1657,7 +1648,6 @@ async def handle_region_overview(event: MessageEvent, args: Message = CommandArg
                     "🟠 橙色：精英怪格子",
                     "⬛ 灰色：未探索区域",
                     f"🟡 亮黄圆圈：你的位置 ({current_x},{current_y})",
-                    "🔢 图片边缘显示坐标数字"
                 ]
 
                 msg_text = "\n".join(msg_lines)
@@ -1741,6 +1731,7 @@ async def handle_region_overview(event: MessageEvent, args: Message = CommandArg
 
                 msg_lines.extend([
                     "━━━━━━━━━━━━━",
+                    "⏰ 只显示今日刷新的格子",
                     "🟢 绿色：材料格子",
                     "🟡 金色：宝藏格子",
                     "🔴 红色：诡异格子",
