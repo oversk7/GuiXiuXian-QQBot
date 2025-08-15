@@ -233,8 +233,25 @@ async def _sweep_dungeon(player: Player, cfg: ItemConfig, qty: int, ctx: str, se
     if player.stamina < qty:
         return False, f"⛔ 咒抗不足，需要 {qty} 点咒抗"
 
-    # 获取当前诡域配置
-    region_config = config.map_config["regions"].get(player.region)
+    # 获取当前诡域配置（支持无限层诡域）
+    region_config = None
+    if "层诡域" in player.region:
+        # 新的层级制诡域
+        try:
+            level = int(player.region.replace("层诡域", ""))
+            # 优先从预生成配置获取，如果不存在则动态生成（支持无限层）
+            region_config = config.map_config.get("dungeon_levels", {}).get(level)
+            if not region_config:
+                # 动态生成超过100层的配置
+                region_config = config._generate_dungeon_level_config(
+                    level, config.map_config.get("dungeon_generation_rules", {})
+                )
+        except ValueError:
+            return False, "⛔ 诡域层级格式错误，无法扫荡"
+    else:
+        # 兼容旧的命名诡域
+        region_config = config.map_config["regions"].get(player.region)
+
     if not region_config:
         return False, "⛔ 未知的诡域，无法扫荡"
 
