@@ -1714,7 +1714,7 @@ async def handle_region_overview(event: MessageEvent, args: Message = CommandArg
                 # 构建说明文字
                 if region.endswith("层诡域"):
                     msg_lines = [
-                        f"🗺️ {region} 完整地图",
+                        f"🗺️ {region} 今日探索小地图",
                         "━━━━━━━━━━━━━",
                         f"📊 诡域等级：Tier {tier}",
                         f"⚔️ 诡异等级：{level_range[0]}-{level_range[1]}级",
@@ -1731,7 +1731,6 @@ async def handle_region_overview(event: MessageEvent, args: Message = CommandArg
 
                 msg_lines.extend([
                     "━━━━━━━━━━━━━",
-                    "⏰ 只显示今日刷新的格子",
                     "🟢 绿色：材料格子",
                     "🟡 金色：宝藏格子",
                     "🔴 红色：诡异格子",
