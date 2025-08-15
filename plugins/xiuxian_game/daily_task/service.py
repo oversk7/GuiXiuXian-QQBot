@@ -20,10 +20,13 @@ class DailyTaskService:
     # 用于避免频繁清理的缓存
     _last_cleanup_date = None
     
+    # 真人名字池，增加代入感
     GHOST_NAMES = [
-        "太上仙翁", "太极真仙", "玄妙道长", "无相道君", "太虚真人",
-        "笔佡", "纸人道长", "梦游仙师", "黑斑真人", "虚影道君", "道仙",
-        "石像仙翁", "星光仙师", "血肉道君", "尸斑仙翁"
+        "张伟", "王芳", "李娜", "刘强", "陈静", "杨明", "赵丽", "黄勇", "周敏", "吴华",
+        "徐丽", "朱军", "林峰", "何静", "郭强", "马丽", "孙勇", "罗敏", "高峰", "梁静",
+        "宋伟", "唐丽", "许强", "韩敏", "冯勇", "曹静", "彭峰", "董丽", "袁强", "蒋敏",
+        "贾勇", "夏静", "邹峰", "施丽", "陆强", "孔敏", "崔勇", "史静", "龚峰", "邵丽",
+        "段强", "雷敏", "黎勇", "薛静", "常峰", "武丽", "乔强", "钟敏", "谭勇", "戴静"
     ]
 
     CITY_NAMES = [
@@ -39,10 +42,20 @@ class DailyTaskService:
         # 被动清理过期任务
         await DailyTaskService.check_and_cleanup_expired_tasks(session)
 
-        # 检查今日是否已有任务
-        existing_task = await DailyTaskService.get_player_daily_task(session, player.id, today)
-        if existing_task:
-            return existing_task
+        # 检查今日可用任务数量（每天最多3个委托）
+        existing_tasks = await DailyTaskService.get_player_daily_tasks(session, player.id, today)
+        if len(existing_tasks) >= 3:
+            # 返回第一个可用的任务
+            for task in existing_tasks:
+                if task.is_available() or task.is_accepted():
+                    return task
+            # 如果都完成了，返回最后一个
+            return existing_tasks[-1] if existing_tasks else None
+
+        # 如果有未完成的任务，优先返回
+        for task in existing_tasks:
+            if task.is_available() or task.is_accepted():
+                return task
         
         # 生成随机坐标（在大都会范围内）
         target_x = random.randint(-200, 200)
@@ -67,7 +80,7 @@ class DailyTaskService:
         # 计算奖励
         rewards = DailyTaskService._calculate_rewards(player.level, enemy_level, selected_task_type)
 
-        # 根据任务类型生成不同的标题和敌人名称
+        # 根据任务类型生成不同的标题和敌人名称（简化鬼怪名字）
         task_title, enemy_name = DailyTaskService._generate_task_title_and_enemy(
             selected_task_type, city_name, ghost_name
         )
@@ -95,9 +108,74 @@ class DailyTaskService:
 
         session.add(task)
 
-        # 创建鬼怪NPC到目标地点
-        await DailyTaskService.create_ghost_npc_for_task(session, task)
+        # 不在生成任务时创建NPC，而是在接取任务时创建
 
+        return task
+
+    @staticmethod
+    async def force_generate_new_task(session: AsyncSession, player: Player) -> Optional[DailyTask]:
+        """强制生成新的每日任务（用于刷新委托）"""
+        today = date.today()
+
+        # 被动清理过期任务
+        await DailyTaskService.check_and_cleanup_expired_tasks(session)
+
+        # 检查今日任务数量
+        existing_tasks = await DailyTaskService.get_player_daily_tasks(session, player.id, today)
+        if len(existing_tasks) >= 3:
+            return None  # 已达上限
+
+        # 生成新任务的逻辑（与原generate_daily_task相同，但跳过检查）
+        # 生成随机坐标（在大都会范围内）
+        target_x = random.randint(-200, 200)
+        target_y = random.randint(-200, 200)
+
+        # 随机选择城市和鬼怪名称
+        city_name = random.choice(DailyTaskService.CITY_NAMES)
+        ghost_name = random.choice(DailyTaskService.GHOST_NAMES)
+
+        # 随机选择任务类型
+        task_types = list(TaskType)
+        selected_task_type = random.choice(task_types)
+
+        # 根据任务类型生成对应的任务描述
+        task_descriptions = DailyTaskService._get_task_descriptions_by_type(selected_task_type, city_name, ghost_name)
+        description = random.choice(task_descriptions)
+
+        # 根据玩家等级和总战力计算敌人属性
+        enemy_level = max(1, player.level + random.randint(-5, 5))
+        enemy_stats = DailyTaskService._calculate_enemy_stats(enemy_level, player)
+
+        # 计算奖励
+        rewards = DailyTaskService._calculate_rewards(player.level, enemy_level, selected_task_type)
+
+        # 根据任务类型生成不同的标题和敌人名称（简化鬼怪名字）
+        task_title, enemy_name = DailyTaskService._generate_task_title_and_enemy(
+            selected_task_type, city_name, ghost_name
+        )
+
+        # 创建任务
+        task = DailyTask(
+            player_id=player.id,
+            task_type=selected_task_type,
+            title=task_title,
+            description=description,
+            target_region="大都会",
+            target_x=target_x,
+            target_y=target_y,
+            enemy_name=enemy_name,
+            enemy_level=enemy_level,
+            enemy_hp=enemy_stats["hp"],
+            enemy_attack=enemy_stats["attack"],
+            enemy_defense=enemy_stats["defense"],
+            enemy_agility=enemy_stats["agility"],
+            exp_reward=rewards["exp"],
+            gold_reward=rewards["gold"],
+            guild_points_reward=rewards["guild_points"],
+            task_date=today
+        )
+
+        session.add(task)
         return task
 
     @staticmethod
@@ -105,47 +183,47 @@ class DailyTaskService:
         """根据任务类型获取对应的任务描述"""
         if task_type == TaskType.PEN_SPIRIT_CASE:
             return [
-                f"{city_name}城中近夜有诡异之事：居民夜半梦游，穿墙而过，手持黑笔，于空中书写。醒后皆不记所为，唯身生黑斑，日渐增多。疑为{ghost_name}作祟，以笔墨控人心神。恳请道友速赴{city_name}城，破此笔仙之术。",
-                f"闻{city_name}城中有{ghost_name}化身笔仙，夜入民宅，操控人心。被其蛊惑者皆夜半起身，手执黑笔，书写诡异文字，醒后身生梅花黑斑，痛痒难忍。此鬼善隐匿，难以察觉。望道友前往{city_name}城，寻此笔仙踪迹。",
-                f"{city_name}城内近日怪事频发：有人夜半梦游，身如纸片，可穿墙遁地。醒后皆言不知所为，唯手中握有黑笔一支。疑为{ghost_name}笔仙作祟，以梦境控人。恳请道友速往{city_name}城，破此梦游之术。"
+                f"{city_name}城中近夜有诡异之事：居民夜半梦游，穿墙而过，手持黑笔，于空中书写。醒后皆不记所为，唯身生黑斑，日渐增多。据调查，此事与死者{ghost_name}有关，其生前酷爱书法，死后化为笔仙作祟。恳请道友速赴{city_name}城，超度此鬼。",
+                f"闻{city_name}城中有死者{ghost_name}化身笔仙，夜入民宅，操控人心。被其蛊惑者皆夜半起身，手执黑笔，书写诡异文字，醒后身生梅花黑斑，痛痒难忍。此鬼善隐匿，难以察觉。望道友前往{city_name}城，寻此笔仙踪迹。",
+                f"{city_name}城内近日怪事频发：有人夜半梦游，身如纸片，可穿墙遁地。醒后皆言不知所为，唯手中握有黑笔一支。经查，死者{ghost_name}生前为书法家，死后不散，化为笔仙作祟。恳请道友速往{city_name}城，破此梦游之术。"
             ]
         elif task_type == TaskType.FAKE_IMMORTAL_CULT:
             return [
-                f"闻{city_name}城中有{ghost_name}设神坛，供奉石像，传授修炼之法。修者需以沸水灼身，以针刺骨，痛苦万分。然修者皆言此乃仙途必经，甘愿受苦。实则此鬼以痛苦为食，蛊惑人心。望道友前往{city_name}城，毁此邪坛。",
-                f"{city_name}城遭{ghost_name}蛊惑，城中设有神像，红光照耀，香火不断。修者需日夜跪拜，不得安眠。久之，修者皆成石像模样，僵硬不动，唯眼中有泪。此鬼以人为石，极为残忍。恳请道友速赴{city_name}城，救此石化之民。",
-                f"近闻{city_name}城中有{ghost_name}传授道仙经，声称可得长生。修者需承受非人折磨：沸水煮身、针刺入骨、悬梁练气。修者皆言此乃成仙正道，实为此鬼蛊惑。望道友前往{city_name}城，破此邪教。"
+                f"闻{city_name}城中有死者{ghost_name}化为邪修，设神坛蛊惑民众。其生前或为修炼者，死后不甘，化为邪灵传授邪法。修者需以沸水灼身，以针刺骨，痛苦万分。然修者皆言此乃仙途必经，甘愿受苦。实则此鬼以痛苦为食。望道友前往{city_name}城，毁此邪坛。",
+                f"{city_name}城遭死者{ghost_name}化成的邪修蛊惑，城中设有神像，红光照耀，香火不断。此鬼生前或为邪道中人，死后化为邪灵，继续传播邪法。修者需日夜跪拜，不得安眠。久之，修者皆成石像模样，僵硬不动，唯眼中有泪。恳请道友速赴{city_name}城，救此石化之民。",
+                f"近闻{city_name}城中有死者{ghost_name}化为邪修，传授邪道经文，声称可得长生。此鬼生前或为邪教徒，死后不散，继续传播邪法。修者需承受非人折磨：沸水煮身、针刺入骨、悬梁练气。修者皆言此乃成仙正道，实为此鬼蛊惑。望道友前往{city_name}城，破此邪教。"
             ]
         elif task_type == TaskType.SHAPE_SHIFTER_HUNT:
             return [
-                f"{city_name}城内近日怪事频发：有人入室而不开门，有人变脸而不自知，有人身生肉洞而自残不止。皆因{ghost_name}化身道长，传授邪法所致。此鬼能操控人形，变化无常，极为危险。恳请道友速往{city_name}城，除此变形之鬼。",
-                f"近日{city_name}城中监控尽失，天眼不明。有{ghost_name}化身修者，身如纸片，可穿墙遁地，来去无踪。城中居民夜不敢眠，恐遭此鬼侵扰。此鬼善隐匿，难以察觉，需高人出手。望道友前往{city_name}城，寻此隐形之鬼。",
-                f"{city_name}城中有{ghost_name}善变化，可化作任何人形，混入人群。被其附身者面容渐变，行为诡异，最终失去人性。此鬼极为狡猾，难以分辨真假。恳请道友速赴{city_name}城，识破此变形之鬼。"
+                f"{city_name}城内近日怪事频发：有人入室而不开门，有人变脸而不自知，有人身生肉洞而自残不止。皆因死者{ghost_name}化为变形怪作祟。此鬼生前或为术士，死后化为变形鬼，能操控人形，变化无常，极为危险。恳请道友速往{city_name}城，除此变形之鬼。",
+                f"近日{city_name}城中监控尽失，天眼不明。有死者{ghost_name}化为变形怪，身如纸片，可穿墙遁地，来去无踪。此鬼生前或精通变化之术，死后化为变形鬼，城中居民夜不敢眠，恐遭此鬼侵扰。此鬼善隐匿，难以察觉，需高人出手。望道友前往{city_name}城，寻此隐形之鬼。",
+                f"{city_name}城中有死者{ghost_name}化为变形怪，善变化，可化作任何人形，混入人群。此鬼生前或为江湖术士，死后不散，化为变形鬼。被其附身者面容渐变，行为诡异，最终失去人性。此鬼极为狡猾，难以分辨真假。恳请道友速赴{city_name}城，识破此变形之鬼。"
             ]
         elif task_type == TaskType.STONE_CURSE_BREAK:
             return [
-                f"{city_name}城遭{ghost_name}石化诅咒，城中居民渐成石像。初时仅行动迟缓，继而肌肤僵硬，最终化为顽石。唯眼中尚有泪水，可知其痛苦。此诅咒传播极快，需速破解。恳请道友前往{city_name}城，破此石化之咒。",
-                f"闻{city_name}城中有{ghost_name}设石像神坛，凡拜者皆渐化石。城中已有数百人成石像，立于街头，神情痛苦。此鬼以石化为乐，极为残忍。望道友速赴{city_name}城，毁此石像神坛。",
-                f"{city_name}城内近日异象：居民皆面色苍白，行动僵硬，如石像般。疑为{ghost_name}石化鬼作祟，以诅咒控人。被诅咒者渐失血肉，化为顽石，痛苦万分。恳请道友速往{city_name}城，解此石化之厄。"
+                f"{city_name}城遭死者{ghost_name}化成的石化怪诅咒，城中居民渐成石像。此鬼生前或为雕刻师，死后化为石化鬼，以石化诅咒害人。初时仅行动迟缓，继而肌肤僵硬，最终化为顽石。唯眼中尚有泪水，可知其痛苦。此诅咒传播极快，需速破解。恳请道友前往{city_name}城，破此石化之咒。",
+                f"闻{city_name}城中有死者{ghost_name}化为石化怪，设石像神坛，凡拜者皆渐化石。此鬼生前或精通石雕之术，死后化为石化鬼，以石化为乐。城中已有数百人成石像，立于街头，神情痛苦。此鬼极为残忍。望道友速赴{city_name}城，毁此石像神坛。",
+                f"{city_name}城内近日异象：居民皆面色苍白，行动僵硬，如石像般。疑为死者{ghost_name}化成的石化怪作祟，以诅咒控人。此鬼生前或为石匠，死后不散，化为石化鬼。被诅咒者渐失血肉，化为顽石，痛苦万分。恳请道友速往{city_name}城，解此石化之厄。"
             ]
         elif task_type == TaskType.TORTURE_CULT_RAID:
             return [
-                f"闻{city_name}城中有{ghost_name}传授锻体之法：以热水煮身，以苦胆入口，以悬梁练气。修者皆言此乃成仙正道，然观其状，皆面容扭曲，痛苦不堪。实为此鬼以折磨为乐，蛊惑众生。望道友前往{city_name}城，破此酷刑之术。",
-                f"{city_name}城中有{ghost_name}设酷刑道场，传授痛苦修炼法。修者需承受沸水灼身、针刺入骨、刀割血肉等酷刑。修者皆言痛苦乃成仙必经，甘愿受虐。实为此鬼以痛苦为食。恳请道友速赴{city_name}城，毁此酷刑道场。",
-                f"近日{city_name}城中异象频生：有人自残不止，有人痛苦哀嚎，有人身生肉洞。皆因{ghost_name}传授酷刑修炼法所致。此鬼善蛊惑人心，以折磨为乐。恳请道友速往{city_name}城，除此酷刑之鬼。"
+                f"闻{city_name}城中有死者{ghost_name}化为邪教徒，传授锻体之法：以热水煮身，以苦胆入口，以悬梁练气。此鬼生前或为邪教头目，死后化为邪灵，继续传播邪法。修者皆言此乃成仙正道，然观其状，皆面容扭曲，痛苦不堪。实为此鬼以折磨为乐，蛊惑众生。望道友前往{city_name}城，破此酷刑之术。",
+                f"{city_name}城中有死者{ghost_name}化为邪教徒，设酷刑道场，传授痛苦修炼法。此鬼生前或为酷刑师，死后不散，化为邪灵。修者需承受沸水灼身、针刺入骨、刀割血肉等酷刑。修者皆言痛苦乃成仙必经，甘愿受虐。实为此鬼以痛苦为食。恳请道友速赴{city_name}城，毁此酷刑道场。",
+                f"近日{city_name}城中异象频生：有人自残不止，有人痛苦哀嚎，有人身生肉洞。皆因死者{ghost_name}化为邪教徒，传授酷刑修炼法所致。此鬼生前或为虐待狂，死后化为邪灵，善蛊惑人心，以折磨为乐。恳请道友速往{city_name}城，除此酷刑之鬼。"
             ]
         else:
             # 默认的鬼怪消除任务描述
             return [
-            # 原有的道仙蛊惑类任务
-            f"近日{city_name}城中异象频生，{ghost_name}蛊惑民心，百姓皆言修仙得道，却不知所修非仙。城中老幼皆面露诡笑，双目无神，夜夜诵经不休。望道友速往{city_name}城，破此邪术，还百姓清明。",
+            # 真人名字的鬼怪作祟任务
+            f"近日{city_name}城中异象频生，死者{ghost_name}化为厉鬼，四处作祟害人。其生前或有冤屈，死后怨气不散，常于夜间出没，吓唬路人，甚至附身害命。此鬼戾气极重，已伤及无辜数人。恳请道友前往{city_name}城，超度此鬼。",
 
-            f"{city_name}城内邪气冲天，{ghost_name}传授邪法，民众争相修习。然所修之法实为鬼道，修者渐失人性，面容枯槁，行如游魂。城中已无活人气息，唯余阴森鬼气。恳请道友前往{city_name}城，斩断此邪缘。",
+            f"{city_name}城内阴气弥漫，死者{ghost_name}化为恶鬼，夜夜作祟。其生前或遭横死，死后不甘，化为厉鬼报复世人。凡遇此鬼者，轻则大病一场，重则性命不保。城中百姓人心惶惶，不敢夜出。望道友速赴{city_name}城，除此大害。",
 
-            f"闻{city_name}城中有{ghost_name}自称道仙，传授长生之术。城中百姓趋之若鹜，日夜修炼。然修者皆渐生异状：肌肤苍白如纸，双目深陷无光，言语颠倒，行为诡异。实乃鬼魅蛊惑，非真仙道。望道友速赴{city_name}城，除此伪仙。",
+            f"闻{city_name}城中有死者{ghost_name}化为恶鬼，专门害人性命。此鬼手段残忍，已有多人遇害。当地百姓避之不及，夜不敢出门。据传此鬼生前身份不明，死后怨气冲天，化为厉鬼作祟。望道友速赴{city_name}城，诛杀此鬼。",
 
-            f"{city_name}城遭{ghost_name}侵扰，此鬼化身道长，于城中设坛传法。百姓信以为真，皆来求道。然所传之法实为邪术，修者渐失血色，夜不能寐，日不思食，形如行尸。城中阴气弥漫，生机断绝。恳请道友前往{city_name}城，破此邪坛。",
+            f"{city_name}城遭死者{ghost_name}化成的厉鬼侵扰，此鬼生前或有深仇大恨，死后不散，化为恶鬼害人。城中已有数人被其害死，百姓惶恐不安。此鬼凶残异常，普通人根本无法对付。恳请道友前往{city_name}城，超度此恶鬼。",
 
-            f"近闻{city_name}城中出现奇人，自称得道高仙，能传不老之术。城中富商巨贾、平民百姓皆拜其为师。然修习月余，弟子们皆生怪病：白日昏睡，夜晚游荡，面无血色，目光呆滞。实为{ghost_name}作祟，以邪法控制人心。望道友速往{city_name}城，揭穿此鬼伪装。",
+            f"近闻{city_name}城中出现恶鬼{ghost_name}，此鬼生前身份成谜，死后化为厉鬼，专门寻仇报复。凡与其有过节者，皆遭其害。城中人人自危，不知何时会成为下一个受害者。实为{ghost_name}怨气太重，化鬼作祟。望道友速往{city_name}城，除此恶鬼。",
 
             f"{city_name}城中近日香火鼎盛，皆因有{ghost_name}化身仙师，传授修仙之法。城中男女老幼皆言得遇真仙，日夜修炼不辍。然观其修者，皆面色青白，双目无神，言语失常，行为怪异。此非修仙，实为鬼道蛊惑。恳请道友前往{city_name}城，破此迷障。",
 
@@ -167,20 +245,20 @@ class DailyTaskService:
     def _generate_task_title_and_enemy(task_type: TaskType, city_name: str, ghost_name: str) -> Tuple[str, str]:
         """根据任务类型生成任务标题和敌人名称"""
         if task_type == TaskType.GHOST_ELIMINATION:
-            return f"缉邪司委托：{city_name}城伪仙{ghost_name}蛊惑事件", f"伪仙·{ghost_name}"
+            return f"缉邪司委托：{city_name}城鬼怪{ghost_name}作祟事件", f"鬼怪·{ghost_name}"
         elif task_type == TaskType.PEN_SPIRIT_CASE:
             return f"缉邪司委托：{city_name}城笔仙{ghost_name}梦游案", f"笔仙·{ghost_name}"
         elif task_type == TaskType.FAKE_IMMORTAL_CULT:
-            return f"缉邪司委托：{city_name}城道仙{ghost_name}邪教案", f"道仙·{ghost_name}"
+            return f"缉邪司委托：{city_name}城邪修{ghost_name}蛊惑案", f"邪修·{ghost_name}"
         elif task_type == TaskType.SHAPE_SHIFTER_HUNT:
-            return f"缉邪司委托：{city_name}城变形鬼{ghost_name}追捕令", f"变形鬼·{ghost_name}"
+            return f"缉邪司委托：{city_name}城变形怪{ghost_name}追捕令", f"变形怪·{ghost_name}"
         elif task_type == TaskType.STONE_CURSE_BREAK:
-            return f"缉邪司委托：{city_name}城石化诅咒{ghost_name}破解案", f"石化鬼·{ghost_name}"
+            return f"缉邪司委托：{city_name}城石化怪{ghost_name}破解案", f"石化怪·{ghost_name}"
         elif task_type == TaskType.TORTURE_CULT_RAID:
-            return f"缉邪司委托：{city_name}城酷刑邪教{ghost_name}清剿令", f"酷刑鬼·{ghost_name}"
+            return f"缉邪司委托：{city_name}城邪教徒{ghost_name}清剿令", f"邪教徒·{ghost_name}"
         else:
             # 默认情况
-            return f"缉邪司委托：{city_name}城伪仙{ghost_name}蛊惑事件", f"伪仙·{ghost_name}"
+            return f"缉邪司委托：{city_name}城鬼怪{ghost_name}事件", f"鬼怪·{ghost_name}"
 
     @staticmethod
     def _calculate_guild_exp_reward(task_type: TaskType, enemy_level: int) -> int:
@@ -352,19 +430,35 @@ class DailyTaskService:
     
     @staticmethod
     async def get_player_daily_task(session: AsyncSession, player_id: str, task_date: date = None) -> Optional[DailyTask]:
-        """获取玩家指定日期的每日任务"""
+        """获取玩家指定日期的第一个每日任务"""
         if task_date is None:
             task_date = date.today()
-        
+
         result = await session.execute(
             select(DailyTask).where(
                 and_(
                     DailyTask.player_id == player_id,
                     DailyTask.task_date == task_date
                 )
-            )
+            ).order_by(DailyTask.id)
         )
         return result.scalars().first()
+
+    @staticmethod
+    async def get_player_daily_tasks(session: AsyncSession, player_id: str, task_date: date = None) -> List[DailyTask]:
+        """获取玩家指定日期的所有每日任务"""
+        if task_date is None:
+            task_date = date.today()
+
+        result = await session.execute(
+            select(DailyTask).where(
+                and_(
+                    DailyTask.player_id == player_id,
+                    DailyTask.task_date == task_date
+                )
+            ).order_by(DailyTask.id)
+        )
+        return result.scalars().all()
     
     @staticmethod
     async def accept_task(session: AsyncSession, task: DailyTask) -> Tuple[bool, str]:
@@ -375,34 +469,48 @@ class DailyTaskService:
         if not task.is_available():
             return False, "任务已被接取或已完成"
 
+        # 在指定位置生成鬼怪NPC
+        ghost_npc = await DailyTaskService.create_ghost_npc_for_task(session, task)
+        if not ghost_npc:
+            return False, "生成鬼怪NPC失败，请稍后重试"
+
         task.accept_task()
         session.add(task)
 
-        return True, f"✅ 成功接取任务：{task.title}"
+        return True, f"✅ 成功接取任务：{task.title}\n👻 {task.enemy_name}已在{task.location_str}出现！"
     
     @staticmethod
     async def complete_task(session: AsyncSession, player: Player, task: DailyTask) -> Tuple[bool, str, Dict]:
         """完成任务并发放奖励"""
         if not task.is_accepted():
             return False, "任务尚未接取或已完成", {}
-        
+
         # 检查玩家是否在任务目标位置
         if player.x != task.target_x or player.y != task.target_y:
             return False, f"请先前往任务目标位置：{task.location_str}", {}
-        
+
+        # 检查指定的鬼怪NPC是否已死亡
+        from ..world.npc_service import NPCService
+        ghost_npc = await NPCService.get_npc_by_id(session, f"ghost_task_{task.id}")
+        if not ghost_npc:
+            return False, "找不到任务目标鬼怪，任务可能已过期", {}
+
+        if not ghost_npc.is_dead():
+            return False, f"任务目标{task.enemy_name}仍然存活，请击杀后再来完成任务", {}
+
         # 发放奖励
         rewards_given = {}
-        
+
         # 经验奖励
         if task.exp_reward > 0:
             player.exp += task.exp_reward
             rewards_given["exp"] = task.exp_reward
-        
+
         # 金币奖励
         if task.gold_reward > 0:
             player.gold += task.gold_reward
             rewards_given["gold"] = task.gold_reward
-        
+
         # 积分奖励（无论是否有公会都给予）
         if task.guild_points_reward > 0:
             player.gold2 += task.guild_points_reward

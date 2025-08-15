@@ -12,6 +12,7 @@ from .service import DailyTaskService
 from ..battle.integration_helper import BattleIntegrationHelper
 import time
 import random
+from datetime import date
 
 
 # ==================== 查看每日任务 ====================
@@ -25,41 +26,48 @@ async def handle_daily_task(event: MessageEvent):
             await daily_task_cmd.finish("⛔ 请先创建角色")
         if player.level < 30:
             await daily_task_cmd.finish("⛔ 该功能仅对Lv.30以上角色开放")
-        # 获取或生成今日任务（会自动被动清理过期任务）
-        task = await DailyTaskService.generate_daily_task(session, player)
-        await session.commit()
-        
+        # 获取今日所有任务
+        today = date.today()
+        tasks = await DailyTaskService.get_player_daily_tasks(session, player.id, today)
+
+        # 如果没有任务，生成新任务
+        if not tasks:
+            task = await DailyTaskService.generate_daily_task(session, player)
+            tasks = [task] if task else []
+            await session.commit()
+
         # 获取任务汇总信息
         summary = await DailyTaskService.get_task_summary(session, player.id)
-        
+
         # 构建消息
         lines = ["🏛️ 大都会缉邪司 - 每日委托", "━━━━━━━━━━━━━"]
-        
-        # 今日任务信息
-        if task.is_available():
-            status_emoji = "📋"
-            status_text = "可接取"
-        elif task.is_accepted():
-            status_emoji = "⚔️"
-            status_text = "进行中"
-        elif task.is_completed():
-            status_emoji = "✅"
-            status_text = "已完成"
+
+        if not tasks:
+            lines.append("⚠️ 今日暂无委托任务")
         else:
-            status_emoji = "❌"
-            status_text = "已过期"
-        
-        lines.append(f"{status_emoji} 【{task.title}】")
-        lines.append(f"📍 目标位置：{task.location_str}")
-        lines.append(f"👹 目标敌人：{task.enemy_name} Lv.{task.enemy_level}")
-        lines.append(f"💰 任务奖励：{task.get_reward_summary(bool(player.guild_id))}")
-        lines.append(f"📊 任务状态：{status_text}")
-        lines.append("")
-        
-        # 任务描述
-        lines.append("📜 任务详情：")
-        lines.append(task.description)
-        lines.append("")
+            # 显示所有任务
+            for i, task in enumerate(tasks, 1):
+                if task.is_available():
+                    status_emoji = "📋"
+                    status_text = "可接取"
+                elif task.is_accepted():
+                    status_emoji = "⚔️"
+                    status_text = "进行中"
+                elif task.is_completed():
+                    status_emoji = "✅"
+                    status_text = "已完成"
+                else:
+                    status_emoji = "❌"
+                    status_text = "已过期"
+
+                lines.append(f"{status_emoji} 【委托{i}】{task.title}")
+                lines.append(f"📍 目标位置：{task.location_str}")
+                lines.append(f"👹 目标敌人：{task.enemy_name} Lv.{task.enemy_level}")
+                lines.append(f"💰 任务奖励：{task.get_reward_summary(bool(player.guild_id))}")
+                lines.append(f"📊 任务状态：{status_text}")
+                lines.append("")
+
+        lines.append("━━━━━━━━━━━━━")
         
         # 统计信息
         lines.append("📈 完成统计：")
@@ -68,12 +76,18 @@ async def handle_daily_task(event: MessageEvent):
         lines.append("")
         
         # 操作提示
-        if task.is_available():
-            lines.append("💡 使用【接取任务】接取今日委托")
-        elif task.is_accepted():
-            lines.append("💡 前往目标位置后使用【完成任务】")
-        elif task.is_completed():
-            lines.append("🎉 今日任务已完成，明日再来！")
+        available_count = sum(1 for task in tasks if task.is_available())
+        accepted_count = sum(1 for task in tasks if task.is_accepted())
+        completed_count = sum(1 for task in tasks if task.is_completed())
+
+        if available_count > 0:
+            lines.append(f"💡 使用【接取任务 <委托编号>】接取委托（如：接取任务 1）")
+        if accepted_count > 0:
+            lines.append("💡 前往目标位置，使用【观察】查看鬼怪，击杀后使用【完成任务】")
+        if completed_count == len(tasks) and len(tasks) >= 3:
+            lines.append("🎉 今日所有委托已完成，明日再来！")
+        elif len(tasks) < 3:
+            lines.append("💡 使用【刷新委托】获取更多委托任务")
         
         await daily_task_cmd.finish(message_add_head("\n".join(lines), event))
 
@@ -82,36 +96,59 @@ async def handle_daily_task(event: MessageEvent):
 accept_task_cmd = on_command("接取委托", aliases={"接取任务", "接收委托"}, block=True, priority=5)
 
 @accept_task_cmd.handle()
-async def handle_accept_task(event: MessageEvent):
+async def handle_accept_task(event: MessageEvent, args: Message = CommandArg()):
     async with safe_session() as session:
         player = await session.get(Player, event.get_user_id())
         if not player:
             await accept_task_cmd.finish("⛔ 请先创建角色")
-        
+
+        # 解析参数
+        args_text = args.extract_plain_text().strip()
+        task_index = 1  # 默认接取第一个任务
+
+        if args_text:
+            try:
+                task_index = int(args_text)
+                if task_index < 1 or task_index > 3:
+                    await accept_task_cmd.finish("⛔ 委托编号必须是1-3之间的数字")
+            except ValueError:
+                await accept_task_cmd.finish("⛔ 请输入正确的委托编号（1-3）")
+
         # 获取今日任务
-        task = await DailyTaskService.get_player_daily_task(session, player.id)
-        if not task:
-            # 生成新任务
-            task = await DailyTaskService.generate_daily_task(session, player)
-        
+        today = date.today()
+        tasks = await DailyTaskService.get_player_daily_tasks(session, player.id, today)
+
+        # 如果没有足够的任务，生成新任务
+        while len(tasks) < task_index:
+            new_task = await DailyTaskService.force_generate_new_task(session, player)
+            if new_task:
+                tasks.append(new_task)
+            else:
+                break
+
+        if len(tasks) < task_index:
+            await accept_task_cmd.finish(f"⛔ 委托{task_index}不存在")
+
+        task = tasks[task_index - 1]
+
         # 接取任务
         success, message = await DailyTaskService.accept_task(session, task)
-        
+
         if success:
             await session.commit()
             msg = (
                 f"🏛️ 缉邪司委托接取成功！\n"
                 f"━━━━━━━━━━━━━\n"
-                f"📋 任务：{task.title}\n"
+                f"📋 委托{task_index}：{task.title}\n"
                 f"📍 目标：{task.location_str}\n"
                 f"👹 敌人：{task.enemy_name} Lv.{task.enemy_level}\n"
                 f"💰 奖励：{task.get_reward_summary(bool(player.guild_id))}\n"
                 f"━━━━━━━━━━━━━\n"
-                f"💡 请前往目标位置，使用【完成任务】与敌人战斗"
+                f"💡 请前往目标位置，使用【观察】查看鬼怪，击杀后使用【完成任务】"
             )
         else:
             msg = f"⛔ {message}"
-        
+
         await accept_task_cmd.finish(message_add_head(msg, event))
 
 
@@ -126,102 +163,74 @@ async def handle_complete_task(event: MessageEvent):
             await complete_task_cmd.finish("⛔ 请先创建角色")
         
         # 获取今日已接取的任务
-        task = await DailyTaskService.get_player_daily_task(session, player.id)
-        if not task or not task.is_accepted():
+        today = date.today()
+        tasks = await DailyTaskService.get_player_daily_tasks(session, player.id, today)
+        accepted_tasks = [task for task in tasks if task.is_accepted()]
+
+        if not accepted_tasks:
             await complete_task_cmd.finish("⛔ 你没有已接取的任务")
-        
-        # 检查位置
-        if player.x != task.target_x or player.y != task.target_y:
+
+        # 检查当前位置是否有可完成的任务
+        current_x, current_y = player.x, player.y
+        completable_tasks = [
+            task for task in accepted_tasks
+            if task.target_x == current_x and task.target_y == current_y
+        ]
+
+        if not completable_tasks:
+            task_locations = [f"{task.location_str}" for task in accepted_tasks]
             await complete_task_cmd.finish(
-                f"⛔ 请先前往任务目标位置：{task.location_str}\n"
-                f"💡 当前位置：{player.region}({player.x},{player.y})"
+                f"⛔ 当前位置没有可完成的任务\n"
+                f"💡 请前往以下任务位置：\n" + "\n".join(task_locations)
             )
-        
-        # 开始战斗
-        await complete_task_cmd.send(message_add_head(
-            f"⚔️ 遭遇{task.enemy_name}！\n"
-            f"👹 敌人等级：Lv.{task.enemy_level}\n"
-            f"🩸 敌人血量：{task.enemy_hp}\n"
-            f"⚡ 战斗开始！", event
-        ))
-        
-        # 使用战斗系统
-        battle_timestamp = int(time.time() * 1000)
-        seed = f"DailyTask_{task.id}:{player.id}:{battle_timestamp}"
-        
-        victory, battle_log, damage_taken = BattleIntegrationHelper.enhanced_player_vs_monster_battle(
-            player, task.enemy_stats, task.enemy_name, seed=seed, max_rounds=50
-        )
-        
-        # 更新玩家血量
-        player.hp = max(0, player.hp - damage_taken)
-        
-        if victory:
-            # 战斗胜利，完成任务
-            success, message, rewards = await DailyTaskService.complete_task(session, player, task)
 
-            if success:
-                # 更新委托完成统计（用于公会任务）
-                if player.guild_id:
-                    from ..guild.guild_task_service import GuildTaskService
-                    await GuildTaskService.update_commission_stats(session, player.id)
+        # 选择第一个可完成的任务
+        task = completable_tasks[0]
+        
+        # 位置检查已在上面完成
+        
+        # 完成任务（检测NPC是否死亡）
+        success, message, rewards = await DailyTaskService.complete_task(session, player, task)
 
-                await session.commit()
-                
-                # 构建胜利消息
-                battle_summary = "\n".join(battle_log)
-                reward_lines = []
-                if "exp" in rewards:
-                    reward_lines.append(f"经验+{rewards['exp']}")
-                if "gold" in rewards:
-                    reward_lines.append(f"金币+{rewards['gold']}")
-                if "guild_points" in rewards:
-                    reward_lines.append(f"积分+{rewards['guild_points']}")
-                if "guild_exp" in rewards:
-                    reward_lines.append(f"公会经验+{rewards['guild_exp']}")
-                
-                reward_text = " ".join(reward_lines) if reward_lines else "无奖励"
-                
-                # 生成诡异的胜利描述
-                victory_descriptions = [
-                    f"伪仙面具破碎，露出狰狞鬼面，发出凄厉惨叫后化为青烟散去。城中被蛊惑的百姓渐渐清醒，双目重现神采。",
-                    f"邪法破除，{task.enemy_name}现出原形，乃一厉鬼也！随着鬼物消散，城中阴气尽散，百姓从噩梦中苏醒。",
-                    f"伪仙道袍化为灰烬，鬼魅真身暴露无遗。随着此鬼伏诛，城中被控制的民众纷纷倒地，片刻后醒来，已不记邪法之事。",
-                    f"道坛崩塌，邪符自燃，{task.enemy_name}发出不甘怒吼后魂飞魄散。城中恢复生机，百姓重获自由意志。"
-                ]
-                victory_desc = random.choice(victory_descriptions)
+        if success:
+            # 更新委托完成统计（用于公会任务）
+            if player.guild_id:
+                from ..guild.guild_task_service import GuildTaskService
+                await GuildTaskService.update_commission_stats(session, player.id)
 
-                msg = (
-                    f"{battle_summary}\n"
-                    f"━━━━━━━━━━━━━\n"
-                    f"🎉 任务完成！\n"
-                    f"👻 {victory_desc}\n"
-                    f"💰 获得奖励：{reward_text}\n"
-                    f"🏛️ 缉邪司对你的英勇表示赞赏！"
-                )
-            else:
-                msg = f"⛔ {message}"
-        else:
-            # 战斗失败
-            await session.commit()  # 保存血量变化
+            await session.commit()
 
-            # 生成诡异的失败描述
-            defeat_descriptions = [
-                f"伪仙{task.enemy_name}邪笑连连，邪法愈发强盛。你身受重伤，只得暂时退却。城中百姓仍在其蛊惑之下，如行尸走肉。",
-                f"邪法太过诡异，{task.enemy_name}的幻术让你陷入迷障。你勉强逃脱，但伪仙仍在城中传播邪道，民众深陷其中。",
-                f"道坛邪光大盛，{task.enemy_name}实力超乎想象。你败退而归，城中百姓仍被邪法控制，面无血色，目光呆滞。",
-                f"伪仙之力诡异莫测，你一时不敌。{task.enemy_name}狂笑不止，继续在城中蛊惑人心，传授邪道。"
+            # 构建完成消息
+            reward_lines = []
+            if "exp" in rewards:
+                reward_lines.append(f"经验+{rewards['exp']}")
+            if "gold" in rewards:
+                reward_lines.append(f"金币+{rewards['gold']}")
+            if "guild_points" in rewards:
+                reward_lines.append(f"积分+{rewards['guild_points']}")
+            if "guild_exp" in rewards:
+                reward_lines.append(f"公会经验+{rewards['guild_exp']}")
+
+            reward_text = " ".join(reward_lines) if reward_lines else "无奖励"
+
+            # 生成任务完成描述
+            completion_descriptions = [
+                f"恶鬼{task.enemy_name}已被成功诛杀，其怨气消散，化为青烟。城中阴霾尽散，百姓重获安宁。",
+                f"厉鬼{task.enemy_name}伏诛，其魂魄被超度，不再作祟。城中恢复生机，百姓感激不尽。",
+                f"邪鬼{task.enemy_name}已被除去，其邪法破除，城中百姓从噩梦中苏醒，重获自由。",
+                f"恶灵{task.enemy_name}魂飞魄散，其作祟之力彻底消失。城中重现祥和，百姓安居乐业。"
             ]
-            defeat_desc = random.choice(defeat_descriptions)
+            completion_desc = random.choice(completion_descriptions)
 
-            battle_summary = "\n".join(battle_log)
             msg = (
-                f"{battle_summary}\n"
+                f"🎉 任务完成！\n"
                 f"━━━━━━━━━━━━━\n"
-                f"💀 战斗失败！\n"
-                f"👻 {defeat_desc}\n"
-                f"💡 建议：提升等级、更换装备或使用丹药增强属性后再来挑战"
+                f"👻 {completion_desc}\n"
+                f"💰 获得奖励：{reward_text}\n"
+                f"🏛️ 缉邪司对你的英勇表示赞赏！"
             )
+        else:
+            msg = f"⛔ {message}"
         
         await complete_task_cmd.finish(message_add_head(msg, event))
 
@@ -258,3 +267,43 @@ async def handle_task_stats(event: MessageEvent):
         lines.append("💡 每日完成委托可获得经验、金币和积分奖励，有公会还可获得公会经验")
         
         await task_stats_cmd.finish(message_add_head("\n".join(lines), event))
+
+
+# ==================== 刷新委托 ====================
+refresh_task_cmd = on_command("刷新委托", aliases={"刷新任务", "更多委托"}, block=True, priority=5)
+
+@refresh_task_cmd.handle()
+async def handle_refresh_task(event: MessageEvent):
+    async with safe_session() as session:
+        player = await session.get(Player, event.get_user_id())
+        if not player:
+            await refresh_task_cmd.finish("⛔ 请先创建角色")
+        if player.level < 30:
+            await refresh_task_cmd.finish("⛔ 该功能仅对Lv.30以上角色开放")
+
+        # 获取今日任务
+        today = date.today()
+        tasks = await DailyTaskService.get_player_daily_tasks(session, player.id, today)
+
+        if len(tasks) >= 3:
+            await refresh_task_cmd.finish("⛔ 今日委托已达上限（3个），请完成后再来")
+
+        # 生成新任务
+        new_task = await DailyTaskService.force_generate_new_task(session, player)
+        if not new_task:
+            await refresh_task_cmd.finish("⛔ 生成委托失败，请稍后重试")
+
+        await session.commit()
+
+        msg = (
+            f"🏛️ 缉邪司新委托生成！\n"
+            f"━━━━━━━━━━━━━\n"
+            f"📋 委托{len(tasks) + 1}：{new_task.title}\n"
+            f"📍 目标：{new_task.location_str}\n"
+            f"👹 敌人：{new_task.enemy_name} Lv.{new_task.enemy_level}\n"
+            f"💰 奖励：{new_task.get_reward_summary(bool(player.guild_id))}\n"
+            f"━━━━━━━━━━━━━\n"
+            f"💡 使用【接取任务 {len(tasks) + 1}】接取此委托"
+        )
+
+        await refresh_task_cmd.finish(message_add_head(msg, event))
