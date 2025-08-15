@@ -283,11 +283,29 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
         if len(all_equipped) >= 4:
             await wear_equipment.finish("⛔ 装备栏已满，最多只能穿戴4件装备，请先卸下其他装备")
 
-        # 穿戴新装备
-        equip.equipped = True
+        # 获取所有已装备的装备（不包括即将穿戴的这件）
+        all_equipped_stmt = select(ItemInstance).where(
+            ItemInstance.player_id == event.get_user_id(),
+            ItemInstance.equipped == True,
+            ItemInstance.item_id.in_(EQUIP_ITEM_IDS)
+        )
+        currently_equipped = (await session.execute(all_equipped_stmt)).scalars().all()
 
-        # 计算并应用属性加成
-        # 获取玩家基础属性（无装备加成）
+        # 1. 先卸下所有装备，恢复基础属性
+        for eq in currently_equipped:
+            # 恢复玩家属性
+            delta = (eq.extra_attrs or {}).get("_persist_bonus", {})
+            for k, v in delta.items():
+                setattr(player, k, getattr(player, k) - v)
+
+            # 清除持久化记录并标记未穿戴
+            if "_persist_bonus" in (eq.extra_attrs or {}):
+                extra_new = {k: v for k, v in eq.extra_attrs.items() if k != "_persist_bonus"}
+                eq.extra_attrs = extra_new
+
+            eq.equipped = False
+
+        # 2. 获取玩家基础属性（无装备加成）
         base_attrs = {
             "attack": player.attack,
             "defense": player.defense,
@@ -297,36 +315,43 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
             "max_mp": player.max_mp,
         }
 
-        # 创建临时属性字典用于计算装备加成
-        temp_attrs = base_attrs.copy()
+        # 3. 重新穿戴所有装备（包括新装备），每件都基于基础属性计算
+        all_equipment_to_wear = currently_equipped + [equip]
 
-        # 使用装备的 apply_attr_bonus 方法计算加成
-        equip.apply_attr_bonus(temp_attrs, base_attrs)
+        for eq in all_equipment_to_wear:
+            # 标记为已装备
+            eq.equipped = True
 
-        # 计算差值（即装备提供的加成）
-        delta = {}
-        for attr, new_value in temp_attrs.items():
-            # 只处理base_attrs中存在的属性，避免KeyError
-            if attr in base_attrs:
-                base_value = base_attrs[attr]
-                if new_value != base_value:
-                    delta[attr] = new_value - base_value
-            else:
-                # 对于base_attrs中不存在的属性（如战斗属性），直接使用新值作为加成
-                if new_value != 0:
-                    delta[attr] = new_value
+            # 基于基础属性计算装备加成
+            attrs_temp = base_attrs.copy()
+            eq.apply_attr_bonus(attrs_temp, base_attrs)
+            new_delta = {}
+            for k in attrs_temp:
+                if k in base_attrs:
+                    if attrs_temp[k] != base_attrs[k]:
+                        new_delta[k] = attrs_temp[k] - base_attrs[k]
+                else:
+                    # 对于base_attrs中不存在的属性，直接使用新值作为加成
+                    if attrs_temp[k] != 0:
+                        new_delta[k] = attrs_temp[k]
 
-        # 应用属性加成到玩家
-        for k, v in delta.items():
-            current_value = getattr(player, k, 0)
-            setattr(player, k, current_value + v)
+            # 应用到玩家属性
+            for k, v in new_delta.items():
+                setattr(player, k, getattr(player, k) + v)
+
+            # 保存新的持久化加成
+            extra = eq.extra_attrs or {}
+            extra["_persist_bonus"] = new_delta
+            eq.extra_attrs = extra
+            session.add(eq)
+
+        # 确保当前HP/MP不超过新的上限
+        if player.hp > player.max_hp:
+            player.hp = player.max_hp
+        if player.mp > player.max_mp:
+            player.mp = player.max_mp
 
         session.add(player)
-
-        # 保存 delta 到 extra_attrs 便于卸下时恢复
-        extra_old = equip.extra_attrs or {}
-        extra_new = {**extra_old, "_persist_bonus": delta}
-        equip.extra_attrs = extra_new
 
         await session.commit()
 
@@ -428,6 +453,12 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
             current_value = getattr(player, k, 0)
             setattr(player, k, max(0, current_value - v))
 
+        # 确保当前HP/MP不超过新的上限
+        if player.hp > player.max_hp:
+            player.hp = player.max_hp
+        if player.mp > player.max_mp:
+            player.mp = player.max_mp
+
         session.add(player)
         session.add(equip)
         await session.commit()
@@ -518,6 +549,12 @@ async def _(event: MessageEvent):
             session.add(equip)
             unworn_equipment.append(f"{equip.config.name}(ID:{equip.id})")
             all_failed_tasks.extend(failed_tasks)
+
+        # 确保当前HP/MP不超过新的上限
+        if player.hp > player.max_hp:
+            player.hp = player.max_hp
+        if player.mp > player.max_mp:
+            player.mp = player.max_mp
 
         session.add(player)
         await session.commit()

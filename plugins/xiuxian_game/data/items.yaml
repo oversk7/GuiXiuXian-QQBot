@@ -448,7 +448,7 @@ items:
       type: "EQUIPMENT"
       price: 3000
       durability: 80
-      attr_bonus: {"hp": 80, "defense": 15}
+      attr_bonus: {"hp": 40, "defense": 8}
       recipe:
         materials:
           spirit_bone: 20
@@ -466,7 +466,7 @@ items:
       type: "EQUIPMENT"
       price: 2500
       durability: 60
-      attr_bonus: {"mp": 60, "luck": 8}
+      attr_bonus: {"mp": 35, "luck": 8}
       recipe:
         materials:
           ghost_tears: 25
@@ -484,7 +484,7 @@ items:
       type: "EQUIPMENT"
       price: 2800
       durability: 70
-      attr_bonus: {"attack": 25, "agility": 10}
+      attr_bonus: {"attack": 15, "agility": 6}
       recipe:
         materials:
           iron_rust: 20
@@ -504,8 +504,8 @@ items:
       type: "EQUIPMENT"
       price: 8000
       durability: 100
-      attr_bonus: {"hp": 120}
-      attr_ratio: {"hp": 0.05}
+      attr_bonus: {"hp": 80}
+      attr_ratio: {"hp": 0.08}
       recipe:
         materials:
           drowned_scale: 8
@@ -523,8 +523,8 @@ items:
       type: "EQUIPMENT"
       price: 7500
       durability: 100
-      attr_bonus: {"mp": 100}
-      attr_ratio: {"mp": 0.05}
+      attr_bonus: {"mp": 70, "luck": 5}
+      attr_ratio: {"mp": 0.10}
       recipe:
         materials:
           yin_essence: 5
@@ -542,8 +542,8 @@ items:
       type: "EQUIPMENT"
       price: 9500
       durability: 120
-      attr_bonus: {"defense": 35, "hp": 80}
-      attr_ratio: {"defense": 0.08}
+      attr_bonus: {"defense": 20, "hp": 50}
+      attr_ratio: {"defense": 0.12, "hp": 0.06}
       recipe:
         materials:
           corrupted_bandage: 6
@@ -563,8 +563,8 @@ items:
       type: "EQUIPMENT"
       price: 25000
       durability: 120
-      attr_bonus: {"luck": 15}
-      attr_ratio: {"mp": 0.15}
+      attr_bonus: {"luck": 15, "mp": 60}
+      attr_ratio: {"mp": 0.20, "luck": 0.08}
       recipe:
         materials:
           soul_crystal: 2
@@ -582,8 +582,8 @@ items:
       type: "EQUIPMENT"
       price: 35000
       durability: 140
-      attr_bonus: {"defense": 25}
-      attr_ratio: {"hp": 0.2, "defense": 0.12}
+      attr_bonus: {"defense": 15, "hp": 60}
+      attr_ratio: {"hp": 0.25, "defense": 0.15}
       recipe:
         materials:
           cursed_mirror_shard: 3
@@ -601,8 +601,8 @@ items:
       type: "EQUIPMENT"
       price: 32000
       durability: 130
-      attr_bonus: {"agility": 20}
-      attr_ratio: {"agility": 0.18, "luck": 0.1}
+      attr_bonus: {"agility": 20, "luck": 15}
+      attr_ratio: {"agility": 0.25, "luck": 0.15}
       recipe:
         materials:
           phantom_thread: 4
@@ -622,7 +622,8 @@ items:
       type: "EQUIPMENT"
       price: 60000
       durability: 150
-      attr_ratio: {"hp": 0.25, "attack": 0.15}
+      attr_bonus: {"hp": 100, "attack": 30}
+      attr_ratio: {"hp": 0.30, "attack": 0.18}
       recipe:
         materials:
           medical_record: 1
@@ -641,7 +642,8 @@ items:
       type: "EQUIPMENT"
       price: 80000
       durability: 160
-      attr_ratio: {"attack": 0.35, "agility": 0.2}
+      attr_bonus: {"attack": 50, "agility": 25}
+      attr_ratio: {"attack": 0.40, "agility": 0.25}
       recipe:
         materials:
           demon_heart: 1
@@ -660,7 +662,8 @@ items:
       type: "EQUIPMENT"
       price: 100000
       durability: 180
-      attr_ratio: {"mp": 0.3, "luck": 0.25, "attack": 0.2}
+      attr_bonus: {"mp": 80, "luck": 40, "attack": 35}
+      attr_ratio: {"mp": 0.35, "luck": 0.30, "attack": 0.25}
       recipe:
         materials:
           void_essence: 2
@@ -681,7 +684,8 @@ items:
       type: "EQUIPMENT"
       price: 200000
       durability: 200
-      attr_ratio: {"hp": 0.4, "mp": 0.4, "defense": 0.3}
+      attr_bonus: {"hp": 150, "mp": 120, "defense": 60}
+      attr_ratio: {"hp": 0.45, "mp": 0.45, "defense": 0.35}
       recipe:
         materials:
           god_tear: 1
@@ -700,7 +704,8 @@ items:
       type: "EQUIPMENT"
       price: 300000
       durability: 220
-      attr_ratio: {"attack": 0.5, "agility": 0.35, "luck": 0.3}
+      attr_bonus: {"attack": 80, "agility": 50, "luck": 45}
+      attr_ratio: {"attack": 0.55, "agility": 0.40, "luck": 0.35}
       recipe:
         materials:
           world_fragment: 1
@@ -721,8 +726,8 @@ items:
       type: "EQUIPMENT"
       price: 30000
       durability: 100
-      attr_ratio: {"agility": 0.3}
-      attr_bonus: {"luck": 10}
+      attr_bonus: {"agility": 15, "luck": 8}
+      attr_ratio: {"agility": 0.25, "luck": 0.08}
       recipe:
         materials:
           nightmare_silk: 15
@@ -740,8 +745,8 @@ items:
       type: "EQUIPMENT"
       price: 80000
       durability: 100
-      attr_bonus: {"mp": 35}
-      attr_ratio: {"attack": 0.2}
+      attr_bonus: {"mp": 50, "attack": 20}
+      attr_ratio: {"attack": 0.25, "mp": 0.15}
       recipe:
         materials:
           soul_crystal: 3
@@ -762,7 +767,8 @@ items:
       type: "EQUIPMENT"
       price: 80000
       durability: 100
-      attr_ratio: {"luck": 0.3}
+      attr_bonus: {"luck": 18, "agility": 12}
+      attr_ratio: {"luck": 0.30, "agility": 0.18}
       repair_cost: 100   # Boss掉落，不可锻造
       required_level: 85
       gem_slots: 3
@@ -774,7 +780,8 @@ items:
       type: "EQUIPMENT"
       price: 100000
       durability: 100
-      attr_ratio: {"attack": 0.4}
+      attr_bonus: {"attack": 45, "luck": 20}
+      attr_ratio: {"attack": 0.42, "luck": 0.18}
       repair_cost: 150   # Boss掉落，不可锻造
       required_level: 100
       gem_slots: 3
@@ -786,7 +793,8 @@ items:
       type: "EQUIPMENT"
       price: 150000
       durability: 100
-      attr_ratio: {"attack": 0.6}
+      attr_bonus: {"attack": 70, "defense": 30}
+      attr_ratio: {"attack": 0.65, "defense": 0.25}
       repair_cost: 100   # Boss掉落，不可锻造
       required_level: 130
       gem_slots: 4
@@ -798,8 +806,8 @@ items:
       type: "EQUIPMENT"
       price: 120000
       durability: 100
-      attr_bonus: {"agility": 50}
-      attr_ratio: {"mp": 0.5}
+      attr_bonus: {"agility": 40, "mp": 60}
+      attr_ratio: {"mp": 0.48, "agility": 0.30}
       repair_cost: 180   # Boss掉落，不可锻造
       required_level: 120
       gem_slots: 4

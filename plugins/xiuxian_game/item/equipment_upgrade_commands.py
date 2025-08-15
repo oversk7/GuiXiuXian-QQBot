@@ -18,6 +18,78 @@ from ..utils import message_add_head
 from .equipment_upgrade_service import EquipmentUpgradeService
 
 
+async def _recalculate_equipment_attributes(session, player: Player):
+    """重新计算装备属性加成"""
+    # 获取所有已装备的装备
+    equip_item_ids = config.items_config["by_type"]["EQUIPMENT"]
+    stmt = select(ItemInstance).where(
+        ItemInstance.player_id == player.id,
+        ItemInstance.equipped == True,
+        ItemInstance.item_id.in_(equip_item_ids)
+    )
+    equipped_items = (await session.execute(stmt)).scalars().all()
+
+    # 1. 先卸下所有装备，恢复基础属性
+    for eq in equipped_items:
+        # 恢复玩家属性
+        delta = (eq.extra_attrs or {}).get("_persist_bonus", {})
+        for k, v in delta.items():
+            setattr(player, k, getattr(player, k) - v)
+
+        # 清除持久化记录并标记未穿戴
+        if "_persist_bonus" in (eq.extra_attrs or {}):
+            extra_new = {k: v for k, v in eq.extra_attrs.items() if k != "_persist_bonus"}
+            eq.extra_attrs = extra_new
+
+        eq.equipped = False
+
+    # 2. 获取玩家基础属性（无装备加成）
+    base_attrs = {
+        "attack": player.attack,
+        "defense": player.defense,
+        "agility": player.agility,
+        "luck": player.luck,
+        "max_hp": player.max_hp,
+        "max_mp": player.max_mp,
+    }
+
+    # 3. 重新穿戴所有装备，每件都基于基础属性计算
+    for eq in equipped_items:
+        # 标记为已装备
+        eq.equipped = True
+
+        # 基于基础属性计算装备加成
+        attrs_temp = base_attrs.copy()
+        eq.apply_attr_bonus(attrs_temp, base_attrs)
+        new_delta = {}
+        for k in attrs_temp:
+            if k in base_attrs:
+                if attrs_temp[k] != base_attrs[k]:
+                    new_delta[k] = attrs_temp[k] - base_attrs[k]
+            else:
+                # 对于base_attrs中不存在的属性，直接使用新值作为加成
+                if attrs_temp[k] != 0:
+                    new_delta[k] = attrs_temp[k]
+
+        # 应用到玩家属性
+        for k, v in new_delta.items():
+            setattr(player, k, getattr(player, k) + v)
+
+        # 保存新的持久化加成
+        extra = eq.extra_attrs or {}
+        extra["_persist_bonus"] = new_delta
+        eq.extra_attrs = extra
+        session.add(eq)
+
+    # 确保当前HP/MP不超过新的上限
+    if player.hp > player.max_hp:
+        player.hp = player.max_hp
+    if player.mp > player.max_mp:
+        player.mp = player.max_mp
+
+    session.add(player)
+
+
 # ---------------- 指令：查看升阶信息 ----------------
 upgrade_info_cmd = on_command("升阶信息", aliases={"升阶预览"}, block=True, priority=5)
 
@@ -136,6 +208,10 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
         success, message, result_info = await EquipmentUpgradeService.perform_upgrade(
             session, equip, player, use_protection
         )
+
+        # 如果装备升级成功且装备已穿戴，需要重新计算装备属性加成
+        if success and equip.equipped:
+            await _recalculate_equipment_attributes(session, player)
 
         await session.commit()
 
