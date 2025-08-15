@@ -160,7 +160,7 @@ async def handle_player_attack(session, attacker: Player, target: Player, event:
         
         await attack_cmd.finish(message_add_head("\n".join(result_lines), event))
         
-    except Exception as e:
+    except ValueError as e:
         await attack_cmd.finish(f"⛔ 战斗系统错误：{str(e)}")
 
 
@@ -233,7 +233,7 @@ async def handle_npc_attack(session, attacker: Player, target_npc, event: Messag
         await session.commit()
         await attack_cmd.finish(message_add_head("\n".join(result_lines), event))
         
-    except Exception as e:
+    except ValueError as e:
         await attack_cmd.finish(f"⛔ 战斗系统错误：{str(e)}")
 
 
