@@ -99,14 +99,16 @@ async def handle_claim_chest(event: MessageEvent):
         if not unclaimed_levels:
             await claim_chest_cmd.finish("⛔ 暂无可领取的宝箱\n💡 继续探索诡域，每到达第10层的倍数即可获得宝箱！")
 
-        # 检查背包容量
+        # 检查背包容量（使用有效容量，包含月卡加成）
         stmt = select(ItemInstance).where(ItemInstance.player_id == player.id)
         current_items = (await session.execute(stmt)).scalars().all()
         current_slots = sum(1 for item in current_items if item.quantity > 0)
 
+        # 获取有效背包容量（包含月卡加成）
+        effective_capacity = await player.get_effective_inventory_capacity(session)
         needed_slots = len(unclaimed_levels)
-        if current_slots + needed_slots > player.inventory_capacity:
-            await claim_chest_cmd.finish(f"⛔ 背包空间不足！需要 {needed_slots} 个空位，当前剩余 {player.inventory_capacity - current_slots} 个空位")
+        if current_slots + needed_slots > effective_capacity:
+            await claim_chest_cmd.finish(f"⛔ 背包空间不足！需要 {needed_slots} 个空位，当前剩余 {effective_capacity - current_slots} 个空位")
 
         # 批量创建深渊探索者宝箱和记录
         claimed_count = 0
