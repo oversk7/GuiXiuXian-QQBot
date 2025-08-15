@@ -40,12 +40,17 @@ async def handle_attack(event: MessageEvent, args: Message = CommandArg()):
             "• 鬼怪NPC（真实战斗）\n"
             "• 可击杀的NPC\n"
             "━━━━━━━━━━━━━\n"
+            "🔍 智能匹配：\n"
+            "• 支持部分名称匹配\n"
+            "• 【攻击 乔强】可匹配【邪教徒·乔强】\n"
+            "• 【攻击 邪教徒】可匹配【邪教徒·乔强】\n"
+            "━━━━━━━━━━━━━\n"
             "⚠️ 注意事项：\n"
             "• 攻击玩家不会造成真实损失\n"
             "• 攻击NPC可能导致其死亡\n"
             "• 死亡的NPC会在一定时间后复活\n"
             "━━━━━━━━━━━━━\n"
-            "🌟 示例：攻击 1001 或 攻击 铁匠老王"
+            "🌟 示例：攻击 1001 或 攻击 乔强"
         )
         await attack_cmd.finish(message_add_head(help_msg, event))
     
@@ -72,6 +77,27 @@ async def handle_attack(event: MessageEvent, args: Message = CommandArg()):
         elif target_npc:
             await handle_npc_attack(session, player, target_npc, event)
         else:
+            # 检查是否有多个匹配结果
+            location = await LocationService.get_location_by_coordinates(session, current_x, current_y, current_region)
+            if location:
+                possible_npcs = await find_npc_by_smart_match(session, args_text, location.id)
+                if len(possible_npcs) > 1:
+                    npc_list = []
+                    for npc in possible_npcs[:5]:  # 最多显示5个
+                        npc_list.append(f"• {npc.name}")
+
+                    msg = (
+                        f"🔍 找到多个匹配'{args_text}'的目标：\n"
+                        "━━━━━━━━━━━━━\n" +
+                        "\n".join(npc_list) +
+                        ("\n..." if len(possible_npcs) > 5 else "") +
+                        "\n━━━━━━━━━━━━━\n"
+                        "💡 请使用更具体的名称，如：\n"
+                        f"• 【攻击 {possible_npcs[0].name.split('·')[-1]}】\n"
+                        f"• 【攻击 {possible_npcs[0].name}】"
+                    )
+                    await attack_cmd.finish(message_add_head(msg, event))
+
             await attack_cmd.finish(f"⛔ 找不到目标'{args_text}'，请确认目标在当前位置")
 
 
@@ -79,7 +105,7 @@ async def parse_attack_target(session, target_name: str, x: int, y: int, region:
     """解析攻击目标"""
     target_player = None
     target_npc = None
-    
+
     # 尝试按UID查找玩家
     if target_name.isdigit():
         uid = int(target_name)
@@ -100,19 +126,81 @@ async def parse_attack_target(session, target_name: str, x: int, y: int, region:
             if p.nickname == target_name:
                 target_player = p
                 break
-        
+
         # 如果没找到玩家，查找NPC
         if not target_player:
             location = await LocationService.get_location_by_coordinates(session, x, y, region)
             if location:
+                # 先尝试精确匹配
                 target_npc = await NPCService.get_npc_by_name(session, target_name, location.id)
+
                 if not target_npc:
-                    # 尝试模糊匹配
-                    possible_npcs = await NPCService.find_npc_by_partial_name(session, target_name, location.id)
+                    # 尝试智能匹配（支持带点号的名字）
+                    possible_npcs = await find_npc_by_smart_match(session, target_name, location.id)
                     if len(possible_npcs) == 1:
                         target_npc = possible_npcs[0]
-    
+                    elif len(possible_npcs) > 1:
+                        # 多个匹配结果，尝试更精确的匹配
+                        exact_matches = [npc for npc in possible_npcs if target_name.lower() in npc.name.lower()]
+                        if len(exact_matches) == 1:
+                            target_npc = exact_matches[0]
+
     return target_player, target_npc
+
+
+async def find_npc_by_smart_match(session, target_name: str, location_id: int):
+    """智能匹配NPC名称，支持带点号的名字"""
+    from sqlalchemy import select, and_, or_
+    from ..models.npc import NPC, NPCStatus
+
+    # 清理输入的目标名称
+    clean_target = target_name.strip()
+
+    # 构建多种匹配条件
+    conditions = [
+        NPC.location_id == location_id,
+        NPC.is_active == True,
+        NPC.status != NPCStatus.DEAD
+    ]
+
+    # 匹配策略：
+    # 1. 包含目标名称的NPC
+    # 2. 点号后面部分匹配（如"乔强"匹配"邪教徒·乔强"）
+    # 3. 点号前面部分匹配（如"邪教徒"匹配"邪教徒·乔强"）
+    name_conditions = or_(
+        NPC.name.like(f"%{clean_target}%"),  # 基础模糊匹配
+        NPC.name.like(f"%·{clean_target}"),  # 匹配点号后的部分
+        NPC.name.like(f"{clean_target}·%"),  # 匹配点号前的部分
+    )
+
+    conditions.append(name_conditions)
+
+    stmt = select(NPC).where(and_(*conditions))
+    result = await session.execute(stmt)
+    npcs = result.scalars().all()
+
+    # 按匹配优先级排序
+    def match_priority(npc):
+        name = npc.name.lower()
+        target = clean_target.lower()
+
+        # 精确匹配优先级最高
+        if name == target:
+            return 0
+        # 完整包含目标名称
+        elif target in name:
+            return 1
+        # 点号后匹配
+        elif f"·{target}" in name:
+            return 2
+        # 点号前匹配
+        elif f"{target}·" in name:
+            return 3
+        # 其他模糊匹配
+        else:
+            return 4
+
+    return sorted(npcs, key=match_priority)
 
 
 async def handle_player_attack(session, attacker: Player, target: Player, event: MessageEvent):
