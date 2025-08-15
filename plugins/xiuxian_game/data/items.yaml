@@ -704,8 +704,8 @@ items:
       type: "EQUIPMENT"
       price: 300000
       durability: 220
-      attr_bonus: {"attack": 80, "agility": 50, "luck": 45}
-      attr_ratio: {"attack": 0.55, "agility": 0.40, "luck": 0.35}
+      attr_bonus: {"attack": 80, "agility": 50}
+      attr_ratio: {"attack": 0.55, "agility": 0.40, "luck": 0.3}
       recipe:
         materials:
           world_fragment: 1
@@ -716,6 +716,27 @@ items:
       repair_cost: 100
       required_level: 220
       gem_slots: 5
+      rarity: "orange"
+
+    - item_id: "shroud_of_eternity"
+      name: "寿衣"
+      description: "用死者的怨念与神明之泪编织而成的诡异寿衣，每一根丝线都浸透着亡魂的哀嚎。穿戴者的血肉将与布料融为一体，获得不死不灭的诅咒庇护，但代价是永远无法安息... 👻"
+      type: "EQUIPMENT"
+      price: 250000
+      durability: 240
+      attr_bonus: {"hp": 200, "defense": 80}
+      attr_ratio: {"hp": 0.50, "defense": 0.45}
+      recipe:
+        materials:
+          god_tear: 3
+          void_essence: 5
+          demon_heart: 3
+          spirit_stone: 8
+          cursed_mirror_shard: 12
+        gold: 60000
+      repair_cost: 120
+      required_level: 200
+      gem_slots: 4
       rarity: "orange"
 
     # ========== 可锻造的特殊装备 ==========

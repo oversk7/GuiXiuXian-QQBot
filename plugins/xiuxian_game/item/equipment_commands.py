@@ -120,6 +120,17 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
         if not tpl:
             await equipment_detail.finish("⛔ 装备配置错误")
 
+        # 稀有度中文映射
+        rarity_map = {
+            "white": "普通",
+            "green": "优秀",
+            "blue": "稀有",
+            "purple": "史诗",
+            "orange": "传说"
+        }
+        rarity_display = tpl.get_rarity_display()
+        rarity_name = rarity_map.get(tpl.rarity, tpl.rarity)
+
         # 构建详细信息
         lines = [
             f"⚔️ 装备详情",
@@ -130,7 +141,7 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
             f"⭐ 升阶等级：+{equip.upgrade_level}阶",
             f"🛠️ 耐久度：{equip.durability}/{tpl.durability}",
             f"💰 价值：{tpl.price:,} 金币",
-            f"🎨 品质：{tpl.rarity}",
+            f"🎨 品质：{rarity_display}{rarity_name}",
             f"👕 状态：{'🟢已装备' if equip.equipped else '🔘未装备'}",
             ""
         ]
