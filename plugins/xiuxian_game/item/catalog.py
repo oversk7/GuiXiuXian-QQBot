@@ -125,7 +125,7 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
 
     # 必须提供关键字，否则提醒
     if not keyword:
-        await catalog_cmd.finish("⛔ 请提供要查询的名称，例如：图鉴 回春散 或 图鉴 贞子")
+        await catalog_cmd.finish("⛔ 请提供要查询的名称，例如：图鉴 回春散")
 
     # 获取玩家信息（用于查询丹药使用状态）
     player = None
