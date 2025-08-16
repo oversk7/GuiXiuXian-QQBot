@@ -416,16 +416,42 @@ async def handle_inventory(event: MessageEvent, args: Message = CommandArg()):
             bonus = effective_capacity - player.inventory_capacity
             capacity_info += f" (💳+{bonus})"
 
-        formatted = await paginate_items(items, page, page_size=page_size, capacity_info=capacity_info)
-        final_message = message_add_head(formatted, event)
+        try:
+            formatted = await paginate_items(items, page, page_size=page_size, capacity_info=capacity_info)
+            print(f"[背包调试] paginate_items 成功，formatted 类型: {type(formatted)}")
 
-        # 调试信息：在控制台打印发送给玩家的完整消息
-        print(f"[背包调试] 玩家 {player.nickname}(UID:{player.uid}) 查看背包第{page}页:")
-        print("=" * 50)
-        print(final_message)
-        print("=" * 50)
+            final_message = message_add_head(formatted, event)
+            print(f"[背包调试] message_add_head 成功，final_message 类型: {type(final_message)}")
 
-        await inventory_cmd.finish(final_message)
+            # 调试信息：在控制台打印发送给玩家的完整消息
+            print(f"[背包调试] 玩家 {player.nickname}(UID:{player.uid}) 查看背包第{page}页:")
+            print("=" * 50)
+            print(final_message)
+            print("=" * 50)
+
+            print(f"[背包调试] 准备调用 inventory_cmd.send()")
+            print(f"[背包调试] final_message 内容长度: {len(str(final_message))}")
+            print(f"[背包调试] final_message 内容预览: {str(final_message)[:200]}...")
+
+            try:
+                await inventory_cmd.send(final_message)
+                print(f"[背包调试] inventory_cmd.send() 调用完成")
+            except Exception as send_error:
+                print(f"[背包调试] send() 调用失败: {type(send_error).__name__}: {send_error}")
+                import traceback
+                traceback.print_exc()
+                # 尝试发送简单消息
+                try:
+                    await inventory_cmd.send("背包功能暂时出现问题，请稍后重试")
+                    print(f"[背包调试] 简单消息发送成功")
+                except Exception as simple_error:
+                    print(f"[背包调试] 简单消息也发送失败: {simple_error}")
+                    raise
+        except Exception as e:
+            print(f"[背包调试] 发生异常: {type(e).__name__}: {e}")
+            import traceback
+            traceback.print_exc()
+            raise
 
 
 
