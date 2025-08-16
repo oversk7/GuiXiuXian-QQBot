@@ -151,6 +151,9 @@ trade_history_cmd = on_command("跑商记录", block=True, priority=5)
 # 跑商推荐：列出可获利的买卖路线
 trade_advise_cmd = on_command("跑商推荐", aliases={"套利", "赚差价"}, block=True, priority=5)
 
+# 交易限制查询：查看玩家当前的交易限制情况
+trade_restrictions_cmd = on_command("交易限制", aliases={"限制查询", "交易状态"}, block=True, priority=5)
+
 @market_cmd.handle()
 async def _(event: MessageEvent):
     async with safe_session() as session:
@@ -549,9 +552,15 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
 
 @trade_advise_cmd.handle()
 async def _(event: MessageEvent):
-    """遍历市集与商品，列出正利润路线（购买→售出）。"""
+    """遍历市集与商品，列出正利润路线（购买→售出），考虑玩家个人交易限制。"""
     async with safe_session() as session:
+        player: Player | None = await session.get(Player, event.get_user_id())
+        if not player:
+            await trade_advise_cmd.finish("⛔ 请先创建角色")
+
         opportunities = []
+        filtered_count = 0  # 被过滤掉的机会数量
+
         for src in MARKETS:
             for iid in src.items:
                 # 检查源市场库存
@@ -576,6 +585,15 @@ async def _(event: MessageEvent):
                             profit = buy_p_dst - sell_p_src
                             margin = 1.0
 
+                        # 检查玩家是否可以在目标市场出售该商品（考虑原地交易限制）
+                        can_sell_at_dst = await TradeRecord.can_sell_at_market(
+                            session, player.id, dst.id, iid, hours=4
+                        )
+
+                        if not can_sell_at_dst:
+                            filtered_count += 1
+                            continue  # 跳过这个机会，因为玩家在目标市场有交易限制
+
                         opportunities.append({
                             "item": item_cfg.name,
                             "from": src.name,
@@ -585,10 +603,16 @@ async def _(event: MessageEvent):
                             "profit": profit,
                             "margin": margin,
                             "src_stock": src_state.current_stock,
+                            "src_id": src.id,
+                            "dst_id": dst.id,
+                            "item_id": iid,
                         })
 
         if not opportunities:
-            await trade_advise_cmd.finish("ℹ️ 今日暂无明显差价或库存不足，明天再来看看吧！")
+            filter_msg = ""
+            if filtered_count > 0:
+                filter_msg = f"\n💡 已过滤 {filtered_count} 个受交易限制影响的机会"
+            await trade_advise_cmd.finish(f"ℹ️ 今日暂无可用的盈利机会，明天再来看看吧！{filter_msg}")
 
         # 按利润降序排序，随机挑选前10条中的5条进行推荐
         opportunities.sort(key=lambda d: d["profit"], reverse=True)
@@ -598,7 +622,13 @@ async def _(event: MessageEvent):
         top_opportunities = opportunities[:10]  # 取前10条
         sample = _rnd.sample(top_opportunities, min(5, len(top_opportunities)))
 
-        lines = ["💹 跑商盈利机会 (优质推荐)", "━━━━━━━━━━━━━"]
+        lines = ["💹 跑商盈利机会 (个性化推荐)", "━━━━━━━━━━━━━"]
+
+        # 添加个人情况说明
+        if filtered_count > 0:
+            lines.append(f"🔍 已为您过滤 {filtered_count} 个受交易限制的机会")
+            lines.append("━━━━━━━━━━━━━")
+
         for op in sample:
             lines.append(
                 f"📦 {op['item']} (库存:{op['src_stock']})\n🛒 {op['from']} → {op['to']}  "+
@@ -606,6 +636,11 @@ async def _(event: MessageEvent):
                 f"📈 +{op['profit']} ({op['margin']*100:.0f}%)"
             )
             lines.append("──────────")
+
+        # 添加提示信息
+        lines.append("💡 推荐已考虑您的交易记录，避免原地交易限制")
+        if filtered_count > 0:
+            lines.append("💡 4小时后可能有更多机会解锁")
 
         await trade_advise_cmd.finish(message_add_head("\n".join(lines), event))
 
@@ -828,3 +863,95 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
             f"📦 获得：{item_cfg.name} ×{quantity}\n"
             f"💎 消耗：{total_cost}积分\n"
             f"💎 剩余：{player.gold2}积分", event))
+
+
+# -------- 交易限制查询 --------
+
+@trade_restrictions_cmd.handle()
+async def _(event: MessageEvent):
+    """查看玩家当前的交易限制情况"""
+    async with safe_session() as session:
+        player: Player | None = await session.get(Player, event.get_user_id())
+        if not player:
+            await trade_restrictions_cmd.finish("⛔ 请先创建角色")
+
+        from datetime import timedelta
+        from sqlalchemy import select, and_
+
+        # 查询最近4小时内的购买记录
+        time_limit = datetime.now() - timedelta(hours=4)
+        stmt = select(TradeRecord).where(
+            and_(
+                TradeRecord.player_id == player.id,
+                TradeRecord.trade_type == TradeType.BUY,
+                TradeRecord.trade_time > time_limit
+            )
+        ).order_by(TradeRecord.trade_time.desc())
+
+        result = await session.execute(stmt)
+        recent_purchases = result.scalars().all()
+
+        if not recent_purchases:
+            await trade_restrictions_cmd.finish(message_add_head(
+                "✅ 当前无交易限制\n"
+                "━━━━━━━━━━━━━\n"
+                "🎯 所有市集均可自由交易\n"
+                "💡 可使用【跑商推荐】查看盈利机会", event))
+
+        lines = ["⚠️ 当前交易限制情况", "━━━━━━━━━━━━━"]
+
+        # 按市场分组统计限制
+        restrictions_by_market = {}
+        for purchase in recent_purchases:
+            market_id = purchase.market_id
+            item_id = purchase.item_id
+
+            if market_id not in restrictions_by_market:
+                restrictions_by_market[market_id] = []
+
+            # 计算解锁时间
+            unlock_time = purchase.trade_time + timedelta(hours=4)
+            time_remaining = unlock_time - datetime.now()
+
+            if time_remaining.total_seconds() > 0:
+                hours = int(time_remaining.total_seconds() // 3600)
+                minutes = int((time_remaining.total_seconds() % 3600) // 60)
+                time_str = f"{hours}小时{minutes}分钟" if hours > 0 else f"{minutes}分钟"
+
+                item_cfg = config.items_config["by_id"].get(item_id)
+                item_name = item_cfg.name if item_cfg else item_id
+
+                restrictions_by_market[market_id].append({
+                    "item": item_name,
+                    "time_remaining": time_str,
+                    "unlock_time": unlock_time
+                })
+
+        # 显示限制信息
+        for market_id, restrictions in restrictions_by_market.items():
+            if not restrictions:  # 跳过已过期的限制
+                continue
+
+            market = next((m for m in MARKETS if m.id == market_id), None)
+            market_name = market.name if market else market_id
+
+            lines.append(f"📍 {market_name}")
+            for restriction in restrictions:
+                lines.append(f"  🚫 {restriction['item']} - 还需 {restriction['time_remaining']}")
+            lines.append("")
+
+        if len(lines) == 2:  # 只有标题，说明所有限制都已过期
+            await trade_restrictions_cmd.finish(message_add_head(
+                "✅ 当前无交易限制\n"
+                "━━━━━━━━━━━━━\n"
+                "🎯 所有市集均可自由交易\n"
+                "💡 可使用【跑商推荐】查看盈利机会", event))
+
+        lines.extend([
+            "━━━━━━━━━━━━━",
+            "💡 在限制时间内无法在对应市集出售相应商品",
+            "💡 可前往其他市集出售或等待限制解除",
+            "💡 使用【跑商推荐】获取个性化建议"
+        ])
+
+        await trade_restrictions_cmd.finish(message_add_head("\n".join(lines), event))
