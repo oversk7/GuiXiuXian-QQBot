@@ -167,7 +167,7 @@ async def handle_use_item(event: MessageEvent, args: Message = CommandArg()):
             for material_id, material_quantity in player._sweep_materials:
                 try:
                     await ItemInstance.add_item(session, player.id, material_id, material_quantity)
-                except ValueError as e:
+                except ValueError:
                     # 如果添加材料失败，记录但不影响主流程
                     pass
             # 清理临时属性
@@ -417,7 +417,15 @@ async def handle_inventory(event: MessageEvent, args: Message = CommandArg()):
             capacity_info += f" (💳+{bonus})"
 
         formatted = await paginate_items(items, page, page_size=page_size, capacity_info=capacity_info)
-        await inventory_cmd.finish(message_add_head(formatted, event))
+        final_message = message_add_head(formatted, event)
+
+        # 调试信息：在控制台打印发送给玩家的完整消息
+        print(f"[背包调试] 玩家 {player.nickname}(UID:{player.uid}) 查看背包第{page}页:")
+        print("=" * 50)
+        print(final_message)
+        print("=" * 50)
+
+        await inventory_cmd.finish(final_message)
 
 
 
