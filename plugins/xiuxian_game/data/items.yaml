@@ -496,6 +496,24 @@ items:
       gem_slots: 1
       rarity: "white"
 
+    - item_id: "broken_glasses"
+      name: "破眼镜"
+      description: "镜片已经碎了，但我还是戴着它。透过破碎的镜片，我看到的世界变得支离破碎，就像我的内心一样。有时候我觉得，也许破碎的才是真实的。"
+      type: "EQUIPMENT"
+      price: 1800
+      durability: 50
+      attr_bonus: {"attack": 12, "luck": 8}
+      recipe:
+        materials:
+          bone_fragment: 12
+          cursed_silk: 8
+          iron_rust: 6
+        gold: 300
+      repair_cost: 5
+      required_level: 7
+      gem_slots: 1
+      rarity: "white"
+
     # ========== 中级装备 (21-60级) - 数值+少量比例，白色+绿色材料 ==========
 
     - item_id: "swim_coat"
@@ -555,6 +573,138 @@ items:
       gem_slots: 2
       rarity: "green"
 
+    - item_id: "wedding_photo"
+      name: "结婚照"
+      description: "这张结婚照里的新娘总是在哭，新郎却始终面带微笑。我试图把照片收起来，但每次回到家，它总是重新出现在客厅的桌子上，而且新娘的眼泪越来越多。"
+      type: "EQUIPMENT"
+      price: 6500
+      durability: 90
+      attr_bonus: {"mp": 60, "luck": 15}
+      attr_ratio: {"mp": 0.12}
+      recipe:
+        materials:
+          nightmare_silk: 8
+          yin_essence: 4
+          ghost_tears: 20
+        gold: 1000
+      repair_cost: 10
+      required_level: 22
+      gem_slots: 2
+      rarity: "green"
+
+    - item_id: "hospital_gown"
+      name: "病号服"
+      description: "这件病号服是我在精神病院时穿的，上面还有我当时抓挠留下的血迹。每当我穿上它，就会想起那些被束缚在病床上的日子，想起那些永远不会停止的尖叫声。"
+      type: "EQUIPMENT"
+      price: 7200
+      durability: 100
+      attr_bonus: {"hp": 70, "defense": 18}
+      attr_ratio: {"hp": 0.10, "defense": 0.08}
+      recipe:
+        materials:
+          corrupted_bandage: 8
+          yin_essence: 3
+          ash_powder: 20
+        gold: 1200
+      repair_cost: 10
+      required_level: 25
+      gem_slots: 2
+      rarity: "green"
+
+    - item_id: "kitchen_knife"
+      name: "菜刀"
+      description: "这把菜刀是我从厨房拿的，本来只是想切菜，但不知道为什么，每次握住它，我就会想起那个雨夜，想起那个永远不会再回来的人。刀刃上的血迹怎么洗都洗不掉。"
+      type: "EQUIPMENT"
+      price: 8000
+      durability: 95
+      attr_bonus: {"attack": 25, "agility": 12}
+      attr_ratio: {"attack": 0.15}
+      recipe:
+        materials:
+          iron_rust: 25
+          rotten_core: 15
+          spirit_bone: 20
+        gold: 1500
+      repair_cost: 10
+      required_level: 28
+      gem_slots: 2
+      rarity: "green"
+
+    - item_id: "school_uniform"
+      name: "校服"
+      description: "这是我高中时的校服，虽然已经过了这么多年，但它还是能完美地穿在我身上。每当我穿上它，就会听到同学们的窃窃私语，听到他们在背后议论我的声音。"
+      type: "EQUIPMENT"
+      price: 7800
+      durability: 85
+      attr_bonus: {"mp": 55, "agility": 15}
+      attr_ratio: {"mp": 0.14}
+      recipe:
+        materials:
+          school_bell_fragment: 5
+          cursed_silk: 20
+          nightmare_silk: 6
+        gold: 1400
+      repair_cost: 10
+      required_level: 32
+      gem_slots: 2
+      rarity: "green"
+
+    - item_id: "old_coat"
+      name: "旧大衣"
+      description: "这件大衣是我从死人身上扒下来的，当时他已经在雪地里躺了很久。穿上它后，我总是感觉很冷，即使在夏天也是如此。有时候我觉得，那个死人还在里面。"
+      type: "EQUIPMENT"
+      price: 8500
+      durability: 110
+      attr_bonus: {"defense": 20, "hp": 60}
+      attr_ratio: {"defense": 0.12, "hp": 0.10}
+      recipe:
+        materials:
+          drowned_scale: 8
+          grave_soil: 25
+          yin_essence: 6
+        gold: 1600
+      repair_cost: 10
+      required_level: 35
+      gem_slots: 2
+      rarity: "green"
+     
+    - item_id: "funeral_wreath"
+      name: "花圈"
+      description: "这个花圈是为我准备的，上面写着我的名字和生卒年月。奇怪的是，死亡日期总是明天。每过一天，日期就会自动更新，永远指向明天。"
+      type: "EQUIPMENT"
+      price: 13000
+      durability: 130
+      attr_bonus: {"mp": 70, "luck": 20}
+      attr_ratio: {"mp": 0.15, "luck": 0.12}
+      recipe:
+        materials:
+          withered_flower: 12
+          drowned_scale: 8
+          nightmare_silk: 15
+        gold: 2800
+      repair_cost: 15
+      required_level: 48
+      gem_slots: 2
+      rarity: "green"
+
+    - item_id: "music_box"
+      name: "八音盒"
+      description: "这个八音盒是我小时候最喜欢的玩具，里面的小人会随着音乐转圈跳舞。但现在它坏了，音乐变得断断续续，小人的动作也变得僵硬扭曲，就像在痛苦地挣扎。"
+      type: "EQUIPMENT"
+      price: 9000
+      durability: 105
+      attr_bonus: {"mp": 65, "luck": 15}
+      attr_ratio: {"mp": 0.16, "luck": 0.08}
+      recipe:
+        materials:
+          withered_flower: 6
+          ghost_tears: 35
+          cursed_silk: 20
+        gold: 1800
+      repair_cost: 10
+      required_level: 38
+      gem_slots: 2
+      rarity: "green"
     # ========== 高级装备 (61-100级) - 比例加成为主，绿色+蓝色材料 ==========
 
     - item_id: "crying_tape"
@@ -592,6 +742,25 @@ items:
         gold: 8000
       repair_cost: 20
       required_level: 70
+      gem_slots: 3
+      rarity: "blue"
+
+    - item_id: "grandfather_clock"
+      name: "老爷钟"
+      description: "这座老爷钟从我记事起就在客厅里，它的钟摆声伴随了我的整个童年。但现在它停了，指针永远指向凌晨3点33分。奇怪的是，每当到了这个时间，我总能听到它在滴答作响。"
+      type: "EQUIPMENT"
+      price: 40000
+      durability: 190
+      attr_bonus: {"defense": 35}
+      attr_ratio: {"mp": 0.30, "defense": 0.12}
+      recipe:
+        materials:
+          time_dust: 1
+          phantom_thread: 20
+          nightmare_silk: 30
+        gold: 13000
+      repair_cost: 25
+      required_level: 92
       gem_slots: 3
       rarity: "blue"
 
@@ -676,6 +845,25 @@ items:
       gem_slots: 4
       rarity: "purple"
 
+    - item_id: "shock_therapy_device"
+      name: "电击治疗仪"
+      description: "这台电击治疗仪曾经用来治疗精神疾病，通过电击来重置患者的大脑。现在我明白了，也许我需要的不是治疗，而是彻底的重启。让电流洗涤我的灵魂，让我重新开始。"
+      type: "EQUIPMENT"
+      price: 135000
+      durability: 290
+      attr_bonus: {"attack": 100, "agility": 70}
+      attr_ratio: {"attack": 0.45, "agility": 0.35}
+      recipe:
+        materials:
+          medical_record: 5
+          void_essence: 12
+          iron_rust: 80
+          phantom_thread: 50
+        gold: 70000
+      repair_cost: 80
+      required_level: 142
+      gem_slots: 4
+      rarity: "purple"
     # ========== 传说装备 (151+级) - 极高比例加成，紫色+橙色材料 ==========
 
     - item_id: "god_tear_amulet"
@@ -779,6 +967,26 @@ items:
       required_level: 90
       gem_slots: 3
       rarity: "blue"
+    
+    - item_id: "reality_suicide_note"
+      name: "现实遗书"
+      description: "这是我写给现实的遗书，每一个字都在否定这个世界的存在。当我写完最后一个字时，现实开始崩塌，虚无开始蔓延。也许毁灭才是真正的解脱。"
+      type: "EQUIPMENT"
+      price: 250000
+      durability: 380
+      attr_bonus: {"attack": 150, "mp": 200}
+      attr_ratio: {"attack": 0.60, "mp": 0.50}
+      recipe:
+        materials:
+          world_fragment: 3
+          time_dust: 8
+          void_essence: 20
+          medical_record: 10
+        gold: 150000
+      repair_cost: 120
+      required_level: 175
+      gem_slots: 5
+      rarity: "orange"
 
     # ========== Boss掉落专属装备（不可锻造）==========
 
@@ -1124,50 +1332,6 @@ items:
       description: "隔绝噪音，放大心声"
       type: "GOODS"
       price: 900
-
-  # 鬼怪碎片（用于合成完整鬼怪）
-  ghost_fragments:
-    - item_id: "insurance_man_fragment"
-      name: "保险鬼的投影"
-      description: "幸福人寿保险员工留下的怨念碎片 📺✨"
-      type: "GHOST_FRAGMENT"
-      price: 20000
-      grudge_value: 10
-
-    - item_id: "black_dog_fragment"
-      name: "黑犬的投影"
-      description: "黑犬留下的怨念碎片 🐶💉"
-      type: "GHOST_FRAGMENT"
-      price: 20000
-      grudge_value: 10
-
-    - item_id: "wang_mei_fragment"
-      name: "王梅的投影"
-      description: "王梅留下的怨念碎片🧠💊"
-      type: "GHOST_FRAGMENT"
-      price: 20000
-      grudge_value: 10
-
-    - item_id: "he_bei_bei_fragment"
-      name: "何贝贝的投影"
-      description: "何贝贝留下的怨念碎片🔍💫"
-      type: "GHOST_FRAGMENT"
-      price: 20000
-      grudge_value: 10
-
-    - item_id: "se_gui_fragment"
-      name: "色鬼的投影"
-      description: "色鬼留下的怨念碎片 💣🔍"
-      type: "GHOST_FRAGMENT"
-      price: 20000
-      grudge_value: 10
-    
-    - item_id: "geng_gui_fragment"
-      name: "耿鬼的投影"
-      description: "耿鬼留下的怨念碎片 🪓👻"
-      type: "GHOST_FRAGMENT"
-      price: 20000
-      grudge_value: 10
 
   gems:  # 宝石类镶嵌物品
     # ========== 暴击佛珠系列（1-10级）==========
