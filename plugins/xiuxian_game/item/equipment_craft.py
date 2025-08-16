@@ -18,7 +18,9 @@ async def _(event: MessageEvent):
     for item_id in config.items_config["by_type"]["EQUIPMENT"]:
         tpl = config.items_config["by_id"].get(item_id)
         if tpl and tpl.recipe:  # 有配方才可锻造
-            craftable.append(tpl.name)
+            # 添加品质颜色标注
+            rarity_display = tpl.get_rarity_display()
+            craftable.append(f"{rarity_display}{tpl.name}")
 
     if not craftable:
         await list_craft_cmd.finish("🧐 目前暂无可锻造装备")

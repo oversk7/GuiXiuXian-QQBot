@@ -112,10 +112,16 @@ class EquipmentUpgradeService:
         """获取升阶所需金币"""
         if current_level >= 10:
             return 0
-        
+
         target_level = current_level + 1
-        # 金币需求指数增长
-        return 1000 * (2 ** target_level)
+        # 金币需求大幅增加，更高的投入要求
+        base_cost = 5000 * (3 ** target_level)  # 基础成本提升
+
+        # 高阶装备额外增加成本
+        if target_level >= 7:
+            base_cost += 100000 * (target_level - 6)  # 7阶以上每阶额外增加10万+
+
+        return base_cost
     
     @classmethod
     def get_success_rate(cls, current_level: int, use_protection: bool = False) -> float:
