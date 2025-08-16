@@ -768,10 +768,10 @@ items:
       name: "幽魂斗篷"
       description: "由幽魂丝线编织的斗篷，穿戴者如鬼魅般难以捉摸。"
       type: "EQUIPMENT"
-      price: 32000
+      price: 30000
       durability: 130
-      attr_bonus: {"agility": 20, "luck": 15}
-      attr_ratio: {"agility": 0.25, "luck": 0.15}
+      attr_bonus: {"agility": 20}
+      attr_ratio: {"agility": 0.25}
       recipe:
         materials:
           phantom_thread: 4
@@ -933,9 +933,9 @@ items:
       name: "雾都风衣"
       description: "这件风衣可以遮住你的面容，隐藏你的体型，掩盖你犯下的所有罪行。（开膛手套装）"
       type: "EQUIPMENT"
-      price: 30000
+      price: 32000
       durability: 100
-      attr_bonus: {"agility": 15, "luck": 8}
+      attr_bonus: {"agility": 15}
       attr_ratio: {"agility": 0.25, "luck": 0.08}
       recipe:
         materials:
