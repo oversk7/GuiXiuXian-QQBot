@@ -674,8 +674,8 @@ items:
       type: "EQUIPMENT"
       price: 13000
       durability: 130
-      attr_bonus: {"mp": 70, "luck": 20}
-      attr_ratio: {"mp": 0.15, "luck": 0.12}
+      attr_bonus: {"mp": 70, "hp": 20}
+      attr_ratio: {"mp": 0.15, "hp": 0.12}
       recipe:
         materials:
           withered_flower: 12
