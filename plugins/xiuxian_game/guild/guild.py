@@ -539,7 +539,10 @@ async def handle_list_guilds(event: MessageEvent, args: Message = CommandArg()):
         base_info = ""
         if g.base_x is not None and g.base_y is not None:
             base_info = f" 基地:({g.base_x},{g.base_y}) 势力:{g.territory_range}"
-        lines.append(f"{idx}. 『{g.name}』 Lv.{g.level} ({cnt}/{cap}){base_info}")
+        lines.append(f"{idx}. 『{g.name}』[ID:{g.id}] Lv.{g.level} ({cnt}/{cap}){base_info}")
+
+    lines.append("━━━━━━━━━━")
+    lines.append("💡 使用【加入公会 公会ID】申请加入公会")
 
     await list_guilds_cmd.finish(message_add_head("\n".join(lines), event))
 
