@@ -14,14 +14,14 @@ class BattleAttributeCalculator:
     
     # 属性上限配置
     ATTRIBUTE_CAPS = {
-        "critical_rate": 95,      # 暴击率
+        "critical_rate": 500,      # 暴击率
         "combo_rate": 60,         # 连击率上限60%
         "counter_rate": 80,       # 反击率上限80%
         "dodge_rate": 500,         # 闪避率
         "accuracy_rate": 500,     # 命中率能和闪避率抵消，所以可以超过100
         "skill_crit_rate": 70,    # 灵爆率上限70%
         "penetration_rate": 100,   # 穿透率
-        "anti_crit_rate": 95     # 抗暴率上限
+        "anti_crit_rate": 500     # 抗暴率上限
     }
     
     # 等级加成配置（移除等级加成，改为装备驱动）
