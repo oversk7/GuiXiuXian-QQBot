@@ -99,7 +99,8 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
                 "",
                 "📝 说明：",
                 f"• 需要消耗 {upgrade_info['required_gem_count']} 个相同镶嵌物进行合成",
-                "• 失败时镶嵌物会消失，使用稳定水晶可保护一个镶嵌物"
+                "• 失败时镶嵌物会降阶（1级镶嵌物失败会消失）",
+                "• 使用稳定水晶可保护一个原等级镶嵌物"
             ])
 
         await gem_upgrade_info_cmd.finish(message_add_head("\n".join(lines), event))

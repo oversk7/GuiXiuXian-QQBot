@@ -88,16 +88,34 @@ class GemUpgradeService:
         current_level = cls.get_gem_level(item_id)
         if current_level == 0 or current_level >= 10:
             return None
-        
+
         base_type = cls.get_gem_base_type(item_id)
         if not base_type:
             return None
-        
+
         next_gem_id = f"{base_type}_{current_level + 1}"
-        
+
         # 验证下一级镶嵌物是否存在
         if config.items_config["by_id"].get(next_gem_id):
             return next_gem_id
+        return None
+
+    @classmethod
+    def get_previous_level_gem_id(cls, item_id: str) -> Optional[str]:
+        """获取前一级镶嵌物的ID"""
+        current_level = cls.get_gem_level(item_id)
+        if current_level <= 1:
+            return None  # 1级镶嵌物没有前一级
+
+        base_type = cls.get_gem_base_type(item_id)
+        if not base_type:
+            return None
+
+        prev_gem_id = f"{base_type}_{current_level - 1}"
+
+        # 验证前一级镶嵌物是否存在
+        if config.items_config["by_id"].get(prev_gem_id):
+            return prev_gem_id
         return None
     
     @classmethod
@@ -283,8 +301,20 @@ class GemUpgradeService:
                 except ValueError:
                     message = f"💔 升级失败！\n⚠️ 背包空间不足，{gem_name} 丢失了\n💰 消耗金币: {required_gold}"
             else:
-                # 没有保护，镶嵌物全部消失
-                message = f"💔 升级失败！\n💀 {gem_name} x{required_gem_count} 全部消失\n💰 消耗金币: {required_gold}"
+                # 没有保护，镶嵌物降阶
+                prev_gem_id = cls.get_previous_level_gem_id(gem_id)
+                if prev_gem_id:
+                    # 有前一级，降阶到前一级
+                    try:
+                        await ItemInstance.add_item(session, player.id, prev_gem_id, 1)
+                        prev_gem_config = config.items_config["by_id"].get(prev_gem_id)
+                        prev_gem_name = prev_gem_config.name if prev_gem_config else prev_gem_id
+                        message = f"💔 升级失败！\n📉 {gem_name} 降阶为 {prev_gem_name}\n💰 消耗金币: {required_gold}"
+                    except ValueError:
+                        message = f"💔 升级失败！\n⚠️ 背包空间不足，镶嵌物丢失了\n💰 消耗金币: {required_gold}"
+                else:
+                    # 已经是1级，无法降阶，直接消失
+                    message = f"💔 升级失败！\n💀 {gem_name} 已是最低等级，升级失败后消失\n💰 消耗金币: {required_gold}"
 
             return False, message, consumed_materials
 
