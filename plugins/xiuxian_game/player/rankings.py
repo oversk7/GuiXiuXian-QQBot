@@ -105,14 +105,14 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
         "每一层诡域，都是对意志的考验。",
         "探索者的足迹，是通往真理的阶梯。"
     ]
-    
+
     quote = random.choice(exploration_quotes)
     lines = ["🌀 探索排行榜", quote, "━━━━━━━━━━━━━"]
-    
+
     for idx, p in enumerate(players, 1):
         # 使用emoji装饰前三名
         rank_emoji = "🥇" if idx == 1 else "🥈" if idx == 2 else "🥉" if idx == 3 else f"{idx}."
-        
+
         # 根据探索层数显示不同的称号
         if p.max_dungeon_level == 0:
             title = "🌱新手探索者"
@@ -126,10 +126,59 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
             title = "👑大师探索者"
         else:
             title = "🌌传说探索者"
-            
+
         lines.append(f"{rank_emoji} {p.nickname}[UID:{p.uid}] - {title} 第{p.max_dungeon_level}层")
 
     await exploration_rank_cmd.finish(message_add_head("\n".join(lines), event))
+
+
+# ==================== 敏捷榜 ====================
+agility_rank_cmd = on_command("敏捷榜", aliases={"速度榜", "敏捷排行榜", "速度排行榜"}, block=True, priority=5)
+
+@agility_rank_cmd.handle()
+async def _(event: MessageEvent, args: Message = CommandArg()):
+    """显示敏捷值最高的前10名玩家"""
+    async with safe_session() as session:
+        stmt = select(Player).order_by(Player.agility.desc()).limit(10)
+        players = (await session.execute(stmt)).scalars().all()
+
+    if not players:
+        await agility_rank_cmd.finish("暂无排行榜数据")
+
+    agility_quotes = [
+        "疾如风，徐如林，侵掠如火，不动如山。",
+        "速度不仅是力量，更是智慧的体现。",
+        "在瞬息万变的战场上，敏捷决定生死。",
+        "身如闪电，心如止水，这便是敏捷的真谛。",
+        "快者为王，慢者为寇。"
+    ]
+
+    quote = random.choice(agility_quotes)
+    lines = ["⚡ 敏捷排行榜", quote, "━━━━━━━━━━━━━"]
+
+    for idx, p in enumerate(players, 1):
+        # 使用emoji装饰前三名
+        rank_emoji = "🥇" if idx == 1 else "🥈" if idx == 2 else "🥉" if idx == 3 else f"{idx}."
+
+        # 根据敏捷值显示不同的称号
+        if p.agility < 10:
+            title = "🐌迟缓者"
+        elif p.agility < 30:
+            title = "🚶‍♂️步行者"
+        elif p.agility < 60:
+            title = "🏃‍♂️奔跑者"
+        elif p.agility < 100:
+            title = "🦌疾风者"
+        elif p.agility < 150:
+            title = "⚡闪电者"
+        elif p.agility < 200:
+            title = "🌪️风暴者"
+        else:
+            title = "💫光速者"
+
+        lines.append(f"{rank_emoji} {p.nickname}[UID:{p.uid}] - {title} ⚡{p.agility}")
+
+    await agility_rank_cmd.finish(message_add_head("\n".join(lines), event))
 
 
 # ==================== 排行榜总览 ====================
@@ -146,6 +195,7 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
         "🍀 【幸运榜】 - 查看幸运排行",
         "💰 【财富榜】 - 查看财富排行",
         "🌀 【探索榜】 - 查看探索排行",
+        "⚡ 【敏捷榜】 - 查看敏捷排行",
         "",
         "🏛️ 系统排行榜：",
         "🏦 【存款榜】 - 查看存款排行",
@@ -156,5 +206,5 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
         "━━━━━━━━━━━━━",
         "💡 发送对应指令查看详细排行榜"
     ]
-    
+
     await all_rankings_cmd.finish(message_add_head("\n".join(lines), event))
