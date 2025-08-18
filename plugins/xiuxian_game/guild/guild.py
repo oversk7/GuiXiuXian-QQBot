@@ -7,7 +7,7 @@ from datetime import datetime, date
 from ..models.db import safe_session
 from ..models.player import Player
 from ..models.inventory import ItemInstance
-from ..models.guild import Guild, GuildMember, GuildPosition, BuildingType
+from ..models.guild import Guild, GuildMember, GuildPosition, BuildingType, GuildWarehouseItem
 from ..config import config
 from ..utils import message_add_head
 from ..models.social_application import SocialApplication, ApplicationType, ApplicationStatus
@@ -1104,7 +1104,10 @@ async def handle_guild_warehouse(event: MessageEvent):
             await guild_warehouse_cmd.finish("⛔ 公会尚未建造仓库")
 
         items = await GuildFacilityService.get_warehouse_items(session, player.guild_id)
-        current_slots_used = len(items)  # 格子数等于实际的堆叠数量
+
+        # 获取实际占用的格子数（数据库中的记录数，每个记录代表一个堆叠）
+        stmt = select(_func.count(GuildWarehouseItem.id)).where(GuildWarehouseItem.guild_id == player.guild_id)
+        current_slots_used = (await session.execute(stmt)).scalar_one() or 0
 
         if not items:
             msg = f"📦 公会『{guild.name}』仓库\n━━━━━━━━━━\n格子：{current_slots_used}/{capacity}\n暂无物品\n━━━━━━━━━━\n使用【存入仓库 <物品名> <数量>】存入物品"
