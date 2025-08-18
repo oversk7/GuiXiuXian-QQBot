@@ -72,6 +72,16 @@ CATEGORY_MAPPING = {
     "宝石": "GEM",
 }
 
+# 物品类型中文映射（用于显示）
+TYPE_NAME_MAP = {
+    "CONSUMABLE": "消耗品",
+    "MATERIAL": "材料",
+    "EQUIPMENT": "装备",
+    "GOODS": "商品",
+    "GHOST_FRAGMENT": "鬼怪碎片",
+    "GEM": "宝石"
+}
+
 # 默认展示顺序（决定排序权重）
 CATEGORY_ORDER = [
     "CONSUMABLE_NON_ELIXIR",  # 普通消耗品（不含丹药）
@@ -411,12 +421,20 @@ async def handle_inventory(event: MessageEvent, args: Message = CommandArg()):
             else:
                 # 普通物品显示总数量
                 total_quantity = sum(item.quantity for item in matching_items)
+
+                # 获取物品类型的中文名称
+                type_cn = TYPE_NAME_MAP.get(item_config.type.value, item_config.type.value)
+
+                # 特殊处理丹药类型
+                if item_config.item_id.endswith("_elixir"):
+                    type_cn = "丹药"
+
                 lines = [
                     f"🔍 物品查询结果",
                     f"━━━━━━━━━━━━━",
                     f"📦 物品名称：{item_config.name}",
                     f"🔢 拥有数量：{total_quantity}",
-                    f"📋 物品类型：{item_config.type.value}",
+                    f"📋 物品类型：{type_cn}",
                     f"📝 物品描述：{item_config.description}"
                 ]
 
