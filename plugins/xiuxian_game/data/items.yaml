@@ -1246,46 +1246,45 @@ items:
 
     - item_id: "swift_wind_elixir"
       name: "疾风丹"
-      description: "身轻如燕，大幅提升敏捷度。持续30分钟。"
+      description: "身轻如燕，敏捷+100，持续30分钟。"
       type: "CONSUMABLE"
       price: 5000
       effect_type: "TEMPORARY_BUFF"
       effect_params:
         buff_name: "疾风状态"
-        agility: 50
+        agility: 100
         duration_minutes: 30
       daily_limit: 5
 
     - item_id: "berserker_elixir"
       name: "狂战丹"
-      description: "进入狂战状态，大幅提升攻击力和暴击率，但降低防御。持续15分钟。"
+      description: "进入狂战状态，暴击率+15%，但降低100防御。持续15分钟。"
       type: "CONSUMABLE"
       price: 15000
       effect_type: "TEMPORARY_BUFF"
       effect_params:
         buff_name: "狂战状态"
-        attack: 25
         critical_rate: 15
-        defense: -5
+        defense: -100
         duration_minutes: 15
       daily_limit: 2
 
     - item_id: "shadow_step_elixir"
       name: "影步丹"
-      description: "身如鬼魅，大幅提升敏捷和闪避率。持续25分钟。"
+      description: "身如鬼魅，敏捷+200，闪避率+10%。持续25分钟。"
       type: "CONSUMABLE"
       price: 12000
       effect_type: "TEMPORARY_BUFF"
       effect_params:
         buff_name: "影步状态"
-        agility: 20
-        dodge_rate: 20
+        agility: 200
+        dodge_rate: 10
         duration_minutes: 25
       daily_limit: 3
 
     - item_id: "eagle_eye_elixir"
       name: "鹰眼丹"
-      description: "目光如鹰，大幅提升命中率和暴击率。持续15分钟。"
+      description: "目光如鹰，命中率+12%，暴击率+25%。持续15分钟。"
       type: "CONSUMABLE"
       price: 12000
       effect_type: "TEMPORARY_BUFF"
@@ -1298,14 +1297,14 @@ items:
 
     - item_id: "combo_master_elixir"
       name: "连击丹"
-      description: "招式连绵不绝，大幅提升连击率和反击率。持续15分钟。"
+      description: "招式连绵不绝，连击率+20%，反击率+10%。持续15分钟。"
       type: "CONSUMABLE"
       price: 18000
       effect_type: "TEMPORARY_BUFF"
       effect_params:
         buff_name: "连击大师"
-        combo_rate: 30
-        counter_rate: 25
+        combo_rate: 20
+        counter_rate: 10
         duration_minutes: 15
       daily_limit: 2
 
