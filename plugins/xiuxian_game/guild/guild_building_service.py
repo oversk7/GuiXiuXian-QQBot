@@ -24,7 +24,12 @@ class GuildBuildingService:
                 2: {"exp_multiplier": 1.2},
                 3: {"exp_multiplier": 1.3},
                 4: {"exp_multiplier": 1.4},
-                5: {"exp_multiplier": 1.5}
+                5: {"exp_multiplier": 1.5},
+                6: {"exp_multiplier": 1.6},
+                7: {"exp_multiplier": 1.7},
+                8: {"exp_multiplier": 1.8},
+                9: {"exp_multiplier": 1.9},
+                10: {"exp_multiplier": 2.0}
             }
         },
         BuildingType.TREASURY_VAULT: {
@@ -35,7 +40,9 @@ class GuildBuildingService:
             "effects": {
                 1: {"treasury_limit": 500000},
                 2: {"treasury_limit": 1000000},
-                3: {"treasury_limit": 2000000}
+                3: {"treasury_limit": 2000000},
+                4: {"treasury_limit": 5000000},
+                5: {"treasury_limit": 10000000},
             }
         },
         BuildingType.TRAINING_GROUND: {
@@ -54,12 +61,14 @@ class GuildBuildingService:
         BuildingType.TELEPORT_ARRAY: {
             "name": "传送阵",
             "description": "允许公会成员传送到基地",
-            "max_level": 3,
+            "max_level": 5,
             "base_cost": {"gold": 100000, "materials": {"墓土": 300, "诡异石": 80, "灵石": 50}},
             "effects": {
                 1: {"teleport_range": 50, "daily_uses": 1},
                 2: {"teleport_range": 100, "daily_uses": 1},
-                3: {"teleport_range": 200, "daily_uses": 2}
+                3: {"teleport_range": 200, "daily_uses": 2},
+                4: {"teleport_range": 300, "daily_uses": 2},
+                5: {"teleport_range": 500, "daily_uses": 2}
             }
         },
         BuildingType.ALCHEMY_ROOM: {
