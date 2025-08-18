@@ -17,7 +17,7 @@ class GuildBuildingService:
         BuildingType.EXPERIENCE_SHRINE: {
             "name": "经验神龛",
             "description": "提升公会经验转换倍率",
-            "max_level": 5,
+            "max_level": 10,
             "base_cost": {"gold": 50000, "materials": {"墓土": 200, "阴煞精华": 50, "血肉结晶": 20}},
             "effects": {
                 1: {"exp_multiplier": 1.1},
@@ -35,7 +35,7 @@ class GuildBuildingService:
         BuildingType.TREASURY_VAULT: {
             "name": "资金金库",
             "description": "增加公会资金上限",
-            "max_level": 3,
+            "max_level": 5,
             "base_cost": {"gold": 80000, "materials": {"墓土": 150, "诡异石": 30, "魂魄结晶": 15}},
             "effects": {
                 1: {"treasury_limit": 500000},
