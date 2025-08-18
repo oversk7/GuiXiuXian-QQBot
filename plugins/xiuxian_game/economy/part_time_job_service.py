@@ -315,8 +315,11 @@ class PartTimeJobService:
         # 格式化时间显示
         duration = job_config['duration_hours']
         if duration < 1:
-            minutes = int(duration * 60)
-            time_str = f"{minutes}分钟"
+            minutes = round(duration * 60, 1)
+            if minutes == int(minutes):
+                time_str = f"{int(minutes)}分钟"
+            else:
+                time_str = f"{minutes}分钟"
         else:
             time_str = f"{duration}小时"
 

@@ -61,8 +61,11 @@ async def handle_work(event: MessageEvent, args: Message = CommandArg()):
                 # 格式化时间显示
                 duration = job['duration_hours']
                 if duration < 1:
-                    minutes = int(duration * 60)
-                    time_str = f"{minutes}分钟"
+                    minutes = round(duration * 60, 1)
+                    if minutes == int(minutes):
+                        time_str = f"{int(minutes)}分钟"
+                    else:
+                        time_str = f"{minutes}分钟"
                 else:
                     time_str = f"{duration}小时"
 
@@ -112,8 +115,11 @@ async def handle_work(event: MessageEvent, args: Message = CommandArg()):
             # 格式化工作时长显示
             duration = job_config['duration_hours']
             if duration < 1:
-                minutes = int(duration * 60)
-                duration_str = f"{minutes}分钟"
+                minutes = round(duration * 60, 1)
+                if minutes == int(minutes):
+                    duration_str = f"{int(minutes)}分钟"
+                else:
+                    duration_str = f"{minutes}分钟"
             else:
                 duration_str = f"{duration}小时"
 
