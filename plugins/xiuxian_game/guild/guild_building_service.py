@@ -87,12 +87,14 @@ class GuildBuildingService:
         BuildingType.GUILD_WAREHOUSE: {
             "name": "公会仓库",
             "description": "提供公共空间存放物品",
-            "max_level": 3,
+            "max_level": 5,
             "base_cost": {"gold": 70000, "materials": {"墓土": 250, "灵石": 50, "诅咒丝线": 30, "铁锈": 30}},
             "effects": {
                 1: {"storage_slots": 30},
                 2: {"storage_slots": 50},
-                3: {"storage_slots": 100}
+                3: {"storage_slots": 100},
+                4: {"storage_slots": 200},
+                5: {"storage_slots": 300}
             }
         }
         # 注意：灵塔和防御城墙暂时下架，功能还不稳定
