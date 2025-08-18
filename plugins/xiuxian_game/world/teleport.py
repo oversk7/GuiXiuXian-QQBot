@@ -111,7 +111,7 @@ async def _handle_teleport_logic(event: MessageEvent, target_region: str, cmd_ha
         # 在进入诡域前，若存在导航，则推进至当前时间（作用于现实世界坐标）
         if nav_task:
             from ..world.navigation import _update_nav_position
-            _update_nav_position(player, nav_task)
+            await _update_nav_position(player, nav_task, session)
             # 不删除任务，保留以便返回后继续/完成
 
         # 扣除咒抗
@@ -191,7 +191,7 @@ async def handle_revive(event: MessageEvent):
         from ..world.navigation import _update_nav_position
         nav_task = await session.get(NavigationTask, player.id)
         if nav_task:
-            reached = _update_nav_position(player, nav_task)
+            reached = await _update_nav_position(player, nav_task, session)
             if reached:
                 await session.delete(nav_task)
 

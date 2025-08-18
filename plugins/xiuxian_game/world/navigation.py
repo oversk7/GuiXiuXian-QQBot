@@ -64,7 +64,7 @@ def _move_towards(curr_x: int, curr_y: int, target_x: int, target_y: int, distan
     return round(new_x), round(new_y)
 
 
-def _update_nav_position(player: Player, task: NavigationTask | None) -> bool:
+async def _update_nav_position(player: Player, task: NavigationTask | None, session=None) -> bool:
     """根据经过时间推进现实世界导航进度，返回是否到达目标。
 
     设计要点：
@@ -81,7 +81,13 @@ def _update_nav_position(player: Player, task: NavigationTask | None) -> bool:
     if elapsed <= 0:
         return False
 
-    speed = _tiles_per_second(player.agility)
+    # 获取有效敏捷值（包含临时buff加成）
+    effective_agility = player.agility
+    if session:
+        effective_attrs = await player.get_effective_attributes(session)
+        effective_agility = effective_attrs.get("agility", player.agility)
+
+    speed = _tiles_per_second(effective_agility)
     movable_distance = elapsed * speed
     if movable_distance <= 0:
         return False
@@ -122,7 +128,7 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
 
         # 处理已有导航：先更新位置
         task: NavigationTask | None = await session.get(NavigationTask, player.id)
-        reached = _update_nav_position(player, task)
+        reached = await _update_nav_position(player, task, session)
         if reached and task:
             # 已到达则删除任务记录
             await session.delete(task)
@@ -144,7 +150,10 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
             # -------- 计算实时展示坐标（现实世界） --------
             now_p = datetime.now()
             elapsed_p = (now_p - task.last_update).total_seconds()
-            speed_p = _tiles_per_second(player.agility)
+            # 获取有效敏捷值（包含临时buff加成）
+            effective_attrs = await player.get_effective_attributes(session)
+            effective_agility = effective_attrs.get("agility", player.agility)
+            speed_p = _tiles_per_second(effective_agility)
             move_distance = elapsed_p * speed_p
 
             base_x, base_y = _real_coords(player)
@@ -165,7 +174,8 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
             disp_y = round(disp_y, 1)
 
             # 速度 & 预计剩余时间（使用欧几里得距离，基于现实坐标）
-            speed_now = _tiles_per_second(player.agility)
+            # 使用已计算的有效敏捷值
+            speed_now = speed_p  # 复用上面计算的有效速度
             rem_distance = _euclidean_distance(base_x, base_y, target_x, target_y)
             eta_sec = rem_distance / speed_now if speed_now > 0 else 0
             eta_td = timedelta(seconds=int(eta_sec))
@@ -200,7 +210,10 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
             task = NavigationTask(player_id=player.id, target_x=tx, target_y=ty, last_update=datetime.now())
             session.add(task)
         # 速度与预计时间（使用欧几里得距离，基于现实坐标）
-        speed_now = _tiles_per_second(player.agility)
+        # 获取有效敏捷值（包含临时buff加成）
+        effective_attrs = await player.get_effective_attributes(session)
+        effective_agility = effective_attrs.get("agility", player.agility)
+        speed_now = _tiles_per_second(effective_agility)
         # 基于现实坐标计算剩余距离
         base_x, base_y = float(player.real_world_x or 0), float(player.real_world_y or 0)
         rem_distance = _euclidean_distance(base_x, base_y, tx, ty)
@@ -234,7 +247,7 @@ async def _(event: MessageEvent):
         if not task:
             await stop_nav_cmd.finish("ℹ️ 当前未在导航中。")
 
-        _update_nav_position(player, task)
+        await _update_nav_position(player, task, session)
         await session.delete(task)
         await session.commit()
         # 展示现实坐标

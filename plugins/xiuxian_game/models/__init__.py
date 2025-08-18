@@ -35,6 +35,8 @@ from .dungeon_chest_record import DungeonChestRecord
 # 地点和NPC管理系统模型
 from .location import Location
 from .npc import NPC, NPCType, NPCStatus
+# 临时buff系统模型
+from .temporary_buff import TemporaryBuff
 
 __all__ = [
     "Player", "Guild", "GuildMember", "GuildBuilding", "GuildPosition", "BuildingType", "WorldMessage", "BankAccount", "ItemInstance", "WorldTile", "NavigationTask", "AlchemyRecord", "MarketOrder",

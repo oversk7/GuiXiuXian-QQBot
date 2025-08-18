@@ -9,7 +9,7 @@ from typing import Callable, Awaitable, Dict, Tuple
 from ..models.player import Player
 from ..models.inventory import ItemEffectType, ItemConfig, ItemInstance, ItemType
 from ..models.elixir_usage import ElixirUsageLog
-from datetime import date
+from datetime import date, datetime, timedelta
 
 # 类型别名
 EffectHandler = Callable[[Player, ItemConfig, int, str, object], Awaitable[Tuple[bool, str]]]
@@ -177,6 +177,90 @@ async def _buff(player: Player, cfg: ItemConfig, qty: int, ctx: str, session=Non
     if not changed:
         return False, "⛔ 增益属性无效"
     return True, f"✨ 获得增益：{', '.join(changed)}"
+
+
+@register(ItemEffectType.TEMPORARY_BUFF)
+async def _temporary_buff(player: Player, cfg: ItemConfig, qty: int, ctx: str, session=None) -> Tuple[bool, str]:
+    """临时属性加成丹药：创建有时间限制的临时buff"""
+    if not session:
+        return False, "⛔ 系统错误：缺少数据库会话"
+
+    # 获取丹药配置
+    effect_params = cfg.effect_params or {}
+    if not effect_params:
+        return False, "⛔ 该丹药没有任何增益效果"
+
+    # 获取持续时间（分钟）
+    duration_minutes = effect_params.get("duration_minutes", 30)  # 默认30分钟
+    buff_name = effect_params.get("buff_name", cfg.name)
+
+    # 提取属性加成
+    attribute_bonuses = {}
+    for key, value in effect_params.items():
+        if key not in ["duration_minutes", "buff_name"] and hasattr(player, key):
+            attribute_bonuses[key] = int(value) * qty
+
+    if not attribute_bonuses:
+        return False, "⛔ 该丹药没有有效的属性加成"
+
+    # 创建临时buff
+    from ..models.temporary_buff import TemporaryBuff
+
+    buff_id = f"{cfg.item_id}_buff"
+    buff = await TemporaryBuff.create_buff(
+        session=session,
+        player_id=player.id,
+        buff_id=buff_id,
+        buff_name=buff_name,
+        attribute_bonuses=attribute_bonuses,
+        duration_minutes=duration_minutes,
+        source_item_id=cfg.item_id,
+        source_description=f"使用{cfg.name}获得"
+    )
+
+    # 格式化属性加成显示
+    ATTRIBUTE_MAP = {
+        "max_hp": "体",
+        "max_mp": "智",
+        "attack": "力",
+        "defense": "防",
+        "agility": "敏",
+        "luck": "运",
+        "critical_rate": "暴击率",
+        "critical_power": "暴击力",
+        "combo_rate": "连击率",
+        "counter_rate": "反击率",
+        "dodge_rate": "闪避率",
+        "accuracy_rate": "命中率",
+        "skill_crit_rate": "灵爆率",
+        "penetration_rate": "穿透率",
+        "anti_crit_rate": "抗暴率"
+    }
+
+    bonus_strs = []
+    for attr, value in attribute_bonuses.items():
+        attr_name = ATTRIBUTE_MAP.get(attr, attr)
+        if value > 0:
+            bonus_strs.append(f"{attr_name}+{value}")
+        elif value < 0:
+            bonus_strs.append(f"{attr_name}{value}")
+
+    # 格式化时间显示
+    if duration_minutes >= 60:
+        hours = duration_minutes // 60
+        minutes = duration_minutes % 60
+        time_str = f"{hours}小时{minutes}分钟" if minutes > 0 else f"{hours}小时"
+    else:
+        time_str = f"{duration_minutes}分钟"
+
+    bonus_text = ", ".join(bonus_strs)
+
+    # 更新使用记录
+    if session:
+        await update_elixir_usage(session, player, cfg, qty)
+
+    return True, f"✨ 获得临时增益：{bonus_text}\n⏰ 持续时间：{time_str}"
+
 
 @register(ItemEffectType.GAIN_EXP)
 async def _gain_exp(player: Player, cfg: ItemConfig, qty: int, ctx: str, session=None) -> Tuple[bool, str]:
@@ -890,3 +974,67 @@ async def _world_boss_chest(player: Player, cfg: ItemConfig, qty: int, ctx: str,
     result_lines.append(random.choice(flavor_texts))
 
     return True, "\n".join(result_lines)
+
+
+# ============== 临时buff管理功能 ==============
+
+async def get_player_buff_status(session, player: Player) -> str:
+    """获取玩家的临时buff状态信息"""
+    from ..models.temporary_buff import TemporaryBuff
+
+    # 清理过期buff
+    await TemporaryBuff.cleanup_expired_buffs(session, player.id)
+
+    # 获取激活的buff
+    active_buffs = await TemporaryBuff.get_active_buffs(session, player.id)
+
+    if not active_buffs:
+        return "🌟 当前没有任何临时增益效果"
+
+    lines = [
+        "✨ 当前临时增益状态",
+        "━━━━━━━━━━━━━"
+    ]
+
+    for buff in active_buffs:
+        lines.append(buff.format_display())
+
+    # 显示总属性加成
+    total_bonuses = await TemporaryBuff.get_total_attribute_bonuses(session, player.id)
+    if total_bonuses:
+        lines.append("")
+        lines.append("📊 总属性加成：")
+
+        attr_map = {
+            "max_hp": "体",
+            "max_mp": "智",
+            "attack": "力",
+            "defense": "防",
+            "agility": "敏",
+            "luck": "运",
+            "critical_rate": "暴击率",
+            "critical_power": "暴击力",
+            "combo_rate": "连击率",
+            "counter_rate": "反击率",
+            "dodge_rate": "闪避率",
+            "accuracy_rate": "命中率",
+            "skill_crit_rate": "灵爆率",
+            "penetration_rate": "穿透率",
+            "anti_crit_rate": "抗暴率"
+        }
+
+        bonus_strs = []
+        for attr, value in total_bonuses.items():
+            attr_name = attr_map.get(attr, attr)
+            if value > 0:
+                bonus_strs.append(f"{attr_name}+{value}")
+            elif value < 0:
+                bonus_strs.append(f"{attr_name}{value}")
+
+        if bonus_strs:
+            lines.append(f"  {', '.join(bonus_strs)}")
+
+    lines.append("")
+    lines.append("💡 提示：临时增益会在时间到期后自动消失")
+
+    return "\n".join(lines)

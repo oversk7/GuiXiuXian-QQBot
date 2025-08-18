@@ -181,13 +181,20 @@ class Player(Base):
         benefits = await get_player_card_benefits(session, self.id)
         return self.inventory_capacity + benefits["inventory_bonus"]
 
-    def get_effective_battle_attributes(self, session=None) -> dict:
-        """获取有效战斗属性（包含装备加成）
+    async def get_effective_attributes(self, session=None) -> dict:
+        """获取有效属性（包含装备加成、丹药加成和临时buff加成）
 
-        返回格式化后的战斗属性字典，数值为百分比形式
+        返回包含所有属性的字典，这是玩家的最终有效属性
+        注意：装备加成已经通过_persist_bonus机制直接应用到玩家属性上
         """
-        # 基础属性值
+        # 当前属性值（已包含装备加成和永久丹药加成）
         base_attrs = {
+            "max_hp": self.max_hp,
+            "max_mp": self.max_mp,
+            "attack": self.attack,
+            "defense": self.defense,
+            "agility": self.agility,
+            "luck": self.luck,
             "critical_rate": self.critical_rate,
             "critical_power": self.critical_power,
             "combo_rate": self.combo_rate,
@@ -199,13 +206,147 @@ class Player(Base):
             "anti_crit_rate": self.anti_crit_rate
         }
 
-        # TODO: 后续添加装备加成计算
-        # if session:
-        #     equipment_bonus = await self._get_equipment_battle_bonus(session)
-        #     for attr, bonus in equipment_bonus.items():
-        #         base_attrs[attr] = min(base_attrs[attr] + bonus, self._get_attr_cap(attr))
+        # 添加临时buff加成
+        if session:
+            from .temporary_buff import TemporaryBuff
+            buff_bonuses = await TemporaryBuff.get_total_attribute_bonuses(session, self.id)
+            for attr, bonus in buff_bonuses.items():
+                if attr in base_attrs:
+                    base_attrs[attr] += bonus
 
         return base_attrs
+
+    async def get_effective_battle_attributes(self, session=None) -> dict:
+        """获取有效战斗属性（仅包含战斗相关属性）
+
+        返回格式化后的战斗属性字典，用于战斗系统
+        这是get_effective_attributes的子集，只包含战斗相关属性
+        """
+        # 获取完整的有效属性
+        all_attrs = await self.get_effective_attributes(session)
+
+        # 只返回战斗相关属性
+        battle_attrs = {
+            "critical_rate": all_attrs["critical_rate"],
+            "critical_power": all_attrs["critical_power"],
+            "combo_rate": all_attrs["combo_rate"],
+            "counter_rate": all_attrs["counter_rate"],
+            "dodge_rate": all_attrs["dodge_rate"],
+            "accuracy_rate": all_attrs["accuracy_rate"],
+            "skill_crit_rate": all_attrs["skill_crit_rate"],
+            "penetration_rate": all_attrs["penetration_rate"],
+            "anti_crit_rate": all_attrs["anti_crit_rate"]
+        }
+
+        return battle_attrs
+
+    async def get_attribute_breakdown(self, session=None) -> dict:
+        """获取属性来源分解（基础、装备、丹药、临时buff）
+
+        返回格式：
+        {
+            "base": {...},      # 基础属性（无任何加成）
+            "equipment": {...}, # 装备加成
+            "elixir": {...},    # 永久丹药加成
+            "temporary": {...}, # 临时buff加成
+            "total": {...}      # 最终有效属性
+        }
+        """
+        # 获取基础属性（从初始值和加点计算）
+        from ..config import config as gcfg
+        from ..models.elixir_usage import ElixirUsageLog
+        from sqlalchemy import select
+
+        # 初始基础属性
+        INIT_ATTRS = {
+            "max_hp": 20,
+            "max_mp": 20,
+            "attack": 1,
+            "defense": 5,
+            "agility": 5,
+            "luck": 1,
+            "critical_rate": 5,
+            "critical_power": 0,
+            "combo_rate": 0,
+            "counter_rate": 0,
+            "dodge_rate": 0,
+            "accuracy_rate": 80,
+            "skill_crit_rate": 0,
+            "penetration_rate": 0,
+            "anti_crit_rate": 0
+        }
+
+        # 计算丹药加成
+        elixir_bonus = {k: 0 for k in INIT_ATTRS}
+        if session:
+            stmt = select(ElixirUsageLog).where(ElixirUsageLog.player_id == self.id)
+            logs = (await session.execute(stmt)).scalars().all()
+
+            elixir_usage_total = {}
+            for log in logs:
+                if log.item_id not in elixir_usage_total:
+                    elixir_usage_total[log.item_id] = 0
+                elixir_usage_total[log.item_id] += log.quantity
+
+            for item_id, total_qty in elixir_usage_total.items():
+                item_cfg = gcfg.items_config["by_id"].get(item_id)
+                if item_cfg and item_cfg.effect_type.value == "BUFF":
+                    effect_params = item_cfg.effect_params or {}
+                    for attr, value in effect_params.items():
+                        if attr in elixir_bonus:
+                            elixir_bonus[attr] += int(value) * total_qty
+
+        # 计算基础属性（初始值 + 丹药加成 + 加点）
+        base_attrs = {}
+        for attr in INIT_ATTRS:
+            base_value = INIT_ATTRS[attr] + elixir_bonus.get(attr, 0)
+            # 这里应该加上加点的属性，但目前简化处理
+            base_attrs[attr] = base_value
+
+        # 计算装备加成
+        equipment_bonus = {k: 0 for k in INIT_ATTRS}
+        if session:
+            from sqlalchemy import select
+            from ..models.inventory import ItemInstance
+
+            stmt = select(ItemInstance).where(
+                ItemInstance.player_id == self.id,
+                ItemInstance.equipped == True,
+                ItemInstance.item_id.in_(gcfg.items_config["by_type"]["EQUIPMENT"])
+            )
+            equipped_items = (await session.execute(stmt)).scalars().all()
+
+            for eq in equipped_items:
+                delta = (eq.extra_attrs or {}).get("_persist_bonus", {})
+                for k, v in delta.items():
+                    if k in equipment_bonus:
+                        equipment_bonus[k] += int(v)
+
+        # 计算临时buff加成
+        temporary_bonus = {k: 0 for k in INIT_ATTRS}
+        if session:
+            from .temporary_buff import TemporaryBuff
+            buff_bonuses = await TemporaryBuff.get_total_attribute_bonuses(session, self.id)
+            for attr, bonus in buff_bonuses.items():
+                if attr in temporary_bonus:
+                    temporary_bonus[attr] = bonus
+
+        # 计算最终属性
+        total_attrs = {}
+        for attr in INIT_ATTRS:
+            total_attrs[attr] = (
+                base_attrs[attr] +
+                equipment_bonus[attr] +
+                temporary_bonus[attr]
+            )
+
+        return {
+            "base": base_attrs,
+            "equipment": equipment_bonus,
+            "elixir": elixir_bonus,
+            "temporary": temporary_bonus,
+            "total": total_attrs
+        }
 
     def _get_attr_cap(self, attr_name: str) -> int:
         """获取属性上限值"""

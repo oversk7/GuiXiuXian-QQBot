@@ -138,3 +138,57 @@ elixirs:
       demon_heart: 2        # 紫色材料
     quantity: 1
     base_success: 0.3
+
+  # ========== 临时增益丹药配方 ==========
+
+  # 疾风丹 - 基础敏捷增益丹药 (1-30级)
+  swift_wind:
+    produce_item_id: "swift_wind_elixir"
+    materials:
+      cursed_silk: 20       # 白色材料
+      ghost_tears: 15       # 白色材料
+      ash_powder: 12        # 白色材料
+    quantity: 1
+    base_success: 0.85
+
+  # 狂战丹 - 中级战斗增益丹药 (31-60级)
+  berserker:
+    produce_item_id: "berserker_elixir"
+    materials:
+      corrupted_bandage: 6  # 绿色材料
+      withered_flower: 4    # 绿色材料
+      spirit_bone: 25       # 白色材料
+      iron_rust: 20         # 白色材料
+    quantity: 1
+    base_success: 0.7
+
+  # 影步丹 - 高级敏捷增益丹药 (61-100级)
+  shadow_step:
+    produce_item_id: "shadow_step_elixir"
+    materials:
+      phantom_thread: 5     # 蓝色材料
+      nightmare_silk: 12    # 绿色材料
+      cursed_silk: 30       # 白色材料
+    quantity: 1
+    base_success: 0.65
+
+  # 鹰眼丹 - 高级精准增益丹药 (61-100级)
+  eagle_eye:
+    produce_item_id: "eagle_eye_elixir"
+    materials:
+      cursed_mirror_shard: 3 # 蓝色材料
+      school_bell_fragment: 8 # 绿色材料
+      ghost_tears: 40       # 白色材料
+    quantity: 1
+    base_success: 0.65
+
+  # 连击丹 - 高级连击增益丹药 (61-100级)
+  combo_master:
+    produce_item_id: "combo_master_elixir"
+    materials:
+      flesh_crystal: 4      # 蓝色材料
+      nightmare_silk: 15    # 绿色材料
+      corrupted_bandage: 10 # 绿色材料
+      spirit_bone: 35       # 白色材料
+    quantity: 1
+    base_success: 0.6

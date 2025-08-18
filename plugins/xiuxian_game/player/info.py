@@ -142,7 +142,7 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
         player_upd = await session_nav.get(Player, player.id)
         task = await session_nav.get(NavigationTask, player.id)
         if player_upd and task:
-            reached = _update_nav_position(player_upd, task)
+            reached = await _update_nav_position(player_upd, task, session_nav)
             if reached:
                 await session_nav.delete(task)
             await session_nav.commit()
