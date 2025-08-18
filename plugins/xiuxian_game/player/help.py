@@ -255,7 +255,8 @@ async def handle_equip(event: MessageEvent, args: Message = CommandArg()):
         "⚠️ 等级限制：装备有等级要求，等级不足无法穿戴\n"
         "⚠️ 升阶说明：等阶越高成功率越低，失败可能降级或损坏\n"
         "⚠️ 镶嵌说明：需要镶嵌锤，拆卸需要拆卸凿，有损坏风险\n"
-        "⚠️ 镶嵌物升级：失败时降阶，稳定水晶可保护"
+        "⚠️ 镶嵌物升级：失败时降阶（1级失败会消失），稳定水晶可保护\n"
+        "⚠️ 装备损坏：装备升阶失败损坏时，会随机回收一个镶嵌物"
     )
     await equip_cmd.finish(Message(msg))
 

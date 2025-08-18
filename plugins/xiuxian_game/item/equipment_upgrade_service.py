@@ -270,10 +270,21 @@ class EquipmentUpgradeService:
             
             # 检查是否损坏
             if random.random() < consequence["destroy"]:
-                # 装备损坏
+                # 装备损坏前，先回收镶嵌的宝石
+                recovered_gems = await cls._recover_gems_from_equipment(session, equipment, player)
+
+                # 删除装备
                 await session.delete(equipment)
                 result_info["result"] = "destroyed"
-                return False, f"💥 升阶失败，装备已损坏！", result_info
+
+                # 构建消息
+                message = "💥 升阶失败，装备已损坏！"
+                if recovered_gems:
+                    message += f"\n💎 随机回收镶嵌物：{', '.join(recovered_gems)}"
+                else:
+                    message += "\n💀 装备上没有镶嵌物可回收"
+
+                return False, message, result_info
             
             # 装备降级
             downgrade_levels = consequence["downgrade"]
@@ -286,3 +297,51 @@ class EquipmentUpgradeService:
             else:
                 result_info["result"] = "failed_no_change"
                 return False, f"💔 升阶失败，装备等级不变", result_info
+
+    @classmethod
+    async def _recover_gems_from_equipment(cls, session: AsyncSession, equipment: ItemInstance, player: Player) -> List[str]:
+        """
+        从装备中随机回收一个镶嵌的宝石
+        返回回收的宝石名称列表
+        """
+        import random
+        from ..models.inventory import ItemInstance
+        from ..config import config
+
+        recovered_gems = []
+
+        if not equipment.is_equipment or not equipment.gem_slots_data:
+            return recovered_gems
+
+        # 收集所有镶嵌的宝石
+        available_gems = []
+        for slot_index, gem_item_id in equipment.gem_slots_data.items():
+            if gem_item_id:
+                available_gems.append(gem_item_id)
+
+        # 如果没有镶嵌的宝石，直接返回
+        if not available_gems:
+            return recovered_gems
+
+        # 随机选择一个宝石进行回收
+        selected_gem_id = random.choice(available_gems)
+        gem_config = config.items_config["by_id"].get(selected_gem_id)
+        gem_name = gem_config.name if gem_config else selected_gem_id
+
+        try:
+            # 尝试将宝石添加到背包
+            await ItemInstance.add_item(session, player.id, selected_gem_id, 1)
+            recovered_gems.append(gem_name)
+        except ValueError:
+            # 背包空间不足，转换为金币
+            if gem_config and gem_config.price:
+                gold_value = gem_config.price
+                player.gold += gold_value
+                recovered_gems.append(f"{gem_name}(转为{gold_value}金币)")
+            else:
+                # 没有价格配置，按默认价格处理
+                default_gold = 1000
+                player.gold += default_gold
+                recovered_gems.append(f"{gem_name}(转为{default_gold}金币)")
+
+        return recovered_gems
