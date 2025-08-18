@@ -326,13 +326,14 @@ async def handle_elixir_bonus(event: MessageEvent):
 
 @inventory_cmd.handle()
 async def handle_inventory(event: MessageEvent, args: Message = CommandArg()):
-    # 解析参数：/背包 [类型] [页数]
+    # 解析参数：/背包 [类型/物品名称] [页数]
     params = args.extract_plain_text().strip().split()
     category_key: str | None = None  # 内部标识（CATEGORY_MAPPING 的 value）
     page: int = 1
+    query_item_name: str | None = None  # 查询特定物品名称
 
     if len(params) == 1:
-        # 可能是类型或页码
+        # 可能是类型、页码或物品名称
         if params[0] in CATEGORY_MAPPING:
             category_key = CATEGORY_MAPPING[params[0]]
         else:
@@ -341,7 +342,8 @@ async def handle_inventory(event: MessageEvent, args: Message = CommandArg()):
                 if page < 1:
                     raise ValueError
             except ValueError:
-                await inventory_cmd.finish("⛔ 格式错误，正确格式：背包 [类型] [页数] 或 背包 [页数]")
+                # 既不是类型也不是页码，当作物品名称处理
+                query_item_name = params[0]
     elif len(params) == 2:
         # 类型 + 页码
         type_str, page_str = params
@@ -355,7 +357,7 @@ async def handle_inventory(event: MessageEvent, args: Message = CommandArg()):
         except ValueError:
             await inventory_cmd.finish("⛔ 页码必须为正整数")
     elif len(params) > 2:
-        await inventory_cmd.finish("⛔ 格式错误，正确格式：背包 [类型] [页数]")
+        await inventory_cmd.finish("⛔ 格式错误，正确格式：背包 [类型/物品名称] [页数]")
 
     # --- 获取背包数据 ---
     async with safe_session() as session:
@@ -372,6 +374,54 @@ async def handle_inventory(event: MessageEvent, args: Message = CommandArg()):
 
         if not items:
             await inventory_cmd.finish("🎒 你的背包空无一物")
+
+        # --- 处理查询特定物品 ---
+        if query_item_name:
+            # 查找物品配置
+            item_config = config.items_config["by_name"].get(query_item_name)
+            if not item_config:
+                await inventory_cmd.finish(f"⛔ 不存在物品：{query_item_name}")
+
+            # 统计该物品的总数量
+            matching_items = [item for item in items if item.item_id == item_config.item_id]
+
+            if not matching_items:
+                await inventory_cmd.finish(f"🎒 背包中没有 {query_item_name}")
+
+            # 计算总数量
+            if item_config.type == ItemType.EQUIPMENT:
+                # 装备显示数量和详细信息
+                total_count = len(matching_items)
+                lines = [
+                    f"🔍 物品查询结果",
+                    f"━━━━━━━━━━━━━",
+                    f"📦 物品名称：{item_config.name}",
+                    f"🔢 拥有数量：{total_count} 件",
+                    f"📋 物品类型：装备",
+                    ""
+                ]
+
+                # 显示装备详情
+                for i, equipment in enumerate(matching_items, 1):
+                    durability_info = f"🛠️ {equipment.durability}/{item_config.durability}"
+                    upgrade_info = f"⭐+{equipment.upgrade_level}阶" if equipment.upgrade_level > 0 else ""
+                    equipped_info = "🎯已装备" if equipment.equipped else "📦未装备"
+
+                    lines.append(f"{i}. {durability_info} {upgrade_info} {equipped_info}")
+            else:
+                # 普通物品显示总数量
+                total_quantity = sum(item.quantity for item in matching_items)
+                lines = [
+                    f"🔍 物品查询结果",
+                    f"━━━━━━━━━━━━━",
+                    f"📦 物品名称：{item_config.name}",
+                    f"🔢 拥有数量：{total_quantity}",
+                    f"📋 物品类型：{item_config.type.value}",
+                    f"📝 物品描述：{item_config.description}"
+                ]
+
+            result_msg = "\n".join(lines)
+            await inventory_cmd.finish(message_add_head(result_msg, event))
 
         # ----------- Python 端分类过滤 -----------
         def _is_elixir(inst: ItemInstance) -> bool:
@@ -435,18 +485,8 @@ async def handle_inventory(event: MessageEvent, args: Message = CommandArg()):
 
             try:
                 await inventory_cmd.send(final_message)
-                print(f"[背包调试] inventory_cmd.send() 调用完成")
             except Exception as send_error:
                 print(f"[背包调试] send() 调用失败: {type(send_error).__name__}: {send_error}")
-                import traceback
-                traceback.print_exc()
-                # 尝试发送简单消息
-                try:
-                    await inventory_cmd.send("背包功能暂时出现问题，请稍后重试")
-                    print(f"[背包调试] 简单消息发送成功")
-                except Exception as simple_error:
-                    print(f"[背包调试] 简单消息也发送失败: {simple_error}")
-                    raise
         except Exception as e:
             print(f"[背包调试] 发生异常: {type(e).__name__}: {e}")
             import traceback
