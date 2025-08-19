@@ -135,45 +135,71 @@ class PartTimeJobService:
                 {"name": "观众打赏", "probability": 0.3, "bonus": 40, "description": "观众额外打赏"},
                 {"name": "表演失败", "probability": 0.1, "bonus": -20, "description": "表演效果不佳，收入减少"},
             ]
+        },
+        "delivery_driver": {
+            "name": "配送司机",
+            "description": "负责货物配送和运输工作",
+            "base_reward": 160,
+            "duration_hours": 0.05,  # 3分钟
+            "required_level": 5,
+            "emoji": "🚚",
+            "special_events": [
+                {"name": "准时送达", "probability": 0.2, "bonus": 50, "description": "准时送达获得时效奖金"},
+                {"name": "客户好评", "probability": 0.15, "bonus": 70, "description": "服务态度好获得客户好评奖励"},
+                {"name": "节油奖励", "probability": 0.1, "bonus": 40, "description": "驾驶技术好，节省燃油获得奖励"},
+            ]
+        },
+        "warehouse_keeper": {
+            "name": "仓库管理员",
+            "description": "负责仓库货物管理和盘点工作",
+            "base_reward": 130,
+            "duration_hours": 0.042,  # 2.5分钟
+            "required_level": 3,
+            "emoji": "📋",
+            "special_events": [
+                {"name": "盘点准确", "probability": 0.18, "bonus": 60, "description": "盘点工作准确无误"},
+                {"name": "发现问题", "probability": 0.12, "bonus": 80, "description": "发现库存问题并及时处理"},
+                {"name": "效率提升", "probability": 0.15, "bonus": 45, "description": "工作效率高获得效率奖金"},
+            ]
         }
     }
 
-    # 工作地点配置
+    # 工作地点配置 - 整合到相应城镇中
     JOB_LOCATIONS = {
         "business_center": {
             "location_id": "business_center",
             "name": "上京商业中心",
             "description": "繁华的商业区，有各种服务业工作机会",
-            "x": 0,
+            "x": 0,  # 上京
             "y": 0,
             "available_jobs": ["cashier", "coffee_server", "cinema_usher"],
             "required_level": 1
         },
         "industrial_zone": {
             "location_id": "industrial_zone",
-            "name": "制造工业区",
+            "name": "荔湾镇工业区",
             "description": "工厂集中的工业区，体力劳动较多",
-            "x": 100,
+            "x": 120,  # 荔湾镇
             "y": 200,
             "available_jobs": ["factory_worker", "cargo_handler", "quality_inspector"],
             "required_level": 1
         },
         "entertainment_district": {
             "location_id": "entertainment_district",
-            "name": "休闲娱乐街区",
+            "name": "郸城娱乐街区",
             "description": "充满活力的娱乐区，工作轻松有趣",
-            "x": -50,
-            "y": 150,
+            "x": 120,  # 郸城
+            "y": 120,
             "available_jobs": ["internet_cafe_manager", "cinema_usher", "street_performer_assistant"],
             "required_level": 1
         },
-        "logistics_hub": {
-            "location_id": "logistics_hub",
-            "name": "物流配送中心",
-            "description": "快递和物流的集散地",
-            "x": 200,
-            "y": -100,
-            "available_jobs": ["delivery_sorter", "cargo_handler"],
+        "logistics_center": {
+            "location_id": "logistics_center",
+            "name": "东郊物流中心",
+            "description": "物流配送中心，负责货物运输和仓储",
+            "x": 390,  # 东郊
+            "y": 50,
+            "available_jobs": ["delivery_driver", "warehouse_keeper", "cargo_handler"],
             "required_level": 1
         }
     }

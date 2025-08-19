@@ -23,11 +23,11 @@ def _show_default_job_locations(lines):
         for location_data in PartTimeJobService.JOB_LOCATIONS.values():
             lines.append(f"• {location_data['name']} ({location_data['x']},{location_data['y']}) - {location_data['description']}")
     except ImportError:
-        # 如果导入失败，显示基本信息
+        # 如果导入失败，显示基本信息（已整合到城镇中）
         lines.append("• 上京商业中心 (0,0) - 繁华的商业区")
-        lines.append("• 制造工业区 (100,200) - 工厂集中的工业区")
-        lines.append("• 休闲娱乐街区 (-50,150) - 充满活力的娱乐区")
-        lines.append("• 物流配送中心 (200,-100) - 物流配送中心")
+        lines.append("• 荔湾镇工业区 (120,200) - 工厂集中的工业区")
+        lines.append("• 郸城娱乐街区 (120,120) - 充满活力的娱乐区")
+        lines.append("• 东郊物流中心 (390,50) - 物流配送中心")
 
 # 地图指令
 map_cmd = on_command("地图", aliases={"地点", "地点列表", "坐标"}, block=True, priority=5)
@@ -245,9 +245,9 @@ async def _(event: MessageEvent):
             except ImportError:
                 coord_info.append("🟣 打工地点：")
                 coord_info.append("   • 上京商业中心 (0,0)")
-                coord_info.append("   • 制造工业区 (100,200)")
-                coord_info.append("   • 休闲娱乐街区 (-50,150)")
-                coord_info.append("   • 物流配送中心 (200,-100)")
+                coord_info.append("   • 荔湾镇工业区 (120,200)")
+                coord_info.append("   • 郸城娱乐街区 (120,120)")
+                coord_info.append("   • 东郊物流中心 (390,50)")
 
             # 当前玩家位置 - 使用正确的当前坐标
             current_x, current_y = player.get_current_coordinates()

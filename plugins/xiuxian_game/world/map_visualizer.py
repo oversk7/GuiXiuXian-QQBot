@@ -27,9 +27,9 @@ class MapVisualizer:
     """地图可视化器"""
     
     def __init__(self):
-        # 地图配置
+        # 地图配置 - 扩大纵向范围以显示所有地点
         self.map_width = 1200
-        self.map_height = 800
+        self.map_height = 1000  # 增加高度以容纳Y轴范围-500到500
         self.grid_size = 20  # 每个网格的像素大小
         self.coordinate_scale = 50  # 坐标缩放比例，50像素 = 1游戏坐标
         
@@ -139,10 +139,11 @@ class MapVisualizer:
         # 游戏坐标原点在地图中心
         center_x = self.map_width // 2
         center_y = self.map_height // 2
-        
-        pixel_x = center_x + (x * self.map_width // 1000)  # 假设游戏世界范围是-500到500
-        pixel_y = center_y - (y * self.map_height // 800)  # Y轴翻转，向上为正
-        
+
+        # 扩大坐标范围以适应实际地点分布：X轴-500到500，Y轴-500到500
+        pixel_x = center_x + (x * self.map_width // 1000)  # X轴范围-500到500
+        pixel_y = center_y - (y * self.map_height // 1000)  # Y轴范围-500到500，Y轴翻转，向上为正
+
         return pixel_x, pixel_y
     
     def _draw_background_and_grid(self, draw: ImageDraw.Draw):
@@ -165,17 +166,17 @@ class MapVisualizer:
         # Y轴
         draw.line([center_x, 0, center_x, self.map_height], fill=self.colors['border'], width=2)
         
-        # 绘制坐标刻度
+        # 绘制坐标刻度 - 扩大范围以显示所有地点
         for i in range(-500, 501, 100):
             if i == 0:
                 continue
-            
+
             # X轴刻度
             pixel_x, _ = self._game_to_pixel(i, 0)
             if 0 <= pixel_x <= self.map_width:
                 draw.line([pixel_x, center_y - 5, pixel_x, center_y + 5], fill=self.colors['border'], width=2)
                 draw.text((pixel_x - 10, center_y + 8), str(i), fill=self.colors['coordinate_text'], font=self.fonts['small'])
-            
+
             # Y轴刻度
             _, pixel_y = self._game_to_pixel(0, i)
             if 0 <= pixel_y <= self.map_height:
@@ -391,12 +392,12 @@ class MapVisualizer:
                 self._draw_location(draw, location_data['x'], location_data['y'], 
                                   location_data['name'], 'job')
         except ImportError:
-            # 如果导入失败，使用默认配置
+            # 如果导入失败，使用默认配置（已整合到城镇中）
             default_jobs = [
                 (0, 0, "上京商业中心"),
-                (100, 200, "制造工业区"),
-                (-50, 150, "休闲娱乐街区"),
-                (200, -100, "物流配送中心"),
+                (120, 200, "荔湾镇工业区"),
+                (120, 120, "郸城娱乐街区"),
+                (390, 50, "东郊物流中心"),
             ]
             for x, y, name in default_jobs:
                 self._draw_location(draw, x, y, name, 'job')

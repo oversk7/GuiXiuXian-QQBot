@@ -51,8 +51,8 @@ def is_in_town(x: int, y: int, region: str = "大都会") -> bool:
             if distance <= 5:
                 return True
     except ImportError:
-        # 如果导入失败，使用默认坐标
-        default_job_coords = [(0, 0), (100, 200), (-50, 150), (200, -100)]
+        # 如果导入失败，使用默认坐标（已整合到城镇中）
+        default_job_coords = [(0, 0), (120, 200), (120, 120), (390, 50)]
         for job_x, job_y in default_job_coords:
             distance = abs(x - job_x) + abs(y - job_y)
             if distance <= 5:
