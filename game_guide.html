@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>诡修仙 - 核心玩法指南</title>
+    <title>诡修仙 - 新手教程</title>
     <style>
         * {
             margin: 0;
@@ -17,175 +17,160 @@
             color: #fff;
             min-height: 100vh;
             padding: 20px;
+            line-height: 1.6;
         }
         
         .container {
-            max-width: 1200px;
+            max-width: 900px;
             margin: 0 auto;
-            background: rgba(0, 0, 0, 0.7);
-            border-radius: 20px;
+            background: rgba(0, 0, 0, 0.8);
+            border-radius: 15px;
             padding: 30px;
-            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.5);
+            box-shadow: 0 15px 30px rgba(0, 0, 0, 0.6);
             border: 2px solid rgba(255, 215, 0, 0.3);
         }
         
         .header {
             text-align: center;
-            margin-bottom: 40px;
-            position: relative;
+            margin-bottom: 30px;
         }
         
         .title {
-            font-size: 3.5em;
+            font-size: 2.8em;
             font-weight: bold;
-            background: linear-gradient(45deg, #ff6b6b, #ffd93d, #6bcf7f, #4ecdc4, #45b7d1);
-            background-size: 300% 300%;
-            -webkit-background-clip: text;
-            -webkit-text-fill-color: transparent;
-            animation: gradient 3s ease infinite;
-            text-shadow: 0 0 30px rgba(255, 255, 255, 0.5);
+            color: #ffd700;
+            text-shadow: 0 0 20px rgba(255, 215, 0, 0.5);
             margin-bottom: 10px;
         }
         
-        @keyframes gradient {
-            0% { background-position: 0% 50%; }
-            50% { background-position: 100% 50%; }
-            100% { background-position: 0% 50%; }
+        .subtitle {
+            font-size: 1.2em;
+            color: #ccc;
+            margin-bottom: 20px;
         }
         
-        .subtitle {
+        .step-card {
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 10px;
+            padding: 20px;
+            margin-bottom: 20px;
+            border-left: 4px solid #ffd700;
+        }
+        
+        .step-number {
+            background: #ffd700;
+            color: #000;
+            width: 30px;
+            height: 30px;
+            border-radius: 50%;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: bold;
+            margin-right: 10px;
+        }
+        
+        .step-title {
             font-size: 1.3em;
             color: #ffd700;
-            margin-bottom: 20px;
-            text-shadow: 0 0 10px rgba(255, 215, 0, 0.5);
-        }
-        
-        .quick-start {
-            background: linear-gradient(135deg, #ff6b6b, #ee5a52);
-            padding: 20px;
-            border-radius: 15px;
-            margin-bottom: 30px;
-            text-align: center;
-            box-shadow: 0 10px 20px rgba(255, 107, 107, 0.3);
-        }
-        
-        .quick-start h3 {
-            font-size: 1.8em;
-            margin-bottom: 15px;
-            color: #fff;
-        }
-        
-        .quick-commands {
+            margin-bottom: 10px;
             display: flex;
-            justify-content: center;
-            gap: 15px;
-            flex-wrap: wrap;
+            align-items: center;
         }
         
-        .cmd-btn {
-            background: rgba(255, 255, 255, 0.2);
-            padding: 10px 20px;
-            border-radius: 25px;
-            font-weight: bold;
-            border: 2px solid rgba(255, 255, 255, 0.3);
-            transition: all 0.3s ease;
-        }
-        
-        .cmd-btn:hover {
-            background: rgba(255, 255, 255, 0.3);
-            transform: translateY(-2px);
-            box-shadow: 0 5px 15px rgba(255, 255, 255, 0.2);
-        }
-        
-        .systems-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(350px, 1fr));
-            gap: 25px;
-            margin-bottom: 30px;
-        }
-        
-        .system-card {
-            background: linear-gradient(135deg, rgba(255, 255, 255, 0.1), rgba(255, 255, 255, 0.05));
-            border-radius: 15px;
-            padding: 25px;
-            border: 1px solid rgba(255, 255, 255, 0.2);
-            transition: all 0.3s ease;
-            position: relative;
-            overflow: hidden;
-        }
-        
-        .system-card::before {
-            content: '';
-            position: absolute;
-            top: 0;
-            left: -100%;
-            width: 100%;
-            height: 100%;
-            background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.1), transparent);
-            transition: left 0.5s ease;
-        }
-        
-        .system-card:hover::before {
-            left: 100%;
-        }
-        
-        .system-card:hover {
-            transform: translateY(-5px);
-            box-shadow: 0 15px 30px rgba(0, 0, 0, 0.3);
-            border-color: rgba(255, 215, 0, 0.5);
-        }
-        
-        .system-icon {
-            font-size: 2.5em;
+        .step-content {
+            color: #fff;
+            font-size: 1.1em;
             margin-bottom: 15px;
-            display: block;
         }
         
-        .system-title {
-            font-size: 1.5em;
-            font-weight: bold;
-            margin-bottom: 15px;
-            color: #ffd700;
-        }
-        
-        .system-desc {
-            color: #ccc;
-            margin-bottom: 15px;
-            line-height: 1.6;
-        }
-        
-        .system-commands {
-            list-style: none;
-        }
-        
-        .system-commands li {
-            background: rgba(0, 0, 0, 0.3);
-            margin: 8px 0;
-            padding: 8px 12px;
+        .command-box {
+            background: rgba(0, 0, 0, 0.5);
+            border: 1px solid #ffd700;
             border-radius: 8px;
-            border-left: 3px solid #ffd700;
+            padding: 15px;
+            margin: 10px 0;
             font-family: 'Courier New', monospace;
-            font-size: 0.9em;
+        }
+        
+        .command {
+            color: #4ecdc4;
+            font-weight: bold;
+            font-size: 1.1em;
+        }
+        
+        .command-desc {
+            color: #ccc;
+            margin-top: 5px;
+            font-size: 0.95em;
+        }
+        
+        .tip-box {
+            background: rgba(76, 175, 80, 0.2);
+            border: 1px solid #4caf50;
+            border-radius: 8px;
+            padding: 15px;
+            margin: 15px 0;
+        }
+        
+        .tip-title {
+            color: #4caf50;
+            font-weight: bold;
+            margin-bottom: 8px;
+        }
+        
+        .warning-box {
+            background: rgba(255, 152, 0, 0.2);
+            border: 1px solid #ff9800;
+            border-radius: 8px;
+            padding: 15px;
+            margin: 15px 0;
+        }
+        
+        .warning-title {
+            color: #ff9800;
+            font-weight: bold;
+            margin-bottom: 8px;
+        }
+        
+        .section-title {
+            font-size: 1.8em;
+            color: #ffd700;
+            text-align: center;
+            margin: 30px 0 20px 0;
+            text-shadow: 0 0 10px rgba(255, 215, 0, 0.5);
         }
         
         .highlight {
             color: #ffd700;
             font-weight: bold;
         }
+
+        .qq-link {
+            color: #4ecdc4;
+            text-decoration: none;
+            font-weight: bold;
+            transition: all 0.3s ease;
+        }
+
+        .qq-link:hover {
+            color: #ffd700;
+            text-shadow: 0 0 10px rgba(255, 215, 0, 0.5);
+        }
         
         .footer {
             text-align: center;
-            margin-top: 40px;
+            margin-top: 30px;
             padding: 20px;
             background: rgba(0, 0, 0, 0.5);
-            border-radius: 15px;
+            border-radius: 10px;
             border: 1px solid rgba(255, 215, 0, 0.3);
         }
         
         .footer h3 {
             color: #ffd700;
             margin-bottom: 15px;
-            font-size: 1.5em;
+            font-size: 1.4em;
         }
         
         .footer p {
@@ -194,207 +179,227 @@
             margin-bottom: 10px;
         }
         
-        .glow {
-            animation: glow 2s ease-in-out infinite alternate;
-        }
-        
-        @keyframes glow {
-            from { text-shadow: 0 0 10px rgba(255, 215, 0, 0.5); }
-            to { text-shadow: 0 0 20px rgba(255, 215, 0, 0.8), 0 0 30px rgba(255, 215, 0, 0.6); }
-        }
-        
-        .pulse {
-            animation: pulse 2s infinite;
-        }
-        
-        @keyframes pulse {
-            0% { transform: scale(1); }
-            50% { transform: scale(1.05); }
-            100% { transform: scale(1); }
+        .divider {
+            border: none;
+            height: 2px;
+            background: linear-gradient(90deg, transparent, #ffd700, transparent);
+            margin: 20px 0;
         }
     </style>
 </head>
 <body>
     <div class="container">
         <div class="header">
-            <h1 class="title glow">诡修仙</h1>
-            <p class="subtitle">诡异风格的文字修仙游戏 - 核心玩法指南</p>
+            <h1 class="title">🎮 诡修仙新手教程</h1>
+            <p class="subtitle">快速入门游戏指南</p>
         </div>
         
-        <div class="quick-start pulse">
-            <h3>🚀 新手快速开始</h3>
-            <div class="quick-commands">
-                <span class="cmd-btn">注册</span>
-                <span class="cmd-btn">修炼</span>
-                <span class="cmd-btn">面板</span>
-                <span class="cmd-btn">帮助</span>
+        <div class="step-card">
+            <div class="step-title">
+                <span class="step-number">1</span>
+                👶 第一步：创建你的角色
             </div>
-        </div>
-        
-        <div class="systems-grid">
-            <div class="system-card">
-                <span class="system-icon">🧘</span>
-                <h3 class="system-title">修炼系统</h3>
-                <p class="system-desc">突破境界获得属性点，献祭材料获取怨念保驾护航</p>
-                <ul class="system-commands">
-                    <li><span class="highlight">修炼</span> - 获取经验，5分钟冷却</li>
-                    <li><span class="highlight">闭关</span> - 挂机修炼，效率减半</li>
-                    <li><span class="highlight">突破</span> - 提升境界获得属性点</li>
-                    <li><span class="highlight">加点 属性 点数</span> - 分配属性点</li>
-                </ul>
+            <div class="step-content">
+                想要开始游戏，你需要先创建一个角色。就像注册QQ号一样简单！
             </div>
-            
-            <div class="system-card">
-                <span class="system-icon">🌀</span>
-                <h3 class="system-title">诡域探索</h3>
-                <p class="system-desc">无限层诡域探索，击败诡异获得经验和材料</p>
-                <ul class="system-commands">
-                    <li><span class="highlight">进入 N层诡域</span> - 进入指定深度</li>
-                    <li><span class="highlight">探索</span> - 探索当前格子事件</li>
-                    <li><span class="highlight">上/下/左/右</span> - 诡域中移动</li>
-                    <li><span class="highlight">返回</span> - 回到现实世界</li>
-                </ul>
+            <div class="command-box">
+                <div class="command">注册</div>
+                <div class="command-desc">发送这个指令，然后输入你想要的角色名字</div>
             </div>
-            
-            <div class="system-card">
-                <span class="system-icon">⚔️</span>
-                <h3 class="system-title">装备系统</h3>
-                <p class="system-desc">锻造装备，升阶强化，镶嵌宝石提升战力</p>
-                <ul class="system-commands">
-                    <li><span class="highlight">装备栏</span> - 查看当前装备</li>
-                    <li><span class="highlight">装备 名称</span> - 穿戴指定装备</li>
-                    <li><span class="highlight">升阶 名称</span> - 装备升阶强化</li>
-                    <li><span class="highlight">镶嵌 装备 孔位 宝石</span> - 镶嵌宝石</li>
-                </ul>
-            </div>
-            
-            <div class="system-card">
-                <span class="system-icon">🏪</span>
-                <h3 class="system-title">跑商系统</h3>
-                <p class="system-desc">利用不同坐标的差价赚取金币，每日价格波动</p>
-                <ul class="system-commands">
-                    <li><span class="highlight">市集</span> - 查看当前市场价格</li>
-                    <li><span class="highlight">购买 物品 数量</span> - 购买商品</li>
-                    <li><span class="highlight">出售 物品 数量</span> - 出售商品</li>
-                    <li><span class="highlight">跑商推荐</span> - 查看盈利路线</li>
-                </ul>
-            </div>
-            
-            <div class="system-card">
-                <span class="system-icon">🔮</span>
-                <h3 class="system-title">炼丹系统</h3>
-                <p class="system-desc">消耗材料炼制丹药，提升修炼效率和属性</p>
-                <ul class="system-commands">
-                    <li><span class="highlight">丹方</span> - 查看炼丹配方</li>
-                    <li><span class="highlight">炼丹 配方 数量</span> - 开始炼丹</li>
-                    <li><span class="highlight">收获丹药</span> - 收获完成的丹药</li>
-                    <li><span class="highlight">使用 丹药 数量</span> - 服用丹药</li>
-                </ul>
-            </div>
-            
-            <div class="system-card">
-                <span class="system-icon">📦</span>
-                <h3 class="system-title">交易系统</h3>
-                <p class="system-desc">玩家间自由交易平台，智能撮合成交，支持物品和装备实例交易</p>
-                <ul class="system-commands">
-                    <li><span class="highlight">交易清单</span> - 查看所有在售物品</li>
-                    <li><span class="highlight">挂牌 出售 物品 价格</span> - 出售物品</li>
-                    <li><span class="highlight">挂牌 收购 物品 价格</span> - 收购物品</li>
-                    <li><span class="highlight">我的挂牌</span> - 查看自己的订单</li>
-                </ul>
-            </div>
-
-            <div class="system-card">
-                <span class="system-icon">🏰</span>
-                <h3 class="system-title">公会系统</h3>
-                <p class="system-desc">加入公会获得建筑福利，完成任务获得奖励</p>
-                <ul class="system-commands">
-                    <li><span class="highlight">公会列表</span> - 查看所有公会</li>
-                    <li><span class="highlight">加入公会 ID</span> - 申请加入公会</li>
-                    <li><span class="highlight">捐献金币 金额</span> - 捐献获得积分</li>
-                    <li><span class="highlight">公会任务</span> - 查看任务列表</li>
-                </ul>
-            </div>
-        </div>
-
-        <!-- 交易系统详细说明 -->
-        <div class="system-card" style="margin-top: 30px; background: linear-gradient(135deg, rgba(255, 215, 0, 0.1), rgba(255, 215, 0, 0.05)); border: 2px solid rgba(255, 215, 0, 0.3);">
-            <span class="system-icon">🔄</span>
-            <h3 class="system-title" style="color: #ffd700; font-size: 2em;">交易成交原理详解</h3>
-            <div style="color: #fff; line-height: 1.8; font-size: 1.1em;">
-                <h4 style="color: #ffd700; margin: 20px 0 10px 0;">💡 智能撮合机制</h4>
-                <p style="margin-bottom: 15px;">交易系统采用<strong>价格优先、时间优先</strong>的撮合原则，确保公平高效的交易环境：</p>
-
-                <div style="background: rgba(0,0,0,0.3); padding: 15px; border-radius: 10px; margin: 15px 0; border-left: 4px solid #4ecdc4;">
-                    <h5 style="color: #4ecdc4; margin-bottom: 10px;">🔸 买单撮合流程</h5>
-                    <p>当你发布买单时，系统会自动寻找：</p>
-                    <ul style="margin-left: 20px;">
-                        <li>价格 ≤ 你的买价的所有卖单</li>
-                        <li>按价格从低到高排序（优先成交便宜的）</li>
-                        <li>相同价格按挂牌时间先后顺序</li>
-                        <li>成交价格采用卖方的挂牌价格</li>
-                    </ul>
-                </div>
-
-                <div style="background: rgba(0,0,0,0.3); padding: 15px; border-radius: 10px; margin: 15px 0; border-left: 4px solid #ff6b6b;">
-                    <h5 style="color: #ff6b6b; margin-bottom: 10px;">🔸 卖单撮合流程</h5>
-                    <p>当你发布卖单时，系统会自动寻找：</p>
-                    <ul style="margin-left: 20px;">
-                        <li>价格 ≥ 你的卖价的所有买单</li>
-                        <li>按价格从高到低排序（优先成交高价的）</li>
-                        <li>相同价格按挂牌时间先后顺序</li>
-                        <li>成交价格采用买方的挂牌价格</li>
-                    </ul>
-                </div>
-
-                <h4 style="color: #ffd700; margin: 20px 0 10px 0;">💰 交易示例</h4>
-                <div style="background: rgba(0,0,0,0.3); padding: 15px; border-radius: 10px; margin: 15px 0;">
-                    <p><strong>场景：</strong>市场上有以下卖单：</p>
-                    <ul style="margin-left: 20px; color: #ccc;">
-                        <li>玩家A：出售回春散 100个 @50金币/个</li>
-                        <li>玩家B：出售回春散 200个 @55金币/个</li>
-                        <li>玩家C：出售回春散 150个 @60金币/个</li>
-                    </ul>
-                    <p><strong>你发布：</strong>收购回春散 300个 @58金币/个</p>
-                    <p><strong>撮合结果：</strong></p>
-                    <ul style="margin-left: 20px; color: #90EE90;">
-                        <li>✅ 与玩家A成交 100个 @50金币/个（你省了8金币/个）</li>
-                        <li>✅ 与玩家B成交 200个 @55金币/个（你省了3金币/个）</li>
-                        <li>❌ 玩家C价格60金币/个超出你的预算，不成交</li>
-                        <li>📋 剩余需求100个继续挂牌等待</li>
-                    </ul>
-                </div>
-
-                <h4 style="color: #ffd700; margin: 20px 0 10px 0;">🛡️ 防刷钱机制</h4>
-                <div style="background: rgba(255,0,0,0.1); padding: 15px; border-radius: 10px; margin: 15px 0; border: 1px solid rgba(255,0,0,0.3);">
-                    <ul style="margin-left: 20px;">
-                        <li><strong>时间限制：</strong>8小时内购买的物品不能挂牌出售</li>
-                        <li><strong>数量限制：</strong>每位玩家最多同时挂牌6个订单</li>
-                        <li><strong>资源冻结：</strong>挂牌时物品/金币被冻结，防止重复使用</li>
-                        <li><strong>阶梯税收：</strong>大额交易征收税收，维护经济平衡</li>
-                    </ul>
-                </div>
-
-                <h4 style="color: #ffd700; margin: 20px 0 10px 0;">⚔️ 装备实例交易</h4>
-                <div style="background: rgba(138,43,226,0.1); padding: 15px; border-radius: 10px; margin: 15px 0; border: 1px solid rgba(138,43,226,0.3);">
-                    <p>装备交易支持个性化属性，每件装备都是独特的：</p>
-                    <ul style="margin-left: 20px;">
-                        <li><strong>升阶等级：</strong>+0到+10的升阶效果完整保留</li>
-                        <li><strong>镶嵌宝石：</strong>所有镶嵌的宝石、符文、佛珠等</li>
-                        <li><strong>耐久度：</strong>当前耐久度状态</li>
-                        <li><strong>装备摘要：</strong>自动生成装备特征描述</li>
-                    </ul>
-                    <p style="color: #ffd700;">💡 使用【估价 装备名】可查看装备的市场参考价值</p>
-                </div>
+            <div class="tip-box">
+                <div class="tip-title">💡 小贴士</div>
+                你也可以直接发送：注册 张三（把张三换成你想要的名字）
             </div>
         </div>
         
+        <div class="step-card">
+            <div class="step-title">
+                <span class="step-number">2</span>
+                🧘 第二步：开始修炼
+            </div>
+            <div class="step-content">
+                创建角色后，你就可以开始修炼了！修炼可以让你变强，就像升级一样。
+            </div>
+            <div class="command-box">
+                <div class="command">修炼</div>
+                <div class="command-desc">每5分钟可以修炼一次，获得经验值</div>
+            </div>
+            <div class="command-box">
+                <div class="command">面板</div>
+                <div class="command-desc">查看你的角色信息，包括等级、金币等</div>
+            </div>
+            <div class="tip-box">
+                <div class="tip-title">💡 小贴士</div>
+                如果你想挂机修炼，可以发送【闭关】，虽然效率低一些，但可以自动修炼！
+            </div>
+        </div>
+
+        <div class="step-card">
+            <div class="step-title">
+                <span class="step-number">3</span>
+                ⬆️ 第三步：突破境界
+            </div>
+            <div class="step-content">
+                当你修炼到一定程度，就可以突破境界了！突破后会获得属性点，让你更强。
+            </div>
+            <div class="command-box">
+                <div class="command">突破</div>
+                <div class="command-desc">提升境界，获得属性点</div>
+            </div>
+            <div class="command-box">
+                <div class="command">加点 攻击 5</div>
+                <div class="command-desc">把5个属性点加到攻击力上（可以换成防御、敏捷、幸运）</div>
+            </div>
+            <div class="warning-box">
+                <div class="warning-title">⚠️ 注意</div>
+                突破有失败的可能！如果失败了，可以用怨念或棺材钉来保证成功。
+            </div>
+        </div>
+
+        <hr class="divider">
+        
+        <h2 class="section-title">🎮 核心玩法介绍</h2>
+
+        <div class="step-card">
+            <div class="step-title">
+                🌀 诡域探索 - 冒险赚钱
+            </div>
+            <div class="step-content">
+                诡域是一个神秘的地方，里面有鬼怪和宝藏。你可以进去冒险，打败鬼怪获得经验和材料。
+            </div>
+            <div class="command-box">
+                <div class="command">进入 1层诡域</div>
+                <div class="command-desc">进入第1层诡域开始冒险</div>
+            </div>
+            <div class="command-box">
+                <div class="command">探索</div>
+                <div class="command-desc">在诡域中探索，可能遇到怪物或宝箱</div>
+            </div>
+            <div class="command-box">
+                <div class="command">上 / 下 / 左 / 右</div>
+                <div class="command-desc">在诡域中移动</div>
+            </div>
+        </div>
+
+        <div class="step-card">
+            <div class="step-title">
+                🏪 跑商系统 - 买低卖高
+            </div>
+            <div class="step-content">
+                不同地方的物品价格不一样，你可以在便宜的地方买，在贵的地方卖，赚取差价！
+            </div>
+            <div class="command-box">
+                <div class="command">市集</div>
+                <div class="command-desc">查看当前位置的物品价格</div>
+            </div>
+            <div class="command-box">
+                <div class="command">购买 香水 10</div>
+                <div class="command-desc">购买10瓶香水</div>
+            </div>
+            <div class="command-box">
+                <div class="command">跑商推荐</div>
+                <div class="command-desc">系统推荐赚钱路线</div>
+            </div>
+        </div>
+
+        <div class="step-card">
+            <div class="step-title">
+                📦 交易系统 - 和其他玩家买卖
+            </div>
+            <div class="step-content">
+                你可以把不需要的东西卖给其他玩家，或者从其他玩家那里买到需要的东西。
+            </div>
+            <div class="command-box">
+                <div class="command">交易清单</div>
+                <div class="command-desc">看看其他玩家在卖什么</div>
+            </div>
+            <div class="command-box">
+                <div class="command">挂牌 出售 回春散 50 1</div>
+                <div class="command-desc">以50金币的价格出售1个回春散</div>
+            </div>
+            <div class="command-box">
+                <div class="command">挂牌 收购 寿衣 1000 1</div>
+                <div class="command-desc">以1000金币的价格收购1个寿衣</div>
+            </div>
+            <div class="tip-box">
+                <div class="tip-title">💡 小贴士</div>
+                系统会自动帮你找到最好的价格！如果有人卖得比你出价低，会自动成交。
+            </div>
+        </div>
+
+        <div class="step-card">
+            <div class="step-title">
+                ⚔️ 装备系统 - 让自己更强
+            </div>
+            <div class="step-content">
+                好的装备可以让你更强！你可以穿戴装备，还可以升级装备。
+            </div>
+            <div class="command-box">
+                <div class="command">装备栏</div>
+                <div class="command-desc">查看你现在穿的装备</div>
+            </div>
+            <div class="command-box">
+                <div class="command">装备 寿衣</div>
+                <div class="command-desc">穿上寿衣（如果你有的话）</div>
+            </div>
+            <div class="command-box">
+                <div class="command">升阶 寿衣</div>
+                <div class="command-desc">升级寿衣，让它更强</div>
+            </div>
+        </div>
+
+        <hr class="divider">
+
+        <h2 class="section-title">🎯 常用指令速查</h2>
+
+        <div class="step-card">
+            <div class="step-title">
+                📋 基础指令
+            </div>
+            <div class="command-box">
+                <div class="command">帮助</div>
+                <div class="command-desc">查看所有系统列表</div>
+            </div>
+            <div class="command-box">
+                <div class="command">修炼系统</div>
+                <div class="command-desc">查看修炼相关的详细指令</div>
+            </div>
+            <div class="command-box">
+                <div class="command">背包</div>
+                <div class="command-desc">查看你的物品</div>
+            </div>
+            <div class="command-box">
+                <div class="command">地图</div>
+                <div class="command-desc">查看游戏世界的地图</div>
+            </div>
+        </div>
+
+        <div class="step-card">
+            <div class="step-title">
+                ❓ 遇到问题怎么办？
+            </div>
+            <div class="step-content">
+                如果你不知道怎么玩，或者遇到了问题，可以：
+            </div>
+            <div class="tip-box">
+                <div class="tip-title">💡 获取帮助的方法</div>
+                <p>1. 发送【帮助】查看所有系统</p>
+                <p>2. 发送【修炼系统】查看修炼相关指令</p>
+                <p>3. 加入官方QQ群：<a href="https://qun.qq.com/universal-share/share?ac=1&authKey=kzDWa4Q88FXt0%2BkMvimY5%2ByWIwTtpcTkLk2Dagdq%2BQ%2Fz1SPBi38l0zxjPKun4Eyv&busi_data=eyJncm91cENvZGUiOiI5NjI0OTQ2NzkiLCJ0b2tlbiI6InN6UmV4c2NUakZiOEpxMmlWMHVtOHExVGQwYS9Eb1JaTHNWRnZGcDF3QVVZUE5BUTZaY3puUXFTRUtvdGRTaC8iLCJ1aW4iOiIyNjk4NTk1MTE1In0%3D&data=ONUViSvHIQdjpDVhrwlshmho2jQ9i--ajXkpREWW4XmKu-I-gPCmYqDtOYpT_afRB0fTO8V5OWE8DPtBt2nl9g&svctype=4&tempid=h5_group_info" class="qq-link" target="_blank">962494679</a></p>
+                <p>4. 直接在群里问机器人或其他玩家</p>
+            </div>
+        </div>
+
         <div class="footer">
-            <h3>🎮 开始你的修仙之旅</h3>
-            <p>💡 发送 <span class="highlight">注册</span> 创建角色，然后发送 <span class="highlight">修炼</span> 开始修炼</p>
-            <p>💡 发送 <span class="highlight">帮助</span> 查看所有系统，发送 <span class="highlight">修炼系统</span> 查看详细指令</p>
-            <p>💡 官群：962494679 | 发送 <span class="highlight">邀请码</span> 邀请好友获得奖励</p>
-            <p>🌟 在诡异的世界中修炼成仙，体验独特的文字冒险！</p>
+            <h3>🎮 现在就开始游戏吧！</h3>
+            <p>🚀 第一步：发送 <span class="highlight">注册</span></p>
+            <p>🧘 第二步：发送 <span class="highlight">修炼</span></p>
+            <p>📊 第三步：发送 <span class="highlight">面板</span> 查看角色</p>
+            <p>🎯 然后：发送 <span class="highlight">帮助</span> 探索更多玩法</p>
+            <hr class="divider">
+            <p>👥 官方QQ群：<a href="https://qun.qq.com/universal-share/share?ac=1&authKey=kzDWa4Q88FXt0%2BkMvimY5%2ByWIwTtpcTkLk2Dagdq%2BQ%2Fz1SPBi38l0zxjPKun4Eyv&busi_data=eyJncm91cENvZGUiOiI5NjI0OTQ2NzkiLCJ0b2tlbiI6InN6UmV4c2NUakZiOEpxMmlWMHVtOHExVGQwYS9Eb1JaTHNWRnZGcDF3QVVZUE5BUTZaY3puUXFTRUtvdGRTaC8iLCJ1aW4iOiIyNjk4NTk1MTE1In0%3D&data=ONUViSvHIQdjpDVhrwlshmho2jQ9i--ajXkpREWW4XmKu-I-gPCmYqDtOYpT_afRB0fTO8V5OWE8DPtBt2nl9g&svctype=4&tempid=h5_group_info" class="qq-link" target="_blank">962494679</a></p>
+            <p>🎁 发送 <span class="highlight">邀请码</span> 邀请好友获得奖励</p>
+            <p>🌟 祝你在诡异的修仙世界玩得开心！</p>
         </div>
     </div>
 </body>
