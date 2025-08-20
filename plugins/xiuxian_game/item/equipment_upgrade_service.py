@@ -20,15 +20,15 @@ from ..config import config
 class EquipmentUpgradeService:
     """装备升阶服务类（装备合成模式）"""
 
-    # 升阶成功率配置
+    # 升阶成功率配置（已优化，提高玩家体验）
     SUCCESS_RATES = {
-        1: 0.90, 2: 0.85, 3: 0.80,  # 1-3阶：高成功率
-        4: 0.70, 5: 0.60, 6: 0.50,  # 4-6阶：中等成功率
-        7: 0.40, 8: 0.30, 9: 0.20,  # 7-9阶：低成功率
-        10: 0.10                     # 10阶：极低成功率
+        1: 0.95, 2: 0.90, 3: 0.85,  # 1-3阶：高成功率
+        4: 0.80, 5: 0.75, 6: 0.70,  # 4-6阶：中等成功率
+        7: 0.60, 8: 0.50, 9: 0.40,  # 7-9阶：中低成功率
+        10: 0.25                     # 10阶：低成功率
     }
 
-    # 升阶失败后果配置
+    # 升阶失败后果配置（已优化，减轻惩罚）
     FAILURE_CONSEQUENCES = {
         # 1-3阶：只消耗材料，装备不变
         1: {"downgrade": 0, "destroy": 0.0},
@@ -40,13 +40,13 @@ class EquipmentUpgradeService:
         5: {"downgrade": 1, "destroy": 0.0},
         6: {"downgrade": 1, "destroy": 0.0},
 
-        # 7-9阶：可能降2阶或损坏
-        7: {"downgrade": 2, "destroy": 0.05},
-        8: {"downgrade": 2, "destroy": 0.08},
-        9: {"downgrade": 2, "destroy": 0.10},
+        # 7-9阶：可能降1阶或少量损坏风险
+        7: {"downgrade": 1, "destroy": 0.02},
+        8: {"downgrade": 1, "destroy": 0.03},
+        9: {"downgrade": 2, "destroy": 0.05},
 
-        # 10阶：可能降3阶或损坏
-        10: {"downgrade": 3, "destroy": 0.15}
+        # 10阶：可能降2阶或损坏
+        10: {"downgrade": 2, "destroy": 0.08}
     }
 
     # 装备合成需求配置（需要的相同装备数量）
