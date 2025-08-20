@@ -77,13 +77,6 @@ async def _(event: MessageEvent):
         mansion_result = await session.execute(mansion_stmt)
         mansion_owners = mansion_result.scalars().all()
 
-        # 临时调试信息 - 帮助诊断问题
-        print(f"[DEBUG] 当前位置: ({current_x},{current_y}), 区域: {player.region}")
-        print(f"[DEBUG] 查询到 {len(mansion_owners)} 个阴宅")
-        for i, owner in enumerate(mansion_owners):
-            distance = calculate_distance(current_x, current_y, owner.mansion_x, owner.mansion_y)
-            print(f"[DEBUG] 阴宅 {i+1}: {owner.nickname} 位置({owner.mansion_x},{owner.mansion_y}) 等级{owner.mansion_level} 距离{distance}格")
-
         for owner in mansion_owners:
             distance = calculate_distance(current_x, current_y, owner.mansion_x, owner.mansion_y)
             nearby_places.append({
@@ -101,23 +94,19 @@ async def _(event: MessageEvent):
         
         # 按距离排序
         nearby_places.sort(key=lambda x: x["distance"])
-
+        
         lines = [
             f"📍 当前位置：({current_x},{current_y})",
             "🔍 附近地点 (100格内)：",
             "━━━━━━━━━━━━━"
         ]
-
+        
         for place in nearby_places[:10]:  # 最多显示10个
-            # 对于阴宅，总是显示坐标，因为阴宅名称不包含坐标信息
-            if place['type'] == '阴宅':
-                lines.append(f"• {place['name']} {place['coord']} - 距离{place['distance']}格")
+            # 检查地点名称是否已包含坐标，避免重复显示
+            if place['coord'] in place['name']:
+                lines.append(f"• {place['name']} - 距离{place['distance']}格")
             else:
-                # 对于其他地点，检查是否已包含坐标信息
-                if place['coord'] in place['name']:
-                    lines.append(f"• {place['name']} - 距离{place['distance']}格")
-                else:
-                    lines.append(f"• {place['name']} {place['coord']} - 距离{place['distance']}格")
+                lines.append(f"• {place['name']} {place['coord']} - 距离{place['distance']}格")
         
         lines.extend([
             "━━━━━━━━━━━━━",
