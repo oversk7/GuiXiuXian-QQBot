@@ -1,0 +1,86 @@
+"""
+阴宅系统命令处理器
+处理阴宅相关的游戏指令
+"""
+from nonebot import on_command
+from nonebot.adapters.qq import MessageEvent, Message
+from nonebot.params import CommandArg
+from ..utils import message_add_head
+from ..models.db import safe_session
+from ..models.player import Player
+from .mansion import MansionService
+
+
+# 阴宅相关命令
+mansion_status_cmd = on_command("阴宅", aliases={"阴宅状态", "查看阴宅"}, priority=4, block=True)
+purchase_mansion_cmd = on_command("购买阴宅", aliases={"买阴宅"}, priority=4, block=True)
+upgrade_mansion_cmd = on_command("升级阴宅", aliases={"阴宅升级"}, priority=4, block=True)
+
+
+@mansion_status_cmd.handle()
+async def handle_mansion_status(event: MessageEvent):
+    """查看阴宅状态"""
+    user_id = event.get_user_id()
+    async with safe_session() as session:
+        # 获取玩家数据
+        player = await session.get(Player, user_id)
+        if not player:
+            await mansion_status_cmd.finish("⛔ 请先使用【注册】命令创建角色")
+        
+        # 格式化阴宅状态信息
+        status_msg = MansionService.format_mansion_status(player)
+        
+        await mansion_status_cmd.finish(message_add_head(status_msg, event))
+
+
+@purchase_mansion_cmd.handle()
+async def handle_purchase_mansion(event: MessageEvent):
+    """购买阴宅"""
+    user_id = event.get_user_id()
+    async with safe_session() as session:
+        # 获取玩家数据
+        player = await session.get(Player, user_id)
+        if not player:
+            await purchase_mansion_cmd.finish("⛔ 请先使用【注册】命令创建角色")
+        
+        # 尝试购买阴宅
+        success, result_msg = await MansionService.purchase_mansion(session, player)
+        
+        if success:
+            # 保存数据
+            session.add(player)
+            await session.commit()
+            
+            await purchase_mansion_cmd.finish(message_add_head(result_msg, event))
+        else:
+            await purchase_mansion_cmd.finish(message_add_head(f"⛔ {result_msg}", event))
+
+
+@upgrade_mansion_cmd.handle()
+async def handle_upgrade_mansion(event: MessageEvent):
+    """升级阴宅"""
+    user_id = event.get_user_id()
+    async with safe_session() as session:
+        # 获取玩家数据
+        player = await session.get(Player, user_id)
+        if not player:
+            await upgrade_mansion_cmd.finish("⛔ 请先使用【注册】命令创建角色")
+        
+        # 检查是否拥有阴宅
+        if player.mansion_level <= 0:
+            await upgrade_mansion_cmd.finish(message_add_head(
+                "⛔ 你还没有阴宅，请先使用【购买阴宅】命令",
+                event
+            ))
+        
+        # 尝试升级阴宅
+        success, result_msg = await MansionService.upgrade_mansion(session, player)
+        
+        if success:
+            # 保存数据
+            session.add(player)
+            await session.commit()
+            
+            await upgrade_mansion_cmd.finish(message_add_head(result_msg, event))
+        else:
+            await upgrade_mansion_cmd.finish(message_add_head(f"⛔ {result_msg}", event))

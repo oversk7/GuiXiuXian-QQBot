@@ -34,7 +34,7 @@ async def handle_help(event: MessageEvent, args: Message = CommandArg()):
         "🔮 炼丹系统  🎮 娱乐系统\n"
         "💕 社交系统  🏰 副本系统\n"
         "📈 投资系统  💼 打工系统\n"
-        "🏛️ 委托系统\n"
+        "�️ 阴宅系统  �🏛️ 委托系统\n"
         "═════════════\n"
         "💡 发送对应系统查看详细指令，【赞助】支持诡修仙\n"
         "💡 【】括号里是指令，<>里是必填，[]里是选填\n"
@@ -290,6 +290,32 @@ async def handle_xiu_lian(event: MessageEvent, args: Message = CommandArg()):
         "【献祭】 献祭材料以获取怨念值，用于为突破护航\n"
     )
     await xiu_lian_cmd.finish(Message(msg))
+
+
+# 阴宅系统
+mansion_cmd = on_command("阴宅系统", aliases={"阴宅帮助"}, priority=4, block=True)
+
+@mansion_cmd.handle()
+async def handle_mansion(event: MessageEvent, args: Message = CommandArg()):
+    msg = (
+        "✨ 阴宅系统帮助 ✨\n"
+        "拥有阴宅可大幅提升修炼效率，但必须在阴宅位置才有效\n"
+        "━━━━━━━━━━━━━\n"
+        "【阴宅】 查看阴宅状态和位置信息\n"
+        "【购买阴宅】 在当前位置花费1000万金币购买1级阴宅\n"
+        "【升级阴宅】 在阴宅位置消耗金币升级等级\n"
+        "━━━━━━━━━━━━━\n"
+        "💡 阴宅等级效率加成：\n"
+        "   1级：+20%  2级：+29%  3级：+38%\n"
+        "   4级：+47%  5级：+56%  6级：+65%\n"
+        "   7级：+74%  8级：+83%  9级：+92%\n"
+        "   10级：+101%\n"
+        "━━━━━━━━━━━━━\n"
+        "💡 阴宅建在购买时的位置，无法移动\n"
+        "💡 只有在阴宅位置修炼/闭关才能享受加成\n"
+        "💡 升级阴宅也必须在阴宅位置进行\n"
+    )
+    await mansion_cmd.finish(Message(msg))
 
 
 # 活动系统

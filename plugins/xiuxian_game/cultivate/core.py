@@ -77,6 +77,13 @@ async def handle_cultivate(event: MessageEvent):
             guild_bonuses = await GuildBuildingService.get_guild_bonuses(session, player.guild_id)
             guild_cultivation_bonus = guild_bonuses.get("cultivation_bonus", 0.0)
 
+        # 获取阴宅修为加成（只有在阴宅位置才有效）
+        mansion_cultivation_bonus = 0.0
+        if player.mansion_level > 0:
+            from .mansion import MansionService
+            if MansionService.is_at_mansion(player):
+                mansion_cultivation_bonus = MansionService.get_efficiency_bonus(player.mansion_level)
+
         # 分别计算各种加成（都基于基础经验）
         from .reincarnation import ReincarnationService
         reincarnation_bonus_rate = ReincarnationService.get_cultivation_efficiency_bonus(player.reincarnation_level)
@@ -87,9 +94,11 @@ async def handle_cultivate(event: MessageEvent):
         reincarnation_bonus = int(base_exp_gain * reincarnation_bonus_rate)
         # 公会加成
         guild_bonus = int(base_exp_gain * guild_cultivation_bonus)
+        # 阴宅加成
+        mansion_bonus = int(base_exp_gain * mansion_cultivation_bonus)
 
         # 总经验 = 基础经验 + 各种加成
-        exp_gain = base_exp_gain + card_bonus + reincarnation_bonus + guild_bonus
+        exp_gain = base_exp_gain + card_bonus + reincarnation_bonus + guild_bonus + mansion_bonus
 
         # 更新数据
         player.last_cultivation = datetime.now()
@@ -111,6 +120,10 @@ async def handle_cultivate(event: MessageEvent):
         if guild_bonus > 0:
             guild_percent = guild_cultivation_bonus * 100
             bonus_msg += f"\n✧ 公会加成 🏰 +{guild_bonus} 怨炁 (+{guild_percent:.1f}%)"
+
+        if mansion_bonus > 0:
+            mansion_percent = mansion_cultivation_bonus * 100
+            bonus_msg += f"\n✧ 阴宅加成 🏚️ +{mansion_bonus} 怨炁 (+{mansion_percent:.1f}%)"
 
         msg = (
             "你在黑焰里看见自己的影子喘息。\n"
@@ -153,6 +166,13 @@ async def handle_seclusion(event: MessageEvent):
             guild_bonuses = await GuildBuildingService.get_guild_bonuses(session, player.guild_id)
             guild_cultivation_bonus = guild_bonuses.get("cultivation_bonus", 0.0)
 
+        # 获取阴宅修为加成（只有在阴宅位置才有效）
+        mansion_cultivation_bonus = 0.0
+        if player.mansion_level > 0:
+            from .mansion import MansionService
+            if MansionService.is_at_mansion(player):
+                mansion_cultivation_bonus = MansionService.get_efficiency_bonus(player.mansion_level)
+
         # 计算棺材钉数量和效率加成（最多100根，50%加成）
         coffin_nail_count = await get_coffin_nail_count(session, player.id)
         effective_coffin_nail_count = min(coffin_nail_count, 100)  # 最多100根有效
@@ -178,6 +198,10 @@ async def handle_seclusion(event: MessageEvent):
         if guild_cultivation_bonus > 0:
             guild_efficiency = guild_cultivation_bonus * 100
             efficiency_msg += f"\n✧ 公会加成 🏰 提升效率 +{guild_efficiency:.1f}%"
+
+        if mansion_cultivation_bonus > 0:
+            mansion_efficiency = mansion_cultivation_bonus * 100
+            efficiency_msg += f"\n✧ 阴宅加成 🏚️ 提升效率 +{mansion_efficiency:.1f}%"
 
         seclusion_hours = benefits["seclusion_time_limit"] // 3600
         time_limit_msg = f"\n✧ 闭关时长上限 ⏰ {seclusion_hours}小时"
@@ -222,6 +246,13 @@ async def handle_out_seclusion(event: MessageEvent):
             guild_bonuses = await GuildBuildingService.get_guild_bonuses(session, player.guild_id)
             guild_cultivation_bonus = guild_bonuses.get("cultivation_bonus", 0.0)
 
+        # 获取阴宅修为加成（只有在阴宅位置才有效）
+        mansion_cultivation_bonus = 0.0
+        if player.mansion_level > 0:
+            from .mansion import MansionService
+            if MansionService.is_at_mansion(player):
+                mansion_cultivation_bonus = MansionService.get_efficiency_bonus(player.mansion_level)
+
         # 计算棺材钉数量和效率加成（最多100根，50%加成）
         coffin_nail_count = await get_coffin_nail_count(session, player.id)
         effective_coffin_nail_count = min(coffin_nail_count, 100)  # 最多100根有效
@@ -255,8 +286,11 @@ async def handle_out_seclusion(event: MessageEvent):
         # 公会修为加成
         guild_bonus = int(base_exp_gain * guild_cultivation_bonus)
 
+        # 阴宅修为加成
+        mansion_bonus = int(base_exp_gain * mansion_cultivation_bonus)
+
         # 总经验 = 基础经验 + 各种加成
-        exp_gain = base_exp_gain + coffin_nail_bonus + card_bonus + reincarnation_exp_bonus + guild_bonus
+        exp_gain = base_exp_gain + coffin_nail_bonus + card_bonus + reincarnation_exp_bonus + guild_bonus + mansion_bonus
 
         player.exp += exp_gain
 
@@ -284,6 +318,10 @@ async def handle_out_seclusion(event: MessageEvent):
         if guild_bonus > 0:
             guild_efficiency = guild_cultivation_bonus * 100
             efficiency_msg += f"\n✧ 公会加成 🏰 额外获得 +{guild_bonus} 怨炁 (+{guild_efficiency:.1f}%)"
+
+        if mansion_bonus > 0:
+            mansion_efficiency = mansion_cultivation_bonus * 100
+            efficiency_msg += f"\n✧ 阴宅加成 🏚️ 额外获得 +{mansion_bonus} 怨炁 (+{mansion_efficiency:.1f}%)"
 
         msg_out = (
             "🔓你推开棺盖，阴灰散落。\n"

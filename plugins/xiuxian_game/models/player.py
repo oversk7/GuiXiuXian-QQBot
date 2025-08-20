@@ -173,6 +173,11 @@ class Player(Base):
     seclusion_start_time: Mapped[datetime] = mapped_column(DateTime, nullable=True, comment="闭关开始时间")
     last_message_board_check: Mapped[datetime] = mapped_column(DateTime, nullable=True, comment="最后查看留言板时间")
 
+    # 阴宅系统
+    mansion_level: Mapped[int] = mapped_column(Integer, default=0, server_default='0', comment="阴宅等级(0表示未拥有)")
+    mansion_x: Mapped[int | None] = mapped_column(Integer, nullable=True, comment="阴宅X坐标")
+    mansion_y: Mapped[int | None] = mapped_column(Integer, nullable=True, comment="阴宅Y坐标")
+
     monthly_cards: Mapped[list["MonthlyCard"]] = relationship("MonthlyCard", back_populates="player")
     
     async def get_effective_inventory_capacity(self, session) -> int:
