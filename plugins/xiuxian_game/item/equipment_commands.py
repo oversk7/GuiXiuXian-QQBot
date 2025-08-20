@@ -146,12 +146,12 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
             ""
         ]
 
+        # 获取升阶加成倍率（在所有属性显示前获取）
+        upgrade_multiplier = equip.get_upgrade_bonus_multiplier()
+
         # 基础属性
         if tpl.attr_bonus or tpl.attr_ratio:
             lines.append("📈 基础属性：")
-            
-            # 获取升阶加成倍率
-            upgrade_multiplier = equip.get_upgrade_bonus_multiplier()
             
             # 固定值属性
             if tpl.attr_bonus:
