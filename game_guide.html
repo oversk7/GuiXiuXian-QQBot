@@ -247,18 +247,66 @@
                 <div class="command-desc">提升境界，获得属性点</div>
             </div>
             <div class="command-box">
-                <div class="command">加点 攻击 5</div>
-                <div class="command-desc">把5个属性点加到攻击力上（可以换成防御、敏捷、幸运）</div>
+                <div class="command">加点 体 5</div>
+                <div class="command-desc">把5个属性点加到生命上（还可以换成智、防、敏、运）</div>
             </div>
             <div class="warning-box">
                 <div class="warning-title">⚠️ 注意</div>
-                突破有失败的可能！如果失败了，可以用怨念或棺材钉来保证成功。
+                突破有失败的可能！如果失败了，可以消耗怨念来保证成功。
             </div>
         </div>
 
         <hr class="divider">
         
         <h2 class="section-title">🎮 核心玩法介绍</h2>
+
+        <div class="step-card">
+            <div class="step-title">
+                🧭 导航系统 - 自动移动
+            </div>
+            <div class="step-content">
+                在现实世界（大都会）中，你可以使用导航系统自动前往指定坐标。导航速度取决于你的敏捷属性。
+            </div>
+            <div class="command-box">
+                <div class="command">导航 100 200</div>
+                <div class="command-desc">自动前往坐标(100,200)，敏捷越高速度越快</div>
+            </div>
+            <div class="command-box">
+                <div class="command">导航</div>
+                <div class="command-desc">查看当前导航进度和位置信息</div>
+            </div>
+            <div class="command-box">
+                <div class="command">中断导航</div>
+                <div class="command-desc">停止当前导航任务</div>
+            </div>
+            <div class="tip-box">
+                <div class="tip-title">💡 小贴士</div>
+                导航只在现实世界有效，坐标范围是-500到500。即使在诡域中也可以设置导航，会在现实世界中移动！
+            </div>
+        </div>
+
+        <div class="step-card">
+            <div class="step-title">
+                🗺️ 坐标系统 - 双重世界
+            </div>
+            <div class="step-content">
+                游戏有两套独立的坐标系统：现实坐标和诡域坐标。理解这个系统很重要！
+            </div>
+            <div class="command-box">
+                <div class="command">地图</div>
+                <div class="command-desc">查看现实世界地图和重要地点坐标</div>
+            </div>
+            <div class="command-box">
+                <div class="command">面板</div>
+                <div class="command-desc">查看当前位置信息，包括坐标显示</div>
+            </div>
+            <div class="warning-box">
+                <div class="warning-title">📍 坐标系统说明</div>
+                <p><strong>现实坐标：</strong>在大都会中的位置，范围-500到500，用于跑商、打工等</p>
+                <p><strong>诡域坐标：</strong>在诡域中的位置，范围-5到5，每层诡域都是独立的</p>
+                <p><strong>重要：</strong>进入诡域时会保存现实坐标，退出时自动回到原位置</p>
+            </div>
+        </div>
 
         <div class="step-card">
             <div class="step-title">
@@ -277,7 +325,15 @@
             </div>
             <div class="command-box">
                 <div class="command">上 / 下 / 左 / 右</div>
-                <div class="command-desc">在诡域中移动</div>
+                <div class="command-desc">在诡域中移动（单格移动，范围-5到5）</div>
+            </div>
+            <div class="command-box">
+                <div class="command">返回</div>
+                <div class="command-desc">退出诡域，回到现实世界原来的位置</div>
+            </div>
+            <div class="tip-box">
+                <div class="tip-title">💡 小贴士</div>
+                诡域中只能用方向键移动，不能使用导航。每层诡域都有独立的坐标系统！
             </div>
         </div>
 
@@ -370,7 +426,33 @@
             </div>
             <div class="command-box">
                 <div class="command">地图</div>
-                <div class="command-desc">查看游戏世界的地图</div>
+                <div class="command-desc">查看游戏世界的地图和重要地点</div>
+            </div>
+        </div>
+
+        <div class="step-card">
+            <div class="step-title">
+                🧭 移动导航指令
+            </div>
+            <div class="command-box">
+                <div class="command">导航 x y</div>
+                <div class="command-desc">在现实世界自动前往指定坐标</div>
+            </div>
+            <div class="command-box">
+                <div class="command">导航</div>
+                <div class="command-desc">查看当前导航状态和位置</div>
+            </div>
+            <div class="command-box">
+                <div class="command">中断导航</div>
+                <div class="command-desc">停止当前导航任务</div>
+            </div>
+            <div class="command-box">
+                <div class="command">上/下/左/右</div>
+                <div class="command-desc">在诡域中单格移动</div>
+            </div>
+            <div class="command-box">
+                <div class="command">附近玩家</div>
+                <div class="command-desc">查看同区域的其他玩家</div>
             </div>
         </div>
 
@@ -395,6 +477,8 @@
             <p>🚀 第一步：发送 <span class="highlight">注册</span></p>
             <p>🧘 第二步：发送 <span class="highlight">修炼</span></p>
             <p>📊 第三步：发送 <span class="highlight">面板</span> 查看角色</p>
+            <p>🗺️ 第四步：发送 <span class="highlight">地图</span> 了解世界</p>
+            <p>🧭 第五步：发送 <span class="highlight">导航 100 100</span> 体验移动</p>
             <p>🎯 然后：发送 <span class="highlight">帮助</span> 探索更多玩法</p>
             <hr class="divider">
             <p>👥 官方QQ群：<a href="https://qun.qq.com/universal-share/share?ac=1&authKey=kzDWa4Q88FXt0%2BkMvimY5%2ByWIwTtpcTkLk2Dagdq%2BQ%2Fz1SPBi38l0zxjPKun4Eyv&busi_data=eyJncm91cENvZGUiOiI5NjI0OTQ2NzkiLCJ0b2tlbiI6InN6UmV4c2NUakZiOEpxMmlWMHVtOHExVGQwYS9Eb1JaTHNWRnZGcDF3QVVZUE5BUTZaY3puUXFTRUtvdGRTaC8iLCJ1aW4iOiIyNjk4NTk1MTE1In0%3D&data=ONUViSvHIQdjpDVhrwlshmho2jQ9i--ajXkpREWW4XmKu-I-gPCmYqDtOYpT_afRB0fTO8V5OWE8DPtBt2nl9g&svctype=4&tempid=h5_group_info" class="qq-link" target="_blank">962494679</a></p>
