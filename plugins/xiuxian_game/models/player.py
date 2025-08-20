@@ -1,4 +1,4 @@
-from sqlalchemy import Integer, BigInteger, String, DateTime, func, Boolean
+from sqlalchemy import Integer, BigInteger, String, DateTime, func, Boolean, Index, text
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from datetime import datetime
 from .db import Base
@@ -181,7 +181,19 @@ class Player(Base):
     mansion_allow_others: Mapped[bool] = mapped_column(Boolean, default=True, server_default='True', comment="是否允许其他玩家使用阴宅")
 
     monthly_cards: Mapped[list["MonthlyCard"]] = relationship("MonthlyCard", back_populates="player")
-    
+
+    # 表约束
+    __table_args__ = (
+        # 阴宅位置唯一约束：同一位置只能有一个阴宅
+        Index(
+            'idx_mansion_location_unique',
+            'mansion_x', 'mansion_y',
+            unique=True,
+            postgresql_where=text('mansion_level > 0 AND mansion_x IS NOT NULL AND mansion_y IS NOT NULL'),
+            sqlite_where='mansion_level > 0 AND mansion_x IS NOT NULL AND mansion_y IS NOT NULL'
+        ),
+    )
+
     async def get_effective_inventory_capacity(self, session) -> int:
         """获取有效背包容量（包含月卡加成）"""
         from .monthly_card import get_player_card_benefits

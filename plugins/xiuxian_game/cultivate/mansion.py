@@ -116,9 +116,12 @@ class MansionService:
             select(Player).where(
                 Player.mansion_x == x,
                 Player.mansion_y == y,
-                Player.mansion_level > 0
+                Player.mansion_level > 0,
+                Player.mansion_x.isnot(None),
+                Player.mansion_y.isnot(None)
             )
         )
+        # 现在有了唯一约束，可以安全使用 scalar_one_or_none()
         return result.scalar_one_or_none()
 
     @classmethod
@@ -375,6 +378,15 @@ class MansionService:
 
         # 设置阴宅位置为玩家当前位置
         current_x, current_y = player.get_current_coordinates()
+
+        # 检查是否在原点(0,0)，原点不允许建造阴宅（保护新手）
+        if current_x == 0 and current_y == 0:
+            return False, "原点(0,0)是新手出生地，不允许建造阴宅。请移动到其他位置后再购买"
+
+        # 检查当前位置是否已有其他玩家的阴宅
+        existing_owner = await cls.find_mansion_owner_at_location(session, current_x, current_y)
+        if existing_owner:
+            return False, f"位置({current_x}, {current_y})已有玩家{existing_owner.nickname}的阴宅，请选择其他位置"
 
         # 执行购买
         player.gold -= purchase_cost
