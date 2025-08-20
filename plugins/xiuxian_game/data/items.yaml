@@ -1044,29 +1044,12 @@ items:
 
     # ========== 炼丹炉系列 ==========
 
-    - item_id: "furnace_white"
-      name: "简陋炼丹炉"
-      description: "生锈且漏风的炉子，仅适合练手"
-      type: "EQUIPMENT"
-      price: 3000
-      durability: 50
-      recipe:
-        materials:
-          iron_rust: 30
-          ash_powder: 20
-          grave_soil: 15
-        gold: 800
-      repair_cost: 5
-      required_level: 15
-      gem_slots: 0
-      rarity: "white"
-
-    - item_id: "furnace_green"
-      name: "普通炼丹炉"
-      description: "常见炼丹炉，成功率一般"
+    - item_id: "furnace"
+      name: "炼丹炉"
+      description: "可升阶的炼丹炉，等级越高成功率越高"
       type: "EQUIPMENT"
       price: 8000
-      durability: 80
+      durability: 100
       recipe:
         materials:
           yin_essence: 5
@@ -1075,63 +1058,9 @@ items:
           ash_powder: 30
         gold: 2000
       repair_cost: 5
-      required_level: 40
+      required_level: 10
       gem_slots: 0
       rarity: "green"
-
-    - item_id: "furnace_blue"
-      name: "精良炼丹炉"
-      description: "做工精良，成丹率不错"
-      type: "EQUIPMENT"
-      price: 20000
-      durability: 100
-      recipe:
-        materials:
-          flesh_crystal: 3
-          nightmare_silk: 8
-          yin_essence: 12
-          spirit_bone: 35
-        gold: 5000
-      repair_cost: 5
-      required_level: 70
-      gem_slots: 0
-      rarity: "blue"
-
-    - item_id: "furnace_purple"
-      name: "稀有炼丹炉"
-      description: "符阵加持，成功率大幅提升"
-      type: "EQUIPMENT"
-      price: 50000
-      durability: 120
-      recipe:
-        materials:
-          soul_crystal: 2
-          cursed_mirror_shard: 1
-          flesh_crystal: 6
-          nightmare_silk: 15
-        gold: 12000
-      repair_cost: 50
-      required_level: 110
-      gem_slots: 0
-      rarity: "purple"
-
-    - item_id: "furnace_gold"
-      name: "传奇炼丹炉"
-      description: "传说中的丹炉，几乎不会失败"
-      type: "EQUIPMENT"
-      price: 150000
-      durability: 150
-      recipe:
-        materials:
-          demon_heart: 1
-          void_essence: 1
-          soul_crystal: 5
-          cursed_mirror_shard: 3
-        gold: 30000
-      repair_cost: 80
-      required_level: 160
-      gem_slots: 0
-      rarity: "orange"
 
   elixirs:  # 丹药类不可售卖
     - item_id: "spirit_elixir"

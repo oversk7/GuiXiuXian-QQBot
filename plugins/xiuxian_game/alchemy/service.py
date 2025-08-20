@@ -15,16 +15,32 @@ from ..models.alchemy_task import AlchemyRecord
 class AlchemyService:
     """炼丹服务类 - 封装所有炼丹相关的业务逻辑"""
     
-    # 炉子品质映射：item_id -> (成功率系数, 耐久消耗基数)
-    FURNACE_QUALITIES: Dict[str, Tuple[float, int]] = {
-        "furnace_white": (0.8, 7),   # 成功率×0.8，耐久消耗7
-        "furnace_green": (1.0, 5),   # 成功率×1.0
-        "furnace_blue":  (1.25, 4),
-        "furnace_purple": (1.5, 3),
-        "furnace_gold":  (2.0, 2),
-    }
+    # 炼丹炉基础配置
+    FURNACE_ITEM_ID = "furnace"  # 统一的炼丹炉item_id
     
     BASE_TIME_MINUTES = 5  # 每炉基础耗时5分钟
+
+    @classmethod
+    def get_furnace_effects(cls, upgrade_level: int) -> Tuple[float, int]:
+        """
+        根据炼丹炉升阶等级计算效果
+        Returns:
+            (成功率系数, 耐久消耗基数)
+        """
+        # 成功率系数：+0阶=1.0，每阶+0.1，最高+10阶=2.0
+        success_multiplier = 1.0 + (upgrade_level * 0.1)
+
+        # 耐久消耗：根据等级阶段递减
+        if upgrade_level <= 1:
+            durability_cost = 5
+        elif upgrade_level <= 4:
+            durability_cost = 4
+        elif upgrade_level <= 7:
+            durability_cost = 3
+        else:  # 8-10阶
+            durability_cost = 2
+
+        return success_multiplier, durability_cost
     
     @classmethod
     def get_recipes(cls) -> Dict[str, dict]:
@@ -67,11 +83,11 @@ class AlchemyService:
         """获取玩家的所有炼丹炉"""
         stmt = select(ItemInstance).where(
             ItemInstance.player_id == player_id,
-            ItemInstance.item_id.in_(cls.FURNACE_QUALITIES.keys()),
+            ItemInstance.item_id == cls.FURNACE_ITEM_ID,
         )
         furnaces = (await session.execute(stmt)).scalars().all()
-        # 按品质系数、耐久排序
-        furnaces.sort(key=lambda inst: (cls.FURNACE_QUALITIES[inst.item_id][0], inst.durability), reverse=True)
+        # 按升阶等级、耐久排序
+        furnaces.sort(key=lambda inst: (inst.upgrade_level, inst.durability), reverse=True)
         return furnaces
     
     @classmethod
@@ -115,10 +131,10 @@ class AlchemyService:
         if not furnace or furnace.player_id != player_id:
             return False, "⛔ 未找到对应炼丹炉或非本人所有", None
         
-        if furnace.item_id not in cls.FURNACE_QUALITIES:
+        if furnace.item_id != cls.FURNACE_ITEM_ID:
             return False, "⛔ 该装备不是炼丹炉", None
-        
-        coeff, dura_cost_base = cls.FURNACE_QUALITIES[furnace.item_id]
+
+        coeff, dura_cost_base = cls.get_furnace_effects(furnace.upgrade_level)
         
         # 检查耐久
         total_dura_need = dura_cost_base * qty

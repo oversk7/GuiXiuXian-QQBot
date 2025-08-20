@@ -421,9 +421,8 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
         from ..alchemy.service import AlchemyService
         from ..models.alchemy_task import AlchemyRecord
 
-        furnace_ids = list(AlchemyService.FURNACE_QUALITIES.keys())
         failed_tasks = []
-        if equip.item_id in furnace_ids:
+        if equip.item_id == AlchemyService.FURNACE_ITEM_ID:
             # 查找使用该炼丹炉的进行中任务
             stmt = select(AlchemyRecord).where(
                 and_(
@@ -507,7 +506,6 @@ async def _(event: MessageEvent):
         from ..alchemy.service import AlchemyService
         from ..models.alchemy_task import AlchemyRecord
 
-        furnace_ids = list(AlchemyService.FURNACE_QUALITIES.keys())
         all_failed_tasks = []  # 所有失败的炼丹任务
 
         unworn_equipment = []  # 记录卸下的装备信息
@@ -516,7 +514,7 @@ async def _(event: MessageEvent):
         for equip in equipped_items:
             # 检查是否为炼丹炉，如果是则处理进行中的炼丹任务
             failed_tasks = []
-            if equip.item_id in furnace_ids:
+            if equip.item_id == AlchemyService.FURNACE_ITEM_ID:
                 # 查找使用该炼丹炉的进行中任务
                 stmt = select(AlchemyRecord).where(
                     and_(

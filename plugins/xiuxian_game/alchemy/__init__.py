@@ -31,23 +31,18 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
 
 @start_cmd.handle()
 async def _(event: MessageEvent, args: Message = CommandArg()):
-    """炼丹 炉ID 配方序号|名称 [数量]"""
+    """炼丹 配方序号|名称 [数量]"""
     params = args.extract_plain_text().strip().split()
-    if len(params) < 2 or len(params) > 3:
-        await start_cmd.finish("⛔ 格式：炼丹 炉ID 配方序号|名称 [数量]")
+    if len(params) < 1 or len(params) > 2:
+        await start_cmd.finish("⛔ 格式：炼丹 配方序号|名称 [数量]")
 
     # 解析参数
-    try:
-        furnace_id = int(params[0])
-    except ValueError:
-        await start_cmd.finish("⛔ 炉ID 必须是数字，可通过背包/装备栏查询")
-
-    target = params[1]
+    target = params[0]
 
     qty = 1
-    if len(params) == 3:
+    if len(params) == 2:
         try:
-            qty = int(params[2])
+            qty = int(params[1])
             if qty < 1:
                 raise ValueError
         except ValueError:
@@ -65,14 +60,24 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
         if not player:
             await start_cmd.finish("⛔ 请先创建角色")
 
+        # 自动选择最高阶的炼丹炉
+        furnaces = await AlchemyService.get_player_furnaces(session, player.id)
+        if not furnaces:
+            await start_cmd.finish("⛔ 你没有炼丹炉，请先获得炼丹炉")
+
+        # 选择第一个（已按升阶等级排序）
+        best_furnace = furnaces[0]
+
         # 开始炼丹
         success, msg, record = await AlchemyService.start_alchemy(
-            session, player.id, furnace_id, recipe_key, recipe, qty
+            session, player.id, best_furnace.id, recipe_key, recipe, qty
         )
 
         if success:
             await session.commit()
-            await start_cmd.finish(message_add_head(msg, event))
+            # 添加炼丹炉信息到消息中
+            furnace_info = f"🏺 使用炼丹炉+{best_furnace.upgrade_level}阶 (ID:{best_furnace.id})\n"
+            await start_cmd.finish(message_add_head(furnace_info + msg, event))
         else:
             await session.rollback()
             await start_cmd.finish(msg)
