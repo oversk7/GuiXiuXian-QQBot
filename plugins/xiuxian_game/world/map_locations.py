@@ -7,27 +7,10 @@ from __future__ import annotations
 
 from nonebot import on_command
 from nonebot.adapters.qq import MessageEvent, MessageSegment, Message
-from sqlalchemy import select
 
 from ..models.db import safe_session
 from ..models.player import Player
-from ..models.part_time_job import JobLocation
 from ..utils import message_add_head
-from ..config import config
-
-# 辅助函数
-def _show_default_job_locations(lines):
-    """显示默认的打工地点配置"""
-    try:
-        from ..economy.part_time_job_service import PartTimeJobService
-        for location_data in PartTimeJobService.JOB_LOCATIONS.values():
-            lines.append(f"• {location_data['name']} ({location_data['x']},{location_data['y']}) - {location_data['description']}")
-    except ImportError:
-        # 如果导入失败，显示基本信息（已整合到城镇中）
-        lines.append("• 上京商业中心 (0,0) - 繁华的商业区")
-        lines.append("• 荔湾镇工业区 (120,200) - 工厂集中的工业区")
-        lines.append("• 郸城娱乐街区 (120,120) - 充满活力的娱乐区")
-        lines.append("• 东郊物流中心 (390,50) - 物流配送中心")
 
 # 可视化地图指令
 visual_map_cmd = on_command("地图", aliases={"可视化地图"}, block=True, priority=5)
@@ -77,38 +60,32 @@ async def _(event: MessageEvent):
                 "distance": hq_distance,
                 "type": "特殊商店"
             })
-        
-        # 3. 检查打工地点
-        try:
-            stmt = select(JobLocation).where(JobLocation.is_active == True)
-            job_locations = (await session.execute(stmt)).scalars().all()
-            
-            for location in job_locations:
-                distance = calculate_distance(current_x, current_y, location.x, location.y)
-                if distance <= 100:
-                    nearby_places.append({
-                        "name": f"💼 {location.name}",
-                        "coord": f"({location.x},{location.y})",
-                        "distance": distance,
-                        "type": "打工地点"
-                    })
-        except Exception:
-            # 如果查询失败，使用默认配置
-            try:
-                from ..economy.part_time_job_service import PartTimeJobService
-                for location_data in PartTimeJobService.JOB_LOCATIONS.values():
-                    distance = calculate_distance(current_x, current_y, location_data['x'], location_data['y'])
-                    if distance <= 100:
-                        nearby_places.append({
-                            "name": f"💼 {location_data['name']}",
-                            "coord": f"({location_data['x']},{location_data['y']})",
-                            "distance": distance,
-                            "type": "打工地点"
-                        })
-            except ImportError:
-                # 如果导入失败，跳过打工地点
-                pass
-        
+
+        # 3. 检查附近的阴宅
+        from sqlalchemy import select, and_, func
+
+        # 查询附近100格内的阴宅
+        mansion_stmt = select(Player).where(
+            and_(
+                Player.mansion_level > 0,
+                Player.mansion_x.isnot(None),
+                Player.mansion_y.isnot(None),
+                Player.region == player.region,
+                func.abs(Player.mansion_x - current_x) + func.abs(Player.mansion_y - current_y) <= 100
+            )
+        )
+        mansion_result = await session.execute(mansion_stmt)
+        mansion_owners = mansion_result.scalars().all()
+
+        for owner in mansion_owners:
+            distance = calculate_distance(current_x, current_y, owner.mansion_x, owner.mansion_y)
+            nearby_places.append({
+                "name": f"🏚️ {owner.nickname}的阴宅",
+                "coord": f"({owner.mansion_x},{owner.mansion_y})",
+                "distance": distance,
+                "type": "阴宅"
+            })
+
         if not nearby_places:
             await nearby_locations_cmd.finish(message_add_head(
                 f"📍 当前位置：({current_x},{current_y})\n"
@@ -125,7 +102,11 @@ async def _(event: MessageEvent):
         ]
         
         for place in nearby_places[:10]:  # 最多显示10个
-            lines.append(f"{place['name']} {place['coord']} - 距离{place['distance']}格")
+            # 检查地点名称是否已包含坐标，避免重复显示
+            if place['coord'] in place['name']:
+                lines.append(f"• {place['name']} - 距离{place['distance']}格")
+            else:
+                lines.append(f"• {place['name']} {place['coord']} - 距离{place['distance']}格")
         
         lines.extend([
             "━━━━━━━━━━━━━",
@@ -171,18 +152,7 @@ async def _(event: MessageEvent):
             coord_info.append("🟡 特殊地点：")
             coord_info.append(f"   • 缉邪司总部 ({hq_x},{hq_y})")
 
-            # 打工地点
-            try:
-                from ..economy.part_time_job_service import PartTimeJobService
-                coord_info.append("🟣 打工地点：")
-                for location_data in PartTimeJobService.JOB_LOCATIONS.values():
-                    coord_info.append(f"   • {location_data['name']} ({location_data['x']},{location_data['y']})")
-            except ImportError:
-                coord_info.append("🟣 打工地点：")
-                coord_info.append("   • 上京商业中心 (0,0)")
-                coord_info.append("   • 荔湾镇工业区 (120,200)")
-                coord_info.append("   • 郸城娱乐街区 (120,120)")
-                coord_info.append("   • 东郊物流中心 (390,50)")
+
 
             # 当前玩家位置 - 使用正确的当前坐标
             current_x, current_y = player.get_current_coordinates()

@@ -88,6 +88,34 @@ async def show_basic_location_info(session: AsyncSession, player: Player, x: int
     nearby_locations = await LocationService.get_nearby_locations(
         session, x, y, region, max_distance=50
     )
+
+    # 获取附近的阴宅
+    from ..cultivate.mansion import MansionService
+    from sqlalchemy import select, and_, func
+    nearby_mansions = []
+
+    # 查询附近50格内的阴宅
+    mansion_stmt = select(Player).where(
+        and_(
+            Player.mansion_level > 0,
+            Player.mansion_x.isnot(None),
+            Player.mansion_y.isnot(None),
+            Player.region == region,
+            func.abs(Player.mansion_x - x) + func.abs(Player.mansion_y - y) <= 50
+        )
+    )
+    mansion_result = await session.execute(mansion_stmt)
+    mansion_owners = mansion_result.scalars().all()
+
+    for owner in mansion_owners:
+        distance = abs(owner.mansion_x - x) + abs(owner.mansion_y - y)
+        nearby_mansions.append({
+            "name": f"🏚️ {owner.nickname}的阴宅",
+            "x": owner.mansion_x,
+            "y": owner.mansion_y,
+            "distance": distance,
+            "level": owner.mansion_level
+        })
     
     lines = [
         f"所在地 ※ 荒野({x},{y})",
@@ -109,12 +137,40 @@ async def show_basic_location_info(session: AsyncSession, player: Player, x: int
         lines.append("👉攻击 <玩家>")
         lines.append("")
     
-    # 显示附近地点
-    if nearby_locations:
+    # 显示附近地点（包括阴宅）
+    all_nearby_places = []
+
+    # 添加普通地点
+    for loc in nearby_locations:
+        distance = abs(loc.x - x) + abs(loc.y - y)
+        all_nearby_places.append({
+            "name": loc.name,
+            "x": loc.x,
+            "y": loc.y,
+            "distance": distance,
+            "type": "location"
+        })
+
+    # 添加阴宅
+    all_nearby_places.extend([{
+        "name": mansion["name"],
+        "x": mansion["x"],
+        "y": mansion["y"],
+        "distance": mansion["distance"],
+        "type": "mansion"
+    } for mansion in nearby_mansions])
+
+    if all_nearby_places:
+        # 按距离排序
+        all_nearby_places.sort(key=lambda p: p["distance"])
+
         lines.append("🗺️ 附近地点：")
-        for loc in nearby_locations[:5]:  # 最多显示5个
-            distance = abs(loc.x - x) + abs(loc.y - y)
-            lines.append(f"• {loc.name} ({loc.x},{loc.y}) - 距离{distance}格")
+        for place in all_nearby_places[:5]:  # 最多显示5个
+            # 检查地点名称是否已包含坐标，避免重复显示
+            if f"({place['x']},{place['y']})" in place["name"]:
+                lines.append(f"• {place['name']} - 距离{place['distance']}格")
+            else:
+                lines.append(f"• {place['name']} ({place['x']},{place['y']}) - 距离{place['distance']}格")
         lines.append("💡 使用【导航 x y】前往指定地点")
     else:
         lines.append("🔍 附近50格内没有特殊地点")
