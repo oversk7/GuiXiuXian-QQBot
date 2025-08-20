@@ -17,6 +17,7 @@ from ..models import Player, ItemInstance
 from ..config import config
 from ..utils import message_add_head
 from .gem_socket_service import GemSocketService
+from .equipment_commands import find_equipment_by_input
 
 
 # ---------------- 指令：查看装备孔位 ----------------
@@ -84,12 +85,12 @@ socket_gem_cmd = on_command("镶嵌", aliases={"宝石镶嵌"}, block=True, prio
 async def _(event: MessageEvent, args: Message = CommandArg()):
     arg_text = args.extract_plain_text().strip()
     if not arg_text:
-        await socket_gem_cmd.finish("⛔ 格式：镶嵌 装备ID/名称 孔位号 宝石名称")
+        await socket_gem_cmd.finish("⛔ 格式：镶嵌 装备编号/名称 孔位号 宝石名称")
 
     # 解析参数
     parts = arg_text.split()
     if len(parts) < 3:
-        await socket_gem_cmd.finish("⛔ 格式：镶嵌 装备ID/名称 孔位号 宝石名称")
+        await socket_gem_cmd.finish("⛔ 格式：镶嵌 装备编号/名称 孔位号 宝石名称")
 
     equipment_arg = parts[0]
     try:
@@ -106,9 +107,9 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
             await socket_gem_cmd.finish("⛔ 请先创建角色")
 
         # 查找装备
-        equip = await _find_equipment(session, event.get_user_id(), equipment_arg)
+        equip = await find_equipment_by_input(session, event.get_user_id(), equipment_arg)
         if not equip:
-            await socket_gem_cmd.finish("⛔ 未找到指定装备")
+            await socket_gem_cmd.finish("⛔ 未找到指定装备，请使用装备栏中显示的编号或装备名称")
 
         # 查找宝石
         gem_config = config.items_config["by_name"].get(gem_name)
@@ -137,12 +138,12 @@ remove_gem_cmd = on_command("拆卸", aliases={"宝石拆卸"}, block=True, prio
 async def _(event: MessageEvent, args: Message = CommandArg()):
     arg_text = args.extract_plain_text().strip()
     if not arg_text:
-        await remove_gem_cmd.finish("⛔ 格式：拆卸 装备ID/名称 孔位号")
+        await remove_gem_cmd.finish("⛔ 格式：拆卸 装备编号/名称 孔位号")
 
     # 解析参数
     parts = arg_text.split()
     if len(parts) < 2:
-        await remove_gem_cmd.finish("⛔ 格式：拆卸 装备ID/名称 孔位号")
+        await remove_gem_cmd.finish("⛔ 格式：拆卸 装备编号/名称 孔位号")
 
     equipment_arg = parts[0]
     try:
@@ -157,9 +158,9 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
             await remove_gem_cmd.finish("⛔ 请先创建角色")
 
         # 查找装备
-        equip = await _find_equipment(session, event.get_user_id(), equipment_arg)
+        equip = await find_equipment_by_input(session, event.get_user_id(), equipment_arg)
         if not equip:
-            await remove_gem_cmd.finish("⛔ 未找到指定装备")
+            await remove_gem_cmd.finish("⛔ 未找到指定装备，请使用装备栏中显示的编号或装备名称")
 
         # 执行拆卸
         success, message = await GemSocketService.remove_gem(
@@ -233,33 +234,4 @@ async def _(event: MessageEvent):
         await gem_list_cmd.finish(message_add_head("\n".join(lines), event))
 
 
-# ---------------- 辅助函数 ----------------
-async def _find_equipment(session, player_id: str, arg: str) -> ItemInstance | None:
-    """查找装备的辅助函数"""
-    equip = None
-    
-    # 尝试按ID查找
-    if arg.isdigit():
-        equip_id = int(arg)
-        equip = await session.get(ItemInstance, equip_id)
-        if not equip or equip.player_id != player_id or not equip.is_equipment:
-            return None
-    else:
-        # 按名称查找
-        item_config = config.items_config["by_name"].get(arg)
-        if not item_config or item_config.type.value != "EQUIPMENT":
-            return None
 
-        # 查找玩家所有该名称的装备，优先选择已装备的
-        stmt = select(ItemInstance).where(
-            ItemInstance.player_id == player_id,
-            ItemInstance.item_id == item_config.item_id
-        ).order_by(ItemInstance.equipped.desc())
-
-        items = (await session.execute(stmt)).scalars().all()
-        if not items:
-            return None
-        
-        equip = items[0]
-    
-    return equip

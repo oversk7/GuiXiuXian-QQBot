@@ -21,6 +21,55 @@ from ..utils import message_add_head
 # 获取所有装备物品ID
 EQUIP_ITEM_IDS = config.items_config["by_type"]["EQUIPMENT"]
 
+
+async def find_equipment_by_input(session, player_id: str, input_arg: str) -> ItemInstance:
+    """
+    根据用户输入查找装备，支持：
+    1. 简短编号（1-装备总数）
+    2. 原始ID（数字）
+    3. 装备名称
+
+    返回找到的装备实例，如果未找到则返回None
+    """
+    # 先获取玩家所有装备
+    stmt_all = select(ItemInstance).where(
+        ItemInstance.player_id == player_id,
+        ItemInstance.item_id.in_(EQUIP_ITEM_IDS)
+    )
+    all_equips = (await session.execute(stmt_all)).scalars().all()
+
+    if input_arg.isdigit():
+        input_id = int(input_arg)
+
+        # 如果输入的是简短编号（1-装备总数）
+        if 1 <= input_id <= len(all_equips):
+            return all_equips[input_id - 1]  # 转换为0基索引
+        else:
+            # 尝试按原始ID查找
+            equip = await session.get(ItemInstance, input_id)
+            if equip and equip.player_id == player_id and equip.is_equipment:
+                return equip
+            return None
+    else:
+        # 按名称查找
+        item_config = config.items_config["by_name"].get(input_arg)
+        if not item_config or item_config.type.value != "EQUIPMENT":
+            return None
+
+        # 在玩家装备中查找该名称的装备
+        for equip in all_equips:
+            if equip.item_id == item_config.item_id:
+                return equip
+        return None
+
+
+def get_equipment_short_id(all_equips: list, target_equip: ItemInstance) -> int:
+    """获取装备的简短编号"""
+    for i, equip in enumerate(all_equips, 1):
+        if equip.id == target_equip.id:
+            return i
+    return 0
+
 # ---------------- 指令：查看装备栏 ----------------
 list_equipment = on_command("装备栏", aliases={"我的装备"}, block=True, priority=5)
 
@@ -45,6 +94,12 @@ async def _(event: MessageEvent):
         equipped_count = sum(1 for eq in equips if eq.equipped)
 
         lines = [f"🎽 装备栏 ({equipped_count}/4)", "━━━━━━━━━━━━━"]
+
+        # 为装备分配简短编号
+        equipment_numbers = {}
+        for i, eq in enumerate(equips, 1):
+            equipment_numbers[eq.id] = i
+
         for eq in equips:
             tpl = eq.config
             equip_state = "🟢已装备" if eq.equipped else "🔘未装备"
@@ -52,8 +107,9 @@ async def _(event: MessageEvent):
             # 构建装备信息
             info_parts = []
 
-            # 基础信息
-            info_parts.append(f"🆔{eq.id}│{tpl.name}")
+            # 基础信息 - 使用简短编号
+            short_id = equipment_numbers[eq.id]
+            info_parts.append(f"🆔{short_id}│{tpl.name}")
 
             # 升阶等级
             if eq.upgrade_level > 0:
@@ -81,7 +137,7 @@ equipment_detail = on_command("装备详情", aliases={"装备信息", "查看�
 async def _(event: MessageEvent, args: Message = CommandArg()):
     arg = args.extract_plain_text().strip()
     if not arg:
-        await equipment_detail.finish("⛔ 格式：装备详情 装备ID/名称")
+        await equipment_detail.finish("⛔ 格式：装备详情 装备编号/名称")
 
     async with safe_session() as session:
         player = await session.get(Player, event.get_user_id())
@@ -89,31 +145,9 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
             await equipment_detail.finish("⛔ 请先创建角色")
 
         # 查找装备
-        equip = None
-        
-        # 尝试按ID查找
-        if arg.isdigit():
-            equip_id = int(arg)
-            equip = await session.get(ItemInstance, equip_id)
-            if not equip or equip.player_id != event.get_user_id() or not equip.is_equipment:
-                await equipment_detail.finish("⛔ 无效装备 ID 或非本人所有")
-        else:
-            # 按名称查找，优先选择已装备的
-            item_config = config.items_config["by_name"].get(arg)
-            if not item_config or item_config.type.value != "EQUIPMENT":
-                await equipment_detail.finish("⛔ 未找到对应装备名称，或该物品不是装备")
-
-            # 查找玩家所有该名称的装备，优先选择已装备的
-            stmt = select(ItemInstance).where(
-                ItemInstance.player_id == event.get_user_id(),
-                ItemInstance.item_id == item_config.item_id
-            ).order_by(ItemInstance.equipped.desc(), ItemInstance.upgrade_level.desc())
-
-            items = (await session.execute(stmt)).scalars().all()
-            if not items:
-                await equipment_detail.finish(f"⛔ 你没有 {arg}")
-            
-            equip = items[0]
+        equip = await find_equipment_by_input(session, event.get_user_id(), arg)
+        if not equip:
+            await equipment_detail.finish("⛔ 未找到指定装备，请使用装备栏中显示的编号或装备名称")
 
         # 获取装备配置
         tpl = equip.config
@@ -230,36 +264,27 @@ wear_equipment = on_command("装备", aliases={"穿戴", "佩戴"}, block=True, 
 async def _(event: MessageEvent, args: Message = CommandArg()):
     arg = args.extract_plain_text().strip()
     if not arg:
-        await wear_equipment.finish("⛔ 格式：装备 装备ID/名称")
+        await wear_equipment.finish("⛔ 格式：装备 装备编号/名称")
 
     async with safe_session() as session:
-        equip = None
+        # 查找装备
+        equip = await find_equipment_by_input(session, event.get_user_id(), arg)
+        if not equip:
+            await wear_equipment.finish("⛔ 未找到指定装备，请使用装备栏中显示的编号或装备名称")
 
-        # 尝试按ID查找
-        if arg.isdigit():
-            equip_id = int(arg)
-            equip = await session.get(ItemInstance, equip_id)
-            if not equip or equip.player_id != event.get_user_id() or not equip.is_equipment:
-                await wear_equipment.finish("⛔ 无效装备 ID 或非本人所有")
-        else:
-            # 按名称查找，优先选择耐久度最高的未装备装备
+        # 如果是按名称查找且有多个同名装备，优先选择耐久度最高的未装备装备
+        if not arg.isdigit():
             item_config = config.items_config["by_name"].get(arg)
-            if not item_config or item_config.type.value != "EQUIPMENT":
-                await wear_equipment.finish("⛔ 未找到对应装备名称，或该物品不是装备")
+            if item_config:
+                stmt = select(ItemInstance).where(
+                    ItemInstance.player_id == event.get_user_id(),
+                    ItemInstance.item_id == item_config.item_id,
+                    ItemInstance.equipped == False
+                ).order_by(ItemInstance.durability.desc())
 
-            # 查找玩家所有该名称的未装备装备，按耐久度降序排列
-            stmt = select(ItemInstance).where(
-                ItemInstance.player_id == event.get_user_id(),
-                ItemInstance.item_id == item_config.item_id,
-                ItemInstance.equipped == False
-            ).order_by(ItemInstance.durability.desc())
-
-            unequipped_items = (await session.execute(stmt)).scalars().all()
-            if not unequipped_items:
-                await wear_equipment.finish(f"⛔ 你没有未装备的 {arg}")
-
-            # 选择耐久度最高的那件
-            equip = unequipped_items[0]
+                unequipped_items = (await session.execute(stmt)).scalars().all()
+                if unequipped_items:
+                    equip = unequipped_items[0]  # 选择耐久度最高的那件
 
         # 检查是否已装备
         if equip.equipped:
@@ -378,37 +403,27 @@ unwear_equipment = on_command("卸下", block=True, priority=5)
 async def _(event: MessageEvent, args: Message = CommandArg()):
     arg = args.extract_plain_text().strip()
     if not arg:
-        await unwear_equipment.finish("⛔ 格式：卸下 装备ID/名称")
+        await unwear_equipment.finish("⛔ 格式：卸下 装备编号/名称")
 
     async with safe_session() as session:
-        equip = None
+        # 查找装备
+        equip = await find_equipment_by_input(session, event.get_user_id(), arg)
+        if not equip:
+            await unwear_equipment.finish("⛔ 未找到指定装备，请使用装备栏中显示的编号或装备名称")
 
-        # 尝试按ID查找
-        if arg.isdigit():
-            equip_id = int(arg)
-            equip = await session.get(ItemInstance, equip_id)
-            if not equip or equip.player_id != event.get_user_id() or not equip.is_equipment:
-                await unwear_equipment.finish("⛔ 无效装备 ID 或非本人所有")
-        else:
-            # 按名称查找，优先选择已装备的
+        # 如果是按名称查找且有多个同名装备，优先选择已装备且升阶等级最高的
+        if not arg.isdigit():
             item_config = config.items_config["by_name"].get(arg)
-            if not item_config or item_config.type.value != "EQUIPMENT":
-                await unwear_equipment.finish("⛔ 未找到对应装备名称，或该物品不是装备")
+            if item_config:
+                stmt = select(ItemInstance).where(
+                    ItemInstance.player_id == event.get_user_id(),
+                    ItemInstance.item_id == item_config.item_id,
+                    ItemInstance.equipped == True
+                ).order_by(ItemInstance.upgrade_level.desc())
 
-            # 查找玩家所有该名称的已装备装备，按升阶等级降序排列
-            from sqlalchemy import select
-            stmt = select(ItemInstance).where(
-                ItemInstance.player_id == event.get_user_id(),
-                ItemInstance.item_id == item_config.item_id,
-                ItemInstance.equipped == True
-            ).order_by(ItemInstance.upgrade_level.desc())
-
-            equipped_items = (await session.execute(stmt)).scalars().all()
-            if not equipped_items:
-                await unwear_equipment.finish(f"⛔ 你没有已装备的 {arg}")
-
-            # 选择升阶等级最高的那件
-            equip = equipped_items[0]
+                equipped_items = (await session.execute(stmt)).scalars().all()
+                if equipped_items:
+                    equip = equipped_items[0]  # 选择升阶等级最高的那件
 
         # 检查是否已装备
         if not equip.equipped:

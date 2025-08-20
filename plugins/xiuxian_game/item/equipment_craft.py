@@ -7,6 +7,7 @@ from ..models.db import safe_session
 from ..models import Player, ItemInstance
 from ..config import config
 from ..utils import message_add_head
+from .equipment_commands import find_equipment_by_input
 
 # ---------------- 指令：锻造列表 ----------------
 # 列出所有可锻造装备
@@ -152,7 +153,7 @@ repair_cmd = on_command("修复", aliases={"修理"}, block=True, priority=5)
 async def _(event: MessageEvent, args: Message = CommandArg()):
     arg_text = args.extract_plain_text().strip()
     if not arg_text:
-        await repair_cmd.finish("⛔ 格式：修理 装备ID/名称 [金币比例:怨念比例]\n💡 示例：修理 白骨护甲 3:2 或 3：2（金币怨念按3:2分配）\n💡 不指定比例则默认使用金币")
+        await repair_cmd.finish("⛔ 格式：修理 装备编号/名称 [金币比例:怨念比例]\n💡 示例：修理 白骨护甲 3:2 或 3：2（金币怨念按3:2分配）\n💡 不指定比例则默认使用金币")
 
     # 解析参数
     parts = arg_text.split()
@@ -181,38 +182,29 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
         else:
             await repair_cmd.finish("⛔ 比例格式错误，应为 金币比例:怨念比例，如 3:2 或 3：2")
     elif len(parts) > 2:
-        await repair_cmd.finish("⛔ 参数过多，格式：修理 装备ID/名称 [金币比例:怨念比例]")
+        await repair_cmd.finish("⛔ 参数过多，格式：修理 装备编号/名称 [金币比例:怨念比例]")
 
     async with safe_session() as session:
-        equip = None
+        # 查找装备
+        equip = await find_equipment_by_input(session, event.get_user_id(), equipment_arg)
+        if not equip:
+            await repair_cmd.finish("⛔ 未找到指定装备，请使用装备栏中显示的编号或装备名称")
 
-        # 尝试按ID查找
-        if equipment_arg.isdigit():
-            equip_id = int(equipment_arg)
-            equip = await session.get(ItemInstance, equip_id)
-            if not equip or equip.player_id != event.get_user_id() or equip.config.type.value != "EQUIPMENT":
-                await repair_cmd.finish("⛔ 无效装备ID或非本人所有")
-        else:
-            # 按名称查找，优先选择耐久度最低的装备
+        # 如果是按名称查找且有多个同名装备，优先选择耐久度最低的需要修复的装备
+        if not equipment_arg.isdigit():
             item_config = config.items_config["by_name"].get(equipment_arg)
-            if not item_config or item_config.type.value != "EQUIPMENT":
-                await repair_cmd.finish("⛔ 未找到对应装备名称，或该物品不是装备")
+            if item_config:
+                stmt = select(ItemInstance).where(
+                    ItemInstance.player_id == event.get_user_id(),
+                    ItemInstance.item_id == item_config.item_id
+                ).order_by(ItemInstance.durability.asc())
 
-            # 查找玩家所有该名称的装备，按耐久度升序排列，只选择需要修复的
-            stmt = select(ItemInstance).where(
-                ItemInstance.player_id == event.get_user_id(),
-                ItemInstance.item_id == item_config.item_id
-            ).order_by(ItemInstance.durability.asc())
+                all_items = (await session.execute(stmt)).scalars().all()
+                # 过滤出需要修复的装备（耐久度未满的）
+                repairable_items = [item for item in all_items if item.durability < item.config.durability]
 
-            all_items = (await session.execute(stmt)).scalars().all()
-            # 过滤出需要修复的装备（耐久度未满的）
-            repairable_items = [item for item in all_items if item.durability < item.config.durability]
-
-            if not repairable_items:
-                await repair_cmd.finish(f"⛔ 你没有需要修复的 {equipment_arg}")
-
-            # 选择耐久度最低的那件
-            equip = repairable_items[0]
+                if repairable_items:
+                    equip = repairable_items[0]  # 选择耐久度最低的那件
 
         tpl = equip.config
         if equip.durability >= tpl.durability:

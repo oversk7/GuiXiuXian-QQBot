@@ -11,6 +11,7 @@ from ..models.inventory import ItemInstance
 from ..config import config
 from ..utils import message_add_head
 from .equipment_trade_service import EquipmentTradeService
+from ..item.equipment_commands import find_equipment_by_input
 
 MAX_LISTINGS = 6  # 每位玩家最大挂牌数
 AUTO_MATCH = True
@@ -596,22 +597,20 @@ equipment_appraise_cmd = on_command("估价", aliases={"装备估价"}, block=Tr
 
 @equipment_appraise_cmd.handle()
 async def _(event: MessageEvent, args: Message = CommandArg()):
-    """估价 装备ID"""
+    """估价 装备编号/名称"""
     arg = args.extract_plain_text().strip()
-    if not arg.isdigit():
-        await equipment_appraise_cmd.finish("⛔ 格式：估价 装备ID")
-
-    equipment_id = int(arg)
+    if not arg:
+        await equipment_appraise_cmd.finish("⛔ 格式：估价 装备编号/名称")
 
     async with safe_session() as session:
         player = await session.get(Player, event.get_user_id())
         if not player:
             await equipment_appraise_cmd.finish("⛔ 请先创建角色")
 
-        # 获取装备
-        equipment = await session.get(ItemInstance, equipment_id)
-        if not equipment or equipment.player_id != player.id or not equipment.is_equipment:
-            await equipment_appraise_cmd.finish("⛔ 无效装备ID或非本人所有")
+        # 查找装备
+        equipment = await find_equipment_by_input(session, event.get_user_id(), arg)
+        if not equipment:
+            await equipment_appraise_cmd.finish("⛔ 未找到指定装备，请使用装备栏中显示的编号或装备名称")
 
         # 计算估价
         min_price, max_price = EquipmentTradeService.calculate_equipment_value_range(equipment)
