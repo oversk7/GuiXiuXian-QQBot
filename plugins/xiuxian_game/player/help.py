@@ -40,6 +40,7 @@ async def handle_help(event: MessageEvent, args: Message = CommandArg()):
         "💡 【】括号里是指令，<>里是必填，[]里是选填\n"
         "💡 官群：962494679，不会玩直接问机器人或者加群\n"
         "💡 发送/邀请码 邀请好友获得分级奖励，最高可获得3万+金币\n"
+        "💡 教程：http://Oversky.Online"
     )
     await help_cmd.finish(Message(msg))
 
