@@ -127,8 +127,11 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
         available_equipment = await EquipmentUpgradeService.get_available_equipment_for_upgrade(
             session, player.id, equip.item_id, current_level
         )
-        success_rate = EquipmentUpgradeService.get_success_rate(current_level)
-        success_rate_with_protection = EquipmentUpgradeService.get_success_rate(current_level, True)
+        success_rate = EquipmentUpgradeService.get_success_rate(current_level, False, player.luck)
+        success_rate_with_protection = EquipmentUpgradeService.get_success_rate(current_level, True, player.luck)
+
+        # 计算基础成功率（不含运气加成）
+        base_success_rate = EquipmentUpgradeService.get_success_rate(current_level, False, 0)
 
         # 构建信息显示
         lines = [
@@ -137,7 +140,8 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
             f"🎯 装备：{equip.config.name} (ID:{equip.id})",
             f"📊 当前等级：+{current_level}阶 → +{target_level}阶",
             f"💰 金币消耗：{required_gold:,}",
-            f"📈 成功率：{success_rate:.1%}",
+            f"📈 基础成功率：{base_success_rate:.1%}",
+            f"🍀 运气加成后：{success_rate:.1%}",
             f"💎 稳定水晶加成：{success_rate_with_protection:.1%}",
             "",
             "🔧 装备合成需求："
@@ -277,7 +281,7 @@ async def _(event: MessageEvent):
 
             current_level = equip.upgrade_level
             target_level = current_level + 1
-            success_rate = EquipmentUpgradeService.get_success_rate(current_level)
+            success_rate = EquipmentUpgradeService.get_success_rate(current_level, False, player.luck)
 
             # 获取简短编号
             short_id = get_equipment_short_id(all_equips, equip)

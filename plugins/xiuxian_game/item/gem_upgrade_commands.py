@@ -42,7 +42,7 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
             await gem_upgrade_info_cmd.finish("⛔ 该物品不是可升级的镶嵌物")
 
         # 获取升级信息
-        upgrade_info = GemUpgradeService.get_gem_display_info(gem_id)
+        upgrade_info = GemUpgradeService.get_gem_display_info(gem_id, player.luck)
         if not upgrade_info:
             await gem_upgrade_info_cmd.finish("⛔ 获取升级信息失败")
 
@@ -88,10 +88,14 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
                 status = "✅" if owned_qty_material >= required_qty else "❌"
                 lines.append(f"{status} {material_name}: {owned_qty_material}/{required_qty}")
 
+            # 计算基础成功率（不含运气加成）
+            base_success_rate = GemUpgradeService.get_success_rate(upgrade_info['current_level'], False, 0)
+
             lines.extend([
                 "",
-                f"📈 成功率: {upgrade_info['success_rate']:.1%}",
-                f"🛡️ 保护成功率: {upgrade_info['success_rate_with_protection']:.1%}",
+                f"📈 基础成功率: {base_success_rate:.1%}",
+                f"🍀 运气加成后: {upgrade_info['success_rate']:.1%}",
+                f"🛡️ 稳定水晶加成: {upgrade_info['success_rate_with_protection']:.1%}",
                 "",
                 "💡 使用方法：",
                 f"• 合成镶嵌物 {arg}",
@@ -100,7 +104,8 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
                 "📝 说明：",
                 f"• 需要消耗 {upgrade_info['required_gem_count']} 个相同镶嵌物进行合成",
                 "• 失败时镶嵌物会降阶（1级镶嵌物失败会消失）",
-                "• 使用稳定水晶可保护一个原等级镶嵌物"
+                "• 使用稳定水晶可保护一个原等级镶嵌物",
+                f"• 运气值 {player.luck} 提供额外成功率加成"
             ])
 
         await gem_upgrade_info_cmd.finish(message_add_head("\n".join(lines), event))

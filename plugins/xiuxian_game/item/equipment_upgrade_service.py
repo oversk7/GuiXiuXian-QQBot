@@ -124,18 +124,23 @@ class EquipmentUpgradeService:
         return base_cost
     
     @classmethod
-    def get_success_rate(cls, current_level: int, use_protection: bool = False) -> float:
+    def get_success_rate(cls, current_level: int, use_protection: bool = False, player_luck: int = 0) -> float:
         """获取升阶成功率"""
         if current_level >= 10:
             return 0.0
-        
+
         target_level = current_level + 1
         base_rate = cls.SUCCESS_RATES.get(target_level, 0.0)
-        
+
+        # 运气加成（最多20%）
+        from ..utils import luck_prob
+        luck_bonus = luck_prob(player_luck) * 0.2  # 运气值转换为0-20%的加成
+        base_rate = min(1.0, base_rate + luck_bonus)
+
         # 稳定水晶提升成功率
         if use_protection:
             base_rate = min(1.0, base_rate + 0.2)
-        
+
         return base_rate
     
     @classmethod
@@ -200,7 +205,7 @@ class EquipmentUpgradeService:
         target_level = current_level + 1
         required_materials = cls.get_upgrade_materials(current_level)
         required_gold = cls.get_upgrade_gold_cost(current_level)
-        success_rate = cls.get_success_rate(current_level, use_protection)
+        success_rate = cls.get_success_rate(current_level, use_protection, player.luck)
 
         # 获取需要消耗的装备
         required_equipment_count = cls.get_equipment_requirements(current_level)

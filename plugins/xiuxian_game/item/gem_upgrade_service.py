@@ -161,11 +161,17 @@ class GemUpgradeService:
         return cls.UPGRADE_GOLD_COSTS.get(current_level, 0)
     
     @classmethod
-    def get_success_rate(cls, current_level: int, use_protection: bool = False) -> float:
+    def get_success_rate(cls, current_level: int, use_protection: bool = False, player_luck: int = 0) -> float:
         """获取升级成功率"""
         base_rate = cls.SUCCESS_RATES.get(current_level, 0.0)
+
+        # 运气加成（最多20%）
+        from ..utils import luck_prob
+        luck_bonus = luck_prob(player_luck) * 0.2  # 运气值转换为0-20%的加成
+        base_rate = min(1.0, base_rate + luck_bonus)
+
         if use_protection:
-            return min(1.0, base_rate + 0.2)  # 稳定水晶增加20%成功率
+            base_rate = min(1.0, base_rate + 0.2)  # 稳定水晶增加20%成功率
         return base_rate
     
     @classmethod
@@ -273,7 +279,7 @@ class GemUpgradeService:
             consumed_materials["stabilizer_crystal"] = 1
 
         # 计算成功率并判定结果
-        success_rate = cls.get_success_rate(current_level, use_protection)
+        success_rate = cls.get_success_rate(current_level, use_protection, player.luck)
         is_success = random.random() < success_rate
 
         gem_config = config.items_config["by_id"].get(gem_id)
@@ -319,7 +325,7 @@ class GemUpgradeService:
             return False, message, consumed_materials
 
     @classmethod
-    def get_gem_display_info(cls, gem_id: str) -> Dict[str, any]:
+    def get_gem_display_info(cls, gem_id: str, player_luck: int = 0) -> Dict[str, any]:
         """获取镶嵌物显示信息"""
         if not cls.is_upgradeable_gem(gem_id):
             return {}
@@ -338,8 +344,8 @@ class GemUpgradeService:
             "required_gem_count": cls.get_required_gem_count(current_level),
             "required_materials": cls.get_upgrade_materials(current_level),
             "required_gold": cls.get_upgrade_gold_cost(current_level),
-            "success_rate": cls.get_success_rate(current_level),
-            "success_rate_with_protection": cls.get_success_rate(current_level, True)
+            "success_rate": cls.get_success_rate(current_level, False, player_luck),
+            "success_rate_with_protection": cls.get_success_rate(current_level, True, player_luck)
         }
 
         if next_gem_id:
