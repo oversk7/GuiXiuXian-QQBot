@@ -209,7 +209,7 @@ async def handle_elixir_tolerance(event: MessageEvent, args: Message = CommandAr
             await elixir_tolerance_cmd.finish("📊 今日尚未服用任何丹药")
 
         # 构建使用状态报告
-        lines = ["📊 今日丹药使用状态", "=" * 30]
+        lines = ["📊 今日丹药使用状态", "=" * 15]
 
         for log in logs:
             item_config = config.items_config["by_id"].get(log.item_id)
