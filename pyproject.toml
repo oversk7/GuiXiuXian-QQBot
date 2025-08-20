@@ -4,6 +4,10 @@ version = "0.1.0"
 description = "GuiXiuXian"
 readme = "README.md"
 requires-python = ">=3.9, <4.0"
+dependencies = [
+    "fastapi",
+    "uvicorn"
+]
 
 [tool.nonebot]
 adapters = [

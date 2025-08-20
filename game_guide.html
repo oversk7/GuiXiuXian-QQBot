@@ -1,0 +1,317 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>诡修仙 - 核心玩法指南</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: 'Microsoft YaHei', '微软雅黑', Arial, sans-serif;
+            background: linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%);
+            color: #fff;
+            min-height: 100vh;
+            padding: 20px;
+        }
+        
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            background: rgba(0, 0, 0, 0.7);
+            border-radius: 20px;
+            padding: 30px;
+            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.5);
+            border: 2px solid rgba(255, 215, 0, 0.3);
+        }
+        
+        .header {
+            text-align: center;
+            margin-bottom: 40px;
+            position: relative;
+        }
+        
+        .title {
+            font-size: 3.5em;
+            font-weight: bold;
+            background: linear-gradient(45deg, #ff6b6b, #ffd93d, #6bcf7f, #4ecdc4, #45b7d1);
+            background-size: 300% 300%;
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            animation: gradient 3s ease infinite;
+            text-shadow: 0 0 30px rgba(255, 255, 255, 0.5);
+            margin-bottom: 10px;
+        }
+        
+        @keyframes gradient {
+            0% { background-position: 0% 50%; }
+            50% { background-position: 100% 50%; }
+            100% { background-position: 0% 50%; }
+        }
+        
+        .subtitle {
+            font-size: 1.3em;
+            color: #ffd700;
+            margin-bottom: 20px;
+            text-shadow: 0 0 10px rgba(255, 215, 0, 0.5);
+        }
+        
+        .quick-start {
+            background: linear-gradient(135deg, #ff6b6b, #ee5a52);
+            padding: 20px;
+            border-radius: 15px;
+            margin-bottom: 30px;
+            text-align: center;
+            box-shadow: 0 10px 20px rgba(255, 107, 107, 0.3);
+        }
+        
+        .quick-start h3 {
+            font-size: 1.8em;
+            margin-bottom: 15px;
+            color: #fff;
+        }
+        
+        .quick-commands {
+            display: flex;
+            justify-content: center;
+            gap: 15px;
+            flex-wrap: wrap;
+        }
+        
+        .cmd-btn {
+            background: rgba(255, 255, 255, 0.2);
+            padding: 10px 20px;
+            border-radius: 25px;
+            font-weight: bold;
+            border: 2px solid rgba(255, 255, 255, 0.3);
+            transition: all 0.3s ease;
+        }
+        
+        .cmd-btn:hover {
+            background: rgba(255, 255, 255, 0.3);
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(255, 255, 255, 0.2);
+        }
+        
+        .systems-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(350px, 1fr));
+            gap: 25px;
+            margin-bottom: 30px;
+        }
+        
+        .system-card {
+            background: linear-gradient(135deg, rgba(255, 255, 255, 0.1), rgba(255, 255, 255, 0.05));
+            border-radius: 15px;
+            padding: 25px;
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            transition: all 0.3s ease;
+            position: relative;
+            overflow: hidden;
+        }
+        
+        .system-card::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: -100%;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.1), transparent);
+            transition: left 0.5s ease;
+        }
+        
+        .system-card:hover::before {
+            left: 100%;
+        }
+        
+        .system-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 15px 30px rgba(0, 0, 0, 0.3);
+            border-color: rgba(255, 215, 0, 0.5);
+        }
+        
+        .system-icon {
+            font-size: 2.5em;
+            margin-bottom: 15px;
+            display: block;
+        }
+        
+        .system-title {
+            font-size: 1.5em;
+            font-weight: bold;
+            margin-bottom: 15px;
+            color: #ffd700;
+        }
+        
+        .system-desc {
+            color: #ccc;
+            margin-bottom: 15px;
+            line-height: 1.6;
+        }
+        
+        .system-commands {
+            list-style: none;
+        }
+        
+        .system-commands li {
+            background: rgba(0, 0, 0, 0.3);
+            margin: 8px 0;
+            padding: 8px 12px;
+            border-radius: 8px;
+            border-left: 3px solid #ffd700;
+            font-family: 'Courier New', monospace;
+            font-size: 0.9em;
+        }
+        
+        .highlight {
+            color: #ffd700;
+            font-weight: bold;
+        }
+        
+        .footer {
+            text-align: center;
+            margin-top: 40px;
+            padding: 20px;
+            background: rgba(0, 0, 0, 0.5);
+            border-radius: 15px;
+            border: 1px solid rgba(255, 215, 0, 0.3);
+        }
+        
+        .footer h3 {
+            color: #ffd700;
+            margin-bottom: 15px;
+            font-size: 1.5em;
+        }
+        
+        .footer p {
+            color: #ccc;
+            line-height: 1.6;
+            margin-bottom: 10px;
+        }
+        
+        .glow {
+            animation: glow 2s ease-in-out infinite alternate;
+        }
+        
+        @keyframes glow {
+            from { text-shadow: 0 0 10px rgba(255, 215, 0, 0.5); }
+            to { text-shadow: 0 0 20px rgba(255, 215, 0, 0.8), 0 0 30px rgba(255, 215, 0, 0.6); }
+        }
+        
+        .pulse {
+            animation: pulse 2s infinite;
+        }
+        
+        @keyframes pulse {
+            0% { transform: scale(1); }
+            50% { transform: scale(1.05); }
+            100% { transform: scale(1); }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1 class="title glow">诡修仙</h1>
+            <p class="subtitle">诡异风格的文字修仙游戏 - 核心玩法指南</p>
+        </div>
+        
+        <div class="quick-start pulse">
+            <h3>🚀 新手快速开始</h3>
+            <div class="quick-commands">
+                <span class="cmd-btn">注册</span>
+                <span class="cmd-btn">修炼</span>
+                <span class="cmd-btn">面板</span>
+                <span class="cmd-btn">帮助</span>
+            </div>
+        </div>
+        
+        <div class="systems-grid">
+            <div class="system-card">
+                <span class="system-icon">🧘</span>
+                <h3 class="system-title">修炼系统</h3>
+                <p class="system-desc">突破境界获得属性点，献祭材料获取怨念保驾护航</p>
+                <ul class="system-commands">
+                    <li><span class="highlight">修炼</span> - 获取经验，5分钟冷却</li>
+                    <li><span class="highlight">闭关</span> - 挂机修炼，效率减半</li>
+                    <li><span class="highlight">突破</span> - 提升境界获得属性点</li>
+                    <li><span class="highlight">加点 属性 点数</span> - 分配属性点</li>
+                </ul>
+            </div>
+            
+            <div class="system-card">
+                <span class="system-icon">🌀</span>
+                <h3 class="system-title">诡域探索</h3>
+                <p class="system-desc">无限层诡域探索，击败诡异获得经验和材料</p>
+                <ul class="system-commands">
+                    <li><span class="highlight">进入 N层诡域</span> - 进入指定深度</li>
+                    <li><span class="highlight">探索</span> - 探索当前格子事件</li>
+                    <li><span class="highlight">上/下/左/右</span> - 诡域中移动</li>
+                    <li><span class="highlight">返回</span> - 回到现实世界</li>
+                </ul>
+            </div>
+            
+            <div class="system-card">
+                <span class="system-icon">⚔️</span>
+                <h3 class="system-title">装备系统</h3>
+                <p class="system-desc">锻造装备，升阶强化，镶嵌宝石提升战力</p>
+                <ul class="system-commands">
+                    <li><span class="highlight">装备栏</span> - 查看当前装备</li>
+                    <li><span class="highlight">装备 名称</span> - 穿戴指定装备</li>
+                    <li><span class="highlight">升阶 名称</span> - 装备升阶强化</li>
+                    <li><span class="highlight">镶嵌 装备 孔位 宝石</span> - 镶嵌宝石</li>
+                </ul>
+            </div>
+            
+            <div class="system-card">
+                <span class="system-icon">🏪</span>
+                <h3 class="system-title">跑商系统</h3>
+                <p class="system-desc">利用不同坐标的差价赚取金币，每日价格波动</p>
+                <ul class="system-commands">
+                    <li><span class="highlight">市集</span> - 查看当前市场价格</li>
+                    <li><span class="highlight">购买 物品 数量</span> - 购买商品</li>
+                    <li><span class="highlight">出售 物品 数量</span> - 出售商品</li>
+                    <li><span class="highlight">跑商推荐</span> - 查看盈利路线</li>
+                </ul>
+            </div>
+            
+            <div class="system-card">
+                <span class="system-icon">🔮</span>
+                <h3 class="system-title">炼丹系统</h3>
+                <p class="system-desc">消耗材料炼制丹药，提升修炼效率和属性</p>
+                <ul class="system-commands">
+                    <li><span class="highlight">丹方</span> - 查看炼丹配方</li>
+                    <li><span class="highlight">炼丹 配方 数量</span> - 开始炼丹</li>
+                    <li><span class="highlight">收获丹药</span> - 收获完成的丹药</li>
+                    <li><span class="highlight">使用 丹药 数量</span> - 服用丹药</li>
+                </ul>
+            </div>
+            
+            <div class="system-card">
+                <span class="system-icon">🏰</span>
+                <h3 class="system-title">公会系统</h3>
+                <p class="system-desc">加入公会获得建筑福利，完成任务获得奖励</p>
+                <ul class="system-commands">
+                    <li><span class="highlight">公会列表</span> - 查看所有公会</li>
+                    <li><span class="highlight">加入公会 ID</span> - 申请加入公会</li>
+                    <li><span class="highlight">捐献金币 金额</span> - 捐献获得积分</li>
+                    <li><span class="highlight">公会任务</span> - 查看任务列表</li>
+                </ul>
+            </div>
+        </div>
+        
+        <div class="footer">
+            <h3>🎮 开始你的修仙之旅</h3>
+            <p>💡 发送 <span class="highlight">注册</span> 创建角色，然后发送 <span class="highlight">修炼</span> 开始修炼</p>
+            <p>💡 发送 <span class="highlight">帮助</span> 查看所有系统，发送 <span class="highlight">修炼系统</span> 查看详细指令</p>
+            <p>💡 官群：962494679 | 发送 <span class="highlight">邀请码</span> 邀请好友获得奖励</p>
+            <p>🌟 在诡异的世界中修炼成仙，体验独特的文字冒险！</p>
+        </div>
+    </div>
+</body>
+</html>
