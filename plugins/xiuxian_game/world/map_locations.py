@@ -29,73 +29,8 @@ def _show_default_job_locations(lines):
         lines.append("• 郸城娱乐街区 (120,120) - 充满活力的娱乐区")
         lines.append("• 东郊物流中心 (390,50) - 物流配送中心")
 
-# 地图指令
-map_cmd = on_command("地图", aliases={"地点", "地点列表", "坐标"}, block=True, priority=5)
-
 # 可视化地图指令
-visual_map_cmd = on_command("可视化地图", aliases={"地图图片", "地图可视化", "图形地图"}, block=True, priority=5)
-
-@map_cmd.handle()
-async def _(event: MessageEvent):
-    """显示所有地点信息"""
-    async with safe_session() as session:
-        player: Player | None = await session.get(Player, event.get_user_id())
-        if not player:
-            await map_cmd.finish("⛔ 请先创建角色")
-        
-        # 获取当前正确的坐标
-        current_x, current_y = player.get_current_coordinates()
-
-        lines = [
-            "🗺️ 大都会地点一览",
-            "━━━━━━━━━━━━━",
-            f"📍 当前位置：({current_x},{current_y})",
-            "━━━━━━━━━━━━━"
-        ]
-        
-        # 1. 市集地点
-        lines.append("🏪 市集交易地点：")
-        from ..economy.merchants import MARKETS
-        for market in MARKETS:
-            lines.append(f"• {market.name} ({market.x},{market.y})")
-        
-        lines.append("")
-        
-        # 2. 特殊商店
-        lines.append("🏛️ 特殊商店：")
-        from ..economy.merchants import HEADQUARTERS_COORD
-        lines.append(f"• 缉邪司总部 {HEADQUARTERS_COORD} - 积分兑换升阶材料")
-        
-        lines.append("")
-        
-        # 3. 打工地点
-        lines.append("💼 打工地点：")
-        try:
-            # 查询数据库中的工作地点
-            stmt = select(JobLocation).where(JobLocation.is_active == True)
-            job_locations = (await session.execute(stmt)).scalars().all()
-
-            if job_locations:
-                for location in job_locations:
-                    lines.append(f"• {location.name} ({location.x},{location.y}) - {location.description}")
-            else:
-                # 如果数据库中没有，显示默认配置
-                _show_default_job_locations(lines)
-        except Exception:
-            # 如果查询失败，显示默认配置
-            _show_default_job_locations(lines)
-
-        lines.extend([
-            "━━━━━━━━━━━━━",
-            "💡 使用方法：",
-            "• 【导航 x y】- 自动导航到指定坐标",
-            "• 【市集】- 查看当前位置市场",
-            "• 【打工】- 查看当前位置工作",
-            "• 【总部商店】- 前往总部兑换升阶材料"
-        ])
-        
-        await map_cmd.finish(message_add_head("\n".join(lines), event))
-
+visual_map_cmd = on_command("地图", aliases={"可视化地图"}, block=True, priority=5)
 
 # 附近地点指令
 nearby_locations_cmd = on_command("附近地点", aliases={"周边"}, block=True, priority=5)
