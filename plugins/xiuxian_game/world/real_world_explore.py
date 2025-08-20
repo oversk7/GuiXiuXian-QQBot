@@ -13,6 +13,7 @@ from ..models.player import Player
 from ..utils import message_add_head
 from .location_service import LocationService
 from .npc_service import NPCService
+from ..cultivate.mansion import MansionService
 
 
 # ==================== 现实世界探索命令 ====================
@@ -67,6 +68,11 @@ async def show_location_info(session: AsyncSession, player: Player, location, cu
         location_summary, current_x, current_y, nearby_players
     )
 
+    # 添加阴宅信息
+    mansion_info = await get_mansion_info_for_location(session, player, current_x, current_y)
+    if mansion_info:
+        info_text += "\n\n" + mansion_info
+
     await real_explore_cmd.finish(message_add_head(info_text, event))
 
 
@@ -115,7 +121,55 @@ async def show_basic_location_info(session: AsyncSession, player: Player, x: int
         lines.append("💡 使用【地图】查看所有地点坐标")
     
     info_text = "\n".join(lines)
+
+    # 添加阴宅信息
+    mansion_info = await get_mansion_info_for_location(session, player, x, y)
+    if mansion_info:
+        info_text += "\n\n" + mansion_info
+
     await real_explore_cmd.finish(message_add_head(info_text, event))
+
+
+async def get_mansion_info_for_location(session: AsyncSession, player: Player, x: int, y: int) -> str | None:
+    """获取指定位置的阴宅信息，用于在观察指令中显示"""
+    # 查找当前位置的阴宅主人
+    mansion_owner = await MansionService.find_mansion_owner_at_location(session, x, y)
+
+    if not mansion_owner:
+        return None
+
+    mansion_info = MansionService.get_mansion_info(mansion_owner.mansion_level)
+
+    # 检查是否可以使用
+    can_use, use_msg = await MansionService.can_use_mansion(session, player, mansion_owner)
+
+    # 构建简化的阴宅信息
+    if player.id == mansion_owner.id:
+        # 阴宅主人查看自己的阴宅
+        status_info = "你的阴宅"
+        usage_info = ""
+    else:
+        # 其他玩家查看
+        status_info = f"{mansion_owner.nickname} 的阴宅"
+        if can_use:
+            if mansion_owner.mansion_usage_fee > 0:
+                usage_info = f"💰 使用费用：{mansion_owner.mansion_usage_fee:,}金币"
+            else:
+                usage_info = "💰 免费使用"
+        else:
+            usage_info = f"❌ {use_msg}"
+
+    lines = [
+        f"🏚️ 阴宅信息",
+        f"━━━━━━━━━━━━━",
+        f"✧ {status_info} (Lv.{mansion_info['level']})",
+        f"✧ 修炼效率：+{mansion_info['efficiency_percent']:.1f}%"
+    ]
+
+    if usage_info:
+        lines.append(f"✧ {usage_info}")
+
+    return "\n".join(lines)
 
 
 # ==================== 地点详情命令 ====================

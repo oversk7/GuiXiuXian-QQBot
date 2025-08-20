@@ -15,6 +15,8 @@ from .mansion import MansionService
 mansion_status_cmd = on_command("阴宅", aliases={"阴宅状态", "查看阴宅"}, priority=4, block=True)
 purchase_mansion_cmd = on_command("购买阴宅", aliases={"买阴宅"}, priority=4, block=True)
 upgrade_mansion_cmd = on_command("升级阴宅", aliases={"阴宅升级"}, priority=4, block=True)
+set_mansion_fee_cmd = on_command("设置阴宅费用", aliases={"阴宅费用"}, priority=4, block=True)
+toggle_mansion_access_cmd = on_command("切换阴宅权限", aliases={"阴宅权限"}, priority=4, block=True)
 
 
 @mansion_status_cmd.handle()
@@ -84,3 +86,70 @@ async def handle_upgrade_mansion(event: MessageEvent):
             await upgrade_mansion_cmd.finish(message_add_head(result_msg, event))
         else:
             await upgrade_mansion_cmd.finish(message_add_head(f"⛔ {result_msg}", event))
+
+
+@set_mansion_fee_cmd.handle()
+async def handle_set_mansion_fee(event: MessageEvent, args: Message = CommandArg()):
+    """设置阴宅使用费用"""
+    user_id = event.get_user_id()
+
+    # 解析参数
+    arg_text = args.extract_plain_text().strip()
+    if not arg_text:
+        await set_mansion_fee_cmd.finish(message_add_head(
+            "⛔ 请输入费用金额\n"
+            "━━━━━━━━━━━━━\n"
+            "用法：【设置阴宅费用 <金币数>】\n"
+            "例如：【设置阴宅费用 5000】\n"
+            "设置为0表示免费使用\n"
+            f"费用范围：0 或 {MansionService.MIN_USAGE_FEE:,}-{MansionService.MAX_USAGE_FEE:,}金币",
+            event
+        ))
+
+    try:
+        fee = int(arg_text)
+    except ValueError:
+        await set_mansion_fee_cmd.finish(message_add_head(
+            "⛔ 请输入有效的数字",
+            event
+        ))
+
+    async with safe_session() as session:
+        # 获取玩家数据
+        player = await session.get(Player, user_id)
+        if not player:
+            await set_mansion_fee_cmd.finish("⛔ 请先使用【注册】命令创建角色")
+
+        # 设置阴宅使用费用
+        success, result_msg = await MansionService.set_mansion_usage_fee(session, player, fee)
+
+        if success:
+            # 保存数据
+            await session.commit()
+            await set_mansion_fee_cmd.finish(message_add_head(result_msg, event))
+        else:
+            await set_mansion_fee_cmd.finish(message_add_head(f"⛔ {result_msg}", event))
+
+
+@toggle_mansion_access_cmd.handle()
+async def handle_toggle_mansion_access(event: MessageEvent):
+    """切换阴宅访问权限"""
+    user_id = event.get_user_id()
+    async with safe_session() as session:
+        # 获取玩家数据
+        player = await session.get(Player, user_id)
+        if not player:
+            await toggle_mansion_access_cmd.finish("⛔ 请先使用【注册】命令创建角色")
+
+        # 切换阴宅访问权限
+        success, result_msg = await MansionService.toggle_mansion_access(session, player)
+
+        if success:
+            # 保存数据
+            await session.commit()
+            await toggle_mansion_access_cmd.finish(message_add_head(result_msg, event))
+        else:
+            await toggle_mansion_access_cmd.finish(message_add_head(f"⛔ {result_msg}", event))
+
+
+

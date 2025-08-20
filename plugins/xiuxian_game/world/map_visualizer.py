@@ -42,6 +42,7 @@ class MapVisualizer:
             'market': '#FF8800',      # 市集橙色
             'job': '#8844FF',         # 打工地点紫色
             'special': '#FF44FF',     # 特殊地点粉色
+            'mansion': '#8B4513',     # 阴宅棕色
             'border': '#4488CC',      # 边框颜色
             'location_text': '#333333',  # 地点文字颜色
             'navigation_line': '#00FF00',  # 导航连线绿色
@@ -198,6 +199,72 @@ class MapVisualizer:
         # 只绘制地点标记（圆形），不显示任何文字
         draw.ellipse([pixel_x - size, pixel_y - size, pixel_x + size, pixel_y + size],
                     fill=color, outline='#000000', width=2)
+
+    def _draw_mansion(self, draw: ImageDraw.Draw, x: int, y: int, mansion_level: int,
+                     owner_nickname: str, size: int = 6):
+        """绘制阴宅标记（房子形状）"""
+        pixel_x, pixel_y = self._game_to_pixel(x, y)
+
+        # 确保在地图范围内
+        if not (0 <= pixel_x <= self.map_width and 0 <= pixel_y <= self.map_height):
+            return
+
+        # 绘制房子形状的阴宅标记
+        # 房子底部（矩形）
+        house_width = size * 2
+        house_height = size * 1.5
+        house_left = pixel_x - house_width // 2
+        house_top = pixel_y - house_height // 2
+        house_right = house_left + house_width
+        house_bottom = house_top + house_height
+
+        # 绘制房子主体
+        draw.rectangle([house_left, house_top, house_right, house_bottom],
+                      fill=self.colors['mansion'], outline='#000000', width=1)
+
+        # 绘制房顶（三角形）
+        roof_height = size
+        roof_points = [
+            (pixel_x, house_top - roof_height),  # 顶点
+            (house_left - 1, house_top),         # 左下
+            (house_right + 1, house_top)         # 右下
+        ]
+        draw.polygon(roof_points, fill='#654321', outline='#000000', width=1)
+
+        # 根据阴宅等级在房子上显示等级标记
+        if mansion_level <= 10:
+            # 在房子中心显示等级数字
+            level_text = str(mansion_level)
+            # 使用小字体显示等级
+            text_bbox = draw.textbbox((0, 0), level_text, font=self.fonts['small'])
+            text_width = text_bbox[2] - text_bbox[0]
+            text_height = text_bbox[3] - text_bbox[1]
+            text_x = pixel_x - text_width // 2
+            text_y = pixel_y - text_height // 2
+            draw.text((text_x, text_y), level_text, fill='#FFFFFF', font=self.fonts['small'])
+
+    async def _draw_mansions(self, draw: ImageDraw.Draw, session: AsyncSession):
+        """查询并绘制所有阴宅"""
+        # 查询所有拥有阴宅的玩家
+        stmt = select(Player).where(
+            Player.mansion_level > 0,
+            Player.mansion_x.isnot(None),
+            Player.mansion_y.isnot(None),
+            Player.region == "大都会"  # 只显示大都会区域的阴宅
+        )
+        result = await session.execute(stmt)
+        mansion_owners = result.scalars().all()
+
+        # 绘制每个阴宅
+        for owner in mansion_owners:
+            if owner.mansion_x is not None and owner.mansion_y is not None:
+                self._draw_mansion(
+                    draw,
+                    owner.mansion_x,
+                    owner.mansion_y,
+                    owner.mansion_level,
+                    owner.nickname
+                )
     
     def _draw_players(self, draw: ImageDraw.Draw, players: List[Player], current_player_id: str = None):
         """绘制玩家位置"""
@@ -324,7 +391,7 @@ class MapVisualizer:
         legend_x = 20
         legend_y = 20
         legend_width = 200
-        legend_height = 160  # 增加高度以容纳导航项目
+        legend_height = 180  # 增加高度以容纳阴宅项目
 
         # 绘制图例背景
         draw.rectangle([legend_x, legend_y, legend_x + legend_width, legend_y + legend_height],
@@ -344,6 +411,7 @@ class MapVisualizer:
                 ("🟠 市集交易", self.colors['market']),
                 ("🟣 打工地点", self.colors['job']),
                 ("🟡 特殊地点", self.colors['special']),
+                ("🏠 阴宅", self.colors['mansion']),
                 ("🟢 导航路线", self.colors['navigation_line']),
                 ("🟨 导航目标", self.colors['navigation_target']),
             ]
@@ -353,16 +421,38 @@ class MapVisualizer:
                 ("● Markets", self.colors['market']),
                 ("● Jobs", self.colors['job']),
                 ("● Special", self.colors['special']),
+                ("● Mansions", self.colors['mansion']),
                 ("● Navigation", self.colors['navigation_line']),
                 ("● Target", self.colors['navigation_target']),
             ]
 
         for i, (text, color) in enumerate(legend_items):
             item_y = legend_y + 35 + i * 20
-            # 绘制颜色标记
-            draw.ellipse([legend_x + 15, item_y, legend_x + 25, item_y + 10], fill=color)
+
+            # 特殊处理阴宅图例 - 绘制小房子
+            if "阴宅" in text or "Mansions" in text:
+                # 绘制小房子图标
+                house_size = 3
+                house_x = legend_x + 20
+                house_y = item_y + 5
+
+                # 房子主体
+                draw.rectangle([house_x - house_size, house_y - house_size,
+                               house_x + house_size, house_y + house_size],
+                              fill=color, outline='#000000', width=1)
+                # 房顶
+                roof_points = [
+                    (house_x, house_y - house_size - 2),  # 顶点
+                    (house_x - house_size - 1, house_y - house_size),  # 左下
+                    (house_x + house_size + 1, house_y - house_size)   # 右下
+                ]
+                draw.polygon(roof_points, fill='#654321', outline='#000000', width=1)
+            else:
+                # 绘制普通圆形标记
+                draw.ellipse([legend_x + 15, item_y, legend_x + 25, item_y + 10], fill=color)
+
             # 绘制文字
-            display_text = text[2:] if text.startswith(("🔴", "🟠", "🟣", "🟡")) else text
+            display_text = text[2:] if text.startswith(("🔴", "🟠", "🟣", "🟡", "🏠")) else text
             draw.text((legend_x + 35, item_y - 2), display_text, fill=self.colors['location_text'], font=self.fonts['small'])
     
     async def generate_map(self, session: AsyncSession, current_player_id: str = None) -> bytes:
@@ -406,7 +496,10 @@ class MapVisualizer:
         stmt = select(Player).where(Player.region == "大都会")
         result = await session.execute(stmt)
         players = result.scalars().all()
-        
+
+        # 查询并绘制阴宅
+        await self._draw_mansions(draw, session)
+
         # 绘制所有玩家，当前玩家会显示为粗红点，其他玩家显示为小红点
         self._draw_players(draw, players, current_player_id)
 

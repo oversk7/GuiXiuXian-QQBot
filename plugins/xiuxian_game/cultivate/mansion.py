@@ -3,6 +3,7 @@
 提供阴宅等级管理、升级费用计算、修炼效率加成等功能
 """
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy import select
 from ..models.player import Player
 from ..config import config
 import math
@@ -17,6 +18,10 @@ class MansionService:
     COST_MULTIPLIER = 1.5  # 费用递增倍数
     BASE_EFFICIENCY = 0.2  # 基础效率加成（20%）
     EFFICIENCY_INCREMENT = 0.09  # 每级效率递增（9%）
+
+    # 阴宅使用费用配置
+    MIN_USAGE_FEE = 1000  # 最低使用费用（1000金币）
+    MAX_USAGE_FEE = 1_000_000  # 最高使用费用（100万金币）
     
     @classmethod
     def get_upgrade_cost(cls, current_level: int) -> int:
@@ -93,6 +98,185 @@ class MansionService:
         current_x, current_y = player.get_current_coordinates()
         return (current_x == player.mansion_x and
                 current_y == player.mansion_y)
+
+    @classmethod
+    async def find_mansion_owner_at_location(cls, session: AsyncSession, x: int, y: int) -> Player | None:
+        """
+        查找指定位置的阴宅主人
+
+        Args:
+            session: 数据库会话
+            x: X坐标
+            y: Y坐标
+
+        Returns:
+            阴宅主人玩家对象，如果没有找到则返回None
+        """
+        result = await session.execute(
+            select(Player).where(
+                Player.mansion_x == x,
+                Player.mansion_y == y,
+                Player.mansion_level > 0
+            )
+        )
+        return result.scalar_one_or_none()
+
+    @classmethod
+    async def can_use_mansion(cls, session: AsyncSession, player: Player, mansion_owner: Player) -> tuple[bool, str]:
+        """
+        检查玩家是否可以使用指定阴宅
+
+        Args:
+            session: 数据库会话
+            player: 使用者玩家对象
+            mansion_owner: 阴宅主人玩家对象
+
+        Returns:
+            (是否可以使用, 结果信息)
+        """
+        # 检查是否是阴宅主人自己
+        if player.id == mansion_owner.id:
+            return True, "阴宅主人可以免费使用自己的阴宅"
+
+        # 检查阴宅主人是否允许其他玩家使用
+        if not mansion_owner.mansion_allow_others:
+            return False, "阴宅主人不允许其他玩家使用"
+
+        # 检查使用费用
+        if mansion_owner.mansion_usage_fee > 0:
+            if player.gold < mansion_owner.mansion_usage_fee:
+                return False, f"金币不足，使用此阴宅需要{mansion_owner.mansion_usage_fee:,}金币，当前拥有{player.gold:,}金币"
+
+        return True, "可以使用此阴宅"
+
+    @classmethod
+    async def pay_mansion_usage_fee(cls, session: AsyncSession, player: Player, mansion_owner: Player) -> tuple[bool, str]:
+        """
+        支付阴宅使用费用
+
+        Args:
+            session: 数据库会话
+            player: 使用者玩家对象
+            mansion_owner: 阴宅主人玩家对象
+
+        Returns:
+            (是否成功, 结果信息)
+        """
+        # 如果是阴宅主人自己，无需支付费用
+        if player.id == mansion_owner.id:
+            return True, ""
+
+        # 如果没有设置使用费用，无需支付
+        if mansion_owner.mansion_usage_fee <= 0:
+            return True, ""
+
+        # 检查金币是否足够
+        if player.gold < mansion_owner.mansion_usage_fee:
+            return False, f"金币不足，使用此阴宅需要{mansion_owner.mansion_usage_fee:,}金币"
+
+        # 扣除使用者金币，增加阴宅主人金币
+        player.gold -= mansion_owner.mansion_usage_fee
+        mansion_owner.gold += mansion_owner.mansion_usage_fee
+
+        # 保存数据
+        session.add(player)
+        session.add(mansion_owner)
+
+        return True, f"已支付{mansion_owner.mansion_usage_fee:,}金币给阴宅主人 {mansion_owner.nickname}"
+
+    @classmethod
+    async def set_mansion_usage_fee(cls, session: AsyncSession, player: Player, fee: int) -> tuple[bool, str]:
+        """
+        设置阴宅使用费用
+
+        Args:
+            session: 数据库会话
+            player: 阴宅主人玩家对象
+            fee: 使用费用
+
+        Returns:
+            (是否成功, 结果信息)
+        """
+        # 检查是否拥有阴宅
+        if not cls.has_mansion(player):
+            return False, "你还没有阴宅，无法设置使用费用"
+
+        # 检查费用范围
+        if fee < 0:
+            return False, "使用费用不能为负数"
+
+        if fee > 0 and fee < cls.MIN_USAGE_FEE:
+            return False, f"使用费用不能低于{cls.MIN_USAGE_FEE:,}金币"
+
+        if fee > cls.MAX_USAGE_FEE:
+            return False, f"使用费用不能超过{cls.MAX_USAGE_FEE:,}金币"
+
+        # 设置费用
+        old_fee = player.mansion_usage_fee
+        player.mansion_usage_fee = fee
+        session.add(player)
+
+        if fee == 0:
+            result_msg = (
+                f"🏚️ 阴宅使用费用设置成功！\n"
+                f"━━━━━━━━━━━━━\n"
+                f"✧ 原费用：{old_fee:,}金币\n"
+                f"✧ 新费用：免费使用\n"
+                f"✧ 阴宅位置：({player.mansion_x}, {player.mansion_y})\n"
+                f"━━━━━━━━━━━━━\n"
+                f"💡 其他玩家现在可以免费使用你的阴宅"
+            )
+        else:
+            result_msg = (
+                f"🏚️ 阴宅使用费用设置成功！\n"
+                f"━━━━━━━━━━━━━\n"
+                f"✧ 原费用：{old_fee:,}金币\n"
+                f"✧ 新费用：{fee:,}金币\n"
+                f"✧ 阴宅位置：({player.mansion_x}, {player.mansion_y})\n"
+                f"━━━━━━━━━━━━━\n"
+                f"💡 其他玩家使用你的阴宅需支付{fee:,}金币"
+            )
+
+        return True, result_msg
+
+    @classmethod
+    async def toggle_mansion_access(cls, session: AsyncSession, player: Player) -> tuple[bool, str]:
+        """
+        切换阴宅访问权限
+
+        Args:
+            session: 数据库会话
+            player: 阴宅主人玩家对象
+
+        Returns:
+            (是否成功, 结果信息)
+        """
+        # 检查是否拥有阴宅
+        if not cls.has_mansion(player):
+            return False, "你还没有阴宅，无法设置访问权限"
+
+        # 切换权限
+        player.mansion_allow_others = not player.mansion_allow_others
+        session.add(player)
+
+        status = "允许" if player.mansion_allow_others else "禁止"
+        result_msg = (
+            f"🏚️ 阴宅访问权限设置成功！\n"
+            f"━━━━━━━━━━━━━\n"
+            f"✧ 访问权限：{status}其他玩家使用\n"
+            f"✧ 阴宅位置：({player.mansion_x}, {player.mansion_y})\n"
+            f"━━━━━━━━━━━━━\n"
+        )
+
+        if player.mansion_allow_others:
+            if player.mansion_usage_fee > 0:
+                result_msg += f"💡 其他玩家使用你的阴宅需支付{player.mansion_usage_fee:,}金币"
+            else:
+                result_msg += f"💡 其他玩家现在可以免费使用你的阴宅"
+        else:
+            result_msg += f"💡 其他玩家无法使用你的阴宅"
+
+        return True, result_msg
 
     @classmethod
     async def can_upgrade(cls, session: AsyncSession, player: Player) -> tuple[bool, str]:
@@ -273,8 +457,17 @@ class MansionService:
         if not is_at_mansion:
             status_msg += " (需在阴宅位置)"
 
+        # 添加阴宅使用费用和权限信息
+        access_status = "允许" if player.mansion_allow_others else "禁止"
+        if player.mansion_usage_fee > 0:
+            fee_info = f"{player.mansion_usage_fee:,}金币"
+        else:
+            fee_info = "免费"
+
         status_msg += (
-            f"\n✧ 当前金币：{player.gold:,}金币\n"
+            f"\n✧ 使用费用：{fee_info}\n"
+            f"✧ 他人使用：{access_status}\n"
+            f"✧ 当前金币：{player.gold:,}金币\n"
             f"━━━━━━━━━━━━━"
         )
 
@@ -289,4 +482,93 @@ class MansionService:
         else:
             status_msg += f"\n🎉 阴宅已达到最大等级！"
 
+        # 添加阴宅管理相关命令提示
+        status_msg += (
+            f"\n⬇️ 【设置阴宅费用 <金币数>】设置使用费用\n"
+            f"⬇️ 【切换阴宅权限】允许/禁止他人使用"
+        )
+
         return status_msg
+
+    @classmethod
+    async def format_location_mansion_info(cls, session: AsyncSession, player: Player) -> str:
+        """
+        格式化显示当前位置的阴宅信息（供其他玩家查看）
+
+        Args:
+            session: 数据库会话
+            player: 查看者玩家对象
+
+        Returns:
+            格式化的阴宅信息字符串
+        """
+        current_x, current_y = player.get_current_coordinates()
+
+        # 查找当前位置的阴宅主人
+        mansion_owner = await cls.find_mansion_owner_at_location(session, current_x, current_y)
+
+        if not mansion_owner:
+            return (
+                f"🏚️ 当前位置阴宅信息\n"
+                f"━━━━━━━━━━━━━\n"
+                f"✧ 位置：({current_x}, {current_y})\n"
+                f"✧ 状态：此处没有阴宅\n"
+                f"━━━━━━━━━━━━━\n"
+                f"💡 只有阴宅主人可以在此建造阴宅"
+            )
+
+        mansion_info = cls.get_mansion_info(mansion_owner.mansion_level)
+
+        # 检查是否可以使用
+        can_use, use_msg = await cls.can_use_mansion(session, player, mansion_owner)
+
+        # 构建信息
+        if player.id == mansion_owner.id:
+            # 阴宅主人查看自己的阴宅
+            status_info = "你的阴宅"
+        else:
+            # 其他玩家查看
+            status_info = f"{mansion_owner.nickname} 的阴宅"
+
+        access_status = "允许" if mansion_owner.mansion_allow_others else "禁止"
+        if mansion_owner.mansion_usage_fee > 0:
+            fee_info = f"{mansion_owner.mansion_usage_fee:,}金币"
+        else:
+            fee_info = "免费"
+
+        result_msg = (
+            f"🏚️ 当前位置阴宅信息\n"
+            f"━━━━━━━━━━━━━\n"
+            f"✧ 阴宅主人：{mansion_owner.nickname}\n"
+            f"✧ 阴宅等级：{mansion_info['level']}级"
+        )
+
+        if mansion_info['is_max_level']:
+            result_msg += " (满级)"
+
+        result_msg += (
+            f"\n✧ 修炼效率：+{mansion_info['efficiency_percent']:.1f}%\n"
+            f"✧ 使用费用：{fee_info}\n"
+            f"✧ 他人使用：{access_status}\n"
+            f"✧ 位置：({current_x}, {current_y})\n"
+            f"━━━━━━━━━━━━━"
+        )
+
+        if player.id != mansion_owner.id:
+            if can_use:
+                if mansion_owner.mansion_usage_fee > 0:
+                    result_msg += (
+                        f"\n💡 你可以支付{mansion_owner.mansion_usage_fee:,}金币使用此阴宅\n"
+                        f"💡 在此位置修炼/闭关将享受+{mansion_info['efficiency_percent']:.1f}%效率加成"
+                    )
+                else:
+                    result_msg += (
+                        f"\n💡 你可以免费使用此阴宅\n"
+                        f"💡 在此位置修炼/闭关将享受+{mansion_info['efficiency_percent']:.1f}%效率加成"
+                    )
+            else:
+                result_msg += f"\n❌ {use_msg}"
+        else:
+            result_msg += f"\n💡 这是你的阴宅，可以免费享受修炼加成"
+
+        return result_msg
