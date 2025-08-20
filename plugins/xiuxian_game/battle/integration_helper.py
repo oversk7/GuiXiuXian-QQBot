@@ -297,7 +297,7 @@ class BattleIntegrationHelper:
                             monster_hp = max(0, monster_hp - counter_result["total_damage"])
                             round_actions.append(f"🛡️反击→{counter_result['total_damage']}")
 
-                    # 检查怪物反击（300级以后的怪物才有反击）
+                    # 检查怪物反击（200级以后的怪物才有反击）
                     if monster_hp > 0 and player_hp > 0:
                         monster_counter_rate = monster_stats.get("counter_rate", 0)
                         if engine.rng.random() < (monster_counter_rate / 100):
@@ -535,7 +535,7 @@ class BattleIntegrationHelper:
 
     @staticmethod
     def _monster_attack_player(monster_stats: Dict, player: Player, engine: BattleEngine) -> Dict:
-        """怪物攻击玩家的增强逻辑（支持300级以后怪物的特殊属性）
+        """怪物攻击玩家的增强逻辑（支持200级以后怪物的特殊属性）
 
         Args:
             monster_stats: 怪物属性（包含特殊属性）
@@ -573,7 +573,7 @@ class BattleIntegrationHelper:
 
         result["hit"] = True
 
-        # 怪物暴击判定（300级以后的怪物才有）
+        # 怪物暴击判定（200级以后的怪物才有）
         monster_crit_rate = monster_stats.get("crit_rate", 0)
         player_anti_crit_rate = player_attrs.get("anti_crit_rate", 0)  # 玩家抗暴率（如果有的话）
 
@@ -582,7 +582,7 @@ class BattleIntegrationHelper:
         is_critical = engine.rng.random() < (effective_crit_rate / 100)
         result["is_critical"] = is_critical
 
-        # 怪物连击判定（300级以后的怪物才有）
+        # 怪物连击判定（200级以后的怪物才有）
         monster_combo_rate = monster_stats.get("combo_rate", 0)
         combo_count = 1
         if engine.rng.random() < (monster_combo_rate / 100):

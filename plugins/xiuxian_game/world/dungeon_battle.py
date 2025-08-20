@@ -110,8 +110,9 @@ def get_region_materials(region: str) -> dict:
 
 def calculate_monster_attributes(monster_level: int, is_elite: bool = False) -> dict:
     """
-    计算诡异属性，支持无限层级（300+级）
+    计算诡异属性，支持无限层级（200+级开始有特殊属性）
     爬塔系统：诡异强度逐层递增，保持挑战性
+    200层以后（约1000级）大幅提高抗暴率，应对高暴击伤害玩家
     """
     import random
 
@@ -156,39 +157,60 @@ def calculate_monster_attributes(monster_level: int, is_elite: bool = False) -> 
     if is_elite:
         if monster_level <= 100:
             elite_multiplier = 1.8
-        elif monster_level <= 300:
+        elif monster_level <= 500:
             elite_multiplier = 2.0
-        else:
+        elif monster_level <= 1000:
             elite_multiplier = 2.2
+        else:
+            elite_multiplier = 2.5  # 1000级以后的精英怪更强
 
         hp = int(hp * elite_multiplier)
         attack = int(attack * elite_multiplier)
         agility = int(agility * elite_multiplier)
 
-    # 为300级以后的诡异添加特殊战斗属性
+    # 为200级以后的诡异添加特殊战斗属性（200层约1000级怪物）
     special_attributes = {}
-    if monster_level >= 300:
+    if monster_level >= 200:
         # 基础特殊属性计算（基于层级）
-        level_factor = (monster_level - 300) / 100  # 每100级为一个档次
+        level_factor = (monster_level - 200) / 100  # 每100级为一个档次
 
-        # 暴击率：300级起3%，每100级+1.5%，最高12%（适度降低）
-        crit_rate = min(12, 3 + level_factor * 1.5)
+        # 200-999级：基础特殊属性
+        if monster_level < 1000:
+            # 暴击率：200级起2%，每100级+1%，最高8%
+            crit_rate = min(8, 2 + level_factor * 1)
+            # 连击率：200级起1%，每100级+0.5%，最高5%
+            combo_rate = min(5, 1 + level_factor * 0.5)
+            # 反击率：200级起3%，每100级+1%，最高10%
+            counter_rate = min(10, 3 + level_factor * 1)
+            # 抗暴率：200级起15%，每100级+3%，最高40%（大幅提高）
+            anti_crit_rate = min(40, 15 + level_factor * 3)
+        else:
+            # 1000级以后：超高特殊属性（200层以后）
+            high_level_factor = (monster_level - 1000) / 100
 
-        # 连击率：300级起2%，每100级+1%，最高8%（适度降低）
-        combo_rate = min(8, 2 + level_factor * 1)
+            # 暴击率：1000级起5%，每100级+2%，最高25%
+            crit_rate = min(25, 5 + high_level_factor * 2)
+            # 连击率：1000级起3%，每100级+1.5%，最高15%
+            combo_rate = min(15, 3 + high_level_factor * 1.5)
+            # 反击率：1000级起8%，每100级+2%，最高30%
+            counter_rate = min(30, 8 + high_level_factor * 2)
+            # 抗暴率：1000级起50%，每100级+5%，最高80%（超高抗暴）
+            anti_crit_rate = min(80, 50 + high_level_factor * 5)
 
-        # 反击率：300级起5%，每100级+1.5%，最高15%（适度降低）
-        counter_rate = min(15, 5 + level_factor * 1.5)
-
-        # 抗暴率：300级起8%，每100级+2%，最高20%（适度降低）
-        anti_crit_rate = min(20, 8 + level_factor * 2)
-
-        # 精英诡异特殊属性加成（适度调整）
+        # 精英诡异特殊属性加成
         if is_elite:
-            crit_rate = min(18, crit_rate * 1.4)      # 精英诡异暴击率1.4倍，上限18%
-            combo_rate = min(12, combo_rate * 1.2)    # 精英怪连击率1.2倍，上限12%
-            counter_rate = min(20, counter_rate * 1.3) # 精英怪反击率1.3倍，上限20%
-            anti_crit_rate = min(28, anti_crit_rate * 1.3) # 精英怪抗暴率1.3倍，上限28%
+            if monster_level < 1000:
+                # 200-999级精英怪加成
+                crit_rate = min(15, crit_rate * 1.5)      # 精英诡异暴击率1.5倍，上限15%
+                combo_rate = min(8, combo_rate * 1.3)     # 精英怪连击率1.3倍，上限8%
+                counter_rate = min(15, counter_rate * 1.2) # 精英怪反击率1.2倍，上限15%
+                anti_crit_rate = min(60, anti_crit_rate * 1.4) # 精英怪抗暴率1.4倍，上限60%
+            else:
+                # 1000级以后精英怪加成
+                crit_rate = min(35, crit_rate * 1.3)      # 精英诡异暴击率1.3倍，上限35%
+                combo_rate = min(20, combo_rate * 1.2)    # 精英怪连击率1.2倍，上限20%
+                counter_rate = min(40, counter_rate * 1.2) # 精英怪反击率1.2倍，上限40%
+                anti_crit_rate = min(95, anti_crit_rate * 1.15) # 精英怪抗暴率1.15倍，上限95%
 
         special_attributes = {
             "crit_rate": round(crit_rate, 1),           # 暴击率
@@ -421,8 +443,8 @@ async def get_or_create_tile(session, region: str, x: int, y: int) -> WorldTile:
                     "defeated_by": []  # 记录击败过的玩家，避免原地无限刷
                 }
 
-                # 为300级以后的诡异添加特殊属性
-                if monster_level >= 300:
+                # 为200级以后的诡异添加特殊属性
+                if monster_level >= 200:
                     tile.state.update({
                         "crit_rate": monster_attrs.get("crit_rate", 0),
                         "combo_rate": monster_attrs.get("combo_rate", 0),
@@ -484,8 +506,8 @@ async def get_or_create_tile(session, region: str, x: int, y: int) -> WorldTile:
                     "defeated_by": []  # 记录击败过的玩家
                 }
 
-                # 为300级以后的精英诡异添加特殊属性
-                if monster_level >= 300:
+                # 为200级以后的精英诡异添加特殊属性
+                if monster_level >= 200:
                     tile.state.update({
                         "crit_rate": monster_attrs.get("crit_rate", 0),
                         "combo_rate": monster_attrs.get("combo_rate", 0),
@@ -629,9 +651,9 @@ async def _(event: MessageEvent):
                 monster = t.state.get("name")
                 monster_level = t.state.get("level", 1)
 
-                # 为300级以后的诡异显示特殊属性提示
+                # 为200级以后的诡异显示特殊属性提示
                 special_info = ""
-                if monster_level >= 300:
+                if monster_level >= 200:
                     special_attrs = []
                     if t.state.get("crit_rate", 0) > 0:
                         special_attrs.append(f"💥暴击{t.state['crit_rate']:.1f}%")
@@ -658,9 +680,9 @@ async def _(event: MessageEvent):
                 monster_name = t.state.get("name", "精英诡异")
                 monster_level = t.state.get("level", 1)
 
-                # 为300级以后的精英诡异显示特殊属性提示
+                # 为200级以后的精英诡异显示特殊属性提示
                 special_info = ""
-                if monster_level >= 300:
+                if monster_level >= 200:
                     special_attrs = []
                     if t.state.get("crit_rate", 0) > 0:
                         special_attrs.append(f"💥暴击{t.state['crit_rate']:.1f}%")
@@ -761,9 +783,9 @@ async def _handle_personal_monster(session, tile: WorldTile, player: Player) -> 
         "defense": 0  # 诡异默认无防御
     }
 
-    # 为300级以后的诡异添加特殊属性
+    # 为200级以后的诡异添加特殊属性
     monster_level = tile.state.get("level", 1)
-    if monster_level >= 300:
+    if monster_level >= 200:
         monster_stats.update({
             "crit_rate": tile.state.get("crit_rate", 0),
             "combo_rate": tile.state.get("combo_rate", 0),
@@ -774,8 +796,8 @@ async def _handle_personal_monster(session, tile: WorldTile, player: Player) -> 
     monster_name = tile.state.get("name", "未知诡影")
     monster_display = f"{monster_name}(Lv{monster_level})"
 
-    # 为300级以后的诡异显示特殊属性信息
-    if monster_level >= 300:
+    # 为200级以后的诡异显示特殊属性信息
+    if monster_level >= 200:
         special_attrs = []
         if monster_stats.get("crit_rate", 0) > 0:
             special_attrs.append(f"💥{monster_stats['crit_rate']:.1f}%")
