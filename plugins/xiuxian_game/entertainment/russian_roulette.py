@@ -7,7 +7,7 @@ from nonebot.adapters.qq import MessageEvent, Message
 from nonebot.params import CommandArg
 from sqlalchemy import select
 from ..models.russian_roulette import RoomStatus
-from ..models.inventory import ItemInstance
+
 from ..models.db import safe_session
 from ..models.player import Player
 from ..utils import message_add_head
@@ -52,10 +52,9 @@ async def handle_create_room(event: MessageEvent, args: Message = CommandArg()):
             "▫️ 【房间状态】 - 查看房间状态\n"
             "━━━━━━━━━━━━━\n"
             "💰 筹码设置：\n"
-            "▫️ 【恶魔轮盘 筹码 <金币数>】 - 只投注金币\n"
-            "▫️ 【恶魔轮盘 筹码 <金币数> <道具名>】 - 投注金币+道具\n"
-            "▫️ 【恶魔轮盘 筹码 <金币数> <道具名>:<数量>】 - 指定道具数量\n"
-            "▫️ 示例：恶魔轮盘 筹码 1000 回春散:2 鬼泪:5\n"
+            "▫️ 【恶魔轮盘 筹码 <金币数>】 - 只能投注金币\n"
+            "▫️ 示例：恶魔轮盘 筹码 1000\n"
+            "▫️ 注意：系统将抽取3%税收\n"
             "━━━━━━━━━━━━━\n"
             "🎲 游戏指令：\n"
             "▫️ 【开枪 <自己/对手>】 - 选择射击目标\n"
@@ -108,8 +107,9 @@ async def handle_create_room(event: MessageEvent, args: Message = CommandArg()):
                     f"👤 玩家：{player.nickname}[UID:{player.uid}]\n"
                     f"━━━━━━━━━━━━━\n"
                     f"💰 现在可以设置筹码\n"
-                    f"📝 使用：恶魔轮盘 筹码 [金币数] [道具名:数量]\n"
-                    f"📝 示例：恶魔轮盘 筹码 1000 回春散:2 鬼泪:5"
+                    f"📝 使用：恶魔轮盘 筹码 [金币数]\n"
+                    f"📝 示例：恶魔轮盘 筹码 1000\n"
+                    f"💸 注意：系统将抽取3%税收"
                 )
                 await create_room_cmd.finish(message_add_head(result_msg, event))
             else:
@@ -118,27 +118,15 @@ async def handle_create_room(event: MessageEvent, args: Message = CommandArg()):
         elif args_text.startswith("筹码 "):
             parts = args_text[3:].strip().split()
             if not parts:
-                await create_room_cmd.finish("⛔ 格式：恶魔轮盘 筹码 [金币数] [道具名称1:数量1] [道具名称2:数量2]...\n例如：恶魔轮盘 筹码 1000 回春散:2 鬼泪:5")
+                await create_room_cmd.finish("⛔ 格式：恶魔轮盘 筹码 [金币数]\n例如：恶魔轮盘 筹码 1000\n💸 注意：系统将抽取3%税收")
+
+            # 检查是否尝试使用道具
+            if len(parts) > 1:
+                await create_room_cmd.finish("⛔ 恶魔轮盘已取消道具和装备筹码，只能使用金币作为筹码\n📝 正确格式：恶魔轮盘 筹码 [金币数]")
 
             try:
                 gold = int(parts[0])
-                item_bets = []
-
-                # 解析道具名称和数量
-                for i in range(1, len(parts)):
-                    item_part = parts[i]
-                    if ':' in item_part:
-                        item_name, quantity_str = item_part.split(':', 1)
-                        try:
-                            quantity = int(quantity_str)
-                            if quantity <= 0:
-                                await create_room_cmd.finish(f"⛔ 道具数量必须大于0：{item_name}")
-                            item_bets.append({"name": item_name.strip(), "quantity": quantity})
-                        except ValueError:
-                            await create_room_cmd.finish(f"⛔ 道具数量必须为数字：{item_part}")
-                    else:
-                        # 如果没有指定数量，默认为1
-                        item_bets.append({"name": item_part.strip(), "quantity": 1})
+                item_bets = []  # 不再支持道具筹码
 
             except ValueError:
                 await create_room_cmd.finish("⛔ 金币数必须为数字")
@@ -148,7 +136,7 @@ async def handle_create_room(event: MessageEvent, args: Message = CommandArg()):
             if not room:
                 await create_room_cmd.finish("⛔ 你不在任何房间中")
 
-            success, msg, bet_details = await RussianRouletteService.set_bet(
+            success, msg, _ = await RussianRouletteService.set_bet(
                 session, player.id, room.room_id, gold, item_bets
             )
 
@@ -156,13 +144,9 @@ async def handle_create_room(event: MessageEvent, args: Message = CommandArg()):
                 result_msg = (
                     f"💰 筹码设置成功！\n"
                     f"━━━━━━━━━━━━━\n"
-                    f"💎 金币：{gold}\n"
-                )
-                if bet_details and bet_details.get("items"):
-                    result_msg += "🎒 道具：\n"
-                    for item_detail in bet_details["items"]:
-                        result_msg += f"  • {item_detail['name']} x{item_detail['quantity']}\n"
-                result_msg += (
+                    f"💎 投注金币：{gold}\n"
+                    f"💸 系统税收：{int(gold * 0.03 * 2)}金币 (3%)\n"
+                    f"🏆 获胜可得：{gold * 2 - int(gold * 0.03 * 2)}金币\n"
                     f"━━━━━━━━━━━━━\n"
                     f"⏳ 等待对手设置筹码...\n"
                     f"📝 双方设置完成后使用：恶魔轮盘 开始"
@@ -633,37 +617,24 @@ async def handle_room_status(event: MessageEvent):
             ])
 
             # 玩家1筹码
-            p1_items = json.loads(room.player1_items_bet) if room.player1_items_bet else []
             p1_bet_info = f"💎 {room.player1_gold_bet}金币"
-            if p1_items:
-                # 检查是否为新格式（包含name和quantity）
-                if p1_items and isinstance(p1_items[0], dict):
-                    # 新格式：显示详细道具信息
-                    total_items = sum(item.get("quantity", 1) for item in p1_items)
-                    p1_bet_info += f" + {total_items}个道具"
-                    for item in p1_items:
-                        p1_bet_info += f"\n    • {item.get('name', '未知道具')} x{item.get('quantity', 1)}"
-                else:
-                    # 兼容旧格式
-                    p1_bet_info += f" + {len(p1_items)}个道具"
             status_lines.append(f"  {player1.nickname}: {p1_bet_info}")
 
             # 玩家2筹码
             if player2:
-                p2_items = json.loads(room.player2_items_bet) if room.player2_items_bet else []
                 p2_bet_info = f"💎 {room.player2_gold_bet}金币"
-                if p2_items:
-                    # 检查是否为新格式（包含name和quantity）
-                    if p2_items and isinstance(p2_items[0], dict):
-                        # 新格式：显示详细道具信息
-                        total_items = sum(item.get("quantity", 1) for item in p2_items)
-                        p2_bet_info += f" + {total_items}个道具"
-                        for item in p2_items:
-                            p2_bet_info += f"\n    • {item.get('name', '未知道具')} x{item.get('quantity', 1)}"
-                    else:
-                        # 兼容旧格式
-                        p2_bet_info += f" + {len(p2_items)}个道具"
                 status_lines.append(f"  {player2.nickname}: {p2_bet_info}")
+
+            # 显示奖池和税收信息
+            if room.player1_gold_bet > 0 and room.player2_gold_bet > 0:
+                total_pool = room.player1_gold_bet + room.player2_gold_bet
+                tax_amount = int(total_pool * 0.03)
+                final_reward = total_pool - tax_amount
+                status_lines.extend([
+                    f"💰 奖池总额：{total_pool}金币",
+                    f"💸 系统税收：{tax_amount}金币 (3%)",
+                    f"🏆 获胜奖励：{final_reward}金币"
+                ])
 
         # 显示游戏状态
         if room.status == "playing":
@@ -729,13 +700,9 @@ async def handle_leave_room(event: MessageEvent):
                 room.player2_items_bet = None
                 room.status = RoomStatus.WAITING.value
 
-                # 返还筹码给原房主
+                # 返还筹码给原房主（只返还金币）
                 if room.player1_gold_bet > 0:
                     player.gold += room.player1_gold_bet
-                if room.player1_items_bet:
-                    items = json.loads(room.player1_items_bet)
-                    for item_id in items:
-                        await ItemInstance.add_item(session, player.id, item_id, 1)
 
                 await session.commit()
                 await leave_room_cmd.finish(message_add_head("✅ 已退出房间，房主权限已转移", event))
@@ -747,13 +714,9 @@ async def handle_leave_room(event: MessageEvent):
 
         elif room.player2_id == player.id:
             # 玩家2退出
-            # 返还筹码
+            # 返还筹码（只返还金币）
             if room.player2_gold_bet > 0:
                 player.gold += room.player2_gold_bet
-            if room.player2_items_bet:
-                items = json.loads(room.player2_items_bet)
-                for item_id in items:
-                    await ItemInstance.add_item(session, player.id, item_id, 1)
 
             room.player2_id = None
             room.player2_gold_bet = 0
