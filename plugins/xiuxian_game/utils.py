@@ -335,15 +335,15 @@ rate_limiter = RateLimiter()
 
 # 注册默认的操作限制 - 防止高频刷材料
 rate_limiter.register_action("move", RateLimitConfig(
-    max_requests=30,
-    time_window=30.0,
-    cooldown=0.8  # 每次移动间隔0.8秒，有效防止每秒5次的高频操作
+    max_requests=25,
+    time_window=30,
+    cooldown=1
 ))
 
 rate_limiter.register_action("explore", RateLimitConfig(
-    max_requests=30,  # 60秒内最多探索30次
-    time_window=60.0,
-    cooldown=0.5  # 每次探索间隔0.5秒
+    max_requests=25,
+    time_window=30,
+    cooldown=1  # 每次探索间隔
 ))
 
 # 打工系统频率限制 - 防止过度刷金币
