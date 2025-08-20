@@ -96,13 +96,24 @@ async def handle_set_mansion_fee(event: MessageEvent, args: Message = CommandArg
     # 解析参数
     arg_text = args.extract_plain_text().strip()
     if not arg_text:
+        # 获取玩家数据以显示当前阴宅等级的最低费用要求
+        async with safe_session() as temp_session:
+            temp_player = await temp_session.get(Player, user_id)
+            if temp_player and temp_player.mansion_level > 0:
+                min_fee = MansionService.get_min_usage_fee(temp_player.mansion_level)
+                fee_range_text = f"{min_fee:,}-{MansionService.MAX_USAGE_FEE:,}金币"
+                level_text = f"（{temp_player.mansion_level}级阴宅）"
+            else:
+                fee_range_text = f"{MansionService.BASE_MIN_USAGE_FEE:,}-{MansionService.MAX_USAGE_FEE:,}金币"
+                level_text = ""
+
         await set_mansion_fee_cmd.finish(message_add_head(
             "⛔ 请输入费用金额\n"
             "━━━━━━━━━━━━━\n"
             "用法：【设置阴宅费用 <金币数>】\n"
             "例如：【设置阴宅费用 5000】\n"
-            "设置为0表示免费使用\n"
-            f"费用范围：0 或 {MansionService.MIN_USAGE_FEE:,}-{MansionService.MAX_USAGE_FEE:,}金币",
+            f"费用范围：{fee_range_text}{level_text}\n"
+            "💡 阴宅等级越高，最低费用要求越高",
             event
         ))
 

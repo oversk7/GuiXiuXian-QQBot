@@ -945,7 +945,7 @@ async def handle_ai_guide(event: MessageEvent):
         user_message = event.get_plaintext().strip()
         
         # 忽略空消息或过短消息
-        if not user_message or len(user_message) < 2:
+        if not user_message or len(user_message) < 4:
             return
 
         # 忽略纯数字消息（可能是剧情选择）

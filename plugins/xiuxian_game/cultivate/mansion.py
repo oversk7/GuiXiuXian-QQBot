@@ -20,9 +20,29 @@ class MansionService:
     EFFICIENCY_INCREMENT = 0.09  # 每级效率递增（9%）
 
     # 阴宅使用费用配置
-    MIN_USAGE_FEE = 1000  # 最低使用费用（1000金币）
+    BASE_MIN_USAGE_FEE = 1000  # 基础最低使用费用（1000金币）
     MAX_USAGE_FEE = 1_000_000  # 最高使用费用（100万金币）
+    FEE_LEVEL_MULTIPLIER = 500  # 每级增加的最低费用（500金币）
     
+    @classmethod
+    def get_min_usage_fee(cls, mansion_level: int) -> int:
+        """
+        根据阴宅等级计算最低使用费用
+
+        Args:
+            mansion_level: 阴宅等级
+
+        Returns:
+            最低使用费用（金币）
+        """
+        if mansion_level <= 0:
+            return 0
+
+        # 最低费用公式：基础费用 + (等级-1) * 每级增量
+        # 1级=1000, 2级=1500, 3级=2000, ..., 10级=5500
+        min_fee = cls.BASE_MIN_USAGE_FEE + (mansion_level - 1) * cls.FEE_LEVEL_MULTIPLIER
+        return min_fee
+
     @classmethod
     def get_upgrade_cost(cls, current_level: int) -> int:
         """
@@ -146,9 +166,8 @@ class MansionService:
             return False, "阴宅主人不允许其他玩家使用"
 
         # 检查使用费用
-        if mansion_owner.mansion_usage_fee > 0:
-            if player.gold < mansion_owner.mansion_usage_fee:
-                return False, f"金币不足，使用此阴宅需要{mansion_owner.mansion_usage_fee:,}金币，当前拥有{player.gold:,}金币"
+        if player.gold < mansion_owner.mansion_usage_fee:
+            return False, f"金币不足，使用此阴宅需要{mansion_owner.mansion_usage_fee:,}金币，当前拥有{player.gold:,}金币"
 
         return True, "可以使用此阴宅"
 
@@ -167,10 +186,6 @@ class MansionService:
         """
         # 如果是阴宅主人自己，无需支付费用
         if player.id == mansion_owner.id:
-            return True, ""
-
-        # 如果没有设置使用费用，无需支付
-        if mansion_owner.mansion_usage_fee <= 0:
             return True, ""
 
         # 检查金币是否足够
@@ -208,8 +223,10 @@ class MansionService:
         if fee < 0:
             return False, "使用费用不能为负数"
 
-        if fee > 0 and fee < cls.MIN_USAGE_FEE:
-            return False, f"使用费用不能低于{cls.MIN_USAGE_FEE:,}金币"
+        # 根据阴宅等级计算最低费用要求
+        min_fee = cls.get_min_usage_fee(player.mansion_level)
+        if fee < min_fee:
+            return False, f"使用费用不能低于{min_fee:,}金币（{player.mansion_level}级阴宅最低要求）"
 
         if fee > cls.MAX_USAGE_FEE:
             return False, f"使用费用不能超过{cls.MAX_USAGE_FEE:,}金币"
@@ -219,26 +236,17 @@ class MansionService:
         player.mansion_usage_fee = fee
         session.add(player)
 
-        if fee == 0:
-            result_msg = (
-                f"🏚️ 阴宅使用费用设置成功！\n"
-                f"━━━━━━━━━━━━━\n"
-                f"✧ 原费用：{old_fee:,}金币\n"
-                f"✧ 新费用：免费使用\n"
-                f"✧ 阴宅位置：({player.mansion_x}, {player.mansion_y})\n"
-                f"━━━━━━━━━━━━━\n"
-                f"💡 其他玩家现在可以免费使用你的阴宅"
-            )
-        else:
-            result_msg = (
-                f"🏚️ 阴宅使用费用设置成功！\n"
-                f"━━━━━━━━━━━━━\n"
-                f"✧ 原费用：{old_fee:,}金币\n"
-                f"✧ 新费用：{fee:,}金币\n"
-                f"✧ 阴宅位置：({player.mansion_x}, {player.mansion_y})\n"
-                f"━━━━━━━━━━━━━\n"
-                f"💡 其他玩家使用你的阴宅需支付{fee:,}金币"
-            )
+        result_msg = (
+            f"🏚️ 阴宅使用费用设置成功！\n"
+            f"━━━━━━━━━━━━━\n"
+            f"✧ 原费用：{old_fee:,}金币\n"
+            f"✧ 新费用：{fee:,}金币\n"
+            f"✧ 阴宅等级：{player.mansion_level}级\n"
+            f"✧ 最低要求：{min_fee:,}金币\n"
+            f"✧ 阴宅位置：({player.mansion_x}, {player.mansion_y})\n"
+            f"━━━━━━━━━━━━━\n"
+            f"💡 其他玩家使用你的阴宅需支付{fee:,}金币"
+        )
 
         return True, result_msg
 
@@ -272,10 +280,7 @@ class MansionService:
         )
 
         if player.mansion_allow_others:
-            if player.mansion_usage_fee > 0:
-                result_msg += f"💡 其他玩家使用你的阴宅需支付{player.mansion_usage_fee:,}金币"
-            else:
-                result_msg += f"💡 其他玩家现在可以免费使用你的阴宅"
+            result_msg += f"💡 其他玩家使用你的阴宅需支付{player.mansion_usage_fee:,}金币"
         else:
             result_msg += f"💡 其他玩家无法使用你的阴宅"
 
@@ -333,6 +338,15 @@ class MansionService:
         player.gold -= upgrade_cost
         player.mansion_level += 1
 
+        # 检查并调整使用费用
+        new_min_fee = cls.get_min_usage_fee(player.mansion_level)
+        old_fee = player.mansion_usage_fee
+        fee_adjusted = False
+
+        if player.mansion_usage_fee < new_min_fee:
+            player.mansion_usage_fee = new_min_fee
+            fee_adjusted = True
+
         # 获取新等级信息
         new_info = cls.get_mansion_info(player.mansion_level)
 
@@ -344,8 +358,18 @@ class MansionService:
             f"✧ 阴宅位置：({player.mansion_x}, {player.mansion_y})\n"
             f"✧ 消耗金币：{upgrade_cost:,}\n"
             f"✧ 剩余金币：{player.gold:,}\n"
-            f"━━━━━━━━━━━━━"
         )
+
+        if fee_adjusted:
+            success_msg += (
+                f"✧ 使用费用：{old_fee:,} → {player.mansion_usage_fee:,}金币（自动调整）\n"
+            )
+        else:
+            success_msg += (
+                f"✧ 使用费用：{player.mansion_usage_fee:,}金币\n"
+            )
+
+        success_msg += f"━━━━━━━━━━━━━"
 
         if not new_info['is_max_level']:
             next_cost = cls.get_upgrade_cost(player.mansion_level)
@@ -394,6 +418,9 @@ class MansionService:
         player.mansion_x = current_x
         player.mansion_y = current_y
 
+        # 设置默认使用费用为1级阴宅的最低要求
+        player.mansion_usage_fee = cls.get_min_usage_fee(1)
+
         # 获取阴宅信息
         mansion_info = cls.get_mansion_info(1)
 
@@ -403,10 +430,12 @@ class MansionService:
             f"✧ 阴宅等级：1级\n"
             f"✧ 阴宅位置：({current_x}, {current_y})\n"
             f"✧ 修炼效率：+{mansion_info['efficiency_percent']:.1f}%\n"
+            f"✧ 使用费用：{player.mansion_usage_fee:,}金币（默认）\n"
             f"✧ 消耗金币：{purchase_cost:,}\n"
             f"✧ 剩余金币：{player.gold:,}\n"
             f"━━━━━━━━━━━━━\n"
             f"💡 只有在阴宅位置修炼才能享受加成\n"
+            f"💡 可使用【设置阴宅费用】调整收费\n"
             f"⬇️ 下级升级需要：{mansion_info['upgrade_cost']:,}金币"
         )
 
@@ -471,13 +500,11 @@ class MansionService:
 
         # 添加阴宅使用费用和权限信息
         access_status = "允许" if player.mansion_allow_others else "禁止"
-        if player.mansion_usage_fee > 0:
-            fee_info = f"{player.mansion_usage_fee:,}金币"
-        else:
-            fee_info = "免费"
+        min_fee = cls.get_min_usage_fee(player.mansion_level)
 
         status_msg += (
-            f"\n✧ 使用费用：{fee_info}\n"
+            f"\n✧ 使用费用：{player.mansion_usage_fee:,}金币\n"
+            f"✧ 最低要求：{min_fee:,}金币\n"
             f"✧ 他人使用：{access_status}\n"
             f"✧ 当前金币：{player.gold:,}金币\n"
             f"━━━━━━━━━━━━━"
@@ -543,10 +570,7 @@ class MansionService:
             status_info = f"{mansion_owner.nickname} 的阴宅"
 
         access_status = "允许" if mansion_owner.mansion_allow_others else "禁止"
-        if mansion_owner.mansion_usage_fee > 0:
-            fee_info = f"{mansion_owner.mansion_usage_fee:,}金币"
-        else:
-            fee_info = "免费"
+        min_fee = cls.get_min_usage_fee(mansion_owner.mansion_level)
 
         result_msg = (
             f"🏚️ 当前位置阴宅信息\n"
@@ -560,7 +584,8 @@ class MansionService:
 
         result_msg += (
             f"\n✧ 修炼效率：+{mansion_info['efficiency_percent']:.1f}%\n"
-            f"✧ 使用费用：{fee_info}\n"
+            f"✧ 使用费用：{mansion_owner.mansion_usage_fee:,}金币\n"
+            f"✧ 最低要求：{min_fee:,}金币\n"
             f"✧ 他人使用：{access_status}\n"
             f"✧ 位置：({current_x}, {current_y})\n"
             f"━━━━━━━━━━━━━"
@@ -568,16 +593,10 @@ class MansionService:
 
         if player.id != mansion_owner.id:
             if can_use:
-                if mansion_owner.mansion_usage_fee > 0:
-                    result_msg += (
-                        f"\n💡 你可以支付{mansion_owner.mansion_usage_fee:,}金币使用此阴宅\n"
-                        f"💡 在此位置修炼/闭关将享受+{mansion_info['efficiency_percent']:.1f}%效率加成"
-                    )
-                else:
-                    result_msg += (
-                        f"\n💡 你可以免费使用此阴宅\n"
-                        f"💡 在此位置修炼/闭关将享受+{mansion_info['efficiency_percent']:.1f}%效率加成"
-                    )
+                result_msg += (
+                    f"\n💡 你可以支付{mansion_owner.mansion_usage_fee:,}金币使用此阴宅\n"
+                    f"💡 在此位置修炼/闭关将享受+{mansion_info['efficiency_percent']:.1f}%效率加成"
+                )
             else:
                 result_msg += f"\n❌ {use_msg}"
         else:
