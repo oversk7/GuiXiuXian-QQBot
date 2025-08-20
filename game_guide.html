@@ -293,6 +293,18 @@
             </div>
             
             <div class="system-card">
+                <span class="system-icon">📦</span>
+                <h3 class="system-title">交易系统</h3>
+                <p class="system-desc">玩家间自由交易平台，智能撮合成交，支持物品和装备实例交易</p>
+                <ul class="system-commands">
+                    <li><span class="highlight">交易清单</span> - 查看所有在售物品</li>
+                    <li><span class="highlight">挂牌 出售 物品 价格</span> - 出售物品</li>
+                    <li><span class="highlight">挂牌 收购 物品 价格</span> - 收购物品</li>
+                    <li><span class="highlight">我的挂牌</span> - 查看自己的订单</li>
+                </ul>
+            </div>
+
+            <div class="system-card">
                 <span class="system-icon">🏰</span>
                 <h3 class="system-title">公会系统</h3>
                 <p class="system-desc">加入公会获得建筑福利，完成任务获得奖励</p>
@@ -302,6 +314,78 @@
                     <li><span class="highlight">捐献金币 金额</span> - 捐献获得积分</li>
                     <li><span class="highlight">公会任务</span> - 查看任务列表</li>
                 </ul>
+            </div>
+        </div>
+
+        <!-- 交易系统详细说明 -->
+        <div class="system-card" style="margin-top: 30px; background: linear-gradient(135deg, rgba(255, 215, 0, 0.1), rgba(255, 215, 0, 0.05)); border: 2px solid rgba(255, 215, 0, 0.3);">
+            <span class="system-icon">🔄</span>
+            <h3 class="system-title" style="color: #ffd700; font-size: 2em;">交易成交原理详解</h3>
+            <div style="color: #fff; line-height: 1.8; font-size: 1.1em;">
+                <h4 style="color: #ffd700; margin: 20px 0 10px 0;">💡 智能撮合机制</h4>
+                <p style="margin-bottom: 15px;">交易系统采用<strong>价格优先、时间优先</strong>的撮合原则，确保公平高效的交易环境：</p>
+
+                <div style="background: rgba(0,0,0,0.3); padding: 15px; border-radius: 10px; margin: 15px 0; border-left: 4px solid #4ecdc4;">
+                    <h5 style="color: #4ecdc4; margin-bottom: 10px;">🔸 买单撮合流程</h5>
+                    <p>当你发布买单时，系统会自动寻找：</p>
+                    <ul style="margin-left: 20px;">
+                        <li>价格 ≤ 你的买价的所有卖单</li>
+                        <li>按价格从低到高排序（优先成交便宜的）</li>
+                        <li>相同价格按挂牌时间先后顺序</li>
+                        <li>成交价格采用卖方的挂牌价格</li>
+                    </ul>
+                </div>
+
+                <div style="background: rgba(0,0,0,0.3); padding: 15px; border-radius: 10px; margin: 15px 0; border-left: 4px solid #ff6b6b;">
+                    <h5 style="color: #ff6b6b; margin-bottom: 10px;">🔸 卖单撮合流程</h5>
+                    <p>当你发布卖单时，系统会自动寻找：</p>
+                    <ul style="margin-left: 20px;">
+                        <li>价格 ≥ 你的卖价的所有买单</li>
+                        <li>按价格从高到低排序（优先成交高价的）</li>
+                        <li>相同价格按挂牌时间先后顺序</li>
+                        <li>成交价格采用买方的挂牌价格</li>
+                    </ul>
+                </div>
+
+                <h4 style="color: #ffd700; margin: 20px 0 10px 0;">💰 交易示例</h4>
+                <div style="background: rgba(0,0,0,0.3); padding: 15px; border-radius: 10px; margin: 15px 0;">
+                    <p><strong>场景：</strong>市场上有以下卖单：</p>
+                    <ul style="margin-left: 20px; color: #ccc;">
+                        <li>玩家A：出售回春散 100个 @50金币/个</li>
+                        <li>玩家B：出售回春散 200个 @55金币/个</li>
+                        <li>玩家C：出售回春散 150个 @60金币/个</li>
+                    </ul>
+                    <p><strong>你发布：</strong>收购回春散 300个 @58金币/个</p>
+                    <p><strong>撮合结果：</strong></p>
+                    <ul style="margin-left: 20px; color: #90EE90;">
+                        <li>✅ 与玩家A成交 100个 @50金币/个（你省了8金币/个）</li>
+                        <li>✅ 与玩家B成交 200个 @55金币/个（你省了3金币/个）</li>
+                        <li>❌ 玩家C价格60金币/个超出你的预算，不成交</li>
+                        <li>📋 剩余需求100个继续挂牌等待</li>
+                    </ul>
+                </div>
+
+                <h4 style="color: #ffd700; margin: 20px 0 10px 0;">🛡️ 防刷钱机制</h4>
+                <div style="background: rgba(255,0,0,0.1); padding: 15px; border-radius: 10px; margin: 15px 0; border: 1px solid rgba(255,0,0,0.3);">
+                    <ul style="margin-left: 20px;">
+                        <li><strong>时间限制：</strong>8小时内购买的物品不能挂牌出售</li>
+                        <li><strong>数量限制：</strong>每位玩家最多同时挂牌6个订单</li>
+                        <li><strong>资源冻结：</strong>挂牌时物品/金币被冻结，防止重复使用</li>
+                        <li><strong>阶梯税收：</strong>大额交易征收税收，维护经济平衡</li>
+                    </ul>
+                </div>
+
+                <h4 style="color: #ffd700; margin: 20px 0 10px 0;">⚔️ 装备实例交易</h4>
+                <div style="background: rgba(138,43,226,0.1); padding: 15px; border-radius: 10px; margin: 15px 0; border: 1px solid rgba(138,43,226,0.3);">
+                    <p>装备交易支持个性化属性，每件装备都是独特的：</p>
+                    <ul style="margin-left: 20px;">
+                        <li><strong>升阶等级：</strong>+0到+10的升阶效果完整保留</li>
+                        <li><strong>镶嵌宝石：</strong>所有镶嵌的宝石、符文、佛珠等</li>
+                        <li><strong>耐久度：</strong>当前耐久度状态</li>
+                        <li><strong>装备摘要：</strong>自动生成装备特征描述</li>
+                    </ul>
+                    <p style="color: #ffd700;">💡 使用【估价 装备名】可查看装备的市场参考价值</p>
+                </div>
             </div>
         </div>
         
