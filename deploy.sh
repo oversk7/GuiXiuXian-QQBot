@@ -21,11 +21,11 @@ fi
 echo "📦 安装Python依赖..."
 pip3 install fastapi uvicorn
 
-# 检查端口8080是否被占用
-if lsof -Pi :8080 -sTCP:LISTEN -t >/dev/null ; then
-    echo "⚠️  端口8080已被占用，请先关闭占用进程或修改端口"
-    echo "查看占用进程: lsof -i :8080"
-    echo "杀死进程: kill -9 \$(lsof -t -i:8080)"
+# 检查端口8888是否被占用
+if lsof -Pi :8888 -sTCP:LISTEN -t >/dev/null ; then
+    echo "⚠️  端口8888已被占用，请先关闭占用进程或修改端口"
+    echo "查看占用进程: lsof -i :8888"
+    echo "杀死进程: kill -9 \$(lsof -t -i:8888)"
     read -p "是否继续部署？(y/n): " -n 1 -r
     echo
     if [[ ! $REPLY =~ ^[Yy]$ ]]; then
@@ -61,8 +61,8 @@ echo "  sudo systemctl start guixiuxian-web"
 
 # 启动web服务器
 echo "🌐 启动Web服务器..."
-echo "访问地址: http://oversky.online:8080"
-echo "本地地址: http://localhost:8080"
+echo "访问地址: http://oversky.online:8888"
+echo "本地地址: http://localhost:8888"
 echo "按 Ctrl+C 停止服务"
 
 python3 web_server.py
