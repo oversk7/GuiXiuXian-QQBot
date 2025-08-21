@@ -59,11 +59,11 @@ class GuildTaskService:
         },
         "weekly_commission": {
             "name": "以恶鬼身，行菩萨事",
-            "description": "一周完成7次委托",
+            "description": "一周完成10次委托",
             "points_reward": 300,
             "base_exp": 300,  # 基础经验，会根据公会倍率动态计算
             "max_per_week": 1,
-            "requirement": 7
+            "requirement": 10
         }
     }
 

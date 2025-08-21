@@ -383,22 +383,19 @@ class GuildFacilityService:
             item_config = config.items_config["by_id"].get(item.item_id)
             if item_config:
                 if item.item_id not in item_groups:
-                    # 找到最早的存入者作为代表
+                    # 找到最新的存入者作为代表（因为items已按deposited_at降序排列，第一个就是最新的）
                     depositor = await session.get(Player, item.deposited_by)
                     item_groups[item.item_id] = {
                         "item_id": item.item_id,
                         "item_name": item_config.name,
                         "quantity": 0,
                         "deposited_by": depositor.nickname if depositor else "未知",
-                        "deposited_at": item.deposited_at,
+                        "deposited_at": item.deposited_at,  # 使用最新的存入时间
                         "stack_ids": []  # 记录所有堆叠的ID，用于取出时的处理
                     }
 
                 item_groups[item.item_id]["quantity"] += item.quantity
                 item_groups[item.item_id]["stack_ids"].append(item.id)
-                # 保持最早的存入时间
-                if item.deposited_at < item_groups[item.item_id]["deposited_at"]:
-                    item_groups[item.item_id]["deposited_at"] = item.deposited_at
 
         # 转换为列表并按存入时间排序
         result = list(item_groups.values())
@@ -514,10 +511,10 @@ class GuildFacilityService:
         except ValueError as e:
             return False, f"背包空间不足：{str(e)}"
 
-        # 从实际的堆叠中扣除物品（按照堆叠顺序，优先扣除较小的堆叠）
+        # 从实际的堆叠中扣除物品（按照存入时间降序，与显示顺序保持一致）
         stmt = select(GuildWarehouseItem).where(
             and_(GuildWarehouseItem.guild_id == guild_id, GuildWarehouseItem.item_id == selected_item["item_id"])
-        ).order_by(GuildWarehouseItem.quantity.asc())  # 按数量升序，优先扣除小堆叠
+        ).order_by(GuildWarehouseItem.deposited_at.desc())  # 按存入时间降序，与显示顺序一致
 
         warehouse_stacks = (await session.execute(stmt)).scalars().all()
 
