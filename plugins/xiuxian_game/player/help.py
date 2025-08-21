@@ -40,6 +40,7 @@ async def handle_help(event: MessageEvent, args: Message = CommandArg()):
         "💡 【】括号里是指令，<>里是必填，[]里是选填\n"
         "💡 发送/邀请码 邀请好友获得分级奖励，最高可获得3万+金币\n"
         "💡 不会玩加频道：https://Pd.qq.Com/s/d0g9cvds4"
+        "💡 官群：962494679"
     )
     await help_cmd.finish(Message(msg))
 
