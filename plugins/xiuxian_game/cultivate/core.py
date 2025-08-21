@@ -188,9 +188,8 @@ async def handle_seclusion(event: MessageEvent):
             guild_bonuses = await GuildBuildingService.get_guild_bonuses(session, player.guild_id)
             guild_cultivation_bonus = guild_bonuses.get("cultivation_bonus", 0.0)
 
-        # 获取阴宅修为加成（支持使用其他玩家的阴宅）
+        # 获取阴宅修为加成（闭关时只检查是否有阴宅，不支付费用）
         mansion_cultivation_bonus = 0.0
-        mansion_usage_msg = ""
         from .mansion import MansionService
 
         # 检查当前位置是否有阴宅
@@ -198,20 +197,11 @@ async def handle_seclusion(event: MessageEvent):
         mansion_owner = await MansionService.find_mansion_owner_at_location(session, current_x, current_y)
 
         if mansion_owner:
-            # 检查是否可以使用阴宅
-            can_use, use_msg = await MansionService.can_use_mansion(session, player, mansion_owner)
-
-            if can_use:
-                # 支付使用费用
-                payment_success, payment_msg = await MansionService.pay_mansion_usage_fee(session, player, mansion_owner)
-
-                if payment_success:
-                    mansion_cultivation_bonus = MansionService.get_efficiency_bonus(mansion_owner.mansion_level)
-                    if payment_msg:  # 如果有支付信息
-                        mansion_usage_msg = f"\n✧ 阴宅费用 💰 {payment_msg}"
-                else:
-                    # 支付失败，无法使用阴宅加成
-                    mansion_cultivation_bonus = 0.0
+            # 闭关时只检查是否有阴宅加成，不支付费用
+            # 如果是自己的阴宅或者阴宅允许他人使用，则可以享受加成
+            if (player.id == mansion_owner.id or
+                (mansion_owner.mansion_allow_others and mansion_owner.mansion_level > 0)):
+                mansion_cultivation_bonus = MansionService.get_efficiency_bonus(mansion_owner.mansion_level)
 
         # 计算棺材钉数量和效率加成（最多100根，50%加成）
         coffin_nail_count = await get_coffin_nail_count(session, player.id)
@@ -242,9 +232,6 @@ async def handle_seclusion(event: MessageEvent):
         if mansion_cultivation_bonus > 0:
             mansion_efficiency = mansion_cultivation_bonus * 100
             efficiency_msg += f"\n✧ 阴宅加成 🏚️ 提升效率 +{mansion_efficiency:.1f}%"
-
-        # 添加阴宅使用费用信息
-        efficiency_msg += mansion_usage_msg
 
         seclusion_hours = benefits["seclusion_time_limit"] // 3600
         time_limit_msg = f"\n✧ 闭关时长上限 ⏰ {seclusion_hours}小时"
@@ -289,8 +276,9 @@ async def handle_out_seclusion(event: MessageEvent):
             guild_bonuses = await GuildBuildingService.get_guild_bonuses(session, player.guild_id)
             guild_cultivation_bonus = guild_bonuses.get("cultivation_bonus", 0.0)
 
-        # 获取阴宅修为加成（出关时检查当前位置的阴宅）
+        # 获取阴宅修为加成（出关时支付使用费用并获得加成）
         mansion_cultivation_bonus = 0.0
+        mansion_usage_msg = ""
         from .mansion import MansionService
 
         # 检查当前位置是否有阴宅
@@ -298,16 +286,24 @@ async def handle_out_seclusion(event: MessageEvent):
         mansion_owner = await MansionService.find_mansion_owner_at_location(session, current_x, current_y)
 
         if mansion_owner:
-            # 出关时不需要再次支付费用，只检查是否有阴宅加成
-            # 如果是自己的阴宅或者阴宅允许他人使用，则享受加成
-            if (player.id == mansion_owner.id or
-                (mansion_owner.mansion_allow_others and mansion_owner.mansion_level > 0)):
-                mansion_cultivation_bonus = MansionService.get_efficiency_bonus(mansion_owner.mansion_level)
+            # 检查是否可以使用阴宅
+            can_use, _ = await MansionService.can_use_mansion(session, player, mansion_owner)
+
+            if can_use:
+                # 支付使用费用
+                payment_success, payment_msg = await MansionService.pay_mansion_usage_fee(session, player, mansion_owner)
+
+                if payment_success:
+                    mansion_cultivation_bonus = MansionService.get_efficiency_bonus(mansion_owner.mansion_level)
+                    if payment_msg:  # 如果有支付信息
+                        mansion_usage_msg = f"\n✧ 阴宅费用 💰 {payment_msg}"
+                else:
+                    # 支付失败，无法使用阴宅加成
+                    mansion_cultivation_bonus = 0.0
 
         # 计算棺材钉数量和效率加成（最多100根，50%加成）
         coffin_nail_count = await get_coffin_nail_count(session, player.id)
         effective_coffin_nail_count = min(coffin_nail_count, 100)  # 最多100根有效
-        coffin_nail_multiplier = 1.0 + (effective_coffin_nail_count * 0.005)  # 每个棺材钉提升0.5%效率
 
         player.is_secluded = False
         k = 7 if player.level <= 10 else 6
@@ -373,6 +369,9 @@ async def handle_out_seclusion(event: MessageEvent):
         if mansion_bonus > 0:
             mansion_efficiency = mansion_cultivation_bonus * 100
             efficiency_msg += f"\n✧ 阴宅加成 🏚️ 额外获得 +{mansion_bonus} 怨炁 (+{mansion_efficiency:.1f}%)"
+
+        # 添加阴宅使用费用信息
+        efficiency_msg += mansion_usage_msg
 
         msg_out = (
             "🔓你推开棺盖，阴灰散落。\n"
