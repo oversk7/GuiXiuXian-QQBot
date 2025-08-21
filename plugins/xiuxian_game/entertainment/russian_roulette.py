@@ -91,6 +91,18 @@ async def handle_create_room(bot: Bot, event: MessageEvent, args: Message = Comm
             "▫️ 【使用道具 肾上腺素 <道具名>】 - 偷取指定道具并立刻使用\n"
             "▫️ 【预知】 - 私聊指令，查看预知结果\n"
             "━━━━━━━━━━━━━\n"
+            "🎒 道具说明：\n"
+            "▫️ 🔪小刀 - 下次射击伤害翻倍\n"
+            "▫️ ⛓️手铐 - 限制对手下回合行动\n"
+            "▫️ 🚬香烟 - 恢复1点血量\n"
+            "▫️ 🔍放大镜 - 查看当前弹药类型\n"
+            "▫️ 🍺饮料 - 退掉当前弹药\n"
+            "▫️ 💉肾上腺素 - 偷取对手道具并立刻使用\n"
+            "▫️ 💊过期药物 - 40%恢复2血量，否则扣1血量\n"
+            "▫️ 🔄逆转器 - 转换当前弹药类型\n"
+            "▫️ 📞电话 - 随机预知一发弹药位置\n"
+            "▫️ 🎲骰子 - 打乱剩余子弹顺序，使预知失效\n"
+            "━━━━━━━━━━━━━\n"
             "💡 注意：预知类道具需要私聊机器人查看结果"
         )
         await create_room_cmd.finish(message_add_head(help_msg, event))
@@ -473,7 +485,8 @@ async def handle_use_adrenaline(bot: Bot, event: MessageEvent, args: Message = C
         "饮料": ItemType.BEER,
         "过期药物": ItemType.EXPIRED_MEDICINE,
         "逆转器": ItemType.INVERTER,
-        "电话": ItemType.PHONE
+        "电话": ItemType.PHONE,
+        "骰子": ItemType.DICE
     }
 
     if target_item_name not in item_mapping:
@@ -619,7 +632,8 @@ async def handle_use_item(bot: Bot, event: MessageEvent, args: Message = Command
         "肾上腺素": ItemType.ADRENALINE,
         "过期药物": ItemType.EXPIRED_MEDICINE,
         "逆转器": ItemType.INVERTER,
-        "电话": ItemType.PHONE
+        "电话": ItemType.PHONE,
+        "骰子": ItemType.DICE
     }
 
     if item_name not in item_mapping:
@@ -704,6 +718,8 @@ async def handle_use_item(bot: Bot, event: MessageEvent, args: Message = Command
             success, result_msg = RussianRouletteCore.use_inverter(game_state)
         elif item_type == ItemType.PHONE:
             success, result_msg = RussianRouletteCore.use_phone(game_state, player.id)
+        elif item_type == ItemType.DICE:
+            success, result_msg = RussianRouletteCore.use_dice(game_state)
 
         if not success:
             await use_item_cmd.finish(message_add_head(f"❌ {result_msg}", event))

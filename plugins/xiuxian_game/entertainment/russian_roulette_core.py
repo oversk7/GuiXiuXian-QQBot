@@ -18,6 +18,7 @@ class ItemType(Enum):
     EXPIRED_MEDICINE = "expired_medicine"  # 过期药物 - 40%恢复2血量，否则扣1血量
     INVERTER = "inverter"        # 逆转器 - 转换当前弹药类型
     PHONE = "phone"              # 电话 - 随机预知一发弹药
+    DICE = "dice"                # 骰子 - 打乱剩余子弹顺序
 
 
 class RussianRouletteCore:
@@ -33,7 +34,8 @@ class RussianRouletteCore:
         ItemType.ADRENALINE: {"name": "💉肾上腺素", "description": "偷取对手一个道具并立刻使用"},
         ItemType.EXPIRED_MEDICINE: {"name": "💊过期药物", "description": "40%恢复2血量，否则扣1血量"},
         ItemType.INVERTER: {"name": "🔄逆转器", "description": "转换当前弹药类型"},
-        ItemType.PHONE: {"name": "📞电话", "description": "随机预知一发弹药位置"}
+        ItemType.PHONE: {"name": "📞电话", "description": "随机预知一发弹药位置"},
+        ItemType.DICE: {"name": "🎲骰子", "description": "打乱剩余子弹顺序，使预知失效"}
     }
     
     @staticmethod
@@ -171,6 +173,8 @@ class RussianRouletteCore:
             use_success, use_msg = RussianRouletteCore.use_inverter(game_state)
         elif stolen_item == ItemType.PHONE:
             use_success, use_msg = RussianRouletteCore.use_phone(game_state, user_id)
+        elif stolen_item == ItemType.DICE:
+            use_success, use_msg = RussianRouletteCore.use_dice(game_state)
         else:
             return False, f"💉 未知道具类型：{item_name}"
 
@@ -218,16 +222,16 @@ class RussianRouletteCore:
         """使用电话"""
         bullets = json.loads(game_state["bullets"])
         current_index = game_state["current_bullet_index"]
-        
+
         remaining_bullets = bullets[current_index:]
         if not remaining_bullets:
             return False, "📞 弹夹已空，无法使用电话"
-        
+
         # 随机选择一发剩余弹药进行预知
         random_index = random.randint(0, len(remaining_bullets) - 1)
         actual_index = current_index + random_index
         bullet_type = "实弹" if bullets[actual_index] else "空包弹"
-        
+
         # 存储私密信息
         phone_info = {
             "player_id": player_id,
@@ -236,8 +240,34 @@ class RussianRouletteCore:
             "is_live": bullets[actual_index]
         }
         game_state["phone_info"] = json.dumps(phone_info)
-        
+
         return True, f"📞 电话已使用！请私聊机器人，发送【预知】查看结果"
+
+    @staticmethod
+    def use_dice(game_state: dict) -> Tuple[bool, str]:
+        """使用骰子"""
+        bullets = json.loads(game_state["bullets"])
+        current_index = game_state["current_bullet_index"]
+
+        remaining_bullets = bullets[current_index:]
+        if not remaining_bullets:
+            return False, "🎲 弹夹已空，无法使用骰子"
+
+        if len(remaining_bullets) <= 1:
+            return False, "🎲 剩余子弹不足，无法打乱顺序"
+
+        # 打乱剩余子弹的顺序
+        random.shuffle(remaining_bullets)
+
+        # 重新组合子弹序列
+        new_bullets = bullets[:current_index] + remaining_bullets
+        game_state["bullets"] = json.dumps(new_bullets)
+
+        # 清除所有预知信息，因为子弹顺序已改变
+        game_state["magnifier_info"] = None
+        game_state["phone_info"] = None
+
+        return True, f"🎲 骰子已使用！剩余子弹顺序已打乱，所有预知信息失效"
     
     @staticmethod
     def shoot(game_state: dict, shooter_id: str, target_id: str) -> Tuple[bool, str, bool]:
@@ -412,12 +442,12 @@ class RussianRouletteCore:
             item_counts = Counter(player_items)
 
             # 推荐常用道具
-            priority_items = ["magnifier", "cigarette", "knife", "beer", "phone"]
+            priority_items = ["magnifier", "cigarette", "knife", "beer", "phone", "dice"]
             for item_type in priority_items:
                 if item_type in item_counts:
                     item_config = RussianRouletteCore.ITEM_CONFIGS.get(ItemType(item_type))
                     if item_config:
-                        item_name = item_config["name"].replace("🔍", "").replace("🚬", "").replace("🔪", "").replace("🍺", "").replace("📞", "")
+                        item_name = item_config["name"].replace("🔍", "").replace("🚬", "").replace("🔪", "").replace("🍺", "").replace("📞", "").replace("🎲", "")
                         commands.append(f"【使用道具 {item_name.strip()}】")
                         break  # 只推荐一个道具，避免太多选择
 
