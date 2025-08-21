@@ -3,7 +3,7 @@
 """
 import json
 from nonebot import on_command
-from nonebot.adapters.qq import MessageEvent, Message
+from nonebot.adapters.qq import Bot, MessageEvent, Message
 from nonebot.params import CommandArg
 from sqlalchemy import select
 from ..models.russian_roulette import RoomStatus
@@ -50,7 +50,7 @@ def _format_player_items(items_json: str, player_name: str) -> str:
 create_room_cmd = on_command("恶魔轮盘", aliases={"轮盘赌", "俄罗斯轮盘"}, block=True, priority=5)
 
 @create_room_cmd.handle()
-async def handle_create_room(event: MessageEvent, args: Message = CommandArg()):
+async def handle_create_room(bot: Bot, event: MessageEvent, args: Message = CommandArg()):
     """创建恶魔轮盘赌房间"""
     # 检查是否为群聊
     session_id = event.get_session_id()
@@ -241,8 +241,6 @@ async def handle_create_room(event: MessageEvent, args: Message = CommandArg()):
                 )
 
                 # 先发送游戏开始消息
-                from nonebot.adapters.qq import Bot
-                bot = Bot.get_current()
                 await bot.send(event, message_add_head(result_msg, event))
 
                 # 延迟一下，然后分两次发送道具信息
@@ -273,7 +271,7 @@ async def handle_create_room(event: MessageEvent, args: Message = CommandArg()):
 shoot_cmd = on_command("开枪", block=True, priority=5)
 
 @shoot_cmd.handle()
-async def handle_shoot(event: MessageEvent, args: Message = CommandArg()):
+async def handle_shoot(bot: Bot, event: MessageEvent, args: Message = CommandArg()):
     """处理开枪指令"""
     # 检查是否为群聊
     session_id = event.get_session_id()
@@ -426,8 +424,6 @@ async def handle_shoot(event: MessageEvent, args: Message = CommandArg()):
         # 如果重新装弹了，需要分别发送道具信息
         if reloaded:
             # 先发送基础消息
-            from nonebot.adapters.qq import Bot
-            bot = Bot.get_current()
             await bot.send(event, message_add_head(result_msg, event))
 
             # 延迟一下，然后分两次发送道具信息
@@ -457,7 +453,7 @@ use_item_cmd = on_command("使用道具", aliases={"道具"}, block=True, priori
 use_adrenaline_cmd = on_command("使用道具 肾上腺素", block=True, priority=4)
 
 @use_adrenaline_cmd.handle()
-async def handle_use_adrenaline(event: MessageEvent, args: Message = CommandArg()):
+async def handle_use_adrenaline(bot: Bot, event: MessageEvent, args: Message = CommandArg()):
     """处理使用肾上腺素指令"""
     # 检查是否为群聊
     session_id = event.get_session_id()
@@ -575,8 +571,6 @@ async def handle_use_adrenaline(event: MessageEvent, args: Message = CommandArg(
         # 如果重新装弹了，需要分别发送道具信息
         if reloaded:
             # 先发送基础消息
-            from nonebot.adapters.qq import Bot
-            bot = Bot.get_current()
             await bot.send(event, message_add_head(final_msg, event))
 
             # 延迟一下，然后分两次发送道具信息
@@ -604,7 +598,7 @@ async def handle_use_adrenaline(event: MessageEvent, args: Message = CommandArg(
 
 
 @use_item_cmd.handle()
-async def handle_use_item(event: MessageEvent, args: Message = CommandArg()):
+async def handle_use_item(bot: Bot, event: MessageEvent, args: Message = CommandArg()):
     """处理使用道具指令"""
     # 检查是否为群聊
     session_id = event.get_session_id()
@@ -756,8 +750,6 @@ async def handle_use_item(event: MessageEvent, args: Message = CommandArg()):
         # 如果重新装弹了，需要分别发送道具信息
         if reloaded:
             # 先发送基础消息
-            from nonebot.adapters.qq import Bot
-            bot = Bot.get_current()
             await bot.send(event, message_add_head(final_msg, event))
 
             # 延迟一下，然后分两次发送道具信息
