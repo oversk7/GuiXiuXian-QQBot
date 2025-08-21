@@ -579,30 +579,51 @@ async def handle_use_adrenaline(bot: Bot, event: MessageEvent, args: Message = C
         game.magnifier_info = game_state.get("magnifier_info")
         game.phone_info = game_state.get("phone_info")
 
-        # 检查是否需要重新装弹（偷到的道具可能会影响弹药）
-        reloaded, reload_msg = RussianRouletteCore.check_and_reload(
-            game_state, room.player1_id, room.player2_id
-        )
-        if reloaded:
-            # 更新重新装弹后的游戏状态
-            game.bullets = game_state["bullets"]
-            game.current_bullet_index = game_state["current_bullet_index"]
-            game.player1_items = game_state[f"{room.player1_id}_items"]
-            game.player2_items = game_state[f"{room.player2_id}_items"]
-            game.is_sawed_off = game_state["is_sawed_off"]
-            game.handcuffed_player_id = game_state.get("handcuffed_player_id")
-            game.magnifier_info = game_state.get("magnifier_info")
-            game.phone_info = game_state.get("phone_info")
+        # 检查使用肾上腺素后是否有玩家血量降为0（游戏结束）
+        game_over = False
+        winner_id = None
+        if game.player1_hp <= 0:
+            game_over = True
+            winner_id = room.player2_id
+        elif game.player2_hp <= 0:
+            game_over = True
+            winner_id = room.player1_id
+
+        # 如果游戏未结束，检查是否需要重新装弹（偷到的道具可能会影响弹药）
+        reloaded = False
+        reload_msg = ""
+        if not game_over:
+            reloaded, reload_msg = RussianRouletteCore.check_and_reload(
+                game_state, room.player1_id, room.player2_id
+            )
+            if reloaded:
+                # 更新重新装弹后的游戏状态
+                game.bullets = game_state["bullets"]
+                game.current_bullet_index = game_state["current_bullet_index"]
+                game.player1_items = game_state[f"{room.player1_id}_items"]
+                game.player2_items = game_state[f"{room.player2_id}_items"]
+                game.is_sawed_off = game_state["is_sawed_off"]
+                game.handcuffed_player_id = game_state.get("handcuffed_player_id")
+                game.magnifier_info = game_state.get("magnifier_info")
+                game.phone_info = game_state.get("phone_info")
 
         await session.commit()
 
-        # 显示结果
+        # 构建基础消息
         final_msg = f"🎒 {player.nickname} 使用了肾上腺素\n{result_msg}"
-        if reloaded:
+        if reload_msg:
             final_msg += f"\n{reload_msg}"
 
-        # 如果重新装弹了，需要分别发送道具信息
-        if reloaded:
+        # 如果游戏结束，处理胜负
+        if game_over:
+            winner = await session.get(Player, winner_id)
+            _, reward_msg = await RussianRouletteService.finish_game(
+                session, room.room_id, winner_id
+            )
+            final_msg += f"\n🏆 {winner.nickname} 获胜！\n{reward_msg}"
+
+        # 如果重新装弹了且游戏未结束，需要分别发送道具信息
+        if reloaded and not game_over:
             # 先发送基础消息
             await bot.send(event, message_add_head(final_msg, event))
 
@@ -626,7 +647,7 @@ async def handle_use_adrenaline(bot: Bot, event: MessageEvent, args: Message = C
 
             return  # 使用return而不是finish，因为已经发送了消息
         else:
-            # 没有重新装弹，正常发送消息
+            # 没有重新装弹或游戏已结束，正常发送消息
             await use_adrenaline_cmd.finish(message_add_head(final_msg, event))
 
 
@@ -767,34 +788,54 @@ async def handle_use_item(bot: Bot, event: MessageEvent, args: Message = Command
         game.magnifier_info = game_state.get("magnifier_info")
         game.phone_info = game_state.get("phone_info")
 
-        # 检查是否需要重新装弹
-        reloaded, reload_msg = RussianRouletteCore.check_and_reload(
-            game_state, room.player1_id, room.player2_id
-        )
-        if reloaded:
-            # 更新重新装弹后的游戏状态
-            game.bullets = game_state["bullets"]
-            game.current_bullet_index = game_state["current_bullet_index"]
-            game.player1_items = game_state[f"{room.player1_id}_items"]
-            game.player2_items = game_state[f"{room.player2_id}_items"]
-            game.is_sawed_off = game_state["is_sawed_off"]
-            game.handcuffed_player_id = game_state.get("handcuffed_player_id")
-            game.magnifier_info = game_state.get("magnifier_info")
-            game.phone_info = game_state.get("phone_info")
+        # 检查使用道具后是否有玩家血量降为0（游戏结束）
+        game_over = False
+        winner_id = None
+        if game.player1_hp <= 0:
+            game_over = True
+            winner_id = room.player2_id
+        elif game.player2_hp <= 0:
+            game_over = True
+            winner_id = room.player1_id
+
+        # 如果游戏未结束，检查是否需要重新装弹
+        reloaded = False
+        reload_msg = ""
+        if not game_over:
+            reloaded, reload_msg = RussianRouletteCore.check_and_reload(
+                game_state, room.player1_id, room.player2_id
+            )
+            if reloaded:
+                # 更新重新装弹后的游戏状态
+                game.bullets = game_state["bullets"]
+                game.current_bullet_index = game_state["current_bullet_index"]
+                game.player1_items = game_state[f"{room.player1_id}_items"]
+                game.player2_items = game_state[f"{room.player2_id}_items"]
+                game.is_sawed_off = game_state["is_sawed_off"]
+                game.handcuffed_player_id = game_state.get("handcuffed_player_id")
+                game.magnifier_info = game_state.get("magnifier_info")
+                game.phone_info = game_state.get("phone_info")
 
         await session.commit()
 
-        # 使用道具后只显示简单的结果信息，不显示完整游戏状态避免刷屏
+        # 构建基础消息
         final_msg = f"🎒 {player.nickname} 使用了{item_name}\n{result_msg}"
         if reload_msg:
             final_msg += f"\n{reload_msg}"
 
-        # 如果使用了手铐，添加连续行动提示
-        if item_type == ItemType.HANDCUFFS and success:
+        # 如果游戏结束，处理胜负
+        if game_over:
+            winner = await session.get(Player, winner_id)
+            _, reward_msg = await RussianRouletteService.finish_game(
+                session, room.room_id, winner_id
+            )
+            final_msg += f"\n🏆 {winner.nickname} 获胜！\n{reward_msg}"
+        elif item_type == ItemType.HANDCUFFS and success:
+            # 如果使用了手铐且游戏未结束，添加连续行动提示
             final_msg += f"\n🔄 {player.nickname} 可以继续行动"
 
-        # 如果重新装弹了，需要分别发送道具信息
-        if reloaded:
+        # 如果重新装弹了且游戏未结束，需要分别发送道具信息
+        if reloaded and not game_over:
             # 先发送基础消息
             await bot.send(event, message_add_head(final_msg, event))
 
@@ -818,7 +859,7 @@ async def handle_use_item(bot: Bot, event: MessageEvent, args: Message = Command
 
             return  # 使用return而不是finish，因为已经发送了消息
         else:
-            # 没有重新装弹，正常发送消息
+            # 没有重新装弹或游戏已结束，正常发送消息
             await use_item_cmd.finish(message_add_head(final_msg, event))
 
 
