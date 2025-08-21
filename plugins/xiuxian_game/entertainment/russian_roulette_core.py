@@ -30,7 +30,7 @@ class RussianRouletteCore:
         ItemType.CIGARETTE: {"name": "🚬香烟", "description": "恢复1点血量"},
         ItemType.MAGNIFIER: {"name": "🔍放大镜", "description": "查看当前弹药类型"},
         ItemType.BEER: {"name": "🍺饮料", "description": "退掉当前弹药"},
-        ItemType.ADRENALINE: {"name": "💉肾上腺素", "description": "偷取对手一个道具"},
+        ItemType.ADRENALINE: {"name": "💉肾上腺素", "description": "偷取对手一个道具并立刻使用"},
         ItemType.EXPIRED_MEDICINE: {"name": "💊过期药物", "description": "40%恢复2血量，否则扣1血量"},
         ItemType.INVERTER: {"name": "🔄逆转器", "description": "转换当前弹药类型"},
         ItemType.PHONE: {"name": "📞电话", "description": "随机预知一发弹药位置"}
@@ -121,28 +121,55 @@ class RussianRouletteCore:
         return True, f"🍺 饮料已使用！退出了一发{bullet_type}"
     
     @staticmethod
-    def use_adrenaline(game_state: dict, user_id: str, target_id: str, stolen_item: ItemType) -> Tuple[bool, str]:
-        """使用肾上腺素"""
+    def use_adrenaline(game_state: dict, user_id: str, target_id: str, stolen_item: ItemType, max_hp: int = 3) -> Tuple[bool, str]:
+        """使用肾上腺素 - 偷取对手道具并立刻使用"""
         user_items_key = f"{user_id}_items"
         target_items_key = f"{target_id}_items"
-        
-        user_items = json.loads(game_state.get(user_items_key, "[]"))
+
         target_items = json.loads(game_state.get(target_items_key, "[]"))
-        
+
         # 检查目标是否有该道具
         stolen_item_str = stolen_item.value
         if stolen_item_str not in target_items:
             return False, f"💉 对手没有{RussianRouletteCore.ITEM_CONFIGS[stolen_item]['name']}"
-        
-        # 转移道具
+
+        # 从对手道具中移除
         target_items.remove(stolen_item_str)
-        user_items.append(stolen_item_str)
-        
-        game_state[user_items_key] = json.dumps(user_items)
         game_state[target_items_key] = json.dumps(target_items)
-        
+
         item_name = RussianRouletteCore.ITEM_CONFIGS[stolen_item]['name']
-        return True, f"💉 肾上腺素已使用！偷取了对手的{item_name}"
+
+        # 立刻使用偷到的道具
+        use_success = False
+        use_msg = ""
+
+        if stolen_item == ItemType.KNIFE:
+            use_success, use_msg = RussianRouletteCore.use_knife(game_state)
+        elif stolen_item == ItemType.HANDCUFFS:
+            use_success, use_msg = RussianRouletteCore.use_handcuffs(game_state, target_id)
+        elif stolen_item == ItemType.CIGARETTE:
+            use_success, use_msg = RussianRouletteCore.use_cigarette(game_state, user_id, max_hp)
+        elif stolen_item == ItemType.MAGNIFIER:
+            use_success, use_msg = RussianRouletteCore.use_magnifier(game_state, user_id)
+        elif stolen_item == ItemType.BEER:
+            use_success, use_msg = RussianRouletteCore.use_beer(game_state)
+        elif stolen_item == ItemType.ADRENALINE:
+            # 不能偷取肾上腺素（避免无限循环）
+            return False, f"💉 无法偷取肾上腺素！"
+        elif stolen_item == ItemType.EXPIRED_MEDICINE:
+            use_success, use_msg = RussianRouletteCore.use_expired_medicine(game_state, user_id, max_hp)
+        elif stolen_item == ItemType.INVERTER:
+            use_success, use_msg = RussianRouletteCore.use_inverter(game_state)
+        elif stolen_item == ItemType.PHONE:
+            use_success, use_msg = RussianRouletteCore.use_phone(game_state, user_id)
+        else:
+            return False, f"💉 未知道具类型：{item_name}"
+
+        if use_success:
+            return True, f"💉 肾上腺素已使用！偷取了对手的{item_name}并立刻使用\n{use_msg}"
+        else:
+            # 如果使用失败，道具已经被移除了，但没有效果
+            return True, f"💉 肾上腺素已使用！偷取了对手的{item_name}但使用失败\n{use_msg}"
     
     @staticmethod
     def use_expired_medicine(game_state: dict, player_id: str, max_hp: int = 3) -> Tuple[bool, str]:

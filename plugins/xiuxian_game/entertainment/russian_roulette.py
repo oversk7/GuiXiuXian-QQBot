@@ -60,6 +60,7 @@ async def handle_create_room(event: MessageEvent, args: Message = CommandArg()):
             "▫️ 【开枪 <自己/对手>】 - 选择射击目标\n"
             "▫️ 【查看道具】 - 查看可用道具\n"
             "▫️ 【使用道具 <道具名>】 - 使用道具\n"
+            "▫️ 【使用道具 肾上腺素 <道具名>】 - 偷取指定道具并立刻使用\n"
             "▫️ 【预知】 - 私聊指令，查看预知结果\n"
             "━━━━━━━━━━━━━\n"
             "💡 注意：预知类道具需要私聊机器人查看结果"
@@ -261,7 +262,7 @@ async def handle_shoot(event: MessageEvent, args: Message = CommandArg()):
             opponent_id = room.get_opponent_id(player.id)
             game.current_player_id = opponent_id
             await session.commit()
-            
+
             await shoot_cmd.finish(message_add_head("⛓️ 你被手铐限制，跳过本回合", event))
         
         # 确定射击目标
@@ -376,6 +377,141 @@ async def handle_shoot(event: MessageEvent, args: Message = CommandArg()):
 # 使用道具指令
 use_item_cmd = on_command("使用道具", aliases={"道具"}, block=True, priority=5)
 
+# 使用肾上腺素指令（带参数）
+use_adrenaline_cmd = on_command("使用道具 肾上腺素", block=True, priority=4)
+
+@use_adrenaline_cmd.handle()
+async def handle_use_adrenaline(event: MessageEvent, args: Message = CommandArg()):
+    """处理使用肾上腺素指令"""
+    # 检查是否为群聊
+    session_id = event.get_session_id()
+    if not session_id.startswith("group_"):
+        await use_adrenaline_cmd.finish("⛔ 游戏指令只能在群聊中使用")
+
+    target_item_name = args.extract_plain_text().strip()
+    if not target_item_name:
+        await use_adrenaline_cmd.finish("⛔ 请指定要偷取的道具名称\n📝 示例：使用道具 肾上腺素 小刀")
+
+    # 道具名称映射（肾上腺素不能偷取肾上腺素）
+    item_mapping = {
+        "小刀": ItemType.KNIFE,
+        "手铐": ItemType.HANDCUFFS,
+        "香烟": ItemType.CIGARETTE,
+        "放大镜": ItemType.MAGNIFIER,
+        "饮料": ItemType.BEER,
+        "过期药物": ItemType.EXPIRED_MEDICINE,
+        "逆转器": ItemType.INVERTER,
+        "电话": ItemType.PHONE
+    }
+
+    if target_item_name not in item_mapping:
+        available_items = "、".join(item_mapping.keys())
+        await use_adrenaline_cmd.finish(f"⛔ 未知道具。可偷取道具：{available_items}")
+
+    target_item_type = item_mapping[target_item_name]
+
+    async with safe_session() as session:
+        player = await session.get(Player, event.get_user_id())
+        if not player:
+            await use_adrenaline_cmd.finish("⛔ 请先创建角色")
+
+        # 获取玩家当前房间和游戏
+        room = await RussianRouletteService.get_player_active_room(session, player.id)
+        if not room:
+            await use_adrenaline_cmd.finish("⛔ 你不在任何游戏房间中")
+
+        game = await RussianRouletteService.get_game_by_room_id(session, room.room_id)
+        if not game:
+            await use_adrenaline_cmd.finish("⛔ 游戏尚未开始")
+
+        # 检查是否轮到该玩家
+        if game.current_player_id != player.id:
+            await use_adrenaline_cmd.finish("⛔ 还没轮到你行动")
+
+        # 检查是否被手铐限制
+        if game.handcuffed_player_id == player.id:
+            # 解除手铐限制
+            game.handcuffed_player_id = None
+            # 切换到对手回合
+            opponent_id = room.get_opponent_id(player.id)
+            game.current_player_id = opponent_id
+            await session.commit()
+
+            await use_adrenaline_cmd.finish(message_add_head("⛓️ 你被手铐限制，跳过本回合", event))
+
+        # 检查玩家是否有肾上腺素
+        if room.player1_id == player.id:
+            player_items = json.loads(game.player1_items or "[]")
+        else:
+            player_items = json.loads(game.player2_items or "[]")
+
+        if ItemType.ADRENALINE.value not in player_items:
+            await use_adrenaline_cmd.finish("⛔ 你没有肾上腺素")
+
+        # 构建游戏状态
+        game_state = {
+            "bullets": game.bullets,
+            "current_bullet_index": game.current_bullet_index,
+            f"{room.player1_id}_hp": game.player1_hp,
+            f"{room.player2_id}_hp": game.player2_hp,
+            "is_sawed_off": game.is_sawed_off,
+            "handcuffed_player_id": game.handcuffed_player_id,
+            f"{room.player1_id}_items": game.player1_items,
+            f"{room.player2_id}_items": game.player2_items,
+            "magnifier_info": game.magnifier_info,
+            "phone_info": game.phone_info
+        }
+
+        # 使用肾上腺素偷取指定道具
+        opponent_id = room.get_opponent_id(player.id)
+        success, result_msg = RussianRouletteCore.use_adrenaline(game_state, player.id, opponent_id, target_item_type, room.max_hp)
+
+        if not success:
+            await use_adrenaline_cmd.finish(message_add_head(f"❌ {result_msg}", event))
+
+        # 消耗肾上腺素
+        player_items.remove(ItemType.ADRENALINE.value)
+        if room.player1_id == player.id:
+            game.player1_items = json.dumps(player_items)
+        else:
+            game.player2_items = json.dumps(player_items)
+
+        # 更新游戏状态（偷到的道具可能会改变游戏状态）
+        game.bullets = game_state["bullets"]
+        game.current_bullet_index = game_state["current_bullet_index"]
+        game.player1_hp = game_state[f"{room.player1_id}_hp"]
+        game.player2_hp = game_state[f"{room.player2_id}_hp"]
+        game.is_sawed_off = game_state["is_sawed_off"]
+        game.handcuffed_player_id = game_state.get("handcuffed_player_id")
+        game.player1_items = game_state[f"{room.player1_id}_items"]
+        game.player2_items = game_state[f"{room.player2_id}_items"]
+        game.magnifier_info = game_state.get("magnifier_info")
+        game.phone_info = game_state.get("phone_info")
+
+        # 检查是否需要重新装弹（偷到的道具可能会影响弹药）
+        reloaded, reload_msg = RussianRouletteCore.check_and_reload(
+            game_state, room.player1_id, room.player2_id
+        )
+        if reloaded:
+            # 更新重新装弹后的游戏状态
+            game.bullets = game_state["bullets"]
+            game.current_bullet_index = game_state["current_bullet_index"]
+            game.player1_items = game_state[f"{room.player1_id}_items"]
+            game.player2_items = game_state[f"{room.player2_id}_items"]
+            game.is_sawed_off = game_state["is_sawed_off"]
+            game.handcuffed_player_id = game_state.get("handcuffed_player_id")
+            game.magnifier_info = game_state.get("magnifier_info")
+            game.phone_info = game_state.get("phone_info")
+
+        await session.commit()
+
+        # 显示结果
+        final_msg = f"🎒 {player.nickname} 使用了肾上腺素\n{result_msg}"
+        if reloaded:
+            final_msg += f"\n{reload_msg}"
+        await use_adrenaline_cmd.finish(message_add_head(final_msg, event))
+
+
 @use_item_cmd.handle()
 async def handle_use_item(event: MessageEvent, args: Message = CommandArg()):
     """处理使用道具指令"""
@@ -425,6 +561,17 @@ async def handle_use_item(event: MessageEvent, args: Message = CommandArg()):
         if game.current_player_id != player.id:
             await use_item_cmd.finish("⛔ 还没轮到你行动")
 
+        # 检查是否被手铐限制
+        if game.handcuffed_player_id == player.id:
+            # 解除手铐限制
+            game.handcuffed_player_id = None
+            # 切换到对手回合
+            opponent_id = room.get_opponent_id(player.id)
+            game.current_player_id = opponent_id
+            await session.commit()
+
+            await use_item_cmd.finish(message_add_head("⛓️ 你被手铐限制，跳过本回合", event))
+
         # 检查玩家是否有该道具
         if room.player1_id == player.id:
             player_items = json.loads(game.player1_items or "[]")
@@ -464,19 +611,8 @@ async def handle_use_item(event: MessageEvent, args: Message = CommandArg()):
         elif item_type == ItemType.BEER:
             success, result_msg = RussianRouletteCore.use_beer(game_state)
         elif item_type == ItemType.ADRENALINE:
-            # 肾上腺素需要额外参数，这里简化处理 - 随机偷取对手一个道具
-            opponent_id = room.get_opponent_id(player.id)
-            opponent_items = json.loads(game.player2_items if room.player1_id == player.id else game.player1_items or "[]")
-
-            if not opponent_items:
-                await use_item_cmd.finish(message_add_head("⛔ 对手没有道具可以偷取", event))
-
-            # 随机选择一个道具偷取
-            import random
-            stolen_item_str = random.choice(opponent_items)
-            stolen_item = ItemType(stolen_item_str)
-
-            success, result_msg = RussianRouletteCore.use_adrenaline(game_state, player.id, opponent_id, stolen_item)
+            # 肾上腺素需要指定偷取的道具，这里提示用户使用正确格式
+            await use_item_cmd.finish(message_add_head("⛔ 肾上腺素需要指定偷取的道具\n📝 使用格式：使用道具 肾上腺素 [道具名]\n📝 示例：使用道具 肾上腺素 小刀", event))
         elif item_type == ItemType.EXPIRED_MEDICINE:
             success, result_msg = RussianRouletteCore.use_expired_medicine(game_state, player.id, room.max_hp)
         elif item_type == ItemType.INVERTER:
