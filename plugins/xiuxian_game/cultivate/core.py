@@ -29,6 +29,7 @@ cultivate = on_command("修炼", block=True, priority=5)
 seclusion = on_command("闭关", block=True, priority=5)
 out_seclusion = on_command("出关", block=True, priority=5)
 breakthrough = on_command("突破", block=True, priority=5)
+continuous_breakthrough = on_command("连续突破", aliases={"连突"}, block=True, priority=5)
 assign_points = on_command("加点",aliases={"分配"}, block=True, priority=5)
 
 
@@ -603,6 +604,183 @@ async def handle_breakthrough(event: MessageEvent, args: Message = CommandArg())
         session.add(player)
         await session.commit()
         await breakthrough.finish(message_add_head(msg, event))
+
+@continuous_breakthrough.handle()
+async def handle_continuous_breakthrough(event: MessageEvent, args: Message = CommandArg()):
+    """连续突破逻辑"""
+    user_id = event.get_user_id()
+    async with safe_session() as session:
+        player = await session.get(Player, user_id)
+        if not player:
+            await continuous_breakthrough.finish("⛔ 请先使用【注册】命令创建角色")
+
+        cfg_break = cfg["breakthrough"]
+
+        # 解析参数，若包含"镇厄"则启用保驾护航模式
+        arg_text = args.extract_plain_text().strip().lower() if isinstance(args, Message) else ""
+        use_guardian = arg_text in {"护", "镇厄", "镇", "怨念"}
+
+        # 检查是否达到冥返要求等级
+        from .reincarnation import ReincarnationService
+        required_level = ReincarnationService.get_required_level_for_reincarnation(player.reincarnation_level)
+        if player.level >= required_level:
+            reincarnation_count = player.reincarnation_level + 1
+            await continuous_breakthrough.finish(
+                f"🌟 你已达到冥返要求 Lv.{required_level}！\n"
+                "━━━━━━━━━━━━━\n"
+                f"✧ 可进行第{reincarnation_count}次冥返轮回\n"
+                "✧ 冥返将重塑根基，获得更强潜力\n"
+                "━━━━━━━━━━━━━\n"
+                "⬇️ 【冥返】踏入轮回，重铸道基\n"
+                "⬇️ 【冥返信息】查看详细信息"
+            )
+
+        # 统计信息
+        breakthrough_count = 0
+        total_resentment_cost = 0
+        total_attribute_points = 0
+        start_level = player.level
+        start_exp = player.exp
+        start_resentment = player.resentment
+
+        # 连续突破循环
+        while True:
+            required_exp = calculate_level_up_exp(player.level)
+
+            # 检查经验是否足够
+            if player.exp < required_exp:
+                break
+
+            # 计算镇厄消耗
+            base_cost = cfg_break.get("guardian_cost_base", cfg_break.get("guardian_cost", 50))
+            per_level_inc = cfg_break.get("guardian_cost_per_level", 15)
+            guardian_cost = base_cost + player.level * per_level_inc
+
+            # 如果启用镇厄，检查怨念值是否足够
+            if use_guardian and player.resentment < guardian_cost:
+                break
+
+            # 计算成功率
+            if player.level < cfg_break["change_level"]:
+                success_chance = 1.0
+            else:
+                base_rate = cfg_break.get("base_success_rate", 0.8)
+                decay = cfg_break.get("decay_per_level", 0.005)
+                min_rate = cfg_break.get("min_success_rate", 0.05)
+                success_chance = max(min_rate, base_rate - decay * (player.level - cfg_break["change_level"]))
+
+                # 失败累加机制
+                if cfg_break.get("fail_bonus_enabled", True):
+                    fail_bonus_rate = cfg_break.get("fail_bonus_rate", 0.01)
+                    fail_bonus = player.breakthrough_fail_count * fail_bonus_rate
+                    success_chance += fail_bonus
+
+                    # 应用成功率上限
+                    max_rate = cfg_break.get("fail_bonus_max_rate", 0.95)
+                    success_chance = min(success_chance, max_rate)
+
+            # 镇厄则必定成功
+            if use_guardian:
+                success_chance = 1.0
+
+            # 执行突破
+            if player.level < cfg_break["change_level"] or random.random() <= success_chance:
+                # 突破成功
+                old_level = player.level
+                player.exp -= required_exp
+                player.level += 1
+                breakthrough_count += 1
+
+                # 突破成功，重置失败次数
+                player.breakthrough_fail_count = 0
+
+                # 消耗怨念值（如果启用镇厄）
+                if use_guardian:
+                    player.resentment -= guardian_cost
+                    total_resentment_cost += guardian_cost
+
+                # 根据转数计算属性点获得
+                points_gained = ReincarnationService.get_attribute_points_per_level(player.reincarnation_level)
+                player.attribute_points += points_gained
+                total_attribute_points += points_gained
+
+                # 触发升级钩子
+                from ..social.level_hooks import on_player_level_up
+                await on_player_level_up(session, player.id, old_level, player.level)
+
+            else:
+                # 突破失败，停止连续突破
+                player.breakthrough_fail_count += 1
+
+                # 检查月卡权益
+                card_benefits = await get_player_card_benefits(session, player.id)
+                breakthrough_protection = card_benefits.get("breakthrough_protection", 0)
+
+                # 确定修为保留比例
+                if breakthrough_protection > 0:
+                    keep_ratio = breakthrough_protection
+                else:
+                    keep_ratio = cfg_break["fail_keep_ratio"]
+
+                player.exp = round(player.exp - required_exp*(1-keep_ratio))
+                break
+
+        session.add(player)
+        await session.commit()
+
+        # 构建结果消息
+        if breakthrough_count == 0:
+            if player.exp < calculate_level_up_exp(player.level):
+                msg = (
+                    "💢 修为不足，无法进行突破！\n"
+                    "━━━━━━━━━━━━━\n"
+                    f"✧ 当前修为 {player.exp}/{calculate_level_up_exp(player.level)}\n"
+                    "━━━━━━━━━━━━━\n"
+                    "⬇️ 【修炼】继续喂养怨炁"
+                )
+            elif use_guardian and start_resentment < (cfg_break.get("guardian_cost_base", 50) + player.level * cfg_break.get("guardian_cost_per_level", 15)):
+                msg = (
+                    "💢 怨念值不足，无法使用镇厄！\n"
+                    "━━━━━━━━━━━━━\n"
+                    f"✧ 当前怨念值 {player.resentment}\n"
+                    f"✧ 镇厄需要 {cfg_break.get('guardian_cost_base', 50) + player.level * cfg_break.get('guardian_cost_per_level', 15)}\n"
+                    "━━━━━━━━━━━━━\n"
+                    "⬇️ 【献祭】获取怨念值\n"
+                    "⬇️ 【连续突破】不使用镇厄"
+                )
+            else:
+                msg = (
+                    "💥 首次突破失败，连续突破中断！\n"
+                    "━━━━━━━━━━━━━\n"
+                    f"✧ 当前等级 Lv.{player.level}\n"
+                    f"✧ 剩余修为 {player.exp}\n"
+                    f"✧ 连续失败 {player.breakthrough_fail_count} 次\n"
+                    "━━━━━━━━━━━━━\n"
+                    "⬇️ 建议【突破 镇厄】以怨念护体"
+                )
+        else:
+            # 计算消耗的修为
+            consumed_exp = start_exp - player.exp
+
+            cost_msg = ""
+            if use_guardian and total_resentment_cost > 0:
+                cost_msg = f"✧ 消耗怨念值 {total_resentment_cost} (剩余{player.resentment})\n"
+
+            msg = (
+                f"⛓️‍💥连续突破完成！骨裂声不绝于耳！\n"
+                "━━━━━━━━━━━━━\n"
+                f"✧ 突破次数 {breakthrough_count} 次\n"
+                f"✧ 等级提升 Lv.{start_level} → Lv.{player.level}\n"
+                f"✧ 消耗修为 {consumed_exp}\n"
+                f"✧ 获得属性点 + {total_attribute_points}" + (f" (转数加成)" if player.reincarnation_level > 0 else "") + "\n"
+                f"✧ 剩余修为 {player.exp}\n"
+                + cost_msg +
+                "━━━━━━━━━━━━━\n"
+                "⬇️ 【加点】缝合裂隙\n"
+                "⬇️ 【修炼】继续喂养怨炁"
+            )
+
+        await continuous_breakthrough.finish(message_add_head(msg, event))
 
 # 基础属性映射表
 ATTRIBUTE_MAP = {
