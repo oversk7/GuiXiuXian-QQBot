@@ -389,27 +389,7 @@ class Player(Base):
 
         return "\n".join(lines)
 
-    async def format_battle_attributes_async(self, session=None) -> str:
-        """格式化显示战斗属性（异步版本，包含临时buff）"""
-        attrs = await self.get_effective_battle_attributes(session)
 
-        # 计算暴击倍数显示（基础1.5倍 + 暴击力*0.1倍）
-        crit_multiplier = 1.5 + (attrs['critical_power'] * 0.1)
-
-        lines = [
-            "⚔️ 战斗属性 ⚔️",
-            f"💥 暴击率: {attrs['critical_rate']}%",
-            f"💢 暴击力: {crit_multiplier:.1f}倍",
-            f"🔄 连击率: {attrs['combo_rate']}%",
-            f"🛡️ 反击率: {attrs['counter_rate']}%",
-            f"⚡ 闪避率: {attrs['dodge_rate']}%",
-            f"🎯 命中率: {attrs['accuracy_rate']}%",
-            f"✨ 灵爆率: {attrs['skill_crit_rate']}%",
-            f"🗡️ 穿透率: {attrs['penetration_rate']}%",
-            f"🛡️ 抗暴率: {attrs['anti_crit_rate']}%"
-        ]
-
-        return "\n".join(lines)
 
 
 async def get_player_by_uid(uid: str):
