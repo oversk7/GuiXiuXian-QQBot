@@ -290,8 +290,8 @@ async def _(event: MessageEvent, state: T_State, args: Message = CommandArg()):
 async def _(event: MessageEvent, nickname: str = ArgPlainText()):
     nickname = nickname.strip()
 
-    if not nickname:
-        await register.reject("⛔ 昵称不能为空，请重新输入")
+    if not nickname or nickname in ["修炼"]:
+        await register.reject("⛔ 昵称不能为空或者是指令，请重新输入")
 
     # 检查并处理常见的误输入情况
     cleaned_nickname = _clean_nickname_input(nickname)
