@@ -691,3 +691,35 @@ class BattleIntegrationHelper:
         ]
         
         return "\n".join(lines)
+
+    @staticmethod
+    async def get_battle_attribute_display_async(player: "Player", session=None) -> str:
+        """获取战斗属性显示（异步版本，包含临时buff）
+
+        Args:
+            player: 玩家对象
+            session: 数据库会话（用于获取临时buff）
+
+        Returns:
+            格式化的战斗属性显示
+        """
+        from .battle_attributes import BattleAttributeCalculator
+        attrs = await BattleAttributeCalculator.calculate_effective_attributes_async(player, session)
+
+        # 计算暴击倍数显示（基础1.5倍 + 暴击力*0.1倍）
+        crit_multiplier = 1.5 + (attrs['critical_power'] * 0.1)
+
+        lines = [
+            "⚔️ 战斗属性 ⚔️",
+            f"💥 暴击率: {attrs['critical_rate']:.1f}%",
+            f"💢 暴击力: {crit_multiplier:.1f}倍",
+            f"🔄 连击率: {attrs['combo_rate']:.1f}%",
+            f"🛡️ 反击率: {attrs['counter_rate']:.1f}%",
+            f"⚡ 闪避率: {attrs['dodge_rate']:.1f}%",
+            f"🎯 命中率: {attrs['accuracy_rate']:.1f}%",
+            f"✨ 灵爆率: {attrs['skill_crit_rate']:.1f}%",
+            f"🗡️ 穿透率: {attrs['penetration_rate']:.1f}%",
+            f"🛡️ 抗暴率: {attrs['anti_crit_rate']:.1f}%"
+        ]
+
+        return "\n".join(lines)

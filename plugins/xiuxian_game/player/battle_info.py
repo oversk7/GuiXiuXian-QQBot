@@ -31,23 +31,34 @@ async def handle_battle_info(event: MessageEvent, args: Message = CommandArg()):
             await battle_info.send(event, "❌ 你还没有创建角色，请先使用 创建角色 命令")
             return
         
-        # 获取战斗属性显示
-        battle_attr_display = BattleIntegrationHelper.get_battle_attribute_display(player)
-        
-        # 基础属性显示
+        # 获取包含临时buff的有效属性
+        effective_attrs = await player.get_effective_attributes(session)
+
+        # 获取战斗属性显示（包含临时buff）
+        battle_attr_display = await BattleIntegrationHelper.get_battle_attribute_display_async(player, session)
+
+        # 基础属性显示（使用有效属性）
         basic_info = [
             f"👤 {player.nickname} (Lv.{player.level})",
-            f"❤️ 血量: {player.hp}/{player.max_hp}",
-            f"🧠 理智: {player.mp}/{player.max_mp}",
-            f"⚔️ 攻击: {player.attack}",
-            f"🛡️ 防御: {player.defense}",
-            f"⚡ 敏捷: {player.agility}",
-            f"🍀 运气: {player.luck}",
+            f"❤️ 血量: {player.hp}/{effective_attrs['max_hp']}",
+            f"🧠 理智: {player.mp}/{effective_attrs['max_mp']}",
+            f"⚔️ 攻击: {effective_attrs['attack']}",
+            f"🛡️ 防御: {effective_attrs['defense']}",
+            f"⚡ 敏捷: {effective_attrs['agility']}",
+            f"🍀 运气: {effective_attrs['luck']}",
             ""
         ]
         
+        # 检查是否有临时buff
+        from ..models.temporary_buff import TemporaryBuff
+        active_buffs = await TemporaryBuff.get_active_buffs(session, player.id)
+
+        buff_info = ""
+        if active_buffs:
+            buff_info = f"\n\n✨ 当前增益状态: {len(active_buffs)}个\n💡 输入【增益状态】查看详情"
+
         # 组合完整信息
-        full_info = "\n".join(basic_info) + battle_attr_display
+        full_info = "\n".join(basic_info) + battle_attr_display + buff_info
         await battle_info.finish(full_info)
 
 

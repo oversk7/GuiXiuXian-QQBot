@@ -28,6 +28,7 @@ def _tier_rate(balance: int) -> float:
 bank_balance_cmd = on_command("余额", aliases={"冥行账单"}, block=True, priority=5)
 bank_deposit_cmd = on_command("存", aliases={"存款"}, block=True, priority=5)
 bank_withdraw_cmd = on_command("取", aliases={"取款"}, block=True, priority=5)
+bank_transfer_cmd = on_command("转账", aliases={"银行转账"}, block=True, priority=5)
 bank_invest_cmd = on_command("银行投资", aliases={"投资理财"}, block=True, priority=5)
 
 # ==================== 存款排行榜 ====================
@@ -126,6 +127,87 @@ async def handle_withdraw(event: MessageEvent, args: Message = CommandArg()):
         session.add_all([player, acc])
         await session.commit()
         await bank_withdraw_cmd.finish(message_add_head(f"💰 取出 {amt} 金币，剩余存款 {acc.balance}", event))
+
+
+@bank_transfer_cmd.handle()
+async def handle_transfer(event: MessageEvent, args: Message = CommandArg()):
+    args_text = args.extract_plain_text().strip()
+    if not args_text:
+        await bank_transfer_cmd.finish("⛔ 格式：转账 UID 金额")
+
+    parts = args_text.split()
+    if len(parts) != 2:
+        await bank_transfer_cmd.finish("⛔ 格式：转账 UID 金额")
+
+    try:
+        target_uid = int(parts[0])
+        amt = int(parts[1])
+        if amt <= 0:
+            raise ValueError
+    except ValueError:
+        await bank_transfer_cmd.finish("⛔ UID和金额必须为正整数")
+
+    async with safe_session() as session:
+        # 获取转账发起人
+        sender = await session.get(Player, event.get_user_id())
+        if not sender:
+            await bank_transfer_cmd.finish("⛔ 请先创建角色")
+
+        # 获取转账接收人
+        from sqlalchemy import select
+        receiver = (await session.execute(select(Player).where(Player.uid == target_uid))).scalars().first()
+        if not receiver:
+            await bank_transfer_cmd.finish("⛔ 未找到目标玩家")
+
+        # 不能给自己转账
+        if sender.id == receiver.id:
+            await bank_transfer_cmd.finish("⛔ 不能给自己转账")
+
+        # 获取发起人银行账户
+        sender_acc = await session.get(BankAccount, sender.id)
+        if not sender_acc:
+            sender_acc = BankAccount(player_id=sender.id, balance=0, last_interest=datetime.now())
+            session.add(sender_acc)
+            await session.flush()
+
+        # 应用利息
+        _apply_interest(sender_acc)
+
+        # 检查余额
+        if sender_acc.balance < amt:
+            await bank_transfer_cmd.finish("⛔ 银行存款不足")
+
+        # 计算税收（3%）
+        tax = int(amt * 0.03)
+        actual_amount = amt - tax
+
+        # 获取接收人银行账户
+        receiver_acc = await session.get(BankAccount, receiver.id)
+        if not receiver_acc:
+            receiver_acc = BankAccount(player_id=receiver.id, balance=0, last_interest=datetime.now())
+            session.add(receiver_acc)
+            await session.flush()
+
+        # 应用利息
+        _apply_interest(receiver_acc)
+
+        # 执行转账
+        sender_acc.balance -= amt
+        receiver_acc.balance += actual_amount
+
+        session.add_all([sender_acc, receiver_acc])
+        await session.commit()
+
+        msg = (
+            f"💸 转账成功\n"
+            f"━━━━━━━━━━━━━\n"
+            f"💰 转账金额：{amt} 金币\n"
+            f"💸 手续费：{tax} 金币 (3%)\n"
+            f"💎 实际到账：{actual_amount} 金币\n"
+            f"👤 收款人：{receiver.nickname}[UID:{receiver.uid}]\n"
+            f"💳 剩余存款：{sender_acc.balance} 金币"
+        )
+        await bank_transfer_cmd.finish(message_add_head(msg, event))
 
 
 @deposit_rank_cmd.handle()

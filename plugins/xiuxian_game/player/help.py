@@ -112,6 +112,7 @@ async def handle_bank(event: MessageEvent, args: Message = CommandArg()):
         "【存 <金额>】 存入冥行\n"
         "【取 <金额>】 从冥行取出\n"
         "【余额】 查询冥行存款并进行利滚利\n"
+        "【转账 <UID> <金额>】 向其他玩家转账（收取3%手续费）\n"
         "【存款榜】 查看冥行存款排行榜\n"
         "【银行投资】 查看气运投资理财选项"
     )

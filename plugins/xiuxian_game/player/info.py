@@ -156,9 +156,13 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
                 player.real_world_x = player_upd.real_world_x
                 player.real_world_y = player_upd.real_world_y
 
-    # ------- 统计装备加成 -------
-    bonus = defaultdict(int)
+    # ------- 获取包含临时buff的有效属性 -------
     async with safe_session() as session2:
+        # 获取有效属性（包含装备、丹药和临时buff加成）
+        effective_attrs = await player.get_effective_attributes(session2)
+
+        # 统计装备加成用于显示
+        bonus = defaultdict(int)
         from sqlalchemy import select as sel
         equip_ids = config.items_config["by_type"]["EQUIPMENT"]
         eq_stmt = sel(ItemInstance).where(
@@ -172,21 +176,21 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
             for k, v in delta.items():
                 bonus[k] += int(v)
 
-    # 读取属性并拼接加成
-    def fmt(attr_key: str, value: int):
+    # 读取有效属性并拼接装备加成显示
+    def fmt(attr_key: str, effective_value: int):
         inc = bonus.get(attr_key, 0)
-        return f"{value} (+{inc})" if inc else str(value)
+        return f"{effective_value} (+{inc})" if inc else str(effective_value)
 
-    atk_str = fmt("attack", player.attack)
-    def_str = fmt("defense", player.defense)
-    agi_str = fmt("agility", player.agility)
-    luk_str = fmt("luck", player.luck)
-    hp_max_str = fmt("max_hp", player.max_hp)
-    mp_max_str = fmt("max_mp", player.max_mp)
+    atk_str = fmt("attack", effective_attrs["attack"])
+    def_str = fmt("defense", effective_attrs["defense"])
+    agi_str = fmt("agility", effective_attrs["agility"])
+    luk_str = fmt("luck", effective_attrs["luck"])
+    hp_max_str = fmt("max_hp", effective_attrs["max_hp"])
+    mp_max_str = fmt("max_mp", effective_attrs["max_mp"])
 
     # 若当前 HP/MP 超出新上限，则修正显示
-    cur_hp = player.hp
-    cur_mp = player.mp
+    cur_hp = min(player.hp, effective_attrs["max_hp"])
+    cur_mp = min(player.mp, effective_attrs["max_mp"])
 
     # 公会名称
     guild_name = "无所属"
