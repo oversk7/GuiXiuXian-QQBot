@@ -126,12 +126,21 @@ class RussianRouletteCore:
         user_items_key = f"{user_id}_items"
         target_items_key = f"{target_id}_items"
 
+        user_items = json.loads(game_state.get(user_items_key, "[]"))
         target_items = json.loads(game_state.get(target_items_key, "[]"))
+
+        # 检查使用者是否有肾上腺素
+        if ItemType.ADRENALINE.value not in user_items:
+            return False, f"💉 你没有肾上腺素"
 
         # 检查目标是否有该道具
         stolen_item_str = stolen_item.value
         if stolen_item_str not in target_items:
             return False, f"💉 对手没有{RussianRouletteCore.ITEM_CONFIGS[stolen_item]['name']}"
+
+        # 消耗使用者的肾上腺素
+        user_items.remove(ItemType.ADRENALINE.value)
+        game_state[user_items_key] = json.dumps(user_items)
 
         # 从对手道具中移除
         target_items.remove(stolen_item_str)

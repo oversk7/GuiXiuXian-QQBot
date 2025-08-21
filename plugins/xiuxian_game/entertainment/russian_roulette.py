@@ -16,6 +16,34 @@ from .russian_roulette_core import RussianRouletteCore, ItemType
 from .russian_roulette_cleanup import RussianRouletteCleanup
 
 
+def _format_player_items(items_json: str, player_name: str) -> str:
+    """格式化玩家道具信息"""
+    items = json.loads(items_json or "[]")
+    if not items:
+        return f"🎒 {player_name} 没有道具"
+
+    # 统计道具数量
+    from collections import Counter
+    item_counts = Counter(items)
+
+    # 构建道具列表
+    item_lines = [f"🎒 {player_name} 的道具", "━━━━━━━━━━━━━"]
+
+    for item_str, count in item_counts.items():
+        try:
+            item_type = ItemType(item_str)
+            item_config = RussianRouletteCore.ITEM_CONFIGS[item_type]
+            if count > 1:
+                item_lines.append(f"{item_config['name']} x{count}")
+            else:
+                item_lines.append(f"{item_config['name']}")
+            item_lines.append(f"  └ {item_config['description']}")
+        except (ValueError, KeyError):
+            item_lines.append(f"❓ 未知道具: {item_str} x{count}")
+
+    return "\n".join(item_lines)
+
+
 # ==================== 房间管理指令 ====================
 
 # 创建房间
@@ -211,7 +239,27 @@ async def handle_create_room(event: MessageEvent, args: Message = CommandArg()):
                     f"🎯 {player1.nickname} 先手！\n"
                     f"{recommended}"
                 )
-                await create_room_cmd.finish(message_add_head(result_msg, event))
+
+                # 先发送游戏开始消息
+                from nonebot.adapters.qq import Bot
+                bot = Bot.get_current()
+                await bot.send(event, message_add_head(result_msg, event))
+
+                # 延迟一下，然后分两次发送道具信息
+                import asyncio
+                await asyncio.sleep(1)
+
+                # 发送玩家1的道具
+                player1_items_msg = _format_player_items(game.player1_items, player1.nickname)
+                await bot.send(event, message_add_head(player1_items_msg, event))
+
+                await asyncio.sleep(1)
+
+                # 发送玩家2的道具
+                player2_items_msg = _format_player_items(game.player2_items, player2.nickname)
+                await bot.send(event, message_add_head(player2_items_msg, event))
+
+                return  # 使用return而不是finish，因为已经发送了消息
             else:
                 await create_room_cmd.finish(message_add_head(f"❌ {msg}", event))
         
@@ -326,6 +374,9 @@ async def handle_shoot(event: MessageEvent, args: Message = CommandArg()):
 
         # 构建基础消息
         result_msg = f"🎯 {player.nickname} 对{target}开枪\n{shoot_msg}"
+
+        # 检查是否重新装弹，如果是则需要分别发送道具信息
+        reloaded = bool(reload_msg)
         if reload_msg:
             result_msg += f"\n{reload_msg}"
 
@@ -369,9 +420,34 @@ async def handle_shoot(event: MessageEvent, args: Message = CommandArg()):
                 # 添加推荐指令
                 recommended = RussianRouletteCore.get_recommended_commands(display_game_state, opponent_id)
                 result_msg += f"\n{recommended}"
-        
+
         await session.commit()
-        await shoot_cmd.finish(message_add_head(result_msg, event))
+
+        # 如果重新装弹了，需要分别发送道具信息
+        if reloaded:
+            # 先发送基础消息
+            from nonebot.adapters.qq import Bot
+            bot = Bot.get_current()
+            await bot.send(event, message_add_head(result_msg, event))
+
+            # 延迟一下，然后分两次发送道具信息
+            import asyncio
+            await asyncio.sleep(1)
+
+            # 发送玩家1的道具
+            player1_items_msg = _format_player_items(game.player1_items, player1.nickname)
+            await bot.send(event, message_add_head(player1_items_msg, event))
+
+            await asyncio.sleep(1)
+
+            # 发送玩家2的道具
+            player2_items_msg = _format_player_items(game.player2_items, player2.nickname)
+            await bot.send(event, message_add_head(player2_items_msg, event))
+
+            return  # 使用return而不是finish，因为已经发送了消息
+        else:
+            # 没有重新装弹，正常发送消息
+            await shoot_cmd.finish(message_add_head(result_msg, event))
 
 
 # 使用道具指令
@@ -439,14 +515,7 @@ async def handle_use_adrenaline(event: MessageEvent, args: Message = CommandArg(
 
             await use_adrenaline_cmd.finish(message_add_head("⛓️ 你被手铐限制，跳过本回合", event))
 
-        # 检查玩家是否有肾上腺素
-        if room.player1_id == player.id:
-            player_items = json.loads(game.player1_items or "[]")
-        else:
-            player_items = json.loads(game.player2_items or "[]")
 
-        if ItemType.ADRENALINE.value not in player_items:
-            await use_adrenaline_cmd.finish("⛔ 你没有肾上腺素")
 
         # 构建游戏状态
         game_state = {
@@ -468,13 +537,6 @@ async def handle_use_adrenaline(event: MessageEvent, args: Message = CommandArg(
 
         if not success:
             await use_adrenaline_cmd.finish(message_add_head(f"❌ {result_msg}", event))
-
-        # 消耗肾上腺素
-        player_items.remove(ItemType.ADRENALINE.value)
-        if room.player1_id == player.id:
-            game.player1_items = json.dumps(player_items)
-        else:
-            game.player2_items = json.dumps(player_items)
 
         # 更新游戏状态（偷到的道具可能会改变游戏状态）
         game.bullets = game_state["bullets"]
@@ -509,7 +571,36 @@ async def handle_use_adrenaline(event: MessageEvent, args: Message = CommandArg(
         final_msg = f"🎒 {player.nickname} 使用了肾上腺素\n{result_msg}"
         if reloaded:
             final_msg += f"\n{reload_msg}"
-        await use_adrenaline_cmd.finish(message_add_head(final_msg, event))
+
+        # 如果重新装弹了，需要分别发送道具信息
+        if reloaded:
+            # 先发送基础消息
+            from nonebot.adapters.qq import Bot
+            bot = Bot.get_current()
+            await bot.send(event, message_add_head(final_msg, event))
+
+            # 延迟一下，然后分两次发送道具信息
+            import asyncio
+            await asyncio.sleep(1)
+
+            # 获取玩家信息用于显示
+            player1 = await session.get(Player, room.player1_id)
+            player2 = await session.get(Player, room.player2_id)
+
+            # 发送玩家1的道具
+            player1_items_msg = _format_player_items(game.player1_items, player1.nickname)
+            await bot.send(event, message_add_head(player1_items_msg, event))
+
+            await asyncio.sleep(1)
+
+            # 发送玩家2的道具
+            player2_items_msg = _format_player_items(game.player2_items, player2.nickname)
+            await bot.send(event, message_add_head(player2_items_msg, event))
+
+            return  # 使用return而不是finish，因为已经发送了消息
+        else:
+            # 没有重新装弹，正常发送消息
+            await use_adrenaline_cmd.finish(message_add_head(final_msg, event))
 
 
 @use_item_cmd.handle()
@@ -661,7 +752,36 @@ async def handle_use_item(event: MessageEvent, args: Message = CommandArg()):
         final_msg = f"🎒 {player.nickname} 使用了{item_name}\n{result_msg}"
         if reload_msg:
             final_msg += f"\n{reload_msg}"
-        await use_item_cmd.finish(message_add_head(final_msg, event))
+
+        # 如果重新装弹了，需要分别发送道具信息
+        if reloaded:
+            # 先发送基础消息
+            from nonebot.adapters.qq import Bot
+            bot = Bot.get_current()
+            await bot.send(event, message_add_head(final_msg, event))
+
+            # 延迟一下，然后分两次发送道具信息
+            import asyncio
+            await asyncio.sleep(1)
+
+            # 获取玩家信息用于显示
+            player1 = await session.get(Player, room.player1_id)
+            player2 = await session.get(Player, room.player2_id)
+
+            # 发送玩家1的道具
+            player1_items_msg = _format_player_items(game.player1_items, player1.nickname)
+            await bot.send(event, message_add_head(player1_items_msg, event))
+
+            await asyncio.sleep(1)
+
+            # 发送玩家2的道具
+            player2_items_msg = _format_player_items(game.player2_items, player2.nickname)
+            await bot.send(event, message_add_head(player2_items_msg, event))
+
+            return  # 使用return而不是finish，因为已经发送了消息
+        else:
+            # 没有重新装弹，正常发送消息
+            await use_item_cmd.finish(message_add_head(final_msg, event))
 
 
 # 查看预知结果（私聊指令）
