@@ -70,7 +70,9 @@ class RussianRouletteCore:
     def use_handcuffs(game_state: dict, target_player_id: str) -> Tuple[bool, str]:
         """使用手铐"""
         game_state["handcuffed_player_id"] = target_player_id
-        return True, f"⛓️ 手铐已使用！对手下回合将被限制行动"
+        # 设置标记，表示使用手铐后应该跳过对手回合
+        game_state["handcuffs_skip_turn"] = True
+        return True, f"⛓️ 手铐已使用！对手下回合将被限制行动，你可以连续行动"
     
     @staticmethod
     def use_cigarette(game_state: dict, player_id: str, max_hp: int = 3) -> Tuple[bool, str]:

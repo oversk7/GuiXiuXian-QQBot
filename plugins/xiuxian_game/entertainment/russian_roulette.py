@@ -316,12 +316,14 @@ async def handle_shoot(bot: Bot, event: MessageEvent, args: Message = CommandArg
         if game.handcuffed_player_id == player.id:
             # 解除手铐限制
             game.handcuffed_player_id = None
-            # 切换到对手回合
+            # 切换回使用手铐的玩家（对手）
             opponent_id = room.get_opponent_id(player.id)
             game.current_player_id = opponent_id
             await session.commit()
 
-            await shoot_cmd.finish(message_add_head("⛓️ 你被手铐限制，跳过本回合", event))
+            # 获取对手信息
+            opponent = await session.get(Player, opponent_id)
+            await shoot_cmd.finish(message_add_head(f"⛓️ 你被手铐限制，跳过本回合\n🔄 轮到 {opponent.nickname} 继续行动", event))
         
         # 确定射击目标
         if target == "自己":
@@ -336,7 +338,8 @@ async def handle_shoot(bot: Bot, event: MessageEvent, args: Message = CommandArg
             f"{room.player1_id}_hp": game.player1_hp,
             f"{room.player2_id}_hp": game.player2_hp,
             "is_sawed_off": game.is_sawed_off,
-            "handcuffed_player_id": game.handcuffed_player_id
+            "handcuffed_player_id": game.handcuffed_player_id,
+            "handcuffs_skip_turn": getattr(game, 'handcuffs_skip_turn', False)
         }
         
         # 执行射击
@@ -424,12 +427,26 @@ async def handle_shoot(bot: Bot, event: MessageEvent, args: Message = CommandArg
             else:
                 # 切换回合
                 opponent_id = room.get_opponent_id(player.id)
-                game.current_player_id = opponent_id
-                opponent = await session.get(Player, opponent_id)
-                result_msg += f"\n🔄 轮到 {opponent.nickname} 行动\n\n{game_display}"
-                # 添加推荐指令
-                recommended = RussianRouletteCore.get_recommended_commands(display_game_state, opponent_id)
-                result_msg += f"\n{recommended}"
+
+                # 检查对手是否被手铐限制
+                if game.handcuffed_player_id == opponent_id:
+                    # 对手被手铐限制，跳过其回合，当前玩家继续行动
+                    game.handcuffed_player_id = None  # 解除手铐限制
+                    # 不切换回合，当前玩家继续
+                    opponent = await session.get(Player, opponent_id)
+                    result_msg += f"\n⛓️ {opponent.nickname} 被手铐限制，跳过回合"
+                    result_msg += f"\n🔄 {player.nickname} 继续行动\n\n{game_display}"
+                    # 添加推荐指令
+                    recommended = RussianRouletteCore.get_recommended_commands(display_game_state, player.id)
+                    result_msg += f"\n{recommended}"
+                else:
+                    # 正常切换回合
+                    game.current_player_id = opponent_id
+                    opponent = await session.get(Player, opponent_id)
+                    result_msg += f"\n🔄 轮到 {opponent.nickname} 行动\n\n{game_display}"
+                    # 添加推荐指令
+                    recommended = RussianRouletteCore.get_recommended_commands(display_game_state, opponent_id)
+                    result_msg += f"\n{recommended}"
 
         await session.commit()
 
@@ -517,12 +534,14 @@ async def handle_use_adrenaline(bot: Bot, event: MessageEvent, args: Message = C
         if game.handcuffed_player_id == player.id:
             # 解除手铐限制
             game.handcuffed_player_id = None
-            # 切换到对手回合
+            # 切换回使用手铐的玩家（对手）
             opponent_id = room.get_opponent_id(player.id)
             game.current_player_id = opponent_id
             await session.commit()
 
-            await use_adrenaline_cmd.finish(message_add_head("⛓️ 你被手铐限制，跳过本回合", event))
+            # 获取对手信息
+            opponent = await session.get(Player, opponent_id)
+            await use_adrenaline_cmd.finish(message_add_head(f"⛓️ 你被手铐限制，跳过本回合\n🔄 轮到 {opponent.nickname} 继续行动", event))
 
 
 
@@ -537,7 +556,8 @@ async def handle_use_adrenaline(bot: Bot, event: MessageEvent, args: Message = C
             f"{room.player1_id}_items": game.player1_items,
             f"{room.player2_id}_items": game.player2_items,
             "magnifier_info": game.magnifier_info,
-            "phone_info": game.phone_info
+            "phone_info": game.phone_info,
+            "handcuffs_skip_turn": getattr(game, 'handcuffs_skip_turn', False)
         }
 
         # 使用肾上腺素偷取指定道具
@@ -664,12 +684,14 @@ async def handle_use_item(bot: Bot, event: MessageEvent, args: Message = Command
         if game.handcuffed_player_id == player.id:
             # 解除手铐限制
             game.handcuffed_player_id = None
-            # 切换到对手回合
+            # 切换回使用手铐的玩家（对手）
             opponent_id = room.get_opponent_id(player.id)
             game.current_player_id = opponent_id
             await session.commit()
 
-            await use_item_cmd.finish(message_add_head("⛓️ 你被手铐限制，跳过本回合", event))
+            # 获取对手信息
+            opponent = await session.get(Player, opponent_id)
+            await use_item_cmd.finish(message_add_head(f"⛓️ 你被手铐限制，跳过本回合\n🔄 轮到 {opponent.nickname} 继续行动", event))
 
         # 检查玩家是否有该道具
         if room.player1_id == player.id:
@@ -691,7 +713,8 @@ async def handle_use_item(bot: Bot, event: MessageEvent, args: Message = Command
             f"{room.player1_id}_items": game.player1_items,
             f"{room.player2_id}_items": game.player2_items,
             "magnifier_info": game.magnifier_info,
-            "phone_info": game.phone_info
+            "phone_info": game.phone_info,
+            "handcuffs_skip_turn": getattr(game, 'handcuffs_skip_turn', False)
         }
 
         # 使用道具
@@ -703,6 +726,9 @@ async def handle_use_item(bot: Bot, event: MessageEvent, args: Message = Command
         elif item_type == ItemType.HANDCUFFS:
             opponent_id = room.get_opponent_id(player.id)
             success, result_msg = RussianRouletteCore.use_handcuffs(game_state, opponent_id)
+            # 使用手铐后，设置特殊标记，表示下次回合切换时应该跳过对手
+            if success:
+                game_state["handcuffs_used_by"] = player.id
         elif item_type == ItemType.CIGARETTE:
             success, result_msg = RussianRouletteCore.use_cigarette(game_state, player.id, room.max_hp)
         elif item_type == ItemType.MAGNIFIER:
@@ -762,6 +788,10 @@ async def handle_use_item(bot: Bot, event: MessageEvent, args: Message = Command
         final_msg = f"🎒 {player.nickname} 使用了{item_name}\n{result_msg}"
         if reload_msg:
             final_msg += f"\n{reload_msg}"
+
+        # 如果使用了手铐，添加连续行动提示
+        if item_type == ItemType.HANDCUFFS and success:
+            final_msg += f"\n🔄 {player.nickname} 可以继续行动"
 
         # 如果重新装弹了，需要分别发送道具信息
         if reloaded:
