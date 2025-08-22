@@ -391,19 +391,18 @@ class GuildFacilityService:
                         "quantity": 0,
                         "deposited_by": depositor.nickname if depositor else "未知",
                         "deposited_at": item.deposited_at,  # 使用最新的存入时间
-                        "stack_ids": []  # 记录所有堆叠的ID，用于取出时的处理
+                        "earliest_deposited_at": item.deposited_at,  # 记录最早的存入时间
                     }
+                else:
+                    # 更新最早的存入时间
+                    if item.deposited_at < item_groups[item.item_id]["earliest_deposited_at"]:
+                        item_groups[item.item_id]["earliest_deposited_at"] = item.deposited_at
 
                 item_groups[item.item_id]["quantity"] += item.quantity
-                item_groups[item.item_id]["stack_ids"].append(item.id)
 
-        # 转换为列表并按存入时间排序
+        # 转换为列表并按最早存入时间排序（保证稳定的排序）
         result = list(item_groups.values())
-        result.sort(key=lambda x: x["deposited_at"], reverse=True)
-
-        # 为每个合并的物品组分配一个虚拟ID（用于取出时的索引）
-        for idx, item_group in enumerate(result):
-            item_group["id"] = f"group_{idx}"
+        result.sort(key=lambda x: x["earliest_deposited_at"])
 
         return result
 
@@ -511,10 +510,10 @@ class GuildFacilityService:
         except ValueError as e:
             return False, f"背包空间不足：{str(e)}"
 
-        # 从实际的堆叠中扣除物品（按照存入时间降序，与显示顺序保持一致）
+        # 从实际的堆叠中扣除物品（按照存入时间降序，优先取出最新的）
         stmt = select(GuildWarehouseItem).where(
             and_(GuildWarehouseItem.guild_id == guild_id, GuildWarehouseItem.item_id == selected_item["item_id"])
-        ).order_by(GuildWarehouseItem.deposited_at.desc())  # 按存入时间降序，与显示顺序一致
+        ).order_by(GuildWarehouseItem.deposited_at.desc())  # 按存入时间降序，优先取出最新的
 
         warehouse_stacks = (await session.execute(stmt)).scalars().all()
 
