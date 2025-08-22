@@ -1067,9 +1067,10 @@ async def _monthly_card_box(player: Player, cfg: ItemConfig, qty: int, ctx: str,
         # 添加材料到背包
         try:
             await ItemInstance.add_item(session, player.id, material_id, quantity)
-            results.append(f"💎 {material_config.name} ×{quantity}")
+            # 使用get_display_name()方法获取带稀有度emoji的材料名称
+            results.append(f"💎 {material_config.get_display_name()} ×{quantity}")
         except ValueError as e:
-            results.append(f"⚠️ {material_config.name} 添加失败：{e}")
+            results.append(f"⚠️ {material_config.get_display_name()} 添加失败：{e}")
 
     if not results:
         return False, "⛔ 月卡宝箱开启失败"
