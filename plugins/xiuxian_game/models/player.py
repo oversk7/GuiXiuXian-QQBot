@@ -316,14 +316,11 @@ class Player(Base):
                             elixir_bonus[attr] += int(value) * total_qty
 
         # 计算基础属性（初始值 + 丹药加成 + 加点）
+        # 基础属性 = 当前属性值 - 装备加成 - 临时buff加成
         base_attrs = {}
-        for attr in INIT_ATTRS:
-            base_value = INIT_ATTRS[attr] + elixir_bonus.get(attr, 0)
-            # 这里应该加上加点的属性，但目前简化处理
-            base_attrs[attr] = base_value
 
-        # 计算装备加成
-        equipment_bonus = {k: 0 for k in INIT_ATTRS}
+        # 先获取装备加成（用于计算基础属性）
+        equipment_bonus_temp = {k: 0 for k in INIT_ATTRS}
         if session:
             from sqlalchemy import select
             from ..models.inventory import ItemInstance
@@ -338,29 +335,47 @@ class Player(Base):
             for eq in equipped_items:
                 delta = (eq.extra_attrs or {}).get("_persist_bonus", {})
                 for k, v in delta.items():
-                    if k in equipment_bonus:
-                        equipment_bonus[k] += int(v)
+                    if k in equipment_bonus_temp:
+                        equipment_bonus_temp[k] += int(v)
 
-        # 计算临时buff加成
-        temporary_bonus = {k: 0 for k in INIT_ATTRS}
+        # 获取临时buff加成（用于计算基础属性）
+        temporary_bonus_temp = {k: 0 for k in INIT_ATTRS}
         if session:
             from .temporary_buff import TemporaryBuff
             buff_bonuses = await TemporaryBuff.get_total_attribute_bonuses(session, self.id)
             for attr, bonus in buff_bonuses.items():
-                if attr in temporary_bonus:
-                    temporary_bonus[attr] = bonus
+                if attr in temporary_bonus_temp:
+                    temporary_bonus_temp[attr] = bonus
 
-        # 计算最终属性
+        # 计算基础属性：当前属性值 - 装备加成 - 临时buff加成
+        for attr in INIT_ATTRS:
+            current_value = getattr(self, attr, INIT_ATTRS[attr])
+            base_value = current_value - equipment_bonus_temp[attr] - temporary_bonus_temp[attr]
+            base_attrs[attr] = base_value
+
+        # 装备加成（已在上面计算过）
+        equipment_bonus = equipment_bonus_temp
+
+        # 临时buff加成（已在上面计算过）
+        temporary_bonus = temporary_bonus_temp
+
+        # 重新分解基础属性为：初始值 + 加点 + 丹药加成
+        pure_base_attrs = {}  # 初始值 + 加点（不含丹药）
+        for attr in INIT_ATTRS:
+            pure_base_attrs[attr] = base_attrs[attr] - elixir_bonus[attr]
+
+        # 计算最终属性（应该等于当前属性值）
         total_attrs = {}
         for attr in INIT_ATTRS:
             total_attrs[attr] = (
-                base_attrs[attr] +
+                pure_base_attrs[attr] +
+                elixir_bonus[attr] +
                 equipment_bonus[attr] +
                 temporary_bonus[attr]
             )
 
         return {
-            "base": base_attrs,
+            "base": pure_base_attrs,
             "equipment": equipment_bonus,
             "elixir": elixir_bonus,
             "temporary": temporary_bonus,
