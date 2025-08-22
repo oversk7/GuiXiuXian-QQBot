@@ -76,6 +76,13 @@ items:
       effect_type: "SWEEP_DUNGEON"
       price: 100000
 
+    - item_id: "monthly_card_box"
+      name: "月卡宝箱"
+      description: "精美的宝箱，散发着神秘的光芒。使用后可随机获得一种材料10-50个。月卡用户专属奖励。💎"
+      type: "CONSUMABLE"
+      effect_type: "MONTHLY_CARD_BOX"
+      price: 50000
+
     - item_id: "coffin_nail"
       name: "棺材钉"
       description: "锈迹斑斑的铁钉，由上世纪驭鬼者所制，可以大幅度压制灵异力量，帮助突破。持有越多，闭关效率越高(最多100根，50%加成)⚰️。"

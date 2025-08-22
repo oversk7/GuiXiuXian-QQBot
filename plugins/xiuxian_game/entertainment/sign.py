@@ -86,16 +86,25 @@ async def handle_sign(event: MessageEvent):
         else:
             stamina_msg = f"\n💪 咒抗已恢复至 {stamina_limit}/{stamina_limit}"
 
-        # 月卡权利：签到时发放扫荡令
+        # 月卡权利：签到时发放月卡宝箱
         monthly_card_msg = ""
-        sweep_tokens = benefits["sign_sweep_tokens"]
-        if sweep_tokens > 0:
+        monthly_card_boxes = benefits["sign_monthly_card_boxes"]
+        if monthly_card_boxes > 0:
             try:
-                await ItemInstance.add_item(session, user_id, "sweep_token", quantity=sweep_tokens)
-                monthly_card_msg = f"\n⚡ 月卡权利：获得扫荡令*{sweep_tokens}"
+                await ItemInstance.add_item(session, user_id, "monthly_card_box", quantity=monthly_card_boxes)
+                monthly_card_msg = f"\n💎 月卡权利：获得月卡宝箱*{monthly_card_boxes}"
             except ValueError as e:
                 # 如果添加物品失败，记录错误但不影响签到
-                monthly_card_msg = f"\n⚠️ 月卡扫荡令发放失败：{e}"
+                monthly_card_msg = f"\n⚠️ 月卡宝箱发放失败：{e}"
+
+        # 所有玩家签到都获得扫荡令
+        sweep_token_msg = ""
+        try:
+            await ItemInstance.add_item(session, user_id, "sweep_token", quantity=5)
+            sweep_token_msg = f"\n⚡ 每日奖励：获得扫荡令*5"
+        except ValueError as e:
+            # 如果添加物品失败，记录错误但不影响签到
+            sweep_token_msg = f"\n⚠️ 扫荡令发放失败：{e}"
 
         new_msg = ""
         # 检查是否为创建账号的同一天
@@ -147,4 +156,4 @@ async def handle_sign(event: MessageEvent):
 
         # 然后发送响应消息
         await sign.send(
-            f"🛞{player.nickname}[{player.uid}] 连续签到 {streak} 天！获得 {base_reward} 金币！\n{lucky_msg}{bonus_msg}{stamina_msg}{monthly_card_msg}{new_msg}{guild_msg}")
+            f"🛞{player.nickname}[{player.uid}] 连续签到 {streak} 天！获得 {base_reward} 金币！\n{lucky_msg}{bonus_msg}{stamina_msg}{monthly_card_msg}{sweep_token_msg}{new_msg}{guild_msg}")

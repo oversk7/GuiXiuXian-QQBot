@@ -123,7 +123,7 @@ def get_monthly_card_config():
             "inventory_bonus": monthly_config.get("basic", {}).get("inventory_bonus", 5),
             "auto_collect": monthly_config.get("basic", {}).get("auto_collect", False),
             "sign_stamina_bonus": monthly_config.get("basic", {}).get("sign_stamina_bonus", 0),
-            "sign_sweep_tokens": monthly_config.get("basic", {}).get("sign_sweep_tokens", 1),
+            "sign_monthly_card_boxes": monthly_config.get("basic", {}).get("sign_monthly_card_boxes", 1),
             "breakthrough_protection": monthly_config.get("basic", {}).get("breakthrough_protection", 0.0),
         },
         CardType.PREMIUM: {
@@ -134,7 +134,7 @@ def get_monthly_card_config():
             "inventory_bonus": monthly_config.get("premium", {}).get("inventory_bonus", 20),
             "auto_collect": monthly_config.get("premium", {}).get("auto_collect", True),
             "sign_stamina_bonus": monthly_config.get("premium", {}).get("sign_stamina_bonus", 0),
-            "sign_sweep_tokens": monthly_config.get("premium", {}).get("sign_sweep_tokens", 3),
+            "sign_monthly_card_boxes": monthly_config.get("premium", {}).get("sign_monthly_card_boxes", 3),
             "breakthrough_protection": monthly_config.get("premium", {}).get("breakthrough_protection", 0.0),
         }
     }
@@ -154,7 +154,7 @@ async def get_player_card_benefits(session, player_id: str) -> dict:
         "inventory_bonus": 0,
         "auto_collect": False,
         "sign_stamina_bonus": 0,  # 签到咒抗上限增加
-        "sign_sweep_tokens": 0,  # 签到获得扫荡令数量
+        "sign_monthly_card_boxes": 0,  # 签到获得月卡宝箱数量
         "breakthrough_protection": 0.0,  # 突破失败保护（修为保留比例）
     }
 
@@ -171,7 +171,7 @@ async def get_player_card_benefits(session, player_id: str) -> dict:
         benefits["seclusion_efficiency"] += card_benefits.get("seclusion_efficiency", 0)
         benefits["inventory_bonus"] += card_benefits.get("inventory_bonus", 0)
         benefits["sign_stamina_bonus"] += card_benefits.get("sign_stamina_bonus", 0)
-        benefits["sign_sweep_tokens"] += card_benefits.get("sign_sweep_tokens", 0)
+        benefits["sign_monthly_card_boxes"] += card_benefits.get("sign_monthly_card_boxes", 0)
 
         # 突破保护取最大值
         benefits["breakthrough_protection"] = max(

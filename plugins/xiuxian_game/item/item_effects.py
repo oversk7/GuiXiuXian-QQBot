@@ -1038,3 +1038,41 @@ async def get_player_buff_status(session, player: Player) -> str:
     lines.append("💡 提示：临时增益会在时间到期后自动消失")
 
     return "\n".join(lines)
+
+
+@register(ItemEffectType.MONTHLY_CARD_BOX)
+async def _monthly_card_box(player: Player, cfg: ItemConfig, qty: int, ctx: str, session=None) -> Tuple[bool, str]:
+    """月卡宝箱：随机获得一种材料10-50个"""
+    import random
+    from ..config import config
+    from ..models.inventory import ItemInstance
+
+    # 获取所有材料类型的物品
+    material_items = config.items_config["by_type"].get("MATERIAL", [])
+    if not material_items:
+        return False, "⛔ 系统错误：未找到材料配置"
+
+    results = []
+
+    for _ in range(qty):
+        # 随机选择一种材料
+        material_id = random.choice(material_items)
+        material_config = config.items_config["by_id"].get(material_id)
+        if not material_config:
+            continue
+
+        # 随机数量10-50个
+        quantity = random.randint(10, 50)
+
+        # 添加材料到背包
+        try:
+            await ItemInstance.add_item(session, player.id, material_id, quantity)
+            results.append(f"💎 {material_config.name} ×{quantity}")
+        except ValueError as e:
+            results.append(f"⚠️ {material_config.name} 添加失败：{e}")
+
+    if not results:
+        return False, "⛔ 月卡宝箱开启失败"
+
+    result_msg = f"✨ 月卡宝箱开启成功！\n━━━━━━━━━━━━━\n" + "\n".join(results)
+    return True, result_msg
