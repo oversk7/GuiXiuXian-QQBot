@@ -199,16 +199,18 @@ class BattleIntegrationHelper:
         monster_stats: Dict,
         monster_name: str,
         seed: Optional[str] = None,
-        max_rounds: int = 20
+        max_rounds: int = 20,
+        monster_full_display: Optional[str] = None
     ) -> Tuple[bool, List[str], int]:
         """增强版玩家vs怪物战斗
 
         Args:
             player: 玩家对象
             monster_stats: 怪物属性字典 {"hp": int, "attack": int, "defense": int, "agility": int}
-            monster_name: 怪物名称
+            monster_name: 怪物名称（用于攻击动作）
             seed: 随机种子
             max_rounds: 最大回合数
+            monster_full_display: 怪物完整显示名称（用于战斗开始，包含特殊属性）
 
         Returns:
             (是否胜利, 战斗日志, 玩家受到的伤害)
@@ -221,7 +223,9 @@ class BattleIntegrationHelper:
         monster_hp = monster_stats["hp"]
         initial_player_hp = player_hp
 
-        battle_log.append(f"⚔️ {player.nickname} VS {monster_name}")
+        # 使用完整显示名称（如果提供）或基础名称
+        display_name = monster_full_display if monster_full_display else monster_name
+        battle_log.append(f"⚔️ {player.nickname} VS {display_name}")
         
         # 判定先后手（基于敏捷）
         from .battle_attributes import BattleAttributeCalculator

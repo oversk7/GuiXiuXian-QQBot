@@ -289,9 +289,12 @@ async def handle_monster_drops(session, player: Player, monster_level: int, regi
     elif monster_level <= 100:
         # 高级诡异：30%白色，25%绿色，15%蓝色，3%紫色
         drop_rates = {"white": 0.30, "green": 0.25, "blue": 0.15, "purple": 0.03}
-    else:
+    elif monster_level <= 200:
         # 顶级诡异：20%白色，20%绿色，20%蓝色，8%紫色，1%橙色
         drop_rates = {"white": 0.20, "green": 0.20, "blue": 0.20, "purple": 0.08, "orange": 0.01}
+    else:
+        # 超级诡异（200层以后）：15%白色，15%绿色，25%蓝色，12%紫色，3%橙色
+        drop_rates = {"white": 0.15, "green": 0.15, "blue": 0.25, "purple": 0.12, "orange": 0.03}
 
     # 精英怪掉落率翻倍，并且有更高概率掉落稀有材料
     if is_elite:
@@ -329,6 +332,12 @@ async def handle_monster_drops(session, player: Player, monster_level: int, regi
                     candidate_materials = region_materials["basic"]
                 else:
                     candidate_materials = get_materials_by_rarity(rarity)
+
+                    # 特殊处理：200层以后的诡异，橙色材料掉落时确保包含世界碎片
+                    if rarity == "orange" and monster_level > 200:
+                        # 确保世界碎片在候选列表中（如果不在的话添加）
+                        if "world_fragment" not in candidate_materials:
+                            candidate_materials.append("world_fragment")
 
             if candidate_materials:
                 material_id = rng.choice(candidate_materials)
@@ -794,7 +803,8 @@ async def _handle_personal_monster(session, tile: WorldTile, player: Player) -> 
         })
 
     monster_name = tile.state.get("name", "未知诡影")
-    monster_display = f"{monster_name}(Lv{monster_level})"
+    monster_base_display = f"{monster_name}(Lv{monster_level})"
+    monster_full_display = monster_base_display
 
     # 为200级以后的诡异显示特殊属性信息
     if monster_level >= 200:
@@ -809,7 +819,7 @@ async def _handle_personal_monster(session, tile: WorldTile, player: Player) -> 
             special_attrs.append(f"🛡️{monster_stats['anti_crit_rate']:.1f}%")
 
         if special_attrs:
-            monster_display += f" [{' '.join(special_attrs)}]"
+            monster_full_display += f" [{' '.join(special_attrs)}]"
 
     # 使用新战斗系统
     from ..battle.integration_helper import BattleIntegrationHelper
@@ -819,9 +829,10 @@ async def _handle_personal_monster(session, tile: WorldTile, player: Player) -> 
     battle_timestamp = int(time.time() * 1000)  # 毫秒级时间戳
     seed = f"P_{tile.seed}:{player.id}:{battle_timestamp}"
 
-    # 执行增强战斗
+    # 执行增强战斗 - 传递基础显示名称和完整显示名称
     victory, battle_log, damage_taken = BattleIntegrationHelper.enhanced_player_vs_monster_battle(
-        player, monster_stats, monster_display, seed=seed, max_rounds=100
+        player, monster_stats, monster_base_display, seed=seed, max_rounds=100,
+        monster_full_display=monster_full_display
     )
 
     # 更新玩家血量
@@ -838,7 +849,7 @@ async def _handle_personal_monster(session, tile: WorldTile, player: Player) -> 
         rng = random.Random(hash(f"P_{tile.seed}:{player.id}:{drop_timestamp}"))
         exp_gain = rng.randint(1, 4) * monster_level
         player.exp += exp_gain
-        battle_summary.append(f"🎉 你击杀了 {monster_display}，获得 {exp_gain} EXP")
+        battle_summary.append(f"🎉 你击杀了 {monster_full_display}，获得 {exp_gain} EXP")
 
         # 更新战斗胜利统计（用于公会任务）
         if player.guild_id:
@@ -881,7 +892,7 @@ async def _handle_personal_monster(session, tile: WorldTile, player: Player) -> 
                         battle_summary.append("💎 【领取宝箱】一键领取所有可领取的宝箱")
 
     elif player.hp <= 0:
-        battle_summary.append(f"💀 你被 {monster_display} 击败，很遗憾，你已死亡")
+        battle_summary.append(f"💀 你被 {monster_full_display} 击败，很遗憾，你已死亡")
 
     # ---------------- 扣除装备耐久 ----------------
     result_eq = await session.execute(
