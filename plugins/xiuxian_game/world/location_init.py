@@ -722,8 +722,8 @@ async def init_neutral_npcs(session) -> int:
 def _get_merchant_name(market_name: str) -> str:
     """根据市集名称生成商人名称"""
     name_map = {
-        "上京": "李四",
-        "北郊": "王五", 
+        "上京": "李掌柜",
+        "北郊": "王五",
         "东郊": "赵六",
         "西郊": "钱七",
         "南郊": "孙八",
@@ -746,7 +746,7 @@ def _get_employer_name(location_name: str) -> str:
     elif "娱乐" in location_name:
         return "店长小李"
     elif "配送" in location_name:
-        return "主管老王"
+        return "主管老陈"
     else:
         return "负责人"
 
