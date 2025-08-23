@@ -37,8 +37,10 @@ async def handle_npc_interaction(event: MessageEvent, args: Message = CommandArg
             "• 工匠 - 装备锻造、强化、镶嵌\n"
             "• 雇主 - 打工服务\n"
             "• 鬼怪 - 战斗\n"
+            "• 中立NPC - 怪谈风格对话，了解世界观\n"
             "━━━━━━━━━━━━━\n"
-            "🌟 示例：交互 铁匠老王"
+            "🌟 示例：交互 铁匠老王\n"
+            "👻 提示：中立NPC会分享神秘的故事和传说"
         )
         await interact_cmd.finish(message_add_head(help_msg, event))
     
@@ -215,6 +217,11 @@ async def handle_special_vendor_interaction(session, player: Player, npc, event:
 
 async def handle_generic_interaction(session, player: Player, npc, event: MessageEvent):
     """处理普通NPC交互"""
+    # 检查是否是中立NPC（有特殊对话）
+    if npc.extra_data and npc.extra_data.get("is_neutral") and npc.extra_data.get("dialogues"):
+        await handle_neutral_npc_interaction(session, player, npc, event)
+        return
+
     lines = [
         f"👤 {npc.name}",
         "━━━━━━━━━━━━━",
@@ -222,7 +229,55 @@ async def handle_generic_interaction(session, player: Player, npc, event: Messag
         "",
         "ℹ️ 这是一个普通的NPC，暂时没有特殊功能。"
     ]
-    
+
+    await interact_cmd.finish(message_add_head("\n".join(lines), event))
+
+
+async def handle_neutral_npc_interaction(session, player: Player, npc, event: MessageEvent):
+    """处理中立NPC交互，显示怪谈风格对话"""
+    import random
+
+    dialogues = npc.extra_data.get("dialogues", [])
+    if not dialogues:
+        await handle_generic_interaction(session, player, npc, event)
+        return
+
+    # 随机选择一句对话，或者按顺序循环
+    dialogue_index = npc.extra_data.get("dialogue_index", 0)
+
+    # 30%概率随机选择，70%概率按顺序
+    if random.random() < 0.3:
+        selected_dialogue = random.choice(dialogues)
+    else:
+        selected_dialogue = dialogues[dialogue_index % len(dialogues)]
+        # 更新对话索引
+        npc.extra_data["dialogue_index"] = (dialogue_index + 1) % len(dialogues)
+
+    # 根据NPC类型添加不同的氛围描述
+    atmosphere_descriptions = [
+        "周围的空气似乎变得阴冷...",
+        "你感到一阵莫名的寒意...",
+        "远处传来若有若无的叹息声...",
+        "风中似乎夹杂着什么奇怪的味道...",
+        "你觉得有什么东西在暗中观察着你...",
+        "空气中弥漫着一股说不出的诡异感...",
+        "你的心跳不由自主地加快了..."
+    ]
+
+    atmosphere = random.choice(atmosphere_descriptions)
+
+    lines = [
+        f"👤 {npc.name}",
+        "━━━━━━━━━━━━━",
+        f"🌫️ {atmosphere}",
+        "",
+        selected_dialogue,
+        "",
+        "━━━━━━━━━━━━━",
+        "💭 这个NPC似乎知道一些不为人知的秘密...",
+        "🔄 再次交互可能会听到不同的话语"
+    ]
+
     await interact_cmd.finish(message_add_head("\n".join(lines), event))
 
 

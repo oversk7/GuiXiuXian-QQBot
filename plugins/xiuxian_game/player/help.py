@@ -415,6 +415,7 @@ async def handle_ren_wu(event: MessageEvent, args: Message = CommandArg()):
         "【攻击 <目标>】 攻击玩家或NPC（支持关键词匹配）\n"
         "【NPC列表】 查看当前位置的所有NPC\n"
         "• 支持部分名称匹配，无需输入完整名称\n"
+        "💡 每个NPC都有5句不同的怪谈对话，每次交互都可能听到不同故事\n"
         "━━━━━━━━━━━━━\n"
         "⚔️ 荒野/诡域PvP系统：\n"
         "🏘️ 城镇安全区（市集/总部/打工地点附近5格）：\n"
