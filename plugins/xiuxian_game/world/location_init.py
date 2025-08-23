@@ -446,45 +446,7 @@ async def init_neutral_npcs(session) -> int:
                 "👻 孟婆：「你身边跟着几个鬼魂...都是你杀死的」",
                 "👻 孟婆：「修炼就是在和死神赛跑...但死神总是会赢」"
             ]
-        }
-    ]
-
-    # 创建中立NPC
-    for npc_config in neutral_npcs:
-        # 检查坐标处是否已有地点
-        location = await LocationService.get_location_by_coordinates(
-            session, npc_config["x"], npc_config["y"], "大都会"
-        )
-
-        if not location:
-            # 如果没有地点，跳过这个NPC（因为要求必须在已有地点）
-            print(f"警告：坐标 ({npc_config['x']}, {npc_config['y']}) 没有找到已有地点，跳过NPC {npc_config['name']}")
-            continue
-
-        # 检查是否已有该NPC
-        existing_npc = await NPCService.get_npc_by_name(
-            session, npc_config["name"], location.id
-        )
-
-        if not existing_npc:
-            # 创建中立NPC
-            neutral_npc = NPC(
-                npc_id=npc_config["npc_id"],
-                name=npc_config["name"],
-                description=npc_config["description"],
-                npc_type=NPCType.NORMAL,
-                location_id=location.id,
-                is_killable=False,
-                extra_data={
-                    "dialogues": npc_config["dialogues"],
-                    "dialogue_index": 0,
-                    "is_neutral": True,
-                    "mystery_level": "high"
-                }
-            )
-            session.add(neutral_npc)
-            created_count += 1
-
+        },
         # 金陵 (220, -350)
         {
             "npc_id": "antique_dealer",
@@ -492,8 +454,8 @@ async def init_neutral_npcs(session) -> int:
             "x": 220, "y": -350,
             "description": "一个戴着眼镜的中年男人，专门收购奇怪的古董",
             "dialogues": [
-                "💎 钱老板：「我这里有很多好东西...都是从死人手里收来的」",
-                "💎 钱老板：「有些古董有灵性，会选择自己的主人...」",
+                "� 钱老板：「我这里有很多好东西...都是从死人手里收来的」",
+                "� 钱老板：「有些古董有灵性，会选择自己的主人...」",
                 "💎 钱老板：「你见过会哭的玉佩吗？我这里就有一块」",
                 "💎 钱老板：「修炼的人总喜欢这些老东西...但要小心被反噬」",
                 "💎 钱老板：「最近收到一面镜子，照出来的不是你的脸...」"
@@ -682,8 +644,44 @@ async def init_neutral_npcs(session) -> int:
         }
     ]
 
-    # 创建更多中立NPC
-    for npc_config in more_neutral_npcs:
+    # 创建中立NPC
+    for npc_config in neutral_npcs:
+        # 检查坐标处是否已有地点
+        location = await LocationService.get_location_by_coordinates(
+            session, npc_config["x"], npc_config["y"], "大都会"
+        )
+
+        if not location:
+            # 如果没有地点，跳过这个NPC（因为要求必须在已有地点）
+            print(f"警告：坐标 ({npc_config['x']}, {npc_config['y']}) 没有找到已有地点，跳过NPC {npc_config['name']}")
+            continue
+
+        # 检查是否已有该NPC
+        existing_npc = await NPCService.get_npc_by_name(
+            session, npc_config["name"], location.id
+        )
+
+        if not existing_npc:
+            # 创建中立NPC
+            neutral_npc = NPC(
+                npc_id=npc_config["npc_id"],
+                name=npc_config["name"],
+                description=npc_config["description"],
+                npc_type=NPCType.NORMAL,
+                location_id=location.id,
+                is_killable=False,
+                extra_data={
+                    "dialogues": npc_config["dialogues"],
+                    "dialogue_index": 0,
+                    "is_neutral": True,
+                    "mystery_level": "high"
+                }
+            )
+            session.add(neutral_npc)
+            created_count += 1
+
+    # 创建中立NPC
+    for npc_config in neutral_npcs:
         # 检查坐标处是否已有地点
         location = await LocationService.get_location_by_coordinates(
             session, npc_config["x"], npc_config["y"], "大都会"
