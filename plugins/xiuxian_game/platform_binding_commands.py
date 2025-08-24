@@ -54,7 +54,7 @@ async def handle_generate_binding_key(event: MessageEvent):
                     f"🔑 你已有有效的绑定密钥\n"
                     f"密钥：{binding.binding_key}\n"
                     f"状态：永久有效（直到使用成功）\n"
-                    f"💡 请在频道中私聊机器人使用：绑定账号 {binding.binding_key} {player.uid}"
+                    f"💡 请在频道中发送：绑定账号 {binding.binding_key} {player.uid}"
                 )
         else:
             # 创建新的绑定记录
@@ -79,7 +79,7 @@ async def handle_generate_binding_key(event: MessageEvent):
             f"有效期：永久有效（直到使用成功）\n"
             f"━━━━━━━━━━━━━\n"
             f"💡 使用方法：\n"
-            f"1. 在频道中私聊机器人\n"
+            f"1. 在频道中发送指令\n"
             f"2. 发送：绑定账号 {binding.binding_key} {player.uid}\n"
             f"3. 验证成功后即可在频道中使用游戏功能\n"
             f"━━━━━━━━━━━━━\n"
@@ -94,9 +94,7 @@ bind_account_cmd = on_command("绑定账号", block=True, priority=5)
 
 @bind_account_cmd.handle()
 async def handle_bind_account(event: MessageEvent, args: Message = CommandArg()):
-    """绑定账号（仅限私聊）"""
-    if not is_private_message(event):
-        await bind_account_cmd.finish("⛔ 账号绑定只能在私聊中进行")
+    """绑定账号"""
     
     args_text = args.extract_plain_text().strip()
     if not args_text:
@@ -228,7 +226,7 @@ async def handle_binding_status(event: MessageEvent):
                         f"绑定密钥：{binding.binding_key}\n"
                         f"有效期：永久有效（直到使用成功）\n"
                         f"━━━━━━━━━━━━━\n"
-                        f"💡 请在频道中私聊机器人使用：绑定账号 {binding.binding_key} {player.uid}"
+                        f"💡 请在频道中发送：绑定账号 {binding.binding_key} {player.uid}"
                     )
                 else:
                     msg = (
