@@ -26,6 +26,9 @@ async def handle_sign(event: MessageEvent):
             else:
                 await sign.send("您还没有创建角色，请先注册。")
             return
+
+        # 获取用户ID用于物品发放
+        user_id = player.id
         
         last_sign_date = player.last_sign.date() if player.last_sign else None
         today = now.date()
@@ -104,15 +107,11 @@ async def handle_sign(event: MessageEvent):
         # 所有玩家签到都获得扫荡令
         sweep_token_msg = ""
         base_sweep_tokens = 5  # 基础扫荡令数量
-        monthly_sweep_tokens = benefits["sign_sweep_tokens"]  # 月卡额外扫荡令
-        total_sweep_tokens = base_sweep_tokens + monthly_sweep_tokens
+        total_sweep_tokens = base_sweep_tokens  # 月卡不再额外提供扫荡令
 
         try:
             await ItemInstance.add_item(session, user_id, "sweep_token", quantity=total_sweep_tokens)
-            if monthly_sweep_tokens > 0:
-                sweep_token_msg = f"\n⚡ 每日奖励：获得扫荡令*{base_sweep_tokens} (月卡+{monthly_sweep_tokens})"
-            else:
-                sweep_token_msg = f"\n⚡ 每日奖励：获得扫荡令*{base_sweep_tokens}"
+            sweep_token_msg = f"\n⚡ 每日奖励：获得扫荡令*{base_sweep_tokens}"
         except ValueError as e:
             # 如果添加物品失败，记录错误但不影响签到
             sweep_token_msg = f"\n⚠️ 扫荡令发放失败：{e}"
