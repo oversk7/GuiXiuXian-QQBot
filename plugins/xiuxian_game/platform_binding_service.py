@@ -5,6 +5,7 @@
 from typing import Optional, Tuple, Dict, Any
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
+from sqlalchemy.exc import IntegrityError
 from datetime import datetime
 
 from .models.player import Player
@@ -57,9 +58,14 @@ class PlatformBindingService:
             binding.updated_at = datetime.now()
             
             await session.commit()
-            
+
             return True, "绑定密钥生成成功", binding.binding_key
-            
+
+        except IntegrityError as e:
+            await session.rollback()
+            if "uq_primary_platform_id" in str(e):
+                return False, "该账号已有绑定记录", None
+            return False, f"数据库约束错误：{str(e)}", None
         except Exception as e:
             await session.rollback()
             return False, f"生成绑定密钥失败：{str(e)}", None
@@ -116,9 +122,14 @@ class PlatformBindingService:
             binding.clear_binding_key()
             
             await session.commit()
-            
+
             return True, "账号绑定成功", target_player
-            
+
+        except IntegrityError as e:
+            await session.rollback()
+            if "uq_secondary_platform_id" in str(e):
+                return False, "该频道账号已被其他群聊账号绑定", None
+            return False, f"数据库约束错误：{str(e)}", None
         except Exception as e:
             await session.rollback()
             return False, f"绑定失败：{str(e)}", None

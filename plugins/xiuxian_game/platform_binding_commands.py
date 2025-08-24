@@ -120,6 +120,16 @@ async def handle_bind_account(event: MessageEvent, args: Message = CommandArg())
         current_player = await session.get(Player, user_id)
         if current_player:
             await bind_account_cmd.finish("⛔ 你已经有角色了，无法绑定其他账号")
+
+        # 检查当前频道用户是否已被其他账号绑定
+        existing_binding_stmt = select(PlatformBinding).where(
+            PlatformBinding.secondary_platform_id == user_id,
+            PlatformBinding.is_active == True
+        )
+        existing_binding_result = await session.execute(existing_binding_stmt)
+        existing_binding = existing_binding_result.scalars().first()
+        if existing_binding:
+            await bind_account_cmd.finish("⛔ 你的频道账号已被其他群聊账号绑定")
         
         # 查找目标玩家
         target_player_stmt = select(Player).where(Player.uid == target_uid)
