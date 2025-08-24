@@ -37,6 +37,8 @@ from .location import Location
 from .npc import NPC, NPCType, NPCStatus
 # 临时buff系统模型
 from .temporary_buff import TemporaryBuff
+# 跨平台绑定系统模型
+from .platform_binding import PlatformBinding
 
 __all__ = [
     "Player", "Guild", "GuildMember", "GuildBuilding", "GuildPosition", "BuildingType", "WorldMessage", "BankAccount", "ItemInstance", "WorldTile", "NavigationTask", "AlchemyRecord", "MarketOrder",
@@ -48,5 +50,6 @@ __all__ = [
     "GuildTaskRecord", "GuildTaskType", "PlayerTaskStats",
     "WorldBossCycle", "WorldBossDamage",
     "InviteReward", "DungeonChestRecord",
-    "Location", "NPC", "NPCType", "NPCStatus"
+    "Location", "NPC", "NPCType", "NPCStatus",
+    "TemporaryBuff", "PlatformBinding"
 ]

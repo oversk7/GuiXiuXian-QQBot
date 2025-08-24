@@ -35,6 +35,7 @@ async def handle_help(event: MessageEvent, args: Message = CommandArg()):
         "💕 社交系统  🏰 副本系统\n"
         "📈 投资系统  💼 打工系统\n"
         "🏠️ 阴宅系统  🏛️ 委托系统\n"
+        "📱 账号管理\n"
         "═════════════\n"
         "💡 发送对应系统查看详细指令，【赞助】支持诡修仙\n"
         "💡 【】括号里是指令，<>里是必填，[]里是选填\n"
@@ -910,4 +911,43 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
         await give_item_cmd.finish(f"✅ 已给予 UID:{target_uid} {tpl.name} ✖️{qty}")
 
 
+# 跨平台绑定系统
+platform_binding_cmd = on_command("跨平台绑定", aliases={"账号管理", "绑定帮助"}, priority=4, block=True)
+
+@platform_binding_cmd.handle()
+async def handle_platform_binding(event: MessageEvent, args: Message = CommandArg()):
+    msg = (
+        "✨ 跨平台绑定系统帮助 ✨\n"
+        "实现群聊和频道账号绑定，数据互通\n"
+        "━━━━━━━━━━━━━\n"
+        "🔗 绑定流程：\n"
+        "1️⃣ 在群聊中注册角色\n"
+        "2️⃣ 私聊机器人发送【生成绑定密钥】\n"
+        "3️⃣ 在频道中私聊机器人发送【绑定账号 密钥 UID】\n"
+        "4️⃣ 绑定成功后可在两个平台使用相同角色\n"
+        "\n"
+        "📋 相关指令：\n"
+        "【生成绑定密钥】 生成6位数字绑定密钥（私聊）\n"
+        "【绑定账号 <密钥> <UID>】 使用密钥绑定账号（私聊）\n"
+        "【绑定状态】 查看当前账号绑定状态\n"
+        "【解除绑定】 解除频道账号绑定（私聊）\n"
+        "\n"
+        "🔒 安全机制：\n"
+        "• 绑定密钥永久有效，使用成功后自动失效\n"
+        "• 只能在私聊中生成密钥和执行绑定\n"
+        "• 每个群聊账号只能绑定一个频道账号\n"
+        "• 频道账号不能单独注册，只能通过绑定获得\n"
+        "\n"
+        "🌐 平台识别：\n"
+        "• 群聊消息：正常显示\n"
+        "• 频道消息：显示🏛️频道模式标识\n"
+        "• 面板中显示账号绑定状态\n"
+        "\n"
+        "⚠️ 注意事项：\n"
+        "• 绑定后两个平台共享同一角色数据\n"
+        "• 解除绑定后频道账号无法再访问角色\n"
+        "• 请妥善保管绑定密钥，勿泄露给他人\n"
+        "• 如遇问题请联系管理员处理"
+    )
+    await platform_binding_cmd.finish(Message(msg))
 

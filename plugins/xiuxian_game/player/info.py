@@ -14,6 +14,8 @@ from ..models.guild import Guild
 import random
 from ..models.navigation_task import NavigationTask
 from ..world.navigation import _update_nav_position
+from ..platform_utils import get_unified_player, get_player_platform_display, format_platform_message, is_guild_message
+from ..config import config
 
 
 def _format_player_location(player: Player) -> str:
@@ -133,9 +135,13 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
             if not player:
                 await profile.finish("⛔ 未找到该 UID")
         else:
-            player = await session.get(Player, event.get_user_id())
+            # 使用跨平台工具获取玩家数据
+            player = await get_unified_player(session, event)
     if not player:
-        await profile.finish("⛔ 你还没有创建角色")
+        if is_guild_message(event):
+            await profile.finish("⛔ 你还没有创建角色或绑定账号\n💡 请先在群聊注册角色，然后使用绑定功能")
+        else:
+            await profile.finish("⛔ 你还没有创建角色")
 
     # -------- 更新坐标（若在自动导航） --------
     async with safe_session() as session_nav:
@@ -216,6 +222,10 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
         chinese_reincarnation = number_to_chinese(player.reincarnation_level)
         reincarnation_info = f" · {chinese_reincarnation}转"
 
+    # 获取平台显示信息
+    async with safe_session() as session_platform:
+        platform_info = await get_player_platform_display(session_platform, player)
+
     content = (
         f"┏━━ 信息 ━━━━\n"
         f"┃{player.nickname}[UID:{player.uid}]「{player.sex}」\n"
@@ -232,10 +242,13 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
         f"┃ 💀怨念 {player.resentment} ✨点数 {player.attribute_points}\n"
         f"┃ ☯公会 {guild_name}\n"
         f"┃ 📍位置 {_format_player_location(player)}\n"
+        f"┃ 🌐平台 {platform_info}\n"
         "┣━━━━━━━━━\n"
         f"┃☞【装备栏】【社交系统】{unread_notice}"
     )
-    await profile.finish(message_add_head(content, event))
+    # 使用平台格式化工具
+    formatted_content = format_platform_message(content, event)
+    await profile.finish(message_add_head(formatted_content, event))
 
 @register.handle()
 async def _(event: MessageEvent, state: T_State, args: Message = CommandArg()):

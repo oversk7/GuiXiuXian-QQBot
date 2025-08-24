@@ -30,6 +30,9 @@ from . import (
     world_boss
 )
 
+# 导入跨平台绑定模块
+from . import platform_binding_commands
+
 driver = get_driver()
 
 @driver.on_startup
