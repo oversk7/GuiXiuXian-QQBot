@@ -177,7 +177,7 @@ async def _(event: MessageEvent):
             lines = ["🏪 可交易地点一览", "━━━━━━━━━━━━━"]
             for m in MARKETS:
                 lines.append(f"• {m.name} ({m.x},{m.y})")
-            lines.append("━━━━━━━━━━━━━\n🧭 前往对应坐标后输入【市集】联系当地商人")
+            lines.append("━━━━━━━━━━━━━\n🧭 前往对应坐标后输入【市集】联系当地商人\n🧭 使用【导航 x y】前往")
             await market_cmd.finish(message_add_head("\n".join(lines), event))
 
         lines = [f"🏪 {market.name} ({market.x},{market.y})", "━━━━━━━━━━━━━"]
