@@ -90,9 +90,14 @@ test_complete_job_cmd = on_command("测试完成工作", block=True, priority=1,
 async def handle_test_complete_job(event: MessageEvent):
     """测试命令：立即完成当前工作"""
     async with safe_session() as session:
-        player = await session.get(Player, event.get_user_id())
+        # 使用跨平台工具获取玩家数据
+        from ..platform_utils import get_unified_player, is_guild_message
+        player = await get_unified_player(session, event)
         if not player:
-            await test_complete_job_cmd.finish("⛔ 请先创建角色")
+            if is_guild_message(event):
+                await test_complete_job_cmd.finish("⛔ 你还没有创建角色或绑定账号\n💡 请先在群聊注册角色，然后使用绑定功能")
+            else:
+                await test_complete_job_cmd.finish("⛔ 请先创建角色")
 
         # 获取当前工作状态
         success, msg, status = await PartTimeJobService.get_current_job_status(session, player)

@@ -179,9 +179,14 @@ async def handle_finish_work(event: MessageEvent):
 async def handle_work_status(event: MessageEvent):
     """处理工作状态命令"""
     async with safe_session() as session:
-        player = await session.get(Player, event.get_user_id())
+        # 使用跨平台工具获取玩家数据
+        from ..platform_utils import get_unified_player, is_guild_message
+        player = await get_unified_player(session, event)
         if not player:
-            await work_status_cmd.finish("⛔ 请先创建角色")
+            if is_guild_message(event):
+                await work_status_cmd.finish("⛔ 你还没有创建角色或绑定账号\n💡 请先在群聊注册角色，然后使用绑定功能")
+            else:
+                await work_status_cmd.finish("⛔ 请先创建角色")
 
         success, msg, status = await PartTimeJobService.get_current_job_status(session, player)
 

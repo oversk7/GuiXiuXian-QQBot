@@ -128,10 +128,12 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
         await catalog_cmd.finish("⛔ 请提供要查询的名称，例如：图鉴 回春散")
 
     # 获取玩家信息（用于查询丹药使用状态）
+    from ..platform_utils import get_unified_player
     player = None
     elixir_usage_map = {}
     async with safe_session() as session:
-        player = await session.get(Player, event.get_user_id())
+        # 使用跨平台工具获取玩家数据
+        player = await get_unified_player(session, event)
         if player:
             # 获取今日所有丹药使用记录
             stmt = select(ElixirUsageLog).where(

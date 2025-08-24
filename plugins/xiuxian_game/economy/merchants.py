@@ -158,9 +158,14 @@ trade_restrictions_cmd = on_command("交易限制", aliases={"限制查询", "�
 @market_cmd.handle()
 async def _(event: MessageEvent):
     async with safe_session() as session:
-        player: Player | None = await session.get(Player, event.get_user_id())
+        # 使用跨平台工具获取玩家数据
+        from ..platform_utils import get_unified_player, is_guild_message
+        player: Player | None = await get_unified_player(session, event)
         if not player:
-            await market_cmd.finish("⛔ 请先创建角色")
+            if is_guild_message(event):
+                await market_cmd.finish("⛔ 你还没有创建角色或绑定账号\n💡 请先在群聊注册角色，然后使用绑定功能")
+            else:
+                await market_cmd.finish("⛔ 请先创建角色")
         if player.region != "大都会":
             await market_cmd.finish(message_add_head(
                 "💀 诡域之中皆不可信\n"
@@ -210,9 +215,14 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
         await buy_cmd.finish("❌ 数量需大于0")
 
     async with safe_session() as session:
-        player: Player | None = await session.get(Player, event.get_user_id())
+        # 使用跨平台工具获取玩家数据
+        from ..platform_utils import get_unified_player, is_guild_message
+        player: Player | None = await get_unified_player(session, event)
         if not player:
-            await buy_cmd.finish("⛔ 请先创建角色")
+            if is_guild_message(event):
+                await buy_cmd.finish("⛔ 你还没有创建角色或绑定账号\n💡 请先在群聊注册角色，然后使用绑定功能")
+            else:
+                await buy_cmd.finish("⛔ 请先创建角色")
         if player.region != "大都会":
             await buy_cmd.finish(message_add_head(
                 "💀 诡域之中皆不可信\n"
@@ -330,9 +340,14 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
         await sell_cmd.finish("❌ 数量必须大于0")
 
     async with safe_session() as session:
-        player: Player | None = await session.get(Player, event.get_user_id())
+        # 使用跨平台工具获取玩家数据
+        from ..platform_utils import get_unified_player, is_guild_message
+        player: Player | None = await get_unified_player(session, event)
         if not player:
-            await sell_cmd.finish("⛔ 请先创建角色")
+            if is_guild_message(event):
+                await sell_cmd.finish("⛔ 你还没有创建角色或绑定账号\n💡 请先在群聊注册角色，然后使用绑定功能")
+            else:
+                await sell_cmd.finish("⛔ 请先创建角色")
         if player.region != "大都会":
             await sell_cmd.finish(message_add_head(
                 "💀 诡域之中皆不可信\n"
@@ -509,9 +524,14 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
             pass
 
     async with safe_session() as session:
-        player: Player | None = await session.get(Player, event.get_user_id())
+        # 使用跨平台工具获取玩家数据
+        from ..platform_utils import get_unified_player, is_guild_message
+        player: Player | None = await get_unified_player(session, event)
         if not player:
-            await trade_history_cmd.finish("⛔ 请先创建角色")
+            if is_guild_message(event):
+                await trade_history_cmd.finish("⛔ 你还没有创建角色或绑定账号\n💡 请先在群聊注册角色，然后使用绑定功能")
+            else:
+                await trade_history_cmd.finish("⛔ 请先创建角色")
 
         # 查询交易记录
         from sqlalchemy import select, desc
@@ -555,9 +575,14 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
 async def _(event: MessageEvent):
     """遍历市集与商品，列出正利润路线（购买→售出），考虑玩家个人交易限制。"""
     async with safe_session() as session:
-        player: Player | None = await session.get(Player, event.get_user_id())
+        # 使用跨平台工具获取玩家数据
+        from ..platform_utils import get_unified_player, is_guild_message
+        player: Player | None = await get_unified_player(session, event)
         if not player:
-            await trade_advise_cmd.finish("⛔ 请先创建角色")
+            if is_guild_message(event):
+                await trade_advise_cmd.finish("⛔ 你还没有创建角色或绑定账号\n💡 请先在群聊注册角色，然后使用绑定功能")
+            else:
+                await trade_advise_cmd.finish("⛔ 请先创建角色")
 
         opportunities = []
         filtered_count = 0  # 被过滤掉的机会数量
@@ -656,9 +681,14 @@ shop_cmd = on_command("系统商店", aliases={"特殊商店"}, block=True, prio
 @shop_cmd.handle()
 async def _(event: MessageEvent):
     async with safe_session() as session:
-        player: Player | None = await session.get(Player, event.get_user_id())
+        # 使用跨平台工具获取玩家数据
+        from ..platform_utils import get_unified_player, is_guild_message
+        player: Player | None = await get_unified_player(session, event)
         if not player:
-            await shop_cmd.finish("⛔ 请先创建角色")
+            if is_guild_message(event):
+                await shop_cmd.finish("⛔ 你还没有创建角色或绑定账号\n💡 请先在群聊注册角色，然后使用绑定功能")
+            else:
+                await shop_cmd.finish("⛔ 请先创建角色")
         if player.region != "大都会":
             await shop_cmd.finish(message_add_head(
                 "💀 诡域之中皆不可信\n"
@@ -703,9 +733,14 @@ headquarters_cmd = on_command("缉邪司总部", aliases={"总部商店", "总�
 async def _(event: MessageEvent):
     """缉邪司总部商店"""
     async with safe_session() as session:
-        player: Player | None = await session.get(Player, event.get_user_id())
+        # 使用跨平台工具获取玩家数据
+        from ..platform_utils import get_unified_player, is_guild_message
+        player: Player | None = await get_unified_player(session, event)
         if not player:
-            await headquarters_cmd.finish("⛔ 请先创建角色")
+            if is_guild_message(event):
+                await headquarters_cmd.finish("⛔ 你还没有创建角色或绑定账号\n💡 请先在群聊注册角色，然后使用绑定功能")
+            else:
+                await headquarters_cmd.finish("⛔ 请先创建角色")
 
         if player.region != "大都会":
             await headquarters_cmd.finish(message_add_head(
@@ -809,9 +844,14 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
             await headquarters_exchange_cmd.finish("⛔ 数量必须是正整数")
 
     async with safe_session() as session:
-        player: Player | None = await session.get(Player, event.get_user_id())
+        # 使用跨平台工具获取玩家数据
+        from ..platform_utils import get_unified_player, is_guild_message
+        player: Player | None = await get_unified_player(session, event)
         if not player:
-            await headquarters_exchange_cmd.finish("⛔ 请先创建角色")
+            if is_guild_message(event):
+                await headquarters_exchange_cmd.finish("⛔ 你还没有创建角色或绑定账号\n💡 请先在群聊注册角色，然后使用绑定功能")
+            else:
+                await headquarters_exchange_cmd.finish("⛔ 请先创建角色")
 
         if player.region != "大都会":
             await headquarters_exchange_cmd.finish("⛔ 诡域中无法使用缉邪司服务")
@@ -872,9 +912,14 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
 async def _(event: MessageEvent):
     """查看玩家当前的交易限制情况"""
     async with safe_session() as session:
-        player: Player | None = await session.get(Player, event.get_user_id())
+        # 使用跨平台工具获取玩家数据
+        from ..platform_utils import get_unified_player, is_guild_message
+        player: Player | None = await get_unified_player(session, event)
         if not player:
-            await trade_restrictions_cmd.finish("⛔ 请先创建角色")
+            if is_guild_message(event):
+                await trade_restrictions_cmd.finish("⛔ 你还没有创建角色或绑定账号\n💡 请先在群聊注册角色，然后使用绑定功能")
+            else:
+                await trade_restrictions_cmd.finish("⛔ 请先创建角色")
 
         from datetime import timedelta
         from sqlalchemy import select, and_

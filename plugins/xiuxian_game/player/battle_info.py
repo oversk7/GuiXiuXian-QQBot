@@ -20,15 +20,18 @@ battle_info = on_command("战力", aliases={"属性", "我的战力"}, block=Tru
 @battle_info.handle()
 async def handle_battle_info(event: MessageEvent, args: Message = CommandArg()):
     """查看战斗属性"""
-    user_id = event.get_user_id()
+    from ..platform_utils import get_unified_player, is_guild_message
+    from ..models.db import safe_session
     
-    async with get_session() as session:
-        # 获取玩家信息
-        result = await session.execute(select(Player).where(Player.id == user_id))
-        player = result.scalars().first()
-        
+    async with safe_session() as session:
+        # 使用跨平台工具获取玩家数据
+        player = await get_unified_player(session, event)
+
         if not player:
-            await battle_info.send(event, "❌ 你还没有创建角色，请先使用 创建角色 命令")
+            if is_guild_message(event):
+                await battle_info.send("⛔ 你还没有创建角色或绑定账号\n💡 请先在群聊注册角色，然后使用绑定功能")
+            else:
+                await battle_info.send("❌ 你还没有创建角色，请先使用 创建角色 命令")
             return
         
         # 获取包含临时buff的有效属性

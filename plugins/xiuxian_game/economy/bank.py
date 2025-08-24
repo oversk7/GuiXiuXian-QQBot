@@ -54,9 +54,14 @@ def _apply_interest(acc: BankAccount):
 @bank_balance_cmd.handle()
 async def handle_balance(event: MessageEvent):
     async with safe_session() as session:
-        player = await session.get(Player, event.get_user_id())
+        # 使用跨平台工具获取玩家数据
+        from ..platform_utils import get_unified_player, is_guild_message
+        player = await get_unified_player(session, event)
         if not player:
-            await bank_balance_cmd.finish("⛔ 请先创建角色")
+            if is_guild_message(event):
+                await bank_balance_cmd.finish("⛔ 你还没有创建角色或绑定账号\n💡 请先在群聊注册角色，然后使用绑定功能")
+            else:
+                await bank_balance_cmd.finish("⛔ 请先创建角色")
         acc = await session.get(BankAccount, player.id)
         if not acc:
             acc = BankAccount(player_id=player.id, balance=0, last_interest=datetime.now())
@@ -82,9 +87,14 @@ async def handle_deposit(event: MessageEvent, args: Message = CommandArg()):
         await bank_deposit_cmd.finish("⛔ 金额必须为正整数")
 
     async with safe_session() as session:
-        player = await session.get(Player, event.get_user_id())
+        # 使用跨平台工具获取玩家数据
+        from ..platform_utils import get_unified_player, is_guild_message
+        player = await get_unified_player(session, event)
         if not player:
-            await bank_deposit_cmd.finish("⛔ 请先创建角色")
+            if is_guild_message(event):
+                await bank_deposit_cmd.finish("⛔ 你还没有创建角色或绑定账号\n💡 请先在群聊注册角色，然后使用绑定功能")
+            else:
+                await bank_deposit_cmd.finish("⛔ 请先创建角色")
         if player.gold < amt:
             await bank_deposit_cmd.finish("⛔ 金币不足")
         acc = await session.get(BankAccount, player.id)
@@ -113,9 +123,14 @@ async def handle_withdraw(event: MessageEvent, args: Message = CommandArg()):
         await bank_withdraw_cmd.finish("⛔ 金额必须为正整数")
 
     async with safe_session() as session:
-        player = await session.get(Player, event.get_user_id())
+        # 使用跨平台工具获取玩家数据
+        from ..platform_utils import get_unified_player, is_guild_message
+        player = await get_unified_player(session, event)
         if not player:
-            await bank_withdraw_cmd.finish("⛔ 请先创建角色")
+            if is_guild_message(event):
+                await bank_withdraw_cmd.finish("⛔ 你还没有创建角色或绑定账号\n💡 请先在群聊注册角色，然后使用绑定功能")
+            else:
+                await bank_withdraw_cmd.finish("⛔ 请先创建角色")
         acc = await session.get(BankAccount, player.id)
         if not acc or acc.balance <= 0:
             await bank_withdraw_cmd.finish("⛔ 你没有任何存款")
@@ -148,10 +163,14 @@ async def handle_transfer(event: MessageEvent, args: Message = CommandArg()):
         await bank_transfer_cmd.finish("⛔ UID和金额必须为正整数")
 
     async with safe_session() as session:
-        # 获取转账发起人
-        sender = await session.get(Player, event.get_user_id())
+        # 使用跨平台工具获取转账发起人数据
+        from ..platform_utils import get_unified_player, is_guild_message
+        sender = await get_unified_player(session, event)
         if not sender:
-            await bank_transfer_cmd.finish("⛔ 请先创建角色")
+            if is_guild_message(event):
+                await bank_transfer_cmd.finish("⛔ 你还没有创建角色或绑定账号\n💡 请先在群聊注册角色，然后使用绑定功能")
+            else:
+                await bank_transfer_cmd.finish("⛔ 请先创建角色")
 
         # 获取转账接收人
         from sqlalchemy import select
@@ -242,9 +261,14 @@ async def handle_deposit_rank(event: MessageEvent):
 async def handle_bank_invest(event: MessageEvent):
     """银行投资理财"""
     async with safe_session() as session:
-        player = await session.get(Player, event.get_user_id())
+        # 使用跨平台工具获取玩家数据
+        from ..platform_utils import get_unified_player, is_guild_message
+        player = await get_unified_player(session, event)
         if not player:
-            await bank_invest_cmd.finish("⛔ 请先创建角色")
+            if is_guild_message(event):
+                await bank_invest_cmd.finish("⛔ 你还没有创建角色或绑定账号\n💡 请先在群聊注册角色，然后使用绑定功能")
+            else:
+                await bank_invest_cmd.finish("⛔ 请先创建角色")
 
         acc = await session.get(BankAccount, player.id)
         if not acc:

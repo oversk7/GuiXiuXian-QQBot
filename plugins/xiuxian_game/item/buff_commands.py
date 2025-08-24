@@ -20,9 +20,14 @@ buff_status_cmd = on_command("增益状态", aliases={"buff状态", "临时增�
 async def handle_buff_status(event: MessageEvent):
     """查看玩家的临时buff状态"""
     async with safe_session() as session:
-        player = await session.get(Player, event.get_user_id())
+        # 使用跨平台工具获取玩家数据
+        from ..platform_utils import get_unified_player, is_guild_message
+        player = await get_unified_player(session, event)
         if not player:
-            await buff_status_cmd.finish("⛔ 请先创建角色")
+            if is_guild_message(event):
+                await buff_status_cmd.finish("⛔ 你还没有创建角色或绑定账号\n💡 请先在群聊注册角色，然后使用绑定功能")
+            else:
+                await buff_status_cmd.finish("⛔ 请先创建角色")
         
         status_msg = await get_player_buff_status(session, player)
         await session.commit()  # 提交清理过期buff的操作
@@ -74,9 +79,14 @@ attribute_breakdown_cmd = on_command("属性分解", aliases={"属性详情", "�
 async def handle_attribute_breakdown(event: MessageEvent):
     """显示玩家属性的详细分解信息"""
     async with safe_session() as session:
-        player = await session.get(Player, event.get_user_id())
+        # 使用跨平台工具获取玩家数据
+        from ..platform_utils import get_unified_player, is_guild_message
+        player = await get_unified_player(session, event)
         if not player:
-            await attribute_breakdown_cmd.finish("⛔ 请先创建角色")
+            if is_guild_message(event):
+                await attribute_breakdown_cmd.finish("⛔ 你还没有创建角色或绑定账号\n💡 请先在群聊注册角色，然后使用绑定功能")
+            else:
+                await attribute_breakdown_cmd.finish("⛔ 请先创建角色")
 
         breakdown = await player.get_attribute_breakdown(session)
 

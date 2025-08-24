@@ -456,9 +456,13 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
         await change_gender.finish(f"⛔ 无效的性别，可选：{Gender.MALE.value}/{Gender.FEMALE.value}")
 
     async with safe_session() as session:
-        player = await session.get(Player, event.get_user_id())
+        # 使用跨平台工具获取玩家数据
+        player = await get_unified_player(session, event)
         if not player:
-            await change_gender.finish("⛔ 请先创建角色")
+            if is_guild_message(event):
+                await change_gender.finish("⛔ 你还没有创建角色或绑定账号\n💡 请先在群聊注册角色，然后使用绑定功能")
+            else:
+                await change_gender.finish("⛔ 请先创建角色")
 
         if player.sex == gender:
             await change_gender.finish(f"⛔ 你的性别已经是{gender.value}了")
@@ -482,9 +486,13 @@ async def _(event: MessageEvent):
 
     # 检查是否已有角色
     async with safe_session() as session:
-        player = await session.get(Player, event.get_user_id())
+        # 使用跨平台工具获取玩家数据
+        player = await get_unified_player(session, event)
         if not player:
-            await newbie_guide.finish("⛔ 请先创建角色，发送【注册】开始游戏")
+            if is_guild_message(event):
+                await newbie_guide.finish("⛔ 你还没有创建角色或绑定账号\n💡 请先在群聊注册角色，然后使用绑定功能")
+            else:
+                await newbie_guide.finish("⛔ 请先创建角色，发送【注册】开始游戏")
 
     content = (
         "🔰 新手指引 - 指令格式详解\n"

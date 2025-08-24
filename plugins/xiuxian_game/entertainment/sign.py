@@ -11,16 +11,20 @@ sign = on_command("签到", block=True, priority=5)
 
 @sign.handle()
 async def handle_sign(event: MessageEvent):
-    user_id = event.get_user_id()
+    from ..platform_utils import get_unified_player, is_guild_message
+    from ..models.db import safe_session
+
     now = datetime.now()
     group_id = getattr(event, "group_id", None)
-    async with get_session() as session:
-        stmt = select(Player).where(Player.id == user_id)
-        result = await session.execute(stmt)
-        player = result.scalar_one_or_none()
-        
+    async with safe_session() as session:
+        # 使用跨平台工具获取玩家数据
+        player = await get_unified_player(session, event)
+
         if not player:
-            await sign.send("您还没有创建角色，请先注册。")
+            if is_guild_message(event):
+                await sign.send("⛔ 你还没有创建角色或绑定账号\n💡 请先在群聊注册角色，然后使用绑定功能")
+            else:
+                await sign.send("您还没有创建角色，请先注册。")
             return
         
         last_sign_date = player.last_sign.date() if player.last_sign else None

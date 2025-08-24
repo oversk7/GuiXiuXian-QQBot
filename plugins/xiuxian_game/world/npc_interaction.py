@@ -45,9 +45,14 @@ async def handle_npc_interaction(event: MessageEvent, args: Message = CommandArg
         await interact_cmd.finish(message_add_head(help_msg, event))
     
     async with safe_session() as session:
-        player: Player = await session.get(Player, event.get_user_id())
+        # 使用跨平台工具获取玩家数据
+        from ..platform_utils import get_unified_player, is_guild_message
+        player: Player = await get_unified_player(session, event)
         if not player:
-            await interact_cmd.finish("⛔ 请先创建角色")
+            if is_guild_message(event):
+                await interact_cmd.finish("⛔ 你还没有创建角色或绑定账号\n💡 请先在群聊注册角色，然后使用绑定功能")
+            else:
+                await interact_cmd.finish("⛔ 请先创建角色")
         
         if player.is_in_dungeon():
             await interact_cmd.finish("⛔ 你在诡域中，无法与现实世界的NPC交互")

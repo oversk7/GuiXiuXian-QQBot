@@ -76,13 +76,18 @@ list_equipment = on_command("装备栏", aliases={"我的装备"}, block=True, p
 @list_equipment.handle()
 async def _(event: MessageEvent):
     async with safe_session() as session:
-        player = await session.get(Player, event.get_user_id())
+        # 使用跨平台工具获取玩家数据
+        from ..platform_utils import get_unified_player, is_guild_message
+        player = await get_unified_player(session, event)
         if not player:
-            await list_equipment.finish("⛔ 请先创建角色")
+            if is_guild_message(event):
+                await list_equipment.finish("⛔ 你还没有创建角色或绑定账号\n💡 请先在群聊注册角色，然后使用绑定功能")
+            else:
+                await list_equipment.finish("⛔ 请先创建角色")
 
         # 查询玩家所有装备条目
         stmt = select(ItemInstance).where(
-            ItemInstance.player_id == event.get_user_id(),
+            ItemInstance.player_id == player.id,
             ItemInstance.item_id.in_(EQUIP_ITEM_IDS)
         )
         equips = (await session.execute(stmt)).scalars().all()
@@ -140,12 +145,17 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
         await equipment_detail.finish("⛔ 格式：装备详情 装备编号/名称")
 
     async with safe_session() as session:
-        player = await session.get(Player, event.get_user_id())
+        # 使用跨平台工具获取玩家数据
+        from ..platform_utils import get_unified_player, is_guild_message
+        player = await get_unified_player(session, event)
         if not player:
-            await equipment_detail.finish("⛔ 请先创建角色")
+            if is_guild_message(event):
+                await equipment_detail.finish("⛔ 你还没有创建角色或绑定账号\n💡 请先在群聊注册角色，然后使用绑定功能")
+            else:
+                await equipment_detail.finish("⛔ 请先创建角色")
 
         # 查找装备
-        equip = await find_equipment_by_input(session, event.get_user_id(), arg)
+        equip = await find_equipment_by_input(session, player.id, arg)
         if not equip:
             await equipment_detail.finish("⛔ 未找到指定装备，请使用装备栏中显示的编号或装备名称")
 
@@ -267,8 +277,17 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
         await wear_equipment.finish("⛔ 格式：装备 装备编号/名称")
 
     async with safe_session() as session:
+        # 使用跨平台工具获取玩家数据
+        from ..platform_utils import get_unified_player, is_guild_message
+        player = await get_unified_player(session, event)
+        if not player:
+            if is_guild_message(event):
+                await wear_equipment.finish("⛔ 你还没有创建角色或绑定账号\n💡 请先在群聊注册角色，然后使用绑定功能")
+            else:
+                await wear_equipment.finish("⛔ 请先创建角色")
+
         # 查找装备
-        equip = await find_equipment_by_input(session, event.get_user_id(), arg)
+        equip = await find_equipment_by_input(session, player.id, arg)
         if not equip:
             await wear_equipment.finish("⛔ 未找到指定装备，请使用装备栏中显示的编号或装备名称")
 
@@ -277,7 +296,7 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
             item_config = config.items_config["by_name"].get(arg)
             if item_config:
                 stmt = select(ItemInstance).where(
-                    ItemInstance.player_id == event.get_user_id(),
+                    ItemInstance.player_id == player.id,
                     ItemInstance.item_id == item_config.item_id,
                     ItemInstance.equipped == False
                 ).order_by(ItemInstance.durability.desc())
@@ -289,9 +308,6 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
         # 检查是否已装备
         if equip.equipped:
             await wear_equipment.finish("⛔ 该装备已经穿戴")
-
-        # 获取玩家信息
-        player = await session.get(Player, event.get_user_id())
 
         # 检查等级要求
         if equip.config.required_level > player.level:
@@ -406,8 +422,17 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
         await unwear_equipment.finish("⛔ 格式：卸下 装备编号/名称")
 
     async with safe_session() as session:
+        # 使用跨平台工具获取玩家数据
+        from ..platform_utils import get_unified_player, is_guild_message
+        player = await get_unified_player(session, event)
+        if not player:
+            if is_guild_message(event):
+                await unwear_equipment.finish("⛔ 你还没有创建角色或绑定账号\n💡 请先在群聊注册角色，然后使用绑定功能")
+            else:
+                await unwear_equipment.finish("⛔ 请先创建角色")
+
         # 查找装备
-        equip = await find_equipment_by_input(session, event.get_user_id(), arg)
+        equip = await find_equipment_by_input(session, player.id, arg)
         if not equip:
             await unwear_equipment.finish("⛔ 未找到指定装备，请使用装备栏中显示的编号或装备名称")
 
@@ -416,7 +441,7 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
             item_config = config.items_config["by_name"].get(arg)
             if item_config:
                 stmt = select(ItemInstance).where(
-                    ItemInstance.player_id == event.get_user_id(),
+                    ItemInstance.player_id == player.id,
                     ItemInstance.item_id == item_config.item_id,
                     ItemInstance.equipped == True
                 ).order_by(ItemInstance.upgrade_level.desc())
@@ -429,9 +454,6 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
         if not equip.equipped:
             await unwear_equipment.finish("⛔ 该装备未穿戴")
 
-        # 获取玩家信息
-        player = await session.get(Player, event.get_user_id())
-
         # 检查是否为炼丹炉，如果是则处理进行中的炼丹任务
         from ..alchemy.service import AlchemyService
         from ..models.alchemy_task import AlchemyRecord
@@ -441,7 +463,7 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
             # 查找使用该炼丹炉的进行中任务
             stmt = select(AlchemyRecord).where(
                 and_(
-                    AlchemyRecord.player_id == event.get_user_id(),
+                    AlchemyRecord.player_id == player.id,
                     AlchemyRecord.furnace_id == equip.id,
                     AlchemyRecord.claimed == False
                 )

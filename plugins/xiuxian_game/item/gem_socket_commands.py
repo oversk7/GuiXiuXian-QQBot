@@ -102,12 +102,17 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
     gem_name = " ".join(parts[2:])
 
     async with safe_session() as session:
-        player = await session.get(Player, event.get_user_id())
+        # 使用跨平台工具获取玩家数据
+        from ..platform_utils import get_unified_player, is_guild_message
+        player = await get_unified_player(session, event)
         if not player:
-            await socket_gem_cmd.finish("⛔ 请先创建角色")
+            if is_guild_message(event):
+                await socket_gem_cmd.finish("⛔ 你还没有创建角色或绑定账号\n💡 请先在群聊注册角色，然后使用绑定功能")
+            else:
+                await socket_gem_cmd.finish("⛔ 请先创建角色")
 
         # 查找装备
-        equip = await find_equipment_by_input(session, event.get_user_id(), equipment_arg)
+        equip = await find_equipment_by_input(session, player.id, equipment_arg)
         if not equip:
             await socket_gem_cmd.finish("⛔ 未找到指定装备，请使用装备栏中显示的编号或装备名称")
 
@@ -153,12 +158,17 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
         await remove_gem_cmd.finish("⛔ 孔位号必须是数字")
 
     async with safe_session() as session:
-        player = await session.get(Player, event.get_user_id())
+        # 使用跨平台工具获取玩家数据
+        from ..platform_utils import get_unified_player, is_guild_message
+        player = await get_unified_player(session, event)
         if not player:
-            await remove_gem_cmd.finish("⛔ 请先创建角色")
+            if is_guild_message(event):
+                await remove_gem_cmd.finish("⛔ 你还没有创建角色或绑定账号\n💡 请先在群聊注册角色，然后使用绑定功能")
+            else:
+                await remove_gem_cmd.finish("⛔ 请先创建角色")
 
         # 查找装备
-        equip = await find_equipment_by_input(session, event.get_user_id(), equipment_arg)
+        equip = await find_equipment_by_input(session, player.id, equipment_arg)
         if not equip:
             await remove_gem_cmd.finish("⛔ 未找到指定装备，请使用装备栏中显示的编号或装备名称")
 

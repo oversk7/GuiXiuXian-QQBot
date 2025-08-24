@@ -959,9 +959,14 @@ async def handle_ai_guide(event: MessageEvent):
             return
             
         async with safe_session() as session:
-            player = await session.get(Player, event.get_user_id())
+            # 使用跨平台工具获取玩家数据
+            from .platform_utils import get_unified_player
+            player = await get_unified_player(session, event)
             # 检查是否在剧情状态中
-            story_session = await StorySession.get_active_session(session, player.id)
+            if player:
+                story_session = await StorySession.get_active_session(session, player.id)
+            else:
+                story_session = None
             if story_session:
                 return  # 剧情状态中不处理AI引导
 

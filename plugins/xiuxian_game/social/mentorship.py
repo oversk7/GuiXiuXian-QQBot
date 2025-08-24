@@ -142,9 +142,14 @@ master_cmd = on_command("师父", aliases={"师傅"}, block=True, priority=5)
 @master_cmd.handle()
 async def handle_master(event: MessageEvent):
     async with safe_session() as session:
-        player = await session.get(Player, event.get_user_id())
+        # 使用跨平台工具获取玩家数据
+        from ..platform_utils import get_unified_player, is_guild_message
+        player = await get_unified_player(session, event)
         if not player:
-            await master_cmd.finish("⛔ 请先创建角色")
+            if is_guild_message(event):
+                await master_cmd.finish("⛔ 你还没有创建角色或绑定账号\n💡 请先在群聊注册角色，然后使用绑定功能")
+            else:
+                await master_cmd.finish("⛔ 请先创建角色")
 
         master = await MentorshipService.get_master(session, player.id)
         if not master:
@@ -203,9 +208,14 @@ async def handle_graduation(event: MessageEvent, args: Message = CommandArg()):
         await graduation_cmd.finish("UID 必须为数字")
 
     async with safe_session() as session:
-        player = await session.get(Player, event.get_user_id())
+        # 使用跨平台工具获取玩家数据
+        from ..platform_utils import get_unified_player, is_guild_message
+        player = await get_unified_player(session, event)
         if not player:
-            await graduation_cmd.finish("⛔ 请先创建角色")
+            if is_guild_message(event):
+                await graduation_cmd.finish("⛔ 你还没有创建角色或绑定账号\n💡 请先在群聊注册角色，然后使用绑定功能")
+            else:
+                await graduation_cmd.finish("⛔ 请先创建角色")
 
         success, message = await MentorshipService.dismiss_disciple(session, player.id, disciple_uid, is_graduation=True)
         if success:

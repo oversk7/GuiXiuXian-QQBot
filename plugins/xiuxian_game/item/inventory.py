@@ -111,10 +111,14 @@ async def handle_use_item(event: MessageEvent, args: Message = CommandArg()):
             await use_item.finish("⛔ 数量必须为正整数")
 
     async with safe_session() as session:
-        # 获取玩家和物品信息
-        player = await session.get(Player, event.get_user_id())
+        # 使用跨平台工具获取玩家数据
+        from ..platform_utils import get_unified_player, is_guild_message
+        player = await get_unified_player(session, event)
         if not player:
-            await use_item.finish("⛔ 请先创建角色")
+            if is_guild_message(event):
+                await use_item.finish("⛔ 你还没有创建角色或绑定账号\n💡 请先在群聊注册角色，然后使用绑定功能")
+            else:
+                await use_item.finish("⛔ 请先创建角色")
 
         # 查找物品
         item_config = config.items_config["by_name"].get(item_name)
@@ -124,7 +128,7 @@ async def handle_use_item(event: MessageEvent, args: Message = CommandArg()):
         # 检查背包中是否有该物品 (聚合数量)
         inv_rows = (await session.execute(
             select(ItemInstance)
-            .where(ItemInstance.player_id == event.get_user_id())
+            .where(ItemInstance.player_id == player.id)
             .where(ItemInstance.item_id == item_config.item_id)
         )).scalars().all()
         total_qty = sum(r.quantity for r in inv_rows)
@@ -371,13 +375,18 @@ async def handle_inventory(event: MessageEvent, args: Message = CommandArg()):
 
     # --- 获取背包数据 ---
     async with safe_session() as session:
-        player = await session.get(Player, event.get_user_id())
+        # 使用跨平台工具获取玩家数据
+        from ..platform_utils import get_unified_player, is_guild_message
+        player = await get_unified_player(session, event)
         if not player:
-            await inventory_cmd.finish("⛔ 请先创建角色")
+            if is_guild_message(event):
+                await inventory_cmd.finish("⛔ 你还没有创建角色或绑定账号\n💡 请先在群聊注册角色，然后使用绑定功能")
+            else:
+                await inventory_cmd.finish("⛔ 请先创建角色")
 
         result = await session.execute(
             select(ItemInstance)
-            .where(ItemInstance.player_id == event.get_user_id())
+            .where(ItemInstance.player_id == player.id)
             .where(ItemInstance.quantity > 0)
         )
         items: list[ItemInstance] = result.scalars().all()
@@ -594,14 +603,19 @@ async def handle_drop_item(event: MessageEvent, args: Message = CommandArg()):
 async def handle_organize_inventory(event: MessageEvent):
     """整理背包，将同类型可堆叠物品合并"""
     async with safe_session() as session:
-        player = await session.get(Player, event.get_user_id())
+        # 使用跨平台工具获取玩家数据
+        from ..platform_utils import get_unified_player, is_guild_message
+        player = await get_unified_player(session, event)
         if not player:
-            await organize_inventory_cmd.finish("⛔ 请先创建角色")
+            if is_guild_message(event):
+                await organize_inventory_cmd.finish("⛔ 你还没有创建角色或绑定账号\n💡 请先在群聊注册角色，然后使用绑定功能")
+            else:
+                await organize_inventory_cmd.finish("⛔ 请先创建角色")
 
         # 获取所有背包物品
         result = await session.execute(
             select(ItemInstance)
-            .where(ItemInstance.player_id == event.get_user_id())
+            .where(ItemInstance.player_id == player.id)
             .where(ItemInstance.quantity > 0)
         )
         items: list[ItemInstance] = result.scalars().all()

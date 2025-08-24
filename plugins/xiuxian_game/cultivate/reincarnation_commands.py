@@ -16,12 +16,16 @@ reincarnation_info_cmd = on_command("冥返信息", aliases={"转数信息", "�
 @reincarnate_cmd.handle()
 async def handle_reincarnate(event: MessageEvent):
     """处理冥返命令"""
-    user_id = event.get_user_id()
+    from ..platform_utils import get_unified_player, is_guild_message
     
     async with safe_session() as session:
-        player = await session.get(Player, user_id)
+        # 使用跨平台工具获取玩家数据
+        player = await get_unified_player(session, event)
         if not player:
-            await reincarnate_cmd.finish("⛔ 请先使用【注册】命令创建角色")
+            if is_guild_message(event):
+                await reincarnate_cmd.finish("⛔ 你还没有创建角色或绑定账号\n💡 请先在群聊注册角色，然后使用绑定功能")
+            else:
+                await reincarnate_cmd.finish("⛔ 请先使用【注册】命令创建角色")
         
         # 检查是否可以冥返
         if not await ReincarnationService.can_reincarnate(player):
@@ -44,12 +48,14 @@ async def handle_reincarnate(event: MessageEvent):
 @reincarnation_info_cmd.handle()
 async def handle_reincarnation_info(event: MessageEvent):
     """处理冥返信息查询命令"""
-    user_id = event.get_user_id()
-
     async with safe_session() as session:
-        player = await session.get(Player, user_id)
+        # 使用跨平台工具获取玩家数据
+        player = await get_unified_player(session, event)
         if not player:
-            await reincarnation_info_cmd.finish("⛔ 请先使用【注册】命令创建角色")
+            if is_guild_message(event):
+                await reincarnation_info_cmd.finish("⛔ 你还没有创建角色或绑定账号\n💡 请先在群聊注册角色，然后使用绑定功能")
+            else:
+                await reincarnation_info_cmd.finish("⛔ 请先使用【注册】命令创建角色")
 
         current_level = player.level
         current_reincarnation = player.reincarnation_level

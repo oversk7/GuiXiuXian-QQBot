@@ -99,9 +99,14 @@ accept_task_cmd = on_command("接取委托", aliases={"接取任务", "接收委
 @accept_task_cmd.handle()
 async def handle_accept_task(event: MessageEvent, args: Message = CommandArg()):
     async with safe_session() as session:
-        player = await session.get(Player, event.get_user_id())
+        # 使用跨平台工具获取玩家数据
+        from ..platform_utils import get_unified_player, is_guild_message
+        player = await get_unified_player(session, event)
         if not player:
-            await accept_task_cmd.finish("⛔ 请先创建角色")
+            if is_guild_message(event):
+                await accept_task_cmd.finish("⛔ 你还没有创建角色或绑定账号\n💡 请先在群聊注册角色，然后使用绑定功能")
+            else:
+                await accept_task_cmd.finish("⛔ 请先创建角色")
 
         # 解析参数
         args_text = args.extract_plain_text().strip()

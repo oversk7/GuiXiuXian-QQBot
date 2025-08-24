@@ -131,9 +131,13 @@ async def handle_stock_buy(event: MessageEvent, args: Message = CommandArg()):
     
     use_bank = len(parts) > 2 and parts[2] in ["银行", "bank"]
     
+    # 获取玩家ID
+    from ..platform_utils import get_platform_info
+    _, user_id = get_platform_info(event)
+
     # 执行买入
     success, message = await StockService.buy_stock(
-        event.get_user_id(), symbol, shares, use_bank
+        user_id, symbol, shares, use_bank
     )
     
     if success:
@@ -163,9 +167,13 @@ async def handle_stock_sell(event: MessageEvent, args: Message = CommandArg()):
     
     to_bank = len(parts) > 2 and parts[2] in ["银行", "bank"]
     
+    # 获取玩家ID
+    from ..platform_utils import get_platform_info
+    _, user_id = get_platform_info(event)
+
     # 执行卖出
     success, message = await StockService.sell_stock(
-        event.get_user_id(), symbol, shares, to_bank
+        user_id, symbol, shares, to_bank
     )
     
     if success:
@@ -180,7 +188,11 @@ async def handle_stock_holdings(event: MessageEvent):
     # 被动触发价格更新
     price_updated = await StockService.check_and_update_prices()
 
-    holdings = await StockService.get_player_holdings(event.get_user_id())
+    # 获取玩家ID
+    from ..platform_utils import get_platform_info
+    _, user_id = get_platform_info(event)
+
+    holdings = await StockService.get_player_holdings(user_id)
 
     if not holdings:
         await stock_holdings_cmd.finish(message_add_head("� 您当前没有投资", event))
@@ -243,7 +255,11 @@ async def handle_stock_holdings(event: MessageEvent):
 @stock_transactions_cmd.handle()
 async def handle_stock_transactions(event: MessageEvent):
     """查看投资记录"""
-    transactions = await StockService.get_player_transactions(event.get_user_id(), 10)
+    # 获取玩家ID
+    from ..platform_utils import get_platform_info
+    _, user_id = get_platform_info(event)
+
+    transactions = await StockService.get_player_transactions(user_id, 10)
 
     if not transactions:
         await stock_transactions_cmd.finish(message_add_head("📋 您还没有投资记录", event))
@@ -341,9 +357,14 @@ async def handle_stock_update(event: MessageEvent):
 async def handle_stock_refresh_time(event: MessageEvent):
     """查看气运价格刷新时间"""
     async with safe_session() as session:
-        player = await session.get(Player, event.get_user_id())
+        # 使用跨平台工具获取玩家数据
+        from ..platform_utils import get_unified_player, is_guild_message
+        player = await get_unified_player(session, event)
         if not player:
-            await stock_refresh_time_cmd.finish("⛔ 请先创建角色")
+            if is_guild_message(event):
+                await stock_refresh_time_cmd.finish("⛔ 你还没有创建角色或绑定账号\n💡 请先在群聊注册角色，然后使用绑定功能")
+            else:
+                await stock_refresh_time_cmd.finish("⛔ 请先创建角色")
 
         # 获取最近更新的股票
         stmt = select(Stock).where(Stock.is_active == True).order_by(Stock.updated_at.desc()).limit(1)
@@ -412,9 +433,14 @@ async def handle_stock_history(event: MessageEvent, args: Message = CommandArg()
             days = 7
 
     async with safe_session() as session:
-        player = await session.get(Player, event.get_user_id())
+        # 使用跨平台工具获取玩家数据
+        from ..platform_utils import get_unified_player, is_guild_message
+        player = await get_unified_player(session, event)
         if not player:
-            await stock_history_cmd.finish("⛔ 请先创建角色")
+            if is_guild_message(event):
+                await stock_history_cmd.finish("⛔ 你还没有创建角色或绑定账号\n💡 请先在群聊注册角色，然后使用绑定功能")
+            else:
+                await stock_history_cmd.finish("⛔ 请先创建角色")
 
         # 获取股票信息
         stmt = select(Stock).where(Stock.symbol == symbol, Stock.is_active == True)

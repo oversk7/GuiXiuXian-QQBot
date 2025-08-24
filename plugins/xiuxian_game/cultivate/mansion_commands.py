@@ -38,12 +38,16 @@ async def handle_mansion_status(event: MessageEvent):
 @purchase_mansion_cmd.handle()
 async def handle_purchase_mansion(event: MessageEvent):
     """购买阴宅"""
-    user_id = event.get_user_id()
+    from ..platform_utils import get_unified_player, is_guild_message
+
     async with safe_session() as session:
-        # 获取玩家数据
-        player = await session.get(Player, user_id)
+        # 使用跨平台工具获取玩家数据
+        player = await get_unified_player(session, event)
         if not player:
-            await purchase_mansion_cmd.finish("⛔ 请先使用【注册】命令创建角色")
+            if is_guild_message(event):
+                await purchase_mansion_cmd.finish("⛔ 你还没有创建角色或绑定账号\n💡 请先在群聊注册角色，然后使用绑定功能")
+            else:
+                await purchase_mansion_cmd.finish("⛔ 请先使用【注册】命令创建角色")
         
         # 尝试购买阴宅
         success, result_msg = await MansionService.purchase_mansion(session, player)
@@ -61,12 +65,15 @@ async def handle_purchase_mansion(event: MessageEvent):
 @upgrade_mansion_cmd.handle()
 async def handle_upgrade_mansion(event: MessageEvent):
     """升级阴宅"""
-    user_id = event.get_user_id()
     async with safe_session() as session:
-        # 获取玩家数据
-        player = await session.get(Player, user_id)
+        # 使用跨平台工具获取玩家数据
+        from ..platform_utils import get_unified_player, is_guild_message
+        player = await get_unified_player(session, event)
         if not player:
-            await upgrade_mansion_cmd.finish("⛔ 请先使用【注册】命令创建角色")
+            if is_guild_message(event):
+                await upgrade_mansion_cmd.finish("⛔ 你还没有创建角色或绑定账号\n💡 请先在群聊注册角色，然后使用绑定功能")
+            else:
+                await upgrade_mansion_cmd.finish("⛔ 请先使用【注册】命令创建角色")
         
         # 检查是否拥有阴宅
         if player.mansion_level <= 0:

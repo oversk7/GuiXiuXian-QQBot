@@ -240,10 +240,18 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
 
 @stop_nav_cmd.handle()
 async def _(event: MessageEvent):
-    pid = event.get_user_id()
+    from ..platform_utils import get_unified_player, is_guild_message
+
     async with safe_session() as session:
-        player = await session.get(Player, pid)
-        task: NavigationTask | None = await session.get(NavigationTask, pid)
+        # 使用跨平台工具获取玩家数据
+        player = await get_unified_player(session, event)
+        if not player:
+            if is_guild_message(event):
+                await stop_nav_cmd.finish("⛔ 你还没有创建角色或绑定账号\n💡 请先在群聊注册角色，然后使用绑定功能")
+            else:
+                await stop_nav_cmd.finish("⛔ 请先创建角色")
+
+        task: NavigationTask | None = await session.get(NavigationTask, player.id)
         if not task:
             await stop_nav_cmd.finish("ℹ️ 当前未在导航中。")
 

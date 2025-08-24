@@ -24,9 +24,14 @@ real_explore_cmd = on_command("观察", aliases={"附近"}, block=True, priority
 async def handle_real_world_explore(event: MessageEvent):
     """处理现实世界探索命令"""
     async with safe_session() as session:
-        player: Player = await session.get(Player, event.get_user_id())
+        # 使用跨平台工具获取玩家数据
+        from ..platform_utils import get_unified_player, is_guild_message
+        player: Player = await get_unified_player(session, event)
         if not player:
-            await real_explore_cmd.finish("⛔ 请先创建角色")
+            if is_guild_message(event):
+                await real_explore_cmd.finish("⛔ 你还没有创建角色或绑定账号\n💡 请先在群聊注册角色，然后使用绑定功能")
+            else:
+                await real_explore_cmd.finish("⛔ 请先创建角色")
         
         # 只在现实世界中使用
         if player.is_in_dungeon():
