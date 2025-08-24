@@ -137,11 +137,6 @@ async def handle_check_monthly_card(event: MessageEvent):
         if benefits["sign_stamina_bonus"] > 0:
             msg_lines.append(f"💪 签到咒抗上限 +{benefits['sign_stamina_bonus']}")
 
-        # 添加扫荡令权益说明
-        if benefits["sign_sweep_tokens"] > 0:
-            msg_lines.append(f"⚡ 签到获得扫荡令*{benefits['sign_sweep_tokens']}")
-            msg_lines.append("💡 使用【扫荡令兑换】查看专属兑换商店")
-
         # 添加突破保护权益说明
         if benefits["breakthrough_protection"] > 0:
             protection_percent = int(benefits["breakthrough_protection"] * 100)
