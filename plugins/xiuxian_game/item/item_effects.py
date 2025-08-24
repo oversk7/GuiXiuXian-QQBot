@@ -323,7 +323,11 @@ async def _sweep_dungeon(player: Player, cfg: ItemConfig, qty: int, ctx: str, se
     if "层诡域" in player.region:
         # 新的层级制诡域
         try:
-            level = int(player.region.replace("层诡域", ""))
+            level_str = player.region.replace("层诡域", "")
+            # 兼容"第N层诡域"格式，移除开头的"第"字
+            if level_str.startswith("第"):
+                level_str = level_str[1:]
+            level = int(level_str)
             # 优先从预生成配置获取，如果不存在则动态生成（支持无限层）
             region_config = config.map_config.get("dungeon_levels", {}).get(level)
             if not region_config:

@@ -86,7 +86,11 @@ def get_region_materials(region: str) -> dict:
     # 检查是否为新的层级制诡域
     if "层诡域" in region:
         try:
-            level = int(region.replace("层诡域", ""))
+            level_str = region.replace("层诡域", "")
+            # 兼容"第N层诡域"格式，移除开头的"第"字
+            if level_str.startswith("第"):
+                level_str = level_str[1:]
+            level = int(level_str)
             # 优先从预生成配置获取，如果不存在则动态生成（支持无限层）
             region_config = config.map_config.get("dungeon_levels", {}).get(level)
             if not region_config:
@@ -399,7 +403,11 @@ async def get_or_create_tile(session, region: str, x: int, y: int) -> WorldTile:
         elif "层诡域" in region:
             # 新的层级制诡域
             try:
-                level = int(region.replace("层诡域", ""))
+                level_str = region.replace("层诡域", "")
+                # 兼容"第N层诡域"格式，移除开头的"第"字
+                if level_str.startswith("第"):
+                    level_str = level_str[1:]
+                level = int(level_str)
                 # 优先从预生成配置获取，如果不存在则动态生成（支持无限层）
                 region_config = config.map_config.get("dungeon_levels", {}).get(level)
                 if not region_config:
@@ -1720,6 +1728,9 @@ async def handle_region_overview(event: MessageEvent, args: Message = CommandArg
             if region.endswith("层诡域"):
                 try:
                     level_str = region.replace("层诡域", "")
+                    # 兼容"第N层诡域"格式，移除开头的"第"字
+                    if level_str.startswith("第"):
+                        level_str = level_str[1:]
                     dungeon_level = int(level_str)
                     # 优先从预生成配置获取，如果不存在则动态生成（支持无限层）
                     dungeon_config = config.map_config.get("dungeon_levels", {}).get(dungeon_level)
@@ -1729,7 +1740,7 @@ async def handle_region_overview(event: MessageEvent, args: Message = CommandArg
                             dungeon_level, config.map_config.get("dungeon_generation_rules", {})
                         )
                 except ValueError:
-                    await region_overview_cmd.finish("⛔ 诡域层级格式错误，请使用：俯瞰 1层诡域")
+                    await region_overview_cmd.finish("⛔ 诡域层级格式错误，请使用：俯瞰 1层诡域 或 俯瞰 第1层诡域")
             else:
                 # 兼容旧的命名诡域
                 if region not in config.map_config.get("regions", {}):

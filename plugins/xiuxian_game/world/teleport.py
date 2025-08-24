@@ -30,7 +30,7 @@ async def handle_teleport(event: MessageEvent, args: Message = CommandArg()):
     """处理传送指令，支持进入层级制诡域"""
     target_region = args.extract_plain_text().strip()
     if not target_region:
-        await teleport_cmd.finish("⛔ 请指定目标，例如：传送 1层诡域")
+        await teleport_cmd.finish("⛔ 请指定目标，例如：传送 1层诡域 或 传送 第1层诡域")
 
     # 调用共同的传送处理函数
     await _handle_teleport_logic(event, target_region, teleport_cmd)
@@ -41,7 +41,7 @@ async def handle_enter(event: MessageEvent, args: Message = CommandArg()):
     """处理进入指令，支持进入层级制诡域"""
     target_region = args.extract_plain_text().strip()
     if not target_region:
-        await enter_cmd.finish("⛔ 请指定目标，例如：进入 1层诡域")
+        await enter_cmd.finish("⛔ 请指定目标，例如：进入 1层诡域 或 进入 第1层诡域")
 
     # 调用共同的传送处理函数
     await _handle_teleport_logic(event, target_region, enter_cmd)
@@ -53,9 +53,12 @@ async def _handle_teleport_logic(event: MessageEvent, target_region: str, cmd_ha
     if target_region.endswith("层诡域"):
         try:
             level_str = target_region.replace("层诡域", "")
+            # 兼容"第N层诡域"格式，移除开头的"第"字
+            if level_str.startswith("第"):
+                level_str = level_str[1:]
             dungeon_level = int(level_str)
         except ValueError:
-            await cmd_handler.finish("⛔ 诡域层级格式错误，请使用：1层诡域")
+            await cmd_handler.finish("⛔ 诡域层级格式错误，请使用：1层诡域 或 第1层诡域")
 
         # 验证层级范围
         if dungeon_level <= 0:
