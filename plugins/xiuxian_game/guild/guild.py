@@ -950,8 +950,10 @@ async def handle_confirm_build_with_name(event: MessageEvent, args: Message = Co
 guild_teleport_cmd = on_command("公会传送", aliases={"传送到公会"}, block=True, priority=5)
 
 @guild_teleport_cmd.handle()
-async def handle_guild_teleport(event: MessageEvent):
-    """使用传送阵传送到公会基地"""
+async def handle_guild_teleport(event: MessageEvent, args: Message = CommandArg()):
+    """使用传送阵传送到公会基地或势力范围内的指定坐标"""
+    args_text = args.extract_plain_text().strip()
+
     async with safe_session() as session:
         player = await session.get(Player, event.get_user_id())
         if not player or not player.guild_id:
@@ -961,13 +963,69 @@ async def handle_guild_teleport(event: MessageEvent):
         if player.region != "大都会":
             await guild_teleport_cmd.finish("⛔ 只能在现实世界使用传送阵")
 
-        success, message = await GuildFacilityService.teleport_to_guild(session, player.id, player.guild_id)
+        guild = await session.get(Guild, player.guild_id)
+        if not guild:
+            await guild_teleport_cmd.finish("⛔ 公会数据异常")
 
-        if success:
-            await session.commit()
-            await guild_teleport_cmd.finish(message_add_head(f"✨ {message}", event))
+        # 如果没有参数，传送到公会基地
+        if not args_text:
+            success, message = await GuildFacilityService.teleport_to_guild(session, player.id, player.guild_id)
+
+            if success:
+                await session.commit()
+                await guild_teleport_cmd.finish(message_add_head(f"✨ {message}", event))
+            else:
+                await guild_teleport_cmd.finish(message_add_head(f"⛔ {message}", event))
+
+        # 如果有参数，解析坐标并传送到势力范围内
         else:
-            await guild_teleport_cmd.finish(message_add_head(f"⛔ {message}", event))
+            # 检查是否在公会基地
+            current_x, current_y = player.get_current_coordinates()
+            if guild.base_x is None or guild.base_y is None:
+                await guild_teleport_cmd.finish("⛔ 公会尚未设置基地")
+
+            if current_x != guild.base_x or current_y != guild.base_y:
+                await guild_teleport_cmd.finish("⛔ 只有在公会基地才能传送到势力范围内的坐标")
+
+            # 解析坐标参数
+            coords = args_text.split()
+            if len(coords) != 2:
+                await guild_teleport_cmd.finish("⛔ 格式错误，正确格式：公会传送 x y")
+
+            try:
+                target_x = int(coords[0])
+                target_y = int(coords[1])
+            except ValueError:
+                await guild_teleport_cmd.finish("⛔ 坐标必须是数字")
+
+            # 检查目标坐标是否在势力范围内
+            base_x, base_y = guild.base_x, guild.base_y
+            territory_range = guild.territory_range
+
+            # 势力范围是以基地为中心的正方形区域
+            half_range = territory_range // 2
+            min_x = base_x - half_range
+            max_x = base_x + half_range
+            min_y = base_y - half_range
+            max_y = base_y + half_range
+
+            if not (min_x <= target_x <= max_x and min_y <= target_y <= max_y):
+                await guild_teleport_cmd.finish(
+                    f"⛔ 目标坐标({target_x}, {target_y})超出公会势力范围\n"
+                    f"势力范围：X({min_x}~{max_x}) Y({min_y}~{max_y})"
+                )
+
+            # 执行传送（不消耗传送次数）
+            player.real_world_x = target_x
+            player.real_world_y = target_y
+            player.x = target_x
+            player.y = target_y
+            session.add(player)
+            await session.commit()
+
+            await guild_teleport_cmd.finish(message_add_head(
+                f"✨ 传送成功！从公会基地({base_x}, {base_y})传送到({target_x}, {target_y})", event
+            ))
 
 # ==================== 公会丹房 ====================
 guild_alchemy_cmd = on_command("公会丹房", aliases={"丹房", "丹药兑换"}, block=True, priority=5)
