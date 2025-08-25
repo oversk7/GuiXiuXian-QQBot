@@ -229,10 +229,19 @@ class RussianRouletteService:
         tax_amount = int(total_gold * tax_rate)
         final_reward = total_gold - tax_amount
 
-        # 分配奖励给获胜者
+        # 分配奖励给获胜者和失败者
         winner = await session.get(Player, winner_id)
+        loser_id = room.player1_id if winner_id == room.player2_id else room.player2_id
+        loser = await session.get(Player, loser_id)
+
         if winner:
             winner.gold += final_reward
+            # 获胜者获得2分小游戏积分
+            winner.mini_game_score += 2
+
+        if loser:
+            # 失败者获得1分小游戏积分
+            loser.mini_game_score += 1
 
         # 更新状态
         room.status = RoomStatus.FINISHED.value
@@ -244,7 +253,8 @@ class RussianRouletteService:
         reward_msg = (
             f"💰 奖池总额：{total_gold}金币\n"
             f"💸 系统税收：{tax_amount}金币 (3%)\n"
-            f"🏆 实际获得：{final_reward}金币"
+            f"🏆 实际获得：{final_reward}金币\n"
+            f"🎮 小游戏积分：获胜者+2分，失败者+1分"
         )
 
         return True, reward_msg

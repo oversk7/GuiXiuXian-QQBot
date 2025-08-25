@@ -210,6 +210,7 @@ async def handle_player(event: MessageEvent, args: Message = CommandArg()):
         "【幸运榜】 查看幸运榜\n"
         "【探索榜】 查看探索榜\n"
         "【敏捷榜】 查看敏捷榜\n"
+        "【小游戏榜】 查看小游戏积分排行\n"
         "【战力】 查看自身完整属性\n"
         "【战力说明】 查看各项战斗属性的作用\n"
         "【加点帮助】 查看基本属性加点指南\n"

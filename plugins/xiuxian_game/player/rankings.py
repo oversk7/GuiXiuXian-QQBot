@@ -181,6 +181,55 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
     await agility_rank_cmd.finish(message_add_head("\n".join(lines), event))
 
 
+# ==================== 小游戏榜 ====================
+mini_game_rank_cmd = on_command("小游戏榜", aliases={"游戏榜", "小游戏排行榜"}, block=True, priority=5)
+
+@mini_game_rank_cmd.handle()
+async def _(event: MessageEvent, args: Message = CommandArg()):
+    """显示小游戏积分最高的前10名玩家"""
+    async with safe_session() as session:
+        stmt = select(Player).order_by(Player.mini_game_score.desc()).limit(10)
+        players = (await session.execute(stmt)).scalars().all()
+
+    if not players:
+        await mini_game_rank_cmd.finish("暂无排行榜数据")
+
+    game_quotes = [
+        "游戏人生，人生如戏，在虚拟与现实间寻找真我。",
+        "每一次游戏都是一次冒险，每一分积分都是勇气的见证。",
+        "在游戏的世界里，你就是自己命运的主宰。",
+        "胜负乃兵家常事，重要的是享受游戏的过程。",
+        "小游戏，大智慧，方寸之间见真章。"
+    ]
+
+    quote = random.choice(game_quotes)
+    lines = ["🎮 小游戏排行榜", quote, "━━━━━━━━━━━━━"]
+
+    for idx, p in enumerate(players, 1):
+        # 使用emoji装饰前三名
+        rank_emoji = "🥇" if idx == 1 else "🥈" if idx == 2 else "🥉" if idx == 3 else f"{idx}."
+
+        # 根据积分显示不同的称号
+        if p.mini_game_score == 0:
+            title = "🌱游戏新手"
+        elif p.mini_game_score < 10:
+            title = "🎯初级玩家"
+        elif p.mini_game_score < 50:
+            title = "🎲资深玩家"
+        elif p.mini_game_score < 100:
+            title = "🎪游戏达人"
+        elif p.mini_game_score < 200:
+            title = "🎨游戏大师"
+        elif p.mini_game_score < 500:
+            title = "👑游戏王者"
+        else:
+            title = "🌟传奇玩家"
+
+        lines.append(f"{rank_emoji} {p.nickname}[UID:{p.uid}] - {title} 🎮{p.mini_game_score}分")
+
+    await mini_game_rank_cmd.finish(message_add_head("\n".join(lines), event))
+
+
 # ==================== 排行榜总览 ====================
 all_rankings_cmd = on_command("排行榜", aliases={"榜单", "排行榜总览"}, block=True, priority=5)
 
@@ -196,6 +245,7 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
         "💰 【财富榜】 - 查看财富排行",
         "🌀 【探索榜】 - 查看探索排行",
         "⚡ 【敏捷榜】 - 查看敏捷排行",
+        "🎮 【小游戏榜】 - 查看小游戏排行",
         "",
         "🏛️ 系统排行榜：",
         "🏦 【存款榜】 - 查看存款排行",

@@ -59,6 +59,7 @@ class Player(Base):
     vip: Mapped[int] = mapped_column(Integer, default=0, server_default='0', comment="VIP等级")
     gold: Mapped[int] = mapped_column(BigInteger, default=1000, server_default='1000', comment="货币")
     gold2: Mapped[int] = mapped_column(BigInteger, default=0, server_default='0', comment="积分")
+    mini_game_score: Mapped[int] = mapped_column(Integer, default=0, server_default='0', comment="小游戏积分")
     
     last_sign: Mapped[datetime] = mapped_column(DateTime, nullable=True, comment="上次签到日期")
     sign_streak: Mapped[int] = mapped_column(Integer, default=0, server_default='0', comment="连续签到天数")

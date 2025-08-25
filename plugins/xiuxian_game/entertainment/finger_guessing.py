@@ -50,28 +50,41 @@ async def handle_fist_game(event: MessageEvent, args: Message = CommandArg()):
         
         # 判断胜负
         win_map = {"石头": "剪刀", "剪刀": "布", "布": "石头"}
+        game_score_msg = ""
         if player_choice == opponent_choice:
-            # 平局返还金币
+            # 平局返还金币，不给积分
             player.gold += bet
             result_msg = f"🤝 平局！双方都出了 {player_choice}"
             result_icon = "🔄"
         elif win_map[player_choice] == opponent_choice:
             reward = bet * 2
             player.gold += reward
+            # 获胜者获得2分小游戏积分
+            player.mini_game_score += 2
             result_msg = f"🎉 胜利！{player_choice} 击败了 {opponent_choice}"
             result_icon = "✨"
+            game_score_msg = "🎮 小游戏积分 +2"
         else:
+            # 失败者获得1分小游戏积分
+            player.mini_game_score += 1
             result_msg = f"💔 失败！{opponent_choice} 击败了 {player_choice}"
             result_icon = "💸"
+            game_score_msg = "🎮 小游戏积分 +1"
 
         await session.commit()
         
         # 格式化结果消息
-        result = (
-            f"{result_icon} 猜拳结果\n"
-            f"▫️ 你的选择：{player_choice}\n"
-            f"▫️ 对手选择：{opponent_choice}\n"
-            f"▫️ 结果：{result_msg}\n"
+        result_lines = [
+            f"{result_icon} 猜拳结果",
+            f"▫️ 你的选择：{player_choice}",
+            f"▫️ 对手选择：{opponent_choice}",
+            f"▫️ 结果：{result_msg}",
             f"💰 当前金币：{player.gold}"
-        )
+        ]
+
+        if game_score_msg:
+            result_lines.append(game_score_msg)
+            result_lines.append(f"🎮 小游戏总积分：{player.mini_game_score}")
+
+        result = "\n".join(result_lines)
         await guess_fist.finish(message_add_head(result, event)) 
