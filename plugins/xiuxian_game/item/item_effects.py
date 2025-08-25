@@ -380,8 +380,8 @@ async def _sweep_dungeon(player: Player, cfg: ItemConfig, qty: int, ctx: str, se
     # 1. 理智限制：player.mp / 每格mp消耗
     mp_limit = player.mp // mp_cost_per_tile
 
-    # 2. 血量限制：player.hp / (怪物单次伤害 * (1-免伤率)) / x
-    hp_limit = int(player.hp / actual_damage_per_hit / monster_ratio) if monster_ratio > 0 else float('inf')
+    # 2. 血量限制：已取消，扫荡令不再受血量限制
+    # hp_limit = int(player.hp / actual_damage_per_hit / monster_ratio) if monster_ratio > 0 else float('inf')
 
     # 3. 装备耐久度限制：查询已装备装备的最低耐久度 / x
     # 注意：装备耐久度不能低于5，避免装备意外损坏
@@ -401,8 +401,8 @@ async def _sweep_dungeon(player: Player, cfg: ItemConfig, qty: int, ctx: str, se
             available_durability = max(0, min_durability - 5)
             durability_limit = int(available_durability / monster_ratio) if monster_ratio > 0 and available_durability > 0 else 0
 
-    # 取最小值作为实际能探索的格子数，再乘以扫荡令数量
-    base_tiles = min(mp_limit, hp_limit, durability_limit)
+    # 取最小值作为实际能探索的格子数（不再考虑hp限制），再乘以扫荡令数量
+    base_tiles = min(mp_limit, durability_limit)
     total_tiles = base_tiles * qty
 
     # 检查是否因为装备耐久度过低而无法扫荡
@@ -414,7 +414,7 @@ async def _sweep_dungeon(player: Player, cfg: ItemConfig, qty: int, ctx: str, se
     total_tiles = max(1, total_tiles)
 
     results.append(f"🗺️ 探索格子共计: {total_tiles}个")
-    results.append(f"📊 限制因素: MP({mp_limit}) HP({hp_limit}) 耐久({durability_limit if durability_limit != float('inf') else '∞'})")
+    results.append(f"📊 限制因素: MP({mp_limit}) 耐久({durability_limit if durability_limit != float('inf') else '∞'}) (HP限制已取消)")
 
     # 按世界地图格子概率分配格子类型
     tile_weights = [15, 5, 75, 5]  # 材料、宝藏、怪物(避开)、休息
