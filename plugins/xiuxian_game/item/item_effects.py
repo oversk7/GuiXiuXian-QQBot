@@ -414,7 +414,7 @@ async def _sweep_dungeon(player: Player, cfg: ItemConfig, qty: int, ctx: str, se
     total_tiles = max(1, total_tiles)
 
     results.append(f"🗺️ 探索格子共计: {total_tiles}个")
-    results.append(f"📊 限制因素: MP({mp_limit}) 耐久({durability_limit if durability_limit != float('inf') else '∞'}) (HP限制已取消)")
+    results.append(f"📊 限制因素: 理智({mp_limit}) 耐久({durability_limit if durability_limit != float('inf') else '∞'}) (生命限制已取消)")
 
     # 按世界地图格子概率分配格子类型
     tile_weights = [15, 5, 75, 5]  # 材料、宝藏、怪物(避开)、休息
