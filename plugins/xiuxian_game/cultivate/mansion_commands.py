@@ -17,6 +17,7 @@ purchase_mansion_cmd = on_command("购买阴宅", aliases={"买阴宅"}, priorit
 upgrade_mansion_cmd = on_command("升级阴宅", aliases={"阴宅升级"}, priority=4, block=True)
 set_mansion_fee_cmd = on_command("设置阴宅费用", aliases={"阴宅费用"}, priority=4, block=True)
 toggle_mansion_access_cmd = on_command("切换阴宅权限", aliases={"阴宅权限"}, priority=4, block=True)
+toggle_mansion_payment_cmd = on_command("切换阴宅付费意愿", aliases={"阴宅付费意愿", "阴宅付费"}, priority=4, block=True)
 
 
 @mansion_status_cmd.handle()
@@ -168,6 +169,27 @@ async def handle_toggle_mansion_access(event: MessageEvent):
             await toggle_mansion_access_cmd.finish(message_add_head(result_msg, event))
         else:
             await toggle_mansion_access_cmd.finish(message_add_head(f"⛔ {result_msg}", event))
+
+
+@toggle_mansion_payment_cmd.handle()
+async def handle_toggle_mansion_payment(event: MessageEvent):
+    """切换阴宅付费使用意愿"""
+    user_id = event.get_user_id()
+    async with safe_session() as session:
+        # 获取玩家数据
+        player = await session.get(Player, user_id)
+        if not player:
+            await toggle_mansion_payment_cmd.finish("⛔ 请先使用【注册】命令创建角色")
+
+        # 切换阴宅付费使用意愿
+        success, result_msg = await MansionService.toggle_mansion_payment_willingness(session, player)
+
+        if success:
+            # 保存数据
+            await session.commit()
+            await toggle_mansion_payment_cmd.finish(message_add_head(result_msg, event))
+        else:
+            await toggle_mansion_payment_cmd.finish(message_add_head(f"⛔ {result_msg}", event))
 
 
 

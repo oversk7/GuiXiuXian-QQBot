@@ -207,9 +207,13 @@ async def handle_seclusion(event: MessageEvent):
 
         if mansion_owner:
             # 闭关时只检查是否有阴宅加成，不支付费用
-            # 如果是自己的阴宅或者阴宅允许他人使用，则可以享受加成
-            if (player.id == mansion_owner.id or
-                (mansion_owner.mansion_allow_others and mansion_owner.mansion_level > 0)):
+            # 如果是自己的阴宅，可以享受加成
+            if player.id == mansion_owner.id:
+                mansion_cultivation_bonus = MansionService.get_efficiency_bonus(mansion_owner.mansion_level)
+            # 如果是他人阴宅，需要检查阴宅主人是否允许使用，以及玩家是否愿意使用他人阴宅
+            elif (mansion_owner.mansion_allow_others and
+                  mansion_owner.mansion_level > 0 and
+                  player.mansion_willing_to_pay):
                 mansion_cultivation_bonus = MansionService.get_efficiency_bonus(mansion_owner.mansion_level)
 
         # 计算棺材钉数量和效率加成（最多100根，50%加成）

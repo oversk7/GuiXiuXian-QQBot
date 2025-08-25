@@ -179,6 +179,7 @@ class Player(Base):
     mansion_y: Mapped[int | None] = mapped_column(Integer, nullable=True, comment="阴宅Y坐标")
     mansion_usage_fee: Mapped[int] = mapped_column(Integer, default=0, server_default='0', comment="阴宅使用费用(其他玩家使用需支付的金币)")
     mansion_allow_others: Mapped[bool] = mapped_column(Boolean, default=True, server_default='True', comment="是否允许其他玩家使用阴宅")
+    mansion_willing_to_pay: Mapped[bool] = mapped_column(Boolean, default=True, server_default='True', comment="是否愿意支付费用使用他人阴宅")
 
     monthly_cards: Mapped[list["MonthlyCard"]] = relationship("MonthlyCard", back_populates="player")
 

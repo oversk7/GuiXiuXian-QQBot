@@ -165,6 +165,10 @@ class MansionService:
         if not mansion_owner.mansion_allow_others:
             return False, "阴宅主人不允许其他玩家使用"
 
+        # 检查使用者是否愿意支付费用使用他人阴宅
+        if not player.mansion_willing_to_pay:
+            return False, "你已设置不愿意支付费用使用他人阴宅"
+
         # 检查使用费用
         if player.gold < mansion_owner.mansion_usage_fee:
             return False, f"金币不足，使用此阴宅需要{mansion_owner.mansion_usage_fee:,}金币，当前拥有{player.gold:,}金币"
@@ -287,6 +291,44 @@ class MansionService:
         return True, result_msg
 
     @classmethod
+    async def toggle_mansion_payment_willingness(cls, session: AsyncSession, player: Player) -> tuple[bool, str]:
+        """
+        切换玩家的阴宅付费使用意愿
+
+        Args:
+            session: 数据库会话
+            player: 玩家对象
+
+        Returns:
+            (是否成功, 结果信息)
+        """
+        # 切换意愿
+        player.mansion_willing_to_pay = not player.mansion_willing_to_pay
+        session.add(player)
+
+        status = "愿意" if player.mansion_willing_to_pay else "不愿意"
+        result_msg = (
+            f"🏚️ 阴宅使用意愿设置成功！\n"
+            f"━━━━━━━━━━━━━\n"
+            f"✧ 使用意愿：{status}支付费用使用他人阴宅\n"
+            f"━━━━━━━━━━━━━\n"
+        )
+
+        if player.mansion_willing_to_pay:
+            result_msg += (
+                f"💡 在他人阴宅修炼时会自动支付使用费用\n"
+                f"💡 可以享受阴宅修炼效率加成"
+            )
+        else:
+            result_msg += (
+                f"💡 在他人阴宅修炼时不会支付费用\n"
+                f"💡 无法享受阴宅修炼效率加成\n"
+                f"💡 使用【切换阴宅付费意愿】可重新开启"
+            )
+
+        return True, result_msg
+
+    @classmethod
     async def can_upgrade(cls, session: AsyncSession, player: Player) -> tuple[bool, str]:
         """
         检查玩家是否可以升级阴宅
@@ -380,6 +422,42 @@ class MansionService:
         return True, success_msg
     
     @classmethod
+    def calculate_distance(cls, x1: int, y1: int, x2: int, y2: int) -> int:
+        """计算两点间的曼哈顿距离"""
+        return abs(x1 - x2) + abs(y1 - y2)
+
+    @classmethod
+    def check_distance_from_towns(cls, x: int, y: int) -> tuple[bool, str]:
+        """
+        检查指定位置是否距离城镇市集过近
+
+        Args:
+            x: X坐标
+            y: Y坐标
+
+        Returns:
+            (是否可以建造, 错误信息)
+        """
+        # 导入市集和总部坐标
+        from ..economy.merchants import MARKETS, HEADQUARTERS_COORD
+
+        min_distance = 20  # 最小距离限制
+
+        # 检查与所有市集的距离
+        for market in MARKETS:
+            distance = cls.calculate_distance(x, y, market.x, market.y)
+            if distance <= min_distance:
+                return False, f"距离{market.name}市集过近（{distance}格），阴宅不能在城镇市集{min_distance}格半径范围内建造"
+
+        # 检查与缉邪司总部的距离
+        hq_x, hq_y = HEADQUARTERS_COORD
+        hq_distance = cls.calculate_distance(x, y, hq_x, hq_y)
+        if hq_distance <= min_distance:
+            return False, f"距离缉邪司总部过近（{hq_distance}格），阴宅不能在城镇市集{min_distance}格半径范围内建造"
+
+        return True, ""
+
+    @classmethod
     async def purchase_mansion(cls, session: AsyncSession, player: Player) -> tuple[bool, str]:
         """
         购买阴宅（从0级升级到1级）
@@ -406,6 +484,11 @@ class MansionService:
         # 检查是否在原点(0,0)，原点不允许建造阴宅（保护新手）
         if current_x == 0 and current_y == 0:
             return False, "原点(0,0)是新手出生地，不允许建造阴宅。请移动到其他位置后再购买"
+
+        # 检查距离城镇市集的限制
+        can_build, distance_error = cls.check_distance_from_towns(current_x, current_y)
+        if not can_build:
+            return False, distance_error
 
         # 检查当前位置是否已有其他玩家的阴宅
         existing_owner = await cls.find_mansion_owner_at_location(session, current_x, current_y)
@@ -456,17 +539,20 @@ class MansionService:
 
         if player.mansion_level <= 0:
             purchase_cost = cls.get_upgrade_cost(0)
+            payment_willingness = "愿意" if player.mansion_willing_to_pay else "不愿意"
             return (
                 f"🏚️ 阴宅状态\n"
                 f"━━━━━━━━━━━━━\n"
                 f"✧ 状态：未拥有\n"
                 f"✧ 当前位置：({current_x}, {current_y})\n"
                 f"✧ 购买费用：{purchase_cost:,}金币\n"
+                f"✧ 付费意愿：{payment_willingness}使用他人阴宅\n"
                 f"✧ 当前金币：{player.gold:,}金币\n"
                 f"━━━━━━━━━━━━━\n"
                 f"💡 阴宅将建在当前位置\n"
                 f"💡 只有在阴宅位置修炼才有加成\n"
-                f"⬇️ 【购买阴宅】开始你的阴宅之旅"
+                f"⬇️ 【购买阴宅】开始你的阴宅之旅\n"
+                f"⬇️ 【切换阴宅付费意愿】设置是否愿意付费使用他人阴宅"
             )
 
         mansion_info = cls.get_mansion_info(player.mansion_level)
@@ -500,12 +586,14 @@ class MansionService:
 
         # 添加阴宅使用费用和权限信息
         access_status = "允许" if player.mansion_allow_others else "禁止"
+        payment_willingness = "愿意" if player.mansion_willing_to_pay else "不愿意"
         min_fee = cls.get_min_usage_fee(player.mansion_level)
 
         status_msg += (
             f"\n✧ 使用费用：{player.mansion_usage_fee:,}金币\n"
             f"✧ 最低要求：{min_fee:,}金币\n"
             f"✧ 他人使用：{access_status}\n"
+            f"✧ 付费意愿：{payment_willingness}使用他人阴宅\n"
             f"✧ 当前金币：{player.gold:,}金币\n"
             f"━━━━━━━━━━━━━"
         )
@@ -524,7 +612,8 @@ class MansionService:
         # 添加阴宅管理相关命令提示
         status_msg += (
             f"\n⬇️ 【设置阴宅费用 <金币数>】设置使用费用\n"
-            f"⬇️ 【切换阴宅权限】允许/禁止他人使用"
+            f"⬇️ 【切换阴宅权限】允许/禁止他人使用\n"
+            f"⬇️ 【切换阴宅付费意愿】设置是否愿意付费使用他人阴宅"
         )
 
         return status_msg
