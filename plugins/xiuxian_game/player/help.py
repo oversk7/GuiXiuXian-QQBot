@@ -293,6 +293,7 @@ async def handle_xiu_lian(event: MessageEvent, args: Message = CommandArg()):
         "【冥返】 300级满级后，冥返重塑根基，获得更强潜力\n"
         "【加点 <属性> <点数>】 分配突破获得的属性点，增强实力\n"
         "【加点帮助】 查看属性详解和推荐加点方案\n"
+        "【免费洗点】 新手专用，30级以下消耗5点咒抗重置属性点\n"
         "【献祭】 献祭材料以获取怨念值，用于为突破护航\n"
     )
     await xiu_lian_cmd.finish(Message(msg))

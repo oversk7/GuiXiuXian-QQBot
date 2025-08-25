@@ -31,6 +31,7 @@ out_seclusion = on_command("出关", block=True, priority=5)
 breakthrough = on_command("突破", block=True, priority=5)
 continuous_breakthrough = on_command("连续突破", aliases={"连突"}, block=True, priority=5)
 assign_points = on_command("加点",aliases={"分配"}, block=True, priority=5)
+free_reset_points = on_command("免费洗点", aliases={"新手洗点"}, block=True, priority=5)
 
 
 
@@ -1018,3 +1019,204 @@ async def handle_assign(event: MessageEvent, args: Message = CommandArg()):
             msg += "\n💡 【加点帮助】查看属性指南"
 
         await assign_points.finish(message_add_head(msg, event))
+
+
+@free_reset_points.handle()
+async def handle_free_reset_points(event: MessageEvent):
+    """免费洗点处理函数 - 仅限30级以下玩家使用，消耗5点咒抗"""
+    async with safe_session() as session:
+        # 使用跨平台工具获取玩家数据
+        from ..platform_utils import get_unified_player, is_guild_message
+        player = await get_unified_player(session, event)
+        if not player:
+            if is_guild_message(event):
+                await free_reset_points.finish("⛔ 你还没有创建角色或绑定账号\n💡 请先在群聊注册角色，然后使用绑定功能")
+            else:
+                await free_reset_points.finish("⛔ 请先创建角色")
+
+        # 检查等级限制
+        if player.level >= 30:
+            await free_reset_points.finish(
+                "⛔ 免费洗点仅限30级以下的新手使用！\n"
+                "━━━━━━━━━━━━━\n"
+                f"📊 你的等级：{player.level}级\n"
+                "📊 等级限制：30级以下\n"
+                "━━━━━━━━━━━━━\n"
+                "💡 高级玩家请购买【重启符】洗点\n"
+            )
+
+        # 检查咒抗是否足够
+        required_stamina = 5
+        if player.stamina < required_stamina:
+            await free_reset_points.finish(
+                f"⛔ 咒抗不足，无法使用免费洗点！\n"
+                "━━━━━━━━━━━━━\n"
+                f"⚡ 当前咒抗：{player.stamina}\n"
+                f"⚡ 需要咒抗：{required_stamina}\n"
+                "━━━━━━━━━━━━━\n"
+                "💡 每日签到可恢复咒抗\n"
+                "💡 发送【签到】恢复咒抗"
+            )
+
+        # 执行免费洗点逻辑（复用重启符的逻辑）
+        from ..config import config as gcfg
+        from sqlalchemy import select
+        from ..models.elixir_usage import ElixirUsageLog
+        from ..models.inventory import ItemInstance
+
+        # 初始基础属性
+        INIT = {
+            "max_hp": 20,
+            "max_mp": 20,
+            "attack": 1,
+            "defense": 5,
+            "agility": 5,
+            "luck": 1,
+        }
+
+        # 计算丹药加成
+        elixir_bonus = {k: 0 for k in INIT}
+        # 获取所有丹药使用记录（不限日期，因为丹药效果是永久的）
+        stmt = select(ElixirUsageLog).where(ElixirUsageLog.player_id == player.id)
+        logs = (await session.execute(stmt)).scalars().all()
+
+        # 统计每种丹药的总使用量
+        elixir_usage_total = {}
+        for log in logs:
+            if log.item_id not in elixir_usage_total:
+                elixir_usage_total[log.item_id] = 0
+            elixir_usage_total[log.item_id] += log.quantity
+
+        # 计算丹药属性加成
+        from ..models.inventory import ItemEffectType
+        for item_id, total_qty in elixir_usage_total.items():
+            item_cfg = gcfg.items_config["by_id"].get(item_id)
+            if item_cfg and item_cfg.effect_type == ItemEffectType.BUFF:
+                effect_params = item_cfg.effect_params or {}
+                for attr, value in effect_params.items():
+                    if attr in elixir_bonus:
+                        elixir_bonus[attr] += int(value) * total_qty
+
+        # 重置属性为基础值 + 丹药 bonus（先不加装备加成）
+        for k, base_v in INIT.items():
+            setattr(player, k, base_v + elixir_bonus.get(k, 0))
+
+        # 重新计算可分配点（考虑转数加成）
+        from ..cultivate.reincarnation import ReincarnationService
+        pts_per_lvl = ReincarnationService.get_attribute_points_per_level(player.reincarnation_level)
+        player.attribute_points = (player.level - 1) * pts_per_lvl
+
+        # 重新计算装备加成（基于新的基础属性）
+        # 获取所有已装备的装备
+        stmt = select(ItemInstance).where(
+            ItemInstance.player_id == player.id,
+            ItemInstance.equipped == True,
+            ItemInstance.item_id.in_(gcfg.items_config["by_type"]["EQUIPMENT"])
+        )
+        equipped_items = (await session.execute(stmt)).scalars().all()
+
+        # 1. 先卸下所有装备，恢复基础属性
+        for eq in equipped_items:
+            # 恢复玩家属性
+            delta = (eq.extra_attrs or {}).get("_persist_bonus", {})
+            for k, v in delta.items():
+                setattr(player, k, getattr(player, k) - v)
+
+            # 清除持久化记录并标记未穿戴
+            if "_persist_bonus" in (eq.extra_attrs or {}):
+                extra_new = {k: v for k, v in eq.extra_attrs.items() if k != "_persist_bonus"}
+                eq.extra_attrs = extra_new
+
+            eq.equipped = False
+
+        # 2. 获取玩家基础属性（无装备加成）
+        base_attrs = {
+            "attack": player.attack,
+            "defense": player.defense,
+            "agility": player.agility,
+            "luck": player.luck,
+            "max_hp": player.max_hp,
+            "max_mp": player.max_mp,
+        }
+
+        # 3. 重新穿戴所有装备，每件都基于基础属性计算
+        for eq in equipped_items:
+            # 标记为已装备
+            eq.equipped = True
+
+            # 基于基础属性计算装备加成
+            attrs_temp = base_attrs.copy()
+            eq.apply_attr_bonus(attrs_temp, base_attrs)
+            new_delta = {}
+            for k in attrs_temp:
+                if k in base_attrs:
+                    if attrs_temp[k] != base_attrs[k]:
+                        new_delta[k] = attrs_temp[k] - base_attrs[k]
+                else:
+                    # 对于base_attrs中不存在的属性，直接使用新值作为加成
+                    if attrs_temp[k] != 0:
+                        new_delta[k] = attrs_temp[k]
+
+            # 应用到玩家属性
+            for k, v in new_delta.items():
+                setattr(player, k, getattr(player, k) + v)
+
+            # 保存新的持久化加成
+            extra = eq.extra_attrs or {}
+            extra["_persist_bonus"] = new_delta
+            eq.extra_attrs = extra
+            session.add(eq)
+
+        # 保证当前 HP/MP 不超上限
+        if player.hp > player.max_hp:
+            player.hp = player.max_hp
+        if player.mp > player.max_mp:
+            player.mp = player.max_mp
+
+        # 扣除咒抗
+        player.stamina -= required_stamina
+
+        # 生成详细的重置信息
+        bonus_info = []
+
+        # 检查是否有装备加成（重新计算后的）
+        has_equipment_bonus = False
+        for eq in equipped_items:
+            delta = (eq.extra_attrs or {}).get("_persist_bonus", {})
+            if any(delta.values()):
+                has_equipment_bonus = True
+                break
+
+        if has_equipment_bonus:
+            bonus_info.append("装备加成已保留")
+
+        if any(elixir_bonus.values()):
+            elixir_details = []
+            for k, v in elixir_bonus.items():
+                if v > 0:
+                    attr_name = {"max_hp": "体", "max_mp": "智", "attack": "力", "defense": "防", "agility": "敏", "luck": "运"}.get(k, k)
+                    elixir_details.append(f"{attr_name}+{v}")
+            if elixir_details:
+                bonus_info.append(f"丹药加成已保留({', '.join(elixir_details)})")
+
+        bonus_msg = f"，{', '.join(bonus_info)}" if bonus_info else ""
+
+        session.add(player)
+        await session.commit()
+
+        msg = (
+            "🆓 新手免费洗点成功！\n"
+            "━━━━━━━━━━━━━\n"
+            "🔄 属性已重置，所有点数已退还\n"
+            f"⚡ 消耗咒抗：{required_stamina} (剩余：{player.stamina})\n"
+            f"📊 可分配属性点：{player.attribute_points}\n"
+            f"{bonus_msg}\n" if bonus_msg else ""
+            "━━━━━━━━━━━━━\n"
+            "💡 现在可以重新分配属性点了！\n"
+            "💡 发送【加点帮助】查看属性指南\n"
+            "━━━━━━━━━━━━━\n"
+            "⚠️ 此功能仅限30级以下使用\n"
+            "⚠️ 30级后请使用重启符洗点"
+        )
+
+        await free_reset_points.finish(message_add_head(msg, event))
