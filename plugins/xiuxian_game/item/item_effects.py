@@ -600,7 +600,7 @@ async def _sweep_dungeon(player: Player, cfg: ItemConfig, qty: int, ctx: str, se
 
     # 扣除血量（基于怪物格子数和实际伤害）
     hp_consumed = monster_tiles * actual_damage_per_hit
-    player.hp = max(0, player.hp - hp_consumed)
+    player.hp = max(1, player.hp - hp_consumed)
 
     results.append(f"⚡ 消耗咒抗: {qty} (剩余: {player.stamina})")
     results.append(f"🧠 消耗理智: {mp_consumed} (剩余: {player.mp})")
