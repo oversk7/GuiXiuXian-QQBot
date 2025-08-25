@@ -660,6 +660,7 @@ async def handle_continuous_breakthrough(event: MessageEvent, args: Message = Co
 
         # 统计信息
         breakthrough_count = 0
+        failed_attempts = 0
         total_resentment_cost = 0
         total_attribute_points = 0
         start_level = player.level
@@ -732,7 +733,7 @@ async def handle_continuous_breakthrough(event: MessageEvent, args: Message = Co
                 await on_player_level_up(session, player.id, old_level, player.level)
 
             else:
-                # 突破失败，停止连续突破
+                # 突破失败，但不停止连续突破，继续尝试
                 player.breakthrough_fail_count += 1
 
                 # 检查月卡权益
@@ -746,7 +747,9 @@ async def handle_continuous_breakthrough(event: MessageEvent, args: Message = Co
                     keep_ratio = cfg_break["fail_keep_ratio"]
 
                 player.exp = round(player.exp - required_exp*(1-keep_ratio))
-                break
+
+                # 记录失败信息，但继续循环
+                failed_attempts += 1
 
         session.add(player)
         await session.commit()
@@ -772,12 +775,22 @@ async def handle_continuous_breakthrough(event: MessageEvent, args: Message = Co
                     "⬇️ 【连续突破】不使用镇厄"
                 )
             else:
+                # 计算下次成功率加成
+                next_bonus = 0
+                if cfg_break.get("fail_bonus_enabled", True):
+                    fail_bonus_rate = cfg_break.get("fail_bonus_rate", 0.01)
+                    next_bonus = player.breakthrough_fail_count * fail_bonus_rate
+                    max_rate = cfg_break.get("fail_bonus_max_rate", 0.95)
+                    next_bonus = min(next_bonus, max_rate)
+
                 msg = (
-                    "💥 首次突破失败，连续突破中断！\n"
+                    "💥 连续突破失败，修为耗尽！\n"
                     "━━━━━━━━━━━━━\n"
                     f"✧ 当前等级 Lv.{player.level}\n"
+                    f"✧ 失败次数 {failed_attempts} 次\n"
                     f"✧ 剩余修为 {player.exp}\n"
                     f"✧ 连续失败 {player.breakthrough_fail_count} 次\n"
+                    f"✧ 下次成功率加成 +{int(next_bonus*100)}%\n"
                     "━━━━━━━━━━━━━\n"
                     "⬇️ 建议【突破 镇厄】以怨念护体"
                 )
@@ -789,10 +802,16 @@ async def handle_continuous_breakthrough(event: MessageEvent, args: Message = Co
             if use_guardian and total_resentment_cost > 0:
                 cost_msg = f"✧ 消耗怨念值 {total_resentment_cost} (剩余{player.resentment})\n"
 
+            # 构建失败信息
+            fail_msg = ""
+            if failed_attempts > 0:
+                fail_msg = f"✧ 失败次数 {failed_attempts} 次\n"
+
             msg = (
                 f"⛓️‍💥连续突破完成！骨裂声不绝于耳！\n"
                 "━━━━━━━━━━━━━\n"
                 f"✧ 突破次数 {breakthrough_count} 次\n"
+                + fail_msg +
                 f"✧ 等级提升 Lv.{start_level} → Lv.{player.level}\n"
                 f"✧ 消耗修为 {consumed_exp}\n"
                 f"✧ 获得属性点 + {total_attribute_points}" + (f" (转数加成)" if player.reincarnation_level > 0 else "") + "\n"
