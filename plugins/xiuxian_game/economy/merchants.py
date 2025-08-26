@@ -61,7 +61,7 @@ ALL_GOODS = [
     "yin_grass", "blood_pact"
 ]
 
-# ================= 新的硬编码市集配置 =================
+# ================= 硬编码市集配置 =================
 # 基于地理位置和经济特色进行商品分配，确保跑商路线的多样性和盈利性
 
 MARKET_CONFIGS = {
@@ -1198,80 +1198,3 @@ async def _(event: MessageEvent):
         ])
 
         await trade_restrictions_cmd.finish(message_add_head("\n".join(lines), event))
-
-
-# ================= 管理员命令：市集配置分析 =================
-from nonebot.permission import SUPERUSER
-
-market_analysis_cmd = on_command("市集配置分析", block=True, priority=1, permission=SUPERUSER)
-
-@market_analysis_cmd.handle()
-async def _(event: MessageEvent):
-    """查看市集配置分析报告（仅管理员）"""
-
-    # 统计每种商品的分布
-    item_distribution = {}
-    for item_id in ALL_GOODS:
-        sellable_markets = [m.name for m in MARKETS if m.can_sell_to_player(item_id)]
-        buyable_markets = [m.name for m in MARKETS if m.can_buy_from_player(item_id)]
-        item_distribution[item_id] = {
-            'sellable_count': len(sellable_markets),
-            'buyable_count': len(buyable_markets),
-            'sellable_markets': sellable_markets,
-            'buyable_markets': buyable_markets
-        }
-
-    lines = ["📊 市集配置分析报告", "━━━━━━━━━━━━━"]
-
-    # 商品分布统计
-    lines.append("📦 商品分布统计：")
-    for item_id, dist in item_distribution.items():
-        item_cfg = config.items_config["by_id"].get(item_id)
-        item_name = item_cfg.name if item_cfg else item_id
-        lines.append(f"  {item_name}: 出售{dist['sellable_count']}个市集, 收购{dist['buyable_count']}个市集")
-
-    lines.append("")
-
-    # 市集商品数量
-    lines.append("🏪 各市集商品数量：")
-    for market in MARKETS:
-        lines.append(f"  {market.name}: 出售{len(market.sellable_items)}种, 收购{len(market.buyable_items)}种")
-
-    lines.append("")
-
-    # 分析跑商路线数量
-    route_count = 0
-    route_details = []
-    for src in MARKETS:
-        for dst in MARKETS:
-            if src == dst:
-                continue
-            common_items = set(src.sellable_items) & set(dst.buyable_items)
-            if common_items:
-                route_count += len(common_items)
-                distance = abs(src.x - dst.x) + abs(src.y - dst.y)
-                route_details.append((src.name, dst.name, len(common_items), distance))
-
-    lines.append(f"🚚 理论跑商路线数量: {route_count}")
-
-    # 平均距离
-    total_distance = sum(abs(m1.x-m2.x)+abs(m1.y-m2.y) for m1 in MARKETS for m2 in MARKETS if m1!=m2)
-    avg_distance = total_distance // (len(MARKETS)*(len(MARKETS)-1))
-    lines.append(f"📍 市集间平均距离: {avg_distance}")
-
-    lines.append("")
-
-    # 检查交易机会较少的商品
-    isolated_items = [item_id for item_id, dist in item_distribution.items()
-                     if dist['sellable_count'] < 3 or dist['buyable_count'] < 3]
-    if isolated_items:
-        lines.append("⚠️ 交易机会较少的商品:")
-        for item_id in isolated_items:
-            item_cfg = config.items_config["by_id"].get(item_id)
-            item_name = item_cfg.name if item_cfg else item_id
-            dist = item_distribution[item_id]
-            lines.append(f"  {item_name}: 出售{dist['sellable_count']}个, 收购{dist['buyable_count']}个")
-    else:
-        lines.append("✅ 所有商品都有充足的交易机会")
-
-    await market_analysis_cmd.finish(message_add_head("\n".join(lines), event))
