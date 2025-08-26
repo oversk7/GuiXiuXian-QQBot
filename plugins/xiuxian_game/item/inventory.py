@@ -68,7 +68,6 @@ CATEGORY_MAPPING = {
     "商品": "GOODS",
     "装备": "EQUIPMENT",
     "丹药": "ELIXIR",  # 特殊标记，实质为 CONSUMABLE 下的一类
-    "鬼怪碎片": "GHOST_FRAGMENT",
     "宝石": "GEM",
 }
 
@@ -78,7 +77,6 @@ TYPE_NAME_MAP = {
     "MATERIAL": "材料",
     "EQUIPMENT": "装备",
     "GOODS": "商品",
-    "GHOST_FRAGMENT": "鬼怪碎片",
     "GEM": "宝石"
 }
 
