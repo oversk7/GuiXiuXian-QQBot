@@ -86,7 +86,7 @@ async def show_basic_location_info(session: AsyncSession, player: Player, x: int
     """显示基本位置信息（没有特殊地点时）"""
     # 获取附近玩家
     nearby_players = await LocationService.get_nearby_players(
-        session, x, y, region, max_distance=0, exclude_player_id=player.id
+        session, x, y, region, max_distance=3, exclude_player_id=player.id
     )
     
     # 获取附近地点
