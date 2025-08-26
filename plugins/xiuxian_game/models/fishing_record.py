@@ -128,15 +128,23 @@ class FishingStats(Base):
     async def get_or_create(cls, session, player_id: str):
         """获取或创建钓鱼统计记录"""
         from sqlalchemy import select
-        
+
         stmt = select(cls).where(cls.player_id == player_id)
         result = await session.execute(stmt)
         stats = result.scalar_one_or_none()
-        
+
         if not stats:
-            stats = cls(player_id=player_id)
+            stats = cls(
+                player_id=player_id,
+                total_fishing_count=0,
+                total_fish_caught=0,
+                rare_fish_caught=0,
+                legendary_fish_caught=0,
+                best_fish_value=0,
+                total_fish_value=0
+            )
             session.add(stats)
-        
+
         return stats
     
     async def update_stats(self, session, fish_value: int, fish_rarity: str, quantity: int = 1):

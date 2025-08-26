@@ -22,20 +22,26 @@ fishing_cmd = on_command("钓鱼", block=True, priority=5)
 async def _(event: MessageEvent):
     """钓鱼指令处理"""
     async with safe_session() as session:
-        # 使用跨平台工具获取玩家数据
-        from ..platform_utils import get_unified_player, is_guild_message
-        player = await get_unified_player(session, event)
-        if not player:
-            if is_guild_message(event):
-                await fishing_cmd.finish("⛔ 你还没有创建角色或绑定账号\n💡 请先在群聊注册角色，然后使用绑定功能")
-            else:
-                await fishing_cmd.finish("⛔ 请先创建角色")
+        try:
+            # 使用跨平台工具获取玩家数据
+            from ..platform_utils import get_unified_player, is_guild_message
+            player = await get_unified_player(session, event)
+            if not player:
+                if is_guild_message(event):
+                    await fishing_cmd.finish("⛔ 你还没有创建角色或绑定账号\n💡 请先在群聊注册角色，然后使用绑定功能")
+                else:
+                    await fishing_cmd.finish("⛔ 请先创建角色")
 
-        # 执行钓鱼
-        result = await FishingService.do_fishing(session, player)
-        
-        if not result["success"]:
-            await fishing_cmd.finish(message_add_head(result["message"], event))
+            # 执行钓鱼
+            result = await FishingService.do_fishing(session, player)
+
+            if not result["success"]:
+                await fishing_cmd.finish(message_add_head(result["message"], event))
+        except TypeError as e:
+            if "unsupported operand type(s) for +=: 'NoneType' and 'int'" in str(e):
+                await fishing_cmd.finish(message_add_head("⛔ 钓鱼数据异常，请联系管理员处理", event))
+            else:
+                raise
         
         # 构建成功消息
         rarity_emoji = {

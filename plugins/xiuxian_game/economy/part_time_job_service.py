@@ -476,7 +476,15 @@ class PartTimeJobService:
         stats = (await session.execute(stmt)).scalars().first()
 
         if not stats:
-            stats = PlayerJobStats(player_id=player_id)
+            stats = PlayerJobStats(
+                player_id=player_id,
+                total_jobs_completed=0,
+                total_earnings=0,
+                total_work_hours=0,
+                current_streak=0,
+                max_streak=0,
+                achievements={}
+            )
             session.add(stats)
             await session.flush()
 

@@ -74,7 +74,17 @@ class GuildTaskService:
         stats = (await session.execute(stmt)).scalar_one_or_none()
 
         if not stats:
-            stats = PlayerTaskStats(player_id=player_id)
+            stats = PlayerTaskStats(
+                player_id=player_id,
+                total_explorations=0,
+                total_combat_victories=0,
+                total_commissions=0,
+                today_explorations=0,
+                today_combat_victories=0,
+                today_commissions=0,
+                week_commissions=0,
+                week_daily_tasks=0
+            )
             session.add(stats)
             await session.flush()  # 确保获得ID
 
