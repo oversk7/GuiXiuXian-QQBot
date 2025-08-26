@@ -33,48 +33,201 @@ from ..utils import message_add_head
 from ..config import config
 
 # ------------------- 市场配置 -------------------
-class Market:
-    def __init__(self, mid: str, name: str, coord: Tuple[int, int], items: List[str]):
+class MarketConfig:
+    """市场配置类，支持独立的买入和卖出商品列表"""
+    def __init__(self, mid: str, name: str, coord: Tuple[int, int],
+                 sellable_items: List[str], buyable_items: List[str] = None):
         self.id = mid
         self.name = name
         self.x, self.y = coord
-        self.items = items
+        self.sellable_items = sellable_items  # 市场出售的商品（玩家可购买）
+        self.buyable_items = buyable_items or sellable_items  # 市场收购的商品（玩家可出售）
+        # 为了兼容现有代码，保留items属性
+        self.items = list(set(sellable_items + self.buyable_items))
 
-goods_ids = [
-    "lux_perfume", "red_wine","gold_watch", "diamond_ring", "silk_scarf",
+    def can_sell_to_player(self, item_id: str) -> bool:
+        """检查市场是否向玩家出售此商品"""
+        return item_id in self.sellable_items
+
+    def can_buy_from_player(self, item_id: str) -> bool:
+        """检查市场是否从玩家收购此商品"""
+        return item_id in self.buyable_items
+
+# 所有跑商商品列表
+ALL_GOODS = [
+    "lux_perfume", "red_wine", "gold_watch", "diamond_ring", "silk_scarf",
     "dslr_camera", "smartphone", "gaming_console", "designer_bag", "luxury_chocolate",
-    "art_book", "concert_ticket", "fountain_pen", "sneakers", "noise_headphones","yin_grass","blood_pact"
+    "art_book", "concert_ticket", "fountain_pen", "sneakers", "noise_headphones",
+    "yin_grass", "blood_pact"
 ]
 
-# 生成重叠商品列表：每个市场拥有 5 个商品，起始索引按 3 步进，形成交叠
-def _goods_for_merchant(idx: int, slice_size: int = 5) -> List[str]:
-    start = (idx * 3) % len(goods_ids)  # 步进 3，产生重叠
-    return [goods_ids[(start + j) % len(goods_ids)] for j in range(slice_size)]
+# ================= 新的硬编码市集配置 =================
+# 基于地理位置和经济特色进行商品分配，确保跑商路线的多样性和盈利性
 
+MARKET_CONFIGS = {
+    # 上京 (0,0) - 政治中心，奢侈品集散地
+    "merchant1": {
+        "name": "上京",
+        "coord": (0, 0),
+        "sellable": ["gold_watch", "diamond_ring", "lux_perfume", "designer_bag", "red_wine"],
+        "buyable": ["gold_watch", "diamond_ring", "lux_perfume", "designer_bag", "red_wine", "art_book"]
+    },
 
-# 市场基础信息（id, 显示名, 坐标）
-_PROFILE_DATA = [
-    ("merchant1", "上京", (0, 0)),
-    ("merchant2", "北郊", (100, 460)),
-    ("merchant3", "东郊", (390, 50)),
-    ("merchant4", "西郊", (-420, 140)),
-    ("merchant5", "南郊", (-100, -480)),
-    ("merchant6", "金陵", (220, -350)),
-    ("merchant7", "云岭", (-250, 490)),
-    ("merchant8", "郸城", (120, 120)),
-    ("merchant9", "荔湾镇", (120, 200)),
-    ("merchant10", "摩配镇", (80, 140)),
-    ("merchant11", "风雪镇", (-5, 390)),
-    ("merchant12", "舟山", (200, -200)),
-]
+    # 北郊 (100,460) - 工业区，电子产品集中
+    "merchant2": {
+        "name": "北郊",
+        "coord": (100, 460),
+        "sellable": ["smartphone", "gaming_console", "noise_headphones", "dslr_camera", "lux_perfume"],
+        "buyable": ["smartphone", "gaming_console", "noise_headphones", "dslr_camera", "fountain_pen"]
+    },
 
+    # 东郊 (390,50) - 制造业基地，日用品丰富
+    "merchant3": {
+        "name": "东郊",
+        "coord": (390, 50),
+        "sellable": ["sneakers", "silk_scarf", "fountain_pen", "concert_ticket", "luxury_chocolate"],
+        "buyable": ["sneakers", "silk_scarf", "fountain_pen", "concert_ticket", "smartphone", "gaming_console"]
+    },
 
-# 创建市场实例，自动分配重叠商品
-MARKETS: List[Market] = []
-for idx, (mid, name, coord) in enumerate(_PROFILE_DATA):
-    MARKETS.append(Market(mid, name, coord, _goods_for_merchant(idx)))
+    # 西郊 (-420,140) - 文化区，艺术品交易
+    "merchant4": {
+        "name": "西郊",
+        "coord": (-420, 140),
+        "sellable": ["art_book", "concert_ticket", "fountain_pen", "luxury_chocolate", "blood_pact"],
+        "buyable": ["art_book", "concert_ticket", "fountain_pen", "luxury_chocolate", "lux_perfume", "designer_bag"]
+    },
 
-MARKET_BY_COORD: Dict[Tuple[int, int], Market] = {(m.x, m.y): m for m in MARKETS}
+    # 南郊 (-100,-480) - 港口，进口商品多
+    "merchant5": {
+        "name": "南郊",
+        "coord": (-100, -480),
+        "sellable": ["red_wine", "luxury_chocolate", "designer_bag", "dslr_camera", "gold_watch"],
+        "buyable": ["red_wine", "luxury_chocolate", "dslr_camera", "gold_watch", "diamond_ring", "gaming_console"]
+    },
+
+    # 金陵 (220,-350) - 古都，传统与现代结合
+    "merchant6": {
+        "name": "金陵",
+        "coord": (220, -350),
+        "sellable": ["gold_watch", "art_book", "fountain_pen", "silk_scarf", "yin_grass"],
+        "buyable": ["gold_watch", "art_book", "silk_scarf", "yin_grass", "sneakers", "concert_ticket", "diamond_ring"]
+    },
+
+    # 云岭 (-250,490) - 山区，药材丰富
+    "merchant7": {
+        "name": "云岭",
+        "coord": (-250, 490),
+        "sellable": ["yin_grass", "blood_pact", "luxury_chocolate", "art_book", "gaming_console"],
+        "buyable": ["yin_grass", "blood_pact", "luxury_chocolate", "silk_scarf", "fountain_pen"]
+    },
+
+    # 郸城 (120,120) - 商业重镇，各类商品齐全
+    "merchant8": {
+        "name": "郸城",
+        "coord": (120, 120),
+        "sellable": ["smartphone", "sneakers", "noise_headphones", "designer_bag", "concert_ticket"],
+        "buyable": ["smartphone", "sneakers", "noise_headphones", "designer_bag", "gaming_console", "lux_perfume"]
+    },
+
+    # 荔湾镇 (120,200) - 小镇，特色商品
+    "merchant9": {
+        "name": "荔湾镇",
+        "coord": (120, 200),
+        "sellable": ["silk_scarf", "luxury_chocolate", "fountain_pen", "sneakers"],
+        "buyable": ["silk_scarf", "luxury_chocolate", "fountain_pen", "sneakers", "art_book", "noise_headphones"]
+    },
+
+    # 摩配镇 (80,140) - 机械城，电子设备专业
+    "merchant10": {
+        "name": "摩配镇",
+        "coord": (80, 140),
+        "sellable": ["gaming_console", "dslr_camera", "noise_headphones", "smartphone"],
+        "buyable": ["gaming_console", "dslr_camera", "noise_headphones", "red_wine", "lux_perfume"]
+    },
+
+    # 风雪镇 (-5,390) - 边境小镇，药材和特殊商品
+    "merchant11": {
+        "name": "风雪镇",
+        "coord": (-5, 390),
+        "sellable": ["blood_pact", "yin_grass", "concert_ticket", "art_book"],
+        "buyable": ["blood_pact", "yin_grass", "concert_ticket", "diamond_ring", "gold_watch"]
+    },
+
+    # 舟山 (200,-200) - 海岛，海外商品
+    "merchant12": {
+        "name": "舟山",
+        "coord": (200, -200),
+        "sellable": ["diamond_ring", "red_wine", "dslr_camera", "designer_bag"],
+        "buyable": ["diamond_ring", "red_wine", "dslr_camera", "designer_bag", "gaming_console", "smartphone"]
+    }
+}
+
+# 创建市场实例
+MARKETS: List[MarketConfig] = []
+for mid, config_data in MARKET_CONFIGS.items():
+    market = MarketConfig(
+        mid=mid,
+        name=config_data["name"],
+        coord=config_data["coord"],
+        sellable_items=config_data["sellable"],
+        buyable_items=config_data["buyable"]
+    )
+    MARKETS.append(market)
+
+MARKET_BY_COORD: Dict[Tuple[int, int], MarketConfig] = {(m.x, m.y): m for m in MARKETS}
+
+# ================= 配置验证和分析工具 =================
+def analyze_market_configuration():
+    """分析市场配置的合理性"""
+    print("=== 市集货物分配分析报告 ===")
+
+    # 统计每种商品的分布
+    item_distribution = {}
+    for item_id in ALL_GOODS:
+        sellable_markets = [m.name for m in MARKETS if m.can_sell_to_player(item_id)]
+        buyable_markets = [m.name for m in MARKETS if m.can_buy_from_player(item_id)]
+        item_distribution[item_id] = {
+            'sellable_count': len(sellable_markets),
+            'buyable_count': len(buyable_markets),
+            'sellable_markets': sellable_markets,
+            'buyable_markets': buyable_markets
+        }
+
+    print("\n📊 商品分布统计：")
+    for item_id, dist in item_distribution.items():
+        from ..config import config
+        item_cfg = config.items_config["by_id"].get(item_id)
+        item_name = item_cfg.name if item_cfg else item_id
+        print(f"  {item_name}: 出售{dist['sellable_count']}个市集, 收购{dist['buyable_count']}个市集")
+
+    # 统计市集商品数量
+    print("\n🏪 市集商品数量：")
+    for market in MARKETS:
+        print(f"  {market.name}: 出售{len(market.sellable_items)}种, 收购{len(market.buyable_items)}种")
+
+    # 分析跑商路线数量
+    route_count = 0
+    for src in MARKETS:
+        for dst in MARKETS:
+            if src == dst:
+                continue
+            common_items = set(src.sellable_items) & set(dst.buyable_items)
+            if common_items:
+                route_count += len(common_items)
+
+    print(f"\n🚚 理论跑商路线数量: {route_count}")
+    print(f"📍 平均每个市集间距: {sum(abs(m1.x-m2.x)+abs(m1.y-m2.y) for m1 in MARKETS for m2 in MARKETS if m1!=m2) // (len(MARKETS)*(len(MARKETS)-1))}")
+
+    # 检查是否有孤立商品
+    isolated_items = [item_id for item_id, dist in item_distribution.items()
+                     if dist['sellable_count'] < 3 or dist['buyable_count'] < 3]
+    if isolated_items:
+        print(f"\n⚠️ 交易机会较少的商品: {isolated_items}")
+
+    print("=== 分析完成 ===\n")
+
+# 在模块加载时进行配置分析（仅在开发环境）
+# analyze_market_configuration()
 
 # ------------------- 工具函数 -------------------
 _DEF_TIME = time(hour=9)
@@ -90,7 +243,7 @@ def _current_seed_day() -> date:
 
 
 
-async def _price_for(session, market: Market, item_id: str) -> Tuple[int, int]:
+async def _price_for(session, market: MarketConfig, item_id: str) -> Tuple[int, int]:
     """返回 (sell_price, buy_price) - 优化的动态价格系统
 
     价格计算逻辑：
@@ -186,16 +339,30 @@ async def _(event: MessageEvent):
             await market_cmd.finish(message_add_head("\n".join(lines), event))
 
         lines = [f"🏪 {market.name} ({market.x},{market.y})", "━━━━━━━━━━━━━"]
-        for iid in market.items:
-            item_cfg = config.items_config["by_id"].get(iid)
-            sell_p, buy_p = await _price_for(session, market, iid)
 
-            # 获取库存状态
-            market_state = await MarketState.get_or_create(session, market.id, iid)
-            stock_status = market_state.get_stock_status()
-            stock_info = f"({market_state.current_stock})"
+        # 显示可购买的商品
+        if market.sellable_items:
+            lines.append("📦 可购买商品：")
+            for iid in market.sellable_items:
+                item_cfg = config.items_config["by_id"].get(iid)
+                sell_p, _ = await _price_for(session, market, iid)
 
-            lines.append(f"{item_cfg.name}│售 {sell_p}│收 {buy_p}│库存{stock_info}{stock_status}")
+                # 获取库存状态
+                market_state = await MarketState.get_or_create(session, market.id, iid)
+                stock_status = market_state.get_stock_status()
+                stock_info = f"({market_state.current_stock})"
+
+                lines.append(f"  {item_cfg.name}│售价 {sell_p}│库存{stock_info}{stock_status}")
+
+        # 显示可出售的商品（如果与可购买不同）
+        buyable_only = set(market.buyable_items) - set(market.sellable_items)
+        if buyable_only:
+            lines.append("💰 额外收购商品：")
+            for iid in buyable_only:
+                item_cfg = config.items_config["by_id"].get(iid)
+                _, buy_p = await _price_for(session, market, iid)
+                lines.append(f"  {item_cfg.name}│收价 {buy_p}")
+
         lines.append("━━━━━━━━━━━━━\n💡 价格受供需影响，库存有限先到先得")
         await market_cmd.finish(message_add_head("\n".join(lines), event))
 
@@ -238,8 +405,8 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
         if not item_cfg:
             await buy_cmd.finish("⛔ 不存在该物品")
 
-        # 市集购买逻辑
-        if market and item_cfg.item_id in market.items:
+        # 市集购买逻辑 - 检查市场是否出售此商品
+        if market and market.can_sell_to_player(item_cfg.item_id):
             # 获取市场状态
             market_state = await MarketState.get_or_create(session, market.id, item_cfg.item_id)
             await market_state.check_daily_refresh(session)
@@ -252,7 +419,7 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
             result_inv = await session.execute(
                 select(ItemInstance).where(
                     ItemInstance.player_id == player.id,
-                    ItemInstance.item_id.in_(goods_ids)  # 只统计跑商商品
+                    ItemInstance.item_id.in_(ALL_GOODS)  # 只统计跑商商品
                 )
             )
             current_goods = result_inv.scalars().all()
@@ -363,7 +530,11 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
             await sell_cmd.finish("⛔ 这里只有风～没有商人")
 
         item_cfg = config.items_config["by_name"].get(item_name)
-        if not item_cfg or item_cfg.item_id not in market.items:
+        if not item_cfg:
+            await sell_cmd.finish("⛔ 不存在该物品")
+
+        # 检查市场是否收购此商品
+        if not market.can_buy_from_player(item_cfg.item_id):
             await sell_cmd.finish("⛔ 商人不收购该物品")
 
         # 检查库存（聚合数量）
@@ -462,16 +633,30 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
 
     async with safe_session() as session:
         lines = [f"🏪 {market.name} ({market.x},{market.y})", "━━━━━━━━━━━━━"]
-        for iid in market.items:
-            item_cfg = config.items_config["by_id"].get(iid)
-            sell_p, buy_p = await _price_for(session, market, iid)
 
-            # 获取库存状态
-            market_state = await MarketState.get_or_create(session, market.id, iid)
-            stock_status = market_state.get_stock_status()
-            stock_info = f"({market_state.current_stock})"
+        # 显示可购买的商品
+        if market.sellable_items:
+            lines.append("📦 可购买商品：")
+            for iid in market.sellable_items:
+                item_cfg = config.items_config["by_id"].get(iid)
+                sell_p, _ = await _price_for(session, market, iid)
 
-            lines.append(f"{item_cfg.name}│售 {sell_p}│收 {buy_p}│库存{stock_info}{stock_status}")
+                # 获取库存状态
+                market_state = await MarketState.get_or_create(session, market.id, iid)
+                stock_status = market_state.get_stock_status()
+                stock_info = f"({market_state.current_stock})"
+
+                lines.append(f"  {item_cfg.name}│售价 {sell_p}│库存{stock_info}{stock_status}")
+
+        # 显示可出售的商品（如果与可购买不同）
+        buyable_only = set(market.buyable_items) - set(market.sellable_items)
+        if buyable_only:
+            lines.append("💰 额外收购商品：")
+            for iid in buyable_only:
+                item_cfg = config.items_config["by_id"].get(iid)
+                _, buy_p = await _price_for(session, market, iid)
+                lines.append(f"  {item_cfg.name}│收价 {buy_p}")
+
         lines.append("━━━━━━━━━━━━━\n🧭 到达坐标后发送【市集】进行交易")
 
         await detail_market_cmd.finish(message_add_head("\n".join(lines), event))
@@ -491,20 +676,32 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
     async with safe_session() as session:
         lines = [f"💹 {item_cfg.name} 各市集价格", "━━━━━━━━━━━━━"]
         found = False
+
         for m in MARKETS:
-            if item_cfg.item_id not in m.items:
+            can_sell = m.can_sell_to_player(item_cfg.item_id)
+            can_buy = m.can_buy_from_player(item_cfg.item_id)
+
+            if not can_sell and not can_buy:
                 continue
-            sell_p, buy_p = await _price_for(session, m, item_cfg.item_id)
 
-            # 获取库存状态
-            market_state = await MarketState.get_or_create(session, m.id, item_cfg.item_id)
-            stock_info = f"({market_state.current_stock})"
-
-            lines.append(f"{m.name}│售 {sell_p}│收 {buy_p}│库存{stock_info}")
             found = True
+            price_info = []
+
+            if can_sell:
+                sell_p, _ = await _price_for(session, m, item_cfg.item_id)
+                # 获取库存状态
+                market_state = await MarketState.get_or_create(session, m.id, item_cfg.item_id)
+                stock_info = f"({market_state.current_stock})"
+                price_info.append(f"售 {sell_p}│库存{stock_info}")
+
+            if can_buy:
+                _, buy_p = await _price_for(session, m, item_cfg.item_id)
+                price_info.append(f"收 {buy_p}")
+
+            lines.append(f"{m.name}│{' '.join(price_info)}")
 
         if not found:
-            await price_compare_cmd.finish("ℹ️ 暂无市集出售该物品")
+            await price_compare_cmd.finish("ℹ️ 暂无市集交易该物品")
 
         await price_compare_cmd.finish(message_add_head("\n".join(lines), event))
 
@@ -588,7 +785,7 @@ async def _(event: MessageEvent):
         filtered_count = 0  # 被过滤掉的机会数量
 
         for src in MARKETS:
-            for iid in src.items:
+            for iid in src.sellable_items:  # 只考虑源市场出售的商品
                 # 检查源市场库存
                 src_state = await MarketState.get_or_create(session, src.id, iid)
                 if not src_state.can_purchase(1):  # 至少要有1个库存
@@ -596,7 +793,7 @@ async def _(event: MessageEvent):
 
                 sell_p_src, _ = await _price_for(session, src, iid)
                 for dst in MARKETS:
-                    if dst is src or iid not in dst.items:
+                    if dst is src or not dst.can_buy_from_player(iid):  # 检查目标市场是否收购此商品
                         continue
                     _, buy_p_dst = await _price_for(session, dst, iid)
                     profit = buy_p_dst - sell_p_src
@@ -1001,3 +1198,80 @@ async def _(event: MessageEvent):
         ])
 
         await trade_restrictions_cmd.finish(message_add_head("\n".join(lines), event))
+
+
+# ================= 管理员命令：市集配置分析 =================
+from nonebot.permission import SUPERUSER
+
+market_analysis_cmd = on_command("市集配置分析", block=True, priority=1, permission=SUPERUSER)
+
+@market_analysis_cmd.handle()
+async def _(event: MessageEvent):
+    """查看市集配置分析报告（仅管理员）"""
+
+    # 统计每种商品的分布
+    item_distribution = {}
+    for item_id in ALL_GOODS:
+        sellable_markets = [m.name for m in MARKETS if m.can_sell_to_player(item_id)]
+        buyable_markets = [m.name for m in MARKETS if m.can_buy_from_player(item_id)]
+        item_distribution[item_id] = {
+            'sellable_count': len(sellable_markets),
+            'buyable_count': len(buyable_markets),
+            'sellable_markets': sellable_markets,
+            'buyable_markets': buyable_markets
+        }
+
+    lines = ["📊 市集配置分析报告", "━━━━━━━━━━━━━"]
+
+    # 商品分布统计
+    lines.append("📦 商品分布统计：")
+    for item_id, dist in item_distribution.items():
+        item_cfg = config.items_config["by_id"].get(item_id)
+        item_name = item_cfg.name if item_cfg else item_id
+        lines.append(f"  {item_name}: 出售{dist['sellable_count']}个市集, 收购{dist['buyable_count']}个市集")
+
+    lines.append("")
+
+    # 市集商品数量
+    lines.append("🏪 各市集商品数量：")
+    for market in MARKETS:
+        lines.append(f"  {market.name}: 出售{len(market.sellable_items)}种, 收购{len(market.buyable_items)}种")
+
+    lines.append("")
+
+    # 分析跑商路线数量
+    route_count = 0
+    route_details = []
+    for src in MARKETS:
+        for dst in MARKETS:
+            if src == dst:
+                continue
+            common_items = set(src.sellable_items) & set(dst.buyable_items)
+            if common_items:
+                route_count += len(common_items)
+                distance = abs(src.x - dst.x) + abs(src.y - dst.y)
+                route_details.append((src.name, dst.name, len(common_items), distance))
+
+    lines.append(f"🚚 理论跑商路线数量: {route_count}")
+
+    # 平均距离
+    total_distance = sum(abs(m1.x-m2.x)+abs(m1.y-m2.y) for m1 in MARKETS for m2 in MARKETS if m1!=m2)
+    avg_distance = total_distance // (len(MARKETS)*(len(MARKETS)-1))
+    lines.append(f"📍 市集间平均距离: {avg_distance}")
+
+    lines.append("")
+
+    # 检查交易机会较少的商品
+    isolated_items = [item_id for item_id, dist in item_distribution.items()
+                     if dist['sellable_count'] < 3 or dist['buyable_count'] < 3]
+    if isolated_items:
+        lines.append("⚠️ 交易机会较少的商品:")
+        for item_id in isolated_items:
+            item_cfg = config.items_config["by_id"].get(item_id)
+            item_name = item_cfg.name if item_cfg else item_id
+            dist = item_distribution[item_id]
+            lines.append(f"  {item_name}: 出售{dist['sellable_count']}个, 收购{dist['buyable_count']}个")
+    else:
+        lines.append("✅ 所有商品都有充足的交易机会")
+
+    await market_analysis_cmd.finish(message_add_head("\n".join(lines), event))
