@@ -98,28 +98,29 @@ class FishingService:
     @classmethod
     def calculate_fish_rarity(cls, player: Player) -> str:
         """根据玩家属性计算钓到鱼的稀有度
-        
+
         Args:
             player: 玩家对象
-            
+
         Returns:
             稀有度字符串
         """
         # 基础概率
         weights = []
         rarities = []
-        
+
         for rarity, config in cls.FISH_RARITY_CONFIG.items():
             base_weight = config["weight"]
-            
-            # 运气值影响稀有鱼概率（每点运气增加0.1%稀有鱼概率）
+
+            # 运气值影响稀有鱼概率（使用S型曲线，最多增加原概率的50%）
             if rarity in ["purple", "orange"]:
-                luck_bonus = player.luck * 0.1
-                base_weight += luck_bonus
-            
+                from ..utils import luck_prob
+                luck_multiplier = 1 + luck_prob(player.luck) * 0.5
+                base_weight *= luck_multiplier
+
             weights.append(base_weight)
             rarities.append(rarity)
-        
+
         # 随机选择稀有度
         return random.choices(rarities, weights=weights)[0]
     
@@ -160,12 +161,12 @@ class FishingService:
             # 蓝色及以上：固定1条
             base_quantity = 1
         
-        # 运气值影响数量（每10点运气有10%概率额外+1）
+        # 运气值影响数量（每20点运气有5%概率额外+1，降低数量加成）
         luck_bonus = 0
-        if player.luck >= 10:
-            luck_rolls = player.luck // 10
+        if player.luck >= 20:
+            luck_rolls = player.luck // 20
             for _ in range(luck_rolls):
-                if random.random() < 0.1:  # 10%概率
+                if random.random() < 0.05:  # 5%概率
                     luck_bonus += 1
         
         return base_quantity + luck_bonus
