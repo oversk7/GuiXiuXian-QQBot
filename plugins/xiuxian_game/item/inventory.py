@@ -88,9 +88,8 @@ CATEGORY_ORDER = [
     "MATERIAL",
     "GOODS",
     "ELIXIR",                # 丹药（item_id 以 _elixir 结尾）
-    "EQUIPMENT",
     "GEM",                   # 宝石
-    "GHOST_FRAGMENT",        # 鬼怪碎片
+    "EQUIPMENT"
 ]
 
 @use_item.handle()
