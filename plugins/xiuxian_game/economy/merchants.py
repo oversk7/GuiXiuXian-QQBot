@@ -507,6 +507,9 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
 # -------- 卖出 --------
 sell_cmd = on_command("出售", aliases={"卖"}, block=True, priority=5)
 
+# -------- 自动出售 --------
+auto_sell_cmd = on_command("自动出售", aliases={"一键出售", "批量出售"}, block=True, priority=5)
+
 @sell_cmd.handle()
 async def _(event: MessageEvent, args: Message = CommandArg()):
     arg_text = args.extract_plain_text().strip()
@@ -620,6 +623,148 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
         await sell_cmd.finish(message_add_head(
             f"💰 卖出 {item_cfg.name}×{qty} 成功！\n🪙 获得 {total_gain + bonus} 金币{bonus_msg}\n"
             f"📦 市场库存：{market_state.current_stock}", event))
+
+@auto_sell_cmd.handle()
+async def _(event: MessageEvent):
+    """自动出售背包中所有可出售的商品"""
+    async with safe_session() as session:
+        # 使用跨平台工具获取玩家数据
+        from ..platform_utils import get_unified_player, is_guild_message
+        player = await get_unified_player(session, event)
+        if not player:
+            if is_guild_message(event):
+                await auto_sell_cmd.finish("⛔ 你还没有创建角色或绑定账号\n💡 请先在群聊注册角色，然后使用绑定功能")
+            else:
+                await auto_sell_cmd.finish("⛔ 请先创建角色")
+
+        # 获取当前位置的市场
+        current_x, current_y = player.get_current_coordinates()
+        market = MARKET_BY_COORD.get((current_x, current_y))
+        if not market:
+            await auto_sell_cmd.finish("⛔ 当前位置没有市集，请先前往市集")
+
+        # 获取背包中的所有商品（排除装备）
+        result = await session.execute(
+            select(ItemInstance)
+            .where(ItemInstance.player_id == player.id)
+            .where(ItemInstance.quantity > 0)
+        )
+        all_items = result.scalars().all()
+
+        # 过滤出可出售的商品
+        sellable_items = []
+        for item in all_items:
+            if item.is_equipment:
+                continue  # 跳过装备
+
+            # 检查市场是否收购此商品
+            if not market.can_buy_from_player(item.item_id):
+                continue
+
+            # 检查是否可以在此市场出售（4小时限制）
+            can_sell = await TradeRecord.can_sell_at_market(
+                session, player.id, market.id, item.item_id, hours=4
+            )
+            if not can_sell:
+                continue
+
+            sellable_items.append(item)
+
+        if not sellable_items:
+            await auto_sell_cmd.finish(message_add_head(
+                "📦 背包中没有可在当前市集出售的商品\n"
+                "💡 可能原因：\n"
+                "• 背包中没有商品\n"
+                "• 当前市集不收购你的商品\n"
+                "• 4小时内在此地购买的商品不能出售", event))
+
+        # 计算总收益和详细信息
+        total_gain = 0
+        total_bonus = 0
+        sold_items = []
+
+        for item in sellable_items:
+            item_cfg = config.items_config["by_id"].get(item.item_id)
+            if not item_cfg:
+                continue
+
+            # 获取市场状态和价格
+            market_state = await MarketState.get_or_create(session, market.id, item.item_id)
+            await market_state.check_daily_refresh(session)
+
+            _, buy_price = await _price_for(session, market, item.item_id)
+            item_gain = buy_price * item.quantity
+
+            # 计算跑商奖励
+            bonus = 0
+            recent_purchases = await TradeRecord.get_recent_purchases_at_market(
+                session, player.id, market.id, item.item_id, hours=24
+            )
+            if not recent_purchases:
+                bonus = int(item_gain * 0.05)
+
+            # 扣除物品
+            success_consume = await ItemInstance.consume_item(
+                session, player.id, item.item_id, item.quantity
+            )
+            if not success_consume:
+                continue
+
+            # 更新市场状态
+            market_state.apply_sale(item.quantity)
+
+            # 记录交易
+            await TradeRecord.record_trade(
+                session=session,
+                player_id=player.id,
+                trade_type=TradeType.SELL,
+                market_id=market.id,
+                item_id=item.item_id,
+                quantity=item.quantity,
+                unit_price=buy_price,
+                total_amount=item_gain
+            )
+
+            total_gain += item_gain
+            total_bonus += bonus
+            sold_items.append({
+                "name": item_cfg.name,
+                "quantity": item.quantity,
+                "unit_price": buy_price,
+                "total": item_gain,
+                "bonus": bonus
+            })
+
+            session.add(market_state)
+
+        if not sold_items:
+            await auto_sell_cmd.finish(message_add_head("❌ 没有成功出售任何商品", event))
+
+        # 更新玩家金币
+        player.gold += total_gain + total_bonus
+        session.add(player)
+        await session.commit()
+
+        # 生成结果消息
+        lines = [
+            f"💰 自动出售完成！共出售 {len(sold_items)} 种商品",
+            "━━━━━━━━━━━━━"
+        ]
+
+        for item in sold_items:
+            bonus_text = f" (+{item['bonus']}跑商奖励)" if item['bonus'] > 0 else ""
+            lines.append(f"• {item['name']} ×{item['quantity']} = {item['total']}金币{bonus_text}")
+
+        lines.extend([
+            "━━━━━━━━━━━━━",
+            f"🪙 总收益：{total_gain + total_bonus} 金币",
+            f"💰 当前金币：{player.gold}"
+        ])
+
+        if total_bonus > 0:
+            lines.append(f"🎁 跨市场交易奖励：{total_bonus} 金币")
+
+        await auto_sell_cmd.finish(message_add_head("\n".join(lines), event))
 
 # -------- 市集列表 --------
 
