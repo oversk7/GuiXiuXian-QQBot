@@ -388,7 +388,10 @@ async def handle_inventory(event: MessageEvent, args: Message = CommandArg()):
             .where(ItemInstance.player_id == player.id)
             .where(ItemInstance.quantity > 0)
         )
-        items: list[ItemInstance] = result.scalars().all()
+        all_items: list[ItemInstance] = result.scalars().all()
+
+        # 过滤掉装备，装备不在背包中显示
+        items: list[ItemInstance] = [item for item in all_items if not item.is_equipment]
 
         if not items:
             await inventory_cmd.finish("🎒 你的背包空无一物")
@@ -400,51 +403,34 @@ async def handle_inventory(event: MessageEvent, args: Message = CommandArg()):
             if not item_config:
                 await inventory_cmd.finish(f"⛔ 不存在物品：{query_item_name}")
 
-            # 统计该物品的总数量
-            matching_items = [item for item in items if item.item_id == item_config.item_id]
+            # 如果查询的是装备，提示使用装备栏查看
+            if item_config.type == ItemType.EQUIPMENT:
+                await inventory_cmd.finish(f"⚔️ {query_item_name} 是装备类物品\n💡 请使用 /装备栏 查看装备信息")
+
+            # 统计该物品的总数量（从所有物品中查找，不只是背包物品）
+            matching_items = [item for item in all_items if item.item_id == item_config.item_id]
 
             if not matching_items:
-                await inventory_cmd.finish(f"🎒 背包中没有 {query_item_name}")
+                await inventory_cmd.finish(f"� 背包中没有 {query_item_name}")
 
-            # 计算总数量
-            if item_config.type == ItemType.EQUIPMENT:
-                # 装备显示数量和详细信息
-                total_count = len(matching_items)
-                lines = [
-                    f"🔍 物品查询结果",
-                    f"━━━━━━━━━━━━━",
-                    f"📦 物品名称：{item_config.name}",
-                    f"🔢 拥有数量：{total_count} 件",
-                    f"📋 物品类型：装备",
-                    ""
-                ]
+            # 普通物品显示总数量
+            total_quantity = sum(item.quantity for item in matching_items)
 
-                # 显示装备详情
-                for i, equipment in enumerate(matching_items, 1):
-                    durability_info = f"🛠️ {equipment.durability}/{item_config.durability}"
-                    upgrade_info = f"⭐+{equipment.upgrade_level}阶" if equipment.upgrade_level > 0 else ""
-                    equipped_info = "🎯已装备" if equipment.equipped else "📦未装备"
+            # 获取物品类型的中文名称
+            type_cn = TYPE_NAME_MAP.get(item_config.type.value, item_config.type.value)
 
-                    lines.append(f"{i}. {durability_info} {upgrade_info} {equipped_info}")
-            else:
-                # 普通物品显示总数量
-                total_quantity = sum(item.quantity for item in matching_items)
+            # 特殊处理丹药类型
+            if item_config.item_id.endswith("_elixir"):
+                type_cn = "丹药"
 
-                # 获取物品类型的中文名称
-                type_cn = TYPE_NAME_MAP.get(item_config.type.value, item_config.type.value)
-
-                # 特殊处理丹药类型
-                if item_config.item_id.endswith("_elixir"):
-                    type_cn = "丹药"
-
-                lines = [
-                    f"🔍 物品查询结果",
-                    f"━━━━━━━━━━━━━",
-                    f"📦 物品名称：{item_config.name}",
-                    f"🔢 拥有数量：{total_quantity}",
-                    f"📋 物品类型：{type_cn}",
-                    f"📝 物品描述：{item_config.description}"
-                ]
+            lines = [
+                f"🔍 物品查询结果",
+                f"━━━━━━━━━━━━━",
+                f"📦 物品名称：{item_config.name}",
+                f"🔢 拥有数量：{total_quantity}",
+                f"📋 物品类型：{type_cn}",
+                f"📝 物品描述：{item_config.description}"
+            ]
 
             result_msg = "\n".join(lines)
             await inventory_cmd.finish(message_add_head(result_msg, event))
@@ -459,7 +445,10 @@ async def handle_inventory(event: MessageEvent, args: Message = CommandArg()):
             return inst.config.type.value  # MATERIAL / GOODS / EQUIPMENT
 
         if category_key:
-            if category_key == "ELIXIR":
+            if category_key == "EQUIPMENT":
+                # 装备不在背包中显示，提示使用装备栏
+                await inventory_cmd.finish("⚔️ 装备不在背包中显示\n💡 请使用 /装备栏 查看装备信息")
+            elif category_key == "ELIXIR":
                 items = [it for it in items if _is_elixir(it)]
             elif category_key == "CONSUMABLE":
                 items = [it for it in items if it.config.type == ItemType.CONSUMABLE and not _is_elixir(it)]
@@ -618,22 +607,25 @@ async def handle_organize_inventory(event: MessageEvent):
             .where(ItemInstance.player_id == player.id)
             .where(ItemInstance.quantity > 0)
         )
-        items: list[ItemInstance] = result.scalars().all()
+        all_items: list[ItemInstance] = result.scalars().all()
+
+        # 过滤掉装备，只整理非装备物品
+        items: list[ItemInstance] = [item for item in all_items if not item.is_equipment]
+        equipment_count = sum(1 for item in all_items if item.is_equipment)
 
         if not items:
-            await organize_inventory_cmd.finish("🎒 背包空无一物，无需整理")
+            if equipment_count > 0:
+                await organize_inventory_cmd.finish(f"🎒 背包中只有装备，无需整理\n⚔️ 装备 {equipment_count} 件（装备不参与整理）")
+            else:
+                await organize_inventory_cmd.finish("🎒 背包空无一物，无需整理")
 
-        # 统计可堆叠物品（装备不参与整理）
+        # 统计可堆叠物品
         stackable_items = {}  # item_id -> [ItemInstance, ...]
-        equipment_count = 0
 
         for item in items:
-            if item.is_equipment:
-                equipment_count += 1
-            else:
-                if item.item_id not in stackable_items:
-                    stackable_items[item.item_id] = []
-                stackable_items[item.item_id].append(item)
+            if item.item_id not in stackable_items:
+                stackable_items[item.item_id] = []
+            stackable_items[item.item_id].append(item)
 
         # 检查是否有需要整理的物品
         items_to_organize = []
