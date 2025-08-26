@@ -14,6 +14,46 @@ from ..models.monthly_card import get_player_card_benefits
 
 cfg = config.game_config["cultivate"]
 
+# 修炼文案池 - 增加修炼时的沉浸感和新鲜感
+CULTIVATE_FLAVOR_TEXTS = [
+    "你在黑焰里看见自己的影子喘息。",
+    "怨炁如潮水般涌入你的经脉，灼烧着每一寸血肉。",
+    "虚无的低语在耳边回响，诉说着不可名状的真理。",
+    "阴冷的力量沿着脊椎攀爬，你感受到灵魂的颤栗。",
+    "黑暗中有什么东西在注视着你，但你已无法回头。",
+    "血管中流淌的不再是血液，而是纯粹的恶意。",
+    "你听见骨骼在重塑的声音，痛苦与力量交织缠绕。",
+    "深渊的气息从毛孔中渗出，你正在蜕变成别的存在。",
+    "意识在虚空中飘荡，你看见了死亡的另一面。",
+    "每一次呼吸都在吞噬光明，每一次心跳都在召唤黑暗。",
+    "灵魂深处传来古老的呼唤，那是来自彼岸的邀请。",
+    "你的影子开始独立行动，在墙上描绘着诡异的符文。"
+]
+
+# 闭关文案池 - 增加闭关时的仪式感
+SECLUSION_FLAVOR_TEXTS = [
+    "{nickname} 躺入破棺，将最后一枚钉子钉入。",
+    "{nickname} 缓缓合上棺盖，黑暗吞噬了最后一丝光明。",
+    "{nickname} 在棺材中蜷缩身体，感受死亡的拥抱。",
+    "{nickname} 闭上双眼，让意识沉入无尽的深渊。",
+    "{nickname} 将自己封印在木棺中，开始漫长的蜕变。",
+    "{nickname} 躺在冰冷的棺材里，聆听心跳逐渐微弱。",
+    "{nickname} 用钉子封住棺盖，与外界彻底隔绝。",
+    "{nickname} 在黑暗中闭关，灵魂开始游离于生死之间。"
+]
+
+# 出关文案池 - 增加出关时的重生感
+OUT_SECLUSION_FLAVOR_TEXTS = [
+    "你推开棺盖，阴灰散落。",
+    "棺盖缓缓打开，你从死亡中苏醒。",
+    "你破棺而出，带着深渊的气息。",
+    "木棺开启，你重新睁开双眼。",
+    "你从黑暗中归来，灵魂已然蜕变。",
+    "棺材的束缚被打破，你获得了新生。",
+    "你推开沉重的棺盖，重见天日。",
+    "从死寂中醒来，你感受到力量的涌动。"
+]
+
 
 async def get_coffin_nail_count(session, player_id: str) -> int:
     """获取玩家背包中棺材钉的数量"""
@@ -152,14 +192,17 @@ async def handle_cultivate(event: MessageEvent):
         # 添加阴宅使用费用信息
         bonus_msg += mansion_usage_msg
 
+        # 随机选择修炼文案
+        flavor_text = random.choice(CULTIVATE_FLAVOR_TEXTS)
+
         msg = (
-            "你在黑焰里看见自己的影子喘息。\n"
+            f"{flavor_text}\n"
             "━━━━━━━━━━━━━\n"
             f"✧ 汲取怨炁 + {exp_gain}↑"
             f"{bonus_msg}\n"
             f"✧ 修为残烛 {player.exp}↑/{exp_max} {f'(可突破)' if player.exp> exp_max else ''}\n"
             "━━━━━━━━━━━━━\n"
-            "⬇️ 【突破】倾听骨骼断裂\n"
+            "⬇️ 【[连续]突破】倾听骨骼断裂\n"
             "⬇️ 【加点】缝合裂隙，塑形新肉"
         )
         await cultivate.finish(message_add_head(msg, event))
@@ -250,8 +293,11 @@ async def handle_seclusion(event: MessageEvent):
         seclusion_hours = benefits["seclusion_time_limit"] // 3600
         time_limit_msg = f"\n✧ 闭关时长上限 ⏰ {seclusion_hours}小时"
 
+        # 随机选择闭关文案
+        seclusion_flavor_text = random.choice(SECLUSION_FLAVOR_TEXTS).format(nickname=player.nickname)
+
         msg_secl = (
-            f"🕯️{player.nickname} 躺入破棺，将最后一枚钉子钉入。\n"
+            f"🕯️{seclusion_flavor_text}\n"
             "━━━━━━━━━━━━━\n"
             "✧ 离线修炼进行中，期间无法普通修炼"
             f"{efficiency_msg}"
@@ -392,8 +438,11 @@ async def handle_out_seclusion(event: MessageEvent):
         # 添加阴宅使用费用信息
         efficiency_msg += mansion_usage_msg
 
+        # 随机选择出关文案
+        out_seclusion_flavor_text = random.choice(OUT_SECLUSION_FLAVOR_TEXTS)
+
         msg_out = (
-            "🔓你推开棺盖，阴灰散落。\n"
+            f"🔓{out_seclusion_flavor_text}\n"
             "━━━━━━━━━━━━━\n"
             f"✧ 累积怨炁 + {exp_gain}↑"
             f"{efficiency_msg}\n"
