@@ -92,6 +92,7 @@ async def handle_fishing(event: MessageEvent, args: Message = CommandArg()):
         "【钓鱼记录】 查看个人钓鱼记录\n"
         "【钓鱼排行】 查看钓鱼排行榜\n"
         "【钓鱼图鉴】 查看详细钓鱼说明\n"
+        "【吃鱼 鱼类名称 数量】 品尝鱼类美味（仅娱乐）\n"
         "━━━━━━━━━━━━━\n"
         "🐟 鱼类稀有度：\n"
         "⚪ 普通（60%）- 鲤鱼、鲫鱼、草鱼等\n"

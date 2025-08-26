@@ -236,26 +236,27 @@ class FishingService:
     @classmethod
     async def get_fishing_leaderboard(cls, session, limit: int = 10) -> List[Dict]:
         """获取钓鱼排行榜
-        
+
         Args:
             session: 数据库会话
             limit: 返回数量限制
-            
+
         Returns:
             排行榜列表
         """
         from sqlalchemy import select, desc
-        
-        stmt = select(FishingStats, Player.nickname).join(
+
+        stmt = select(FishingStats, Player.nickname, Player.uid).join(
             Player, FishingStats.player_id == Player.id
         ).order_by(desc(FishingStats.total_fish_value)).limit(limit)
-        
+
         result = await session.execute(stmt)
         leaderboard = []
-        
-        for stats, nickname in result:
+
+        for stats, nickname, uid in result:
             leaderboard.append({
                 "nickname": nickname,
+                "uid": uid,
                 "total_fishing_count": stats.total_fishing_count,
                 "total_fish_caught": stats.total_fish_caught,
                 "total_fish_value": stats.total_fish_value,
@@ -263,5 +264,5 @@ class FishingService:
                 "legendary_fish_caught": stats.legendary_fish_caught,
                 "best_fish_value": stats.best_fish_value
             })
-        
+
         return leaderboard
