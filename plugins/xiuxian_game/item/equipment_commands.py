@@ -71,13 +71,25 @@ def get_equipment_short_id(all_equips: list, target_equip: ItemInstance) -> int:
     return 0
 
 # ---------------- 指令：查看装备栏 ----------------
-list_equipment = on_command("装备栏", aliases={"我的装备"}, block=True, priority=5)
+list_equipment = on_command("装备栏", aliases={"我的装备"}, block=True, priority=5, force_whitespace=True)
 
 @list_equipment.handle()
-async def _(event: MessageEvent):
+async def _(event: MessageEvent, args: Message = CommandArg()):
+    # 解析参数
+    arg = args.extract_plain_text().strip()
+    page = 1
+    if arg:
+        try:
+            page = int(arg)
+            if page < 1:
+                page = 1
+        except ValueError:
+            await list_equipment.finish("⛔ 页码必须是正整数")
+
     async with safe_session() as session:
         # 使用跨平台工具获取玩家数据
         from ..platform_utils import get_unified_player, is_guild_message
+        from ..config import config
         player = await get_unified_player(session, event)
         if not player:
             if is_guild_message(event):
@@ -98,23 +110,27 @@ async def _(event: MessageEvent):
         # 统计已装备数量
         equipped_count = sum(1 for eq in equips if eq.equipped)
 
+        # 分页设置
+        page_size = config.game_config["game"]["inventory_page_size"]  # 使用与背包相同的分页大小
+        total_pages = (len(equips) - 1) // page_size + 1
+        page = max(1, min(page, total_pages))
+
+        start_idx = (page - 1) * page_size
+        end_idx = start_idx + page_size
+        current_page_equips = equips[start_idx:end_idx]
+
         lines = [f"🎽 装备栏 ({equipped_count}/4)", "━━━━━━━━━━━━━"]
 
-        # 为装备分配简短编号
-        equipment_numbers = {}
-        for i, eq in enumerate(equips, 1):
-            equipment_numbers[eq.id] = i
-
-        for eq in equips:
+        # 为装备分配简短编号（全局编号）
+        for i, eq in enumerate(current_page_equips, start=start_idx + 1):
             tpl = eq.config
             equip_state = "🟢已装备" if eq.equipped else "🔘未装备"
 
             # 构建装备信息
             info_parts = []
 
-            # 基础信息 - 使用简短编号
-            short_id = equipment_numbers[eq.id]
-            info_parts.append(f"🆔{short_id}│{tpl.name}")
+            # 基础信息 - 使用全局编号
+            info_parts.append(f"🆔{i}│{tpl.name}")
 
             # 升阶等级
             if eq.upgrade_level > 0:
@@ -131,6 +147,13 @@ async def _(event: MessageEvent):
             info_parts.append(equip_state)
 
             lines.append(" ".join(info_parts))
+
+        # 添加分页信息
+        if total_pages > 1:
+            lines.append("━━━━━━━━━━━━━")
+            lines.append(f"📖 第 {page} 页（共 {total_pages} 页）")
+            if page < total_pages:
+                lines.append("💡 使用【装备栏 页码】查看其他页")
 
         await list_equipment.finish(message_add_head("\n".join(lines), event))
 

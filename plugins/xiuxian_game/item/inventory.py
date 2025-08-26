@@ -485,7 +485,8 @@ async def handle_inventory(event: MessageEvent, args: Message = CommandArg()):
 
         # 获取容量信息（包含月卡加成）
         effective_capacity = await player.get_effective_inventory_capacity(session)
-        used_slots = len(items)
+        # 计算已使用的背包格数（装备不计入）
+        used_slots = sum(1 for item in items if not item.is_equipment)
         capacity_info = f"📦 容量：{used_slots}/{effective_capacity}"
 
         # 如果有月卡加成，显示详细信息
