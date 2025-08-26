@@ -577,13 +577,36 @@ async def handle_drop_item(event: MessageEvent, args: Message = CommandArg()):
         if not item_cfg:
             await drop_item.finish(f"⛔ 不存在物品：{item_name}")
 
+        # 检查是否为鱼类物品
+        is_fish = False
+        try:
+            from ..fishing.service import FishingService
+            all_fish_ids = []
+            for rarity_config in FishingService.FISH_RARITY_CONFIG.values():
+                all_fish_ids.extend(rarity_config["fish_list"])
+            is_fish = item_cfg.item_id in all_fish_ids
+        except ImportError:
+            # 如果钓鱼模块不存在，则不是鱼类
+            pass
+
         try:
             await ItemInstance.consume_item(session, player.id, item_cfg.item_id, quantity)
         except ValueError as e:
             await drop_item.finish(f"⛔ 丢弃失败：{e}")
         await session.commit()
 
-    await drop_item.finish(f"🗑️ 已丢弃 {item_name} ✖️{quantity}")
+    # 根据是否为鱼类显示不同的消息
+    if is_fish:
+        # 鱼类显示放生消息和功德增加
+        if quantity == 1:
+            message = f"🐟 你将 {item_name} 放生回了大自然\n✨ 功德 +1"
+        else:
+            message = f"🐟 你将 {quantity} 条 {item_name} 放生回了大自然\n✨ 功德 +{quantity}"
+    else:
+        # 普通物品显示丢弃消息
+        message = f"🗑️ 已丢弃 {item_name} ✖️{quantity}"
+
+    await drop_item.finish(message)
 
 
 @organize_inventory_cmd.handle()
