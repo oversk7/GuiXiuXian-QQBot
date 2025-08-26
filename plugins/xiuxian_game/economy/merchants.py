@@ -61,6 +61,20 @@ ALL_GOODS = [
     "yin_grass", "blood_pact"
 ]
 
+# 所有鱼类列表（钓鱼系统专用）
+ALL_FISH = [
+    # 普通鱼类（白色品质）
+    "common_carp", "crucian_carp", "grass_carp", "silver_carp", "catfish",
+    # 绿色品质鱼类
+    "bass", "mandarin_fish", "yellow_croaker", "pomfret", "snapper",
+    # 蓝色品质鱼类
+    "salmon", "tuna", "grouper", "eel", "turbot",
+    # 紫色品质稀有鱼类
+    "chinese_sturgeon", "arowana", "giant_catfish", "bluefin_tuna",
+    # 橙色品质传说鱼类
+    "golden_dragon_fish", "phoenix_fish", "void_fish"
+]
+
 # ================= 硬编码市集配置 =================
 # 基于地理位置和经济特色进行商品分配，确保跑商路线的多样性和盈利性
 
@@ -153,12 +167,12 @@ MARKET_CONFIGS = {
         "buyable": ["blood_pact", "yin_grass", "concert_ticket", "diamond_ring", "gold_watch"]
     },
 
-    # 舟山 (200,-200) - 海岛，海外商品
+    # 舟山 (200,-200) - 海岛城市，海外商品 + 鱼类收购
     "merchant12": {
         "name": "舟山",
         "coord": (200, -200),
         "sellable": ["diamond_ring", "red_wine", "dslr_camera", "designer_bag"],
-        "buyable": ["diamond_ring", "red_wine", "dslr_camera", "designer_bag", "gaming_console", "smartphone"]
+        "buyable": ["diamond_ring", "red_wine", "dslr_camera", "designer_bag", "gaming_console", "smartphone"] + ALL_FISH
     }
 }
 
@@ -419,7 +433,7 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
             result_inv = await session.execute(
                 select(ItemInstance).where(
                     ItemInstance.player_id == player.id,
-                    ItemInstance.item_id.in_(ALL_GOODS)  # 只统计跑商商品
+                    ItemInstance.item_id.in_(ALL_GOODS + ALL_FISH)  # 统计跑商商品和鱼类
                 )
             )
             current_goods = result_inv.scalars().all()

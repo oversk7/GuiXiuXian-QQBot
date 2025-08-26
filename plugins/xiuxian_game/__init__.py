@@ -27,7 +27,8 @@ from . import (
     backup,
     ai_guide,  # AI引导系统（包含管理员数据库查询）
     battle,  # 战斗系统（包含PVP切磋）
-    world_boss
+    world_boss,
+    fishing  # 钓鱼系统
 )
 
 # 导入跨平台绑定模块

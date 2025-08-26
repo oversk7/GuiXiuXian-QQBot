@@ -39,6 +39,8 @@ from .npc import NPC, NPCType, NPCStatus
 from .temporary_buff import TemporaryBuff
 # 跨平台绑定系统模型
 from .platform_binding import PlatformBinding
+# 钓鱼系统模型
+from .fishing_record import FishingRecord, FishingStats
 
 __all__ = [
     "Player", "Guild", "GuildMember", "GuildBuilding", "GuildPosition", "BuildingType", "WorldMessage", "BankAccount", "ItemInstance", "WorldTile", "NavigationTask", "AlchemyRecord", "MarketOrder",
@@ -51,5 +53,5 @@ __all__ = [
     "WorldBossCycle", "WorldBossDamage",
     "InviteReward", "DungeonChestRecord",
     "Location", "NPC", "NPCType", "NPCStatus",
-    "TemporaryBuff", "PlatformBinding"
+    "TemporaryBuff", "PlatformBinding", "FishingRecord", "FishingStats"
 ]

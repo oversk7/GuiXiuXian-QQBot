@@ -1335,6 +1335,166 @@ items:
       type: "GOODS"
       price: 900
 
+  fish:  # 鱼类物品（钓鱼系统专用）
+    # ========== 普通鱼类（白色品质）==========
+    - item_id: "common_carp"
+      name: "鲤鱼"
+      description: "常见的淡水鱼，肉质鲜美，营养丰富 🐟"
+      type: "GOODS"
+      rarity: "white"
+      price: 50
+
+    - item_id: "crucian_carp"
+      name: "鲫鱼"
+      description: "小巧的淡水鱼，适合煲汤，味道鲜甜 🐟"
+      type: "GOODS"
+      rarity: "white"
+      price: 40
+
+    - item_id: "grass_carp"
+      name: "草鱼"
+      description: "体型较大的草食性鱼类，肉质紧实 🐟"
+      type: "GOODS"
+      rarity: "white"
+      price: 60
+
+    - item_id: "silver_carp"
+      name: "鲢鱼"
+      description: "银白色的淡水鱼，头大身小，适合做鱼头汤 🐟"
+      type: "GOODS"
+      rarity: "white"
+      price: 45
+
+    - item_id: "catfish"
+      name: "鲶鱼"
+      description: "无鳞的底栖鱼类，肉质滑嫩，营养价值高 🐟"
+      type: "GOODS"
+      rarity: "white"
+      price: 70
+
+    # ========== 绿色品质鱼类 ==========
+    - item_id: "bass"
+      name: "鲈鱼"
+      description: "肉质鲜美的海鱼，富含蛋白质，深受食客喜爱 🐟"
+      type: "GOODS"
+      rarity: "green"
+      price: 120
+
+    - item_id: "mandarin_fish"
+      name: "桂鱼"
+      description: "名贵的淡水鱼，肉质细嫩，刺少味美 🐟"
+      type: "GOODS"
+      rarity: "green"
+      price: 150
+
+    - item_id: "yellow_croaker"
+      name: "黄花鱼"
+      description: "金黄色的海鱼，肉质鲜嫩，是制作鱼丸的上等原料 🐟"
+      type: "GOODS"
+      rarity: "green"
+      price: 180
+
+    - item_id: "pomfret"
+      name: "鲳鱼"
+      description: "扁平的海鱼，肉质鲜美，适合清蒸 🐟"
+      type: "GOODS"
+      rarity: "green"
+      price: 160
+
+    - item_id: "snapper"
+      name: "鲷鱼"
+      description: "高档海鱼，肉质紧实，口感极佳 🐟"
+      type: "GOODS"
+      rarity: "green"
+      price: 200
+
+    # ========== 蓝色品质鱼类 ==========
+    - item_id: "salmon"
+      name: "三文鱼"
+      description: "珍贵的洄游鱼类，肉质鲜美，富含不饱和脂肪酸 🐟"
+      type: "GOODS"
+      rarity: "blue"
+      price: 350
+
+    - item_id: "tuna"
+      name: "金枪鱼"
+      description: "深海大型鱼类，肉质紧实，是制作刺身的顶级食材 🐟"
+      type: "GOODS"
+      rarity: "blue"
+      price: 400
+
+    - item_id: "grouper"
+      name: "石斑鱼"
+      description: "名贵的海鱼，肉质鲜美，营养价值极高 🐟"
+      type: "GOODS"
+      rarity: "blue"
+      price: 450
+
+    - item_id: "eel"
+      name: "鳗鱼"
+      description: "细长的鱼类，肉质鲜美，具有很高的营养价值 🐟"
+      type: "GOODS"
+      rarity: "blue"
+      price: 380
+
+    - item_id: "turbot"
+      name: "多宝鱼"
+      description: "扁平的海鱼，肉质细嫩，是高档餐厅的招牌菜 🐟"
+      type: "GOODS"
+      rarity: "blue"
+      price: 420
+
+    # ========== 紫色品质稀有鱼类 ==========
+    - item_id: "chinese_sturgeon"
+      name: "中华鲟"
+      description: "古老而珍贵的鱼类，被誉为'水中大熊猫'，极其罕见 🐟"
+      type: "GOODS"
+      rarity: "purple"
+      price: 800
+
+    - item_id: "arowana"
+      name: "龙鱼"
+      description: "神秘的观赏鱼，传说能带来好运，价值连城 🐟"
+      type: "GOODS"
+      rarity: "purple"
+      price: 1000
+
+    - item_id: "giant_catfish"
+      name: "巨型鲶鱼"
+      description: "体型巨大的鲶鱼，极其罕见，肉质鲜美 🐟"
+      type: "GOODS"
+      rarity: "purple"
+      price: 750
+
+    - item_id: "bluefin_tuna"
+      name: "蓝鳍金枪鱼"
+      description: "金枪鱼中的极品，肉质顶级，价格昂贵 🐟"
+      type: "GOODS"
+      rarity: "purple"
+      price: 900
+
+    # ========== 橙色品质传说鱼类 ==========
+    - item_id: "golden_dragon_fish"
+      name: "金龙鱼"
+      description: "传说中的神鱼，全身金光闪闪，据说食用后能增强修为 🐟✨"
+      type: "GOODS"
+      rarity: "orange"
+      price: 2000
+
+    - item_id: "phoenix_fish"
+      name: "凤凰鱼"
+      description: "传说中的神鱼，羽翼般的鳍片，据说能带来重生之力 🐟🔥"
+      type: "GOODS"
+      rarity: "orange"
+      price: 2500
+
+    - item_id: "void_fish"
+      name: "虚空鱼"
+      description: "来自诡域深处的神秘鱼类，身体半透明，蕴含诡异力量 🐟👻"
+      type: "GOODS"
+      rarity: "orange"
+      price: 3000
+
   gems:  # 宝石类镶嵌物品
     # ========== 暴击佛珠系列（1-10级）==========
     - item_id: "critical_bead_1"

@@ -35,7 +35,7 @@ async def handle_help(event: MessageEvent, args: Message = CommandArg()):
         "💕 社交系统  🏰 副本系统\n"
         "📈 投资系统  💼 打工系统\n"
         "🏠️ 阴宅系统  🏛️ 委托系统\n"
-        "📱 账号管理\n"
+        "🎣 钓鱼系统  📱 账号管理\n"
         "═════════════\n"
         "💡 发送对应系统查看详细指令，【赞助】支持诡修仙\n"
         "💡 【】括号里是指令，<>里是必填，[]里是选填\n"
@@ -76,6 +76,43 @@ async def handle_market(event: MessageEvent, args: Message = CommandArg()):
         "💡 跑商推荐已智能过滤受限制影响的路线"
     )
     await market_cmd.finish(Message(msg))
+
+# 钓鱼系统
+fishing_cmd = on_command("钓鱼系统", aliases={"钓鱼帮助"}, block=True, priority=5)
+
+@fishing_cmd.handle()
+async def handle_fishing(event: MessageEvent, args: Message = CommandArg()):
+    msg = (
+        "✨ 钓鱼系统帮助 ✨\n"
+        "随时随地享受钓鱼乐趣，获得各种珍贵鱼类\n"
+        "━━━━━━━━━━━━━\n"
+        "🎣 钓鱼操作：\n"
+        "【钓鱼】 开始钓鱼（冷却5分钟）\n"
+        "【钓鱼状态】 查看当前钓鱼状态和统计\n"
+        "【钓鱼记录】 查看个人钓鱼记录\n"
+        "【钓鱼排行】 查看钓鱼排行榜\n"
+        "【钓鱼图鉴】 查看详细钓鱼说明\n"
+        "━━━━━━━━━━━━━\n"
+        "🐟 鱼类稀有度：\n"
+        "⚪ 普通（60%）- 鲤鱼、鲫鱼、草鱼等\n"
+        "🟢 优良（25%）- 鲈鱼、桂鱼、黄花鱼等\n"
+        "🔵 精品（12%）- 三文鱼、金枪鱼、石斑鱼等\n"
+        "🟣 稀有（2.5%）- 中华鲟、龙鱼等\n"
+        "🟠 传说（0.5%）- 金龙鱼、凤凰鱼等\n"
+        "━━━━━━━━━━━━━\n"
+        "💰 鱼类交易：\n"
+        "• 可在舟山(200,-200)出售给商人\n"
+        "• 稀有鱼类价值更高，传说鱼类价值连城\n"
+        "• 运气值影响稀有鱼概率\n"
+        "━━━━━━━━━━━━━\n"
+        "⏰ 限制说明：\n"
+        "• 每次钓鱼冷却5分钟\n"
+        "• 每日钓鱼次数限制50次\n"
+        "• 需要背包空间存放鱼类\n"
+        "💡 钓鱼不受地点限制，新手友好"
+    )
+    await fishing_cmd.finish(Message(msg))
+
 # 炼丹系统
 alchemy_cmd = on_command("炼丹系统",aliases={"炼丹帮助"}, priority=4, block=True)
 
