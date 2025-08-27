@@ -16,8 +16,9 @@ def _get_material_obtain_methods(item_id: str, rarity: str) -> str:
     methods = []
 
     # 检查是否在市集中出售
-    from ..economy.merchants import goods_ids
-    if item_id in goods_ids:
+    from ..economy.merchants import MARKETS
+    market_sellable = any(market.can_sell_to_player(item_id) for market in MARKETS)
+    if market_sellable:
         methods.append("市集购买")
 
     # 检查是否在万事屋中出售
