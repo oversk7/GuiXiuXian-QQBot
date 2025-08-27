@@ -19,33 +19,33 @@ class FishingService:
     # 鱼类稀有度配置
     FISH_RARITY_CONFIG = {
         "white": {
-            "weight": 60,  # 60%概率
+            "weight": 55,  # 55%概率（降低5%）
             "fish_list": [
-                "common_carp", "crucian_carp", "grass_carp", 
+                "common_carp", "crucian_carp", "grass_carp",
                 "silver_carp", "catfish"
             ]
         },
         "green": {
-            "weight": 25,  # 25%概率
+            "weight": 28,  # 28%概率（提高3%）
             "fish_list": [
-                "bass", "mandarin_fish", "yellow_croaker", 
+                "bass", "mandarin_fish", "yellow_croaker",
                 "pomfret", "snapper"
             ]
         },
         "blue": {
-            "weight": 12,  # 12%概率
+            "weight": 14,  # 14%概率（提高2%）
             "fish_list": [
                 "salmon", "tuna", "grouper", "eel", "turbot"
             ]
         },
         "purple": {
-            "weight": 2.5,  # 2.5%概率
+            "weight": 2.5,  # 2.5%概率（保持不变，运气加成更强）
             "fish_list": [
                 "chinese_sturgeon", "arowana", "giant_catfish", "bluefin_tuna"
             ]
         },
         "orange": {
-            "weight": 0.5,  # 0.5%概率
+            "weight": 0.5,  # 0.5%概率（保持不变，运气加成更强）
             "fish_list": [
                 "golden_dragon_fish", "phoenix_fish", "void_fish"
             ]
@@ -112,11 +112,27 @@ class FishingService:
         for rarity, config in cls.FISH_RARITY_CONFIG.items():
             base_weight = config["weight"]
 
-            # 运气值影响稀有鱼概率（使用S型曲线，最多增加原概率的50%）
-            if rarity in ["purple", "orange"]:
-                from ..utils import luck_prob
-                luck_multiplier = 1 + luck_prob(player.luck) * 0.5
+            # 运气值影响稀有鱼概率（分层加成，让高运气玩家感受明显提升）
+            from ..utils import luck_prob
+            luck_factor = luck_prob(player.luck)
+
+            if rarity == "orange":
+                # 橙色传说鱼：运气加成最大，最多增加原概率的300%
+                luck_multiplier = 1 + luck_factor * 3.0
                 base_weight *= luck_multiplier
+            elif rarity == "purple":
+                # 紫色稀有鱼：运气加成较大，最多增加原概率的200%
+                luck_multiplier = 1 + luck_factor * 2.0
+                base_weight *= luck_multiplier
+            elif rarity == "blue":
+                # 蓝色精品鱼：运气加成中等，最多增加原概率的100%
+                luck_multiplier = 1 + luck_factor * 1.0
+                base_weight *= luck_multiplier
+            elif rarity == "green":
+                # 绿色优良鱼：运气加成较小，最多增加原概率的50%
+                luck_multiplier = 1 + luck_factor * 0.5
+                base_weight *= luck_multiplier
+            # 白色普通鱼不受运气影响，保持基础概率
 
             weights.append(base_weight)
             rarities.append(rarity)
@@ -161,13 +177,27 @@ class FishingService:
             # 蓝色及以上：固定1条
             base_quantity = 1
         
-        # 运气值影响数量（每20点运气有5%概率额外+1，降低数量加成）
+        # 运气值影响数量（优化后的数量加成机制）
         luck_bonus = 0
-        if player.luck >= 20:
-            luck_rolls = player.luck // 20
-            for _ in range(luck_rolls):
-                if random.random() < 0.05:  # 5%概率
-                    luck_bonus += 1
+        from ..utils import luck_prob
+        luck_factor = luck_prob(player.luck)
+
+        # 根据稀有度和运气值计算额外数量
+        if rarity == "white":
+            # 白色鱼：高运气时有更高概率获得额外数量
+            if random.random() < luck_factor * 0.4:  # 最高40%概率
+                luck_bonus += 1
+            if random.random() < luck_factor * 0.2:  # 最高20%概率
+                luck_bonus += 1
+        elif rarity == "green":
+            # 绿色鱼：中等概率获得额外数量
+            if random.random() < luck_factor * 0.3:  # 最高30%概率
+                luck_bonus += 1
+        elif rarity == "blue":
+            # 蓝色鱼：较低概率获得额外数量
+            if random.random() < luck_factor * 0.2:  # 最高20%概率
+                luck_bonus += 1
+        # 紫色和橙色鱼保持稀缺性，不增加数量
         
         return base_quantity + luck_bonus
     
