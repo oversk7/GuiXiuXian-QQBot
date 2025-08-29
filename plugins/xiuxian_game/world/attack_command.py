@@ -18,7 +18,7 @@ from ..models.inventory import ItemInstance
 from ..utils import message_add_head
 from .location_service import LocationService
 from .npc_service import NPCService
-from ..player.info import realm_by_level_and_reincarnation
+from ..player.realm_utils import realm_by_level_and_reincarnation
 from ..battle.integration_helper import BattleIntegrationHelper
 from ..config import config
 

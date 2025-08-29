@@ -7,7 +7,7 @@ from sqlalchemy import select
 from ..models.db import safe_session
 from ..models.player import Player
 from ..utils import message_add_head
-from ..player.info import realm_by_level_and_reincarnation
+from ..player.realm_utils import realm_by_level_and_reincarnation
 
 # ----------------- 指令：附近玩家 -----------------
 # 查看当前区域距离自己最近的前 5 位玩家

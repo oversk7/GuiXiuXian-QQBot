@@ -8,7 +8,7 @@ from ..models.marriage import Marriage
 from ..models.mentorship import Mentorship
 from ..utils import message_add_head
 from .mentorship_service import MentorshipService
-from ..player.info import realm_by_level_and_reincarnation
+from ..player.realm_utils import realm_by_level_and_reincarnation
 
 
 # ==================== 恩爱榜 ====================

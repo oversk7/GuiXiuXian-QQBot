@@ -7,7 +7,7 @@ from ..models.db import safe_session
 from ..models.player import Player
 from ..utils import message_add_head
 from .mentorship_service import MentorshipService
-from ..player.info import realm_by_level_and_reincarnation
+from ..player.realm_utils import realm_by_level_and_reincarnation
 
 
 # ==================== 拜师 ====================
