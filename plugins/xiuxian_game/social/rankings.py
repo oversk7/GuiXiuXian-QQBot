@@ -8,6 +8,7 @@ from ..models.marriage import Marriage
 from ..models.mentorship import Mentorship
 from ..utils import message_add_head
 from .mentorship_service import MentorshipService
+from ..player.info import realm_by_level_and_reincarnation
 
 
 # ==================== 恩爱榜 ====================
@@ -61,8 +62,7 @@ async def handle_mentor_ranking(event: MessageEvent):
         if not rankings:
             await mentor_ranking_cmd.finish("暂无恩师榜数据")
         
-        # 导入境界映射函数
-        from ..player.info import realm_by_level_and_reincarnation
+        # 使用境界映射函数
 
         lines = ["🎓 恩师排行榜", "▃▃▃▃▃▃▃▃▃▃"]
 

@@ -7,6 +7,7 @@ from sqlalchemy import select
 from ..models.db import safe_session
 from ..models.player import Player
 from ..utils import message_add_head
+from ..player.info import realm_by_level_and_reincarnation
 
 # ----------------- 指令：附近玩家 -----------------
 # 查看当前区域距离自己最近的前 5 位玩家
@@ -41,8 +42,7 @@ async def _(event: MessageEvent):
         others.sort(key=_dist)
         top5 = others[:5]
 
-        # 导入境界映射函数
-        from ..player.info import realm_by_level_and_reincarnation
+        # 使用境界映射函数
 
         # 构造回复 - 使用正确的当前坐标
         current_x, current_y = player.get_current_coordinates()

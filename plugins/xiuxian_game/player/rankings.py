@@ -7,7 +7,7 @@ import random
 from ..models.db import safe_session
 from ..models.player import Player
 from ..utils import message_add_head
-from .info import realm_by_level, number_to_chinese
+from .info import realm_by_level, realm_by_level_and_reincarnation, number_to_chinese
 
 # ==================== 修为榜 ====================
 level_rank_cmd = on_command("修为榜", aliases={"等级榜"}, block=True, priority=5)

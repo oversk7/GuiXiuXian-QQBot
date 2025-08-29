@@ -7,6 +7,7 @@ from ..models.db import safe_session
 from ..models.player import Player
 from ..utils import message_add_head
 from .mentorship_service import MentorshipService
+from ..player.info import realm_by_level_and_reincarnation
 
 
 # ==================== 拜师 ====================
@@ -183,8 +184,7 @@ async def handle_disciples(event: MessageEvent):
         if not disciples:
             await disciples_cmd.finish("🚫 你还没有徒弟")
 
-        # 导入境界映射函数
-        from ..player.info import realm_by_level_and_reincarnation
+        # 使用境界映射函数
 
         lines = [f"👥 徒弟列表 ({len(disciples)}/5)", "━━━━━━━━━━"]
         for disciple in disciples:

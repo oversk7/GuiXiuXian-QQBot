@@ -18,6 +18,7 @@ from ..models.inventory import ItemInstance
 from ..utils import message_add_head
 from .location_service import LocationService
 from .npc_service import NPCService
+from ..player.info import realm_by_level_and_reincarnation
 from ..battle.integration_helper import BattleIntegrationHelper
 from ..config import config
 
@@ -408,7 +409,6 @@ async def handle_player_attack(session, attacker: Player, target: Player, event:
         ]
 
         # 添加玩家信息
-        from ..player.info import realm_by_level_and_reincarnation
         attacker_realm = realm_by_level_and_reincarnation(attacker.level, attacker.reincarnation_level)
         target_realm = realm_by_level_and_reincarnation(target.level, target.reincarnation_level)
 
