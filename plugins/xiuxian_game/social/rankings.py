@@ -62,7 +62,7 @@ async def handle_mentor_ranking(event: MessageEvent):
             await mentor_ranking_cmd.finish("暂无恩师榜数据")
         
         # 导入境界映射函数
-        from ..player.info import realm_by_level
+        from ..player.info import realm_by_level_and_reincarnation
 
         lines = ["🎓 恩师排行榜", "▃▃▃▃▃▃▃▃▃▃"]
 
@@ -74,7 +74,8 @@ async def handle_mentor_ranking(event: MessageEvent):
             # 使用emoji装饰
             rank_emoji = "🥇" if idx == 1 else "🥈" if idx == 2 else "🥉" if idx == 3 else f"{idx}."
 
-            lines.append(f"{rank_emoji} {master.nickname}[UID:{master.uid}] Lv.{master.level} {realm_by_level(master.level)}")
+            realm_name = realm_by_level_and_reincarnation(master.level, master.reincarnation_level)
+            lines.append(f"{rank_emoji} {master.nickname}[UID:{master.uid}] Lv.{master.level} {realm_name}")
             lines.append(f"   ⭐ 恩师点：{total_points}")
             lines.append(f"   👥 徒弟数：{disciple_count}")
             lines.append("")  # 空行分隔

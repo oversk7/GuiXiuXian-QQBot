@@ -408,9 +408,9 @@ async def handle_player_attack(session, attacker: Player, target: Player, event:
         ]
 
         # 添加玩家信息
-        from ..player.info import realm_by_level
-        attacker_realm = realm_by_level(attacker.level)
-        target_realm = realm_by_level(target.level)
+        from ..player.info import realm_by_level_and_reincarnation
+        attacker_realm = realm_by_level_and_reincarnation(attacker.level, attacker.reincarnation_level)
+        target_realm = realm_by_level_and_reincarnation(target.level, target.reincarnation_level)
 
         result_lines.extend([
             f"🔥 {attacker.nickname}[UID:{attacker.uid}] Lv.{attacker.level} {attacker_realm}",

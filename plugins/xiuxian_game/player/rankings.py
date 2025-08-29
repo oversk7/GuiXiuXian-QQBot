@@ -24,15 +24,11 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
 
     lines = ["📈 修为排行榜", "━━━━━━━━━━━━━"]
     for idx, p in enumerate(players, 1):
-        realm_name = realm_by_level(p.level)
+        # 使用新的境界显示函数，包含转生信息
+        realm_name = realm_by_level_and_reincarnation(p.level, p.reincarnation_level)
         # 使用emoji装饰前三名
         rank_emoji = "🥇" if idx == 1 else "🥈" if idx == 2 else "🥉" if idx == 3 else f"{idx}."
-        # 转数信息（只有冥返过才显示）
-        reincarnation_text = ""
-        if p.reincarnation_level > 0:
-            chinese_reincarnation = number_to_chinese(p.reincarnation_level)
-            reincarnation_text = f"{chinese_reincarnation}转 "
-        lines.append(f"{rank_emoji} {p.nickname}[UID:{p.uid}] - {reincarnation_text}Lv.{p.level}『{realm_name}』 ({p.exp} EXP)")
+        lines.append(f"{rank_emoji} {p.nickname}[UID:{p.uid}] - Lv.{p.level}『{realm_name}』 ({p.exp} EXP)")
 
     await level_rank_cmd.finish(message_add_head("\n".join(lines), event))
 

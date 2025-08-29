@@ -44,9 +44,35 @@ REALM_NAMES = [
     "绝念境",
     "诡天境",
     "灾厄境",
+    # 一转境界（300-500级）
+    "冥返境",
+    "轮回境",
+    "涅槃境",
+    # 二转境界（500-1000级）
+    "虚无境",
+    "混沌境",
+    "太初境",
+    "无极境",
+    "永恒境",
+    # 三转及以上境界（1000级+）
+    "超脱境",
+    "至尊境",
+    "神话境",
+    "传说境",
+    "不朽境",
+    "万古境",
+    "无上境",
 ]
 
-REALM_THRESHOLDS = [20, 40, 60, 80, 100, 130, 160, 190, 250, 300]
+REALM_THRESHOLDS = [
+    20, 40, 60, 80, 100, 130, 160, 190, 250, 300,
+    # 一转境界阈值
+    350, 400, 500,
+    # 二转境界阈值
+    600, 700, 800, 900, 1000,
+    # 三转及以上境界阈值
+    1200, 1400, 1600, 1800, 2000, 2500, 3000
+]
 
 def number_to_chinese(num: int) -> str:
     """将阿拉伯数字转换为中文数字"""
@@ -107,7 +133,49 @@ def realm_by_level(level: int) -> str:
     for idx, cap in enumerate(REALM_THRESHOLDS):
         if level <= cap:
             return REALM_NAMES[idx]
-    return REALM_NAMES[-1] + "+"
+
+    # 如果超过所有预设阈值，使用动态境界名称
+    if level > REALM_THRESHOLDS[-1]:
+        # 计算超出的等级段
+        excess_level = level - REALM_THRESHOLDS[-1]
+        tier = (excess_level - 1) // 500 + 1  # 每500级一个新境界
+
+        # 超越境界名称
+        transcendent_realms = [
+            "破天境", "逆天境", "弑神境", "创世境", "主宰境",
+            "至高境", "终极境", "无限境", "永恒境", "绝对境"
+        ]
+
+        if tier <= len(transcendent_realms):
+            return transcendent_realms[tier - 1]
+        else:
+            # 如果连超越境界都不够用，显示数字境界
+            return f"第{number_to_chinese(tier)}重天境"
+
+    return REALM_NAMES[-1]
+
+
+def realm_by_level_and_reincarnation(level: int, reincarnation_level: int = 0) -> str:
+    """根据等级和转生等级返回更精确的境界名称"""
+    base_realm = realm_by_level(level)
+
+    # 如果有转生等级，在境界名称后添加转生标识
+    if reincarnation_level > 0:
+        # 根据转生等级添加不同的前缀或后缀
+        if reincarnation_level == 1:
+            return f"一转·{base_realm}"
+        elif reincarnation_level == 2:
+            return f"二转·{base_realm}"
+        elif reincarnation_level == 3:
+            return f"三转·{base_realm}"
+        elif reincarnation_level <= 9:
+            chinese_reincarnation = number_to_chinese(reincarnation_level)
+            return f"{chinese_reincarnation}转·{base_realm}"
+        else:
+            # 超过九转的显示方式
+            return f"轮回{reincarnation_level}世·{base_realm}"
+
+    return base_realm
 
 profile = on_command("角色",aliases={"面板","状态"}, block=True, priority=5)
 register = on_command("注册", block=True, priority=5)
@@ -206,7 +274,7 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
             if g_obj:
                 guild_name = g_obj.name
 
-    realm_name = realm_by_level(player.level)
+    realm_name = realm_by_level_and_reincarnation(player.level, player.reincarnation_level)
 
     exp_max = calculate_level_up_exp(player.level)
 
@@ -216,12 +284,6 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
     if has_unread:
         unread_notice = "\n┃📬 有新留言未读！输入【留言板】查看"
 
-    # 转数信息（只有冥返过才显示）
-    reincarnation_info = ""
-    if player.reincarnation_level > 0:
-        chinese_reincarnation = number_to_chinese(player.reincarnation_level)
-        reincarnation_info = f" · {chinese_reincarnation}转"
-
     # 获取平台显示信息
     async with safe_session() as session_platform:
         platform_info = await get_player_platform_display(session_platform, player)
@@ -229,7 +291,7 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
     content = (
         f"┏━━ 信息 ━━━━\n"
         f"┃{player.nickname}[UID:{player.uid}]「{player.sex}」\n"
-        f"┃ Lv.{player.level}{reincarnation_info} · {realm_name}\n"
+        f"┃ Lv.{player.level} · {realm_name}\n"
         f"┃ Exp {player.exp}/{exp_max}\n"
         "┣━━ 状态 ━━━━\n"
         f"┃ ❤️生命 {cur_hp}/{hp_max_str}\n"

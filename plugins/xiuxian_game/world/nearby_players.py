@@ -42,7 +42,7 @@ async def _(event: MessageEvent):
         top5 = others[:5]
 
         # 导入境界映射函数
-        from ..player.info import realm_by_level
+        from ..player.info import realm_by_level_and_reincarnation
 
         # 构造回复 - 使用正确的当前坐标
         current_x, current_y = player.get_current_coordinates()
@@ -52,8 +52,9 @@ async def _(event: MessageEvent):
         for idx, p in enumerate(top5, 1):
             gender_val = p.sex.value if hasattr(p.sex, "value") else str(p.sex)
             gender_icon = "♂" if gender_val == "男" else "♀"
+            realm_name = realm_by_level_and_reincarnation(p.level, p.reincarnation_level)
             lines.append(
-                f"{idx}. {p.nickname} {gender_icon} Lv.{p.level} {realm_by_level(p.level)}  UID:{p.uid}  距离:{_dist(p)}"
+                f"{idx}. {p.nickname} {gender_icon} Lv.{p.level} {realm_name}  UID:{p.uid}  距离:{_dist(p)}"
             )
 
         await nearby_cmd.finish(message_add_head("\n".join(lines), event)) 

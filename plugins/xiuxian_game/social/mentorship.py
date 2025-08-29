@@ -184,11 +184,12 @@ async def handle_disciples(event: MessageEvent):
             await disciples_cmd.finish("🚫 你还没有徒弟")
 
         # 导入境界映射函数
-        from ..player.info import realm_by_level
+        from ..player.info import realm_by_level_and_reincarnation
 
         lines = [f"👥 徒弟列表 ({len(disciples)}/5)", "━━━━━━━━━━"]
         for disciple in disciples:
-            lines.append(f"👤 {disciple.nickname}[UID:{disciple.uid}] Lv.{disciple.level} {realm_by_level(disciple.level)}")
+            realm_name = realm_by_level_and_reincarnation(disciple.level, disciple.reincarnation_level)
+            lines.append(f"👤 {disciple.nickname}[UID:{disciple.uid}] Lv.{disciple.level} {realm_name}")
 
         lines.append("\n使用「逐出徒弟 UID」可以逐出徒弟")
         lines.append("使用「出师 UID」可以让徒弟出师")
