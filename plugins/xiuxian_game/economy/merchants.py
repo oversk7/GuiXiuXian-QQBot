@@ -688,12 +688,15 @@ async def _(event: MessageEvent):
             if not item_cfg:
                 continue
 
+            # 保存原始数量（在consume_item之前）
+            original_quantity = item.quantity
+
             # 获取市场状态和价格
             market_state = await MarketState.get_or_create(session, market.id, item.item_id)
             await market_state.check_daily_refresh(session)
 
             _, buy_price = await _price_for(session, market, item.item_id)
-            item_gain = buy_price * item.quantity
+            item_gain = buy_price * original_quantity
 
             # 计算跑商奖励
             bonus = 0
@@ -705,13 +708,13 @@ async def _(event: MessageEvent):
 
             # 扣除物品
             success_consume = await ItemInstance.consume_item(
-                session, player.id, item.item_id, item.quantity
+                session, player.id, item.item_id, original_quantity
             )
             if not success_consume:
                 continue
 
             # 更新市场状态
-            market_state.apply_sale(item.quantity)
+            market_state.apply_sale(original_quantity)
 
             # 记录交易
             await TradeRecord.record_trade(
@@ -720,7 +723,7 @@ async def _(event: MessageEvent):
                 trade_type=TradeType.SELL,
                 market_id=market.id,
                 item_id=item.item_id,
-                quantity=item.quantity,
+                quantity=original_quantity,
                 unit_price=buy_price,
                 total_amount=item_gain
             )
@@ -729,7 +732,7 @@ async def _(event: MessageEvent):
             total_bonus += bonus
             sold_items.append({
                 "name": item_cfg.name,
-                "quantity": item.quantity,
+                "quantity": original_quantity,
                 "unit_price": buy_price,
                 "total": item_gain,
                 "bonus": bonus
