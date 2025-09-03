@@ -523,6 +523,11 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
             current_value = getattr(player, k, 0)
             setattr(player, k, max(0, current_value - v))
 
+        # 清除装备的持久化加成记录
+        if "_persist_bonus" in (equip.extra_attrs or {}):
+            extra_new = {k: v for k, v in equip.extra_attrs.items() if k != "_persist_bonus"}
+            equip.extra_attrs = extra_new
+
         # 确保当前HP/MP不超过新的上限
         if player.hp > player.max_hp:
             player.hp = player.max_hp

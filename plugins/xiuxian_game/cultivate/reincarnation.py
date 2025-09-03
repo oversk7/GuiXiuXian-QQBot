@@ -100,7 +100,7 @@ class ReincarnationService:
     
     @staticmethod
     async def _recalculate_equipment_bonus(session: AsyncSession, player: Player):
-        """重新计算装备加成"""
+        """重新计算装备加成（冥返专用）"""
         # 获取所有已装备的装备
         stmt = select(ItemInstance).where(
             ItemInstance.player_id == player.id,
@@ -108,22 +108,18 @@ class ReincarnationService:
             ItemInstance.item_id.in_(config.items_config["by_type"]["EQUIPMENT"])
         )
         equipped_items = (await session.execute(stmt)).scalars().all()
-        
-        # 1. 先卸下所有装备，恢复基础属性
+
+        # 冥返时，玩家属性已经被重置为基础值，不需要减去旧的装备加成
+        # 直接清除所有装备的持久化记录，然后重新计算
+
+        # 1. 清除所有装备的持久化记录，但保持装备状态
         for eq in equipped_items:
-            # 恢复玩家属性
-            delta = (eq.extra_attrs or {}).get("_persist_bonus", {})
-            for k, v in delta.items():
-                setattr(player, k, getattr(player, k) - v)
-            
-            # 清除持久化记录并标记未穿戴
+            # 清除持久化记录
             if "_persist_bonus" in (eq.extra_attrs or {}):
                 extra_new = {k: v for k, v in eq.extra_attrs.items() if k != "_persist_bonus"}
                 eq.extra_attrs = extra_new
-            
-            eq.equipped = False
-        
-        # 2. 获取玩家基础属性（无装备加成）
+
+        # 2. 获取玩家当前基础属性（已经是冥返后的重置属性）
         base_attrs = {
             "attack": player.attack,
             "defense": player.defense,
@@ -132,12 +128,9 @@ class ReincarnationService:
             "max_hp": player.max_hp,
             "max_mp": player.max_mp,
         }
-        
-        # 3. 重新穿戴所有装备，每件都基于基础属性计算
+
+        # 3. 重新计算并应用所有装备的加成
         for eq in equipped_items:
-            # 标记为已装备
-            eq.equipped = True
-            
             # 基于基础属性计算装备加成
             attrs_temp = base_attrs.copy()
             eq.apply_attr_bonus(attrs_temp, base_attrs)
@@ -150,11 +143,11 @@ class ReincarnationService:
                     # 对于base_attrs中不存在的属性，直接使用新值作为加成
                     if attrs_temp[k] != 0:
                         new_delta[k] = attrs_temp[k]
-            
+
             # 应用到玩家属性
             for k, v in new_delta.items():
                 setattr(player, k, getattr(player, k) + v)
-            
+
             # 保存新的持久化加成
             extra = eq.extra_attrs or {}
             extra["_persist_bonus"] = new_delta
