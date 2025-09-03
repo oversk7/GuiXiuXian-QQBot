@@ -775,7 +775,7 @@ class MansionService:
         result_msg = (
             f"🏚️ 当前位置阴宅信息\n"
             f"━━━━━━━━━━━━━\n"
-            f"✧ 阴宅主人：{mansion_owner.nickname}\n"
+            f"✧ 阴宅主人：{mansion_owner.nickname}[{mansion_owner.uid}]\n"
             f"✧ 阴宅等级：{mansion_info['level']}级"
         )
 

@@ -211,7 +211,7 @@ async def get_mansion_info_for_location(session: AsyncSession, player: Player, x
         usage_info = ""
     else:
         # 其他玩家查看
-        status_info = f"{mansion_owner.nickname} 的阴宅"
+        status_info = f"{mansion_owner.nickname}[{mansion_owner.uid}] 的阴宅"
         if can_use:
             if mansion_owner.mansion_usage_fee > 0:
                 usage_info = f"💰 使用费用：{mansion_owner.mansion_usage_fee:,}金币"
