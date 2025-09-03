@@ -427,6 +427,117 @@ class MansionService:
         return abs(x1 - x2) + abs(y1 - y2)
 
     @classmethod
+    def calculate_migration_cost(cls, mansion_level: int) -> int:
+        """
+        计算阴宅迁移费用
+
+        Args:
+            mansion_level: 阴宅等级
+
+        Returns:
+            迁移费用（当前等级升级费用的50%）
+        """
+        if mansion_level <= 0:
+            return 0
+
+        # 迁移费用 = 当前等级升级费用的50%
+        upgrade_cost = cls.get_upgrade_cost(mansion_level)
+        migration_cost = int(upgrade_cost * 0.5)
+        return migration_cost
+
+    @classmethod
+    async def can_migrate_mansion(cls, session: AsyncSession, player: Player, target_x: int, target_y: int) -> tuple[bool, str]:
+        """
+        检查玩家是否可以迁移阴宅到指定位置
+
+        Args:
+            session: 数据库会话
+            player: 玩家对象
+            target_x: 目标X坐标
+            target_y: 目标Y坐标
+
+        Returns:
+            (是否可以迁移, 错误信息)
+        """
+        # 检查是否拥有阴宅
+        if not cls.has_mansion(player):
+            return False, "你还没有阴宅，无法进行迁移"
+
+        # 检查目标位置是否是原点(0,0)
+        if target_x == 0 and target_y == 0:
+            return False, "原点(0,0)是新手出生地，不允许迁移阴宅到此位置"
+
+        # 检查目标位置是否与当前位置相同
+        if target_x == player.mansion_x and target_y == player.mansion_y:
+            return False, f"阴宅已在位置({target_x}, {target_y})，无需迁移"
+
+        # 检查距离城镇市集的限制
+        can_build, distance_error = cls.check_distance_from_towns(target_x, target_y)
+        if not can_build:
+            return False, distance_error
+
+        # 检查目标位置是否已有其他玩家的阴宅
+        existing_owner = await cls.find_mansion_owner_at_location(session, target_x, target_y)
+        if existing_owner:
+            return False, f"位置({target_x}, {target_y})已有玩家{existing_owner.nickname}的阴宅，请选择其他位置"
+
+        # 检查金币是否足够
+        migration_cost = cls.calculate_migration_cost(player.mansion_level)
+        if player.gold < migration_cost:
+            return False, f"金币不足，迁移阴宅需要{migration_cost:,}金币，当前拥有{player.gold:,}金币"
+
+        return True, ""
+
+    @classmethod
+    async def migrate_mansion(cls, session: AsyncSession, player: Player, target_x: int, target_y: int) -> tuple[bool, str]:
+        """
+        执行阴宅迁移
+
+        Args:
+            session: 数据库会话
+            player: 玩家对象
+            target_x: 目标X坐标
+            target_y: 目标Y坐标
+
+        Returns:
+            (是否成功, 结果信息)
+        """
+        # 检查是否可以迁移
+        can_migrate, error_msg = await cls.can_migrate_mansion(session, player, target_x, target_y)
+        if not can_migrate:
+            return False, error_msg
+
+        # 记录原位置
+        old_x, old_y = player.mansion_x, player.mansion_y
+
+        # 计算迁移费用
+        migration_cost = cls.calculate_migration_cost(player.mansion_level)
+
+        # 执行迁移
+        player.gold -= migration_cost
+        player.mansion_x = target_x
+        player.mansion_y = target_y
+
+        # 保存数据
+        session.add(player)
+
+        # 格式化成功信息
+        success_msg = (
+            f"🏚️ 阴宅迁移成功！\n"
+            f"━━━━━━━━━━━━━\n"
+            f"✧ 阴宅等级：{player.mansion_level}级\n"
+            f"✧ 原位置：({old_x}, {old_y})\n"
+            f"✧ 新位置：({target_x}, {target_y})\n"
+            f"✧ 迁移费用：{migration_cost:,}金币\n"
+            f"✧ 剩余金币：{player.gold:,}金币\n"
+            f"━━━━━━━━━━━━━\n"
+            f"💡 阴宅等级、使用费用、权限设置等属性保持不变\n"
+            f"💡 在新位置修炼/闭关可享受{cls.get_efficiency_bonus(player.mansion_level)*100:.0f}%效率加成"
+        )
+
+        return True, success_msg
+
+    @classmethod
     def check_distance_from_towns(cls, x: int, y: int) -> tuple[bool, str]:
         """
         检查指定位置是否距离城镇市集过近

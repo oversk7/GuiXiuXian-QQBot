@@ -18,6 +18,7 @@ upgrade_mansion_cmd = on_command("升级阴宅", aliases={"阴宅升级"}, prior
 set_mansion_fee_cmd = on_command("设置阴宅费用", aliases={"阴宅费用"}, priority=4, block=True)
 toggle_mansion_access_cmd = on_command("切换阴宅权限", aliases={"阴宅权限"}, priority=4, block=True)
 toggle_mansion_payment_cmd = on_command("切换阴宅付费意愿", aliases={"阴宅付费意愿", "阴宅付费"}, priority=4, block=True)
+migrate_mansion_cmd = on_command("迁移阴宅", aliases={"阴宅迁移"}, priority=4, block=True)
 
 
 @mansion_status_cmd.handle()
@@ -190,6 +191,101 @@ async def handle_toggle_mansion_payment(event: MessageEvent):
             await toggle_mansion_payment_cmd.finish(message_add_head(result_msg, event))
         else:
             await toggle_mansion_payment_cmd.finish(message_add_head(f"⛔ {result_msg}", event))
+
+
+@migrate_mansion_cmd.handle()
+async def handle_migrate_mansion(event: MessageEvent, args: Message = CommandArg()):
+    """迁移阴宅"""
+    user_id = event.get_user_id()
+
+    # 解析参数
+    arg_text = args.extract_plain_text().strip()
+
+    async with safe_session() as session:
+        # 获取玩家数据
+        player = await session.get(Player, user_id)
+        if not player:
+            await migrate_mansion_cmd.finish("⛔ 请先使用【注册】命令创建角色")
+
+        # 如果没有参数，显示迁移帮助和确认信息
+        if not arg_text:
+            # 检查是否拥有阴宅
+            if not MansionService.has_mansion(player):
+                await migrate_mansion_cmd.finish(message_add_head(
+                    "⛔ 你还没有阴宅，无法进行迁移\n"
+                    "💡 请先使用【购买阴宅】命令购买阴宅",
+                    event
+                ))
+
+            # 获取目标位置（玩家当前位置）
+            target_x, target_y = player.get_current_coordinates()
+
+            # 检查是否可以迁移
+            can_migrate, error_msg = await MansionService.can_migrate_mansion(session, player, target_x, target_y)
+            if not can_migrate:
+                await migrate_mansion_cmd.finish(message_add_head(f"⛔ {error_msg}", event))
+
+            # 显示迁移确认信息
+            migration_cost = MansionService.calculate_migration_cost(player.mansion_level)
+            old_x, old_y = player.mansion_x, player.mansion_y
+
+            confirm_msg = (
+                f"🏚️ 确认迁移阴宅\n"
+                f"━━━━━━━━━━━━━\n"
+                f"✧ 阴宅等级：{player.mansion_level}级\n"
+                f"✧ 原位置：({old_x}, {old_y})\n"
+                f"✧ 新位置：({target_x}, {target_y})\n"
+                f"✧ 迁移费用：{migration_cost:,}金币\n"
+                f"✧ 当前金币：{player.gold:,}金币\n"
+                f"✧ 迁移后金币：{player.gold - migration_cost:,}金币\n"
+                f"━━━━━━━━━━━━━\n"
+                f"💡 迁移后阴宅等级、使用费用、权限设置等属性保持不变\n"
+                f"⚠️ 请发送【迁移阴宅 确认】来执行迁移"
+            )
+
+            await migrate_mansion_cmd.finish(message_add_head(confirm_msg, event))
+
+        # 如果参数是"确认"，执行迁移
+        elif arg_text == "确认":
+            # 获取目标位置（玩家当前位置）
+            target_x, target_y = player.get_current_coordinates()
+
+            # 执行迁移
+            success, result_msg = await MansionService.migrate_mansion(session, player, target_x, target_y)
+
+            if success:
+                # 保存数据
+                await session.commit()
+                await migrate_mansion_cmd.finish(message_add_head(result_msg, event))
+            else:
+                await migrate_mansion_cmd.finish(message_add_head(f"⛔ {result_msg}", event))
+
+        # 其他参数，显示帮助信息
+        else:
+            migration_cost = 0
+            current_pos = "无阴宅"
+            if MansionService.has_mansion(player):
+                migration_cost = MansionService.calculate_migration_cost(player.mansion_level)
+                current_pos = f"({player.mansion_x}, {player.mansion_y})"
+
+            await migrate_mansion_cmd.finish(message_add_head(
+                "🏚️ 阴宅迁移帮助\n"
+                "━━━━━━━━━━━━━\n"
+                "用法：【迁移阴宅】（查看迁移信息）\n"
+                "用法：【迁移阴宅 确认】（执行迁移）\n"
+                f"当前阴宅位置：{current_pos}\n"
+                f"迁移费用：{migration_cost:,}金币（当前等级升级费用的50%）\n"
+                "━━━━━━━━━━━━━\n"
+                "⚠️ 迁移限制：\n"
+                "• 只有阴宅主人可以迁移\n"
+                "• 不能迁移到原点(0,0)\n"
+                "• 不能距离城镇市集20格范围内\n"
+                "• 新位置不能已有其他玩家的阴宅\n"
+                "• 需要足够的金币支付迁移费用\n"
+                "━━━━━━━━━━━━━\n"
+                "💡 迁移后保持阴宅等级、使用费用、权限设置等所有属性不变",
+                event
+            ))
 
 
 
