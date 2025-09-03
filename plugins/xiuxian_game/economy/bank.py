@@ -230,30 +230,54 @@ async def handle_transfer(event: MessageEvent, args: Message = CommandArg()):
 
 
 @deposit_rank_cmd.handle()
-async def handle_deposit_rank(event: MessageEvent):
+async def handle_deposit_rank(event: MessageEvent, args: Message = CommandArg()):
+    """显示存款最多的前30名玩家，支持分页"""
+    # 解析页码参数
+    page_text = args.extract_plain_text().strip()
+    try:
+        page = int(page_text) if page_text else 1
+    except ValueError:
+        page = 1
+    page = max(1, min(page, 3))  # 限制在1-3页
+    
+    page_size = 10
+    offset = (page - 1) * page_size
+    
     async with safe_session() as session:
-        # 先取前20余额账号，再结息，避免遍历全库
+        # 先取前30余额账号，再结息，避免遍历全库
         from sqlalchemy import func as _func
-        sub_stmt = select(BankAccount).order_by(BankAccount.balance.desc()).limit(20)
+        sub_stmt = select(BankAccount).order_by(BankAccount.balance.desc()).limit(30)
         accounts = (await session.execute(sub_stmt)).scalars().all()
         if not accounts:
             await deposit_rank_cmd.finish("暂无存款数据")
-        rows = []
+        
+        # 为所有账户结息
         for acc in accounts:
             _apply_interest(acc)
-            rows.append(acc)
-        # 按更新后余额排序取10
-        rows.sort(key=lambda x: x.balance, reverse=True)
-        top10 = rows[:10]
+        
+        # 按更新后余额排序
+        accounts.sort(key=lambda x: x.balance, reverse=True)
+        
+        # 分页处理
+        page_accounts = accounts[offset:offset + page_size]
+        
         # 自动提交利息写回
-        session.add_all(top10)
+        session.add_all(accounts)
         await session.commit()
-        lines = ["🏦 存款排行榜", "▃▃▃▃▃▃▃▃▃▃"]
-        for idx, acc in enumerate(top10, 1):
+        
+        lines = [f"🏦 存款排行榜 (第{page}/3页)", "━━━━━━━━━━━━━"]
+        for idx, acc in enumerate(page_accounts, start=offset + 1):
             p = await session.get(Player, acc.player_id)
             if not p:
                 continue
-            lines.append(f"{idx}. {p.nickname}[UID:{p.uid}] - {acc.balance}💰")
+            # 使用emoji装饰前三名
+            rank_emoji = "🥇" if idx == 1 else "🥈" if idx == 2 else "🥉" if idx == 3 else f"{idx}."
+            lines.append(f"{rank_emoji} {p.nickname}[UID:{p.uid}] - {acc.balance}💰")
+        
+        if page < 3:
+            lines.append("━━━━━━━━━━━━━")
+            lines.append("💡 使用【存款榜 页码】查看其他页")
+        
         await deposit_rank_cmd.finish(message_add_head("\n".join(lines), event))
 
 

@@ -14,21 +14,36 @@ level_rank_cmd = on_command("修为榜", aliases={"等级榜"}, block=True, prio
 
 @level_rank_cmd.handle()
 async def _(event: MessageEvent, args: Message = CommandArg()):
-    """按等级 (level) 及经验排序的前 10 名玩家排行榜"""
+    """按等级 (level) 及经验排序的前 30 名玩家排行榜，支持分页"""
+    # 解析页码参数
+    page_text = args.extract_plain_text().strip()
+    try:
+        page = int(page_text) if page_text else 1
+    except ValueError:
+        page = 1
+    page = max(1, min(page, 3))  # 限制在1-3页
+    
+    page_size = 10
+    offset = (page - 1) * page_size
+    
     async with safe_session() as session:
-        stmt = select(Player).order_by(Player.reincarnation_level.desc(), Player.level.desc(), Player.exp.desc()).limit(10)
+        stmt = select(Player).order_by(Player.reincarnation_level.desc(), Player.level.desc(), Player.exp.desc()).offset(offset).limit(page_size)
         players = (await session.execute(stmt)).scalars().all()
 
     if not players:
         await level_rank_cmd.finish("暂无排行榜数据")
 
-    lines = ["📈 修为排行榜", "━━━━━━━━━━━━━"]
-    for idx, p in enumerate(players, 1):
+    lines = [f"📈 修为排行榜 (第{page}/3页)", "━━━━━━━━━━━━━"]
+    for idx, p in enumerate(players, start=offset + 1):
         # 使用新的境界显示函数，包含转生信息
         realm_name = realm_by_level_and_reincarnation(p.level, p.reincarnation_level)
         # 使用emoji装饰前三名
         rank_emoji = "🥇" if idx == 1 else "🥈" if idx == 2 else "🥉" if idx == 3 else f"{idx}."
         lines.append(f"{rank_emoji} {p.nickname}[UID:{p.uid}] - Lv.{p.level}『{realm_name}』 ({p.exp} EXP)")
+    
+    if page < 3:
+        lines.append("━━━━━━━━━━━━━")
+        lines.append("💡 使用【修为榜 页码】查看其他页")
 
     await level_rank_cmd.finish(message_add_head("\n".join(lines), event))
 
@@ -64,19 +79,34 @@ wealth_rank_cmd = on_command("财富榜", aliases={"财富排行榜"}, block=Tru
 
 @wealth_rank_cmd.handle()
 async def _(event: MessageEvent, args: Message = CommandArg()):
-    """显示金币最多的前10名玩家"""
+    """显示金币最多的前30名玩家，支持分页"""
+    # 解析页码参数
+    page_text = args.extract_plain_text().strip()
+    try:
+        page = int(page_text) if page_text else 1
+    except ValueError:
+        page = 1
+    page = max(1, min(page, 3))  # 限制在1-3页
+    
+    page_size = 10
+    offset = (page - 1) * page_size
+    
     async with safe_session() as session:
-        stmt = select(Player).order_by(Player.gold.desc()).limit(10)
+        stmt = select(Player).order_by(Player.gold.desc()).offset(offset).limit(page_size)
         players = (await session.execute(stmt)).scalars().all()
 
     if not players:
         await wealth_rank_cmd.finish("暂无排行榜数据")
 
-    lines = ["💰 财富排行榜", "━━━━━━━━━━━━━"]
-    for idx, p in enumerate(players, 1):
+    lines = [f"💰 财富排行榜 (第{page}/3页)", "━━━━━━━━━━━━━"]
+    for idx, p in enumerate(players, start=offset + 1):
         # 使用emoji装饰前三名
         rank_emoji = "🥇" if idx == 1 else "🥈" if idx == 2 else "🥉" if idx == 3 else f"{idx}."
         lines.append(f"{rank_emoji} {p.nickname}[UID:{p.uid}] - {p.gold}💰")
+    
+    if page < 3:
+        lines.append("━━━━━━━━━━━━━")
+        lines.append("💡 使用【财富榜 页码】查看其他页")
 
     await wealth_rank_cmd.finish(message_add_head("\n".join(lines), event))
 
@@ -255,3 +285,5 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
     ]
 
     await all_rankings_cmd.finish(message_add_head("\n".join(lines), event))
+
+
