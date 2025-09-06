@@ -224,7 +224,7 @@ class LocationService:
                     lines.append(f"{npc.get_display_name()}{hint}")
             
             lines.append("⬇️ 交互 <NPC>")
-            lines.append("")
+            lines.append("⬇️ 死斗 <NPC>")
         
         # 显示地点功能
         functions = location_summary["functions"]
