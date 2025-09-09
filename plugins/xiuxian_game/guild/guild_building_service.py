@@ -48,14 +48,19 @@ class GuildBuildingService:
         BuildingType.TRAINING_GROUND: {
             "name": "训练场",
             "description": "提升成员修为加成",
-            "max_level": 5,
+            "max_level": 10,
             "base_cost": {"gold": 60000, "materials": {"墓土": 180, "梦魇丝线": 40, "诡异石": 25}},
             "effects": {
                 1: {"cultivation_bonus": 0.05},
                 2: {"cultivation_bonus": 0.08},
                 3: {"cultivation_bonus": 0.12},
                 4: {"cultivation_bonus": 0.15},
-                5: {"cultivation_bonus": 0.20}
+                5: {"cultivation_bonus": 0.20},
+                6: {"cultivation_bonus": 0.25},
+                7: {"cultivation_bonus": 0.30},
+                8: {"cultivation_bonus": 0.35},
+                9: {"cultivation_bonus": 0.40},
+                10: {"cultivation_bonus": 0.50}
             }
         },
         BuildingType.TELEPORT_ARRAY: {
@@ -87,14 +92,19 @@ class GuildBuildingService:
         BuildingType.GUILD_WAREHOUSE: {
             "name": "公会仓库",
             "description": "提供公共空间存放物品",
-            "max_level": 5,
-            "base_cost": {"gold": 70000, "materials": {"墓土": 250, "灵石": 50, "诅咒丝线": 30, "铁锈": 30}},
+            "max_level": 10,
+            "base_cost": {"gold": 70000, "materials": {"墓土": 250, "灵石": 80, "诅咒丝线": 30, "铁锈": 50}},
             "effects": {
                 1: {"storage_slots": 30},
                 2: {"storage_slots": 50},
                 3: {"storage_slots": 100},
                 4: {"storage_slots": 200},
-                5: {"storage_slots": 300}
+                5: {"storage_slots": 300},
+                6: {"storage_slots": 400},
+                7: {"storage_slots": 500},
+                8: {"storage_slots": 600},
+                9: {"storage_slots": 700},
+                10: {"storage_slots": 800}
             }
         }
         # 注意：灵塔和防御城墙暂时下架，功能还不稳定
