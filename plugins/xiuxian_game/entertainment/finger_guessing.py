@@ -13,6 +13,10 @@ guess_fist = on_command("猜拳", priority=5, block=True)
 @guess_fist.handle()
 async def handle_fist_game(event: MessageEvent, args: Message = CommandArg()):
     """处理猜拳游戏"""
+    group_id = getattr(event, "group_id", None)
+    if group_id == None:
+        await guess_fist.finish("⛔ 猜拳指令只能在群聊中使用")
+
     async with safe_session() as session:
         # 获取玩家信息
         player = await session.get(Player, event.get_user_id())
@@ -32,10 +36,10 @@ async def handle_fist_game(event: MessageEvent, args: Message = CommandArg()):
 
         try:
             bet = int(bet_str)
-            if bet < 1 or bet > 1000000:
+            if bet < 1000 or bet > 99999999:
                 raise ValueError
         except ValueError:
-            await guess_fist.finish("⚠️ 金币数必须为1-1000000之间的整数")
+            await guess_fist.finish("⚠️ 金币数必须为1000-99999999之间的整数")
 
         # 金币检查
         if player.gold < bet:
