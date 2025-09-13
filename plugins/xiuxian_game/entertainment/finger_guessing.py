@@ -54,7 +54,7 @@ async def handle_fist_game(event: MessageEvent, args: Message = CommandArg()):
             gold_change = 0
         elif win_map[player_choice] == opponent_choice:
             # 赢了得到赌注的两倍
-            reward = bet * 2
+            reward = bet
             player.gold += reward
             result_msg = f"🎉 胜利！{player_choice} 击败了 {opponent_choice}"
             result_icon = "✨"
