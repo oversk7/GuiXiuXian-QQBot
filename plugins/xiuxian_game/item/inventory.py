@@ -711,3 +711,82 @@ async def handle_organize_inventory(event: MessageEvent):
 
         result_msg = "\n".join(result_lines)
         await organize_inventory_cmd.finish(message_add_head(result_msg, event))
+
+# 新增：管理员专用物品转移指令
+transfer_item_cmd = on_command("转移物品", block=True, priority=2)
+
+# 新增副管理员判断
+from ..ai_guide import is_admin
+from ..config import Config
+
+def is_sub_admin(user_id: str) -> bool:
+    config = Config()
+    sub_admin_ids = config.game_config.get("admin", {}).get("sub_admin_ids", [])
+    return user_id in sub_admin_ids
+
+@transfer_item_cmd.handle()
+async def handle_transfer_item(event: MessageEvent, args: Message = CommandArg()):
+    """
+    管理员/副管理员专用：将某玩家背包中的物品转移到另一玩家背包
+    用法：转移物品 UID1 UID2 物品名 数量
+    """
+    from ..models.player import get_player_by_uid
+    from ..models.inventory import ItemInstance
+
+    params = args.extract_plain_text().strip().split()
+    if len(params) != 4:
+        await transfer_item_cmd.finish("⛔ 格式错误，正确格式：转移物品 UID1 UID2 物品名 数量")
+
+    uid1, uid2, item_name, qty_str = params
+    try:
+        quantity = int(qty_str)
+        if quantity <= 0:
+            raise ValueError
+    except ValueError:
+        await transfer_item_cmd.finish("⛔ 数量必须为正整数")
+
+    # 权限校验（管理员或副管理员）
+    if not (is_admin(event.get_user_id()) or is_sub_admin(event.get_user_id())):
+        await transfer_item_cmd.finish("⛔ 只有管理员或副管理员可以使用此指令")
+
+    async with safe_session() as session:
+        # 获取玩家对象
+        player1 = await get_player_by_uid(uid1)
+        player2 = await get_player_by_uid(uid2)
+        if not player1:
+            await transfer_item_cmd.finish(f"⛔ 未找到UID为{uid1}的玩家")
+        if not player2:
+            await transfer_item_cmd.finish(f"⛔ 未找到UID为{uid2}的玩家")
+
+        # 查找物品模板
+        item_cfg = config.items_config["by_name"].get(item_name)
+        if not item_cfg:
+            await transfer_item_cmd.finish(f"⛔ 不存在物品：{item_name}")
+
+        # 检查源玩家物品数量
+        result = await session.execute(
+            select(ItemInstance)
+            .where(ItemInstance.player_id == player1.id)
+            .where(ItemInstance.item_id == item_cfg.item_id)
+        )
+        inv_rows = result.scalars().all()
+        total_qty = sum(r.quantity for r in inv_rows)
+        if total_qty < quantity:
+            await transfer_item_cmd.finish(f"⛔ 源玩家背包中{item_name}数量不足（现有{total_qty}）")
+
+        # 扣除源玩家物品
+        try:
+            await ItemInstance.consume_item(session, player1.id, item_cfg.item_id, quantity)
+        except ValueError as e:
+            await transfer_item_cmd.finish(f"⛔ 扣除物品失败：{e}")
+
+        # 添加到目标玩家
+        try:
+            await ItemInstance.add_item(session, player2.id, item_cfg.item_id, quantity)
+        except ValueError as e:
+            await session.rollback()
+            await transfer_item_cmd.finish(f"⛔ 添加物品失败：{e}")
+
+        await session.commit()
+
+    await transfer_item_cmd.finish(f"✅ 已成功将 {item_name} ✖️{quantity} 从 UID:{uid1} 转移到 UID:{uid2}")
