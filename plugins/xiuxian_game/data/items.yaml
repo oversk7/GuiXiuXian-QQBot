@@ -790,6 +790,45 @@ items:
       gem_slots: 3
       rarity: "blue"
 
+    - item_id: "fog_coat"
+      name: "雾都风衣"
+      description: "这件风衣可以遮住你的面容，隐藏你的体型，掩盖你犯下的所有罪行。（开膛手套装）"
+      type: "EQUIPMENT"
+      price: 32000
+      durability: 100
+      attr_bonus: {"agility": 15}
+      attr_ratio: {"agility": 0.25, "luck": 0.08}
+      recipe:
+        materials:
+          nightmare_silk: 15
+          withered_flower: 8
+          yin_essence: 6
+        gold: 8000
+      repair_cost: 100
+      required_level: 80
+      gem_slots: 3
+      rarity: "blue"
+
+    - item_id: "soul_flag"
+      name: "镇魂幡"
+      description: "幡不动，魂不散。幡若动，是谁在召唤？"
+      type: "EQUIPMENT"
+      price: 80000
+      durability: 100
+      attr_bonus: {"mp": 50, "attack": 20}
+      attr_ratio: {"attack": 0.25, "mp": 0.15}
+      recipe:
+        materials:
+          soul_crystal: 3
+          phantom_thread: 6
+          cursed_mirror_shard: 2
+          nightmare_silk: 20
+        gold: 12000
+      repair_cost: 150
+      required_level: 90
+      gem_slots: 3
+      rarity: "blue"
+
     # ========== 顶级装备 (101-150级) - 高比例加成，蓝色+紫色材料 ==========
 
     - item_id: "drawer"
@@ -873,6 +912,26 @@ items:
       rarity: "purple"
     # ========== 传说装备 (151+级) - 极高比例加成，紫色+橙色材料 ==========
 
+    - item_id: "reality_suicide_note"
+      name: "现实遗书"
+      description: "这是我写给现实的遗书，每一个字都在否定这个世界的存在。当我写完最后一个字时，现实开始崩塌，虚无开始蔓延。也许毁灭才是真正的解脱。"
+      type: "EQUIPMENT"
+      price: 250000
+      durability: 380
+      attr_bonus: {"attack": 150, "mp": 200}
+      attr_ratio: {"attack": 0.60, "mp": 0.50}
+      recipe:
+        materials:
+          world_fragment: 3
+          time_dust: 8
+          void_essence: 20
+          medical_record: 10
+        gold: 150000
+      repair_cost: 120
+      required_level: 175
+      gem_slots: 5
+      rarity: "orange"
+
     - item_id: "god_tear_amulet"
       name: "神泪护符"
       description: "用神明之泪制成的护符，蕴含着无尽的慈悲与力量。"
@@ -932,67 +991,6 @@ items:
       repair_cost: 120
       required_level: 200
       gem_slots: 4
-      rarity: "orange"
-
-    # ========== 可锻造的特殊装备 ==========
-
-    - item_id: "fog_coat"
-      name: "雾都风衣"
-      description: "这件风衣可以遮住你的面容，隐藏你的体型，掩盖你犯下的所有罪行。（开膛手套装）"
-      type: "EQUIPMENT"
-      price: 32000
-      durability: 100
-      attr_bonus: {"agility": 15}
-      attr_ratio: {"agility": 0.25, "luck": 0.08}
-      recipe:
-        materials:
-          nightmare_silk: 15
-          withered_flower: 8
-          yin_essence: 6
-        gold: 8000
-      repair_cost: 100
-      required_level: 80
-      gem_slots: 3
-      rarity: "blue"
-
-    - item_id: "soul_flag"
-      name: "镇魂幡"
-      description: "幡不动，魂不散。幡若动，是谁在召唤？"
-      type: "EQUIPMENT"
-      price: 80000
-      durability: 100
-      attr_bonus: {"mp": 50, "attack": 20}
-      attr_ratio: {"attack": 0.25, "mp": 0.15}
-      recipe:
-        materials:
-          soul_crystal: 3
-          phantom_thread: 6
-          cursed_mirror_shard: 2
-          nightmare_silk: 20
-        gold: 12000
-      repair_cost: 150
-      required_level: 90
-      gem_slots: 3
-      rarity: "blue"
-    
-    - item_id: "reality_suicide_note"
-      name: "现实遗书"
-      description: "这是我写给现实的遗书，每一个字都在否定这个世界的存在。当我写完最后一个字时，现实开始崩塌，虚无开始蔓延。也许毁灭才是真正的解脱。"
-      type: "EQUIPMENT"
-      price: 250000
-      durability: 380
-      attr_bonus: {"attack": 150, "mp": 200}
-      attr_ratio: {"attack": 0.60, "mp": 0.50}
-      recipe:
-        materials:
-          world_fragment: 3
-          time_dust: 8
-          void_essence: 20
-          medical_record: 10
-        gold: 150000
-      repair_cost: 120
-      required_level: 175
-      gem_slots: 5
       rarity: "orange"
 
     # ========== Boss掉落专属装备（不可锻造）==========
