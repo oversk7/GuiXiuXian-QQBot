@@ -98,14 +98,21 @@ class AlchemyService:
             (是否充足, 错误信息)
         """
         invs = (await session.execute(select(ItemInstance).where(ItemInstance.player_id == player_id))).scalars().all()
-        
+
         mats_required = {mid: q * qty for mid, q in recipe["materials"].items()}
+        missing_details: List[str] = []
         for mid, need in mats_required.items():
             total_have = sum(i.quantity for i in invs if i.item_id == mid)
             if total_have < need:
                 name = config.items_config["by_id"][mid].name
-                return False, f"材料不足：{name}✖️{need}"
-        
+                shortage = need - total_have
+                missing_details.append(
+                    f"{name}✖️{need}（缺少{shortage}）"
+                )
+
+        if missing_details:
+            return False, "材料不足：" + "、".join(missing_details)
+
         return True, ""
     
     @classmethod
