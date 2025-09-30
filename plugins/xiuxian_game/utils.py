@@ -177,6 +177,94 @@ def damage_reduction_rate(defense: int | float) -> float:
     return min(reduction, 0.6)
 
 
+DEFENSE_FLAT_REDUCTION_RATIO: float = 0.2
+"""防御转换为数值减伤时的比例系数。"""
+
+DEFENSE_MAX_FLAT_PORTION: float = 0.5
+"""数值减伤相对于原始伤害所能占据的最大比例。"""
+
+
+def apply_defense_mitigation(
+    base_damage: int,
+    defense: int | float,
+    penetration_ratio: float = 0.0,
+) -> dict[str, float]:
+    """综合计算防御带来的数值减伤与比例减伤。
+
+    参数
+    ------
+    base_damage : int
+        即将结算的原始伤害值。
+    defense : int | float
+        防御力数值。
+    penetration_ratio : float, 可选
+        穿透比例，范围为 ``[0, 1]``，用于削减有效防御。
+
+    返回值
+    ------
+    dict
+        ``{"final_damage", "blocked", "flat_reduction", "percent_reduction"}``
+        四个键分别表示最终伤害、被防御抵挡的总伤害、数值减伤量以及
+        比例减伤率。
+    """
+
+    if base_damage <= 0:
+        return {
+            "final_damage": 0,
+            "blocked": 0,
+            "flat_reduction": 0,
+            "percent_reduction": 0.0,
+        }
+
+    if defense <= 0:
+        final = max(1, int(base_damage))
+        return {
+            "final_damage": final,
+            "blocked": base_damage - final,
+            "flat_reduction": 0,
+            "percent_reduction": 0.0,
+        }
+
+    effective_penetration = max(0.0, min(1.0, penetration_ratio))
+    effective_defense = defense * (1.0 - effective_penetration)
+
+    if effective_defense <= 0:
+        final = max(1, int(base_damage))
+        return {
+            "final_damage": final,
+            "blocked": base_damage - final,
+            "flat_reduction": 0,
+            "percent_reduction": 0.0,
+        }
+
+    # 数值减伤：以防御的一定比例换算，同时限制为原始伤害的一半以内
+    flat_reduction = int(effective_defense * DEFENSE_FLAT_REDUCTION_RATIO)
+    max_flat_reduction = int(base_damage * DEFENSE_MAX_FLAT_PORTION)
+    flat_reduction = max(0, min(flat_reduction, max_flat_reduction))
+
+    damage_after_flat = max(0, base_damage - flat_reduction)
+
+    percent_reduction = damage_reduction_rate(effective_defense)
+    reduced_damage = damage_after_flat * (1 - percent_reduction)
+    final_damage = int(reduced_damage)
+
+    if damage_after_flat > 0 and final_damage <= 0:
+        final_damage = 1
+
+    final_damage = max(0, min(base_damage, final_damage))
+    if base_damage > 0 and final_damage <= 0:
+        final_damage = 1
+
+    blocked = max(0, base_damage - final_damage)
+
+    return {
+        "final_damage": final_damage,
+        "blocked": blocked,
+        "flat_reduction": flat_reduction,
+        "percent_reduction": percent_reduction,
+    }
+
+
 # ---------------- URL 转义工具 ----------------
 
 def bypass_urls(

@@ -315,7 +315,7 @@ async def _sweep_dungeon(player: Player, cfg: ItemConfig, qty: int, ctx: str, se
     """
     import random
     from ..config import config
-    from ..utils import luck_prob, damage_reduction_rate
+    from ..utils import luck_prob, apply_defense_mitigation
     from ..models.inventory import ItemInstance
     from ..world.dungeon_battle import calculate_monster_attributes, get_region_materials, get_materials_by_rarity
     from sqlalchemy import select as _select
@@ -383,8 +383,8 @@ async def _sweep_dungeon(player: Player, cfg: ItemConfig, qty: int, ctx: str, se
     monster_damage = monster_attrs["attack"]
 
     # 计算免伤率
-    damage_reduction = damage_reduction_rate(player.defense)
-    actual_damage_per_hit = max(1, int(monster_damage * (1 - damage_reduction)))
+    mitigation = apply_defense_mitigation(monster_damage, player.defense)
+    actual_damage_per_hit = mitigation["final_damage"]
 
     # 计算各种限制下的最大格子数
     # 1. 理智限制：player.mp / 每格mp消耗

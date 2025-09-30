@@ -307,9 +307,10 @@ class BattleIntegrationHelper:
                         if engine.rng.random() < (monster_counter_rate / 100):
                             # 怪物反击伤害为攻击力的70%
                             counter_damage = max(1, int(monster_stats["attack"] * 0.7))
-                            from ..utils import damage_reduction_rate
-                            damage_reduction = damage_reduction_rate(player.defense)
-                            final_counter_damage = max(1, int(counter_damage * (1 - damage_reduction)))
+                            from ..utils import apply_defense_mitigation
+
+                            mitigation = apply_defense_mitigation(counter_damage, player.defense)
+                            final_counter_damage = mitigation["final_damage"]
 
                             player_hp = max(0, player_hp - final_counter_damage)
                             round_actions.append(f"⚡{monster_name}反击→{final_counter_damage}")
@@ -602,11 +603,12 @@ class BattleIntegrationHelper:
             current_damage = int(current_damage * 1.5)  # 怪物暴击1.5倍伤害
             result["effects"].append("💥暴击")
 
-        # 防御减伤计算
-        from ..utils import damage_reduction_rate
-        damage_reduction = damage_reduction_rate(player.defense)
-        final_damage = max(1, int(current_damage * (1 - damage_reduction)))
-        blocked_damage = current_damage - final_damage
+        # 防御减伤计算（数值减伤 + 比例减伤）
+        from ..utils import apply_defense_mitigation
+
+        mitigation = apply_defense_mitigation(current_damage, player.defense)
+        final_damage = mitigation["final_damage"]
+        blocked_damage = mitigation["blocked"]
 
         # 连击处理
         total_damage = final_damage

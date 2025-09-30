@@ -153,16 +153,19 @@ class BattleEngine:
         # 应用穿透和防御
         monster_defense = monster_stats.get("defense", 0)
         if penetration_ratio > 0:
-            from ..utils import damage_reduction_rate
-            normal_reduction = damage_reduction_rate(monster_defense)
-            penetration_reduction = normal_reduction * (1 - penetration_ratio)
-            final_damage = max(1, int(final_damage * (1 - penetration_reduction)))
+            from ..utils import apply_defense_mitigation
+
+            mitigation = apply_defense_mitigation(
+                final_damage, monster_defense, penetration_ratio
+            )
+            final_damage = mitigation["final_damage"]
             result["effects"].append("PENETRATION")
         else:
-            from ..utils import damage_reduction_rate
-            damage_reduction = damage_reduction_rate(monster_defense)
-            final_damage = max(1, int(final_damage * (1 - damage_reduction)))
-        
+            from ..utils import apply_defense_mitigation
+
+            mitigation = apply_defense_mitigation(final_damage, monster_defense)
+            final_damage = mitigation["final_damage"]
+
         result["damage"] = final_damage
         return result
     
