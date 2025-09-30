@@ -170,6 +170,16 @@ async def _buff(player: Player, cfg: ItemConfig, qty: int, ctx: str, session=Non
         setattr(player, k, new_val)
         changed.append(f"{ATTRIBUTE_MAP.get(k, k)}+{int(v)*qty}")
 
+    # 属性发生变化后重新计算装备加成，确保百分比加成基于最新基础值
+    if session:
+        await _recalculate_equipment_bonus(session, player)
+
+    # 使用新上限修正当前血量/理智值
+    if player.hp > player.max_hp:
+        player.hp = player.max_hp
+    if player.mp > player.max_mp:
+        player.mp = player.max_mp
+
     # 更新使用记录
     if session:
         await update_elixir_usage(session, player, cfg, qty)
@@ -778,6 +788,68 @@ async def _reset_attr(player: Player, cfg: ItemConfig, qty: int, ctx: str, sessi
 
     bonus_msg = f"，{', '.join(bonus_info)}" if bonus_info else ""
     return True, f"🔄 属性已重置，所有点数已退还，可重新分配{bonus_msg}"
+
+
+async def _recalculate_equipment_bonus(session, player: Player):
+    """重新计算装备持久化加成，确保百分比加成与最新基础属性同步"""
+    if not session:
+        return
+
+    from sqlalchemy import select
+    from ..config import config as gcfg
+
+    stmt = select(ItemInstance).where(
+        ItemInstance.player_id == player.id,
+        ItemInstance.equipped == True,
+        ItemInstance.item_id.in_(gcfg.items_config["by_type"]["EQUIPMENT"])
+    )
+    equipped_items = (await session.execute(stmt)).scalars().all()
+
+    if not equipped_items:
+        return
+
+    for eq in equipped_items:
+        delta_prev = (eq.extra_attrs or {}).get("_persist_bonus", {})
+        for k, v in delta_prev.items():
+            if hasattr(player, k):
+                setattr(player, k, getattr(player, k) - v)
+
+        if "_persist_bonus" in (eq.extra_attrs or {}):
+            extra_new = {k: v for k, v in eq.extra_attrs.items() if k != "_persist_bonus"}
+            eq.extra_attrs = extra_new
+
+        eq.equipped = False
+
+    base_attrs = {
+        "attack": player.attack,
+        "defense": player.defense,
+        "agility": player.agility,
+        "luck": player.luck,
+        "max_hp": player.max_hp,
+        "max_mp": player.max_mp,
+    }
+
+    for eq in equipped_items:
+        eq.equipped = True
+
+        attrs_temp = base_attrs.copy()
+        eq.apply_attr_bonus(attrs_temp, base_attrs)
+        new_delta = {}
+        for k in attrs_temp:
+            if k in base_attrs:
+                if attrs_temp[k] != base_attrs[k]:
+                    new_delta[k] = attrs_temp[k] - base_attrs[k]
+            else:
+                if attrs_temp[k] != 0:
+                    new_delta[k] = attrs_temp[k]
+
+        for k, v in new_delta.items():
+            setattr(player, k, getattr(player, k) + v)
+
+        extra = eq.extra_attrs or {}
+        extra["_persist_bonus"] = new_delta
+        eq.extra_attrs = extra
+        session.add(eq)
 
 
 @register(ItemEffectType.EXPAND_TERRITORY)
