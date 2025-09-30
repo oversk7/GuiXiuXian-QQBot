@@ -1,4 +1,4 @@
-from sqlalchemy import select, and_
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from typing import Tuple, Optional
 
@@ -71,27 +71,14 @@ class GiftService:
         if item_config.type not in [ItemType.CONSUMABLE, ItemType.GOODS]:
             return False, "只能送消耗品类物品"
 
-        # 检查发送者是否有足够的物品（只处理消耗品和商品）
-        stmt = select(ItemInstance).where(
-            and_(
-                ItemInstance.player_id == sender_id,
-                ItemInstance.item_id == item_config.item_id,
-                ItemInstance.quantity >= quantity
-            )
-        )
-        sender_item = (await session.execute(stmt)).scalars().first()
-
-        if not sender_item:
+        # 检查并扣除发送者的物品（只处理消耗品和商品）
+        try:
+            await ItemInstance.consume_item(session, sender_id, item_config.item_id, quantity)
+        except ValueError:
             return False, f"你没有足够的「{item_name}」"
 
         # 计算礼物总价值
         total_value = item_config.price * quantity
-
-        # 扣除发送者的物品（只处理消耗品和商品）
-        if sender_item.quantity == quantity:
-            await session.delete(sender_item)
-        else:
-            sender_item.quantity -= quantity
 
         # 给接收者添加物品（夫妻送商品时不给物品）
         is_marriage_goods = (gift_type == GiftType.MARRIAGE and item_config.type == ItemType.GOODS)
