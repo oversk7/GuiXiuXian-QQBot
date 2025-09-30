@@ -651,26 +651,32 @@ async def _(event: MessageEvent):
         )
         all_items = result.scalars().all()
 
-        # 过滤出可出售的商品
-        sellable_items = []
+        # 过滤出可出售的商品，并按物品ID聚合数量
+        aggregated_items: dict[str, int] = {}
+        blocked_items: set[str] = set()
+
         for item in all_items:
             if item.is_equipment:
                 continue  # 跳过装备
 
-            # 检查市场是否收购此商品
             if not market.can_buy_from_player(item.item_id):
                 continue
 
-            # 检查是否可以在此市场出售（4小时限制）
-            can_sell = await TradeRecord.can_sell_at_market(
-                session, player.id, market.id, item.item_id, hours=4
-            )
-            if not can_sell:
+            if item.item_id in blocked_items:
                 continue
 
-            sellable_items.append(item)
+            if item.item_id not in aggregated_items:
+                can_sell = await TradeRecord.can_sell_at_market(
+                    session, player.id, market.id, item.item_id, hours=4
+                )
+                if not can_sell:
+                    blocked_items.add(item.item_id)
+                    continue
+                aggregated_items[item.item_id] = 0
 
-        if not sellable_items:
+            aggregated_items[item.item_id] += item.quantity
+
+        if not aggregated_items:
             await auto_sell_cmd.finish(message_add_head(
                 "📦 背包中没有可在当前市集出售的商品\n"
                 "💡 可能原因：\n"
@@ -683,38 +689,42 @@ async def _(event: MessageEvent):
         total_bonus = 0
         sold_items = []
 
-        for item in sellable_items:
-            item_cfg = config.items_config["by_id"].get(item.item_id)
+        for item_id, quantity in aggregated_items.items():
+            if quantity <= 0:
+                continue
+
+            item_cfg = config.items_config["by_id"].get(item_id)
             if not item_cfg:
                 continue
 
-            # 保存原始数量（在consume_item之前）
-            original_quantity = item.quantity
-
             # 获取市场状态和价格
-            market_state = await MarketState.get_or_create(session, market.id, item.item_id)
+            market_state = await MarketState.get_or_create(session, market.id, item_id)
             await market_state.check_daily_refresh(session)
 
-            _, buy_price = await _price_for(session, market, item.item_id)
-            item_gain = buy_price * original_quantity
+            _, buy_price = await _price_for(session, market, item_id)
+            item_gain = buy_price * quantity
 
             # 计算跑商奖励
             bonus = 0
             recent_purchases = await TradeRecord.get_recent_purchases_at_market(
-                session, player.id, market.id, item.item_id, hours=24
+                session, player.id, market.id, item_id, hours=24
             )
             if not recent_purchases:
                 bonus = int(item_gain * 0.05)
 
             # 扣除物品
-            success_consume = await ItemInstance.consume_item(
-                session, player.id, item.item_id, original_quantity
-            )
+            try:
+                success_consume = await ItemInstance.consume_item(
+                    session, player.id, item_id, quantity
+                )
+            except ValueError:
+                continue
+
             if not success_consume:
                 continue
 
             # 更新市场状态
-            market_state.apply_sale(original_quantity)
+            market_state.apply_sale(quantity)
 
             # 记录交易
             await TradeRecord.record_trade(
@@ -722,8 +732,8 @@ async def _(event: MessageEvent):
                 player_id=player.id,
                 trade_type=TradeType.SELL,
                 market_id=market.id,
-                item_id=item.item_id,
-                quantity=original_quantity,
+                item_id=item_id,
+                quantity=quantity,
                 unit_price=buy_price,
                 total_amount=item_gain
             )
@@ -732,7 +742,7 @@ async def _(event: MessageEvent):
             total_bonus += bonus
             sold_items.append({
                 "name": item_cfg.name,
-                "quantity": original_quantity,
+                "quantity": quantity,
                 "unit_price": buy_price,
                 "total": item_gain,
                 "bonus": bonus

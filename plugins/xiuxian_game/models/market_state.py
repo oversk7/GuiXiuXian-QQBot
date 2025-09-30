@@ -123,6 +123,8 @@ class MarketState(Base):
     
     def apply_sale(self, quantity: int):
         """应用出售操作对市场状态的影响"""
+        previous_stock = self.current_stock
+
         # 增加库存（但不超过最大值）
         self.current_stock = min(self.max_stock, self.current_stock + quantity)
 
@@ -134,9 +136,18 @@ class MarketState(Base):
         self.demand_factor = max(0.6, self.demand_factor - demand_decrease)  # 最低0.6倍
 
         # 提高供给因子（库存增加，供给充足，价格下降）
-        if self.current_stock > self.max_stock * 0.7:  # 库存高于70%时
-            supply_increase = quantity * 0.005  # 增加影响
-            self.supply_factor = min(1.6, self.supply_factor + supply_increase)  # 最高1.6倍
+        threshold_stock = self.max_stock * 0.7
+        if self.current_stock > threshold_stock:
+            if previous_stock >= threshold_stock:
+                effective_qty = quantity
+            elif self.current_stock <= threshold_stock:
+                effective_qty = 0
+            else:
+                effective_qty = self.current_stock - threshold_stock
+
+            if effective_qty > 0:
+                supply_increase = effective_qty * 0.005  # 增加影响
+                self.supply_factor = min(1.6, self.supply_factor + supply_increase)  # 最高1.6倍
 
         self.updated_at = datetime.now()
     
