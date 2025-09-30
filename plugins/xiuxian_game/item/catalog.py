@@ -13,107 +13,112 @@ from ..models.elixir_usage import ElixirUsageLog
 
 def _get_material_obtain_methods(item_id: str, rarity: str) -> str:
     """获取材料的获取方式信息"""
-    methods = []
+
+    def _format_scope(tiers: list[str], regions: list[str]) -> str:
+        """格式化展示诡域范围或旧区域信息"""
+        # 去重但保持顺序
+        unique_tiers = list(dict.fromkeys(tiers))
+        unique_regions = list(dict.fromkeys(regions))
+
+        if unique_tiers:
+            display = "、".join(unique_tiers[:3])
+            if len(unique_tiers) > 3:
+                display += "等"
+            return f"{display}重诡域"
+
+        if unique_regions:
+            display = "、".join(unique_regions[:3])
+            if len(unique_regions) > 3:
+                display += "等"
+            return display
+
+        return ""
+
+    def _append_scope(methods_list: list[str], label: str, tiers: list[str], regions: list[str]):
+        scope = _format_scope(tiers, regions)
+        if scope:
+            methods_list.append(f"{label}（{scope}）")
+        else:
+            methods_list.append(label)
+
+    methods: list[str] = []
 
     # 检查是否在市集中出售
     from ..economy.merchants import MARKETS
-    market_sellable = any(market.can_sell_to_player(item_id) for market in MARKETS)
-    if market_sellable:
+
+    if any(market.can_sell_to_player(item_id) for market in MARKETS):
         methods.append("市集购买")
 
     # 检查是否在万事屋中出售
     from ..economy.merchants import SHOP_ITEMS
+
     if item_id in SHOP_ITEMS:
         methods.append("万事屋购买")
 
     # 检查诡域材料配置
     map_config = config.map_config
-    merchant_tiers = []
-    basic_tiers = []
+    merchant_tiers: list[str] = []
+    basic_tiers: list[str] = []
 
     # 检查动态诡域材料配置
     dungeon_rules = map_config.get("dungeon_generation_rules", {})
     material_tiers = dungeon_rules.get("material_tiers", {})
 
     for tier_range, materials in material_tiers.items():
-        # 检查商人材料
         merchant_materials = materials.get("merchant_materials", [])
         if item_id in merchant_materials:
             merchant_tiers.append(tier_range)
 
-        # 检查基础材料
         basic_materials = materials.get("basic_materials", [])
         if item_id in basic_materials:
             basic_tiers.append(tier_range)
 
     # 兼容旧区域配置（如果还有的话）
-    merchant_regions = []
-    basic_regions = []
+    merchant_regions: list[str] = []
+    basic_regions: list[str] = []
 
     for region_name, region_config in map_config.get("regions", {}).items():
         # 跳过大都会等非诡域区域
         if region_name == "大都会":
             continue
 
-        # 检查商人材料
         merchant_materials = region_config.get("merchant_materials", [])
         if item_id in merchant_materials:
             merchant_regions.append(region_name)
 
-        # 检查基础材料
         basic_materials = region_config.get("basic_materials", [])
         if item_id in basic_materials:
             basic_regions.append(region_name)
 
+    has_basic_scope = bool(basic_tiers or basic_regions)
+    has_merchant_scope = bool(merchant_tiers or merchant_regions)
+
     # 根据稀有度添加获取方式
     if rarity == "white":
-        methods.append("材料格子采集")
+        _append_scope(methods, "材料格子采集", basic_tiers, basic_regions)
 
-        # 优先显示诡域深度信息
-        if basic_tiers:
-            tiers_str = "、".join(basic_tiers[:3])  # 最多显示3个深度范围
-            if len(basic_tiers) > 3:
-                tiers_str += "等"
-            methods.append(f"诡域探索({tiers_str}重)")
-        elif basic_regions:
-            regions_str = "、".join(basic_regions[:3])  # 兼容旧区域
-            if len(basic_regions) > 3:
-                regions_str += "等"
-            methods.append(f"探索({regions_str})")
+        if has_basic_scope:
+            _append_scope(methods, "扫荡令扫荡（材料格子）", basic_tiers, basic_regions)
 
-        methods.append("扫荡令扫荡")
+        # 白色材料亦可能来自战斗掉落
+        methods.append("诡异战斗掉落（概率）")
 
-    # 战斗掉落说明
-    if rarity in ["green", "blue", "purple", "orange"]:
-        # 根据稀有度添加具体的掉落说明
-        if rarity == "green":
-            methods.append("战斗掉落(21级+诡异)")
-        elif rarity == "blue":
-            methods.append("战斗掉落(61级+诡异)")
-        elif rarity == "purple":
-            methods.append("战斗掉落(101级+诡异)")
-        elif rarity == "orange":
-            methods.append("战斗掉落(101级+恐怖诡异)")
+    else:
+        # 战斗掉落说明：怪物等级越高，稀有材料出现概率越高
+        methods.append("诡异战斗掉落（怪物等级越高掉落率越高）")
 
-        # 扫荡系统也能获得高级材料
-        methods.append("扫荡令扫荡(概率获得)")
+        # 扫荡令仅在对应诡域中有高阶材料配置时才能掉落
+        if has_merchant_scope:
+            _append_scope(methods, "扫荡令扫荡（概率获得）", merchant_tiers, merchant_regions)
 
-        # 精英诡异特殊掉落
-        methods.append("精英诡异(高概率)")
+        # 精英诡异有更高掉落概率
+        methods.append("精英诡异战斗（更高概率）")
 
-        # 诡域商人材料
-        if merchant_tiers:
-            tiers_str = "、".join(merchant_tiers[:3])
-            if len(merchant_tiers) > 3:
-                tiers_str += "等"
-            methods.append(f"诡域商人({tiers_str}重)")
-        elif merchant_regions:
-            regions_str = "、".join(merchant_regions[:3])
-            if len(merchant_regions) > 3:
-                regions_str += "等"
-            methods.append(f"副本商人({regions_str})")
+    # 诡域商人售卖范围
+    if has_merchant_scope:
+        _append_scope(methods, "诡域商人售卖", merchant_tiers, merchant_regions)
 
-    return "、".join(methods) if methods else "暂无获取途径"
+    return "\n".join(f"• {method}" for method in methods) if methods else "暂无获取途径"
 
 # 图鉴命令：查询物品、装备和鬼怪的详细信息
 catalog_cmd = on_command("图鉴", aliases={"查看","查看物品","详情"}, block=True, priority=5)
@@ -258,7 +263,7 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
 
             # 获取材料获取方式
             obtain_methods = _get_material_obtain_methods(cfg.item_id, cfg.rarity)
-            obtain_info = f"📍 获取方式：{obtain_methods}" if obtain_methods else ""
+            obtain_info = f"📍 获取方式：\n{obtain_methods}" if obtain_methods else ""
 
             extra_info = "\n" + "\n".join(filter(bool, [rarity_info, grudge_info, obtain_info]))
 
