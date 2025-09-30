@@ -360,20 +360,23 @@ class BattleEffectProcessor:
         
         # 应用穿透
         if penetration_ratio > 0:
-            # 穿透部分无视防御，非穿透部分正常计算防御
-            from ..utils import damage_reduction_rate
-            normal_reduction = damage_reduction_rate(defender.defense)
-            penetration_reduction = normal_reduction * (1 - penetration_ratio)
-            final_damage = max(1, int(final_damage * (1 - penetration_reduction)))
+            # 穿透削减有效防御后再计算数值+比例减伤
+            from ..utils import apply_defense_mitigation
+
+            mitigation = apply_defense_mitigation(
+                final_damage, defender.defense, penetration_ratio
+            )
+            final_damage = mitigation["final_damage"]
             result["effects"].append("PENETRATION")
         else:
             # 正常防御计算
-            from ..utils import damage_reduction_rate
-            damage_reduction = damage_reduction_rate(defender.defense)
-            final_damage = max(1, int(final_damage * (1 - damage_reduction)))
-        
+            from ..utils import apply_defense_mitigation
+
+            mitigation = apply_defense_mitigation(final_damage, defender.defense)
+            final_damage = mitigation["final_damage"]
+
         result["damage"] = final_damage
-        
+
         return result
     
     @classmethod
