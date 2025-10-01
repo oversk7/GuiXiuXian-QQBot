@@ -48,6 +48,8 @@ class GiftService:
         receiver = (await session.execute(select(Player).where(Player.uid == receiver_uid))).scalars().first()
         if not receiver:
             return False, "未找到该UID的玩家"
+
+        receiver_name = receiver.nickname
         
         # 检查是否可以送礼
         can_send, reason, gift_type = await GiftService.can_send_gift(session, sender_id, receiver.id)
@@ -87,8 +89,13 @@ class GiftService:
             # 统一使用 ItemInstance.add_item 方法处理物品添加，确保正确处理叠加限制
             try:
                 await ItemInstance.add_item(session, receiver.id, item_config.item_id, quantity)
-            except ValueError as e:
-                return False, f"添加物品失败：{e}"
+            except ValueError:
+                try:
+                    await ItemInstance.add_item(session, sender_id, item_config.item_id, quantity)
+                except ValueError:
+                    await session.rollback()
+                    return False, "送礼失败，物品返还异常，请稍后再试"
+                return False, f"{receiver_name}的背包空间不足，送礼失败，物品已退还"
         
         # 记录礼物
         gift_record = GiftRecord(
