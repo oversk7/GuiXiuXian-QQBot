@@ -310,7 +310,7 @@ async def handle_monster_drops(session, player: Player, monster_level: int, regi
                 enhanced_rates[rarity] = min(rate * 2, 0.8)  # 其他材料2倍概率
         drop_rates = enhanced_rates
 
-    drops = []
+    drops = {}
     region_materials = get_region_materials(region)
 
     # 检查每个稀有度的掉落
@@ -355,13 +355,18 @@ async def handle_monster_drops(session, player: Player, monster_level: int, regi
                     await ItemInstance.add_item(session, player.id, material_id, quantity)
                     item_config = config.items_config["by_id"].get(material_id)
                     if item_config:
-                        drops.append(f"{item_config.get_display_name()} ✖️{quantity}")
+                        display_name = item_config.get_display_name()
+                        if display_name in drops:
+                            drops[display_name] += quantity
+                        else:
+                            drops[display_name] = quantity
                 except ValueError:
                     # 背包满了，跳过这个掉落
                     pass
 
     if drops:
-        return f"💎 战利品：{', '.join(drops)}"
+        drop_texts = [f"{name} ✖️{quantity}" for name, quantity in drops.items()]
+        return f"💎 战利品：{', '.join(drop_texts)}"
     else:
         return ""
 
