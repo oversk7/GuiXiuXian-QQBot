@@ -13,7 +13,7 @@ class ItemType(Enum):
     HANDCUFFS = "handcuffs"      # 手铐 - 限制对手下回合
     CIGARETTE = "cigarette"      # 香烟 - 恢复1血量
     MAGNIFIER = "magnifier"      # 放大镜 - 查看当前弹药
-    BEER = "beer"                # 饮料 - 退掉当前弹药
+    BEER = "beer"                # 啤酒 - 退掉当前弹药
     ADRENALINE = "adrenaline"    # 肾上腺素 - 偷取对手道具
     EXPIRED_MEDICINE = "expired_medicine"  # 过期药物 - 40%恢复2血量，否则扣1血量
     INVERTER = "inverter"        # 逆转器 - 转换当前弹药类型
@@ -30,7 +30,7 @@ class RussianRouletteCore:
         ItemType.HANDCUFFS: {"name": "⛓️手铐", "description": "限制对手下回合行动"},
         ItemType.CIGARETTE: {"name": "🚬香烟", "description": "恢复1点血量"},
         ItemType.MAGNIFIER: {"name": "🔍放大镜", "description": "查看当前弹药类型"},
-        ItemType.BEER: {"name": "🍺饮料", "description": "退掉当前弹药"},
+        ItemType.BEER: {"name": "🍺啤酒", "description": "退掉当前弹药"},
         ItemType.ADRENALINE: {"name": "💉肾上腺素", "description": "偷取对手一个道具并立刻使用"},
         ItemType.EXPIRED_MEDICINE: {"name": "💊过期药物", "description": "40%恢复2血量，否则扣1血量"},
         ItemType.INVERTER: {"name": "🔄逆转器", "description": "转换当前弹药类型"},
@@ -109,12 +109,12 @@ class RussianRouletteCore:
     
     @staticmethod
     def use_beer(game_state: dict) -> Tuple[bool, str]:
-        """使用饮料"""
+        """使用啤酒"""
         bullets = json.loads(game_state["bullets"])
         current_index = game_state["current_bullet_index"]
         
         if current_index >= len(bullets):
-            return False, "🍺 弹夹已空，无法使用饮料"
+            return False, "🍺 弹夹已空，无法使用啤酒"
         
         ejected_bullet = bullets[current_index]
         bullet_type = "实弹" if ejected_bullet else "空包弹"
@@ -122,7 +122,7 @@ class RussianRouletteCore:
         # 推进弹药索引
         game_state["current_bullet_index"] = current_index + 1
         
-        return True, f"🍺 饮料已使用！退出了一发{bullet_type}"
+        return True, f"🍺 啤酒已使用！退出了一发{bullet_type}"
     
     @staticmethod
     def use_adrenaline(game_state: dict, user_id: str, target_id: str, stolen_item: ItemType, max_hp: int = 3) -> Tuple[bool, str]:

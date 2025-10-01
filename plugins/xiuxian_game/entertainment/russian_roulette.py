@@ -96,7 +96,7 @@ async def handle_create_room(bot: Bot, event: MessageEvent, args: Message = Comm
             "▫️ ⛓️手铐 - 限制对手下回合行动\n"
             "▫️ 🚬香烟 - 恢复1点血量\n"
             "▫️ 🔍放大镜 - 查看当前弹药类型\n"
-            "▫️ 🍺饮料 - 退掉当前弹药\n"
+            "▫️ 🍺啤酒 - 退掉当前弹药\n"
             "▫️ 💉肾上腺素 - 偷取对手道具并立刻使用\n"
             "▫️ 💊过期药物 - 40%恢复2血量，否则扣1血量\n"
             "▫️ 🔄逆转器 - 转换当前弹药类型\n"
@@ -499,7 +499,7 @@ async def handle_use_adrenaline(bot: Bot, event: MessageEvent, args: Message = C
         "手铐": ItemType.HANDCUFFS,
         "香烟": ItemType.CIGARETTE,
         "放大镜": ItemType.MAGNIFIER,
-        "饮料": ItemType.BEER,
+        "啤酒": ItemType.BEER,
         "过期药物": ItemType.EXPIRED_MEDICINE,
         "逆转器": ItemType.INVERTER,
         "电话": ItemType.PHONE,
@@ -669,7 +669,7 @@ async def handle_use_item(bot: Bot, event: MessageEvent, args: Message = Command
         "手铐": ItemType.HANDCUFFS,
         "香烟": ItemType.CIGARETTE,
         "放大镜": ItemType.MAGNIFIER,
-        "饮料": ItemType.BEER,
+        "啤酒": ItemType.BEER,
         "肾上腺素": ItemType.ADRENALINE,
         "过期药物": ItemType.EXPIRED_MEDICINE,
         "逆转器": ItemType.INVERTER,
