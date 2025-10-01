@@ -56,9 +56,29 @@ class RussianRouletteCore:
     
     @staticmethod
     def generate_items(count: int = 4) -> List[ItemType]:
-        """生成随机道具"""
+        """生成随机道具，确保同一种道具最多出现两次"""
+        if count <= 0:
+            return []
+
         available_items = list(ItemType)
-        return random.choices(available_items, k=count)
+        max_per_item = 2
+        max_total = len(available_items) * max_per_item
+
+        # 如果需求超过可分配上限，则截断到最大可分配数量
+        target_count = min(count, max_total)
+
+        items: List[ItemType] = []
+        item_counts: Dict[ItemType, int] = {item: 0 for item in available_items}
+
+        while len(items) < target_count:
+            item = random.choice(available_items)
+            if item_counts[item] >= max_per_item:
+                continue
+
+            items.append(item)
+            item_counts[item] += 1
+
+        return items
     
     @staticmethod
     def use_knife(game_state: dict) -> Tuple[bool, str]:
