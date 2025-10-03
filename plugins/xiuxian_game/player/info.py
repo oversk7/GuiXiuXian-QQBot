@@ -143,7 +143,7 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
     has_unread = await has_unread_messages(player.id)
     unread_notice = ""
     if has_unread:
-        unread_notice = "\n┃📬 有新留言未读！输入【留言板】查看"
+        unread_notice = "\n┃📬 有新留言或私信未读！输入【留言板】或【留言板 私信】查看"
 
     # 获取平台显示信息
     async with safe_session() as session_platform:
