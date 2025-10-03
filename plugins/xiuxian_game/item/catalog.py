@@ -242,6 +242,18 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
             if hasattr(cfg, 'gem_slots') and cfg.gem_slots > 0:
                 equipment_info.append(f"💎 宝石孔位：{cfg.gem_slots}个")
 
+            # 特殊效果信息（显示解锁条件）
+            if hasattr(cfg, 'special_effects') and cfg.special_effects:
+                effects_lines = ["✨ 特殊效果（升阶解锁）："]
+                for idx, effect in enumerate(cfg.special_effects, start=1):
+                    # 获取效果描述
+                    desc = effect.get('description', '')
+                    if desc:
+                        # 计算解锁所需的升阶等级
+                        required_level = idx * 2
+                        effects_lines.append(f"  • [{idx}] {desc} (+{required_level}阶解锁)")
+                equipment_info.extend(effects_lines)
+
             if equipment_info:
                 extra_info = "\n" + "\n".join(equipment_info)
 

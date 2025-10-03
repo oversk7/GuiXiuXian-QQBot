@@ -47,12 +47,24 @@ class Player(Base):
     critical_rate: Mapped[int] = mapped_column(Integer, default=5, server_default='5', comment="暴击率(百分比)")
     critical_power: Mapped[int] = mapped_column(Integer, default=0, server_default='0', comment="暴击力(每点增加0.1倍伤害)")
     combo_rate: Mapped[int] = mapped_column(Integer, default=0, server_default='0', comment="连击率(百分比)")
-    counter_rate: Mapped[int] = mapped_column(Integer, default=0, server_default='0', comment="反击率(百分比)")
+    counter_rate: Mapped[int] = mapped_column(Integer, default=0, server_default='0', comment="反击率/反弹率(百分比)")
     dodge_rate: Mapped[int] = mapped_column(Integer, default=0, server_default='0', comment="闪避率(百分比)")
     accuracy_rate: Mapped[int] = mapped_column(Integer, default=80, server_default='80', comment="命中率(百分比)")
     skill_crit_rate: Mapped[int] = mapped_column(Integer, default=0, server_default='0', comment="灵爆率(百分比)")
     penetration_rate: Mapped[int] = mapped_column(Integer, default=0, server_default='0', comment="穿透率(百分比)")
     anti_crit_rate: Mapped[int] = mapped_column(Integer, default=0, server_default='0', comment="抗暴率(百分比)")
+
+    # 增强战斗属性
+    lifesteal_rate: Mapped[int] = mapped_column(Integer, default=0, server_default='0', comment="吸血率(百分比)")
+    immobilize_rate: Mapped[int] = mapped_column(Integer, default=0, server_default='0', comment="定身率(百分比)")
+    true_damage_rate: Mapped[int] = mapped_column(Integer, default=0, server_default='0', comment="真伤率(百分比)")
+    regen_rate: Mapped[int] = mapped_column(Integer, default=0, server_default='0', comment="回血率(百分比)")
+
+    # 战斗统计
+    total_battles: Mapped[int] = mapped_column(Integer, default=0, server_default='0', comment="总战斗次数")
+    total_wins: Mapped[int] = mapped_column(Integer, default=0, server_default='0', comment="总胜利次数")
+    total_damage_dealt: Mapped[int] = mapped_column(Integer, default=0, server_default='0', comment="总造成伤害")
+
     guild_id: Mapped[int | None] = mapped_column(Integer, nullable=True, comment="所属公会ID")
     guild_contribution: Mapped[int] = mapped_column(BigInteger, default=0, server_default='0', comment="公会贡献值")
     
@@ -193,7 +205,7 @@ class Player(Base):
             'mansion_x', 'mansion_y',
             unique=True,
             postgresql_where=text('mansion_level > 0 AND mansion_x IS NOT NULL AND mansion_y IS NOT NULL'),
-            sqlite_where='mansion_level > 0 AND mansion_x IS NOT NULL AND mansion_y IS NOT NULL'
+            sqlite_where=text('mansion_level > 0 AND mansion_x IS NOT NULL AND mansion_y IS NOT NULL')
         ),
     )
 
@@ -225,7 +237,12 @@ class Player(Base):
             "accuracy_rate": self.accuracy_rate,
             "skill_crit_rate": self.skill_crit_rate,
             "penetration_rate": self.penetration_rate,
-            "anti_crit_rate": self.anti_crit_rate
+            "anti_crit_rate": self.anti_crit_rate,
+            # 增强战斗属性
+            "lifesteal_rate": self.lifesteal_rate,
+            "immobilize_rate": self.immobilize_rate,
+            "true_damage_rate": self.true_damage_rate,
+            "regen_rate": self.regen_rate,
         }
 
         # 添加临时buff加成
@@ -257,7 +274,12 @@ class Player(Base):
             "accuracy_rate": all_attrs["accuracy_rate"],
             "skill_crit_rate": all_attrs["skill_crit_rate"],
             "penetration_rate": all_attrs["penetration_rate"],
-            "anti_crit_rate": all_attrs["anti_crit_rate"]
+            "anti_crit_rate": all_attrs["anti_crit_rate"],
+            # 增强战斗属性
+            "lifesteal_rate": all_attrs["lifesteal_rate"],
+            "immobilize_rate": all_attrs["immobilize_rate"],
+            "true_damage_rate": all_attrs["true_damage_rate"],
+            "regen_rate": all_attrs["regen_rate"],
         }
 
         return battle_attrs
@@ -295,7 +317,12 @@ class Player(Base):
             "accuracy_rate": 80,
             "skill_crit_rate": 0,
             "penetration_rate": 0,
-            "anti_crit_rate": 0
+            "anti_crit_rate": 0,
+            # 增强战斗属性
+            "lifesteal_rate": 0,
+            "immobilize_rate": 0,
+            "true_damage_rate": 0,
+            "regen_rate": 0,
         }
 
         # 计算丹药加成

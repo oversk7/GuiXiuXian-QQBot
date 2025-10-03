@@ -25,12 +25,10 @@ class TriggerType(str, Enum):
 class EffectType(str, Enum):
     """效果类型"""
     # 伤害相关
-    LIFESTEAL = "lifesteal"         # 吸血
-    TRUE_DAMAGE = "true_damage"     # 真实伤害
-    DAMAGE_BOOST = "damage_boost"   # 伤害提升
-    
+    LIFESTEAL = "lifesteal"         # 吸血(基于造成伤害的百分比恢复HP)
+    TRUE_DAMAGE = "true_damage"     # 真实伤害(持续状态，攻击完全无视防御)
+
     # 控制相关
-    IMMOBILIZE = "immobilize"       # 定身(无法行动)
     FEAR = "fear"                   # 恐惧(无法行动)
     
     # 属性增益
@@ -109,7 +107,7 @@ class BattleEffectManager:
         """添加效果到单位"""
         if unit_id not in self.active_effects:
             self.active_effects[unit_id] = []
-        
+
         # 检查是否已存在相同类型的效果
         for existing in self.active_effects[unit_id]:
             if existing.effect_type == effect.effect_type and existing.source == effect.source:
@@ -120,10 +118,29 @@ class BattleEffectManager:
                     # 无法叠加，刷新持续时间
                     existing.duration = max(existing.duration, effect.duration)
                     return True
-        
+
         # 添加新效果
         self.active_effects[unit_id].append(effect)
         return True
+
+    def remove_effect(self, unit_id: str, effect: BattleEffect) -> bool:
+        """移除指定效果
+
+        Args:
+            unit_id: 单位ID
+            effect: 要移除的效果对象
+
+        Returns:
+            是否成功移除
+        """
+        if unit_id not in self.active_effects:
+            return False
+
+        try:
+            self.active_effects[unit_id].remove(effect)
+            return True
+        except ValueError:
+            return False
     
     def register_triggers(self, unit_id: str, triggers: List[TriggerConfig]):
         """注册触发器"""
@@ -214,15 +231,15 @@ class BattleEffectManager:
             self.trigger_configs[unit_id].clear()
     
     def has_control_effect(self, unit_id: str) -> bool:
-        """检查单位是否被控制(定身/恐惧等)"""
+        """检查单位是否被控制(恐惧等)"""
         if unit_id not in self.active_effects:
             return False
-        
-        control_effects = [EffectType.IMMOBILIZE, EffectType.FEAR]
+
+        control_effects = [EffectType.FEAR]
         for effect in self.active_effects[unit_id]:
             if effect.effect_type in control_effects:
                 return True
-        
+
         return False
     
     def calculate_attribute_modifier(self, unit_id: str, attr_name: str) -> float:
@@ -302,7 +319,6 @@ def format_effect_message(effect: BattleEffect, target_name: str, is_trigger: bo
     emoji_map = {
         EffectType.LIFESTEAL: "🧡",
         EffectType.TRUE_DAMAGE: "🔥",
-        EffectType.IMMOBILIZE: "⛓️",
         EffectType.FEAR: "😱",
         EffectType.BUFF_ATTACK: "⚔️",
         EffectType.BUFF_DEFENSE: "🛡️",
@@ -315,24 +331,18 @@ def format_effect_message(effect: BattleEffect, target_name: str, is_trigger: bo
         EffectType.HEAL: "💚",
         EffectType.SHIELD: "🛡️",
         EffectType.REFLECT: "↩️",
-        EffectType.INVINCIBLE: "✨",
-        EffectType.DAMAGE_BOOST: "💢",
+        EffectType.INVINCIBLE: "✨"
     }
 
     emoji = emoji_map.get(effect.effect_type, "✨")
 
-    if is_trigger:
-        msg = f"{emoji} 触发【{effect.source}】"
-    else:
-        msg = f"{emoji}"
-
     # 根据效果类型生成描述
-    if effect.effect_type in [EffectType.IMMOBILIZE, EffectType.FEAR]:
-        msg += f" {target_name}被定身{effect.duration}回合"
+    if effect.effect_type == EffectType.FEAR:
+        msg = f"{emoji} {target_name}被恐惧{effect.duration}回合"
     elif effect.effect_type == EffectType.LIFESTEAL:
-        msg += f" 吸血{effect.value:.0f}%"
+        msg = f"{emoji} 吸血{effect.value:.0f}%"
     elif effect.effect_type == EffectType.TRUE_DAMAGE:
-        msg += f" 真实伤害+{effect.value:.0f}%"
+        msg = f"{emoji} {target_name}进入真伤状态(持续{effect.duration}回合)"
     elif effect.effect_type in [EffectType.BUFF_ATTACK, EffectType.BUFF_DEFENSE,
                                 EffectType.BUFF_CRITICAL, EffectType.BUFF_DODGE,
                                 EffectType.BUFF_ACCURACY]:
@@ -346,12 +356,14 @@ def format_effect_message(effect: BattleEffect, target_name: str, is_trigger: bo
 
         stack_info = f"(第{effect.stacks}层)" if effect.max_stacks > 1 else ""
         duration_info = f"{effect.duration}回合" if effect.duration > 0 else "永久"
-        msg += f" {target_name}{attr_name}+{effect.value:.0f}%{stack_info}，持续{duration_info}"
+        msg = f"{emoji} {target_name}{attr_name}+{effect.value:.0f}%{stack_info}，持续{duration_info}"
     elif effect.effect_type == EffectType.REGEN:
-        msg += f" {target_name}每回合回复{effect.value:.0f}%生命值"
+        msg = f"{emoji} {target_name}每回合回复{effect.value:.0f}%生命值"
     elif effect.effect_type == EffectType.SHIELD:
-        msg += f" {target_name}获得{effect.value:.0f}点护盾"
+        msg = f"{emoji} {target_name}获得{effect.value:.0f}点护盾"
     elif effect.description:
-        msg += f" {effect.description}"
+        msg = f"{emoji} {effect.description}"
+    else:
+        msg = f"{emoji} 未知效果"
 
     return msg

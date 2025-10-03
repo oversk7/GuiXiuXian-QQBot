@@ -283,6 +283,30 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
             lines.append(f"  • 总提升：+{(upgrade_multiplier - 1) * 100:.0f}%")
             lines.append("")
 
+        # 特殊效果（显示解锁状态）
+        if hasattr(tpl, 'special_effects') and tpl.special_effects:
+            lines.append("✨ 特殊效果：")
+
+            # 计算已解锁的效果数量（每2阶解锁1个效果）
+            unlocked_count = equip.upgrade_level // 2
+
+            for idx, effect in enumerate(tpl.special_effects, start=1):
+                desc = effect.get('description', '')
+                if not desc:
+                    continue
+
+                # 计算解锁所需的升阶等级
+                required_level = idx * 2
+
+                if idx <= unlocked_count:
+                    # 已解锁
+                    lines.append(f"  ✅ [{idx}] {desc}")
+                else:
+                    # 未解锁
+                    lines.append(f"  🔒 [{idx}] {desc} (需要+{required_level}阶)")
+
+            lines.append("")
+
         # 描述
         lines.append("📝 描述：")
         lines.append(f"  {tpl.description}")

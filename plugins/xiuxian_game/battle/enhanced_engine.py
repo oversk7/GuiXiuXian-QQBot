@@ -1,25 +1,33 @@
 """
 增强战斗引擎 - 集成状态效果和触发系统
-基于现有battle_engine.py扩展，不替换原有逻辑
+完整的战斗引擎，支持装备特殊效果、状态效果、触发系统等
 """
 
 import random
 from typing import Dict, List, Optional, Any, Tuple
 from ..models.player import Player
-from .battle_engine import BattleEngine
 from .battle_attributes import BattleAttributeCalculator
 from .battle_effects import (
-    BattleEffectManager, TriggerType, EffectType, BattleEffect, 
+    BattleEffectManager, TriggerType, EffectType, BattleEffect,
     TriggerConfig, parse_triggers_from_yaml, format_effect_message
 )
 
 
-class EnhancedBattleEngine(BattleEngine):
+class EnhancedBattleEngine:
     """增强战斗引擎 - 支持状态效果和触发系统"""
-    
+
     def __init__(self, seed: Optional[str] = None):
-        """初始化增强战斗引擎"""
-        super().__init__(seed)
+        """初始化增强战斗引擎
+
+        Args:
+            seed: 随机种子，用于确定性战斗
+        """
+        if seed:
+            import hashlib
+            self.rng = random.Random(hashlib.md5(seed.encode()).hexdigest())
+        else:
+            self.rng = random.Random()
+
         self.effect_manager = BattleEffectManager()
         self.turn_counter = 0
         self.battle_log: List[str] = []
@@ -55,25 +63,45 @@ class EnhancedBattleEngine(BattleEngine):
             self.effect_manager.add_effect(player.id, effect)
     
     def _register_equipment_triggers(self, unit_id: str, equipped_items: List):
-        """注册装备的触发器"""
+        """注册装备的触发器
+
+        特殊效果解锁规则：
+        - +2阶: 解锁第1个效果
+        - +4阶: 解锁第2个效果
+        - +6阶: 解锁第3个效果
+        - +8阶: 解锁第4个效果
+        - +10阶: 解锁第5个效果
+        """
         for item in equipped_items:
             # 从装备配置中获取special_effects
             config = item.config if hasattr(item, 'config') else None
             if not config:
                 continue
-            
+
             special_effects = getattr(config, 'special_effects', None)
             if not special_effects:
                 continue
-            
+
+            # 获取装备升阶等级
+            upgrade_level = getattr(item, 'upgrade_level', 0)
+
+            # 计算已解锁的效果数量（每2阶解锁1个效果）
+            unlocked_count = upgrade_level // 2
+
+            # 只取已解锁的效果
+            unlocked_effects = special_effects[:unlocked_count] if unlocked_count > 0 else []
+
+            if not unlocked_effects:
+                continue
+
             # 解析触发器配置
-            triggers = parse_triggers_from_yaml(special_effects)
-            
+            triggers = parse_triggers_from_yaml(unlocked_effects)
+
             # 为每个触发器添加来源信息
             for trigger in triggers:
                 if not trigger.description:
                     trigger.description = f"{config.name}的特殊效果"
-            
+
             self.effect_manager.register_triggers(unit_id, triggers)
     
     def execute_turn(self, attacker: Player, defender: Any, is_player_turn: bool = True) -> Dict:
@@ -106,7 +134,7 @@ class EnhancedBattleEngine(BattleEngine):
         
         # 检查是否被控制
         if self.effect_manager.has_control_effect(attacker_id):
-            turn_result["messages"].append(f"⛓️ {attacker.nickname}被定身，无法行动")
+            turn_result["messages"].append(f"😱 {attacker.nickname}被恐惧，无法行动")
             return turn_result
         
         # 执行攻击
@@ -115,6 +143,17 @@ class EnhancedBattleEngine(BattleEngine):
         turn_result["damage_dealt"] = attack_result.get("total_damage", 0)
         turn_result["hp_restored"] = attack_result.get("hp_restored", 0)  # 新增：传递恢复的HP
         turn_result["effects_triggered"] = attack_result.get("effects_triggered", [])
+
+        # 处理反弹伤害（对攻击者造成伤害）
+        reflect_damage = attack_result.get("reflect_damage", 0)
+        if reflect_damage > 0:
+            turn_result["reflect_damage"] = reflect_damage
+            # 注意：实际扣血由外部战斗系统处理
+
+        # 处理防御者回血
+        defender_hp_restored = attack_result.get("defender_hp_restored", 0)
+        if defender_hp_restored > 0:
+            turn_result["defender_hp_restored"] = defender_hp_restored
 
         return turn_result
     
@@ -154,15 +193,70 @@ class EnhancedBattleEngine(BattleEngine):
         messages.extend(tick_msgs)
 
         return messages, hp_restored
+
+    def trigger_on_kill(self, killer: Player, victim: Any) -> Dict:
+        """触发击杀效果
+
+        Args:
+            killer: 击杀者
+            victim: 被击杀者
+
+        Returns:
+            击杀效果结果字典
+        """
+        result = {
+            "messages": [],
+            "hp_restored": 0,
+            "effects_triggered": []
+        }
+
+        killer_id = killer.id
+        killer_name = killer.nickname
+        victim_name = victim.nickname if hasattr(victim, 'nickname') else victim.get("name", "敌人")
+
+        # 触发击杀效果
+        kill_effects = self.effect_manager.check_triggers(killer_id, TriggerType.ON_KILL, {
+            "source": killer_name,
+            "victim": victim_name,
+            "current_hp": killer.hp,
+            "max_hp": killer.max_hp
+        })
+
+        # 处理击杀触发的效果
+        for effect in kill_effects:
+            if effect.effect_type == EffectType.HEAL:
+                # 立即回血
+                heal_amount = int(killer.max_hp * effect.value / 100) if effect.is_percentage else int(effect.value)
+                result["hp_restored"] += heal_amount
+                result["messages"].append(f"💚 击杀回复！{killer_name}恢复{heal_amount}生命值")
+                result["effects_triggered"].append("heal")
+
+            elif effect.duration > 0:
+                # 持续性效果
+                self.effect_manager.add_effect(killer_id, effect)
+                result["messages"].append(format_effect_message(effect, killer_name))
+                result["effects_triggered"].append(effect.effect_type.value)
+
+        return result
     
     def _execute_enhanced_attack(self, attacker: Player, defender: Any,
-                                is_player_turn: bool) -> Dict:
-        """执行增强攻击，包含触发效果"""
+                                is_player_turn: bool, is_counter: bool = False,
+                                is_combo: bool = False) -> Dict:
+        """执行增强攻击，包含触发效果
+
+        Args:
+            attacker: 攻击者
+            defender: 防御者
+            is_player_turn: 是否为玩家回合
+            is_counter: 是否为反击攻击（反击不触发连击）
+            is_combo: 是否为连击攻击（连击不触发first_turn效果）
+        """
         result = {
             "messages": [],
             "total_damage": 0,
             "hp_restored": 0,  # 新增：记录恢复的HP
-            "effects_triggered": []
+            "effects_triggered": [],
+            "combo_count": 1  # 记录连击次数
         }
         
         attacker_id = attacker.id
@@ -172,22 +266,54 @@ class EnhancedBattleEngine(BattleEngine):
         
         # 获取属性修正
         attack_modifier = self.effect_manager.calculate_attribute_modifier(attacker_id, "attack")
-        
+
         # 计算基础攻击力(应用属性修正)
         base_attack = int(attacker.attack * (1 + attack_modifier / 100))
-        
+
+        # 检查是否有真伤状态
+        has_true_damage = len(self.effect_manager.get_active_effects(attacker_id, EffectType.TRUE_DAMAGE)) > 0
+
         # 执行基础攻击
         if hasattr(defender, 'defense'):
-            # 对玩家
+            # 对玩家 - 需要应用双方的战斗buff
             from .battle_attributes import BattleEffectProcessor
-            attack_result = BattleEffectProcessor.process_attack(
-                attacker, defender, base_attack, False, self.rng
-            )
+            if has_true_damage:
+                # 真伤状态：完全无视防御
+                attack_result = {
+                    "hit": True,
+                    "damage": base_attack,
+                    "is_critical": False,
+                    "is_penetration": False,
+                    "combo_count": 1,
+                    "effects": ["TRUE_DAMAGE"]
+                }
+            else:
+                # 获取双方基础属性
+                attacker_base_attrs = BattleAttributeCalculator.calculate_effective_attributes(attacker)
+                defender_base_attrs = BattleAttributeCalculator.calculate_effective_attributes(defender)
+
+                # 应用战斗buff
+                attacker_attrs = self._get_effective_battle_attributes(attacker_id, attacker_base_attrs)
+                defender_attrs = self._get_effective_battle_attributes(defender_id, defender_base_attrs)
+
+                # 使用增强的属性进行攻击判定
+                attack_result = self._process_pvp_attack(
+                    attacker, defender, base_attack, False,
+                    attacker_attrs, defender_attrs
+                )
         else:
             # 对怪物
-            attack_result = self._process_monster_attack(
-                attacker, defender, base_attack, False
-            )
+            if has_true_damage:
+                # 真伤状态：完全无视防御
+                attack_result = {
+                    "hit": True,
+                    "total_damage": base_attack,
+                    "is_critical": False
+                }
+            else:
+                attack_result = self._process_monster_attack(
+                    attacker, defender, base_attack, False
+                )
         
         # 格式化基础攻击消息
         if not attack_result["hit"]:
@@ -210,12 +336,56 @@ class EnhancedBattleEngine(BattleEngine):
         # 命中
         damage = attack_result["damage"]
         is_critical = attack_result.get("is_critical", False)
-        
+        combo_count = attack_result.get("combo_count", 1)
+        result["combo_count"] = combo_count
+
+        # 检查防御者是否有无敌状态
+        invincible_effects = self.effect_manager.get_active_effects(defender_id, EffectType.INVINCIBLE)
+        if invincible_effects:
+            result["messages"].append(f"✨ {defender_name}处于无敌状态，免疫所有伤害！")
+            return result
+
+        # 检查防御者是否有护盾
+        shield_effects = self.effect_manager.get_active_effects(defender_id, EffectType.SHIELD)
+        absorbed_by_shield = 0
+        for shield_effect in shield_effects:
+            if hasattr(shield_effect, 'shield_value') and shield_effect.shield_value > 0:
+                if damage <= shield_effect.shield_value:
+                    # 护盾完全吸收伤害
+                    absorbed_by_shield += damage
+                    shield_effect.shield_value -= damage
+                    damage = 0
+                    result["messages"].append(f"🛡️ 护盾吸收{absorbed_by_shield}伤害，剩余{shield_effect.shield_value}点护盾")
+                    break
+                else:
+                    # 护盾部分吸收
+                    absorbed_by_shield += shield_effect.shield_value
+                    damage -= shield_effect.shield_value
+                    result["messages"].append(f"🛡️ 护盾吸收{shield_effect.shield_value}伤害后破碎")
+                    shield_effect.shield_value = 0
+                    # 护盾破碎，移除效果
+                    self.effect_manager.remove_effect(defender_id, shield_effect)
+
         # 构建攻击消息
-        attack_msg = f"⚔️ {attacker_name}攻击{defender_name}"
+        if is_combo:
+            # 连击攻击的消息格式
+            attack_msg = f"  🔄 连击"
+        else:
+            attack_msg = f"⚔️ {attacker_name}攻击{defender_name}"
+            if combo_count > 1 and not is_counter:
+                attack_msg += f" 🔄x{combo_count}"
+
+        if has_true_damage:
+            attack_msg += " 🔥真伤！"
         if is_critical:
             attack_msg += " 💥暴击！"
-        attack_msg += f" 造成{damage}伤害"
+
+        # 显示实际伤害（扣除护盾后）
+        if absorbed_by_shield > 0:
+            attack_msg += f" 造成{damage + absorbed_by_shield}伤害(护盾吸收{absorbed_by_shield})"
+        else:
+            attack_msg += f" 造成{damage}伤害"
+
         result["messages"].append(attack_msg)
         result["total_damage"] = damage
         
@@ -227,9 +397,13 @@ class EnhancedBattleEngine(BattleEngine):
             "current_hp": attacker.hp,
             "max_hp": attacker.max_hp
         }
-        
+
         attack_effects = self.effect_manager.check_triggers(attacker_id, TriggerType.ON_ATTACK, context)
-        
+
+        # 触发命中效果（命中后触发）
+        hit_effects = self.effect_manager.check_triggers(attacker_id, TriggerType.ON_HIT, context)
+        attack_effects.extend(hit_effects)
+
         # 如果暴击，触发暴击效果
         if is_critical:
             crit_effects = self.effect_manager.check_triggers(attacker_id, TriggerType.ON_CRITICAL, context)
@@ -245,20 +419,34 @@ class EnhancedBattleEngine(BattleEngine):
                 result["messages"].append(f"🧡 吸血恢复{lifesteal_amount}生命值")
                 result["effects_triggered"].append("lifesteal")
 
+            elif effect.effect_type == EffectType.HEAL:
+                # 立即回血效果
+                heal_amount = int(attacker.max_hp * effect.value / 100) if effect.is_percentage else int(effect.value)
+                result["hp_restored"] += heal_amount
+                result["messages"].append(f"💚 立即回复{heal_amount}生命值")
+                result["effects_triggered"].append("heal")
+
+            elif effect.effect_type == EffectType.FEAR:
+                # 对敌人施加恐惧效果
+                self.effect_manager.add_effect(defender_id, effect)
+                result["messages"].append(f"😱 {defender_name}被恐惧{effect.duration}回合")
+                result["effects_triggered"].append("fear")
+
             elif effect.effect_type == EffectType.TRUE_DAMAGE:
-                true_damage = int(damage * effect.value / 100)
-                result["total_damage"] += true_damage
-                result["messages"].append(f"🔥 真实伤害额外造成{true_damage}伤害")
+                # 真伤状态：添加到攻击者身上
+                self.effect_manager.add_effect(attacker_id, effect)
+                result["messages"].append(f"🔥 进入真伤状态！(持续{effect.duration}回合)")
                 result["effects_triggered"].append("true_damage")
 
-            elif effect.effect_type == EffectType.IMMOBILIZE:
-                # 对敌人施加定身效果
-                self.effect_manager.add_effect(defender_id, effect)
-                result["messages"].append(format_effect_message(effect, defender_name))
-                result["effects_triggered"].append("immobilize")
+            elif effect.effect_type == EffectType.DAMAGE_BOOST:
+                # 伤害提升效果（立即生效）
+                boost_damage = int(damage * effect.value / 100)
+                result["total_damage"] += boost_damage
+                result["messages"].append(f"💥 伤害提升！额外造成{boost_damage}伤害")
+                result["effects_triggered"].append("damage_boost")
 
             elif effect.duration > 0:
-                # 持续性效果
+                # 其他持续性效果
                 self.effect_manager.add_effect(attacker_id, effect)
                 result["messages"].append(format_effect_message(effect, attacker_name))
                 result["effects_triggered"].append(effect.effect_type.value)
@@ -273,21 +461,405 @@ class EnhancedBattleEngine(BattleEngine):
         
         for effect in defense_effects:
             if effect.effect_type == EffectType.REFLECT:
-                # 反弹伤害
+                # 反弹伤害（实际扣血）
                 reflect_damage = int(damage * effect.value / 100)
+                result["reflect_damage"] = result.get("reflect_damage", 0) + reflect_damage
                 result["messages"].append(f"↩️ {defender_name}反弹{reflect_damage}伤害给{attacker_name}")
                 result["effects_triggered"].append("reflect")
+
+            elif effect.effect_type == EffectType.SHIELD:
+                # 护盾效果
+                shield_value = int(defender.max_hp * effect.value / 100) if effect.is_percentage else int(effect.value)
+                self.effect_manager.add_effect(defender_id, effect)
+                # 将护盾值存储在effect中
+                effect.shield_value = shield_value
+                result["messages"].append(f"🛡️ {defender_name}获得{shield_value}点护盾")
+                result["effects_triggered"].append("shield")
+
+            elif effect.effect_type == EffectType.HEAL:
+                # 立即回血
+                heal_amount = int(defender.max_hp * effect.value / 100) if effect.is_percentage else int(effect.value)
+                result["defender_hp_restored"] = result.get("defender_hp_restored", 0) + heal_amount
+                result["messages"].append(f"💚 {defender_name}立即回复{heal_amount}生命值")
+                result["effects_triggered"].append("heal")
+
             else:
                 self.effect_manager.add_effect(defender_id, effect)
                 result["messages"].append(format_effect_message(effect, defender_name))
                 result["effects_triggered"].append(effect.effect_type.value)
-        
+
+        # 处理连击（反击不触发连击，连击本身也不再触发连击）
+        if not is_counter and not is_combo and combo_count > 1:
+            for combo_index in range(combo_count - 1):
+                # 连击时需要重新执行完整的攻击流程
+                # 但使用85%的基础攻击力
+                combo_result = self._execute_single_combo_attack(
+                    attacker, defender, is_player_turn,
+                    attacker_id, defender_id, attacker_name, defender_name,
+                    base_attack, combo_index + 2  # 第2、3、4次连击
+                )
+
+                # 累加伤害和恢复值
+                result["total_damage"] += combo_result.get("total_damage", 0)
+                result["hp_restored"] += combo_result.get("hp_restored", 0)
+                result["messages"].extend(combo_result.get("messages", []))
+                result["effects_triggered"].extend(combo_result.get("effects_triggered", []))
+
+        return result
+
+    def _execute_single_combo_attack(self, attacker: Player, defender: Any,
+                                     is_player_turn: bool, attacker_id: str,
+                                     defender_id: str, attacker_name: str,
+                                     defender_name: str, base_attack: int,
+                                     combo_number: int) -> Dict:
+        """执行单次连击攻击
+
+        Args:
+            attacker: 攻击者
+            defender: 防御者
+            is_player_turn: 是否为玩家回合
+            attacker_id: 攻击者ID
+            defender_id: 防御者ID
+            attacker_name: 攻击者名称
+            defender_name: 防御者名称
+            base_attack: 基础攻击力
+            combo_number: 连击序号（2、3、4...）
+        """
+        result = {
+            "messages": [],
+            "total_damage": 0,
+            "hp_restored": 0,
+            "effects_triggered": []
+        }
+
+        # 连击伤害为85%
+        combo_base_attack = int(base_attack * 0.85)
+
+        # 应用属性修正
+        attack_modifier = self.effect_manager.calculate_attribute_modifier(attacker_id, "attack")
+        combo_attack = int(combo_base_attack * (1 + attack_modifier / 100))
+
+        # 检查是否有真伤状态
+        has_true_damage = len(self.effect_manager.get_active_effects(attacker_id, EffectType.TRUE_DAMAGE)) > 0
+
+        # 执行基础攻击
+        if hasattr(defender, 'defense'):
+            from .battle_attributes import BattleEffectProcessor
+            if has_true_damage:
+                attack_result = {
+                    "hit": True,
+                    "damage": combo_attack,
+                    "is_critical": False,
+                    "is_penetration": False,
+                    "combo_count": 1,
+                    "effects": ["TRUE_DAMAGE"]
+                }
+            else:
+                # 获取双方基础属性
+                attacker_base_attrs = BattleAttributeCalculator.calculate_effective_attributes(attacker)
+                defender_base_attrs = BattleAttributeCalculator.calculate_effective_attributes(defender)
+
+                # 应用战斗buff
+                attacker_attrs = self._get_effective_battle_attributes(attacker_id, attacker_base_attrs)
+                defender_attrs = self._get_effective_battle_attributes(defender_id, defender_base_attrs)
+
+                # 使用增强的属性进行攻击判定
+                attack_result = self._process_pvp_attack(
+                    attacker, defender, combo_attack, False,
+                    attacker_attrs, defender_attrs
+                )
+        else:
+            if has_true_damage:
+                attack_result = {
+                    "hit": True,
+                    "total_damage": combo_attack,
+                    "is_critical": False
+                }
+            else:
+                attack_result = self._process_monster_attack(
+                    attacker, defender, combo_attack, False
+                )
+
+        # 如果未命中
+        if not attack_result["hit"]:
+            result["messages"].append(f"  🔄 连击第{combo_number}次 被闪避")
+            return result
+
+        # 命中
+        damage = attack_result["damage"]
+        is_critical = attack_result.get("is_critical", False)
+
+        # 构建攻击消息
+        attack_msg = f"  🔄 连击第{combo_number}次"
+        if has_true_damage:
+            attack_msg += " 🔥真伤！"
+        if is_critical:
+            attack_msg += " 💥暴击！"
+        attack_msg += f" 造成{damage}伤害"
+        result["messages"].append(attack_msg)
+        result["total_damage"] = damage
+
+        # 触发攻击时效果
+        context = {
+            "source": attacker_name,
+            "damage": damage,
+            "is_critical": is_critical,
+            "current_hp": attacker.hp,
+            "max_hp": attacker.max_hp
+        }
+
+        attack_effects = self.effect_manager.check_triggers(attacker_id, TriggerType.ON_ATTACK, context)
+
+        # 如果暴击，触发暴击效果
+        if is_critical:
+            crit_effects = self.effect_manager.check_triggers(attacker_id, TriggerType.ON_CRITICAL, context)
+            attack_effects.extend(crit_effects)
+
+        # 处理触发的效果
+        for effect in attack_effects:
+            if effect.effect_type == EffectType.LIFESTEAL:
+                lifesteal_amount = int(damage * effect.value / 100)
+                result["hp_restored"] += lifesteal_amount
+                result["messages"].append(f"    🧡 吸血恢复{lifesteal_amount}生命值")
+                result["effects_triggered"].append("lifesteal")
+
+            elif effect.effect_type == EffectType.TRUE_DAMAGE:
+                # 真伤状态：添加到攻击者身上
+                self.effect_manager.add_effect(attacker_id, effect)
+                result["messages"].append(f"    🔥 进入真伤状态！(持续{effect.duration}回合)")
+                result["effects_triggered"].append("true_damage")
+
+            elif effect.effect_type == EffectType.FEAR:
+                self.effect_manager.add_effect(defender_id, effect)
+                result["messages"].append(f"    😱 {defender_name}被恐惧{effect.duration}回合")
+                result["effects_triggered"].append("fear")
+
+            elif effect.effect_type == EffectType.DAMAGE_BOOST:
+                boost_damage = int(damage * effect.value / 100)
+                result["total_damage"] += boost_damage
+                result["messages"].append(f"    💥 伤害提升！额外造成{boost_damage}伤害")
+                result["effects_triggered"].append("damage_boost")
+
+            elif effect.duration > 0:
+                # 其他持续性效果（连击不重复添加，避免叠加过多）
+                pass
+
         return result
     
+    def _get_effective_battle_attributes(self, unit_id: str, base_attrs: Dict) -> Dict:
+        """获取应用了战斗buff后的有效属性
+
+        Args:
+            unit_id: 单位ID
+            base_attrs: 基础属性字典
+
+        Returns:
+            应用buff后的属性字典
+        """
+        effective_attrs = base_attrs.copy()
+
+        # 应用战斗buff修正
+        for attr_name in ["critical_rate", "dodge_rate", "accuracy_rate"]:
+            modifier = self.effect_manager.calculate_attribute_modifier(unit_id, attr_name)
+            if modifier != 0:
+                effective_attrs[attr_name] = effective_attrs.get(attr_name, 0) + modifier
+                # 应用上限
+                cap = BattleAttributeCalculator.ATTRIBUTE_CAPS.get(attr_name, 100)
+                effective_attrs[attr_name] = min(effective_attrs[attr_name], cap)
+                effective_attrs[attr_name] = max(0, effective_attrs[attr_name])
+
+        return effective_attrs
+
+    def _process_pvp_attack(self, attacker: Player, defender: Player, base_damage: int,
+                           is_skill: bool, attacker_attrs: Dict, defender_attrs: Dict) -> Dict:
+        """处理PVP攻击（使用已应用buff的属性）
+
+        Args:
+            attacker: 攻击者
+            defender: 防御者
+            base_damage: 基础伤害
+            is_skill: 是否为技能攻击
+            attacker_attrs: 攻击者的有效属性（已应用buff）
+            defender_attrs: 防御者的有效属性（已应用buff）
+
+        Returns:
+            攻击结果字典
+        """
+        result = {
+            "hit": False,
+            "damage": 0,
+            "is_critical": False,
+            "is_penetration": False,
+            "combo_count": 1,
+            "effects": []
+        }
+
+        # 1. 命中判定
+        hit_chance = BattleAttributeCalculator.calculate_hit_chance(
+            attacker_attrs["accuracy_rate"],
+            defender_attrs["dodge_rate"]
+        )
+
+        if self.rng.random() > hit_chance:
+            result["effects"].append("被闪避")
+            return result
+
+        result["hit"] = True
+
+        # 2. 穿透判定
+        penetration_ratio = BattleAttributeCalculator.get_penetration_ratio(
+            attacker_attrs["penetration_rate"]
+        )
+        if penetration_ratio > 0:
+            result["is_penetration"] = True
+            result["penetration_ratio"] = penetration_ratio
+
+        # 3. 暴击判定（考虑防御方抗暴率）
+        crit_rate = attacker_attrs["skill_crit_rate"] if is_skill else attacker_attrs["critical_rate"]
+        defender_anti_crit_rate = defender_attrs["anti_crit_rate"]
+
+        # 计算实际暴击率（攻击方暴击率 - 防御方抗暴率）
+        effective_crit_rate = max(0, crit_rate - defender_anti_crit_rate)
+        is_critical = BattleAttributeCalculator.roll_critical_hit(effective_crit_rate, self.rng)
+        result["is_critical"] = is_critical
+
+        # 4. 连击判定（仅普攻）
+        if not is_skill:
+            combo_count = BattleAttributeCalculator.roll_combo_attack(
+                attacker_attrs["combo_rate"], self.rng
+            )
+            result["combo_count"] = combo_count
+
+        # 5. 伤害计算
+        final_damage = base_damage
+
+        # 应用暴击
+        if is_critical:
+            final_damage = BattleAttributeCalculator.calculate_critical_damage(
+                final_damage, attacker_attrs["critical_power"]
+            )
+            result["effects"].append("CRITICAL")
+
+        # 应用穿透和防御（考虑防御buff）
+        # 获取防御者的防御力修正
+        defender_id = defender.id if hasattr(defender, 'id') else "enemy"
+        defense_modifier = self.effect_manager.calculate_attribute_modifier(defender_id, "defense")
+        effective_defense = int(defender.defense * (1 + defense_modifier / 100))
+
+        if penetration_ratio > 0:
+            from ..utils import apply_defense_mitigation
+            mitigation = apply_defense_mitigation(
+                final_damage, effective_defense, penetration_ratio
+            )
+            final_damage = mitigation["final_damage"]
+            result["effects"].append("PENETRATION")
+        else:
+            from ..utils import apply_defense_mitigation
+            mitigation = apply_defense_mitigation(final_damage, effective_defense)
+            final_damage = mitigation["final_damage"]
+
+        result["damage"] = final_damage
+        return result
+
+    def _process_monster_attack(self, attacker: Player, monster_stats: Dict,
+                               base_damage: int, is_skill: bool) -> Dict:
+        """处理对怪物的攻击（简化版）
+
+        Args:
+            attacker: 攻击者玩家
+            monster_stats: 怪物属性字典
+            base_damage: 基础伤害
+            is_skill: 是否为技能攻击
+
+        Returns:
+            攻击结果字典
+        """
+        # 获取基础属性
+        base_attrs = BattleAttributeCalculator.calculate_effective_attributes(attacker)
+
+        # 应用战斗buff
+        attacker_id = attacker.id
+        attacker_attrs = self._get_effective_battle_attributes(attacker_id, base_attrs)
+
+        result = {
+            "hit": False,
+            "damage": 0,
+            "is_critical": False,
+            "is_penetration": False,
+            "combo_count": 1,
+            "effects": []
+        }
+
+        # 命中判定（怪物闪避率固定为0，敏捷只影响先后手）
+        monster_dodge_rate = 0.0  # 怪物闪避率固定为0
+
+        hit_chance = BattleAttributeCalculator.calculate_hit_chance(
+            attacker_attrs["accuracy_rate"], monster_dodge_rate
+        )
+
+        if self.rng.random() > hit_chance:
+            result["effects"].append("被闪避")
+            return result
+
+        result["hit"] = True
+
+        # 穿透比例计算
+        penetration_ratio = BattleAttributeCalculator.get_penetration_ratio(
+            attacker_attrs["penetration_rate"]
+        )
+        if penetration_ratio > 0:
+            result["is_penetration"] = True
+            result["penetration_ratio"] = penetration_ratio
+
+        # 暴击判定（考虑怪物抗暴率）
+        crit_rate = attacker_attrs["skill_crit_rate"] if is_skill else attacker_attrs["critical_rate"]
+        monster_anti_crit_rate = monster_stats.get("anti_crit_rate", 0)
+
+        # 计算实际暴击率（玩家暴击率 - 怪物抗暴率）
+        effective_crit_rate = max(0, crit_rate - monster_anti_crit_rate)
+        is_critical = BattleAttributeCalculator.roll_critical_hit(effective_crit_rate, self.rng)
+        result["is_critical"] = is_critical
+
+        # 连击判定（仅普攻）
+        if not is_skill:
+            combo_count = BattleAttributeCalculator.roll_combo_attack(
+                attacker_attrs["combo_rate"], self.rng
+            )
+            result["combo_count"] = combo_count
+
+        # 伤害计算
+        final_damage = base_damage
+
+        # 应用暴击
+        if is_critical:
+            final_damage = BattleAttributeCalculator.calculate_critical_damage(
+                final_damage, attacker_attrs["critical_power"]
+            )
+            result["effects"].append("CRITICAL")
+
+        # 应用穿透和防御
+        monster_defense = monster_stats.get("defense", 0)
+        if penetration_ratio > 0:
+            from ..utils import apply_defense_mitigation
+
+            mitigation = apply_defense_mitigation(
+                final_damage, monster_defense, penetration_ratio
+            )
+            final_damage = mitigation["final_damage"]
+            result["effects"].append("PENETRATION")
+        else:
+            from ..utils import apply_defense_mitigation
+
+            mitigation = apply_defense_mitigation(final_damage, monster_defense)
+            final_damage = mitigation["final_damage"]
+
+        result["damage"] = final_damage
+        return result
+
     def get_battle_log(self) -> List[str]:
         """获取战斗日志"""
         return self.battle_log.copy()
-    
+
     def format_battle_summary(self) -> str:
         """格式化战斗摘要"""
         return "\n".join(self.battle_log)

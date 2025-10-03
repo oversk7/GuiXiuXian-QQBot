@@ -842,9 +842,9 @@ async def _handle_personal_monster(session, tile: WorldTile, player: Player) -> 
     battle_timestamp = int(time.time() * 1000)  # 毫秒级时间戳
     seed = f"P_{tile.seed}:{player.id}:{battle_timestamp}"
 
-    # 执行增强战斗 - 传递基础显示名称和完整显示名称
-    victory, battle_log, damage_taken = BattleIntegrationHelper.enhanced_player_vs_monster_battle(
-        player, monster_stats, monster_base_display, seed=seed, max_rounds=100,
+    # 执行增强战斗V2 - 支持装备特殊效果
+    victory, battle_log, damage_taken = await BattleIntegrationHelper.enhanced_player_vs_monster_battle_v2(
+        player, monster_stats, monster_base_display, session, seed=seed, max_rounds=100,
         monster_full_display=monster_full_display
     )
 

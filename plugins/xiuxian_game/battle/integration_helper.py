@@ -7,7 +7,6 @@
 import random
 from typing import Dict, List, Tuple, Optional, Any
 from ..models.player import Player
-from .battle_engine import BattleEngine
 from .enhanced_engine import EnhancedBattleEngine
 
 
@@ -32,7 +31,7 @@ class BattleIntegrationHelper:
         Returns:
             (player1是否胜利, 战斗日志, player1受到的伤害, player2受到的伤害)
         """
-        engine = BattleEngine(seed)
+        engine = EnhancedBattleEngine(seed)
         battle_log = []
 
         # 初始化战斗状态
@@ -96,6 +95,20 @@ class BattleIntegrationHelper:
                     # 显示血量变化
                     battle_log.append(f"   {second_player.nickname} 血量: {second_hp_ref[0]}")
 
+                    # 检查击杀并触发击杀效果
+                    if second_hp_ref[0] <= 0:
+                        kill_result = engine.trigger_on_kill(first_player, second_player)
+                        if kill_result.get("messages"):
+                            battle_log.extend(kill_result["messages"])
+                        # 击杀回血（更新first_hp_ref）
+                        if kill_result.get("hp_restored", 0) > 0:
+                            if player1_first:
+                                player1_hp = min(first_player.max_hp, first_hp_ref[0] + kill_result["hp_restored"])
+                                first_hp_ref[0] = player1_hp
+                            else:
+                                player2_hp = min(first_player.max_hp, first_hp_ref[0] + kill_result["hp_restored"])
+                                first_hp_ref[0] = player2_hp
+
                     # 检查反击
                     if second_hp_ref[0] > 0:
                         counter_result = engine.check_counter_attack(second_player, first_player)
@@ -142,6 +155,20 @@ class BattleIntegrationHelper:
 
                     # 显示血量变化
                     battle_log.append(f"   {first_player.nickname} 血量: {first_hp_ref[0]}")
+
+                    # 检查击杀并触发击杀效果
+                    if first_hp_ref[0] <= 0:
+                        kill_result = engine.trigger_on_kill(second_player, first_player)
+                        if kill_result.get("messages"):
+                            battle_log.extend(kill_result["messages"])
+                        # 击杀回血（更新second_hp_ref）
+                        if kill_result.get("hp_restored", 0) > 0:
+                            if player1_first:
+                                player2_hp = min(second_player.max_hp, second_hp_ref[0] + kill_result["hp_restored"])
+                                second_hp_ref[0] = player2_hp
+                            else:
+                                player1_hp = min(second_player.max_hp, second_hp_ref[0] + kill_result["hp_restored"])
+                                second_hp_ref[0] = player1_hp
 
                     # 检查反击
                     if first_hp_ref[0] > 0:
@@ -232,6 +259,9 @@ class BattleIntegrationHelper:
         engine = EnhancedBattleEngine(seed)
         battle_log = []
 
+        # 怪物ID统一使用 "enemy"
+        monster_id = "enemy"
+
         # 初始化战斗状态
         player_hp = player.hp
         monster_hp = monster_stats["hp"]
@@ -268,22 +298,92 @@ class BattleIntegrationHelper:
                 if turn_result.get("hp_restored", 0) > 0:
                     player_hp = min(player.max_hp, player_hp + turn_result["hp_restored"])
 
+                # 应用反弹伤害（怪物反弹给玩家）
+                reflect_damage = turn_result.get("reflect_damage", 0)
+                if reflect_damage > 0:
+                    player_hp = max(0, player_hp - reflect_damage)
+                    # 反弹消息已在turn_result中，不需要重复添加
+
+                # 检查击杀并触发击杀效果
                 if monster_hp <= 0:
+                    kill_result = engine.trigger_on_kill(player, monster_stats)
+                    battle_log.extend(kill_result["messages"])
+
+                    # 应用击杀回血
+                    if kill_result.get("hp_restored", 0) > 0:
+                        player_hp = min(player.max_hp, player_hp + kill_result["hp_restored"])
+
                     break
 
-            # 怪物回合（简化版，不使用增强效果）
+                # 检查怪物反击
+                if monster_hp > 0 and player_hp > 0:
+                    monster_counter_rate = monster_stats.get("counter_rate", 0)
+                    if engine.rng.random() < (monster_counter_rate / 100):
+                        # 怪物反击伤害为攻击力的70%
+                        counter_damage = max(1, int(monster_stats["attack"] * 0.7))
+                        from ..utils import apply_defense_mitigation
+
+                        mitigation = apply_defense_mitigation(counter_damage, player.defense)
+                        final_counter_damage = mitigation["final_damage"]
+
+                        player_hp = max(0, player_hp - final_counter_damage)
+                        battle_log.append(f"🛡️ {monster_name}反击！造成{final_counter_damage}伤害")
+
+                        if player_hp <= 0:
+                            break
+
+            # 怪物回合
             if monster_hp > 0 and player_hp > 0:
-                monster_damage = monster_stats["attack"]
-                # 应用防御减伤
-                from ..utils import apply_defense_mitigation
-                mitigation = apply_defense_mitigation(monster_damage, player.defense)
-                final_damage = mitigation["final_damage"]
+                # 检查怪物是否被恐惧
+                if engine.effect_manager.has_control_effect(monster_id):
+                    battle_log.append(f"😱 {monster_name}被恐惧，无法行动")
+                else:
+                    monster_damage = monster_stats["attack"]
+                    # 应用防御减伤
+                    from ..utils import apply_defense_mitigation
+                    mitigation = apply_defense_mitigation(monster_damage, player.defense)
+                    final_damage = mitigation["final_damage"]
 
-                player_hp = max(0, player_hp - final_damage)
-                battle_log.append(f"👹 {monster_name}攻击{player.nickname}，造成{final_damage}伤害")
+                    player_hp = max(0, player_hp - final_damage)
+                    battle_log.append(f"👹 {monster_name}攻击{player.nickname}，造成{final_damage}伤害")
 
-                if player_hp <= 0:
-                    break
+                    if player_hp <= 0:
+                        break
+
+                    # 检查玩家反击（只有怪物攻击成功后才能反击）
+                    if player_hp > 0 and monster_hp > 0:
+                        from .battle_attributes import BattleEffectProcessor
+                        if BattleEffectProcessor.check_counter_attack(player, engine.rng):
+                            # 玩家反击（使用增强引擎执行反击攻击）
+                            counter_result = engine._execute_enhanced_attack(
+                                player, monster_stats, True, is_counter=True
+                            )
+
+                            battle_log.append(f"🛡️ {player.nickname}反击！")
+                            battle_log.extend(counter_result["messages"])
+
+                            # 扣除怪物血量
+                            monster_hp = max(0, monster_hp - counter_result.get("total_damage", 0))
+
+                            # 恢复玩家HP（反击也可以吸血）
+                            if counter_result.get("hp_restored", 0) > 0:
+                                player_hp = min(player.max_hp, player_hp + counter_result["hp_restored"])
+
+                            # 应用反弹伤害（怪物反弹给玩家）
+                            reflect_damage = counter_result.get("reflect_damage", 0)
+                            if reflect_damage > 0:
+                                player_hp = max(0, player_hp - reflect_damage)
+
+                            # 检查反击击杀并触发击杀效果
+                            if monster_hp <= 0:
+                                kill_result = engine.trigger_on_kill(player, monster_stats)
+                                battle_log.extend(kill_result["messages"])
+
+                                # 应用击杀回血
+                                if kill_result.get("hp_restored", 0) > 0:
+                                    player_hp = min(player.max_hp, player_hp + kill_result["hp_restored"])
+
+                                break
 
             # 怪物先手的情况
             if not player_first and player_hp > 0 and monster_hp > 0:
@@ -296,6 +396,39 @@ class BattleIntegrationHelper:
                 # 恢复玩家HP（吸血、回血等效果）
                 if turn_result.get("hp_restored", 0) > 0:
                     player_hp = min(player.max_hp, player_hp + turn_result["hp_restored"])
+
+                # 应用反弹伤害（怪物反弹给玩家）
+                reflect_damage = turn_result.get("reflect_damage", 0)
+                if reflect_damage > 0:
+                    player_hp = max(0, player_hp - reflect_damage)
+
+                # 检查击杀并触发击杀效果
+                if monster_hp <= 0:
+                    kill_result = engine.trigger_on_kill(player, monster_stats)
+                    battle_log.extend(kill_result["messages"])
+
+                    # 应用击杀回血
+                    if kill_result.get("hp_restored", 0) > 0:
+                        player_hp = min(player.max_hp, player_hp + kill_result["hp_restored"])
+
+                    break
+
+                # 检查怪物反击
+                if monster_hp > 0 and player_hp > 0:
+                    monster_counter_rate = monster_stats.get("counter_rate", 0)
+                    if engine.rng.random() < (monster_counter_rate / 100):
+                        # 怪物反击伤害为攻击力的70%
+                        counter_damage = max(1, int(monster_stats["attack"] * 0.7))
+                        from ..utils import apply_defense_mitigation
+
+                        mitigation = apply_defense_mitigation(counter_damage, player.defense)
+                        final_counter_damage = mitigation["final_damage"]
+
+                        player_hp = max(0, player_hp - final_counter_damage)
+                        battle_log.append(f"🛡️ {monster_name}反击！造成{final_counter_damage}伤害")
+
+                        if player_hp <= 0:
+                            break
 
         # 战斗结果
         victory = monster_hp <= 0
@@ -330,7 +463,7 @@ class BattleIntegrationHelper:
         Returns:
             (是否胜利, 战斗日志, 玩家受到的伤害)
         """
-        engine = BattleEngine(seed)
+        engine = EnhancedBattleEngine(seed)
         battle_log = []
 
         # 初始化战斗状态
@@ -375,6 +508,14 @@ class BattleIntegrationHelper:
 
                         effect_text = "".join(effects)
                         round_actions.append(f"{effect_text}{player.nickname}→{player_attack_result['total_damage']}")
+
+                        # 检查击杀并触发击杀效果
+                        if monster_hp <= 0:
+                            kill_result = engine.trigger_on_kill(player, monster_stats)
+                            # 击杀回血
+                            if kill_result.get("hp_restored", 0) > 0:
+                                player_hp = min(player.max_hp, player_hp + kill_result["hp_restored"])
+                                round_actions.append(f"💚+{kill_result['hp_restored']}")
                     else:
                         round_actions.append(f"{player.nickname}→被闪避")
 
@@ -451,6 +592,14 @@ class BattleIntegrationHelper:
 
                         effect_text = "".join(effects)
                         round_actions.append(f"{effect_text}{player.nickname}→{player_attack_result['total_damage']}")
+
+                        # 检查击杀并触发击杀效果
+                        if monster_hp <= 0:
+                            kill_result = engine.trigger_on_kill(player, monster_stats)
+                            # 击杀回血
+                            if kill_result.get("hp_restored", 0) > 0:
+                                player_hp = min(player.max_hp, player_hp + kill_result["hp_restored"])
+                                round_actions.append(f"💚+{kill_result['hp_restored']}")
                     else:
                         round_actions.append(f"{player.nickname}→被闪避")
 
@@ -492,7 +641,7 @@ class BattleIntegrationHelper:
         Returns:
             (player1是否胜利, 战斗日志, player1受到的伤害, player2受到的伤害)
         """
-        engine = BattleEngine(seed)
+        engine = EnhancedBattleEngine(seed)
         battle_log = []
 
         # 初始化战斗状态
@@ -543,6 +692,13 @@ class BattleIntegrationHelper:
                             round_actions.append(f"{effect_text}{player1.nickname}→{damage}🛡️挡{blocked_damage}")
                         else:
                             round_actions.append(f"{effect_text}{player1.nickname}→{damage}")
+
+                        # 检查击杀并触发击杀效果
+                        if player2_hp <= 0:
+                            kill_result = engine.trigger_on_kill(player1, player2)
+                            if kill_result.get("hp_restored", 0) > 0:
+                                player1_hp = min(player1.max_hp, player1_hp + kill_result["hp_restored"])
+                                round_actions.append(f"💚+{kill_result['hp_restored']}")
                     else:
                         round_actions.append(f"{player1.nickname}→被闪避")
 
@@ -572,6 +728,13 @@ class BattleIntegrationHelper:
                             round_actions.append(f"{effect_text}{player2.nickname}→{damage}🛡️挡{blocked_damage}")
                         else:
                             round_actions.append(f"{effect_text}{player2.nickname}→{damage}")
+
+                        # 检查击杀并触发击杀效果
+                        if player1_hp <= 0:
+                            kill_result = engine.trigger_on_kill(player2, player1)
+                            if kill_result.get("hp_restored", 0) > 0:
+                                player2_hp = min(player2.max_hp, player2_hp + kill_result["hp_restored"])
+                                round_actions.append(f"💚+{kill_result['hp_restored']}")
                     else:
                         round_actions.append(f"{player2.nickname}→被闪避")
             else:
@@ -601,6 +764,13 @@ class BattleIntegrationHelper:
                             round_actions.append(f"{effect_text}{player2.nickname}→{damage}🛡️挡{blocked_damage}")
                         else:
                             round_actions.append(f"{effect_text}{player2.nickname}→{damage}")
+
+                        # 检查击杀并触发击杀效果
+                        if player1_hp <= 0:
+                            kill_result = engine.trigger_on_kill(player2, player1)
+                            if kill_result.get("hp_restored", 0) > 0:
+                                player2_hp = min(player2.max_hp, player2_hp + kill_result["hp_restored"])
+                                round_actions.append(f"💚+{kill_result['hp_restored']}")
                     else:
                         round_actions.append(f"{player2.nickname}→被闪避")
 
@@ -630,6 +800,13 @@ class BattleIntegrationHelper:
                             round_actions.append(f"{effect_text}{player1.nickname}→{damage}🛡️挡{blocked_damage}")
                         else:
                             round_actions.append(f"{effect_text}{player1.nickname}→{damage}")
+
+                        # 检查击杀并触发击杀效果
+                        if player2_hp <= 0:
+                            kill_result = engine.trigger_on_kill(player1, player2)
+                            if kill_result.get("hp_restored", 0) > 0:
+                                player1_hp = min(player1.max_hp, player1_hp + kill_result["hp_restored"])
+                                round_actions.append(f"💚+{kill_result['hp_restored']}")
                     else:
                         round_actions.append(f"{player1.nickname}→被闪避")
 
@@ -654,7 +831,7 @@ class BattleIntegrationHelper:
         return player1_victory, battle_log, player1_damage_taken, player2_damage_taken
 
     @staticmethod
-    def _monster_attack_player(monster_stats: Dict, player: Player, engine: BattleEngine) -> Dict:
+    def _monster_attack_player(monster_stats: Dict, player: Player, engine: EnhancedBattleEngine) -> Dict:
         """怪物攻击玩家的增强逻辑（支持200级以后怪物的特殊属性）
 
         Args:

@@ -67,6 +67,9 @@ class ItemConfig:
         self.gem_slots = data.get("gem_slots", 0)  # 宝石孔位数量
         self.max_upgrade_level = data.get("max_upgrade_level", 10)  # 最大升阶等级
 
+        # 特殊效果配置(增强战斗系统)
+        self.special_effects = data.get("special_effects", [])  # 特殊效果列表
+
     def get_rarity_display(self) -> str:
         """获取稀有度显示文本"""
         rarity_map = {
