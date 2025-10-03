@@ -194,6 +194,89 @@ class EnhancedBattleEngine:
 
         return messages, hp_restored
 
+    def execute_player_turn(self, attacker: Player, defender: Any, base_attack: int, is_skill: bool = False) -> Dict:
+        """执行玩家攻击回合（简化版本，用于PVP简洁格式）
+
+        Args:
+            attacker: 攻击者
+            defender: 防御者
+            base_attack: 基础攻击力
+            is_skill: 是否为技能攻击
+
+        Returns:
+            攻击结果字典，包含 hit, damage/total_damage, is_critical, combo_count, is_penetration 等字段
+        """
+        attacker_id = attacker.id
+        defender_id = defender.id if hasattr(defender, 'id') else "enemy"
+
+        # 获取属性修正
+        attack_modifier = self.effect_manager.calculate_attribute_modifier(attacker_id, "attack")
+
+        # 计算修正后的攻击力
+        modified_attack = int(base_attack * (1 + attack_modifier / 100))
+
+        # 检查是否有真伤状态
+        has_true_damage = len(self.effect_manager.get_active_effects(attacker_id, EffectType.TRUE_DAMAGE)) > 0
+
+        # 执行攻击判定
+        if hasattr(defender, 'defense'):
+            # 对玩家 - PVP战斗
+            if has_true_damage:
+                # 真伤状态：完全无视防御
+                attack_result = {
+                    "hit": True,
+                    "damage": modified_attack,
+                    "total_damage": modified_attack,
+                    "is_critical": False,
+                    "is_penetration": False,
+                    "combo_count": 1,
+                    "effects": ["TRUE_DAMAGE"]
+                }
+            else:
+                # 获取双方基础属性
+                attacker_base_attrs = BattleAttributeCalculator.calculate_effective_attributes(attacker)
+                defender_base_attrs = BattleAttributeCalculator.calculate_effective_attributes(defender)
+
+                # 应用战斗buff
+                attacker_attrs = self._get_effective_battle_attributes(attacker_id, attacker_base_attrs)
+                defender_attrs = self._get_effective_battle_attributes(defender_id, defender_base_attrs)
+
+                # 使用增强的属性进行攻击判定
+                attack_result = self._process_pvp_attack(
+                    attacker, defender, modified_attack, is_skill,
+                    attacker_attrs, defender_attrs
+                )
+        else:
+            # 对怪物
+            if has_true_damage:
+                # 真伤状态：完全无视防御
+                attack_result = {
+                    "hit": True,
+                    "damage": modified_attack,
+                    "total_damage": modified_attack,
+                    "is_critical": False,
+                    "is_penetration": False,
+                    "combo_count": 1
+                }
+            else:
+                attack_result = self._process_monster_attack(
+                    attacker, defender, modified_attack, is_skill
+                )
+
+        # 确保返回值包含所需字段
+        if "total_damage" not in attack_result and "damage" in attack_result:
+            attack_result["total_damage"] = attack_result["damage"]
+        elif "damage" not in attack_result and "total_damage" in attack_result:
+            attack_result["damage"] = attack_result["total_damage"]
+
+        # 确保包含默认值
+        attack_result.setdefault("hit", False)
+        attack_result.setdefault("is_critical", False)
+        attack_result.setdefault("is_penetration", False)
+        attack_result.setdefault("combo_count", 1)
+
+        return attack_result
+
     def trigger_on_kill(self, killer: Player, victim: Any) -> Dict:
         """触发击杀效果
 
@@ -759,6 +842,7 @@ class EnhancedBattleEngine:
             final_damage = mitigation["final_damage"]
 
         result["damage"] = final_damage
+        result["total_damage"] = final_damage  # 添加 total_damage 字段以保持兼容性
         return result
 
     def _process_monster_attack(self, attacker: Player, monster_stats: Dict,
@@ -854,6 +938,7 @@ class EnhancedBattleEngine:
             final_damage = mitigation["final_damage"]
 
         result["damage"] = final_damage
+        result["total_damage"] = final_damage  # 添加 total_damage 字段以保持兼容性
         return result
 
     def get_battle_log(self) -> List[str]:

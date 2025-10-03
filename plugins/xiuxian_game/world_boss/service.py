@@ -414,11 +414,11 @@ class WorldBossService:
         Returns:
             (是否胜利, 战斗日志, 理智损失)
         """
-        from ..battle.battle_engine import BattleEngine
+        from ..battle.enhanced_engine import EnhancedBattleEngine
         from ..battle.battle_attributes import BattleAttributeCalculator
 
         # 初始化战斗引擎
-        engine = BattleEngine(seed)
+        engine = EnhancedBattleEngine(seed)
         battle_log = []
         sanity_damage = 0
         total_damage_dealt = 0
@@ -435,10 +435,11 @@ class WorldBossService:
 
             # 玩家攻击BOSS（使用完整战斗属性系统）
             base_attack = max(1, player.attack - boss_stats["defense"] // 2)
-            attack_result = engine._process_monster_attack(player, boss_stats, base_attack, False)
+            attack_result = engine.execute_player_turn(player, boss_stats, base_attack, False)
 
             if attack_result["hit"]:
-                damage = attack_result["damage"]
+                # 使用 total_damage 字段，它已经包含了所有伤害（包括连击）
+                damage = attack_result.get("total_damage", attack_result.get("damage", 0))
                 total_damage_dealt += damage
 
                 # 构建攻击描述
@@ -446,11 +447,11 @@ class WorldBossService:
 
                 # 添加效果描述
                 effects = []
-                if attack_result["is_critical"]:
+                if attack_result.get("is_critical"):
                     effects.append("💥暴击")
-                if attack_result["is_penetration"]:
+                if attack_result.get("is_penetration"):
                     effects.append("🔥穿透")
-                if attack_result["combo_count"] > 1:
+                if attack_result.get("combo_count", 1) > 1:
                     effects.append(f"⚡连击x{attack_result['combo_count']}")
 
                 if effects:
@@ -458,12 +459,6 @@ class WorldBossService:
 
                 attack_desc += f"，造成 {damage:,} 点伤害"
                 battle_log.append(attack_desc)
-
-                # 连击额外伤害
-                if attack_result["combo_count"] > 1:
-                    combo_damage = damage * (attack_result["combo_count"] - 1)
-                    total_damage_dealt += combo_damage
-                    battle_log.append(f"   ⚡ 连击追加伤害：{combo_damage:,}")
             else:
                 battle_log.append(f"💨 {player.nickname} 的攻击被 {boss_name} 闪避了")
 
