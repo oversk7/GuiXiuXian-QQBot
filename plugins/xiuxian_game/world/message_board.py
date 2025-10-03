@@ -70,13 +70,13 @@ def clean_message_content(content: str) -> str:
     return content
 
 
-async def has_unread_messages(player_id: str) -> bool:
-    """检查玩家是否有未读的世界留言或私信"""
+async def get_unread_message_status(player_id: str) -> tuple[bool, bool]:
+    """检查玩家的世界留言板与私信的未读状态"""
 
     async with safe_session() as session:
         player = await session.get(Player, player_id)
         if not player:
-            return False
+            return False, False
 
         world_query = select(_func.count(WorldMessage.id)).where(
             WorldMessage.recipient_id.is_(None)
@@ -86,8 +86,6 @@ async def has_unread_messages(player_id: str) -> bool:
                 WorldMessage.created_at > player.last_message_board_check
             )
         world_count = (await session.execute(world_query)).scalar_one()
-        if world_count > 0:
-            return True
 
         private_query = select(_func.count(WorldMessage.id)).where(
             WorldMessage.recipient_id == player_id
@@ -97,7 +95,8 @@ async def has_unread_messages(player_id: str) -> bool:
                 WorldMessage.created_at > player.last_private_message_check
             )
         private_count = (await session.execute(private_query)).scalar_one()
-        return private_count > 0
+
+        return world_count > 0, private_count > 0
 
 
 async def mark_scope_messages_as_read(player_id: str, scope: MessageScope):

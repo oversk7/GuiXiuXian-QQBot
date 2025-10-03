@@ -31,7 +31,7 @@ def _format_player_location(player: Player) -> str:
         real_x, real_y = player.get_current_coordinates()
         return f"{player.get_current_region()} ({real_x},{real_y})"
 from ..config import config
-from ..world.message_board import has_unread_messages
+from ..world.message_board import get_unread_message_status
 
 # 从独立模块导入境界相关函数，避免循环导入
 from .realm_utils import realm_by_level, realm_by_level_and_reincarnation, number_to_chinese
@@ -139,11 +139,16 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
 
     exp_max = calculate_level_up_exp(player.level)
 
-    # 检查是否有未读留言
-    has_unread = await has_unread_messages(player.id)
+    # 检查未读的留言板与私信状态
+    has_world_unread, has_private_unread = await get_unread_message_status(player.id)
     unread_notice = ""
-    if has_unread:
-        unread_notice = "\n┃📬 有新留言或私信未读！输入【留言板】或【留言板 私信】查看"
+    notice_lines: list[str] = []
+    if has_private_unread:
+        notice_lines.append("📬 有新私信未读！输入【留言板 私信】查看")
+    if has_world_unread:
+        notice_lines.append("🗒️ 世界留言板有新内容！输入【留言板】查看")
+    if notice_lines:
+        unread_notice = "".join(f"\n┃{line}" for line in notice_lines)
 
     # 获取平台显示信息
     async with safe_session() as session_platform:
