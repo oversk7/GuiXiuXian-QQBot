@@ -720,9 +720,15 @@ async def handle_continuous_breakthrough(event: MessageEvent, args: Message = Co
         start_level = player.level
         start_exp = player.exp
         start_resentment = player.resentment
+        reached_level_cap = False
 
         # 连续突破循环
         while True:
+            # 达到当前转数对应的等级上限后停止突破
+            if player.level >= required_level:
+                reached_level_cap = True
+                break
+
             required_exp = calculate_level_up_exp(player.level)
 
             # 检查经验是否足够
@@ -871,6 +877,7 @@ async def handle_continuous_breakthrough(event: MessageEvent, args: Message = Co
                 f"✧ 获得属性点 + {total_attribute_points}" + (f" (转数加成)" if player.reincarnation_level > 0 else "") + "\n"
                 f"✧ 剩余修为 {player.exp}\n"
                 + cost_msg +
+                (f"✧ 当前已达 Lv.{required_level}，需先进行冥返才能继续突破\n" if reached_level_cap else "") +
                 "━━━━━━━━━━━━━\n"
                 "⬇️ 【加点】缝合裂隙\n"
                 "⬇️ 【修炼】继续喂养怨炁"
