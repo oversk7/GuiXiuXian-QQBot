@@ -5,9 +5,10 @@
 """
 
 import random
-from typing import Dict, List, Tuple, Optional
+from typing import Dict, List, Tuple, Optional, Any
 from ..models.player import Player
 from .battle_engine import BattleEngine
+from .enhanced_engine import EnhancedBattleEngine
 
 
 class BattleIntegrationHelper:
@@ -194,6 +195,120 @@ class BattleIntegrationHelper:
         return player1_victory, battle_log, player1_damage_taken, player2_damage_taken
 
     @staticmethod
+    async def enhanced_player_vs_monster_battle_v2(
+        player: Player,
+        monster_stats: Dict,
+        monster_name: str,
+        session: Any,
+        seed: Optional[str] = None,
+        max_rounds: int = 20,
+        monster_full_display: Optional[str] = None
+    ) -> Tuple[bool, List[str], int]:
+        """增强版玩家vs怪物战斗 V2 - 支持装备特殊效果
+
+        Args:
+            player: 玩家对象
+            monster_stats: 怪物属性字典 {"hp": int, "attack": int, "defense": int, "agility": int}
+            monster_name: 怪物名称（用于攻击动作）
+            session: 数据库会话
+            seed: 随机种子
+            max_rounds: 最大回合数
+            monster_full_display: 怪物完整显示名称（用于战斗开始，包含特殊属性）
+
+        Returns:
+            (是否胜利, 战斗日志, 玩家受到的伤害)
+        """
+        # 获取玩家装备
+        from sqlalchemy import select
+        from ..models.inventory import ItemInstance
+
+        stmt = select(ItemInstance).where(
+            ItemInstance.player_id == player.id,
+            ItemInstance.equipped == True
+        )
+        equipped_items = (await session.execute(stmt)).scalars().all()
+
+        # 创建增强战斗引擎
+        engine = EnhancedBattleEngine(seed)
+        battle_log = []
+
+        # 初始化战斗状态
+        player_hp = player.hp
+        monster_hp = monster_stats["hp"]
+        initial_player_hp = player_hp
+
+        # 使用完整显示名称（如果提供）或基础名称
+        display_name = monster_full_display if monster_full_display else monster_name
+        battle_log.append(f"⚔️ {player.nickname} VS {display_name}")
+
+        # 初始化战斗
+        engine.start_battle(player, monster_stats, equipped_items)
+
+        # 判定先后手（基于敏捷）
+        from .battle_attributes import BattleAttributeCalculator
+        player_first = BattleAttributeCalculator.determine_turn_order(
+            player.agility, monster_stats.get("agility", 10), engine.rng
+        )
+
+        for round_num in range(1, max_rounds + 1):
+            if player_hp <= 0 or monster_hp <= 0:
+                break
+
+            battle_log.append(f"━━━ 第{round_num}回合 ━━━")
+
+            # 玩家回合
+            if player_first and player_hp > 0 and monster_hp > 0:
+                turn_result = engine.execute_turn(player, monster_stats, is_player_turn=True)
+                battle_log.extend(turn_result["messages"])
+
+                # 扣除怪物血量
+                monster_hp = max(0, monster_hp - turn_result["damage_dealt"])
+
+                # 恢复玩家HP（吸血、回血等效果）
+                if turn_result.get("hp_restored", 0) > 0:
+                    player_hp = min(player.max_hp, player_hp + turn_result["hp_restored"])
+
+                if monster_hp <= 0:
+                    break
+
+            # 怪物回合（简化版，不使用增强效果）
+            if monster_hp > 0 and player_hp > 0:
+                monster_damage = monster_stats["attack"]
+                # 应用防御减伤
+                from ..utils import apply_defense_mitigation
+                mitigation = apply_defense_mitigation(monster_damage, player.defense)
+                final_damage = mitigation["final_damage"]
+
+                player_hp = max(0, player_hp - final_damage)
+                battle_log.append(f"👹 {monster_name}攻击{player.nickname}，造成{final_damage}伤害")
+
+                if player_hp <= 0:
+                    break
+
+            # 怪物先手的情况
+            if not player_first and player_hp > 0 and monster_hp > 0:
+                turn_result = engine.execute_turn(player, monster_stats, is_player_turn=True)
+                battle_log.extend(turn_result["messages"])
+
+                # 扣除怪物血量
+                monster_hp = max(0, monster_hp - turn_result["damage_dealt"])
+
+                # 恢复玩家HP（吸血、回血等效果）
+                if turn_result.get("hp_restored", 0) > 0:
+                    player_hp = min(player.max_hp, player_hp + turn_result["hp_restored"])
+
+        # 战斗结果
+        victory = monster_hp <= 0
+        damage_taken = initial_player_hp - player_hp
+
+        if victory:
+            battle_log.append(f"🎉 {player.nickname}获胜！")
+        else:
+            battle_log.append(f"💀 {player.nickname}战败...")
+
+        return victory, battle_log, damage_taken
+
+    @staticmethod
     def enhanced_player_vs_monster_battle(
         player: Player,
         monster_stats: Dict,
@@ -202,7 +317,7 @@ class BattleIntegrationHelper:
         max_rounds: int = 20,
         monster_full_display: Optional[str] = None
     ) -> Tuple[bool, List[str], int]:
-        """增强版玩家vs怪物战斗
+        """增强版玩家vs怪物战斗（旧版本，保持兼容性）
 
         Args:
             player: 玩家对象
