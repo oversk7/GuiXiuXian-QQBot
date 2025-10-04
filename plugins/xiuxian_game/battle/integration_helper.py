@@ -9,20 +9,32 @@ from typing import Dict, List, Tuple, Optional, Any
 from ..models.player import Player
 from .enhanced_engine import EnhancedBattleEngine
 
+try:
+    from .battle_image import get_battle_image_generator, should_use_image
+    IMAGE_SUPPORT = True
+except ImportError:
+    IMAGE_SUPPORT = False
 
-def create_hp_bar(current_hp: int, max_hp: int, bar_length: int = 8) -> str:
+
+def create_hp_bar(current_hp: int, max_hp: int, bar_length: int = 8, show_full: bool = False) -> str:
     """创建可视化血条
 
     Args:
         current_hp: 当前血量
         max_hp: 最大血量
         bar_length: 血条长度（字符数，默认8）
+        show_full: 是否显示完整信息（数值+百分比），False时只显示百分比
 
     Returns:
-        格式化的血条字符串，如：❤️❤️❤️❤️🖤🖤🖤🖤 1234/5000 (24.7%)
+        格式化的血条字符串
+        show_full=True: ❤️❤️❤️❤️🖤🖤🖤🖤 1234/5000 (24.7%)
+        show_full=False: ❤️❤️❤️❤️🖤🖤🖤🖤 (24.7%)
     """
     if max_hp <= 0:
-        return "🖤" * bar_length + " 0/0 (0.0%)"
+        if show_full:
+            return "🖤" * bar_length + " 0/0 (0.0%)"
+        else:
+            return "🖤" * bar_length + " (0.0%)"
 
     # 计算血量百分比
     hp_percent = (current_hp / max_hp) * 100
@@ -34,8 +46,11 @@ def create_hp_bar(current_hp: int, max_hp: int, bar_length: int = 8) -> str:
     # 构建血条
     hp_bar = "❤️" * filled_hearts + "🖤" * empty_hearts
 
-    # 添加数值和百分比
-    hp_text = f"{hp_bar} {current_hp}/{max_hp} ({hp_percent:.1f}%)"
+    # 根据show_full决定显示格式
+    if show_full:
+        hp_text = f"{hp_bar} {current_hp}/{max_hp} ({hp_percent:.1f}%)"
+    else:
+        hp_text = f"{hp_bar} ({hp_percent:.1f}%)"
 
     return hp_text
 
@@ -227,9 +242,9 @@ class BattleIntegrationHelper:
             else:
                 player2_hp, player1_hp = first_hp_ref[0], second_hp_ref[0]
 
-            # 回合结束后显示双方血量
-            player1_hp_bar = create_hp_bar(player1_hp, player1.max_hp)
-            player2_hp_bar = create_hp_bar(player2_hp, player2.max_hp)
+            # 回合结束后显示双方血量（只显示百分比）
+            player1_hp_bar = create_hp_bar(player1_hp, player1.max_hp, show_full=False)
+            player2_hp_bar = create_hp_bar(player2_hp, player2.max_hp, show_full=False)
             battle_log.append(f"  {player1.nickname}:")
             battle_log.append(f"    {player1_hp_bar}")
             battle_log.append(f"  {player2.nickname}:")
@@ -244,21 +259,21 @@ class BattleIntegrationHelper:
         battle_log.append("━━━━━━━━━━━━")
         if player1_victory:
             battle_log.append(f"🎉 {player1.nickname}获得胜利！用时{round_num}回合")
-            # 只显示存活方的血条
-            player1_hp_bar = create_hp_bar(player1_hp, player1.max_hp)
+            # 只显示存活方的血条（完整信息）
+            player1_hp_bar = create_hp_bar(player1_hp, player1.max_hp, show_full=True)
             battle_log.append(f"  {player1.nickname}:")
             battle_log.append(f"    {player1_hp_bar}")
         elif player1_hp <= 0:
             battle_log.append(f"🎉 {player2.nickname}获得胜利！用时{round_num}回合")
-            # 只显示存活方的血条
-            player2_hp_bar = create_hp_bar(player2_hp, player2.max_hp)
+            # 只显示存活方的血条（完整信息）
+            player2_hp_bar = create_hp_bar(player2_hp, player2.max_hp, show_full=True)
             battle_log.append(f"  {player2.nickname}:")
             battle_log.append(f"    {player2_hp_bar}")
         else:
-            # 平局或超时 - 显示双方血条
+            # 平局或超时 - 显示双方血条（完整信息）
             battle_log.append(f"⏰ 战斗超时，平局！用时{round_num}回合")
-            player1_hp_bar = create_hp_bar(player1_hp, player1.max_hp)
-            player2_hp_bar = create_hp_bar(player2_hp, player2.max_hp)
+            player1_hp_bar = create_hp_bar(player1_hp, player1.max_hp, show_full=True)
+            player2_hp_bar = create_hp_bar(player2_hp, player2.max_hp, show_full=True)
             battle_log.append(f"  {player1.nickname}:")
             battle_log.append(f"    {player1_hp_bar}")
             battle_log.append(f"  {player2.nickname}:")
@@ -502,10 +517,10 @@ class BattleIntegrationHelper:
                         if player_hp <= 0:
                             break
 
-            # 回合结束后显示双方血量
+            # 回合结束后显示双方血量（只显示百分比）
             if player_hp > 0 and monster_hp > 0:
-                player_hp_bar = create_hp_bar(player_hp, player.max_hp)
-                monster_hp_bar = create_hp_bar(monster_hp, monster_stats["hp"])
+                player_hp_bar = create_hp_bar(player_hp, player.max_hp, show_full=False)
+                monster_hp_bar = create_hp_bar(monster_hp, monster_stats["hp"], show_full=False)
                 battle_log.append(f"  {player.nickname}:")
                 battle_log.append(f"    {player_hp_bar}")
                 battle_log.append(f"  {monster_name}:")
@@ -518,14 +533,14 @@ class BattleIntegrationHelper:
         battle_log.append("━━━━━━━━━━━━")
         if victory:
             battle_log.append(f"🎉 {player.nickname}获胜！用时{round_num}回合")
-            # 只显示存活方的血条
-            player_hp_bar = create_hp_bar(player_hp, player.max_hp)
+            # 只显示存活方的血条（完整信息）
+            player_hp_bar = create_hp_bar(player_hp, player.max_hp, show_full=True)
             battle_log.append(f"  {player.nickname}:")
             battle_log.append(f"    {player_hp_bar}")
         else:
             battle_log.append(f"💀 {player.nickname}战败！用时{round_num}回合")
-            # 只显示存活方的血条
-            monster_hp_bar = create_hp_bar(monster_hp, monster_stats["hp"])
+            # 只显示存活方的血条（完整信息）
+            monster_hp_bar = create_hp_bar(monster_hp, monster_stats["hp"], show_full=True)
             battle_log.append(f"  {monster_name}:")
             battle_log.append(f"    {monster_hp_bar}")
 
@@ -712,9 +727,9 @@ class BattleIntegrationHelper:
             if round_actions:
                 battle_log.append(f"R{round_num}: " + " | ".join(round_actions))
 
-            # 每回合结束后显示双方血量
-            player_hp_bar = create_hp_bar(player_hp, player.max_hp)
-            monster_hp_bar = create_hp_bar(monster_hp, monster_stats["hp"])
+            # 每回合结束后显示双方血量（只显示百分比）
+            player_hp_bar = create_hp_bar(player_hp, player.max_hp, show_full=False)
+            monster_hp_bar = create_hp_bar(monster_hp, monster_stats["hp"], show_full=False)
             battle_log.append(f"  {player.nickname}:")
             battle_log.append(f"    {player_hp_bar}")
             battle_log.append(f"  {monster_name}:")
@@ -728,14 +743,14 @@ class BattleIntegrationHelper:
         battle_log.append("━━━━━━━━━━━━")
         if victory:
             battle_log.append(f"🎉 胜利！用时{round_num}回合")
-            # 只显示存活方的血条
-            player_hp_bar = create_hp_bar(player_hp, player.max_hp)
+            # 只显示存活方的血条（完整信息）
+            player_hp_bar = create_hp_bar(player_hp, player.max_hp, show_full=True)
             battle_log.append(f"  {player.nickname}:")
             battle_log.append(f"    {player_hp_bar}")
         else:
             battle_log.append(f"💀 战败！用时{round_num}回合")
-            # 只显示存活方的血条
-            monster_hp_bar = create_hp_bar(monster_hp, monster_stats["hp"])
+            # 只显示存活方的血条（完整信息）
+            monster_hp_bar = create_hp_bar(monster_hp, monster_stats["hp"], show_full=True)
             battle_log.append(f"  {monster_name}:")
             battle_log.append(f"    {monster_hp_bar}")
 
@@ -945,9 +960,9 @@ class BattleIntegrationHelper:
             if round_actions:
                 battle_log.append(f"R{round_num}: " + " | ".join(round_actions))
 
-            # 每回合结束后显示双方血量
-            player1_hp_bar = create_hp_bar(player1_hp, player1.max_hp)
-            player2_hp_bar = create_hp_bar(player2_hp, player2.max_hp)
+            # 每回合结束后显示双方血量（只显示百分比）
+            player1_hp_bar = create_hp_bar(player1_hp, player1.max_hp, show_full=False)
+            player2_hp_bar = create_hp_bar(player2_hp, player2.max_hp, show_full=False)
             battle_log.append(f"  {player1.nickname}:")
             battle_log.append(f"    {player1_hp_bar}")
             battle_log.append(f"  {player2.nickname}:")
@@ -962,21 +977,21 @@ class BattleIntegrationHelper:
         battle_log.append("━━━━━━━━━━━━")
         if player1_victory:
             battle_log.append(f"🎉 {player1.nickname}胜利！用时{round_num}回合")
-            # 只显示存活方的血条
-            player1_hp_bar = create_hp_bar(player1_hp, player1.max_hp)
+            # 只显示存活方的血条（完整信息）
+            player1_hp_bar = create_hp_bar(player1_hp, player1.max_hp, show_full=True)
             battle_log.append(f"  {player1.nickname}:")
             battle_log.append(f"    {player1_hp_bar}")
         elif player1_hp <= 0:
             battle_log.append(f"🎉 {player2.nickname}胜利！用时{round_num}回合")
-            # 只显示存活方的血条
-            player2_hp_bar = create_hp_bar(player2_hp, player2.max_hp)
+            # 只显示存活方的血条（完整信息）
+            player2_hp_bar = create_hp_bar(player2_hp, player2.max_hp, show_full=True)
             battle_log.append(f"  {player2.nickname}:")
             battle_log.append(f"    {player2_hp_bar}")
         else:
-            # 平局或超时 - 显示双方血条
+            # 平局或超时 - 显示双方血条（完整信息）
             battle_log.append(f"⏰ 战斗超时，平局！用时{round_num}回合")
-            player1_hp_bar = create_hp_bar(player1_hp, player1.max_hp)
-            player2_hp_bar = create_hp_bar(player2_hp, player2.max_hp)
+            player1_hp_bar = create_hp_bar(player1_hp, player1.max_hp, show_full=True)
+            player2_hp_bar = create_hp_bar(player2_hp, player2.max_hp, show_full=True)
             battle_log.append(f"  {player1.nickname}:")
             battle_log.append(f"    {player1_hp_bar}")
             battle_log.append(f"  {player2.nickname}:")
