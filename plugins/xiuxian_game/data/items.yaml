@@ -1089,13 +1089,6 @@ items:
       durability: 230
       attr_bonus: {"attack": 85, "agility": 55}
       attr_ratio: {"attack": 0.60, "agility": 0.45}
-      recipe:
-        materials:
-          world_fragment: 1
-          time_dust: 2
-          void_essence: 5
-          demon_heart: 4
-        gold: 85000
       repair_cost: 110
       required_level: 220
       gem_slots: 5
@@ -1109,6 +1102,20 @@ items:
           max_trigger_count: 3
           next_effect: "fierce_tiger_bullet"
           description: "虎标弹：造成伤害提高30%(最多生效3次主动攻击)"
+        - trigger: "first_turn"
+          chance: 0
+          effect: "fierce_tiger_bullet"
+          value: 50
+          duration: 0
+          max_trigger_count: 3
+          next_effect: "rigid_qi_heart"
+          description: "猛虎标弹：虎标弹失效后自动激活，造成伤害提高50%，受到伤害降低30%(最多生效3次主动攻击)"
+        - trigger: "first_turn"
+          chance: 0
+          effect: "rigid_qi_heart"
+          value: 60
+          duration: 3
+          description: "刚气-心：猛虎标弹失效后触发，受到伤害降低60%，造成伤害降低30%(持续3回合)"
 
     - item_id: "shroud_of_eternity"
       name: "寿衣"
