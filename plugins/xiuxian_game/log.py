@@ -132,19 +132,62 @@ async def handle_view_error_log(event: MessageEvent, args: Message = CommandArg(
 
         # 过滤敏感内容的函数
         def sanitize_log(log_text: str) -> str:
-            """过滤日志中的敏感内容，避免被QQ拦截"""
-            # 替换文件路径中的 .py 为 [py]
+            """过滤日志中的敏感内容，只保留关键报错信息"""
             import re
-            # 匹配 .py 文件路径
-            log_text = re.sub(r'\.py\b', '[py]', log_text)
-            # 匹配常见的文件扩展名
-            log_text = re.sub(r'\.(txt|log|db|yaml|json|toml)\b', r'[\1]', log_text)
-            # 替换可能被识别为URL的路径分隔符
-            log_text = log_text.replace('/', '／')  # 使用全角斜杠
-            log_text = log_text.replace('\\', '＼')  # 使用全角反斜杠
-            # 替换 http/https
-            log_text = re.sub(r'https?://', 'hxxp://', log_text, flags=re.IGNORECASE)
-            return log_text
+            lines = log_text.split('\n')
+            result_lines = []
+
+            for line in lines:
+                # 保留ERROR行
+                if '| ERROR' in line or '| EXCEPTION' in line:
+                    result_lines.append(line)
+                    continue
+
+                # 保留Traceback行
+                if line.strip().startswith('Traceback'):
+                    result_lines.append(line)
+                    continue
+
+                # 处理File行，只保留文件名和行号
+                if 'File "' in line:
+                    # 提取文件名和行号
+                    # 格式：  File "/path/to/file.py", line 123, in function_name
+                    match = re.search(r'File "([^"]+)", line (\d+)(?:, in (.+))?', line)
+                    if match:
+                        full_path = match.group(1)
+                        line_num = match.group(2)
+                        func_name = match.group(3) if match.group(3) else ''
+
+                        # 只保留文件名（去掉路径）
+                        import os
+                        file_name = os.path.basename(full_path)
+
+                        # 重新构建行
+                        indent = len(line) - len(line.lstrip())
+                        if func_name:
+                            new_line = ' ' * indent + f'File "{file_name}", line {line_num}, in {func_name}'
+                        else:
+                            new_line = ' ' * indent + f'File "{file_name}", line {line_num}'
+                        result_lines.append(new_line)
+                    else:
+                        result_lines.append(line)
+                    continue
+
+                # 保留异常类型行（如 AttributeError, ValueError 等）
+                if line.strip() and (
+                    'Error:' in line or
+                    'Exception:' in line or
+                    line.strip().endswith('Error') or
+                    line.strip().endswith('Exception')
+                ):
+                    result_lines.append(line)
+                    continue
+
+                # 保留代码行（通常是缩进的）
+                if line.strip() and not line.strip().startswith('│'):
+                    result_lines.append(line)
+
+            return '\n'.join(result_lines)
 
         # 构建消息 - 只显示最新的一条完整报错
         # 因为完整的堆栈跟踪通常很长，一次只显示一条更合适
@@ -158,7 +201,7 @@ async def handle_view_error_log(event: MessageEvent, args: Message = CommandArg(
                 "",
                 "━━━━━━━━━━━━━",
                 "💡 使用【查看报错 数量】可查看更多",
-                "💡 路径中的特殊字符已转换以避免拦截"
+                "💡 已过滤完整路径，仅显示文件名"
             ]
         else:
             # 如果有多条，只显示最新的一条完整报错
@@ -171,8 +214,8 @@ async def handle_view_error_log(event: MessageEvent, args: Message = CommandArg(
                 "",
                 "━━━━━━━━━━━━━",
                 f"💡 共找到 {len(error_logs)} 条报错",
-                "💡 由于完整堆栈跟踪较长，仅显示最新1条",
-                "💡 路径中的特殊字符已转换以避免拦截"
+                "💡 已过滤完整路径，仅显示文件名",
+                "💡 如需完整路径请查看日志文件"
             ]
 
         message = "\n".join(msg_lines)
@@ -201,7 +244,7 @@ async def handle_view_error_log(event: MessageEvent, args: Message = CommandArg(
                 "━━━━━━━━━━━━━",
                 f"💡 共找到 {len(error_logs)} 条报错",
                 "💡 完整堆栈跟踪过长已截断",
-                "💡 路径中的特殊字符已转换以避免拦截"
+                "💡 已过滤完整路径，仅显示文件名"
             ]
             message = "\n".join(msg_lines)
 
