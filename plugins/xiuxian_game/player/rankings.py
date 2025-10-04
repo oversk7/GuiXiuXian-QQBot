@@ -11,6 +11,31 @@ from ..models.stock import StockHolding
 from ..utils import message_add_head
 from .realm_utils import realm_by_level_and_reincarnation, number_to_chinese
 
+
+def _format_wealth(amount: int) -> str:
+    """格式化财富显示，使用w（万）、e（亿）等单位
+
+    Args:
+        amount: 金额数值
+
+    Returns:
+        格式化后的字符串
+    """
+    if amount >= 100_000_000:  # 1亿以上
+        value = amount / 100_000_000
+        if value >= 10:
+            return f"{value:.1f}e💰"
+        else:
+            return f"{value:.2f}e💰"
+    elif amount >= 10_000:  # 1万以上
+        value = amount / 10_000
+        if value >= 100:
+            return f"{value:.1f}w💰"
+        else:
+            return f"{value:.2f}w💰"
+    else:
+        return f"{amount}💰"
+
 # ==================== 修为榜 ====================
 level_rank_cmd = on_command("修为榜", aliases={"等级榜"}, block=True, priority=5)
 
@@ -161,25 +186,14 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
         for idx, data in enumerate(page_data, start=offset + 1):
             p = data['player']
             total = data['total_wealth']
-            gold = data['gold']
-            bank = data['bank_balance']
-            invest = data['investment_value']
 
             # 使用emoji装饰前三名
             rank_emoji = "🥇" if idx == 1 else "🥈" if idx == 2 else "🥉" if idx == 3 else f"{idx}."
 
-            # 构建详细信息
-            detail_parts = []
-            if gold > 0:
-                detail_parts.append(f"现金{gold}")
-            if bank > 0:
-                detail_parts.append(f"存款{bank}")
-            if invest > 0:
-                detail_parts.append(f"投资{invest}")
+            # 格式化金额显示
+            formatted_wealth = _format_wealth(total)
 
-            detail = f" ({'+'.join(detail_parts)})" if detail_parts else ""
-
-            lines.append(f"{rank_emoji} {p.nickname}[UID:{p.uid}] - {total:,}💰{detail}")
+            lines.append(f"{rank_emoji} {p.nickname}[UID:{p.uid}] - {formatted_wealth}")
 
         if page < 3:
             lines.append("━━━━━━━━━━━━━")
