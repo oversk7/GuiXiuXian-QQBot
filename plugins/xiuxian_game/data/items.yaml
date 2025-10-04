@@ -830,16 +830,10 @@ items:
       rarity: "blue"
       special_effects:
         - trigger: "on_attack"
-          chance: 20
+          chance: 15
           effect: "fear"
           duration: 1
-          description: "攻击时20%概率镇魂，使敌人恐惧1回合"
-        - trigger: "on_defense"
-          chance: 100
-          effect: "regen"
-          value: 3
-          duration: 1
-          description: "被攻击后回血3%(持续1回合)"
+          description: "攻击时15%概率镇魂，使敌人恐惧1回合"
 
     # ========== 顶级装备 (101-150级) - 高比例加成，蓝色+紫色材料 ==========
 
@@ -864,10 +858,10 @@ items:
       rarity: "purple"
       special_effects:
         - trigger: "on_defense"
-          chance: 25
+          chance: 20
           effect: "fear"
           duration: 1
-          description: "被攻击时25%概率使敌人陷入恐惧"
+          description: "被攻击时20%概率使敌人陷入恐惧"
 
     - item_id: "wedding_dress"
       name: "嫁衣"
@@ -890,17 +884,12 @@ items:
       rarity: "purple"
       special_effects:
         - trigger: "on_attack"
-          chance: 100
+          chance: 30
           effect: "lifesteal"
           value: 12
           duration: 0
-          description: "攻击时吸血12%"
-        - trigger: "on_critical"
-          chance: 50
-          effect: "buff_attack"
-          value: 30
-          duration: 2
-          description: "暴击时50%概率攻击力+30%(持续2回合)"
+          description: "攻击时30%概率触发吸血12%"
+
 
     - item_id: "void_essence_crown"
       name: "虚无之冠"
@@ -922,12 +911,6 @@ items:
       gem_slots: 4
       rarity: "purple"
       special_effects:
-        - trigger: "first_turn"
-          chance: 100
-          effect: "buff_critical"
-          value: 25
-          duration: 3
-          description: "战斗开始时暴击率+25%(持续3回合)"
         - trigger: "on_dodge"
           chance: 100
           effect: "regen"
@@ -960,11 +943,7 @@ items:
           effect: "fear"
           duration: 1
           description: "攻击时35%概率电击敌人，使其恐惧1回合"
-        - trigger: "on_critical"
-          chance: 100
-          effect: "true_damage"
-          duration: 2
-          description: "暴击时进入真伤状态(持续2回合，攻击无视防御)"
+
     # ========== 传说装备 (151+级) - 极高比例加成，紫色+橙色材料 ==========
 
     - item_id: "reality_suicide_note"
@@ -987,11 +966,6 @@ items:
       gem_slots: 5
       rarity: "orange"
       special_effects:
-        - trigger: "first_turn"
-          chance: 100
-          effect: "true_damage"
-          duration: 3
-          description: "战斗开始进入真伤状态(持续3回合，攻击无视防御)"
         - trigger: "on_critical"
           chance: 60
           effect: "fear"
@@ -1027,21 +1001,9 @@ items:
         - trigger: "each_turn"
           chance: 100
           effect: "regen"
-          value: 8
+          value: 5
           duration: 0
-          description: "每回合回血8%"
-        - trigger: "on_defense"
-          chance: 100
-          effect: "buff_defense"
-          value: 40
-          duration: 2
-          description: "被攻击后防御+40%(持续2回合)"
-        - trigger: "low_hp"
-          chance: 100
-          effect: "shield"
-          value: 30
-          duration: 3
-          description: "低血量时获得30%护盾(持续3回合)"
+          description: "每回合回血5%"
 
     - item_id: "world_fragment_blade"
       name: "世界碎片之刃"
@@ -1066,24 +1028,18 @@ items:
         - trigger: "first_turn"
           chance: 100
           effect: "true_damage"
-          duration: 5
-          description: "战斗开始进入真伤状态(持续5回合，撕裂现实)"
+          duration: 3
+          description: "战斗开始进入真伤状态(持续3回合，撕裂现实)"
         - trigger: "on_critical"
           chance: 100
           effect: "damage_boost"
           value: 40
           duration: 2
           description: "暴击后伤害+40%(持续2回合)"
-        - trigger: "first_turn"
-          chance: 100
-          effect: "buff_attack"
-          value: 50
-          duration: 3
-          description: "战斗开始时攻击力+50%(持续3回合)"
 
     - item_id: "heaven_retreat_star_blade"
       name: "天退星刀"
-      description: "以陨落星辰锻造的利刃，刀光流转间似有星芒破碎。"
+      description: "以陨落星辰锻造的利刃，刀光流转间似有星芒破碎。（专属，UID:1331）"
       type: "EQUIPMENT"
       price: 320000
       durability: 230
@@ -1138,18 +1094,6 @@ items:
       gem_slots: 4
       rarity: "orange"
       special_effects:
-        - trigger: "each_turn"
-          chance: 100
-          effect: "regen"
-          value: 10
-          duration: 0
-          description: "每回合回血10%(不死不灭)"
-        - trigger: "on_defense"
-          chance: 100
-          effect: "reflect"
-          value: 25
-          duration: 0
-          description: "被攻击时反射25%伤害(亡魂反噬)"
         - trigger: "low_hp"
           chance: 100
           effect: "buff_defense"

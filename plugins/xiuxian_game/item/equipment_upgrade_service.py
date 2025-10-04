@@ -62,34 +62,134 @@ class EquipmentUpgradeService:
         9: 4,   # 9阶需要4个8阶装备
         10: 5   # 10阶需要5个9阶装备
     }
-    
+
     @classmethod
-    def get_equipment_requirements(cls, current_level: int) -> int:
-        """获取升阶所需的相同装备数量"""
+    def is_rare_equipment(cls, item_id: str) -> bool:
+        """判断是否为稀有装备（没有配方的装备）
+
+        稀有装备包括：
+        1. VIP定制装备（如天退星刀）
+        2. Boss掉落专属装备（如幸运剪刀、黑色信封等）
+        3. 其他没有配方的特殊装备
+
+        这些装备不需要消耗多个装备来升阶，只需要特殊材料
+        """
+        from ..config import config
+        item_config = config.items_config["by_id"].get(item_id)
+        if not item_config:
+            return False
+
+        # 检查是否有recipe字段
+        # 如果没有recipe或recipe为None/空，则视为稀有装备
+        return not hasattr(item_config, 'recipe') or not item_config.recipe
+
+    @classmethod
+    def get_equipment_requirements(cls, current_level: int, item_id: str = None) -> int:
+        """获取升阶所需的相同装备数量
+
+        Args:
+            current_level: 当前升阶等级
+            item_id: 装备ID（用于判断是否为稀有装备）
+        """
         if current_level >= 10:
             return 0  # 已达最高等级
+
+        # 稀有装备（没有配方的装备）不需要消耗多个装备
+        if item_id and cls.is_rare_equipment(item_id):
+            return 1  # 只需要装备本身
 
         target_level = current_level + 1
         return cls.EQUIPMENT_REQUIREMENTS.get(target_level, 2)
 
     @classmethod
-    def get_upgrade_materials(cls, current_level: int) -> Dict[str, int]:
-        """获取升阶所需升阶石材料"""
+    def get_upgrade_materials(cls, current_level: int, item_id: str = None) -> Dict[str, int]:
+        """获取升阶所需升阶石材料
+
+        Args:
+            current_level: 当前升阶等级
+            item_id: 装备ID（用于判断是否为稀有装备）
+        """
         if current_level >= 10:
             return {}  # 已达最高等级
 
         target_level = current_level + 1
         materials = {}
 
-        # 只需要升阶石，不需要其他材料
-        if target_level <= 3:
-            materials["upgrade_stone_low"] = target_level
-        elif target_level <= 6:
-            materials["upgrade_stone_mid"] = target_level - 3
-        elif target_level <= 9:
-            materials["upgrade_stone_high"] = target_level - 6
-        else:  # target_level == 10
-            materials["upgrade_stone_supreme"] = 1
+        # 稀有装备（没有配方的装备）使用特殊材料
+        if item_id and cls.is_rare_equipment(item_id):
+            # 根据装备稀有度和等级要求，使用不同的材料组合
+            from ..config import config
+            item_config = config.items_config["by_id"].get(item_id)
+
+            if item_config:
+                rarity = getattr(item_config, 'rarity', 'white')
+                required_level = getattr(item_config, 'required_level', 1)
+
+                # 根据稀有度和等级确定材料
+                if rarity == 'orange' or required_level >= 150:
+                    # 传说级装备：使用高级材料
+                    if target_level <= 3:
+                        materials["upgrade_stone_low"] = target_level
+                        materials["void_essence"] = target_level
+                    elif target_level <= 6:
+                        materials["upgrade_stone_mid"] = target_level - 3
+                        materials["demon_heart"] = 1
+                    elif target_level <= 9:
+                        materials["upgrade_stone_high"] = target_level - 6
+                        materials["time_dust"] = target_level - 6
+                    else:  # target_level == 10
+                        materials["upgrade_stone_supreme"] = 1
+                        materials["world_fragment"] = 1
+
+                elif rarity == 'purple' or required_level >= 100:
+                    # 紫色装备：使用中级材料
+                    if target_level <= 3:
+                        materials["upgrade_stone_low"] = target_level
+                        materials["soul_crystal"] = target_level
+                    elif target_level <= 6:
+                        materials["upgrade_stone_mid"] = target_level - 3
+                        materials["cursed_mirror_shard"] = target_level - 3
+                    elif target_level <= 9:
+                        materials["upgrade_stone_high"] = target_level - 6
+                        materials["demon_heart"] = 1
+                    else:  # target_level == 10
+                        materials["upgrade_stone_supreme"] = 1
+                        materials["void_essence"] = 2
+
+                elif rarity == 'blue' or required_level >= 60:
+                    # 蓝色装备：使用低级材料
+                    if target_level <= 3:
+                        materials["upgrade_stone_low"] = target_level
+                        materials["phantom_thread"] = target_level * 2
+                    elif target_level <= 6:
+                        materials["upgrade_stone_mid"] = target_level - 3
+                        materials["soul_crystal"] = target_level - 3
+                    elif target_level <= 9:
+                        materials["upgrade_stone_high"] = target_level - 6
+                        materials["cursed_mirror_shard"] = target_level - 6
+                    else:  # target_level == 10
+                        materials["upgrade_stone_supreme"] = 1
+                        materials["demon_heart"] = 1
+                else:
+                    # 绿色/白色装备：只需要升阶石
+                    if target_level <= 3:
+                        materials["upgrade_stone_low"] = target_level
+                    elif target_level <= 6:
+                        materials["upgrade_stone_mid"] = target_level - 3
+                    elif target_level <= 9:
+                        materials["upgrade_stone_high"] = target_level - 6
+                    else:  # target_level == 10
+                        materials["upgrade_stone_supreme"] = 1
+        else:
+            # 普通装备（有配方的装备）只需要升阶石
+            if target_level <= 3:
+                materials["upgrade_stone_low"] = target_level
+            elif target_level <= 6:
+                materials["upgrade_stone_mid"] = target_level - 3
+            elif target_level <= 9:
+                materials["upgrade_stone_high"] = target_level - 6
+            else:  # target_level == 10
+                materials["upgrade_stone_supreme"] = 1
 
         return materials
 
@@ -156,16 +256,21 @@ class EquipmentUpgradeService:
             return False, "请先卸下装备再进行升阶"
 
         # 检查相同装备数量
-        required_equipment_count = cls.get_equipment_requirements(equipment.upgrade_level)
+        required_equipment_count = cls.get_equipment_requirements(equipment.upgrade_level, equipment.item_id)
         available_equipment = await cls.get_available_equipment_for_upgrade(
             session, player.id, equipment.item_id, equipment.upgrade_level
         )
 
         if len(available_equipment) < required_equipment_count:
-            return False, f"需要 {required_equipment_count} 个 +{equipment.upgrade_level}阶 {equipment.config.name}，当前只有 {len(available_equipment)} 个"
+            # 稀有装备的提示更友好
+            if cls.is_rare_equipment(equipment.item_id):
+                # 稀有装备只需要1个（装备本身），所以这个检查应该总是通过
+                pass
+            else:
+                return False, f"需要 {required_equipment_count} 个 +{equipment.upgrade_level}阶 {equipment.config.name}，当前只有 {len(available_equipment)} 个"
 
         # 检查升阶石材料
-        required_materials = cls.get_upgrade_materials(equipment.upgrade_level)
+        required_materials = cls.get_upgrade_materials(equipment.upgrade_level, equipment.item_id)
         for material_id, required_qty in required_materials.items():
             if not await cls._has_enough_material(session, player.id, material_id, required_qty):
                 material_config = config.items_config["by_id"].get(material_id)
@@ -203,24 +308,27 @@ class EquipmentUpgradeService:
         # 获取升阶信息
         current_level = equipment.upgrade_level
         target_level = current_level + 1
-        required_materials = cls.get_upgrade_materials(current_level)
+        required_materials = cls.get_upgrade_materials(current_level, equipment.item_id)
         required_gold = cls.get_upgrade_gold_cost(current_level)
         success_rate = cls.get_success_rate(current_level, use_protection, player.luck)
 
         # 获取需要消耗的装备
-        required_equipment_count = cls.get_equipment_requirements(current_level)
-        available_equipment = await cls.get_available_equipment_for_upgrade(
-            session, player.id, equipment.item_id, current_level
-        )
+        required_equipment_count = cls.get_equipment_requirements(current_level, equipment.item_id)
 
-        # 选择要消耗的装备（排除主装备本身）
+        # 稀有装备（没有配方的装备）不需要消耗多个装备
         equipment_to_consume = []
-        for eq in available_equipment:
-            if eq.id != equipment.id and len(equipment_to_consume) < required_equipment_count - 1:
-                equipment_to_consume.append(eq)
+        if not cls.is_rare_equipment(equipment.item_id):
+            available_equipment = await cls.get_available_equipment_for_upgrade(
+                session, player.id, equipment.item_id, current_level
+            )
 
-        if len(equipment_to_consume) < required_equipment_count - 1:
-            return False, "可用装备数量不足", {}
+            # 选择要消耗的装备（排除主装备本身）
+            for eq in available_equipment:
+                if eq.id != equipment.id and len(equipment_to_consume) < required_equipment_count - 1:
+                    equipment_to_consume.append(eq)
+
+            if len(equipment_to_consume) < required_equipment_count - 1:
+                return False, "可用装备数量不足", {}
 
         # 消耗升阶石材料
         consumed_materials = {}
