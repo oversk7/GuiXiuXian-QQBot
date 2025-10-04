@@ -7,7 +7,7 @@ from ..models.db import safe_session
 from ..models.player import Player
 from ..utils import message_add_head
 from .reincarnation import ReincarnationService
-
+from ..platform_utils import get_unified_player, is_guild_message
 
 reincarnate_cmd = on_command("冥返", aliases={"轮回", "重生"}, block=True, priority=5)
 reincarnation_info_cmd = on_command("冥返信息", aliases={"转数信息", "轮回信息"}, block=True, priority=5)
@@ -16,8 +16,6 @@ reincarnation_info_cmd = on_command("冥返信息", aliases={"转数信息", "�
 @reincarnate_cmd.handle()
 async def handle_reincarnate(event: MessageEvent):
     """处理冥返命令"""
-    from ..platform_utils import get_unified_player, is_guild_message
-    
     async with safe_session() as session:
         # 使用跨平台工具获取玩家数据
         player = await get_unified_player(session, event)
