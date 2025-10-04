@@ -49,14 +49,14 @@ async def handle_view_error_log(event: MessageEvent, args: Message = CommandArg(
 
     try:
         # 读取日志文件，查找ERROR级别的日志
-        error_logs = []
+        error_summaries = []
         with open(log_file, "r", encoding="utf-8") as f:
             lines = f.readlines()
 
         # 从后往前读取，找到ERROR日志
         # 日志格式：2025-10-04 10:57:04.850 | ERROR | ...
-        # 完整报错包含：ERROR行 + Traceback + 多行堆栈跟踪 + 最终的异常信息
-        current_error = []
+        # 只提取最后一行的错误信息，避免路径被识别为URL
+        current_error_lines = []
 
         for i in range(len(lines) - 1, -1, -1):
             line = lines[i]
@@ -79,14 +79,12 @@ async def handle_view_error_log(event: MessageEvent, args: Message = CommandArg(
                 # 这是一条新的日志行
                 if "ERROR" in line or "EXCEPTION" in line:
                     # 找到一条ERROR日志的开始
-                    current_error.insert(0, line)
+                    current_error_lines = [line]
 
-                    # 继续向后读取，收集完整的堆栈跟踪
-                    # 堆栈跟踪通常包含：Traceback、File行、异常类型等
-                    # 限制最多读取100行，避免过长
+                    # 继续向后读取，收集完整的错误信息
                     j = i + 1
-                    lines_collected = 1  # 已经收集了ERROR行本身
-                    max_lines = 100  # 每条报错最多100行
+                    max_lines = 100  # 每条报错最多读取100行
+                    lines_collected = 1
 
                     while j < len(lines) and lines_collected < max_lines:
                         next_line = lines[j]
@@ -108,144 +106,93 @@ async def handle_view_error_log(event: MessageEvent, args: Message = CommandArg(
                         if is_next_log_start:
                             break
 
-                        # 否则，这是当前ERROR的一部分
-                        current_error.append(next_line)
+                        # 收集这一行
+                        current_error_lines.append(next_line)
                         j += 1
                         lines_collected += 1
 
-                    # 如果达到行数限制，添加提示
-                    if lines_collected >= max_lines:
-                        current_error.append("\n... (堆栈跟踪过长，已截断) ...\n")
+                    # 提取最后一行的错误信息（通常是异常类型和消息）
+                    # 从后往前找第一个非空行
+                    last_error_line = None
+                    for error_line in reversed(current_error_lines):
+                        stripped = error_line.strip()
+                        if stripped and not stripped.startswith('│'):
+                            # 检查是否包含常见的异常关键词
+                            if any(keyword in stripped for keyword in ['Error:', 'Exception:', 'Error', 'Exception']):
+                                last_error_line = stripped
+                                break
 
-                    # 保存完整的ERROR日志
-                    error_logs.append("".join(current_error))
-                    current_error = []
+                    # 如果没找到异常行，就用ERROR日志行本身
+                    if not last_error_line:
+                        # 从ERROR行中提取错误信息
+                        # 格式：2025-10-04 10:57:04.850 | ERROR | module:function:line - 错误信息
+                        error_line = current_error_lines[0]
+                        if '| ERROR |' in error_line:
+                            parts = error_line.split('| ERROR |', 1)
+                            if len(parts) > 1:
+                                last_error_line = parts[1].strip()
+                            else:
+                                last_error_line = error_line.strip()
+                        else:
+                            last_error_line = error_line.strip()
 
-                    if len(error_logs) >= count:
+                    # 保存错误摘要
+                    error_summaries.append(last_error_line)
+
+                    if len(error_summaries) >= count:
                         break
 
-        if not error_logs:
+        if not error_summaries:
             await view_error_log_cmd.finish(message_add_head("✅ 没有找到报错日志", event))
 
         # 反转列表，使最新的在最后
-        error_logs.reverse()
+        error_summaries.reverse()
 
-        # 过滤敏感内容的函数
-        def sanitize_log(log_text: str) -> str:
-            """过滤日志中的敏感内容，只保留关键报错信息"""
-            import re
-            lines = log_text.split('\n')
-            result_lines = []
-
-            for line in lines:
-                # 保留ERROR行
-                if '| ERROR' in line or '| EXCEPTION' in line:
-                    result_lines.append(line)
-                    continue
-
-                # 保留Traceback行
-                if line.strip().startswith('Traceback'):
-                    result_lines.append(line)
-                    continue
-
-                # 处理File行，只保留文件名和行号
-                if 'File "' in line:
-                    # 提取文件名和行号
-                    # 格式：  File "/path/to/file.py", line 123, in function_name
-                    match = re.search(r'File "([^"]+)", line (\d+)(?:, in (.+))?', line)
-                    if match:
-                        full_path = match.group(1)
-                        line_num = match.group(2)
-                        func_name = match.group(3) if match.group(3) else ''
-
-                        # 只保留文件名（去掉路径）
-                        import os
-                        file_name = os.path.basename(full_path)
-
-                        # 重新构建行
-                        indent = len(line) - len(line.lstrip())
-                        if func_name:
-                            new_line = ' ' * indent + f'File "{file_name}", line {line_num}, in {func_name}'
-                        else:
-                            new_line = ' ' * indent + f'File "{file_name}", line {line_num}'
-                        result_lines.append(new_line)
-                    else:
-                        result_lines.append(line)
-                    continue
-
-                # 保留异常类型行（如 AttributeError, ValueError 等）
-                if line.strip() and (
-                    'Error:' in line or
-                    'Exception:' in line or
-                    line.strip().endswith('Error') or
-                    line.strip().endswith('Exception')
-                ):
-                    result_lines.append(line)
-                    continue
-
-                # 保留代码行（通常是缩进的）
-                if line.strip() and not line.strip().startswith('│'):
-                    result_lines.append(line)
-
-            return '\n'.join(result_lines)
-
-        # 构建消息 - 只显示最新的一条完整报错
-        # 因为完整的堆栈跟踪通常很长，一次只显示一条更合适
-        if len(error_logs) == 1:
-            sanitized_log = sanitize_log(error_logs[0].strip())
+        # 构建消息 - 只显示最后一行错误信息
+        if len(error_summaries) == 1:
             msg_lines = [
-                "🔍 最近1条报错日志",
+                "🔍 最近1条报错",
                 "━━━━━━━━━━━━━",
                 "",
-                sanitized_log,
+                f"❌ {error_summaries[0]}",
                 "",
                 "━━━━━━━━━━━━━",
-                "💡 使用【查看报错 数量】可查看更多",
-                "💡 已过滤完整路径，仅显示文件名"
+                "💡 使用【查看报错 数量】可查看更多"
             ]
         else:
-            # 如果有多条，只显示最新的一条完整报错
-            sanitized_log = sanitize_log(error_logs[-1].strip())
+            # 显示多条错误摘要
             msg_lines = [
-                f"🔍 最近{len(error_logs)}条报错中的最新1条",
+                f"🔍 最近{len(error_summaries)}条报错",
                 "━━━━━━━━━━━━━",
-                "",
-                sanitized_log,
-                "",
-                "━━━━━━━━━━━━━",
-                f"💡 共找到 {len(error_logs)} 条报错",
-                "💡 已过滤完整路径，仅显示文件名",
-                "💡 如需完整路径请查看日志文件"
+                ""
             ]
+            for idx, error in enumerate(error_summaries, 1):
+                msg_lines.append(f"{idx}. {error}")
+            msg_lines.extend([
+                "",
+                "━━━━━━━━━━━━━",
+                "💡 仅显示错误摘要，避免路径拦截"
+            ])
 
         message = "\n".join(msg_lines)
 
-        # 如果单条消息仍然太长（超过4500字符），进行截断
+        # 如果消息太长，只保留最新的几条
         if len(message) > 4500:
-            # 截取ERROR行和最后的异常信息
-            error_log = error_logs[-1].strip()
-            lines = error_log.split('\n')
-
-            # 保留第一行（ERROR行）和最后几行（异常信息）
-            if len(lines) > 20:
-                truncated = '\n'.join(lines[:5]) + '\n\n... (中间省略) ...\n\n' + '\n'.join(lines[-10:])
-            else:
-                truncated = error_log
-
-            # 过滤敏感内容
-            truncated = sanitize_log(truncated)
-
+            # 只显示最新的3条
+            recent_errors = error_summaries[-3:]
             msg_lines = [
-                "🔍 最新报错日志（已截断）",
+                f"🔍 最新3条报错（共{len(error_summaries)}条）",
                 "━━━━━━━━━━━━━",
-                "",
-                truncated,
-                "",
-                "━━━━━━━━━━━━━",
-                f"💡 共找到 {len(error_logs)} 条报错",
-                "💡 完整堆栈跟踪过长已截断",
-                "💡 已过滤完整路径，仅显示文件名"
+                ""
             ]
+            for idx, error in enumerate(recent_errors, 1):
+                msg_lines.append(f"{idx}. {error}")
+            msg_lines.extend([
+                "",
+                "━━━━━━━━━━━━━",
+                f"💡 共找到 {len(error_summaries)} 条报错",
+                "💡 仅显示最新3条错误摘要"
+            ])
             message = "\n".join(msg_lines)
 
         await view_error_log_cmd.finish(message_add_head(message, event))
