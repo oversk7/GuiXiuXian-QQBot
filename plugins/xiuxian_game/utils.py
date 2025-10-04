@@ -32,7 +32,7 @@ def calculate_level_up_exp(current_level: int) -> int:
     else:
         # 后期：二次函数
         level_diff = current_level - curve["curve_change_level"]
-        return int(calculate_level_up_exp(curve["curve_change_level"]-1) + (level_diff ** 1.8) * curve["late_multiplier"])
+        return int(calculate_level_up_exp(curve["curve_change_level"]-1) + (level_diff ** 2) * curve["late_multiplier"])
 
 
 
