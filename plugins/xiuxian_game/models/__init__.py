@@ -41,6 +41,8 @@ from .temporary_buff import TemporaryBuff
 from .platform_binding import PlatformBinding
 # 钓鱼系统模型
 from .fishing_record import FishingRecord, FishingStats
+# 抽奖系统模型
+from .lottery import Lottery, LotteryParticipant, LotteryType, LotteryStatus
 
 __all__ = [
     "Player", "Guild", "GuildMember", "GuildBuilding", "GuildPosition", "BuildingType", "WorldMessage", "BankAccount", "ItemInstance", "WorldTile", "NavigationTask", "AlchemyRecord", "MarketOrder",
@@ -53,5 +55,6 @@ __all__ = [
     "WorldBossCycle", "WorldBossDamage",
     "InviteReward", "DungeonChestRecord",
     "Location", "NPC", "NPCType", "NPCStatus",
-    "TemporaryBuff", "PlatformBinding", "FishingRecord", "FishingStats"
+    "TemporaryBuff", "PlatformBinding", "FishingRecord", "FishingStats",
+    "Lottery", "LotteryParticipant", "LotteryType", "LotteryStatus"
 ]

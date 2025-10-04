@@ -36,6 +36,7 @@ async def handle_help(event: MessageEvent, args: Message = CommandArg()):
         "📈 投资系统  💼 打工系统\n"
         "🏠️ 阴宅系统  🏛️ 委托系统\n"
         "🎣 钓鱼系统  📱 账号管理\n"
+        "🎁 抽奖系统\n"
         "═════════════\n"
         "💡 发送对应系统查看详细指令，【赞助】支持诡修仙\n"
         "💡 【】括号里是指令，<>里是必填，[]里是选填\n"
@@ -774,6 +775,41 @@ async def handle_backup_help(event: MessageEvent, args: Message = CommandArg()):
     )
     await backup_help_cmd.finish(Message(msg))
 
+# 抽奖系统
+lottery_help_cmd = on_command("抽奖系统", aliases={"抽奖帮助"}, priority=4, block=True)
+
+@lottery_help_cmd.handle()
+async def handle_lottery_help(event: MessageEvent, args: Message = CommandArg()):
+    msg = (
+        "✨ 抽奖系统帮助 ✨\n"
+        "管理员发起，玩家参与\n"
+        "━━━━━━━━━━━━━\n"
+        "👥 玩家指令：\n"
+        "【参与抽奖 <抽奖ID>】 参与指定抽奖活动\n"
+        "【抽奖详情 <抽奖ID>】 查看抽奖详情和中奖名单\n"
+        "【我的抽奖】 查看我参与的抽奖记录\n"
+        "━━━━━━━━━━━━━\n"
+        "🔧 管理员指令：\n"
+        "【发起抽奖 <物品名/金币> <中奖人数> <每人数量> [最低等级]】\n"
+        "  发起抽奖活动，奖品从背包扣除\n"
+        "【开奖 <抽奖ID>】 进行开奖并发放奖品\n"
+        "【取消抽奖 <抽奖ID>】 取消抽奖并退还奖品\n"
+        "━━━━━━━━━━━━━\n"
+        "📝 说明：\n"
+        "• 发起抽奖时会从管理员背包扣除奖品\n"
+        "• 可设置最低等级要求，防止小号参与\n"
+        "• 参与人数少于中奖人数时，全部参与者中奖\n"
+        "• 参与人数多于中奖人数时，随机抽取中奖者\n"
+        "• 发起人不能参与自己发起的抽奖\n"
+        "━━━━━━━━━━━━━\n"
+        "💡 示例：\n"
+        "发起抽奖 棺材钉 10 10\n"
+        "发起抽奖 金币 5 1000 50\n"
+        "参与抽奖 1\n"
+        "开奖 1"
+    )
+    await lottery_help_cmd.finish(Message(msg))
+
 # 管理员系统
 admin_help_cmd = on_command("管理员系统", aliases={"管理员帮助", "管理指令"}, priority=4, block=True, permission=SUPERUSER)
 
@@ -787,6 +823,12 @@ async def handle_admin_help(event: MessageEvent, args: Message = CommandArg()):
         "【发物品 <UID> <物品名> [数量]】 给玩家发放物品\n"
         "【发装备 <UID> <装备名> [数量]】 给玩家发放装备\n"
         "【转移物品 <UID1> <UID2> <物品名> <数量>】 转移物品\n"
+        "━━━━━━━━━━━━━\n"
+        "🎁 抽奖系统：\n"
+        "【发起抽奖 <物品名/金币> <中奖人数> <每人数量> [最低等级]】 发起抽奖活动\n"
+        "【开奖 <抽奖ID>】 进行开奖（仅发起人）\n"
+        "【抽奖详情 <抽奖ID>】 查看抽奖详情\n"
+        "【取消抽奖 <抽奖ID>】 取消抽奖并退还奖品\n"
         "━━━━━━━━━━━━━\n"
         "📊 数据统计：\n"
         "【材料统计】 查看全服材料分布统计\n"
