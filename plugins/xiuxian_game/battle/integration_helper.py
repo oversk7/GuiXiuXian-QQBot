@@ -10,6 +10,36 @@ from ..models.player import Player
 from .enhanced_engine import EnhancedBattleEngine
 
 
+def create_hp_bar(current_hp: int, max_hp: int, bar_length: int = 12) -> str:
+    """创建可视化血条
+
+    Args:
+        current_hp: 当前血量
+        max_hp: 最大血量
+        bar_length: 血条长度（字符数）
+
+    Returns:
+        格式化的血条字符串，如：❤️❤️❤️❤️🖤🖤🖤🖤🖤🖤🖤🖤 1234/5000 (24.7%)
+    """
+    if max_hp <= 0:
+        return "🖤" * bar_length + " 0/0 (0.0%)"
+
+    # 计算血量百分比
+    hp_percent = (current_hp / max_hp) * 100
+
+    # 计算填充的心形数量
+    filled_hearts = int((current_hp / max_hp) * bar_length)
+    empty_hearts = bar_length - filled_hearts
+
+    # 构建血条
+    hp_bar = "❤️" * filled_hearts + "🖤" * empty_hearts
+
+    # 添加数值和百分比
+    hp_text = f"{hp_bar} {current_hp}/{max_hp} ({hp_percent:.1f}%)"
+
+    return hp_text
+
+
 class BattleIntegrationHelper:
     """战斗系统集成助手"""
 
@@ -59,13 +89,13 @@ class BattleIntegrationHelper:
             _, player1_hp_restored = engine._process_turn_start(player1.id, player1)
             if player1_hp_restored > 0:
                 player1_hp = min(player1.max_hp, player1_hp + player1_hp_restored)
-                battle_log.append(f"💚 {player1.nickname}回复{player1_hp_restored}生命值")
+                battle_log.append(f"💚 {player1.nickname}回复{player1_hp_restored}HP")
 
             # 玩家2 regen
             _, player2_hp_restored = engine._process_turn_start(player2.id, player2)
             if player2_hp_restored > 0:
                 player2_hp = min(player2.max_hp, player2_hp + player2_hp_restored)
-                battle_log.append(f"💚 {player2.nickname}回复{player2_hp_restored}生命值")
+                battle_log.append(f"💚 {player2.nickname}回复{player2_hp_restored}HP")
 
             # 确定回合顺序
             if player1_first:
@@ -102,11 +132,8 @@ class BattleIntegrationHelper:
                     if effects:
                         action_desc += f" ({' '.join(effects)})"
 
-                    action_desc += f" 造成 {damage} 点伤害"
+                    action_desc += f" 造成{damage}伤害"
                     battle_log.append(action_desc)
-
-                    # 显示血量变化
-                    battle_log.append(f"   {second_player.nickname} 血量: {second_hp_ref[0]}")
 
                     # 检查击杀并触发击杀效果
                     if second_hp_ref[0] <= 0:
@@ -129,14 +156,13 @@ class BattleIntegrationHelper:
                             counter_damage = counter_result["damage"]
                             first_hp_ref[0] = max(0, first_hp_ref[0] - counter_damage)
 
-                            counter_desc = f"🛡️ {second_player.nickname} 反击 {first_player.nickname}"
+                            counter_desc = f"🛡️ {second_player.nickname}反击{first_player.nickname}"
                             if counter_result.get("is_critical"):
-                                counter_desc += " (💥暴击)"
-                            counter_desc += f" 造成 {counter_damage} 点伤害"
+                                counter_desc += " 💥暴击"
+                            counter_desc += f" 造成{counter_damage}伤害"
                             battle_log.append(counter_desc)
-                            battle_log.append(f"   {first_player.nickname} 血量: {first_hp_ref[0]}")
                 else:
-                    battle_log.append(f"⚡ {first_player.nickname} 攻击 {second_player.nickname}，但被敏捷地闪避了！")
+                    battle_log.append(f"⚡ {first_player.nickname}攻击被闪避")
 
             # 第二个玩家攻击（如果还活着且第一个玩家也还活着）
             if second_hp_ref[0] > 0 and first_hp_ref[0] > 0:
@@ -163,11 +189,8 @@ class BattleIntegrationHelper:
                     if effects:
                         action_desc += f" ({' '.join(effects)})"
 
-                    action_desc += f" 造成 {damage} 点伤害"
+                    action_desc += f" 造成{damage}伤害"
                     battle_log.append(action_desc)
-
-                    # 显示血量变化
-                    battle_log.append(f"   {first_player.nickname} 血量: {first_hp_ref[0]}")
 
                     # 检查击杀并触发击杀效果
                     if first_hp_ref[0] <= 0:
@@ -190,14 +213,13 @@ class BattleIntegrationHelper:
                             counter_damage = counter_result["damage"]
                             second_hp_ref[0] = max(0, second_hp_ref[0] - counter_damage)
 
-                            counter_desc = f"🛡️ {first_player.nickname} 反击 {second_player.nickname}"
+                            counter_desc = f"🛡️ {first_player.nickname}反击{second_player.nickname}"
                             if counter_result.get("is_critical"):
-                                counter_desc += " (💥暴击)"
-                            counter_desc += f" 造成 {counter_damage} 点伤害"
+                                counter_desc += " 💥暴击"
+                            counter_desc += f" 造成{counter_damage}伤害"
                             battle_log.append(counter_desc)
-                            battle_log.append(f"   {second_player.nickname} 血量: {second_hp_ref[0]}")
                 else:
-                    battle_log.append(f"⚡ {second_player.nickname} 攻击 {first_player.nickname}，但被敏捷地闪避了！")
+                    battle_log.append(f"⚡ {second_player.nickname}攻击被闪避")
 
             # 更新实际血量变量
             if player1_first:
@@ -205,30 +227,26 @@ class BattleIntegrationHelper:
             else:
                 player2_hp, player1_hp = first_hp_ref[0], second_hp_ref[0]
 
+            # 回合结束后显示双方血量
+            player1_hp_bar = create_hp_bar(player1_hp, player1.max_hp)
+            player2_hp_bar = create_hp_bar(player2_hp, player2.max_hp)
+            battle_log.append(f"  {player1.nickname}: {player1_hp_bar}")
+            battle_log.append(f"  {player2.nickname}: {player2_hp_bar}")
+
         # 战斗结果
         player1_victory = player2_hp <= 0
         player1_damage_taken = initial_player1_hp - player1_hp
         player2_damage_taken = initial_player2_hp - player2_hp
 
         # 详细的结果显示
-        battle_log.append("━━━━━━━━━━━━━")
+        battle_log.append("━━━━━━━━━━━━")
         if player1_victory:
-            battle_log.append(f"🎉 {player1.nickname} 获得胜利！")
-            battle_log.append(f"📊 战斗统计：")
-            battle_log.append(f"   回合数：{round_num}")
-            battle_log.append(f"   {player1.nickname} 剩余血量：{player1_hp}/{initial_player1_hp}")
-            battle_log.append(f"   {player2.nickname} 受到伤害：{player2_damage_taken}")
+            battle_log.append(f"🎉 {player1.nickname}获得胜利！用时{round_num}回合")
         elif player1_hp <= 0:
-            battle_log.append(f"🎉 {player2.nickname} 获得胜利！")
-            battle_log.append(f"📊 战斗统计：")
-            battle_log.append(f"   回合数：{round_num}")
-            battle_log.append(f"   {player2.nickname} 剩余血量：{player2_hp}/{initial_player2_hp}")
-            battle_log.append(f"   {player1.nickname} 受到伤害：{player1_damage_taken}")
+            battle_log.append(f"🎉 {player2.nickname}获得胜利！用时{round_num}回合")
         else:
             # 平局或超时
-            battle_log.append(f"⏰ 战斗超时，平局！")
-            battle_log.append(f"📊 战斗统计：")
-            battle_log.append(f"   回合数：{round_num}")
+            battle_log.append(f"⏰ 战斗超时，平局！用时{round_num}回合")
             battle_log.append(f"   {player1.nickname} 剩余血量：{player1_hp}/{initial_player1_hp}")
             battle_log.append(f"   {player2.nickname} 剩余血量：{player2_hp}/{initial_player2_hp}")
 
@@ -468,14 +486,22 @@ class BattleIntegrationHelper:
                         if player_hp <= 0:
                             break
 
+            # 回合结束后显示双方血量
+            if player_hp > 0 and monster_hp > 0:
+                player_hp_bar = create_hp_bar(player_hp, player.max_hp)
+                monster_hp_bar = create_hp_bar(monster_hp, monster_stats["hp"])
+                battle_log.append(f"  {player.nickname}: {player_hp_bar}")
+                battle_log.append(f"  {monster_name}: {monster_hp_bar}")
+
         # 战斗结果
         victory = monster_hp <= 0
         damage_taken = initial_player_hp - player_hp
 
+        battle_log.append("━━━━━━━━━━━━")
         if victory:
-            battle_log.append(f"🎉 {player.nickname}获胜！")
+            battle_log.append(f"🎉 {player.nickname}获胜！用时{round_num}回合")
         else:
-            battle_log.append(f"💀 {player.nickname}战败...")
+            battle_log.append(f"💀 {player.nickname}战败！用时{round_num}回合")
 
         return victory, battle_log, damage_taken
 
@@ -659,19 +685,23 @@ class BattleIntegrationHelper:
             # 将回合动作合并为一行
             if round_actions:
                 battle_log.append(f"R{round_num}: " + " | ".join(round_actions))
-        
+
+            # 每回合结束后显示双方血量
+            player_hp_bar = create_hp_bar(player_hp, player.max_hp)
+            monster_hp_bar = create_hp_bar(monster_hp, monster_stats["hp"])
+            battle_log.append(f"  {player.nickname}: {player_hp_bar}")
+            battle_log.append(f"  {monster_name}: {monster_hp_bar}")
+
         # 战斗结果
         victory = monster_hp <= 0
         damage_taken = initial_player_hp - player_hp
 
         # 紧凑格式的结果显示
-        remaining_player_hp = player_hp
+        battle_log.append("━━━━━━━━━━━━")
         if victory:
-            battle_log.append(f"🎉 胜利！{round_num}回合，剩余{remaining_player_hp}血")
+            battle_log.append(f"🎉 胜利！用时{round_num}回合")
         else:
-            # 显示失败原因和剩余血量
-            remaining_monster_hp = monster_hp
-            battle_log.append(f"💀 战败！{round_num}回合，剩余{remaining_player_hp}血，敌剩{remaining_monster_hp}血")
+            battle_log.append(f"💀 战败！用时{round_num}回合")
 
         return victory, battle_log, damage_taken
 
@@ -879,19 +909,26 @@ class BattleIntegrationHelper:
             if round_actions:
                 battle_log.append(f"R{round_num}: " + " | ".join(round_actions))
 
+            # 每回合结束后显示双方血量
+            player1_hp_bar = create_hp_bar(player1_hp, player1.max_hp)
+            player2_hp_bar = create_hp_bar(player2_hp, player2.max_hp)
+            battle_log.append(f"  {player1.nickname}: {player1_hp_bar}")
+            battle_log.append(f"  {player2.nickname}: {player2_hp_bar}")
+
         # 计算伤害
         player1_damage_taken = initial_player1_hp - player1_hp
         player2_damage_taken = initial_player2_hp - player2_hp
         player1_victory = player2_hp <= 0
 
         # 紧凑格式的结果显示
+        battle_log.append("━━━━━━━━━━━━")
         if player1_victory:
-            battle_log.append(f"🎉 {player1.nickname}胜利！{round_num}回合，剩余{player1_hp}血")
+            battle_log.append(f"🎉 {player1.nickname}胜利！用时{round_num}回合")
         elif player1_hp <= 0:
-            battle_log.append(f"🎉 {player2.nickname}胜利！{round_num}回合，剩余{player2_hp}血")
+            battle_log.append(f"🎉 {player2.nickname}胜利！用时{round_num}回合")
         else:
             # 平局或超时
-            battle_log.append(f"⏰ 战斗超时，平局！{round_num}回合，{player1.nickname}剩{player1_hp}血，{player2.nickname}剩{player2_hp}血")
+            battle_log.append(f"⏰ 战斗超时，平局！用时{round_num}回合")
 
         return player1_victory, battle_log, player1_damage_taken, player2_damage_taken
 

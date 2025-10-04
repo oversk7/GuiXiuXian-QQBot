@@ -186,7 +186,7 @@ class EnhancedBattleEngine:
 
         if total_regen > 0:
             hp_restored += total_regen
-            messages.append(f"💚 {unit.nickname if hasattr(unit, 'nickname') else '敌人'}回复{total_regen}生命值")
+            messages.append(f"💚 {unit.nickname if hasattr(unit, 'nickname') else '敌人'}回复{total_regen}HP")
 
         # 效果持续时间递减
         tick_msgs = self.effect_manager.tick_effects(unit_id)
@@ -311,7 +311,7 @@ class EnhancedBattleEngine:
                 # 立即回血
                 heal_amount = int(killer.max_hp * effect.value / 100) if effect.is_percentage else int(effect.value)
                 result["hp_restored"] += heal_amount
-                result["messages"].append(f"💚 击杀回复！{killer_name}恢复{heal_amount}生命值")
+                result["messages"].append(f"💚 击杀回复{heal_amount}HP")
                 result["effects_triggered"].append("heal")
 
             elif effect.duration > 0:
@@ -563,14 +563,14 @@ class EnhancedBattleEngine:
                 lifesteal_amount = int(damage * effect.value / 100)
                 # 实际恢复HP（不超过最大值）
                 result["hp_restored"] += lifesteal_amount
-                result["messages"].append(f"🧡 吸血恢复{lifesteal_amount}生命值")
+                result["messages"].append(f"🧡 吸血{lifesteal_amount}HP")
                 result["effects_triggered"].append("lifesteal")
 
             elif effect.effect_type == EffectType.HEAL:
                 # 立即回血效果
                 heal_amount = int(attacker.max_hp * effect.value / 100) if effect.is_percentage else int(effect.value)
                 result["hp_restored"] += heal_amount
-                result["messages"].append(f"💚 立即回复{heal_amount}生命值")
+                result["messages"].append(f"💚 回复{heal_amount}HP")
                 result["effects_triggered"].append("heal")
 
             elif effect.effect_type == EffectType.FEAR:
@@ -627,7 +627,7 @@ class EnhancedBattleEngine:
                 # 立即回血
                 heal_amount = int(defender.max_hp * effect.value / 100) if effect.is_percentage else int(effect.value)
                 result["defender_hp_restored"] = result.get("defender_hp_restored", 0) + heal_amount
-                result["messages"].append(f"💚 {defender_name}立即回复{heal_amount}生命值")
+                result["messages"].append(f"💚 {defender_name}回复{heal_amount}HP")
                 result["effects_triggered"].append("heal")
 
             else:
@@ -767,7 +767,7 @@ class EnhancedBattleEngine:
             if effect.effect_type == EffectType.LIFESTEAL:
                 lifesteal_amount = int(damage * effect.value / 100)
                 result["hp_restored"] += lifesteal_amount
-                result["messages"].append(f"    🧡 吸血恢复{lifesteal_amount}生命值")
+                result["messages"].append(f"    🧡 吸血{lifesteal_amount}HP")
                 result["effects_triggered"].append("lifesteal")
 
             elif effect.effect_type == EffectType.TRUE_DAMAGE:
