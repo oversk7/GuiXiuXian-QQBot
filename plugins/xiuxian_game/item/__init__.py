@@ -6,3 +6,4 @@ from . import gem_socket_commands, gem_socket_service
 from . import gem_upgrade_commands, gem_upgrade_service
 from . import deception
 from . import buff_commands
+from . import material_stats
