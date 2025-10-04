@@ -131,17 +131,17 @@ class EnhancedBattleEngine:
         turn_start_msgs, turn_start_hp = self._process_turn_start(attacker_id, attacker)
         turn_result["messages"].extend(turn_start_msgs)
         turn_result["hp_restored"] += turn_start_hp
-        
+
         # 检查是否被控制
         if self.effect_manager.has_control_effect(attacker_id):
             turn_result["messages"].append(f"😱 {attacker.nickname}被恐惧，无法行动")
             return turn_result
-        
+
         # 执行攻击
         attack_result = self._execute_enhanced_attack(attacker, defender, is_player_turn)
         turn_result["messages"].extend(attack_result["messages"])
         turn_result["damage_dealt"] = attack_result.get("total_damage", 0)
-        turn_result["hp_restored"] = attack_result.get("hp_restored", 0)  # 新增：传递恢复的HP
+        turn_result["hp_restored"] += attack_result.get("hp_restored", 0)  # 累加恢复的HP（包括regen和吸血）
         turn_result["effects_triggered"] = attack_result.get("effects_triggered", [])
 
         # 处理反弹伤害（对攻击者造成伤害）
