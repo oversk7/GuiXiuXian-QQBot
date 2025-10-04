@@ -423,6 +423,69 @@ class EnhancedBattleEngine:
         combo_count = attack_result.get("combo_count", 1)
         result["combo_count"] = combo_count
 
+        # 检查并应用虎标弹等计数型伤害加成效果
+        tiger_bullet_effects = self.effect_manager.get_active_effects(attacker_id, EffectType.TIGER_BULLET)
+        for tiger_effect in tiger_bullet_effects:
+            if tiger_effect.consume_trigger():
+                # 还有剩余次数，应用伤害加成
+                boost_damage = int(damage * tiger_effect.value / 100)
+                damage += boost_damage
+                result["messages"].append(f"🐯 虎标弹！伤害提升{tiger_effect.value:.0f}% (+{boost_damage})")
+            else:
+                # 次数用尽，移除效果并触发下一个效果
+                self.effect_manager.remove_effect(attacker_id, tiger_effect)
+                result["messages"].append(f"🐯 虎标弹效果结束")
+
+                # 触发猛虎标弹
+                if tiger_effect.next_effect == "fierce_tiger_bullet":
+                    from .battle_effects import BattleEffect
+                    fierce_effect = BattleEffect(
+                        effect_type=EffectType.FIERCE_TIGER_BULLET,
+                        value=50,  # 造成伤害提高50%
+                        duration=0,
+                        source=tiger_effect.source,
+                        description="猛虎标弹",
+                        max_trigger_count=3,
+                        next_effect="rigid_qi_heart"
+                    )
+                    self.effect_manager.add_effect(attacker_id, fierce_effect)
+                    result["messages"].append(f"🐅 猛虎标弹激活！")
+
+        # 检查并应用猛虎标弹效果
+        fierce_tiger_effects = self.effect_manager.get_active_effects(attacker_id, EffectType.FIERCE_TIGER_BULLET)
+        for fierce_effect in fierce_tiger_effects:
+            if fierce_effect.consume_trigger():
+                # 还有剩余次数，应用伤害加成
+                boost_damage = int(damage * fierce_effect.value / 100)
+                damage += boost_damage
+                result["messages"].append(f"🐅 猛虎标弹！伤害提升{fierce_effect.value:.0f}% (+{boost_damage})")
+            else:
+                # 次数用尽，移除效果并触发刚气-心
+                self.effect_manager.remove_effect(attacker_id, fierce_effect)
+                result["messages"].append(f"🐅 猛虎标弹效果结束")
+
+                # 触发刚气-心
+                if fierce_effect.next_effect == "rigid_qi_heart":
+                    from .battle_effects import BattleEffect
+                    rigid_effect = BattleEffect(
+                        effect_type=EffectType.RIGID_QI_HEART,
+                        value=60,  # 受到伤害降低60%
+                        duration=3,
+                        source=fierce_effect.source,
+                        description="刚气-心"
+                    )
+                    self.effect_manager.add_effect(attacker_id, rigid_effect)
+                    result["messages"].append(f"💪 刚气-心触发！受到伤害降低60%(持续3回合)")
+
+        # 检查刚气-心状态，降低造成的伤害
+        rigid_qi_effects = self.effect_manager.get_active_effects(attacker_id, EffectType.RIGID_QI_HEART)
+        if rigid_qi_effects:
+            for rigid_effect in rigid_qi_effects:
+                # 刚气-心：造成伤害降低30%
+                damage_reduction = int(damage * 30 / 100)
+                damage -= damage_reduction
+                result["messages"].append(f"💪 刚气-心：造成伤害降低30% (-{damage_reduction})")
+
         # 检查防御者是否有无敌状态
         invincible_effects = self.effect_manager.get_active_effects(defender_id, EffectType.INVINCIBLE)
         if invincible_effects:

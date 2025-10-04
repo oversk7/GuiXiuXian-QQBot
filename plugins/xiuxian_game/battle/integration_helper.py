@@ -344,6 +344,24 @@ class BattleIntegrationHelper:
                     mitigation = apply_defense_mitigation(monster_damage, player.defense)
                     final_damage = mitigation["final_damage"]
 
+                    # 检查玩家是否有刚气-心效果（减少受到的伤害）
+                    from ..battle.battle_effects import EffectType
+                    rigid_qi_effects = engine.effect_manager.get_active_effects(player.id, EffectType.RIGID_QI_HEART)
+                    if rigid_qi_effects:
+                        for rigid_effect in rigid_qi_effects:
+                            damage_reduction = int(final_damage * rigid_effect.value / 100)
+                            final_damage -= damage_reduction
+                            battle_log.append(f"💪 刚气-心！受到伤害降低{rigid_effect.value:.0f}% (-{damage_reduction})")
+
+                    # 检查玩家是否有猛虎标弹效果（减少受到的伤害）
+                    fierce_tiger_effects = engine.effect_manager.get_active_effects(player.id, EffectType.FIERCE_TIGER_BULLET)
+                    if fierce_tiger_effects:
+                        for fierce_effect in fierce_tiger_effects:
+                            # 猛虎标弹：受到伤害降低30%
+                            damage_reduction = int(final_damage * 30 / 100)
+                            final_damage -= damage_reduction
+                            battle_log.append(f"🐅 猛虎标弹！受到伤害降低30% (-{damage_reduction})")
+
                     player_hp = max(0, player_hp - final_damage)
                     battle_log.append(f"👹 {monster_name}攻击{player.nickname}，造成{final_damage}伤害")
 

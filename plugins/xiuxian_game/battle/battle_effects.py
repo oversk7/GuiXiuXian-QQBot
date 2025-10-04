@@ -27,29 +27,35 @@ class EffectType(str, Enum):
     # 伤害相关
     LIFESTEAL = "lifesteal"         # 吸血(基于造成伤害的百分比恢复HP)
     TRUE_DAMAGE = "true_damage"     # 真实伤害(持续状态，攻击完全无视防御)
+    DAMAGE_BOOST = "damage_boost"   # 伤害提升(百分比加成)
 
     # 控制相关
     FEAR = "fear"                   # 恐惧(无法行动)
-    
+
     # 属性增益
     BUFF_ATTACK = "buff_attack"     # 攻击力提升
     BUFF_DEFENSE = "buff_defense"   # 防御力提升
     BUFF_CRITICAL = "buff_critical" # 暴击率提升
     BUFF_DODGE = "buff_dodge"       # 闪避率提升
     BUFF_ACCURACY = "buff_accuracy" # 命中率提升
-    
+
     # 属性削弱
     DEBUFF_ATTACK = "debuff_attack"     # 攻击力降低
     DEBUFF_DEFENSE = "debuff_defense"   # 防御力降低
-    
+
     # 回复相关
     REGEN = "regen"                 # 每回合回血
     HEAL = "heal"                   # 立即回血
-    
+
     # 特殊效果
     SHIELD = "shield"               # 护盾
     REFLECT = "reflect"             # 反弹伤害
     INVINCIBLE = "invincible"       # 无敌
+
+    # 复杂连锁效果（天退星刀专用）
+    TIGER_BULLET = "tiger_bullet"           # 虎标弹：造成伤害提高(计数型)
+    FIERCE_TIGER_BULLET = "fierce_tiger_bullet"  # 猛虎标弹：虎标弹失效后激活
+    RIGID_QI_HEART = "rigid_qi_heart"       # 刚气-心：猛虎标弹失效后触发
 
 
 @dataclass
@@ -63,7 +69,10 @@ class BattleEffect:
     source: str = ""                # 效果来源(装备名称等)
     description: str = ""           # 效果描述
     is_percentage: bool = True      # 是否为百分比值
-    
+    trigger_count: int = 0          # 触发计数器（用于计数型效果，如虎标弹）
+    max_trigger_count: int = 0      # 最大触发次数（0表示无限制）
+    next_effect: str = ""           # 失效后触发的下一个效果类型
+
     def apply_stack(self, new_value: float = None) -> bool:
         """叠加效果"""
         if self.stacks < self.max_stacks:
@@ -72,12 +81,19 @@ class BattleEffect:
                 self.value += new_value
             return True
         return False
-    
+
     def tick(self) -> bool:
         """回合结算，返回是否还有效"""
         if self.duration > 0:
             self.duration -= 1
         return self.duration > 0 or self.duration == -1  # -1表示永久效果
+
+    def consume_trigger(self) -> bool:
+        """消耗一次触发次数，返回是否还有剩余次数"""
+        if self.max_trigger_count <= 0:
+            return True  # 无限制
+        self.trigger_count += 1
+        return self.trigger_count < self.max_trigger_count
 
 
 @dataclass
@@ -92,6 +108,10 @@ class TriggerConfig:
     threshold: float = 0            # 触发阈值(如低血量百分比)
     description: str = ""
     is_percentage: bool = True      # 是否为百分比值
+    max_trigger_count: int = 0      # 最大触发次数（0表示无限制）
+    next_effect: str = ""           # 失效后触发的下一个效果类型
+    next_effect_value: float = 0    # 下一个效果的数值
+    next_effect_duration: int = 0   # 下一个效果的持续时间
 
 
 class BattleEffectManager:
@@ -148,26 +168,26 @@ class BattleEffectManager:
             self.trigger_configs[unit_id] = []
         self.trigger_configs[unit_id].extend(triggers)
     
-    def check_triggers(self, unit_id: str, trigger_type: TriggerType, 
+    def check_triggers(self, unit_id: str, trigger_type: TriggerType,
                       context: Dict[str, Any]) -> List[BattleEffect]:
         """检查并触发效果"""
         triggered_effects = []
-        
+
         if unit_id not in self.trigger_configs:
             return triggered_effects
-        
+
         for trigger_config in self.trigger_configs[unit_id]:
             if trigger_config.trigger != trigger_type:
                 continue
-            
+
             # 检查触发条件
             if not self._check_condition(trigger_config, context):
                 continue
-            
+
             # 概率判定
             if random.random() * 100 > trigger_config.chance:
                 continue
-            
+
             # 创建效果
             effect = BattleEffect(
                 effect_type=trigger_config.effect,
@@ -176,11 +196,13 @@ class BattleEffectManager:
                 max_stacks=trigger_config.max_stacks,
                 source=context.get("source", "未知"),
                 description=trigger_config.description,
-                is_percentage=trigger_config.is_percentage
+                is_percentage=trigger_config.is_percentage,
+                max_trigger_count=trigger_config.max_trigger_count,
+                next_effect=trigger_config.next_effect
             )
-            
+
             triggered_effects.append(effect)
-        
+
         return triggered_effects
     
     def _check_condition(self, trigger: TriggerConfig, context: Dict[str, Any]) -> bool:
@@ -304,7 +326,11 @@ def parse_triggers_from_yaml(special_effects: List[Dict]) -> List[TriggerConfig]
                 max_stacks=int(effect_data.get("max_stacks", 1)),
                 threshold=float(effect_data.get("threshold", 0)),
                 description=effect_data.get("description", ""),
-                is_percentage=effect_data.get("is_percentage", True)
+                is_percentage=effect_data.get("is_percentage", True),
+                max_trigger_count=int(effect_data.get("max_trigger_count", 0)),
+                next_effect=effect_data.get("next_effect", ""),
+                next_effect_value=float(effect_data.get("next_effect_value", 0)),
+                next_effect_duration=int(effect_data.get("next_effect_duration", 0))
             )
             triggers.append(trigger)
         except (ValueError, KeyError) as e:
