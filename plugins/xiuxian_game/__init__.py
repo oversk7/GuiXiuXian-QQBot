@@ -28,7 +28,8 @@ from . import (
     ai_guide,  # AI引导系统（包含管理员数据库查询）
     battle,  # 战斗系统（包含PVP切磋）
     world_boss,
-    fishing  # 钓鱼系统
+    fishing,
+    admin,  # 管理员专用指令
 )
 
 # 导入跨平台绑定模块

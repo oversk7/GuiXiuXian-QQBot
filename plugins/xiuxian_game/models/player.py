@@ -289,7 +289,7 @@ class Player(Base):
 
         返回格式：
         {
-            "base": {...},      # 基础属性（无任何加成）
+            "base": {...},      # 基础属性（初始值 + 加点，不含丹药）
             "equipment": {...}, # 装备加成
             "elixir": {...},    # 永久丹药加成
             "temporary": {...}, # 临时buff加成
@@ -345,12 +345,8 @@ class Player(Base):
                         if attr in elixir_bonus:
                             elixir_bonus[attr] += int(value) * total_qty
 
-        # 计算基础属性（初始值 + 丹药加成 + 加点）
-        # 基础属性 = 当前属性值 - 装备加成 - 临时buff加成
-        base_attrs = {}
-
-        # 先获取装备加成（用于计算基础属性）
-        equipment_bonus_temp = {k: 0 for k in INIT_ATTRS}
+        # 获取装备加成
+        equipment_bonus = {k: 0 for k in INIT_ATTRS}
         if session:
             from sqlalchemy import select
             from ..models.inventory import ItemInstance
@@ -365,47 +361,39 @@ class Player(Base):
             for eq in equipped_items:
                 delta = (eq.extra_attrs or {}).get("_persist_bonus", {})
                 for k, v in delta.items():
-                    if k in equipment_bonus_temp:
-                        equipment_bonus_temp[k] += int(v)
+                    if k in equipment_bonus:
+                        equipment_bonus[k] += int(v)
 
-        # 获取临时buff加成（用于计算基础属性）
-        temporary_bonus_temp = {k: 0 for k in INIT_ATTRS}
+        # 获取临时buff加成
+        temporary_bonus = {k: 0 for k in INIT_ATTRS}
         if session:
             from .temporary_buff import TemporaryBuff
             buff_bonuses = await TemporaryBuff.get_total_attribute_bonuses(session, self.id)
             for attr, bonus in buff_bonuses.items():
-                if attr in temporary_bonus_temp:
-                    temporary_bonus_temp[attr] = bonus
+                if attr in temporary_bonus:
+                    temporary_bonus[attr] = bonus
 
-        # 计算基础属性：当前属性值 - 装备加成 - 临时buff加成
+        # 计算基础属性（初始值 + 加点，不含丹药）
+        # 基础属性 = 当前属性值 - 装备加成 - 临时buff加成 - 丹药加成
+        base_attrs = {}
         for attr in INIT_ATTRS:
             current_value = getattr(self, attr, INIT_ATTRS[attr])
-            base_value = current_value - equipment_bonus_temp[attr] - temporary_bonus_temp[attr]
-            base_attrs[attr] = base_value
-
-        # 装备加成（已在上面计算过）
-        equipment_bonus = equipment_bonus_temp
-
-        # 临时buff加成（已在上面计算过）
-        temporary_bonus = temporary_bonus_temp
-
-        # 重新分解基础属性为：初始值 + 加点 + 丹药加成
-        pure_base_attrs = {}  # 初始值 + 加点（不含丹药）
-        for attr in INIT_ATTRS:
-            pure_base_attrs[attr] = base_attrs[attr] - elixir_bonus[attr]
+            base_value = current_value - equipment_bonus[attr] - temporary_bonus[attr] - elixir_bonus[attr]
+            # 确保基础属性不会小于初始值（防止数据异常）
+            base_attrs[attr] = max(base_value, INIT_ATTRS[attr])
 
         # 计算最终属性（应该等于当前属性值）
         total_attrs = {}
         for attr in INIT_ATTRS:
             total_attrs[attr] = (
-                pure_base_attrs[attr] +
+                base_attrs[attr] +
                 elixir_bonus[attr] +
                 equipment_bonus[attr] +
                 temporary_bonus[attr]
             )
 
         return {
-            "base": pure_base_attrs,
+            "base": base_attrs,
             "equipment": equipment_bonus,
             "elixir": elixir_bonus,
             "temporary": temporary_bonus,
