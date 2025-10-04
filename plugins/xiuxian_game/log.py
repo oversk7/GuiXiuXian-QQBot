@@ -32,9 +32,9 @@ async def handle_view_error_log(event: MessageEvent, args: Message = CommandArg(
     """管理员查看最近的报错日志"""
     args_text = args.extract_plain_text().strip()
 
-    # 默认显示最近10条，可以指定数量
+    # 默认显示最近1条，可以指定数量
     try:
-        count = int(args_text) if args_text else 10
+        count = int(args_text) if args_text else 1
         if count <= 0 or count > 100:
             await view_error_log_cmd.finish("⛔ 数量必须在1-100之间")
     except ValueError:
@@ -130,30 +130,49 @@ async def handle_view_error_log(event: MessageEvent, args: Message = CommandArg(
         # 反转列表，使最新的在最后
         error_logs.reverse()
 
+        # 过滤敏感内容的函数
+        def sanitize_log(log_text: str) -> str:
+            """过滤日志中的敏感内容，避免被QQ拦截"""
+            # 替换文件路径中的 .py 为 [py]
+            import re
+            # 匹配 .py 文件路径
+            log_text = re.sub(r'\.py\b', '[py]', log_text)
+            # 匹配常见的文件扩展名
+            log_text = re.sub(r'\.(txt|log|db|yaml|json|toml)\b', r'[\1]', log_text)
+            # 替换可能被识别为URL的路径分隔符
+            log_text = log_text.replace('/', '／')  # 使用全角斜杠
+            log_text = log_text.replace('\\', '＼')  # 使用全角反斜杠
+            # 替换 http/https
+            log_text = re.sub(r'https?://', 'hxxp://', log_text, flags=re.IGNORECASE)
+            return log_text
+
         # 构建消息 - 只显示最新的一条完整报错
         # 因为完整的堆栈跟踪通常很长，一次只显示一条更合适
         if len(error_logs) == 1:
+            sanitized_log = sanitize_log(error_logs[0].strip())
             msg_lines = [
                 "🔍 最近1条报错日志",
                 "━━━━━━━━━━━━━",
                 "",
-                error_logs[0].strip(),
+                sanitized_log,
                 "",
                 "━━━━━━━━━━━━━",
-                "💡 使用【查看报错 数量】可查看更多"
+                "💡 使用【查看报错 数量】可查看更多",
+                "💡 路径中的特殊字符已转换以避免拦截"
             ]
         else:
             # 如果有多条，只显示最新的一条完整报错
+            sanitized_log = sanitize_log(error_logs[-1].strip())
             msg_lines = [
                 f"🔍 最近{len(error_logs)}条报错中的最新1条",
                 "━━━━━━━━━━━━━",
                 "",
-                error_logs[-1].strip(),
+                sanitized_log,
                 "",
                 "━━━━━━━━━━━━━",
                 f"💡 共找到 {len(error_logs)} 条报错",
                 "💡 由于完整堆栈跟踪较长，仅显示最新1条",
-                "💡 如需查看更多，请直接查看日志文件"
+                "💡 路径中的特殊字符已转换以避免拦截"
             ]
 
         message = "\n".join(msg_lines)
@@ -170,6 +189,9 @@ async def handle_view_error_log(event: MessageEvent, args: Message = CommandArg(
             else:
                 truncated = error_log
 
+            # 过滤敏感内容
+            truncated = sanitize_log(truncated)
+
             msg_lines = [
                 "🔍 最新报错日志（已截断）",
                 "━━━━━━━━━━━━━",
@@ -179,7 +201,7 @@ async def handle_view_error_log(event: MessageEvent, args: Message = CommandArg(
                 "━━━━━━━━━━━━━",
                 f"💡 共找到 {len(error_logs)} 条报错",
                 "💡 完整堆栈跟踪过长已截断",
-                "💡 请查看日志文件获取完整信息"
+                "💡 路径中的特殊字符已转换以避免拦截"
             ]
             message = "\n".join(msg_lines)
 
