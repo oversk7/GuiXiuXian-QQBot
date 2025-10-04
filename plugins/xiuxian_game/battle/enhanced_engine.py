@@ -1005,6 +1005,47 @@ class EnhancedBattleEngine:
         result["total_damage"] = final_damage  # 添加 total_damage 字段以保持兼容性
         return result
 
+    def check_counter_attack(self, defender: Player, attacker: Player) -> Optional[Dict]:
+        """检查并执行反击
+
+        Args:
+            defender: 防御者（可能反击的一方）
+            attacker: 攻击者（被反击的目标）
+
+        Returns:
+            反击结果字典，如果未触发反击则返回None
+            包含字段: hit, damage, is_critical
+        """
+        # 获取防御者的有效属性
+        defender_base_attrs = BattleAttributeCalculator.calculate_effective_attributes(defender)
+        defender_id = defender.id
+        defender_attrs = self._get_effective_battle_attributes(defender_id, defender_base_attrs)
+
+        # 判定是否触发反击
+        counter_triggered = BattleAttributeCalculator.roll_counter_attack(
+            defender_attrs["counter_rate"], self.rng
+        )
+
+        if not counter_triggered:
+            return None
+
+        # 触发反击，执行一次简化的攻击
+        # 反击伤害为防御者攻击力的50%
+        counter_attack = int(defender.attack * 0.5)
+
+        # 获取攻击者的有效属性
+        attacker_base_attrs = BattleAttributeCalculator.calculate_effective_attributes(attacker)
+        attacker_id = attacker.id if hasattr(attacker, 'id') else "enemy"
+        attacker_attrs = self._get_effective_battle_attributes(attacker_id, attacker_base_attrs)
+
+        # 执行反击攻击判定
+        attack_result = self._process_pvp_attack(
+            defender, attacker, counter_attack, False,
+            defender_attrs, attacker_attrs
+        )
+
+        return attack_result
+
     def get_battle_log(self) -> List[str]:
         """获取战斗日志"""
         return self.battle_log.copy()

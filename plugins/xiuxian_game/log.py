@@ -55,18 +55,22 @@ async def handle_view_error_log(event: MessageEvent, args: Message = CommandArg(
 
         # 从后往前读取，找到ERROR日志
         # 日志格式：2025-10-04 10:57:04.850 | ERROR | ...
+        # 完整报错包含：ERROR行 + Traceback + 多行堆栈跟踪 + 最终的异常信息
         current_error = []
-        in_error_block = False
 
-        for line in reversed(lines):
+        for i in range(len(lines) - 1, -1, -1):
+            line = lines[i]
             line_stripped = line.strip()
 
             # 检查是否是新的日志条目（以日期时间开头，格式：YYYY-MM-DD HH:MM:SS）
             is_log_start = False
             if len(line_stripped) > 19:
                 try:
-                    # 尝试解析时间戳部分
-                    if line_stripped[0:4].isdigit() and line_stripped[4] == '-':
+                    # 尝试解析时间戳部分：YYYY-MM-DD
+                    if (line_stripped[0:4].isdigit() and
+                        line_stripped[4] == '-' and
+                        line_stripped[5:7].isdigit() and
+                        line_stripped[7] == '-'):
                         is_log_start = True
                 except (IndexError, ValueError):
                     pass
@@ -76,24 +80,49 @@ async def handle_view_error_log(event: MessageEvent, args: Message = CommandArg(
                 if "ERROR" in line or "EXCEPTION" in line:
                     # 找到一条ERROR日志的开始
                     current_error.insert(0, line)
+
+                    # 继续向后读取，收集完整的堆栈跟踪
+                    # 堆栈跟踪通常包含：Traceback、File行、异常类型等
+                    # 限制最多读取100行，避免过长
+                    j = i + 1
+                    lines_collected = 1  # 已经收集了ERROR行本身
+                    max_lines = 100  # 每条报错最多100行
+
+                    while j < len(lines) and lines_collected < max_lines:
+                        next_line = lines[j]
+                        next_stripped = next_line.strip()
+
+                        # 检查下一行是否是新的日志条目
+                        is_next_log_start = False
+                        if len(next_stripped) > 19:
+                            try:
+                                if (next_stripped[0:4].isdigit() and
+                                    next_stripped[4] == '-' and
+                                    next_stripped[5:7].isdigit() and
+                                    next_stripped[7] == '-'):
+                                    is_next_log_start = True
+                            except (IndexError, ValueError):
+                                pass
+
+                        # 如果遇到新的日志条目，停止收集
+                        if is_next_log_start:
+                            break
+
+                        # 否则，这是当前ERROR的一部分
+                        current_error.append(next_line)
+                        j += 1
+                        lines_collected += 1
+
+                    # 如果达到行数限制，添加提示
+                    if lines_collected >= max_lines:
+                        current_error.append("\n... (堆栈跟踪过长，已截断) ...\n")
+
+                    # 保存完整的ERROR日志
                     error_logs.append("".join(current_error))
                     current_error = []
-                    in_error_block = False
 
                     if len(error_logs) >= count:
                         break
-                elif in_error_block:
-                    # 上一条ERROR日志的多行内容结束
-                    in_error_block = False
-                    current_error = []
-            else:
-                # 这是日志的续行（堆栈跟踪等）
-                if in_error_block or (current_error and not error_logs):
-                    current_error.insert(0, line)
-
-            # 如果刚找到ERROR，标记为在ERROR块中
-            if is_log_start and ("ERROR" in line or "EXCEPTION" in line):
-                in_error_block = True
 
         if not error_logs:
             await view_error_log_cmd.finish(message_add_head("✅ 没有找到报错日志", event))
@@ -101,38 +130,56 @@ async def handle_view_error_log(event: MessageEvent, args: Message = CommandArg(
         # 反转列表，使最新的在最后
         error_logs.reverse()
 
-        # 构建消息
-        msg_lines = [
-            f"🔍 最近{len(error_logs)}条报错日志",
-            "━━━━━━━━━━━━━"
-        ]
-
-        for i, error_log in enumerate(error_logs, 1):
-            # 限制每条日志的长度，避免消息过长
-            error_log = error_log.strip()
-            if len(error_log) > 500:
-                error_log = error_log[:500] + "..."
-
-            msg_lines.append(f"\n📋 报错 #{i}:")
-            msg_lines.append(error_log)
-            msg_lines.append("━━━━━━━━━━━━━")
-
-        msg_lines.append(f"\n💡 共找到 {len(error_logs)} 条报错")
-        msg_lines.append("💡 使用【查看报错 数量】指定查看条数")
+        # 构建消息 - 只显示最新的一条完整报错
+        # 因为完整的堆栈跟踪通常很长，一次只显示一条更合适
+        if len(error_logs) == 1:
+            msg_lines = [
+                "🔍 最近1条报错日志",
+                "━━━━━━━━━━━━━",
+                "",
+                error_logs[0].strip(),
+                "",
+                "━━━━━━━━━━━━━",
+                "💡 使用【查看报错 数量】可查看更多"
+            ]
+        else:
+            # 如果有多条，只显示最新的一条完整报错
+            msg_lines = [
+                f"🔍 最近{len(error_logs)}条报错中的最新1条",
+                "━━━━━━━━━━━━━",
+                "",
+                error_logs[-1].strip(),
+                "",
+                "━━━━━━━━━━━━━",
+                f"💡 共找到 {len(error_logs)} 条报错",
+                "💡 由于完整堆栈跟踪较长，仅显示最新1条",
+                "💡 如需查看更多，请直接查看日志文件"
+            ]
 
         message = "\n".join(msg_lines)
 
-        # 如果消息太长，分段发送
-        if len(message) > 4000:
-            # 只发送最后一条完整的报错
+        # 如果单条消息仍然太长（超过4500字符），进行截断
+        if len(message) > 4500:
+            # 截取ERROR行和最后的异常信息
+            error_log = error_logs[-1].strip()
+            lines = error_log.split('\n')
+
+            # 保留第一行（ERROR行）和最后几行（异常信息）
+            if len(lines) > 20:
+                truncated = '\n'.join(lines[:5]) + '\n\n... (中间省略) ...\n\n' + '\n'.join(lines[-10:])
+            else:
+                truncated = error_log
+
             msg_lines = [
-                "🔍 最近1条完整报错日志",
+                "🔍 最新报错日志（已截断）",
                 "━━━━━━━━━━━━━",
-                f"\n📋 最新报错:",
-                error_logs[-1].strip(),
+                "",
+                truncated,
+                "",
                 "━━━━━━━━━━━━━",
-                f"\n⚠️ 共有 {len(error_logs)} 条报错，消息过长仅显示最新1条",
-                "💡 建议查看日志文件获取完整信息"
+                f"💡 共找到 {len(error_logs)} 条报错",
+                "💡 完整堆栈跟踪过长已截断",
+                "💡 请查看日志文件获取完整信息"
             ]
             message = "\n".join(msg_lines)
 
