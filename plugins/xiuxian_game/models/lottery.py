@@ -1,7 +1,7 @@
 """
 抽奖系统数据模型
 """
-from sqlalchemy import Integer, String, DateTime, Boolean, Text, func, BigInteger
+from sqlalchemy import Integer, String, DateTime, Boolean, Text, func, BigInteger, Enum as SQLEnum
 from sqlalchemy.orm import Mapped, mapped_column
 from datetime import datetime
 from .db import Base
@@ -31,20 +31,20 @@ class Lottery(Base):
     creator_uid: Mapped[int] = mapped_column(Integer, nullable=False, comment="发起人UID")
     creator_name: Mapped[str] = mapped_column(String(24), nullable=False, comment="发起人昵称")
     
-    lottery_type: Mapped[LotteryType] = mapped_column(String(16), nullable=False, comment="抽奖类型")
+    lottery_type: Mapped[LotteryType] = mapped_column(SQLEnum(LotteryType, values_callable=lambda x: [e.value for e in x]), nullable=False, comment="抽奖类型")
     item_id: Mapped[str] = mapped_column(String(64), nullable=True, comment="物品/装备ID")
     item_name: Mapped[str] = mapped_column(String(64), nullable=False, comment="奖品名称")
-    
+
     # 奖品配置
     winner_count: Mapped[int] = mapped_column(Integer, nullable=False, comment="中奖人数")
     prize_per_winner: Mapped[int] = mapped_column(Integer, nullable=False, comment="每人奖品数量")
     total_prize: Mapped[int] = mapped_column(Integer, nullable=False, comment="奖品总数")
-    
+
     # 参与条件
     min_level: Mapped[int] = mapped_column(Integer, default=1, comment="最低等级要求")
 
     # 状态
-    status: Mapped[LotteryStatus] = mapped_column(String(16), default=LotteryStatus.PENDING, comment="抽奖状态")
+    status: Mapped[LotteryStatus] = mapped_column(SQLEnum(LotteryStatus, values_callable=lambda x: [e.value for e in x]), default=LotteryStatus.PENDING, comment="抽奖状态")
 
     # 时间
     created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now(), comment="创建时间")
