@@ -390,6 +390,7 @@ class EnhancedBattleEngine:
                 # 真伤状态：完全无视防御
                 attack_result = {
                     "hit": True,
+                    "damage": base_attack,
                     "total_damage": base_attack,
                     "is_critical": False
                 }

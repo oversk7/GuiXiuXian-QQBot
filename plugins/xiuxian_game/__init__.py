@@ -29,7 +29,6 @@ from . import (
     battle,  # 战斗系统（包含PVP切磋）
     world_boss,
     fishing,
-    admin,  # 管理员专用指令
 )
 
 # 导入跨平台绑定模块
