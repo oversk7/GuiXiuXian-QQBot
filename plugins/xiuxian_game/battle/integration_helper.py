@@ -54,6 +54,19 @@ class BattleIntegrationHelper:
 
             battle_log.append(f"━━━ 第{round_num}回合 ━━━")
 
+            # 处理回合开始效果（regen等）
+            # 玩家1 regen
+            _, player1_hp_restored = engine._process_turn_start(player1.id, player1)
+            if player1_hp_restored > 0:
+                player1_hp = min(player1.max_hp, player1_hp + player1_hp_restored)
+                battle_log.append(f"💚 {player1.nickname}回复{player1_hp_restored}生命值")
+
+            # 玩家2 regen
+            _, player2_hp_restored = engine._process_turn_start(player2.id, player2)
+            if player2_hp_restored > 0:
+                player2_hp = min(player2.max_hp, player2_hp + player2_hp_restored)
+                battle_log.append(f"💚 {player2.nickname}回复{player2_hp_restored}生命值")
+
             # 确定回合顺序
             if player1_first:
                 first_player, second_player = player1, player2
@@ -334,6 +347,13 @@ class BattleIntegrationHelper:
 
             # 怪物回合
             if monster_hp > 0 and player_hp > 0:
+                # 处理怪物回合开始效果（包括regen）
+                monster_turn_start_msgs, monster_hp_restored = engine._process_turn_start(monster_id, monster_stats)
+                if monster_turn_start_msgs:
+                    battle_log.extend(monster_turn_start_msgs)
+                if monster_hp_restored > 0:
+                    monster_hp = min(monster_stats["hp"], monster_hp + monster_hp_restored)
+
                 # 检查怪物是否被恐惧
                 if engine.effect_manager.has_control_effect(monster_id):
                     battle_log.append(f"😱 {monster_name}被恐惧，无法行动")
@@ -504,6 +524,20 @@ class BattleIntegrationHelper:
                 break
 
             round_actions = []  # 紧凑模式的单行显示
+
+            # 处理回合开始效果（regen等）
+            # 玩家regen
+            _, player_hp_restored = engine._process_turn_start(player.id, player)
+            if player_hp_restored > 0:
+                player_hp = min(player.max_hp, player_hp + player_hp_restored)
+                round_actions.append(f"💚{player.nickname}+{player_hp_restored}")
+
+            # 怪物regen
+            monster_id = "enemy"
+            _, monster_hp_restored = engine._process_turn_start(monster_id, monster_stats)
+            if monster_hp_restored > 0:
+                monster_hp = min(monster_stats["hp"], monster_hp + monster_hp_restored)
+                round_actions.append(f"💚{monster_name}+{monster_hp_restored}")
 
             # 根据先后手判定执行攻击顺序
             if player_first:
@@ -681,6 +715,19 @@ class BattleIntegrationHelper:
                 break
 
             round_actions = []  # 紧凑模式的单行显示
+
+            # 处理回合开始效果（regen等）
+            # 玩家1 regen
+            _, player1_hp_restored = engine._process_turn_start(player1.id, player1)
+            if player1_hp_restored > 0:
+                player1_hp = min(player1.max_hp, player1_hp + player1_hp_restored)
+                round_actions.append(f"💚{player1.nickname}+{player1_hp_restored}")
+
+            # 玩家2 regen
+            _, player2_hp_restored = engine._process_turn_start(player2.id, player2)
+            if player2_hp_restored > 0:
+                player2_hp = min(player2.max_hp, player2_hp + player2_hp_restored)
+                round_actions.append(f"💚{player2.nickname}+{player2_hp_restored}")
 
             # 根据先后手判定执行攻击顺序
             if player1_first:
