@@ -774,6 +774,36 @@ async def handle_backup_help(event: MessageEvent, args: Message = CommandArg()):
     )
     await backup_help_cmd.finish(Message(msg))
 
+# 管理员系统
+admin_help_cmd = on_command("管理员系统", aliases={"管理员帮助", "管理指令"}, priority=4, block=True, permission=SUPERUSER)
+
+@admin_help_cmd.handle()
+async def handle_admin_help(event: MessageEvent, args: Message = CommandArg()):
+    msg = (
+        "✨ 管理员系统帮助 ✨\n"
+        "超级管理员专用指令\n"
+        "━━━━━━━━━━━━━\n"
+        "🔧 物品管理：\n"
+        "【发物品 <UID> <物品名> [数量]】 给玩家发放物品\n"
+        "【发装备 <UID> <装备名> [数量]】 给玩家发放装备\n"
+        "【转移物品 <UID1> <UID2> <物品名> <数量>】 转移物品\n"
+        "━━━━━━━━━━━━━\n"
+        "📊 数据统计：\n"
+        "【材料统计】 查看全服材料分布统计\n"
+        "【材料详情 <材料名>】 查看指定材料详细分布\n"
+        "━━━━━━━━━━━━━\n"
+        "🔍 日志管理：\n"
+        "【查看报错 [数量]】 查看最近的报错日志（默认10条）\n"
+        "【最近报错】 查看最近的报错日志\n"
+        "【报错日志】 查看最近的报错日志\n"
+        "━━━━━━━━━━━━━\n"
+        "💾 备份管理：\n"
+        "【手动备份】 立即创建数据库备份\n"
+        "【备份状态】 查看备份文件列表\n"
+        "【恢复备份 <文件名>】 从备份恢复数据库\n"
+    )
+    await admin_help_cmd.finish(Message(msg))
+
 button_test_cmd = on_command("按钮测试", priority=4, block=True)
 @button_test_cmd.handle()
 async def handle_button_test(event: MessageEvent, args: Message = CommandArg()):
