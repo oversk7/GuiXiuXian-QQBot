@@ -1,11 +1,13 @@
 from nonebot import on_command
 from nonebot.adapters.qq import MessageEvent, Message
 from nonebot.params import CommandArg
-from sqlalchemy import select
+from sqlalchemy import select, func
 import random
 
 from ..models.db import safe_session
 from ..models.player import Player
+from ..models.bank_account import BankAccount
+from ..models.stock import StockHolding
 from ..utils import message_add_head
 from .realm_utils import realm_by_level_and_reincarnation, number_to_chinese
 
@@ -79,7 +81,9 @@ wealth_rank_cmd = on_command("财富榜", aliases={"财富排行榜"}, block=Tru
 
 @wealth_rank_cmd.handle()
 async def _(event: MessageEvent, args: Message = CommandArg()):
-    """显示金币最多的前30名玩家，支持分页"""
+    """显示总财富最多的前30名玩家，支持分页
+    总财富 = 面板金币 + 银行余额 + 投资价值
+    """
     # 解析页码参数
     page_text = args.extract_plain_text().strip()
     try:
@@ -87,26 +91,100 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
     except ValueError:
         page = 1
     page = max(1, min(page, 3))  # 限制在1-3页
-    
+
     page_size = 10
     offset = (page - 1) * page_size
-    
+
     async with safe_session() as session:
-        stmt = select(Player).order_by(Player.gold.desc()).offset(offset).limit(page_size)
-        players = (await session.execute(stmt)).scalars().all()
+        # 获取所有玩家的基础信息
+        all_players_stmt = select(Player).order_by(Player.gold.desc()).limit(30)
+        all_players = (await session.execute(all_players_stmt)).scalars().all()
 
-    if not players:
-        await wealth_rank_cmd.finish("暂无排行榜数据")
+        if not all_players:
+            await wealth_rank_cmd.finish("暂无排行榜数据")
 
-    lines = [f"💰 财富排行榜 (第{page}/3页)", "━━━━━━━━━━━━━"]
-    for idx, p in enumerate(players, start=offset + 1):
-        # 使用emoji装饰前三名
-        rank_emoji = "🥇" if idx == 1 else "🥈" if idx == 2 else "🥉" if idx == 3 else f"{idx}."
-        lines.append(f"{rank_emoji} {p.nickname}[UID:{p.uid}] - {p.gold}💰")
-    
-    if page < 3:
-        lines.append("━━━━━━━━━━━━━")
-        lines.append("💡 使用【财富榜 页码】查看其他页")
+        # 批量获取玩家ID列表
+        player_ids = [p.id for p in all_players]
+
+        # 批量查询银行余额
+        bank_stmt = select(BankAccount).where(BankAccount.player_id.in_(player_ids))
+        bank_accounts = (await session.execute(bank_stmt)).scalars().all()
+        bank_map = {acc.player_id: acc.balance for acc in bank_accounts}
+
+        # 批量查询投资持仓
+        from sqlalchemy.orm import selectinload
+        holdings_stmt = select(StockHolding).options(
+            selectinload(StockHolding.stock)
+        ).where(
+            StockHolding.player_id.in_(player_ids),
+            StockHolding.shares > 0
+        )
+        all_holdings = (await session.execute(holdings_stmt)).scalars().all()
+
+        # 按玩家ID分组计算投资价值
+        investment_map = {}
+        for holding in all_holdings:
+            if holding.player_id not in investment_map:
+                investment_map[holding.player_id] = 0
+            investment_map[holding.player_id] += holding.current_value
+
+        # 计算每个玩家的总财富
+        wealth_data = []
+        for player in all_players:
+            # 面板金币
+            gold = player.gold
+
+            # 银行余额
+            bank_balance = bank_map.get(player.id, 0)
+
+            # 投资价值
+            investment_value = investment_map.get(player.id, 0)
+
+            # 总财富
+            total_wealth = gold + bank_balance + investment_value
+
+            wealth_data.append({
+                'player': player,
+                'gold': gold,
+                'bank_balance': bank_balance,
+                'investment_value': investment_value,
+                'total_wealth': total_wealth
+            })
+
+        # 按总财富排序
+        wealth_data.sort(key=lambda x: x['total_wealth'], reverse=True)
+
+        # 分页处理
+        page_data = wealth_data[offset:offset + page_size]
+
+        lines = [f"💰 财富排行榜 (第{page}/3页)", "━━━━━━━━━━━━━"]
+        for idx, data in enumerate(page_data, start=offset + 1):
+            p = data['player']
+            total = data['total_wealth']
+            gold = data['gold']
+            bank = data['bank_balance']
+            invest = data['investment_value']
+
+            # 使用emoji装饰前三名
+            rank_emoji = "🥇" if idx == 1 else "🥈" if idx == 2 else "🥉" if idx == 3 else f"{idx}."
+
+            # 构建详细信息
+            detail_parts = []
+            if gold > 0:
+                detail_parts.append(f"现金{gold}")
+            if bank > 0:
+                detail_parts.append(f"存款{bank}")
+            if invest > 0:
+                detail_parts.append(f"投资{invest}")
+
+            detail = f" ({'+'.join(detail_parts)})" if detail_parts else ""
+
+            lines.append(f"{rank_emoji} {p.nickname}[UID:{p.uid}] - {total:,}💰{detail}")
+
+        if page < 3:
+            lines.append("━━━━━━━━━━━━━")
+            lines.append("💡 使用【财富榜 页码】查看其他页")
+            lines.append("💡 总财富 = 面板金币 + 银行余额 + 投资价值")
 
     await wealth_rank_cmd.finish(message_add_head("\n".join(lines), event))
 
@@ -268,7 +346,7 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
         "🎯 玩家排行榜：",
         "📈 【修为榜】 - 查看修为排行",
         "🍀 【幸运榜】 - 查看幸运排行",
-        "💰 【财富榜】 - 查看财富排行",
+        "💰 【财富榜】 - 查看财富排行（含现金+存款+投资）",
         "🌀 【探索榜】 - 查看探索排行",
         "⚡ 【敏捷榜】 - 查看敏捷排行",
         "🎮 【小游戏榜】 - 查看小游戏排行",
