@@ -74,7 +74,7 @@ DATABASE_SCHEMA = """
    - max_dungeon_level: 到达过的最高诡域层级
    - hp, max_hp: 生命值/最大生命值
    - mp, max_mp: 理智值/最大理智值
-   - attack, defense, agility, luck, stamina: 基础属性
+   - attack, defense, agility, luck, stamina(咒抗): 基础属性
    - critical_rate, critical_damage, dodge_rate, hit_rate: 战斗属性
    - counter_rate, combo_rate, penetration_rate: 高级战斗属性
    - guild_id: 所属公会ID
