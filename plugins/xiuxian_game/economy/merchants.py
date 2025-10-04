@@ -53,12 +53,19 @@ class MarketConfig:
         """检查市场是否从玩家收购此商品"""
         return item_id in self.buyable_items
 
-# 所有跑商商品列表
+# 所有跑商商品列表（包含血契丹和阴冥草，用于市场配置和分析）
 ALL_GOODS = [
     "lux_perfume", "red_wine", "gold_watch", "diamond_ring", "silk_scarf",
     "dslr_camera", "smartphone", "gaming_console", "designer_bag", "luxury_chocolate",
     "art_book", "concert_ticket", "fountain_pen", "sneakers", "noise_headphones",
     "yin_grass", "blood_pact"
+]
+
+# 受携带限制的商品列表（不包含血契丹和阴冥草）
+LIMITED_GOODS = [
+    "lux_perfume", "red_wine", "gold_watch", "diamond_ring", "silk_scarf",
+    "dslr_camera", "smartphone", "gaming_console", "designer_bag", "luxury_chocolate",
+    "art_book", "concert_ticket", "fountain_pen", "sneakers", "noise_headphones"
 ]
 
 # 所有鱼类列表（钓鱼系统专用）
@@ -430,10 +437,11 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
                 await buy_cmd.finish(f"❌ 库存不足！当前库存：{market_state.current_stock}，需要：{qty}")
 
             # 检查背包商品总量限制（防止高等级玩家垄断库存）
+            # 注意：血契丹和阴冥草不占用携带上限
             result_inv = await session.execute(
                 select(ItemInstance).where(
                     ItemInstance.player_id == player.id,
-                    ItemInstance.item_id.in_(ALL_GOODS + ALL_FISH)  # 统计跑商商品和鱼类
+                    ItemInstance.item_id.in_(LIMITED_GOODS + ALL_FISH)  # 统计受限商品和鱼类
                 )
             )
             current_goods = result_inv.scalars().all()
