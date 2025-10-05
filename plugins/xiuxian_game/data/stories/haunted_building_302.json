@@ -1,0 +1,1159 @@
+{
+  "id": "haunted_building_trial",
+  "title": "302室鬼楼",
+  "description": "你在灰蒙蒙的混沌中醒来，掌心的手机泛着微弱光亮。当你触碰屏幕，周遭场景骤然切换——你身处一间三十平米的老旧婚房，饭桌上的红烧排骨还冒着热气，床头结婚照里的新娘笑靥如花，而床尾那只一人高的泰迪熊，尾巴处藏着一抹黑褐色的血迹。这是一场以“生存”为赌注的文字冒险，五枚隐形的“生机筹码”握在你手中，每一次选择，都是与盘踞在楼里的亡灵博弈。",
+  "start_node": "gender_choice",
+  "nodes": {
+    "gender_choice": {
+      "type": "choice",
+      "content": "手机屏幕亮起，一行文字缓缓浮现：“请完成前置选择，以匹配身份背景。”\n屏幕上只有两个选项，没有多余提示——",
+      "options": [
+        {
+          "id": 1,
+          "text": "A.男",
+          "next": "identity_male",
+          "effects": {
+            "variables": {
+              "gender": "male",
+              "revive_coin": 5,
+              "identity_set": false
+            }
+          }
+        },
+        {
+          "id": 2,
+          "text": "B.女",
+          "next": "identity_female",
+          "effects": {
+            "variables": {
+              "gender": "female",
+              "revive_coin": 5,
+              "identity_set": true,
+              "name": "白颜",
+              "husband_name": "伍金刚",
+              "has_teddy_blood": false,
+              "met_husband": false,
+              "neighbor_info": []
+            }
+          }
+        }
+      ]
+    },
+    "identity_male": {
+      "type": "story",
+      "content": "你选择“男”，手机屏幕却闪烁了三下，文字重新刷新：“身份匹配异常，触发特殊设定。”\n下一秒，你感到身体轻飘飘的，视线矮了几分——镜中映出的，是一个面容清秀的女子模样，身上穿着浅粉色的家居服。手机提示：“临时身份：白颜，新婚少妇，与丈夫伍金刚居住在302室，正处于年假休息中。”",
+      "next": "dining_table",
+      "effects": {
+        "variables": {
+          "identity_set": true,
+          "name": "白颜",
+          "husband_name": "伍金刚",
+          "has_teddy_blood": false,
+          "met_husband": false,
+          "neighbor_info": []
+        }
+      }
+    },
+    "identity_female": {
+      "type": "story",
+      "content": "你选择“B.女”，手机震动一下，屏幕显示：“身份匹配成功——白颜，新婚少妇，与丈夫伍金刚居住在302室。”\n你低头看向饭桌，红烧排骨、酱香茄子、西红柿鸡蛋汤冒着热气，电饭煲里盛着热腾腾的米饭，唯独没有摆碗筷——显然，是在等还没回家的丈夫。",
+      "next": "dining_table",
+      "effects": {
+        "variables": {
+          "has_checked_rice": false
+        }
+      }
+    },
+    "dining_table": {
+      "type": "choice",
+      "content": "你坐在饭桌前，夹起一块酱香茄子，味道马马虎虎。放下筷子时，你的手肘碰到了桌角的泰迪熊——熊身软乎乎的，尾巴处却有一块毛颜色异常，凑近一闻，是刺鼻的腥味。你刚想仔细查看，走廊里传来沉重的脚步声，越来越近，紧接着，防盗门被敲响：“咚咚咚！咚咚咚！”\n手机突然震动，周围的一切都静止了，挂钟的指针停在八点二十五分，屏幕上出现选项：",
+      "options": [
+        {
+          "id": 1,
+          "text": "A.大声问门外的人是谁，确认是伍金刚再开门",
+          "next": "ask_who",
+          "effects": {
+            "variables": {
+              "choice_type": "door_ask"
+            }
+          }
+        },
+        {
+          "id": 2,
+          "text": "B.透过猫眼看门外的人，确定是伍金刚再开门",
+          "next": "look_peephole",
+          "effects": {
+            "variables": {
+              "choice_type": "door_peep"
+            }
+          }
+        },
+        {
+          "id": 3,
+          "text": "C.不开门，假装没听见——老公带了钥匙，会自己开门",
+          "next": "pretend_not_hear",
+          "effects": {
+            "variables": {
+              "choice_type": "door_ignore"
+            }
+          }
+        }
+      ]
+    },
+    "ask_who": {
+      "type": "story",
+      "content": "你朝着门外喊：“谁啊？”\n门外传来粗犷的男声：“颜颜，是我，金刚！公司加班，回来晚了。”\n你放心地拉开门，一个一米八五的高大男人站在门口，手里提着一个纸袋子：“给你买了你爱吃的绿豆糕。”他说着就给了你一个熊抱，你下意识地躲开，他却没在意，自顾自地换鞋进门：“饿死了，快盛饭！”",
+      "next": "after_dinner",
+      "effects": {
+        "variables": {
+          "met_husband": true,
+          "has_mung_cake": true
+        }
+      }
+    },
+    "look_peephole": {
+      "type": "story",
+      "content": "你踮着脚凑到猫眼上，外面是一个高大魁梧的男人，穿着蓝色工装，手里提着纸袋子——正是你结婚照上的丈夫伍金刚。你打开门，他立刻迎上来抱你：“颜颜，让你等久了！”他把纸袋子递给你：“绿豆糕，你前两天念叨着要吃的。”",
+      "next": "after_dinner",
+      "effects": {
+        "variables": {
+          "met_husband": true,
+          "has_mung_cake": true
+        }
+      }
+    },
+    "pretend_not_hear": {
+      "type": "story",
+      "content": "你缩在沙发上，假装没听见敲门声。过了两分钟，门外传来钥匙转动的声音——伍金刚推门进来，手里提着绿豆糕，疑惑地看着你：“颜颜，没听见我敲门？”你刚想解释，他却把绿豆糕放在桌上：“饿坏了，我先盛饭。”\n吃饭时，他频频看你：“你今天怎么怪怪的？是不是不舒服？”",
+      "next": "after_dinner",
+      "effects": {
+        "variables": {
+          "met_husband": true,
+          "has_mung_cake": true,
+          "husband_suspicious": true
+        }
+      }
+    },
+    "after_dinner": {
+      "type": "story",
+      "content": "伍金刚狼吞虎咽地吃了三大碗饭，把桌上的菜扫了大半。你刚想收拾碗筷，他却抢先把碗碟端进厨房：“你坐着，我来洗。”\n他洗碗时，你拿起一块绿豆糕尝了尝，甜得发腻。这时，你想起床尾那只泰迪熊——刚才没来得及细看，现在走到床尾，捏了捏熊的肚子，没发现异常，却在尾巴处摸到一块发硬的地方，拨开毛一看，黑褐色的血迹已经干了，黏在熊的皮毛上。",
+      "next": "teddy_blood_choice",
+      "effects": {
+        "variables": {
+          "has_teddy_blood": true
+        }
+      }
+    },
+    "teddy_blood_choice": {
+      "type": "choice",
+      "content": "伍金刚洗完碗，擦着手从厨房出来，看到你盯着泰迪熊发呆，走过来搂住你：“怎么了？”你指着熊尾巴上的血迹，故意抖着声音说：“金刚，这熊上有血……我有点怕。”\n他的身体僵了一下，随即拍着你的背安慰：“没事，都过去了。”你追问是什么事，他却不肯多说。这时，他突然凑到你耳边：“今晚……我们早点休息？”说着，手就往你的腰上摸来。你该怎么办？",
+      "options": [
+        {
+          "id": 1,
+          "text": "A.推开他的手，说身体不舒服，拒绝他",
+          "next": "refuse_husband",
+          "effects": {
+            "variables": {
+              "refused_husband": true
+            }
+          }
+        },
+        {
+          "id": 2,
+          "text": "B.顺着他的话，趁机追问泰迪熊血迹的事",
+          "next": "ask_blood",
+          "effects": {
+            "variables": {
+              "is_cooperative": true
+            }
+          }
+        },
+        {
+          "id": 3,
+          "text": "C.假装同意，等他放松警惕，去厨房拿菜刀防身",
+          "next": "get_kitchen_knife",
+          "effects": {
+            "variables": {
+              "has_knife": false,
+              "is_pretending": true
+            }
+          }
+        }
+      ]
+    },
+    "refuse_husband": {
+      "type": "story",
+      "content": "你推开伍金刚的手：“我今天身体不舒服，想早点睡。”他愣了一下，随即露出失落的表情：“好吧，那你先躺会儿，我去冲个澡。”\n他进浴室后，你躺在床上，盯着天花板思索——泰迪熊的血肯定不简单。几分钟后，伍金刚穿着睡衣出来，看到你裹着被子发抖，急忙走过来：“颜颜，怎么了？”你往他怀里缩了缩：“我一看到那熊，就想起那天的事……”\n他叹了口气：“是刘啸天那畜生！前几天我出门，他来家里做客，对我动手动脚，你用花瓶砸了他，瓷片划到他的头，血溅到了熊上。警察说你是正当防卫，没事的。”",
+      "next": "midnight_choice1",
+      "effects": {
+        "variables": {
+          "know_blood_truth": true,
+          "ghost_name": "刘啸天",
+          "husband_possessed": false
+        }
+      }
+    },
+    "ask_blood": {
+      "type": "story",
+      "content": "你顺着他的话点点头，挽住他的胳膊：“好啊，不过你得先告诉我，熊上的血是怎么回事？我总觉得不安心。”\n伍金刚的眼神闪烁了一下，最终还是松口：“是我兄弟刘啸天，前几天来家里，趁我不在对 you 动手动脚，你用花瓶砸了他，血溅到熊上了。别怕，警察都定了正当防卫。”\n他刚说完，浴室的水声突然停了——不是他关的，而是凭空中断。你看向浴室门口，水汽里似乎站着一个模糊的人影，正盯着你们。",
+      "next": "bathroom_figure",
+      "effects": {
+        "variables": {
+          "know_blood_truth": true,
+          "ghost_name": "刘啸天",
+          "has_bathroom_ghost": true
+        }
+      }
+    },
+    "get_kitchen_knife": {
+      "type": "story",
+      "content": "你假装同意，等伍金刚转身去拿睡衣，你趁机溜到厨房，打开抽屉想拿菜刀——却摸到一个冰凉的东西，低头一看，是一只沾着血的瓷片，和泰迪熊上的血迹颜色一样。\n“颜颜，你在干嘛？”伍金刚的声音突然从背后传来，你猛地回头，发现他的眼睛通红，嘴角咧开一个诡异的弧度，和结婚照上的憨厚模样判若两人。他一步步走近：“你在找这个吗？”手里拿着那片沾血的瓷片。",
+      "next": "possessed_husband1",
+      "effects": {
+        "variables": {
+          "husband_possessed": true,
+          "revive_coin": "-1"
+        }
+      }
+    },
+    "bathroom_figure": {
+      "type": "choice",
+      "content": "浴室门口的人影越来越清晰，是一个穿着灰色T恤的男人，额头上有一道狰狞的伤口，正往下滴血——和伍金刚描述的刘啸天一模一样。伍金刚也看到了，猛地站起来挡在你身前：“刘啸天！你还敢来！”\n刘啸天咧嘴一笑，身体开始变得透明：“我不是来报仇的，我是来‘找伴’的。”他的手伸向伍金刚的后背，伍金刚却像被定住一样，一动不动。你该怎么办？",
+      "options": [
+        {
+          "id": 1,
+          "text": "A.拿起桌上的绿豆糕砸向刘啸天",
+          "next": "throw_cake",
+          "effects": {
+            "variables": {
+              "has_mung_cake": false
+            }
+          }
+        },
+        {
+          "id": 2,
+          "text": "B.拉着伍金刚往门外跑",
+          "next": "run_outside",
+          "effects": {
+            "variables": {
+              "is_running": true
+            }
+          }
+        },
+        {
+          "id": 3,
+          "text": "C.躲到床底，观察刘啸天的动作",
+          "next": "hide_under_bed1",
+          "effects": {
+            "variables": {
+              "is_hiding": true
+            }
+          }
+        }
+      ]
+    },
+    "throw_cake": {
+      "type": "story",
+      "content": "你抓起桌上的绿豆糕，狠狠砸向刘啸天。糕点砸在他身上，却像穿过空气一样，没造成任何影响。他冷笑一声：“没用的。”\n下一秒，伍金刚突然转过身，眼睛通红，一把掐住你的脖子：“颜颜，陪我一起吧。”你挣扎着看向他的脸，发现他的嘴角和刘啸天一样，咧开了诡异的笑容——他被附身了！\n你感到呼吸越来越困难，眼前一黑，失去了意识。",
+      "next": "revive1",
+      "effects": {
+        "variables": {
+          "revive_coin": "-1"
+        }
+      }
+    },
+    "run_outside": {
+      "type": "story",
+      "content": "你拉着伍金刚往门口跑，他却像灌了铅一样沉，脚步挪不动。刘啸天的手已经搭在了他的肩膀上，伍金刚浑身一颤，突然发力甩开你：“别碰我！”他的声音变得尖锐，和刘啸天的声音重叠在一起。\n你趁机拉开门，冲到楼道里，声控灯应声亮起——二楼的平台上，有一滩黑色的液体，散发着腥臭。你刚想往下跑，身后传来伍金刚的叫声：“颜颜，回来！”声音里带着哭腔，又夹杂着刘啸天的冷笑。",
+      "next": "corridor_choice",
+      "effects": {
+        "variables": {
+          "husband_possessed": true,
+          "saw_second_floor_liquid": true
+        }
+      }
+    },
+    "corridor_choice": {
+      "type": "choice",
+      "content": "你站在昏暗的楼道里，二楼的走廊被微弱的应急灯照亮，黑色液体在楼梯口泛着黯淡的光。楼下的出口似乎有声音靠近，楼上也有窸窣的脚步声。你准备：",
+      "options": [
+        {
+          "id": 1,
+          "text": "A.立刻冲下楼寻找逃生出口（冒险）",
+          "next": "corridor_down",
+          "effects": {
+            "variables": {
+              "is_running": true
+            }
+          }
+        },
+        {
+          "id": 2,
+          "text": "B.向上靠近302门查看情况（尝试救人/调查）",
+          "next": "corridor_up",
+          "effects": {
+            "variables": {
+              "is_investigating": true
+            }
+          }
+        },
+        {
+          "id": 3,
+          "text": "C.躲进旁边的小商铺（保守，可能暂时安全）",
+          "next": "corridor_shop",
+          "effects": {
+            "variables": {
+              "took_cover": true
+            }
+          }
+        }
+      ]
+    },
+    "corridor_down": {
+      "type": "story",
+      "content": "你决定冲下楼。跑到一半，黑色液体像潮水般向你喷溅，一只形似狗的影子从阴影里扑出，你被抓住肩膀拖拽，感觉冷冷的利爪掠过皮肤。你用力挣脱，却发现旁边有人向你伸手。",
+      "next": "corridor_down_help",
+      "effects": {
+        "variables": {
+          "revive_coin": "-1",
+          "took_damage": true
+        }
+      }
+    },
+    "corridor_down_help": {
+      "type": "choice",
+      "content": "在混乱中，你看到两种可能的援助来源：一位手提手电的邻居和一个黑影。你选择：",
+      "options": [
+        {
+          "id": 1,
+          "text": "向手电的邻居呼救并抓住他的手",
+          "next": "corridor_neighbor_help",
+          "effects": {
+            "variables": {
+              "trust": "+1"
+            }
+          }
+        },
+        {
+          "id": 2,
+          "text": "抓住黑影的手臂（冒险，或是假扮的同伴）",
+          "next": "corridor_grab_shadow",
+          "effects": {
+            "variables": {
+              "trust": "-1",
+              "revive_coin": "-1"
+            }
+          }
+        }
+      ]
+    },
+    "corridor_neighbor_help": {
+      "type": "story",
+      "content": "邻居用力把你拉出黑影的控制，顺势将你带到一间小店里。店主锁上门，递给你一杯热水。你感激地喘着气，但外面仍有吵杂的声音，仿佛有人在搜寻你们。",
+      "next": "corridor_shop_after_help",
+      "effects": {
+        "variables": {
+          "met_helpful_neighbor": true
+        }
+      }
+    },
+    "corridor_shop_after_help": {
+      "type": "story",
+      "content": "邻居把你带进小店后，店主简单检查了你的伤口，并叮嘱你们暂且不要上三楼。你们在店里休整片刻，交换情报，决定下一步是出门找更多幸存者还是再搜集证据。",
+      "next": "corridor_shop_search",
+      "effects": {
+        "variables": {
+          "rested_after_help": true
+        }
+      }
+    },
+    "corridor_grab_shadow": {
+      "type": "story",
+      "content": "你硬着头皮抓住黑影的手臂，结果被一股寒气灼伤，手臂开始麻木。黑影发出类似笑声的声音，随后消失在楼道深处。你带着伤继续前行，但不确定刚才抓到的是否是人。",
+      "next": "corridor_injury",
+      "effects": {
+        "variables": {
+          "is_injured": true
+        }
+      }
+    },
+    "corridor_injury": {
+      "type": "choice",
+      "content": "受伤后的你需要做出抉择：",
+      "options": [
+        {
+          "id": 1,
+          "text": "继续向楼下冲，尽快寻找出口",
+          "next": "corridor_escape_hurry"
+        },
+        {
+          "id": 2,
+          "text": "回到小店暂时疗伤并搜寻线索",
+          "next": "corridor_shop_after_help"
+        }
+      ]
+    },
+    "corridor_escape_hurry": {
+      "type": "end",
+      "content": "你匆忙下楼，虽然最后逃离了楼区，但因伤势过重而在远处失去意识。你被后来的幸存者发现，带走治疗。",
+      "effects": {
+        "variables": {
+          "trial_partial": 1
+        }
+      }
+    },
+    "corridor_shop": {
+      "type": "story",
+      "content": "你躲进楼道旁的小商铺，店主惊讶地看着你，迅速把门反锁。店里摆放着杂货和一些旧物，你注意到柜台后有一张便签，上面写着‘不要上三楼’——字体歪斜，像是被急促写下。",
+      "next": "corridor_shop_search",
+      "effects": {
+        "variables": {
+          "took_cover": true,
+          "found_note": true
+        }
+      }
+    },
+    "corridor_shop_search": {
+      "type": "choice",
+      "content": "店主询问你发生了什么。你要：",
+      "options": [
+        {
+          "id": 1,
+          "text": "向店主求助并请求带路离开",
+          "next": "shop_help_leave",
+          "effects": {
+            "variables": {
+              "trust": "+1"
+            }
+          }
+        },
+        {
+          "id": 2,
+          "text": "留在店内继续翻找线索",
+          "next": "shop_search_clues",
+          "effects": {
+            "variables": {
+              "clues_found": "+1"
+            }
+          }
+        }
+      ]
+    },
+    "shop_help_leave": {
+      "type": "story",
+      "content": "店主带着你从一条后门小巷离开，他低声说这里的人都知道晚上不要上三楼，很多年前曾有一场仪式在那发生。你们暂时到了一个安全的临时避难点。",
+      "next": "shop_safe_finish",
+      "effects": {
+        "variables": {
+          "escaped_with_help": true
+        }
+      }
+    },
+    "shop_search_clues": {
+      "type": "story",
+      "content": "你在店里翻找，找到一张发黄的收据和一张破损的照片，照片背面写着‘402/1998’。你把收据和照片收好，也许能与之前的线索对应上。",
+      "next": "shop_safe_finish",
+      "effects": {
+        "variables": {
+          "clues_found": "+2"
+        }
+      }
+    },
+    "shop_safe_finish": {
+      "type": "end",
+      "content": "在店主的帮助下你暂时脱离危险，获得线索并保存了部分证据。虽未立刻解除诅咒，但你活着，有更多机会继续追查真相。",
+      "effects": {
+        "variables": {
+          "trial_success": 0
+        }
+      }
+    },
+    "corridor_up": {
+      "type": "story",
+      "content": "你选择靠近302门，试图救出仍可能被控制的伍金刚或确认屋内情况。走近门口，你听到里面传来低语，声音像两个不同的人在争吵，随后是一阵微弱的哭声。",
+      "next": "knock_302",
+      "effects": {
+        "variables": {
+          "is_checking_302": true
+        }
+      }
+    },
+    "knock_302": {
+      "type": "choice",
+      "content": "你在302门前轻轻敲门，里面的声音停了片刻，然后有一个沙哑的声音回应：“谁？”你：",
+      "options": [
+        {
+          "id": 1,
+          "text": "说是邻居，试图安抚并要求他们开门",
+          "next": "call_open_302"
+        },
+        {
+          "id": 2,
+          "text": "声称要报警，吓唬里面的人让他们现身",
+          "next": "threaten_302",
+          "conditions": {
+            "revive_coin": { ">=": 1 }
+          }
+        },
+        {
+          "id": 3,
+          "text": "退后并选择从旁边窗户偷看",
+          "next": "peek_302"
+        }
+      ]
+    },
+    "call_open_302": {
+      "type": "story",
+      "content": "你软声说是隔壁的邻居，希望他们能开门谈谈。门缝被轻轻推开一条缝，伍金刚那双红眼在缝隙中闪过，他低声说：\"别出声\"。门并未打开。",
+      "next": "knock_302_after_call",
+      "effects": {
+        "variables": {
+          "met_husband": true
+        }
+      }
+    },
+    "threaten_302": {
+      "type": "story",
+      "content": "你威胁说要报警，声音透过门缝传到屋内。门内的声音变得更加扭曲，仿佛有人在窃笑。过了一会儿，门被狠狠推开，一个模糊的人影冲向你，但你侧身躲过，反而抓住了他的手臂——那是一只冰冷而空洞的手。",
+      "next": "revive3",
+      "effects": {
+        "variables": {
+          "revive_coin": "-1",
+          "is_injured": true
+        }
+      }
+    },
+    "peek_302": {
+      "type": "story",
+      "content": "你从窗户往里偷看，透过窗缝看到客厅杂乱，电视黑屏，床上散落着衣物。角落里似乎有东西在抖动，你隐约看见一只形体像人但又不像人的东西，正盯着窗外。",
+      "next": "peek_302_after",
+      "effects": {
+        "variables": {
+          "peeked_302": true,
+          "clues_found": "+1"
+        }
+      }
+    },
+    "peek_302_after": {
+      "type": "story",
+      "content": "你继续观察，发现床上有几件旧衣服被撕扯的痕迹，窗帘后有暗红色的污迹。你决定下一步是敲门、藏匿还是回店里找人一起应对。",
+      "next": "knock_302_after_call",
+      "effects": {
+        "variables": {
+          "more_peek_clues": true
+        }
+      }
+    },
+    "knock_302_after_call": {
+      "type": "choice",
+      "content": "门缝又闭合了，哭声变得更大。你现在：",
+      "options": [
+        {
+          "id": 1,
+          "text": "继续敲门并尝试强行进入",
+          "next": "force_enter_302"
+        },
+        {
+          "id": 2,
+          "text": "撤离并带着线索去找更多人帮助",
+          "next": "shop_help_leave",
+          "effects": {
+            "variables": {
+              "clues_found": "+1"
+            }
+          }
+        },
+        {
+          "id": 3,
+          "text": "在门边放置符纸并退回观察",
+          "next": "place_talisman",
+          "effects": {
+            "variables": {
+              "placed_talisman": true
+            }
+          }
+        }
+      ]
+    },
+    "force_enter_302": {
+      "type": "story",
+      "content": "你试图强行开门，门突然被一股寒气顶住，无法推开。门缝中传来低沉的低语，仿佛在说：\"不要回来……\"你感觉到一股力量向你袭来，视野一黑——",
+      "next": "revive3",
+      "effects": {
+        "variables": {
+          "revive_coin": "-1"
+        }
+      }
+    },
+    "place_talisman": {
+      "type": "story",
+      "content": "你从包里摸出一张符纸，轻轻贴在门上。贴上的那一瞬间，楼道里的气氛似乎缓和了一些，哭声也变小了。你退回到角落观察，心里对接下来的行动多了些把握。",
+      "next": "shop_safe_finish",
+      "effects": {
+        "variables": {
+          "placed_talisman": true
+        }
+      }
+    },
+    "hide_under_bed1": {
+      "type": "story",
+      "content": "你钻到床底，透过床板缝隙看到刘啸天的手按在伍金刚的后背上，伍金刚的身体开始抽搐，皮肤变得苍白。突然，伍金刚低下头，眼睛直勾勾地看向床底——和你对上了视线。\n“找到你了。”他咧开嘴笑，脖子开始以诡异的角度扭曲，慢慢弯向床底。你想往后退，却撞到了墙，伍金刚的手伸了进来，抓住了你的脚踝。",
+      "next": "revive1",
+      "effects": {
+        "variables": {
+          "revive_coin": "-1"
+        }
+      }
+    },
+    "revive1": {
+      "type": "story",
+      "content": "你猛地睁开眼，发现自己还坐在床边，伍金刚正拿着睡衣走向浴室：“我去冲个澡，你等我。”\n手机震动了一下，屏幕显示：“消耗1枚生机筹码，回到选择前。当前剩余：{revive_coin}枚。”你摸了摸脖子，没有掐痕——刚才的死亡是真的，现在是重新来过。",
+      "next": "teddy_blood_choice",
+      "effects": {
+        "variables": {
+          "has_revived": true
+        }
+      }
+    },
+    "possessed_husband1": {
+      "type": "story",
+      "content": "伍金刚拿着瓷片走近，你往后退，后背撞到了冰箱。他举起瓷片，就要朝你刺来——突然，厨房的窗户被风吹开，一张纸飘了进来，落在他脚边。他低头一看，是一张泛黄的照片，上面是他和刘啸天的合影，两人勾着肩膀笑。\n伍金刚的动作顿住了，眼神恢复了几分清明：“颜颜，我……”他刚想说什么，身体又猛地一僵，瓷片掉在地上，他捂住头蹲了下去：“别逼我……”",
+      "next": "help_husband",
+      "effects": {
+        "variables": {
+          "husband_half_possessed": true
+        }
+      }
+    },
+    "help_husband": {
+      "type": "choice",
+      "content": "伍金刚蹲在地上，头抵着膝盖，嘴里喃喃自语：“刘啸天，你快走……别缠着我。”你看到他的后背上，有一个模糊的人影在蠕动，像是要从他身体里钻出来。这时，手机震动，屏幕出现选项：",
+      "options": [
+        {
+          "id": 1,
+          "text": "A.拿起地上的瓷片，刺向伍金刚后背上的人影",
+          "next": "stab_shadow",
+          "effects": {
+            "variables": {
+              "used_porcelain": true
+            }
+          }
+        },
+        {
+          "id": 2,
+          "text": "B.打开厨房窗户，大喊“有人吗”，寻求邻居帮助",
+          "next": "shout_for_help",
+          "effects": {
+            "variables": {
+              "shouted_help": true
+            }
+          }
+        },
+        {
+          "id": 3,
+          "text": "C.扶起伍金刚，把他拖到卧室，用被子蒙住他的头",
+          "next": "cover_husband",
+          "effects": {
+            "variables": {
+              "is_covering": true
+            }
+          }
+        }
+      ]
+    },
+    "stab_shadow": {
+      "type": "story",
+      "content": "你拿起瓷片，对准伍金刚后背上的人影刺去。瓷片刚碰到人影，就发出“滋啦”的声响，人影扭曲了一下，伍金刚惨叫一声：“疼！”他猛地转过身，眼睛通红，一把夺过瓷片，朝你刺来——这次，是他自己的意识，却被疼痛逼得失去了理智。",
+      "next": "revive2",
+      "effects": {
+        "variables": {
+          "revive_coin": "-1"
+        }
+      }
+    },
+    "shout_for_help": {
+      "type": "story",
+      "content": "你打开窗户大喊：“有人吗？快来帮忙！”楼下传来一个老太太的声音：“小姑娘，咋了？”你探头一看，二楼窗口站着一个头发花白的老人，手里拎着菜篮。“我老公不舒服，您能上来看看吗？”\n老太太点点头：“等着，我这就上来。”几分钟后，敲门声响起，你刚想开门，伍金刚突然冲过来拉住你：“别开！她不是好人！”他的眼神恢复了清明，指着门外：“她是303的王奶奶，前几天刚走了！”",
+      "next": "grandma_knock",
+      "effects": {
+        "variables": {
+          "met_ghost_grandma": true,
+          "neighbor_info": ["303王奶奶（已去世）"]
+        }
+      }
+    },
+    "cover_husband": {
+      "type": "story",
+      "content": "你扶起伍金刚，把他拖到卧室，用被子蒙住他的头。他在被子里挣扎了几下，就不动了。你刚想掀开被子看看，被子突然鼓了起来，像是有什么东西在里面蠕动。\n“颜颜，我好冷。”被子里传来刘啸天的声音，紧接着，被子被掀开，伍金刚坐在床上，脸色惨白，嘴角流着血：“你为什么要蒙住我？我只是想和你一起……”",
+      "next": "revive2",
+      "effects": {
+        "variables": {
+          "revive_coin": "-1"
+        }
+      }
+    },
+    "revive2": {
+      "type": "story",
+      "content": "你再次睁开眼，伍金刚还在厨房洗碗，水声哗哗作响。手机提示：“消耗1枚生机筹码，回到选择前。当前剩余：{revive_coin}枚。”\n你走到客厅，看到茶几上放着一张纸条，是伍金刚写的：“颜颜，我明天调休，带你去看医生，你最近总说害怕，别憋在心里。”",
+      "next": "midnight_choice1",
+      "effects": {
+        "variables": {
+          "husband_will_take_to_hospital": true
+        }
+      }
+    },
+    "grandma_knock": {
+      "type": "choice",
+      "content": "门外的敲门声越来越响：“小姑娘，开门啊！我来帮你了！”伍金刚躲在门后，死死拉住你的手：“别开，她死了三天了，我昨天还看到她家人抬着棺材出小区！”\n你透过猫眼一看，门外的王奶奶笑容满面，手里的菜篮里装着绿油油的野菜，菜篮上盖着一块厚布。她的手指关节粗大，指甲缝里有黑色的泥垢。手机震动，出现选项：",
+      "options": [
+        {
+          "id": 1,
+          "text": "A.打开门，假装热情，趁机查看菜篮里的东西",
+          "next": "open_door_grandma",
+          "effects": {
+            "variables": {
+              "opened_door_to_grandma": true
+            }
+          }
+        },
+        {
+          "id": 2,
+          "text": "B.隔着门说“不用了，我老公没事了”，打发她走",
+          "next": "refuse_grandma",
+          "effects": {
+            "variables": {
+              "refused_grandma": true
+            }
+          }
+        },
+        {
+          "id": 3,
+          "text": "C.拿起厨房的菜刀，躲在门后，等她开门再动手",
+          "next": "prepare_knife_grandma",
+          "effects": {
+            "variables": {
+              "has_knife": true
+            }
+          }
+        }
+      ]
+    },
+    "open_door_grandma": {
+      "type": "story",
+      "content": "你打开门，笑着说：“王奶奶，麻烦您了。”她走进来，菜篮放在地上，一把抓住你的手：“小姑娘，你脸色不好，是不是被什么东西缠上了？”她的手冰凉，力气大得惊人。\n你趁机看向菜篮，掀开厚布——里面根本不是野菜，而是一篮子黑乎乎的毒虫，正爬来爬去。“奶奶，您的菜……”你刚想说什么，她突然把你往厨房拖：“别怕，我给你做点‘好东西’，吃了就不怕了。”厨房的灶台上，摆着一把滴血的菜刀。",
+      "next": "revive3",
+      "effects": {
+        "variables": {
+          "revive_coin": "-1"
+        }
+      }
+    },
+    "refuse_grandma": {
+      "type": "story",
+      "content": "你隔着门喊：“王奶奶，谢谢您，我老公好多了，您回去吧！”门外的敲门声停了，过了几秒，传来她的声音：“那好吧，我明天再来看你。”\n脚步声渐行渐远，伍金刚松了口气：“吓死我了，她前几天就是在厨房剁菜的时候走的，听说剁着剁着就倒了。”你看向厨房，灶台上的菜刀还在，阳光照在上面，反射出冷光。",
+      "next": "midnight_choice1",
+      "effects": {
+        "variables": {
+          "grandma_left": true
+        }
+      }
+    },
+    "prepare_knife_grandma": {
+      "type": "story",
+      "content": "你拿起菜刀躲在门后，门外的敲门声突然停了。过了一会儿，传来钥匙转动的声音——王奶奶竟然有你家的钥匙！你握紧菜刀，门被推开，她探进头来：“小姑娘，我进来了啊。”\n你刚想挥刀，她却突然举起菜篮，把里面的毒虫朝你扔来。毒虫爬满了你的脚，你吓得尖叫，菜刀掉在地上。她趁机冲过来，抓住你的胳膊：“跟我走，陪我包饺子！”",
+      "next": "revive3",
+      "effects": {
+        "variables": {
+          "revive_coin": "-1"
+        }
+      }
+    },
+    "revive3": {
+      "type": "story",
+      "content": "你醒来时，伍金刚正帮你盖被子：“颜颜，你怎么睡着了？做噩梦了吗？喊得好大声。”\n手机提示：“消耗1枚生机筹码，回到选择前。当前剩余：{revive_coin}枚。”你看向门口，猫眼外空无一人——王奶奶已经走了。",
+      "next": "midnight_choice1",
+      "effects": {
+        "variables": {
+          "grandma_gone": true
+        }
+      }
+    },
+    "midnight_choice1": {
+      "type": "choice",
+      "content": "半夜一点，你被隔壁传来的“梆梆”剁肉声吵醒。你睁开眼，发现伍金刚不在身边——他坐在床尾，背对着你，肩膀一耸一耸的，像是在哭。“金刚？”你喊了他一声，他没回头，反而缓缓抬起头，脖子以不可思议的角度扭向你，脸贴在肩膀上，眼睛通红：“颜颜，你醒了？”\n手机震动，屏幕出现选项：",
+      "options": [
+        {
+          "id": 1,
+          "text": "A.假装没看见，闭眼翻身继续睡",
+          "next": "pretend_sleep1",
+          "effects": {
+            "variables": {
+              "pretended_sleep": true
+            }
+          }
+        },
+        {
+          "id": 2,
+          "text": "B.大声叫醒他，告诉他脖子扭了，让他赶紧恢复",
+          "next": "wake_husband1",
+          "effects": {
+            "variables": {
+              "woke_husband": true
+            }
+          }
+        },
+        {
+          "id": 3,
+          "text": "C.悄悄下床，去厨房拿电饭煲砸他",
+          "next": "hit_husband_rice",
+          "effects": {
+            "variables": {
+              "is_attacking": true
+            }
+          }
+        }
+      ]
+    },
+    "pretend_sleep1": {
+      "type": "story",
+      "content": "你闭眼翻身，假装没看见。背后传来脚步声，伍金刚走到你身边，弯下腰，脸离你的后脑勺越来越近。你能感觉到他的呼吸，带着一股腥气。\n“你在装睡对不对？”他的声音贴着你的耳朵，冰冷的手摸向你的脖子。你想挣扎，却发现身体动不了，只能任由他的手越来越紧。",
+      "next": "revive4",
+      "effects": {
+        "variables": {
+          "revive_coin": "-1"
+        }
+      }
+    },
+    "wake_husband1": {
+      "type": "story",
+      "content": "你大声喊：“金刚！你的脖子扭了！快别这样！”他愣了一下，脖子慢慢恢复正常，茫然地看着你：“颜颜，怎么了？我刚才在睡觉啊。”你指着他的脖子：“你刚才脖子扭成那样，还盯着我看！”\n他摸了摸脖子：“不可能啊，我没梦游的毛病。”这时，隔壁的剁肉声停了，传来烧水的声音。伍金刚突然想起什么：“对了，303的王奶奶走了，她孙子李明一个人住，刚才的剁肉声，不会是……”",
+      "next": "next_morning",
+      "effects": {
+        "variables": {
+          "husband_doubt_ghost": true,
+          "neighbor_info": ["303王奶奶（已去世）", "303李明（王奶奶孙子，高一学生）"]
+        }
+      }
+    },
+    "hit_husband_rice": {
+      "type": "story",
+      "content": "你悄悄下床，走到厨房，抱起电饭煲——里面还有半锅米饭，沉甸甸的。你转身往卧室走，刚到门口，就看到伍金刚站在卧室门口，眼睛通红：“你要干什么？”他的身体开始扭曲，手臂变长，朝你抓来。\n你举起电饭煲砸过去，正好砸在他的头上。米饭撒了一地，他惨叫一声，倒在地上。你趁机往门外跑，却撞到了一个人——是王奶奶，她手里拎着菜刀：“小姑娘，跑什么？”",
+      "next": "revive4",
+      "effects": {
+        "variables": {
+          "revive_coin": "-1"
+        }
+      }
+    },
+    "revive4": {
+      "type": "story",
+      "content": "你醒来时，剁肉声还在继续。伍金刚躺在你身边，睡得很沉。手机提示：“消耗1枚生机筹码，回到选择前。当前剩余：{revive_coin}枚。”\n你摸了摸口袋，摸到一张纸条，是你自己写的：“别攻击，别装睡，叫醒他。”——是上一次复活时留下的提示。",
+      "next": "wake_husband1",
+      "effects": {
+        "variables": {
+          "has_reminder": true
+        }
+      }
+    },
+    "next_morning": {
+      "type": "story",
+      "content": "第二天早上，伍金刚去公司加班，临走前给你留了早餐和一张纸条：“颜颜，我中午不回来，你自己做饭吃。下午我请假，带你去看医生。”\n你吃完早餐，决定出去打探情况。锁门时，你看到门牌是302，三楼一共有三户：301、302、303。楼道里脏兮兮的，二楼平台上的黑色液体还在，散发着腥臭。\n你下楼出了小区，在附近的超市买了些食材，回来时，在小区花坛边看到一个小姑娘追着一条狗跑：“欢欢，别跑！”狗钻进草丛，叼出一根火腿肠，小姑娘掰开狗嘴：“不许吃地上的东西！”",
+      "next": "community_choice",
+      "effects": {
+        "variables": {
+          "went_out": true,
+          "saw_girl_dog": true,
+          "girl_name": "许菲乐",
+          "dog_name": "欢欢"
+        }
+      }
+    },
+    "community_choice": {
+      "type": "choice",
+      "content": "你刚想上楼，就看到一个年轻妈妈抱着孩子走过来，孩子指着狗：“妈妈，狗狗！”年轻妈妈拦住孩子：“别去，小心被咬。”小姑娘不乐意了：“我家欢欢不咬人！”\n这时，你的手机震动，屏幕出现选项：",
+      "options": [
+        {
+          "id": 1,
+          "text": "A.上前搭话，问小姑娘是不是住在这栋楼",
+          "next": "talk_to_girl",
+          "effects": {
+            "variables": {
+              "talked_to_girl": true
+            }
+          }
+        },
+        {
+          "id": 2,
+          "text": "B.观察年轻妈妈，问她是不是住在402",
+          "next": "talk_to_mother",
+          "effects": {
+            "variables": {
+              "talked_to_mother": true
+            }
+          }
+        },
+        {
+          "id": 3,
+          "text": "C.趁机上楼，不想掺和这些事",
+          "next": "go_upstairs",
+          "effects": {
+            "variables": {
+              "avoided_community": true
+            }
+          }
+        }
+      ]
+    },
+    "talk_to_girl": {
+      "type": "story",
+      "content": "你上前搭话：“小姑娘，你家住在这栋楼吗？”她点点头：“我住502，我叫许菲乐。”狗叼着火腿肠跑过来，许菲乐一把夺过：“说了不许吃！”\n你趁机问：“昨晚你听到剁肉声了吗？”她愣了一下：“听到了，是303的李明哥哥家，他奶奶走了，他一个人在家，不知道在剁什么。”说完，她抱着狗跑了：“妈妈喊我回家了！”",
+      "next": "upstairs_grandma",
+      "effects": {
+        "variables": {
+          "neighbor_info": ["303王奶奶（已去世）", "303李明（王奶奶孙子，高一学生）", "502许菲乐（养犬“欢欢”）"]
+        }
+      }
+    },
+    "talk_to_mother": {
+      "type": "story",
+      "content": "你上前问年轻妈妈：“您是不是住在402？”她愣了一下：“是啊，你怎么知道？”“我住302，刚搬来没多久。”你笑着说。\n她叹了口气：“住在这里可得小心点，我家小女儿上周从窗户掉下去了，没了。”她说着，眼圈红了：“我叫伊梓涵，我丈夫常年出差，就我带着两个孩子住。”这时，孩子突然指着你的身后：“妈妈，阿姨背后有个人。”你回头一看，什么都没有。",
+      "next": "upstairs_grandma",
+      "effects": {
+        "variables": {
+          "neighbor_info": ["303王奶奶（已去世）", "303李明（王奶奶孙子，高一学生）", "402伊梓涵（丧女）"],
+          "met_yi_zihan": true
+        }
+      }
+    },
+    "go_upstairs": {
+      "type": "story",
+      "content": "你趁机上楼，走到二楼时，看到一个头发花白的老人倒在地上，菜篮滚在一边，野菜撒了一地。她捂着腿，痛苦地呻吟：“小姑娘，能不能扶我一把？”\n你刚想绕过她，手机突然震动，屏幕出现选项：",
+      "options": [
+        {
+          "id": 1,
+          "text": "A.假装没看见，直接上楼",
+          "next": "ignore_grandma_fall",
+          "effects": {
+            "variables": {
+              "ignored_fall_grandma": true
+            }
+          }
+        },
+        {
+          "id": 2,
+          "text": "B.扶她起来，送她回303",
+          "next": "help_fall_grandma",
+          "effects": {
+            "variables": {
+              "helped_fall_grandma": true
+            }
+          }
+        },
+        {
+          "id": 3,
+          "text": "C.打电话给物业，让物业来处理",
+          "next": "call_property",
+          "effects": {
+            "variables": {
+              "called_property": true
+            }
+          }
+        }
+      ]
+    },
+    "upstairs_grandma": {
+      "type": "story",
+      "content": "你走到二楼，看到王奶奶倒在地上，菜篮滚在一边，野菜撒了一地。她捂着腿，痛苦地呻吟：“小姑娘，能不能扶我一把？”你认出她，是昨晚敲门的303王奶奶——伍金刚说她已经去世了！",
+      "next": "ghost_grandma_choice",
+      "effects": {
+        "variables": {
+          "saw_ghost_grandma_fall": true
+        }
+      }
+    },
+    "ignore_grandma_fall": {
+      "type": "story",
+      "content": "你假装没看见，快步上楼。背后传来王奶奶的声音：“小姑娘，你会后悔的。”你没回头，回到302，锁上门。\n晚上，伍金刚回来，你跟他说看到王奶奶倒在二楼，他吓得脸都白了：“她都死了，你怎么会看到她？”这时，门外传来敲门声，是许菲乐：“阿姨，欢欢不见了，你看到它了吗？”你透过猫眼一看，许菲乐的脸上沾着血，怀里抱着一只断手。",
+      "next": "final_choice",
+      "effects": {
+        "variables": {
+          "dog_missing": true,
+          "xu_feile_dead": true
+        }
+      }
+    },
+    "help_fall_grandma": {
+      "type": "story",
+      "content": "你扶王奶奶起来，她笑着说：“谢谢你，小姑娘，跟我回家喝杯茶。”你被她拉着往303走，门一打开，里面黑漆漆的，一股腥气扑面而来。她把你推进厨房，灶台上摆着一把剁骨刀，菜篮里的野菜变成了毒虫：“陪我包饺子吧，用这些‘馅’。”",
+      "next": "revive5",
+      "effects": {
+        "variables": {
+          "revive_coin": "-1"
+        }
+      }
+    },
+    "call_property": {
+      "type": "story",
+      "content": "你拿出手机打物业电话，却没人接。王奶奶叹了口气：“别打了，物业早就下班了。”她突然站起来，腿也不疼了，一把抓住你的胳膊：“跟我走！”你挣扎着甩开她，往302跑，她在后面追：“你跑不掉的！”",
+      "next": "final_choice",
+      "effects": {
+        "variables": {
+          "angered_grandma": true
+        }
+      }
+    },
+    "ghost_grandma_choice": {
+      "type": "choice",
+      "content": "王奶奶看着你，嘴角咧开诡异的笑：“小姑娘，你知道我为什么倒在这里吗？因为我在等你啊。”她的身体开始变得透明，菜篮里的野菜变成了毒虫。手机震动，屏幕出现选项：",
+      "options": [
+        {
+          "id": 1,
+          "text": "A.转身往楼下跑，逃出小区",
+          "next": "run_out_community",
+          "effects": {
+            "variables": {
+              "is_running_out": true
+            }
+          }
+        },
+        {
+          "id": 2,
+          "text": "B.往302跑，锁上门躲起来",
+          "next": "run_to_302",
+          "effects": {
+            "variables": {
+              "is_hiding_in_302": true
+            }
+          }
+        },
+        {
+          "id": 3,
+          "text": "C.大喊“李明”，让她孙子出来",
+          "next": "shout_li_ming",
+          "effects": {
+            "variables": {
+              "shouted_li_ming": true
+            }
+          }
+        }
+      ]
+    },
+    "run_out_community": {
+      "type": "story",
+      "content": "你转身往楼下跑，王奶奶在后面追：“别跑！”你冲出小区大门，拦了一辆出租车：“快开车！”出租车司机回头，是刘啸天，额头上流着血：“颜颜，你要去哪？我送你啊。”你吓得跳下车，往远处跑，身后传来许菲乐的声音：“阿姨，等等我！”",
+      "next": "revive5",
+      "effects": {
+        "variables": {
+          "revive_coin": "-1"
+        }
+      }
+    },
+    "run_to_302": {
+      "type": "story",
+      "content": "你往302跑，掏出钥匙开门，王奶奶在后面追：“你躲不掉的！”你锁上门，靠在门上喘气。这时，窗户传来“咚咚”声，你回头一看，伊梓涵的上半身挂在防盗网上，流着血泪：“我的孩子，你看到了吗？”\n门外传来敲门声，是伍金刚：“颜颜，开门！我回来了！”你透过猫眼一看，他的眼睛通红，身后跟着刘啸天。",
+      "next": "final_choice",
+      "effects": {
+        "variables": {
+          "yi_zihan_ghost": true,
+          "husband_with_liuxiaotian": true
+        }
+      }
+    },
+    "shout_li_ming": {
+      "type": "story",
+      "content": "你大喊：“李明！你奶奶在这里！”303的门打开，李明探出头：“奶奶，你干什么呢？”王奶奶的动作顿住，李明走过来：“奶奶，别吓着邻居。”他拉着王奶奶往303走，回头对你笑了笑：“不好意思，我奶奶就这样。”\n你松了口气，回到302。晚上，伍金刚回来，你跟他说这件事，他疑惑地说：“李明上周就搬走了，住学校宿舍了，你看到的是谁？”",
+      "next": "final_choice",
+      "effects": {
+        "variables": {
+          "li_ming_gone": true,
+          "saw_fake_li_ming": true
+        }
+      }
+    },
+    "revive5": {
+      "type": "story",
+      "content": "你醒来时，还站在二楼楼梯口，王奶奶倒在地上，菜篮滚在一边。手机提示：“消耗1枚生机筹码，回到选择前。当前剩余：{revive_coin}枚。”\n你摸了摸口袋，里面有一张纸条：“找机会汇合其他玩家，一起逃出去。”你想起伊梓涵和许菲乐，她们应该也是“玩家”。",
+      "next": "shout_li_ming",
+      "effects": {
+        "variables": {
+          "know_other_players": true
+        }
+      }
+    },
+    "final_choice": {
+      "type": "choice",
+      "content": "你被困在302，门外是伍金刚和刘啸天，窗户上挂着伊梓涵的上半身，楼下传来许菲乐和狗的叫声，王奶奶在楼道里剁菜：“梆梆梆！”手机震动，屏幕显示：“最后选择，生存或死亡。”",
+      "options": [
+        {
+          "id": 1,
+          "text": "A.打开门，说服伍金刚清醒，一起冲出去",
+          "next": "final_escape1",
+          "effects": {
+            "variables": {
+              "final_choice": "A"
+            }
+          }
+        },
+        {
+          "id": 2,
+          "text": "B.打碎窗户，踩着伊梓涵的身体跳下去",
+          "next": "final_escape2",
+          "effects": {
+            "variables": {
+              "final_choice": "B"
+            }
+          }
+        },
+        {
+          "id": 3,
+          "text": "C.躲进衣柜，拿出泰迪熊，用熊上的血吸引鬼怪注意力",
+          "next": "final_escape3",
+          "effects": {
+            "variables": {
+              "final_choice": "C"
+            }
+          }
+        }
+      ]
+    },
+    "final_escape1": {
+      "type": "story",
+      "content": "你打开门，伍金刚愣了一下，刘啸天的人影在他身后浮现。“金刚，醒醒！”你大喊，把结婚照扔给他。他接住照片，看到上面的自己和你，眼神恢复了清明：“颜颜，我……”他猛地推开刘啸天，拉着你往楼下跑：“快！”\n楼道里的王奶奶举着菜刀冲过来，伍金刚把你护在身后，一脚踹开她：“别碰我老婆！”你们冲到一楼，许菲乐和狗挡在门口，伍金刚捡起一根木棍，砸向狗：“让开！”狗惨叫一声，许菲乐愣了一下，你们趁机冲出小区。\n身后传来鬼怪的叫声，你们一直跑，直到天亮。手机提示：“试炼完成，生存成功。”",
+      "next": "end_success",
+      "effects": {
+        "variables": {
+          "trial_success": true
+        }
+      }
+    },
+    "final_escape2": {
+      "type": "story",
+      "content": "你打碎窗户，伊梓涵的上半身朝你抓来：“我的孩子！”你踩着她的身体跳下去，落在草丛里，膝盖擦破了皮。你爬起来就跑，许菲乐抱着狗追过来：“阿姨，别走！”\n你往小区大门跑，刘啸天突然出现在你面前：“颜颜，陪我吧。”你捡起一块石头砸向他，他后退了一步。这时，伍金刚从楼上跳下来，砸在刘啸天身上：“颜颜，快跑！”你趁机冲出小区，回头一看，伍金刚和鬼怪们扭打在一起。\n天亮时，你在小区外的路灯下等到伍金刚——他浑身是伤，却笑着说：“我没事。”手机提示：“试炼完成，生存成功。”",
+      "next": "end_success",
+      "effects": {
+        "variables": {
+          "trial_success": true
+        }
+      }
+    },
+    "final_escape3": {
+      "type": "story",
+      "content": "你躲进衣柜，拿出泰迪熊，撕开尾巴处的皮毛，露出里面的血迹。你把熊扔到客厅，鬼怪们的注意力都被吸引过去：刘啸天盯着血迹发呆，伊梓涵凑过去闻了闻，王奶奶放下菜刀，许菲乐的狗扑上去舔血。\n你趁机从衣柜里出来，打开门，往楼下跑。伍金刚还在门口，眼神清明：“颜颜，我等你很久了！”他拉着你冲出小区，鬼怪们反应过来时，你们已经跑远了。\n天亮时，你们坐在早餐店，伍金刚说：“我们搬去别的地方住，再也不回来了。”手机提示：“试炼完成，生存成功。”",
+      "next": "end_success",
+      "effects": {
+        "variables": {
+          "trial_success": true
+        }
+      }
+    },
+    "end_success": {
+      "type": "end",
+      "content": "你和伍金刚坐在早餐店，阳光照在身上，暖洋洋的。手机屏幕亮起：“【试炼成功】你在302室鬼楼中，凭借5枚生机筹码和精准的选择，成功逃出生天。你识破了刘啸天的附身、王奶奶的伪装、伊梓涵的执念，也守护了伍金刚的清醒。这场试炼，不仅是生存的博弈，更是对人性的考验——你没有被恐惧吞噬，最终迎来了黎明。”\n\n【奖励】：生机筹码剩余{revive_coin}枚（可用于下次试炼）、“鬼楼生存指南”（记录所有鬼怪弱点）。",
+      "effects": {
+        "variables": {
+          "reward_obtained": true
+        }
+      }
+    }
+  }
+}
