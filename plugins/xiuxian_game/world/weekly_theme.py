@@ -29,7 +29,7 @@ THEME_CONFIG: Dict[WeeklyTheme, Dict] = {
         "related_locations": ["卫生间", "试衣间", "理发店", "舞蹈室"],
         "material_boost": {
             "cursed_mirror_shard": 1.5,     # 诅咒镜片掉率+50%
-            "phantom_thread": 1.3,          # 幻影丝线掉率+30%
+            "phantom_thread": 1.3,          # 幽魂丝线掉率+30%
         },
         "atmosphere_texts": [
             "镜子里的你眨了眨眼，但你确定自己没有眨。",
@@ -44,8 +44,8 @@ THEME_CONFIG: Dict[WeeklyTheme, Dict] = {
         "emoji": "👤",
         "related_locations": ["电影院", "KTV", "聚会厅", "包厢"],
         "material_boost": {
-            "soul_crystal": 1.5,            # 灵魂结晶掉率+50%
-            "nightmare_silk": 1.3,          # 梦魇丝绸掉率+30%
+            "soul_crystal": 1.5,            # 魂魄结晶掉率+50%
+            "nightmare_silk": 1.3,          # 梦魇丝线掉率+30%
         },
         "atmosphere_texts": [
             "你数了数房间里的人，明明只有三个，为什么有四个影子？",
@@ -60,8 +60,8 @@ THEME_CONFIG: Dict[WeeklyTheme, Dict] = {
         "emoji": "🪜",
         "related_locations": ["楼梯间", "天台", "消防通道", "地下室"],
         "material_boost": {
-            "ghost_bone": 1.5,              # 鬼骨掉率+50%
-            "yin_iron": 1.3,                # 阴铁掉率+30%
+            "spirit_bone": 1.5,             # 灵骨掉率+50%
+            "bone_fragment": 1.3,           # 骨片掉率+30%
         },
         "atmosphere_texts": [
             "楼梯间的脚步声在你停下后，又多响了三声。",
@@ -77,7 +77,7 @@ THEME_CONFIG: Dict[WeeklyTheme, Dict] = {
         "related_locations": ["住宅", "旅馆", "公寓", "宿舍"],
         "material_boost": {
             "flesh_crystal": 1.5,           # 血肉结晶掉率+50%
-            "cursed_talisman": 1.3,         # 诅咒符纸掉率+30%
+            "cursed_silk": 1.3,             # 诅咒丝线掉率+30%
         },
         "atmosphere_texts": [
             "敲门声很有节奏：三长两短，三长两短，一直重复。",
@@ -92,7 +92,7 @@ THEME_CONFIG: Dict[WeeklyTheme, Dict] = {
         "emoji": "🌑",
         "related_locations": ["街道", "小巷", "地下通道", "停车场"],
         "material_boost": {
-            "void_essence": 1.5,            # 虚空精华掉率+50%
+            "void_essence": 1.5,            # 虚无精华掉率+50%
             "demon_heart": 1.3,             # 恶魔之心掉率+30%
         },
         "atmosphere_texts": [
@@ -108,8 +108,8 @@ THEME_CONFIG: Dict[WeeklyTheme, Dict] = {
         "emoji": "🛗",
         "related_locations": ["电梯", "高楼", "商场", "医院"],
         "material_boost": {
-            "medical_record": 1.5,          # 病历本掉率+50%
-            "rusty_chain": 1.3,             # 锈蚀铁链掉率+30%
+            "medical_record": 1.5,          # 病例单掉率+50%
+            "corrupted_bandage": 1.3,       # 污血布条掉率+30%
         },
         "atmosphere_texts": [
             "电梯突然停在两层之间，显示屏上闪烁着'13.5'。",
@@ -124,8 +124,8 @@ THEME_CONFIG: Dict[WeeklyTheme, Dict] = {
         "emoji": "📞",
         "related_locations": ["电话亭", "办公室", "家中", "地铁站"],
         "material_boost": {
-            "spirit_stone": 1.5,            # 灵石掉率+50%
-            "god_tear": 1.3,                # 神之泪掉率+30%
+            "kissed_phone_number": 1.5,     # 被死者亲吻的号码掉率+50%
+            "wanted_poster": 1.3,           # 寻人启事掉率+30%
         },
         "atmosphere_texts": [
             "电话那头传来你自己的声音：'不要回头，它就在你身后。'",
