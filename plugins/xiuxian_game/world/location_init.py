@@ -388,10 +388,10 @@ async def handle_refresh_workshops(event: MessageEvent, args: Message = CommandA
                     loc.add_function("forge", forge_config)
                     created_forge += 1
 
-                # 覆盖 allow_items
-                cfg = loc.get_function_config("forge") or {}
+                # 覆盖 allow_items（注意：为触发 SQLAlchemy 变更跟踪，需要回写到 functions）
+                cfg = dict(loc.get_function_config("forge") or {})
                 cfg["allow_items"] = CITY_FORGE_WHITELIST.get(m.name, [])
-                # 直接修改 cfg 即可生效（cfg 为 functions 内部字典引用）
+                loc.functions["forge"] = cfg  # 回写以触发 MutableDict 变更
                 updated += 1
 
             await session.commit()

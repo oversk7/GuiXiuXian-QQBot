@@ -25,10 +25,15 @@ async def _(event: MessageEvent):
             await list_craft_cmd.finish("⛔ 请先创建角色")
         if player.is_in_dungeon():
             await list_craft_cmd.finish(message_add_head("⛔ 诡域中无法进行锻造相关操作", event))
-        # 获取本区域内所有拥有锻造功能的城镇
-        forge_locs = await LocationService.get_locations_with_function(session, "forge", player.get_current_region())
+        # 获取全图所有拥有锻造功能的城镇（不局限当前区域）
+        from ..economy.merchants import MARKETS
+        forge_locs = []
+        for m in MARKETS:
+            loc = await LocationService.get_location_by_coordinates(session, m.x, m.y, "大都会")
+            if loc and loc.has_function("forge"):
+                forge_locs.append(loc)
         if not forge_locs:
-            await list_craft_cmd.finish(message_add_head("⛔ 当前区域暂无工坊", event))
+            await list_craft_cmd.finish(message_add_head("⛔ 全图暂无工坊", event))
 
         # 反向映射：装备ID -> 可锻造城镇列表
         item_to_cities: dict[str, set[str]] = {}
