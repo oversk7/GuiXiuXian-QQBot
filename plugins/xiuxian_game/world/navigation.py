@@ -99,6 +99,11 @@ async def _update_nav_position(player: Player, task: NavigationTask | None, sess
 
     tx, ty = task.target_x, task.target_y
     new_x, new_y = _move_towards(cx, cy, tx, ty, movable_distance)
+    distance_moved = _euclidean_distance(cx, cy, new_x, new_y)
+
+    # 若整数化后仍未产生位移，则保留时间累积供下次使用
+    if distance_moved == 0:
+        return False
 
     # 写回：更新现实世界坐标，如果在现实世界则同步到x,y
     player.real_world_x = new_x
@@ -108,7 +113,12 @@ async def _update_nav_position(player: Player, task: NavigationTask | None, sess
     if not (getattr(player, "is_in_dungeon") and player.is_in_dungeon()):
         player.x, player.y = new_x, new_y
 
-    task.last_update = now
+    # 将未被利用的时间余额保留，以便累积到下一次更新
+    if speed > 0:
+        unused_time = (movable_distance - distance_moved) / speed
+        task.last_update = now - timedelta(seconds=unused_time)
+    else:
+        task.last_update = now
 
     # 判断是否抵达
     return new_x == tx and new_y == ty
