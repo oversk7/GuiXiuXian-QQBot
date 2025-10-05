@@ -33,18 +33,28 @@ async def _(event: MessageEvent):
         if not has_forge:
             await list_craft_cmd.finish(message_add_head("⛔ 需要在工匠的工坊附近(≤3格)查看锻造列表\n💡 使用【观察】【NPC列表】寻找工匠", event))
 
-    craftable = []
-    for item_id in config.items_config["by_type"]["EQUIPMENT"]:
-        tpl = config.items_config["by_id"].get(item_id)
-        if tpl and tpl.recipe:  # 有配方才可锻造
-            rarity_display = tpl.get_rarity_display()
-            craftable.append(f"{rarity_display}{tpl.name}")
+    # 查找最近的工坊地点
+    forge_locs = [loc for loc in (near or []) if loc.has_function("forge")]
+    nearest = min(forge_locs, key=lambda loc: abs(loc.x - x) + abs(loc.y - y))
+    forge_cfg = nearest.get_function_config("forge") or {}
+    allow_ids: list[str] = forge_cfg.get("allow_items", [])
 
-    if not craftable:
-        await list_craft_cmd.finish("🧐 目前暂无可锻造装备")
+    if not allow_ids:
+        await list_craft_cmd.finish(message_add_head(f"⛔ {nearest.name} 尚未配置锻造列表", event))
 
-    lines = ["🔨 可锻造装备 (发送 /配方 装备名 查看详情)", "━━━━━━━━━"]
-    lines.extend([f"• {name}" for name in craftable])
+    # 映射为可读名称并按稀有度/等级简单排序显示
+    craftable_names = []
+    for iid in allow_ids:
+        tpl = config.items_config["by_id"].get(iid)
+        if tpl and tpl.recipe:
+            craftable_names.append((tpl.get_rarity_display(), tpl.name))
+
+    if not craftable_names:
+        await list_craft_cmd.finish(message_add_head(f"🧐 {nearest.name} 暂无可锻造装备", event))
+
+    craftable_names.sort(key=lambda t: t[1])
+    lines = [f"🔨 {nearest.name} 可锻造装备 (用【配方 装备名】查看)", "━━━━━━━━━━━━━"]
+    lines.extend([f"• {rar}{name}" for (rar, name) in craftable_names])
     await list_craft_cmd.finish(message_add_head("\n".join(lines), event))
 
 # ---------------- 指令：配方查询 ----------------
@@ -138,9 +148,18 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
         from ..world.location_service import LocationService
         x, y = player.get_current_coordinates()
         near = await LocationService.get_nearby_locations(session, x, y, player.get_current_region(), max_distance=3)
-        has_forge = any(loc.has_function("forge") for loc in (near or []))
-        if not has_forge:
+        forge_locs = [loc for loc in (near or []) if loc.has_function("forge")]
+        if not forge_locs:
             await craft_cmd.finish(message_add_head("⛔ 需要在工匠的工坊附近(≤3格)才能锻造\n💡 使用【观察】【NPC列表】寻找工匠", event))
+
+        # 城市锻造白名单校验
+        nearest = min(forge_locs, key=lambda loc: abs(loc.x - x) + abs(loc.y - y))
+        forge_cfg = nearest.get_function_config("forge") or {}
+        allow_ids: list[str] = forge_cfg.get("allow_items", [])
+        if allow_ids and item_cfg.item_id not in allow_ids:
+            await craft_cmd.finish(message_add_head(
+                f"⛔ {nearest.name} 的工匠尚未掌握『{item_cfg.name}』的锻造\n"
+                f"💡 发送【锻造列表】查看本城可锻造清单", event))
 
         # 金币校验
         if player.gold < req_gold:

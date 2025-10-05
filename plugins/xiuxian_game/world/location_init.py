@@ -184,60 +184,84 @@ async def init_job_locations(session) -> int:
 
 
 async def init_workshop_locations(session) -> int:
-    """在现有地点添加工匠NPC"""
-    # 在一些现有的市集地点添加工匠NPC，而不是创建新地点
-    workshops = [
-        {
-            "x": -5,
-            "y": 390,
-            "craftsman_name": "风雪大师"
-        },
-        {
-            "x": 390,
-            "y": 50,
-            "craftsman_name": "铁匠老王"
-        },
-        {
-            "x": -420,
-            "y": 140,
-            "craftsman_name": "锻造师李三"
+    """为每个城市（市集）添加工匠NPC与城市专属锻造列表"""
+    # 从市集配置中获取所有城市
+    from ..economy.merchants import MARKETS
+
+    # 城市专属锻造白名单（按需可扩展）——装备为 items.yaml 中的 equipment.item_id
+    CITY_FORGE_WHITELIST: dict[str, list[str]] = {
+        "上京": ["bone_armor", "ghost_tear_pendant"],
+        "北郊": ["rusty_blade", "broken_glasses"],
+        "东郊": ["bone_armor", "rusty_blade"],
+        "西郊": ["ghost_tear_pendant", "broken_glasses"],
+        "南郊": ["bone_armor", "broken_glasses"],
+        "金陵": ["rusty_blade", "ghost_tear_pendant"],
+        "云岭": ["bone_armor"],
+        "郸城": ["rusty_blade"],
+        "荔湾镇": ["broken_glasses", "ghost_tear_pendant"],
+        "摩配镇": ["rusty_blade"],
+        "风雪镇": ["bone_armor", "ghost_tear_pendant"],
+        "舟山": ["rusty_blade"],
+    }
+
+    def _get_craftsman_name_by_city(city_name: str) -> str:
+        name_map = {
+            "上京": "百工坊师傅",
+            "北郊": "打铁张",
+            "东郊": "匠人许",
+            "西郊": "工匠周",
+            "南郊": "匠师南宫",
+            "金陵": "金陵巧匠",
+            "云岭": "山城老匠",
+            "郸城": "郸城铁匠",
+            "荔湾镇": "荔湾匠人",
+            "摩配镇": "机修匠",
+            "风雪镇": "风雪大师",
+            "舟山": "舟山打铁",
         }
-    ]
+        return name_map.get(city_name, f"工匠{city_name}")
 
     created_count = 0
 
-    for workshop in workshops:
-        # 查找现有地点
+    for m in MARKETS:
+        # 查找城市对应地点（市集地点已在 init_market_locations 中创建/补齐）
         existing_location = await LocationService.get_location_by_coordinates(
-            session, workshop['x'], workshop['y'], "大都会"
+            session, m.x, m.y, "大都会"
         )
+        if not existing_location:
+            # 若异常缺失，则跳过该城市
+            continue
 
-        if existing_location:
-            # 确保functions字段不为None
-            if existing_location.functions is None:
-                existing_location.functions = {}
-            # 为现有地点添加锻造功能
-            if not existing_location.has_function("forge"):
-                forge_config = {
-                    "enabled": True,
-                    "services": ["forge", "enhance", "gem_socket"]
-                }
-                existing_location.add_function("forge", forge_config)
+        # 确保functions字段不为None
+        if existing_location.functions is None:
+            existing_location.functions = {}
 
-            # 检查是否已有工匠NPC
-            existing_craftsman = await NPCService.get_npc_by_name(
-                session, workshop['craftsman_name'], existing_location.id
+        # 为地点添加锻造功能，并写入“城市专属锻造白名单”
+        if not existing_location.has_function("forge"):
+            forge_config = {
+                "enabled": True,
+                "services": ["forge", "enhance", "gem_socket"],
+                "allow_items": CITY_FORGE_WHITELIST.get(m.name, [])
+            }
+            existing_location.add_function("forge", forge_config)
+        else:
+            # 已存在锻造功能则补齐白名单字段
+            cfg = existing_location.get_function_config("forge")
+            cfg.setdefault("allow_items", CITY_FORGE_WHITELIST.get(m.name, []))
+
+        # 查找/创建工匠NPC（每城一个）
+        craftsman_name = _get_craftsman_name_by_city(m.name)
+        existing_craftsman = await NPCService.get_npc_by_name(
+            session, craftsman_name, existing_location.id
+        )
+        if not existing_craftsman:
+            craftsman_npc = NPC.create_craftsman(
+                npc_id=f"craftsman_{m.id}",
+                name=craftsman_name,
+                location_id=existing_location.id
             )
-
-            if not existing_craftsman:
-                # 创建工匠NPC
-                craftsman_npc = NPC.create_craftsman(
-                    npc_id=f"craftsman_{workshop['x']}_{workshop['y']}",
-                    name=workshop['craftsman_name'],
-                    location_id=existing_location.id
-                )
-                session.add(craftsman_npc)
-                created_count += 1
+            session.add(craftsman_npc)
+            created_count += 1
 
     return created_count
 
