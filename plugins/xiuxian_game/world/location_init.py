@@ -222,8 +222,11 @@ async def init_workshop_locations(session) -> int:
         "金陵": ["drawer", "wedding_dress", "void_crown"],  # 心理恐怖主题
 
         # === 终极区域 (150级+) - 神器级装备，橙色/红色品质 ===
-        "上京": ["electroshock_device", "reality_suicide_note", "god_tear_amulet", "world_fragment_blade"],  # 首都，最高级装备
-        "风雪镇": ["shroud", "alchemy_furnace"],  # 特殊地区，炼丹相关
+        # 按照“由(0,0)新手村向外辐射、风雪镇最高”的规则：
+        # • 上京(0,0)仅能锻造初级装备
+        # • 风雪镇可锻造最高阶装备
+        "上京": ["bone_armor", "rusty_blade", "broken_glasses", "ghost_tear_pendant"],  # 新手村，仅基础装备
+        "风雪镇": ["reality_suicide_note", "god_tear_amulet", "world_fragment_blade"],  # 终极地区，最高级装备
     }
 
     def _get_craftsman_name_by_city(city_name: str) -> str:

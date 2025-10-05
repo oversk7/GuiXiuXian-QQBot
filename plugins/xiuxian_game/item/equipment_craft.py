@@ -25,44 +25,33 @@ async def _(event: MessageEvent):
             await list_craft_cmd.finish("⛔ 请先创建角色")
         if player.is_in_dungeon():
             await list_craft_cmd.finish(message_add_head("⛔ 诡域中无法进行锻造相关操作", event))
-        from ..world.location_service import LocationService
-        # 优先搜索附近3格的工坊；若没有，则退回当前区域任意工坊
-        x, y = player.get_current_coordinates()
-        near = await LocationService.get_nearby_locations(session, x, y, player.get_current_region(), max_distance=3)
-        forge_locs = [loc for loc in (near or []) if loc.has_function("forge")]
-        if not forge_locs:
-            forge_locs = await LocationService.get_locations_with_function(session, "forge", player.get_current_region())
+        # 获取本区域内所有拥有锻造功能的城镇
+        forge_locs = await LocationService.get_locations_with_function(session, "forge", player.get_current_region())
         if not forge_locs:
             await list_craft_cmd.finish(message_add_head("⛔ 当前区域暂无工坊", event))
 
-    # 查找最近的工坊地点（若未贴近，则就近选择本区域的工坊）
-    nearest = min(forge_locs, key=lambda loc: abs(loc.x - x) + abs(loc.y - y))
-    forge_cfg = nearest.get_function_config("forge") or {}
-    allow_ids: list[str] = forge_cfg.get("allow_items", [])
+        # 反向映射：装备ID -> 可锻造城镇列表
+        item_to_cities: dict[str, set[str]] = {}
+        for loc in forge_locs:
+            forge_cfg = loc.get_function_config("forge") or {}
+            allow_ids: list[str] = forge_cfg.get("allow_items", [])
+            for iid in allow_ids:
+                tpl = config.items_config["by_id"].get(iid)
+                if not tpl or not tpl.recipe:
+                    continue
+                item_to_cities.setdefault(iid, set()).add(loc.name)
 
-    # 映射为可读名称：若本城未配置，则回退到“默认锻造目录”（所有带配方的装备）
-    craftable_names = []
-    used_default_catalog = False
-    if allow_ids:
-        for iid in allow_ids:
-            tpl = config.items_config["by_id"].get(iid)
-            if tpl and tpl.recipe:
-                craftable_names.append((tpl.get_rarity_display(), tpl.name))
-    else:
-        used_default_catalog = True
-        for tpl in config.items_config["by_id"].values():
-            if tpl and tpl.recipe:
-                craftable_names.append((tpl.get_rarity_display(), tpl.name))
+    # 汇总所有有配方的装备，并标注“可锻造城镇”
+    all_equip_tpls = [tpl for tpl in config.items_config["by_id"].values() if tpl and tpl.recipe]
+    # 优先按 required_level 排序（无则视为1），再按名称
+    all_equip_tpls.sort(key=lambda t: ((t.required_level or 1), t.name))
 
-    if not craftable_names:
-        await list_craft_cmd.finish(message_add_head(f"🧐 {nearest.name} 暂无可锻造装备", event))
+    lines = ["🔨 全部装备锻造一览", "━━━━━━━━━━━━━", "💡 用【配方 装备名】查看材料与花费"]
+    for tpl in all_equip_tpls:
+        cities = sorted(item_to_cities.get(tpl.item_id, []))
+        city_text = "、".join(cities) if cities else "—"
+        lines.append(f"• {tpl.get_rarity_display()}{tpl.name} -> 城镇：{city_text}")
 
-    craftable_names.sort(key=lambda t: t[1])
-    lines = [f"🔨 {nearest.name} 可锻造装备 (用【配方 装备名】查看)", "━━━━━━━━━━━━━"]
-    lines.extend([f"• {rar}{name}" for (rar, name) in craftable_names])
-    if used_default_catalog:
-        lines.append("")
-        lines.append("💡 本城未配置专属清单，已显示默认锻造目录")
     await list_craft_cmd.finish(message_add_head("\n".join(lines), event))
 
 # ---------------- 指令：工匠配方一览 ----------------
@@ -265,7 +254,7 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
         if allow_ids and item_cfg.item_id not in allow_ids:
             await craft_cmd.finish(message_add_head(
                 f"⛔ {nearest.name} 的工匠尚未掌握『{item_cfg.name}』的锻造\n"
-                f"💡 发送【锻造列表】查看本城可锻造清单", event))
+                f"💡 发送【锻造列表】查看可锻造城镇", event))
 
         # 金币校验
         if player.gold < req_gold:
