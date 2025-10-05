@@ -113,6 +113,14 @@ class TriggerConfig:
     next_effect: str = ""           # 失效后触发的下一个效果类型
     next_effect_value: float = 0    # 下一个效果的数值
     next_effect_duration: int = 0   # 下一个效果的持续时间
+    # 新增：上下文条件判断（都市怪谈风味）
+    ctx_mp_threshold: float = 0     # 理智值阈值（低于此值才触发，0表示不限制）
+    ctx_region_in: list = None      # 限定区域列表（如["医院","地铁"]，None表示不限制）
+    ctx_time_range: list = None     # 限定时间范围（如[22, 6]表示22点到次日6点，None表示不限制）
+    # —— 环境/氛围条件（可选，未配置则无影响）——
+    ctx_mp_max: float = 0           # 仅当当前理智(%) ≤ 该值时触发（0=不限制）
+    ctx_region_in: list[str] | None = None  # 仅当所在区域在列表内时触发
+    ctx_theme_in: list[str] | None = None   # 仅当本周主题在列表内时触发
 
 
 class BattleEffectManager:
@@ -208,13 +216,40 @@ class BattleEffectManager:
         return triggered_effects
     
     def _check_condition(self, trigger: TriggerConfig, context: Dict[str, Any]) -> bool:
-        """检查触发条件"""
+        """检查触发条件（含环境条件）"""
+        # 低血量特殊判定
         if trigger.trigger == TriggerType.LOW_HP:
             current_hp = context.get('current_hp', 100)
             max_hp = context.get('max_hp', 100)
             hp_percentage = (current_hp / max_hp) * 100 if max_hp > 0 else 0
-            return hp_percentage <= (trigger.threshold or 30)
-        
+            if not (hp_percentage <= (trigger.threshold or 30)):
+                return False
+        # 其它触发类型默认不额外限制（除非配置了环境条件）
+
+        # 环境：理智上限（当前理智百分比必须≤阈值）
+        if getattr(trigger, 'ctx_mp_max', 0):
+            cur_mp = context.get('current_mp', 100)
+            max_mp = context.get('max_mp', 100)
+            mp_pct = (cur_mp / max_mp) * 100 if max_mp > 0 else 100
+            if mp_pct > trigger.ctx_mp_max:
+                return False
+
+        # 环境：区域白名单
+        region_list = getattr(trigger, 'ctx_region_in', None)
+        if region_list is not None and len(region_list) > 0:
+            region = context.get('region', '')
+            # 支持模糊匹配（如"医院"可匹配"废弃医院"）
+            if not any(r in region for r in region_list):
+                return False
+
+        # 环境：周主题白名单
+        theme_list = getattr(trigger, 'ctx_theme_in', None)
+        if theme_list is not None and len(theme_list) > 0:
+            theme = context.get('theme', '')
+            # 支持模糊匹配
+            if not any(t in theme for t in theme_list):
+                return False
+
         return True
     
     def get_active_effects(self, unit_id: str, effect_type: EffectType = None) -> List[BattleEffect]:
@@ -314,7 +349,7 @@ class BattleEffectManager:
 
 
 def parse_triggers_from_yaml(special_effects: List[Dict]) -> List[TriggerConfig]:
-    """从YAML配置解析触发器"""
+    """从YAML配置解析触发器（向后兼容，新增环境条件可选）"""
     triggers = []
 
     for effect_data in special_effects:
@@ -332,10 +367,14 @@ def parse_triggers_from_yaml(special_effects: List[Dict]) -> List[TriggerConfig]
                 max_trigger_count=int(effect_data.get("max_trigger_count", 0)),
                 next_effect=effect_data.get("next_effect", ""),
                 next_effect_value=float(effect_data.get("next_effect_value", 0)),
-                next_effect_duration=int(effect_data.get("next_effect_duration", 0))
+                next_effect_duration=int(effect_data.get("next_effect_duration", 0)),
+                # 新增环境条件（若未配置则保持默认值）
+                ctx_mp_max=float(effect_data.get("ctx_mp_max", 0) or 0),
+                ctx_region_in=effect_data.get("ctx_region_in"),
+                ctx_theme_in=effect_data.get("ctx_theme_in"),
             )
             triggers.append(trigger)
-        except (ValueError, KeyError) as e:
+        except (ValueError, KeyError):
             # 配置错误时跳过
             continue
 

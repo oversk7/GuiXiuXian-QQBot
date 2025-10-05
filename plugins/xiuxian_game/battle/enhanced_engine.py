@@ -52,11 +52,22 @@ class EnhancedBattleEngine:
         if player_equipped_items:
             self._register_equipment_triggers(player.id, player_equipped_items)
 
-        # 触发玩家首回合效果
+        # 触发玩家首回合效果（补充环境上下文）
+        try:
+            from ..utils import get_weekly_theme
+            theme_name = get_weekly_theme()["name"]
+        except Exception:
+            theme_name = ""
+        region = player.get_current_region() if hasattr(player, 'get_current_region') else getattr(player, 'region', "")
+
         triggered = self.effect_manager.check_triggers(player.id, TriggerType.FIRST_TURN, {
             "source": "战斗开始",
             "current_hp": player.hp,
-            "max_hp": player.max_hp
+            "max_hp": player.max_hp,
+            "current_mp": getattr(player, 'mp', 0),
+            "max_mp": getattr(player, 'max_mp', 0),
+            "region": region,
+            "theme": theme_name,
         })
 
         for effect in triggered:
@@ -65,10 +76,15 @@ class EnhancedBattleEngine:
         # 触发敌方首回合效果（对称处理）
         enemy_hp = enemy.hp if hasattr(enemy, 'hp') else enemy.get("hp", 100)
         enemy_max_hp = enemy.max_hp if hasattr(enemy, 'max_hp') else enemy.get("max_hp", 100)
+        enemy_region = getattr(enemy, 'region', region)
         enemy_triggered = self.effect_manager.check_triggers(enemy_id, TriggerType.FIRST_TURN, {
             "source": "战斗开始",
             "current_hp": enemy_hp,
-            "max_hp": enemy_max_hp
+            "max_hp": enemy_max_hp,
+            "current_mp": getattr(enemy, 'mp', 0),
+            "max_mp": getattr(enemy, 'max_mp', 0),
+            "region": enemy_region,
+            "theme": theme_name,
         })
 
         for effect in enemy_triggered:
@@ -179,10 +195,20 @@ class EnhancedBattleEngine:
         hp_restored = 0
 
         # 触发每回合效果
+        region = unit.get_current_region() if hasattr(unit, 'get_current_region') else getattr(unit, 'region', "")
+        try:
+            from ..utils import get_weekly_theme
+            theme_name = get_weekly_theme()["name"]
+        except Exception:
+            theme_name = ""
         triggered = self.effect_manager.check_triggers(unit_id, TriggerType.EACH_TURN, {
             "source": "回合开始",
             "current_hp": getattr(unit, 'hp', 100),
-            "max_hp": getattr(unit, 'max_hp', 100)
+            "max_hp": getattr(unit, 'max_hp', 100),
+            "current_mp": getattr(unit, 'mp', 0),
+            "max_mp": getattr(unit, 'max_mp', 0),
+            "region": region,
+            "theme": theme_name,
         })
 
         for effect in triggered:
@@ -573,11 +599,21 @@ class EnhancedBattleEngine:
                 result["effects_triggered"].append(effect.effect_type.value)
         
         # 触发防御时效果(被攻击方)
+        defender_region = defender.get_current_region() if hasattr(defender, 'get_current_region') else getattr(defender, 'region', "")
+        try:
+            from ..utils import get_weekly_theme
+            theme_name = get_weekly_theme()["name"]
+        except Exception:
+            theme_name = ""
         defense_effects = self.effect_manager.check_triggers(defender_id, TriggerType.ON_DEFENSE, {
             "source": defender_name,
             "damage": damage,
             "current_hp": getattr(defender, 'hp', 100),
-            "max_hp": getattr(defender, 'max_hp', 100)
+            "max_hp": getattr(defender, 'max_hp', 100),
+            "current_mp": getattr(defender, 'mp', 0),
+            "max_mp": getattr(defender, 'max_mp', 0),
+            "region": defender_region,
+            "theme": theme_name,
         })
         
         for effect in defense_effects:

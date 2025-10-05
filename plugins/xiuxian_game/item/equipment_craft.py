@@ -5,9 +5,12 @@ from nonebot.adapters.qq import MessageEvent, Message
 from sqlalchemy import select
 from ..models.db import safe_session
 from ..models import Player, ItemInstance
+from ..models.npc import NPCType
 from ..config import config
 from ..utils import message_add_head
 from .equipment_commands import find_equipment_by_input
+from ..world.location_service import LocationService
+from ..world.npc_service import NPCService
 
 # ---------------- 指令：锻造列表 ----------------
 # 列出所有可锻造装备
@@ -15,11 +18,25 @@ list_craft_cmd = on_command("锻造列表", aliases={"装备列表"}, block=True
 
 @list_craft_cmd.handle()
 async def _(event: MessageEvent):
+    # 位置与NPC前置校验：必须在工匠工坊附近（≤3格），且不能在诡域中
+    async with safe_session() as session:
+        player: Player | None = await session.get(Player, event.get_user_id())
+        if not player:
+            await list_craft_cmd.finish("⛔ 请先创建角色")
+        if player.is_in_dungeon():
+            await list_craft_cmd.finish(message_add_head("⛔ 诡域中无法进行锻造相关操作", event))
+        from ..world.location_service import LocationService
+        # 搜索附近3格是否存在工坊功能
+        x, y = player.get_current_coordinates()
+        near = await LocationService.get_nearby_locations(session, x, y, player.get_current_region(), max_distance=3)
+        has_forge = any(loc.has_function("forge") for loc in (near or []))
+        if not has_forge:
+            await list_craft_cmd.finish(message_add_head("⛔ 需要在工匠的工坊附近(≤3格)查看锻造列表\n💡 使用【观察】【NPC列表】寻找工匠", event))
+
     craftable = []
     for item_id in config.items_config["by_type"]["EQUIPMENT"]:
         tpl = config.items_config["by_id"].get(item_id)
         if tpl and tpl.recipe:  # 有配方才可锻造
-            # 添加品质颜色标注
             rarity_display = tpl.get_rarity_display()
             craftable.append(f"{rarity_display}{tpl.name}")
 
@@ -38,6 +55,20 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
     equip_name = args.extract_plain_text().strip()
     if not equip_name:
         await recipe_cmd.finish("⛔ 格式：配方 装备名称")
+
+    # 前置校验：位置在工匠工坊附近
+    async with safe_session() as session:
+        player: Player | None = await session.get(Player, event.get_user_id())
+        if not player:
+            await recipe_cmd.finish("⛔ 请先创建角色")
+        if player.is_in_dungeon():
+            await recipe_cmd.finish(message_add_head("⛔ 诡域中无法查看锻造配方", event))
+        from ..world.location_service import LocationService
+        x, y = player.get_current_coordinates()
+        near = await LocationService.get_nearby_locations(session, x, y, player.get_current_region(), max_distance=3)
+        has_forge = any(loc.has_function("forge") for loc in (near or []))
+        if not has_forge:
+            await recipe_cmd.finish(message_add_head("⛔ 需要在工匠的工坊附近(≤3格)查看锻造配方\n💡 使用【观察】【NPC列表】寻找工匠", event))
 
     item_cfg = config.items_config["by_name"].get(equip_name)
     if not item_cfg or item_cfg.type.value != "EQUIPMENT" or not item_cfg.recipe:
@@ -100,6 +131,16 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
         player: Player | None = await session.get(Player, event.get_user_id())
         if not player:
             await craft_cmd.finish("⛔ 请先创建角色")
+        # 诡域中禁止锻造
+        if player.is_in_dungeon():
+            await craft_cmd.finish(message_add_head("⛔ 诡域中无法锻造", event))
+        # 校验是否在工匠工坊附近（≤3格）
+        from ..world.location_service import LocationService
+        x, y = player.get_current_coordinates()
+        near = await LocationService.get_nearby_locations(session, x, y, player.get_current_region(), max_distance=3)
+        has_forge = any(loc.has_function("forge") for loc in (near or []))
+        if not has_forge:
+            await craft_cmd.finish(message_add_head("⛔ 需要在工匠的工坊附近(≤3格)才能锻造\n💡 使用【观察】【NPC列表】寻找工匠", event))
 
         # 金币校验
         if player.gold < req_gold:

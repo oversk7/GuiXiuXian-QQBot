@@ -25,7 +25,7 @@ def calculate_level_up_exp(current_level: int) -> int:
     cfg = config.game_config["game"]
     base = cfg["base_exp"]
     curve = cfg["exp_curve"]
-    
+
     if current_level < curve["curve_change_level"]:
         # 前期：一次函数
         return int(base + (current_level-1) * curve["early_multiplier"])
@@ -43,11 +43,11 @@ async def generate_exp_table(max_level: int = 100) -> str:
     """
     import csv
     from pathlib import Path
-    
+
     cfg = config.game_config["game"]
     table = []
     total_exp = 0
-    
+
     for level in range(1, max_level + 1):
         required = calculate_level_up_exp(level)
         total_exp += required
@@ -56,14 +56,14 @@ async def generate_exp_table(max_level: int = 100) -> str:
             "升级所需经验": required,
             "累计总经验": total_exp
         })
-    
+
     # 确保数据目录存在
     output_path = config.data_dir / "level_exp_table.csv"
     with open(output_path, "w", newline="", encoding="utf8") as f:
         writer = csv.DictWriter(f, fieldnames=["等级", "升级所需经验", "累计总经验"])
         writer.writeheader()
         writer.writerows(table)
-    
+
     return str(output_path)
 
 
@@ -449,5 +449,53 @@ def check_action_limit(user_id: str, action: str) -> tuple[bool, Optional[str]]:
 def record_action(user_id: str, action: str):
     """便捷函数：记录操作"""
     rate_limiter.record_request(user_id, action)
+
+
+def get_weekly_theme() -> dict:
+    """获取当前周主题信息（便捷函数）"""
+    try:
+        from .world.weekly_theme import WeeklyThemeManager
+        theme = WeeklyThemeManager.get_current_theme()
+        config = WeeklyThemeManager.get_theme_config(theme)
+        return {
+            "theme": theme,
+            "name": config.get("name", ""),
+            "emoji": config.get("emoji", ""),
+            "description": config.get("description", "")
+        }
+    except ImportError:
+        return {"theme": None, "name": "", "emoji": "", "description": ""}
+
+
+# ---------------- 周主题氛围 ----------------
+from datetime import datetime
+
+_WEEKLY_THEMES: list[dict] = [
+    {"name": "地铁惊悸", "emoji": "🚇", "hint": "末班车上总有一个空座，不要坐。", "favored_regions": ["大都会"]},
+    {"name": "医院回廊", "emoji": "🏥", "hint": "镜子里的人会先眨眼。", "favored_regions": ["大都会"]},
+    {"name": "出租屋镜像", "emoji": "🏠", "hint": "第三次敲门时，别回头。", "favored_regions": ["大都会"]},
+    {"name": "午夜公交", "emoji": "🚌", "hint": "司机不会收钱，他收的是别的。", "favored_regions": ["大都会"]},
+    {"name": "商场停电", "emoji": "🛒", "hint": "当广播倒放时，躲进衣柜。", "favored_regions": ["大都会"]},
+    {"name": "公园无头雕像", "emoji": "🗿", "hint": "影子里多了一张脸。", "favored_regions": ["大都会"]},
+    {"name": "图书馆耳语", "emoji": "📚", "hint": "第十三页被撕掉了。", "favored_regions": ["大都会"]},
+]
+
+def get_weekly_theme() -> dict:
+    """返回当前周主题。
+    采用 ISO 周数进行轮换，保证全服一致且无需持久化。
+    返回: {name, emoji, hint, favored_regions}
+    """
+    try:
+        iso_week = datetime.now().isocalendar().week
+    except AttributeError:
+        # 兼容性处理
+        iso_week = int(datetime.now().strftime("%W")) or 1
+    idx = (iso_week - 1) % len(_WEEKLY_THEMES)
+    return _WEEKLY_THEMES[idx]
+
+
+def format_theme_banner(prefix: str = "本周主题") -> str:
+    t = get_weekly_theme()
+    return f"{t['emoji']} {prefix}：{t['name']}\n{t['hint']}"
 
 
