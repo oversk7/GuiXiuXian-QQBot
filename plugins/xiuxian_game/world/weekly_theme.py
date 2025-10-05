@@ -159,37 +159,44 @@ class WeeklyThemeManager:
     @staticmethod
     def get_theme_info() -> str:
         """获取当前主题信息（格式化文本）"""
+        from ..config import config as game_config
+
         theme = WeeklyThemeManager.get_current_theme()
-        config = THEME_CONFIG[theme]
-        
+        theme_config = THEME_CONFIG[theme]
+
         # 计算本周剩余天数
         now = datetime.now()
         days_until_monday = (7 - now.weekday()) % 7
         if days_until_monday == 0:
             days_until_monday = 7
-        
+
         lines = [
-            f"🌙 本周主题：{config['emoji']} {config['name']}",
+            f"🌙 本周主题：{theme_config['emoji']} {theme_config['name']}",
             "━━━━━━━━━━━━━",
-            f"📖 {config['description']}",
+            f"📖 {theme_config['description']}",
             "",
             "✨ 主题效果：",
         ]
-        
-        # 材料加成
-        if config.get("material_boost"):
+
+        # 材料加成（显示中文名称）
+        if theme_config.get("material_boost"):
             lines.append("📦 材料掉落加成：")
-            for material, boost in config["material_boost"].items():
+            for material_id, boost in theme_config["material_boost"].items():
                 boost_pct = int((boost - 1) * 100)
-                lines.append(f"  • {material} +{boost_pct}%")
-        
+                # 尝试从配置中获取材料中文名
+                try:
+                    material_name = game_config.items_config["by_id"].get(material_id, {}).name or material_id
+                except (AttributeError, KeyError):
+                    material_name = material_id
+                lines.append(f"  • {material_name} +{boost_pct}%")
+
         lines.extend([
             "",
             f"⏰ 距离主题切换还有 {days_until_monday} 天",
             "━━━━━━━━━━━━━",
             "💡 主题每周一自动切换"
         ])
-        
+
         return "\n".join(lines)
     
     @staticmethod
