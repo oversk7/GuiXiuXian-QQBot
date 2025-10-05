@@ -105,16 +105,22 @@ async def init_market_locations(session) -> int:
                 }
                 location.add_function("market", market_config)
 
-        # 检查是否已有商人NPC
-        existing_merchant = await NPCService.get_npc_by_name(
-            session, f"商人{_get_merchant_name(market.name)}", location.id
+        # 检查是否已有商人NPC（按名称和npc_id双重检查）
+        merchant_name = f"商人{_get_merchant_name(market.name)}"
+        merchant_npc_id = f"merchant_{market.id}"
+
+        existing_merchant_by_name = await NPCService.get_npc_by_name(
+            session, merchant_name, location.id
+        )
+        existing_merchant_by_id = await NPCService.get_npc_by_id(
+            session, merchant_npc_id
         )
 
-        if not existing_merchant:
+        if not existing_merchant_by_name and not existing_merchant_by_id:
             # 创建商人NPC
             merchant_npc = NPC.create_merchant(
-                npc_id=f"merchant_{market.id}",
-                name=f"商人{_get_merchant_name(market.name)}",
+                npc_id=merchant_npc_id,
+                name=merchant_name,
                 location_id=location.id,
                 market_items=market.items
             )
@@ -163,16 +169,21 @@ async def init_job_locations(session) -> int:
                 }
                 location.add_function("part_time_job", job_config)
 
-        # 检查是否已有雇主NPC
+        # 检查是否已有雇主NPC（按名称和npc_id双重检查）
         employer_name = f"雇主{_get_employer_name(location_data['name'])}"
-        existing_employer = await NPCService.get_npc_by_name(
+        employer_npc_id = f"employer_{location_id}"
+
+        existing_employer_by_name = await NPCService.get_npc_by_name(
             session, employer_name, location.id
         )
+        existing_employer_by_id = await NPCService.get_npc_by_id(
+            session, employer_npc_id
+        )
 
-        if not existing_employer:
+        if not existing_employer_by_name and not existing_employer_by_id:
             # 创建雇主NPC
             employer_npc = NPC.create_employer(
-                npc_id=f"employer_{location_id}",
+                npc_id=employer_npc_id,
                 name=employer_name,
                 location_id=location.id,
                 available_jobs=location_data.get('available_jobs', {})
@@ -188,36 +199,51 @@ async def init_workshop_locations(session) -> int:
     # 从市集配置中获取所有城市
     from ..economy.merchants import MARKETS
 
-    # 城市专属锻造白名单（按需可扩展）——装备为 items.yaml 中的 equipment.item_id
+    # 城市专属锻造白名单（按世界观/难度系统细分）
     CITY_FORGE_WHITELIST: dict[str, list[str]] = {
-        "上京": ["bone_armor", "ghost_tear_pendant"],
-        "北郊": ["rusty_blade", "broken_glasses"],
-        "东郊": ["bone_armor", "rusty_blade"],
-        "西郊": ["ghost_tear_pendant", "broken_glasses"],
-        "南郊": ["bone_armor", "broken_glasses"],
-        "金陵": ["rusty_blade", "ghost_tear_pendant"],
-        "云岭": ["bone_armor"],
-        "郸城": ["rusty_blade"],
-        "荔湾镇": ["broken_glasses", "ghost_tear_pendant"],
-        "摩配镇": ["rusty_blade"],
-        "风雪镇": ["bone_armor", "ghost_tear_pendant"],
-        "舟山": ["rusty_blade"],
+        # === 新手区域 (1-30级) - 基础装备，白色/绿色品质 ===
+        "北郊": ["bone_armor", "rusty_blade", "broken_glasses"],  # 新手村，基础三件套
+        "东郊": ["bone_armor", "ghost_tear_pendant", "rusty_blade"],  # 东部新手区
+        "西郊": ["ghost_tear_pendant", "broken_glasses", "bone_armor"],  # 西部新手区
+        "南郊": ["rusty_blade", "broken_glasses", "ghost_tear_pendant"],  # 南部新手区
+
+        # === 中级区域 (30-80级) - 进阶装备，蓝色品质为主 ===
+        "荔湾镇": ["drowned_coat", "self_awareness_key", "corrupted_bandage", "wedding_photo"],  # 水域主题
+        "摩配镇": ["patient_gown", "kitchen_knife", "school_uniform"],  # 都市恐怖主题
+        "郸城": ["old_coat", "wreath", "music_box"],  # 死亡主题
+        "舟山": ["crying_tape", "mirror_armor", "grandfather_clock"],  # 时间/记忆主题
+
+        # === 高级区域 (80-150级) - 高阶装备，紫色品质 ===
+        "云岭": ["phantom_cloak", "fog_coat", "soul_banner"],  # 幽灵主题
+        "金陵": ["drawer", "wedding_dress", "void_crown"],  # 心理恐怖主题
+
+        # === 终极区域 (150级+) - 神器级装备，橙色/红色品质 ===
+        "上京": ["electroshock_device", "reality_suicide_note", "god_tear_amulet", "world_fragment_blade"],  # 首都，最高级装备
+        "风雪镇": ["shroud", "alchemy_furnace"],  # 特殊地区，炼丹相关
     }
 
     def _get_craftsman_name_by_city(city_name: str) -> str:
+        """获取城市对应的工匠名称，按主题风格命名"""
         name_map = {
-            "上京": "百工坊师傅",
+            # 新手区域工匠 - 朴实名字
             "北郊": "打铁张",
             "东郊": "匠人许",
             "西郊": "工匠周",
             "南郊": "匠师南宫",
-            "金陵": "金陵巧匠",
-            "云岭": "山城老匠",
-            "郸城": "郸城铁匠",
-            "荔湾镇": "荔湾匠人",
-            "摩配镇": "机修匠",
-            "风雪镇": "风雪大师",
-            "舟山": "舟山打铁",
+
+            # 中级区域工匠 - 主题化名字
+            "荔湾镇": "水鬼匠师",  # 水域主题
+            "摩配镇": "疯狂技师",  # 都市恐怖主题
+            "郸城": "送葬匠人",  # 死亡主题
+            "舟山": "时光工匠",  # 时间/记忆主题
+
+            # 高级区域工匠 - 神秘名字
+            "云岭": "幽魂锻师",  # 幽灵主题
+            "金陵": "心魔巧匠",  # 心理恐怖主题
+
+            # 终极区域工匠 - 传说级名字
+            "上京": "百工坊宗师",  # 首都最高级
+            "风雪镇": "炼魂大师",  # 特殊地区
         }
         return name_map.get(city_name, f"工匠{city_name}")
 
@@ -251,12 +277,18 @@ async def init_workshop_locations(session) -> int:
 
         # 查找/创建工匠NPC（每城一个）
         craftsman_name = _get_craftsman_name_by_city(m.name)
-        existing_craftsman = await NPCService.get_npc_by_name(
+        craftsman_npc_id = f"craftsman_{m.id}"
+
+        existing_craftsman_by_name = await NPCService.get_npc_by_name(
             session, craftsman_name, existing_location.id
         )
-        if not existing_craftsman:
+        existing_craftsman_by_id = await NPCService.get_npc_by_id(
+            session, craftsman_npc_id
+        )
+
+        if not existing_craftsman_by_name and not existing_craftsman_by_id:
             craftsman_npc = NPC.create_craftsman(
-                npc_id=f"craftsman_{m.id}",
+                npc_id=craftsman_npc_id,
                 name=craftsman_name,
                 location_id=existing_location.id
             )
@@ -303,16 +335,22 @@ async def init_special_locations(session) -> int:
             }
             location.add_function("special_shop", shop_config)
 
-    # 检查是否已有管理员NPC
-    existing_admin = await NPCService.get_npc_by_name(
-        session, "司长曹延华", location.id
+    # 检查是否已有管理员NPC（按名称和npc_id双重检查）
+    admin_name = "司长曹延华"
+    admin_npc_id = "headquarters_admin"
+
+    existing_admin_by_name = await NPCService.get_npc_by_name(
+        session, admin_name, location.id
+    )
+    existing_admin_by_id = await NPCService.get_npc_by_id(
+        session, admin_npc_id
     )
 
-    if not existing_admin:
+    if not existing_admin_by_name and not existing_admin_by_id:
         # 创建总部管理员NPC
         admin_npc = NPC(
-            npc_id="headquarters_admin",
-            name="司长曹延华",
+            npc_id=admin_npc_id,
+            name=admin_name,
             description="缉邪司司长，负责积分兑换和升阶材料管理",
             npc_type=NPCType.SPECIAL_VENDOR,
             location_id=location.id,
@@ -716,12 +754,15 @@ async def init_neutral_npcs(session) -> int:
             print(f"警告：坐标 ({npc_config['x']}, {npc_config['y']}) 没有找到已有地点，跳过NPC {npc_config['name']}")
             continue
 
-        # 检查是否已有该NPC
-        existing_npc = await NPCService.get_npc_by_name(
+        # 检查是否已有该NPC（按名称和npc_id双重检查）
+        existing_npc_by_name = await NPCService.get_npc_by_name(
             session, npc_config["name"], location.id
         )
+        existing_npc_by_id = await NPCService.get_npc_by_id(
+            session, npc_config["npc_id"]
+        )
 
-        if not existing_npc:
+        if not existing_npc_by_name and not existing_npc_by_id:
             # 创建中立NPC
             neutral_npc = NPC(
                 npc_id=npc_config["npc_id"],

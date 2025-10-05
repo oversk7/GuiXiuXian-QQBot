@@ -57,6 +57,110 @@ async def _(event: MessageEvent):
     lines.extend([f"• {rar}{name}" for (rar, name) in craftable_names])
     await list_craft_cmd.finish(message_add_head("\n".join(lines), event))
 
+# ---------------- 指令：工匠配方一览 ----------------
+craftsman_recipes_cmd = on_command("工匠配方一览", aliases={"城市锻造", "城市配方"}, block=True, priority=5)
+
+@craftsman_recipes_cmd.handle()
+async def _(event: MessageEvent, args: Message = CommandArg()):
+    city_name = args.extract_plain_text().strip()
+    if not city_name:
+        # 显示所有城市列表
+        from ..economy.merchants import MARKETS
+        city_list = "、".join([m.name for m in MARKETS])
+        await craftsman_recipes_cmd.finish(f"⛔ 格式：工匠配方一览 城市名\n💡 可选城市：{city_list}")
+
+    # 查找城市对应的市集配置
+    from ..economy.merchants import MARKETS
+    target_market = None
+    for m in MARKETS:
+        if m.name == city_name:
+            target_market = m
+            break
+
+    if not target_market:
+        city_list = "、".join([m.name for m in MARKETS])
+        await craftsman_recipes_cmd.finish(f"⛔ 未找到城市：{city_name}\n💡 可选城市：{city_list}")
+
+    async with safe_session() as session:
+        # 查找该城市的地点
+        location = await LocationService.get_location_by_coordinates(
+            session, target_market.x, target_market.y, "大都会"
+        )
+
+        if not location or not location.has_function("forge"):
+            await craftsman_recipes_cmd.finish(f"⛔ {city_name} 尚未设置工坊")
+
+        forge_cfg = location.get_function_config("forge") or {}
+        allow_ids: list[str] = forge_cfg.get("allow_items", [])
+
+        if not allow_ids:
+            await craftsman_recipes_cmd.finish(f"⛔ {city_name} 尚未配置锻造列表")
+
+        # 获取工匠名称
+        craftsman_name = _get_craftsman_name_by_city(city_name)
+
+        # 构建装备列表
+        craftable_items = []
+        for iid in allow_ids:
+            tpl = config.items_config["by_id"].get(iid)
+            if tpl and tpl.recipe:
+                # 获取材料信息
+                mats = tpl.recipe.get("materials", {})
+                if "flesh_crystal" not in mats:
+                    mats = {**mats, "flesh_crystal": 1}
+                gold_cost = tpl.recipe.get("gold", 0)
+
+                mat_text = " + ".join([f"{config.items_config['by_id'][mid].name}×{qty}"
+                                     for mid, qty in mats.items()])
+
+                craftable_items.append({
+                    "name": tpl.name,
+                    "rarity": tpl.get_rarity_display(),
+                    "level": tpl.required_level or 1,
+                    "materials": mat_text,
+                    "gold": gold_cost
+                })
+
+        if not craftable_items:
+            await craftsman_recipes_cmd.finish(f"🧐 {city_name} 暂无可锻造装备")
+
+        # 按等级排序
+        craftable_items.sort(key=lambda x: x["level"])
+
+        lines = [f"⚒️ {city_name} - {craftsman_name} 锻造配方一览", "━━━━━━━━━━━━━"]
+        for item in craftable_items:
+            lines.append(f"• {item['rarity']}{item['name']} (Lv.{item['level']})")
+            lines.append(f"  材料：{item['materials']}")
+            lines.append(f"  金币：{item['gold']}💰")
+            lines.append("")
+
+        await craftsman_recipes_cmd.finish(message_add_head("\n".join(lines), event))
+
+def _get_craftsman_name_by_city(city_name: str) -> str:
+    """获取城市对应的工匠名称，按主题风格命名"""
+    name_map = {
+        # 新手区域工匠 - 朴实名字
+        "北郊": "打铁张",
+        "东郊": "匠人许",
+        "西郊": "工匠周",
+        "南郊": "匠师南宫",
+
+        # 中级区域工匠 - 主题化名字
+        "荔湾镇": "水鬼匠师",  # 水域主题
+        "摩配镇": "疯狂技师",  # 都市恐怖主题
+        "郸城": "送葬匠人",  # 死亡主题
+        "舟山": "时光工匠",  # 时间/记忆主题
+
+        # 高级区域工匠 - 神秘名字
+        "云岭": "幽魂锻师",  # 幽灵主题
+        "金陵": "心魔巧匠",  # 心理恐怖主题
+
+        # 终极区域工匠 - 传说级名字
+        "上京": "百工坊宗师",  # 首都最高级
+        "风雪镇": "炼魂大师",  # 特殊地区
+    }
+    return name_map.get(city_name, f"工匠{city_name}")
+
 # ---------------- 指令：配方查询 ----------------
 recipe_cmd = on_command("配方", aliases={"锻造配方"}, block=True, priority=5)
 
