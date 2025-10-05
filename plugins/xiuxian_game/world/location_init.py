@@ -8,6 +8,8 @@ from nonebot import on_command
 from nonebot.adapters.qq import MessageEvent
 from nonebot.permission import SUPERUSER
 
+from sqlalchemy.exc import SQLAlchemyError
+
 from ..models.db import safe_session
 from ..models.location import Location
 from ..models.npc import NPC, NPCType
@@ -27,13 +29,13 @@ async def handle_init_locations(event: MessageEvent):
         async with safe_session() as session:
             # 初始化市集地点和商人NPC
             market_count = await init_market_locations(session)
-            
+
             # 初始化打工地点和雇主NPC
             job_count = await init_job_locations(session)
-            
+
             # 初始化工坊地点和工匠NPC
             workshop_count = await init_workshop_locations(session)
-            
+
             # 初始化特殊商店和NPC
             special_count = await init_special_locations(session)
 
@@ -60,10 +62,12 @@ async def handle_init_locations(event: MessageEvent):
                 "━━━━━━━━━━━━━\n"
                 "🌟 新增中立NPC具有丰富的怪谈风格对话！"
             )
-            
+
             await init_locations_cmd.finish(message_add_head(result_msg, event))
-            
-    except Exception as e:
+
+    except SQLAlchemyError as e:
+        await init_locations_cmd.finish(f"❌ 初始化失败（数据库）：{str(e)}")
+    except ValueError as e:
         await init_locations_cmd.finish(f"❌ 初始化失败：{str(e)}")
 
 
@@ -706,41 +710,6 @@ async def init_neutral_npcs(session) -> int:
         }
     ]
 
-    # 创建中立NPC
-    for npc_config in neutral_npcs:
-        # 检查坐标处是否已有地点
-        location = await LocationService.get_location_by_coordinates(
-            session, npc_config["x"], npc_config["y"], "大都会"
-        )
-
-        if not location:
-            # 如果没有地点，跳过这个NPC（因为要求必须在已有地点）
-            print(f"警告：坐标 ({npc_config['x']}, {npc_config['y']}) 没有找到已有地点，跳过NPC {npc_config['name']}")
-            continue
-
-        # 检查是否已有该NPC
-        existing_npc = await NPCService.get_npc_by_name(
-            session, npc_config["name"], location.id
-        )
-
-        if not existing_npc:
-            # 创建中立NPC
-            neutral_npc = NPC(
-                npc_id=npc_config["npc_id"],
-                name=npc_config["name"],
-                description=npc_config["description"],
-                npc_type=NPCType.NORMAL,
-                location_id=location.id,
-                is_killable=False,
-                extra_data={
-                    "dialogues": npc_config["dialogues"],
-                    "dialogue_index": 0,
-                    "is_neutral": True,
-                    "mystery_level": "high"
-                }
-            )
-            session.add(neutral_npc)
-            created_count += 1
 
     # 创建中立NPC
     for npc_config in neutral_npcs:
@@ -847,7 +816,10 @@ async def handle_init_neutral_npcs(event: MessageEvent):
 
             await init_neutral_cmd.finish(message_add_head(result_msg, event))
 
-    except Exception as e:
+    except SQLAlchemyError as e:
+        error_msg = f"❌ 中立NPC初始化失败（数据库）：{str(e)}"
+        await init_neutral_cmd.finish(message_add_head(error_msg, event))
+    except ValueError as e:
         error_msg = f"❌ 中立NPC初始化失败：{str(e)}"
         await init_neutral_cmd.finish(message_add_head(error_msg, event))
 
@@ -863,9 +835,9 @@ async def handle_migrate_data(event: MessageEvent):
         async with safe_session() as session:
             # 迁移打工地点数据
             migrated_count = await LocationService.migrate_from_job_locations(session)
-            
+
             await session.commit()
-            
+
             result_msg = (
                 "✅ 数据迁移完成！\n"
                 "━━━━━━━━━━━━━\n"
@@ -873,9 +845,9 @@ async def handle_migrate_data(event: MessageEvent):
                 "━━━━━━━━━━━━━\n"
                 "💡 原有数据已保留，新系统已集成"
             )
-            
+
             await migrate_data_cmd.finish(message_add_head(result_msg, event))
-            
+
     except ValueError as e:
         await migrate_data_cmd.finish(f"❌ 迁移失败：{str(e)}")
 
@@ -891,12 +863,12 @@ async def handle_cleanup_npcs(event: MessageEvent):
         async with safe_session() as session:
             # 检查并复活NPC
             respawned_count = await NPCService.check_and_respawn_npcs(session)
-            
+
             # 清理过期的动态NPC
             cleaned_count = await NPCService.cleanup_expired_dynamic_npcs(session, max_age_hours=24)
-            
+
             await session.commit()
-            
+
             result_msg = (
                 "✅ NPC清理完成！\n"
                 "━━━━━━━━━━━━━\n"
@@ -905,8 +877,8 @@ async def handle_cleanup_npcs(event: MessageEvent):
                 "━━━━━━━━━━━━━\n"
                 "💡 系统已自动维护NPC状态"
             )
-            
+
             await cleanup_npcs_cmd.finish(message_add_head(result_msg, event))
-            
+
     except ValueError as e:
         await cleanup_npcs_cmd.finish(f"❌ 清理失败：{str(e)}")
