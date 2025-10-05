@@ -18,7 +18,7 @@ list_craft_cmd = on_command("锻造列表", aliases={"装备列表"}, block=True
 
 @list_craft_cmd.handle()
 async def _(event: MessageEvent):
-    # 位置与NPC前置校验：必须在工匠工坊附近（≤3格），且不能在诡域中
+    # 位置前置校验：诡域中禁止，但允许远程查看锻造列表（无须贴身靠近工坊）
     async with safe_session() as session:
         player: Player | None = await session.get(Player, event.get_user_id())
         if not player:
@@ -26,28 +26,33 @@ async def _(event: MessageEvent):
         if player.is_in_dungeon():
             await list_craft_cmd.finish(message_add_head("⛔ 诡域中无法进行锻造相关操作", event))
         from ..world.location_service import LocationService
-        # 搜索附近3格是否存在工坊功能
+        # 优先搜索附近3格的工坊；若没有，则退回当前区域任意工坊
         x, y = player.get_current_coordinates()
         near = await LocationService.get_nearby_locations(session, x, y, player.get_current_region(), max_distance=3)
-        has_forge = any(loc.has_function("forge") for loc in (near or []))
-        if not has_forge:
-            await list_craft_cmd.finish(message_add_head("⛔ 需要在工匠的工坊附近(≤3格)查看锻造列表\n💡 使用【观察】【NPC列表】寻找工匠", event))
+        forge_locs = [loc for loc in (near or []) if loc.has_function("forge")]
+        if not forge_locs:
+            forge_locs = await LocationService.get_locations_with_function(session, "forge", player.get_current_region())
+        if not forge_locs:
+            await list_craft_cmd.finish(message_add_head("⛔ 当前区域暂无工坊", event))
 
-    # 查找最近的工坊地点
-    forge_locs = [loc for loc in (near or []) if loc.has_function("forge")]
+    # 查找最近的工坊地点（若未贴近，则就近选择本区域的工坊）
     nearest = min(forge_locs, key=lambda loc: abs(loc.x - x) + abs(loc.y - y))
     forge_cfg = nearest.get_function_config("forge") or {}
     allow_ids: list[str] = forge_cfg.get("allow_items", [])
 
-    if not allow_ids:
-        await list_craft_cmd.finish(message_add_head(f"⛔ {nearest.name} 尚未配置锻造列表", event))
-
-    # 映射为可读名称并按稀有度/等级简单排序显示
+    # 映射为可读名称：若本城未配置，则回退到“默认锻造目录”（所有带配方的装备）
     craftable_names = []
-    for iid in allow_ids:
-        tpl = config.items_config["by_id"].get(iid)
-        if tpl and tpl.recipe:
-            craftable_names.append((tpl.get_rarity_display(), tpl.name))
+    used_default_catalog = False
+    if allow_ids:
+        for iid in allow_ids:
+            tpl = config.items_config["by_id"].get(iid)
+            if tpl and tpl.recipe:
+                craftable_names.append((tpl.get_rarity_display(), tpl.name))
+    else:
+        used_default_catalog = True
+        for tpl in config.items_config["by_id"].values():
+            if tpl and tpl.recipe:
+                craftable_names.append((tpl.get_rarity_display(), tpl.name))
 
     if not craftable_names:
         await list_craft_cmd.finish(message_add_head(f"🧐 {nearest.name} 暂无可锻造装备", event))
@@ -55,6 +60,9 @@ async def _(event: MessageEvent):
     craftable_names.sort(key=lambda t: t[1])
     lines = [f"🔨 {nearest.name} 可锻造装备 (用【配方 装备名】查看)", "━━━━━━━━━━━━━"]
     lines.extend([f"• {rar}{name}" for (rar, name) in craftable_names])
+    if used_default_catalog:
+        lines.append("")
+        lines.append("💡 本城未配置专属清单，已显示默认锻造目录")
     await list_craft_cmd.finish(message_add_head("\n".join(lines), event))
 
 # ---------------- 指令：工匠配方一览 ----------------
@@ -170,19 +178,13 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
     if not equip_name:
         await recipe_cmd.finish("⛔ 格式：配方 装备名称")
 
-    # 前置校验：位置在工匠工坊附近
+    # 前置校验：允许远程查看（诡域内禁止）
     async with safe_session() as session:
         player: Player | None = await session.get(Player, event.get_user_id())
         if not player:
             await recipe_cmd.finish("⛔ 请先创建角色")
         if player.is_in_dungeon():
             await recipe_cmd.finish(message_add_head("⛔ 诡域中无法查看锻造配方", event))
-        from ..world.location_service import LocationService
-        x, y = player.get_current_coordinates()
-        near = await LocationService.get_nearby_locations(session, x, y, player.get_current_region(), max_distance=3)
-        has_forge = any(loc.has_function("forge") for loc in (near or []))
-        if not has_forge:
-            await recipe_cmd.finish(message_add_head("⛔ 需要在工匠的工坊附近(≤3格)查看锻造配方\n💡 使用【观察】【NPC列表】寻找工匠", event))
 
     item_cfg = config.items_config["by_name"].get(equip_name)
     if not item_cfg or item_cfg.type.value != "EQUIPMENT" or not item_cfg.recipe:
