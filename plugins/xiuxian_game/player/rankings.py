@@ -121,19 +121,28 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
     offset = (page - 1) * page_size
 
     async with safe_session() as session:
-        # 获取所有玩家的基础信息
-        all_players_stmt = select(Player).order_by(Player.gold.desc()).limit(30)
-        all_players = (await session.execute(all_players_stmt)).scalars().all()
+        # 组合候选玩家：金币前50 + 存款前50，避免只按金币过滤导致银行富豪缺失
+        gold_top_ids = (await session.execute(select(Player.id).order_by(Player.gold.desc()).limit(50))).scalars().all()
+        bank_top_ids = (await session.execute(select(BankAccount.player_id).order_by(BankAccount.balance.desc()).limit(50))).scalars().all()
+        player_ids = list({*gold_top_ids, *bank_top_ids})
 
-        if not all_players:
+        if not player_ids:
             await wealth_rank_cmd.finish("暂无排行榜数据")
 
-        # 批量获取玩家ID列表
-        player_ids = [p.id for p in all_players]
+        # 拉取候选玩家
+        all_players_stmt = select(Player).where(Player.id.in_(player_ids))
+        all_players = (await session.execute(all_players_stmt)).scalars().all()
 
-        # 批量查询银行余额
+        # 批量查询银行余额并结息以确保余额最新
         bank_stmt = select(BankAccount).where(BankAccount.player_id.in_(player_ids))
         bank_accounts = (await session.execute(bank_stmt)).scalars().all()
+        # 结息，保持与【存款榜】一致的口径
+        from ..economy.bank import _apply_interest
+        for acc in bank_accounts:
+            _apply_interest(acc)
+        if bank_accounts:
+            session.add_all(bank_accounts)
+            await session.commit()
         bank_map = {acc.player_id: acc.balance for acc in bank_accounts}
 
         # 批量查询投资持仓
