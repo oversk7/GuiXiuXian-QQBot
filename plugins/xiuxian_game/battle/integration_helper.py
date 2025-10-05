@@ -59,9 +59,10 @@ class BattleIntegrationHelper:
     """战斗系统集成助手"""
 
     @staticmethod
-    def enhanced_player_vs_player_battle(
+    async def enhanced_player_vs_player_battle(
         player1: Player,
         player2: Player,
+        session,
         seed: Optional[str] = None,
         max_rounds: int = 30
     ) -> Tuple[bool, List[str], int, int]:
@@ -70,12 +71,30 @@ class BattleIntegrationHelper:
         Args:
             player1: 挑战者玩家
             player2: 被挑战者玩家
+            session: 数据库会话
             seed: 随机种子
             max_rounds: 最大回合数
 
         Returns:
             (player1是否胜利, 战斗日志, player1受到的伤害, player2受到的伤害)
         """
+        # 获取双方装备
+        from sqlalchemy import select
+        from ..models.inventory import ItemInstance
+
+        stmt1 = select(ItemInstance).where(
+            ItemInstance.player_id == player1.id,
+            ItemInstance.equipped == True
+        )
+        player1_equipped_items = (await session.execute(stmt1)).scalars().all()
+
+        stmt2 = select(ItemInstance).where(
+            ItemInstance.player_id == player2.id,
+            ItemInstance.equipped == True
+        )
+        player2_equipped_items = (await session.execute(stmt2)).scalars().all()
+
+        # 创建增强战斗引擎
         engine = EnhancedBattleEngine(seed)
         battle_log = []
 
@@ -86,6 +105,12 @@ class BattleIntegrationHelper:
         initial_player2_hp = player2_hp
 
         battle_log.append(f"⚔️ {player1.nickname} VS {player2.nickname}")
+
+        # 初始化战斗 - 注册双方装备的触发器
+        engine.start_battle(player1, player2, player1_equipped_items)
+        # 为玩家2也注册装备触发器
+        if player2_equipped_items:
+            engine._register_equipment_triggers(player2.id, player2_equipped_items)
 
         # 判定先后手（基于敏捷）
         from .battle_attributes import BattleAttributeCalculator
@@ -757,9 +782,10 @@ class BattleIntegrationHelper:
         return victory, battle_log, damage_taken
 
     @staticmethod
-    def compact_player_vs_player_battle(
+    async def compact_player_vs_player_battle(
         player1: Player,
         player2: Player,
+        session,
         seed: Optional[str] = None,
         max_rounds: int = 30
     ) -> Tuple[bool, List[str], int, int]:
@@ -768,12 +794,30 @@ class BattleIntegrationHelper:
         Args:
             player1: 挑战者玩家
             player2: 被挑战者玩家
+            session: 数据库会话
             seed: 随机种子
             max_rounds: 最大回合数
 
         Returns:
             (player1是否胜利, 战斗日志, player1受到的伤害, player2受到的伤害)
         """
+        # 获取双方装备
+        from sqlalchemy import select
+        from ..models.inventory import ItemInstance
+
+        stmt1 = select(ItemInstance).where(
+            ItemInstance.player_id == player1.id,
+            ItemInstance.equipped == True
+        )
+        player1_equipped_items = (await session.execute(stmt1)).scalars().all()
+
+        stmt2 = select(ItemInstance).where(
+            ItemInstance.player_id == player2.id,
+            ItemInstance.equipped == True
+        )
+        player2_equipped_items = (await session.execute(stmt2)).scalars().all()
+
+        # 创建增强战斗引擎
         engine = EnhancedBattleEngine(seed)
         battle_log = []
 
@@ -784,6 +828,12 @@ class BattleIntegrationHelper:
         initial_player2_hp = player2_hp
 
         battle_log.append(f"⚔️ {player1.nickname} VS {player2.nickname}")
+
+        # 初始化战斗 - 注册双方装备的触发器
+        engine.start_battle(player1, player2, player1_equipped_items)
+        # 为玩家2也注册装备触发器
+        if player2_equipped_items:
+            engine._register_equipment_triggers(player2.id, player2_equipped_items)
 
         # 判定先后手（基于敏捷）
         from .battle_attributes import BattleAttributeCalculator

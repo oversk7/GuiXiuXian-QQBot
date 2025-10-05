@@ -410,8 +410,8 @@ async def handle_player_attack(session, attacker: Player, target: Player, event:
     seed = f"PVP_{attacker.id}_{target.id}_{battle_timestamp}"
 
     try:
-        victory, battle_log, attacker_damage, target_damage = BattleIntegrationHelper.enhanced_player_vs_player_battle(
-            attacker, target, seed=seed, max_rounds=30
+        victory, battle_log, attacker_damage, target_damage = await BattleIntegrationHelper.enhanced_player_vs_player_battle(
+            attacker, target, session, seed=seed, max_rounds=30
         )
 
         # 构建战斗结果消息

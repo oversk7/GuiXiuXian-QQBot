@@ -91,8 +91,8 @@ async def handle_pvp(event: MessageEvent, args: Message = CommandArg()):
         
         # 执行PVP战斗（使用简洁格式）
         try:
-            victory, battle_log, challenger_damage, target_damage = BattleIntegrationHelper.compact_player_vs_player_battle(
-                challenger, target_player, seed=seed, max_rounds=30
+            victory, battle_log, challenger_damage, target_damage = await BattleIntegrationHelper.compact_player_vs_player_battle(
+                challenger, target_player, session, seed=seed, max_rounds=30
             )
             
             # 构建战斗结果消息
@@ -185,8 +185,8 @@ async def handle_simulate(event: MessageEvent, args: Message = CommandArg()):
         
         # 执行模拟战斗（使用简洁格式）
         try:
-            _, battle_log, _, _ = BattleIntegrationHelper.compact_player_vs_player_battle(
-                player1, player2, seed=seed, max_rounds=30
+            _, battle_log, _, _ = await BattleIntegrationHelper.compact_player_vs_player_battle(
+                player1, player2, session, seed=seed, max_rounds=30
             )
 
             # 构建战斗结果消息
