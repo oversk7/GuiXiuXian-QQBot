@@ -7,6 +7,7 @@ from enum import Enum
 from dataclasses import dataclass, field
 from typing import Dict, List, Optional, Any
 import random
+import copy
 
 
 class TriggerType(str, Enum):
@@ -124,7 +125,7 @@ class BattleEffectManager:
         self.trigger_configs: Dict[str, List[TriggerConfig]] = {}
     
     def add_effect(self, unit_id: str, effect: BattleEffect) -> bool:
-        """添加效果到单位"""
+        """添加效果到单位（深拷贝以避免共享状态）"""
         if unit_id not in self.active_effects:
             self.active_effects[unit_id] = []
 
@@ -139,8 +140,9 @@ class BattleEffectManager:
                     existing.duration = max(existing.duration, effect.duration)
                     return True
 
-        # 添加新效果
-        self.active_effects[unit_id].append(effect)
+        # 深拷贝效果对象，避免多个单位共享同一个效果实例（如护盾值）
+        effect_copy = copy.deepcopy(effect)
+        self.active_effects[unit_id].append(effect_copy)
         return True
 
     def remove_effect(self, unit_id: str, effect: BattleEffect) -> bool:
