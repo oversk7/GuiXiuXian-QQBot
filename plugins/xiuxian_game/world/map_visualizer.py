@@ -43,6 +43,7 @@ class MapVisualizer:
             'job': '#8844FF',         # 打工地点紫色
             'special': '#FF44FF',     # 特殊地点粉色
             'mansion': '#8B4513',     # 阴宅棕色
+            'mansion_connector': '#0066CC',  # 阴宅指示连线
             'border': '#4488CC',      # 边框颜色
             'location_text': '#333333',  # 地点文字颜色
             'navigation_line': '#00FF00',  # 导航连线绿色
@@ -185,13 +186,13 @@ class MapVisualizer:
                 draw.text((center_x + 8, pixel_y - 8), str(i), fill=self.colors['coordinate_text'], font=self.fonts['small'])
     
     def _draw_location(self, draw: ImageDraw.Draw, x: int, y: int, name: str,
-                      location_type: str, size: int = 8):
-        """绘制地点标记"""
+                      location_type: str, size: int = 8) -> Optional[Tuple[int, int]]:
+        """绘制地点标记，并返回像素坐标"""
         pixel_x, pixel_y = self._game_to_pixel(x, y)
 
         # 确保在地图范围内
         if not (0 <= pixel_x <= self.map_width and 0 <= pixel_y <= self.map_height):
-            return
+            return None
 
         # 根据类型选择颜色
         color = self.colors.get(location_type, self.colors['special'])
@@ -200,8 +201,11 @@ class MapVisualizer:
         draw.ellipse([pixel_x - size, pixel_y - size, pixel_x + size, pixel_y + size],
                     fill=color, outline='#000000', width=2)
 
+        return pixel_x, pixel_y
+
     def _draw_mansion(self, draw: ImageDraw.Draw, x: int, y: int, mansion_level: int,
-                     owner_nickname: str, size: int = 6):
+                     owner_nickname: str, occupancy_map: Optional[Dict[Tuple[int, int], Dict[str, Any]]] = None,
+                     size: int = 6):
         """绘制阴宅标记（房子形状）"""
         pixel_x, pixel_y = self._game_to_pixel(x, y)
 
@@ -209,12 +213,31 @@ class MapVisualizer:
         if not (0 <= pixel_x <= self.map_width and 0 <= pixel_y <= self.map_height):
             return
 
+        adjusted_pixel_x, adjusted_pixel_y = pixel_x, pixel_y
+        connector_needed = False
+
+        if occupancy_map and (pixel_x, pixel_y) in occupancy_map:
+            connector_needed = True
+            offset_distance = 22
+            adjusted_pixel_x = pixel_x + offset_distance
+            adjusted_pixel_y = pixel_y
+
+            if adjusted_pixel_x + size >= self.map_width:
+                adjusted_pixel_x = pixel_x - offset_distance
+
+            if adjusted_pixel_x - size < 0:
+                adjusted_pixel_x = pixel_x
+                connector_needed = False
+
+        house_center_x = adjusted_pixel_x
+        house_center_y = adjusted_pixel_y
+
         # 绘制房子形状的阴宅标记
         # 房子底部（矩形）
         house_width = size * 2
         house_height = size * 1.5
-        house_left = pixel_x - house_width // 2
-        house_top = pixel_y - house_height // 2
+        house_left = house_center_x - house_width // 2
+        house_top = house_center_y - house_height // 2
         house_right = house_left + house_width
         house_bottom = house_top + house_height
 
@@ -225,11 +248,28 @@ class MapVisualizer:
         # 绘制房顶（三角形）
         roof_height = size
         roof_points = [
-            (pixel_x, house_top - roof_height),  # 顶点
+            (house_center_x, house_top - roof_height),  # 顶点
             (house_left - 1, house_top),         # 左下
             (house_right + 1, house_top)         # 右下
         ]
         draw.polygon(roof_points, fill='#654321', outline='#000000', width=1)
+
+        if connector_needed:
+            connector_color = self.colors['mansion_connector']
+            line_start_x = house_center_x
+            line_start_y = house_center_y
+            draw.line([line_start_x, line_start_y, pixel_x, pixel_y],
+                      fill=connector_color, width=2)
+
+            arrow_length = 8
+            arrow_angle = math.radians(25)
+            base_angle = math.atan2(pixel_y - line_start_y, pixel_x - line_start_x)
+
+            for angle_delta in (arrow_angle, -arrow_angle):
+                arrow_x = pixel_x - arrow_length * math.cos(base_angle + angle_delta)
+                arrow_y = pixel_y - arrow_length * math.sin(base_angle + angle_delta)
+                draw.line([pixel_x, pixel_y, arrow_x, arrow_y],
+                          fill=connector_color, width=1)
 
         # 根据阴宅等级在房子上显示等级标记
         if mansion_level <= 10:
@@ -239,11 +279,12 @@ class MapVisualizer:
             text_bbox = draw.textbbox((0, 0), level_text, font=self.fonts['small'])
             text_width = text_bbox[2] - text_bbox[0]
             text_height = text_bbox[3] - text_bbox[1]
-            text_x = pixel_x - text_width // 2
-            text_y = pixel_y - text_height // 2
+            text_x = house_center_x - text_width // 2
+            text_y = house_center_y - text_height // 2
             draw.text((text_x, text_y), level_text, fill='#FFFFFF', font=self.fonts['small'])
 
-    async def _draw_mansions(self, draw: ImageDraw.Draw, session: AsyncSession):
+    async def _draw_mansions(self, draw: ImageDraw.Draw, session: AsyncSession,
+                             occupancy_map: Optional[Dict[Tuple[int, int], Dict[str, Any]]] = None):
         """查询并绘制所有阴宅"""
         # 查询所有拥有阴宅的玩家
         stmt = select(Player).where(
@@ -263,7 +304,8 @@ class MapVisualizer:
                     owner.mansion_x,
                     owner.mansion_y,
                     owner.mansion_level,
-                    owner.nickname
+                    owner.nickname,
+                    occupancy_map
                 )
     
     def _draw_players(self, draw: ImageDraw.Draw, players: List[Player], current_player_id: str = None):
@@ -411,7 +453,7 @@ class MapVisualizer:
                 ("🟠 市集交易", self.colors['market']),
                 ("🟣 打工地点", self.colors['job']),
                 ("🟡 特殊地点", self.colors['special']),
-                ("🏠 阴宅", self.colors['mansion']),
+                ("🏠 阴宅（箭头指示真实位置）", self.colors['mansion']),
                 ("🟢 导航路线", self.colors['navigation_line']),
                 ("🟨 导航目标", self.colors['navigation_target']),
             ]
@@ -421,7 +463,7 @@ class MapVisualizer:
                 ("● Markets", self.colors['market']),
                 ("● Jobs", self.colors['job']),
                 ("● Special", self.colors['special']),
-                ("● Mansions", self.colors['mansion']),
+                ("● Mansions (offset with pointer)", self.colors['mansion']),
                 ("● Navigation", self.colors['navigation_line']),
                 ("● Target", self.colors['navigation_target']),
             ]
@@ -463,34 +505,47 @@ class MapVisualizer:
         # 创建图片
         image = Image.new('RGB', (self.map_width, self.map_height), self.colors['background'])
         draw = ImageDraw.Draw(image)
-        
+
         # 绘制背景和网格
         self._draw_background_and_grid(draw)
-        
+
+        occupancy_map: Dict[Tuple[int, int], Dict[str, Any]] = {}
+
         # 绘制市集
         for market in MARKETS:
-            self._draw_location(draw, market.x, market.y, market.name, 'market')
-        
+            coords = self._draw_location(draw, market.x, market.y, market.name, 'market')
+            if coords:
+                occupancy_map[coords] = {'type': 'market', 'name': market.name}
+
         # 绘制缉邪司总部
         hq_x, hq_y = HEADQUARTERS_COORD
-        self._draw_location(draw, hq_x, hq_y, "缉邪司总部", 'special')
-        
+        hq_coords = self._draw_location(draw, hq_x, hq_y, "缉邪司总部", 'special')
+        if hq_coords:
+            occupancy_map[hq_coords] = {'type': 'special', 'name': '缉邪司总部'}
+
         # 绘制打工地点
         try:
             from ..economy.part_time_job_service import PartTimeJobService
             for location_data in PartTimeJobService.JOB_LOCATIONS.values():
-                self._draw_location(draw, location_data['x'], location_data['y'], 
-                                  location_data['name'], 'job')
+                coords = self._draw_location(draw, location_data['x'], location_data['y'],
+                                             location_data['name'], 'job')
+                if coords:
+                    occupancy_map[coords] = {
+                        'type': 'job',
+                        'name': location_data['name']
+                    }
         except ImportError:
             # 如果导入失败，使用默认配置（已整合到城镇中）
             default_jobs = [
-                (0, 0, "上京商业中心"),
+                (0, 0, "上京商业心"),
                 (120, 200, "荔湾镇工业区"),
                 (120, 120, "郸城娱乐街区"),
                 (390, 50, "东郊物流中心"),
             ]
             for x, y, name in default_jobs:
-                self._draw_location(draw, x, y, name, 'job')
+                coords = self._draw_location(draw, x, y, name, 'job')
+                if coords:
+                    occupancy_map[coords] = {'type': 'job', 'name': name}
         
         # 查询并绘制玩家位置
         stmt = select(Player).where(Player.region == "大都会")
@@ -498,7 +553,7 @@ class MapVisualizer:
         players = result.scalars().all()
 
         # 查询并绘制阴宅
-        await self._draw_mansions(draw, session)
+        await self._draw_mansions(draw, session, occupancy_map)
 
         # 绘制所有玩家，当前玩家会显示为粗红点，其他玩家显示为小红点
         self._draw_players(draw, players, current_player_id)
