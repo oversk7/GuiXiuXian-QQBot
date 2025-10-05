@@ -63,8 +63,17 @@ def is_in_town(x: int, y: int, region: str = "大都会") -> bool:
 
 
 # ==================== 荒野掉落处理 ====================
-async def handle_wilderness_drops(session, loser: Player) -> str:
-    """处理荒野死斗的物品掉落"""
+async def handle_wilderness_drops(session, loser: Player, winner: Player) -> str:
+    """处理荒野死斗的物品掉落
+
+    Args:
+        session: 数据库会话
+        loser: 败者玩家
+        winner: 胜者玩家（击杀者）
+
+    Returns:
+        掉落信息字符串
+    """
     from sqlalchemy import select
     from ..models.inventory import ItemType
 
@@ -101,7 +110,8 @@ async def handle_wilderness_drops(session, loser: Player) -> str:
 
     # 随机选择要掉落的物品
     dropped_items = random.sample(droppable_items, min(drop_count, len(droppable_items)))
-    dropped_descriptions = []
+    obtained_items = []  # 成功获得的物品
+    discarded_items = []  # 因背包满而丢弃的物品
 
     for item in dropped_items:
         item_config = config.items_config["by_id"].get(item.item_id)
@@ -112,17 +122,30 @@ async def handle_wilderness_drops(session, loser: Player) -> str:
         drop_quantity = max(1, int(item.quantity * random.uniform(0.2, 0.5)))
         drop_quantity = min(drop_quantity, item.quantity)
 
-        # 扣除物品
+        # 从败者身上扣除物品
         item.quantity -= drop_quantity
         if item.quantity <= 0:
             await session.delete(item)
 
-        dropped_descriptions.append(f"{item_config.name} ✖️{drop_quantity}")
+        # 尝试将物品给予击杀者
+        try:
+            await ItemInstance.add_item(session, winner.id, item.item_id, drop_quantity)
+            obtained_items.append(f"{item_config.name} ✖️{drop_quantity}")
+        except ValueError:
+            # 背包满了，物品丢弃
+            discarded_items.append(f"{item_config.name} ✖️{drop_quantity}")
 
-    if dropped_descriptions:
-        return f"💀 {loser.nickname} 掉落了：{', '.join(dropped_descriptions)}"
-    else:
+    # 构建掉落信息
+    result_msg = []
+    if obtained_items:
+        result_msg.append(f"💎 {winner.nickname} 获得了：{', '.join(obtained_items)}")
+    if discarded_items:
+        result_msg.append(f"📦 背包已满，丢弃了：{', '.join(discarded_items)}")
+
+    if not obtained_items and not discarded_items:
         return f"💀 {loser.nickname} 没有掉落任何物品"
+
+    return "\n".join(result_msg)
 
 
 # ==================== 攻击命令 ====================
@@ -441,7 +464,8 @@ async def handle_player_attack(session, attacker: Player, target: Player, event:
 
             # 处理败者的物品掉落
             loser = target if victory else attacker
-            drop_msg = await handle_wilderness_drops(session, loser)
+            winner = attacker if victory else target
+            drop_msg = await handle_wilderness_drops(session, loser, winner)
             if drop_msg:
                 result_lines.append(drop_msg)
 
