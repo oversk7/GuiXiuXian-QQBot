@@ -6,6 +6,9 @@
 
 from nonebot import on_command
 from nonebot.adapters.qq import MessageEvent
+from nonebot.adapters.qq import Message
+from nonebot.params import CommandArg
+
 from nonebot.permission import SUPERUSER
 
 from sqlalchemy.exc import SQLAlchemyError
@@ -226,7 +229,7 @@ async def init_workshop_locations(session) -> int:
         # • 上京(0,0)仅能锻造初级装备
         # • 风雪镇可锻造最高阶装备
         "上京": ["bone_armor", "rusty_blade", "broken_glasses", "ghost_tear_pendant"],  # 新手村，仅基础装备
-        "风雪镇": ["reality_suicide_note", "god_tear_amulet", "world_fragment_blade"],  # 终极地区，最高级装备
+        "风雪镇": ["reality_suicide_note", "god_tear_amulet", "world_fragment_blade", "shroud_of_eternity"],  # 终极地区，最高级装备
     }
 
     def _get_craftsman_name_by_city(city_name: str) -> str:
@@ -302,9 +305,92 @@ async def init_workshop_locations(session) -> int:
             session.add(craftsman_npc)
             created_count += 1
 
-    return created_count
+# ==================== 刷新工坊清单（覆盖写入） ====================
+refresh_workshops_cmd = on_command("刷新工坊清单", block=True, priority=1, permission=SUPERUSER)
 
 
+@refresh_workshops_cmd.handle()
+async def handle_refresh_workshops(event: MessageEvent, args: Message = CommandArg()):
+    """覆盖更新所有城市的工坊锻造白名单（按当前规则）。
+    使用场景：历史上已初始化过地点，因 setdefault 不会覆盖老配置，导致新规则未生效。
+    该命令将强制覆盖 allow_items，仅更新锻造清单，不改动其他功能字段。
+    """
+    try:
+        async with safe_session() as session:
+            # 市集（城市）列表
+            from ..economy.merchants import MARKETS
+
+            # 与 init_workshop_locations 规则保持一致（含新手村/风雪镇改动）
+            CITY_FORGE_WHITELIST: dict[str, list[str]] = {
+                # === 新手区域 (1-30级) - 基础装备，白色/绿色品质 ===
+                "北郊": ["bone_armor", "rusty_blade", "broken_glasses"],
+                "东郊": ["bone_armor", "ghost_tear_pendant", "rusty_blade"],
+                "西郊": ["ghost_tear_pendant", "broken_glasses", "bone_armor"],
+                "南郊": ["rusty_blade", "broken_glasses", "ghost_tear_pendant"],
+
+                # === 中级区域 (30-80级) - 进阶装备，蓝色品质为主 ===
+                "荔湾镇": ["drowned_coat", "self_awareness_key", "corrupted_bandage", "wedding_photo"],
+                "摩配镇": ["patient_gown", "kitchen_knife", "school_uniform"],
+                "郸城": ["old_coat", "wreath", "music_box"],
+                "舟山": ["crying_tape", "mirror_armor", "grandfather_clock"],
+
+                # === 高级区域 (80-150级) - 高阶装备，紫色品质 ===
+                "云岭": ["phantom_cloak", "fog_coat", "soul_banner"],
+                "金陵": ["drawer", "wedding_dress", "void_crown"],
+
+                # === 终极区域 (150级+) - 最高级装备 ===
+                # 上京(0,0)：仅初级装备（新手村）
+                "上京": ["bone_armor", "rusty_blade", "broken_glasses", "ghost_tear_pendant"],
+                # 风雪镇：最强装备
+                "风雪镇": ["reality_suicide_note", "god_tear_amulet", "world_fragment_blade", "shroud_of_eternity"],
+            }
+
+            from ..models.location import Location
+            updated = 0
+            created_forge = 0
+
+            for m in MARKETS:
+                # 查找城市地点
+                loc = await LocationService.get_location_by_coordinates(session, m.x, m.y, "大都会")
+                if not loc:
+                    continue
+
+                # 确保 functions 存在
+                if loc.functions is None:
+                    loc.functions = {}
+
+                # 若无 forge 功能则添加
+                if not loc.has_function("forge"):
+                    forge_config = {
+                        "enabled": True,
+                        "services": ["forge", "enhance", "gem_socket"],
+                        "allow_items": []
+                    }
+                    loc.add_function("forge", forge_config)
+                    created_forge += 1
+
+                # 覆盖 allow_items
+                cfg = loc.get_function_config("forge") or {}
+                cfg["allow_items"] = CITY_FORGE_WHITELIST.get(m.name, [])
+                # 直接修改 cfg 即可生效（cfg 为 functions 内部字典引用）
+                updated += 1
+
+            await session.commit()
+
+            msg = (
+                "✅ 工坊清单刷新完成！\n"
+                "━━━━━━━━━━━━━\n"
+                f"🔧 覆盖城市：{updated} 个\n"
+                f"🧰 新增工坊功能：{created_forge} 个\n"
+                "━━━━━━━━━━━━━\n"
+                "💡 已按当前规则：上京(0,0)仅初级、风雪镇最高级"
+            )
+            await refresh_workshops_cmd.finish(message_add_head(msg, event))
+
+    except SQLAlchemyError as e:
+        await refresh_workshops_cmd.finish(f"❌ 刷新失败（数据库）：{str(e)}")
+    except ValueError as e:
+        await refresh_workshops_cmd.finish(f"❌ 刷新失败：{str(e)}")
 async def init_special_locations(session) -> int:
     """在缉邪司总部添加管理员NPC"""
     # 缉邪司总部

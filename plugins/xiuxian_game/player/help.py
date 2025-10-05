@@ -843,6 +843,10 @@ async def handle_admin_help(event: MessageEvent, args: Message = CommandArg()):
         "【手动备份】 立即创建数据库备份\n"
         "【备份状态】 查看备份文件列表\n"
         "【恢复备份 <文件名>】 从备份恢复数据库\n"
+        "━━━━━━━━━━━━━\n"
+        "🛠️ 工坊维护：\n"
+        "【刷新工坊清单】 覆盖更新所有城镇的锻造清单（超级用户）\n"
+
     )
     await admin_help_cmd.finish(Message(msg))
 

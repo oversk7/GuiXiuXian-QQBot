@@ -50,7 +50,7 @@ async def _(event: MessageEvent):
     for tpl in all_equip_tpls:
         cities = sorted(item_to_cities.get(tpl.item_id, []))
         city_text = "、".join(cities) if cities else "—"
-        lines.append(f"• {tpl.get_rarity_display()}{tpl.name} -> 城镇：{city_text}")
+        lines.append(f"• {tpl.get_rarity_display()}{tpl.name}({city_text})")
 
     await list_craft_cmd.finish(message_add_head("\n".join(lines), event))
 
