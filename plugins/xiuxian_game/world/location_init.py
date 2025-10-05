@@ -345,6 +345,25 @@ async def handle_refresh_workshops(event: MessageEvent, args: Message = CommandA
                 "风雪镇": ["reality_suicide_note", "god_tear_amulet", "world_fragment_blade", "shroud_of_eternity"],
             }
 
+                # —— 动态规则修正：低品质（白/绿）仅允许在(0,0)“上京”锻造 ——
+                # 构建各稀有度物品集合（仅含有配方的装备）
+                from ..config import config as _cfg
+                by_id = _cfg.items_config["by_id"]
+                low_ids = [c.item_id for c in by_id.values() if c.recipe and c.rarity in ("white", "green")]
+                orange_ids = [c.item_id for c in by_id.values() if c.recipe and c.rarity == "orange"]
+
+                # 1) 上京覆盖为全部白/绿装备
+                CITY_FORGE_WHITELIST["上京"] = sorted(set(low_ids))
+                # 2) 非上京城市移除所有白/绿
+                for k, v in list(CITY_FORGE_WHITELIST.items()):
+                    if k == "上京":
+                        continue
+                    CITY_FORGE_WHITELIST[k] = [iid for iid in v if iid not in low_ids]
+                # 3) 风雪镇确保拥有全部橙色最高级装备
+                existing = set(CITY_FORGE_WHITELIST.get("风雪镇", []))
+                CITY_FORGE_WHITELIST["风雪镇"] = sorted(existing.union(orange_ids))
+
+
             from ..models.location import Location
             updated = 0
             created_forge = 0
