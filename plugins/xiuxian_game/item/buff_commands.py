@@ -139,39 +139,24 @@ async def handle_attribute_breakdown(event: MessageEvent):
             detail = " + ".join(parts) if len(parts) > 1 else parts[0]
             lines.append(f"🔸 {attr_name}: {total} ({detail})")
 
-        # 显示战斗属性（如果有加成）
+        # 显示战斗属性（只显示总值，不分解来源，因为主要来自镶嵌宝石）
         battle_attrs = ["critical_rate", "critical_power", "combo_rate", "counter_rate",
                        "dodge_rate", "accuracy_rate", "skill_crit_rate", "penetration_rate", "anti_crit_rate"]
 
-        has_battle_bonus = False
+        has_battle_attrs = False
         battle_lines = []
 
         for attr in battle_attrs:
-            equipment = breakdown["equipment"][attr]
-            temporary = breakdown["temporary"][attr]
-
-            if equipment != 0 or temporary != 0:
-                has_battle_bonus = True
+            total = breakdown["total"][attr]
+            # 只显示非零的战斗属性
+            if total != 0:
+                has_battle_attrs = True
                 attr_name = attr_names.get(attr, attr)
-                total = breakdown["total"][attr]
-                base = breakdown["base"][attr]
+                battle_lines.append(f"🔸 {attr_name}: {total}")
 
-                parts = [f"基础{base}"]
-                if equipment > 0:
-                    parts.append(f"装备+{equipment}")
-                elif equipment < 0:
-                    parts.append(f"装备{equipment}")
-                if temporary > 0:
-                    parts.append(f"临时+{temporary}")
-                elif temporary < 0:
-                    parts.append(f"临时{temporary}")
-
-                detail = " + ".join(parts) if len(parts) > 1 else parts[0]
-                battle_lines.append(f"🔸 {attr_name}: {total} ({detail})")
-
-        if has_battle_bonus:
+        if has_battle_attrs:
             lines.append("")
-            lines.append("⚔️ 战斗属性加成:")
+            lines.append("⚔️ 战斗属性:")
             lines.extend(battle_lines)
 
         # 显示临时buff状态
