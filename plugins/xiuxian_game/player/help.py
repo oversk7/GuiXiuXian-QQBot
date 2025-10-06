@@ -846,6 +846,9 @@ async def handle_admin_help(event: MessageEvent, args: Message = CommandArg()):
         "━━━━━━━━━━━━━\n"
         "🛠️ 工坊维护：\n"
         "【刷新工坊清单】 覆盖更新所有城镇的锻造清单（超级用户）\n"
+        "━━━━━━━━━━━━━\n"
+        "🧩 数据迁移 / 修复：\n"
+        "【迁移加体比例 [预览|执行|执行 不备份]】 按新规则(1:3)迁移max_hp，并清零装备持久化max_hp，加装后生效\n"
 
     )
     await admin_help_cmd.finish(Message(msg))
