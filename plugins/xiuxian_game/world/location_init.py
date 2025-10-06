@@ -219,6 +219,7 @@ async def init_workshop_locations(session) -> int:
         "摩配镇": ["patient_gown", "kitchen_knife", "school_uniform"],  # 都市恐怖主题
         "郸城": ["old_coat", "wreath", "music_box"],  # 死亡主题
         "舟山": ["crying_tape", "mirror_armor", "grandfather_clock"],  # 时间/记忆主题
+        "大昌市": ["old_coat", "wreath", "music_box"],  # 综合商埠，继承郸城锻造线
 
         # === 高级区域 (80-150级) - 高阶装备，紫色品质 ===
         "云岭": ["phantom_cloak", "fog_coat", "soul_banner"],  # 幽灵主题
@@ -246,6 +247,7 @@ async def init_workshop_locations(session) -> int:
             "摩配镇": "疯狂技师",  # 都市恐怖主题
             "郸城": "送葬匠人",  # 死亡主题
             "舟山": "时光工匠",  # 时间/记忆主题
+            "大昌市": "大昌匠人",  # 综合商埠主题
 
             # 高级区域工匠 - 神秘名字
             "云岭": "幽魂锻师",  # 幽灵主题
@@ -333,6 +335,7 @@ async def handle_refresh_workshops(event: MessageEvent, args: Message = CommandA
                 "摩配镇": ["patient_gown", "kitchen_knife", "school_uniform"],
                 "郸城": ["old_coat", "wreath", "music_box"],
                 "舟山": ["crying_tape", "mirror_armor", "grandfather_clock"],
+                "大昌市": ["old_coat", "wreath", "music_box"],
 
                 # === 高级区域 (80-150级) - 高阶装备，紫色品质 ===
                 "云岭": ["phantom_cloak", "fog_coat", "soul_banner"],

@@ -180,6 +180,14 @@ MARKET_CONFIGS = {
         "coord": (200, -200),
         "sellable": ["diamond_ring", "red_wine", "dslr_camera", "designer_bag"],
         "buyable": ["diamond_ring", "red_wine", "dslr_camera", "designer_bag", "gaming_console", "smartphone"] + ALL_FISH
+    },
+
+    # 大昌市 (-400,-240) - 西南商埠，综合贸易
+    "merchant13": {
+        "name": "大昌市",
+        "coord": (-400, -240),
+        "sellable": ["smartphone", "sneakers", "noise_headphones", "designer_bag", "concert_ticket"],
+        "buyable": ["smartphone", "sneakers", "noise_headphones", "designer_bag", "gaming_console", "lux_perfume"]
     }
 }
 
