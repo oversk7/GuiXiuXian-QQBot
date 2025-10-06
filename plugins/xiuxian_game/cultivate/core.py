@@ -1059,9 +1059,22 @@ async def handle_assign(event: MessageEvent, args: Message = CommandArg()):
 
         session.add(player)
         await session.commit()
+
+        # 展示本次加点带来的实际数值提升（如 体+10 实际 生命上限+30）
+        _label_map = {
+            "max_hp": "生命上限",
+            "max_mp": "理智上限",
+            "attack": "攻击",
+            "defense": "防御",
+            "agility": "敏捷",
+            "luck": "幸运",
+        }
+        _actual_line = f"✧ 实际提升：{_label_map.get(attr_field, attr_field)} +{inc_val}\n"
+
         msg = (
             "🩸 裂隙缝合\n"
             f"✧ {attr_name} +{points} → {getattr(player, attr_field)}\n"
+            f"{_actual_line}"
             "━━━━━━━━━━━━━\n"
             f"✧ 剩余属性点 {player.attribute_points}\n"
             "━━━━━━━━━━━━━\n"
