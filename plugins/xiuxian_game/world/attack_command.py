@@ -15,12 +15,16 @@ from ..models.db import safe_session
 from ..models.player import Player
 from ..models.npc import NPCType
 from ..models.inventory import ItemInstance
-from ..utils import message_add_head
+from ..utils import message_add_head, check_action_limit, record_action
 from .location_service import LocationService
 from .npc_service import NPCService
 from ..player.realm_utils import realm_by_level_and_reincarnation
 from ..battle.integration_helper import BattleIntegrationHelper
 from ..config import config
+
+# 掉落保护（短期内避免重复劫掠）
+DROP_PROTECTION_SECONDS = 60
+_last_pvp_drop_time: dict[str, float] = {}
 
 
 # ==================== 城镇判断函数 ====================
@@ -155,8 +159,15 @@ attack_cmd = on_command("攻击", aliases={"死斗"}, block=True, priority=5)
 @attack_cmd.handle()
 async def handle_attack(event: MessageEvent, args: Message = CommandArg()):
     """处理攻击命令"""
+    # 频率限制
+    user_id = event.get_user_id()
+    allowed, error_msg = check_action_limit(user_id, "attack")
+    if not allowed:
+        await attack_cmd.finish(error_msg)
+    record_action(user_id, "attack")
+
     args_text = args.extract_plain_text().strip()
-    
+
     if not args_text:
         help_msg = (
             "⚔️ 攻击系统\n"
@@ -191,7 +202,7 @@ async def handle_attack(event: MessageEvent, args: Message = CommandArg()):
             "🌟 示例：攻击 1001 或 攻击 乔强"
         )
         await attack_cmd.finish(message_add_head(help_msg, event))
-    
+
     async with safe_session() as session:
         # 使用跨平台工具获取玩家数据
         from ..platform_utils import get_unified_player, is_guild_message
@@ -201,20 +212,18 @@ async def handle_attack(event: MessageEvent, args: Message = CommandArg()):
                 await attack_cmd.finish("⛔ 你还没有创建角色或绑定账号\n💡 请先在群聊注册角色，然后使用绑定功能")
             else:
                 await attack_cmd.finish("⛔ 请先创建角色")
-        
-        if player.is_in_dungeon():
-            await attack_cmd.finish("⛔ 你在诡域中，无法攻击现实世界的目标")
-        
+
+        # 在诡域内允许攻击；跨世界目标会在区域一致性与距离校验中被拦截
         if player.hp <= 0:
             await attack_cmd.finish("⛔ 你已死亡，无法发起攻击")
-        
+
         # 获取当前位置
         current_x, current_y = player.get_current_coordinates()
         current_region = player.get_current_region()
-        
+
         # 尝试解析目标
         target_player, target_npc = await parse_attack_target(session, args_text, current_x, current_y, current_region)
-        
+
         if target_player:
             await handle_player_attack(session, player, target_player, event)
         elif target_npc:
@@ -390,6 +399,9 @@ async def handle_player_attack(session, attacker: Player, target: Player, event:
     # 检查目标是否在同一区域
     attacker_region = attacker.get_current_region()
     target_region = target.get_current_region()
+    if target.hp <= 0:
+        await attack_cmd.finish("⛔ 对方已濒死，无法继续劫掠\n💡 等其复活后再试")
+
     if attacker_region != target_region:
         await attack_cmd.finish("⛔ 目标不在同一区域")
 
@@ -404,6 +416,14 @@ async def handle_player_attack(session, attacker: Player, target: Player, event:
     current_x, current_y = attacker.get_current_coordinates()
     current_region = attacker.get_current_region()
     in_town = is_in_town(current_x, current_y, current_region)
+    # 阴宅作为安全区
+    try:
+        from ..cultivate.mansion import MansionService
+        if MansionService.is_at_mansion(attacker) or MansionService.is_at_mansion(target):
+            in_town = True
+    except ImportError:
+        pass
+
 
     # 执行PVP战斗
     battle_timestamp = int(time.time() * 1000)
@@ -462,12 +482,18 @@ async def handle_player_attack(session, attacker: Player, target: Player, event:
             if damage_info:
                 result_lines.extend(damage_info)
 
-            # 处理败者的物品掉落
+            # 处理败者的物品掉落（掉落保护）
             loser = target if victory else attacker
             winner = attacker if victory else target
-            drop_msg = await handle_wilderness_drops(session, loser, winner)
-            if drop_msg:
-                result_lines.append(drop_msg)
+            now_ts = time.time()
+            last_ts = _last_pvp_drop_time.get(loser.id, 0)
+            if now_ts - last_ts < DROP_PROTECTION_SECONDS:
+                result_lines.append("🛡️ 掉落保护生效：短时间内不再掉落物品")
+            else:
+                drop_msg = await handle_wilderness_drops(session, loser, winner)
+                _last_pvp_drop_time[loser.id] = now_ts
+                if drop_msg:
+                    result_lines.append(drop_msg)
 
         result_lines.append(battle_desc)
 
@@ -483,16 +509,16 @@ async def handle_npc_attack(session, attacker: Player, target_npc, event: Messag
     # 检查NPC状态
     if target_npc.is_dead():
         await attack_cmd.finish(f"⛔ {target_npc.name}已经死亡")
-    
+
     if target_npc.is_respawning():
         remaining = target_npc.respawn_time - target_npc.death_time
         minutes = int(remaining.total_seconds() / 60)
         await attack_cmd.finish(f"⛔ {target_npc.name}正在复活中，还需{minutes}分钟")
-    
+
     # 检查是否可以攻击
     if not target_npc.is_killable and target_npc.npc_type != NPCType.GHOST:
         await attack_cmd.finish(f"⛔ {target_npc.name}是友善的NPC，无法攻击")
-    
+
     # 构建NPC战斗属性
     npc_stats = {
         "hp": target_npc.hp,
@@ -500,28 +526,28 @@ async def handle_npc_attack(session, attacker: Player, target_npc, event: Messag
         "defense": target_npc.defense,
         "agility": target_npc.agility
     }
-    
+
     # 执行战斗
     battle_timestamp = int(time.time() * 1000)
     seed = f"NPC_{attacker.id}_{target_npc.npc_id}_{battle_timestamp}"
-    
+
     try:
         victory, battle_log, damage_taken = BattleIntegrationHelper.enhanced_player_vs_monster_battle(
             attacker, npc_stats, target_npc.name, seed=seed, max_rounds=50
         )
-        
+
         # 更新玩家血量
         attacker.hp = max(0, attacker.hp - damage_taken)
-        
+
         # 构建战斗结果
         result_lines = [
             f"⚔️ {attacker.nickname} VS {target_npc.name}",
             "━━━━━━━━━━━━━"
         ]
-        
+
         # 显示战斗日志
         result_lines.extend(battle_log)
-        
+
         if victory:
             # 玩家胜利，NPC死亡
             if target_npc.is_killable:
@@ -529,7 +555,7 @@ async def handle_npc_attack(session, attacker: Player, target_npc, event: Messag
                 result_lines.append(f"💀 {target_npc.name}被击杀")
                 if target_npc.respawn_duration_minutes > 0:
                     result_lines.append(f"⏰ {target_npc.respawn_duration_minutes}分钟后复活")
-            
+
             # 鬼怪特殊奖励
             if target_npc.npc_type == NPCType.GHOST:
                 exp_gain = target_npc.level * 10
@@ -543,10 +569,10 @@ async def handle_npc_attack(session, attacker: Player, target_npc, event: Messag
                 result_lines.append("💀 你被击败了")
             else:
                 result_lines.append("⏰ 战斗超时，平局")
-        
+
         await session.commit()
         await attack_cmd.finish(message_add_head("\n".join(result_lines), event))
-        
+
     except ValueError as e:
         await attack_cmd.finish(f"⛔ 战斗系统错误：{str(e)}")
 
@@ -567,7 +593,7 @@ async def handle_kill_stats(event: MessageEvent):
                 await kill_stats_cmd.finish("⛔ 你还没有创建角色或绑定账号\n💡 请先在群聊注册角色，然后使用绑定功能")
             else:
                 await kill_stats_cmd.finish("⛔ 请先创建角色")
-        
+
         # 这里可以添加击杀统计的逻辑
         # 目前先显示基本信息
         lines = [
@@ -587,5 +613,5 @@ async def handle_kill_stats(event: MessageEvent):
             "",
             "💡 提示：击杀统计功能正在开发中"
         ]
-        
+
         await kill_stats_cmd.finish(message_add_head("\n".join(lines), event))
