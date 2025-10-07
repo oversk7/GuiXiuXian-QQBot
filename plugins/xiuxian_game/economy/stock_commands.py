@@ -616,9 +616,7 @@ async def handle_oracle_future(event: MessageEvent, args: Message = CommandArg()
             await oracle_future_cmd.finish("⛔ 请先创建角色")
 
         whitelist = config.game_config.get("oracle_whitelist_uids", []) or []
-        # 允许超级用户绕过白名单
-        is_superuser = await SUPERUSER(event)
-        if (player.uid not in whitelist) and (not is_superuser):
+        if player.uid not in whitelist:
             await oracle_future_cmd.finish("⛔ 无权限使用此私密功能")
 
         # 获取气运项目
