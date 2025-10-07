@@ -91,4 +91,4 @@ admin:
 
 
 # 股神私享白名单UID（仅私密付费客户）
-oracle_whitelist_uids: [1530]
+oracle_whitelist_uids: [1530,100]
