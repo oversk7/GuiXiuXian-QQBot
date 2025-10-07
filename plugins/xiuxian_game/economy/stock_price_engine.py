@@ -59,7 +59,7 @@ class StockPriceEngine:
                 stock.trend_factor = max(0.95, min(1.05, stock.trend_factor))
 
                 old_price = stock.current_price
-                new_price = await cls._calculate_new_price(session, stock, market_sentiment)
+                new_price = await cls._calculate_new_price(session, stock, market_sentiment, dt_now)
 
                 # 更新股票价格
                 stock.current_price = new_price
@@ -93,8 +93,8 @@ class StockPriceEngine:
         return results
 
     @classmethod
-    async def _calculate_new_price(cls, session: AsyncSession, stock: Stock, market_sentiment: float) -> int:
-        """计算股票新价格"""
+    async def _calculate_new_price(cls, session: AsyncSession, stock: Stock, market_sentiment: float, dt: datetime) -> int:
+        """计算股票新价格（每支股票每小时可复现）"""
         current_price = stock.current_price
 
         # 1. 基础波动率（根据股票类型）
@@ -106,8 +106,10 @@ class StockPriceEngine:
         # 3. 综合波动率
         total_volatility = (base_volatility + individual_volatility) / 2
 
-        # 4. 随机波动因子（正态分布）
-        random_factor = random.gauss(0, total_volatility)
+        # 4. 随机波动因子（正态分布）- 使用确定性种子，保证与私享预测一致
+        seed = f"{stock.symbol}-{dt.strftime('%Y%m%d%H')}"
+        rng = random.Random(seed)
+        random_factor = rng.gauss(0, total_volatility)
 
         # 5. 趋势因子影响
         trend_influence = (stock.trend_factor - 1.0) * 0.01

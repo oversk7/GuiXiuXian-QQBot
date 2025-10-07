@@ -626,12 +626,11 @@ async def handle_oracle_future(event: MessageEvent, args: Message = CommandArg()
         if not stock:
             await oracle_future_cmd.finish(f"⛔ 气运项目 {symbol} 不存在或未激活")
 
-        # 逐小时模拟
-        seed = f"{player.uid}-{symbol}-{datetime.now().date()}"
-        rng = random.Random(seed)
+        # 逐小时模拟（与引擎一致的确定性随机：按“股票代码+小时”固定）
         now = datetime.now().replace(minute=0, second=0, microsecond=0)
 
         current_price = stock.current_price
+        trend_factor_local = stock.trend_factor
         lines = [
             f"📈 股神私享·{stock.name}({stock.symbol}) [UID:{player.uid}]",
             "━━━━━━━━━━━━━",
@@ -640,13 +639,21 @@ async def handle_oracle_future(event: MessageEvent, args: Message = CommandArg()
         for i in range(1, hours + 1):
             dt = now + timedelta(hours=i)
             sentiment = StockPriceEngine.get_sentiment_for_hour(dt)
+
+            # 与引擎一致：先衰减趋势因子，再计算价格
+            trend_factor_local = 1.0 + (trend_factor_local - 1.0) * 0.9
+            trend_factor_local = max(0.95, min(1.05, trend_factor_local))
+
+            # 与引擎一致：当小时种子仅与“股票代码+小时”相关
+            hour_seed = f"{symbol}-{dt.strftime('%Y%m%d%H')}"
+            rng = random.Random(hour_seed)
             current_price, change = _oracle_next_price(
                 rng,
                 current_price,
                 stock.base_price,
                 stock.stock_type,
                 stock.volatility,
-                stock.trend_factor,
+                trend_factor_local,
                 sentiment,
             )
             t = dt.strftime("%m-%d %H:%M")
