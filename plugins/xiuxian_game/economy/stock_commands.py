@@ -12,13 +12,17 @@ from nonebot import on_command
 from nonebot.adapters.qq import MessageEvent, Message
 from nonebot.params import CommandArg
 from sqlalchemy import select
-from datetime import datetime
+from datetime import datetime, timedelta
 from nonebot.permission import SUPERUSER
 from ..models.db import safe_session
 from ..models.player import Player
 from ..models.stock import Stock, StockType, StockPriceHistory
 from ..utils import message_add_head
 from .stock_service import StockService
+from .stock_price_engine import StockPriceEngine
+from ..config import config
+import random
+
 
 
 # 气运投资相关命令
@@ -82,7 +86,7 @@ async def handle_stock_list(event: MessageEvent):
             else:
                 lines.append("⏰ 即将刷新价格...")
         lines.append("")
-        
+
         type_names = {
             StockType.TECH: "🔬 法宝气运",
             StockType.FINANCE: "🏦 金融气运",
@@ -91,22 +95,22 @@ async def handle_stock_list(event: MessageEvent):
             StockType.HEALTHCARE: "🏥 医道气运",
             StockType.MATERIALS: "🏗️ 材料气运"
         }
-        
+
         for stock_type, stocks_in_type in type_groups.items():
             lines.append(f"\n{type_names.get(stock_type, stock_type)}")
             for stock in stocks_in_type:
                 # 计算涨跌
                 change_rate = ((stock.current_price - stock.base_price) / stock.base_price) * 100
                 change_symbol = "📈" if change_rate > 0 else "📉" if change_rate < 0 else "➡️"
-                
+
                 lines.append(
                     f"{stock.symbol} {stock.name}\n"
                     f"  💰 {stock.current_price} 金币 {change_symbol}"
                 )
-        
+
         lines.append("\n💡 使用「投资气运 代码 数量」进行投资")
         lines.append("💡 使用「投资气运 代码 数量 银行」从银行账户扣款")
-        
+
         await stock_list_cmd.finish(message_add_head("\n".join(lines), event))
 
 
@@ -120,7 +124,7 @@ async def handle_stock_buy(event: MessageEvent, args: Message = CommandArg()):
     parts = args_text.split()
     if len(parts) < 2:
         await stock_buy_cmd.finish("⛔ 格式：投资气运 <气运代码> <数量> [银行]")
-    
+
     symbol = parts[0].upper()
     try:
         shares = int(parts[1])
@@ -128,9 +132,9 @@ async def handle_stock_buy(event: MessageEvent, args: Message = CommandArg()):
             raise ValueError
     except ValueError:
         await stock_buy_cmd.finish("⛔ 气运数量必须为正整数")
-    
+
     use_bank = len(parts) > 2 and parts[2] in ["银行", "bank"]
-    
+
     # 获取玩家ID
     from ..platform_utils import get_platform_info
     _, user_id = get_platform_info(event)
@@ -139,7 +143,7 @@ async def handle_stock_buy(event: MessageEvent, args: Message = CommandArg()):
     success, message = await StockService.buy_stock(
         user_id, symbol, shares, use_bank
     )
-    
+
     if success:
         await stock_buy_cmd.finish(message_add_head(f"✅ {message}", event))
     else:
@@ -156,7 +160,7 @@ async def handle_stock_sell(event: MessageEvent, args: Message = CommandArg()):
     parts = args_text.split()
     if len(parts) < 2:
         await stock_sell_cmd.finish("⛔ 格式：出售气运 <气运代码> <数量> [银行]")
-    
+
     symbol = parts[0].upper()
     try:
         shares = int(parts[1])
@@ -164,9 +168,9 @@ async def handle_stock_sell(event: MessageEvent, args: Message = CommandArg()):
             raise ValueError
     except ValueError:
         await stock_sell_cmd.finish("⛔ 气运数量必须为正整数")
-    
+
     to_bank = len(parts) > 2 and parts[2] in ["银行", "bank"]
-    
+
     # 获取玩家ID
     from ..platform_utils import get_platform_info
     _, user_id = get_platform_info(event)
@@ -175,7 +179,7 @@ async def handle_stock_sell(event: MessageEvent, args: Message = CommandArg()):
     success, message = await StockService.sell_stock(
         user_id, symbol, shares, to_bank
     )
-    
+
     if success:
         await stock_sell_cmd.finish(message_add_head(f"✅ {message}", event))
     else:
@@ -222,16 +226,16 @@ async def handle_stock_holdings(event: MessageEvent):
                 else:
                     lines.append("⏰ 即将刷新价格...")
             lines.append("")
-    
+
     total_value = 0
     total_cost = 0
-    
+
     for holding in holdings:
         total_value += holding["current_value"]
         total_cost += holding["total_cost"]
-        
+
         profit_symbol = "📈" if holding["profit_loss"] > 0 else "📉" if holding["profit_loss"] < 0 else "➡️"
-        
+
         lines.append(
             f"\n{holding['symbol']} {holding['name']}\n"
             f"  🗠 持有：{holding['shares']} 份\n"
@@ -240,15 +244,15 @@ async def handle_stock_holdings(event: MessageEvent):
             f"  💵 价值：{holding['current_value']} 金币\n"
             f"  {profit_symbol} 盈亏：{holding['profit_loss']:+} 金币 ({holding['profit_loss_rate']:+.2f}%)"
         )
-    
+
     total_profit = total_value - total_cost
     total_profit_rate = (total_profit / total_cost * 100) if total_cost > 0 else 0
     profit_symbol = "📈" if total_profit > 0 else "📉" if total_profit < 0 else "➡️"
-    
+
     lines.append(f"\n💰 总价值：{total_value} 金币")
     lines.append(f"💰 总成本：{total_cost} 金币")
     lines.append(f"{profit_symbol} 总盈亏：{total_profit:+} 金币 ({total_profit_rate:+.2f}%)")
-    
+
     await stock_holdings_cmd.finish(message_add_head("\n".join(lines), event))
 
 
@@ -265,7 +269,7 @@ async def handle_stock_transactions(event: MessageEvent):
         await stock_transactions_cmd.finish(message_add_head("📋 您还没有投资记录", event))
 
     lines = ["📋 最近投资记录", "▃▃▃▃▃▃▃▃▃▃"]
-    
+
     for trans in transactions:
         type_symbol = "🟢" if trans["type"] == "BUY" else "🔴"
         type_text = "投资" if trans["type"] == "BUY" else "出售"
@@ -278,7 +282,7 @@ async def handle_stock_transactions(event: MessageEvent):
             f"  💸 手续费：{trans['commission']} 金币\n"
             f"  🕐 时间：{trans['created_at'].strftime('%m-%d %H:%M')}"
         )
-    
+
     await stock_transactions_cmd.finish(message_add_head("\n".join(lines), event))
 
 
@@ -550,6 +554,102 @@ async def handle_stock_analysis(event: MessageEvent):
         lines.append("• ✅ 单次变化限制（±20%）")
         lines.append("• ✅ 长期会回归基础价格")
         lines.append("")
-        lines.append("💡 使用「气运历史 代码」查看具体股票历史")
 
-        await stock_analysis_cmd.finish(message_add_head("\n".join(lines), event))
+# ==================== 私密付费：未来涨势（仅白名单UID，私聊可用） ====================
+oracle_future_cmd = on_command("未来涨势", block=True, priority=5)
+
+
+def _oracle_next_price(rng: random.Random, price: int, base_price: int, stock_type: StockType, volatility: float, trend_factor: float) -> tuple[int, float]:
+    """基于现有价格引擎的公式进行单步前向模拟（不写库）
+    返回：(新价格, 本步变化率)
+    """
+    base_vol = StockPriceEngine.TYPE_VOLATILITY.get(stock_type, 0.05)
+    total_vol = (base_vol + volatility) / 2
+
+    # 随机因子（正态分布）、趋势影响、回归因子，市场情绪固定为中性
+    rand_factor = rng.gauss(0, total_vol)
+    trend_influence = (trend_factor - 1.0) * 0.01
+    regression_factor = -((price - base_price) / base_price) * 0.02
+
+    total_change = rand_factor + trend_influence + regression_factor
+    # 限制单步变化幅度
+    total_change = max(-0.20, min(0.20, total_change))
+
+    new_price = int(price * (1 + total_change))
+    min_price = max(1, int(base_price * 0.2))
+    new_price = max(min_price, new_price)
+    return new_price, total_change
+
+
+@oracle_future_cmd.handle()
+async def handle_oracle_future(event: MessageEvent, args: Message = CommandArg()):
+    """隐藏指令：未来涨势 <代码> <小时数>
+    - 仅限私聊
+    - 仅白名单UID或超级用户
+    - 直接返回逐小时具体时间与价格
+    """
+    # 仅私聊
+    if not event.get_session_id().startswith("friend_"):
+        await oracle_future_cmd.finish("⛔ 此指令仅限私信使用")
+
+    args_text = args.extract_plain_text().strip()
+    parts = args_text.split()
+    if len(parts) != 2:
+        await oracle_future_cmd.finish("⛔ 格式：未来涨势 <气运代码> <小时数>")
+
+    symbol = parts[0].upper()
+    try:
+        hours = int(parts[1])
+        if hours <= 0:
+            raise ValueError
+    except ValueError:
+        await oracle_future_cmd.finish("⛔ 小时数必须为正整数")
+
+    # 单次预测窗口上限，避免消息过长
+    ORACLE_MAX_HOURS = 168  # 7天
+    hours = min(hours, ORACLE_MAX_HOURS)
+
+    async with safe_session() as session:
+        # 获取玩家与白名单
+        player = await session.get(Player, event.get_user_id())
+        if not player:
+            await oracle_future_cmd.finish("⛔ 请先创建角色")
+
+        whitelist = config.game_config.get("oracle_whitelist_uids", []) or []
+        # 允许超级用户绕过白名单
+        is_superuser = await SUPERUSER(event)
+        if (player.uid not in whitelist) and (not is_superuser):
+            await oracle_future_cmd.finish("⛔ 无权限使用此私密功能")
+
+        # 获取气运项目
+        stmt = select(Stock).where(Stock.symbol == symbol, Stock.is_active == True)
+        stock = (await session.execute(stmt)).scalars().first()
+        if not stock:
+            await oracle_future_cmd.finish(f"⛔ 气运项目 {symbol} 不存在或未激活")
+
+        # 逐小时模拟
+        seed = f"{player.uid}-{symbol}-{datetime.now().date()}"
+        rng = random.Random(seed)
+        now = datetime.now().replace(minute=0, second=0, microsecond=0)
+
+        current_price = stock.current_price
+        lines = [
+            f"📈 股神私享·{stock.name}({stock.symbol}) [UID:{player.uid}]",
+            "━━━━━━━━━━━━━",
+        ]
+
+        for i in range(1, hours + 1):
+            current_price, change = _oracle_next_price(
+                rng,
+                current_price,
+                stock.base_price,
+                stock.stock_type,
+                stock.volatility,
+                stock.trend_factor,
+            )
+            t = (now + timedelta(hours=i)).strftime("%m-%d %H:%M")
+            arrow = "📈" if change > 0 else ("📉" if change < 0 else "➡️")
+            lines.append(f"{t}  {arrow}  {current_price} 金币  ({change*100:+.2f}%)")
+
+        await oracle_future_cmd.finish(message_add_head("\n".join(lines), event))
+
