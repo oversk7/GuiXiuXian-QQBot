@@ -240,19 +240,30 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
         # 使用emoji装饰前三名
         rank_emoji = "🥇" if idx == 1 else "🥈" if idx == 2 else "🥉" if idx == 3 else f"{idx}."
 
-        # 根据探索层数显示不同的称号
-        if p.max_dungeon_level == 0:
+        # 根据探索层数显示不同的称号（扩充高阶段位）
+        lvl = p.max_dungeon_level
+        if lvl == 0:
             title = "🌱新手探索者"
-        elif p.max_dungeon_level < 10:
+        elif lvl < 10:
             title = "🔍初级探索者"
-        elif p.max_dungeon_level < 50:
+        elif lvl < 50:
             title = "⚔️资深探索者"
-        elif p.max_dungeon_level < 100:
+        elif lvl < 100:
             title = "🌟精英探索者"
-        elif p.max_dungeon_level < 200:
+        elif lvl < 200:
             title = "👑大师探索者"
+        elif lvl < 300:
+            title = "🕳️深渊行者"
+        elif lvl < 500:
+            title = "🔮虚空寻路者"
+        elif lvl < 800:
+            title = "👁️边界见证者"
+        elif lvl < 1000:
+            title = "🌀维度旅者"
+        elif lvl < 1500:
+            title = "🌙禁忌开拓者"
         else:
-            title = "🌌传说探索者"
+            title = "🌌不可名状的先驱"
 
         lines.append(f"{rank_emoji} {p.nickname}[UID:{p.uid}] - {title} 第{p.max_dungeon_level}层")
 
@@ -287,21 +298,32 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
         # 使用emoji装饰前三名
         rank_emoji = "🥇" if idx == 1 else "🥈" if idx == 2 else "🥉" if idx == 3 else f"{idx}."
 
-        # 根据敏捷值显示不同的称号
-        if p.agility < 10:
+        # 根据敏捷值显示不同的称号（扩充高阶段位）
+        agi = p.agility
+        if agi < 10:
             title = "🐌迟缓者"
-        elif p.agility < 30:
+        elif agi < 30:
             title = "🚶‍♂️步行者"
-        elif p.agility < 60:
+        elif agi < 60:
             title = "🏃‍♂️奔跑者"
-        elif p.agility < 100:
+        elif agi < 100:
             title = "🦌疾风者"
-        elif p.agility < 150:
+        elif agi < 150:
             title = "⚡闪电者"
-        elif p.agility < 200:
+        elif agi < 200:
             title = "🌪️风暴者"
+        elif agi < 300:
+            title = "🌬️音障破者"
+        elif agi < 500:
+            title = "🌠流星掠影"
+        elif agi < 800:
+            title = "🛰️轨道驰骋者"
+        elif agi < 1200:
+            title = "⏱️时隙跃迁者"
+        elif agi < 2000:
+            title = "🕳️相对论践踏者"
         else:
-            title = "💫光速者"
+            title = "🌀相位神行者"
 
         lines.append(f"{rank_emoji} {p.nickname}[UID:{p.uid}] - {title} ⚡{p.agility}")
 
