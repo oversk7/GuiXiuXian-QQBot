@@ -66,25 +66,22 @@ async def handle_stock_list(event: MessageEvent):
         # 构建消息
         lines = ["💎 气运投资行情", "▃▃▃▃▃▃▃▃▃▃"]
 
-        # 计算下次刷新时间
-        latest_stock = max(stocks, key=lambda s: s.updated_at)
-        next_update_time = latest_stock.updated_at + StockService.PRICE_UPDATE_INTERVAL
+        # 计算下次刷新时间（整点刷新）
         now = datetime.now()
-        time_until_update = next_update_time - now
+        current_hour = now.replace(minute=0, second=0, microsecond=0)
+        next_hour = current_hour + timedelta(hours=1)
+        time_until_update = next_hour - now
 
         # 显示刷新时间信息
         if price_updated:
             lines.append("🔄 价格已更新")
         else:
-            if time_until_update.total_seconds() > 0:
-                hours = int(time_until_update.total_seconds() // 3600)
-                minutes = int((time_until_update.total_seconds() % 3600) // 60)
-                if hours > 0:
-                    lines.append(f"⏰ 下次刷新：{hours}小时{minutes}分钟后")
-                else:
-                    lines.append(f"⏰ 下次刷新：{minutes}分钟后")
+            minutes = int(time_until_update.total_seconds() // 60)
+            seconds = int(time_until_update.total_seconds() % 60)
+            if minutes > 0:
+                lines.append(f"⏰ 下次刷新：{minutes}分{seconds}秒后 ({next_hour.strftime('%H:%M')}整点)")
             else:
-                lines.append("⏰ 即将刷新价格...")
+                lines.append(f"⏰ 下次刷新：{seconds}秒后")
         lines.append("")
 
         type_names = {
@@ -559,6 +556,67 @@ async def handle_stock_analysis(event: MessageEvent):
 oracle_future_cmd = on_command("未来涨势", block=True, priority=5)
 
 
+async def _show_all_stocks_prediction(session, player: Player, event: MessageEvent):
+    """显示所有股票未来5小时预测"""
+    # 获取所有活跃股票
+    stmt = select(Stock).where(Stock.is_active == True).order_by(Stock.symbol)
+    stocks = (await session.execute(stmt)).scalars().all()
+
+    if not stocks:
+        await oracle_future_cmd.finish("⛔ 当前没有可投资的气运")
+
+    now = datetime.now().replace(minute=0, second=0, microsecond=0)
+    hours = 5  # 默认预测5小时
+
+    lines = [
+        f"📈 股神私享·全市场预测 [UID:{player.uid}]",
+        "━━━━━━━━━━━━━",
+        f"⏰ 基准时间：{now.strftime('%m-%d %H:%M')}",
+        ""
+    ]
+
+    for stock in stocks:
+        current_price = stock.current_price
+        trend_factor_local = stock.trend_factor
+
+        # 股票标题
+        lines.append(f"【{stock.symbol}】{stock.name} - 当前 {current_price} 金币")
+
+        # 预测未来5小时
+        predictions = []
+        for i in range(1, hours + 1):
+            dt = now + timedelta(hours=i)
+            sentiment = StockPriceEngine.get_sentiment_for_hour(dt)
+
+            # 先衰减趋势因子
+            trend_factor_local = 1.0 + (trend_factor_local - 1.0) * 0.9
+            trend_factor_local = max(0.95, min(1.05, trend_factor_local))
+
+            # 计算价格
+            hour_seed = f"{stock.symbol}-{dt.strftime('%Y%m%d%H')}"
+            rng = random.Random(hour_seed)
+            current_price, change = _oracle_next_price(
+                rng,
+                current_price,
+                stock.base_price,
+                stock.stock_type,
+                stock.volatility,
+                trend_factor_local,
+                sentiment,
+            )
+
+            arrow = "📈" if change > 0 else ("📉" if change < 0 else "➡️")
+            predictions.append(f"{dt.strftime('%H时')} {arrow}{current_price}")
+
+        lines.append("  " + " | ".join(predictions))
+        lines.append("")
+
+    lines.append("💡 查看详细：未来涨势 <代码> <小时数>")
+
+    await oracle_future_cmd.finish(message_add_head("\n".join(lines), event))
+
+
+
 def _oracle_next_price(rng: random.Random, price: int, base_price: int, stock_type: StockType, volatility: float, trend_factor: float, market_sentiment: float) -> tuple[int, float]:
     """基于现有价格引擎的公式进行单步前向模拟（不写库）
     返回：(新价格, 本步变化率)
@@ -584,31 +642,15 @@ def _oracle_next_price(rng: random.Random, price: int, base_price: int, stock_ty
 
 @oracle_future_cmd.handle()
 async def handle_oracle_future(event: MessageEvent, args: Message = CommandArg()):
-    """隐藏指令：未来涨势 <代码> <小时数>
+    """隐藏指令：未来涨势 [代码] [小时数]
     - 仅限私聊
-    - 仅白名单UID或超级用户
-    - 直接返回逐小时具体时间与价格
+    - 仅白名单UID
+    - 无参数：显示所有股票未来5小时预测
+    - 有参数：显示指定股票指定小时数预测
     """
     # 仅私聊
     if not event.get_session_id().startswith("friend_"):
         await oracle_future_cmd.finish("⛔ 此指令仅限私信使用")
-
-    args_text = args.extract_plain_text().strip()
-    parts = args_text.split()
-    if len(parts) != 2:
-        await oracle_future_cmd.finish("⛔ 格式：未来涨势 <气运代码> <小时数>")
-
-    symbol = parts[0].upper()
-    try:
-        hours = int(parts[1])
-        if hours <= 0:
-            raise ValueError
-    except ValueError:
-        await oracle_future_cmd.finish("⛔ 小时数必须为正整数")
-
-    # 单次预测窗口上限，避免消息过长
-    ORACLE_MAX_HOURS = 168  # 7天
-    hours = min(hours, ORACLE_MAX_HOURS)
 
     async with safe_session() as session:
         # 获取玩家与白名单
@@ -619,6 +661,30 @@ async def handle_oracle_future(event: MessageEvent, args: Message = CommandArg()
         whitelist = config.game_config.get("oracle_whitelist_uids", []) or []
         if player.uid not in whitelist:
             await oracle_future_cmd.finish("⛔ 无权限使用此私密功能")
+
+        args_text = args.extract_plain_text().strip()
+
+        # 无参数：显示所有股票未来5小时
+        if not args_text:
+            await _show_all_stocks_prediction(session, player, event)
+            return
+
+        # 有参数：显示指定股票
+        parts = args_text.split()
+        if len(parts) != 2:
+            await oracle_future_cmd.finish("⛔ 格式：未来涨势 <气运代码> <小时数>\n💡 或直接发送「未来涨势」查看所有股票未来5小时")
+
+        symbol = parts[0].upper()
+        try:
+            hours = int(parts[1])
+            if hours <= 0:
+                raise ValueError
+        except ValueError:
+            await oracle_future_cmd.finish("⛔ 小时数必须为正整数")
+
+        # 单次预测窗口上限，避免消息过长
+        ORACLE_MAX_HOURS = 168  # 7天
+        hours = min(hours, ORACLE_MAX_HOURS)
 
         # 获取气运项目
         stmt = select(Stock).where(Stock.symbol == symbol, Stock.is_active == True)
