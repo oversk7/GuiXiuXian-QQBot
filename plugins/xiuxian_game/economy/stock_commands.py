@@ -559,19 +559,20 @@ async def handle_stock_analysis(event: MessageEvent):
 oracle_future_cmd = on_command("未来涨势", block=True, priority=5)
 
 
-def _oracle_next_price(rng: random.Random, price: int, base_price: int, stock_type: StockType, volatility: float, trend_factor: float) -> tuple[int, float]:
+def _oracle_next_price(rng: random.Random, price: int, base_price: int, stock_type: StockType, volatility: float, trend_factor: float, market_sentiment: float) -> tuple[int, float]:
     """基于现有价格引擎的公式进行单步前向模拟（不写库）
     返回：(新价格, 本步变化率)
     """
     base_vol = StockPriceEngine.TYPE_VOLATILITY.get(stock_type, 0.05)
     total_vol = (base_vol + volatility) / 2
 
-    # 随机因子（正态分布）、趋势影响、回归因子，市场情绪固定为中性
+    # 随机因子（正态分布）、趋势影响、回归因子、市场情绪
     rand_factor = rng.gauss(0, total_vol)
     trend_influence = (trend_factor - 1.0) * 0.01
     regression_factor = -((price - base_price) / base_price) * 0.02
+    sentiment_influence = (market_sentiment - 1.0)
 
-    total_change = rand_factor + trend_influence + regression_factor
+    total_change = rand_factor + trend_influence + regression_factor + sentiment_influence
     # 限制单步变化幅度
     total_change = max(-0.20, min(0.20, total_change))
 
@@ -637,6 +638,8 @@ async def handle_oracle_future(event: MessageEvent, args: Message = CommandArg()
         ]
 
         for i in range(1, hours + 1):
+            dt = now + timedelta(hours=i)
+            sentiment = StockPriceEngine.get_sentiment_for_hour(dt)
             current_price, change = _oracle_next_price(
                 rng,
                 current_price,
@@ -644,8 +647,9 @@ async def handle_oracle_future(event: MessageEvent, args: Message = CommandArg()
                 stock.stock_type,
                 stock.volatility,
                 stock.trend_factor,
+                sentiment,
             )
-            t = (now + timedelta(hours=i)).strftime("%m-%d %H:%M")
+            t = dt.strftime("%m-%d %H:%M")
             arrow = "📈" if change > 0 else ("📉" if change < 0 else "➡️")
             lines.append(f"{t}  {arrow}  {current_price} 金币  ({change*100:+.2f}%)")
 
