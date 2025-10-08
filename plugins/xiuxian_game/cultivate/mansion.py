@@ -13,7 +13,7 @@ class MansionService:
     """阴宅服务类"""
     
     # 阴宅等级配置
-    MAX_LEVEL = 10  # 最大等级
+    MAX_LEVEL = 30  # 最大等级
     BASE_UPGRADE_COST = 10_000_000  # 基础升级费用（1千万）
     COST_MULTIPLIER = 1.5  # 费用递增倍数
     BASE_EFFICIENCY = 0.2  # 基础效率加成（20%）
@@ -21,9 +21,9 @@ class MansionService:
 
     # 阴宅使用费用配置
     BASE_MIN_USAGE_FEE = 1000  # 基础最低使用费用（1000金币）
-    MAX_USAGE_FEE = 1_000_000  # 最高使用费用（100万金币）
+    MAX_USAGE_FEE = 5_000_000  # 最高使用费用（500万金币）
     FEE_LEVEL_MULTIPLIER = 500  # 每级增加的最低费用（500金币）
-    
+
     @classmethod
     def get_min_usage_fee(cls, mansion_level: int) -> int:
         """
