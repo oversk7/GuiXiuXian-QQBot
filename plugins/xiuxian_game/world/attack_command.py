@@ -21,6 +21,10 @@ from .npc_service import NPCService
 from ..player.realm_utils import realm_by_level_and_reincarnation
 from ..battle.integration_helper import BattleIntegrationHelper
 from ..config import config
+from ..models.pvp_log import PvpLog
+from sqlalchemy.exc import SQLAlchemyError
+
+
 
 # 掉落保护（短期内避免重复劫掠）
 DROP_PROTECTION_SECONDS = 60
@@ -487,13 +491,44 @@ async def handle_player_attack(session, attacker: Player, target: Player, event:
             winner = attacker if victory else target
             now_ts = time.time()
             last_ts = _last_pvp_drop_time.get(loser.id, 0)
+            drop_summary = ""
             if now_ts - last_ts < DROP_PROTECTION_SECONDS:
                 result_lines.append("🛡️ 掉落保护生效：短时间内不再掉落物品")
+                drop_summary = "🛡️ 掉落保护生效"
             else:
                 drop_msg = await handle_wilderness_drops(session, loser, winner)
                 _last_pvp_drop_time[loser.id] = now_ts
                 if drop_msg:
                     result_lines.append(drop_msg)
+                    # 压缩为单行摘要便于列表展示
+                    drop_summary = drop_msg.replace("\n", "；")
+                else:
+                    drop_summary = "无掉落"
+
+            # 记录死斗日志（仅非城镇）
+            try:
+                bt_simple = "诡域" if "诡域" in battle_type else "荒野"
+                log = PvpLog(
+                    ts=int(time.time()),
+                    region=current_region,
+                    x=attacker_x,
+                    y=attacker_y,
+                    attacker_id=attacker.id,
+                    defender_id=target.id,
+                    attacker_uid=attacker.uid,
+                    defender_uid=target.uid,
+                    attacker_name=attacker.nickname,
+                    defender_name=target.nickname,
+                    battle_type=bt_simple,
+                    attacker_victory=1 if victory else 0,
+                    attacker_damage=attacker_damage,
+                    defender_damage=target_damage,
+                    drop_summary=drop_summary,
+                )
+                session.add(log)
+            except (ValueError, SQLAlchemyError):
+                # 忽略日志记录/表未创建等问题，不影响战斗流程
+                pass
 
         result_lines.append(battle_desc)
 
@@ -544,9 +579,6 @@ async def handle_npc_attack(session, attacker: Player, target_npc, event: Messag
             f"⚔️ {attacker.nickname} VS {target_npc.name}",
             "━━━━━━━━━━━━━"
         ]
-
-        # 显示战斗日志
-        result_lines.extend(battle_log)
 
         if victory:
             # 玩家胜利，NPC死亡
@@ -615,3 +647,72 @@ async def handle_kill_stats(event: MessageEvent):
         ]
 
         await kill_stats_cmd.finish(message_add_head("\n".join(lines), event))
+
+# ==================== 死斗日志查看 ====================
+pvp_log_cmd = on_command("死斗日志", aliases={"PVP日志", "战斗日志"}, block=True, priority=5)
+
+
+@pvp_log_cmd.handle()
+async def handle_pvp_log(event: MessageEvent, args: Message = CommandArg()):
+    """查看个人死斗日志（包含被袭击与主动进攻）"""
+    async with safe_session() as session:
+        # 获取玩家
+        from ..platform_utils import get_unified_player, is_guild_message
+        player: Player = await get_unified_player(session, event)
+        if not player:
+            if is_guild_message(event):
+                await pvp_log_cmd.finish("⛔ 你还没有创建角色或绑定账号\n💡 请先在群聊注册角色，然后使用绑定功能")
+            else:
+                await pvp_log_cmd.finish("⛔ 请先创建角色")
+
+        # 解析页码
+        text = args.extract_plain_text().strip()
+        page = 1
+        if text.isdigit() and int(text) >= 1:
+            page = int(text)
+        page_size = 5
+        offset = (page - 1) * page_size
+
+        from sqlalchemy import select, or_, desc
+        stmt = (
+            select(PvpLog)
+            .where(or_(PvpLog.attacker_uid == player.uid, PvpLog.defender_uid == player.uid))
+            .order_by(desc(PvpLog.ts))
+            .offset(offset)
+            .limit(page_size)
+        )
+        logs = (await session.execute(stmt)).scalars().all()
+
+        if not logs:
+            await pvp_log_cmd.finish(
+                message_add_head("📜 死斗日志\n━━━━━━━━━━━━━\n暂无记录\n💡 使用【攻击】进行荒野/诡域死斗，或当被袭击后查看此处", event)
+            )
+
+        import time as _t
+        lines = [f"📜 死斗日志 第{page}页", "━━━━━━━━━━━━━"]
+        for rec in logs:
+            ts_str = _t.strftime("%Y-%m-%d %H:%M:%S", _t.localtime(rec.ts))
+            you_are_attacker = rec.attacker_uid == player.uid
+            if you_are_attacker:
+                role_tag = "🟩 你进攻"
+                opponent = f"{rec.defender_name}[UID:{rec.defender_uid}]"
+                result = "你 胜" if rec.attacker_victory == 1 else "你 败"
+                dmg = f"你-{rec.attacker_damage}HP 对方-{rec.defender_damage}HP"
+            else:
+                role_tag = "🟥 被袭击"
+                opponent = f"{rec.attacker_name}[UID:{rec.attacker_uid}]"
+                result = "你 败" if rec.attacker_victory == 1 else "你 胜"
+                dmg = f"你-{rec.defender_damage}HP 对方-{rec.attacker_damage}HP"
+
+            where = f"{rec.battle_type} {rec.region} ({rec.x},{rec.y})"
+            drop = rec.drop_summary or "无掉落"
+            lines.extend([
+                f"{role_tag} | {ts_str} | {where}",
+                f"对手：{opponent}",
+                f"结果：{result}  •  伤害：{dmg}",
+                f"掉落：{drop}",
+                "━━━━━━━━━━━━━",
+            ])
+
+        await pvp_log_cmd.finish(message_add_head("\n".join(lines), event))
+

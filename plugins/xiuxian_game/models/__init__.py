@@ -43,6 +43,8 @@ from .platform_binding import PlatformBinding
 from .fishing_record import FishingRecord, FishingStats
 # 抽奖系统模型
 from .lottery import Lottery, LotteryParticipant, LotteryType, LotteryStatus
+from .pvp_log import PvpLog
+
 
 __all__ = [
     "Player", "Guild", "GuildMember", "GuildBuilding", "GuildPosition", "BuildingType", "WorldMessage", "BankAccount", "ItemInstance", "WorldTile", "NavigationTask", "AlchemyRecord", "MarketOrder",
@@ -56,5 +58,6 @@ __all__ = [
     "InviteReward", "DungeonChestRecord",
     "Location", "NPC", "NPCType", "NPCStatus",
     "TemporaryBuff", "PlatformBinding", "FishingRecord", "FishingStats",
-    "Lottery", "LotteryParticipant", "LotteryType", "LotteryStatus"
+    "Lottery", "LotteryParticipant", "LotteryType", "LotteryStatus",
+    "PvpLog"
 ]
