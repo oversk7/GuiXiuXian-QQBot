@@ -12,8 +12,10 @@ from nonebot.params import CommandArg
 from ..models.db import safe_session
 from ..models.player import Player
 from ..models.navigation_task import NavigationTask
+from ..models.world_tile import WorldTile
 from ..config import config
 from ..utils import message_add_head
+from sqlalchemy import select
 
 
 # 传送指令
@@ -23,6 +25,91 @@ revive_cmd = on_command("返回", aliases={"复活"}, block=True, priority=5)
 # 层级切换指令
 prev_level_cmd = on_command("上一层", aliases={"上层"}, block=True, priority=5)
 next_level_cmd = on_command("下一层", aliases={"下层"}, block=True, priority=5)
+
+
+async def get_tile_description(session, player: Player, region: str, x: int, y: int) -> str:
+    """获取指定位置格子的描述信息
+
+    Args:
+        session: 数据库会话
+        player: 玩家对象
+        region: 区域名称
+        x: X坐标
+        y: Y坐标
+
+    Returns:
+        格子描述字符串
+    """
+    # 获取或创建格子
+    from .dungeon_battle import get_or_create_tile
+    tile = await get_or_create_tile(session, region, x, y)
+
+    # 根据格子类型生成描述
+    if tile.event_type == "MATERIAL":
+        item_cfg = config.items_config["by_id"].get(tile.state.get("item_id"))
+        item_name = item_cfg.get_display_name() if item_cfg else "未知材料"
+        qty = tile.state.get("quantity", "?")
+        looted_by = tile.state.get("looted_by", [])
+        if player.id in looted_by or tile.state.get("looted"):
+            return f"🪨 这里曾经散落着 {item_name} ✖️{qty}，但已被搜刮一空。"
+        return f"✨ 你发现了材料 {item_name} ✖️{qty}，可输入【收集】获取。"
+    elif tile.event_type == "TREASURE":
+        if tile.state.get("looted"):
+            return "🪨 破碎的宝箱静静躺在尘埃中，没有任何价值。"
+        return "🎁 你注意到一个尘封宝箱，输入【探索】能打开它。"
+    elif tile.event_type == "EMPTY":
+        if player.id in tile.state.get("defeated_by", []):
+            return "🪨 这里只剩下诡异的残骸，散发着淡淡的血腥味。"
+        monster = tile.state.get("name")
+        monster_level = tile.state.get("level", 1)
+
+        # 为200级以后的诡异显示特殊属性提示
+        special_info = ""
+        if monster_level >= 200:
+            special_attrs = []
+            if tile.state.get("crit_rate", 0) > 0:
+                special_attrs.append(f"💥暴击{tile.state['crit_rate']:.1f}%")
+            if tile.state.get("combo_rate", 0) > 0:
+                special_attrs.append(f"🔄连击{tile.state['combo_rate']:.1f}%")
+            if tile.state.get("counter_rate", 0) > 0:
+                special_attrs.append(f"⚡反击{tile.state['counter_rate']:.1f}%")
+            if tile.state.get("anti_crit_rate", 0) > 0:
+                special_attrs.append(f"🛡️抗暴{tile.state['anti_crit_rate']:.1f}%")
+
+            if special_attrs:
+                special_info = f"\n🔥 特殊能力：{' '.join(special_attrs)}"
+
+        return f"🌫️ 空间扭曲中传来异响，似乎有 {monster}(Lv{monster_level}) 在此游荡。{special_info}\n若想挑战，可输入【探索】进行调查。"
+    elif tile.event_type == "REST":
+        return "🌫️ 你发现了一家驿站，可输入【探索】恢复生命。"
+    elif tile.event_type == "MERCHANT":
+        if player.id in tile.state.get("visited_by", []):
+            return "🏪 卖货郎已经离开了，只留下空荡荡的摊位。"
+        return "🏪 你遇到了神秘卖货郎，输入【探索】查看他的商品。"
+    elif tile.event_type == "ELITE":
+        if player.id in tile.state.get("defeated_by", []):
+            return "🪨 精英诡异的残骸散落一地，空气中弥漫着强大的灵力余波。"
+        monster = tile.state.get("name")
+        monster_level = tile.state.get("level", 1)
+
+        # 精英怪显示特殊属性
+        special_info = ""
+        special_attrs = []
+        if tile.state.get("crit_rate", 0) > 0:
+            special_attrs.append(f"💥暴击{tile.state['crit_rate']:.1f}%")
+        if tile.state.get("combo_rate", 0) > 0:
+            special_attrs.append(f"🔄连击{tile.state['combo_rate']:.1f}%")
+        if tile.state.get("counter_rate", 0) > 0:
+            special_attrs.append(f"⚡反击{tile.state['counter_rate']:.1f}%")
+        if tile.state.get("anti_crit_rate", 0) > 0:
+            special_attrs.append(f"🛡️抗暴{tile.state['anti_crit_rate']:.1f}%")
+
+        if special_attrs:
+            special_info = f"\n🔥 特殊能力：{' '.join(special_attrs)}"
+
+        return f"⚠️ 强大的灵力波动！精英诡异 {monster}(Lv{monster_level}) 盘踞于此！{special_info}\n输入【探索】挑战它。"
+    else:
+        return "🌫️ 这里空无一物，只有虚空的回响。"
 
 
 @teleport_cmd.handle()
@@ -135,6 +222,11 @@ async def _handle_teleport_logic(event: MessageEvent, target_region: str, cmd_ha
         session.add(player)
         await session.commit()
 
+        # 获取当前位置格子描述
+        tile_desc = None
+        if dungeon_level:
+            tile_desc = await get_tile_description(session, player, target_name, player.dungeon_x, player.dungeon_y)
+
     msg_lines = [
         f"🚪 你耗费 {STAM_COST} 咒抗跨越裂隙，抵达『{target_name}』",
         f"当前位置：{target_name} {current_pos}",
@@ -148,6 +240,11 @@ async def _handle_teleport_logic(event: MessageEvent, target_region: str, cmd_ha
         msg_lines.append("🗺️ 这是一个10x10的独立空间")
         msg_lines.append("📍 坐标范围：(-5,-5) 到 (5,5)")
         msg_lines.append("🧭 使用【上下左右】移动，【探索】调查")
+
+        # 添加当前位置格子描述
+        if tile_desc:
+            msg_lines.append("━━━━━━━━━━━━━")
+            msg_lines.append(tile_desc)
         msg_lines.append("⬆️ 【上一层】切换到更浅的诡域")
         msg_lines.append("⬇️ 【下一层】切换到更深的诡域")
         msg_lines.append("🏠 【返回】穿越回表世界")
@@ -255,6 +352,9 @@ async def handle_prev_level(event: MessageEvent):
         session.add(player)
         await session.commit()
 
+        # 获取当前位置格子描述
+        tile_desc = await get_tile_description(session, player, f"{target_level}层诡域", player.dungeon_x, player.dungeon_y)
+
         msg_lines = [
             f"🌀 你穿越空间裂隙，从第{current_level}重诡域来到第{target_level}重诡域",
             f"📍 当前位置：{target_level}层诡域 ({player.dungeon_x},{player.dungeon_y})",
@@ -264,7 +364,9 @@ async def handle_prev_level(event: MessageEvent):
             "🧭 使用【上下左右】移动，【探索】调查",
             "⬆️ 【上一层】切换到更浅的诡域",
             "⬇️ 【下一层】切换到更深的诡域",
-            "🏠 【返回】穿越回表世界"
+            "🏠 【返回】穿越回表世界",
+            "━━━━━━━━━━━━━",
+            tile_desc
         ]
 
         msg = "\n".join(msg_lines)
@@ -302,6 +404,9 @@ async def handle_next_level(event: MessageEvent):
         session.add(player)
         await session.commit()
 
+        # 获取当前位置格子描述
+        tile_desc = await get_tile_description(session, player, f"{target_level}层诡域", player.dungeon_x, player.dungeon_y)
+
         msg_lines = [
             f"🌀 你穿越空间裂隙，从第{current_level}重诡域来到第{target_level}重诡域",
             f"📍 当前位置：{target_level}层诡域 ({player.dungeon_x},{player.dungeon_y})",
@@ -311,7 +416,9 @@ async def handle_next_level(event: MessageEvent):
             "🧭 使用【上下左右】移动，【探索】调查",
             "⬆️ 【上一层】切换到更浅的诡域",
             "⬇️ 【下一层】切换到更深的诡域",
-            "🏠 【返回】穿越回表世界"
+            "🏠 【返回】穿越回表世界",
+            "━━━━━━━━━━━━━",
+            tile_desc
         ]
 
         msg = "\n".join(msg_lines)
