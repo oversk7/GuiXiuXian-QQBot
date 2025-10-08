@@ -3,6 +3,9 @@ from nonebot.adapters.qq import MessageEvent, Message
 from nonebot.params import CommandArg
 from nonebot.permission import SUPERUSER
 from pathlib import Path
+from sqlalchemy.exc import SQLAlchemyError
+from datetime import datetime
+import json
 from .models.db import safe_session
 from .models.player import Player
 from .utils import message_add_head
@@ -12,16 +15,155 @@ log_uid_matcher = on_message(priority=1, block=False)
 
 @log_uid_matcher.handle()
 async def _(event: MessageEvent):
-    """记录触发指令的玩家信息"""
+    """记录触发指令的玩家信息，并同步最近活跃时间"""
     try:
         async with safe_session() as session:
             player = await session.get(Player, event.get_user_id())
         uid = player.uid if player else "未注册"
         nickname = player.nickname if player else "未注册"
-        command = event.get_plaintext().strip() if event.get_plaintext().strip() else "未知指令"
+        cmd_text_raw = event.get_plaintext().strip()
+        command = cmd_text_raw if cmd_text_raw else "未知指令"
         logger.info(f"UID:{uid} 昵称:{nickname} 指令:{command}")
-    except Exception as e:
+        # 仅在文本非空时记录活跃时间
+        if cmd_text_raw:
+            _update_last_active(player, event.get_user_id(), command)
+    except SQLAlchemyError as e:
         logger.error(f"UID:未知 昵称:未知 指令:未知 状态:失败 错误:{str(e)}")
+
+
+
+def _update_last_active(player: Player | None, user_id: str, command: str) -> None:
+    """将玩家最近活跃时间写入日志目录下的last_active.json
+    不改动数据库，避免迁移；后续有需要可读取此文件做活跃统计/展示
+    """
+    log_dir = Path(__file__).parent.parent.parent / "logs"
+    log_dir.mkdir(parents=True, exist_ok=True)
+    path = log_dir / "last_active.json"
+
+    data = {}
+    try:
+        if path.exists():
+            with open(path, "r", encoding="utf-8") as f:
+                loaded = json.load(f)
+                if isinstance(loaded, dict):
+                    data = loaded
+    except (json.JSONDecodeError, OSError):
+        data = {}
+
+    record = {
+        "uid": (player.uid if player else None),
+        "nickname": (player.nickname if player else None),
+        "last_active": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+        "last_command": command,
+    }
+
+    # 使用平台ID作为键，便于通过event.get_user_id()直接读取
+    data[str(user_id)] = record
+
+    try:
+        with open(path, "w", encoding="utf-8") as f:
+            json.dump(data, f, ensure_ascii=False, indent=2)
+    except OSError:
+        # 写入失败不影响主流程
+        pass
+
+
+# ==================== 查看全服最近活动记录 ====================
+recent_activity_cmd = on_command("最近活动", aliases={"活动记录", "全服活动"}, block=True, priority=5)
+
+@recent_activity_cmd.handle()
+async def handle_recent_activity(event: MessageEvent, args: Message = CommandArg()):
+    """查看全服最近玩家活动记录"""
+    args_text = args.extract_plain_text().strip()
+
+    # 默认显示最近10条，可以指定数量
+    try:
+        count = int(args_text) if args_text else 10
+        if count <= 0 or count > 50:
+            await recent_activity_cmd.finish("⛔ 数量必须在1-50之间")
+    except ValueError:
+        await recent_activity_cmd.finish("⛔ 请输入有效的数字")
+
+    log_dir = Path(__file__).parent.parent.parent / "logs"
+    path = log_dir / "last_active.json"
+
+    if not path.exists():
+        await recent_activity_cmd.finish(message_add_head("❌ 暂无活动记录", event))
+
+    try:
+        with open(path, "r", encoding="utf-8") as f:
+            data = json.load(f)
+
+        if not isinstance(data, dict) or not data:
+            await recent_activity_cmd.finish(message_add_head("❌ 暂无活动记录", event))
+
+        # 将所有记录转换为列表，并按时间排序
+        records = []
+        for user_id, record in data.items():
+            if record.get("last_active") and record.get("uid"):
+                try:
+                    # 解析时间字符串
+                    active_time = datetime.strptime(record["last_active"], "%Y-%m-%d %H:%M:%S")
+                    records.append({
+                        "uid": record["uid"],
+                        "nickname": record.get("nickname", "未知"),
+                        "time": active_time,
+                        "command": record.get("last_command", "未知指令"),
+                    })
+                except (ValueError, KeyError):
+                    continue
+
+        if not records:
+            await recent_activity_cmd.finish(message_add_head("❌ 暂无有效活动记录", event))
+
+        # 按时间倒序排序（最新的在前）
+        records.sort(key=lambda x: x["time"], reverse=True)
+
+        # 取前N条
+        records = records[:count]
+
+        # 构建消息
+        now = datetime.now()
+        msg_lines = [
+            f"📊 全服最近{len(records)}条活动",
+            "━━━━━━━━━━━━━",
+            ""
+        ]
+
+        for idx, rec in enumerate(records, 1):
+            # 计算时间差
+            time_diff = now - rec["time"]
+
+            # 格式化时间差
+            if time_diff.total_seconds() < 60:
+                time_str = f"{int(time_diff.total_seconds())}秒前"
+            elif time_diff.total_seconds() < 3600:
+                time_str = f"{int(time_diff.total_seconds() / 60)}分钟前"
+            elif time_diff.total_seconds() < 86400:
+                time_str = f"{int(time_diff.total_seconds() / 3600)}小时前"
+            else:
+                time_str = f"{int(time_diff.total_seconds() / 86400)}天前"
+
+            # 截断过长的指令
+            cmd_display = rec["command"]
+            if len(cmd_display) > 20:
+                cmd_display = cmd_display[:20] + "..."
+
+            msg_lines.append(f"{time_str} | {rec['nickname']}(UID:{rec['uid']}) | {cmd_display}")
+
+        msg_lines.extend([
+            "",
+            "━━━━━━━━━━━━━",
+            f"💡 使用【最近活动 数量】查看更多（最多50条）"
+        ])
+
+        message = "\n".join(msg_lines)
+        await recent_activity_cmd.finish(message_add_head(message, event))
+
+    except json.JSONDecodeError:
+        await recent_activity_cmd.finish(message_add_head("❌ 活动记录文件格式错误", event))
+    except OSError as e:
+        await recent_activity_cmd.finish(message_add_head(f"❌ 读取活动记录失败: {str(e)}", event))
 
 
 # ==================== 管理员指令：查看最近报错日志 ====================
