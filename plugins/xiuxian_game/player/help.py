@@ -28,14 +28,14 @@ async def handle_help(event: MessageEvent, args: Message = CommandArg()):
         "═════════════\n"
         "🧘 修炼系统  🎭 玩家系统\n"
         "🎒 背包系统  🛒 装备系统\n"
-        "🏪 跑商系统  📦 交易系统\n"
-        "🗓️ 世界系统  🏰 副本系统\n"
+        "⚔️ 战斗系统  🗺️ 探索系统\n"
+        "🏰 副本系统  🏛️ 委托系统\n"
+        "💰 经济系统  📦 交易系统\n"
         "🎮 公会系统  💕 社交系统\n"
-        "💰 银行系统  📈 投资系统\n"
         "🔮 炼丹系统  🏠 阴宅系统\n"
-        "🏛️ 委托系统  💼 打工系统\n"
-        "🎣 钓鱼系统  🎮 娱乐系统\n"
-        "🎁 抽奖系统  📱 账号管理\n"
+        "💼 打工系统  🎣 钓鱼系统\n"
+        "🎮 娱乐系统  🎁 抽奖系统\n"
+        "📱 账号管理\n"
         "═════════════\n"
         "💡 发送对应系统查看详细指令，【赞助】支持诡修仙\n"
         "💡 【】括号里是指令，<>里是必填，[]里是选填\n"
@@ -46,15 +46,29 @@ async def handle_help(event: MessageEvent, args: Message = CommandArg()):
     )
     await help_cmd.finish(Message(msg))
 
-# 跑商系统
-market_cmd = on_command("跑商系统",aliases={"跑商帮助"}, block=True, priority=5)
-@market_cmd.handle()
-async def handle_market(event: MessageEvent, args: Message = CommandArg()):
+# 经济系统（整合跑商、银行、投资）
+economy_cmd = on_command("经济系统",aliases={"经济帮助","跑商系统","跑商帮助","银行系统","银行帮助","投资系统","气运投资"}, block=True, priority=5)
+@economy_cmd.handle()
+async def handle_economy(event: MessageEvent, args: Message = CommandArg()):
     msg = (
-        "✨ 跑商系统帮助 ✨\n"
-        "利用不同坐标的差价赚取金币，每日早9点刷新基础价格，一天内的价格受供需波动，及时查看市价避免亏损\n"
+        "✨ 经济系统帮助 ✨\n"
+        "管理金币、跑商赚钱、银行理财、气运投资\n"
         "━━━━━━━━━━━━━\n"
-        "🏪 市集交易：\n"
+        "💰 银行系统：\n"
+        "【存 <金额>】 存入冥行\n"
+        "【取 <金额>】 从冥行取出\n"
+        "【余额】 查询冥行存款并进行利滚利\n"
+        "【存款榜】 查看冥行存款排行榜\n"
+        "━━━━━━━━━━━━━\n"
+        "📈 气运投资：\n"
+        "【投资行情】 查看所有可投资项目\n"
+        "【投资刷新时间】 查看气运价格刷新时间\n"
+        "【投资气运 <代码> <数量> [银行]】 投资气运\n"
+        "【出售气运 <代码> <数量> [银行]】 出售气运\n"
+        "【我的投资】 查看投资情况\n"
+        "【投资记录】 查看投资记录\n"
+        "━━━━━━━━━━━━━\n"
+        "🏪 跑商系统：\n"
         "【市集】 查看当前坐标市场价格表\n"
         "【市集列表】 查看全部市集坐标\n"
         "【市集详情 <市集名称>】 查看指定市集商品\n"
@@ -72,11 +86,12 @@ async def handle_market(event: MessageEvent, args: Message = CommandArg()):
         "• 专售装备升阶相关特殊物品、镶嵌物\n"
         "• 使用公会积分兑换，无需加入公会\n"
         "━━━━━━━━━━━━━\n"
-        "⚠️ 防刷钱：在某地购买的商品，4小时内不可在同地出售\n"
-        "⚖️ 携带限制：背包中商品总量不能超过500个，防止垄断库存\n"
-        "💡 跑商推荐已智能过滤受限制影响的路线"
+        "💡 存款会自动产生利息，定期查询余额可获得收益\n"
+        "💡 气运投资有风险，投资需谨慎！交易手续费3%\n"
+        "⚠️ 跑商防刷钱：在某地购买的商品，4小时内不可在同地出售\n"
+        "⚖️ 携带限制：背包中商品总量不能超过500个"
     )
-    await market_cmd.finish(Message(msg))
+    await economy_cmd.finish(Message(msg))
 
 # 钓鱼系统
 fishing_cmd = on_command("钓鱼系统", aliases={"钓鱼帮助"}, block=True, priority=5)
@@ -141,55 +156,40 @@ async def handle_alchemy(event: MessageEvent, args: Message = CommandArg()):
     )
     await alchemy_cmd.finish(Message(msg))
 
-# 银行系统
-bank_cmd = on_command("银行系统",aliases={"银行帮助"}, priority=4, block=True)
-@bank_cmd.handle()
-async def handle_bank(event: MessageEvent, args: Message = CommandArg()):
+# 战斗系统
+battle_cmd = on_command("战斗系统",aliases={"战斗帮助","PVP系统"}, priority=4, block=True)
+@battle_cmd.handle()
+async def handle_battle(event: MessageEvent, args: Message = CommandArg()):
     msg = (
-        "✨ 银行系统帮助 ✨\n"
-        "冥行存取金币，查询余额时自动利滚利\n"
+        "✨ 战斗系统帮助 ✨\n"
+        "玩家对战、NPC战斗、世界BOSS挑战\n"
         "━━━━━━━━━━━━━\n"
-        "【存 <金额>】 存入冥行\n"
-        "【取 <金额>】 从冥行取出\n"
-        "【余额】 查询冥行存款并进行利滚利\n"
-        "【转账 <UID> <金额>】 向其他玩家转账（收取3%手续费）\n"
-        "【存款榜】 查看冥行存款排行榜\n"
-        "【银行投资】 查看气运投资理财选项\n"
+        "⚔️ 玩家对战：\n"
+        "【切磋 <UID>】 友好切磋，无损失\n"
+        "【模拟战斗 <UID1> <UID2>】 观看两个玩家的模拟战斗\n"
+        "【攻击 <玩家UID/NPC名称>】 攻击目标\n"
+        "  • 城镇安全区：友好切磋，无损失\n"
+        "  • 荒野/诡域：真实死斗，败者掉落物品\n"
+        "【死斗日志 [页码]】 查看PVP日志\n"
         "━━━━━━━━━━━━━\n"
-        "💡 存款会自动产生利息，定期查询余额可获得收益\n"
-        "💡 转账可用于玩家间金币交易，手续费3%"
+        "🌟 世界BOSS：\n"
+        "【世界BOSS】 查看BOSS信息与规则\n"
+        "【讨伐BOSS】 攻击BOSS（每日3次）\n"
+        "【BOSS排行】 查看伤害排行榜\n"
+        "【开启深渊宝箱】 开启获得的深渊宝箱奖励\n"
+        "━━━━━━━━━━━━━\n"
+        "� 战力系统：\n"
+        "【战力】 查看自身完整属性\n"
+        "【战力说明】 查看各项战斗属性的作用\n"
+        "【加点帮助】 查看基本属性加点指南\n"
+        "━━━━━━━━━━━━━\n"
+        "⚡ 战斗机制：\n"
+        "• 敏捷高的玩家更容易获得先手\n"
+        "• 支持暴击、连击、反击、闪避等效果\n"
+        "• 最多进行30回合，超时则平局\n"
+        "� 城镇安全区包括：市集、总部、打工地点附近5格"
     )
-    await bank_cmd.finish(Message(msg))
-
-# 气运投资系统
-stock_cmd = on_command("气运投资",aliases={"投资系统"}, priority=4, block=True)
-@stock_cmd.handle()
-async def handle_stock(event: MessageEvent, args: Message = CommandArg()):
-    msg = (
-        "✨ 气运投资系统帮助 ✨\n"
-        "投资各类气运项目，获得修仙资源收益\n"
-        "━━━━━━━━━━━━━\n"
-        "【投资行情】 查看所有可投资项目\n"
-        "【投资刷新时间】 查看气运价格刷新时间\n"
-        "【投资气运 <代码> <数量>】 投资气运（使用现金）\n"
-        "【投资气运 <代码> <数量> 银行】 投资气运（使用银行资金）\n"
-        "【出售气运 <代码> <数量>】 出售气运（收入到现金）\n"
-        "【出售气运 <代码> <数量> 银行】 出售气运（收入到银行）\n"
-        "【我的投资】 查看投资情况\n"
-        "【投资记录】 查看投资记录\n"
-        "━━━━━━━━━━━━━\n"
-        "💎 投资类型：\n"
-        "🔬 法宝气运 - 高波动，高风险高收益\n"
-        "🏦 金融气运 - 相对稳定\n"
-        "⚡ 灵气气运 - 中等波动\n"
-        "🛒 丹药气运 - 较为稳定\n"
-        "🏥 医道气运 - 中等波动\n"
-        "🏗️ 材料气运 - 较高波动\n"
-        "━━━━━━━━━━━━━\n"
-        "⚠️ 风险提示：气运投资有风险，投资需谨慎！\n"
-        "💸 手续费：交易金额的3%"
-    )
-    await stock_cmd.finish(Message(msg))
+    await battle_cmd.finish(Message(msg))
 
 # 打工系统
 part_time_job_cmd = on_command("打工系统", aliases={"打工帮助"}, priority=4, block=True)
@@ -374,32 +374,36 @@ async def handle_mansion(event: MessageEvent, args: Message = CommandArg()):
     await mansion_cmd.finish(Message(msg))
 
 
-# 活动系统
-huo_dong_cmd = on_command("娱乐系统", aliases={"娱乐帮助"}, priority=4, block=True)
+# 娱乐系统
+entertainment_cmd = on_command("娱乐系统", aliases={"娱乐帮助"}, priority=4, block=True)
 
-@huo_dong_cmd.handle()
-async def handle_huo_dong(event: MessageEvent, args: Message = CommandArg()):
+@entertainment_cmd.handle()
+async def handle_entertainment(event: MessageEvent, args: Message = CommandArg()):
     msg = (
         "✨ 娱乐系统 ✨\n"
-        "杂七杂八的小游戏和活动\n"
+        "签到、小游戏、互动剧情等休闲玩法\n"
         "━━━━━━━━━━━━━\n"
-        "🎯 基础功能：\n"
+        "🎯 日常活动：\n"
         "【签到】 每日签到，获取奖励\n"
-        "【切磋 UID】 PVP切磋，无损失的玩家对战\n"
-        "【模拟战斗 UID1 UID2】 观看两个玩家的模拟战斗\n"
-        "【恶魔轮盘帮助】 PVP对战，可以获得对方的赌注（3%税收）\n"
-        "【试炼列表】 查看可用的互动剧情\n"
         "【月卡】 查看月卡状态和权益\n"
-        "━━━━━━━━━━━━━\n"
-        "📱 日常：\n"
         "【抽签 [你的问题]】 中国传统诸葛灵签，显示卦象、签诗、解签\n"
         "【摸鱼日历】 获取今日摸鱼日历和日报图片\n"
         "【每日一言】 获取励志名言警句\n"
         "━━━━━━━━━━━━━\n"
-        "💳 月卡权益：修炼效率提升、闭关时长增加、背包扩容、签到获得月卡宝箱等\n"
-        "💼 打工系统：前往指定坐标打工赚钱，详见【打工系统】\n"
+        "🎮 小游戏：\n"
+        "【恶魔轮盘帮助】 PVP对战赌博游戏（3%税收）\n"
+        "【试炼列表】 查看可用的互动剧情\n"
+        "━━━━━━━━━━━━━\n"
+        "💳 月卡权益：\n"
+        "• 修炼闭关效率提升\n"
+        "• 闭关时长增加\n"
+        "• 背包扩容\n"
+        "• 签到获得月卡宝箱\n"
+        "• 一键献祭、一键修复等便捷功能\n"
+        "━━━━━━━━━━━━━\n"
+        "� 发送【赞助】查看月卡购买方式"
     )
-    await huo_dong_cmd.finish(Message(msg))
+    await entertainment_cmd.finish(Message(msg))
 
 # 背包系统
 bag_cmd = on_command("背包系统", aliases={"背包帮助"}, priority=4, block=True)
@@ -444,12 +448,12 @@ async def handle_bag(event: MessageEvent, args: Message = CommandArg()):
     )
     await bag_cmd.finish(Message(msg))
 
-# 任务系统
-ren_wu_cmd = on_command("世界系统", aliases={"世界帮助"}, priority=4, block=True)
-@ren_wu_cmd.handle()
-async def handle_ren_wu(event: MessageEvent, args: Message = CommandArg()):
+# 探索系统
+explore_cmd = on_command("探索系统", aliases={"世界系统","世界帮助","探索帮助"}, priority=4, block=True)
+@explore_cmd.handle()
+async def handle_explore(event: MessageEvent, args: Message = CommandArg()):
     msg = (
-        "✨ 世界系统帮助 ✨\n"
+        "✨ 探索系统帮助 ✨\n"
         "依赖敏捷进行坐标移动，探索世界，与NPC交互\n"
         "━━━━━━━━━━━━━\n"
         "🗺️ 地图导航：\n"
@@ -463,7 +467,6 @@ async def handle_ren_wu(event: MessageEvent, args: Message = CommandArg()):
         "【观察】 查看当前位置信息（NPC、玩家、阴宅）\n"
         "【地点详情】 查看当前地点的详细信息\n"
         "【交互 <NPC名称>】 与NPC交互（支持关键词）\n"
-        "【攻击 <目标>】 攻击玩家或NPC\n"
         "【NPC列表】 查看当前位置的所有NPC\n"
         "━━━━━━━━━━━━━\n"
         "⚒️ 工坊锻造：\n"
@@ -472,14 +475,6 @@ async def handle_ren_wu(event: MessageEvent, args: Message = CommandArg()):
         "【锻造 <装备名>】 在工坊附近锻造（≤3格）\n"
         "【工匠配方一览 <城市名>】 远程查看城市配方\n"
         "━━━━━━━━━━━━━\n"
-        "⚔️ PvP系统：\n"
-        "🏘️ 城镇安全区（市集/总部/打工地点附近5格）：\n"
-        "• 玩家攻击为友好切磋，无任何损失\n"
-        "🌲 荒野/诡域危险区（其他所有区域）：\n"
-        "• 玩家攻击为真实死斗，败者掉落部分物品\n"
-        "• 不掉落装备和珍贵材料（紫色及以上）\n"
-        "【死斗日志 [页码]】 查看PVP日志\n"
-        "━━━━━━━━━━━━━\n"
         "👥 社交功能：\n"
         "【最近活动 <UID>】 查看指定玩家的最近上线时间\n"
         "【附近玩家】 查看附近玩家\n"
@@ -487,17 +482,13 @@ async def handle_ren_wu(event: MessageEvent, args: Message = CommandArg()):
         "【私信 UID 内容】 给指定修士发送私信\n"
         "【留言板 [世界/私信] [页码]】 查看留言或私信\n"
         "━━━━━━━━━━━━━\n"
-        "🌟 世界BOSS：\n"
-        "【世界BOSS】 查看BOSS信息与规则\n"
-        "【讨伐BOSS】 攻击BOSS（每日3次）\n"
-        "【BOSS排行】 查看伤害排行榜\n"
-        "【开启深渊宝箱】 开启获得的深渊宝箱奖励\n"
-        "━━━━━━━━━━━━━\n"
-        "🌙 其他：\n"
+        "� 其他：\n"
         "【本周主题】 查看本周都市怪谈主题\n"
-        "【更新】 查看最近更新公告"
+        "【更新】 查看最近更新公告\n"
+        "━━━━━━━━━━━━━\n"
+        "💡 敏捷属性影响移动速度和导航效率"
     )
-    await ren_wu_cmd.finish(Message(msg))
+    await explore_cmd.finish(Message(msg))
 
 # 副本系统
 fan_ben_cmd = on_command("副本系统", aliases={"副本帮助"}, priority=4, block=True)
@@ -543,9 +534,12 @@ trade_cmd = on_command("交易系统", aliases={"交易帮助"}, priority=4, blo
 async def handle_trade(event: MessageEvent, args: Message = CommandArg()):
     msg = (
         "✨ 交易系统帮助 ✨\n"
-        "玩家间自由交易平台，支持物品和装备交易，智能撮合成交\n"
+        "玩家间自由交易平台，支持物品、装备交易和金币转账\n"
         "━━━━━━━━━━━━━\n"
-        "🎽 基础功能：\n"
+        "💰 金币转账：\n"
+        "【转账 <UID> <金额>】 向其他玩家转账（收取3%手续费）\n"
+        "━━━━━━━━━━━━━\n"
+        "🎽 物品交易：\n"
         "【交易清单 [页数]】 查看所有在售与求购物品\n"
         "【查牌 <物品名> [页数]】 查看物品买卖价格\n"
         "【挂牌 <出售/收购> <物品名> <单价> [数量]】 挂牌交易\n"
@@ -569,7 +563,8 @@ async def handle_trade(event: MessageEvent, args: Message = CommandArg()):
         "• 50001-200000：超出部分5%\n"
         "• 200000以上：超出部分8%\n"
         "━━━━━━━━━━━━━\n"
-        "⚠️ 限制：最多挂6个订单，8小时内购买的物品不能出售"
+        "⚠️ 限制：最多挂6个订单，8小时内购买的物品不能出售\n"
+        "💡 转账可用于玩家间金币交易，手续费3%"
     )
     await trade_cmd.finish(Message(msg))
 
