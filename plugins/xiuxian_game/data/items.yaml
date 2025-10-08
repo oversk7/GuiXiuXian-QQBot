@@ -1176,45 +1176,47 @@ items:
       rarity: "green"
 
   elixirs:  # 丹药类不可售卖
+    # ========== 经验类丹药 - 按等级伸缩，全程有用 ==========
     - item_id: "spirit_elixir"
       name: "升灵丹"
-      description: "服用后立即获得 8000 经验"
+      description: "初级修炼丹药，随修为增长效果提升。基础3000经验+等级×50"
       type: "CONSUMABLE"
       price: 30000
-      effect_type: "GAIN_EXP"
-      effect_params: {"value": 8000}
-      daily_limit: 3
+      effect_type: "GAIN_EXP_SCALED"
+      effect_params: {"base_value": 3000, "scale_factor": 50}
+      daily_limit: 5
 
     - item_id: "blood_heart_elixir"
       name: "血心丹"
-      description: "以凶兽心血炼制，服用可大幅提升修为，伴随阵阵心跳声。服用后立即获得 25000 经验"
+      description: "以凶兽心血炼制，效果随修为倍增。基础8000经验+等级×120"
       type: "CONSUMABLE"
       price: 50000
-      effect_type: "GAIN_EXP"
-      effect_params: {"value": 25000}
-      daily_limit: 2
+      effect_type: "GAIN_EXP_SCALED"
+      effect_params: {"base_value": 8000, "scale_factor": 120}
+      daily_limit: 3
 
     - item_id: "night_soul_elixir"
       name: "夜魂丹"
-      description: "月蚀之夜炼成，黑雾缭绕，能快速提升修为却染上寒意。服用后立即获得 50000 经验"
+      description: "月蚀之夜炼成，黑雾缭绕，高阶修士专用。基础15000经验+等级×200"
       type: "CONSUMABLE"
       price: 100000
-      effect_type: "GAIN_EXP"
-      effect_params: {"value": 50000}
-      daily_limit: 1
-
-    - item_id: "void_eye_elixir"
-      name: "虚眼丹"
-      description: "凝聚亡者之眼，服用后视万象虚妄，运势与攻击永久提升。"
-      type: "CONSUMABLE"
-      price: 200000
-      effect_type: "BUFF"
-      effect_params: {"luck": 5, "attack": 5}
+      effect_type: "GAIN_EXP_SCALED"
+      effect_params: {"base_value": 15000, "scale_factor": 200}
       daily_limit: 2
 
+    - item_id: "divine_blessing_elixir"
+      name: "神明恩赐丹"
+      description: "蕴含神明恩泽的传说丹药，顶级修士的选择。基础30000经验+等级×350"
+      type: "CONSUMABLE"
+      price: 300000
+      effect_type: "GAIN_EXP_SCALED"
+      effect_params: {"base_value": 30000, "scale_factor": 350}
+      daily_limit: 1
+
+    # ========== 治疗类丹药 - 百分比恢复，附带短时增益 ==========
     - item_id: "life_recovery_elixir"
       name: "回生丹"
-      description: "以珍贵药材炼制，服用后可恢复30%最大生命值。"
+      description: "恢复30%生命值，并短时提升5%防御（10分钟）"
       type: "CONSUMABLE"
       price: 80000
       effect_type: "RESTORE_HP_PERCENT"
@@ -1223,7 +1225,7 @@ items:
 
     - item_id: "soul_recovery_elixir"
       name: "凝魂丹"
-      description: "凝聚魂魄精华，服用后可恢复30%最大理智值。"
+      description: "恢复30%理智值，并短时提升5%智力（10分钟）"
       type: "CONSUMABLE"
       price: 80000
       effect_type: "RESTORE_MP_PERCENT"
@@ -1232,7 +1234,7 @@ items:
 
     - item_id: "great_life_recovery_elixir"
       name: "大回生丹"
-      description: "顶级回血丹药，服用后可恢复60%最大生命值。"
+      description: "恢复60%生命值，并短时提升8%防御（15分钟）"
       type: "CONSUMABLE"
       price: 150000
       effect_type: "RESTORE_HP_PERCENT"
@@ -1241,13 +1243,14 @@ items:
 
     - item_id: "great_soul_recovery_elixir"
       name: "大凝魂丹"
-      description: "顶级回理智丹药，服用后可恢复60%最大理智值。"
+      description: "恢复60%理智值，并短时提升8%智力（15分钟）"
       type: "CONSUMABLE"
       price: 150000
       effect_type: "RESTORE_MP_PERCENT"
       effect_params: {"percent": 0.6}
       daily_limit: 100
 
+    # ========== 复活类丹药 - 保持原有设计 ==========
     - item_id: "perfect_revive_elixir"
       name: "完美还魂丹"
       description: "以天材地宝炼制的极品复活丹。（恢复95%状态）"
@@ -1266,67 +1269,66 @@ items:
       effect_params: {"rate": 1.0}
       daily_limit: 10
 
-    - item_id: "divine_blessing_elixir"
-      name: "神明恩赐丹"
-      description: "蕴含神明恩泽的传说丹药，服用后可获得大量修为。服用后立即获得 80000 经验"
+    # ========== 永久属性丹药 - 固定值增益（避免数值爆炸）==========
+    - item_id: "void_eye_elixir"
+      name: "虚眼丹"
+      description: "凝聚亡者之眼，永久提升5点运气和5点攻击力"
       type: "CONSUMABLE"
-      price: 300000
-      effect_type: "GAIN_EXP"
-      effect_params: {"value": 80000}
-      daily_limit: 1
+      price: 200000
+      effect_type: "BUFF"
+      effect_params: {"luck": 5, "attack": 5}
+      daily_limit: 2
 
     - item_id: "world_power_elixir"
       name: "世界之力丹"
-      description: "凝聚世界本源之力的至高丹药，服用后全属性永久提升5~10。"
+      description: "凝聚世界本源之力，永久提升全属性（体10/智5/力10/防5/敏5/运5）"
       type: "CONSUMABLE"
       price: 800000
       effect_type: "BUFF"
       effect_params: {"max_hp": 10, "max_mp": 5, "attack": 10, "defense": 5, "agility": 5, "luck": 5}
       daily_limit: 1
 
-    # ========== 临时增益丹药系列 ==========
-
+    # ========== 临时战斗增益丹药 - 百分比加成，强而短 ==========
     - item_id: "swift_wind_elixir"
       name: "疾风丹"
-      description: "身轻如燕，敏捷+100，持续30分钟。"
+      description: "身轻如燕，敏捷+15%，持续20分钟"
       type: "CONSUMABLE"
       price: 5000
-      effect_type: "TEMPORARY_BUFF"
+      effect_type: "TEMPORARY_BUFF_PERCENT"
       effect_params:
         buff_name: "疾风状态"
-        agility: 100
-        duration_minutes: 30
+        agility_pct: 15
+        duration_minutes: 20
       daily_limit: 5
 
     - item_id: "berserker_elixir"
       name: "狂战丹"
-      description: "进入狂战状态，暴击率+15%，但降低100防御。持续15分钟。"
+      description: "狂暴战意，攻击+20%，防御-10%，持续15分钟"
       type: "CONSUMABLE"
       price: 15000
-      effect_type: "TEMPORARY_BUFF"
+      effect_type: "TEMPORARY_BUFF_PERCENT"
       effect_params:
         buff_name: "狂战状态"
-        critical_rate: 15
-        defense: -100
+        attack_pct: 20
+        defense_pct: -10
         duration_minutes: 15
-      daily_limit: 2
+      daily_limit: 3
 
     - item_id: "shadow_step_elixir"
       name: "影步丹"
-      description: "身如鬼魅，敏捷+200，闪避率+10%。持续25分钟。"
+      description: "身如鬼魅，敏捷+25%，持续20分钟"
       type: "CONSUMABLE"
       price: 12000
-      effect_type: "TEMPORARY_BUFF"
+      effect_type: "TEMPORARY_BUFF_PERCENT"
       effect_params:
         buff_name: "影步状态"
-        agility: 200
-        dodge_rate: 10
-        duration_minutes: 25
+        agility_pct: 25
+        duration_minutes: 20
       daily_limit: 3
 
     - item_id: "eagle_eye_elixir"
       name: "鹰眼丹"
-      description: "目光如鹰，命中率+12%，暴击率+25%。持续15分钟。"
+      description: "目光如鹰，命中率+25%，暴击率+12%，持续15分钟"
       type: "CONSUMABLE"
       price: 12000
       effect_type: "TEMPORARY_BUFF"
@@ -1339,7 +1341,7 @@ items:
 
     - item_id: "combo_master_elixir"
       name: "连击丹"
-      description: "招式连绵不绝，连击率+20%，反击率+10%。持续15分钟。"
+      description: "招式连绵不绝，连击率+20%，反击率+10%，持续15分钟"
       type: "CONSUMABLE"
       price: 18000
       effect_type: "TEMPORARY_BUFF"
@@ -1349,6 +1351,182 @@ items:
         counter_rate: 10
         duration_minutes: 15
       daily_limit: 2
+
+    # ========== 防御与生存类丹药 ==========
+    - item_id: "iron_body_elixir"
+      name: "金刚体丹"
+      description: "铜皮铁骨，防御+30%，持续20分钟"
+      type: "CONSUMABLE"
+      price: 15000
+      effect_type: "TEMPORARY_BUFF_PERCENT"
+      effect_params:
+        buff_name: "金刚体"
+        defense_pct: 30
+        duration_minutes: 20
+      daily_limit: 3
+
+    - item_id: "vitality_elixir"
+      name: "生机丹"
+      description: "生机勃发，生命上限+20%，持续30分钟"
+      type: "CONSUMABLE"
+      price: 18000
+      effect_type: "TEMPORARY_BUFF_PERCENT"
+      effect_params:
+        buff_name: "生机勃发"
+        max_hp_pct: 20
+        duration_minutes: 30
+      daily_limit: 3
+
+    # ========== 综合战斗类丹药 ==========
+    - item_id: "battle_god_elixir"
+      name: "战神丹"
+      description: "战神附体，攻击+15%，防御+10%，敏捷+10%，持续15分钟"
+      type: "CONSUMABLE"
+      price: 25000
+      effect_type: "TEMPORARY_BUFF_PERCENT"
+      effect_params:
+        buff_name: "战神附体"
+        attack_pct: 15
+        defense_pct: 10
+        agility_pct: 10
+        duration_minutes: 15
+      daily_limit: 2
+
+    - item_id: "fortune_elixir"
+      name: "鸿运丹"
+      description: "时来运转，运气+30%，持续30分钟（探索、战利品必备）"
+      type: "CONSUMABLE"
+      price: 20000
+      effect_type: "TEMPORARY_BUFF_PERCENT"
+      effect_params:
+        buff_name: "鸿运当头"
+        luck_pct: 30
+        duration_minutes: 30
+      daily_limit: 3
+
+    # ========== 特殊功能类丹药 ==========
+    - item_id: "wisdom_elixir"
+      name: "悟道丹"
+      description: "顿悟修行，理智上限+25%，持续1小时（长时间修炼必备）"
+      type: "CONSUMABLE"
+      price: 22000
+      effect_type: "TEMPORARY_BUFF_PERCENT"
+      effect_params:
+        buff_name: "悟道状态"
+        max_mp_pct: 25
+        duration_minutes: 60
+      daily_limit: 2
+
+    - item_id: "berserk_fury_elixir"
+      name: "暴怒丹"
+      description: "极致狂暴，攻击+35%，防御-20%，持续10分钟（BOSS战专用）"
+      type: "CONSUMABLE"
+      price: 30000
+      effect_type: "TEMPORARY_BUFF_PERCENT"
+      effect_params:
+        buff_name: "暴怒"
+        attack_pct: 35
+        defense_pct: -20
+        duration_minutes: 10
+      daily_limit: 2
+
+    # ========== 永久小幅属性丹药（分类细化）- 固定值 ==========
+    - item_id: "strength_essence_elixir"
+      name: "力之精华丹"
+      description: "永久提升3点攻击力"
+      type: "CONSUMABLE"
+      price: 150000
+      effect_type: "BUFF"
+      effect_params: {"attack": 3}
+      daily_limit: 1
+
+    - item_id: "agility_essence_elixir"
+      name: "敏之精华丹"
+      description: "永久提升3点敏捷"
+      type: "CONSUMABLE"
+      price: 150000
+      effect_type: "BUFF"
+      effect_params: {"agility": 3}
+      daily_limit: 1
+
+    - item_id: "defense_essence_elixir"
+      name: "防之精华丹"
+      description: "永久提升3点防御"
+      type: "CONSUMABLE"
+      price: 150000
+      effect_type: "BUFF"
+      effect_params: {"defense": 3}
+      daily_limit: 1
+
+    - item_id: "vitality_essence_elixir"
+      name: "体之精华丹"
+      description: "永久提升5点生命上限"
+      type: "CONSUMABLE"
+      price: 150000
+      effect_type: "BUFF"
+      effect_params: {"max_hp": 5}
+      daily_limit: 1
+
+    # ========== 洗髓类丹药 - 属性重置玩法 ==========
+    - item_id: "reforge_strength_elixir"
+      name: "归元破力丹"
+      description: "归元返本，破力化灵。洗去3%的攻击力，转化为自由属性点"
+      type: "CONSUMABLE"
+      price: 100000
+      effect_type: "REFORGE_ATTR"
+      effect_params:
+        source_attr: "attack"
+        percent: 3
+        attr_name: "攻击力"
+      daily_limit: 5
+
+    - item_id: "reforge_agility_elixir"
+      name: "归元化敏丹"
+      description: "归元返本，化敏为灵。洗去3%的敏捷，转化为自由属性点"
+      type: "CONSUMABLE"
+      price: 100000
+      effect_type: "REFORGE_ATTR"
+      effect_params:
+        source_attr: "agility"
+        percent: 3
+        attr_name: "敏捷"
+      daily_limit: 5
+
+    - item_id: "reforge_defense_elixir"
+      name: "归元散防丹"
+      description: "归元返本，散防为灵。洗去3%的防御，转化为自由属性点"
+      type: "CONSUMABLE"
+      price: 100000
+      effect_type: "REFORGE_ATTR"
+      effect_params:
+        source_attr: "defense"
+        percent: 3
+        attr_name: "防御"
+      daily_limit: 5
+
+    - item_id: "reforge_vitality_elixir"
+      name: "归元化体丹"
+      description: "归元返本，化体为灵。洗去3%的生命上限，转化为自由属性点"
+      type: "CONSUMABLE"
+      price: 100000
+      effect_type: "REFORGE_ATTR"
+      effect_params:
+        source_attr: "max_hp"
+        percent: 3
+        attr_name: "生命上限"
+      daily_limit: 5
+
+    - item_id: "reforge_wisdom_elixir"
+      name: "归元凝神丹"
+      description: "归元返本，凝神化灵。洗去3%的理智上限，转化为自由属性点"
+      type: "CONSUMABLE"
+      price: 100000
+      effect_type: "REFORGE_ATTR"
+      effect_params:
+        source_attr: "max_mp"
+        percent: 3
+        attr_name: "理智上限"
+      daily_limit: 5
 
   goods:  # 仅用于跑商系统倒卖的奢侈品
     - item_id: "lux_perfume"

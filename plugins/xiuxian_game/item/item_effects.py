@@ -290,6 +290,149 @@ async def _gain_exp(player: Player, cfg: ItemConfig, qty: int, ctx: str, session
     return True, f"📚 获得 {actual_value} 点经验"
 
 
+@register(ItemEffectType.GAIN_EXP_SCALED)
+async def _gain_exp_scaled(player: Player, cfg: ItemConfig, qty: int, ctx: str, session=None) -> Tuple[bool, str]:
+    """按等级伸缩的经验丹：base_value + level * scale_factor"""
+    base_value = int(cfg.effect_params.get("base_value", 0))
+    scale_factor = float(cfg.effect_params.get("scale_factor", 0))
+
+    if base_value <= 0:
+        return False, "⛔ 该丹药配置错误"
+
+    # 计算伸缩经验值
+    level_bonus = int(player.level * scale_factor)
+    actual_value = (base_value + level_bonus) * qty
+    player.exp += actual_value
+
+    # 更新使用记录
+    if session:
+        await update_elixir_usage(session, player, cfg, qty)
+
+    return True, f"📚 获得 {actual_value} 点经验（基础{base_value}+等级加成{level_bonus}）"
+
+
+@register(ItemEffectType.BUFF_PERCENT)
+async def _buff_percent(player: Player, cfg: ItemConfig, qty: int, ctx: str, session=None) -> Tuple[bool, str]:
+    """永久百分比属性加成：按当前基础属性的百分比增加"""
+    if not session:
+        return False, "⛔ 系统错误：缺少数据库会话"
+
+    attrs = cfg.effect_params or {}
+    if not attrs:
+        return False, "⛔ 该道具没有任何增益"
+
+    ATTRIBUTE_MAP = {
+        "max_hp": "体",
+        "max_mp": "智",
+        "attack": "力",
+        "agility": "敏",
+        "luck": "运",
+        "defense": "防",
+    }
+
+    changed = []
+    for k, v in attrs.items():
+        if k.endswith("_pct") and hasattr(player, k.replace("_pct", "")):
+            attr_name = k.replace("_pct", "")
+            old_value = getattr(player, attr_name)
+            # 计算百分比增量
+            percent = float(v) / 100.0
+            increase = int(old_value * percent * qty)
+            if increase == 0 and percent > 0:
+                increase = 1  # 至少增加1点
+            new_value = old_value + increase
+            setattr(player, attr_name, new_value)
+            changed.append(f"{ATTRIBUTE_MAP.get(attr_name, attr_name)}+{increase}({int(float(v)*qty)}%)")
+
+    # 属性发生变化后重新计算装备加成
+    await _recalculate_equipment_bonus(session, player)
+
+    # 使用新上限修正当前血量/理智值
+    if player.hp > player.max_hp:
+        player.hp = player.max_hp
+    if player.mp > player.max_mp:
+        player.mp = player.max_mp
+
+    # 更新使用记录
+    await update_elixir_usage(session, player, cfg, qty)
+
+    if not changed:
+        return False, "⛔ 增益属性无效"
+    return True, f"✨ 获得永久增益：{', '.join(changed)}"
+
+
+@register(ItemEffectType.TEMPORARY_BUFF_PERCENT)
+async def _temporary_buff_percent(player: Player, cfg: ItemConfig, qty: int, ctx: str, session=None) -> Tuple[bool, str]:
+    """临时百分比属性加成：按当前基础属性的百分比创建临时buff"""
+    if not session:
+        return False, "⛔ 系统错误：缺少数据库会话"
+
+    effect_params = cfg.effect_params or {}
+    if not effect_params:
+        return False, "⛔ 该丹药没有任何增益效果"
+
+    duration_minutes = effect_params.get("duration_minutes", 30)
+    buff_name = effect_params.get("buff_name", cfg.name)
+
+    # 计算实际属性加成值
+    attribute_bonuses = {}
+    bonus_display = []
+
+    ATTRIBUTE_MAP = {
+        "max_hp": "体", "max_mp": "智", "attack": "力",
+        "defense": "防", "agility": "敏", "luck": "运",
+        "critical_rate": "暴击率", "critical_power": "暴击力",
+        "combo_rate": "连击率", "counter_rate": "反击率",
+        "dodge_rate": "闪避率", "accuracy_rate": "命中率",
+    }
+
+    for key, value in effect_params.items():
+        if key in ["duration_minutes", "buff_name"]:
+            continue
+
+        if key.endswith("_pct"):
+            attr_name = key.replace("_pct", "")
+            if hasattr(player, attr_name):
+                base_value = getattr(player, attr_name)
+                percent = float(value) / 100.0
+                increase = int(base_value * percent * qty)
+                if increase == 0 and percent > 0:
+                    increase = 1
+                attribute_bonuses[attr_name] = increase
+                bonus_display.append(f"{ATTRIBUTE_MAP.get(attr_name, attr_name)}+{increase}({int(float(value)*qty)}%)")
+
+    if not attribute_bonuses:
+        return False, "⛔ 该丹药没有有效的属性加成"
+
+    # 创建临时buff
+    from ..models.temporary_buff import TemporaryBuff
+
+    buff_id = f"{cfg.item_id}_buff"
+    await TemporaryBuff.create_buff(
+        session=session,
+        player_id=player.id,
+        buff_id=buff_id,
+        buff_name=buff_name,
+        attribute_bonuses=attribute_bonuses,
+        duration_minutes=duration_minutes,
+        source_item_id=cfg.item_id,
+        source_description=f"使用{cfg.name}获得"
+    )
+
+    # 格式化时间显示
+    if duration_minutes >= 60:
+        hours = duration_minutes // 60
+        minutes = duration_minutes % 60
+        time_str = f"{hours}小时{minutes}分钟" if minutes > 0 else f"{hours}小时"
+    else:
+        time_str = f"{duration_minutes}分钟"
+
+    # 更新使用记录
+    await update_elixir_usage(session, player, cfg, qty)
+
+    return True, f"✨ 获得临时增益：{', '.join(bonus_display)}\n⏰ 持续时间：{time_str}"
+
+
 @register(ItemEffectType.GAIN_RESENTMENT)
 async def _gain_resentment(player: Player, cfg: ItemConfig, qty: int, ctx: str, session=None) -> Tuple[bool, str]:
     """直接获得怨念值，道具参数 value 指定单份怨念量。"""
@@ -302,6 +445,77 @@ async def _gain_resentment(player: Player, cfg: ItemConfig, qty: int, ctx: str, 
     player.resentment += actual_value
 
     return True, f"💀 获得 {actual_value} 点怨念值 (当前 {player.resentment})"
+
+
+@register(ItemEffectType.REFORGE_ATTR)
+async def _reforge_attr(player: Player, cfg: ItemConfig, qty: int, ctx: str, session=None) -> Tuple[bool, str]:
+    """洗髓丹药：将指定属性的百分比转换为可分配属性点
+
+    配置格式：
+    effect_params:
+        source_attr: "attack"  # 源属性（attack/defense/agility/max_hp/max_mp）
+        percent: 3  # 转换百分比（3表示3%）
+        attr_name: "力量"  # 属性显示名称
+    """
+    if not session:
+        return False, "⛔ 系统错误：缺少数据库会话"
+
+    source_attr = cfg.effect_params.get("source_attr")
+    percent = float(cfg.effect_params.get("percent", 0))
+    attr_name = cfg.effect_params.get("attr_name", source_attr)
+
+    if not source_attr or percent <= 0:
+        return False, "⛔ 该丹药配置错误"
+
+    if not hasattr(player, source_attr):
+        return False, f"⛔ 无效的属性：{source_attr}"
+
+    # 获取当前属性值
+    current_value = getattr(player, source_attr)
+    if current_value <= 0:
+        return False, f"⛔ {attr_name}不足，无法洗髓"
+
+    # 计算转换量（每次使用转换一次）
+    convert_amount = int(current_value * (percent / 100.0) * qty)
+    if convert_amount == 0:
+        convert_amount = 1  # 至少转换1点
+
+    # 检查是否会导致属性过低
+    min_value = 1
+    if source_attr in ["max_hp", "max_mp"]:
+        min_value = 10  # 生命和理智至少保留10点
+
+    if current_value - convert_amount < min_value:
+        return False, f"⛔ {attr_name}过低，无法继续洗髓（至少需保留{min_value}点）"
+
+    # 扣除源属性
+    setattr(player, source_attr, current_value - convert_amount)
+
+    # 增加可分配属性点
+    player.attribute_points += convert_amount
+
+    # 如果是生命或理智上限，需要调整当前值
+    if source_attr == "max_hp" and player.hp > player.max_hp:
+        player.hp = player.max_hp
+    elif source_attr == "max_mp" and player.mp > player.max_mp:
+        player.mp = player.max_mp
+
+    # 重新计算装备加成
+    await _recalculate_equipment_bonus(session, player)
+
+    # 更新使用记录
+    await update_elixir_usage(session, player, cfg, qty)
+
+    return True, (
+        f"🔄 洗髓成功！\n"
+        f"━━━━━━━━━━━━━\n"
+        f"转换：{attr_name} -{convert_amount} ({int(percent * qty)}%)\n"
+        f"获得：可分配属性点 +{convert_amount}\n"
+        f"━━━━━━━━━━━━━\n"
+        f"当前{attr_name}：{getattr(player, source_attr)}\n"
+        f"可分配属性点：{player.attribute_points}\n"
+        f"💡 使用【加点】指令分配属性点"
+    )
 
 @register(ItemEffectType.SWEEP_DUNGEON)
 async def _sweep_dungeon(player: Player, cfg: ItemConfig, qty: int, ctx: str, session=None) -> Tuple[bool, str]:

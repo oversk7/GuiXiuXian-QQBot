@@ -1,13 +1,14 @@
 elixirs:
-  # ========== 初级丹药 (1-20级) - 主要使用白色材料 ==========
+  # ========== 初级丹药 (1-30级) - 主要使用白色材料 ==========
 
-  # 基础经验丹药 - 升灵丹 (3000经验)
+  # 基础经验丹药 - 升灵丹（伸缩经验）
   spirit_pill:
     produce_item_id: "spirit_elixir"
     materials:
-      rotten_core: 8        # 白色材料
-      ghost_tears: 5        # 白色材料
-      spirit_bone: 3        # 白色材料
+      rotten_core: 10       # 白色材料
+      ghost_tears: 8        # 白色材料
+      spirit_bone: 6        # 白色材料
+      common_carp: 3        # 白色鱼类（钓鱼联动）
     quantity: 1
     base_success: 0.9
 
@@ -15,9 +16,10 @@ elixirs:
   life_recovery:
     produce_item_id: "life_recovery_elixir"
     materials:
-      spirit_bone: 10       # 白色材料
-      bone_fragment: 15     # 白色材料
-      ash_powder: 8         # 白色材料
+      spirit_bone: 12       # 白色材料
+      bone_fragment: 18     # 白色材料
+      ash_powder: 10        # 白色材料
+      crucian_carp: 2       # 白色鱼类（钓鱼联动）
     quantity: 1
     base_success: 0.9
 
@@ -25,22 +27,35 @@ elixirs:
   soul_recovery:
     produce_item_id: "soul_recovery_elixir"
     materials:
-      ghost_tears: 12       # 白色材料
-      cursed_silk: 8        # 白色材料
-      grave_soil: 6         # 白色材料
+      ghost_tears: 15       # 白色材料
+      cursed_silk: 12       # 白色材料
+      grave_soil: 8         # 白色材料
+      grass_carp: 2         # 白色鱼类（钓鱼联动）
     quantity: 1
     base_success: 0.9
 
-  # ========== 中级丹药 (21-60级) - 白色+绿色材料 ==========
+  # 初级战斗丹药 - 疾风丹
+  swift_wind:
+    produce_item_id: "swift_wind_elixir"
+    materials:
+      cursed_silk: 25       # 白色材料
+      ghost_tears: 20       # 白色材料
+      ash_powder: 15        # 白色材料
+      silver_carp: 3        # 白色鱼类（钓鱼联动）
+    quantity: 1
+    base_success: 0.85
 
-  # 中级经验丹药 - 血心丹 (8000经验)
+  # ========== 中级丹药 (31-70级) - 白色+绿色材料 ==========
+
+  # 中级经验丹药 - 血心丹（伸缩经验）
   blood_heart:
     produce_item_id: "blood_heart_elixir"
     materials:
-      yin_essence: 6        # 绿色材料
-      corrupted_bandage: 4  # 绿色材料
-      rotten_core: 15       # 白色材料
-      iron_rust: 10         # 白色材料
+      yin_essence: 8        # 绿色材料
+      corrupted_bandage: 6  # 绿色材料
+      rotten_core: 20       # 白色材料
+      iron_rust: 15         # 白色材料
+      bass: 2               # 绿色鱼类（钓鱼联动）
     quantity: 1
     base_success: 0.8
 
@@ -48,10 +63,11 @@ elixirs:
   great_life_recovery:
     produce_item_id: "great_life_recovery_elixir"
     materials:
-      drowned_scale: 5      # 绿色材料
-      spirit_bone: 20       # 白色材料
-      bone_fragment: 25     # 白色材料
-      ash_powder: 15        # 白色材料
+      drowned_scale: 8      # 绿色材料
+      spirit_bone: 25       # 白色材料
+      bone_fragment: 30     # 白色材料
+      ash_powder: 20        # 白色材料
+      mandarin_fish: 2      # 绿色鱼类（钓鱼联动）
     quantity: 1
     base_success: 0.8
 
@@ -59,136 +75,310 @@ elixirs:
   great_soul_recovery:
     produce_item_id: "great_soul_recovery_elixir"
     materials:
-      yin_essence: 8        # 绿色材料
-      withered_flower: 3    # 绿色材料
-      ghost_tears: 25       # 白色材料
-      cursed_silk: 18       # 白色材料
+      yin_essence: 10       # 绿色材料
+      withered_flower: 5    # 绿色材料
+      ghost_tears: 30       # 白色材料
+      cursed_silk: 22       # 白色材料
+      yellow_croaker: 2     # 绿色鱼类（钓鱼联动）
     quantity: 1
     base_success: 0.8
 
-  # ========== 高级丹药 (61-100级) - 绿色+蓝色材料 ==========
+  # 中级战斗丹药 - 狂战丹
+  berserker:
+    produce_item_id: "berserker_elixir"
+    materials:
+      corrupted_bandage: 8  # 绿色材料
+      withered_flower: 6    # 绿色材料
+      spirit_bone: 30       # 白色材料
+      iron_rust: 25         # 白色材料
+      pomfret: 2            # 绿色鱼类（钓鱼联动）
+    quantity: 1
+    base_success: 0.75
 
-  # 高级经验丹药 - 夜魂丹 (12000经验)
+  # 中级防御丹药 - 金刚体丹
+  iron_body:
+    produce_item_id: "iron_body_elixir"
+    materials:
+      drowned_scale: 10     # 绿色材料
+      corrupted_bandage: 8  # 绿色材料
+      bone_fragment: 35     # 白色材料
+      iron_rust: 30         # 白色材料
+      snapper: 2            # 绿色鱼类（钓鱼联动）
+    quantity: 1
+    base_success: 0.75
+
+  # 中级生存丹药 - 生机丹
+  vitality:
+    produce_item_id: "vitality_elixir"
+    materials:
+      withered_flower: 10   # 绿色材料
+      yin_essence: 8        # 绿色材料
+      spirit_bone: 40       # 白色材料
+      ghost_tears: 35       # 白色材料
+      catfish: 3            # 白色鱼类（钓鱼联动）
+    quantity: 1
+    base_success: 0.75
+
+  # ========== 高级丹药 (71-110级) - 绿色+蓝色材料 ==========
+
+  # 高级经验丹药 - 夜魂丹（伸缩经验）
   night_soul:
     produce_item_id: "night_soul_elixir"
     materials:
-      flesh_crystal: 3      # 蓝色材料
-      nightmare_silk: 8     # 绿色材料
-      school_bell_fragment: 5 # 绿色材料
-      yin_essence: 6        # 绿色材料
+      flesh_crystal: 5      # 蓝色材料
+      nightmare_silk: 12    # 绿色材料
+      school_bell_fragment: 8 # 绿色材料
+      yin_essence: 10       # 绿色材料
+      salmon: 1             # 蓝色鱼类（钓鱼联动）
     quantity: 1
-    base_success: 0.75
+    base_success: 0.7
 
   # 高级复活丹药 - 完美还魂丹 (95%复活)
   perfect_revive:
     produce_item_id: "perfect_revive_elixir"
     materials:
-      soul_crystal: 2       # 蓝色材料
-      nightmare_silk: 12    # 绿色材料
-      drowned_scale: 8      # 绿色材料
-      corrupted_bandage: 6  # 绿色材料
+      soul_crystal: 3       # 蓝色材料
+      nightmare_silk: 15    # 绿色材料
+      drowned_scale: 12     # 绿色材料
+      corrupted_bandage: 10 # 绿色材料
+      tuna: 1               # 蓝色鱼类（钓鱼联动）
     quantity: 1
-    base_success: 0.7
+    base_success: 0.65
 
-  # ========== 顶级丹药 (101-150级) - 蓝色+紫色材料 ==========
+  # 高级战斗丹药 - 影步丹
+  shadow_step:
+    produce_item_id: "shadow_step_elixir"
+    materials:
+      phantom_thread: 6     # 蓝色材料
+      nightmare_silk: 15    # 绿色材料
+      cursed_silk: 40       # 白色材料
+      eel: 1                # 蓝色鱼类（钓鱼联动）
+    quantity: 1
+    base_success: 0.65
 
-  # 属性提升丹药 - 虚眼丹 (永久+5运气+5攻击)
+  # 高级精准丹药 - 鹰眼丹
+  eagle_eye:
+    produce_item_id: "eagle_eye_elixir"
+    materials:
+      cursed_mirror_shard: 4 # 蓝色材料
+      school_bell_fragment: 10 # 绿色材料
+      ghost_tears: 50       # 白色材料
+      grouper: 1            # 蓝色鱼类（钓鱼联动）
+    quantity: 1
+    base_success: 0.65
+
+  # 高级连击丹药 - 连击丹
+  combo_master:
+    produce_item_id: "combo_master_elixir"
+    materials:
+      flesh_crystal: 5      # 蓝色材料
+      nightmare_silk: 18    # 绿色材料
+      corrupted_bandage: 12 # 绿色材料
+      spirit_bone: 45       # 白色材料
+      turbot: 1             # 蓝色鱼类（钓鱼联动）
+    quantity: 1
+    base_success: 0.6
+
+  # 高级综合战斗丹药 - 战神丹
+  battle_god:
+    produce_item_id: "battle_god_elixir"
+    materials:
+      flesh_crystal: 6      # 蓝色材料
+      phantom_thread: 5     # 蓝色材料
+      nightmare_silk: 20    # 绿色材料
+      drowned_scale: 15     # 绿色材料
+      salmon: 2             # 蓝色鱼类（钓鱼联动）
+    quantity: 1
+    base_success: 0.6
+
+  # 高级运气丹药 - 鸿运丹
+  fortune:
+    produce_item_id: "fortune_elixir"
+    materials:
+      cursed_mirror_shard: 5 # 蓝色材料
+      withered_flower: 15   # 绿色材料
+      ghost_tears: 50       # 白色材料
+      tuna: 1               # 蓝色鱼类（钓鱼联动）
+    quantity: 1
+    base_success: 0.65
+
+  # 高级修炼丹药 - 悟道丹
+  wisdom:
+    produce_item_id: "wisdom_elixir"
+    materials:
+      soul_crystal: 4       # 蓝色材料
+      school_bell_fragment: 12 # 绿色材料
+      yin_essence: 15       # 绿色材料
+      cursed_silk: 45       # 白色材料
+      grouper: 1            # 蓝色鱼类（钓鱼联动）
+    quantity: 1
+    base_success: 0.65
+
+  # ========== 顶级丹药 (111-150级) - 蓝色+紫色材料 ==========
+
+  # 顶级狂暴丹药 - 暴怒丹
+  berserk_fury:
+    produce_item_id: "berserk_fury_elixir"
+    materials:
+      demon_heart: 1        # 紫色材料
+      flesh_crystal: 8      # 蓝色材料
+      nightmare_silk: 25    # 绿色材料
+      corrupted_bandage: 20 # 绿色材料
+      chinese_sturgeon: 1   # 紫色鱼类（钓鱼联动）
+    quantity: 1
+    base_success: 0.55
+
+  # 顶级属性丹药 - 虚眼丹（永久固定值）
   void_eye:
     produce_item_id: "void_eye_elixir"
     materials:
-      cursed_mirror_shard: 2  # 蓝色材料
-      medical_record: 1       # 紫色材料
-      phantom_thread: 3       # 蓝色材料
-      nightmare_silk: 15      # 绿色材料
+      cursed_mirror_shard: 5  # 蓝色材料
+      medical_record: 2       # 紫色材料
+      phantom_thread: 6       # 蓝色材料
+      nightmare_silk: 20      # 绿色材料
+      arowana: 1              # 紫色鱼类（钓鱼联动）
     quantity: 1
-    base_success: 0.6
+    base_success: 0.55
 
   # 终极复活丹药 - 真还魂丹 (100%复活)
   supreme_revive:
     produce_item_id: "supreme_revive_elixir"
     materials:
-      demon_heart: 1        # 紫色材料
-      soul_crystal: 4       # 蓝色材料
-      flesh_crystal: 6      # 蓝色材料
-      phantom_thread: 8     # 蓝色材料
-      nightmare_silk: 20    # 绿色材料
+      demon_heart: 2        # 紫色材料
+      soul_crystal: 6       # 蓝色材料
+      flesh_crystal: 8      # 蓝色材料
+      phantom_thread: 10    # 蓝色材料
+      nightmare_silk: 25    # 绿色材料
+      bluefin_tuna: 1       # 紫色鱼类（钓鱼联动）
     quantity: 1
-    base_success: 0.5
+    base_success: 0.45
 
   # ========== 传说丹药 (151+级) - 紫色+橙色材料 ==========
 
-  # 传说经验丹药 - 神明恩赐丹 (25000经验)
+  # 传说经验丹药 - 神明恩赐丹（伸缩经验）
   divine_blessing:
     produce_item_id: "divine_blessing_elixir"
     materials:
-      god_tear: 2          # 橙色材料
-      void_essence: 2       # 紫色材料
-      demon_heart: 3        # 紫色材料
-      cursed_mirror_shard: 5 # 蓝色材料
+      god_tear: 3          # 橙色材料
+      void_essence: 4       # 紫色材料
+      demon_heart: 5        # 紫色材料
+      cursed_mirror_shard: 8 # 蓝色材料
+      golden_dragon_fish: 1  # 橙色鱼类（钓鱼联动）
     quantity: 1
-    base_success: 0.4
+    base_success: 0.35
 
-  # 传说属性丹药 - 世界之力丹 (永久+10全属性)
+  # 传说属性丹药 - 世界之力丹（永久固定值全属性）
   world_power:
     produce_item_id: "world_power_elixir"
     materials:
-      world_fragment: 2     # 橙色材料
-      time_dust: 3          # 橙色材料
-      void_essence: 3       # 紫色材料
-      demon_heart: 2        # 紫色材料
+      world_fragment: 3     # 橙色材料
+      time_dust: 4          # 橙色材料
+      void_essence: 5       # 紫色材料
+      demon_heart: 4        # 紫色材料
+      phoenix_fish: 1       # 橙色鱼类（钓鱼联动）
     quantity: 1
-    base_success: 0.3
+    base_success: 0.25
 
-  # ========== 临时增益丹药配方 ==========
+  # ========== 永久属性精华丹药配方 ==========
 
-  # 疾风丹 - 基础敏捷增益丹药 (1-30级)
-  swift_wind:
-    produce_item_id: "swift_wind_elixir"
+  # 力之精华丹
+  strength_essence:
+    produce_item_id: "strength_essence_elixir"
     materials:
-      cursed_silk: 20       # 白色材料
-      ghost_tears: 15       # 白色材料
-      ash_powder: 12        # 白色材料
+      void_essence: 2       # 紫色材料
+      flesh_crystal: 6      # 蓝色材料
+      corrupted_bandage: 15 # 绿色材料
     quantity: 1
-    base_success: 0.85
+    base_success: 0.5
 
-  # 狂战丹 - 中级战斗增益丹药 (31-60级)
-  berserker:
-    produce_item_id: "berserker_elixir"
+  # 敏之精华丹
+  agility_essence:
+    produce_item_id: "agility_essence_elixir"
     materials:
-      corrupted_bandage: 6  # 绿色材料
-      withered_flower: 4    # 绿色材料
-      spirit_bone: 25       # 白色材料
-      iron_rust: 20         # 白色材料
-    quantity: 1
-    base_success: 0.7
-
-  # 影步丹 - 高级敏捷增益丹药 (61-100级)
-  shadow_step:
-    produce_item_id: "shadow_step_elixir"
-    materials:
-      phantom_thread: 5     # 蓝色材料
-      nightmare_silk: 12    # 绿色材料
-      cursed_silk: 30       # 白色材料
-    quantity: 1
-    base_success: 0.65
-
-  # 鹰眼丹 - 高级精准增益丹药 (61-100级)
-  eagle_eye:
-    produce_item_id: "eagle_eye_elixir"
-    materials:
-      cursed_mirror_shard: 3 # 蓝色材料
-      school_bell_fragment: 8 # 绿色材料
-      ghost_tears: 40       # 白色材料
-    quantity: 1
-    base_success: 0.65
-
-  # 连击丹 - 高级连击增益丹药 (61-100级)
-  combo_master:
-    produce_item_id: "combo_master_elixir"
-    materials:
-      flesh_crystal: 4      # 蓝色材料
+      void_essence: 2       # 紫色材料
+      phantom_thread: 6     # 蓝色材料
       nightmare_silk: 15    # 绿色材料
-      corrupted_bandage: 10 # 绿色材料
-      spirit_bone: 35       # 白色材料
     quantity: 1
-    base_success: 0.6
+    base_success: 0.5
+
+  # 防之精华丹
+  defense_essence:
+    produce_item_id: "defense_essence_elixir"
+    materials:
+      void_essence: 2       # 紫色材料
+      soul_crystal: 6       # 蓝色材料
+      drowned_scale: 15     # 绿色材料
+    quantity: 1
+    base_success: 0.5
+
+  # 体之精华丹
+  vitality_essence:
+    produce_item_id: "vitality_essence_elixir"
+    materials:
+      void_essence: 2       # 紫色材料
+      flesh_crystal: 6      # 蓝色材料
+      withered_flower: 15   # 绿色材料
+    quantity: 1
+    base_success: 0.5
+
+  # ========== 洗髓类丹药配方（归元系列）==========
+
+  # 归元破力丹（转换攻击力）
+  reforge_strength:
+    produce_item_id: "reforge_strength_elixir"
+    materials:
+      soul_crystal: 3       # 蓝色材料
+      flesh_crystal: 5      # 蓝色材料
+      corrupted_bandage: 12 # 绿色材料
+      spirit_bone: 30       # 白色材料
+      salmon: 2             # 蓝色鱼类（钓鱼联动）
+    quantity: 1
+    base_success: 0.65
+
+  # 归元化敏丹（转换敏捷）
+  reforge_agility:
+    produce_item_id: "reforge_agility_elixir"
+    materials:
+      phantom_thread: 4     # 蓝色材料
+      cursed_mirror_shard: 3 # 蓝色材料
+      nightmare_silk: 12    # 绿色材料
+      cursed_silk: 35       # 白色材料
+      eel: 2                # 蓝色鱼类（钓鱼联动）
+    quantity: 1
+    base_success: 0.65
+
+  # 归元散防丹（转换防御）
+  reforge_defense:
+    produce_item_id: "reforge_defense_elixir"
+    materials:
+      soul_crystal: 4       # 蓝色材料
+      phantom_thread: 3     # 蓝色材料
+      drowned_scale: 12     # 绿色材料
+      bone_fragment: 35     # 白色材料
+      turbot: 2             # 蓝色鱼类（钓鱼联动）
+    quantity: 1
+    base_success: 0.65
+
+  # 归元化体丹（转换生命上限）
+  reforge_vitality:
+    produce_item_id: "reforge_vitality_elixir"
+    materials:
+      flesh_crystal: 5      # 蓝色材料
+      soul_crystal: 3       # 蓝色材料
+      withered_flower: 12   # 绿色材料
+      spirit_bone: 40       # 白色材料
+      grouper: 2            # 蓝色鱼类（钓鱼联动）
+    quantity: 1
+    base_success: 0.65
+
+  # 归元凝神丹（转换理智上限）
+  reforge_wisdom:
+    produce_item_id: "reforge_wisdom_elixir"
+    materials:
+      cursed_mirror_shard: 4 # 蓝色材料
+      soul_crystal: 4       # 蓝色材料
+      school_bell_fragment: 10 # 绿色材料
+      ghost_tears: 40       # 白色材料
+      tuna: 2               # 蓝色鱼类（钓鱼联动）
+    quantity: 1
+    base_success: 0.65
