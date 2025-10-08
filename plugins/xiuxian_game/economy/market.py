@@ -13,6 +13,8 @@ from ..utils import message_add_head
 from .equipment_trade_service import EquipmentTradeService
 from ..item.equipment_commands import find_equipment_by_input
 
+from datetime import date
+
 MAX_LISTINGS = 6  # 每位玩家最大挂牌数
 AUTO_MATCH = True
 # === 输出格式辅助 ===
@@ -64,6 +66,119 @@ def calculate_transaction_tax(amount: int) -> int:
         return int(amount * 0.15)
     else:
         return int(amount * 0.20)
+# ====== 价格基础与底价吸附 ======
+PRICE_FLOOR_ALPHA = 0.85  # 参考价折扣系数（底价=参考价*alpha 与 基础价 取最大）
+MIN_UNIT_PRICE = 10       # 系统绝对最小单价下限
+
+# 全局经济倍率（不改动配置文件，按类别/稀有度动态放大基础价）
+ECONOMY_MULT_BY_TYPE = {
+    "MATERIAL": 1.0,
+    "GOODS": 1.2,
+    "CONSUMABLE": 3.0,
+    "GEM": 12.0,
+    "EQUIPMENT": 25.0,
+}
+ECONOMY_MULT_BY_RARITY = {
+    "white": 200.0,
+    "green": 200.0,
+    "blue": 220.0,
+    "purple": 260.0,
+    "orange": 300.0,
+}
+
+# ====== 财富指数联动（自动经济倍率） ======
+WEALTH_TOP_N = 100
+WEALTH_BASELINE = 500_000_000  # 5亿作为基线
+WEALTH_GAMMA = 0.5             # 缩放幂指数（<1 使增长放缓）
+WEALTH_SMIN = 1.0
+WEALTH_SMAX = 50.0
+WEALTH_EMA_ALPHA = 0.3          # 指数平滑系数（越大越敏感）
+
+_wealth_cache_day: int | None = None
+_wealth_prev_scale: float = 1.0
+
+async def _get_wealth_scale(session) -> float:
+    """按TopN玩家金币中位数计算当日财富指数S，并进行EMA平滑与上下限夹持。"""
+    global _wealth_cache_day, _wealth_prev_scale
+    today_ord = date.today().toordinal()
+    if _wealth_cache_day == today_ord and _wealth_prev_scale:
+        return _wealth_prev_scale
+
+    stmt = select(Player.gold).order_by(desc(Player.gold)).limit(WEALTH_TOP_N)
+    rows = (await session.execute(stmt)).all()
+    vals = [int(v) for (v,) in rows if v is not None]
+    if not vals:
+        _wealth_cache_day = today_ord
+        _wealth_prev_scale = 1.0
+        return 1.0
+
+    vals.sort()
+    n = len(vals)
+    if n % 2 == 1:
+        median_v = vals[n // 2]
+    else:
+        median_v = (vals[n // 2 - 1] + vals[n // 2]) / 2
+
+    ratio = max(median_v, 1) / WEALTH_BASELINE
+    raw = pow(ratio, WEALTH_GAMMA)
+    raw = max(WEALTH_SMIN, min(raw, WEALTH_SMAX))
+
+    scale = WEALTH_EMA_ALPHA * raw + (1.0 - WEALTH_EMA_ALPHA) * (_wealth_prev_scale or 1.0)
+    _wealth_prev_scale = scale
+    _wealth_cache_day = today_ord
+    return scale
+
+EQUIPMENT_FLOOR_MULT = 20.0  # 装备估价下界的额外放大
+
+async def _compute_item_floor_price(session, item_cfg) -> int:
+    """计算普通物品的底价：综合物品基础价(含经济倍率)与近期市场参考价。
+    参考价使用最近若干卖单价格的截尾均值，剔除过低异常值。
+    """
+    base = int(getattr(item_cfg, "price", 0) or 0)
+    base = max(base, MIN_UNIT_PRICE)
+
+    # 按类别/稀有度放大基础价（动态经济时代调整）
+    type_val = getattr(item_cfg.type, "value", str(item_cfg.type))
+    rarity = getattr(item_cfg, "rarity", None) or "white"
+    t_mult = ECONOMY_MULT_BY_TYPE.get(str(type_val), 1.0)
+    r_mult = ECONOMY_MULT_BY_RARITY.get(str(rarity), ECONOMY_MULT_BY_RARITY["white"])
+    scale = await _get_wealth_scale(session)
+    econ_base = int(base * t_mult * r_mult * scale)
+
+    # 取最近 50 条非装备卖单作为参考
+    stmt = (
+        select(MarketOrder.price)
+        .where(
+            MarketOrder.item_id == item_cfg.item_id,
+            MarketOrder.side == OrderSide.SELL,
+            MarketOrder.is_instance_trade == False,
+        )
+        .order_by(desc(MarketOrder.created_at))
+        .limit(50)
+    )
+    prices = [int(p) for (p,) in (await session.execute(stmt)).all()]
+    # 剔除过低异常值（小于基础价的60%或小于最小单价）
+    lo_cut = max(int(base * 0.6), MIN_UNIT_PRICE)
+    prices = [p for p in prices if p >= lo_cut]
+    if prices:
+        prices.sort()
+        n = len(prices)
+        trim = max(1, n // 10) if n >= 10 else 0
+        core = prices[trim:n - trim] if trim and n - trim > trim else prices
+        ref = sum(core) / len(core)
+        ref_floor = int(ref * PRICE_FLOOR_ALPHA)
+    else:
+        ref_floor = 0
+
+    floor_price = max(econ_base, ref_floor, MIN_UNIT_PRICE)
+    return floor_price
+
+async def _compute_equipment_floor_price(session, equipment) -> int:
+    """计算装备实例底价：使用装备估价下界，并按财富指数放大。"""
+    min_price, _ = EquipmentTradeService.calculate_equipment_value_range(equipment)
+    scale = await _get_wealth_scale(session)
+    return max(int(min_price * EQUIPMENT_FLOOR_MULT * scale), MIN_UNIT_PRICE)
+
 
 # ---------------- 指令：挂牌 ----------------
 list_cmd = on_command("挂牌", block=True, priority=5)
@@ -121,6 +236,14 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
                                   f"⬇️ 【撤牌 <牌子ID>】\n"
                                   f"⬇️ 【查牌 <物品名> [页数]】")
 
+        # 底价吸附（普通物品的出售单）
+        snap_hint = ""
+        if side == OrderSide.SELL and not is_equipment:
+            floor_price = await _compute_item_floor_price(session, item_cfg)
+            if price < floor_price:
+                price = floor_price
+                snap_hint = f"（已自动吸附到底价{floor_price}💰）"
+
         # 资源冻结
         if side == OrderSide.SELL:
             # 检查是否可以挂牌（8小时内购买的商品不能挂牌）
@@ -161,8 +284,11 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
 
     result_msg = (
         f"📈 成功挂牌 🆔{new_order.id}┃{mode_str}{item_cfg.name}┃💰{price}┃📦{quantity}"
-        + ("\n" + fill_msg if fill_msg else "")
     )
+    if snap_hint:
+        result_msg += f"\n{snap_hint}"
+    if fill_msg:
+        result_msg += "\n" + fill_msg
     await list_cmd.finish(message_add_head(result_msg, event))
 
 
@@ -229,6 +355,13 @@ async def _create_equipment_order(session, player, equipment: ItemInstance, pric
     # 生成装备摘要
     summary = EquipmentTradeService.generate_equipment_summary(equipment)
 
+    # 底价吸附（装备）
+    snap_hint = ""
+    floor_price = await _compute_equipment_floor_price(session, equipment)
+    if price < floor_price:
+        price = floor_price
+        snap_hint = f"（已自动吸附到底价{floor_price}💰）"
+
     # 创建装备订单
     new_order = MarketOrder(
         player_id=player.id,
@@ -250,6 +383,8 @@ async def _create_equipment_order(session, player, equipment: ItemInstance, pric
     await session.commit()
 
     result_msg = f"📈 成功挂牌装备 🆔{new_order.id}┃{summary}┃💰{price:,}"
+    if snap_hint:
+        result_msg += "\n" + snap_hint
     if fill_msg:
         result_msg += "\n" + fill_msg
 
@@ -765,4 +900,4 @@ async def _try_auto_match(session, new_order: MarketOrder, player: Player, same_
         if refund > 0:
             player.gold += refund
 
-    return "\n".join(trade_lines) 
+    return "\n".join(trade_lines)
