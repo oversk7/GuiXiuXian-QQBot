@@ -7,7 +7,7 @@ import random
 from ..models.db import safe_session
 from ..models.player import Player
 from ..models.bank_account import BankAccount
-from ..models.stock import StockHolding
+from ..models.stock import StockHolding, Stock
 from ..utils import message_add_head
 from .realm_utils import realm_by_level_and_reincarnation, number_to_chinese
 
@@ -121,10 +121,19 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
     offset = (page - 1) * page_size
 
     async with safe_session() as session:
-        # 组合候选玩家：金币前50 + 存款前50，避免只按金币过滤导致银行富豪缺失
+        # 组合候选玩家：金币前50 + 存款前50 + 投资市值前50，确保高额投资者不会遗漏
         gold_top_ids = (await session.execute(select(Player.id).order_by(Player.gold.desc()).limit(50))).scalars().all()
         bank_top_ids = (await session.execute(select(BankAccount.player_id).order_by(BankAccount.balance.desc()).limit(50))).scalars().all()
-        player_ids = list({*gold_top_ids, *bank_top_ids})
+        # 投资市值Top：按 sum(shares * current_price) 排序
+        invest_top_ids = (await session.execute(
+            select(StockHolding.player_id)
+            .join(Stock, Stock.id == StockHolding.stock_id)
+            .where(StockHolding.shares > 0)
+            .group_by(StockHolding.player_id)
+            .order_by(func.sum(StockHolding.shares * Stock.current_price).desc())
+            .limit(50)
+        )).scalars().all()
+        player_ids = list({*gold_top_ids, *bank_top_ids, *invest_top_ids})
 
         if not player_ids:
             await wealth_rank_cmd.finish("暂无排行榜数据")
