@@ -215,21 +215,28 @@ async def init_workshop_locations(session) -> int:
         "南郊": ["rusty_blade", "broken_glasses", "ghost_tear_pendant"],  # 南部新手区
 
         # === 中级区域 (30-80级) - 进阶装备，蓝色品质为主 ===
-        "荔湾镇": ["drowned_coat", "self_awareness_key", "corrupted_bandage", "wedding_photo"],  # 水域主题
-        "摩配镇": ["patient_gown", "kitchen_knife", "school_uniform"],  # 都市恐怖主题
-        "郸城": ["old_coat", "wreath", "music_box"],  # 死亡主题
-        "舟山": ["crying_tape", "mirror_armor", "grandfather_clock"],  # 时间/记忆主题
-        "大昌市": ["old_coat", "wreath", "music_box"],  # 综合商埠，继承郸城锻造线
+        "荔湾镇": ["swim_coat", "self_awareness_key", "corrupted_bandage_wrap", "wedding_photo"],  # 水域主题
+        "摩配镇": ["hospital_gown", "kitchen_knife", "school_uniform"],  # 都市恐怖主题
+        "郸城": ["old_coat", "funeral_wreath", "music_box"],  # 死亡主题
+        "舟山": ["crying_tape", "mirror_shard_armor", "grandfather_clock"],  # 时间/记忆主题
+        "大昌市": ["old_coat", "funeral_wreath", "music_box"],  # 综合商埠，继承郸城锻造线
 
         # === 高级区域 (80-150级) - 高阶装备，紫色品质 ===
-        "云岭": ["phantom_cloak", "fog_coat", "soul_banner"],  # 幽灵主题
-        "金陵": ["drawer", "wedding_dress", "void_crown"],  # 心理恐怖主题
+        "云岭": ["phantom_cloak", "fog_coat", "soul_flag"],  # 幽灵主题
+        "金陵": ["drawer", "wedding_dress", "void_essence_crown", "shock_therapy_device"],  # 心理恐怖主题
 
         # === 终极区域 (150级+) - 神器级装备，橙色/红色品质 ===
         # 按照“由(0,0)新手村向外辐射、风雪镇最高”的规则：
-        # • 上京(0,0)仅能锻造初级装备
+        # • 上京(0,0)作为首都，可锻造所有基础和中级装备
         # • 风雪镇可锻造最高阶装备
-        "上京": ["bone_armor", "rusty_blade", "broken_glasses", "ghost_tear_pendant"],  # 新手村，仅基础装备
+        "上京": [
+            # 白色装备
+            "bone_armor", "ghost_tear_pendant", "broken_glasses", "rusty_blade",
+            # 绿色装备
+            "furnace", "wedding_photo", "swim_coat", "hospital_gown", "kitchen_knife",
+            "self_awareness_key", "school_uniform", "old_coat", "corrupted_bandage_wrap",
+            "music_box", "funeral_wreath"
+        ],  # 首都，可锻造所有基础和中级装备
         "风雪镇": ["reality_suicide_note", "god_tear_amulet", "world_fragment_blade", "shroud_of_eternity"],  # 终极地区，最高级装备
     }
 
@@ -331,19 +338,26 @@ async def handle_refresh_workshops(event: MessageEvent, args: Message = CommandA
                 "南郊": ["rusty_blade", "broken_glasses", "ghost_tear_pendant"],
 
                 # === 中级区域 (30-80级) - 进阶装备，蓝色品质为主 ===
-                "荔湾镇": ["drowned_coat", "self_awareness_key", "corrupted_bandage", "wedding_photo"],
-                "摩配镇": ["patient_gown", "kitchen_knife", "school_uniform"],
-                "郸城": ["old_coat", "wreath", "music_box"],
-                "舟山": ["crying_tape", "mirror_armor", "grandfather_clock"],
-                "大昌市": ["old_coat", "wreath", "music_box"],
+                "荔湾镇": ["swim_coat", "self_awareness_key", "corrupted_bandage_wrap", "wedding_photo"],
+                "摩配镇": ["hospital_gown", "kitchen_knife", "school_uniform"],
+                "郸城": ["old_coat", "funeral_wreath", "music_box"],
+                "舟山": ["crying_tape", "mirror_shard_armor", "grandfather_clock"],
+                "大昌市": ["old_coat", "funeral_wreath", "music_box"],
 
                 # === 高级区域 (80-150级) - 高阶装备，紫色品质 ===
-                "云岭": ["phantom_cloak", "fog_coat", "soul_banner"],
-                "金陵": ["drawer", "wedding_dress", "void_crown"],
+                "云岭": ["phantom_cloak", "fog_coat", "soul_flag"],
+                "金陵": ["drawer", "wedding_dress", "void_essence_crown", "shock_therapy_device"],
 
                 # === 终极区域 (150级+) - 最高级装备 ===
-                # 上京(0,0)：仅初级装备（新手村）
-                "上京": ["bone_armor", "rusty_blade", "broken_glasses", "ghost_tear_pendant"],
+                # 上京(0,0)：作为首都，可锻造所有基础和中级装备
+                "上京": [
+                    # 白色装备
+                    "bone_armor", "ghost_tear_pendant", "broken_glasses", "rusty_blade",
+                    # 绿色装备
+                    "furnace", "wedding_photo", "swim_coat", "hospital_gown", "kitchen_knife",
+                    "self_awareness_key", "school_uniform", "old_coat", "corrupted_bandage_wrap",
+                    "music_box", "funeral_wreath"
+                ],
                 # 风雪镇：最强装备
                 "风雪镇": ["reality_suicide_note", "god_tear_amulet", "world_fragment_blade", "shroud_of_eternity"],
             }
