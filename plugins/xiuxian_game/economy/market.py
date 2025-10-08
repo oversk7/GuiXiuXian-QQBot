@@ -66,33 +66,33 @@ def calculate_transaction_tax(amount: int) -> int:
         return int(amount * 0.15)
     else:
         return int(amount * 0.20)
-# ====== 价格基础与底价吸附 ======
-PRICE_FLOOR_ALPHA = 0.85  # 参考价折扣系数（底价=参考价*alpha 与 基础价 取最大）
-MIN_UNIT_PRICE = 10       # 系统绝对最小单价下限
+# ====== 价格基础与底价吸附（调低整体物价与门槛） ======
+PRICE_FLOOR_ALPHA = 0.6   # 参考价折扣系数（底价≈参考价*alpha 与 经济基础价 取最大）
+MIN_UNIT_PRICE = 10       # 系统绝对最小单价下限（如需进一步降低门槛可改为 5）
 
-# 全局经济倍率（不改动配置文件，按类别/稀有度动态放大基础价）
+# 全局经济倍率（更温和的倍率，避免底价被放大过头）
 ECONOMY_MULT_BY_TYPE = {
-    "MATERIAL": 1.0,
-    "GOODS": 1.2,
-    "CONSUMABLE": 3.0,
-    "GEM": 12.0,
-    "EQUIPMENT": 25.0,
+    "MATERIAL": 0.7,
+    "GOODS": 0.9,
+    "CONSUMABLE": 1.2,
+    "GEM": 2.0,
+    "EQUIPMENT": 4.0,
 }
 ECONOMY_MULT_BY_RARITY = {
-    "white": 200.0,
-    "green": 200.0,
-    "blue": 220.0,
-    "purple": 260.0,
-    "orange": 300.0,
+    "white": 1.0,
+    "green": 1.05,
+    "blue": 1.10,
+    "purple": 1.20,
+    "orange": 1.30,
 }
 
 # ====== 财富指数联动（自动经济倍率） ======
 WEALTH_TOP_N = 100
-WEALTH_BASELINE = 500_000_000  # 5亿作为基线
-WEALTH_GAMMA = 0.5             # 缩放幂指数（<1 使增长放缓）
-WEALTH_SMIN = 1.0
-WEALTH_SMAX = 50.0
-WEALTH_EMA_ALPHA = 0.3          # 指数平滑系数（越大越敏感）
+WEALTH_BASELINE = 5_000_000_000  # 50亿作为基线（提高基线以降低放大效果）
+WEALTH_GAMMA = 0.3               # 更平缓的增长（降低高端玩家对全服物价的拉动）
+WEALTH_SMIN = 1.0                # 不低于1，避免低谷期进一步打压物价
+WEALTH_SMAX = 3.0                # 限制上限，避免土豪时代通胀
+WEALTH_EMA_ALPHA = 0.15          # 降低敏感度，收敛更平滑
 
 _wealth_cache_day: int | None = None
 _wealth_prev_scale: float = 1.0
@@ -128,7 +128,7 @@ async def _get_wealth_scale(session) -> float:
     _wealth_cache_day = today_ord
     return scale
 
-EQUIPMENT_FLOOR_MULT = 20.0  # 装备估价下界的额外放大
+EQUIPMENT_FLOOR_MULT = 6.0   # 降低装备底价放大，缓解高价壁垒
 
 async def _compute_item_floor_price(session, item_cfg) -> int:
     """计算普通物品的底价：综合物品基础价(含经济倍率)与近期市场参考价。
