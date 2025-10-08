@@ -130,11 +130,6 @@ async def handle_check_monthly_card(event: MessageEvent):
             msg_lines.append("🤖 材料自动采集")
         msg_lines.append("🤖 【一键修复 [金币:怨念]】修复所有装备，可指定比例")
         msg_lines.append("⚙️ 【一键献祭 [稀有度]】批量献祭指定稀有度材料")
-
-        # 检查是否有高级月卡，显示一键嗑药功能
-        has_premium = any(card.card_type == CardType.PREMIUM for card in active_cards)
-        if has_premium:
-            msg_lines.append("💊 【一键嗑药】自动使用回春散和凝神草补满状态")
         if benefits["sign_stamina_bonus"] > 0:
             msg_lines.append(f"💪 签到咒抗上限 +{benefits['sign_stamina_bonus']}")
 
@@ -289,21 +284,13 @@ auto_use_medicine_cmd = on_command("一键嗑药", aliases={"一键磕药", "自
 
 @auto_use_medicine_cmd.handle()
 async def handle_auto_use_medicine(event: MessageEvent, args: Message = CommandArg()):
-    """高级月卡权益：一键嗑药 - 自动使用适量的回春散和凝神草补满血量和法力值"""
+    """一键嗑药 - 自动使用适量的回春散和凝神草补满血量和法力值"""
     user_id = event.get_user_id()
 
     async with safe_session() as session:
         player = await session.get(Player, user_id)
         if not player:
             await auto_use_medicine_cmd.finish("⛔ 请先创建角色")
-
-        # 检查是否有高级月卡权益
-        premium_card = await MonthlyCard.get_active_card(session, player.id, CardType.PREMIUM)
-        if not premium_card:
-            await auto_use_medicine_cmd.finish(message_add_head(
-                "⛔ 一键嗑药是高级月卡专属功能，请先购买高级月卡",
-                event
-            ))
 
         # 检查玩家是否已死亡
         if player.hp <= 0:
