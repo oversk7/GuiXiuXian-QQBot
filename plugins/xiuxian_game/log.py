@@ -73,16 +73,26 @@ recent_activity_cmd = on_command("最近活动", aliases={"活动记录", "全�
 
 @recent_activity_cmd.handle()
 async def handle_recent_activity(event: MessageEvent, args: Message = CommandArg()):
-    """查看全服最近玩家活动记录"""
+    """查看全服最近玩家活动记录或指定UID玩家的活动记录"""
     args_text = args.extract_plain_text().strip()
 
-    # 默认显示最近10条，可以指定数量
-    try:
-        count = int(args_text) if args_text else 10
-        if count <= 0 or count > 50:
-            await recent_activity_cmd.finish("⛔ 数量必须在1-50之间")
-    except ValueError:
-        await recent_activity_cmd.finish("⛔ 请输入有效的数字")
+    # 解析参数：可能是数量或UID
+    target_uid = None
+    count = 10  # 默认显示10条
+
+    if args_text:
+        try:
+            num = int(args_text)
+            # 判断是数量还是UID
+            # 如果数字在1-50之间，视为数量；否则视为UID
+            if 1 <= num <= 50:
+                count = num
+            else:
+                # 视为UID
+                target_uid = num
+                count = 50  # 查看指定玩家时，最多显示50条
+        except ValueError:
+            await recent_activity_cmd.finish("⛔ 请输入有效的数字（数量1-50或玩家UID）")
 
     log_dir = Path(__file__).parent.parent.parent / "logs"
     path = log_dir / "last_active.json"
@@ -101,6 +111,10 @@ async def handle_recent_activity(event: MessageEvent, args: Message = CommandArg
         records = []
         for user_id, record in data.items():
             if record.get("last_active") and record.get("uid"):
+                # 如果指定了UID，只收集该玩家的记录
+                if target_uid is not None and record.get("uid") != target_uid:
+                    continue
+
                 try:
                     # 解析时间字符串
                     active_time = datetime.strptime(record["last_active"], "%Y-%m-%d %H:%M:%S")
@@ -114,7 +128,10 @@ async def handle_recent_activity(event: MessageEvent, args: Message = CommandArg
                     continue
 
         if not records:
-            await recent_activity_cmd.finish(message_add_head("❌ 暂无有效活动记录", event))
+            if target_uid is not None:
+                await recent_activity_cmd.finish(message_add_head(f"❌ 未找到UID:{target_uid}的活动记录", event))
+            else:
+                await recent_activity_cmd.finish(message_add_head("❌ 暂无有效活动记录", event))
 
         # 按时间倒序排序（最新的在前）
         records.sort(key=lambda x: x["time"], reverse=True)
@@ -124,11 +141,21 @@ async def handle_recent_activity(event: MessageEvent, args: Message = CommandArg
 
         # 构建消息
         now = datetime.now()
-        msg_lines = [
-            f"📊 全服最近{len(records)}条活动",
-            "━━━━━━━━━━━━━",
-            ""
-        ]
+        if target_uid is not None:
+            # 查看指定玩家的活动
+            player_name = records[0]["nickname"]
+            msg_lines = [
+                f"📊 {player_name}(UID:{target_uid})的最近{len(records)}条活动",
+                "━━━━━━━━━━━━━",
+                ""
+            ]
+        else:
+            # 查看全服活动
+            msg_lines = [
+                f"📊 全服最近{len(records)}条活动",
+                "━━━━━━━━━━━━━",
+                ""
+            ]
 
         for idx, rec in enumerate(records, 1):
             # 计算时间差
@@ -149,13 +176,23 @@ async def handle_recent_activity(event: MessageEvent, args: Message = CommandArg
             if len(cmd_display) > 20:
                 cmd_display = cmd_display[:20] + "..."
 
-            msg_lines.append(f"{time_str} | {rec['nickname']}(UID:{rec['uid']}) | {cmd_display}")
+            if target_uid is not None:
+                # 查看指定玩家时，不显示玩家名称
+                msg_lines.append(f"{time_str} | {cmd_display}")
+            else:
+                # 查看全服时，显示玩家名称
+                msg_lines.append(f"{time_str} | {rec['nickname']}(UID:{rec['uid']}) | {cmd_display}")
 
         msg_lines.extend([
             "",
             "━━━━━━━━━━━━━",
-            f"💡 使用【最近活动 数量】查看更多（最多50条）"
         ])
+
+        if target_uid is not None:
+            msg_lines.append(f"💡 使用【最近活动】查看全服活动")
+        else:
+            msg_lines.append(f"💡 使用【最近活动 数量】查看更多（最多50条）")
+            msg_lines.append(f"💡 使用【最近活动 UID】查看指定玩家活动")
 
         message = "\n".join(msg_lines)
         await recent_activity_cmd.finish(message_add_head(message, event))
