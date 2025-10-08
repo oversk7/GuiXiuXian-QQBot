@@ -129,6 +129,7 @@ async def handle_check_monthly_card(event: MessageEvent):
         if benefits["auto_collect"]:
             msg_lines.append("🤖 材料自动采集")
         msg_lines.append("🤖 【一键修复 [金币:怨念]】修复所有装备，可指定比例")
+        msg_lines.append("⚙️ 【一键献祭 [稀有度]】批量献祭指定稀有度材料")
 
         # 检查是否有高级月卡，显示一键嗑药功能
         has_premium = any(card.card_type == CardType.PREMIUM for card in active_cards)
