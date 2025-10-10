@@ -236,9 +236,9 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
                                   f"⬇️ 【撤牌 <牌子ID>】\n"
                                   f"⬇️ 【查牌 <物品名> [页数]】")
 
-        # 底价吸附（普通物品的出售单）
+        # 底价吸附（普通物品）
         snap_hint = ""
-        if side == OrderSide.SELL and not is_equipment:
+        if not is_equipment:
             floor_price = await _compute_item_floor_price(session, item_cfg)
             if price < floor_price:
                 price = floor_price
