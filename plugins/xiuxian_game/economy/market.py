@@ -830,6 +830,8 @@ async def _try_auto_match(session, new_order: MarketOrder, player: Player, same_
     original_qty = new_order.quantity
     total_spent = 0  # BUY 单实际花费
 
+    halt_reason: str | None = None
+
     for opp in opposite_orders:
         if remaining == 0:
             break
@@ -864,6 +866,10 @@ async def _try_auto_match(session, new_order: MarketOrder, player: Player, same_
                 await ItemInstance.add_item(session, buyer.id, item_cfg.item_id, trade_qty)
             except ValueError:
                 # 买家背包空间不足，停止撮合
+                if buyer_id == player.id:
+                    halt_reason = "⚠️ 成交中断：你的背包空间不足，未能继续自动撮合"
+                else:
+                    halt_reason = "⚠️ 成交中断：买家背包空间不足，未能继续自动撮合"
                 break
 
         # 计算交易金额和阶梯税收
@@ -899,5 +905,8 @@ async def _try_auto_match(session, new_order: MarketOrder, player: Player, same_
         refund = frozen_total - total_spent - remaining * new_order.price
         if refund > 0:
             player.gold += refund
+
+    if halt_reason:
+        trade_lines.append(halt_reason)
 
     return "\n".join(trade_lines)
