@@ -103,7 +103,7 @@ class GiftService:
         # 查询接收者所有背包物品以计算已用格数
         result_all = await session.execute(select(ItemInstance).where(ItemInstance.player_id == receiver.id))
         receiver_all_items = result_all.scalars().all()
-        used_slots = sum(1 for it in receiver_all_items if not it.is_equipment)
+        used_slots = sum(1 for it in receiver_all_items if not it.is_equipment and not it.is_fish)
         effective_capacity = await receiver.get_effective_inventory_capacity(session)
         free_slots = max(0, effective_capacity - used_slots)
         # 查询接收者该物品的现有堆叠，计算可在原堆中继续叠加的空间
