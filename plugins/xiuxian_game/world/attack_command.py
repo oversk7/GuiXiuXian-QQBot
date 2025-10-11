@@ -580,6 +580,11 @@ async def handle_npc_attack(session, attacker: Player, target_npc, event: Messag
             "━━━━━━━━━━━━━"
         ]
 
+        # 展示战斗过程，方便玩家了解每一回合的战况
+        result_lines.extend(battle_log)
+
+        result_lines.append("━━━━━━━━━━━━━")
+
         if victory:
             # 玩家胜利，NPC死亡
             if target_npc.is_killable:
