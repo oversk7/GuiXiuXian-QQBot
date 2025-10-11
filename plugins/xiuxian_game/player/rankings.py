@@ -96,7 +96,34 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
     for idx, p in enumerate(players, 1):
         # 使用emoji装饰前三名
         rank_emoji = "🥇" if idx == 1 else "🥈" if idx == 2 else "🥉" if idx == 3 else f"{idx}."
-        lines.append(f"{rank_emoji} {p.nickname}[UID:{p.uid}] - 🍀{p.luck}")
+
+        luck = p.luck
+        if luck < -200:
+            title = "☠️厄运降临者"
+        elif luck < -100:
+            title = "🌫️命途多舛者"
+        elif luck < -50:
+            title = "🌪️风暴引路人"
+        elif luck < 0:
+            title = "🌧️逆风求生者"
+        elif luck < 30:
+            title = "🌱祈愿初成者"
+        elif luck < 60:
+            title = "🍃好运追逐者"
+        elif luck < 90:
+            title = "✨福运携行者"
+        elif luck < 120:
+            title = "🌈奇迹召唤者"
+        elif luck < 180:
+            title = "🌟命运眷顾者"
+        elif luck < 250:
+            title = "🪄祝福编织者"
+        elif luck < 400:
+            title = "🛡️奇迹庇护者"
+        else:
+            title = "🌀幸运星耀者"
+
+        lines.append(f"{rank_emoji} {p.nickname}[UID:{p.uid}] - {title} 🍀{p.luck}")
 
     await luck_rank_cmd.finish(message_add_head("\n".join(lines), event))
 
