@@ -1225,7 +1225,7 @@ items:
 
     - item_id: "soul_recovery_elixir"
       name: "凝魂丹"
-      description: "恢复30%理智值，并短时提升5%智力（10分钟）"
+      description: "恢复30%理智值，余温在脑海盘旋，十分钟内仍能听见失落灵魂的低语"
       type: "CONSUMABLE"
       price: 80000
       effect_type: "RESTORE_MP_PERCENT"
@@ -1243,7 +1243,7 @@ items:
 
     - item_id: "great_soul_recovery_elixir"
       name: "大凝魂丹"
-      description: "恢复60%理智值，并短时提升8%智力（15分钟）"
+      description: "恢复60%理智值，浓稠的雾气将心神包裹，十五分钟后方才散去"
       type: "CONSUMABLE"
       price: 150000
       effect_type: "RESTORE_MP_PERCENT"
@@ -1394,7 +1394,7 @@ items:
 
     - item_id: "fortune_elixir"
       name: "鸿运丹"
-      description: "时来运转，运气+30%，持续30分钟（探索、战利品必备）"
+      description: "吞下后舌尖泛起铁锈味，仿佛有无形之手拨弄命运骰子，30分钟内好运向你倾斜"
       type: "CONSUMABLE"
       price: 20000
       effect_type: "TEMPORARY_BUFF_PERCENT"
