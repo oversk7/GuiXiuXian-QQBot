@@ -103,7 +103,7 @@ async def handle_batch_sacrifice(event: MessageEvent, args: Message = CommandArg
         if not raw_text:
             await batch_sacrifice_cmd.finish(
                 "⛔ 请指定要献祭的材料\n"
-                "💡 示例：一键献祭 九幽石 太初灵晶"
+                "💡 示例：一键献祭 病历单 寻人启事"
             )
 
         # 支持空格、顿号、逗号分隔
