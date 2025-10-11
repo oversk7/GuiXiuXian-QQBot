@@ -53,38 +53,45 @@ async def handle_create_lottery(event: MessageEvent, args: Message = CommandArg(
         await create_lottery_cmd.finish("⛔ 只有管理员和子管理员可以发起抽奖")
 
     params = args.extract_plain_text().strip().split()
-    if len(params) < 3 or len(params) > 4:
+    if len(params) < 3 or len(params) > 5:
         await create_lottery_cmd.finish(
             "⛔ 格式错误\n"
             "━━━━━━━━━━━━━\n"
             "正确格式：\n"
-            "【发起抽奖 物品名 中奖人数 每人数量 [最低等级]】\n"
-            "【发起抽奖 装备名 中奖人数 每人数量 [最低等级]】\n"
-            "【发起抽奖 金币 中奖人数 每人数量 [最低等级]】\n"
+            "【发起抽奖 物品名 中奖人数 每人数量 [最低等级 [最高等级]]】\n"
+            "【发起抽奖 装备名 中奖人数 每人数量 [最低等级 [最高等级]]】\n"
+            "【发起抽奖 金币 中奖人数 每人数量 [最低等级 [最高等级]]】\n"
             "━━━━━━━━━━━━━\n"
             "示例：\n"
             "发起抽奖 棺材钉 10 10\n"
-            "发起抽奖 金币 5 1000 50\n"
+            "发起抽奖 金币 5 1000 50 120\n"
             "━━━━━━━━━━━━━\n"
-            "💡 最低等级默认为1，可选填防止小号参与"
+            "💡 最低等级默认为1，可选填防止小号参与\n"
+            "💡 最高等级默认为不限，可选填限制高等级玩家"
         )
 
     prize_name = params[0]
     winner_count_str = params[1]
     prize_per_winner_str = params[2]
-    min_level_str = params[3] if len(params) == 4 else "1"
+    min_level_str = params[3] if len(params) >= 4 else "1"
+    max_level_str = params[4] if len(params) >= 5 else None
     
     # 参数校验
+    max_level = None
+
     try:
         winner_count = int(winner_count_str)
         prize_per_winner = int(prize_per_winner_str)
         min_level = int(min_level_str)
+        max_level = int(max_level_str) if max_level_str is not None else None
         if winner_count <= 0 or prize_per_winner <= 0:
             raise ValueError
         if min_level < 1:
             raise ValueError
+        if max_level is not None and (max_level < 1 or max_level < min_level):
+            raise ValueError
     except ValueError:
-        await create_lottery_cmd.finish("⛔ 中奖人数、每人数量和最低等级必须为正整数")
+        await create_lottery_cmd.finish("⛔ 中奖人数、每人数量以及等级要求必须为正整数，且最高等级需不小于最低等级")
     
     async with safe_session() as session:
         # 获取发起人信息
@@ -165,6 +172,7 @@ async def handle_create_lottery(event: MessageEvent, args: Message = CommandArg(
             prize_per_winner=prize_per_winner,
             total_prize=total_prize,
             min_level=min_level,
+            max_level=max_level,
             status=LotteryStatus.PENDING,
             group_id=group_id
         )
@@ -184,8 +192,13 @@ async def handle_create_lottery(event: MessageEvent, args: Message = CommandArg(
             f"💰 奖品总数：{total_prize} 个",
         ]
 
-        if min_level > 1:
-            msg_lines.append(f"⭐ 等级要求：{min_level}级及以上")
+        if min_level > 1 or max_level is not None:
+            if max_level is None:
+                msg_lines.append(f"⭐ 等级要求：{min_level}级及以上")
+            elif min_level <= 1:
+                msg_lines.append(f"⭐ 等级要求：{max_level}级及以下")
+            else:
+                msg_lines.append(f"⭐ 等级要求：{min_level}-{max_level}级")
 
         msg_lines.extend([
             f"━━━━━━━━━━━━━",
@@ -240,6 +253,13 @@ async def handle_join_lottery(event: MessageEvent, args: Message = CommandArg())
             await join_lottery_cmd.finish(
                 f"⛔ 等级不足\n"
                 f"需要等级：{lottery.min_level}级\n"
+                f"当前等级：{player.level}级"
+            )
+
+        if lottery.max_level is not None and player.level > lottery.max_level:
+            await join_lottery_cmd.finish(
+                f"⛔ 等级过高\n"
+                f"允许等级：{lottery.max_level}级及以下\n"
                 f"当前等级：{player.level}级"
             )
 
@@ -439,8 +459,13 @@ async def handle_lottery_info(event: MessageEvent, args: Message = CommandArg())
             f"💰 奖品总数：{lottery.total_prize} 个",
         ]
 
-        if lottery.min_level > 1:
-            msg_lines.append(f"⭐ 等级要求：{lottery.min_level}级及以上")
+        if lottery.min_level > 1 or lottery.max_level is not None:
+            if lottery.max_level is None:
+                msg_lines.append(f"⭐ 等级要求：{lottery.min_level}级及以上")
+            elif lottery.min_level <= 1:
+                msg_lines.append(f"⭐ 等级要求：{lottery.max_level}级及以下")
+            else:
+                msg_lines.append(f"⭐ 等级要求：{lottery.min_level}-{lottery.max_level}级")
 
         msg_lines.extend([
             f"📊 参与人数：{participant_count} 人",

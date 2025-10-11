@@ -42,6 +42,7 @@ class Lottery(Base):
 
     # 参与条件
     min_level: Mapped[int] = mapped_column(Integer, default=1, comment="最低等级要求")
+    max_level: Mapped[int | None] = mapped_column(Integer, nullable=True, comment="最高等级要求")
 
     # 状态
     status: Mapped[LotteryStatus] = mapped_column(SQLEnum(LotteryStatus, values_callable=lambda x: [e.value for e in x]), default=LotteryStatus.PENDING, comment="抽奖状态")
