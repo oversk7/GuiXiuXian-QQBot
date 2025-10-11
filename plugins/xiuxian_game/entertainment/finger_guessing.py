@@ -1,11 +1,14 @@
+from datetime import datetime
+import random
+
 from nonebot import on_command
+from nonebot.adapters.qq import Message
 from nonebot.adapters.qq import MessageEvent
 from nonebot.params import CommandArg
-from nonebot.adapters.qq import Message
+
 from ..models.db import safe_session
 from ..models.player import Player
 from ..utils import message_add_head
-import random
 
 # 猜拳功能
 guess_fist = on_command("猜拳", priority=5, block=True)
@@ -16,6 +19,9 @@ async def handle_fist_game(event: MessageEvent, args: Message = CommandArg()):
     group_id = getattr(event, "group_id", None)
     if group_id == None:
         await guess_fist.finish("⛔ 猜拳指令只能在群聊中使用")
+
+    if datetime.now().weekday() != 5:
+        await guess_fist.finish("⛔ 猜拳小游戏仅限周六开放，请周六再来玩~")
 
     async with safe_session() as session:
         # 获取玩家信息
