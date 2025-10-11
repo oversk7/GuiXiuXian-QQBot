@@ -723,13 +723,19 @@ async def handle_organize_inventory(event: MessageEvent):
         )
         all_items: list[ItemInstance] = result.scalars().all()
 
-        # 过滤掉装备，只整理非装备物品
-        items: list[ItemInstance] = [item for item in all_items if not item.is_equipment]
+        # 过滤掉装备和鱼类，只整理背包物品
+        items: list[ItemInstance] = [item for item in all_items if not item.is_equipment and not item.is_fish]
         equipment_count = sum(1 for item in all_items if item.is_equipment)
+        fish_count = sum(1 for item in all_items if item.is_fish)
 
         if not items:
-            if equipment_count > 0:
-                await organize_inventory_cmd.finish(f"🎒 背包中只有装备，无需整理\n⚔️ 装备 {equipment_count} 件（装备不参与整理）")
+            if equipment_count > 0 or fish_count > 0:
+                msg_parts = ["🎒 背包中没有需要整理的物品"]
+                if equipment_count > 0:
+                    msg_parts.append(f"⚔️ 装备 {equipment_count} 件（装备不参与整理）")
+                if fish_count > 0:
+                    msg_parts.append(f"🐟 鱼类 {fish_count} 种（鱼类存放在鱼栏）")
+                await organize_inventory_cmd.finish("\n".join(msg_parts))
             else:
                 await organize_inventory_cmd.finish("🎒 背包空无一物，无需整理")
 
@@ -795,9 +801,14 @@ async def handle_organize_inventory(event: MessageEvent):
             "🧹 背包整理完成！",
             "━━━━━━━━━━━━━",
             f"📦 整理了 {organized_count} 种物品",
-            f"🆓 释放了 {freed_slots} 个背包格子",
-            f"⚔️ 装备 {equipment_count} 件（装备不参与整理）"
+            f"🆓 释放了 {freed_slots} 个背包格子"
         ]
+
+        # 添加装备和鱼类统计
+        if equipment_count > 0:
+            result_lines.append(f"⚔️ 装备 {equipment_count} 件（装备不参与整理）")
+        if fish_count > 0:
+            result_lines.append(f"🐟 鱼类 {fish_count} 种（鱼类存放在鱼栏）")
 
         if freed_slots > 0:
             result_lines.append("✨ 现在背包更加整洁了！")

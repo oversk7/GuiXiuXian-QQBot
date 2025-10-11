@@ -82,16 +82,8 @@ class FishingService:
             return False, f"今日钓鱼次数已达上限（{cls.DAILY_FISHING_LIMIT}次），明天再来吧！"
         
         # 检查背包空间（通过计算当前使用情况）
-        from sqlalchemy import select
-        result_inv = await session.execute(
-            select(ItemInstance).where(ItemInstance.player_id == player.id)
-        )
-        stacks_all = result_inv.scalars().all()
-        used_slots = sum(1 for item in stacks_all if not item.is_equipment)
-        effective_capacity = await player.get_effective_inventory_capacity(session)
-
-        if used_slots >= effective_capacity:
-            return False, "背包空间不足，请清理背包后再试"
+        # 注意：鱼类不占用背包空间，所以不需要检查背包容量
+        # 钓鱼系统使用独立的鱼栏存储，类似装备栏
         
         return True, ""
     
