@@ -180,7 +180,8 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
         "MATERIAL": "材料",
         "EQUIPMENT": "装备",
         "GOODS": "商品",
-        "GEM": "镶嵌物"
+        "GEM": "镶嵌物",
+        "FISH": "鱼类",
     }
 
     lines = ["📖 图鉴查询结果 ✨", "━━━━━━━━━━"]
