@@ -1,3 +1,5 @@
+from collections import defaultdict
+
 from nonebot import on_command
 from nonebot.params import CommandArg
 from nonebot.adapters.qq import MessageEvent, Message
@@ -53,6 +55,7 @@ async def _handle_expand_territory(session, player: Player, item_config, quantit
 
 
 inventory_cmd = on_command("背包", block=True, priority=5)
+fish_inventory_cmd = on_command("鱼栏", aliases={"鱼篓", "鱼仓", "鱼库", "我的鱼"}, block=True, priority=5)
 use_item = on_command("使用", block=True, priority=5)
 elixir_tolerance_cmd = on_command("耐药性", aliases={"丹药耐药性"}, block=True, priority=5)
 elixir_bonus_cmd = on_command("丹药加成", aliases={"丹药总加成", "丹药效果"}, block=True, priority=5)
@@ -69,6 +72,7 @@ CATEGORY_MAPPING = {
     "装备": "EQUIPMENT",
     "丹药": "ELIXIR",  # 特殊标记，实质为 CONSUMABLE 下的一类
     "宝石": "GEM",
+    "鱼类": "FISH",
 }
 
 # 物品类型中文映射（用于显示）
@@ -77,7 +81,8 @@ TYPE_NAME_MAP = {
     "MATERIAL": "材料",
     "EQUIPMENT": "装备",
     "GOODS": "商品",
-    "GEM": "宝石"
+    "GEM": "宝石",
+    "FISH": "鱼类",
 }
 
 # 默认展示顺序（决定排序权重）
@@ -389,9 +394,10 @@ async def handle_inventory(event: MessageEvent, args: Message = CommandArg()):
         all_items: list[ItemInstance] = result.scalars().all()
 
         # 过滤掉装备，装备不在背包中显示
-        items: list[ItemInstance] = [item for item in all_items if not item.is_equipment]
+        inventory_items: list[ItemInstance] = [item for item in all_items if not item.is_equipment and not item.is_fish]
+        items: list[ItemInstance] = list(inventory_items)
 
-        if not items:
+        if not inventory_items:
             await inventory_cmd.finish("🎒 你的背包空无一物")
 
         # --- 处理查询特定物品 ---
@@ -404,6 +410,9 @@ async def handle_inventory(event: MessageEvent, args: Message = CommandArg()):
             # 如果查询的是装备，提示使用装备栏查看
             if item_config.type == ItemType.EQUIPMENT:
                 await inventory_cmd.finish(f"⚔️ {query_item_name} 是装备类物品\n💡 请使用 /装备栏 查看装备信息")
+
+            if item_config.is_fish:
+                await inventory_cmd.finish(f"🐟 {query_item_name} 存放在鱼栏中\n💡 请使用 /鱼栏 查看鱼类存量")
 
             # 统计该物品的总数量（从所有物品中查找，不只是背包物品）
             matching_items = [item for item in all_items if item.item_id == item_config.item_id]
@@ -446,6 +455,8 @@ async def handle_inventory(event: MessageEvent, args: Message = CommandArg()):
             if category_key == "EQUIPMENT":
                 # 装备不在背包中显示，提示使用装备栏
                 await inventory_cmd.finish("⚔️ 装备不在背包中显示\n💡 请使用 /装备栏 查看装备信息")
+            elif category_key == "FISH":
+                await inventory_cmd.finish("🐟 鱼类不再占用背包空间\n💡 请使用 /鱼栏 查看鱼类存量")
             elif category_key == "ELIXIR":
                 items = [it for it in items if _is_elixir(it)]
             elif category_key == "CONSUMABLE":
@@ -472,7 +483,7 @@ async def handle_inventory(event: MessageEvent, args: Message = CommandArg()):
         # 获取容量信息（包含月卡加成）
         effective_capacity = await player.get_effective_inventory_capacity(session)
         # 计算已使用的背包格数（装备不计入）
-        used_slots = sum(1 for item in items if not item.is_equipment)
+        used_slots = len(inventory_items)
         capacity_info = f"📦 容量：{used_slots}/{effective_capacity}"
 
         # 如果有月卡加成，显示详细信息
@@ -506,6 +517,88 @@ async def handle_inventory(event: MessageEvent, args: Message = CommandArg()):
             import traceback
             traceback.print_exc()
             raise
+
+
+@fish_inventory_cmd.handle()
+async def handle_fish_inventory(event: MessageEvent, args: Message = CommandArg()):
+    """查看鱼类存量"""
+    params = args.extract_plain_text().strip().split()
+    page = 1
+    if params:
+        if len(params) != 1:
+            await fish_inventory_cmd.finish("⛔ 格式错误，正确格式：鱼栏 [页数]")
+        try:
+            page = int(params[0])
+            if page < 1:
+                raise ValueError
+        except ValueError:
+            await fish_inventory_cmd.finish("⛔ 页码必须为正整数")
+
+    async with safe_session() as session:
+        from ..platform_utils import get_unified_player, is_guild_message
+
+        player = await get_unified_player(session, event)
+        if not player:
+            if is_guild_message(event):
+                await fish_inventory_cmd.finish("⛔ 你还没有创建角色或绑定账号\n💡 请先在群聊注册角色，然后使用绑定功能")
+            else:
+                await fish_inventory_cmd.finish("⛔ 请先创建角色")
+
+        result = await session.execute(
+            select(ItemInstance)
+            .where(ItemInstance.player_id == player.id)
+            .where(ItemInstance.quantity > 0)
+        )
+        fish_items = [item for item in result.scalars().all() if item.is_fish]
+
+        if not fish_items:
+            await fish_inventory_cmd.finish("🐟 你的鱼栏里一条鱼都没有")
+
+        aggregated: dict[str, int] = defaultdict(int)
+        for inst in fish_items:
+            aggregated[inst.item_id] += inst.quantity
+
+        entries = []
+        total_quantity = 0
+        total_value = 0
+        rarity_order = {"orange": 0, "purple": 1, "blue": 2, "green": 3, "white": 4}
+
+        for item_id, qty in aggregated.items():
+            tpl = config.items_config["by_id"].get(item_id)
+            if not tpl:
+                continue
+            entries.append((tpl, qty))
+            total_quantity += qty
+            total_value += (tpl.price or 0) * qty
+
+        if not entries:
+            await fish_inventory_cmd.finish("🐟 你的鱼栏里一条鱼都没有")
+
+        entries.sort(key=lambda x: (rarity_order.get(getattr(x[0], "rarity", "white"), 99), x[0].name))
+
+        page_size = config.game_config["game"]["inventory_page_size"]
+        total_pages = (len(entries) - 1) // page_size + 1
+        page = max(1, min(page, total_pages))
+        start = (page - 1) * page_size
+        current_entries = entries[start:start + page_size]
+
+        lines = [
+            "🐟 鱼栏存量",
+            "━━━━━━━━━━━━━",
+            f"📊 总数量：{total_quantity} 条",
+            f"💰 总估值：{total_value} 灵石",
+            ""
+        ]
+
+        for idx, (tpl, qty) in enumerate(current_entries, start=start + 1):
+            value = (tpl.price or 0) * qty
+            lines.append(f"{idx}. {tpl.get_rarity_display()}{tpl.name} ✖️{qty}（估值 {value} 灵石）")
+
+        lines.append("")
+        lines.append(f"📖 第 {page} 页（共 {total_pages} 页)")
+
+        message = "\n".join(lines)
+        await fish_inventory_cmd.finish(message_add_head(message, event))
 
 
 

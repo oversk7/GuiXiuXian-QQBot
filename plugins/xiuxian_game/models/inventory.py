@@ -17,6 +17,7 @@ class ItemType(str,PyEnum):
     GOODS = "GOODS"
     GHOST_FRAGMENT = "GHOST_FRAGMENT"
     GEM = "GEM"
+    FISH = "FISH"
 
 class ItemEffectType(str, PyEnum):
     RESTORE_HP = "RESTORE_HP"
@@ -63,6 +64,9 @@ class ItemConfig:
         # 材料稀有度
         self.rarity = data.get("rarity", "white")
 
+        # 标签信息，用于扩展分类，例如活动限定物等
+        self.tags = set(data.get("tags", []))
+
         # 丹药每日使用限制
         self.daily_limit = data.get("daily_limit", 0)  # 每日服用上限，0表示无限制
 
@@ -88,6 +92,13 @@ class ItemConfig:
     def get_display_name(self) -> str:
         """获取带稀有度标识的物品名称"""
         return f"{self.get_rarity_display()}{self.name}"
+
+    @property
+    def is_fish(self) -> bool:
+        """判断是否为鱼类物品"""
+        if self.type == ItemType.FISH:
+            return True
+        return "fish" in self.tags
 
 class ItemInstance(Base):
     """统一的物品实例模型
@@ -125,14 +136,20 @@ class ItemInstance(Base):
     def is_equipment(self) -> bool:
         """是否为装备"""
         return self.config and self.config.type == ItemType.EQUIPMENT
-    
+
+    @property
+    def is_fish(self) -> bool:
+        """是否为鱼类物品"""
+        tpl = self.config
+        return bool(tpl and tpl.is_fish)
+
     @property
     def slot_count(self) -> int:
         """当前记录占用的背包格数（装备固定为1，普通物品按堆叠计算）"""
         if self.is_equipment:
             return 1
         return ceil(self.quantity / STACK_SIZE)
-    
+
     @property
     def available_space(self) -> int:
         """当前这格剩余可放置数量（装备为0，普通物品为0~STACK_SIZE，若为负数则表示需要拆分）"""
@@ -282,6 +299,7 @@ class ItemInstance(Base):
         if not item_config:
             raise ValueError(f"物品模板 {template_id} 不存在")
         is_equipment = item_config.type == ItemType.EQUIPMENT
+        is_fish = item_config.is_fish
 
         # 获取玩家和背包所有物品
         player: Player | None = await session.get(Player, player_id)
@@ -294,7 +312,7 @@ class ItemInstance(Base):
         stacks_all: list[ItemInstance] = result_inv.scalars().all()
 
         # 计算已使用的背包格数（装备不计入）
-        used_slots = sum(1 for item in stacks_all if not item.is_equipment)
+        used_slots = sum(1 for item in stacks_all if not item.is_equipment and not item.is_fish)
 
         # 获取有效背包容量（包含月卡加成）
         effective_capacity = await player.get_effective_inventory_capacity(session)
@@ -314,12 +332,13 @@ class ItemInstance(Base):
         # 普通物品处理 - 先检查空间
         existing_qty = sum(inv.quantity for inv in stacks_all if inv.item_id == template_id and not inv.is_equipment)
         new_total_qty = existing_qty + quantity
-        new_slot_cnt = ceil(new_total_qty / STACK_SIZE)
-        current_slot_cnt = ceil(existing_qty / STACK_SIZE) if existing_qty else 0
-        extra_slots_needed = new_slot_cnt - current_slot_cnt
+        if not is_fish:
+            new_slot_cnt = ceil(new_total_qty / STACK_SIZE)
+            current_slot_cnt = ceil(existing_qty / STACK_SIZE) if existing_qty else 0
+            extra_slots_needed = new_slot_cnt - current_slot_cnt
 
-        if used_slots + extra_slots_needed > effective_capacity:
-            raise ValueError(f"背包空间不足")
+            if used_slots + extra_slots_needed > effective_capacity:
+                raise ValueError(f"背包空间不足")
 
         # 空间足够，开始添加物品
         # 填充已有堆叠

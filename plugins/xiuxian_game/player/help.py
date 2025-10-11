@@ -125,7 +125,7 @@ async def handle_fishing(event: MessageEvent, args: Message = CommandArg()):
         "⏰ 限制说明：\n"
         "• 每次钓鱼冷却5分钟\n"
         "• 每日钓鱼次数限制50次\n"
-        "• 需要背包空间存放鱼类\n"
+        "• 鱼类存入专属鱼栏，不占背包空间\n"
         "💡 钓鱼不受地点限制，新手友好"
     )
     await fishing_cmd.finish(Message(msg))

@@ -77,6 +77,7 @@ ECONOMY_MULT_BY_TYPE = {
     "CONSUMABLE": 1.2,
     "GEM": 2.0,
     "EQUIPMENT": 4.0,
+    "FISH": 0.9,
 }
 ECONOMY_MULT_BY_RARITY = {
     "white": 1.0,
