@@ -586,13 +586,13 @@ async def handle_fish_inventory(event: MessageEvent, args: Message = CommandArg(
             "🐟 鱼栏存量",
             "━━━━━━━━━━━━━",
             f"📊 总数量：{total_quantity} 条",
-            f"💰 总估值：{total_value} 灵石",
+            f"💰 总估值：{total_value} 金币",
             ""
         ]
 
         for idx, (tpl, qty) in enumerate(current_entries, start=start + 1):
             value = (tpl.price or 0) * qty
-            lines.append(f"{idx}. {tpl.get_rarity_display()}{tpl.name} ✖️{qty}（估值 {value} 灵石）")
+            lines.append(f"{idx}. {tpl.get_rarity_display()}{tpl.name} ✖️{qty}（估值 {value} 金币）")
 
         lines.append("")
         lines.append(f"📖 第 {page} 页（共 {total_pages} 页)")
