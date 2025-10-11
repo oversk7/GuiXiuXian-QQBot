@@ -118,7 +118,7 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
         page = int(page_text) if page_text else 1
     except ValueError:
         page = 1
-    page = max(1, page)
+    page = max(1, min(page, 3))
 
     page_size = 10
 
@@ -128,6 +128,7 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
             await luck_rank_cmd.finish("暂无排行榜数据")
 
         total_pages = max(1, ceil(total_count / page_size))
+        total_pages = min(3, total_pages)
         page = min(page, total_pages)
         offset = (page - 1) * page_size
 
