@@ -20,12 +20,17 @@ claim_cmd = on_command("收获丹药", aliases={"领取丹药"}, block=True, pri
 @recipe_cmd.handle()
 async def _(event: MessageEvent, args: Message = CommandArg()):
     arg = args.extract_plain_text().strip()
-    try:
-        page = int(arg) if arg else 1
-    except ValueError:
+    if not arg:
         page = 1
-    content = AlchemyService.format_recipes(page)
-    content += ("\n⬇️ 【丹方 [页数]】")
+        content = AlchemyService.format_recipes(page)
+        content += ("\n⬇️ 【丹方 [页数]】")
+    elif arg.isdigit():
+        page = int(arg)
+        content = AlchemyService.format_recipes(page)
+        content += ("\n⬇️ 【丹方 [页数]】")
+    else:
+        matches = AlchemyService.search_recipes(arg)
+        content = AlchemyService.format_recipe_search(arg, matches)
     await recipe_cmd.finish(message_add_head(content, event))
 
 

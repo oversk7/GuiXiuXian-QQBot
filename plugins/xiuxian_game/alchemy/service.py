@@ -46,7 +46,12 @@ class AlchemyService:
     def get_recipes(cls) -> Dict[str, dict]:
         """获取所有丹方配置"""
         return config.elixirs_config.get("elixirs", {})
-    
+
+    @classmethod
+    def get_recipe_list(cls) -> List[Tuple[str, dict]]:
+        """以列表形式返回丹方配置，保持原有顺序"""
+        return list(cls.get_recipes().items())
+
     @classmethod
     def find_recipe(cls, target: str) -> Optional[Tuple[str, dict]]:
         """
@@ -57,7 +62,7 @@ class AlchemyService:
             (recipe_key, recipe_config) 或 None
         """
         recipes_dict = cls.get_recipes()
-        recipes = list(recipes_dict.items())
+        recipes = cls.get_recipe_list()
         
         # 按序号查找
         if target.isdigit():
@@ -75,9 +80,27 @@ class AlchemyService:
         # 按配方key查找
         if target in recipes_dict:
             return target, recipes_dict[target]
-        
+
         return None
-    
+
+    @classmethod
+    def search_recipes(cls, keyword: str) -> List[Tuple[int, str, dict]]:
+        """按关键字搜索丹方，返回(序号, 配方key, 配方)列表"""
+        keyword = keyword.strip()
+        if not keyword:
+            return []
+
+        keyword_lower = keyword.lower()
+        results: List[Tuple[int, str, dict]] = []
+        for idx, (key, recipe) in enumerate(cls.get_recipe_list(), start=1):
+            prod_cfg = config.items_config["by_id"][recipe["produce_item_id"]]
+            prod_name = prod_cfg.name
+
+            if keyword_lower in key.lower() or keyword in prod_name or keyword_lower in prod_name.lower():
+                results.append((idx, key, recipe))
+
+        return results
+
     @classmethod
     async def get_player_furnaces(cls, session: AsyncSession, player_id: str) -> List[ItemInstance]:
         """获取玩家的所有炼丹炉"""
@@ -259,8 +282,7 @@ class AlchemyService:
     @classmethod
     def format_recipes(cls, page: int = 1, page_size: int = 5) -> str:
         """格式化丹方列表"""
-        recipes_dict = cls.get_recipes()
-        recipes = list(recipes_dict.values())
+        recipes = [r for _, r in cls.get_recipe_list()]
         total_pages = (len(recipes)-1)//page_size + 1 if recipes else 1
         page = max(1, min(page, total_pages))
         start = (page-1)*page_size
@@ -273,4 +295,26 @@ class AlchemyService:
             mats = ", ".join([f"{config.items_config['by_id'][mid].name}✖️{qty}" for mid, qty in r["materials"].items()])
             lines.append(f"{idx}. {prod_cfg.name} (成功率 {int(r['base_success']*100)}%)\n   材料: {mats}")
         lines.append(f"\n页 {page}/{total_pages}")
+        return "\n".join(lines)
+
+    @classmethod
+    def format_recipe_search(cls, keyword: str, matches: List[Tuple[int, str, dict]]) -> str:
+        """格式化丹方搜索结果"""
+        if not matches:
+            return f"🔍 未找到与“{keyword}”相关的丹方"
+
+        lines = [f"🔍 丹方搜索：{keyword}", "━" * 10]
+        for idx, _, recipe in matches:
+            prod_cfg = config.items_config["by_id"][recipe["produce_item_id"]]
+            mats = ", ".join(
+                [
+                    f"{config.items_config['by_id'][mid].name}✖️{qty}"
+                    for mid, qty in recipe["materials"].items()
+                ]
+            )
+            lines.append(
+                f"{idx}. {prod_cfg.name} (成功率 {int(recipe['base_success']*100)}%)\n   材料: {mats}"
+            )
+
+        lines.append("\n➡️ 使用【炼丹 配方序号|名称 [数量]】开始炼丹")
         return "\n".join(lines)
