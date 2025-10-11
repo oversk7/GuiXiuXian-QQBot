@@ -129,7 +129,7 @@ async def handle_check_monthly_card(event: MessageEvent):
         if benefits["auto_collect"]:
             msg_lines.append("🤖 材料自动采集")
         msg_lines.append("🤖 【一键修复 [金币:怨念]】修复所有装备，可指定比例")
-        msg_lines.append("⚙️ 【一键献祭 [稀有度]】批量献祭指定稀有度材料")
+        msg_lines.append("⚙️ 【一键献祭 <材料1> [材料2...]】批量献祭指定材料")
         if benefits["sign_stamina_bonus"] > 0:
             msg_lines.append(f"💪 签到咒抗上限 +{benefits['sign_stamina_bonus']}")
 
