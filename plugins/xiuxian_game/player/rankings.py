@@ -2,6 +2,7 @@ from nonebot import on_command
 from nonebot.adapters.qq import MessageEvent, Message
 from nonebot.params import CommandArg
 from sqlalchemy import select, func
+from math import ceil
 import random
 
 from ..models.db import safe_session
@@ -78,25 +79,80 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
 # ==================== 幸运榜 ====================
 luck_rank_cmd = on_command("幸运榜", aliases={"运气榜", "幸运排行榜"}, block=True, priority=5)
 
+
+def _luck_title(luck: int) -> str:
+    if luck < 30:
+        return "🌱祈愿初成者"
+    if luck < 60:
+        return "🍃好运追逐者"
+    if luck < 90:
+        return "✨福运携行者"
+    if luck < 130:
+        return "🌈奇迹召唤者"
+    if luck < 180:
+        return "🌟命运眷顾者"
+    if luck < 250:
+        return "🪄祝福编织者"
+    if luck < 400:
+        return "🛡️奇迹庇护者"
+    if luck < 600:
+        return "🔥奇迹续燃者"
+    if luck < 800:
+        return "🪐命运引航者"
+    if luck < 1000:
+        return "🌌幸运主宰者"
+    if luck < 1300:
+        return "✨星命庇佑者"
+    if luck < 1600:
+        return "🌠福运星辉者"
+    if luck < 2000:
+        return "🌀无上幸运者"
+    return "🏅天命之选者"
+
+
 @luck_rank_cmd.handle()
 async def _(event: MessageEvent, args: Message = CommandArg()):
-    """显示幸运值最高的前10名玩家"""
+    """显示幸运值最高的玩家排行榜，支持分页"""
+    page_text = args.extract_plain_text().strip()
+    try:
+        page = int(page_text) if page_text else 1
+    except ValueError:
+        page = 1
+    page = max(1, page)
+
+    page_size = 10
+
     async with safe_session() as session:
-        stmt = select(Player).order_by(Player.luck.desc()).limit(10)
+        total_count = (await session.execute(select(func.count()).select_from(Player))).scalar_one()
+        if total_count == 0:
+            await luck_rank_cmd.finish("暂无排行榜数据")
+
+        total_pages = max(1, ceil(total_count / page_size))
+        page = min(page, total_pages)
+        offset = (page - 1) * page_size
+
+        stmt = select(Player).order_by(Player.luck.desc()).offset(offset).limit(page_size)
         players = (await session.execute(stmt)).scalars().all()
 
     if not players:
         await luck_rank_cmd.finish("暂无排行榜数据")
 
-    wishes = random.choice(["你信任那些微小的可能性，于是，世界便以暴击的星火与翻倍的惊喜回应这份信任。",
-                            "这份加点，不是侥幸，是宣言：你相信，那1%的闪光，足以点亮100%的征程。",
-                            "凡俗眼中的偶然，是你掌中的必然。",
+    wishes = random.choice([
+        "你信任那些微小的可能性，于是，世界便以暴击的星火与翻倍的惊喜回应这份信任。",
+        "这份加点，不是侥幸，是宣言：你相信，那1%的闪光，足以点亮100%的征程。",
+        "凡俗眼中的偶然，是你掌中的必然。",
     ])
-    lines = ["🍀 幸运排行榜", wishes, "━━━━━━━━━━━━━"]
-    for idx, p in enumerate(players, 1):
-        # 使用emoji装饰前三名
+    lines = [f"🍀 幸运排行榜 (第{page}/{total_pages}页)", wishes, "━━━━━━━━━━━━━"]
+    for idx, p in enumerate(players, start=offset + 1):
         rank_emoji = "🥇" if idx == 1 else "🥈" if idx == 2 else "🥉" if idx == 3 else f"{idx}."
-        lines.append(f"{rank_emoji} {p.nickname}[UID:{p.uid}] - 🍀{p.luck}")
+
+        title = _luck_title(p.luck)
+
+        lines.append(f"{rank_emoji} {p.nickname}[UID:{p.uid}] - {title} 🍀{p.luck}")
+
+    if page < total_pages:
+        lines.append("━━━━━━━━━━━━━")
+        lines.append("💡 使用【幸运榜 页码】查看其他页")
 
     await luck_rank_cmd.finish(message_add_head("\n".join(lines), event))
 
