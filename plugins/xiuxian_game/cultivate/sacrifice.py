@@ -1,3 +1,5 @@
+import re
+
 from nonebot import on_command
 from nonebot.adapters.qq import MessageEvent, Message
 from nonebot.params import CommandArg
@@ -81,7 +83,7 @@ async def handle_sacrifice(event: MessageEvent, args: Message = CommandArg()):
 
 @batch_sacrifice_cmd.handle()
 async def handle_batch_sacrifice(event: MessageEvent, args: Message = CommandArg()):
-    """一键献祭指定稀有度的全部材料（月卡用户专属）"""
+    """一键献祭指定的材料（月卡用户专属）"""
     # 检查月卡权限
     async with safe_session() as session:
         player = await session.get(Player, event.get_user_id())
@@ -96,63 +98,89 @@ async def handle_batch_sacrifice(event: MessageEvent, args: Message = CommandArg
                 "💡 发送【赞助】了解月卡权益"
             )
 
-        # 解析参数，默认为白色
-        rarity_input = args.extract_plain_text().strip().lower()
-        if not rarity_input:
-            rarity = "white"
-        else:
-            # 支持中文和英文输入
-            rarity_map = {
-                "白": "white", "白色": "white", "white": "white",
-                "绿": "green", "绿色": "green", "green": "green",
-                "蓝": "blue", "蓝色": "blue", "blue": "blue",
-                "紫": "purple", "紫色": "purple", "purple": "purple",
-                "橙": "orange", "橙色": "orange", "orange": "orange"
-            }
-            rarity = rarity_map.get(rarity_input)
-            if not rarity:
-                await batch_sacrifice_cmd.finish(
-                    "⛔ 稀有度格式错误\n"
-                    "💡 支持：白/绿/蓝/紫/橙\n"
-                    "💡 示例：一键献祭 白色"
-                )
+        # 解析参数
+        raw_text = args.extract_plain_text().strip()
+        if not raw_text:
+            await batch_sacrifice_cmd.finish(
+                "⛔ 请指定要献祭的材料\n"
+                "💡 示例：一键献祭 九幽石 太初灵晶"
+            )
 
-        # 获取背包中所有指定稀有度的材料
+        # 支持空格、顿号、逗号分隔
+        raw_names = re.split(r"[\s,，、]+", raw_text)
+        unique_names = []
+        seen = set()
+        for name in raw_names:
+            if not name:
+                continue
+            if name in seen:
+                continue
+            seen.add(name)
+            unique_names.append(name)
+
+        if not unique_names:
+            await batch_sacrifice_cmd.finish("⛔ 未识别到有效的材料名称")
+
+        # 校验材料配置
+        item_cfgs = []
+        invalid_names = []
+        unsacrificable_names = []
+        for name in unique_names:
+            cfg = config.items_config["by_name"].get(name)
+            if not cfg:
+                invalid_names.append(name)
+                continue
+
+            if cfg.type.value not in ["MATERIAL", "CONSUMABLE"] or cfg.grudge_value <= 0:
+                unsacrificable_names.append(name)
+                continue
+
+            item_cfgs.append(cfg)
+
+        if invalid_names:
+            await batch_sacrifice_cmd.finish(
+                "⛔ 未找到以下材料：" + "、".join(invalid_names)
+            )
+
+        if unsacrificable_names:
+            await batch_sacrifice_cmd.finish(
+                "⛔ 以下材料无法献祭：" + "、".join(unsacrificable_names)
+            )
+
+        # 获取背包中所有指定材料
+        item_ids = [cfg.item_id for cfg in item_cfgs]
+
         inv_rows = (await session.execute(
             select(ItemInstance).where(
                 ItemInstance.player_id == player.id,
-                ItemInstance.quantity > 0
+                ItemInstance.quantity > 0,
+                ItemInstance.item_id.in_(item_ids)
             )
         )).scalars().all()
 
-        # 筛选出可献祭的材料
-        sacrificable_items = []
+        quantity_map = {}
         for item_inst in inv_rows:
-            item_cfg = config.items_config["by_id"].get(item_inst.item_id)
-            if not item_cfg:
-                continue
+            quantity_map[item_inst.item_id] = (
+                quantity_map.get(item_inst.item_id, 0) + item_inst.quantity
+            )
 
-            # 检查是否是材料或消耗品，且有怨念值，且稀有度匹配
-            if (item_cfg.type.value in ["MATERIAL", "CONSUMABLE"] and
-                item_cfg.grudge_value > 0 and
-                item_cfg.rarity == rarity):
-                sacrificable_items.append((item_inst, item_cfg))
+        sacrificable_items = []
+        missing_items = []
+        for cfg in item_cfgs:
+            total_qty = quantity_map.get(cfg.item_id, 0)
+            if total_qty <= 0:
+                missing_items.append(cfg.get_display_name())
+                continue
+            sacrificable_items.append((cfg, total_qty))
 
         if not sacrificable_items:
-            rarity_emoji = {
-                "white": "⚪", "green": "🟢", "blue": "🔵",
-                "purple": "🟣", "orange": "🟠"
-            }
-            await batch_sacrifice_cmd.finish(
-                f"⛔ 背包中没有可献祭的{rarity_emoji.get(rarity, '⚪')}{rarity.upper()}材料"
-            )
+            await batch_sacrifice_cmd.finish("⛔ 指定的材料在背包中不存在或数量为0")
 
         # 批量献祭
         total_gained = 0
         sacrifice_details = []
 
-        for item_inst, item_cfg in sacrificable_items:
-            qty = item_inst.quantity
+        for item_cfg, qty in sacrificable_items:
             gained = item_cfg.grudge_value * qty
             total_gained += gained
 
@@ -172,20 +200,10 @@ async def handle_batch_sacrifice(event: MessageEvent, args: Message = CommandArg
         await session.commit()
 
         # 构建消息
-        rarity_emoji = {
-            "white": "⚪", "green": "🟢", "blue": "🔵",
-            "purple": "🟣", "orange": "🟠"
-        }
-        rarity_name = {
-            "white": "白色", "green": "绿色", "blue": "蓝色",
-            "purple": "紫色", "orange": "橙色"
-        }
-
         msg_lines = [
             f"💳 月卡特权：一键献祭",
             "━━━━━━━━━━━━━",
-            f"🎯 稀有度：{rarity_emoji.get(rarity, '⚪')}{rarity_name.get(rarity, rarity.upper())}",
-            f"📦 献祭数量：{len(sacrifice_details)}种材料",
+            f"📦 献祭种类：{len(sacrifice_details)}",
             "━━━━━━━━━━━━━",
             "📋 献祭明细："
         ]
@@ -197,12 +215,18 @@ async def handle_batch_sacrifice(event: MessageEvent, args: Message = CommandArg
         if len(sacrifice_details) > 10:
             msg_lines.append(f"  ... 还有{len(sacrifice_details) - 10}种材料")
 
+        if missing_items:
+            msg_lines.extend([
+                "━━━━━━━━━━━━━",
+                "⚠️ 未献祭：" + "、".join(missing_items)
+            ])
+
         msg_lines.extend([
             "━━━━━━━━━━━━━",
             f"✧ 怨念值 + {total_gained}↑",
             f"✧ 当前怨念值 {player.resentment}",
             "━━━━━━━━━━━━━",
-            "⬇️ 【一键献祭 [稀有度]】继续献祭",
+            "⬇️ 【一键献祭 材料1 材料2】继续献祭",
             "⬇️ 【突破 [镇厄]】以怨念护体突破"
         ])
 
