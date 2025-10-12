@@ -382,3 +382,15 @@ elixirs:
       tuna: 2               # 蓝色鱼类（钓鱼联动）
     quantity: 1
     base_success: 0.65
+
+  # 归元化运丹（转换运气）
+  reforge_luck:
+    produce_item_id: "reforge_luck_elixir"
+    materials:
+      cursed_mirror_shard: 5 # 蓝色材料
+      phantom_thread: 4     # 蓝色材料
+      withered_flower: 12  # 绿色材料
+      ghost_tears: 45      # 白色材料
+      grouper: 2           # 蓝色鱼类（钓鱼联动）
+    quantity: 1
+    base_success: 0.65

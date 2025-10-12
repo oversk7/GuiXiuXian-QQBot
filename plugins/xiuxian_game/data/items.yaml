@@ -1528,6 +1528,18 @@ items:
         attr_name: "理智上限"
       daily_limit: 5
 
+    - item_id: "reforge_luck_elixir"
+      name: "归元化运丹"
+      description: "归元返本，化运为灵。洗去3%的运气，转化为自由属性点"
+      type: "CONSUMABLE"
+      price: 100000
+      effect_type: "REFORGE_ATTR"
+      effect_params:
+        source_attr: "luck"
+        percent: 3
+        attr_name: "运气"
+      daily_limit: 5
+
   goods:  # 仅用于跑商系统倒卖的奢侈品
     - item_id: "lux_perfume"
       name: "香水"
