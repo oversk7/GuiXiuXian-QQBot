@@ -38,6 +38,7 @@ class ItemEffectType(str, PyEnum):
     SWEEP_DUNGEON = "SWEEP_DUNGEON"
     WORLD_BOSS_CHEST = "WORLD_BOSS_CHEST"
     MONTHLY_CARD_BOX = "MONTHLY_CARD_BOX"
+    DIVINE_PUNISHMENT = "DIVINE_PUNISHMENT"  # 天罚符：强制击杀指定目标
     # 以下类型不使用 apply_effect 处理
     CHANGE_NAME = "CHANGE_NAME"
     TELEPORT = "TELEPORT"
