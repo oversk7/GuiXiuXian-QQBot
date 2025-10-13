@@ -1,4 +1,5 @@
 from collections import defaultdict
+import asyncio
 
 from nonebot import on_command
 from nonebot.params import CommandArg
@@ -62,6 +63,20 @@ elixir_bonus_cmd = on_command("丹药加成", aliases={"丹药总加成", "丹�
 rename_cmd = on_command("改名", block=True, priority=5)
 drop_item = on_command("丢弃", aliases={"抛弃", "drop"}, block=True, priority=5)
 organize_inventory_cmd = on_command("整理背包", aliases={"整理", "背包整理"}, block=True, priority=5)
+
+
+# ---------------- 整理背包并发锁 ----------------
+_inventory_organize_locks: dict[str, asyncio.Lock] = {}
+
+
+def _get_inventory_lock(player_id: str) -> asyncio.Lock:
+    """获取指定玩家的整理锁，确保同一时间只处理一次整理请求"""
+
+    lock = _inventory_organize_locks.get(player_id)
+    if lock is None:
+        lock = asyncio.Lock()
+        _inventory_organize_locks[player_id] = lock
+    return lock
 
 # ---------------- 背包类别映射 ----------------
 # 用户输入 → 内部标识
@@ -715,106 +730,116 @@ async def handle_organize_inventory(event: MessageEvent):
             else:
                 await organize_inventory_cmd.finish("⛔ 请先创建角色")
 
-        # 获取所有背包物品
-        result = await session.execute(
-            select(ItemInstance)
-            .where(ItemInstance.player_id == player.id)
-            .where(ItemInstance.quantity > 0)
-        )
-        all_items: list[ItemInstance] = result.scalars().all()
-
-        # 过滤掉装备和鱼类，只整理背包物品
-        items: list[ItemInstance] = [item for item in all_items if not item.is_equipment and not item.is_fish]
-        equipment_count = sum(1 for item in all_items if item.is_equipment)
-        fish_count = sum(1 for item in all_items if item.is_fish)
-
-        if not items:
-            if equipment_count > 0 or fish_count > 0:
-                msg_parts = ["🎒 背包中没有需要整理的物品"]
-                if equipment_count > 0:
-                    msg_parts.append(f"⚔️ 装备 {equipment_count} 件（装备不参与整理）")
-                if fish_count > 0:
-                    msg_parts.append(f"🐟 鱼类 {fish_count} 种（鱼类存放在鱼栏）")
-                await organize_inventory_cmd.finish("\n".join(msg_parts))
-            else:
-                await organize_inventory_cmd.finish("🎒 背包空无一物，无需整理")
-
-        # 统计可堆叠物品
-        stackable_items = {}  # item_id -> [ItemInstance, ...]
-
-        for item in items:
-            if item.item_id not in stackable_items:
-                stackable_items[item.item_id] = []
-            stackable_items[item.item_id].append(item)
-
-        # 检查是否有需要整理的物品
-        items_to_organize = []
-        for item_id, instances in stackable_items.items():
-            if len(instances) > 1:  # 有多个堆叠的同类物品
-                items_to_organize.append((item_id, instances))
-
-        if not items_to_organize:
-            await organize_inventory_cmd.finish("✨ 背包已经很整齐了，无需整理")
-
-        # 开始整理
-        organized_count = 0
-        freed_slots = 0
+        player_lock = _get_inventory_lock(player.id)
+        try:
+            await asyncio.wait_for(player_lock.acquire(), timeout=0.1)
+        except asyncio.TimeoutError:
+            await organize_inventory_cmd.finish("⏳ 正在整理背包，请稍候再试~")
 
         try:
-            for item_id, instances in items_to_organize:
-                # 计算总数量
-                total_quantity = sum(inst.quantity for inst in instances)
+            # 获取所有背包物品
+            result = await session.execute(
+                select(ItemInstance)
+                .where(ItemInstance.player_id == player.id)
+                .where(ItemInstance.quantity > 0)
+            )
+            all_items: list[ItemInstance] = result.scalars().all()
 
-                # 计算需要的堆叠数
-                from ..models.inventory import STACK_SIZE
-                from math import ceil
-                needed_stacks = ceil(total_quantity / STACK_SIZE)
+            # 过滤掉装备和鱼类，只整理背包物品
+            items: list[ItemInstance] = [item for item in all_items if not item.is_equipment and not item.is_fish]
+            equipment_count = sum(1 for item in all_items if item.is_equipment)
+            fish_count = sum(1 for item in all_items if item.is_fish)
 
-                # 删除所有旧的实例
-                for inst in instances:
-                    await session.delete(inst)
+            if not items:
+                if equipment_count > 0 or fish_count > 0:
+                    msg_parts = ["🎒 背包中没有需要整理的物品"]
+                    if equipment_count > 0:
+                        msg_parts.append(f"⚔️ 装备 {equipment_count} 件（装备不参与整理）")
+                    if fish_count > 0:
+                        msg_parts.append(f"🐟 鱼类 {fish_count} 种（鱼类存放在鱼栏）")
+                    await organize_inventory_cmd.finish("\n".join(msg_parts))
+                else:
+                    await organize_inventory_cmd.finish("🎒 背包空无一物，无需整理")
 
-                # 创建新的整理后的堆叠
-                remaining_quantity = total_quantity
-                for _ in range(needed_stacks):
-                    stack_quantity = min(STACK_SIZE, remaining_quantity)
-                    new_instance = ItemInstance(
-                        player_id=event.get_user_id(),
-                        item_id=item_id,
-                        quantity=stack_quantity
-                    )
-                    session.add(new_instance)
-                    remaining_quantity -= stack_quantity
+            # 统计可堆叠物品
+            stackable_items = {}  # item_id -> [ItemInstance, ...]
 
-                # 统计整理效果
-                original_stacks = len(instances)
-                freed_slots += original_stacks - needed_stacks
-                organized_count += 1
+            for item in items:
+                if item.item_id not in stackable_items:
+                    stackable_items[item.item_id] = []
+                stackable_items[item.item_id].append(item)
 
-            await session.commit()
-        except Exception:
-            await session.rollback()
-            await organize_inventory_cmd.finish("⛔ 整理背包时发生错误，请重试")
+            # 检查是否有需要整理的物品
+            items_to_organize = []
+            for item_id, instances in stackable_items.items():
+                if len(instances) > 1:  # 有多个堆叠的同类物品
+                    items_to_organize.append((item_id, instances))
 
-        # 构建结果消息
-        result_lines = [
-            "🧹 背包整理完成！",
-            "━━━━━━━━━━━━━",
-            f"📦 整理了 {organized_count} 种物品",
-            f"🆓 释放了 {freed_slots} 个背包格子"
-        ]
+            if not items_to_organize:
+                await organize_inventory_cmd.finish("✨ 背包已经很整齐了，无需整理")
 
-        # 添加装备和鱼类统计
-        if equipment_count > 0:
-            result_lines.append(f"⚔️ 装备 {equipment_count} 件（装备不参与整理）")
-        if fish_count > 0:
-            result_lines.append(f"🐟 鱼类 {fish_count} 种（鱼类存放在鱼栏）")
+            # 开始整理
+            organized_count = 0
+            freed_slots = 0
 
-        if freed_slots > 0:
-            result_lines.append("✨ 现在背包更加整洁了！")
+            try:
+                for item_id, instances in items_to_organize:
+                    # 计算总数量
+                    total_quantity = sum(inst.quantity for inst in instances)
 
-        result_msg = "\n".join(result_lines)
-        await organize_inventory_cmd.finish(message_add_head(result_msg, event))
+                    # 计算需要的堆叠数
+                    from ..models.inventory import STACK_SIZE
+                    from math import ceil
+                    needed_stacks = ceil(total_quantity / STACK_SIZE)
+
+                    # 删除所有旧的实例
+                    for inst in instances:
+                        await session.delete(inst)
+
+                    # 创建新的整理后的堆叠
+                    remaining_quantity = total_quantity
+                    for _ in range(needed_stacks):
+                        stack_quantity = min(STACK_SIZE, remaining_quantity)
+                        new_instance = ItemInstance(
+                            player_id=player.id,
+                            item_id=item_id,
+                            quantity=stack_quantity
+                        )
+                        session.add(new_instance)
+                        remaining_quantity -= stack_quantity
+
+                    # 统计整理效果
+                    original_stacks = len(instances)
+                    freed_slots += original_stacks - needed_stacks
+                    organized_count += 1
+
+                await session.commit()
+            except Exception:
+                await session.rollback()
+                await organize_inventory_cmd.finish("⛔ 整理背包时发生错误，请重试")
+
+            # 构建结果消息
+            result_lines = [
+                "🧹 背包整理完成！",
+                "━━━━━━━━━━━━━",
+                f"📦 整理了 {organized_count} 种物品",
+                f"🆓 释放了 {freed_slots} 个背包格子"
+            ]
+
+            # 添加装备和鱼类统计
+            if equipment_count > 0:
+                result_lines.append(f"⚔️ 装备 {equipment_count} 件（装备不参与整理）")
+            if fish_count > 0:
+                result_lines.append(f"🐟 鱼类 {fish_count} 种（鱼类存放在鱼栏）")
+
+            if freed_slots > 0:
+                result_lines.append("✨ 现在背包更加整洁了！")
+
+            result_msg = "\n".join(result_lines)
+            await organize_inventory_cmd.finish(message_add_head(result_msg, event))
+        finally:
+            if player_lock.locked():
+                player_lock.release()
 
 # 新增：管理员专用物品转移指令
 transfer_item_cmd = on_command("转移物品", block=True, priority=2)
