@@ -99,6 +99,13 @@ items:
       price: 500000
       grudge_value: 10000
 
+    - item_id: "divine_punishment_talisman"
+      name: "天罚符"
+      description: "蕴含雷霆神威的禁忌符箓。使用后可指定一名UID玩家，强制触发一次如死斗般的处决并掠夺其掉落。使用方法：使用 天罚符 [目标UID] ⚡"
+      type: "CONSUMABLE"
+      effect_type: "DIVINE_PUNISHMENT"
+      price: 1000000
+
   materials:  # 材料类
     # ========== 白色（普通）材料 ==========
     - item_id: "rotten_core"

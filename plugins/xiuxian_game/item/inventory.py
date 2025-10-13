@@ -118,14 +118,7 @@ async def handle_use_item(event: MessageEvent, args: Message = CommandArg()):
 
     item_name = params[0]
     quantity = 1
-    
-    if len(params) > 1:
-        try:
-            quantity = int(params[1])
-            if quantity <= 0:
-                raise ValueError
-        except ValueError:
-            await use_item.finish("⛔ 数量必须为正整数")
+    ctx_payload: object = "world"
 
     async with safe_session() as session:
         # 使用跨平台工具获取玩家数据
@@ -172,8 +165,27 @@ async def handle_use_item(event: MessageEvent, args: Message = CommandArg()):
             if used_today + quantity > daily_limit:
                 await use_item.finish(f"⛔ {item_config.name} 每日最多可服用 {daily_limit} 颗，今日已用 {used_today} 颗")
 
+        # 解析使用参数
+        remaining_args = params[1:]
+
+        if item_config.effect_type == ItemEffectType.DIVINE_PUNISHMENT:
+            if not remaining_args:
+                await use_item.finish("⛔ 请提供目标UID，例如：使用 天罚符 12345")
+            target_uid_str = remaining_args[0]
+            if not target_uid_str.isdigit():
+                await use_item.finish("⛔ 目标UID必须为正整数")
+            ctx_payload = {"scene": "world", "target_uid": int(target_uid_str)}
+            quantity = 1
+        elif remaining_args:
+            try:
+                quantity = int(remaining_args[0])
+                if quantity <= 0:
+                    raise ValueError
+            except ValueError:
+                await use_item.finish("⛔ 数量必须为正整数")
+
         # 调用统一效果执行器（传递session以支持耐药性）
-        success, msg = await apply_effect(player, item_config, quantity, ctx="world", session=session)
+        success, msg = await apply_effect(player, item_config, quantity, ctx=ctx_payload, session=session)
 
         # 特殊处理：公会扩张令
         if not success and msg == "EXPAND_TERRITORY_SPECIAL_HANDLING":

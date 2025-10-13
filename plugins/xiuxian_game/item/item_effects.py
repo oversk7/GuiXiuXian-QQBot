@@ -6,13 +6,14 @@ from __future__ import annotations
 """
 
 from typing import Callable, Awaitable, Dict, Tuple
+import time
 from ..models.player import Player
 from ..models.inventory import ItemEffectType, ItemConfig, ItemInstance, ItemType
 from ..models.elixir_usage import ElixirUsageLog
 from datetime import date, datetime, timedelta
 
 # 类型别名
-EffectHandler = Callable[[Player, ItemConfig, int, str, object], Awaitable[Tuple[bool, str]]]
+EffectHandler = Callable[[Player, ItemConfig, int, object, object], Awaitable[Tuple[bool, str]]]
 
 # 注册表
 _REGISTRY: Dict[ItemEffectType, EffectHandler] = {}
@@ -27,7 +28,7 @@ def register(effect_type: ItemEffectType):
 
 
 
-async def apply_effect(player: Player, item_cfg: ItemConfig, quantity: int = 1, ctx: str = "world", session=None) -> Tuple[bool, str]:
+async def apply_effect(player: Player, item_cfg: ItemConfig, quantity: int = 1, ctx: object = "world", session=None) -> Tuple[bool, str]:
     """根据 item_cfg 调用对应处理器
 
     参数
@@ -38,8 +39,8 @@ async def apply_effect(player: Player, item_cfg: ItemConfig, quantity: int = 1, 
         物品配置
     quantity : int
         使用数量
-    ctx : str
-        使用场景。可选示例："world"、"battle"、"death" 等
+    ctx : object
+        使用场景或额外参数。常见示例："world"、"battle"，也可以传递包含额外数据的字典
     session : AsyncSession
         数据库会话，用于耐药性处理
 
@@ -1067,7 +1068,7 @@ async def _recalculate_equipment_bonus(session, player: Player):
 
 
 @register(ItemEffectType.EXPAND_TERRITORY)
-async def _expand_territory(player: Player, cfg: ItemConfig, qty: int, ctx: str, session=None) -> Tuple[bool, str]:
+async def _expand_territory(player: Player, cfg: ItemConfig, qty: int, ctx: object, session=None) -> Tuple[bool, str]:
     """扩张公会势力范围 - 这个效果需要特殊处理，因为需要修改Guild对象"""
     # 检查玩家是否加入公会
     if not player.guild_id:
@@ -1079,7 +1080,7 @@ async def _expand_territory(player: Player, cfg: ItemConfig, qty: int, ctx: str,
 
 
 @register(ItemEffectType.WORLD_BOSS_CHEST)
-async def _world_boss_chest(player: Player, cfg: ItemConfig, qty: int, ctx: str, session=None) -> Tuple[bool, str]:
+async def _world_boss_chest(player: Player, cfg: ItemConfig, qty: int, ctx: object, session=None) -> Tuple[bool, str]:
     """世界BOSS宝箱开启效果"""
     import random
     from datetime import datetime
@@ -1264,6 +1265,62 @@ async def _world_boss_chest(player: Player, cfg: ItemConfig, qty: int, ctx: str,
     result_lines.append(random.choice(flavor_texts))
 
     return True, "\n".join(result_lines)
+
+
+@register(ItemEffectType.DIVINE_PUNISHMENT)
+async def _divine_punishment(player: Player, cfg: ItemConfig, qty: int, ctx: object, session=None) -> Tuple[bool, str]:
+    """天罚符：强制击杀指定UID的玩家"""
+
+    if not session:
+        return False, "⛔ 系统错误：缺少数据库会话"
+
+    target_uid = None
+    if isinstance(ctx, dict):
+        target_uid = ctx.get("target_uid")
+
+    try:
+        target_uid = int(target_uid)
+    except (TypeError, ValueError):
+        return False, "⛔ 请提供有效的目标UID，例如：使用 天罚符 12345"
+
+    from sqlalchemy import select
+
+    target_stmt = select(Player).where(Player.uid == target_uid)
+    target_result = await session.execute(target_stmt)
+    target = target_result.scalars().first()
+
+    if not target:
+        return False, f"⛔ 未找到UID为 {target_uid} 的玩家"
+
+    if target.id == player.id:
+        return False, "⛔ 你不能对自己使用天罚符"
+
+    if target.hp <= 0:
+        return False, "⛔ 目标已处于濒死状态，无需再次击杀"
+
+    # 直接将目标击杀
+    target.hp = 0
+    target.mp = 0
+
+    from ..world import attack_command as attack_module
+
+    now_ts = time.time()
+    last_ts = attack_module._last_pvp_drop_time.get(target.id, 0)
+    if now_ts - last_ts < attack_module.DROP_PROTECTION_SECONDS:
+        drop_message = "🛡️ 掉落保护生效：短时间内不再掉落物品"
+    else:
+        drop_result = await attack_module.handle_wilderness_drops(session, target, player)
+        attack_module._last_pvp_drop_time[target.id] = now_ts
+        drop_message = drop_result or f"💀 {target.nickname} 没有掉落任何物品"
+
+    session.add(target)
+
+    result_lines = [
+        f"⚡ 天罚降临！{target.nickname}[UID:{target.uid}] 当场毙命。",
+        drop_message,
+    ]
+
+    return True, "\n".join(line for line in result_lines if line)
 
 
 # ============== 临时buff管理功能 ==============
