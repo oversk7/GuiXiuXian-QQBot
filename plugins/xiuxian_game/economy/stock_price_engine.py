@@ -15,7 +15,7 @@ from typing import Dict, List, Tuple
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, func
 
-from ..models.stock import Stock, StockPriceHistory, StockType
+from ..models.stock import Stock, StockPriceHistory, StockType, StockHolding
 from ..models.db import safe_session
 
 
@@ -94,7 +94,7 @@ class StockPriceEngine:
 
     @classmethod
     async def _calculate_new_price(cls, session: AsyncSession, stock: Stock, market_sentiment: float, dt: datetime) -> int:
-        """计算股票新价格（每支股票每小时可复现）"""
+        """计算股票新价格（引入不可预测随机性与投资规模拖拽）"""
         current_price = stock.current_price
 
         # 1. 基础波动率（根据股票类型）
@@ -106,10 +106,8 @@ class StockPriceEngine:
         # 3. 综合波动率
         total_volatility = (base_volatility + individual_volatility) / 2
 
-        # 4. 随机波动因子（正态分布）- 使用确定性种子，保证与私享预测一致
-        seed = f"{stock.symbol}-{dt.strftime('%Y%m%d%H')}"
-        rng = random.Random(seed)
-        random_factor = rng.gauss(0, total_volatility)
+        # 4. 随机波动因子（正态分布）- 恢复为不可预测（取消确定性种子）
+        random_factor = random.gauss(0, total_volatility)
 
         # 5. 趋势因子影响
         trend_influence = (stock.trend_factor - 1.0) * 0.01
@@ -120,12 +118,22 @@ class StockPriceEngine:
         # 7. 历史价格回归因子（防止价格偏离基础价格太远）
         regression_factor = cls._calculate_regression_factor(stock)
 
+        # 7.5 投入越多越难赚：按玩家总持仓占比施加负向漂移（0% ~ -5%）
+        invested_shares = (await session.execute(
+            select(func.sum(StockHolding.shares)).where(StockHolding.stock_id == stock.id)
+        )).scalar()
+        invested_shares = invested_shares or 0
+        fraction = (invested_shares / stock.circulating_shares) if stock.circulating_shares else 0.0
+        fraction = max(0.0, min(1.0, float(fraction)))
+        investment_drag = -0.05 * math.sqrt(fraction)  # sqrt curve: mild early impact, stronger later
+
         # 8. 综合计算价格变化率
         total_change_rate = (
             random_factor +           # 随机波动
             trend_influence +         # 个股趋势
             sentiment_influence +     # 市场情绪
-            regression_factor         # 价格回归
+            regression_factor +       # 价格回归
+            investment_drag           # 投入越多越难赚（负向漂移）
         )
 
         # 9. 限制单次变化幅度（±20%）

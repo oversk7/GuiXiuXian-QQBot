@@ -90,5 +90,3 @@ admin:
   sub_admin_ids: ['25923E084C80C8D64AE10ADA5536D25B']
 
 
-# 股神私享白名单UID（仅私密付费客户）
-oracle_whitelist_uids: [100]
