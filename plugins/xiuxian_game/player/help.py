@@ -97,7 +97,7 @@ async def handle_economy(event: MessageEvent, args: Message = CommandArg()):
         "💡 气运投资有风险，投资需谨慎！交易手续费3%\n"
         "⚠️ 跑商防刷钱：在某地购买的商品，4小时内不可在同地出售\n"
         "⚖️ 携带限制：背包中商品总量不能超过500个"
-}    )
+    )
     await economy_cmd.finish(Message(msg))
 
 # 钓鱼系统
