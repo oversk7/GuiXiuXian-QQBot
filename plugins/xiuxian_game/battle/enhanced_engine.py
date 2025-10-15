@@ -33,6 +33,8 @@ class EnhancedBattleEngine:
         self.battle_log: List[str] = []
         # 记录首回合临时加成（需战后回退）
         self._temp_hp_from_mp: Dict[str, int] = {}
+        # 缓存装备实例，用于检查每日触发限制
+        self._equipped_items_cache: Dict[str, List] = {}
 
 
     def start_battle(self, player: Player, enemy: Any, player_equipped_items: List = None):
@@ -48,6 +50,10 @@ class EnhancedBattleEngine:
 
         # 清除旧效果
         self.effect_manager.clear_effects(player.id)
+
+        # 缓存玩家装备，用于后续检查每日触发限制
+        if player_equipped_items:
+            self._equipped_items_cache[player.id] = player_equipped_items
         enemy_id = enemy.id if hasattr(enemy, 'id') else "enemy"
         self.effect_manager.clear_effects(enemy_id)
 
@@ -353,6 +359,31 @@ class EnhancedBattleEngine:
             "effects_triggered": unified.get("effects_triggered", []),
         }
 
+    def _check_blade_daily_random_available(self, player: Player) -> bool:
+        """检查刃之魔灵效果今天是否可以触发
+
+        Args:
+            player: 玩家对象
+
+        Returns:
+            True表示今天还未触发，可以触发；False表示今天已触发
+        """
+        # 获取缓存的装备列表
+        equipped_items = self._equipped_items_cache.get(player.id, [])
+
+        # 查找斩龙闪装备
+        for item in equipped_items:
+            if item.item_id == "vip_blade_zhanlongshan":
+                extra = item.extra_attrs or {}
+                from datetime import datetime
+                today = datetime.now().strftime("%Y%m%d")
+                # 如果今天已经触发过，返回False
+                if extra.get("blade_rand_day") == today:
+                    return False
+                break
+
+        return True
+
     def trigger_on_kill(self, killer: Player, victim: Any) -> Dict:
         """触发击杀效果
 
@@ -404,32 +435,36 @@ class EnhancedBattleEngine:
 
             elif effect.effect_type == EffectType.GAIN_RANDOM_ATTR:
                 # 刃之魔灵：掠夺随机属性（需要在战斗结束后持久化）
-                # 预先抽取属性用于显示，持久化时也可使用该字段
-                allowed_attrs = [
-                    "attack", "defense", "max_hp", "max_mp", "agility", "luck"
-                ]
-                attr_cn = {
-                    "attack": "攻击力",
-                    "defense": "防御力",
-                    "max_hp": "最大生命值",
-                    "max_mp": "最大理智值",
-                    "agility": "敏捷",
-                    "luck": "运气",
-                }
-                chosen_attr = self.rng.choice(allowed_attrs)
-                val = int(effect.value)
-                result["messages"].append(
-                    f"⚔️ 刃之魔灵：掠夺灵魂，{attr_cn.get(chosen_attr, '随机属性')}+{val}（战后结算）"
-                )
-                result["effects_triggered"].append("gain_random_attr")
-                # 标记需要在战后结算中处理（包含已抽取的属性名）
-                if not hasattr(result, 'post_battle_effects'):
-                    result['post_battle_effects'] = []
-                result['post_battle_effects'].append({
-                    'type': 'gain_random_attr',
-                    'attr': chosen_attr,
-                    'value': val
-                })
+                # 检查今天是否已经触发过
+                should_trigger = self._check_blade_daily_random_available(killer)
+
+                if should_trigger:
+                    # 预先抽取属性用于显示，持久化时也可使用该字段
+                    allowed_attrs = [
+                        "attack", "defense", "max_hp", "max_mp", "agility", "luck"
+                    ]
+                    attr_cn = {
+                        "attack": "攻击力",
+                        "defense": "防御力",
+                        "max_hp": "最大生命值",
+                        "max_mp": "最大理智值",
+                        "agility": "敏捷",
+                        "luck": "运气",
+                    }
+                    chosen_attr = self.rng.choice(allowed_attrs)
+                    val = int(effect.value)
+                    result["messages"].append(
+                        f"⚔️ 刃之魔灵：掠夺灵魂，{attr_cn.get(chosen_attr, '随机属性')}+{val}（战后结算）"
+                    )
+                    result["effects_triggered"].append("gain_random_attr")
+                    # 标记需要在战后结算中处理（包含已抽取的属性名）
+                    if not hasattr(result, 'post_battle_effects'):
+                        result['post_battle_effects'] = []
+                    result['post_battle_effects'].append({
+                        'type': 'gain_random_attr',
+                        'attr': chosen_attr,
+                        'value': val
+                    })
 
             elif effect.duration > 0:
                 # 持续性效果
