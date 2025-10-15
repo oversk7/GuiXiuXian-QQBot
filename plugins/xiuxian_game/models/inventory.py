@@ -194,12 +194,23 @@ class ItemInstance(Base):
             attrs[key] = attrs.get(key, 0) + ratio_bonus
 
         # 额外属性（强化）
-        for k, v in (self.extra_attrs or {}).items():
-            if k.startswith("_"):
-                continue  # 跳过内部字段，如 _persist_bonus
-            if not isinstance(v, (int, float)):
-                continue
-            attrs[k] = attrs.get(k, 0) + int(v)
+        # 仅应用“合法的属性键”，避免将装备元数据（如计数/日期等）误加到玩家身上
+        extra = self.extra_attrs or {}
+        if extra:
+            allowed_keys = set(base_attrs.keys()) if base_attrs else {
+                "max_hp","max_mp","attack","defense","agility","luck",
+                "critical_rate","critical_power","combo_rate","counter_rate","dodge_rate","accuracy_rate",
+                "skill_crit_rate","penetration_rate","anti_crit_rate",
+                "lifesteal_rate","immobilize_rate","true_damage_rate","regen_rate"
+            }
+            for k, v in extra.items():
+                if k.startswith("_"):
+                    continue  # 内部字段，如 _persist_bonus、_robexxx
+                if k not in allowed_keys:
+                    continue  # 忽略不在属性白名单内的键（如 robe_die_cnt/robe_die_day 等元数据）
+                if not isinstance(v, (int, float)):
+                    continue
+                attrs[k] = attrs.get(k, 0) + int(v)
 
         # 宝石镶嵌属性加成
         self._apply_gem_bonus(attrs, base_attrs)

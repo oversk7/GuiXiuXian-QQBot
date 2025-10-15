@@ -334,6 +334,14 @@ class BattleIntegrationHelper:
             battle_log.append(f"   {player1.nickname} 剩余血量：{player1_hp}/{initial_player1_hp}")
             battle_log.append(f"   {player2.nickname} 剩余血量：{player2_hp}/{initial_player2_hp}")
 
+
+        # 战斗结束：回退双方首回合临时增益（如灵影体质）
+        try:
+            engine.reset_temp_bonuses(player1)
+            engine.reset_temp_bonuses(player2)
+        except Exception:
+            pass
+
         return player1_victory, battle_log, player1_damage_taken, player2_damage_taken
 
     @staticmethod
@@ -597,6 +605,13 @@ class BattleIntegrationHelper:
             battle_log.append(f"  {monster_name}:")
             battle_log.append(f"    {monster_hp_bar}")
 
+
+        # 战斗结束：回退首回合临时增益（如灵影体质）
+        try:
+            engine.reset_temp_bonuses(player)
+        except Exception:
+            pass
+
         return victory, battle_log, damage_taken
 
     @staticmethod
@@ -800,6 +815,13 @@ class BattleIntegrationHelper:
             player_hp_bar = create_hp_bar(player_hp, player.max_hp, show_full=True)
             battle_log.append(f"  {player.nickname}:")
             battle_log.append(f"    {player_hp_bar}")
+
+        # 战斗结束：回退首回合临时增益（如灵影体质）
+        try:
+            engine.reset_temp_bonuses(player)
+        except Exception:
+            pass
+
         else:
             battle_log.append(f"💀 战败！用时{round_num}回合")
             # 只显示存活方的血条（完整信息）

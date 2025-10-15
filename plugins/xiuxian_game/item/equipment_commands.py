@@ -413,7 +413,8 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
             # 恢复玩家属性
             delta = (eq.extra_attrs or {}).get("_persist_bonus", {})
             for k, v in delta.items():
-                setattr(player, k, getattr(player, k) - v)
+                current_value = getattr(player, k, 0)
+                setattr(player, k, max(0, current_value - v))
 
             # 清除持久化记录并标记未穿戴
             if "_persist_bonus" in (eq.extra_attrs or {}):

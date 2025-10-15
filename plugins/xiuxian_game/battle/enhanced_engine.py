@@ -31,6 +31,9 @@ class EnhancedBattleEngine:
         self.effect_manager = BattleEffectManager()
         self.turn_counter = 0
         self.battle_log: List[str] = []
+        # 记录首回合临时加成（需战后回退）
+        self._temp_hp_from_mp: Dict[str, int] = {}
+
 
     def start_battle(self, player: Player, enemy: Any, player_equipped_items: List = None):
         """战斗开始，初始化效果和触发器
@@ -101,10 +104,12 @@ class EnhancedBattleEngine:
             hp_from_mp_effects = self.effect_manager.get_active_effects(player.id, EffectType.HP_FROM_MP)
             for eff in hp_from_mp_effects:
                 if eff.is_percentage:
-                    # 按百分比增加最大生命值
+                    # 按百分比增加最大生命值（仅战斗内临时生效）
                     hp_bonus = int(player_max_mp * eff.value / 100)
                     player.max_hp += hp_bonus
                     player.hp += hp_bonus  # 同时增加当前生命值
+                    # 记录临时加成，战斗结束回退
+                    self._temp_hp_from_mp[player.id] = self._temp_hp_from_mp.get(player.id, 0) + hp_bonus
                     self.battle_log.append(f"✨ 灵影体质·lv.EX：最大生命值+{hp_bonus}（理智值的{eff.value:.0f}%）")
         except AttributeError:
             pass
@@ -143,6 +148,9 @@ class EnhancedBattleEngine:
                     if hasattr(enemy, 'max_hp'):
                         enemy.max_hp += hp_bonus
                         enemy.hp += hp_bonus
+                        # 记录敌方的临时加成（若为玩家对象）
+                        if hasattr(enemy, 'id'):
+                            self._temp_hp_from_mp[enemy.id] = self._temp_hp_from_mp.get(enemy.id, 0) + hp_bonus
                         self.battle_log.append(f"✨ {enemy.nickname if hasattr(enemy, 'nickname') else '敌人'}的灵影体质·lv.EX：最大生命值+{hp_bonus}")
         except AttributeError:
             pass
@@ -1236,6 +1244,21 @@ class EnhancedBattleEngine:
         attack_result = self._process_pvp_attack(
             defender, attacker, counter_attack, False,
             defender_attrs, attacker_attrs
+
+    def reset_temp_bonuses(self, unit: Any):
+        """回退首回合临时增加的最大生命值等（如灵影体质）"""
+        try:
+            unit_id = unit.id if hasattr(unit, 'id') else None
+        except Exception:
+            unit_id = None
+        if not unit_id:
+            return
+        bonus = self._temp_hp_from_mp.pop(unit_id, 0)
+        if bonus > 0 and hasattr(unit, 'max_hp'):
+            unit.max_hp = max(1, unit.max_hp - bonus)
+            if hasattr(unit, 'hp'):
+                unit.hp = min(unit.hp, unit.max_hp)
+
         )
 
         return attack_result
