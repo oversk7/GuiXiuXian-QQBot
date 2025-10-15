@@ -10,7 +10,7 @@ plugins/xiuxian_game/data/cache/
 __pycache__/
 *.py[cod]
 *$py.class
-
+logs/
 # C extensions
 *.so
 
