@@ -98,19 +98,25 @@ class EnhancedBattleEngine:
         except AttributeError:
             pass
 
-        # 首回合：灵影体质·lv.EX - 按最大理智增加最大生命值
+        # 首回合：灵影体质·lv.EX - 按最大理智增加最大生命值，同时按同百分比提升当前生命值
         try:
             player_max_mp = getattr(player, 'max_mp', 0)
             hp_from_mp_effects = self.effect_manager.get_active_effects(player.id, EffectType.HP_FROM_MP)
+            # 汇总百分比，避免多特效循环导致不一致
+            total_pct = 0
             for eff in hp_from_mp_effects:
                 if eff.is_percentage:
-                    # 按百分比增加最大生命值（仅战斗内临时生效）
-                    hp_bonus = int(player_max_mp * eff.value / 100)
-                    player.max_hp += hp_bonus
-                    player.hp += hp_bonus  # 同时增加当前生命值
-                    # 记录临时加成，战斗结束回退
-                    self._temp_hp_from_mp[player.id] = self._temp_hp_from_mp.get(player.id, 0) + hp_bonus
-                    self.battle_log.append(f"✨ 灵影体质·lv.EX：最大生命值+{hp_bonus}（理智值的{eff.value:.0f}%）")
+                    total_pct += eff.value
+            if total_pct > 0:
+                base_hp = player.hp
+                hp_bonus_total = int(player_max_mp * total_pct / 100)
+                player.max_hp += hp_bonus_total
+                # 当前生命值按百分比提升（基于提升前的当前HP）
+                hp_inc_cur = int(base_hp * total_pct / 100)
+                player.hp = min(player.max_hp, base_hp + hp_inc_cur)
+                # 记录临时加成，战斗结束回退
+                self._temp_hp_from_mp[player.id] = self._temp_hp_from_mp.get(player.id, 0) + hp_bonus_total
+                self.battle_log.append(f"✨ 灵影体质·lv.EX：最大生命值+{hp_bonus_total}（理智值的{total_pct:.0f}%），当前生命值+{hp_inc_cur}")
         except AttributeError:
             pass
 
@@ -138,20 +144,25 @@ class EnhancedBattleEngine:
         except AttributeError:
             pass
 
-        # 敌方同理处理灵影体质
+        # 敌方同理处理灵影体质：上限按理智百分比提升，当前生命值也按相同百分比提升
         try:
             enemy_max_mp = getattr(enemy, 'max_mp', 0) if hasattr(enemy, 'max_mp') else 0
             hp_from_mp_effects_enemy = self.effect_manager.get_active_effects(enemy_id, EffectType.HP_FROM_MP)
+            total_pct_e = 0
             for eff in hp_from_mp_effects_enemy:
                 if eff.is_percentage:
-                    hp_bonus = int(enemy_max_mp * eff.value / 100)
-                    if hasattr(enemy, 'max_hp'):
-                        enemy.max_hp += hp_bonus
-                        enemy.hp += hp_bonus
-                        # 记录敌方的临时加成（若为玩家对象）
-                        if hasattr(enemy, 'id'):
-                            self._temp_hp_from_mp[enemy.id] = self._temp_hp_from_mp.get(enemy.id, 0) + hp_bonus
-                        self.battle_log.append(f"✨ {enemy.nickname if hasattr(enemy, 'nickname') else '敌人'}的灵影体质·lv.EX：最大生命值+{hp_bonus}")
+                    total_pct_e += eff.value
+            if total_pct_e > 0 and hasattr(enemy, 'max_hp'):
+                base_hp_e = enemy.hp if hasattr(enemy, 'hp') else 0
+                hp_bonus_total_e = int(enemy_max_mp * total_pct_e / 100)
+                enemy.max_hp += hp_bonus_total_e
+                hp_inc_cur_e = int(base_hp_e * total_pct_e / 100)
+                if hasattr(enemy, 'hp'):
+                    enemy.hp = min(enemy.max_hp, base_hp_e + hp_inc_cur_e)
+                # 记录敌方的临时加成（若为玩家对象）
+                if hasattr(enemy, 'id'):
+                    self._temp_hp_from_mp[enemy.id] = self._temp_hp_from_mp.get(enemy.id, 0) + hp_bonus_total_e
+                self.battle_log.append(f"✨ {enemy.nickname if hasattr(enemy, 'nickname') else '敌人'}的灵影体质·lv.EX：最大生命值+{hp_bonus_total_e}")
         except AttributeError:
             pass
 
@@ -1258,9 +1269,16 @@ class EnhancedBattleEngine:
             return
         bonus = self._temp_hp_from_mp.pop(unit_id, 0)
         if bonus > 0 and hasattr(unit, 'max_hp'):
-            unit.max_hp = max(1, unit.max_hp - bonus)
+            old_max = unit.max_hp
+            new_max = max(1, old_max - bonus)
+            # 维持战斗结束时的血量比例：按比例回退当前生命值
+            if hasattr(unit, 'hp') and old_max > 0:
+                ratio = unit.hp / float(old_max)
+            else:
+                ratio = 0.0
+            unit.max_hp = new_max
             if hasattr(unit, 'hp'):
-                unit.hp = min(unit.hp, unit.max_hp)
+                unit.hp = int(max(0, min(new_max, ratio * new_max)))
 
     def get_battle_log(self) -> List[str]:
         """获取战斗日志"""
