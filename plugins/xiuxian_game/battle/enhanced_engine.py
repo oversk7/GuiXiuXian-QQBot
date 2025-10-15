@@ -52,14 +52,26 @@ class EnhancedBattleEngine:
         if player_equipped_items:
             self._register_equipment_triggers(player.id, player_equipped_items)
 
-        # 触发玩家首回合效果（补充环境上下文）
+        # 先应用被动效果（始终生效类），确保后续判定可读取
         try:
             from ..utils import get_weekly_theme
             theme_name = get_weekly_theme()["name"]
         except Exception:
             theme_name = ""
         region = player.get_current_region() if hasattr(player, 'get_current_region') else getattr(player, 'region', "")
+        passive_effects = self.effect_manager.check_triggers(player.id, TriggerType.PASSIVE, {
+            "source": "战斗开始",
+            "current_hp": player.hp,
+            "max_hp": player.max_hp,
+            "current_mp": getattr(player, 'mp', 0),
+            "max_mp": getattr(player, 'max_mp', 0),
+            "region": region,
+            "theme": theme_name,
+        })
+        for eff in passive_effects:
+            self.effect_manager.add_effect(player.id, eff)
 
+        # 触发玩家首回合效果（补充环境上下文）
         triggered = self.effect_manager.check_triggers(player.id, TriggerType.FIRST_TURN, {
             "source": "战斗开始",
             "current_hp": player.hp,
@@ -80,6 +92,20 @@ class EnhancedBattleEngine:
             for eff in mp_shields:
                 eff.shield_value = int(player_max_mp)
                 eff.effect_type = EffectType.SHIELD
+        except AttributeError:
+            pass
+
+        # 首回合：灵影体质·lv.EX - 按最大理智增加最大生命值
+        try:
+            player_max_mp = getattr(player, 'max_mp', 0)
+            hp_from_mp_effects = self.effect_manager.get_active_effects(player.id, EffectType.HP_FROM_MP)
+            for eff in hp_from_mp_effects:
+                if eff.is_percentage:
+                    # 按百分比增加最大生命值
+                    hp_bonus = int(player_max_mp * eff.value / 100)
+                    player.max_hp += hp_bonus
+                    player.hp += hp_bonus  # 同时增加当前生命值
+                    self.battle_log.append(f"✨ 灵影体质·lv.EX：最大生命值+{hp_bonus}（理智值的{eff.value:.0f}%）")
         except AttributeError:
             pass
 
@@ -104,6 +130,20 @@ class EnhancedBattleEngine:
             for eff in mp_shields_enemy:
                 eff.shield_value = int(enemy_max_mp)
                 eff.effect_type = EffectType.SHIELD
+        except AttributeError:
+            pass
+
+        # 敌方同理处理灵影体质
+        try:
+            enemy_max_mp = getattr(enemy, 'max_mp', 0) if hasattr(enemy, 'max_mp') else 0
+            hp_from_mp_effects_enemy = self.effect_manager.get_active_effects(enemy_id, EffectType.HP_FROM_MP)
+            for eff in hp_from_mp_effects_enemy:
+                if eff.is_percentage:
+                    hp_bonus = int(enemy_max_mp * eff.value / 100)
+                    if hasattr(enemy, 'max_hp'):
+                        enemy.max_hp += hp_bonus
+                        enemy.hp += hp_bonus
+                        self.battle_log.append(f"✨ {enemy.nickname if hasattr(enemy, 'nickname') else '敌人'}的灵影体质·lv.EX：最大生命值+{hp_bonus}")
         except AttributeError:
             pass
 
@@ -330,6 +370,30 @@ class EnhancedBattleEngine:
                 result["messages"].append(f"💚 击杀回复{heal_amount}HP")
                 result["effects_triggered"].append("heal")
 
+            elif effect.effect_type == EffectType.GAIN_MP:
+                # 噬灵者：永久获得理智值（需要在战斗结束后持久化）
+                result["messages"].append(f"👻 噬灵者：剥离灵魂，理智值+{int(effect.value)}（战后结算）")
+                result["effects_triggered"].append("gain_mp")
+                # 标记需要在战斗结束后处理
+                if not hasattr(result, 'post_battle_effects'):
+                    result['post_battle_effects'] = []
+                result['post_battle_effects'].append({
+                    'type': 'gain_mp',
+                    'value': int(effect.value)
+                })
+
+            elif effect.effect_type == EffectType.GAIN_RANDOM_ATTR:
+                # 刃之魔灵：掠夺随机属性（需要在战斗结束后持久化）
+                result["messages"].append(f"⚔️ 刃之魔灵：掠夺灵魂，随机属性+{int(effect.value)}（战后结算）")
+                result["effects_triggered"].append("gain_random_attr")
+                # 标记需要在战斗结束后处理
+                if not hasattr(result, 'post_battle_effects'):
+                    result['post_battle_effects'] = []
+                result['post_battle_effects'].append({
+                    'type': 'gain_random_attr',
+                    'value': int(effect.value)
+                })
+
             elif effect.duration > 0:
                 # 持续性效果
                 self.effect_manager.add_effect(killer_id, effect)
@@ -377,6 +441,24 @@ class EnhancedBattleEngine:
 
         # 检查是否有真伤状态
         has_true_damage = len(self.effect_manager.get_active_effects(attacker_id, EffectType.TRUE_DAMAGE)) > 0
+        # 预取“无视类”效果：
+        # - IGNORE_SPECIAL（绝魔体质，来自PASSIVE）
+        # - IGNORE_DEFENSE（至尊锋刃，ON_ATTACK逐次判定）
+        ignore_special_effects = self.effect_manager.get_active_effects(attacker_id, EffectType.IGNORE_SPECIAL)
+        ignore_special_ratio = 0.0
+        for eff in ignore_special_effects:
+            val = float(getattr(eff, 'value', 0))
+            ignore_special_ratio += max(0.0, val) / 100.0
+        # ON_ATTACK 前置判定，仅提取 IGNORE_DEFENSE，用于本次攻击
+        pre_ctx = {"source": "pre_attack", "current_hp": getattr(attacker, 'hp', 0), "max_hp": getattr(attacker, 'max_hp', 0)}
+        pre_attack_effects = self.effect_manager.check_triggers(attacker_id, TriggerType.ON_ATTACK, pre_ctx)
+        ignore_defense_ratio = 0.0
+        for eff in pre_attack_effects:
+            if eff.effect_type == EffectType.IGNORE_DEFENSE:
+                val = float(getattr(eff, 'value', 0))
+                ignore_defense_ratio += max(0.0, val) / 100.0
+        # 组合用于护盾/无敌等通用绕过比例
+        bypass_fraction = 1.0 - (1.0 - min(1.0, ignore_special_ratio)) * (1.0 - min(1.0, ignore_defense_ratio))
 
         # 执行基础攻击
         if hasattr(defender, 'defense'):
@@ -392,12 +474,16 @@ class EnhancedBattleEngine:
             # 使用增强的属性进行攻击判定（真伤在判定内处理）
             attack_result = self._process_pvp_attack(
                 attacker, defender, base_attack, is_skill,
-                attacker_attrs, defender_attrs, has_true_damage
+                attacker_attrs, defender_attrs, has_true_damage,
+                ignore_defense_ratio=ignore_defense_ratio,
+                ignore_special_ratio=ignore_special_ratio,
             )
         else:
             # 对怪物（真伤在判定内处理）
             attack_result = self._process_monster_attack(
-                attacker, defender, base_attack, is_skill, has_true_damage
+                attacker, defender, base_attack, is_skill, has_true_damage,
+                ignore_defense_ratio=ignore_defense_ratio,
+                ignore_special_ratio=ignore_special_ratio,
             )
 
         # 格式化基础攻击消息
@@ -500,11 +586,16 @@ class EnhancedBattleEngine:
                 damage -= damage_reduction
                 result["messages"].append(f"💪 刚气-心：造成伤害降低30% (-{damage_reduction})")
 
-        # 检查防御者是否有无敌状态
+        # 检查防御者是否有无敌状态（可被“绝魔体质/至尊锋刃”部分无视）
         invincible_effects = self.effect_manager.get_active_effects(defender_id, EffectType.INVINCIBLE)
         if invincible_effects:
-            result["messages"].append(f"✨ {defender_name}处于无敌状态，免疫所有伤害！")
-            return result
+            if 'bypass_fraction' in locals() and bypass_fraction > 0:
+                partial = max(1, int(damage * bypass_fraction))
+                result["messages"].append(f"✨ {defender_name}处于无敌状态，但被锋刃/绝魔部分无视，仍造成{partial}伤害！")
+                damage = partial
+            else:
+                result["messages"].append(f"✨ {defender_name}处于无敌状态，免疫所有伤害！")
+                return result
 
         # 恐惧状态增伤（联动增强）
         fear_effects = self.effect_manager.get_active_effects(defender_id, EffectType.FEAR)
@@ -513,26 +604,35 @@ class EnhancedBattleEngine:
             damage += fear_bonus
             result["messages"].append(f"😱 恐惧加深伤害 +{fear_bonus}")
 
-        # 检查防御者是否有护盾
+        # 检查防御者是否有护盾（可被部分无视）
         shield_effects = self.effect_manager.get_active_effects(defender_id, EffectType.SHIELD)
         absorbed_by_shield = 0
+        # 先计算直接绕过护盾的伤害比例
+        pre_bypass = 0
+        if 'bypass_fraction' in locals() and bypass_fraction > 0 and damage > 0:
+            pre_bypass = int(damage * min(1.0, max(0.0, bypass_fraction)))
+            damage_for_shield = max(0, damage - pre_bypass)
+        else:
+            damage_for_shield = damage
         for shield_effect in shield_effects:
             if hasattr(shield_effect, 'shield_value') and shield_effect.shield_value > 0:
-                if damage <= shield_effect.shield_value:
-                    # 护盾完全吸收伤害
-                    absorbed_by_shield += damage
-                    shield_effect.shield_value -= damage
-                    damage = 0
+                if damage_for_shield <= shield_effect.shield_value:
+                    # 护盾完全吸收伤害（未能被绕过的部分）
+                    absorbed_by_shield += damage_for_shield
+                    shield_effect.shield_value -= damage_for_shield
+                    damage_for_shield = 0
                     result["messages"].append(f"🛡️ 护盾吸收{absorbed_by_shield}伤害，剩余{shield_effect.shield_value}点护盾")
                     break
                 else:
                     # 护盾部分吸收
                     absorbed_by_shield += shield_effect.shield_value
-                    damage -= shield_effect.shield_value
+                    damage_for_shield -= shield_effect.shield_value
                     result["messages"].append(f"🛡️ 护盾吸收{shield_effect.shield_value}伤害后破碎")
                     shield_effect.shield_value = 0
                     # 护盾破碎，移除效果
                     self.effect_manager.remove_effect(defender_id, shield_effect)
+        # 合并护盾绕过与护盾结算后的伤害
+        damage = pre_bypass + damage_for_shield
 
         # 构建攻击消息
         if is_combo:
@@ -550,7 +650,11 @@ class EnhancedBattleEngine:
 
         # 显示实际伤害（扣除护盾后）
         if absorbed_by_shield > 0:
-            attack_msg += f" 造成{damage + absorbed_by_shield}伤害(护盾吸收{absorbed_by_shield})"
+            # pre_bypass 部分直接穿透护盾，故展示总伤害需包含该部分
+            total_shown = damage + absorbed_by_shield
+            if 'pre_bypass' in locals() and pre_bypass > 0:
+                total_shown += 0  # damage 已经包含 pre_bypass，不重复相加
+            attack_msg += f" 造成{total_shown}伤害(护盾吸收{absorbed_by_shield})"
         else:
             attack_msg += f" 造成{damage}伤害"
 
@@ -595,6 +699,7 @@ class EnhancedBattleEngine:
                 heal_amount = int(attacker.max_hp * effect.value / 100) if effect.is_percentage else int(effect.value)
                 result["hp_restored"] += heal_amount
                 result["messages"].append(f"💚 回复{heal_amount}HP")
+
                 result["effects_triggered"].append("heal")
 
             elif effect.effect_type == EffectType.FEAR:
@@ -622,15 +727,18 @@ class EnhancedBattleEngine:
                 result["messages"].append(format_effect_message(effect, attacker_name))
                 result["effects_triggered"].append(effect.effect_type.value)
 
-        # 触发防御时效果(被攻击方)
+        # 触发防御时效果(被攻击方) - 同时触发ON_DEFENSE和ON_ATTACKED
         defender_region = defender.get_current_region() if hasattr(defender, 'get_current_region') else getattr(defender, 'region', "")
         try:
             from ..utils import get_weekly_theme
             theme_name = get_weekly_theme()["name"]
         except Exception:
             theme_name = ""
-        defense_effects = self.effect_manager.check_triggers(defender_id, TriggerType.ON_DEFENSE, {
+
+        defense_context = {
             "source": defender_name,
+            "attacker": attacker_name,
+            "attacker_id": attacker_id,
             "damage": damage,
             "current_hp": getattr(defender, 'hp', 100),
             "max_hp": getattr(defender, 'max_hp', 100),
@@ -638,15 +746,49 @@ class EnhancedBattleEngine:
             "max_mp": getattr(defender, 'max_mp', 0),
             "region": defender_region,
             "theme": theme_name,
-        })
+        }
+
+        defense_effects = self.effect_manager.check_triggers(defender_id, TriggerType.ON_DEFENSE, defense_context)
+        # 同时检查ON_ATTACKED触发器（镜怨之衣使用）
+        attacked_effects = self.effect_manager.check_triggers(defender_id, TriggerType.ON_ATTACKED, defense_context)
+        defense_effects.extend(attacked_effects)
+
+        #  50%
+        if 'ignore_special_ratio' in locals() and ignore_special_ratio > 0 and defense_effects:
+            scale = max(0.0, 1.0 - min(1.0, ignore_special_ratio))
+            for eff in defense_effects:
+                if hasattr(eff, 'value') and isinstance(getattr(eff, 'value'), (int, float)):
+                    eff.value = float(eff.value) * scale
 
         for effect in defense_effects:
-            if effect.effect_type == EffectType.REFLECT:
-                # 反弹伤害（实际扣血）
+            if effect.effect_type == EffectType.REFLECT_DEATH:
+                # 镜怨体质：反射死亡(可被“绝魔体质”按概率压制)
+                apply_instant_death = True
+                if 'ignore_special_ratio' in locals() and ignore_special_ratio > 0:
+                    # 将“必死”视为100%概率效果，被忽视50%后 -> 仅有(1-忽视)的概率生效
+                    if self.rng.random() < min(1.0, ignore_special_ratio):
+                        apply_instant_death = False
+                        result["messages"].append("🪞 镜怨体质被斩龙闪压制，必死效果本次未触发")
+                if apply_instant_death:
+                    result["attacker_instant_death"] = True
+                    result["messages"].append(f"🪞 镜怨体质！{attacker_name}的攻击被镜像反噬，灵魂瞬间破碎——直接死亡！")
+                    result["messages"].append("💀 镜中之人，以己之力斩己之形。")
+                    result["effects_triggered"].append("reflect_death")
+                # 标记攻击者需要立即死亡
+                if hasattr(attacker, 'hp'):
+                    attacker.hp = 0
+
+            elif effect.effect_type == EffectType.REFLECT:
+                # 反弹伤害（实际扣血），可被“绝魔体质”部分无视
                 reflect_damage = int(damage * effect.value / 100)
-                result["reflect_damage"] = result.get("reflect_damage", 0) + reflect_damage
-                result["messages"].append(f"↩️ {defender_name}反弹{reflect_damage}伤害给{attacker_name}")
-                result["effects_triggered"].append("reflect")
+                reduce_factor = 1.0
+                if 'ignore_special_ratio' in locals() and ignore_special_ratio > 0:
+                    reduce_factor = max(0.0, 1.0 - min(1.0, ignore_special_ratio))
+                reflect_damage = int(reflect_damage * reduce_factor)
+                if reflect_damage > 0:
+                    result["reflect_damage"] = result.get("reflect_damage", 0) + reflect_damage
+                    result["messages"].append(f"↩️ {defender_name}反弹{reflect_damage}伤害给{attacker_name}")
+                    result["effects_triggered"].append("reflect")
 
             elif effect.effect_type == EffectType.SHIELD:
                 # 护盾效果
@@ -843,7 +985,9 @@ class EnhancedBattleEngine:
 
     def _process_pvp_attack(self, attacker: Player, defender: Player, base_damage: int,
                            is_skill: bool, attacker_attrs: Dict, defender_attrs: Dict,
-                           has_true_damage: bool = False) -> Dict:
+                           has_true_damage: bool = False,
+                           ignore_defense_ratio: float = 0.0,
+                           ignore_special_ratio: float = 0.0) -> Dict:
         """处理PVP攻击（使用已应用buff的属性）
 
         Args:
@@ -868,9 +1012,13 @@ class EnhancedBattleEngine:
         }
 
         # 1. 命中判定（真伤也需要命中判定）
+        # 斩龙闪：无视部分“闪避/特殊效果”，对方闪避率按忽视比例降低
+        adjusted_dodge = defender_attrs.get("dodge_rate", 0)
+        adjusted_dodge = adjusted_dodge * (1 - max(0.0, min(1.0, ignore_defense_ratio)))
+        adjusted_dodge = adjusted_dodge * (1 - max(0.0, min(1.0, ignore_special_ratio)))
         hit_chance = BattleAttributeCalculator.calculate_hit_chance(
-            attacker_attrs["accuracy_rate"],
-            defender_attrs["dodge_rate"]
+            attacker_attrs.get("accuracy_rate", 0),
+            adjusted_dodge
         )
 
         if self.rng.random() > hit_chance:
@@ -883,8 +1031,10 @@ class EnhancedBattleEngine:
         penetration_ratio = 0
         if not has_true_damage:
             penetration_ratio = BattleAttributeCalculator.get_penetration_ratio(
-                attacker_attrs["penetration_rate"]
+                attacker_attrs.get("penetration_rate", 0)
             )
+            # 叠加“至尊锋刃”提供的额外无视比例
+            penetration_ratio = min(1.0, penetration_ratio + max(0.0, ignore_defense_ratio))
             if penetration_ratio > 0:
                 result["is_penetration"] = True
                 result["penetration_ratio"] = penetration_ratio
@@ -942,7 +1092,9 @@ class EnhancedBattleEngine:
         return result
 
     def _process_monster_attack(self, attacker: Player, monster_stats: Dict,
-                               base_damage: int, is_skill: bool, has_true_damage: bool = False) -> Dict:
+                               base_damage: int, is_skill: bool, has_true_damage: bool = False,
+                               ignore_defense_ratio: float = 0.0,
+                               ignore_special_ratio: float = 0.0) -> Dict:
         """处理对怪物的攻击（简化版）
 
         Args:
@@ -988,8 +1140,10 @@ class EnhancedBattleEngine:
         penetration_ratio = 0
         if not has_true_damage:
             penetration_ratio = BattleAttributeCalculator.get_penetration_ratio(
-                attacker_attrs["penetration_rate"]
+                attacker_attrs.get("penetration_rate", 0)
             )
+            # 叠加“至尊锋刃”提供的额外无视比例
+            penetration_ratio = min(1.0, penetration_ratio + max(0.0, ignore_defense_ratio))
             if penetration_ratio > 0:
                 result["is_penetration"] = True
                 result["penetration_ratio"] = penetration_ratio

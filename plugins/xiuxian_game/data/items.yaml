@@ -1178,63 +1178,73 @@ items:
     # ========== VIP定制装备 ==========
 
     - item_id: "vip_blade_zhanlongshan"
-      name: "斩龙闪"
+      name: "斩龙闪（长刀）"
       description: "弑神伐恶，斩魂戮邪，封魔于刃，斩尽不死不灭！\n🌟灭法之影套装之一"
       type: "EQUIPMENT"
       rarity: "red"
       price: 0
       durability: 300
       required_level: 10
-      attr_bonus: {"attack": 100, "agility": 100, "mp": 100}
-      attr_ratio: {"attack": 1.0, "agility": 1.0, "mp": 1.0}
+      attr_bonus: {"attack": 100, "mp": 100, "agility": 100}
+      attr_ratio: {"attack": 1.0, "mp": 1.0, "agility": 1.0}
       special_effects:
         - trigger: "first_turn"
-          effect: "shield_from_mp"
+          effect: "hp_from_mp"
+          is_percentage: true
+          value: 100
+          description: "[1] 灵影体质·lv.EX：理智值与生命值形成良好循环，开始战斗后最大生命值得到大幅度增强，提升数值为总理智值的100%。"
+        - trigger: "passive"
+          effect: "ignore_special"
+          is_percentage: true
+          value: 50
+          description: "[2] 绝魔体质：自身无视敌人任何形式的特殊效果、特殊属性50%影响。"
+        - trigger: "on_kill"
+          effect: "gain_mp"
           is_percentage: false
-          value: 0
-          description: "[1] 灵影体质·EX：以最大理智值化为护盾，战斗开始即获得等额护盾。"
+          value: 2
+          description: "[3] 噬灵者：击杀敌人后剥离“灵”可永久夺取理智值2点。（每日最多永久提升40点）"
+        - trigger: "on_attack"
+          effect: "ignore_defense"
+          is_percentage: true
+          value: 20
+          description: "[4] 至尊锋刃：以此武器攻击无视20%伤害豁免、减免、闪避、护盾、防御、无敌等效果"
         - trigger: "on_hit"
           effect: "execute"
           is_percentage: true
           value: 30
-          description: "[5] 魔刃·弑滅：若命中后敌方生命≤30%，无视免疫与复活直接处决。"
+          description: "[5] 魔刃·弑滅「此特性永久具有高优先权」：在敌人「生命值总量」低于30%时，无视任何效果将斩杀灵魂。"
         - trigger: "on_kill"
-          effect: "lifesteal"
+          effect: "gain_random_attr"
           is_percentage: false
-          value: 0
-          description: "[3] 噬灵者：本日每击杀一次，永久+2最大理智（每日上限40，由系统在战后结算）。"
-        - trigger: "first_turn"
-          effect: "buff_attack"
-          is_percentage: false
-          value: 0
-          description: "[6] 刃之魔灵：每日首次入战，随机+40属性（攻/防/敏/运/生命上限/理智上限），永久保留。"
+          value: 40
+          description: "[6] 刃之魔灵：斩杀敌人死亡后掠夺随机属性40点增长自身（掠夺每天仅生效一次）"
 
     - item_id: "vip_robe_jingyuanzhiyi"
       name: "镜怨之衣"
-      description: "镜中有怨，怨起则镜生刃。\n🌟灭法之影套装之一"
+      description: "有时，你的倒影会比你更早死去。"
       type: "EQUIPMENT"
       rarity: "red"
       price: 0
       durability: 300
       required_level: 10
-      attr_bonus: {"defense": 60, "stamina": 60, "attack": 80, "agility": 60}
-      attr_ratio: {"defense": 0.60, "stamina": 1.00, "attack": 0.80, "agility": 0.60}
+      attr_bonus: {"stamina": 100, "attack": 80, "agility": 60, "defense": 60}
+      attr_ratio: {"stamina": 1.0, "attack": 0.80, "agility": 0.60, "defense": 0.60}
       special_effects:
-        - trigger: "first_turn"
-          effect: "shield"
-          is_percentage: true
-          value: 15
-          description: "[2] 镜中庇佑：开局获得15%最大生命护盾。"
-        - trigger: "on_defense"
-          effect: "reflect"
-          is_percentage: true
-          value: 30
-          description: "[1] 镜怨体质：仅当他人或怪物主动发起死斗时，反噬致死（由系统在战前判定，免战斗过程）。"
-        - trigger: "on_kill"
-          effect: "heal"
+        - trigger: "on_attacked"
+          effect: "reflect_death"
           is_percentage: false
           value: 0
-          description: "[3] 镜怨自噬：自身死亡后攻击+2（每日上限20，由系统在战后结算）。"
+          description: "[1] 镜怨体质：当他人主动攻击你时，其攻击行为被视为"对自身发动"，镜怨会在敌人心智中"映射自身存在"，使攻击者的灵魂瞬间反噬自身——**直接死亡（无视等级、抗性、防御、免死效果）**。\n"镜中之人，以己之力斩己之形。""
+        - trigger: "on_attacked"
+          effect: "heal"
+          is_percentage: true
+          value: 10
+          description: "[2] 怨息环流：每次被攻击后，会吸收敌人残余灵息，使自身生命恢复10%。\n"所有的痛苦，最终都成了我的养料。""
+        - trigger: "on_death"
+          effect: "gain_attack"
+          is_percentage: false
+          value: 2
+          description: "[3] 自噬：每被击杀一次（死亡后复活），自身的力量上限提高2点，直至永恒。（每天最多永久提升20点）\n"死是镜的记忆，我的死，是下一次的回声。""
 
           iron_rust: 40
           ash_powder: 30

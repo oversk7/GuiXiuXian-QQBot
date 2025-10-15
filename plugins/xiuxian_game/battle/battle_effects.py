@@ -14,13 +14,16 @@ class TriggerType(str, Enum):
     """触发类型"""
     ON_ATTACK = "on_attack"          # 攻击时触发
     ON_DEFENSE = "on_defense"        # 防御时触发(被攻击时)
+    ON_ATTACKED = "on_attacked"      # 被攻击时触发(与ON_DEFENSE相同，但语义更清晰)
     ON_CRITICAL = "on_critical"      # 暴击时触发
     ON_DODGE = "on_dodge"           # 闪避成功时触发
     ON_KILL = "on_kill"             # 击杀敌人时触发
+    ON_DEATH = "on_death"           # 死亡时触发
     FIRST_TURN = "first_turn"       # 战斗首回合触发
     EACH_TURN = "each_turn"         # 每回合开始时触发
     LOW_HP = "low_hp"               # 低血量时触发(<=30%)
     ON_HIT = "on_hit"               # 命中时触发
+    PASSIVE = "passive"             # 被动效果(始终生效)
 
 
 class EffectType(str, Enum):
@@ -52,13 +55,22 @@ class EffectType(str, Enum):
     # 特殊效果
     SHIELD = "shield"               # 护盾
     SHIELD_FROM_MP = "shield_from_mp"   # 灵影护盾：按最大理智转化护盾（首回合）
+    HP_FROM_MP = "hp_from_mp"       # 灵影体质：按最大理智增加最大生命值（首回合）
     REFLECT = "reflect"             # 反弹伤害
+    REFLECT_DEATH = "reflect_death" # 反射死亡：攻击者直接死亡（镜怨之衣）
     INVINCIBLE = "invincible"       # 无敌
 
     # 复杂连锁效果（天退星刀专用）
     TIGER_BULLET = "tiger_bullet"           # 虎标弹：造成伤害提高(计数型)
     FIERCE_TIGER_BULLET = "fierce_tiger_bullet"  # 猛虎标弹：虎标弹失效后激活
     RIGID_QI_HEART = "rigid_qi_heart"       # 刚气-心：猛虎标弹失效后触发
+
+    # VIP定制装备效果（斩龙闪、镜怨之衣）
+    IGNORE_SPECIAL = "ignore_special"       # 绝魔体质：无视特殊效果
+    GAIN_MP = "gain_mp"                     # 噬灵者：永久获得理智值
+    IGNORE_DEFENSE = "ignore_defense"       # 至尊锋刃：无视防御
+    GAIN_RANDOM_ATTR = "gain_random_attr"   # 刃之魔灵：获得随机属性
+    GAIN_ATTACK = "gain_attack"             # 自噬：永久获得攻击力
 
 
 @dataclass
