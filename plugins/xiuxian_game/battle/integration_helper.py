@@ -168,6 +168,12 @@ class BattleIntegrationHelper:
                 if attack_result["hit"]:
                     damage = attack_result["damage"]
                     second_hp_ref[0] = max(0, second_hp_ref[0] - damage)
+                    # 防守方受击触发（如镜怨披风·怨息环流：被攻击后恢复10%）
+                    heal_def = attack_result.get("defender_hp_restored", 0)
+                    if heal_def > 0:
+                        second_hp_ref[0] = min(second_player.max_hp, second_hp_ref[0] + heal_def)
+                        battle_log.append(f"💚 {second_player.nickname}回复{heal_def}HP")
+
 
                     # 构建详细攻击描述
                     action_desc = f"⚔️ {first_player.nickname} 攻击 {second_player.nickname}"
@@ -235,6 +241,12 @@ class BattleIntegrationHelper:
 
                     # 命中后检查处决（忽略无敌等，直接强制死亡）
                     exec_thr = _get_execute_threshold(second_player.id)
+                    # 防守方受击触发（如镜怨披风·怨息环流：被攻击后恢复10%）
+                    heal_def = attack_result.get("defender_hp_restored", 0)
+                    if heal_def > 0:
+                        first_hp_ref[0] = min(first_player.max_hp, first_hp_ref[0] + heal_def)
+                        battle_log.append(f"💚 {first_player.nickname}回复{heal_def}HP")
+
                     if exec_thr > 0 and first_hp_ref[0] > 0:
                         if first_hp_ref[0] <= int(first_player.max_hp * exec_thr / 100):
                             battle_log.append(f"⚰️ {second_player.nickname}发动处决，{first_player.nickname}被弑灭！")
@@ -482,6 +494,37 @@ class BattleIntegrationHelper:
                             damage_reduction = int(final_damage * rigid_effect.value / 100)
                             final_damage -= damage_reduction
                             battle_log.append(f"💪 刚气-心！受到伤害降低{rigid_effect.value:.0f}% (-{damage_reduction})")
+
+                        # 被攻击方（玩家）受击触发：如镜怨披风·怨息环流（恢复10%）
+                        try:
+                            from ..battle.battle_effects import TriggerType, EffectType
+                            # 环境上下文（与引擎一致的最小集合）
+                            region = player.get_current_region() if hasattr(player, 'get_current_region') else getattr(player, 'region', "")
+                            try:
+                                from ..utils import get_weekly_theme
+                                theme_name = get_weekly_theme()["name"]
+                            except Exception:
+                                theme_name = ""
+                            defense_context = {
+                                "source": monster_name,
+                                "attacker": monster_name,
+                                "current_hp": player_hp,
+                                "max_hp": player.max_hp,
+                                "region": region,
+                                "theme": theme_name,
+                            }
+                            defense_effects = engine.effect_manager.check_triggers(player.id, TriggerType.ON_DEFENSE, defense_context)
+                            attacked_effects = engine.effect_manager.check_triggers(player.id, TriggerType.ON_ATTACKED, defense_context)
+                            defense_effects.extend(attacked_effects)
+                            for eff in defense_effects:
+                                if eff.effect_type == EffectType.HEAL:
+                                    heal_amount = int(player.max_hp * eff.value / 100) if eff.is_percentage else int(eff.value)
+                                    player_hp = min(player.max_hp, player_hp + heal_amount)
+                                    battle_log.append(f"💚 {player.nickname}回复{heal_amount}HP")
+                        except Exception:
+                            # 防御触发失败不影响主流程
+                            pass
+
 
                     # 检查玩家是否有猛虎标弹效果（减少受到的伤害）
                     fierce_tiger_effects = engine.effect_manager.get_active_effects(player.id, EffectType.FIERCE_TIGER_BULLET)
@@ -921,6 +964,12 @@ class BattleIntegrationHelper:
                     if attack_result["hit"]:
                         damage = attack_result["damage"]
                         player2_hp = max(0, player2_hp - damage)
+                        # 防守方受击触发（如镜怨披风·怨息环流）
+                        heal_def = attack_result.get("defender_hp_restored", 0)
+                        if heal_def > 0:
+                            player2_hp = min(player2.max_hp, player2_hp + heal_def)
+                            round_actions.append(f"💚{player2.nickname}+{heal_def}")
+
                         # 紧凑格式：显示效果和伤害
                         effects = []
                         if attack_result.get("is_critical"):
@@ -957,6 +1006,37 @@ class BattleIntegrationHelper:
                     if attack_result["hit"]:
                         damage = attack_result["damage"]
                         player1_hp = max(0, player1_hp - damage)
+                        # 
+                        # 
+                        # 
+                        # 
+                        # 
+                        # 
+                        # 
+                        # 
+                        # 
+                        # 
+                        # 
+                        # 
+                        # 
+                        # 
+                        # 
+                        # 
+                        # 
+                        # 
+                        # 
+                        # 
+                        # 
+                        # 
+                        # 
+                        # 
+                        # 
+                        # 防守方受击触发（如镜怨披风·怨息环流）
+                        heal_def = attack_result.get("defender_hp_restored", 0)
+                        if heal_def > 0:
+                            player1_hp = min(player1.max_hp, player1_hp + heal_def)
+                            round_actions.append(f"💚{player1.nickname}+{heal_def}")
+
                         # 紧凑格式：显示效果和伤害
                         effects = []
                         if attack_result.get("is_critical"):
@@ -993,6 +1073,12 @@ class BattleIntegrationHelper:
                     if attack_result["hit"]:
                         damage = attack_result["damage"]
                         player1_hp = max(0, player1_hp - damage)
+                        # 防守方受击触发（如镜怨披风·怨息环流）
+                        heal_def = attack_result.get("defender_hp_restored", 0)
+                        if heal_def > 0:
+                            player1_hp = min(player1.max_hp, player1_hp + heal_def)
+                            round_actions.append(f"💚{player1.nickname}+{heal_def}")
+
                         # 紧凑格式：显示效果和伤害
                         effects = []
                         if attack_result.get("is_critical"):
@@ -1035,6 +1121,12 @@ class BattleIntegrationHelper:
                             effects.append("💥")
                         if attack_result.get("combo_count", 1) > 1:
                             effects.append(f"🔄x{attack_result['combo_count']}")
+                        # 防守方受击触发（如镜怨披风·怨息环流）
+                        heal_def = attack_result.get("defender_hp_restored", 0)
+                        if heal_def > 0:
+                            player2_hp = min(player2.max_hp, player2_hp + heal_def)
+                            round_actions.append(f"💚{player2.nickname}+{heal_def}")
+
                         if attack_result.get("is_penetration", False):
                             effects.append("🗡️")
 

@@ -338,6 +338,7 @@ class EnhancedBattleEngine:
             "is_penetration": unified.get("is_penetration", False),
             "messages": unified.get("messages", []),
             "hp_restored": unified.get("hp_restored", 0),
+            "defender_hp_restored": unified.get("defender_hp_restored", 0),
             "effects_triggered": unified.get("effects_triggered", []),
         }
 
