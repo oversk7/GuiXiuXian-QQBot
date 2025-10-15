@@ -1234,17 +1234,17 @@ items:
           effect: "reflect_death"
           is_percentage: false
           value: 0
-          description: "[1] 镜怨体质：当他人主动攻击你时，其攻击行为被视为\"对自身发动\"，镜怨会在敌人心智中\"映射自身存在\"，使攻击者的灵魂瞬间反噬自身——直接死亡（具有高优先级）。\n\"镜中之人，以己之力斩己之形。\""
+          description: "[1] 镜怨体质：当他人主动攻击你时，其攻击行为被视为\"对自身发动\"，镜怨会在敌人心智中\"映射自身存在\"，使攻击者的灵魂瞬间反噬自身——直接死亡（具有高优先级）。"
         - trigger: "on_attacked"
           effect: "heal"
           is_percentage: true
           value: 10
-          description: "[2] 怨息环流：每次被攻击后，会吸收敌人残余灵息，使自身生命恢复10%。\n\"所有的痛苦，最终都成了我的养料。\""
+          description: "[2] 怨息环流：每次被攻击后，会吸收敌人残余灵息，使自身生命恢复10%。"
         - trigger: "on_death"
           effect: "gain_attack"
           is_percentage: false
           value: 2
-          description: "[3] 自噬：每被击杀一次（死亡后复活），自身的力量上限提高2点，直至永恒。（每天最多永久提升20点）\n\"死是镜的记忆，我的死，是下一次的回声。\""
+          description: "[3] 自噬：每被击杀一次（死亡后复活），自身的力量上限提高2点，直至永恒。（每天最多永久提升20点）"
 
       recipe:
         materials:
