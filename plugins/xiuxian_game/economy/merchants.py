@@ -1113,7 +1113,7 @@ SHOP_ITEMS = [
 
 # 黑市配置
 BLACK_MARKET_ID = "black_market"
-BLACK_MARKET_OVERPRICE = 3.5  # 高溢价倍数（基础价×3.5）
+BLACK_MARKET_OVERPRICE = 10
 BLACK_MARKET_MIN_ITEMS = 3
 BLACK_MARKET_MAX_ITEMS = 6
 BLACK_MARKET_STOCK_MIN = 10
@@ -1242,7 +1242,7 @@ async def _(event: MessageEvent):
         lines = ["🕳️ 黑市", "━━━━━━━━━━━━━"]
         # 今日黑市·高溢价限量
         if today_items:
-            lines.append("🖤 今日上架（高溢价×{:.1f}，限量）:".format(BLACK_MARKET_OVERPRICE))
+            lines.append("🖤 黑市商人：这可都是我从诡域坟墓里偷出来的好东西~".format(BLACK_MARKET_OVERPRICE))
             for iid in today_items:
                 cfg = config.items_config["by_id"].get(iid)
                 if not cfg:
