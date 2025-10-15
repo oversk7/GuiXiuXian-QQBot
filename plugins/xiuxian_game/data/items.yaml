@@ -1187,6 +1187,7 @@ items:
       required_level: 10
       attr_bonus: {"attack": 100, "mp": 100, "agility": 100}
       attr_ratio: {"attack": 1.0, "mp": 1.0, "agility": 1.0}
+      gem_slots: 5
       special_effects:
         - trigger: "first_turn"
           effect: "hp_from_mp"
@@ -1245,15 +1246,9 @@ items:
           is_percentage: false
           value: 2
           description: "[3] 自噬：每被击杀一次（死亡后复活），自身的力量上限提高2点，直至永恒。（每天最多永久提升20点）"
-
-      recipe:
-        materials:
-          iron_rust: 40
-          ash_powder: 30
-        gold: 2000
       repair_cost: 5
       required_level: 10
-      gem_slots: 0
+      gem_slots: 5
 
   elixirs:  # 丹药类不可售卖
     # ========== 经验类丹药 - 按等级伸缩，全程有用 ==========
