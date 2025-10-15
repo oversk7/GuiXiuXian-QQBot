@@ -17,6 +17,7 @@ from ..models.db import safe_session
 from ..models import Player, ItemInstance
 from ..config import config
 from ..utils import message_add_head
+from ..alchemy.service import AlchemyService
 
 # 获取所有装备物品ID
 EQUIP_ITEM_IDS = config.items_config["by_type"]["EQUIPMENT"]
@@ -216,6 +217,10 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
 
         # 获取升阶加成倍率（在所有属性显示前获取）
         upgrade_multiplier = equip.get_upgrade_bonus_multiplier()
+        is_furnace = equip.item_id == AlchemyService.FURNACE_ITEM_ID
+        furnace_success = furnace_durability = None
+        if is_furnace:
+            furnace_success, furnace_durability = AlchemyService.get_furnace_effects(equip.upgrade_level)
 
         # 基础属性
         if tpl.attr_bonus or tpl.attr_ratio:
@@ -276,12 +281,31 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
 
             lines.append("")
 
+        # 炼丹炉专属效果展示
+        if is_furnace:
+            lines.append("🔥 炼丹效果：")
+            lines.append(f"  • 当前成功率倍率：×{furnace_success:.1f}")
+            lines.append(f"  • 每炉耐久消耗：{furnace_durability}点")
+
+            next_level = equip.upgrade_level + 1
+            max_level = equip.config.max_upgrade_level if equip.config else 10
+            if next_level <= max_level:
+                next_success, next_durability = AlchemyService.get_furnace_effects(next_level)
+                lines.append(
+                    f"  • 下一阶(+{next_level})预览：成功率×{next_success:.1f}，耐久消耗 {next_durability}点"
+                )
+            lines.append("")
+
         # 升阶提升说明
         if equip.upgrade_level > 0:
             lines.append("⭐ 升阶加成：")
             lines.append(f"  • 当前等阶：+{equip.upgrade_level}阶")
-            lines.append(f"  • 属性倍率：{upgrade_multiplier:.1f}x")
-            lines.append(f"  • 总提升：+{(upgrade_multiplier - 1) * 100:.0f}%")
+            if is_furnace:
+                lines.append(f"  • 成功率提升：+{(furnace_success - 1) * 100:.0f}%")
+                lines.append(f"  • 当前耐久消耗：{furnace_durability}点/炉")
+            else:
+                lines.append(f"  • 属性倍率：{upgrade_multiplier:.1f}x")
+                lines.append(f"  • 总提升：+{(upgrade_multiplier - 1) * 100:.0f}%")
             lines.append("")
 
         # 特殊效果（显示解锁状态）
