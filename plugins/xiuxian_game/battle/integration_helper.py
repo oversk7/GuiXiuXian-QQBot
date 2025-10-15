@@ -123,6 +123,11 @@ class BattleIntegrationHelper:
         # 为玩家2也注册装备触发器
         if player2_equipped_items:
             engine._register_equipment_triggers(player2.id, player2_equipped_items)
+        # 同步首回合临时增益导致的即时生命值变化（如“灵影体质”）
+        player1_hp = player1.hp
+        player2_hp = player2.hp
+        initial_player1_hp = player1_hp
+        initial_player2_hp = player2_hp
 
         # 判定先后手（基于敏捷）
         from .battle_attributes import BattleAttributeCalculator
@@ -408,6 +413,9 @@ class BattleIntegrationHelper:
 
         # 初始化战斗
         engine.start_battle(player, monster_stats, equipped_items)
+        # 同步首回合临时增益导致的即时生命值变化（如“灵影体质”）
+        player_hp = player.hp
+        initial_player_hp = player_hp
 
         # 判定先后手（基于敏捷）
         from .battle_attributes import BattleAttributeCalculator
@@ -927,6 +935,11 @@ class BattleIntegrationHelper:
         # 为玩家2也注册装备触发器
         if player2_equipped_items:
             engine._register_equipment_triggers(player2.id, player2_equipped_items)
+        # 同步首回合临时增益导致的即时生命值变化（如“灵影体质”）
+        player1_hp = player1.hp
+        player2_hp = player2.hp
+        initial_player1_hp = player1_hp
+        initial_player2_hp = player2_hp
 
         # 判定先后手（基于敏捷）
         from .battle_attributes import BattleAttributeCalculator

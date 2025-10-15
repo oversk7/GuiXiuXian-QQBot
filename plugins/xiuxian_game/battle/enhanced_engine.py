@@ -404,14 +404,31 @@ class EnhancedBattleEngine:
 
             elif effect.effect_type == EffectType.GAIN_RANDOM_ATTR:
                 # 刃之魔灵：掠夺随机属性（需要在战斗结束后持久化）
-                result["messages"].append(f"⚔️ 刃之魔灵：掠夺灵魂，随机属性+{int(effect.value)}（战后结算）")
+                # 预先抽取属性用于显示，持久化时也可使用该字段
+                allowed_attrs = [
+                    "attack", "defense", "max_hp", "max_mp", "agility", "luck"
+                ]
+                attr_cn = {
+                    "attack": "攻击力",
+                    "defense": "防御力",
+                    "max_hp": "最大生命值",
+                    "max_mp": "最大理智值",
+                    "agility": "敏捷",
+                    "luck": "运气",
+                }
+                chosen_attr = self.rng.choice(allowed_attrs)
+                val = int(effect.value)
+                result["messages"].append(
+                    f"⚔️ 刃之魔灵：掠夺灵魂，{attr_cn.get(chosen_attr, '随机属性')}+{val}（战后结算）"
+                )
                 result["effects_triggered"].append("gain_random_attr")
-                # 标记需要在战斗结束后处理
+                # 标记需要在战后结算中处理（包含已抽取的属性名）
                 if not hasattr(result, 'post_battle_effects'):
                     result['post_battle_effects'] = []
                 result['post_battle_effects'].append({
                     'type': 'gain_random_attr',
-                    'value': int(effect.value)
+                    'attr': chosen_attr,
+                    'value': val
                 })
 
             elif effect.duration > 0:
