@@ -1244,6 +1244,8 @@ class EnhancedBattleEngine:
         attack_result = self._process_pvp_attack(
             defender, attacker, counter_attack, False,
             defender_attrs, attacker_attrs
+        )
+        return attack_result
 
     def reset_temp_bonuses(self, unit: Any):
         """回退首回合临时增加的最大生命值等（如灵影体质）"""
@@ -1258,10 +1260,6 @@ class EnhancedBattleEngine:
             unit.max_hp = max(1, unit.max_hp - bonus)
             if hasattr(unit, 'hp'):
                 unit.hp = min(unit.hp, unit.max_hp)
-
-        )
-
-        return attack_result
 
     def get_battle_log(self) -> List[str]:
         """获取战斗日志"""
