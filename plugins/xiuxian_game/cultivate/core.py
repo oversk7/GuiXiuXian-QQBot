@@ -1132,6 +1132,7 @@ async def handle_free_reset_points(event: MessageEvent):
         from sqlalchemy import select
         from ..models.elixir_usage import ElixirUsageLog
         from ..models.inventory import ItemInstance
+        from ..models.vip_equipment_bonus import VIPEquipmentBonus
 
         # 初始基础属性
         INIT = {
@@ -1166,9 +1167,19 @@ async def handle_free_reset_points(event: MessageEvent):
                     if attr in elixir_bonus:
                         elixir_bonus[attr] += int(value) * total_qty
 
-        # 重置属性为基础值 + 丹药 bonus（先不加装备加成）
+        # 获取VIP装备永久加成
+        vip_bonus = {k: 0 for k in INIT}
+        stmt_vip = select(VIPEquipmentBonus).where(VIPEquipmentBonus.player_id == player.id)
+        vip_record = (await session.execute(stmt_vip)).scalars().first()
+        if vip_record:
+            for attr, value in vip_record.get_total_bonus().items():
+                if attr in vip_bonus:
+                    vip_bonus[attr] = int(value)
+
+        # 重置属性为基础值 + 丹药加成 + VIP装备永久加成（先不加装备加成）
         for k, base_v in INIT.items():
-            setattr(player, k, base_v + elixir_bonus.get(k, 0))
+            total_bonus = elixir_bonus.get(k, 0) + vip_bonus.get(k, 0)
+            setattr(player, k, base_v + total_bonus)
 
         # 重新计算可分配点（考虑转数加成）
         from ..cultivate.reincarnation import ReincarnationService

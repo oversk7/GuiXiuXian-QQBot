@@ -609,7 +609,7 @@ async def _sweep_dungeon(player: Player, cfg: ItemConfig, qty: int, ctx: str, se
     # hp_limit = int(player.hp / actual_damage_per_hit / monster_ratio) if monster_ratio > 0 else float('inf')
 
     # 3. 装备耐久度限制：查询已装备装备的最低耐久度 / x
-    # 注意：装备耐久度不能低于5，避免装备意外损坏
+    # 新规则：允许降至0；0则自动卸下且无法穿戴
     durability_limit = float('inf')
     if session:
         result_eq = await session.execute(
@@ -622,8 +622,7 @@ async def _sweep_dungeon(player: Player, cfg: ItemConfig, qty: int, ctx: str, se
         equipped_items = result_eq.scalars().all()
         if equipped_items:
             min_durability = min(eq.durability for eq in equipped_items)
-            # 确保装备耐久度不会低于5，所以可用耐久度 = min_durability - 5
-            available_durability = max(0, min_durability - 5)
+            available_durability = max(0, min_durability)
             durability_limit = int(available_durability / monster_ratio) if monster_ratio > 0 and available_durability > 0 else 0
 
     # 取最小值作为实际能探索的格子数（不再考虑hp限制），再乘以扫荡令数量
@@ -790,7 +789,7 @@ async def _sweep_dungeon(player: Player, cfg: ItemConfig, qty: int, ctx: str, se
         results.append(f"🛌 (遇到驿站×{rest_tiles}次)")
 
     # 扣除装备耐久度（基于怪物格子数）
-    # 注意：装备耐久度不能低于5，避免装备意外损坏
+    # 新规则：允许降至0；降至0将自动卸下且需修理后才能穿戴
     if session and monster_tiles > 0:
         result_eq = await session.execute(
             _select(ItemInstance).where(
@@ -803,15 +802,30 @@ async def _sweep_dungeon(player: Player, cfg: ItemConfig, qty: int, ctx: str, se
         durability_warnings = []
 
         for eq in equipped_items:
-            # 每个怪物格子消耗1点耐久度，但不能让耐久度低于5
             durability_loss = monster_tiles
-            max_loss = max(0, eq.durability - 5)  # 最多只能扣到剩余5点耐久
-            actual_loss = min(durability_loss, max_loss)
+            actual_loss = min(durability_loss, eq.durability)
 
             if actual_loss > 0:
                 eq.durability -= actual_loss
-                if eq.durability <= 10:  # 耐久度警告阈值
-                    durability_warnings.append(f"⚠️ {eq.config.name} 耐久度较低({eq.durability}/{eq.config.durability})，建议及时修理")
+                if eq.durability == 0:
+                    # 自动卸下并回退属性加成
+                    delta = (eq.extra_attrs or {}).get("_persist_bonus", {})
+                    for k, v in delta.items():
+                        setattr(player, k, getattr(player, k) - v)
+                    eq.equipped = False
+                    # 限制当前HP/MP不超过新的上限
+                    if player.hp > player.max_hp:
+                        player.hp = player.max_hp
+                    if player.mp > player.max_mp:
+                        player.mp = player.max_mp
+                    durability_warnings.append(
+                        f"💔 {eq.config.name} 耐久耗尽已自动卸下\n"
+                        f"   ⚠️ 需修理后才能再次穿戴"
+                    )
+                elif eq.durability <= 10:
+                    durability_warnings.append(
+                        f"⚠️ {eq.config.name} 耐久度较低 ({eq.durability}/{eq.config.durability})，建议及时修理"
+                    )
 
         if durability_warnings:
             results.extend(durability_warnings)
@@ -837,13 +851,14 @@ async def _sweep_dungeon(player: Player, cfg: ItemConfig, qty: int, ctx: str, se
 
 @register(ItemEffectType.RESET_ATTR)
 async def _reset_attr(player: Player, cfg: ItemConfig, qty: int, ctx: str, session=None):
-    """重置已分配属性点，保留装备加成和丹药加成。仅允许 qty=1。"""
+    """重置已分配属性点，保留装备加成、丹药加成和VIP装备永久加成。仅允许 qty=1。"""
     if qty != 1:
         return False, "⛔ 重启符一次只能使用 1 个"
 
     from ..config import config as gcfg
     from sqlalchemy import select
     from ..models.elixir_usage import ElixirUsageLog
+    from ..models.vip_equipment_bonus import VIPEquipmentBonus
 
     # 初始基础属性
     INIT = {
@@ -890,9 +905,20 @@ async def _reset_attr(player: Player, cfg: ItemConfig, qty: int, ctx: str, sessi
                     if attr in elixir_bonus:
                         elixir_bonus[attr] += int(value) * total_qty
 
-    # 重置属性为基础值 + 丹药 bonus（先不加装备加成）
+    # 获取VIP装备永久加成
+    vip_bonus = {k: 0 for k in INIT}
+    if session:
+        stmt = select(VIPEquipmentBonus).where(VIPEquipmentBonus.player_id == player.id)
+        vip_record = (await session.execute(stmt)).scalars().first()
+        if vip_record:
+            for attr, value in vip_record.get_total_bonus().items():
+                if attr in vip_bonus:
+                    vip_bonus[attr] = int(value)
+
+    # 重置属性为基础值 + 丹药加成 + VIP装备永久加成（先不加装备加成）
     for k, base_v in INIT.items():
-        setattr(player, k, base_v + elixir_bonus.get(k, 0))
+        total_bonus = elixir_bonus.get(k, 0) + vip_bonus.get(k, 0)
+        setattr(player, k, base_v + total_bonus)
 
     # 重新计算可分配点（考虑转数加成）
     from ..cultivate.reincarnation import ReincarnationService

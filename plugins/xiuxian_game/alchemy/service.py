@@ -182,10 +182,11 @@ class AlchemyService:
         
         # 扣除炉子耐久
         broken = furnace.lose_durability(total_dura_need)
-        furnace_note = "（炉子已损坏）" if broken else f"（剩余耐久 {furnace.durability})"
+        furnace_note = "（炉子已损坏，需修理）" if broken else f"（剩余耐久 {furnace.durability})"
         if broken:
-            await session.delete(furnace)
-        
+            # 炉子耐久为0：不再删除，保留以便修理
+            pass
+
         # 创建炼丹记录
         success_rate = min(0.95, recipe["base_success"] * coeff)
         duration_minutes = cls.BASE_TIME_MINUTES * qty

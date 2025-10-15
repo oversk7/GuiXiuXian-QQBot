@@ -245,14 +245,25 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
 
             # 特殊效果信息（显示解锁条件）
             if hasattr(cfg, 'special_effects') and cfg.special_effects:
-                effects_lines = ["✨ 特殊效果（升阶解锁）："]
-                for idx, effect in enumerate(cfg.special_effects, start=1):
-                    # 获取效果描述
-                    desc = effect.get('description', '')
-                    if desc:
-                        # 计算解锁所需的升阶等级
-                        required_level = idx * 2
-                        effects_lines.append(f"  • [{idx}] {desc} (+{required_level}阶解锁)")
+                # VIP定制装备列表（0阶即全解锁）
+                VIP_EQUIPMENT_IDS = {"vip_blade_zhanlongshan", "vip_robe_jingyuanzhiyi"}
+                is_vip_equipment = item_id in VIP_EQUIPMENT_IDS
+
+                if is_vip_equipment:
+                    effects_lines = ["✨ 特殊效果（VIP定制，0阶全解锁）："]
+                    for effect in cfg.special_effects:
+                        desc = effect.get('description', '')
+                        if desc:
+                            effects_lines.append(f"  • {desc}")
+                else:
+                    effects_lines = ["✨ 特殊效果（升阶解锁）："]
+                    for idx, effect in enumerate(cfg.special_effects, start=1):
+                        # 获取效果描述
+                        desc = effect.get('description', '')
+                        if desc:
+                            # 计算解锁所需的升阶等级
+                            required_level = idx * 2
+                            effects_lines.append(f"  • [{idx}] {desc} (+{required_level}阶解锁)")
                 equipment_info.extend(effects_lines)
 
             if equipment_info:

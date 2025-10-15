@@ -44,6 +44,8 @@ from .fishing_record import FishingRecord, FishingStats
 # 抽奖系统模型
 from .lottery import Lottery, LotteryParticipant, LotteryType, LotteryStatus
 from .pvp_log import PvpLog
+# VIP装备永久加成系统模型
+from .vip_equipment_bonus import VIPEquipmentBonus
 
 
 __all__ = [
@@ -59,5 +61,5 @@ __all__ = [
     "Location", "NPC", "NPCType", "NPCStatus",
     "TemporaryBuff", "PlatformBinding", "FishingRecord", "FishingStats",
     "Lottery", "LotteryParticipant", "LotteryType", "LotteryStatus",
-    "PvpLog"
+    "PvpLog", "VIPEquipmentBonus"
 ]

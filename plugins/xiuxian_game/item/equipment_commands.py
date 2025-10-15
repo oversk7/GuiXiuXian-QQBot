@@ -193,7 +193,8 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
             "green": "优秀",
             "blue": "稀有",
             "purple": "史诗",
-            "orange": "传说"
+            "orange": "传说",
+            "red": "永恒"
         }
         rarity_display = tpl.get_rarity_display()
         rarity_name = rarity_map.get(tpl.rarity, tpl.rarity)
@@ -219,50 +220,50 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
         # 基础属性
         if tpl.attr_bonus or tpl.attr_ratio:
             lines.append("📈 基础属性：")
-            
+
             # 固定值属性
             if tpl.attr_bonus:
                 for k, v in tpl.attr_bonus.items():
                     base_value = int(v)
                     current_value = int(v * upgrade_multiplier)
                     bonus = current_value - base_value
-                    
+
                     attr_name = {
                         "attack": "攻击力", "defense": "防御力", "agility": "敏捷",
                         "luck": "运气", "hp": "生命值", "mp": "理智值",
                         "max_hp": "最大生命值", "max_mp": "最大理智值"
                     }.get(k, k)
-                    
+
                     if bonus > 0:
                         lines.append(f"  • {attr_name}：{base_value} → {current_value} (+{bonus})")
                     else:
                         lines.append(f"  • {attr_name}：{base_value}")
-            
+
             # 百分比属性
             if tpl.attr_ratio:
                 for k, r in tpl.attr_ratio.items():
                     base_ratio = float(r) * 100
                     current_ratio = float(r) * upgrade_multiplier * 100
                     bonus_ratio = current_ratio - base_ratio
-                    
+
                     attr_name = {
                         "attack": "攻击力", "defense": "防御力", "agility": "敏捷",
                         "luck": "运气", "hp": "生命值", "mp": "理智值",
                         "max_hp": "最大生命值", "max_mp": "最大理智值"
                     }.get(k, k)
-                    
+
                     if bonus_ratio > 0:
                         lines.append(f"  • {attr_name}：{base_ratio:.1f}% → 现在{current_ratio:.1f}% (+{bonus_ratio:.1f}%)")
                     else:
                         lines.append(f"  • {attr_name}：{base_ratio:.1f}%")
-            
+
             lines.append("")
 
         # 宝石镶嵌信息
         if equip.available_gem_slots > 0:
             lines.append("💎 宝石镶嵌：")
             lines.append(f"  • 孔位：{equip.used_gem_slots}/{equip.available_gem_slots}")
-            
+
             if equip.used_gem_slots > 0:
                 from .gem_socket_service import GemSocketService
                 gem_info = await GemSocketService.get_equipment_gem_info(equip)
@@ -272,7 +273,7 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
                         gem_name = slot_info["gem_name"]
                         gem_type = slot_info["gem_type"]
                         lines.append(f"  • 孔位{slot_num}：{gem_type} - {gem_name}")
-            
+
             lines.append("")
 
         # 升阶提升说明
@@ -287,23 +288,35 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
         if hasattr(tpl, 'special_effects') and tpl.special_effects:
             lines.append("✨ 特殊效果：")
 
-            # 计算已解锁的效果数量（每2阶解锁1个效果）
-            unlocked_count = equip.upgrade_level // 2
+            # VIP定制装备列表（0阶即全解锁）
+            VIP_EQUIPMENT_IDS = {"vip_blade_zhanlongshan", "vip_robe_jingyuanzhiyi"}
+            is_vip_equipment = equip.item_id in VIP_EQUIPMENT_IDS
 
-            for idx, effect in enumerate(tpl.special_effects, start=1):
-                desc = effect.get('description', '')
-                if not desc:
-                    continue
+            if is_vip_equipment:
+                # VIP装备：全部效果已解锁
+                for idx, effect in enumerate(tpl.special_effects, start=1):
+                    desc = effect.get('description', '')
+                    if not desc:
+                        continue
+                    lines.append(f"  ✅ {desc}")
+            else:
+                # 普通装备：计算已解锁的效果数量（每2阶解锁1个效果）
+                unlocked_count = equip.upgrade_level // 2
 
-                # 计算解锁所需的升阶等级
-                required_level = idx * 2
+                for idx, effect in enumerate(tpl.special_effects, start=1):
+                    desc = effect.get('description', '')
+                    if not desc:
+                        continue
 
-                if idx <= unlocked_count:
-                    # 已解锁
-                    lines.append(f"  ✅ [{idx}] {desc}")
-                else:
-                    # 未解锁
-                    lines.append(f"  🔒 [{idx}] {desc} (需要+{required_level}阶)")
+                    # 计算解锁所需的升阶等级
+                    required_level = idx * 2
+
+                    if idx <= unlocked_count:
+                        # 已解锁
+                        lines.append(f"  ✅ [{idx}] {desc}")
+                    else:
+                        # 未解锁
+                        lines.append(f"  🔒 [{idx}] {desc} (需要+{required_level}阶)")
 
             lines.append("")
 
@@ -359,6 +372,11 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
         # 检查等级要求
         if equip.config.required_level > player.level:
             await wear_equipment.finish(f"⛔ 等级不足，需要 Lv.{equip.config.required_level}")
+
+
+        # 检查耐久是否为0（损坏）
+        if equip.durability <= 0:
+            await wear_equipment.finish("⛔ 该装备已损坏（耐久为0），请先修理后再穿戴")
 
         # 检查是否有同名装备已装备
         same_type_stmt = select(ItemInstance).where(
@@ -456,6 +474,8 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
 
         # 显示穿戴的装备信息，包括ID和耐久度
         durability_info = f" (ID:{equip.id}, 耐久:{equip.durability}/{equip.config.durability})"
+        if equip.durability == 0:
+            await wear_equipment.finish(f"⛔ {equip.config.name} 耐久为0，已自动卸下，请先修理")
         await wear_equipment.finish(f"✅ 成功穿戴 {equip.config.name}{durability_info}")
 
 

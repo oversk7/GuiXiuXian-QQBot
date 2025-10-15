@@ -27,7 +27,10 @@ class ReincarnationService:
         
         # 获取丹药加成
         elixir_bonus = await ReincarnationService._get_elixir_bonus(session, player.id)
-        
+
+        # 获取VIP装备永久加成
+        vip_bonus = await ReincarnationService._get_vip_equipment_bonus(session, player.id)
+
         # 初始基础属性
         INIT_ATTRS = {
             "max_hp": 20,
@@ -37,15 +40,16 @@ class ReincarnationService:
             "agility": 5,
             "luck": 1,
         }
-        
+
         # 记录冥返前的信息
         old_level = player.level
         old_reincarnation = player.reincarnation_level
-        
-        # 重置属性为基础值 + 丹药加成
+
+        # 重置属性为基础值 + 丹药加成 + VIP装备永久加成
         for attr_name, base_value in INIT_ATTRS.items():
-            setattr(player, attr_name, base_value + elixir_bonus.get(attr_name, 0))
-        
+            total_bonus = elixir_bonus.get(attr_name, 0) + vip_bonus.get(attr_name, 0)
+            setattr(player, attr_name, base_value + total_bonus)
+
         # 重置等级和经验
         player.level = 1
         player.exp = 0
@@ -84,20 +88,32 @@ class ReincarnationService:
         )
         
         return msg
-    
+
     @staticmethod
     async def _get_elixir_bonus(session: AsyncSession, player_id: str) -> dict:
         """获取玩家的丹药加成"""
         stmt = select(ElixirUsageLog).where(ElixirUsageLog.player_id == player_id)
         logs = (await session.execute(stmt)).scalars().all()
-        
+
         elixir_bonus = {}
         for log in logs:
             for attr_name, bonus in log.get_attribute_bonus().items():
                 elixir_bonus[attr_name] = elixir_bonus.get(attr_name, 0) + bonus
-        
+
         return elixir_bonus
-    
+
+    @staticmethod
+    async def _get_vip_equipment_bonus(session: AsyncSession, player_id: str) -> dict:
+        """获取玩家的VIP装备永久加成"""
+        from ..models.vip_equipment_bonus import VIPEquipmentBonus
+        stmt = select(VIPEquipmentBonus).where(VIPEquipmentBonus.player_id == player_id)
+        record = (await session.execute(stmt)).scalars().first()
+
+        if not record:
+            return {}
+
+        return record.get_total_bonus()
+
     @staticmethod
     async def _recalculate_equipment_bonus(session: AsyncSession, player: Player):
         """重新计算装备加成（冥返专用）"""

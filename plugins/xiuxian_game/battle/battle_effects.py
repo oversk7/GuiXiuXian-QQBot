@@ -29,6 +29,7 @@ class EffectType(str, Enum):
     LIFESTEAL = "lifesteal"         # 吸血(基于造成伤害的百分比恢复HP)
     TRUE_DAMAGE = "true_damage"     # 真实伤害(持续状态，攻击完全无视防御)
     DAMAGE_BOOST = "damage_boost"   # 伤害提升(百分比加成)
+    EXECUTE = "execute"             # 处决(当目标生命低于阈值时直接击杀)
 
     # 控制相关
     FEAR = "fear"                   # 恐惧(无法行动)
@@ -50,6 +51,7 @@ class EffectType(str, Enum):
 
     # 特殊效果
     SHIELD = "shield"               # 护盾
+    SHIELD_FROM_MP = "shield_from_mp"   # 灵影护盾：按最大理智转化护盾（首回合）
     REFLECT = "reflect"             # 反弹伤害
     INVINCIBLE = "invincible"       # 无敌
 

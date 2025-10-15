@@ -6,10 +6,14 @@
 """
 
 from nonebot import on_command
+# 所有命令均需block=True（在命令注册处已统一配置）
+
 from nonebot.adapters.qq import MessageEvent, Message
 from nonebot.params import CommandArg
 import time
 import random
+from datetime import datetime
+
 
 from ..models.db import safe_session
 from ..models.player import Player
@@ -428,6 +432,77 @@ async def handle_player_attack(session, attacker: Player, target: Player, event:
     except ImportError:
         pass
 
+    # 死斗前镜怨体质（自保）判定：仅在荒野/诡域且为被动防御方触发
+    if not in_town:
+        # 检查目标是否穿戴镜怨之衣
+        from sqlalchemy import select
+        try:
+            stmt = select(ItemInstance).where(
+                ItemInstance.player_id == target.id,
+                ItemInstance.equipped == True,
+                ItemInstance.item_id == "vip_robe_jingyuanzhiyi"
+            )
+            target_robe = (await session.execute(stmt)).scalars().first()
+        except SQLAlchemyError:
+            target_robe = None
+        if target_robe:
+            # 镜怨体质触发：反杀来犯者
+            loser = attacker
+            winner = target
+            result_lines = [
+                "⚠️ 死斗触发前置判定",
+                "━━━━━━━━━━━━━",
+                f"🪞 {target.nickname}的『镜怨之衣』[镜怨体质]映照来犯之人",
+                f"⚰️ {attacker.nickname}当场毙命！(镜怨体质·自保)",
+                "━━━━━━━━━━━━━",
+            ]
+            # 立即结算死亡与掉落
+            attacker_damage = attacker.hp  # 全部生命归零
+            target_damage = 0
+            attacker.hp = 0
+            # 掉落（含保护）
+            now_ts = time.time()
+            last_ts = _last_pvp_drop_time.get(loser.id, 0)
+            if now_ts - last_ts < DROP_PROTECTION_SECONDS:
+                result_lines.append("🛡️ 掉落保护生效：短时间内不再掉落物品")
+                drop_summary = "🛡️ 掉落保护生效"
+            else:
+                drop_msg = await handle_wilderness_drops(session, loser, winner)
+                _last_pvp_drop_time[loser.id] = now_ts
+                if drop_msg:
+                    result_lines.append(drop_msg)
+                    drop_summary = drop_msg.replace("\n", "；")
+                else:
+                    drop_summary = "无掉落"
+
+            # 镜怨之衣自噬：自身死亡+2攻击（日上限20）——此处未触发（因目标未死），仅保留为战后通用处理
+            # 记录死斗日志
+            try:
+                bt_simple = "诡域" if current_region != "大都会" else "荒野"
+                log = PvpLog(
+                    ts=int(time.time()),
+                    region=current_region,
+                    x=attacker_x,
+                    y=attacker_y,
+                    attacker_id=attacker.id,
+                    defender_id=target.id,
+                    attacker_uid=attacker.uid,
+                    defender_uid=target.uid,
+                    attacker_name=attacker.nickname,
+                    defender_name=target.nickname,
+                    battle_type=bt_simple,
+                    attacker_victory=0,
+                    attacker_damage=attacker_damage,
+                    defender_damage=target_damage,
+                    drop_summary=drop_summary,
+                )
+                session.add(log)
+            except (ValueError, SQLAlchemyError):
+                pass
+
+            await session.commit()
+            await attack_cmd.finish(message_add_head("\n".join(result_lines), event))
+
 
     # 执行PVP战斗
     battle_timestamp = int(time.time() * 1000)
@@ -458,6 +533,119 @@ async def handle_player_attack(session, attacker: Player, target: Player, event:
         # 添加玩家信息
         attacker_realm = realm_by_level_and_reincarnation(attacker.level, attacker.reincarnation_level)
         target_realm = realm_by_level_and_reincarnation(target.level, target.reincarnation_level)
+
+        # 战后：处理VIP装备的永久与每日加成（仅死斗生效）
+        if not in_town:
+            from sqlalchemy import select
+            from datetime import datetime
+            from ..models.vip_equipment_bonus import VIPEquipmentBonus
+            def _today_key() -> str:
+                return datetime.now().strftime("%Y%m%d")
+
+            async def _apply_blade_daily_random(player: Player):
+                stmt = select(ItemInstance).where(
+                    ItemInstance.player_id == player.id,
+                    ItemInstance.equipped == True,
+                    ItemInstance.item_id == "vip_blade_zhanlongshan"
+                )
+                inst = (await session.execute(stmt)).scalars().first()
+                if not inst:
+                    return None
+                extra = inst.extra_attrs or {}
+                day = _today_key()
+                if extra.get("blade_rand_day") == day:
+                    return None
+                # 首次触发：+40随机属性
+                import random as _r
+                attr_map = {
+                    "attack": "攻击", "defense": "防御", "agility": "敏捷",
+                    "luck": "幸运", "max_hp": "生命上限", "max_mp": "理智上限"
+                }
+                attrs = list(attr_map.keys())
+                chosen = _r.choice(attrs)
+                # 使用VIPEquipmentBonus表持久化，确保冥返后不会丢失
+                vip_bonus = await VIPEquipmentBonus.get_or_create(session, player.id)
+                vip_bonus.add_bonus(chosen, 40)
+                setattr(player, chosen, getattr(player, chosen) + 40)
+                extra["blade_rand_day"] = day
+                inst.extra_attrs = extra
+                return f"✨ 刃之魔灵：{player.nickname} 今日首战恩赐，{attr_map[chosen]}+40（永久）"
+
+            async def _apply_blade_kill_mp(winner: Player):
+                stmt = select(ItemInstance).where(
+                    ItemInstance.player_id == winner.id,
+                    ItemInstance.equipped == True,
+                    ItemInstance.item_id == "vip_blade_zhanlongshan"
+                )
+                inst = (await session.execute(stmt)).scalars().first()
+                if not inst:
+                    return None
+                extra = inst.extra_attrs or {}
+                day = _today_key()
+                if extra.get("blade_kill_day") != day:
+                    extra["blade_kill_day"] = day
+                    extra["blade_kill_cnt"] = 0
+                current_cnt = int(extra.get("blade_kill_cnt", 0))
+                if current_cnt >= 20:
+                    return f"🩸 噬灵者：今日已达上限（{current_cnt}/20）"
+                # 使用VIPEquipmentBonus表持久化，确保冥返后不会丢失
+                vip_bonus = await VIPEquipmentBonus.get_or_create(session, winner.id)
+                vip_bonus.add_bonus("max_mp", 2)
+                # +2最大理智
+                winner.max_mp = winner.max_mp + 2
+                extra["blade_kill_cnt"] = current_cnt + 1
+                inst.extra_attrs = extra
+                return f"🩸 噬灵者：击杀吞噬，理智上限+2（今日{extra['blade_kill_cnt']}/20）"
+
+            async def _apply_robe_self_siphon(dead_player: Player):
+                stmt = select(ItemInstance).where(
+                    ItemInstance.player_id == dead_player.id,
+                    ItemInstance.equipped == True,
+                    ItemInstance.item_id == "vip_robe_jingyuanzhiyi"
+                )
+                inst = (await session.execute(stmt)).scalars().first()
+                if not inst:
+                    return None
+                extra = inst.extra_attrs or {}
+                day = _today_key()
+                if extra.get("robe_die_day") != day:
+                    extra["robe_die_day"] = day
+                    extra["robe_die_cnt"] = 0
+                current_cnt = int(extra.get("robe_die_cnt", 0))
+                if current_cnt >= 20:
+                    return f"🪞 镜怨自噬：今日已达上限（{current_cnt}/20）"
+                # 使用VIPEquipmentBonus表持久化，确保冥返后不会丢失
+                vip_bonus = await VIPEquipmentBonus.get_or_create(session, dead_player.id)
+                vip_bonus.add_bonus("attack", 2)
+                dead_player.attack = dead_player.attack + 2
+                extra["robe_die_cnt"] = current_cnt + 1
+                inst.extra_attrs = extra
+                return f"🪞 镜怨自噬：死亡化怨，攻击+2（今日{extra['robe_die_cnt']}/20）"
+
+            # 每日随机属性（双方）
+            msg_a = await _apply_blade_daily_random(attacker)
+            if msg_a:
+                result_lines.append(msg_a)
+            msg_b = await _apply_blade_daily_random(target)
+            if msg_b:
+                result_lines.append(msg_b)
+
+            # 击杀与自噬收益
+            if victory:
+                gain_msg = await _apply_blade_kill_mp(attacker)
+                if gain_msg:
+                    result_lines.append(gain_msg)
+                # 败者死亡自噬
+                robemsg = await _apply_robe_self_siphon(target)
+                if robemsg:
+                    result_lines.append(robemsg)
+            else:
+                gain_msg = await _apply_blade_kill_mp(target)
+                if gain_msg:
+                    result_lines.append(gain_msg)
+                robemsg = await _apply_robe_self_siphon(attacker)
+                if robemsg:
+                    result_lines.append(robemsg)
 
         result_lines.extend([
             f"🔥 {attacker.nickname}[UID:{attacker.uid}] Lv.{attacker.level} {attacker_realm}",

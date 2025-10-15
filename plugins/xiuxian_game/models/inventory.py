@@ -86,7 +86,8 @@ class ItemConfig:
             "green": "🟢",
             "blue": "🔵",
             "purple": "🟣",
-            "orange": "🟠"
+            "orange": "🟠",
+            "red": "🔴"
         }
         return rarity_map.get(self.rarity, "⚪")
 
@@ -232,7 +233,7 @@ class ItemInstance(Base):
                 attrs[key] = attrs.get(key, 0) + ratio_bonus
 
     def lose_durability(self, amount: int = 1) -> bool:
-        """扣除耐久。返回 True 如果装备已损坏并应销毁。"""
+        """扣除耐久。返回 True 如果耐久降至0（已损坏，需要自动卸下）。"""
         if not self.is_equipment:
             return False
         self.durability = max(0, self.durability - amount)

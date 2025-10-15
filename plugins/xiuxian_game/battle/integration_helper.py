@@ -98,6 +98,18 @@ class BattleIntegrationHelper:
         engine = EnhancedBattleEngine(seed)
         battle_log = []
 
+        # 执行处决阈值查询辅助
+        from .battle_effects import EffectType
+        def _get_execute_threshold(unit_id: str) -> int:
+            cfgs = engine.effect_manager.trigger_configs.get(unit_id, [])
+            for cfg in cfgs:
+                if getattr(cfg, 'effect', None) == EffectType.EXECUTE:
+                    try:
+                        return int(cfg.value)
+                    except (TypeError, ValueError):
+                        return 0
+            return 0
+
         # 初始化战斗状态
         player1_hp = player1.hp
         player2_hp = player2.hp
@@ -162,6 +174,14 @@ class BattleIntegrationHelper:
 
                     # 添加特效标识
                     effects = []
+
+                        # 命中后检查处决（忽略无敌等，直接强制死亡）
+                        exec_thr = _get_execute_threshold(first_player.id)
+                        if exec_thr > 0 and second_hp_ref[0] > 0:
+                            if second_hp_ref[0] <= int(second_player.max_hp * exec_thr / 100):
+                                battle_log.append(f"⚰️ {first_player.nickname}发动处决，{second_player.nickname}被弑灭！")
+                                second_hp_ref[0] = 0
+
                     if attack_result.get("is_critical"):
                         effects.append("💥暴击")
                     if attack_result.get("is_penetration"):
@@ -212,6 +232,14 @@ class BattleIntegrationHelper:
 
                 if attack_result["hit"]:
                     damage = attack_result["damage"]
+
+                        # 命中后检查处决（忽略无敌等，直接强制死亡）
+                        exec_thr = _get_execute_threshold(second_player.id)
+                        if exec_thr > 0 and first_hp_ref[0] > 0:
+                            if first_hp_ref[0] <= int(first_player.max_hp * exec_thr / 100):
+                                battle_log.append(f"⚰️ {second_player.nickname}发动处决，{first_player.nickname}被弑灭！")
+                                first_hp_ref[0] = 0
+
                     first_hp_ref[0] = max(0, first_hp_ref[0] - damage)
 
                     # 构建详细攻击描述
@@ -604,7 +632,7 @@ class BattleIntegrationHelper:
         # 使用完整显示名称（如果提供）或基础名称
         display_name = monster_full_display if monster_full_display else monster_name
         battle_log.append(f"⚔️ {player.nickname} VS {display_name}")
-        
+
         # 判定先后手（基于敏捷）
         from .battle_attributes import BattleAttributeCalculator
         player_first = BattleAttributeCalculator.determine_turn_order(
@@ -1132,65 +1160,65 @@ class BattleIntegrationHelper:
         result["damage"] = total_damage
         result["blocked"] = blocked_damage
         return result
-    
+
     @staticmethod
-    def create_battle_summary(player: Player, victory: bool, battle_log: List[str], 
+    def create_battle_summary(player: Player, victory: bool, battle_log: List[str],
                             damage_taken: int, exp_gain: int = 0) -> str:
         """创建战斗总结
-        
+
         Args:
             player: 玩家对象
             victory: 是否胜利
             battle_log: 战斗日志
             damage_taken: 受到的伤害
             exp_gain: 获得的经验
-            
+
         Returns:
             格式化的战斗总结
         """
         summary_lines = []
-        
+
         # 战斗结果
         if victory:
             summary_lines.append("🎉 战斗胜利！")
         else:
             summary_lines.append("💀 战斗失败...")
-        
+
         # 关键战斗日志（最多显示8条）
-        key_logs = [log for log in battle_log if any(keyword in log for keyword in 
+        key_logs = [log for log in battle_log if any(keyword in log for keyword in
                    ["暴击", "连击", "反击", "穿透", "闪避", "胜利", "战败", "回合"])]
-        
+
         if len(key_logs) > 8:
             summary_lines.extend(key_logs[:3])
             summary_lines.append("...")
             summary_lines.extend(key_logs[-3:])
         else:
             summary_lines.extend(key_logs)
-        
+
         # 战斗统计
         summary_lines.append("")
         summary_lines.append("📊 战斗统计:")
         summary_lines.append(f"剩余血量: {player.hp}/{player.max_hp}")
         summary_lines.append(f"受到伤害: {damage_taken}")
-        
+
         if exp_gain > 0:
             summary_lines.append(f"获得经验: {exp_gain}")
-        
+
         return "\n".join(summary_lines)
-    
+
     @staticmethod
     def get_battle_attribute_display(player: Player) -> str:
         """获取战斗属性显示
-        
+
         Args:
             player: 玩家对象
-            
+
         Returns:
             格式化的战斗属性显示
         """
         from .battle_attributes import BattleAttributeCalculator
         attrs = BattleAttributeCalculator.calculate_effective_attributes(player)
-        
+
         # 计算暴击倍数显示（基础1.5倍 + 暴击力*0.1倍）
         crit_multiplier = 1.5 + (attrs['critical_power'] * 0.1)
 
@@ -1206,7 +1234,7 @@ class BattleIntegrationHelper:
             f"🗡️ 穿透率: {attrs['penetration_rate']:.1f}%",
             f"🛡️ 抗暴率: {attrs['anti_crit_rate']:.1f}%"
         ]
-        
+
         return "\n".join(lines)
 
     @staticmethod

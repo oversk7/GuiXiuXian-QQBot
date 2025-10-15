@@ -31,7 +31,7 @@ class EnhancedBattleEngine:
         self.effect_manager = BattleEffectManager()
         self.turn_counter = 0
         self.battle_log: List[str] = []
-    
+
     def start_battle(self, player: Player, enemy: Any, player_equipped_items: List = None):
         """战斗开始，初始化效果和触发器
 
@@ -73,6 +73,16 @@ class EnhancedBattleEngine:
         for effect in triggered:
             self.effect_manager.add_effect(player.id, effect)
 
+        # 首回合：将灵影护盾转换为实际护盾值（按最大理智）
+        try:
+            player_max_mp = getattr(player, 'max_mp', 0)
+            mp_shields = self.effect_manager.get_active_effects(player.id, EffectType.SHIELD_FROM_MP)
+            for eff in mp_shields:
+                eff.shield_value = int(player_max_mp)
+                eff.effect_type = EffectType.SHIELD
+        except AttributeError:
+            pass
+
         # 触发敌方首回合效果（对称处理）
         enemy_hp = enemy.hp if hasattr(enemy, 'hp') else enemy.get("hp", 100)
         enemy_max_hp = enemy.max_hp if hasattr(enemy, 'max_hp') else enemy.get("max_hp", 100)
@@ -87,19 +97,29 @@ class EnhancedBattleEngine:
             "theme": theme_name,
         })
 
+        # 敌方同理处理灵影护盾
+        try:
+            enemy_max_mp = getattr(enemy, 'max_mp', 0) if hasattr(enemy, 'max_mp') else 0
+            mp_shields_enemy = self.effect_manager.get_active_effects(enemy_id, EffectType.SHIELD_FROM_MP)
+            for eff in mp_shields_enemy:
+                eff.shield_value = int(enemy_max_mp)
+                eff.effect_type = EffectType.SHIELD
+        except AttributeError:
+            pass
+
         for effect in enemy_triggered:
             self.effect_manager.add_effect(enemy_id, effect)
-    
+
     def _register_equipment_triggers(self, unit_id: str, equipped_items: List):
         """注册装备的触发器
 
         特殊效果解锁规则：
-        - +2阶: 解锁第1个效果
-        - +4阶: 解锁第2个效果
-        - +6阶: 解锁第3个效果
-        - +8阶: 解锁第4个效果
-        - +10阶: 解锁第5个效果
+        - 普通装备：+2阶解锁第1个效果，+4阶解锁第2个效果，依此类推
+        - VIP定制装备（斩龙闪、镜怨之衣）：0阶即解锁全部效果
         """
+        # VIP定制装备列表（0阶即全解锁）
+        VIP_EQUIPMENT_IDS = {"vip_blade_zhanlongshan", "vip_robe_jingyuanzhiyi"}
+
         for item in equipped_items:
             # 从装备配置中获取special_effects
             config = item.config if hasattr(item, 'config') else None
@@ -110,14 +130,18 @@ class EnhancedBattleEngine:
             if not special_effects:
                 continue
 
-            # 获取装备升阶等级
+            # 获取装备ID和升阶等级
+            item_id = getattr(item, 'item_id', '')
             upgrade_level = getattr(item, 'upgrade_level', 0)
 
-            # 计算已解锁的效果数量（每2阶解锁1个效果）
-            unlocked_count = upgrade_level // 2
-
-            # 只取已解锁的效果
-            unlocked_effects = special_effects[:unlocked_count] if unlocked_count > 0 else []
+            # 判断是否为VIP定制装备
+            if item_id in VIP_EQUIPMENT_IDS:
+                # VIP装备：0阶即解锁全部效果
+                unlocked_effects = special_effects
+            else:
+                # 普通装备：每2阶解锁1个效果
+                unlocked_count = upgrade_level // 2
+                unlocked_effects = special_effects[:unlocked_count] if unlocked_count > 0 else []
 
             if not unlocked_effects:
                 continue
@@ -131,7 +155,7 @@ class EnhancedBattleEngine:
                     trigger.description = f"{config.name}的特殊效果"
 
             self.effect_manager.register_triggers(unit_id, triggers)
-    
+
     def execute_turn(self, attacker: Player, defender: Any, is_player_turn: bool = True) -> Dict:
         """执行一个回合，包含效果处理
 
@@ -151,7 +175,7 @@ class EnhancedBattleEngine:
             "hp_restored": 0,  # 新增：记录恢复的HP
             "effects_triggered": []
         }
-        
+
         attacker_id = attacker.id
         defender_id = defender.id if hasattr(defender, 'id') else "enemy"
 
@@ -184,7 +208,7 @@ class EnhancedBattleEngine:
             turn_result["defender_hp_restored"] = defender_hp_restored
 
         return turn_result
-    
+
     def _process_turn_start(self, unit_id: str, unit: Any) -> Tuple[List[str], int]:
         """处理回合开始效果
 
@@ -313,7 +337,7 @@ class EnhancedBattleEngine:
                 result["effects_triggered"].append(effect.effect_type.value)
 
         return result
-    
+
     def _execute_enhanced_attack(self, attacker: Player, defender: Any,
                                 is_player_turn: bool, is_counter: bool = False,
                                 is_combo: bool = False, is_skill: bool = False,
@@ -375,7 +399,7 @@ class EnhancedBattleEngine:
             attack_result = self._process_monster_attack(
                 attacker, defender, base_attack, is_skill, has_true_damage
             )
-        
+
         # 格式化基础攻击消息
         if not attack_result["hit"]:
             result["messages"].append(f"⚡ {attacker_name}攻击{defender_name}，但被闪避了")
@@ -403,7 +427,7 @@ class EnhancedBattleEngine:
             # 标记本次攻击未命中
             result["hit"] = False
             return result
-        
+
         # 命中
         damage = attack_result["damage"]
         is_critical = attack_result.get("is_critical", False)
@@ -532,7 +556,7 @@ class EnhancedBattleEngine:
 
         result["messages"].append(attack_msg)
         result["total_damage"] = damage
-        
+
         # 触发攻击时效果
         context = {
             "source": attacker_name,
@@ -552,7 +576,7 @@ class EnhancedBattleEngine:
         if is_critical:
             crit_effects = self.effect_manager.check_triggers(attacker_id, TriggerType.ON_CRITICAL, context)
             attack_effects.extend(crit_effects)
-        
+
         # 处理触发的效果
         for effect in attack_effects:
             # 立即生效的效果
@@ -597,7 +621,7 @@ class EnhancedBattleEngine:
                 self.effect_manager.add_effect(attacker_id, effect)
                 result["messages"].append(format_effect_message(effect, attacker_name))
                 result["effects_triggered"].append(effect.effect_type.value)
-        
+
         # 触发防御时效果(被攻击方)
         defender_region = defender.get_current_region() if hasattr(defender, 'get_current_region') else getattr(defender, 'region', "")
         try:
@@ -615,7 +639,7 @@ class EnhancedBattleEngine:
             "region": defender_region,
             "theme": theme_name,
         })
-        
+
         for effect in defense_effects:
             if effect.effect_type == EffectType.REFLECT:
                 # 反弹伤害（实际扣血）
@@ -792,7 +816,7 @@ class EnhancedBattleEngine:
                 pass
 
         return result
-    
+
     def _get_effective_battle_attributes(self, unit_id: str, base_attrs: Dict) -> Dict:
         """获取应用了战斗buff后的有效属性
 
