@@ -53,20 +53,24 @@ async def handle_dungeon_chest_info(event: MessageEvent):
         ]
         
         if available_levels:
-            msg_lines.append("🎁 可领取的宝箱：")
-            for level in available_levels:
-                if level in claimed_levels:
-                    msg_lines.append(f"  ✅ 第{level}层宝箱 (已领取)")
-                else:
-                    msg_lines.append(f"  🎁 第{level}层宝箱 (可领取)")
-            
-            # 检查是否有可领取的宝箱
-            unclaimed_levels = [level for level in available_levels if level not in claimed_levels]
+            unclaimed_levels = sorted(
+                level for level in available_levels if level not in claimed_levels
+            )
+            claimed_count = len(claimed_levels)
             if unclaimed_levels:
+                unclaimed_display = "、".join(f"第{level}层" for level in unclaimed_levels)
                 msg_lines.extend([
+                    f"🎁 待领取宝箱：共 {len(unclaimed_levels)} 个",
+                    f"  {unclaimed_display}",
                     "",
                     "💡 使用【领取宝箱】一键领取所有可领取的宝箱"
                 ])
+            else:
+                msg_lines.append("🔒 暂无可领取的宝箱")
+                msg_lines.append("💡 继续探索诡域，每到达第10层的倍数即可获得宝箱！")
+
+            if claimed_count:
+                msg_lines.append(f"✅ 已领取宝箱：{claimed_count} 个")
         else:
             msg_lines.append("🔒 暂无可领取的宝箱")
             msg_lines.append("💡 继续探索诡域，每到达第10层的倍数即可获得宝箱！")
