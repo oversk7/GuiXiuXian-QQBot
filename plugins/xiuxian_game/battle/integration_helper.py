@@ -175,12 +175,12 @@ class BattleIntegrationHelper:
                     # 添加特效标识
                     effects = []
 
-                        # 命中后检查处决（忽略无敌等，直接强制死亡）
-                        exec_thr = _get_execute_threshold(first_player.id)
-                        if exec_thr > 0 and second_hp_ref[0] > 0:
-                            if second_hp_ref[0] <= int(second_player.max_hp * exec_thr / 100):
-                                battle_log.append(f"⚰️ {first_player.nickname}发动处决，{second_player.nickname}被弑灭！")
-                                second_hp_ref[0] = 0
+                    # 命中后检查处决（忽略无敌等，直接强制死亡）
+                    exec_thr = _get_execute_threshold(first_player.id)
+                    if exec_thr > 0 and second_hp_ref[0] > 0:
+                        if second_hp_ref[0] <= int(second_player.max_hp * exec_thr / 100):
+                            battle_log.append(f"⚰️ {first_player.nickname}发动处决，{second_player.nickname}被弑灭！")
+                            second_hp_ref[0] = 0
 
                     if attack_result.get("is_critical"):
                         effects.append("💥暴击")
@@ -233,12 +233,12 @@ class BattleIntegrationHelper:
                 if attack_result["hit"]:
                     damage = attack_result["damage"]
 
-                        # 命中后检查处决（忽略无敌等，直接强制死亡）
-                        exec_thr = _get_execute_threshold(second_player.id)
-                        if exec_thr > 0 and first_hp_ref[0] > 0:
-                            if first_hp_ref[0] <= int(first_player.max_hp * exec_thr / 100):
-                                battle_log.append(f"⚰️ {second_player.nickname}发动处决，{first_player.nickname}被弑灭！")
-                                first_hp_ref[0] = 0
+                    # 命中后检查处决（忽略无敌等，直接强制死亡）
+                    exec_thr = _get_execute_threshold(second_player.id)
+                    if exec_thr > 0 and first_hp_ref[0] > 0:
+                        if first_hp_ref[0] <= int(first_player.max_hp * exec_thr / 100):
+                            battle_log.append(f"⚰️ {second_player.nickname}发动处决，{first_player.nickname}被弑灭！")
+                            first_hp_ref[0] = 0
 
                     first_hp_ref[0] = max(0, first_hp_ref[0] - damage)
 

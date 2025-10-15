@@ -217,7 +217,8 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
                 "green": "优秀",
                 "blue": "稀有",
                 "purple": "史诗",
-                "orange": "传说"
+                "orange": "传说",
+                "red": "永恒"
             }
             rarity_name = rarity_map.get(cfg.rarity, cfg.rarity)
             equipment_info.append(f"⭐ 稀有度：{rarity_display}{rarity_name}")
@@ -247,7 +248,7 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
             if hasattr(cfg, 'special_effects') and cfg.special_effects:
                 # VIP定制装备列表（0阶即全解锁）
                 VIP_EQUIPMENT_IDS = {"vip_blade_zhanlongshan", "vip_robe_jingyuanzhiyi"}
-                is_vip_equipment = item_id in VIP_EQUIPMENT_IDS
+                is_vip_equipment = cfg.item_id in VIP_EQUIPMENT_IDS
 
                 if is_vip_equipment:
                     effects_lines = ["✨ 特殊效果（VIP定制，0阶全解锁）："]
