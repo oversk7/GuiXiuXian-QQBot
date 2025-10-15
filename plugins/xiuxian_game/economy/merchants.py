@@ -501,24 +501,75 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
                 f"✅ 购买 {item_cfg.name}×{qty} 成功！\n💸 花费 {total_cost} 金币\n"
                 f"📦 剩余库存：{market_state.current_stock}", event))
 
-        # 万事屋购买逻辑（保持不变）
-        elif item_cfg.item_id in SHOP_ITEMS:
-            total_cost = item_cfg.price * qty
-
-            if player.gold < total_cost:
-                await buy_cmd.finish(f"💰 金币不足，需要 {total_cost} (当前 {player.gold})")
-
-            try:
-                await ItemInstance.add_item(session, player.id, item_cfg.item_id, qty)
-            except ValueError as e:
-                await buy_cmd.finish(f"❌ {e}")
-
-            player.gold -= total_cost
-            await session.commit()
-            await buy_cmd.finish(message_add_head(
-                f"✅ 购买 {item_cfg.name}×{qty} 成功！\n💸 花费 {total_cost} 金币", event))
+        # 黑市/基础商店逻辑
         else:
-            await buy_cmd.finish("⛔ 此处无法购买该物品")
+            # 今日黑市上架（非基础物品）
+            today_items = await _pick_black_market_today_items(session)
+            if item_cfg.item_id in SHOP_ITEMS:
+                # 基础物品原价
+                total_cost = item_cfg.price * qty
+                if player.gold < total_cost:
+                    await buy_cmd.finish(f"💰 金币不足，需要 {total_cost} (当前 {player.gold})")
+                try:
+                    await ItemInstance.add_item(session, player.id, item_cfg.item_id, qty)
+                except ValueError as e:
+                    await buy_cmd.finish(f"❌ {e}")
+                player.gold -= total_cost
+                await session.commit()
+                await buy_cmd.finish(message_add_head(
+                    f"✅ 购买 {item_cfg.name}×{qty} 成功！\n💸 花费 {total_cost} 金币", event))
+
+            elif item_cfg.item_id in today_items:
+                # 黑市高溢价 + 限购
+                # 确保今日库存已初始化
+                await _ensure_black_market_stock(session, [item_cfg.item_id])
+                mstate = await MarketState.get_or_create(session, BLACK_MARKET_ID, item_cfg.item_id)
+
+                if not mstate.can_purchase(qty):
+                    await buy_cmd.finish(f"❌ 黑市库存不足！当前库存：{mstate.current_stock}，需要：{qty}")
+
+                # 每人每天总限购（不含基础物品）
+                bought = await _black_market_daily_purchased_qty(session, player.id)
+                remaining = max(0, BLACK_MARKET_DAILY_LIMIT_PER_PLAYER - bought)
+                if qty > remaining:
+                    await buy_cmd.finish(
+                        f"⛔ 超出今日限购！已购 {bought}/{BLACK_MARKET_DAILY_LIMIT_PER_PLAYER}，还可购买 {remaining} 件")
+
+                unit_price = max(1, int((item_cfg.price or 1) * BLACK_MARKET_OVERPRICE))
+                total_cost = unit_price * qty
+                if player.gold < total_cost:
+                    await buy_cmd.finish(f"💰 金币不足，需要 {total_cost} (当前 {player.gold})")
+
+                # 先加物，再扣款，避免金额不足卡死库存
+                try:
+                    await ItemInstance.add_item(session, player.id, item_cfg.item_id, qty)
+                except ValueError as e:
+                    await buy_cmd.finish(f"❌ {e}")
+
+                player.gold -= total_cost
+                mstate.apply_purchase(qty)
+
+                # 记录交易
+                await TradeRecord.record_trade(
+                    session=session,
+                    player_id=player.id,
+                    trade_type=TradeType.BUY,
+                    market_id=BLACK_MARKET_ID,
+                    item_id=item_cfg.item_id,
+                    quantity=qty,
+                    unit_price=unit_price,
+                    total_amount=total_cost
+                )
+
+                session.add_all([player, mstate])
+                await session.commit()
+
+                await buy_cmd.finish(message_add_head(
+                    f"✅ 黑市购买 {item_cfg.name}×{qty} 成功！\n💸 花费 {total_cost} 金币\n"
+                    f"📦 黑市剩余库存：{mstate.current_stock}", event))
+
+            else:
+                await buy_cmd.finish("⛔ 此处无法购买该物品")
 
 # -------- 卖出 --------
 sell_cmd = on_command("出售", aliases={"卖"}, block=True, priority=5)
@@ -1055,39 +1106,168 @@ async def _(event: MessageEvent):
 
         await trade_advise_cmd.finish(message_add_head("\n".join(lines), event))
 
-# 系统商店商品
+# 系统商店基础物品（保留原价）
 SHOP_ITEMS = [
-    "revive_potion", "rename_card", "president_letter", "territory_expansion_scroll","heal_potion","spirit_herb"
+    "revive_potion", "rename_card", "president_letter", "territory_expansion_scroll", "heal_potion", "spirit_herb"
 ]
 
-# 普通商店指令
-shop_cmd = on_command("系统商店", aliases={"特殊商店"}, block=True, priority=5)
+# 黑市配置
+BLACK_MARKET_ID = "black_market"
+BLACK_MARKET_OVERPRICE = 3.5  # 高溢价倍数（基础价×3.5）
+BLACK_MARKET_MIN_ITEMS = 3
+BLACK_MARKET_MAX_ITEMS = 6
+BLACK_MARKET_STOCK_MIN = 10
+BLACK_MARKET_STOCK_MAX = 20
+BLACK_MARKET_DAILY_LIMIT_PER_PLAYER = 50  # 除基础物品外，每人每日总限购
 
-@shop_cmd.handle()
+# 黑市候选池（不含装备）——以消耗品为主，如升阶石/稳定水晶
+BLACK_MARKET_CANDIDATES = [
+    "upgrade_stone_low", "upgrade_stone_mid", "upgrade_stone_high", "upgrade_stone_supreme", "stabilizer_crystal"
+]
+
+from datetime import datetime as _dt, time as _time
+
+
+def _black_market_seed_day() -> str:
+    """与市集一致的日切：09:00 前算前一天。返回形如 'YYYY-MM-DD' 的字符串。"""
+    day = _current_seed_day()  # 复用市集的日切逻辑
+    return day.isoformat()
+
+
+def _black_market_day_start_dt() -> _dt:
+    """返回本'黑市日'的起始时间点(datetime)，用于统计每日限购。"""
+    day = _current_seed_day()
+    return _dt.combine(day, _DEF_TIME)
+
+
+async def _pick_black_market_today_items(session) -> list[str]:
+    """确定今日黑市上架道具（按固定种子随机），不含基础物品与装备。"""
+    seed_str = f"{BLACK_MARKET_ID}:{_black_market_seed_day()}"
+    seed_int = int(hashlib.md5(seed_str.encode()).hexdigest(), 16)
+    rng_local = random.Random(seed_int)
+
+    # 过滤候选中不存在或为装备的条目
+    valid = []
+    for iid in BLACK_MARKET_CANDIDATES:
+        cfg = config.items_config["by_id"].get(iid)
+        if not cfg:
+            continue
+        if getattr(cfg, "type", "") == "EQUIPMENT":
+            continue
+        # 排除基础物品
+        if iid in SHOP_ITEMS:
+            continue
+        valid.append(iid)
+
+    if not valid:
+        return []
+
+    count = rng_local.randint(BLACK_MARKET_MIN_ITEMS, min(BLACK_MARKET_MAX_ITEMS, len(valid)))
+    rng_local.shuffle(valid)
+    return valid[:count]
+
+
+async def _ensure_black_market_stock(session, items: list[str]):
+    """为今日上架的黑市物品设置库存（每日刷新为10-20随机），使用 MarketState 持久化。"""
+    if not items:
+        return
+    today = _current_seed_day()
+    seed_str = f"{BLACK_MARKET_ID}:{today.isoformat()}:stock"
+    seed_int = int(hashlib.md5(seed_str.encode()).hexdigest(), 16)
+    rng_local = random.Random(seed_int)
+
+    for iid in items:
+        market_state = await MarketState.get_or_create(session, BLACK_MARKET_ID, iid)
+        # 若跨日，则重置库存到当日随机值
+        last_date = market_state.last_refresh_date
+        if isinstance(last_date, _dt):
+            last_date = last_date.date()
+        if last_date < today:
+            stock = rng_local.randint(BLACK_MARKET_STOCK_MIN, BLACK_MARKET_STOCK_MAX)
+            market_state.current_stock = stock
+            market_state.max_stock = stock
+            market_state.daily_sold = 0
+            market_state.daily_bought = 0
+            market_state.last_refresh_date = today
+            market_state.updated_at = _dt.now()
+            session.add(market_state)
+
+
+async def _black_market_daily_purchased_qty(session, player_id: str) -> int:
+    """统计玩家今日在黑市（非基础物品）的已购数量（用于50件总限购）。"""
+    from sqlalchemy import select, and_
+    day_start = _black_market_day_start_dt()
+    stmt = select(TradeRecord).where(and_(
+        TradeRecord.player_id == player_id,
+        TradeRecord.market_id == BLACK_MARKET_ID,
+        TradeRecord.trade_type == TradeType.BUY,
+        TradeRecord.trade_time > day_start,
+    ))
+    result = await session.execute(stmt)
+    records = result.scalars().all()
+    total = 0
+    # 仅统计非基础物品
+    for r in records:
+        if r.item_id in SHOP_ITEMS:
+            continue
+        total += r.quantity
+    return total
+
+
+# 黑市指令（替代原“系统商店”）
+black_market_cmd = on_command("黑市", aliases={"系统商店", "特殊商店"}, block=True, priority=5)
+
+@black_market_cmd.handle()
 async def _(event: MessageEvent):
     async with safe_session() as session:
-        # 使用跨平台工具获取玩家数据
         from ..platform_utils import get_unified_player, is_guild_message
         player: Player | None = await get_unified_player(session, event)
         if not player:
             if is_guild_message(event):
-                await shop_cmd.finish("⛔ 你还没有创建角色或绑定账号\n💡 请先在群聊注册角色，然后使用绑定功能")
+                await black_market_cmd.finish("⛔ 你还没有创建角色或绑定账号\n💡 请先在群聊注册角色，然后使用绑定功能")
             else:
-                await shop_cmd.finish("⛔ 请先创建角色")
+                await black_market_cmd.finish("⛔ 请先创建角色")
         if player.region != "大都会":
-            await shop_cmd.finish(message_add_head(
+            await black_market_cmd.finish(message_add_head(
                 "💀 诡域之中皆不可信\n"
                 "━━━━━━━━━━━━━\n"
                 "此地没有安全商人。\n"
                 "━━━━━━━━━━━━━\n"
                 "⬇️ 【返回】脱离诡域，返回现实", event))
 
-        lines = ["🏬 系统商店", "━━━━━━━━━━━━━"]
+        # 今日上架与库存
+        today_items = await _pick_black_market_today_items(session)
+        await _ensure_black_market_stock(session, today_items)
+
+        lines = ["🕳️ 黑市", "━━━━━━━━━━━━━"]
+        # 今日黑市·高溢价限量
+        if today_items:
+            lines.append("🖤 今日上架（高溢价×{:.1f}，限量）:".format(BLACK_MARKET_OVERPRICE))
+            for iid in today_items:
+                cfg = config.items_config["by_id"].get(iid)
+                if not cfg:
+                    continue
+                mstate = await MarketState.get_or_create(session, BLACK_MARKET_ID, iid)
+                unit_price = max(1, int((cfg.price or 1) * BLACK_MARKET_OVERPRICE))
+                lines.append(f"• {cfg.name}│{unit_price} 金币│库存({mstate.current_stock})")
+            lines.append("━━━━━━━━━━━━━")
+
+        # 基础物品·原价
+        lines.append("📦 基础物品（原价）:")
         for item_id in SHOP_ITEMS:
-            item_cfg = config.items_config["by_id"].get(item_id)
-            lines.append(f"{item_cfg.name}│{item_cfg.price} 金币")
-        lines.append("━━━━━━━━━━━━━\n⬇️【购买 [物品] [数量]】")
-        await shop_cmd.finish(message_add_head("\n".join(lines), event))
+            cfg = config.items_config["by_id"].get(item_id)
+            if cfg:
+                lines.append(f"• {cfg.name}│{cfg.price} 金币")
+
+        # 限购说明
+        bought = await _black_market_daily_purchased_qty(session, player.id)
+        lines.extend([
+            "━━━━━━━━━━━━━",
+            f"📏 限购：除基础物品外，每人每日总计≤{BLACK_MARKET_DAILY_LIMIT_PER_PLAYER} 件",
+            f"🧮 今日已购（不含基础物品）：{bought}/{BLACK_MARKET_DAILY_LIMIT_PER_PLAYER}",
+            "⬇️【购买 物品名称 数量】"
+        ])
+        await black_market_cmd.finish(message_add_head("\n".join(lines), event))
 
 
 # ==================== 缉邪司总部商店系统 ====================

@@ -346,7 +346,7 @@ items:
       description: "蕴含微弱能量的升阶石，可用于装备和镶嵌物1-3阶升级 ⬆️"
       type: "CONSUMABLE"
       rarity: "white"
-      price: 500
+      price: 20000
       grudge_value: 5
 
     - item_id: "upgrade_stone_mid"
@@ -354,7 +354,7 @@ items:
       description: "蕴含中等能量的升阶石，可用于装备和镶嵌物4-6阶升级 ⬆️"
       type: "CONSUMABLE"
       rarity: "green"
-      price: 2000
+      price: 100000
       grudge_value: 20
 
     - item_id: "upgrade_stone_high"
@@ -362,7 +362,7 @@ items:
       description: "蕴含强大能量的升阶石，可用于装备和镶嵌物7-9阶升级 ⬆️"
       type: "CONSUMABLE"
       rarity: "blue"
-      price: 8000
+      price: 300000
       grudge_value: 80
 
     - item_id: "upgrade_stone_supreme"
@@ -370,7 +370,7 @@ items:
       description: "蕴含极致能量的升阶石，可用于装备和镶嵌物10阶升级 ⬆️"
       type: "CONSUMABLE"
       rarity: "purple"
-      price: 30000
+      price: 300000
       grudge_value: 300
 
     - item_id: "stabilizer_crystal"
