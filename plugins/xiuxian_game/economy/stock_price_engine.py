@@ -49,6 +49,13 @@ class StockPriceEngine:
             stmt = select(Stock).where(Stock.is_active == True)
             stocks = (await session.execute(stmt)).scalars().all()
 
+            # 统计全市场的投资规模，用于限制整体金币增速
+            total_investment = (
+                await session.execute(select(func.sum(StockHolding.total_cost)))
+            ).scalar()
+            total_investment = float(total_investment or 0)
+            global_pressure = math.log1p(total_investment / 10000.0)
+
             # 确定当前小时的市场情绪（可复现的情绪日程表）
             dt_now = datetime.now().replace(minute=0, second=0, microsecond=0)
             market_sentiment = cls.get_sentiment_for_hour(dt_now)
@@ -59,7 +66,13 @@ class StockPriceEngine:
                 stock.trend_factor = max(0.95, min(1.05, stock.trend_factor))
 
                 old_price = stock.current_price
-                new_price = await cls._calculate_new_price(session, stock, market_sentiment, dt_now)
+                new_price = await cls._calculate_new_price(
+                    session,
+                    stock,
+                    market_sentiment,
+                    dt_now,
+                    global_pressure,
+                )
 
                 # 更新股票价格
                 stock.current_price = new_price
@@ -93,7 +106,14 @@ class StockPriceEngine:
         return results
 
     @classmethod
-    async def _calculate_new_price(cls, session: AsyncSession, stock: Stock, market_sentiment: float, dt: datetime) -> int:
+    async def _calculate_new_price(
+        cls,
+        session: AsyncSession,
+        stock: Stock,
+        market_sentiment: float,
+        dt: datetime,
+        global_pressure: float,
+    ) -> int:
         """计算股票新价格（引入不可预测随机性与投资规模拖拽）"""
         current_price = stock.current_price
 
@@ -118,14 +138,31 @@ class StockPriceEngine:
         # 7. 历史价格回归因子（防止价格偏离基础价格太远）
         regression_factor = cls._calculate_regression_factor(stock)
 
-        # 7.5 投入越多越难赚：按玩家总持仓占比施加负向漂移（0% ~ -5%）
-        invested_shares = (await session.execute(
-            select(func.sum(StockHolding.shares)).where(StockHolding.stock_id == stock.id)
-        )).scalar()
+        # 7.5 投入越多越难赚：按照持仓占比、项目投入与全局投入叠加负向漂移
+        invested_shares = (
+            await session.execute(
+                select(func.sum(StockHolding.shares)).where(StockHolding.stock_id == stock.id)
+            )
+        ).scalar()
         invested_shares = invested_shares or 0
-        fraction = (invested_shares / stock.circulating_shares) if stock.circulating_shares else 0.0
+        fraction = (
+            invested_shares / stock.circulating_shares
+        ) if stock.circulating_shares else 0.0
         fraction = max(0.0, min(1.0, float(fraction)))
-        investment_drag = -0.05 * math.sqrt(fraction)  # sqrt curve: mild early impact, stronger later
+
+        # 按照投入金币数量添加额外拖拽，使大规模投入更易亏损
+        invested_capital = (
+            await session.execute(
+                select(func.sum(StockHolding.total_cost)).where(StockHolding.stock_id == stock.id)
+            )
+        ).scalar()
+        invested_capital = float(invested_capital or 0)
+        capital_pressure = math.log1p(invested_capital / 1000.0)
+
+        share_drag = -0.05 * math.sqrt(fraction)
+        capital_drag = -0.02 * min(5.0, capital_pressure)
+        global_drag = -0.01 * min(5.0, global_pressure)
+        investment_drag = share_drag + capital_drag + global_drag
 
         # 8. 综合计算价格变化率
         total_change_rate = (
