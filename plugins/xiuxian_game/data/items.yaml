@@ -1249,7 +1249,7 @@ items:
       gem_slots: 5
 
     - item_id: "vip_medal_tiandi"
-      name: "天帝祝福勋章"
+      name: "天帝残勋"
       description: |
         我在古庙废墟下拾到它。
         勋章覆着冷光，背面刻着“天帝”二字，却似是从内刻出。
@@ -1258,7 +1258,7 @@ items:
         只是夜深时，勋章会微微发烫，像有谁在脉搏里低语。
         我听不清，只隐约分辨出三个字——
         “替——祂——活。”
-      type: "GOODS"
+      type: "EQUIPMENT"
       rarity: "red"
       tags: ["vip_exclusive"]
 
