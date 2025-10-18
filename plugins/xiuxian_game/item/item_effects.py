@@ -7,6 +7,7 @@ from __future__ import annotations
 
 from typing import Callable, Awaitable, Dict, Tuple
 import time
+from decimal import Decimal, ROUND_DOWN, ROUND_HALF_UP
 from ..models.player import Player
 from ..models.inventory import ItemEffectType, ItemConfig, ItemInstance, ItemType
 from ..models.elixir_usage import ElixirUsageLog
@@ -476,8 +477,34 @@ async def _reforge_attr(player: Player, cfg: ItemConfig, qty: int, ctx: str, ses
     if current_value <= 0:
         return False, f"⛔ {attr_name}不足，无法洗髓"
 
-    # 计算转换量（每次使用转换一次）
-    convert_amount = int(current_value * (percent / 100.0) * qty)
+    # 计算去除装备加成后的基础属性值
+    base_value = Decimal(str(current_value))
+    if session:
+        from sqlalchemy import select
+        from ..config import config as gcfg
+
+        stmt = select(ItemInstance).where(
+            ItemInstance.player_id == player.id,
+            ItemInstance.equipped == True,
+            ItemInstance.item_id.in_(gcfg.items_config["by_type"]["EQUIPMENT"]),
+        )
+        equipped_items = (await session.execute(stmt)).scalars().all()
+
+        for eq in equipped_items:
+            delta = (eq.extra_attrs or {}).get("_persist_bonus", {})
+            bonus = delta.get(source_attr)
+            if isinstance(bonus, (int, float, Decimal)):
+                base_value -= Decimal(str(bonus))
+
+    base_value = base_value.to_integral_value(rounding=ROUND_HALF_UP)
+    base_value_int = int(base_value)
+
+    if base_value_int <= 0:
+        return False, f"⛔ {attr_name}基础值不足，无法洗髓"
+
+    # 计算转换量（每次使用转换一次，仅针对基础属性值）
+    percent_ratio = Decimal(str(percent)) / Decimal("100")
+    convert_amount = int((Decimal(base_value_int) * percent_ratio * Decimal(qty)).to_integral_value(rounding=ROUND_DOWN))
     if convert_amount == 0:
         convert_amount = 1  # 至少转换1点
 
@@ -486,7 +513,7 @@ async def _reforge_attr(player: Player, cfg: ItemConfig, qty: int, ctx: str, ses
     if source_attr in ["max_hp", "max_mp"]:
         min_value = 10  # 生命和理智至少保留10点
 
-    if current_value - convert_amount < min_value:
+    if base_value_int - convert_amount < min_value:
         return False, f"⛔ {attr_name}过低，无法继续洗髓（至少需保留{min_value}点）"
 
     # 扣除源属性
