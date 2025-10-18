@@ -1055,7 +1055,7 @@ items:
       repair_cost: 110
       required_level: 220
       gem_slots: 5
-      rarity: "orange"
+      rarity: "red"
       special_effects:
         - trigger: "first_turn"
           chance: 100
@@ -1182,7 +1182,6 @@ items:
       description: "弑神伐恶，斩魂戮邪，封魔于刃，斩尽不死不灭！\n🌟灭法之影套装之一"
       type: "EQUIPMENT"
       rarity: "red"
-      price: 0
       durability: 300
       required_level: 10
       attr_bonus: {"attack": 100, "mp": 100, "agility": 100}
@@ -1225,7 +1224,6 @@ items:
       description: "有时，你的倒影会比你更早死去。"
       type: "EQUIPMENT"
       rarity: "red"
-      price: 0
       durability: 300
       required_level: 10
       attr_bonus: {"hp": 100, "attack": 80, "agility": 60, "defense": 60}
@@ -1235,7 +1233,7 @@ items:
           effect: "reflect_death"
           is_percentage: false
           value: 0
-          description: "[1] 镜怨体质：？？？"
+          description: "[1] 镜怨体质：当他人主动攻击你时，其攻击行为被视为“对自身发动”，镜怨会在敌人心智中“映射自身存在”，使攻击者的灵魂瞬间反噬自身——直接死亡。"
         - trigger: "on_attacked"
           effect: "heal"
           is_percentage: true
