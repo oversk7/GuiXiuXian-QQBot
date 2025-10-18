@@ -135,6 +135,24 @@ async def handle_use_item(event: MessageEvent, args: Message = CommandArg()):
         if not item_config:
             await use_item.finish(f"⛔ 不存在物品：{item_name}")
 
+        # 先解析使用参数，确保后续校验使用正确的数量
+        remaining_args = params[1:]
+        if item_config.effect_type == ItemEffectType.DIVINE_PUNISHMENT:
+            if not remaining_args:
+                await use_item.finish("⛔ 请提供目标UID，例如：使用 天罚符 12345")
+            target_uid_str = remaining_args[0]
+            if not target_uid_str.isdigit():
+                await use_item.finish("⛔ 目标UID必须为正整数")
+            ctx_payload = {"scene": "world", "target_uid": int(target_uid_str)}
+            quantity = 1
+        elif remaining_args:
+            try:
+                quantity = int(remaining_args[0])
+                if quantity <= 0:
+                    raise ValueError
+            except ValueError:
+                await use_item.finish("⛔ 数量必须为正整数")
+
         # 检查背包中是否有该物品 (聚合数量)
         inv_rows = (await session.execute(
             select(ItemInstance)
@@ -142,7 +160,6 @@ async def handle_use_item(event: MessageEvent, args: Message = CommandArg()):
             .where(ItemInstance.item_id == item_config.item_id)
         )).scalars().all()
         total_qty = sum(r.quantity for r in inv_rows)
-
         if total_qty < quantity:
             await use_item.finish(f"⛔ {item_name} 数量不足")
 
@@ -164,25 +181,6 @@ async def handle_use_item(event: MessageEvent, args: Message = CommandArg()):
             used_today = log_row.quantity if log_row else 0
             if used_today + quantity > daily_limit:
                 await use_item.finish(f"⛔ {item_config.name} 每日最多可服用 {daily_limit} 颗，今日已用 {used_today} 颗")
-
-        # 解析使用参数
-        remaining_args = params[1:]
-
-        if item_config.effect_type == ItemEffectType.DIVINE_PUNISHMENT:
-            if not remaining_args:
-                await use_item.finish("⛔ 请提供目标UID，例如：使用 天罚符 12345")
-            target_uid_str = remaining_args[0]
-            if not target_uid_str.isdigit():
-                await use_item.finish("⛔ 目标UID必须为正整数")
-            ctx_payload = {"scene": "world", "target_uid": int(target_uid_str)}
-            quantity = 1
-        elif remaining_args:
-            try:
-                quantity = int(remaining_args[0])
-                if quantity <= 0:
-                    raise ValueError
-            except ValueError:
-                await use_item.finish("⛔ 数量必须为正整数")
 
         # 调用统一效果执行器（传递session以支持耐药性）
         success, msg = await apply_effect(player, item_config, quantity, ctx=ctx_payload, session=session)

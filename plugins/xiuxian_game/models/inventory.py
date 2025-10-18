@@ -441,5 +441,7 @@ class ItemInstance(Base):
                 await session.delete(inv)
             else:
                 session.add(inv)
-                break
+        if remaining > 0:
+            # 并发等特殊情况下可能出现数量不足，抛出异常由上层回滚处理
+            raise ValueError("物品数量不足")
         return True
