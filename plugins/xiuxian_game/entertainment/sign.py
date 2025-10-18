@@ -116,6 +116,23 @@ async def handle_sign(event: MessageEvent):
             # 如果添加物品失败，记录错误但不影响签到
             sweep_token_msg = f"\n⚠️ 扫荡令发放失败：{e}"
 
+        vip_medal_msg = ""
+        if player.vip and player.vip > 0:
+            stmt_medal = select(ItemInstance).where(
+                ItemInstance.player_id == user_id,
+                ItemInstance.item_id == "vip_medal_tiandi"
+            )
+            medal_instance = (await session.execute(stmt_medal)).scalars().first()
+            if medal_instance:
+                from ..models.vip_equipment_bonus import VIPEquipmentBonus
+
+                vip_record = await VIPEquipmentBonus.get_or_create(session, player.id)
+                vip_record.add_bonus("attack", 15)
+                vip_record.add_bonus("luck", 15)
+                player.attack += 15
+                player.luck += 15
+                vip_medal_msg = "\n👑 天帝祝福：筋骨更盛，鸿运加身（力+15 运+15·永久）"
+
         new_msg = ""
         # 检查是否为创建账号的同一天
         if player.created_at.date() == today:
@@ -166,4 +183,4 @@ async def handle_sign(event: MessageEvent):
 
         # 然后发送响应消息
         await sign.send(
-            f"🛞{player.nickname}[{player.uid}] 连续签到 {streak} 天！获得 {base_reward} 金币！\n{lucky_msg}{bonus_msg}{stamina_msg}{monthly_card_msg}{sweep_token_msg}{new_msg}{guild_msg}")
+            f"🛞{player.nickname}[{player.uid}] 连续签到 {streak} 天！获得 {base_reward} 金币！\n{lucky_msg}{bonus_msg}{stamina_msg}{monthly_card_msg}{sweep_token_msg}{vip_medal_msg}{new_msg}{guild_msg}")
