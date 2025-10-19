@@ -1001,14 +1001,14 @@ async def _handle_personal_monster(session, tile: WorldTile, player: Player) -> 
             extra["blade_kill_day"] = day
             extra["blade_kill_cnt"] = 0
         if int(extra.get("blade_kill_cnt", 0)) >= 20:
-            return "(噬灵者今日上限已满)"
+            return "(噬灵者今日上限已满)"
         # 使用VIPEquipmentBonus表持久化，确保冥返后不会丢失
         vip_bonus = await _VIPBonus.get_or_create(session, _player.id)
         vip_bonus.add_bonus("max_mp", 2)
-        _player.max_mp = _player.max_mp + 2
+        _player.max_hp = _player.max_hp + 2
         extra["blade_kill_cnt"] = int(extra.get("blade_kill_cnt", 0)) + 1
         inst.extra_attrs = extra
-        return f"🩸 噬灵者：击杀吞噬，理智上限+2（今日{extra['blade_kill_cnt']}/20）"
+        return f"🩸 噬灵者：击杀吞噬，生命上限+2（今日{extra['blade_kill_cnt']}/20）"
 
     _msg_rand = await _apply_blade_daily_random_on_death(player)
     if _msg_rand:
