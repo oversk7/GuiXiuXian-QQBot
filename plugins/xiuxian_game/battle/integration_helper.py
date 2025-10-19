@@ -1132,6 +1132,7 @@ class BattleIntegrationHelper:
                         if attack_result.get("combo_count", 1) > 1:
                             effects.append(f"🔄x{attack_result['combo_count']}")
                         if attack_result.get("is_penetration", False):
+                            effects.append("🗡️")
 
 
                         # 处决判定（玩家2对玩家1）
@@ -1141,7 +1142,7 @@ class BattleIntegrationHelper:
                                 player1_hp = 0
                                 round_actions.append("⚰️处决！")
 
-                            effects.append("🗡️")
+
                         if any(isinstance(t, str) and "GUARANTEED_20%" in t for t in attack_result.get("effects", [])):
                             effects.append("🎯")
 
