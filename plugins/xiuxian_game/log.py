@@ -10,6 +10,48 @@ from .models.db import safe_session
 from .models.player import Player
 from .utils import message_add_head
 
+# --- 性能埋点：E2E 指令耗时 + 日志文件输出 ---
+import time, logging, os
+from logging.handlers import RotatingFileHandler
+from nonebot.message import run_preprocessor, run_postprocessor
+
+# 轻量文件日志，避免刷屏控制台
+_log_dir = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(__file__))), "logs")
+os.makedirs(_log_dir, exist_ok=True)
+
+def _ensure_file_logger(name: str, filename: str):
+    lg = logging.getLogger(name)
+    # 避免重复添加handler
+    if not any(isinstance(h, RotatingFileHandler) and getattr(h, 'baseFilename', '').endswith(filename) for h in lg.handlers):
+        handler = RotatingFileHandler(os.path.join(_log_dir, filename), maxBytes=2*1024*1024, backupCount=3, encoding="utf-8")
+        fmt = logging.Formatter('%(asctime)s | %(levelname)s | %(message)s')
+        handler.setFormatter(fmt)
+        lg.addHandler(handler)
+        lg.setLevel(logging.INFO)
+
+_ensure_file_logger("perf", "perf.log")
+_ensure_file_logger("sql", "sql.log")
+_ensure_file_logger("hot", "hot.log")
+
+@run_preprocessor
+async def _perf_pre(bot, event, state):
+    # 记录开始时间
+    setattr(event, "_perf_t0", time.perf_counter())
+
+@run_postprocessor
+async def _perf_post(bot, event, state, matcher):
+    t0 = getattr(event, "_perf_t0", None)
+    if t0 is None:
+        return
+    ms = (time.perf_counter() - t0) * 1000
+    try:
+        mtype = getattr(matcher, "type", "?")
+        mname = getattr(matcher, "module_name", "?")
+        logging.getLogger("perf").info(f"{mtype}-{mname} {ms:.1f}ms")
+    except AttributeError:
+        # 属性获取失败不影响主流程
+        pass
+
 # 不阻拦也不回复，仅后台记录
 log_uid_matcher = on_message(priority=1, block=False)
 
