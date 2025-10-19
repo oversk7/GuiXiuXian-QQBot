@@ -21,7 +21,7 @@ class DatabaseBackupService:
         # 备份文件名前缀
         self.backup_prefix = "game_backup_"
         # 最大保留备份数量
-        self.max_backups = 3
+        self.max_backups = 12
     
     def create_backup(self) -> bool:
         """

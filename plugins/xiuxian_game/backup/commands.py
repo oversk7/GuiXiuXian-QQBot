@@ -69,7 +69,7 @@ async def handle_backup_status(event: MessageEvent):
                 "📦 数据库备份状态",
                 "━━━━━━━━━━━━━",
                 f"📊 备份总数: {len(backups)}",
-                f"🔄 自动备份: 每小时一次",
+                f"🔄 自动备份: 每2小时一次",
                 f"📁 保留数量: 最近 {backup_service.max_backups} 个",
                 "",
                 "📋 备份文件列表:"

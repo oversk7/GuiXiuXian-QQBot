@@ -19,18 +19,18 @@ async def setup_backup_scheduler():
             logger.info("⚠️ 数据库备份定时任务已存在，跳过设置")
             return
 
-        # 添加每小时执行一次的备份任务
+        # 添加每2小时执行一次的备份任务
         scheduler.add_job(
             func=perform_backup,
             trigger="interval",
-            hours=1,  # 每小时执行一次
+            hours=2,  # 每2小时执行一次
             id="database_backup",
             replace_existing=True,  # 如果任务已存在则替换
             max_instances=1,  # 最多同时运行1个实例
             coalesce=True,  # 如果有多个任务堆积，只执行最新的一个
         )
 
-        logger.info("✅ 数据库备份定时任务已设置 - 每小时执行一次")
+        logger.info("✅ 数据库备份定时任务已设置 - 每2小时执行一次")
 
         # 移除启动时立即执行备份，避免频繁备份
         # 如果需要立即备份，可以使用【手动备份】命令
