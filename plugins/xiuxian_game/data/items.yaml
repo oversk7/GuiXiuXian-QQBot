@@ -1191,8 +1191,8 @@ items:
         - trigger: "first_turn"
           effect: "mp_from_hp"
           is_percentage: true
-          value: 100
-          description: "[1] 灵影体质·lv.EX：理智和生命形成良好循环，穿戴后，以自身最大生命值的100%转化为最大理智值提升。"
+          value: 50
+          description: "[1] 灵影体质·lv.EX：理智和生命形成良好循环，穿戴后，以自身最大生命值的50%转化为最大理智值提升。"
         - trigger: "passive"
           effect: "ignore_special"
           is_percentage: true
