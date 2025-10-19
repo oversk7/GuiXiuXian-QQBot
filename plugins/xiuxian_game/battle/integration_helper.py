@@ -1133,6 +1133,7 @@ class BattleIntegrationHelper:
                             effects.append(f"🔄x{attack_result['combo_count']}")
                         if attack_result.get("is_penetration", False):
 
+
                         # 处决判定（玩家2对玩家1）
                         _thr = _get_exec_thr(player2.id)
                         if _thr > 0 and player1_hp > 0:
