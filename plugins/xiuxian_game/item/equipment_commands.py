@@ -487,6 +487,65 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
             eq.extra_attrs = extra
             session.add(eq)
 
+
+	        # 3.5 处理“生命→理智”的全局被动（如：斩龙闪）——应在面板上全局生效
+	        # 将 YAML 中的 mp_from_hp 从战斗内首回合，转为此处的全局持久化属性加成
+	        # 计算方式：按当前玩家最大生命值（已应用所有装备基础加成后）乘以百分比，转化为最大理智值加成
+	        mp_from_hp_effects = []  # (equip, pct, flat, is_percentage)
+	        total_pct = 0.0
+	        total_flat = 0
+	        for eq2 in all_equipment_to_wear:
+	            cfg2 = eq2.config if hasattr(eq2, 'config') else None
+	            if not cfg2 or not getattr(cfg2, 'special_effects', None):
+	                continue
+	            for eff in cfg2.special_effects:
+	                if eff.get('effect') == 'mp_from_hp':
+	                    is_pct = bool(eff.get('is_percentage', True))
+	                    if is_pct:
+	                        val_pct = float(eff.get('value', 0) or 0)
+	                        if val_pct > 0:
+	                            total_pct += val_pct
+	                            mp_from_hp_effects.append((eq2, val_pct, 0, True))
+	                    else:
+	                        val_flat = int(eff.get('value', 0) or 0)
+	                        if val_flat > 0:
+	                            total_flat += val_flat
+	                            mp_from_hp_effects.append((eq2, 0.0, val_flat, False))
+	        if mp_from_hp_effects:
+	            # 基于“先应用其他装备的血量加成、排除自身（拥有 mp_from_hp 的装备）对HP的加成后”的最大生命值来计算
+	            current_hp_after_all = int(getattr(player, 'max_hp', 0) or 0)
+	            hp_from_self_equips = 0
+	            for (eq2, _, _, _) in mp_from_hp_effects:
+	                delta2 = (eq2.extra_attrs or {}).get("_persist_bonus", {})
+	                hp_from_self_equips += int(delta2.get("max_hp", 0) or 0)
+	            base_for_convert = max(1, current_hp_after_all - hp_from_self_equips)
+	            bonus_from_pct = int(base_for_convert * total_pct / 100.0) if total_pct > 0 else 0
+	            total_bonus_mp = bonus_from_pct + int(total_flat)
+	            if total_bonus_mp > 0:
+	                # 将总加成分摊写入每件装备的 _persist_bonus
+	                remaining = total_bonus_mp
+	                for idx, (eq2, pct, flat, is_pct) in enumerate(mp_from_hp_effects):
+	                    part = 0
+	                    if is_pct and pct > 0:
+	                        part = int(base_for_convert * pct / 100.0)
+	                    elif (not is_pct) and flat > 0:
+	                        part = int(flat)
+	                    # 修正末件舍入误差
+	                    if idx == len(mp_from_hp_effects) - 1:
+	                        part = remaining
+	                    remaining -= part
+	                    if part <= 0:
+	                        continue
+	                    # 应用到玩家
+	                    player.max_mp = int(getattr(player, 'max_mp', 0)) + part
+	                    # 写入装备的持久化加成记录
+	                    extra2 = eq2.extra_attrs or {}
+	                    persist = dict(extra2.get("_persist_bonus", {}))
+	                    persist["max_mp"] = int(persist.get("max_mp", 0)) + part
+	                    extra2["_persist_bonus"] = persist
+	                    eq2.extra_attrs = extra2
+	                    session.add(eq2)
+
         # 确保当前HP/MP不超过新的上限
         if player.hp > player.max_hp:
             player.hp = player.max_hp

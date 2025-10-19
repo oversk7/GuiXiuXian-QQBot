@@ -205,6 +205,9 @@ class BattleIntegrationHelper:
 
                     action_desc += f" 造成{damage}伤害"
                     battle_log.append(action_desc)
+                    # 附加引擎生成的细节（含🎯20%/80%拆分）
+                    if attack_result.get("messages"):
+                        battle_log.extend(attack_result["messages"])
 
                     # 检查击杀并触发击杀效果
                     if second_hp_ref[0] <= 0:
@@ -273,6 +276,9 @@ class BattleIntegrationHelper:
 
                     if effects:
                         action_desc += f" ({' '.join(effects)})"
+                    # 附加引擎生成的细节（含🎯20%/80%拆分）
+                    if attack_result.get("messages"):
+                        battle_log.extend(attack_result["messages"])
 
                     action_desc += f" 造成{damage}伤害"
                     battle_log.append(action_desc)
@@ -792,11 +798,18 @@ class BattleIntegrationHelper:
                         if player_attack_result.get("is_penetration", False):
                             effects.append("🗡️")
 
-                        if any(isinstance(t, str) and "GUARANTEED_20%" in t for t in attack_result.get("effects", [])):
+                        if any(isinstance(t, str) and "GUARANTEED_20%" in t for t in player_attack_result.get("effects", [])):
                             effects.append("🎯")
 
                         effect_text = "".join(effects)
-                        round_actions.append(f"{effect_text}{player.nickname}→{player_attack_result['total_damage']}")
+                        # 斩龙闪拆分：在紧凑日志中展示20%/80%
+                        _gd = player_attack_result.get("guaranteed_damage", 0)
+                        _nd = player_attack_result.get("normal_damage", 0)
+                        _split = ""
+                        if any(isinstance(t, str) and "GUARANTEED_20%" in t for t in player_attack_result.get("effects", [])):
+                            _nd_text = "被闪避" if player_attack_result.get("normal_missed") else str(_nd)
+                            _split = f" [20%:{_gd} + 80%:{_nd_text}]"
+                        round_actions.append(f"{effect_text}{player.nickname}→{player_attack_result['total_damage']}{_split}")
 
                         # 检查击杀并触发击杀效果
                         if monster_hp <= 0:
@@ -883,7 +896,14 @@ class BattleIntegrationHelper:
                             effects.append("🎯")
 
                         effect_text = "".join(effects)
-                        round_actions.append(f"{effect_text}{player.nickname}→{player_attack_result['total_damage']}")
+                        # 斩龙闪拆分：在紧凑日志中展示20%/80%
+                        _gd = player_attack_result.get("guaranteed_damage", 0)
+                        _nd = player_attack_result.get("normal_damage", 0)
+                        _split = ""
+                        if any(isinstance(t, str) and "GUARANTEED_20%" in t for t in player_attack_result.get("effects", [])):
+                            _nd_text = "被闪避" if player_attack_result.get("normal_missed") else str(_nd)
+                            _split = f" [20%:{_gd} + 80%:{_nd_text}]"
+                        round_actions.append(f"{effect_text}{player.nickname}→{player_attack_result['total_damage']}{_split}")
 
                         # 检查击杀并触发击杀效果
                         if monster_hp <= 0:
@@ -1072,9 +1092,22 @@ class BattleIntegrationHelper:
                         # 计算格挡伤害（基础攻击力 - 实际伤害）
                         blocked_damage = player1.attack - damage
                         if blocked_damage > 0:
-                            round_actions.append(f"{effect_text}{player1.nickname}→{damage}🛡️挡{blocked_damage}")
+                            # 斩龙闪：在紧凑日志中给出20%/80%拆分
+                            _gd = attack_result.get("guaranteed_damage", 0)
+                            _nd = attack_result.get("normal_damage", 0)
+                            _split = ""
+                            if any(isinstance(t, str) and "GUARANTEED_20%" in t for t in attack_result.get("effects", [])):
+                                _nd_text = "被闪避" if attack_result.get("normal_missed") else str(_nd)
+                                _split = f" [20%:{_gd} + 80%:{_nd_text}]"
+                            round_actions.append(f"{effect_text}{player1.nickname}→{damage}🛡️挡{blocked_damage}{_split}")
                         else:
-                            round_actions.append(f"{effect_text}{player1.nickname}→{damage}")
+                            _gd = attack_result.get("guaranteed_damage", 0)
+                            _nd = attack_result.get("normal_damage", 0)
+                            _split = ""
+                            if any(isinstance(t, str) and "GUARANTEED_20%" in t for t in attack_result.get("effects", [])):
+                                _nd_text = "被闪避" if attack_result.get("normal_missed") else str(_nd)
+                                _split = f" [20%:{_gd} + 80%:{_nd_text}]"
+                            round_actions.append(f"{effect_text}{player1.nickname}→{damage}{_split}")
 
                         # 检查击杀并触发击杀效果
                         if player2_hp <= 0:
@@ -1151,9 +1184,21 @@ class BattleIntegrationHelper:
                         # 计算格挡伤害（基础攻击力 - 实际伤害）
                         blocked_damage = player2.attack - damage
                         if blocked_damage > 0:
-                            round_actions.append(f"{effect_text}{player2.nickname}→{damage}🛡️挡{blocked_damage}")
+                            _gd = attack_result.get("guaranteed_damage", 0)
+                            _nd = attack_result.get("normal_damage", 0)
+                            _split = ""
+                            if any(isinstance(t, str) and "GUARANTEED_20%" in t for t in attack_result.get("effects", [])):
+                                _nd_text = "被闪避" if attack_result.get("normal_missed") else str(_nd)
+                                _split = f" [20%:{_gd} + 80%:{_nd_text}]"
+                            round_actions.append(f"{effect_text}{player2.nickname}→{damage}🛡️挡{blocked_damage}{_split}")
                         else:
-                            round_actions.append(f"{effect_text}{player2.nickname}→{damage}")
+                            _gd = attack_result.get("guaranteed_damage", 0)
+                            _nd = attack_result.get("normal_damage", 0)
+                            _split = ""
+                            if any(isinstance(t, str) and "GUARANTEED_20%" in t for t in attack_result.get("effects", [])):
+                                _nd_text = "被闪避" if attack_result.get("normal_missed") else str(_nd)
+                                _split = f" [20%:{_gd} + 80%:{_nd_text}]"
+                            round_actions.append(f"{effect_text}{player2.nickname}→{damage}{_split}")
 
                         # 检查击杀并触发击杀效果
                         if player1_hp <= 0:

@@ -755,8 +755,8 @@ async def handle_npc_attack(session, attacker: Player, target_npc, event: Messag
     seed = f"NPC_{attacker.id}_{target_npc.npc_id}_{battle_timestamp}"
 
     try:
-        victory, battle_log, damage_taken = BattleIntegrationHelper.enhanced_player_vs_monster_battle(
-            attacker, npc_stats, target_npc.name, seed=seed, max_rounds=50
+        victory, battle_log, damage_taken = await BattleIntegrationHelper.enhanced_player_vs_monster_battle_v2(
+            attacker, npc_stats, target_npc.name, session, seed=seed, max_rounds=50
         )
 
         # 更新玩家血量

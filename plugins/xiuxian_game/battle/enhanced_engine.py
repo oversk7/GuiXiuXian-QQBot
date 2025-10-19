@@ -321,6 +321,11 @@ class EnhancedBattleEngine:
                 if not trigger.description:
                     trigger.description = f"{config.name}的特殊效果"
 
+            # 针对“斩龙闪”：其“生命→理智”的加成应为全局被动，面板可见，不在战斗内首回合生效
+            # 因此这里过滤掉其 MP_FROM_HP 的战斗触发器，避免与全局持久化重复
+            if item_id == "vip_blade_zhanlongshan":
+                triggers = [t for t in triggers if t.effect != EffectType.MP_FROM_HP]
+
             self.effect_manager.register_triggers(unit_id, triggers)
 
     def execute_turn(self, attacker: Player, defender: Any, is_player_turn: bool = True) -> Dict:
@@ -362,6 +367,19 @@ class EnhancedBattleEngine:
         turn_result["damage_dealt"] = attack_result.get("total_damage", 0)
         turn_result["hp_restored"] += attack_result.get("hp_restored", 0)  # 累加恢复的HP（包括regen和吸血）
         turn_result["effects_triggered"] = attack_result.get("effects_triggered", [])
+
+        # 兼容旧调用方：回填关键字段，便于上层紧凑日志使用
+        turn_result["hit"] = attack_result.get("hit", False)
+        # 注意：优先使用 total_damage（包含连击与护盾结算后），回退到 damage
+        turn_result["damage"] = attack_result.get("total_damage", attack_result.get("damage", 0))
+        turn_result["is_critical"] = attack_result.get("is_critical", False)
+        turn_result["is_penetration"] = attack_result.get("is_penetration", False)
+        turn_result["combo_count"] = attack_result.get("combo_count", 1)
+        turn_result["effects"] = attack_result.get("effects", [])
+        # 斩龙闪：20%必中与80%常规部分的拆分
+        turn_result["guaranteed_damage"] = attack_result.get("guaranteed_damage", 0)
+        turn_result["normal_damage"] = attack_result.get("normal_damage", 0)
+        turn_result["normal_missed"] = attack_result.get("normal_missed", False)
 
         # 处理反弹伤害（对攻击者造成伤害）
         reflect_damage = attack_result.get("reflect_damage", 0)
@@ -845,14 +863,23 @@ class EnhancedBattleEngine:
             attack_msg += " 💥暴击！"
 
         # 显示实际伤害（扣除护盾后）
+        # 斩龙闪：在文案中直观展示20%必中与80%常规的拆分
+        _gd = attack_result.get("guaranteed_damage", 0)
+        _nd = attack_result.get("normal_damage", 0)
+        _normal_missed = attack_result.get("normal_missed", False)
+        _split_suffix = ""
+        if has_guaranteed:
+            _nd_text = "被闪避" if _normal_missed else str(_nd)
+            _split_suffix = f" [20%:{_gd} + 80%:{_nd_text}]"
+
         if absorbed_by_shield > 0:
             # pre_bypass 部分直接穿透护盾，故展示总伤害需包含该部分
             total_shown = damage + absorbed_by_shield
             if 'pre_bypass' in locals() and pre_bypass > 0:
                 total_shown += 0  # damage 已经包含 pre_bypass，不重复相加
-            attack_msg += f" 造成{total_shown}伤害(护盾吸收{absorbed_by_shield})"
+            attack_msg += f" 造成{total_shown}伤害(护盾吸收{absorbed_by_shield})" + _split_suffix
         else:
-            attack_msg += f" 造成{damage}伤害"
+            attack_msg += f" 造成{damage}伤害" + _split_suffix
 
         result["messages"].append(attack_msg)
         result["total_damage"] = damage
@@ -1287,6 +1314,10 @@ class EnhancedBattleEngine:
         total = guaranteed_final + normal_final
         result["damage"] = total
         result["total_damage"] = total
+        # 暴露拆分信息，供上层日志与PVP/副本共用
+        result["guaranteed_damage"] = guaranteed_final
+        result["normal_damage"] = normal_final
+        result["normal_missed"] = (normal_base > 0 and not normal_hit)
         return result
 
     def _process_monster_attack(self, attacker: Player, monster_stats: Dict,
@@ -1382,6 +1413,10 @@ class EnhancedBattleEngine:
         total = guaranteed_final + normal_final
         result["damage"] = total
         result["total_damage"] = total
+        # 暴露拆分信息，供上层日志与PVP/副本共用
+        result["guaranteed_damage"] = guaranteed_final
+        result["normal_damage"] = normal_final
+        result["normal_missed"] = (normal_base > 0 and not normal_hit)
         return result
 
     def check_counter_attack(self, defender: Player, attacker: Player) -> Optional[Dict]:
