@@ -82,59 +82,6 @@ async def _recalculate_equipment_attributes(session, player: Player):
         eq.extra_attrs = extra
         session.add(eq)
 
-    # 3.5 处理“生命→理智”的全局被动（如：斩龙闪）——应在面板上全局生效
-    # 将 YAML 中的 mp_from_hp 从战斗内首回合，转为此处的全局持久化属性加成
-    # 口径：先应用其它装备的HP加成，再据此计算能转换的MP（排除自身对HP的加成，避免自我放大）
-    mp_from_hp_effects = []  # (equip, pct, flat, is_percentage)
-    total_pct = 0.0
-    total_flat = 0
-    for eq2 in equipped_items:
-        cfg2 = eq2.config if hasattr(eq2, 'config') else None
-        if not cfg2 or not getattr(cfg2, 'special_effects', None):
-            continue
-        for eff in cfg2.special_effects:
-            if eff.get('effect') == 'mp_from_hp':
-                is_pct = bool(eff.get('is_percentage', True))
-                if is_pct:
-                    val_pct = float(eff.get('value', 0) or 0)
-                    if val_pct > 0:
-                        total_pct += val_pct
-                        mp_from_hp_effects.append((eq2, val_pct, 0, True))
-                else:
-                    val_flat = int(eff.get('value', 0) or 0)
-                    if val_flat > 0:
-                        total_flat += val_flat
-                        mp_from_hp_effects.append((eq2, 0.0, val_flat, False))
-    if mp_from_hp_effects:
-        current_hp_after_all = int(getattr(player, 'max_hp', 0) or 0)
-        hp_from_self_equips = 0
-        for (eq2, _, _, _) in mp_from_hp_effects:
-            delta2 = (eq2.extra_attrs or {}).get("_persist_bonus", {})
-            hp_from_self_equips += int(delta2.get("max_hp", 0) or 0)
-        base_for_convert = max(1, current_hp_after_all - hp_from_self_equips)
-        bonus_from_pct = int(base_for_convert * total_pct / 100.0) if total_pct > 0 else 0
-        total_bonus_mp = bonus_from_pct + int(total_flat)
-        if total_bonus_mp > 0:
-            remaining = total_bonus_mp
-            for idx, (eq2, pct, flat, is_pct) in enumerate(mp_from_hp_effects):
-                part = 0
-                if is_pct and pct > 0:
-                    part = int(base_for_convert * pct / 100.0)
-                elif (not is_pct) and flat > 0:
-                    part = int(flat)
-                if idx == len(mp_from_hp_effects) - 1:
-                    part = remaining
-                remaining -= part
-                if part <= 0:
-                    continue
-                player.max_mp = int(getattr(player, 'max_mp', 0)) + part
-                extra2 = eq2.extra_attrs or {}
-                persist = dict(extra2.get("_persist_bonus", {}))
-                persist["max_mp"] = int(persist.get("max_mp", 0)) + part
-                extra2["_persist_bonus"] = persist
-                eq2.extra_attrs = extra2
-                session.add(eq2)
-
     # 确保当前HP/MP不超过新的上限
     if player.hp > player.max_hp:
         player.hp = player.max_hp
@@ -275,7 +222,7 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
 
         # 构建结果消息
         result_lines = [message]
-
+        
         if result_info:
             # 显示消耗信息
             consumed_equipment = result_info.get("consumed_equipment", [])
