@@ -20,26 +20,19 @@ engine = create_async_engine(
         "check_same_thread": False,  # 允许多线程访问
     },
 )
-# --- SQL 执行耗时埋点（SQLite/MySQL 通用） ---
+# --- SQLite WAL 配置，仅在SQLite下生效（MySQL下不会触发） ---
 from sqlalchemy import event
-import time, logging
+import sqlite3
 
-try:
-    @event.listens_for(engine.sync_engine, "before_cursor_execute")
-    def _before_exec(conn, cursor, stmt, params, ctx, execmany):
-        ctx._q_t0 = time.perf_counter()
-
-    @event.listens_for(engine.sync_engine, "after_cursor_execute")
-    def _after_exec(conn, cursor, stmt, params, ctx, execmany):
-        t0 = getattr(ctx, "_q_t0", None)
-        if t0 is not None:
-            ms = (time.perf_counter() - t0) * 1000
-            # 只记录>50ms的SQL，避免日志过多
-            if ms > 50:
-                logging.getLogger("sql").info(f"{ms:.1f}ms | {str(stmt)[:200]}")
-except (AttributeError, RuntimeError):
-    # 在极少数初始化阶段 engine 未就绪时跳过埋点，不影响主流程
-    pass
+@event.listens_for(engine.sync_engine, "connect")
+def _sqlite_enable_wal(dbapi_connection, connection_record):
+    # 仅对 sqlite3 连接应用 PRAGMA，避免在其他数据库上执行
+    if not isinstance(dbapi_connection, sqlite3.Connection):
+        return
+    cursor = dbapi_connection.cursor()
+    cursor.execute("PRAGMA journal_mode=WAL")
+    cursor.execute("PRAGMA synchronous=NORMAL")
+    cursor.close()
 
 
 # 创建异步会话工厂
