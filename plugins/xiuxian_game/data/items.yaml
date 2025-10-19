@@ -1182,7 +1182,7 @@ items:
       description: "弑神伐恶，斩魂戮邪，封魔于刃，斩尽不死不灭！\n🌟灭法之影套装之一"
       type: "EQUIPMENT"
       rarity: "red"
-      durability: 300
+      durability: 380
       required_level: 10
       attr_bonus: {"attack": 100, "hp": 100, "agility": 100}
       attr_ratio: {"attack": 1.0, "hp": 1.0, "agility": 1.0}
@@ -1192,7 +1192,7 @@ items:
           effect: "mp_from_hp"
           is_percentage: true
           value: 100
-          description: "[1] 灵影体质·lv.EX：开始战斗后，以自身最大生命值的100%转化为最大理智值提升（当前理智按同等比例提升，仅展示用途）。"
+          description: "[1] 灵影体质·lv.EX：理智和生命形成良好循环，开始战斗后，以自身最大生命值的100%转化为最大理智值提升。"
         - trigger: "passive"
           effect: "ignore_special"
           is_percentage: true
@@ -1207,12 +1207,12 @@ items:
           effect: "ignore_defense"
           is_percentage: true
           value: 20
-          description: "[4] 至尊锋刃：自身造成的伤害中，20%伤害必中（跳过命中判定），其余80%的伤害才参与命中/暴击/穿透/减免等判定。"
+          description: "[4] 至尊锋刃：自身造成的伤害中，20%伤害必中，其余80%的伤害才参与命中/暴击/穿透/减免等判定。"
         - trigger: "on_hit"
           effect: "execute"
           is_percentage: true
           value: 30
-          description: "[5] 魔刃·弑滅：当敌人生命低于30%时，直接斩杀（生命归零，立判死亡）。"
+          description: "[5] 魔刃·弑滅：当敌人生命低于30%时，无视任何效果直接斩杀。"
         - trigger: "on_kill"
           effect: "gain_random_attr"
           is_percentage: false
