@@ -33,6 +33,7 @@ class EnhancedBattleEngine:
         self.battle_log: List[str] = []
         # 记录首回合临时加成（需战后回退）
         self._temp_hp_from_mp: Dict[str, int] = {}
+        self._temp_mp_from_hp: Dict[str, int] = {}
         # 缓存装备实例，用于检查每日触发限制
         self._equipped_items_cache: Dict[str, List] = {}
 
@@ -126,6 +127,28 @@ class EnhancedBattleEngine:
         except AttributeError:
             pass
 
+        # 首回合：灵影体质（反向）- 按最大生命值增加最大理智值，同时可按同百分比提升当前理智
+        try:
+            player_max_hp = getattr(player, 'max_hp', 0)
+            mp_from_hp_effects = self.effect_manager.get_active_effects(player.id, EffectType.MP_FROM_HP)
+            total_pct_mp = 0
+            for eff in mp_from_hp_effects:
+                if eff.is_percentage:
+                    total_pct_mp += eff.value
+            if total_pct_mp > 0 and hasattr(player, 'max_mp'):
+                base_mp = getattr(player, 'mp', 0)
+                mp_bonus_total = int(player_max_hp * total_pct_mp / 100)
+                player.max_mp = getattr(player, 'max_mp', 0) + mp_bonus_total
+                # 当前理智按百分比提升（仅展示用途）
+                if hasattr(player, 'mp'):
+                    mp_inc_cur = int(base_mp * total_pct_mp / 100)
+                    player.mp = min(player.max_mp, base_mp + mp_inc_cur)
+                # 记录临时加成，战斗结束回退
+                self._temp_mp_from_hp[player.id] = self._temp_mp_from_hp.get(player.id, 0) + mp_bonus_total
+                self.battle_log.append(f"✨ 灵影体质·反：最大理智+{mp_bonus_total}（生命值的{total_pct_mp:.0f}%）")
+        except AttributeError:
+            pass
+
         # 触发敌方首回合效果（对称处理）
         enemy_hp = enemy.hp if hasattr(enemy, 'hp') else enemy.get("hp", 100)
         enemy_max_hp = enemy.max_hp if hasattr(enemy, 'max_hp') else enemy.get("max_hp", 100)
@@ -149,6 +172,85 @@ class EnhancedBattleEngine:
                 eff.effect_type = EffectType.SHIELD
         except AttributeError:
             pass
+        #
+        #
+        #
+        # 	
+        #
+        #
+        #
+        #
+        #
+        #
+        #
+        #
+        #
+        #
+        #
+        #
+        #
+        #
+        #
+        #
+        #
+        #
+        #
+        #
+        #
+        #
+        #
+        #
+        #
+        #
+        #
+        #
+        #
+        #
+        #
+        #
+        #
+        #
+        #
+        #
+        #
+        #
+        #
+        #
+        #
+        #
+        #
+        #
+        #
+        #
+        #
+        #
+        #
+        #
+        #
+        #
+        #
+        #
+        # 敌方同理处理灵影体质（反向）：最大理智按生命值百分比提升
+        try:
+            enemy_max_hp2 = getattr(enemy, 'max_hp', 0) if hasattr(enemy, 'max_hp') else 0
+            mp_from_hp_enemy = self.effect_manager.get_active_effects(enemy_id, EffectType.MP_FROM_HP)
+            total_pct_emp = 0
+            for eff in mp_from_hp_enemy:
+                if eff.is_percentage:
+                    total_pct_emp += eff.value
+            if total_pct_emp > 0 and hasattr(enemy, 'max_mp'):
+                base_emp = getattr(enemy, 'mp', 0) if hasattr(enemy, 'mp') else 0
+                mp_bonus_total_e2 = int(enemy_max_hp2 * total_pct_emp / 100)
+                enemy.max_mp = getattr(enemy, 'max_mp', 0) + mp_bonus_total_e2
+                if hasattr(enemy, 'mp'):
+                    mp_inc_cur_e = int(base_emp * total_pct_emp / 100)
+                    enemy.mp = min(enemy.max_mp, base_emp + mp_inc_cur_e)
+                if hasattr(enemy, 'id'):
+                    self._temp_mp_from_hp[enemy.id] = self._temp_mp_from_hp.get(enemy.id, 0) + mp_bonus_total_e2
+                self.battle_log.append(f"✨ {enemy.nickname if hasattr(enemy, 'nickname') else '敌人'}的灵影体质·反：最大理智+{mp_bonus_total_e2}")
+        except AttributeError:
+            pass
+
 
         # 敌方同理处理灵影体质：上限按理智百分比提升，当前生命值也按相同百分比提升
         try:
@@ -433,6 +535,18 @@ class EnhancedBattleEngine:
                     'value': int(effect.value)
                 })
 
+            elif effect.effect_type == EffectType.GAIN_HP:
+                # 噬灵者（变更）：永久获得最大生命值（需要在战斗结束后持久化）
+                result["messages"].append(f"💓 噬灵者：剥离血肉，最大生命值+{int(effect.value)}（战后结算）")
+                result["effects_triggered"].append("gain_max_hp")
+                if not hasattr(result, 'post_battle_effects'):
+                    result['post_battle_effects'] = []
+                result['post_battle_effects'].append({
+                    'type': 'gain_max_hp',
+                    'value': int(effect.value)
+                })
+
+
             elif effect.effect_type == EffectType.GAIN_RANDOM_ATTR:
                 # 刃之魔灵：掠夺随机属性（需要在战斗结束后持久化）
                 # 检查今天是否已经触发过
@@ -547,15 +661,17 @@ class EnhancedBattleEngine:
             attack_result = self._process_pvp_attack(
                 attacker, defender, base_attack, is_skill,
                 attacker_attrs, defender_attrs, has_true_damage,
-                ignore_defense_ratio=ignore_defense_ratio,
+                ignore_defense_ratio=0.0,
                 ignore_special_ratio=ignore_special_ratio,
+                guaranteed_fraction=ignore_defense_ratio,
             )
         else:
             # 对怪物（真伤在判定内处理）
             attack_result = self._process_monster_attack(
                 attacker, defender, base_attack, is_skill, has_true_damage,
-                ignore_defense_ratio=ignore_defense_ratio,
+                ignore_defense_ratio=0.0,
                 ignore_special_ratio=ignore_special_ratio,
+                guaranteed_fraction=ignore_defense_ratio,
             )
 
         # 格式化基础攻击消息
@@ -594,6 +710,12 @@ class EnhancedBattleEngine:
         # 记录关键标志
         result["is_critical"] = is_critical
         result["is_penetration"] = attack_result.get("is_penetration", False)
+        # 标记是否包含必中20%
+        has_guaranteed = False
+        for eff_tag in attack_result.get("effects", []):
+            if isinstance(eff_tag, str) and "GUARANTEED_20%" in eff_tag:
+                has_guaranteed = True
+                break
 
         # 检查并应用虎标弹等计数型伤害加成效果
         tiger_bullet_effects = self.effect_manager.get_active_effects(attacker_id, EffectType.TIGER_BULLET)
@@ -717,6 +839,8 @@ class EnhancedBattleEngine:
 
         if has_true_damage:
             attack_msg += " 🔥真伤！"
+        if has_guaranteed:
+            attack_msg += " 🎯必中20%"
         if is_critical:
             attack_msg += " 💥暴击！"
 
@@ -966,11 +1090,19 @@ class EnhancedBattleEngine:
         # 命中
         damage = attack_result["damage"]
         is_critical = attack_result.get("is_critical", False)
+        # 检查是否包含必中20%
+        has_guaranteed = False
+        for eff_tag in attack_result.get("effects", []):
+            if isinstance(eff_tag, str) and "GUARANTEED_20%" in eff_tag:
+                has_guaranteed = True
+                break
 
         # 构建攻击消息
         attack_msg = f"  🔄 连击第{combo_number}次"
         if has_true_damage:
             attack_msg += " 🔥真伤！"
+        if has_guaranteed:
+            attack_msg += " 🎯必中20%"
         if is_critical:
             attack_msg += " 💥暴击！"
         attack_msg += f" 造成{damage}伤害"
@@ -1059,23 +1191,17 @@ class EnhancedBattleEngine:
                            is_skill: bool, attacker_attrs: Dict, defender_attrs: Dict,
                            has_true_damage: bool = False,
                            ignore_defense_ratio: float = 0.0,
-                           ignore_special_ratio: float = 0.0) -> Dict:
+                           ignore_special_ratio: float = 0.0,
+                           guaranteed_fraction: float = 0.0) -> Dict:
         """处理PVP攻击（使用已应用buff的属性）
 
-        Args:
-            attacker: 攻击者
-            defender: 防御者
-            base_damage: 基础伤害
-            is_skill: 是否为技能攻击
-            attacker_attrs: 攻击者的有效属性（已应用buff）
-            defender_attrs: 防御者的有效属性（已应用buff）
-            has_true_damage: 是否有真伤状态（只无视防御，不跳过命中判定）
-
-        Returns:
-            攻击结果字典
+        规则调整：
+        - guaranteed_fraction 部分的伤害“必中”（绕过命中判定），但不参与暴击/连击/额外穿透计算；
+          是否参与防御减伤按常规处理（真伤则无视防御）。
+        - 其余 (1 - guaranteed_fraction) 部分按原有流程进行完整判定。
         """
         result = {
-            "hit": False,
+            "hit": False,            # 是否有任何伤害命中
             "damage": 0,
             "is_critical": False,
             "is_penetration": False,
@@ -1083,106 +1209,96 @@ class EnhancedBattleEngine:
             "effects": []
         }
 
-        # 1. 命中判定（真伤也需要命中判定）
-        # 斩龙闪：无视部分“闪避/特殊效果”，对方闪避率按忽视比例降低
+        gf = max(0.0, min(1.0, float(guaranteed_fraction)))
+        guaranteed_base = int(base_damage * gf)
+        normal_base = max(0, base_damage - guaranteed_base)
+
+        # 1) 命中判定（仅对 normal 部分生效）
         adjusted_dodge = defender_attrs.get("dodge_rate", 0)
         adjusted_dodge = adjusted_dodge * (1 - max(0.0, min(1.0, ignore_defense_ratio)))
         adjusted_dodge = adjusted_dodge * (1 - max(0.0, min(1.0, ignore_special_ratio)))
         hit_chance = BattleAttributeCalculator.calculate_hit_chance(
-            attacker_attrs.get("accuracy_rate", 0),
-            adjusted_dodge
+            attacker_attrs.get("accuracy_rate", 0), adjusted_dodge
         )
+        normal_hit = True
+        if normal_base > 0 and self.rng.random() > hit_chance:
+            normal_hit = False
+            result["effects"].append("被闪避(80%)")
 
-        if self.rng.random() > hit_chance:
-            result["effects"].append("被闪避")
-            return result
+        # 如果 guaranteed 部分存在，则整体视为命中
+        if guaranteed_base > 0 or normal_hit:
+            result["hit"] = True
 
-        result["hit"] = True
-
-        # 2. 穿透判定（真伤时跳过，因为真伤直接无视防御）
-        penetration_ratio = 0
-        if not has_true_damage:
+        # 2) 穿透判定（仅对 normal 部分，真伤跳过）
+        penetration_ratio = 0.0
+        if normal_hit and normal_base > 0 and not has_true_damage:
             penetration_ratio = BattleAttributeCalculator.get_penetration_ratio(
                 attacker_attrs.get("penetration_rate", 0)
             )
-            # 叠加“至尊锋刃”提供的额外无视比例
-            penetration_ratio = min(1.0, penetration_ratio + max(0.0, ignore_defense_ratio))
             if penetration_ratio > 0:
                 result["is_penetration"] = True
                 result["penetration_ratio"] = penetration_ratio
 
-        # 3. 暴击判定（考虑防御方抗暴率）
-        crit_rate = attacker_attrs["skill_crit_rate"] if is_skill else attacker_attrs["critical_rate"]
-        defender_anti_crit_rate = defender_attrs["anti_crit_rate"]
+        # 3) 暴击判定（仅对 normal 部分）
+        is_critical = False
+        if normal_hit and normal_base > 0:
+            crit_rate = attacker_attrs["skill_crit_rate"] if is_skill else attacker_attrs["critical_rate"]
+            defender_anti_crit_rate = defender_attrs["anti_crit_rate"]
+            effective_crit_rate = max(0, crit_rate - defender_anti_crit_rate)
+            is_critical = BattleAttributeCalculator.roll_critical_hit(effective_crit_rate, self.rng)
+            result["is_critical"] = is_critical
 
-        # 计算实际暴击率（攻击方暴击率 - 防御方抗暴率）
-        effective_crit_rate = max(0, crit_rate - defender_anti_crit_rate)
-        is_critical = BattleAttributeCalculator.roll_critical_hit(effective_crit_rate, self.rng)
-        result["is_critical"] = is_critical
+        # 4) 计算防御修正
+        defender_id = defender.id if hasattr(defender, 'id') else "enemy"
+        defense_modifier = self.effect_manager.calculate_attribute_modifier(defender_id, "defense")
+        effective_defense = int(defender.defense * (1 + defense_modifier / 100))
 
-        # 4. 连击判定（仅普攻）
-        if not is_skill:
-            combo_count = BattleAttributeCalculator.roll_combo_attack(
-                attacker_attrs["combo_rate"], self.rng
-            )
-            result["combo_count"] = combo_count
+        from ..utils import apply_defense_mitigation
 
-        # 5. 伤害计算
-        final_damage = base_damage
-
-        # 应用暴击
-        if is_critical:
-            final_damage = BattleAttributeCalculator.calculate_critical_damage(
-                final_damage, attacker_attrs["critical_power"]
-            )
-            result["effects"].append("CRITICAL")
-
-        # 应用防御减伤（真伤时完全无视防御）
-        if has_true_damage:
-            # 真伤：不应用防御减伤
-            result["effects"].append("TRUE_DAMAGE")
-        else:
-            # 获取防御者的防御力修正
-            defender_id = defender.id if hasattr(defender, 'id') else "enemy"
-            defense_modifier = self.effect_manager.calculate_attribute_modifier(defender_id, "defense")
-            effective_defense = int(defender.defense * (1 + defense_modifier / 100))
-
-            if penetration_ratio > 0:
-                from ..utils import apply_defense_mitigation
-                mitigation = apply_defense_mitigation(
-                    final_damage, effective_defense, penetration_ratio
-                )
-                final_damage = mitigation["final_damage"]
-                result["effects"].append("PENETRATION")
+        # 5) 先计算 guaranteed 部分：不暴击、不穿透；真伤则不减伤
+        guaranteed_final = guaranteed_base
+        if guaranteed_final > 0:
+            if has_true_damage:
+                result["effects"].append("TRUE_DAMAGE(20%)")
             else:
-                from ..utils import apply_defense_mitigation
-                mitigation = apply_defense_mitigation(final_damage, effective_defense)
-                final_damage = mitigation["final_damage"]
+                mitigation = apply_defense_mitigation(guaranteed_final, effective_defense)
+                guaranteed_final = mitigation["final_damage"]
+            result["effects"].append("GUARANTEED_20%")
 
-        result["damage"] = final_damage
-        result["total_damage"] = final_damage  # 添加 total_damage 字段以保持兼容性
+        # 6) 再计算 normal 部分
+        normal_final = 0
+        if normal_hit and normal_base > 0:
+            dmg = normal_base
+            if is_critical:
+                dmg = BattleAttributeCalculator.calculate_critical_damage(dmg, attacker_attrs["critical_power"])
+                result["effects"].append("CRITICAL")
+            if has_true_damage:
+                result["effects"].append("TRUE_DAMAGE")
+            else:
+                if penetration_ratio > 0:
+                    mit = apply_defense_mitigation(dmg, effective_defense, penetration_ratio)
+                    dmg = mit["final_damage"]
+                    result["effects"].append("PENETRATION")
+                else:
+                    mit = apply_defense_mitigation(dmg, effective_defense)
+                    dmg = mit["final_damage"]
+            normal_final = dmg
+
+        total = guaranteed_final + normal_final
+        result["damage"] = total
+        result["total_damage"] = total
         return result
 
     def _process_monster_attack(self, attacker: Player, monster_stats: Dict,
                                base_damage: int, is_skill: bool, has_true_damage: bool = False,
                                ignore_defense_ratio: float = 0.0,
-                               ignore_special_ratio: float = 0.0) -> Dict:
-        """处理对怪物的攻击（简化版）
-
-        Args:
-            attacker: 攻击者玩家
-            monster_stats: 怪物属性字典
-            base_damage: 基础伤害
-            is_skill: 是否为技能攻击
-            has_true_damage: 是否有真伤状态（只无视防御，不跳过命中判定）
-
-        Returns:
-            攻击结果字典
+                               ignore_special_ratio: float = 0.0,
+                               guaranteed_fraction: float = 0.0) -> Dict:
         """
-        # 获取基础属性
+        简化的对怪攻击判定，支持固定比例伤害必中（不参与命中/暴击/穿透），其余部分走常规判定。
+        """
+        # 基础与buff
         base_attrs = BattleAttributeCalculator.calculate_effective_attributes(attacker)
-
-        # 应用战斗buff
         attacker_id = attacker.id
         attacker_attrs = self._get_effective_battle_attributes(attacker_id, base_attrs)
 
@@ -1195,80 +1311,77 @@ class EnhancedBattleEngine:
             "effects": []
         }
 
-        # 命中判定（怪物闪避率固定为0，敏捷只影响先后手）（真伤也需要命中判定）
-        monster_dodge_rate = 0.0  # 怪物闪避率固定为0
+        gf = max(0.0, min(1.0, float(guaranteed_fraction)))
+        guaranteed_base = int(base_damage * gf)
+        normal_base = max(0, base_damage - guaranteed_base)
 
+        # 命中（仅影响 normal 部分）
+        monster_dodge_rate = 0.0
         hit_chance = BattleAttributeCalculator.calculate_hit_chance(
             attacker_attrs["accuracy_rate"], monster_dodge_rate
         )
+        normal_hit = True
+        if normal_base > 0 and self.rng.random() > hit_chance:
+            normal_hit = False
+            result["effects"].append("被闪避(80%)")
 
-        if self.rng.random() > hit_chance:
-            result["effects"].append("被闪避")
-            return result
+        if guaranteed_base > 0 or normal_hit:
+            result["hit"] = True
 
-        result["hit"] = True
-
-        # 穿透比例计算（真伤时跳过，因为真伤直接无视防御）
-        penetration_ratio = 0
-        if not has_true_damage:
+        # 穿透（仅 normal 部分；真伤跳过）
+        penetration_ratio = 0.0
+        if normal_hit and normal_base > 0 and not has_true_damage:
             penetration_ratio = BattleAttributeCalculator.get_penetration_ratio(
                 attacker_attrs.get("penetration_rate", 0)
             )
-            # 叠加“至尊锋刃”提供的额外无视比例
-            penetration_ratio = min(1.0, penetration_ratio + max(0.0, ignore_defense_ratio))
             if penetration_ratio > 0:
                 result["is_penetration"] = True
                 result["penetration_ratio"] = penetration_ratio
 
-        # 暴击判定（考虑怪物抗暴率）
-        crit_rate = attacker_attrs["skill_crit_rate"] if is_skill else attacker_attrs["critical_rate"]
-        monster_anti_crit_rate = monster_stats.get("anti_crit_rate", 0)
+        # 暴击（仅 normal 部分）
+        is_critical = False
+        if normal_hit and normal_base > 0:
+            crit_rate = attacker_attrs["skill_crit_rate"] if is_skill else attacker_attrs["critical_rate"]
+            monster_anti_crit_rate = monster_stats.get("anti_crit_rate", 0)
+            effective_crit_rate = max(0, crit_rate - monster_anti_crit_rate)
+            is_critical = BattleAttributeCalculator.roll_critical_hit(effective_crit_rate, self.rng)
+            result["is_critical"] = is_critical
 
-        # 计算实际暴击率（玩家暴击率 - 怪物抗暴率）
-        effective_crit_rate = max(0, crit_rate - monster_anti_crit_rate)
-        is_critical = BattleAttributeCalculator.roll_critical_hit(effective_crit_rate, self.rng)
-        result["is_critical"] = is_critical
+        from ..utils import apply_defense_mitigation
+        monster_defense = monster_stats.get("defense", 0)
 
-        # 连击判定（仅普攻）
-        if not is_skill:
-            combo_count = BattleAttributeCalculator.roll_combo_attack(
-                attacker_attrs["combo_rate"], self.rng
-            )
-            result["combo_count"] = combo_count
-
-        # 伤害计算
-        final_damage = base_damage
-
-        # 应用暴击
-        if is_critical:
-            final_damage = BattleAttributeCalculator.calculate_critical_damage(
-                final_damage, attacker_attrs["critical_power"]
-            )
-            result["effects"].append("CRITICAL")
-
-        # 应用防御减伤（真伤时完全无视防御）
-        if has_true_damage:
-            # 真伤：不应用防御减伤
-            result["effects"].append("TRUE_DAMAGE")
-        else:
-            # 应用穿透和防御
-            monster_defense = monster_stats.get("defense", 0)
-            if penetration_ratio > 0:
-                from ..utils import apply_defense_mitigation
-
-                mitigation = apply_defense_mitigation(
-                    final_damage, monster_defense, penetration_ratio
-                )
-                final_damage = mitigation["final_damage"]
-                result["effects"].append("PENETRATION")
+        # guaranteed 部分：不暴击、不穿透；真伤则不减伤
+        guaranteed_final = guaranteed_base
+        if guaranteed_final > 0:
+            if has_true_damage:
+                result["effects"].append("TRUE_DAMAGE(20%)")
             else:
-                from ..utils import apply_defense_mitigation
+                mit = apply_defense_mitigation(guaranteed_final, monster_defense)
+                guaranteed_final = mit["final_damage"]
+            result["effects"].append("GUARANTEED_20%")
 
-                mitigation = apply_defense_mitigation(final_damage, monster_defense)
-                final_damage = mitigation["final_damage"]
+        # normal 部分
+        normal_final = 0
+        if normal_hit and normal_base > 0:
+            dmg = normal_base
+            if is_critical:
+                dmg = BattleAttributeCalculator.calculate_critical_damage(dmg, attacker_attrs["critical_power"])
+                result["effects"].append("CRITICAL")
+            if has_true_damage:
+                result["effects"].append("TRUE_DAMAGE")
+            else:
+                if penetration_ratio > 0:
+                    mit = apply_defense_mitigation(dmg, monster_defense, penetration_ratio)
+                    dmg = mit["final_damage"]
+                    result["effects"].append("PENETRATION")
+                else:
+                    mit = apply_defense_mitigation(dmg, monster_defense)
+                    dmg = mit["final_damage"]
+            normal_final = dmg
 
-        result["damage"] = final_damage
-        result["total_damage"] = final_damage  # 添加 total_damage 字段以保持兼容性
+        total = guaranteed_final + normal_final
+        result["damage"] = total
+        result["total_damage"] = total
         return result
 
     def check_counter_attack(self, defender: Player, attacker: Player) -> Optional[Dict]:
@@ -1319,11 +1432,11 @@ class EnhancedBattleEngine:
             unit_id = None
         if not unit_id:
             return
-        bonus = self._temp_hp_from_mp.pop(unit_id, 0)
-        if bonus > 0 and hasattr(unit, 'max_hp'):
+        # 回退首回合由理智转生命（HP_FROM_MP）
+        bonus_hp = self._temp_hp_from_mp.pop(unit_id, 0)
+        if bonus_hp > 0 and hasattr(unit, 'max_hp'):
             old_max = unit.max_hp
-            new_max = max(1, old_max - bonus)
-            # 维持战斗结束时的血量比例：按比例回退当前生命值
+            new_max = max(1, old_max - bonus_hp)
             if hasattr(unit, 'hp') and old_max > 0:
                 ratio = unit.hp / float(old_max)
             else:
@@ -1331,6 +1444,18 @@ class EnhancedBattleEngine:
             unit.max_hp = new_max
             if hasattr(unit, 'hp'):
                 unit.hp = int(max(0, min(new_max, ratio * new_max)))
+        # 回退首回合由生命转理智（MP_FROM_HP）
+        bonus_mp = self._temp_mp_from_hp.pop(unit_id, 0) if hasattr(self, '_temp_mp_from_hp') else 0
+        if bonus_mp > 0 and hasattr(unit, 'max_mp'):
+            old_max_mp = unit.max_mp
+            new_max_mp = max(1, old_max_mp - bonus_mp)
+            if hasattr(unit, 'mp') and old_max_mp > 0:
+                ratio_mp = unit.mp / float(old_max_mp)
+            else:
+                ratio_mp = 0.0
+            unit.max_mp = new_max_mp
+            if hasattr(unit, 'mp'):
+                unit.mp = int(max(0, min(new_max_mp, ratio_mp * new_max_mp)))
 
     def get_battle_log(self) -> List[str]:
         """获取战斗日志"""

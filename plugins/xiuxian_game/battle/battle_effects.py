@@ -56,6 +56,7 @@ class EffectType(str, Enum):
     SHIELD = "shield"               # 护盾
     SHIELD_FROM_MP = "shield_from_mp"   # 灵影护盾：按最大理智转化护盾（首回合）
     HP_FROM_MP = "hp_from_mp"       # 灵影体质：按最大理智增加最大生命值（首回合）
+    MP_FROM_HP = "mp_from_hp"       # 灵影体质（反向）：按最大生命值增加最大理智（首回合）
     REFLECT = "reflect"             # 反弹伤害
     REFLECT_DEATH = "reflect_death" # 反射死亡：攻击者直接死亡（镜怨之衣）
     INVINCIBLE = "invincible"       # 无敌
@@ -68,7 +69,8 @@ class EffectType(str, Enum):
     # VIP定制装备效果（斩龙闪、镜怨之衣）
     IGNORE_SPECIAL = "ignore_special"       # 绝魔体质：无视特殊效果
     GAIN_MP = "gain_mp"                     # 噬灵者：永久获得理智值
-    IGNORE_DEFENSE = "ignore_defense"       # 至尊锋刃：无视防御
+    GAIN_HP = "gain_hp"                     # 噬灵者（变更）：永久获得最大生命值
+    IGNORE_DEFENSE = "ignore_defense"       # 至尊锋刃：无视防御（已调整为“必中伤害占比”语义）
     GAIN_RANDOM_ATTR = "gain_random_attr"   # 刃之魔灵：获得随机属性
     GAIN_ATTACK = "gain_attack"             # 自噬：永久获得攻击力
 

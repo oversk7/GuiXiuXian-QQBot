@@ -1184,35 +1184,35 @@ items:
       rarity: "red"
       durability: 300
       required_level: 10
-      attr_bonus: {"attack": 100, "mp": 100, "agility": 100}
-      attr_ratio: {"attack": 1.0, "mp": 1.0, "agility": 1.0}
+      attr_bonus: {"attack": 100, "hp": 100, "agility": 100}
+      attr_ratio: {"attack": 1.0, "hp": 1.0, "agility": 1.0}
       gem_slots: 5
       special_effects:
         - trigger: "first_turn"
-          effect: "hp_from_mp"
+          effect: "mp_from_hp"
           is_percentage: true
           value: 100
-          description: "[1] 灵影体质·lv.EX：理智值与生命值形成良好循环，开始战斗后最大生命值得到大幅度增强，提升数值为总理智值的100%。"
+          description: "[1] 灵影体质·lv.EX：开始战斗后，以自身最大生命值的100%转化为最大理智值提升（当前理智按同等比例提升，仅展示用途）。"
         - trigger: "passive"
           effect: "ignore_special"
           is_percentage: true
           value: 50
           description: "[2] 绝魔体质：自身无视敌人任何形式的特殊效果、特殊属性50%影响。"
         - trigger: "on_kill"
-          effect: "gain_mp"
+          effect: "gain_hp"
           is_percentage: false
           value: 2
-          description: "[3] 噬灵者：击杀敌人后剥离“灵”可永久夺取理智值2点。（每日最多永久提升40点）"
+          description: "[3] 噬灵者：击杀敌人后剥离‘血肉’，永久提升最大生命值2点（战后结算；每日最多永久提升40点）。"
         - trigger: "on_attack"
           effect: "ignore_defense"
           is_percentage: true
           value: 20
-          description: "[4] 至尊锋刃：以此武器攻击无视20%伤害豁免、减免、闪避、护盾、防御、无敌等效果"
+          description: "[4] 至尊锋刃：自身造成的伤害中，20%伤害必中（跳过命中判定），其余80%的伤害才参与命中/暴击/穿透/减免等判定。"
         - trigger: "on_hit"
           effect: "execute"
           is_percentage: true
           value: 30
-          description: "[5] 魔刃·弑滅：在敌人「生命值总量」低于30%时，无视任何效果将斩杀灵魂。"
+          description: "[5] 魔刃·弑滅：当敌人生命低于30%时，直接斩杀（生命归零，立判死亡）。"
         - trigger: "on_kill"
           effect: "gain_random_attr"
           is_percentage: false

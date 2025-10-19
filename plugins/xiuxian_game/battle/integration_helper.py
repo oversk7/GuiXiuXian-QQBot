@@ -189,7 +189,7 @@ class BattleIntegrationHelper:
                     # 命中后检查处决（忽略无敌等，直接强制死亡）
                     exec_thr = _get_execute_threshold(first_player.id)
                     if exec_thr > 0 and second_hp_ref[0] > 0:
-                        if second_hp_ref[0] <= int(second_player.max_hp * exec_thr / 100):
+                        if second_hp_ref[0] < int(second_player.max_hp * exec_thr / 100):
                             battle_log.append(f"⚰️ {first_player.nickname}发动处决，{second_player.nickname}被弑灭！")
                             second_hp_ref[0] = 0
 
@@ -253,7 +253,7 @@ class BattleIntegrationHelper:
                         battle_log.append(f"💚 {first_player.nickname}回复{heal_def}HP")
 
                     if exec_thr > 0 and first_hp_ref[0] > 0:
-                        if first_hp_ref[0] <= int(first_player.max_hp * exec_thr / 100):
+                        if first_hp_ref[0] < int(first_player.max_hp * exec_thr / 100):
                             battle_log.append(f"⚰️ {second_player.nickname}发动处决，{first_player.nickname}被弑灭！")
                             first_hp_ref[0] = 0
 
@@ -398,6 +398,19 @@ class BattleIntegrationHelper:
         # 创建增强战斗引擎
         engine = EnhancedBattleEngine(seed)
         battle_log = []
+        post_effects: list = []
+
+        # 处决阈值查询（从已注册的触发配置中读取）
+        from .battle_effects import EffectType
+        def _get_execute_threshold(unit_id: str) -> int:
+            cfgs = engine.effect_manager.trigger_configs.get(unit_id, [])
+            for cfg in cfgs:
+                if getattr(cfg, 'effect', None) == EffectType.EXECUTE:
+                    try:
+                        return int(cfg.value)
+                    except (TypeError, ValueError):
+                        return 0
+            return 0
 
         # 怪物ID统一使用 "enemy"
         monster_id = "enemy"
@@ -447,10 +460,21 @@ class BattleIntegrationHelper:
                     player_hp = max(0, player_hp - reflect_damage)
                     # 反弹消息已在turn_result中，不需要重复添加
 
+                # 命中后检查处决（怪物战斗）：若怪物生命值低于阈值，直接斩杀
+                exec_thr = _get_execute_threshold(player.id)
+                if exec_thr > 0 and monster_hp > 0:
+                    if monster_hp < int(monster_stats["hp"] * exec_thr / 100):
+                        monster_hp = 0
+                        battle_log.append(f"⚰️ {player.nickname}发动处决，{display_name}被弑灭！")
+
+
                 # 检查击杀并触发击杀效果
                 if monster_hp <= 0:
                     kill_result = engine.trigger_on_kill(player, monster_stats)
                     battle_log.extend(kill_result["messages"])
+                    # 汇总战后效果以便统一持久化
+                    if 'post_battle_effects' in kill_result:
+                        post_effects.extend(kill_result['post_battle_effects'])
 
                     # 应用击杀回血
                     if kill_result.get("hp_restored", 0) > 0:
@@ -573,10 +597,23 @@ class BattleIntegrationHelper:
                             if reflect_damage > 0:
                                 player_hp = max(0, player_hp - reflect_damage)
 
+
+                                # 反击后检查处决（怪物战斗）
+                                exec_thr = _get_execute_threshold(player.id)
+                                if exec_thr > 0 and monster_hp > 0:
+                                    if monster_hp < int(monster_stats["hp"] * exec_thr / 100):
+                                        monster_hp = 0
+                                        battle_log.append(f"⚰️ {player.nickname}发动处决，{display_name}被弑灭！")
+
                             # 检查反击击杀并触发击杀效果
                             if monster_hp <= 0:
                                 kill_result = engine.trigger_on_kill(player, monster_stats)
                                 battle_log.extend(kill_result["messages"])
+
+                                # 汇总战后效果以便统一持久化
+                                if 'post_battle_effects' in kill_result:
+                                    post_effects.extend(kill_result['post_battle_effects'])
+
 
                                 # 应用击杀回血
                                 if kill_result.get("hp_restored", 0) > 0:
@@ -601,10 +638,21 @@ class BattleIntegrationHelper:
                 if reflect_damage > 0:
                     player_hp = max(0, player_hp - reflect_damage)
 
+
+                # 命中后检查处决（怪物战斗）：若怪物生命值低于阈值，直接斩杀
+                exec_thr = _get_execute_threshold(player.id)
+                if exec_thr > 0 and monster_hp > 0:
+                    if monster_hp < int(monster_stats["hp"] * exec_thr / 100):
+                        monster_hp = 0
+                        battle_log.append(f"⚰️ {player.nickname}发动处决，{display_name}被弑灭！")
+
                 # 检查击杀并触发击杀效果
                 if monster_hp <= 0:
                     kill_result = engine.trigger_on_kill(player, monster_stats)
                     battle_log.extend(kill_result["messages"])
+                    # 汇总战后效果以便统一持久化
+                    if 'post_battle_effects' in kill_result:
+                        post_effects.extend(kill_result['post_battle_effects'])
 
                     # 应用击杀回血
                     if kill_result.get("hp_restored", 0) > 0:
@@ -744,6 +792,9 @@ class BattleIntegrationHelper:
                         if player_attack_result.get("is_penetration", False):
                             effects.append("🗡️")
 
+                        if any(isinstance(t, str) and "GUARANTEED_20%" in t for t in attack_result.get("effects", [])):
+                            effects.append("🎯")
+
                         effect_text = "".join(effects)
                         round_actions.append(f"{effect_text}{player.nickname}→{player_attack_result['total_damage']}")
 
@@ -827,6 +878,9 @@ class BattleIntegrationHelper:
                             effects.append(f"🔄x{player_attack_result['combo_count']}")
                         if player_attack_result.get("is_penetration", False):
                             effects.append("🗡️")
+
+                        if any(isinstance(t, str) and "GUARANTEED_20%" in t for t in player_attack_result.get("effects", [])):
+                            effects.append("🎯")
 
                         effect_text = "".join(effects)
                         round_actions.append(f"{effect_text}{player.nickname}→{player_attack_result['total_damage']}")
@@ -941,6 +995,19 @@ class BattleIntegrationHelper:
         initial_player1_hp = player1_hp
         initial_player2_hp = player2_hp
 
+        # eff8 ef8ececfede  afed0bf
+        from .battle_effects import EffectType as _Eff
+        def _get_exec_thr(_uid: str) -> int:
+            cfgs = engine.effect_manager.trigger_configs.get(_uid, [])
+            for cfg in cfgs:
+                if getattr(cfg, 'effect', None) == _Eff.EXECUTE:
+                    try:
+                        return int(cfg.value)
+                    except (TypeError, ValueError):
+                        return 0
+            return 0
+
+
         # 判定先后手（基于敏捷）
         from .battle_attributes import BattleAttributeCalculator
         player1_first = BattleAttributeCalculator.determine_turn_order(
@@ -977,6 +1044,12 @@ class BattleIntegrationHelper:
                     if attack_result["hit"]:
                         damage = attack_result["damage"]
                         player2_hp = max(0, player2_hp - damage)
+                        # 斩杀判定
+                        exec_thr = _get_exec_thr(player1.id)
+                        if exec_thr > 0 and player2_hp > 0:
+                            if player2_hp < int(player2.max_hp * exec_thr / 100):
+                                player2_hp = 0
+                                round_actions.append("⚰️处决！")
                         # 防守方受击触发（如镜怨披风·怨息环流）
                         heal_def = attack_result.get("defender_hp_restored", 0)
                         if heal_def > 0:
@@ -991,6 +1064,8 @@ class BattleIntegrationHelper:
                             effects.append(f"🔄x{attack_result['combo_count']}")
                         if attack_result.get("is_penetration", False):
                             effects.append("🗡️")
+                        if any(isinstance(t, str) and "GUARANTEED_20%" in t for t in attack_result.get("effects", [])):
+                            effects.append("🎯")
 
                         effect_text = "".join(effects)
 
@@ -1057,7 +1132,17 @@ class BattleIntegrationHelper:
                         if attack_result.get("combo_count", 1) > 1:
                             effects.append(f"🔄x{attack_result['combo_count']}")
                         if attack_result.get("is_penetration", False):
+
+                        # 处决判定（玩家2对玩家1）
+                        _thr = _get_exec_thr(player2.id)
+                        if _thr > 0 and player1_hp > 0:
+                            if player1_hp < int(player1.max_hp * _thr / 100):
+                                player1_hp = 0
+                                round_actions.append("⚰️处决！")
+
                             effects.append("🗡️")
+                        if any(isinstance(t, str) and "GUARANTEED_20%" in t for t in attack_result.get("effects", [])):
+                            effects.append("🎯")
 
                         effect_text = "".join(effects)
 
@@ -1101,6 +1186,9 @@ class BattleIntegrationHelper:
                         if attack_result.get("is_penetration", False):
                             effects.append("🗡️")
 
+                        if any(isinstance(t, str) and "GUARANTEED_20%" in t for t in attack_result.get("effects", [])):
+                            effects.append("🎯")
+
                         effect_text = "".join(effects)
 
                         # 计算格挡伤害（基础攻击力 - 实际伤害）
@@ -1109,6 +1197,14 @@ class BattleIntegrationHelper:
                             round_actions.append(f"{effect_text}{player2.nickname}→{damage}🛡️挡{blocked_damage}")
                         else:
                             round_actions.append(f"{effect_text}{player2.nickname}→{damage}")
+
+
+                        # 处决判定（玩家2对玩家1）
+                        _thr = _get_exec_thr(player2.id)
+                        if _thr > 0 and player1_hp > 0:
+                            if player1_hp < int(player1.max_hp * _thr / 100):
+                                player1_hp = 0
+                                round_actions.append("⚰️处决！")
 
                         # 检查击杀并触发击杀效果
                         if player1_hp <= 0:
@@ -1128,6 +1224,13 @@ class BattleIntegrationHelper:
                     if attack_result["hit"]:
                         damage = attack_result["damage"]
                         player2_hp = max(0, player2_hp - damage)
+
+                        # 处决判定（玩家1对玩家2）
+                        _thr2 = _get_exec_thr(player1.id)
+                        if _thr2 > 0 and player2_hp > 0:
+                            if player2_hp < int(player2.max_hp * _thr2 / 100):
+                                player2_hp = 0
+                                round_actions.append("⚰️处决！")
                         # 紧凑格式：显示效果和伤害
                         effects = []
                         if attack_result.get("is_critical"):
@@ -1142,6 +1245,9 @@ class BattleIntegrationHelper:
 
                         if attack_result.get("is_penetration", False):
                             effects.append("🗡️")
+
+                        if any(isinstance(t, str) and "GUARANTEED_20%" in t for t in attack_result.get("effects", [])):
+                            effects.append("🎯")
 
                         effect_text = "".join(effects)
 
