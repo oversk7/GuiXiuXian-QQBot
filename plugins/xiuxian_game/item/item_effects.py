@@ -10,6 +10,7 @@ import time
 from decimal import Decimal, ROUND_DOWN, ROUND_HALF_UP
 from ..models.player import Player
 from ..models.inventory import ItemEffectType, ItemConfig, ItemInstance, ItemType
+from .equipment_commands import recalc_equipment_attributes
 from ..models.elixir_usage import ElixirUsageLog
 from datetime import date, datetime, timedelta
 
@@ -827,6 +828,7 @@ async def _sweep_dungeon(player: Player, cfg: ItemConfig, qty: int, ctx: str, se
         )
         equipped_items = result_eq.scalars().all()
         durability_warnings = []
+        needs_recalc = False
 
         for eq in equipped_items:
             durability_loss = monster_tiles
@@ -841,11 +843,7 @@ async def _sweep_dungeon(player: Player, cfg: ItemConfig, qty: int, ctx: str, se
                         current_value = getattr(player, k, 0)
                         setattr(player, k, max(0, current_value - v))
                     eq.equipped = False
-                    # 限制当前HP/MP不超过新的上限
-                    if player.hp > player.max_hp:
-                        player.hp = player.max_hp
-                    if player.mp > player.max_mp:
-                        player.mp = player.max_mp
+                    needs_recalc = True
                     durability_warnings.append(
                         f"💔 {eq.config.name} 耐久耗尽已自动卸下\n"
                         f"   ⚠️ 需修理后才能再次穿戴"
@@ -854,6 +852,9 @@ async def _sweep_dungeon(player: Player, cfg: ItemConfig, qty: int, ctx: str, se
                     durability_warnings.append(
                         f"⚠️ {eq.config.name} 耐久度较低 ({eq.durability}/{eq.config.durability})，建议及时修理"
                     )
+
+        if needs_recalc:
+            await recalc_equipment_attributes(session, player)
 
         if durability_warnings:
             results.extend(durability_warnings)
@@ -1064,61 +1065,7 @@ async def _recalculate_equipment_bonus(session, player: Player):
     if not session:
         return
 
-    from sqlalchemy import select
-    from ..config import config as gcfg
-
-    stmt = select(ItemInstance).where(
-        ItemInstance.player_id == player.id,
-        ItemInstance.equipped == True,
-        ItemInstance.item_id.in_(gcfg.items_config["by_type"]["EQUIPMENT"])
-    )
-    equipped_items = (await session.execute(stmt)).scalars().all()
-
-    if not equipped_items:
-        return
-
-    for eq in equipped_items:
-        delta_prev = (eq.extra_attrs or {}).get("_persist_bonus", {})
-        for k, v in delta_prev.items():
-            if hasattr(player, k):
-                setattr(player, k, getattr(player, k) - v)
-
-        if "_persist_bonus" in (eq.extra_attrs or {}):
-            extra_new = {k: v for k, v in eq.extra_attrs.items() if k != "_persist_bonus"}
-            eq.extra_attrs = extra_new
-
-        eq.equipped = False
-
-    base_attrs = {
-        "attack": player.attack,
-        "defense": player.defense,
-        "agility": player.agility,
-        "luck": player.luck,
-        "max_hp": player.max_hp,
-        "max_mp": player.max_mp,
-    }
-
-    for eq in equipped_items:
-        eq.equipped = True
-
-        attrs_temp = base_attrs.copy()
-        eq.apply_attr_bonus(attrs_temp, base_attrs)
-        new_delta = {}
-        for k in attrs_temp:
-            if k in base_attrs:
-                if attrs_temp[k] != base_attrs[k]:
-                    new_delta[k] = attrs_temp[k] - base_attrs[k]
-            else:
-                if attrs_temp[k] != 0:
-                    new_delta[k] = attrs_temp[k]
-
-        for k, v in new_delta.items():
-            setattr(player, k, getattr(player, k) + v)
-
-        extra = eq.extra_attrs or {}
-        extra["_persist_bonus"] = new_delta
-        eq.extra_attrs = extra
-        session.add(eq)
+    await recalc_equipment_attributes(session, player)
 
 
 @register(ItemEffectType.EXPAND_TERRITORY)
