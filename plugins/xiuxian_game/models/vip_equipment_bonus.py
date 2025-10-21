@@ -7,6 +7,7 @@ VIP装备永久属性加成记录
 
 from sqlalchemy import Integer, String, JSON
 from sqlalchemy.orm import Mapped, mapped_column
+from sqlalchemy.ext.mutable import MutableDict
 from .db import Base
 
 
@@ -19,7 +20,7 @@ class VIPEquipmentBonus(Base):
     
     # 存储各属性的累计加成值
     # 格式: {"attack": 100, "max_mp": 80, "defense": 40, ...}
-    bonus_attrs: Mapped[dict] = mapped_column(JSON, default=dict)
+    bonus_attrs: Mapped[dict] = mapped_column(MutableDict.as_mutable(JSON), default=dict, server_default="{}", comment="属性加成JSON")
 
     def add_bonus(self, attr_name: str, value: int):
         """增加指定属性的加成"""
