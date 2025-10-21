@@ -574,11 +574,7 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
                             mp_from_hp_effects.append((eq2, 0.0, val_flat, False))
         if mp_from_hp_effects:
             current_hp_after_all = int(getattr(player, 'max_hp', 0) or 0)
-            hp_from_self_equips = 0
-            for (eq2, _, _, _) in mp_from_hp_effects:
-                delta2 = (eq2.extra_attrs or {}).get("_persist_bonus", {})
-                hp_from_self_equips += int(delta2.get("max_hp", 0) or 0)
-            base_for_convert = max(1, current_hp_after_all - hp_from_self_equips)
+            base_for_convert = max(1, current_hp_after_all)
             bonus_from_pct = int(base_for_convert * total_pct / 100.0) if total_pct > 0 else 0
             total_bonus_mp = bonus_from_pct + int(total_flat)
             if total_bonus_mp > 0:

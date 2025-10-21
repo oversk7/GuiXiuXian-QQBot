@@ -1,4 +1,4 @@
-"""
+﻿"""
 战斗系统集成助手
 
 提供将新战斗属性系统集成到现有战斗逻辑中的工具函数
@@ -717,7 +717,7 @@ class BattleIntegrationHelper:
         except Exception:
             pass
 
-        return victory, battle_log, damage_taken
+        return victory, battle_log, damage_taken, post_effects
 
     @staticmethod
     def enhanced_player_vs_monster_battle(

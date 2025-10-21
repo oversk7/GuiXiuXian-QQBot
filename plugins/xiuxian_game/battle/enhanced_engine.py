@@ -555,13 +555,16 @@ class EnhancedBattleEngine:
 
             elif effect.effect_type == EffectType.GAIN_HP:
                 # 噬灵者（变更）：永久获得最大生命值（需要在战斗结束后持久化）
-                result["messages"].append(f"💓 噬灵者：剥离血肉，最大生命值+{int(effect.value)}（战后结算）")
+                # value是属性点数，1属性点=3生命值
+                attr_points = int(effect.value)
+                actual_hp = attr_points * 3  # 转换为实际生命值
+                result["messages"].append(f"💓 噬灵者：剥离血肉，最大生命值+{actual_hp}（战后结算）")
                 result["effects_triggered"].append("gain_max_hp")
                 if not hasattr(result, 'post_battle_effects'):
                     result['post_battle_effects'] = []
                 result['post_battle_effects'].append({
                     'type': 'gain_max_hp',
-                    'value': int(effect.value)
+                    'value': attr_points  # 传递属性点数，由上层转换
                 })
 
 

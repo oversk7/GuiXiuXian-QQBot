@@ -843,7 +843,7 @@ async def _handle_personal_monster(session, tile: WorldTile, player: Player) -> 
     seed = f"P_{tile.seed}:{player.id}:{battle_timestamp}"
 
     # 执行增强战斗V2 - 支持装备特殊效果
-    victory, battle_log, damage_taken = await BattleIntegrationHelper.enhanced_player_vs_monster_battle_v2(
+    victory, battle_log, damage_taken, post_effects = await BattleIntegrationHelper.enhanced_player_vs_monster_battle_v2(
         player, monster_stats, monster_base_display, session, seed=seed, max_rounds=100,
         monster_full_display=monster_full_display
     )
@@ -869,64 +869,74 @@ async def _handle_personal_monster(session, tile: WorldTile, player: Player) -> 
             from ..guild.guild_task_service import GuildTaskService
             await GuildTaskService.update_combat_victory_stats(session, player.id)
 
-        # PVE胜利后：应用VIP装备的每日/永久收益
-        from sqlalchemy import select as _select
-        from datetime import datetime as _dt
-        from ..models.inventory import ItemInstance as _ItemInstance
-        from ..models.vip_equipment_bonus import VIPEquipmentBonus as _VIPBonus
-        def _today_key() -> str:
-            return _dt.now().strftime("%Y%m%d")
-        async def _apply_blade_daily_random(_player):
-            stmt = _select(_ItemInstance).where(
-                _ItemInstance.player_id == _player.id,
-                _ItemInstance.equipped == True,
-                _ItemInstance.item_id == "vip_blade_zhanlongshan"
-            )
-            inst = (await session.execute(stmt)).scalars().first()
-            if not inst:
-                return None
-            extra = inst.extra_attrs or {}
-            day = _today_key()
-            if extra.get("blade_rand_day") == day:
-                return None
-            import random as _r
-            attr_map = {
-                "attack": "攻击", "defense": "防御", "agility": "敏捷",
-                "luck": "幸运", "max_hp": "生命上限", "max_mp": "理智上限"
-            }
-            attrs = list(attr_map.keys())
-            chosen = _r.choice(attrs)
-            # 使用VIPEquipmentBonus表持久化，确保冥返后不会丢失
-            vip_bonus = await _VIPBonus.get_or_create(session, _player.id)
-            vip_bonus.add_bonus(chosen, 40)
-            setattr(_player, chosen, getattr(_player, chosen) + 40)
-            extra["blade_rand_day"] = day
-            inst.extra_attrs = extra
-            return f"✨ 刃之魔灵：今日首战恩赐，{attr_map[chosen]}+40（永久）"
-        async def _apply_blade_kill_mp(_winner):
-            stmt = _select(_ItemInstance).where(
-                _ItemInstance.player_id == _winner.id,
-                _ItemInstance.equipped == True,
-                _ItemInstance.item_id == "vip_blade_zhanlongshan"
-            )
-            inst = (await session.execute(stmt)).scalars().first()
-            if not inst:
-                return None
-            extra = inst.extra_attrs or {}
-            day = _today_key()
-            if extra.get("blade_kill_day") != day:
-                extra["blade_kill_day"] = day
-                extra["blade_kill_cnt"] = 0
-            current_cnt = int(extra.get("blade_kill_cnt", 0))
-            if current_cnt >= 20:
-                return f"🩸 噬灵者：今日已达上限（{current_cnt}/20）"
-            # 使用VIPEquipmentBonus表持久化，确保冥返后不会丢失
-            vip_bonus = await _VIPBonus.get_or_create(session, _winner.id)
-            vip_bonus.add_bonus("max_mp", 2)
-            _winner.max_mp = _winner.max_mp + 2
-            extra["blade_kill_cnt"] = current_cnt + 1
-            inst.extra_attrs = extra
-            return f"🩸 噬灵者：击杀吞噬，理智上限+2（今日{extra['blade_kill_cnt']}/20）"
+        # 结算“斩龙闪”的战后效果，保持与战斗日志一致（修复 Bug3/1）
+        try:
+            if post_effects:
+                from sqlalchemy import select as _select
+                from ..models.inventory import ItemInstance as _ItemInstance
+                from ..models.vip_equipment_bonus import VIPEquipmentBonus as _VIPBonus
+                from datetime import datetime as _dt
+
+                def _today_key() -> str:
+                    return _dt.now().strftime("%Y%m%d")
+
+                # 找到已穿戴的斩龙闪
+                stmt = _select(_ItemInstance).where(
+                    _ItemInstance.player_id == player.id,
+                    _ItemInstance.equipped == True,
+                    _ItemInstance.item_id == "vip_blade_zhanlongshan",
+                )
+                inst = (await session.execute(stmt)).scalars().first()
+                if inst:
+                    extra = dict(inst.extra_attrs or {})
+                    vip_bonus = await _VIPBonus.get_or_create(session, player.id)
+                    day = _today_key()
+
+                    cn_map = {
+                        "attack": "攻击",
+                        "defense": "防御",
+                        "agility": "敏捷",
+                        "luck": "幸运",
+                        "max_hp": "生命上限",
+                        "max_mp": "理智上限",
+                    }
+
+                    for eff in post_effects:
+                        et = eff.get("type")
+                        if et == "gain_random_attr":
+                            if extra.get("blade_rand_day") != day:
+                                attr = eff.get("attr")
+                                val = int(eff.get("value", 0) or 0)
+                                # 持久化并立即生效
+                                vip_bonus.add_bonus(attr, val)
+                                setattr(player, attr, getattr(player, attr) + val)
+                                extra["blade_rand_day"] = day
+                                battle_summary.append(f"✨ 刃之魔灵：今日首战恩赐，{cn_map.get(attr, attr)}+{val}（永久）")
+                        elif et == "gain_max_hp":
+                            # 击杀永久+2属性点（每日最多20次），1属性点=3生命值，所以实际+6生命值
+                            if extra.get("blade_kill_day") != day:
+                                extra["blade_kill_day"] = day
+                                extra["blade_kill_cnt"] = 0
+                            cnt = int(extra.get("blade_kill_cnt", 0))
+                            if cnt < 20:
+                                attr_points = int(eff.get("value", 0) or 0)  # 属性点数
+                                actual_hp = attr_points * 3  # 1属性点=3生命值
+                                vip_bonus.add_bonus("max_hp", actual_hp)
+                                player.max_hp = player.max_hp + actual_hp
+                                extra["blade_kill_cnt"] = cnt + 1
+                                battle_summary.append(
+                                    f"🩸 噬灵者：击杀吞噬，生命上限+{actual_hp}（今日{extra['blade_kill_cnt']}/20）"
+                                )
+
+                    inst.extra_attrs = extra
+                    session.add(inst)
+                    session.add(player)
+                    await session.commit()
+        except Exception:
+            # 不影响战斗主流程
+            pass
+
+
 
     # PVE失败（玩家死亡）：应用镜怨自噬与每日随机属性
     from sqlalchemy import select as _select
@@ -1003,12 +1013,14 @@ async def _handle_personal_monster(session, tile: WorldTile, player: Player) -> 
         if int(extra.get("blade_kill_cnt", 0)) >= 20:
             return "(噬灵者今日上限已满)"
         # 使用VIPEquipmentBonus表持久化，确保冥返后不会丢失
+        # 击杀永久+2属性点，1属性点=3生命值，所以实际+6生命值
         vip_bonus = await _VIPBonus.get_or_create(session, _player.id)
-        vip_bonus.add_bonus("max_mp", 2)
-        _player.max_hp = _player.max_hp + 2
+        actual_hp = 2 * 3  # 2属性点 × 3生命值/属性点 = 6生命值
+        vip_bonus.add_bonus("max_hp", actual_hp)
+        _player.max_hp = _player.max_hp + actual_hp
         extra["blade_kill_cnt"] = int(extra.get("blade_kill_cnt", 0)) + 1
         inst.extra_attrs = extra
-        return f"🩸 噬灵者：击杀吞噬，生命上限+2（今日{extra['blade_kill_cnt']}/20）"
+        return f"🩸 噬灵者：击杀吞噬，生命上限+{actual_hp}（今日{extra['blade_kill_cnt']}/20）"
 
     _msg_rand = await _apply_blade_daily_random_on_death(player)
     if _msg_rand:

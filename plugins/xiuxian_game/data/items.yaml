@@ -1191,8 +1191,8 @@ items:
         - trigger: "first_turn"
           effect: "mp_from_hp"
           is_percentage: true
-          value: 100
-          description: "[1] 灵影体质·lv.EX：理智和生命形成良好循环，穿戴后，以自身最大生命值的100%转化为最大理智值提升。"
+          value: 40
+          description: "[1] 灵影体质·lv.EX：理智和生命形成良好循环，穿戴后，以自身最大生命值的40%转化为最大理智值提升。"
         - trigger: "passive"
           effect: "ignore_special"
           is_percentage: true
@@ -1202,7 +1202,7 @@ items:
           effect: "gain_hp"
           is_percentage: false
           value: 2
-          description: "[3] 噬灵者：击杀敌人后剥离‘血肉’，永久提升最大生命值2点（战后结算；每日最多永久提升40点）。"
+          description: "[3] 噬灵者：击杀敌人后剥离‘血肉’，永久提升2点体质属性（相当于+6生命值；战后结算；每日最多20次，共+120生命值）。"
         - trigger: "on_attack"
           effect: "ignore_defense"
           is_percentage: true
