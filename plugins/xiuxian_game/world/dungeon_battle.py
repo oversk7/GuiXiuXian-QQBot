@@ -936,108 +936,107 @@ async def _handle_personal_monster(session, tile: WorldTile, player: Player) -> 
             # 不影响战斗主流程
             pass
 
+    else:
+        # PVE失败（玩家死亡）：应用镜怨自噬与每日随机属性
+        from sqlalchemy import select as _select
+        from datetime import datetime as _dt
+        from ..models.inventory import ItemInstance as _ItemInstance
+        def _today_key() -> str:
+            return _dt.now().strftime("%Y%m%d")
+        async def _apply_blade_daily_random_on_death(_player):
+            stmt = _select(_ItemInstance).where(
+                _ItemInstance.player_id == _player.id,
+                _ItemInstance.equipped == True,
+                _ItemInstance.item_id == "vip_blade_zhanlongshan"
+            )
+            inst = (await session.execute(stmt)).scalars().first()
+            if not inst:
+                return None
+            extra = inst.extra_attrs or {}
+            day = _today_key()
+            if extra.get("blade_rand_day") == day:
+                return None
+            import random as _r
+            attr_map = {
+                "attack": "攻击", "defense": "防御", "agility": "敏捷",
+                "luck": "幸运", "max_hp": "生命上限", "max_mp": "理智上限"
+            }
+            attrs = list(attr_map.keys())
+            chosen = _r.choice(attrs)
+            # 使用VIPEquipmentBonus表持久化，确保冥返后不会丢失
+            vip_bonus = await _VIPBonus.get_or_create(session, _player.id)
+            vip_bonus.add_bonus(chosen, 40)
+            setattr(_player, chosen, getattr(_player, chosen) + 40)
+            extra["blade_rand_day"] = day
+            inst.extra_attrs = extra
+            return f"✨ 刃之魔灵：今日首战恩赐，{attr_map[chosen]}+40（永久）"
+        async def _apply_robe_self_siphon(_dead_player):
+            stmt = _select(_ItemInstance).where(
+                _ItemInstance.player_id == _dead_player.id,
+                _ItemInstance.equipped == True,
+                _ItemInstance.item_id == "vip_robe_jingyuanzhiyi"
+            )
+            inst = (await session.execute(stmt)).scalars().first()
+            if not inst:
+                return None
+            extra = inst.extra_attrs or {}
+            day = _today_key()
+            if extra.get("robe_die_day") != day:
+                extra["robe_die_day"] = day
+                extra["robe_die_cnt"] = 0
+            current_cnt = int(extra.get("robe_die_cnt", 0))
+            if current_cnt >= 20:
+                return f"🪞 镜怨自噬：今日已达上限（{current_cnt}/20）"
+            # 使用VIPEquipmentBonus表持久化，确保冥返后不会丢失
+            vip_bonus = await _VIPBonus.get_or_create(session, _dead_player.id)
+            vip_bonus.add_bonus("attack", 2)
+            _dead_player.attack = _dead_player.attack + 2
+            extra["robe_die_cnt"] = current_cnt + 1
+            inst.extra_attrs = extra
+            return f"🪞 镜怨自噬：死亡化怨，攻击+2（今日{extra['robe_die_cnt']}/20）"
+        async def _apply_blade_kill_mp_on_death(_player):
+            """同归于尽时，玩家击杀怪物也触发噬灵者效果"""
+            stmt = _select(_ItemInstance).where(
+                _ItemInstance.player_id == _player.id,
+                _ItemInstance.equipped == True,
+                _ItemInstance.item_id == "vip_blade_zhanlongshan"
+            )
+            inst = (await session.execute(stmt)).scalars().first()
+            if not inst:
+                return None
+            extra = inst.extra_attrs or {}
+            day = _today_key()
+            if extra.get("blade_kill_day") != day:
+                extra["blade_kill_day"] = day
+                extra["blade_kill_cnt"] = 0
+            if int(extra.get("blade_kill_cnt", 0)) >= 20:
+                return "(噬灵者今日上限已满)"
+            # 使用VIPEquipmentBonus表持久化，确保冥返后不会丢失
+            # 击杀永久+2属性点，1属性点=3生命值，所以实际+6生命值
+            vip_bonus = await _VIPBonus.get_or_create(session, _player.id)
+            actual_hp = 2 * 3  # 2属性点 × 3生命值/属性点 = 6生命值
+            vip_bonus.add_bonus("max_hp", actual_hp)
+            _player.max_hp = _player.max_hp + actual_hp
+            extra["blade_kill_cnt"] = int(extra.get("blade_kill_cnt", 0)) + 1
+            inst.extra_attrs = extra
+            return f"🩸 噬灵者：击杀吞噬，生命上限+{actual_hp}（今日{extra['blade_kill_cnt']}/20）"
 
+        _msg_rand = await _apply_blade_daily_random_on_death(player)
+        if _msg_rand:
+            battle_summary.append(_msg_rand)
+        _msg_die = await _apply_robe_self_siphon(player)
+        if _msg_die:
+            battle_summary.append(_msg_die)
+        # 同归于尽时也触发噬灵者（击杀怪物）
+        _msg_kill2 = await _apply_blade_kill_mp_on_death(player)
+        if _msg_kill2:
+            battle_summary.append(_msg_kill2)
 
-    # PVE失败（玩家死亡）：应用镜怨自噬与每日随机属性
-    from sqlalchemy import select as _select
-    from datetime import datetime as _dt
-    from ..models.inventory import ItemInstance as _ItemInstance
-    def _today_key() -> str:
-        return _dt.now().strftime("%Y%m%d")
-    async def _apply_blade_daily_random_on_death(_player):
-        stmt = _select(_ItemInstance).where(
-            _ItemInstance.player_id == _player.id,
-            _ItemInstance.equipped == True,
-            _ItemInstance.item_id == "vip_blade_zhanlongshan"
-        )
-        inst = (await session.execute(stmt)).scalars().first()
-        if not inst:
-            return None
-        extra = inst.extra_attrs or {}
-        day = _today_key()
-        if extra.get("blade_rand_day") == day:
-            return None
-        import random as _r
-        attr_map = {
-            "attack": "攻击", "defense": "防御", "agility": "敏捷",
-            "luck": "幸运", "max_hp": "生命上限", "max_mp": "理智上限"
-        }
-        attrs = list(attr_map.keys())
-        chosen = _r.choice(attrs)
-        # 使用VIPEquipmentBonus表持久化，确保冥返后不会丢失
-        vip_bonus = await _VIPBonus.get_or_create(session, _player.id)
-        vip_bonus.add_bonus(chosen, 40)
-        setattr(_player, chosen, getattr(_player, chosen) + 40)
-        extra["blade_rand_day"] = day
-        inst.extra_attrs = extra
-        return f"✨ 刃之魔灵：今日首战恩赐，{attr_map[chosen]}+40（永久）"
-    async def _apply_robe_self_siphon(_dead_player):
-        stmt = _select(_ItemInstance).where(
-            _ItemInstance.player_id == _dead_player.id,
-            _ItemInstance.equipped == True,
-            _ItemInstance.item_id == "vip_robe_jingyuanzhiyi"
-        )
-        inst = (await session.execute(stmt)).scalars().first()
-        if not inst:
-            return None
-        extra = inst.extra_attrs or {}
-        day = _today_key()
-        if extra.get("robe_die_day") != day:
-            extra["robe_die_day"] = day
-            extra["robe_die_cnt"] = 0
-        current_cnt = int(extra.get("robe_die_cnt", 0))
-        if current_cnt >= 20:
-            return f"🪞 镜怨自噬：今日已达上限（{current_cnt}/20）"
-        # 使用VIPEquipmentBonus表持久化，确保冥返后不会丢失
-        vip_bonus = await _VIPBonus.get_or_create(session, _dead_player.id)
-        vip_bonus.add_bonus("attack", 2)
-        _dead_player.attack = _dead_player.attack + 2
-        extra["robe_die_cnt"] = current_cnt + 1
-        inst.extra_attrs = extra
-        return f"🪞 镜怨自噬：死亡化怨，攻击+2（今日{extra['robe_die_cnt']}/20）"
-    async def _apply_blade_kill_mp_on_death(_player):
-        """同归于尽时，玩家击杀怪物也触发噬灵者效果"""
-        stmt = _select(_ItemInstance).where(
-            _ItemInstance.player_id == _player.id,
-            _ItemInstance.equipped == True,
-            _ItemInstance.item_id == "vip_blade_zhanlongshan"
-        )
-        inst = (await session.execute(stmt)).scalars().first()
-        if not inst:
-            return None
-        extra = inst.extra_attrs or {}
-        day = _today_key()
-        if extra.get("blade_kill_day") != day:
-            extra["blade_kill_day"] = day
-            extra["blade_kill_cnt"] = 0
-        if int(extra.get("blade_kill_cnt", 0)) >= 20:
-            return "(噬灵者今日上限已满)"
-        # 使用VIPEquipmentBonus表持久化，确保冥返后不会丢失
-        # 击杀永久+2属性点，1属性点=3生命值，所以实际+6生命值
-        vip_bonus = await _VIPBonus.get_or_create(session, _player.id)
-        actual_hp = 2 * 3  # 2属性点 × 3生命值/属性点 = 6生命值
-        vip_bonus.add_bonus("max_hp", actual_hp)
-        _player.max_hp = _player.max_hp + actual_hp
-        extra["blade_kill_cnt"] = int(extra.get("blade_kill_cnt", 0)) + 1
-        inst.extra_attrs = extra
-        return f"🩸 噬灵者：击杀吞噬，生命上限+{actual_hp}（今日{extra['blade_kill_cnt']}/20）"
-
-    _msg_rand = await _apply_blade_daily_random_on_death(player)
-    if _msg_rand:
-        battle_summary.append(_msg_rand)
-    _msg_die = await _apply_robe_self_siphon(player)
-    if _msg_die:
-        battle_summary.append(_msg_die)
-    # 同归于尽时也触发噬灵者（击杀怪物）
-    _msg_kill2 = await _apply_blade_kill_mp_on_death(player)
-    if _msg_kill2:
-        battle_summary.append(_msg_kill2)
-
-    # 诡异掉落材料机制
-    is_elite = tile.state.get("is_elite", False)
-    drop_result = await handle_monster_drops(session, player, monster_level, player.region, rng, is_elite)
-    if drop_result:
-        battle_summary.append(drop_result)
+        # 诡异掉落材料机制
+        is_elite = tile.state.get("is_elite", False)
+        drop_result = await handle_monster_drops(session, player, monster_level, player.region, rng, is_elite)
+        if drop_result:
+            battle_summary.append(drop_result)
 
     # 标记为已击败（无论是精英怪还是普通小怪）
     tile.state.setdefault("defeated_by", []).append(player.id)

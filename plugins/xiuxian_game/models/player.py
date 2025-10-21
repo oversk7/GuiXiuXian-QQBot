@@ -285,15 +285,16 @@ class Player(Base):
         return battle_attrs
 
     async def get_attribute_breakdown(self, session=None) -> dict:
-        """获取属性来源分解（基础、装备、丹药、临时buff）
+        """获取属性来源分解（基础、装备、丹药、VIP装备永久加成、临时buff）
 
         返回格式：
         {
-            "base": {...},      # 基础属性（初始值 + 加点，不含丹药）
-            "equipment": {...}, # 装备加成
-            "elixir": {...},    # 永久丹药加成
-            "temporary": {...}, # 临时buff加成
-            "total": {...}      # 最终有效属性
+            "base": {...},         # 基础属性（初始值 + 加点，不含丹药）
+            "equipment": {...},    # 装备加成
+            "elixir": {...},       # 永久丹药加成
+            "vip_equipment": {...},# VIP装备永久加成
+            "temporary": {...},    # 临时buff加成
+            "total": {...}         # 最终有效属性
         }
         """
         # 获取基础属性（从初始值和加点计算）
@@ -364,6 +365,17 @@ class Player(Base):
                     if k in equipment_bonus:
                         equipment_bonus[k] += int(v)
 
+        # 获取VIP装备永久加成
+        vip_equipment_bonus = {k: 0 for k in INIT_ATTRS}
+        if session:
+            from .vip_equipment_bonus import VIPEquipmentBonus
+            stmt = select(VIPEquipmentBonus).where(VIPEquipmentBonus.player_id == self.id)
+            vip_record = (await session.execute(stmt)).scalars().first()
+            if vip_record:
+                for attr, value in vip_record.get_total_bonus().items():
+                    if attr in vip_equipment_bonus:
+                        vip_equipment_bonus[attr] = int(value)
+
         # 获取临时buff加成
         temporary_bonus = {k: 0 for k in INIT_ATTRS}
         if session:
@@ -373,12 +385,12 @@ class Player(Base):
                 if attr in temporary_bonus:
                     temporary_bonus[attr] = bonus
 
-        # 计算基础属性（初始值 + 加点，不含丹药）
-        # 基础属性 = 当前属性值 - 装备加成 - 临时buff加成 - 丹药加成
+        # 计算基础属性（初始值 + 加点，不含丹药和VIP装备永久加成）
+        # 基础属性 = 当前属性值 - 装备加成 - 临时buff加成 - 丹药加成 - VIP装备永久加成
         base_attrs = {}
         for attr in INIT_ATTRS:
             current_value = getattr(self, attr, INIT_ATTRS[attr])
-            base_value = current_value - equipment_bonus[attr] - temporary_bonus[attr] - elixir_bonus[attr]
+            base_value = current_value - equipment_bonus[attr] - temporary_bonus[attr] - elixir_bonus[attr] - vip_equipment_bonus[attr]
             # 确保基础属性不会小于初始值（防止数据异常）
             base_attrs[attr] = max(base_value, INIT_ATTRS[attr])
 
@@ -388,6 +400,7 @@ class Player(Base):
             total_attrs[attr] = (
                 base_attrs[attr] +
                 elixir_bonus[attr] +
+                vip_equipment_bonus[attr] +
                 equipment_bonus[attr] +
                 temporary_bonus[attr]
             )
@@ -396,6 +409,7 @@ class Player(Base):
             "base": base_attrs,
             "equipment": equipment_bonus,
             "elixir": elixir_bonus,
+            "vip_equipment": vip_equipment_bonus,
             "temporary": temporary_bonus,
             "total": total_attrs
         }

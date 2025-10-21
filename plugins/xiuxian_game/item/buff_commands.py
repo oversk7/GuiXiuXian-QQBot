@@ -122,6 +122,7 @@ async def handle_attribute_breakdown(event: MessageEvent):
             base = breakdown["base"][attr]
             equipment = breakdown["equipment"][attr]
             elixir = breakdown["elixir"][attr]
+            vip_equipment = breakdown["vip_equipment"][attr]
             temporary = breakdown["temporary"][attr]
             total = breakdown["total"][attr]
 
@@ -131,6 +132,8 @@ async def handle_attribute_breakdown(event: MessageEvent):
                 parts.append(f"装备+{equipment}")
             if elixir > 0:
                 parts.append(f"丹药+{elixir}")
+            if vip_equipment > 0:
+                parts.append(f"定制+{vip_equipment}")
             if temporary > 0:
                 parts.append(f"临时+{temporary}")
             elif temporary < 0:
