@@ -755,7 +755,7 @@ async def handle_npc_attack(session, attacker: Player, target_npc, event: Messag
     seed = f"NPC_{attacker.id}_{target_npc.npc_id}_{battle_timestamp}"
 
     try:
-        victory, battle_log, damage_taken, _ = await BattleIntegrationHelper.enhanced_player_vs_monster_battle_v2(
+        victory, battle_log, damage_taken, post_effects = await BattleIntegrationHelper.enhanced_player_vs_monster_battle_v2(
             attacker, npc_stats, target_npc.name, session, seed=seed, max_rounds=50
         )
 
@@ -788,6 +788,67 @@ async def handle_npc_attack(session, attacker: Player, target_npc, event: Messag
                 attacker.exp += exp_gain
                 attacker.gold += gold_gain
                 result_lines.append(f"🎉 击杀鬼怪获得 {exp_gain} EXP，{gold_gain} 金币")
+            # 结算VIP定制装备（斩龙闪）的战后永久加成（如“噬灵者”）
+            if victory and post_effects:
+                from sqlalchemy import select as _select
+                from ..models.inventory import ItemInstance as _ItemInstance
+                from ..models.vip_equipment_bonus import VIPEquipmentBonus as _VIPBonus
+                from datetime import datetime as _dt
+
+                def _today_key() -> str:
+                    return _dt.now().strftime("%Y%m%d")
+
+                # 仅处理已穿戴的斩龙闪
+                stmt = _select(_ItemInstance).where(
+                    _ItemInstance.player_id == attacker.id,
+                    _ItemInstance.equipped == True,
+                    _ItemInstance.item_id == "vip_blade_zhanlongshan",
+                )
+                inst = (await session.execute(stmt)).scalars().first()
+                if inst:
+                    extra = dict(inst.extra_attrs or {})
+                    vip_bonus = await _VIPBonus.get_or_create(session, attacker.id)
+                    day = _today_key()
+
+                    cn_map = {
+                        "attack": "攻击",
+                        "defense": "防御",
+                        "agility": "敏捷",
+                        "luck": "幸运",
+                        "max_hp": "生命上限",
+                        "max_mp": "理智上限",
+                    }
+
+                    for eff in post_effects:
+                        et = eff.get("type")
+                        if et == "gain_random_attr":
+                            if extra.get("blade_rand_day") != day:
+                                attr = eff.get("attr")
+                                val = int(eff.get("value", 0) or 0)
+                                vip_bonus.add_bonus(attr, val)
+                                setattr(attacker, attr, getattr(attacker, attr) + val)
+                                extra["blade_rand_day"] = day
+                                result_lines.append(f"✨ 刃之魔灵：今日首战恩赐，{cn_map.get(attr, attr)}+{val}（永久）")
+                        elif et == "gain_max_hp":
+                            # 击杀永久+2属性点（每日最多20次），1属性点=3生命值，所以实际+6生命值
+                            if extra.get("blade_kill_day") != day:
+                                extra["blade_kill_day"] = day
+                                extra["blade_kill_cnt"] = 0
+                            cnt = int(extra.get("blade_kill_cnt", 0))
+                            if cnt < 20:
+                                attr_points = int(eff.get("value", 0) or 0)
+                                actual_hp = attr_points * 3
+                                vip_bonus.add_bonus("max_hp", actual_hp)
+                                attacker.max_hp = attacker.max_hp + actual_hp
+                                extra["blade_kill_cnt"] = cnt + 1
+                                result_lines.append(
+                                    f"🩸 噬灵者：击杀吞噬，生命上限+{actual_hp}（今日{extra['blade_kill_cnt']}/20）"
+                                )
+
+                    inst.extra_attrs = extra
+                    session.add(inst)
+                    session.add(attacker)
+
         else:
             # 玩家失败
             if attacker.hp <= 0:
