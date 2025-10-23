@@ -61,7 +61,7 @@ ALL_GOODS = [
     "yin_grass", "blood_pact"
 ]
 
-# 受携带限制的商品列表（不包含血契丹和阴冥草）
+# 受携带限制的商品列表（不包含血契丹、阴冥草和鱼类）
 LIMITED_GOODS = [
     "lux_perfume", "red_wine", "gold_watch", "diamond_ring", "silk_scarf",
     "dslr_camera", "smartphone", "gaming_console", "designer_bag", "luxury_chocolate",
@@ -445,11 +445,11 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
                 await buy_cmd.finish(f"❌ 库存不足！当前库存：{market_state.current_stock}，需要：{qty}")
 
             # 检查背包商品总量限制（防止高等级玩家垄断库存）
-            # 注意：血契丹和阴冥草不占用携带上限
+            # 注意：血契丹、阴冥草和鱼类不占用携带上限
             result_inv = await session.execute(
                 select(ItemInstance).where(
                     ItemInstance.player_id == player.id,
-                    ItemInstance.item_id.in_(LIMITED_GOODS + ALL_FISH)  # 统计受限商品和鱼类
+                    ItemInstance.item_id.in_(LIMITED_GOODS)  # 仅统计受限商品
                 )
             )
             current_goods = result_inv.scalars().all()
