@@ -174,8 +174,9 @@ class BattleIntegrationHelper:
                     damage = attack_result["damage"]
                     second_hp_ref[0] = max(0, second_hp_ref[0] - damage)
                     # 防守方受击触发（如镜怨披风·怨息环流：被攻击后恢复10%）
+                    # 只有在防守方还活着时才能回血，避免死人复活
                     heal_def = attack_result.get("defender_hp_restored", 0)
-                    if heal_def > 0:
+                    if heal_def > 0 and second_hp_ref[0] > 0:
                         second_hp_ref[0] = min(second_player.max_hp, second_hp_ref[0] + heal_def)
                         battle_log.append(f"💚 {second_player.nickname}回复{heal_def}HP")
 
@@ -247,20 +248,22 @@ class BattleIntegrationHelper:
                 if attack_result["hit"]:
                     damage = attack_result["damage"]
 
+                    # 先扣血
+                    first_hp_ref[0] = max(0, first_hp_ref[0] - damage)
+
                     # 命中后检查处决（忽略无敌等，直接强制死亡）
                     exec_thr = _get_execute_threshold(second_player.id)
-                    # 防守方受击触发（如镜怨披风·怨息环流：被攻击后恢复10%）
-                    heal_def = attack_result.get("defender_hp_restored", 0)
-                    if heal_def > 0:
-                        first_hp_ref[0] = min(first_player.max_hp, first_hp_ref[0] + heal_def)
-                        battle_log.append(f"💚 {first_player.nickname}回复{heal_def}HP")
-
                     if exec_thr > 0 and first_hp_ref[0] > 0:
                         if first_hp_ref[0] < int(first_player.max_hp * exec_thr / 100):
                             battle_log.append(f"⚰️ {second_player.nickname}发动处决，{first_player.nickname}被弑灭！")
                             first_hp_ref[0] = 0
 
-                    first_hp_ref[0] = max(0, first_hp_ref[0] - damage)
+                    # 防守方受击触发（如镜怨披风·怨息环流：被攻击后恢复10%）
+                    # 只有在防守方还活着时才能回血，避免死人复活
+                    heal_def = attack_result.get("defender_hp_restored", 0)
+                    if heal_def > 0 and first_hp_ref[0] > 0:
+                        first_hp_ref[0] = min(first_player.max_hp, first_hp_ref[0] + heal_def)
+                        battle_log.append(f"💚 {first_player.nickname}回复{heal_def}HP")
 
                     # 构建详细攻击描述
                     action_desc = f"⚔️ {second_player.nickname} 攻击 {first_player.nickname}"
@@ -585,7 +588,22 @@ class BattleIntegrationHelper:
                             final_damage -= damage_reduction
                             battle_log.append(f"💪 刚气-心！受到伤害降低{rigid_effect.value:.0f}% (-{damage_reduction})")
 
-                        # 被攻击方（玩家）受击触发：如镜怨披风·怨息环流（恢复10%）
+                    # 检查玩家是否有猛虎标弹效果（减少受到的伤害）
+                    fierce_tiger_effects = engine.effect_manager.get_active_effects(player.id, EffectType.FIERCE_TIGER_BULLET)
+                    if fierce_tiger_effects:
+                        for fierce_effect in fierce_tiger_effects:
+                            # 猛虎标弹：受到伤害降低30%
+                            damage_reduction = int(final_damage * 30 / 100)
+                            final_damage -= damage_reduction
+                            battle_log.append(f"🐅 猛虎标弹！受到伤害降低30% (-{damage_reduction})")
+
+                    # 先扣血
+                    player_hp = max(0, player_hp - final_damage)
+                    battle_log.append(f"👹 {monster_name}攻击{player.nickname}，造成{final_damage}伤害")
+
+                    # 被攻击方（玩家）受击触发：如镜怨披风·怨息环流（恢复10%）
+                    # 只有在玩家还活着时才能回血，避免死人复活
+                    if player_hp > 0:
                         try:
                             from ..battle.battle_effects import TriggerType, EffectType
                             # 环境上下文（与引擎一致的最小集合）
@@ -614,19 +632,6 @@ class BattleIntegrationHelper:
                         except Exception:
                             # 防御触发失败不影响主流程
                             pass
-
-
-                    # 检查玩家是否有猛虎标弹效果（减少受到的伤害）
-                    fierce_tiger_effects = engine.effect_manager.get_active_effects(player.id, EffectType.FIERCE_TIGER_BULLET)
-                    if fierce_tiger_effects:
-                        for fierce_effect in fierce_tiger_effects:
-                            # 猛虎标弹：受到伤害降低30%
-                            damage_reduction = int(final_damage * 30 / 100)
-                            final_damage -= damage_reduction
-                            battle_log.append(f"🐅 猛虎标弹！受到伤害降低30% (-{damage_reduction})")
-
-                    player_hp = max(0, player_hp - final_damage)
-                    battle_log.append(f"👹 {monster_name}攻击{player.nickname}，造成{final_damage}伤害")
 
                     if player_hp <= 0:
                         break
@@ -1171,8 +1176,9 @@ class BattleIntegrationHelper:
                                 player2_hp = 0
                                 round_actions.append("⚰️处决！")
                         # 防守方受击触发（如镜怨披风·怨息环流）
+                        # 只有在防守方还活着时才能回血，避免死人复活
                         heal_def = attack_result.get("defender_hp_restored", 0)
-                        if heal_def > 0:
+                        if heal_def > 0 and player2_hp > 0:
                             player2_hp = min(player2.max_hp, player2_hp + heal_def)
                             round_actions.append(f"💚{player2.nickname}+{heal_def}")
 
@@ -1253,8 +1259,9 @@ class BattleIntegrationHelper:
                         # 
                         # 
                         # 防守方受击触发（如镜怨披风·怨息环流）
+                        # 只有在防守方还活着时才能回血，避免死人复活
                         heal_def = attack_result.get("defender_hp_restored", 0)
-                        if heal_def > 0:
+                        if heal_def > 0 and player1_hp > 0:
                             player1_hp = min(player1.max_hp, player1_hp + heal_def)
                             round_actions.append(f"💚{player1.nickname}+{heal_def}")
 
@@ -1319,8 +1326,9 @@ class BattleIntegrationHelper:
                         damage = attack_result["damage"]
                         player1_hp = max(0, player1_hp - damage)
                         # 防守方受击触发（如镜怨披风·怨息环流）
+                        # 只有在防守方还活着时才能回血，避免死人复活
                         heal_def = attack_result.get("defender_hp_restored", 0)
-                        if heal_def > 0:
+                        if heal_def > 0 and player1_hp > 0:
                             player1_hp = min(player1.max_hp, player1_hp + heal_def)
                             round_actions.append(f"💚{player1.nickname}+{heal_def}")
 
@@ -1378,17 +1386,19 @@ class BattleIntegrationHelper:
                             if player2_hp < int(player2.max_hp * _thr2 / 100):
                                 player2_hp = 0
                                 round_actions.append("⚰️处决！")
+                        # 防守方受击触发（如镜怨披风·怨息环流）
+                        # 只有在防守方还活着时才能回血，避免死人复活
+                        heal_def = attack_result.get("defender_hp_restored", 0)
+                        if heal_def > 0 and player2_hp > 0:
+                            player2_hp = min(player2.max_hp, player2_hp + heal_def)
+                            round_actions.append(f"�{player2.nickname}+{heal_def}")
+
                         # 紧凑格式：显示效果和伤害
                         effects = []
                         if attack_result.get("is_critical"):
                             effects.append("💥")
                         if attack_result.get("combo_count", 1) > 1:
-                            effects.append(f"🔄x{attack_result['combo_count']}")
-                        # 防守方受击触发（如镜怨披风·怨息环流）
-                        heal_def = attack_result.get("defender_hp_restored", 0)
-                        if heal_def > 0:
-                            player2_hp = min(player2.max_hp, player2_hp + heal_def)
-                            round_actions.append(f"💚{player2.nickname}+{heal_def}")
+                            effects.append(f"�x{attack_result['combo_count']}")
 
                         if attack_result.get("is_penetration", False):
                             effects.append("🗡️")
