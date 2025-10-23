@@ -724,7 +724,9 @@ class EnhancedBattleEngine:
             return result
 
         # 命中
-        damage = attack_result["damage"]
+        total_damage_from_attack = attack_result["damage"]
+        guaranteed_damage = attack_result.get("guaranteed_damage", 0)
+        damage = max(0, total_damage_from_attack - guaranteed_damage)
         is_critical = attack_result.get("is_critical", False)
         combo_count = attack_result.get("combo_count", 1)
         result["combo_count"] = combo_count
@@ -732,11 +734,7 @@ class EnhancedBattleEngine:
         result["is_critical"] = is_critical
         result["is_penetration"] = attack_result.get("is_penetration", False)
         # 标记是否包含必中20%
-        has_guaranteed = False
-        for eff_tag in attack_result.get("effects", []):
-            if isinstance(eff_tag, str) and "GUARANTEED_20%" in eff_tag:
-                has_guaranteed = True
-                break
+        has_guaranteed = guaranteed_damage > 0
 
         # 检查并应用虎标弹等计数型伤害加成效果
         tiger_bullet_effects = self.effect_manager.get_active_effects(attacker_id, EffectType.TIGER_BULLET)
@@ -804,12 +802,24 @@ class EnhancedBattleEngine:
         # 检查防御者是否有无敌状态（可被“绝魔体质/至尊锋刃”部分无视）
         invincible_effects = self.effect_manager.get_active_effects(defender_id, EffectType.INVINCIBLE)
         if invincible_effects:
-            if 'bypass_fraction' in locals() and bypass_fraction > 0:
-                partial = max(1, int(damage * bypass_fraction))
-                result["messages"].append(f"✨ {defender_name}处于无敌状态，但被锋刃/绝魔部分无视，仍造成{partial}伤害！")
-                damage = partial
+            bypass = 0.0
+            if 'bypass_fraction' in locals():
+                bypass = min(1.0, max(0.0, bypass_fraction))
+            invincible_msg = f"✨ {defender_name}处于无敌状态，"
+            if damage > 0:
+                if bypass > 0:
+                    partial = max(1, int(damage * bypass))
+                    invincible_msg += f"但被锋刃/绝魔部分无视，常规伤害仍造成{partial}！"
+                    damage = partial
+                else:
+                    invincible_msg += "常规伤害被完全免疫！"
+                    damage = 0
             else:
-                result["messages"].append(f"✨ {defender_name}处于无敌状态，免疫所有伤害！")
+                invincible_msg += "常规伤害被完全免疫！"
+            if guaranteed_damage > 0:
+                invincible_msg += f"必中段无视无敌，造成{guaranteed_damage}伤害！"
+            result["messages"].append(invincible_msg)
+            if damage == 0 and guaranteed_damage <= 0:
                 return result
 
         # 恐惧状态增伤（联动增强）
@@ -867,25 +877,22 @@ class EnhancedBattleEngine:
 
         # 显示实际伤害（扣除护盾后）
         # 斩龙闪：在文案中直观展示20%必中与80%常规的拆分
-        _gd = attack_result.get("guaranteed_damage", 0)
-        _nd = attack_result.get("normal_damage", 0)
         _normal_missed = attack_result.get("normal_missed", False)
+        normal_after_mod = damage
         _split_suffix = ""
         if has_guaranteed:
-            _nd_text = "被闪避" if _normal_missed else str(_nd)
-            _split_suffix = f" [20%:{_gd} + 80%:{_nd_text}]"
+            _nd_text = "被闪避" if _normal_missed else str(normal_after_mod)
+            _split_suffix = f" [20%:{guaranteed_damage} + 80%:{_nd_text}]"
 
+        final_damage = guaranteed_damage + damage
         if absorbed_by_shield > 0:
-            # pre_bypass 部分直接穿透护盾，故展示总伤害需包含该部分
-            total_shown = damage + absorbed_by_shield
-            if 'pre_bypass' in locals() and pre_bypass > 0:
-                total_shown += 0  # damage 已经包含 pre_bypass，不重复相加
-            attack_msg += f" 造成{total_shown}伤害(护盾吸收{absorbed_by_shield})" + _split_suffix
+            attack_msg += f" 造成{final_damage}伤害(护盾吸收{absorbed_by_shield})" + _split_suffix
         else:
-            attack_msg += f" 造成{damage}伤害" + _split_suffix
+            attack_msg += f" 造成{final_damage}伤害" + _split_suffix
 
         result["messages"].append(attack_msg)
-        result["total_damage"] = damage
+        result["total_damage"] = final_damage
+        damage = final_damage
 
         # 触发攻击时效果
         context = {
@@ -1226,8 +1233,8 @@ class EnhancedBattleEngine:
         """处理PVP攻击（使用已应用buff的属性）
 
         规则调整：
-        - guaranteed_fraction 部分的伤害“必中”（绕过命中判定），但不参与暴击/连击/额外穿透计算；
-          是否参与防御减伤按常规处理（真伤则无视防御）。
+        - guaranteed_fraction 部分的伤害“必中”（绕过命中判定），且直接结算为最终伤害，
+          不参与暴击、连击、额外穿透或任何形式的减伤。
         - 其余 (1 - guaranteed_fraction) 部分按原有流程进行完整判定。
         """
         result = {
@@ -1285,25 +1292,9 @@ class EnhancedBattleEngine:
 
         from ..utils import apply_defense_mitigation
 
-        # 5) 先计算 guaranteed 部分：不暴击、不穿透；真伤则不减伤
-        # 但如果防御方有绝魔体质，真伤效果被削弱50%
+        # 5) guaranteed 部分：直接结算为最终伤害，不参与任何减伤/暴击/穿透
         guaranteed_final = guaranteed_base
         if guaranteed_final > 0:
-            if has_true_damage:
-                # 检查防御方是否有绝魔体质（免疫50%真伤）
-                if ignore_special_ratio > 0:
-                    # 50%真伤 + 50%普通伤害（受防御减伤）
-                    true_damage_part = int(guaranteed_final * 0.5)
-                    normal_damage_part = guaranteed_final - true_damage_part
-                    # 普通伤害部分受防御减伤
-                    mitigation = apply_defense_mitigation(normal_damage_part, effective_defense)
-                    guaranteed_final = true_damage_part + mitigation["final_damage"]
-                    result["effects"].append("TRUE_DAMAGE(20%,绝魔免疫50%)")
-                else:
-                    result["effects"].append("TRUE_DAMAGE(20%)")
-            else:
-                mitigation = apply_defense_mitigation(guaranteed_final, effective_defense)
-                guaranteed_final = mitigation["final_damage"]
             result["effects"].append("GUARANTEED_20%")
 
         # 6) 再计算 normal 部分
@@ -1355,7 +1346,8 @@ class EnhancedBattleEngine:
                                ignore_special_ratio: float = 0.0,
                                guaranteed_fraction: float = 0.0) -> Dict:
         """
-        简化的对怪攻击判定，支持固定比例伤害必中（不参与命中/暴击/穿透），其余部分走常规判定。
+        简化的对怪攻击判定，支持固定比例伤害必中（直接结算最终伤害，不参与命中/暴击/穿透/减伤），
+        其余部分走常规判定。
         """
         # 基础与buff
         base_attrs = BattleAttributeCalculator.calculate_effective_attributes(attacker)
@@ -1410,14 +1402,9 @@ class EnhancedBattleEngine:
         from ..utils import apply_defense_mitigation
         monster_defense = monster_stats.get("defense", 0)
 
-        # guaranteed 部分：不暴击、不穿透；真伤则不减伤
+        # guaranteed 部分：直接结算为最终伤害，不参与任何减伤/暴击/穿透
         guaranteed_final = guaranteed_base
         if guaranteed_final > 0:
-            if has_true_damage:
-                result["effects"].append("TRUE_DAMAGE(20%)")
-            else:
-                mit = apply_defense_mitigation(guaranteed_final, monster_defense)
-                guaranteed_final = mit["final_damage"]
             result["effects"].append("GUARANTEED_20%")
 
         # normal 部分
