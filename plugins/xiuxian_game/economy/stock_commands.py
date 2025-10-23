@@ -337,10 +337,7 @@ async def handle_stock_init(event: MessageEvent):
 @stock_update_cmd.handle()
 async def handle_stock_update(event: MessageEvent):
     """手动更新气运价格（仅管理员）"""
-    # 检查权限
-    if not await SUPERUSER(event):
-        await stock_update_cmd.finish("⛔ 仅管理员可使用此命令")
-
+    # 注意：权限检查已在命令注册时通过 permission=SUPERUSER 完成，这里无需再次检查
     try:
         # 强制更新价格
         updated = await StockService.check_and_update_prices(force_update=True)
