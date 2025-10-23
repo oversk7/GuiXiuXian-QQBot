@@ -1286,10 +1286,21 @@ class EnhancedBattleEngine:
         from ..utils import apply_defense_mitigation
 
         # 5) 先计算 guaranteed 部分：不暴击、不穿透；真伤则不减伤
+        # 但如果防御方有绝魔体质，真伤效果被削弱50%
         guaranteed_final = guaranteed_base
         if guaranteed_final > 0:
             if has_true_damage:
-                result["effects"].append("TRUE_DAMAGE(20%)")
+                # 检查防御方是否有绝魔体质（免疫50%真伤）
+                if ignore_special_ratio > 0:
+                    # 50%真伤 + 50%普通伤害（受防御减伤）
+                    true_damage_part = int(guaranteed_final * 0.5)
+                    normal_damage_part = guaranteed_final - true_damage_part
+                    # 普通伤害部分受防御减伤
+                    mitigation = apply_defense_mitigation(normal_damage_part, effective_defense)
+                    guaranteed_final = true_damage_part + mitigation["final_damage"]
+                    result["effects"].append("TRUE_DAMAGE(20%,绝魔免疫50%)")
+                else:
+                    result["effects"].append("TRUE_DAMAGE(20%)")
             else:
                 mitigation = apply_defense_mitigation(guaranteed_final, effective_defense)
                 guaranteed_final = mitigation["final_damage"]
@@ -1303,7 +1314,22 @@ class EnhancedBattleEngine:
                 dmg = BattleAttributeCalculator.calculate_critical_damage(dmg, attacker_attrs["critical_power"])
                 result["effects"].append("CRITICAL")
             if has_true_damage:
-                result["effects"].append("TRUE_DAMAGE")
+                # 检查防御方是否有绝魔体质（免疫50%真伤）
+                if ignore_special_ratio > 0:
+                    # 50%真伤 + 50%普通伤害（受防御减伤）
+                    true_damage_part = int(dmg * 0.5)
+                    normal_damage_part = dmg - true_damage_part
+                    # 普通伤害部分受防御减伤
+                    if penetration_ratio > 0:
+                        mit = apply_defense_mitigation(normal_damage_part, effective_defense, penetration_ratio)
+                        dmg = true_damage_part + mit["final_damage"]
+                        result["effects"].append("TRUE_DAMAGE(绝魔免疫50%)+PENETRATION")
+                    else:
+                        mit = apply_defense_mitigation(normal_damage_part, effective_defense)
+                        dmg = true_damage_part + mit["final_damage"]
+                        result["effects"].append("TRUE_DAMAGE(绝魔免疫50%)")
+                else:
+                    result["effects"].append("TRUE_DAMAGE")
             else:
                 if penetration_ratio > 0:
                     mit = apply_defense_mitigation(dmg, effective_defense, penetration_ratio)

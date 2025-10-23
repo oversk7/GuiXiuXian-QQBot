@@ -494,10 +494,34 @@ class BattleIntegrationHelper:
                     if engine.rng.random() < (monster_counter_rate / 100):
                         # 怪物反击伤害为攻击力的70%
                         counter_damage = max(1, int(monster_stats["attack"] * 0.7))
+
+                        # 检查怪物是否有真伤属性
+                        monster_true_damage_rate = monster_stats.get("true_damage_rate", 0)
+                        has_true_damage = monster_true_damage_rate > 0
+
+                        # 检查玩家是否有绝魔体质
+                        from ..battle.battle_effects import EffectType
+                        ignore_special_effects = engine.effect_manager.get_active_effects(player.id, EffectType.IGNORE_SPECIAL)
+                        ignore_special_ratio = 0.0
+                        for eff in ignore_special_effects:
+                            val = float(getattr(eff, 'value', 0))
+                            ignore_special_ratio += max(0.0, val) / 100.0
+
                         from ..utils import apply_defense_mitigation
 
-                        mitigation = apply_defense_mitigation(counter_damage, player.defense)
-                        final_counter_damage = mitigation["final_damage"]
+                        if has_true_damage and ignore_special_ratio > 0:
+                            # 50%真伤 + 50%普通伤害
+                            true_damage_part = int(counter_damage * 0.5)
+                            normal_damage_part = counter_damage - true_damage_part
+                            mitigation = apply_defense_mitigation(normal_damage_part, player.defense)
+                            final_counter_damage = true_damage_part + mitigation["final_damage"]
+                        elif has_true_damage:
+                            # 完全真伤
+                            final_counter_damage = counter_damage
+                        else:
+                            # 普通伤害
+                            mitigation = apply_defense_mitigation(counter_damage, player.defense)
+                            final_counter_damage = mitigation["final_damage"]
 
                         player_hp = max(0, player_hp - final_counter_damage)
                         battle_log.append(f"🛡️ {monster_name}反击！造成{final_counter_damage}伤害")
@@ -519,13 +543,41 @@ class BattleIntegrationHelper:
                     battle_log.append(f"😱 {monster_name}被恐惧，无法行动")
                 else:
                     monster_damage = monster_stats["attack"]
+
+                    # 检查怪物是否有真伤属性（未来可能添加）
+                    monster_true_damage_rate = monster_stats.get("true_damage_rate", 0)
+                    has_true_damage = monster_true_damage_rate > 0
+
+                    # 检查玩家是否有绝魔体质（免疫50%真伤）
+                    from ..battle.battle_effects import EffectType
+                    ignore_special_effects = engine.effect_manager.get_active_effects(player.id, EffectType.IGNORE_SPECIAL)
+                    ignore_special_ratio = 0.0
+                    for eff in ignore_special_effects:
+                        val = float(getattr(eff, 'value', 0))
+                        ignore_special_ratio += max(0.0, val) / 100.0
+
                     # 应用防御减伤
                     from ..utils import apply_defense_mitigation
-                    mitigation = apply_defense_mitigation(monster_damage, player.defense)
-                    final_damage = mitigation["final_damage"]
+
+                    if has_true_damage:
+                        # 怪物有真伤属性
+                        if ignore_special_ratio > 0:
+                            # 玩家有绝魔体质：50%真伤 + 50%普通伤害（受防御减伤）
+                            true_damage_part = int(monster_damage * 0.5)
+                            normal_damage_part = monster_damage - true_damage_part
+                            mitigation = apply_defense_mitigation(normal_damage_part, player.defense)
+                            final_damage = true_damage_part + mitigation["final_damage"]
+                            battle_log.append(f"🔥 {monster_name}的真伤被绝魔体质免疫50%！")
+                        else:
+                            # 完全真伤，无视防御
+                            final_damage = monster_damage
+                            battle_log.append(f"🔥 {monster_name}的真伤无视防御！")
+                    else:
+                        # 普通伤害，正常计算防御减伤
+                        mitigation = apply_defense_mitigation(monster_damage, player.defense)
+                        final_damage = mitigation["final_damage"]
 
                     # 检查玩家是否有刚气-心效果（减少受到的伤害）
-                    from ..battle.battle_effects import EffectType
                     rigid_qi_effects = engine.effect_manager.get_active_effects(player.id, EffectType.RIGID_QI_HEART)
                     if rigid_qi_effects:
                         for rigid_effect in rigid_qi_effects:
@@ -672,10 +724,34 @@ class BattleIntegrationHelper:
                     if engine.rng.random() < (monster_counter_rate / 100):
                         # 怪物反击伤害为攻击力的70%
                         counter_damage = max(1, int(monster_stats["attack"] * 0.7))
+
+                        # 检查怪物是否有真伤属性
+                        monster_true_damage_rate = monster_stats.get("true_damage_rate", 0)
+                        has_true_damage = monster_true_damage_rate > 0
+
+                        # 检查玩家是否有绝魔体质
+                        from ..battle.battle_effects import EffectType
+                        ignore_special_effects = engine.effect_manager.get_active_effects(player.id, EffectType.IGNORE_SPECIAL)
+                        ignore_special_ratio = 0.0
+                        for eff in ignore_special_effects:
+                            val = float(getattr(eff, 'value', 0))
+                            ignore_special_ratio += max(0.0, val) / 100.0
+
                         from ..utils import apply_defense_mitigation
 
-                        mitigation = apply_defense_mitigation(counter_damage, player.defense)
-                        final_counter_damage = mitigation["final_damage"]
+                        if has_true_damage and ignore_special_ratio > 0:
+                            # 50%真伤 + 50%普通伤害
+                            true_damage_part = int(counter_damage * 0.5)
+                            normal_damage_part = counter_damage - true_damage_part
+                            mitigation = apply_defense_mitigation(normal_damage_part, player.defense)
+                            final_counter_damage = true_damage_part + mitigation["final_damage"]
+                        elif has_true_damage:
+                            # 完全真伤
+                            final_counter_damage = counter_damage
+                        else:
+                            # 普通伤害
+                            mitigation = apply_defense_mitigation(counter_damage, player.defense)
+                            final_counter_damage = mitigation["final_damage"]
 
                         player_hp = max(0, player_hp - final_counter_damage)
                         battle_log.append(f"🛡️ {monster_name}反击！造成{final_counter_damage}伤害")
@@ -865,10 +941,34 @@ class BattleIntegrationHelper:
                         if engine.rng.random() < (monster_counter_rate / 100):
                             # 怪物反击伤害为攻击力的70%
                             counter_damage = max(1, int(monster_stats["attack"] * 0.7))
+
+                            # 检查怪物是否有真伤属性
+                            monster_true_damage_rate = monster_stats.get("true_damage_rate", 0)
+                            has_true_damage = monster_true_damage_rate > 0
+
+                            # 检查玩家是否有绝魔体质
+                            from ..battle.battle_effects import EffectType
+                            ignore_special_effects = engine.effect_manager.get_active_effects(player.id, EffectType.IGNORE_SPECIAL)
+                            ignore_special_ratio = 0.0
+                            for eff in ignore_special_effects:
+                                val = float(getattr(eff, 'value', 0))
+                                ignore_special_ratio += max(0.0, val) / 100.0
+
                             from ..utils import apply_defense_mitigation
 
-                            mitigation = apply_defense_mitigation(counter_damage, player.defense)
-                            final_counter_damage = mitigation["final_damage"]
+                            if has_true_damage and ignore_special_ratio > 0:
+                                # 50%真伤 + 50%普通伤害
+                                true_damage_part = int(counter_damage * 0.5)
+                                normal_damage_part = counter_damage - true_damage_part
+                                mitigation = apply_defense_mitigation(normal_damage_part, player.defense)
+                                final_counter_damage = true_damage_part + mitigation["final_damage"]
+                            elif has_true_damage:
+                                # 完全真伤
+                                final_counter_damage = counter_damage
+                            else:
+                                # 普通伤害
+                                mitigation = apply_defense_mitigation(counter_damage, player.defense)
+                                final_counter_damage = mitigation["final_damage"]
 
                             player_hp = max(0, player_hp - final_counter_damage)
                             round_actions.append(f"⚡{monster_name}反击→{final_counter_damage}")
@@ -1422,12 +1522,41 @@ class BattleIntegrationHelper:
             current_damage = int(current_damage * 1.5)  # 怪物暴击1.5倍伤害
             result["effects"].append("💥暴击")
 
+        # 检查怪物是否有真伤属性（未来可能添加）
+        monster_true_damage_rate = monster_stats.get("true_damage_rate", 0)
+        has_true_damage = monster_true_damage_rate > 0
+
+        # 检查玩家是否有绝魔体质（免疫50%真伤）
+        from ..battle.battle_effects import EffectType
+        ignore_special_effects = engine.effect_manager.get_active_effects(player.id, EffectType.IGNORE_SPECIAL)
+        ignore_special_ratio = 0.0
+        for eff in ignore_special_effects:
+            val = float(getattr(eff, 'value', 0))
+            ignore_special_ratio += max(0.0, val) / 100.0
+
         # 防御减伤计算（数值减伤 + 比例减伤）
         from ..utils import apply_defense_mitigation
 
-        mitigation = apply_defense_mitigation(current_damage, player.defense)
-        final_damage = mitigation["final_damage"]
-        blocked_damage = mitigation["blocked"]
+        if has_true_damage:
+            # 怪物有真伤属性
+            if ignore_special_ratio > 0:
+                # 玩家有绝魔体质：50%真伤 + 50%普通伤害（受防御减伤）
+                true_damage_part = int(current_damage * 0.5)
+                normal_damage_part = current_damage - true_damage_part
+                mitigation = apply_defense_mitigation(normal_damage_part, player.defense)
+                final_damage = true_damage_part + mitigation["final_damage"]
+                blocked_damage = mitigation["blocked"]
+                result["effects"].append("🔥真伤(绝魔免疫50%)")
+            else:
+                # 完全真伤，无视防御
+                final_damage = current_damage
+                blocked_damage = 0
+                result["effects"].append("🔥真伤")
+        else:
+            # 普通伤害，正常计算防御减伤
+            mitigation = apply_defense_mitigation(current_damage, player.defense)
+            final_damage = mitigation["final_damage"]
+            blocked_damage = mitigation["blocked"]
 
         # 连击处理
         total_damage = final_damage
