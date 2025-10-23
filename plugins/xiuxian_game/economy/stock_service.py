@@ -29,6 +29,9 @@ class StockService:
     MIN_COMMISSION = 1
     MAX_COMMISSION = 1000000
 
+    # 持仓限制配置
+    MAX_SHARES_PER_STOCK = 1000000  # 每种股票最多持有100万份
+
     # 价格刷新配置
     PRICE_UPDATE_INTERVAL = timedelta(hours=1)  # 被动触发更新间隔：1小时
     
@@ -89,7 +92,22 @@ class StockService:
             # 验证交易数量
             if shares <= 0:
                 return False, "交易数量必须大于0"
-            
+
+            # 检查持仓限制
+            holding_stmt = select(StockHolding).where(
+                and_(StockHolding.player_id == player_id, StockHolding.stock_id == stock.id)
+            )
+            existing_holding = (await session.execute(holding_stmt)).scalars().first()
+            current_shares = existing_holding.shares if existing_holding else 0
+
+            # 检查买入后是否超过限制
+            if current_shares + shares > cls.MAX_SHARES_PER_STOCK:
+                remaining = cls.MAX_SHARES_PER_STOCK - current_shares
+                if remaining <= 0:
+                    return False, f"已达到持仓上限，每种气运最多持有 {cls.MAX_SHARES_PER_STOCK:,} 份"
+                else:
+                    return False, f"超过持仓上限，当前持有 {current_shares:,} 份，最多还能买入 {remaining:,} 份"
+
             # 计算交易金额和手续费
             unit_price = stock.current_price
             total_amount = unit_price * shares
