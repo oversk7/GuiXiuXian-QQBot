@@ -299,9 +299,15 @@ async def handle_auto_use_medicine(event: MessageEvent, args: Message = CommandA
                 event
             ))
 
+        effective_attrs = await player.get_effective_attributes(session)
+        effective_max_hp = effective_attrs.get("max_hp", player.max_hp)
+        effective_max_mp = effective_attrs.get("max_mp", player.max_mp)
+        current_hp = min(player.hp, effective_max_hp)
+        current_mp = min(player.mp, effective_max_mp)
+
         # 检查是否需要补血和补蓝
-        hp_needed = player.max_hp - player.hp
-        mp_needed = player.max_mp - player.mp
+        hp_needed = max(0, effective_max_hp - current_hp)
+        mp_needed = max(0, effective_max_mp - current_mp)
 
         if hp_needed <= 0 and mp_needed <= 0:
             await auto_use_medicine_cmd.finish(message_add_head(
@@ -402,8 +408,10 @@ async def handle_auto_use_medicine(event: MessageEvent, args: Message = CommandA
         if total_mp_restored > 0:
             result_msg.append(f"💙 恢复法力值：{total_mp_restored}")
 
+        current_hp = min(player.hp, effective_max_hp)
+        current_mp = min(player.mp, effective_max_mp)
         result_msg.extend([
-            f"📊 当前状态：{player.hp}/{player.max_hp} HP | {player.mp}/{player.max_mp} MP",
+            f"📊 当前状态：{current_hp}/{effective_max_hp} HP | {current_mp}/{effective_max_mp} MP",
             "━━━━━━━━━━━━━"
         ])
 
