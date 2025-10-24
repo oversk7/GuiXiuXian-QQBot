@@ -80,10 +80,17 @@ async def _restore_hp(player: Player, cfg: ItemConfig, qty: int, ctx: str, sessi
     value = int(cfg.effect_params.get("value", 0)) * qty
     if player.hp <= 0:
         return False, "🧐 你已经死亡，无法恢复生命"
-    if player.hp >= player.max_hp:
+
+    effective_max_hp = player.max_hp
+    if session:
+        effective_attrs = await player.get_effective_attributes(session)
+        effective_max_hp = effective_attrs.get("max_hp", effective_max_hp)
+
+    if player.hp >= effective_max_hp:
         return False, "🧐 你的生命值已满，不需要使用此物品"
-    player.hp = min(player.max_hp, player.hp + value)
-    return True, f"❤️ 恢复 {value} 点生命值 (当前 {player.hp}/{player.max_hp})"
+
+    player.hp = min(effective_max_hp, player.hp + value)
+    return True, f"❤️ 恢复 {value} 点生命值 (当前 {player.hp}/{effective_max_hp})"
 
 
 @register(ItemEffectType.RESTORE_MP)
@@ -91,23 +98,36 @@ async def _restore_mp(player: Player, cfg: ItemConfig, qty: int, ctx: str, sessi
     value = int(cfg.effect_params.get("value", 0)) * qty
     if player.hp <= 0:
         return False, "🧐 你已经死亡，无法恢复理智"
-    if player.mp >= player.max_mp:
+
+    effective_max_mp = player.max_mp
+    if session:
+        effective_attrs = await player.get_effective_attributes(session)
+        effective_max_mp = effective_attrs.get("max_mp", effective_max_mp)
+
+    if player.mp >= effective_max_mp:
         return False, "🧐 你的理智值已满，不需要使用此物品"
-    player.mp = min(player.max_mp, player.mp + value)
-    return True, f"🧠 恢复 {value} 点理智 (当前 {player.mp}/{player.max_mp})"
+
+    player.mp = min(effective_max_mp, player.mp + value)
+    return True, f"🧠 恢复 {value} 点理智 (当前 {player.mp}/{effective_max_mp})"
 
 
 @register(ItemEffectType.RESTORE_HP_PERCENT)
 async def _restore_hp_percent(player: Player, cfg: ItemConfig, qty: int, ctx: str, session=None) -> Tuple[bool, str]:
     if player.hp <= 0:
         return False, "🧐 你已经死亡，无法恢复生命"
-    if player.hp >= player.max_hp:
+
+    effective_max_hp = player.max_hp
+    if session:
+        effective_attrs = await player.get_effective_attributes(session)
+        effective_max_hp = effective_attrs.get("max_hp", effective_max_hp)
+
+    if player.hp >= effective_max_hp:
         return False, "🧐 你的生命值已满，不需要使用此物品"
 
     # 计算恢复量（效果不减弱）
     percent = float(cfg.effect_params.get("percent", 0)) * qty
-    value = int(player.max_hp * percent)
-    player.hp = min(player.max_hp, player.hp + value)
+    value = int(effective_max_hp * percent)
+    player.hp = min(effective_max_hp, player.hp + value)
 
     # 更新使用记录
     if session:
@@ -121,13 +141,19 @@ async def _restore_hp_percent(player: Player, cfg: ItemConfig, qty: int, ctx: st
 async def _restore_mp_percent(player: Player, cfg: ItemConfig, qty: int, ctx: str, session=None) -> Tuple[bool, str]:
     if player.hp <= 0:
         return False, "🧐 你已经死亡，无法恢复理智"
-    if player.mp >= player.max_mp:
+
+    effective_max_mp = player.max_mp
+    if session:
+        effective_attrs = await player.get_effective_attributes(session)
+        effective_max_mp = effective_attrs.get("max_mp", effective_max_mp)
+
+    if player.mp >= effective_max_mp:
         return False, "🧐 你的理智值已满，不需要使用此物品"
 
     # 计算恢复量（效果不减弱）
     percent = float(cfg.effect_params.get("percent", 0)) * qty
-    value = int(player.max_mp * percent)
-    player.mp = min(player.max_mp, player.mp + value)
+    value = int(effective_max_mp * percent)
+    player.mp = min(effective_max_mp, player.mp + value)
 
     # 更新使用记录
     if session:
