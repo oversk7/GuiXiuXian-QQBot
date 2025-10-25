@@ -177,21 +177,45 @@ async def handle_create_room(bot: Bot, event: MessageEvent, args: Message = Comm
             if not room:
                 await create_room_cmd.finish("⛔ 你不在任何房间中")
 
-            success, msg, _ = await RussianRouletteService.set_bet(
+            success, msg, bet_details = await RussianRouletteService.set_bet(
                 session, player.id, room.room_id, gold, item_bets
             )
 
             if success:
-                result_msg = (
-                    f"💰 筹码设置成功！\n"
-                    f"━━━━━━━━━━━━━\n"
-                    f"💎 投注金币：{gold}\n"
-                    f"💸 系统税收：{int(gold * 0.03 * 2)}金币 (3%)\n"
-                    f"🏆 获胜可得：{gold * 2 - int(gold * 0.03 * 2)}金币\n"
-                    f"━━━━━━━━━━━━━\n"
-                    f"⏳ 等待对手设置筹码...\n"
-                    f"📝 双方设置完成后使用：恶魔轮盘 开始"
-                )
+                opponent_gold = bet_details.get("opponent_gold", 0)
+                both_ready = bet_details.get("both_ready", False)
+                total_pool = bet_details.get("total_pool", gold + opponent_gold)
+
+                result_lines = [
+                    "💰 筹码设置成功！",
+                    "━━━━━━━━━━━━━",
+                    f"💎 你的投注：{gold}金币"
+                ]
+
+                if opponent_gold:
+                    result_lines.append(f"🎲 对手投注：{opponent_gold}金币")
+                else:
+                    result_lines.append("🎲 对手投注：尚未设置")
+
+                if both_ready:
+                    tax_amount = bet_details.get("tax_amount", 0)
+                    final_reward = bet_details.get("final_reward", total_pool - tax_amount)
+                    result_lines.extend([
+                        "━━━━━━━━━━━━━",
+                        f"💰 奖池总额：{total_pool}金币",
+                        f"💸 系统税收：{tax_amount}金币 (3%)",
+                        f"🏆 获胜可得：{final_reward}金币"
+                    ])
+                else:
+                    result_lines.extend([
+                        "━━━━━━━━━━━━━",
+                        f"💰 当前奖池：{total_pool}金币",
+                        "⏳ 等待对手设置筹码..."
+                    ])
+
+                result_lines.append("📝 双方设置完成后使用：恶魔轮盘 开始")
+
+                result_msg = "\n".join(result_lines)
                 await create_room_cmd.finish(message_add_head(result_msg, event))
             else:
                 await create_room_cmd.finish(message_add_head(f"❌ {msg}", event))
