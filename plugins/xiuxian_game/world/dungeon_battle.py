@@ -864,6 +864,14 @@ async def _handle_personal_monster(session, tile: WorldTile, player: Player) -> 
         player.exp += exp_gain
         battle_summary.append(f"🎉 你击杀了 {monster_full_display}，获得 {exp_gain} EXP")
 
+        # 诡异掉落材料机制
+        is_elite = tile.state.get("is_elite", False)
+        drop_result = await handle_monster_drops(
+            session, player, monster_level, player.region, rng, is_elite
+        )
+        if drop_result:
+            battle_summary.append(drop_result)
+
         # 更新战斗胜利统计（用于公会任务）
         if player.guild_id:
             from ..guild.guild_task_service import GuildTaskService
@@ -1031,12 +1039,6 @@ async def _handle_personal_monster(session, tile: WorldTile, player: Player) -> 
         _msg_kill2 = await _apply_blade_kill_mp_on_death(player)
         if _msg_kill2:
             battle_summary.append(_msg_kill2)
-
-        # 诡异掉落材料机制
-        is_elite = tile.state.get("is_elite", False)
-        drop_result = await handle_monster_drops(session, player, monster_level, player.region, rng, is_elite)
-        if drop_result:
-            battle_summary.append(drop_result)
 
     # 标记为已击败（无论是精英怪还是普通小怪）
     tile.state.setdefault("defeated_by", []).append(player.id)
