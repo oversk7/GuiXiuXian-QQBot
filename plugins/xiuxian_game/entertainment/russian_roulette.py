@@ -84,6 +84,7 @@ async def handle_create_room(bot: Bot, event: MessageEvent, args: Message = Comm
             "💰 筹码设置：\n"
             "▫️ 【恶魔轮盘 筹码 <金币数>】 - 只能投注金币\n"
             "▫️ 示例：恶魔轮盘 筹码 1000\n"
+            "▫️ 第二位下注者的金额需 ≥ 第一位下注者\n"
             "▫️ 注意：系统将抽取3%税收\n"
             "━━━━━━━━━━━━━\n"
             "🎲 游戏指令：\n"
