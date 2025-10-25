@@ -113,6 +113,18 @@ class RussianRouletteService:
         if player.gold < gold:
             return False, f"金币不足！你有{player.gold}金币，需要{gold}金币", {}
 
+        # 判断当前和对手的筹码情况
+        if room.player1_id == player_id:
+            current_bet = room.player1_gold_bet
+            opponent_bet = room.player2_gold_bet or 0
+        else:
+            current_bet = room.player2_gold_bet
+            opponent_bet = room.player1_gold_bet or 0
+
+        # 第二位下注的玩家需要满足不低于对手的筹码
+        if opponent_bet > 0 and current_bet == 0 and gold < opponent_bet:
+            return False, f"对手已下注 {opponent_bet} 金币，你的筹码至少需要相同", {}
+
         # 设置筹码（只有金币，不再支持道具）
         if room.player1_id == player_id:
             room.player1_gold_bet = gold
@@ -124,10 +136,27 @@ class RussianRouletteService:
         await session.commit()
 
         # 返回详细信息用于显示
+        opponent_gold = 0
+        if room.player1_id == player_id:
+            opponent_gold = room.player2_gold_bet or 0
+        else:
+            opponent_gold = room.player1_gold_bet or 0
+
+        both_ready = room.player1_gold_bet > 0 and room.player2_gold_bet > 0
+        total_pool = room.player1_gold_bet + room.player2_gold_bet if both_ready else gold + opponent_gold
+
         bet_details = {
             "gold": gold,
+            "opponent_gold": opponent_gold,
+            "both_ready": both_ready,
+            "total_pool": total_pool,
             "items": []  # 不再有道具
         }
+
+        if both_ready:
+            tax_rate = 0.03
+            bet_details["tax_amount"] = int(total_pool * tax_rate)
+            bet_details["final_reward"] = total_pool - bet_details["tax_amount"]
 
         return True, "筹码设置成功！", bet_details
     
