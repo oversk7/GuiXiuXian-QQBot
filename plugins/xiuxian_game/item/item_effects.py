@@ -134,7 +134,7 @@ async def _restore_hp_percent(player: Player, cfg: ItemConfig, qty: int, ctx: st
         await update_elixir_usage(session, player, cfg, qty)
 
     percent_display = int(percent * 100)
-    return True, f"❤️ 恢复 {percent_display}% 生命值 ({value}点) (当前 {player.hp}/{player.max_hp})"
+    return True, f"❤️ 恢复 {percent_display}% 生命值 ({value}点) (当前 {player.hp}/{effective_max_hp})"
 
 
 @register(ItemEffectType.RESTORE_MP_PERCENT)
@@ -160,7 +160,7 @@ async def _restore_mp_percent(player: Player, cfg: ItemConfig, qty: int, ctx: st
         await update_elixir_usage(session, player, cfg, qty)
 
     percent_display = int(percent * 100)
-    return True, f"🧠 恢复 {percent_display}% 理智值 ({value}点) (当前 {player.mp}/{player.max_mp})"
+    return True, f"🧠 恢复 {percent_display}% 理智值 ({value}点) (当前 {player.mp}/{effective_max_mp})"
 
 # 原地复活，与复活指令效果不同
 @register(ItemEffectType.REVIVE)
