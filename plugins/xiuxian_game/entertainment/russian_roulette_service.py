@@ -113,6 +113,18 @@ class RussianRouletteService:
         if player.gold < gold:
             return False, f"金币不足！你有{player.gold}金币，需要{gold}金币", {}
 
+        # 判断当前和对手的筹码情况
+        if room.player1_id == player_id:
+            current_bet = room.player1_gold_bet
+            opponent_bet = room.player2_gold_bet or 0
+        else:
+            current_bet = room.player2_gold_bet
+            opponent_bet = room.player1_gold_bet or 0
+
+        # 第二位下注的玩家需要满足不低于对手的筹码
+        if opponent_bet > 0 and current_bet == 0 and gold < opponent_bet:
+            return False, f"对手已下注 {opponent_bet} 金币，你的筹码至少需要相同", {}
+
         # 设置筹码（只有金币，不再支持道具）
         if room.player1_id == player_id:
             room.player1_gold_bet = gold
