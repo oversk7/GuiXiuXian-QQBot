@@ -110,6 +110,7 @@ def _extract_outer_event_id(event: Any) -> Optional[str]:
 try:
     from nonebot.message import run_preprocessor  # type: ignore
     from nonebot.exception import IgnoredException  # type: ignore
+    from nonebot.adapters import Bot, Event  # type: ignore
     _HAS_PREPROCESSOR = True
 except ImportError:
     _HAS_PREPROCESSOR = False
@@ -118,7 +119,7 @@ except ImportError:
 if _HAS_PREPROCESSOR:
 
     @run_preprocessor  # type: ignore[misc]
-    async def _event_id_dedup(bot: Any, event: Any, state: Dict[str, Any]) -> None:  # noqa: ANN401
+    async def _event_id_dedup(bot: Bot, event: Event, state: Dict[str, Any]) -> None:
         now = time.monotonic()
         _cleanup_event_ids(now)
 
