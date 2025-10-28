@@ -19,7 +19,7 @@ from ..models.db import safe_session
 from ..models.player import Player
 from ..models.npc import NPCType
 from ..models.inventory import ItemInstance
-from ..utils import message_add_head, check_action_limit, record_action
+from ..utils import message_add_head
 from .location_service import LocationService
 from .npc_service import NPCService
 from ..player.realm_utils import realm_by_level_and_reincarnation
@@ -167,12 +167,7 @@ attack_cmd = on_command("攻击", aliases={"死斗"}, block=True, priority=5)
 @attack_cmd.handle()
 async def handle_attack(event: MessageEvent, args: Message = CommandArg()):
     """处理攻击命令"""
-    # 频率限制
     user_id = event.get_user_id()
-    allowed, error_msg = check_action_limit(user_id, "attack")
-    if not allowed:
-        await attack_cmd.finish(error_msg)
-    record_action(user_id, "attack")
 
     args_text = args.extract_plain_text().strip()
 

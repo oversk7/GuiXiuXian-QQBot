@@ -421,18 +421,8 @@ class RateLimiter:
 # 全局频率限制器实例
 rate_limiter = RateLimiter()
 
-# 注册默认的操作限制 - 防止高频刷材料
-rate_limiter.register_action("move", RateLimitConfig(
-    max_requests=25,
-    time_window=30,
-    cooldown=0.9
-))
-
-rate_limiter.register_action("explore", RateLimitConfig(
-    max_requests=25,
-    time_window=30,
-    cooldown=0.9  # 每次探索间隔
-))
+# 注意：通用指令（move、explore 等）的速率限制已迁移到 message_guard.py 统一处理
+# 这里仅保留特殊业务逻辑的速率限制配置
 
 # 打工系统频率限制 - 防止过度刷金币
 rate_limiter.register_action("start_work", RateLimitConfig(
