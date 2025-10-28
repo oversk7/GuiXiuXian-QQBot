@@ -111,6 +111,7 @@ try:
     from nonebot.message import run_preprocessor  # type: ignore
     from nonebot.exception import IgnoredException  # type: ignore
     from nonebot.adapters import Bot, Event  # type: ignore
+    from nonebot.typing import T_State
     _HAS_PREPROCESSOR = True
 except ImportError:
     _HAS_PREPROCESSOR = False
@@ -119,7 +120,7 @@ except ImportError:
 if _HAS_PREPROCESSOR:
 
     @run_preprocessor  # type: ignore[misc]
-    async def _event_id_dedup(bot: Bot, event: Event, state: Dict[str, Any]) -> None:
+    async def _event_id_dedup(bot: Bot, event: Event, state: T_State) -> None:
         now = time.monotonic()
         _cleanup_event_ids(now)
 
