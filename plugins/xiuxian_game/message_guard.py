@@ -47,6 +47,21 @@ def _cleanup_messages(now: float) -> None:
         if _message_cache.get(key) == ts:
             _message_cache.pop(key, None)
 
+# 仅打印一次“外层id格式异常”日志，避免刷屏
+_outer_id_format_warned: bool = False
+
+def _normalize_outer_id(value: Any) -> Optional[str]:
+    global _outer_id_format_warned
+    if isinstance(value, (str, int)):
+        s = str(value)
+        # 经验规则：应包含事件类型前缀+冒号，且长度较长
+        if (":" in s) and (len(s) >= 20):
+            return s
+        if not _outer_id_format_warned:
+            logger.debug("Outer id format not recognized, skip dedup: %r", s)
+            _outer_id_format_warned = True
+    return None
+
 
 # —— 最外层 id 提取 ——
 
@@ -60,9 +75,9 @@ def _extract_outer_event_id(event: Any) -> Optional[str]:
     若均不可得，返回 None。
     """
     # 1) 直接属性
-    outer_id = getattr(event, "id", None)
-    if isinstance(outer_id, (str, int)):
-        return str(outer_id)
+    outer_id = _normalize_outer_id(getattr(event, "id", None))
+    if outer_id:
+        return outer_id
 
     # 2) model_dump/by_alias
     data: Optional[dict] = None
@@ -78,11 +93,15 @@ def _extract_outer_event_id(event: Any) -> Optional[str]:
             data = None
 
     if isinstance(data, dict):
-        if "id" in data and data["id"] is not None:
-            return str(data["id"])  # 可能为 'GROUP_AT_MESSAGE_CREATE:xxxx'
+        candidate = data.get("id")
+        outer_id = _normalize_outer_id(candidate)
+        if outer_id:
+            return outer_id
         header = data.get("header") if isinstance(data.get("header"), dict) else None
-        if header and header.get("id"):
-            return str(header["id"])
+        if header:
+            outer_id = _normalize_outer_id(header.get("id"))
+            if outer_id:
+                return outer_id
 
     return None
 
