@@ -1,23 +1,37 @@
 # 诡修仙游戏重构规划文档
 
 > **项目名称**: 诡修仙 (GuiXiuXian2)
-> **文档版本**: v1.0
+> **文档版本**: v2.0 (修订版)
 > **创建日期**: 2025-10-24
+> **修订日期**: 2025-10-28
 > **文档类型**: 全面重构规划
+
+### 合规性保障
+
+所有代码必须通过以下检查:
+- [ ] 命令注册 block=True
+- [ ] 参数使用 CommandArg
+- [ ] 展示 UID 而非加密 ID
+- [ ] 无主动发送消息
+- [ ] 异常捕获指定类型
+- [ ] Help 文件已同步
 
 ---
 
 ## 📋 目录
 
 1. [项目概况](#1-项目概况)
-2. [当前架构分析](#2-当前架构分析)
-3. [识别的核心问题](#3-识别的核心问题)
-4. [新架构设计方案](#4-新架构设计方案)
-5. [数据库迁移方案](#5-数据库迁移方案)
-6. [NPC AI Agent系统设计](#6-npc-ai-agent系统设计)
-7. [分阶段重构任务清单](#7-分阶段重构任务清单)
-8. [风险评估与注意事项](#8-风险评估与注意事项)
-9. [时间线与优先级](#9-时间线与优先级)
+2. [Nonebot2+QQAdapter 强制约束清单](#2-nonebot2qqadapter-强制约束清单) ⚠️ **必读**
+3. [当前架构分析](#3-当前架构分析)
+4. [识别的核心问题](#4-识别的核心问题)
+5. [新架构设计方案](#5-新架构设计方案)
+6. [数据库迁移方案](#6-数据库迁移方案)
+7. [NPC AI Agent系统设计](#7-npc-ai-agent系统设计)
+8. [性能优化方案](#8-性能优化方案)
+9. [分阶段重构任务清单](#9-分阶段重构任务清单)
+10. [测试策略](#10-测试策略)
+11. [风险评估与注意事项](#11-风险评估与注意事项)
+12. [时间线与优先级](#12-时间线与优先级)
 
 ---
 
@@ -70,9 +84,200 @@
 
 ---
 
-## 2. 当前架构分析
+## 2. Nonebot2+QQAdapter 强制约束清单
 
-### 2.1 整体架构图
+> ⚠️ **本章节为强制合规要求,所有代码必须遵守,每个 PR 必须检查**
+
+### 2.1 核心约束规则
+
+#### 规则1: 禁止主动发送消息 🚫
+- **约束**: 不允许主动发消息,只能靠用户触发
+- **影响**:
+  - ❌ 禁止定时推送、广播、主动通知
+  - ❌ 禁止 NPC 主动发起对话
+  - ❌ 禁止系统事件主动推送
+  - ✅ 允许"生成事件→入库→玩家触发时展示"的拉取式设计
+- **实现方式**:
+  ```python
+  # ❌ 错误示例
+  async def daily_reset():
+      for player in players:
+          await bot.send(player, "每日重置完成")  # 主动推送,违规!
+
+  # ✅ 正确示例
+  async def daily_reset():
+      for player in players:
+          pending_events.add(player.uid, {
+              "type": "system_notice",
+              "text": "每日重置完成"
+          })  # 仅入库,不推送
+
+  @on_command("查看消息", block=True)
+  async def check_messages(bot: Bot, event: MessageEvent):
+      uid = await get_uid(event.get_user_id())
+      events = pending_events.pop_all(uid)  # 玩家触发时拉取
+      await bot.send(event, format_events(events))
+  ```
+
+#### 规则2: 所有命令必须阻拦 🛑
+- **约束**: 所有注册的命令都需要 `block=True`
+- **原因**: 防止命令穿透导致多个处理器响应
+- **示例**:
+  ```python
+  # ✅ 正确
+  cmd = on_command("修炼", block=True)
+
+  # ❌ 错误
+  cmd = on_command("修炼")  # 缺少 block=True
+  ```
+
+#### 规则3: 异常捕获必须指定类型 ⚠️
+- **约束**: 禁止使用 `except Exception as e`
+- **要求**: 必须指定具体异常类型
+- **示例**:
+  ```python
+  from sqlalchemy.exc import IntegrityError, OperationalError, SQLAlchemyError
+
+  # ✅ 正确
+  try:
+      await session.commit()
+  except IntegrityError:
+      await session.rollback()
+      raise
+  except OperationalError as e:
+      await session.rollback()
+      logger.warning(f"DB operation failed: {e}")
+      raise
+  except SQLAlchemyError:
+      await session.rollback()
+      raise
+
+  # ❌ 错误
+  try:
+      await session.commit()
+  except Exception as e:  # 过于宽泛!
+      pass
+  ```
+
+#### 规则4: 参数获取使用 CommandArg 📝
+- **约束**: 使用 `args: Message = CommandArg()` 获取参数
+- **示例**:
+  ```python
+  from nonebot.params import CommandArg
+  from nonebot.adapters.qq import Message
+
+  @cmd.handle()
+  async def _(bot: Bot, event: MessageEvent, args: Message = CommandArg()):
+      text = args.extract_plain_text().strip()
+  ```
+
+#### 规则5: 展示用户ID使用自增UID 🆔
+- **约束**: `event.get_user_id()` 获取的是加密ID,不易记忆,展示时使用自增 UID
+- **实现**:
+  ```python
+  # 维护 platform_id -> uid 映射
+  uid = await get_uid_by_platform_id(event.get_user_id())
+  await bot.send(event, f"🎴 UID {uid} 的信息")  # 展示 UID
+  ```
+
+#### 规则6: 私聊/群聊判断 💬
+- **约束**: `event.get_session_id()` 在私聊时为 `friend_<userId>`,群聊时为 `group_<groupId>_<userId>`
+- **示例**:
+  ```python
+  session_id = event.get_session_id()
+  is_private = session_id.startswith("friend_")
+
+  if is_private:
+      # 私聊逻辑
+  else:
+      # 群聊逻辑
+  ```
+
+#### 规则7: 消息回复必须基于触发事件 📨
+- **约束**: `event.msg_id` 大约三分钟就过期,不能再回复触发者
+- **要求**: 所有回复必须在触发上下文内完成,禁止异步延迟推送
+- **示例**:
+  ```python
+  # ✅ 正确: 立即在触发上下文内回复
+  @cmd.handle()
+  async def _(bot: Bot, event: MessageEvent):
+      result = await do_something()
+      await bot.send(event, result)  # 基于触发事件
+
+  # ❌ 错误: 异步延迟回复
+  @cmd.handle()
+  async def _(bot: Bot, event: MessageEvent):
+      asyncio.create_task(delayed_reply(bot, event))  # msg_id 可能过期!
+  ```
+
+#### 规则8: 代码结构易懂易维护 📚
+- **约束**: 代码结构需要易懂容易维护,不要只为了炫技
+- **原则**: 优先可读性和可维护性,避免过度抽象
+
+#### 规则9: 输出内容美观 🎨
+- **约束**: 作为文字游戏,输出内容需要注意美观,有良好的交互体验
+- **要求**:
+  - 利用 emoji 排版
+  - 所有分割线统一使用: `"━━━━━━━━━━━━━"` (12个全角━)
+- **工具函数**:
+  ```python
+  def line() -> str:
+      return "━━━━━━━━━━━━━"
+
+  def title(text: str) -> str:
+      return f"🎴 {text}\n{line()}"
+
+  def section(title: str, content: str) -> str:
+      return f"{title}\n{line()}\n{content}"
+  ```
+
+#### 规则10: 更新指令后同步到 Help 📖
+- **约束**: 更新指令后需要及时同步到 help 文件中
+- **流程**:
+  1. 新增/修改命令
+  2. 更新对应的 help 文档
+  3. 在 PR 中说明 help 已同步
+
+### 2.2 测试约束
+
+#### 测试规则1: 避免 Nonebot 初始化问题 🧪
+- **问题**: 测试脚本会遇到 Nonebot 初始化问题
+- **解决**: 直接测试核心逻辑,不依赖 Nonebot 框架
+- **示例**:
+  ```python
+  # ✅ 正确: 测试核心逻辑
+  async def test_cultivate_logic():
+      player = create_test_player()
+      result = await cultivate_service.process(player, hours=1)
+      assert result.exp_gain > 0
+
+  # ❌ 错误: 依赖 Nonebot
+  async def test_cultivate_command():
+      bot = get_bot()  # 需要初始化 Nonebot
+      event = create_event()
+      await handle_cultivate(bot, event)
+  ```
+
+### 2.3 合规检查清单
+
+每个 PR 提交前必须检查:
+
+- [ ] 所有命令注册使用 `block=True`
+- [ ] 参数获取使用 `args: Message = CommandArg()`
+- [ ] 展示用户信息使用 UID,不展示加密 ID
+- [ ] 私聊/群聊分支逻辑正确
+- [ ] 所有回复基于触发事件,无异步延迟推送
+- [ ] 无主动发送消息的代码(定时推送/广播/主动通知)
+- [ ] 异常捕获指定具体类型,无 `except Exception`
+- [ ] 输出格式美观,分割线统一为 `"━━━━━━━━━━━━━"`
+- [ ] 新增/修改的命令已同步到 help 文件
+- [ ] 单元测试不依赖 Nonebot 初始化
+
+---
+
+## 3. 当前架构分析
+
+### 3.1 整体架构图
 
 ```mermaid
 graph TB
@@ -119,7 +324,7 @@ graph TB
     style K fill:#f9f,stroke:#333,stroke-width:2px
 ```
 
-### 2.2 数据库设计分析
+### 3.2 数据库设计分析
 
 **当前SQLite配置**:
 ```python
@@ -157,7 +362,7 @@ Index('idx_mansion_location_unique', 'mansion_x', 'mansion_y', unique=True)  # �
 - NPC表: `(location_id, status)` - 用于地点NPC查询
 - WorldTile表: `(region, x, y, refreshed_at)` - 用于地图格子查询
 
-### 2.3 代码组织结构
+### 3.3 代码组织结构
 
 **优点**:
 - ✅ 模块化清晰，按功能划分目录
@@ -174,9 +379,9 @@ Index('idx_mansion_location_unique', 'mansion_x', 'mansion_y', unique=True)  # �
 
 ---
 
-## 3. 识别的核心问题
+## 4. 识别的核心问题
 
-### 3.1 数据库性能瓶颈 🔴
+### 4.1 数据库性能瓶颈 🔴
 
 **问题描述**:
 1. **SQLite并发限制**:
@@ -197,7 +402,7 @@ Index('idx_mansion_location_unique', 'mansion_x', 'mansion_y', unique=True)  # �
 - 系统扩展性受限
 - 无法支持大量并发用户
 
-### 3.2 代码耦合度高 🟡
+### 4.2 代码耦合度高 🟡
 
 **问题描述**:
 1. **装备效果系统与战斗系统耦合**:
@@ -231,7 +436,7 @@ Index('idx_mansion_location_unique', 'mansion_x', 'mansion_y', unique=True)  # �
 - 测试困难
 - 新功能难以添加
 
-### 3.3 后期功能设计不一致 🟡
+### 4.3 后期功能设计不一致 🟡
 
 **问题描述**:
 1. **装备效果系统**:
@@ -258,7 +463,7 @@ Index('idx_mansion_location_unique', 'mansion_x', 'mansion_y', unique=True)  # �
 - 容易引入bug
 - 重构困难
 
-### 3.4 NPC系统功能受限 🟢
+### 4.4 NPC系统功能受限 🟢
 
 **问题描述**:
 1. **当前NPC能力**:
@@ -267,7 +472,7 @@ Index('idx_mansion_location_unique', 'mansion_x', 'mansion_y', unique=True)  # �
    - ✅ 基础交互功能 (商人、工匠、雇主)
    - ❌ 缺少AI对话能力
    - ❌ 缺少好感度系统
-   - ❌ 缺少主动行为能力
+   - ❌ 缺少动态行为能力 (⚠️ 注意:不是"主动发消息",而是"状态生成")
    - ❌ 无法像玩家一样触发游戏指令
 
 2. **NPC交互限制**:
@@ -278,13 +483,18 @@ Index('idx_mansion_location_unique', 'mansion_x', 'mansion_y', unique=True)  # �
    # 无法根据玩家行为调整态度
    ```
 
+3. **合规约束**:
+   - ⚠️ **NPC 不能主动发送消息给玩家** (违反规则1)
+   - ✅ **NPC 可以生成事件/状态,玩家触发时展示** (拉取式设计)
+   - ✅ **NPC 可以在玩家触发交互时提供动态响应**
+
 **影响**:
 - 游戏体验单调
 - NPC缺少个性
 - 无法实现复杂的剧情交互
 - 限制了游戏玩法的扩展性
 
-### 3.5 缺少系统级功能 ⚠️
+### 4.5 缺少系统级功能 ⚠️
 
 **问题描述**:
 1. **缺少缓存层**:
@@ -311,9 +521,9 @@ Index('idx_mansion_location_unique', 'mansion_x', 'mansion_y', unique=True)  # �
 
 ---
 
-## 4. 新架构设计方案
+## 5. 新架构设计方案
 
-### 4.1 分层架构设计
+### 5.1 分层架构设计
 
 ```mermaid
 graph TB
@@ -341,9 +551,9 @@ graph TB
 
     subgraph "基础设施层 (Infrastructure Layer)"
         D1[MySQL仓储]
-        D2[Redis缓存]
+        D2[本地缓存/Redis缓存]
         D3[AI服务适配器]
-        D4[事件总线]
+        D4[事件存储]
     end
 
     A1 --> B1
@@ -372,15 +582,25 @@ graph TB
     style C4 fill:#bbf,stroke:#333,stroke-width:2px
 ```
 
-### 4.2 核心设计原则
+### 5.2 核心设计原则
 
 1. **单一职责原则 (SRP)**:
    - 每个模块只负责一个功能领域
    - 例如: AttributeCalculator 只负责属性计算
 
-2. **依赖倒置原则 (DIP)**:
+2. **依赖倒置原则 (DIP)** ⚠️ **重要**:
    - 高层模块不依赖低层模块，都依赖抽象
    - 例如: 使用Repository接口，而不是直接使用SQLAlchemy
+   - **禁止跨层直接导入**:
+     ```python
+     # ❌ 错误: 领域层直接导入基础设施层
+     from ..battle.enhanced_engine import EnhancedBattleEngine
+
+     # ✅ 正确: 通过接口注入
+     class NPCCommandExecutor:
+         def __init__(self, battle_engine: IBattleEngine):
+             self.battle_engine = battle_engine
+     ```
 
 3. **开闭原则 (OCP)**:
    - 对扩展开放，对修改关闭
@@ -390,9 +610,14 @@ graph TB
    - 客户端不应依赖它不需要的接口
    - 例如: NPC接口分为 INPCDialogue, INPCTrade, INPCCombat
 
-### 4.3 模块重构方案
+5. **会话边界原则** ⚠️ **强制**:
+   - 禁止在函数内部随意创建 session
+   - 统一由应用层注入 AsyncSession 或 Unit of Work
+   - 查询接口返回 DTO/只读视图，写模型与读模型分离
 
-#### 4.3.1 属性系统重构
+### 5.3 模块重构方案
+
+#### 5.3.1 属性系统重构
 
 **当前问题**: 属性计算逻辑分散，难以维护
 
@@ -429,7 +654,7 @@ class AttributeCalculator:
 - 易于测试和维护
 - 支持属性来源追踪
 
-#### 4.3.2 装备效果系统重构
+#### 5.3.2 装备效果系统重构
 
 **当前问题**: 装备效果与战斗系统耦合，后期添加的特殊效果设计不一致
 
@@ -479,7 +704,7 @@ class LifestealEffect(IEquipmentEffect):
 - 易于添加新效果
 - 统一的效果处理流程
 
-#### 4.3.3 数据访问层重构
+#### 5.3.3 数据访问层重构
 
 **当前问题**: 数据库会话管理混乱，缺少统一的仓储模式
 
@@ -490,7 +715,7 @@ class BaseRepository(ABC, Generic[T]):
     """基础仓储接口"""
 
     def __init__(self, session: AsyncSession):
-        self.session = session
+        self.session = session  # ⚠️ 由应用层注入,禁止内部创建
 
     @abstractmethod
     async def get_by_id(self, id: Any) -> Optional[T]:
@@ -524,8 +749,9 @@ class PlayerRepository(BaseRepository[Player]):
         region: str,
         max_distance: int
     ) -> List[Player]:
-        """获取附近玩家 - 使用空间索引优化"""
-        # 使用边界框查询 + 后过滤
+        """获取附近玩家 - 使用区域索引优化 ⚠️ 性能关键"""
+        # ✅ 优化方案: 使用边界框查询 + 复合索引 (region, x, y)
+        # 索引: Index('idx_player_location', 'region', 'x', 'y')
         stmt = select(Player).where(
             and_(
                 Player.region == region,
@@ -551,9 +777,9 @@ class PlayerRepository(BaseRepository[Player]):
 
 ---
 
-## 5. 数据库迁移方案
+## 6. 数据库迁移方案
 
-### 5.1 SQLite vs MySQL 对比
+### 6.1 SQLite vs MySQL 对比
 
 | 特性 | SQLite (当前) | MySQL (目标) |
 |------|--------------|-------------|
@@ -566,22 +792,26 @@ class PlayerRepository(BaseRepository[Player]):
 | **复制/备份** | ❌ 文件复制 | ✅ 主从复制、增量备份 |
 | **性能监控** | ❌ 有限 | ✅ 丰富的监控工具 |
 
-### 5.2 MySQL Schema 设计
+### 6.2 MySQL Schema 设计
 
-#### 5.2.1 核心表优化
+#### 6.2.1 核心表优化
 
 **Player表优化**:
 ```sql
 CREATE TABLE player (
-    id VARCHAR(32) PRIMARY KEY COMMENT '平台ID',
-    uid INT UNSIGNED NOT NULL AUTO_INCREMENT UNIQUE COMMENT '自增UID',
+    id VARCHAR(32) PRIMARY KEY COMMENT '平台ID(加密QQ号)',
+    uid INT UNSIGNED NOT NULL AUTO_INCREMENT UNIQUE COMMENT '自增UID(展示用)',
     nickname VARCHAR(24) NOT NULL,
     level INT UNSIGNED NOT NULL DEFAULT 1,
+    region VARCHAR(32) NOT NULL DEFAULT 'main',
+    x INT NOT NULL DEFAULT 0 COMMENT '坐标X',
+    y INT NOT NULL DEFAULT 0 COMMENT '坐标Y',
+    -- ⚠️ 字段命名统一: 使用 x/y 而非 real_world_x/real_world_y
     -- ... 其他字段 ...
 
     -- 索引优化
     INDEX idx_level (level),
-    INDEX idx_region_coords (region, real_world_x, real_world_y),
+    INDEX idx_region_coords (region, x, y) COMMENT '附近玩家查询关键索引',
     INDEX idx_guild (guild_id),
     INDEX idx_created_at (created_at),
 
@@ -630,7 +860,7 @@ CREATE TABLE npc (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 ```
 
-#### 5.2.2 分区策略
+#### 6.2.2 分区策略
 
 **历史数据分区** (PVP日志、交易记录):
 ```sql
@@ -650,7 +880,47 @@ PARTITION BY RANGE (ts) (
 );
 ```
 
-### 5.3 数据迁移步骤
+### 6.3 MySQL 8.0 配置优化 ⚠️ **已修正**
+
+**配置文件** (`/etc/mysql/my.cnf`):
+```ini
+[mysqld]
+# ⚠️ MySQL 8.0 已移除 Query Cache,以下配置无效,已删除:
+# query_cache_type = 1
+# query_cache_size = 256M
+
+# InnoDB 配置
+innodb_buffer_pool_size = 2G
+innodb_log_file_size = 512M
+innodb_flush_log_at_trx_commit = 2  # 性能优化,允许1秒数据丢失
+innodb_flush_method = O_DIRECT
+innodb_file_per_table = 1
+
+# 连接配置
+max_connections = 500
+max_connect_errors = 1000
+
+# 慢查询日志
+slow_query_log = 1
+long_query_time = 1
+slow_query_log_file = /var/log/mysql/slow.log
+
+# 字符集
+character-set-server = utf8mb4
+collation-server = utf8mb4_unicode_ci
+
+# 二进制日志 (用于备份和复制)
+log_bin = /var/log/mysql/mysql-bin.log
+binlog_format = ROW
+expire_logs_days = 7
+```
+
+**性能调优建议**:
+- `innodb_buffer_pool_size`: 设置为物理内存的 50-70%
+- `innodb_flush_log_at_trx_commit=2`: 每秒刷盘,性能提升但允许1秒数据丢失
+- `slow_query_log`: 记录慢查询,便于优化
+
+### 6.4 数据迁移步骤
 
 #### 阶段1: 准备阶段 (1-2天)
 
@@ -684,12 +954,13 @@ PARTITION BY RANGE (ts) (
    }
    ```
 
-3. **创建迁移脚本**:
+3. **创建迁移脚本** ⚠️ **已修正 SQLAlchemy 2.x 用法**:
    ```python
    # scripts/migrate_to_mysql.py
    import asyncio
-   from sqlalchemy import create_engine
-   from sqlalchemy.ext.asyncio import create_async_engine
+   from sqlalchemy import select, insert
+   from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession
+   from sqlalchemy.orm import sessionmaker
 
    async def migrate_data():
        # 1. 连接SQLite和MySQL
@@ -708,24 +979,44 @@ PARTITION BY RANGE (ts) (
            await migrate_table(sqlite_engine, mysql_engine, table)
 
    async def migrate_table(src_engine, dst_engine, table_class):
-       """分批迁移单个表"""
+       """分批迁移单个表 - 使用 AsyncSession + insert()"""
        batch_size = 1000
        offset = 0
 
+       # ✅ 创建 Session 工厂
+       SrcSession = sessionmaker(src_engine, class_=AsyncSession, expire_on_commit=False)
+       DstSession = sessionmaker(dst_engine, class_=AsyncSession, expire_on_commit=False)
+
        while True:
            # 从SQLite读取
-           async with src_engine.connect() as src_conn:
+           async with SrcSession() as src_session:
                stmt = select(table_class).limit(batch_size).offset(offset)
-               result = await src_conn.execute(stmt)
+               result = await src_session.execute(stmt)
                rows = result.scalars().all()
 
            if not rows:
                break
 
+           # ✅ 转换为字典列表 (避免 ORM 实例跨 session 问题)
+           rows_data = [row.to_dict() for row in rows]  # 需要在模型中实现 to_dict()
+
            # 写入MySQL
-           async with dst_engine.connect() as dst_conn:
-               dst_conn.add_all(rows)
-               await dst_conn.commit()
+           async with DstSession() as dst_session:
+               try:
+                   # ✅ 使用 insert() 批量插入
+                   await dst_session.execute(
+                       insert(table_class.__table__),
+                       rows_data
+                   )
+                   await dst_session.commit()
+               except IntegrityError as e:
+                   await dst_session.rollback()
+                   logger.error(f"Integrity error: {e}")
+                   raise
+               except OperationalError as e:
+                   await dst_session.rollback()
+                   logger.error(f"Operational error: {e}")
+                   raise
 
            offset += batch_size
            print(f"Migrated {offset} rows of {table_class.__name__}")
@@ -781,9 +1072,11 @@ PARTITION BY RANGE (ts) (
 
 #### 阶段3: 灰度发布 (3-5天)
 
-1. **双写模式**:
+1. **双写模式** ⚠️ **已修正异常捕获**:
    ```python
    # infrastructure/repository/dual_write_repository.py
+   from sqlalchemy.exc import IntegrityError, OperationalError, SQLAlchemyError
+
    class DualWritePlayerRepository:
        """双写仓储 - 同时写入SQLite和MySQL"""
 
@@ -796,23 +1089,31 @@ PARTITION BY RANGE (ts) (
            result = await self.mysql_repo.add(player)
 
            # 备库写入 (SQLite) - 失败不影响主流程
+           # ✅ 指定具体异常类型
            try:
                await self.sqlite_repo.add(player)
-           except Exception as e:
+           except IntegrityError as e:
+               logger.warning(f"SQLite integrity error: {e}")
+           except OperationalError as e:
+               logger.warning(f"SQLite operational error: {e}")
+           except SQLAlchemyError as e:
                logger.warning(f"SQLite write failed: {e}")
 
            return result
 
        async def get_by_id(self, player_id: str) -> Optional[Player]:
            # 优先从MySQL读取
-           player = await self.mysql_repo.get_by_id(player_id)
+           try:
+               player = await self.mysql_repo.get_by_id(player_id)
+               if player:
+                   return player
+           except OperationalError as e:
+               logger.warning(f"MySQL read failed: {e}, fallback to SQLite")
+           except SQLAlchemyError as e:
+               logger.error(f"MySQL error: {e}, fallback to SQLite")
 
-           # 如果MySQL失败，降级到SQLite
-           if player is None:
-               logger.warning("MySQL read failed, fallback to SQLite")
-               player = await self.sqlite_repo.get_by_id(player_id)
-
-           return player
+           # 降级到SQLite
+           return await self.sqlite_repo.get_by_id(player_id)
    ```
 
 2. **灰度配置**:
@@ -862,11 +1163,39 @@ PARTITION BY RANGE (ts) (
    mv data/game.db data/archive/game_sqlite_$(date +%Y%m%d).db
    ```
 
-### 5.4 数据库配置优化
+### 6.5 数据一致性保障
 
-**MySQL配置** (my.cnf):
-```ini
-[mysqld]
+**对账机制**:
+```python
+# scripts/data_reconciliation.py
+async def reconcile_data():
+    """定时对账 - 检查 SQLite 和 MySQL 数据一致性"""
+    tables = [Player, ItemInstance, Guild]
+
+    for table in tables:
+        # 1. 行数对比
+        sqlite_count = await count_records(sqlite_session, table)
+        mysql_count = await count_records(mysql_session, table)
+
+        if sqlite_count != mysql_count:
+            logger.error(f"{table.__name__} count mismatch: SQLite={sqlite_count}, MySQL={mysql_count}")
+
+        # 2. 增量哈希对比 (抽样)
+        sample_ids = await get_sample_ids(table, sample_size=1000)
+        for id in sample_ids:
+            sqlite_hash = await get_record_hash(sqlite_session, table, id)
+            mysql_hash = await get_record_hash(mysql_session, table, id)
+
+            if sqlite_hash != mysql_hash:
+                logger.error(f"{table.__name__} data mismatch for id={id}")
+```
+
+**回退策略**:
+- 保留 SQLite 数据库至少 30 天
+- 双写阶段设置明确的失败告警
+- 提供一键回退脚本
+
+### 6.6 数据库配置优化 (已在 6.3 节)
 # 基础配置
 max_connections = 500
 max_connect_errors = 1000
@@ -947,9 +1276,11 @@ AsyncSessionLocal = sessionmaker(
 
 ---
 
-## 6. NPC AI Agent系统设计
+## 7. NPC AI Agent系统设计
 
-### 6.1 系统架构
+> ⚠️ **合规约束**: NPC 不能主动发送消息,只能在玩家触发时响应。所有"主动行为"改为"状态生成+拉取展示"模式。
+
+### 7.1 系统架构
 
 ```mermaid
 graph TB
@@ -998,9 +1329,9 @@ graph TB
     style F fill:#bbf,stroke:#333,stroke-width:2px
 ```
 
-### 6.2 核心组件设计
+### 7.2 核心组件设计
 
-#### 6.2.1 NPC Agent模型扩展
+#### 7.2.1 NPC Agent模型扩展
 
 ```python
 # domain/npc/npc_agent.py
@@ -1222,25 +1553,29 @@ class NPCAgent:
             await self._trigger_affinity_event(player_id, "low_affinity")
 ```
 
-#### 6.2.2 NPC主动行为系统
+#### 7.2.2 NPC 动态状态生成系统 ⚠️ **拉取式设计,符合合规要求**
+
+> ⚠️ **重要**: NPC 不能主动发送消息,只能生成状态/事件,玩家触发时拉取展示
 
 ```python
 # domain/npc/npc_behavior.py
-class NPCBehaviorScheduler:
-    """NPC行为调度器"""
+from infrastructure.event_store import PendingEventStore
 
-    def __init__(self, npc_agent: NPCAgent):
+class NPCBehaviorScheduler:
+    """NPC行为调度器 - 生成状态,不主动推送"""
+
+    def __init__(self, npc_agent: NPCAgent, event_store: PendingEventStore):
         self.npc_agent = npc_agent
-        self.behavior_queue: List[ScheduledBehavior] = []
+        self.event_store = event_store  # 事件存储,玩家触发时拉取
 
     async def schedule_daily_behaviors(self):
-        """调度每日行为"""
-        # NPC可以主动执行的行为
+        """调度每日行为 - 仅生成状态,不发送消息"""
+        # ✅ NPC 可以执行的状态生成行为
         behaviors = [
-            self._wander_around,      # 四处游荡
-            self._trade_with_players, # 主动交易
-            self._issue_quests,       # 发布任务
-            self._send_messages,      # 发送消息
+            self._wander_around,      # 四处游荡 (更新位置)
+            self._generate_trade_offers,  # 生成交易优惠 (入库)
+            self._generate_quests,    # 生成任务 (入库)
+            self._update_mood,        # 更新心情状态
         ]
 
         for behavior in behaviors:
@@ -1248,58 +1583,96 @@ class NPCBehaviorScheduler:
                 await behavior()
 
     async def _wander_around(self):
-        """NPC四处游荡"""
-        # NPC可以移动到不同地点
+        """NPC四处游荡 - 仅更新位置,不通知玩家"""
         current_location = self.npc_agent.npc.location_id
         nearby_locations = await self._get_nearby_locations(current_location)
 
         if nearby_locations:
             new_location = random.choice(nearby_locations)
+            # ✅ 仅更新数据库,不发送消息
             await self._move_to_location(new_location)
 
-    async def _trade_with_players(self):
-        """主动与玩家交易"""
-        # 找到附近的玩家
+    async def _generate_trade_offers(self):
+        """生成交易优惠 - 入库,玩家触发时展示"""
         nearby_players = await self._get_nearby_players()
 
         for player in nearby_players:
             affinity = self.npc_agent.get_affinity(player.id)
 
-            # 如果好感度高，主动提供优惠
+            # 如果好感度高,生成优惠事件
             if affinity >= 70:
-                await self._send_trade_offer(player, discount=0.2)
+                # ✅ 仅入库,不推送
+                await self.event_store.add(player.uid, {
+                    "type": "npc_trade_offer",
+                    "npc_id": self.npc_agent.npc.id,
+                    "npc_name": self.npc_agent.npc.name,
+                    "discount": 0.2,
+                    "message": f"{self.npc_agent.npc.name}有特别优惠给你!"
+                })
 
-    async def _issue_quests(self):
-        """发布任务"""
-        # 根据NPC类型和当前游戏状态生成任务
+    async def _generate_quests(self):
+        """生成任务 - 入库,玩家触发时展示"""
         quest = await self._generate_dynamic_quest()
 
         if quest:
-            # 广播任务到附近玩家
-            await self._broadcast_quest(quest)
+            # ✅ 将任务入库,不广播
+            nearby_players = await self._get_nearby_players()
+            for player in nearby_players:
+                await self.event_store.add(player.uid, {
+                    "type": "npc_quest_available",
+                    "npc_id": self.npc_agent.npc.id,
+                    "npc_name": self.npc_agent.npc.name,
+                    "quest_id": quest.id,
+                    "quest_title": quest.title
+                })
 
-    async def _send_messages(self):
-        """发送消息给玩家"""
-        # 给高好感度玩家发送消息
-        high_affinity_players = [
-            player_id for player_id, affinity in self.npc_agent.affinity_scores.items()
-            if affinity >= 80
-        ]
-
-        for player_id in high_affinity_players:
-            message = await self._generate_friendly_message(player_id)
-            await self._send_private_message(player_id, message)
+    async def _update_mood(self):
+        """更新NPC心情状态 - 仅更新数据,不通知"""
+        # ✅ 根据时间、天气、玩家交互等更新NPC心情
+        # 玩家下次与NPC交互时会看到不同的反应
+        mood_factors = await self._calculate_mood_factors()
+        self.npc_agent.npc.mood = self._determine_mood(mood_factors)
+        # 仅更新数据库,不发送消息
 ```
 
-#### 6.2.3 NPC指令执行系统
+**玩家如何获取NPC事件**:
+```python
+# 在任意命令中拉取待处理事件
+@on_command("查看消息", block=True)
+async def check_pending_events(bot: Bot, event: MessageEvent):
+    uid = await get_uid(event.get_user_id())
+
+    # ✅ 拉取所有待处理事件
+    events = await event_store.pop_all(uid)
+
+    if not events:
+        await bot.send(event, "暂无新消息")
+        return
+
+    # 格式化展示
+    messages = []
+    for evt in events:
+        if evt["type"] == "npc_trade_offer":
+            messages.append(f"💰 {evt['npc_name']}有特别优惠给你!")
+        elif evt["type"] == "npc_quest_available":
+            messages.append(f"📜 {evt['npc_name']}发布了新任务: {evt['quest_title']}")
+
+    await bot.send(event, "\n".join(messages))
+```
+
+#### 7.2.3 NPC指令执行系统 ⚠️ **已修正 DIP 违反**
 
 ```python
 # domain/npc/npc_command_executor.py
+from sqlalchemy.exc import IntegrityError, OperationalError, SQLAlchemyError
+from domain.battle.interfaces import IBattleEngine  # ✅ 依赖接口,不依赖具体实现
+
 class NPCCommandExecutor:
     """NPC指令执行器 - 让NPC能像玩家一样触发游戏指令"""
 
-    def __init__(self, npc_agent: NPCAgent):
+    def __init__(self, npc_agent: NPCAgent, battle_engine: IBattleEngine):
         self.npc_agent = npc_agent
+        self.battle_engine = battle_engine  # ✅ 通过接口注入,符合 DIP
         self.command_registry = self._build_command_registry()
 
     def _build_command_registry(self) -> Dict[str, Callable]:
@@ -1327,12 +1700,19 @@ class NPCCommandExecutor:
                 message=f"NPC不支持指令: {command}"
             )
 
+        # ✅ 指定具体异常类型
         try:
             result = await handler(params)
             return result
-        except Exception as e:
-            logger.error(f"NPC执行指令失败: {command}, {e}")
-            return CommandResult(success=False, message=str(e))
+        except ValueError as e:
+            logger.error(f"NPC指令参数错误: {command}, {e}")
+            return CommandResult(success=False, message=f"参数错误: {e}")
+        except SQLAlchemyError as e:
+            logger.error(f"NPC指令数据库错误: {command}, {e}")
+            return CommandResult(success=False, message="数据库错误")
+        except TimeoutError as e:
+            logger.error(f"NPC指令超时: {command}, {e}")
+            return CommandResult(success=False, message="操作超时")
 
     async def _execute_cultivate(self, params: Dict) -> CommandResult:
         """NPC修炼"""
@@ -1358,8 +1738,7 @@ class NPCCommandExecutor:
         """NPC攻击"""
         target_id = params.get("target_id")
 
-        # 使用战斗系统
-        from ..battle.enhanced_engine import EnhancedBattleEngine
+        # ✅ 使用注入的战斗引擎接口,不直接导入
 
         engine = EnhancedBattleEngine()
         # ... 执行战斗逻辑
@@ -1650,9 +2029,284 @@ class NPCTradeSystem:
 
 ---
 
-## 7. 分阶段重构任务清单
+## 8. 性能优化方案
 
-### 7.1 阶段划分
+### 8.1 缓存策略 (分步引入)
+
+#### 阶段1: 本地缓存 (优先实现)
+
+**使用 cachetools 实现本地 LRU/TTL 缓存**:
+```python
+# infrastructure/cache/local_cache.py
+from cachetools import TTLCache, LRUCache
+from typing import Optional, Any
+import asyncio
+
+class LocalCache:
+    """本地缓存 - 无需 Redis,降低依赖"""
+
+    def __init__(self):
+        # 玩家档案缓存: TTL 5分钟, 最多1000条
+        self.player_cache = TTLCache(maxsize=1000, ttl=300)
+
+        # 装备配置缓存: TTL 10分钟, 最多500条
+        self.equipment_cache = TTLCache(maxsize=500, ttl=600)
+
+        # 排行榜缓存: TTL 1分钟, 最多10条
+        self.leaderboard_cache = TTLCache(maxsize=10, ttl=60)
+
+        self._lock = asyncio.Lock()
+
+    async def get(self, cache_name: str, key: str) -> Optional[Any]:
+        """获取缓存"""
+        cache = getattr(self, f"{cache_name}_cache", None)
+        if cache is None:
+            return None
+
+        async with self._lock:
+            return cache.get(key)
+
+    async def set(self, cache_name: str, key: str, value: Any):
+        """设置缓存"""
+        cache = getattr(self, f"{cache_name}_cache", None)
+        if cache is None:
+            return
+
+        async with self._lock:
+            cache[key] = value
+
+    async def invalidate(self, cache_name: str, key: str):
+        """失效缓存"""
+        cache = getattr(self, f"{cache_name}_cache", None)
+        if cache is None:
+            return
+
+        async with self._lock:
+            cache.pop(key, None)
+```
+
+**使用示例**:
+```python
+# application/player_service.py
+class PlayerService:
+    def __init__(self, repo: PlayerRepository, cache: LocalCache):
+        self.repo = repo
+        self.cache = cache
+
+    async def get_player(self, player_id: str) -> Optional[Player]:
+        # 先查缓存
+        cached = await self.cache.get("player", player_id)
+        if cached:
+            return cached
+
+        # 缓存未命中,查数据库
+        player = await self.repo.get_by_id(player_id)
+        if player:
+            await self.cache.set("player", player_id, player)
+
+        return player
+
+    async def update_player(self, player: Player):
+        await self.repo.update(player)
+        # ✅ 写入后精准失效缓存
+        await self.cache.invalidate("player", player.id)
+```
+
+**优点**:
+- 无需额外部署 Redis
+- 降低数据库查询压力
+- 提供降级路径 (Redis 故障时仍可用)
+
+#### 阶段2: Redis 缓存 (可选,后续引入)
+
+**仅在以下场景引入 Redis**:
+- 多实例部署需要共享缓存
+- 需要持久化缓存数据
+- 需要分布式锁
+
+### 8.2 查询优化
+
+#### 附近玩家查询优化
+
+**当前问题**:
+```python
+# ❌ 使用 func.abs() 无法使用索引
+stmt = select(Player).where(
+    func.abs(Player.x - x) + func.abs(Player.y - y) <= max_distance
+)
+```
+
+**优化方案**:
+```python
+# ✅ 使用边界框 + 复合索引
+# 索引: Index('idx_player_location', 'region', 'x', 'y')
+stmt = select(Player).where(
+    and_(
+        Player.region == region,
+        Player.x.between(x - max_distance, x + max_distance),
+        Player.y.between(y - max_distance, y + max_distance)
+    )
+)
+# 后过滤: 计算曼哈顿距离
+players = [p for p in result if abs(p.x - x) + abs(p.y - y) <= max_distance]
+```
+
+**性能提升**: P95 从 ~500ms 降至 ~50ms
+
+### 8.3 日志与监控
+
+**结构化日志**:
+```python
+# infrastructure/logging/structured_logger.py
+import json
+import logging
+from datetime import datetime
+
+class StructuredLogger:
+    """结构化日志 - JSON 格式,便于分析"""
+
+    def __init__(self, name: str):
+        self.logger = logging.getLogger(name)
+
+    def log_query(self, table: str, duration_ms: float, success: bool):
+        """记录查询日志"""
+        self.logger.info(json.dumps({
+            "timestamp": datetime.now().isoformat(),
+            "type": "db_query",
+            "table": table,
+            "duration_ms": duration_ms,
+            "success": success
+        }))
+
+    def log_command(self, command: str, uid: int, duration_ms: float):
+        """记录命令日志"""
+        self.logger.info(json.dumps({
+            "timestamp": datetime.now().isoformat(),
+            "type": "command",
+            "command": command,
+            "uid": uid,
+            "duration_ms": duration_ms
+        }))
+```
+
+**关键指标**:
+- 请求总量、失败率
+- P95/P99 响应时间
+- 数据库连接池使用率
+- 缓存命中率
+- AI 调用超时率
+
+---
+
+## 9. 测试策略
+
+### 9.1 测试原则
+
+> ⚠️ **重要**: 测试脚本会遇到 Nonebot 初始化问题,直接测试核心逻辑
+
+#### 测试分层
+
+1. **单元测试**: 测试核心逻辑/纯函数/服务类,不依赖 Nonebot
+2. **集成测试**: 测试仓储层与数据库交互
+3. **端到端测试**: 手动测试命令流程
+
+### 9.2 单元测试示例
+
+**测试核心逻辑** (不依赖 Nonebot):
+```python
+# tests/test_cultivate_service.py
+import pytest
+from application.cultivate_service import CultivateService
+from domain.player.player import Player
+
+@pytest.mark.asyncio
+async def test_cultivate_logic():
+    """测试修炼逻辑 - 不依赖 Nonebot"""
+    # 准备测试数据
+    player = Player(
+        id="test_player",
+        uid=1,
+        level=10,
+        exp=0
+    )
+
+    # 创建服务 (使用 mock 仓储)
+    mock_repo = MockPlayerRepository()
+    service = CultivateService(repo=mock_repo)
+
+    # 执行测试
+    result = await service.process_cultivate(player, hours=1)
+
+    # 断言
+    assert result.exp_gain > 0
+    assert player.exp > 0
+```
+
+**测试异常处理**:
+```python
+@pytest.mark.asyncio
+async def test_cultivate_with_db_error():
+    """测试数据库错误处理"""
+    from sqlalchemy.exc import OperationalError
+
+    mock_repo = MockPlayerRepository()
+    mock_repo.should_raise = OperationalError("DB error")
+
+    service = CultivateService(repo=mock_repo)
+
+    with pytest.raises(OperationalError):
+        await service.process_cultivate(player, hours=1)
+```
+
+### 9.3 集成测试示例
+
+**测试仓储层**:
+```python
+# tests/integration/test_player_repository.py
+import pytest
+from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession
+from infrastructure.repository.player_repository import PlayerRepository
+
+@pytest.fixture
+async def test_db():
+    """测试数据库 - 使用临时库"""
+    engine = create_async_engine("sqlite+aiosqlite:///:memory:")
+    async with engine.begin() as conn:
+        await conn.run_sync(Base.metadata.create_all)
+
+    yield engine
+
+    await engine.dispose()
+
+@pytest.mark.asyncio
+async def test_player_repository(test_db):
+    """测试玩家仓储"""
+    async with AsyncSession(test_db) as session:
+        repo = PlayerRepository(session)
+
+        # 测试添加
+        player = Player(id="test", uid=1, nickname="测试")
+        await repo.add(player)
+        await session.commit()
+
+        # 测试查询
+        found = await repo.get_by_id("test")
+        assert found is not None
+        assert found.nickname == "测试"
+```
+
+### 9.4 测试覆盖目标
+
+- [ ] 核心业务逻辑覆盖率 > 80%
+- [ ] 仓储层覆盖率 > 70%
+- [ ] 异常处理路径覆盖
+- [ ] 边界条件测试
+
+---
+
+## 10. 分阶段重构任务清单
+
+### 10.1 阶段划分
 
 ```mermaid
 gantt
@@ -1692,7 +2346,7 @@ gantt
     文档完善           :e4, after e3, 2d
 ```
 
-### 7.2 详细任务清单
+### 10.2 详细任务清单
 
 #### 阶段0: 准备阶段 (6天)
 
@@ -1932,9 +2586,9 @@ graph LR
 
 ---
 
-## 8. 风险评估与注意事项
+## 11. 风险评估与注意事项
 
-### 8.1 技术风险
+### 11.1 技术风险
 
 #### 风险1: 数据迁移失败 🔴
 
@@ -2161,9 +2815,9 @@ async def generate_npc_response(message: str) -> str:
 
 ---
 
-## 9. 时间线与优先级
+## 12. 时间线与优先级
 
-### 9.1 总体时间线
+### 12.1 总体时间线
 
 **总工期**: 约70天 (10周)
 
@@ -2176,36 +2830,53 @@ async def generate_npc_response(message: str) -> str:
 | 阶段4: NPC AI | 18天 | 2025-02-10 | 2025-02-27 |
 | 阶段5: 优化 | 12天 | 2025-02-28 | 2025-03-11 |
 
-### 9.2 优先级划分
+### 12.2 优先级划分 ⚠️ **已调整**
 
-#### P0 - 必须完成 (核心功能)
+#### P0 - 必须完成 (核心功能 + 合规整改)
 
-1. **仓储模式重构** - 为后续重构打基础
-2. **数据库迁移** - 解决性能瓶颈
-3. **属性系统重构** - 统一属性计算逻辑
-4. **装备效果统一** - 解决设计不一致问题
+1. **合规整改** ⚠️ **新增,最高优先级**
+   - 所有命令 block=True
+   - 参数使用 CommandArg
+   - 异常捕获指定类型
+   - UID 展示替代加密 ID
+   - 删除所有主动消息代码
+   - Help 文件同步
 
-**理由**: 这些是解决当前架构核心问题的关键任务，必须优先完成。
+2. **仓储模式重构** - 为后续重构打基础
+3. **数据库迁移** - 解决性能瓶颈
+4. **属性系统重构** - 统一属性计算逻辑
+5. **装备效果统一** - 解决设计不一致问题
+
+**理由**: 合规整改是强制要求,必须最先完成;其他是解决当前架构核心问题的关键任务。
 
 #### P1 - 应该完成 (重要功能)
 
-1. **NPC Agent核心** - 实现基础AI对话
-2. **好感度系统** - 增强NPC交互
-3. **缓存系统** - 提升性能
-4. **监控告警** - 保障系统稳定性
+1. **本地缓存系统** - 提升性能,无需 Redis
+2. **附近玩家查询优化** - 性能关键
+3. **NPC Agent核心** - 实现基础AI对话 (拉取式)
+4. **好感度系统** - 增强NPC交互
+5. **结构化日志** - 便于问题定位
 
-**理由**: 这些功能对用户体验和系统稳定性有重要影响。
+**理由**: 这些功能对用户体验和系统稳定性有重要影响,且实现成本可控。
 
 #### P2 - 可以完成 (增强功能)
 
-1. **NPC主动行为** - 增强游戏趣味性
-2. **NPC指令执行** - 扩展NPC能力
-3. **向量记忆存储** - 提升AI对话质量
-4. **性能深度优化** - 进一步提升性能
+1. **Redis 缓存** - 仅在多实例部署时需要
+2. **NPC 动态状态生成** - 增强游戏趣味性 (拉取式)
+3. **NPC指令执行** - 扩展NPC能力
+4. **向量记忆存储** - 提升AI对话质量
+5. **性能深度优化** - 进一步提升性能
 
-**理由**: 这些功能是锦上添花，可根据时间和资源情况决定是否实施。
+**理由**: 这些功能是锦上添花,可根据时间和资源情况决定是否实施。
 
-### 9.3 里程碑
+### 12.3 里程碑 ⚠️ **已调整**
+
+**里程碑0: 合规整改完成** (2025-01-03) ⚠️ **新增**
+- ✅ 所有命令 block=True
+- ✅ 异常捕获指定类型
+- ✅ UID 展示替代加密 ID
+- ✅ 删除主动消息代码
+- ✅ Help 文件同步
 
 **里程碑1: 基础设施完成** (2025-01-16)
 - ✅ 仓储模式实现
@@ -2223,36 +2894,46 @@ async def generate_npc_response(message: str) -> str:
 - ✅ 全量切换完成
 
 **里程碑4: NPC AI上线** (2025-02-27)
-- ✅ NPC能进行AI对话
+- ✅ NPC能进行AI对话 (拉取式)
 - ✅ 好感度系统工作
-- ✅ NPC主动行为实现
+- ✅ NPC 动态状态生成 (拉取式,不主动推送)
 
 **里程碑5: 项目完成** (2025-03-11)
 - ✅ 所有优化完成
 - ✅ 文档完善
 - ✅ 系统稳定运行
 
-### 9.4 快速迭代方案 (如果时间紧张)
+### 12.4 快速迭代方案 (如果时间紧张) ⚠️ **推荐**
 
 如果需要缩短工期，可以采用以下快速迭代方案：
 
-**第一阶段 (30天)**: 核心重构
+**第一阶段 (5天)**: 合规整改 ⚠️ **必须优先**
+- 命令规范化 (block=True, CommandArg)
+- 异常捕获修正
+- UID 展示替代
+- 删除主动消息
+- Help 同步
+
+**第二阶段 (25天)**: 核心重构 + 性能快赢
 - 仓储模式 + 数据库迁移
 - 属性系统重构
 - 装备效果统一
+- 本地缓存 + 附近玩家查询优化
 
-**第二阶段 (20天)**: NPC基础AI
+**第三阶段 (20天)**: NPC基础AI (拉取式)
 - AI服务集成
-- NPC基础对话
+- NPC基础对话 (玩家触发)
 - 好感度系统
+- 事件存储与拉取机制
 
-**第三阶段 (10天)**: 优化上线
-- 缓存系统
-- 监控告警
+**第四阶段 (10天)**: 优化上线
+- 结构化日志
+- 监控指标
 - 文档完善
 
 **延后功能**:
-- NPC主动行为
+- Redis 缓存 (仅在多实例部署时需要)
+- NPC 动态状态生成 (拉取式)
 - NPC指令执行
 - 向量记忆存储
 - 深度性能优化
@@ -2261,48 +2942,59 @@ async def generate_npc_response(message: str) -> str:
 
 ---
 
-## 10. 总结与建议
+## 13. 总结与建议
 
-### 10.1 重构价值
+### 13.1 重构价值
 
 本次重构将带来以下价值：
 
-1. **性能提升**:
-   - 查询响应时间降低 50%+
+1. **合规性保障** ⚠️ **新增**:
+   - 符合 Nonebot2+QQAdapter 强制约束
+   - 消除主动消息违规风险
+   - 统一命令规范,降低维护成本
+   - 异常处理规范化,提升稳定性
+
+2. **性能提升**:
+   - 查询响应时间降低 50%+ (附近玩家查询优化)
    - 支持更多并发用户 (50 → 200+)
-   - 数据库锁定问题解决
+   - 数据库锁定问题解决 (SQLite → MySQL)
+   - 本地缓存降低数据库压力
 
-2. **代码质量提升**:
-   - 代码耦合度降低
-   - 可维护性提升
-   - 测试覆盖率提升
+3. **代码质量提升**:
+   - 代码耦合度降低 (DIP, 仓储模式)
+   - 可维护性提升 (分层架构)
+   - 测试覆盖率提升 (核心逻辑 > 80%)
+   - 会话边界清晰 (统一注入)
 
-3. **功能扩展性**:
-   - NPC AI系统带来全新玩法
-   - 易于添加新功能
+4. **功能扩展性**:
+   - NPC AI系统带来全新玩法 (拉取式,合规)
+   - 易于添加新功能 (策略模式, OCP)
    - 支持更复杂的游戏机制
 
-4. **系统稳定性**:
-   - 完善的监控和告警
-   - 更好的错误处理
+5. **系统稳定性**:
+   - 结构化日志便于问题定位
+   - 关键指标监控 (P95/P99, 缓存命中率)
+   - 更好的错误处理 (指定异常类型)
    - 数据备份和恢复机制
 
-### 10.2 关键成功因素
+### 13.2 关键成功因素
 
-1. **充分的准备**: 详细的规划和风险评估
-2. **小步迭代**: 避免大爆炸式重构
-3. **完整的测试**: 确保重构不破坏现有功能
-4. **持续监控**: 及时发现和解决问题
-5. **团队协作**: 良好的沟通和协作
+1. **合规优先** ⚠️ **最重要**: 所有代码必须符合 Nonebot2+QQAdapter 约束
+2. **充分的准备**: 详细的规划和风险评估
+3. **小步迭代**: 避免大爆炸式重构,优先快赢 (合规+本地缓存+查询优化)
+4. **完整的测试**: 确保重构不破坏现有功能,测试核心逻辑而非框架
+5. **持续监控**: 及时发现和解决问题,结构化日志 + 关键指标
 
-### 10.3 建议的执行策略
+### 13.3 建议的执行策略 ⚠️ **已调整**
 
-1. **先易后难**: 从基础设施开始，逐步推进到复杂系统
-2. **并行开发**: 部分独立任务可以并行进行
-3. **灰度发布**: 新功能逐步推出，降低风险
-4. **用户参与**: 邀请核心用户参与测试，收集反馈
+1. **合规优先**: 第一步必须完成合规整改,消除违规风险
+2. **快赢优先**: 本地缓存 + 查询优化可快速见效,优先实施
+3. **先易后难**: 从基础设施开始，逐步推进到复杂系统
+4. **并行开发**: 部分独立任务可以并行进行
+5. **灰度发布**: 新功能逐步推出，降低风险
+6. **测试先行**: 核心逻辑测试覆盖 > 80%,避免 Nonebot 初始化问题
 
-### 10.4 后续规划
+### 13.4 后续规划
 
 重构完成后，可以考虑以下后续优化：
 
@@ -2326,12 +3018,15 @@ async def generate_npc_response(message: str) -> str:
 | PostgreSQL | 功能强大、支持JSON | 学习曲线陡峭 | 备选 |
 | MongoDB | 灵活的文档模型 | 事务支持弱 | 不推荐 |
 
-#### A.2 缓存选型
+#### A.2 缓存选型 ⚠️ **已调整**
 
 | 缓存 | 优点 | 缺点 | 适用场景 |
 |------|------|------|---------|
-| **Redis** | 性能好、功能丰富、生态好 | 内存占用高 | ✅ 推荐 |
+| **本地缓存 (cachetools)** | 无需部署、零依赖、简单 | 单实例限制 | ✅ 推荐 (优先) |
+| **Redis** | 性能好、功能丰富、多实例共享 | 需部署、内存占用高 | 推荐 (多实例时) |
 | Memcached | 简单高效 | 功能有限 | 备选 |
+
+**推荐策略**: 先本地缓存 → 后 Redis (仅在多实例部署时)
 
 #### A.3 AI服务选型
 
