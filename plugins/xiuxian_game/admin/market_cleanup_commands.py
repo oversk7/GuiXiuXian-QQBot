@@ -56,9 +56,6 @@ async def handle_cleanup(event: MessageEvent, args: Message = CommandArg()):
         auto_removed_missing: List[str] = []
 
         for order in orders:
-            if order.side != OrderSide.SELL:
-                continue
-
             # 对于普通物品，底价可被缓存；装备需要逐件计算
             floor_price: int | None = None
             cap_price: int | None = None
@@ -73,7 +70,7 @@ async def handle_cleanup(event: MessageEvent, args: Message = CommandArg()):
                     auto_removed_missing.append(
                         f"🆔{order.id}┃装备实例缺失，直接清理"
                     )
-                    session.delete(order)
+                    await session.delete(order)
                     continue
 
                 floor_price = await _compute_equipment_floor_price(session, equipment)
@@ -90,7 +87,7 @@ async def handle_cleanup(event: MessageEvent, args: Message = CommandArg()):
                         auto_removed_missing.append(
                             f"🆔{order.id}┃物品配置缺失，直接清理"
                         )
-                        session.delete(order)
+                        await session.delete(order)
                         continue
                     item_floor_cache[item_id] = await _compute_item_floor_price(
                         session, item_cfg
@@ -110,7 +107,7 @@ async def handle_cleanup(event: MessageEvent, args: Message = CommandArg()):
             hard_cap = base_price * 100
 
             reasons: List[str] = []
-            if order.price > cap_price:
+            if order.side == OrderSide.SELL and order.price > cap_price:
                 reasons.append(f"超过建议上限 {cap_price}💰")
             if order.price > hard_cap:
                 reasons.append(f"超过基础价百倍 {hard_cap}💰")
@@ -120,7 +117,7 @@ async def handle_cleanup(event: MessageEvent, args: Message = CommandArg()):
                 removed.append(
                     f"🆔{order.id}┃{item_name}┃{order.price}💰 ＞ {'、'.join(reasons)}"
                 )
-                session.delete(order)
+                await session.delete(order)
 
         if not removed and not auto_removed_missing:
             await cleanup_cmd.finish(
