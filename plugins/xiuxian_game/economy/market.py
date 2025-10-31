@@ -6,6 +6,7 @@ from sqlalchemy import select, func, asc, desc, and_
 from sqlalchemy.orm import selectinload
 from ..models.db import safe_session
 from ..models.market_order import MarketOrder, OrderSide
+from ..models.trade_record import TradeRecord, TradeType
 from ..models.player import Player
 from ..models.inventory import ItemInstance
 from ..config import config
@@ -13,7 +14,7 @@ from ..utils import message_add_head
 from .equipment_trade_service import EquipmentTradeService
 from ..item.equipment_commands import find_equipment_by_input
 
-from datetime import date
+from datetime import date, datetime, timedelta
 
 MAX_LISTINGS = 6  # 每位玩家最大挂牌数
 AUTO_MATCH = True
@@ -69,6 +70,10 @@ def calculate_transaction_tax(amount: int) -> int:
 # ====== 价格基础与底价吸附（调低整体物价与门槛） ======
 PRICE_FLOOR_ALPHA = 0.6   # 参考价折扣系数（底价≈参考价*alpha 与 经济基础价 取最大）
 MIN_UNIT_PRICE = 10       # 系统绝对最小单价下限（如需进一步降低门槛可改为 5）
+
+# 成交价采样窗口及阈值（用于底价估计，详见 _compute_item_floor_price）
+TRADE_REF_LOOKBACK_DAYS = 7       # 最近 N 天的成交价作为参考样本
+TRADE_REF_MIN_SAMPLES = 5         # 至少需要的成交样本数，低于该值将回退到挂牌价/经济基础价
 
 # 全局经济倍率（更温和的倍率，避免底价被放大过头）
 ECONOMY_MULT_BY_TYPE = {
@@ -146,30 +151,53 @@ async def _compute_item_floor_price(session, item_cfg) -> int:
     scale = await _get_wealth_scale(session)
     econ_base = int(base * t_mult * r_mult * scale)
 
-    # 取最近 50 条非装备卖单作为参考
-    stmt = (
-        select(MarketOrder.price)
+    lookback_since = datetime.now() - timedelta(days=TRADE_REF_LOOKBACK_DAYS)
+    trade_stmt = (
+        select(TradeRecord.unit_price)
         .where(
-            MarketOrder.item_id == item_cfg.item_id,
-            MarketOrder.side == OrderSide.SELL,
-            MarketOrder.is_instance_trade == False,
+            TradeRecord.item_id == item_cfg.item_id,
+            TradeRecord.trade_type == TradeType.SELL,
+            TradeRecord.trade_time >= lookback_since,
         )
-        .order_by(desc(MarketOrder.created_at))
-        .limit(50)
+        .order_by(desc(TradeRecord.trade_time))
+        .limit(200)
     )
-    prices = [int(p) for (p,) in (await session.execute(stmt)).all()]
+    trade_prices = [int(p) for (p,) in (await session.execute(trade_stmt)).all()]
+
     # 剔除过低异常值（小于基础价的60%或小于最小单价）
     lo_cut = max(int(base * 0.6), MIN_UNIT_PRICE)
-    prices = [p for p in prices if p >= lo_cut]
-    if prices:
-        prices.sort()
-        n = len(prices)
+    trade_prices = [p for p in trade_prices if p >= lo_cut]
+
+    ref_floor = 0
+    if len(trade_prices) >= TRADE_REF_MIN_SAMPLES:
+        trade_prices.sort()
+        n = len(trade_prices)
         trim = max(1, n // 10) if n >= 10 else 0
-        core = prices[trim:n - trim] if trim and n - trim > trim else prices
+        core = trade_prices[trim:n - trim] if trim and n - trim > trim else trade_prices
         ref = sum(core) / len(core)
         ref_floor = int(ref * PRICE_FLOOR_ALPHA)
     else:
-        ref_floor = 0
+        # 回退：若成交样本不足，混合最近的挂牌价，避免底价回落为 0
+        order_stmt = (
+            select(MarketOrder.price)
+            .where(
+                MarketOrder.item_id == item_cfg.item_id,
+                MarketOrder.side == OrderSide.SELL,
+                MarketOrder.is_instance_trade == False,
+            )
+            .order_by(desc(MarketOrder.created_at))
+            .limit(20)
+        )
+        order_prices = [int(p) for (p,) in (await session.execute(order_stmt)).all()]
+        order_prices = [p for p in order_prices if p >= lo_cut]
+        combined = trade_prices + order_prices
+        if combined:
+            combined.sort()
+            n = len(combined)
+            trim = max(1, n // 10) if n >= 10 else 0
+            core = combined[trim:n - trim] if trim and n - trim > trim else combined
+            ref = sum(core) / len(core)
+            ref_floor = int(ref * PRICE_FLOOR_ALPHA)
 
     floor_price = max(econ_base, ref_floor, MIN_UNIT_PRICE)
     return floor_price
