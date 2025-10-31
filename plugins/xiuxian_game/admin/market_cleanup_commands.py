@@ -8,7 +8,9 @@ from nonebot.adapters.qq import MessageEvent, Message
 from sqlalchemy import select
 
 from ..ai_guide import is_admin
+from ..economy.equipment_trade_service import EquipmentTradeService
 from ..economy.market import (
+    MIN_UNIT_PRICE,
     PRICE_CAP_MULT,
     _compute_equipment_floor_price,
     _compute_item_floor_price,
@@ -49,6 +51,7 @@ async def handle_cleanup(event: MessageEvent, args: Message = CommandArg()):
             await cleanup_cmd.finish(message_add_head("📭 市场目前没有任何挂牌", event))
 
         item_floor_cache: Dict[str, int] = {}
+        item_base_cache: Dict[str, int] = {}
         removed: List[str] = []
         auto_removed_missing: List[str] = []
 
@@ -59,6 +62,7 @@ async def handle_cleanup(event: MessageEvent, args: Message = CommandArg()):
             # 对于普通物品，底价可被缓存；装备需要逐件计算
             floor_price: int | None = None
             cap_price: int | None = None
+            base_price: int | None = None
 
             if order.is_instance_trade:
                 equipment = None
@@ -74,6 +78,10 @@ async def handle_cleanup(event: MessageEvent, args: Message = CommandArg()):
 
                 floor_price = await _compute_equipment_floor_price(session, equipment)
                 cap_price = max(int(floor_price * multiplier), floor_price)
+                base_price = max(
+                    int(EquipmentTradeService.calculate_equipment_value_range(equipment)[0]),
+                    MIN_UNIT_PRICE,
+                )
             else:
                 item_id = order.item_id
                 if item_id not in item_floor_cache:
@@ -87,16 +95,30 @@ async def handle_cleanup(event: MessageEvent, args: Message = CommandArg()):
                     item_floor_cache[item_id] = await _compute_item_floor_price(
                         session, item_cfg
                     )
+                    base_price_val = max(
+                        int(getattr(item_cfg, "price", 0) or 0),
+                        MIN_UNIT_PRICE,
+                    )
+                    item_base_cache[item_id] = base_price_val
                 floor_price = item_floor_cache[item_id]
                 cap_price = max(int(floor_price * multiplier), floor_price)
+                base_price = item_base_cache.get(item_id, MIN_UNIT_PRICE)
 
-            if cap_price is None or floor_price is None:
+            if cap_price is None or floor_price is None or base_price is None:
                 continue
 
+            hard_cap = base_price * 100
+
+            reasons: List[str] = []
             if order.price > cap_price:
+                reasons.append(f"超过建议上限 {cap_price}💰")
+            if order.price > hard_cap:
+                reasons.append(f"超过基础价百倍 {hard_cap}💰")
+
+            if reasons:
                 item_name = order.item.name if order.item else order.item_id
                 removed.append(
-                    f"🆔{order.id}┃{item_name}┃{order.price}💰 ＞ 上限 {cap_price}💰"
+                    f"🆔{order.id}┃{item_name}┃{order.price}💰 ＞ {'、'.join(reasons)}"
                 )
                 session.delete(order)
 
