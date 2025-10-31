@@ -70,7 +70,7 @@ async def handle_cleanup(event: MessageEvent, args: Message = CommandArg()):
                     auto_removed_missing.append(
                         f"🆔{order.id}┃装备实例缺失，直接清理"
                     )
-                    session.delete(order)
+                    await session.delete(order)
                     continue
 
                 floor_price = await _compute_equipment_floor_price(session, equipment)
@@ -87,7 +87,7 @@ async def handle_cleanup(event: MessageEvent, args: Message = CommandArg()):
                         auto_removed_missing.append(
                             f"🆔{order.id}┃物品配置缺失，直接清理"
                         )
-                        session.delete(order)
+                        await session.delete(order)
                         continue
                     item_floor_cache[item_id] = await _compute_item_floor_price(
                         session, item_cfg
@@ -117,7 +117,7 @@ async def handle_cleanup(event: MessageEvent, args: Message = CommandArg()):
                 removed.append(
                     f"🆔{order.id}┃{item_name}┃{order.price}💰 ＞ {'、'.join(reasons)}"
                 )
-                session.delete(order)
+                await session.delete(order)
 
         if not removed and not auto_removed_missing:
             await cleanup_cmd.finish(
