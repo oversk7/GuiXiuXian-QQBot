@@ -69,6 +69,7 @@ def calculate_transaction_tax(amount: int) -> int:
 # ====== 价格基础与底价吸附（调低整体物价与门槛） ======
 PRICE_FLOOR_ALPHA = 0.6   # 参考价折扣系数（底价≈参考价*alpha 与 经济基础价 取最大）
 MIN_UNIT_PRICE = 10       # 系统绝对最小单价下限（如需进一步降低门槛可改为 5）
+PRICE_CAP_MULT = 8        # 建议价倍数上限，防止恶意拉高挂牌价格
 
 # 全局经济倍率（更温和的倍率，避免底价被放大过头）
 ECONOMY_MULT_BY_TYPE = {
@@ -206,7 +207,9 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
         if price < 10 or quantity <= 0:
             raise ValueError
     except ValueError:
-        await list_cmd.finish("⛔ 单价不能低于10，数量必须为正整数")
+        await list_cmd.finish(
+            f"⛔ 单价不能低于10，数量必须为正整数，且挂牌价格需在建议底价的 {PRICE_CAP_MULT} 倍以内"
+        )
 
     # 物品模板
     item_cfg = config.items_config["by_name"].get(item_name)
@@ -237,13 +240,26 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
                                   f"⬇️ 【撤牌 <牌子ID>】\n"
                                   f"⬇️ 【查牌 <物品名> [页数]】")
 
-        # 底价吸附（普通物品）
+        # 底价吸附与价格上限（普通物品）
         snap_hint = ""
+        cap_hint = ""
         if not is_equipment:
             floor_price = await _compute_item_floor_price(session, item_cfg)
-            if price < floor_price:
+            price_cap = max(int(floor_price * PRICE_CAP_MULT), floor_price)
+            if price > price_cap:
+                await list_cmd.finish(
+                    message_add_head(
+                        (
+                            f"⛔ {item_cfg.name} 的挂牌价格不得超过建议底价 {floor_price}💰 的 {PRICE_CAP_MULT} 倍\n"
+                            f"💡 该物品当前上限为 {price_cap}💰，请调整价格后再试"
+                        ),
+                        event,
+                    )
+                )
+            if side == OrderSide.SELL and price < floor_price:
                 price = floor_price
                 snap_hint = f"（已自动吸附到底价{floor_price}💰）"
+            cap_hint = f"💡 建议底价{floor_price}💰，挂牌上限{price_cap}💰（{PRICE_CAP_MULT}倍）"
 
         # 资源冻结
         if side == OrderSide.SELL:
@@ -288,6 +304,8 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
     )
     if snap_hint:
         result_msg += f"\n{snap_hint}"
+    if cap_hint:
+        result_msg += f"\n{cap_hint}"
     if fill_msg:
         result_msg += "\n" + fill_msg
     await list_cmd.finish(message_add_head(result_msg, event))
@@ -332,7 +350,8 @@ async def _handle_equipment_listing(event: MessageEvent, item_cfg, price: int):
 
         lines = [
             f"📋 选择要挂牌的 {item_cfg.name}：",
-            "━━━━━━━━━━━━━"
+            "━━━━━━━━━━━━━",
+            f"💡 提醒：挂牌价格需在建议底价的 {PRICE_CAP_MULT} 倍以内"
         ]
 
         # 使用保存的摘要信息显示装备列表
@@ -359,6 +378,17 @@ async def _create_equipment_order(session, player, equipment: ItemInstance, pric
     # 底价吸附（装备）
     snap_hint = ""
     floor_price = await _compute_equipment_floor_price(session, equipment)
+    price_cap = max(int(floor_price * PRICE_CAP_MULT), floor_price)
+    if price > price_cap:
+        await list_cmd.finish(
+            message_add_head(
+                (
+                    f"⛔ 装备挂牌价格不得超过建议底价 {floor_price}💰 的 {PRICE_CAP_MULT} 倍\n"
+                    f"💡 该装备当前上限为 {price_cap}💰，请调整价格后再试"
+                ),
+                event,
+            )
+        )
     if price < floor_price:
         price = floor_price
         snap_hint = f"（已自动吸附到底价{floor_price}💰）"
