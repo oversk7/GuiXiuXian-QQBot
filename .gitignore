@@ -142,3 +142,15 @@ dmypy.json
 .pytype/
 
 # End of https://www.toptal.com/developers/gitignore/api/python
+
+# MySQL Migration - Database Configuration (contains sensitive passwords)
+plugins/xiuxian_game/config/database.yaml
+
+# MySQL Migration - Backup files
+plugins/xiuxian_game/models/db_old.py
+*.sql
+*.sql.gz
+backups/
+
+# MySQL Migration - Temporary files
+scripts/.migrate_status

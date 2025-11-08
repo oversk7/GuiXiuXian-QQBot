@@ -182,7 +182,7 @@ class Player(Base):
         return available_levels
 
     inventory_capacity: Mapped[int] = mapped_column(Integer, default=50, server_default='50', nullable=False, comment="背包容量")
-    is_secluded: Mapped[bool] = mapped_column(Boolean, default=False, server_default='False', comment="是否闭关")
+    is_secluded: Mapped[bool] = mapped_column(Boolean, default=False, server_default=text('0'), comment="是否闭关")
     seclusion_start_time: Mapped[datetime] = mapped_column(DateTime, nullable=True, comment="闭关开始时间")
     last_message_board_check: Mapped[datetime] = mapped_column(DateTime, nullable=True, comment="最后查看世界留言时间")
     last_private_message_check: Mapped[datetime] = mapped_column(DateTime, nullable=True, comment="最后查看私信时间")
@@ -192,8 +192,8 @@ class Player(Base):
     mansion_x: Mapped[int | None] = mapped_column(Integer, nullable=True, comment="阴宅X坐标")
     mansion_y: Mapped[int | None] = mapped_column(Integer, nullable=True, comment="阴宅Y坐标")
     mansion_usage_fee: Mapped[int] = mapped_column(Integer, default=0, server_default='0', comment="阴宅使用费用(其他玩家使用需支付的金币)")
-    mansion_allow_others: Mapped[bool] = mapped_column(Boolean, default=True, server_default='True', comment="是否允许其他玩家使用阴宅")
-    mansion_willing_to_pay: Mapped[bool] = mapped_column(Boolean, default=True, server_default='True', comment="是否愿意支付费用使用他人阴宅")
+    mansion_allow_others: Mapped[bool] = mapped_column(Boolean, default=True, server_default=text('1'), comment="是否允许其他玩家使用阴宅")
+    mansion_willing_to_pay: Mapped[bool] = mapped_column(Boolean, default=True, server_default=text('1'), comment="是否愿意支付费用使用他人阴宅")
 
     monthly_cards: Mapped[list["MonthlyCard"]] = relationship("MonthlyCard", back_populates="player")
 

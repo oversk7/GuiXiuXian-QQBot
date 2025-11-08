@@ -1,4 +1,4 @@
-from sqlalchemy import String, Integer, DateTime, Text, Boolean
+from sqlalchemy import String, Integer, DateTime, Text, Boolean, text
 from sqlalchemy.orm import Mapped, mapped_column
 from sqlalchemy.sql import func
 from .db import Base
@@ -15,7 +15,7 @@ class StorySession(Base):
     player_id: Mapped[str] = mapped_column(String(32), index=True, comment="玩家平台ID")
     story_id: Mapped[str] = mapped_column(String(64), comment="剧情ID")
     current_node: Mapped[str] = mapped_column(String(64), comment="当前节点ID")
-    is_active: Mapped[bool] = mapped_column(Boolean, default=True, server_default='True', comment="是否激活")
+    is_active: Mapped[bool] = mapped_column(Boolean, default=True, server_default=text('1'), comment="是否激活")
     story_data: Mapped[str] = mapped_column(Text, nullable=True, comment="剧情数据JSON")
     variables: Mapped[str] = mapped_column(Text, nullable=True, comment="剧情变量JSON")
     created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now(), comment="创建时间")

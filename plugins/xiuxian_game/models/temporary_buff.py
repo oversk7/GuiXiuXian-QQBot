@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from sqlalchemy import String, Integer, DateTime, Boolean, Text, func, select
+from sqlalchemy import String, Integer, DateTime, Boolean, Text, func, select, text
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from sqlalchemy.dialects.mysql import JSON
 from sqlalchemy.ext.mutable import MutableDict
@@ -34,7 +34,7 @@ class TemporaryBuff(Base):
     duration_minutes: Mapped[int] = mapped_column(Integer, comment="持续时间(分钟)")
     
     # 状态
-    is_active: Mapped[bool] = mapped_column(Boolean, default=True, server_default='True', comment="是否激活")
+    is_active: Mapped[bool] = mapped_column(Boolean, default=True, server_default=text('1'), comment="是否激活")
     
     # 来源信息
     source_item_id: Mapped[str] = mapped_column(String(64), nullable=True, comment="来源物品ID")
