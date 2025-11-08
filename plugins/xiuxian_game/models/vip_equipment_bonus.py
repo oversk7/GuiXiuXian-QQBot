@@ -17,10 +17,10 @@ class VIPEquipmentBonus(Base):
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
     player_id: Mapped[str] = mapped_column(String(32), index=True, unique=True)
-    
+
     # 存储各属性的累计加成值
     # 格式: {"attack": 100, "max_mp": 80, "defense": 40, ...}
-    bonus_attrs: Mapped[dict] = mapped_column(MutableDict.as_mutable(JSON), default=dict, server_default="{}", comment="属性加成JSON")
+    bonus_attrs: Mapped[dict] = mapped_column(MutableDict.as_mutable(JSON), default=dict, comment="属性加成JSON")
 
     def add_bonus(self, attr_name: str, value: int):
         """增加指定属性的加成"""

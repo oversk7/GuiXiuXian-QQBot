@@ -20,7 +20,7 @@ class WorldTile(Base):
     refreshed_at: Mapped[datetime] = mapped_column(DateTime, default=func.now(), comment="当前格子最后一次生成/刷新时间")
     event_type: Mapped[str] = mapped_column(String(24), default="EMPTY", server_default="EMPTY", comment="事件类型")
     seed: Mapped[str] = mapped_column(String(64), comment="生成种子", nullable=True)
-    state: Mapped[dict] = mapped_column(MutableDict.as_mutable(JSON), default=dict, server_default='{}', comment="事件状态JSON")
+    state: Mapped[dict] = mapped_column(MutableDict.as_mutable(JSON), default=dict, comment="事件状态JSON")
 
     __table_args__ = (
         UniqueConstraint('region', 'x', 'y', name='uq_region_coordinates'),

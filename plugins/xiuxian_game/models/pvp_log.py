@@ -41,7 +41,7 @@ class PvpLog(Base):
     defender_damage: Mapped[int] = mapped_column(Integer, default=0, server_default="0")
 
     # 掉落概要（多行文本，展示给双方）
-    drop_summary: Mapped[str] = mapped_column(Text, default="", server_default="")
+    drop_summary: Mapped[str] = mapped_column(Text, default="")
 
 
 Index("idx_pvp_defender_ts", PvpLog.defender_uid, PvpLog.ts)
