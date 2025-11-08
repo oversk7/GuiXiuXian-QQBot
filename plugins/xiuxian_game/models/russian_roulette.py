@@ -89,6 +89,9 @@ class RussianRouletteGame(Base):
     # 特殊状态
     is_sawed_off: Mapped[bool] = mapped_column(Boolean, default=False, comment="是否使用了小刀(下次伤害翻倍)")
     handcuffed_player_id: Mapped[str] = mapped_column(String(32), nullable=True, comment="被手铐限制的玩家ID")
+    handcuffs_cooldown_player_id: Mapped[str] = mapped_column(
+        String(32), nullable=True, comment="手铐冷却目标ID，需行动一次后才能再次使用"
+    )
     
     # 预知信息存储(私密信息)
     magnifier_info: Mapped[str] = mapped_column(Text, nullable=True, comment="放大镜查看结果(JSON)")
