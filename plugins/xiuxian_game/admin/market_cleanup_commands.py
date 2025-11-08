@@ -18,6 +18,7 @@ from ..economy.market import (
 from ..models.db import safe_session
 from ..models.inventory import ItemInstance
 from ..models.market_order import MarketOrder, OrderSide
+from ..models.player import Player
 from ..utils import message_add_head
 
 
@@ -107,15 +108,50 @@ async def handle_cleanup(event: MessageEvent, args: Message = CommandArg()):
             hard_cap = base_price * 100
 
             reasons: List[str] = []
-            if order.side == OrderSide.SELL and order.price > cap_price:
+            if order.price > cap_price:
                 reasons.append(f"超过基础价上限 {cap_price}💰")
             if order.price > hard_cap:
                 reasons.append(f"超过基础价百倍 {hard_cap}💰")
 
             if reasons:
                 item_name = order.item.name if order.item else order.item_id
+                refund_issues: List[str] = []
+
+                if order.side == OrderSide.SELL:
+                    if order.is_instance_trade:
+                        equipment = await EquipmentTradeService.get_equipment_by_instance_id(
+                            session, order.item_instance_id
+                        )
+                        if equipment:
+                            await EquipmentTradeService.unfreeze_equipment(
+                                session, equipment
+                            )
+                        else:
+                            refund_issues.append("装备实例缺失，未解冻")
+                    else:
+                        try:
+                            await ItemInstance.add_item(
+                                session,
+                                order.player_id,
+                                order.item_id,
+                                order.quantity,
+                            )
+                        except ValueError as exc:
+                            refund_issues.append(f"返还物品失败：{exc}")
+                else:
+                    player = await session.get(Player, order.player_id)
+                    if player:
+                        player.gold += order.price * order.quantity
+                        session.add(player)
+                    else:
+                        refund_issues.append("玩家不存在，未返还金币")
+
+                note = ""
+                if refund_issues:
+                    note = f"（{'；'.join(refund_issues)}）"
+
                 removed.append(
-                    f"🆔{order.id}┃{item_name}┃{order.price}💰 ＞ {'、'.join(reasons)}"
+                    f"🆔{order.id}┃{item_name}┃{order.price}💰 ＞ {'、'.join(reasons)}{note}"
                 )
                 await session.delete(order)
 
