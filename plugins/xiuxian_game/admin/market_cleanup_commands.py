@@ -26,7 +26,7 @@ cleanup_cmd = on_command("清理异常挂牌", block=True, priority=1)
 
 @cleanup_cmd.handle()
 async def handle_cleanup(event: MessageEvent, args: Message = CommandArg()):
-    """管理员指令：清理高于建议上限的异常挂牌。"""
+    """管理员指令：清理高于基础价上限的异常挂牌。"""
 
     user_id = event.get_user_id()
     if not is_admin(user_id):
@@ -74,11 +74,11 @@ async def handle_cleanup(event: MessageEvent, args: Message = CommandArg()):
                     continue
 
                 floor_price = await _compute_equipment_floor_price(session, equipment)
-                cap_price = max(int(floor_price * multiplier), floor_price)
                 base_price = max(
                     int(EquipmentTradeService.calculate_equipment_value_range(equipment)[0]),
                     MIN_UNIT_PRICE,
                 )
+                cap_price = max(int(base_price * multiplier), base_price)
             else:
                 item_id = order.item_id
                 if item_id not in item_floor_cache:
@@ -98,8 +98,8 @@ async def handle_cleanup(event: MessageEvent, args: Message = CommandArg()):
                     )
                     item_base_cache[item_id] = base_price_val
                 floor_price = item_floor_cache[item_id]
-                cap_price = max(int(floor_price * multiplier), floor_price)
                 base_price = item_base_cache.get(item_id, MIN_UNIT_PRICE)
+                cap_price = max(int(base_price * multiplier), base_price)
 
             if cap_price is None or floor_price is None or base_price is None:
                 continue
@@ -108,7 +108,7 @@ async def handle_cleanup(event: MessageEvent, args: Message = CommandArg()):
 
             reasons: List[str] = []
             if order.side == OrderSide.SELL and order.price > cap_price:
-                reasons.append(f"超过建议上限 {cap_price}💰")
+                reasons.append(f"超过基础价上限 {cap_price}💰")
             if order.price > hard_cap:
                 reasons.append(f"超过基础价百倍 {hard_cap}💰")
 
@@ -137,6 +137,6 @@ async def handle_cleanup(event: MessageEvent, args: Message = CommandArg()):
         lines.extend(auto_removed_missing[:5])
         if len(auto_removed_missing) > 5:
             lines.append("…… 其余已省略")
-    lines.append(f"📊 使用倍数：{multiplier:g}× 建议底价上限")
+    lines.append(f"📊 使用倍数：{multiplier:g}× 基础价上限")
 
     await cleanup_cmd.finish(message_add_head("\n".join(lines), event))
