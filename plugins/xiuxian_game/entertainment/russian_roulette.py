@@ -338,7 +338,11 @@ async def handle_shoot(bot: Bot, event: MessageEvent, args: Message = CommandArg
         # 检查是否轮到该玩家
         if game.current_player_id != player.id:
             await shoot_cmd.finish("⛔ 还没轮到你行动")
-        
+
+        # 如果玩家已经重新获得行动权，清除手铐冷却状态
+        if getattr(game, "handcuffs_cooldown_player_id", None) == player.id and game.handcuffed_player_id != player.id:
+            game.handcuffs_cooldown_player_id = None
+
         # 检查是否被手铐限制
         if game.handcuffed_player_id == player.id:
             # 解除手铐限制
@@ -366,7 +370,8 @@ async def handle_shoot(bot: Bot, event: MessageEvent, args: Message = CommandArg
             f"{room.player2_id}_hp": game.player2_hp,
             "is_sawed_off": game.is_sawed_off,
             "handcuffed_player_id": game.handcuffed_player_id,
-            "handcuffs_skip_turn": getattr(game, 'handcuffs_skip_turn', False)
+            "handcuffs_skip_turn": getattr(game, 'handcuffs_skip_turn', False),
+            "handcuffs_cooldown_player_id": getattr(game, "handcuffs_cooldown_player_id", None)
         }
         
         # 执行射击
@@ -381,6 +386,7 @@ async def handle_shoot(bot: Bot, event: MessageEvent, args: Message = CommandArg
         game.player2_hp = game_state[f"{room.player2_id}_hp"]
         game.is_sawed_off = game_state["is_sawed_off"]
         game.handcuffed_player_id = game_state.get("handcuffed_player_id")
+        game.handcuffs_cooldown_player_id = game_state.get("handcuffs_cooldown_player_id")
 
         # 检查是否需要重新装弹（在游戏未结束的情况下）
         reload_msg = ""
@@ -396,6 +402,7 @@ async def handle_shoot(bot: Bot, event: MessageEvent, args: Message = CommandArg
                 game.player2_items = game_state[f"{room.player2_id}_items"]
                 game.is_sawed_off = game_state["is_sawed_off"]
                 game.handcuffed_player_id = game_state.get("handcuffed_player_id")
+                game.handcuffs_cooldown_player_id = game_state.get("handcuffs_cooldown_player_id")
                 game.magnifier_info = game_state.get("magnifier_info")
                 game.phone_info = game_state.get("phone_info")
         
@@ -557,6 +564,10 @@ async def handle_use_adrenaline(bot: Bot, event: MessageEvent, args: Message = C
         if game.current_player_id != player.id:
             await use_adrenaline_cmd.finish("⛔ 还没轮到你行动")
 
+        # 如果玩家已经重新获得行动权，清除手铐冷却状态
+        if getattr(game, "handcuffs_cooldown_player_id", None) == player.id and game.handcuffed_player_id != player.id:
+            game.handcuffs_cooldown_player_id = None
+
         # 检查是否被手铐限制
         if game.handcuffed_player_id == player.id:
             # 解除手铐限制
@@ -584,7 +595,8 @@ async def handle_use_adrenaline(bot: Bot, event: MessageEvent, args: Message = C
             f"{room.player2_id}_items": game.player2_items,
             "magnifier_info": game.magnifier_info,
             "phone_info": game.phone_info,
-            "handcuffs_skip_turn": getattr(game, 'handcuffs_skip_turn', False)
+            "handcuffs_skip_turn": getattr(game, 'handcuffs_skip_turn', False),
+            "handcuffs_cooldown_player_id": getattr(game, "handcuffs_cooldown_player_id", None)
         }
 
         # 使用肾上腺素偷取指定道具
@@ -605,6 +617,7 @@ async def handle_use_adrenaline(bot: Bot, event: MessageEvent, args: Message = C
         game.player2_items = game_state[f"{room.player2_id}_items"]
         game.magnifier_info = game_state.get("magnifier_info")
         game.phone_info = game_state.get("phone_info")
+        game.handcuffs_cooldown_player_id = game_state.get("handcuffs_cooldown_player_id")
 
         # 检查使用肾上腺素后是否有玩家血量降为0（游戏结束）
         game_over = False
@@ -633,6 +646,7 @@ async def handle_use_adrenaline(bot: Bot, event: MessageEvent, args: Message = C
                 game.handcuffed_player_id = game_state.get("handcuffed_player_id")
                 game.magnifier_info = game_state.get("magnifier_info")
                 game.phone_info = game_state.get("phone_info")
+                game.handcuffs_cooldown_player_id = game_state.get("handcuffs_cooldown_player_id")
 
         await session.commit()
 
@@ -728,6 +742,10 @@ async def handle_use_item(bot: Bot, event: MessageEvent, args: Message = Command
         if game.current_player_id != player.id:
             await use_item_cmd.finish("⛔ 还没轮到你行动")
 
+        # 如果玩家已经重新获得行动权，清除手铐冷却状态
+        if getattr(game, "handcuffs_cooldown_player_id", None) == player.id and game.handcuffed_player_id != player.id:
+            game.handcuffs_cooldown_player_id = None
+
         # 检查是否被手铐限制
         if game.handcuffed_player_id == player.id:
             # 解除手铐限制
@@ -750,6 +768,14 @@ async def handle_use_item(bot: Bot, event: MessageEvent, args: Message = Command
         if item_type.value not in player_items:
             await use_item_cmd.finish(f"⛔ 你没有{item_name}")
 
+        opponent_id = room.get_opponent_id(player.id)
+        if item_type == ItemType.HANDCUFFS:
+            if game.handcuffed_player_id == opponent_id:
+                await use_item_cmd.finish(message_add_head("⛔ 对手已被手铐限制，等待其行动一次后再使用", event))
+            cooldown_target = getattr(game, "handcuffs_cooldown_player_id", None)
+            if cooldown_target == opponent_id:
+                await use_item_cmd.finish(message_add_head("⛔ 对手刚刚被手铐限制，需其行动一次后才能再次使用", event))
+
         # 构建游戏状态
         game_state = {
             "bullets": game.bullets,
@@ -762,7 +788,8 @@ async def handle_use_item(bot: Bot, event: MessageEvent, args: Message = Command
             f"{room.player2_id}_items": game.player2_items,
             "magnifier_info": game.magnifier_info,
             "phone_info": game.phone_info,
-            "handcuffs_skip_turn": getattr(game, 'handcuffs_skip_turn', False)
+            "handcuffs_skip_turn": getattr(game, 'handcuffs_skip_turn', False),
+            "handcuffs_cooldown_player_id": getattr(game, "handcuffs_cooldown_player_id", None)
         }
 
         # 使用道具
@@ -772,7 +799,6 @@ async def handle_use_item(bot: Bot, event: MessageEvent, args: Message = Command
         if item_type == ItemType.KNIFE:
             success, result_msg = RussianRouletteCore.use_knife(game_state)
         elif item_type == ItemType.HANDCUFFS:
-            opponent_id = room.get_opponent_id(player.id)
             success, result_msg = RussianRouletteCore.use_handcuffs(game_state, opponent_id)
             # 使用手铐后，设置特殊标记，表示下次回合切换时应该跳过对手
             if success:
@@ -812,6 +838,7 @@ async def handle_use_item(bot: Bot, event: MessageEvent, args: Message = Command
         game.player2_hp = game_state[f"{room.player2_id}_hp"]
         game.is_sawed_off = game_state["is_sawed_off"]
         game.handcuffed_player_id = game_state.get("handcuffed_player_id")
+        game.handcuffs_cooldown_player_id = game_state.get("handcuffs_cooldown_player_id")
         game.magnifier_info = game_state.get("magnifier_info")
         game.phone_info = game_state.get("phone_info")
 
@@ -840,6 +867,7 @@ async def handle_use_item(bot: Bot, event: MessageEvent, args: Message = Command
                 game.player2_items = game_state[f"{room.player2_id}_items"]
                 game.is_sawed_off = game_state["is_sawed_off"]
                 game.handcuffed_player_id = game_state.get("handcuffed_player_id")
+                game.handcuffs_cooldown_player_id = game_state.get("handcuffs_cooldown_player_id")
                 game.magnifier_info = game_state.get("magnifier_info")
                 game.phone_info = game_state.get("phone_info")
 

@@ -92,6 +92,7 @@ class RussianRouletteCore:
         game_state["handcuffed_player_id"] = target_player_id
         # 设置标记，表示使用手铐后应该跳过对手回合
         game_state["handcuffs_skip_turn"] = True
+        game_state["handcuffs_cooldown_player_id"] = target_player_id
         return True, f"⛓️ 手铐已使用！对手下回合将被限制行动，你可以连续行动"
     
     @staticmethod
