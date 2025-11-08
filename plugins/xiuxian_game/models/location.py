@@ -33,19 +33,17 @@ class Location(Base):
     functions: Mapped[dict] = mapped_column(
         MutableDict.as_mutable(JSON),
         default=dict,
-        server_default='{}',
         comment="地点功能配置JSON"
     )
-    
+
     # 地点状态
     is_active: Mapped[bool] = mapped_column(Boolean, default=True, comment="是否激活")
     required_level: Mapped[int] = mapped_column(Integer, default=1, comment="进入所需最低等级")
-    
+
     # 扩展配置
     config: Mapped[dict] = mapped_column(
         MutableDict.as_mutable(JSON),
         default=dict,
-        server_default='{}',
         comment="地点扩展配置JSON"
     )
     

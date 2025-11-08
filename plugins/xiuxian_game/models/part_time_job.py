@@ -35,7 +35,6 @@ class PartTimeJob(Base):
     extra_data: Mapped[dict] = mapped_column(
         MutableDict.as_mutable(JSON),
         default=dict,
-        server_default='{}',
         comment="额外数据JSON"
     )
 
@@ -79,7 +78,6 @@ class JobLocation(Base):
     available_jobs: Mapped[dict] = mapped_column(
         MutableDict.as_mutable(JSON),
         default=dict,
-        server_default='{}',
         comment="可用工作类型配置JSON"
     )
 
@@ -118,7 +116,6 @@ class PlayerJobStats(Base):
     achievements: Mapped[dict] = mapped_column(
         MutableDict.as_mutable(JSON),
         default=dict,
-        server_default='{}',
         comment="成就数据JSON"
     )
 

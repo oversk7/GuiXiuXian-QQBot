@@ -69,7 +69,6 @@ class NPC(Base):
     functions: Mapped[dict] = mapped_column(
         MutableDict.as_mutable(JSON),
         default=dict,
-        server_default='{}',
         comment="NPC功能配置JSON"
     )
     
@@ -77,7 +76,6 @@ class NPC(Base):
     extra_data: Mapped[dict] = mapped_column(
         MutableDict.as_mutable(JSON),
         default=dict,
-        server_default='{}',
         comment="扩展数据JSON"
     )
     

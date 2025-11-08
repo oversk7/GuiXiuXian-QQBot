@@ -24,7 +24,6 @@ class TemporaryBuff(Base):
     attribute_bonuses: Mapped[dict] = mapped_column(
         MutableDict.as_mutable(JSON),
         default=dict,
-        server_default='{}',
         comment="属性加成JSON: {attr_name: bonus_value}"
     )
     
@@ -44,7 +43,6 @@ class TemporaryBuff(Base):
     extra_data: Mapped[dict] = mapped_column(
         MutableDict.as_mutable(JSON),
         default=dict,
-        server_default='{}',
         comment="额外数据JSON"
     )
 
