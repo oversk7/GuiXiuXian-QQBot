@@ -506,9 +506,15 @@ async def _reforge_attr(player: Player, cfg: ItemConfig, qty: int, ctx: str, ses
 
     # 计算去除装备加成后的基础属性值
     base_value = Decimal(str(current_value))
+    from ..config import config as gcfg
+    attributes_base = (
+        gcfg.game_config.get("cultivate", {}).get("attributes_base", {})
+        if hasattr(gcfg, "game_config")
+        else {}
+    )
+
     if session:
         from sqlalchemy import select
-        from ..config import config as gcfg
 
         stmt = select(ItemInstance).where(
             ItemInstance.player_id == player.id,
@@ -531,14 +537,48 @@ async def _reforge_attr(player: Player, cfg: ItemConfig, qty: int, ctx: str, ses
 
     # 计算转换量（每次使用转换一次，仅针对基础属性值）
     percent_ratio = Decimal(str(percent)) / Decimal("100")
-    convert_amount = int((Decimal(base_value_int) * percent_ratio * Decimal(qty)).to_integral_value(rounding=ROUND_DOWN))
-    if convert_amount == 0:
-        convert_amount = 1  # 至少转换1点
+    convert_amount_decimal = Decimal(base_value_int) * percent_ratio * Decimal(qty)
+    convert_amount = int(convert_amount_decimal.to_integral_value(rounding=ROUND_DOWN))
 
     # 检查是否会导致属性过低
     min_value = 1
     if source_attr in ["max_hp", "max_mp"]:
         min_value = 10  # 生命和理智至少保留10点
+
+    max_convertible = base_value_int - min_value
+    if max_convertible <= 0:
+        return False, f"⛔ {attr_name}过低，无法继续洗髓（至少需保留{min_value}点）"
+
+    ratio_raw = attributes_base.get(source_attr, 1)
+    try:
+        convert_ratio = int(ratio_raw)
+    except (TypeError, ValueError):
+        convert_ratio = 1
+    if convert_ratio <= 0:
+        convert_ratio = 1
+
+    if convert_ratio > 1:
+        max_points = max_convertible // convert_ratio
+        if max_points <= 0:
+            return False, f"⛔ {attr_name}过低，无法继续洗髓（至少需保留{min_value}点）"
+
+        if convert_amount <= 0:
+            convert_amount = convert_ratio
+        points_gain = convert_amount // convert_ratio
+        if points_gain <= 0:
+            points_gain = 1
+        if points_gain > max_points:
+            points_gain = max_points
+        convert_amount = points_gain * convert_ratio
+    else:
+        if convert_amount <= 0:
+            convert_amount = 1  # 至少转换1点
+        if convert_amount > max_convertible:
+            convert_amount = max_convertible
+        points_gain = convert_amount
+
+    if convert_amount <= 0 or points_gain <= 0:
+        return False, f"⛔ {attr_name}过低，无法继续洗髓（至少需保留{min_value}点）"
 
     if base_value_int - convert_amount < min_value:
         return False, f"⛔ {attr_name}过低，无法继续洗髓（至少需保留{min_value}点）"
@@ -547,7 +587,9 @@ async def _reforge_attr(player: Player, cfg: ItemConfig, qty: int, ctx: str, ses
     setattr(player, source_attr, current_value - convert_amount)
 
     # 增加可分配属性点
-    player.attribute_points += convert_amount
+    player.attribute_points += points_gain
+
+    gain_display = points_gain
 
     # 如果是生命或理智上限，需要调整当前值
     if source_attr == "max_hp" and player.hp > player.max_hp:
@@ -565,7 +607,7 @@ async def _reforge_attr(player: Player, cfg: ItemConfig, qty: int, ctx: str, ses
         f"🔄 洗髓成功！\n"
         f"━━━━━━━━━━━━━\n"
         f"转换：{attr_name} -{convert_amount} ({int(percent * qty)}%)\n"
-        f"获得：可分配属性点 +{convert_amount}\n"
+        f"获得：可分配属性点 +{gain_display}\n"
         f"━━━━━━━━━━━━━\n"
         f"当前{attr_name}：{getattr(player, source_attr)}\n"
         f"可分配属性点：{player.attribute_points}\n"
