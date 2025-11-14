@@ -120,12 +120,49 @@ async def handle_open_chest(event: MessageEvent, args: Message = CommandArg()):
                 "💡 使用方法：",
                 "  开宝箱 <宝箱名称>",
                 "  开宝箱 <序号>",
+                "  开宝箱 全部",
                 "",
                 "示例：开宝箱 深渊勇士宝箱",
                 "示例：开宝箱 1"
             ])
 
             await open_chest_cmd.finish(message_add_head("\n".join(lines), event))
+
+        # 支持一键开启所有宝箱
+        normalized_arg = arg_text.lower()
+        all_keywords = {"全部", "全部开启", "全部开", "全开", "全部打开", "全都开", "全部宝箱", "all"}
+        if normalized_arg in all_keywords:
+            opened_count = 0
+            result_messages = []
+
+            for chest in abyss_chests:
+                chest_config = config.items_config["by_id"].get(chest.item_id)
+                if not chest_config:
+                    result_messages.append(f"⛔ 未找到宝箱配置：{chest.item_id}，已跳过")
+                    continue
+
+                if chest.quantity <= 0:
+                    continue
+
+                success, result_msg = await apply_effect(player, chest_config, chest.quantity, "world", session)
+                if success:
+                    opened_count += chest.quantity
+                    result_messages.append(result_msg)
+                    await session.delete(chest)
+                else:
+                    display_name = chest_config.get_display_name()
+                    result_messages.append(f"⛔ {display_name} 开启失败：{result_msg}")
+
+            if not result_messages:
+                await open_chest_cmd.finish("⛔ 未找到可开启的深渊宝箱")
+
+            if opened_count > 0:
+                await session.commit()
+                summary = ["🎉 已开启所有深渊宝箱！", ""]
+                summary.extend(result_messages)
+                await open_chest_cmd.finish(message_add_head("\n\n".join(summary).strip(), event))
+            else:
+                await open_chest_cmd.finish(message_add_head("\n\n".join(result_messages).strip(), event))
 
         # 查找指定的宝箱
         target_chest = None
