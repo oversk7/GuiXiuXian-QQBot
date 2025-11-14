@@ -79,14 +79,17 @@ class GuildBuildingService:
         BuildingType.ALCHEMY_ROOM: {
             "name": "丹房",
             "description": "每日随机产出丹药",
-            "max_level": 5,
+            "max_level": 8,
             "base_cost": {"gold": 80000, "materials": {"墓土": 200, "阴煞精华": 60, "腐坏的内丹": 40}},
             "effects": {
-                1: {"daily_production": 5, "pill_quality": "basic"},
-                2: {"daily_production": 10, "pill_quality": "basic"},
-                3: {"daily_production": 8, "pill_quality": "intermediate"},
+                1: {"daily_production": 4, "pill_quality": "basic"},
+                2: {"daily_production": 7, "pill_quality": "basic"},
+                3: {"daily_production": 9, "pill_quality": "intermediate"},
                 4: {"daily_production": 12, "pill_quality": "intermediate"},
-                5: {"daily_production": 10, "pill_quality": "advanced"}
+                5: {"daily_production": 14, "pill_quality": "advanced"},
+                6: {"daily_production": 16, "pill_quality": "advanced"},
+                7: {"daily_production": 18, "pill_quality": "master"},
+                8: {"daily_production": 20, "pill_quality": "legendary"}
             }
         },
         BuildingType.GUILD_WAREHOUSE: {
@@ -343,7 +346,9 @@ class GuildBuildingService:
         pill_quality_map = {
             "basic": "初级",
             "intermediate": "中级",
-            "advanced": "高级"
+            "advanced": "高级",
+            "master": "顶级",
+            "legendary": "传说"
         }
 
         effects_list = []
