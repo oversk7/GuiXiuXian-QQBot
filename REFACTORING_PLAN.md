@@ -1,721 +1,158 @@
-# 诡修仙游戏重构规划文档
+# 诡修仙游戏重构规划文档 v3.0 - 设计模式驱动重构
 
 > **项目名称**: 诡修仙 (GuiXiuXian2)
-> **文档版本**: v2.0 (修订版)
-> **创建日期**: 2025-10-24
-> **修订日期**: 2025-10-28
-> **文档类型**: 全面重构规划
-
-### 合规性保障
-
-所有代码必须通过以下检查:
-- [ ] 命令注册 block=True
-- [ ] 参数使用 CommandArg
-- [ ] 展示 UID 而非加密 ID
-- [ ] 无主动发送消息
-- [ ] 异常捕获指定类型
-- [ ] Help 文件已同步
+> **文档版本**: v3.0 (基于最新代码调研的改进版)
+> **创建日期**: 2025-11-15
+> **文档类型**: 松耦合、易扩展架构重构规划
 
 ---
 
-## 📋 目录
+## 📋 执行摘要
 
-1. [项目概况](#1-项目概况)
-2. [Nonebot2+QQAdapter 强制约束清单](#2-nonebot2qqadapter-强制约束清单) ⚠️ **必读**
-3. [当前架构分析](#3-当前架构分析)
-4. [识别的核心问题](#4-识别的核心问题)
-5. [新架构设计方案](#5-新架构设计方案)
-6. [数据库迁移方案](#6-数据库迁移方案)
-7. [NPC AI Agent系统设计](#7-npc-ai-agent系统设计)
-8. [性能优化方案](#8-性能优化方案)
-9. [分阶段重构任务清单](#9-分阶段重构任务清单)
-10. [测试策略](#10-测试策略)
-11. [风险评估与注意事项](#11-风险评估与注意事项)
-12. [时间线与优先级](#12-时间线与优先级)
+基于对最新代码库的深度调研,本文档提出了一套**以设计模式为驱动**的重构方案,旨在实现:
+- **松耦合**: 通过依赖注入和接口抽象解耦模块
+- **易扩展**: 使用策略/工厂/责任链模式支持功能扩展
+- **可测试**: 分离核心逻辑与框架依赖
+- **可维护**: 清晰的分层架构和单一职责原则
 
 ---
 
-## 1. 项目概况
+## 📊 目录
 
-### 1.1 项目基本信息
-
-- **项目类型**: 基于Nonebot2+QQAdapter的QQ群文字修仙游戏
-- **代码规模**: 约43,444行Python代码
-- **数据模型**: 37个数据模型文件
-- **核心模块**: 12个主要功能模块
-- **技术栈**:
-  - 框架: Nonebot2 2.4.1
-  - 适配器: nonebot-adapter-qq 1.6.2
-  - ORM: SQLAlchemy 2.0.38
-  - 数据库: SQLite (aiosqlite 0.21.0)
-  - 调度: APScheduler 3.11.0
-  - 配置: PyYAML 6.0.2, Pydantic 2.10.6
-
-### 1.2 核心功能模块
-
-| 模块 | 功能描述 | 代码位置 |
-|------|---------|---------|
-| **玩家系统** | 玩家数据、属性管理、等级系统 | `player/` |
-| **修炼系统** | 修炼、闭关、突破、转生 | `cultivate/` |
-| **战斗系统** | PVP、PVE、战斗引擎、效果系统 | `battle/` |
-| **装备系统** | 装备、宝石、升阶、特殊效果 | `item/` |
-| **世界系统** | 地图、诡域、导航、地点管理 | `world/` |
-| **NPC系统** | NPC管理、交互、商人、工匠 | `world/npc_*.py` |
-| **公会系统** | 公会管理、建筑、任务、仓库 | `guild/` |
-| **经济系统** | 市场、交易、股票、打工、银行 | `economy/` |
-| **社交系统** | 结婚、师徒、赠礼、好感度 | `social/` |
-| **炼丹系统** | 炼丹、丹方、材料管理 | `alchemy/` |
-| **娱乐系统** | 签到、小游戏、俄罗斯轮盘 | `entertainment/` |
-| **任务系统** | 每日任务、公会任务 | `daily_task/`, `guild/guild_task_*` |
-
-### 1.3 数据模型概览
-
-**核心模型** (37个):
-- Player (玩家)
-- ItemInstance (物品实例)
-- Guild/GuildMember (公会)
-- NPC/Location (NPC和地点)
-- WorldTile (世界地图格子)
-- MarketOrder (市场订单)
-- Stock/StockHolding (股票)
-- Marriage/Mentorship (社交关系)
-- TemporaryBuff (临时增益)
-- 等等...
+1. [核心问题诊断](#1-核心问题诊断)
+2. [设计模式解决方案](#2-设计模式解决方案)
+3. [重构实施路线图](#3-重构实施路线图)
+4. [详细设计方案](#4-详细设计方案)
+5. [实施指南](#5-实施指南)
 
 ---
 
-## 2. Nonebot2+QQAdapter 强制约束清单
+## 1. 核心问题诊断
 
-> ⚠️ **本章节为强制合规要求,所有代码必须遵守,每个 PR 必须检查**
+### 1.1 架构问题汇总表
 
-### 2.1 核心约束规则
+| 问题类别 | 具体表现 | 影响范围 | 严重程度 |
+|---------|---------|---------|---------|
+| **属性计算分散** | 4+处属性计算逻辑 (player.py:218, BattleAttributeCalculator, item effects, buff system) | 战斗/装备/buff系统 | 🔴 高 |
+| **循环依赖** | item_effects.py ↔ equipment_commands.py | 物品/装备模块 | 🔴 高 |
+| **无依赖注入** | 全局导入 safe_session, config singleton | 全项目 | 🟠 中 |
+| **会话管理混乱** | 3种会话模式并存,无统一边界 | 数据访问层 | 🟠 中 |
+| **效果系统重复** | 装饰器注册 vs 管理器模式 | 物品/战斗系统 | 🟡 低 |
+| **缺少抽象接口** | 服务类无Protocol/ABC约束 | 全项目 | 🟠 中 |
 
-#### 规则1: 禁止主动发送消息 🚫
-- **约束**: 不允许主动发消息,只能靠用户触发
-- **影响**:
-  - ❌ 禁止定时推送、广播、主动通知
-  - ❌ 禁止 NPC 主动发起对话
-  - ❌ 禁止系统事件主动推送
-  - ✅ 允许"生成事件→入库→玩家触发时展示"的拉取式设计
-- **实现方式**:
-  ```python
-  # ❌ 错误示例
-  async def daily_reset():
-      for player in players:
-          await bot.send(player, "每日重置完成")  # 主动推送,违规!
-
-  # ✅ 正确示例
-  async def daily_reset():
-      for player in players:
-          pending_events.add(player.uid, {
-              "type": "system_notice",
-              "text": "每日重置完成"
-          })  # 仅入库,不推送
-
-  @on_command("查看消息", block=True)
-  async def check_messages(bot: Bot, event: MessageEvent):
-      uid = await get_uid(event.get_user_id())
-      events = pending_events.pop_all(uid)  # 玩家触发时拉取
-      await bot.send(event, format_events(events))
-  ```
-
-#### 规则2: 所有命令必须阻拦 🛑
-- **约束**: 所有注册的命令都需要 `block=True`
-- **原因**: 防止命令穿透导致多个处理器响应
-- **示例**:
-  ```python
-  # ✅ 正确
-  cmd = on_command("修炼", block=True)
-
-  # ❌ 错误
-  cmd = on_command("修炼")  # 缺少 block=True
-  ```
-
-#### 规则3: 异常捕获必须指定类型 ⚠️
-- **约束**: 禁止使用 `except Exception as e`
-- **要求**: 必须指定具体异常类型
-- **示例**:
-  ```python
-  from sqlalchemy.exc import IntegrityError, OperationalError, SQLAlchemyError
-
-  # ✅ 正确
-  try:
-      await session.commit()
-  except IntegrityError:
-      await session.rollback()
-      raise
-  except OperationalError as e:
-      await session.rollback()
-      logger.warning(f"DB operation failed: {e}")
-      raise
-  except SQLAlchemyError:
-      await session.rollback()
-      raise
-
-  # ❌ 错误
-  try:
-      await session.commit()
-  except Exception as e:  # 过于宽泛!
-      pass
-  ```
-
-#### 规则4: 参数获取使用 CommandArg 📝
-- **约束**: 使用 `args: Message = CommandArg()` 获取参数
-- **示例**:
-  ```python
-  from nonebot.params import CommandArg
-  from nonebot.adapters.qq import Message
-
-  @cmd.handle()
-  async def _(bot: Bot, event: MessageEvent, args: Message = CommandArg()):
-      text = args.extract_plain_text().strip()
-  ```
-
-#### 规则5: 展示用户ID使用自增UID 🆔
-- **约束**: `event.get_user_id()` 获取的是加密ID,不易记忆,展示时使用自增 UID
-- **实现**:
-  ```python
-  # 维护 platform_id -> uid 映射
-  uid = await get_uid_by_platform_id(event.get_user_id())
-  await bot.send(event, f"🎴 UID {uid} 的信息")  # 展示 UID
-  ```
-
-#### 规则6: 私聊/群聊判断 💬
-- **约束**: `event.get_session_id()` 在私聊时为 `friend_<userId>`,群聊时为 `group_<groupId>_<userId>`
-- **示例**:
-  ```python
-  session_id = event.get_session_id()
-  is_private = session_id.startswith("friend_")
-
-  if is_private:
-      # 私聊逻辑
-  else:
-      # 群聊逻辑
-  ```
-
-#### 规则7: 消息回复必须基于触发事件 📨
-- **约束**: `event.msg_id` 大约三分钟就过期,不能再回复触发者
-- **要求**: 所有回复必须在触发上下文内完成,禁止异步延迟推送
-- **示例**:
-  ```python
-  # ✅ 正确: 立即在触发上下文内回复
-  @cmd.handle()
-  async def _(bot: Bot, event: MessageEvent):
-      result = await do_something()
-      await bot.send(event, result)  # 基于触发事件
-
-  # ❌ 错误: 异步延迟回复
-  @cmd.handle()
-  async def _(bot: Bot, event: MessageEvent):
-      asyncio.create_task(delayed_reply(bot, event))  # msg_id 可能过期!
-  ```
-
-#### 规则8: 代码结构易懂易维护 📚
-- **约束**: 代码结构需要易懂容易维护,不要只为了炫技
-- **原则**: 优先可读性和可维护性,避免过度抽象
-
-#### 规则9: 输出内容美观 🎨
-- **约束**: 作为文字游戏,输出内容需要注意美观,有良好的交互体验
-- **要求**:
-  - 利用 emoji 排版
-  - 所有分割线统一使用: `"━━━━━━━━━━━━━"` (12个全角━)
-- **工具函数**:
-  ```python
-  def line() -> str:
-      return "━━━━━━━━━━━━━"
-
-  def title(text: str) -> str:
-      return f"🎴 {text}\n{line()}"
-
-  def section(title: str, content: str) -> str:
-      return f"{title}\n{line()}\n{content}"
-  ```
-
-#### 规则10: 更新指令后同步到 Help 📖
-- **约束**: 更新指令后需要及时同步到 help 文件中
-- **流程**:
-  1. 新增/修改命令
-  2. 更新对应的 help 文档
-  3. 在 PR 中说明 help 已同步
-
-### 2.2 测试约束
-
-#### 测试规则1: 避免 Nonebot 初始化问题 🧪
-- **问题**: 测试脚本会遇到 Nonebot 初始化问题
-- **解决**: 直接测试核心逻辑,不依赖 Nonebot 框架
-- **示例**:
-  ```python
-  # ✅ 正确: 测试核心逻辑
-  async def test_cultivate_logic():
-      player = create_test_player()
-      result = await cultivate_service.process(player, hours=1)
-      assert result.exp_gain > 0
-
-  # ❌ 错误: 依赖 Nonebot
-  async def test_cultivate_command():
-      bot = get_bot()  # 需要初始化 Nonebot
-      event = create_event()
-      await handle_cultivate(bot, event)
-  ```
-
-### 2.3 合规检查清单
-
-每个 PR 提交前必须检查:
-
-- [ ] 所有命令注册使用 `block=True`
-- [ ] 参数获取使用 `args: Message = CommandArg()`
-- [ ] 展示用户信息使用 UID,不展示加密 ID
-- [ ] 私聊/群聊分支逻辑正确
-- [ ] 所有回复基于触发事件,无异步延迟推送
-- [ ] 无主动发送消息的代码(定时推送/广播/主动通知)
-- [ ] 异常捕获指定具体类型,无 `except Exception`
-- [ ] 输出格式美观,分割线统一为 `"━━━━━━━━━━━━━"`
-- [ ] 新增/修改的命令已同步到 help 文件
-- [ ] 单元测试不依赖 Nonebot 初始化
-
----
-
-## 3. 当前架构分析
-
-### 3.1 整体架构图
+### 1.2 代码耦合图谱
 
 ```mermaid
-graph TB
-    subgraph "表现层"
-        A[Nonebot2命令处理器]
-        B[消息格式化]
-    end
+graph TD
+    A[item/item_effects.py] -->|直接导入| B[equipment_commands.py]
+    B -->|调用| A
+    C[battle/enhanced_engine.py] -->|硬编码依赖| D[BattleEffectManager]
+    E[command handlers] -->|直接创建| F[safe_session]
+    E -->|全局导入| G[Config singleton]
+    H[Player model] -->|分散计算| I[4+属性计算点]
 
-    subgraph "业务逻辑层"
-        C[玩家管理]
-        D[战斗引擎]
-        E[装备系统]
-        F[经济系统]
-        G[公会系统]
-        H[NPC服务]
-    end
-
-    subgraph "数据访问层"
-        I[SQLAlchemy ORM]
-        J[safe_session管理器]
-    end
-
-    subgraph "数据存储层"
-        K[(SQLite数据库)]
-    end
-
-    A --> C
-    A --> D
-    A --> E
-    A --> F
-    A --> G
-    A --> H
-
-    C --> I
-    D --> I
-    E --> I
-    F --> I
-    G --> I
-    H --> I
-
-    I --> J
-    J --> K
-
-    style K fill:#f9f,stroke:#333,stroke-width:2px
+    style A fill:#f99,stroke:#333
+    style B fill:#f99,stroke:#333
+    style E fill:#fc9,stroke:#333
+    style H fill:#fc9,stroke:#333
 ```
-
-### 3.2 数据库设计分析
-
-**当前SQLite配置**:
-```python
-# plugins/xiuxian_game/models/db.py
-engine = create_async_engine(
-    "sqlite+aiosqlite:///data/game.db",
-    echo=False,
-    connect_args={
-        "timeout": 30,
-        "check_same_thread": False,
-    },
-)
-```
-
-**优化措施**:
-- ✅ WAL模式启用
-- ✅ 异步会话管理
-- ✅ 重试机制 (retry_session)
-- ⚠️ 缺少连接池配置
-- ⚠️ 缺少查询优化
-- ⚠️ 索引设计不完善
-
-**索引使用情况**:
-```python
-# 已有索引示例
-Index('idx_player_stock', 'player_id', 'stock_id', unique=True)  # 股票持仓
-Index('idx_stock_time', 'stock_id', 'recorded_at')  # 股票价格历史
-Index('idx_pvp_defender_ts', 'defender_uid', 'ts')  # PVP日志
-Index('idx_mansion_location_unique', 'mansion_x', 'mansion_y', unique=True)  # 阴宅位置
-```
-
-**缺失的关键索引**:
-- Player表: `(region, x, y)` - 用于附近玩家查询
-- ItemInstance表: `(player_id, equipped)` - 用于装备查询
-- NPC表: `(location_id, status)` - 用于地点NPC查询
-- WorldTile表: `(region, x, y, refreshed_at)` - 用于地图格子查询
-
-### 3.3 代码组织结构
-
-**优点**:
-- ✅ 模块化清晰，按功能划分目录
-- ✅ 使用Service层模式 (如GuildService, NPCService)
-- ✅ 配置与代码分离 (YAML配置文件)
-- ✅ 使用装饰器注册模式 (item_effects.py)
-
-**缺点**:
-- ❌ 业务逻辑与命令处理混合 (部分文件)
-- ❌ 缺少统一的异常处理机制
-- ❌ 缺少数据验证层
-- ❌ 缺少缓存层
-- ❌ 后期功能设计不一致
 
 ---
 
-## 4. 识别的核心问题
+## 2. 设计模式解决方案
 
-### 4.1 数据库性能瓶颈 🔴
+### 2.1 依赖注入容器 (Dependency Injection Container)
 
-**问题描述**:
-1. **SQLite并发限制**:
-   - 写操作串行化，多用户同时操作时出现锁定
-   - 数据库锁定超时 (timeout: 30s)
+**问题**: 硬编码依赖导致测试困难,模块间紧耦合
 
-2. **查询性能问题**:
-   - 附近玩家查询使用 `func.abs()` 计算距离，无法使用索引
-   - 公会成员列表查询使用复杂的 `case` 排序
-   - 装备查询频繁，缺少缓存
+**解决方案**: 引入轻量级DI容器
 
-3. **数据增长问题**:
-   - 交易记录、PVP日志等历史数据无限增长
-   - 缺少数据归档机制
-
-**影响**:
-- 用户体验差 (响应慢、超时)
-- 系统扩展性受限
-- 无法支持大量并发用户
-
-### 4.2 代码耦合度高 🟡
-
-**问题描述**:
-1. **装备效果系统与战斗系统耦合**:
-   ```python
-   # item/item_effects.py 中需要调用 equipment_commands.recalc_equipment_attributes
-   # battle/enhanced_engine.py 中需要解析装备的 special_effects
-   # 两个系统相互依赖，难以独立测试和维护
-   ```
-
-2. **属性计算分散**:
-   ```python
-   # 属性计算逻辑分散在多处：
-   # - Player.get_effective_attributes()
-   # - Player.get_attribute_breakdown()
-   # - ItemInstance.apply_attr_bonus()
-   # - BattleAttributeCalculator
-   # - 各种buff/丹药效果处理
-   ```
-
-3. **数据库会话传递混乱**:
-   ```python
-   # 有些函数使用 safe_session()
-   # 有些函数接收 session 参数
-   # 有些函数内部创建新session
-   # 缺少统一的会话管理策略
-   ```
-
-**影响**:
-- 代码难以维护
-- 修改一处影响多处
-- 测试困难
-- 新功能难以添加
-
-### 4.3 后期功能设计不一致 🟡
-
-**问题描述**:
-1. **装备效果系统**:
-   - 早期: 简单的固定属性加成
-   - 后期: 复杂的特殊效果、触发器、状态效果
-   - 两种设计模式并存，代码复杂度高
-
-2. **临时buff系统**:
-   - 早期: 直接修改玩家属性
-   - 后期: 使用TemporaryBuff模型
-   - 两种方式并存，容易出错
-
-3. **物品效果类型**:
-   ```python
-   # ItemEffectType 枚举不断扩展
-   # 从简单的 RESTORE_HP, RESTORE_MP
-   # 到复杂的 SWEEP_DUNGEON, WORLD_BOSS_CHEST, DIVINE_PUNISHMENT
-   # 缺少统一的设计模式
-   ```
-
-**影响**:
-- 代码可读性差
-- 新人难以理解
-- 容易引入bug
-- 重构困难
-
-### 4.4 NPC系统功能受限 🟢
-
-**问题描述**:
-1. **当前NPC能力**:
-   - ✅ 基础数据模型完善 (NPC, NPCType, NPCStatus)
-   - ✅ 位置管理、状态管理
-   - ✅ 基础交互功能 (商人、工匠、雇主)
-   - ❌ 缺少AI对话能力
-   - ❌ 缺少好感度系统
-   - ❌ 缺少动态行为能力 (⚠️ 注意:不是"主动发消息",而是"状态生成")
-   - ❌ 无法像玩家一样触发游戏指令
-
-2. **NPC交互限制**:
-   ```python
-   # 当前NPC交互是硬编码的功能
-   # 例如: 商人只能交易，工匠只能锻造
-   # 无法进行自然语言对话
-   # 无法根据玩家行为调整态度
-   ```
-
-3. **合规约束**:
-   - ⚠️ **NPC 不能主动发送消息给玩家** (违反规则1)
-   - ✅ **NPC 可以生成事件/状态,玩家触发时展示** (拉取式设计)
-   - ✅ **NPC 可以在玩家触发交互时提供动态响应**
-
-**影响**:
-- 游戏体验单调
-- NPC缺少个性
-- 无法实现复杂的剧情交互
-- 限制了游戏玩法的扩展性
-
-### 4.5 缺少系统级功能 ⚠️
-
-**问题描述**:
-1. **缺少缓存层**:
-   - 频繁查询的数据 (玩家信息、装备配置) 没有缓存
-   - 每次请求都查询数据库
-
-2. **缺少日志系统**:
-   - 虽然有 `log.py`，但使用不统一
-   - 缺少结构化日志
-   - 难以追踪问题
-
-3. **缺少监控和性能分析**:
-   - 无法了解系统瓶颈
-   - 无法追踪慢查询
-
-4. **缺少数据验证**:
-   - 用户输入验证不完善
-   - 容易出现数据异常
-
-**影响**:
-- 系统稳定性差
-- 问题难以定位
-- 性能优化困难
-
----
-
-## 5. 新架构设计方案
-
-### 5.1 分层架构设计
-
-```mermaid
-graph TB
-    subgraph "接入层 (Presentation Layer)"
-        A1[Nonebot2命令路由]
-        A2[消息格式化器]
-        A3[参数验证器]
-    end
-
-    subgraph "应用层 (Application Layer)"
-        B1[玩家用例]
-        B2[战斗用例]
-        B3[交易用例]
-        B4[NPC交互用例]
-    end
-
-    subgraph "领域层 (Domain Layer)"
-        C1[玩家领域模型]
-        C2[战斗领域模型]
-        C3[装备领域模型]
-        C4[NPC领域模型]
-        C5[领域服务]
-        C6[领域事件]
-    end
-
-    subgraph "基础设施层 (Infrastructure Layer)"
-        D1[MySQL仓储]
-        D2[本地缓存/Redis缓存]
-        D3[AI服务适配器]
-        D4[事件存储]
-    end
-
-    A1 --> B1
-    A1 --> B2
-    A1 --> B3
-    A1 --> B4
-
-    B1 --> C1
-    B2 --> C2
-    B3 --> C3
-    B4 --> C4
-
-    C1 --> C5
-    C2 --> C5
-    C3 --> C5
-    C4 --> C5
-
-    C5 --> D1
-    C5 --> D2
-    C4 --> D3
-    C6 --> D4
-
-    style C1 fill:#bbf,stroke:#333,stroke-width:2px
-    style C2 fill:#bbf,stroke:#333,stroke-width:2px
-    style C3 fill:#bbf,stroke:#333,stroke-width:2px
-    style C4 fill:#bbf,stroke:#333,stroke-width:2px
-```
-
-### 5.2 核心设计原则
-
-1. **单一职责原则 (SRP)**:
-   - 每个模块只负责一个功能领域
-   - 例如: AttributeCalculator 只负责属性计算
-
-2. **依赖倒置原则 (DIP)** ⚠️ **重要**:
-   - 高层模块不依赖低层模块，都依赖抽象
-   - 例如: 使用Repository接口，而不是直接使用SQLAlchemy
-   - **禁止跨层直接导入**:
-     ```python
-     # ❌ 错误: 领域层直接导入基础设施层
-     from ..battle.enhanced_engine import EnhancedBattleEngine
-
-     # ✅ 正确: 通过接口注入
-     class NPCCommandExecutor:
-         def __init__(self, battle_engine: IBattleEngine):
-             self.battle_engine = battle_engine
-     ```
-
-3. **开闭原则 (OCP)**:
-   - 对扩展开放，对修改关闭
-   - 例如: 使用策略模式处理不同类型的物品效果
-
-4. **接口隔离原则 (ISP)**:
-   - 客户端不应依赖它不需要的接口
-   - 例如: NPC接口分为 INPCDialogue, INPCTrade, INPCCombat
-
-5. **会话边界原则** ⚠️ **强制**:
-   - 禁止在函数内部随意创建 session
-   - 统一由应用层注入 AsyncSession 或 Unit of Work
-   - 查询接口返回 DTO/只读视图，写模型与读模型分离
-
-### 5.3 模块重构方案
-
-#### 5.3.1 属性系统重构
-
-**当前问题**: 属性计算逻辑分散，难以维护
-
-**新设计**:
 ```python
-# domain/attribute/attribute_calculator.py
-class AttributeCalculator:
-    """统一的属性计算器"""
+# infrastructure/di/container.py
+from typing import Dict, Type, Callable, Any
+from dataclasses import dataclass
 
-    def calculate_final_attributes(
-        self,
-        player: Player,
-        context: AttributeContext
-    ) -> FinalAttributes:
-        """计算最终属性"""
-        base = self._get_base_attributes(player)
-        equipment = self._calculate_equipment_bonus(player, base)
-        elixir = self._calculate_elixir_bonus(player)
-        buff = self._calculate_buff_bonus(player)
-        vip = self._calculate_vip_bonus(player)
+@dataclass
+class ServiceDescriptor:
+    service_type: Type
+    implementation: Callable
+    lifetime: str  # singleton, scoped, transient
 
-        return FinalAttributes(
-            base=base,
-            equipment=equipment,
-            elixir=elixir,
-            buff=buff,
-            vip=vip,
-            total=base + equipment + elixir + buff + vip
+class DIContainer:
+    """依赖注入容器"""
+
+    def __init__(self):
+        self._services: Dict[Type, ServiceDescriptor] = {}
+        self._singletons: Dict[Type, Any] = {}
+
+    def register_singleton(self, service_type: Type, factory: Callable):
+        """注册单例服务"""
+        self._services[service_type] = ServiceDescriptor(
+            service_type, factory, "singleton"
         )
+
+    def register_scoped(self, service_type: Type, factory: Callable):
+        """注册作用域服务"""
+        self._services[service_type] = ServiceDescriptor(
+            service_type, factory, "scoped"
+        )
+
+    def register_transient(self, service_type: Type, factory: Callable):
+        """注册瞬时服务"""
+        self._services[service_type] = ServiceDescriptor(
+            service_type, factory, "transient"
+        )
+
+    def resolve(self, service_type: Type) -> Any:
+        """解析服务实例"""
+        descriptor = self._services.get(service_type)
+        if not descriptor:
+            raise ValueError(f"Service {service_type} not registered")
+
+        if descriptor.lifetime == "singleton":
+            if service_type not in self._singletons:
+                self._singletons[service_type] = descriptor.implementation(self)
+            return self._singletons[service_type]
+
+        elif descriptor.lifetime == "transient":
+            return descriptor.implementation(self)
+
+        else:  # scoped
+            # 从作用域上下文获取 (简化版)
+            return descriptor.implementation(self)
+
+# 使用示例
+container = DIContainer()
+
+# 注册服务
+container.register_singleton(IPlayerRepository, lambda c: PlayerRepository(c.resolve(AsyncSession)))
+container.register_scoped(AsyncSession, lambda c: create_session())
+container.register_transient(AttributeCalculator, lambda c: AttributeCalculator())
+
+# 解析使用
+player_repo = container.resolve(IPlayerRepository)
 ```
 
 **优点**:
-- 所有属性计算逻辑集中在一处
-- 易于测试和维护
-- 支持属性来源追踪
+- ✅ 解耦模块依赖
+- ✅ 支持接口注入,易于测试
+- ✅ 集中管理依赖生命周期
 
-#### 5.3.2 装备效果系统重构
+### 2.2 仓储模式 + 工作单元 (Repository + Unit of Work)
 
-**当前问题**: 装备效果与战斗系统耦合，后期添加的特殊效果设计不一致
+**问题**: 会话管理混乱,事务边界不清
 
-**新设计**:
+**解决方案**: Repository管理查询,UoW管理事务
+
 ```python
-# domain/equipment/effect_system.py
-class EquipmentEffectRegistry:
-    """装备效果注册表"""
+# domain/repositories/base.py
+from abc import ABC, abstractmethod
+from typing import Generic, TypeVar, Optional, List
 
-    def register_effect(self, effect_id: str, effect: IEquipmentEffect):
-        """注册装备效果"""
-        pass
+T = TypeVar('T')
 
-    def apply_effects(
-        self,
-        equipment: Equipment,
-        context: EffectContext
-    ) -> List[EffectResult]:
-        """应用装备效果"""
-        pass
-
-# 效果接口
-class IEquipmentEffect(ABC):
-    @abstractmethod
-    def can_trigger(self, context: EffectContext) -> bool:
-        """判断是否可以触发"""
-        pass
-
-    @abstractmethod
-    def execute(self, context: EffectContext) -> EffectResult:
-        """执行效果"""
-        pass
-
-# 具体效果实现
-class LifestealEffect(IEquipmentEffect):
-    """吸血效果"""
-    def can_trigger(self, context: EffectContext) -> bool:
-        return context.trigger_type == TriggerType.ON_ATTACK
-
-    def execute(self, context: EffectContext) -> EffectResult:
-        heal_amount = context.damage_dealt * self.rate
-        return EffectResult(heal=heal_amount)
-```
-
-**优点**:
-- 装备效果与战斗系统解耦
-- 易于添加新效果
-- 统一的效果处理流程
-
-#### 5.3.3 数据访问层重构
-
-**当前问题**: 数据库会话管理混乱，缺少统一的仓储模式
-
-**新设计**:
-```python
-# infrastructure/repository/base_repository.py
-class BaseRepository(ABC, Generic[T]):
-    """基础仓储接口"""
-
-    def __init__(self, session: AsyncSession):
-        self.session = session  # ⚠️ 由应用层注入,禁止内部创建
+class IRepository(ABC, Generic[T]):
+    """仓储接口"""
 
     @abstractmethod
     async def get_by_id(self, id: Any) -> Optional[T]:
@@ -733,25 +170,22 @@ class BaseRepository(ABC, Generic[T]):
     async def delete(self, id: Any) -> bool:
         pass
 
-# infrastructure/repository/player_repository.py
-class PlayerRepository(BaseRepository[Player]):
-    """玩家仓储"""
+# infrastructure/repositories/player_repository.py
+class PlayerRepository(IRepository[Player]):
+    """玩家仓储实现"""
+
+    def __init__(self, session: AsyncSession):
+        self._session = session  # 由外部注入,不内部创建
 
     async def get_by_id(self, player_id: str) -> Optional[Player]:
         stmt = select(Player).where(Player.id == player_id)
-        result = await self.session.execute(stmt)
+        result = await self._session.execute(stmt)
         return result.scalar_one_or_none()
 
     async def get_nearby_players(
-        self,
-        x: int,
-        y: int,
-        region: str,
-        max_distance: int
+        self, x: int, y: int, region: str, max_distance: int
     ) -> List[Player]:
-        """获取附近玩家 - 使用区域索引优化 ⚠️ 性能关键"""
-        # ✅ 优化方案: 使用边界框查询 + 复合索引 (region, x, y)
-        # 索引: Index('idx_player_location', 'region', 'x', 'y')
+        """优化的附近玩家查询 - 使用边界框+索引"""
         stmt = select(Player).where(
             and_(
                 Player.region == region,
@@ -759,2312 +193,952 @@ class PlayerRepository(BaseRepository[Player]):
                 Player.y.between(y - max_distance, y + max_distance)
             )
         )
-        result = await self.session.execute(stmt)
+        result = await self._session.execute(stmt)
         players = result.scalars().all()
 
-        # 后过滤：计算曼哈顿距离
+        # 后过滤: 曼哈顿距离
         return [
             p for p in players
             if abs(p.x - x) + abs(p.y - y) <= max_distance
         ]
+
+# infrastructure/uow/unit_of_work.py
+class UnitOfWork:
+    """工作单元 - 管理事务边界"""
+
+    def __init__(self, session_factory: Callable[[], AsyncSession]):
+        self._session_factory = session_factory
+        self._session: Optional[AsyncSession] = None
+
+        # 仓储实例
+        self.players: Optional[PlayerRepository] = None
+        self.items: Optional[ItemRepository] = None
+        self.guilds: Optional[GuildRepository] = None
+
+    async def __aenter__(self):
+        self._session = self._session_factory()
+
+        # 创建仓储实例,注入同一session
+        self.players = PlayerRepository(self._session)
+        self.items = ItemRepository(self._session)
+        self.guilds = GuildRepository(self._session)
+
+        return self
+
+    async def __aexit__(self, exc_type, exc_val, exc_tb):
+        if exc_type:
+            await self._session.rollback()
+        else:
+            await self._session.commit()
+
+        await self._session.close()
+
+    async def commit(self):
+        await self._session.commit()
+
+    async def rollback(self):
+        await self._session.rollback()
+
+# 使用示例
+async def cultivate_use_case(player_id: str, hours: int):
+    """修炼用例 - 明确的事务边界"""
+    async with UnitOfWork(session_factory) as uow:
+        # 查询
+        player = await uow.players.get_by_id(player_id)
+        if not player:
+            raise PlayerNotFoundError()
+
+        # 业务逻辑
+        exp_gain = calculate_exp_gain(player, hours)
+        player.exp += exp_gain
+
+        # 更新
+        await uow.players.update(player)
+
+        # 提交事务 (或退出上下文自动提交)
+        await uow.commit()
 ```
 
 **优点**:
-- 统一的数据访问接口
-- 易于切换数据库
-- 支持查询优化
-- 易于测试 (可以mock仓储)
+- ✅ 统一的事务边界
+- ✅ 会话生命周期清晰
+- ✅ 仓储接口易于mock测试
 
----
+### 2.3 策略模式统一效果系统 (Strategy Pattern)
 
-## 6. 数据库迁移方案
+**问题**: 装备效果和战斗效果设计不一致,难以扩展
 
-### 6.1 SQLite vs MySQL 对比
-
-| 特性 | SQLite (当前) | MySQL (目标) |
-|------|--------------|-------------|
-| **并发写入** | ❌ 串行化，单写入 | ✅ 支持多并发写入 |
-| **连接池** | ❌ 不支持 | ✅ 支持连接池 |
-| **索引类型** | ⚠️ 有限 (B-Tree) | ✅ 丰富 (B-Tree, Hash, Full-Text, Spatial) |
-| **事务隔离** | ⚠️ 有限 | ✅ 完整的ACID支持 |
-| **数据量** | ⚠️ 适合小型应用 | ✅ 适合大型应用 |
-| **查询优化器** | ⚠️ 简单 | ✅ 强大 |
-| **复制/备份** | ❌ 文件复制 | ✅ 主从复制、增量备份 |
-| **性能监控** | ❌ 有限 | ✅ 丰富的监控工具 |
-
-### 6.2 MySQL Schema 设计
-
-#### 6.2.1 核心表优化
-
-**Player表优化**:
-```sql
-CREATE TABLE player (
-    id VARCHAR(32) PRIMARY KEY COMMENT '平台ID(加密QQ号)',
-    uid INT UNSIGNED NOT NULL AUTO_INCREMENT UNIQUE COMMENT '自增UID(展示用)',
-    nickname VARCHAR(24) NOT NULL,
-    level INT UNSIGNED NOT NULL DEFAULT 1,
-    region VARCHAR(32) NOT NULL DEFAULT 'main',
-    x INT NOT NULL DEFAULT 0 COMMENT '坐标X',
-    y INT NOT NULL DEFAULT 0 COMMENT '坐标Y',
-    -- ⚠️ 字段命名统一: 使用 x/y 而非 real_world_x/real_world_y
-    -- ... 其他字段 ...
-
-    -- 索引优化
-    INDEX idx_level (level),
-    INDEX idx_region_coords (region, x, y) COMMENT '附近玩家查询关键索引',
-    INDEX idx_guild (guild_id),
-    INDEX idx_created_at (created_at),
-
-    -- 全文索引 (用于昵称搜索)
-    FULLTEXT INDEX ft_nickname (nickname)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
-```
-
-**ItemInstance表优化**:
-```sql
-CREATE TABLE item_instance (
-    id BIGINT UNSIGNED PRIMARY KEY AUTO_INCREMENT,
-    player_id VARCHAR(32) NOT NULL,
-    item_id VARCHAR(64) NOT NULL,
-    quantity INT UNSIGNED NOT NULL DEFAULT 1,
-    equipped BOOLEAN NOT NULL DEFAULT FALSE,
-    -- ... 其他字段 ...
-
-    -- 复合索引优化
-    INDEX idx_player_equipped (player_id, equipped),
-    INDEX idx_player_item (player_id, item_id),
-    INDEX idx_created_at (created_at),
-
-    FOREIGN KEY (player_id) REFERENCES player(id) ON DELETE CASCADE
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
-```
-
-**NPC表优化**:
-```sql
-CREATE TABLE npc (
-    id INT UNSIGNED PRIMARY KEY AUTO_INCREMENT,
-    npc_id VARCHAR(64) UNIQUE NOT NULL,
-    name VARCHAR(100) NOT NULL,
-    npc_type ENUM('merchant', 'craftsman', 'employer', 'ghost', 'special_vendor', 'guard', 'normal') NOT NULL,
-    location_id INT UNSIGNED NOT NULL,
-    status ENUM('alive', 'dead', 'respawning') NOT NULL DEFAULT 'alive',
-    is_active BOOLEAN NOT NULL DEFAULT TRUE,
-    -- ... 其他字段 ...
-
-    -- 索引优化
-    INDEX idx_location_status (location_id, status, is_active),
-    INDEX idx_type (npc_type),
-    INDEX idx_name (name),
-
-    FOREIGN KEY (location_id) REFERENCES location(id) ON DELETE CASCADE
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
-```
-
-#### 6.2.2 分区策略
-
-**历史数据分区** (PVP日志、交易记录):
-```sql
-CREATE TABLE pvp_log (
-    id BIGINT UNSIGNED PRIMARY KEY AUTO_INCREMENT,
-    ts BIGINT UNSIGNED NOT NULL COMMENT '时间戳(秒)',
-    -- ... 其他字段 ...
-
-    INDEX idx_ts (ts)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
-PARTITION BY RANGE (ts) (
-    PARTITION p202501 VALUES LESS THAN (UNIX_TIMESTAMP('2025-02-01')),
-    PARTITION p202502 VALUES LESS THAN (UNIX_TIMESTAMP('2025-03-01')),
-    PARTITION p202503 VALUES LESS THAN (UNIX_TIMESTAMP('2025-04-01')),
-    -- ... 按月分区 ...
-    PARTITION pmax VALUES LESS THAN MAXVALUE
-);
-```
-
-### 6.3 MySQL 8.0 配置优化 ⚠️ **已修正**
-
-**配置文件** (`/etc/mysql/my.cnf`):
-```ini
-[mysqld]
-# ⚠️ MySQL 8.0 已移除 Query Cache,以下配置无效,已删除:
-# query_cache_type = 1
-# query_cache_size = 256M
-
-# InnoDB 配置
-innodb_buffer_pool_size = 2G
-innodb_log_file_size = 512M
-innodb_flush_log_at_trx_commit = 2  # 性能优化,允许1秒数据丢失
-innodb_flush_method = O_DIRECT
-innodb_file_per_table = 1
-
-# 连接配置
-max_connections = 500
-max_connect_errors = 1000
-
-# 慢查询日志
-slow_query_log = 1
-long_query_time = 1
-slow_query_log_file = /var/log/mysql/slow.log
-
-# 字符集
-character-set-server = utf8mb4
-collation-server = utf8mb4_unicode_ci
-
-# 二进制日志 (用于备份和复制)
-log_bin = /var/log/mysql/mysql-bin.log
-binlog_format = ROW
-expire_logs_days = 7
-```
-
-**性能调优建议**:
-- `innodb_buffer_pool_size`: 设置为物理内存的 50-70%
-- `innodb_flush_log_at_trx_commit=2`: 每秒刷盘,性能提升但允许1秒数据丢失
-- `slow_query_log`: 记录慢查询,便于优化
-
-### 6.4 数据迁移步骤
-
-#### 阶段1: 准备阶段 (1-2天)
-
-1. **环境准备**:
-   ```bash
-   # 安装MySQL
-   sudo apt-get install mysql-server
-
-   # 安装Python MySQL驱动
-   pip install aiomysql pymysql
-   ```
-
-2. **配置文件准备**:
-   ```python
-   # config/database.py
-   DATABASE_CONFIG = {
-       "sqlite": {
-           "url": "sqlite+aiosqlite:///data/game.db"
-       },
-       "mysql": {
-           "host": "localhost",
-           "port": 3306,
-           "user": "guixiuxian",
-           "password": "your_password",
-           "database": "guixiuxian_db",
-           "pool_size": 20,
-           "max_overflow": 10,
-           "pool_recycle": 3600,
-           "echo": False
-       }
-   }
-   ```
-
-3. **创建迁移脚本** ⚠️ **已修正 SQLAlchemy 2.x 用法**:
-   ```python
-   # scripts/migrate_to_mysql.py
-   import asyncio
-   from sqlalchemy import select, insert
-   from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession
-   from sqlalchemy.orm import sessionmaker
-
-   async def migrate_data():
-       # 1. 连接SQLite和MySQL
-       sqlite_engine = create_async_engine("sqlite+aiosqlite:///data/game.db")
-       mysql_engine = create_async_engine(
-           "mysql+aiomysql://user:pass@localhost/guixiuxian_db"
-       )
-
-       # 2. 创建MySQL表结构
-       async with mysql_engine.begin() as conn:
-           await conn.run_sync(Base.metadata.create_all)
-
-       # 3. 分批迁移数据
-       tables = [Player, ItemInstance, Guild, NPC, ...]
-       for table in tables:
-           await migrate_table(sqlite_engine, mysql_engine, table)
-
-   async def migrate_table(src_engine, dst_engine, table_class):
-       """分批迁移单个表 - 使用 AsyncSession + insert()"""
-       batch_size = 1000
-       offset = 0
-
-       # ✅ 创建 Session 工厂
-       SrcSession = sessionmaker(src_engine, class_=AsyncSession, expire_on_commit=False)
-       DstSession = sessionmaker(dst_engine, class_=AsyncSession, expire_on_commit=False)
-
-       while True:
-           # 从SQLite读取
-           async with SrcSession() as src_session:
-               stmt = select(table_class).limit(batch_size).offset(offset)
-               result = await src_session.execute(stmt)
-               rows = result.scalars().all()
-
-           if not rows:
-               break
-
-           # ✅ 转换为字典列表 (避免 ORM 实例跨 session 问题)
-           rows_data = [row.to_dict() for row in rows]  # 需要在模型中实现 to_dict()
-
-           # 写入MySQL
-           async with DstSession() as dst_session:
-               try:
-                   # ✅ 使用 insert() 批量插入
-                   await dst_session.execute(
-                       insert(table_class.__table__),
-                       rows_data
-                   )
-                   await dst_session.commit()
-               except IntegrityError as e:
-                   await dst_session.rollback()
-                   logger.error(f"Integrity error: {e}")
-                   raise
-               except OperationalError as e:
-                   await dst_session.rollback()
-                   logger.error(f"Operational error: {e}")
-                   raise
-
-           offset += batch_size
-           print(f"Migrated {offset} rows of {table_class.__name__}")
-   ```
-
-#### 阶段2: 测试迁移 (2-3天)
-
-1. **备份当前数据**:
-   ```bash
-   cp data/game.db data/game_backup_$(date +%Y%m%d).db
-   ```
-
-2. **执行迁移**:
-   ```bash
-   python scripts/migrate_to_mysql.py
-   ```
-
-3. **数据验证**:
-   ```python
-   # scripts/validate_migration.py
-   async def validate_migration():
-       # 对比SQLite和MySQL的数据
-       sqlite_count = await count_records(sqlite_engine, Player)
-       mysql_count = await count_records(mysql_engine, Player)
-
-       assert sqlite_count == mysql_count, "Player count mismatch"
-
-       # 抽样验证数据一致性
-       sample_ids = random.sample(all_player_ids, 100)
-       for player_id in sample_ids:
-           sqlite_player = await get_player(sqlite_engine, player_id)
-           mysql_player = await get_player(mysql_engine, player_id)
-           assert_player_equal(sqlite_player, mysql_player)
-   ```
-
-4. **性能测试**:
-   ```python
-   # scripts/benchmark.py
-   async def benchmark():
-       # 测试常见查询的性能
-       queries = [
-           "get_player_by_id",
-           "get_nearby_players",
-           "get_equipped_items",
-           "get_guild_members",
-       ]
-
-       for query in queries:
-           sqlite_time = await measure_query(sqlite_engine, query)
-           mysql_time = await measure_query(mysql_engine, query)
-           print(f"{query}: SQLite={sqlite_time}ms, MySQL={mysql_time}ms")
-   ```
-
-#### 阶段3: 灰度发布 (3-5天)
-
-1. **双写模式** ⚠️ **已修正异常捕获**:
-   ```python
-   # infrastructure/repository/dual_write_repository.py
-   from sqlalchemy.exc import IntegrityError, OperationalError, SQLAlchemyError
-
-   class DualWritePlayerRepository:
-       """双写仓储 - 同时写入SQLite和MySQL"""
-
-       def __init__(self, sqlite_repo, mysql_repo):
-           self.sqlite_repo = sqlite_repo
-           self.mysql_repo = mysql_repo
-
-       async def add(self, player: Player) -> Player:
-           # 主库写入 (MySQL)
-           result = await self.mysql_repo.add(player)
-
-           # 备库写入 (SQLite) - 失败不影响主流程
-           # ✅ 指定具体异常类型
-           try:
-               await self.sqlite_repo.add(player)
-           except IntegrityError as e:
-               logger.warning(f"SQLite integrity error: {e}")
-           except OperationalError as e:
-               logger.warning(f"SQLite operational error: {e}")
-           except SQLAlchemyError as e:
-               logger.warning(f"SQLite write failed: {e}")
-
-           return result
-
-       async def get_by_id(self, player_id: str) -> Optional[Player]:
-           # 优先从MySQL读取
-           try:
-               player = await self.mysql_repo.get_by_id(player_id)
-               if player:
-                   return player
-           except OperationalError as e:
-               logger.warning(f"MySQL read failed: {e}, fallback to SQLite")
-           except SQLAlchemyError as e:
-               logger.error(f"MySQL error: {e}, fallback to SQLite")
-
-           # 降级到SQLite
-           return await self.sqlite_repo.get_by_id(player_id)
-   ```
-
-2. **灰度配置**:
-   ```python
-   # config/feature_flags.py
-   FEATURE_FLAGS = {
-       "use_mysql": {
-           "enabled": True,
-           "rollout_percentage": 10,  # 10%的用户使用MySQL
-       }
-   }
-
-   def should_use_mysql(user_id: str) -> bool:
-       if not FEATURE_FLAGS["use_mysql"]["enabled"]:
-           return False
-
-       # 基于用户ID的哈希值决定是否使用MySQL
-       hash_value = int(hashlib.md5(user_id.encode()).hexdigest(), 16)
-       percentage = hash_value % 100
-       return percentage < FEATURE_FLAGS["use_mysql"]["rollout_percentage"]
-   ```
-
-3. **监控指标**:
-   - 查询响应时间
-   - 错误率
-   - 数据一致性
-   - 数据库连接数
-   - 慢查询日志
-
-#### 阶段4: 全量切换 (1天)
-
-1. **停止双写**:
-   ```python
-   # 将rollout_percentage设置为100%
-   FEATURE_FLAGS["use_mysql"]["rollout_percentage"] = 100
-   ```
-
-2. **移除SQLite依赖**:
-   ```python
-   # 移除DualWriteRepository，直接使用MySQLRepository
-   # 更新所有依赖注入配置
-   ```
-
-3. **清理旧数据**:
-   ```bash
-   # 归档SQLite数据库
-   mv data/game.db data/archive/game_sqlite_$(date +%Y%m%d).db
-   ```
-
-### 6.5 数据一致性保障
-
-**对账机制**:
-```python
-# scripts/data_reconciliation.py
-async def reconcile_data():
-    """定时对账 - 检查 SQLite 和 MySQL 数据一致性"""
-    tables = [Player, ItemInstance, Guild]
-
-    for table in tables:
-        # 1. 行数对比
-        sqlite_count = await count_records(sqlite_session, table)
-        mysql_count = await count_records(mysql_session, table)
-
-        if sqlite_count != mysql_count:
-            logger.error(f"{table.__name__} count mismatch: SQLite={sqlite_count}, MySQL={mysql_count}")
-
-        # 2. 增量哈希对比 (抽样)
-        sample_ids = await get_sample_ids(table, sample_size=1000)
-        for id in sample_ids:
-            sqlite_hash = await get_record_hash(sqlite_session, table, id)
-            mysql_hash = await get_record_hash(mysql_session, table, id)
-
-            if sqlite_hash != mysql_hash:
-                logger.error(f"{table.__name__} data mismatch for id={id}")
-```
-
-**回退策略**:
-- 保留 SQLite 数据库至少 30 天
-- 双写阶段设置明确的失败告警
-- 提供一键回退脚本
-
-### 6.6 数据库配置优化 (已在 6.3 节)
-# 基础配置
-max_connections = 500
-max_connect_errors = 1000
-
-# InnoDB配置
-innodb_buffer_pool_size = 2G
-innodb_log_file_size = 512M
-innodb_flush_log_at_trx_commit = 2
-innodb_flush_method = O_DIRECT
-
-# 查询缓存
-query_cache_type = 1
-query_cache_size = 256M
-
-# 慢查询日志
-slow_query_log = 1
-slow_query_log_file = /var/log/mysql/slow.log
-long_query_time = 1
-
-# 字符集
-character-set-server = utf8mb4
-collation-server = utf8mb4_unicode_ci
-```
-
-**SQLAlchemy配置**:
-```python
-# infrastructure/database/mysql_engine.py
-from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession
-from sqlalchemy.orm import sessionmaker
-from sqlalchemy.pool import NullPool, QueuePool
-
-engine = create_async_engine(
-    "mysql+aiomysql://user:pass@localhost/guixiuxian_db",
-    echo=False,
-    pool_size=20,              # 连接池大小
-    max_overflow=10,           # 最大溢出连接数
-    pool_recycle=3600,         # 连接回收时间(秒)
-    pool_pre_ping=True,        # 连接前ping检查
-    pool_use_lifo=True,        # 后进先出(减少连接空闲时间)
-    connect_args={
-        "charset": "utf8mb4",
-        "autocommit": False,
-    }
-)
-
-AsyncSessionLocal = sessionmaker(
-    bind=engine,
-    class_=AsyncSession,
-    expire_on_commit=False,
-    autoflush=False,
-)
-```
-
-### 5.5 回滚方案
-
-如果迁移过程中出现问题，需要快速回滚：
-
-1. **立即切换回SQLite**:
-   ```python
-   # 修改feature flag
-   FEATURE_FLAGS["use_mysql"]["enabled"] = False
-   ```
-
-2. **恢复SQLite数据**:
-   ```bash
-   # 如果SQLite数据已损坏，从备份恢复
-   cp data/game_backup_YYYYMMDD.db data/game.db
-   ```
-
-3. **数据同步**:
-   ```python
-   # 如果MySQL有新数据，需要同步回SQLite
-   async def sync_mysql_to_sqlite():
-       # 获取MySQL中的最新数据
-       # 写入SQLite
-       pass
-   ```
-
----
-
-## 7. NPC AI Agent系统设计
-
-> ⚠️ **合规约束**: NPC 不能主动发送消息,只能在玩家触发时响应。所有"主动行为"改为"状态生成+拉取展示"模式。
-
-### 7.1 系统架构
-
-```mermaid
-graph TB
-    subgraph "玩家交互层"
-        A[玩家发送消息]
-        B[NPC响应]
-    end
-
-    subgraph "NPC Agent核心"
-        C[对话管理器]
-        D[意图识别器]
-        E[行为决策器]
-        F[好感度系统]
-    end
-
-    subgraph "AI服务层"
-        G[LLM服务<br/>GPT-4/Claude]
-        H[向量数据库<br/>记忆存储]
-        I[情感分析]
-    end
-
-    subgraph "游戏系统集成"
-        J[指令执行器]
-        K[游戏状态查询]
-        L[事件触发器]
-    end
-
-    A --> C
-    C --> D
-    D --> E
-    E --> F
-
-    C --> G
-    C --> H
-    D --> I
-
-    E --> J
-    E --> K
-    F --> L
-
-    J --> B
-    K --> B
-
-    style C fill:#bbf,stroke:#333,stroke-width:2px
-    style E fill:#bbf,stroke:#333,stroke-width:2px
-    style F fill:#bbf,stroke:#333,stroke-width:2px
-```
-
-### 7.2 核心组件设计
-
-#### 7.2.1 NPC Agent模型扩展
+**解决方案**: 统一效果接口+策略注册表
 
 ```python
-# domain/npc/npc_agent.py
-from dataclasses import dataclass
-from typing import List, Dict, Optional
+# domain/effects/effect_interface.py
+from abc import ABC, abstractmethod
 from enum import Enum
 
-class NPCPersonality(Enum):
-    """NPC性格类型"""
-    FRIENDLY = "friendly"      # 友善
-    NEUTRAL = "neutral"        # 中立
-    HOSTILE = "hostile"        # 敌对
-    MYSTERIOUS = "mysterious"  # 神秘
-    GREEDY = "greedy"         # 贪婪
-    HONORABLE = "honorable"   # 正直
+class TriggerType(Enum):
+    """触发类型"""
+    PASSIVE = "passive"          # 被动
+    ON_ATTACK = "on_attack"      # 攻击时
+    ON_DEFEND = "on_defend"      # 防御时
+    ON_SKILL = "on_skill"        # 技能释放时
+    TURN_START = "turn_start"    # 回合开始
+    TURN_END = "turn_end"        # 回合结束
 
 @dataclass
-class NPCMemory:
-    """NPC记忆"""
-    player_id: str
-    interaction_count: int
-    last_interaction: datetime
-    conversation_history: List[Dict]  # 对话历史
-    relationship_events: List[Dict]   # 关系事件
+class EffectContext:
+    """效果执行上下文"""
+    trigger_type: TriggerType
+    source: Any  # 效果来源 (装备/技能/buff)
+    target: Player
+    battle_state: Optional[BattleState] = None
+    damage_dealt: Optional[int] = None
 
-class NPCAgent:
-    """NPC智能体"""
+@dataclass
+class EffectResult:
+    """效果执行结果"""
+    success: bool
+    message: str
+    attribute_changes: Dict[str, int] = field(default_factory=dict)
+    status_changes: List[str] = field(default_factory=list)
 
-    def __init__(
-        self,
-        npc: NPC,
-        personality: NPCPersonality,
-        ai_service: IAIService,
-        memory_store: IMemoryStore
-    ):
-        self.npc = npc
-        self.personality = personality
-        self.ai_service = ai_service
-        self.memory_store = memory_store
+class IEffect(ABC):
+    """效果接口 - 所有效果的统一抽象"""
 
-        # 好感度系统
-        self.affinity_scores: Dict[str, int] = {}  # player_id -> score
+    @abstractmethod
+    def can_trigger(self, context: EffectContext) -> bool:
+        """判断是否可以触发"""
+        pass
 
-        # 行为配置
-        self.behavior_config = self._load_behavior_config()
+    @abstractmethod
+    async def execute(self, context: EffectContext) -> EffectResult:
+        """执行效果"""
+        pass
 
-    async def process_interaction(
-        self,
-        player: Player,
-        message: str,
-        context: InteractionContext
-    ) -> NPCResponse:
-        """处理玩家交互"""
-        # 1. 加载记忆
-        memory = await self.memory_store.get_memory(self.npc.npc_id, player.id)
+    @property
+    @abstractmethod
+    def effect_id(self) -> str:
+        """效果唯一标识"""
+        pass
 
-        # 2. 意图识别
-        intent = await self._recognize_intent(message, memory)
+# domain/effects/effect_registry.py
+class EffectRegistry:
+    """效果注册表 - 管理所有效果"""
 
-        # 3. 好感度检查
-        affinity = self.get_affinity(player.id)
+    def __init__(self):
+        self._effects: Dict[str, IEffect] = {}
 
-        # 4. 生成响应
-        response = await self._generate_response(
-            player, message, intent, affinity, memory
-        )
+    def register(self, effect: IEffect):
+        """注册效果"""
+        self._effects[effect.effect_id] = effect
 
-        # 5. 执行行为
-        actions = await self._decide_actions(intent, affinity, context)
+    def get(self, effect_id: str) -> Optional[IEffect]:
+        """获取效果"""
+        return self._effects.get(effect_id)
 
-        # 6. 更新记忆和好感度
-        await self._update_memory(player.id, message, response, intent)
-        await self._update_affinity(player.id, intent, actions)
-
-        return NPCResponse(
-            text=response,
-            actions=actions,
-            affinity_change=self._calculate_affinity_change(intent)
-        )
-
-    async def _recognize_intent(
-        self,
-        message: str,
-        memory: NPCMemory
-    ) -> Intent:
-        """识别玩家意图"""
-        # 使用AI服务识别意图
-        prompt = f"""
-        你是一个{self.npc.name}，性格是{self.personality.value}。
-        玩家说："{message}"
-
-        请识别玩家的意图，从以下选项中选择：
-        - GREETING: 打招呼
-        - TRADE: 想要交易
-        - QUEST: 询问任务
-        - CHAT: 闲聊
-        - ATTACK: 攻击意图
-        - GIFT: 赠送礼物
-        - ASK_INFO: 询问信息
-
-        返回JSON格式：{{"intent": "...", "confidence": 0.0-1.0}}
-        """
-
-        result = await self.ai_service.complete(prompt)
-        return Intent.from_json(result)
-
-    async def _generate_response(
-        self,
-        player: Player,
-        message: str,
-        intent: Intent,
-        affinity: int,
-        memory: NPCMemory
-    ) -> str:
-        """生成NPC响应"""
-        # 构建上下文
-        context = self._build_context(player, memory, affinity)
-
-        # 生成响应
-        prompt = f"""
-        你是{self.npc.name}，{self.npc.description}。
-        你的性格是{self.personality.value}。
-
-        玩家信息：
-        - 昵称：{player.nickname}
-        - 等级：{player.level}
-        - 与你的好感度：{affinity}/100
-
-        对话历史：
-        {self._format_conversation_history(memory.conversation_history[-5:])}
-
-        玩家说："{message}"
-        意图：{intent.type}
-
-        请生成一个符合你性格的响应。注意：
-        1. 保持角色一致性
-        2. 根据好感度调整态度
-        3. 如果好感度低，可以拒绝某些请求
-        4. 使用诡异修仙世界观的语言风格
-        5. 响应长度控制在50字以内
-        """
-
-        response = await self.ai_service.complete(prompt)
-        return response
-
-    async def _decide_actions(
-        self,
-        intent: Intent,
-        affinity: int,
-        context: InteractionContext
-    ) -> List[NPCAction]:
-        """决定NPC行为"""
-        actions = []
-
-        # 根据意图和好感度决定行为
-        if intent.type == IntentType.TRADE:
-            if affinity >= 30:
-                actions.append(NPCAction(
-                    type=ActionType.OPEN_TRADE,
-                    params={"discount": self._calculate_discount(affinity)}
-                ))
-            else:
-                actions.append(NPCAction(
-                    type=ActionType.REFUSE,
-                    params={"reason": "好感度不足"}
-                ))
-
-        elif intent.type == IntentType.QUEST:
-            if affinity >= 50:
-                # 生成任务
-                quest = await self._generate_quest(context.player)
-                actions.append(NPCAction(
-                    type=ActionType.GIVE_QUEST,
-                    params={"quest": quest}
-                ))
-
-        elif intent.type == IntentType.GIFT:
-            # 接受礼物，增加好感度
-            actions.append(NPCAction(
-                type=ActionType.ACCEPT_GIFT,
-                params={}
-            ))
-
-        return actions
-
-    def get_affinity(self, player_id: str) -> int:
-        """获取好感度"""
-        return self.affinity_scores.get(player_id, 50)  # 默认50
-
-    async def _update_affinity(
-        self,
-        player_id: str,
-        intent: Intent,
-        actions: List[NPCAction]
-    ):
-        """更新好感度"""
-        current = self.get_affinity(player_id)
-        change = 0
-
-        # 根据交互类型调整好感度
-        if intent.type == IntentType.GIFT:
-            change = +10
-        elif intent.type == IntentType.ATTACK:
-            change = -20
-        elif intent.type == IntentType.CHAT:
-            change = +1
-
-        # 应用性格修正
-        change = self._apply_personality_modifier(change, intent)
-
-        # 更新好感度 (0-100)
-        new_affinity = max(0, min(100, current + change))
-        self.affinity_scores[player_id] = new_affinity
-
-        # 触发好感度事件
-        if new_affinity >= 80 and current < 80:
-            await self._trigger_affinity_event(player_id, "high_affinity")
-        elif new_affinity <= 20 and current > 20:
-            await self._trigger_affinity_event(player_id, "low_affinity")
-```
-
-#### 7.2.2 NPC 动态状态生成系统 ⚠️ **拉取式设计,符合合规要求**
-
-> ⚠️ **重要**: NPC 不能主动发送消息,只能生成状态/事件,玩家触发时拉取展示
-
-```python
-# domain/npc/npc_behavior.py
-from infrastructure.event_store import PendingEventStore
-
-class NPCBehaviorScheduler:
-    """NPC行为调度器 - 生成状态,不主动推送"""
-
-    def __init__(self, npc_agent: NPCAgent, event_store: PendingEventStore):
-        self.npc_agent = npc_agent
-        self.event_store = event_store  # 事件存储,玩家触发时拉取
-
-    async def schedule_daily_behaviors(self):
-        """调度每日行为 - 仅生成状态,不发送消息"""
-        # ✅ NPC 可以执行的状态生成行为
-        behaviors = [
-            self._wander_around,      # 四处游荡 (更新位置)
-            self._generate_trade_offers,  # 生成交易优惠 (入库)
-            self._generate_quests,    # 生成任务 (入库)
-            self._update_mood,        # 更新心情状态
+    def get_by_trigger(self, trigger_type: TriggerType) -> List[IEffect]:
+        """获取特定触发类型的所有效果"""
+        return [
+            effect for effect in self._effects.values()
+            if isinstance(effect, TriggeredEffect) and effect.trigger_type == trigger_type
         ]
 
-        for behavior in behaviors:
-            if await self._should_execute(behavior):
-                await behavior()
+# 装饰器注册
+def register_effect(effect_id: str):
+    """效果注册装饰器"""
+    def decorator(cls: Type[IEffect]):
+        # 自动注册到全局注册表
+        effect_registry.register(cls())
+        return cls
+    return decorator
 
-    async def _wander_around(self):
-        """NPC四处游荡 - 仅更新位置,不通知玩家"""
-        current_location = self.npc_agent.npc.location_id
-        nearby_locations = await self._get_nearby_locations(current_location)
+# 具体效果实现示例
+@register_effect("lifesteal")
+class LifestealEffect(IEffect):
+    """吸血效果"""
 
-        if nearby_locations:
-            new_location = random.choice(nearby_locations)
-            # ✅ 仅更新数据库,不发送消息
-            await self._move_to_location(new_location)
+    def __init__(self, rate: float = 0.2):
+        self.rate = rate
 
-    async def _generate_trade_offers(self):
-        """生成交易优惠 - 入库,玩家触发时展示"""
-        nearby_players = await self._get_nearby_players()
+    @property
+    def effect_id(self) -> str:
+        return "lifesteal"
 
-        for player in nearby_players:
-            affinity = self.npc_agent.get_affinity(player.id)
+    def can_trigger(self, context: EffectContext) -> bool:
+        return (
+            context.trigger_type == TriggerType.ON_ATTACK
+            and context.damage_dealt is not None
+            and context.damage_dealt > 0
+        )
 
-            # 如果好感度高,生成优惠事件
-            if affinity >= 70:
-                # ✅ 仅入库,不推送
-                await self.event_store.add(player.uid, {
-                    "type": "npc_trade_offer",
-                    "npc_id": self.npc_agent.npc.id,
-                    "npc_name": self.npc_agent.npc.name,
-                    "discount": 0.2,
-                    "message": f"{self.npc_agent.npc.name}有特别优惠给你!"
-                })
+    async def execute(self, context: EffectContext) -> EffectResult:
+        heal_amount = int(context.damage_dealt * self.rate)
+        context.target.hp = min(
+            context.target.hp + heal_amount,
+            context.target.max_hp
+        )
 
-    async def _generate_quests(self):
-        """生成任务 - 入库,玩家触发时展示"""
-        quest = await self._generate_dynamic_quest()
+        return EffectResult(
+            success=True,
+            message=f"吸血回复{heal_amount}点生命",
+            attribute_changes={"hp": heal_amount}
+        )
 
-        if quest:
-            # ✅ 将任务入库,不广播
-            nearby_players = await self._get_nearby_players()
-            for player in nearby_players:
-                await self.event_store.add(player.uid, {
-                    "type": "npc_quest_available",
-                    "npc_id": self.npc_agent.npc.id,
-                    "npc_name": self.npc_agent.npc.name,
-                    "quest_id": quest.id,
-                    "quest_title": quest.title
-                })
+@register_effect("counterattack")
+class CounterattackEffect(IEffect):
+    """反击效果"""
 
-    async def _update_mood(self):
-        """更新NPC心情状态 - 仅更新数据,不通知"""
-        # ✅ 根据时间、天气、玩家交互等更新NPC心情
-        # 玩家下次与NPC交互时会看到不同的反应
-        mood_factors = await self._calculate_mood_factors()
-        self.npc_agent.npc.mood = self._determine_mood(mood_factors)
-        # 仅更新数据库,不发送消息
+    @property
+    def effect_id(self) -> str:
+        return "counterattack"
+
+    def can_trigger(self, context: EffectContext) -> bool:
+        return context.trigger_type == TriggerType.ON_DEFEND
+
+    async def execute(self, context: EffectContext) -> EffectResult:
+        # 实现反击逻辑
+        pass
 ```
 
-**玩家如何获取NPC事件**:
+**迁移策略**:
+1. 创建效果接口和注册表
+2. 将现有装备效果适配到新接口 (Adapter模式)
+3. 将战斗效果重构为策略实现
+4. 逐步替换旧代码引用
+
+**优点**:
+- ✅ 统一的效果管理
+- ✅ 易于添加新效果 (开闭原则)
+- ✅ 效果组合灵活 (责任链模式)
+
+### 2.4 属性计算器统一 (Single Responsibility + Composite)
+
+**问题**: 属性计算分散在4+处,难以维护
+
+**解决方案**: 单一属性计算器+组合模式
+
 ```python
-# 在任意命令中拉取待处理事件
-@on_command("查看消息", block=True)
-async def check_pending_events(bot: Bot, event: MessageEvent):
-    uid = await get_uid(event.get_user_id())
+# domain/attributes/attribute_calculator.py
+from dataclasses import dataclass
+from typing import Protocol
 
-    # ✅ 拉取所有待处理事件
-    events = await event_store.pop_all(uid)
+@dataclass
+class AttributeBonus:
+    """属性加成"""
+    attack: int = 0
+    defense: int = 0
+    hp: int = 0
+    mp: int = 0
+    agility: int = 0
+    # ... 其他属性
 
-    if not events:
-        await bot.send(event, "暂无新消息")
-        return
+@dataclass
+class AttributeBreakdown:
+    """属性明细 - 用于调试和展示"""
+    base: AttributeBonus
+    equipment: AttributeBonus
+    buff: AttributeBonus
+    elixir: AttributeBonus
+    vip: AttributeBonus
+    total: AttributeBonus
 
-    # 格式化展示
-    messages = []
-    for evt in events:
-        if evt["type"] == "npc_trade_offer":
-            messages.append(f"💰 {evt['npc_name']}有特别优惠给你!")
-        elif evt["type"] == "npc_quest_available":
-            messages.append(f"📜 {evt['npc_name']}发布了新任务: {evt['quest_title']}")
+class IAttributeSource(Protocol):
+    """属性来源接口"""
+    async def calculate_bonus(self, player: Player) -> AttributeBonus:
+        """计算属性加成"""
+        ...
 
-    await bot.send(event, "\n".join(messages))
+class AttributeCalculator:
+    """统一属性计算器 - 单一职责"""
+
+    def __init__(self):
+        self._sources: List[IAttributeSource] = []
+
+    def add_source(self, source: IAttributeSource):
+        """添加属性来源"""
+        self._sources.append(source)
+
+    async def calculate_final_attributes(
+        self, player: Player
+    ) -> AttributeBreakdown:
+        """计算最终属性 - 组合所有来源"""
+        base = await self._calculate_base(player)
+
+        # 并发计算各来源加成
+        sources_bonuses = await asyncio.gather(*[
+            source.calculate_bonus(player) for source in self._sources
+        ])
+
+        # 汇总
+        total = self._sum_bonuses([base] + sources_bonuses)
+
+        return AttributeBreakdown(
+            base=base,
+            equipment=sources_bonuses[0] if len(sources_bonuses) > 0 else AttributeBonus(),
+            buff=sources_bonuses[1] if len(sources_bonuses) > 1 else AttributeBonus(),
+            elixir=sources_bonuses[2] if len(sources_bonuses) > 2 else AttributeBonus(),
+            vip=sources_bonuses[3] if len(sources_bonuses) > 3 else AttributeBonus(),
+            total=total
+        )
+
+    async def _calculate_base(self, player: Player) -> AttributeBonus:
+        """计算基础属性"""
+        return AttributeBonus(
+            attack=player.base_attack,
+            defense=player.base_defense,
+            hp=player.base_hp,
+            mp=player.base_mp,
+            agility=player.base_agility
+        )
+
+    def _sum_bonuses(self, bonuses: List[AttributeBonus]) -> AttributeBonus:
+        """汇总属性加成"""
+        return AttributeBonus(
+            attack=sum(b.attack for b in bonuses),
+            defense=sum(b.defense for b in bonuses),
+            hp=sum(b.hp for b in bonuses),
+            mp=sum(b.mp for b in bonuses),
+            agility=sum(b.agility for b in bonuses)
+        )
+
+# 具体属性来源实现
+class EquipmentAttributeSource(IAttributeSource):
+    """装备属性来源"""
+
+    def __init__(self, item_repo: IItemRepository):
+        self._item_repo = item_repo
+
+    async def calculate_bonus(self, player: Player) -> AttributeBonus:
+        # 查询玩家装备
+        equipped_items = await self._item_repo.get_equipped_items(player.id)
+
+        # 汇总装备属性
+        total = AttributeBonus()
+        for item in equipped_items:
+            total.attack += item.attack_bonus
+            total.defense += item.defense_bonus
+            # ...
+
+        return total
+
+class BuffAttributeSource(IAttributeSource):
+    """buff属性来源"""
+
+    def __init__(self, buff_repo: IBuffRepository):
+        self._buff_repo = buff_repo
+
+    async def calculate_bonus(self, player: Player) -> AttributeBonus:
+        buffs = await self._buff_repo.get_active_buffs(player.id)
+
+        total = AttributeBonus()
+        for buff in buffs:
+            total.attack += buff.attack_bonus
+            total.defense += buff.defense_bonus
+            # ...
+
+        return total
+
+# 使用示例
+calculator = AttributeCalculator()
+calculator.add_source(EquipmentAttributeSource(item_repo))
+calculator.add_source(BuffAttributeSource(buff_repo))
+calculator.add_source(ElixirAttributeSource(elixir_repo))
+calculator.add_source(VIPAttributeSource(vip_service))
+
+breakdown = await calculator.calculate_final_attributes(player)
+print(f"总攻击力: {breakdown.total.attack}")
+print(f"  基础: {breakdown.base.attack}")
+print(f"  装备: {breakdown.equipment.attack}")
+print(f"  buff: {breakdown.buff.attack}")
 ```
 
-#### 7.2.3 NPC指令执行系统 ⚠️ **已修正 DIP 违反**
+**优点**:
+- ✅ 单一计算入口
+- ✅ 属性来源可扩展 (开闭原则)
+- ✅ 支持属性追溯 (调试友好)
+- ✅ 易于测试 (mock各来源)
+
+### 2.5 命令模式解耦NPC行为 (Command Pattern)
+
+**问题**: NPC行为执行与战斗系统耦合 (REFACTORING_PLAN.md line 1743直接导入EnhancedBattleEngine)
+
+**解决方案**: 命令模式+接口注入
 
 ```python
-# domain/npc/npc_command_executor.py
-from sqlalchemy.exc import IntegrityError, OperationalError, SQLAlchemyError
-from domain.battle.interfaces import IBattleEngine  # ✅ 依赖接口,不依赖具体实现
+# domain/npc/commands/command_interface.py
+from abc import ABC, abstractmethod
 
-class NPCCommandExecutor:
-    """NPC指令执行器 - 让NPC能像玩家一样触发游戏指令"""
+@dataclass
+class CommandContext:
+    """命令执行上下文"""
+    executor: Any  # NPC或Player
+    target: Optional[Any] = None
+    params: Dict[str, Any] = field(default_factory=dict)
 
-    def __init__(self, npc_agent: NPCAgent, battle_engine: IBattleEngine):
-        self.npc_agent = npc_agent
-        self.battle_engine = battle_engine  # ✅ 通过接口注入,符合 DIP
-        self.command_registry = self._build_command_registry()
+@dataclass
+class CommandResult:
+    """命令执行结果"""
+    success: bool
+    message: str
+    data: Dict[str, Any] = field(default_factory=dict)
 
-    def _build_command_registry(self) -> Dict[str, Callable]:
-        """构建NPC可执行的指令注册表"""
-        return {
-            "修炼": self._execute_cultivate,
-            "探索": self._execute_explore,
-            "交易": self._execute_trade,
-            "攻击": self._execute_attack,
-            "使用物品": self._execute_use_item,
-            "移动": self._execute_move,
-        }
+class ICommand(ABC):
+    """命令接口"""
 
-    async def execute_command(
-        self,
-        command: str,
-        params: Dict[str, Any]
-    ) -> CommandResult:
-        """执行指令"""
-        handler = self.command_registry.get(command)
+    @abstractmethod
+    async def execute(self, context: CommandContext) -> CommandResult:
+        """执行命令"""
+        pass
 
-        if not handler:
-            return CommandResult(
-                success=False,
-                message=f"NPC不支持指令: {command}"
-            )
+    @abstractmethod
+    def can_execute(self, context: CommandContext) -> bool:
+        """判断是否可执行"""
+        pass
 
-        # ✅ 指定具体异常类型
-        try:
-            result = await handler(params)
-            return result
-        except ValueError as e:
-            logger.error(f"NPC指令参数错误: {command}, {e}")
-            return CommandResult(success=False, message=f"参数错误: {e}")
-        except SQLAlchemyError as e:
-            logger.error(f"NPC指令数据库错误: {command}, {e}")
-            return CommandResult(success=False, message="数据库错误")
-        except TimeoutError as e:
-            logger.error(f"NPC指令超时: {command}, {e}")
-            return CommandResult(success=False, message="操作超时")
+# domain/npc/commands/attack_command.py
+class AttackCommand(ICommand):
+    """攻击命令"""
 
-    async def _execute_cultivate(self, params: Dict) -> CommandResult:
-        """NPC修炼"""
-        # NPC也有经验值和等级
-        # 可以通过修炼提升实力
-        exp_gain = random.randint(50, 100)
-        self.npc_agent.npc.exp += exp_gain
+    def __init__(self, battle_engine: IBattleEngine):  # 依赖接口
+        self._battle_engine = battle_engine
 
-        # 检查是否升级
-        if self.npc_agent.npc.exp >= self._calculate_level_up_exp():
-            self.npc_agent.npc.level += 1
-            return CommandResult(
-                success=True,
-                message=f"{self.npc_agent.npc.name}修炼有成，突破至{self.npc_agent.npc.level}级！"
-            )
+    def can_execute(self, context: CommandContext) -> bool:
+        return context.target is not None
+
+    async def execute(self, context: CommandContext) -> CommandResult:
+        # 使用注入的战斗引擎接口
+        battle_result = await self._battle_engine.start_battle(
+            attacker=context.executor,
+            defender=context.target
+        )
 
         return CommandResult(
             success=True,
-            message=f"{self.npc_agent.npc.name}修炼获得{exp_gain}点经验"
+            message=f"战斗完成,{battle_result.winner}获胜",
+            data={"battle_log": battle_result.log}
         )
 
-    async def _execute_attack(self, params: Dict) -> CommandResult:
-        """NPC攻击"""
-        target_id = params.get("target_id")
+# domain/battle/interfaces.py
+class IBattleEngine(Protocol):
+    """战斗引擎接口 - 供NPC等系统依赖"""
+    async def start_battle(self, attacker: Any, defender: Any) -> BattleResult:
+        ...
 
-        # ✅ 使用注入的战斗引擎接口,不直接导入
+# infrastructure/battle/enhanced_engine.py
+class EnhancedBattleEngine(IBattleEngine):
+    """战斗引擎实现"""
 
-        engine = EnhancedBattleEngine()
-        # ... 执行战斗逻辑
-
-        return CommandResult(success=True, message="战斗完成")
-```
-
-### 6.3 AI服务集成
-
-#### 6.3.1 AI服务接口
-
-```python
-# infrastructure/ai/ai_service_interface.py
-from abc import ABC, abstractmethod
-
-class IAIService(ABC):
-    """AI服务接口"""
-
-    @abstractmethod
-    async def complete(
-        self,
-        prompt: str,
-        max_tokens: int = 150,
-        temperature: float = 0.7
-    ) -> str:
-        """文本补全"""
+    async def start_battle(self, attacker: Any, defender: Any) -> BattleResult:
+        # 具体实现
         pass
 
-    @abstractmethod
-    async def embed(self, text: str) -> List[float]:
-        """文本嵌入"""
-        pass
+# domain/npc/npc_command_executor.py
+class NPCCommandExecutor:
+    """NPC命令执行器"""
 
-    @abstractmethod
-    async def analyze_sentiment(self, text: str) -> SentimentResult:
-        """情感分析"""
-        pass
+    def __init__(self, command_registry: Dict[str, ICommand]):
+        self._commands = command_registry  # 通过DI注入命令
 
-# infrastructure/ai/openai_service.py
-class OpenAIService(IAIService):
-    """OpenAI服务实现"""
+    async def execute_command(
+        self, command_name: str, context: CommandContext
+    ) -> CommandResult:
+        command = self._commands.get(command_name)
+        if not command:
+            return CommandResult(success=False, message=f"未知命令: {command_name}")
 
-    def __init__(self, api_key: str, model: str = "gpt-4"):
-        self.client = AsyncOpenAI(api_key=api_key)
-        self.model = model
+        if not command.can_execute(context):
+            return CommandResult(success=False, message="命令无法执行")
 
-    async def complete(
-        self,
-        prompt: str,
-        max_tokens: int = 150,
-        temperature: float = 0.7
-    ) -> str:
-        response = await self.client.chat.completions.create(
-            model=self.model,
-            messages=[{"role": "user", "content": prompt}],
-            max_tokens=max_tokens,
-            temperature=temperature
-        )
-        return response.choices[0].message.content
-```
+        return await command.execute(context)
 
-#### 6.3.2 记忆存储系统
+# DI容器配置
+container.register_singleton(
+    IBattleEngine,
+    lambda c: EnhancedBattleEngine()
+)
 
-```python
-# infrastructure/memory/memory_store.py
-class VectorMemoryStore:
-    """向量记忆存储 - 使用向量数据库存储NPC记忆"""
+container.register_transient(
+    AttackCommand,
+    lambda c: AttackCommand(c.resolve(IBattleEngine))
+)
 
-    def __init__(self, ai_service: IAIService):
-        self.ai_service = ai_service
-        # 使用Chroma/Pinecone/Qdrant等向量数据库
-        self.vector_db = ChromaDB()
+command_registry = {
+    "攻击": container.resolve(AttackCommand),
+    "修炼": container.resolve(CultivateCommand),
+    # ...
+}
 
-    async def store_memory(
-        self,
-        npc_id: str,
-        player_id: str,
-        memory: str,
-        metadata: Dict
-    ):
-        """存储记忆"""
-        # 生成嵌入向量
-        embedding = await self.ai_service.embed(memory)
-
-        # 存储到向量数据库
-        await self.vector_db.add(
-            collection=f"npc_{npc_id}_memories",
-            id=f"{player_id}_{datetime.now().timestamp()}",
-            embedding=embedding,
-            metadata={
-                "player_id": player_id,
-                "memory": memory,
-                **metadata
-            }
-        )
-
-    async def retrieve_relevant_memories(
-        self,
-        npc_id: str,
-        player_id: str,
-        query: str,
-        top_k: int = 5
-    ) -> List[Memory]:
-        """检索相关记忆"""
-        # 生成查询嵌入
-        query_embedding = await self.ai_service.embed(query)
-
-        # 向量搜索
-        results = await self.vector_db.query(
-            collection=f"npc_{npc_id}_memories",
-            query_embedding=query_embedding,
-            filter={"player_id": player_id},
-            top_k=top_k
-        )
-
-        return [Memory.from_dict(r.metadata) for r in results]
-```
-
-### 6.4 好感度系统
-
-```python
-# domain/npc/affinity_system.py
-class AffinitySystem:
-    """好感度系统"""
-
-    # 好感度等级
-    AFFINITY_LEVELS = {
-        (0, 20): "仇恨",
-        (20, 40): "冷淡",
-        (40, 60): "普通",
-        (60, 80): "友好",
-        (80, 100): "亲密"
-    }
-
-    def __init__(self):
-        self.affinity_scores: Dict[Tuple[str, str], int] = {}  # (npc_id, player_id) -> score
-
-    def get_affinity(self, npc_id: str, player_id: str) -> int:
-        """获取好感度"""
-        return self.affinity_scores.get((npc_id, player_id), 50)
-
-    def get_affinity_level(self, npc_id: str, player_id: str) -> str:
-        """获取好感度等级"""
-        score = self.get_affinity(npc_id, player_id)
-
-        for (min_score, max_score), level in self.AFFINITY_LEVELS.items():
-            if min_score <= score < max_score:
-                return level
-
-        return "亲密"  # 100分
-
-    async def modify_affinity(
-        self,
-        npc_id: str,
-        player_id: str,
-        change: int,
-        reason: str
-    ):
-        """修改好感度"""
-        current = self.get_affinity(npc_id, player_id)
-        new_score = max(0, min(100, current + change))
-
-        self.affinity_scores[(npc_id, player_id)] = new_score
-
-        # 记录好感度变化
-        await self._log_affinity_change(npc_id, player_id, change, reason)
-
-        # 触发好感度事件
-        await self._check_affinity_events(npc_id, player_id, current, new_score)
-
-    async def _check_affinity_events(
-        self,
-        npc_id: str,
-        player_id: str,
-        old_score: int,
-        new_score: int
-    ):
-        """检查并触发好感度事件"""
-        # 跨越等级阈值时触发事件
-        thresholds = [20, 40, 60, 80]
-
-        for threshold in thresholds:
-            if old_score < threshold <= new_score:
-                await self._trigger_affinity_milestone(
-                    npc_id, player_id, threshold, "increase"
-                )
-            elif old_score >= threshold > new_score:
-                await self._trigger_affinity_milestone(
-                    npc_id, player_id, threshold, "decrease"
-                )
-
-    async def _trigger_affinity_milestone(
-        self,
-        npc_id: str,
-        player_id: str,
-        threshold: int,
-        direction: str
-    ):
-        """触发好感度里程碑事件"""
-        # 发送通知给玩家
-        # 解锁新功能/任务
-        # 改变NPC行为
-        pass
-```
-
-### 6.5 NPC交易系统增强
-
-```python
-# domain/npc/npc_trade.py
-class NPCTradeSystem:
-    """NPC交易系统 - 支持自由交易"""
-
-    def __init__(self, npc_agent: NPCAgent, affinity_system: AffinitySystem):
-        self.npc_agent = npc_agent
-        self.affinity_system = affinity_system
-
-    async def initiate_trade(
-        self,
-        player: Player,
-        trade_proposal: TradeProposal
-    ) -> TradeResult:
-        """发起交易"""
-        # 1. 检查好感度
-        affinity = self.affinity_system.get_affinity(
-            self.npc_agent.npc.npc_id,
-            player.id
-        )
-
-        if affinity < 30:
-            return TradeResult(
-                success=False,
-                message=f"{self.npc_agent.npc.name}对你不够信任，拒绝交易"
-            )
-
-        # 2. NPC评估交易提案
-        evaluation = await self._evaluate_trade(trade_proposal, affinity)
-
-        if not evaluation.acceptable:
-            # NPC可以提出反提案
-            counter_proposal = await self._generate_counter_proposal(
-                trade_proposal, evaluation
-            )
-            return TradeResult(
-                success=False,
-                message=f"{self.npc_agent.npc.name}不接受这个交易",
-                counter_proposal=counter_proposal
-            )
-
-        # 3. 执行交易
-        await self._execute_trade(player, trade_proposal)
-
-        # 4. 更新好感度
-        await self.affinity_system.modify_affinity(
-            self.npc_agent.npc.npc_id,
-            player.id,
-            change=+5,
-            reason="成功交易"
-        )
-
-        return TradeResult(
-            success=True,
-            message=f"与{self.npc_agent.npc.name}交易成功"
-        )
-
-    async def _evaluate_trade(
-        self,
-        proposal: TradeProposal,
-        affinity: int
-    ) -> TradeEvaluation:
-        """评估交易提案"""
-        # 使用AI评估交易是否公平
-        prompt = f"""
-        你是{self.npc_agent.npc.name}，性格是{self.npc_agent.personality.value}。
-
-        玩家提出交易：
-        - 玩家给出：{proposal.player_offers}
-        - 玩家想要：{proposal.player_wants}
-
-        你与玩家的好感度：{affinity}/100
-
-        请评估这个交易是否公平，是否接受。
-        返回JSON：{{"acceptable": true/false, "reason": "...", "fairness_score": 0.0-1.0}}
-        """
-
-        result = await self.npc_agent.ai_service.complete(prompt)
-        return TradeEvaluation.from_json(result)
-```
-
----
-
-## 8. 性能优化方案
-
-### 8.1 缓存策略 (分步引入)
-
-#### 阶段1: 本地缓存 (优先实现)
-
-**使用 cachetools 实现本地 LRU/TTL 缓存**:
-```python
-# infrastructure/cache/local_cache.py
-from cachetools import TTLCache, LRUCache
-from typing import Optional, Any
-import asyncio
-
-class LocalCache:
-    """本地缓存 - 无需 Redis,降低依赖"""
-
-    def __init__(self):
-        # 玩家档案缓存: TTL 5分钟, 最多1000条
-        self.player_cache = TTLCache(maxsize=1000, ttl=300)
-
-        # 装备配置缓存: TTL 10分钟, 最多500条
-        self.equipment_cache = TTLCache(maxsize=500, ttl=600)
-
-        # 排行榜缓存: TTL 1分钟, 最多10条
-        self.leaderboard_cache = TTLCache(maxsize=10, ttl=60)
-
-        self._lock = asyncio.Lock()
-
-    async def get(self, cache_name: str, key: str) -> Optional[Any]:
-        """获取缓存"""
-        cache = getattr(self, f"{cache_name}_cache", None)
-        if cache is None:
-            return None
-
-        async with self._lock:
-            return cache.get(key)
-
-    async def set(self, cache_name: str, key: str, value: Any):
-        """设置缓存"""
-        cache = getattr(self, f"{cache_name}_cache", None)
-        if cache is None:
-            return
-
-        async with self._lock:
-            cache[key] = value
-
-    async def invalidate(self, cache_name: str, key: str):
-        """失效缓存"""
-        cache = getattr(self, f"{cache_name}_cache", None)
-        if cache is None:
-            return
-
-        async with self._lock:
-            cache.pop(key, None)
-```
-
-**使用示例**:
-```python
-# application/player_service.py
-class PlayerService:
-    def __init__(self, repo: PlayerRepository, cache: LocalCache):
-        self.repo = repo
-        self.cache = cache
-
-    async def get_player(self, player_id: str) -> Optional[Player]:
-        # 先查缓存
-        cached = await self.cache.get("player", player_id)
-        if cached:
-            return cached
-
-        # 缓存未命中,查数据库
-        player = await self.repo.get_by_id(player_id)
-        if player:
-            await self.cache.set("player", player_id, player)
-
-        return player
-
-    async def update_player(self, player: Player):
-        await self.repo.update(player)
-        # ✅ 写入后精准失效缓存
-        await self.cache.invalidate("player", player.id)
+executor = NPCCommandExecutor(command_registry)
 ```
 
 **优点**:
-- 无需额外部署 Redis
-- 降低数据库查询压力
-- 提供降级路径 (Redis 故障时仍可用)
+- ✅ NPC与战斗系统解耦 (依赖接口)
+- ✅ 命令可扩展 (注册新命令)
+- ✅ 易于测试 (mock命令)
 
-#### 阶段2: Redis 缓存 (可选,后续引入)
+### 2.6 观察者模式实现事件系统 (Observer Pattern)
 
-**仅在以下场景引入 Redis**:
-- 多实例部署需要共享缓存
-- 需要持久化缓存数据
-- 需要分布式锁
+**问题**: 缺少领域事件,副作用逻辑散落各处
 
-### 8.2 查询优化
+**解决方案**: 事件发布/订阅机制
 
-#### 附近玩家查询优化
-
-**当前问题**:
 ```python
-# ❌ 使用 func.abs() 无法使用索引
-stmt = select(Player).where(
-    func.abs(Player.x - x) + func.abs(Player.y - y) <= max_distance
-)
+# domain/events/event_bus.py
+from typing import Callable, List
+from dataclasses import dataclass
+from abc import ABC
+
+@dataclass
+class DomainEvent(ABC):
+    """领域事件基类"""
+    timestamp: datetime = field(default_factory=datetime.now)
+
+@dataclass
+class PlayerLevelUpEvent(DomainEvent):
+    """玩家升级事件"""
+    player_id: str
+    old_level: int
+    new_level: int
+
+@dataclass
+class ItemUsedEvent(DomainEvent):
+    """物品使用事件"""
+    player_id: str
+    item_id: str
+    quantity: int
+
+class EventBus:
+    """事件总线"""
+
+    def __init__(self):
+        self._handlers: Dict[Type[DomainEvent], List[Callable]] = {}
+
+    def subscribe(self, event_type: Type[DomainEvent], handler: Callable):
+        """订阅事件"""
+        if event_type not in self._handlers:
+            self._handlers[event_type] = []
+        self._handlers[event_type].append(handler)
+
+    async def publish(self, event: DomainEvent):
+        """发布事件"""
+        event_type = type(event)
+        handlers = self._handlers.get(event_type, [])
+
+        # 并发执行所有处理器
+        await asyncio.gather(*[handler(event) for handler in handlers])
+
+# 事件处理器示例
+async def on_player_level_up(event: PlayerLevelUpEvent):
+    """玩家升级事件处理器"""
+    # 发放升级奖励
+    await reward_service.grant_level_up_reward(event.player_id, event.new_level)
+
+    # 更新排行榜缓存失效
+    await cache.invalidate("leaderboard")
+
+    # 通知公会成员 (拉取式: 存入event_store)
+    player = await player_repo.get_by_id(event.player_id)
+    if player.guild_id:
+        await event_store.add_guild_event(
+            player.guild_id,
+            f"{player.nickname}突破至{event.new_level}级!"
+        )
+
+# 注册事件处理器
+event_bus.subscribe(PlayerLevelUpEvent, on_player_level_up)
+
+# 使用示例
+async def cultivate_breakthrough(player: Player):
+    old_level = player.level
+    player.level += 1
+
+    await player_repo.update(player)
+
+    # 发布领域事件
+    await event_bus.publish(PlayerLevelUpEvent(
+        player_id=player.id,
+        old_level=old_level,
+        new_level=player.level
+    ))
 ```
 
-**优化方案**:
-```python
-# ✅ 使用边界框 + 复合索引
-# 索引: Index('idx_player_location', 'region', 'x', 'y')
-stmt = select(Player).where(
-    and_(
-        Player.region == region,
-        Player.x.between(x - max_distance, x + max_distance),
-        Player.y.between(y - max_distance, y + max_distance)
-    )
-)
-# 后过滤: 计算曼哈顿距离
-players = [p for p in result if abs(p.x - x) + abs(p.y - y) <= max_distance]
-```
-
-**性能提升**: P95 从 ~500ms 降至 ~50ms
-
-### 8.3 日志与监控
-
-**结构化日志**:
-```python
-# infrastructure/logging/structured_logger.py
-import json
-import logging
-from datetime import datetime
-
-class StructuredLogger:
-    """结构化日志 - JSON 格式,便于分析"""
-
-    def __init__(self, name: str):
-        self.logger = logging.getLogger(name)
-
-    def log_query(self, table: str, duration_ms: float, success: bool):
-        """记录查询日志"""
-        self.logger.info(json.dumps({
-            "timestamp": datetime.now().isoformat(),
-            "type": "db_query",
-            "table": table,
-            "duration_ms": duration_ms,
-            "success": success
-        }))
-
-    def log_command(self, command: str, uid: int, duration_ms: float):
-        """记录命令日志"""
-        self.logger.info(json.dumps({
-            "timestamp": datetime.now().isoformat(),
-            "type": "command",
-            "command": command,
-            "uid": uid,
-            "duration_ms": duration_ms
-        }))
-```
-
-**关键指标**:
-- 请求总量、失败率
-- P95/P99 响应时间
-- 数据库连接池使用率
-- 缓存命中率
-- AI 调用超时率
+**优点**:
+- ✅ 解耦副作用逻辑
+- ✅ 支持多个订阅者
+- ✅ 易于添加新功能 (订阅事件即可)
 
 ---
 
-## 9. 测试策略
+## 3. 重构实施路线图
 
-### 9.1 测试原则
-
-> ⚠️ **重要**: 测试脚本会遇到 Nonebot 初始化问题,直接测试核心逻辑
-
-#### 测试分层
-
-1. **单元测试**: 测试核心逻辑/纯函数/服务类,不依赖 Nonebot
-2. **集成测试**: 测试仓储层与数据库交互
-3. **端到端测试**: 手动测试命令流程
-
-### 9.2 单元测试示例
-
-**测试核心逻辑** (不依赖 Nonebot):
-```python
-# tests/test_cultivate_service.py
-import pytest
-from application.cultivate_service import CultivateService
-from domain.player.player import Player
-
-@pytest.mark.asyncio
-async def test_cultivate_logic():
-    """测试修炼逻辑 - 不依赖 Nonebot"""
-    # 准备测试数据
-    player = Player(
-        id="test_player",
-        uid=1,
-        level=10,
-        exp=0
-    )
-
-    # 创建服务 (使用 mock 仓储)
-    mock_repo = MockPlayerRepository()
-    service = CultivateService(repo=mock_repo)
-
-    # 执行测试
-    result = await service.process_cultivate(player, hours=1)
-
-    # 断言
-    assert result.exp_gain > 0
-    assert player.exp > 0
-```
-
-**测试异常处理**:
-```python
-@pytest.mark.asyncio
-async def test_cultivate_with_db_error():
-    """测试数据库错误处理"""
-    from sqlalchemy.exc import OperationalError
-
-    mock_repo = MockPlayerRepository()
-    mock_repo.should_raise = OperationalError("DB error")
-
-    service = CultivateService(repo=mock_repo)
-
-    with pytest.raises(OperationalError):
-        await service.process_cultivate(player, hours=1)
-```
-
-### 9.3 集成测试示例
-
-**测试仓储层**:
-```python
-# tests/integration/test_player_repository.py
-import pytest
-from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession
-from infrastructure.repository.player_repository import PlayerRepository
-
-@pytest.fixture
-async def test_db():
-    """测试数据库 - 使用临时库"""
-    engine = create_async_engine("sqlite+aiosqlite:///:memory:")
-    async with engine.begin() as conn:
-        await conn.run_sync(Base.metadata.create_all)
-
-    yield engine
-
-    await engine.dispose()
-
-@pytest.mark.asyncio
-async def test_player_repository(test_db):
-    """测试玩家仓储"""
-    async with AsyncSession(test_db) as session:
-        repo = PlayerRepository(session)
-
-        # 测试添加
-        player = Player(id="test", uid=1, nickname="测试")
-        await repo.add(player)
-        await session.commit()
-
-        # 测试查询
-        found = await repo.get_by_id("test")
-        assert found is not None
-        assert found.nickname == "测试"
-```
-
-### 9.4 测试覆盖目标
-
-- [ ] 核心业务逻辑覆盖率 > 80%
-- [ ] 仓储层覆盖率 > 70%
-- [ ] 异常处理路径覆盖
-- [ ] 边界条件测试
-
----
-
-## 10. 分阶段重构任务清单
-
-### 10.1 阶段划分
+### 3.1 四阶段渐进式重构
 
 ```mermaid
 gantt
-    title 诡修仙重构时间线
+    title 设计模式驱动重构路线图
     dateFormat  YYYY-MM-DD
-    section 准备阶段
-    环境搭建           :p1, 2025-01-01, 2d
-    代码审查           :p2, after p1, 3d
-    重构方案评审       :p3, after p2, 1d
 
-    section 阶段1: 基础设施
-    仓储模式重构       :a1, after p3, 5d
-    数据库迁移准备     :a2, after a1, 3d
-    MySQL测试环境      :a3, after a2, 2d
+    section 阶段0: 合规修正 (P0)
+    block=True修正           :p0-1, 2025-11-16, 2d
+    异常类型指定             :p0-2, after p0-1, 1d
+    UID展示替换              :p0-3, after p0-2, 1d
 
-    section 阶段2: 核心系统
-    属性系统重构       :b1, after a3, 4d
-    装备效果统一       :b2, after b1, 5d
-    战斗系统解耦       :b3, after b2, 4d
+    section 阶段1: 基础框架 (5周)
+    DI容器实现               :a1, after p0-3, 3d
+    仓储+UoW模式             :a2, after a1, 5d
+    属性计算器重构           :a3, after a2, 4d
+    效果系统统一             :a4, after a3, 6d
 
-    section 阶段3: 数据迁移
-    数据迁移脚本       :c1, after b3, 3d
-    测试迁移           :c2, after c1, 2d
-    灰度发布           :c3, after c2, 5d
-    全量切换           :c4, after c3, 1d
+    section 阶段2: 解耦重构 (3周)
+    循环依赖解除             :b1, after a4, 4d
+    命令模式引入             :b2, after b1, 3d
+    事件系统实现             :b3, after b2, 4d
 
-    section 阶段4: NPC AI
-    AI服务集成         :d1, after c4, 4d
-    NPC Agent开发      :d2, after d1, 7d
-    好感度系统         :d3, after d2, 3d
-    NPC行为调度        :d4, after d3, 4d
+    section 阶段3: 性能优化 (2周)
+    本地缓存集成             :c1, after b3, 3d
+    查询优化                 :c2, after c1, 4d
+    MySQL迁移                :c3, after c2, 5d
 
-    section 阶段5: 优化
-    性能优化           :e1, after d4, 5d
-    缓存系统           :e2, after e1, 3d
-    监控告警           :e3, after e2, 2d
-    文档完善           :e4, after e3, 2d
+    section 阶段4: 测试与文档 (1周)
+    单元测试编写             :d1, after c3, 3d
+    文档完善                 :d2, after d1, 2d
 ```
 
-### 10.2 详细任务清单
+### 3.2 优先级矩阵
 
-#### 阶段0: 准备阶段 (6天)
+| 任务 | 价值 | 难度 | 优先级 | 说明 |
+|-----|------|------|--------|------|
+| **合规修正** | 🔴 | 🟢 | P0 | 强制要求,必须最先完成 |
+| **属性计算器** | 🔴 | 🟠 | P0 | 解决核心分散问题 |
+| **效果系统统一** | 🔴 | 🔴 | P0 | 解决设计不一致 |
+| **DI容器** | 🟠 | 🟡 | P1 | 解耦基础 |
+| **仓储+UoW** | 🟠 | 🟠 | P1 | 会话管理统一 |
+| **循环依赖解除** | 🟠 | 🟡 | P1 | 提升可维护性 |
+| **本地缓存** | 🟡 | 🟢 | P1 | 性能快赢 |
+| **命令模式** | 🟡 | 🟠 | P2 | NPC扩展性 |
+| **事件系统** | 🟡 | 🟠 | P2 | 解耦副作用 |
+| **MySQL迁移** | 🟡 | 🔴 | P2 | 并发性能 |
 
-**任务列表**:
-- [ ] **P0.1**: 搭建开发环境
-  - 安装MySQL 8.0
-  - 配置Python虚拟环境
-  - 安装依赖包 (aiomysql, redis, openai等)
+---
 
-- [ ] **P0.2**: 代码审查和分析
-  - 完成所有模块的代码审查
-  - 识别技术债务
-  - 确定重构优先级
+## 4. 详细设计方案
 
-- [ ] **P0.3**: 重构方案评审
-  - 团队评审重构方案
-  - 确定技术选型
-  - 制定详细时间表
-
-#### 阶段1: 基础设施重构 (10天)
-
-**任务列表**:
-- [ ] **A1.1**: 实现仓储模式
-  - 创建 `BaseRepository` 接口
-  - 实现 `PlayerRepository`
-  - 实现 `ItemRepository`
-  - 实现 `NPCRepository`
-  - 实现 `GuildRepository`
-  - 编写单元测试
-
-- [ ] **A1.2**: 数据库迁移准备
-  - 设计MySQL schema
-  - 编写迁移脚本
-  - 创建索引优化方案
-  - 设计分区策略
-
-- [ ] **A1.3**: 搭建MySQL测试环境
-  - 配置MySQL服务器
-  - 创建数据库和用户
-  - 配置连接池
-  - 性能基准测试
-
-**验收标准**:
-- ✅ 所有仓储接口实现完成
-- ✅ 单元测试覆盖率 > 80%
-- ✅ MySQL环境可正常连接
-- ✅ 迁移脚本通过测试
-
-#### 阶段2: 核心系统重构 (13天)
-
-**任务列表**:
-- [ ] **B2.1**: 属性系统重构
-  - 创建 `AttributeCalculator` 类
-  - 统一属性计算逻辑
-  - 实现属性来源追踪
-  - 重构 `Player.get_effective_attributes()`
-  - 编写单元测试
-
-- [ ] **B2.2**: 装备效果系统统一
-  - 设计统一的效果接口 `IEquipmentEffect`
-  - 重构 `item_effects.py`
-  - 重构 `battle_effects.py`
-  - 创建 `EquipmentEffectRegistry`
-  - 迁移现有效果到新系统
-  - 编写单元测试
-
-- [ ] **B2.3**: 战斗系统解耦
-  - 提取战斗逻辑到 `BattleDomain`
-  - 解耦装备效果依赖
-  - 重构 `EnhancedBattleEngine`
-  - 编写集成测试
-
-**验收标准**:
-- ✅ 属性计算逻辑统一
-- ✅ 装备效果系统统一
-- ✅ 战斗系统与装备系统解耦
-- ✅ 所有现有功能正常工作
-- ✅ 测试覆盖率 > 75%
-
-#### 阶段3: 数据库迁移 (11天)
-
-**任务列表**:
-- [ ] **C3.1**: 数据迁移脚本开发
-  - 实现 `migrate_to_mysql.py`
-  - 实现数据验证脚本
-  - 实现回滚脚本
-  - 编写迁移文档
-
-- [ ] **C3.2**: 测试迁移
-  - 在测试环境执行迁移
-  - 验证数据完整性
-  - 性能对比测试
-  - 修复发现的问题
-
-- [ ] **C3.3**: 灰度发布
-  - 实现双写模式
-  - 配置feature flag
-  - 10%用户灰度
-  - 50%用户灰度
-  - 监控指标
-
-- [ ] **C3.4**: 全量切换
-  - 100%用户切换到MySQL
-  - 移除SQLite依赖
-  - 归档旧数据
-  - 性能监控
-
-**验收标准**:
-- ✅ 数据迁移成功率 100%
-- ✅ 数据一致性验证通过
-- ✅ 查询性能提升 > 50%
-- ✅ 无数据丢失
-- ✅ 回滚方案可用
-
-#### 阶段4: NPC AI Agent系统 (18天)
-
-**任务列表**:
-- [ ] **D4.1**: AI服务集成
-  - 实现 `IAIService` 接口
-  - 集成OpenAI API
-  - 实现向量嵌入
-  - 实现情感分析
-  - 编写单元测试
-
-- [ ] **D4.2**: NPC Agent核心开发
-  - 扩展NPC模型
-  - 实现 `NPCAgent` 类
-  - 实现意图识别
-  - 实现对话生成
-  - 实现行为决策
-  - 编写单元测试
-
-- [ ] **D4.3**: 好感度系统
-  - 实现 `AffinitySystem`
-  - 设计好感度等级
-  - 实现好感度事件
-  - 集成到NPC交互
-  - 编写单元测试
-
-- [ ] **D4.4**: NPC行为调度
-  - 实现 `NPCBehaviorScheduler`
-  - 实现NPC主动行为
-  - 实现NPC指令执行
-  - 集成到游戏循环
-  - 编写集成测试
-
-- [ ] **D4.5**: 记忆存储系统
-  - 选择向量数据库 (Chroma/Qdrant)
-  - 实现 `VectorMemoryStore`
-  - 实现记忆检索
-  - 优化检索性能
-  - 编写单元测试
-
-**验收标准**:
-- ✅ NPC能进行自然语言对话
-- ✅ 好感度系统正常工作
-- ✅ NPC能执行游戏指令
-- ✅ NPC能主动发起交互
-- ✅ 记忆系统正常工作
-- ✅ AI响应时间 < 2秒
-
-#### 阶段5: 优化和完善 (12天)
-
-**任务列表**:
-- [ ] **E5.1**: 性能优化
-  - 识别性能瓶颈
-  - 优化慢查询
-  - 优化N+1查询
-  - 数据库索引优化
-  - 性能基准测试
-
-- [ ] **E5.2**: 缓存系统
-  - 集成Redis
-  - 实现玩家数据缓存
-  - 实现配置缓存
-  - 实现查询结果缓存
-  - 缓存失效策略
-
-- [ ] **E5.3**: 监控和告警
-  - 集成Prometheus
-  - 配置性能指标
-  - 配置错误告警
-  - 配置慢查询告警
-  - 搭建Grafana仪表板
-
-- [ ] **E5.4**: 文档完善
-  - 编写架构文档
-  - 编写API文档
-  - 编写部署文档
-  - 编写运维手册
-  - 更新README
-
-**验收标准**:
-- ✅ 查询响应时间 < 100ms (P95)
-- ✅ 缓存命中率 > 80%
-- ✅ 监控指标完整
-- ✅ 文档完善
-
-### 7.3 任务依赖关系
+### 4.1 目标架构图
 
 ```mermaid
-graph LR
-    P[准备阶段] --> A[阶段1: 基础设施]
-    A --> B[阶段2: 核心系统]
-    B --> C[阶段3: 数据迁移]
-    C --> D[阶段4: NPC AI]
-    D --> E[阶段5: 优化]
+graph TB
+    subgraph "Presentation Layer 表现层"
+        A[Nonebot2 Commands] --> B[DTO Mappers]
+    end
 
-    A --> A1[仓储模式]
-    A --> A2[MySQL准备]
+    subgraph "Application Layer 应用层"
+        C[Use Cases] --> D[Unit of Work]
+    end
 
-    B --> B1[属性系统]
-    B --> B2[装备效果]
-    B --> B3[战斗系统]
+    subgraph "Domain Layer 领域层"
+        E[Domain Models] --> F[Domain Services]
+        F --> G[AttributeCalculator]
+        F --> H[EffectRegistry]
+        I[Domain Events] --> J[Event Bus]
+    end
 
-    B1 --> B2
-    B2 --> B3
+    subgraph "Infrastructure Layer 基础设施层"
+        K[Repositories] --> L[MySQL/SQLite]
+        M[DI Container] -.-> K
+        M -.-> F
+        M -.-> C
+        N[Local Cache] --> K
+    end
 
-    C --> C1[迁移脚本]
-    C --> C2[测试迁移]
-    C --> C3[灰度发布]
-    C --> C4[全量切换]
+    B --> C
+    C --> F
+    C --> I
+    K --> E
 
-    C1 --> C2
-    C2 --> C3
-    C3 --> C4
-
-    D --> D1[AI集成]
-    D --> D2[NPC Agent]
-    D --> D3[好感度]
-    D --> D4[行为调度]
-
-    D1 --> D2
-    D2 --> D3
-    D3 --> D4
+    style E fill:#bbf,stroke:#333,stroke-width:2px
+    style F fill:#bbf,stroke:#333,stroke-width:2px
+    style M fill:#9f9,stroke:#333,stroke-width:2px
 ```
 
----
+### 4.2 关键模块重构详情
 
-## 11. 风险评估与注意事项
+#### 4.2.1 属性系统重构
 
-### 11.1 技术风险
+**当前状态** (分散在4+处):
+- `plugins/xiuxian_game/models/player.py:218-256` - get_effective_attributes
+- `plugins/xiuxian_game/battle/battle_attributes.py` - BattleAttributeCalculator
+- `plugins/xiuxian_game/item/item_effects.py` - 装备效果计算
+- `plugins/xiuxian_game/models/temporary_buff.py` - Buff加成计算
 
-#### 风险1: 数据迁移失败 🔴
+**目标状态** (统一入口):
+```
+domain/attributes/
+├── attribute_calculator.py      # 主计算器
+├── attribute_sources/
+│   ├── base_source.py           # 基础属性
+│   ├── equipment_source.py      # 装备加成
+│   ├── buff_source.py           # Buff加成
+│   ├── elixir_source.py         # 丹药加成
+│   └── vip_source.py            # VIP加成
+└── interfaces.py                # IAttributeSource接口
+```
 
-**风险描述**:
-- 数据迁移过程中可能出现数据丢失或损坏
-- SQLite和MySQL的数据类型差异可能导致数据转换错误
-- 迁移过程中服务中断影响用户体验
+**迁移步骤**:
+1. 创建AttributeCalculator和接口
+2. 实现各AttributeSource (适配现有逻辑)
+3. 更新Player模型使用新计算器
+4. 更新战斗系统使用新计算器
+5. 删除旧的分散计算逻辑
 
-**影响**: 严重 - 可能导致玩家数据丢失
+#### 4.2.2 效果系统重构
 
-**缓解措施**:
-1. **完整备份**: 迁移前完整备份SQLite数据库
-2. **分批迁移**: 使用分批迁移策略，每批验证数据完整性
-3. **双写模式**: 实现双写模式，确保数据同步
-4. **回滚方案**: 准备快速回滚方案
-5. **灰度发布**: 逐步切换用户，及时发现问题
+**当前状态** (两套系统):
+- `plugins/xiuxian_game/item/item_effects.py` - 装饰器注册
+- `plugins/xiuxian_game/battle/battle_effects.py` - 管理器模式
 
-**应急预案**:
+**目标状态** (统一接口):
+```
+domain/effects/
+├── effect_interface.py          # IEffect接口
+├── effect_registry.py           # 统一注册表
+├── equipment_effects/           # 装备效果
+│   ├── lifesteal.py
+│   ├── counterattack.py
+│   └── ...
+├── battle_effects/              # 战斗效果
+│   ├── stun.py
+│   ├── poison.py
+│   └── ...
+└── buff_effects/                # Buff效果
+    ├── attack_boost.py
+    └── ...
+```
+
+**适配器模式迁移**:
 ```python
-# 如果迁移失败，立即执行：
-1. 停止MySQL写入
-2. 切换回SQLite
-3. 从备份恢复数据
-4. 分析失败原因
-5. 修复问题后重新迁移
+# 适配器: 将旧效果适配到新接口
+class LegacyItemEffectAdapter(IEffect):
+    """旧物品效果适配器"""
+
+    def __init__(self, legacy_handler: Callable):
+        self._legacy_handler = legacy_handler
+
+    async def execute(self, context: EffectContext) -> EffectResult:
+        # 转换上下文格式
+        legacy_result = await self._legacy_handler(
+            player=context.target,
+            item=context.source
+        )
+        # 转换结果格式
+        return EffectResult(
+            success=True,
+            message=legacy_result
+        )
 ```
 
-#### 风险2: 性能回归 🟡
+#### 4.2.3 循环依赖解除
 
-**风险描述**:
-- 重构后的代码可能引入性能问题
-- 新的抽象层可能增加开销
-- MySQL配置不当可能导致性能下降
-
-**影响**: 中等 - 影响用户体验
-
-**缓解措施**:
-1. **性能基准测试**: 重构前后进行性能对比
-2. **压力测试**: 模拟高并发场景
-3. **监控指标**: 实时监控关键性能指标
-4. **逐步优化**: 发现性能问题及时优化
-
-**性能指标**:
-| 指标 | 当前 | 目标 | 监控方式 |
-|------|------|------|---------|
-| 查询响应时间 (P95) | 200ms | < 100ms | Prometheus |
-| 并发用户数 | 50 | 200+ | 压力测试 |
-| 数据库连接数 | 10 | 20-30 | MySQL监控 |
-| 缓存命中率 | 0% | > 80% | Redis监控 |
-
-#### 风险3: AI服务不稳定 🟡
-
-**风险描述**:
-- OpenAI API可能出现限流、超时、服务中断
-- AI响应时间不可控
-- AI生成内容可能不符合预期
-
-**影响**: 中等 - NPC功能受限
-
-**缓解措施**:
-1. **降级策略**: AI服务失败时使用预设回复
-2. **超时控制**: 设置合理的超时时间 (2-3秒)
-3. **重试机制**: 实现指数退避重试
-4. **内容过滤**: 过滤不当内容
-5. **备用服务**: 准备备用AI服务 (Claude, 本地模型)
-
-**降级方案**:
+**问题代码** (item_effects.py ↔ equipment_commands.py):
 ```python
-async def generate_npc_response(message: str) -> str:
-    try:
-        # 尝试使用AI生成
-        response = await ai_service.complete(prompt, timeout=2.0)
-        return response
-    except TimeoutError:
-        # 超时降级
-        return get_fallback_response(message)
-    except APIError:
-        # API错误降级
-        return get_fallback_response(message)
+# item/item_effects.py (line 13)
+from .equipment_commands import recalc_equipment_attributes  # ❌ 循环依赖
+
+async def apply_equipment_effect(player: Player):
+    # ...
+    await recalc_equipment_attributes(player)  # 直接调用
 ```
 
-#### 风险4: 代码兼容性问题 🟢
+**解决方案** (依赖注入+事件):
+```python
+# domain/equipment/equipment_service.py
+class EquipmentService:
+    def __init__(self, event_bus: EventBus):
+        self._event_bus = event_bus
 
-**风险描述**:
-- 重构可能破坏现有功能
-- 依赖关系复杂，难以完全测试
-- 边界情况可能被遗漏
+    async def apply_equipment_effect(self, player: Player, item: Item):
+        # 应用效果
+        player.attack += item.attack_bonus
 
-**影响**: 低 - 可通过测试发现
+        # 发布事件,而非直接调用重算
+        await self._event_bus.publish(EquipmentChangedEvent(
+            player_id=player.id
+        ))
 
-**缓解措施**:
-1. **完整测试**: 编写全面的单元测试和集成测试
-2. **回归测试**: 重构后运行完整的回归测试
-3. **代码审查**: 严格的代码审查流程
-4. **小步迭代**: 小步重构，每步验证
+# application/event_handlers/equipment_handlers.py
+async def on_equipment_changed(event: EquipmentChangedEvent):
+    """装备变化事件处理器"""
+    # 重新计算属性
+    calculator = container.resolve(AttributeCalculator)
+    player = await player_repo.get_by_id(event.player_id)
 
-### 8.2 业务风险
+    breakdown = await calculator.calculate_final_attributes(player)
+    # 更新玩家缓存属性
+    player.cached_attack = breakdown.total.attack
+    await player_repo.update(player)
 
-#### 风险5: 用户体验下降 🟡
-
-**风险描述**:
-- 重构期间可能出现服务不稳定
-- 新功能可能不符合用户预期
-- NPC AI可能产生不当内容
-
-**影响**: 中等 - 影响用户满意度
-
-**缓解措施**:
-1. **用户通知**: 提前通知用户维护时间
-2. **灰度发布**: 逐步推出新功能
-3. **用户反馈**: 收集用户反馈及时调整
-4. **内容审核**: 审核NPC生成的内容
-
-#### 风险6: 开发周期延长 🟡
-
-**风险描述**:
-- 重构工作量可能超出预期
-- 遇到技术难题需要额外时间
-- 测试和修复bug耗时
-
-**影响**: 中等 - 延迟上线时间
-
-**缓解措施**:
-1. **合理规划**: 预留缓冲时间
-2. **优先级管理**: 优先完成核心功能
-3. **并行开发**: 部分任务可并行进行
-4. **定期评审**: 每周评审进度，及时调整
-
-### 8.3 运维风险
-
-#### 风险7: 数据库运维复杂度增加 🟡
-
-**风险描述**:
-- MySQL运维比SQLite复杂
-- 需要配置备份、监控、主从复制
-- 需要专业的DBA知识
-
-**影响**: 中等 - 增加运维成本
-
-**缓解措施**:
-1. **自动化运维**: 使用自动化工具 (Ansible, Docker)
-2. **监控告警**: 完善的监控和告警系统
-3. **文档完善**: 编写详细的运维文档
-4. **培训**: 团队成员学习MySQL运维知识
-
-#### 风险8: 成本增加 💰
-
-**风险描述**:
-- MySQL服务器成本
-- Redis缓存服务器成本
-- OpenAI API调用成本
-- 向量数据库成本
-
-**影响**: 中等 - 增加运营成本
-
-**成本估算**:
-| 项目 | 月成本 | 备注 |
-|------|--------|------|
-| MySQL服务器 | ¥200-500 | 云服务器 (2核4G) |
-| Redis服务器 | ¥100-300 | 云服务器 (1核2G) |
-| OpenAI API | ¥500-2000 | 取决于调用量 |
-| 向量数据库 | ¥0-500 | 自建或云服务 |
-| **总计** | **¥800-3300** | |
-
-**成本优化**:
-1. **缓存优化**: 减少AI调用次数
-2. **批量处理**: 批量调用AI API
-3. **本地模型**: 考虑使用本地开源模型
-4. **资源复用**: 多个服务共用服务器
-
-### 8.4 注意事项
-
-#### 开发注意事项
-
-1. **保持向后兼容**:
-   - 重构时保持API接口不变
-   - 使用适配器模式兼容旧代码
-
-2. **增量重构**:
-   - 不要一次性重构所有代码
-   - 每次重构一个模块，确保稳定后再继续
-
-3. **测试先行**:
-   - 重构前先编写测试
-   - 确保测试覆盖率足够高
-
-4. **代码审查**:
-   - 所有重构代码必须经过审查
-   - 至少两人审查通过才能合并
-
-#### 数据库注意事项
-
-1. **索引优化**:
-   - 不要过度索引
-   - 定期分析索引使用情况
-   - 删除无用索引
-
-2. **查询优化**:
-   - 避免SELECT *
-   - 使用EXPLAIN分析查询计划
-   - 避免N+1查询
-
-3. **事务管理**:
-   - 保持事务简短
-   - 避免长事务锁表
-   - 合理使用事务隔离级别
-
-#### AI集成注意事项
-
-1. **成本控制**:
-   - 限制每个用户的AI调用次数
-   - 缓存常见问题的回复
-   - 使用较便宜的模型处理简单任务
-
-2. **内容安全**:
-   - 过滤敏感词
-   - 审核AI生成的内容
-   - 设置内容长度限制
-
-3. **性能优化**:
-   - 异步调用AI服务
-   - 设置合理的超时时间
-   - 实现降级策略
+# 注册事件
+event_bus.subscribe(EquipmentChangedEvent, on_equipment_changed)
+```
 
 ---
 
-## 12. 时间线与优先级
+## 5. 实施指南
 
-### 12.1 总体时间线
+### 5.1 风险控制策略
 
-**总工期**: 约70天 (10周)
+| 风险 | 缓解措施 | 应急预案 |
+|-----|---------|---------|
+| **破坏现有功能** | 1. 并行开发新旧代码<br>2. Feature Flag控制切换<br>3. 完整回归测试 | 立即回滚Feature Flag |
+| **性能回归** | 1. 性能基准测试<br>2. 灰度发布<br>3. 监控关键指标 | 降级到旧实现 |
+| **测试覆盖不足** | 1. 核心逻辑测试优先<br>2. 测试先行TDD<br>3. Mock框架隔离依赖 | 延长测试周期 |
 
-| 阶段 | 工期 | 开始日期 | 结束日期 |
-|------|------|---------|---------|
-| 准备阶段 | 6天 | 2025-01-01 | 2025-01-06 |
-| 阶段1: 基础设施 | 10天 | 2025-01-07 | 2025-01-16 |
-| 阶段2: 核心系统 | 13天 | 2025-01-17 | 2025-01-29 |
-| 阶段3: 数据迁移 | 11天 | 2025-01-30 | 2025-02-09 |
-| 阶段4: NPC AI | 18天 | 2025-02-10 | 2025-02-27 |
-| 阶段5: 优化 | 12天 | 2025-02-28 | 2025-03-11 |
+### 5.2 测试策略
 
-### 12.2 优先级划分 ⚠️ **已调整**
+#### 单元测试示例 (核心逻辑)
+```python
+# tests/unit/test_attribute_calculator.py
+import pytest
+from domain.attributes.attribute_calculator import AttributeCalculator
+from domain.attributes.attribute_sources import EquipmentAttributeSource
 
-#### P0 - 必须完成 (核心功能 + 合规整改)
+@pytest.mark.asyncio
+async def test_attribute_calculator():
+    """测试属性计算器 - 不依赖Nonebot"""
+    # Mock仓储
+    mock_item_repo = MockItemRepository()
+    mock_item_repo.set_equipped_items([
+        MockItem(attack_bonus=10, defense_bonus=5)
+    ])
 
-1. **合规整改** ⚠️ **新增,最高优先级**
-   - 所有命令 block=True
-   - 参数使用 CommandArg
-   - 异常捕获指定类型
-   - UID 展示替代加密 ID
-   - 删除所有主动消息代码
-   - Help 文件同步
+    # 创建计算器
+    calculator = AttributeCalculator()
+    calculator.add_source(EquipmentAttributeSource(mock_item_repo))
 
-2. **仓储模式重构** - 为后续重构打基础
-3. **数据库迁移** - 解决性能瓶颈
-4. **属性系统重构** - 统一属性计算逻辑
-5. **装备效果统一** - 解决设计不一致问题
+    # 测试玩家
+    player = MockPlayer(base_attack=50, base_defense=30)
 
-**理由**: 合规整改是强制要求,必须最先完成;其他是解决当前架构核心问题的关键任务。
+    # 执行计算
+    breakdown = await calculator.calculate_final_attributes(player)
 
-#### P1 - 应该完成 (重要功能)
+    # 断言
+    assert breakdown.total.attack == 60  # 50 + 10
+    assert breakdown.total.defense == 35  # 30 + 5
+    assert breakdown.equipment.attack == 10
+```
 
-1. **本地缓存系统** - 提升性能,无需 Redis
-2. **附近玩家查询优化** - 性能关键
-3. **NPC Agent核心** - 实现基础AI对话 (拉取式)
-4. **好感度系统** - 增强NPC交互
-5. **结构化日志** - 便于问题定位
+#### 集成测试示例 (仓储层)
+```python
+# tests/integration/test_player_repository.py
+@pytest.fixture
+async def test_db():
+    """内存数据库"""
+    engine = create_async_engine("sqlite+aiosqlite:///:memory:")
+    async with engine.begin() as conn:
+        await conn.run_sync(Base.metadata.create_all)
+    yield engine
+    await engine.dispose()
 
-**理由**: 这些功能对用户体验和系统稳定性有重要影响,且实现成本可控。
+@pytest.mark.asyncio
+async def test_player_repository_nearby_query(test_db):
+    """测试附近玩家查询优化"""
+    async with AsyncSession(test_db) as session:
+        repo = PlayerRepository(session)
 
-#### P2 - 可以完成 (增强功能)
+        # 插入测试数据
+        players = [
+            Player(id=f"p{i}", x=i, y=i, region="main")
+            for i in range(10)
+        ]
+        for p in players:
+            await repo.add(p)
+        await session.commit()
 
-1. **Redis 缓存** - 仅在多实例部署时需要
-2. **NPC 动态状态生成** - 增强游戏趣味性 (拉取式)
-3. **NPC指令执行** - 扩展NPC能力
-4. **向量记忆存储** - 提升AI对话质量
-5. **性能深度优化** - 进一步提升性能
+        # 查询附近玩家
+        nearby = await repo.get_nearby_players(5, 5, "main", max_distance=2)
 
-**理由**: 这些功能是锦上添花,可根据时间和资源情况决定是否实施。
+        # 断言
+        assert len(nearby) == 5  # 3,4,5,6,7
+```
 
-### 12.3 里程碑 ⚠️ **已调整**
+### 5.3 代码审查清单
 
-**里程碑0: 合规整改完成** (2025-01-03) ⚠️ **新增**
-- ✅ 所有命令 block=True
-- ✅ 异常捕获指定类型
-- ✅ UID 展示替代加密 ID
-- ✅ 删除主动消息代码
-- ✅ Help 文件同步
+每次PR必须检查:
+- [ ] 是否使用了DI容器注入依赖 (而非直接import)
+- [ ] 是否依赖接口而非具体实现 (DIP原则)
+- [ ] 是否使用UoW管理事务边界
+- [ ] 是否遵循单一职责原则
+- [ ] 是否有对应的单元测试
+- [ ] 是否符合合规约束 (block=True, 指定异常类型, UID展示)
 
-**里程碑1: 基础设施完成** (2025-01-16)
-- ✅ 仓储模式实现
-- ✅ MySQL环境搭建
-- ✅ 迁移脚本准备
+### 5.4 渐进式迁移示例
 
-**里程碑2: 核心系统重构完成** (2025-01-29)
-- ✅ 属性系统统一
-- ✅ 装备效果统一
-- ✅ 战斗系统解耦
+**阶段1: 并行实现**
+```python
+# 保留旧代码
+def old_calculate_attributes(player: Player) -> int:
+    # 旧逻辑
+    pass
 
-**里程碑3: 数据库迁移完成** (2025-02-09)
-- ✅ 数据迁移成功
-- ✅ 性能提升验证
-- ✅ 全量切换完成
+# 新实现
+async def new_calculate_attributes(player: Player) -> AttributeBreakdown:
+    calculator = container.resolve(AttributeCalculator)
+    return await calculator.calculate_final_attributes(player)
 
-**里程碑4: NPC AI上线** (2025-02-27)
-- ✅ NPC能进行AI对话 (拉取式)
-- ✅ 好感度系统工作
-- ✅ NPC 动态状态生成 (拉取式,不主动推送)
+# Feature Flag控制
+if feature_flags.use_new_attribute_calculator:
+    breakdown = await new_calculate_attributes(player)
+    attack = breakdown.total.attack
+else:
+    attack = old_calculate_attributes(player)
+```
 
-**里程碑5: 项目完成** (2025-03-11)
-- ✅ 所有优化完成
-- ✅ 文档完善
-- ✅ 系统稳定运行
+**阶段2: 灰度验证**
+```python
+# 双写验证一致性
+old_attack = old_calculate_attributes(player)
+new_breakdown = await new_calculate_attributes(player)
 
-### 12.4 快速迭代方案 (如果时间紧张) ⚠️ **推荐**
+if abs(old_attack - new_breakdown.total.attack) > 1:
+    logger.error(f"属性计算不一致: old={old_attack}, new={new_breakdown.total.attack}")
+```
 
-如果需要缩短工期，可以采用以下快速迭代方案：
-
-**第一阶段 (5天)**: 合规整改 ⚠️ **必须优先**
-- 命令规范化 (block=True, CommandArg)
-- 异常捕获修正
-- UID 展示替代
-- 删除主动消息
-- Help 同步
-
-**第二阶段 (25天)**: 核心重构 + 性能快赢
-- 仓储模式 + 数据库迁移
-- 属性系统重构
-- 装备效果统一
-- 本地缓存 + 附近玩家查询优化
-
-**第三阶段 (20天)**: NPC基础AI (拉取式)
-- AI服务集成
-- NPC基础对话 (玩家触发)
-- 好感度系统
-- 事件存储与拉取机制
-
-**第四阶段 (10天)**: 优化上线
-- 结构化日志
-- 监控指标
-- 文档完善
-
-**延后功能**:
-- Redis 缓存 (仅在多实例部署时需要)
-- NPC 动态状态生成 (拉取式)
-- NPC指令执行
-- 向量记忆存储
-- 深度性能优化
-
-这些功能可以在后续版本中逐步添加。
-
----
-
-## 13. 总结与建议
-
-### 13.1 重构价值
-
-本次重构将带来以下价值：
-
-1. **合规性保障** ⚠️ **新增**:
-   - 符合 Nonebot2+QQAdapter 强制约束
-   - 消除主动消息违规风险
-   - 统一命令规范,降低维护成本
-   - 异常处理规范化,提升稳定性
-
-2. **性能提升**:
-   - 查询响应时间降低 50%+ (附近玩家查询优化)
-   - 支持更多并发用户 (50 → 200+)
-   - 数据库锁定问题解决 (SQLite → MySQL)
-   - 本地缓存降低数据库压力
-
-3. **代码质量提升**:
-   - 代码耦合度降低 (DIP, 仓储模式)
-   - 可维护性提升 (分层架构)
-   - 测试覆盖率提升 (核心逻辑 > 80%)
-   - 会话边界清晰 (统一注入)
-
-4. **功能扩展性**:
-   - NPC AI系统带来全新玩法 (拉取式,合规)
-   - 易于添加新功能 (策略模式, OCP)
-   - 支持更复杂的游戏机制
-
-5. **系统稳定性**:
-   - 结构化日志便于问题定位
-   - 关键指标监控 (P95/P99, 缓存命中率)
-   - 更好的错误处理 (指定异常类型)
-   - 数据备份和恢复机制
-
-### 13.2 关键成功因素
-
-1. **合规优先** ⚠️ **最重要**: 所有代码必须符合 Nonebot2+QQAdapter 约束
-2. **充分的准备**: 详细的规划和风险评估
-3. **小步迭代**: 避免大爆炸式重构,优先快赢 (合规+本地缓存+查询优化)
-4. **完整的测试**: 确保重构不破坏现有功能,测试核心逻辑而非框架
-5. **持续监控**: 及时发现和解决问题,结构化日志 + 关键指标
-
-### 13.3 建议的执行策略 ⚠️ **已调整**
-
-1. **合规优先**: 第一步必须完成合规整改,消除违规风险
-2. **快赢优先**: 本地缓存 + 查询优化可快速见效,优先实施
-3. **先易后难**: 从基础设施开始，逐步推进到复杂系统
-4. **并行开发**: 部分独立任务可以并行进行
-5. **灰度发布**: 新功能逐步推出，降低风险
-6. **测试先行**: 核心逻辑测试覆盖 > 80%,避免 Nonebot 初始化问题
-
-### 13.4 后续规划
-
-重构完成后，可以考虑以下后续优化：
-
-1. **微服务化**: 将大型单体应用拆分为微服务
-2. **容器化部署**: 使用Docker/Kubernetes部署
-3. **多区域部署**: 支持多个游戏区服
-4. **实时对战**: 实现实时PVP对战
-5. **移动端支持**: 开发移动端客户端
+**阶段3: 完全切换**
+```python
+# 删除旧代码和Feature Flag
+breakdown = await new_calculate_attributes(player)
+attack = breakdown.total.attack
+```
 
 ---
 
-## 附录
+## 6. 总结
 
-### A. 技术选型对比
+### 6.1 预期收益
 
-#### A.1 数据库选型
+| 指标 | 当前 | 目标 | 提升 |
+|-----|------|------|------|
+| **循环依赖数** | 2+ | 0 | -100% |
+| **属性计算入口** | 4+ | 1 | -75% |
+| **效果系统数量** | 2 | 1 | -50% |
+| **单元测试覆盖率** | <10% | >80% | +70% |
+| **新功能开发时间** | 2-3天 | 0.5-1天 | -60% |
 
-| 数据库 | 优点 | 缺点 | 适用场景 |
-|--------|------|------|---------|
-| **MySQL** | 成熟稳定、生态丰富、性能好 | 运维复杂 | ✅ 推荐 |
-| PostgreSQL | 功能强大、支持JSON | 学习曲线陡峭 | 备选 |
-| MongoDB | 灵活的文档模型 | 事务支持弱 | 不推荐 |
+### 6.2 关键成功因素
 
-#### A.2 缓存选型 ⚠️ **已调整**
+1. ✅ **合规优先**: 先完成P0合规修正
+2. ✅ **小步迭代**: 每次重构一个模块,验证后再继续
+3. ✅ **测试保障**: 核心逻辑测试覆盖>80%
+4. ✅ **并行开发**: 新旧代码并行,Feature Flag控制
+5. ✅ **持续监控**: 关键指标实时监控
 
-| 缓存 | 优点 | 缺点 | 适用场景 |
-|------|------|------|---------|
-| **本地缓存 (cachetools)** | 无需部署、零依赖、简单 | 单实例限制 | ✅ 推荐 (优先) |
-| **Redis** | 性能好、功能丰富、多实例共享 | 需部署、内存占用高 | 推荐 (多实例时) |
-| Memcached | 简单高效 | 功能有限 | 备选 |
+### 6.3 后续优化方向
 
-**推荐策略**: 先本地缓存 → 后 Redis (仅在多实例部署时)
-
-#### A.3 AI服务选型
-
-| 服务 | 优点 | 缺点 | 成本 |
-|------|------|------|------|
-| **OpenAI GPT-4** | 质量最高、API稳定 | 成本较高 | ¥0.03/1K tokens |
-| Claude | 质量高、上下文长 | API限制多 | ¥0.025/1K tokens |
-| 本地模型 (Llama) | 成本低、可控 | 质量较低、需要GPU | 服务器成本 |
-
-**推荐方案**: OpenAI GPT-4 (主) + 本地模型 (降级)
-
-#### A.4 向量数据库选型
-
-| 数据库 | 优点 | 缺点 | 适用场景 |
-|--------|------|------|---------|
-| **Chroma** | 开源、易用、轻量 | 功能有限 | ✅ 推荐 (小规模) |
-| Qdrant | 性能好、功能丰富 | 部署复杂 | 推荐 (大规模) |
-| Pinecone | 托管服务、易用 | 成本高 | 备选 |
-
-### B. 参考资料
-
-1. **SQLAlchemy文档**: https://docs.sqlalchemy.org/
-2. **MySQL优化指南**: https://dev.mysql.com/doc/refman/8.0/en/optimization.html
-3. **OpenAI API文档**: https://platform.openai.com/docs
-4. **Nonebot2文档**: https://nonebot.dev/
-5. **领域驱动设计**: Eric Evans - "Domain-Driven Design"
-6. **重构**: Martin Fowler - "Refactoring"
-
-### C. 联系方式
-
-如有问题或建议，请联系：
-- 项目负责人: [待填写]
-- 技术负责人: [待填写]
-- 邮箱: [待填写]
+- **P3优化**: Redis缓存 (多实例部署时)
+- **P3优化**: MySQL分区表 (历史数据归档)
+- **P4扩展**: GraphQL API (前后端分离)
+- **P4扩展**: WebSocket (实时对战)
 
 ---
 
-**文档结束**
-
-*本文档将随着重构进展持续更新*
-
+**文档版本**: v3.0
+**最后更新**: 2025-11-15
+**维护者**: Claude Code + 开发团队
