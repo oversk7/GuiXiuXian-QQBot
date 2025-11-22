@@ -71,9 +71,9 @@ class FishingService:
             last_time = await FishingRecord.get_last_fishing_time(session, player.id)
             if last_time:
                 next_time = last_time + timedelta(minutes=cls.FISHING_COOLDOWN)
-                remaining = next_time - datetime.now()
-                minutes = int(remaining.total_seconds() // 60)
-                seconds = int(remaining.total_seconds() % 60)
+                remaining_seconds = max(0, int((next_time - datetime.now()).total_seconds()))
+                minutes = remaining_seconds // 60
+                seconds = remaining_seconds % 60
                 return False, f"钓鱼冷却中，还需等待 {minutes}分{seconds}秒"
         
         # 检查每日钓鱼次数限制
