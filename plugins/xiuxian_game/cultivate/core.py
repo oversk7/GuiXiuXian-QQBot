@@ -816,7 +816,27 @@ async def handle_continuous_breakthrough(event: MessageEvent, args: Message = Co
 
         # 构建结果消息
         if breakthrough_count == 0:
-            if player.exp < calculate_level_up_exp(player.level):
+            if failed_attempts > 0:
+                # 计算下次成功率加成
+                next_bonus = 0
+                if cfg_break.get("fail_bonus_enabled", True):
+                    fail_bonus_rate = cfg_break.get("fail_bonus_rate", 0.01)
+                    next_bonus = player.breakthrough_fail_count * fail_bonus_rate
+                    max_rate = cfg_break.get("fail_bonus_max_rate", 0.95)
+                    next_bonus = min(next_bonus, max_rate)
+
+                msg = (
+                    "💥 连续突破失败，修为不足以继续！\n"
+                    "━━━━━━━━━━━━━\n"
+                    f"✧ 本轮失败 {failed_attempts} 次\n"
+                    f"✧ 当前等级 Lv.{player.level}\n"
+                    f"✧ 剩余修为 {player.exp}/{calculate_level_up_exp(player.level)}\n"
+                    f"✧ 连续失败 {player.breakthrough_fail_count} 次\n"
+                    f"✧ 下次成功率加成 +{int(next_bonus*100)}%\n"
+                    "━━━━━━━━━━━━━\n"
+                    "⬇️ 建议【突破 镇厄】以怨念护体"
+                )
+            elif player.exp < calculate_level_up_exp(player.level):
                 msg = (
                     "💢 修为不足，无法进行突破！\n"
                     "━━━━━━━━━━━━━\n"
