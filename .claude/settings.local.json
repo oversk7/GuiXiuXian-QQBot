@@ -1,7 +1,14 @@
 {
   "permissions": {
     "allow": [
-      "Bash(python:*)"
+      "Bash(python:*)",
+      "Bash(find:*)",
+      "Bash(mkdir:*)",
+      "Bash(timeout:*)",
+      "Bash(xargs:*)",
+      "Bash(tree:*)",
+      "Bash(findstr:*)",
+      "Bash(cat:*)"
     ],
     "deny": [],
     "ask": []
