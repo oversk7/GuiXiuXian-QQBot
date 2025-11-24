@@ -121,8 +121,8 @@ db_type = db_config["database"].get("type", "sqlite")
 database_url = build_database_url(db_config)
 engine_config = build_engine_config(db_config)
 
-print(f"🔧 数据库类型: {db_type.upper()}")
-print(f"🔗 连接地址: {database_url.split('@')[-1] if '@' in database_url else database_url}")
+print(f"数据库类型: {db_type.upper()}")
+print(f"连接地址: {database_url.split('@')[-1] if '@' in database_url else database_url}")
 
 # 创建异步引擎
 engine = create_async_engine(database_url, **engine_config)
@@ -141,7 +141,7 @@ if db_type == "sqlite":
         cursor.execute("PRAGMA synchronous=NORMAL")
         cursor.close()
     
-    print("✅ SQLite WAL 模式已启用")
+    print("SQLite WAL 模式已启用")
 
 
 # ==================== 会话工厂 ====================
@@ -166,10 +166,10 @@ def get_base():
 
 async def init_db():
     """初始化数据库表结构"""
-    print("🔄 正在初始化数据库...")
+    print("正在初始化数据库...")
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
-    print("✅ 数据库初始化完成")
+    print("数据库初始化完成")
 
 
 # ==================== 会话管理器 ====================
