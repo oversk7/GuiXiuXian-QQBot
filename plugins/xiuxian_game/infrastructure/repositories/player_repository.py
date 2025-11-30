@@ -11,6 +11,7 @@ from sqlalchemy.orm import joinedload
 
 from ...domain.repositories.base import IRepository
 from ...models.player import Player
+from ...models.account_ownership import AccountOwnership
 
 
 class PlayerRepository(IRepository[Player]):
@@ -244,3 +245,29 @@ class PlayerRepository(IRepository[Player]):
         stmt = select(Player).where(Player.id.in_(player_ids))
         result = await self._session.execute(stmt)
         return result.scalars().all()
+
+    async def get_active_by_platform_id(self, platform_id: str) -> Optional[Player]:
+        """
+        根据平台ID获取当前激活的玩家账号
+
+        通过 AccountOwnership 表查询 is_active=True 的账号，
+        支持多账号切换功能。
+
+        Args:
+            platform_id: 平台ID（QQ号、频道ID等）
+
+        Returns:
+            激活的玩家对象，如果不存在则返回 None
+        """
+        stmt = (
+            select(Player)
+            .join(AccountOwnership, Player.id == AccountOwnership.player_id)
+            .where(
+                and_(
+                    AccountOwnership.owner_platform_id == platform_id,
+                    AccountOwnership.is_active == True
+                )
+            )
+        )
+        result = await self._session.execute(stmt)
+        return result.scalar_one_or_none()

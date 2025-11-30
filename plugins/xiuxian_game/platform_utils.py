@@ -6,6 +6,7 @@ from typing import Optional, Tuple
 from nonebot.adapters.qq import MessageEvent
 from sqlalchemy.ext.asyncio import AsyncSession
 from .models.player import Player
+from .infrastructure.repositories.player_repository import PlayerRepository
 
 
 class PlatformType:
@@ -61,6 +62,10 @@ async def get_unified_player(session: AsyncSession, event: MessageEvent) -> Opti
     """
     获取统一的玩家数据
 
+    支持账号切换功能：
+    1. 优先查询当前激活的账号（通过 AccountOwnership.is_active）
+    2. 如果未找到激活账号（无账号切换记录），回退到直接查询 Player
+
     Args:
         session: 数据库会话
         event: 消息事件
@@ -70,8 +75,14 @@ async def get_unified_player(session: AsyncSession, event: MessageEvent) -> Opti
     """
     _, user_id = get_platform_info(event)
 
-    # 直接查找玩家
-    player = await session.get(Player, user_id)
+    # 使用 PlayerRepository 查询激活的账号
+    player_repo = PlayerRepository(session)
+    player = await player_repo.get_active_by_platform_id(user_id)
+
+    # 如果没有激活账号记录（用户未使用账号切换系统），回退到直接查询
+    if player is None:
+        player = await session.get(Player, user_id)
+
     return player
 
 
