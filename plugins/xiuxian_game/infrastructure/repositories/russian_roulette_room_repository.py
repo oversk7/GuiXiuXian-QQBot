@@ -43,6 +43,10 @@ class RussianRouletteRoomRepository(IRepository[RussianRouletteRoom]):
         """
         return await self._session.get(RussianRouletteRoom, id)
 
+    async def get_by_id(self, entity_id: int) -> Optional[RussianRouletteRoom]:
+        """get_by_id别名，调用find_by_id以符合IRepository接口"""
+        return await self.find_by_id(entity_id)
+
     async def find_by_room_id(self, room_id: str) -> Optional[RussianRouletteRoom]:
         """
         通过房间ID查询房间
@@ -182,22 +186,62 @@ class RussianRouletteRoomRepository(IRepository[RussianRouletteRoom]):
         await self._session.flush()  # 刷新以获取生成的ID
         return room
 
-    async def update(self, room: RussianRouletteRoom) -> None:
+    async def add(self, entity: RussianRouletteRoom) -> RussianRouletteRoom:
+        """add别名，调用create以符合IRepository接口"""
+        return await self.create(entity)
+
+    async def update(self, room: RussianRouletteRoom) -> RussianRouletteRoom:
         """
         更新房间信息
 
         Args:
             room: 房间实体
+
+        Returns:
+            更新后的房间实体
         """
         self._session.add(room)
         await self._session.flush()
+        return room
 
-    async def delete(self, room: RussianRouletteRoom) -> None:
+    async def delete(self, entity_id: int) -> bool:
         """
         删除房间
 
         Args:
-            room: 房间实体
+            entity_id: 房间ID
+
+        Returns:
+            是否删除成功
         """
-        await self._session.delete(room)
-        await self._session.flush()
+        entity = await self.get_by_id(entity_id)
+        if entity:
+            await self._session.delete(entity)
+            await self._session.flush()
+            return True
+        return False
+
+    async def exists(self, entity_id: int) -> bool:
+        """
+        检查房间是否存在
+
+        Args:
+            entity_id: 房间ID
+
+        Returns:
+            是否存在
+        """
+        entity = await self.get_by_id(entity_id)
+        return entity is not None
+
+    async def count(self) -> int:
+        """
+        获取房间总数
+
+        Returns:
+            房间数量
+        """
+        from sqlalchemy import func
+        stmt = select(func.count()).select_from(RussianRouletteRoom)
+        result = await self._session.execute(stmt)
+        return result.scalar()

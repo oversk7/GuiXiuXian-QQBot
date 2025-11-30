@@ -56,6 +56,19 @@ class StockHoldingRepository(IRepository[StockHolding]):
         result = await self._session.execute(stmt)
         return result.scalar()
 
+    async def exists(self, entity_id: int) -> bool:
+        """
+        检查持仓记录是否存在
+
+        Args:
+            entity_id: 持仓ID
+
+        Returns:
+            是否存在
+        """
+        entity = await self.get_by_id(entity_id)
+        return entity is not None
+
     # ==================== 持仓特定方法 ====================
 
     async def get_by_player_and_stock(

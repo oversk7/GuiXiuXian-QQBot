@@ -267,6 +267,7 @@ class LocationRepository(IRepository[Location]):
             更新后的Location对象
         """
         self._session.add(location)
+        await self._session.flush()
         return location
 
     async def delete(self, location_id: str) -> bool:
@@ -284,6 +285,31 @@ class LocationRepository(IRepository[Location]):
             return False
         location.is_active = False
         return True
+
+    async def exists(self, entity_id: str) -> bool:
+        """
+        检查地点是否存在
+
+        Args:
+            entity_id: 地点ID
+
+        Returns:
+            是否存在
+        """
+        entity = await self.get_by_id(entity_id)
+        return entity is not None
+
+    async def count(self) -> int:
+        """
+        获取地点总数
+
+        Returns:
+            地点数量
+        """
+        from sqlalchemy import func
+        stmt = select(func.count()).select_from(Location)
+        result = await self._session.execute(stmt)
+        return result.scalar()
 
     async def add_batch(self, locations: List[Location]) -> List[Location]:
         """

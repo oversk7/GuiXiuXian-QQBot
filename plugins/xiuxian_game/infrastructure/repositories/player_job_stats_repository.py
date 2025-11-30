@@ -52,6 +52,19 @@ class PlayerJobStatsRepository(IRepository[PlayerJobStats]):
         result = await self._session.execute(stmt)
         return result.scalar()
 
+    async def exists(self, entity_id: str) -> bool:
+        """
+        检查玩家打工统计是否存在
+
+        Args:
+            entity_id: 玩家ID（主键）
+
+        Returns:
+            是否存在
+        """
+        entity = await self.get_by_id(entity_id)
+        return entity is not None
+
     # ==================== 玩家打工统计特定方法 ====================
 
     async def get_by_player_id(self, player_id: str) -> Optional[PlayerJobStats]:

@@ -42,6 +42,10 @@ class RussianRouletteGameRepository(IRepository[RussianRouletteGame]):
         """
         return await self._session.get(RussianRouletteGame, id)
 
+    async def get_by_id(self, entity_id: int) -> Optional[RussianRouletteGame]:
+        """get_by_id别名，调用find_by_id以符合IRepository接口"""
+        return await self.find_by_id(entity_id)
+
     # ==================== 业务查询 ====================
 
     async def find_by_room_id(
@@ -99,22 +103,62 @@ class RussianRouletteGameRepository(IRepository[RussianRouletteGame]):
         await self._session.flush()  # 刷新以获取生成的ID
         return game
 
-    async def update(self, game: RussianRouletteGame) -> None:
+    async def add(self, entity: RussianRouletteGame) -> RussianRouletteGame:
+        """add别名，调用create以符合IRepository接口"""
+        return await self.create(entity)
+
+    async def update(self, game: RussianRouletteGame) -> RussianRouletteGame:
         """
         更新游戏状态
 
         Args:
             game: 游戏实体
+
+        Returns:
+            更新后的游戏实体
         """
         self._session.add(game)
         await self._session.flush()
+        return game
 
-    async def delete(self, game: RussianRouletteGame) -> None:
+    async def delete(self, entity_id: int) -> bool:
         """
         删除游戏
 
         Args:
-            game: 游戏实体
+            entity_id: 游戏ID
+
+        Returns:
+            是否删除成功
         """
-        await self._session.delete(game)
-        await self._session.flush()
+        entity = await self.get_by_id(entity_id)
+        if entity:
+            await self._session.delete(entity)
+            await self._session.flush()
+            return True
+        return False
+
+    async def exists(self, entity_id: int) -> bool:
+        """
+        检查游戏是否存在
+
+        Args:
+            entity_id: 游戏ID
+
+        Returns:
+            是否存在
+        """
+        entity = await self.get_by_id(entity_id)
+        return entity is not None
+
+    async def count(self) -> int:
+        """
+        获取游戏总数
+
+        Returns:
+            游戏数量
+        """
+        from sqlalchemy import func
+        stmt = select(func.count()).select_from(RussianRouletteGame)
+        result = await self._session.execute(stmt)
+        return result.scalar()

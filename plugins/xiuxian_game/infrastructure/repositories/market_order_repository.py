@@ -41,6 +41,10 @@ class MarketOrderRepository(IRepository[MarketOrder]):
         """
         return await self._session.get(MarketOrder, order_id)
 
+    async def get_by_id(self, entity_id: int) -> Optional[MarketOrder]:
+        """get_by_id别名，调用find_by_id以符合IRepository接口"""
+        return await self.find_by_id(entity_id)
+
     # ==================== 装备实例关联查询 ====================
 
     async def find_by_equipment_instance(self, instance_id: int) -> Optional[MarketOrder]:
@@ -93,22 +97,62 @@ class MarketOrderRepository(IRepository[MarketOrder]):
         await self._session.flush()  # 刷新以获取生成的ID
         return order
 
-    async def update(self, order: MarketOrder) -> None:
+    async def add(self, entity: MarketOrder) -> MarketOrder:
+        """add别名，调用create以符合IRepository接口"""
+        return await self.create(entity)
+
+    async def update(self, order: MarketOrder) -> MarketOrder:
         """
         更新订单信息
 
         Args:
             order: 订单实体
+
+        Returns:
+            更新后的订单实体
         """
         self._session.add(order)
         await self._session.flush()
+        return order
 
-    async def delete(self, order: MarketOrder) -> None:
+    async def delete(self, entity_id: int) -> bool:
         """
         删除订单
 
         Args:
-            order: 订单实体
+            entity_id: 订单ID
+
+        Returns:
+            是否删除成功
         """
-        await self._session.delete(order)
-        await self._session.flush()
+        entity = await self.get_by_id(entity_id)
+        if entity:
+            await self._session.delete(entity)
+            await self._session.flush()
+            return True
+        return False
+
+    async def exists(self, entity_id: int) -> bool:
+        """
+        检查订单是否存在
+
+        Args:
+            entity_id: 订单ID
+
+        Returns:
+            是否存在
+        """
+        entity = await self.get_by_id(entity_id)
+        return entity is not None
+
+    async def count(self) -> int:
+        """
+        获取订单总数
+
+        Returns:
+            订单数量
+        """
+        from sqlalchemy import func
+        stmt = select(func.count()).select_from(MarketOrder)
+        result = await self._session.execute(stmt)
+        return result.scalar()

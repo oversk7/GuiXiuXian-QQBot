@@ -52,6 +52,19 @@ class BankAccountRepository(IRepository[BankAccount]):
         result = await self._session.execute(stmt)
         return result.scalar()
 
+    async def exists(self, entity_id: str) -> bool:
+        """
+        检查银行账户是否存在
+
+        Args:
+            entity_id: 玩家ID（银行账户主键）
+
+        Returns:
+            是否存在
+        """
+        entity = await self.get_by_id(entity_id)
+        return entity is not None
+
     # ==================== 银行账户特定方法 ====================
 
     async def get_or_create(self, player_id: str) -> BankAccount:

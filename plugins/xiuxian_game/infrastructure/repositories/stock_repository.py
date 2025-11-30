@@ -57,6 +57,19 @@ class StockRepository(IRepository[Stock]):
         result = await self._session.execute(stmt)
         return result.scalar()
 
+    async def exists(self, entity_id: int) -> bool:
+        """
+        检查股票是否存在
+
+        Args:
+            entity_id: 股票ID
+
+        Returns:
+            是否存在
+        """
+        entity = await self.get_by_id(entity_id)
+        return entity is not None
+
     # ==================== 股票特定方法 ====================
 
     async def get_by_symbol(self, symbol: str) -> Optional[Stock]:

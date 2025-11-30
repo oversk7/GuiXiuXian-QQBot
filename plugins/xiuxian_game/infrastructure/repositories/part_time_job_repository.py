@@ -56,6 +56,19 @@ class PartTimeJobRepository(IRepository[PartTimeJob]):
         result = await self._session.execute(stmt)
         return result.scalar()
 
+    async def exists(self, entity_id: int) -> bool:
+        """
+        检查打工记录是否存在
+
+        Args:
+            entity_id: 打工记录ID
+
+        Returns:
+            是否存在
+        """
+        entity = await self.get_by_id(entity_id)
+        return entity is not None
+
     # ==================== 打工记录特定方法 ====================
 
     async def get_current_working_job(self, player_id: str) -> Optional[PartTimeJob]:

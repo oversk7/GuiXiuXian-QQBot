@@ -55,6 +55,19 @@ class JobLocationRepository(IRepository[JobLocation]):
         result = await self._session.execute(stmt)
         return result.scalar()
 
+    async def exists(self, entity_id: int) -> bool:
+        """
+        检查工作地点是否存在
+
+        Args:
+            entity_id: 工作地点ID
+
+        Returns:
+            是否存在
+        """
+        entity = await self.get_by_id(entity_id)
+        return entity is not None
+
     # ==================== 工作地点特定方法 ====================
 
     async def get_by_location_id(self, location_id: str) -> Optional[JobLocation]:

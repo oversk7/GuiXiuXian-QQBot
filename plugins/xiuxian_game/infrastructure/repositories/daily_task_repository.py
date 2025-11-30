@@ -45,6 +45,10 @@ class DailyTaskRepository(IRepository[DailyTask]):
         result = await self._session.execute(stmt)
         return result.scalar_one_or_none()
 
+    async def get_by_id(self, entity_id: int) -> Optional[DailyTask]:
+        """get_by_id别名，调用find_by_id以符合IRepository接口"""
+        return await self.find_by_id(entity_id)
+
     async def find_by_player_and_date(
         self,
         player_id: str,
@@ -191,7 +195,50 @@ class DailyTaskRepository(IRepository[DailyTask]):
             更新后的DailyTask对象
         """
         self._session.add(task)
+        await self._session.flush()
         return task
+
+    async def delete(self, entity_id: int) -> bool:
+        """
+        删除任务（软删除，标记为EXPIRED）
+
+        Args:
+            entity_id: 任务ID
+
+        Returns:
+            是否删除成功
+        """
+        from ...models.daily_task import TaskStatus
+        task = await self.get_by_id(entity_id)
+        if task:
+            task.status = TaskStatus.EXPIRED
+            await self.update(task)
+            return True
+        return False
+
+    async def exists(self, entity_id: int) -> bool:
+        """
+        检查任务是否存在
+
+        Args:
+            entity_id: 任务ID
+
+        Returns:
+            是否存在
+        """
+        entity = await self.get_by_id(entity_id)
+        return entity is not None
+
+    async def count(self) -> int:
+        """
+        获取任务总数
+
+        Returns:
+            任务数量
+        """
+        stmt = select(func.count()).select_from(DailyTask)
+        result = await self._session.execute(stmt)
+        return result.scalar()
 
     async def bulk_update_status(
         self,

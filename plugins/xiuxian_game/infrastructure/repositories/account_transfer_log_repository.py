@@ -43,6 +43,10 @@ class AccountTransferLogRepository(IRepository[AccountTransferLog]):
         """
         return await self._session.get(AccountTransferLog, log_id)
 
+    async def get_by_id(self, entity_id: int) -> Optional[AccountTransferLog]:
+        """get_by_id别名，调用find_by_id以符合IRepository接口"""
+        return await self.find_by_id(entity_id)
+
     # ==================== 账号转让历史查询 ====================
 
     async def find_by_player_id(
@@ -232,25 +236,67 @@ class AccountTransferLogRepository(IRepository[AccountTransferLog]):
         await self._session.flush()
         return log
 
-    async def update(self, log: AccountTransferLog) -> None:
+    async def add(self, entity: AccountTransferLog) -> AccountTransferLog:
+        """add别名，调用create以符合IRepository接口"""
+        self._session.add(entity)
+        await self._session.flush()
+        return entity
+
+    async def update(self, log: AccountTransferLog) -> AccountTransferLog:
         """
         更新转让记录（一般不需要，仅用于修正错误）
 
         Args:
             log: 转让记录
+
+        Returns:
+            更新后的转让记录
         """
         self._session.add(log)
         await self._session.flush()
+        return log
 
-    async def delete(self, log: AccountTransferLog) -> None:
+    async def delete(self, entity_id: int) -> bool:
         """
         删除转让记录（谨慎使用，会影响审计追踪）
 
         Args:
-            log: 转让记录
+            entity_id: 转让记录ID
+
+        Returns:
+            是否删除成功
         """
-        await self._session.delete(log)
-        await self._session.flush()
+        entity = await self.get_by_id(entity_id)
+        if entity:
+            await self._session.delete(entity)
+            await self._session.flush()
+            return True
+        return False
+
+    async def exists(self, entity_id: int) -> bool:
+        """
+        检查转让记录是否存在
+
+        Args:
+            entity_id: 转让记录ID
+
+        Returns:
+            是否存在
+        """
+        entity = await self.get_by_id(entity_id)
+        return entity is not None
+
+    async def count(self) -> int:
+        """
+        获取转让记录总数
+
+        Returns:
+            记录数量
+        """
+        from sqlalchemy import func
+        stmt = select(func.count()).select_from(AccountTransferLog)
+        result = await self._session.execute(stmt)
+        return result.scalar()
 
     # ==================== 高级查询 ====================
 

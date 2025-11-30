@@ -204,6 +204,10 @@ class NPCRepository(IRepository[NPC]):
         await self._session.flush()
         return npc
 
+    async def add(self, entity: NPC) -> NPC:
+        """add别名，调用create以符合IRepository接口"""
+        return await self.create(entity)
+
     async def update(self, npc: NPC) -> NPC:
         """
         更新NPC
@@ -215,6 +219,7 @@ class NPCRepository(IRepository[NPC]):
             更新后的NPC对象
         """
         self._session.add(npc)
+        await self._session.flush()
         return npc
 
     async def kill(self, npc_id: str) -> bool:
@@ -263,6 +268,31 @@ class NPCRepository(IRepository[NPC]):
             return False
         npc.is_active = False
         return True
+
+    async def exists(self, entity_id: str) -> bool:
+        """
+        检查NPC是否存在
+
+        Args:
+            entity_id: NPC ID
+
+        Returns:
+            是否存在
+        """
+        entity = await self.get_by_id(entity_id)
+        return entity is not None
+
+    async def count(self) -> int:
+        """
+        获取NPC总数
+
+        Returns:
+            NPC数量
+        """
+        from sqlalchemy import func
+        stmt = select(func.count()).select_from(NPC)
+        result = await self._session.execute(stmt)
+        return result.scalar()
 
     async def cleanup_expired_dynamic(self, max_age_hours: int = 24) -> int:
         """

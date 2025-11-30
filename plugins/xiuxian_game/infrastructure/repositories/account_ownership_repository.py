@@ -44,6 +44,10 @@ class AccountOwnershipRepository(IRepository[AccountOwnership]):
         """
         return await self._session.get(AccountOwnership, ownership_id)
 
+    async def get_by_id(self, entity_id: int) -> Optional[AccountOwnership]:
+        """get_by_id别名，调用find_by_id以符合IRepository接口"""
+        return await self.find_by_id(entity_id)
+
     async def find_by_player_id(self, player_id: str) -> Optional[AccountOwnership]:
         """
         通过游戏账号ID查询所有权记录
@@ -202,25 +206,65 @@ class AccountOwnershipRepository(IRepository[AccountOwnership]):
         await self._session.flush()
         return ownership
 
-    async def update(self, ownership: AccountOwnership) -> None:
+    async def add(self, entity: AccountOwnership) -> AccountOwnership:
+        """add别名，调用create以符合IRepository接口"""
+        return await self.create(entity)
+
+    async def update(self, ownership: AccountOwnership) -> AccountOwnership:
         """
         更新所有权记录
 
         Args:
             ownership: 所有权记录
+
+        Returns:
+            更新后的所有权记录
         """
         self._session.add(ownership)
         await self._session.flush()
+        return ownership
 
-    async def delete(self, ownership: AccountOwnership) -> None:
+    async def delete(self, entity_id: int) -> bool:
         """
         删除所有权记录
 
         Args:
-            ownership: 所有权记录
+            entity_id: 所有权记录ID
+
+        Returns:
+            是否删除成功
         """
-        await self._session.delete(ownership)
-        await self._session.flush()
+        entity = await self.get_by_id(entity_id)
+        if entity:
+            await self._session.delete(entity)
+            await self._session.flush()
+            return True
+        return False
+
+    async def exists(self, entity_id: int) -> bool:
+        """
+        检查所有权记录是否存在
+
+        Args:
+            entity_id: 所有权记录ID
+
+        Returns:
+            是否存在
+        """
+        entity = await self.get_by_id(entity_id)
+        return entity is not None
+
+    async def count(self) -> int:
+        """
+        获取所有权记录总数
+
+        Returns:
+            记录数量
+        """
+        from sqlalchemy import func
+        stmt = select(func.count()).select_from(AccountOwnership)
+        result = await self._session.execute(stmt)
+        return result.scalar()
 
     # ==================== 批量操作 ====================
 

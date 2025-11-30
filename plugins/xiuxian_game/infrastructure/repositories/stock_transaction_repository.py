@@ -60,6 +60,19 @@ class StockTransactionRepository(IRepository[StockTransaction]):
         result = await self._session.execute(stmt)
         return result.scalar()
 
+    async def exists(self, entity_id: int) -> bool:
+        """
+        检查交易记录是否存在
+
+        Args:
+            entity_id: 交易记录ID
+
+        Returns:
+            是否存在
+        """
+        entity = await self.get_by_id(entity_id)
+        return entity is not None
+
     # ==================== 交易记录特定方法 ====================
 
     async def get_player_transactions_with_stock(

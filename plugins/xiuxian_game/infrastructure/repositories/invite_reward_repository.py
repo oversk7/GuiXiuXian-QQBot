@@ -53,6 +53,19 @@ class InviteRewardRepository(IRepository[InviteReward]):
         result = await self._session.execute(stmt)
         return result.scalar()
 
+    async def exists(self, entity_id: int) -> bool:
+        """
+        检查邀请记录是否存在
+
+        Args:
+            entity_id: 邀请记录ID
+
+        Returns:
+            是否存在
+        """
+        entity = await self.get_by_id(entity_id)
+        return entity is not None
+
     # ==================== 邀请奖励特定方法 ====================
 
     async def get_by_invitee_uid(self, invitee_uid: int) -> Optional[InviteReward]:
