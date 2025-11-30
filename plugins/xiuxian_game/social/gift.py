@@ -80,11 +80,6 @@ async def handle_send_gift(event: MessageEvent, args: Message = CommandArg()):
         else:
             success, message = await GiftService.send_gift(session, sender.id, receiver_uid, item_name, quantity)
 
-        # 在 finish() 之前手动提交事务，避免 FinishedException 导致回滚
-        # finish() 会抛出异常，safe_session 会捕获并回滚，所以需要提前提交
-        if success:
-            await session.commit()
-
         if success:
             await send_gift_cmd.finish(message_add_head(f"🎁 {message}", event))
         else:

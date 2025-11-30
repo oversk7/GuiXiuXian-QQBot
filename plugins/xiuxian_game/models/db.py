@@ -198,6 +198,19 @@ async def safe_session():
             await session.rollback()
             raise e
         except Exception as e:
+            # 排除 Nonebot2 的流程控制异常（finish/pause/reject）
+            # 这些异常是正常流程控制，不应导致事务回滚
+            try:
+                from nonebot.exception import FinishedException, PausedException, RejectedException
+                if isinstance(e, (FinishedException, PausedException, RejectedException)):
+                    # 流程控制异常：提交事务后重新抛出
+                    await session.commit()
+                    raise e
+            except ImportError:
+                # 如果无法导入 Nonebot 异常（非 Nonebot 环境），按原逻辑处理
+                pass
+
+            # 其他异常：回滚事务
             await session.rollback()
             raise e
         finally:
