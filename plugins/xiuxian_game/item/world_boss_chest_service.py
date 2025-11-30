@@ -8,8 +8,7 @@ from typing import List, Tuple
 from datetime import datetime
 
 from ..models.player import Player
-from ..models.inventory import ItemInstance
-from ..config import ItemConfig
+from ..models.inventory import ItemInstance, ItemConfig
 from ..infrastructure.repositories.player_repository import PlayerRepository
 from ..infrastructure.repositories.item_repository import ItemRepository
 from ..domain.effects.interfaces import EffectResult
