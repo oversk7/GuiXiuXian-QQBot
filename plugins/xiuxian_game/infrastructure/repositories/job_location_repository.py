@@ -8,7 +8,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, and_
 
 from ...models.part_time_job import JobLocation
-from ..domain.repositories.base import IRepository
+from ...domain.repositories.base import IRepository
 
 
 class JobLocationRepository(IRepository[JobLocation]):

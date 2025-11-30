@@ -13,7 +13,7 @@ from sqlalchemy import select, and_, update
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
-from ..domain.repositories.base import IRepository
+from ...domain.repositories.base import IRepository
 from ...models.account_ownership import AccountOwnership
 from ...models.player import Player
 

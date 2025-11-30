@@ -13,7 +13,7 @@ from datetime import datetime
 from sqlalchemy import select, and_, or_
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from ..domain.repositories.base import IRepository
+from ...domain.repositories.base import IRepository
 from ...models.russian_roulette import RussianRouletteRoom, RoomStatus
 
 

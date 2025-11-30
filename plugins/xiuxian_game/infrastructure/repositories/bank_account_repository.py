@@ -9,7 +9,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 
 from ...models.bank_account import BankAccount
-from ..domain.repositories.base import IRepository
+from ...domain.repositories.base import IRepository
 
 
 class BankAccountRepository(IRepository[BankAccount]):

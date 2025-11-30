@@ -13,7 +13,7 @@ from sqlalchemy import select, and_, desc
 from sqlalchemy.ext.asyncio import AsyncSession
 from datetime import datetime
 
-from ..domain.repositories.base import IRepository
+from ...domain.repositories.base import IRepository
 from ...models.account_transfer_log import AccountTransferLog
 
 

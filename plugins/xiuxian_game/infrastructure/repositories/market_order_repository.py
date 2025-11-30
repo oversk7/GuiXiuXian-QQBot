@@ -11,7 +11,7 @@ from typing import Optional, List
 from sqlalchemy import select, and_
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from ..domain.repositories.base import IRepository
+from ...domain.repositories.base import IRepository
 from ...models.market_order import MarketOrder
 
 

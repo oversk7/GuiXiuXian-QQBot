@@ -10,7 +10,7 @@ from sqlalchemy.orm import joinedload
 
 from ...models.invite_reward import InviteReward
 from ...models.player import Player
-from ..domain.repositories.base import IRepository
+from ...domain.repositories.base import IRepository
 
 
 class InviteRewardRepository(IRepository[InviteReward]):

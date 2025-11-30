@@ -10,7 +10,7 @@ from sqlalchemy import select, and_
 from sqlalchemy.orm import selectinload
 
 from ...models.stock import Stock, StockPriceHistory
-from ..domain.repositories.base import IRepository
+from ...domain.repositories.base import IRepository
 
 
 class StockRepository(IRepository[Stock]):

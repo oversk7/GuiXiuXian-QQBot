@@ -9,7 +9,7 @@ from sqlalchemy import select, and_
 from sqlalchemy.orm import selectinload
 
 from ...models.stock import StockHolding, Stock
-from ..domain.repositories.base import IRepository
+from ...domain.repositories.base import IRepository
 
 
 class StockHoldingRepository(IRepository[StockHolding]):

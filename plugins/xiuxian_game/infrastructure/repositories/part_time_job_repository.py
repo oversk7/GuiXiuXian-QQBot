@@ -9,7 +9,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, and_
 
 from ...models.part_time_job import PartTimeJob
-from ..domain.repositories.base import IRepository
+from ...domain.repositories.base import IRepository
 
 
 class PartTimeJobRepository(IRepository[PartTimeJob]):
