@@ -5,6 +5,7 @@ from nonebot.params import CommandArg
 from ..models.db import safe_session
 from ..models.player import Player
 from ..utils import message_add_head
+from ..platform_utils import get_unified_player
 from .gift_service import GiftService
 
 # ==================== Feature Flag ====================
@@ -41,7 +42,8 @@ async def handle_send_gift(event: MessageEvent, args: Message = CommandArg()):
         await send_gift_cmd.finish("数量必须大于0")
     
     async with safe_session() as session:
-        sender = await session.get(Player, event.get_user_id())
+        # 使用 get_unified_player 获取当前激活的游戏账号
+        sender = await get_unified_player(session, event)
         if not sender:
             await send_gift_cmd.finish("⛔ 请先创建角色")
 
@@ -92,7 +94,8 @@ gift_history_cmd = on_command("送礼记录", aliases={"我的送礼"}, block=Tr
 @gift_history_cmd.handle()
 async def handle_gift_history(event: MessageEvent):
     async with safe_session() as session:
-        player = await session.get(Player, event.get_user_id())
+        # 使用 get_unified_player 获取当前激活的游戏账号
+        player = await get_unified_player(session, event)
         if not player:
             await gift_history_cmd.finish("⛔ 请先创建角色")
 
@@ -153,7 +156,8 @@ received_gifts_cmd = on_command("收礼记录", aliases={"收到的礼物"}, blo
 @received_gifts_cmd.handle()
 async def handle_received_gifts(event: MessageEvent):
     async with safe_session() as session:
-        player = await session.get(Player, event.get_user_id())
+        # 使用 get_unified_player 获取当前激活的游戏账号
+        player = await get_unified_player(session, event)
         if not player:
             await received_gifts_cmd.finish("⛔ 请先创建角色")
 

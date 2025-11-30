@@ -73,9 +73,6 @@ class GiftService:
 
         对应原代码:
             gift_service.py Line 21-68
-
-        多账号支持:
-            允许同一owner_platform_id下的多个游戏账号之间自由送礼
         """
         if sender_id == receiver_id:
             return False, "不能给自己送礼", None
@@ -94,18 +91,6 @@ class GiftService:
         mentorship = await self._mentorship_service.get_mentorship(receiver_id, sender_id)
         if mentorship:
             return True, "", GiftType.MENTORSHIP
-
-        # 检查是否为同一玩家的多个游戏账号（通过AccountOwnership）
-        from ..infrastructure.repositories.account_ownership_repository import AccountOwnershipRepository
-        ownership_repo = AccountOwnershipRepository(self._player_repo._session)
-
-        sender_ownership = await ownership_repo.find_by_player_id(sender_id)
-        receiver_ownership = await ownership_repo.find_by_player_id(receiver_id)
-
-        if sender_ownership and receiver_ownership:
-            if sender_ownership.owner_platform_id == receiver_ownership.owner_platform_id:
-                # 同一真实玩家的多个游戏账号之间可以送礼
-                return True, "", GiftType.MENTORSHIP  # 使用MENTORSHIP类型，允许送消耗品
 
         return False, "只能向配偶或师父/徒弟送礼", None
 
