@@ -18,7 +18,7 @@ CREATE TABLE IF NOT EXISTS account_ownership (
     KEY idx_account_ownership_owner (owner_platform_id),
     KEY idx_account_ownership_active (owner_platform_id, is_active),
     KEY idx_account_ownership_transfer_key (transfer_key),
-    FOREIGN KEY (player_id) REFERENCES players(id) ON DELETE CASCADE
+    FOREIGN KEY (player_id) REFERENCES player(id) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='账号所有权记录表';
 
 -- 2. 创建账号转让历史表
@@ -34,7 +34,7 @@ CREATE TABLE IF NOT EXISTS account_transfer_logs (
     KEY idx_transfer_log_player (player_id, transfer_time),
     KEY idx_transfer_log_from (from_platform_id, transfer_time),
     KEY idx_transfer_log_to (to_platform_id, transfer_time),
-    FOREIGN KEY (player_id) REFERENCES players(id) ON DELETE CASCADE
+    FOREIGN KEY (player_id) REFERENCES player(id) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='账号转让历史记录表';
 
 -- 3. 为现有玩家创建所有权记录
@@ -46,14 +46,14 @@ SELECT
     '主号' as display_name,
     'created' as acquired_type,
     created_at as acquired_at
-FROM players
+FROM player
 WHERE NOT EXISTS (
-    SELECT 1 FROM account_ownership WHERE account_ownership.player_id = players.id
+    SELECT 1 FROM account_ownership WHERE account_ownership.player_id = player.id
 );
 
 -- 4. 显示迁移结果统计
 SELECT
     '迁移结果统计' as info,
-    (SELECT COUNT(*) FROM players) as players_count,
+    (SELECT COUNT(*) FROM player) as players_count,
     (SELECT COUNT(*) FROM account_ownership) as ownership_count,
     (SELECT COUNT(*) FROM account_ownership WHERE is_active = TRUE) as active_count;
