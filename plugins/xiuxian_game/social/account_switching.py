@@ -1,19 +1,22 @@
 """
 账号切换命令处理器
 
-支持的命令：
+玩家命令：
 - 我的账号 - 查看拥有的所有游戏账号
 - 切换账号 <账号ID> - 切换到指定的游戏账号
 - 重命名账号 <账号ID> <新名称> - 重命名账号备注
-- 生成转让密钥 <账号ID> - 生成账号转让密钥
+- 转让历史 - 查看账号买入/卖出历史
+
+管理员命令（仅SUPERUSER）：
+- 生成转让密钥 <账号ID> - 为玩家生成账号转让密钥（账号买卖）
 - 接收账号 <转让密钥> - 使用转让密钥接收账号
 - 取消转让 <账号ID> - 取消账号的转让密钥
-- 转让历史 - 查看账号买入/卖出历史
 """
 
 from nonebot import on_command
 from nonebot.adapters.qq import MessageEvent, Message
 from nonebot.params import CommandArg
+from nonebot.permission import SUPERUSER
 
 from ..models.db import safe_session
 from ..models.player import Player
@@ -130,7 +133,7 @@ async def handle_rename_account(event: MessageEvent, args: Message = CommandArg(
 
 
 # ==================== 生成转让密钥 ====================
-generate_transfer_key_cmd = on_command("生成转让密钥", aliases={"转让账号"}, block=True, priority=5)
+generate_transfer_key_cmd = on_command("生成转让密钥", aliases={"转让账号"}, block=True, priority=5, permission=SUPERUSER)
 
 @generate_transfer_key_cmd.handle()
 async def handle_generate_transfer_key(event: MessageEvent, args: Message = CommandArg()):
@@ -172,7 +175,7 @@ async def handle_generate_transfer_key(event: MessageEvent, args: Message = Comm
 
 
 # ==================== 接收账号 ====================
-accept_transfer_cmd = on_command("接收账号", aliases={"使用转让密钥"}, block=True, priority=5)
+accept_transfer_cmd = on_command("接收账号", aliases={"使用转让密钥"}, block=True, priority=5, permission=SUPERUSER)
 
 @accept_transfer_cmd.handle()
 async def handle_accept_transfer(event: MessageEvent, args: Message = CommandArg()):
@@ -210,7 +213,7 @@ async def handle_accept_transfer(event: MessageEvent, args: Message = CommandArg
 
 
 # ==================== 取消转让 ====================
-cancel_transfer_cmd = on_command("取消转让", block=True, priority=5)
+cancel_transfer_cmd = on_command("取消转让", block=True, priority=5, permission=SUPERUSER)
 
 @cancel_transfer_cmd.handle()
 async def handle_cancel_transfer(event: MessageEvent, args: Message = CommandArg()):
