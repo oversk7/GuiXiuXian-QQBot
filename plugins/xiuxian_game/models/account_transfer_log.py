@@ -22,7 +22,7 @@ class AccountTransferLog(Base):
     # 转让的账号
     player_id: Mapped[str] = mapped_column(
         String(64),
-        ForeignKey('players.id', ondelete='CASCADE'),
+        ForeignKey('player.id', ondelete='CASCADE'),
         index=True,
         comment="被转让的游戏账号ID"
     )
