@@ -18,6 +18,7 @@ from ..models import Player, ItemInstance
 from ..config import config
 from ..utils import message_add_head
 from ..alchemy.service import AlchemyService
+from ..platform_utils import get_unified_player
 # 导入装备服务模块（业务逻辑已移至此处，解决模块耦合）
 from .equipment_service import recalc_equipment_attributes, EQUIP_ITEM_IDS
 
