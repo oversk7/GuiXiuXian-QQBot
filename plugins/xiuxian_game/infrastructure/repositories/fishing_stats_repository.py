@@ -30,6 +30,7 @@ class FishingStatsRepository(IRepository[FishingStats]):
 
     async def update(self, fishing_stats: FishingStats) -> FishingStats:
         """更新统计记录"""
+        self._session.add(fishing_stats)  # 必须先标记对象为需要更新
         await self._session.flush()
         return fishing_stats
 

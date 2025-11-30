@@ -340,6 +340,7 @@ class ItemInstance(Base):
                     quantity=1,
                     durability=equip_durability
                 ))
+            await session.flush()  # 确保装备立即可见
             return True
 
         # 普通物品处理 - 先检查空间
@@ -385,6 +386,9 @@ class ItemInstance(Base):
             put_qty = min(STACK_SIZE, remaining_qty)
             session.add(ItemInstance(player_id=player_id, item_id=template_id, quantity=put_qty))
             remaining_qty -= put_qty
+
+        # 确保所有物品添加操作立即刷新到数据库
+        await session.flush()
         return True
 
     @staticmethod

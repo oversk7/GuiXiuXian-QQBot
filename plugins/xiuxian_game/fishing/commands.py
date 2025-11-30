@@ -61,7 +61,10 @@ async def _(event: MessageEvent):
                 await fishing_cmd.finish(message_add_head("⛔ 钓鱼数据异常，请联系管理员处理", event))
             else:
                 raise
-        
+
+        # ⚠️ 关键修复：必须在finish()之前commit，否则finish()抛出的异常会导致rollback
+        await session.commit()
+
         # 构建成功消息
         rarity_emoji = {
             "white": "⚪",
