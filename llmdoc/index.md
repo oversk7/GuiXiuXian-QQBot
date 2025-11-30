@@ -1,7 +1,7 @@
 # 诡修仙项目文档系统
 
-**文档版本**: 2.2
-**最后更新**: 2025-11-29
+**文档版本**: 2.3
+**最后更新**: 2025-11-30
 **文档受众**: LLM代理和项目开发者
 **文档状态**: 已清理冗余单模块文档，保留核心架构和未完成模块调研
 
@@ -28,22 +28,26 @@
 - `project-overview.md` - 项目整体介绍
 - `architecture-summary.md` - 架构总览
 - `refactoring-strategy.md` - 重构策略概览
+- `service-di-completion.md` - Service DI重构100%完成里程碑
 
 ### `/architecture/` - 系统架构 (LLM检索地图)
 回答"系统如何工作?":
 - `current-architecture.md` - 当前架构详细分析
+- `service-di-architecture.md` - Service DI架构实现
 - `attribute-system.md` - 属性系统架构
 - `battle-effect-bridge.md` - 战斗效果桥接器架构
 
 ### `/guides/` - 操作指南
 回答"如何执行X任务?":
 - `refactoring-roadmap.md` - 重构实施路线图
+- `deploy-service-di.md` - 如何部署Service DI重构
 - `how-to-create-battle-effect-bridge.md` - 如何创建战斗效果桥接器
 - `feature-flag-control.md` - Feature Flag控制指南
 - `how-to-add-effect.md` - 如何添加新效果
 
 ### `/reference/` - 参考资料
 回答"X的具体定义是什么?":
+- `service-api-reference.md` - 27个Service API清单
 - `battle-effect-bridge-api.md` - BattleEffectBridge API参考
 - `code-issues.md` - 代码问题清单
 - `data-models.md` - 数据模型参考
@@ -159,7 +163,32 @@ LLM代理生成的调研和分析（仅保留未完成模块的调研）：
 
 ---
 
-## 9. 最新更新 (2025-11-29)
+## 9. 最新更新 (2025-11-30)
+
+### 🎉 Service DI重构100%完成 ✅
+
+**重构完成度**: 27/27 Services（100%）
+
+**最后4个Feature Flag已启用**:
+- ✅ EquipmentTradeService (economy/market.py:21)
+- ✅ DailyTaskService (daily_task/commands.py:19)
+- ✅ RussianRouletteService (entertainment/russian_roulette.py:20)
+- ✅ LocationService (world/real_world_explore.py:20, world/npc_interaction.py:22)
+
+**关键修复完成**:
+- ✅ 修复PlatformBinding引用 (player/info.py) - commit 13de600
+- ✅ 修复38个Repository导入路径（..domain → ...domain）- commit ad8013f
+- ✅ 修复SQL迁移脚本表名（players → player）- commit a3747fa
+
+**数据库迁移准备**:
+- ✅ migrate_account_ownership.sql（AccountSwitching系统）
+- ⏳ 待生产环境执行
+
+**详细文档**: `/llmdoc/overview/service-di-completion.md`
+
+---
+
+## 10. 历史更新 (2025-11-29)
 
 ### 文档系统清理完成 ✅
 
