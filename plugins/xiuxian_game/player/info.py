@@ -18,6 +18,7 @@ from ..platform_utils import get_unified_player, format_platform_message, is_gui
 from ..config import config
 from ..infrastructure.uow import UnitOfWork
 from ..domain.attributes import get_effective_attributes_v2
+from ..infrastructure.repositories.account_transfer_log_repository import AccountTransferLogRepository
 
 
 def _format_player_location(player: Player) -> str:
@@ -322,6 +323,18 @@ async def create_player(event: MessageEvent, nickname: str, gender: Gender) -> s
         )
         if result.scalars().first():
             return "⛔ 你已经创建过角色了"
+
+        # 检查是否有账号转让历史（防止转让后重复创建）
+        transfer_log_repo = AccountTransferLogRepository(session)
+        transfer_history = await transfer_log_repo.find_by_from_platform(
+            event.get_user_id(),
+            limit=1
+        )
+        if transfer_history:
+            return (
+                "⛔ 你的账号曾有转让记录，无法再次创建角色\n"
+                "💡 如果这是误操作，请联系管理员"
+            )
 
         # 获取当前最大UID
         max_uid_result = await session.execute(
