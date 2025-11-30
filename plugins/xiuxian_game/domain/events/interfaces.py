@@ -16,8 +16,8 @@ class IEvent(ABC):
     使用dataclass简化事件数据的定义。
     """
 
-    # 事件发生时间（自动生成）
-    occurred_at: datetime = field(default_factory=datetime.now)
+    # 事件发生时间（自动生成，使用kw_only避免与子类必需参数冲突）
+    occurred_at: datetime = field(default_factory=datetime.now, kw_only=True)
 
     # 事件名称（用于日志和调试）
     @property
