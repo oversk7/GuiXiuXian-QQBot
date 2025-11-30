@@ -8,7 +8,7 @@
 """
 
 from sqlalchemy import String, DateTime, Boolean, Integer, func, Index, UniqueConstraint, ForeignKey
-from sqlalchemy.orm import Mapped, mapped_column
+from sqlalchemy.orm import Mapped, mapped_column, relationship
 from datetime import datetime
 from .db import Base
 import secrets
@@ -31,9 +31,12 @@ class AccountOwnership(Base):
     # 游戏账号信息
     player_id: Mapped[str] = mapped_column(
         String(64),
-        ForeignKey('players.id', ondelete='CASCADE'),
+        ForeignKey('player.id', ondelete='CASCADE'),
         comment="拥有的游戏账号ID"
     )
+
+    # 关系定义
+    player: Mapped["Player"] = relationship("Player", foreign_keys=[player_id], lazy="joined")
 
     # 状态信息
     is_active: Mapped[bool] = mapped_column(
