@@ -15,6 +15,11 @@ from .location_service import LocationService
 from .npc_service import NPCService
 from ..cultivate.mansion import MansionService
 
+# ==================== Feature Flag ====================
+# 设置为True使用新版DI架构的LocationService，False使用旧版本
+USE_NEW_LOCATION_SERVICE = True
+# =====================================================
+
 
 # ==================== 现实世界探索命令 ====================
 real_explore_cmd = on_command("观察", aliases={"附近"}, block=True, priority=5)

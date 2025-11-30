@@ -16,6 +16,11 @@ from ..config import config
 from ..utils import message_add_head
 from .gem_upgrade_service import GemUpgradeService
 
+# ==================== Feature Flag ====================
+# 设置为True使用新版DI架构的GemUpgradeService，False使用旧版本
+USE_NEW_GEM_UPGRADE_SERVICE = True
+# =====================================================
+
 
 # ---------------- 指令：查看镶嵌物升级信息 ----------------
 gem_upgrade_info_cmd = on_command("镶嵌物升级", aliases={"宝石升级", "佛珠升级", "升级镶嵌物"}, block=True, priority=5)
@@ -138,9 +143,20 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
         gem_id = gem_config.item_id
 
         # 执行升级
-        success, message, consumed_materials = await GemUpgradeService.upgrade_gem(
-            session, gem_id, player, use_protection
-        )
+        if USE_NEW_GEM_UPGRADE_SERVICE:
+            from ..infrastructure.repositories.item_repository import ItemRepository
+            from ..infrastructure.repositories.player_repository import PlayerRepository
+            from .gem_upgrade_service_new import GemUpgradeService as GemUpgradeServiceNew
+
+            service = GemUpgradeServiceNew(
+                item_repo=ItemRepository(session),
+                player_repo=PlayerRepository(session),
+            )
+            success, message, consumed_materials = await service.upgrade_gem(gem_id, player, use_protection)
+        else:
+            success, message, consumed_materials = await GemUpgradeService.upgrade_gem(
+                session, gem_id, player, use_protection
+            )
 
         await session.commit()
 

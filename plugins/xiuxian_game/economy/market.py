@@ -16,6 +16,16 @@ from ..item.equipment_commands import find_equipment_by_input
 
 from datetime import date, datetime, timedelta
 
+# ==================== Feature Flag ====================
+# 设置为True使用新版DI架构的EquipmentTradeService，False使用旧版本
+USE_NEW_EQUIPMENT_TRADE_SERVICE = True
+# =====================================================
+
+if USE_NEW_EQUIPMENT_TRADE_SERVICE:
+    from .equipment_trade_service_new import EquipmentTradeService as EquipmentTradeServiceNew
+    from ..infrastructure.repositories.item_repository import ItemRepository
+    from ..infrastructure.repositories.market_order_repository import MarketOrderRepository
+
 MAX_LISTINGS = 6  # 每位玩家最大挂牌数
 AUTO_MATCH = True
 # === 输出格式辅助 ===
@@ -347,9 +357,15 @@ async def _handle_equipment_listing(event: MessageEvent, item_cfg, price: int):
             await list_cmd.finish("⛔ 请先创建角色")
 
         # 获取玩家的装备列表
-        equipment_list = await EquipmentTradeService.get_player_equipment_list(
-            session, player.id, item_cfg.item_id
-        )
+        if USE_NEW_EQUIPMENT_TRADE_SERVICE:
+            item_repo = ItemRepository(session)
+            market_order_repo = MarketOrderRepository(session)
+            service = EquipmentTradeServiceNew(item_repo, market_order_repo)
+            equipment_list = await service.get_player_equipment_list(player.id, item_cfg.item_id)
+        else:
+            equipment_list = await EquipmentTradeService.get_player_equipment_list(
+                session, player.id, item_cfg.item_id
+            )
 
         if not equipment_list:
             await list_cmd.finish(f"⛔ 你没有可挂牌的 {item_cfg.name}")
@@ -397,8 +413,15 @@ async def _handle_equipment_listing(event: MessageEvent, item_cfg, price: int):
 async def _create_equipment_order(session, player, equipment: ItemInstance, price: int, event: MessageEvent):
     """创建装备订单"""
     # 冻结装备
-    if not await EquipmentTradeService.freeze_equipment(session, equipment):
-        await list_cmd.finish("⛔ 该装备无法挂牌（可能已在交易中或已装备）")
+    if USE_NEW_EQUIPMENT_TRADE_SERVICE:
+        item_repo = ItemRepository(session)
+        market_order_repo = MarketOrderRepository(session)
+        service = EquipmentTradeServiceNew(item_repo, market_order_repo)
+        if not await service.freeze_equipment(equipment):
+            await list_cmd.finish("⛔ 该装备无法挂牌（可能已在交易中或已装备）")
+    else:
+        if not await EquipmentTradeService.freeze_equipment(session, equipment):
+            await list_cmd.finish("⛔ 该装备无法挂牌（可能已在交易中或已装备）")
 
     # 生成装备摘要
     summary = EquipmentTradeService.generate_equipment_summary(equipment)
@@ -530,11 +553,20 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
         if order.side == OrderSide.SELL:
             if order.is_equipment_trade:
                 # 装备交易：解冻装备
-                equipment = await EquipmentTradeService.get_equipment_by_instance_id(
-                    session, order.item_instance_id
-                )
-                if equipment:
-                    await EquipmentTradeService.unfreeze_equipment(session, equipment)
+                if USE_NEW_EQUIPMENT_TRADE_SERVICE:
+                    item_repo = ItemRepository(session)
+                    market_order_repo = MarketOrderRepository(session)
+                    service = EquipmentTradeServiceNew(item_repo, market_order_repo)
+
+                    equipment = await service.get_equipment_by_instance_id(order.item_instance_id)
+                    if equipment:
+                        await service.unfreeze_equipment(equipment)
+                else:
+                    equipment = await EquipmentTradeService.get_equipment_by_instance_id(
+                        session, order.item_instance_id
+                    )
+                    if equipment:
+                        await EquipmentTradeService.unfreeze_equipment(session, equipment)
             else:
                 # 普通物品：退回剩余物品
                 try:
@@ -865,6 +897,13 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
 # ======= 辅助函数 =======
 async def _try_auto_match(session, new_order: MarketOrder, player: Player, same_price_only: bool = False) -> str:
     """自动撮合逻辑，返回描述信息（可能为空）。"""
+    # 初始化新版service（如果启用）
+    equipment_service = None
+    if USE_NEW_EQUIPMENT_TRADE_SERVICE:
+        item_repo = ItemRepository(session)
+        market_order_repo = MarketOrderRepository(session)
+        equipment_service = EquipmentTradeServiceNew(item_repo, market_order_repo)
+
     if new_order.side == OrderSide.BUY:
         # 买单 → 查找卖单
         price_cond = (MarketOrder.price == new_order.price) if same_price_only else (MarketOrder.price <= new_order.price)
@@ -907,18 +946,28 @@ async def _try_auto_match(session, new_order: MarketOrder, player: Player, same_
         # 处理物品转移
         if new_order.side == OrderSide.SELL and new_order.is_equipment_trade:
             # 卖方是装备，转移装备实例
-            equipment = await EquipmentTradeService.get_equipment_by_instance_id(
-                session, new_order.item_instance_id
-            )
-            if not equipment or not await EquipmentTradeService.transfer_equipment(session, equipment, buyer.id):
-                break  # 装备转移失败，停止撮合
+            if USE_NEW_EQUIPMENT_TRADE_SERVICE:
+                equipment = await equipment_service.get_equipment_by_instance_id(new_order.item_instance_id)
+                if not equipment or not await equipment_service.transfer_equipment(equipment, buyer.id):
+                    break  # 装备转移失败，停止撮合
+            else:
+                equipment = await EquipmentTradeService.get_equipment_by_instance_id(
+                    session, new_order.item_instance_id
+                )
+                if not equipment or not await EquipmentTradeService.transfer_equipment(session, equipment, buyer.id):
+                    break  # 装备转移失败，停止撮合
         elif opp.side == OrderSide.SELL and opp.is_equipment_trade:
             # 对手方是装备，转移装备实例
-            equipment = await EquipmentTradeService.get_equipment_by_instance_id(
-                session, opp.item_instance_id
-            )
-            if not equipment or not await EquipmentTradeService.transfer_equipment(session, equipment, buyer.id):
-                break  # 装备转移失败，停止撮合
+            if USE_NEW_EQUIPMENT_TRADE_SERVICE:
+                equipment = await equipment_service.get_equipment_by_instance_id(opp.item_instance_id)
+                if not equipment or not await equipment_service.transfer_equipment(equipment, buyer.id):
+                    break  # 装备转移失败，停止撮合
+            else:
+                equipment = await EquipmentTradeService.get_equipment_by_instance_id(
+                    session, opp.item_instance_id
+                )
+                if not equipment or not await EquipmentTradeService.transfer_equipment(session, equipment, buyer.id):
+                    break  # 装备转移失败，停止撮合
         else:
             # 普通物品交易，检查背包空间
             try:

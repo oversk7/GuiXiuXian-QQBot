@@ -7,6 +7,15 @@ from ..models.player import Player
 from ..utils import message_add_head
 from .gift_service import GiftService
 
+# ==================== Feature Flag ====================
+# 设置为True使用新版DI架构的GiftService，False使用旧版本
+USE_NEW_GIFT_SERVICE = True
+# 设置为True使用新版DI架构的MarriageService，False使用旧版本
+USE_NEW_MARRIAGE_SERVICE = True
+# 设置为True使用新版DI架构的MentorshipService，False使用旧版本
+USE_NEW_MENTORSHIP_SERVICE = True
+# =====================================================
+
 
 # ==================== 送礼 ====================
 send_gift_cmd = on_command("送礼", block=True, priority=5)
@@ -35,8 +44,42 @@ async def handle_send_gift(event: MessageEvent, args: Message = CommandArg()):
         sender = await session.get(Player, event.get_user_id())
         if not sender:
             await send_gift_cmd.finish("⛔ 请先创建角色")
-        
-        success, message = await GiftService.send_gift(session, sender.id, receiver_uid, item_name, quantity)
+
+        if USE_NEW_GIFT_SERVICE:
+            from ..infrastructure.repositories.player_repository import PlayerRepository
+            from ..infrastructure.repositories.gift_record_repository import GiftRecordRepository
+            from ..infrastructure.repositories.item_repository import ItemRepository
+            from ..infrastructure.repositories.marriage_repository import MarriageRepository
+            from ..infrastructure.repositories.mentorship_repository import MentorshipRepository
+            from ..infrastructure.repositories.social_application_repository import SocialApplicationRepository
+            from .gift_service_new import GiftService as GiftServiceNew
+            from .marriage_service_new import MarriageService as MarriageServiceNew
+            from .mentorship_service_new import MentorshipService as MentorshipServiceNew
+
+            # 创建依赖的Service实例
+            marriage_service = MarriageServiceNew(
+                player_repo=PlayerRepository(session),
+                social_app_repo=SocialApplicationRepository(session),
+                marriage_repo=MarriageRepository(session),
+            )
+            mentorship_service = MentorshipServiceNew(
+                player_repo=PlayerRepository(session),
+                social_app_repo=SocialApplicationRepository(session),
+                mentorship_repo=MentorshipRepository(session),
+            )
+
+            # 创建GiftService实例
+            service = GiftServiceNew(
+                player_repo=PlayerRepository(session),
+                marriage_service=marriage_service,
+                mentorship_service=mentorship_service,
+                gift_record_repo=GiftRecordRepository(session),
+                item_repo=ItemRepository(session),
+            )
+            success, message = await service.send_gift(sender.id, receiver_uid, item_name, quantity)
+        else:
+            success, message = await GiftService.send_gift(session, sender.id, receiver_uid, item_name, quantity)
+
         if success:
             await send_gift_cmd.finish(message_add_head(f"🎁 {message}", event))
         else:
@@ -52,8 +95,42 @@ async def handle_gift_history(event: MessageEvent):
         player = await session.get(Player, event.get_user_id())
         if not player:
             await gift_history_cmd.finish("⛔ 请先创建角色")
-        
-        gifts = await GiftService.get_gift_history(session, player.id)
+
+        if USE_NEW_GIFT_SERVICE:
+            from ..infrastructure.repositories.player_repository import PlayerRepository
+            from ..infrastructure.repositories.gift_record_repository import GiftRecordRepository
+            from ..infrastructure.repositories.item_repository import ItemRepository
+            from ..infrastructure.repositories.marriage_repository import MarriageRepository
+            from ..infrastructure.repositories.mentorship_repository import MentorshipRepository
+            from ..infrastructure.repositories.social_application_repository import SocialApplicationRepository
+            from .gift_service_new import GiftService as GiftServiceNew
+            from .marriage_service_new import MarriageService as MarriageServiceNew
+            from .mentorship_service_new import MentorshipService as MentorshipServiceNew
+
+            # 创建依赖的Service实例
+            marriage_service = MarriageServiceNew(
+                player_repo=PlayerRepository(session),
+                social_app_repo=SocialApplicationRepository(session),
+                marriage_repo=MarriageRepository(session),
+            )
+            mentorship_service = MentorshipServiceNew(
+                player_repo=PlayerRepository(session),
+                social_app_repo=SocialApplicationRepository(session),
+                mentorship_repo=MentorshipRepository(session),
+            )
+
+            # 创建GiftService实例
+            service = GiftServiceNew(
+                player_repo=PlayerRepository(session),
+                marriage_service=marriage_service,
+                mentorship_service=mentorship_service,
+                gift_record_repo=GiftRecordRepository(session),
+                item_repo=ItemRepository(session),
+            )
+            gifts = await service.get_gift_history(player.id)
+        else:
+            gifts = await GiftService.get_gift_history(session, player.id)
+
         if not gifts:
             await gift_history_cmd.finish("暂无送礼记录")
         
@@ -79,8 +156,42 @@ async def handle_received_gifts(event: MessageEvent):
         player = await session.get(Player, event.get_user_id())
         if not player:
             await received_gifts_cmd.finish("⛔ 请先创建角色")
-        
-        gifts = await GiftService.get_received_gifts(session, player.id)
+
+        if USE_NEW_GIFT_SERVICE:
+            from ..infrastructure.repositories.player_repository import PlayerRepository
+            from ..infrastructure.repositories.gift_record_repository import GiftRecordRepository
+            from ..infrastructure.repositories.item_repository import ItemRepository
+            from ..infrastructure.repositories.marriage_repository import MarriageRepository
+            from ..infrastructure.repositories.mentorship_repository import MentorshipRepository
+            from ..infrastructure.repositories.social_application_repository import SocialApplicationRepository
+            from .gift_service_new import GiftService as GiftServiceNew
+            from .marriage_service_new import MarriageService as MarriageServiceNew
+            from .mentorship_service_new import MentorshipService as MentorshipServiceNew
+
+            # 创建依赖的Service实例
+            marriage_service = MarriageServiceNew(
+                player_repo=PlayerRepository(session),
+                social_app_repo=SocialApplicationRepository(session),
+                marriage_repo=MarriageRepository(session),
+            )
+            mentorship_service = MentorshipServiceNew(
+                player_repo=PlayerRepository(session),
+                social_app_repo=SocialApplicationRepository(session),
+                mentorship_repo=MentorshipRepository(session),
+            )
+
+            # 创建GiftService实例
+            service = GiftServiceNew(
+                player_repo=PlayerRepository(session),
+                marriage_service=marriage_service,
+                mentorship_service=mentorship_service,
+                gift_record_repo=GiftRecordRepository(session),
+                item_repo=ItemRepository(session),
+            )
+            gifts = await service.get_received_gifts(player.id)
+        else:
+            gifts = await GiftService.get_received_gifts(session, player.id)
+
         if not gifts:
             await received_gifts_cmd.finish("暂无收礼记录")
         

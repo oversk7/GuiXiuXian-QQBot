@@ -15,6 +15,13 @@ from ..utils import message_add_head
 from .location_service import LocationService
 from .npc_service import NPCService
 
+# ==================== Feature Flag ====================
+# 设置为True使用新版DI架构的NPCService，False使用旧版本
+USE_NEW_NPC_SERVICE = True
+# 设置为True使用新版DI架构的LocationService，False使用旧版本
+USE_NEW_LOCATION_SERVICE = True
+# =====================================================
+
 
 # ==================== NPC交互命令 ====================
 interact_cmd = on_command("交互", aliases={"对话", "找"}, block=True, priority=5)
@@ -57,6 +64,12 @@ async def handle_npc_interaction(event: MessageEvent, args: Message = CommandArg
         if player.is_in_dungeon():
             await interact_cmd.finish("⛔ 你在诡域中，无法与现实世界的NPC交互")
 
+        # 初始化NPC服务
+        if USE_NEW_NPC_SERVICE:
+            from ..infrastructure.repositories.npc_repository import NPCRepository
+            from .npc_service_new import NPCService as NPCServiceNew
+            npc_service = NPCServiceNew(session=session, npc_repo=NPCRepository(session))
+
         # 获取当前位置
         current_x, current_y = player.get_current_coordinates()
         current_region = player.get_current_region()
@@ -70,7 +83,10 @@ async def handle_npc_interaction(event: MessageEvent, args: Message = CommandArg
             await interact_cmd.finish("⛔ 当前位置没有NPC可以交互")
 
         # 查找指定名称的NPC
-        npc = await NPCService.get_npc_by_name(session, args_text, location.id)
+        if USE_NEW_NPC_SERVICE:
+            npc = await npc_service.get_npc_by_name(args_text, location.id)
+        else:
+            npc = await NPCService.get_npc_by_name(session, args_text, location.id)
 
         if not npc:
             # 尝试智能匹配（支持带点号的名字）
@@ -100,7 +116,10 @@ async def handle_npc_interaction(event: MessageEvent, args: Message = CommandArg
                 await interact_cmd.finish(message_add_head(msg, event))
 
         # 获取NPC交互信息
-        interaction_info = await NPCService.get_npc_interaction_info(session, npc)
+        if USE_NEW_NPC_SERVICE:
+            interaction_info = await npc_service.get_npc_interaction_info(npc)
+        else:
+            interaction_info = await NPCService.get_npc_interaction_info(session, npc)
 
         if not interaction_info["can_interact"]:
             await interact_cmd.finish(f"⛔ {interaction_info['message']}")

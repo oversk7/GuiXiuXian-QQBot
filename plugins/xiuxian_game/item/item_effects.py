@@ -10,9 +10,17 @@ import time
 from decimal import Decimal, ROUND_DOWN, ROUND_HALF_UP
 from ..models.player import Player
 from ..models.inventory import ItemEffectType, ItemConfig, ItemInstance, ItemType
-from .equipment_commands import recalc_equipment_attributes
+# 从装备服务模块导入（已解耦，不再依赖命令层）
+from .equipment_service import recalc_equipment_attributes
 from ..models.elixir_usage import ElixirUsageLog
 from datetime import date, datetime, timedelta
+
+# ==================== Feature Flag ====================
+# 设置为True使用新版DI架构的EquipmentService，False使用旧版本
+USE_NEW_EQUIPMENT_SERVICE = True
+# 设置为True使用新版DI架构的复杂效果Service（SWEEP_DUNGEON、RESET_ATTR、WORLD_BOSS_CHEST），False使用旧版本
+USE_NEW_COMPLEX_EFFECT_SERVICES = True
+# =====================================================
 
 # 类型别名
 EffectHandler = Callable[[Player, ItemConfig, int, object, object], Awaitable[Tuple[bool, str]]]
@@ -616,516 +624,559 @@ async def _reforge_attr(player: Player, cfg: ItemConfig, qty: int, ctx: str, ses
 
 @register(ItemEffectType.SWEEP_DUNGEON)
 async def _sweep_dungeon(player: Player, cfg: ItemConfig, qty: int, ctx: str, session=None) -> Tuple[bool, str]:
-    """扫荡当前诡域，获得经验和材料奖励
+    """扫荡当前诡域，获得经验和材料奖励"""
+    if USE_NEW_COMPLEX_EFFECT_SERVICES:
+        # 新版本：使用DI架构的Service
+        from ..infrastructure.repositories.player_repository import PlayerRepository
+        from ..infrastructure.repositories.item_repository import ItemRepository
+        from .sweep_dungeon_service import SweepDungeonService
+        from .equipment_service_new import EquipmentService
 
-    扫荡逻辑：
-    1. 根据玩家mp、hp、装备耐久度计算能探索的格子数
-    2. 按格子概率分配经验、材料、金币格子
-    3. 单个格子经验取决于区域怪物等级
-    4. 材料受幸运加成影响，增加高级奖励估算
-    """
-    import random
-    from ..config import config
-    from ..utils import luck_prob, apply_defense_mitigation
-    from ..models.inventory import ItemInstance
-    from ..world.dungeon_battle import calculate_monster_attributes, get_region_materials, get_materials_by_rarity
-    from sqlalchemy import select as _select
-
-    # 检查是否在诡域中
-    if player.region == "大都会":
-        return False, "⛔ 你在现实世界中，无法使用扫荡令"
-
-    # 检查咒抗是否足够
-    if player.stamina < qty:
-        return False, f"⛔ 咒抗不足，需要 {qty} 点咒抗"
-
-    # 获取当前诡域配置（支持无限层诡域）
-    region_config = None
-    if "层诡域" in player.region:
-        # 新的层级制诡域
-        try:
-            level_str = player.region.replace("层诡域", "")
-            # 兼容"第N层诡域"格式，移除开头的"第"字
-            if level_str.startswith("第"):
-                level_str = level_str[1:]
-            level = int(level_str)
-            # 优先从预生成配置获取，如果不存在则动态生成（支持无限层）
-            region_config = config.map_config.get("dungeon_levels", {}).get(level)
-            if not region_config:
-                # 动态生成超过100层的配置
-                region_config = config._generate_dungeon_level_config(
-                    level, config.map_config.get("dungeon_generation_rules", {})
-                )
-        except ValueError:
-            return False, "⛔ 诡域层级格式错误，无法扫荡"
-    else:
-        # 兼容旧的命名诡域
-        region_config = config.map_config["regions"].get(player.region)
-
-    if not region_config:
-        return False, "⛔ 未知的诡域，无法扫荡"
-
-    # 消耗咒抗
-    player.stamina -= qty
-
-    # 霸气宣言
-    sweep_declarations = [
-        "⚡ 「此地诡异，皆为我所驭！」",
-        "⚡ 「区区邪祟，岂敢阻我道路！」",
-        "⚡ 「天地万物，尽在掌握之中！」",
-        "⚡ 「诡域之力，为我所用！」",
-        "⚡ 「鬼神退避，唯我独尊！」"
-    ]
-    declaration = random.choice(sweep_declarations)
-
-    results = [declaration, ""]
-
-    # 获取诡域基础信息
-    level_range = region_config["level_range"]
-    avg_level = (level_range[0] + level_range[1]) // 2
-    mp_cost_per_tile = region_config.get("mp_cost", 1)  # 每格理智消耗
-
-    # 计算怪物格子比例 (x)
-    tile_weights = [15, 5, 75, 5]  # 材料、宝藏、怪物、休息
-    monster_ratio = tile_weights[2] / 100  # 怪物格子比例 x = 0.75
-
-    # 计算怪物平均伤害
-    monster_attrs = calculate_monster_attributes(avg_level, is_elite=False)
-    monster_damage = monster_attrs["attack"]
-
-    # 计算免伤率
-    mitigation = apply_defense_mitigation(monster_damage, player.defense)
-    actual_damage_per_hit = mitigation["final_damage"]
-
-    # 计算各种限制下的最大格子数
-    # 1. 理智限制：player.mp / 每格mp消耗
-    mp_limit = player.mp // mp_cost_per_tile
-
-    # 2. 血量限制：已取消，扫荡令不再受血量限制
-    # hp_limit = int(player.hp / actual_damage_per_hit / monster_ratio) if monster_ratio > 0 else float('inf')
-
-    # 3. 装备耐久度限制：查询已装备装备的最低耐久度 / x
-    # 新规则：允许降至0；0则自动卸下且无法穿戴
-    durability_limit = float('inf')
-    if session:
-        result_eq = await session.execute(
-            _select(ItemInstance).where(
-                ItemInstance.player_id == player.id,
-                ItemInstance.equipped == True,
-                ItemInstance.item_id.in_(config.items_config["by_type"]["EQUIPMENT"])
+        sweep_service = SweepDungeonService(
+            player_repo=PlayerRepository(session),
+            item_repo=ItemRepository(session),
+            equipment_service=EquipmentService(
+                item_repo=ItemRepository(session),
+                player_repo=PlayerRepository(session)
             )
         )
-        equipped_items = result_eq.scalars().all()
-        if equipped_items:
-            min_durability = min(eq.durability for eq in equipped_items)
-            available_durability = max(0, min_durability)
-            durability_limit = int(available_durability / monster_ratio) if monster_ratio > 0 and available_durability > 0 else 0
+        result = await sweep_service.execute(player, cfg, qty, str(ctx))
+        return result.success, result.message
+    else:
+        # 旧版本：保留原有业务逻辑（342行代码）
+        import random
+        from ..config import config
+        from ..utils import luck_prob, apply_defense_mitigation
+        from ..models.inventory import ItemInstance
+        from ..world.dungeon_battle import calculate_monster_attributes, get_region_materials, get_materials_by_rarity
+        from sqlalchemy import select as _select
 
-    # 取最小值作为实际能探索的格子数（不再考虑hp限制），再乘以扫荡令数量
-    base_tiles = min(mp_limit, durability_limit)
-    total_tiles = base_tiles * qty
+        # 检查是否在诡域中
+        if player.region == "大都会":
+            return False, "⛔ 你在现实世界中，无法使用扫荡令"
 
-    # 检查是否因为装备耐久度过低而无法扫荡
-    if durability_limit == 0 and equipped_items:
-        min_durability = min(eq.durability for eq in equipped_items)
-        return False, f"⛔ 装备耐久度过低，无法进行扫荡！最低装备耐久度为{min_durability}，建议修理后再使用扫荡令"
+        # 检查咒抗是否足够
+        if player.stamina < qty:
+            return False, f"⛔ 咒抗不足，需要 {qty} 点咒抗"
 
-    # 确保至少有1个格子
-    total_tiles = max(1, total_tiles)
-
-    results.append(f"🗺️ 探索格子共计: {total_tiles}个")
-    results.append(f"📊 限制因素: 理智({mp_limit}) 耐久({durability_limit if durability_limit != float('inf') else '∞'}) (生命限制已取消)")
-
-    # 按世界地图格子概率分配格子类型
-    tile_weights = [15, 5, 75, 5]  # 材料、宝藏、怪物(避开)、休息
-    tile_types = ["MATERIAL", "TREASURE", "EMPTY", "REST"]
-
-    # 分配各类型格子数量
-    material_tiles = tile_weights[0] * total_tiles // 100
-    treasure_tiles = tile_weights[1] * total_tiles // 100
-    monster_tiles = tile_weights[2] * total_tiles // 100
-    rest_tiles = tile_weights[3] * total_tiles // 100
-
-    # 探索经验
-    exploration_exp = monster_tiles * random.randint(1, 4) * avg_level
-    player.exp += exploration_exp
-    results.append(f"📚 探索获得经验: {exploration_exp} (探索格子×{monster_tiles})")
-
-    # 估算打怪获得的高级奖励（基于怪物格子数）
-    high_grade_rewards = []
-    if monster_tiles > 0:
-
-        # 模拟打怪掉落，估算高级材料获得
-        estimated_drops = {}
-
-        # 根据怪物等级确定掉落概率
-        if avg_level <= 20:
-            drop_rates = {"white": 0.30, "green": 0.10}
-        elif avg_level <= 60:
-            drop_rates = {"white": 0.40, "green": 0.20, "blue": 0.05}
-        elif avg_level <= 100:
-            drop_rates = {"white": 0.30, "green": 0.25, "blue": 0.15, "purple": 0.03}
-        else:
-            drop_rates = {"white": 0.20, "green": 0.20, "blue": 0.20, "purple": 0.08, "orange": 0.01}
-
-        # 获取当前区域材料配置
-        region_materials = get_region_materials(player.region)
-
-        # 估算每种稀有度材料的获得数量
-        for rarity, base_rate in drop_rates.items():
-            if rarity == "white":  # 白色材料不算高级奖励
-                continue
-
-            # 考虑幸运值影响
-            final_rate = base_rate * (1 + luck_prob(player.luck))
-            expected_count = int(monster_tiles * final_rate)
-
-            if expected_count > 0:
-                # 优先从区域商人材料中选择（与战斗掉落逻辑一致）
-                candidate_materials = []
-                for material_id in region_materials["merchant"]:
-                    item_config = config.items_config["by_id"].get(material_id)
-                    if item_config and item_config.rarity == rarity:
-                        candidate_materials.append(material_id)
-
-                # 如果区域没有对应稀有度的材料，从全局材料中选择
-                if not candidate_materials:
-                    candidate_materials = get_materials_by_rarity(rarity)
-
-                if candidate_materials:
-                    material_id = random.choice(candidate_materials)
-                    estimated_drops[material_id] = expected_count
-
-        # 添加估算的高级材料到背包
-        for material_id, count in estimated_drops.items():
+        # 获取当前诡域配置（支持无限层诡域）
+        region_config = None
+        if "层诡域" in player.region:
+            # 新的层级制诡域
             try:
-                await ItemInstance.add_item(session, player.id, material_id, count)
-                material_config = config.items_config["by_id"].get(material_id)
-                if material_config:
-                    high_grade_rewards.append(f"{material_config.get_display_name()} ✖️{count}")
+                level_str = player.region.replace("层诡域", "")
+                # 兼容"第N层诡域"格式，移除开头的"第"字
+                if level_str.startswith("第"):
+                    level_str = level_str[1:]
+                level = int(level_str)
+                # 优先从预生成配置获取，如果不存在则动态生成（支持无限层）
+                region_config = config.map_config.get("dungeon_levels", {}).get(level)
+                if not region_config:
+                    # 动态生成超过100层的配置
+                    region_config = config._generate_dungeon_level_config(
+                        level, config.map_config.get("dungeon_generation_rules", {})
+                    )
             except ValueError:
-                # 背包满了，跳过
-                pass
+                return False, "⛔ 诡域层级格式错误，无法扫荡"
+        else:
+            # 兼容旧的命名诡域
+            region_config = config.map_config["regions"].get(player.region)
 
-        if high_grade_rewards:
-            results.append(f"✨ 打怪获得高级奖励: {', '.join(high_grade_rewards)}")
+        if not region_config:
+            return False, "⛔ 未知的诡域，无法扫荡"
 
-    # 计算材料奖励 - 扫荡主要获得基础材料
-    materials_gained = []
-    if material_tiles > 0:
+        # 消耗咒抗
+        player.stamina -= qty
 
-        region_materials = get_region_materials(player.region)
-        basic_materials = region_materials["basic"]
+        # 霸气宣言
+        sweep_declarations = [
+            "⚡ 「此地诡异，皆为我所驭！」",
+            "⚡ 「区区邪祟，岂敢阻我道路！」",
+            "⚡ 「天地万物，尽在掌握之中！」",
+            "⚡ 「诡域之力，为我所用！」",
+            "⚡ 「鬼神退避，唯我独尊！」"
+        ]
+        declaration = random.choice(sweep_declarations)
 
-        if basic_materials:
-            for _ in range(material_tiles):
-                material_id = random.choice(basic_materials)
+        results = [declaration, ""]
 
-                # 基础数量2-4个（扫荡效率更高）
-                base_quantity = random.randint(2, 4)
+        # 获取诡域基础信息
+        level_range = region_config["level_range"]
+        avg_level = (level_range[0] + level_range[1]) // 2
+        mp_cost_per_tile = region_config.get("mp_cost", 1)  # 每格理智消耗
 
+        # 计算怪物格子比例 (x)
+        tile_weights = [15, 5, 75, 5]  # 材料、宝藏、怪物、休息
+        monster_ratio = tile_weights[2] / 100  # 怪物格子比例 x = 0.75
+
+        # 计算怪物平均伤害
+        monster_attrs = calculate_monster_attributes(avg_level, is_elite=False)
+        monster_damage = monster_attrs["attack"]
+
+        # 计算免伤率
+        mitigation = apply_defense_mitigation(monster_damage, player.defense)
+        actual_damage_per_hit = mitigation["final_damage"]
+
+        # 计算各种限制下的最大格子数
+        # 1. 理智限制：player.mp / 每格mp消耗
+        mp_limit = player.mp // mp_cost_per_tile
+
+        # 2. 血量限制：已取消，扫荡令不再受血量限制
+        # hp_limit = int(player.hp / actual_damage_per_hit / monster_ratio) if monster_ratio > 0 else float('inf')
+
+        # 3. 装备耐久度限制：查询已装备装备的最低耐久度 / x
+        # 新规则：允许降至0；0则自动卸下且无法穿戴
+        durability_limit = float('inf')
+        if session:
+            result_eq = await session.execute(
+                _select(ItemInstance).where(
+                    ItemInstance.player_id == player.id,
+                    ItemInstance.equipped == True,
+                    ItemInstance.item_id.in_(config.items_config["by_type"]["EQUIPMENT"])
+                )
+            )
+            equipped_items = result_eq.scalars().all()
+            if equipped_items:
+                min_durability = min(eq.durability for eq in equipped_items)
+                available_durability = max(0, min_durability)
+                durability_limit = int(available_durability / monster_ratio) if monster_ratio > 0 and available_durability > 0 else 0
+
+        # 取最小值作为实际能探索的格子数（不再考虑hp限制），再乘以扫荡令数量
+        base_tiles = min(mp_limit, durability_limit)
+        total_tiles = base_tiles * qty
+
+        # 检查是否因为装备耐久度过低而无法扫荡
+        if durability_limit == 0 and equipped_items:
+            min_durability = min(eq.durability for eq in equipped_items)
+            return False, f"⛔ 装备耐久度过低，无法进行扫荡！最低装备耐久度为{min_durability}，建议修理后再使用扫荡令"
+
+        # 确保至少有1个格子
+        total_tiles = max(1, total_tiles)
+
+        results.append(f"🗺️ 探索格子共计: {total_tiles}个")
+        results.append(f"📊 限制因素: 理智({mp_limit}) 耐久({durability_limit if durability_limit != float('inf') else '∞'}) (生命限制已取消)")
+
+        # 按世界地图格子概率分配格子类型
+        tile_weights = [15, 5, 75, 5]  # 材料、宝藏、怪物(避开)、休息
+        tile_types = ["MATERIAL", "TREASURE", "EMPTY", "REST"]
+
+        # 分配各类型格子数量
+        material_tiles = tile_weights[0] * total_tiles // 100
+        treasure_tiles = tile_weights[1] * total_tiles // 100
+        monster_tiles = tile_weights[2] * total_tiles // 100
+        rest_tiles = tile_weights[3] * total_tiles // 100
+
+        # 探索经验
+        exploration_exp = monster_tiles * random.randint(1, 4) * avg_level
+        player.exp += exploration_exp
+        results.append(f"📚 探索获得经验: {exploration_exp} (探索格子×{monster_tiles})")
+
+        # 估算打怪获得的高级奖励（基于怪物格子数）
+        high_grade_rewards = []
+        if monster_tiles > 0:
+
+            # 模拟打怪掉落，估算高级材料获得
+            estimated_drops = {}
+
+            # 根据怪物等级确定掉落概率
+            if avg_level <= 20:
+                drop_rates = {"white": 0.30, "green": 0.10}
+            elif avg_level <= 60:
+                drop_rates = {"white": 0.40, "green": 0.20, "blue": 0.05}
+            elif avg_level <= 100:
+                drop_rates = {"white": 0.30, "green": 0.25, "blue": 0.15, "purple": 0.03}
+            else:
+                drop_rates = {"white": 0.20, "green": 0.20, "blue": 0.20, "purple": 0.08, "orange": 0.01}
+
+            # 获取当前区域材料配置
+            region_materials = get_region_materials(player.region)
+
+            # 估算每种稀有度材料的获得数量
+            for rarity, base_rate in drop_rates.items():
+                if rarity == "white":  # 白色材料不算高级奖励
+                    continue
+
+                # 考虑幸运值影响
+                final_rate = base_rate * (1 + luck_prob(player.luck))
+                expected_count = int(monster_tiles * final_rate)
+
+                if expected_count > 0:
+                    # 优先从区域商人材料中选择（与战斗掉落逻辑一致）
+                    candidate_materials = []
+                    for material_id in region_materials["merchant"]:
+                        item_config = config.items_config["by_id"].get(material_id)
+                        if item_config and item_config.rarity == rarity:
+                            candidate_materials.append(material_id)
+
+                    # 如果区域没有对应稀有度的材料，从全局材料中选择
+                    if not candidate_materials:
+                        candidate_materials = get_materials_by_rarity(rarity)
+
+                    if candidate_materials:
+                        material_id = random.choice(candidate_materials)
+                        estimated_drops[material_id] = expected_count
+
+            # 添加估算的高级材料到背包
+            for material_id, count in estimated_drops.items():
+                try:
+                    await ItemInstance.add_item(session, player.id, material_id, count)
+                    material_config = config.items_config["by_id"].get(material_id)
+                    if material_config:
+                        high_grade_rewards.append(f"{material_config.get_display_name()} ✖️{count}")
+                except ValueError:
+                    # 背包满了，跳过
+                    pass
+
+            if high_grade_rewards:
+                results.append(f"✨ 打怪获得高级奖励: {', '.join(high_grade_rewards)}")
+
+        # 计算材料奖励 - 扫荡主要获得基础材料
+        materials_gained = []
+        if material_tiles > 0:
+
+            region_materials = get_region_materials(player.region)
+            basic_materials = region_materials["basic"]
+
+            if basic_materials:
+                for _ in range(material_tiles):
+                    material_id = random.choice(basic_materials)
+
+                    # 基础数量2-4个（扫荡效率更高）
+                    base_quantity = random.randint(2, 4)
+
+                    # 幸运加成
+                    if random.random() < luck_prob(player.luck):
+                        base_quantity = int(base_quantity * 1.5)  # 幸运1.5倍
+
+                    materials_gained.append((material_id, base_quantity))
+            else:
+                # 如果没有配置基础材料，从白色材料中随机选择
+                white_materials = get_materials_by_rarity("white")
+                for _ in range(material_tiles):
+                    if white_materials:
+                        material_id = random.choice(white_materials)
+                        base_quantity = random.randint(2, 4)
+                        if random.random() < luck_prob(player.luck):
+                            base_quantity = int(base_quantity * 1.5)
+                        materials_gained.append((material_id, base_quantity))
+
+        # 计算金币奖励（来自宝藏格子）
+        total_gold = 0
+        if treasure_tiles > 0:
+            for _ in range(treasure_tiles):
+                # 单个宝藏格子金币
+                base_gold = random.randint(50, 200)
                 # 幸运加成
                 if random.random() < luck_prob(player.luck):
-                    base_quantity = int(base_quantity * 1.5)  # 幸运1.5倍
+                    base_gold = int(base_gold * 1.3)  # 幸运1.3倍
+                total_gold += base_gold
 
-                materials_gained.append((material_id, base_quantity))
-        else:
-            # 如果没有配置基础材料，从白色材料中随机选择
-            white_materials = get_materials_by_rarity("white")
-            for _ in range(material_tiles):
-                if white_materials:
-                    material_id = random.choice(white_materials)
-                    base_quantity = random.randint(2, 4)
-                    if random.random() < luck_prob(player.luck):
-                        base_quantity = int(base_quantity * 1.5)
-                    materials_gained.append((material_id, base_quantity))
+            player.gold += total_gold
+            results.append(f"💰 发现宝藏获得金币: {total_gold} (宝藏格子×{treasure_tiles})")
 
-    # 计算金币奖励（来自宝藏格子）
-    total_gold = 0
-    if treasure_tiles > 0:
-        for _ in range(treasure_tiles):
-            # 单个宝藏格子金币
-            base_gold = random.randint(50, 200)
-            # 幸运加成
-            if random.random() < luck_prob(player.luck):
-                base_gold = int(base_gold * 1.3)  # 幸运1.3倍
-            total_gold += base_gold
+        # 处理材料奖励 - 合并相同材料
+        if materials_gained:
+            # 合并相同材料的数量
+            material_summary = {}
+            for material_id, quantity in materials_gained:
+                if material_id in material_summary:
+                    material_summary[material_id] += quantity
+                else:
+                    material_summary[material_id] = quantity
 
-        player.gold += total_gold
-        results.append(f"💰 发现宝藏获得金币: {total_gold} (宝藏格子×{treasure_tiles})")
+            # 生成显示信息
+            material_info = []
+            merged_materials = []
+            for material_id, total_quantity in material_summary.items():
+                item_config = config.items_config["by_id"].get(material_id)
+                if item_config:
+                    material_info.append(f"{item_config.get_display_name()} ✖️{total_quantity}")
+                    merged_materials.append((material_id, total_quantity))
 
-    # 处理材料奖励 - 合并相同材料
-    if materials_gained:
-        # 合并相同材料的数量
-        material_summary = {}
-        for material_id, quantity in materials_gained:
-            if material_id in material_summary:
-                material_summary[material_id] += quantity
-            else:
-                material_summary[material_id] = quantity
+            if material_info:
+                results.append(f"💎 采集材料: {', '.join(material_info)} (材料格子×{material_tiles})")
+                # 将合并后的材料信息存储到player的临时属性中，供调用方处理
+                if not hasattr(player, '_sweep_materials'):
+                    player._sweep_materials = []
+                player._sweep_materials.extend(merged_materials)
 
-        # 生成显示信息
-        material_info = []
-        merged_materials = []
-        for material_id, total_quantity in material_summary.items():
-            item_config = config.items_config["by_id"].get(material_id)
-            if item_config:
-                material_info.append(f"{item_config.get_display_name()} ✖️{total_quantity}")
-                merged_materials.append((material_id, total_quantity))
+        # 休息格子只展示数量，因为扫荡本就不耗状态
+        if rest_tiles > 0:
+            results.append(f"🛌 (遇到驿站×{rest_tiles}次)")
 
-        if material_info:
-            results.append(f"💎 采集材料: {', '.join(material_info)} (材料格子×{material_tiles})")
-            # 将合并后的材料信息存储到player的临时属性中，供调用方处理
-            if not hasattr(player, '_sweep_materials'):
-                player._sweep_materials = []
-            player._sweep_materials.extend(merged_materials)
-
-    # 休息格子只展示数量，因为扫荡本就不耗状态
-    if rest_tiles > 0:
-        results.append(f"🛌 (遇到驿站×{rest_tiles}次)")
-
-    # 扣除装备耐久度（基于怪物格子数）
-    # 新规则：允许降至0；降至0将自动卸下且需修理后才能穿戴
-    if session and monster_tiles > 0:
-        result_eq = await session.execute(
-            _select(ItemInstance).where(
-                ItemInstance.player_id == player.id,
-                ItemInstance.equipped == True,
-                ItemInstance.item_id.in_(config.items_config["by_type"]["EQUIPMENT"])
+        # 扣除装备耐久度（基于怪物格子数）
+        # 新规则：允许降至0；降至0将自动卸下且需修理后才能穿戴
+        if session and monster_tiles > 0:
+            result_eq = await session.execute(
+                _select(ItemInstance).where(
+                    ItemInstance.player_id == player.id,
+                    ItemInstance.equipped == True,
+                    ItemInstance.item_id.in_(config.items_config["by_type"]["EQUIPMENT"])
+                )
             )
-        )
-        equipped_items = result_eq.scalars().all()
-        durability_warnings = []
-        needs_recalc = False
+            equipped_items = result_eq.scalars().all()
+            durability_warnings = []
+            needs_recalc = False
 
-        for eq in equipped_items:
-            durability_loss = monster_tiles
-            actual_loss = min(durability_loss, eq.durability)
+            for eq in equipped_items:
+                durability_loss = monster_tiles
+                actual_loss = min(durability_loss, eq.durability)
 
-            if actual_loss > 0:
-                eq.durability -= actual_loss
-                if eq.durability == 0:
-                    # 自动卸下并回退属性加成
-                    delta = (eq.extra_attrs or {}).get("_persist_bonus", {})
-                    for k, v in delta.items():
-                        current_value = getattr(player, k, 0)
-                        setattr(player, k, max(0, current_value - v))
-                    eq.equipped = False
-                    needs_recalc = True
-                    durability_warnings.append(
-                        f"💔 {eq.config.name} 耐久耗尽已自动卸下\n"
-                        f"   ⚠️ 需修理后才能再次穿戴"
+                if actual_loss > 0:
+                    eq.durability -= actual_loss
+                    if eq.durability == 0:
+                        # 自动卸下并回退属性加成
+                        delta = (eq.extra_attrs or {}).get("_persist_bonus", {})
+                        for k, v in delta.items():
+                            current_value = getattr(player, k, 0)
+                            setattr(player, k, max(0, current_value - v))
+                        eq.equipped = False
+                        needs_recalc = True
+                        durability_warnings.append(
+                            f"💔 {eq.config.name} 耐久耗尽已自动卸下\n"
+                            f"   ⚠️ 需修理后才能再次穿戴"
+                        )
+                    elif eq.durability <= 10:
+                        durability_warnings.append(
+                            f"⚠️ {eq.config.name} 耐久度较低 ({eq.durability}/{eq.config.durability})，建议及时修理"
+                        )
+
+            if needs_recalc:
+                if USE_NEW_EQUIPMENT_SERVICE:
+                    # 新版本: 使用DI架构的EquipmentService
+                    from ..infrastructure.repositories.item_repository import ItemRepository
+                    from ..infrastructure.repositories.player_repository import PlayerRepository
+                    from .equipment_service_new import EquipmentService
+
+                    equipment_service = EquipmentService(
+                        item_repo=ItemRepository(session),
+                        player_repo=PlayerRepository(session)
                     )
-                elif eq.durability <= 10:
-                    durability_warnings.append(
-                        f"⚠️ {eq.config.name} 耐久度较低 ({eq.durability}/{eq.config.durability})，建议及时修理"
-                    )
+                    await equipment_service.recalc_equipment_attributes(player)
+                else:
+                    # 旧版本: 使用静态函数
+                    await recalc_equipment_attributes(session, player)
 
-        if needs_recalc:
-            await recalc_equipment_attributes(session, player)
+            if durability_warnings:
+                results.extend(durability_warnings)
 
-        if durability_warnings:
-            results.extend(durability_warnings)
+        # 扣除理智值（基于总格子数和每格消耗）
+        mp_consumed = total_tiles * mp_cost_per_tile
+        player.mp = max(0, player.mp - mp_consumed)
+        if player.mp == 0 and player.hp > 0:
+            player.hp = 0  # 理智耗尽即"疯狂身亡"
+            results.append("💀 理智耗尽，陷入疯狂！")
 
-    # 扣除理智值（基于总格子数和每格消耗）
-    mp_consumed = total_tiles * mp_cost_per_tile
-    player.mp = max(0, player.mp - mp_consumed)
-    if player.mp == 0 and player.hp > 0:
-        player.hp = 0  # 理智耗尽即"疯狂身亡"
-        results.append("💀 理智耗尽，陷入疯狂！")
+        # 扣除血量（基于怪物格子数和实际伤害）
+        hp_consumed = monster_tiles * actual_damage_per_hit
+        player.hp = max(1, player.hp - hp_consumed)
 
-    # 扣除血量（基于怪物格子数和实际伤害）
-    hp_consumed = monster_tiles * actual_damage_per_hit
-    player.hp = max(1, player.hp - hp_consumed)
+        results.append(f"⚡ 消耗咒抗: {qty} (剩余: {player.stamina})")
+        results.append(f"🧠 消耗理智: {mp_consumed} (剩余: {player.mp})")
+        results.append(f"❤️ 消耗血量: {hp_consumed} (剩余: {player.hp})")
 
-    results.append(f"⚡ 消耗咒抗: {qty} (剩余: {player.stamina})")
-    results.append(f"🧠 消耗理智: {mp_consumed} (剩余: {player.mp})")
-    results.append(f"❤️ 消耗血量: {hp_consumed} (剩余: {player.hp})")
-
-    return True, "\n".join(results)
+        return True, "\n".join(results)
 
 # ---------------- 重置属性 ----------------
 
 @register(ItemEffectType.RESET_ATTR)
 async def _reset_attr(player: Player, cfg: ItemConfig, qty: int, ctx: str, session=None):
-    """重置已分配属性点，保留装备加成、丹药加成和VIP装备永久加成。仅允许 qty=1。"""
-    if qty != 1:
-        return False, "⛔ 重启符一次只能使用 1 个"
+    """重置已分配属性点，保留装备加成、丹药加成和VIP装备永久加成"""
+    if USE_NEW_COMPLEX_EFFECT_SERVICES:
+        # 新版本：使用DI架构的Service
+        from ..infrastructure.repositories.player_repository import PlayerRepository
+        from ..infrastructure.repositories.item_repository import ItemRepository
+        from ..infrastructure.repositories.elixir_usage_repository import ElixirUsageRepository
+        from ..infrastructure.repositories.vip_equipment_bonus_repository import VIPEquipmentBonusRepository
+        from .reset_attr_service import ResetAttrService
 
-    from ..config import config as gcfg
-    from sqlalchemy import select
-    from ..models.elixir_usage import ElixirUsageLog
-    from ..models.vip_equipment_bonus import VIPEquipmentBonus
-
-    # 初始基础属性
-    INIT = {
-        "max_hp": 20,
-        "max_mp": 20,
-        "attack": 1,
-        "defense": 5,
-        "agility": 5,
-        "luck": 1,
-    }
-
-    # 累计装备 bonus
-    equipment_bonus = {k: 0 for k in INIT}
-    # 从 Session 中预加载玩家装备
-    eq_list = player.__dict__.get("item_instances")
-    if eq_list:
-        for eq in eq_list:
-            if getattr(eq, "equipped", False) and eq.config and eq.config.type == ItemType.EQUIPMENT:
-                delta = (eq.extra_attrs or {}).get("_persist_bonus", {})
-                for k, v in delta.items():
-                    if k in equipment_bonus:
-                        equipment_bonus[k] += int(v)
-
-    # 计算丹药加成
-    elixir_bonus = {k: 0 for k in INIT}
-    if session:
-        # 获取所有丹药使用记录（不限日期，因为丹药效果是永久的）
-        stmt = select(ElixirUsageLog).where(ElixirUsageLog.player_id == player.id)
-        logs = (await session.execute(stmt)).scalars().all()
-
-        # 统计每种丹药的总使用量
-        elixir_usage_total = {}
-        for log in logs:
-            if log.item_id not in elixir_usage_total:
-                elixir_usage_total[log.item_id] = 0
-            elixir_usage_total[log.item_id] += log.quantity
-
-        # 计算丹药属性加成
-        for item_id, total_qty in elixir_usage_total.items():
-            item_cfg = gcfg.items_config["by_id"].get(item_id)
-            if item_cfg and item_cfg.effect_type == ItemEffectType.BUFF:
-                effect_params = item_cfg.effect_params or {}
-                for attr, value in effect_params.items():
-                    if attr in elixir_bonus:
-                        elixir_bonus[attr] += int(value) * total_qty
-
-    # 获取VIP装备永久加成
-    vip_bonus = {k: 0 for k in INIT}
-    if session:
-        stmt = select(VIPEquipmentBonus).where(VIPEquipmentBonus.player_id == player.id)
-        vip_record = (await session.execute(stmt)).scalars().first()
-        if vip_record:
-            for attr, value in vip_record.get_total_bonus().items():
-                if attr in vip_bonus:
-                    vip_bonus[attr] = int(value)
-
-    # 重置属性为基础值 + 丹药加成 + VIP装备永久加成（先不加装备加成）
-    for k, base_v in INIT.items():
-        total_bonus = elixir_bonus.get(k, 0) + vip_bonus.get(k, 0)
-        setattr(player, k, base_v + total_bonus)
-
-    # 重新计算可分配点（考虑转数加成）
-    from ..cultivate.reincarnation import ReincarnationService
-    pts_per_lvl = ReincarnationService.get_attribute_points_per_level(player.reincarnation_level)
-    player.attribute_points = (player.level - 1) * pts_per_lvl
-
-    # 重新计算装备加成（基于新的基础属性）
-    if session:
-        from sqlalchemy import select
-        from ..models.inventory import ItemInstance
-
-        # 获取所有已装备的装备
-        stmt = select(ItemInstance).where(
-            ItemInstance.player_id == player.id,
-            ItemInstance.equipped == True,
-            ItemInstance.item_id.in_(gcfg.items_config["by_type"]["EQUIPMENT"])
+        reset_service = ResetAttrService(
+            player_repo=PlayerRepository(session),
+            item_repo=ItemRepository(session),
+            elixir_usage_repo=ElixirUsageRepository(session),
+            vip_equipment_bonus_repo=VIPEquipmentBonusRepository(session)
         )
-        equipped_items = (await session.execute(stmt)).scalars().all()
+        result = await reset_service.execute(player, cfg, qty, str(ctx))
+        return result.success, result.message
+    else:
+        # 旧版本：保留原有业务逻辑（180行代码）
+        if qty != 1:
+            return False, "⛔ 重启符一次只能使用 1 个"
 
-        # 1. 先卸下所有装备，恢复基础属性
-        for eq in equipped_items:
-            # 恢复玩家属性
-            delta = (eq.extra_attrs or {}).get("_persist_bonus", {})
-            for k, v in delta.items():
-                setattr(player, k, getattr(player, k) - v)
-            
-            # 清除持久化记录并标记未穿戴
-            if "_persist_bonus" in (eq.extra_attrs or {}):
-                extra_new = {k: v for k, v in eq.extra_attrs.items() if k != "_persist_bonus"}
-                eq.extra_attrs = extra_new
-            
-            eq.equipped = False
+        from ..config import config as gcfg
+        from sqlalchemy import select
+        from ..models.elixir_usage import ElixirUsageLog
+        from ..models.vip_equipment_bonus import VIPEquipmentBonus
 
-        # 2. 获取玩家基础属性（无装备加成）
-        base_attrs = {
-            "attack": player.attack,
-            "defense": player.defense,
-            "agility": player.agility,
-            "luck": player.luck,
-            "max_hp": player.max_hp,
-            "max_mp": player.max_mp,
+        # 初始基础属性
+        INIT = {
+            "max_hp": 20,
+            "max_mp": 20,
+            "attack": 1,
+            "defense": 5,
+            "agility": 5,
+            "luck": 1,
         }
 
-        # 3. 重新穿戴所有装备，每件都基于基础属性计算
-        for eq in equipped_items:
-            # 标记为已装备
-            eq.equipped = True
-            
-            # 基于基础属性计算装备加成
-            attrs_temp = base_attrs.copy()
-            eq.apply_attr_bonus(attrs_temp, base_attrs)
-            new_delta = {}
-            for k in attrs_temp:
-                if k in base_attrs:
-                    if attrs_temp[k] != base_attrs[k]:
-                        new_delta[k] = attrs_temp[k] - base_attrs[k]
-                else:
-                    # 对于base_attrs中不存在的属性，直接使用新值作为加成
-                    if attrs_temp[k] != 0:
-                        new_delta[k] = attrs_temp[k]
-            
-            # 应用到玩家属性
-            for k, v in new_delta.items():
-                setattr(player, k, getattr(player, k) + v)
-            
-            # 保存新的持久化加成
-            extra = eq.extra_attrs or {}
-            extra["_persist_bonus"] = new_delta
-            eq.extra_attrs = extra
-            session.add(eq)
+        # 累计装备 bonus
+        equipment_bonus = {k: 0 for k in INIT}
+        # 从 Session 中预加载玩家装备
+        eq_list = player.__dict__.get("item_instances")
+        if eq_list:
+            for eq in eq_list:
+                if getattr(eq, "equipped", False) and eq.config and eq.config.type == ItemType.EQUIPMENT:
+                    delta = (eq.extra_attrs or {}).get("_persist_bonus", {})
+                    for k, v in delta.items():
+                        if k in equipment_bonus:
+                            equipment_bonus[k] += int(v)
 
-    # 保证当前 HP/MP 不超上限
-    if player.hp > player.max_hp:
-        player.hp = player.max_hp
-    if player.mp > player.max_mp:
-        player.mp = player.max_mp
+        # 计算丹药加成
+        elixir_bonus = {k: 0 for k in INIT}
+        if session:
+            # 获取所有丹药使用记录（不限日期，因为丹药效果是永久的）
+            stmt = select(ElixirUsageLog).where(ElixirUsageLog.player_id == player.id)
+            logs = (await session.execute(stmt)).scalars().all()
 
-    # 生成详细的重置信息
-    bonus_info = []
+            # 统计每种丹药的总使用量
+            elixir_usage_total = {}
+            for log in logs:
+                if log.item_id not in elixir_usage_total:
+                    elixir_usage_total[log.item_id] = 0
+                elixir_usage_total[log.item_id] += log.quantity
 
-    # 检查是否有装备加成（重新计算后的）
-    has_equipment_bonus = False
-    if session:
-        # 重新获取装备加成信息用于显示
-        stmt = select(ItemInstance).where(
-            ItemInstance.player_id == player.id,
-            ItemInstance.equipped == True,
-            ItemInstance.item_id.in_(gcfg.items_config["by_type"]["EQUIPMENT"])
-        )
-        equipped_items = (await session.execute(stmt)).scalars().all()
-        for eq in equipped_items:
-            delta = (eq.extra_attrs or {}).get("_persist_bonus", {})
-            if any(delta.values()):
-                has_equipment_bonus = True
-                break
+            # 计算丹药属性加成
+            for item_id, total_qty in elixir_usage_total.items():
+                item_cfg = gcfg.items_config["by_id"].get(item_id)
+                if item_cfg and item_cfg.effect_type == ItemEffectType.BUFF:
+                    effect_params = item_cfg.effect_params or {}
+                    for attr, value in effect_params.items():
+                        if attr in elixir_bonus:
+                            elixir_bonus[attr] += int(value) * total_qty
 
-    if has_equipment_bonus:
-        bonus_info.append("装备加成已保留")
+        # 获取VIP装备永久加成
+        vip_bonus = {k: 0 for k in INIT}
+        if session:
+            stmt = select(VIPEquipmentBonus).where(VIPEquipmentBonus.player_id == player.id)
+            vip_record = (await session.execute(stmt)).scalars().first()
+            if vip_record:
+                for attr, value in vip_record.get_total_bonus().items():
+                    if attr in vip_bonus:
+                        vip_bonus[attr] = int(value)
 
-    if any(elixir_bonus.values()):
-        elixir_details = []
-        for k, v in elixir_bonus.items():
-            if v > 0:
-                attr_name = {"max_hp": "体", "max_mp": "智", "attack": "力", "defense": "防", "agility": "敏", "luck": "运"}.get(k, k)
-                elixir_details.append(f"{attr_name}+{v}")
-        if elixir_details:
-            bonus_info.append(f"丹药加成已保留({', '.join(elixir_details)})")
+        # 重置属性为基础值 + 丹药加成 + VIP装备永久加成（先不加装备加成）
+        for k, base_v in INIT.items():
+            total_bonus = elixir_bonus.get(k, 0) + vip_bonus.get(k, 0)
+            setattr(player, k, base_v + total_bonus)
 
-    bonus_msg = f"，{', '.join(bonus_info)}" if bonus_info else ""
-    return True, f"🔄 属性已重置，所有点数已退还，可重新分配{bonus_msg}"
+        # 重新计算可分配点（考虑转数加成）
+        from ..cultivate.reincarnation import ReincarnationService
+        pts_per_lvl = ReincarnationService.get_attribute_points_per_level(player.reincarnation_level)
+        player.attribute_points = (player.level - 1) * pts_per_lvl
+
+        # 重新计算装备加成（基于新的基础属性）
+        if session:
+            from sqlalchemy import select
+            from ..models.inventory import ItemInstance
+
+            # 获取所有已装备的装备
+            stmt = select(ItemInstance).where(
+                ItemInstance.player_id == player.id,
+                ItemInstance.equipped == True,
+                ItemInstance.item_id.in_(gcfg.items_config["by_type"]["EQUIPMENT"])
+            )
+            equipped_items = (await session.execute(stmt)).scalars().all()
+
+            # 1. 先卸下所有装备，恢复基础属性
+            for eq in equipped_items:
+                # 恢复玩家属性
+                delta = (eq.extra_attrs or {}).get("_persist_bonus", {})
+                for k, v in delta.items():
+                    setattr(player, k, getattr(player, k) - v)
+
+                # 清除持久化记录并标记未穿戴
+                if "_persist_bonus" in (eq.extra_attrs or {}):
+                    extra_new = {k: v for k, v in eq.extra_attrs.items() if k != "_persist_bonus"}
+                    eq.extra_attrs = extra_new
+
+                eq.equipped = False
+
+            # 2. 获取玩家基础属性（无装备加成）
+            base_attrs = {
+                "attack": player.attack,
+                "defense": player.defense,
+                "agility": player.agility,
+                "luck": player.luck,
+                "max_hp": player.max_hp,
+                "max_mp": player.max_mp,
+            }
+
+            # 3. 重新穿戴所有装备，每件都基于基础属性计算
+            for eq in equipped_items:
+                # 标记为已装备
+                eq.equipped = True
+
+                # 基于基础属性计算装备加成
+                attrs_temp = base_attrs.copy()
+                eq.apply_attr_bonus(attrs_temp, base_attrs)
+                new_delta = {}
+                for k in attrs_temp:
+                    if k in base_attrs:
+                        if attrs_temp[k] != base_attrs[k]:
+                            new_delta[k] = attrs_temp[k] - base_attrs[k]
+                    else:
+                        # 对于base_attrs中不存在的属性，直接使用新值作为加成
+                        if attrs_temp[k] != 0:
+                            new_delta[k] = attrs_temp[k]
+
+                # 应用到玩家属性
+                for k, v in new_delta.items():
+                    setattr(player, k, getattr(player, k) + v)
+
+                # 保存新的持久化加成
+                extra = eq.extra_attrs or {}
+                extra["_persist_bonus"] = new_delta
+                eq.extra_attrs = extra
+                session.add(eq)
+
+        # 保证当前 HP/MP 不超上限
+        if player.hp > player.max_hp:
+            player.hp = player.max_hp
+        if player.mp > player.max_mp:
+            player.mp = player.max_mp
+
+        # 生成详细的重置信息
+        bonus_info = []
+
+        # 检查是否有装备加成（重新计算后的）
+        has_equipment_bonus = False
+        if session:
+            # 重新获取装备加成信息用于显示
+            stmt = select(ItemInstance).where(
+                ItemInstance.player_id == player.id,
+                ItemInstance.equipped == True,
+                ItemInstance.item_id.in_(gcfg.items_config["by_type"]["EQUIPMENT"])
+            )
+            equipped_items = (await session.execute(stmt)).scalars().all()
+            for eq in equipped_items:
+                delta = (eq.extra_attrs or {}).get("_persist_bonus", {})
+                if any(delta.values()):
+                    has_equipment_bonus = True
+                    break
+
+        if has_equipment_bonus:
+            bonus_info.append("装备加成已保留")
+
+        if any(elixir_bonus.values()):
+            elixir_details = []
+            for k, v in elixir_bonus.items():
+                if v > 0:
+                    attr_name = {"max_hp": "体", "max_mp": "智", "attack": "力", "defense": "防", "agility": "敏", "luck": "运"}.get(k, k)
+                    elixir_details.append(f"{attr_name}+{v}")
+            if elixir_details:
+                bonus_info.append(f"丹药加成已保留({', '.join(elixir_details)})")
+
+        bonus_msg = f"，{', '.join(bonus_info)}" if bonus_info else ""
+        return True, f"🔄 属性已重置，所有点数已退还，可重新分配{bonus_msg}"
 
 
 async def _recalculate_equipment_bonus(session, player: Player):
@@ -1133,7 +1184,20 @@ async def _recalculate_equipment_bonus(session, player: Player):
     if not session:
         return
 
-    await recalc_equipment_attributes(session, player)
+    if USE_NEW_EQUIPMENT_SERVICE:
+        # 新版本: 使用DI架构的EquipmentService
+        from ..infrastructure.repositories.item_repository import ItemRepository
+        from ..infrastructure.repositories.player_repository import PlayerRepository
+        from .equipment_service_new import EquipmentService
+
+        equipment_service = EquipmentService(
+            item_repo=ItemRepository(session),
+            player_repo=PlayerRepository(session)
+        )
+        await equipment_service.recalc_equipment_attributes(player)
+    else:
+        # 旧版本: 使用静态函数
+        await recalc_equipment_attributes(session, player)
 
 
 @register(ItemEffectType.EXPAND_TERRITORY)
@@ -1151,189 +1215,206 @@ async def _expand_territory(player: Player, cfg: ItemConfig, qty: int, ctx: obje
 @register(ItemEffectType.WORLD_BOSS_CHEST)
 async def _world_boss_chest(player: Player, cfg: ItemConfig, qty: int, ctx: object, session=None) -> Tuple[bool, str]:
     """世界BOSS宝箱开启效果"""
-    import random
-    from datetime import datetime
+    if USE_NEW_COMPLEX_EFFECT_SERVICES:
+        # 新版本：使用DI架构的Service
+        from ..infrastructure.repositories.player_repository import PlayerRepository
+        from ..infrastructure.repositories.item_repository import ItemRepository
+        from .world_boss_chest_service import WorldBossChestService
 
-    if not session:
-        return False, "⛔ 系统错误：缺少数据库会话"
+        if not session:
+            return False, "⛔ 系统错误：缺少数据库会话"
 
-    tier = cfg.effect_params.get("tier", "participant")
+        chest_service = WorldBossChestService(
+            player_repo=PlayerRepository(session),
+            item_repo=ItemRepository(session)
+        )
+        result = await chest_service.execute(player, cfg, qty, str(ctx))
+        return result.success, result.message
+    else:
+        # 旧版本：保留原有业务逻辑（186行代码）
+        import random
+        from datetime import datetime
 
-    # 不同等级宝箱的奖励池
-    reward_pools = {
-        "overlord": {  # 深渊霸主宝箱
-            "gems": [
-                ("critical_bead_4", 1, 0.1),
-                ("combo_bead_4", 1, 0.1),
-                ("dodge_bead_4", 1, 0.1),
-                ("counter_jade_4", 1, 0.1),
-                ("critical_power_agate_4", 1, 0.1),
-                ("penetration_crystal_4", 1, 0.1),
-                ("spirit_burst_amethyst_4", 1, 0.1),
-                ("anti_crit_rune_4", 1, 0.1),
-            ],
-            "materials": [
-                ("upgrade_stone_supreme", 3, 0.3),
-                ("stabilizer_crystal", 5, 0.1),
-            ],
-            "gold": (20000, 50000)
-        },
-        "king": {  # 深渊王者宝箱
-            "gems": [
-                ("critical_bead_3", 1, 0.1),
-                ("combo_bead_3", 1, 0.1),
-                ("dodge_bead_3", 1, 0.1),
-                ("counter_jade_3", 1, 0.1),
-                ("critical_power_agate_3", 1, 0.1),
-                ("penetration_crystal_3", 1, 0.1),
-                ("spirit_burst_amethyst_3", 1, 0.1),
-                ("anti_crit_rune_3", 1, 0.1),
-            ],
-            "materials": [
-                ("upgrade_stone_supreme", 2, 0.3),
-                ("stabilizer_crystal", 3, 0.1),
-            ],
-            "gold": (10000, 20000)
-        },
-        "warrior": {  # 深渊勇士宝箱
-            "gems": [
-                ("critical_bead_2", 1, 0.1),
-                ("combo_bead_2", 1, 0.1),
-                ("dodge_bead_2", 1, 0.1),
-                ("counter_jade_2", 1, 0.1),
-                ("critical_power_agate_2", 1, 0.1),
-                ("penetration_crystal_2", 1, 0.1),
-                ("spirit_burst_amethyst_2", 1, 0.1),
-                ("anti_crit_rune_2", 1, 0.1),
-            ],
-            "materials": [
-                ("upgrade_stone_supreme", 1, 0.1),
-                ("stabilizer_crystal", 2, 0.1),
-            ],
-            "gold": (10000, 20000)
-        },
-        "explorer": {  # 深渊探索者宝箱
-            "gems": [
-                ("critical_bead_1", 1, 0.2),
-                ("combo_bead_1", 1, 0.2),
-                ("accuracy_bead_1", 1, 0.2),
-                ("counter_jade_1", 1, 0.2),
-                ("penetration_crystal_1", 1, 0.2),
-                ("anti_crit_rune_1", 1, 0.2),
-            ],
-            "materials": [
-                ("stabilizer_crystal", 1, 0.1),
-            ],
-            "gold": (10000, 20000)
-        },
-        "challenger": {  # 深渊挑战者宝箱
-            "gems": [
-                ("critical_bead_1", 1, 0.1),
-                ("accuracy_bead_1", 1, 0.1),
-                ("dodge_bead_1", 1, 0.1),
-                ("counter_jade_1", 1, 0.1),
-                ("critical_power_agate_1", 1, 0.2),
-                ("anti_crit_rune_1", 1, 0.1),
-            ],
-            "gold": (5000, 15000)
-        },
-        "participant": {  # 深渊参与者宝箱
-            "gems": [
-                ("critical_bead_1", 1, 0.1),
-                ("accuracy_bead_1", 1, 0.1),
-                ("anti_crit_rune_1", 1, 0.1),
-            ],
-            "materials": [
-                ("upgrade_stone_low", 1, 0.2),
-            ],
-            "gold": (2000, 8000)
+        if not session:
+            return False, "⛔ 系统错误：缺少数据库会话"
+
+        tier = cfg.effect_params.get("tier", "participant")
+
+        # 不同等级宝箱的奖励池
+        reward_pools = {
+            "overlord": {  # 深渊霸主宝箱
+                "gems": [
+                    ("critical_bead_4", 1, 0.1),
+                    ("combo_bead_4", 1, 0.1),
+                    ("dodge_bead_4", 1, 0.1),
+                    ("counter_jade_4", 1, 0.1),
+                    ("critical_power_agate_4", 1, 0.1),
+                    ("penetration_crystal_4", 1, 0.1),
+                    ("spirit_burst_amethyst_4", 1, 0.1),
+                    ("anti_crit_rune_4", 1, 0.1),
+                ],
+                "materials": [
+                    ("upgrade_stone_supreme", 3, 0.3),
+                    ("stabilizer_crystal", 5, 0.1),
+                ],
+                "gold": (20000, 50000)
+            },
+            "king": {  # 深渊王者宝箱
+                "gems": [
+                    ("critical_bead_3", 1, 0.1),
+                    ("combo_bead_3", 1, 0.1),
+                    ("dodge_bead_3", 1, 0.1),
+                    ("counter_jade_3", 1, 0.1),
+                    ("critical_power_agate_3", 1, 0.1),
+                    ("penetration_crystal_3", 1, 0.1),
+                    ("spirit_burst_amethyst_3", 1, 0.1),
+                    ("anti_crit_rune_3", 1, 0.1),
+                ],
+                "materials": [
+                    ("upgrade_stone_supreme", 2, 0.3),
+                    ("stabilizer_crystal", 3, 0.1),
+                ],
+                "gold": (10000, 20000)
+            },
+            "warrior": {  # 深渊勇士宝箱
+                "gems": [
+                    ("critical_bead_2", 1, 0.1),
+                    ("combo_bead_2", 1, 0.1),
+                    ("dodge_bead_2", 1, 0.1),
+                    ("counter_jade_2", 1, 0.1),
+                    ("critical_power_agate_2", 1, 0.1),
+                    ("penetration_crystal_2", 1, 0.1),
+                    ("spirit_burst_amethyst_2", 1, 0.1),
+                    ("anti_crit_rune_2", 1, 0.1),
+                ],
+                "materials": [
+                    ("upgrade_stone_supreme", 1, 0.1),
+                    ("stabilizer_crystal", 2, 0.1),
+                ],
+                "gold": (10000, 20000)
+            },
+            "explorer": {  # 深渊探索者宝箱
+                "gems": [
+                    ("critical_bead_1", 1, 0.2),
+                    ("combo_bead_1", 1, 0.2),
+                    ("accuracy_bead_1", 1, 0.2),
+                    ("counter_jade_1", 1, 0.2),
+                    ("penetration_crystal_1", 1, 0.2),
+                    ("anti_crit_rune_1", 1, 0.2),
+                ],
+                "materials": [
+                    ("stabilizer_crystal", 1, 0.1),
+                ],
+                "gold": (10000, 20000)
+            },
+            "challenger": {  # 深渊挑战者宝箱
+                "gems": [
+                    ("critical_bead_1", 1, 0.1),
+                    ("accuracy_bead_1", 1, 0.1),
+                    ("dodge_bead_1", 1, 0.1),
+                    ("counter_jade_1", 1, 0.1),
+                    ("critical_power_agate_1", 1, 0.2),
+                    ("anti_crit_rune_1", 1, 0.1),
+                ],
+                "gold": (5000, 15000)
+            },
+            "participant": {  # 深渊参与者宝箱
+                "gems": [
+                    ("critical_bead_1", 1, 0.1),
+                    ("accuracy_bead_1", 1, 0.1),
+                    ("anti_crit_rune_1", 1, 0.1),
+                ],
+                "materials": [
+                    ("upgrade_stone_low", 1, 0.2),
+                ],
+                "gold": (2000, 8000)
+            }
         }
-    }
 
-    pool = reward_pools.get(tier, reward_pools["participant"])
-    rewards = []
+        pool = reward_pools.get(tier, reward_pools["participant"])
+        rewards = []
 
-    # 处理多个宝箱
-    for _ in range(qty):
-        # 金币奖励（必得）
-        gold_min, gold_max = pool["gold"]
-        gold_reward = random.randint(gold_min, gold_max)
-        player.gold += gold_reward
-        rewards.append(f"💰 {gold_reward:,} 金币")
+        # 处理多个宝箱
+        for _ in range(qty):
+            # 金币奖励（必得）
+            gold_min, gold_max = pool["gold"]
+            gold_reward = random.randint(gold_min, gold_max)
+            player.gold += gold_reward
+            rewards.append(f"💰 {gold_reward:,} 金币")
 
-        # 镶嵌物奖励
-        if "gems" in pool:
-            for gem_id, gem_qty, probability in pool["gems"]:
-                if random.random() < probability:
-                    # 创建镶嵌物实例
-                    gem_item = ItemInstance(
-                        player_id=player.id,
-                        item_id=gem_id,
-                        quantity=gem_qty,
-                        created_at=datetime.now()
-                    )
-                    session.add(gem_item)
+            # 镶嵌物奖励
+            if "gems" in pool:
+                for gem_id, gem_qty, probability in pool["gems"]:
+                    if random.random() < probability:
+                        # 创建镶嵌物实例
+                        gem_item = ItemInstance(
+                            player_id=player.id,
+                            item_id=gem_id,
+                            quantity=gem_qty,
+                            created_at=datetime.now()
+                        )
+                        session.add(gem_item)
 
-                    # 获取物品配置以显示名称
-                    from ..config import config
-                    gem_config = config.items_config["by_id"].get(gem_id)
-                    if gem_config:
-                        rewards.append(f"💎 {gem_config.get_display_name()} x{gem_qty}")
+                        # 获取物品配置以显示名称
+                        from ..config import config
+                        gem_config = config.items_config["by_id"].get(gem_id)
+                        if gem_config:
+                            rewards.append(f"💎 {gem_config.get_display_name()} x{gem_qty}")
 
-        # 材料奖励
-        if "materials" in pool:
-            for material_id, material_qty, probability in pool["materials"]:
-                if random.random() < probability:
-                    # 创建材料实例
-                    material_item = ItemInstance(
-                        player_id=player.id,
-                        item_id=material_id,
-                        quantity=material_qty,
-                        created_at=datetime.now()
-                    )
-                    session.add(material_item)
+            # 材料奖励
+            if "materials" in pool:
+                for material_id, material_qty, probability in pool["materials"]:
+                    if random.random() < probability:
+                        # 创建材料实例
+                        material_item = ItemInstance(
+                            player_id=player.id,
+                            item_id=material_id,
+                            quantity=material_qty,
+                            created_at=datetime.now()
+                        )
+                        session.add(material_item)
 
-                    # 获取物品配置以显示名称
-                    from ..config import config
-                    material_config = config.items_config["by_id"].get(material_id)
-                    if material_config:
-                        rewards.append(f"🔮 {material_config.get_display_name()} x{material_qty}")
+                        # 获取物品配置以显示名称
+                        from ..config import config
+                        material_config = config.items_config["by_id"].get(material_id)
+                        if material_config:
+                            rewards.append(f"🔮 {material_config.get_display_name()} x{material_qty}")
 
-    if not rewards:
-        rewards.append("💰 少量金币")
+        if not rewards:
+            rewards.append("💰 少量金币")
 
-    # 构建结果消息
-    chest_names = {
-        "overlord": "深渊霸主宝箱",
-        "king": "深渊王者宝箱",
-        "warrior": "深渊勇士宝箱",
-        "explorer": "深渊探索者宝箱",
-        "challenger": "深渊挑战者宝箱",
-        "participant": "深渊参与者宝箱"
-    }
+        # 构建结果消息
+        chest_names = {
+            "overlord": "深渊霸主宝箱",
+            "king": "深渊王者宝箱",
+            "warrior": "深渊勇士宝箱",
+            "explorer": "深渊探索者宝箱",
+            "challenger": "深渊挑战者宝箱",
+            "participant": "深渊参与者宝箱"
+        }
 
-    chest_name = chest_names.get(tier, "神秘宝箱")
-    qty_text = f" x{qty}" if qty > 1 else ""
+        chest_name = chest_names.get(tier, "神秘宝箱")
+        qty_text = f" x{qty}" if qty > 1 else ""
 
-    result_lines = [
-        f"🎁 开启 {chest_name}{qty_text}",
-        "✨ 获得奖励：",
-        *[f"  {reward}" for reward in rewards]
-    ]
+        result_lines = [
+            f"🎁 开启 {chest_name}{qty_text}",
+            "✨ 获得奖励：",
+            *[f"  {reward}" for reward in rewards]
+        ]
 
-    # 添加一些克苏鲁风格的描述
-    flavor_texts = [
-        "🌀 宝箱中散发出深渊的气息，仿佛在低语着古老的秘密...",
-        "👁️ 无数眼球在宝箱内闪烁，见证着你的收获...",
-        "🔮 扭曲的能量从宝箱中涌出，化作珍贵的奖励...",
-        "⚡ 虚空的力量凝聚成实体，成为你战斗的助力...",
-        "🌊 深渊的馈赠降临，带来不可名状的力量..."
-    ]
+        # 添加一些克苏鲁风格的描述
+        flavor_texts = [
+            "🌀 宝箱中散发出深渊的气息，仿佛在低语着古老的秘密...",
+            "👁️ 无数眼球在宝箱内闪烁，见证着你的收获...",
+            "🔮 扭曲的能量从宝箱中涌出，化作珍贵的奖励...",
+            "⚡ 虚空的力量凝聚成实体，成为你战斗的助力...",
+            "🌊 深渊的馈赠降临，带来不可名状的力量..."
+        ]
 
-    result_lines.append("")
-    result_lines.append(random.choice(flavor_texts))
+        result_lines.append("")
+        result_lines.append(random.choice(flavor_texts))
 
-    return True, "\n".join(result_lines)
+        return True, "\n".join(result_lines)
 
 
 @register(ItemEffectType.DIVINE_PUNISHMENT)

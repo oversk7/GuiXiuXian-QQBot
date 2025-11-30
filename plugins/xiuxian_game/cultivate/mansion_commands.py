@@ -10,6 +10,9 @@ from ..models.db import safe_session
 from ..models.player import Player
 from .mansion import MansionService
 
+# Feature Flag: 控制是否使用新版MansionService (DI架构)
+USE_NEW_MANSION_SERVICE = True
+
 
 # 阴宅相关命令
 mansion_status_cmd = on_command("阴宅", aliases={"阴宅状态", "查看阴宅"}, priority=4, block=True)
@@ -52,7 +55,16 @@ async def handle_purchase_mansion(event: MessageEvent):
                 await purchase_mansion_cmd.finish("⛔ 请先使用【注册】命令创建角色")
         
         # 尝试购买阴宅
-        success, result_msg = await MansionService.purchase_mansion(session, player)
+        if USE_NEW_MANSION_SERVICE:
+            from ..infrastructure.repositories.player_repository import PlayerRepository
+            from .mansion_service_new import MansionService as MansionServiceNew
+
+            service = MansionServiceNew(
+                player_repo=PlayerRepository(session),
+            )
+            success, result_msg = await service.purchase_mansion(player)
+        else:
+            success, result_msg = await MansionService.purchase_mansion(session, player)
         
         if success:
             # 保存数据
@@ -85,7 +97,16 @@ async def handle_upgrade_mansion(event: MessageEvent):
             ))
         
         # 尝试升级阴宅
-        success, result_msg = await MansionService.upgrade_mansion(session, player)
+        if USE_NEW_MANSION_SERVICE:
+            from ..infrastructure.repositories.player_repository import PlayerRepository
+            from .mansion_service_new import MansionService as MansionServiceNew
+
+            service = MansionServiceNew(
+                player_repo=PlayerRepository(session),
+            )
+            success, result_msg = await service.upgrade_mansion(player)
+        else:
+            success, result_msg = await MansionService.upgrade_mansion(session, player)
         
         if success:
             # 保存数据
@@ -141,7 +162,16 @@ async def handle_set_mansion_fee(event: MessageEvent, args: Message = CommandArg
             await set_mansion_fee_cmd.finish("⛔ 请先使用【注册】命令创建角色")
 
         # 设置阴宅使用费用
-        success, result_msg = await MansionService.set_mansion_usage_fee(session, player, fee)
+        if USE_NEW_MANSION_SERVICE:
+            from ..infrastructure.repositories.player_repository import PlayerRepository
+            from .mansion_service_new import MansionService as MansionServiceNew
+
+            service = MansionServiceNew(
+                player_repo=PlayerRepository(session),
+            )
+            success, result_msg = await service.set_mansion_usage_fee(player, fee)
+        else:
+            success, result_msg = await MansionService.set_mansion_usage_fee(session, player, fee)
 
         if success:
             # 保存数据
@@ -162,7 +192,16 @@ async def handle_toggle_mansion_access(event: MessageEvent):
             await toggle_mansion_access_cmd.finish("⛔ 请先使用【注册】命令创建角色")
 
         # 切换阴宅访问权限
-        success, result_msg = await MansionService.toggle_mansion_access(session, player)
+        if USE_NEW_MANSION_SERVICE:
+            from ..infrastructure.repositories.player_repository import PlayerRepository
+            from .mansion_service_new import MansionService as MansionServiceNew
+
+            service = MansionServiceNew(
+                player_repo=PlayerRepository(session),
+            )
+            success, result_msg = await service.toggle_mansion_access(player)
+        else:
+            success, result_msg = await MansionService.toggle_mansion_access(session, player)
 
         if success:
             # 保存数据
@@ -183,7 +222,16 @@ async def handle_toggle_mansion_payment(event: MessageEvent):
             await toggle_mansion_payment_cmd.finish("⛔ 请先使用【注册】命令创建角色")
 
         # 切换阴宅付费使用意愿
-        success, result_msg = await MansionService.toggle_mansion_payment_willingness(session, player)
+        if USE_NEW_MANSION_SERVICE:
+            from ..infrastructure.repositories.player_repository import PlayerRepository
+            from .mansion_service_new import MansionService as MansionServiceNew
+
+            service = MansionServiceNew(
+                player_repo=PlayerRepository(session),
+            )
+            success, result_msg = await service.toggle_mansion_payment_willingness(player)
+        else:
+            success, result_msg = await MansionService.toggle_mansion_payment_willingness(session, player)
 
         if success:
             # 保存数据
@@ -221,7 +269,16 @@ async def handle_migrate_mansion(event: MessageEvent, args: Message = CommandArg
             target_x, target_y = player.get_current_coordinates()
 
             # 检查是否可以迁移
-            can_migrate, error_msg = await MansionService.can_migrate_mansion(session, player, target_x, target_y)
+            if USE_NEW_MANSION_SERVICE:
+                from ..infrastructure.repositories.player_repository import PlayerRepository
+                from .mansion_service_new import MansionService as MansionServiceNew
+
+                service = MansionServiceNew(
+                    player_repo=PlayerRepository(session),
+                )
+                can_migrate, error_msg = await service.can_migrate_mansion(player, target_x, target_y)
+            else:
+                can_migrate, error_msg = await MansionService.can_migrate_mansion(session, player, target_x, target_y)
             if not can_migrate:
                 await migrate_mansion_cmd.finish(message_add_head(f"⛔ {error_msg}", event))
 
@@ -251,7 +308,16 @@ async def handle_migrate_mansion(event: MessageEvent, args: Message = CommandArg
             target_x, target_y = player.get_current_coordinates()
 
             # 执行迁移
-            success, result_msg = await MansionService.migrate_mansion(session, player, target_x, target_y)
+            if USE_NEW_MANSION_SERVICE:
+                from ..infrastructure.repositories.player_repository import PlayerRepository
+                from .mansion_service_new import MansionService as MansionServiceNew
+
+                service = MansionServiceNew(
+                    player_repo=PlayerRepository(session),
+                )
+                success, result_msg = await service.migrate_mansion(player, target_x, target_y)
+            else:
+                success, result_msg = await MansionService.migrate_mansion(session, player, target_x, target_y)
 
             if success:
                 # 保存数据

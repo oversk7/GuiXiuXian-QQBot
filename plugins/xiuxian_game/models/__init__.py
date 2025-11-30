@@ -37,8 +37,6 @@ from .location import Location
 from .npc import NPC, NPCType, NPCStatus
 # 临时buff系统模型
 from .temporary_buff import TemporaryBuff
-# 跨平台绑定系统模型
-from .platform_binding import PlatformBinding
 # 钓鱼系统模型
 from .fishing_record import FishingRecord, FishingStats
 # 抽奖系统模型
@@ -46,6 +44,9 @@ from .lottery import Lottery, LotteryParticipant, LotteryType, LotteryStatus
 from .pvp_log import PvpLog
 # VIP装备永久加成系统模型
 from .vip_equipment_bonus import VIPEquipmentBonus
+# 账号所有权系统模型
+from .account_ownership import AccountOwnership
+from .account_transfer_log import AccountTransferLog
 
 
 __all__ = [
@@ -59,7 +60,8 @@ __all__ = [
     "WorldBossCycle", "WorldBossDamage",
     "InviteReward", "DungeonChestRecord",
     "Location", "NPC", "NPCType", "NPCStatus",
-    "TemporaryBuff", "PlatformBinding", "FishingRecord", "FishingStats",
+    "TemporaryBuff", "FishingRecord", "FishingStats",
     "Lottery", "LotteryParticipant", "LotteryType", "LotteryStatus",
-    "PvpLog", "VIPEquipmentBonus"
+    "PvpLog", "VIPEquipmentBonus",
+    "AccountOwnership", "AccountTransferLog"
 ]

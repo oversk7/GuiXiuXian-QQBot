@@ -1,7 +1,7 @@
 from collections import defaultdict
 import asyncio
 
-from nonebot import on_command
+from nonebot import on_command, logger
 from nonebot.params import CommandArg
 from nonebot.adapters.qq import MessageEvent, Message
 from ..models.db import safe_session
@@ -16,6 +16,9 @@ from datetime import date
 from ..models.elixir_usage import ElixirUsageLog
 
 from ..models.guild import Guild
+
+# 导入新效果系统（带Feature Flag）
+from ..domain.effects.adapters import apply_effect_with_fallback, USE_NEW_EFFECT_SYSTEM
 
 async def _handle_expand_territory(session, player: Player, item_config, quantity: int):
     """处理公会扩张令的特殊逻辑"""
@@ -182,8 +185,11 @@ async def handle_use_item(event: MessageEvent, args: Message = CommandArg()):
             if used_today + quantity > daily_limit:
                 await use_item.finish(f"⛔ {item_config.name} 每日最多可服用 {daily_limit} 颗，今日已用 {used_today} 颗")
 
-        # 调用统一效果执行器（传递session以支持耐药性）
-        success, msg = await apply_effect(player, item_config, quantity, ctx=ctx_payload, session=session)
+        # 调用效果执行器（新旧系统自动切换）
+        # 根据环境变量 USE_NEW_EFFECT_SYSTEM 选择使用新系统还是旧系统
+        if USE_NEW_EFFECT_SYSTEM:
+            logger.debug(f"[ItemUse] 使用新效果系统处理: {item_config.name}")
+        success, msg = await apply_effect_with_fallback(player, item_config, quantity, ctx=ctx_payload, session=session)
 
         # 特殊处理：公会扩张令
         if not success and msg == "EXPAND_TERRITORY_SPECIAL_HANDLING":

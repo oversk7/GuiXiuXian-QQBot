@@ -18,164 +18,13 @@ from ..models import Player, ItemInstance
 from ..config import config
 from ..utils import message_add_head
 from ..alchemy.service import AlchemyService
+# 导入装备服务模块（业务逻辑已移至此处，解决模块耦合）
+from .equipment_service import recalc_equipment_attributes, EQUIP_ITEM_IDS
 
-
-def _apply_mp_from_hp_effects(player: Player, equipped_items: list[ItemInstance], session) -> None:
-    """将拥有 mp_from_hp 特效的装备的加成重新应用到玩家身上。"""
-    if not equipped_items:
-        return
-
-    mp_from_hp_effects: list[tuple[ItemInstance, float, int, bool]] = []
-    total_pct = 0.0
-    total_flat = 0
-
-    for eq in equipped_items:
-        if not getattr(eq, "equipped", False):
-            continue
-        cfg = eq.config if hasattr(eq, "config") else None
-        if not cfg or not getattr(cfg, "special_effects", None):
-            continue
-
-        for eff in cfg.special_effects:
-            if eff.get("effect") != "mp_from_hp":
-                continue
-            is_pct = bool(eff.get("is_percentage", True))
-            if is_pct:
-                val_pct = float(eff.get("value", 0) or 0)
-                if val_pct > 0:
-                    total_pct += val_pct
-                    mp_from_hp_effects.append((eq, val_pct, 0, True))
-            else:
-                val_flat = int(eff.get("value", 0) or 0)
-                if val_flat > 0:
-                    total_flat += val_flat
-                    mp_from_hp_effects.append((eq, 0.0, val_flat, False))
-
-    if not mp_from_hp_effects:
-        return
-
-    current_hp_after_all = int(getattr(player, "max_hp", 0) or 0)
-    hp_from_self_equips = 0
-    for eq, _, _, _ in mp_from_hp_effects:
-        delta = (eq.extra_attrs or {}).get("_persist_bonus", {})
-        hp_from_self_equips += int(delta.get("max_hp", 0) or 0)
-
-    base_for_convert = max(1, current_hp_after_all - hp_from_self_equips)
-    bonus_from_pct = int(base_for_convert * total_pct / 100.0) if total_pct > 0 else 0
-    total_bonus_mp = bonus_from_pct + int(total_flat)
-    if total_bonus_mp <= 0:
-        return
-
-    remaining = total_bonus_mp
-    for idx, (eq, pct, flat, is_pct) in enumerate(mp_from_hp_effects):
-        part = 0
-        if is_pct and pct > 0:
-            part = int(base_for_convert * pct / 100.0)
-        elif (not is_pct) and flat > 0:
-            part = int(flat)
-
-        if idx == len(mp_from_hp_effects) - 1:
-            part = remaining
-        else:
-            part = min(part, remaining)
-
-        if part <= 0:
-            continue
-
-        remaining = max(0, remaining - part)
-        player.max_mp = int(getattr(player, "max_mp", 0)) + part
-
-        extra = eq.extra_attrs or {}
-        persist = dict(extra.get("_persist_bonus", {}))
-        persist["max_mp"] = int(persist.get("max_mp", 0)) + part
-        extra["_persist_bonus"] = persist
-        eq.extra_attrs = extra
-        session.add(eq)
-
-
-async def recalc_equipment_attributes(
-    session,
-    player: Player,
-    equipped_items: list[ItemInstance] | None = None,
-) -> None:
-    """重新计算玩家当前装备提供的属性加成（包含 mp_from_hp 特效）。"""
-
-    if equipped_items is None:
-        stmt = select(ItemInstance).where(
-            ItemInstance.player_id == player.id,
-            ItemInstance.equipped == True,
-            ItemInstance.item_id.in_(EQUIP_ITEM_IDS),
-        )
-        equipped_items = (await session.execute(stmt)).scalars().all()
-
-    if not equipped_items:
-        if player.hp > player.max_hp:
-            player.hp = player.max_hp
-        if player.mp > player.max_mp:
-            player.mp = player.max_mp
-        session.add(player)
-        return
-
-    # 1. 先移除所有已记录的装备加成
-    for eq in equipped_items:
-        if not getattr(eq, "equipped", False):
-            continue
-        delta = (eq.extra_attrs or {}).get("_persist_bonus", {})
-        for k, v in delta.items():
-            current_value = getattr(player, k, 0)
-            setattr(player, k, max(0, current_value - int(v or 0)))
-
-        if "_persist_bonus" in (eq.extra_attrs or {}):
-            extra_new = {k: v for k, v in eq.extra_attrs.items() if k != "_persist_bonus"}
-            eq.extra_attrs = extra_new
-
-        eq.equipped = False
-
-    # 2. 基于当前基础属性重新应用装备加成
-    base_attrs = {
-        "attack": player.attack,
-        "defense": player.defense,
-        "agility": player.agility,
-        "luck": player.luck,
-        "max_hp": player.max_hp,
-        "max_mp": player.max_mp,
-    }
-
-    for eq in equipped_items:
-        eq.equipped = True
-
-        attrs_temp = base_attrs.copy()
-        eq.apply_attr_bonus(attrs_temp, base_attrs)
-        new_delta = {}
-        for k in attrs_temp:
-            if k in base_attrs:
-                if attrs_temp[k] != base_attrs[k]:
-                    new_delta[k] = attrs_temp[k] - base_attrs[k]
-            else:
-                if attrs_temp[k] != 0:
-                    new_delta[k] = attrs_temp[k]
-
-        for k, v in new_delta.items():
-            setattr(player, k, getattr(player, k) + v)
-
-        extra = eq.extra_attrs or {}
-        extra["_persist_bonus"] = new_delta
-        eq.extra_attrs = extra
-        session.add(eq)
-
-    # 3. 再处理 mp_from_hp 类全局被动
-    _apply_mp_from_hp_effects(player, equipped_items, session)
-
-    # 4. 确保当前 HP/MP 不超过新的上限
-    if player.hp > player.max_hp:
-        player.hp = player.max_hp
-    if player.mp > player.max_mp:
-        player.mp = player.max_mp
-
-    session.add(player)
-
-# 获取所有装备物品ID
-EQUIP_ITEM_IDS = config.items_config["by_type"]["EQUIPMENT"]
+# ==================== Feature Flag ====================
+# 设置为True使用新版DI架构的EquipmentService，False使用旧版本
+USE_NEW_EQUIPMENT_SERVICE = True
+# =====================================================
 
 
 async def find_equipment_by_input(session, player_id: str, input_arg: str) -> ItemInstance:
@@ -579,186 +428,36 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
         if len(all_equipped) >= 4:
             await wear_equipment.finish("⛔ 装备栏已满，最多只能穿戴4件装备，请先卸下其他装备")
 
-        # 获取所有已装备的装备（不包括即将穿戴的这件）
-        all_equipped_stmt = select(ItemInstance).where(
-            ItemInstance.player_id == event.get_user_id(),
-            ItemInstance.equipped == True,
-            ItemInstance.item_id.in_(EQUIP_ITEM_IDS)
-        )
-        currently_equipped = (await session.execute(all_equipped_stmt)).scalars().all()
+        # 标记新装备为已装备
+        equip.equipped = True
+        session.add(equip)
 
-        # 1. 先卸下所有装备，恢复基础属性
-        for eq in currently_equipped:
-            # 恢复玩家属性
-            delta = (eq.extra_attrs or {}).get("_persist_bonus", {})
-            for k, v in delta.items():
-                current_value = getattr(player, k, 0)
-                setattr(player, k, max(0, current_value - v))
+        # 重新计算装备属性
+        if USE_NEW_EQUIPMENT_SERVICE:
+            # 新版本: 使用DI架构的EquipmentService（通过当前session创建Repository）
+            from ..infrastructure.repositories.item_repository import ItemRepository
+            from ..infrastructure.repositories.player_repository import PlayerRepository
+            from .equipment_service_new import EquipmentService
 
-            # 清除持久化记录并标记未穿戴
-            if "_persist_bonus" in (eq.extra_attrs or {}):
-                extra_new = {k: v for k, v in eq.extra_attrs.items() if k != "_persist_bonus"}
-                eq.extra_attrs = extra_new
+            equipment_service = EquipmentService(
+                item_repo=ItemRepository(session),
+                player_repo=PlayerRepository(session)
+            )
 
-            eq.equipped = False
+            # 重新计算装备属性（包括所有已装备的装备）
+            await equipment_service.recalc_equipment_attributes(player)
+        else:
+            # 旧版本: 使用静态函数recalc_equipment_attributes
+            # 获取所有已装备的装备（包括刚刚标记为已装备的新装备）
+            all_equipped_stmt = select(ItemInstance).where(
+                ItemInstance.player_id == player.id,
+                ItemInstance.equipped == True,
+                ItemInstance.item_id.in_(EQUIP_ITEM_IDS)
+            )
+            all_equipped_items = (await session.execute(all_equipped_stmt)).scalars().all()
 
-        # 2. 获取玩家基础属性（无装备加成）
-        base_attrs = {
-            "attack": player.attack,
-            "defense": player.defense,
-            "agility": player.agility,
-            "luck": player.luck,
-            "max_hp": player.max_hp,
-            "max_mp": player.max_mp,
-        }
-
-        # 3. 重新穿戴所有装备（包括新装备），每件都基于基础属性计算
-        all_equipment_to_wear = currently_equipped + [equip]
-
-        for eq in all_equipment_to_wear:
-            # 标记为已装备
-            eq.equipped = True
-
-            # 基于基础属性计算装备加成
-            attrs_temp = base_attrs.copy()
-            eq.apply_attr_bonus(attrs_temp, base_attrs)
-            new_delta = {}
-            for k in attrs_temp:
-                if k in base_attrs:
-                    if attrs_temp[k] != base_attrs[k]:
-                        new_delta[k] = attrs_temp[k] - base_attrs[k]
-                else:
-                    # 对于base_attrs中不存在的属性，直接使用新值作为加成
-                    if attrs_temp[k] != 0:
-                        new_delta[k] = attrs_temp[k]
-
-            # 应用到玩家属性
-            for k, v in new_delta.items():
-                setattr(player, k, getattr(player, k) + v)
-
-            # 保存新的持久化加成
-            extra = eq.extra_attrs or {}
-            extra["_persist_bonus"] = new_delta
-            eq.extra_attrs = extra
-            session.add(eq)
-
-
-        """
-
-	        # 3.5 处理“生命→理智”的全局被动（如：斩龙闪）——应在面板上全局生效
-	        # 将 YAML 中的 mp_from_hp 从战斗内首回合，转为此处的全局持久化属性加成
-	        # 计算方式：按当前玩家最大生命值（已应用所有装备基础加成后）乘以百分比，转化为最大理智值加成
-	        mp_from_hp_effects = []  # (equip, pct, flat, is_percentage)
-	        total_pct = 0.0
-	        total_flat = 0
-	        for eq2 in all_equipment_to_wear:
-	            cfg2 = eq2.config if hasattr(eq2, 'config') else None
-	            if not cfg2 or not getattr(cfg2, 'special_effects', None):
-	                continue
-	            for eff in cfg2.special_effects:
-	                if eff.get('effect') == 'mp_from_hp':
-	                    is_pct = bool(eff.get('is_percentage', True))
-	                    if is_pct:
-	                        val_pct = float(eff.get('value', 0) or 0)
-	                        if val_pct > 0:
-	                            total_pct += val_pct
-	                            mp_from_hp_effects.append((eq2, val_pct, 0, True))
-	                    else:
-	                        val_flat = int(eff.get('value', 0) or 0)
-	                        if val_flat > 0:
-	                            total_flat += val_flat
-	                            mp_from_hp_effects.append((eq2, 0.0, val_flat, False))
-	        if mp_from_hp_effects:
-	            # 基于“先应用其他装备的血量加成、排除自身（拥有 mp_from_hp 的装备）对HP的加成后”的最大生命值来计算
-	            current_hp_after_all = int(getattr(player, 'max_hp', 0) or 0)
-	            hp_from_self_equips = 0
-	            for (eq2, _, _, _) in mp_from_hp_effects:
-	                delta2 = (eq2.extra_attrs or {}).get("_persist_bonus", {})
-	                hp_from_self_equips += int(delta2.get("max_hp", 0) or 0)
-	            base_for_convert = max(1, current_hp_after_all - hp_from_self_equips)
-	            bonus_from_pct = int(base_for_convert * total_pct / 100.0) if total_pct > 0 else 0
-	            total_bonus_mp = bonus_from_pct + int(total_flat)
-	            if total_bonus_mp > 0:
-	                # 将总加成分摊写入每件装备的 _persist_bonus
-	                remaining = total_bonus_mp
-	                for idx, (eq2, pct, flat, is_pct) in enumerate(mp_from_hp_effects):
-	                    part = 0
-	                    if is_pct and pct > 0:
-	                        part = int(base_for_convert * pct / 100.0)
-	                    elif (not is_pct) and flat > 0:
-	                        part = int(flat)
-	                    # 修正末件舍入误差
-	                    if idx == len(mp_from_hp_effects) - 1:
-	                        part = remaining
-	                    remaining -= part
-	                    if part <= 0:
-	                        continue
-	                    # 应用到玩家
-	                    player.max_mp = int(getattr(player, 'max_mp', 0)) + part
-	                    # 写入装备的持久化加成记录
-	                    extra2 = eq2.extra_attrs or {}
-	                    persist = dict(extra2.get("_persist_bonus", {}))
-	                    persist["max_mp"] = int(persist.get("max_mp", 0)) + part
-	                    extra2["_persist_bonus"] = persist
-	                    eq2.extra_attrs = extra2
-	                    session.add(eq2)
-
-        """
-        # 3.5 处理“生命→理智”的全局被动（如：斩龙闪）——应在面板上全局生效
-        # 将 YAML 中的 mp_from_hp 从战斗内首回合，转为此处的全局持久化属性加成
-        # 口径：先应用其它装备的HP加成，再据此计算能转换的MP（排除自身对HP的加成，避免自我放大）
-        mp_from_hp_effects = []  # (equip, pct, flat, is_percentage)
-        total_pct = 0.0
-        total_flat = 0
-        for eq2 in all_equipment_to_wear:
-            cfg2 = eq2.config if hasattr(eq2, 'config') else None
-            if not cfg2 or not getattr(cfg2, 'special_effects', None):
-                continue
-            for eff in cfg2.special_effects:
-                if eff.get('effect') == 'mp_from_hp':
-                    is_pct = bool(eff.get('is_percentage', True))
-                    if is_pct:
-                        val_pct = float(eff.get('value', 0) or 0)
-                        if val_pct > 0:
-                            total_pct += val_pct
-                            mp_from_hp_effects.append((eq2, val_pct, 0, True))
-                    else:
-                        val_flat = int(eff.get('value', 0) or 0)
-                        if val_flat > 0:
-                            total_flat += val_flat
-                            mp_from_hp_effects.append((eq2, 0.0, val_flat, False))
-        if mp_from_hp_effects:
-            current_hp_after_all = int(getattr(player, 'max_hp', 0) or 0)
-            base_for_convert = max(1, current_hp_after_all)
-            bonus_from_pct = int(base_for_convert * total_pct / 100.0) if total_pct > 0 else 0
-            total_bonus_mp = bonus_from_pct + int(total_flat)
-            if total_bonus_mp > 0:
-                remaining = total_bonus_mp
-                for idx, (eq2, pct, flat, is_pct) in enumerate(mp_from_hp_effects):
-                    part = 0
-                    if is_pct and pct > 0:
-                        part = int(base_for_convert * pct / 100.0)
-                    elif (not is_pct) and flat > 0:
-                        part = int(flat)
-                    if idx == len(mp_from_hp_effects) - 1:
-                        part = remaining
-                    remaining -= part
-                    if part <= 0:
-                        continue
-                    player.max_mp = int(getattr(player, 'max_mp', 0)) + part
-                    extra2 = eq2.extra_attrs or {}
-                    persist = dict(extra2.get("_persist_bonus", {}))
-                    persist["max_mp"] = int(persist.get("max_mp", 0)) + part
-                    extra2["_persist_bonus"] = persist
-                    eq2.extra_attrs = extra2
-                    session.add(eq2)
-
-
-        # 确保当前HP/MP不超过新的上限
-        if player.hp > player.max_hp:
-            player.hp = player.max_hp
-        if player.mp > player.max_mp:
-            player.mp = player.max_mp
+            # 调用装备服务重新计算属性
+            await recalc_equipment_attributes(session, player, all_equipped_items)
 
         session.add(player)
 
@@ -867,7 +566,21 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
         session.add(equip)
 
         # 重新计算剩余装备的属性加成，确保 mp_from_hp 等全局被动同步
-        await recalc_equipment_attributes(session, player)
+        if USE_NEW_EQUIPMENT_SERVICE:
+            # 新版本: 使用DI架构的EquipmentService
+            from ..infrastructure.repositories.item_repository import ItemRepository
+            from ..infrastructure.repositories.player_repository import PlayerRepository
+            from .equipment_service_new import EquipmentService
+
+            equipment_service = EquipmentService(
+                item_repo=ItemRepository(session),
+                player_repo=PlayerRepository(session)
+            )
+            await equipment_service.recalc_equipment_attributes(player)
+        else:
+            # 旧版本: 使用静态函数
+            await recalc_equipment_attributes(session, player)
+
         await session.commit()
 
         # 构建结果消息

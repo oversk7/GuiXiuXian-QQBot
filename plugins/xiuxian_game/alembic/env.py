@@ -1,6 +1,8 @@
 import sys
 import os
 from logging.config import fileConfig
+from pathlib import Path
+import yaml
 
 from sqlalchemy import engine_from_config
 from sqlalchemy import pool
@@ -19,8 +21,61 @@ from models.db import get_base
 # access to the values within the .ini file in use.
 config = context.config
 
-# 为 alembic 设置同步数据库 URL
-config.set_main_option('sqlalchemy.url', 'sqlite:///data/game.db')
+
+# ==================== 动态加载数据库配置 ====================
+def load_database_config() -> dict:
+    """从 database.yaml 加载数据库配置"""
+    config_path = Path(project_root) / "config" / "database.yaml"
+
+    if not config_path.exists():
+        print(f"⚠️ 数据库配置文件不存在: {config_path}")
+        print("📝 使用默认 SQLite 配置")
+        return {
+            "database": {
+                "type": "sqlite",
+                "sqlite": {"path": "data/game.db"}
+            }
+        }
+
+    with open(config_path, "r", encoding="utf-8") as f:
+        return yaml.safe_load(f)
+
+
+def build_sync_database_url(db_config: dict) -> str:
+    """构建同步数据库 URL (用于 Alembic 迁移)"""
+    db_cfg = db_config["database"]
+    db_type = db_cfg.get("type", "sqlite")
+
+    if db_type == "sqlite":
+        sqlite_cfg = db_cfg["sqlite"]
+        db_path = os.path.join(project_root, sqlite_cfg["path"])
+        return f"sqlite:///{db_path}"
+
+    elif db_type == "mysql":
+        mysql_cfg = db_cfg["mysql"]
+        host = mysql_cfg["host"]
+        port = mysql_cfg["port"]
+        user = mysql_cfg["user"]
+        password = mysql_cfg["password"]
+        database = mysql_cfg["database"]
+        charset = mysql_cfg.get("charset", "utf8mb4")
+
+        return f"mysql+pymysql://{user}:{password}@{host}:{port}/{database}?charset={charset}"
+
+    else:
+        raise ValueError(f"不支持的数据库类型: {db_type}")
+
+
+# 从配置文件加载数据库 URL
+try:
+    db_config = load_database_config()
+    database_url = build_sync_database_url(db_config)
+    config.set_main_option('sqlalchemy.url', database_url)
+    print(f"✅ Alembic 数据库配置: {db_config['database']['type']}")
+except Exception as e:
+    print(f"❌ 加载数据库配置失败: {e}")
+    print("📝 回退到默认 SQLite 配置")
+    config.set_main_option('sqlalchemy.url', 'sqlite:///data/game.db')
 
 # Interpret the config file for Python logging.
 # This line sets up loggers basically.

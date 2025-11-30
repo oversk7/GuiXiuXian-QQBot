@@ -23,7 +23,10 @@ from .stock_price_engine import StockPriceEngine
 from ..config import config
 import random
 
-
+# ==================== Feature Flag ====================
+# 设置为True使用新版DI架构的StockService，False使用旧版本
+USE_NEW_STOCK_SERVICE = True
+# =====================================================
 
 # 气运投资相关命令
 stock_list_cmd = on_command("气运行情", aliases={"投资行情", "灵石行情"}, block=True, priority=5)
@@ -41,17 +44,50 @@ stock_update_cmd = on_command("更新气运价格", aliases={"刷新气运价格
 @stock_list_cmd.handle()
 async def handle_stock_list(event: MessageEvent):
     """查看气运投资行情"""
-    # 被动触发价格更新
-    price_updated = await StockService.check_and_update_prices()
+    if USE_NEW_STOCK_SERVICE:
+        # 新版本: 使用DI架构
+        from ..infrastructure.uow.unit_of_work import UnitOfWork
+        from ..models.db import AsyncSessionLocal
+        from .stock_service_new import StockService as StockServiceNew
 
-    async with safe_session() as session:
-        player = await session.get(Player, event.get_user_id())
-        if not player:
-            await stock_list_cmd.finish("⛔ 请先创建角色")
+        def session_factory():
+            return AsyncSessionLocal()
 
-        # 获取所有活跃股票
-        stmt = select(Stock).where(Stock.is_active == True).order_by(Stock.symbol)
-        stocks = (await session.execute(stmt)).scalars().all()
+        async with UnitOfWork(session_factory) as uow:
+            # 创建StockService实例
+            stock_service = StockServiceNew(
+                player_repo=uow.players,
+                stock_repo=uow.stocks,
+                stock_holding_repo=uow.stock_holdings,
+                stock_transaction_repo=uow.stock_transactions,
+                bank_account_repo=uow.bank_accounts
+            )
+
+            # 被动触发价格更新
+            price_updated = await stock_service.check_and_update_prices()
+
+            player = await uow.session.get(Player, event.get_user_id())
+            if not player:
+                await stock_list_cmd.finish("⛔ 请先创建角色")
+
+            # 获取所有活跃股票
+            stmt = select(Stock).where(Stock.is_active == True).order_by(Stock.symbol)
+            stocks = (await uow.session.execute(stmt)).scalars().all()
+
+            session = uow.session  # 为后续代码提供session引用
+    else:
+        # 旧版本: 使用静态方法
+        async with safe_session() as session:
+            # 被动触发价格更新
+            price_updated = await StockService.check_and_update_prices(session)
+
+            player = await session.get(Player, event.get_user_id())
+            if not player:
+                await stock_list_cmd.finish("⛔ 请先创建角色")
+
+            # 获取所有活跃股票
+            stmt = select(Stock).where(Stock.is_active == True).order_by(Stock.symbol)
+            stocks = (await session.execute(stmt)).scalars().all()
 
         if not stocks:
             await stock_list_cmd.finish("💎 当前没有可投资的气运")
@@ -137,9 +173,35 @@ async def handle_stock_buy(event: MessageEvent, args: Message = CommandArg()):
     _, user_id = get_platform_info(event)
 
     # 执行买入
-    success, message = await StockService.buy_stock(
-        user_id, symbol, shares, use_bank
-    )
+    if USE_NEW_STOCK_SERVICE:
+        # 新版本: 使用DI架构
+        from ..infrastructure.uow.unit_of_work import UnitOfWork
+        from ..models.db import AsyncSessionLocal
+        from .stock_service_new import StockService as StockServiceNew
+
+        def session_factory():
+            return AsyncSessionLocal()
+
+        async with UnitOfWork(session_factory) as uow:
+            # 创建StockService实例
+            stock_service = StockServiceNew(
+                player_repo=uow.players,
+                stock_repo=uow.stocks,
+                stock_holding_repo=uow.stock_holdings,
+                stock_transaction_repo=uow.stock_transactions,
+                bank_account_repo=uow.bank_accounts
+            )
+
+            # 使用新版本买入
+            success, message = await stock_service.buy_stock(
+                user_id, symbol, shares, use_bank
+            )
+    else:
+        # 旧版本: 使用静态方法
+        async with safe_session() as session:
+            success, message = await StockService.buy_stock(
+                session, user_id, symbol, shares, use_bank
+            )
 
     if success:
         await stock_buy_cmd.finish(message_add_head(f"✅ {message}", event))
@@ -173,9 +235,35 @@ async def handle_stock_sell(event: MessageEvent, args: Message = CommandArg()):
     _, user_id = get_platform_info(event)
 
     # 执行卖出
-    success, message = await StockService.sell_stock(
-        user_id, symbol, shares, to_bank
-    )
+    if USE_NEW_STOCK_SERVICE:
+        # 新版本: 使用DI架构
+        from ..infrastructure.uow.unit_of_work import UnitOfWork
+        from ..models.db import AsyncSessionLocal
+        from .stock_service_new import StockService as StockServiceNew
+
+        def session_factory():
+            return AsyncSessionLocal()
+
+        async with UnitOfWork(session_factory) as uow:
+            # 创建StockService实例
+            stock_service = StockServiceNew(
+                player_repo=uow.players,
+                stock_repo=uow.stocks,
+                stock_holding_repo=uow.stock_holdings,
+                stock_transaction_repo=uow.stock_transactions,
+                bank_account_repo=uow.bank_accounts
+            )
+
+            # 使用新版本卖出
+            success, message = await stock_service.sell_stock(
+                user_id, symbol, shares, to_bank
+            )
+    else:
+        # 旧版本: 使用静态方法
+        async with safe_session() as session:
+            success, message = await StockService.sell_stock(
+                session, user_id, symbol, shares, to_bank
+            )
 
     if success:
         await stock_sell_cmd.finish(message_add_head(f"✅ {message}", event))
@@ -186,14 +274,38 @@ async def handle_stock_sell(event: MessageEvent, args: Message = CommandArg()):
 @stock_holdings_cmd.handle()
 async def handle_stock_holdings(event: MessageEvent):
     """查看气运投资持仓"""
-    # 被动触发价格更新
-    price_updated = await StockService.check_and_update_prices()
-
     # 获取玩家ID
     from ..platform_utils import get_platform_info
     _, user_id = get_platform_info(event)
 
-    holdings = await StockService.get_player_holdings(user_id)
+    # 被动触发价格更新和获取持仓
+    if USE_NEW_STOCK_SERVICE:
+        # 新版本: 使用DI架构
+        from ..infrastructure.uow.unit_of_work import UnitOfWork
+        from ..models.db import AsyncSessionLocal
+        from .stock_service_new import StockService as StockServiceNew
+
+        def session_factory():
+            return AsyncSessionLocal()
+
+        async with UnitOfWork(session_factory) as uow:
+            # 创建StockService实例
+            stock_service = StockServiceNew(
+                player_repo=uow.players,
+                stock_repo=uow.stocks,
+                stock_holding_repo=uow.stock_holdings,
+                stock_transaction_repo=uow.stock_transactions,
+                bank_account_repo=uow.bank_accounts
+            )
+
+            # 使用新版本
+            price_updated = await stock_service.check_and_update_prices()
+            holdings = await stock_service.get_player_holdings(user_id)
+    else:
+        # 旧版本: 使用静态方法
+        async with safe_session() as session:
+            price_updated = await StockService.check_and_update_prices(session)
+            holdings = await StockService.get_player_holdings(session, user_id)
 
     if not holdings:
         await stock_holdings_cmd.finish(message_add_head("� 您当前没有投资", event))
@@ -201,28 +313,58 @@ async def handle_stock_holdings(event: MessageEvent):
     lines = ["🗠 我的气运投资", "▃▃▃▃▃▃▃▃▃▃"]
 
     # 获取刷新时间信息
-    async with safe_session() as session:
-        stmt = select(Stock).where(Stock.is_active == True).order_by(Stock.updated_at.desc()).limit(1)
-        latest_stock = (await session.execute(stmt)).scalars().first()
+    if USE_NEW_STOCK_SERVICE:
+        from ..infrastructure.uow.unit_of_work import UnitOfWork
+        from ..models.db import AsyncSessionLocal
 
-        if latest_stock:
-            next_update_time = latest_stock.updated_at + StockService.PRICE_UPDATE_INTERVAL
-            now = datetime.now()
-            time_until_update = next_update_time - now
+        def session_factory():
+            return AsyncSessionLocal()
 
-            if price_updated:
-                lines.append("🔄 价格已更新")
-            else:
-                if time_until_update.total_seconds() > 0:
-                    hours = int(time_until_update.total_seconds() // 3600)
-                    minutes = int((time_until_update.total_seconds() % 3600) // 60)
-                    if hours > 0:
-                        lines.append(f"⏰ 下次刷新：{hours}小时{minutes}分钟后")
-                    else:
-                        lines.append(f"⏰ 下次刷新：{minutes}分钟后")
+        async with UnitOfWork(session_factory) as uow:
+            stmt = select(Stock).where(Stock.is_active == True).order_by(Stock.updated_at.desc()).limit(1)
+            latest_stock = (await uow.session.execute(stmt)).scalars().first()
+
+            if latest_stock:
+                next_update_time = latest_stock.updated_at + StockService.PRICE_UPDATE_INTERVAL
+                now = datetime.now()
+                time_until_update = next_update_time - now
+
+                if price_updated:
+                    lines.append("🔄 价格已更新")
                 else:
-                    lines.append("⏰ 即将刷新价格...")
-            lines.append("")
+                    if time_until_update.total_seconds() > 0:
+                        hours = int(time_until_update.total_seconds() // 3600)
+                        minutes = int((time_until_update.total_seconds() % 3600) // 60)
+                        if hours > 0:
+                            lines.append(f"⏰ 下次刷新：{hours}小时{minutes}分钟后")
+                        else:
+                            lines.append(f"⏰ 下次刷新：{minutes}分钟后")
+                    else:
+                        lines.append("⏰ 即将刷新价格...")
+                lines.append("")
+    else:
+        async with safe_session() as session:
+            stmt = select(Stock).where(Stock.is_active == True).order_by(Stock.updated_at.desc()).limit(1)
+            latest_stock = (await session.execute(stmt)).scalars().first()
+
+            if latest_stock:
+                next_update_time = latest_stock.updated_at + StockService.PRICE_UPDATE_INTERVAL
+                now = datetime.now()
+                time_until_update = next_update_time - now
+
+                if price_updated:
+                    lines.append("🔄 价格已更新")
+                else:
+                    if time_until_update.total_seconds() > 0:
+                        hours = int(time_until_update.total_seconds() // 3600)
+                        minutes = int((time_until_update.total_seconds() % 3600) // 60)
+                        if hours > 0:
+                            lines.append(f"⏰ 下次刷新：{hours}小时{minutes}分钟后")
+                        else:
+                            lines.append(f"⏰ 下次刷新：{minutes}分钟后")
+                    else:
+                        lines.append("⏰ 即将刷新价格...")
+                lines.append("")
 
     total_value = 0
     total_cost = 0
@@ -260,7 +402,31 @@ async def handle_stock_transactions(event: MessageEvent):
     from ..platform_utils import get_platform_info
     _, user_id = get_platform_info(event)
 
-    transactions = await StockService.get_player_transactions(user_id, 10)
+    if USE_NEW_STOCK_SERVICE:
+        # 新版本: 使用DI架构
+        from ..infrastructure.uow.unit_of_work import UnitOfWork
+        from ..models.db import AsyncSessionLocal
+        from .stock_service_new import StockService as StockServiceNew
+
+        def session_factory():
+            return AsyncSessionLocal()
+
+        async with UnitOfWork(session_factory) as uow:
+            # 创建StockService实例
+            stock_service = StockServiceNew(
+                player_repo=uow.players,
+                stock_repo=uow.stocks,
+                stock_holding_repo=uow.stock_holdings,
+                stock_transaction_repo=uow.stock_transactions,
+                bank_account_repo=uow.bank_accounts
+            )
+
+            # 使用新版本
+            transactions = await stock_service.get_player_transactions(user_id, 10)
+    else:
+        # 旧版本: 使用静态方法
+        async with safe_session() as session:
+            transactions = await StockService.get_player_transactions(session, user_id, 10)
 
     if not transactions:
         await stock_transactions_cmd.finish(message_add_head("📋 您还没有投资记录", event))
@@ -340,7 +506,31 @@ async def handle_stock_update(event: MessageEvent):
     # 注意：权限检查已在命令注册时通过 permission=SUPERUSER 完成，这里无需再次检查
     try:
         # 强制更新价格
-        updated = await StockService.check_and_update_prices(force_update=True)
+        if USE_NEW_STOCK_SERVICE:
+            # 新版本: 使用DI架构
+            from ..infrastructure.uow.unit_of_work import UnitOfWork
+            from ..models.db import AsyncSessionLocal
+            from .stock_service_new import StockService as StockServiceNew
+
+            def session_factory():
+                return AsyncSessionLocal()
+
+            async with UnitOfWork(session_factory) as uow:
+                # 创建StockService实例
+                stock_service = StockServiceNew(
+                    player_repo=uow.players,
+                    stock_repo=uow.stocks,
+                    stock_holding_repo=uow.stock_holdings,
+                    stock_transaction_repo=uow.stock_transactions,
+                    bank_account_repo=uow.bank_accounts
+                )
+
+                # 使用新版本强制更新
+                updated = await stock_service.check_and_update_prices(force_update=True)
+        else:
+            # 旧版本: 使用静态方法
+            async with safe_session() as session:
+                updated = await StockService.check_and_update_prices(session, force_update=True)
 
         if updated:
             await stock_update_cmd.finish(message_add_head("✅ 气运价格已强制更新", event))

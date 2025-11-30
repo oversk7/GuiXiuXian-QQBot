@@ -11,6 +11,8 @@ from sqlalchemy import select as _sel
 from ..models.inventory import ItemInstance as _Equip, ItemType
 from ..models.monthly_card import get_player_card_benefits
 
+# Feature Flag: 控制是否使用新版MansionService (DI架构)
+USE_NEW_MANSION_SERVICE = True
 
 cfg = config.game_config["cultivate"]
 
@@ -130,23 +132,47 @@ async def handle_cultivate(event: MessageEvent):
 
         # 检查当前位置是否有阴宅
         current_x, current_y = player.get_current_coordinates()
-        mansion_owner = await MansionService.find_mansion_owner_at_location(session, current_x, current_y)
 
-        if mansion_owner:
-            # 检查是否可以使用阴宅
-            can_use, use_msg = await MansionService.can_use_mansion(session, player, mansion_owner)
+        if USE_NEW_MANSION_SERVICE:
+            from ..infrastructure.repositories.player_repository import PlayerRepository
+            from .mansion_service_new import MansionService as MansionServiceNew
 
-            if can_use:
-                # 支付使用费用
-                payment_success, payment_msg = await MansionService.pay_mansion_usage_fee(session, player, mansion_owner)
+            service = MansionServiceNew(
+                player_repo=PlayerRepository(session),
+            )
+            mansion_owner = await service.find_mansion_owner_at_location(current_x, current_y)
 
-                if payment_success:
-                    mansion_cultivation_bonus = MansionService.get_efficiency_bonus(mansion_owner.mansion_level)
-                    if payment_msg:  # 如果有支付信息
-                        mansion_usage_msg = f"\n✧ 阴宅费用 💰 {payment_msg}"
-                else:
-                    # 支付失败，无法使用阴宅加成
-                    mansion_cultivation_bonus = 0.0
+            if mansion_owner:
+                can_use, use_msg = await service.can_use_mansion(player, mansion_owner)
+
+                if can_use:
+                    payment_success, payment_msg = await service.pay_mansion_usage_fee(player, mansion_owner)
+
+                    if payment_success:
+                        mansion_cultivation_bonus = MansionService.get_efficiency_bonus(mansion_owner.mansion_level)
+                        if payment_msg:  # 如果有支付信息
+                            mansion_usage_msg = f"\n✧ 阴宅费用 💰 {payment_msg}"
+                    else:
+                        # 支付失败，无法使用阴宅加成
+                        mansion_cultivation_bonus = 0.0
+        else:
+            mansion_owner = await MansionService.find_mansion_owner_at_location(session, current_x, current_y)
+
+            if mansion_owner:
+                # 检查是否可以使用阴宅
+                can_use, use_msg = await MansionService.can_use_mansion(session, player, mansion_owner)
+
+                if can_use:
+                    # 支付使用费用
+                    payment_success, payment_msg = await MansionService.pay_mansion_usage_fee(session, player, mansion_owner)
+
+                    if payment_success:
+                        mansion_cultivation_bonus = MansionService.get_efficiency_bonus(mansion_owner.mansion_level)
+                        if payment_msg:  # 如果有支付信息
+                            mansion_usage_msg = f"\n✧ 阴宅费用 💰 {payment_msg}"
+                    else:
+                        # 支付失败，无法使用阴宅加成
+                        mansion_cultivation_bonus = 0.0
 
         # 分别计算各种加成（都基于基础经验）
         from .reincarnation import ReincarnationService
@@ -247,18 +273,39 @@ async def handle_seclusion(event: MessageEvent):
 
         # 检查当前位置是否有阴宅
         current_x, current_y = player.get_current_coordinates()
-        mansion_owner = await MansionService.find_mansion_owner_at_location(session, current_x, current_y)
 
-        if mansion_owner:
-            # 闭关时只检查是否有阴宅加成，不支付费用
-            # 如果是自己的阴宅，可以享受加成
-            if player.id == mansion_owner.id:
-                mansion_cultivation_bonus = MansionService.get_efficiency_bonus(mansion_owner.mansion_level)
-            # 如果是他人阴宅，需要检查阴宅主人是否允许使用，以及玩家是否愿意使用他人阴宅
-            elif (mansion_owner.mansion_allow_others and
-                  mansion_owner.mansion_level > 0 and
-                  player.mansion_willing_to_pay):
-                mansion_cultivation_bonus = MansionService.get_efficiency_bonus(mansion_owner.mansion_level)
+        if USE_NEW_MANSION_SERVICE:
+            from ..infrastructure.repositories.player_repository import PlayerRepository
+            from .mansion_service_new import MansionService as MansionServiceNew
+
+            service = MansionServiceNew(
+                player_repo=PlayerRepository(session),
+            )
+            mansion_owner = await service.find_mansion_owner_at_location(current_x, current_y)
+
+            if mansion_owner:
+                # 闭关时只检查是否有阴宅加成，不支付费用
+                # 如果是自己的阴宅，可以享受加成
+                if player.id == mansion_owner.id:
+                    mansion_cultivation_bonus = MansionService.get_efficiency_bonus(mansion_owner.mansion_level)
+                # 如果是他人阴宅，需要检查阴宅主人是否允许使用，以及玩家是否愿意使用他人阴宅
+                elif (mansion_owner.mansion_allow_others and
+                      mansion_owner.mansion_level > 0 and
+                      player.mansion_willing_to_pay):
+                    mansion_cultivation_bonus = MansionService.get_efficiency_bonus(mansion_owner.mansion_level)
+        else:
+            mansion_owner = await MansionService.find_mansion_owner_at_location(session, current_x, current_y)
+
+            if mansion_owner:
+                # 闭关时只检查是否有阴宅加成，不支付费用
+                # 如果是自己的阴宅，可以享受加成
+                if player.id == mansion_owner.id:
+                    mansion_cultivation_bonus = MansionService.get_efficiency_bonus(mansion_owner.mansion_level)
+                # 如果是他人阴宅，需要检查阴宅主人是否允许使用，以及玩家是否愿意使用他人阴宅
+                elif (mansion_owner.mansion_allow_others and
+                      mansion_owner.mansion_level > 0 and
+                      player.mansion_willing_to_pay):
+                    mansion_cultivation_bonus = MansionService.get_efficiency_bonus(mansion_owner.mansion_level)
 
         # 计算棺材钉数量和效率加成（最多100根，50%加成）
         coffin_nail_count = await get_coffin_nail_count(session, player.id)
@@ -348,23 +395,47 @@ async def handle_out_seclusion(event: MessageEvent):
 
         # 检查当前位置是否有阴宅
         current_x, current_y = player.get_current_coordinates()
-        mansion_owner = await MansionService.find_mansion_owner_at_location(session, current_x, current_y)
 
-        if mansion_owner:
-            # 检查是否可以使用阴宅
-            can_use, _ = await MansionService.can_use_mansion(session, player, mansion_owner)
+        if USE_NEW_MANSION_SERVICE:
+            from ..infrastructure.repositories.player_repository import PlayerRepository
+            from .mansion_service_new import MansionService as MansionServiceNew
 
-            if can_use:
-                # 支付使用费用
-                payment_success, payment_msg = await MansionService.pay_mansion_usage_fee(session, player, mansion_owner)
+            service = MansionServiceNew(
+                player_repo=PlayerRepository(session),
+            )
+            mansion_owner = await service.find_mansion_owner_at_location(current_x, current_y)
 
-                if payment_success:
-                    mansion_cultivation_bonus = MansionService.get_efficiency_bonus(mansion_owner.mansion_level)
-                    if payment_msg:  # 如果有支付信息
-                        mansion_usage_msg = f"\n✧ 阴宅费用 💰 {payment_msg}"
-                else:
-                    # 支付失败，无法使用阴宅加成
-                    mansion_cultivation_bonus = 0.0
+            if mansion_owner:
+                can_use, _ = await service.can_use_mansion(player, mansion_owner)
+
+                if can_use:
+                    payment_success, payment_msg = await service.pay_mansion_usage_fee(player, mansion_owner)
+
+                    if payment_success:
+                        mansion_cultivation_bonus = MansionService.get_efficiency_bonus(mansion_owner.mansion_level)
+                        if payment_msg:  # 如果有支付信息
+                            mansion_usage_msg = f"\n✧ 阴宅费用 💰 {payment_msg}"
+                    else:
+                        # 支付失败，无法使用阴宅加成
+                        mansion_cultivation_bonus = 0.0
+        else:
+            mansion_owner = await MansionService.find_mansion_owner_at_location(session, current_x, current_y)
+
+            if mansion_owner:
+                # 检查是否可以使用阴宅
+                can_use, _ = await MansionService.can_use_mansion(session, player, mansion_owner)
+
+                if can_use:
+                    # 支付使用费用
+                    payment_success, payment_msg = await MansionService.pay_mansion_usage_fee(session, player, mansion_owner)
+
+                    if payment_success:
+                        mansion_cultivation_bonus = MansionService.get_efficiency_bonus(mansion_owner.mansion_level)
+                        if payment_msg:  # 如果有支付信息
+                            mansion_usage_msg = f"\n✧ 阴宅费用 💰 {payment_msg}"
+                    else:
+                        # 支付失败，无法使用阴宅加成
+                        mansion_cultivation_bonus = 0.0
 
         # 计算棺材钉数量和效率加成（最多100根，50%加成）
         coffin_nail_count = await get_coffin_nail_count(session, player.id)

@@ -9,6 +9,11 @@ from ..config import config
 from .marriage_service import MarriageService
 from .mentorship_service import MentorshipService
 
+# ==================== Feature Flag ====================
+# 设置为True使用新版DI架构的MentorshipService，False使用旧版本
+USE_NEW_MENTORSHIP_SERVICE = True
+# =====================================================
+
 
 class GiftService:
     """礼物系统服务类"""
@@ -23,17 +28,43 @@ class GiftService:
         marriage = await MarriageService.get_marriage(session, sender_id)
         if marriage and marriage.involves_player(receiver_id):
             return True, "", GiftType.MARRIAGE
-        
+
         # 检查是否为师徒关系
-        mentorship = await MentorshipService.get_mentorship(session, sender_id, receiver_id)
+        if USE_NEW_MENTORSHIP_SERVICE:
+            from ..infrastructure.repositories.player_repository import PlayerRepository
+            from ..infrastructure.repositories.social_application_repository import SocialApplicationRepository
+            from ..infrastructure.repositories.mentorship_repository import MentorshipRepository
+            from .mentorship_service_new import MentorshipService as MentorshipServiceNew
+
+            service = MentorshipServiceNew(
+                player_repo=PlayerRepository(session),
+                social_app_repo=SocialApplicationRepository(session),
+                mentorship_repo=MentorshipRepository(session),
+            )
+            mentorship = await service.get_mentorship(sender_id, receiver_id)
+        else:
+            mentorship = await MentorshipService.get_mentorship(session, sender_id, receiver_id)
         if mentorship:
             return True, "", GiftType.MENTORSHIP
         
         # 检查反向师徒关系
-        mentorship = await MentorshipService.get_mentorship(session, receiver_id, sender_id)
+        if USE_NEW_MENTORSHIP_SERVICE:
+            from ..infrastructure.repositories.player_repository import PlayerRepository
+            from ..infrastructure.repositories.social_application_repository import SocialApplicationRepository
+            from ..infrastructure.repositories.mentorship_repository import MentorshipRepository
+            from .mentorship_service_new import MentorshipService as MentorshipServiceNew
+
+            service = MentorshipServiceNew(
+                player_repo=PlayerRepository(session),
+                social_app_repo=SocialApplicationRepository(session),
+                mentorship_repo=MentorshipRepository(session),
+            )
+            mentorship = await service.get_mentorship(receiver_id, sender_id)
+        else:
+            mentorship = await MentorshipService.get_mentorship(session, receiver_id, sender_id)
         if mentorship:
             return True, "", GiftType.MENTORSHIP
-        
+
         return False, "只能向配偶或师父/徒弟送礼", None
     
     @staticmethod

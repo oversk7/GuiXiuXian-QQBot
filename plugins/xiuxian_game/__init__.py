@@ -33,11 +33,36 @@ from . import (
     admin,  # 管理员功能（包含抽奖系统）
 )
 
-# 导入跨平台绑定模块
-from . import platform_binding_commands
-
 driver = get_driver()
 
 @driver.on_startup
 async def _():
-    await init_db() 
+    await init_db()
+
+    # 注册效果系统（物品效果适配器 + 战斗效果桥接器）
+    from .domain.effects.adapters import (
+        register_all_item_effect_adapters,
+        register_all_battle_effect_bridges,
+        USE_NEW_EFFECT_SYSTEM
+    )
+    from nonebot import logger
+
+    try:
+        # 注册物品效果适配器
+        adapters = register_all_item_effect_adapters()
+        logger.success(f"[EffectSystem] 成功注册 {len(adapters)} 个物品效果适配器")
+
+        # 注册战斗效果桥接器
+        bridges = register_all_battle_effect_bridges()
+        logger.success(f"[EffectSystem] 成功注册 {len(bridges)} 个战斗效果桥接器")
+
+        # Feature Flag状态
+        if USE_NEW_EFFECT_SYSTEM:
+            logger.success("[EffectSystem] 新效果系统已启用")
+        else:
+            logger.info("[EffectSystem] 新效果系统已注册但未启用（Feature Flag关闭）")
+
+    except Exception as e:
+        logger.error(f"[EffectSystem] 注册效果系统失败: {e}")
+        import traceback
+        traceback.print_exc() 

@@ -14,13 +14,33 @@ from ..models.social_application import SocialApplication, ApplicationType, Appl
 from ..models.donation_log import PlayerDonationLog
 from ..models.navigation_task import NavigationTask
 from .guild_application_service import GuildApplicationService
+from .guild_application_service_new import GuildApplicationService as GuildApplicationServiceNew  # DI版本
 from .guild_service import GuildService
+from .guild_service_new import GuildService as GuildServiceNew  # DI版本
 from .guild_permission import GuildPermission
 from .guild_economy_service import GuildEconomyService
+from .guild_economy_service_new import GuildEconomyService as GuildEconomyServiceNew  # DI版本
 from .guild_building_service import GuildBuildingService
+from .guild_building_service_new import GuildBuildingService as GuildBuildingServiceNew  # DI版本
 from .guild_task_service import GuildTaskService
+from .guild_task_service_new import GuildTaskService as GuildTaskServiceNew  # DI版本
 from .guild_facility_service import GuildFacilityService
+from .guild_facility_service_new import GuildFacilityService as GuildFacilityServiceNew  # DI版本
 from .guild_daily_tasks import GuildDailyTasks
+
+# ===== Feature Flag =====
+# 设置为True使用新版DI架构的GuildService
+USE_NEW_GUILD_SERVICE = True
+# 设置为True使用新版DI架构的GuildApplicationService（修复P0问题：移除内部commit）
+USE_NEW_GUILD_APPLICATION_SERVICE = True
+# 设置为True使用新版DI架构的GuildBuildingService
+USE_NEW_GUILD_BUILDING_SERVICE = True
+# 设置为True使用新版DI架构的GuildEconomyService
+USE_NEW_GUILD_ECONOMY_SERVICE = True
+# 设置为True使用新版DI架构的GuildFacilityService
+USE_NEW_GUILD_FACILITY_SERVICE = True
+# 设置为True使用新版DI架构的GuildTaskService
+USE_NEW_GUILD_TASK_SERVICE = True
 
 # ===== 工具函数 =====
 # 翻译大数字为 w（万）单位，保留 1 位小数，10w 以下不显示 w
@@ -48,47 +68,66 @@ async def handle_create_guild(event: MessageEvent, args: Message = CommandArg())
     if len(guild_name) > 16:
         await create_guild_cmd.finish("⛔ 公会名称长度不能超过16个字符")
 
-    async with safe_session() as session:
-        # 获取玩家
-        player = await session.get(Player, event.get_user_id())
-        if not player:
-            await create_guild_cmd.finish("⛔ 请先创建角色")
-        if player.guild_id is not None:
-            await create_guild_cmd.finish("⛔ 你已经加入公会，无法再次创建")
+    if USE_NEW_GUILD_SERVICE:
+        # 新版本: 使用DI架构，所有操作在同一个UoW事务中
+        from ..infrastructure.uow.unit_of_work import UnitOfWork
+        from ..models.db import AsyncSessionLocal
 
-        # 检查会长委任书
-        president_cfg = config.items_config["by_name"].get("会长委任书")
-        if not president_cfg:
-            await create_guild_cmd.finish("⚠️ 配置缺少 会长委任书")
+        def session_factory():
+            return AsyncSessionLocal()
 
-        result = await session.execute(
-            select(ItemInstance).where(
-                ItemInstance.player_id == player.id,
-                ItemInstance.item_id == president_cfg.item_id
+        async with UnitOfWork(session_factory) as uow:
+            # 1. 获取玩家（使用UoW的session）
+            player = await uow.session.get(Player, event.get_user_id())
+            if not player:
+                await create_guild_cmd.finish("⛔ 请先创建角色")
+            if player.guild_id is not None:
+                await create_guild_cmd.finish("⛔ 你已经加入公会，无法再次创建")
+
+            # 2. 检查会长委任书
+            president_cfg = config.items_config["by_name"].get("会长委任书")
+            if not president_cfg:
+                await create_guild_cmd.finish("⚠️ 配置缺少 会长委任书")
+
+            result = await uow.session.execute(
+                select(ItemInstance).where(
+                    ItemInstance.player_id == player.id,
+                    ItemInstance.item_id == president_cfg.item_id
+                )
             )
-        )
-        inv = result.scalars().first()
-        if not inv or inv.quantity < 1:
-            await create_guild_cmd.finish("⛔ 你没有会长委任书")
+            inv = result.scalars().first()
+            if not inv or inv.quantity < 1:
+                await create_guild_cmd.finish("⛔ 你没有会长委任书")
 
-        # 检查公会名重复
-        exist_stmt = select(Guild).where(Guild.name == guild_name)
-        if (await session.execute(exist_stmt)).scalars().first():
-            await create_guild_cmd.finish("⛔ 已存在同名公会")
+            # 3. 检查公会名重复（使用UoW的仓储）
+            existing_guild = await uow.guilds.get_by_name(guild_name)
+            if existing_guild:
+                await create_guild_cmd.finish("⛔ 已存在同名公会")
 
-        # 使用新的公会服务创建公会
-        success, message, new_guild = await GuildService.create_guild(session, player.id, guild_name)
+            # 4. 使用UoW的仓储创建Service
+            guild_service = GuildServiceNew(
+                player_repo=uow.players,
+                guild_repo=uow.guilds,
+                uow=uow
+            )
 
-        if not success:
-            await create_guild_cmd.finish(f"⛔ {message}")
+            # 5. 创建公会
+            success, message, new_guild = await guild_service.create_guild(
+                player_id=player.id,
+                guild_name=guild_name
+            )
 
-        # 扣除委任书
-        inv.quantity -= 1
-        if inv.quantity <= 0:
-            await session.delete(inv)
+            if not success:
+                await create_guild_cmd.finish(f"⛔ {message}")
 
-        await session.commit()
+            # 6. 扣除委任书（在同一个事务中）
+            inv.quantity -= 1
+            if inv.quantity <= 0:
+                await uow.session.delete(inv)
 
+            # 7. UoW会在__aexit__中自动commit所有操作
+
+        # 8. 返回成功消息
         msg = (
             f"🏰 公会『{guild_name}』正式成立！\n"
             f"▫️ 会长：{player.nickname}\n"
@@ -96,81 +135,192 @@ async def handle_create_guild(event: MessageEvent, args: Message = CommandArg())
             f"▫️ 职位：{GuildPermission.get_position_display_name(GuildPosition.PRESIDENT)}"
         )
         await create_guild_cmd.finish(message_add_head(msg, event))
+    else:
+        # 旧版本: 静态方法
+        async with safe_session() as session:
+            # 获取玩家
+            player = await session.get(Player, event.get_user_id())
+            if not player:
+                await create_guild_cmd.finish("⛔ 请先创建角色")
+            if player.guild_id is not None:
+                await create_guild_cmd.finish("⛔ 你已经加入公会，无法再次创建")
+
+            # 检查会长委任书
+            president_cfg = config.items_config["by_name"].get("会长委任书")
+            if not president_cfg:
+                await create_guild_cmd.finish("⚠️ 配置缺少 会长委任书")
+
+            result = await session.execute(
+                select(ItemInstance).where(
+                    ItemInstance.player_id == player.id,
+                    ItemInstance.item_id == president_cfg.item_id
+                )
+            )
+            inv = result.scalars().first()
+            if not inv or inv.quantity < 1:
+                await create_guild_cmd.finish("⛔ 你没有会长委任书")
+
+            # 检查公会名重复
+            exist_stmt = select(Guild).where(Guild.name == guild_name)
+            if (await session.execute(exist_stmt)).scalars().first():
+                await create_guild_cmd.finish("⛔ 已存在同名公会")
+
+            # 使用公会服务创建公会
+            success, message, new_guild = await GuildService.create_guild(session, player.id, guild_name)
+
+            if not success:
+                await create_guild_cmd.finish(f"⛔ {message}")
+
+            # 扣除委任书
+            inv.quantity -= 1
+            if inv.quantity <= 0:
+                await session.delete(inv)
+
+            await session.commit()
+
+            msg = (
+                f"🏰 公会『{guild_name}』正式成立！\n"
+                f"▫️ 会长：{player.nickname}\n"
+                f"▫️ 公会 ID：{new_guild.id}\n"
+                f"▫️ 职位：{GuildPermission.get_position_display_name(GuildPosition.PRESIDENT)}"
+            )
+            await create_guild_cmd.finish(message_add_head(msg, event))
 
 # ==================== 公会信息 ====================
 guild_info_cmd = on_command("公会", aliases={"我的公会", "公会信息"}, block=True, priority=5,force_whitespace=True)
 
 @guild_info_cmd.handle()
 async def handle_guild_info(event: MessageEvent):
-    async with safe_session() as session:
-        player = await session.get(Player, event.get_user_id())
-        if not player or player.guild_id is None:
-            await guild_info_cmd.finish("⛔ 你尚未加入任何公会")
+    if USE_NEW_GUILD_SERVICE:
+        # 新版本: 使用DI架构
+        from ..infrastructure.uow.unit_of_work import UnitOfWork
+        from ..models.db import AsyncSessionLocal
+        from .guild_service_new import GuildService as GuildServiceNew
 
-        guild_obj = await session.get(Guild, player.guild_id)
-        if not guild_obj:
-            # 数据不一致，修正玩家字段
-            player.guild_id = None
-            session.add(player)
-            await session.commit()
-            await guild_info_cmd.finish("⚠️ 公会数据异常，请稍后重试")
+        def session_factory():
+            return AsyncSessionLocal()
 
-        # 触发公会每日刷新（静默执行，不显示结果）
-        await GuildDailyTasks.trigger_guild_daily_refresh(session, player.guild_id)
+        async with UnitOfWork(session_factory) as uow:
+            player = await uow.session.get(Player, event.get_user_id())
+            if not player or player.guild_id is None:
+                await guild_info_cmd.finish("⛔ 你尚未加入任何公会")
 
-        # 获取玩家职位
-        player_position = await GuildPermission.get_member_position(session, player.id, guild_obj.id)
-        position_name = GuildPermission.get_position_display_name(player_position) if player_position else "未知"
+            guild_obj = await uow.session.get(Guild, player.guild_id)
+            if not guild_obj:
+                # 数据不一致，修正玩家字段
+                player.guild_id = None
+                uow.session.add(player)
+                await uow.commit()
+                await guild_info_cmd.finish("⚠️ 公会数据异常，请稍后重试")
 
-        # 会长信息
-        president = await session.get(Player, guild_obj.president_id)
+            # 触发公会每日刷新（静默执行，不显示结果）
+            await GuildDailyTasks.trigger_guild_daily_refresh(uow.session, player.guild_id)
 
-        # 成员统计
-        member_count = await GuildService.get_member_count(session, guild_obj.id)
-        capacity = GuildService.get_guild_capacity(guild_obj.level)
+            # 获取玩家职位
+            player_position = await GuildPermission.get_member_position(uow.session, player.id, guild_obj.id)
+            position_name = GuildPermission.get_position_display_name(player_position) if player_position else "未知"
 
-        # 经验和升级信息
-        exp_current = GuildEconomyService.format_large_number(guild_obj.exp)
-        upgrade_cost = GuildEconomyService.get_guild_upgrade_cost(guild_obj.level)
-        exp_need = GuildEconomyService.format_large_number(upgrade_cost["exp"])
+            # 会长信息
+            president = await uow.session.get(Player, guild_obj.president_id)
 
-        # 资金信息
-        treasury = GuildEconomyService.format_large_number(guild_obj.treasury)
-
-        # 建筑加成信息
-        bonuses = await GuildBuildingService.get_guild_bonuses(session, guild_obj.id)
-        exp_multiplier = bonuses.get("exp_multiplier", 1.0)
-        cultivation_bonus = bonuses.get("cultivation_bonus", 0.0)
-
-        # 基地信息
-        base_info = ""
-        if guild_obj.base_x is not None and guild_obj.base_y is not None:
-            base_info = (
-                f"▫️ 基地坐标：({guild_obj.base_x}, {guild_obj.base_y})\n"
-                f"▫️ 势力范围：{guild_obj.territory_range}×{guild_obj.territory_range}\n"
+            # 创建GuildService实例
+            guild_service = GuildServiceNew(
+                player_repo=uow.players,
+                guild_repo=uow.guilds,
+                uow=uow
             )
-        elif guild_obj.level >= 2:
-            base_info = f"▫️ 基地坐标：未设置（可使用【设置基地】命令）\n"
 
-        # 加成信息
-        bonus_info = f"▫️ 经验倍率：{exp_multiplier:.1f}x\n"
-        if cultivation_bonus > 0:
-            bonus_info += f"▫️ 修为加成：+{cultivation_bonus*100:.1f}%\n"
+            # 成员统计 (使用新版本)
+            member_count = await guild_service.get_member_count(guild_obj.id)
+            capacity = guild_service.get_guild_capacity(guild_obj.level)
 
-        msg = (
-            f"🏰 公会面板\n"
-            f"▫️『{guild_obj.name}』[ID:{guild_obj.id}] Lv.{guild_obj.level}\n"
-            f"▫️ 会长：{president.nickname if president else '未知'}\n"
-            f"▫️ 你的职位：{position_name}\n"
-            f"▫️ 人数：{member_count}/{capacity}\n"
-            f"▫️ 经验：{exp_current}/{exp_need}\n"
-            f"▫️ 资金库：{treasury}\n"
-            f"{bonus_info}"
-            f"▫️ 创建时间：{guild_obj.created_at.strftime('%Y-%m-%d')}\n"
-            f"{base_info}"
-            f"▫️ 公告：{guild_obj.notice or '暂无公告'}"
+            # 为后续代码提供session引用
+            session = uow.session
+    else:
+        # 旧版本: 使用静态方法
+        async with safe_session() as session:
+            player = await session.get(Player, event.get_user_id())
+            if not player or player.guild_id is None:
+                await guild_info_cmd.finish("⛔ 你尚未加入任何公会")
+
+            guild_obj = await session.get(Guild, player.guild_id)
+            if not guild_obj:
+                # 数据不一致，修正玩家字段
+                player.guild_id = None
+                session.add(player)
+                await session.commit()
+                await guild_info_cmd.finish("⚠️ 公会数据异常，请稍后重试")
+
+            # 触发公会每日刷新（静默执行，不显示结果）
+            await GuildDailyTasks.trigger_guild_daily_refresh(session, player.guild_id)
+
+            # 获取玩家职位
+            player_position = await GuildPermission.get_member_position(session, player.id, guild_obj.id)
+            position_name = GuildPermission.get_position_display_name(player_position) if player_position else "未知"
+
+            # 会长信息
+            president = await session.get(Player, guild_obj.president_id)
+
+            # 成员统计 (使用旧版本)
+            member_count = await GuildService.get_member_count(session, guild_obj.id)
+            capacity = GuildService.get_guild_capacity(guild_obj.level)
+
+    # 经验和升级信息
+    exp_current = GuildEconomyService.format_large_number(guild_obj.exp)
+    upgrade_cost = GuildEconomyService.get_guild_upgrade_cost(guild_obj.level)
+    exp_need = GuildEconomyService.format_large_number(upgrade_cost["exp"])
+
+    # 资金信息
+    treasury = GuildEconomyService.format_large_number(guild_obj.treasury)
+
+    # 建筑加成信息
+    if USE_NEW_GUILD_BUILDING_SERVICE:
+        # 新版：使用DI架构Service
+        from ..infrastructure.repositories.guild_repository import GuildRepository
+        from ..infrastructure.repositories.guild_building_repository import GuildBuildingRepository
+
+        building_service = GuildBuildingServiceNew(
+            guild_repo=GuildRepository(session),
+            building_repo=GuildBuildingRepository(session),
+            item_repo=None  # get_guild_bonuses不需要item_repo
         )
-        await guild_info_cmd.finish(message_add_head(msg, event))
+        bonuses = await building_service.get_guild_bonuses(guild_obj.id)
+    else:
+        # 旧版：使用静态方法
+        bonuses = await GuildBuildingService.get_guild_bonuses(session, guild_obj.id)
+
+    exp_multiplier = bonuses.get("exp_multiplier", 1.0)
+    cultivation_bonus = bonuses.get("cultivation_bonus", 0.0)
+
+    # 基地信息
+    base_info = ""
+    if guild_obj.base_x is not None and guild_obj.base_y is not None:
+        base_info = (
+            f"▫️ 基地坐标：({guild_obj.base_x}, {guild_obj.base_y})\n"
+            f"▫️ 势力范围：{guild_obj.territory_range}×{guild_obj.territory_range}\n"
+        )
+    elif guild_obj.level >= 2:
+        base_info = f"▫️ 基地坐标：未设置（可使用【设置基地】命令）\n"
+
+    # 加成信息
+    bonus_info = f"▫️ 经验倍率：{exp_multiplier:.1f}x\n"
+    if cultivation_bonus > 0:
+        bonus_info += f"▫️ 修为加成：+{cultivation_bonus*100:.1f}%\n"
+
+    msg = (
+        f"🏰 公会面板\n"
+        f"▫️『{guild_obj.name}』[ID:{guild_obj.id}] Lv.{guild_obj.level}\n"
+        f"▫️ 会长：{president.nickname if president else '未知'}\n"
+        f"▫️ 你的职位：{position_name}\n"
+        f"▫️ 人数：{member_count}/{capacity}\n"
+        f"▫️ 经验：{exp_current}/{exp_need}\n"
+        f"▫️ 资金库：{treasury}\n"
+        f"{bonus_info}"
+        f"▫️ 创建时间：{guild_obj.created_at.strftime('%Y-%m-%d')}\n"
+        f"{base_info}"
+        f"▫️ 公告：{guild_obj.notice or '暂无公告'}"
+    )
+    await guild_info_cmd.finish(message_add_head(msg, event))
 
 # ==================== 公会加成 ====================
 guild_bonuses_cmd = on_command("公会加成", aliases={"加成效果"}, block=True, priority=5)
@@ -184,7 +334,21 @@ async def handle_guild_bonuses(event: MessageEvent):
             await guild_bonuses_cmd.finish("⛔ 你未加入任何公会")
 
         guild = await session.get(Guild, player.guild_id)
-        bonuses = await GuildBuildingService.get_guild_bonuses(session, player.guild_id)
+
+        if USE_NEW_GUILD_BUILDING_SERVICE:
+            # 新版：使用DI架构Service
+            from ..infrastructure.repositories.guild_repository import GuildRepository
+            from ..infrastructure.repositories.guild_building_repository import GuildBuildingRepository
+
+            building_service = GuildBuildingServiceNew(
+                guild_repo=GuildRepository(session),
+                building_repo=GuildBuildingRepository(session),
+                item_repo=None  # get_guild_bonuses不需要item_repo
+            )
+            bonuses = await building_service.get_guild_bonuses(player.guild_id)
+        else:
+            # 旧版：使用静态方法
+            bonuses = await GuildBuildingService.get_guild_bonuses(session, player.guild_id)
 
         lines = [f"🎯 公会『{guild.name}』加成效果", "━━━━━━━━━━"]
 
@@ -266,16 +430,42 @@ async def handle_join_guild(event: MessageEvent, args: Message = CommandArg()):
         if not player:
             await join_guild_cmd.finish("⛔ 请先创建角色")
 
-        # 检查是否可以申请加入公会
-        can_apply, reason = await GuildApplicationService.can_apply_guild(session, player.id, guild_id)
-        if not can_apply:
-            await join_guild_cmd.finish(f"⛔ {reason}")
+        if USE_NEW_GUILD_APPLICATION_SERVICE:
+            # 新版：使用DI架构Service（修复P0问题：移除内部commit）
+            from ..infrastructure.repositories.player_repository import PlayerRepository
+            from ..infrastructure.repositories.guild_repository import GuildRepository
+            from ..infrastructure.repositories.social_application_repository import SocialApplicationRepository
 
-        # 获取公会信息
-        guild_obj = await session.get(Guild, guild_id)
+            service = GuildApplicationServiceNew(
+                player_repo=PlayerRepository(session),
+                guild_repo=GuildRepository(session),
+                application_repo=SocialApplicationRepository(session)
+            )
 
-        # 创建申请记录
-        await GuildApplicationService.create_guild_application(session, player.id, guild_id)
+            # 检查是否可以申请加入公会
+            can_apply, reason = await service.can_apply_guild(player.id, guild_id)
+            if not can_apply:
+                await join_guild_cmd.finish(f"⛔ {reason}")
+
+            # 获取公会信息
+            guild_obj = await session.get(Guild, guild_id)
+
+            # 创建申请记录
+            await service.create_guild_application(player.id, guild_id)
+            await session.commit()  # 由调用方控制事务边界
+        else:
+            # 旧版：使用@staticmethod静态方法（有P0问题：内部commit）
+            # 检查是否可以申请加入公会
+            can_apply, reason = await GuildApplicationService.can_apply_guild(session, player.id, guild_id)
+            if not can_apply:
+                await join_guild_cmd.finish(f"⛔ {reason}")
+
+            # 获取公会信息
+            guild_obj = await session.get(Guild, guild_id)
+
+            # 创建申请记录
+            await GuildApplicationService.create_guild_application(session, player.id, guild_id)
+            # 旧版内部已commit，无需手动commit
 
         await join_guild_cmd.finish(message_add_head(f"✅ 已向『{guild_obj.name}』提交入会申请，等待审核", event))
 
@@ -284,22 +474,56 @@ quit_guild_cmd = on_command("退会", aliases={"退出公会"}, block=True, prio
 
 @quit_guild_cmd.handle()
 async def handle_quit_guild(event: MessageEvent):
-    async with safe_session() as session:
-        player = await session.get(Player, event.get_user_id())
-        if not player or player.guild_id is None:
-            await quit_guild_cmd.finish("⛔ 你未加入任何公会")
+    if USE_NEW_GUILD_SERVICE:
+        # 新版本: 使用DI架构
+        from ..infrastructure.uow.unit_of_work import UnitOfWork
+        from ..models.db import AsyncSessionLocal
+        from .guild_service_new import GuildService as GuildServiceNew
 
-        guild_obj = await session.get(Guild, player.guild_id)
-        guild_name = guild_obj.name if guild_obj else "未知公会"
+        def session_factory():
+            return AsyncSessionLocal()
 
-        # 使用新的公会服务退出公会
-        success, message = await GuildService.leave_guild(session, player.id)
+        async with UnitOfWork(session_factory) as uow:
+            player = await uow.session.get(Player, event.get_user_id())
+            if not player or player.guild_id is None:
+                await quit_guild_cmd.finish("⛔ 你未加入任何公会")
 
-        if not success:
-            await quit_guild_cmd.finish(f"⛔ {message}")
+            guild_obj = await uow.session.get(Guild, player.guild_id)
+            guild_name = guild_obj.name if guild_obj else "未知公会"
 
-        await session.commit()
-        await quit_guild_cmd.finish(message_add_head(f"🚪 你已退出公会『{guild_name}』，个人积分和贡献已清空", event))
+            # 创建GuildService实例
+            guild_service = GuildServiceNew(
+                player_repo=uow.players,
+                guild_repo=uow.guilds,
+                uow=uow
+            )
+
+            # 使用新版本退出公会
+            success, message = await guild_service.leave_guild(player.id)
+
+            if not success:
+                await quit_guild_cmd.finish(f"⛔ {message}")
+
+            # UoW会在__aexit__中自动commit
+            await quit_guild_cmd.finish(message_add_head(f"🚪 你已退出公会『{guild_name}』，个人积分和贡献已清空", event))
+    else:
+        # 旧版本: 使用静态方法
+        async with safe_session() as session:
+            player = await session.get(Player, event.get_user_id())
+            if not player or player.guild_id is None:
+                await quit_guild_cmd.finish("⛔ 你未加入任何公会")
+
+            guild_obj = await session.get(Guild, player.guild_id)
+            guild_name = guild_obj.name if guild_obj else "未知公会"
+
+            # 使用旧版本退出公会
+            success, message = await GuildService.leave_guild(session, player.id)
+
+            if not success:
+                await quit_guild_cmd.finish(f"⛔ {message}")
+
+            await session.commit()
+            await quit_guild_cmd.finish(message_add_head(f"🚪 你已退出公会『{guild_name}』，个人积分和贡献已清空", event))
 
 # ==================== 解散公会 ====================
 
@@ -347,54 +571,82 @@ async def handle_member_list(event: MessageEvent, args: Message = CommandArg()):
         page = 1
     page = max(1, page)
 
-    async with safe_session() as session:
-        player = await session.get(Player, event.get_user_id())
-        if not player or player.guild_id is None:
-            await member_list_cmd.finish("⛔ 你未加入任何公会")
-        guild_obj = await session.get(Guild, player.guild_id)
-        if not guild_obj:
-            await member_list_cmd.finish("⚠️ 公会数据异常")
+    if USE_NEW_GUILD_SERVICE:
+        # 新版本: 使用DI架构
+        from ..infrastructure.uow.unit_of_work import UnitOfWork
+        from ..models.db import AsyncSessionLocal
+        from .guild_service_new import GuildService as GuildServiceNew
 
-        # 使用新的公会服务获取成员列表
-        all_members = await GuildService.get_guild_members(session, guild_obj.id)
+        def session_factory():
+            return AsyncSessionLocal()
 
-        # 计算分页
-        total_members = len(all_members)
-        if total_members == 0:
-            await member_list_cmd.finish("⛔ 公会暂无成员")
+        async with UnitOfWork(session_factory) as uow:
+            player = await uow.session.get(Player, event.get_user_id())
+            if not player or player.guild_id is None:
+                await member_list_cmd.finish("⛔ 你未加入任何公会")
+            guild_obj = await uow.session.get(Guild, player.guild_id)
+            if not guild_obj:
+                await member_list_cmd.finish("⚠️ 公会数据异常")
 
-        total_pages = (total_members - 1) // page_size + 1
-        page = min(page, total_pages)
-
-        # 获取当前页的成员
-        start_idx = (page - 1) * page_size
-        end_idx = start_idx + page_size
-        members = all_members[start_idx:end_idx]
-
-        lines = [f"👥 公会成员『{guild_obj.name}』({total_members}人) 第{page}/{total_pages}页", "━━━━━━━━━━━━━"]
-        for idx, member in enumerate(members, start_idx + 1):
-            # 职位图标
-            position_icons = {
-                GuildPosition.PRESIDENT: "👑",
-                GuildPosition.VICE_PRESIDENT: "⭐",
-                GuildPosition.CORE_MEMBER: "🔸",
-                GuildPosition.MEMBER: ""
-            }
-            icon = position_icons.get(member["position"], "")
-
-            lines.append(
-                f"{idx}. {member['nickname']}[{member['uid']}]{icon} "
-                f"Lv.{member['level']} "
-                f"{member['position_name']} "
-                f"贡:{GuildEconomyService.format_large_number(member['contribution'])}"
+            # 创建GuildService实例
+            guild_service = GuildServiceNew(
+                player_repo=uow.players,
+                guild_repo=uow.guilds,
+                uow=uow
             )
 
-        # 添加分页提示
-        if total_pages > 1:
-            lines.append("━━━━━━━━━━━━━")
-            lines.append(f"💡 使用「公会成员 页码」查看其他页面")
+            # 使用新版本获取成员列表
+            all_members = await guild_service.get_guild_members(guild_obj.id)
+    else:
+        # 旧版本: 使用静态方法
+        async with safe_session() as session:
+            player = await session.get(Player, event.get_user_id())
+            if not player or player.guild_id is None:
+                await member_list_cmd.finish("⛔ 你未加入任何公会")
+            guild_obj = await session.get(Guild, player.guild_id)
+            if not guild_obj:
+                await member_list_cmd.finish("⚠️ 公会数据异常")
 
-        await member_list_cmd.finish(message_add_head("\n".join(lines), event))
+            # 使用旧版本获取成员列表
+            all_members = await GuildService.get_guild_members(session, guild_obj.id)
+
+    # 计算分页 (两个版本共享)
+    total_members = len(all_members)
+    if total_members == 0:
+        await member_list_cmd.finish("⛔ 公会暂无成员")
+
+    total_pages = (total_members - 1) // page_size + 1
+    page = min(page, total_pages)
+
+    # 获取当前页的成员
+    start_idx = (page - 1) * page_size
+    end_idx = start_idx + page_size
+    members = all_members[start_idx:end_idx]
+
+    lines = [f"👥 公会成员『{guild_obj.name}』({total_members}人) 第{page}/{total_pages}页", "━━━━━━━━━━━━━"]
+    for idx, member in enumerate(members, start_idx + 1):
+        # 职位图标
+        position_icons = {
+            GuildPosition.PRESIDENT: "👑",
+            GuildPosition.VICE_PRESIDENT: "⭐",
+            GuildPosition.CORE_MEMBER: "🔸",
+            GuildPosition.MEMBER: ""
+        }
+        icon = position_icons.get(member["position"], "")
+
+        lines.append(
+            f"{idx}. {member['nickname']}[{member['uid']}]{icon} "
+            f"Lv.{member['level']} "
+            f"{member['position_name']} "
+            f"贡:{GuildEconomyService.format_large_number(member['contribution'])}"
+        )
+
+    # 添加分页提示
+    if total_pages > 1:
+        lines.append("━━━━━━━━━━━━━")
+        lines.append(f"💡 使用「公会成员 页码」查看其他页面")
+
+    await member_list_cmd.finish(message_add_head("\n".join(lines), event))
 
 # ==================== 捐献金币 ====================
 donate_cmd = on_command("捐献金币", aliases={"贡献", "捐献","上供"}, block=True, priority=5)
@@ -412,16 +664,50 @@ async def handle_donate(event: MessageEvent, args: Message = CommandArg()):
         await donate_cmd.finish("⛔ 金额必须为正整数")
 
     async with safe_session() as session:
-        # 使用新的经济服务处理捐献
-        success, message, result = await GuildEconomyService.donate_gold(session, event.get_user_id(), amt)
+        # 使用经济服务处理捐献
+        if USE_NEW_GUILD_ECONOMY_SERVICE:
+            # 新版：使用DI架构Service
+            from ..infrastructure.repositories.guild_repository import GuildRepository
+            from ..infrastructure.repositories.player_repository import PlayerRepository
+            from ..infrastructure.repositories.guild_building_repository import GuildBuildingRepository
+            from ..infrastructure.repositories.player_donation_log_repository import PlayerDonationLogRepository
+
+            economy_service = GuildEconomyServiceNew(
+                guild_repo=GuildRepository(session),
+                player_repo=PlayerRepository(session),
+                donation_log_repo=PlayerDonationLogRepository(session),
+                building_repo=GuildBuildingRepository(session)
+            )
+            success, message, result = await economy_service.donate_gold(event.get_user_id(), amt)
+        else:
+            # 旧版：使用静态方法
+            success, message, result = await GuildEconomyService.donate_gold(session, event.get_user_id(), amt)
 
         if not success:
             await donate_cmd.finish(f"⛔ {message}")
 
         # 检查并完成每日捐献任务
-        task_success, task_message, task_result = await GuildTaskService.complete_daily_donation_task(session, event.get_user_id())
+        if USE_NEW_GUILD_TASK_SERVICE:
+            from ..infrastructure.repositories.player_repository import PlayerRepository
+            from ..infrastructure.repositories.guild_repository import GuildRepository
+            from ..infrastructure.repositories.player_task_stats_repository import PlayerTaskStatsRepository
+            from ..infrastructure.repositories.guild_task_record_repository import GuildTaskRecordRepository
+            from ..infrastructure.repositories.player_donation_log_repository import PlayerDonationLogRepository
+            from ..infrastructure.repositories.guild_building_repository import GuildBuildingRepository
 
-        await session.commit()
+            task_service = GuildTaskServiceNew(
+                player_repo=PlayerRepository(session),
+                guild_repo=GuildRepository(session),
+                player_task_stats_repo=PlayerTaskStatsRepository(session),
+                guild_task_record_repo=GuildTaskRecordRepository(session),
+                player_donation_log_repo=PlayerDonationLogRepository(session),
+                guild_building_repo=GuildBuildingRepository(session),
+            )
+            task_success, task_message, task_result = await task_service.complete_daily_donation_task(event.get_user_id())
+        else:
+            task_success, task_message, task_result = await GuildTaskService.complete_daily_donation_task(session, event.get_user_id())
+
+        await session.commit()  # 由调用方控制事务边界
 
         # 构建返回消息
         msg_lines = [
@@ -456,12 +742,28 @@ async def handle_guild_upgrade(event: MessageEvent):
         if not player or not player.guild_id:
             await guild_upgrade_cmd.finish("⛔ 你未加入任何公会")
 
-        success, message = await GuildEconomyService.upgrade_guild(session, player.guild_id, player.id)
+        if USE_NEW_GUILD_ECONOMY_SERVICE:
+            # 新版：使用DI架构Service
+            from ..infrastructure.repositories.guild_repository import GuildRepository
+            from ..infrastructure.repositories.player_repository import PlayerRepository
+            from ..infrastructure.repositories.guild_building_repository import GuildBuildingRepository
+            from ..infrastructure.repositories.player_donation_log_repository import PlayerDonationLogRepository
+
+            economy_service = GuildEconomyServiceNew(
+                guild_repo=GuildRepository(session),
+                player_repo=PlayerRepository(session),
+                donation_log_repo=PlayerDonationLogRepository(session),
+                building_repo=GuildBuildingRepository(session)
+            )
+            success, message = await economy_service.upgrade_guild(player.guild_id, player.id)
+        else:
+            # 旧版：使用静态方法
+            success, message = await GuildEconomyService.upgrade_guild(session, player.guild_id, player.id)
 
         if not success:
             await guild_upgrade_cmd.finish(f"⛔ {message}")
 
-        await session.commit()
+        await session.commit()  # 由调用方控制事务边界
         await guild_upgrade_cmd.finish(message_add_head(f"🎉 {message}", event))
 
 # ==================== 转让会长 ====================
@@ -562,7 +864,19 @@ async def handle_app_list(event: MessageEvent):
         if not can_manage:
             await application_list_cmd.finish(f"⛔ {reason}")
 
-        apps = await GuildApplicationService.get_pending_applications(session, player.guild_id)
+        if USE_NEW_GUILD_APPLICATION_SERVICE:
+            # 新版：使用DI架构Service
+            from ..infrastructure.repositories.social_application_repository import SocialApplicationRepository
+            service = GuildApplicationServiceNew(
+                player_repo=PlayerRepository(session),
+                guild_repo=GuildRepository(session),
+                application_repo=SocialApplicationRepository(session)
+            )
+            apps = await service.get_pending_applications(player.guild_id)
+        else:
+            # 旧版：使用@staticmethod静态方法
+            apps = await GuildApplicationService.get_pending_applications(session, player.guild_id)
+
         if not apps:
             await application_list_cmd.finish("暂无待处理申请")
 
@@ -588,45 +902,145 @@ async def _process_application(event: MessageEvent, args: Message, approve: bool
     except ValueError:
         await (approve_cmd if approve else reject_cmd).finish("UID 必须为数字")
 
-    async with safe_session() as session:
-        player = await session.get(Player, event.get_user_id())
-        if not player or player.guild_id is None:
-            await (approve_cmd if approve else reject_cmd).finish("⛔ 你未加入公会")
+    if USE_NEW_GUILD_SERVICE:
+        # 新版本: 使用DI架构
+        from ..infrastructure.uow.unit_of_work import UnitOfWork
+        from ..models.db import AsyncSessionLocal
+        from .guild_service_new import GuildService as GuildServiceNew
 
-        # 检查是否有管理权限（会长和副会长）
-        from .guild_permission import GuildPermission
-        can_manage, reason = await GuildPermission.can_manage_guild(session, player.id, player.guild_id)
-        if not can_manage:
-            await (approve_cmd if approve else reject_cmd).finish(f"⛔ {reason}")
+        def session_factory():
+            return AsyncSessionLocal()
 
-        guild_obj = await session.get(Guild, player.guild_id)
-        applicant = (await session.execute(select(Player).where(Player.uid == target_uid))).scalars().first()
-        if not applicant:
-            await (approve_cmd if approve else reject_cmd).finish("⛔ 未找到该 UID")
+        async with UnitOfWork(session_factory) as uow:
+            player = await uow.session.get(Player, event.get_user_id())
+            if not player or player.guild_id is None:
+                await (approve_cmd if approve else reject_cmd).finish("⛔ 你未加入公会")
 
-        app = await GuildApplicationService.get_application_by_player_and_guild(session, applicant.id, guild_obj.id)
-        if not app:
-            await (approve_cmd if approve else reject_cmd).finish("⛔ 无待处理申请")
+            # 检查是否有管理权限（会长和副会长）
+            from .guild_permission import GuildPermission
+            can_manage, reason = await GuildPermission.can_manage_guild(uow.session, player.id, player.guild_id)
+            if not can_manage:
+                await (approve_cmd if approve else reject_cmd).finish(f"⛔ {reason}")
 
-        if approve:
-            # 使用新的公会服务加入公会
-            success, reason = await GuildService.join_guild(session, applicant.id, guild_obj.id)
-            if not success:
-                await (approve_cmd if approve else reject_cmd).finish(message_add_head(f"⛔ {reason}", event))
+            guild_obj = await uow.session.get(Guild, player.guild_id)
+            applicant = (await uow.session.execute(select(Player).where(Player.uid == target_uid))).scalars().first()
+            if not applicant:
+                await (approve_cmd if approve else reject_cmd).finish("⛔ 未找到该 UID")
 
-            # 标记申请为已批准
-            app.status = ApplicationStatus.APPROVED
-            app.processed_at = datetime.now()
-            session.add(app)
+            if USE_NEW_GUILD_APPLICATION_SERVICE:
+                # 新版：使用DI架构GuildApplicationService
+                from ..infrastructure.repositories.social_application_repository import SocialApplicationRepository
+                app_service = GuildApplicationServiceNew(
+                    player_repo=uow.players,
+                    guild_repo=uow.guilds,
+                    application_repo=SocialApplicationRepository(uow.session)
+                )
+                app = await app_service.get_application_by_player_and_guild(applicant.id, guild_obj.id)
+            else:
+                # 旧版：使用@staticmethod静态方法
+                app = await GuildApplicationService.get_application_by_player_and_guild(uow.session, applicant.id, guild_obj.id)
 
-            result_msg = f"✅ 已同意 {applicant.nickname}[UID:{target_uid}] 加入公会"
-        else:
-            await GuildApplicationService.reject_application(session, app)
-            result_msg = f"🚫 已拒绝 {applicant.nickname}[UID:{target_uid}] 的申请"
+            if not app:
+                await (approve_cmd if approve else reject_cmd).finish("⛔ 无待处理申请")
 
-        # 提交事务
-        await session.commit()
-        await (approve_cmd if approve else reject_cmd).finish(message_add_head(result_msg, event))
+            if approve:
+                # 创建GuildService实例
+                guild_service = GuildServiceNew(
+                    player_repo=uow.players,
+                    guild_repo=uow.guilds,
+                    uow=uow
+                )
+
+                # 使用新版本加入公会
+                success, reason = await guild_service.join_guild(applicant.id, guild_obj.id)
+                if not success:
+                    await (approve_cmd if approve else reject_cmd).finish(message_add_head(f"⛔ {reason}", event))
+
+                if USE_NEW_GUILD_APPLICATION_SERVICE:
+                    # 新版：使用DI架构Service批准申请
+                    await app_service.approve_application(app, guild_obj)
+                else:
+                    # 旧版：手动标记申请为已批准
+                    app.status = ApplicationStatus.APPROVED
+                    app.processed_at = datetime.now()
+                    uow.session.add(app)
+
+                result_msg = f"✅ 已同意 {applicant.nickname}[UID:{target_uid}] 加入公会"
+            else:
+                if USE_NEW_GUILD_APPLICATION_SERVICE:
+                    # 新版：使用DI架构Service拒绝申请
+                    await app_service.reject_application(app)
+                else:
+                    # 旧版：使用@staticmethod静态方法（有P0问题：内部commit）
+                    await GuildApplicationService.reject_application(uow.session, app)
+                result_msg = f"🚫 已拒绝 {applicant.nickname}[UID:{target_uid}] 的申请"
+
+            # UoW会在__aexit__中自动commit
+            await (approve_cmd if approve else reject_cmd).finish(message_add_head(result_msg, event))
+    else:
+        # 旧版本: 使用静态方法
+        async with safe_session() as session:
+            player = await session.get(Player, event.get_user_id())
+            if not player or player.guild_id is None:
+                await (approve_cmd if approve else reject_cmd).finish("⛔ 你未加入公会")
+
+            # 检查是否有管理权限（会长和副会长）
+            from .guild_permission import GuildPermission
+            can_manage, reason = await GuildPermission.can_manage_guild(session, player.id, player.guild_id)
+            if not can_manage:
+                await (approve_cmd if approve else reject_cmd).finish(f"⛔ {reason}")
+
+            guild_obj = await session.get(Guild, player.guild_id)
+            applicant = (await session.execute(select(Player).where(Player.uid == target_uid))).scalars().first()
+            if not applicant:
+                await (approve_cmd if approve else reject_cmd).finish("⛔ 未找到该 UID")
+
+            if USE_NEW_GUILD_APPLICATION_SERVICE:
+                # 新版：使用DI架构GuildApplicationService
+                from ..infrastructure.repositories.player_repository import PlayerRepository
+                from ..infrastructure.repositories.guild_repository import GuildRepository
+                from ..infrastructure.repositories.social_application_repository import SocialApplicationRepository
+                app_service = GuildApplicationServiceNew(
+                    player_repo=PlayerRepository(session),
+                    guild_repo=GuildRepository(session),
+                    application_repo=SocialApplicationRepository(session)
+                )
+                app = await app_service.get_application_by_player_and_guild(applicant.id, guild_obj.id)
+            else:
+                # 旧版：使用@staticmethod静态方法
+                app = await GuildApplicationService.get_application_by_player_and_guild(session, applicant.id, guild_obj.id)
+
+            if not app:
+                await (approve_cmd if approve else reject_cmd).finish("⛔ 无待处理申请")
+
+            if approve:
+                # 使用旧版本加入公会
+                success, reason = await GuildService.join_guild(session, applicant.id, guild_obj.id)
+                if not success:
+                    await (approve_cmd if approve else reject_cmd).finish(message_add_head(f"⛔ {reason}", event))
+
+                if USE_NEW_GUILD_APPLICATION_SERVICE:
+                    # 新版：使用DI架构Service批准申请
+                    await app_service.approve_application(app, guild_obj)
+                else:
+                    # 旧版：手动标记申请为已批准
+                    app.status = ApplicationStatus.APPROVED
+                    app.processed_at = datetime.now()
+                    session.add(app)
+
+                result_msg = f"✅ 已同意 {applicant.nickname}[UID:{target_uid}] 加入公会"
+            else:
+                if USE_NEW_GUILD_APPLICATION_SERVICE:
+                    # 新版：使用DI架构Service拒绝申请
+                    await app_service.reject_application(app)
+                else:
+                    # 旧版：使用@staticmethod静态方法（有P0问题：内部commit）
+                    await GuildApplicationService.reject_application(session, app)
+                result_msg = f"🚫 已拒绝 {applicant.nickname}[UID:{target_uid}] 的申请"
+
+            # 提交事务
+            await session.commit()
+            await (approve_cmd if approve else reject_cmd).finish(message_add_head(result_msg, event))
 
 @approve_cmd.handle()
 async def _(event: MessageEvent, args: Message = CommandArg()):
@@ -760,30 +1174,72 @@ async def handle_set_position(event: MessageEvent, args: Message = CommandArg())
 
     new_position = position_map[position_name]
 
-    async with safe_session() as session:
-        player = await session.get(Player, event.get_user_id())
-        if not player or not player.guild_id:
-            await set_position_cmd.finish("⛔ 你未加入任何公会")
+    if USE_NEW_GUILD_SERVICE:
+        # 新版本: 使用DI架构
+        from ..infrastructure.uow.unit_of_work import UnitOfWork
+        from ..models.db import AsyncSessionLocal
+        from .guild_service_new import GuildService as GuildServiceNew
 
-        # 查找目标玩家
-        target_stmt = select(Player).where(Player.uid == int(target_uid))
-        target_player = (await session.execute(target_stmt)).scalars().first()
-        if not target_player:
-            await set_position_cmd.finish("⛔ 未找到该UID的玩家")
+        def session_factory():
+            return AsyncSessionLocal()
 
-        if target_player.guild_id != player.guild_id:
-            await set_position_cmd.finish("⛔ 该玩家不在你的公会中")
+        async with UnitOfWork(session_factory) as uow:
+            player = await uow.session.get(Player, event.get_user_id())
+            if not player or not player.guild_id:
+                await set_position_cmd.finish("⛔ 你未加入任何公会")
 
-        # 设置职位
-        success, message = await GuildService.set_member_position(
-            session, player.id, player.guild_id, target_player.id, new_position
-        )
+            # 查找目标玩家
+            target_stmt = select(Player).where(Player.uid == int(target_uid))
+            target_player = (await uow.session.execute(target_stmt)).scalars().first()
+            if not target_player:
+                await set_position_cmd.finish("⛔ 未找到该UID的玩家")
 
-        if not success:
-            await set_position_cmd.finish(f"⛔ {message}")
+            if target_player.guild_id != player.guild_id:
+                await set_position_cmd.finish("⛔ 该玩家不在你的公会中")
 
-        await session.commit()
-        await set_position_cmd.finish(message_add_head(f"✅ {message}", event))
+            # 创建GuildService实例
+            guild_service = GuildServiceNew(
+                player_repo=uow.players,
+                guild_repo=uow.guilds,
+                uow=uow
+            )
+
+            # 使用新版本设置职位
+            success, message = await guild_service.set_member_position(
+                player.id, player.guild_id, target_player.id, new_position
+            )
+
+            if not success:
+                await set_position_cmd.finish(f"⛔ {message}")
+
+            # UoW会在__aexit__中自动commit
+            await set_position_cmd.finish(message_add_head(f"✅ {message}", event))
+    else:
+        # 旧版本: 使用静态方法
+        async with safe_session() as session:
+            player = await session.get(Player, event.get_user_id())
+            if not player or not player.guild_id:
+                await set_position_cmd.finish("⛔ 你未加入任何公会")
+
+            # 查找目标玩家
+            target_stmt = select(Player).where(Player.uid == int(target_uid))
+            target_player = (await session.execute(target_stmt)).scalars().first()
+            if not target_player:
+                await set_position_cmd.finish("⛔ 未找到该UID的玩家")
+
+            if target_player.guild_id != player.guild_id:
+                await set_position_cmd.finish("⛔ 该玩家不在你的公会中")
+
+            # 使用旧版本设置职位
+            success, message = await GuildService.set_member_position(
+                session, player.id, player.guild_id, target_player.id, new_position
+            )
+
+            if not success:
+                await set_position_cmd.finish(f"⛔ {message}")
+
+            await session.commit()
+            await set_position_cmd.finish(message_add_head(f"✅ {message}", event))
 
 # ==================== 踢出公会成员 ====================
 kick_member_cmd = on_command("踢出公会", aliases={"踢出成员"}, block=True, priority=5)
@@ -800,21 +1256,54 @@ async def handle_kick_member(event: MessageEvent, args: Message = CommandArg()):
     except ValueError:
         await kick_member_cmd.finish("⛔ UID 必须是数字")
 
-    async with safe_session() as session:
-        player = await session.get(Player, event.get_user_id())
-        if not player or not player.guild_id:
-            await kick_member_cmd.finish("⛔ 你未加入任何公会")
+    if USE_NEW_GUILD_SERVICE:
+        # 新版本: 使用DI架构
+        from ..infrastructure.uow.unit_of_work import UnitOfWork
+        from ..models.db import AsyncSessionLocal
+        from .guild_service_new import GuildService as GuildServiceNew
 
-        # 踢出成员
-        success, message = await GuildService.kick_member(
-            session, player.id, player.guild_id, target_uid
-        )
+        def session_factory():
+            return AsyncSessionLocal()
 
-        if not success:
-            await kick_member_cmd.finish(f"⛔ {message}")
+        async with UnitOfWork(session_factory) as uow:
+            player = await uow.session.get(Player, event.get_user_id())
+            if not player or not player.guild_id:
+                await kick_member_cmd.finish("⛔ 你未加入任何公会")
 
-        await session.commit()
-        await kick_member_cmd.finish(message_add_head(f"🚪 {message}", event))
+            # 创建GuildService实例
+            guild_service = GuildServiceNew(
+                player_repo=uow.players,
+                guild_repo=uow.guilds,
+                uow=uow
+            )
+
+            # 使用新版本踢出成员
+            success, message = await guild_service.kick_member(
+                player.id, player.guild_id, target_uid
+            )
+
+            if not success:
+                await kick_member_cmd.finish(f"⛔ {message}")
+
+            # UoW会在__aexit__中自动commit
+            await kick_member_cmd.finish(message_add_head(f"🚪 {message}", event))
+    else:
+        # 旧版本: 使用静态方法
+        async with safe_session() as session:
+            player = await session.get(Player, event.get_user_id())
+            if not player or not player.guild_id:
+                await kick_member_cmd.finish("⛔ 你未加入任何公会")
+
+            # 使用旧版本踢出成员
+            success, message = await GuildService.kick_member(
+                session, player.id, player.guild_id, target_uid
+            )
+
+            if not success:
+                await kick_member_cmd.finish(f"⛔ {message}")
+
+            await session.commit()
+            await kick_member_cmd.finish(message_add_head(f"🚪 {message}", event))
 
 # ==================== 公会建筑管理 ====================
 guild_buildings_cmd = on_command("公会建筑", aliases={"建筑列表"}, block=True, priority=5)
@@ -828,15 +1317,32 @@ async def handle_guild_buildings(event: MessageEvent):
             await guild_buildings_cmd.finish("⛔ 你未加入任何公会")
 
         guild = await session.get(Guild, player.guild_id)
-        buildings = await GuildBuildingService.get_guild_buildings(session, player.guild_id)
+
+        if USE_NEW_GUILD_BUILDING_SERVICE:
+            # 新版：使用DI架构Service
+            from ..infrastructure.repositories.guild_repository import GuildRepository
+            from ..infrastructure.repositories.guild_building_repository import GuildBuildingRepository
+
+            building_service = GuildBuildingServiceNew(
+                guild_repo=GuildRepository(session),
+                building_repo=GuildBuildingRepository(session),
+                item_repo=None  # get_guild_buildings不需要item_repo
+            )
+            buildings = await building_service.get_guild_buildings(player.guild_id)
+        else:
+            # 旧版：使用静态方法
+            buildings = await GuildBuildingService.get_guild_buildings(session, player.guild_id)
 
         if not buildings:
             msg = f"🏗️ 公会『{guild.name}』建筑列表\n━━━━━━━━━━\n暂无建筑"
         else:
             lines = [f"🏗️ 公会『{guild.name}』建筑列表", "━━━━━━━━━━"]
             for building in buildings:
-                # 使用建筑服务的格式化方法
-                effects_str = GuildBuildingService.format_building_effects(building["effects"])
+                # 使用建筑服务的格式化方法（静态方法，新旧版本都可用）
+                if USE_NEW_GUILD_BUILDING_SERVICE:
+                    effects_str = GuildBuildingServiceNew.format_building_effects(building["effects"])
+                else:
+                    effects_str = GuildBuildingService.format_building_effects(building["effects"])
                 lines.append(f"▫️ {building['name']} Lv.{building['level']}/{building['max_level']}")
                 lines.append(f"   效果：{effects_str}")
             msg = "\n".join(lines)
@@ -875,7 +1381,21 @@ async def handle_build(event: MessageEvent, args: Message = CommandArg()):
             await build_cmd.finish("⛔ 你未加入任何公会")
 
         # 获取建造成本
-        cost = await GuildBuildingService.get_build_cost(session, player.guild_id, building_type)
+        if USE_NEW_GUILD_BUILDING_SERVICE:
+            # 新版：使用DI架构Service
+            from ..infrastructure.repositories.guild_repository import GuildRepository
+            from ..infrastructure.repositories.guild_building_repository import GuildBuildingRepository
+
+            building_service = GuildBuildingServiceNew(
+                guild_repo=GuildRepository(session),
+                building_repo=GuildBuildingRepository(session),
+                item_repo=None  # get_build_cost不需要item_repo
+            )
+            cost = await building_service.get_build_cost(player.guild_id, building_type)
+        else:
+            # 旧版：使用静态方法
+            cost = await GuildBuildingService.get_build_cost(session, player.guild_id, building_type)
+
         if not cost:
             await build_cmd.finish("⛔ 该建筑已达到最高等级")
 
@@ -934,12 +1454,28 @@ async def handle_confirm_build_with_name(event: MessageEvent, args: Message = Co
             await confirm_build_with_name_cmd.finish("⛔ 你未加入任何公会")
 
         # 执行建造
-        success, message = await GuildBuildingService.build_or_upgrade(
-            session, player.guild_id, building_type, player.id
-        )
+        if USE_NEW_GUILD_BUILDING_SERVICE:
+            # 新版：使用DI架构Service（由调用方控制事务边界）
+            from ..infrastructure.repositories.guild_repository import GuildRepository
+            from ..infrastructure.repositories.guild_building_repository import GuildBuildingRepository
+            from ..infrastructure.repositories.item_repository import ItemRepository
+
+            building_service = GuildBuildingServiceNew(
+                guild_repo=GuildRepository(session),
+                building_repo=GuildBuildingRepository(session),
+                item_repo=ItemRepository(session)  # build_or_upgrade需要item_repo消耗材料
+            )
+            success, message = await building_service.build_or_upgrade(
+                player.guild_id, building_type, player.id
+            )
+        else:
+            # 旧版：使用静态方法
+            success, message = await GuildBuildingService.build_or_upgrade(
+                session, player.guild_id, building_type, player.id
+            )
 
         if success:
-            await session.commit()
+            await session.commit()  # 由调用方控制事务边界
             await confirm_build_with_name_cmd.finish(message_add_head(f"🏗️ {message}", event))
         else:
             await confirm_build_with_name_cmd.finish(message_add_head(f"⛔ {message}", event))
@@ -969,7 +1505,27 @@ async def handle_guild_teleport(event: MessageEvent, args: Message = CommandArg(
 
         # 如果没有参数，传送到公会基地
         if not args_text:
-            success, message = await GuildFacilityService.teleport_to_guild(session, player.id, player.guild_id)
+            if USE_NEW_GUILD_FACILITY_SERVICE:
+                from ..infrastructure.repositories.guild_repository import GuildRepository
+                from ..infrastructure.repositories.guild_building_repository import GuildBuildingRepository
+                from ..infrastructure.repositories.player_repository import PlayerRepository
+                from ..infrastructure.repositories.item_repository import ItemRepository
+                from ..infrastructure.repositories.guild_teleport_log_repository import GuildTeleportLogRepository
+                from ..infrastructure.repositories.guild_alchemy_production_repository import GuildAlchemyProductionRepository
+                from ..infrastructure.repositories.guild_warehouse_item_repository import GuildWarehouseItemRepository
+
+                facility_service = GuildFacilityServiceNew(
+                    guild_repo=GuildRepository(session),
+                    building_repo=GuildBuildingRepository(session),
+                    player_repo=PlayerRepository(session),
+                    item_repo=ItemRepository(session),
+                    teleport_log_repo=GuildTeleportLogRepository(session),
+                    alchemy_production_repo=GuildAlchemyProductionRepository(session),
+                    warehouse_item_repo=GuildWarehouseItemRepository(session),
+                )
+                success, message = await facility_service.teleport_to_guild(player.id, player.guild_id)
+            else:
+                success, message = await GuildFacilityService.teleport_to_guild(session, player.id, player.guild_id)
 
             if success:
                 await session.commit()
@@ -1043,7 +1599,27 @@ async def handle_guild_alchemy(event: MessageEvent):
         # 触发丹房产出检查和生成
         refresh_result = await GuildDailyTasks.trigger_guild_daily_refresh(session, player.guild_id)
 
-        productions = await GuildFacilityService.get_alchemy_production_grouped(session, player.guild_id)
+        if USE_NEW_GUILD_FACILITY_SERVICE:
+            from ..infrastructure.repositories.guild_repository import GuildRepository
+            from ..infrastructure.repositories.guild_building_repository import GuildBuildingRepository
+            from ..infrastructure.repositories.player_repository import PlayerRepository
+            from ..infrastructure.repositories.item_repository import ItemRepository
+            from ..infrastructure.repositories.guild_teleport_log_repository import GuildTeleportLogRepository
+            from ..infrastructure.repositories.guild_alchemy_production_repository import GuildAlchemyProductionRepository
+            from ..infrastructure.repositories.guild_warehouse_item_repository import GuildWarehouseItemRepository
+
+            facility_service = GuildFacilityServiceNew(
+                guild_repo=GuildRepository(session),
+                building_repo=GuildBuildingRepository(session),
+                player_repo=PlayerRepository(session),
+                item_repo=ItemRepository(session),
+                teleport_log_repo=GuildTeleportLogRepository(session),
+                alchemy_production_repo=GuildAlchemyProductionRepository(session),
+                warehouse_item_repo=GuildWarehouseItemRepository(session),
+            )
+            productions = await facility_service.get_alchemy_production_grouped(player.guild_id)
+        else:
+            productions = await GuildFacilityService.get_alchemy_production_grouped(session, player.guild_id)
 
         # 提交丹房产出的更改
         await session.commit()
@@ -1092,11 +1668,35 @@ async def handle_exchange_pill(event: MessageEvent, args: Message = CommandArg()
         # 触发丹房产出检查和生成
         await GuildDailyTasks.trigger_guild_daily_refresh(session, player.guild_id)
 
+        # 创建facility_service实例（新旧两个版本都可能需要）
+        if USE_NEW_GUILD_FACILITY_SERVICE:
+            from ..infrastructure.repositories.guild_repository import GuildRepository
+            from ..infrastructure.repositories.guild_building_repository import GuildBuildingRepository
+            from ..infrastructure.repositories.player_repository import PlayerRepository
+            from ..infrastructure.repositories.item_repository import ItemRepository
+            from ..infrastructure.repositories.guild_teleport_log_repository import GuildTeleportLogRepository
+            from ..infrastructure.repositories.guild_alchemy_production_repository import GuildAlchemyProductionRepository
+            from ..infrastructure.repositories.guild_warehouse_item_repository import GuildWarehouseItemRepository
+
+            facility_service = GuildFacilityServiceNew(
+                guild_repo=GuildRepository(session),
+                building_repo=GuildBuildingRepository(session),
+                player_repo=PlayerRepository(session),
+                item_repo=ItemRepository(session),
+                teleport_log_repo=GuildTeleportLogRepository(session),
+                alchemy_production_repo=GuildAlchemyProductionRepository(session),
+                warehouse_item_repo=GuildWarehouseItemRepository(session),
+            )
+
         # 兼容旧格式（纯数字序号）
         if len(params) == 1 and params[0].isdigit():
             try:
                 index = int(params[0])
-                productions = await GuildFacilityService.get_alchemy_production(session, player.guild_id)
+
+                if USE_NEW_GUILD_FACILITY_SERVICE:
+                    productions = await facility_service.get_alchemy_production(player.guild_id)
+                else:
+                    productions = await GuildFacilityService.get_alchemy_production(session, player.guild_id)
 
                 if not productions or index < 1 or index > len(productions):
                     await exchange_pill_cmd.finish("⛔ 无效的序号")
@@ -1110,9 +1710,14 @@ async def handle_exchange_pill(event: MessageEvent, args: Message = CommandArg()
 
                 points_cost = max(1, item_config.price // 100)
 
-                success, message = await GuildFacilityService.claim_alchemy_item(
-                    session, player.id, player.guild_id, selected_prod["id"], points_cost
-                )
+                if USE_NEW_GUILD_FACILITY_SERVICE:
+                    success, message = await facility_service.claim_alchemy_item(
+                        player.id, player.guild_id, selected_prod["id"], points_cost
+                    )
+                else:
+                    success, message = await GuildFacilityService.claim_alchemy_item(
+                        session, player.id, player.guild_id, selected_prod["id"], points_cost
+                    )
             except ValueError:
                 await exchange_pill_cmd.finish("⛔ 序号必须是数字")
         else:
@@ -1128,9 +1733,14 @@ async def handle_exchange_pill(event: MessageEvent, args: Message = CommandArg()
             except ValueError:
                 await exchange_pill_cmd.finish("⛔ 数量必须是正整数")
 
-            success, message = await GuildFacilityService.claim_alchemy_item_by_name(
-                session, player.id, player.guild_id, item_name, quantity
-            )
+            if USE_NEW_GUILD_FACILITY_SERVICE:
+                success, message = await facility_service.claim_alchemy_item_by_name(
+                    player.id, player.guild_id, item_name, quantity
+                )
+            else:
+                success, message = await GuildFacilityService.claim_alchemy_item_by_name(
+                    session, player.id, player.guild_id, item_name, quantity
+                )
 
         if success:
             await session.commit()
@@ -1157,11 +1767,33 @@ async def handle_guild_warehouse(event: MessageEvent):
         if player.x != guild.base_x or player.y != guild.base_y:
             await guild_warehouse_cmd.finish("⛔ 只有在公会基地才能访问仓库")
 
-        capacity = await GuildFacilityService.get_warehouse_capacity(session, player.guild_id)
-        if capacity == 0:
-            await guild_warehouse_cmd.finish("⛔ 公会尚未建造仓库")
+        if USE_NEW_GUILD_FACILITY_SERVICE:
+            from ..infrastructure.repositories.guild_repository import GuildRepository
+            from ..infrastructure.repositories.guild_building_repository import GuildBuildingRepository
+            from ..infrastructure.repositories.player_repository import PlayerRepository
+            from ..infrastructure.repositories.item_repository import ItemRepository
+            from ..infrastructure.repositories.guild_teleport_log_repository import GuildTeleportLogRepository
+            from ..infrastructure.repositories.guild_alchemy_production_repository import GuildAlchemyProductionRepository
+            from ..infrastructure.repositories.guild_warehouse_item_repository import GuildWarehouseItemRepository
 
-        items = await GuildFacilityService.get_warehouse_items(session, player.guild_id)
+            facility_service = GuildFacilityServiceNew(
+                guild_repo=GuildRepository(session),
+                building_repo=GuildBuildingRepository(session),
+                player_repo=PlayerRepository(session),
+                item_repo=ItemRepository(session),
+                teleport_log_repo=GuildTeleportLogRepository(session),
+                alchemy_production_repo=GuildAlchemyProductionRepository(session),
+                warehouse_item_repo=GuildWarehouseItemRepository(session),
+            )
+            capacity = await facility_service.get_warehouse_capacity(player.guild_id)
+            if capacity == 0:
+                await guild_warehouse_cmd.finish("⛔ 公会尚未建造仓库")
+            items = await facility_service.get_warehouse_items(player.guild_id)
+        else:
+            capacity = await GuildFacilityService.get_warehouse_capacity(session, player.guild_id)
+            if capacity == 0:
+                await guild_warehouse_cmd.finish("⛔ 公会尚未建造仓库")
+            items = await GuildFacilityService.get_warehouse_items(session, player.guild_id)
 
         # 获取实际占用的格子数（数据库中的记录数，每个记录代表一个堆叠）
         stmt = select(_func.count(GuildWarehouseItem.id)).where(GuildWarehouseItem.guild_id == player.guild_id)
@@ -1224,9 +1856,31 @@ async def handle_deposit_warehouse(event: MessageEvent, args: Message = CommandA
         if not item_config:
             await deposit_warehouse_cmd.finish("⛔ 未找到该物品")
 
-        success, message = await GuildFacilityService.deposit_to_warehouse(
-            session, player.id, player.guild_id, item_config.item_id, quantity
-        )
+        if USE_NEW_GUILD_FACILITY_SERVICE:
+            from ..infrastructure.repositories.guild_repository import GuildRepository
+            from ..infrastructure.repositories.guild_building_repository import GuildBuildingRepository
+            from ..infrastructure.repositories.player_repository import PlayerRepository
+            from ..infrastructure.repositories.item_repository import ItemRepository
+            from ..infrastructure.repositories.guild_teleport_log_repository import GuildTeleportLogRepository
+            from ..infrastructure.repositories.guild_alchemy_production_repository import GuildAlchemyProductionRepository
+            from ..infrastructure.repositories.guild_warehouse_item_repository import GuildWarehouseItemRepository
+
+            facility_service = GuildFacilityServiceNew(
+                guild_repo=GuildRepository(session),
+                building_repo=GuildBuildingRepository(session),
+                player_repo=PlayerRepository(session),
+                item_repo=ItemRepository(session),
+                teleport_log_repo=GuildTeleportLogRepository(session),
+                alchemy_production_repo=GuildAlchemyProductionRepository(session),
+                warehouse_item_repo=GuildWarehouseItemRepository(session),
+            )
+            success, message = await facility_service.deposit_to_warehouse(
+                player.id, player.guild_id, item_config.item_id, quantity
+            )
+        else:
+            success, message = await GuildFacilityService.deposit_to_warehouse(
+                session, player.id, player.guild_id, item_config.item_id, quantity
+            )
 
         if success:
             await session.commit()
@@ -1269,9 +1923,31 @@ async def handle_withdraw_warehouse(event: MessageEvent, args: Message = Command
         if player.x != guild.base_x or player.y != guild.base_y:
             await withdraw_warehouse_cmd.finish("⛔ 只有在公会基地才能访问仓库")
 
-        success, message = await GuildFacilityService.withdraw_from_warehouse(
-            session, player.id, player.guild_id, index, quantity
-        )
+        if USE_NEW_GUILD_FACILITY_SERVICE:
+            from ..infrastructure.repositories.guild_repository import GuildRepository
+            from ..infrastructure.repositories.guild_building_repository import GuildBuildingRepository
+            from ..infrastructure.repositories.player_repository import PlayerRepository
+            from ..infrastructure.repositories.item_repository import ItemRepository
+            from ..infrastructure.repositories.guild_teleport_log_repository import GuildTeleportLogRepository
+            from ..infrastructure.repositories.guild_alchemy_production_repository import GuildAlchemyProductionRepository
+            from ..infrastructure.repositories.guild_warehouse_item_repository import GuildWarehouseItemRepository
+
+            facility_service = GuildFacilityServiceNew(
+                guild_repo=GuildRepository(session),
+                building_repo=GuildBuildingRepository(session),
+                player_repo=PlayerRepository(session),
+                item_repo=ItemRepository(session),
+                teleport_log_repo=GuildTeleportLogRepository(session),
+                alchemy_production_repo=GuildAlchemyProductionRepository(session),
+                warehouse_item_repo=GuildWarehouseItemRepository(session),
+            )
+            success, message = await facility_service.withdraw_from_warehouse(
+                player.id, player.guild_id, index, quantity
+            )
+        else:
+            success, message = await GuildFacilityService.withdraw_from_warehouse(
+                session, player.id, player.guild_id, index, quantity
+            )
 
         if success:
             await session.commit()

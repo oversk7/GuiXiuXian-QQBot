@@ -19,14 +19,34 @@ from .equipment_upgrade_service import EquipmentUpgradeService
 from .equipment_commands import (
     find_equipment_by_input,
     get_equipment_short_id,
-    EQUIP_ITEM_IDS,
-    recalc_equipment_attributes,
 )
+# 从装备服务模块导入（已解耦）
+from .equipment_service import recalc_equipment_attributes, EQUIP_ITEM_IDS
+
+# ==================== Feature Flag ====================
+# 设置为True使用新版DI架构的EquipmentService，False使用旧版本
+USE_NEW_EQUIPMENT_SERVICE = True
+# 设置为True使用新版DI架构的EquipmentUpgradeService，False使用旧版本
+USE_NEW_EQUIPMENT_UPGRADE_SERVICE = True
+# =====================================================
 
 
 async def _recalculate_equipment_attributes(session, player: Player):
     """重新计算装备属性加成"""
-    await recalc_equipment_attributes(session, player)
+    if USE_NEW_EQUIPMENT_SERVICE:
+        # 新版本: 使用DI架构的EquipmentService
+        from ..infrastructure.repositories.item_repository import ItemRepository
+        from ..infrastructure.repositories.player_repository import PlayerRepository
+        from .equipment_service_new import EquipmentService
+
+        equipment_service = EquipmentService(
+            item_repo=ItemRepository(session),
+            player_repo=PlayerRepository(session)
+        )
+        await equipment_service.recalc_equipment_attributes(player)
+    else:
+        # 旧版本: 使用静态函数
+        await recalc_equipment_attributes(session, player)
 
 
 # ---------------- 指令：查看升阶信息 ----------------
@@ -57,19 +77,36 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
             await upgrade_info_cmd.finish(f"✨ {equip.config.name} 已达最高等级 (+{current_level}阶)")
 
         target_level = current_level + 1
-        required_equipment_count = EquipmentUpgradeService.get_equipment_requirements(current_level)
-        required_materials = EquipmentUpgradeService.get_upgrade_materials(current_level)
-        required_gold = EquipmentUpgradeService.get_upgrade_gold_cost(current_level)
 
-        # 获取可用装备数量
-        available_equipment = await EquipmentUpgradeService.get_available_equipment_for_upgrade(
-            session, player.id, equip.item_id, current_level
-        )
-        success_rate = EquipmentUpgradeService.get_success_rate(current_level, False, player.luck)
-        success_rate_with_protection = EquipmentUpgradeService.get_success_rate(current_level, True, player.luck)
+        if USE_NEW_EQUIPMENT_UPGRADE_SERVICE:
+            # 新版本: 使用DI架构的EquipmentUpgradeService
+            from ..infrastructure.repositories.item_repository import ItemRepository
+            from ..infrastructure.repositories.player_repository import PlayerRepository
+            from .equipment_upgrade_service_new import EquipmentUpgradeService as EquipmentUpgradeServiceNew
 
-        # 计算基础成功率（不含运气加成）
-        base_success_rate = EquipmentUpgradeService.get_success_rate(current_level, False, 0)
+            upgrade_service = EquipmentUpgradeServiceNew(
+                item_repo=ItemRepository(session),
+                player_repo=PlayerRepository(session)
+            )
+
+            required_equipment_count = upgrade_service.get_equipment_requirements(current_level, equip.item_id)
+            required_materials = upgrade_service.get_upgrade_materials(current_level, equip.item_id)
+            required_gold = upgrade_service.get_upgrade_gold_cost(current_level)
+            available_equipment = await upgrade_service._item_repo.get_available_equipment_for_upgrade(player.id, equip.item_id, current_level)
+            success_rate = upgrade_service.get_success_rate(current_level, False, player.luck)
+            success_rate_with_protection = upgrade_service.get_success_rate(current_level, True, player.luck)
+            base_success_rate = upgrade_service.get_success_rate(current_level, False, 0)
+        else:
+            # 旧版本: 使用静态方法
+            required_equipment_count = EquipmentUpgradeService.get_equipment_requirements(current_level)
+            required_materials = EquipmentUpgradeService.get_upgrade_materials(current_level)
+            required_gold = EquipmentUpgradeService.get_upgrade_gold_cost(current_level)
+            available_equipment = await EquipmentUpgradeService.get_available_equipment_for_upgrade(
+                session, player.id, equip.item_id, current_level
+            )
+            success_rate = EquipmentUpgradeService.get_success_rate(current_level, False, player.luck)
+            success_rate_with_protection = EquipmentUpgradeService.get_success_rate(current_level, True, player.luck)
+            base_success_rate = EquipmentUpgradeService.get_success_rate(current_level, False, 0)
 
         # 构建信息显示
         lines = [
@@ -148,9 +185,22 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
             await upgrade_equipment_cmd.finish("⛔ 未找到指定装备，请使用装备栏中显示的编号或装备名称")
 
         # 执行升阶
-        success, message, result_info = await EquipmentUpgradeService.perform_upgrade(
-            session, equip, player, use_protection
-        )
+        if USE_NEW_EQUIPMENT_UPGRADE_SERVICE:
+            # 新版本: 使用DI架构的EquipmentUpgradeService
+            from ..infrastructure.repositories.item_repository import ItemRepository
+            from ..infrastructure.repositories.player_repository import PlayerRepository
+            from .equipment_upgrade_service_new import EquipmentUpgradeService as EquipmentUpgradeServiceNew
+
+            upgrade_service = EquipmentUpgradeServiceNew(
+                item_repo=ItemRepository(session),
+                player_repo=PlayerRepository(session)
+            )
+            success, message, result_info = await upgrade_service.perform_upgrade(equip, player, use_protection)
+        else:
+            # 旧版本: 使用静态方法
+            success, message, result_info = await EquipmentUpgradeService.perform_upgrade(
+                session, equip, player, use_protection
+            )
 
         # 如果装备升级成功且装备已穿戴，需要重新计算装备属性加成
         if success and equip.equipped:
@@ -213,13 +263,28 @@ async def _(event: MessageEvent):
 
         lines = ["⚔️ 可升阶装备列表", "━━━━━━━━━━━━━"]
 
+        if USE_NEW_EQUIPMENT_UPGRADE_SERVICE:
+            # 新版本: 使用DI架构的EquipmentUpgradeService
+            from ..infrastructure.repositories.item_repository import ItemRepository
+            from ..infrastructure.repositories.player_repository import PlayerRepository
+            from .equipment_upgrade_service_new import EquipmentUpgradeService as EquipmentUpgradeServiceNew
+
+            upgrade_service = EquipmentUpgradeServiceNew(
+                item_repo=ItemRepository(session),
+                player_repo=PlayerRepository(session)
+            )
+
         for equip in equips:
             if equip.upgrade_level >= 10:
                 continue  # 跳过已满级装备
 
             current_level = equip.upgrade_level
             target_level = current_level + 1
-            success_rate = EquipmentUpgradeService.get_success_rate(current_level, False, player.luck)
+
+            if USE_NEW_EQUIPMENT_UPGRADE_SERVICE:
+                success_rate = upgrade_service.get_success_rate(current_level, False, player.luck)
+            else:
+                success_rate = EquipmentUpgradeService.get_success_rate(current_level, False, player.luck)
 
             # 获取简短编号
             short_id = get_equipment_short_id(all_equips, equip)

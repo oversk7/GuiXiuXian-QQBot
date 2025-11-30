@@ -2,7 +2,7 @@ from nonebot import on_command
 from nonebot.params import CommandArg, ArgPlainText
 from nonebot.adapters.qq import MessageEvent, Message
 from nonebot.typing import T_State
-from ..models.db import safe_session
+from ..models.db import safe_session, AsyncSessionLocal
 from ..models.player import Player
 from sqlalchemy import select, func
 from ..models.player import Gender
@@ -16,6 +16,8 @@ from ..models.navigation_task import NavigationTask
 from ..world.navigation import _update_nav_position
 from ..platform_utils import get_unified_player, get_player_platform_display, format_platform_message, is_guild_message
 from ..config import config
+from ..infrastructure.uow import UnitOfWork
+from ..domain.attributes import get_effective_attributes_v2
 
 
 def _format_player_location(player: Player) -> str:
@@ -47,40 +49,42 @@ attribute_guide = on_command("加点帮助", aliases={"属性帮助", "加点指
 
 @profile.handle()
 async def _(event: MessageEvent, args: Message = CommandArg()):
-    async with safe_session() as session:
-        arg_text = args.extract_plain_text().strip()
-        # 如果提供了 UID，则查询对应玩家面板
-        target_uid: int | None = None
-        if arg_text:
-            try:
-                target_uid = int(arg_text)
-            except ValueError:
-                await profile.finish("⛔ UID 必须为数字")
+    # 解析参数：如果提供了 UID，则查询对应玩家面板
+    arg_text = args.extract_plain_text().strip()
+    target_uid: int | None = None
+    if arg_text:
+        try:
+            target_uid = int(arg_text)
+        except ValueError:
+            await profile.finish("⛔ UID 必须为数字")
 
+    # 使用UnitOfWork统一所有查询，确保事务原子性
+    async with UnitOfWork(AsyncSessionLocal) as uow:
+        # 1. 获取玩家
         if target_uid is not None:
             stmt = select(Player).where(Player.uid == target_uid)
-            result = await session.execute(stmt)
+            result = await uow.session.execute(stmt)
             player = result.scalars().first()
             if not player:
                 await profile.finish("⛔ 未找到该 UID")
         else:
             # 使用跨平台工具获取玩家数据
-            player = await get_unified_player(session, event)
-    if not player:
-        if is_guild_message(event):
-            await profile.finish("⛔ 你还没有创建角色或绑定账号\n💡 请先在群聊注册角色，然后使用绑定功能")
-        else:
-            await profile.finish("⛔ 你还没有创建角色")
+            player = await get_unified_player(uow.session, event)
 
-    # -------- 更新坐标（若在自动导航） --------
-    async with safe_session() as session_nav:
-        player_upd = await session_nav.get(Player, player.id)
-        task = await session_nav.get(NavigationTask, player.id)
+        if not player:
+            if is_guild_message(event):
+                await profile.finish("⛔ 你还没有创建角色或绑定账号\n💡 请先在群聊注册角色，然后使用绑定功能")
+            else:
+                await profile.finish("⛔ 你还没有创建角色")
+
+        # 2. 更新坐标（若在自动导航）
+        player_upd = await uow.session.get(Player, player.id)
+        task = await uow.session.get(NavigationTask, player.id)
         if player_upd and task:
-            reached = await _update_nav_position(player_upd, task, session_nav)
+            reached = await _update_nav_position(player_upd, task, uow.session)
             if reached:
-                await session_nav.delete(task)
-            await session_nav.commit()
+                await uow.session.delete(task)
+            await uow.commit()  # 立即提交导航更新
             # 同步内存对象用于展示
             # 只有在现实世界时才同步x,y坐标，在副本中保持副本坐标
             if not player.is_in_dungeon():
@@ -91,27 +95,34 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
                 player.real_world_x = player_upd.real_world_x
                 player.real_world_y = player_upd.real_world_y
 
-    # ------- 获取包含临时buff的有效属性 -------
-    async with safe_session() as session2:
-        # 获取有效属性（包含装备、丹药和临时buff加成）
-        effective_attrs = await player.get_effective_attributes(session2)
+        # 3. 获取有效属性（使用AttributeCalculator v2）
+        effective_attrs = await get_effective_attributes_v2(player, uow.session)
 
-        # 统计装备加成用于显示
+        # 4. 统计装备加成用于显示
         bonus = defaultdict(int)
-        from sqlalchemy import select as sel
         equip_ids = config.items_config["by_type"]["EQUIPMENT"]
-        eq_stmt = sel(ItemInstance).where(
+        eq_stmt = select(ItemInstance).where(
             ItemInstance.player_id == player.id,
             ItemInstance.equipped == True,
             ItemInstance.item_id.in_(equip_ids)
         )
-        equiped_list = (await session2.execute(eq_stmt)).scalars().all()
+        equiped_list = (await uow.session.execute(eq_stmt)).scalars().all()
         for eq in equiped_list:
             delta = (eq.extra_attrs or {}).get("_persist_bonus", {})
             for k, v in delta.items():
                 bonus[k] += int(v)
 
-    # 读取有效属性并拼接装备加成显示
+        # 5. 获取公会信息
+        guild_name = "无所属"
+        if player.guild_id:
+            g_obj = await uow.session.get(Guild, player.guild_id)
+            if g_obj:
+                guild_name = g_obj.name
+
+        # 6. 获取平台显示信息
+        platform_info = await get_player_platform_display(uow.session, player)
+
+    # 7. 格式化属性显示
     def fmt(attr_key: str, effective_value: int):
         inc = bonus.get(attr_key, 0)
         return f"{effective_value} (+{inc})" if inc else str(effective_value)
@@ -127,16 +138,7 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
     cur_hp = min(player.hp, effective_attrs["max_hp"])
     cur_mp = min(player.mp, effective_attrs["max_mp"])
 
-    # 公会名称
-    guild_name = "无所属"
-    if player.guild_id:
-        async with safe_session() as session_g:
-            g_obj = await session_g.get(Guild, player.guild_id)
-            if g_obj:
-                guild_name = g_obj.name
-
     realm_name = realm_by_level_and_reincarnation(player.level, player.reincarnation_level)
-
     exp_max = calculate_level_up_exp(player.level)
 
     # 检查未读的留言板与私信状态
@@ -149,10 +151,6 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
         notice_lines.append("🗒️ 世界留言板有新内容！输入【留言板】查看")
     if notice_lines:
         unread_notice = "".join(f"\n┃{line}" for line in notice_lines)
-
-    # 获取平台显示信息
-    async with safe_session() as session_platform:
-        platform_info = await get_player_platform_display(session_platform, player)
 
     content = (
         f"┏━━ 信息 ━━━━\n"

@@ -15,7 +15,6 @@ from typing import Dict, List, Tuple, Optional, Any
 from sqlalchemy import select, and_, func
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from ..models.db import safe_session
 from ..models.player import Player
 from ..models.part_time_job import PartTimeJob, JobLocation, PlayerJobStats
 from ..utils import luck_prob
@@ -227,7 +226,7 @@ class PartTimeJobService:
                 )
                 session.add(location)
 
-        await session.commit()
+        # 注意：不在这里commit，由调用方控制事务边界
 
     @classmethod
     async def get_available_jobs_at_location(cls, session: AsyncSession, player: Player) -> Tuple[bool, str, List[Dict]]:
@@ -336,7 +335,7 @@ class PartTimeJobService:
         )
 
         session.add(new_job)
-        await session.commit()
+        # 注意：不在这里commit，由调用方控制事务边界
 
         # 格式化时间显示
         duration = job_config['duration_hours']
@@ -423,7 +422,7 @@ class PartTimeJobService:
         await cls.update_job_preferences(session, stats, current_job.job_type, current_job.job_location_id)
 
         session.add_all([current_job, player, stats])
-        await session.commit()
+        # 注意：不在这里commit，由调用方控制事务边界
 
         # 构建结果信息
         result = {

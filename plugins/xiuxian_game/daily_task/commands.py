@@ -14,6 +14,12 @@ import time
 import random
 from datetime import date
 
+# ==================== Feature Flag ====================
+# 设置为True使用新版DI架构的DailyTaskService，False使用旧版本
+USE_NEW_DAILY_TASK_SERVICE = True
+USE_NEW_GUILD_TASK_SERVICE = True
+# =====================================================
+
 
 # ==================== 查看每日任务 ====================
 daily_task_cmd = on_command("每日委托", aliases={"任务", "每日任务"}, block=True, priority=5)
@@ -202,8 +208,27 @@ async def handle_complete_task(event: MessageEvent):
         if success:
             # 更新委托完成统计（用于公会任务）
             if player.guild_id:
-                from ..guild.guild_task_service import GuildTaskService
-                await GuildTaskService.update_commission_stats(session, player.id)
+                if USE_NEW_GUILD_TASK_SERVICE:
+                    from ..guild.guild_task_service_new import GuildTaskService as GuildTaskServiceNew
+                    from ..infrastructure.repositories.player_repository import PlayerRepository
+                    from ..infrastructure.repositories.guild_repository import GuildRepository
+                    from ..infrastructure.repositories.player_task_stats_repository import PlayerTaskStatsRepository
+                    from ..infrastructure.repositories.guild_task_record_repository import GuildTaskRecordRepository
+                    from ..infrastructure.repositories.player_donation_log_repository import PlayerDonationLogRepository
+                    from ..infrastructure.repositories.guild_building_repository import GuildBuildingRepository
+
+                    task_service = GuildTaskServiceNew(
+                        player_repo=PlayerRepository(session),
+                        guild_repo=GuildRepository(session),
+                        player_task_stats_repo=PlayerTaskStatsRepository(session),
+                        guild_task_record_repo=GuildTaskRecordRepository(session),
+                        player_donation_log_repo=PlayerDonationLogRepository(session),
+                        guild_building_repo=GuildBuildingRepository(session),
+                    )
+                    await task_service.update_commission_stats(player.id)
+                else:
+                    from ..guild.guild_task_service import GuildTaskService
+                    await GuildTaskService.update_commission_stats(session, player.id)
 
             await session.commit()
 

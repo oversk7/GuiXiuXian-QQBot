@@ -15,6 +15,11 @@ from ..utils import message_add_head
 from ..config import config
 from .service import FishingService
 
+# ==================== Feature Flag ====================
+# 设置为True使用新版DI架构的FishingService，False使用旧版本
+USE_NEW_FISHING_SERVICE = True
+# =====================================================
+
 
 # 钓鱼指令
 fishing_cmd = on_command("钓鱼", block=True, priority=5)
@@ -34,7 +39,20 @@ async def _(event: MessageEvent):
                     await fishing_cmd.finish("⛔ 请先创建角色")
 
             # 执行钓鱼
-            result = await FishingService.do_fishing(session, player)
+            if USE_NEW_FISHING_SERVICE:
+                from ..infrastructure.repositories.fishing_record_repository import FishingRecordRepository
+                from ..infrastructure.repositories.fishing_stats_repository import FishingStatsRepository
+                from ..infrastructure.repositories.item_repository import ItemRepository
+                from .service_new import FishingService as FishingServiceNew
+
+                service = FishingServiceNew(
+                    fishing_record_repo=FishingRecordRepository(session),
+                    fishing_stats_repo=FishingStatsRepository(session),
+                    item_repo=ItemRepository(session),
+                )
+                result = await service.do_fishing(player)
+            else:
+                result = await FishingService.do_fishing(session, player)
 
             if not result["success"]:
                 await fishing_cmd.finish(message_add_head(result["message"], event))
@@ -135,7 +153,20 @@ fishing_leaderboard_cmd = on_command("钓鱼排行", aliases={"钓鱼榜"}, bloc
 async def _(event: MessageEvent):
     """查看钓鱼排行榜"""
     async with safe_session() as session:
-        leaderboard = await FishingService.get_fishing_leaderboard(session, 10)
+        if USE_NEW_FISHING_SERVICE:
+            from ..infrastructure.repositories.fishing_record_repository import FishingRecordRepository
+            from ..infrastructure.repositories.fishing_stats_repository import FishingStatsRepository
+            from ..infrastructure.repositories.item_repository import ItemRepository
+            from .service_new import FishingService as FishingServiceNew
+
+            service = FishingServiceNew(
+                fishing_record_repo=FishingRecordRepository(session),
+                fishing_stats_repo=FishingStatsRepository(session),
+                item_repo=ItemRepository(session),
+            )
+            leaderboard = await service.get_fishing_leaderboard(10)
+        else:
+            leaderboard = await FishingService.get_fishing_leaderboard(session, 10)
         
         if not leaderboard:
             await fishing_leaderboard_cmd.finish(message_add_head("📊 暂无钓鱼排行数据", event))
@@ -184,7 +215,20 @@ async def _(event: MessageEvent):
                 await fishing_status_cmd.finish("⛔ 请先创建角色")
 
         # 检查钓鱼状态
-        can_fish, reason = await FishingService.can_fishing(session, player)
+        if USE_NEW_FISHING_SERVICE:
+            from ..infrastructure.repositories.fishing_record_repository import FishingRecordRepository
+            from ..infrastructure.repositories.fishing_stats_repository import FishingStatsRepository
+            from ..infrastructure.repositories.item_repository import ItemRepository
+            from .service_new import FishingService as FishingServiceNew
+
+            service = FishingServiceNew(
+                fishing_record_repo=FishingRecordRepository(session),
+                fishing_stats_repo=FishingStatsRepository(session),
+                item_repo=ItemRepository(session),
+            )
+            can_fish, reason = await service.can_fishing(player)
+        else:
+            can_fish, reason = await FishingService.can_fishing(session, player)
         
         # 获取统计信息
         stats = await FishingRecord.get_player_fishing_stats(session, player.id)

@@ -9,6 +9,9 @@ from ..utils import message_add_head
 from .reincarnation import ReincarnationService
 from ..platform_utils import get_unified_player, is_guild_message
 
+# Feature Flag: 控制是否使用新版ReincarnationService (DI架构)
+USE_NEW_REINCARNATION_SERVICE = True
+
 reincarnate_cmd = on_command("冥返", aliases={"轮回", "重生"}, block=True, priority=5)
 reincarnation_info_cmd = on_command("冥返信息", aliases={"转数信息", "轮回信息"}, block=True, priority=5)
 
@@ -25,21 +28,51 @@ async def handle_reincarnate(event: MessageEvent):
             else:
                 await reincarnate_cmd.finish("⛔ 请先使用【注册】命令创建角色")
         
-        # 检查是否可以冥返
-        if not await ReincarnationService.can_reincarnate(player):
-            required_level = ReincarnationService.get_required_level_for_reincarnation(player.reincarnation_level)
-            reincarnation_count = player.reincarnation_level + 1
-            await reincarnate_cmd.finish(
-                f"⛔ 冥返条件不足！\n"
-                f"━━━━━━━━━━━━━\n"
-                f"✧ 当前等级：Lv.{player.level}\n"
-                f"✧ 需要等级：Lv.{required_level} (第{reincarnation_count}次冥返)\n"
-                f"━━━━━━━━━━━━━\n"
-                "⬇️ 【修炼】【突破】提升等级"
+        # 检查是否可以冥返 & 执行冥返
+        if USE_NEW_REINCARNATION_SERVICE:
+            # 使用新版DI架构的ReincarnationService
+            from ..infrastructure.repositories.player_repository import PlayerRepository
+            from ..infrastructure.repositories.elixir_usage_repository import ElixirUsageRepository
+            from ..infrastructure.repositories.vip_equipment_bonus_repository import VIPEquipmentBonusRepository
+            from ..infrastructure.repositories.item_repository import ItemRepository
+            from .reincarnation_service_new import ReincarnationService as ReincarnationServiceNew
+
+            service = ReincarnationServiceNew(
+                player_repo=PlayerRepository(session),
+                elixir_usage_repo=ElixirUsageRepository(session),
+                vip_equipment_bonus_repo=VIPEquipmentBonusRepository(session),
+                item_repo=ItemRepository(session),
             )
-        
-        # 执行冥返
-        result_msg = await ReincarnationService.perform_reincarnation(session, player)
+
+            if not await service.can_reincarnate(player):
+                required_level = ReincarnationService.get_required_level_for_reincarnation(player.reincarnation_level)
+                reincarnation_count = player.reincarnation_level + 1
+                await reincarnate_cmd.finish(
+                    f"⛔ 冥返条件不足！\n"
+                    f"━━━━━━━━━━━━━\n"
+                    f"✧ 当前等级：Lv.{player.level}\n"
+                    f"✧ 需要等级：Lv.{required_level} (第{reincarnation_count}次冥返)\n"
+                    f"━━━━━━━━━━━━━\n"
+                    "⬇️ 【修炼】【突破】提升等级"
+                )
+
+            result_msg = await service.perform_reincarnation(player)
+        else:
+            # 使用旧版静态方法的ReincarnationService
+            if not await ReincarnationService.can_reincarnate(player):
+                required_level = ReincarnationService.get_required_level_for_reincarnation(player.reincarnation_level)
+                reincarnation_count = player.reincarnation_level + 1
+                await reincarnate_cmd.finish(
+                    f"⛔ 冥返条件不足！\n"
+                    f"━━━━━━━━━━━━━\n"
+                    f"✧ 当前等级：Lv.{player.level}\n"
+                    f"✧ 需要等级：Lv.{required_level} (第{reincarnation_count}次冥返)\n"
+                    f"━━━━━━━━━━━━━\n"
+                    "⬇️ 【修炼】【突破】提升等级"
+                )
+
+            result_msg = await ReincarnationService.perform_reincarnation(session, player)
+
         await reincarnate_cmd.finish(message_add_head(result_msg, event))
 
 

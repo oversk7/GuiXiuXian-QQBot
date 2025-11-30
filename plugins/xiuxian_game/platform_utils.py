@@ -5,9 +5,7 @@
 from typing import Optional, Tuple
 from nonebot.adapters.qq import MessageEvent
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select
 from .models.player import Player
-from .models.platform_binding import PlatformBinding
 
 
 class PlatformType:
@@ -61,78 +59,22 @@ def is_private_message(event: MessageEvent) -> bool:
 
 async def get_unified_player(session: AsyncSession, event: MessageEvent) -> Optional[Player]:
     """
-    获取统一的玩家数据（支持跨平台绑定）
-    
+    获取统一的玩家数据
+
     Args:
         session: 数据库会话
         event: 消息事件
-        
+
     Returns:
         Player对象或None
     """
-    platform_type, user_id = get_platform_info(event)
-    
-    # 首先尝试直接查找玩家
+    _, user_id = get_platform_info(event)
+
+    # 直接查找玩家
     player = await session.get(Player, user_id)
-    if player:
-        return player
-    
-    # 如果是频道消息且没有找到玩家，尝试查找绑定关系
-    if platform_type == PlatformType.GUILD:
-        # 查找以当前频道用户ID为次平台ID的绑定关系
-        binding_stmt = select(PlatformBinding).where(
-            PlatformBinding.secondary_platform_id == user_id,
-            PlatformBinding.is_active == True
-        )
-        binding_result = await session.execute(binding_stmt)
-        binding = binding_result.scalars().first()
-        
-        if binding:
-            # 通过绑定关系找到主平台玩家
-            player = await session.get(Player, binding.primary_platform_id)
-            return player
-    
-    # 如果是群聊消息且没有找到玩家，尝试查找绑定关系
-    elif platform_type == PlatformType.GROUP:
-        # 查找以当前群聊用户ID为主平台ID的绑定关系
-        binding_stmt = select(PlatformBinding).where(
-            PlatformBinding.primary_platform_id == user_id,
-            PlatformBinding.is_active == True
-        )
-        binding_result = await session.execute(binding_stmt)
-        binding = binding_result.scalars().first()
-        
-        if binding:
-            # 如果有绑定关系，返回主平台玩家（就是当前玩家）
-            player = await session.get(Player, binding.primary_platform_id)
-            return player
-    
-    return None
+    return player
 
 
-async def get_player_platform_display(session: AsyncSession, player: Player) -> str:
-    """
-    获取玩家的平台显示信息
-    
-    Args:
-        session: 数据库会话
-        player: 玩家对象
-        
-    Returns:
-        平台显示字符串
-    """
-    # 查找是否有绑定关系
-    binding_stmt = select(PlatformBinding).where(
-        PlatformBinding.primary_platform_id == player.id,
-        PlatformBinding.is_active == True
-    )
-    binding_result = await session.execute(binding_stmt)
-    binding = binding_result.scalars().first()
-    
-    if binding:
-        return "🔗 已绑定频道账号"
-    else:
-        return "📱 仅群聊账号"
 
 
 def format_platform_message(content: str, event: MessageEvent) -> str:

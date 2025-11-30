@@ -28,6 +28,11 @@ from ..models.player import Player
 from ..utils import message_add_head
 from .service import WorldBossService
 
+# ==================== Feature Flag ====================
+# 设置为True使用新版DI架构的WorldBossService，False使用旧版本
+USE_NEW_WORLD_BOSS_SERVICE = True
+# =====================================================
+
 
 view_cmd = on_command("世界BOSS", aliases={"世界Boss", "世界boss"}, block=True, priority=5)
 attack_cmd = on_command("讨伐BOSS", aliases={"讨伐boss", "讨伐BOSS"}, block=True, priority=5)
@@ -38,13 +43,32 @@ open_chest_cmd = on_command("开启深渊宝箱", aliases={"开启宝箱", "开�
 @view_cmd.handle()
 async def handle_view(event: MessageEvent):
     async with safe_session() as session:
-        # 懒触发：检查并刷新周期（必要时结算上期）
-        cycle, tip = await WorldBossService.check_and_refresh_cycle(session)
         player = await session.get(Player, event.get_user_id())
         if not player:
             await view_cmd.finish("⛔ 请先创建角色")
 
-        msg = await WorldBossService.build_boss_view(session, cycle, player)
+        if USE_NEW_WORLD_BOSS_SERVICE:
+            from ..infrastructure.repositories.world_boss_cycle_repository import WorldBossCycleRepository
+            from ..infrastructure.repositories.world_boss_damage_repository import WorldBossDamageRepository
+            from ..infrastructure.repositories.player_repository import PlayerRepository
+            from ..infrastructure.repositories.item_repository import ItemRepository
+            from .service_new import WorldBossService as WorldBossServiceNew
+
+            service = WorldBossServiceNew(
+                session=session,
+                cycle_repo=WorldBossCycleRepository(session),
+                damage_repo=WorldBossDamageRepository(session),
+                player_repo=PlayerRepository(session),
+                item_repo=ItemRepository(session)
+            )
+            # 懒触发：检查并刷新周期（必要时结算上期）
+            cycle, tip = await service.check_and_refresh_cycle()
+            msg = await service.build_boss_view(cycle, player)
+        else:
+            # 懒触发：检查并刷新周期（必要时结算上期）
+            cycle, tip = await WorldBossService.check_and_refresh_cycle(session)
+            msg = await WorldBossService.build_boss_view(session, cycle, player)
+
         if tip:
             msg = tip + "\n" + msg
         await view_cmd.finish(message_add_head(msg, event))
@@ -53,12 +77,30 @@ async def handle_view(event: MessageEvent):
 @attack_cmd.handle()
 async def handle_attack(event: MessageEvent, args: Message = CommandArg()):
     async with safe_session() as session:
-        cycle, tip = await WorldBossService.check_and_refresh_cycle(session)
         player = await session.get(Player, event.get_user_id())
         if not player:
             await attack_cmd.finish("⛔ 请先创建角色")
 
-        ok, reply = await WorldBossService.attack_boss(session, cycle, player)
+        if USE_NEW_WORLD_BOSS_SERVICE:
+            from ..infrastructure.repositories.world_boss_cycle_repository import WorldBossCycleRepository
+            from ..infrastructure.repositories.world_boss_damage_repository import WorldBossDamageRepository
+            from ..infrastructure.repositories.player_repository import PlayerRepository
+            from ..infrastructure.repositories.item_repository import ItemRepository
+            from .service_new import WorldBossService as WorldBossServiceNew
+
+            service = WorldBossServiceNew(
+                session=session,
+                cycle_repo=WorldBossCycleRepository(session),
+                damage_repo=WorldBossDamageRepository(session),
+                player_repo=PlayerRepository(session),
+                item_repo=ItemRepository(session)
+            )
+            cycle, tip = await service.check_and_refresh_cycle()
+            ok, reply = await service.attack_boss(cycle, player)
+        else:
+            cycle, tip = await WorldBossService.check_and_refresh_cycle(session)
+            ok, reply = await WorldBossService.attack_boss(session, cycle, player)
+
         if tip:
             reply = tip + "\n" + reply
         await attack_cmd.finish(message_add_head(reply, event))
@@ -67,8 +109,26 @@ async def handle_attack(event: MessageEvent, args: Message = CommandArg()):
 @rank_cmd.handle()
 async def handle_rank(event: MessageEvent):
     async with safe_session() as session:
-        cycle, tip = await WorldBossService.check_and_refresh_cycle(session)
-        msg = await WorldBossService.build_ranking_view(session, cycle)
+        if USE_NEW_WORLD_BOSS_SERVICE:
+            from ..infrastructure.repositories.world_boss_cycle_repository import WorldBossCycleRepository
+            from ..infrastructure.repositories.world_boss_damage_repository import WorldBossDamageRepository
+            from ..infrastructure.repositories.player_repository import PlayerRepository
+            from ..infrastructure.repositories.item_repository import ItemRepository
+            from .service_new import WorldBossService as WorldBossServiceNew
+
+            service = WorldBossServiceNew(
+                session=session,
+                cycle_repo=WorldBossCycleRepository(session),
+                damage_repo=WorldBossDamageRepository(session),
+                player_repo=PlayerRepository(session),
+                item_repo=ItemRepository(session)
+            )
+            cycle, tip = await service.check_and_refresh_cycle()
+            msg = await service.build_ranking_view(cycle)
+        else:
+            cycle, tip = await WorldBossService.check_and_refresh_cycle(session)
+            msg = await WorldBossService.build_ranking_view(session, cycle)
+
         if tip:
             msg = tip + "\n" + msg
         await rank_cmd.finish(message_add_head(msg, event))

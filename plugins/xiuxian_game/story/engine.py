@@ -24,30 +24,30 @@ class StoryEngine:
     
     def _load_stories(self):
         """加载所有剧情文件"""
-        print(f"🔍 剧情目录: {self.story_dir}")
+        print(f"[StoryEngine] 剧情目录: {self.story_dir}")
         if not self.story_dir.exists():
-            print(f"❌ 剧情目录不存在，创建目录: {self.story_dir}")
+            print(f"[StoryEngine] [ERROR] 剧情目录不存在，创建目录: {self.story_dir}")
             self.story_dir.mkdir(parents=True, exist_ok=True)
             return
 
         json_files = list(self.story_dir.glob("*.json"))
-        print(f"📚 找到 {len(json_files)} 个剧情文件")
+        print(f"[StoryEngine] 找到 {len(json_files)} 个剧情文件")
 
         for file_path in json_files:
             try:
-                print(f"📄 加载剧情文件: {file_path}")
+                print(f"[StoryEngine] 加载剧情文件: {file_path}")
                 with open(file_path, 'r', encoding='utf-8') as f:
                     story_data = json.load(f)
                     story_id = story_data.get('id')
                     if story_id:
                         self.stories[story_id] = story_data
-                        print(f"✅ 成功加载剧情: {story_id}")
+                        print(f"[StoryEngine] [SUCCESS] 成功加载剧情: {story_id}")
                     else:
-                        print(f"⚠️ 剧情文件缺少ID: {file_path}")
+                        print(f"[StoryEngine] [WARNING] 剧情文件缺少ID: {file_path}")
             except Exception as e:
-                print(f"❌ 加载剧情文件失败 {file_path}: {e}")
+                print(f"[StoryEngine] [ERROR] 加载剧情文件失败 {file_path}: {e}")
 
-        print(f"🎭 总共加载了 {len(self.stories)} 个剧情: {list(self.stories.keys())}")
+        print(f"[StoryEngine] 总共加载了 {len(self.stories)} 个剧情: {list(self.stories.keys())}")
     
     def get_story_list(self) -> List[Dict[str, str]]:
         """获取可用剧情列表"""
