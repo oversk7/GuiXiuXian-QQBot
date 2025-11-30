@@ -8,6 +8,7 @@ from ..models.db import safe_session
 from ..models.player import Player
 from ..models.daily_task import DailyTask, TaskStatus
 from ..utils import message_add_head
+from ..platform_utils import get_unified_player
 from .service import DailyTaskService
 from ..battle.integration_helper import BattleIntegrationHelper
 import time
