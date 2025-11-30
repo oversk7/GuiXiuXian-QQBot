@@ -51,7 +51,7 @@ async def handle_my_accounts(event: MessageEvent):
             status = "✅ 激活中" if acc["is_active"] else "⚪ 未激活"
             lines.append(
                 f"{status} {acc['display_name']}\n"
-                f"   角色名: {acc['player_name']} | {acc['cultivation_level_name']}\n"
+                f"   角色名: {acc['player_name']} | UID: {acc['uid']}\n"
                 f"   等级: Lv.{acc['level']}\n"
                 f"   账号ID: {acc['player_id']}\n"
                 f"   获得方式: {acc['acquired_type']}"
