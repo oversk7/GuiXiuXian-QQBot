@@ -246,7 +246,15 @@ async def handle_deposit_rank(event: MessageEvent, args: Message = CommandArg())
     async with safe_session() as session:
         # 先取前30余额账号，再结息，避免遍历全库
         from sqlalchemy import func as _func
-        sub_stmt = select(BankAccount).order_by(BankAccount.balance.desc()).limit(30)
+        from sqlalchemy.orm import joinedload
+
+        # 使用joinedload预加载Player，避免N+1查询（11次→1次）
+        sub_stmt = (
+            select(BankAccount)
+            .options(joinedload(BankAccount.player))
+            .order_by(BankAccount.balance.desc())
+            .limit(30)
+        )
         accounts = (await session.execute(sub_stmt)).scalars().all()
         if not accounts:
             await deposit_rank_cmd.finish("暂无存款数据")
@@ -267,7 +275,8 @@ async def handle_deposit_rank(event: MessageEvent, args: Message = CommandArg())
         
         lines = [f"🏦 存款排行榜 (第{page}/3页)", "━━━━━━━━━━━━━"]
         for idx, acc in enumerate(page_accounts, start=offset + 1):
-            p = await session.get(Player, acc.player_id)
+            # 直接使用预加载的player，避免N+1查询
+            p = acc.player
             if not p:
                 continue
             # 使用emoji装饰前三名
