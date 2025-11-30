@@ -7,6 +7,7 @@ from __future__ import annotations
 - 通过构造函数注入4个Repository依赖
 - 移除所有内部commit()调用（7处），由外层safe_session()统一管理事务
 - 保持业务逻辑完全一致
+- 集成事件系统：发布WorldBossDamageEvent
 
 功能：
 1. 懒加载周期刷新（周三/六 20:00）
@@ -31,6 +32,8 @@ from ..infrastructure.repositories.world_boss_cycle_repository import WorldBossC
 from ..infrastructure.repositories.world_boss_damage_repository import WorldBossDamageRepository
 from ..infrastructure.repositories.player_repository import PlayerRepository
 from ..infrastructure.repositories.item_repository import ItemRepository
+# 事件系统
+from ..domain.events import event_bus, WorldBossDamageEvent
 
 
 class WorldBossService:
@@ -387,6 +390,16 @@ class WorldBossService:
         damage_record.attacks_today += 1
         damage_record.last_attack_ts = now_ts
         await self._damage_repo.update(damage_record)
+
+        # 发布世界BOSS伤害事件
+        await event_bus.publish(WorldBossDamageEvent(
+            player_id=player.id,
+            boss_id=str(cycle.id),
+            boss_name=f"{cycle.boss_name}·{cycle.boss_title}",
+            damage=damage_dealt,
+            total_damage=damage_record.total_damage,
+            is_final_blow=False  # 这里不判断是否为最后一击，可在后续优化
+        ))
 
         # 构建结果消息
         lines = [

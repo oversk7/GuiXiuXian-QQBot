@@ -8,6 +8,7 @@
 - 移除所有内部commit()调用(2处)，由调用方控制事务边界
 - 保持业务逻辑完全一致
 - 移除Feature Flag逻辑，直接使用注入的DI版本Service
+- 集成事件系统：发布GiftGivenEvent
 """
 from typing import Tuple, Optional, List
 from sqlalchemy import select
@@ -22,6 +23,8 @@ from ..infrastructure.repositories.item_repository import ItemRepository
 # Service依赖（注入DI版本）
 from .marriage_service_new import MarriageService
 from .mentorship_service_new import MentorshipService
+# 事件系统
+from ..domain.events import event_bus, GiftGivenEvent
 
 
 class GiftService:
@@ -169,6 +172,17 @@ class GiftService:
             await self._gift_record_repo.add(gift_record)
             love_value = max(1, total_value // 100)
             await self._marriage_service.update_gift_value(sender_id, receiver.id, love_value)
+
+            # 发布送礼事件
+            await event_bus.publish(GiftGivenEvent(
+                sender_id=sender_id,
+                receiver_id=receiver.id,
+                item_id=item_config.item_id,
+                item_name=item_name,
+                quantity=quantity,
+                favorability_gained=love_value
+            ))
+
             # P0修复: 移除commit() - 由调用方控制事务
             return True, f"成功向配偶 {receiver.nickname} 送出 {quantity}个「{item_name}」，增加恩爱值 {love_value}（商品已消耗）"
 
@@ -222,9 +236,21 @@ class GiftService:
         await self._gift_record_repo.add(gift_record)
 
         # 婚姻关系但非"商品"的情况：也计入恩爱值（沿用原逻辑按1%）
+        favorability_value = 0
         if gift_type == GiftType.MARRIAGE:
             love_value = max(1, total_value // 100)
             await self._marriage_service.update_gift_value(sender_id, receiver.id, love_value)
+            favorability_value = love_value
+
+        # 发布送礼事件
+        await event_bus.publish(GiftGivenEvent(
+            sender_id=sender_id,
+            receiver_id=receiver.id,
+            item_id=item_config.item_id,
+            item_name=item_name,
+            quantity=actual_qty,
+            favorability_gained=favorability_value
+        ))
 
         # P0修复: 移除commit() - 由调用方控制事务
 
