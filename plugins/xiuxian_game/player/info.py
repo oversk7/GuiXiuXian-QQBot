@@ -14,7 +14,7 @@ from ..models.guild import Guild
 import random
 from ..models.navigation_task import NavigationTask
 from ..world.navigation import _update_nav_position
-from ..platform_utils import get_unified_player, get_player_platform_display, format_platform_message, is_guild_message
+from ..platform_utils import get_unified_player, format_platform_message, is_guild_message
 from ..config import config
 from ..infrastructure.uow import UnitOfWork
 from ..domain.attributes import get_effective_attributes_v2
@@ -119,9 +119,6 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
             if g_obj:
                 guild_name = g_obj.name
 
-        # 6. 获取平台显示信息
-        platform_info = await get_player_platform_display(uow.session, player)
-
     # 7. 格式化属性显示
     def fmt(attr_key: str, effective_value: int):
         inc = bonus.get(attr_key, 0)
@@ -168,7 +165,6 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
         f"┃ 💀怨念 {player.resentment} ✨点数 {player.attribute_points}\n"
         f"┃ ☯公会 {guild_name}\n"
         f"┃ 📍位置 {_format_player_location(player)}\n"
-        f"┃ 🌐平台 {platform_info}\n"
         "┣━━━━━━━━━\n"
         f"┃☞【装备栏】【社交系统】{unread_notice}"
     )
