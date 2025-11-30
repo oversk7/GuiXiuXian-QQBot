@@ -83,9 +83,9 @@ class AccountSwitchingService:
                     "is_active": ownership.is_active,
                     "acquired_type": ownership.acquired_type,
                     "acquired_at": ownership.acquired_at,
-                    "player_name": player.name,
+                    "player_name": player.nickname,
                     "level": player.level,
-                    "cultivation_level_name": player.cultivation_level_name
+                    "uid": player.uid
                 })
 
         return accounts
