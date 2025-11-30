@@ -20,6 +20,7 @@ from ..models.db import safe_session
 from ..models.player import Player
 from ..utils import message_add_head
 from ..models.navigation_task import NavigationTask
+from ..platform_utils import get_unified_player
 
 # ----------------- 持久化模型 -----------------
 
