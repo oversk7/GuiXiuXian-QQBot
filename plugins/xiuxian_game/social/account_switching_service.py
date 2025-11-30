@@ -200,11 +200,7 @@ class AccountSwitchingService:
         if ownership.owner_platform_id != owner_platform_id:
             return False, "这不是你的账号"
 
-        # 2. 不能转让激活的账号
-        if ownership.is_active:
-            return False, "不能转让当前激活的账号，请先切换到其他账号"
-
-        # 3. 生成转让密钥
+        # 2. 生成转让密钥（允许转让激活账号，解决单账号转让的死锁问题）
         transfer_key = AccountOwnership.generate_transfer_key()
         ownership.transfer_key = transfer_key
         ownership.transfer_key_created_at = datetime.now()
