@@ -22,7 +22,8 @@ async def handle_battle_info(event: MessageEvent, args: Message = CommandArg()):
     """查看战斗属性"""
     from ..platform_utils import get_unified_player, is_guild_message
     from ..models.db import safe_session
-    
+    from ..domain.attributes import get_effective_attributes_v2
+
     async with safe_session() as session:
         # 使用跨平台工具获取玩家数据
         player = await get_unified_player(session, event)
@@ -33,9 +34,10 @@ async def handle_battle_info(event: MessageEvent, args: Message = CommandArg()):
             else:
                 await battle_info.send("❌ 你还没有创建角色，请先使用 创建角色 命令")
             return
-        
-        # 获取包含临时buff的有效属性
-        effective_attrs = await player.get_effective_attributes(session)
+
+        # 使用AttributeCalculator v2获取包含所有加成的有效属性
+        # v2包含：基础属性 + 装备加成 + buff加成 + 丹药加成
+        effective_attrs = await get_effective_attributes_v2(player, session)
 
         # 获取战斗属性显示（包含临时buff）
         battle_attr_display = await BattleIntegrationHelper.get_battle_attribute_display_async(player, session)
