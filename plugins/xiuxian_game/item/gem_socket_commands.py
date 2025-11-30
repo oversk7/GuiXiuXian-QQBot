@@ -35,7 +35,7 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
         await gem_slots_cmd.finish("⛔ 格式：孔位 装备ID/名称")
 
     async with safe_session() as session:
-        player = await session.get(Player, event.get_user_id())
+        player = await get_unified_player(session, event)
         if not player:
             await gem_slots_cmd.finish("⛔ 请先创建角色")
 
@@ -218,7 +218,7 @@ gem_list_cmd = on_command("镶嵌物品", aliases={"宝石列表", "我的宝石
 @gem_list_cmd.handle()
 async def _(event: MessageEvent):
     async with safe_session() as session:
-        player = await session.get(Player, event.get_user_id())
+        player = await get_unified_player(session, event)
         if not player:
             await gem_list_cmd.finish("⛔ 请先创建角色")
 

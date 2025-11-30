@@ -14,6 +14,7 @@ from ..models.player import Player
 from ..utils import message_add_head
 from .russian_roulette_core import RussianRouletteCore, ItemType
 from .russian_roulette_cleanup import RussianRouletteCleanup
+from ..platform_utils import get_unified_player
 
 # ==================== Feature Flag ====================
 # 设置为True使用新版DI架构的RussianRouletteService，False使用旧版本
@@ -123,7 +124,7 @@ async def handle_create_room(bot: Bot, event: MessageEvent, args: Message = Comm
         await create_room_cmd.finish(message_add_head(help_msg, event))
     
     async with safe_session() as session:
-        player = await session.get(Player, event.get_user_id())
+        player = await get_unified_player(session, event)
         if not player:
             await create_room_cmd.finish("⛔ 请先创建角色")
         
@@ -382,7 +383,7 @@ async def handle_shoot(bot: Bot, event: MessageEvent, args: Message = CommandArg
         await shoot_cmd.finish("⛔ 请指定射击目标：开枪 自己/对手")
     
     async with safe_session() as session:
-        player = await session.get(Player, event.get_user_id())
+        player = await get_unified_player(session, event)
         if not player:
             await shoot_cmd.finish("⛔ 请先创建角色")
         
@@ -625,7 +626,7 @@ async def handle_use_adrenaline(bot: Bot, event: MessageEvent, args: Message = C
     target_item_type = item_mapping[target_item_name]
 
     async with safe_session() as session:
-        player = await session.get(Player, event.get_user_id())
+        player = await get_unified_player(session, event)
         if not player:
             await use_adrenaline_cmd.finish("⛔ 请先创建角色")
 
@@ -821,7 +822,7 @@ async def handle_use_item(bot: Bot, event: MessageEvent, args: Message = Command
     item_type = item_mapping[item_name]
 
     async with safe_session() as session:
-        player = await session.get(Player, event.get_user_id())
+        player = await get_unified_player(session, event)
         if not player:
             await use_item_cmd.finish("⛔ 请先创建角色")
 
@@ -1044,7 +1045,7 @@ async def handle_check_prediction(event: MessageEvent):
         await check_prediction_cmd.finish("⛔ 预知结果只能私聊查看")
 
     async with safe_session() as session:
-        player = await session.get(Player, event.get_user_id())
+        player = await get_unified_player(session, event)
         if not player:
             await check_prediction_cmd.finish("⛔ 请先创建角色")
 
@@ -1098,7 +1099,7 @@ room_status_cmd = on_command("房间状态", aliases={"轮盘状态"}, block=Tru
 async def handle_room_status(event: MessageEvent):
     """查看当前房间状态"""
     async with safe_session() as session:
-        player = await session.get(Player, event.get_user_id())
+        player = await get_unified_player(session, event)
         if not player:
             await room_status_cmd.finish("⛔ 请先创建角色")
 
@@ -1204,7 +1205,7 @@ leave_room_cmd = on_command("退出房间", aliases={"离开房间"}, block=True
 async def handle_leave_room(event: MessageEvent):
     """退出当前房间"""
     async with safe_session() as session:
-        player = await session.get(Player, event.get_user_id())
+        player = await get_unified_player(session, event)
         if not player:
             await leave_room_cmd.finish("⛔ 请先创建角色")
 
@@ -1272,7 +1273,7 @@ view_items_cmd = on_command("查看道具", aliases={"道具列表", "我的道�
 async def handle_view_items(event: MessageEvent):
     """查看当前游戏中的道具"""
     async with safe_session() as session:
-        player = await session.get(Player, event.get_user_id())
+        player = await get_unified_player(session, event)
         if not player:
             await view_items_cmd.finish("⛔ 请先创建角色")
 

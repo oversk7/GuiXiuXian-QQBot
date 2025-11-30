@@ -130,7 +130,7 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
     parts = [p for p in arg_text.split() if p]
 
     async with safe_session() as session:
-        player: Player | None = await session.get(Player, event.get_user_id())
+        player: Player | None = await get_unified_player(session, event)
         if not player:
             await nav_cmd.finish("⛔ 请先创建角色")
 

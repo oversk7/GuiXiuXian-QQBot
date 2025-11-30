@@ -20,6 +20,7 @@ else:
 
 # 保持向后兼容：旧版Service（仅用于常量引用）
 from .service import AlchemyService as AlchemyServiceLegacy
+from ..platform_utils import get_unified_player
 
 # ---------------- 指令 ----------------
 
@@ -107,7 +108,7 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
 
             recipe_key, recipe = recipe_result
 
-            player = await session.get(Player, event.get_user_id())
+            player = await get_unified_player(session, event)
             if not player:
                 await start_cmd.finish("⛔ 请先创建角色")
 
@@ -142,7 +143,7 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
         recipe_key, recipe = recipe_result
 
         async with safe_session() as session:
-            player = await session.get(Player, event.get_user_id())
+            player = await get_unified_player(session, event)
             if not player:
                 await start_cmd.finish("⛔ 请先创建角色")
 
@@ -211,7 +212,7 @@ async def _(event: MessageEvent):
 async def _(event: MessageEvent):
     """领取炼丹奖励"""
     async with safe_session() as session:
-        player = await session.get(Player, event.get_user_id())
+        player = await get_unified_player(session, event)
         if not player:
             await claim_cmd.finish("⛔ 请先创建角色")
 

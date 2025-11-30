@@ -9,6 +9,7 @@ import json
 from .models.db import safe_session
 from .models.player import Player
 from .utils import message_add_head
+from .platform_utils import get_unified_player
 
 # 不阻拦也不回复，仅后台记录
 log_uid_matcher = on_message(priority=1, block=False)
@@ -18,7 +19,7 @@ async def _(event: MessageEvent):
     """记录触发指令的玩家信息，并同步最近活跃时间"""
     try:
         async with safe_session() as session:
-            player = await session.get(Player, event.get_user_id())
+            player = await get_unified_player(session, event)
         uid = player.uid if player else "未注册"
         nickname = player.nickname if player else "未注册"
         cmd_text_raw = event.get_plaintext().strip()

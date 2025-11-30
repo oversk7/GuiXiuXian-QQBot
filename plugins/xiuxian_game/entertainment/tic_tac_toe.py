@@ -5,6 +5,7 @@ from nonebot.adapters.qq import Message
 from ..models.db import safe_session
 from ..models.player import Player
 from ..utils import message_add_head
+from ..platform_utils import get_unified_player
 import random
 
 # 简单的游戏状态存储（实际项目中应该用数据库）
@@ -117,7 +118,7 @@ async def handle_tic_tac_toe(event: MessageEvent, args: Message = CommandArg()):
     """处理井字棋游戏"""
     # 先获取玩家信息，然后立即释放数据库连接
     async with safe_session() as session:
-        player = await session.get(Player, event.get_user_id())
+        player = await get_unified_player(session, event)
         if not player:
             await tic_tac_toe.finish("⛔ 请先创建角色")
 
@@ -204,7 +205,7 @@ async def handle_tic_tac_toe(event: MessageEvent, args: Message = CommandArg()):
 
         # 只在需要时使用数据库会话
         async with safe_session() as session:
-            player = await session.get(Player, event.get_user_id())
+            player = await get_unified_player(session, event)
             player.gold += gold_gain
             session.add(player)
             await session.commit()
@@ -245,7 +246,7 @@ async def handle_tic_tac_toe(event: MessageEvent, args: Message = CommandArg()):
     if winner == 2:
         # 只在需要时使用数据库会话
         async with safe_session() as session:
-            player = await session.get(Player, event.get_user_id())
+            player = await get_unified_player(session, event)
             player.gold -= 50
             session.add(player)
             await session.commit()

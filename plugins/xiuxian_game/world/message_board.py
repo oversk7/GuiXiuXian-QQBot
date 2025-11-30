@@ -12,6 +12,7 @@ from ..models.db import safe_session
 from ..models.player import Player
 from ..models.world_message import WorldMessage
 from ..utils import message_add_head
+from ..platform_utils import get_unified_player
 
 
 # 违禁词列表 - 可根据需要扩展
@@ -256,7 +257,7 @@ async def handle_leave_msg(event: MessageEvent, args: Message = CommandArg()):
         await leave_msg_cmd.send(message_add_head("⚠️ 检测到敏感词汇，已自动过滤", event))
 
     async with safe_session() as session:
-        player = await session.get(Player, event.get_user_id())
+        player = await get_unified_player(session, event)
         if not player:
             await leave_msg_cmd.finish("⛔ 请先创建角色")
         msg_rec = WorldMessage(
@@ -320,7 +321,7 @@ async def handle_private_message(event: MessageEvent, args: Message = CommandArg
 
     sender_last_check = None
     async with safe_session() as session:
-        sender = await session.get(Player, event.get_user_id())
+        sender = await get_unified_player(session, event)
         if not sender:
             await private_msg_cmd.finish("⛔ 请先创建角色")
 

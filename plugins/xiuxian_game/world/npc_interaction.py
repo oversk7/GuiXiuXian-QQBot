@@ -319,7 +319,7 @@ npc_list_cmd = on_command("NPC列表", aliases={"npc列表", "查看NPC"}, block
 async def handle_npc_list(event: MessageEvent):
     """显示当前位置的NPC列表"""
     async with safe_session() as session:
-        player: Player = await session.get(Player, event.get_user_id())
+        player: Player = await get_unified_player(session, event)
         if not player:
             await npc_list_cmd.finish("⛔ 请先创建角色")
 

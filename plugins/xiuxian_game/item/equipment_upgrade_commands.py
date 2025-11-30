@@ -22,6 +22,7 @@ from .equipment_commands import (
 )
 # 从装备服务模块导入（已解耦）
 from .equipment_service import recalc_equipment_attributes, EQUIP_ITEM_IDS
+from ..platform_utils import get_unified_player
 
 # ==================== Feature Flag ====================
 # 设置为True使用新版DI架构的EquipmentService，False使用旧版本
@@ -59,7 +60,7 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
         await upgrade_info_cmd.finish("⛔ 格式：升阶信息 装备编号/名称")
 
     async with safe_session() as session:
-        player = await session.get(Player, event.get_user_id())
+        player = await get_unified_player(session, event)
         if not player:
             await upgrade_info_cmd.finish("⛔ 请先创建角色")
 
@@ -175,7 +176,7 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
     use_protection = len(parts) > 1 and ("稳定水晶" in parts[1] or "护身符" in parts[1])
 
     async with safe_session() as session:
-        player = await session.get(Player, event.get_user_id())
+        player = await get_unified_player(session, event)
         if not player:
             await upgrade_equipment_cmd.finish("⛔ 请先创建角色")
 
@@ -239,7 +240,7 @@ upgrade_list_cmd = on_command("升阶列表", aliases={"可升阶装备"}, block
 @upgrade_list_cmd.handle()
 async def _(event: MessageEvent):
     async with safe_session() as session:
-        player = await session.get(Player, event.get_user_id())
+        player = await get_unified_player(session, event)
         if not player:
             await upgrade_list_cmd.finish("⛔ 请先创建角色")
 

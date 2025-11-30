@@ -14,6 +14,7 @@ from ..models.player import Player
 from ..models.inventory import ItemInstance
 from ..config import config
 from ..utils import message_add_head
+from ..platform_utils import get_unified_player
 
 __all__ = [
     "token_exchange_cmd",
@@ -54,7 +55,7 @@ exchange_elixir_cmd = on_command(
 async def handle_token_exchange(event: MessageEvent):
     """查看月卡宝箱兑换商店"""
     async with safe_session() as session:
-        player = await session.get(Player, event.get_user_id())
+        player = await get_unified_player(session, event)
         if not player:
             await token_exchange_cmd.finish("⛔ 请先创建角色")
 
@@ -111,7 +112,7 @@ async def handle_exchange_elixir(event: MessageEvent, args: Message = CommandArg
         await exchange_elixir_cmd.finish("⛔ 数量必须是正整数")
 
     async with safe_session() as session:
-        player = await session.get(Player, event.get_user_id())
+        player = await get_unified_player(session, event)
         if not player:
             await exchange_elixir_cmd.finish("⛔ 请先创建角色")
 

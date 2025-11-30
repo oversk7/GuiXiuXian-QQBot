@@ -13,6 +13,7 @@ from ..config import config
 from ..utils import message_add_head
 from .equipment_trade_service import EquipmentTradeService
 from ..item.equipment_commands import find_equipment_by_input
+from ..platform_utils import get_unified_player
 
 from datetime import date, datetime, timedelta
 
@@ -264,7 +265,7 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
         return
 
     async with safe_session() as session:
-        player: Player | None = await session.get(Player, event.get_user_id())
+        player: Player | None = await get_unified_player(session, event)
         if not player:
             await list_cmd.finish("⛔ 请先创建角色")
 
@@ -352,7 +353,7 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
 async def _handle_equipment_listing(event: MessageEvent, item_cfg, price: int):
     """处理装备挂牌选择"""
     async with safe_session() as session:
-        player = await session.get(Player, event.get_user_id())
+        player = await get_unified_player(session, event)
         if not player:
             await list_cmd.finish("⛔ 请先创建角色")
 
@@ -548,7 +549,7 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
         if not order or order.player_id != event.get_user_id():
             await cancel_cmd.finish("⛔ 无效牌子")
 
-        player = await session.get(Player, event.get_user_id())
+        player = await get_unified_player(session, event)
 
         if order.side == OrderSide.SELL:
             if order.is_equipment_trade:
@@ -750,7 +751,7 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
             await my_orders_cmd.finish("⛔ 页数必须为正整数")
 
     async with safe_session() as session:
-        player: Player | None = await session.get(Player, event.get_user_id())
+        player: Player | None = await get_unified_player(session, event)
         if not player:
             await my_orders_cmd.finish("⛔ 请先创建角色")
 
@@ -829,7 +830,7 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
         await equipment_appraise_cmd.finish("⛔ 格式：估价 装备编号/名称")
 
     async with safe_session() as session:
-        player = await session.get(Player, event.get_user_id())
+        player = await get_unified_player(session, event)
         if not player:
             await equipment_appraise_cmd.finish("⛔ 请先创建角色")
 

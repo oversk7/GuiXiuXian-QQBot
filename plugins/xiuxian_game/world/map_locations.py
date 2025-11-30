@@ -11,6 +11,7 @@ from nonebot.adapters.qq import MessageEvent, MessageSegment, Message
 from ..models.db import safe_session
 from ..models.player import Player
 from ..utils import message_add_head
+from ..platform_utils import get_unified_player
 
 # 可视化地图指令
 visual_map_cmd = on_command("地图", aliases={"可视化地图"}, block=True, priority=5)
@@ -22,7 +23,7 @@ nearby_locations_cmd = on_command("附近地点", aliases={"周边"}, block=True
 async def _(event: MessageEvent):
     """显示附近的重要地点"""
     async with safe_session() as session:
-        player: Player | None = await session.get(Player, event.get_user_id())
+        player: Player | None = await get_unified_player(session, event)
         if not player:
             await nearby_locations_cmd.finish("⛔ 请先创建角色")
         
@@ -120,7 +121,7 @@ async def _(event: MessageEvent):
 async def _(event: MessageEvent):
     """生成可视化地图"""
     async with safe_session() as session:
-        player: Player | None = await session.get(Player, event.get_user_id())
+        player: Player | None = await get_unified_player(session, event)
         if not player:
             await visual_map_cmd.finish("⛔ 请先创建角色")
 

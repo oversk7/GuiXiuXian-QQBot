@@ -5,6 +5,7 @@ from nonebot.adapters.qq import Message
 from ..models.db import safe_session
 from ..models.player import Player
 from ..utils import message_add_head
+from ..platform_utils import get_unified_player
 import random
 from typing import List, Tuple, Dict
 from dataclasses import dataclass
@@ -443,7 +444,7 @@ async def handle_array_breaking(event: MessageEvent, args: Message = CommandArg(
     """处理阵法破解游戏"""
     # 获取玩家信息
     async with safe_session() as session:
-        player = await session.get(Player, event.get_user_id())
+        player = await get_unified_player(session, event)
         if not player:
             await array_breaking.finish("⛔ 请先创建角色")
         
@@ -533,7 +534,7 @@ async def handle_array_breaking(event: MessageEvent, args: Message = CommandArg(
         
         # 更新玩家金币
         async with safe_session() as session:
-            player = await session.get(Player, event.get_user_id())
+            player = await get_unified_player(session, event)
             player.gold += net_gain
             session.add(player)
             await session.commit()

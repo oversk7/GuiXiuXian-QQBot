@@ -27,7 +27,7 @@ daily_task_cmd = on_command("每日委托", aliases={"任务", "每日任务"}, 
 @daily_task_cmd.handle()
 async def handle_daily_task(event: MessageEvent):
     async with safe_session() as session:
-        player = await session.get(Player, event.get_user_id())
+        player = await get_unified_player(session, event)
         if not player:
             await daily_task_cmd.finish("⛔ 请先创建角色")
         if player.level < 30:
@@ -171,7 +171,7 @@ complete_task_cmd = on_command("完成任务", aliases={"完成委托", "退邪"
 @complete_task_cmd.handle()
 async def handle_complete_task(event: MessageEvent):
     async with safe_session() as session:
-        player = await session.get(Player, event.get_user_id())
+        player = await get_unified_player(session, event)
         if not player:
             await complete_task_cmd.finish("⛔ 请先创建角色")
         
@@ -273,7 +273,7 @@ task_stats_cmd = on_command("任务统计", aliases={"委托统计"}, block=True
 @task_stats_cmd.handle()
 async def handle_task_stats(event: MessageEvent):
     async with safe_session() as session:
-        player = await session.get(Player, event.get_user_id())
+        player = await get_unified_player(session, event)
         if not player:
             await task_stats_cmd.finish("⛔ 请先创建角色")
         
@@ -307,7 +307,7 @@ refresh_task_cmd = on_command("刷新委托", aliases={"刷新任务", "更多�
 @refresh_task_cmd.handle()
 async def handle_refresh_task(event: MessageEvent):
     async with safe_session() as session:
-        player = await session.get(Player, event.get_user_id())
+        player = await get_unified_player(session, event)
         if not player:
             await refresh_task_cmd.finish("⛔ 请先创建角色")
         if player.level < 30:

@@ -66,7 +66,7 @@ async def handle_stock_list(event: MessageEvent):
             # 被动触发价格更新
             price_updated = await stock_service.check_and_update_prices()
 
-            player = await uow.session.get(Player, event.get_user_id())
+            player = await get_unified_player(uow.session, event)
             if not player:
                 await stock_list_cmd.finish("⛔ 请先创建角色")
 
@@ -81,7 +81,7 @@ async def handle_stock_list(event: MessageEvent):
             # 被动触发价格更新
             price_updated = await StockService.check_and_update_prices(session)
 
-            player = await session.get(Player, event.get_user_id())
+            player = await get_unified_player(session, event)
             if not player:
                 await stock_list_cmd.finish("⛔ 请先创建角色")
 
@@ -686,7 +686,7 @@ async def handle_stock_history(event: MessageEvent, args: Message = CommandArg()
 async def handle_stock_analysis(event: MessageEvent):
     """解释股票价格波动的随机性原理"""
     async with safe_session() as session:
-        player = await session.get(Player, event.get_user_id())
+        player = await get_unified_player(session, event)
         if not player:
             await stock_analysis_cmd.finish("⛔ 请先创建角色")
 

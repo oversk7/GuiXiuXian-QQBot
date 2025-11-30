@@ -15,6 +15,7 @@ from ..models import Player, ItemInstance
 from ..config import config
 from ..utils import message_add_head
 from .gem_upgrade_service import GemUpgradeService
+from ..platform_utils import get_unified_player
 
 # ==================== Feature Flag ====================
 # 设置为True使用新版DI架构的GemUpgradeService，False使用旧版本
@@ -32,7 +33,7 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
         await gem_upgrade_info_cmd.finish("⛔ 格式：镶嵌物升级 镶嵌物名称")
 
     async with safe_session() as session:
-        player = await session.get(Player, event.get_user_id())
+        player = await get_unified_player(session, event)
         if not player:
             await gem_upgrade_info_cmd.finish("⛔ 请先创建角色")
 
@@ -131,7 +132,7 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
     use_protection = len(parts) > 1 and "稳定水晶" in " ".join(parts[1:])
 
     async with safe_session() as session:
-        player = await session.get(Player, event.get_user_id())
+        player = await get_unified_player(session, event)
         if not player:
             await gem_upgrade_cmd.finish("⛔ 请先创建角色")
 
@@ -184,7 +185,7 @@ upgradeable_gems_cmd = on_command("可升级镶嵌物", aliases={"我的镶嵌�
 @upgradeable_gems_cmd.handle()
 async def _(event: MessageEvent):
     async with safe_session() as session:
-        player = await session.get(Player, event.get_user_id())
+        player = await get_unified_player(session, event)
         if not player:
             await upgradeable_gems_cmd.finish("⛔ 请先创建角色")
 

@@ -11,6 +11,7 @@ from ..models.invite_reward import InviteReward
 from ..utils import message_add_head
 from .invite_reward_service import InviteRewardService
 from sqlalchemy import select
+from ..platform_utils import get_unified_player
 
 # ==================== Feature Flag ====================
 # 设置为True使用新版DI架构的InviteRewardService，False使用旧版本
@@ -101,7 +102,7 @@ async def _(event: MessageEvent):
             return AsyncSessionLocal()
 
         async with UnitOfWork(session_factory) as uow:
-            player = await uow.session.get(Player, event.get_user_id())
+            player = await get_unified_player(uow.session, event)
             if not player:
                 await invite_cmd.finish("⛔ 请先创建角色")
 
@@ -122,7 +123,7 @@ async def _(event: MessageEvent):
     else:
         # 旧版本: 使用静态方法
         async with safe_session() as session:
-            player = await session.get(Player, event.get_user_id())
+            player = await get_unified_player(session, event)
             if not player:
                 await invite_cmd.finish("⛔ 请先创建角色")
 
@@ -172,7 +173,7 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
             return AsyncSessionLocal()
 
         async with UnitOfWork(session_factory) as uow:
-            player = await uow.session.get(Player, event.get_user_id())
+            player = await get_unified_player(uow.session, event)
             if not player:
                 await bind_cmd.finish("⛔ 请先创建角色")
 
@@ -246,7 +247,7 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
     else:
         # 旧版本: 使用静态方法
         async with safe_session() as session:
-            player = await session.get(Player, event.get_user_id())
+            player = await get_unified_player(session, event)
             if not player:
                 await bind_cmd.finish("⛔ 请先创建角色")
 
@@ -325,7 +326,7 @@ async def _(event: MessageEvent):
             return AsyncSessionLocal()
 
         async with UnitOfWork(session_factory) as uow:
-            player = await uow.session.get(Player, event.get_user_id())
+            player = await get_unified_player(uow.session, event)
             if not player:
                 await invite_status_cmd.finish("⛔ 请先创建角色")
 
@@ -342,7 +343,7 @@ async def _(event: MessageEvent):
     else:
         # 旧版本: 使用静态方法
         async with safe_session() as session:
-            player = await session.get(Player, event.get_user_id())
+            player = await get_unified_player(session, event)
             if not player:
                 await invite_status_cmd.finish("⛔ 请先创建角色")
 

@@ -26,6 +26,7 @@ from ..models.world_tile import WorldTile
 from ..models.monthly_card import get_player_card_benefits
 from ..config import config
 from ..utils import message_add_head, luck_prob
+from ..platform_utils import get_unified_player
 
 # Feature Flag（在文件顶部靠近其他导入的位置）
 USE_NEW_GUILD_TASK_SERVICE = True
@@ -582,7 +583,7 @@ async def _(event: MessageEvent):
     user_id = event.get_user_id()
 
     async with retry_session() as session:
-        player: Player | None = await session.get(Player, event.get_user_id())
+        player: Player | None = await get_unified_player(session, event)
         if not player:
             await move_cmd.finish("⛔ 请先创建角色")
 
@@ -1213,7 +1214,7 @@ async def _(event: MessageEvent):
     user_id = event.get_user_id()
 
     async with safe_session() as session:
-        player: Player | None = await session.get(Player, event.get_user_id())
+        player: Player | None = await get_unified_player(session, event)
         if not player:
             await explore_cmd.finish("⛔ 请先创建角色")
 
@@ -1282,7 +1283,7 @@ async def handle_buy(event: MessageEvent, args: Message = CommandArg()):
         return
 
     async with safe_session() as session:
-        player = await session.get(Player, event.get_user_id())
+        player = await get_unified_player(session, event)
         if not player:
             await buy_cmd.finish("⛔ 请先创建角色")
 
@@ -1352,7 +1353,7 @@ async def handle_teleport_list(event: MessageEvent):
     """显示无限层诡域爬塔进度"""
     async with safe_session() as session:
         # 检查玩家是否存在
-        player = await session.get(Player, event.get_user_id())
+        player = await get_unified_player(session, event)
         if not player:
             await teleport_list.finish("⛔ 请先创建角色")
 
@@ -1864,7 +1865,7 @@ async def generate_region_overview_image(region: str, session, player_x: int = N
 async def handle_region_overview(event: MessageEvent, args: Message = CommandArg()):
     """生成诡域探索概览图片"""
     async with safe_session() as session:
-        player = await session.get(Player, event.get_user_id())
+        player = await get_unified_player(session, event)
         if not player:
             await region_overview_cmd.finish("⛔ 请先创建角色")
 

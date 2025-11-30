@@ -230,7 +230,7 @@ async def handle_use_item(event: MessageEvent, args: Message = CommandArg()):
 async def handle_elixir_tolerance(event: MessageEvent, args: Message = CommandArg()):
     """查看丹药使用状态"""
     async with safe_session() as session:
-        player = await session.get(Player, event.get_user_id())
+        player = await get_unified_player(session, event)
         if not player:
             await elixir_tolerance_cmd.finish("⛔ 请先创建角色")
 
@@ -275,7 +275,7 @@ async def handle_elixir_tolerance(event: MessageEvent, args: Message = CommandAr
 async def handle_elixir_bonus(event: MessageEvent):
     """查看丹药总加成"""
     async with safe_session() as session:
-        player = await session.get(Player, event.get_user_id())
+        player = await get_unified_player(session, event)
         if not player:
             await elixir_bonus_cmd.finish("⛔ 请先创建角色")
 
@@ -641,7 +641,7 @@ async def handle_rename(event: MessageEvent, args: Message = CommandArg()):
 
     async with safe_session() as session:
         # 获取玩家和改名卡信息
-        player = await session.get(Player, event.get_user_id())
+        player = await get_unified_player(session, event)
         if not player:
             await rename_cmd.finish("⛔ 请先创建角色")
 
@@ -692,7 +692,7 @@ async def handle_drop_item(event: MessageEvent, args: Message = CommandArg()):
 
     async with safe_session() as session:
         # 获取玩家
-        player = await session.get(Player, event.get_user_id())
+        player = await get_unified_player(session, event)
         if not player:
             await drop_item.finish("⛔ 请先创建角色")
 

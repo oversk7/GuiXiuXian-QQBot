@@ -597,7 +597,7 @@ unwear_all_equipment = on_command("一键卸下", aliases={"卸下全部", "全�
 @unwear_all_equipment.handle()
 async def _(event: MessageEvent):
     async with safe_session() as session:
-        player = await session.get(Player, event.get_user_id())
+        player = await get_unified_player(session, event)
         if not player:
             await unwear_all_equipment.finish("⛔ 请先创建角色")
 

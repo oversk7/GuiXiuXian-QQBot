@@ -9,6 +9,7 @@ from nonebot.params import CommandArg
 from ..models.db import safe_session
 from ..models.player import Player
 from ..utils import message_add_head
+from ..platform_utils import get_unified_player
 
 # 猜拳功能
 guess_fist = on_command("猜拳", priority=5, block=True)
@@ -25,7 +26,7 @@ async def handle_fist_game(event: MessageEvent, args: Message = CommandArg()):
 
     async with safe_session() as session:
         # 获取玩家信息
-        player = await session.get(Player, event.get_user_id())
+        player = await get_unified_player(session, event)
         if not player:
             await guess_fist.finish("⛔ 请先创建角色")
 

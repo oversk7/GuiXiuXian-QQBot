@@ -473,7 +473,7 @@ async def _(event: MessageEvent):
 
     # 检查是否已有角色
     async with safe_session() as session:
-        player = await session.get(Player, event.get_user_id())
+        player = await get_unified_player(session, event)
         if not player:
             await attribute_guide.finish("⛔ 请先创建角色，发送【注册】开始游戏")
 

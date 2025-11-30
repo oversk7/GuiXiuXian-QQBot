@@ -11,6 +11,7 @@ from ..utils import message_add_head
 from .equipment_commands import find_equipment_by_input
 from ..world.location_service import LocationService
 from ..world.npc_service import NPCService
+from ..platform_utils import get_unified_player
 
 # ---------------- 指令：锻造列表 ----------------
 # 列出所有可锻造装备
@@ -20,7 +21,7 @@ list_craft_cmd = on_command("锻造列表", aliases={"装备列表"}, block=True
 async def _(event: MessageEvent):
     # 位置前置校验：诡域中禁止，但允许远程查看锻造列表（无须贴身靠近工坊）
     async with safe_session() as session:
-        player: Player | None = await session.get(Player, event.get_user_id())
+        player: Player | None = await get_unified_player(session, event)
         if not player:
             await list_craft_cmd.finish("⛔ 请先创建角色")
         if player.is_in_dungeon():
@@ -175,7 +176,7 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
 
     # 前置校验：允许远程查看（诡域内禁止）
     async with safe_session() as session:
-        player: Player | None = await session.get(Player, event.get_user_id())
+        player: Player | None = await get_unified_player(session, event)
         if not player:
             await recipe_cmd.finish("⛔ 请先创建角色")
         if player.is_in_dungeon():
@@ -239,7 +240,7 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
     req_gold: int = int(recipe.get("gold", 0))
 
     async with safe_session() as session:
-        player: Player | None = await session.get(Player, event.get_user_id())
+        player: Player | None = await get_unified_player(session, event)
         if not player:
             await craft_cmd.finish("⛔ 请先创建角色")
         # 诡域中禁止锻造
@@ -376,7 +377,7 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
         cost_per = tpl.repair_cost if tpl.repair_cost is not None else max(1, int(tpl.price / max(1, tpl.durability)))
         total_cost = cost_per * missing
 
-        player = await session.get(Player, event.get_user_id())
+        player = await get_unified_player(session, event)
 
         # 如果用户指定了比例
         if gold_ratio is not None and resentment_ratio is not None:

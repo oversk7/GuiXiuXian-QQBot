@@ -42,7 +42,7 @@ clear_buffs_cmd = on_command("清理增益", aliases={"清理buff", "清理过�
 async def handle_clear_buffs(event: MessageEvent):
     """手动清理过期的buff"""
     async with safe_session() as session:
-        player = await session.get(Player, event.get_user_id())
+        player = await get_unified_player(session, event)
         if not player:
             await clear_buffs_cmd.finish("⛔ 请先创建角色")
         

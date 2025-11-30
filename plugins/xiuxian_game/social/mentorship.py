@@ -31,7 +31,7 @@ async def handle_worship(event: MessageEvent, args: Message = CommandArg()):
     
     async with safe_session() as session:
         # 获取申请人
-        applicant = await session.get(Player, event.get_user_id())
+        applicant = await get_unified_player(session, event)
         if not applicant:
             await worship_cmd.finish("⛔ 请先创建角色")
         
@@ -86,7 +86,7 @@ mentorship_applications_cmd = on_command("拜师申请", aliases={"师徒申请"
 @mentorship_applications_cmd.handle()
 async def handle_mentorship_applications(event: MessageEvent):
     async with safe_session() as session:
-        player = await session.get(Player, event.get_user_id())
+        player = await get_unified_player(session, event)
         if not player:
             await mentorship_applications_cmd.finish("⛔ 请先创建角色")
 
@@ -134,7 +134,7 @@ async def handle_accept_disciple(event: MessageEvent, args: Message = CommandArg
         await accept_disciple_cmd.finish("UID 必须为数字")
     
     async with safe_session() as session:
-        player = await session.get(Player, event.get_user_id())
+        player = await get_unified_player(session, event)
         if not player:
             await accept_disciple_cmd.finish("⛔ 请先创建角色")
         
@@ -178,7 +178,7 @@ async def handle_reject_disciple(event: MessageEvent, args: Message = CommandArg
         await reject_disciple_cmd.finish("UID 必须为数字")
     
     async with safe_session() as session:
-        player = await session.get(Player, event.get_user_id())
+        player = await get_unified_player(session, event)
         if not player:
             await reject_disciple_cmd.finish("⛔ 请先创建角色")
         
@@ -259,7 +259,7 @@ disciples_cmd = on_command("徒弟", aliases={"弟子"}, block=True, priority=5)
 @disciples_cmd.handle()
 async def handle_disciples(event: MessageEvent):
     async with safe_session() as session:
-        player = await session.get(Player, event.get_user_id())
+        player = await get_unified_player(session, event)
         if not player:
             await disciples_cmd.finish("⛔ 请先创建角色")
 
@@ -339,7 +339,7 @@ leave_master_cmd = on_command("脱离师门", aliases={"叛师"}, block=True, pr
 @leave_master_cmd.handle()
 async def handle_leave_master(event: MessageEvent):
     async with safe_session() as session:
-        player = await session.get(Player, event.get_user_id())
+        player = await get_unified_player(session, event)
         if not player:
             await leave_master_cmd.finish("⛔ 请先创建角色")
 

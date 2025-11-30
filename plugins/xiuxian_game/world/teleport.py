@@ -15,6 +15,7 @@ from ..models.navigation_task import NavigationTask
 from ..models.world_tile import WorldTile
 from ..config import config
 from ..utils import message_add_head
+from ..platform_utils import get_unified_player
 from sqlalchemy import select
 
 
@@ -167,7 +168,7 @@ async def _handle_teleport_logic(event: MessageEvent, target_region: str, cmd_ha
     STAM_COST = 1  # 咒抗消耗
 
     async with safe_session() as session:
-        player = await session.get(Player, event.get_user_id())
+        player = await get_unified_player(session, event)
         if not player:
             await cmd_handler.finish("⛔ 请先创建角色")
 
@@ -273,7 +274,7 @@ async def _handle_teleport_logic(event: MessageEvent, target_region: str, cmd_ha
 async def handle_revive(event: MessageEvent):
     """处理返回指令，退出诡域返回现实世界"""
     async with safe_session() as session:
-        player = await session.get(Player, event.get_user_id())
+        player = await get_unified_player(session, event)
         if not player:
             await revive_cmd.finish("⛔ 请先创建角色")
         
@@ -328,7 +329,7 @@ async def handle_revive(event: MessageEvent):
 async def handle_prev_level(event: MessageEvent):
     """处理上一层指令，切换到上一层诡域"""
     async with safe_session() as session:
-        player = await session.get(Player, event.get_user_id())
+        player = await get_unified_player(session, event)
         if not player:
             await prev_level_cmd.finish("⛔ 请先创建角色")
 
@@ -377,7 +378,7 @@ async def handle_prev_level(event: MessageEvent):
 async def handle_next_level(event: MessageEvent):
     """处理下一层指令，切换到下一层诡域"""
     async with safe_session() as session:
-        player = await session.get(Player, event.get_user_id())
+        player = await get_unified_player(session, event)
         if not player:
             await next_level_cmd.finish("⛔ 请先创建角色")
 

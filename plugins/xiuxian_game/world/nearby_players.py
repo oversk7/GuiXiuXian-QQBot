@@ -8,6 +8,7 @@ from ..models.db import safe_session
 from ..models.player import Player
 from ..utils import message_add_head
 from ..player.realm_utils import realm_by_level_and_reincarnation
+from ..platform_utils import get_unified_player
 
 # ----------------- 指令：附近玩家 -----------------
 # 查看当前区域距离自己最近的前 5 位玩家
@@ -18,7 +19,7 @@ nearby_cmd = on_command("附近玩家", aliases={"附近人"}, block=True, prior
 async def _(event: MessageEvent):
     async with safe_session() as session:
         # 获取当前玩家
-        player: Player | None = await session.get(Player, event.get_user_id())
+        player: Player | None = await get_unified_player(session, event)
         if not player:
             await nearby_cmd.finish("⛔ 请先创建角色")
 

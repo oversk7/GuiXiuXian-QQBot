@@ -27,6 +27,7 @@ from ..models.db import safe_session
 from ..models.player import Player
 from ..utils import message_add_head
 from .service import WorldBossService
+from ..platform_utils import get_unified_player
 
 # ==================== Feature Flag ====================
 # 设置为True使用新版DI架构的WorldBossService，False使用旧版本
@@ -43,7 +44,7 @@ open_chest_cmd = on_command("开启深渊宝箱", aliases={"开启宝箱", "开�
 @view_cmd.handle()
 async def handle_view(event: MessageEvent):
     async with safe_session() as session:
-        player = await session.get(Player, event.get_user_id())
+        player = await get_unified_player(session, event)
         if not player:
             await view_cmd.finish("⛔ 请先创建角色")
 
@@ -77,7 +78,7 @@ async def handle_view(event: MessageEvent):
 @attack_cmd.handle()
 async def handle_attack(event: MessageEvent, args: Message = CommandArg()):
     async with safe_session() as session:
-        player = await session.get(Player, event.get_user_id())
+        player = await get_unified_player(session, event)
         if not player:
             await attack_cmd.finish("⛔ 请先创建角色")
 
@@ -143,7 +144,7 @@ async def handle_open_chest(event: MessageEvent, args: Message = CommandArg()):
     from ..config import config
 
     async with safe_session() as session:
-        player = await session.get(Player, event.get_user_id())
+        player = await get_unified_player(session, event)
         if not player:
             await open_chest_cmd.finish("⛔ 请先创建角色")
 

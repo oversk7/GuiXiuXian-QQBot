@@ -246,7 +246,7 @@ location_detail_cmd = on_command("地点详情", aliases={"地点信息"}, block
 async def handle_location_detail(event: MessageEvent):
     """显示当前地点的详细信息"""
     async with safe_session() as session:
-        player: Player = await session.get(Player, event.get_user_id())
+        player: Player = await get_unified_player(session, event)
         if not player:
             await location_detail_cmd.finish("⛔ 请先创建角色")
         

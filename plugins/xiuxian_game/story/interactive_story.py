@@ -9,6 +9,7 @@ from ..models.db import safe_session
 from ..models.player import Player
 from ..models.story_session import StorySession
 from ..utils import message_add_head
+from ..platform_utils import get_unified_player
 from .engine import StoryEngine
 import re
 import os
@@ -35,7 +36,7 @@ continue_handler = on_regex(r".*", block=False, priority=15)
 async def handle_story_list(event: MessageEvent):
     """显示可用试炼列表"""
     async with safe_session() as session:
-        player = await session.get(Player, event.get_user_id())
+        player = await get_unified_player(session, event)
         if not player:
             await story_list_cmd.finish("⛔ 请先创建角色")
         
@@ -64,7 +65,7 @@ async def handle_story_list(event: MessageEvent):
 async def handle_start_story(event: MessageEvent, args: Message = CommandArg()):
     """开始试炼"""
     async with safe_session() as session:
-        player = await session.get(Player, event.get_user_id())
+        player = await get_unified_player(session, event)
         if not player:
             await start_story_cmd.finish("⛔ 请先创建角色")
         
@@ -104,7 +105,7 @@ async def handle_start_story(event: MessageEvent, args: Message = CommandArg()):
 async def handle_story_status(event: MessageEvent):
     """查看试炼状态"""
     async with safe_session() as session:
-        player = await session.get(Player, event.get_user_id())
+        player = await get_unified_player(session, event)
         if not player:
             await story_status_cmd.finish("⛔ 请先创建角色")
         
@@ -130,7 +131,7 @@ async def handle_story_status(event: MessageEvent):
 async def handle_quit_story(event: MessageEvent):
     """退出试炼"""
     async with safe_session() as session:
-        player = await session.get(Player, event.get_user_id())
+        player = await get_unified_player(session, event)
         if not player:
             await quit_story_cmd.finish("⛔ 请先创建角色")
         
@@ -151,7 +152,7 @@ async def handle_quit_story(event: MessageEvent):
 async def handle_choice(event: MessageEvent):
     """处理数字选择"""
     async with safe_session() as session:
-        player = await session.get(Player, event.get_user_id())
+        player = await get_unified_player(session, event)
         if not player:
             return  # 不是注册玩家，忽略
         
@@ -215,7 +216,7 @@ async def handle_choice(event: MessageEvent):
 async def handle_continue(event: MessageEvent):
     """处理普通试炼节点的继续"""
     async with safe_session() as session:
-        player = await session.get(Player, event.get_user_id())
+        player = await get_unified_player(session, event)
         if not player:
             return  # 不是注册玩家，忽略
 

@@ -53,7 +53,7 @@ async def handle_work(event: MessageEvent, args: Message = CommandArg()):
             return AsyncSessionLocal()
 
         async with UnitOfWork(session_factory) as uow:
-            player = await uow.session.get(Player, event.get_user_id())
+            player = await get_unified_player(uow.session, event)
             if not player:
                 await work_cmd.finish("⛔ 请先创建角色")
 
@@ -90,7 +90,7 @@ async def handle_work(event: MessageEvent, args: Message = CommandArg()):
     else:
         # 旧版本: 使用静态方法
         async with safe_session() as session:
-            player = await session.get(Player, event.get_user_id())
+            player = await get_unified_player(session, event)
             if not player:
                 await work_cmd.finish("⛔ 请先创建角色")
 
@@ -209,7 +209,7 @@ async def handle_finish_work(event: MessageEvent):
             return AsyncSessionLocal()
 
         async with UnitOfWork(session_factory) as uow:
-            player = await uow.session.get(Player, event.get_user_id())
+            player = await get_unified_player(uow.session, event)
             if not player:
                 await finish_work_cmd.finish("⛔ 请先创建角色")
 
@@ -223,7 +223,7 @@ async def handle_finish_work(event: MessageEvent):
             success, msg, result = await part_time_job_service.complete_job(player)
     else:
         async with safe_session() as session:
-            player = await session.get(Player, event.get_user_id())
+            player = await get_unified_player(session, event)
             if not player:
                 await finish_work_cmd.finish("⛔ 请先创建角色")
 
@@ -340,7 +340,7 @@ async def handle_work_locations(event: MessageEvent):
             return AsyncSessionLocal()
 
         async with UnitOfWork(session_factory) as uow:
-            player = await uow.session.get(Player, event.get_user_id())
+            player = await get_unified_player(uow.session, event)
             if not player:
                 await work_locations_cmd.finish("⛔ 请先创建角色")
 
@@ -354,7 +354,7 @@ async def handle_work_locations(event: MessageEvent):
             locations = await part_time_job_service.get_job_locations_list()
     else:
         async with safe_session() as session:
-            player = await session.get(Player, event.get_user_id())
+            player = await get_unified_player(session, event)
             if not player:
                 await work_locations_cmd.finish("⛔ 请先创建角色")
 
@@ -393,7 +393,7 @@ async def handle_work_history(event: MessageEvent):
             return AsyncSessionLocal()
 
         async with UnitOfWork(session_factory) as uow:
-            player = await uow.session.get(Player, event.get_user_id())
+            player = await get_unified_player(uow.session, event)
             if not player:
                 await work_history_cmd.finish("⛔ 请先创建角色")
 
@@ -407,7 +407,7 @@ async def handle_work_history(event: MessageEvent):
             history = await part_time_job_service.get_player_job_history(player.id, 5)
     else:
         async with safe_session() as session:
-            player = await session.get(Player, event.get_user_id())
+            player = await get_unified_player(session, event)
             if not player:
                 await work_history_cmd.finish("⛔ 请先创建角色")
 
@@ -445,7 +445,7 @@ async def handle_work_stats(event: MessageEvent):
             return AsyncSessionLocal()
 
         async with UnitOfWork(session_factory) as uow:
-            player = await uow.session.get(Player, event.get_user_id())
+            player = await get_unified_player(uow.session, event)
             if not player:
                 await work_stats_cmd.finish("⛔ 请先创建角色")
 
@@ -459,7 +459,7 @@ async def handle_work_stats(event: MessageEvent):
             stats = await part_time_job_service._player_job_stats_repo.get_or_create(player.id)
     else:
         async with safe_session() as session:
-            player = await session.get(Player, event.get_user_id())
+            player = await get_unified_player(session, event)
             if not player:
                 await work_stats_cmd.finish("⛔ 请先创建角色")
 

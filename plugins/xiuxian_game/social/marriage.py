@@ -7,6 +7,7 @@ from ..models.db import safe_session
 from ..models.player import Player
 from ..utils import message_add_head
 from .marriage_service import MarriageService
+from ..platform_utils import get_unified_player
 
 # ==================== Feature Flag ====================
 # 设置为True使用新版DI架构的MarriageService，False使用旧版本
@@ -30,7 +31,7 @@ async def handle_propose(event: MessageEvent, args: Message = CommandArg()):
     
     async with safe_session() as session:
         # 获取申请人
-        proposer = await session.get(Player, event.get_user_id())
+        proposer = await get_unified_player(session, event)
         if not proposer:
             await propose_cmd.finish("⛔ 请先创建角色")
         
@@ -85,7 +86,7 @@ marriage_applications_cmd = on_command("求婚申请", aliases={"婚姻申请"},
 @marriage_applications_cmd.handle()
 async def handle_marriage_applications(event: MessageEvent):
     async with safe_session() as session:
-        player = await session.get(Player, event.get_user_id())
+        player = await get_unified_player(session, event)
         if not player:
             await marriage_applications_cmd.finish("⛔ 请先创建角色")
 
@@ -130,7 +131,7 @@ async def handle_accept_proposal(event: MessageEvent, args: Message = CommandArg
         await accept_proposal_cmd.finish("UID 必须为数字")
     
     async with safe_session() as session:
-        player = await session.get(Player, event.get_user_id())
+        player = await get_unified_player(session, event)
         if not player:
             await accept_proposal_cmd.finish("⛔ 请先创建角色")
         
@@ -174,7 +175,7 @@ async def handle_reject_proposal(event: MessageEvent, args: Message = CommandArg
         await reject_proposal_cmd.finish("UID 必须为数字")
     
     async with safe_session() as session:
-        player = await session.get(Player, event.get_user_id())
+        player = await get_unified_player(session, event)
         if not player:
             await reject_proposal_cmd.finish("⛔ 请先创建角色")
         
@@ -209,7 +210,7 @@ spouse_cmd = on_command("配偶", aliases={"老婆", "老公", "夫妻"}, block=
 @spouse_cmd.handle()
 async def handle_spouse(event: MessageEvent):
     async with safe_session() as session:
-        player = await session.get(Player, event.get_user_id())
+        player = await get_unified_player(session, event)
         if not player:
             await spouse_cmd.finish("⛔ 请先创建角色")
 
@@ -267,7 +268,7 @@ divorce_cmd = on_command("离婚", block=True, priority=5)
 @divorce_cmd.handle()
 async def handle_divorce(event: MessageEvent):
     async with safe_session() as session:
-        player = await session.get(Player, event.get_user_id())
+        player = await get_unified_player(session, event)
         if not player:
             await divorce_cmd.finish("⛔ 请先创建角色")
 

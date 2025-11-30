@@ -11,6 +11,7 @@ from ..models.inventory import ItemInstance
 from ..models.monthly_card import MonthlyCard
 from ..utils import message_add_head
 from ..config import config
+from ..platform_utils import get_unified_player
 
 sacrifice_cmd = on_command("献祭", block=True, priority=5)
 batch_sacrifice_cmd = on_command("一键献祭", block=True, priority=5)
@@ -42,7 +43,7 @@ async def handle_sacrifice(event: MessageEvent, args: Message = CommandArg()):
         await sacrifice_cmd.finish("⛔ 该材料未蕴含怨念，无法献祭")
 
     async with safe_session() as session:
-        player = await session.get(Player, event.get_user_id())
+        player = await get_unified_player(session, event)
         if not player:
             await sacrifice_cmd.finish("⛔ 请先创建角色")
 
@@ -86,7 +87,7 @@ async def handle_batch_sacrifice(event: MessageEvent, args: Message = CommandArg
     """一键献祭指定的材料（月卡用户专属）"""
     # 检查月卡权限
     async with safe_session() as session:
-        player = await session.get(Player, event.get_user_id())
+        player = await get_unified_player(session, event)
         if not player:
             await batch_sacrifice_cmd.finish("⛔ 请先创建角色")
 

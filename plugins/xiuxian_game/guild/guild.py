@@ -27,6 +27,7 @@ from .guild_task_service_new import GuildTaskService as GuildTaskServiceNew  # D
 from .guild_facility_service import GuildFacilityService
 from .guild_facility_service_new import GuildFacilityService as GuildFacilityServiceNew  # DI版本
 from .guild_daily_tasks import GuildDailyTasks
+from ..platform_utils import get_unified_player
 
 # ===== Feature Flag =====
 # 设置为True使用新版DI架构的GuildService
@@ -78,7 +79,7 @@ async def handle_create_guild(event: MessageEvent, args: Message = CommandArg())
 
         async with UnitOfWork(session_factory) as uow:
             # 1. 获取玩家（使用UoW的session）
-            player = await uow.session.get(Player, event.get_user_id())
+            player = await get_unified_player(uow.session, event)
             if not player:
                 await create_guild_cmd.finish("⛔ 请先创建角色")
             if player.guild_id is not None:
@@ -139,7 +140,7 @@ async def handle_create_guild(event: MessageEvent, args: Message = CommandArg())
         # 旧版本: 静态方法
         async with safe_session() as session:
             # 获取玩家
-            player = await session.get(Player, event.get_user_id())
+            player = await get_unified_player(session, event)
             if not player:
                 await create_guild_cmd.finish("⛔ 请先创建角色")
             if player.guild_id is not None:
@@ -201,7 +202,7 @@ async def handle_guild_info(event: MessageEvent):
             return AsyncSessionLocal()
 
         async with UnitOfWork(session_factory) as uow:
-            player = await uow.session.get(Player, event.get_user_id())
+            player = await get_unified_player(uow.session, event)
             if not player or player.guild_id is None:
                 await guild_info_cmd.finish("⛔ 你尚未加入任何公会")
 
@@ -239,7 +240,7 @@ async def handle_guild_info(event: MessageEvent):
     else:
         # 旧版本: 使用静态方法
         async with safe_session() as session:
-            player = await session.get(Player, event.get_user_id())
+            player = await get_unified_player(session, event)
             if not player or player.guild_id is None:
                 await guild_info_cmd.finish("⛔ 你尚未加入任何公会")
 
@@ -329,7 +330,7 @@ guild_bonuses_cmd = on_command("公会加成", aliases={"加成效果"}, block=T
 async def handle_guild_bonuses(event: MessageEvent):
     """查看公会建筑提供的所有加成效果"""
     async with safe_session() as session:
-        player = await session.get(Player, event.get_user_id())
+        player = await get_unified_player(session, event)
         if not player or not player.guild_id:
             await guild_bonuses_cmd.finish("⛔ 你未加入任何公会")
 
@@ -426,7 +427,7 @@ async def handle_join_guild(event: MessageEvent, args: Message = CommandArg()):
         await join_guild_cmd.finish("⛔ 公会 ID 必须是数字")
 
     async with safe_session() as session:
-        player = await session.get(Player, event.get_user_id())
+        player = await get_unified_player(session, event)
         if not player:
             await join_guild_cmd.finish("⛔ 请先创建角色")
 
@@ -484,7 +485,7 @@ async def handle_quit_guild(event: MessageEvent):
             return AsyncSessionLocal()
 
         async with UnitOfWork(session_factory) as uow:
-            player = await uow.session.get(Player, event.get_user_id())
+            player = await get_unified_player(uow.session, event)
             if not player or player.guild_id is None:
                 await quit_guild_cmd.finish("⛔ 你未加入任何公会")
 
@@ -509,7 +510,7 @@ async def handle_quit_guild(event: MessageEvent):
     else:
         # 旧版本: 使用静态方法
         async with safe_session() as session:
-            player = await session.get(Player, event.get_user_id())
+            player = await get_unified_player(session, event)
             if not player or player.guild_id is None:
                 await quit_guild_cmd.finish("⛔ 你未加入任何公会")
 
@@ -532,7 +533,7 @@ dissolve_guild_cmd = on_command("解散公会", block=True, priority=5)
 @dissolve_guild_cmd.handle()
 async def handle_dissolve_guild(event: MessageEvent):
     async with safe_session() as session:
-        player = await session.get(Player, event.get_user_id())
+        player = await get_unified_player(session, event)
         if not player or player.guild_id is None:
             await dissolve_guild_cmd.finish("⛔ 你未加入公会")
 
@@ -581,7 +582,7 @@ async def handle_member_list(event: MessageEvent, args: Message = CommandArg()):
             return AsyncSessionLocal()
 
         async with UnitOfWork(session_factory) as uow:
-            player = await uow.session.get(Player, event.get_user_id())
+            player = await get_unified_player(uow.session, event)
             if not player or player.guild_id is None:
                 await member_list_cmd.finish("⛔ 你未加入任何公会")
             guild_obj = await uow.session.get(Guild, player.guild_id)
@@ -600,7 +601,7 @@ async def handle_member_list(event: MessageEvent, args: Message = CommandArg()):
     else:
         # 旧版本: 使用静态方法
         async with safe_session() as session:
-            player = await session.get(Player, event.get_user_id())
+            player = await get_unified_player(session, event)
             if not player or player.guild_id is None:
                 await member_list_cmd.finish("⛔ 你未加入任何公会")
             guild_obj = await session.get(Guild, player.guild_id)
@@ -738,7 +739,7 @@ guild_upgrade_cmd = on_command("公会升级", aliases={"升级公会"}, block=T
 async def handle_guild_upgrade(event: MessageEvent):
     """公会升级"""
     async with safe_session() as session:
-        player = await session.get(Player, event.get_user_id())
+        player = await get_unified_player(session, event)
         if not player or not player.guild_id:
             await guild_upgrade_cmd.finish("⛔ 你未加入任何公会")
 
@@ -780,7 +781,7 @@ async def handle_transfer(event: MessageEvent, args: Message = CommandArg()):
         await transfer_cmd.finish("⛔ UID 必须是数字")
 
     async with safe_session() as session:
-        player = await session.get(Player, event.get_user_id())
+        player = await get_unified_player(session, event)
         if not player or player.guild_id is None:
             await transfer_cmd.finish("⛔ 你未加入公会")
         guild_obj = await session.get(Guild, player.guild_id)
@@ -854,7 +855,7 @@ application_list_cmd = on_command("申请列表", block=True, priority=5)
 @application_list_cmd.handle()
 async def handle_app_list(event: MessageEvent):
     async with safe_session() as session:
-        player = await session.get(Player, event.get_user_id())
+        player = await get_unified_player(session, event)
         if not player or player.guild_id is None:
             await application_list_cmd.finish("⛔ 你未加入公会")
 
@@ -912,7 +913,7 @@ async def _process_application(event: MessageEvent, args: Message, approve: bool
             return AsyncSessionLocal()
 
         async with UnitOfWork(session_factory) as uow:
-            player = await uow.session.get(Player, event.get_user_id())
+            player = await get_unified_player(uow.session, event)
             if not player or player.guild_id is None:
                 await (approve_cmd if approve else reject_cmd).finish("⛔ 你未加入公会")
 
@@ -980,7 +981,7 @@ async def _process_application(event: MessageEvent, args: Message, approve: bool
     else:
         # 旧版本: 使用静态方法
         async with safe_session() as session:
-            player = await session.get(Player, event.get_user_id())
+            player = await get_unified_player(session, event)
             if not player or player.guild_id is None:
                 await (approve_cmd if approve else reject_cmd).finish("⛔ 你未加入公会")
 
@@ -1057,7 +1058,7 @@ notice_cmd = on_command("公会公告", aliases={"公告"}, block=True, priority
 async def handle_notice(event: MessageEvent, args: Message = CommandArg()):
     text = args.extract_plain_text().strip()
     async with safe_session() as session:
-        player = await session.get(Player, event.get_user_id())
+        player = await get_unified_player(session, event)
         if not player or player.guild_id is None:
             await notice_cmd.finish("⛔ 你未加入公会")
         guild_obj = await session.get(Guild, player.guild_id)
@@ -1089,7 +1090,7 @@ set_base_cmd = on_command("设置基地", block=True, priority=5)
 async def handle_set_base(event: MessageEvent):
     """设置公会基地：设置基地"""
     async with safe_session() as session:
-        player = await session.get(Player, event.get_user_id())
+        player = await get_unified_player(session, event)
         if not player or not player.guild_id:
             await set_base_cmd.finish("⛔ 你未加入任何公会")
 
@@ -1184,7 +1185,7 @@ async def handle_set_position(event: MessageEvent, args: Message = CommandArg())
             return AsyncSessionLocal()
 
         async with UnitOfWork(session_factory) as uow:
-            player = await uow.session.get(Player, event.get_user_id())
+            player = await get_unified_player(uow.session, event)
             if not player or not player.guild_id:
                 await set_position_cmd.finish("⛔ 你未加入任何公会")
 
@@ -1217,7 +1218,7 @@ async def handle_set_position(event: MessageEvent, args: Message = CommandArg())
     else:
         # 旧版本: 使用静态方法
         async with safe_session() as session:
-            player = await session.get(Player, event.get_user_id())
+            player = await get_unified_player(session, event)
             if not player or not player.guild_id:
                 await set_position_cmd.finish("⛔ 你未加入任何公会")
 
@@ -1266,7 +1267,7 @@ async def handle_kick_member(event: MessageEvent, args: Message = CommandArg()):
             return AsyncSessionLocal()
 
         async with UnitOfWork(session_factory) as uow:
-            player = await uow.session.get(Player, event.get_user_id())
+            player = await get_unified_player(uow.session, event)
             if not player or not player.guild_id:
                 await kick_member_cmd.finish("⛔ 你未加入任何公会")
 
@@ -1290,7 +1291,7 @@ async def handle_kick_member(event: MessageEvent, args: Message = CommandArg()):
     else:
         # 旧版本: 使用静态方法
         async with safe_session() as session:
-            player = await session.get(Player, event.get_user_id())
+            player = await get_unified_player(session, event)
             if not player or not player.guild_id:
                 await kick_member_cmd.finish("⛔ 你未加入任何公会")
 
@@ -1312,7 +1313,7 @@ guild_buildings_cmd = on_command("公会建筑", aliases={"建筑列表"}, block
 async def handle_guild_buildings(event: MessageEvent):
     """查看公会建筑列表"""
     async with safe_session() as session:
-        player = await session.get(Player, event.get_user_id())
+        player = await get_unified_player(session, event)
         if not player or not player.guild_id:
             await guild_buildings_cmd.finish("⛔ 你未加入任何公会")
 
@@ -1376,7 +1377,7 @@ async def handle_build(event: MessageEvent, args: Message = CommandArg()):
     building_type = building_map[building_name]
 
     async with safe_session() as session:
-        player = await session.get(Player, event.get_user_id())
+        player = await get_unified_player(session, event)
         if not player or not player.guild_id:
             await build_cmd.finish("⛔ 你未加入任何公会")
 
@@ -1412,7 +1413,7 @@ confirm_build_cmd = on_command("确认", block=True, priority=5)
 async def handle_confirm_build(event: MessageEvent):
     """确认建造建筑"""
     async with safe_session() as session:
-        player = await session.get(Player, event.get_user_id())
+        player = await get_unified_player(session, event)
         if not player or not player.guild_id:
             await confirm_build_cmd.finish("⛔ 你未加入任何公会")
 
@@ -1449,7 +1450,7 @@ async def handle_confirm_build_with_name(event: MessageEvent, args: Message = Co
     building_type = building_map[building_name]
 
     async with safe_session() as session:
-        player = await session.get(Player, event.get_user_id())
+        player = await get_unified_player(session, event)
         if not player or not player.guild_id:
             await confirm_build_with_name_cmd.finish("⛔ 你未加入任何公会")
 
@@ -1491,7 +1492,7 @@ async def handle_guild_teleport(event: MessageEvent, args: Message = CommandArg(
     args_text = args.extract_plain_text().strip()
 
     async with safe_session() as session:
-        player = await session.get(Player, event.get_user_id())
+        player = await get_unified_player(session, event)
         if not player or not player.guild_id:
             await guild_teleport_cmd.finish("⛔ 你未加入任何公会")
 
@@ -1590,7 +1591,7 @@ guild_alchemy_cmd = on_command("公会丹房", aliases={"丹房", "丹药兑换"
 async def handle_guild_alchemy(event: MessageEvent):
     """查看公会丹房产出"""
     async with safe_session() as session:
-        player = await session.get(Player, event.get_user_id())
+        player = await get_unified_player(session, event)
         if not player or not player.guild_id:
             await guild_alchemy_cmd.finish("⛔ 你未加入任何公会")
 
@@ -1661,7 +1662,7 @@ async def handle_exchange_pill(event: MessageEvent, args: Message = CommandArg()
         await exchange_pill_cmd.finish("⛔ 格式错误，正确格式：兑换丹药 [丹药名称] [数量]")
 
     async with safe_session() as session:
-        player = await session.get(Player, event.get_user_id())
+        player = await get_unified_player(session, event)
         if not player or not player.guild_id:
             await exchange_pill_cmd.finish("⛔ 你未加入任何公会")
 
@@ -1755,7 +1756,7 @@ guild_warehouse_cmd = on_command("公会仓库", aliases={"仓库"}, block=True,
 async def handle_guild_warehouse(event: MessageEvent):
     """查看公会仓库"""
     async with safe_session() as session:
-        player = await session.get(Player, event.get_user_id())
+        player = await get_unified_player(session, event)
         if not player or not player.guild_id:
             await guild_warehouse_cmd.finish("⛔ 你未加入任何公会")
 
@@ -1839,7 +1840,7 @@ async def handle_deposit_warehouse(event: MessageEvent, args: Message = CommandA
         await deposit_warehouse_cmd.finish("⛔ 数量必须是正整数")
 
     async with safe_session() as session:
-        player = await session.get(Player, event.get_user_id())
+        player = await get_unified_player(session, event)
         if not player or not player.guild_id:
             await deposit_warehouse_cmd.finish("⛔ 你未加入任何公会")
 
@@ -1911,7 +1912,7 @@ async def handle_withdraw_warehouse(event: MessageEvent, args: Message = Command
         await withdraw_warehouse_cmd.finish("⛔ 序号和数量必须是正整数")
 
     async with safe_session() as session:
-        player = await session.get(Player, event.get_user_id())
+        player = await get_unified_player(session, event)
         if not player or not player.guild_id:
             await withdraw_warehouse_cmd.finish("⛔ 你未加入任何公会")
 
