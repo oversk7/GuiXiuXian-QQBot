@@ -666,9 +666,30 @@ async def _(event: MessageEvent):
                 current_value = getattr(player, k, 0)
                 setattr(player, k, max(0, current_value - v))
 
+            # 清除装备的持久化加成记录
+            if "_persist_bonus" in (equip.extra_attrs or {}):
+                extra_new = {k: v for k, v in equip.extra_attrs.items() if k != "_persist_bonus"}
+                equip.extra_attrs = extra_new
+
             session.add(equip)
             unworn_equipment.append(f"{equip.config.name}(ID:{equip.id})")
             all_failed_tasks.extend(failed_tasks)
+
+        # 重新计算剩余装备的属性加成，确保属性正确恢复
+        if USE_NEW_EQUIPMENT_SERVICE:
+            # 新版本: 使用DI架构的EquipmentService
+            from ..infrastructure.repositories.item_repository import ItemRepository
+            from ..infrastructure.repositories.player_repository import PlayerRepository
+            from .equipment_service_new import EquipmentService
+
+            equipment_service = EquipmentService(
+                item_repo=ItemRepository(session),
+                player_repo=PlayerRepository(session)
+            )
+            await equipment_service.recalc_equipment_attributes(player)
+        else:
+            # 旧版本: 使用静态函数
+            await recalc_equipment_attributes(session, player)
 
         # 确保当前HP/MP不超过新的上限
         if player.hp > player.max_hp:
