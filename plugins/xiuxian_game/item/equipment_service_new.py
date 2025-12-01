@@ -66,10 +66,9 @@ class EquipmentService:
             await self._player_repo.update(player)
             return
 
-        # 1. 先移除所有已记录的装备加成
+        # 1. 先移除所有已记录的装备加成（包括已卸下的装备）
+        # 这一步会将player属性恢复到真实的无装备基础属性
         for eq in equipped_items:
-            if not getattr(eq, "equipped", False):
-                continue
             delta = (eq.extra_attrs or {}).get("_persist_bonus", {})
             for k, v in delta.items():
                 current_value = getattr(player, k, 0)
@@ -79,9 +78,8 @@ class EquipmentService:
                 extra_new = {k: v for k, v in eq.extra_attrs.items() if k != "_persist_bonus"}
                 eq.extra_attrs = extra_new
 
-            eq.equipped = False
-
         # 2. 基于当前基础属性重新应用装备加成
+        # 注意：此时player属性已经是真实的无装备基础属性
         base_attrs = {
             "attack": player.attack,
             "defense": player.defense,
@@ -91,8 +89,11 @@ class EquipmentService:
             "max_mp": player.max_mp,
         }
 
+        # 3. 只重新应用equipped=True的装备
         for eq in equipped_items:
-            eq.equipped = True
+            # 跳过未装备的（例如刚卸下的装备）
+            if not getattr(eq, "equipped", False):
+                continue
 
             attrs_temp = base_attrs.copy()
             eq.apply_attr_bonus(attrs_temp, base_attrs)
@@ -115,10 +116,11 @@ class EquipmentService:
         # 批量更新装备的extra_attrs
         await self._item_repo.update_extra_attrs_batch(equipped_items)
 
-        # 3. 再处理 mp_from_hp 类全局被动
-        await self._apply_mp_from_hp_effects(player, equipped_items)
+        # 4. 再处理 mp_from_hp 类全局被动（只处理equipped=True的装备）
+        equipped_only = [eq for eq in equipped_items if getattr(eq, "equipped", False)]
+        await self._apply_mp_from_hp_effects(player, equipped_only)
 
-        # 4. 确保当前 HP/MP 不超过新的上限
+        # 5. 确保当前 HP/MP 不超过新的上限
         if player.hp > player.max_hp:
             player.hp = player.max_hp
         if player.mp > player.max_mp:
