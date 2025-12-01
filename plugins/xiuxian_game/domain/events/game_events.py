@@ -119,7 +119,7 @@ class WorldBossDamageEvent(IEvent):
     @property
     def event_name(self) -> str:
         final_flag = "[最后一击]" if self.is_final_blow else ""
-        return f"BOSS伤害 [{self.player_id}] {final_flag}对{self.boss_name}造成{damage:,}伤害"
+        return f"BOSS伤害 [{self.player_id}] {final_flag}对{self.boss_name}造成{self.damage:,}伤害"
 
 
 # ==================== 经济事件 ====================
