@@ -150,3 +150,17 @@ class IAttributeSource(Protocol):
     def source_name(self) -> str:
         """属性来源名称（用于调试）"""
         ...
+
+    @property
+    def is_persisted(self) -> bool:
+        """
+        该属性来源是否已持久化到Player属性中
+
+        如果为True，表示该来源的加成已经通过recalc等机制写入Player对象的属性，
+        AttributeCalculator在计算total时不应该重复累加。
+
+        Examples:
+            - 装备加成：is_persisted=True（通过_persist_bonus机制写入player.max_hp等）
+            - Buff加成：is_persisted=False（临时加成，不修改player属性）
+        """
+        ...

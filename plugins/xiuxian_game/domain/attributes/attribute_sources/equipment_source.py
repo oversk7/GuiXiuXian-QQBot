@@ -29,6 +29,11 @@ class EquipmentAttributeSource(IAttributeSource):
     def source_name(self) -> str:
         return "equipment"
 
+    @property
+    def is_persisted(self) -> bool:
+        """装备加成已通过_persist_bonus机制持久化到Player属性"""
+        return True
+
     async def calculate_bonus(
         self,
         player,

@@ -72,10 +72,12 @@ class AttributeCalculator:
             bonus = await source.calculate_bonus(player, session)
             sources_bonuses.append(bonus)
 
-        # 汇总
+        # 汇总（只累加未持久化的来源，已持久化的来源已经在base中了）
+        # 例如：装备加成通过recalc写入player属性，buff加成是临时的
         total = base
-        for bonus in sources_bonuses:
-            total = total + bonus
+        for i, source in enumerate(self._sources):
+            if not source.is_persisted:
+                total = total + sources_bonuses[i]
 
         if not include_breakdown:
             return total
@@ -101,10 +103,13 @@ class AttributeCalculator:
 
     def _calculate_base(self, player) -> AttributeBonus:
         """
-        计算基础属性
+        读取玩家当前属性作为base
 
-        注意: 基础属性已经包含了通过_persist_bonus持久化的装备和丹药加成
-        这里只是读取Player模型的属性值
+        重要：base已经包含了所有持久化的加成（is_persisted=True的来源）
+        - 装备加成：通过recalc_equipment_attributes写入player属性
+        - 丹药加成：持久化的丹药加成也在player属性中
+
+        因此，在calculate_final_attributes中，只需要累加临时加成（is_persisted=False）
         """
         return AttributeBonus(
             attack=getattr(player, 'attack', 0),

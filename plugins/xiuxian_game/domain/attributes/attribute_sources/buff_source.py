@@ -40,6 +40,11 @@ class BuffAttributeSource(IAttributeSource):
     def source_name(self) -> str:
         return "buff"
 
+    @property
+    def is_persisted(self) -> bool:
+        """Buff加成是临时的，不持久化到Player属性"""
+        return False
+
     async def calculate_bonus(
         self,
         player,
