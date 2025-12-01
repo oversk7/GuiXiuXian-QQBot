@@ -11,6 +11,9 @@
 - 生成转让密钥 <账号ID> - 为玩家生成账号转让密钥（账号买卖）
 - 接收账号 <转让密钥> - 使用转让密钥接收账号
 - 取消转让 <账号ID> - 取消账号的转让密钥
+- 临时切换 <UID> - 管理员临时切换到指定账号（不改变所有权）
+- 退出临时切换 - 管理员退出临时切换状态
+- 临时切换状态 - 查看当前临时切换状态
 """
 
 from nonebot import on_command
@@ -25,6 +28,12 @@ from ..infrastructure.repositories.account_ownership_repository import AccountOw
 from ..infrastructure.repositories.account_transfer_log_repository import AccountTransferLogRepository
 from ..infrastructure.repositories.player_repository import PlayerRepository
 from .account_switching_service import AccountSwitchingService
+from ..platform_utils import (
+    admin_temp_switch_to,
+    admin_exit_temp_switch,
+    is_admin_temp_switching,
+    get_admin_temp_switch_target
+)
 
 
 # ==================== 我的账号 ====================
@@ -187,7 +196,7 @@ async def handle_generate_transfer_key(event: MessageEvent, args: Message = Comm
             player_repo=player_repo
         )
 
-        success, result = await service.generate_transfer_key(platform_id, target_player.id)
+        success, result = await service.generate_transfer_key(platform_id, target_player.id, is_admin=True)
 
         if success:
             await session.commit()
@@ -343,3 +352,116 @@ async def handle_transfer_history(event: MessageEvent):
                 )
 
         await transfer_history_cmd.finish(message_add_head("\n".join(lines), event))
+
+
+# ==================== 临时切换（管理员调试功能） ====================
+admin_temp_switch_cmd = on_command("临时切换", aliases={"临时切换账号"}, block=True, priority=5, permission=SUPERUSER)
+
+@admin_temp_switch_cmd.handle()
+async def handle_admin_temp_switch(event: MessageEvent, args: Message = CommandArg()):
+    """管理员临时切换到指定账号进行调试"""
+    args_text = args.extract_plain_text().strip()
+    if not args_text:
+        await admin_temp_switch_cmd.finish("⛔ 请提供要临时切换的账号UID\n格式：临时切换 <UID>")
+
+    admin_platform_id = event.get_user_id()
+
+    # 将UID转换为整数
+    try:
+        target_uid = int(args_text)
+    except ValueError:
+        await admin_temp_switch_cmd.finish("⛔ UID必须是数字")
+
+    async with safe_session() as session:
+        # 通过UID查询player_id
+        player_repo = PlayerRepository(session)
+        target_player = await player_repo.get_by_uid(target_uid)
+        if not target_player:
+            await admin_temp_switch_cmd.finish(f"⛔ UID {target_uid} 不存在")
+
+        # 执行临时切换
+        admin_temp_switch_to(admin_platform_id, target_player.id)
+
+        lines = [
+            "🔧 管理员临时切换成功",
+            "━━━━━━━━━━",
+            f"目标账号: {target_player.nickname}",
+            f"UID: {target_player.uid}",
+            f"等级: Lv.{target_player.level}",
+            "━━━━━━━━━━",
+            "⚠️ 你现在以该账号的身份操作游戏",
+            "⚠️ 账号所有权未改变",
+            "⚠️ 使用「退出临时切换」恢复自己的账号",
+            "\n💡 提示: 所有游戏命令现在都作用于目标账号"
+        ]
+        await admin_temp_switch_cmd.finish(message_add_head("\n".join(lines), event))
+
+
+# ==================== 退出临时切换 ====================
+exit_temp_switch_cmd = on_command("退出临时切换", aliases={"取消临时切换"}, block=True, priority=5, permission=SUPERUSER)
+
+@exit_temp_switch_cmd.handle()
+async def handle_exit_temp_switch(event: MessageEvent):
+    """管理员退出临时切换状态"""
+    admin_platform_id = event.get_user_id()
+
+    # 检查是否在临时切换状态
+    if not is_admin_temp_switching(admin_platform_id):
+        await exit_temp_switch_cmd.finish("⛔ 你当前没有在临时切换状态")
+
+    # 获取临时切换的目标信息（用于显示）
+    target_player_id = get_admin_temp_switch_target(admin_platform_id)
+
+    async with safe_session() as session:
+        target_player = None
+        if target_player_id:
+            target_player = await session.get(Player, target_player_id)
+
+    # 退出临时切换
+    admin_exit_temp_switch(admin_platform_id)
+
+    lines = [
+        "✅ 已退出临时切换",
+        "━━━━━━━━━━"
+    ]
+    if target_player:
+        lines.append(f"之前临时切换的账号: {target_player.nickname} (UID: {target_player.uid})")
+        lines.append("━━━━━━━━━━")
+    lines.append("💡 你已恢复为自己的账号")
+
+    await exit_temp_switch_cmd.finish(message_add_head("\n".join(lines), event))
+
+
+# ==================== 临时切换状态 ====================
+temp_switch_status_cmd = on_command("临时切换状态", block=True, priority=5, permission=SUPERUSER)
+
+@temp_switch_status_cmd.handle()
+async def handle_temp_switch_status(event: MessageEvent):
+    """查看当前临时切换状态"""
+    admin_platform_id = event.get_user_id()
+
+    if not is_admin_temp_switching(admin_platform_id):
+        await temp_switch_status_cmd.finish("⛔ 你当前没有在临时切换状态")
+
+    target_player_id = get_admin_temp_switch_target(admin_platform_id)
+
+    async with safe_session() as session:
+        target_player = None
+        if target_player_id:
+            target_player = await session.get(Player, target_player_id)
+
+        if not target_player:
+            await temp_switch_status_cmd.finish("⛔ 临时切换的目标账号不存在")
+
+        lines = [
+            "🔧 临时切换状态",
+            "━━━━━━━━━━",
+            f"当前切换到: {target_player.nickname}",
+            f"UID: {target_player.uid}",
+            f"等级: Lv.{target_player.level}",
+            f"境界: {target_player.cultivation_level_name}",
+            "━━━━━━━━━━",
+            "💡 所有游戏命令都作用于此账号",
+            "💡 使用「退出临时切换」恢复自己的账号"
+        ]
+        await temp_switch_status_cmd.finish(message_add_head("\n".join(lines), event))

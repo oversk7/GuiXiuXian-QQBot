@@ -180,7 +180,8 @@ class AccountSwitchingService:
     async def generate_transfer_key(
         self,
         owner_platform_id: str,
-        player_id: str
+        player_id: str,
+        is_admin: bool = False
     ) -> Tuple[bool, str]:
         """
         生成账号转让密钥
@@ -188,6 +189,7 @@ class AccountSwitchingService:
         Args:
             owner_platform_id: 拥有者的平台ID
             player_id: 要转让的游戏账号ID
+            is_admin: 是否为管理员操作（管理员可以为任何账号生成转让密钥）
 
         Returns:
             (是否成功, 转让密钥或错误信息)
@@ -197,7 +199,8 @@ class AccountSwitchingService:
         if not ownership:
             return False, "账号不存在"
 
-        if ownership.owner_platform_id != owner_platform_id:
+        # 管理员可以跳过所有权检查
+        if not is_admin and ownership.owner_platform_id != owner_platform_id:
             return False, "这不是你的账号"
 
         # 2. 生成转让密钥（允许转让激活账号，解决单账号转让的死锁问题）

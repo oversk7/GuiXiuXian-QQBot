@@ -277,8 +277,48 @@ sqlalchemy.url = sqlite:///data/game.db  # 硬编码
 
 ---
 
+## 6. 已修复问题
+
+### ✅ 装备卸载属性清零Bug (2025-12-01)
+
+**问题描述**: 使用"一键卸下"命令后，玩家的攻击、敏捷、理智等属性被清零，而不是恢复到基础值（无装备状态）。
+
+**根本原因**:
+1. 卸载装备时仅减去了装备的属性加成
+2. 未清理 `_persist_bonus` 持久化加成记录
+3. 未调用 `recalc_equipment_attributes()` 重新计算剩余装备的属性
+
+**代码位置**: `plugins/xiuxian_game/item/equipment_commands.py:669-692`
+
+**修复内容**:
+```python
+# 1. 清除装备的持久化加成记录
+if "_persist_bonus" in (equip.extra_attrs or {}):
+    extra_new = {k: v for k, v in equip.extra_attrs.items() if k != "_persist_bonus"}
+    equip.extra_attrs = extra_new
+
+# 2. 重新计算剩余装备的属性加成
+if USE_NEW_EQUIPMENT_SERVICE:
+    equipment_service = EquipmentService(...)
+    await equipment_service.recalc_equipment_attributes(player)
+else:
+    await recalc_equipment_attributes(session, player)
+```
+
+**修复日期**: 2025-12-01
+
+**影响范围**: 所有使用"一键卸下"功能的玩家
+
+**验证方法**:
+1. 装备多件装备后记录攻击力
+2. 使用"一键卸下"命令
+3. 验证攻击力恢复到基础值（非零）
+
+---
+
 **相关文档**:
-- 重构规划: `/llmdoc/REFACTORING_PLAN_v4.md`
-- 重构路线: `/guides/refactoring-roadmap.md`
-- 目标架构: `/architecture/target-architecture.md`
-- 设计模式: `/reference/design-patterns.md`
+- 游戏平衡分析: `/llmdoc/agent/game_balance_analysis_2025_12_01.md`
+- 重构规划: `/llmdoc/REFACTORING_PLAN_v4.md` (已归档)
+- 重构路线: `/guides/refactoring-roadmap.md` (已归档)
+- 目标架构: `/architecture/target-architecture.md` (已归档)
+- 设计模式: `/reference/design-patterns.md` (已归档)
