@@ -66,9 +66,12 @@ class EquipmentService:
             await self._player_repo.update(player)
             return
 
-        # 1. 先移除所有已记录的装备加成（包括已卸下的装备）
-        # 这一步会将player属性恢复到真实的无装备基础属性
+        # 1. 先移除所有已记录的装备加成
+        # 注意：只处理equipped=True的装备，跳过已卸下的（equipped=False）
+        # 因为"卸下装备"命令会在调用recalc前手动移除属性
         for eq in equipped_items:
+            if not getattr(eq, "equipped", False):
+                continue
             delta = (eq.extra_attrs or {}).get("_persist_bonus", {})
             for k, v in delta.items():
                 current_value = getattr(player, k, 0)
@@ -77,6 +80,8 @@ class EquipmentService:
             if "_persist_bonus" in (eq.extra_attrs or {}):
                 extra_new = {k: v for k, v in eq.extra_attrs.items() if k != "_persist_bonus"}
                 eq.extra_attrs = extra_new
+
+            eq.equipped = False
 
         # 2. 基于当前基础属性重新应用装备加成
         # 注意：此时player属性已经是真实的无装备基础属性
@@ -89,11 +94,9 @@ class EquipmentService:
             "max_mp": player.max_mp,
         }
 
-        # 3. 只重新应用equipped=True的装备
+        # 3. 重新应用装备加成
         for eq in equipped_items:
-            # 跳过未装备的（例如刚卸下的装备）
-            if not getattr(eq, "equipped", False):
-                continue
+            eq.equipped = True
 
             attrs_temp = base_attrs.copy()
             eq.apply_attr_bonus(attrs_temp, base_attrs)

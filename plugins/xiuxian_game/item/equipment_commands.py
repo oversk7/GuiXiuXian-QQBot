@@ -552,17 +552,21 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
 
         # 卸下装备
         equip.equipped = False
+
+        # 移除装备的属性加成
+        delta = (equip.extra_attrs or {}).get("_persist_bonus", {})
+        for k, v in delta.items():
+            current_value = getattr(player, k, 0)
+            setattr(player, k, max(0, current_value - v))
+
+        # 清除装备的持久化加成记录
+        if "_persist_bonus" in (equip.extra_attrs or {}):
+            extra_new = {k: v for k, v in equip.extra_attrs.items() if k != "_persist_bonus"}
+            equip.extra_attrs = extra_new
+
         session.add(equip)
 
-        # 查询所有装备（包括刚卸下的），以便recalc正确计算基础属性
-        stmt = select(ItemInstance).where(
-            ItemInstance.player_id == player.id,
-            ItemInstance.item_id.in_(EQUIP_ITEM_IDS)
-        )
-        all_items = (await session.execute(stmt)).scalars().all()
-
         # 重新计算剩余装备的属性加成，确保 mp_from_hp 等全局被动同步
-        # 注意：传入所有装备，recalc会先移除所有装备的_persist_bonus得到真实基础属性
         if USE_NEW_EQUIPMENT_SERVICE:
             # 新版本: 使用DI架构的EquipmentService
             from ..infrastructure.repositories.item_repository import ItemRepository
@@ -573,10 +577,10 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
                 item_repo=ItemRepository(session),
                 player_repo=PlayerRepository(session)
             )
-            await equipment_service.recalc_equipment_attributes(player, all_items)
+            await equipment_service.recalc_equipment_attributes(player)
         else:
             # 旧版本: 使用静态函数
-            await recalc_equipment_attributes(session, player, all_items)
+            await recalc_equipment_attributes(session, player)
 
         await session.commit()
 
