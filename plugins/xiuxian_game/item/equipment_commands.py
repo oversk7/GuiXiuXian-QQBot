@@ -555,7 +555,6 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
         session.add(equip)
 
         # 查询所有装备（包括刚卸下的），以便recalc正确计算基础属性
-        from ..data.items import EQUIP_ITEM_IDS
         stmt = select(ItemInstance).where(
             ItemInstance.player_id == player.id,
             ItemInstance.item_id.in_(EQUIP_ITEM_IDS)
