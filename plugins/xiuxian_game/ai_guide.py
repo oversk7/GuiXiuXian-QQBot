@@ -58,35 +58,98 @@ async def call_zhipu_api(messages, model="GLM-4.5-Flash", timeout=30):
 DATABASE_SCHEMA = """
 数据库表结构信息：
 
-1. player表（玩家信息）：
-   - id: 玩家平台ID（主键）
-   - uid: 自增UID（唯一）
-   - nickname: 昵称
-   - level: 等级
-   - sex: 性别（男/女）
-   - exp: 经验值
-   - attribute_points: 可分配属性点
-   - region: 区域
-   - x, y: 旧版本坐标位置
-   - real_world_x, real_world_y: 现实世界坐标位置
-   - dungeon_level: 当前诡域层级(0=现实世界)
-   - dungeon_x, dungeon_y: 诡域内坐标(-5到5)
-   - max_dungeon_level: 到达过的最高诡域层级
-   - hp, max_hp: 生命值/最大生命值
-   - mp, max_mp: 理智值/最大理智值
-   - attack, defense, agility, luck, stamina(咒抗): 基础属性
-   - critical_rate, critical_damage, dodge_rate, hit_rate: 战斗属性
-   - counter_rate, combo_rate, penetration_rate: 高级战斗属性
-   - guild_id: 所属公会ID
-   - guild_contribution: 公会贡献值
-   - vip: VIP等级
-   - gold, gold2: 金币/积分
-   - reincarnation_level: 转数
-   - inventory_capacity: 背包容量
-   - is_secluded: 是否闭关
-   - seclusion_start_time: 闭关开始时间
-   - last_message_board_check: 最后查看留言板时间
-   - created_at: 创建时间
+1. player表（玩家信息，共87个字段）：
+
+   【基础信息】
+   - id: 玩家平台ID（主键，String(32)）
+   - uid: 自增UID（唯一，Integer）
+   - nickname: 昵称（String(24)）
+   - level: 等级（Integer，默认1）
+   - sex: 性别（男/女，String(8)）
+   - created_at: 创建时间（DateTime）
+
+   【经验和属性点】
+   - exp: 当前经验值（Integer，默认0）
+   - attribute_points: 可分配属性点（Integer，默认0）
+   - reincarnation_level: 转数/冥返次数（Integer，默认0）
+   - breakthrough_fail_count: 当前连续突破失败次数（Integer，默认0）
+
+   【基础属性】
+   - attack: 攻击力（Integer，默认1）
+   - defense: 防御力（Integer，默认5）
+   - agility: 敏捷度（Integer，默认5）
+   - luck: 运气值（Integer，默认1）
+   - stamina: 咒抗/精神抗性（Integer，默认10）
+
+   【HP/MP系统】
+   - hp: 当前生命值（Integer，默认20）
+   - max_hp: 最大生命值（Integer，默认20）
+   - mp: 当前理智值（Integer，默认20）
+   - max_mp: 最大理智值（Integer，默认20）
+
+   【扩展战斗属性 - 16个字段】
+   - critical_rate: 暴击率（百分比，Integer，默认5）
+   - critical_power: 暴击力/每点增加0.1倍伤害（Integer，默认0）
+   - combo_rate: 连击率（百分比，Integer，默认0）
+   - counter_rate: 反击率/反弹率（百分比，Integer，默认0）
+   - dodge_rate: 闪避率（百分比，Integer，默认0）
+   - accuracy_rate: 命中率（百分比，Integer，默认80）
+   - skill_crit_rate: 灵爆率/技能暴击率（百分比，Integer，默认0）
+   - penetration_rate: 穿透率/无视防御（百分比，Integer，默认0）
+   - anti_crit_rate: 抗暴率/降低敌方暴击（百分比，Integer，默认0）
+   - lifesteal_rate: 吸血率（百分比，Integer，默认0）
+   - immobilize_rate: 定身率（百分比，Integer，默认0）
+   - true_damage_rate: 真伤率（百分比，Integer，默认0）
+   - regen_rate: 回血率（百分比，Integer，默认0）
+
+   【战斗统计】
+   - total_battles: 总战斗次数（Integer，默认0）
+   - total_wins: 总胜利次数（Integer，默认0）
+   - total_damage_dealt: 总造成伤害（Integer，默认0）
+   - resentment: 怨念值（Integer，默认0）
+
+   【经济系统】
+   - gold: 金币/主要货币（BigInteger，默认1000）
+   - gold2: 积分/副货币（BigInteger，默认0）
+   - mini_game_score: 小游戏积分（Integer，默认0）
+
+   【签到系统】
+   - last_sign: 上次签到日期（DateTime，可为空）
+   - sign_streak: 连续签到天数（Integer，默认0）
+   - last_cultivation: 上次修炼时间（DateTime，可为空）
+
+   【世界坐标系统】
+   - region: 区域名称（String(32)，默认"大都会"）
+   - x: 兼容字段/当前X坐标（Integer，默认0）
+   - y: 兼容字段/当前Y坐标（Integer，默认0）
+   - real_world_x: 现实世界X坐标（Integer，默认0）
+   - real_world_y: 现实世界Y坐标（Integer，默认0）
+
+   【双层坐标系统 - 诡域】
+   - dungeon_level: 当前诡域层级/0=现实世界（Integer，默认0）
+   - dungeon_x: 诡域内小坐标X/-5到5（Integer，默认0）
+   - dungeon_y: 诡域内小坐标Y/-5到5（Integer，默认0）
+   - max_dungeon_level: 到达过的最高诡域层级（Integer，默认0）
+
+   【公会系统】
+   - guild_id: 所属公会ID（Integer，可为空）
+   - guild_contribution: 公会贡献值（BigInteger，默认0）
+
+   【阴宅系统】
+   - mansion_level: 阴宅等级/0表示未拥有（Integer，默认0）
+   - mansion_x: 阴宅X坐标（Integer，可为空）
+   - mansion_y: 阴宅Y坐标（Integer，可为空）
+   - mansion_usage_fee: 阴宅使用费用/金币（Integer，默认0）
+   - mansion_allow_others: 是否允许其他玩家使用阴宅（Boolean，默认True）
+   - mansion_willing_to_pay: 是否愿意支付费用使用他人阴宅（Boolean，默认True）
+
+   【其他系统】
+   - inventory_capacity: 背包容量/基础值（Integer，默认50）
+   - vip: VIP等级（Integer，默认0）
+   - is_secluded: 是否在闭关状态（Boolean，默认False）
+   - seclusion_start_time: 闭关开始时间（DateTime，可为空）
+   - last_message_board_check: 最后查看世界留言时间（DateTime，可为空）
+   - last_private_message_check: 最后查看私信时间（DateTime，可为空）
 
 2. guild表（公会信息）：
    - id: 公会ID（主键）
@@ -468,6 +531,91 @@ DATABASE_SCHEMA = """
 - 修改玩家VIP等级：UPDATE player SET vip = 5 WHERE nickname = '玩家昵称'
 - 修改玩家转数：UPDATE player SET reincarnation_level = 3 WHERE nickname = '玩家昵称'
 - 修改玩家生命值：UPDATE player SET hp = 1000, max_hp = 1000 WHERE nickname = '玩家昵称'
+
+完整玩家面板数据覆盖示例（根据【面板】命令显示的数据）：
+当管理员提供一个玩家的面板数据时，应生成包含所有关键字段的UPDATE语句：
+
+示例1 - 基础面板数据覆盖：
+UPDATE player SET
+  nickname = '张三',
+  level = 100,
+  exp = 5000,
+  sex = '男',
+  hp = 1000,
+  max_hp = 1000,
+  mp = 800,
+  max_mp = 800,
+  attack = 500,
+  defense = 300,
+  agility = 200,
+  luck = 150,
+  stamina = 50,
+  gold = 100000,
+  gold2 = 5000,
+  attribute_points = 10,
+  resentment = 500,
+  vip = 3,
+  reincarnation_level = 2,
+  real_world_x = 100,
+  real_world_y = 200,
+  dungeon_level = 0
+WHERE uid = 1001
+
+示例2 - 完整战斗属性覆盖：
+UPDATE player SET
+  nickname = '李四',
+  level = 150,
+  exp = 8000,
+  hp = 2000,
+  max_hp = 2000,
+  mp = 1500,
+  max_mp = 1500,
+  attack = 800,
+  defense = 600,
+  agility = 400,
+  luck = 200,
+  stamina = 80,
+  critical_rate = 45,
+  critical_power = 30,
+  combo_rate = 25,
+  counter_rate = 15,
+  dodge_rate = 35,
+  accuracy_rate = 95,
+  skill_crit_rate = 20,
+  penetration_rate = 30,
+  anti_crit_rate = 25,
+  lifesteal_rate = 10,
+  immobilize_rate = 5,
+  true_damage_rate = 8,
+  regen_rate = 12,
+  gold = 500000,
+  gold2 = 10000,
+  resentment = 1000,
+  reincarnation_level = 3,
+  vip = 5
+WHERE nickname = '李四'
+
+示例3 - 坐标系统完整覆盖：
+UPDATE player SET
+  real_world_x = 390,
+  real_world_y = 50,
+  dungeon_level = 5,
+  dungeon_x = 3,
+  dungeon_y = -2,
+  max_dungeon_level = 8,
+  region = '5层诡域',
+  x = 3,
+  y = -2
+WHERE uid = 1001
+
+⚠️ 重要提示：
+1. 根据玩家面板显示的数据，只更新有提供的字段，不要更新未提供的字段
+2. 如果面板显示玩家在诡域中，需要同时设置 dungeon_level、dungeon_x、dungeon_y、region、x、y
+3. 如果面板显示玩家在现实世界，设置 dungeon_level=0，并更新 real_world_x、real_world_y
+4. 装备加成已经持久化在 attack、defense 等基础属性中，不要单独设置装备加成
+5. Boolean字段：is_secluded、mansion_allow_others等，使用0/1或true/false
+6. DateTime字段可为空的用NULL，例如：last_sign = NULL
+7. 定位玩家优先使用 uid，其次 nickname，最后 id（平台ID）
 """
 
 async def generate_sql_from_natural_language(query_text: str) -> str:
@@ -487,7 +635,24 @@ async def generate_sql_from_natural_language(query_text: str) -> str:
 7. 如果涉及公会信息，记得JOIN相关表
 8. 玩家昵称显示时优先使用nickname字段
 9. UPDATE操作时要使用WHERE条件限制影响范围，避免全表更新
-10. 修改玩家数据时，可以通过nickname、uid或id来定位玩家，管理员“我”的UID是100
+10. 修改玩家数据时，可以通过nickname、uid或id来定位玩家，管理员"我"的UID是100
+
+【玩家面板数据覆盖专用规则】：
+当用户提供一个玩家的完整面板数据时：
+11. 识别面板中提供的所有字段（包括基础属性、战斗属性、经济数据、坐标等）
+12. 生成包含所有识别字段的UPDATE语句，确保字段名与player表完全匹配
+13. 注意坐标系统：
+    - 如果在诡域：设置dungeon_level>0，dungeon_x，dungeon_y，region（如"5层诡域"）
+    - 如果在现实世界：设置dungeon_level=0，real_world_x，real_world_y，region="大都会"
+14. 扩展战斗属性字段名务必准确：
+    - critical_power（不是critical_damage）
+    - accuracy_rate（不是hit_rate）
+    - skill_crit_rate（灵爆率）
+    - anti_crit_rate（抗暴率）
+    - lifesteal_rate, immobilize_rate, true_damage_rate, regen_rate
+15. 识别面板中的"装备加成"时，不要尝试单独设置，因为加成已持久化在基础属性中
+16. Boolean字段使用0或1（如is_secluded=0或1）
+17. 优先使用WHERE uid = ? 来定位玩家
 
 用户查询：{query_text}
 
