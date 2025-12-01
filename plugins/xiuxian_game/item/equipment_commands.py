@@ -409,7 +409,7 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
 
         # 检查是否有同名装备已装备
         same_type_stmt = select(ItemInstance).where(
-            ItemInstance.player_id == event.get_user_id(),
+            ItemInstance.player_id == player.id,
             ItemInstance.item_id == equip.item_id,
             ItemInstance.equipped == True
         )
@@ -420,7 +420,7 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
 
         # 检查装备数量限制（最多4件）
         all_equipped_stmt = select(ItemInstance).where(
-            ItemInstance.player_id == event.get_user_id(),
+            ItemInstance.player_id == player.id,
             ItemInstance.equipped == True,
             ItemInstance.item_id.in_(EQUIP_ITEM_IDS)
         )
@@ -604,7 +604,7 @@ async def _(event: MessageEvent):
 
         # 查找所有已装备的装备
         stmt = select(ItemInstance).where(
-            ItemInstance.player_id == event.get_user_id(),
+            ItemInstance.player_id == player.id,
             ItemInstance.equipped == True,
             ItemInstance.item_id.in_(EQUIP_ITEM_IDS)
         )
@@ -629,7 +629,7 @@ async def _(event: MessageEvent):
                 # 查找使用该炼丹炉的进行中任务
                 stmt = select(AlchemyRecord).where(
                     and_(
-                        AlchemyRecord.player_id == event.get_user_id(),
+                        AlchemyRecord.player_id == player.id,
                         AlchemyRecord.furnace_id == equip.id,
                         AlchemyRecord.claimed == False
                     )
