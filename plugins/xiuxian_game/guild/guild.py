@@ -867,6 +867,8 @@ async def handle_app_list(event: MessageEvent):
 
         if USE_NEW_GUILD_APPLICATION_SERVICE:
             # 新版：使用DI架构Service
+            from ..infrastructure.repositories.player_repository import PlayerRepository
+            from ..infrastructure.repositories.guild_repository import GuildRepository
             from ..infrastructure.repositories.social_application_repository import SocialApplicationRepository
             service = GuildApplicationServiceNew(
                 player_repo=PlayerRepository(session),
