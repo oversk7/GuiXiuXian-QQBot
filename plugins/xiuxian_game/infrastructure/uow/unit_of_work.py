@@ -56,6 +56,7 @@ class UnitOfWork:
         self._stocks = None
         self._stock_holdings = None
         self._stock_transactions = None
+        self._stock_events = None
         self._bank_accounts = None
 
         # 打工相关仓储
@@ -135,6 +136,14 @@ class UnitOfWork:
             from ..repositories.stock_transaction_repository import StockTransactionRepository
             self._stock_transactions = StockTransactionRepository(self._session)
         return self._stock_transactions
+
+    @property
+    def stock_events(self):
+        """股票事件仓储"""
+        if self._stock_events is None:
+            from ..repositories.stock_event_repository import StockEventRepository
+            self._stock_events = StockEventRepository(self._session)
+        return self._stock_events
 
     @property
     def bank_accounts(self):

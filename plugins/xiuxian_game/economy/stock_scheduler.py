@@ -163,14 +163,31 @@ async def perform_weekly_black_swan_check():
     try:
         logger.info("🦢 开始检查黑天鹅事件...")
 
-        # TODO: 实现黑天鹅事件触发逻辑
-        # 这部分逻辑比较复杂，暂时留空
-        # 后续可以添加事件配置和触发机制
+        from ..infrastructure.uow.unit_of_work import UnitOfWork
+        from ..models.db import AsyncSessionLocal
+        from .black_swan_service import BlackSwanService
 
-        logger.info("✅ 黑天鹅事件检查完成（当前未实现）")
+        def session_factory():
+            return AsyncSessionLocal()
+
+        async with UnitOfWork(session_factory) as uow:
+            black_swan_service = BlackSwanService(
+                stock_repo=uow.stocks,
+                stock_event_repo=uow.stock_events
+            )
+
+            triggered_events = await black_swan_service.check_and_trigger_events()
+            await uow.commit()
+
+        if triggered_events:
+            logger.info(f"✅ 黑天鹅事件检查完成: 触发了 {len(triggered_events)} 个事件")
+            for event in triggered_events:
+                logger.info(f"  - {event['event_name']}: {event['stock_name']} 暴跌 {abs(event['price_impact'])*100:.0f}%")
+        else:
+            logger.info("✅ 黑天鹅事件检查完成: 本周未触发任何事件")
 
     except Exception as e:
-        logger.error(f"❌ 黑天鹅事件检查失败: {e}")
+        logger.error(f"❌ 黑天鹅事件检查失败: {e}", exc_info=True)
 
 
 @driver.on_shutdown

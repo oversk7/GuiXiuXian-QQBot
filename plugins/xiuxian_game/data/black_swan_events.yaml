@@ -1,0 +1,147 @@
+# 黑天鹅事件配置
+# 修仙界气运市场的突发性灾难事件
+
+events:
+  # 金融类气运灾难
+  - event_id: "bank_run"
+    name: "冥行挤兑风波"
+    description: "冥界银行爆发挤兑危机，金融类气运遭受重创"
+    affected_type: "FINANCE"
+    probability: 0.15  # 每周15%触发概率（提高5倍）
+    price_impact: -0.50  # 暴跌50%（原40%）
+    health_impact: -60  # 健康度损失60点（原50点）
+    duration_days: 3
+    announcement: "⚡【黑天鹅】冥行挤兑风波爆发！金融类气运暴跌50%，灵力大损！"
+
+  - event_id: "financial_fraud"
+    name: "账房司舞弊案"
+    description: "账房司爆出重大舞弊丑闻，金融气运信任崩塌"
+    affected_type: "FINANCE"
+    probability: 0.12
+    price_impact: -0.45
+    health_impact: -55
+    duration_days: 2
+    announcement: "⚡【黑天鹅】账房司舞弊案曝光！金融类气运暴跌45%！"
+
+  # 材料类气运灾难
+  - event_id: "mine_collapse"
+    name: "诡域矿脉枯竭"
+    description: "主要诡域矿脉突然枯竭，材料供应链崩溃"
+    affected_type: "MATERIALS"
+    probability: 0.15
+    price_impact: -0.48
+    health_impact: -58
+    duration_days: 3
+    announcement: "⚡【黑天鹅】诡域矿脉枯竭！材料类气运暴跌48%，供应链断裂！"
+
+  - event_id: "demon_invasion"
+    name: "魔族入侵矿区"
+    description: "魔族大军入侵主要矿区，材料产量骤降"
+    affected_type: "MATERIALS"
+    probability: 0.12
+    price_impact: -0.42
+    health_impact: -52
+    duration_days: 2
+    announcement: "⚡【黑天鹅】魔族入侵矿区！材料类气运暴跌42%！"
+
+  # 能源类气运灾难
+  - event_id: "spirit_stone_crisis"
+    name: "灵石矿危机"
+    description: "主要灵石矿突发坍塌，能源供应告急"
+    affected_type: "ENERGY"
+    probability: 0.15
+    price_impact: -0.52
+    health_impact: -62
+    duration_days: 3
+    announcement: "⚡【黑天鹅】灵石矿危机爆发！能源类气运暴跌52%！"
+
+  - event_id: "energy_embargo"
+    name: "灵力禁运"
+    description: "仙盟对修仙界实施灵力禁运，能源价格崩塌"
+    affected_type: "ENERGY"
+    probability: 0.12
+    price_impact: -0.46
+    health_impact: -56
+    duration_days: 2
+    announcement: "⚡【黑天鹅】灵力禁运令下达！能源类气运暴跌46%！"
+
+  # 消费类气运灾难
+  - event_id: "plague_outbreak"
+    name: "诡瘟爆发"
+    description: "诡异瘟疫在城镇间蔓延，消费市场陷入恐慌"
+    affected_type: "CONSUMER"
+    probability: 0.13
+    price_impact: -0.44
+    health_impact: -54
+    duration_days: 3
+    announcement: "⚡【黑天鹅】诡瘟爆发！消费类气运暴跌44%，市场恐慌！"
+
+  - event_id: "market_crash"
+    name: "市集大火"
+    description: "上京商业中心发生大火，消费市场受创"
+    affected_type: "CONSUMER"
+    probability: 0.10
+    price_impact: -0.38
+    health_impact: -48
+    duration_days: 2
+    announcement: "⚡【黑天鹅】市集大火！消费类气运暴跌38%！"
+
+  # 医疗类气运灾难
+  - event_id: "elixir_scandal"
+    name: "丹药造假丑闻"
+    description: "知名丹坊爆出造假丑闻，医疗气运信任崩塌"
+    affected_type: "HEALTHCARE"
+    probability: 0.13
+    price_impact: -0.49
+    health_impact: -59
+    duration_days: 3
+    announcement: "⚡【黑天鹅】丹药造假丑闻！医疗类气运暴跌49%！"
+
+  - event_id: "herb_poison"
+    name: "灵草污染事件"
+    description: "主要灵草产地遭受污染，医疗市场震荡"
+    affected_type: "HEALTHCARE"
+    probability: 0.10
+    price_impact: -0.40
+    health_impact: -50
+    duration_days: 2
+    announcement: "⚡【黑天鹅】灵草污染事件！医疗类气运暴跌40%！"
+
+  # 科技类气运灾难
+  - event_id: "artifact_malfunction"
+    name: "法器大规模失灵"
+    description: "传送阵法器系统大规模失灵，科技气运受挫"
+    affected_type: "TECH"
+    probability: 0.13
+    price_impact: -0.47
+    health_impact: -57
+    duration_days: 3
+    announcement: "⚡【黑天鹅】法器大规模失灵！科技类气运暴跌47%！"
+
+  - event_id: "formation_collapse"
+    name: "阵法研究失败"
+    description: "缉邪司重大阵法研究失败，科技信心崩盘"
+    affected_type: "TECH"
+    probability: 0.10
+    price_impact: -0.39
+    health_impact: -49
+    duration_days: 2
+    announcement: "⚡【黑天鹅】阵法研究失败！科技类气运暴跌39%！"
+
+# 全局配置
+settings:
+  # 每周触发检查时间（周一凌晨0点）
+  check_schedule: "0 0 * * 1"
+
+  # 是否启用黑天鹅事件
+  enabled: true
+
+  # 同一类型气运的事件冷却期（天）- 缩短冷却期让事件更频繁
+  cooldown_days: 3
+
+  # 全局触发概率调整系数（1.0=正常，0.5=减半，2.0=翻倍）
+  # 设置为1.5倍，让事件触发更频繁
+  global_probability_multiplier: 1.5
+
+  # 是否群公告通知
+  enable_group_broadcast: true

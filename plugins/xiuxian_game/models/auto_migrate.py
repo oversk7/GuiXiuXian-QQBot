@@ -36,6 +36,29 @@ REQUIRED_FIELDS: Dict[str, Dict[str, str]] = {
 }
 
 
+# 定义需要自动创建的表（仅用于新表创建，不修改已有表）
+# 注意：这会调用 CREATE TABLE IF NOT EXISTS
+REQUIRED_TABLES: Dict[str, str] = {
+    "stock_events": """
+        CREATE TABLE IF NOT EXISTS stock_events (
+            id INT AUTO_INCREMENT PRIMARY KEY COMMENT 'ID',
+            event_id VARCHAR(50) NOT NULL COMMENT '事件ID',
+            event_name VARCHAR(100) NOT NULL COMMENT '事件名称',
+            description VARCHAR(500) NOT NULL COMMENT '事件描述',
+            affected_stock_id INT NOT NULL COMMENT '受影响股票ID',
+            price_impact FLOAT NOT NULL COMMENT '价格影响（-0.4表示跌40%）',
+            health_impact INT NOT NULL COMMENT '健康度影响',
+            trigger_date DATETIME NOT NULL COMMENT '触发时间',
+            duration_days INT NOT NULL COMMENT '持续天数',
+            is_active BOOLEAN DEFAULT TRUE COMMENT '是否生效中',
+            created_at DATETIME DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+            INDEX idx_stock_event (affected_stock_id, is_active),
+            FOREIGN KEY (affected_stock_id) REFERENCES stocks(id)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='股票突发事件表'
+    """,
+}
+
+
 # 定义需要自动创建的索引
 # 格式: [(表名, 索引名, 索引列)]
 REQUIRED_INDEXES: List[Tuple[str, str, str]] = [
@@ -59,17 +82,42 @@ async def auto_migrate(engine: AsyncEngine, verbose: bool = True):
         print("🔍 [自动迁移] 检查数据库结构...")
 
     async with engine.begin() as conn:
-        # 1. 添加缺失的字段
+        # 1. 创建缺失的表
+        tables_created = await _create_missing_tables(conn, verbose)
+
+        # 2. 添加缺失的字段
         fields_added = await _add_missing_fields(conn, verbose)
 
-        # 2. 创建缺失的索引
+        # 3. 创建缺失的索引
         indexes_added = await _add_missing_indexes(conn, verbose)
 
         if verbose:
-            if fields_added > 0 or indexes_added > 0:
-                print(f"✅ [自动迁移] 完成！添加了 {fields_added} 个字段，{indexes_added} 个索引")
+            if tables_created > 0 or fields_added > 0 or indexes_added > 0:
+                print(f"✅ [自动迁移] 完成！创建了 {tables_created} 个表，添加了 {fields_added} 个字段，{indexes_added} 个索引")
             else:
                 print("✓ [自动迁移] 数据库结构已是最新")
+
+
+async def _create_missing_tables(conn, verbose: bool) -> int:
+    """创建缺失的表"""
+    created_count = 0
+
+    for table_name, create_sql in REQUIRED_TABLES.items():
+        try:
+            await conn.execute(text(create_sql))
+            if verbose:
+                print(f"  📊 创建表: {table_name}")
+            created_count += 1
+        except Exception as e:
+            error_msg = str(e).lower()
+            # 忽略"表已存在"错误
+            if "already exists" in error_msg or "duplicate" in error_msg:
+                if verbose:
+                    logger.debug(f"  ✓ 表 {table_name} 已存在")
+            else:
+                logger.error(f"❌ [自动迁移] 创建表 {table_name} 失败: {e}")
+
+    return created_count
 
 
 async def _add_missing_fields(conn, verbose: bool) -> int:

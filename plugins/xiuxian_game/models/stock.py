@@ -175,6 +175,9 @@ class StockEvent(Base):
 
     created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
 
+    # 关系
+    stock: Mapped["Stock"] = relationship("Stock", foreign_keys=[affected_stock_id])
+
     # 索引
     __table_args__ = (
         Index('idx_stock_event', 'affected_stock_id', 'is_active'),
