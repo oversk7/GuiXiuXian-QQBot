@@ -33,8 +33,8 @@ class StockService:
     通过构造函数注入所需的Repository，不再使用静态方法
     """
 
-    # 手续费配置
-    COMMISSION_RATE = 0.03
+    # 手续费配置（反套利改进：降低手续费）
+    COMMISSION_RATE = 0.005  # 0.5% 手续费（原3%）
     MIN_COMMISSION = 1
     MAX_COMMISSION = 1000000
 
@@ -43,6 +43,9 @@ class StockService:
 
     # 价格刷新配置
     PRICE_UPDATE_INTERVAL = timedelta(hours=1)  # 被动触发更新间隔：1小时
+
+    # 持仓成本配置
+    DAILY_HOLDING_FEE_RATE = 0.001  # 每日0.1%持仓管理费
 
     def __init__(
         self,
@@ -283,7 +286,9 @@ class StockService:
                 "current_value": holding.current_value,
                 "total_cost": holding.total_cost,
                 "profit_loss": holding.profit_loss,
-                "profit_loss_rate": holding.profit_loss_rate
+                "profit_loss_rate": holding.profit_loss_rate,
+                "health": stock.health,  # 添加健康度
+                "is_active": stock.is_active  # 添加活跃状态
             })
 
         return result
@@ -371,3 +376,114 @@ class StockService:
             await self._stock_holding_repo.delete_holding(holding)
         else:
             await self._stock_holding_repo.update(holding)
+
+    async def delist_stock(self, stock_id: int) -> Tuple[bool, str, int]:
+        """退市处理：清空所有玩家持仓
+
+        Args:
+            stock_id: 股票ID
+
+        Returns:
+            (是否成功, 消息, 受影响玩家数)
+        """
+        from ..models.stock import StockHolding
+
+        # 获取股票信息
+        stock = await self._stock_repo.get_by_id(stock_id)
+        if not stock:
+            return False, "股票不存在", 0
+
+        # 获取所有持仓玩家
+        holdings = await self._stock_holding_repo.get_all_holdings_by_stock(stock_id)
+
+        if not holdings:
+            return True, f"{stock.name} 退市完成（无持仓玩家）", 0
+
+        total_loss = 0
+        affected_players = len(holdings)
+
+        # 清空所有持仓
+        for holding in holdings:
+            market_value = holding.shares * stock.current_price
+            total_loss += market_value
+
+            # 删除持仓记录
+            await self._stock_holding_repo.delete_holding(holding)
+
+            # TODO: 发送私聊通知（需要在调用方处理）
+
+        return True, f"{stock.name} 退市完成，影响{affected_players}名玩家，市值蒸发{total_loss:,}金币", affected_players
+
+    async def check_delist_condition(self, stock) -> bool:
+        """检查股票是否满足退市条件
+
+        Args:
+            stock: Stock对象
+
+        Returns:
+            是否需要退市
+        """
+        return stock.health <= 0 and stock.is_active
+
+    async def apply_holding_cost(self) -> Dict[str, int]:
+        """扣除所有玩家的持仓管理费（每日定时任务调用）
+
+        Returns:
+            统计信息字典
+        """
+        from ..models.stock import StockHolding
+
+        stats = {
+            "total_players": 0,
+            "total_fees": 0,
+            "forced_sell_count": 0,
+        }
+
+        # 获取所有持仓
+        all_holdings = await self._stock_holding_repo.get_all_holdings()
+
+        for holding in all_holdings:
+            # 跳过已退市的股票
+            if not holding.stock.is_active:
+                continue
+
+            # 计算管理费（0.1%/天）
+            market_value = holding.shares * holding.stock.current_price
+            fee = int(market_value * self.DAILY_HOLDING_FEE_RATE)
+
+            if fee == 0:
+                continue
+
+            # 获取玩家信息
+            player = await self._player_repo.get_by_id(holding.player_id)
+            if not player:
+                continue
+
+            stats["total_players"] += 1
+
+            # 扣除管理费
+            if player.gold >= fee:
+                player.gold -= fee
+                await self._player_repo.update(player)
+                stats["total_fees"] += fee
+            else:
+                # 金币不足，强制卖出部分持仓
+                shares_to_sell = min(
+                    holding.shares,
+                    (fee - player.gold) // holding.stock.current_price + 1
+                )
+
+                # 执行强制卖出
+                success, msg = await self.sell_stock(
+                    player.id,
+                    holding.stock.symbol,
+                    shares_to_sell,
+                    to_bank=False
+                )
+
+                if success:
+                    stats["forced_sell_count"] += 1
+
+                # TODO: 发送私聊通知（需要在调用方处理）
+
+        return stats

@@ -1,9 +1,9 @@
 # 诡修仙项目文档系统
 
-**文档版本**: 3.1
+**文档版本**: 3.2
 **最后更新**: 2025-12-02
 **文档受众**: LLM代理和项目开发者
-**文档状态**: 生产就绪，包含游戏平衡分析
+**文档状态**: 生产就绪，包含游戏平衡分析和投资系统反套利实施
 
 ---
 
@@ -68,11 +68,18 @@ LLM代理生成的调研和分析:
 - `npc_service_di_and_ai_investigation.md` - NPCService DI重构与AI接口预留
 - `doc_cleanup_investigation.md` - 文档清理调研报告
 - `game_balance_analysis_2025_12_01.md` - 游戏平衡分析与漏洞修复报告 (2025-12-01)
+- `investment_system_investigation.md` - 投资系统初步调查报告（银行+股票）
+- `stock_system_files_investigation.md` - 投资系统文件清单调查
 
 ### `/design/` - 系统设计方案
 游戏设计和系统重构方案:
 - `game_system_redesign_2025_12_02.md` - 新手体验破局完整方案 (2025-12-02)
 - `EXECUTIVE_SUMMARY.md` - 执行摘要 (快速查阅版)
+
+**投资系统反套利实施** (2025-12-02):
+- `investment_anti_arbitrage_redesign.md` - 反套利设计方案（最终方案，191行）
+- `investment_implementation_summary.md` - 实施总结（代码修改清单+部署指南，325行）
+- `investment_system_redesign_2025_12_02.md` - 初版设计方案（已被反套利方案取代）
 
 ### `/archive/` - 历史文档归档
 已归档的历史调研报告和重构文档:
@@ -98,6 +105,11 @@ LLM代理生成的调研和分析:
 2. 查看 `/architecture/event-system-architecture.md` 使用事件系统
 3. 参考 `/guides/event-system-guide.md` 发布和订阅事件
 
+### 游戏平衡优化
+1. 查看 `/agent/game_balance_analysis_2025_12_01.md` 了解已识别的平衡问题
+2. 参考 `/design/investment_anti_arbitrage_redesign.md` 学习反套利机制设计
+3. 阅读 `/design/investment_implementation_summary.md` 查看实施细节和部署步骤
+
 ---
 
 ## 4. 核心概念速查
@@ -111,6 +123,8 @@ LLM代理生成的调研和分析:
 | **Service DI** | 依赖注入、Repository模式、UnitOfWork | `/architecture/service-di-architecture.md` |
 | **账号切换** | 一个真实玩家拥有多个游戏账号，支持转让和管理员临时切换 | `/architecture/account-switching-system.md` |
 | **N+1查询** | 循环中逐个查询关联对象的性能问题 | `/reference/code-issues.md` |
+| **股票健康度** | 价格下跌损耗健康度，归零退市，防止套利 | `/design/investment_anti_arbitrage_redesign.md` |
+| **持仓成本** | 每日0.1%管理费，防止无限持有 | `/design/investment_implementation_summary.md` |
 
 ---
 
@@ -135,6 +149,12 @@ LLM代理生成的调研和分析:
 - `plugins\xiuxian_game\infrastructure\di\container.py` - DI容器
 - `plugins\xiuxian_game\social\account_switching_service.py` - 账号切换服务
 - `plugins\xiuxian_game\platform_utils.py` - 统一玩家访问接口(支持账号切换)
+
+### 经济系统（投资）
+- `plugins\xiuxian_game\economy\stock_price_engine.py` - 股票价格引擎（反套利+健康度更新）
+- `plugins\xiuxian_game\economy\stock_service_new.py` - 股票交易服务（0.5%手续费+退市+持仓成本）
+- `plugins\xiuxian_game\economy\stock_scheduler.py` - 股票定时任务（每日管理费+黑天鹅事件）
+- `plugins\xiuxian_game\models\stock.py` - Stock/StockHolding/StockEvent模型
 
 ---
 
@@ -222,6 +242,23 @@ LLM代理生成的调研和分析:
   - **位置**: `plugins/xiuxian_game/platform_utils.py:12-154` (核心逻辑)
   - **命令**: `plugins/xiuxian_game/social/account_switching.py:357-467` (3个新命令)
   - **详情**: `/architecture/account-switching-system.md`
+
+**✅ 投资系统反套利机制实施** (2025-12-02):
+- **问题**: 股票投资存在无风险套利漏洞（长期持有+正向趋势=稳赚不赔）
+- **核心修复**:
+  - **股票健康度系统**: 价格下跌损耗健康度（跌1%=-1点），归零退市
+  - **持仓成本系统**: 每日0.1%管理费，防止无限持有
+  - **无套利价格模型**: 移除正向趋势，期望收益=0
+  - **黑天鹅事件框架**: 随机市场崩溃机制（框架就绪）
+- **修改文件**: 8个核心文件（模型+引擎+Service+UI+调度器+Repository）
+  - `plugins/xiuxian_game/models/stock.py` - 新增5个健康度字段+StockEvent模型
+  - `plugins/xiuxian_game/economy/stock_price_engine.py` - 移除正向趋势+健康度更新
+  - `plugins/xiuxian_game/economy/stock_service_new.py` - 手续费3%→0.5%+退市+持仓成本
+  - `plugins/xiuxian_game/economy/stock_commands.py` - UI显示健康度emoji（🟢🟡🔴）
+  - `plugins/xiuxian_game/economy/stock_scheduler.py` - 每日管理费+每周黑天鹅检查
+  - `plugins/xiuxian_game/alembic/versions/add_stock_health_and_events.py` - 数据库迁移
+- **设计文档**: `/design/investment_anti_arbitrage_redesign.md`
+- **实施总结**: `/design/investment_implementation_summary.md`
 
 ---
 

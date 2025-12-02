@@ -89,48 +89,58 @@ class StockPriceEngine:
     
     @classmethod
     async def _calculate_new_price(cls, session: AsyncSession, stock: Stock, market_sentiment: float) -> int:
-        """计算股票新价格"""
+        """计算股票新价格（无套利版本）
+
+        核心改动：
+        1. 移除正向趋势因子（trend_influence）
+        2. 添加健康度更新逻辑
+        3. 检查退市条件
+        """
         current_price = stock.current_price
-        
+
         # 1. 基础波动率（根据股票类型）
         base_volatility = cls.TYPE_VOLATILITY.get(stock.stock_type, 0.05)
-        
+
         # 2. 个股波动率
         individual_volatility = stock.volatility
-        
+
         # 3. 综合波动率
         total_volatility = (base_volatility + individual_volatility) / 2
-        
-        # 4. 随机波动因子（正态分布）
+
+        # 4. 随机波动因子（正态分布，期望值=0）
         random_factor = random.gauss(0, total_volatility)
-        
-        # 5. 趋势因子影响
-        trend_influence = (stock.trend_factor - 1.0) * 0.01
-        
-        # 6. 市场情绪影响
-        sentiment_influence = (market_sentiment - 1.0)
-        
-        # 7. 历史价格回归因子（防止价格偏离基础价格太远）
+
+        # 5. 市场情绪影响（简化为随机值，期望=0）
+        sentiment = random.choice([-0.02, 0, 0.02])  # -2%, 0%, +2%
+
+        # 6. 历史价格回归因子（防止价格偏离基础价格太远）
         regression_factor = cls._calculate_regression_factor(stock)
-        
-        # 8. 综合计算价格变化率
+
+        # 7. 综合计算价格变化率（移除正向趋势！）
         total_change_rate = (
-            random_factor +           # 随机波动
-            trend_influence +         # 个股趋势
-            sentiment_influence +     # 市场情绪
+            random_factor +           # 随机波动（期望=0）
+            sentiment +               # 市场情绪（期望=0）
             regression_factor         # 价格回归
         )
-        
-        # 9. 限制单次变化幅度（±20%）
-        total_change_rate = max(-0.20, min(0.20, total_change_rate))
-        
-        # 10. 计算新价格
+
+        # 8. 限制单次变化幅度（±15%）
+        total_change_rate = max(-0.15, min(0.15, total_change_rate))
+
+        # 9. 计算新价格
         new_price = int(current_price * (1 + total_change_rate))
-        
-        # 11. 确保价格不低于基础价格的20%
-        min_price = max(1, int(stock.base_price * 0.2))
+
+        # 10. 确保价格不低于基础价格的30%
+        min_price = max(1, int(stock.base_price * 0.3))
         new_price = max(min_price, new_price)
-        
+
+        # 11. 更新健康度
+        cls._update_health(stock, total_change_rate)
+
+        # 12. 检查是否需要退市
+        if stock.health <= 0:
+            await cls._delist_stock(session, stock)
+            return 0
+
         return new_price
     
     @classmethod
@@ -150,17 +160,57 @@ class StockPriceEngine:
         """计算价格回归因子"""
         current_price = stock.current_price
         base_price = stock.base_price
-        
+
         # 计算当前价格相对于基础价格的偏离程度
         deviation = (current_price - base_price) / base_price
-        
+
         # 回归强度（偏离越大，回归力度越强）
-        regression_strength = 0.02  # 2%的回归强度
-        
+        regression_strength = 0.01  # 1%的弱回归强度
+
         # 回归因子（负值表示向基础价格回归）
         regression_factor = -deviation * regression_strength
-        
+
         return regression_factor
+
+    @classmethod
+    def _update_health(cls, stock: Stock, change_rate: float) -> None:
+        """更新股票健康度
+
+        规则：
+        1. 价格下跌时损耗健康度（跌1% = -1点健康）
+        2. 价格上涨时恢复健康度（涨1% = +0.5点健康，恢复慢于下跌）
+        3. 健康度衰减速度由 health_decay_rate 控制
+        """
+        if change_rate < 0:
+            # 下跌：损耗健康度
+            health_loss = abs(change_rate) * 100 * stock.health_decay_rate
+            stock.health -= int(health_loss)
+        else:
+            # 上涨：恢复健康度（恢复速度减半）
+            health_gain = change_rate * 50 * stock.health_decay_rate
+            stock.health += int(health_gain)
+
+        # 限制健康度范围 [0, 100]
+        stock.health = max(0, min(100, stock.health))
+
+    @classmethod
+    async def _delist_stock(cls, session: AsyncSession, stock: Stock) -> None:
+        """股票退市处理
+
+        退市流程：
+        1. 标记股票为已退市
+        2. 清空所有玩家持仓（通过后续定时任务处理）
+        3. 记录退市信息
+        """
+        from ..models.stock import StockHolding
+
+        # 标记为已退市
+        stock.is_active = False
+        stock.delisted_at = datetime.now()
+        stock.delist_reason = "健康度归零"
+
+        # 注意：清空持仓的逻辑应该在 stock_service_new.py 中实现
+        # 这里只标记退市状态，实际清空操作由 StockService.delist_stock() 处理
     
     @classmethod
     async def get_price_trend(cls, session: AsyncSession, stock_id: int, days: int = 7) -> List[Dict]:

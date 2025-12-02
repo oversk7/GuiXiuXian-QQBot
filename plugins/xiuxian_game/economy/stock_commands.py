@@ -121,9 +121,21 @@ async def handle_stock_list(event: MessageEvent):
             change_rate = ((stock.current_price - stock.base_price) / stock.base_price) * 100
             change_symbol = "📈" if change_rate > 0 else "📉" if change_rate < 0 else "➡️"
 
+            # 健康度显示（用emoji表示）
+            health = stock.health
+            if health >= 70:
+                health_emoji = "🟢"
+                health_text = "健康"
+            elif health >= 30:
+                health_emoji = "🟡"
+                health_text = "偏低"
+            else:
+                health_emoji = "🔴"
+                health_text = "危险"
+
             lines.append(
                 f"{stock.symbol} {stock.name}\n"
-                f"  💰 {stock.current_price} 金币 {change_symbol}"
+                f"  💰 {stock.current_price} 金币 {change_symbol} {health_emoji} {health_text}"
             )
 
     lines.append("\n💡 使用「投资气运 代码 数量」进行投资")
@@ -312,13 +324,29 @@ async def handle_stock_holdings(event: MessageEvent):
 
         profit_symbol = "📈" if holding["profit_loss"] > 0 else "📉" if holding["profit_loss"] < 0 else "➡️"
 
+        # 健康度显示和风险预警
+        health = holding.get("health", 100)
+        if health >= 70:
+            health_emoji = "🟢"
+            health_text = "健康"
+            risk_warning = ""
+        elif health >= 30:
+            health_emoji = "🟡"
+            health_text = "偏低"
+            risk_warning = "\n  ⚠️ 建议关注，考虑止损"
+        else:
+            health_emoji = "🔴"
+            health_text = "危险"
+            risk_warning = "\n  🚨 高风险！建议立即止损"
+
         lines.append(
             f"\n{holding['symbol']} {holding['name']}\n"
             f"  🗠 持有：{holding['shares']} 份\n"
             f"  💰 成本：{holding['avg_cost']} 金币/份\n"
             f"  ✨ 现价：{holding['current_price']} 金币/份\n"
             f"  💵 价值：{holding['current_value']} 金币\n"
-            f"  {profit_symbol} 盈亏：{holding['profit_loss']:+} 金币 ({holding['profit_loss_rate']:+.2f}%)"
+            f"  {profit_symbol} 盈亏：{holding['profit_loss']:+} 金币 ({holding['profit_loss_rate']:+.2f}%)\n"
+            f"  {health_emoji} 健康度：{health_text} ({health}/100){risk_warning}"
         )
 
     total_profit = total_value - total_cost

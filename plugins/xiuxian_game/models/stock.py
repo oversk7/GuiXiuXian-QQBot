@@ -1,6 +1,7 @@
 from sqlalchemy import String, Integer, BigInteger, DateTime, Float, Boolean, ForeignKey, func, Index
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from datetime import datetime
+from typing import Optional
 from enum import Enum as PyEnum
 from .db import Base
 
@@ -41,10 +42,16 @@ class Stock(Base):
     # 波动参数
     volatility: Mapped[float] = mapped_column(Float, default=0.05, comment="波动率（0.01-0.20）")
     trend_factor: Mapped[float] = mapped_column(Float, default=1.0, comment="趋势因子（0.8-1.2）")
-    
+
+    # 健康度系统（反套利机制）
+    health: Mapped[int] = mapped_column(Integer, default=100, comment="健康度(100-0)")
+    health_decay_rate: Mapped[float] = mapped_column(Float, default=1.0, comment="健康度衰减速度倍率")
+
     # 状态
-    is_active: Mapped[bool] = mapped_column(Boolean, default=True, comment="是否可交易")
-    
+    is_active: Mapped[bool] = mapped_column(Boolean, default=True, comment="是否活跃（未退市）")
+    delisted_at: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True, comment="退市时间")
+    delist_reason: Mapped[Optional[str]] = mapped_column(String(100), nullable=True, comment="退市原因")
+
     # 时间戳
     created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
     updated_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now(), onupdate=func.now())
@@ -127,25 +134,48 @@ class StockTransaction(Base):
 class StockPriceHistory(Base):
     """股票价格历史表"""
     __tablename__ = "stock_price_history"
-    
+
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
     stock_id: Mapped[int] = mapped_column(Integer, ForeignKey("stocks.id"), index=True)
-    
+
     # 价格信息
     price: Mapped[int] = mapped_column(Integer, comment="价格（金币）")
     change_amount: Mapped[int] = mapped_column(Integer, default=0, comment="变动金额")
     change_rate: Mapped[float] = mapped_column(Float, default=0.0, comment="变动比例")
-    
+
     # 成交信息
     volume: Mapped[int] = mapped_column(Integer, default=0, comment="成交量")
-    
+
     # 时间戳
     recorded_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now(), index=True)
-    
+
     # 关系
     stock: Mapped["Stock"] = relationship("Stock", back_populates="price_history")
-    
+
     # 索引
     __table_args__ = (
         Index('idx_stock_time', 'stock_id', 'recorded_at'),
+    )
+
+
+class StockEvent(Base):
+    """股票突发事件表"""
+    __tablename__ = "stock_events"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    event_id: Mapped[str] = mapped_column(String(50), comment="事件ID")
+    event_name: Mapped[str] = mapped_column(String(100), comment="事件名称")
+    description: Mapped[str] = mapped_column(String(500), comment="事件描述")
+    affected_stock_id: Mapped[int] = mapped_column(Integer, ForeignKey("stocks.id"), index=True, comment="受影响股票ID")
+    price_impact: Mapped[float] = mapped_column(Float, comment="价格影响（-0.4表示跌40%）")
+    health_impact: Mapped[int] = mapped_column(Integer, comment="健康度影响")
+    trigger_date: Mapped[datetime] = mapped_column(DateTime, comment="触发时间")
+    duration_days: Mapped[int] = mapped_column(Integer, comment="持续天数")
+    is_active: Mapped[bool] = mapped_column(Boolean, default=True, comment="是否生效中")
+
+    created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
+
+    # 索引
+    __table_args__ = (
+        Index('idx_stock_event', 'affected_stock_id', 'is_active'),
     )

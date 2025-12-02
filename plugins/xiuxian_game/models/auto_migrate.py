@@ -22,6 +22,13 @@ REQUIRED_FIELDS: Dict[str, Dict[str, str]] = {
         "is_tutorial": "BOOLEAN DEFAULT FALSE COMMENT '是否为新手教程任务'",
         "auto_accept": "BOOLEAN DEFAULT FALSE COMMENT '是否自动接取'",
     },
+    "stocks": {
+        "health": "INT DEFAULT 100 COMMENT '健康度(100-0)'",
+        "health_decay_rate": "FLOAT DEFAULT 1.0 COMMENT '健康度衰减速度倍率'",
+        "is_active": "BOOLEAN DEFAULT TRUE COMMENT '是否活跃（未退市）'",
+        "delisted_at": "DATETIME NULL COMMENT '退市时间'",
+        "delist_reason": "VARCHAR(100) NULL COMMENT '退市原因'",
+    },
     # 未来需要添加更多字段时，直接在这里添加即可
     # "player": {
     #     "new_field": "VARCHAR(100) NULL COMMENT '新字段说明'",

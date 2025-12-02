@@ -139,3 +139,32 @@ class StockHoldingRepository(IRepository[StockHolding]):
         """
         holding = await self.get_by_player_and_stock(player_id, stock_id)
         return holding.shares if holding else 0
+
+    async def get_all_holdings_by_stock(self, stock_id: int) -> List[StockHolding]:
+        """
+        获取某只股票的所有持仓记录
+
+        Args:
+            stock_id: 股票ID
+
+        Returns:
+            持仓列表
+        """
+        stmt = select(StockHolding).where(StockHolding.stock_id == stock_id)
+        result = await self._session.execute(stmt)
+        return list(result.scalars().all())
+
+    async def get_all_holdings(self) -> List[StockHolding]:
+        """
+        获取所有持仓记录（预加载股票信息）
+
+        Returns:
+            持仓列表（已预加载Stock关联）
+        """
+        stmt = (
+            select(StockHolding)
+            .options(selectinload(StockHolding.stock))
+            .where(StockHolding.shares > 0)
+        )
+        result = await self._session.execute(stmt)
+        return list(result.scalars().all())
