@@ -45,16 +45,6 @@ stock_update_cmd = on_command("更新气运价格", aliases={"刷新气运价格
 @stock_list_cmd.handle()
 async def handle_stock_list(event: MessageEvent):
     """查看气运投资行情"""
-    try:
-        await _handle_stock_list_impl(event)
-    except Exception as e:
-        from nonebot import logger
-        logger.error(f"❌ [投资行情] 发生错误: {e}", exc_info=True)
-        await stock_list_cmd.finish(message_add_head(f"⛔ 系统错误：{e}", event))
-
-
-async def _handle_stock_list_impl(event: MessageEvent):
-    """内部实现：查看气运投资行情"""
     if USE_NEW_STOCK_SERVICE:
         # 新版本: 使用DI架构
         from ..infrastructure.uow.unit_of_work import UnitOfWork
