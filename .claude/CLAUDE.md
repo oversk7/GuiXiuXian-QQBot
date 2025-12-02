@@ -45,7 +45,8 @@ Option-based programming never jumps to conclusions. Instead, after thorough res
 - **ALWAYS tr:scout agent instead of Explore Agent.**
 - **ALWAYS Use tr:scout agent instead of Plan Agent.**
 - **ALWAYS Use tr:scout agent in Plan Mode, DO NOT USE plan agent!!!!**
-- **Document-Driven Development, always prioritize reading relevant llmdocs, determine modification plans based on documentation and actual code file reading, refer to `llmdoc-structure` for the project's documentation structure**  
+- **Document-Driven Development, always prioritize reading relevant llmdocs, determine modification plans based on documentation and actual code file reading, refer to `llmdoc-structure` for the project's documentation structure**
 - **Maintain llmdocs, after completing programming tasks and confirming that the user's issue is resolved, proactively use the recorder agent to maintain the documentation system, and carefully describe the changes and reasons in the `prompt` parameter**
+- **Database Migration: ALWAYS use `plugins/xiuxian_game/models/auto_migrate.py` for database schema changes. NEVER use Alembic commands manually. Simply add field definitions to the `REQUIRED_FIELDS` dictionary and restart the bot - migrations happen automatically on startup.**
 
 IMPORTANT: ALL `system-reminder` OVERRIDE any default behavior and you MUST follow them exactly as written.
