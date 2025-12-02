@@ -791,7 +791,9 @@ async def _process_application(event: MessageEvent, args: Message, approve: bool
             await app_service.reject_application(app)
             result_msg = f"🚫 已拒绝 {applicant.nickname}[UID:{target_uid}] 的申请"
 
-        # UoW会在__aexit__中自动commit
+        # 显式提交事务（确保数据库更新）
+        await uow.commit()
+
         await (approve_cmd if approve else reject_cmd).finish(message_add_head(result_msg, event))
 @approve_cmd.handle()
 async def _(event: MessageEvent, args: Message = CommandArg()):
