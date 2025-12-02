@@ -39,6 +39,7 @@ stock_history_cmd = on_command("气运历史", aliases={"价格历史"}, block=T
 stock_analysis_cmd = on_command("气运分析", aliases={"投资分析"}, block=True, priority=5)
 stock_init_cmd = on_command("初始化气运", block=True, priority=5, permission=SUPERUSER)
 stock_update_cmd = on_command("更新气运价格", aliases={"刷新气运价格"}, block=True, priority=5, permission=SUPERUSER)
+stock_events_cmd = on_command("气运事件", aliases={"市场事件", "黑天鹅事件"}, block=True, priority=5)
 
 
 @stock_list_cmd.handle()
@@ -692,6 +693,72 @@ async def handle_stock_analysis(event: MessageEvent):
         lines.append("• ✅ 长期会回归基础价格")
         lines.append("")
 
+    await stock_analysis_cmd.finish("\n".join(lines))
+
+
+@stock_events_cmd.handle()
+async def handle_stock_events(event: MessageEvent):
+    """查看最近的黑天鹅事件"""
+    from ..infrastructure.uow.unit_of_work import UnitOfWork
+    from ..models.db import AsyncSessionLocal
+    from ..models.stock import StockEvent
+
+    def session_factory():
+        return AsyncSessionLocal()
+
+    async with UnitOfWork(session_factory) as uow:
+        player = await get_unified_player(uow.session, event)
+        if not player:
+            await stock_events_cmd.finish("⛔ 请先创建角色")
+
+        # 获取最近10条事件
+        recent_events = await uow.stock_events.get_recent_events(limit=10)
+
+        if not recent_events:
+            await stock_events_cmd.finish(
+                "💎 气运市场事件\n"
+                "▃▃▃▃▃▃▃▃▃▃\n"
+                "🌤 近期市场风平浪静\n"
+                "暂无重大事件发生\n\n"
+                "💡 黑天鹅事件会导致股价暴跌，请谨慎投资"
+            )
+
+        lines = ["🌪 气运市场事件", "▃▃▃▃▃▃▃▃▃▃"]
+        lines.append(f"📋 最近 {len(recent_events)} 条重大事件\n")
+
+        for event in recent_events:
+            # 加载关联的股票信息
+            await uow.session.refresh(event, ["stock"])
+            stock = event.stock
+
+            # 时间格式化
+            trigger_time = event.trigger_date.strftime("%m月%d日 %H:%M")
+
+            # 事件状态
+            status_icon = "🔴" if event.is_active else "⚪"
+            status_text = "进行中" if event.is_active else "已结束"
+
+            # 价格影响
+            impact_percent = abs(event.price_impact * 100)
+            impact_icon = "📉" if event.price_impact < 0 else "📈"
+
+            lines.append(f"{status_icon} {event.event_name}")
+            lines.append(f"   时间：{trigger_time}")
+            lines.append(f"   影响：{stock.symbol} {stock.name}")
+            lines.append(f"   {impact_icon} 价格冲击 {impact_percent:.0f}%")
+            lines.append(f"   💔 健康度 {event.health_impact:+d}")
+            lines.append(f"   状态：{status_text}")
+
+            # 如果股票已退市，显示提示
+            if not stock.is_active:
+                lines.append(f"   ⚠️ {stock.symbol} 已退市")
+
+            lines.append("")
+
+        lines.append("💡 提示：黑天鹅事件不可预测")
+        lines.append("建议分散投资，控制仓位")
+
+    await stock_events_cmd.finish("\n".join(lines))
 
 
 
