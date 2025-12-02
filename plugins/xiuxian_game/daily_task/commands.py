@@ -38,7 +38,12 @@ async def handle_daily_task(event: MessageEvent):
         # 实例化依赖Service
         location_service = LocationService(uow.locations)
         npc_service = NPCService(uow.session, uow.npcs)
-        guild_economy_service = GuildEconomyService(uow.guilds) if player.guild_id else None
+        guild_economy_service = GuildEconomyService(
+            guild_repo=uow.guilds,
+            player_repo=uow.players,
+            donation_log_repo=uow.player_donation_logs,
+            building_repo=uow.guild_buildings
+        ) if player.guild_id else None
 
         # 实例化DailyTaskService
         task_service = DailyTaskService(
@@ -149,7 +154,12 @@ async def handle_accept_task(event: MessageEvent, args: Message = CommandArg()):
         # 实例化依赖Service
         location_service = LocationService(uow.locations)
         npc_service = NPCService(uow.session, uow.npcs)
-        guild_economy_service = GuildEconomyService(uow.guilds) if player.guild_id else None
+        guild_economy_service = GuildEconomyService(
+            guild_repo=uow.guilds,
+            player_repo=uow.players,
+            donation_log_repo=uow.player_donation_logs,
+            building_repo=uow.guild_buildings
+        ) if player.guild_id else None
 
         # 实例化DailyTaskService
         task_service = DailyTaskService(
@@ -214,7 +224,12 @@ async def handle_complete_task(event: MessageEvent):
         # 实例化依赖Service
         location_service = LocationService(uow.locations)
         npc_service = NPCService(uow.session, uow.npcs)
-        guild_economy_service = GuildEconomyService(uow.guilds) if player.guild_id else None
+        guild_economy_service = GuildEconomyService(
+            guild_repo=uow.guilds,
+            player_repo=uow.players,
+            donation_log_repo=uow.player_donation_logs,
+            building_repo=uow.guild_buildings
+        ) if player.guild_id else None
 
         # 实例化DailyTaskService
         task_service = DailyTaskService(
@@ -325,7 +340,12 @@ async def handle_task_stats(event: MessageEvent):
         # 实例化依赖Service
         location_service = LocationService(uow.locations)
         npc_service = NPCService(uow.session, uow.npcs)
-        guild_economy_service = GuildEconomyService(uow.guilds) if player.guild_id else None
+        guild_economy_service = GuildEconomyService(
+            guild_repo=uow.guilds,
+            player_repo=uow.players,
+            donation_log_repo=uow.player_donation_logs,
+            building_repo=uow.guild_buildings
+        ) if player.guild_id else None
 
         # 实例化DailyTaskService
         task_service = DailyTaskService(
@@ -377,7 +397,12 @@ async def handle_refresh_task(event: MessageEvent):
         # 实例化依赖Service
         location_service = LocationService(uow.locations)
         npc_service = NPCService(uow.session, uow.npcs)
-        guild_economy_service = GuildEconomyService(uow.guilds) if player.guild_id else None
+        guild_economy_service = GuildEconomyService(
+            guild_repo=uow.guilds,
+            player_repo=uow.players,
+            donation_log_repo=uow.player_donation_logs,
+            building_repo=uow.guild_buildings
+        ) if player.guild_id else None
 
         # 实例化DailyTaskService
         task_service = DailyTaskService(

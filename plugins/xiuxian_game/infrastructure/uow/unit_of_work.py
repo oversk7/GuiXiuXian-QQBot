@@ -68,6 +68,10 @@ class UnitOfWork:
         self._locations = None
         self._npcs = None
 
+        # 公会相关仓储
+        self._guild_buildings = None
+        self._player_donation_logs = None
+
     @property
     def players(self):
         """玩家仓储"""
@@ -187,6 +191,22 @@ class UnitOfWork:
             from ..repositories.npc_repository import NPCRepository
             self._npcs = NPCRepository(self._session)
         return self._npcs
+
+    @property
+    def guild_buildings(self):
+        """公会建筑仓储"""
+        if self._guild_buildings is None:
+            from ..repositories.guild_building_repository import GuildBuildingRepository
+            self._guild_buildings = GuildBuildingRepository(self._session)
+        return self._guild_buildings
+
+    @property
+    def player_donation_logs(self):
+        """玩家捐献日志仓储"""
+        if self._player_donation_logs is None:
+            from ..repositories.player_donation_log_repository import PlayerDonationLogRepository
+            self._player_donation_logs = PlayerDonationLogRepository(self._session)
+        return self._player_donation_logs
 
     @property
     def session(self) -> AsyncSession:
