@@ -170,29 +170,25 @@ async def handle_guild_info(event: MessageEvent):
         member_count = await guild_service.get_member_count(guild_obj.id)
         capacity = guild_service.get_guild_capacity(guild_obj.level)
 
-        # 为后续代码提供session引用
-        session = uow.session
-    # 经验和升级信息
-    exp_current = GuildEconomyService.format_large_number(guild_obj.exp)
-    upgrade_cost = GuildEconomyService.get_guild_upgrade_cost(guild_obj.level)
-    exp_need = GuildEconomyService.format_large_number(upgrade_cost["exp"])
+        # 经验和升级信息
+        exp_current = GuildEconomyService.format_large_number(guild_obj.exp)
+        upgrade_cost = GuildEconomyService.get_guild_upgrade_cost(guild_obj.level)
+        exp_need = GuildEconomyService.format_large_number(upgrade_cost["exp"])
 
-    # 资金信息
-    treasury = GuildEconomyService.format_large_number(guild_obj.treasury)
+        # 资金信息
+        treasury = GuildEconomyService.format_large_number(guild_obj.treasury)
 
-    # 建筑加成信息
-    # 新版：使用DI架构Service
-    from ..infrastructure.repositories.guild_repository import GuildRepository
-    from ..infrastructure.repositories.guild_building_repository import GuildBuildingRepository
+        # 建筑加成信息（在UnitOfWork内部使用uow的Repository）
+        from ..infrastructure.repositories.guild_building_repository import GuildBuildingRepository
 
-    building_service = GuildBuildingServiceNew(
-        guild_repo=GuildRepository(session),
-        building_repo=GuildBuildingRepository(session),
-        item_repo=None  # get_guild_bonuses不需要item_repo
-    )
-    bonuses = await building_service.get_guild_bonuses(guild_obj.id)
-    exp_multiplier = bonuses.get("exp_multiplier", 1.0)
-    cultivation_bonus = bonuses.get("cultivation_bonus", 0.0)
+        building_service = GuildBuildingServiceNew(
+            guild_repo=uow.guilds,  # 使用UoW的Repository
+            building_repo=GuildBuildingRepository(uow.session),
+            item_repo=None  # get_guild_bonuses不需要item_repo
+        )
+        bonuses = await building_service.get_guild_bonuses(guild_obj.id)
+        exp_multiplier = bonuses.get("exp_multiplier", 1.0)
+        cultivation_bonus = bonuses.get("cultivation_bonus", 0.0)
 
     # 基地信息
     base_info = ""
