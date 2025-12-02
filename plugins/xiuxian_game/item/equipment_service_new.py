@@ -176,13 +176,10 @@ class EquipmentService:
         if not mp_from_hp_effects:
             return
 
+        # 使用穿装备后的总生命值来计算MP（符合客户需求）
+        # 之前的逻辑会减去装备自身的HP，导致计算基数错误
         current_hp_after_all = int(getattr(player, "max_hp", 0) or 0)
-        hp_from_self_equips = 0
-        for eq, _, _, _ in mp_from_hp_effects:
-            delta = (eq.extra_attrs or {}).get("_persist_bonus", {})
-            hp_from_self_equips += int(delta.get("max_hp", 0) or 0)
-
-        base_for_convert = max(1, current_hp_after_all - hp_from_self_equips)
+        base_for_convert = max(1, current_hp_after_all)  # 直接使用总HP，不减去装备HP
         bonus_from_pct = int(base_for_convert * total_pct / 100.0) if total_pct > 0 else 0
         total_bonus_mp = bonus_from_pct + int(total_flat)
         if total_bonus_mp <= 0:
