@@ -73,7 +73,6 @@ async def handle_stock_list(event: MessageEvent):
         stmt = select(Stock).where(Stock.is_active == True).order_by(Stock.symbol)
         stocks = (await uow.session.execute(stmt)).scalars().all()
 
-        session = uow.session  # 为后续代码提供session引用
     # 检查是否有股票数据（新旧版本共用）
     if not stocks:
         await stock_list_cmd.finish("💎 当前没有可投资的气运")

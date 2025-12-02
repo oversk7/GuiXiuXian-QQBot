@@ -250,72 +250,72 @@ async def _(event: MessageEvent):
         # 获取邀请状态信息 (使用新版本)
         invite_status = await invite_reward_service.get_invite_status(player.uid)
 
-        session = uow.session  # 为后续代码提供session引用
-    msg = f"📊 {player.nickname} 的邀请状态\n━━━━━━━━━━━━━\n"
+        # 在UnitOfWork内部构建完整消息
+        msg = f"📊 {player.nickname} 的邀请状态\n━━━━━━━━━━━━━\n"
 
-    # 作为邀请者的信息
-    if invite_status["invited_count"] > 0:
-        msg += f"👥 已邀请玩家：{invite_status['invited_count']} 人\n"
+        # 作为邀请者的信息
+        if invite_status["invited_count"] > 0:
+            msg += f"👥 已邀请玩家：{invite_status['invited_count']} 人\n"
 
-        # 显示每个被邀请者的奖励状态
-        for record in invite_status["inviter_records"]:
-            # 获取被邀请者信息
-            invitee_stmt = select(Player).where(Player.uid == record.invitee_uid)
-            invitee_result = await session.execute(invitee_stmt)
-            invitee = invitee_result.scalars().first()
+            # 显示每个被邀请者的奖励状态
+            for record in invite_status["inviter_records"]:
+                # 获取被邀请者信息（在UnitOfWork内部）
+                invitee_stmt = select(Player).where(Player.uid == record.invitee_uid)
+                invitee_result = await uow.session.execute(invitee_stmt)
+                invitee = invitee_result.scalars().first()
 
-            if invitee:
-                status_icons = []
+                if invitee:
+                    status_icons = []
+                    if record.level_1_rewarded:
+                        status_icons.append("✅1级")
+                    else:
+                        status_icons.append("❌1级")
+
+                    if record.level_10_rewarded:
+                        status_icons.append("✅10级")
+                    elif invitee.level >= 10:
+                        status_icons.append("🎁10级")
+                    else:
+                        status_icons.append("❌10级")
+
+                    if record.level_50_rewarded:
+                        status_icons.append("✅50级")
+                    elif invitee.level >= 50:
+                        status_icons.append("🎁50级")
+                    else:
+                        status_icons.append("❌50级")
+
+                    msg += f"  • {invitee.nickname}(Lv.{invitee.level}) {' '.join(status_icons)}\n"
+        else:
+            msg += "👥 尚未邀请任何玩家\n"
+
+        # 作为被邀请者的信息
+        if invite_status["invitee_record"]:
+            record = invite_status["invitee_record"]
+            inviter_stmt = select(Player).where(Player.uid == record.inviter_uid)
+            inviter_result = await uow.session.execute(inviter_stmt)
+            inviter = inviter_result.scalars().first()
+
+            if inviter:
+                msg += f"━━━━━━━━━━━━━\n"
+                msg += f"🎯 被 {inviter.nickname} 邀请\n"
+
+                status_msg = []
                 if record.level_1_rewarded:
-                    status_icons.append("✅1级")
-                else:
-                    status_icons.append("❌1级")
-
+                    status_msg.append("✅1级奖励已领取")
                 if record.level_10_rewarded:
-                    status_icons.append("✅10级")
-                elif invitee.level >= 10:
-                    status_icons.append("🎁10级")
-                else:
-                    status_icons.append("❌10级")
-
+                    status_msg.append("✅10级奖励已领取")
+                elif player.level >= 10:
+                    status_msg.append("🎁10级奖励待发放")
                 if record.level_50_rewarded:
-                    status_icons.append("✅50级")
-                elif invitee.level >= 50:
-                    status_icons.append("🎁50级")
-                else:
-                    status_icons.append("❌50级")
+                    status_msg.append("✅50级奖励已领取")
+                elif player.level >= 50:
+                    status_msg.append("🎁50级奖励待发放")
 
-                msg += f"  • {invitee.nickname}(Lv.{invitee.level}) {' '.join(status_icons)}\n"
-    else:
-        msg += "👥 尚未邀请任何玩家\n"
+                if status_msg:
+                    msg += "  " + "\n  ".join(status_msg)
 
-    # 作为被邀请者的信息
-    if invite_status["invitee_record"]:
-        record = invite_status["invitee_record"]
-        inviter_stmt = select(Player).where(Player.uid == record.inviter_uid)
-        inviter_result = await session.execute(inviter_stmt)
-        inviter = inviter_result.scalars().first()
-
-        if inviter:
-            msg += f"━━━━━━━━━━━━━\n"
-            msg += f"🎯 被 {inviter.nickname} 邀请\n"
-
-            status_msg = []
-            if record.level_1_rewarded:
-                status_msg.append("✅1级奖励已领取")
-            if record.level_10_rewarded:
-                status_msg.append("✅10级奖励已领取")
-            elif player.level >= 10:
-                status_msg.append("🎁10级奖励待发放")
-            if record.level_50_rewarded:
-                status_msg.append("✅50级奖励已领取")
-            elif player.level >= 50:
-                status_msg.append("🎁50级奖励待发放")
-
-            if status_msg:
-                msg += "  " + "\n  ".join(status_msg)
-
-    msg += "\n━━━━━━━━━━━━━\n"
-    msg += "💡 说明：✅已领取 🎁待发放 ❌未达成"
+        msg += "\n━━━━━━━━━━━━━\n"
+        msg += "💡 说明：✅已领取 🎁待发放 ❌未达成"
 
     await invite_status_cmd.finish(message_add_head(msg, event))
