@@ -68,11 +68,16 @@ async def handle_stock_list(event: MessageEvent):
 
         player = await get_unified_player(uow.session, event)
         if not player:
-            await stock_list_cmd.finish("⛔ 请先创建角色")
+            error_msg = "⛔ 请先创建角色"
+        else:
+            error_msg = None
+            # 获取所有活跃股票
+            stmt = select(Stock).where(Stock.is_active == True).order_by(Stock.symbol)
+            stocks = (await uow.session.execute(stmt)).scalars().all()
 
-        # 获取所有活跃股票
-        stmt = select(Stock).where(Stock.is_active == True).order_by(Stock.symbol)
-        stocks = (await uow.session.execute(stmt)).scalars().all()
+    # 在 UnitOfWork 外部处理错误
+    if error_msg:
+        await stock_list_cmd.finish(error_msg)
 
     # 检查是否有股票数据（新旧版本共用）
     if not stocks:
@@ -709,56 +714,63 @@ async def handle_stock_events(event: MessageEvent):
     async with UnitOfWork(session_factory) as uow:
         player = await get_unified_player(uow.session, event)
         if not player:
-            await stock_events_cmd.finish("⛔ 请先创建角色")
+            error_msg = "⛔ 请先创建角色"
+        else:
+            error_msg = None
+            # 获取最近10条事件
+            recent_events = await uow.stock_events.get_recent_events(limit=10)
 
-        # 获取最近10条事件
-        recent_events = await uow.stock_events.get_recent_events(limit=10)
+            if not recent_events:
+                result_msg = (
+                    "💎 气运市场事件\n"
+                    "▃▃▃▃▃▃▃▃▃▃\n"
+                    "🌤 近期市场风平浪静\n"
+                    "暂无重大事件发生\n\n"
+                    "💡 黑天鹅事件会导致股价暴跌，请谨慎投资"
+                )
+            else:
+                lines = ["🌪 气运市场事件", "▃▃▃▃▃▃▃▃▃▃"]
+                lines.append(f"📋 最近 {len(recent_events)} 条重大事件\n")
 
-        if not recent_events:
-            await stock_events_cmd.finish(
-                "💎 气运市场事件\n"
-                "▃▃▃▃▃▃▃▃▃▃\n"
-                "🌤 近期市场风平浪静\n"
-                "暂无重大事件发生\n\n"
-                "💡 黑天鹅事件会导致股价暴跌，请谨慎投资"
-            )
+                for evt in recent_events:
+                    # 加载关联的股票信息
+                    await uow.session.refresh(evt, ["stock"])
+                    stock = evt.stock
 
-        lines = ["🌪 气运市场事件", "▃▃▃▃▃▃▃▃▃▃"]
-        lines.append(f"📋 最近 {len(recent_events)} 条重大事件\n")
+                    # 时间格式化
+                    trigger_time = evt.trigger_date.strftime("%m月%d日 %H:%M")
 
-        for event in recent_events:
-            # 加载关联的股票信息
-            await uow.session.refresh(event, ["stock"])
-            stock = event.stock
+                    # 事件状态
+                    status_icon = "🔴" if evt.is_active else "⚪"
+                    status_text = "进行中" if evt.is_active else "已结束"
 
-            # 时间格式化
-            trigger_time = event.trigger_date.strftime("%m月%d日 %H:%M")
+                    # 价格影响
+                    impact_percent = abs(evt.price_impact * 100)
+                    impact_icon = "📉" if evt.price_impact < 0 else "📈"
 
-            # 事件状态
-            status_icon = "🔴" if event.is_active else "⚪"
-            status_text = "进行中" if event.is_active else "已结束"
+                    lines.append(f"{status_icon} {evt.event_name}")
+                    lines.append(f"   时间：{trigger_time}")
+                    lines.append(f"   影响：{stock.symbol} {stock.name}")
+                    lines.append(f"   {impact_icon} 价格冲击 {impact_percent:.0f}%")
+                    lines.append(f"   💔 健康度 {evt.health_impact:+d}")
+                    lines.append(f"   状态：{status_text}")
 
-            # 价格影响
-            impact_percent = abs(event.price_impact * 100)
-            impact_icon = "📉" if event.price_impact < 0 else "📈"
+                    # 如果股票已退市，显示提示
+                    if not stock.is_active:
+                        lines.append(f"   ⚠️ {stock.symbol} 已退市")
 
-            lines.append(f"{status_icon} {event.event_name}")
-            lines.append(f"   时间：{trigger_time}")
-            lines.append(f"   影响：{stock.symbol} {stock.name}")
-            lines.append(f"   {impact_icon} 价格冲击 {impact_percent:.0f}%")
-            lines.append(f"   💔 健康度 {event.health_impact:+d}")
-            lines.append(f"   状态：{status_text}")
+                    lines.append("")
 
-            # 如果股票已退市，显示提示
-            if not stock.is_active:
-                lines.append(f"   ⚠️ {stock.symbol} 已退市")
+                lines.append("💡 提示：黑天鹅事件不可预测")
+                lines.append("建议分散投资，控制仓位")
 
-            lines.append("")
+                result_msg = "\n".join(lines)
 
-        lines.append("💡 提示：黑天鹅事件不可预测")
-        lines.append("建议分散投资，控制仓位")
-
-    await stock_events_cmd.finish("\n".join(lines))
+    # 在 UnitOfWork 外部处理返回
+    if error_msg:
+        await stock_events_cmd.finish(error_msg)
+    else:
+        await stock_events_cmd.finish(result_msg)
 
 
 
