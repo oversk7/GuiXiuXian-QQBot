@@ -174,7 +174,7 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
     if target_uid is None:
         from ..quest.novice_quest_service import NoviceQuestService
         quest_completed, quest_msg = await NoviceQuestService.check_and_advance_quest(
-            uow.session, player, "command", {"command": "我的面板"}
+            uow.session, player, "command", {"command": "角色"}
         )
 
         if quest_completed and quest_msg:

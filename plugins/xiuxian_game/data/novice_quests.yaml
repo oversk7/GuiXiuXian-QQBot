@@ -69,9 +69,9 @@ novice_basic_chain:
     # 第5步：查看面板
     - step: 5
       title: "凝视深渊"
-      description: "使用【我的面板】指令，查看你当前的状态"
+      description: "使用【角色】【面板】或【状态】指令，查看你当前的状态"
       completion_type: "command"
-      completion_target: "我的面板"
+      completion_target: "角色"
       completion_count: 1
       rewards:
         exp: 200
