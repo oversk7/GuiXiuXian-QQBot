@@ -4,20 +4,20 @@ from nonebot.adapters.qq import MessageEvent, Message
 from nonebot.params import CommandArg
 from sqlalchemy import select, and_
 
-from ..models.db import safe_session
+from ..models.db import AsyncSessionLocal
 from ..models.player import Player
 from ..models.daily_task import DailyTask, TaskStatus
 from ..utils import message_add_head
 from ..platform_utils import get_unified_player
 from .service_new import DailyTaskService
 from ..battle.integration_helper import BattleIntegrationHelper
+from ..infrastructure.uow.unit_of_work import UnitOfWork
+from ..world.location_service_new import LocationService
+from ..world.npc_service_new import NPCService
+from ..guild.guild_economy_service_new import GuildEconomyService
 import time
 import random
 from datetime import date
-
-# ==================== Feature Flag ====================
-# 设置为True使用新版DI架构的DailyTaskService，False使用旧版本
-# =====================================================
 
 
 # ==================== 查看每日任务 ====================
@@ -25,24 +25,41 @@ daily_task_cmd = on_command("每日委托", aliases={"任务", "每日任务"}, 
 
 @daily_task_cmd.handle()
 async def handle_daily_task(event: MessageEvent):
-    async with safe_session() as session:
-        player = await get_unified_player(session, event)
+    def session_factory():
+        return AsyncSessionLocal()
+
+    async with UnitOfWork(session_factory) as uow:
+        player = await get_unified_player(uow.session, event)
         if not player:
             await daily_task_cmd.finish("⛔ 请先创建角色")
         if player.level < 30:
             await daily_task_cmd.finish("⛔ 该功能仅对Lv.30以上角色开放")
+
+        # 实例化依赖Service
+        location_service = LocationService(uow.locations, uow.npcs)
+        npc_service = NPCService(uow.npcs)
+        guild_economy_service = GuildEconomyService(uow.guilds) if player.guild_id else None
+
+        # 实例化DailyTaskService
+        task_service = DailyTaskService(
+            daily_task_repo=uow.daily_tasks,
+            location_service=location_service,
+            npc_service=npc_service,
+            guild_economy_service=guild_economy_service
+        )
+
         # 获取今日所有任务
         today = date.today()
-        tasks = await DailyTaskService.get_player_daily_tasks(session, player.id, today)
+        tasks = await task_service.get_player_daily_tasks(player.id, today)
 
         # 如果没有任务，生成新任务
         if not tasks:
-            task = await DailyTaskService.generate_daily_task(session, player)
+            task = await task_service.generate_daily_task(player)
             tasks = [task] if task else []
-            await session.commit()
+            await uow.commit()
 
         # 获取任务汇总信息
-        summary = await DailyTaskService.get_task_summary(session, player.id)
+        summary = await task_service.get_task_summary(player.id)
 
         # 构建消息
         lines = ["🏛️ 大都会缉邪司 - 每日委托", "━━━━━━━━━━━━━"]
@@ -103,10 +120,14 @@ accept_task_cmd = on_command("接取委托", aliases={"接取任务", "接收委
 
 @accept_task_cmd.handle()
 async def handle_accept_task(event: MessageEvent, args: Message = CommandArg()):
-    async with safe_session() as session:
-        # 使用跨平台工具获取玩家数据
-        from ..platform_utils import get_unified_player, is_guild_message
-        player = await get_unified_player(session, event)
+    # 使用跨平台工具获取玩家数据
+    from ..platform_utils import get_unified_player, is_guild_message
+
+    def session_factory():
+        return AsyncSessionLocal()
+
+    async with UnitOfWork(session_factory) as uow:
+        player = await get_unified_player(uow.session, event)
         if not player:
             if is_guild_message(event):
                 await accept_task_cmd.finish("⛔ 你还没有创建角色或绑定账号\n💡 请先在群聊注册角色，然后使用绑定功能")
@@ -125,13 +146,26 @@ async def handle_accept_task(event: MessageEvent, args: Message = CommandArg()):
             except ValueError:
                 await accept_task_cmd.finish("⛔ 请输入正确的委托编号（1-3）")
 
+        # 实例化依赖Service
+        location_service = LocationService(uow.locations, uow.npcs)
+        npc_service = NPCService(uow.npcs)
+        guild_economy_service = GuildEconomyService(uow.guilds) if player.guild_id else None
+
+        # 实例化DailyTaskService
+        task_service = DailyTaskService(
+            daily_task_repo=uow.daily_tasks,
+            location_service=location_service,
+            npc_service=npc_service,
+            guild_economy_service=guild_economy_service
+        )
+
         # 获取今日任务
         today = date.today()
-        tasks = await DailyTaskService.get_player_daily_tasks(session, player.id, today)
+        tasks = await task_service.get_player_daily_tasks(player.id, today)
 
         # 如果没有足够的任务，生成新任务
         while len(tasks) < task_index:
-            new_task = await DailyTaskService.force_generate_new_task(session, player)
+            new_task = await task_service.force_generate_new_task(player)
             if new_task:
                 tasks.append(new_task)
             else:
@@ -143,10 +177,10 @@ async def handle_accept_task(event: MessageEvent, args: Message = CommandArg()):
         task = tasks[task_index - 1]
 
         # 接取任务
-        success, message = await DailyTaskService.accept_task(session, task)
+        success, message = await task_service.accept_task(task)
 
         if success:
-            await session.commit()
+            await uow.commit()
             msg = (
                 f"🏛️ 缉邪司委托接取成功！\n"
                 f"━━━━━━━━━━━━━\n"
@@ -161,7 +195,7 @@ async def handle_accept_task(event: MessageEvent, args: Message = CommandArg()):
         else:
             msg = f"⛔ {message}"
 
-        await accept_task_cmd.finish(message_add_head(msg, event))
+    await accept_task_cmd.finish(message_add_head(msg, event))
 
 
 # ==================== 完成任务 ====================
@@ -169,14 +203,30 @@ complete_task_cmd = on_command("完成任务", aliases={"完成委托", "退邪"
 
 @complete_task_cmd.handle()
 async def handle_complete_task(event: MessageEvent):
-    async with safe_session() as session:
-        player = await get_unified_player(session, event)
+    def session_factory():
+        return AsyncSessionLocal()
+
+    async with UnitOfWork(session_factory) as uow:
+        player = await get_unified_player(uow.session, event)
         if not player:
             await complete_task_cmd.finish("⛔ 请先创建角色")
-        
+
+        # 实例化依赖Service
+        location_service = LocationService(uow.locations, uow.npcs)
+        npc_service = NPCService(uow.npcs)
+        guild_economy_service = GuildEconomyService(uow.guilds) if player.guild_id else None
+
+        # 实例化DailyTaskService
+        task_service = DailyTaskService(
+            daily_task_repo=uow.daily_tasks,
+            location_service=location_service,
+            npc_service=npc_service,
+            guild_economy_service=guild_economy_service
+        )
+
         # 获取今日已接取的任务
         today = date.today()
-        tasks = await DailyTaskService.get_player_daily_tasks(session, player.id, today)
+        tasks = await task_service.get_player_daily_tasks(player.id, today)
         accepted_tasks = [task for task in tasks if task.is_accepted()]
 
         if not accepted_tasks:
@@ -198,33 +248,31 @@ async def handle_complete_task(event: MessageEvent):
 
         # 选择第一个可完成的任务
         task = completable_tasks[0]
-        
+
         # 位置检查已在上面完成
-        
+
         # 完成任务（检测NPC是否死亡）
-        success, message, rewards = await DailyTaskService.complete_task(session, player, task)
+        success, message, rewards = await task_service.complete_task(player, task)
 
         if success:
             # 更新委托完成统计（用于公会任务）
             if player.guild_id:
                 from ..guild.guild_task_service_new import GuildTaskService as GuildTaskServiceNew
-                from ..infrastructure.repositories.player_repository import PlayerRepository
-                from ..infrastructure.repositories.guild_repository import GuildRepository
                 from ..infrastructure.repositories.player_task_stats_repository import PlayerTaskStatsRepository
                 from ..infrastructure.repositories.guild_task_record_repository import GuildTaskRecordRepository
                 from ..infrastructure.repositories.player_donation_log_repository import PlayerDonationLogRepository
                 from ..infrastructure.repositories.guild_building_repository import GuildBuildingRepository
 
-                task_service = GuildTaskServiceNew(
-                    player_repo=PlayerRepository(session),
-                    guild_repo=GuildRepository(session),
-                    player_task_stats_repo=PlayerTaskStatsRepository(session),
-                    guild_task_record_repo=GuildTaskRecordRepository(session),
-                    player_donation_log_repo=PlayerDonationLogRepository(session),
-                    guild_building_repo=GuildBuildingRepository(session),
+                guild_task_service = GuildTaskServiceNew(
+                    player_repo=uow.players,
+                    guild_repo=uow.guilds,
+                    player_task_stats_repo=PlayerTaskStatsRepository(uow.session),
+                    guild_task_record_repo=GuildTaskRecordRepository(uow.session),
+                    player_donation_log_repo=PlayerDonationLogRepository(uow.session),
+                    guild_building_repo=GuildBuildingRepository(uow.session),
                 )
-                await task_service.update_commission_stats(player.id)
-            await session.commit()
+                await guild_task_service.update_commission_stats(player.id)
+            await uow.commit()
 
             # 构建完成消息
             reward_lines = []
@@ -257,8 +305,8 @@ async def handle_complete_task(event: MessageEvent):
             )
         else:
             msg = f"⛔ {message}"
-        
-        await complete_task_cmd.finish(message_add_head(msg, event))
+
+    await complete_task_cmd.finish(message_add_head(msg, event))
 
 
 # ==================== 任务统计 ====================
@@ -266,17 +314,33 @@ task_stats_cmd = on_command("任务统计", aliases={"委托统计"}, block=True
 
 @task_stats_cmd.handle()
 async def handle_task_stats(event: MessageEvent):
-    async with safe_session() as session:
-        player = await get_unified_player(session, event)
+    def session_factory():
+        return AsyncSessionLocal()
+
+    async with UnitOfWork(session_factory) as uow:
+        player = await get_unified_player(uow.session, event)
         if not player:
             await task_stats_cmd.finish("⛔ 请先创建角色")
-        
-        summary = await DailyTaskService.get_task_summary(session, player.id)
-        
+
+        # 实例化依赖Service
+        location_service = LocationService(uow.locations, uow.npcs)
+        npc_service = NPCService(uow.npcs)
+        guild_economy_service = GuildEconomyService(uow.guilds) if player.guild_id else None
+
+        # 实例化DailyTaskService
+        task_service = DailyTaskService(
+            daily_task_repo=uow.daily_tasks,
+            location_service=location_service,
+            npc_service=npc_service,
+            guild_economy_service=guild_economy_service
+        )
+
+        summary = await task_service.get_task_summary(player.id)
+
         lines = ["📊 缉邪司委托统计", "━━━━━━━━━━━━━"]
         lines.append(f"📅 本周完成：{summary['weekly_completed']} 次")
         lines.append(f"🏆 总计完成：{summary['total_completed']} 次")
-        
+
         # 今日任务状态
         today_task = summary['today_task']
         if today_task:
@@ -288,11 +352,11 @@ async def handle_task_stats(event: MessageEvent):
                 lines.append("📋 今日任务：可接取")
         else:
             lines.append("📋 今日任务：尚未生成")
-        
+
         lines.append("")
         lines.append("💡 每日完成委托可获得经验、金币和积分奖励，有公会还可获得公会经验")
-        
-        await task_stats_cmd.finish(message_add_head("\n".join(lines), event))
+
+    await task_stats_cmd.finish(message_add_head("\n".join(lines), event))
 
 
 # ==================== 刷新委托 ====================
@@ -300,26 +364,42 @@ refresh_task_cmd = on_command("刷新委托", aliases={"刷新任务", "更多�
 
 @refresh_task_cmd.handle()
 async def handle_refresh_task(event: MessageEvent):
-    async with safe_session() as session:
-        player = await get_unified_player(session, event)
+    def session_factory():
+        return AsyncSessionLocal()
+
+    async with UnitOfWork(session_factory) as uow:
+        player = await get_unified_player(uow.session, event)
         if not player:
             await refresh_task_cmd.finish("⛔ 请先创建角色")
         if player.level < 30:
             await refresh_task_cmd.finish("⛔ 该功能仅对Lv.30以上角色开放")
 
+        # 实例化依赖Service
+        location_service = LocationService(uow.locations, uow.npcs)
+        npc_service = NPCService(uow.npcs)
+        guild_economy_service = GuildEconomyService(uow.guilds) if player.guild_id else None
+
+        # 实例化DailyTaskService
+        task_service = DailyTaskService(
+            daily_task_repo=uow.daily_tasks,
+            location_service=location_service,
+            npc_service=npc_service,
+            guild_economy_service=guild_economy_service
+        )
+
         # 获取今日任务
         today = date.today()
-        tasks = await DailyTaskService.get_player_daily_tasks(session, player.id, today)
+        tasks = await task_service.get_player_daily_tasks(player.id, today)
 
         if len(tasks) >= 3:
             await refresh_task_cmd.finish("⛔ 今日委托已达上限（3个），请完成后再来")
 
         # 生成新任务
-        new_task = await DailyTaskService.force_generate_new_task(session, player)
+        new_task = await task_service.force_generate_new_task(player)
         if not new_task:
             await refresh_task_cmd.finish("⛔ 生成委托失败，请稍后重试")
 
-        await session.commit()
+        await uow.commit()
 
         msg = (
             f"🏛️ 缉邪司新委托生成！\n"
@@ -333,4 +413,4 @@ async def handle_refresh_task(event: MessageEvent):
             f"💡 使用【接取任务 {len(tasks) + 1}】接取此委托"
         )
 
-        await refresh_task_cmd.finish(message_add_head(msg, event))
+    await refresh_task_cmd.finish(message_add_head(msg, event))

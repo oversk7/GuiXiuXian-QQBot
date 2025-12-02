@@ -63,6 +63,11 @@ class UnitOfWork:
         self._job_locations = None
         self._player_job_stats = None
 
+        # 每日任务和世界相关仓储
+        self._daily_tasks = None
+        self._locations = None
+        self._npcs = None
+
     @property
     def players(self):
         """玩家仓储"""
@@ -158,6 +163,30 @@ class UnitOfWork:
             from ..repositories.player_job_stats_repository import PlayerJobStatsRepository
             self._player_job_stats = PlayerJobStatsRepository(self._session)
         return self._player_job_stats
+
+    @property
+    def daily_tasks(self):
+        """每日任务仓储"""
+        if self._daily_tasks is None:
+            from ..repositories.daily_task_repository import DailyTaskRepository
+            self._daily_tasks = DailyTaskRepository(self._session)
+        return self._daily_tasks
+
+    @property
+    def locations(self):
+        """地点仓储"""
+        if self._locations is None:
+            from ..repositories.location_repository import LocationRepository
+            self._locations = LocationRepository(self._session)
+        return self._locations
+
+    @property
+    def npcs(self):
+        """NPC仓储"""
+        if self._npcs is None:
+            from ..repositories.npc_repository import NPCRepository
+            self._npcs = NPCRepository(self._session)
+        return self._npcs
 
     @property
     def session(self) -> AsyncSession:
