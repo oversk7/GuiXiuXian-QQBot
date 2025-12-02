@@ -206,7 +206,7 @@ async def handle_ghost_interaction(session, player: Player, npc, event: MessageE
         f"🛡️ 防御：{npc.defense}",
         "",
         "⚔️ 可用操作：",
-        "• 【攻击 {npc.name}】与鬼怪战斗",
+        f"• 【攻击 {npc.name}】与鬼怪战斗",
         "",
         "⚠️ 警告：战斗可能造成伤亡，请谨慎行事！"
     ]
