@@ -11,7 +11,6 @@ from ..platform_utils import get_unified_player
 
 # ==================== Feature Flag ====================
 # 设置为True使用新版DI架构的MarriageService，False使用旧版本
-USE_NEW_MARRIAGE_SERVICE = True
 # =====================================================
 
 
@@ -41,39 +40,32 @@ async def handle_propose(event: MessageEvent, args: Message = CommandArg()):
             await propose_cmd.finish("⛔ 未找到该 UID 的玩家")
 
         # 检查是否可以求婚
-        if USE_NEW_MARRIAGE_SERVICE:
-            from ..infrastructure.repositories.player_repository import PlayerRepository
-            from ..infrastructure.repositories.social_application_repository import SocialApplicationRepository
-            from ..infrastructure.repositories.marriage_repository import MarriageRepository
-            from .marriage_service_new import MarriageService as MarriageServiceNew
+        from ..infrastructure.repositories.player_repository import PlayerRepository
+        from ..infrastructure.repositories.social_application_repository import SocialApplicationRepository
+        from ..infrastructure.repositories.marriage_repository import MarriageRepository
+        from .marriage_service_new import MarriageService as MarriageServiceNew
 
-            service = MarriageServiceNew(
-                player_repo=PlayerRepository(session),
-                social_app_repo=SocialApplicationRepository(session),
-                marriage_repo=MarriageRepository(session),
-            )
-            can_propose, reason = await service.can_propose(proposer.id, target.id)
-        else:
-            can_propose, reason = await MarriageService.can_propose(session, proposer.id, target.id)
+        service = MarriageServiceNew(
+            player_repo=PlayerRepository(session),
+            social_app_repo=SocialApplicationRepository(session),
+            marriage_repo=MarriageRepository(session),
+        )
+        can_propose, reason = await service.can_propose(proposer.id, target.id)
         if not can_propose:
             await propose_cmd.finish(f"⛔ {reason}")
 
         # 创建求婚申请
-        if USE_NEW_MARRIAGE_SERVICE:
-            from ..infrastructure.repositories.player_repository import PlayerRepository
-            from ..infrastructure.repositories.social_application_repository import SocialApplicationRepository
-            from ..infrastructure.repositories.marriage_repository import MarriageRepository
-            from .marriage_service_new import MarriageService as MarriageServiceNew
+        from ..infrastructure.repositories.player_repository import PlayerRepository
+        from ..infrastructure.repositories.social_application_repository import SocialApplicationRepository
+        from ..infrastructure.repositories.marriage_repository import MarriageRepository
+        from .marriage_service_new import MarriageService as MarriageServiceNew
 
-            service = MarriageServiceNew(
-                player_repo=PlayerRepository(session),
-                social_app_repo=SocialApplicationRepository(session),
-                marriage_repo=MarriageRepository(session),
-            )
-            await service.create_proposal(proposer.id, target.id)
-        else:
-            await MarriageService.create_proposal(session, proposer.id, target.id)
-
+        service = MarriageServiceNew(
+            player_repo=PlayerRepository(session),
+            social_app_repo=SocialApplicationRepository(session),
+            marriage_repo=MarriageRepository(session),
+        )
+        await service.create_proposal(proposer.id, target.id)
         await propose_cmd.finish(message_add_head(
             f"💕 已向 {target.nickname}[UID:{target.uid}] 发送求婚申请，等待对方回复",
             event
@@ -90,20 +82,17 @@ async def handle_marriage_applications(event: MessageEvent):
         if not player:
             await marriage_applications_cmd.finish("⛔ 请先创建角色")
 
-        if USE_NEW_MARRIAGE_SERVICE:
-            from ..infrastructure.repositories.player_repository import PlayerRepository
-            from ..infrastructure.repositories.social_application_repository import SocialApplicationRepository
-            from ..infrastructure.repositories.marriage_repository import MarriageRepository
-            from .marriage_service_new import MarriageService as MarriageServiceNew
+        from ..infrastructure.repositories.player_repository import PlayerRepository
+        from ..infrastructure.repositories.social_application_repository import SocialApplicationRepository
+        from ..infrastructure.repositories.marriage_repository import MarriageRepository
+        from .marriage_service_new import MarriageService as MarriageServiceNew
 
-            service = MarriageServiceNew(
-                player_repo=PlayerRepository(session),
-                social_app_repo=SocialApplicationRepository(session),
-                marriage_repo=MarriageRepository(session),
-            )
-            proposals = await service.get_pending_proposals(player.id)
-        else:
-            proposals = await MarriageService.get_pending_proposals(session, player.id)
+        service = MarriageServiceNew(
+            player_repo=PlayerRepository(session),
+            social_app_repo=SocialApplicationRepository(session),
+            marriage_repo=MarriageRepository(session),
+        )
+        proposals = await service.get_pending_proposals(player.id)
         if not proposals:
             await marriage_applications_cmd.finish("暂无待处理的求婚申请")
         
@@ -140,20 +129,17 @@ async def handle_accept_proposal(event: MessageEvent, args: Message = CommandArg
         if not proposer:
             await accept_proposal_cmd.finish("⛔ 未找到该 UID 的玩家")
 
-        if USE_NEW_MARRIAGE_SERVICE:
-            from ..infrastructure.repositories.player_repository import PlayerRepository
-            from ..infrastructure.repositories.social_application_repository import SocialApplicationRepository
-            from ..infrastructure.repositories.marriage_repository import MarriageRepository
-            from .marriage_service_new import MarriageService as MarriageServiceNew
+        from ..infrastructure.repositories.player_repository import PlayerRepository
+        from ..infrastructure.repositories.social_application_repository import SocialApplicationRepository
+        from ..infrastructure.repositories.marriage_repository import MarriageRepository
+        from .marriage_service_new import MarriageService as MarriageServiceNew
 
-            service = MarriageServiceNew(
-                player_repo=PlayerRepository(session),
-                social_app_repo=SocialApplicationRepository(session),
-                marriage_repo=MarriageRepository(session),
-            )
-            success, message = await service.accept_proposal_by_uid(proposer.id, player.id)
-        else:
-            success, message = await MarriageService.accept_proposal_by_uid(session, proposer.id, player.id)
+        service = MarriageServiceNew(
+            player_repo=PlayerRepository(session),
+            social_app_repo=SocialApplicationRepository(session),
+            marriage_repo=MarriageRepository(session),
+        )
+        success, message = await service.accept_proposal_by_uid(proposer.id, player.id)
         if success:
             await accept_proposal_cmd.finish(message_add_head(f"💒 {message}", event))
         else:
@@ -184,20 +170,17 @@ async def handle_reject_proposal(event: MessageEvent, args: Message = CommandArg
         if not proposer:
             await reject_proposal_cmd.finish("⛔ 未找到该 UID 的玩家")
 
-        if USE_NEW_MARRIAGE_SERVICE:
-            from ..infrastructure.repositories.player_repository import PlayerRepository
-            from ..infrastructure.repositories.social_application_repository import SocialApplicationRepository
-            from ..infrastructure.repositories.marriage_repository import MarriageRepository
-            from .marriage_service_new import MarriageService as MarriageServiceNew
+        from ..infrastructure.repositories.player_repository import PlayerRepository
+        from ..infrastructure.repositories.social_application_repository import SocialApplicationRepository
+        from ..infrastructure.repositories.marriage_repository import MarriageRepository
+        from .marriage_service_new import MarriageService as MarriageServiceNew
 
-            service = MarriageServiceNew(
-                player_repo=PlayerRepository(session),
-                social_app_repo=SocialApplicationRepository(session),
-                marriage_repo=MarriageRepository(session),
-            )
-            success, message = await service.reject_proposal_by_uid(proposer.id, player.id)
-        else:
-            success, message = await MarriageService.reject_proposal_by_uid(session, proposer.id, player.id)
+        service = MarriageServiceNew(
+            player_repo=PlayerRepository(session),
+            social_app_repo=SocialApplicationRepository(session),
+            marriage_repo=MarriageRepository(session),
+        )
+        success, message = await service.reject_proposal_by_uid(proposer.id, player.id)
         if success:
             await reject_proposal_cmd.finish(message_add_head(f"💔 {message}", event))
         else:
@@ -214,38 +197,31 @@ async def handle_spouse(event: MessageEvent):
         if not player:
             await spouse_cmd.finish("⛔ 请先创建角色")
 
-        if USE_NEW_MARRIAGE_SERVICE:
-            from ..infrastructure.repositories.player_repository import PlayerRepository
-            from ..infrastructure.repositories.social_application_repository import SocialApplicationRepository
-            from ..infrastructure.repositories.marriage_repository import MarriageRepository
-            from .marriage_service_new import MarriageService as MarriageServiceNew
+        from ..infrastructure.repositories.player_repository import PlayerRepository
+        from ..infrastructure.repositories.social_application_repository import SocialApplicationRepository
+        from ..infrastructure.repositories.marriage_repository import MarriageRepository
+        from .marriage_service_new import MarriageService as MarriageServiceNew
 
-            service = MarriageServiceNew(
-                player_repo=PlayerRepository(session),
-                social_app_repo=SocialApplicationRepository(session),
-                marriage_repo=MarriageRepository(session),
-            )
-            spouse = await service.get_spouse(player.id)
-        else:
-            spouse = await MarriageService.get_spouse(session, player.id)
+        service = MarriageServiceNew(
+            player_repo=PlayerRepository(session),
+            social_app_repo=SocialApplicationRepository(session),
+            marriage_repo=MarriageRepository(session),
+        )
+        spouse = await service.get_spouse(player.id)
         if not spouse:
             await spouse_cmd.finish("💔 你还没有结婚")
 
-        if USE_NEW_MARRIAGE_SERVICE:
-            from ..infrastructure.repositories.player_repository import PlayerRepository
-            from ..infrastructure.repositories.social_application_repository import SocialApplicationRepository
-            from ..infrastructure.repositories.marriage_repository import MarriageRepository
-            from .marriage_service_new import MarriageService as MarriageServiceNew
+        from ..infrastructure.repositories.player_repository import PlayerRepository
+        from ..infrastructure.repositories.social_application_repository import SocialApplicationRepository
+        from ..infrastructure.repositories.marriage_repository import MarriageRepository
+        from .marriage_service_new import MarriageService as MarriageServiceNew
 
-            service = MarriageServiceNew(
-                player_repo=PlayerRepository(session),
-                social_app_repo=SocialApplicationRepository(session),
-                marriage_repo=MarriageRepository(session),
-            )
-            marriage = await service.get_marriage(player.id)
-        else:
-            marriage = await MarriageService.get_marriage(session, player.id)
-        
+        service = MarriageServiceNew(
+            player_repo=PlayerRepository(session),
+            social_app_repo=SocialApplicationRepository(session),
+            marriage_repo=MarriageRepository(session),
+        )
+        marriage = await service.get_marriage(player.id)
         # 导入境界映射函数
         from ..player.info import realm_by_level
 
@@ -272,20 +248,17 @@ async def handle_divorce(event: MessageEvent):
         if not player:
             await divorce_cmd.finish("⛔ 请先创建角色")
 
-        if USE_NEW_MARRIAGE_SERVICE:
-            from ..infrastructure.repositories.player_repository import PlayerRepository
-            from ..infrastructure.repositories.social_application_repository import SocialApplicationRepository
-            from ..infrastructure.repositories.marriage_repository import MarriageRepository
-            from .marriage_service_new import MarriageService as MarriageServiceNew
+        from ..infrastructure.repositories.player_repository import PlayerRepository
+        from ..infrastructure.repositories.social_application_repository import SocialApplicationRepository
+        from ..infrastructure.repositories.marriage_repository import MarriageRepository
+        from .marriage_service_new import MarriageService as MarriageServiceNew
 
-            service = MarriageServiceNew(
-                player_repo=PlayerRepository(session),
-                social_app_repo=SocialApplicationRepository(session),
-                marriage_repo=MarriageRepository(session),
-            )
-            success, message = await service.divorce(player.id)
-        else:
-            success, message = await MarriageService.divorce(session, player.id)
+        service = MarriageServiceNew(
+            player_repo=PlayerRepository(session),
+            social_app_repo=SocialApplicationRepository(session),
+            marriage_repo=MarriageRepository(session),
+        )
+        success, message = await service.divorce(player.id)
         if success:
             await divorce_cmd.finish(message_add_head(f"💔 {message}", event))
         else:

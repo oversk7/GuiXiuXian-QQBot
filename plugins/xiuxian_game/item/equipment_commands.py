@@ -17,14 +17,12 @@ from ..models.db import safe_session
 from ..models import Player, ItemInstance
 from ..config import config
 from ..utils import message_add_head
-from ..alchemy.service import AlchemyService
 from ..platform_utils import get_unified_player
 # 导入装备服务模块（业务逻辑已移至此处，解决模块耦合）
 from .equipment_service import recalc_equipment_attributes, EQUIP_ITEM_IDS
 
 # ==================== Feature Flag ====================
 # 设置为True使用新版DI架构的EquipmentService，False使用旧版本
-USE_NEW_EQUIPMENT_SERVICE = True
 # =====================================================
 
 
@@ -169,6 +167,8 @@ equipment_detail = on_command("装备详情", aliases={"装备信息", "查看�
 
 @equipment_detail.handle()
 async def _(event: MessageEvent, args: Message = CommandArg()):
+    from ..alchemy.service_new import AlchemyService
+
     arg = args.extract_plain_text().strip()
     if not arg:
         await equipment_detail.finish("⛔ 格式：装备详情 装备编号/名称")
@@ -275,7 +275,7 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
             lines.append(f"  • 孔位：{equip.used_gem_slots}/{equip.available_gem_slots}")
 
             if equip.used_gem_slots > 0:
-                from .gem_socket_service import GemSocketService
+                from .gem_socket_service_new import GemSocketService
                 gem_info = await GemSocketService.get_equipment_gem_info(equip)
                 for slot_info in gem_info:
                     if not slot_info["is_empty"]:
@@ -434,32 +434,18 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
         session.add(equip)
 
         # 重新计算装备属性
-        if USE_NEW_EQUIPMENT_SERVICE:
-            # 新版本: 使用DI架构的EquipmentService（通过当前session创建Repository）
-            from ..infrastructure.repositories.item_repository import ItemRepository
-            from ..infrastructure.repositories.player_repository import PlayerRepository
-            from .equipment_service_new import EquipmentService
+        # 新版本: 使用DI架构的EquipmentService（通过当前session创建Repository）
+        from ..infrastructure.repositories.item_repository import ItemRepository
+        from ..infrastructure.repositories.player_repository import PlayerRepository
+        from .equipment_service_new import EquipmentService
 
-            equipment_service = EquipmentService(
-                item_repo=ItemRepository(session),
-                player_repo=PlayerRepository(session)
-            )
+        equipment_service = EquipmentService(
+            item_repo=ItemRepository(session),
+            player_repo=PlayerRepository(session)
+        )
 
-            # 重新计算装备属性（包括所有已装备的装备）
-            await equipment_service.recalc_equipment_attributes(player)
-        else:
-            # 旧版本: 使用静态函数recalc_equipment_attributes
-            # 获取所有已装备的装备（包括刚刚标记为已装备的新装备）
-            all_equipped_stmt = select(ItemInstance).where(
-                ItemInstance.player_id == player.id,
-                ItemInstance.equipped == True,
-                ItemInstance.item_id.in_(EQUIP_ITEM_IDS)
-            )
-            all_equipped_items = (await session.execute(all_equipped_stmt)).scalars().all()
-
-            # 调用装备服务重新计算属性
-            await recalc_equipment_attributes(session, player, all_equipped_items)
-
+        # 重新计算装备属性（包括所有已装备的装备）
+        await equipment_service.recalc_equipment_attributes(player)
         session.add(player)
 
         await session.commit()
@@ -514,7 +500,7 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
             await unwear_equipment.finish("⛔ 该装备未穿戴")
 
         # 检查是否为炼丹炉，如果是则处理进行中的炼丹任务
-        from ..alchemy.service import AlchemyService
+        from ..alchemy.service_new import AlchemyService
         from ..models.alchemy_task import AlchemyRecord
 
         failed_tasks = []
@@ -567,21 +553,16 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
         session.add(equip)
 
         # 重新计算剩余装备的属性加成，确保 mp_from_hp 等全局被动同步
-        if USE_NEW_EQUIPMENT_SERVICE:
-            # 新版本: 使用DI架构的EquipmentService
-            from ..infrastructure.repositories.item_repository import ItemRepository
-            from ..infrastructure.repositories.player_repository import PlayerRepository
-            from .equipment_service_new import EquipmentService
+        # 新版本: 使用DI架构的EquipmentService
+        from ..infrastructure.repositories.item_repository import ItemRepository
+        from ..infrastructure.repositories.player_repository import PlayerRepository
+        from .equipment_service_new import EquipmentService
 
-            equipment_service = EquipmentService(
-                item_repo=ItemRepository(session),
-                player_repo=PlayerRepository(session)
-            )
-            await equipment_service.recalc_equipment_attributes(player)
-        else:
-            # 旧版本: 使用静态函数
-            await recalc_equipment_attributes(session, player)
-
+        equipment_service = EquipmentService(
+            item_repo=ItemRepository(session),
+            player_repo=PlayerRepository(session)
+        )
+        await equipment_service.recalc_equipment_attributes(player)
         await session.commit()
 
         # 构建结果消息
@@ -614,7 +595,7 @@ async def _(event: MessageEvent):
             await unwear_all_equipment.finish("⛔ 你没有穿戴任何装备")
 
         # 处理炼丹炉相关的任务
-        from ..alchemy.service import AlchemyService
+        from ..alchemy.service_new import AlchemyService
         from ..models.alchemy_task import AlchemyRecord
 
         all_failed_tasks = []  # 所有失败的炼丹任务
@@ -676,21 +657,16 @@ async def _(event: MessageEvent):
             all_failed_tasks.extend(failed_tasks)
 
         # 重新计算剩余装备的属性加成，确保属性正确恢复
-        if USE_NEW_EQUIPMENT_SERVICE:
-            # 新版本: 使用DI架构的EquipmentService
-            from ..infrastructure.repositories.item_repository import ItemRepository
-            from ..infrastructure.repositories.player_repository import PlayerRepository
-            from .equipment_service_new import EquipmentService
+        # 新版本: 使用DI架构的EquipmentService
+        from ..infrastructure.repositories.item_repository import ItemRepository
+        from ..infrastructure.repositories.player_repository import PlayerRepository
+        from .equipment_service_new import EquipmentService
 
-            equipment_service = EquipmentService(
-                item_repo=ItemRepository(session),
-                player_repo=PlayerRepository(session)
-            )
-            await equipment_service.recalc_equipment_attributes(player)
-        else:
-            # 旧版本: 使用静态函数
-            await recalc_equipment_attributes(session, player)
-
+        equipment_service = EquipmentService(
+            item_repo=ItemRepository(session),
+            player_repo=PlayerRepository(session)
+        )
+        await equipment_service.recalc_equipment_attributes(player)
         # 确保当前HP/MP不超过新的上限
         if player.hp > player.max_hp:
             player.hp = player.max_hp

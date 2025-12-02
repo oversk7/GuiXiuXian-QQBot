@@ -21,10 +21,10 @@ from ..models.db import safe_session
 from ..models.player import Player
 from ..utils import message_add_head, check_action_limit, record_action
 from .part_time_job_service import PartTimeJobService
+from ..platform_utils import get_unified_player
 
 # ==================== Feature Flag ====================
 # 设置为True使用新版DI架构的PartTimeJobService，False使用旧版本
-USE_NEW_PART_TIME_JOB_SERVICE = True
 # =====================================================
 
 
@@ -43,81 +43,49 @@ work_stats_cmd = on_command("打工统计", aliases={"工作统计"}, block=True
 @work_cmd.handle()
 async def handle_work(event: MessageEvent, args: Message = CommandArg()):
     """处理打工命令"""
-    if USE_NEW_PART_TIME_JOB_SERVICE:
-        # 新版本: 使用DI架构
-        from ..infrastructure.uow.unit_of_work import UnitOfWork
-        from ..models.db import AsyncSessionLocal
-        from .part_time_job_service_new import PartTimeJobService as PartTimeJobServiceNew
+    # 新版本: 使用DI架构
+    from ..infrastructure.uow.unit_of_work import UnitOfWork
+    from ..models.db import AsyncSessionLocal
+    from .part_time_job_service_new import PartTimeJobService as PartTimeJobServiceNew
 
-        def session_factory():
-            return AsyncSessionLocal()
+    def session_factory():
+        return AsyncSessionLocal()
 
-        async with UnitOfWork(session_factory) as uow:
-            player = await get_unified_player(uow.session, event)
-            if not player:
-                await work_cmd.finish("⛔ 请先创建角色")
+    async with UnitOfWork(session_factory) as uow:
+        player = await get_unified_player(uow.session, event)
+        if not player:
+            await work_cmd.finish("⛔ 请先创建角色")
 
-            args_text = args.extract_plain_text().strip()
+        args_text = args.extract_plain_text().strip()
 
-            part_time_job_service = PartTimeJobServiceNew(
-                player_repo=uow.players,
-                part_time_job_repo=uow.part_time_jobs,
-                job_location_repo=uow.job_locations,
-                player_job_stats_repo=uow.player_job_stats
-            )
+        part_time_job_service = PartTimeJobServiceNew(
+            player_repo=uow.players,
+            part_time_job_repo=uow.part_time_jobs,
+            job_location_repo=uow.job_locations,
+            player_job_stats_repo=uow.player_job_stats
+        )
 
-            if not args_text:
-                # 查看当前位置的工作机会
-                success, msg, jobs = await part_time_job_service.get_available_jobs_at_location(player)
-            else:
-                # 开始指定工作
-                # 检查频率限制
-                can_work, limit_msg = check_action_limit(event.get_user_id(), "start_work")
-                if not can_work:
-                    await work_cmd.finish(message_add_head(f"❌ {limit_msg}", event))
+        if not args_text:
+            # 查看当前位置的工作机会
+            success, msg, jobs = await part_time_job_service.get_available_jobs_at_location(player)
+        else:
+            # 开始指定工作
+            # 检查频率限制
+            can_work, limit_msg = check_action_limit(event.get_user_id(), "start_work")
+            if not can_work:
+                await work_cmd.finish(message_add_head(f"❌ {limit_msg}", event))
 
-                # 先尝试通过工作名称匹配
-                job_type = None
-                for jtype, jconfig in PartTimeJobServiceNew.JOB_TYPES.items():
-                    if args_text in jconfig["name"] or args_text == jconfig["name"]:
-                        job_type = jtype
-                        break
+            # 先尝试通过工作名称匹配
+            job_type = None
+            for jtype, jconfig in PartTimeJobServiceNew.JOB_TYPES.items():
+                if args_text in jconfig["name"] or args_text == jconfig["name"]:
+                    job_type = jtype
+                    break
 
-                if not job_type:
-                    await work_cmd.finish(message_add_head(f"❌ 找不到工作：{args_text}\n💡 使用【打工】查看可用工作", event))
+            if not job_type:
+                await work_cmd.finish(message_add_head(f"❌ 找不到工作：{args_text}\n💡 使用【打工】查看可用工作", event))
 
-                success, msg, job = await part_time_job_service.start_job(player, job_type)
-    else:
-        # 旧版本: 使用静态方法
-        async with safe_session() as session:
-            player = await get_unified_player(session, event)
-            if not player:
-                await work_cmd.finish("⛔ 请先创建角色")
-
-            args_text = args.extract_plain_text().strip()
-
-            if not args_text:
-                # 查看当前位置的工作机会
-                success, msg, jobs = await PartTimeJobService.get_available_jobs_at_location(session, player)
-            else:
-                # 开始指定工作
-                # 检查频率限制
-                can_work, limit_msg = check_action_limit(event.get_user_id(), "start_work")
-                if not can_work:
-                    await work_cmd.finish(message_add_head(f"❌ {limit_msg}", event))
-
-                # 先尝试通过工作名称匹配
-                job_type = None
-                for jtype, jconfig in PartTimeJobService.JOB_TYPES.items():
-                    if args_text in jconfig["name"] or args_text == jconfig["name"]:
-                        job_type = jtype
-                        break
-
-                if not job_type:
-                    await work_cmd.finish(message_add_head(f"❌ 找不到工作：{args_text}\n💡 使用【打工】查看可用工作", event))
-
-                success, msg, job = await PartTimeJobService.start_job(session, player, job_type)
-
+            success, msg, job = await part_time_job_service.start_job(player, job_type)
     # 共享的消息构建逻辑
     if not args_text:
         # 查看工作机会的消息
@@ -164,12 +132,8 @@ async def handle_work(event: MessageEvent, args: Message = CommandArg()):
         record_action(event.get_user_id(), "start_work")
 
         # 获取job_config（新旧版本都有JOB_TYPES）
-        if USE_NEW_PART_TIME_JOB_SERVICE:
-            from .part_time_job_service_new import PartTimeJobService as PartTimeJobServiceNew
-            job_config = PartTimeJobServiceNew.JOB_TYPES[job_type]
-        else:
-            job_config = PartTimeJobService.JOB_TYPES[job_type]
-
+        from .part_time_job_service_new import PartTimeJobService as PartTimeJobServiceNew
+        job_config = PartTimeJobServiceNew.JOB_TYPES[job_type]
         end_time_str = job.end_time.strftime("%H:%M")
 
         # 格式化工作时长显示
@@ -200,35 +164,26 @@ async def handle_work(event: MessageEvent, args: Message = CommandArg()):
 @finish_work_cmd.handle()
 async def handle_finish_work(event: MessageEvent):
     """处理收工命令"""
-    if USE_NEW_PART_TIME_JOB_SERVICE:
-        from ..infrastructure.uow.unit_of_work import UnitOfWork
-        from ..models.db import AsyncSessionLocal
-        from .part_time_job_service_new import PartTimeJobService as PartTimeJobServiceNew
+    from ..infrastructure.uow.unit_of_work import UnitOfWork
+    from ..models.db import AsyncSessionLocal
+    from .part_time_job_service_new import PartTimeJobService as PartTimeJobServiceNew
 
-        def session_factory():
-            return AsyncSessionLocal()
+    def session_factory():
+        return AsyncSessionLocal()
 
-        async with UnitOfWork(session_factory) as uow:
-            player = await get_unified_player(uow.session, event)
-            if not player:
-                await finish_work_cmd.finish("⛔ 请先创建角色")
+    async with UnitOfWork(session_factory) as uow:
+        player = await get_unified_player(uow.session, event)
+        if not player:
+            await finish_work_cmd.finish("⛔ 请先创建角色")
 
-            part_time_job_service = PartTimeJobServiceNew(
-                player_repo=uow.players,
-                part_time_job_repo=uow.part_time_jobs,
-                job_location_repo=uow.job_locations,
-                player_job_stats_repo=uow.player_job_stats
-            )
+        part_time_job_service = PartTimeJobServiceNew(
+            player_repo=uow.players,
+            part_time_job_repo=uow.part_time_jobs,
+            job_location_repo=uow.job_locations,
+            player_job_stats_repo=uow.player_job_stats
+        )
 
-            success, msg, result = await part_time_job_service.complete_job(player)
-    else:
-        async with safe_session() as session:
-            player = await get_unified_player(session, event)
-            if not player:
-                await finish_work_cmd.finish("⛔ 请先创建角色")
-
-            success, msg, result = await PartTimeJobService.complete_job(session, player)
-
+        success, msg, result = await part_time_job_service.complete_job(player)
     if not success:
         await finish_work_cmd.finish(message_add_head(f"❌ {msg}", event))
 
@@ -260,43 +215,30 @@ async def handle_finish_work(event: MessageEvent):
 @work_status_cmd.handle()
 async def handle_work_status(event: MessageEvent):
     """处理工作状态命令"""
-    if USE_NEW_PART_TIME_JOB_SERVICE:
-        from ..infrastructure.uow.unit_of_work import UnitOfWork
-        from ..models.db import AsyncSessionLocal
-        from .part_time_job_service_new import PartTimeJobService as PartTimeJobServiceNew
-        from ..platform_utils import get_unified_player, is_guild_message
+    from ..infrastructure.uow.unit_of_work import UnitOfWork
+    from ..models.db import AsyncSessionLocal
+    from .part_time_job_service_new import PartTimeJobService as PartTimeJobServiceNew
+    from ..platform_utils import get_unified_player, is_guild_message
 
-        def session_factory():
-            return AsyncSessionLocal()
+    def session_factory():
+        return AsyncSessionLocal()
 
-        async with UnitOfWork(session_factory) as uow:
-            player = await get_unified_player(uow.session, event)
-            if not player:
-                if is_guild_message(event):
-                    await work_status_cmd.finish("⛔ 你还没有创建角色或绑定账号\n💡 请先在群聊注册角色，然后使用绑定功能")
-                else:
-                    await work_status_cmd.finish("⛔ 请先创建角色")
+    async with UnitOfWork(session_factory) as uow:
+        player = await get_unified_player(uow.session, event)
+        if not player:
+            if is_guild_message(event):
+                await work_status_cmd.finish("⛔ 你还没有创建角色或绑定账号\n💡 请先在群聊注册角色，然后使用绑定功能")
+            else:
+                await work_status_cmd.finish("⛔ 请先创建角色")
 
-            part_time_job_service = PartTimeJobServiceNew(
-                player_repo=uow.players,
-                part_time_job_repo=uow.part_time_jobs,
-                job_location_repo=uow.job_locations,
-                player_job_stats_repo=uow.player_job_stats
-            )
+        part_time_job_service = PartTimeJobServiceNew(
+            player_repo=uow.players,
+            part_time_job_repo=uow.part_time_jobs,
+            job_location_repo=uow.job_locations,
+            player_job_stats_repo=uow.player_job_stats
+        )
 
-            success, msg, status = await part_time_job_service.get_current_job_status(player)
-    else:
-        async with safe_session() as session:
-            from ..platform_utils import get_unified_player, is_guild_message
-            player = await get_unified_player(session, event)
-            if not player:
-                if is_guild_message(event):
-                    await work_status_cmd.finish("⛔ 你还没有创建角色或绑定账号\n💡 请先在群聊注册角色，然后使用绑定功能")
-                else:
-                    await work_status_cmd.finish("⛔ 请先创建角色")
-
-            success, msg, status = await PartTimeJobService.get_current_job_status(session, player)
-
+        success, msg, status = await part_time_job_service.get_current_job_status(player)
     if not success:
         await work_status_cmd.finish(message_add_head(f"ℹ️ {msg}", event))
 
@@ -331,35 +273,26 @@ async def handle_work_status(event: MessageEvent):
 @work_locations_cmd.handle()
 async def handle_work_locations(event: MessageEvent):
     """处理工作地点命令"""
-    if USE_NEW_PART_TIME_JOB_SERVICE:
-        from ..infrastructure.uow.unit_of_work import UnitOfWork
-        from ..models.db import AsyncSessionLocal
-        from .part_time_job_service_new import PartTimeJobService as PartTimeJobServiceNew
+    from ..infrastructure.uow.unit_of_work import UnitOfWork
+    from ..models.db import AsyncSessionLocal
+    from .part_time_job_service_new import PartTimeJobService as PartTimeJobServiceNew
 
-        def session_factory():
-            return AsyncSessionLocal()
+    def session_factory():
+        return AsyncSessionLocal()
 
-        async with UnitOfWork(session_factory) as uow:
-            player = await get_unified_player(uow.session, event)
-            if not player:
-                await work_locations_cmd.finish("⛔ 请先创建角色")
+    async with UnitOfWork(session_factory) as uow:
+        player = await get_unified_player(uow.session, event)
+        if not player:
+            await work_locations_cmd.finish("⛔ 请先创建角色")
 
-            part_time_job_service = PartTimeJobServiceNew(
-                player_repo=uow.players,
-                part_time_job_repo=uow.part_time_jobs,
-                job_location_repo=uow.job_locations,
-                player_job_stats_repo=uow.player_job_stats
-            )
+        part_time_job_service = PartTimeJobServiceNew(
+            player_repo=uow.players,
+            part_time_job_repo=uow.part_time_jobs,
+            job_location_repo=uow.job_locations,
+            player_job_stats_repo=uow.player_job_stats
+        )
 
-            locations = await part_time_job_service.get_job_locations_list()
-    else:
-        async with safe_session() as session:
-            player = await get_unified_player(session, event)
-            if not player:
-                await work_locations_cmd.finish("⛔ 请先创建角色")
-
-            locations = await PartTimeJobService.get_job_locations_list(session)
-
+        locations = await part_time_job_service.get_job_locations_list()
     if not locations:
         await work_locations_cmd.finish(message_add_head("❌ 暂无工作地点", event))
 
@@ -384,35 +317,26 @@ async def handle_work_locations(event: MessageEvent):
 @work_history_cmd.handle()
 async def handle_work_history(event: MessageEvent):
     """处理打工记录命令"""
-    if USE_NEW_PART_TIME_JOB_SERVICE:
-        from ..infrastructure.uow.unit_of_work import UnitOfWork
-        from ..models.db import AsyncSessionLocal
-        from .part_time_job_service_new import PartTimeJobService as PartTimeJobServiceNew
+    from ..infrastructure.uow.unit_of_work import UnitOfWork
+    from ..models.db import AsyncSessionLocal
+    from .part_time_job_service_new import PartTimeJobService as PartTimeJobServiceNew
 
-        def session_factory():
-            return AsyncSessionLocal()
+    def session_factory():
+        return AsyncSessionLocal()
 
-        async with UnitOfWork(session_factory) as uow:
-            player = await get_unified_player(uow.session, event)
-            if not player:
-                await work_history_cmd.finish("⛔ 请先创建角色")
+    async with UnitOfWork(session_factory) as uow:
+        player = await get_unified_player(uow.session, event)
+        if not player:
+            await work_history_cmd.finish("⛔ 请先创建角色")
 
-            part_time_job_service = PartTimeJobServiceNew(
-                player_repo=uow.players,
-                part_time_job_repo=uow.part_time_jobs,
-                job_location_repo=uow.job_locations,
-                player_job_stats_repo=uow.player_job_stats
-            )
+        part_time_job_service = PartTimeJobServiceNew(
+            player_repo=uow.players,
+            part_time_job_repo=uow.part_time_jobs,
+            job_location_repo=uow.job_locations,
+            player_job_stats_repo=uow.player_job_stats
+        )
 
-            history = await part_time_job_service.get_player_job_history(player.id, 5)
-    else:
-        async with safe_session() as session:
-            player = await get_unified_player(session, event)
-            if not player:
-                await work_history_cmd.finish("⛔ 请先创建角色")
-
-            history = await PartTimeJobService.get_player_job_history(session, player.id, 5)
-
+        history = await part_time_job_service.get_player_job_history(player.id, 5)
     if not history:
         await work_history_cmd.finish(message_add_head("📝 暂无打工记录", event))
 
@@ -436,35 +360,26 @@ async def handle_work_history(event: MessageEvent):
 @work_stats_cmd.handle()
 async def handle_work_stats(event: MessageEvent):
     """处理打工统计命令"""
-    if USE_NEW_PART_TIME_JOB_SERVICE:
-        from ..infrastructure.uow.unit_of_work import UnitOfWork
-        from ..models.db import AsyncSessionLocal
-        from .part_time_job_service_new import PartTimeJobService as PartTimeJobServiceNew
+    from ..infrastructure.uow.unit_of_work import UnitOfWork
+    from ..models.db import AsyncSessionLocal
+    from .part_time_job_service_new import PartTimeJobService as PartTimeJobServiceNew
 
-        def session_factory():
-            return AsyncSessionLocal()
+    def session_factory():
+        return AsyncSessionLocal()
 
-        async with UnitOfWork(session_factory) as uow:
-            player = await get_unified_player(uow.session, event)
-            if not player:
-                await work_stats_cmd.finish("⛔ 请先创建角色")
+    async with UnitOfWork(session_factory) as uow:
+        player = await get_unified_player(uow.session, event)
+        if not player:
+            await work_stats_cmd.finish("⛔ 请先创建角色")
 
-            part_time_job_service = PartTimeJobServiceNew(
-                player_repo=uow.players,
-                part_time_job_repo=uow.part_time_jobs,
-                job_location_repo=uow.job_locations,
-                player_job_stats_repo=uow.player_job_stats
-            )
+        part_time_job_service = PartTimeJobServiceNew(
+            player_repo=uow.players,
+            part_time_job_repo=uow.part_time_jobs,
+            job_location_repo=uow.job_locations,
+            player_job_stats_repo=uow.player_job_stats
+        )
 
-            stats = await part_time_job_service._player_job_stats_repo.get_or_create(player.id)
-    else:
-        async with safe_session() as session:
-            player = await get_unified_player(session, event)
-            if not player:
-                await work_stats_cmd.finish("⛔ 请先创建角色")
-
-            stats = await PartTimeJobService.get_or_create_player_stats(session, player.id)
-
+        stats = await part_time_job_service._player_job_stats_repo.get_or_create(player.id)
     # 计算平均收入
     avg_income = stats.total_earnings // max(stats.total_jobs_completed, 1)
 
@@ -480,12 +395,8 @@ async def handle_work_stats(event: MessageEvent):
     ]
 
     # 获取JOB_TYPES（新旧版本都有）
-    if USE_NEW_PART_TIME_JOB_SERVICE:
-        from .part_time_job_service_new import PartTimeJobService as PartTimeJobServiceNew
-        job_types = PartTimeJobServiceNew.JOB_TYPES
-    else:
-        job_types = PartTimeJobService.JOB_TYPES
-
+    from .part_time_job_service_new import PartTimeJobService as PartTimeJobServiceNew
+    job_types = PartTimeJobServiceNew.JOB_TYPES
     if stats.favorite_job_type and stats.favorite_job_type in job_types:
         fav_job = job_types[stats.favorite_job_type]
         lines.append(f"❤️ 偏好工作：{fav_job['name']}")

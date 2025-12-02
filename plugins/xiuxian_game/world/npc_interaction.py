@@ -15,12 +15,7 @@ from ..utils import message_add_head
 from .location_service import LocationService
 from .npc_service import NPCService
 
-# ==================== Feature Flag ====================
-# 设置为True使用新版DI架构的NPCService，False使用旧版本
-USE_NEW_NPC_SERVICE = True
-# 设置为True使用新版DI架构的LocationService，False使用旧版本
-USE_NEW_LOCATION_SERVICE = True
-# =====================================================
+# 使用DI架构的NPCService和LocationService
 
 
 # ==================== NPC交互命令 ====================
@@ -65,10 +60,9 @@ async def handle_npc_interaction(event: MessageEvent, args: Message = CommandArg
             await interact_cmd.finish("⛔ 你在诡域中，无法与现实世界的NPC交互")
 
         # 初始化NPC服务
-        if USE_NEW_NPC_SERVICE:
-            from ..infrastructure.repositories.npc_repository import NPCRepository
-            from .npc_service_new import NPCService as NPCServiceNew
-            npc_service = NPCServiceNew(session=session, npc_repo=NPCRepository(session))
+        from ..infrastructure.repositories.npc_repository import NPCRepository
+        from .npc_service_new import NPCService as NPCServiceNew
+        npc_service = NPCServiceNew(session=session, npc_repo=NPCRepository(session))
 
         # 获取当前位置
         current_x, current_y = player.get_current_coordinates()
@@ -76,18 +70,14 @@ async def handle_npc_interaction(event: MessageEvent, args: Message = CommandArg
 
         # 查找当前位置的地点
         location = await LocationService.get_location_by_coordinates(
-            session, current_x, current_y, current_region
+        session, current_x, current_y, current_region
         )
 
         if not location:
             await interact_cmd.finish("⛔ 当前位置没有NPC可以交互")
 
         # 查找指定名称的NPC
-        if USE_NEW_NPC_SERVICE:
-            npc = await npc_service.get_npc_by_name(args_text, location.id)
-        else:
-            npc = await NPCService.get_npc_by_name(session, args_text, location.id)
-
+        npc = await npc_service.get_npc_by_name(args_text, location.id)
         if not npc:
             # 尝试智能匹配（支持带点号的名字）
             from .attack_command import find_npc_by_smart_match
@@ -116,11 +106,7 @@ async def handle_npc_interaction(event: MessageEvent, args: Message = CommandArg
                 await interact_cmd.finish(message_add_head(msg, event))
 
         # 获取NPC交互信息
-        if USE_NEW_NPC_SERVICE:
-            interaction_info = await npc_service.get_npc_interaction_info(npc)
-        else:
-            interaction_info = await NPCService.get_npc_interaction_info(session, npc)
-
+        interaction_info = await npc_service.get_npc_interaction_info(npc)
         if not interaction_info["can_interact"]:
             await interact_cmd.finish(f"⛔ {interaction_info['message']}")
 
@@ -318,6 +304,8 @@ npc_list_cmd = on_command("NPC列表", aliases={"npc列表", "查看NPC"}, block
 @npc_list_cmd.handle()
 async def handle_npc_list(event: MessageEvent):
     """显示当前位置的NPC列表"""
+    from ..platform_utils import get_unified_player
+
     async with safe_session() as session:
         player: Player = await get_unified_player(session, event)
         if not player:

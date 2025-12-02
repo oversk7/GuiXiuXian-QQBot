@@ -9,7 +9,7 @@ from ..models.player import Player
 from ..models.daily_task import DailyTask, TaskStatus
 from ..utils import message_add_head
 from ..platform_utils import get_unified_player
-from .service import DailyTaskService
+from .service_new import DailyTaskService
 from ..battle.integration_helper import BattleIntegrationHelper
 import time
 import random
@@ -17,8 +17,6 @@ from datetime import date
 
 # ==================== Feature Flag ====================
 # 设置为True使用新版DI架构的DailyTaskService，False使用旧版本
-USE_NEW_DAILY_TASK_SERVICE = True
-USE_NEW_GUILD_TASK_SERVICE = True
 # =====================================================
 
 
@@ -209,28 +207,23 @@ async def handle_complete_task(event: MessageEvent):
         if success:
             # 更新委托完成统计（用于公会任务）
             if player.guild_id:
-                if USE_NEW_GUILD_TASK_SERVICE:
-                    from ..guild.guild_task_service_new import GuildTaskService as GuildTaskServiceNew
-                    from ..infrastructure.repositories.player_repository import PlayerRepository
-                    from ..infrastructure.repositories.guild_repository import GuildRepository
-                    from ..infrastructure.repositories.player_task_stats_repository import PlayerTaskStatsRepository
-                    from ..infrastructure.repositories.guild_task_record_repository import GuildTaskRecordRepository
-                    from ..infrastructure.repositories.player_donation_log_repository import PlayerDonationLogRepository
-                    from ..infrastructure.repositories.guild_building_repository import GuildBuildingRepository
+                from ..guild.guild_task_service_new import GuildTaskService as GuildTaskServiceNew
+                from ..infrastructure.repositories.player_repository import PlayerRepository
+                from ..infrastructure.repositories.guild_repository import GuildRepository
+                from ..infrastructure.repositories.player_task_stats_repository import PlayerTaskStatsRepository
+                from ..infrastructure.repositories.guild_task_record_repository import GuildTaskRecordRepository
+                from ..infrastructure.repositories.player_donation_log_repository import PlayerDonationLogRepository
+                from ..infrastructure.repositories.guild_building_repository import GuildBuildingRepository
 
-                    task_service = GuildTaskServiceNew(
-                        player_repo=PlayerRepository(session),
-                        guild_repo=GuildRepository(session),
-                        player_task_stats_repo=PlayerTaskStatsRepository(session),
-                        guild_task_record_repo=GuildTaskRecordRepository(session),
-                        player_donation_log_repo=PlayerDonationLogRepository(session),
-                        guild_building_repo=GuildBuildingRepository(session),
-                    )
-                    await task_service.update_commission_stats(player.id)
-                else:
-                    from ..guild.guild_task_service import GuildTaskService
-                    await GuildTaskService.update_commission_stats(session, player.id)
-
+                task_service = GuildTaskServiceNew(
+                    player_repo=PlayerRepository(session),
+                    guild_repo=GuildRepository(session),
+                    player_task_stats_repo=PlayerTaskStatsRepository(session),
+                    guild_task_record_repo=GuildTaskRecordRepository(session),
+                    player_donation_log_repo=PlayerDonationLogRepository(session),
+                    guild_building_repo=GuildBuildingRepository(session),
+                )
+                await task_service.update_commission_stats(player.id)
             await session.commit()
 
             # 构建完成消息

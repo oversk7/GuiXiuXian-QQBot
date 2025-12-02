@@ -16,12 +16,12 @@ from ..models.db import safe_session
 from ..models import Player, ItemInstance
 from ..config import config
 from ..utils import message_add_head
-from .gem_socket_service import GemSocketService
+from .gem_socket_service_new import GemSocketService
 from .equipment_commands import find_equipment_by_input
+from ..platform_utils import get_unified_player
 
 # ==================== Feature Flag ====================
 # 设置为True使用新版DI架构的GemSocketService，False使用旧版本
-USE_NEW_GEM_SOCKET_SERVICE = True
 # =====================================================
 
 
@@ -40,7 +40,7 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
             await gem_slots_cmd.finish("⛔ 请先创建角色")
 
         # 查找装备
-        equip = await _find_equipment(session, event.get_user_id(), arg)
+        equip = await find_equipment_by_input(session, player.id, arg)
         if not equip:
             await gem_slots_cmd.finish("⛔ 未找到指定装备")
 
@@ -129,21 +129,15 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
         gem_item_id = gem_config.item_id
 
         # 执行镶嵌
-        if USE_NEW_GEM_SOCKET_SERVICE:
-            from ..infrastructure.repositories.item_repository import ItemRepository
-            from ..infrastructure.repositories.player_repository import PlayerRepository
-            from .gem_socket_service_new import GemSocketService as GemSocketServiceNew
+        from ..infrastructure.repositories.item_repository import ItemRepository
+        from ..infrastructure.repositories.player_repository import PlayerRepository
+        from .gem_socket_service_new import GemSocketService as GemSocketServiceNew
 
-            service = GemSocketServiceNew(
-                item_repo=ItemRepository(session),
-                player_repo=PlayerRepository(session),
-            )
-            success, message = await service.socket_gem(equip, gem_item_id, slot_index, player)
-        else:
-            success, message = await GemSocketService.socket_gem(
-                session, equip, gem_item_id, slot_index, player
-            )
-
+        service = GemSocketServiceNew(
+            item_repo=ItemRepository(session),
+            player_repo=PlayerRepository(session),
+        )
+        success, message = await service.socket_gem(equip, gem_item_id, slot_index, player)
         await session.commit()
 
         if success:
@@ -189,21 +183,15 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
             await remove_gem_cmd.finish("⛔ 未找到指定装备，请使用装备栏中显示的编号或装备名称")
 
         # 执行拆卸
-        if USE_NEW_GEM_SOCKET_SERVICE:
-            from ..infrastructure.repositories.item_repository import ItemRepository
-            from ..infrastructure.repositories.player_repository import PlayerRepository
-            from .gem_socket_service_new import GemSocketService as GemSocketServiceNew
+        from ..infrastructure.repositories.item_repository import ItemRepository
+        from ..infrastructure.repositories.player_repository import PlayerRepository
+        from .gem_socket_service_new import GemSocketService as GemSocketServiceNew
 
-            service = GemSocketServiceNew(
-                item_repo=ItemRepository(session),
-                player_repo=PlayerRepository(session),
-            )
-            success, message = await service.remove_gem(equip, slot_index, player)
-        else:
-            success, message = await GemSocketService.remove_gem(
-                session, equip, slot_index, player
-            )
-
+        service = GemSocketServiceNew(
+            item_repo=ItemRepository(session),
+            player_repo=PlayerRepository(session),
+        )
+        success, message = await service.remove_gem(equip, slot_index, player)
         await session.commit()
 
         if success:

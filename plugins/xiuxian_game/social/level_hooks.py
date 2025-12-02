@@ -7,9 +7,7 @@ from ..player.invite_reward_service import InviteRewardService
 
 # ==================== Feature Flag ====================
 # 设置为True使用新版DI架构的InviteRewardService，False使用旧版本
-USE_NEW_INVITE_REWARD_SERVICE = True
 # 设置为True使用新版DI架构的MentorshipService，False使用旧版本
-USE_NEW_MENTORSHIP_SERVICE = True
 # =====================================================
 
 
@@ -26,40 +24,31 @@ async def on_player_level_up(session: AsyncSession, player_id: str, old_level: i
     level_increase = new_level - old_level
     if level_increase > 0:
         # 更新师父的恩师点
-        if USE_NEW_MENTORSHIP_SERVICE:
-            from ..infrastructure.repositories.player_repository import PlayerRepository
-            from ..infrastructure.repositories.social_application_repository import SocialApplicationRepository
-            from ..infrastructure.repositories.mentorship_repository import MentorshipRepository
-            from .mentorship_service_new import MentorshipService as MentorshipServiceNew
+        from ..infrastructure.repositories.player_repository import PlayerRepository
+        from ..infrastructure.repositories.social_application_repository import SocialApplicationRepository
+        from ..infrastructure.repositories.mentorship_repository import MentorshipRepository
+        from .mentorship_service_new import MentorshipService as MentorshipServiceNew
 
-            service = MentorshipServiceNew(
-                player_repo=PlayerRepository(session),
-                social_app_repo=SocialApplicationRepository(session),
-                mentorship_repo=MentorshipRepository(session),
-            )
-            await service.update_mentor_points(player_id, level_increase)
-        else:
-            await MentorshipService.update_mentor_points(session, player_id, level_increase)
-
+        service = MentorshipServiceNew(
+            player_repo=PlayerRepository(session),
+            social_app_repo=SocialApplicationRepository(session),
+            mentorship_repo=MentorshipRepository(session),
+        )
+        await service.update_mentor_points(player_id, level_increase)
         # 检查并发放邀请奖励
-        if USE_NEW_INVITE_REWARD_SERVICE:
-            # 新版本: 使用DI架构（使用传入的session，因为调用方已管理事务）
-            from ..player.invite_reward_service_new import InviteRewardService as InviteRewardServiceNew
-            from ..infrastructure.repositories.player_repository import PlayerRepository
-            from ..infrastructure.repositories.invite_reward_repository import InviteRewardRepository
+        # 新版本: 使用DI架构（使用传入的session，因为调用方已管理事务）
+        from ..player.invite_reward_service_new import InviteRewardService as InviteRewardServiceNew
+        from ..infrastructure.repositories.player_repository import PlayerRepository
+        from ..infrastructure.repositories.invite_reward_repository import InviteRewardRepository
 
-            # 使用传入的session创建Repository（不创建新的UoW，保持事务一致性）
-            invite_reward_service = InviteRewardServiceNew(
-                invite_reward_repo=InviteRewardRepository(session),
-                player_repo=PlayerRepository(session)
-            )
+        # 使用传入的session创建Repository（不创建新的UoW，保持事务一致性）
+        invite_reward_service = InviteRewardServiceNew(
+            invite_reward_repo=InviteRewardRepository(session),
+            player_repo=PlayerRepository(session)
+        )
 
-            # 使用新版本
-            reward_messages = await invite_reward_service.check_and_grant_level_rewards(player_id, new_level)
-        else:
-            # 旧版本: 使用静态方法
-            reward_messages = await InviteRewardService.check_and_grant_level_rewards(session, player_id, new_level)
-
+        # 使用新版本
+        reward_messages = await invite_reward_service.check_and_grant_level_rewards(player_id, new_level)
         # 返回奖励消息，供调用方使用
         return reward_messages
 

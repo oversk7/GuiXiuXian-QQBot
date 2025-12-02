@@ -12,7 +12,6 @@ from ..player.realm_utils import realm_by_level_and_reincarnation
 
 # ==================== Feature Flag ====================
 # 设置为True使用新版DI架构的MentorshipService，False使用旧版本
-USE_NEW_MENTORSHIP_SERVICE = True
 # =====================================================
 
 
@@ -62,7 +61,26 @@ mentor_ranking_cmd = on_command("恩师榜", aliases={"师父榜", "恩师排行
 async def handle_mentor_ranking(event: MessageEvent):
     async with safe_session() as session:
         # 获取恩师点排行榜
-        if USE_NEW_MENTORSHIP_SERVICE:
+        from ..infrastructure.repositories.player_repository import PlayerRepository
+        from ..infrastructure.repositories.social_application_repository import SocialApplicationRepository
+        from ..infrastructure.repositories.mentorship_repository import MentorshipRepository
+        from .mentorship_service_new import MentorshipService as MentorshipServiceNew
+
+        service = MentorshipServiceNew(
+            player_repo=PlayerRepository(session),
+            social_app_repo=SocialApplicationRepository(session),
+            mentorship_repo=MentorshipRepository(session),
+        )
+        rankings = await service.get_mentor_points_ranking(10)
+        if not rankings:
+            await mentor_ranking_cmd.finish("暂无恩师榜数据")
+        
+        # 使用境界映射函数
+
+        lines = ["🎓 恩师排行榜", "▃▃▃▃▃▃▃▃▃▃"]
+
+        for idx, (master, total_points) in enumerate(rankings, 1):
+            # 获取该师父的徒弟数量
             from ..infrastructure.repositories.player_repository import PlayerRepository
             from ..infrastructure.repositories.social_application_repository import SocialApplicationRepository
             from ..infrastructure.repositories.mentorship_repository import MentorshipRepository
@@ -73,33 +91,7 @@ async def handle_mentor_ranking(event: MessageEvent):
                 social_app_repo=SocialApplicationRepository(session),
                 mentorship_repo=MentorshipRepository(session),
             )
-            rankings = await service.get_mentor_points_ranking(10)
-        else:
-            rankings = await MentorshipService.get_mentor_points_ranking(session, 10)
-
-        if not rankings:
-            await mentor_ranking_cmd.finish("暂无恩师榜数据")
-        
-        # 使用境界映射函数
-
-        lines = ["🎓 恩师排行榜", "▃▃▃▃▃▃▃▃▃▃"]
-
-        for idx, (master, total_points) in enumerate(rankings, 1):
-            # 获取该师父的徒弟数量
-            if USE_NEW_MENTORSHIP_SERVICE:
-                from ..infrastructure.repositories.player_repository import PlayerRepository
-                from ..infrastructure.repositories.social_application_repository import SocialApplicationRepository
-                from ..infrastructure.repositories.mentorship_repository import MentorshipRepository
-                from .mentorship_service_new import MentorshipService as MentorshipServiceNew
-
-                service = MentorshipServiceNew(
-                    player_repo=PlayerRepository(session),
-                    social_app_repo=SocialApplicationRepository(session),
-                    mentorship_repo=MentorshipRepository(session),
-                )
-                disciples = await service.get_disciples(master.id)
-            else:
-                disciples = await MentorshipService.get_disciples(session, master.id)
+            disciples = await service.get_disciples(master.id)
             disciple_count = len(disciples)
 
             # 使用emoji装饰

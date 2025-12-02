@@ -134,7 +134,7 @@ stock_buy_cmd_old = on_command("投资气运_旧", block=True, priority=5)
 async def handle_stock_buy_old(event: MessageEvent, args = CommandArg()):
     """旧版本：使用静态方法 + safe_session"""
     from ..models.db import safe_session
-    from .stock_service import StockService
+    from .stock_service_legacy import StockService
 
     args_list = str(args).strip().split()
     if len(args_list) != 2:
@@ -214,7 +214,6 @@ async def handle_stock_buy_new(event: MessageEvent, args = CommandArg()):
 # ==================== Feature Flag模式（推荐） ====================
 
 # 在stock_commands.py顶部添加：
-USE_NEW_STOCK_SERVICE = True  # 切换开关
 
 stock_buy_cmd = on_command("投资气运", block=True, priority=5)
 
@@ -231,44 +230,29 @@ async def handle_stock_buy(event: MessageEvent, args = CommandArg()):
     except ValueError:
         await stock_buy_cmd.finish("⛔ 数量必须是整数")
 
-    if USE_NEW_STOCK_SERVICE:
-        # ===== 新版本路径 =====
-        from ..models.db import AsyncSessionLocal
-        from ..infrastructure.uow.unit_of_work import UnitOfWork
-        from .stock_service_new import StockService
+    # ===== 新版本路径 =====
+    from ..models.db import AsyncSessionLocal
+    from ..infrastructure.uow.unit_of_work import UnitOfWork
+    from .stock_service_new import StockService
 
-        def session_factory():
-            return AsyncSessionLocal()
+    def session_factory():
+        return AsyncSessionLocal()
 
-        async with UnitOfWork(session_factory) as uow:
-            stock_service = StockService(
-                player_repo=uow.players,
-                stock_repo=uow.stocks,
-                stock_holding_repo=uow.stock_holdings,
-                stock_transaction_repo=uow.stock_transactions,
-                bank_account_repo=uow.bank_accounts
-            )
+    async with UnitOfWork(session_factory) as uow:
+        stock_service = StockService(
+            player_repo=uow.players,
+            stock_repo=uow.stocks,
+            stock_holding_repo=uow.stock_holdings,
+            stock_transaction_repo=uow.stock_transactions,
+            bank_account_repo=uow.bank_accounts
+        )
 
-            success, message = await stock_service.buy_stock(
-                player_id=event.get_user_id(),
-                stock_symbol=stock_symbol,
-                shares=shares,
-                use_bank=False
-            )
-    else:
-        # ===== 旧版本路径 =====
-        from ..models.db import safe_session
-        from .stock_service import StockService
-
-        async with safe_session() as session:
-            success, message = await StockService.buy_stock(
-                session=session,
-                player_id=event.get_user_id(),
-                stock_symbol=stock_symbol,
-                shares=shares,
-                use_bank=False
-            )
-
+        success, message = await stock_service.buy_stock(
+            player_id=event.get_user_id(),
+            stock_symbol=stock_symbol,
+            shares=shares,
+            use_bank=False
+        )
     # 统一返回
     if success:
         await stock_buy_cmd.finish(f"✅ {message}")

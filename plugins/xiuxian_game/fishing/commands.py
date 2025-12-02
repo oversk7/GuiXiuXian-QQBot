@@ -13,11 +13,10 @@ from ..models.fishing_record import FishingRecord, FishingStats
 from ..models.inventory import ItemInstance
 from ..utils import message_add_head
 from ..config import config
-from .service import FishingService
+from .service_new import FishingService
 
 # ==================== Feature Flag ====================
 # 设置为True使用新版DI架构的FishingService，False使用旧版本
-USE_NEW_FISHING_SERVICE = True
 # =====================================================
 
 
@@ -39,21 +38,17 @@ async def _(event: MessageEvent):
                     await fishing_cmd.finish("⛔ 请先创建角色")
 
             # 执行钓鱼
-            if USE_NEW_FISHING_SERVICE:
-                from ..infrastructure.repositories.fishing_record_repository import FishingRecordRepository
-                from ..infrastructure.repositories.fishing_stats_repository import FishingStatsRepository
-                from ..infrastructure.repositories.item_repository import ItemRepository
-                from .service_new import FishingService as FishingServiceNew
+            from ..infrastructure.repositories.fishing_record_repository import FishingRecordRepository
+            from ..infrastructure.repositories.fishing_stats_repository import FishingStatsRepository
+            from ..infrastructure.repositories.item_repository import ItemRepository
+            from .service_new import FishingService as FishingServiceNew
 
-                service = FishingServiceNew(
-                    fishing_record_repo=FishingRecordRepository(session),
-                    fishing_stats_repo=FishingStatsRepository(session),
-                    item_repo=ItemRepository(session),
-                )
-                result = await service.do_fishing(player)
-            else:
-                result = await FishingService.do_fishing(session, player)
-
+            service = FishingServiceNew(
+                fishing_record_repo=FishingRecordRepository(session),
+                fishing_stats_repo=FishingStatsRepository(session),
+                item_repo=ItemRepository(session),
+            )
+            result = await service.do_fishing(player)
             if not result["success"]:
                 await fishing_cmd.finish(message_add_head(result["message"], event))
         except TypeError as e:
@@ -156,21 +151,17 @@ fishing_leaderboard_cmd = on_command("钓鱼排行", aliases={"钓鱼榜"}, bloc
 async def _(event: MessageEvent):
     """查看钓鱼排行榜"""
     async with safe_session() as session:
-        if USE_NEW_FISHING_SERVICE:
-            from ..infrastructure.repositories.fishing_record_repository import FishingRecordRepository
-            from ..infrastructure.repositories.fishing_stats_repository import FishingStatsRepository
-            from ..infrastructure.repositories.item_repository import ItemRepository
-            from .service_new import FishingService as FishingServiceNew
+        from ..infrastructure.repositories.fishing_record_repository import FishingRecordRepository
+        from ..infrastructure.repositories.fishing_stats_repository import FishingStatsRepository
+        from ..infrastructure.repositories.item_repository import ItemRepository
+        from .service_new import FishingService as FishingServiceNew
 
-            service = FishingServiceNew(
-                fishing_record_repo=FishingRecordRepository(session),
-                fishing_stats_repo=FishingStatsRepository(session),
-                item_repo=ItemRepository(session),
-            )
-            leaderboard = await service.get_fishing_leaderboard(10)
-        else:
-            leaderboard = await FishingService.get_fishing_leaderboard(session, 10)
-        
+        service = FishingServiceNew(
+            fishing_record_repo=FishingRecordRepository(session),
+            fishing_stats_repo=FishingStatsRepository(session),
+            item_repo=ItemRepository(session),
+        )
+        leaderboard = await service.get_fishing_leaderboard(10)
         if not leaderboard:
             await fishing_leaderboard_cmd.finish(message_add_head("📊 暂无钓鱼排行数据", event))
         
@@ -218,21 +209,17 @@ async def _(event: MessageEvent):
                 await fishing_status_cmd.finish("⛔ 请先创建角色")
 
         # 检查钓鱼状态
-        if USE_NEW_FISHING_SERVICE:
-            from ..infrastructure.repositories.fishing_record_repository import FishingRecordRepository
-            from ..infrastructure.repositories.fishing_stats_repository import FishingStatsRepository
-            from ..infrastructure.repositories.item_repository import ItemRepository
-            from .service_new import FishingService as FishingServiceNew
+        from ..infrastructure.repositories.fishing_record_repository import FishingRecordRepository
+        from ..infrastructure.repositories.fishing_stats_repository import FishingStatsRepository
+        from ..infrastructure.repositories.item_repository import ItemRepository
+        from .service_new import FishingService as FishingServiceNew
 
-            service = FishingServiceNew(
-                fishing_record_repo=FishingRecordRepository(session),
-                fishing_stats_repo=FishingStatsRepository(session),
-                item_repo=ItemRepository(session),
-            )
-            can_fish, reason = await service.can_fishing(player)
-        else:
-            can_fish, reason = await FishingService.can_fishing(session, player)
-        
+        service = FishingServiceNew(
+            fishing_record_repo=FishingRecordRepository(session),
+            fishing_stats_repo=FishingStatsRepository(session),
+            item_repo=ItemRepository(session),
+        )
+        can_fish, reason = await service.can_fishing(player)
         # 获取统计信息
         stats = await FishingRecord.get_player_fishing_stats(session, player.id)
         
@@ -368,7 +355,7 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
 
         # 检查是否为鱼类物品（通过item_id判断）
         # 所有鱼类物品都在钓鱼系统的鱼类列表中
-        from .service import FishingService
+        from .service_new import FishingService
         all_fish_ids = []
         for rarity_config in FishingService.FISH_RARITY_CONFIG.values():
             all_fish_ids.extend(rarity_config["fish_list"])

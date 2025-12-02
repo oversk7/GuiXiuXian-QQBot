@@ -8,8 +8,6 @@ import random
 from ..utils import luck_prob
 
 # Feature Flag（在文件顶部靠近其他导入的位置）
-USE_NEW_GUILD_TASK_SERVICE = True
-
 sign = on_command("签到", block=True, priority=5)
 
 @sign.handle()
@@ -153,79 +151,51 @@ async def handle_sign(event: MessageEvent):
             # 导入公会相关服务
             from ..models.guild_task_record import GuildTaskType
 
-            if USE_NEW_GUILD_TASK_SERVICE:
-                from ..guild.guild_task_service_new import GuildTaskService as GuildTaskServiceNew
-                from ..guild.guild_economy_service_new import GuildEconomyService as GuildEconomyServiceNew
-                from ..infrastructure.repositories.player_repository import PlayerRepository
-                from ..infrastructure.repositories.guild_repository import GuildRepository
-                from ..infrastructure.repositories.player_task_stats_repository import PlayerTaskStatsRepository
-                from ..infrastructure.repositories.guild_task_record_repository import GuildTaskRecordRepository
-                from ..infrastructure.repositories.player_donation_log_repository import PlayerDonationLogRepository
-                from ..infrastructure.repositories.guild_building_repository import GuildBuildingRepository
+            from ..guild.guild_task_service_new import GuildTaskService as GuildTaskServiceNew
+            from ..guild.guild_economy_service_new import GuildEconomyService as GuildEconomyServiceNew
+            from ..infrastructure.repositories.player_repository import PlayerRepository
+            from ..infrastructure.repositories.guild_repository import GuildRepository
+            from ..infrastructure.repositories.player_task_stats_repository import PlayerTaskStatsRepository
+            from ..infrastructure.repositories.guild_task_record_repository import GuildTaskRecordRepository
+            from ..infrastructure.repositories.player_donation_log_repository import PlayerDonationLogRepository
+            from ..infrastructure.repositories.guild_building_repository import GuildBuildingRepository
 
-                # 获取公会签到任务配置
-                task_config = GuildTaskServiceNew.DAILY_TASKS["daily_sign"]
-                points_reward = task_config["points_reward"]
-                base_exp = task_config["base_exp"]
+            # 获取公会签到任务配置
+            task_config = GuildTaskServiceNew.DAILY_TASKS["daily_sign"]
+            points_reward = task_config["points_reward"]
+            base_exp = task_config["base_exp"]
 
-                # 发放公会积分和贡献
-                player.gold2 += points_reward
-                player.guild_contribution += points_reward
+            # 发放公会积分和贡献
+            player.gold2 += points_reward
+            player.guild_contribution += points_reward
 
-                # 添加公会经验（会根据公会建筑倍率动态计算）
-                guild_economy_service = GuildEconomyServiceNew(
-                    guild_repo=GuildRepository(session),
-                    player_repo=PlayerRepository(session),
-                    donation_log_repo=PlayerDonationLogRepository(session),
-                    building_repo=GuildBuildingRepository(session),
-                )
-                guild_exp_gained = await guild_economy_service.add_guild_experience(
-                    player.guild_id, base_exp
-                )
+            # 添加公会经验（会根据公会建筑倍率动态计算）
+            guild_economy_service = GuildEconomyServiceNew(
+                guild_repo=GuildRepository(session),
+                player_repo=PlayerRepository(session),
+                donation_log_repo=PlayerDonationLogRepository(session),
+                building_repo=GuildBuildingRepository(session),
+            )
+            guild_exp_gained = await guild_economy_service.add_guild_experience(
+                player.guild_id, base_exp
+            )
 
-                # 记录签到任务完成
-                task_service = GuildTaskServiceNew(
-                    player_repo=PlayerRepository(session),
-                    guild_repo=GuildRepository(session),
-                    player_task_stats_repo=PlayerTaskStatsRepository(session),
-                    guild_task_record_repo=GuildTaskRecordRepository(session),
-                    player_donation_log_repo=PlayerDonationLogRepository(session),
-                    guild_building_repo=GuildBuildingRepository(session),
-                )
-                await task_service.record_task_completion(
-                    player.id, player.guild_id, GuildTaskType.DAILY_SIGN,
-                    points_reward, guild_exp_gained
-                )
+            # 记录签到任务完成
+            task_service = GuildTaskServiceNew(
+                player_repo=PlayerRepository(session),
+                guild_repo=GuildRepository(session),
+                player_task_stats_repo=PlayerTaskStatsRepository(session),
+                guild_task_record_repo=GuildTaskRecordRepository(session),
+                player_donation_log_repo=PlayerDonationLogRepository(session),
+                guild_building_repo=GuildBuildingRepository(session),
+            )
+            await task_service.record_task_completion(
+                player.id, player.guild_id, GuildTaskType.DAILY_SIGN,
+                points_reward, guild_exp_gained
+            )
 
-                # 更新日常任务完成统计
-                await task_service.update_daily_task_completion_stats(player.id)
-            else:
-                from ..guild.guild_economy_service import GuildEconomyService
-                from ..guild.guild_task_service import GuildTaskService
-
-                # 获取公会签到任务配置
-                task_config = GuildTaskService.DAILY_TASKS["daily_sign"]
-                points_reward = task_config["points_reward"]
-                base_exp = task_config["base_exp"]
-
-                # 发放公会积分和贡献
-                player.gold2 += points_reward
-                player.guild_contribution += points_reward
-
-                # 添加公会经验（会根据公会建筑倍率动态计算）
-                guild_exp_gained = await GuildEconomyService.add_guild_experience(
-                    session, player.guild_id, base_exp
-                )
-
-                # 记录签到任务完成
-                await GuildTaskService.record_task_completion(
-                    session, player.id, player.guild_id, GuildTaskType.DAILY_SIGN,
-                    points_reward, guild_exp_gained
-                )
-
-                # 更新日常任务完成统计
-                await GuildTaskService.update_daily_task_completion_stats(session, player.id)
-
+            # 更新日常任务完成统计
+            await task_service.update_daily_task_completion_stats(player.id)
             guild_msg = f"\n🏰 公会奖励：积分+{points_reward} 公会经验+{guild_exp_gained}"
 
         # 先提交数据库事务，确保数据保存成功

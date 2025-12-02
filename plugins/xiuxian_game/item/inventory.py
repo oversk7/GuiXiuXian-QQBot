@@ -708,7 +708,7 @@ async def handle_drop_item(event: MessageEvent, args: Message = CommandArg()):
         # 检查是否为鱼类物品
         is_fish = False
         try:
-            from ..fishing.service import FishingService
+            from ..fishing.service_new import FishingService
             all_fish_ids = []
             for rarity_config in FishingService.FISH_RARITY_CONFIG.values():
                 all_fish_ids.extend(rarity_config["fish_list"])

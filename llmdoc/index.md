@@ -1,7 +1,7 @@
 # 诡修仙项目文档系统
 
 **文档版本**: 3.1
-**最后更新**: 2025-12-01
+**最后更新**: 2025-12-02
 **文档受众**: LLM代理和项目开发者
 **文档状态**: 生产就绪，包含游戏平衡分析
 
@@ -9,7 +9,7 @@
 
 ## 1. 项目概述
 
-诡修仙是一个基于Nonebot2框架的QQ游戏机器人,采用异步SQLAlchemy ORM进行数据管理。项目包含165个Python文件、49个数据模型,实现了修炼、战斗、公会、经济、社交等15+子系统。
+诡修仙是一个基于Nonebot2框架的QQ游戏机器人,采用异步SQLAlchemy ORM进行数据管理。项目包含约142个核心Python文件、49个数据模型,实现了修炼、战斗、公会、经济、社交等15+子系统。
 
 **核心技术栈**:
 - Nonebot2 (QQ机器人框架)
@@ -31,7 +31,8 @@
 ### `/architecture/` - 系统架构 (LLM检索地图)
 回答"系统如何工作?":
 - `current-architecture.md` - 当前架构详细分析
-- `service-di-architecture.md` - Service DI架构实现
+- `service-di-architecture.md` - Service DI架构实现（Feature Flag移除前）
+- `service-di-final-implementation.md` - Service DI最终实现（Feature Flag已全部移除）
 - `attribute-system.md` - 属性系统架构
 - `battle-effect-bridge.md` - 战斗效果桥接器架构
 - `event-system-architecture.md` - 事件系统架构
@@ -42,11 +43,13 @@
 回答"如何执行X任务?":
 - `deploy-service-di.md` - 如何部署Service DI
 - `how-to-create-battle-effect-bridge.md` - 如何创建战斗效果桥接器
-- `feature-flag-control.md` - Feature Flag控制指南
 - `how-to-add-effect.md` - 如何添加新效果
 - `event-system-guide.md` - 事件系统使用指南
 - `performance-optimization-summary.md` - 性能优化最佳实践
 - `how-to-implement-dialogue-npc.md` - 如何实施对话NPC系统
+
+**已归档** (Feature Flag已移除):
+- `feature-flag-control.md` - 已过时（Feature Flag已全部删除，详见2025-12-02代码清理记录）
 
 ### `/reference/` - 参考资料
 回答"X的具体定义是什么?":
@@ -56,6 +59,7 @@
 - `data-models.md` - 数据模型参考
 - `dialogue-npc-api.md` - 对话NPC系统API参考
 - `account-switching-api.md` - 账号切换系统API参考
+- `code-cleanup-2025-12-02.md` - 代码清理记录（Feature Flag删除、旧Service移除）
 
 ### `/agent/` - 代理调研文档
 LLM代理生成的调研和分析:
@@ -142,7 +146,7 @@ LLM代理生成的调研和分析:
 - 27/27 Services已完成DI改造
 - 47个Repository实现
 - UnitOfWork事务管理
-- Feature Flag全部启用
+- Feature Flag已全部移除（新架构成为唯一实现）
 
 **属性计算系统**:
 - AttributeCalculator统一入口
@@ -250,7 +254,9 @@ LLM代理生成的调研和分析:
 
 ---
 
-## 10. 文档清理说明 (2025-11-30)
+## 10. 代码清理说明
+
+### 文档清理 (2025-11-30)
 
 **清理目标**: 删除重构过程文档，只保留当前项目架构
 
@@ -261,6 +267,19 @@ LLM代理生成的调研和分析:
 4. `/guides/refactoring-roadmap.md` - 重构路线图
 5. `/agent/refactoring_plan_v4_completion_investigation.md` - 完成度调研
 6. `/agent/performance_bottleneck_investigation.md` - 性能瓶颈调研
+
+### 代码清理 (2025-12-02)
+
+**清理目标**: 删除Feature Flag定义、旧Service文件和相关条件分支
+
+**详细说明**: `/llmdoc/reference/code-cleanup-2025-12-02.md`
+
+**清理成果**:
+- 删除23个旧Service文件（5,681行代码）
+- 删除31个Feature Flag定义（100%清除）
+- 修改56个命令处理文件（移除if/else分支）
+- 总计删除7,690行代码
+- Python文件从297减少到274（-8%）
 
 **保留文档**:
 - 所有 `/architecture/` 架构文档 (5个)

@@ -26,7 +26,6 @@ from ..domain.effects.interfaces import EffectResult
 
 # ==================== Feature Flag ====================
 # 设置为True使用新版DI架构的EquipmentService，False使用旧版本
-USE_NEW_EQUIPMENT_SERVICE = True
 # =====================================================
 
 
@@ -516,13 +515,6 @@ class SweepDungeonService:
             await self._item_repo.update_extra_attrs_batch(equipped_items)
 
         if needs_recalc:
-            if USE_NEW_EQUIPMENT_SERVICE and self._equipment_service:
-                # 新版本: 使用DI架构的EquipmentService
-                await self._equipment_service.recalc_equipment_attributes(player)
-            else:
-                # 旧版本: 使用静态函数（需要session，但这里我们在DI架构中）
-                # 如果没有提供equipment_service，警告但不崩溃
-                if not self._equipment_service:
-                    durability_warnings.append("⚠️ 无法重算装备属性，请手动重新穿戴装备")
-
+            # 新版本: 使用DI架构的EquipmentService
+            await self._equipment_service.recalc_equipment_attributes(player)
         return durability_warnings

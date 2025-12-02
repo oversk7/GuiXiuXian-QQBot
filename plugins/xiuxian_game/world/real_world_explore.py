@@ -17,7 +17,6 @@ from ..cultivate.mansion import MansionService
 
 # ==================== Feature Flag ====================
 # 设置为True使用新版DI架构的LocationService，False使用旧版本
-USE_NEW_LOCATION_SERVICE = True
 # =====================================================
 
 
@@ -245,6 +244,8 @@ location_detail_cmd = on_command("地点详情", aliases={"地点信息"}, block
 @location_detail_cmd.handle()
 async def handle_location_detail(event: MessageEvent):
     """显示当前地点的详细信息"""
+    from ..platform_utils import get_unified_player
+
     async with safe_session() as session:
         player: Player = await get_unified_player(session, event)
         if not player:

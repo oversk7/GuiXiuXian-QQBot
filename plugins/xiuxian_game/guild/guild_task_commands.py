@@ -12,9 +12,6 @@ from .guild_task_service_new import GuildTaskService as GuildTaskServiceNew  # D
 from ..platform_utils import get_unified_player
 
 # Feature Flag（在文件顶部靠近其他常量的位置）
-USE_NEW_GUILD_TASK_SERVICE = True
-
-
 # ==================== 公会任务 ====================
 guild_task_cmd = on_command("公会任务", aliases={"公会日常", "公会周常"}, block=True, priority=5)
 
@@ -30,26 +27,22 @@ async def handle_guild_task(event: MessageEvent):
             await guild_task_cmd.finish("⛔ 你未加入任何公会")
 
         # 获取可用任务列表
-        if USE_NEW_GUILD_TASK_SERVICE:
-            from ..infrastructure.repositories.player_repository import PlayerRepository
-            from ..infrastructure.repositories.guild_repository import GuildRepository
-            from ..infrastructure.repositories.player_task_stats_repository import PlayerTaskStatsRepository
-            from ..infrastructure.repositories.guild_task_record_repository import GuildTaskRecordRepository
-            from ..infrastructure.repositories.player_donation_log_repository import PlayerDonationLogRepository
-            from ..infrastructure.repositories.guild_building_repository import GuildBuildingRepository
+        from ..infrastructure.repositories.player_repository import PlayerRepository
+        from ..infrastructure.repositories.guild_repository import GuildRepository
+        from ..infrastructure.repositories.player_task_stats_repository import PlayerTaskStatsRepository
+        from ..infrastructure.repositories.guild_task_record_repository import GuildTaskRecordRepository
+        from ..infrastructure.repositories.player_donation_log_repository import PlayerDonationLogRepository
+        from ..infrastructure.repositories.guild_building_repository import GuildBuildingRepository
 
-            task_service = GuildTaskServiceNew(
-                player_repo=PlayerRepository(session),
-                guild_repo=GuildRepository(session),
-                player_task_stats_repo=PlayerTaskStatsRepository(session),
-                guild_task_record_repo=GuildTaskRecordRepository(session),
-                player_donation_log_repo=PlayerDonationLogRepository(session),
-                guild_building_repo=GuildBuildingRepository(session),
-            )
-            tasks = await task_service.get_available_tasks(player.id)
-        else:
-            tasks = await GuildTaskService.get_available_tasks(session, player.id)
-        
+        task_service = GuildTaskServiceNew(
+            player_repo=PlayerRepository(session),
+            guild_repo=GuildRepository(session),
+            player_task_stats_repo=PlayerTaskStatsRepository(session),
+            guild_task_record_repo=GuildTaskRecordRepository(session),
+            player_donation_log_repo=PlayerDonationLogRepository(session),
+            guild_building_repo=GuildBuildingRepository(session),
+        )
+        tasks = await task_service.get_available_tasks(player.id)
         if not tasks:
             await guild_task_cmd.finish("⛔ 暂无可用的公会任务")
         
@@ -110,26 +103,22 @@ async def handle_complete_guild_task(event: MessageEvent):
             await complete_guild_task_cmd.finish("⛔ 你未加入任何公会")
 
         # 尝试自动完成任务
-        if USE_NEW_GUILD_TASK_SERVICE:
-            from ..infrastructure.repositories.player_repository import PlayerRepository
-            from ..infrastructure.repositories.guild_repository import GuildRepository
-            from ..infrastructure.repositories.player_task_stats_repository import PlayerTaskStatsRepository
-            from ..infrastructure.repositories.guild_task_record_repository import GuildTaskRecordRepository
-            from ..infrastructure.repositories.player_donation_log_repository import PlayerDonationLogRepository
-            from ..infrastructure.repositories.guild_building_repository import GuildBuildingRepository
+        from ..infrastructure.repositories.player_repository import PlayerRepository
+        from ..infrastructure.repositories.guild_repository import GuildRepository
+        from ..infrastructure.repositories.player_task_stats_repository import PlayerTaskStatsRepository
+        from ..infrastructure.repositories.guild_task_record_repository import GuildTaskRecordRepository
+        from ..infrastructure.repositories.player_donation_log_repository import PlayerDonationLogRepository
+        from ..infrastructure.repositories.guild_building_repository import GuildBuildingRepository
 
-            task_service = GuildTaskServiceNew(
-                player_repo=PlayerRepository(session),
-                guild_repo=GuildRepository(session),
-                player_task_stats_repo=PlayerTaskStatsRepository(session),
-                guild_task_record_repo=GuildTaskRecordRepository(session),
-                player_donation_log_repo=PlayerDonationLogRepository(session),
-                guild_building_repo=GuildBuildingRepository(session),
-            )
-            completed_tasks = await task_service.try_auto_complete_tasks(player.id)
-        else:
-            completed_tasks = await GuildTaskService.try_auto_complete_tasks(session, player.id)
-        
+        task_service = GuildTaskServiceNew(
+            player_repo=PlayerRepository(session),
+            guild_repo=GuildRepository(session),
+            player_task_stats_repo=PlayerTaskStatsRepository(session),
+            guild_task_record_repo=GuildTaskRecordRepository(session),
+            player_donation_log_repo=PlayerDonationLogRepository(session),
+            guild_building_repo=GuildBuildingRepository(session),
+        )
+        completed_tasks = await task_service.try_auto_complete_tasks(player.id)
         await session.commit()
         
         if completed_tasks:
@@ -158,28 +147,23 @@ async def handle_guild_task_stats(event: MessageEvent):
             await guild_task_stats_cmd.finish("⛔ 你未加入任何公会")
 
         # 获取个人统计和公会整体统计
-        if USE_NEW_GUILD_TASK_SERVICE:
-            from ..infrastructure.repositories.player_repository import PlayerRepository
-            from ..infrastructure.repositories.guild_repository import GuildRepository
-            from ..infrastructure.repositories.player_task_stats_repository import PlayerTaskStatsRepository
-            from ..infrastructure.repositories.guild_task_record_repository import GuildTaskRecordRepository
-            from ..infrastructure.repositories.player_donation_log_repository import PlayerDonationLogRepository
-            from ..infrastructure.repositories.guild_building_repository import GuildBuildingRepository
+        from ..infrastructure.repositories.player_repository import PlayerRepository
+        from ..infrastructure.repositories.guild_repository import GuildRepository
+        from ..infrastructure.repositories.player_task_stats_repository import PlayerTaskStatsRepository
+        from ..infrastructure.repositories.guild_task_record_repository import GuildTaskRecordRepository
+        from ..infrastructure.repositories.player_donation_log_repository import PlayerDonationLogRepository
+        from ..infrastructure.repositories.guild_building_repository import GuildBuildingRepository
 
-            task_service = GuildTaskServiceNew(
-                player_repo=PlayerRepository(session),
-                guild_repo=GuildRepository(session),
-                player_task_stats_repo=PlayerTaskStatsRepository(session),
-                guild_task_record_repo=GuildTaskRecordRepository(session),
-                player_donation_log_repo=PlayerDonationLogRepository(session),
-                guild_building_repo=GuildBuildingRepository(session),
-            )
-            stats = await task_service.get_or_create_player_stats(player.id)
-            guild_summary = await task_service.get_guild_task_summary(player.guild_id)
-        else:
-            stats = await GuildTaskService.get_or_create_player_stats(session, player.id)
-            guild_summary = await GuildTaskService.get_guild_task_summary(session, player.guild_id)
-        
+        task_service = GuildTaskServiceNew(
+            player_repo=PlayerRepository(session),
+            guild_repo=GuildRepository(session),
+            player_task_stats_repo=PlayerTaskStatsRepository(session),
+            guild_task_record_repo=GuildTaskRecordRepository(session),
+            player_donation_log_repo=PlayerDonationLogRepository(session),
+            guild_building_repo=GuildBuildingRepository(session),
+        )
+        stats = await task_service.get_or_create_player_stats(player.id)
+        guild_summary = await task_service.get_guild_task_summary(player.guild_id)
         msg_lines = [
             "📊 公会任务统计",
             "━━━━━━━━━━━━━",

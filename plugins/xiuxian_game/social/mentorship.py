@@ -12,7 +12,6 @@ from ..player.realm_utils import realm_by_level_and_reincarnation
 
 # ==================== Feature Flag ====================
 # 设置为True使用新版DI架构的MentorshipService，False使用旧版本
-USE_NEW_MENTORSHIP_SERVICE = True
 # =====================================================
 
 
@@ -42,39 +41,32 @@ async def handle_worship(event: MessageEvent, args: Message = CommandArg()):
             await worship_cmd.finish("⛔ 未找到该 UID 的玩家")
         
         # 检查是否可以拜师
-        if USE_NEW_MENTORSHIP_SERVICE:
-            from ..infrastructure.repositories.player_repository import PlayerRepository
-            from ..infrastructure.repositories.social_application_repository import SocialApplicationRepository
-            from ..infrastructure.repositories.mentorship_repository import MentorshipRepository
-            from .mentorship_service_new import MentorshipService as MentorshipServiceNew
+        from ..infrastructure.repositories.player_repository import PlayerRepository
+        from ..infrastructure.repositories.social_application_repository import SocialApplicationRepository
+        from ..infrastructure.repositories.mentorship_repository import MentorshipRepository
+        from .mentorship_service_new import MentorshipService as MentorshipServiceNew
 
-            service = MentorshipServiceNew(
-                player_repo=PlayerRepository(session),
-                social_app_repo=SocialApplicationRepository(session),
-                mentorship_repo=MentorshipRepository(session),
-            )
-            can_worship, reason = await service.can_become_disciple(applicant.id, master.id)
-        else:
-            can_worship, reason = await MentorshipService.can_become_disciple(session, applicant.id, master.id)
+        service = MentorshipServiceNew(
+            player_repo=PlayerRepository(session),
+            social_app_repo=SocialApplicationRepository(session),
+            mentorship_repo=MentorshipRepository(session),
+        )
+        can_worship, reason = await service.can_become_disciple(applicant.id, master.id)
         if not can_worship:
             await worship_cmd.finish(f"⛔ {reason}")
         
         # 创建拜师申请
-        if USE_NEW_MENTORSHIP_SERVICE:
-            from ..infrastructure.repositories.player_repository import PlayerRepository
-            from ..infrastructure.repositories.social_application_repository import SocialApplicationRepository
-            from ..infrastructure.repositories.mentorship_repository import MentorshipRepository
-            from .mentorship_service_new import MentorshipService as MentorshipServiceNew
+        from ..infrastructure.repositories.player_repository import PlayerRepository
+        from ..infrastructure.repositories.social_application_repository import SocialApplicationRepository
+        from ..infrastructure.repositories.mentorship_repository import MentorshipRepository
+        from .mentorship_service_new import MentorshipService as MentorshipServiceNew
 
-            service = MentorshipServiceNew(
-                player_repo=PlayerRepository(session),
-                social_app_repo=SocialApplicationRepository(session),
-                mentorship_repo=MentorshipRepository(session),
-            )
-            await service.create_mentorship_application(applicant.id, master.id)
-        else:
-            await MentorshipService.create_mentorship_application(session, applicant.id, master.id)
-
+        service = MentorshipServiceNew(
+            player_repo=PlayerRepository(session),
+            social_app_repo=SocialApplicationRepository(session),
+            mentorship_repo=MentorshipRepository(session),
+        )
+        await service.create_mentorship_application(applicant.id, master.id)
         await worship_cmd.finish(message_add_head(
             f"🙏 已向 {master.nickname}[UID:{master.uid}] 发送拜师申请，等待对方回复", 
             event
@@ -91,20 +83,17 @@ async def handle_mentorship_applications(event: MessageEvent):
         if not player:
             await mentorship_applications_cmd.finish("⛔ 请先创建角色")
 
-        if USE_NEW_MENTORSHIP_SERVICE:
-            from ..infrastructure.repositories.player_repository import PlayerRepository
-            from ..infrastructure.repositories.social_application_repository import SocialApplicationRepository
-            from ..infrastructure.repositories.mentorship_repository import MentorshipRepository
-            from .mentorship_service_new import MentorshipService as MentorshipServiceNew
+        from ..infrastructure.repositories.player_repository import PlayerRepository
+        from ..infrastructure.repositories.social_application_repository import SocialApplicationRepository
+        from ..infrastructure.repositories.mentorship_repository import MentorshipRepository
+        from .mentorship_service_new import MentorshipService as MentorshipServiceNew
 
-            service = MentorshipServiceNew(
-                player_repo=PlayerRepository(session),
-                social_app_repo=SocialApplicationRepository(session),
-                mentorship_repo=MentorshipRepository(session),
-            )
-            applications = await service.get_pending_mentorship_applications(player.id)
-        else:
-            applications = await MentorshipService.get_pending_mentorship_applications(session, player.id)
+        service = MentorshipServiceNew(
+            player_repo=PlayerRepository(session),
+            social_app_repo=SocialApplicationRepository(session),
+            mentorship_repo=MentorshipRepository(session),
+        )
+        applications = await service.get_pending_mentorship_applications(player.id)
         if not applications:
             await mentorship_applications_cmd.finish("暂无待处理的拜师申请")
 
@@ -144,20 +133,17 @@ async def handle_accept_disciple(event: MessageEvent, args: Message = CommandArg
         if not applicant:
             await accept_disciple_cmd.finish("⛔ 未找到该 UID 的玩家")
 
-        if USE_NEW_MENTORSHIP_SERVICE:
-            from ..infrastructure.repositories.player_repository import PlayerRepository
-            from ..infrastructure.repositories.social_application_repository import SocialApplicationRepository
-            from ..infrastructure.repositories.mentorship_repository import MentorshipRepository
-            from .mentorship_service_new import MentorshipService as MentorshipServiceNew
+        from ..infrastructure.repositories.player_repository import PlayerRepository
+        from ..infrastructure.repositories.social_application_repository import SocialApplicationRepository
+        from ..infrastructure.repositories.mentorship_repository import MentorshipRepository
+        from .mentorship_service_new import MentorshipService as MentorshipServiceNew
 
-            service = MentorshipServiceNew(
-                player_repo=PlayerRepository(session),
-                social_app_repo=SocialApplicationRepository(session),
-                mentorship_repo=MentorshipRepository(session),
-            )
-            success, message = await service.accept_mentorship_application_by_uid(applicant.id, player.id)
-        else:
-            success, message = await MentorshipService.accept_mentorship_application_by_uid(session, applicant.id, player.id)
+        service = MentorshipServiceNew(
+            player_repo=PlayerRepository(session),
+            social_app_repo=SocialApplicationRepository(session),
+            mentorship_repo=MentorshipRepository(session),
+        )
+        success, message = await service.accept_mentorship_application_by_uid(applicant.id, player.id)
         if success:
             await accept_disciple_cmd.finish(message_add_head(f"🎓 {message}", event))
         else:
@@ -188,20 +174,17 @@ async def handle_reject_disciple(event: MessageEvent, args: Message = CommandArg
         if not applicant:
             await reject_disciple_cmd.finish("⛔ 未找到该 UID 的玩家")
 
-        if USE_NEW_MENTORSHIP_SERVICE:
-            from ..infrastructure.repositories.player_repository import PlayerRepository
-            from ..infrastructure.repositories.social_application_repository import SocialApplicationRepository
-            from ..infrastructure.repositories.mentorship_repository import MentorshipRepository
-            from .mentorship_service_new import MentorshipService as MentorshipServiceNew
+        from ..infrastructure.repositories.player_repository import PlayerRepository
+        from ..infrastructure.repositories.social_application_repository import SocialApplicationRepository
+        from ..infrastructure.repositories.mentorship_repository import MentorshipRepository
+        from .mentorship_service_new import MentorshipService as MentorshipServiceNew
 
-            service = MentorshipServiceNew(
-                player_repo=PlayerRepository(session),
-                social_app_repo=SocialApplicationRepository(session),
-                mentorship_repo=MentorshipRepository(session),
-            )
-            success, message = await service.reject_mentorship_application_by_uid(applicant.id, player.id)
-        else:
-            success, message = await MentorshipService.reject_mentorship_application_by_uid(session, applicant.id, player.id)
+        service = MentorshipServiceNew(
+            player_repo=PlayerRepository(session),
+            social_app_repo=SocialApplicationRepository(session),
+            mentorship_repo=MentorshipRepository(session),
+        )
+        success, message = await service.reject_mentorship_application_by_uid(applicant.id, player.id)
         if success:
             await reject_disciple_cmd.finish(message_add_head(f"❌ {message}", event))
         else:
@@ -223,20 +206,17 @@ async def handle_master(event: MessageEvent):
             else:
                 await master_cmd.finish("⛔ 请先创建角色")
 
-        if USE_NEW_MENTORSHIP_SERVICE:
-            from ..infrastructure.repositories.player_repository import PlayerRepository
-            from ..infrastructure.repositories.social_application_repository import SocialApplicationRepository
-            from ..infrastructure.repositories.mentorship_repository import MentorshipRepository
-            from .mentorship_service_new import MentorshipService as MentorshipServiceNew
+        from ..infrastructure.repositories.player_repository import PlayerRepository
+        from ..infrastructure.repositories.social_application_repository import SocialApplicationRepository
+        from ..infrastructure.repositories.mentorship_repository import MentorshipRepository
+        from .mentorship_service_new import MentorshipService as MentorshipServiceNew
 
-            service = MentorshipServiceNew(
-                player_repo=PlayerRepository(session),
-                social_app_repo=SocialApplicationRepository(session),
-                mentorship_repo=MentorshipRepository(session),
-            )
-            master = await service.get_master(player.id)
-        else:
-            master = await MentorshipService.get_master(session, player.id)
+        service = MentorshipServiceNew(
+            player_repo=PlayerRepository(session),
+            social_app_repo=SocialApplicationRepository(session),
+            mentorship_repo=MentorshipRepository(session),
+        )
+        master = await service.get_master(player.id)
         if not master:
             await master_cmd.finish("🚫 你还没有师父")
 
@@ -264,20 +244,17 @@ async def handle_disciples(event: MessageEvent):
         if not player:
             await disciples_cmd.finish("⛔ 请先创建角色")
 
-        if USE_NEW_MENTORSHIP_SERVICE:
-            from ..infrastructure.repositories.player_repository import PlayerRepository
-            from ..infrastructure.repositories.social_application_repository import SocialApplicationRepository
-            from ..infrastructure.repositories.mentorship_repository import MentorshipRepository
-            from .mentorship_service_new import MentorshipService as MentorshipServiceNew
+        from ..infrastructure.repositories.player_repository import PlayerRepository
+        from ..infrastructure.repositories.social_application_repository import SocialApplicationRepository
+        from ..infrastructure.repositories.mentorship_repository import MentorshipRepository
+        from .mentorship_service_new import MentorshipService as MentorshipServiceNew
 
-            service = MentorshipServiceNew(
-                player_repo=PlayerRepository(session),
-                social_app_repo=SocialApplicationRepository(session),
-                mentorship_repo=MentorshipRepository(session),
-            )
-            disciples = await service.get_disciples(player.id)
-        else:
-            disciples = await MentorshipService.get_disciples(session, player.id)
+        service = MentorshipServiceNew(
+            player_repo=PlayerRepository(session),
+            social_app_repo=SocialApplicationRepository(session),
+            mentorship_repo=MentorshipRepository(session),
+        )
+        disciples = await service.get_disciples(player.id)
         if not disciples:
             await disciples_cmd.finish("🚫 你还没有徒弟")
 
@@ -315,20 +292,17 @@ async def handle_graduation(event: MessageEvent, args: Message = CommandArg()):
             else:
                 await graduation_cmd.finish("⛔ 请先创建角色")
 
-        if USE_NEW_MENTORSHIP_SERVICE:
-            from ..infrastructure.repositories.player_repository import PlayerRepository
-            from ..infrastructure.repositories.social_application_repository import SocialApplicationRepository
-            from ..infrastructure.repositories.mentorship_repository import MentorshipRepository
-            from .mentorship_service_new import MentorshipService as MentorshipServiceNew
+        from ..infrastructure.repositories.player_repository import PlayerRepository
+        from ..infrastructure.repositories.social_application_repository import SocialApplicationRepository
+        from ..infrastructure.repositories.mentorship_repository import MentorshipRepository
+        from .mentorship_service_new import MentorshipService as MentorshipServiceNew
 
-            service = MentorshipServiceNew(
-                player_repo=PlayerRepository(session),
-                social_app_repo=SocialApplicationRepository(session),
-                mentorship_repo=MentorshipRepository(session),
-            )
-            success, message = await service.dismiss_disciple(player.id, disciple_uid, is_graduation=True)
-        else:
-            success, message = await MentorshipService.dismiss_disciple(session, player.id, disciple_uid, is_graduation=True)
+        service = MentorshipServiceNew(
+            player_repo=PlayerRepository(session),
+            social_app_repo=SocialApplicationRepository(session),
+            mentorship_repo=MentorshipRepository(session),
+        )
+        success, message = await service.dismiss_disciple(player.id, disciple_uid, is_graduation=True)
         if success:
             await graduation_cmd.finish(message_add_head(f"🎓 {message}", event))
         else:
@@ -344,20 +318,17 @@ async def handle_leave_master(event: MessageEvent):
         if not player:
             await leave_master_cmd.finish("⛔ 请先创建角色")
 
-        if USE_NEW_MENTORSHIP_SERVICE:
-            from ..infrastructure.repositories.player_repository import PlayerRepository
-            from ..infrastructure.repositories.social_application_repository import SocialApplicationRepository
-            from ..infrastructure.repositories.mentorship_repository import MentorshipRepository
-            from .mentorship_service_new import MentorshipService as MentorshipServiceNew
+        from ..infrastructure.repositories.player_repository import PlayerRepository
+        from ..infrastructure.repositories.social_application_repository import SocialApplicationRepository
+        from ..infrastructure.repositories.mentorship_repository import MentorshipRepository
+        from .mentorship_service_new import MentorshipService as MentorshipServiceNew
 
-            service = MentorshipServiceNew(
-                player_repo=PlayerRepository(session),
-                social_app_repo=SocialApplicationRepository(session),
-                mentorship_repo=MentorshipRepository(session),
-            )
-            success, message = await service.leave_master(player.id)
-        else:
-            success, message = await MentorshipService.leave_master(session, player.id)
+        service = MentorshipServiceNew(
+            player_repo=PlayerRepository(session),
+            social_app_repo=SocialApplicationRepository(session),
+            mentorship_repo=MentorshipRepository(session),
+        )
+        success, message = await service.leave_master(player.id)
         if success:
             await leave_master_cmd.finish(message_add_head(f"🚪 {message}", event))
         else:

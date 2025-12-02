@@ -31,9 +31,9 @@
 
 ### 命令处理层 (Presentation)
 
-所有命令处理器通过Feature Flag集成新旧实现：
-- `plugins/xiuxian_game/guild/guild.py` (USE_NEW_GUILD_SERVICE = True)
-- `plugins/xiuxian_game/item/equipment_commands.py` (USE_NEW_EQUIPMENT_SERVICE = True)
+所有命令处理器已完全迁移到新DI实现：
+- `plugins/xiuxian_game/guild/guild.py` (GuildServiceNew)
+- `plugins/xiuxian_game/item/equipment_commands.py` (EquipmentServiceNew)
 - ...等46个命令处理文件
 
 ## 3. Execution Flow (LLM Retrieval Map)
@@ -83,20 +83,12 @@ member = await uow.guild_members.add(new_member)
 await uow.commit()
 ```
 
-### Service调用流程（新架构）
+### Service调用流程
 
 **1. 命令接收**: Nonebot2接收用户命令
 - 位置: `guild/guild.py:create_guild`
 
-**2. Feature Flag判断**: 检查是否使用新架构
-```python
-if USE_NEW_GUILD_SERVICE:
-    # 新架构路径
-else:
-    # 旧架构路径（保留兼容）
-```
-
-**3. 创建UoW**: 打开工作单元
+**2. 创建UoW**: 打开工作单元
 ```python
 async with UnitOfWork() as uow:
 ```
@@ -161,24 +153,18 @@ service = container.resolve(GuildService)
 - 更换数据源只需替换Repository实现
 - 业务逻辑不受影响
 
-### 为什么保留Feature Flag？
+### Feature Flag清理完成（2025-12-02）
 
-**风险控制**:
-- 灰度发布，逐步切换
-- 快速回滚，修改常量即可
-- A/B测试，对比新旧性能
+**迁移阶段完成**:
+- 阶段1 ✅ 开发完成：所有Service已实现DI改造
+- 阶段2 ✅ 测试验证：新架构已稳定运行
+- 阶段3 ✅ 全量上线：移除旧代码和Feature Flag
 
-**部署策略**:
-```python
-# 阶段1: 开发完成，Feature Flag = False（使用旧版）
-USE_NEW_GUILD_SERVICE = False
-
-# 阶段2: 测试验证，Feature Flag = True（小范围测试）
-USE_NEW_GUILD_SERVICE = True
-
-# 阶段3: 全量上线，移除旧代码（未来清理）
-# 删除旧版本代码和Feature Flag判断
-```
+**清理成果**:
+- 删除31个Feature Flag定义
+- 删除23个旧Service文件
+- 修改56个命令处理器，移除条件分支
+- 代码库减少7,690行，提高可维护性
 
 ### 为什么UoW懒加载Repository？
 

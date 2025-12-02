@@ -5,7 +5,7 @@ TODO: 完整实现
 """
 
 from typing import Optional, List
-from sqlalchemy import select, func
+from sqlalchemy import select, func, and_
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from ...domain.repositories.base import IRepository

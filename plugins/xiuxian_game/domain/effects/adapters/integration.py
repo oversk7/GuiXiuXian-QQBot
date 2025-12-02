@@ -25,7 +25,9 @@ def _get_feature_flag() -> bool:
         # 降级到环境变量读取
         return os.getenv("USE_NEW_EFFECT_SYSTEM", "false").lower() == "true"
 
+# 导出 Feature Flag（供其他模块使用）
 USE_NEW_EFFECT_SYSTEM = _get_feature_flag()
+
 
 
 async def apply_effect_v2(

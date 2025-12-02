@@ -41,6 +41,8 @@ clear_buffs_cmd = on_command("清理增益", aliases={"清理buff", "清理过�
 @clear_buffs_cmd.handle()
 async def handle_clear_buffs(event: MessageEvent):
     """手动清理过期的buff"""
+    from ..platform_utils import get_unified_player
+
     async with safe_session() as session:
         player = await get_unified_player(session, event)
         if not player:

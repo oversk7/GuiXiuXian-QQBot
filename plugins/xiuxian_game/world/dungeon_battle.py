@@ -30,9 +30,6 @@ from ..platform_utils import get_unified_player
 from ..item.equipment_service import recalc_equipment_attributes
 
 # Feature Flag（在文件顶部靠近其他导入的位置）
-USE_NEW_GUILD_TASK_SERVICE = True
-
-
 async def check_equipment_durability(session, player_id: str) -> str:
     """检查玩家装备耐久度，如果有装备耐久度低于10，返回提醒消息"""
     # 查询玩家所有已装备的装备
@@ -871,28 +868,23 @@ async def _handle_personal_monster(session, tile: WorldTile, player: Player) -> 
 
         # 更新战斗胜利统计（用于公会任务）
         if player.guild_id:
-            if USE_NEW_GUILD_TASK_SERVICE:
-                from ..guild.guild_task_service_new import GuildTaskService as GuildTaskServiceNew
-                from ..infrastructure.repositories.player_repository import PlayerRepository
-                from ..infrastructure.repositories.guild_repository import GuildRepository
-                from ..infrastructure.repositories.player_task_stats_repository import PlayerTaskStatsRepository
-                from ..infrastructure.repositories.guild_task_record_repository import GuildTaskRecordRepository
-                from ..infrastructure.repositories.player_donation_log_repository import PlayerDonationLogRepository
-                from ..infrastructure.repositories.guild_building_repository import GuildBuildingRepository
+            from ..guild.guild_task_service_new import GuildTaskService as GuildTaskServiceNew
+            from ..infrastructure.repositories.player_repository import PlayerRepository
+            from ..infrastructure.repositories.guild_repository import GuildRepository
+            from ..infrastructure.repositories.player_task_stats_repository import PlayerTaskStatsRepository
+            from ..infrastructure.repositories.guild_task_record_repository import GuildTaskRecordRepository
+            from ..infrastructure.repositories.player_donation_log_repository import PlayerDonationLogRepository
+            from ..infrastructure.repositories.guild_building_repository import GuildBuildingRepository
 
-                task_service = GuildTaskServiceNew(
-                    player_repo=PlayerRepository(session),
-                    guild_repo=GuildRepository(session),
-                    player_task_stats_repo=PlayerTaskStatsRepository(session),
-                    guild_task_record_repo=GuildTaskRecordRepository(session),
-                    player_donation_log_repo=PlayerDonationLogRepository(session),
-                    guild_building_repo=GuildBuildingRepository(session),
-                )
-                await task_service.update_combat_victory_stats(player.id)
-            else:
-                from ..guild.guild_task_service import GuildTaskService
-                await GuildTaskService.update_combat_victory_stats(session, player.id)
-
+            task_service = GuildTaskServiceNew(
+                player_repo=PlayerRepository(session),
+                guild_repo=GuildRepository(session),
+                player_task_stats_repo=PlayerTaskStatsRepository(session),
+                guild_task_record_repo=GuildTaskRecordRepository(session),
+                player_donation_log_repo=PlayerDonationLogRepository(session),
+                guild_building_repo=GuildBuildingRepository(session),
+            )
+            await task_service.update_combat_victory_stats(player.id)
         # 结算“斩龙闪”的战后效果，保持与战斗日志一致（修复 Bug3/1）
         try:
             if post_effects:
@@ -1238,38 +1230,28 @@ async def _(event: MessageEvent):
 
         # 更新探索统计（用于公会任务）
         if player.guild_id:
-            if USE_NEW_GUILD_TASK_SERVICE:
-                from ..guild.guild_task_service_new import GuildTaskService as GuildTaskServiceNew
-                from ..infrastructure.repositories.player_repository import PlayerRepository
-                from ..infrastructure.repositories.guild_repository import GuildRepository
-                from ..infrastructure.repositories.player_task_stats_repository import PlayerTaskStatsRepository
-                from ..infrastructure.repositories.guild_task_record_repository import GuildTaskRecordRepository
-                from ..infrastructure.repositories.player_donation_log_repository import PlayerDonationLogRepository
-                from ..infrastructure.repositories.guild_building_repository import GuildBuildingRepository
+            from ..guild.guild_task_service_new import GuildTaskService as GuildTaskServiceNew
+            from ..infrastructure.repositories.player_repository import PlayerRepository
+            from ..infrastructure.repositories.guild_repository import GuildRepository
+            from ..infrastructure.repositories.player_task_stats_repository import PlayerTaskStatsRepository
+            from ..infrastructure.repositories.guild_task_record_repository import GuildTaskRecordRepository
+            from ..infrastructure.repositories.player_donation_log_repository import PlayerDonationLogRepository
+            from ..infrastructure.repositories.guild_building_repository import GuildBuildingRepository
 
-                task_service = GuildTaskServiceNew(
-                    player_repo=PlayerRepository(session),
-                    guild_repo=GuildRepository(session),
-                    player_task_stats_repo=PlayerTaskStatsRepository(session),
-                    guild_task_record_repo=GuildTaskRecordRepository(session),
-                    player_donation_log_repo=PlayerDonationLogRepository(session),
-                    guild_building_repo=GuildBuildingRepository(session),
-                )
-                await task_service.update_exploration_stats(player.id)
+            task_service = GuildTaskServiceNew(
+                player_repo=PlayerRepository(session),
+                guild_repo=GuildRepository(session),
+                player_task_stats_repo=PlayerTaskStatsRepository(session),
+                guild_task_record_repo=GuildTaskRecordRepository(session),
+                player_donation_log_repo=PlayerDonationLogRepository(session),
+                guild_building_repo=GuildBuildingRepository(session),
+            )
+            await task_service.update_exploration_stats(player.id)
 
-                # 尝试自动完成任务
-                completed_tasks = await task_service.try_auto_complete_tasks(player.id)
-                if completed_tasks:
-                    log += "\n\n🎉 公会任务完成：\n" + "\n".join(completed_tasks)
-            else:
-                from ..guild.guild_task_service import GuildTaskService
-                await GuildTaskService.update_exploration_stats(session, player.id)
-
-                # 尝试自动完成任务
-                completed_tasks = await GuildTaskService.try_auto_complete_tasks(session, player.id)
-                if completed_tasks:
-                    log += "\n\n🎉 公会任务完成：\n" + "\n".join(completed_tasks)
-
+            # 尝试自动完成任务
+            completed_tasks = await task_service.try_auto_complete_tasks(player.id)
+            if completed_tasks:
+                log += "\n\n🎉 公会任务完成：\n" + "\n".join(completed_tasks)
         await session.commit()
 
     header = f"🧭位置 {current_region} ({current_x},{current_y})"

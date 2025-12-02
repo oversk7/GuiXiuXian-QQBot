@@ -31,13 +31,15 @@
 
 | 维度 | 数量 | 说明 |
 |------|------|------|
-| Python文件 | 165 | 分布在15+个子系统模块 |
+| Python文件（核心） | ~142 | 删除旧Service后，分布在15+个子系统模块 |
+| Python文件（总计） | ~274 | 含配置、测试和其他辅助文件 |
 | 数据模型 | 49 | Player模型包含87个字段 |
-| Service类 | 26 | 采用静态方法模式 |
-| 会话操作 | 542 | 分布在88个文件中 |
+| Service类 | 27 | 全部采用DI依赖注入模式 |
+| Repository类 | 47 | 数据访问层统一实现 |
+| 会话操作 | ~400 | 经过UnitOfWork统一管理 |
 | 物品效果 | 45+ | 装饰器注册模式 |
 | 战斗效果 | 75+ | 管理器模式 |
-| 代码总量 | 3-4万行 | 不含配置和文档 |
+| 代码总量 | 2.5-3.5万行 | 清理后，不含配置和文档 |
 
 ### 关键文件位置
 
@@ -81,21 +83,32 @@
 
 详细问题分析参见 `/reference/code-issues.md`
 
-## 4. 重构计划
+## 4. 重构状态
 
-项目正在进行v4.0重构,采用设计模式驱动的松耦合架构:
+### 已完成阶段（v4.0重构）
 
-**核心目标**:
-- 引入DI容器和仓储模式解耦模块
-- 统一属性计算入口(废弃5处分散计算)
-- 统一效果系统接口(IEffect抽象)
-- 使用UoW模式修复多会话问题
-- 优化N+1查询和临时buff缓存
+项目已完成v4.0重构，采用设计模式驱动的松耦合架构：
 
-详细重构策略参见:
-- `/overview/refactoring-strategy.md` - 重构策略概览
-- `/guides/refactoring-roadmap.md` - 实施路线图
-- `/architecture/target-architecture.md` - 目标架构设计
+**核心成果**:
+- ✅ 引入DI容器和仓储模式，解耦模块依赖
+- ✅ 统一属性计算入口（AttributeCalculator）
+- ✅ 统一效果系统接口（IEffect抽象）
+- ✅ 使用UoW模式统一事务管理
+- ✅ N+1查询优化（Repository预加载）
+
+### 代码清理阶段（2025-12-02）
+
+**完成情况**:
+- ✅ 删除31个Feature Flag定义
+- ✅ 删除23个旧Service文件（5,681行）
+- ✅ 修改56个命令处理器，移除条件分支
+- ✅ 总删除代码7,690行，代码库减少8%
+
+**相关文档**:
+- Service DI架构: `/architecture/service-di-architecture.md`
+- 属性系统: `/architecture/attribute-system.md`
+- 效果桥接器: `/architecture/battle-effect-bridge.md`
+- 清理详情: `/reference/code-cleanup-2025-12-02.md`
 
 ---
 
