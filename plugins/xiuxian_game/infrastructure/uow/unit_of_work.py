@@ -159,6 +159,13 @@ class UnitOfWork:
             self._player_job_stats = PlayerJobStatsRepository(self._session)
         return self._player_job_stats
 
+    @property
+    def session(self) -> AsyncSession:
+        """获取当前数据库会话"""
+        if self._session is None:
+            raise RuntimeError("会话未初始化，请在 async with UnitOfWork() 中使用")
+        return self._session
+
     async def __aenter__(self):
         """进入上下文：创建会话"""
         self._session = self._session_factory()
@@ -172,11 +179,13 @@ class UnitOfWork:
         - 如果发生异常，自动回滚
         - 如果没有异常，自动提交
         - 总是关闭会话
+
+        重要：不会吞掉异常，会向上传播
         """
         try:
             if exc_type is not None:
                 # 发生异常，回滚事务
-                logger.warning(f"⚠️ [UnitOfWork] 会话 {id(self._session)} 回滚: {exc_type.__name__}")
+                logger.warning(f"⚠️ [UnitOfWork] 会话 {id(self._session)} 回滚: {exc_type.__name__}: {exc_val}")
                 await self._session.rollback()
             else:
                 # 没有异常，提交事务
@@ -186,6 +195,10 @@ class UnitOfWork:
             # 无论如何都要关闭会话
             logger.debug(f"🔒 [UnitOfWork] 会话 {id(self._session)} 关闭")
             await self._session.close()
+
+        # 不抑制异常，让异常继续向上传播
+        # 返回 False 或不返回值（默认 None），表示不处理异常
+        return False
 
     async def commit(self):
         """手动提交事务"""
