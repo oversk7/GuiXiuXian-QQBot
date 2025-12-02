@@ -27,6 +27,7 @@ from ..models.monthly_card import get_player_card_benefits
 from ..config import config
 from ..utils import message_add_head, luck_prob
 from ..platform_utils import get_unified_player
+from ..item.equipment_service import recalc_equipment_attributes
 
 # Feature Flag（在文件顶部靠近其他导入的位置）
 USE_NEW_GUILD_TASK_SERVICE = True
@@ -1135,6 +1136,9 @@ async def _handle_personal_monster(session, tile: WorldTile, player: Player) -> 
             battle_summary.append(f"   ⚡ 体质下降，失去 {hp_loss_from_equipment} 生命值")
         if mp_loss_from_equipment > 0:
             battle_summary.append(f"   ⚡ 智力下降，失去 {mp_loss_from_equipment} 理智值")
+
+        # 重新计算剩余装备的属性加成（确保百分比加成正确）
+        await recalc_equipment_attributes(session, player)
 
     log = "\n".join(battle_summary)
 
