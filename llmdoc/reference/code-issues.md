@@ -314,6 +314,38 @@ else:
 2. 使用"一键卸下"命令
 3. 验证攻击力恢复到基础值（非零）
 
+### ✅ 扫荡令卸下装备属性减少Bug (2025-12-02)
+
+**问题描述**: 使用扫荡令后自动卸下耐久度为0的装备，重新穿戴时属性减少。
+
+**根本原因**:
+1. 自动卸下装备时手动回退了属性加成
+2. 未清理 `_persist_bonus` 持久化加成记录
+3. 导致重新穿戴时基于错误的基础值计算
+
+**代码位置**: `plugins/xiuxian_game/item/sweep_dungeon_service.py:496-509`
+
+**修复内容**:
+```python
+# 清除_persist_bonus持久化记录
+if "_persist_bonus" in (eq.extra_attrs or {}):
+    extra_new = {k: v for k, v in eq.extra_attrs.items() if k != "_persist_bonus"}
+    eq.extra_attrs = extra_new
+```
+
+**修复日期**: 2025-12-02
+
+**影响范围**: 所有使用扫荡令导致装备耐久度降至0的玩家
+
+**验证方法**:
+1. 穿戴多件装备，记录攻击力A
+2. 使用扫荡令，直到某件装备耐久度降至0被自动卸下
+3. 查看攻击力B，应该等于 A - 该装备的加成
+4. 修理该装备并重新穿戴
+5. 查看攻击力C，应该等于A（而非小于A）
+
+**详细调查**: `/llmdoc/agent/sweep_token_equipment_bug_investigation.md`
+
 ---
 
 **相关文档**:

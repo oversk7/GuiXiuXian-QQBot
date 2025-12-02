@@ -499,6 +499,12 @@ class SweepDungeonService:
                     for k, v in delta.items():
                         current_value = getattr(player, k, 0)
                         setattr(player, k, max(0, current_value - v))
+
+                    # 清除_persist_bonus持久化记录
+                    if "_persist_bonus" in (eq.extra_attrs or {}):
+                        extra_new = {k: v for k, v in eq.extra_attrs.items() if k != "_persist_bonus"}
+                        eq.extra_attrs = extra_new
+
                     eq.equipped = False
                     needs_recalc = True
                     durability_warnings.append(
