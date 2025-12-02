@@ -171,6 +171,10 @@ async def init_db():
         await conn.run_sync(Base.metadata.create_all)
     print("数据库初始化完成")
 
+    # 自动检测并添加缺失的字段和索引
+    from .auto_migrate import auto_migrate
+    await auto_migrate(engine, verbose=True)
+
 
 # ==================== 会话管理器 ====================
 

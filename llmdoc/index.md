@@ -65,6 +65,11 @@ LLM代理生成的调研和分析:
 - `doc_cleanup_investigation.md` - 文档清理调研报告
 - `game_balance_analysis_2025_12_01.md` - 游戏平衡分析与漏洞修复报告 (2025-12-01)
 
+### `/design/` - 系统设计方案
+游戏设计和系统重构方案:
+- `game_system_redesign_2025_12_02.md` - 新手体验破局完整方案 (2025-12-02)
+- `EXECUTIVE_SUMMARY.md` - 执行摘要 (快速查阅版)
+
 ### `/archive/` - 历史文档归档
 已归档的历史调研报告和重构文档:
 - 详见 `/archive/README.md`

@@ -14,6 +14,7 @@ class TaskType(Enum):
     SHAPE_SHIFTER_HUNT = "shape_shifter_hunt"  # 变形鬼怪追捕
     STONE_CURSE_BREAK = "stone_curse_break"    # 石化诅咒破解
     TORTURE_CULT_RAID = "torture_cult_raid"    # 酷刑邪教清剿
+    TUTORIAL = "tutorial"                      # 新手教程任务
 
 
 class TaskStatus(Enum):
@@ -59,7 +60,13 @@ class DailyTask(Base):
     exp_reward: Mapped[int] = mapped_column(Integer, default=0, comment="经验奖励")
     gold_reward: Mapped[int] = mapped_column(Integer, default=0, comment="金币奖励")
     guild_points_reward: Mapped[int] = mapped_column(Integer, default=0, comment="公会积分奖励")
-    
+
+    # 新手任务链扩展字段
+    quest_chain_id: Mapped[str] = mapped_column(String(50), nullable=True, comment="任务链ID（如novice_basic）")
+    quest_step: Mapped[int] = mapped_column(Integer, nullable=True, comment="任务链步骤（1、2、3...）")
+    is_tutorial: Mapped[bool] = mapped_column(Boolean, default=False, comment="是否为新手教程任务")
+    auto_accept: Mapped[bool] = mapped_column(Boolean, default=False, comment="是否自动接取")
+
     # 时间信息
     task_date: Mapped[date] = mapped_column(default=date.today, comment="任务日期")
     accepted_at: Mapped[datetime] = mapped_column(DateTime, nullable=True, comment="接取时间")

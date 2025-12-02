@@ -169,6 +169,17 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
         "┣━━━━━━━━━\n"
         f"┃☞【装备栏】【社交系统】{unread_notice}"
     )
+
+    # 检查新手任务（仅检查自己的面板，不检查查询他人）
+    if target_uid is None:
+        from ..quest.novice_quest_service import NoviceQuestService
+        quest_completed, quest_msg = await NoviceQuestService.check_and_advance_quest(
+            uow.session, player, "command", {"command": "我的面板"}
+        )
+
+        if quest_completed and quest_msg:
+            content += f"\n\n{quest_msg}"
+
     # 使用平台格式化工具
     formatted_content = format_platform_message(content, event)
     await profile.finish(message_add_head(formatted_content, event))
@@ -352,6 +363,11 @@ async def create_player(event: MessageEvent, nickname: str, gender: Gender) -> s
 
         session.add(new_player)
         await session.commit()
+
+        # 初始化新手任务
+        from ..quest.novice_quest_service import NoviceQuestService
+        await NoviceQuestService.init_novice_quests(session, new_player)
+
         card_type = random.choice(('🎲','🀄️','🀃','🀅','🀆','🀀','🀁','🀂','🀒','🀚','🀣'))
         content = (
             "⚰️ 棺盖移位，黑暗替你呼吸——欢迎回到人间。\n"

@@ -1,0 +1,90 @@
+# 新手任务链配置文件
+# 定义新手玩家的引导任务链，帮助玩家快速上手游戏
+
+novice_basic_chain:
+  chain_id: "novice_basic"
+  name: "驭鬼者的第一步"
+  description: "踏入诡异世界的入门引导"
+
+  steps:
+    # 第1步：首次修炼
+    - step: 1
+      title: "初识怨炁"
+      description: "尝试使用【修炼】指令，感受怨炁在体内流动的感觉"
+      completion_type: "command"
+      completion_target: "修炼"
+      completion_count: 1
+      rewards:
+        exp: 500
+        gold: 1000
+      auto_accept: true
+      flavor_text: "黑暗中，有人在低语：'感受它，驾驭它...'"
+
+    # 第2步：修炼3次
+    - step: 2
+      title: "汲取深渊之力"
+      description: "继续【修炼】3次，让怨炁在体内沉淀"
+      completion_type: "command_count"
+      completion_target: "修炼"
+      completion_count: 3
+      rewards:
+        exp: 1000
+        gold: 2000
+        items:
+          - item_id: "heal_potion"
+            quantity: 10
+      auto_accept: true
+      flavor_text: "你的身体开始适应这股力量，但还需要更多..."
+
+    # 第3步：分配属性点
+    - step: 3
+      title: "塑造新生"
+      description: "使用【加点】指令，分配你的属性点，塑造你的战斗形态"
+      completion_type: "command"
+      completion_target: "加点"
+      completion_count: 1
+      rewards:
+        exp: 300
+        gold: 500
+        attribute_points: 10
+      auto_accept: true
+      flavor_text: "缝合裂隙，塑形新肉。选择你的道路..."
+
+    # 第4步：首次突破
+    - step: 4
+      title: "破茧蜕变"
+      description: "积累足够怨炁后，使用【突破】指令，提升你的境界"
+      completion_type: "level_up"
+      completion_target: 2
+      completion_count: 1
+      rewards:
+        exp: 500
+        gold: 3000
+        items:
+          - item_id: "spirit_herb"
+            quantity: 10
+      auto_accept: true
+      flavor_text: "骨骼断裂的声音，是新生的前奏"
+
+    # 第5步：查看面板
+    - step: 5
+      title: "凝视深渊"
+      description: "使用【我的面板】指令，查看你当前的状态"
+      completion_type: "command"
+      completion_target: "我的面板"
+      completion_count: 1
+      rewards:
+        exp: 200
+        gold: 500
+      auto_accept: true
+      flavor_text: "了解自己，才能超越自己"
+
+# 完成新手任务链的总奖励
+completion_reward:
+  title: "驭鬼者之路已开启"
+  exp: 2000
+  gold: 5000
+  items:
+    - item_id: "sweep_order"
+      quantity: 1
+  achievement_title: "初入深渊"

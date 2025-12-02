@@ -1,7 +1,7 @@
 from nonebot import on_command
 from nonebot.adapters.qq import MessageEvent, Message
 from nonebot.params import CommandArg
-from ..utils import  message_add_head, calculate_level_up_exp
+from ..utils import  message_add_head, calculate_level_up_exp, generate_progress_bar, calculate_cultivation_times_needed
 from ..models.db import safe_session
 from ..models.player import Player
 from ..config import config
@@ -197,40 +197,69 @@ async def handle_cultivate(event: MessageEvent):
         await session.commit()
         exp_max = calculate_level_up_exp(player.level)
 
-        # 构建修炼消息，包含各种加成提示
-        bonus_msg = ""
-        if card_bonus > 0:
-            efficiency_percent = benefits["cultivation_efficiency"] * 100
-            bonus_msg += f"\n✧ 月卡加成 💳 +{card_bonus} 怨炁 (+{efficiency_percent:.0f}%)"
-
-        if reincarnation_bonus > 0:
-            reincarnation_percent = reincarnation_bonus_rate * 100
-            bonus_msg += f"\n✧ 转数加成 🌟 +{reincarnation_bonus} 怨炁 (+{reincarnation_percent:.0f}%)"
-
-        if guild_bonus > 0:
-            guild_percent = guild_cultivation_bonus * 100
-            bonus_msg += f"\n✧ 公会加成 🏰 +{guild_bonus} 怨炁 (+{guild_percent:.1f}%)"
-
-        if mansion_bonus > 0:
-            mansion_percent = mansion_cultivation_bonus * 100
-            bonus_msg += f"\n✧ 阴宅加成 🏚️ +{mansion_bonus} 怨炁 (+{mansion_percent:.1f}%)"
-
-        # 添加阴宅使用费用信息
-        bonus_msg += mansion_usage_msg
+        # 构建简洁版修炼消息（折叠式：主行简洁，加成详情折叠显示）
 
         # 随机选择修炼文案
         flavor_text = random.choice(CULTIVATE_FLAVOR_TEXTS)
 
+        # 生成进度条
+        progress_bar = generate_progress_bar(player.exp, exp_max)
+
+        # 构建加成明细行（折叠式）
+        total_bonus = card_bonus + reincarnation_bonus + guild_bonus + mansion_bonus
+        bonus_detail_line = ""
+        if total_bonus > 0:
+            bonus_percent = (total_bonus / base_exp_gain) * 100
+            bonus_parts = []
+
+            # 按顺序显示有效加成
+            if card_bonus > 0:
+                bonus_parts.append(f"月卡+{card_bonus}")
+            if reincarnation_bonus > 0:
+                bonus_parts.append(f"转数+{reincarnation_bonus}")
+            if guild_bonus > 0:
+                bonus_parts.append(f"公会+{guild_bonus}")
+            if mansion_bonus > 0:
+                bonus_parts.append(f"阴宅+{mansion_bonus}")
+
+            bonus_detail = " ".join(bonus_parts)
+            bonus_detail_line = f"\n   ↳ 基础+{base_exp_gain} {bonus_detail} (总加成+{bonus_percent:.0f}%)"
+
+        # 计算还需修炼次数
+        cultivation_times = calculate_cultivation_times_needed(player.exp, exp_max, exp_gain)
+        hours_needed = (cultivation_times * cfg["cool_down"]) / 3600
+
+        # 智能提示文本
+        if player.exp >= exp_max:
+            hint_text = f"💡 【突破】境界壁垒已松动"
+        else:
+            if cultivation_times <= 5:
+                hint_text = f"💡 还需修炼约{cultivation_times}次可突破 (约{hours_needed:.1f}小时，基于当前加成)"
+            else:
+                hint_text = f"💡 还需修炼约{cultivation_times}次可突破"
+
+        # 冷却提示（诡异化）
+        cooldown_text = f"⏰ 深渊的低语将在{cfg['cool_down']//60}分钟后再次响起"
+
         msg = (
             f"{flavor_text}\n"
             "━━━━━━━━━━━━━\n"
-            f"✧ 汲取怨炁 + {exp_gain}↑"
-            f"{bonus_msg}\n"
-            f"✧ 修为残烛 {player.exp}↑/{exp_max} {f'(可突破)' if player.exp> exp_max else ''}\n"
-            "━━━━━━━━━━━━━\n"
-            "⬇️ 【[连续]突破】倾听骨骼断裂\n"
-            "⬇️ 【加点】缝合裂隙，塑形新肉"
+            f"🔥 汲取怨炁(经验) +{exp_gain} | 怨炁进度 {progress_bar}"
+            f"{bonus_detail_line}\n"
+            f"{hint_text}\n"
+            f"{cooldown_text}"
         )
+
+        # 检查新手任务（在发送消息前）
+        from ..quest.novice_quest_service import NoviceQuestService
+        quest_completed, quest_msg = await NoviceQuestService.check_and_advance_quest(
+            session, player, "command", {"command": "修炼"}
+        )
+
+        if quest_completed and quest_msg:
+            # 如果完成了新手任务，在修炼消息后追加任务完成消息
+            msg += f"\n\n{quest_msg}"
+
         await cultivate.finish(message_add_head(msg, event))
 
 @seclusion.handle()
@@ -662,6 +691,15 @@ async def handle_breakthrough(event: MessageEvent, args: Message = CommandArg())
                 "⬇️ 【加点】缝合裂隙\n"
                 "⬇️ 【修炼】继续喂养怨炁"
             )
+
+            # 检查新手任务（等级提升）
+            from ..quest.novice_quest_service import NoviceQuestService
+            quest_completed, quest_msg = await NoviceQuestService.check_and_advance_quest(
+                session, player, "level_up", {}
+            )
+
+            if quest_completed and quest_msg:
+                msg += f"\n\n{quest_msg}"
         else:
             if random.random() <= success_chance:
                 old_level = player.level
@@ -702,6 +740,15 @@ async def handle_breakthrough(event: MessageEvent, args: Message = CommandArg())
                     "⬇️ 【加点】缝合裂隙\n"
                     "⬇️ 【修炼】继续喂养怨炁"
                 )
+
+                # 检查新手任务（等级提升）
+                from ..quest.novice_quest_service import NoviceQuestService
+                quest_completed, quest_msg = await NoviceQuestService.check_and_advance_quest(
+                    session, player, "level_up", {}
+                )
+
+                if quest_completed and quest_msg:
+                    msg += f"\n\n{quest_msg}"
             else:
                 # 突破失败
                 # 增加失败次数
@@ -1177,6 +1224,15 @@ async def handle_assign(event: MessageEvent, args: Message = CommandArg()):
         # 如果还有属性点，提示查看加点帮助
         if player.attribute_points > 0:
             msg += "\n💡 【加点帮助】查看属性指南"
+
+        # 检查新手任务
+        from ..quest.novice_quest_service import NoviceQuestService
+        quest_completed, quest_msg = await NoviceQuestService.check_and_advance_quest(
+            session, player, "command", {"command": "加点"}
+        )
+
+        if quest_completed and quest_msg:
+            msg += f"\n\n{quest_msg}"
 
         await assign_points.finish(message_add_head(msg, event))
 

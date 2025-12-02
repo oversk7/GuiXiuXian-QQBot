@@ -35,6 +35,40 @@ def calculate_level_up_exp(current_level: int) -> int:
         return int(calculate_level_up_exp(curve["curve_change_level"]-1) + (level_diff ** 2) * curve["late_multiplier"])
 
 
+def generate_progress_bar(current: int, maximum: int, length: int = 8) -> str:
+    """
+    生成简洁的进度条
+    :param current: 当前值
+    :param maximum: 最大值
+    :param length: 进度条长度（默认8格）
+    :return: 格式化的进度条字符串 "[████░░░░] 50%"
+    """
+    if maximum <= 0:
+        percentage = 0
+    else:
+        percentage = min(current / maximum, 1.0)  # 限制最大100%
+
+    filled = int(percentage * length)
+    bar = "█" * filled + "░" * (length - filled)
+    return f"[{bar}] {int(percentage * 100)}%"
+
+
+def calculate_cultivation_times_needed(current_exp: int, max_exp: int, avg_exp_per_cultivation: int) -> int:
+    """
+    计算还需要修炼多少次才能升级
+    :param current_exp: 当前经验
+    :param max_exp: 升级所需经验
+    :param avg_exp_per_cultivation: 平均每次修炼获得的经验
+    :return: 还需修炼次数
+    """
+    if avg_exp_per_cultivation <= 0:
+        return 999  # 防止除零错误
+
+    remaining_exp = max(max_exp - current_exp, 0)
+    times = math.ceil(remaining_exp / avg_exp_per_cultivation)
+    return times
+
+
 
 async def generate_exp_table(max_level: int = 100) -> str:
     """
