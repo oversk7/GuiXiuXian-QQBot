@@ -100,62 +100,63 @@ async def _handle_stock_list_impl(event: MessageEvent):
             stmt = select(Stock).where(Stock.is_active == True).order_by(Stock.symbol)
             stocks = (await session.execute(stmt)).scalars().all()
 
-        if not stocks:
-            await stock_list_cmd.finish("💎 当前没有可投资的气运")
+    # 检查是否有股票数据（新旧版本共用）
+    if not stocks:
+        await stock_list_cmd.finish("💎 当前没有可投资的气运")
 
-        # 按类型分组显示
-        type_groups = {}
-        for stock in stocks:
-            if stock.stock_type not in type_groups:
-                type_groups[stock.stock_type] = []
-            type_groups[stock.stock_type].append(stock)
+    # 按类型分组显示
+    type_groups = {}
+    for stock in stocks:
+        if stock.stock_type not in type_groups:
+            type_groups[stock.stock_type] = []
+        type_groups[stock.stock_type].append(stock)
 
-        # 构建消息
-        lines = ["💎 气运投资行情", "▃▃▃▃▃▃▃▃▃▃"]
+    # 构建消息
+    lines = ["💎 气运投资行情", "▃▃▃▃▃▃▃▃▃▃"]
 
-        # 计算下次刷新时间（整点刷新）
-        now = datetime.now()
-        current_hour = now.replace(minute=0, second=0, microsecond=0)
-        next_hour = current_hour + timedelta(hours=1)
-        time_until_update = next_hour - now
+    # 计算下次刷新时间（整点刷新）
+    now = datetime.now()
+    current_hour = now.replace(minute=0, second=0, microsecond=0)
+    next_hour = current_hour + timedelta(hours=1)
+    time_until_update = next_hour - now
 
-        # 显示刷新时间信息
-        if price_updated:
-            lines.append("🔄 价格已更新")
+    # 显示刷新时间信息
+    if price_updated:
+        lines.append("🔄 价格已更新")
+    else:
+        minutes = int(time_until_update.total_seconds() // 60)
+        seconds = int(time_until_update.total_seconds() % 60)
+        if minutes > 0:
+            lines.append(f"⏰ 下次刷新：{minutes}分{seconds}秒后 ({next_hour.strftime('%H:%M')}整点)")
         else:
-            minutes = int(time_until_update.total_seconds() // 60)
-            seconds = int(time_until_update.total_seconds() % 60)
-            if minutes > 0:
-                lines.append(f"⏰ 下次刷新：{minutes}分{seconds}秒后 ({next_hour.strftime('%H:%M')}整点)")
-            else:
-                lines.append(f"⏰ 下次刷新：{seconds}秒后")
-        lines.append("")
+            lines.append(f"⏰ 下次刷新：{seconds}秒后")
+    lines.append("")
 
-        type_names = {
-            StockType.TECH: "🔬 法宝气运",
-            StockType.FINANCE: "🏦 金融气运",
-            StockType.ENERGY: "⚡ 灵气气运",
-            StockType.CONSUMER: "🛒 丹药气运",
-            StockType.HEALTHCARE: "🏥 医道气运",
-            StockType.MATERIALS: "🏗️ 材料气运"
-        }
+    type_names = {
+        StockType.TECH: "🔬 法宝气运",
+        StockType.FINANCE: "🏦 金融气运",
+        StockType.ENERGY: "⚡ 灵气气运",
+        StockType.CONSUMER: "🛒 丹药气运",
+        StockType.HEALTHCARE: "🏥 医道气运",
+        StockType.MATERIALS: "🏗️ 材料气运"
+    }
 
-        for stock_type, stocks_in_type in type_groups.items():
-            lines.append(f"\n{type_names.get(stock_type, stock_type)}")
-            for stock in stocks_in_type:
-                # 计算涨跌
-                change_rate = ((stock.current_price - stock.base_price) / stock.base_price) * 100
-                change_symbol = "📈" if change_rate > 0 else "📉" if change_rate < 0 else "➡️"
+    for stock_type, stocks_in_type in type_groups.items():
+        lines.append(f"\n{type_names.get(stock_type, stock_type)}")
+        for stock in stocks_in_type:
+            # 计算涨跌
+            change_rate = ((stock.current_price - stock.base_price) / stock.base_price) * 100
+            change_symbol = "📈" if change_rate > 0 else "📉" if change_rate < 0 else "➡️"
 
-                lines.append(
-                    f"{stock.symbol} {stock.name}\n"
-                    f"  💰 {stock.current_price} 金币 {change_symbol}"
-                )
+            lines.append(
+                f"{stock.symbol} {stock.name}\n"
+                f"  💰 {stock.current_price} 金币 {change_symbol}"
+            )
 
-        lines.append("\n💡 使用「投资气运 代码 数量」进行投资")
-        lines.append("💡 使用「投资气运 代码 数量 银行」从银行账户扣款")
+    lines.append("\n💡 使用「投资气运 代码 数量」进行投资")
+    lines.append("💡 使用「投资气运 代码 数量 银行」从银行账户扣款")
 
-        await stock_list_cmd.finish(message_add_head("\n".join(lines), event))
+    await stock_list_cmd.finish(message_add_head("\n".join(lines), event))
 
 
 @stock_buy_cmd.handle()
