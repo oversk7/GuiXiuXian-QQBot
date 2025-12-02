@@ -72,10 +72,11 @@ class DailyTaskRepository(IRepository[DailyTask]):
                     DailyTask.task_date == task_date
                 )
             )
-            .order_by(DailyTask.id)
+            .order_by(DailyTask.id.desc())  # 最新的任务优先
+            .limit(1)  # 只返回1条
         )
         result = await self._session.execute(stmt)
-        return result.scalar_one_or_none()
+        return result.scalars().first()  # 使用first()替代scalar_one_or_none()
 
     async def find_all_by_player_and_date(
         self,
