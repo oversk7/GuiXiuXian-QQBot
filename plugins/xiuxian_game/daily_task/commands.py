@@ -36,8 +36,8 @@ async def handle_daily_task(event: MessageEvent):
             await daily_task_cmd.finish("⛔ 该功能仅对Lv.30以上角色开放")
 
         # 实例化依赖Service
-        location_service = LocationService(uow.locations, uow.npcs)
-        npc_service = NPCService(uow.npcs)
+        location_service = LocationService(uow.locations)
+        npc_service = NPCService(uow.session, uow.npcs)
         guild_economy_service = GuildEconomyService(uow.guilds) if player.guild_id else None
 
         # 实例化DailyTaskService
@@ -147,8 +147,8 @@ async def handle_accept_task(event: MessageEvent, args: Message = CommandArg()):
                 await accept_task_cmd.finish("⛔ 请输入正确的委托编号（1-3）")
 
         # 实例化依赖Service
-        location_service = LocationService(uow.locations, uow.npcs)
-        npc_service = NPCService(uow.npcs)
+        location_service = LocationService(uow.locations)
+        npc_service = NPCService(uow.session, uow.npcs)
         guild_economy_service = GuildEconomyService(uow.guilds) if player.guild_id else None
 
         # 实例化DailyTaskService
@@ -212,8 +212,8 @@ async def handle_complete_task(event: MessageEvent):
             await complete_task_cmd.finish("⛔ 请先创建角色")
 
         # 实例化依赖Service
-        location_service = LocationService(uow.locations, uow.npcs)
-        npc_service = NPCService(uow.npcs)
+        location_service = LocationService(uow.locations)
+        npc_service = NPCService(uow.session, uow.npcs)
         guild_economy_service = GuildEconomyService(uow.guilds) if player.guild_id else None
 
         # 实例化DailyTaskService
@@ -323,8 +323,8 @@ async def handle_task_stats(event: MessageEvent):
             await task_stats_cmd.finish("⛔ 请先创建角色")
 
         # 实例化依赖Service
-        location_service = LocationService(uow.locations, uow.npcs)
-        npc_service = NPCService(uow.npcs)
+        location_service = LocationService(uow.locations)
+        npc_service = NPCService(uow.session, uow.npcs)
         guild_economy_service = GuildEconomyService(uow.guilds) if player.guild_id else None
 
         # 实例化DailyTaskService
@@ -375,8 +375,8 @@ async def handle_refresh_task(event: MessageEvent):
             await refresh_task_cmd.finish("⛔ 该功能仅对Lv.30以上角色开放")
 
         # 实例化依赖Service
-        location_service = LocationService(uow.locations, uow.npcs)
-        npc_service = NPCService(uow.npcs)
+        location_service = LocationService(uow.locations)
+        npc_service = NPCService(uow.session, uow.npcs)
         guild_economy_service = GuildEconomyService(uow.guilds) if player.guild_id else None
 
         # 实例化DailyTaskService
