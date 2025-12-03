@@ -288,6 +288,13 @@ class AchievementService:
             elif condition_type == "login_streak":
                 # 连续登录
                 is_unlocked = stats.consecutive_login_days >= condition_value
+            elif condition_type == "account_age":
+                # 账号创建时间检查（用于周年成就）
+                from datetime import datetime
+                if player.created_at and condition_value:
+                    # condition_value 格式: "2025-10-04"
+                    cutoff_date = datetime.strptime(condition_value, "%Y-%m-%d")
+                    is_unlocked = player.created_at < cutoff_date
 
             # 如果达成条件，解锁成就
             if is_unlocked:
@@ -476,6 +483,12 @@ class AchievementService:
                         current_progress = stats.locations_visited
                     elif condition_type == "login_streak":
                         current_progress = stats.consecutive_login_days
+                    elif condition_type == "account_age":
+                        # 账号年龄检查：如果满足条件显示1，否则显示0
+                        from datetime import datetime
+                        if player and player.created_at and achievement_data.get("condition_value"):
+                            cutoff_date = datetime.strptime(achievement_data.get("condition_value"), "%Y-%m-%d")
+                            current_progress = 1 if player.created_at < cutoff_date else 0
 
                     progress_data[achievement_id] = current_progress
 

@@ -152,6 +152,22 @@ basic_achievements:
     flavor_text: "日复一日的坚持，成就非凡的自己"
     hidden: false
 
+  # 8. 周年特别系列
+  first_anniversary:
+    id: "first_anniversary"
+    title: "元老见证者"
+    description: "自诡修仙诞生之初便追随至今，见证了一年的风雨历程"
+    icon: "🎂"
+    condition_type: "account_age"
+    condition_target: "created_before"
+    condition_value: "2025-10-04"  # 2025年10月4日之前创建的账号
+    rewards:
+      gold: 50000
+      exp: 10000
+      attribute_points: 30
+    flavor_text: "一年相伴，感谢有你同行"
+    hidden: false
+
 # 成就分类
 categories:
   cultivation: ["first_cultivation", "cultivation_adept"]
@@ -161,3 +177,4 @@ categories:
   wealth: ["small_fortune"]
   exploration: ["world_explorer"]
   loyalty: ["loyal_believer"]
+  anniversary: ["first_anniversary"]

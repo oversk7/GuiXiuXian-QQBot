@@ -25,36 +25,72 @@ async def handle_achievement(event: MessageEvent, args: Message = CommandArg()):
         # 解析参数
         arg_text = args.extract_plain_text().strip()
 
-        # 如果有参数，显示成就详情
+        # 判断参数类型：数字=页码，非数字=成就名，无参数=第1页
+        page = 1
         if arg_text:
-            await show_achievement_detail(session, player, arg_text, event)
-            return
+            # 尝试解析为页码
+            if arg_text.isdigit():
+                page = int(arg_text)
+            else:
+                # 不是数字，作为成就名处理
+                await show_achievement_detail(session, player, arg_text, event)
+                return
 
         # 获取成就列表
         data = await AchievementService.get_player_achievements(session, player.id)
 
+        # 合并所有成就（已解锁在前，未解锁在后）
+        all_achievements = []
+
+        # 添加已解锁成就（标记状态）
+        for ach in data["unlocked"]:
+            ach_copy = ach.copy()
+            ach_copy["is_unlocked"] = True
+            all_achievements.append(ach_copy)
+
+        # 添加未解锁成就（标记状态）
+        for ach in data["locked"]:
+            ach_copy = ach.copy()
+            ach_copy["is_unlocked"] = False
+            ach_copy["progress"] = data.get("progress", {}).get(ach["id"], 0)
+            all_achievements.append(ach_copy)
+
+        # 分页设置
+        PAGE_SIZE = 15
+        total_count = len(all_achievements)
+        total_pages = (total_count + PAGE_SIZE - 1) // PAGE_SIZE  # 向上取整
+
+        # 验证页码
+        if page < 1:
+            page = 1
+        elif page > total_pages:
+            page = total_pages if total_pages > 0 else 1
+
+        # 计算当前页的成就范围
+        start_idx = (page - 1) * PAGE_SIZE
+        end_idx = min(start_idx + PAGE_SIZE, total_count)
+        page_achievements = all_achievements[start_idx:end_idx]
+
         # 构建显示消息
-        lines = ["🏆 成就系统", "━━━━━━━━━━━━━"]
+        lines = [
+            "🏆 成就系统",
+            f"第 {page}/{total_pages} 页 | 总计 {len(data['unlocked'])}/{total_count} 已解锁",
+            "━━━━━━━━━━━━━"
+        ]
 
-        # 显示已解锁成就
-        if data["unlocked"]:
-            lines.append(f"✅ 已解锁 ({len(data['unlocked'])}/10)：")
-            for ach in data["unlocked"]:
-                lines.append(f"{ach['icon']} {ach['title']} - {ach['description']}")
-            lines.append("")
-
-        # 显示未解锁成就（显示进度）
-        if data["locked"]:
-            lines.append(f"🔒 未解锁 ({len(data['locked'])}/10)：")
-            for ach in data["locked"]:
-                progress = data.get("progress", {}).get(ach["id"], 0)
+        # 显示当前页的成就
+        for ach in page_achievements:
+            if ach["is_unlocked"]:
+                lines.append(f"✅ {ach['icon']} {ach['title']} - {ach['description']}")
+            else:
+                progress = ach.get("progress", 0)
                 target = ach["condition_value"]
-                lines.append(f"{ach['icon']} {ach['title']} - 进度: {progress}/{target}")
-            lines.append("")
+                lines.append(f"🔒 {ach['icon']} {ach['title']} - 进度: {progress}/{target}")
 
+        lines.append("")
         lines.append("━━━━━━━━━━━━━")
-        lines.append("💡 提示：使用【成就 成就名】查看详情")
-        lines.append("💡 完成成就可获得金币、经验和属性点奖励！")
+        lines.append("💡 使用【成就 页码】查看其他页")
+        lines.append("💡 使用【成就 成就名】查看详情")
 
         await achievement_cmd.finish(message_add_head("\n".join(lines), event))
 
@@ -109,7 +145,8 @@ async def show_achievement_detail(session, player, achievement_name: str, event:
         "equipment_obtained": "获得装备",
         "gold_total": "累计获得金币",
         "locations_visited": "探索地点",
-        "login_streak": "连续登录"
+        "login_streak": "连续登录",
+        "account_age": "账号创建时间"
     }
     lines.append(f"  类型：{condition_map.get(condition_type, condition_type)}")
     lines.append(f"  目标：{target}")
