@@ -289,26 +289,38 @@ class DailyTaskService:
     async def create_ghost_npc_for_task(self, task: DailyTask) -> Optional[NPC]:
         """为委托任务创建鬼怪NPC"""
         try:
+            # 先检查是否已存在该NPC（防止重复创建）
+            npc_id = f"ghost_task_{task.id}"
+            existing_npc = await self._npc_service.get_npc_by_id(npc_id)
+            if existing_npc:
+                # 如果已存在，直接返回
+                return existing_npc
+
             # 查找或创建目标地点
             location = await self._location_service.get_location_by_coordinates(
                 task.target_x, task.target_y, task.target_region
             )
 
             if not location:
-                # 创建临时地点
-                location = await self._location_service.create_location(
-                    location_id=f"task_location_{task.target_x}_{task.target_y}",
-                    name=f"荒野({task.target_x},{task.target_y})",
-                    x=task.target_x,
-                    y=task.target_y,
-                    location_type="normal",
-                    description="这里出现了异常的鬼怪活动...",
-                    region=task.target_region
-                )
+                # 先检查是否已存在该location_id（防止重复创建）
+                location_id = f"task_location_{task.target_x}_{task.target_y}"
+                location = await self._location_service.get_location_by_id(location_id)
+
+                if not location:
+                    # 创建临时地点
+                    location = await self._location_service.create_location(
+                        location_id=location_id,
+                        name=f"荒野({task.target_x},{task.target_y})",
+                        x=task.target_x,
+                        y=task.target_y,
+                        location_type="normal",
+                        description="这里出现了异常的鬼怪活动...",
+                        region=task.target_region
+                    )
 
             # 创建鬼怪NPC
             ghost_npc = await self._npc_service.create_ghost_npc(
-                npc_id=f"ghost_task_{task.id}",
+                npc_id=npc_id,
                 name=task.enemy_name,
                 location_id=location.id,
                 level=task.enemy_level,

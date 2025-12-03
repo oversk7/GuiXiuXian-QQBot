@@ -4,6 +4,7 @@
 from sqlalchemy.ext.asyncio import AsyncSession
 from .mentorship_service import MentorshipService
 from ..player.invite_reward_service import InviteRewardService
+from ..player.feature_unlock import get_breakthrough_unlock_message
 
 # ==================== Feature Flag ====================
 # 设置为True使用新版DI架构的InviteRewardService，False使用旧版本
@@ -49,6 +50,12 @@ async def on_player_level_up(session: AsyncSession, player_id: str, old_level: i
 
         # 使用新版本
         reward_messages = await invite_reward_service.check_and_grant_level_rewards(player_id, new_level)
+
+        # 检查是否有功能解锁提示
+        unlock_message = get_breakthrough_unlock_message(new_level, old_level)
+        if unlock_message:
+            reward_messages.append(unlock_message)
+
         # 返回奖励消息，供调用方使用
         return reward_messages
 

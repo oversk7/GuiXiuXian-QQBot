@@ -157,6 +157,27 @@ class LocationService:
             x, y, region, max_distance, exclude_player_id
         )
 
+    async def search_locations_by_name(
+        self,
+        name_keyword: str,
+        region: str = None,
+        limit: int = 10
+    ) -> List[Location]:
+        """
+        模糊搜索地点名称
+
+        Args:
+            name_keyword: 地点名称关键词
+            region: 可选，限定区域
+            limit: 返回结果数量上限，默认10
+
+        Returns:
+            地点列表
+        """
+        return await self._location_repo.find_by_name_like(
+            name_keyword, region, limit
+        )
+
     # ==================== 写入方法 ====================
 
     async def create_location(

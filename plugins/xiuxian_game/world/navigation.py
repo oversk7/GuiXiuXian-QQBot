@@ -6,6 +6,7 @@ from __future__ import annotations
 1. 仅当玩家位于现实世界（region == "大都市"）时可使用导航。
 2. 指令：
    • 导航 x y      → 开启/查看导航进度
+   • 前往 地点名   → 快速前往指定地点
    • 中断导航      → 取消当前导航
 3. 导航过程中不会主动推送消息，位置更新在玩家下一次触发相关指令时计算。
 4. 坐标范围限制：-500 ≤ x,y ≤ 500
@@ -16,11 +17,14 @@ from nonebot.adapters.qq import MessageEvent, Message
 from nonebot.params import CommandArg
 from datetime import datetime, timedelta
 from typing import Tuple
-from ..models.db import safe_session
+from ..models.db import safe_session, session_factory
 from ..models.player import Player
 from ..utils import message_add_head
 from ..models.navigation_task import NavigationTask
 from ..platform_utils import get_unified_player
+from ..infrastructure.uow.unit_of_work import UnitOfWork
+from .location_service_new import LocationService
+from .npc_service_new import NPCService
 
 # ----------------- 持久化模型 -----------------
 
@@ -31,6 +35,8 @@ REAL_WORLD = "大都会"
 
 # ----------------- 指令：导航 -----------------
 nav_cmd = on_command("导航", block=True, priority=5)
+goto_location_cmd = on_command("前往", block=True, priority=5)
+find_npc_cmd = on_command("查找", block=True, priority=5)
 stop_nav_cmd = on_command("中断导航", aliases={"停止导航", "取消导航"}, block=True, priority=5)
 
 
@@ -273,3 +279,202 @@ async def _(event: MessageEvent):
         rx, ry = (player.real_world_x or 0), (player.real_world_y or 0)
         await stop_nav_cmd.finish(message_add_head(
             f"🛑 指针折断，你停在现实坐标 ({rx},{ry})", event))
+
+
+@goto_location_cmd.handle()
+async def _(event: MessageEvent, args: Message = CommandArg()):
+    """【前往 地点名】快速导航到指定地点"""
+    location_name = args.extract_plain_text().strip()
+
+    if not location_name:
+        await goto_location_cmd.finish("⛔ 请输入地点名称，例如：前往 上京")
+
+    # 使用UnitOfWork管理会话和LocationService
+    async with UnitOfWork(session_factory) as uow:
+        player: Player | None = await get_unified_player(uow.session, event)
+        if not player:
+            await goto_location_cmd.finish("⛔ 请先创建角色")
+
+        # 实例化LocationService
+        location_service = LocationService(uow.locations)
+
+        # 搜索地点（当前区域优先）
+        current_region = player.get_current_region()
+        locations = await location_service.search_locations_by_name(
+            location_name,
+            region=current_region,
+            limit=5
+        )
+
+        # 如果当前区域没找到，再搜索其他区域
+        if not locations:
+            locations = await location_service.search_locations_by_name(
+                location_name,
+                region=None,
+                limit=5
+            )
+
+        if not locations:
+            await goto_location_cmd.finish(
+                f"⛔ 未找到地点「{location_name}」\n"
+                "💡 提示：尝试输入地点的关键词，如「上京」「市集」等"
+            )
+
+        # 如果找到多个地点，显示选项让用户确认
+        if len(locations) > 1:
+            location_list = "\n".join([
+                f"{i+1}. {loc.name} ({loc.x},{loc.y}) [{loc.region}]"
+                for i, loc in enumerate(locations)
+            ])
+            await goto_location_cmd.finish(
+                f"🔍 找到多个匹配的地点：\n"
+                f"{location_list}\n\n"
+                f"💡 请使用【导航 x y】前往具体坐标"
+            )
+
+        # 找到唯一地点，开始导航
+        target_location = locations[0]
+        tx, ty = target_location.x, target_location.y
+
+        # 检查坐标范围
+        if not (-MAX_COORD <= tx <= MAX_COORD and -MAX_COORD <= ty <= MAX_COORD):
+            await goto_location_cmd.finish(f"⛔ 目标坐标超出导航范围！")
+
+        # 创建或更新导航任务
+        task: NavigationTask | None = await uow.session.get(NavigationTask, player.id)
+        if task:
+            task.target_x = tx
+            task.target_y = ty
+            task.last_update = datetime.now()
+        else:
+            task = NavigationTask(
+                player_id=player.id,
+                target_x=tx,
+                target_y=ty,
+                last_update=datetime.now()
+            )
+            uow.session.add(task)
+
+        # 计算距离和预计时间
+        effective_attrs = await player.get_effective_attributes(uow.session)
+        effective_agility = effective_attrs.get("agility", player.agility)
+        speed_now = _tiles_per_second(effective_agility)
+
+        # 基于现实坐标计算
+        base_x, base_y = float(player.real_world_x or 0), float(player.real_world_y or 0)
+        rem_distance = _euclidean_distance(base_x, base_y, tx, ty)
+        eta_td = timedelta(seconds=int(rem_distance / speed_now)) if speed_now > 0 else timedelta(seconds=0)
+
+        # 提交事务
+        await uow.commit()
+
+        # 构建导航消息
+        rx, ry = (player.real_world_x or 0), (player.real_world_y or 0)
+        nav_msg = f"📍 已设置导航至【{target_location.name}】\n"
+        nav_msg += "━━━━━━━━━━━━━\n"
+        nav_msg += f"🎯 目标坐标 ({tx},{ty})\n"
+        nav_msg += f"📌 当前坐标 ({rx},{ry})\n"
+
+        # 如果在诡域中，显示诡域位置
+        if player.is_in_dungeon():
+            dungeon_x, dungeon_y = player.get_current_coordinates()
+            nav_msg += f"🌏 诡域位置 {player.get_current_region()} ({dungeon_x},{dungeon_y})\n"
+
+        nav_msg += f"📏 距离 {rem_distance:.1f} 格 | ⏱️ 预计 {str(eta_td)}\n"
+        nav_msg += "━━━━━━━━━━━━━\n"
+        nav_msg += "💡 【导航】查看进度 | 【中断导航】停止前进"
+
+        await goto_location_cmd.finish(message_add_head(nav_msg, event))
+
+
+@find_npc_cmd.handle()
+async def _(event: MessageEvent, args: Message = CommandArg()):
+    """【查找 NPC名称】查询NPC位置"""
+    npc_name = args.extract_plain_text().strip()
+
+    if not npc_name:
+        await find_npc_cmd.finish(
+            "⛔ 请输入NPC名称，例如：查找 商人\n\n"
+            "💡 支持模糊搜索，可以输入名称的一部分"
+        )
+
+    # 使用UnitOfWork管理会话
+    async with UnitOfWork(session_factory) as uow:
+        player: Player | None = await get_unified_player(uow.session, event)
+        if not player:
+            await find_npc_cmd.finish("⛔ 请先创建角色")
+
+        # 实例化Service
+        npc_service = NPCService(uow.session, uow.npcs)
+        location_service = LocationService(uow.locations)
+
+        # 搜索NPC（不限定地点）
+        npcs = await npc_service.find_npc_by_partial_name(npc_name, location_id=None)
+
+        if not npcs:
+            await find_npc_cmd.finish(
+                f"⛔ 未找到NPC「{npc_name}」\n"
+                "💡 提示：尝试输入NPC名称的关键词"
+            )
+
+        # 按距离排序（优先显示最近的NPC）
+        player_x = player.real_world_x or 0
+        player_y = player.real_world_y or 0
+
+        # 获取NPC对应的Location信息并计算距离
+        npc_info_list = []
+        for npc in npcs[:10]:  # 最多显示10个结果
+            location = await location_service.get_location_by_id(str(npc.location_id))
+            if not location:
+                continue
+
+            # 计算曼哈顿距离
+            distance = abs(location.x - player_x) + abs(location.y - player_y)
+
+            npc_info_list.append({
+                "npc": npc,
+                "location": location,
+                "distance": distance
+            })
+
+        # 按距离排序
+        npc_info_list.sort(key=lambda x: x["distance"])
+
+        # 构建结果消息
+        if len(npc_info_list) == 1:
+            # 只有一个结果，显示详细信息
+            info = npc_info_list[0]
+            npc = info["npc"]
+            location = info["location"]
+            distance = info["distance"]
+
+            result_msg = f"🔍 找到NPC：{npc.name}\n"
+            result_msg += "━━━━━━━━━━━━━\n"
+            result_msg += f"📍 位置：{location.name}\n"
+            result_msg += f"🗺️ 坐标：({location.x},{location.y})\n"
+            result_msg += f"🌏 区域：{location.region}\n"
+            result_msg += f"📏 距离：{distance} 格\n"
+            result_msg += "━━━━━━━━━━━━━\n"
+            result_msg += f"💡 【前往 {location.name}】快速导航"
+
+        else:
+            # 多个结果，显示列表
+            result_msg = f"🔍 找到 {len(npc_info_list)} 个匹配的NPC：\n"
+            result_msg += "━━━━━━━━━━━━━\n"
+
+            for i, info in enumerate(npc_info_list[:5], 1):  # 最多显示5个
+                npc = info["npc"]
+                location = info["location"]
+                distance = info["distance"]
+
+                result_msg += f"{i}. {npc.name}\n"
+                result_msg += f"   📍 {location.name} ({location.x},{location.y})\n"
+                result_msg += f"   📏 {distance} 格 [{location.region}]\n"
+
+            if len(npc_info_list) > 5:
+                result_msg += f"\n...还有 {len(npc_info_list) - 5} 个结果\n"
+
+            result_msg += "━━━━━━━━━━━━━\n"
+            result_msg += "💡 【前往 地点名】快速导航至指定地点"
+
+        await find_npc_cmd.finish(message_add_head(result_msg, event))

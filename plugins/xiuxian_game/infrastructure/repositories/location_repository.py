@@ -240,6 +240,38 @@ class LocationRepository(IRepository[Location]):
         result = await self._session.execute(stmt)
         return list(result.scalars().all())
 
+    async def find_by_name_like(
+        self,
+        name_pattern: str,
+        region: str = None,
+        limit: int = 10
+    ) -> List[Location]:
+        """
+        模糊搜索地点名称
+
+        Args:
+            name_pattern: 名称关键词（模糊匹配）
+            region: 可选，限定区域
+            limit: 返回结果数量上限，默认10
+
+        Returns:
+            地点列表，按名称相似度排序
+        """
+        conditions = [
+            Location.is_active == True,
+            Location.name.like(f"%{name_pattern}%")
+        ]
+        if region:
+            conditions.append(Location.region == region)
+
+        stmt = (
+            select(Location)
+            .where(and_(*conditions))
+            .limit(limit)
+        )
+        result = await self._session.execute(stmt)
+        return list(result.scalars().all())
+
     # ==================== 写入方法 ====================
 
     async def add(self, location: Location) -> Location:

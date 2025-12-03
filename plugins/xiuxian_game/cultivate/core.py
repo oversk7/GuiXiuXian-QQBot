@@ -309,40 +309,51 @@ async def handle_seclusion(event: MessageEvent):
         session.add(player)
         await session.commit()
 
-        # 构建闭关消息，包含棺材钉、月卡和公会效率提示
-        efficiency_msg = ""
+        # 构建简洁版闭关消息（折叠式）
+        # 计算总效率
+        total_efficiency = efficiency_bonus
+        efficiency_parts = []
+
         if coffin_nail_count > 0:
+            effective_count = min(coffin_nail_count, 100)
             if coffin_nail_count > 100:
-                efficiency_msg += f"\n✧ 棺材钉 ⚰️ ✖️{coffin_nail_count}(有效{effective_coffin_nail_count}) 提升效率 +{efficiency_bonus:.1f}%"
+                efficiency_parts.append(f"棺材钉×{coffin_nail_count}(有效{effective_count})")
             else:
-                efficiency_msg += f"\n✧ 棺材钉 ⚰️ ✖️{coffin_nail_count} 提升效率 +{efficiency_bonus:.1f}%"
+                efficiency_parts.append(f"棺材钉×{coffin_nail_count}")
 
         if benefits["seclusion_efficiency"] > 0:
             card_efficiency = benefits["seclusion_efficiency"] * 100
-            efficiency_msg += f"\n✧ 月卡加成 💳 提升效率 +{card_efficiency:.0f}%"
+            total_efficiency += card_efficiency
+            efficiency_parts.append("月卡")
 
         if guild_cultivation_bonus > 0:
             guild_efficiency = guild_cultivation_bonus * 100
-            efficiency_msg += f"\n✧ 公会加成 🏰 提升效率 +{guild_efficiency:.1f}%"
+            total_efficiency += guild_efficiency
+            efficiency_parts.append("公会")
 
         if mansion_cultivation_bonus > 0:
             mansion_efficiency = mansion_cultivation_bonus * 100
-            efficiency_msg += f"\n✧ 阴宅加成 🏚️ 提升效率 +{mansion_efficiency:.1f}%"
+            total_efficiency += mansion_efficiency
+            efficiency_parts.append("阴宅")
 
         seclusion_hours = benefits["seclusion_time_limit"] // 3600
-        time_limit_msg = f"\n✧ 闭关时长上限 ⏰ {seclusion_hours}小时"
 
         # 随机选择闭关文案
         seclusion_flavor_text = random.choice(SECLUSION_FLAVOR_TEXTS).format(nickname=player.nickname)
 
+        # 构建加成说明行
+        efficiency_detail = ""
+        if efficiency_parts:
+            efficiency_detail = f"\n   ↳ 效率加成来源: {' + '.join(efficiency_parts)}"
+
         msg_secl = (
-            f"🕯️{seclusion_flavor_text}\n"
+            f"⚰️ {seclusion_flavor_text}\n"
             "━━━━━━━━━━━━━\n"
-            "✧ 离线修炼进行中，期间无法普通修炼"
-            f"{efficiency_msg}"
-            f"{time_limit_msg}\n"
+            f"🔥 离线修炼已开始 | 总效率加成 +{total_efficiency:.1f}%"
+            f"{efficiency_detail}\n"
+            f"⏰ 时长上限 {seclusion_hours}小时 | 期间无法普通修炼\n"
             "━━━━━━━━━━━━━\n"
-            "⬇️ 【出关】推开棺盖"
+            "💡 【出关】推开棺盖并结算怨炁"
         )
         await seclusion.finish(message_add_head(msg_secl, event))
 
@@ -453,46 +464,59 @@ async def handle_out_seclusion(event: MessageEvent):
         await session.commit()
         exp_max2 = calculate_level_up_exp(player.level)
 
-        # 构建出关消息，包含棺材钉、月卡和公会效率提示
-        efficiency_msg = ""
-        if coffin_nail_count > 0:
-            efficiency_bonus = effective_coffin_nail_count * 0.5
-            if coffin_nail_count > 100:
-                efficiency_msg += f"\n✧ 棺材钉 ⚰️ ✖️{coffin_nail_count}(有效{effective_coffin_nail_count}) 额外获得 +{coffin_nail_bonus} 怨炁 (+{efficiency_bonus:.1f}%)"
-            else:
-                efficiency_msg += f"\n✧ 棺材钉 ⚰️ ✖️{coffin_nail_count} 额外获得 +{coffin_nail_bonus} 怨炁 (+{efficiency_bonus:.1f}%)"
-
-        if card_bonus > 0:
-            card_efficiency = benefits["seclusion_efficiency"] * 100
-            efficiency_msg += f"\n✧ 月卡加成 💳 额外获得 +{card_bonus} 怨炁 (+{card_efficiency:.0f}%)"
-
-        if reincarnation_exp_bonus > 0:
-            reincarnation_efficiency = reincarnation_bonus_rate * 100
-            efficiency_msg += f"\n✧ 转数加成 🌟 额外获得 +{reincarnation_exp_bonus} 怨炁 (+{reincarnation_efficiency:.0f}%)"
-
-        if guild_bonus > 0:
-            guild_efficiency = guild_cultivation_bonus * 100
-            efficiency_msg += f"\n✧ 公会加成 🏰 额外获得 +{guild_bonus} 怨炁 (+{guild_efficiency:.1f}%)"
-
-        if mansion_bonus > 0:
-            mansion_efficiency = mansion_cultivation_bonus * 100
-            efficiency_msg += f"\n✧ 阴宅加成 🏚️ 额外获得 +{mansion_bonus} 怨炁 (+{mansion_efficiency:.1f}%)"
-
-        # 添加阴宅使用费用信息
-        efficiency_msg += mansion_usage_msg
-
+        # 构建简洁版出关消息（折叠式）
         # 随机选择出关文案
         out_seclusion_flavor_text = random.choice(OUT_SECLUSION_FLAVOR_TEXTS)
 
+        # 生成进度条
+        progress_bar = generate_progress_bar(player.exp, exp_max2)
+
+        # 构建加成明细（折叠式）
+        bonus_parts = []
+        if coffin_nail_bonus > 0:
+            bonus_parts.append(f"棺材钉+{coffin_nail_bonus}")
+        if card_bonus > 0:
+            bonus_parts.append(f"月卡+{card_bonus}")
+        if reincarnation_exp_bonus > 0:
+            bonus_parts.append(f"转数+{reincarnation_exp_bonus}")
+        if guild_bonus > 0:
+            bonus_parts.append(f"公会+{guild_bonus}")
+        if mansion_bonus > 0:
+            bonus_parts.append(f"阴宅+{mansion_bonus}")
+
+        bonus_detail_line = ""
+        if bonus_parts:
+            total_bonus = exp_gain - base_exp_gain
+            bonus_percent = (total_bonus / base_exp_gain) * 100 if base_exp_gain > 0 else 0
+            bonus_detail = " ".join(bonus_parts)
+            bonus_detail_line = f"\n   ↳ 基础+{base_exp_gain} {bonus_detail} (总加成+{bonus_percent:.0f}%)"
+
+        # 添加阴宅费用提示
+        if mansion_usage_msg:
+            bonus_detail_line += mansion_usage_msg.replace("\n✧ ", "\n   ↳ ")
+
+        # 计算闭关时长
+        seclusion_duration = delta_time // 60  # 转换为分钟
+        hours = seclusion_duration // 60
+        minutes = seclusion_duration % 60
+        if hours > 0:
+            duration_str = f"{hours}小时{minutes}分" if minutes > 0 else f"{hours}小时"
+        else:
+            duration_str = f"{minutes}分钟"
+
+        # 智能提示
+        if player.exp >= exp_max2:
+            hint_text = "💡 【突破】境界壁垒已松动"
+        else:
+            hint_text = "💡 【修炼】继续积累怨炁"
+
         msg_out = (
-            f"🔓{out_seclusion_flavor_text}\n"
+            f"🔓 {out_seclusion_flavor_text}\n"
             "━━━━━━━━━━━━━\n"
-            f"✧ 累积怨炁 + {exp_gain}↑"
-            f"{efficiency_msg}\n"
-            f"✧ 修为残烛 {player.exp}↑/{exp_max2} {('(可突破)' if player.exp>exp_max2 else '')}\n"
-            "━━━━━━━━━━━━━\n"
-            "⬇️ 【修炼】继续喂养怨炁\n"
-            "⬇️ 【突破】倾听骨骼断裂"
+            f"🔥 累积怨炁 +{exp_gain} | 怨炁进度 {progress_bar}"
+            f"{bonus_detail_line}\n"
+            f"⏰ 闭关时长 {duration_str}\n"
+            f"{hint_text}"
         )
         await out_seclusion.finish(message_add_head(msg_out, event))
 
