@@ -1,7 +1,7 @@
 # 诡修仙项目文档系统
 
-**文档版本**: 3.4
-**最后更新**: 2025-12-03
+**文档版本**: 3.6
+**最后更新**: 2025-12-03 (地图可视化系统性能优化 + 周年庆典成就系统)
 **文档受众**: LLM代理和项目开发者
 **文档状态**: 生产就绪，Phase 2新手体验优化已完成
 
@@ -70,6 +70,9 @@ LLM代理生成的调研和分析报告（仅保留系统分析和设计参考�
 - `game_balance_analysis_2025_12_01.md` - 游戏平衡分析与漏洞修复报告 (2025-12-01)
 - `feature_flag_investigation_2025_12_02.md` - Feature Flag调查与架构决策记录
 - `doc_cleanup_investigation.md` - 文档清理调研报告（元文档）
+- `achievement_enhancement_2025_12_03.md` - 成就系统增强与Bug修复记录 (2025-12-03)
+- `anniversary_achievement_2025_12_03.md` - 周年庆典成就系统工作记录 (2025-12-03)
+- `map_visualization_optimization_implementation_2025_12_03.md` - 地图可视化系统性能优化与视觉美化 (2025-12-03)
 
 **投资系统调研**:
 - `investment_system_investigation.md` - 投资系统初步调查报告（银行+股票）
@@ -165,11 +168,12 @@ LLM代理生成的调研和分析报告（仅保留系统分析和设计参考�
 - `plugins\xiuxian_game\infrastructure\di\container.py` - DI容器
 - `plugins\xiuxian_game\social\account_switching_service.py` - 账号切换服务
 - `plugins\xiuxian_game\platform_utils.py` - 统一玩家访问接口(支持账号切换)
+- `plugins\xiuxian_game\world\map_visualizer.py` - 地图可视化系统(字体缓存+渐变背景+阴影效果)
 
 ### 新手体验系统
 - `plugins\xiuxian_game\data\novice_quests.yaml` - 新手任务链配置(10步引导)
 - `plugins\xiuxian_game\achievement\achievement_service.py` - 成就系统服务
-- `plugins\xiuxian_game\data\achievements.yaml` - 微成就配置(10个基础成就)
+- `plugins\xiuxian_game\data\achievements.yaml` - 微成就配置(11个基础成就，支持翻页)
 - `plugins\xiuxian_game\models\achievement.py` - PlayerAchievement/PlayerStats模型
 - `plugins\xiuxian_game\world\navigation.py` - 导航系统(进度条可视化)
 - `plugins\xiuxian_game\infrastructure\uow\unit_of_work.py` - UnitOfWork(修复连接泄漏)
@@ -212,7 +216,8 @@ LLM代理生成的调研和分析报告（仅保留系统分析和设计参考�
 
 **新手体验系统** (Phase 2完成 2025-12-03):
 - 10步新手任务链（从修炼到任务接取）
-- 10个微成就系统（修炼/成长/战斗/装备/财富/探索/忠诚）
+- 11个微成就系统（修炼/成长/战斗/装备/财富/探索/忠诚/周年）
+- 成就列表翻页功能（15个/页，智能参数解析）
 - 导航进度条可视化（进度条+ETA）
 - 任务导航集成（接取任务自动导航）
 - 观察命令优化（10个地点+图标分类）
@@ -274,6 +279,34 @@ LLM代理生成的调研和分析报告（仅保留系统分析和设计参考�
   - **位置**: `plugins/xiuxian_game/platform_utils.py:12-154` (核心逻辑)
   - **命令**: `plugins/xiuxian_game/social/account_switching.py:357-467` (3个新命令)
   - **详情**: `/architecture/account-switching-system.md`
+
+**✅ 成就系统增强与修复** (2025-12-03):
+- **新功能**: 成就详情查询 (`【成就 成就名】`)
+- **老玩家兼容**: 懒加载的历史统计估算机制
+- **Bug修复**: 3个关键bug (AttributeError: unused_points/Inventory/item_type)
+- **闭关系统**: 修复冥返加成缺失 + 统一术语显示
+- **开发规范**: 新增Help Information Sync规则
+- **详细记录**: `/llmdoc/agent/achievement_enhancement_2025_12_03.md`
+
+**✅ 周年庆典成就系统与连接泄漏修复** (2025-12-03):
+- **元老见证者成就**: 为2025.10.4前创建的老玩家提供周年奖励（金币50000+经验10000+属性点30）
+- **account_age条件类型**: 基于玩家创建时间的成就检查机制 + 友好的限定成就显示优化
+  - 新玩家显示: "❌ 限定成就（需2025-10-04前创建）"
+  - 老玩家显示: "✅ 已完成（1/1）"
+- **成就列表翻页**: 每页15个成就，智能参数解析（数字=页码，文字=成就名）
+- **数据库连接泄漏修复**: 重构命令处理器，避免在safe_session()内部调用finish()
+  - 修复模式: 在上下文内构建消息（返回字符串），在外部调用finish()
+  - 泄漏点数: 4处 → 0处
+- **批量解锁脚本**: `scripts/unlock_anniversary_achievement.py` 为老玩家批量解锁
+- **详细记录**: `/llmdoc/agent/anniversary_achievement_2025_12_03.md`, `/llmdoc/agent/database_connection_leak_achievement_2025_12_03.md`
+
+**✅ 地图可视化系统性能优化与视觉美化** (2025-12-03):
+- **字体缓存系统**: 类级缓存避免重复加载，性能提升 33-40%（~300ms）
+- **高性能网格绘制**: 批量绘制替代逐条绘制，网格性能提升 60-70%
+- **渐变背景效果**: 线性渐变（从浅蓝到爱丽丝蓝），提升视觉层次感
+- **地点标记阴影**: 右下偏移投影，增强地点标记立体感
+- **整体性能**: 总地图生成时间提升 20-30%
+- **详细记录**: `/llmdoc/agent/map_visualization_optimization_implementation_2025_12_03.md`
 
 **✅ 投资系统反套利机制实施** (2025-12-02):
 - **问题**: 股票投资存在无风险套利漏洞（长期持有+正向趋势=稳赚不赔）

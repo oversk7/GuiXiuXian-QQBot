@@ -9,7 +9,7 @@
 
 - `plugins/xiuxian_game/achievement/achievement_service.py` (AchievementService): 成就检查、进度更新、奖励发放核心服务
 - `plugins/xiuxian_game/achievement/commands.py` (成就查询命令): 玩家查询成就列表和进度
-- `plugins/xiuxian_game/data/achievements.yaml` (成就配置): 10个基础成就定义（条件、奖励、文案）
+- `plugins/xiuxian_game/data/achievements.yaml` (成就配置): 11个基础成就定义（条件、奖励、文案）
 - `plugins/xiuxian_game/models/achievement.py` (PlayerAchievement, PlayerStats): 成就关联表和统计数据表
 - `plugins/xiuxian_game/models/auto_migrate.py` (自动迁移): 自动创建player_achievement和player_stats表
 
@@ -51,6 +51,7 @@ first_cultivation:
 - `gold_total`: 累计金币
 - `locations_visited`: 地点探索数
 - `login_streak`: 连续登录天数
+- `account_age`: 账号创建时间（用于周年庆典等时间限定成就）
 
 ### 3.3 统计追踪机制
 
@@ -64,6 +65,89 @@ first_cultivation:
 | `equipment_obtained` | 获得装备 | `models/inventory.py:150` |
 | `locations_visited` | 探索地点 | `world/real_world_explore.py:45` |
 | `consecutive_login_days` | 连续登录 | 登录检查点（待实现） |
+
+### 3.4 老玩家兼容机制
+
+**问题**: 成就系统是新功能，老玩家的 `PlayerStats` 表为空。
+
+**解决方案**: 懒加载的历史统计估算机制（`achievement_service.py:156-196`）
+
+**估算规则**:
+- `cultivation_count = (player.level - 1) * 7.5` - 假设每级平均修炼7.5次
+- `total_battles = player.total_battles` - 使用Player表现有字段
+- `total_wins = player.total_wins` - 使用Player表现有字段
+- `equipment_obtained` - 通过 `ItemInstance.is_equipment` 计算属性统计
+
+**触发时机**: 首次查询成就/成就详情/执行成就检查时自动初始化
+
+### 3.5 成就列表翻页机制
+
+**背景**: 成就数量持续增长，单页显示所有成就会导致界面过长。
+
+**分页规则** (`commands.py:17-95`):
+- **每页显示**: 15个成就
+- **命令格式**:
+  - `【成就】` - 查看第1页（默认）
+  - `【成就 2】` - 查看第2页（数字参数=页码）
+  - `【成就 初窥门径】` - 查看成就详情（文字参数=成就名）
+- **显示信息**: 页码 "第 X/Y 页 | 总计 M/N 已解锁"
+- **排序规则**: 已解锁成就在前，未解锁在后（优先展示玩家成就）
+
+**智能参数解析**:
+```python
+if arg_text.isdigit():
+    page = int(arg_text)  # 数字 → 页码
+else:
+    await show_achievement_detail(...)  # 文字 → 成就名
+```
+
+**边界处理**:
+- 页码超出范围自动调整到有效范围
+- 页码 ≤ 0 → 第1页
+- 页码 > 总页数 → 最后一页
+
+### 3.6 账号年龄条件（account_age）与限定成就显示优化
+
+**用途**: 基于玩家创建时间的成就检查（周年庆典、特殊纪念）
+
+**配置格式**:
+```yaml
+first_anniversary:
+  condition_type: "account_age"
+  condition_target: "created_before"
+  condition_value: "2025-10-04"  # YYYY-MM-DD格式
+```
+
+**检查逻辑** (`achievement_service.py:487-492`):
+```python
+elif condition_type == "account_age":
+    cutoff_date = datetime.strptime(achievement_data.get("condition_value"), "%Y-%m-%d")
+    current_progress = 1 if player.created_at < cutoff_date else 0
+```
+
+**进度显示优化** (`commands.py:90-110`):
+
+为提升用户体验，成就列表中限定成就（account_age类型）采用特殊显示逻辑，避免显示 "0/2025-10-04" 等不友好的进度信息：
+
+**新玩家**（不符合条件）:
+```
+🔒 🎂 元老见证者 - ❌ 限定成就（需2025-10-04前创建）
+```
+
+**老玩家**（符合条件）:
+```
+✅ 🎂 元老见证者 - 进度: 1/1 (已完成)
+```
+
+**显示逻辑**:
+- 检查 `condition_type == "account_age"`
+- 若满足条件：显示 "✅ 已完成"
+- 若不满足：显示 "❌ 限定成就（需 DATE 前创建）"
+
+**应用场景**:
+- 周年庆典成就（元老见证者）
+- 限定时期注册奖励
+- 早期测试玩家特权
 
 ## 4. Design Rationale
 
@@ -79,7 +163,7 @@ first_cultivation:
 - **性能优化**: 高频统计更新不影响PlayerAchievement表查询
 - **独立索引**: 可为统计字段单独建立索引优化查询
 
-### 4.3 10个基础成就的设计意图
+### 4.3 11个基础成就的设计意图
 
 | 成就ID | 设计意图 | 预期触发时机 |
 |-------|---------|-------------|
@@ -93,6 +177,15 @@ first_cultivation:
 | `small_fortune` | 财富积累里程碑 | 累计1万金币（约5-8小时） |
 | `world_explorer` | 鼓励探索 | 访问3个地点（完成新手任务后） |
 | `loyal_believer` | 提升留存率 | 连续登录3天 |
+| `first_anniversary` | 一周年庆典 | 2025.10.4前创建（老玩家特权） |
+
+### 4.4 周年成就设计理念
+
+**元老见证者（🎂 first_anniversary）**:
+- **目标群体**: 诡修仙运行一年以来的早期玩家
+- **奖励设计**: 金币50000、经验10000、属性点30（周年特别奖励，非常丰厚）
+- **情感价值**: "一年相伴，感谢有你同行" - 体现对老玩家的感谢
+- **实现方式**: `scripts/unlock_anniversary_achievement.py` 一次性解锁脚本
 
 ## 5. Integration Points
 
@@ -122,8 +215,10 @@ await AchievementService.check_level_achievements(player_id: str, current_level:
 ```
 
 **命令接口**:
-- `【成就】` / `【成就列表】` / `【我的成就】` - 查询成就列表和完成进度
-- 输出格式: 分类显示，标注完成/未完成，显示进度和奖励
+- `【成就】` / `【成就 1】` - 查询成就列表第1页（默认）
+- `【成就 2】` - 查询成就列表第2页（数字参数=页码）
+- `【成就 成就名】` - 查询单个成就的详细信息（支持成就名或成就ID）
+- 输出格式: 分页显示（15个/页），标注完成/未完成，显示进度和奖励
 
 ## 7. Future Enhancements
 
