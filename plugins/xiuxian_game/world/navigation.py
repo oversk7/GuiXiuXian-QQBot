@@ -37,6 +37,7 @@ REAL_WORLD = "大都会"
 nav_cmd = on_command("导航", block=True, priority=5)
 goto_location_cmd = on_command("前往", block=True, priority=5)
 find_npc_cmd = on_command("查找", block=True, priority=5)
+check_data_cmd = on_command("检查数据", block=True, priority=5)
 stop_nav_cmd = on_command("中断导航", aliases={"停止导航", "取消导航"}, block=True, priority=5)
 
 
@@ -321,7 +322,8 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
         if not locations:
             await goto_location_cmd.finish(
                 f"⛔ 未找到地点「{location_name}」\n"
-                "💡 提示：尝试输入地点的关键词，如「上京」「市集」等"
+                "💡 提示：尝试输入地点的关键词，如「上京」「市集」等\n"
+                "💡 如果数据库为空，请先执行【初始化地点】命令"
             )
 
         # 如果找到多个地点，显示选项让用户确认
@@ -422,7 +424,8 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
         if not npcs:
             await find_npc_cmd.finish(
                 f"⛔ 未找到NPC「{npc_name}」\n"
-                "💡 提示：尝试输入NPC名称的关键词"
+                "💡 提示：尝试输入NPC名称的关键词\n"
+                "💡 如果数据库为空，请先执行【初始化地点】命令"
             )
 
         # 按距离排序（优先显示最近的NPC）
@@ -430,9 +433,11 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
         player_y = player.real_world_y or 0
 
         # 获取NPC对应的Location信息并计算距离
+        # NPCRepository已经预加载了location，直接使用npc.location
         npc_info_list = []
         for npc in npcs[:10]:  # 最多显示10个结果
-            location = await location_service.get_location_by_id(str(npc.location_id))
+            # 使用已预加载的location关系
+            location = npc.location
             if not location:
                 continue
 
@@ -486,3 +491,58 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
             result_msg += "💡 【前往 地点名】快速导航至指定地点"
 
         await find_npc_cmd.finish(message_add_head(result_msg, event))
+
+
+@check_data_cmd.handle()
+async def _(event: MessageEvent):
+    """【检查数据】调试命令 - 检查Location和NPC数据状态"""
+    async with UnitOfWork(session_factory) as uow:
+        location_service = LocationService(uow.locations)
+        npc_service = NPCService(uow.session, uow.npcs)
+
+        # 统计Location数量
+        from sqlalchemy import select, func
+        from ..models.location import Location
+        from ..models.npc import NPC
+
+        loc_count_stmt = select(func.count()).select_from(Location).where(Location.is_active == True)
+        loc_count = (await uow.session.execute(loc_count_stmt)).scalar()
+
+        npc_count_stmt = select(func.count()).select_from(NPC).where(NPC.is_active == True)
+        npc_count = (await uow.session.execute(npc_count_stmt)).scalar()
+
+        # 获取前5个Location示例
+        loc_sample_stmt = select(Location).where(Location.is_active == True).limit(5)
+        loc_samples = (await uow.session.execute(loc_sample_stmt)).scalars().all()
+
+        # 获取前5个NPC示例
+        npc_sample_stmt = select(NPC).where(NPC.is_active == True).limit(5)
+        npc_samples = (await uow.session.execute(npc_sample_stmt)).scalars().all()
+
+        msg = "📊 数据库状态检查\n"
+        msg += "━━━━━━━━━━━━━\n"
+        msg += f"📍 Location总数: {loc_count}\n"
+        msg += f"👤 NPC总数: {npc_count}\n"
+        msg += "━━━━━━━━━━━━━\n"
+
+        if loc_samples:
+            msg += "📍 Location示例:\n"
+            for loc in loc_samples:
+                msg += f"  • {loc.name} ({loc.x},{loc.y})\n"
+        else:
+            msg += "⚠️ 没有Location数据！\n"
+
+        msg += "━━━━━━━━━━━━━\n"
+
+        if npc_samples:
+            msg += "👤 NPC示例:\n"
+            for npc in npc_samples:
+                msg += f"  • {npc.name} [{npc.npc_type.value}]\n"
+        else:
+            msg += "⚠️ 没有NPC数据！\n"
+
+        msg += "━━━━━━━━━━━━━\n"
+        if loc_count == 0 or npc_count == 0:
+            msg += "💡 请执行【初始化地点】命令初始化数据"
+
+        await check_data_cmd.finish(message_add_head(msg, event))
