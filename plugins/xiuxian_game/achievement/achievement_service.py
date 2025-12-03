@@ -41,7 +41,7 @@ class AchievementService:
             player_id: 玩家ID
         """
         from ..models.player import Player
-        from ..models.inventory import Inventory
+        from ..models.inventory import ItemInstance
 
         # 检查是否已存在
         result = await session.execute(
@@ -85,9 +85,9 @@ class AchievementService:
 
             # 3. 统计玩家已拥有的装备数量（包括已装备和背包中的）
             inventory_result = await session.execute(
-                select(Inventory).where(
-                    Inventory.player_id == player_id,
-                    Inventory.item_type.in_(["weapon", "armor", "accessory", "artifact"])
+                select(ItemInstance).where(
+                    ItemInstance.player_id == player_id,
+                    ItemInstance.item_type.in_(["weapon", "armor", "accessory", "artifact"])
                 )
             )
             inventory_items = inventory_result.scalars().all()
