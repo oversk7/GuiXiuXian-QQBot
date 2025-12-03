@@ -121,7 +121,17 @@ async def handle_daily_task(event: MessageEvent):
             lines.append("🎉 今日所有委托已完成，明日再来！")
         elif len(tasks) < 3:
             lines.append("💡 使用【刷新委托】获取更多委托任务")
-        
+
+        # 检查新手任务（在最后）
+        from ..quest.novice_quest_service import NoviceQuestService
+        quest_completed, quest_msg = await NoviceQuestService.check_and_advance_quest(
+            uow.session, player, "command", {"command": "任务"}
+        )
+
+        if quest_completed and quest_msg:
+            lines.append("")
+            lines.append(quest_msg)
+
         await daily_task_cmd.finish(message_add_head("\n".join(lines), event))
 
 

@@ -496,6 +496,17 @@ async def handle_player_attack(session, attacker: Player, target: Player, event:
                 pass
 
             await session.commit()
+
+            # 检查新手任务
+            from ..quest.novice_quest_service import NoviceQuestService
+            quest_completed, quest_msg = await NoviceQuestService.check_and_advance_quest(
+                session, attacker, "command", {"command": "攻击"}
+            )
+
+            if quest_completed and quest_msg:
+                result_lines.append("")
+                result_lines.append(quest_msg)
+
             await attack_cmd.finish(message_add_head("\n".join(result_lines), event))
 
 
@@ -716,6 +727,17 @@ async def handle_player_attack(session, attacker: Player, target: Player, event:
         result_lines.append(battle_desc)
 
         await session.commit()
+
+        # 检查新手任务
+        from ..quest.novice_quest_service import NoviceQuestService
+        quest_completed, quest_msg = await NoviceQuestService.check_and_advance_quest(
+            session, attacker, "command", {"command": "攻击"}
+        )
+
+        if quest_completed and quest_msg:
+            result_lines.append("")
+            result_lines.append(quest_msg)
+
         await attack_cmd.finish(message_add_head("\n".join(result_lines), event))
 
     except ValueError as e:
@@ -852,6 +874,17 @@ async def handle_npc_attack(session, attacker: Player, target_npc, event: Messag
                 result_lines.append("⏰ 战斗超时，平局")
 
         await session.commit()
+
+        # 检查新手任务
+        from ..quest.novice_quest_service import NoviceQuestService
+        quest_completed, quest_msg = await NoviceQuestService.check_and_advance_quest(
+            session, attacker, "command", {"command": "攻击"}
+        )
+
+        if quest_completed and quest_msg:
+            result_lines.append("")
+            result_lines.append(quest_msg)
+
         await attack_cmd.finish(message_add_head("\n".join(result_lines), event))
 
     except ValueError as e:

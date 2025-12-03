@@ -460,6 +460,15 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
         nav_msg += "━━━━━━━━━━━━━\n"
         nav_msg += "💡 【导航】查看进度 | 【中断导航】停止前进"
 
+        # 检查新手任务
+        from ..quest.novice_quest_service import NoviceQuestService
+        quest_completed, quest_msg = await NoviceQuestService.check_and_advance_quest(
+            uow.session, player, "command", {"command": "前往"}
+        )
+
+        if quest_completed and quest_msg:
+            nav_msg += f"\n\n{quest_msg}"
+
         await goto_location_cmd.finish(message_add_head(nav_msg, event))
 
 

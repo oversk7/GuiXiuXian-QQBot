@@ -223,7 +223,17 @@ async def handle_use_item(event: MessageEvent, args: Message = CommandArg()):
         session.add(player)
         await session.commit()
 
-        await use_item.finish(f"✅ 成功使用 {item_name} ✖️{quantity}\n" + msg)
+        # 检查新手任务
+        from ..quest.novice_quest_service import NoviceQuestService
+        quest_completed, quest_msg = await NoviceQuestService.check_and_advance_quest(
+            session, player, "command", {"command": "使用"}
+        )
+
+        result_msg = f"✅ 成功使用 {item_name} ✖️{quantity}\n" + msg
+        if quest_completed and quest_msg:
+            result_msg += f"\n\n{quest_msg}"
+
+        await use_item.finish(result_msg)
 
 
 @elixir_tolerance_cmd.handle()
