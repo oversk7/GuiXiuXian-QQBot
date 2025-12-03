@@ -8,11 +8,14 @@
     - 查询所有在2025-10-04之前创建的玩家
     - 为符合条件且未解锁的玩家自动解锁first_anniversary成就
     - 发放周年庆典奖励（金币50000、经验10000、属性点30）
+
+注意：
+    此脚本完全独立运行，不依赖NoneBot和插件模块
+    使用原始SQL查询避免导入插件代码
 """
 
 import asyncio
 import sys
-import os
 from pathlib import Path
 from datetime import datetime
 import yaml
@@ -21,15 +24,28 @@ import yaml
 project_root = Path(__file__).parent.parent
 sys.path.insert(0, str(project_root))
 
-# 在导入插件模块之前，设置环境变量避免 NoneBot 初始化检查
-os.environ.setdefault('NONEBOT_SKIP_INIT_CHECK', '1')
-
-from sqlalchemy import select, and_
 from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession
 from sqlalchemy.orm import sessionmaker
+from sqlalchemy import text
 
 
-# ==================== 独立数据库配置 ====================
+# ==================== 配置 ====================
+
+# 截止日期（2025-10-04之前创建的账号）
+CUTOFF_DATE = "2025-10-04"
+
+# 成就ID
+ACHIEVEMENT_ID = "first_anniversary"
+
+# 奖励配置
+REWARDS = {
+    "gold": 50000,
+    "exp": 10000,
+    "attribute_points": 30
+}
+
+
+# ==================== 数据库连接 ====================
 
 def load_database_config() -> dict:
     """加载数据库配置"""
@@ -41,8 +57,7 @@ def load_database_config() -> dict:
             "database": {
                 "type": "sqlite",
                 "sqlite": {
-                    "path": "data/game.db",
-                    "timeout": 30
+                    "path": "data/game.db"
                 }
             }
         }
@@ -81,41 +96,34 @@ database_url = build_database_url(db_config)
 engine = create_async_engine(database_url, echo=False)
 AsyncSessionLocal = sessionmaker(bind=engine, class_=AsyncSession, expire_on_commit=False)
 
-# 导入模型类（必须在数据库引擎创建之后）
-from plugins.xiuxian_game.models.player import Player
-from plugins.xiuxian_game.models.achievement import PlayerAchievement, PlayerStats
 
+# ==================== 核心逻辑 ====================
 
 async def unlock_anniversary_for_old_players():
     """为老玩家解锁周年成就"""
 
-    # 设置截止日期
-    cutoff_date = datetime(2025, 10, 4)
-    achievement_id = "first_anniversary"
-
-    # 成就奖励配置
-    rewards = {
-        "gold": 50000,
-        "exp": 10000,
-        "attribute_points": 30
-    }
-
     print("=" * 60)
     print("🎂 诡修仙一周年成就解锁脚本")
     print("=" * 60)
-    print(f"截止日期: {cutoff_date.strftime('%Y-%m-%d')}")
-    print(f"成就ID: {achievement_id}")
-    print(f"奖励: 金币{rewards['gold']} 经验{rewards['exp']} 属性点{rewards['attribute_points']}")
+    print(f"截止日期: {CUTOFF_DATE}")
+    print(f"成就ID: {ACHIEVEMENT_ID}")
+    print(f"奖励: 金币{REWARDS['gold']} 经验{REWARDS['exp']} 属性点{REWARDS['attribute_points']}")
     print()
 
     async with AsyncSessionLocal() as session:
         try:
             # 1. 查询所有符合条件的老玩家
             print("📊 正在查询符合条件的玩家...")
-            result = await session.execute(
-                select(Player).where(Player.created_at < cutoff_date)
-            )
-            old_players = result.scalars().all()
+
+            query = text("""
+                SELECT id, uid, nickname, created_at
+                FROM player
+                WHERE created_at < :cutoff_date
+                ORDER BY created_at ASC
+            """)
+
+            result = await session.execute(query, {"cutoff_date": CUTOFF_DATE})
+            old_players = result.fetchall()
 
             if not old_players:
                 print("❌ 未找到符合条件的玩家")
@@ -130,56 +138,90 @@ async def unlock_anniversary_for_old_players():
             error_count = 0
 
             for player in old_players:
+                player_id = player[0]
+                player_uid = player[1]
+                player_nickname = player[2]
+                player_created_at = player[3]
+
                 try:
                     # 检查是否已解锁
-                    existing_result = await session.execute(
-                        select(PlayerAchievement).where(
-                            and_(
-                                PlayerAchievement.player_id == player.id,
-                                PlayerAchievement.achievement_id == achievement_id,
-                                PlayerAchievement.is_completed == True
-                            )
-                        )
+                    check_query = text("""
+                        SELECT id FROM player_achievement
+                        WHERE player_id = :player_id
+                        AND achievement_id = :achievement_id
+                        AND is_completed = 1
+                    """)
+
+                    check_result = await session.execute(
+                        check_query,
+                        {"player_id": player_id, "achievement_id": ACHIEVEMENT_ID}
                     )
-                    existing = existing_result.scalar_one_or_none()
+                    existing = check_result.fetchone()
 
                     if existing:
-                        print(f"⏭️  跳过 {player.nickname} (UID:{player.uid}) - 已解锁")
+                        print(f"⏭️  跳过 {player_nickname} (UID:{player_uid}) - 已解锁")
                         skipped_count += 1
                         continue
 
-                    # 初始化PlayerStats（如果不存在）
-                    stats_result = await session.execute(
-                        select(PlayerStats).where(PlayerStats.player_id == player.id)
-                    )
-                    stats = stats_result.scalar_one_or_none()
+                    # 确保 player_stats 存在
+                    stats_check = text("""
+                        SELECT player_id FROM player_stats
+                        WHERE player_id = :player_id
+                    """)
+                    stats_result = await session.execute(stats_check, {"player_id": player_id})
+                    stats_exists = stats_result.fetchone()
 
-                    if not stats:
-                        stats = PlayerStats(player_id=player.id)
-                        session.add(stats)
+                    if not stats_exists:
+                        # 创建 player_stats 记录
+                        create_stats = text("""
+                            INSERT INTO player_stats (player_id, cultivation_count, total_battles, total_wins, total_kills, equipment_obtained)
+                            VALUES (:player_id, 0, 0, 0, 0, 0)
+                        """)
+                        await session.execute(create_stats, {"player_id": player_id})
 
                     # 创建成就记录
-                    achievement_record = PlayerAchievement(
-                        player_id=player.id,
-                        achievement_id=achievement_id,
-                        is_completed=True,
-                        reward_claimed=True,
-                        unlocked_at=datetime.now()
+                    insert_achievement = text("""
+                        INSERT INTO player_achievement (player_id, achievement_id, is_completed, reward_claimed, unlocked_at)
+                        VALUES (:player_id, :achievement_id, 1, 1, :unlocked_at)
+                    """)
+
+                    await session.execute(
+                        insert_achievement,
+                        {
+                            "player_id": player_id,
+                            "achievement_id": ACHIEVEMENT_ID,
+                            "unlocked_at": datetime.now()
+                        }
                     )
-                    session.add(achievement_record)
 
                     # 发放奖励
-                    player.gold += rewards["gold"]
-                    player.exp += rewards["exp"]
-                    player.attribute_points += rewards["attribute_points"]
-                    session.add(player)
+                    update_player = text("""
+                        UPDATE player
+                        SET gold = gold + :gold,
+                            exp = exp + :exp,
+                            attribute_points = attribute_points + :attribute_points
+                        WHERE id = :player_id
+                    """)
 
-                    print(f"✅ 解锁成功: {player.nickname} (UID:{player.uid})")
-                    print(f"   创建时间: {player.created_at.strftime('%Y-%m-%d %H:%M:%S')}")
+                    await session.execute(
+                        update_player,
+                        {
+                            "player_id": player_id,
+                            "gold": REWARDS["gold"],
+                            "exp": REWARDS["exp"],
+                            "attribute_points": REWARDS["attribute_points"]
+                        }
+                    )
+
+                    print(f"✅ 解锁成功: {player_nickname} (UID:{player_uid})")
+                    if isinstance(player_created_at, str):
+                        print(f"   创建时间: {player_created_at}")
+                    else:
+                        print(f"   创建时间: {player_created_at.strftime('%Y-%m-%d %H:%M:%S')}")
                     unlocked_count += 1
 
                 except Exception as e:
-                    print(f"❌ 错误: {player.nickname} (UID:{player.uid}) - {str(e)}")
+                    print(f"❌ 错误: {player_nickname} (UID:{player_uid}) - {str(e)}")
                     error_count += 1
                     continue
 
