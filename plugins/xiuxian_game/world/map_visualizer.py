@@ -111,28 +111,36 @@ class MapVisualizer:
                 '/Library/Fonts/Arial Unicode MS.ttf',
             ]
 
-            # 加载不同大小的字体
-            for size, name in [(12, 'small'), (14, 'medium'), (16, 'large'), (20, 'title')]:
-                font_loaded = False
-                for font_path in font_paths:
+            # 首先找到一个可用的中文字体路径
+            available_font_path = None
+            for font_path in font_paths:
+                if os.path.exists(font_path):
                     try:
-                        self.fonts[name] = ImageFont.truetype(font_path, size)
-                        font_loaded = True
-                        print(f"✓ 成功加载字体: {os.path.basename(font_path)} (大小: {size})")
+                        # 尝试加载测试
+                        test_font = ImageFont.truetype(font_path, 12)
+                        available_font_path = font_path
+                        print(f"✓ 找到可用中文字体: {os.path.basename(font_path)}")
                         break
-                    except (OSError, IOError) as e:
+                    except (OSError, IOError):
                         continue
 
-                if not font_loaded:
-                    # 尝试使用系统默认字体，但指定大小
+            # 如果找到了可用字体，加载所有大小
+            if available_font_path:
+                for size, name in [(12, 'small'), (14, 'medium'), (16, 'large'), (20, 'title')]:
                     try:
-                        # 尝试使用 DejaVu Sans 作为回退字体
-                        self.fonts[name] = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf", size)
-                        print(f"使用回退字体 DejaVu Sans (大小: {size})")
+                        self.fonts[name] = ImageFont.truetype(available_font_path, size)
+                        print(f"  - 加载字体大小 {size}px: {name}")
                     except (OSError, IOError):
-                        # 最后使用默认字体
                         self.fonts[name] = ImageFont.load_default()
-                        print(f"警告: 无法找到任何字体，使用系统默认字体 (大小: {size})")
+                        print(f"  - 警告: 字体大小 {size} 加载失败，使用默认字体")
+            else:
+                # 没有找到中文字体，使用默认字体
+                print("⚠️ 警告: 未找到任何中文字体，图例文字将显示为方块")
+                print("   建议安装中文字体：")
+                print("   Ubuntu/Debian: sudo apt-get install fonts-wqy-microhei")
+                print("   CentOS/RHEL: sudo yum install wqy-microhei-fonts")
+                for name in ['small', 'medium', 'large', 'title']:
+                    self.fonts[name] = ImageFont.load_default()
 
         except Exception as e:
             # 全部使用默认字体
