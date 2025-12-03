@@ -1,12 +1,19 @@
 """
 自动数据库迁移模块
-在 bot 启动时自动检测并添加缺失的字段和索引
+在 bot 启动时自动检测并添加缺失的字段、索引和 ENUM 值
 无需手动执行 SQL 或 Alembic 命令
+
+功能：
+1. 创建缺失的表
+2. 添加缺失的字段
+3. 创建缺失的索引
+4. 检测并修复 ENUM 类型不匹配（新增）
 """
 from sqlalchemy import text, inspect
 from sqlalchemy.ext.asyncio import AsyncEngine
-from typing import Dict, List, Tuple
+from typing import Dict, List, Tuple, Set
 import logging
+import re
 
 logger = logging.getLogger(__name__)
 
@@ -68,11 +75,35 @@ REQUIRED_INDEXES: List[Tuple[str, str, str]] = [
 ]
 
 
+# 定义需要检查的 ENUM 列
+# 格式: {表名: {列名: [允许的值列表]}}
+# ⚠️ 这里定义的值必须与代码中的 Enum 类保持一致！
+REQUIRED_ENUMS: Dict[str, Dict[str, List[str]]] = {
+    "daily_task": {
+        "task_type": [
+            "ghost_elimination",
+            "pen_spirit_case",
+            "fake_immortal_cult",
+            "shape_shifter_hunt",
+            "stone_curse_break",
+            "torture_cult_raid",
+            "tutorial",
+        ],
+        # 如果有其他 ENUM 列，在这里添加
+        # "status": ["AVAILABLE", "ACCEPTED", "COMPLETED", "EXPIRED"],
+    },
+    # 未来如果有其他表的 ENUM 列需要检查，在这里添加
+    # "other_table": {
+    #     "enum_column": ["value1", "value2", "value3"],
+    # },
+}
+
+
 # ==================== 自动迁移逻辑 ====================
 
 async def auto_migrate(engine: AsyncEngine, verbose: bool = True):
     """
-    自动检测并添加缺失的数据库字段和索引
+    自动检测并添加缺失的数据库字段、索引和 ENUM 值
 
     Args:
         engine: SQLAlchemy 异步引擎
@@ -91,9 +122,14 @@ async def auto_migrate(engine: AsyncEngine, verbose: bool = True):
         # 3. 创建缺失的索引
         indexes_added = await _add_missing_indexes(conn, verbose)
 
+        # 4. 检测并修复 ENUM 列（新增）
+        enums_fixed = await _fix_enum_columns(conn, verbose)
+
         if verbose:
-            if tables_created > 0 or fields_added > 0 or indexes_added > 0:
-                print(f"✅ [自动迁移] 完成！创建了 {tables_created} 个表，添加了 {fields_added} 个字段，{indexes_added} 个索引")
+            if tables_created > 0 or fields_added > 0 or indexes_added > 0 or enums_fixed > 0:
+                print(f"✅ [自动迁移] 完成！创建了 {tables_created} 个表，"
+                      f"添加了 {fields_added} 个字段，{indexes_added} 个索引，"
+                      f"修复了 {enums_fixed} 个 ENUM 列")
             else:
                 print("✓ [自动迁移] 数据库结构已是最新")
 
@@ -218,3 +254,197 @@ async def verify_migration(engine: AsyncEngine) -> bool:
 
         logger.info("✅ 所有必需字段都已存在")
         return True
+
+
+# ==================== ENUM 修复函数 ====================
+
+async def _fix_enum_columns(conn, verbose: bool) -> int:
+    """
+    检测并修复 ENUM 列的值不匹配问题
+
+    MySQL ENUM 类型的限制：
+    - 不能直接 ALTER ENUM ADD VALUE
+    - 必须重建整个列
+
+    修复策略：
+    1. 检测数据库中 ENUM 列的实际值
+    2. 与 REQUIRED_ENUMS 中定义的期望值对比
+    3. 如果不匹配，自动重建 ENUM 列
+
+    Returns:
+        int: 修复的 ENUM 列数量
+    """
+    fixed_count = 0
+
+    for table_name, enum_columns in REQUIRED_ENUMS.items():
+        for column_name, expected_values in enum_columns.items():
+            try:
+                # 1. 获取数据库中的实际 ENUM 值
+                actual_values = await _get_enum_values(conn, table_name, column_name)
+
+                if actual_values is None:
+                    if verbose:
+                        logger.warning(f"⚠️ [ENUM检查] 表 {table_name} 或列 {column_name} 不存在，跳过")
+                    continue
+
+                # 2. 对比期望值和实际值
+                expected_set = set(expected_values)
+                actual_set = set(actual_values)
+
+                if expected_set == actual_set:
+                    if verbose:
+                        logger.debug(f"  ✓ ENUM 列 {table_name}.{column_name} 已是最新")
+                    continue
+
+                # 3. 发现差异，执行修复
+                missing_values = expected_set - actual_set
+                extra_values = actual_set - expected_set
+
+                if verbose:
+                    print(f"  🔧 修复 ENUM 列: {table_name}.{column_name}")
+                    if missing_values:
+                        print(f"     缺失值: {', '.join(missing_values)}")
+                    if extra_values:
+                        print(f"     多余值: {', '.join(extra_values)} (将保留)")
+
+                # 4. 重建 ENUM 列
+                await _rebuild_enum_column(conn, table_name, column_name, expected_values, verbose)
+                fixed_count += 1
+
+                if verbose:
+                    print(f"     ✅ 修复完成")
+
+            except Exception as e:
+                logger.error(f"❌ [ENUM修复] 处理 {table_name}.{column_name} 失败: {e}")
+
+    return fixed_count
+
+
+async def _get_enum_values(conn, table_name: str, column_name: str) -> Set[str] | None:
+    """
+    获取数据库中 ENUM 列的实际值
+
+    Args:
+        conn: 数据库连接
+        table_name: 表名
+        column_name: 列名
+
+    Returns:
+        Set[str]: ENUM 值集合，如果列不存在或不是 ENUM 类型则返回 None
+    """
+    try:
+        # 使用 SHOW COLUMNS 获取列信息
+        result = await conn.execute(
+            text(f"SHOW COLUMNS FROM {table_name} LIKE :column_name"),
+            {"column_name": column_name}
+        )
+        row = result.fetchone()
+
+        if not row:
+            return None  # 列不存在
+
+        # row[1] 是 Type 字段，格式如: enum('value1','value2','value3')
+        column_type = row[1]
+
+        if not column_type.startswith('enum('):
+            return None  # 不是 ENUM 类型
+
+        # 解析 ENUM 值
+        # 正则提取所有单引号内的值
+        enum_values = re.findall(r"'([^']*)'", column_type)
+
+        return set(enum_values)
+
+    except Exception as e:
+        logger.error(f"获取 ENUM 值失败: {table_name}.{column_name}: {e}")
+        return None
+
+
+async def _rebuild_enum_column(
+    conn,
+    table_name: str,
+    column_name: str,
+    new_values: List[str],
+    verbose: bool
+) -> None:
+    """
+    重建 ENUM 列（安全的方式）
+
+    步骤：
+    1. 创建临时 VARCHAR 列
+    2. 复制数据到临时列
+    3. 删除旧 ENUM 列
+    4. 创建新 ENUM 列（包含所有期望的值）
+    5. 恢复数据
+    6. 删除临时列
+
+    Args:
+        conn: 数据库连接
+        table_name: 表名
+        column_name: 列名
+        new_values: 新的 ENUM 值列表
+        verbose: 是否打印详细日志
+    """
+    temp_column = f"{column_name}_temp_migration"
+
+    try:
+        # 获取列的完整定义（包括 NOT NULL、DEFAULT 等属性）
+        result = await conn.execute(
+            text(f"SHOW COLUMNS FROM {table_name} LIKE :column_name"),
+            {"column_name": column_name}
+        )
+        row = result.fetchone()
+
+        is_nullable = (row[2] == 'YES')  # Null 字段
+        default_value = row[4]  # Default 字段
+        comment = row[5] if len(row) > 5 else ''  # Comment 字段
+
+        # 构建 ENUM 列的属性
+        enum_values_str = ', '.join(f"'{v}'" for v in new_values)
+        column_attrs = []
+
+        if not is_nullable:
+            column_attrs.append("NOT NULL")
+
+        if default_value:
+            column_attrs.append(f"DEFAULT '{default_value}'")
+
+        if comment:
+            column_attrs.append(f"COMMENT '{comment}'")
+
+        attrs_str = ' '.join(column_attrs)
+
+        # 执行迁移步骤
+        steps = [
+            # 1. 添加临时列
+            f"ALTER TABLE {table_name} ADD COLUMN {temp_column} VARCHAR(100)",
+
+            # 2. 复制数据
+            f"UPDATE {table_name} SET {temp_column} = {column_name}",
+
+            # 3. 删除旧列
+            f"ALTER TABLE {table_name} DROP COLUMN {column_name}",
+
+            # 4. 创建新 ENUM 列
+            f"ALTER TABLE {table_name} ADD COLUMN {column_name} ENUM({enum_values_str}) {attrs_str}",
+
+            # 5. 恢复数据
+            f"UPDATE {table_name} SET {column_name} = {temp_column}",
+
+            # 6. 删除临时列
+            f"ALTER TABLE {table_name} DROP COLUMN {temp_column}",
+        ]
+
+        for step_sql in steps:
+            if verbose:
+                logger.debug(f"     执行: {step_sql[:80]}...")
+            await conn.execute(text(step_sql))
+
+    except Exception as e:
+        logger.error(f"重建 ENUM 列失败: {table_name}.{column_name}: {e}")
+        # 尝试清理临时列
+        try:
+            await conn.execute(text(f"ALTER TABLE {table_name} DROP COLUMN IF EXISTS {temp_column}"))
+        except:
+            pass
+        raise
