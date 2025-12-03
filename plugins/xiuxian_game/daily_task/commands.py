@@ -93,6 +93,11 @@ async def handle_daily_task(event: MessageEvent):
                 lines.append(f"👹 目标敌人：{task.enemy_name} Lv.{task.enemy_level}")
                 lines.append(f"💰 任务奖励：{task.get_reward_summary(bool(player.guild_id))}")
                 lines.append(f"📊 任务状态：{status_text}")
+
+                # 添加导航快捷方式提示
+                if task.is_available() or task.is_accepted():
+                    lines.append(f"🧭 快捷导航：【导航 {task.target_x} {task.target_y}】")
+
                 lines.append("")
 
         lines.append("━━━━━━━━━━━━━")
@@ -142,14 +147,22 @@ async def handle_accept_task(event: MessageEvent, args: Message = CommandArg()):
         # 解析参数
         args_text = args.extract_plain_text().strip()
         task_index = 1  # 默认接取第一个任务
+        auto_nav = False  # 是否自动设置导航
 
         if args_text:
-            try:
-                task_index = int(args_text)
-                if task_index < 1 or task_index > 3:
-                    await accept_task_cmd.finish("⛔ 委托编号必须是1-3之间的数字")
-            except ValueError:
-                await accept_task_cmd.finish("⛔ 请输入正确的委托编号（1-3）")
+            # 检查是否包含导航参数
+            auto_nav = "--导航" in args_text or "导航" in args_text
+
+            # 移除导航参数后解析任务编号
+            task_number_text = args_text.replace("--导航", "").replace("导航", "").strip()
+
+            if task_number_text:
+                try:
+                    task_index = int(task_number_text)
+                    if task_index < 1 or task_index > 3:
+                        await accept_task_cmd.finish("⛔ 委托编号必须是1-3之间的数字")
+                except ValueError:
+                    await accept_task_cmd.finish("⛔ 请输入正确的委托编号（1-3）")
 
         # 实例化依赖Service
         location_service = LocationService(uow.locations)
@@ -190,7 +203,37 @@ async def handle_accept_task(event: MessageEvent, args: Message = CommandArg()):
         success, message = await task_service.accept_task(task)
 
         if success:
+            # 如果需要自动导航
+            if auto_nav:
+                from ..world.navigation import NavigationTask, _euclidean_distance
+                from datetime import datetime
+
+                # 计算初始距离
+                player_x = player.real_world_x if player.real_world_x is not None else (player.x or 0)
+                player_y = player.real_world_y if player.real_world_y is not None else (player.y or 0)
+                initial_distance = _euclidean_distance(
+                    player_x, player_y, task.target_x, task.target_y
+                )
+
+                # 创建或更新导航任务
+                nav_task = await uow.session.get(NavigationTask, player.id)
+                if nav_task:
+                    nav_task.target_x = task.target_x
+                    nav_task.target_y = task.target_y
+                    nav_task.last_update = datetime.now()
+                    nav_task.initial_distance = initial_distance
+                else:
+                    nav_task = NavigationTask(
+                        player_id=player.id,
+                        target_x=task.target_x,
+                        target_y=task.target_y,
+                        last_update=datetime.now(),
+                        initial_distance=initial_distance
+                    )
+                    uow.session.add(nav_task)
+
             await uow.commit()
+
             msg = (
                 f"🏛️ 缉邪司委托接取成功！\n"
                 f"━━━━━━━━━━━━━\n"
@@ -200,8 +243,14 @@ async def handle_accept_task(event: MessageEvent, args: Message = CommandArg()):
                 f"👹 敌人：{task.enemy_name} Lv.{task.enemy_level}\n"
                 f"💰 奖励：{task.get_reward_summary(bool(player.guild_id))}\n"
                 f"━━━━━━━━━━━━━\n"
-                f"💡 请前往目标位置，使用【观察】查看鬼怪，击杀后使用【完成任务】"
+                f"💡 请前往目标位置，使用【观察】查看鬼怪，击杀后使用【完成任务】\n"
             )
+
+            if auto_nav:
+                msg += f"🧭 已自动设置导航至任务位置\n"
+                msg += f"💡 使用【导航】查看进度 | 【中断导航】停止前进"
+            else:
+                msg += f"🧭 快捷导航：【导航 {task.target_x} {task.target_y}】或【接取任务 {task_index} 导航】"
         else:
             msg = f"⛔ {message}"
 
