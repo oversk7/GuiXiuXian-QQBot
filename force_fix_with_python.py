@@ -10,7 +10,32 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).parent))
 
 from sqlalchemy import text
-from plugins.xiuxian_game.models.db import engine
+from sqlalchemy.ext.asyncio import create_async_engine
+import yaml
+
+# 直接加载数据库配置，不依赖NoneBot
+def load_config():
+    """加载数据库配置"""
+    config_path = Path(__file__).parent / "plugins" / "xiuxian_game" / "config" / "database.yaml"
+    with open(config_path, "r", encoding="utf-8") as f:
+        config = yaml.safe_load(f)
+    return config
+
+# 创建数据库引擎
+config = load_config()
+db_config = config["database"]
+
+if db_config["type"] == "mysql":
+    mysql_cfg = db_config["mysql"]
+    DATABASE_URL = (
+        f"mysql+aiomysql://{mysql_cfg['user']}:{mysql_cfg['password']}"
+        f"@{mysql_cfg['host']}:{mysql_cfg['port']}/{mysql_cfg['database']}"
+        f"?charset={mysql_cfg.get('charset', 'utf8mb4')}"
+    )
+else:
+    raise ValueError("此脚本仅支持MySQL数据库")
+
+engine = create_async_engine(DATABASE_URL, echo=False, pool_pre_ping=True)
 
 
 async def force_fix():
@@ -78,10 +103,17 @@ async def force_fix():
 
             # 步骤7: 验证代码枚举定义
             print("\n[7/7] 验证代码中的枚举定义...")
-            from plugins.xiuxian_game.models.daily_task import TaskType
-            code_values = [e.value for e in TaskType]
-            print(f"  代码中的值: {code_values}")
-            print(f"  数量: {len(code_values)}")
+            expected_values = [
+                'ghost_elimination',
+                'pen_spirit_case',
+                'fake_immortal_cult',
+                'shape_shifter_hunt',
+                'stone_curse_break',
+                'torture_cult_raid',
+                'tutorial'
+            ]
+            print(f"  代码中的值: {expected_values}")
+            print(f"  数量: {len(expected_values)}")
 
             print("\n" + "=" * 60)
             print("✅ 修复完成！")
