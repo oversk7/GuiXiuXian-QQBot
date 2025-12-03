@@ -79,12 +79,89 @@ novice_basic_chain:
       auto_accept: true
       flavor_text: "了解自己，才能超越自己"
 
+    # 第6步：探索周围
+    - step: 6
+      title: "感知世界"
+      description: "使用【观察】或【附近】指令，探索你所在的位置"
+      completion_type: "command"
+      completion_target: "观察"
+      completion_count: 1
+      rewards:
+        exp: 300
+        gold: 800
+      auto_accept: true
+      flavor_text: "睁开你的第三只眼，看清这个世界的真实面貌"
+
+    # 第7步：学会导航
+    - step: 7
+      title: "寻路者"
+      description: "使用【前往 上京】指令，学习如何快速移动到其他地点"
+      completion_type: "command"
+      completion_target: "前往"
+      completion_count: 1
+      rewards:
+        exp: 500
+        gold: 1000
+      auto_accept: true
+      flavor_text: "在诡异的世界中，迷路是最危险的事"
+
+    # 第8步：初次战斗
+    - step: 8
+      title: "血之洗礼"
+      description: "前往任意地点，使用【攻击】指令进行你的第一次战斗"
+      completion_type: "command"
+      completion_target: "攻击"
+      completion_count: 1
+      rewards:
+        exp: 800
+        gold: 1500
+        items:
+          - item_id: "heal_potion"
+            quantity: 20
+      auto_accept: true
+      flavor_text: "鲜血与怨气的交织，这就是驭鬼者的宿命"
+
+    # 第9步：使用物品
+    - step: 9
+      title: "生存之道"
+      description: "使用【背包】查看物品，然后使用【使用 回春散】恢复生命值"
+      completion_type: "command"
+      completion_target: "使用"
+      completion_count: 1
+      rewards:
+        exp: 300
+        gold: 500
+        items:
+          - item_id: "spirit_herb"
+            quantity: 15
+      auto_accept: true
+      flavor_text: "学会治愈自己，才能走得更远"
+
+    # 第10步：接取委托
+    - step: 10
+      title: "缉邪司的召唤"
+      description: "使用【任务】查看每日委托，达到30级后可以接取任务赚取奖励"
+      completion_type: "command"
+      completion_target: "任务"
+      completion_count: 1
+      rewards:
+        exp: 1000
+        gold: 2000
+        attribute_points: 20
+        items:
+          - item_id: "sweep_order"
+            quantity: 2
+      auto_accept: true
+      flavor_text: "大都会缉邪司欢迎你，驭鬼者。去完成你的使命吧！"
+
 # 完成新手任务链的总奖励
 completion_reward:
   title: "驭鬼者之路已开启"
-  exp: 2000
-  gold: 5000
+  exp: 3000
+  gold: 10000
   items:
     - item_id: "sweep_order"
-      quantity: 1
-  achievement_title: "初入深渊"
+      quantity: 5
+    - item_id: "heal_potion"
+      quantity: 50
+  achievement_title: "深渊行者"

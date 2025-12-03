@@ -53,15 +53,21 @@ async def handle_real_world_explore(event: MessageEvent):
             session, current_x, current_y, current_region
         )
         
+        # 检查新手任务（在显示位置信息之前）
+        from ..quest.novice_quest_service import NoviceQuestService
+        quest_completed, quest_msg = await NoviceQuestService.check_and_advance_quest(
+            session, player, "command", {"command": "观察"}
+        )
+
         if location:
             # 有地点，显示地点信息
-            await show_location_info(session, player, location, current_x, current_y, event)
+            await show_location_info(session, player, location, current_x, current_y, event, quest_msg if quest_completed else None)
         else:
             # 没有地点，显示基本位置信息
-            await show_basic_location_info(session, player, current_x, current_y, current_region, event)
+            await show_basic_location_info(session, player, current_x, current_y, current_region, event, quest_msg if quest_completed else None)
 
 
-async def show_location_info(session: AsyncSession, player: Player, location, current_x: int, current_y: int, event: MessageEvent):
+async def show_location_info(session: AsyncSession, player: Player, location, current_x: int, current_y: int, event: MessageEvent, quest_msg: str = None):
     """显示地点详细信息"""
     # 获取地点摘要
     location_summary = await LocationService.get_location_summary(session, location)
@@ -82,11 +88,15 @@ async def show_location_info(session: AsyncSession, player: Player, location, cu
     if mansion_info:
         info_text += "\n\n" + mansion_info
 
+    # 添加新手任务完成消息
+    if quest_msg:
+        info_text += "\n\n" + quest_msg
+
     await real_explore_cmd.finish(message_add_head(info_text, event))
 
 
-async def show_basic_location_info(session: AsyncSession, player: Player, x: int, y: int, 
-                                 region: str, event: MessageEvent):
+async def show_basic_location_info(session: AsyncSession, player: Player, x: int, y: int,
+                                 region: str, event: MessageEvent, quest_msg: str = None):
     """显示基本位置信息（没有特殊地点时）"""
     # 获取附近玩家
     nearby_players = await LocationService.get_nearby_players(
@@ -220,6 +230,10 @@ async def show_basic_location_info(session: AsyncSession, player: Player, x: int
     mansion_info = await get_mansion_info_for_location(session, player, x, y)
     if mansion_info:
         info_text += "\n\n" + mansion_info
+
+    # 添加新手任务完成消息
+    if quest_msg:
+        info_text += "\n\n" + quest_msg
 
     await real_explore_cmd.finish(message_add_head(info_text, event))
 
