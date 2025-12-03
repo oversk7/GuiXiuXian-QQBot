@@ -173,14 +173,43 @@ async def show_basic_location_info(session: AsyncSession, player: Player, x: int
         # 按距离排序
         all_nearby_places.sort(key=lambda p: p["distance"])
 
-        lines.append("🗺️ 附近地点：")
-        for place in all_nearby_places[:5]:  # 最多显示5个
+        # 获取地点类型图标
+        def get_location_icon(place):
+            """根据地点类型返回图标"""
+            if place["type"] == "mansion":
+                return "🏚️"
+            # 尝试从地点名称推断类型
+            name = place["name"]
+            if any(keyword in name for keyword in ["市集", "市", "商"]):
+                return "🏪"
+            elif any(keyword in name for keyword in ["工坊", "锻造", "炼"]):
+                return "⚒️"
+            elif any(keyword in name for keyword in ["总部", "司", "缉邪"]):
+                return "🏛️"
+            elif any(keyword in name for keyword in ["郊", "镇", "城", "岭", "山"]):
+                return "📍"
+            else:
+                return "📌"
+
+        lines.append(f"🗺️ 附近地点（{len(all_nearby_places)}个）：")
+
+        # 显示前10个最近的地点
+        display_count = min(10, len(all_nearby_places))
+        for place in all_nearby_places[:display_count]:
+            icon = get_location_icon(place)
             # 检查地点名称是否已包含坐标，避免重复显示
             if f"({place['x']},{place['y']})" in place["name"]:
-                lines.append(f"• {place['name']} - 距离{place['distance']}格")
+                lines.append(f"{icon} {place['name']} - {place['distance']}格")
             else:
-                lines.append(f"• {place['name']} ({place['x']},{place['y']}) - 距离{place['distance']}格")
-        lines.append("💡 使用【导航 x y】前往指定地点")
+                lines.append(f"{icon} {place['name']} ({place['x']},{place['y']}) - {place['distance']}格")
+
+        # 如果还有更多地点，显示提示
+        if len(all_nearby_places) > display_count:
+            lines.append(f"...还有{len(all_nearby_places) - display_count}个地点")
+
+        lines.append("━━━━━━━━━━━━━")
+        lines.append("💡 【前往 地点名】快速导航")
+        lines.append("💡 【查找 NPC】搜索NPC位置")
     else:
         lines.append("🔍 附近50格内没有特殊地点")
         lines.append("💡 使用【地图】查看所有地点坐标")
