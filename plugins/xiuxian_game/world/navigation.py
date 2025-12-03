@@ -167,8 +167,18 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
         task: NavigationTask | None = await session.get(NavigationTask, player.id)
         reached = await _update_nav_position(player, task, session)
         if reached and task:
-            # 已到达则删除任务记录
+            # 已到达则删除任务记录并通知
+            target_x, target_y = task.target_x, task.target_y
             await session.delete(task)
+            await session.commit()
+
+            rx, ry = (player.real_world_x or 0), (player.real_world_y or 0)
+            arrival_msg = f"🎯 已到达目标位置 ({target_x},{target_y})\n"
+            arrival_msg += "━━━━━━━━━━━━━\n"
+            arrival_msg += f"📍 当前坐标: ({rx},{ry})\n"
+            arrival_msg += "✅ 导航任务已完成"
+
+            await nav_cmd.finish(message_add_head(arrival_msg, event))
 
         # 若未提供坐标 && 有导航，则只是查看进度（在诡域时展示现实坐标）
         if not parts:
@@ -220,7 +230,14 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
             # 计算进度（如果有初始距离）
             from ..utils import generate_progress_bar
             progress_info = ""
-            if task.initial_distance and task.initial_distance > 0:
+
+            # 如果initial_distance为空（旧任务），使用剩余距离作为初始距离的下限估计
+            if task.initial_distance is None or task.initial_distance <= 0:
+                # 对于旧任务，无法准确计算进度，使用剩余距离作为参考
+                # 但我们可以保存当前剩余距离，下次查看时就能显示进度了
+                task.initial_distance = rem_distance if rem_distance > 0 else 1.0
+                progress_info = "📊 进度: [更新中...] (旧任务重新计算)\n"
+            elif task.initial_distance > 0:
                 # 已完成距离 = 初始距离 - 剩余距离
                 completed_distance = max(0, task.initial_distance - rem_distance)
                 progress_percentage = int((completed_distance / task.initial_distance) * 100)
