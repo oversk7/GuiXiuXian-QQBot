@@ -36,6 +36,9 @@ REQUIRED_FIELDS: Dict[str, Dict[str, str]] = {
         "delisted_at": "DATETIME NULL COMMENT '退市时间'",
         "delist_reason": "VARCHAR(100) NULL COMMENT '退市原因'",
     },
+    "navigation_task": {
+        "initial_distance": "FLOAT NULL COMMENT '初始总距离（用于进度计算）'",
+    },
     # 未来需要添加更多字段时，直接在这里添加即可
     # "player": {
     #     "new_field": "VARCHAR(100) NULL COMMENT '新字段说明'",

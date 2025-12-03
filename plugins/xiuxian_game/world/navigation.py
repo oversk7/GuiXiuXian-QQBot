@@ -50,6 +50,25 @@ def _euclidean_distance(x1: int, y1: int, x2: int, y2: int) -> float:
     return ((x2 - x1) ** 2 + (y2 - y1) ** 2) ** 0.5
 
 
+def _format_eta(td: timedelta) -> str:
+    """格式化ETA为人性化的时间显示"""
+    total_seconds = int(td.total_seconds())
+    if total_seconds < 60:
+        return f"{total_seconds}秒"
+    elif total_seconds < 3600:
+        minutes = total_seconds // 60
+        seconds = total_seconds % 60
+        if seconds > 0:
+            return f"{minutes}分{seconds}秒"
+        return f"{minutes}分钟"
+    else:
+        hours = total_seconds // 3600
+        minutes = (total_seconds % 3600) // 60
+        if minutes > 0:
+            return f"{hours}小时{minutes}分"
+        return f"{hours}小时"
+
+
 
 def _move_towards(curr_x: int, curr_y: int, target_x: int, target_y: int, distance: float) -> Tuple[int, int]:
     """沿两点连线方向移动指定距离，返回新的整数坐标。"""
@@ -198,18 +217,35 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
             eta_sec = rem_distance / speed_now if speed_now > 0 else 0
             eta_td = timedelta(seconds=int(eta_sec))
 
+            # 计算进度（如果有初始距离）
+            from ..utils import generate_progress_bar
+            progress_info = ""
+            if task.initial_distance and task.initial_distance > 0:
+                # 已完成距离 = 初始距离 - 剩余距离
+                completed_distance = max(0, task.initial_distance - rem_distance)
+                progress_percentage = int((completed_distance / task.initial_distance) * 100)
+                progress_bar = generate_progress_bar(int(completed_distance), int(task.initial_distance), length=10)
+                progress_info = f"📊 进度: {progress_bar}\n"
+
             await session.commit()
 
             # 构建导航状态显示
             nav_status = f"🧭 导航中 → 目标 ({target_x},{target_y})\n"
-            nav_status += f"▶️ 现实坐标 ({disp_x},{disp_y})\n"
+            nav_status += "━━━━━━━━━━━━━\n"
+            nav_status += f"📍 当前位置: ({disp_x},{disp_y})\n"
 
             # 如果在诡域中，额外显示诡域位置
             if player.is_in_dungeon():
                 dungeon_x, dungeon_y = player.get_current_coordinates()
-                nav_status += f"🌏 当前位置 {player.get_current_region()} ({dungeon_x},{dungeon_y})\n"
+                nav_status += f"🌏 诡域位置: {player.get_current_region()} ({dungeon_x},{dungeon_y})\n"
 
-            nav_status += f"🕒 速度 {speed_now:.2f} 格/秒  预计剩余 {str(eta_td)}"
+            nav_status += f"📏 剩余距离: {rem_distance:.1f} 格\n"
+            if progress_info:
+                nav_status += progress_info
+            nav_status += f"🚀 速度: {speed_now:.2f} 格/秒\n"
+            nav_status += f"⏱️ 预计: {_format_eta(eta_td)}\n"
+            nav_status += "━━━━━━━━━━━━━\n"
+            nav_status += "💡 【中断导航】停止前进"
 
             await nav_cmd.finish(message_add_head(nav_status, event))
 
@@ -220,38 +256,51 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
         if not (-MAX_COORD <= tx <= MAX_COORD and -MAX_COORD <= ty <= MAX_COORD):
             await nav_cmd.finish(f"⛔ 坐标必须在 { -MAX_COORD }~{ MAX_COORD } 范围内！")
 
+        # 基于现实坐标计算初始距离
+        base_x, base_y = float(player.real_world_x or 0), float(player.real_world_y or 0)
+        initial_distance = _euclidean_distance(base_x, base_y, tx, ty)
+
         if task:
             task.target_x = tx
             task.target_y = ty
             task.last_update = datetime.now()
+            task.initial_distance = initial_distance
         else:
-            task = NavigationTask(player_id=player.id, target_x=tx, target_y=ty, last_update=datetime.now())
+            task = NavigationTask(
+                player_id=player.id,
+                target_x=tx,
+                target_y=ty,
+                last_update=datetime.now(),
+                initial_distance=initial_distance
+            )
             session.add(task)
+
         # 速度与预计时间（使用欧几里得距离，基于现实坐标）
         # 获取有效敏捷值（包含临时buff加成）
         effective_attrs = await player.get_effective_attributes(session)
         effective_agility = effective_attrs.get("agility", player.agility)
         speed_now = _tiles_per_second(effective_agility)
-        # 基于现实坐标计算剩余距离
-        base_x, base_y = float(player.real_world_x or 0), float(player.real_world_y or 0)
-        rem_distance = _euclidean_distance(base_x, base_y, tx, ty)
-        eta_td = timedelta(seconds=int(rem_distance / speed_now)) if speed_now > 0 else timedelta(seconds=0)
+        eta_td = timedelta(seconds=int(initial_distance / speed_now)) if speed_now > 0 else timedelta(seconds=0)
 
         await session.commit()
 
         # 构建导航开始消息
         rx, ry = (player.real_world_x or 0), (player.real_world_y or 0)
-        nav_msg = f"⚙️ 指针静默旋转，已开始导航至 ({tx},{ty})。\n"
+        nav_msg = f"⚙️ 指针静默旋转，已开始导航至 ({tx},{ty})\n"
         nav_msg += "━━━━━━━━━━━━━\n"
-        nav_msg += f"✧ 现实坐标 ({rx},{ry})\n"
+        nav_msg += f"📍 起点: ({rx},{ry})\n"
+        nav_msg += f"🎯 终点: ({tx},{ty})\n"
 
         # 如果在诡域中，显示当前诡域位置
         if player.is_in_dungeon():
             dungeon_x, dungeon_y = player.get_current_coordinates()
-            nav_msg += f"🌏 当前位置 {player.get_current_region()} ({dungeon_x},{dungeon_y})\n"
+            nav_msg += f"🌏 诡域位置: {player.get_current_region()} ({dungeon_x},{dungeon_y})\n"
 
-        nav_msg += f"🕒 速度 {speed_now:.2f} 格/秒  预计耗时 {str(eta_td)}\n"
-        nav_msg += "━━━━━━━━━━━━━\n⬇️ 【中断导航】停止前进"
+        nav_msg += f"📏 总距离: {initial_distance:.1f} 格\n"
+        nav_msg += f"🚀 速度: {speed_now:.2f} 格/秒\n"
+        nav_msg += f"⏱️ 预计: {_format_eta(eta_td)}\n"
+        nav_msg += "━━━━━━━━━━━━━\n"
+        nav_msg += "💡 【导航】查看进度 | 【中断导航】停止前进"
 
         await nav_cmd.finish(message_add_head(nav_msg, event))
 
@@ -346,18 +395,24 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
         if not (-MAX_COORD <= tx <= MAX_COORD and -MAX_COORD <= ty <= MAX_COORD):
             await goto_location_cmd.finish(f"⛔ 目标坐标超出导航范围！")
 
+        # 基于现实坐标计算初始距离
+        base_x, base_y = float(player.real_world_x or 0), float(player.real_world_y or 0)
+        initial_distance = _euclidean_distance(base_x, base_y, tx, ty)
+
         # 创建或更新导航任务
         task: NavigationTask | None = await uow.session.get(NavigationTask, player.id)
         if task:
             task.target_x = tx
             task.target_y = ty
             task.last_update = datetime.now()
+            task.initial_distance = initial_distance
         else:
             task = NavigationTask(
                 player_id=player.id,
                 target_x=tx,
                 target_y=ty,
-                last_update=datetime.now()
+                last_update=datetime.now(),
+                initial_distance=initial_distance
             )
             uow.session.add(task)
 
@@ -365,11 +420,7 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
         effective_attrs = await player.get_effective_attributes(uow.session)
         effective_agility = effective_attrs.get("agility", player.agility)
         speed_now = _tiles_per_second(effective_agility)
-
-        # 基于现实坐标计算
-        base_x, base_y = float(player.real_world_x or 0), float(player.real_world_y or 0)
-        rem_distance = _euclidean_distance(base_x, base_y, tx, ty)
-        eta_td = timedelta(seconds=int(rem_distance / speed_now)) if speed_now > 0 else timedelta(seconds=0)
+        eta_td = timedelta(seconds=int(initial_distance / speed_now)) if speed_now > 0 else timedelta(seconds=0)
 
         # 提交事务
         await uow.commit()
@@ -378,15 +429,17 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
         rx, ry = (player.real_world_x or 0), (player.real_world_y or 0)
         nav_msg = f"📍 已设置导航至【{target_location.name}】\n"
         nav_msg += "━━━━━━━━━━━━━\n"
-        nav_msg += f"🎯 目标坐标 ({tx},{ty})\n"
-        nav_msg += f"📌 当前坐标 ({rx},{ry})\n"
+        nav_msg += f"📍 起点: ({rx},{ry})\n"
+        nav_msg += f"🎯 终点: ({tx},{ty})\n"
 
         # 如果在诡域中，显示诡域位置
         if player.is_in_dungeon():
             dungeon_x, dungeon_y = player.get_current_coordinates()
-            nav_msg += f"🌏 诡域位置 {player.get_current_region()} ({dungeon_x},{dungeon_y})\n"
+            nav_msg += f"🌏 诡域位置: {player.get_current_region()} ({dungeon_x},{dungeon_y})\n"
 
-        nav_msg += f"📏 距离 {rem_distance:.1f} 格 | ⏱️ 预计 {str(eta_td)}\n"
+        nav_msg += f"📏 总距离: {initial_distance:.1f} 格\n"
+        nav_msg += f"🚀 速度: {speed_now:.2f} 格/秒\n"
+        nav_msg += f"⏱️ 预计: {_format_eta(eta_td)}\n"
         nav_msg += "━━━━━━━━━━━━━\n"
         nav_msg += "💡 【导航】查看进度 | 【中断导航】停止前进"
 

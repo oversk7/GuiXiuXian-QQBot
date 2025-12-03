@@ -1,6 +1,7 @@
 from datetime import datetime
-from sqlalchemy import String, Integer, DateTime
+from sqlalchemy import String, Integer, DateTime, Float
 from sqlalchemy.orm import Mapped, mapped_column, relationship
+from typing import Optional
 from .db import Base
 
 class NavigationTask(Base):
@@ -12,3 +13,4 @@ class NavigationTask(Base):
     target_x: Mapped[int] = mapped_column(Integer, comment="目标X")
     target_y: Mapped[int] = mapped_column(Integer, comment="目标Y")
     last_update: Mapped[datetime] = mapped_column(DateTime, default=datetime.now, comment="上次位置更新时间")
+    initial_distance: Mapped[Optional[float]] = mapped_column(Float, nullable=True, comment="初始总距离（用于进度计算）")
