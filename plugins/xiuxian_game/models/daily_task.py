@@ -36,7 +36,7 @@ class DailyTask(Base):
     player_id: Mapped[str] = mapped_column(String(32), ForeignKey("player.id"), index=True, comment="玩家ID")
     
     # 任务基本信息
-    task_type: Mapped[TaskType] = mapped_column(SQLEnum(TaskType), comment="任务类型")
+    task_type: Mapped[str] = mapped_column(String(50), comment="任务类型")
     title: Mapped[str] = mapped_column(String(100), comment="任务标题")
     description: Mapped[str] = mapped_column(Text, comment="任务描述")
     
@@ -46,7 +46,7 @@ class DailyTask(Base):
     target_y: Mapped[int] = mapped_column(Integer, comment="目标坐标Y")
     
     # 任务状态
-    status: Mapped[TaskStatus] = mapped_column(SQLEnum(TaskStatus), default=TaskStatus.AVAILABLE, comment="任务状态")
+    status: Mapped[str] = mapped_column(String(20), default="available", comment="任务状态")
     
     # 敌人信息（用于战斗）
     enemy_name: Mapped[str] = mapped_column(String(50), comment="敌人名称")
@@ -78,32 +78,32 @@ class DailyTask(Base):
     
     def is_available(self) -> bool:
         """检查任务是否可接取"""
-        return self.status == TaskStatus.AVAILABLE
-    
+        return self.status == "available"
+
     def is_accepted(self) -> bool:
         """检查任务是否已接取"""
-        return self.status == TaskStatus.ACCEPTED
-    
+        return self.status == "accepted"
+
     def is_completed(self) -> bool:
         """检查任务是否已完成"""
-        return self.status == TaskStatus.COMPLETED
-    
+        return self.status == "completed"
+
     def accept_task(self) -> None:
         """接取任务"""
-        if self.status == TaskStatus.AVAILABLE:
-            self.status = TaskStatus.ACCEPTED
+        if self.status == "available":
+            self.status = "accepted"
             self.accepted_at = datetime.now()
-    
+
     def complete_task(self) -> None:
         """完成任务"""
-        if self.status == TaskStatus.ACCEPTED:
-            self.status = TaskStatus.COMPLETED
+        if self.status == "accepted":
+            self.status = "completed"
             self.completed_at = datetime.now()
-    
+
     def expire_task(self) -> None:
         """任务过期"""
-        if self.status in [TaskStatus.AVAILABLE, TaskStatus.ACCEPTED]:
-            self.status = TaskStatus.EXPIRED
+        if self.status in ["available", "accepted"]:
+            self.status = "expired"
     
     @property
     def location_str(self) -> str:
