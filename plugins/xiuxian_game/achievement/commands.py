@@ -160,9 +160,18 @@ async def show_achievement_detail(session, player, achievement_name: str, event:
                 lines.append(f"  解锁时间：{ach.get('unlocked_at', '未知')}")
                 break
     else:
-        progress_pct = int(progress / target * 100) if target > 0 else 0
         lines.append(f"  状态：🔒 未解锁")
-        lines.append(f"  进度：{progress}/{target} ({progress_pct}%)")
+
+        # 对于 account_age 类型，使用特殊显示方式
+        if condition_type == "account_age":
+            if progress == 1:
+                lines.append(f"  条件：✅ 符合（账号创建于 {target} 之前）")
+            else:
+                lines.append(f"  条件：❌ 不符合（需要在 {target} 之前创建账号）")
+        else:
+            # 其他类型显示数值进度和百分比
+            progress_pct = int(progress / target * 100) if target > 0 else 0
+            lines.append(f"  进度：{progress}/{target} ({progress_pct}%)")
 
     lines.append("")
     lines.append("🎁 奖励：")
