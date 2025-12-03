@@ -83,16 +83,19 @@ class AchievementService:
                 estimated_stats["total_wins"] = player.total_wins or 0
                 estimated_stats["total_kills"] = player.total_wins or 0  # 估算击杀数=胜利数
 
-            # 3. 统计玩家已拥有的装备数量（包括已装备和背包中的）
+            # 3. 统计玩家已拥有的装备数量（通过 durability 字段判断）
+            # 装备的特征：durability > 0 或 equipped = True
+            # 注意：ItemInstance 没有 item_type 字段，类型信息在配置中
             inventory_result = await session.execute(
                 select(ItemInstance).where(
-                    ItemInstance.player_id == player_id,
-                    ItemInstance.item_type.in_(["weapon", "armor", "accessory", "artifact"])
+                    ItemInstance.player_id == player_id
                 )
             )
             inventory_items = inventory_result.scalars().all()
             if inventory_items:
-                estimated_stats["equipment_obtained"] = sum(item.quantity for item in inventory_items)
+                # 在 Python 层面过滤装备（通过 is_equipment 属性）
+                equipment_count = sum(1 for item in inventory_items if item.is_equipment)
+                estimated_stats["equipment_obtained"] = equipment_count
 
             # 创建统计记录
             stats = PlayerStats(
