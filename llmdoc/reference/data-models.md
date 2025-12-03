@@ -122,6 +122,34 @@
 
 ## 4. 其他重要模型
 
+### 新手体验系统 (Phase 2完成 2025-12-03)
+
+**PlayerAchievement** (玩家成就关联表):
+- **位置**: `plugins/xiuxian_game/models/achievement.py:11-32`
+- **字段**: `player_id`, `achievement_id`, `progress`, `is_completed`, `reward_claimed`, `unlocked_at`
+- **用途**: 追踪玩家的成就完成情况和奖励领取状态
+
+**PlayerStats** (玩家统计数据表):
+- **位置**: `plugins/xiuxian_game/models/achievement.py:35-69`
+- **统计类型**:
+  - 修炼: `cultivation_count` (累计修炼次数)
+  - 战斗: `total_battles`, `total_wins`, `total_kills`
+  - 财富: `gold_earned_total`, `gold_spent_total`
+  - 探索: `locations_visited`, `locations_visited_list`
+  - 装备: `equipment_obtained`
+  - 登录: `last_login_date`, `consecutive_login_days`, `total_login_days`
+- **用途**: 为成就系统提供进度追踪数据
+
+**NavigationTask** (导航任务):
+- **位置**: `plugins/xiuxian_game/models/navigation_task.py`
+- **新增字段** (Phase 2): `initial_distance` - 用于计算进度百分比
+- **进度计算**: `progress = (initial_distance - remaining_distance) / initial_distance`
+
+**DailyTask** (每日任务):
+- **位置**: `plugins/xiuxian_game/models/daily_task.py`
+- **新增字段** (Phase 2): `target_region`, `target_x`, `target_y`
+- **计算属性**: `location_str` - 格式化位置字符串（区域名 + 坐标）
+
 ### 经济系统
 - `BankAccount` - 银行账户(余额、利息、最后更新时间)
 - `MarketOrder` - 市场订单(卖家、物品、价格、状态)

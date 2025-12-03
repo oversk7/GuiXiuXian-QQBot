@@ -1,9 +1,9 @@
 # 诡修仙项目文档系统
 
-**文档版本**: 3.3
+**文档版本**: 3.4
 **最后更新**: 2025-12-03
 **文档受众**: LLM代理和项目开发者
-**文档状态**: 生产就绪，已清理临时bug修复文档
+**文档状态**: 生产就绪，Phase 2新手体验优化已完成
 
 ---
 
@@ -38,6 +38,7 @@
 - `event-system-architecture.md` - 事件系统架构
 - `dialogue-npc-system.md` - 对话NPC系统架构（自然对话+游戏指令+好感度）
 - `account-switching-system.md` - 账号切换系统架构（多账号管理+转让+管理员临时切换）
+- `achievement-system.md` - 微成就系统架构（配置驱动+统计追踪+即时反馈）
 
 ### `/guides/` - 操作指南
 回答"如何执行X任务?":
@@ -47,6 +48,7 @@
 - `event-system-guide.md` - 事件系统使用指南
 - `performance-optimization-summary.md` - 性能优化最佳实践
 - `how-to-implement-dialogue-npc.md` - 如何实施对话NPC系统
+- `achievement-system-guide.md` - 如何使用和扩展成就系统
 
 **已归档** (Feature Flag已移除):
 - `feature-flag-control.md` - 已过时（Feature Flag已全部删除，详见2025-12-02代码清理记录）
@@ -88,6 +90,7 @@ LLM代理生成的调研和分析报告（仅保留系统分析和设计参考�
 游戏设计和系统重构方案:
 - `game_system_redesign_2025_12_02.md` - 新手体验破局完整方案 (2025-12-02)
 - `EXECUTIVE_SUMMARY.md` - 执行摘要 (快速查阅版)
+- `phase2_implementation_summary.md` - Phase 2新手体验优化实施摘要 (2025-12-03)
 
 **投资系统反套利实施** (2025-12-02):
 - `investment_anti_arbitrage_redesign.md` - 反套利设计方案（最终方案，191行）
@@ -163,6 +166,14 @@ LLM代理生成的调研和分析报告（仅保留系统分析和设计参考�
 - `plugins\xiuxian_game\social\account_switching_service.py` - 账号切换服务
 - `plugins\xiuxian_game\platform_utils.py` - 统一玩家访问接口(支持账号切换)
 
+### 新手体验系统
+- `plugins\xiuxian_game\data\novice_quests.yaml` - 新手任务链配置(10步引导)
+- `plugins\xiuxian_game\achievement\achievement_service.py` - 成就系统服务
+- `plugins\xiuxian_game\data\achievements.yaml` - 微成就配置(10个基础成就)
+- `plugins\xiuxian_game\models\achievement.py` - PlayerAchievement/PlayerStats模型
+- `plugins\xiuxian_game\world\navigation.py` - 导航系统(进度条可视化)
+- `plugins\xiuxian_game\infrastructure\uow\unit_of_work.py` - UnitOfWork(修复连接泄漏)
+
 ### 经济系统（投资）
 - `plugins\xiuxian_game\economy\stock_price_engine.py` - 股票价格引擎（反套利+健康度更新）
 - `plugins\xiuxian_game\economy\stock_service_new.py` - 股票交易服务（0.5%手续费+退市+持仓成本）
@@ -198,6 +209,14 @@ LLM代理生成的调研和分析报告（仅保留系统分析和设计参考�
 - 领域事件定义
 - 发布/订阅机制
 - Service层集成
+
+**新手体验系统** (Phase 2完成 2025-12-03):
+- 10步新手任务链（从修炼到任务接取）
+- 10个微成就系统（修炼/成长/战斗/装备/财富/探索/忠诚）
+- 导航进度条可视化（进度条+ETA）
+- 任务导航集成（接取任务自动导航）
+- 观察命令优化（10个地点+图标分类）
+- UnitOfWork连接泄漏修复（75个泄漏点已杜绝）
 
 ---
 
