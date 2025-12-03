@@ -179,11 +179,9 @@ async def handle_guild_info(event: MessageEvent):
         treasury = GuildEconomyService.format_large_number(guild_obj.treasury)
 
         # 建筑加成信息（在UnitOfWork内部使用uow的Repository）
-        from ..infrastructure.repositories.guild_building_repository import GuildBuildingRepository
-
         building_service = GuildBuildingServiceNew(
-            guild_repo=uow.guilds,  # 使用UoW的Repository
-            building_repo=GuildBuildingRepository(uow.session),
+            guild_repo=uow.guilds,
+            building_repo=uow.guild_buildings,
             item_repo=None  # get_guild_bonuses不需要item_repo
         )
         bonuses = await building_service.get_guild_bonuses(guild_obj.id)
@@ -754,11 +752,10 @@ async def _process_application(event: MessageEvent, args: Message, approve: bool
             await (approve_cmd if approve else reject_cmd).finish("⛔ 未找到该 UID")
 
         # 使用DI架构GuildApplicationService
-        from ..infrastructure.repositories.social_application_repository import SocialApplicationRepository
         app_service = GuildApplicationServiceNew(
             player_repo=uow.players,
             guild_repo=uow.guilds,
-            application_repo=SocialApplicationRepository(uow.session)
+            application_repo=uow.social_applications
         )
         app = await app_service.get_application_by_player_and_guild(applicant.id, guild_obj.id)
 

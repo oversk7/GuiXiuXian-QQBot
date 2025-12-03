@@ -80,6 +80,11 @@ class UnitOfWork:
         # 公会相关仓储
         self._guild_buildings = None
         self._player_donation_logs = None
+        self._guild_task_records = None
+        self._social_applications = None
+
+        # 任务相关仓储
+        self._player_task_stats = None
 
     @property
     def players(self):
@@ -224,6 +229,30 @@ class UnitOfWork:
             from ..repositories.player_donation_log_repository import PlayerDonationLogRepository
             self._player_donation_logs = PlayerDonationLogRepository(self._session)
         return self._player_donation_logs
+
+    @property
+    def guild_task_records(self):
+        """公会任务记录仓储"""
+        if self._guild_task_records is None:
+            from ..repositories.guild_task_record_repository import GuildTaskRecordRepository
+            self._guild_task_records = GuildTaskRecordRepository(self._session)
+        return self._guild_task_records
+
+    @property
+    def social_applications(self):
+        """社交申请仓储"""
+        if self._social_applications is None:
+            from ..repositories.social_application_repository import SocialApplicationRepository
+            self._social_applications = SocialApplicationRepository(self._session)
+        return self._social_applications
+
+    @property
+    def player_task_stats(self):
+        """玩家任务统计仓储"""
+        if self._player_task_stats is None:
+            from ..repositories.player_task_stats_repository import PlayerTaskStatsRepository
+            self._player_task_stats = PlayerTaskStatsRepository(self._session)
+        return self._player_task_stats
 
     @property
     def session(self) -> AsyncSession:

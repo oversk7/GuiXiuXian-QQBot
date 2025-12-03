@@ -273,18 +273,14 @@ async def handle_complete_task(event: MessageEvent):
             # 更新委托完成统计（用于公会任务）
             if player.guild_id:
                 from ..guild.guild_task_service_new import GuildTaskService as GuildTaskServiceNew
-                from ..infrastructure.repositories.player_task_stats_repository import PlayerTaskStatsRepository
-                from ..infrastructure.repositories.guild_task_record_repository import GuildTaskRecordRepository
-                from ..infrastructure.repositories.player_donation_log_repository import PlayerDonationLogRepository
-                from ..infrastructure.repositories.guild_building_repository import GuildBuildingRepository
 
                 guild_task_service = GuildTaskServiceNew(
                     player_repo=uow.players,
                     guild_repo=uow.guilds,
-                    player_task_stats_repo=PlayerTaskStatsRepository(uow.session),
-                    guild_task_record_repo=GuildTaskRecordRepository(uow.session),
-                    player_donation_log_repo=PlayerDonationLogRepository(uow.session),
-                    guild_building_repo=GuildBuildingRepository(uow.session),
+                    player_task_stats_repo=uow.player_task_stats,
+                    guild_task_record_repo=uow.guild_task_records,
+                    player_donation_log_repo=uow.player_donation_logs,
+                    guild_building_repo=uow.guild_buildings,
                 )
                 await guild_task_service.update_commission_stats(player.id)
             await uow.commit()
