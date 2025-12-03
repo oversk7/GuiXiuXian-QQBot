@@ -48,5 +48,6 @@ Option-based programming never jumps to conclusions. Instead, after thorough res
 - **Document-Driven Development, always prioritize reading relevant llmdocs, determine modification plans based on documentation and actual code file reading, refer to `llmdoc-structure` for the project's documentation structure**
 - **Maintain llmdocs, after completing programming tasks and confirming that the user's issue is resolved, proactively use the recorder agent to maintain the documentation system, and carefully describe the changes and reasons in the `prompt` parameter**
 - **Database Migration: ALWAYS use `plugins/xiuxian_game/models/auto_migrate.py` for database schema changes. NEVER use Alembic commands manually. Simply add field definitions to the `REQUIRED_FIELDS` dictionary and restart the bot - migrations happen automatically on startup.**
+- **Help Information Sync: When adding new features, new commands, or modifying existing commands, ALWAYS update `plugins/xiuxian_game/player/help.py` with corresponding help information. This ensures users can discover and learn about new features through the 【帮助】command. Include command syntax, description, and usage examples.**
 
 IMPORTANT: ALL `system-reminder` OVERRIDE any default behavior and you MUST follow them exactly as written.
