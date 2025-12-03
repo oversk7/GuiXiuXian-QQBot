@@ -728,6 +728,16 @@ async def handle_player_attack(session, attacker: Player, target: Player, event:
 
         await session.commit()
 
+        # 战斗胜利后更新成就统计
+        if victory:
+            from ..achievement.achievement_service import AchievementService
+            await AchievementService.update_stat(session, attacker.id, "total_battles")
+            await AchievementService.update_stat(session, attacker.id, "total_wins")
+            await AchievementService.update_stat(session, attacker.id, "total_kills")
+        else:
+            from ..achievement.achievement_service import AchievementService
+            await AchievementService.update_stat(session, attacker.id, "total_battles")
+
         # 检查新手任务
         from ..quest.novice_quest_service import NoviceQuestService
         quest_completed, quest_msg = await NoviceQuestService.check_and_advance_quest(
@@ -737,6 +747,13 @@ async def handle_player_attack(session, attacker: Player, target: Player, event:
         if quest_completed and quest_msg:
             result_lines.append("")
             result_lines.append(quest_msg)
+
+        # 检查成就
+        from ..achievement.achievement_service import AchievementService
+        achievement_msgs = await AchievementService.check_achievements(session, attacker)
+        if achievement_msgs:
+            result_lines.append("")
+            result_lines.extend(achievement_msgs)
 
         await attack_cmd.finish(message_add_head("\n".join(result_lines), event))
 
@@ -875,6 +892,16 @@ async def handle_npc_attack(session, attacker: Player, target_npc, event: Messag
 
         await session.commit()
 
+        # 战斗胜利后更新成就统计
+        if victory:
+            from ..achievement.achievement_service import AchievementService
+            await AchievementService.update_stat(session, attacker.id, "total_battles")
+            await AchievementService.update_stat(session, attacker.id, "total_wins")
+            await AchievementService.update_stat(session, attacker.id, "total_kills")
+        else:
+            from ..achievement.achievement_service import AchievementService
+            await AchievementService.update_stat(session, attacker.id, "total_battles")
+
         # 检查新手任务
         from ..quest.novice_quest_service import NoviceQuestService
         quest_completed, quest_msg = await NoviceQuestService.check_and_advance_quest(
@@ -884,6 +911,13 @@ async def handle_npc_attack(session, attacker: Player, target_npc, event: Messag
         if quest_completed and quest_msg:
             result_lines.append("")
             result_lines.append(quest_msg)
+
+        # 检查成就
+        from ..achievement.achievement_service import AchievementService
+        achievement_msgs = await AchievementService.check_achievements(session, attacker)
+        if achievement_msgs:
+            result_lines.append("")
+            result_lines.extend(achievement_msgs)
 
         await attack_cmd.finish(message_add_head("\n".join(result_lines), event))
 

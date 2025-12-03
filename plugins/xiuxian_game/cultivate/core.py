@@ -238,6 +238,13 @@ async def handle_cultivate(event: MessageEvent):
             # 如果完成了新手任务，在修炼消息后追加任务完成消息
             msg += f"\n\n{quest_msg}"
 
+        # 更新成就统计并检查成就
+        from ..achievement.achievement_service import AchievementService
+        await AchievementService.update_stat(session, player.id, "cultivation_count")
+        achievement_msgs = await AchievementService.check_achievements(session, player)
+        if achievement_msgs:
+            msg += "\n\n" + "\n\n".join(achievement_msgs)
+
         await cultivate.finish(message_add_head(msg, event))
 
 @seclusion.handle()
@@ -667,6 +674,12 @@ async def handle_breakthrough(event: MessageEvent, args: Message = CommandArg())
 
             if quest_completed and quest_msg:
                 msg += f"\n\n{quest_msg}"
+
+            # 检查成就（等级提升）
+            from ..achievement.achievement_service import AchievementService
+            achievement_msgs = await AchievementService.check_achievements(session, player)
+            if achievement_msgs:
+                msg += "\n\n" + "\n\n".join(achievement_msgs)
         else:
             if random.random() <= success_chance:
                 old_level = player.level
@@ -716,6 +729,12 @@ async def handle_breakthrough(event: MessageEvent, args: Message = CommandArg())
 
                 if quest_completed and quest_msg:
                     msg += f"\n\n{quest_msg}"
+
+                # 检查成就（等级提升）
+                from ..achievement.achievement_service import AchievementService
+                achievement_msgs = await AchievementService.check_achievements(session, player)
+                if achievement_msgs:
+                    msg += "\n\n" + "\n\n".join(achievement_msgs)
             else:
                 # 突破失败
                 # 增加失败次数

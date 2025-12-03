@@ -93,6 +93,39 @@ REQUIRED_TABLES: Dict[str, str] = {
             INDEX idx_fund_holding (fund_id, is_active)
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='理财持仓表'
     """,
+    "player_achievement": """
+        CREATE TABLE IF NOT EXISTS player_achievement (
+            id INT AUTO_INCREMENT PRIMARY KEY COMMENT 'ID',
+            player_id VARCHAR(32) NOT NULL COMMENT '玩家ID',
+            achievement_id VARCHAR(64) NOT NULL COMMENT '成就ID',
+            unlocked_at DATETIME DEFAULT CURRENT_TIMESTAMP COMMENT '解锁时间',
+            progress INT DEFAULT 0 COMMENT '当前进度',
+            is_completed BOOLEAN DEFAULT FALSE COMMENT '是否已完成',
+            reward_claimed BOOLEAN DEFAULT FALSE COMMENT '是否已领取奖励',
+            UNIQUE INDEX idx_player_achievement (player_id, achievement_id),
+            INDEX idx_player_completed (player_id, is_completed),
+            FOREIGN KEY (player_id) REFERENCES player(id)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='玩家成就表'
+    """,
+    "player_stats": """
+        CREATE TABLE IF NOT EXISTS player_stats (
+            player_id VARCHAR(32) PRIMARY KEY COMMENT '玩家ID',
+            cultivation_count INT DEFAULT 0 COMMENT '累计修炼次数',
+            total_battles INT DEFAULT 0 COMMENT '总战斗次数',
+            total_wins INT DEFAULT 0 COMMENT '总胜利次数',
+            total_kills INT DEFAULT 0 COMMENT '总击杀数',
+            gold_earned_total INT DEFAULT 0 COMMENT '累计获得金币',
+            gold_spent_total INT DEFAULT 0 COMMENT '累计花费金币',
+            locations_visited INT DEFAULT 0 COMMENT '探索过的地点数',
+            locations_visited_list VARCHAR(1024) NULL COMMENT '探索过的地点列表(逗号分隔)',
+            equipment_obtained INT DEFAULT 0 COMMENT '获得过的装备数',
+            last_login_date DATETIME NULL COMMENT '最后登录日期',
+            consecutive_login_days INT DEFAULT 0 COMMENT '连续登录天数',
+            total_login_days INT DEFAULT 0 COMMENT '总登录天数',
+            updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+            FOREIGN KEY (player_id) REFERENCES player(id)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='玩家统计数据表'
+    """,
 }
 
 

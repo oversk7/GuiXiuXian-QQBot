@@ -31,6 +31,7 @@ from . import (
     world_boss,
     fishing,
     admin,  # 管理员功能（包含抽奖系统）
+    achievement,  # 成就系统
 )
 
 driver = get_driver()

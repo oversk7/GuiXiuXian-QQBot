@@ -1,0 +1,163 @@
+# 微成就系统配置文件
+# 定义10个基础微成就，帮助新手获得成就感和引导
+
+basic_achievements:
+  # 1. 修炼系列
+  first_cultivation:
+    id: "first_cultivation"
+    title: "初窥门径"
+    description: "完成第一次修炼，踏入驭鬼者的修行之路"
+    icon: "🌟"
+    condition_type: "command_count"
+    condition_target: "修炼"
+    condition_value: 1
+    rewards:
+      gold: 500
+      exp: 100
+    flavor_text: "千里之行，始于足下"
+    hidden: false
+
+  cultivation_adept:
+    id: "cultivation_adept"
+    title: "勤修不辍"
+    description: "累计修炼10次，开始掌握怨炁运行的诀窍"
+    icon: "✨"
+    condition_type: "command_count"
+    condition_target: "修炼"
+    condition_value: 10
+    rewards:
+      gold: 2000
+      exp: 500
+    flavor_text: "修行之路，贵在坚持"
+    hidden: false
+
+  # 2. 成长系列
+  first_breakthrough:
+    id: "first_breakthrough"
+    title: "破茧成蝶"
+    description: "完成第一次境界突破，感受力量的蜕变"
+    icon: "🦋"
+    condition_type: "level_up"
+    condition_target: "level"
+    condition_value: 2
+    rewards:
+      gold: 1000
+      exp: 300
+      attribute_points: 5
+    flavor_text: "破茧之痛，蝶舞之美"
+    hidden: false
+
+  level_ten_warrior:
+    id: "level_ten_warrior"
+    title: "十级勇士"
+    description: "等级达到10级，正式踏入驭鬼者的行列"
+    icon: "⚔️"
+    condition_type: "level_reached"
+    condition_target: "level"
+    condition_value: 10
+    rewards:
+      gold: 5000
+      exp: 1000
+      attribute_points: 10
+    flavor_text: "十级之路，已成勇士"
+    hidden: false
+
+  # 3. 战斗系列
+  first_victory:
+    id: "first_victory"
+    title: "初战告捷"
+    description: "赢得第一场战斗的胜利"
+    icon: "🏆"
+    condition_type: "battle_win"
+    condition_target: "total_wins"
+    condition_value: 1
+    rewards:
+      gold: 1000
+      exp: 300
+    flavor_text: "首胜之战，载入史册"
+    hidden: false
+
+  veteran_fighter:
+    id: "veteran_fighter"
+    title: "百战老兵"
+    description: "击败10个敌人，积累战斗经验"
+    icon: "🛡️"
+    condition_type: "kill_count"
+    condition_target: "total_kills"
+    condition_value: 10
+    rewards:
+      gold: 3000
+      exp: 800
+    flavor_text: "经百战而不殆，历磨难而愈强"
+    hidden: false
+
+  # 4. 装备系列
+  first_equipment:
+    id: "first_equipment"
+    title: "装备加身"
+    description: "获得第一件装备，提升自身实力"
+    icon: "⚙️"
+    condition_type: "equipment_obtained"
+    condition_target: "any_equipment"
+    condition_value: 1
+    rewards:
+      gold: 1500
+      exp: 400
+    flavor_text: "工欲善其事，必先利其器"
+    hidden: false
+
+  # 5. 财富系列
+  small_fortune:
+    id: "small_fortune"
+    title: "小富之家"
+    description: "累计获得1万金币，开始积累财富"
+    icon: "💰"
+    condition_type: "gold_total"
+    condition_target: "gold_earned"
+    condition_value: 10000
+    rewards:
+      gold: 5000
+      exp: 500
+    flavor_text: "财富自由之路，从一万金币开始"
+    hidden: false
+
+  # 6. 探索系列
+  world_explorer:
+    id: "world_explorer"
+    title: "世界探索者"
+    description: "探索3个不同的地点，了解世界的广阔"
+    icon: "🗺️"
+    condition_type: "locations_visited"
+    condition_target: "unique_locations"
+    condition_value: 3
+    rewards:
+      gold: 2000
+      exp: 600
+    flavor_text: "世界那么大，我想去看看"
+    hidden: false
+
+  # 7. 忠诚系列
+  loyal_believer:
+    id: "loyal_believer"
+    title: "忠实信徒"
+    description: "连续登录3天，展现你的坚持"
+    icon: "📅"
+    condition_type: "login_streak"
+    condition_target: "consecutive_days"
+    condition_value: 3
+    rewards:
+      gold: 3000
+      exp: 1000
+      attribute_points: 5
+    flavor_text: "日复一日的坚持，成就非凡的自己"
+    hidden: false
+
+# 成就分类
+categories:
+  cultivation: ["first_cultivation", "cultivation_adept"]
+  growth: ["first_breakthrough", "level_ten_warrior"]
+  battle: ["first_victory", "veteran_fighter"]
+  equipment: ["first_equipment"]
+  wealth: ["small_fortune"]
+  exploration: ["world_explorer"]
+  loyalty: ["loyal_believer"]

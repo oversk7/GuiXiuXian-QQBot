@@ -341,6 +341,11 @@ class ItemInstance(Base):
                     durability=equip_durability
                 ))
             await session.flush()  # 确保装备立即可见
+
+            # 更新成就统计（装备获得）
+            from ..achievement.achievement_service import AchievementService
+            await AchievementService.update_stat(session, player_id, "equipment_obtained", quantity)
+
             return True
 
         # 普通物品处理 - 先检查空间
