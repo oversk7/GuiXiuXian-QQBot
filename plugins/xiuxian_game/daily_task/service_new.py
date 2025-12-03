@@ -334,7 +334,8 @@ class DailyTaskService:
             if ghost_npc.extra_data is None:
                 ghost_npc.extra_data = {}
             ghost_npc.extra_data["task_id"] = task.id
-            ghost_npc.extra_data["task_type"] = task.task_type.value
+            # task.task_type已经是字符串，不需要.value
+            ghost_npc.extra_data["task_type"] = task.task_type
 
             return ghost_npc
 
