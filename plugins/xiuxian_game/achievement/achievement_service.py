@@ -34,10 +34,15 @@ class AchievementService:
         """
         初始化玩家统计数据
 
+        对于老玩家，会根据当前游戏状态估算历史统计数据
+
         Args:
             session: 数据库会话
             player_id: 玩家ID
         """
+        from ..models.player import Player
+        from ..models.inventory import Inventory
+
         # 检查是否已存在
         result = await session.execute(
             select(PlayerStats).where(PlayerStats.player_id == player_id)
@@ -45,7 +50,59 @@ class AchievementService:
         existing = result.scalar_one_or_none()
 
         if not existing:
-            stats = PlayerStats(player_id=player_id)
+            # 获取玩家对象以估算历史数据
+            player_result = await session.execute(
+                select(Player).where(Player.id == player_id)
+            )
+            player = player_result.scalar_one_or_none()
+
+            if not player:
+                # 玩家不存在，创建空统计
+                stats = PlayerStats(player_id=player_id)
+                session.add(stats)
+                await session.commit()
+                return
+
+            # 估算历史统计数据
+            estimated_stats = {
+                "cultivation_count": 0,
+                "total_battles": 0,
+                "total_wins": 0,
+                "total_kills": 0,
+                "equipment_obtained": 0,
+            }
+
+            # 1. 根据等级估算修炼次数（每级约需5-10次修炼，取平均7.5）
+            if player.level > 1:
+                estimated_stats["cultivation_count"] = int((player.level - 1) * 7.5)
+
+            # 2. 使用 Player 模型中的战斗统计（如果有）
+            if hasattr(player, 'total_battles'):
+                estimated_stats["total_battles"] = player.total_battles or 0
+            if hasattr(player, 'total_wins'):
+                estimated_stats["total_wins"] = player.total_wins or 0
+                estimated_stats["total_kills"] = player.total_wins or 0  # 估算击杀数=胜利数
+
+            # 3. 统计玩家已拥有的装备数量（包括已装备和背包中的）
+            inventory_result = await session.execute(
+                select(Inventory).where(
+                    Inventory.player_id == player_id,
+                    Inventory.item_type.in_(["weapon", "armor", "accessory", "artifact"])
+                )
+            )
+            inventory_items = inventory_result.scalars().all()
+            if inventory_items:
+                estimated_stats["equipment_obtained"] = sum(item.quantity for item in inventory_items)
+
+            # 创建统计记录
+            stats = PlayerStats(
+                player_id=player_id,
+                cultivation_count=estimated_stats["cultivation_count"],
+                total_battles=estimated_stats["total_battles"],
+                total_wins=estimated_stats["total_wins"],
+                total_kills=estimated_stats["total_kills"],
+                equipment_obtained=estimated_stats["equipment_obtained"]
+            )
             session.add(stats)
             await session.commit()
 
@@ -305,7 +362,7 @@ class AchievementService:
             reward_parts.append(f"金币+{rewards['gold']}")
 
         if "attribute_points" in rewards and rewards["attribute_points"] > 0:
-            player.unused_points += rewards["attribute_points"]
+            player.attribute_points += rewards["attribute_points"]
             reward_parts.append(f"属性点+{rewards['attribute_points']}")
 
         session.add(player)
