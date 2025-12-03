@@ -76,3 +76,28 @@ class StockEventRepository(IRepository[StockEvent]):
         )
         result = await self._session.execute(stmt)
         return list(result.scalars().all())
+
+    async def count(self, **filters) -> int:
+        """统计事件数量"""
+        from sqlalchemy import func
+        stmt = select(func.count(StockEvent.id))
+        if filters.get("is_active") is not None:
+            stmt = stmt.where(StockEvent.is_active == filters["is_active"])
+        if filters.get("affected_stock_id"):
+            stmt = stmt.where(StockEvent.affected_stock_id == filters["affected_stock_id"])
+        result = await self._session.execute(stmt)
+        return result.scalar() or 0
+
+    async def exists(self, **filters) -> bool:
+        """检查事件是否存在"""
+        from sqlalchemy import func
+        stmt = select(func.count(StockEvent.id))
+        if filters.get("id"):
+            stmt = stmt.where(StockEvent.id == filters["id"])
+        if filters.get("event_id"):
+            stmt = stmt.where(StockEvent.event_id == filters["event_id"])
+        if filters.get("affected_stock_id"):
+            stmt = stmt.where(StockEvent.affected_stock_id == filters["affected_stock_id"])
+        result = await self._session.execute(stmt)
+        count = result.scalar() or 0
+        return count > 0
