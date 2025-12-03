@@ -5,11 +5,36 @@
 -- 解决：改用VARCHAR类型，更灵活且不会有映射问题
 -- ==========================================
 
--- 删除旧的ENUM列
-ALTER TABLE daily_task DROP COLUMN IF EXISTS task_type;
-ALTER TABLE daily_task DROP COLUMN IF EXISTS status;
+-- 删除旧的ENUM列（兼容旧版MySQL）
+-- 步骤1: 检查并删除task_type
+SET @sql1 = (SELECT IF(
+    COUNT(*) > 0,
+    'ALTER TABLE daily_task DROP COLUMN task_type',
+    'SELECT "Column task_type does not exist"'
+) FROM INFORMATION_SCHEMA.COLUMNS
+WHERE TABLE_SCHEMA = DATABASE()
+AND TABLE_NAME = 'daily_task'
+AND COLUMN_NAME = 'task_type');
 
--- 创建VARCHAR列（不再使用ENUM）
+PREPARE stmt1 FROM @sql1;
+EXECUTE stmt1;
+DEALLOCATE PREPARE stmt1;
+
+-- 步骤2: 检查并删除status
+SET @sql2 = (SELECT IF(
+    COUNT(*) > 0,
+    'ALTER TABLE daily_task DROP COLUMN status',
+    'SELECT "Column status does not exist"'
+) FROM INFORMATION_SCHEMA.COLUMNS
+WHERE TABLE_SCHEMA = DATABASE()
+AND TABLE_NAME = 'daily_task'
+AND COLUMN_NAME = 'status');
+
+PREPARE stmt2 FROM @sql2;
+EXECUTE stmt2;
+DEALLOCATE PREPARE stmt2;
+
+-- 步骤3: 创建VARCHAR列（不再使用ENUM）
 ALTER TABLE daily_task ADD COLUMN task_type VARCHAR(50) NOT NULL DEFAULT 'tutorial' COMMENT '任务类型';
 ALTER TABLE daily_task ADD COLUMN status VARCHAR(20) NOT NULL DEFAULT 'available' COMMENT '任务状态';
 
