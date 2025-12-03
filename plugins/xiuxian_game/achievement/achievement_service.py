@@ -454,7 +454,8 @@ class AchievementService:
                 "icon": achievement_data.get("icon", "🏆"),
                 "title": achievement_data.get("title", "未知成就"),
                 "description": achievement_data.get("description", ""),
-                "condition_value": achievement_data.get("condition_value", 0)
+                "condition_value": achievement_data.get("condition_value", 0),
+                "condition_type": achievement_data.get("condition_type", "")
             }
 
             if achievement_id in unlocked_ids:
