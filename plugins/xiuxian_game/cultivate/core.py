@@ -194,7 +194,7 @@ async def handle_cultivate(event: MessageEvent):
             if card_bonus > 0:
                 bonus_parts.append(f"月卡+{card_bonus}")
             if reincarnation_bonus > 0:
-                bonus_parts.append(f"转数+{reincarnation_bonus}")
+                bonus_parts.append(f"冥返+{reincarnation_bonus}")
             if guild_bonus > 0:
                 bonus_parts.append(f"公会+{guild_bonus}")
             if mansion_bonus > 0:
@@ -311,6 +311,10 @@ async def handle_seclusion(event: MessageEvent):
         effective_coffin_nail_count = min(coffin_nail_count, 100)  # 最多100根有效
         efficiency_bonus = effective_coffin_nail_count * 0.5  # 每个棺材钉提升0.5%效率
 
+        # 获取转数闭关效率加成
+        from .reincarnation import ReincarnationService
+        reincarnation_seclusion_bonus = ReincarnationService.get_seclusion_efficiency_bonus(player.reincarnation_level)
+
         player.is_secluded = True
         player.seclusion_start_time = datetime.now()
         session.add(player)
@@ -332,6 +336,11 @@ async def handle_seclusion(event: MessageEvent):
             card_efficiency = benefits["seclusion_efficiency"] * 100
             total_efficiency += card_efficiency
             efficiency_parts.append("月卡")
+
+        if reincarnation_seclusion_bonus > 0:
+            reincarnation_efficiency = reincarnation_seclusion_bonus * 100
+            total_efficiency += reincarnation_efficiency
+            efficiency_parts.append("冥返")
 
         if guild_cultivation_bonus > 0:
             guild_efficiency = guild_cultivation_bonus * 100
@@ -485,7 +494,7 @@ async def handle_out_seclusion(event: MessageEvent):
         if card_bonus > 0:
             bonus_parts.append(f"月卡+{card_bonus}")
         if reincarnation_exp_bonus > 0:
-            bonus_parts.append(f"转数+{reincarnation_exp_bonus}")
+            bonus_parts.append(f"冥返+{reincarnation_exp_bonus}")
         if guild_bonus > 0:
             bonus_parts.append(f"公会+{guild_bonus}")
         if mansion_bonus > 0:
@@ -657,7 +666,7 @@ async def handle_breakthrough(event: MessageEvent, args: Message = CommandArg())
             msg = (
                 f"⛓️‍💥骨裂声回荡，已突破至Lv.{player.level}↑\n"
                 "━━━━━━━━━━━━━\n"
-                f"✧ 获得属性点 + {points_gained}" + (f" (转数加成)" if player.reincarnation_level > 0 else "") + "\n"
+                f"✧ 获得属性点 + {points_gained}" + (f" (冥返加成)" if player.reincarnation_level > 0 else "") + "\n"
                 f"✧ 剩余修为 {player.exp}\n"
                 + cost_msg +
                 reward_msg +
@@ -712,7 +721,7 @@ async def handle_breakthrough(event: MessageEvent, args: Message = CommandArg())
                 msg = (
                     f"⛓️‍💥骨裂声回荡，已突破至Lv.{player.level}↑\n"
                     "━━━━━━━━━━━━━\n"
-                    f"✧ 获得属性点 + {points_gained}" + (f" (转数加成)" if player.reincarnation_level > 0 else "") + "\n"
+                    f"✧ 获得属性点 + {points_gained}" + (f" (冥返加成)" if player.reincarnation_level > 0 else "") + "\n"
                     f"✧ 剩余修为 {player.exp}\n"
                     + cost_msg +
                     reward_msg +
@@ -998,7 +1007,7 @@ async def handle_continuous_breakthrough(event: MessageEvent, args: Message = Co
                 + fail_msg +
                 f"✧ 等级提升 Lv.{start_level} → Lv.{player.level}\n"
                 f"✧ 消耗修为 {consumed_exp}\n"
-                f"✧ 获得属性点 + {total_attribute_points}" + (f" (转数加成)" if player.reincarnation_level > 0 else "") + "\n"
+                f"✧ 获得属性点 + {total_attribute_points}" + (f" (冥返加成)" if player.reincarnation_level > 0 else "") + "\n"
                 f"✧ 剩余修为 {player.exp}\n"
                 + cost_msg +
                 (f"✧ 当前已达 Lv.{required_level}，需先进行冥返才能继续突破\n" if reached_level_cap else "") +
