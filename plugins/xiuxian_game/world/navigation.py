@@ -17,7 +17,7 @@ from nonebot.adapters.qq import MessageEvent, Message
 from nonebot.params import CommandArg
 from datetime import datetime, timedelta
 from typing import Tuple
-from ..models.db import safe_session, session_factory
+from ..models.db import safe_session, AsyncSessionLocal
 from ..models.player import Player
 from ..utils import message_add_head
 from ..models.navigation_task import NavigationTask
@@ -289,6 +289,10 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
     if not location_name:
         await goto_location_cmd.finish("⛔ 请输入地点名称，例如：前往 上京")
 
+    # 定义session_factory
+    def session_factory():
+        return AsyncSessionLocal()
+
     # 使用UnitOfWork管理会话和LocationService
     async with UnitOfWork(session_factory) as uow:
         player: Player | None = await get_unified_player(uow.session, event)
@@ -397,6 +401,10 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
             "⛔ 请输入NPC名称，例如：查找 商人\n\n"
             "💡 支持模糊搜索，可以输入名称的一部分"
         )
+
+    # 定义session_factory
+    def session_factory():
+        return AsyncSessionLocal()
 
     # 使用UnitOfWork管理会话
     async with UnitOfWork(session_factory) as uow:
