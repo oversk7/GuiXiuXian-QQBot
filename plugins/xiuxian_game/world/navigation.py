@@ -17,7 +17,7 @@ from nonebot.adapters.qq import MessageEvent, Message
 from nonebot.params import CommandArg
 from datetime import datetime, timedelta
 from typing import Tuple
-from ..models.db import safe_session, AsyncSessionLocal as session_factory
+from ..models.db import safe_session, AsyncSessionLocal
 from ..models.player import Player
 from ..utils import message_add_head
 from ..models.navigation_task import NavigationTask
@@ -496,6 +496,10 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
 @check_data_cmd.handle()
 async def _(event: MessageEvent):
     """【检查数据】调试命令 - 检查Location和NPC数据状态"""
+    # 定义session_factory
+    def session_factory():
+        return AsyncSessionLocal()
+
     async with UnitOfWork(session_factory) as uow:
         location_service = LocationService(uow.locations)
         npc_service = NPCService(uow.session, uow.npcs)
