@@ -17,7 +17,7 @@ from nonebot.adapters.qq import MessageEvent, Message
 from nonebot.params import CommandArg
 from datetime import datetime, timedelta
 from typing import Tuple
-from ..models.db import safe_session, AsyncSessionLocal
+from ..models.db import safe_session, AsyncSessionLocal as session_factory
 from ..models.player import Player
 from ..utils import message_add_head
 from ..models.navigation_task import NavigationTask

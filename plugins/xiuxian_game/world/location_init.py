@@ -314,6 +314,9 @@ async def init_workshop_locations(session) -> int:
             session.add(craftsman_npc)
             created_count += 1
 
+    return created_count
+
+
 # ==================== 刷新工坊清单（覆盖写入） ====================
 refresh_workshops_cmd = on_command("刷新工坊清单", block=True, priority=1, permission=SUPERUSER)
 
