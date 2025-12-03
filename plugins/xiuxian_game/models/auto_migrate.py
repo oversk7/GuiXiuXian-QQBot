@@ -368,15 +368,17 @@ async def _rebuild_enum_column(
     verbose: bool
 ) -> None:
     """
-    重建 ENUM 列（安全的方式）
+    重建 ENUM 列（安全的方式，带数据验证）
 
     步骤：
+    0. 验证现有数据中的所有值都在新 ENUM 中（新增）
     1. 创建临时 VARCHAR 列
     2. 复制数据到临时列
     3. 删除旧 ENUM 列
     4. 创建新 ENUM 列（包含所有期望的值）
-    5. 恢复数据
-    6. 删除临时列
+    5. 恢复数据（分步进行，便于诊断）
+    6. 验证数据恢复完整性（新增）
+    7. 删除临时列
 
     Args:
         conn: 数据库连接
@@ -388,7 +390,31 @@ async def _rebuild_enum_column(
     temp_column = f"{column_name}_temp_migration"
 
     try:
-        # 获取列的完整定义（包括 NOT NULL、DEFAULT 等属性）
+        # ===== 步骤 0: 验证现有数据 =====
+        if verbose:
+            print(f"     验证现有数据...")
+
+        result = await conn.execute(
+            text(f"SELECT DISTINCT {column_name} FROM {table_name} WHERE {column_name} IS NOT NULL")
+        )
+        actual_data_values = {row[0] for row in result.fetchall()}
+
+        if verbose:
+            print(f"     现有数据中的值: {actual_data_values}")
+            print(f"     新 ENUM 定义的值: {set(new_values)}")
+
+        # 检查是否有数据值不在新 ENUM 中
+        unsupported_values = actual_data_values - set(new_values)
+        if unsupported_values:
+            error_msg = f"数据中存在新 ENUM 不支持的值: {unsupported_values}"
+            logger.error(f"❌ {error_msg}")
+            logger.error(f"   请先更新 REQUIRED_ENUMS 或手动处理这些数据")
+            raise ValueError(error_msg)
+
+        if verbose:
+            print(f"     ✓ 数据验证通过")
+
+        # ===== 获取列的完整定义 =====
         result = await conn.execute(
             text(f"SHOW COLUMNS FROM {table_name} LIKE :column_name"),
             {"column_name": column_name}
@@ -414,31 +440,54 @@ async def _rebuild_enum_column(
 
         attrs_str = ' '.join(column_attrs)
 
-        # 执行迁移步骤
-        steps = [
-            # 1. 添加临时列
-            f"ALTER TABLE {table_name} ADD COLUMN {temp_column} VARCHAR(100)",
-
-            # 2. 复制数据
-            f"UPDATE {table_name} SET {temp_column} = {column_name}",
-
-            # 3. 删除旧列
-            f"ALTER TABLE {table_name} DROP COLUMN {column_name}",
-
-            # 4. 创建新 ENUM 列
-            f"ALTER TABLE {table_name} ADD COLUMN {column_name} ENUM({enum_values_str}) {attrs_str}",
-
-            # 5. 恢复数据
-            f"UPDATE {table_name} SET {column_name} = {temp_column}",
-
-            # 6. 删除临时列
-            f"ALTER TABLE {table_name} DROP COLUMN {temp_column}",
+        # ===== 步骤 1-4: 基础迁移步骤 =====
+        basic_steps = [
+            ("添加临时列", f"ALTER TABLE {table_name} ADD COLUMN {temp_column} VARCHAR(100)"),
+            ("复制数据到临时列", f"UPDATE {table_name} SET {temp_column} = {column_name}"),
+            ("删除旧 ENUM 列", f"ALTER TABLE {table_name} DROP COLUMN {column_name}"),
+            ("创建新 ENUM 列", f"ALTER TABLE {table_name} ADD COLUMN {column_name} ENUM({enum_values_str}) {attrs_str}"),
         ]
 
-        for step_sql in steps:
+        for step_name, step_sql in basic_steps:
             if verbose:
-                logger.debug(f"     执行: {step_sql[:80]}...")
+                print(f"     {step_name}...")
             await conn.execute(text(step_sql))
+
+        # ===== 步骤 5: 分步恢复数据（改进） =====
+        if verbose:
+            print(f"     恢复数据...")
+
+        total_restored = 0
+        for value in actual_data_values:
+            update_sql = f"UPDATE {table_name} SET {column_name} = :value WHERE {temp_column} = :value"
+            result = await conn.execute(text(update_sql), {"value": value})
+            row_count = result.rowcount
+            total_restored += row_count
+
+            if verbose:
+                print(f"       恢复值 '{value}': {row_count} 行")
+
+        # ===== 步骤 6: 验证数据恢复完整性 =====
+        if verbose:
+            print(f"     验证数据完整性...")
+
+        result = await conn.execute(
+            text(f"SELECT COUNT(*) FROM {table_name} WHERE {column_name} IS NULL AND {temp_column} IS NOT NULL")
+        )
+        orphaned_count = result.scalar()
+
+        if orphaned_count > 0:
+            error_msg = f"数据恢复不完整: {orphaned_count} 行数据未能恢复"
+            logger.error(f"❌ {error_msg}")
+            raise ValueError(error_msg)
+
+        if verbose:
+            print(f"     ✓ 数据恢复完整 (总计 {total_restored} 行)")
+
+        # ===== 步骤 7: 删除临时列 =====
+        if verbose:
+            print(f"     删除临时列...")
+        await conn.execute(text(f"ALTER TABLE {table_name} DROP COLUMN {temp_column}"))
 
     except Exception as e:
         logger.error(f"重建 ENUM 列失败: {table_name}.{column_name}: {e}")
