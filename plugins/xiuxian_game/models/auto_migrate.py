@@ -63,6 +63,33 @@ REQUIRED_TABLES: Dict[str, str] = {
             FOREIGN KEY (affected_stock_id) REFERENCES stocks(id)
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='股票突发事件表'
     """,
+    "bank_fund": """
+        CREATE TABLE IF NOT EXISTS bank_fund (
+            id INT AUTO_INCREMENT PRIMARY KEY COMMENT '基金ID',
+            fund_name VARCHAR(100) NOT NULL COMMENT '基金名称',
+            fund_type VARCHAR(50) DEFAULT 'lively' COMMENT '基金类型(lively=活期)',
+            daily_return FLOAT DEFAULT 0.0 COMMENT '当日收益率',
+            total_scale BIGINT DEFAULT 0 COMMENT '基金总规模(金币)',
+            participant_count INT DEFAULT 0 COMMENT '参与人数',
+            created_at DATETIME DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+            updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间'
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='银行理财基金表'
+    """,
+    "fund_holding": """
+        CREATE TABLE IF NOT EXISTS fund_holding (
+            id INT AUTO_INCREMENT PRIMARY KEY COMMENT '持仓ID',
+            player_id VARCHAR(32) NOT NULL COMMENT '玩家ID',
+            fund_id INT NOT NULL COMMENT '基金ID',
+            principal BIGINT NOT NULL COMMENT '本金(金币)',
+            current_value BIGINT NOT NULL COMMENT '当前市值(金币)',
+            accumulated_profit BIGINT DEFAULT 0 COMMENT '累计盈亏(金币)',
+            buy_date DATETIME DEFAULT CURRENT_TIMESTAMP COMMENT '购买时间',
+            last_settlement DATETIME DEFAULT CURRENT_TIMESTAMP COMMENT '最后结算时间',
+            is_active BOOLEAN DEFAULT TRUE COMMENT '是否持有中',
+            INDEX idx_player_holding (player_id, is_active),
+            INDEX idx_fund_holding (fund_id, is_active)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='理财持仓表'
+    """,
 }
 
 

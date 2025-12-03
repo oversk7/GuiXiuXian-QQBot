@@ -67,6 +67,10 @@ class UnitOfWork:
         self._stock_events = None
         self._bank_accounts = None
 
+        # 理财相关仓储
+        self._bank_funds = None
+        self._fund_holdings = None
+
         # 打工相关仓储
         self._part_time_jobs = None
         self._job_locations = None
@@ -165,6 +169,22 @@ class UnitOfWork:
             from ..repositories.bank_account_repository import BankAccountRepository
             self._bank_accounts = BankAccountRepository(self._session)
         return self._bank_accounts
+
+    @property
+    def bank_funds(self):
+        """理财基金仓储"""
+        if self._bank_funds is None:
+            from ..repositories.bank_fund_repository import BankFundRepository
+            self._bank_funds = BankFundRepository(self._session)
+        return self._bank_funds
+
+    @property
+    def fund_holdings(self):
+        """理财持仓仓储"""
+        if self._fund_holdings is None:
+            from ..repositories.fund_holding_repository import FundHoldingRepository
+            self._fund_holdings = FundHoldingRepository(self._session)
+        return self._fund_holdings
 
     @property
     def part_time_jobs(self):

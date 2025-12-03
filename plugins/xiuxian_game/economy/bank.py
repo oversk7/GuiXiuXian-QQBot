@@ -9,20 +9,11 @@ from ..models.player import Player
 from ..models.bank_account import BankAccount
 from ..utils import message_add_head
 
-# ---- 阶梯利率设置 ----
-# (上限, 利率/小时)
-_TIERS = [
-    (100_000, 0.001),   # 10w 以内 0.1%
-    (500_000, 0.0005),  # 10w-50w 0.05%
-    (1_000_000, 0.0001),# 50w-100w 0.01%
-    (float("inf"), 0.0) # 100w 以上无利息
-]
-
-def _tier_rate(balance: int) -> float:
-    for limit, rate in _TIERS:
-        if balance <= limit:
-            return rate
-    return 0.0
+# ==================== 银行系统改革说明 ====================
+# 【2025-12-03】银行系统已取消存款利息
+# 原因：利息是纯货币创造，导致严重通货膨胀(最高金币34.4亿)
+# 新功能：理财产品（零和博弈，管理费作为货币Sink）
+# ======================================================
 
 # 命令
 bank_balance_cmd = on_command("余额", aliases={"冥行账单"}, block=True, priority=5)
@@ -34,21 +25,10 @@ bank_invest_cmd = on_command("银行投资", aliases={"投资理财"}, block=Tru
 # ==================== 存款排行榜 ====================
 deposit_rank_cmd = on_command("存款榜", aliases={"冥行榜"}, block=True, priority=5)
 
-def _apply_interest(acc: BankAccount):
-    now = datetime.now()
-    delta_hours = (now - acc.last_interest).total_seconds() / 3600
-    if delta_hours <= 0 or acc.balance <= 0:
-        acc.last_interest = now
-        return 0
-    gain = int(acc.balance * _tier_rate(acc.balance) * delta_hours)
-    # 单次结息上限 1w
-    cap = 10_000
-    if gain > cap:
-        gain = cap
-    if gain > 0:
-        acc.balance += gain
-    acc.last_interest = now
-    return gain
+# 旧利息计算函数已废弃
+# def _apply_interest(acc: BankAccount):
+#     """已于2025-12-03废弃，不再计算利息"""
+#     pass
 
 
 @bank_balance_cmd.handle()
@@ -67,10 +47,18 @@ async def handle_balance(event: MessageEvent):
             acc = BankAccount(player_id=player.id, balance=0, last_interest=datetime.now())
             session.add(acc)
             await session.commit()
-        gain = _apply_interest(acc)
-        session.add(acc)
-        await session.commit()
-        msg = f"🏦 冥行票据\n▫️ 本次利息：{gain} 金币\n▫️ 当前存款：{acc.balance} 金币\n▫️ 阶梯利率，当存款超过100w时不再产生利息\n\n💡 使用「银行投资」查看投资理财选项"
+
+        # 已取消利息计算
+        msg = (
+            f"🏦 冥界银行账单\n"
+            f"━━━━━━━━━━━━━\n"
+            f"💰 当前存款：{acc.balance:,} 金币\n"
+            f"━━━━━━━━━━━━━\n"
+            f"📢 银行改革公告\n"
+            f"▫️ 已取消存款利息\n"
+            f"▫️ 新增理财产品\n\n"
+            f"💡 使用「理财产品」查看投资选项"
+        )
         await bank_balance_cmd.finish(message_add_head(msg, event))
 
 
@@ -102,7 +90,7 @@ async def handle_deposit(event: MessageEvent, args: Message = CommandArg()):
             acc = BankAccount(player_id=player.id, balance=0, last_interest=datetime.now())
             session.add(acc)
             await session.flush()
-        _apply_interest(acc)
+        # 已取消利息计算
         player.gold -= amt
         acc.balance += amt
         session.add_all([player, acc])
@@ -134,7 +122,7 @@ async def handle_withdraw(event: MessageEvent, args: Message = CommandArg()):
         acc = await session.get(BankAccount, player.id)
         if not acc or acc.balance <= 0:
             await bank_withdraw_cmd.finish("⛔ 你没有任何存款")
-        _apply_interest(acc)
+        # 已取消利息计算
         if amt > acc.balance:
             await bank_withdraw_cmd.finish("⛔ 取款金额超过存款")
         acc.balance -= amt
@@ -189,8 +177,7 @@ async def handle_transfer(event: MessageEvent, args: Message = CommandArg()):
             session.add(sender_acc)
             await session.flush()
 
-        # 应用利息
-        _apply_interest(sender_acc)
+        # 已取消利息计算
 
         # 检查余额
         if sender_acc.balance < amt:
@@ -207,8 +194,7 @@ async def handle_transfer(event: MessageEvent, args: Message = CommandArg()):
             session.add(receiver_acc)
             await session.flush()
 
-        # 应用利息
-        _apply_interest(receiver_acc)
+        # 已取消利息计算
 
         # 执行转账
         sender_acc.balance -= amt
@@ -258,12 +244,10 @@ async def handle_deposit_rank(event: MessageEvent, args: Message = CommandArg())
         accounts = (await session.execute(sub_stmt)).scalars().all()
         if not accounts:
             await deposit_rank_cmd.finish("暂无存款数据")
-        
-        # 为所有账户结息
-        for acc in accounts:
-            _apply_interest(acc)
-        
-        # 按更新后余额排序
+
+        # 已取消利息计算，直接排序
+
+        # 按余额排序
         accounts.sort(key=lambda x: x.balance, reverse=True)
         
         # 分页处理
@@ -309,28 +293,24 @@ async def handle_bank_invest(event: MessageEvent):
             session.add(acc)
             await session.commit()
 
-        # 应用利息
-        gain = _apply_interest(acc)
-        session.add(acc)
-        await session.commit()
+        # 已取消利息计算
 
         msg = (
             "🏦 冥界银行投资理财中心\n"
             "▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃\n"
-            f"💰 当前存款：{acc.balance:,} 金币\n"
-            f"💎 本次利息：{gain} 金币\n\n"
+            f"💰 当前存款：{acc.balance:,} 金币\n\n"
             "💎 投资产品：\n"
             "1️⃣ 气运投资 - 高风险高收益\n"
             "   • 使用「气运行情」查看可投资项目\n"
             "   • 使用「投资气运 代码 数量 银行」从银行账户投资\n"
             "   • 使用「出售气运 代码 数量 银行」出售后存入银行\n\n"
-            "2️⃣ 定期存款 - 稳定收益\n"
-            "   • 当前阶梯利率：\n"
-            "   • 10万以内：0.1%/小时\n"
-            "   • 10-50万：0.05%/小时\n"
-            "   • 50-100万：0.01%/小时\n"
-            "   • 100万以上：无利息\n\n"
-            "💡 风险提示：气运投资有风险，投资需谨慎！"
+            "2️⃣ 活期理财 - 稳健增值(即将上线)\n"
+            "   • 随存随取，每日结算\n"
+            "   • 日收益±5%，管理费0.1%/天\n"
+            "   • 使用「理财产品」查看详情\n\n"
+            "📢 银行改革公告:\n"
+            "   已取消存款利息，控制通货膨胀\n\n"
+            "💡 风险提示：投资有风险，需谨慎！"
         )
 
         await bank_invest_cmd.finish(message_add_head(msg, event))
