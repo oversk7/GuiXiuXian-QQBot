@@ -1,9 +1,9 @@
 # 诡修仙项目文档系统
 
-**文档版本**: 3.2
-**最后更新**: 2025-12-02
+**文档版本**: 3.3
+**最后更新**: 2025-12-03
 **文档受众**: LLM代理和项目开发者
-**文档状态**: 生产就绪，包含游戏平衡分析和投资系统反套利实施
+**文档状态**: 生产就绪，已清理临时bug修复文档
 
 ---
 
@@ -62,14 +62,27 @@
 - `code-cleanup-2025-12-02.md` - 代码清理记录（Feature Flag删除、旧Service移除）
 
 ### `/agent/` - 代理调研文档
-LLM代理生成的调研和分析:
-- `all_services_inventory.md` - 27个Service完整清单
-- `ai_npc_system_investigation.md` - AI NPC系统架构设计（未来实现）
-- `npc_service_di_and_ai_investigation.md` - NPCService DI重构与AI接口预留
-- `doc_cleanup_investigation.md` - 文档清理调研报告
+LLM代理生成的调研和分析报告（仅保留系统分析和设计参考文档）:
+
+**系统平衡与设计分析**:
 - `game_balance_analysis_2025_12_01.md` - 游戏平衡分析与漏洞修复报告 (2025-12-01)
+- `feature_flag_investigation_2025_12_02.md` - Feature Flag调查与架构决策记录
+- `doc_cleanup_investigation.md` - 文档清理调研报告（元文档）
+
+**投资系统调研**:
 - `investment_system_investigation.md` - 投资系统初步调查报告（银行+股票）
 - `stock_system_files_investigation.md` - 投资系统文件清单调查
+
+**未来功能设计**:
+- `ai_npc_implementation_investigation.md` - AI NPC系统架构设计
+- `agent_npc_autonomous_behavior_investigation.md` - Agent NPC自主行为调查
+
+**系统调研参考**:
+- `player_panel_investigation_2025_12_01.md` - 玩家面板系统调查
+- `cultivation_and_quest_investigation.md` - 修炼与任务系统调查
+- `code_logic_comparison_investigation.md` - 代码逻辑对比分析
+
+**清理说明**: 已删除11个临时性bug修复调查文档（装备bug、连接泄漏、ENUM修复等），这些问题均已解决且无长期参考价值。
 
 ### `/design/` - 系统设计方案
 游戏设计和系统重构方案:
@@ -318,18 +331,33 @@ LLM代理生成的调研和分析:
 - 总计删除7,690行代码
 - Python文件从297减少到274（-8%）
 
+### 文档清理 (2025-12-03)
+
+**清理目标**: 删除临时性bug修复调查文档，精简`/agent/`目录
+
+**清理成果**:
+- 删除11个临时bug修复调查文档：
+  - 装备相关bug (4个): equipment_unequip_attribute_bug, equipment_bonus_display_bug, equipment_durability_auto_unequip, sweep_token_equipment_bug
+  - 连接泄漏调查 (3个): connection_leak_investigation, connection_leak_full_scan, connection_leak_updated_investigation
+  - 其他已修复问题 (4个): npc_url_error, guild_approve_db_not_update, daily_task_di_migration, auto_migrate_enum_fix
+- `/agent/`目录从21个文档精简到10个（-52%）
+- 保留10个有长期参考价值的系统分析和设计文档
+
 **保留文档**:
-- 所有 `/architecture/` 架构文档 (5个)
+- 所有 `/architecture/` 架构文档 (8个)
 - 所有 `/guides/` 操作指南 (6个)
-- 所有 `/reference/` 参考资料 (4个)
+- 所有 `/reference/` 参考资料 (6个)
 - 所有 `/overview/` 项目概览 (2个)
-- 所有 `/agent/` 未来设计调研 (3个)
+- 所有 `/design/` 设计方案 (5个)
+- `/agent/` 系统分析和设计参考 (10个)
 - 所有 `/archive/` 历史归档 (11个)
 
 **清理原则**:
 - ✅ 保留描述当前架构如何工作的文档
+- ✅ 保留系统分析、平衡性调研、未来设计等长期参考文档
 - ✅ 保留操作指南和API参考
 - ✅ 保留历史归档（追踪决策变化）
+- ❌ 删除一次性bug修复调查（问题已解决，无复现风险）
 - ❌ 删除重构过程、进度跟踪等临时性文档
 
 ---
