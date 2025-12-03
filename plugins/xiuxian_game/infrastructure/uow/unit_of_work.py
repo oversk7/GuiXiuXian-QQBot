@@ -293,15 +293,29 @@ class UnitOfWork:
 
         - 如果发生异常，自动回滚
         - 如果没有异常，自动提交
+        - 特殊处理 Nonebot2 流程控制异常（FinishedException等）：提交而不是回滚
         - 总是关闭会话
 
         重要：不会吞掉异常，会向上传播
         """
         try:
             if exc_type is not None:
-                # 发生异常，回滚事务
-                logger.warning(f"⚠️ [UnitOfWork] 会话 {id(self._session)} 回滚: {exc_type.__name__}: {exc_val}")
-                await self._session.rollback()
+                # 特殊处理 Nonebot2 流程控制异常
+                # 这些异常是正常流程控制，应该提交事务而不是回滚
+                try:
+                    from nonebot.exception import FinishedException, PausedException, RejectedException
+                    if exc_type in (FinishedException, PausedException, RejectedException):
+                        # 流程控制异常：提交事务
+                        logger.debug(f"✅ [UnitOfWork] 会话 {id(self._session)} 提交（流程控制异常: {exc_type.__name__}）")
+                        await self._session.commit()
+                    else:
+                        # 其他异常：回滚事务
+                        logger.warning(f"⚠️ [UnitOfWork] 会话 {id(self._session)} 回滚: {exc_type.__name__}: {exc_val}")
+                        await self._session.rollback()
+                except ImportError:
+                    # 如果无法导入 Nonebot 异常（非 Nonebot 环境），按原逻辑回滚
+                    logger.warning(f"⚠️ [UnitOfWork] 会话 {id(self._session)} 回滚: {exc_type.__name__}: {exc_val}")
+                    await self._session.rollback()
             else:
                 # 没有异常，提交事务
                 logger.debug(f"✅ [UnitOfWork] 会话 {id(self._session)} 提交")
