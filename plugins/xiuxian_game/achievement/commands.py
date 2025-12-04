@@ -124,14 +124,24 @@ async def get_achievement_detail(session, player, achievement_name: str) -> str:
     if not config:
         return "⛔ 成就配置加载失败"
 
-    # 查找成就
+    # 查找成就（合并基础成就和高难度成就）
     achievement_data = None
     achievement_id = None
-    for aid, ach in config["basic_achievements"].items():
+
+    # 先搜索基础成就
+    for aid, ach in config.get("basic_achievements", {}).items():
         if ach["title"] == achievement_name or aid == achievement_name:
             achievement_data = ach
             achievement_id = aid
             break
+
+    # 如果没找到，再搜索高难度成就
+    if not achievement_data:
+        for aid, ach in config.get("advanced_achievements", {}).items():
+            if ach["title"] == achievement_name or aid == achievement_name:
+                achievement_data = ach
+                achievement_id = aid
+                break
 
     if not achievement_data:
         return f"❌ 未找到成就: {achievement_name}"
@@ -165,9 +175,11 @@ async def get_achievement_detail(session, player, achievement_name: str) -> str:
         "battle_win": "战斗胜利",
         "kill_count": "击杀敌人",
         "equipment_obtained": "获得装备",
+        "equipment_max_upgrade": "拥有满级装备",
         "gold_total": "累计获得金币",
         "locations_visited": "探索地点",
         "login_streak": "连续登录",
+        "total_login_days": "累计登录天数",
         "account_age": "账号创建时间"
     }
     lines.append(f"  类型：{condition_map.get(condition_type, condition_type)}")
