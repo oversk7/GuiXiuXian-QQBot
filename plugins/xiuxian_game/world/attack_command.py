@@ -731,12 +731,12 @@ async def handle_player_attack(session, attacker: Player, target: Player, event:
         # 战斗胜利后更新成就统计
         if victory:
             from ..achievement.achievement_service import AchievementService
-            await AchievementService.update_stat(session, attacker.id, "total_battles")
-            await AchievementService.update_stat(session, attacker.id, "total_wins")
-            await AchievementService.update_stat(session, attacker.id, "total_kills")
+            await AchievementService.update_stat(session, attacker.id, "total_battles", auto_commit=False)
+            await AchievementService.update_stat(session, attacker.id, "total_wins", auto_commit=False)
+            await AchievementService.update_stat(session, attacker.id, "total_kills", auto_commit=True)
         else:
             from ..achievement.achievement_service import AchievementService
-            await AchievementService.update_stat(session, attacker.id, "total_battles")
+            await AchievementService.update_stat(session, attacker.id, "total_battles", auto_commit=True)
 
         # 检查新手任务
         from ..quest.novice_quest_service import NoviceQuestService
@@ -895,12 +895,12 @@ async def handle_npc_attack(session, attacker: Player, target_npc, event: Messag
         # 战斗胜利后更新成就统计
         if victory:
             from ..achievement.achievement_service import AchievementService
-            await AchievementService.update_stat(session, attacker.id, "total_battles")
-            await AchievementService.update_stat(session, attacker.id, "total_wins")
-            await AchievementService.update_stat(session, attacker.id, "total_kills")
+            await AchievementService.update_stat(session, attacker.id, "total_battles", auto_commit=False)
+            await AchievementService.update_stat(session, attacker.id, "total_wins", auto_commit=False)
+            await AchievementService.update_stat(session, attacker.id, "total_kills", auto_commit=True)
         else:
             from ..achievement.achievement_service import AchievementService
-            await AchievementService.update_stat(session, attacker.id, "total_battles")
+            await AchievementService.update_stat(session, attacker.id, "total_battles", auto_commit=True)
 
         # 检查新手任务
         from ..quest.novice_quest_service import NoviceQuestService

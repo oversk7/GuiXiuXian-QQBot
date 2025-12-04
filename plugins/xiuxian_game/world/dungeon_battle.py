@@ -888,9 +888,9 @@ async def _handle_personal_monster(session, tile: WorldTile, player: Player) -> 
 
         # 更新成就统计（诡域战斗胜利）
         from ..achievement.achievement_service import AchievementService
-        await AchievementService.update_stat(session, player.id, "total_battles")
-        await AchievementService.update_stat(session, player.id, "total_wins")
-        await AchievementService.update_stat(session, player.id, "total_kills")
+        await AchievementService.update_stat(session, player.id, "total_battles", auto_commit=False)
+        await AchievementService.update_stat(session, player.id, "total_wins", auto_commit=False)
+        await AchievementService.update_stat(session, player.id, "total_kills", auto_commit=True)
 
         # 结算"斩龙闪"的战后效果，保持与战斗日志一致（修复 Bug3/1）
         try:

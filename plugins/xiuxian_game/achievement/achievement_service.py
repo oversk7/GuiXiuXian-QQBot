@@ -115,7 +115,8 @@ class AchievementService:
         session: AsyncSession,
         player_id: str,
         stat_name: str,
-        increment: int = 1
+        increment: int = 1,
+        auto_commit: bool = True
     ):
         """
         更新玩家统计数据
@@ -125,6 +126,7 @@ class AchievementService:
             player_id: 玩家ID
             stat_name: 统计项名称
             increment: 增量值（默认1）
+            auto_commit: 是否自动提交（默认True，保持向后兼容）
         """
         # 确保统计数据存在
         await cls.init_player_stats(session, player_id)
@@ -140,7 +142,8 @@ class AchievementService:
             current_value = getattr(stats, stat_name)
             setattr(stats, stat_name, current_value + increment)
             session.add(stats)
-            await session.commit()
+            if auto_commit:
+                await session.commit()
 
     @classmethod
     async def update_login_streak(cls, session: AsyncSession, player_id: str):
