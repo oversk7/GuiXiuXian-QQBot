@@ -254,11 +254,11 @@ class MapVisualizer:
         title = "大都会地图"
         subtitle = "Map of the Metropolis"
 
-        # 标题背景装饰框
+        # 标题背景装饰框（移到底部避免遮挡地点）
         title_bg_width = 400
         title_bg_height = 80
         title_bg_x = (self.map_width - title_bg_width) // 2
-        title_bg_y = 25
+        title_bg_y = self.map_height - 120  # 底部位置
 
         # 绘制标题背景（半透明羊皮纸色）
         draw.rectangle([title_bg_x, title_bg_y,
@@ -648,26 +648,26 @@ class MapVisualizer:
         title = "图例" if font_supports_chinese else "Legend"
         draw.text((legend_x + 10, legend_y + 10), title, fill=self.colors['location_text'], font=self.fonts['large'])
 
-        # 图例项目 - 根据字体支持情况选择文字
+        # 图例项目 - 使用纯文字，避免emoji乱码
         if font_supports_chinese:
             legend_items = [
-                ("🔴 玩家位置", self.colors['player']),
-                ("🟠 市集交易", self.colors['market']),
-                ("🟣 打工地点", self.colors['job']),
-                ("🟡 特殊地点", self.colors['special']),
-                ("🏠 阴宅（箭头指示真实位置）", self.colors['mansion']),
-                ("🟢 导航路线", self.colors['navigation_line']),
-                ("🟨 导航目标", self.colors['navigation_target']),
+                ("玩家位置", self.colors['player']),
+                ("市集交易", self.colors['market']),
+                ("打工地点", self.colors['job']),
+                ("特殊地点", self.colors['special']),
+                ("阴宅", self.colors['mansion']),
+                ("导航路线", self.colors['navigation_line']),
+                ("导航目标", self.colors['navigation_target']),
             ]
         else:
             legend_items = [
-                ("● Players", self.colors['player']),
-                ("● Markets", self.colors['market']),
-                ("● Jobs", self.colors['job']),
-                ("● Special", self.colors['special']),
-                ("● Mansions (offset with pointer)", self.colors['mansion']),
-                ("● Navigation", self.colors['navigation_line']),
-                ("● Target", self.colors['navigation_target']),
+                ("Players", self.colors['player']),
+                ("Markets", self.colors['market']),
+                ("Jobs", self.colors['job']),
+                ("Special", self.colors['special']),
+                ("Mansions", self.colors['mansion']),
+                ("Navigation", self.colors['navigation_line']),
+                ("Target", self.colors['navigation_target']),
             ]
 
         for i, (text, color) in enumerate(legend_items):
@@ -692,12 +692,22 @@ class MapVisualizer:
                 ]
                 draw.polygon(roof_points, fill='#654321', outline='#000000', width=1)
             else:
-                # 绘制普通圆形标记
-                draw.ellipse([legend_x + 15, item_y, legend_x + 25, item_y + 10], fill=color)
+                # 绘制圆形颜色标记（带阴影效果）
+                marker_x = legend_x + 20
+                marker_y = item_y + 5
+                marker_size = 5
 
-            # 绘制文字
-            display_text = text[2:] if text.startswith(("🔴", "🟠", "🟣", "🟡", "🏠")) else text
-            draw.text((legend_x + 35, item_y - 2), display_text, fill=self.colors['location_text'], font=self.fonts['small'])
+                # 绘制阴影
+                draw.ellipse([marker_x - marker_size + 1, marker_y - marker_size + 1,
+                             marker_x + marker_size + 1, marker_y + marker_size + 1],
+                            fill='#999999')
+                # 绘制主标记
+                draw.ellipse([marker_x - marker_size, marker_y - marker_size,
+                             marker_x + marker_size, marker_y + marker_size],
+                            fill=color, outline='#000000', width=1)
+
+            # 绘制文字（不再需要去掉emoji前缀）
+            draw.text((legend_x + 35, item_y - 2), text, fill=self.colors['location_text'], font=self.fonts['small'])
     
     async def generate_map(self, session: AsyncSession, current_player_id: str = None) -> bytes:
         """生成地图图片（优化版：字体缓存 + 渐变背景 + 阴影效果）"""
