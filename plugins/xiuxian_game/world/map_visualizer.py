@@ -37,27 +37,46 @@ class MapVisualizer:
         self.grid_size = 20  # 每个网格的像素大小
         self.coordinate_scale = 50  # 坐标缩放比例，50像素 = 1游戏坐标
 
-        # 颜色配置（增强版 - 渐变和阴影支持）
+        # 颜色配置（高端版 - 古地图羊皮纸风格）
         self.colors = {
-            'background': '#E6F3FF',  # 浅蓝色背景
-            'background_gradient_start': '#E6F3FF',  # 渐变起始色
-            'background_gradient_end': '#F0F8FF',    # 渐变结束色
-            'grid': '#D0E8FF',        # 网格线颜色
-            'coordinate_text': '#666666',  # 坐标文字颜色
-            'player': '#FF4444',      # 玩家红点
-            'player_shadow': '#CC0000',  # 玩家阴影
-            'market': '#FF8800',      # 市集橙色
-            'market_shadow': '#CC6600',  # 市集阴影
-            'job': '#8844FF',         # 打工地点紫色
-            'job_shadow': '#6633CC',  # 打工阴影
-            'special': '#FF44FF',     # 特殊地点粉色
-            'special_shadow': '#CC33CC',  # 特殊阴影
-            'mansion': '#8B4513',     # 阴宅棕色
-            'mansion_connector': '#0066CC',  # 阴宅指示连线
-            'border': '#4488CC',      # 边框颜色
-            'location_text': '#333333',  # 地点文字颜色
-            'navigation_line': '#00FF00',  # 导航连线绿色
-            'navigation_target': '#FFFF00',  # 导航目标黄色
+            # 古地图羊皮纸底色
+            'background': '#F4E8D0',  # 羊皮纸底色
+            'background_gradient_start': '#F4E8D0',  # 渐变起始（浅羊皮纸）
+            'background_gradient_end': '#E8DCC0',    # 渐变结束（深羊皮纸）
+            'parchment_texture': '#E8DCC0',  # 纹理颜色
+
+            # 网格和边框（棕褐色调）
+            'grid': '#D4C4A0',        # 网格线（棕褐色）
+            'border': '#8B6914',      # 主边框（深金棕色）
+            'border_decoration': '#CD853F',  # 装饰边框（秘鲁色）
+            'coordinate_text': '#5C4033',  # 坐标文字（深棕色）
+
+            # 地点标记（鲜艳对比）
+            'player': '#DC143C',      # 玩家（深红色）
+            'player_shadow': '#8B0000',  # 玩家阴影
+            'player_glow': '#FFD700',    # 玩家光晕（金色）
+
+            'market': '#FF6B00',      # 市集（鲜艳橙）
+            'market_shadow': '#CC5500',
+
+            'job': '#9370DB',         # 打工（中紫色）
+            'job_shadow': '#6A4C93',
+
+            'special': '#FF1493',     # 特殊（深粉红）
+            'special_shadow': '#C71585',
+
+            'mansion': '#8B4513',     # 阴宅（马鞍棕）
+            'mansion_connector': '#4169E1',  # 连线（宝蓝色）
+
+            # 导航和装饰
+            'location_text': '#2F4F4F',  # 地点文字（深石板灰）
+            'navigation_line': '#32CD32',  # 导航线（酸橙绿）
+            'navigation_target': '#FFD700',  # 导航目标（金色）
+
+            # 标题和图例
+            'title_text': '#4B2E1F',  # 标题（深棕色）
+            'legend_bg': '#FFF8DC',   # 图例背景（玉米丝色）
+            'legend_border': '#8B6914',  # 图例边框
         }
 
         # 字体配置（将在运行时加载）
@@ -154,12 +173,14 @@ class MapVisualizer:
             print(f"✓ 字体已缓存，后续实例将直接使用缓存（性能提升 ~300ms）")
 
     def _draw_gradient_background(self, image: Image.Image):
-        """绘制渐变背景（从上到下的线性渐变）"""
+        """绘制古地图羊皮纸渐变背景（带纹理效果）"""
+        import random
+
         # 解析起始和结束颜色
         start_color = self._hex_to_rgb(self.colors['background_gradient_start'])
         end_color = self._hex_to_rgb(self.colors['background_gradient_end'])
 
-        # 逐行绘制渐变
+        # 逐行绘制渐变并添加纹理
         for y in range(self.map_height):
             # 计算当前行的混合比例
             ratio = y / self.map_height
@@ -173,10 +194,103 @@ class MapVisualizer:
             draw = ImageDraw.Draw(image)
             draw.line([(0, y), (self.map_width, y)], fill=(r, g, b), width=1)
 
+        # 添加羊皮纸纹理效果（噪点）
+        pixels = image.load()
+        random.seed(42)  # 固定种子，保证每次纹理一致
+        for y in range(self.map_height):
+            for x in range(self.map_width):
+                # 随机添加细微的明暗变化（5%概率）
+                if random.random() < 0.05:
+                    current = pixels[x, y]
+                    # 随机调整亮度 -5 到 +5
+                    noise = random.randint(-5, 5)
+                    new_r = max(0, min(255, current[0] + noise))
+                    new_g = max(0, min(255, current[1] + noise))
+                    new_b = max(0, min(255, current[2] + noise))
+                    pixels[x, y] = (new_r, new_g, new_b)
+
     def _hex_to_rgb(self, hex_color: str) -> Tuple[int, int, int]:
         """将十六进制颜色转换为RGB元组"""
         hex_color = hex_color.lstrip('#')
         return tuple(int(hex_color[i:i+2], 16) for i in (0, 2, 4))
+
+    def _draw_decorative_border(self, draw: ImageDraw.Draw):
+        """绘制古地图风格装饰性边框"""
+        # 外层主边框（深金棕色，粗线）
+        border_width = 8
+        draw.rectangle([0, 0, self.map_width - 1, self.map_height - 1],
+                      outline=self.colors['border'], width=border_width)
+
+        # 内层装饰边框（秘鲁色，细线）
+        inner_offset = border_width + 4
+        draw.rectangle([inner_offset, inner_offset,
+                       self.map_width - inner_offset - 1,
+                       self.map_height - inner_offset - 1],
+                      outline=self.colors['border_decoration'], width=3)
+
+        # 绘制四角装饰（菱形图案）
+        corner_size = 30
+        corners = [
+            (inner_offset + 10, inner_offset + 10),  # 左上
+            (self.map_width - inner_offset - 10, inner_offset + 10),  # 右上
+            (inner_offset + 10, self.map_height - inner_offset - 10),  # 左下
+            (self.map_width - inner_offset - 10, self.map_height - inner_offset - 10),  # 右下
+        ]
+
+        for cx, cy in corners:
+            # 绘制菱形装饰
+            diamond = [
+                (cx, cy - corner_size // 2),  # 上
+                (cx + corner_size // 2, cy),  # 右
+                (cx, cy + corner_size // 2),  # 下
+                (cx - corner_size // 2, cy),  # 左
+            ]
+            draw.polygon(diamond, fill=self.colors['border_decoration'],
+                        outline=self.colors['border'], width=2)
+
+    def _draw_map_title(self, draw: ImageDraw.Draw):
+        """绘制地图标题和装饰"""
+        # 标题文字
+        title = "大都会地图"
+        subtitle = "Map of the Metropolis"
+
+        # 标题背景装饰框
+        title_bg_width = 400
+        title_bg_height = 80
+        title_bg_x = (self.map_width - title_bg_width) // 2
+        title_bg_y = 25
+
+        # 绘制标题背景（半透明羊皮纸色）
+        draw.rectangle([title_bg_x, title_bg_y,
+                       title_bg_x + title_bg_width,
+                       title_bg_y + title_bg_height],
+                      fill=self.colors['legend_bg'],
+                      outline=self.colors['border'], width=3)
+
+        # 绘制主标题
+        title_font = self.fonts.get('title', self.fonts.get('large'))
+        # 计算标题宽度以居中
+        try:
+            title_bbox = draw.textbbox((0, 0), title, font=title_font)
+            title_width = title_bbox[2] - title_bbox[0]
+            title_x = title_bg_x + (title_bg_width - title_width) // 2
+        except:
+            title_x = title_bg_x + 80  # 回退位置
+
+        draw.text((title_x, title_bg_y + 15), title,
+                 fill=self.colors['title_text'], font=title_font)
+
+        # 绘制副标题
+        subtitle_font = self.fonts.get('small')
+        try:
+            subtitle_bbox = draw.textbbox((0, 0), subtitle, font=subtitle_font)
+            subtitle_width = subtitle_bbox[2] - subtitle_bbox[0]
+            subtitle_x = title_bg_x + (title_bg_width - subtitle_width) // 2
+        except:
+            subtitle_x = title_bg_x + 100  # 回退位置
+
+        draw.text((subtitle_x, title_bg_y + 50), subtitle,
+                 fill=self.colors['coordinate_text'], font=subtitle_font)
 
     def _check_font_support(self, text: str = "测试") -> bool:
         """检查当前字体是否支持中文显示"""
@@ -210,9 +324,15 @@ class MapVisualizer:
         return pixel_x, pixel_y
     
     def _draw_background_and_grid(self, draw: ImageDraw.Draw, image: Image.Image):
-        """绘制背景和网格（优化版：渐变背景 + 高性能网格）"""
-        # 绘制渐变背景（从上到下）
+        """绘制背景和网格（古地图版：羊皮纸纹理 + 装饰边框 + 标题）"""
+        # 绘制羊皮纸渐变背景和纹理
         self._draw_gradient_background(image)
+
+        # 绘制装饰性边框（多层边框效果）
+        self._draw_decorative_border(draw)
+
+        # 绘制地图标题
+        self._draw_map_title(draw)
 
         # 优化的网格绘制：批量绘制所有线条
         grid_lines = []
@@ -511,15 +631,15 @@ class MapVisualizer:
             is_dash = not is_dash
 
     def _draw_legend(self, draw: ImageDraw.Draw):
-        """绘制图例"""
+        """绘制古地图风格图例"""
         legend_x = 20
-        legend_y = 20
+        legend_y = 120  # 下移以避开标题
         legend_width = 200
         legend_height = 180  # 增加高度以容纳阴宅项目
 
-        # 绘制图例背景
+        # 绘制图例背景（羊皮纸色）
         draw.rectangle([legend_x, legend_y, legend_x + legend_width, legend_y + legend_height],
-                      fill='#FFFFFF', outline=self.colors['border'], width=2)
+                      fill=self.colors['legend_bg'], outline=self.colors['legend_border'], width=3)
 
         # 检查字体是否支持中文
         font_supports_chinese = self._check_font_support("图例")
