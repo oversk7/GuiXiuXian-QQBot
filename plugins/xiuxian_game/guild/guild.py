@@ -1358,7 +1358,7 @@ async def handle_exchange_pill(event: MessageEvent, args: Message = CommandArg()
             warehouse_item_repo=GuildWarehouseItemRepository(session),
         )
 
-        # 兼容旧格式（纯数字序号）
+        # 模式1：纯数字序号 "兑换丹药 1"
         if len(params) == 1 and params[0].isdigit():
             try:
                 index = int(params[0])
@@ -1387,6 +1387,30 @@ async def handle_exchange_pill(event: MessageEvent, args: Message = CommandArg()
                 await exchange_pill_cmd.finish(message_add_head(f"✅ {message}", event))
             else:
                 await exchange_pill_cmd.finish(message_add_head(f"⛔ {message}", event))
+
+        # 模式2：名称+数量 "兑换丹药 仿制还魂丹 5"
+        elif len(params) >= 2:
+            try:
+                quantity = int(params[-1])  # 最后一个参数是数量
+                item_name = " ".join(params[:-1])  # 前面的都是名称
+
+                success, message = await facility_service.claim_alchemy_item_by_name(
+                    player.id, player.guild_id, item_name, quantity
+                )
+
+                if success:
+                    await session.commit()
+                    await exchange_pill_cmd.finish(message_add_head(f"✅ {message}", event))
+                else:
+                    await exchange_pill_cmd.finish(message_add_head(f"⛔ {message}", event))
+            except ValueError:
+                await exchange_pill_cmd.finish("⛔ 数量必须是数字")
+
+        # 模式3：参数格式不符合两种模式
+        else:
+            await exchange_pill_cmd.finish("⛔ 格式错误，支持两种方式：\n"
+                "方式1：兑换丹药 [序号]\n"
+                "方式2：兑换丹药 [丹药名称] [数量]")
 
 # ==================== 公会仓库 ====================
 guild_warehouse_cmd = on_command("公会仓库", aliases={"仓库"}, block=True, priority=5)
