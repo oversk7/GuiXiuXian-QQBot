@@ -330,6 +330,7 @@ async def handle_player(event: MessageEvent, args: Message = CommandArg()):
         "查看玩家信息、排行榜，注册角色和改名\n"
         "━━━━━━━━━━━━━\n"
         "【面板 [UID]】 查看指定玩家面板\n"
+        "【完整面板 [UID]】 查看完整面板（含战力+注册时间）\n"
         "【排行榜】 查看所有排行榜总览\n"
         "【财富榜】 查看财富榜（含现金+存款+投资）\n"
         "【修为榜】 查看修为榜\n"

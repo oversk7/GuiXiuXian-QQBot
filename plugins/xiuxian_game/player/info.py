@@ -556,3 +556,181 @@ async def _(event: MessageEvent):
     )
 
     await attribute_guide.finish(message_add_head(content, event))
+
+
+# 完整面板命令
+complete_profile = on_command("完整面板", block=True, priority=5)
+
+
+@complete_profile.handle()
+async def _(event: MessageEvent, args: Message = CommandArg()):
+    """查看完整面板（包含战力信息和注册时间）"""
+    # 解析参数：如果提供了 UID，则查询对应玩家面板
+    arg_text = args.extract_plain_text().strip()
+    target_uid: int | None = None
+    if arg_text:
+        try:
+            target_uid = int(arg_text)
+        except ValueError:
+            await complete_profile.finish("⛔ UID 必须为数字")
+
+    # 使用UnitOfWork统一所有查询，确保事务原子性
+    async with UnitOfWork(AsyncSessionLocal) as uow:
+        # 1. 获取玩家
+        if target_uid is not None:
+            stmt = select(Player).where(Player.uid == target_uid)
+            result = await uow.session.execute(stmt)
+            player = result.scalars().first()
+            if not player:
+                await complete_profile.finish("⛔ 未找到该 UID")
+        else:
+            # 使用跨平台工具获取玩家数据
+            player = await get_unified_player(uow.session, event)
+
+        if not player:
+            if is_guild_message(event):
+                await complete_profile.finish("⛔ 你还没有创建角色或绑定账号\n💡 请先在群聊注册角色，然后使用绑定功能")
+            else:
+                await complete_profile.finish("⛔ 你还没有创建角色")
+
+        # 2. 更新坐标（若在自动导航）
+        player_upd = await uow.session.get(Player, player.id)
+        task = await uow.session.get(NavigationTask, player.id)
+        if player_upd and task:
+            reached = await _update_nav_position(player_upd, task, uow.session)
+            if reached:
+                await uow.session.delete(task)
+            await uow.commit()  # 立即提交导航更新
+            # 同步内存对象用于展示
+            if not player.is_in_dungeon():
+                player.x = player_upd.x
+                player.y = player_upd.y
+            # 始终同步现实世界坐标
+            if hasattr(player, "real_world_x"):
+                player.real_world_x = player_upd.real_world_x
+                player.real_world_y = player_upd.real_world_y
+
+        # 3. 获取有效属性（使用AttributeCalculator v2）
+        effective_attrs = await get_effective_attributes_v2(player, uow.session)
+
+        # 4. 统计装备加成用于显示
+        bonus = defaultdict(int)
+        equip_ids = config.items_config["by_type"]["EQUIPMENT"]
+        eq_stmt = select(ItemInstance).where(
+            ItemInstance.player_id == player.id,
+            ItemInstance.equipped == True,
+            ItemInstance.item_id.in_(equip_ids)
+        )
+        equiped_list = (await uow.session.execute(eq_stmt)).scalars().all()
+        for eq in equiped_list:
+            delta = (eq.extra_attrs or {}).get("_persist_bonus", {})
+            for k, v in delta.items():
+                bonus[k] += int(v)
+
+        # 5. 获取公会信息
+        guild_name = "无所属"
+        if player.guild_id:
+            g_obj = await uow.session.get(Guild, player.guild_id)
+            if g_obj:
+                guild_name = g_obj.name
+
+        # 6. 获取战斗属性显示
+        from ..battle.integration_helper import BattleIntegrationHelper
+        battle_attr_display = await BattleIntegrationHelper.get_battle_attribute_display_async(player, uow.session)
+
+        # 7. 检查是否有临时buff
+        from ..models.temporary_buff import TemporaryBuff
+        active_buffs = await TemporaryBuff.get_active_buffs(uow.session, player.id)
+
+    # 8. 格式化属性显示
+    def fmt(attr_key: str, effective_value: int):
+        inc = bonus.get(attr_key, 0)
+        return f"{effective_value} (+{inc})" if inc else str(effective_value)
+
+    atk_str = fmt("attack", effective_attrs["attack"])
+    def_str = fmt("defense", effective_attrs["defense"])
+    agi_str = fmt("agility", effective_attrs["agility"])
+    luk_str = fmt("luck", effective_attrs["luck"])
+    hp_max_str = fmt("max_hp", effective_attrs["max_hp"])
+    mp_max_str = fmt("max_mp", effective_attrs["max_mp"])
+
+    # 若当前 HP/MP 超出新上限，则修正显示
+    cur_hp = min(player.hp, effective_attrs["max_hp"])
+    cur_mp = min(player.mp, effective_attrs["max_mp"])
+
+    realm_name = realm_by_level_and_reincarnation(player.level, player.reincarnation_level)
+    exp_max = calculate_level_up_exp(player.level)
+
+    # 9. 格式化注册时间
+    created_at = player.created_at
+    if created_at:
+        created_str = created_at.strftime("%Y-%m-%d %H:%M")
+        # 计算注册天数
+        days_since_created = (datetime.now() - created_at).days
+        created_info = f"{created_str} ({days_since_created}天)"
+    else:
+        created_info = "未知"
+
+    # 10. 检查未读的留言板与私信状态
+    has_world_unread, has_private_unread = await get_unread_message_status(player.id)
+    unread_notice = ""
+    notice_lines: list[str] = []
+    if has_private_unread:
+        notice_lines.append("📬 有新私信未读！输入【留言板 私信】查看")
+    if has_world_unread:
+        notice_lines.append("🗒️ 世界留言板有新内容！输入【留言板】查看")
+    if notice_lines:
+        unread_notice = "".join(f"\n┃{line}" for line in notice_lines)
+
+    # 11. 组装完整面板内容
+    content = (
+        f"┏━━ 信息 ━━━━\n"
+        f"┃{player.nickname}[UID:{player.uid}]「{player.sex}」\n"
+        f"┃ Lv.{player.level} · {realm_name}\n"
+        f"┃ Exp {player.exp}/{exp_max}\n"
+        f"┃ 📅注册 {created_info}\n"
+        "┣━━ 状态 ━━━━\n"
+        f"┃ ❤️生命 {cur_hp}/{hp_max_str}\n"
+        f"┃ 🧠理智 {cur_mp}/{mp_max_str}\n"
+        f"┃ ⚔力 {atk_str}   🛡防 {def_str}\n"
+        f"┃ 👟敏 {agi_str}   🍀运 {luk_str}\n"
+        f"┃ 🔮咒抗 {player.stamina}\n"
+        "┣━━ 战斗属性 ━━\n"
+    )
+
+    # 12. 添加战斗属性（去除第一行的"战斗属性："标题，因为已在面板中显示）
+    battle_lines = battle_attr_display.strip().split('\n')
+    # 跳过战斗属性的标题行，只保留具体属性行
+    for line in battle_lines[1:]:  # 跳过第一行"战斗属性："
+        if line.strip():
+            content += f"┃ {line.strip()}\n"
+
+    # 13. 添加其他信息
+    content += (
+        "┣━━ 其他 ━━━━\n"
+        f"┃ 🪙金币 {player.gold}\n"
+        f"┃ 💀怨念 {player.resentment} ✨点数 {player.attribute_points}\n"
+        f"┃ ☯公会 {guild_name}\n"
+        f"┃ 📍位置 {_format_player_location(player)}\n"
+    )
+
+    # 14. 添加Buff状态提示
+    if active_buffs:
+        content += f"┃ ✨增益 {len(active_buffs)}个 (输入【增益状态】查看)\n"
+
+    content += f"┣━━━━━━━━━\n"
+    content += f"┃☞【装备栏】【社交系统】{unread_notice}"
+
+    # 15. 检查新手任务（仅检查自己的面板，不检查查询他人）
+    if target_uid is None:
+        from ..quest.novice_quest_service import NoviceQuestService
+        quest_completed, quest_msg = await NoviceQuestService.check_and_advance_quest(
+            uow.session, player, "command", {"command": "完整面板"}
+        )
+
+        if quest_completed and quest_msg:
+            content += f"\n\n{quest_msg}"
+
+    # 16. 使用平台格式化工具
+    formatted_content = format_platform_message(content, event)
+    await complete_profile.finish(message_add_head(formatted_content, event))
