@@ -20,7 +20,7 @@ def is_admin(user_id: str) -> bool:
     admin_ids = config.game_config.get("admin", {}).get("admin_ids", [])
     return user_id in admin_ids
 
-async def call_zhipu_api(messages, model="GLM-4.5-Flash", timeout=30):
+async def call_zhipu_api(messages, model="GLM-4", timeout=30):
     """调用智谱AI API（异步版本）"""
     url = "https://open.bigmodel.cn/api/paas/v4/chat/completions"
 
@@ -32,7 +32,7 @@ async def call_zhipu_api(messages, model="GLM-4.5-Flash", timeout=30):
     data = {
         "model": model,
         "messages": messages,
-        "temperature": 0.7,
+        "temperature": 0.1,
         "thinking.type": "disabled"
     }
 
@@ -54,483 +54,114 @@ async def call_zhipu_api(messages, model="GLM-4.5-Flash", timeout=30):
     except aiohttp.ClientError as e:
         raise aiohttp.ClientError(f"网络请求失败: {str(e)}")
 
-# 数据库表结构信息，用于AI理解
+# 数据库表结构信息，用于AI理解（优化版：专注玩家面板数据）
 DATABASE_SCHEMA = """
-数据库表结构信息：
+数据库核心表：player表（玩家面板数据，共87个字段）
 
-1. player表（玩家信息，共87个字段）：
+【基础信息】
+- id: 玩家平台ID（主键，String(32)）
+- uid: 自增UID（唯一，Integer）
+- nickname: 昵称（String(24)）
+- level: 等级（Integer）
+- sex: 性别（男/女，String(8)）
+- created_at: 创建时间（DateTime）
 
-   【基础信息】
-   - id: 玩家平台ID（主键，String(32)）
-   - uid: 自增UID（唯一，Integer）
-   - nickname: 昵称（String(24)）
-   - level: 等级（Integer，默认1）
-   - sex: 性别（男/女，String(8)）
-   - created_at: 创建时间（DateTime）
+【经验和属性点】
+- exp: 当前经验值（Integer）
+- attribute_points: 可分配属性点（Integer）
+- reincarnation_level: 转数/冥返次数（Integer）
+- breakthrough_fail_count: 当前连续突破失败次数（Integer）
 
-   【经验和属性点】
-   - exp: 当前经验值（Integer，默认0）
-   - attribute_points: 可分配属性点（Integer，默认0）
-   - reincarnation_level: 转数/冥返次数（Integer，默认0）
-   - breakthrough_fail_count: 当前连续突破失败次数（Integer，默认0）
+【基础属性】
+- attack: 攻击力（Integer）
+- defense: 防御力（Integer）
+- agility: 敏捷度（Integer）
+- luck: 运气值（Integer）
+- stamina: 咒抗/精神抗性（Integer）
 
-   【基础属性】
-   - attack: 攻击力（Integer，默认1）
-   - defense: 防御力（Integer，默认5）
-   - agility: 敏捷度（Integer，默认5）
-   - luck: 运气值（Integer，默认1）
-   - stamina: 咒抗/精神抗性（Integer，默认10）
+【HP/MP系统】
+- hp: 当前生命值（Integer）
+- max_hp: 最大生命值（Integer）
+- mp: 当前理智值（Integer）
+- max_mp: 最大理智值（Integer）
 
-   【HP/MP系统】
-   - hp: 当前生命值（Integer，默认20）
-   - max_hp: 最大生命值（Integer，默认20）
-   - mp: 当前理智值（Integer，默认20）
-   - max_mp: 最大理智值（Integer，默认20）
+【扩展战斗属性】
+- critical_rate: 暴击率（百分比，Integer）
+- critical_power: 暴击力（Integer）
+- combo_rate: 连击率（百分比，Integer）
+- counter_rate: 反击率（百分比，Integer）
+- dodge_rate: 闪避率（百分比，Integer）
+- accuracy_rate: 命中率（百分比，Integer）
+- skill_crit_rate: 灵爆率（百分比，Integer）
+- penetration_rate: 穿透率（百分比，Integer）
+- anti_crit_rate: 抗暴率（百分比，Integer）
+- lifesteal_rate: 吸血率（百分比，Integer）
+- immobilize_rate: 定身率（百分比，Integer）
+- true_damage_rate: 真伤率（百分比，Integer）
+- regen_rate: 回血率（百分比，Integer）
 
-   【扩展战斗属性 - 16个字段】
-   - critical_rate: 暴击率（百分比，Integer，默认5）
-   - critical_power: 暴击力/每点增加0.1倍伤害（Integer，默认0）
-   - combo_rate: 连击率（百分比，Integer，默认0）
-   - counter_rate: 反击率/反弹率（百分比，Integer，默认0）
-   - dodge_rate: 闪避率（百分比，Integer，默认0）
-   - accuracy_rate: 命中率（百分比，Integer，默认80）
-   - skill_crit_rate: 灵爆率/技能暴击率（百分比，Integer，默认0）
-   - penetration_rate: 穿透率/无视防御（百分比，Integer，默认0）
-   - anti_crit_rate: 抗暴率/降低敌方暴击（百分比，Integer，默认0）
-   - lifesteal_rate: 吸血率（百分比，Integer，默认0）
-   - immobilize_rate: 定身率（百分比，Integer，默认0）
-   - true_damage_rate: 真伤率（百分比，Integer，默认0）
-   - regen_rate: 回血率（百分比，Integer，默认0）
+【战斗统计】
+- total_battles: 总战斗次数（Integer）
+- total_wins: 总胜利次数（Integer）
+- total_damage_dealt: 总造成伤害（Integer）
+- resentment: 怨念值（Integer）
 
-   【战斗统计】
-   - total_battles: 总战斗次数（Integer，默认0）
-   - total_wins: 总胜利次数（Integer，默认0）
-   - total_damage_dealt: 总造成伤害（Integer，默认0）
-   - resentment: 怨念值（Integer，默认0）
+【经济系统】
+- gold: 金币（BigInteger）
+- gold2: 积分（BigInteger）
+- mini_game_score: 小游戏积分（Integer）
 
-   【经济系统】
-   - gold: 金币/主要货币（BigInteger，默认1000）
-   - gold2: 积分/副货币（BigInteger，默认0）
-   - mini_game_score: 小游戏积分（Integer，默认0）
+【签到系统】
+- last_sign: 上次签到日期（DateTime，可为空）
+- sign_streak: 连续签到天数（Integer）
+- last_cultivation: 上次修炼时间（DateTime，可为空）
 
-   【签到系统】
-   - last_sign: 上次签到日期（DateTime，可为空）
-   - sign_streak: 连续签到天数（Integer，默认0）
-   - last_cultivation: 上次修炼时间（DateTime，可为空）
+【坐标系统】
+- region: 区域名称（String(32)）
+- x: 当前X坐标（Integer）
+- y: 当前Y坐标（Integer）
+- real_world_x: 现实世界X坐标（Integer）
+- real_world_y: 现实世界Y坐标（Integer）
+- dungeon_level: 诡域层级/0=现实世界（Integer）
+- dungeon_x: 诡域内X坐标（Integer）
+- dungeon_y: 诡域内Y坐标（Integer）
+- max_dungeon_level: 最高诡域层级（Integer）
 
-   【世界坐标系统】
-   - region: 区域名称（String(32)，默认"大都会"）
-   - x: 兼容字段/当前X坐标（Integer，默认0）
-   - y: 兼容字段/当前Y坐标（Integer，默认0）
-   - real_world_x: 现实世界X坐标（Integer，默认0）
-   - real_world_y: 现实世界Y坐标（Integer，默认0）
+【其他系统】
+- guild_id: 所属公会ID（Integer，可为空）
+- guild_contribution: 公会贡献值（BigInteger）
+- mansion_level: 阴宅等级（Integer）
+- mansion_x, mansion_y: 阴宅坐标（Integer，可为空）
+- inventory_capacity: 背包容量（Integer）
+- vip: VIP等级（Integer）
+- is_secluded: 是否闭关（Boolean）
+- seclusion_start_time: 闭关开始时间（DateTime，可为空）
 
-   【双层坐标系统 - 诡域】
-   - dungeon_level: 当前诡域层级/0=现实世界（Integer，默认0）
-   - dungeon_x: 诡域内小坐标X/-5到5（Integer，默认0）
-   - dungeon_y: 诡域内小坐标Y/-5到5（Integer，默认0）
-   - max_dungeon_level: 到达过的最高诡域层级（Integer，默认0）
+辅助表（仅需了解关系，不提供详细字段）：
+- guild表: 公会信息（与player.guild_id关联）
+- inventory表: 背包物品（通过player_id关联玩家）
+- bank_account表: 银行账户（通过player_id关联玩家）
+- marriage表: 婚姻关系（记录结婚双方）
+- mentorship表: 师徒关系（master_id, disciple_id）
+- world_boss_damage表: 世界BOSS伤害记录
+- alchemy_record表: 炼丹记录
+- market_order表: 市场订单
+- 其他30余张业务表（stock, part_time_job, daily_task等）
 
-   【公会系统】
-   - guild_id: 所属公会ID（Integer，可为空）
-   - guild_contribution: 公会贡献值（BigInteger，默认0）
-
-   【阴宅系统】
-   - mansion_level: 阴宅等级/0表示未拥有（Integer，默认0）
-   - mansion_x: 阴宅X坐标（Integer，可为空）
-   - mansion_y: 阴宅Y坐标（Integer，可为空）
-   - mansion_usage_fee: 阴宅使用费用/金币（Integer，默认0）
-   - mansion_allow_others: 是否允许其他玩家使用阴宅（Boolean，默认True）
-   - mansion_willing_to_pay: 是否愿意支付费用使用他人阴宅（Boolean，默认True）
-
-   【其他系统】
-   - inventory_capacity: 背包容量/基础值（Integer，默认50）
-   - vip: VIP等级（Integer，默认0）
-   - is_secluded: 是否在闭关状态（Boolean，默认False）
-   - seclusion_start_time: 闭关开始时间（DateTime，可为空）
-   - last_message_board_check: 最后查看世界留言时间（DateTime，可为空）
-   - last_private_message_check: 最后查看私信时间（DateTime，可为空）
-
-2. guild表（公会信息）：
-   - id: 公会ID（主键）
-   - name: 公会名称
-   - president_id: 会长玩家ID
-   - level: 公会等级
-   - exp: 公会经验/活跃度
-   - treasury: 公会资金库
-   - notice: 公会公告
-   - base_x, base_y: 公会基地坐标
-   - territory_range: 势力范围
-   - created_at: 创建时间
-
-3. guild_member表（公会成员）：
-   - id: 自增ID
-   - guild_id: 公会ID
-   - player_id: 玩家ID
-   - position: 职位（PRESIDENT/VICE_PRESIDENT/CORE_MEMBER/MEMBER）
-   - joined_at: 加入时间
-
-4. guild_building表（公会建筑）：
-   - id: 自增ID
-   - guild_id: 公会ID
-   - building_type: 建筑类型（TRAINING_GROUND/ALCHEMY_ROOM/WAREHOUSE等）
-   - level: 建筑等级
-   - built_at: 建造时间
-
-5. marriage表（婚姻关系）：
-   - id: 自增ID
-   - player1_id, player2_id: 结婚双方ID
-   - married_at: 结婚时间
-   - total_gift_value: 互送礼物总价值
-
-6. mentorship表（师徒关系）：
-   - id: 自增ID
-   - master_id: 师父ID
-   - disciple_id: 徒弟ID
-   - established_at: 建立时间
-   - mentor_points: 恩师点数
-   - disciple_start_level: 徒弟拜师时等级
-
-7. bank_account表（银行账户）：
-   - player_id: 玩家ID（主键）
-   - balance: 余额
-   - last_interest: 上次利息时间
-
-8. inventory表（背包物品）：
-   - id: 物品实例ID（主键）
-   - player_id: 玩家ID
-   - item_id: 物品模板ID
-   - quantity: 数量
-   - durability: 耐久度（装备）
-   - equipped: 是否已穿戴
-   - extra_attrs: 附加属性JSON
-   - upgrade_level: 装备升阶等级
-   - gem_slots_data: 宝石孔位数据JSON
-   - created_at: 获得时间
-
-9. world_boss_cycle表（世界BOSS周期）：
-   - id: 周期ID（主键）
-   - cycle_key: 周期键
-   - boss_name: BOSS名称
-   - boss_title: BOSS称号
-   - started_at: 开始时间
-   - next_refresh_at: 下次刷新时间
-   - settled: 是否已结算
-
-10. world_boss_damage表（世界BOSS伤害）：
-    - id: 自增ID
-    - cycle_id: 周期ID
-    - player_id: 玩家ID
-    - total_damage: 累计伤害
-    - last_attack_ts: 上次攻击时间戳
-    - attacks_today: 今日攻击次数
-    - attacks_reset_date: 攻击重置日期
-
-11. alchemy_record表（炼丹记录）：
-    - id: 记录ID（主键）
-    - player_id: 玩家ID
-    - furnace_id: 炉子装备ID
-    - recipe_key: 配方键
-    - produce_item_id: 产出物品ID
-    - produce_per: 每炉产出数量
-    - qty: 炉数
-    - success_rate: 成功率
-    - duration_minutes: 耗时（分钟）
-    - materials_used: 使用材料JSON
-    - started_at: 开始时间
-    - claimed: 是否已领取
-
-12. market_order表（市场订单）：
-    - id: 订单ID（主键）
-    - player_id: 玩家ID
-    - side: 订单类型（BUY/SELL）
-    - item_id: 物品ID
-    - price: 价格
-    - quantity: 数量
-    - item_instance_id: 装备实例ID（装备交易）
-    - is_instance_trade: 是否装备实例交易
-    - equipment_summary: 装备摘要信息
-    - created_at: 创建时间
-
-13. market_state表（市场状态）：
-    - id: 自增ID
-    - market_id: 市场ID
-    - item_id: 商品ID
-    - current_stock: 当前库存
-    - max_stock: 最大库存
-    - daily_sold: 今日已售出
-    - daily_bought: 今日已收购
-    - demand_factor: 需求因子
-    - supply_factor: 供给因子
-    - last_refresh_date: 上次刷新日期
-    - created_at, updated_at: 时间戳
-
-14. trade_record表（跑商交易记录）：
-    - id: 记录ID（主键）
-    - player_id: 玩家ID
-    - trade_type: 交易类型（buy/sell）
-    - market_id: 市场ID
-    - item_id: 商品ID
-    - quantity: 交易数量
-    - unit_price: 单价
-    - total_amount: 总金额
-    - trade_time: 交易时间
-
-15. stocks表（股票信息）：
-    - id: 股票ID（主键）
-    - symbol: 股票代码
-    - name: 股票名称
-    - stock_type: 股票类型（TECH/FINANCE/ENERGY等）
-    - base_price: 基础价格
-    - current_price: 当前价格
-    - total_shares: 总股本
-    - circulating_shares: 流通股本
-    - volatility: 波动率
-    - trend_factor: 趋势因子
-    - is_active: 是否可交易
-    - created_at, updated_at: 时间戳
-
-16. stock_holdings表（股票持仓）：
-    - id: 持仓ID（主键）
-    - player_id: 玩家ID
-    - stock_id: 股票ID
-    - shares: 持有股数
-    - avg_cost: 平均成本价
-    - total_cost: 总成本
-    - created_at, updated_at: 时间戳
-
-17. stock_transactions表（股票交易记录）：
-    - id: 交易ID（主键）
-    - player_id: 玩家ID
-    - stock_id: 股票ID
-    - transaction_type: 交易类型（BUY/SELL）
-    - shares: 交易股数
-    - price: 交易价格
-    - total_amount: 交易总金额
-    - commission: 手续费
-    - created_at: 创建时间
-
-18. stock_price_history表（股票价格历史）：
-    - id: 历史ID（主键）
-    - stock_id: 股票ID
-    - price: 价格
-    - change_amount: 变动金额
-    - change_rate: 变动比例
-    - volume: 成交量
-    - recorded_at: 记录时间
-
-19. part_time_job表（打工记录）：
-    - id: 记录ID（主键）
-    - player_id: 玩家ID
-    - job_location_id: 工作地点ID
-    - job_type: 工作类型
-    - is_working: 是否正在工作
-    - start_time: 开始时间
-    - end_time: 预计结束时间
-    - completed_time: 实际完成时间
-    - base_reward: 基础奖励
-    - bonus_reward: 额外奖励
-    - total_reward: 总奖励
-    - work_duration_hours: 工作时长
-    - consecutive_days: 连续工作天数
-    - special_event: 特殊事件描述
-    - extra_data: 额外数据JSON
-    - created_at, updated_at: 时间戳
-
-20. job_location表（工作地点）：
-    - id: 地点ID（主键）
-    - location_id: 地点标识
-    - name: 地点名称
-    - description: 地点描述
-    - x, y: 坐标
-    - region: 所属区域
-    - available_jobs: 可用工作配置JSON
-    - is_active: 是否激活
-    - required_level: 所需最低等级
-    - max_workers: 最大同时工作人数
-    - created_at, updated_at: 时间戳
-
-21. player_job_stats表（玩家打工统计）：
-    - id: 统计ID（主键）
-    - player_id: 玩家ID
-    - total_jobs_completed: 完成工作总数
-    - total_earnings: 总收入
-    - total_work_hours: 总工作小时数
-    - current_streak: 当前连续工作天数
-    - max_streak: 最大连续工作天数
-    - last_work_date: 最后工作日期
-    - favorite_job_type: 最喜欢的工作类型
-    - favorite_location: 最喜欢的工作地点
-    - achievements: 成就数据JSON
-    - created_at, updated_at: 时间戳
-
-22. daily_task表（每日任务）：
-    - id: 任务ID（主键）
-    - player_id: 玩家ID
-    - task_type: 任务类型（ghost_elimination/pen_spirit_case等）
-    - title: 任务标题
-    - description: 任务描述
-    - target_region: 目标区域
-    - target_x, target_y: 目标坐标
-    - status: 任务状态（available/accepted/completed/expired）
-    - enemy_name: 敌人名称
-    - enemy_level, enemy_hp, enemy_attack, enemy_defense, enemy_agility: 敌人属性
-    - exp_reward: 经验奖励
-    - gold_reward: 金币奖励
-    - guild_points_reward: 公会积分奖励
-    - task_date: 任务日期
-    - accepted_at: 接取时间
-    - completed_at: 完成时间
-    - created_at: 创建时间
-
-23. guild_task_record表（公会任务记录）：
-    - id: 记录ID（主键）
-    - player_id: 玩家ID
-    - guild_id: 公会ID
-    - task_type: 任务类型（daily_sign/daily_donation/exploration等）
-    - task_date: 任务日期
-    - progress: 完成进度
-    - points_reward: 获得积分
-    - guild_exp_reward: 公会经验奖励
-    - completed_at: 完成时间
-
-24. player_task_stats表（玩家任务统计）：
-    - id: 统计ID（主键）
-    - player_id: 玩家ID
-    - total_explorations: 总探索次数
-    - total_combat_victories: 总战斗胜利次数
-    - total_commissions: 总委托完成次数
-    - today_explorations: 今日探索次数
-    - today_combat_victories: 今日战斗胜利次数
-    - today_commissions: 今日委托完成次数
-    - week_commissions: 本周委托完成次数
-    - week_daily_tasks: 本周日常任务完成次数
-    - last_daily_reset: 上次日常重置日期
-    - last_weekly_reset: 上次周常重置日期
-
-25. monthly_card表（月卡记录）：
-    - id: 月卡ID（主键）
-    - player_id: 玩家ID
-    - card_type: 月卡类型（BASIC/PREMIUM）
-    - start_time: 开始时间
-    - end_time: 结束时间
-    - created_at: 创建时间
-
-26. elixir_usage_log表（丹药使用记录）：
-    - id: 记录ID（主键）
-    - player_id: 玩家ID
-    - item_id: 丹药ID
-    - use_date: 使用日期
-    - quantity: 使用数量
-
-27. gift_record表（礼物记录）：
-    - id: 记录ID（主键）
-    - sender_id: 送礼人ID
-    - receiver_id: 收礼人ID
-    - item_id: 物品ID
-    - item_name: 物品名称
-    - quantity: 数量
-    - total_value: 总价值
-    - gift_type: 礼物类型（marriage/mentorship）
-    - sent_at: 送礼时间
-
-28. social_application表（社交申请）：
-    - id: 申请ID（主键）
-    - applicant_id: 申请人ID
-    - target_id: 目标玩家ID
-    - guild_id: 公会ID（公会申请）
-    - application_type: 申请类型（marriage/mentorship/guild_join）
-    - status: 申请状态（pending/approved/rejected）
-    - created_at: 申请时间
-    - processed_at: 处理时间
-
-29. navigation_task表（导航任务）：
-    - player_id: 玩家ID（主键）
-    - target_x, target_y: 目标坐标
-    - last_update: 上次更新时间
-
-30. world_tile表（世界格子）：
-    - id: 格子ID（主键）
-    - region: 区域标识
-    - x, y: 坐标
-    - refreshed_at: 刷新时间
-    - event_type: 事件类型
-    - seed: 生成种子
-    - state: 事件状态JSON
-
-31. world_message表（世界留言）：
-    - id: 留言ID（主键）
-    - player_id: 玩家ID
-    - content: 留言内容
-    - created_at: 创建时间
-
-32. story_session表（剧情会话）：
-    - id: 会话ID（主键）
-    - player_id: 玩家ID
-    - story_id: 剧情ID
-    - current_node: 当前节点ID
-    - is_active: 是否激活
-    - story_data: 剧情数据JSON
-    - variables: 剧情变量JSON
-    - created_at, updated_at: 时间戳
-
-33. russian_roulette_room表（恶魔轮盘房间）：
-    - id: 房间ID（主键）
-    - room_id: 房间标识
-    - group_id: 绑定QQ群ID
-    - creator_id: 房主ID
-    - player1_id, player2_id: 玩家ID
-    - status: 房间状态（waiting/betting/playing/finished）
-    - player1_gold_bet, player2_gold_bet: 金币投注
-    - player1_items_bet, player2_items_bet: 道具投注JSON
-    - max_hp: 最大血量
-    - created_at, updated_at: 时间戳
-
-34. russian_roulette_game表（恶魔轮盘游戏）：
-    - id: 游戏ID（主键）
-    - room_id: 房间ID
-    - status: 游戏状态（loading/playing/finished）
-    - current_round: 当前回合数
-    - current_player_id: 当前行动玩家ID
-    - player1_hp, player2_hp: 玩家血量
-    - bullets: 弹药序列JSON
-    - current_bullet_index: 当前弹药索引
-    - player1_items, player2_items: 玩家道具JSON
-    - is_sawed_off: 是否使用小刀
-    - handcuffed_player_id: 被手铐限制的玩家ID
-    - magnifier_info: 放大镜查看结果JSON
-    - phone_info: 电话预知结果JSON
-    - created_at, updated_at: 时间戳
-
-35. player_donation_log表（玩家捐献记录）：
-    - id: 记录ID（主键）
-    - player_id: 玩家ID
-    - donate_date: 捐献日期
-    - amount: 捐献金额
-
-常用查询示例：
+常用查询示例（player表）：
 - 等级最高的玩家：SELECT nickname, level, uid FROM player ORDER BY level DESC, exp DESC LIMIT 10
-- 公会成员数量：SELECT g.name, COUNT(gm.player_id) as member_count FROM guild g LEFT JOIN guild_member gm ON g.id = gm.guild_id GROUP BY g.id ORDER BY member_count DESC
 - 财富排行：SELECT nickname, gold, uid FROM player ORDER BY gold DESC LIMIT 10
-- 银行存款排行：SELECT p.nickname, p.uid, ba.balance FROM player p JOIN bank_account ba ON p.id = ba.player_id ORDER BY ba.balance DESC LIMIT 10
-- 公会资金排行：SELECT name, treasury, level FROM guild ORDER BY treasury DESC LIMIT 10
-- 世界BOSS伤害排行：SELECT p.nickname, p.uid, wbd.total_damage FROM world_boss_damage wbd JOIN player p ON wbd.player_id = p.id WHERE wbd.cycle_id = (SELECT id FROM world_boss_cycle ORDER BY started_at DESC LIMIT 1) ORDER BY wbd.total_damage DESC LIMIT 10
-- 股票持仓排行：SELECT p.nickname, p.uid, s.name as stock_name, sh.shares, sh.total_cost FROM stock_holdings sh JOIN player p ON sh.player_id = p.id JOIN stocks s ON sh.stock_id = s.id WHERE sh.shares > 0 ORDER BY sh.total_cost DESC LIMIT 10
-- 打工收入排行：SELECT p.nickname, p.uid, pjs.total_earnings FROM player_job_stats pjs JOIN player p ON pjs.player_id = p.id ORDER BY pjs.total_earnings DESC LIMIT 10
-- 结婚玩家列表：SELECT p1.nickname as player1, p1.uid as uid1, p2.nickname as player2, p2.uid as uid2, m.married_at, m.total_gift_value FROM marriage m JOIN player p1 ON m.player1_id = p1.id JOIN player p2 ON m.player2_id = p2.id ORDER BY m.total_gift_value DESC
-- 师徒关系列表：SELECT master.nickname as master_name, master.uid as master_uid, disciple.nickname as disciple_name, disciple.uid as disciple_uid, mt.mentor_points FROM mentorship mt JOIN player master ON mt.master_id = master.id JOIN player disciple ON mt.disciple_id = disciple.id ORDER BY mt.mentor_points DESC
+- 查询特定玩家：SELECT * FROM player WHERE nickname = '玩家昵称' 或 WHERE uid = 1001
 
-常用修改示例：
-- 修改玩家坐标：UPDATE player SET x = 100, y = 200 WHERE nickname = '玩家昵称'
+常用修改示例（player表）：
+- 修改玩家坐标：UPDATE player SET x = 100, y = 200 WHERE uid = 1001
 - 修改玩家金币：UPDATE player SET gold = 50000 WHERE uid = 1001
-- 修改玩家等级：UPDATE player SET level = 100, exp = 0 WHERE nickname = '玩家昵称'
-- 修改玩家属性：UPDATE player SET attack = 500, defense = 300, agility = 200, luck = 150 WHERE nickname = '玩家昵称'
-- 修改公会资金：UPDATE guild SET treasury = 1000000 WHERE name = '公会名称'
-- 修改银行余额：UPDATE bank_account SET balance = 500000 WHERE player_id = (SELECT id FROM player WHERE nickname = '玩家昵称')
-- 修改背包容量：UPDATE player SET inventory_capacity = 100 WHERE nickname = '玩家昵称'
-- 修改玩家VIP等级：UPDATE player SET vip = 5 WHERE nickname = '玩家昵称'
-- 修改玩家转数：UPDATE player SET reincarnation_level = 3 WHERE nickname = '玩家昵称'
-- 修改玩家生命值：UPDATE player SET hp = 1000, max_hp = 1000 WHERE nickname = '玩家昵称'
+- 修改玩家等级：UPDATE player SET level = 100, exp = 0 WHERE uid = 1001
+- 修改玩家属性：UPDATE player SET attack = 500, defense = 300, agility = 200, luck = 150 WHERE uid = 1001
+- 修改背包容量：UPDATE player SET inventory_capacity = 100 WHERE uid = 1001
+- 修改玩家VIP等级：UPDATE player SET vip = 5 WHERE uid = 1001
+- 修改玩家转数：UPDATE player SET reincarnation_level = 3 WHERE uid = 1001
+- 修改玩家生命值：UPDATE player SET hp = 1000, max_hp = 1000 WHERE uid = 1001
 
 完整玩家面板数据覆盖示例（根据【面板】命令显示的数据）：
 当管理员提供一个玩家的面板数据时，应生成包含所有关键字段的UPDATE语句：
