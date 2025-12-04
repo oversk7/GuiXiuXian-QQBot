@@ -6,7 +6,7 @@ basic_achievements:
   first_cultivation:
     id: "first_cultivation"
     title: "初窥门径"
-    description: "完成第一次修炼，踏入驭鬼者的修行之路"
+    description: "完成第一次修炼，开始感知体内怨炁的流动"
     icon: "🌟"
     condition_type: "command_count"
     condition_target: "修炼"
@@ -14,13 +14,13 @@ basic_achievements:
     rewards:
       gold: 500
       exp: 100
-    flavor_text: "千里之行，始于足下"
+    flavor_text: "千里之行，始于足下。驭鬼之路，从此开启。"
     hidden: false
 
   cultivation_adept:
     id: "cultivation_adept"
     title: "勤修不辍"
-    description: "累计修炼10次，开始掌握怨炁运行的诀窍"
+    description: "累计修炼10次，逐渐掌握怨炁运行的诀窍"
     icon: "✨"
     condition_type: "command_count"
     condition_target: "修炼"
@@ -28,14 +28,14 @@ basic_achievements:
     rewards:
       gold: 2000
       exp: 500
-    flavor_text: "修行之路，贵在坚持"
+    flavor_text: "修行无捷径，唯勤能补拙。"
     hidden: false
 
   # 2. 成长系列
   first_breakthrough:
     id: "first_breakthrough"
     title: "破茧成蝶"
-    description: "完成第一次境界突破，感受力量的蜕变"
+    description: "突破至2级境界，体验蜕变带来的力量提升"
     icon: "🦋"
     condition_type: "level_up"
     condition_target: "level"
@@ -44,13 +44,13 @@ basic_achievements:
       gold: 1000
       exp: 300
       attribute_points: 5
-    flavor_text: "破茧之痛，蝶舞之美"
+    flavor_text: "破茧之痛，化蝶之美。境界突破，实力飞跃。"
     hidden: false
 
   level_ten_warrior:
     id: "level_ten_warrior"
-    title: "十级勇士"
-    description: "等级达到10级，正式踏入驭鬼者的行列"
+    title: "十级驭鬼者"
+    description: "达到10级，正式踏入驭鬼者的行列"
     icon: "⚔️"
     condition_type: "level_reached"
     condition_target: "level"
@@ -59,14 +59,14 @@ basic_achievements:
       gold: 5000
       exp: 1000
       attribute_points: 10
-    flavor_text: "十级之路，已成勇士"
+    flavor_text: "十级之境，已非凡人。驭鬼之道，渐入佳境。"
     hidden: false
 
   # 3. 战斗系列
   first_victory:
     id: "first_victory"
     title: "初战告捷"
-    description: "赢得第一场战斗的胜利"
+    description: "取得第一场战斗的胜利，品尝胜利的滋味"
     icon: "🏆"
     condition_type: "battle_win"
     condition_target: "total_wins"
@@ -74,13 +74,13 @@ basic_achievements:
     rewards:
       gold: 1000
       exp: 300
-    flavor_text: "首胜之战，载入史册"
+    flavor_text: "首胜之战，意义非凡。"
     hidden: false
 
   veteran_fighter:
     id: "veteran_fighter"
-    title: "百战老兵"
-    description: "击败10个敌人，积累战斗经验"
+    title: "初入战场"
+    description: "击败10个敌人，开始积累实战经验"
     icon: "🛡️"
     condition_type: "kill_count"
     condition_target: "total_kills"
@@ -88,14 +88,14 @@ basic_achievements:
     rewards:
       gold: 3000
       exp: 800
-    flavor_text: "经百战而不殆，历磨难而愈强"
+    flavor_text: "十场战斗，初窥战场之残酷。"
     hidden: false
 
   # 4. 装备系列
   first_equipment:
     id: "first_equipment"
     title: "装备加身"
-    description: "获得第一件装备，提升自身实力"
+    description: "获得第一件装备，感受装备带来的实力提升"
     icon: "⚙️"
     condition_type: "equipment_obtained"
     condition_target: "any_equipment"
@@ -103,13 +103,13 @@ basic_achievements:
     rewards:
       gold: 1500
       exp: 400
-    flavor_text: "工欲善其事，必先利其器"
+    flavor_text: "工欲善其事，必先利其器。"
     hidden: false
 
   # 5. 财富系列
   small_fortune:
     id: "small_fortune"
-    title: "小富之家"
+    title: "小有积蓄"
     description: "累计获得1万金币，开始积累财富"
     icon: "💰"
     condition_type: "gold_total"
@@ -118,14 +118,14 @@ basic_achievements:
     rewards:
       gold: 5000
       exp: 500
-    flavor_text: "财富自由之路，从一万金币开始"
+    flavor_text: "一万金币，不算富裕，但也算是小有积蓄了。"
     hidden: false
 
   # 6. 探索系列
   world_explorer:
     id: "world_explorer"
-    title: "世界探索者"
-    description: "探索3个不同的地点，了解世界的广阔"
+    title: "初探天地"
+    description: "探索3个不同的地点，开始了解这个诡异世界的广阔"
     icon: "🗺️"
     condition_type: "locations_visited"
     condition_target: "unique_locations"
@@ -133,14 +133,14 @@ basic_achievements:
     rewards:
       gold: 2000
       exp: 600
-    flavor_text: "世界那么大，我想去看看"
+    flavor_text: "世界那么大，值得去看看。"
     hidden: false
 
   # 7. 忠诚系列
   loyal_believer:
     id: "loyal_believer"
-    title: "忠实信徒"
-    description: "连续登录3天，展现你的坚持"
+    title: "持之以恒"
+    description: "连续登录3天，展现坚持修炼的决心"
     icon: "📅"
     condition_type: "login_streak"
     condition_target: "consecutive_days"
@@ -149,7 +149,7 @@ basic_achievements:
       gold: 3000
       exp: 1000
       attribute_points: 5
-    flavor_text: "日复一日的坚持，成就非凡的自己"
+    flavor_text: "日复一日的坚持，终将成就非凡。"
     hidden: false
 
   # 8. 周年特别系列
@@ -168,13 +168,276 @@ basic_achievements:
     flavor_text: "一年相伴，感谢有你同行"
     hidden: false
 
+# 高难度成就（挑战性内容）
+advanced_achievements:
+  # 战斗系列 - 高难度
+  hundred_battles:
+    id: "hundred_battles"
+    title: "百战不殆"
+    description: "击败100个敌人，真正的百战老兵"
+    icon: "⚔️"
+    condition_type: "kill_count"
+    condition_target: "total_kills"
+    condition_value: 100
+    rewards:
+      gold: 20000
+      exp: 5000
+      attribute_points: 15
+    flavor_text: "百战之躯，铸就不败之威。"
+    hidden: false
+
+  thousand_slayer:
+    id: "thousand_slayer"
+    title: "千人斩"
+    description: "击败1000个敌人，成为令人闻风丧胆的杀神"
+    icon: "💀"
+    condition_type: "kill_count"
+    condition_target: "total_kills"
+    condition_value: 1000
+    rewards:
+      gold: 100000
+      exp: 30000
+      attribute_points: 50
+    flavor_text: "千人斩之名，威震四方。"
+    hidden: false
+
+  winning_streak:
+    id: "winning_streak"
+    title: "连胜之王"
+    description: "累计取得50场战斗胜利"
+    icon: "👑"
+    condition_type: "battle_win"
+    condition_target: "total_wins"
+    condition_value: 50
+    rewards:
+      gold: 15000
+      exp: 4000
+      attribute_points: 12
+    flavor_text: "胜者为王，五十场不败，已可称王。"
+    hidden: false
+
+  # 成长系列 - 高难度
+  level_thirty_master:
+    id: "level_thirty_master"
+    title: "境界大成"
+    description: "达到30级，踏入高手行列"
+    icon: "🌠"
+    condition_type: "level_reached"
+    condition_target: "level"
+    condition_value: 30
+    rewards:
+      gold: 30000
+      exp: 8000
+      attribute_points: 25
+    flavor_text: "三十级境界，已入高手之流。"
+    hidden: false
+
+  level_fifty_expert:
+    id: "level_fifty_expert"
+    title: "半步天人"
+    description: "达到50级，距离传说只有一步之遥"
+    icon: "✨"
+    condition_type: "level_reached"
+    condition_target: "level"
+    condition_value: 50
+    rewards:
+      gold: 80000
+      exp: 20000
+      attribute_points: 50
+    flavor_text: "五十级之境，半步天人，俯瞰众生。"
+    hidden: false
+
+  level_hundred_legend:
+    id: "level_hundred_legend"
+    title: "通天彻地"
+    description: "达到100级，成为传说中的存在"
+    icon: "🌌"
+    condition_type: "level_reached"
+    condition_target: "level"
+    condition_value: 100
+    rewards:
+      gold: 500000
+      exp: 100000
+      attribute_points: 200
+    flavor_text: "百级之境，通天彻地，已入传说。"
+    hidden: false
+
+  # 修炼系列 - 高难度
+  cultivation_master:
+    id: "cultivation_master"
+    title: "修炼大师"
+    description: "累计修炼100次，深谙修炼之道"
+    icon: "🔮"
+    condition_type: "command_count"
+    condition_target: "修炼"
+    condition_value: 100
+    rewards:
+      gold: 25000
+      exp: 6000
+      attribute_points: 20
+    flavor_text: "百次修炼，已悟真谛。"
+    hidden: false
+
+  ascetic_monk:
+    id: "ascetic_monk"
+    title: "苦修者"
+    description: "累计修炼1000次，视修炼为生命"
+    icon: "🧘"
+    condition_type: "command_count"
+    condition_target: "修炼"
+    condition_value: 1000
+    rewards:
+      gold: 150000
+      exp: 40000
+      attribute_points: 80
+    flavor_text: "千次修炼，苦修成道，心如磐石。"
+    hidden: false
+
+  # 装备系列 - 高难度
+  equipment_collector:
+    id: "equipment_collector"
+    title: "装备收藏家"
+    description: "拥有10件装备，建立自己的武器库"
+    icon: "🗡️"
+    condition_type: "equipment_obtained"
+    condition_target: "any_equipment"
+    condition_value: 10
+    rewards:
+      gold: 20000
+      exp: 5000
+      attribute_points: 15
+    flavor_text: "十件神兵，各有千秋。"
+    hidden: false
+
+  legendary_weapon:
+    id: "legendary_weapon"
+    title: "神兵在手"
+    description: "拥有一件+10级的满级装备"
+    icon: "⚡"
+    condition_type: "equipment_max_upgrade"
+    condition_target: "upgrade_level"
+    condition_value: 10
+    rewards:
+      gold: 50000
+      exp: 15000
+      attribute_points: 30
+    flavor_text: "神兵既成，天下我有。"
+    hidden: false
+
+  # 财富系列 - 高难度
+  wealthy_magnate:
+    id: "wealthy_magnate"
+    title: "富甲一方"
+    description: "累计获得10万金币，成为富豪"
+    icon: "💎"
+    condition_type: "gold_total"
+    condition_target: "gold_earned"
+    condition_value: 100000
+    rewards:
+      gold: 30000
+      exp: 8000
+    flavor_text: "十万金币，已是富甲一方。"
+    hidden: false
+
+  financial_freedom:
+    id: "financial_freedom"
+    title: "财富自由"
+    description: "累计获得100万金币，实现财富自由"
+    icon: "🏆"
+    condition_type: "gold_total"
+    condition_target: "gold_earned"
+    condition_value: 1000000
+    rewards:
+      gold: 200000
+      exp: 50000
+      attribute_points: 100
+    flavor_text: "百万金币，财富自由，无忧无虑。"
+    hidden: false
+
+  # 探索系列 - 高难度
+  seasoned_explorer:
+    id: "seasoned_explorer"
+    title: "游遍天下"
+    description: "探索10个不同的地点，足迹遍布各地"
+    icon: "🧭"
+    condition_type: "locations_visited"
+    condition_target: "unique_locations"
+    condition_value: 10
+    rewards:
+      gold: 15000
+      exp: 4000
+      attribute_points: 10
+    flavor_text: "十处险地，皆留足迹。"
+    hidden: false
+
+  master_explorer:
+    id: "master_explorer"
+    title: "足迹遍布"
+    description: "探索30个不同的地点，成为探索大师"
+    icon: "🌍"
+    condition_type: "locations_visited"
+    condition_target: "unique_locations"
+    condition_value: 30
+    rewards:
+      gold: 60000
+      exp: 20000
+      attribute_points: 40
+    flavor_text: "三十险地，无一不至，天下之大，尽在脚下。"
+    hidden: false
+
+  # 忠诚系列 - 高难度
+  weekly_devotee:
+    id: "weekly_devotee"
+    title: "坚持不懈"
+    description: "连续登录7天，展现坚定的意志"
+    icon: "📆"
+    condition_type: "login_streak"
+    condition_target: "consecutive_days"
+    condition_value: 7
+    rewards:
+      gold: 10000
+      exp: 3000
+      attribute_points: 8
+    flavor_text: "七日不断，意志坚定。"
+    hidden: false
+
+  monthly_devotee:
+    id: "monthly_devotee"
+    title: "铁杆玩家"
+    description: "连续登录30天，成为铁杆玩家"
+    icon: "🎖️"
+    condition_type: "login_streak"
+    condition_target: "consecutive_days"
+    condition_value: 30
+    rewards:
+      gold: 50000
+      exp: 15000
+      attribute_points: 35
+    flavor_text: "三十日连续，铁杆之名，实至名归。"
+    hidden: false
+
+  lifetime_achievement:
+    id: "lifetime_achievement"
+    title: "终身成就"
+    description: "累计登录100天，见证游戏的点点滴滴"
+    icon: "🏅"
+    condition_type: "total_login_days"
+    condition_target: "total_days"
+    condition_value: 100
+    rewards:
+      gold: 100000
+      exp: 30000
+      attribute_points: 60
+    flavor_text: "百日相伴，终身成就，感谢有你。"
+    hidden: false
+
 # 成就分类
 categories:
-  cultivation: ["first_cultivation", "cultivation_adept"]
-  growth: ["first_breakthrough", "level_ten_warrior"]
-  battle: ["first_victory", "veteran_fighter"]
-  equipment: ["first_equipment"]
-  wealth: ["small_fortune"]
-  exploration: ["world_explorer"]
-  loyalty: ["loyal_believer"]
+  cultivation: ["first_cultivation", "cultivation_adept", "cultivation_master", "ascetic_monk"]
+  growth: ["first_breakthrough", "level_ten_warrior", "level_thirty_master", "level_fifty_expert", "level_hundred_legend"]
+  battle: ["first_victory", "veteran_fighter", "winning_streak", "hundred_battles", "thousand_slayer"]
+  equipment: ["first_equipment", "equipment_collector", "legendary_weapon"]
+  wealth: ["small_fortune", "wealthy_magnate", "financial_freedom"]
+  exploration: ["world_explorer", "seasoned_explorer", "master_explorer"]
+  loyalty: ["loyal_believer", "weekly_devotee", "monthly_devotee", "lifetime_achievement"]
   anniversary: ["first_anniversary"]

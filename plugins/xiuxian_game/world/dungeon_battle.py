@@ -885,7 +885,14 @@ async def _handle_personal_monster(session, tile: WorldTile, player: Player) -> 
                 guild_building_repo=GuildBuildingRepository(session),
             )
             await task_service.update_combat_victory_stats(player.id)
-        # 结算“斩龙闪”的战后效果，保持与战斗日志一致（修复 Bug3/1）
+
+        # 更新成就统计（诡域战斗胜利）
+        from ..achievement.achievement_service import AchievementService
+        await AchievementService.update_stat(session, player.id, "total_battles")
+        await AchievementService.update_stat(session, player.id, "total_wins")
+        await AchievementService.update_stat(session, player.id, "total_kills")
+
+        # 结算"斩龙闪"的战后效果，保持与战斗日志一致（修复 Bug3/1）
         try:
             if post_effects:
                 from sqlalchemy import select as _select

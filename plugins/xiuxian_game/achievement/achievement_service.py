@@ -229,7 +229,10 @@ class AchievementService:
         """
         # 加载配置
         config_data = cls._load_achievement_config()
-        achievements = config_data.get("basic_achievements", {})
+        # 合并基础成就和高难度成就
+        achievements = {}
+        achievements.update(config_data.get("basic_achievements", {}))
+        achievements.update(config_data.get("advanced_achievements", {}))
 
         # 获取玩家统计数据
         result = await session.execute(
@@ -288,6 +291,23 @@ class AchievementService:
             elif condition_type == "login_streak":
                 # 连续登录
                 is_unlocked = stats.consecutive_login_days >= condition_value
+            elif condition_type == "total_login_days":
+                # 累计登录天数
+                is_unlocked = stats.total_login_days >= condition_value
+            elif condition_type == "equipment_max_upgrade":
+                # 检查是否拥有满级装备
+                from ..models.inventory import ItemInstance
+                result = await session.execute(
+                    select(ItemInstance).where(
+                        and_(
+                            ItemInstance.player_id == player.id,
+                            ItemInstance.upgrade_level >= condition_value
+                        )
+                    )
+                )
+                max_upgrade_items = result.scalars().all()
+                # 检查是否有装备（通过is_equipment属性判断）
+                is_unlocked = any(item.is_equipment for item in max_upgrade_items)
             elif condition_type == "account_age":
                 # 账号创建时间检查（用于周年成就）
                 from datetime import datetime
@@ -323,7 +343,10 @@ class AchievementService:
         """
         # 加载配置
         config_data = cls._load_achievement_config()
-        achievements = config_data.get("basic_achievements", {})
+        # 合并基础成就和高难度成就
+        achievements = {}
+        achievements.update(config_data.get("basic_achievements", {}))
+        achievements.update(config_data.get("advanced_achievements", {}))
         achievement_data = achievements.get(achievement_id)
 
         if not achievement_data:
@@ -419,7 +442,10 @@ class AchievementService:
         """
         # 加载配置
         config_data = cls._load_achievement_config()
-        achievements = config_data.get("basic_achievements", {})
+        # 合并基础成就和高难度成就
+        achievements = {}
+        achievements.update(config_data.get("basic_achievements", {}))
+        achievements.update(config_data.get("advanced_achievements", {}))
 
         # 获取已解锁的成就
         result = await session.execute(
