@@ -297,7 +297,7 @@ class AchievementService:
             elif condition_type == "equipment_max_upgrade":
                 # 检查是否拥有满级装备
                 from ..models.inventory import ItemInstance
-                result = await session.execute(
+                equipment_result = await session.execute(
                     select(ItemInstance).where(
                         and_(
                             ItemInstance.player_id == player.id,
@@ -305,7 +305,7 @@ class AchievementService:
                         )
                     )
                 )
-                max_upgrade_items = result.scalars().all()
+                max_upgrade_items = equipment_result.scalars().all()
                 # 检查是否有装备（通过is_equipment属性判断）
                 is_unlocked = any(item.is_equipment for item in max_upgrade_items)
             elif condition_type == "account_age":
