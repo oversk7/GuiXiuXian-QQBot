@@ -43,22 +43,31 @@ class ArrayBreakingGame:
         self._generate_solvable_puzzle()
     
     def _generate_solvable_puzzle(self):
-        """生成有解的谜题（倒推生成）"""
-        # 先生成目标序列
+        """生成有解的谜题（多路径版本）"""
+        # 步骤1: 生成目标序列
         self._generate_target_sequences()
 
-        # 创建空矩阵
+        # 步骤2: 创建空矩阵
         self.matrix = [["" for _ in range(self.size)] for _ in range(self.size)]
 
-        # 生成一条主要的解决路径，包含所有目标序列
-        main_path = self._generate_main_solution_path()
+        # 步骤3: 生成最优序列
+        optimal_sequence = self._create_optimal_sequence()
 
-        # 在主路径上放置代码
-        if main_path:
-            self._place_codes_on_path(main_path)
+        # 步骤4: 生成多条可行路径（3-5条）
+        target_count = len(self.target_sequences)
+        paths = self._generate_diverse_paths(len(optimal_sequence), target_count)
 
-        # 填充剩余空位
-        self._fill_remaining_cells()
+        # 步骤5: 在多条路径上放置符文
+        if paths:
+            self._place_codes_on_multiple_paths(paths, optimal_sequence)
+            # 步骤6: 填充剩余空位（传递paths以实现智能填充）
+            self._fill_remaining_cells(paths)
+        else:
+            # 如果多路径生成失败，使用fallback
+            fallback_path = self._generate_fallback_path()
+            self._place_codes_on_path(fallback_path)
+            # 步骤6: 填充剩余空位（传递fallback路径）
+            self._fill_remaining_cells([fallback_path])
     
     def _generate_target_sequences(self):
         """生成目标序列"""
@@ -135,10 +144,11 @@ class ArrayBreakingGame:
         return best_sequence[:self.buffer_size]
 
     def _get_sequence_permutations(self, sequences: List[List[str]]) -> List[List[List[str]]]:
-        """获取序列的不同排列组合（限制数量避免过度计算）"""
+        """获取序列的所有排列组合"""
         import itertools
-        # 只尝试前几种排列，避免计算量过大
-        return list(itertools.permutations(sequences))[:6]
+        # 尝试所有排列，确保找到最优组合
+        # 5x5: 3! = 6种, 6x6: 4! = 24种（计算量可接受）
+        return list(itertools.permutations(sequences))
 
     def _combine_sequences(self, sequences: List[List[str]]) -> List[str]:
         """尝试智能组合多个序列，寻找重叠部分"""
@@ -277,14 +287,18 @@ class ArrayBreakingGame:
         return coverage
 
     def _generate_fallback_path(self) -> List[Tuple[int, int]]:
-        """生成备用路径（确保至少有一个解）"""
+        """生成备用路径（动态步数，确保覆盖最优序列）"""
+        # 计算最优序列的长度，确保fallback路径足够长
+        optimal_sequence = self._create_optimal_sequence()
+        min_steps = min(len(optimal_sequence), self.buffer_size)
+
         path = []
         current_row = 0
         current_col = random.randint(0, self.size - 1)
         path.append((current_row, current_col))
 
         is_horizontal = True
-        for _ in range(1, min(self.buffer_size, 4)):  # 至少生成4步路径
+        for _ in range(1, min_steps):  # 使用动态步数
             if is_horizontal:
                 available_cols = [c for c in range(self.size) if c != current_col]
                 if available_cols:
@@ -312,15 +326,140 @@ class ArrayBreakingGame:
         for i, (row, col) in enumerate(path):
             if i < len(optimal_sequence):
                 self.matrix[row][col] = optimal_sequence[i]
-    
 
-    
-    def _fill_remaining_cells(self):
-        """填充剩余的空单元格"""
+    def _generate_diverse_paths(self, optimal_seq_length: int, target_count: int = 3) -> List[List[Tuple[int, int]]]:
+        """生成多条多样化路径，提高玩家可发现性"""
+        paths = []
+        # 根据难度确定路径数量：5x5生成3条，6x6生成4条
+        target_path_count = min(target_count + 1, 5)
+
+        for i in range(target_path_count):
+            max_attempts = 30  # 减少尝试次数（多路径后不需要太多）
+            path = None
+
+            for attempt in range(max_attempts):
+                # 根据索引选择不同起点策略
+                if i == 0:
+                    start_col = random.randint(0, self.size // 2)  # 左侧起点
+                elif i == 1:
+                    start_col = random.randint(self.size // 2, self.size - 1)  # 右侧起点
+                else:
+                    start_col = random.randint(0, self.size - 1)  # 随机起点
+
+                # 生成单条路径
+                candidate_path = self._generate_single_path(optimal_seq_length, start_col)
+
+                if candidate_path and self._is_diverse_enough(candidate_path, paths):
+                    path = candidate_path
+                    break
+
+            if path:
+                paths.append(path)
+            elif i == 0:
+                # 至少需要一条路径，使用fallback
+                paths.append(self._generate_fallback_path())
+
+        return paths
+
+    def _generate_single_path(self, length: int, start_col: int) -> List[Tuple[int, int]]:
+        """生成单条路径（从指定起点开始）"""
+        path = []
+        current_row = 0
+        current_col = start_col
+        path.append((current_row, current_col))
+
+        is_horizontal = True
+        for _ in range(1, length):
+            if is_horizontal:
+                available_cols = [c for c in range(self.size) if c != current_col]
+                if available_cols:
+                    current_col = random.choice(available_cols)
+                    path.append((current_row, current_col))
+                else:
+                    return None
+            else:
+                available_rows = [r for r in range(self.size) if r != current_row]
+                if available_rows:
+                    current_row = random.choice(available_rows)
+                    path.append((current_row, current_col))
+                else:
+                    return None
+
+            is_horizontal = not is_horizontal
+
+        return path
+
+    def _is_diverse_enough(self, new_path: List[Tuple[int, int]], existing_paths: List[List[Tuple[int, int]]]) -> bool:
+        """检查新路径与已有路径的多样性（重叠度<40%）"""
+        if not existing_paths:
+            return True
+
+        for existing in existing_paths:
+            overlap = set(new_path) & set(existing)
+            overlap_ratio = len(overlap) / len(new_path) if new_path else 0
+            if overlap_ratio > 0.4:  # 重叠超过40%，拒绝
+                return False
+
+        return True
+
+    def _place_codes_on_multiple_paths(self, paths: List[List[Tuple[int, int]]], optimal_sequence: List[str]):
+        """在多条路径上放置符文"""
+        placed_positions = {}  # {(row, col): rune}
+
+        for path in paths:
+            for i, (row, col) in enumerate(path):
+                if i >= len(optimal_sequence):
+                    break
+
+                expected_rune = optimal_sequence[i]
+
+                if (row, col) in placed_positions:
+                    # 位置已被占用，检查符文是否相同
+                    if placed_positions[(row, col)] == expected_rune:
+                        # 符文相同，完美！继续
+                        continue
+                    else:
+                        # 符文冲突，跳过这个位置
+                        continue
+                else:
+                    # 新位置，放置符文
+                    self.matrix[row][col] = expected_rune
+                    placed_positions[(row, col)] = expected_rune
+
+
+    def _fill_remaining_cells(self, paths: List[List[Tuple[int, int]]] = None):
+        """智能填充剩余格子，避免过度干扰"""
+        # 收集所有路径上的位置
+        path_positions = set()
+        if paths:
+            for path in paths:
+                path_positions.update(path)
+
+        # 收集目标序列中使用的符文
+        used_runes = set()
+        for target in self.target_sequences:
+            used_runes.update(target.sequence)
+
+        # 创建"安全符文池"（不在目标中的符文）
+        safe_runes = [r for r in self.code_chars if r not in used_runes]
+        if not safe_runes:
+            safe_runes = self.code_chars  # 如果没有安全符文，使用全部
+
         for row in range(self.size):
             for col in range(self.size):
                 if self.matrix[row][col] == "":
-                    self.matrix[row][col] = random.choice(self.code_chars)
+                    # 检查是否接近路径（曼哈顿距离<=2）
+                    is_near_path = any(
+                        abs(row - pr) + abs(col - pc) <= 2
+                        for pr, pc in path_positions
+                    ) if path_positions else False
+
+                    if is_near_path:
+                        # 接近路径，使用安全符文
+                        self.matrix[row][col] = random.choice(safe_runes)
+                    else:
+                        # 远离路径，随机填充
+                        self.matrix[row][col] = random.choice(self.code_chars)
     
     def display_matrix(self) -> str:
         """显示矩阵"""

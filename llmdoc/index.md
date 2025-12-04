@@ -1,9 +1,9 @@
 # 诡修仙项目文档系统
 
-**文档版本**: 3.6
-**最后更新**: 2025-12-03 (地图可视化系统性能优化 + 周年庆典成就系统)
+**文档版本**: 3.7
+**最后更新**: 2025-12-04 (cyberpunk_hacking多路径机制实施完成)
 **文档受众**: LLM代理和项目开发者
-**文档状态**: 生产就绪，Phase 2新手体验优化已完成
+**文档状态**: 生产就绪，Phase 2新手体验优化已完成，核心游戏系统优化进行中
 
 ---
 
@@ -39,6 +39,7 @@
 - `dialogue-npc-system.md` - 对话NPC系统架构（自然对话+游戏指令+好感度）
 - `account-switching-system.md` - 账号切换系统架构（多账号管理+转让+管理员临时切换）
 - `achievement-system.md` - 微成就系统架构（配置驱动+统计追踪+即时反馈）
+- `cyberpunk_hacking_multipath_implementation.md` - cyberpunk_hacking多路径机制实施记录（可解性75-300倍提升）
 
 ### `/guides/` - 操作指南
 回答"如何执行X任务?":
@@ -74,6 +75,10 @@ LLM代理生成的调研和分析报告（仅保留系统分析和设计参考�
 - `anniversary_achievement_2025_12_03.md` - 周年庆典成就系统工作记录 (2025-12-03)
 - `map_visualization_optimization_implementation_2025_12_03.md` - 地图可视化系统性能优化与视觉美化 (2025-12-03)
 
+**核心游戏系统优化**:
+- `cyberpunk_hacking_solvability_analysis.md` - cyberpunk_hacking序列生成可解性深度分析 (2025-12-04)
+- `cyberpunk_hacking_limitation_investigation.md` - cyberpunk_hacking限制条件与成本调查 (2025-12-04)
+
 **投资系统调研**:
 - `investment_system_investigation.md` - 投资系统初步调查报告（银行+股票）
 - `stock_system_files_investigation.md` - 投资系统文件清单调查
@@ -94,6 +99,11 @@ LLM代理生成的调研和分析报告（仅保留系统分析和设计参考�
 - `game_system_redesign_2025_12_02.md` - 新手体验破局完整方案 (2025-12-02)
 - `EXECUTIVE_SUMMARY.md` - 执行摘要 (快速查阅版)
 - `phase2_implementation_summary.md` - Phase 2新手体验优化实施摘要 (2025-12-03)
+- `attribute_equipment_gem_system_analysis_2025_12_04.md` - 三大系统设计分析（升级加点、装备加成、镶嵌物）
+- `veteran_player_impact_analysis_2025_12_04.md` - 老玩家影响全面分析与改革风险评估 (2025-12-04)
+- `veteran_impact_executive_summary.md` - 老玩家影响分析执行摘要（快速决策版）
+- `cyberpunk_hacking_multipath_design.md` - cyberpunk_hacking多路径机制设计方案 (2025-12-04)
+- `cyberpunk_hacking_implementation_summary.md` - cyberpunk_hacking多路径机制实施摘要（快速查阅版，5分钟） (2025-12-04)
 
 **投资系统反套利实施** (2025-12-02):
 - `investment_anti_arbitrage_redesign.md` - 反套利设计方案（最终方案，191行）
@@ -128,6 +138,8 @@ LLM代理生成的调研和分析报告（仅保留系统分析和设计参考�
 1. 查看 `/agent/game_balance_analysis_2025_12_01.md` 了解已识别的平衡问题
 2. 参考 `/design/investment_anti_arbitrage_redesign.md` 学习反套利机制设计
 3. 阅读 `/design/investment_implementation_summary.md` 查看实施细节和部署步骤
+4. **重要**：查看 `/design/veteran_player_impact_analysis_2025_12_04.md` 了解数值改革的老玩家影响评估
+5. 快速决策参考 `/design/veteran_impact_executive_summary.md`（5分钟阅读版）
 
 ---
 
@@ -307,6 +319,15 @@ LLM代理生成的调研和分析报告（仅保留系统分析和设计参考�
 - **地点标记阴影**: 右下偏移投影，增强地点标记立体感
 - **整体性能**: 总地图生成时间提升 20-30%
 - **详细记录**: `/llmdoc/agent/map_visualization_optimization_implementation_2025_12_03.md`
+
+**✅ cyberpunk_hacking多路径机制实施** (2025-12-04):
+- **多路径设计**: 从单一路径改为3-5条多样化路径
+- **可解性提升**: 5x5从<0.2%提升至15-20%，6x6从<0.1%提升至20-30%（75-300倍）
+- **排列组合优化**: 扩展6x6排列从6种到全部24种（100%覆盖）
+- **Fallback动态化**: 从固定4步改为动态步数，确保6x6也能完全覆盖
+- **多路径符文放置**: 在所有路径上同时放置目标序列符文
+- **智能填充算法**: 接近路径处使用安全符文，避免随机干扰
+- **详细记录**: `/llmdoc/architecture/cyberpunk_hacking_multipath_implementation.md`
 
 **✅ 投资系统反套利机制实施** (2025-12-02):
 - **问题**: 股票投资存在无风险套利漏洞（长期持有+正向趋势=稳赚不赔）
