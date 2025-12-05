@@ -198,7 +198,7 @@ class SweepDungeonService:
             player.gold += total_gold
             # 更新财富成就统计
             from ..achievement.achievement_service import AchievementService
-            await AchievementService.update_stat(session, player.id, "gold_earned_total", increment=total_gold, auto_commit=False)
+            await AchievementService.update_stat(self._player_repo._session, player.id, "gold_earned_total", increment=total_gold, auto_commit=False)
             results.append(f"💰 发现宝藏获得金币: {total_gold} (宝藏格子×{treasure_tiles})")
 
         # 处理材料奖励 - 合并相同材料
