@@ -412,7 +412,7 @@ class PartTimeJobService:
         player.gold += current_job.total_reward
         # 更新财富成就统计
         from ..achievement.achievement_service import AchievementService
-        await AchievementService.update_stat(session, player.id, "gold_earned_total", increment=current_job.total_reward, auto_commit=False)
+        await AchievementService.update_stat(self._player_repo._session, player.id, "gold_earned_total", increment=current_job.total_reward, auto_commit=False)
         await self._player_repo.update(player)
 
         # 更新统计

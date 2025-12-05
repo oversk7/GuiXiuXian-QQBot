@@ -185,7 +185,7 @@ class WorldBossChestService:
             player.gold += gold_reward
             # 更新财富成就统计
             from ..achievement.achievement_service import AchievementService
-            await AchievementService.update_stat(session, player.id, "gold_earned_total", increment=gold_reward, auto_commit=False)
+            await AchievementService.update_stat(self._player_repo._session, player.id, "gold_earned_total", increment=gold_reward, auto_commit=False)
             rewards.append(f"💰 {gold_reward:,} 金币")
 
             # 2. 镶嵌物奖励（概率性）
