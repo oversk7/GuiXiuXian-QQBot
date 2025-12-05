@@ -1,5 +1,5 @@
 from nonebot import on_command
-from nonebot.adapters.qq import MessageEvent
+from nonebot.adapters.qq import MessageEvent, MessageSegment
 from nonebot.params import CommandArg
 from nonebot.adapters.qq import Message
 from ..models.db import safe_session
@@ -9,6 +9,8 @@ from ..platform_utils import get_unified_player
 import random
 from typing import List, Tuple, Dict
 from dataclasses import dataclass
+import base64
+from .cyberpunk_hacking_image import generate_game_image
 
 # 游戏状态存储
 game_sessions: Dict[str, 'ArrayBreakingGame'] = {}
@@ -216,11 +218,11 @@ class ArrayBreakingGame:
                 (["丙", "丁"], 50, "火木相生"),
             ]
         elif self.size == 7:
-            # 7x7困难模式：8步缓冲区（模仿赛博朋克2077）
+            # 7x7困难模式：8步缓冲区
             sequences = [
-                (["甲", "子", "丙"], 100, "数据挖掘_V1"),
-                (["丙", "子", "丙"], 120, "数据挖掘_V2"),
-                (["甲", "甲", "甲", "丙", "丁"], 180, "数据挖掘_V3"),
+                (["甲", "子", "丙"], 100, "天罡正法"),
+                (["丙", "子", "丙"], 120, "地煞逆转"),
+                (["甲", "甲", "甲", "丙", "丁"], 180, "五行轮转"),
             ]
         else:
             # 其他大小使用默认
@@ -301,6 +303,10 @@ class ArrayBreakingGame:
                 if target_str in selected_str:
                     self.completed_sequences.append(i)
     
+    def get_status_image(self) -> bytes:
+        """获取游戏状态图片"""
+        return generate_game_image(self)
+
     def get_status(self) -> str:
         """获取游戏状态"""
         lines = []
@@ -404,8 +410,15 @@ async def handle_array_breaking(event: MessageEvent, args: Message = CommandArg(
         game_sessions[user_id] = game
 
         difficulty_text = "标准(5x5/6步)" if size == 5 else "困难(7x7/8步)"
-        result_msg = f"🎮 已开始{difficulty_text}阵法\n" + game.get_status()
-        await array_breaking.finish(message_add_head(result_msg, event))
+
+        # 生成游戏图片
+        image_bytes = game.get_status_image()
+        image_b64 = base64.b64encode(image_bytes).decode()
+
+        # 发送图片和说明
+        msg_text = f"🎮 已开始{difficulty_text}阵法\n💡 输入【阵法破解 行号 列号】选择符文"
+        await array_breaking.send(message_add_head(msg_text, event))
+        await array_breaking.finish(MessageSegment.image(f"base64://{image_b64}"))
 
     # 放弃游戏
     if args_text == "放弃":
@@ -478,6 +491,7 @@ async def handle_array_breaking(event: MessageEvent, args: Message = CommandArg(
         result_msg = "\n".join(result_lines)
         await array_breaking.finish(message_add_head(result_msg, event))
 
-    # 游戏继续，显示当前状态
-    result_msg = game.get_status()
-    await array_breaking.finish(message_add_head(result_msg, event))
+    # 游戏继续，显示当前状态（图片形式）
+    image_bytes = game.get_status_image()
+    image_b64 = base64.b64encode(image_bytes).decode()
+    await array_breaking.finish(MessageSegment.image(f"base64://{image_b64}"))
