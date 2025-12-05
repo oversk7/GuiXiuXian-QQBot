@@ -5,7 +5,7 @@
     python scripts/unlock_anniversary_achievement.py
 
 功能：
-    - 查询所有在2025-10-04之前创建的玩家
+    - 查询所有在2025-10-07及之前创建的玩家
     - 为符合条件且未解锁的玩家自动解锁first_anniversary成就
     - 发放周年庆典奖励（金币50000、经验10000、属性点30）
 
@@ -31,8 +31,8 @@ from sqlalchemy import text
 
 # ==================== 配置 ====================
 
-# 截止日期（2025-10-04之前创建的账号）
-CUTOFF_DATE = "2025-10-04"
+# 截止日期（2025-10-07及之前创建的账号）
+CUTOFF_DATE = "2025-10-07 23:59:59"
 
 # 成就ID
 ACHIEVEMENT_ID = "first_anniversary"

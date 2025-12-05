@@ -160,7 +160,7 @@ basic_achievements:
     icon: "🎂"
     condition_type: "account_age"
     condition_target: "created_before"
-    condition_value: "2025-10-04"  # 2025年10月4日之前创建的账号
+    condition_value: "2025-10-07"  # 2025年10月7日及之前创建的账号
     rewards:
       gold: 50000
       exp: 10000
