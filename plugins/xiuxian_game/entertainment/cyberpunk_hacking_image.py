@@ -265,14 +265,14 @@ class CyberpunkHackingImageGenerator:
         left_x = self.padding
 
         # 绘制目标序列
-        draw.text((left_x, info_y), "🎯 破阵目标:",
+        draw.text((left_x, info_y), "【破阵目标】",
                  font=self.font_medium, fill=self.COLOR_TEXT)
 
         target_y = info_y + 35
         for i, target in enumerate(game.target_sequences):
-            status = "✅" if i in game.completed_sequences else "⭕"
+            status = "[完成]" if i in game.completed_sequences else "[ ]"
             seq_str = " → ".join(target.sequence)
-            text = f"{status} {target.name}: {seq_str} (+{target.reward}💰)"
+            text = f"{status} {target.name}: {seq_str} (+{target.reward}金币)"
 
             color = self.COLOR_COMPLETED if i in game.completed_sequences else self.COLOR_TARGET
             draw.text((left_x + 10, target_y), text,
@@ -285,15 +285,15 @@ class CyberpunkHackingImageGenerator:
         # 当前符文序列
         if game.selected_codes:
             current_seq = " → ".join(game.selected_codes)
-            draw.text((left_x, status_y), f"📝 当前符文: {current_seq}",
+            draw.text((left_x, status_y), f"【当前符文】{current_seq}",
                      font=self.font_small, fill=self.COLOR_TEXT)
         else:
-            draw.text((left_x, status_y), "📝 当前符文: (空)",
+            draw.text((left_x, status_y), "【当前符文】(空)",
                      font=self.font_small, fill=self.COLOR_TEXT)
 
         # 灵力条
         status_y += 35
-        buffer_text = f"⚡ 灵力: {len(game.current_path)}/{game.buffer_size}"
+        buffer_text = f"【灵力】{len(game.current_path)}/{game.buffer_size}"
         draw.text((left_x, status_y), buffer_text,
                  font=self.font_small, fill=self.COLOR_TEXT)
 
@@ -320,12 +320,12 @@ class CyberpunkHackingImageGenerator:
             direction = "横向" if game.is_horizontal else "纵向"
             if game.is_horizontal:
                 last_row, _ = game.current_path[-1]
-                hint = f"🧭 下一步: {direction}移动（在第{last_row+1}行选择不同列）"
+                hint = f"【下一步】{direction}移动（在第{last_row+1}行选择不同列）"
             else:
                 _, last_col = game.current_path[-1]
-                hint = f"🧭 下一步: {direction}移动（在第{last_col+1}列选择不同行）"
+                hint = f"【下一步】{direction}移动（在第{last_col+1}列选择不同行）"
         else:
-            hint = "🧭 下一步: 选择第一行任意位置"
+            hint = "【下一步】选择第一行任意位置"
 
         draw.text((left_x, status_y), hint,
                  font=self.font_small, fill=self.COLOR_RUNE_HIGHLIGHT)
