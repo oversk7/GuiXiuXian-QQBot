@@ -3,12 +3,17 @@ Cyberpunk Hacking 游戏矩阵图片生成器
 赛博朋克风格的视觉呈现
 """
 from PIL import Image, ImageDraw, ImageFont
-from typing import List, Tuple
+from typing import List, Tuple, Optional, Dict
 import io
 import base64
+import os
 
 class CyberpunkHackingImageGenerator:
     """赛博朋克阵法破解图片生成器"""
+
+    # 类级字体缓存，避免重复加载
+    _cached_fonts: Optional[Dict[str, ImageFont.FreeTypeFont]] = None
+    _font_load_attempted: bool = False
 
     # 赛博朋克配色方案
     COLOR_BG = (15, 20, 30)  # 深色背景
@@ -33,16 +38,102 @@ class CyberpunkHackingImageGenerator:
         self.total_width = self.grid_width + self.padding * 2
         self.total_height = self.grid_height + self.padding * 2 + self.info_height
 
-        # 尝试加载字体
-        try:
-            self.font_large = ImageFont.truetype("msyh.ttc", 32)  # 微软雅黑
-            self.font_medium = ImageFont.truetype("msyh.ttc", 24)
-            self.font_small = ImageFont.truetype("msyh.ttc", 18)
-        except:
-            # 如果找不到字体，使用默认字体
+        # 字体配置
+        self.fonts = {}
+        self._load_fonts()
+
+    def _load_fonts(self):
+        """加载字体，优先使用中文字体（带缓存机制）"""
+        # 如果已有缓存，直接使用
+        if CyberpunkHackingImageGenerator._cached_fonts is not None:
+            self.fonts = CyberpunkHackingImageGenerator._cached_fonts
+            self.font_large = self.fonts['large']
+            self.font_medium = self.fonts['medium']
+            self.font_small = self.fonts['small']
+            return
+
+        # 如果已尝试加载但失败，使用默认字体
+        if CyberpunkHackingImageGenerator._font_load_attempted and CyberpunkHackingImageGenerator._cached_fonts is None:
             self.font_large = ImageFont.load_default()
             self.font_medium = ImageFont.load_default()
             self.font_small = ImageFont.load_default()
+            self.fonts = {'large': self.font_large, 'medium': self.font_medium, 'small': self.font_small}
+            return
+
+        # 标记已尝试加载
+        CyberpunkHackingImageGenerator._font_load_attempted = True
+
+        try:
+            # 尝试加载系统中文字体
+            font_paths = [
+                # Windows 中文字体
+                'C:/Windows/Fonts/msyh.ttc',      # 微软雅黑
+                'C:/Windows/Fonts/simhei.ttf',    # 黑体
+                'C:/Windows/Fonts/simsun.ttc',    # 宋体
+
+                # Linux 中文字体 - 常见路径
+                '/usr/share/fonts/truetype/wqy/wqy-microhei.ttc',           # 文泉驿微米黑
+                '/usr/share/fonts/truetype/wqy/wqy-zenhei.ttc',             # 文泉驿正黑
+                '/usr/share/fonts/truetype/arphic/ukai.ttc',                # AR PL UKai CN
+                '/usr/share/fonts/truetype/arphic/uming.ttc',               # AR PL UMing CN
+                '/usr/share/fonts/opentype/noto/NotoSansCJK-Regular.ttc',   # Noto Sans CJK
+                '/usr/share/fonts/truetype/droid/DroidSansFallbackFull.ttf',
+                '/usr/share/fonts/truetype/liberation/LiberationSans-Regular.ttf',
+                '/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf',
+
+                # Ubuntu/Debian 特定路径
+                '/usr/share/fonts/truetype/noto/NotoSansCJK-Regular.ttc',
+                '/usr/share/fonts/truetype/fonts-noto-cjk/NotoSansCJK-Regular.ttc',
+
+                # CentOS/RHEL 特定路径
+                '/usr/share/fonts/wqy-microhei/wqy-microhei.ttc',
+                '/usr/share/fonts/wqy-zenhei/wqy-zenhei.ttc',
+
+                # macOS 中文字体
+                '/System/Library/Fonts/PingFang.ttc',
+                '/System/Library/Fonts/Hiragino Sans GB.ttc',
+            ]
+
+            # 首先找到一个可用的中文字体路径
+            available_font_path = None
+            for font_path in font_paths:
+                if os.path.exists(font_path):
+                    try:
+                        # 尝试加载测试
+                        test_font = ImageFont.truetype(font_path, 12)
+                        available_font_path = font_path
+                        print(f"[OK] 阵法破解：找到可用中文字体: {os.path.basename(font_path)}")
+                        break
+                    except (OSError, IOError):
+                        continue
+
+            # 如果找到了可用字体，加载所有大小
+            if available_font_path:
+                self.font_large = ImageFont.truetype(available_font_path, 32)
+                self.font_medium = ImageFont.truetype(available_font_path, 24)
+                self.font_small = ImageFont.truetype(available_font_path, 18)
+                self.fonts = {'large': self.font_large, 'medium': self.font_medium, 'small': self.font_small}
+                print(f"[OK] 阵法破解：已加载字体 18px, 24px, 32px")
+            else:
+                # 没有找到中文字体，使用默认字体
+                print("[WARN] 阵法破解：未找到中文字体，使用默认字体")
+                self.font_large = ImageFont.load_default()
+                self.font_medium = ImageFont.load_default()
+                self.font_small = ImageFont.load_default()
+                self.fonts = {'large': self.font_large, 'medium': self.font_medium, 'small': self.font_small}
+
+        except Exception as e:
+            # 全部使用默认字体
+            print(f"阵法破解字体加载异常: {e}")
+            self.font_large = ImageFont.load_default()
+            self.font_medium = ImageFont.load_default()
+            self.font_small = ImageFont.load_default()
+            self.fonts = {'large': self.font_large, 'medium': self.font_medium, 'small': self.font_small}
+
+        # 缓存加载的字体，供后续实例使用
+        if self.fonts:
+            CyberpunkHackingImageGenerator._cached_fonts = self.fonts
+            print(f"[OK] 阵法破解：字体已缓存")
 
     def generate_image(self, game) -> bytes:
         """生成游戏矩阵图片"""
