@@ -92,6 +92,16 @@ async def show_location_info(session: AsyncSession, player: Player, location, cu
     if quest_msg:
         info_text += "\n\n" + quest_msg
 
+    # 记录地点访问并检查成就
+    from ..achievement.achievement_service import AchievementService
+    location_key = f"{location.region}:{location.x}:{location.y}"
+    await AchievementService.add_visited_location(session, player.id, location_key)
+
+    # 检查探索类成就
+    achievement_messages = await AchievementService.check_achievements(session, player.id)
+    if achievement_messages:
+        info_text += "\n\n" + "\n\n".join(achievement_messages)
+
     await real_explore_cmd.finish(message_add_head(info_text, event))
 
 

@@ -178,6 +178,24 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
             arrival_msg += f"📍 当前坐标: ({rx},{ry})\n"
             arrival_msg += "✅ 导航任务已完成"
 
+            # 检查到达位置是否有地点，记录访问并检查成就
+            from .location_service import LocationService
+            from ..achievement.achievement_service import AchievementService
+
+            location = await LocationService.get_location_by_coordinates(
+                session, target_x, target_y, player.get_current_region()
+            )
+
+            if location:
+                # 记录地点访问
+                location_key = f"{location.region}:{location.x}:{location.y}"
+                await AchievementService.add_visited_location(session, player.id, location_key)
+
+                # 检查探索类成就
+                achievement_messages = await AchievementService.check_achievements(session, player.id)
+                if achievement_messages:
+                    arrival_msg += "\n\n" + "\n\n".join(achievement_messages)
+
             await nav_cmd.finish(message_add_head(arrival_msg, event))
 
         # 若未提供坐标 && 有导航，则只是查看进度（在诡域时展示现实坐标）
