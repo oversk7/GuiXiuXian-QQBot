@@ -180,6 +180,12 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
         if quest_completed and quest_msg:
             content += f"\n\n{quest_msg}"
 
+        # 检查财富类成就（查看面板时统一检查）
+        from ..achievement.achievement_service import AchievementService
+        achievement_msgs = await AchievementService.check_achievements(uow.session, player)
+        if achievement_msgs:
+            content += "\n\n" + "\n".join(achievement_msgs)
+
     # 使用平台格式化工具
     formatted_content = format_platform_message(content, event)
     await profile.finish(message_add_head(formatted_content, event))
