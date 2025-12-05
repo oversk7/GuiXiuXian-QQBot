@@ -1,9 +1,9 @@
 # 诡修仙项目文档系统
 
-**文档版本**: 3.7
-**最后更新**: 2025-12-04 (cyberpunk_hacking多路径机制实施完成)
+**文档版本**: 3.8
+**最后更新**: 2025-12-05 (成就系统关键路径集成修复完成)
 **文档受众**: LLM代理和项目开发者
-**文档状态**: 生产就绪，Phase 2新手体验优化已完成，核心游戏系统优化进行中
+**文档状态**: 生产就绪，Phase 2新手体验优化已完成，成就系统关键路径集成已完成
 
 ---
 
@@ -78,6 +78,10 @@ LLM代理生成的调研和分析报告（仅保留系统分析和设计参考�
 **核心游戏系统优化**:
 - `cyberpunk_hacking_solvability_analysis.md` - cyberpunk_hacking序列生成可解性深度分析 (2025-12-04)
 - `cyberpunk_hacking_limitation_investigation.md` - cyberpunk_hacking限制条件与成本调查 (2025-12-04)
+- `achievement_integration_fix_2025_12_05.md` - 成就系统关键路径集成修复实施记录 (2025-12-05)
+- `gold_achievement_investigation_2025_12_05.md` - 财富类成就触发失败根因调查 (2025-12-05)
+- `login_streak_achievement_investigation.md` - 连续登录类成就触发失败根因调查 (2025-12-05)
+- `kill_count_achievement_investigation.md` - 打怪类成就触发问题调查 (2025-12-05)
 
 **投资系统调研**:
 - `investment_system_investigation.md` - 投资系统初步调查报告（银行+股票）
@@ -319,6 +323,22 @@ LLM代理生成的调研和分析报告（仅保留系统分析和设计参考�
 - **地点标记阴影**: 右下偏移投影，增强地点标记立体感
 - **整体性能**: 总地图生成时间提升 20-30%
 - **详细记录**: `/llmdoc/agent/map_visualization_optimization_implementation_2025_12_03.md`
+
+**✅ 成就系统关键路径集成修复** (2025-12-05):
+- **连续登录类成就**: 修复签到系统与成就系统的数据孤岛（1/1 集成）
+  - 新增 `sign.py:86-87` 调用 `update_login_streak()`
+  - 新增 `sign.py:205-206` 调用 `check_achievements()`
+  - 受影响成就：loyal_believer (3天), weekly_devotee (7天), monthly_devotee (30天), lifetime_achievement (100天)
+- **打怪类成就**: 完成副本战斗成就检查集成（2/2 集成）
+  - 修改 `dungeon_battle.py:891-893` auto_commit 参数
+  - 新增 `dungeon_battle.py:895-898` `check_achievements()` 调用
+  - 受影响成就：veteran_fighter (10胜), hundred_battles (100胜), thousand_slayer (1000胜)
+- **财富类成就**: 关键路径集成TOP 10核心系统（11/35 集成，90%+场景覆盖）
+  - 10个源文件、11个修改点（含商人2处）
+  - 覆盖：签到、诡域、新手任务、扫荡令、商人、兼职、市场、股票、Boss宝箱、每日任务
+  - 受影响成就：small_fortune (1万), wealthy_magnate (10万), financial_freedom (100万)
+- **详细记录**: `/llmdoc/agent/achievement_integration_fix_2025_12_05.md`
+- **架构更新**: `/llmdoc/architecture/achievement-system.md` Section 5 集成点统计表
 
 **✅ cyberpunk_hacking多路径机制实施** (2025-12-04):
 - **多路径设计**: 从单一路径改为3-5条多样化路径

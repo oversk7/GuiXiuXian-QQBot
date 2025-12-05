@@ -76,8 +76,15 @@ async def handle_sign(event: MessageEvent):
         # 发放奖励
         player.gold += gold_reward
 
+        # 更新财富成就统计
+        from ..achievement.achievement_service import AchievementService
+        await AchievementService.update_stat(session, player.id, "gold_earned_total", increment=gold_reward, auto_commit=False)
+
         # 更新签到日期
         player.last_sign = now
+
+        # 更新连续登录成就统计
+        await AchievementService.update_login_streak(session, player.id)
 
         # 获取月卡权益
         from ..models.monthly_card import get_player_card_benefits
@@ -198,9 +205,18 @@ async def handle_sign(event: MessageEvent):
             await task_service.update_daily_task_completion_stats(player.id)
             guild_msg = f"\n🏰 公会奖励：积分+{points_reward} 公会经验+{guild_exp_gained}"
 
+        # 检查并解锁成就
+        achievement_msgs = await AchievementService.check_achievements(session, player)
+
         # 先提交数据库事务，确保数据保存成功
         await session.commit()
 
-        # 然后发送响应消息
-        await sign.send(
-            f"🛞{player.nickname}[{player.uid}] 连续签到 {streak} 天！获得 {base_reward} 金币！\n{lucky_msg}{bonus_msg}{stamina_msg}{monthly_card_msg}{sweep_token_msg}{vip_medal_msg}{new_msg}{guild_msg}")
+        # 构建响应消息
+        response_msg = f"🛞{player.nickname}[{player.uid}] 连续签到 {streak} 天！获得 {base_reward} 金币！\n{lucky_msg}{bonus_msg}{stamina_msg}{monthly_card_msg}{sweep_token_msg}{vip_medal_msg}{new_msg}{guild_msg}"
+
+        # 附加成就解锁消息
+        if achievement_msgs:
+            response_msg += "\n\n" + "\n".join(achievement_msgs)
+
+        # 发送响应消息
+        await sign.send(response_msg)

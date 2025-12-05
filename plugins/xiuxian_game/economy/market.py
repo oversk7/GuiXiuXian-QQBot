@@ -950,6 +950,9 @@ async def _try_auto_match(session, new_order: MarketOrder, player: Player, same_
 
         # 金币给卖家（扣除税收）
         seller.gold += trade_amount - tax
+        # 更新财富成就统计
+        from ..achievement.achievement_service import AchievementService
+        await AchievementService.update_stat(session, seller.id, "gold_earned_total", increment=trade_amount - tax, auto_commit=False)
 
         # 更新对手单
         opp.quantity -= trade_qty

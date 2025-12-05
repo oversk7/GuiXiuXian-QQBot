@@ -241,6 +241,9 @@ class DailyTaskService:
         # 金币奖励
         if task.gold_reward > 0:
             player.gold += task.gold_reward
+            # 更新财富成就统计
+            from ..achievement.achievement_service import AchievementService
+            await AchievementService.update_stat(session, player.id, "gold_earned_total", increment=task.gold_reward, auto_commit=False)
             rewards_given["gold"] = task.gold_reward
 
         # 积分奖励（无论是否有公会都给予）

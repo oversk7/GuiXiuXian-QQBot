@@ -297,6 +297,9 @@ class NoviceQuestService:
         # 金币奖励
         if "gold" in rewards and rewards["gold"] > 0:
             player.gold += rewards["gold"]
+            # 更新财富成就统计
+            from ..achievement.achievement_service import AchievementService
+            await AchievementService.update_stat(session, player.id, "gold_earned_total", increment=rewards["gold"], auto_commit=False)
             reward_parts.append(f"金币+{rewards['gold']}")
 
         # 属性点奖励

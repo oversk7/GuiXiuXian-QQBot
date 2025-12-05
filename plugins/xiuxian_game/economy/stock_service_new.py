@@ -240,6 +240,9 @@ class StockService:
         else:
             # 添加到现金
             player.gold += net_proceeds
+            # 更新财富成就统计
+            from ..achievement.achievement_service import AchievementService
+            await AchievementService.update_stat(session, player_id, "gold_earned_total", increment=net_proceeds, auto_commit=False)
             await self._player_repo.update(player)
 
         # 记录交易

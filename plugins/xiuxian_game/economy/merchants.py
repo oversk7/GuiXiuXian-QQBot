@@ -670,6 +670,9 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
 
         # 更新玩家金币和市场状态
         player.gold += total_gain + bonus
+        # 更新财富成就统计
+        from ..achievement.achievement_service import AchievementService
+        await AchievementService.update_stat(session, player.id, "gold_earned_total", increment=total_gain + bonus, auto_commit=False)
         market_state.apply_sale(qty)
 
         # 记录交易
@@ -822,6 +825,9 @@ async def _(event: MessageEvent):
 
         # 更新玩家金币
         player.gold += total_gain + total_bonus
+        # 更新财富成就统计
+        from ..achievement.achievement_service import AchievementService
+        await AchievementService.update_stat(session, player.id, "gold_earned_total", increment=total_gain + total_bonus, auto_commit=False)
         session.add(player)
         await session.commit()
 

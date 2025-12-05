@@ -189,13 +189,56 @@ elif condition_type == "account_age":
 
 ## 5. Integration Points
 
-**已集成的命令处理器** (Phase 2完成):
+### 5.1 已完整集成的统计追踪
+
+**修炼类成就** (100% 集成):
 1. `cultivate/core.py:120` - 修炼后更新 `cultivation_count`
-2. `world/attack_command.py:85,90` - 战斗后更新 `total_wins` 和 `total_kills`
-3. `models/inventory.py:150` - 获得装备时更新 `equipment_obtained`
-4. （待实现）登录检查点 - 更新 `consecutive_login_days`
-5. （待实现）金币获取点 - 更新 `gold_earned_total`
-6. （待实现）地点探索 - 更新 `locations_visited`
+
+**战斗类成就** (100% 集成):
+2. `world/attack_command.py:734-736` - PVP战斗后更新 `total_battles`, `total_wins`, `total_kills`
+3. `world/dungeon_battle.py:891-893` - 副本战斗后更新 `total_battles`, `total_wins`, `total_kills`
+4. `world/dungeon_battle.py:895-898` - 副本战斗后检查成就（新增 2025-12-05）
+
+**装备类成就** (100% 集成):
+5. `models/inventory.py:150` - 获得装备时更新 `equipment_obtained`
+
+**连续登录类成就** (100% 集成，新增 2025-12-05):
+6. `entertainment/sign.py:86-87` - 签到后更新 `consecutive_login_days` 和 `total_login_days`
+7. `entertainment/sign.py:205-206` - 签到后检查并触发成就
+
+**财富类成就** (31% 集成，关键路径，新增 2025-12-05):
+8. `entertainment/sign.py:79-81` - 每日签到金币 (200-500)
+9. `world/dungeon_battle.py:775-777` - 诡域宝藏金币 (100-2000)
+10. `quest/novice_quest_service.py:300-302` - 新手任务金币 (500-5000)
+11. `item/sweep_dungeon_service.py:199-201` - 扫荡令金币 (大量)
+12. `economy/merchants.py:673-675` - 商人出售物品金币（高频）
+13. `economy/merchants.py:828-830` - 批量出售物品金币（高频）
+14. `economy/part_time_job_service_new.py:413-415` - 兼职结算金币 (100-1000)
+15. `economy/market.py:953-955` - 市场交易金币 (用户交易)
+16. `economy/stock_service_new.py:243-245` - 股票卖出收益 (可变)
+17. `item/world_boss_chest_service.py:186-188` - Boss宝箱金币 (高频)
+18. `daily_task/service_new.py:244-246` - 每日任务金币 (300-1000)
+
+### 5.2 待实现的统计追踪
+
+**探索类成就** (0% 集成):
+- （待实现）`locations_visited` - 地点探索统计
+
+**其他低频成就** (部分集成):
+- 小游戏胜利 (5处，低频，暂未集成)
+- 邀请新人 (2处，低频，暂未集成)
+- 管理员操作 (3处，特殊权限，暂未集成)
+
+### 5.3 集成覆盖率统计
+
+| 成就类型 | 触发点总数 | 已集成点数 | 覆盖率 | 玩家场景覆盖 |
+|---------|----------|----------|-------|-----------|
+| 修炼成就 | 1 | 1 | 100% | 100% |
+| 战斗成就 | 2 | 2 | 100% | 100% |
+| 装备成就 | 1 | 1 | 100% | 100% |
+| 连续登录 | 1 | 1 | 100% | 100% |
+| **财富成就** | **35** | **11** | **31%** | **90%+** |
+| 探索成就 | N | 0 | 0% | 0% |
 
 ## 6. API Reference
 

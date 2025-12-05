@@ -772,6 +772,9 @@ async def _handle_treasure(session, tile: WorldTile, player: Player) -> str:
     multiplier = 1 + luck_prob(player.luck)  # 1~2 倍区间
     gold_gain = int(base_gold * multiplier)
     player.gold += gold_gain
+    # 更新财富成就统计
+    from ..achievement.achievement_service import AchievementService
+    await AchievementService.update_stat(session, player.id, "gold_earned_total", increment=gold_gain, auto_commit=False)
     tile.state["looted"] = True
     session.add_all([player, tile])
     await session.flush()
@@ -890,7 +893,12 @@ async def _handle_personal_monster(session, tile: WorldTile, player: Player) -> 
         from ..achievement.achievement_service import AchievementService
         await AchievementService.update_stat(session, player.id, "total_battles", auto_commit=False)
         await AchievementService.update_stat(session, player.id, "total_wins", auto_commit=False)
-        await AchievementService.update_stat(session, player.id, "total_kills", auto_commit=True)
+        await AchievementService.update_stat(session, player.id, "total_kills", auto_commit=False)
+
+        # 检查并解锁成就
+        achievement_msgs = await AchievementService.check_achievements(session, player)
+        if achievement_msgs:
+            battle_summary.extend([""] + achievement_msgs)
 
         # 结算"斩龙闪"的战后效果，保持与战斗日志一致（修复 Bug3/1）
         try:
