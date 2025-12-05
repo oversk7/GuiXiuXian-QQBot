@@ -149,20 +149,22 @@ class ArrayBreakingGame:
 
     def _place_answer_on_paths(self, paths: List[List[Tuple[int, int]]], optimal_sequence: List[str]):
         """在答案路径上精确放置符文（确保100%有解）"""
-        for path in paths:
+        # 所有路径都强制完整放置（确保多条答案路径）
+        for path_idx, path in enumerate(paths):
             for i, (row, col) in enumerate(path):
                 if i >= len(optimal_sequence):
                     break
 
                 rune = optimal_sequence[i]
 
-                # 强制放置符文（确保答案路径完整）
-                if self.matrix[row][col] == "":
+                # 第一条路径强制放置
+                if path_idx == 0:
                     self.matrix[row][col] = rune
-                elif self.matrix[row][col] != rune:
-                    # 位置已被占用但符文不同，优先保留第一条路径的符文
-                    # 但至少保证有一条完整路径
-                    pass
+                else:
+                    # 其他路径：如果位置为空或已有相同符文，则放置
+                    if self.matrix[row][col] == "" or self.matrix[row][col] == rune:
+                        self.matrix[row][col] = rune
+                    # 如果位置已有不同符文，跳过（避免破坏第一条路径）
 
     def _fill_interference_runes(self):
         """填充干扰符文（目标符文+随机符文混合）"""
@@ -176,7 +178,7 @@ class ArrayBreakingGame:
         # 创建干扰符文池（所有符文）
         interference_pool = self.code_chars.copy()
 
-        # 填充所有空位
+        # 填充所有空位（注意：已有符文的位置不覆盖，保护答案路径）
         for row in range(self.size):
             for col in range(self.size):
                 if self.matrix[row][col] == "":
