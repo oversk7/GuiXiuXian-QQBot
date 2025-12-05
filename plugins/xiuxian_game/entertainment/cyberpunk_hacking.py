@@ -416,9 +416,10 @@ async def handle_array_breaking(event: MessageEvent, args: Message = CommandArg(
         image_b64 = base64.b64encode(image_bytes).decode()
 
         # 发送图片和说明
-        msg_text = f"🎮 已开始{difficulty_text}阵法\n💡 输入【阵法破解 行号 列号】选择符文"
-        await array_breaking.send(message_add_head(msg_text, event))
-        await array_breaking.finish(MessageSegment.image(f"base64://{image_b64}"))
+        img = MessageSegment.file_image(image_b64)
+        text_msg = message_add_head(f"🎮 已开始{difficulty_text}阵法\n💡 输入【阵法破解 行号 列号】选择符文", event)
+        msg = Message(text_msg).append(img)
+        await array_breaking.finish(msg)
 
     # 放弃游戏
     if args_text == "放弃":
@@ -494,4 +495,7 @@ async def handle_array_breaking(event: MessageEvent, args: Message = CommandArg(
     # 游戏继续，显示当前状态（图片形式）
     image_bytes = game.get_status_image()
     image_b64 = base64.b64encode(image_bytes).decode()
-    await array_breaking.finish(MessageSegment.image(f"base64://{image_b64}"))
+    img = MessageSegment.file_image(image_b64)
+    text_msg = message_add_head("", event)
+    msg = Message(text_msg).append(img)
+    await array_breaking.finish(msg)
