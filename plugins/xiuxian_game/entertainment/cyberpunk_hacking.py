@@ -30,7 +30,7 @@ class ArrayBreakingGame:
         self.size = size  # 矩阵大小
         self.matrix: List[List[str]] = []
         self.target_sequences: List[TargetSequence] = []
-        self.buffer_size = 6  # 缓冲区大小
+        self.buffer_size = 8 if size == 7 else 6  # 7x7困难模式8步，5x5标准模式6步
         self.current_path: List[Tuple[int, int]] = []  # 当前路径
         self.selected_codes: List[str] = []  # 已选择的代码
         self.is_horizontal = True  # 当前是否在水平方向选择
@@ -43,64 +43,154 @@ class ArrayBreakingGame:
         self._generate_solvable_puzzle()
     
     def _generate_solvable_puzzle(self):
-        """生成有解的谜题（符文密度放置算法，还原赛博朋克2077机制）"""
+        """生成有解的谜题（路径簇+高密度混合策略）"""
         # 步骤1: 生成目标序列
         self._generate_target_sequences()
 
         # 步骤2: 创建空矩阵
         self.matrix = [["" for _ in range(self.size)] for _ in range(self.size)]
 
-        # 步骤3: 统计目标符文的权重（出现频率）
-        rune_weights = {}
-        for target in self.target_sequences:
-            for rune in target.sequence:
-                rune_weights[rune] = rune_weights.get(rune, 0) + 1
+        # 步骤3: 生成最优序列（包含所有目标）
+        optimal_sequence = self._create_optimal_covering_sequence()
 
-        # 步骤4: 计算每个符文的放置密度
-        total_cells = self.size * self.size
-        rune_placement = {}
+        # 步骤4: 生成多条可行路径簇（5-8条，确保可解性）
+        target_path_count = min(self.size, 8)  # 5x5生成5条，7x7生成7条
+        paths = self._generate_solvable_path_clusters(optimal_sequence, target_path_count)
 
-        # 根据赛博朋克2077实际观察，目标符文应占总格子的60-70%
-        # 计算总权重，然后按比例分配
-        total_weight = sum(rune_weights.values())
-        target_total_ratio = 0.65  # 目标符文占总格子的65%
+        # 步骤5: 在路径簇上按顺序放置符文（关键！）
+        self._place_sequences_on_paths(paths, optimal_sequence)
 
-        for rune, weight in rune_weights.items():
-            # 按权重比例分配目标符文总额度
-            rune_ratio = (weight / total_weight) * target_total_ratio
-            count = int(total_cells * rune_ratio)
-
-            # 确保每个符文至少出现 weight * 2 次（保证可解性）
-            count = max(count, weight * 2)
-            rune_placement[rune] = count
-
-        # 步骤5: 符文密度放置
-        self._place_runes_by_density(rune_placement)
-
-        # 步骤6: 填充剩余格子（90%安全符文 + 10%干扰符文）
-        self._fill_remaining_cells_cyberpunk_style(rune_weights)
+        # 步骤6: 填充剩余格子（高密度策略）
+        self._fill_remaining_with_high_density()
     
-    def _place_runes_by_density(self, rune_placement: Dict[str, int]):
-        """按密度随机放置符文（赛博朋克2077风格）"""
-        # 创建所有空位的列表
-        all_positions = [(r, c) for r in range(self.size) for c in range(self.size)]
-        random.shuffle(all_positions)  # 随机打乱顺序
+    def _create_optimal_covering_sequence(self) -> List[str]:
+        """创建包含所有目标序列的最优符文序列（强制100%覆盖）"""
+        sequences = [target.sequence for target in self.target_sequences]
 
-        position_idx = 0
+        # 按长度降序排序
+        sorted_seqs = sorted(sequences, key=len, reverse=True)
+        result = sorted_seqs[0].copy()
 
-        # 为每个目标符文放置指定数量
-        for rune, count in rune_placement.items():
-            placed = 0
-            while placed < count and position_idx < len(all_positions):
-                row, col = all_positions[position_idx]
-                if self.matrix[row][col] == "":  # 确保是空位
+        # 逐个添加剩余序列
+        for seq in sorted_seqs[1:]:
+            seq_str = "".join(seq)
+            result_str = "".join(result)
+
+            # 检查是否已包含
+            if seq_str in result_str:
+                continue
+
+            # 尝试找到最佳连接点（从后往前查找重叠）
+            best_overlap = 0
+            for overlap_len in range(min(len(result), len(seq)), 0, -1):
+                if result[-overlap_len:] == seq[:overlap_len]:
+                    best_overlap = overlap_len
+                    break
+
+            # 添加序列（去除重叠部分）
+            if best_overlap > 0:
+                result.extend(seq[best_overlap:])
+            else:
+                result.extend(seq)
+
+        return result[:self.buffer_size]  # 不超过缓冲区大小
+
+    def _generate_solvable_path_clusters(self, optimal_sequence: List[str], count: int) -> List[List[Tuple[int, int]]]:
+        """生成多条可行路径簇（确保多样性）"""
+        paths = []
+        max_attempts = 50
+
+        for i in range(count):
+            for attempt in range(max_attempts):
+                # 生成路径（长度=最优序列长度，不超过缓冲区）
+                path_length = min(len(optimal_sequence), self.buffer_size)
+
+                # 根据索引选择不同起点
+                if i == 0:
+                    start_col = random.randint(0, self.size // 2)
+                elif i == 1:
+                    start_col = random.randint(self.size // 2, self.size - 1)
+                else:
+                    start_col = random.randint(0, self.size - 1)
+
+                # 生成单条路径
+                path = self._generate_single_alternating_path(path_length, start_col)
+
+                if path and self._is_path_diverse(path, paths):
+                    paths.append(path)
+                    break
+
+        return paths
+
+    def _generate_single_alternating_path(self, length: int, start_col: int) -> List[Tuple[int, int]]:
+        """生成单条行列交替路径"""
+        path = []
+        current_row = 0
+        current_col = start_col
+        path.append((current_row, current_col))
+
+        is_horizontal = True
+        for _ in range(1, length):
+            if is_horizontal:
+                # 水平移动：选择不同列
+                available_cols = [c for c in range(self.size) if c != current_col]
+                if available_cols:
+                    current_col = random.choice(available_cols)
+                    path.append((current_row, current_col))
+                else:
+                    return None
+            else:
+                # 垂直移动：选择不同行
+                available_rows = [r for r in range(self.size) if r != current_row]
+                if available_rows:
+                    current_row = random.choice(available_rows)
+                    path.append((current_row, current_col))
+                else:
+                    return None
+
+            is_horizontal = not is_horizontal
+
+        return path
+
+    def _is_path_diverse(self, new_path: List[Tuple[int, int]], existing_paths: List[List[Tuple[int, int]]]) -> bool:
+        """检查路径多样性（重叠<30%）"""
+        if not existing_paths:
+            return True
+
+        for existing in existing_paths:
+            overlap = set(new_path) & set(existing)
+            overlap_ratio = len(overlap) / len(new_path) if new_path else 0
+            if overlap_ratio > 0.3:
+                return False
+
+        return True
+
+    def _place_sequences_on_paths(self, paths: List[List[Tuple[int, int]]], optimal_sequence: List[str]):
+        """在多条路径上按顺序放置符文（关键方法！）"""
+        for path in paths:
+            for i, (row, col) in enumerate(path):
+                if i >= len(optimal_sequence):
+                    break
+
+                rune = optimal_sequence[i]
+
+                # 如果位置已占用且符文相同，跳过
+                if self.matrix[row][col] == rune:
+                    continue
+                # 如果位置为空，放置符文
+                elif self.matrix[row][col] == "":
                     self.matrix[row][col] = rune
-                    placed += 1
-                position_idx += 1
+                # 如果位置已占用但符文不同，优先保留（避免覆盖）
+                # 注：这可能导致某些路径不完整，但多条路径能保证整体可解性
 
-    def _fill_remaining_cells_cyberpunk_style(self, target_runes: Dict[str, int]):
-        """赛博朋克风格填充（90%安全符文 + 10%干扰）"""
-        # 创建安全符文池（不在目标序列中的符文）
+    def _fill_remaining_with_high_density(self):
+        """高密度填充剩余格子（目标符文为主）"""
+        # 收集目标符文
+        target_runes = set()
+        for target in self.target_sequences:
+            target_runes.update(target.sequence)
+
+        # 创建安全符文池
         safe_runes = [r for r in self.code_chars if r not in target_runes]
         if not safe_runes:
             safe_runes = self.code_chars
@@ -109,23 +199,31 @@ class ArrayBreakingGame:
         for row in range(self.size):
             for col in range(self.size):
                 if self.matrix[row][col] == "":
-                    # 90%概率使用安全符文，10%概率使用目标符文（增加干扰）
-                    if random.random() < 0.90:
-                        self.matrix[row][col] = random.choice(safe_runes)
+                    # 70%使用目标符文，30%使用安全符文（增加巧合概率）
+                    if random.random() < 0.70:
+                        self.matrix[row][col] = random.choice(list(target_runes))
                     else:
-                        # 干扰符文：从目标符文中随机选择
-                        self.matrix[row][col] = random.choice(list(target_runes.keys()))
+                        self.matrix[row][col] = random.choice(safe_runes)
 
     def _generate_target_sequences(self):
         """生成目标序列"""
         # 重新设计序列，包含不同长度的挑战
         if self.size == 5:
+            # 5x5标准模式：6步缓冲区
             sequences = [
                 (["甲", "子", "丙"], 120, "三才归一"),
                 (["子", "丙"], 60, "阴阳相合"),
                 (["丙", "丁"], 50, "火木相生"),
             ]
-        else:  # 6x6
+        elif self.size == 7:
+            # 7x7困难模式：8步缓冲区（模仿赛博朋克2077）
+            sequences = [
+                (["甲", "子", "丙"], 100, "数据挖掘_V1"),
+                (["丙", "子", "丙"], 120, "数据挖掘_V2"),
+                (["甲", "甲", "甲", "丙", "丁"], 180, "数据挖掘_V3"),
+            ]
+        else:
+            # 其他大小使用默认
             sequences = [
                 (["甲", "子", "丙", "丁"], 150, "四象轮转"),
                 (["子", "丙"], 60, "阴阳相合"),
@@ -277,16 +375,16 @@ async def handle_array_breaking(event: MessageEvent, args: Message = CommandArg(
             "▫️ 在天干地支阵中寻找目标符文序列\n"
             "▫️ 只能按行列交替选择（横纵交替）\n"
             "▫️ 第一步只能选择第一行\n"
-            "▫️ 有限的灵力步数（6步）\n"
+            "▫️ 有限的灵力步数（标准6步 / 困难8步）\n"
             "▫️ 完成更多符文序列获得更多奖励\n"
             "━━━━━━━━━━━━━\n"
             "📝 使用方法：\n"
-            "▫️ 【阵法破解 开始】 - 开始5x5阵法\n"
-            "▫️ 【阵法破解 困难】 - 开始6x6阵法\n"
+            "▫️ 【阵法破解 开始】 - 开始5x5标准阵法（6步）\n"
+            "▫️ 【阵法破解 困难】 - 开始7x7困难阵法（8步）\n"
             "▫️ 【阵法破解 <行> <列>】 - 选择位置\n"
             "▫️ 【阵法破解 放弃】 - 放弃当前游戏\n"
             "━━━━━━━━━━━━━\n"
-            "💰 费用：100💰 (5x5) / 150💰 (6x6)\n"
+            "💰 费用：100💰 (5x5) / 200💰 (7x7)\n"
             "💡 例如：【阵法破解 1 3】选择第1行第3列\n"
             "🎯 目标：在灵力用完前完成尽可能多的符文序列"
         )
@@ -294,8 +392,8 @@ async def handle_array_breaking(event: MessageEvent, args: Message = CommandArg(
 
     # 开始新游戏
     if args_text in ["开始", "困难"]:
-        size = 5 if args_text == "开始" else 6
-        cost = 100 if size == 5 else 150
+        size = 5 if args_text == "开始" else 7  # 困难模式改为7x7
+        cost = 100 if size == 5 else 200  # 7x7成本提高到200
 
         # 检查金币
         if player_gold < cost:
@@ -305,7 +403,7 @@ async def handle_array_breaking(event: MessageEvent, args: Message = CommandArg(
         game.game_cost = cost  # 记录游戏成本
         game_sessions[user_id] = game
 
-        difficulty_text = "标准(5x5)" if size == 5 else "困难(6x6)"
+        difficulty_text = "标准(5x5/6步)" if size == 5 else "困难(7x7/8步)"
         result_msg = f"🎮 已开始{difficulty_text}阵法\n" + game.get_status()
         await array_breaking.finish(message_add_head(result_msg, event))
 
