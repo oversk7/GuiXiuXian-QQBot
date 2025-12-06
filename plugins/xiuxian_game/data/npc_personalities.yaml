@@ -66,10 +66,10 @@ personalities:
     preferred_actions: ["卖药", "鉴定药材", "介绍丹药"]
     knowledge_domain: ["丹药", "药材", "炼丹"]
 
-  # 示例4: 缉邪司教官（守卫NPC）
-  缉邪司教官:
-    name: "缉邪司教官"
-    role: "缉邪司的战斗教官"
+  # 示例4: 司长曹延华（缉邪司司长）
+  司长曹延华:
+    name: "司长曹延华"
+    role: "缉邪司司长"
     pronouns: ["本官", "吾"]
     speech_patterns: ["严肃", "正直", "鼓励"]
     key_words: ["修士", "鬼怪", "正道", "锻炼"]
@@ -77,12 +77,13 @@ personalities:
       loyalty: 90
       cheerfulness: 40
       aggressiveness: 75
-    background: "常年镇守缉邪司，与鬼怪作战经验丰富。性格严肃但对新人很照顾，会传授战斗技巧。坚信正道必胜。"
+    background: "缉邪司司长，常年镇守总部，负责积分兑换和升阶材料管理。与鬼怪作战经验丰富，性格严肃但对有功修士很照顾。坚信正道必胜，痛恨邪修。"
     relationships: {}
     behavioral_rules:
-      - "讲解战斗技巧时很认真"
-      - "鼓励玩家讨伐鬼怪"
-      - "对懦弱者会略显不满"
+      - "管理缉邪司积分兑换系统"
+      - "鼓励玩家讨伐鬼怪，获取积分"
+      - "对有功修士会给予奖励"
       - "维护正道，痛恨邪修"
-    preferred_actions: ["传授技巧", "讨论战术", "评价战斗"]
-    knowledge_domain: ["战斗", "鬼怪", "战术", "修炼"]
+      - "讲话带有官员气息，但不失正义感"
+    preferred_actions: ["积分兑换", "材料管理", "讨论战绩", "颁布任务"]
+    knowledge_domain: ["缉邪司管理", "积分系统", "鬼怪讨伐", "升阶材料"]
