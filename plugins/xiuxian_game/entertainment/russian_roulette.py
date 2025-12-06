@@ -1092,13 +1092,14 @@ async def handle_room_status(event: MessageEvent):
                 status_lines.extend([
                     "━━━━━━━━━━━━━",
                     "🎮 游戏状态：",
+                    f"🔄 第 {game.current_round} 轮",
                     f"❤️ {player1.nickname}: {'❤️' * game.player1_hp}{'🖤' * (room.max_hp - game.player1_hp)}",
                     f"❤️ {player2.nickname}: {'❤️' * game.player2_hp}{'🖤' * (room.max_hp - game.player2_hp)}"
                 ])
 
                 # 显示当前回合
                 current_player = await session.get(Player, game.current_player_id)
-                status_lines.append(f"🎯 当前回合：{current_player.nickname}")
+                status_lines.append(f"🎯 当前行动：{current_player.nickname}")
 
                 # 显示剩余弹药（不显示具体实弹和空包弹数量，防止逆转器漏洞）
                 bullets = json.loads(game.bullets)

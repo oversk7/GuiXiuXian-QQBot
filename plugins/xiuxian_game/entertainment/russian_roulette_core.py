@@ -401,9 +401,13 @@ class RussianRouletteCore:
             player1_name = "玩家1"
             player2_name = "玩家2"
 
+        # 获取当前轮数
+        current_round = game_state.get("current_round", 1)
+
         # 构建显示
         display = [
             "🎮 恶魔轮盘赌",
+            f"🔄 第 {current_round} 轮",
             "━━━━━━━━━━━━━",
             f"🔫 剩余弹药：{total_remaining}发",
         ]
