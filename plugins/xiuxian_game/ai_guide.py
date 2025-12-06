@@ -67,6 +67,59 @@ async def call_zhipu_api(messages, model="GLM-4.5-Flash", timeout=30):
     except aiohttp.ClientError as e:
         raise aiohttp.ClientError(f"网络请求失败: {str(e)}")
 
+
+async def call_302ai_api(messages, model="gpt-3.5-turbo", timeout=30):
+    """调用302.ai API（异步版本，OpenAI兼容接口）"""
+    from .config import config
+
+    # 从配置文件读取API密钥
+    ai_config = config.game_config.get("ai_dialogue", {})
+    ai302_config = ai_config.get("ai302", {})
+    api_key = ai302_config.get("api_key", "")
+
+    if not api_key:
+        raise ValueError("302.ai API密钥未配置，请在config.yaml中配置 ai_dialogue.ai302.api_key")
+
+    url = "https://api.302.ai/v1/chat/completions"
+
+    headers = {
+        "Accept": "application/json",
+        "Authorization": f"Bearer {api_key}",
+        "Content-Type": "application/json"
+    }
+
+    # 处理messages格式（确保兼容OpenAI格式）
+    formatted_messages = []
+    for msg in messages:
+        formatted_messages.append({
+            "role": msg.get("role", "user"),
+            "content": msg.get("content", "")
+        })
+
+    data = {
+        "model": model,
+        "messages": formatted_messages
+    }
+
+    try:
+        async with aiohttp.ClientSession(timeout=aiohttp.ClientTimeout(total=timeout)) as session:
+            async with session.post(url, headers=headers, json=data) as response:
+                if response.status == 200:
+                    return await response.json()
+                else:
+                    response_text = await response.text()
+                    raise aiohttp.ClientResponseError(
+                        request_info=response.request_info,
+                        history=response.history,
+                        status=response.status,
+                        message=f"302.ai API调用失败: {response.status}, {response_text}"
+                    )
+    except asyncio.TimeoutError:
+        raise TimeoutError(f"302.ai API调用超时（{timeout}秒）")
+    except aiohttp.ClientError as e:
+        raise aiohttp.ClientError(f"302.ai 网络请求失败: {str(e)}")
+
+
 # 数据库表结构信息，用于AI理解（优化版：专注玩家面板数据）
 DATABASE_SCHEMA = """
 数据库核心表：player表（玩家面板数据，共87个字段）

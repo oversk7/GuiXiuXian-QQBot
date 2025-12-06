@@ -22,9 +22,16 @@ class AIDialogueService:
         # AI配置
         self.provider = ai_config.get("provider", "zhipu")
         self.zhipu_config = ai_config.get("zhipu", {})
+        self.ai302_config = ai_config.get("ai302", {})
         self.max_tokens = self.zhipu_config.get("max_tokens", 300)
         self.temperature = self.zhipu_config.get("temperature", 0.1)
         self.timeout = self.zhipu_config.get("timeout", 30)
+
+        # 降级策略配置
+        fallback_config = ai_config.get("fallback", {})
+        self.fallback_enabled = fallback_config.get("enabled", True)
+        self.fallback_provider = fallback_config.get("fallback_provider", "ai302")
+        self.max_retries = fallback_config.get("max_retries", 1)
 
         # 对话历史配置
         history_config = ai_config.get("history", {})
@@ -77,17 +84,13 @@ class AIDialogueService:
 请以{npc.name}的身份回复这个问题。
 """
 
-            # 调用智谱AI
+            # 调用AI（支持fallback降级）
             messages = [
                 {"role": "system", "content": system_prompt},
                 {"role": "user", "content": user_message}
             ]
 
-            result = await call_zhipu_api(
-                messages,
-                model=self.zhipu_config.get("model", "GLM-4.5-Flash"),
-                timeout=self.timeout
-            )
+            result = await self._call_ai_with_fallback(messages)
 
             # 提取回复内容
             response = result['choices'][0]['message']['content'].strip()
@@ -158,17 +161,13 @@ class AIDialogueService:
 请以{npc.name}的身份，用角色扮演的方式回复这个指令的执行结果。
 """
 
-            # 调用智谱AI
+            # 调用AI（支持fallback降级）
             messages = [
                 {"role": "system", "content": system_prompt},
                 {"role": "user", "content": user_message}
             ]
 
-            result = await call_zhipu_api(
-                messages,
-                model=self.zhipu_config.get("model", "GLM-4.5-Flash"),
-                timeout=self.timeout
-            )
+            result = await self._call_ai_with_fallback(messages)
 
             # 提取回复内容
             response = result['choices'][0]['message']['content'].strip()
@@ -253,3 +252,91 @@ class AIDialogueService:
         # 成本 = (tokens_used / 1000000) * 0.1元 * 100分
         cost_cents = int((tokens_used / 1000000) * 0.1 * 100)
         return max(cost_cents, 1)  # 最少1分
+
+    async def _call_ai_with_fallback(self, messages: list, provider: str = None) -> dict:
+        """
+        调用AI API并支持fallback降级机制
+
+        Args:
+            messages: 对话消息列表
+            provider: 指定provider（None则使用默认）
+
+        Returns:
+            AI API返回结果
+
+        Raises:
+            Exception: 所有provider均失败时抛出异常
+        """
+        from ..ai_guide import call_zhipu_api, call_302ai_api
+
+        # 确定主provider
+        primary_provider = provider or self.provider
+        errors = []
+
+        # 尝试主provider
+        try:
+            if primary_provider == "zhipu":
+                logger.info(f"[AIDialogue] 使用智谱AI调用...")
+                result = await call_zhipu_api(
+                    messages,
+                    model=self.zhipu_config.get("model", "GLM-4-Flash-250414"),
+                    timeout=self.timeout
+                )
+                logger.info(f"[AIDialogue] 智谱AI调用成功")
+                return result
+            elif primary_provider == "ai302":
+                logger.info(f"[AIDialogue] 使用302.ai调用...")
+                result = await call_302ai_api(
+                    messages,
+                    model=self.ai302_config.get("model", "gpt-3.5-turbo"),
+                    timeout=self.timeout
+                )
+                logger.info(f"[AIDialogue] 302.ai调用成功")
+                return result
+            else:
+                raise ValueError(f"不支持的provider: {primary_provider}")
+
+        except Exception as e:
+            error_msg = f"{primary_provider} 调用失败: {type(e).__name__}: {str(e)}"
+            logger.warning(f"[AIDialogue] {error_msg}")
+            errors.append(error_msg)
+
+            # 如果fallback未启用，直接抛出异常
+            if not self.fallback_enabled:
+                raise
+
+            # 尝试fallback provider
+            try:
+                fallback = self.fallback_provider
+                if fallback == primary_provider:
+                    # fallback provider与主provider相同，直接抛出异常
+                    raise Exception(f"主provider和fallback provider相同，无法降级")
+
+                logger.warning(f"[AIDialogue] 尝试降级到备用provider: {fallback}")
+
+                if fallback == "zhipu":
+                    result = await call_zhipu_api(
+                        messages,
+                        model=self.zhipu_config.get("model", "GLM-4-Flash-250414"),
+                        timeout=self.timeout
+                    )
+                    logger.info(f"[AIDialogue] 备用provider {fallback} 调用成功")
+                    return result
+                elif fallback == "ai302":
+                    result = await call_302ai_api(
+                        messages,
+                        model=self.ai302_config.get("model", "gpt-3.5-turbo"),
+                        timeout=self.timeout
+                    )
+                    logger.info(f"[AIDialogue] 备用provider {fallback} 调用成功")
+                    return result
+                else:
+                    raise ValueError(f"不支持的fallback provider: {fallback}")
+
+            except Exception as fallback_error:
+                fallback_error_msg = f"{fallback} 调用失败: {type(fallback_error).__name__}: {str(fallback_error)}"
+                logger.error(f"[AIDialogue] {fallback_error_msg}")
+                errors.append(fallback_error_msg)
+
+                # 所有provider都失败，抛出综合异常
+                raise Exception(f"所有AI provider均失败: {'; '.join(errors)}")

@@ -32,6 +32,7 @@ from . import (
     fishing,
     admin,  # 管理员功能（包含抽奖系统）
     achievement,  # 成就系统
+    dialogue,  # NPC AI对话系统（包含管理员命令）
 )
 
 driver = get_driver()
