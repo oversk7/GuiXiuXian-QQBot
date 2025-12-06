@@ -460,11 +460,14 @@ async def handle_ai_dialogue_interaction(session, player: Player, npc, event: Me
         question: 玩家的问题/对话内容（可选，默认为打招呼）
     """
     import time
+    import logging
     from ..dialogue.ai_dialogue_service import AIDialogueService
     from ..dialogue.npc_favorability_service import NPCFavorabilityService
     from ..dialogue.npc_personality import PersonalityManager
     from ..infrastructure.repositories.npc_dialogue_history_repository import NPCDialogueHistoryRepository
     from ..models.npc_dialogue_history import NPCDialogueHistory
+
+    logger = logging.getLogger(__name__)
 
     start_time = time.time()
 
@@ -502,13 +505,23 @@ async def handle_ai_dialogue_interaction(session, player: Player, npc, event: Me
             limit=10
         )
 
-        # 构建上下文
+        # 分析玩家对话的情感
+        sentiment = fav_service.analyze_dialogue_sentiment(question) if question else "neutral"
+
+        # 构建上下文，包含情感分析结果
         current_x, current_y = player.get_current_coordinates()
         context = {
             "location_name": npc.location.name if npc.location else "未知地点",
             "player_name": player.nickname,
             "player_level": player.level,
-            "coordinates": f"({current_x}, {current_y})"
+            "coordinates": f"({current_x}, {current_y})",
+            "player_sentiment": sentiment,  # 传递情感分析结果
+            "sentiment_hint": {
+                "very_negative": "玩家正在辱骂或攻击你，你应该表现出愤怒、委屈或拒绝交流",
+                "negative": "玩家态度不友好，你应该表现出不高兴或疏远",
+                "positive": "玩家态度友好，你应该表现出开心和亲切",
+                "neutral": "玩家态度中立，正常交流即可"
+            }.get(sentiment, "")
         }
 
         # 生成AI对话（默认的自然对话场景）
@@ -526,14 +539,21 @@ async def handle_ai_dialogue_interaction(session, player: Player, npc, event: Me
             context=context
         )
 
-        # 更新好感度
-        fav_delta = fav_service.get_favorability_change_by_interaction_type("dialogue")
+        # 根据对话内容更新好感度（使用之前分析的sentiment）
+        fav_delta = fav_service.get_favorability_change_by_interaction_type(
+            "dialogue",
+            dialogue_content=question  # 传入玩家的对话内容用于情感分析
+        )
+
+        # 记录情感分析结果（用于日志）
+        logger.info(f"对话情感分析: '{question}' -> {sentiment} -> 好感度变化: {fav_delta:+d}")
+
         favorability = await fav_service.add_interaction(
             npc_id=npc.id,
             player_id=player.id,
             interaction_type="dialogue",
             favorability_delta=fav_delta,
-            event_description=f"与{player.nickname}交谈"
+            event_description=f"与{player.nickname}交谈 ({sentiment})"
         )
 
         # 保存对话历史
@@ -557,29 +577,40 @@ async def handle_ai_dialogue_interaction(session, player: Player, npc, event: Me
 
         # 格式化输出，包含对话历史
         lines = [
-            f"💬 {npc.name}",
+            f"💬 【{npc.name}】",
             "━━━━━━━━━━━━━",
         ]
 
-        # 显示最近2轮对话历史（如果有）
+        # 只显示上一条对话历史（如果有）
         if dialogue_history:
-            recent_display = dialogue_history[-2:]  # 显示最近2轮
-            if recent_display:
-                lines.append("📜 最近对话：")
-                for history in recent_display:
-                    # 截取部分内容避免太长
-                    player_text = history.player_input[:30] + "..." if len(history.player_input) > 30 else history.player_input
-                    npc_text = history.npc_response[:30] + "..." if len(history.npc_response) > 30 else history.npc_response
-                    lines.append(f"  你: {player_text}")
-                    lines.append(f"  {npc.name}: {npc_text}")
-                lines.append("━━━━━━━━━━━━━")
+            last_dialogue = dialogue_history[-1]  # 只取最后一条
+            # 截取部分内容避免太长
+            player_text = last_dialogue.player_input[:30] + "..." if len(last_dialogue.player_input) > 30 else last_dialogue.player_input
+            npc_text = last_dialogue.npc_response[:40] + "..." if len(last_dialogue.npc_response) > 40 else last_dialogue.npc_response
+            lines.append("📜 上次对话：")
+            lines.append(f"  【你】: {player_text}")
+            lines.append(f"  【{npc.name}】: {npc_text}")
+            lines.append("━━━━━━━━━━━━━")
 
         # 显示当前对话
         lines.append("🗨️ 当前对话：")
-        lines.append(f"  你: {question}")
-        lines.append(f"  {npc.name}: {npc_response}")
+        lines.append(f"  【你】: {question}")
+        lines.append(f"  【{npc.name}】: {npc_response}")
         lines.append("")
-        lines.append(f"❤️ 好感度: {favorability.current_favorability}/100 ({favorability.relationship_level})")
+
+        # 显示好感度变化（带情感指示）
+        if fav_delta > 0:
+            change_icon = "📈"
+            change_text = f"+{fav_delta}"
+        elif fav_delta < 0:
+            change_icon = "📉"
+            change_text = str(fav_delta)
+        else:
+            change_icon = "➖"
+            change_text = "±0"
+
+        lines.append(f"❤️ 好感度: {favorability.current_favorability}/100 ({change_icon} {change_text})")
+        lines.append(f"🔗 关系等级: {favorability.relationship_level}")
         lines.append(f"🔄 互动次数: {favorability.total_interactions}次")
 
         await interact_cmd.finish(message_add_head("\n".join(lines), event))

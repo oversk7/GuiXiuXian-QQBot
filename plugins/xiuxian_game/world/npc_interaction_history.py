@@ -58,7 +58,7 @@ async def handle_dialogue_history(event: MessageEvent, args: Message = CommandAr
 
         # 格式化输出
         lines = [
-            f"📖 与{npc.name}的对话历史",
+            f"📖 与【{npc.name}】的对话历史",
             "━━━━━━━━━━━━━",
             f"显示最近{len(dialogue_history)}条记录：",
             ""
@@ -68,8 +68,8 @@ async def handle_dialogue_history(event: MessageEvent, args: Message = CommandAr
             # 格式化时间
             time_str = history.created_at.strftime("%m-%d %H:%M")
             lines.append(f"【{i}. {time_str}】")
-            lines.append(f"  你: {history.player_input}")
-            lines.append(f"  {npc.name}: {history.npc_response}")
+            lines.append(f"  【你】: {history.player_input}")
+            lines.append(f"  【{npc.name}】: {history.npc_response}")
             if history.favorability_change != 0:
                 change_str = f"+{history.favorability_change}" if history.favorability_change > 0 else str(history.favorability_change)
                 lines.append(f"  好感度: {change_str} → {history.favorability_after}/100")

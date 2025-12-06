@@ -122,10 +122,59 @@ class NPCFavorabilityService:
         if event_key not in favorability.milestone_events:
             favorability.milestone_events[event_key] = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
+    def analyze_dialogue_sentiment(self, text: str) -> str:
+        """
+        分析对话内容的情感倾向
+
+        Args:
+            text: 对话内容
+
+        Returns:
+            情感类型: positive/negative/neutral/very_negative
+        """
+        # 负面词汇列表
+        very_negative_words = [
+            "去死", "滚", "傻", "蠢", "废物", "垃圾", "白痴", "该死", "混蛋",
+            "王八蛋", "傻逼", "煞笔", "脑残", "智障", "弱智", "死", "杀了你"
+        ]
+
+        negative_words = [
+            "讨厌", "烦", "无聊", "没用", "笨", "差劲", "糟糕", "恶心",
+            "丑", "臭", "坏", "骗子", "不喜欢", "走开", "别烦我"
+        ]
+
+        # 正面词汇列表
+        positive_words = [
+            "喜欢", "爱", "好", "棒", "厉害", "漂亮", "帅", "美", "优秀",
+            "谢谢", "感谢", "辛苦", "朋友", "兄弟", "姐妹", "帮忙", "请",
+            "您好", "你好", "早安", "晚安", "加油", "关心", "照顾"
+        ]
+
+        text_lower = text.lower()
+
+        # 检查极度负面
+        for word in very_negative_words:
+            if word in text_lower:
+                return "very_negative"
+
+        # 检查负面
+        for word in negative_words:
+            if word in text_lower:
+                return "negative"
+
+        # 检查正面
+        for word in positive_words:
+            if word in text_lower:
+                return "positive"
+
+        # 默认中性
+        return "neutral"
+
     def get_favorability_change_by_interaction_type(
         self,
         interaction_type: str,
-        success: bool = True
+        success: bool = True,
+        dialogue_content: str = None
     ) -> int:
         """
         根据互动类型获取好感度变化值
@@ -133,13 +182,25 @@ class NPCFavorabilityService:
         Args:
             interaction_type: 互动类型
             success: 是否成功（用于指令执行）
+            dialogue_content: 对话内容（用于分析情感）
 
         Returns:
             好感度变化值
         """
         if interaction_type == "dialogue":
-            # 自然对话：+1~+3
-            return 2
+            # 根据对话内容的情感分析调整好感度
+            if dialogue_content:
+                sentiment = self.analyze_dialogue_sentiment(dialogue_content)
+                if sentiment == "very_negative":
+                    return -10  # 辱骂等极度负面内容
+                elif sentiment == "negative":
+                    return -3   # 一般负面内容
+                elif sentiment == "positive":
+                    return 3    # 正面内容
+                else:
+                    return 1    # 中性内容
+            else:
+                return 1  # 默认中性
 
         elif interaction_type == "command_execution":
             if success:
