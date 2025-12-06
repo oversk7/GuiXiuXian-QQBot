@@ -36,16 +36,24 @@ async def handle_enable_npc_ai(event: MessageEvent, args: Message = CommandArg()
 
         # 启用AI对话
         try:
-            await npc_service.enable_ai_for_npc(
-                npc=npc,
-                model="GLM-4.5-Flash",
-                base_favorability=50
+            # 构建AI配置
+            ai_config = {
+                "ai_model": "GLM-4-Flash-250414",
+                "base_favorability": 50
+            }
+
+            success = await npc_service.enable_ai_for_npc(
+                npc_id=npc.npc_id,
+                ai_config=ai_config
             )
+
+            if not success:
+                await enable_npc_ai.finish(f"❌ 启用失败：无法找到NPC")
 
             msg = f"""✅ 已为NPC「{npc.name}」启用AI对话
 
 配置信息:
-- AI模型: GLM-4.5-Flash
+- AI模型: GLM-4-Flash-250414
 - 初始好感度: 50
 - 启用状态: ✅ 已启用
 
@@ -163,16 +171,26 @@ async def handle_batch_enable_npc_ai(event: MessageEvent, args: Message = Comman
         from ..models.npc import NPC
         from ..models.location import Location
 
+        # 导入NPCType以过滤鬼怪
+        from ..models.npc import NPCType
+
         if location_filter:
-            # 按地点过滤
+            # 按地点过滤（排除鬼怪）
             stmt = (
                 select(NPC)
                 .join(Location, NPC.location_id == Location.id)
-                .where(NPC.is_active == True, Location.name == location_filter)
+                .where(
+                    NPC.is_active == True,
+                    Location.name == location_filter,
+                    NPC.npc_type != NPCType.GHOST  # 排除鬼怪
+                )
             )
         else:
-            # 所有NPC
-            stmt = select(NPC).where(NPC.is_active == True)
+            # 所有NPC（排除鬼怪）
+            stmt = select(NPC).where(
+                NPC.is_active == True,
+                NPC.npc_type != NPCType.GHOST  # 排除鬼怪
+            )
 
         result = await session.execute(stmt)
         npcs = list(result.scalars().all())
@@ -196,12 +214,18 @@ async def handle_batch_enable_npc_ai(event: MessageEvent, args: Message = Comman
                     continue
 
                 # 启用AI对话
-                await npc_service.enable_ai_for_npc(
-                    npc=npc,
-                    model="GLM-4-Flash-250414",
-                    base_favorability=50
+                ai_config = {
+                    "ai_model": "GLM-4-Flash-250414",
+                    "base_favorability": 50
+                }
+                success = await npc_service.enable_ai_for_npc(
+                    npc_id=npc.npc_id,
+                    ai_config=ai_config
                 )
-                enabled_count += 1
+                if success:
+                    enabled_count += 1
+                else:
+                    error_count += 1
 
             except Exception as e:
                 logger.error(f"启用NPC {npc.name} 的AI对话失败: {e}")
@@ -214,14 +238,15 @@ async def handle_batch_enable_npc_ai(event: MessageEvent, args: Message = Comman
         msg = f"""✅ 批量启用NPC AI对话完成
 
 📊 统计信息:
-- 总NPC数: {len(npcs)}
+- 总NPC数: {len(npcs)} (已排除鬼怪)
 - ✅ 成功启用: {enabled_count}
 - ⏭️ 已启用跳过: {skipped_count}
 - ❌ 启用失败: {error_count}
 
 配置信息:
 - AI模型: GLM-4-Flash-250414
-- 初始好感度: 50"""
+- 初始好感度: 50
+- 过滤规则: 仅启用非鬼怪类NPC"""
 
         if location_filter:
             msg += f"\n- 地点过滤: {location_filter}"
@@ -248,19 +273,26 @@ async def handle_batch_disable_npc_ai(event: MessageEvent, args: Message = Comma
     async with safe_session() as session:
         npc_service = NPCService(session)
 
-        # 获取所有活跃NPC
+        # 获取所有活跃NPC（排除鬼怪）
         from sqlalchemy import select
-        from ..models.npc import NPC
+        from ..models.npc import NPC, NPCType
         from ..models.location import Location
 
         if location_filter:
             stmt = (
                 select(NPC)
                 .join(Location, NPC.location_id == Location.id)
-                .where(NPC.is_active == True, Location.name == location_filter)
+                .where(
+                    NPC.is_active == True,
+                    Location.name == location_filter,
+                    NPC.npc_type != NPCType.GHOST  # 排除鬼怪
+                )
             )
         else:
-            stmt = select(NPC).where(NPC.is_active == True)
+            stmt = select(NPC).where(
+                NPC.is_active == True,
+                NPC.npc_type != NPCType.GHOST  # 排除鬼怪
+            )
 
         result = await session.execute(stmt)
         npcs = list(result.scalars().all())
@@ -293,7 +325,7 @@ async def handle_batch_disable_npc_ai(event: MessageEvent, args: Message = Comma
         msg = f"""✅ 批量禁用NPC AI对话完成
 
 📊 统计信息:
-- 总NPC数: {len(npcs)}
+- 总NPC数: {len(npcs)} (已排除鬼怪)
 - ✅ 成功禁用: {disabled_count}
 - ⏭️ 未启用跳过: {skipped_count}"""
 
