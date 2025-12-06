@@ -23,7 +23,7 @@ def is_admin(user_id: str) -> bool:
     admin_ids = config.game_config.get("admin", {}).get("admin_ids", [])
     return user_id in admin_ids
 
-async def call_zhipu_api(messages, model="GLM-4", timeout=30):
+async def call_zhipu_api(messages, model="GLM-4.5-Flash", timeout=30):
     """调用智谱AI API（异步版本）"""
     url = "https://open.bigmodel.cn/api/paas/v4/chat/completions"
 
