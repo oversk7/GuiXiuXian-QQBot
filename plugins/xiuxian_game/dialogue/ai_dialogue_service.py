@@ -1,0 +1,256 @@
+"""AI对话生成服务"""
+import logging
+from typing import Optional, List
+from datetime import datetime
+
+from ..models.npc import NPC
+from ..models.npc_dialogue_history import NPCDialogueHistory
+from ..dialogue.npc_personality import PersonalityTemplate
+from ..ai_guide import call_zhipu_api
+from ..config import get_config
+
+logger = logging.getLogger(__name__)
+
+
+class AIDialogueService:
+    """使用智谱AI生成NPC对话的服务"""
+
+    def __init__(self):
+        """初始化AI对话服务"""
+        config = get_config()
+        ai_config = config.game_config.get("ai_dialogue", {})
+
+        # AI配置
+        self.provider = ai_config.get("provider", "zhipu")
+        self.zhipu_config = ai_config.get("zhipu", {})
+        self.max_tokens = self.zhipu_config.get("max_tokens", 300)
+        self.temperature = self.zhipu_config.get("temperature", 0.1)
+        self.timeout = self.zhipu_config.get("timeout", 30)
+
+        # 对话历史配置
+        history_config = ai_config.get("history", {})
+        self.max_history_rounds = history_config.get("max_rounds", 10)
+
+        # 内容安全配置
+        safety_config = ai_config.get("safety", {})
+        self.max_response_length = safety_config.get("max_response_length", 200)
+        self.min_response_length = safety_config.get("min_response_length", 10)
+
+    async def generate_dialogue(
+        self,
+        npc: NPC,
+        personality: PersonalityTemplate,
+        question: str,
+        dialogue_history: List[NPCDialogueHistory],
+        favorability: int,
+        context: Optional[dict] = None
+    ) -> tuple[str, int]:
+        """
+        生成NPC对自然对话的回复
+
+        Args:
+            npc: NPC对象
+            personality: NPC人设
+            question: 玩家提问
+            dialogue_history: 对话历史
+            favorability: 当前好感度
+            context: 附加上下文
+
+        Returns:
+            (NPC回复文本, 消耗的token数)
+        """
+        try:
+            # 构建系统提示词
+            system_prompt = personality.build_system_prompt(
+                favorability=favorability,
+                context=context or {}
+            )
+
+            # 构建对话历史上下文（最近N轮）
+            history_context = self._build_history_context(dialogue_history)
+
+            # 构建用户消息
+            user_message = f"""
+{history_context}
+
+当前玩家问题：{question}
+
+请以{npc.name}的身份回复这个问题。
+"""
+
+            # 调用智谱AI
+            messages = [
+                {"role": "system", "content": system_prompt},
+                {"role": "user", "content": user_message}
+            ]
+
+            result = await call_zhipu_api(
+                messages,
+                model=self.zhipu_config.get("model", "GLM-4.5-Flash"),
+                timeout=self.timeout
+            )
+
+            # 提取回复内容
+            response = result['choices'][0]['message']['content'].strip()
+
+            # 获取token使用情况
+            tokens_used = result.get('usage', {}).get('total_tokens', 0)
+
+            # 验证回复质量
+            if not self._validate_response(response):
+                logger.warning(f"AI回复质量验证失败，NPC: {npc.name}, 回复: {response}")
+                return self._get_fallback_response(npc, favorability), 0
+
+            return response, tokens_used
+
+        except Exception as e:
+            logger.error(f"AI对话生成失败: {type(e).__name__}: {str(e)}", exc_info=True)
+            # 降级方案：返回预设回复
+            return self._get_fallback_response(npc, favorability), 0
+
+    async def generate_roleplay_response(
+        self,
+        npc: NPC,
+        personality: PersonalityTemplate,
+        action: str,
+        game_output: str,
+        dialogue_history: List[NPCDialogueHistory],
+        favorability: int,
+        context: Optional[dict] = None
+    ) -> tuple[str, int]:
+        """
+        生成NPC执行游戏指令后的角色扮演回复
+
+        Args:
+            npc: NPC对象
+            personality: NPC人设
+            action: 执行的动作
+            game_output: 游戏执行结果
+            dialogue_history: 对话历史
+            favorability: 当前好感度
+            context: 附加上下文
+
+        Returns:
+            (NPC回复文本, 消耗的token数)
+        """
+        try:
+            # 构建系统提示词
+            system_prompt = personality.build_system_prompt(
+                favorability=favorability,
+                context=context or {}
+            )
+
+            # 添加指令执行风格指导
+            system_prompt += """
+
+【指令执行回复风格】
+当你执行游戏指令后：
+1. 用一句角色扮演的台词表现你的态度（符合人设和好感度）
+2. 可选：用(动作描写)表现你的行为，如(拿起追风膏，熟练地涂抹开来)
+3. 执行指令后，再用一句台词总结你的感受
+4. 保持简洁，不超过100字
+"""
+
+            # 构建用户消息
+            user_message = f"""
+执行的指令: {action}
+游戏输出: {game_output}
+
+请以{npc.name}的身份，用角色扮演的方式回复这个指令的执行结果。
+"""
+
+            # 调用智谱AI
+            messages = [
+                {"role": "system", "content": system_prompt},
+                {"role": "user", "content": user_message}
+            ]
+
+            result = await call_zhipu_api(
+                messages,
+                model=self.zhipu_config.get("model", "GLM-4.5-Flash"),
+                timeout=self.timeout
+            )
+
+            # 提取回复内容
+            response = result['choices'][0]['message']['content'].strip()
+
+            # 获取token使用情况
+            tokens_used = result.get('usage', {}).get('total_tokens', 0)
+
+            # 验证回复质量
+            if not self._validate_response(response):
+                logger.warning(f"AI角色扮演回复质量验证失败，NPC: {npc.name}, 回复: {response}")
+                return self._get_roleplay_fallback_response(npc, action), 0
+
+            return response, tokens_used
+
+        except Exception as e:
+            logger.error(f"AI角色扮演回复生成失败: {type(e).__name__}: {str(e)}", exc_info=True)
+            # 降级方案：返回预设回复
+            return self._get_roleplay_fallback_response(npc, action), 0
+
+    def _build_history_context(self, dialogue_history: List[NPCDialogueHistory]) -> str:
+        """构建对话历史上下文"""
+        if not dialogue_history:
+            return "这是你们的第一次对话。"
+
+        # 只取最近的N轮对话
+        recent_history = dialogue_history[-self.max_history_rounds:]
+
+        context_lines = ["最近的对话历史："]
+        for history in recent_history:
+            context_lines.append(f"玩家: {history.player_input}")
+            context_lines.append(f"{history.npc.name}: {history.npc_response}")
+
+        return "\n".join(context_lines)
+
+    def _validate_response(self, response: str) -> bool:
+        """验证回复质量"""
+        # 检查长度
+        if len(response) < self.min_response_length:
+            return False
+
+        if len(response) > self.max_response_length:
+            return False
+
+        # 检查是否为空或仅包含空白字符
+        if not response.strip():
+            return False
+
+        return True
+
+    def _get_fallback_response(self, npc: NPC, favorability: int) -> str:
+        """获取降级回复（自然对话）"""
+        if favorability <= 20:
+            return f"{npc.name}冷漠地看了你一眼，没有多说什么。"
+        elif favorability <= 40:
+            return f"{npc.name}客气地点了点头。"
+        elif favorability <= 60:
+            return f"{npc.name}友好地和你交谈了几句。"
+        elif favorability <= 80:
+            return f"{npc.name}亲切地回应了你的问题。"
+        else:
+            return f"{npc.name}热情地与你交流。"
+
+    def _get_roleplay_fallback_response(self, npc: NPC, action: str) -> str:
+        """获取降级回复（角色扮演）"""
+        return f"{npc.name}点了点头，按照你的要求执行了操作。"
+
+    def calculate_cost(self, tokens_used: int) -> int:
+        """
+        计算AI调用成本（以分为单位）
+
+        智谱AI GLM-4.5-Flash定价（参考）:
+        - 输入: 0.1元/百万token
+        - 输出: 0.1元/百万token
+
+        Args:
+            tokens_used: 使用的token数
+
+        Returns:
+            成本（以分为单位，人民币）
+        """
+        # 简化计算：假设输入输出各占一半
+        # 成本 = (tokens_used / 1000000) * 0.1元 * 100分
+        cost_cents = int((tokens_used / 1000000) * 0.1 * 100)
+        return max(cost_cents, 1)  # 最少1分

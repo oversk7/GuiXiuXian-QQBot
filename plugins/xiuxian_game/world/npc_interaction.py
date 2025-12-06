@@ -233,6 +233,11 @@ async def handle_special_vendor_interaction(session, player: Player, npc, event:
 
 async def handle_generic_interaction(session, player: Player, npc, event: MessageEvent):
     """处理普通NPC交互"""
+    # 检查是否启用AI对话
+    if npc.extra_data and npc.extra_data.get("ai_enabled"):
+        await handle_ai_dialogue_interaction(session, player, npc, event)
+        return
+
     # 检查是否是中立NPC（有特殊对话）
     if npc.extra_data and npc.extra_data.get("is_neutral") and npc.extra_data.get("dialogues"):
         await handle_neutral_npc_interaction(session, player, npc, event)
@@ -379,3 +384,128 @@ async def handle_npc_list(event: MessageEvent):
         ])
 
         await npc_list_cmd.finish(message_add_head("\n".join(lines), event))
+
+
+# ==================== AI对话处理 ====================
+async def handle_ai_dialogue_interaction(session, player: Player, npc, event: MessageEvent):
+    """处理启用AI的NPC交互"""
+    import time
+    from ..dialogue.ai_dialogue_service import AIDialogueService
+    from ..dialogue.npc_favorability_service import NPCFavorabilityService
+    from ..dialogue.npc_personality import PersonalityManager
+    from ..infrastructure.repositories.npc_dialogue_history_repository import NPCDialogueHistoryRepository
+    from ..models.npc_dialogue_history import NPCDialogueHistory
+
+    start_time = time.time()
+
+    try:
+        # 初始化服务
+        ai_service = AIDialogueService()
+        fav_service = NPCFavorabilityService(session)
+        history_repo = NPCDialogueHistoryRepository(session)
+
+        # 获取NPC人设
+        personality = PersonalityManager.get_personality(npc.name)
+        if not personality:
+            # 如果没有预设人设，使用默认配置
+            from ..dialogue.npc_personality import PersonalityTemplate
+            personality = PersonalityTemplate(
+                name=npc.name,
+                role=npc.description or "神秘的NPC",
+                pronouns=["我"],
+                speech_patterns=["友好"],
+                key_words=[],
+                background=npc.description or ""
+            )
+
+        # 获取或创建好感度记录
+        favorability = await fav_service.get_favorability(
+            npc_id=npc.id,
+            player_id=player.id,
+            initial_favorability=npc.extra_data.get("base_favorability", 50)
+        )
+
+        # 获取最近对话历史
+        dialogue_history = await history_repo.get_recent_interactions(
+            npc_id=npc.id,
+            player_id=player.id,
+            limit=10
+        )
+
+        # 构建上下文
+        current_x, current_y = player.get_current_coordinates()
+        context = {
+            "location_name": npc.location.name if npc.location else "未知地点",
+            "player_name": player.nickname,
+            "player_level": player.level,
+            "coordinates": f"({current_x}, {current_y})"
+        }
+
+        # 生成AI对话（默认的自然对话场景）
+        question = "你好"  # 默认问候
+        await interact_cmd.send(message_add_head(f"🤖 {npc.name}正在思考...", event))
+
+        npc_response, tokens_used = await ai_service.generate_dialogue(
+            npc=npc,
+            personality=personality,
+            question=question,
+            dialogue_history=dialogue_history,
+            favorability=favorability.current_favorability,
+            context=context
+        )
+
+        # 更新好感度
+        fav_delta = fav_service.get_favorability_change_by_interaction_type("dialogue")
+        favorability = await fav_service.add_interaction(
+            npc_id=npc.id,
+            player_id=player.id,
+            interaction_type="dialogue",
+            favorability_delta=fav_delta,
+            event_description=f"与{player.nickname}交谈"
+        )
+
+        # 保存对话历史
+        dialogue_duration = int(time.time() - start_time)
+        ai_cost = ai_service.calculate_cost(tokens_used)
+
+        history = NPCDialogueHistory(
+            npc_id=npc.id,
+            player_id=player.id,
+            dialogue_type="natural_dialogue",
+            player_input=question,
+            npc_response=npc_response,
+            favorability_change=fav_delta,
+            favorability_after=favorability.current_favorability,
+            dialogue_duration_seconds=dialogue_duration,
+            ai_tokens_used=tokens_used,
+            ai_cost=ai_cost
+        )
+        await history_repo.save(history)
+        await session.commit()
+
+        # 格式化输出
+        lines = [
+            f"💬 {npc.name}",
+            "━━━━━━━━━━━━━",
+            npc_response,
+            "",
+            f"❤️ 好感度: {favorability.current_favorability}/100 ({favorability.relationship_level})",
+            f"🔄 互动次数: {favorability.total_interactions}次"
+        ]
+
+        await interact_cmd.finish(message_add_head("\n".join(lines), event))
+
+    except Exception as e:
+        import logging
+        logger = logging.getLogger(__name__)
+        logger.error(f"AI对话处理失败: {type(e).__name__}: {str(e)}", exc_info=True)
+
+        # 降级到普通对话
+        lines = [
+            f"👤 {npc.name}",
+            "━━━━━━━━━━━━━",
+            f"💬 {npc.name}：{npc.description or '你好，有什么可以帮助你的吗？'}",
+            "",
+            "⚠️ AI对话服务暂时不可用，使用预设对话。"
+        ]
+        await interact_cmd.finish(message_add_head("\n".join(lines), event))

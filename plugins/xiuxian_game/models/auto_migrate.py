@@ -126,6 +126,53 @@ REQUIRED_TABLES: Dict[str, str] = {
             FOREIGN KEY (player_id) REFERENCES player(id)
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='玩家统计数据表'
     """,
+    "npc_dialogue_history": """
+        CREATE TABLE IF NOT EXISTS npc_dialogue_history (
+            id INT AUTO_INCREMENT PRIMARY KEY COMMENT 'ID',
+            npc_id INT NOT NULL COMMENT 'NPC ID',
+            player_id VARCHAR(32) NOT NULL COMMENT '玩家ID',
+            dialogue_type VARCHAR(20) NOT NULL COMMENT '对话类型: natural_dialogue | game_command',
+            player_input TEXT NOT NULL COMMENT '玩家输入',
+            npc_response TEXT NOT NULL COMMENT 'NPC回复',
+            game_command VARCHAR(255) NULL COMMENT '游戏指令内容（仅game_command类型）',
+            game_output TEXT NULL COMMENT '游戏指令执行结果',
+            game_command_status VARCHAR(20) DEFAULT 'success' COMMENT '指令执行状态: success | failed | partial',
+            favorability_change INT DEFAULT 0 COMMENT '本次对话导致的好感度变化',
+            favorability_after INT DEFAULT 50 COMMENT '本次对话后的总好感度',
+            dialogue_duration_seconds INT DEFAULT 0 COMMENT '对话耗时(秒)',
+            ai_tokens_used INT NULL COMMENT 'AI调用消耗的token数',
+            ai_cost INT NULL COMMENT 'AI调用成本(分，人民币)',
+            created_at DATETIME DEFAULT CURRENT_TIMESTAMP COMMENT '对话时间',
+            INDEX idx_npc_id (npc_id),
+            INDEX idx_player_id (player_id),
+            INDEX idx_created_at (created_at),
+            INDEX idx_npc_player_created (npc_id, player_id, created_at),
+            FOREIGN KEY (npc_id) REFERENCES npc(id) ON DELETE CASCADE,
+            FOREIGN KEY (player_id) REFERENCES player(id) ON DELETE CASCADE
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='NPC对话历史表'
+    """,
+    "npc_favorability": """
+        CREATE TABLE IF NOT EXISTS npc_favorability (
+            id INT AUTO_INCREMENT PRIMARY KEY COMMENT 'ID',
+            npc_id INT NOT NULL COMMENT 'NPC ID',
+            player_id VARCHAR(32) NOT NULL COMMENT '玩家ID',
+            current_favorability INT DEFAULT 50 COMMENT '当前好感度(0-100)',
+            total_interactions INT DEFAULT 0 COMMENT '累计互动次数',
+            total_favorability_gained INT DEFAULT 0 COMMENT '累计好感度获得（可为负）',
+            relationship_level VARCHAR(20) DEFAULT '陌生人' COMMENT '关系等级: 陌生人|熟识|友好|亲密|知心',
+            is_follower BOOLEAN DEFAULT FALSE COMMENT '是否跟随关系',
+            is_partner BOOLEAN DEFAULT FALSE COMMENT '是否伴侣关系',
+            milestone_events JSON NULL COMMENT '关键事件记录',
+            first_interaction_at DATETIME DEFAULT CURRENT_TIMESTAMP COMMENT '首次互动时间',
+            last_interaction_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '最后互动时间',
+            updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '记录更新时间',
+            UNIQUE INDEX idx_npc_player_unique (npc_id, player_id),
+            INDEX idx_npc_id (npc_id),
+            INDEX idx_player_id (player_id),
+            FOREIGN KEY (npc_id) REFERENCES npc(id) ON DELETE CASCADE,
+            FOREIGN KEY (player_id) REFERENCES player(id) ON DELETE CASCADE
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='NPC好感度表'
+    """,
 }
 
 

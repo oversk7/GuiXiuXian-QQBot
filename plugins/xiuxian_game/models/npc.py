@@ -85,6 +85,18 @@ class NPC(Base):
     
     # 关系
     location: Mapped["Location"] = relationship("Location", back_populates="npcs")
+    dialogue_histories: Mapped[list["NPCDialogueHistory"]] = relationship(
+        "NPCDialogueHistory",
+        back_populates="npc",
+        foreign_keys="NPCDialogueHistory.npc_id",
+        cascade="all, delete-orphan"
+    )
+    favorability_records: Mapped[list["NPCFavorability"]] = relationship(
+        "NPCFavorability",
+        back_populates="npc",
+        foreign_keys="NPCFavorability.npc_id",
+        cascade="all, delete-orphan"
+    )
     
     def __repr__(self) -> str:
         return f"<NPC(id={self.npc_id}, name={self.name}, type={self.npc_type.value})>"

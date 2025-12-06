@@ -66,4 +66,21 @@ async def _():
     except Exception as e:
         logger.error(f"[EffectSystem] 注册效果系统失败: {e}")
         import traceback
+        traceback.print_exc()
+
+    # 加载NPC人设配置
+    try:
+        from pathlib import Path
+        from .dialogue.npc_personality import PersonalityManager
+
+        personalities_file = Path(__file__).parent / "data" / "npc_personalities.yaml"
+        if personalities_file.exists():
+            PersonalityManager.load_from_file(personalities_file)
+            personalities_count = len(PersonalityManager.get_all_personalities())
+            logger.success(f"[NPCDialogue] 成功加载 {personalities_count} 个NPC人设配置")
+        else:
+            logger.warning(f"[NPCDialogue] NPC人设配置文件不存在: {personalities_file}")
+    except Exception as e:
+        logger.error(f"[NPCDialogue] 加载NPC人设配置失败: {e}")
+        import traceback
         traceback.print_exc() 

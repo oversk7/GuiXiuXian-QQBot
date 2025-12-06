@@ -25,10 +25,21 @@ def is_admin(user_id: str) -> bool:
 
 async def call_zhipu_api(messages, model="GLM-4.5-Flash", timeout=30):
     """调用智谱AI API（异步版本）"""
+    from .config import get_config
+
+    # 从配置文件读取API密钥
+    config = get_config()
+    ai_config = config.game_config.get("ai_dialogue", {})
+    zhipu_config = ai_config.get("zhipu", {})
+    api_key = zhipu_config.get("api_key", "")
+
+    if not api_key:
+        raise ValueError("智谱AI API密钥未配置，请在config.yaml中配置 ai_dialogue.zhipu.api_key")
+
     url = "https://open.bigmodel.cn/api/paas/v4/chat/completions"
 
     headers = {
-        "Authorization": "Bearer ***REMOVED***",
+        "Authorization": f"Bearer {api_key}",
         "Content-Type": "application/json"
     }
 

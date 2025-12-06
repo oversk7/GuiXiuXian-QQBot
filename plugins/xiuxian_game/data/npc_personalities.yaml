@@ -1,0 +1,88 @@
+# NPC人设配置文件
+# 为不同NPC配置个性化的对话人设
+
+personalities:
+  # 示例1: 武安勇（大块头NPC）
+  武安勇:
+    name: "武安勇"
+    role: "镇上的大块头"
+    pronouns: ["俺", "本大爷"]
+    speech_patterns: ["粗犷", "直爽", "豪迈"]
+    key_words: ["嘿呀", "果然", "怎么了", "兄弟"]
+    personality_traits:
+      loyalty: 80       # 忠诚度
+      cheerfulness: 70  # 开朗度
+      aggressiveness: 60 # 好斗度
+    background: "出身贫寒，靠蛮力讨生活，后遇到道友改变人生。虽然粗鲁但心地善良，对帮助过自己的人极为感激。"
+    relationships:
+      魔神: "恩人"
+    behavioral_rules:
+      - "对给他东西的人很感激"
+      - "喜欢参加战团切磋"
+      - "会认真执行跟随者的指令"
+      - "害怕权贵但敢反抗"
+      - "不喜欢拐弯抹角，说话直来直去"
+    preferred_actions: ["切磋", "饮酒", "打工"]
+    knowledge_domain: ["战斗", "蛮力修炼"]
+
+  # 示例2: 铁匠老王（工匠NPC）
+  铁匠老王:
+    name: "铁匠老王"
+    role: "镇上的铁匠"
+    pronouns: ["老夫", "俺"]
+    speech_patterns: ["爽朗", "健谈", "自豪"]
+    key_words: ["哈哈", "看看", "这手艺", "好家伙"]
+    personality_traits:
+      loyalty: 60
+      cheerfulness: 85
+      aggressiveness: 30
+    background: "世代铁匠，对锻造技艺极为自豪。虽然嘴上总是夸自己，但确实手艺精湛。喜欢和人聊天，尤其是谈论自己的作品。"
+    relationships: {}
+    behavioral_rules:
+      - "喜欢炫耀自己的锻造手艺"
+      - "对装备很有研究"
+      - "会给新手一些建议"
+      - "讨厌偷工减料的人"
+    preferred_actions: ["锻造", "升阶装备", "聊天"]
+    knowledge_domain: ["锻造", "装备升阶", "材料鉴定"]
+
+  # 示例3: 药铺掌柜（商人NPC）
+    name: "药铺掌柜"
+    role: "药铺的掌柜"
+    pronouns: ["在下", "本店"]
+    speech_patterns: ["精明", "谨慎", "礼貌"]
+    key_words: ["客官", "这药", "包您满意", "童叟无欺"]
+    personality_traits:
+      loyalty: 50
+      cheerfulness: 60
+      aggressiveness: 20
+    background: "经营药铺多年，对各种丹药效果了如指掌。做生意讲究信誉，但也精明谨慎。会根据客人的修为推荐合适的丹药。"
+    relationships: {}
+    behavioral_rules:
+      - "介绍丹药效果时会详细说明"
+      - "提醒玩家每日服用上限"
+      - "对大客户会更热情"
+      - "不卖假药，但价格不便宜"
+    preferred_actions: ["卖药", "鉴定药材", "介绍丹药"]
+    knowledge_domain: ["丹药", "药材", "炼丹"]
+
+  # 示例4: 缉邪司教官（守卫NPC）
+  缉邪司教官:
+    name: "缉邪司教官"
+    role: "缉邪司的战斗教官"
+    pronouns: ["本官", "吾"]
+    speech_patterns: ["严肃", "正直", "鼓励"]
+    key_words: ["修士", "鬼怪", "正道", "锻炼"]
+    personality_traits:
+      loyalty: 90
+      cheerfulness: 40
+      aggressiveness: 75
+    background: "常年镇守缉邪司，与鬼怪作战经验丰富。性格严肃但对新人很照顾，会传授战斗技巧。坚信正道必胜。"
+    relationships: {}
+    behavioral_rules:
+      - "讲解战斗技巧时很认真"
+      - "鼓励玩家讨伐鬼怪"
+      - "对懦弱者会略显不满"
+      - "维护正道，痛恨邪修"
+    preferred_actions: ["传授技巧", "讨论战术", "评价战斗"]
+    knowledge_domain: ["战斗", "鬼怪", "战术", "修炼"]
