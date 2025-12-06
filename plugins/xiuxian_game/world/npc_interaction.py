@@ -27,6 +27,21 @@ async def handle_npc_interaction(event: MessageEvent, args: Message = CommandArg
     """处理NPC交互命令"""
     args_text = args.extract_plain_text().strip()
 
+    # 分离NPC名字和对话内容（用于AI对话）
+    # 格式: "交互 NPC名" 或 "交互 NPC名 对话内容"
+    npc_name = args_text
+    dialogue_content = None
+
+    # 尝试分割（只在有空格时）
+    if ' ' in args_text:
+        parts = args_text.split(' ', 1)  # 只分割一次
+        potential_npc_name = parts[0]
+        potential_dialogue = parts[1] if len(parts) > 1 else None
+
+        # 先尝试用完整文本匹配，如果失败再用分割后的
+        npc_name = args_text  # 默认用完整文本
+        dialogue_content = potential_dialogue  # 记录可能的对话内容
+
     if not args_text:
         help_msg = (
             "🤖 NPC交互系统\n"
@@ -77,13 +92,25 @@ async def handle_npc_interaction(event: MessageEvent, args: Message = CommandArg
             await interact_cmd.finish("⛔ 当前位置没有NPC可以交互")
 
         # 查找指定名称的NPC
-        npc = await npc_service.get_npc_by_name(args_text, location.id)
+        npc = await npc_service.get_npc_by_name(npc_name, location.id)
         if not npc:
             # 尝试智能匹配（支持带点号的名字）
             from .attack_command import find_npc_by_smart_match
-            possible_npcs = await find_npc_by_smart_match(session, args_text, location.id)
+            possible_npcs = await find_npc_by_smart_match(session, npc_name, location.id)
 
-            if not possible_npcs:
+            # 如果完整文本匹配失败，且包含空格，尝试用第一个词匹配
+            if not possible_npcs and ' ' in args_text:
+                potential_npc_name = args_text.split(' ', 1)[0]
+                npc = await npc_service.get_npc_by_name(potential_npc_name, location.id)
+                if not npc:
+                    possible_npcs = await find_npc_by_smart_match(session, potential_npc_name, location.id)
+                else:
+                    # 找到了！更新npc_name和dialogue_content
+                    npc_name = potential_npc_name
+                    if ' ' in args_text:
+                        dialogue_content = args_text.split(' ', 1)[1]
+
+            if not possible_npcs and not npc:
                 await interact_cmd.finish(f"⛔ 在当前位置找不到名为'{args_text}'的NPC")
             elif len(possible_npcs) == 1:
                 npc = possible_npcs[0]
@@ -129,7 +156,7 @@ async def handle_npc_type_interaction(session, player: Player, npc, interaction_
     elif npc_type == NPCType.SPECIAL_VENDOR:
         await handle_special_vendor_interaction(session, player, npc, event)
     else:
-        await handle_generic_interaction(session, player, npc, event)
+        await handle_generic_interaction(session, player, npc, event, dialogue_content)
 
 
 async def handle_merchant_interaction(session, player: Player, npc, event: MessageEvent):
@@ -231,11 +258,11 @@ async def handle_special_vendor_interaction(session, player: Player, npc, event:
     await interact_cmd.finish(message_add_head("\n".join(lines), event))
 
 
-async def handle_generic_interaction(session, player: Player, npc, event: MessageEvent):
+async def handle_generic_interaction(session, player: Player, npc, event: MessageEvent, dialogue_content: str = None):
     """处理普通NPC交互"""
     # 检查是否启用AI对话
     if npc.extra_data and npc.extra_data.get("ai_enabled"):
-        await handle_ai_dialogue_interaction(session, player, npc, event)
+        await handle_ai_dialogue_interaction(session, player, npc, event, question=dialogue_content)
         return
 
     # 检查是否是中立NPC（有特殊对话）
@@ -260,7 +287,7 @@ async def handle_neutral_npc_interaction(session, player: Player, npc, event: Me
 
     dialogues = npc.extra_data.get("dialogues", [])
     if not dialogues:
-        await handle_generic_interaction(session, player, npc, event)
+        await handle_generic_interaction(session, player, npc, event, dialogue_content=None)
         return
 
     # 随机选择一句对话，或者按顺序循环
@@ -387,8 +414,17 @@ async def handle_npc_list(event: MessageEvent):
 
 
 # ==================== AI对话处理 ====================
-async def handle_ai_dialogue_interaction(session, player: Player, npc, event: MessageEvent):
-    """处理启用AI的NPC交互"""
+async def handle_ai_dialogue_interaction(session, player: Player, npc, event: MessageEvent, question: str = None):
+    """
+    处理启用AI的NPC交互
+
+    Args:
+        session: 数据库会话
+        player: 玩家对象
+        npc: NPC对象
+        event: 消息事件
+        question: 玩家的问题/对话内容（可选，默认为打招呼）
+    """
     import time
     from ..dialogue.ai_dialogue_service import AIDialogueService
     from ..dialogue.npc_favorability_service import NPCFavorabilityService
@@ -442,7 +478,9 @@ async def handle_ai_dialogue_interaction(session, player: Player, npc, event: Me
         }
 
         # 生成AI对话（默认的自然对话场景）
-        question = "你好"  # 默认问候
+        if not question:
+            question = "你好"  # 默认问候
+
         await interact_cmd.send(message_add_head(f"🤖 {npc.name}正在思考...", event))
 
         npc_response, tokens_used = await ai_service.generate_dialogue(

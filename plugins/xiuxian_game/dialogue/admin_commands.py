@@ -1,6 +1,6 @@
 """NPC AI对话管理员命令"""
 from nonebot import on_command
-from nonebot.adapters.onebot.v11 import MessageEvent, Message
+from nonebot.adapters.qq import MessageEvent, Message
 from nonebot.params import CommandArg
 import logging
 
