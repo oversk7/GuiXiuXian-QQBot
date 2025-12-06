@@ -25,10 +25,9 @@ def is_admin(user_id: str) -> bool:
 
 async def call_zhipu_api(messages, model="GLM-4.5-Flash", timeout=30):
     """调用智谱AI API（异步版本）"""
-    from .config import get_config
+    from .config import config
 
     # 从配置文件读取API密钥
-    config = get_config()
     ai_config = config.game_config.get("ai_dialogue", {})
     zhipu_config = ai_config.get("zhipu", {})
     api_key = zhipu_config.get("api_key", "")

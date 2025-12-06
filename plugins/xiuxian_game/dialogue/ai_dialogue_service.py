@@ -7,7 +7,7 @@ from ..models.npc import NPC
 from ..models.npc_dialogue_history import NPCDialogueHistory
 from ..dialogue.npc_personality import PersonalityTemplate
 from ..ai_guide import call_zhipu_api
-from ..config import get_config
+from ..config import config
 
 logger = logging.getLogger(__name__)
 
@@ -17,7 +17,6 @@ class AIDialogueService:
 
     def __init__(self):
         """初始化AI对话服务"""
-        config = get_config()
         ai_config = config.game_config.get("ai_dialogue", {})
 
         # AI配置
