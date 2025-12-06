@@ -513,6 +513,8 @@ class AchievementService:
                         current_progress = stats.locations_visited
                     elif condition_type == "login_streak":
                         current_progress = stats.consecutive_login_days
+                    elif condition_type == "total_login_days":
+                        current_progress = stats.total_login_days
                     elif condition_type == "account_age":
                         # 账号年龄检查：如果满足条件显示1，否则显示0
                         from datetime import datetime
