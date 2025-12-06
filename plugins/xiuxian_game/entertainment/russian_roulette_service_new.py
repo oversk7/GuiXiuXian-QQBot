@@ -68,8 +68,8 @@ class RussianRouletteService:
         if existing_group_room:
             return False, "该群已有活跃的游戏房间", None
 
-        # 生成房间ID
-        room_id = str(uuid.uuid4())[:8]
+        # 生成房间ID（4位短ID）
+        room_id = str(uuid.uuid4())[:4]
 
         # 创建房间
         room = RussianRouletteRoom(
@@ -84,10 +84,50 @@ class RussianRouletteService:
 
         return True, f"房间创建成功！房间ID: {room_id}", created_room
 
+    async def join_group_room(
+        self, player_id: str, group_id: str
+    ) -> Tuple[bool, str]:
+        """自动加入当前群的活跃房间（无需输入房间ID）
+
+        Args:
+            player_id: 玩家ID
+            group_id: 群组ID
+
+        Returns:
+            (成功标志, 消息)
+        """
+        # 检查玩家是否已在其他房间中
+        existing_room = await self.get_player_active_room(player_id)
+        if existing_room:
+            return False, "你已经在其他房间中了"
+
+        # 查找当前群的活跃房间
+        room = await self._room_repo.find_group_active_room(group_id)
+
+        if not room:
+            return False, "本群暂无活跃房间，请先创建房间"
+
+        if room.status != RoomStatus.WAITING.value:
+            return False, "本群房间已开始游戏或已满员"
+
+        if room.is_full():
+            return False, "本群房间已满"
+
+        if room.player1_id == player_id:
+            return False, "你已经在这个房间中了"
+
+        # 加入房间
+        room.player2_id = player_id
+        room.status = RoomStatus.BETTING.value
+
+        await self._room_repo.update(room)
+
+        return True, "成功加入房间！现在可以设置筹码"
+
     async def join_room(
         self, player_id: str, room_id: str, group_id: str
     ) -> Tuple[bool, str]:
-        """加入游戏房间
+        """加入指定房间ID的游戏房间（支持跨群）
 
         Args:
             player_id: 玩家ID

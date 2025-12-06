@@ -83,7 +83,7 @@ async def handle_create_room(bot: Bot, event: MessageEvent, args: Message = Comm
             "━━━━━━━━━━━━━\n"
             "📝 房间指令：\n"
             "▫️ 【恶魔轮盘 创建】 - 创建游戏房间\n"
-            "▫️ 【恶魔轮盘 加入 <房间ID>】 - 加入房间\n"
+            "▫️ 【恶魔轮盘 加入】 - 自动加入本群房间\n"
             "▫️ 【退出房间】 - 游戏开始前退出房间\n"
             "▫️ 【恶魔轮盘 开始】 - 开始游戏\n"
             "▫️ 【房间状态】 - 查看房间状态\n"
@@ -138,26 +138,37 @@ async def handle_create_room(bot: Bot, event: MessageEvent, args: Message = Comm
                     f"📍 绑定群聊：当前群\n"
                     f"━━━━━━━━━━━━━\n"
                     f"💡 等待其他玩家加入...\n"
-                    f"📝 使用：恶魔轮盘 加入 {room.room_id}"
+                    f"📝 使用：恶魔轮盘 加入\n"
+                    f"📝 房间ID：{room.room_id}（跨群加入时使用）"
                 )
                 await create_room_cmd.finish(message_add_head(result_msg, event))
             else:
                 await create_room_cmd.finish(message_add_head(f"❌ {msg}", event))
         
-        elif args_text.startswith("加入 "):
-            room_id = args_text[3:].strip()
-            if not room_id:
-                await create_room_cmd.finish("⛔ 请输入房间ID")
+        elif args_text == "加入" or args_text.startswith("加入"):
+            # 支持两种方式：
+            # 1. 【恶魔轮盘 加入】- 自动加入当前群的活跃房间
+            # 2. 【恶魔轮盘 加入 房间ID】- 加入指定房间（跨群加入）
 
             service = RussianRouletteServiceNew(
                 room_repo=RussianRouletteRoomRepository(session),
                 game_repo=RussianRouletteGameRepository(session),
                 player_repo=PlayerRepository(session)
             )
-            success, msg = await service.join_room(player.id, room_id, group_id)
+
+            if args_text == "加入":
+                # 自动加入当前群的活跃房间
+                success, msg = await service.join_group_room(player.id, group_id)
+            else:
+                # 加入指定房间ID
+                room_id = args_text[3:].strip()
+                if not room_id:
+                    await create_room_cmd.finish("⛔ 请输入房间ID，或直接使用【恶魔轮盘 加入】自动加入本群房间")
+                success, msg = await service.join_room(player.id, room_id, group_id)
+
             if success:
                 result_msg = (
-                    f"✅ 成功加入房间 {room_id}！\n"
+                    f"✅ 成功加入房间！\n"
                     f"━━━━━━━━━━━━━\n"
                     f"👤 玩家：{player.nickname}[UID:{player.uid}]\n"
                     f"━━━━━━━━━━━━━\n"
