@@ -111,7 +111,7 @@ class NoviceQuestService:
                 and_(
                     DailyTask.player_id == player_id,
                     DailyTask.is_tutorial == True,
-                    DailyTask.status == TaskStatus.ACCEPTED
+                    DailyTask.status == TaskStatus.ACCEPTED.value
                 )
             )
         )

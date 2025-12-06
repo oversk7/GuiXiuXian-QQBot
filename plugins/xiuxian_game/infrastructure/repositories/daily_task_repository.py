@@ -124,7 +124,7 @@ class DailyTaskRepository(IRepository[DailyTask]):
         stmt = select(func.count(DailyTask.id)).where(
             and_(
                 DailyTask.player_id == player_id,
-                DailyTask.status == TaskStatus.COMPLETED,
+                DailyTask.status == TaskStatus.COMPLETED.value,
                 DailyTask.task_date >= week_start
             )
         )
@@ -144,7 +144,7 @@ class DailyTaskRepository(IRepository[DailyTask]):
         stmt = select(func.count(DailyTask.id)).where(
             and_(
                 DailyTask.player_id == player_id,
-                DailyTask.status == TaskStatus.COMPLETED
+                DailyTask.status == TaskStatus.COMPLETED.value
             )
         )
         result = await self._session.execute(stmt)
@@ -163,7 +163,7 @@ class DailyTaskRepository(IRepository[DailyTask]):
         stmt = select(DailyTask).where(
             and_(
                 DailyTask.task_date < today,
-                DailyTask.status.in_([TaskStatus.AVAILABLE, TaskStatus.ACCEPTED])
+                DailyTask.status.in_([TaskStatus.AVAILABLE.value, TaskStatus.ACCEPTED.value])
             )
         )
         result = await self._session.execute(stmt)
