@@ -4,6 +4,7 @@ AI引导系统 - 为玩家提供游戏帮助和指令推荐
 import aiohttp
 import asyncio
 import re
+import logging
 from typing import List, Dict, Any
 from nonebot import on_message, on_command
 from nonebot.adapters.qq import MessageEvent
@@ -13,6 +14,8 @@ from .models.player import Player
 from .models.story_session import StorySession
 from .utils import message_add_head
 from .config import Config
+
+logger = logging.getLogger(__name__)
 
 def is_admin(user_id: str) -> bool:
     """检查用户是否为管理员"""
@@ -822,10 +825,19 @@ async def get_ai_guidance(user_message: str, player: Player) -> str:
             {"role": "system", "content": system_prompt},
             {"role": "user", "content": user_message}
         ]
-        
+
         result = await call_zhipu_api(messages)
         return result['choices'][0]['message']['content']
 
-    except Exception:
-        # AI调用失败时的简单回复
+    except asyncio.TimeoutError as e:
+        logger.error(f"AI API调用超时: {str(e)}")
+        return "🤖 助手响应超时，请稍后重试或发送【帮助】查看游戏指令"
+    except aiohttp.ClientError as e:
+        logger.error(f"AI API网络请求失败: {str(e)}")
+        return "🤖 网络连接失败，请稍后重试或发送【帮助】查看游戏指令"
+    except KeyError as e:
+        logger.error(f"AI API响应格式异常，缺少字段: {str(e)}, 响应内容: {result if 'result' in locals() else 'N/A'}")
+        return "🤖 AI响应格式异常，请发送【帮助】查看游戏指令"
+    except Exception as e:
+        logger.error(f"AI引导系统未知错误: {type(e).__name__}: {str(e)}", exc_info=True)
         return "🤖 助手暂时无法回应，请发送【帮助】查看游戏指令"
