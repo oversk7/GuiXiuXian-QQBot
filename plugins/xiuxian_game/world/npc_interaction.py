@@ -93,32 +93,63 @@ async def handle_npc_interaction(event: MessageEvent, args: Message = CommandArg
 
         # 查找指定名称的NPC
         npc = await npc_service.get_npc_by_name(npc_name, location.id)
+
         if not npc:
             # 尝试智能匹配（支持带点号的名字）
             from .attack_command import find_npc_by_smart_match
             possible_npcs = await find_npc_by_smart_match(session, npc_name, location.id)
 
-            # 如果完整文本匹配失败，且包含空格，尝试用第一个词匹配
+            # 如果完整文本匹配失败，且包含空格，尝试用第一个词匹配（支持"交互 司长 你好"）
             if not possible_npcs and ' ' in args_text:
                 potential_npc_name = args_text.split(' ', 1)[0]
                 npc = await npc_service.get_npc_by_name(potential_npc_name, location.id)
                 if not npc:
                     possible_npcs = await find_npc_by_smart_match(session, potential_npc_name, location.id)
-                else:
-                    # 找到了！更新npc_name和dialogue_content
-                    npc_name = potential_npc_name
+                if npc:
+                    # 找到了！更新dialogue_content
                     if ' ' in args_text:
                         dialogue_content = args_text.split(' ', 1)[1]
 
+            # 如果还是找不到，尝试模糊匹配（关键词匹配）
+            if not possible_npcs and not npc:
+                # 获取当前位置所有NPC，进行关键词匹配
+                from sqlalchemy import select
+                stmt = select(NPC).where(
+                    NPC.location_id == location.id,
+                    NPC.is_active == True
+                )
+                result = await session.execute(stmt)
+                all_npcs = list(result.scalars().all())
+
+                # 关键词匹配：NPC名字包含输入的关键词
+                search_keyword = npc_name.lower()
+                matched_npcs = [n for n in all_npcs if search_keyword in n.name.lower()]
+
+                if matched_npcs:
+                    possible_npcs = matched_npcs
+
+            # 处理匹配结果
             if not possible_npcs and not npc:
                 await interact_cmd.finish(f"⛔ 在当前位置找不到名为'{args_text}'的NPC")
+            elif npc:
+                # 已经找到了精确匹配的NPC，继续处理
+                pass
             elif len(possible_npcs) == 1:
+                # 只有一个匹配结果，直接使用
                 npc = possible_npcs[0]
-            else:
+                # 如果原始输入包含空格，提取对话内容
+                if ' ' in args_text and not dialogue_content:
+                    # 尝试从原始输入中分离NPC名和对话内容
+                    dialogue_content = args_text.split(' ', 1)[1] if ' ' in args_text else None
+            elif len(possible_npcs) > 1:
                 # 多个匹配结果，给出友好提示
                 npc_list = []
                 for n in possible_npcs[:5]:  # 最多显示5个
                     npc_list.append(f"• {n.name}")
+
+                # 安全地获取示例名称
+                example_name = possible_npcs[0].name
+                short_name = example_name.split('·')[-1] if '·' in example_name else example_name
 
                 msg = (
                     f"🔍 找到多个匹配'{args_text}'的NPC：\n"
@@ -127,8 +158,8 @@ async def handle_npc_interaction(event: MessageEvent, args: Message = CommandArg
                     ("\n..." if len(possible_npcs) > 5 else "") +
                     "\n━━━━━━━━━━━━━\n"
                     "💡 请使用更具体的名称，如：\n"
-                    f"• 【交互 {possible_npcs[0].name.split('·')[-1]}】\n"
-                    f"• 【交互 {possible_npcs[0].name}】"
+                    f"• 交互 {short_name}\n"
+                    f"• 交互 {example_name}"
                 )
                 await interact_cmd.finish(message_add_head(msg, event))
 
