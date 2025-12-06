@@ -169,11 +169,16 @@ async def handle_npc_interaction(event: MessageEvent, args: Message = CommandArg
             await interact_cmd.finish(f"⛔ {interaction_info['message']}")
 
         # 根据NPC类型处理交互
-        await handle_npc_type_interaction(session, player, npc, interaction_info, event)
+        await handle_npc_type_interaction(session, player, npc, interaction_info, event, dialogue_content)
 
 
-async def handle_npc_type_interaction(session, player: Player, npc, interaction_info: dict, event: MessageEvent):
+async def handle_npc_type_interaction(session, player: Player, npc, interaction_info: dict, event: MessageEvent, dialogue_content: str = None):
     """根据NPC类型处理具体交互"""
+    # 优先检查是否启用AI对话（适用于所有类型的NPC）
+    if npc.extra_data and npc.extra_data.get("ai_enabled"):
+        await handle_ai_dialogue_interaction(session, player, npc, event, question=dialogue_content)
+        return
+
     npc_type = npc.npc_type
 
     if npc_type == NPCType.MERCHANT:
@@ -291,10 +296,7 @@ async def handle_special_vendor_interaction(session, player: Player, npc, event:
 
 async def handle_generic_interaction(session, player: Player, npc, event: MessageEvent, dialogue_content: str = None):
     """处理普通NPC交互"""
-    # 检查是否启用AI对话
-    if npc.extra_data and npc.extra_data.get("ai_enabled"):
-        await handle_ai_dialogue_interaction(session, player, npc, event, question=dialogue_content)
-        return
+    # 注意：AI对话检查已在 handle_npc_type_interaction 中统一处理
 
     # 检查是否是中立NPC（有特殊对话）
     if npc.extra_data and npc.extra_data.get("is_neutral") and npc.extra_data.get("dialogues"):
