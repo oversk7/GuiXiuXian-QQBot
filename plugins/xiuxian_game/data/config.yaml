@@ -118,7 +118,7 @@ ai_dialogue:
 
   # 对话历史管理
   history:
-    max_rounds: 10  # 保留最近多少轮对话
+    max_rounds: 5  # 保留最近多少轮对话（用于AI上下文）
     ttl_days: 30  # 对话历史保留天数
 
   # 限速控制（GLM-4.5-Flash为免费模型，仅需控制调用频率）

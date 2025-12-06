@@ -555,15 +555,32 @@ async def handle_ai_dialogue_interaction(session, player: Player, npc, event: Me
         await history_repo.save(history)
         await session.commit()
 
-        # 格式化输出
+        # 格式化输出，包含对话历史
         lines = [
             f"💬 {npc.name}",
             "━━━━━━━━━━━━━",
-            npc_response,
-            "",
-            f"❤️ 好感度: {favorability.current_favorability}/100 ({favorability.relationship_level})",
-            f"🔄 互动次数: {favorability.total_interactions}次"
         ]
+
+        # 显示最近2轮对话历史（如果有）
+        if dialogue_history:
+            recent_display = dialogue_history[-2:]  # 显示最近2轮
+            if recent_display:
+                lines.append("📜 最近对话：")
+                for history in recent_display:
+                    # 截取部分内容避免太长
+                    player_text = history.player_input[:30] + "..." if len(history.player_input) > 30 else history.player_input
+                    npc_text = history.npc_response[:30] + "..." if len(history.npc_response) > 30 else history.npc_response
+                    lines.append(f"  你: {player_text}")
+                    lines.append(f"  {npc.name}: {npc_text}")
+                lines.append("━━━━━━━━━━━━━")
+
+        # 显示当前对话
+        lines.append("🗨️ 当前对话：")
+        lines.append(f"  你: {question}")
+        lines.append(f"  {npc.name}: {npc_response}")
+        lines.append("")
+        lines.append(f"❤️ 好感度: {favorability.current_favorability}/100 ({favorability.relationship_level})")
+        lines.append(f"🔄 互动次数: {favorability.total_interactions}次")
 
         await interact_cmd.finish(message_add_head("\n".join(lines), event))
 

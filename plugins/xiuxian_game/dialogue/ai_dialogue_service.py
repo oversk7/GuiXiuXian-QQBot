@@ -72,24 +72,23 @@ class AIDialogueService:
                 context=context or {}
             )
 
-            # 构建对话历史上下文（最近N轮）
-            history_context = self._build_history_context(dialogue_history)
+            # 构建messages列表，包含对话历史
+            messages = [{"role": "system", "content": system_prompt}]
 
-            # 构建用户消息
-            user_message = f"""
-{history_context}
+            # 添加对话历史（最近N轮），保持对话的连续性
+            if dialogue_history:
+                # 只取最近的对话，避免token过多
+                recent_history = dialogue_history[-(self.max_history_rounds):]
+                for history in recent_history:
+                    # 添加玩家消息
+                    messages.append({"role": "user", "content": history.player_input})
+                    # 添加NPC回复
+                    messages.append({"role": "assistant", "content": history.npc_response})
 
-当前玩家问题：{question}
-
-请以{npc.name}的身份回复这个问题。
-"""
+            # 添加当前的用户问题
+            messages.append({"role": "user", "content": question})
 
             # 调用AI（支持fallback降级）
-            messages = [
-                {"role": "system", "content": system_prompt},
-                {"role": "user", "content": user_message}
-            ]
-
             result = await self._call_ai_with_fallback(messages)
 
             # 提取回复内容
@@ -198,7 +197,8 @@ class AIDialogueService:
         context_lines = ["最近的对话历史："]
         for history in recent_history:
             context_lines.append(f"玩家: {history.player_input}")
-            context_lines.append(f"{history.npc.name}: {history.npc_response}")
+            # 使用NPC回复字段，避免懒加载问题
+            context_lines.append(f"NPC: {history.npc_response}")
 
         return "\n".join(context_lines)
 
