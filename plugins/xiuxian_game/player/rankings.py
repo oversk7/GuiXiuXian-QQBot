@@ -199,16 +199,10 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
         all_players_stmt = select(Player).where(Player.id.in_(player_ids))
         all_players = (await session.execute(all_players_stmt)).scalars().all()
 
-        # 批量查询银行余额并结息以确保余额最新
+        # 批量查询银行余额（已取消利息结算，参见bank.py:12-16银行改革说明）
         bank_stmt = select(BankAccount).where(BankAccount.player_id.in_(player_ids))
         bank_accounts = (await session.execute(bank_stmt)).scalars().all()
-        # 结息，保持与【存款榜】一致的口径
-        from ..economy.bank import _apply_interest
-        for acc in bank_accounts:
-            _apply_interest(acc)
-        if bank_accounts:
-            session.add_all(bank_accounts)
-            await session.commit()
+        # 银行系统于2025-12-03改革，取消存款利息机制，直接使用现有余额
         bank_map = {acc.player_id: acc.balance for acc in bank_accounts}
 
         # 批量查询投资持仓

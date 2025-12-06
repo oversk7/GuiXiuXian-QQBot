@@ -98,7 +98,7 @@ async def show_location_info(session: AsyncSession, player: Player, location, cu
     await AchievementService.add_visited_location(session, player.id, location_key)
 
     # 检查探索类成就
-    achievement_messages = await AchievementService.check_achievements(session, player.id)
+    achievement_messages = await AchievementService.check_achievements(session, player)
     if achievement_messages:
         info_text += "\n\n" + "\n\n".join(achievement_messages)
 

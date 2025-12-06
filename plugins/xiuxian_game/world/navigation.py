@@ -192,7 +192,7 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
                 await AchievementService.add_visited_location(session, player.id, location_key)
 
                 # 检查探索类成就
-                achievement_messages = await AchievementService.check_achievements(session, player.id)
+                achievement_messages = await AchievementService.check_achievements(session, player)
                 if achievement_messages:
                     arrival_msg += "\n\n" + "\n\n".join(achievement_messages)
 
