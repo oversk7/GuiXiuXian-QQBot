@@ -170,11 +170,76 @@ class NPCFavorabilityService:
         # 默认中性
         return "neutral"
 
+    def calculate_favorability_change_with_decay(
+        self,
+        base_change: int,
+        current_favorability: int,
+        interaction_type: str
+    ) -> int:
+        """
+        计算带递减效应的好感度变化
+
+        Args:
+            base_change: 基础变化值
+            current_favorability: 当前好感度
+            interaction_type: 互动类型
+
+        Returns:
+            实际的好感度变化值
+        """
+        # 定义关系等级门槛
+        thresholds = [20, 40, 60, 80, 95]
+
+        # 日常对话在接近门槛时效果递减
+        if interaction_type == "dialogue":
+            for threshold in thresholds:
+                # 正向变化接近上限门槛
+                if base_change > 0 and current_favorability >= threshold - 5 and current_favorability < threshold:
+                    # 越接近门槛，效果越差
+                    distance_to_threshold = threshold - current_favorability
+                    if distance_to_threshold <= 2:
+                        # 非常接近门槛，日常对话几乎无效
+                        return 0 if base_change <= 3 else 1
+                    else:
+                        # 接近门槛，效果减半
+                        return max(1, base_change // 2)
+
+                # 负向变化接近下限门槛
+                if base_change < 0 and current_favorability <= threshold + 5 and current_favorability > threshold:
+                    distance_from_threshold = current_favorability - threshold
+                    if distance_from_threshold <= 2:
+                        # 刚过门槛，下降缓慢
+                        return max(-1, base_change // 2)
+
+        # 根据当前好感度等级调整变化速率
+        if current_favorability < 20:  # 陌生人
+            multiplier = 1.0  # 正常变化
+        elif current_favorability < 40:  # 熟识
+            multiplier = 0.8  # 80%效果
+        elif current_favorability < 60:  # 友好
+            multiplier = 0.6  # 60%效果
+        elif current_favorability < 80:  # 亲密
+            multiplier = 0.4  # 40%效果
+        else:  # 知心
+            multiplier = 0.2  # 20%效果
+
+        # 应用衰减
+        actual_change = int(base_change * multiplier)
+
+        # 确保至少有最小变化（除非在门槛附近）
+        if base_change > 0:
+            actual_change = max(actual_change, 1) if actual_change > 0 else 0
+        elif base_change < 0:
+            actual_change = min(actual_change, -1) if actual_change < 0 else 0
+
+        return actual_change
+
     def get_favorability_change_by_interaction_type(
         self,
         interaction_type: str,
         success: bool = True,
-        dialogue_content: str = None
+        dialogue_content: str = None,
+        current_favorability: int = 50
     ) -> int:
         """
         根据互动类型获取好感度变化值
@@ -183,48 +248,74 @@ class NPCFavorabilityService:
             interaction_type: 互动类型
             success: 是否成功（用于指令执行）
             dialogue_content: 对话内容（用于分析情感）
+            current_favorability: 当前好感度
 
         Returns:
-            好感度变化值
+            好感度变化值（考虑递减效应）
         """
+        base_change = 0
+
         if interaction_type == "dialogue":
             # 根据对话内容的情感分析调整好感度
             if dialogue_content:
                 sentiment = self.analyze_dialogue_sentiment(dialogue_content)
                 if sentiment == "very_negative":
-                    return -10  # 辱骂等极度负面内容
+                    base_change = -10  # 辱骂等极度负面内容
                 elif sentiment == "negative":
-                    return -3   # 一般负面内容
+                    base_change = -3   # 一般负面内容
                 elif sentiment == "positive":
-                    return 3    # 正面内容
+                    base_change = 3    # 正面内容
                 else:
-                    return 1    # 中性内容
+                    base_change = 1    # 中性内容
             else:
-                return 1  # 默认中性
+                base_change = 1  # 默认中性
 
-        elif interaction_type == "command_execution":
-            if success:
-                # 游戏指令执行成功：+5~+15
-                return 10
-            else:
-                # 游戏指令执行失败：-5
-                return -5
+            # 应用递减效应
+            return self.calculate_favorability_change_with_decay(
+                base_change,
+                current_favorability,
+                interaction_type
+            )
 
         elif interaction_type == "gift":
-            # 赠送物品：+10~+30（具体值应根据物品价值调整）
+            # 赠送物品可以突破门槛（中等事件）
+            base_change = 10  # 基础值，具体应根据物品价值调整
+            # 礼物的递减效应较小
+            multiplier = 0.8 if current_favorability >= 60 else 1.0
+            return max(3, int(base_change * multiplier))
+
+        elif interaction_type == "quest_complete":
+            # 完成任务可以突破门槛（重大事件）
+            base_change = 15
+            # 任务奖励不受递减影响
+            return base_change
+
+        elif interaction_type == "save_life":
+            # 救命之恩（重大事件，可突破所有门槛）
             return 20
+
+        elif interaction_type == "betrayal":
+            # 背叛行为（重大负面事件）
+            return -30
 
         elif interaction_type == "combat":
             if success:
-                # 战斗胜利（与NPC队友）：+5
-                return 5
+                # 战斗胜利（与NPC队友）
+                base_change = 5
+                # 战斗协作的递减较小
+                multiplier = 0.7 if current_favorability >= 60 else 1.0
+                return max(2, int(base_change * multiplier))
             else:
-                # 战斗失败（NPC被击杀）：-50
-                return -50
+                # 战斗失败（NPC被击杀）：重大负面事件
+                return -20
 
         else:
-            # 默认
-            return 1
+            # 默认对话类型，使用递减
+            return self.calculate_favorability_change_with_decay(
+                1,
+                current_favorability,
+                "dialogue"
+            )
 
     async def set_follower_status(
         self,

@@ -542,7 +542,8 @@ async def handle_ai_dialogue_interaction(session, player: Player, npc, event: Me
         # 根据对话内容更新好感度（使用之前分析的sentiment）
         fav_delta = fav_service.get_favorability_change_by_interaction_type(
             "dialogue",
-            dialogue_content=question  # 传入玩家的对话内容用于情感分析
+            dialogue_content=question,  # 传入玩家的对话内容用于情感分析
+            current_favorability=favorability.current_favorability  # 传入当前好感度以计算递减
         )
 
         # 记录情感分析结果（用于日志）
@@ -612,6 +613,25 @@ async def handle_ai_dialogue_interaction(session, player: Player, npc, event: Me
         lines.append(f"❤️ 好感度: {favorability.current_favorability}/100 ({change_icon} {change_text})")
         lines.append(f"🔗 关系等级: {favorability.relationship_level}")
         lines.append(f"🔄 互动次数: {favorability.total_interactions}次")
+
+        # 提示门槛突破信息
+        thresholds = {
+            20: ("熟识", "需要更多交流才能成为朋友"),
+            40: ("友好", "需要赠送礼物或完成任务才能更进一步"),
+            60: ("亲密", "需要共同战斗或完成重要任务才能建立亲密关系"),
+            80: ("知心", "需要经历生死考验才能成为知心好友")
+        }
+
+        for threshold, (level_name, hint) in thresholds.items():
+            # 如果好感度接近门槛（差2点以内）
+            if threshold - 3 <= favorability.current_favorability < threshold:
+                lines.append(f"💡 提示: 即将突破至【{level_name}】关系，{hint}")
+                break
+
+        # 如果好感度很高但变化很小
+        if favorability.current_favorability >= 60 and abs(fav_delta) <= 1:
+            if fav_delta == 0:
+                lines.append("⚠️ 日常对话已无法增进关系，需要特殊互动")
 
         await interact_cmd.finish(message_add_head("\n".join(lines), event))
 
