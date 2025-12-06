@@ -79,9 +79,6 @@ LLM代理生成的调研和分析报告（仅保留系统分析和设计参考�
 - `cyberpunk_hacking_solvability_analysis.md` - cyberpunk_hacking序列生成可解性深度分析 (2025-12-04)
 - `cyberpunk_hacking_limitation_investigation.md` - cyberpunk_hacking限制条件与成本调查 (2025-12-04)
 - `achievement_integration_fix_2025_12_05.md` - 成就系统关键路径集成修复实施记录 (2025-12-05)
-- `gold_achievement_investigation_2025_12_05.md` - 财富类成就触发失败根因调查 (2025-12-05)
-- `login_streak_achievement_investigation.md` - 连续登录类成就触发失败根因调查 (2025-12-05)
-- `kill_count_achievement_investigation.md` - 打怪类成就触发问题调查 (2025-12-05)
 
 **投资系统调研**:
 - `investment_system_investigation.md` - 投资系统初步调查报告（银行+股票）
@@ -96,7 +93,7 @@ LLM代理生成的调研和分析报告（仅保留系统分析和设计参考�
 - `cultivation_and_quest_investigation.md` - 修炼与任务系统调查
 - `code_logic_comparison_investigation.md` - 代码逻辑对比分析
 
-**清理说明**: 已删除11个临时性bug修复调查文档（装备bug、连接泄漏、ENUM修复等），这些问题均已解决且无长期参考价值。
+**清理说明**: 已删除20个临时性bug修复调查文档（2025-12-06清理9个：银行利息、任务统计、成就进度、成就单点调查3个、连接泄漏2个；2025-12-03清理11个：装备bug、连接泄漏、ENUM修复等），这些问题均已解决且无长期参考价值。
 
 ### `/design/` - 系统设计方案
 游戏设计和系统重构方案:
