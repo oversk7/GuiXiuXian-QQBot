@@ -146,3 +146,37 @@ class NPCFavorabilityRepository(IRepository[NPCFavorability]):
         )
         result = await self._session.execute(stmt)
         return list(result.scalars().all())
+
+    # ==================== 实现IRepository抽象方法 ====================
+
+    async def add(self, entity: NPCFavorability) -> NPCFavorability:
+        """添加新好感度记录"""
+        self._session.add(entity)
+        await self._session.flush()
+        return entity
+
+    async def update(self, entity: NPCFavorability) -> NPCFavorability:
+        """更新好感度记录"""
+        await self._session.flush()
+        return entity
+
+    async def delete(self, favorability_id: int) -> bool:
+        """删除好感度记录"""
+        record = await self.get_by_id(favorability_id)
+        if record:
+            await self._session.delete(record)
+            await self._session.flush()
+            return True
+        return False
+
+    async def exists(self, favorability_id: int) -> bool:
+        """检查好感度记录是否存在"""
+        record = await self.get_by_id(favorability_id)
+        return record is not None
+
+    async def count(self) -> int:
+        """获取好感度记录总数"""
+        from sqlalchemy import func
+        stmt = select(func.count()).select_from(NPCFavorability)
+        result = await self._session.execute(stmt)
+        return result.scalar() or 0
