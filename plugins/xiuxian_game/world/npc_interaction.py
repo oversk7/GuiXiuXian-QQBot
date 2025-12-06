@@ -7,6 +7,7 @@ NPC交互命令
 from nonebot import on_command
 from nonebot.adapters.qq import MessageEvent, Message
 from nonebot.params import CommandArg
+from nonebot.exception import FinishedException
 
 from ..models.db import safe_session
 from ..models.player import Player
@@ -566,6 +567,9 @@ async def handle_ai_dialogue_interaction(session, player: Player, npc, event: Me
 
         await interact_cmd.finish(message_add_head("\n".join(lines), event))
 
+    except FinishedException:
+        # FinishedException是正常的流程控制，直接抛出
+        raise
     except Exception as e:
         import logging
         logger = logging.getLogger(__name__)

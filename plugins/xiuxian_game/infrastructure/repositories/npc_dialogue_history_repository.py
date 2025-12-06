@@ -58,6 +58,77 @@ class NPCDialogueHistoryRepository(IRepository[NPCDialogueHistory]):
         await self._session.flush()
         return history
 
+    async def add(self, entity: NPCDialogueHistory) -> NPCDialogueHistory:
+        """
+        添加新实体（IRepository接口方法）
+
+        Args:
+            entity: 要添加的对话历史实体
+
+        Returns:
+            添加后的实体
+        """
+        return await self.save(entity)
+
+    async def update(self, entity: NPCDialogueHistory) -> NPCDialogueHistory:
+        """
+        更新实体（IRepository接口方法）
+
+        Args:
+            entity: 要更新的对话历史实体
+
+        Returns:
+            更新后的实体
+        """
+        await self._session.merge(entity)
+        await self._session.flush()
+        return entity
+
+    async def delete(self, id: int) -> bool:
+        """
+        删除实体（IRepository接口方法）
+
+        Args:
+            id: 要删除的对话历史ID
+
+        Returns:
+            是否删除成功
+        """
+        stmt = select(NPCDialogueHistory).where(NPCDialogueHistory.id == id)
+        result = await self._session.execute(stmt)
+        entity = result.scalar_one_or_none()
+        if entity:
+            await self._session.delete(entity)
+            await self._session.flush()
+            return True
+        return False
+
+    async def exists(self, id: int) -> bool:
+        """
+        检查实体是否存在（IRepository接口方法）
+
+        Args:
+            id: 对话历史ID
+
+        Returns:
+            是否存在
+        """
+        stmt = select(NPCDialogueHistory.id).where(NPCDialogueHistory.id == id)
+        result = await self._session.execute(stmt)
+        return result.scalar_one_or_none() is not None
+
+    async def count(self) -> int:
+        """
+        获取实体总数（IRepository接口方法）
+
+        Returns:
+            对话历史记录总数
+        """
+        from sqlalchemy import func
+        stmt = select(func.count(NPCDialogueHistory.id))
+        result = await self._session.execute(stmt)
+        return result.scalar() or 0
+
     async def get_total_interactions(self, npc_id: int, player_id: str) -> int:
         """获取总对话次数"""
         from sqlalchemy import func

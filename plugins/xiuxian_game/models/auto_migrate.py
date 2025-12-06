@@ -187,7 +187,7 @@ REQUIRED_INDEXES: List[Tuple[str, str, str]] = [
 
 # 定义需要检查的 ENUM 列
 # 格式: {表名: {列名: [允许的值列表]}}
-# ⚠️ 这里定义的值必须与代码中的 Enum 类保持一致！
+# 警告: 这里定义的值必须与代码中的 Enum 类保持一致！
 REQUIRED_ENUMS: Dict[str, Dict[str, List[str]]] = {
     "daily_task": {
         "task_type": [
@@ -220,7 +220,7 @@ async def auto_migrate(engine: AsyncEngine, verbose: bool = True):
         verbose: 是否打印详细日志
     """
     if verbose:
-        print("🔍 [自动迁移] 检查数据库结构...")
+        print("[自动迁移] 检查数据库结构...")
 
     async with engine.begin() as conn:
         # 1. 创建缺失的表
@@ -237,11 +237,11 @@ async def auto_migrate(engine: AsyncEngine, verbose: bool = True):
 
         if verbose:
             if tables_created > 0 or fields_added > 0 or indexes_added > 0 or enums_fixed > 0:
-                print(f"✅ [自动迁移] 完成！创建了 {tables_created} 个表，"
+                print(f"[√] [自动迁移] 完成！创建了 {tables_created} 个表，"
                       f"添加了 {fields_added} 个字段，{indexes_added} 个索引，"
                       f"修复了 {enums_fixed} 个 ENUM 列")
             else:
-                print("✓ [自动迁移] 数据库结构已是最新")
+                print("[√] [自动迁移] 数据库结构已是最新")
 
 
 async def _create_missing_tables(conn, verbose: bool) -> int:
@@ -252,16 +252,16 @@ async def _create_missing_tables(conn, verbose: bool) -> int:
         try:
             await conn.execute(text(create_sql))
             if verbose:
-                print(f"  📊 创建表: {table_name}")
+                print(f"  [创建] 表: {table_name}")
             created_count += 1
         except Exception as e:
             error_msg = str(e).lower()
             # 忽略"表已存在"错误
             if "already exists" in error_msg or "duplicate" in error_msg:
                 if verbose:
-                    logger.debug(f"  ✓ 表 {table_name} 已存在")
+                    logger.debug(f"  [√] 表 {table_name} 已存在")
             else:
-                logger.error(f"❌ [自动迁移] 创建表 {table_name} 失败: {e}")
+                logger.error(f"[X] [自动迁移] 创建表 {table_name} 失败: {e}")
 
     return created_count
 
@@ -283,7 +283,7 @@ async def _add_missing_fields(conn, verbose: bool) -> int:
 
         if not existing_columns:
             if verbose:
-                logger.warning(f"⚠️ [自动迁移] 表 {table_name} 不存在，跳过字段检查")
+                logger.warning(f"[!] [自动迁移] 表 {table_name} 不存在，跳过字段检查")
             continue
 
         # 检查并添加缺失的字段
@@ -294,7 +294,7 @@ async def _add_missing_fields(conn, verbose: bool) -> int:
                     await conn.execute(text(sql))
 
                     if verbose:
-                        print(f"  ➕ 添加字段: {table_name}.{field_name}")
+                        print(f"  [+] 添加字段: {table_name}.{field_name}")
 
                     added_count += 1
 
@@ -303,9 +303,9 @@ async def _add_missing_fields(conn, verbose: bool) -> int:
                     # 忽略"字段已存在"错误
                     if "duplicate" in error_msg or "exists" in error_msg:
                         if verbose:
-                            logger.debug(f"  ✓ 字段 {table_name}.{field_name} 已存在")
+                            logger.debug(f"  [√] 字段 {table_name}.{field_name} 已存在")
                     else:
-                        logger.error(f"❌ [自动迁移] 添加字段 {table_name}.{field_name} 失败: {e}")
+                        logger.error(f"[X] [自动迁移] 添加字段 {table_name}.{field_name} 失败: {e}")
 
     return added_count
 
@@ -331,7 +331,7 @@ async def _add_missing_indexes(conn, verbose: bool) -> int:
                 if verbose:
                     logger.debug(f"  ✓ 索引 {idx_name} 已存在")
             else:
-                logger.error(f"❌ [自动迁移] 创建索引 {idx_name} 失败: {e}")
+                logger.error(f"[X] [自动迁移] 创建索引 {idx_name} 失败: {e}")
 
     return added_count
 
@@ -359,10 +359,10 @@ async def verify_migration(engine: AsyncEngine) -> bool:
 
             for field_name in fields.keys():
                 if field_name not in existing_columns:
-                    logger.error(f"❌ 缺失字段: {table_name}.{field_name}")
+                    logger.error(f"[X] 缺失字段: {table_name}.{field_name}")
                     return False
 
-        logger.info("✅ 所有必需字段都已存在")
+        logger.info("[√] 所有必需字段都已存在")
         return True
 
 
@@ -394,7 +394,7 @@ async def _fix_enum_columns(conn, verbose: bool) -> int:
 
                 if actual_values is None:
                     if verbose:
-                        logger.warning(f"⚠️ [ENUM检查] 表 {table_name} 或列 {column_name} 不存在，跳过")
+                        logger.warning(f"[!] [ENUM检查] 表 {table_name} 或列 {column_name} 不存在，跳过")
                     continue
 
                 # 2. 对比期望值和实际值
@@ -411,7 +411,7 @@ async def _fix_enum_columns(conn, verbose: bool) -> int:
                 extra_values = actual_set - expected_set
 
                 if verbose:
-                    print(f"  🔧 修复 ENUM 列: {table_name}.{column_name}")
+                    print(f"  [修复] 修复 ENUM 列: {table_name}.{column_name}")
                     if missing_values:
                         print(f"     缺失值: {', '.join(missing_values)}")
                     if extra_values:
@@ -422,10 +422,10 @@ async def _fix_enum_columns(conn, verbose: bool) -> int:
                 fixed_count += 1
 
                 if verbose:
-                    print(f"     ✅ 修复完成")
+                    print(f"     [√] 修复完成")
 
             except Exception as e:
-                logger.error(f"❌ [ENUM修复] 处理 {table_name}.{column_name} 失败: {e}")
+                logger.error(f"[X] [ENUM修复] 处理 {table_name}.{column_name} 失败: {e}")
 
     return fixed_count
 
@@ -517,7 +517,7 @@ async def _rebuild_enum_column(
         unsupported_values = actual_data_values - set(new_values)
         if unsupported_values:
             error_msg = f"数据中存在新 ENUM 不支持的值: {unsupported_values}"
-            logger.error(f"❌ {error_msg}")
+            logger.error(f"[X] {error_msg}")
             logger.error(f"   请先更新 REQUIRED_ENUMS 或手动处理这些数据")
             raise ValueError(error_msg)
 
@@ -588,7 +588,7 @@ async def _rebuild_enum_column(
 
         if orphaned_count > 0:
             error_msg = f"数据恢复不完整: {orphaned_count} 行数据未能恢复"
-            logger.error(f"❌ {error_msg}")
+            logger.error(f"[X] {error_msg}")
             raise ValueError(error_msg)
 
         if verbose:
