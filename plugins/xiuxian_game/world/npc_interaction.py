@@ -182,7 +182,7 @@ async def handle_npc_type_interaction(session, player: Player, npc, interaction_
             await handle_ai_dialogue_interaction(session, player, npc, event, question=dialogue_content)
             return
         except Exception as e:
-            logger.error(f"AI对话失败 - NPC: {npc.name}, 玩家: {player.user_id}, 错误: {e}", exc_info=True)
+            logger.error(f"AI对话失败 - NPC: {npc.name}, 玩家: {player.id}, 错误: {e}", exc_info=True)
             # 降级处理：显示友好提示
             await interact_cmd.finish(
                 f"💬 {npc.name}\n"
