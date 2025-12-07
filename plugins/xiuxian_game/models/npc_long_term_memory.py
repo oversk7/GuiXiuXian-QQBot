@@ -43,8 +43,8 @@ class NPCLongTermMemory(Base):
     from_dialogue_id = Column(Integer, nullable=True, comment="关联的起始对话ID")
     to_dialogue_id = Column(Integer, nullable=True, comment="关联的结束对话ID")
 
-    # 元数据
-    metadata = Column(JSON, nullable=True, comment="额外元数据")
+    # 元数据（改名为extra_metadata避免与SQLAlchemy保留属性冲突）
+    extra_metadata = Column(JSON, nullable=True, comment="额外元数据")
 
     # 定义索引
     __table_args__ = (
@@ -79,7 +79,7 @@ class NPCLongTermMemory(Base):
             "emotion_change": self.emotion_change,
             "created_at": self.created_at.strftime("%Y-%m-%d %H:%M:%S") if self.created_at else None,
             "weight": self.weight,
-            "metadata": self.metadata
+            "extra_metadata": self.extra_metadata
         }
 
 

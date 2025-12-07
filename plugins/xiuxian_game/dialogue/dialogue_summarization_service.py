@@ -338,7 +338,7 @@ class DialogueSummarizationService:
                     emotion_change=event.get("emotion_change", 0),
                     from_dialogue_id=from_dialogue_id,
                     to_dialogue_id=to_dialogue_id,
-                    metadata=event  # 存储完整事件数据
+                    extra_metadata=event  # 存储完整事件数据
                 )
                 event_ids.append(memory.id)
             except Exception as e:

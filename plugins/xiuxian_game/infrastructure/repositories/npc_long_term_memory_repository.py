@@ -31,7 +31,7 @@ class NPCLongTermMemoryRepository:
         emotion_change: int = 0,
         from_dialogue_id: Optional[int] = None,
         to_dialogue_id: Optional[int] = None,
-        metadata: Optional[dict] = None
+        extra_metadata: Optional[dict] = None
     ) -> NPCLongTermMemory:
         """
         创建新的长期记忆
@@ -46,7 +46,7 @@ class NPCLongTermMemoryRepository:
             emotion_change: 情感变化值
             from_dialogue_id: 起始对话ID
             to_dialogue_id: 结束对话ID
-            metadata: 额外元数据
+            extra_metadata: 额外元数据
 
         Returns:
             创建的记忆对象
@@ -61,7 +61,7 @@ class NPCLongTermMemoryRepository:
             emotion_change=emotion_change,
             from_dialogue_id=from_dialogue_id,
             to_dialogue_id=to_dialogue_id,
-            metadata=metadata,
+            extra_metadata=extra_metadata,
             created_at=datetime.now(),
             weight=1.0,
             last_accessed_at=datetime.now()
