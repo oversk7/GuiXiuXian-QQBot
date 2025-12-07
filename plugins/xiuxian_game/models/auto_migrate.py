@@ -188,7 +188,7 @@ REQUIRED_TABLES: Dict[str, str] = {
             last_accessed_at DATETIME DEFAULT CURRENT_TIMESTAMP COMMENT '最后访问时间',
             from_dialogue_id INT NULL COMMENT '关联的起始对话ID',
             to_dialogue_id INT NULL COMMENT '关联的结束对话ID',
-            metadata JSON NULL COMMENT '额外元数据',
+            extra_metadata JSON NULL COMMENT '额外元数据',
             INDEX idx_npc_player_time (npc_id, player_id, created_at),
             INDEX idx_memory_type (memory_type),
             INDEX idx_importance (importance_score),
