@@ -210,3 +210,50 @@ class NPCDialogueHistoryRepository(IRepository[NPCDialogueHistory]):
             'total_tokens_used': row.total_tokens or 0,
             'total_cost_cents': row.total_cost or 0,  # 以分为单位
         }
+
+    async def get_dialogue_count(self, npc_id: int, player_id: str) -> int:
+        """
+        获取NPC和玩家的对话总数
+
+        Args:
+            npc_id: NPC ID
+            player_id: 玩家ID
+
+        Returns:
+            对话总数
+        """
+        return await self.get_total_interactions(npc_id, player_id)
+
+    async def get_dialogues_after_id(
+        self,
+        npc_id: int,
+        player_id: str,
+        after_dialogue_id: int,
+        limit: int = 30
+    ) -> List[NPCDialogueHistory]:
+        """
+        获取指定对话ID之后的对话记录（用于总结）
+
+        Args:
+            npc_id: NPC ID
+            player_id: 玩家ID
+            after_dialogue_id: 起始对话ID（不包含此ID）
+            limit: 返回条数限制
+
+        Returns:
+            对话历史列表（按时间正序）
+        """
+        stmt = (
+            select(NPCDialogueHistory)
+            .where(
+                and_(
+                    NPCDialogueHistory.npc_id == npc_id,
+                    NPCDialogueHistory.player_id == player_id,
+                    NPCDialogueHistory.id > after_dialogue_id
+                )
+            )
+            .order_by(NPCDialogueHistory.created_at)  # 正序：从旧到新
+            .limit(limit)
+        )
+        result = await self._session.execute(stmt)
+        return list(result.scalars().all())

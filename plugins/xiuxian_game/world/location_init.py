@@ -42,8 +42,9 @@ async def handle_init_locations(event: MessageEvent):
             # 初始化特殊商店和NPC
             special_count = await init_special_locations(session)
 
-            # 初始化中立NPC
-            neutral_count = await init_neutral_npcs(session)
+            # 初始化中立NPC（已禁用 - 2025-12-07）
+            # neutral_count = await init_neutral_npcs(session)
+            neutral_count = 0  # 不再生成中立NPC
 
             await session.commit()
 
@@ -496,389 +497,15 @@ async def init_special_locations(session) -> int:
 
 
 async def init_neutral_npcs(session) -> int:
-    """初始化中立NPC，增加世界观深度和怪谈氛围"""
-    created_count = 0
+    """
+    初始化中立NPC，增加世界观深度和怪谈氛围
 
-    # 定义中立NPC配置 - 全部分布在已有的市集和城镇地点
-    neutral_npcs = [
-        # === 市集区域的神秘NPC ===
-        # 上京 (0, 0) - 商业中心
-        {
-            "npc_id": "night_watchman",
-            "name": "更夫·李四",
-            "x": 0, "y": 0,
-            "description": "一个打更的老人，总是在深夜出现",
-            "dialogues": [
-                "🔔 李四：「天干物燥，小心火烛...也要小心那些看不见的东西」",
-                "🔔 李四：「我打更几十年，见过太多怪事...有些事不能说」",
-                "🔔 李四：「夜里总有人影在街上飘...那不是活人」",
-                "🔔 李四：「年轻人，夜深了就别出门...外面不安全」",
-                "🔔 李四：「最近缉邪司的人经常出动...看来又有大事要发生了」"
-            ]
-        },
-        {
-            "npc_id": "tea_house_owner",
-            "name": "茶馆老板·赵掌柜",
-            "x": 0, "y": 0,
-            "description": "一个和蔼的中年男人，但眼神总是有些飘忽",
-            "dialogues": [
-                "🍵 赵掌柜：「来杯茶吧...我这茶能压惊，最近很多人需要」",
-                "🍵 赵掌柜：「听说又有修士失踪了...这年头修炼真危险」",
-                "🍵 赵掌柜：「我这茶馆开了三十年，见过太多奇人异事」",
-                "🍵 赵掌柜：「有些客人喝完茶就再也没来过...也不知道去哪了」",
-                "🍵 赵掌柜：「夜里总有人敲门要茶喝...但开门一看，什么都没有」"
-            ]
-        },
-
-        # 北郊 (100, 460)
-        {
-            "npc_id": "paper_money_seller",
-            "name": "纸钱铺老板·孙婆婆",
-            "x": 100, "y": 460,
-            "description": "一个佝偻的老妇人，专门制作纸钱和冥器",
-            "dialogues": [
-                "🪙 孙婆婆：「买点纸钱吧...死人也要花钱的」",
-                "🪙 孙婆婆：「最近生意特别好...总有人要给死去的亲人烧钱」",
-                "🪙 孙婆婆：「我做的纸钱特别灵验...死人收到了会托梦感谢」",
-                "🪙 孙婆婆：「有些修炼的人死了，家人都不敢来买纸钱...怕招惹什么」",
-                "🪙 孙婆婆：「你知道吗？有些纸钱烧了会变成真钱...但代价很大」"
-            ]
-        },
-        {
-            "npc_id": "grave_digger",
-            "name": "掘墓人·老黑",
-            "x": 100, "y": 460,
-            "description": "一个皮肤黝黑的老人，专门负责挖坟掘墓",
-            "dialogues": [
-                "⚱️ 老黑：「挖了一辈子坟，见过太多不该见的东西...」",
-                "⚱️ 老黑：「有些棺材里的人，死了几十年还像活着一样」",
-                "⚱️ 老黑：「修炼的人死后不一样...他们的尸体会发光」",
-                "⚱️ 老黑：「最怕挖到那种会动的棺材...里面的东西还在修炼」",
-                "⚱️ 老黑：「年轻人，别想着长生不老...死了才是解脱」"
-            ]
-        },
-
-        # 东郊 (390, 50) - 物流中心
-        {
-            "npc_id": "old_storyteller",
-            "name": "说书人·老刘",
-            "x": 390, "y": 50,
-            "description": "一个满脸皱纹的老人，总是在讲述着古怪的故事",
-            "dialogues": [
-                "📚 老刘：「想听故事吗？我知道很多...关于那些死而不僵的东西」",
-                "📚 老刘：「从前啊，有个修士进了诡域，出来后就变了个人...」",
-                "📚 老刘：「你知道为什么有些地方总是阴森森的吗？因为死过太多人了」",
-                "📚 老刘：「听说缉邪司最近很忙，到处都有诡异事件...这世道啊」",
-                "📚 老刘：「年轻人，修炼虽好，但别太贪心...有些力量是要付出代价的」"
-            ]
-        },
-        {
-            "npc_id": "courier_ghost",
-            "name": "快递员·阿飘",
-            "x": 390, "y": 50,
-            "description": "一个面色苍白的快递员，总是在送一些奇怪的包裹",
-            "dialogues": [
-                "📦 阿飘：「我送的包裹...有些是给活人的，有些是给死人的」",
-                "📦 阿飘：「最怕送到那些修炼者家里...他们的房子总是阴森森的」",
-                "📦 阿飘：「有一次送包裹，收件人已经死了三天...但还是签收了」",
-                "📦 阿飘：「你们修炼的人订的东西都很奇怪...骨头、血液、魂魄...」",
-                "📦 阿飘：「我怀疑自己也死了...但还在送快递，这正常吗？」"
-            ]
-        },
-
-        # 西郊 (-420, 140)
-        {
-            "npc_id": "herb_collector",
-            "name": "采药人·王麻子",
-            "x": -420, "y": 140,
-            "description": "一个脸上有麻子的中年男人，常年在山里采药",
-            "dialogues": [
-                "🌿 王麻子：「山里的药材越来越难找了...那些地方总有怪事」",
-                "🌿 王麻子：「我见过会动的尸体，还有会说话的骷髅...都在深山里」",
-                "🌿 王麻子：「有些草药长在坟地里，药效特别好...但代价也大」",
-                "🌿 王麻子：「最近山里总有奇怪的声音，像是有人在哭...」",
-                "🌿 王麻子：「你们这些修士啊，总想要好东西，却不知道危险」"
-            ]
-        },
-        {
-            "npc_id": "mountain_hermit",
-            "name": "隐士·无名老人",
-            "x": -420, "y": 140,
-            "description": "一个神秘的老人，据说曾经也是修炼者",
-            "dialogues": [
-                "🏔️ 无名老人：「我曾经也修炼过...但看透了这一切的虚妄」",
-                "🏔️ 无名老人：「修炼到最后，你会发现自己变成了怪物」",
-                "🏔️ 无名老人：「山里有很多修炼失败的人...他们变成了别的东西」",
-                "🏔️ 无名老人：「年轻人，趁早回头吧...这条路没有尽头」",
-                "🏔️ 无名老人：「我见过太多天才...最后都疯了，或者死了」"
-            ]
-        },
-
-        # 南郊 (-100, -480)
-        {
-            "npc_id": "funeral_director",
-            "name": "殡仪师·白无常",
-            "x": -100, "y": -480,
-            "description": "一个穿着白衣的中年男人，专门处理死者后事",
-            "dialogues": [
-                "🕯️ 白无常：「死亡是每个人的归宿...包括修炼者」",
-                "🕯️ 白无常：「我处理过很多修炼者的尸体...他们死得都很奇怪」",
-                "🕯️ 白无常：「有些人死后还在修炼...尸体会自己动」",
-                "🕯️ 白无常：「最可怕的是那些炼尸的...把自己变成了不死不活的东西」",
-                "🕯️ 白无常：「年轻人，好好活着吧...死了就什么都没有了」"
-            ]
-        },
-        {
-            "npc_id": "soul_guide",
-            "name": "引魂人·孟婆",
-            "x": -100, "y": -480,
-            "description": "一个神秘的老妇人，据说能看见死者的灵魂",
-            "dialogues": [
-                "👻 孟婆：「我能看见死者的灵魂...他们总是不愿意离开」",
-                "👻 孟婆：「修炼的人死后灵魂特别执着...很难超度」",
-                "👻 孟婆：「有些修炼者的灵魂会分裂...变成很多个鬼」",
-                "👻 孟婆：「你身边跟着几个鬼魂...都是你杀死的」",
-                "👻 孟婆：「修炼就是在和死神赛跑...但死神总是会赢」"
-            ]
-        },
-        # 金陵 (220, -350)
-        {
-            "npc_id": "antique_dealer",
-            "name": "古董商·钱老板",
-            "x": 220, "y": -350,
-            "description": "一个戴着眼镜的中年男人，专门收购奇怪的古董",
-            "dialogues": [
-                "� 钱老板：「我这里有很多好东西...都是从死人手里收来的」",
-                "� 钱老板：「有些古董有灵性，会选择自己的主人...」",
-                "💎 钱老板：「你见过会哭的玉佩吗？我这里就有一块」",
-                "💎 钱老板：「修炼的人总喜欢这些老东西...但要小心被反噬」",
-                "💎 钱老板：「最近收到一面镜子，照出来的不是你的脸...」"
-            ]
-        },
-        {
-            "npc_id": "jade_appraiser",
-            "name": "鉴宝师·石眼",
-            "x": 220, "y": -350,
-            "description": "一个只有一只眼睛的老人，专门鉴定奇珍异宝",
-            "dialogues": [
-                "👁️ 石眼：「我这只眼睛能看透一切宝物的来历...」",
-                "👁️ 石眼：「有些宝物沾满了血腥...是从死人身上扒下来的」",
-                "👁️ 石眼：「修炼者的法器最值钱...但也最危险」",
-                "👁️ 石眼：「我见过会吃人的宝石...还有会哭的珍珠」",
-                "👁️ 石眼：「年轻人，不是所有宝物都能要...有些会要你的命」"
-            ]
-        },
-
-        # 云岭 (-250, 490)
-        {
-            "npc_id": "cloud_watcher",
-            "name": "观云者·风无痕",
-            "x": -250, "y": 490,
-            "description": "一个总是仰望天空的神秘老人",
-            "dialogues": [
-                "☁️ 风无痕：「云中有异象...预示着大劫将至」",
-                "☁️ 风无痕：「我在云中看到了很多死去的修炼者...他们在警告什么」",
-                "☁️ 风无痕：「天空中的裂缝越来越多...那是通往诡域的门」",
-                "☁️ 风无痕：「修炼者死后会变成云...在天空中游荡」",
-                "☁️ 风无痕：「年轻人，抬头看看天空...你会看到自己的未来」"
-            ]
-        },
-        {
-            "npc_id": "weather_prophet",
-            "name": "天象师·雷鸣",
-            "x": -250, "y": 490,
-            "description": "一个能预测天气的神秘术士",
-            "dialogues": [
-                "⚡ 雷鸣：「雷电中藏着天机...我能听到天的声音」",
-                "⚡ 雷鸣：「最近雷声很不对劲...像是有什么东西在天上打架」",
-                "⚡ 雷鸣：「修炼者渡劫时会引来天雷...但有些雷是来杀人的」",
-                "⚡ 雷鸣：「我见过被雷劈死的修炼者...他们的尸体还在冒烟」",
-                "⚡ 雷鸣：「天要下雨了...血雨」"
-            ]
-        },
-
-        # 郸城 (120, 120) - 娱乐街区
-        {
-            "npc_id": "street_performer",
-            "name": "街头艺人·小丑",
-            "x": 120, "y": 120,
-            "description": "一个画着诡异妆容的街头艺人，总是在表演奇怪的戏法",
-            "dialogues": [
-                "🎭 小丑：「想看魔术吗？我能让死人复活...」",
-                "🎭 小丑：「哈哈哈...这世界本身就是个大戏台，我们都是演员」",
-                "🎭 小丑：「我见过真正的鬼怪...它们比我的表演更精彩」",
-                "🎭 小丑：「修炼？那也是一种表演...看谁能演到最后」",
-                "🎭 小丑：「你想知道真相吗？真相就是...没有真相！」"
-            ]
-        },
-        {
-            "npc_id": "puppet_master",
-            "name": "木偶师·线无形",
-            "x": 120, "y": 120,
-            "description": "一个操控木偶的神秘艺人，木偶看起来像真人",
-            "dialogues": [
-                "🎎 线无形：「我的木偶都是用死人的骨头做的...」",
-                "🎎 线无形：「有时候我分不清谁是木偶，谁是真人」",
-                "🎎 线无形：「修炼者死后最适合做木偶...他们的魂魄还在」",
-                "🎎 线无形：「你想成为我的木偶吗？永远不会死...」",
-                "🎎 线无形：「我怀疑自己也是别人的木偶...」"
-            ]
-        },
-
-        # 荔湾镇 (120, 200) - 工业区
-        {
-            "npc_id": "factory_ghost",
-            "name": "工厂管理员·铁面",
-            "x": 120, "y": 200,
-            "description": "一个戴着铁面具的工厂管理员，从不摘下面具",
-            "dialogues": [
-                "🏭 铁面：「这个工厂死过很多人...机器里还有他们的血」",
-                "🏭 铁面：「夜班的时候总能听到机器自己在运转...」",
-                "🏭 铁面：「有些工人死了还在上班...他们不知道自己已经死了」",
-                "🏭 铁面：「修炼者的血能让机器运转得更快...」",
-                "🏭 铁面：「我的面具下面...已经没有脸了」"
-            ]
-        },
-        {
-            "npc_id": "machine_whisperer",
-            "name": "机械师·齿轮",
-            "x": 120, "y": 200,
-            "description": "一个能和机器对话的神秘技师",
-            "dialogues": [
-                "⚙️ 齿轮：「机器会说话...它们告诉我很多秘密」",
-                "⚙️ 齿轮：「这些机器吃过人肉...它们变得有灵性了」",
-                "⚙️ 齿轮：「修炼者的法器和机器很像...都有自己的意识」",
-                "⚙️ 齿轮：「我把自己的一部分换成了机器...现在分不清哪里是人哪里是机器」",
-                "⚙️ 齿轮：「机器告诉我，人类很快就要被替代了...」"
-            ]
-        },
-
-        # 摩配镇 (80, 140)
-        {
-            "npc_id": "motorcycle_mechanic",
-            "name": "摩托修理工·轰鸣",
-            "x": 80, "y": 140,
-            "description": "一个满身机油的修理工，专门修理各种奇怪的载具",
-            "dialogues": [
-                "🏍️ 轰鸣：「我修过很多奇怪的车...有些是用骨头做的」",
-                "🏍️ 轰鸣：「修炼者的飞行法器坏了也会来找我修...」",
-                "🏍️ 轰鸣：「有一次修车，发现油箱里装的是血...」",
-                "🏍️ 轰鸣：「最怕修那些会自己动的车...它们有自己的意识」",
-                "🏍️ 轰鸣：「我的手已经变成了扳手...再也变不回来了」"
-            ]
-        },
-        {
-            "npc_id": "speed_demon",
-            "name": "车手·疾风",
-            "x": 80, "y": 140,
-            "description": "一个神秘的赛车手，据说能开着车穿越诡域",
-            "dialogues": [
-                "🏁 疾风：「我开车去过诡域...那里的路都是用骨头铺的」",
-                "🏁 疾风：「速度够快就能逃脱死神...但总有一天会被追上」",
-                "🏁 疾风：「我见过很多修炼者在路上死掉...他们跑得不够快」",
-                "🏁 疾风：「我的车里坐着很多鬼魂...他们都是我撞死的」",
-                "🏁 疾风：「想要真正的速度？把灵魂卖给恶魔...」"
-            ]
-        },
-
-        # 风雪镇 (-5, 390)
-        {
-            "npc_id": "mysterious_fortune_teller",
-            "name": "算命婆·陈瞎子",
-            "x": -5, "y": 390,
-            "description": "一个双目失明的老妇人，总是喃喃自语着什么",
-            "dialogues": [
-                "👁️ 陈瞎子：「我虽双目失明，却能看见你看不见的东西...」",
-                "👁️ 陈瞎子：「这世间的诡异，远比你想象的要多...最近总有死人托梦给我」",
-                "👁️ 陈瞎子：「年轻人，你身上有股阴气...是不是最近去过什么不该去的地方？」",
-                "👁️ 陈瞎子：「缉邪司的人啊...你们以为能管得住这些东西？呵呵...」",
-                "👁️ 陈瞎子：「我听说最近又有人失踪了，都是些修炼的年轻人...小心啊」"
-            ]
-        },
-        {
-            "npc_id": "ice_sculptor",
-            "name": "冰雕师·寒无痕",
-            "x": -5, "y": 390,
-            "description": "一个专门雕刻冰雕的艺术家，作品栩栩如生",
-            "dialogues": [
-                "🧊 寒无痕：「我雕的都是死人...他们在冰中永远不会腐烂」",
-                "🧊 寒无痕：「有些冰雕会在夜里动...它们想要复活」",
-                "🧊 寒无痕：「修炼者的尸体最适合做冰雕...他们的表情很生动」",
-                "🧊 寒无痕：「我把自己的心也冻成了冰...现在感受不到任何温暖」",
-                "🧊 寒无痕：「冰雕会说话...它们告诉我生前的秘密」"
-            ]
-        },
-
-        # 舟山 (200, -200)
-        {
-            "npc_id": "fisherman_ghost",
-            "name": "渔夫·老海",
-            "x": 200, "y": -200,
-            "description": "一个常年在海边捕鱼的老人，身上总是湿漉漉的",
-            "dialogues": [
-                "🎣 老海：「海里的鱼越来越少了...但死人越来越多」",
-                "🎣 老海：「我钓上来的不只是鱼...还有很多奇怪的东西」",
-                "🎣 老海：「修炼者死在海里会变成海怪...我见过很多」",
-                "🎣 老海：「海底有一座城市...住着所有溺死的人」",
-                "🎣 老海：「我怀疑自己也淹死了...但还在钓鱼」"
-            ]
-        },
-        {
-            "npc_id": "lighthouse_keeper",
-            "name": "灯塔守护者·明灯",
-            "x": 200, "y": -200,
-            "description": "一个守护灯塔的神秘老人，灯塔的光很奇怪",
-            "dialogues": [
-                "🗼 明灯：「我的灯塔能照亮死者的灵魂...」",
-                "🗼 明灯：「每天晚上都有鬼魂来敲门...它们想要光明」",
-                "🗼 明灯：「修炼者死后会变成光...在灯塔里游荡」",
-                "🗼 明灯：「我已经守了一百年的灯塔...但我不记得自己是什么时候死的」",
-                "🗼 明灯：「灯塔的光能指引迷路的灵魂...包括活人的灵魂」"
-            ]
-        }
-    ]
-
-
-    # 创建中立NPC
-    for npc_config in neutral_npcs:
-        # 检查坐标处是否已有地点
-        location = await LocationService.get_location_by_coordinates(
-            session, npc_config["x"], npc_config["y"], "大都会"
-        )
-
-        if not location:
-            # 如果没有地点，跳过这个NPC（因为要求必须在已有地点）
-            print(f"警告：坐标 ({npc_config['x']}, {npc_config['y']}) 没有找到已有地点，跳过NPC {npc_config['name']}")
-            continue
-
-        # 检查是否已有该NPC（按名称和npc_id双重检查）
-        existing_npc_by_name = await NPCService.get_npc_by_name(
-            session, npc_config["name"], location.id
-        )
-        existing_npc_by_id = await NPCService.get_npc_by_id(
-            session, npc_config["npc_id"]
-        )
-
-        if not existing_npc_by_name and not existing_npc_by_id:
-            # 创建中立NPC
-            neutral_npc = NPC(
-                npc_id=npc_config["npc_id"],
-                name=npc_config["name"],
-                description=npc_config["description"],
-                npc_type=NPCType.NORMAL,
-                location_id=location.id,
-                is_killable=False,
-                extra_data={
-                    "dialogues": npc_config["dialogues"],
-                    "dialogue_index": 0,
-                    "is_neutral": True,
-                    "mystery_level": "high"
-                }
-            )
-            session.add(neutral_npc)
-            created_count += 1
-
-    return created_count
+    注意：此函数已被禁用（2025-12-07）
+    原因：清理装饰性NPC，专注于有服务功能的核心NPC
+    详见：llmdoc/agent/npc_cleanup_investigation.md
+    """
+    # 已禁用 - 不再生成32个装饰性中立NPC
+    return 0
 
 
 def _get_merchant_name(market_name: str) -> str:
@@ -914,42 +541,43 @@ def _get_employer_name(location_name: str) -> str:
 
 
 # ==================== 中立NPC初始化命令 ====================
-init_neutral_cmd = on_command("初始化中立NPC", block=True, priority=1, permission=SUPERUSER)
-
-
-@init_neutral_cmd.handle()
-async def handle_init_neutral_npcs(event: MessageEvent):
-    """单独初始化中立NPC"""
-    try:
-        async with safe_session() as session:
-            # 初始化中立NPC
-            neutral_count = await init_neutral_npcs(session)
-
-            await session.commit()
-
-            result_msg = (
-                "✅ 中立NPC初始化完成！\n"
-                "━━━━━━━━━━━━━\n"
-                f"👤 新增中立NPC：{neutral_count}个\n"
-                "━━━━━━━━━━━━━\n"
-                "🌟 特色功能：\n"
-                "• 丰富的怪谈风格对话\n"
-                "• 随机/循环对话系统\n"
-                "• 神秘的世界观背景\n"
-                "• 诡异的氛围描述\n"
-                "━━━━━━━━━━━━━\n"
-                "🎯 使用【交互 <NPC名称>】与他们对话\n"
-                "👻 每次交互都可能听到不同的故事！"
-            )
-
-            await init_neutral_cmd.finish(message_add_head(result_msg, event))
-
-    except SQLAlchemyError as e:
-        error_msg = f"❌ 中立NPC初始化失败（数据库）：{str(e)}"
-        await init_neutral_cmd.finish(message_add_head(error_msg, event))
-    except ValueError as e:
-        error_msg = f"❌ 中立NPC初始化失败：{str(e)}"
-        await init_neutral_cmd.finish(message_add_head(error_msg, event))
+# 已禁用 - 2025-12-07: 不再生成装饰性中立NPC
+# init_neutral_cmd = on_command("初始化中立NPC", block=True, priority=1, permission=SUPERUSER)
+#
+#
+# @init_neutral_cmd.handle()
+# async def handle_init_neutral_npcs(event: MessageEvent):
+#     """单独初始化中立NPC"""
+#     try:
+#         async with safe_session() as session:
+#             # 初始化中立NPC
+#             neutral_count = await init_neutral_npcs(session)
+#
+#             await session.commit()
+#
+#             result_msg = (
+#                 "✅ 中立NPC初始化完成！\n"
+#                 "━━━━━━━━━━━━━\n"
+#                 f"👤 新增中立NPC：{neutral_count}个\n"
+#                 "━━━━━━━━━━━━━\n"
+#                 "🌟 特色功能：\n"
+#                 "• 丰富的怪谈风格对话\n"
+#                 "• 随机/循环对话系统\n"
+#                 "• 神秘的世界观背景\n"
+#                 "• 诡异的氛围描述\n"
+#                 "━━━━━━━━━━━━━\n"
+#                 "🎯 使用【交互 <NPC名称>】与他们对话\n"
+#                 "👻 每次交互都可能听到不同的故事！"
+#             )
+#
+#             await init_neutral_cmd.finish(message_add_head(result_msg, event))
+#
+#     except SQLAlchemyError as e:
+#         error_msg = f"❌ 中立NPC初始化失败（数据库）：{str(e)}"
+#         await init_neutral_cmd.finish(message_add_head(error_msg, event))
+#     except ValueError as e:
+#         error_msg = f"❌ 中立NPC初始化失败：{str(e)}"
+#         await init_neutral_cmd.finish(message_add_head(error_msg, event))
 
 
 # ==================== 迁移命令 ====================

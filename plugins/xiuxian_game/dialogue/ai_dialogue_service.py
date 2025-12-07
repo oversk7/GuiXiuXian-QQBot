@@ -72,6 +72,11 @@ class AIDialogueService:
                 context=context or {}
             )
 
+            # 添加长期记忆上下文（如果context中提供）
+            long_term_memory = context.get("long_term_memory", "") if context else ""
+            if long_term_memory:
+                system_prompt += f"\n\n{long_term_memory}"
+
             # 构建messages列表，包含对话历史
             messages = [{"role": "system", "content": system_prompt}]
 

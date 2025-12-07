@@ -173,6 +173,44 @@ REQUIRED_TABLES: Dict[str, str] = {
             FOREIGN KEY (player_id) REFERENCES player(id) ON DELETE CASCADE
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='NPC好感度表'
     """,
+    "npc_long_term_memory": """
+        CREATE TABLE IF NOT EXISTS npc_long_term_memory (
+            id INT AUTO_INCREMENT PRIMARY KEY COMMENT 'ID',
+            npc_id INT NOT NULL COMMENT 'NPC ID',
+            player_id VARCHAR(32) NOT NULL COMMENT '玩家ID',
+            memory_type VARCHAR(20) NOT NULL COMMENT '记忆类型: summary(对话总结) | event(关键事件)',
+            content TEXT NOT NULL COMMENT '记忆内容（对话总结或事件描述）',
+            event_type VARCHAR(20) NULL COMMENT '事件类型: gift|quest|promise|conflict|emotion|other',
+            importance_score INT DEFAULT 5 COMMENT '重要性评分(1-10)',
+            emotion_change INT DEFAULT 0 COMMENT '情感变化值（好感度变化）',
+            created_at DATETIME DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+            weight FLOAT DEFAULT 1.0 COMMENT '记忆权重（随时间衰减）',
+            last_accessed_at DATETIME DEFAULT CURRENT_TIMESTAMP COMMENT '最后访问时间',
+            from_dialogue_id INT NULL COMMENT '关联的起始对话ID',
+            to_dialogue_id INT NULL COMMENT '关联的结束对话ID',
+            metadata JSON NULL COMMENT '额外元数据',
+            INDEX idx_npc_player_time (npc_id, player_id, created_at),
+            INDEX idx_memory_type (memory_type),
+            INDEX idx_importance (importance_score),
+            INDEX idx_weight (weight),
+            FOREIGN KEY (npc_id) REFERENCES npc(id) ON DELETE CASCADE,
+            FOREIGN KEY (player_id) REFERENCES player(id) ON DELETE CASCADE
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='NPC长期记忆表'
+    """,
+    "npc_dialogue_summary_checkpoint": """
+        CREATE TABLE IF NOT EXISTS npc_dialogue_summary_checkpoint (
+            id INT AUTO_INCREMENT PRIMARY KEY COMMENT 'ID',
+            npc_id INT NOT NULL COMMENT 'NPC ID',
+            player_id VARCHAR(32) NOT NULL COMMENT '玩家ID',
+            last_summarized_dialogue_id INT NOT NULL COMMENT '最后总结的对话ID',
+            total_dialogues_summarized INT DEFAULT 0 COMMENT '已总结的对话总数',
+            last_summary_time DATETIME DEFAULT CURRENT_TIMESTAMP COMMENT '最后总结时间',
+            next_summary_threshold INT DEFAULT 20 COMMENT '下次总结的对话数阈值',
+            UNIQUE INDEX idx_npc_player_checkpoint (npc_id, player_id),
+            FOREIGN KEY (npc_id) REFERENCES npc(id) ON DELETE CASCADE,
+            FOREIGN KEY (player_id) REFERENCES player(id) ON DELETE CASCADE
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='NPC对话总结检查点表'
+    """,
 }
 
 

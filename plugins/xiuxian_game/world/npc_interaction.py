@@ -8,10 +8,11 @@ from nonebot import on_command
 from nonebot.adapters.qq import MessageEvent, Message
 from nonebot.params import CommandArg
 from nonebot.exception import FinishedException
+from nonebot.log import logger
 
 from ..models.db import safe_session
 from ..models.player import Player
-from ..models.npc import NPCType
+from ..models.npc import NPC, NPCType
 from ..utils import message_add_head
 from .location_service import LocationService
 from .npc_service import NPCService
@@ -177,8 +178,19 @@ async def handle_npc_type_interaction(session, player: Player, npc, interaction_
     """根据NPC类型处理具体交互"""
     # 优先检查是否启用AI对话（适用于所有类型的NPC）
     if npc.extra_data and npc.extra_data.get("ai_enabled"):
-        await handle_ai_dialogue_interaction(session, player, npc, event, question=dialogue_content)
-        return
+        try:
+            await handle_ai_dialogue_interaction(session, player, npc, event, question=dialogue_content)
+            return
+        except Exception as e:
+            logger.error(f"AI对话失败 - NPC: {npc.name}, 玩家: {player.user_id}, 错误: {e}", exc_info=True)
+            # 降级处理：显示友好提示
+            await interact_cmd.finish(
+                f"💬 {npc.name}\n"
+                f"━━━━━━━━━━━━━\n"
+                f"抱歉，{npc.name}暂时无法交谈。请稍后再试。\n\n"
+                f"💡 提示：如果问题持续，请联系管理员。"
+            )
+            return
 
     npc_type = npc.npc_type
 
@@ -508,7 +520,20 @@ async def handle_ai_dialogue_interaction(session, player: Player, npc, event: Me
         # 分析玩家对话的情感
         sentiment = fav_service.analyze_dialogue_sentiment(question) if question else "neutral"
 
-        # 构建上下文，包含情感分析结果
+        # 获取长期记忆上下文
+        from ..dialogue.dialogue_summarization_service import DialogueSummarizationService
+        from ..infrastructure.repositories.npc_long_term_memory_repository import NPCLongTermMemoryRepository
+
+        memory_repo = NPCLongTermMemoryRepository(session)
+        summary_service = DialogueSummarizationService(memory_repo, history_repo)
+        long_term_memory = await summary_service.get_long_term_context(
+            npc_id=npc.id,
+            player_id=player.id,
+            include_summaries=3,  # 最近3次总结
+            include_events=5  # 最近5个重要事件
+        )
+
+        # 构建上下文，包含情感分析结果和长期记忆
         current_x, current_y = player.get_current_coordinates()
         context = {
             "location_name": npc.location.name if npc.location else "未知地点",
@@ -521,7 +546,8 @@ async def handle_ai_dialogue_interaction(session, player: Player, npc, event: Me
                 "negative": "玩家态度不友好，你应该表现出不高兴或疏远",
                 "positive": "玩家态度友好，你应该表现出开心和亲切",
                 "neutral": "玩家态度中立，正常交流即可"
-            }.get(sentiment, "")
+            }.get(sentiment, ""),
+            "long_term_memory": long_term_memory  # 传递长期记忆
         }
 
         # 生成AI对话（默认的自然对话场景）
@@ -575,6 +601,37 @@ async def handle_ai_dialogue_interaction(session, player: Player, npc, event: Me
         )
         await history_repo.save(history)
         await session.commit()
+
+        # 异步触发对话总结（不阻塞用户交互）
+        import asyncio
+        from ..dialogue.dialogue_summarization_service import DialogueSummarizationService
+        from ..infrastructure.repositories.npc_long_term_memory_repository import NPCLongTermMemoryRepository
+
+        async def trigger_summary_async():
+            """后台异步总结任务"""
+            try:
+                # 创建新的session用于后台任务
+                from ..models.db import safe_session
+                async with safe_session() as bg_session:
+                    memory_repo = NPCLongTermMemoryRepository(bg_session)
+                    bg_history_repo = NPCDialogueHistoryRepository(bg_session)
+                    summary_service = DialogueSummarizationService(memory_repo, bg_history_repo)
+
+                    # 检查并执行总结
+                    await summary_service.summarize_dialogues(
+                        npc_id=npc.id,
+                        player_id=player.id,
+                        npc_name=npc.name,
+                        force=False  # 不强制，按阈值触发
+                    )
+                    await bg_session.commit()
+                    logger.info(f"后台总结任务完成 - NPC: {npc.name}, 玩家: {player.id}")
+            except Exception as e:
+                logger.error(f"后台总结任务失败 - NPC: {npc.name}, 错误: {e}", exc_info=True)
+
+        # 创建后台任务（不等待完成）
+        asyncio.create_task(trigger_summary_async())
+
 
         # 格式化输出，包含对话历史
         lines = [

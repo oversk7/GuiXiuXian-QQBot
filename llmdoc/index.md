@@ -1,9 +1,9 @@
 # 诡修仙项目文档系统
 
-**文档版本**: 3.8
-**最后更新**: 2025-12-05 (成就系统关键路径集成修复完成)
+**文档版本**: 3.11
+**最后更新**: 2025-12-07 (NPC AI对话系统Phase 3优化完成：防刷好感度+人设扩展+长期记忆系统)
 **文档受众**: LLM代理和项目开发者
-**文档状态**: 生产就绪，Phase 2新手体验优化已完成，成就系统关键路径集成已完成
+**文档状态**: 生产就绪，Phase 2新手体验优化已完成，NPC AI对话系统Phase 3优化完成（长期记忆+11个人设+防刷机制）
 
 ---
 
@@ -36,7 +36,8 @@
 - `attribute-system.md` - 属性系统架构
 - `battle-effect-bridge.md` - 战斗效果桥接器架构
 - `event-system-architecture.md` - 事件系统架构
-- `dialogue-npc-system.md` - 对话NPC系统架构（自然对话+游戏指令+好感度）
+- `dialogue-npc-system.md` - 对话NPC系统架构（完整设计，含未实现功能）
+- `npc-ai-dialogue-implementation.md` - NPC AI对话系统实施记录（方案2核心功能版，已实施）
 - `account-switching-system.md` - 账号切换系统架构（多账号管理+转让+管理员临时切换）
 - `achievement-system.md` - 微成就系统架构（配置驱动+统计追踪+即时反馈）
 - `cyberpunk_hacking_multipath_implementation.md` - cyberpunk_hacking多路径机制实施记录（可解性75-300倍提升）
@@ -48,7 +49,8 @@
 - `how-to-add-effect.md` - 如何添加新效果
 - `event-system-guide.md` - 事件系统使用指南
 - `performance-optimization-summary.md` - 性能优化最佳实践
-- `how-to-implement-dialogue-npc.md` - 如何实施对话NPC系统
+- `how-to-implement-dialogue-npc.md` - 如何实施对话NPC系统（完整方案，含未实现功能）
+- `npc-ai-dialogue-usage.md` - NPC AI对话系统使用指南（方案2核心功能版）
 - `achievement-system-guide.md` - 如何使用和扩展成就系统
 
 **已归档** (Feature Flag已移除):
@@ -56,11 +58,11 @@
 
 ### `/reference/` - 参考资料
 回答"X的具体定义是什么?":
-- `service-api-reference.md` - 27个Service API清单
+- `service-api-reference.md` - 29个Service API清单（新增2个：AIDialogueService, NPCFavorabilityService）
 - `battle-effect-bridge-api.md` - BattleEffectBridge API参考
 - `code-issues.md` - 代码问题清单
 - `data-models.md` - 数据模型参考
-- `dialogue-npc-api.md` - 对话NPC系统API参考
+- `dialogue-npc-api.md` - 对话NPC系统API参考（完整设计，含未实现功能）
 - `account-switching-api.md` - 账号切换系统API参考
 - `code-cleanup-2025-12-02.md` - 代码清理记录（Feature Flag删除、旧Service移除）
 
@@ -85,8 +87,9 @@ LLM代理生成的调研和分析报告（仅保留系统分析和设计参考�
 - `stock_system_files_investigation.md` - 投资系统文件清单调查
 
 **未来功能设计**:
-- `ai_npc_implementation_investigation.md` - AI NPC系统架构设计
+- `ai_npc_implementation_investigation.md` - AI NPC系统架构设计（方案对比，已选择方案2实施）
 - `agent_npc_autonomous_behavior_investigation.md` - Agent NPC自主行为调查
+- `npc_dialogue_system_implementation_status_2025_12_06.md` - NPC AI对话系统实施决策记录（方案2核心功能版选择理由）
 
 **系统调研参考**:
 - `player_panel_investigation_2025_12_01.md` - 玩家面板系统调查
@@ -154,6 +157,7 @@ LLM代理生成的调研和分析报告（仅保留系统分析和设计参考�
 | **会话管理** | safe_session(自动提交)、UnitOfWork(事务管理) | `/architecture/service-di-architecture.md` |
 | **Service DI** | 依赖注入、Repository模式、UnitOfWork | `/architecture/service-di-architecture.md` |
 | **账号切换** | 一个真实玩家拥有多个游戏账号，支持转让和管理员临时切换 | `/architecture/account-switching-system.md` |
+| **NPC AI对话** | 智谱AI驱动的角色扮演对话+情感分析+递减好感度系统 | `/architecture/npc-ai-dialogue-implementation.md` |
 | **N+1查询** | 循环中逐个查询关联对象的性能问题 | `/reference/code-issues.md` |
 | **股票健康度** | 价格下跌损耗健康度，归零退市，防止套利 | `/design/investment_anti_arbitrage_redesign.md` |
 | **持仓成本** | 每日0.1%管理费，防止无限持有 | `/design/investment_implementation_summary.md` |
@@ -183,6 +187,22 @@ LLM代理生成的调研和分析报告（仅保留系统分析和设计参考�
 - `plugins\xiuxian_game\platform_utils.py` - 统一玩家访问接口(支持账号切换)
 - `plugins\xiuxian_game\world\map_visualizer.py` - 地图可视化系统(字体缓存+渐变背景+阴影效果)
 
+### NPC AI对话系统（新增 2025-12-06，Phase 3优化 2025-12-07）
+- `plugins\xiuxian_game\dialogue\ai_dialogue_service.py` - AI对话生成服务（智谱AI集成+长期记忆注入）
+- `plugins\xiuxian_game\dialogue\npc_favorability_service.py` - 好感度管理服务（情感分析+递减机制+防刷机制）
+- `plugins\xiuxian_game\dialogue\dialogue_summarization_service.py` - 对话总结服务（AI自动总结+关键事件提取）
+- `plugins\xiuxian_game\dialogue\npc_personality.py` - NPC人设模板和管理器
+- `plugins\xiuxian_game\dialogue\admin_commands.py` - 管理员命令（启用/禁用/查看NPC AI）
+- `plugins\xiuxian_game\world\npc_interaction.py` - NPC交互主逻辑（AI对话+UI优化+异步总结）
+- `plugins\xiuxian_game\world\npc_interaction_history.py` - 对话历史查看命令
+- `plugins\xiuxian_game\data\npc_personalities.yaml` - 11个预设NPC人设配置（4基础+2商人+5工匠）
+- `plugins\xiuxian_game\models\npc_dialogue_history.py` - 对话历史模型
+- `plugins\xiuxian_game\models\npc_favorability.py` - 好感度关系模型
+- `plugins\xiuxian_game\models\npc_long_term_memory.py` - 长期记忆模型（总结+关键事件）
+- `plugins\xiuxian_game\infrastructure\repositories\npc_dialogue_history_repository.py` - 对话历史Repository（修复懒加载+新增计数方法）
+- `plugins\xiuxian_game\infrastructure\repositories\npc_favorability_repository.py` - 好感度Repository
+- `plugins\xiuxian_game\infrastructure\repositories\npc_long_term_memory_repository.py` - 长期记忆Repository（CRUD+衰减+查询）
+
 ### 新手体验系统
 - `plugins\xiuxian_game\data\novice_quests.yaml` - 新手任务链配置(10步引导)
 - `plugins\xiuxian_game\achievement\achievement_service.py` - 成就系统服务
@@ -204,8 +224,8 @@ LLM代理生成的调研和分析报告（仅保留系统分析和设计参考�
 ### ✅ 已实现核心系统 (100%)
 
 **Service DI 架构**:
-- 27/27 Services已完成DI改造
-- 47个Repository实现
+- 30/30 Services已完成DI改造（新增3个：AIDialogueService, NPCFavorabilityService, DialogueSummarizationService）
+- 51个Repository实现（新增3个：NPCDialogueHistoryRepository, NPCFavorabilityRepository, NPCLongTermMemoryRepository）
 - UnitOfWork事务管理
 - Feature Flag已全部移除（新架构成为唯一实现）
 
@@ -235,6 +255,29 @@ LLM代理生成的调研和分析报告（仅保留系统分析和设计参考�
 - 任务导航集成（接取任务自动导航）
 - 观察命令优化（10个地点+图标分类）
 - UnitOfWork连接泄漏修复（75个泄漏点已杜绝）
+
+**NPC AI对话系统** (方案2完整版完成 2025-12-06，Phase 3优化完成 2025-12-07):
+- AI对话生成（智谱AI GLM-4.5-Flash集成）
+- **情感分析好感度系统**（分析对话情感：正面+3、中性+1、负面-3、极度负面-10）
+- **递减机制好感度系统**（5个等级门槛，高好感度日常对话效果降低，需重大事件突破）
+- **防刷好感度机制**（≤3字符敷衍回复+0好感度，好感度≥40时中性对话+0，空消息+0）
+- **长期记忆系统**（三层记忆架构：短期历史10轮+中期总结3次+长期事件5个）
+  - AI驱动的对话总结（每20-30轮自动触发）
+  - 关键事件提取（礼物/任务/承诺/冲突/情感变化）
+  - 异步后台总结（不阻塞用户交互）
+  - 记忆权重衰减（decay_rate=0.95）
+  - 预计减少5-10% token消耗
+- 对话历史管理（最近10轮上下文，修复懒加载问题）
+- **对话历史查看命令**（查看最近10条对话记录和好感度变化）
+- **UI优化**（简洁对话显示、门槛提示、好感度变化可视化）
+- **11个预设NPC人设配置**（4基础+2商人+5工匠主题）
+  - 基础NPC: 武安勇、铁匠老王、药铺掌柜、司长曹延华
+  - 商人类: 商人李掌柜（精明型）、商人王五（朴实型）
+  - 工匠类: 百工坊宗师、心魔巧匠、幽魂锻师、疯狂技师、炼魂大师
+- 3个管理员命令（启用/禁用/查看NPC AI）
+- 成本控制（约3元/月，1000次对话/天）
+- 降级机制（AI失败时使用预设对话）
+- 不包括：虚拟Player系统、游戏指令执行、NPC自主决策
 
 ---
 

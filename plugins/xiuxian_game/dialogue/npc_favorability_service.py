@@ -266,9 +266,18 @@ class NPCFavorabilityService:
                 elif sentiment == "positive":
                     base_change = 3    # 正面内容
                 else:
-                    base_change = 1    # 中性内容
+                    # 中性内容：检测敷衍回复和好感度阶段
+                    # 1. 检测敷衍回复（≤3字）
+                    if len(dialogue_content.strip()) <= 3:
+                        base_change = 0  # 无意义对话不增加好感度
+                    # 2. 好感度阶段化：低好感度时中性对话有效，高好感度时需要真诚交流
+                    elif current_favorability < 40:
+                        base_change = 1  # 新手期：普通对话可以增加好感
+                    else:
+                        base_change = 0  # 高好感度期：需要正面对话或重大事件
             else:
-                base_change = 1  # 默认中性
+                # 无对话内容时默认为敷衍
+                base_change = 0
 
             # 应用递减效应
             return self.calculate_favorability_change_with_decay(

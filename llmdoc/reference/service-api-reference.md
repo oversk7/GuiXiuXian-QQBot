@@ -149,7 +149,7 @@
 **NPCService**
 - 文件: `plugins/xiuxian_game/world/npc_service_new.py` (610行)
 - Repository依赖: 2个（NPCRepository, PlayerRepository）
-- 核心方法: interact_with_npc, get_npc_shop_items, buy_from_npc
+- 核心方法: interact_with_npc, get_npc_shop_items, buy_from_npc, enable_ai_for_npc
 - AI接口预留: 7个方法（is_ai_enabled, get_ai_personality等）
 - 详细文档: `SERVICE_REFACTORING_PROGRESS.md:1838-1913`
 
@@ -229,6 +229,25 @@
 
 ---
 
+### Dialogue模块（2个Service，新增 2025-12-06）
+
+**AIDialogueService**
+- 文件: `plugins/xiuxian_game/dialogue/ai_dialogue_service.py` (约250行)
+- Repository依赖: 1个（NPCDialogueHistoryRepository）
+- 核心方法: generate_dialogue, generate_roleplay_response
+- LLM集成: 智谱AI GLM-4.5-Flash（通过ai_guide.call_zhipu_api）
+- 配置: `data/config.yaml:ai_dialogue`
+- 详细文档: `/llmdoc/architecture/npc-ai-dialogue-implementation.md`
+
+**NPCFavorabilityService**
+- 文件: `plugins/xiuxian_game/dialogue/npc_favorability_service.py` (约200行)
+- Repository依赖: 1个（NPCFavorabilityRepository）
+- 核心方法: get_favorability, add_interaction, get_relationship_level
+- 好感度机制: 0-100好感度，5个关系等级（陌生人/熟识/友好/亲密/知心）
+- 详细文档: `/llmdoc/architecture/npc-ai-dialogue-implementation.md`
+
+---
+
 ## 3. 完成度统计
 
 | 模块 | Service数量 | 状态 | 完成日期 |
@@ -245,7 +264,8 @@
 | DailyTask | 1 | ✅ 100% | 2025-11-30 |
 | Alchemy | 1 | ✅ 100% | 2025-11-28 |
 | InviteReward | 1 | ✅ 100% | 2025-11-28 |
-| **总计** | **27** | **✅ 100%** | **2025-11-30** |
+| Dialogue | 2 | ✅ 100% | 2025-12-06 |
+| **总计** | **29** | **✅ 100%** | **2025-12-06** |
 
 ## 4. Feature Flag状态
 
@@ -261,7 +281,7 @@
 
 ## 5. Repository统计
 
-**总计**: 47个Repository类已创建
+**总计**: 49个Repository类已创建（新增2个：NPCDialogueHistoryRepository, NPCFavorabilityRepository）
 
 **主要Repository**:
 - PlayerRepository (228行)
