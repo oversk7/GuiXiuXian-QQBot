@@ -192,9 +192,7 @@ REQUIRED_TABLES: Dict[str, str] = {
             INDEX idx_npc_player_time (npc_id, player_id, created_at),
             INDEX idx_memory_type (memory_type),
             INDEX idx_importance (importance_score),
-            INDEX idx_weight (weight),
-            FOREIGN KEY (npc_id) REFERENCES npc(id) ON DELETE CASCADE,
-            FOREIGN KEY (player_id) REFERENCES player(id) ON DELETE CASCADE
+            INDEX idx_weight (weight)
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='NPC长期记忆表'
     """,
     "npc_dialogue_summary_checkpoint": """
@@ -206,9 +204,7 @@ REQUIRED_TABLES: Dict[str, str] = {
             total_dialogues_summarized INT DEFAULT 0 COMMENT '已总结的对话总数',
             last_summary_time DATETIME DEFAULT CURRENT_TIMESTAMP COMMENT '最后总结时间',
             next_summary_threshold INT DEFAULT 20 COMMENT '下次总结的对话数阈值',
-            UNIQUE INDEX idx_npc_player_checkpoint (npc_id, player_id),
-            FOREIGN KEY (npc_id) REFERENCES npc(id) ON DELETE CASCADE,
-            FOREIGN KEY (player_id) REFERENCES player(id) ON DELETE CASCADE
+            UNIQUE INDEX idx_npc_player_checkpoint (npc_id, player_id)
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='NPC对话总结检查点表'
     """,
 }
