@@ -300,9 +300,8 @@ async def _temporary_buff(player: Player, cfg: ItemConfig, qty: int, ctx: str, s
 
     bonus_text = ", ".join(bonus_strs)
 
-    # 更新使用记录
-    if session:
-        await update_elixir_usage(session, player, cfg, qty)
+    # 临时buff不需要记录到ElixirUsageLog（该表仅用于永久BUFF类型）
+    # 临时buff通过TemporaryBuff表管理，会自动过期
 
     return True, f"✨ 获得临时增益：{bonus_text}\n⏰ 持续时间：{time_str}"
 
@@ -462,8 +461,8 @@ async def _temporary_buff_percent(player: Player, cfg: ItemConfig, qty: int, ctx
     else:
         time_str = f"{duration_minutes}分钟"
 
-    # 更新使用记录
-    await update_elixir_usage(session, player, cfg, qty)
+    # 临时buff不需要记录到ElixirUsageLog（该表仅用于永久BUFF类型）
+    # 临时buff通过TemporaryBuff表管理，会自动过期
 
     return True, f"✨ 获得临时增益：{', '.join(bonus_display)}\n⏰ 持续时间：{time_str}"
 

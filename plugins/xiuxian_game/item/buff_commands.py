@@ -113,7 +113,8 @@ async def handle_attribute_breakdown(event: MessageEvent):
 
         lines = [
             f"📊 {player.nickname} 的属性分解",
-            "━━━━━━━━━━━━━"
+            "━━━━━━━━━━━━━",
+            "💡 基础 = 当前总值 - 所有加成"
         ]
 
         # 显示主要属性的分解
@@ -173,13 +174,20 @@ async def handle_attribute_breakdown(event: MessageEvent):
             for buff in active_buffs:
                 remaining = buff.get_remaining_minutes()
                 lines.append(f"  • {buff.buff_name} (剩余{remaining}分钟)")
+            lines.append("  ⏰ 临时增益激活时，基础值会相应减少")
 
         lines.append("")
         lines.append("💡 提示：使用【增益状态】查看临时增益详情")
+        lines.append("💡 基础属性 = Player表存储值 + 永久丹药加成")
 
-        # 检查是否有异常的基础属性
-        has_negative_base = any(breakdown["base"][attr] < 0 for attr in main_attrs)
-        if has_negative_base:
+        # 检查是否有严重异常的基础属性（负值且没有临时buff）
+        has_abnormal_base = False
+        for attr in main_attrs:
+            if breakdown["base"][attr] < 0 and breakdown["temporary"][attr] == 0:
+                has_abnormal_base = True
+                break
+
+        if has_abnormal_base:
             lines.append("")
             lines.append("⚠️ 检测到基础属性异常，建议联系管理员处理")
 
