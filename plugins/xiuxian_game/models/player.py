@@ -386,11 +386,13 @@ class Player(Base):
                     temporary_bonus[attr] = bonus
 
         # 计算基础属性（初始值 + 加点，不含丹药和VIP装备永久加成）
-        # 基础属性 = 当前属性值 - 装备加成 - 临时buff加成 - 丹药加成 - VIP装备永久加成
+        # 注意：Player表存储的属性值 = 基础 + 装备 + 永久丹药 + VIP装备
+        # 临时buff不会写入Player表，只在get_effective_attributes查询时动态合并
+        # 所以基础属性 = 当前存储值 - 装备 - 丹药 - VIP装备（不减临时buff）
         base_attrs = {}
         for attr in INIT_ATTRS:
             current_value = getattr(self, attr, INIT_ATTRS[attr])
-            base_value = current_value - equipment_bonus[attr] - temporary_bonus[attr] - elixir_bonus[attr] - vip_equipment_bonus[attr]
+            base_value = current_value - equipment_bonus[attr] - elixir_bonus[attr] - vip_equipment_bonus[attr]
             # 确保基础属性不会小于初始值（防止数据异常）
             base_attrs[attr] = max(base_value, INIT_ATTRS[attr])
 
