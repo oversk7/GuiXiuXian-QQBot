@@ -224,8 +224,8 @@ async def handle_attack(event: MessageEvent, args: Message = CommandArg()):
         current_x, current_y = player.get_current_coordinates()
         current_region = player.get_current_region()
 
-        # 尝试解析目标
-        target_player, target_npc = await parse_attack_target(session, args_text, current_x, current_y, current_region)
+        # 尝试解析目标（传入player.id用于任务关联优先匹配）
+        target_player, target_npc = await parse_attack_target(session, args_text, current_x, current_y, current_region, player.id)
 
         if target_player:
             await handle_player_attack(session, player, target_player, event)
@@ -256,7 +256,7 @@ async def handle_attack(event: MessageEvent, args: Message = CommandArg()):
             await attack_cmd.finish(f"⛔ 找不到目标'{args_text}'，请确认目标在当前位置")
 
 
-async def parse_attack_target(session, target_name: str, x: int, y: int, region: str):
+async def parse_attack_target(session, target_name: str, x: int, y: int, region: str, player_id: str = None):
     """解析攻击目标"""
     from sqlalchemy import select, and_
 
@@ -331,10 +331,33 @@ async def parse_attack_target(session, target_name: str, x: int, y: int, region:
                     if len(possible_npcs) == 1:
                         target_npc = possible_npcs[0]
                     elif len(possible_npcs) > 1:
-                        # 多个匹配结果，尝试更精确的匹配
-                        exact_matches = [npc for npc in possible_npcs if target_name.lower() in npc.name.lower()]
-                        if len(exact_matches) == 1:
-                            target_npc = exact_matches[0]
+                        # 多个匹配结果时，优先匹配玩家自己的任务NPC（方案4：任务关联优先匹配）
+                        if player_id:
+                            from ..models.daily_task import DailyTask
+                            # 查询玩家的已接取任务
+                            stmt = select(DailyTask).where(
+                                and_(
+                                    DailyTask.player_id == player_id,
+                                    DailyTask.status == "accepted"
+                                )
+                            )
+                            result = await session.execute(stmt)
+                            player_tasks = result.scalars().all()
+
+                            # 检查是否有NPC与玩家任务关联
+                            if player_tasks:
+                                task_ids = {task.id for task in player_tasks}
+                                for npc in possible_npcs:
+                                    # 检查NPC的extra_data中是否有task_id，且与玩家任务匹配
+                                    if npc.extra_data and npc.extra_data.get("task_id") in task_ids:
+                                        target_npc = npc
+                                        break  # 找到玩家任务的NPC，优先返回
+
+                        # 如果没有找到任务关联的NPC，尝试更精确的匹配
+                        if not target_npc:
+                            exact_matches = [npc for npc in possible_npcs if target_name.lower() in npc.name.lower()]
+                            if len(exact_matches) == 1:
+                                target_npc = exact_matches[0]
 
     return target_player, target_npc
 

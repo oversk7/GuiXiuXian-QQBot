@@ -819,7 +819,11 @@ async def handle_daily_task_help(event: MessageEvent, args: Message = CommandArg
         "💰 奖励：经验、金币、公会积分和经验\n"
         "🎭 任务类型：鬼怪消除、笔仙案件、邪修蛊惑等\n"
         "👻 可与其他玩家合作击杀鬼怪\n"
-        "📅 每日最多接取3个委托，次日过期"
+        "📅 每日最多接取3个委托，次日过期\n"
+        "━━━━━━━━━━━━━\n"
+        "🎯 智能匹配（已优化）：\n"
+        "• 遇到重名NPC时，系统自动优先匹配你的任务目标\n"
+        "• 无需担心攻击到其他玩家的委托NPC"
     )
     await daily_task_help_cmd.finish(Message(msg))
 
