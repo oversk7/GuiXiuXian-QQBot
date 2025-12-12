@@ -506,6 +506,15 @@ async def handle_donate(event: MessageEvent, args: Message = CommandArg()):
         await donate_cmd.finish("⛔ 金额必须为正整数")
 
     async with safe_session() as session:
+        # 使用跨平台工具获取玩家数据（支持多账户）
+        from ..platform_utils import get_unified_player, is_guild_message
+        player = await get_unified_player(session, event)
+        if not player:
+            if is_guild_message(event):
+                await donate_cmd.finish("⛔ 你还没有创建角色或绑定账号\n💡 请先在群聊注册角色，然后使用绑定功能")
+            else:
+                await donate_cmd.finish("⛔ 请先创建角色")
+
         # 使用经济服务处理捐献
         # 新版：使用DI架构Service
         from ..infrastructure.repositories.guild_repository import GuildRepository
@@ -519,7 +528,7 @@ async def handle_donate(event: MessageEvent, args: Message = CommandArg()):
             donation_log_repo=PlayerDonationLogRepository(session),
             building_repo=GuildBuildingRepository(session)
         )
-        success, message, result = await economy_service.donate_gold(event.get_user_id(), amt)
+        success, message, result = await economy_service.donate_gold(player.id, amt)
         if not success:
             await donate_cmd.finish(f"⛔ {message}")
 
@@ -539,7 +548,7 @@ async def handle_donate(event: MessageEvent, args: Message = CommandArg()):
             player_donation_log_repo=PlayerDonationLogRepository(session),
             guild_building_repo=GuildBuildingRepository(session),
         )
-        task_success, task_message, task_result = await task_service.complete_daily_donation_task(event.get_user_id())
+        task_success, task_message, task_result = await task_service.complete_daily_donation_task(player.id)
         await session.commit()  # 由调用方控制事务边界
 
         # 构建返回消息
