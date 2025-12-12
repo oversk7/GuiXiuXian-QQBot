@@ -323,7 +323,15 @@ async def parse_attack_target(session, target_name: str, x: int, y: int, region:
             location = await LocationService.get_location_by_coordinates(session, x, y, region)
             if location:
                 # 先尝试精确匹配
-                target_npc = await NPCService.get_npc_by_name(session, target_name, location.id)
+                try:
+                    target_npc = await NPCService.get_npc_by_name(session, target_name, location.id)
+                except Exception as e:
+                    # 捕获MultipleResultsFound异常（多个重名NPC）
+                    # 这种情况下直接进入智能匹配逻辑
+                    if "Multiple rows were found" in str(e):
+                        target_npc = None
+                    else:
+                        raise  # 其他异常继续抛出
 
                 if not target_npc:
                     # 尝试智能匹配（支持带点号的名字）
