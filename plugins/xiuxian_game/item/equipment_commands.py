@@ -276,7 +276,7 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
 
             if equip.used_gem_slots > 0:
                 from .gem_socket_service_new import GemSocketService
-                gem_info = await GemSocketService.get_equipment_gem_info(equip)
+                gem_info = GemSocketService.get_equipment_gem_info(equip)  # 同步方法，不需要await
                 for slot_info in gem_info:
                     if not slot_info["is_empty"]:
                         slot_num = slot_info["slot_number"]
