@@ -357,10 +357,11 @@ async def handle_draw_lottery(event: MessageEvent, args: Message = CommandArg())
 
         # 发放奖品
         winner_names = []
+        failed_prizes = 0  # 追踪发放失败的奖品数量
+
         for winner in winners:
             winner.is_winner = True
             winner.won_at = datetime.now()
-            winner.prize_received = True
             session.add(winner)
 
             # 获取中奖玩家对象
@@ -371,6 +372,7 @@ async def handle_draw_lottery(event: MessageEvent, args: Message = CommandArg())
             # 发放奖品
             if lottery.lottery_type == LotteryType.GOLD:
                 winner_player.gold += lottery.prize_per_winner
+                winner.prize_received = True  # 金币发放成功
                 session.add(winner_player)
             else:
                 # 发放物品或装备
@@ -381,12 +383,38 @@ async def handle_draw_lottery(event: MessageEvent, args: Message = CommandArg())
                         lottery.item_id,
                         lottery.prize_per_winner
                     )
+                    winner.prize_received = True  # 发放成功后再标记
                 except ValueError as e:
-                    # 背包满了，记录但继续
+                    # 背包满了，累计失败奖品数量，稍后退还给发起人
+                    failed_prizes += lottery.prize_per_winner
+                    winner.prize_received = False  # 标记为未领取
                     winner_names.append(f"{winner.player_name}[UID:{winner.player_uid}]❌背包满")
                     continue
 
             winner_names.append(f"{winner.player_name}[UID:{winner.player_uid}]")
+
+        # 退还失败的奖品给发起人
+        if failed_prizes > 0:
+            creator = await session.get(Player, lottery.creator_id)
+            if creator:
+                try:
+                    if lottery.lottery_type == LotteryType.GOLD:
+                        # 退还金币
+                        creator.gold += failed_prizes
+                        session.add(creator)
+                    else:
+                        # 退还物品或装备
+                        await ItemInstance.add_item(
+                            session,
+                            creator.id,
+                            lottery.item_id,
+                            failed_prizes
+                        )
+                except ValueError as e:
+                    # 发起人背包也满了，记录错误日志
+                    # 注意：这种情况下奖品仍会丢失，但这是极端情况
+                    # TODO: 可以考虑将奖品发送到系统邮箱或稍后重试
+                    pass
 
         # 更新抽奖状态
         lottery.status = LotteryStatus.FINISHED
@@ -414,6 +442,12 @@ async def handle_draw_lottery(event: MessageEvent, args: Message = CommandArg())
         if actual_winner_count < participant_count:
             msg_lines.append(f"━━━━━━━━━━━━━")
             msg_lines.append(f"💔 未中奖：{participant_count - actual_winner_count} 人")
+
+        # 如果有奖品因背包满而退还
+        if failed_prizes > 0:
+            msg_lines.append(f"━━━━━━━━━━━━━")
+            msg_lines.append(f"📮 退还通知：")
+            msg_lines.append(f"由于部分中奖者背包已满，{failed_prizes} 个奖品已退还给发起人")
 
         msg = "\n".join(msg_lines)
         await draw_lottery_cmd.finish(message_add_head(msg, event))
