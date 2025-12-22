@@ -35,35 +35,31 @@ class GuildFacilityService:
             {"item_id": "iron_body_elixir", "weight": 10},  # 金刚体丹
         ],
         "advanced": [
-            {"item_id": "night_soul_elixir", "weight": 18},  # 夜魂丹
-            {"item_id": "divine_blessing_elixir", "weight": 12},  # 神明恩赐丹
-            {"item_id": "supreme_revive_elixir", "weight": 8},  # 真还魂丹
-            {"item_id": "void_eye_elixir", "weight": 10},  # 虚眼丹
-            {"item_id": "battle_god_elixir", "weight": 10},  # 战神丹
-            {"item_id": "fortune_elixir", "weight": 10},  # 鸿运丹
-            {"item_id": "wisdom_elixir", "weight": 8},  # 悟道丹
+            {"item_id": "night_soul_elixir", "weight": 20},  # 夜魂丹（经验类）
+            {"item_id": "great_life_recovery_elixir", "weight": 18},  # 大回生丹（恢复类）
+            {"item_id": "great_soul_recovery_elixir", "weight": 18},  # 大凝魂丹（恢复类）
+            {"item_id": "supreme_revive_elixir", "weight": 10},  # 真还魂丹（复活类）
+            {"item_id": "battle_god_elixir", "weight": 10},  # 战神丹（战斗buff）
+            {"item_id": "wisdom_elixir", "weight": 8},  # 悟道丹（修炼buff）
         ],
         "master": [
-            {"item_id": "world_power_elixir", "weight": 6},  # 世界之力丹
-            {"item_id": "berserker_elixir", "weight": 10},  # 狂战丹
-            {"item_id": "shadow_step_elixir", "weight": 10},  # 影步丹
-            {"item_id": "eagle_eye_elixir", "weight": 8},  # 鹰眼丹
-            {"item_id": "combo_master_elixir", "weight": 6},  # 连击丹
-            {"item_id": "vitality_elixir", "weight": 8},  # 生机丹
-            {"item_id": "swift_wind_elixir", "weight": 8},  # 疾风丹
+            {"item_id": "night_soul_elixir", "weight": 18},  # 夜魂丹（经验类）
+            {"item_id": "divine_blessing_elixir", "weight": 12},  # 神明恩赐丹（经验类）
+            {"item_id": "great_life_recovery_elixir", "weight": 15},  # 大回生丹（恢复类）
+            {"item_id": "great_soul_recovery_elixir", "weight": 15},  # 大凝魂丹（恢复类）
+            {"item_id": "berserker_elixir", "weight": 10},  # 狂战丹（战斗buff）
+            {"item_id": "shadow_step_elixir", "weight": 10},  # 影步丹（战斗buff）
+            {"item_id": "combo_master_elixir", "weight": 8},  # 连击丹（战斗buff）
         ],
         "legendary": [
-            {"item_id": "berserk_fury_elixir", "weight": 8},  # 暴怒丹
-            {"item_id": "strength_essence_elixir", "weight": 4},  # 力之精华丹
-            {"item_id": "agility_essence_elixir", "weight": 4},  # 敏之精华丹
-            {"item_id": "defense_essence_elixir", "weight": 4},  # 防之精华丹
-            {"item_id": "vitality_essence_elixir", "weight": 4},  # 体之精华丹
-            {"item_id": "reforge_strength_elixir", "weight": 3},  # 归元破力丹
-            {"item_id": "reforge_agility_elixir", "weight": 3},  # 归元化敏丹
-            {"item_id": "reforge_defense_elixir", "weight": 3},  # 归元散防丹
-            {"item_id": "reforge_vitality_elixir", "weight": 3},  # 归元化体丹
-            {"item_id": "reforge_wisdom_elixir", "weight": 3},  # 归元凝神丹
-            {"item_id": "reforge_luck_elixir", "weight": 3},  # 归元化运丹
+            {"item_id": "divine_blessing_elixir", "weight": 20},  # 神明恩赐丹（经验类）
+            {"item_id": "night_soul_elixir", "weight": 18},  # 夜魂丹（经验类）
+            {"item_id": "supreme_revive_elixir", "weight": 12},  # 真还魂丹（复活类）
+            {"item_id": "berserk_fury_elixir", "weight": 10},  # 暴怒丹（战斗buff）
+            {"item_id": "strength_essence_elixir", "weight": 6},  # 力之精华丹（永久属性）
+            {"item_id": "agility_essence_elixir", "weight": 6},  # 敏之精华丹（永久属性）
+            {"item_id": "defense_essence_elixir", "weight": 6},  # 防之精华丹（永久属性）
+            {"item_id": "vitality_essence_elixir", "weight": 6},  # 体之精华丹（永久属性）
         ]
     }
 
