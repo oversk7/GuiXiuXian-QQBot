@@ -65,26 +65,51 @@ class StoryEngine:
         return self.stories.get(story_id)
     
     def evaluate_condition(self, condition: Dict[str, Any], player: Player, variables: Dict[str, Any]) -> bool:
-        """评估条件是否满足"""
-        for key, check in condition.items():
-            if key.startswith("player_"):
-                # 玩家属性检查
-                attr_name = key[7:]  # 去掉 "player_" 前缀
-                player_value = getattr(player, attr_name, 0)
-                if not self._check_value(player_value, check):
-                    return False
-            elif key.startswith("story_"):
-                # 剧情变量检查
-                var_name = key[6:]  # 去掉 "story_" 前缀
-                var_value = variables.get(var_name)
-                if not self._check_value(var_value, check):
-                    return False
-            else:
-                # 直接变量检查
-                var_value = variables.get(key)
-                if not self._check_value(var_value, check):
-                    return False
-        return True
+        """
+        评估条件是否满足
+
+        支持格式:
+        1. 简单条件(默认 and): {"player_level": {">=": 10}, "story_key": {"==": true}}
+        2. and 逻辑: {"and": [cond1, cond2, ...]}
+        3. or 逻辑: {"or": [cond1, cond2, ...]}
+        4. 嵌套组合: {"or": [{"and": [cond1, cond2]}, cond3]}
+        """
+        # 检查是否包含逻辑运算符
+        if "and" in condition:
+            # and 逻辑 - 所有条件都必须满足
+            conditions_list = condition["and"]
+            if not isinstance(conditions_list, list):
+                return False
+            return all(self.evaluate_condition(cond, player, variables) for cond in conditions_list)
+
+        elif "or" in condition:
+            # or 逻辑 - 至少一个条件满足
+            conditions_list = condition["or"]
+            if not isinstance(conditions_list, list):
+                return False
+            return any(self.evaluate_condition(cond, player, variables) for cond in conditions_list)
+
+        else:
+            # 简单条件检查(默认 and)
+            for key, check in condition.items():
+                if key.startswith("player_"):
+                    # 玩家属性检查
+                    attr_name = key[7:]  # 去掉 "player_" 前缀
+                    player_value = getattr(player, attr_name, 0)
+                    if not self._check_value(player_value, check):
+                        return False
+                elif key.startswith("story_"):
+                    # 剧情变量检查
+                    var_name = key[6:]  # 去掉 "story_" 前缀
+                    var_value = variables.get(var_name)
+                    if not self._check_value(var_value, check):
+                        return False
+                else:
+                    # 直接变量检查
+                    var_value = variables.get(key)
+                    if not self._check_value(var_value, check):
+                        return False
+            return True
     
     def _check_value(self, value: Any, check: Dict[str, Any]) -> bool:
         """检查单个值是否满足条件"""
@@ -106,6 +131,44 @@ class StoryEngine:
             elif operator == "not_in":
                 return value not in expected
         return True
+
+    def resolve_next(self, next_field: Any, player: Player, variables: Dict[str, Any]) -> Optional[str]:
+        """
+        解析 next 字段,支持条件跳转
+
+        支持格式:
+        1. 简单字符串: "node_2"
+        2. 条件跳转数组: [
+             {"if": condition, "goto": "node_a"},
+             {"if": condition, "goto": "node_b"},
+             {"goto": "default_node"}  // 默认分支(无 if)
+           ]
+
+        返回:
+            目标节点ID,如果没有匹配的条件则返回 None
+        """
+        # 简单字符串格式(向后兼容)
+        if isinstance(next_field, str):
+            return next_field
+
+        # 条件跳转数组格式
+        if isinstance(next_field, list):
+            for branch in next_field:
+                if not isinstance(branch, dict):
+                    continue
+
+                # 检查是否有条件
+                if "if" in branch:
+                    condition = branch["if"]
+                    # 评估条件
+                    if self.evaluate_condition(condition, player, variables):
+                        return branch.get("goto")
+                else:
+                    # 无条件分支(默认分支)
+                    return branch.get("goto")
+
+        # 无效格式或没有匹配的条件
+        return None
     
     def apply_effects(self, effects: Dict[str, Any], player: Player, variables: Dict[str, Any]) -> Tuple[Player, Dict[str, Any]]:
         """应用效果到玩家和变量"""
@@ -235,36 +298,36 @@ class StoryEngine:
         story = self.get_story(story_session.story_id)
         if not story:
             return False, "剧情不存在", None
-        
+
         current_node = story["nodes"].get(story_session.current_node)
         if not current_node or current_node.get("type") != "choice":
             return False, "当前不是选择节点", None
-        
+
         # 查找选择的选项
         selected_option = None
         for option in current_node.get("options", []):
             if option.get("id") == choice_id:
                 selected_option = option
                 break
-        
+
         if not selected_option:
             return False, "无效的选择", None
-        
+
         variables = story_session.get_variables()
-        
+
         # 检查选项条件
         if "conditions" in selected_option:
             if not self.evaluate_condition(selected_option["conditions"], player, variables):
                 return False, "不满足选择条件", None
-        
+
         # 应用选项效果
         if "effects" in selected_option:
             player, variables = self.apply_effects(selected_option["effects"], player, variables)
             story_session.set_variables(variables)
-        
-        # 跳转到下一个节点
-        next_node = selected_option.get("next")
-        if next_node:
-            story_session.current_node = next_node
-        
+
+        # 使用条件跳转解析下一个节点
+        next_node_id = self.resolve_next(selected_option.get("next"), player, variables)
+        if next_node_id:
+            story_session.current_node = next_node_id
+
         return True, "选择成功", self.get_current_node(story_session, player)

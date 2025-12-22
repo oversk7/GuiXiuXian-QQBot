@@ -234,16 +234,16 @@ async def handle_continue(event: MessageEvent):
         if current_node.get("type") != "story":
             return
 
-        # 检查是否有下一个节点
-        next_node_id = current_node.get("next")
-        if not next_node_id:
-            return
-
         # 应用当前节点的效果
+        variables = story_session.get_variables()
         if "effects" in current_node:
-            variables = story_session.get_variables()
             player, variables = story_engine.apply_effects(current_node["effects"], player, variables)
             story_session.set_variables(variables)
+
+        # 使用条件跳转解析下一个节点
+        next_node_id = story_engine.resolve_next(current_node.get("next"), player, variables)
+        if not next_node_id:
+            return
 
         # 跳转到下一个节点
         story_session.current_node = next_node_id
