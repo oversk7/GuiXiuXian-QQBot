@@ -17,6 +17,103 @@ from .config import Config
 
 logger = logging.getLogger(__name__)
 
+async def call_ai_with_fallback(messages: list) -> dict:
+    """
+    调用AI API并支持fallback降级机制
+
+    Args:
+        messages: 对话消息列表
+
+    Returns:
+        AI API返回结果
+
+    Raises:
+        Exception: 所有provider均失败时抛出异常
+    """
+    from .config import config
+
+    # 读取AI配置
+    ai_config = config.game_config.get("ai_dialogue", {})
+    provider = ai_config.get("provider", "zhipu")
+    zhipu_config = ai_config.get("zhipu", {})
+    ai302_config = ai_config.get("ai302", {})
+    timeout = zhipu_config.get("timeout", 30)
+
+    # 降级策略配置
+    fallback_config = ai_config.get("fallback", {})
+    fallback_enabled = fallback_config.get("enabled", True)
+    fallback_provider = fallback_config.get("fallback_provider", "ai302")
+
+    errors = []
+
+    # 尝试主provider
+    try:
+        if provider == "zhipu":
+            logger.info(f"[AI引导] 使用智谱AI调用...")
+            result = await call_zhipu_api(
+                messages,
+                model=zhipu_config.get("model", "GLM-4-Flash-250414"),
+                timeout=timeout
+            )
+            logger.info(f"[AI引导] 智谱AI调用成功")
+            return result
+        elif provider == "ai302":
+            logger.info(f"[AI引导] 使用302.ai调用...")
+            result = await call_302ai_api(
+                messages,
+                model=ai302_config.get("model", "gpt-3.5-turbo"),
+                timeout=timeout
+            )
+            logger.info(f"[AI引导] 302.ai调用成功")
+            return result
+        else:
+            raise ValueError(f"不支持的provider: {provider}")
+
+    except Exception as e:
+        error_msg = f"{provider} 调用失败: {type(e).__name__}: {str(e)}"
+        logger.warning(f"[AI引导] {error_msg}")
+        errors.append(error_msg)
+
+        # 如果fallback未启用，直接抛出异常
+        if not fallback_enabled:
+            raise
+
+        # 尝试fallback provider
+        try:
+            fallback = fallback_provider
+            if fallback == provider:
+                # fallback provider与主provider相同，直接抛出异常
+                raise Exception(f"主provider和fallback provider相同，无法降级")
+
+            logger.warning(f"[AI引导] 尝试降级到备用provider: {fallback}")
+
+            if fallback == "zhipu":
+                result = await call_zhipu_api(
+                    messages,
+                    model=zhipu_config.get("model", "GLM-4-Flash-250414"),
+                    timeout=timeout
+                )
+                logger.info(f"[AI引导] 备用provider {fallback} 调用成功")
+                return result
+            elif fallback == "ai302":
+                result = await call_302ai_api(
+                    messages,
+                    model=ai302_config.get("model", "gpt-3.5-turbo"),
+                    timeout=timeout
+                )
+                logger.info(f"[AI引导] 备用provider {fallback} 调用成功")
+                return result
+            else:
+                raise ValueError(f"不支持的fallback provider: {fallback}")
+
+        except Exception as fallback_error:
+            fallback_error_msg = f"{fallback} 调用失败: {type(fallback_error).__name__}: {str(fallback_error)}"
+            logger.error(f"[AI引导] {fallback_error_msg}")
+            errors.append(fallback_error_msg)
+
+            # 所有provider都失败，抛出综合异常
+            raise Exception(f"所有AI provider均失败: {'; '.join(errors)}")
+
 def is_admin(user_id: str) -> bool:
     """检查用户是否为管理员"""
     config = Config()
@@ -360,7 +457,7 @@ async def generate_sql_from_natural_language(query_text: str) -> str:
             {"role": "user", "content": query_text}
         ]
 
-        result = await call_zhipu_api(messages)
+        result = await call_ai_with_fallback(messages)
         sql_content = result['choices'][0]['message']['content'].strip()
 
         # 提取SQL语句（去除可能的markdown格式）
@@ -446,7 +543,7 @@ SQL语句：{sql_query}
             {"role": "user", "content": str(display_data)}
         ]
 
-        result = await call_zhipu_api(messages)
+        result = await call_ai_with_fallback(messages)
         formatted_content = result['choices'][0]['message']['content'].strip()
 
         # 添加查询统计信息
@@ -897,7 +994,7 @@ async def get_ai_guidance(user_message: str, player: Player) -> str:
             {"role": "user", "content": user_message}
         ]
 
-        result = await call_zhipu_api(messages)
+        result = await call_ai_with_fallback(messages)
         return result['choices'][0]['message']['content']
 
     except asyncio.TimeoutError as e:
