@@ -88,13 +88,11 @@ class NPC(Base):
     dialogue_histories: Mapped[list["NPCDialogueHistory"]] = relationship(
         "NPCDialogueHistory",
         back_populates="npc",
-        foreign_keys="NPCDialogueHistory.npc_id",
         cascade="all, delete-orphan"
     )
     favorability_records: Mapped[list["NPCFavorability"]] = relationship(
         "NPCFavorability",
         back_populates="npc",
-        foreign_keys="NPCFavorability.npc_id",
         cascade="all, delete-orphan"
     )
     
