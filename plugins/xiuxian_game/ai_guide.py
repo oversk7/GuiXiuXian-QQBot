@@ -959,9 +959,98 @@ async def handle_ai_guide(event: MessageEvent, args: Message = CommandArg()):
             event
         ))
 
+def extract_relevant_commands(user_message: str, max_systems: int = 3) -> str:
+    """
+    根据用户问题提取相关的指令系统
+
+    Args:
+        user_message: 用户提问内容
+        max_systems: 最多返回几个系统的指令（默认3个）
+
+    Returns:
+        相关指令的文本
+    """
+    # 定义关键词到系统的映射
+    keyword_map = {
+        "注册|昵称|UID|面板|等级|排行|财富|修为|幸运|战力": "玩家系统",
+        "修炼|突破|闭关|出关|冥返|加点|洗点|献祭|怨念|棺材钉": "修炼系统",
+        "背包|鱼栏|使用|丢弃|图鉴|耐药性|丹药|欺骗": "背包系统",
+        "装备|锻造|升阶|镶嵌|孔位|拆卸|修理|卸下|稳定水晶": "装备系统",
+        "市集|跑商|购买|出售|市价|缉邪司|总部|兑换": "跑商系统",
+        "交易|挂牌|撤牌|查牌|税率|估价": "交易系统",
+        "炼丹|丹方|收获|炼丹炉": "炼丹系统",
+        "存|取|余额|转账|存款|银行": "银行系统",
+        "投资|气运|行情|刷新": "投资系统",
+        "结婚|求婚|离婚|配偶|拜师|收徒|师父|徒弟|送礼|恩爱": "社交系统",
+        "探索|导航|地图|坐标|移动|传送|观察|NPC|交互": "探索系统",
+        "诡域|副本|扫荡|俯瞰|宝箱|怪物": "副本系统",
+        "战斗|攻击|切磋|BOSS|讨伐|死斗": "战斗系统",
+        "公会|创建|加入|退会|捐献|建筑|任务|基地": "公会系统",
+        "委托|接取|完成|刷新|缉邪司": "委托系统",
+        "打工|收工|工作|赚钱": "打工系统",
+        "钓鱼|鱼栏": "钓鱼系统",
+        "阴宅|购买|升级|迁移|费用": "阴宅系统",
+        "签到|抽签|摸鱼|月卡|小游戏": "娱乐系统",
+        "留言|私信|留言板": "留言板系统",
+    }
+
+    # 统计每个系统的匹配分数
+    system_scores = {}
+    for keywords, system_name in keyword_map.items():
+        score = 0
+        for keyword in keywords.split("|"):
+            if keyword in user_message:
+                score += 1
+        if score > 0:
+            system_scores[system_name] = score
+
+    # 如果没有匹配到任何系统，返回常用系统
+    if not system_scores:
+        default_systems = ["游戏常识", "玩家系统", "修炼系统"]
+        return extract_systems_from_full_text(default_systems)
+
+    # 按分数排序，取top N
+    top_systems = sorted(system_scores.items(), key=lambda x: x[1], reverse=True)[:max_systems]
+    system_names = [name for name, _ in top_systems]
+
+    # 始终包含"游戏常识"
+    if "游戏常识" not in system_names:
+        system_names.insert(0, "游戏常识")
+
+    return extract_systems_from_full_text(system_names)
+
+def extract_systems_from_full_text(system_names: list) -> str:
+    """从完整指令文本中提取指定系统"""
+    lines = AI_COMMANDS_TEXT.split('\n')
+    result = []
+    current_system = None
+    capturing = False
+
+    for line in lines:
+        # 检查是否是系统标题
+        if line.strip().endswith('系统：') or line.strip().endswith('常识：'):
+            current_system = line.strip().rstrip('：')
+            if any(sys_name in current_system for sys_name in system_names):
+                capturing = True
+                result.append(line)
+            else:
+                capturing = False
+        elif capturing:
+            # 继续捕获当前系统的内容
+            if line.strip() == '':
+                # 遇到空行可能是系统结束，但继续添加
+                result.append(line)
+            else:
+                result.append(line)
+
+    return '\n'.join(result)
+
 async def get_ai_guidance(user_message: str, player: Player) -> str:
     """获取AI引导回复"""
     try:
+        # 智能提取相关指令（减少token使用，避免超限）
+        relevant_commands = extract_relevant_commands(user_message, max_systems=3)
+
         # 构建系统提示
         system_prompt = f"""你是《诡修仙》QQ机器人文游的AI助手，专门为玩家提供游戏帮助。
 
@@ -969,8 +1058,8 @@ async def get_ai_guidance(user_message: str, player: Player) -> str:
 - 昵称：{player.nickname}[UID：{player.uid}]
 - 等级：{player.level}级
 
-游戏指令知识库：
-{AI_COMMANDS_TEXT}
+相关游戏指令：
+{relevant_commands}
 
 回复规则：
 1. 只回答游戏相关问题，对于游戏外话题直接回复"该话题未检索到结果"
