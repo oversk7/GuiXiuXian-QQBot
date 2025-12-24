@@ -39,6 +39,7 @@ async def handle_help(event: MessageEvent, args: Message = CommandArg()):
         "═════════════\n"
         "💡 发送对应系统查看详细指令，【赞助】支持诡修仙\n"
         "💡 【】括号里是指令，<>里是必填，[]里是选填\n"
+        "💡 发送【问 你的问题】使用AI助手获得游戏指引\n"
         "💡 发送/邀请码 邀请好友获得分级奖励，最高可获得3万+金币\n"
         "💡 不会玩加频道：https://Pd.qq.Com/s/d0g9cvds4\n"
         "💡 教程：https://Tutorials.Bossjlb.Top\n"

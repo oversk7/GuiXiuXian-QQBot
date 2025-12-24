@@ -804,57 +804,65 @@ AI_COMMANDS_TEXT = """
   【兑换真还魂丹 数量】 用月卡兑换真还魂丹
 """
 
-# AI引导处理器 - 优先级设置为最低，确保不会拦截其他指令
-ai_guide = on_message(priority=20, block=False)
+# AI引导处理器 - 使用明确的命令前缀避免误触
+ai_guide = on_command("问", aliases={"请问", "提问", "咨询"}, priority=5, block=True)
 
 @ai_guide.handle()
-async def handle_ai_guide(event: MessageEvent):
-    """AI引导处理器"""
+async def handle_ai_guide(event: MessageEvent, args: Message = CommandArg()):
+    """AI引导处理器 - 需要明确的命令前缀"""
     try:
-        user_message = event.get_plaintext().strip()
-        
-        # 忽略空消息或过短消息
-        if not user_message or len(user_message) < 4:
-            return
+        from nonebot.params import CommandArg
+        from nonebot.adapters.qq import Message
 
-        # 忽略纯数字消息（可能是剧情选择）
-        if user_message.isdigit():
-            return
+        user_message = args.extract_plain_text().strip()
 
-        # 忽略过长消息（可能是复制粘贴的内容）
-        if len(user_message) > 100:
-            return
-            
+        # 如果没有提供问题，返回使用说明
+        if not user_message:
+            await ai_guide.finish(message_add_head(
+                "💡 AI助手使用说明\n"
+                "━━━━━━━━━━━━━\n"
+                "使用方式：【问 你的问题】\n"
+                "示例：\n"
+                "• 【问 如何升级】\n"
+                "• 【请问 怎么赚钱】\n"
+                "• 【提问 装备怎么升阶】\n\n"
+                "💡 也可以直接发送【帮助】查看完整指令列表",
+                event
+            ))
+
         async with safe_session() as session:
             # 使用跨平台工具获取玩家数据
             from .platform_utils import get_unified_player
             player = await get_unified_player(session, event)
-            # 检查是否在剧情状态中
-            if player:
-                story_session = await StorySession.get_active_session(session, player.id)
-            else:
-                story_session = None
-            if story_session:
-                return  # 剧情状态中不处理AI引导
 
-            # 检查是否为管理员，如果是则尝试数据库查询
+            if not player:
+                await ai_guide.finish(message_add_head(
+                    "⛔ 请先发送【注册】创建角色",
+                    event
+                ))
+
+            # 检查是否为管理员的数据库查询请求
             if is_admin(event.get_user_id()):
                 # 判断是否可能是数据库查询请求
                 if is_database_query(user_message):
                     await handle_admin_database_query(user_message, event)
                     return
 
-            # 先发送搜索提示，缓解玩家焦虑
-            await ai_guide.send(message_add_head("未检测到正确指令，正在思考您的问题...", event))
+            # 先发送搜索提示
+            await ai_guide.send(message_add_head("🤔 正在思考您的问题...", event))
 
             # 调用AI进行引导
             response = await get_ai_guidance(user_message, player)
             if response:
-                response += "\n━━━━━━━━━━━━━\n【】括号里的才是指令，外面是指令说明"
+                response += "\n━━━━━━━━━━━━━\n💡 【】括号里的才是指令\n💡 发送【帮助】查看完整指令列表"
                 await ai_guide.finish(message_add_head(response, event))
-                
-    except ValueError:
-        pass
+
+    except Exception as e:
+        logger.error(f"AI引导处理失败: {e}")
+        await ai_guide.finish(message_add_head(
+            "❌ AI助手处理失败，请发送【帮助】查看游戏指令",
+            event
+        ))
 
 async def get_ai_guidance(user_message: str, player: Player) -> str:
     """获取AI引导回复"""
