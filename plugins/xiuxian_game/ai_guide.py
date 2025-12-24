@@ -7,7 +7,8 @@ import re
 import logging
 from typing import List, Dict, Any
 from nonebot import on_message, on_command
-from nonebot.adapters.qq import MessageEvent
+from nonebot.adapters.qq import MessageEvent, Message
+from nonebot.params import CommandArg
 from sqlalchemy import text
 from .models.db import safe_session
 from .models.player import Player
@@ -908,9 +909,6 @@ ai_guide = on_command("问", aliases={"请问", "提问", "咨询"}, priority=5,
 async def handle_ai_guide(event: MessageEvent, args: Message = CommandArg()):
     """AI引导处理器 - 需要明确的命令前缀"""
     try:
-        from nonebot.params import CommandArg
-        from nonebot.adapters.qq import Message
-
         user_message = args.extract_plain_text().strip()
 
         # 如果没有提供问题，返回使用说明
