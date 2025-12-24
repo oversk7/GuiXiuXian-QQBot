@@ -38,7 +38,11 @@ async def check_player_ban(user_id: str) -> tuple[bool, str | None]:
             await session.commit()
             return False, None
 
-        return True, record.get_ban_info()
+        # 在 session context 内部提取所有需要的信息，避免在 context 外部访问数据库对象
+        ban_info = record.get_ban_info()
+
+    # 在 session context 外部返回结果，确保连接已正确关闭
+    return True, ban_info
 
 
 @event_preprocessor
@@ -55,7 +59,15 @@ async def ban_checker(event: MessageEvent):
         return
 
     # 检查是否被封禁
-    is_banned, ban_info = await check_player_ban(user_id)
+    # 注意：这里必须确保 check_player_ban 完全执行完毕（包括关闭数据库连接）
+    # 然后再抛出异常，避免连接泄漏
+    try:
+        is_banned, ban_info = await check_player_ban(user_id)
+    except Exception as e:
+        # 如果检查过程出错，记录日志但不阻止用户操作
+        from nonebot import logger
+        logger.error(f"[BanChecker] 检查封禁状态失败: {e}")
+        return
 
     if is_banned:
         # 如果被封禁，阻止事件继续传播

@@ -105,7 +105,11 @@ async def check_blacklist(player_id: str) -> tuple[bool, str | None]:
             await session.commit()
             return False, None
 
-        return True, record.get_remaining_time()
+        # 在 session context 内部提取所有需要的信息，避免在 context 外部访问数据库对象
+        remaining_time = record.get_remaining_time()
+
+    # 在 session context 外部返回结果，确保连接已正确关闭
+    return True, remaining_time
 
 
 def check_level_requirement(player_level: int) -> tuple[bool, str]:
