@@ -1,9 +1,9 @@
 # 诡修仙项目文档系统
 
-**文档版本**: 3.11
-**最后更新**: 2025-12-07 (NPC AI对话系统Phase 3优化完成：防刷好感度+人设扩展+长期记忆系统)
+**文档版本**: 3.12
+**最后更新**: 2025-12-20 (Story Engine增强：条件系统and/or逻辑+多分支条件跳转)
 **文档受众**: LLM代理和项目开发者
-**文档状态**: 生产就绪，Phase 2新手体验优化已完成，NPC AI对话系统Phase 3优化完成（长期记忆+11个人设+防刷机制）
+**文档状态**: 生产就绪，Phase 2新手体验优化已完成，NPC AI对话系统Phase 3优化完成（长期记忆+11个人设+防刷机制），Story Engine增强完成
 
 ---
 
@@ -41,6 +41,7 @@
 - `account-switching-system.md` - 账号切换系统架构（多账号管理+转让+管理员临时切换）
 - `achievement-system.md` - 微成就系统架构（配置驱动+统计追踪+即时反馈）
 - `cyberpunk_hacking_multipath_implementation.md` - cyberpunk_hacking多路径机制实施记录（可解性75-300倍提升）
+- `story-engine-enhanced-conditions.md` - Story Engine条件和跳转系统增强（and/or逻辑+多分支条件跳转）
 
 ### `/guides/` - 操作指南
 回答"如何执行X任务?":
@@ -52,6 +53,7 @@
 - `how-to-implement-dialogue-npc.md` - 如何实施对话NPC系统（完整方案，含未实现功能）
 - `npc-ai-dialogue-usage.md` - NPC AI对话系统使用指南（方案2核心功能版）
 - `achievement-system-guide.md` - 如何使用和扩展成就系统
+- `story-creation-guide.md` - 如何创建剧情（Story Engine使用指南）
 
 **已归档** (Feature Flag已移除):
 - `feature-flag-control.md` - 已过时（Feature Flag已全部删除，详见2025-12-02代码清理记录）
@@ -65,6 +67,7 @@
 - `dialogue-npc-api.md` - 对话NPC系统API参考（完整设计，含未实现功能）
 - `account-switching-api.md` - 账号切换系统API参考
 - `code-cleanup-2025-12-02.md` - 代码清理记录（Feature Flag删除、旧Service移除）
+- `story-engine-api.md` - Story Engine API参考（条件格式+跳转格式+API方法）
 
 ### `/agent/` - 代理调研文档
 LLM代理生成的调研和分析报告（仅保留系统分析和设计参考文档）:

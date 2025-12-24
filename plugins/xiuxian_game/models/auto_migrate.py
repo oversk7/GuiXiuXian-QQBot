@@ -39,6 +39,11 @@ REQUIRED_FIELDS: Dict[str, Dict[str, str]] = {
     "navigation_task": {
         "initial_distance": "FLOAT NULL COMMENT '初始总距离（用于进度计算）'",
     },
+    "world_message": {
+        "is_deleted": "BOOLEAN DEFAULT FALSE COMMENT '是否已删除（软删除）'",
+        "deleted_by": "VARCHAR(32) NULL COMMENT '删除人ID'",
+        "deleted_at": "DATETIME NULL COMMENT '删除时间'",
+    },
     # 未来需要添加更多字段时，直接在这里添加即可
     # "player": {
     #     "new_field": "VARCHAR(100) NULL COMMENT '新字段说明'",
@@ -206,6 +211,39 @@ REQUIRED_TABLES: Dict[str, str] = {
             next_summary_threshold INT DEFAULT 20 COMMENT '下次总结的对话数阈值',
             UNIQUE INDEX idx_npc_player_checkpoint (npc_id, player_id)
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='NPC对话总结检查点表'
+    """,
+    "message_board_blacklist": """
+        CREATE TABLE IF NOT EXISTS message_board_blacklist (
+            id INT AUTO_INCREMENT PRIMARY KEY COMMENT 'ID',
+            target_player_id VARCHAR(32) NOT NULL COMMENT '被禁言玩家ID',
+            admin_id VARCHAR(32) NOT NULL COMMENT '操作管理员ID',
+            reason VARCHAR(200) NULL COMMENT '禁言原因',
+            created_at DATETIME DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+            expires_at DATETIME NULL COMMENT '过期时间（NULL表示永久禁言）',
+            is_active BOOLEAN DEFAULT TRUE COMMENT '是否生效中',
+            UNIQUE INDEX idx_target_player (target_player_id),
+            INDEX idx_admin_id (admin_id),
+            INDEX idx_is_active (is_active),
+            FOREIGN KEY (target_player_id) REFERENCES player(id) ON DELETE CASCADE,
+            FOREIGN KEY (admin_id) REFERENCES player(id)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='留言板黑名单表'
+    """,
+    "player_ban": """
+        CREATE TABLE IF NOT EXISTS player_ban (
+            id INT AUTO_INCREMENT PRIMARY KEY COMMENT 'ID',
+            player_id VARCHAR(32) NOT NULL COMMENT '被封禁玩家ID',
+            admin_id VARCHAR(32) NOT NULL COMMENT '操作管理员ID',
+            reason VARCHAR(500) NULL COMMENT '封禁原因',
+            ban_type VARCHAR(20) DEFAULT 'permanent' COMMENT '封禁类型：permanent(永久) | temporary(临时)',
+            created_at DATETIME DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+            expires_at DATETIME NULL COMMENT '过期时间（NULL表示永久封禁）',
+            is_active BOOLEAN DEFAULT TRUE COMMENT '是否生效中',
+            UNIQUE INDEX idx_player_id (player_id),
+            INDEX idx_admin_id (admin_id),
+            INDEX idx_is_active (is_active),
+            FOREIGN KEY (player_id) REFERENCES player(id) ON DELETE CASCADE,
+            FOREIGN KEY (admin_id) REFERENCES player(id)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='全局玩家封禁表'
     """,
 }
 

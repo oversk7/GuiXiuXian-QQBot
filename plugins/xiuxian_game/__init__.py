@@ -33,6 +33,7 @@ from . import (
     admin,  # 管理员功能（包含抽奖系统）
     achievement,  # 成就系统
     dialogue,  # NPC AI对话系统（包含管理员命令）
+    global_ban_interceptor,  # 全局封禁拦截器
 )
 
 driver = get_driver()

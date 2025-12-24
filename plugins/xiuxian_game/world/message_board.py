@@ -1,6 +1,6 @@
 from enum import Enum
 import re
-from datetime import datetime
+from datetime import datetime, timedelta
 
 from nonebot import on_command
 from nonebot.adapters.qq import MessageEvent, Message
@@ -11,8 +11,11 @@ from sqlalchemy import func as _func
 from ..models.db import safe_session
 from ..models.player import Player
 from ..models.world_message import WorldMessage
+from ..models.message_blacklist import MessageBoardBlacklist
 from ..utils import message_add_head
 from ..platform_utils import get_unified_player
+from ..ai_guide import is_admin
+from ..config import Config
 
 
 # 违禁词列表 - 可根据需要扩展
@@ -37,10 +40,17 @@ class MessageScope(str, Enum):
 
 MAX_LEN = 120
 PAGE_SIZE = 10
+MIN_LEVEL_TO_POST = 10  # 最低发言等级，可以在config.yaml中配置
 
 leave_msg_cmd = on_command("留言", block=True, priority=5)
 view_board_cmd = on_command("留言板", block=True, priority=5)
 private_msg_cmd = on_command("私信", aliases={"私聊"}, block=True, priority=5)
+
+# ==================== 管理员命令 ====================
+ban_cmd = on_command("禁言", block=True, priority=5)
+unban_cmd = on_command("解禁", block=True, priority=5)
+blacklist_cmd = on_command("黑名单", aliases={"黑名单列表"}, block=True, priority=5)
+delete_msg_cmd = on_command("删除留言", block=True, priority=5)
 
 # ==================== 最近更新 ====================
 latest_update_cmd = on_command("更新", aliases={"最近更新"}, block=True, priority=5)
@@ -69,6 +79,45 @@ def clean_message_content(content: str) -> str:
     content = re.sub(r'<[^>]*faceId[^>]*>', '', content)
     content = re.sub(r"\s+", " ", content).strip()
     return content
+
+
+async def check_blacklist(player_id: str) -> tuple[bool, str | None]:
+    """
+    检查玩家是否在黑名单中
+
+    Returns:
+        (is_banned, remaining_time): 是否被禁言，剩余禁言时间描述
+    """
+    async with safe_session() as session:
+        stmt = select(MessageBoardBlacklist).where(
+            MessageBoardBlacklist.target_player_id == player_id,
+            MessageBoardBlacklist.is_active == True
+        )
+        record = (await session.execute(stmt)).scalars().first()
+
+        if not record:
+            return False, None
+
+        # 检查是否过期
+        if record.is_expired():
+            # 自动解禁
+            record.is_active = False
+            await session.commit()
+            return False, None
+
+        return True, record.get_remaining_time()
+
+
+def check_level_requirement(player_level: int) -> tuple[bool, str]:
+    """
+    检查玩家等级是否满足发言要求
+
+    Returns:
+        (is_allowed, message): 是否允许发言，提示信息
+    """
+    if player_level < MIN_LEVEL_TO_POST:
+        return False, f"⛔ 等级不足！需要达到{MIN_LEVEL_TO_POST}级才能发言"
+    return True, ""
 
 
 async def get_unread_message_status(player_id: str) -> tuple[bool, bool]:
@@ -252,14 +301,25 @@ async def handle_leave_msg(event: MessageEvent, args: Message = CommandArg()):
     if len(content) > MAX_LEN:
         await leave_msg_cmd.finish(f"⛔ 留言不能超过 {MAX_LEN} 字符")
 
-    filtered_content = filter_banned_words(content)
-    if filtered_content != content:
-        await leave_msg_cmd.send(message_add_head("⚠️ 检测到敏感词汇，已自动过滤", event))
-
     async with safe_session() as session:
         player = await get_unified_player(session, event)
         if not player:
             await leave_msg_cmd.finish("⛔ 请先创建角色")
+
+        # 检查等级限制
+        is_allowed, level_msg = check_level_requirement(player.level)
+        if not is_allowed:
+            await leave_msg_cmd.finish(level_msg)
+
+        # 检查黑名单
+        is_banned, remaining_time = await check_blacklist(player.id)
+        if is_banned:
+            await leave_msg_cmd.finish(f"⛔ 你已被禁言，剩余时间：{remaining_time}")
+
+        filtered_content = filter_banned_words(content)
+        if filtered_content != content:
+            await leave_msg_cmd.send(message_add_head("⚠️ 检测到敏感词汇，已自动过滤", event))
+
         msg_rec = WorldMessage(
             player_id=player.id,
             recipient_id=None,
@@ -315,15 +375,25 @@ async def handle_private_message(event: MessageEvent, args: Message = CommandArg
     except ValueError:
         await private_msg_cmd.finish("⛔ 目标 UID 格式错误，请输入数字")
 
-    filtered_content = filter_banned_words(message_body)
-    if filtered_content != message_body:
-        await private_msg_cmd.send(message_add_head("⚠️ 检测到敏感词汇，已自动过滤", event))
-
     sender_last_check = None
     async with safe_session() as session:
         sender = await get_unified_player(session, event)
         if not sender:
             await private_msg_cmd.finish("⛔ 请先创建角色")
+
+        # 检查等级限制
+        is_allowed, level_msg = check_level_requirement(sender.level)
+        if not is_allowed:
+            await private_msg_cmd.finish(level_msg)
+
+        # 检查黑名单
+        is_banned, remaining_time = await check_blacklist(sender.id)
+        if is_banned:
+            await private_msg_cmd.finish(f"⛔ 你已被禁言，剩余时间：{remaining_time}")
+
+        filtered_content = filter_banned_words(message_body)
+        if filtered_content != message_body:
+            await private_msg_cmd.send(message_add_head("⚠️ 检测到敏感词汇，已自动过滤", event))
 
         sender_last_check = sender.last_private_message_check
 
@@ -397,6 +467,220 @@ async def handle_view_board(event: MessageEvent, args: Message = CommandArg()):
     )
     await view_board_cmd.finish(message_add_head(lines, event))
 
+
+# ==================== 管理员命令处理器 ====================
+
+@ban_cmd.handle()
+async def handle_ban(event: MessageEvent, args: Message = CommandArg()):
+    """禁言命令：【禁言 UID [原因] [时长]】"""
+    if not is_admin(event.get_user_id()):
+        await ban_cmd.finish("⛔ 权限不足，该命令仅限管理员使用")
+
+    raw_text = args.extract_plain_text().strip()
+    if not raw_text:
+        await ban_cmd.finish("⛔ 用法：【禁言 UID】或【禁言 UID 原因】或【禁言 UID 原因 时长】\n时长格式：3d（3天）、24h（24小时）、永久")
+
+    parts = raw_text.split(maxsplit=2)
+    target_uid_text = parts[0]
+    reason = parts[1] if len(parts) > 1 else "违反社区规定"
+    duration_text = parts[2] if len(parts) > 2 else "永久"
+
+    try:
+        target_uid = int(target_uid_text)
+    except ValueError:
+        await ban_cmd.finish("⛔ UID 格式错误，请输入数字")
+
+    # 解析时长
+    expires_at = None
+    if duration_text != "永久":
+        if duration_text.endswith('d'):
+            days = int(duration_text[:-1])
+            expires_at = datetime.now() + timedelta(days=days)
+        elif duration_text.endswith('h'):
+            hours = int(duration_text[:-1])
+            expires_at = datetime.now() + timedelta(hours=hours)
+        else:
+            await ban_cmd.finish("⛔ 时长格式错误，请使用：3d（3天）、24h（24小时）或永久")
+
+    async with safe_session() as session:
+        # 获取管理员信息
+        admin = await get_unified_player(session, event)
+        if not admin:
+            await ban_cmd.finish("⛔ 请先创建角色")
+
+        # 获取目标玩家
+        target = (
+            await session.execute(select(Player).where(Player.uid == target_uid))
+        ).scalars().first()
+        if not target:
+            await ban_cmd.finish(f"⛔ 未找到 UID 为 {target_uid} 的玩家")
+
+        # 检查是否已在黑名单
+        existing = (
+            await session.execute(
+                select(MessageBoardBlacklist).where(
+                    MessageBoardBlacklist.target_player_id == target.id,
+                    MessageBoardBlacklist.is_active == True
+                )
+            )
+        ).scalars().first()
+
+        if existing:
+            # 更新现有记录
+            existing.reason = reason
+            existing.expires_at = expires_at
+            existing.admin_id = admin.id
+            existing.created_at = datetime.now()
+        else:
+            # 创建新记录
+            blacklist_record = MessageBoardBlacklist(
+                target_player_id=target.id,
+                admin_id=admin.id,
+                reason=reason,
+                expires_at=expires_at,
+                is_active=True
+            )
+            session.add(blacklist_record)
+
+        await session.commit()
+
+    duration_str = duration_text if duration_text == "永久" else duration_text
+    msg = f"✅ 已禁言玩家【{target.nickname}】(UID:{target_uid})\n原因：{reason}\n时长：{duration_str}"
+    await ban_cmd.finish(message_add_head(msg, event))
+
+
+@unban_cmd.handle()
+async def handle_unban(event: MessageEvent, args: Message = CommandArg()):
+    """解禁命令：【解禁 UID】"""
+    if not is_admin(event.get_user_id()):
+        await unban_cmd.finish("⛔ 权限不足，该命令仅限管理员使用")
+
+    raw_text = args.extract_plain_text().strip()
+    if not raw_text:
+        await unban_cmd.finish("⛔ 用法：【解禁 UID】")
+
+    try:
+        target_uid = int(raw_text)
+    except ValueError:
+        await unban_cmd.finish("⛔ UID 格式错误，请输入数字")
+
+    async with safe_session() as session:
+        # 获取目标玩家
+        target = (
+            await session.execute(select(Player).where(Player.uid == target_uid))
+        ).scalars().first()
+        if not target:
+            await unban_cmd.finish(f"⛔ 未找到 UID 为 {target_uid} 的玩家")
+
+        # 查找黑名单记录
+        record = (
+            await session.execute(
+                select(MessageBoardBlacklist).where(
+                    MessageBoardBlacklist.target_player_id == target.id,
+                    MessageBoardBlacklist.is_active == True
+                )
+            )
+        ).scalars().first()
+
+        if not record:
+            await unban_cmd.finish(f"⛔ 玩家【{target.nickname}】(UID:{target_uid}) 不在黑名单中")
+
+        # 解禁
+        record.is_active = False
+        await session.commit()
+
+    msg = f"✅ 已解除玩家【{target.nickname}】(UID:{target_uid}) 的禁言"
+    await unban_cmd.finish(message_add_head(msg, event))
+
+
+@blacklist_cmd.handle()
+async def handle_blacklist(event: MessageEvent):
+    """查看黑名单列表"""
+    if not is_admin(event.get_user_id()):
+        await blacklist_cmd.finish("⛔ 权限不足，该命令仅限管理员使用")
+
+    async with safe_session() as session:
+        records = (
+            await session.execute(
+                select(MessageBoardBlacklist)
+                .where(MessageBoardBlacklist.is_active == True)
+                .order_by(MessageBoardBlacklist.created_at.desc())
+            )
+        ).scalars().all()
+
+        if not records:
+            await blacklist_cmd.finish(message_add_head("📋 当前黑名单为空", event))
+
+        # 获取所有相关玩家信息
+        player_ids = set()
+        for rec in records:
+            player_ids.add(rec.target_player_id)
+            player_ids.add(rec.admin_id)
+
+        players = {}
+        for pid in player_ids:
+            players[pid] = await session.get(Player, pid)
+
+    lines = ["📋 留言板黑名单", "━━━━━━━━━━"]
+    for rec in records:
+        target_player = players.get(rec.target_player_id)
+        admin_player = players.get(rec.admin_id)
+
+        if not target_player:
+            continue
+
+        time_str = rec.created_at.strftime("%m-%d")
+        remaining = rec.get_remaining_time()
+        admin_name = admin_player.nickname if admin_player else "未知"
+
+        lines.append(
+            f">【{target_player.nickname}】UID:{target_player.uid}\n"
+            f" 原因：{rec.reason or '无'}\n"
+            f" 剩余：{remaining} | 操作员：{admin_name} | 时间：{time_str}"
+        )
+
+    await blacklist_cmd.finish(message_add_head("\n".join(lines), event))
+
+
+@delete_msg_cmd.handle()
+async def handle_delete_message(event: MessageEvent, args: Message = CommandArg()):
+    """删除留言命令：【删除留言 留言ID】"""
+    if not is_admin(event.get_user_id()):
+        await delete_msg_cmd.finish("⛔ 权限不足，该命令仅限管理员使用")
+
+    raw_text = args.extract_plain_text().strip()
+    if not raw_text:
+        await delete_msg_cmd.finish("⛔ 用法：【删除留言 留言ID】")
+
+    try:
+        message_id = int(raw_text)
+    except ValueError:
+        await delete_msg_cmd.finish("⛔ 留言ID格式错误，请输入数字")
+
+    async with safe_session() as session:
+        admin = await get_unified_player(session, event)
+        if not admin:
+            await delete_msg_cmd.finish("⛔ 请先创建角色")
+
+        # 查找留言
+        message = await session.get(WorldMessage, message_id)
+        if not message:
+            await delete_msg_cmd.finish(f"⛔ 未找到ID为 {message_id} 的留言")
+
+        # 软删除（如果字段存在）
+        # 由于WorldMessage模型可能还没有软删除字段，我们暂时直接删除
+        # TODO: 等数据库迁移完成后，改为软删除
+        sender = await session.get(Player, message.player_id)
+        sender_name = sender.nickname if sender else "未知"
+
+        await session.delete(message)
+        await session.commit()
+
+    msg = f"✅ 已删除留言 ID:{message_id}\n发送者：{sender_name}"
+    await delete_msg_cmd.finish(message_add_head(msg, event))
+
+
+# ==================== 最近更新 ====================
 
 @latest_update_cmd.handle()
 async def handle_latest_update(event: MessageEvent):
