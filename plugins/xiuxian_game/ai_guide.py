@@ -624,6 +624,7 @@ async def handle_admin_database_query(user_message: str, event):
         print(sql_query)
         if not sql_query:
             await ai_guide.finish(message_add_head("❌ 无法理解需求，请重新描述或使用游戏指令", event))
+            return
 
         # 执行SQL
         if is_modify:
@@ -637,10 +638,12 @@ async def handle_admin_database_query(user_message: str, event):
         if sql_query.upper().startswith('UPDATE'):
             # UPDATE操作的结果处理
             await ai_guide.finish(message_add_head("✅ 修改操作执行成功！", event))
+            return
         else:
             # SELECT操作的结果处理
             if not result:
                 await ai_guide.finish(message_add_head("📭 查询完成，但没有找到匹配的数据", event))
+                return
 
             # 调用AI整理结果
             formatted_result = await format_query_result(user_message, sql_query, result)
@@ -649,13 +652,17 @@ async def handle_admin_database_query(user_message: str, event):
             admin_result = f"🛡️ 管理员查询结果\n\n{formatted_result}"
 
             await ai_guide.finish(message_add_head(admin_result, event))
+            return
 
     except TimeoutError:
         await ai_guide.finish(message_add_head("⏰ AI分析超时，请稍后重试或使用游戏指令", event))
+        return
     except (aiohttp.ClientError, aiohttp.ClientResponseError):
         await ai_guide.finish(message_add_head("🌐 网络连接失败，请稍后重试", event))
+        return
     except ValueError as e:
         await ai_guide.finish(message_add_head(f"❌ 操作执行失败：{str(e)}", event))
+        return
 
 # 预先格式化的AI指令知识库字符串常量 - 避免每次调用时重新拼接
 AI_COMMANDS_TEXT = """
@@ -924,6 +931,7 @@ async def handle_ai_guide(event: MessageEvent, args: Message = CommandArg()):
                 "💡 也可以直接发送【帮助】查看完整指令列表",
                 event
             ))
+            return  # finish后立即返回，避免进入异常处理
 
         async with safe_session() as session:
             # 使用跨平台工具获取玩家数据
@@ -935,6 +943,7 @@ async def handle_ai_guide(event: MessageEvent, args: Message = CommandArg()):
                     "⛔ 请先发送【注册】创建角色",
                     event
                 ))
+                return  # finish后立即返回
 
             # 检查是否为管理员的数据库查询请求
             if is_admin(event.get_user_id()):
@@ -951,13 +960,20 @@ async def handle_ai_guide(event: MessageEvent, args: Message = CommandArg()):
             if response:
                 response += "\n━━━━━━━━━━━━━\n💡 【】括号里的才是指令\n💡 发送【帮助】查看完整指令列表"
                 await ai_guide.finish(message_add_head(response, event))
+                return  # finish后立即返回
 
     except Exception as e:
+        # 忽略 FinishedException（finish的正常退出机制）
+        from nonebot.exception import FinishedException
+        if isinstance(e, FinishedException):
+            return
+
         logger.error(f"AI引导处理失败: {e}")
         await ai_guide.finish(message_add_head(
             "❌ AI助手处理失败，请发送【帮助】查看游戏指令",
             event
         ))
+        return
 
 def extract_relevant_commands(user_message: str, max_systems: int = 3) -> str:
     """
