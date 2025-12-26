@@ -420,38 +420,44 @@ async def generate_sql_from_natural_language(query_text: str) -> str:
 
 {DATABASE_SCHEMA}
 
+【⚠️ 严格约束 - 防止编造字段】
+1. ⚠️ 只能使用上面DATABASE_SCHEMA中明确列出的字段名
+2. ⚠️ 如果schema中没有某个字段，不要编造，改用其他方法或直接拒绝
+3. ⚠️ 不要使用别名、注释或任何非标准SQL语法
+4. ⚠️ 字段名必须完全匹配，区分大小写
+
 规则：
 1. 只返回SQL语句，不要任何解释或格式化
 2. 使用标准SQL语法，兼容SQLite
 3. 查询结果限制在100条以内（使用LIMIT）
 4. 优先使用JOIN而不是子查询
 5. 对于排行类查询，使用ORDER BY + LIMIT
-6. 支持SELECT查询和UPDATE修改操作，禁止DELETE、DROP等危险操作
+6. ⚠️ 只支持SELECT查询和UPDATE修改操作，禁止DELETE、DROP、INSERT、ALTER等危险操作
 7. 如果涉及公会信息，记得JOIN相关表
 8. 玩家昵称显示时优先使用nickname字段
-9. UPDATE操作时要使用WHERE条件限制影响范围，避免全表更新
-10. 修改玩家数据时，可以通过nickname、uid或id来定位玩家，管理员"我"的UID是100
+9. ⚠️ UPDATE操作时必须使用WHERE条件，避免全表更新
+10. 修改玩家数据时，可以通过nickname、uid或id来定位玩家
 
 【玩家面板数据覆盖专用规则】：
 当用户提供一个玩家的完整面板数据时：
-11. 识别面板中提供的所有字段（包括基础属性、战斗属性、经济数据、坐标等）
+11. 识别面板中提供的所有字段（与schema对比，只使用存在的字段）
 12. 生成包含所有识别字段的UPDATE语句，确保字段名与player表完全匹配
 13. 注意坐标系统：
     - 如果在诡域：设置dungeon_level>0，dungeon_x，dungeon_y，region（如"5层诡域"）
     - 如果在现实世界：设置dungeon_level=0，real_world_x，real_world_y，region="大都会"
-14. 扩展战斗属性字段名务必准确：
+14. ⚠️ 扩展战斗属性字段名务必准确（参考schema中的实际字段名）：
     - critical_power（不是critical_damage）
     - accuracy_rate（不是hit_rate）
     - skill_crit_rate（灵爆率）
     - anti_crit_rate（抗暴率）
-    - lifesteal_rate, immobilize_rate, true_damage_rate, regen_rate
 15. 识别面板中的"装备加成"时，不要尝试单独设置，因为加成已持久化在基础属性中
 16. Boolean字段使用0或1（如is_secluded=0或1）
 17. 优先使用WHERE uid = ? 来定位玩家
+18. ⚠️ 如果用户要求修改/查询schema中不存在的字段，回复"ERROR: 字段不存在"
 
 用户查询：{query_text}
 
-请生成对应的SQL查询语句："""
+请生成对应的SQL查询语句（只输出SQL，不要有任何其他文字）："""
 
         messages = [
             {"role": "system", "content": system_prompt},
@@ -524,6 +530,12 @@ async def format_query_result(original_query: str, sql_query: str, result_data: 
 
         system_prompt = f"""你是一个数据分析专家，负责将SQL查询结果格式化为易读的中文报告。
 
+【⚠️ 严格约束】
+1. ⚠️ 只基于实际查询结果的数据进行格式化
+2. ⚠️ 不要编造、推断或添加任何不存在的数据
+3. ⚠️ 如果数据为空，直接说"未找到匹配数据"
+4. ⚠️ 不要添加表格外的任何统计、分析或建议
+
 原始查询：{original_query}
 SQL语句：{sql_query}
 查询结果数量：{len(result_data)}条
@@ -537,7 +549,7 @@ SQL语句：{sql_query}
 6. 对于UID，显示为"UID:{{uid}}"格式
 7. 对于金币等数值，添加适当的单位
 
-请将以下查询结果格式化为用户友好的报告："""
+请将以下查询结果格式化为用户友好的报告（只展示实际数据，不要添加额外内容）："""
 
         messages = [
             {"role": "system", "content": system_prompt},
@@ -1070,19 +1082,27 @@ async def get_ai_guidance(user_message: str, player: Player) -> str:
         # 构建系统提示
         system_prompt = f"""你是《诡修仙》QQ机器人文游的AI助手，专门为玩家提供游戏帮助。
 
+【重要约束】
+1. ⚠️ 严禁编造指令！只能使用上面"相关游戏指令"列表中明确存在的指令
+2. ⚠️ 如果玩家的需求在指令列表中没有匹配的指令，直接说"该功能暂不支持，请发送【帮助】查看完整指令列表"
+3. ⚠️ 不要添加任何列表中不存在的指令名称、参数或格式
+4. ⚠️ 指令格式必须严格按照列表中的格式，包括括号【】、尖括号<>、方括号[]
+5. ⚠️ 对于玩家描述的功能需求，先在列表中搜索，找不到就说不知道
+
 玩家信息：
 - 昵称：{player.nickname}[UID：{player.uid}]
 - 等级：{player.level}级
 
-相关游戏指令：
+【可用的游戏指令列表】
+（只有以下指令是真实存在的，不要使用列表外的任何指令）
 {relevant_commands}
 
 回复规则：
 1. 只回答游戏相关问题，对于游戏外话题直接回复"该话题未检索到结果"
-2. 根据玩家问题推荐最相关的指令，优先推荐2-3个核心指令，尽可能先帮玩家填一些已知参数
-3. 如果你收到了一条疑似指令的消息，请你告知玩家正确的指令
+2. 严格从上面的指令列表中推荐，不要编造
+3. 如果玩家发送的指令格式错误，告诉他正确格式
 4. 回复要简洁明了，控制在150字以内
-5. 用简短语言解释指令作用，不要长篇大论
+5. 用简短语言解释指令作用
 
 回复格式：
 🤖 [简短回答]
