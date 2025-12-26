@@ -106,6 +106,13 @@ items:
       effect_type: "DIVINE_PUNISHMENT"
       price: 1000000
 
+    - item_id: "santa_ride_ticket"
+      name: "圣诞老人代驾券"
+      description: "🎅 圣诞限定！圣诞老人驾着麋鹿雪橇来接你了！使用后可瞬移到任意合法坐标（现实世界任意位置或已解锁的诡域层级）。使用方法：使用 圣诞老人代驾券 [x坐标] [y坐标] 或 使用 圣诞老人代驾券 [N层诡域]。🛷❄️"
+      type: "CONSUMABLE"
+      effect_type: "SANTA_TELEPORT"
+      price: 888888
+
   materials:  # 材料类
     # ========== 白色（普通）材料 ==========
     - item_id: "rotten_core"

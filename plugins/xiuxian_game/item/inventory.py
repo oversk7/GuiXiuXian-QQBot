@@ -148,6 +148,12 @@ async def handle_use_item(event: MessageEvent, args: Message = CommandArg()):
                 await use_item.finish("⛔ 目标UID必须为正整数")
             ctx_payload = {"scene": "world", "target_uid": int(target_uid_str)}
             quantity = 1
+        elif item_config.effect_type == ItemEffectType.SANTA_TELEPORT:
+            # 圣诞老人代驾券：需要提供目标位置
+            if len(remaining_args) < 2:
+                await use_item.finish("⛔ 请提供目标坐标，例如：使用 圣诞老人代驾券 100 -200 或 使用 圣诞老人代驾券 5层诡域")
+            ctx_payload = {"scene": "world", "target": remaining_args}
+            quantity = 1
         elif remaining_args:
             try:
                 quantity = int(remaining_args[0])

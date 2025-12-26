@@ -859,3 +859,122 @@ async def _monthly_card_box(player: Player, cfg: ItemConfig, qty: int, ctx: str,
 
     result_msg = f"✨ 月卡宝箱开启成功！\n━━━━━━━━━━━━━\n" + "\n".join(results)
     return True, result_msg
+
+
+@register(ItemEffectType.SANTA_TELEPORT)
+async def _santa_teleport(player: Player, cfg: ItemConfig, qty: int, ctx: dict, session=None) -> Tuple[bool, str]:
+    """圣诞老人代驾券：瞬移到任意位置"""
+    if not isinstance(ctx, dict) or "target" not in ctx:
+        return False, "⛔ 参数错误，请提供目标位置"
+
+    target_args = ctx["target"]
+
+    # 判断是传送坐标还是传送诡域
+    # 格式1：使用 圣诞老人代驾券 x y (传送坐标)
+    # 格式2：使用 圣诞老人代驾券 N层诡域 (传送诡域)
+
+    # 检查是否是诡域传送
+    if len(target_args) >= 1 and "层诡域" in target_args[-1]:
+        # 诡域传送
+        target_str = target_args[-1]
+        try:
+            level_str = target_str.replace("层诡域", "")
+            if level_str.startswith("第"):
+                level_str = level_str[1:]
+            dungeon_level = int(level_str)
+        except ValueError:
+            return False, "⛔ 诡域层级格式错误，请使用：N层诡域 或 第N层诡域"
+
+        # 验证层级范围
+        if dungeon_level <= 0:
+            return False, "⛔ 诡域层级必须大于0"
+
+        # 检查是否已解锁该层级
+        if not player.can_enter_dungeon_level(dungeon_level):
+            max_level = player.max_dungeon_level or 0
+            return False, (
+                f"⛔ 你还未解锁第{dungeon_level}重诡域！\n"
+                f"━━━━━━━━━━━━━\n"
+                f"📊 当前最深探索：第{max_level}重诡域\n"
+                f"💡 需要逐重击败诡异解锁更深的诡域"
+            )
+
+        # 执行传送
+        from ..world.dungeon_battle import get_or_create_tile
+        player.enter_dungeon(dungeon_level)
+
+        # 获取新位置描述
+        tile = await get_or_create_tile(session, f"{dungeon_level}层诡域", player.dungeon_x, player.dungeon_y)
+        tile_desc = await _get_tile_description_from_tile(session, player, tile)
+
+        session.add(player)
+        await session.commit()
+
+        msg_lines = [
+            "🎅🛷 嘿！圣诞老人来了！",
+            "━━━━━━━━━━━━━",
+            f"❄️ 雪橇穿过风雪，将你送到了第{dungeon_level}重诡域",
+            f"📍 当前位置：({player.dungeon_x}, {player.dungeon_y})",
+            "━━━━━━━━━━━━━",
+            tile_desc,
+            "🎄 圣诞快乐！祝你探险顺利！"
+        ]
+
+        return True, "\n".join(msg_lines)
+
+    else:
+        # 坐标传送（现实世界）
+        if len(target_args) < 2:
+            return False, "⛔ 请提供完整坐标，例如：使用 圣诞老人代驾券 100 -200"
+
+        try:
+            target_x = int(target_args[0])
+            target_y = int(target_args[1])
+        except ValueError:
+            return False, "⛔ 坐标必须是整数"
+
+        # 坐标范围检查（可根据需要调整）
+        if not (-1000 <= target_x <= 1000 and -1000 <= target_y <= 1000):
+            return False, "⛔ 目标坐标超出范围（-1000到1000）"
+
+        # 退出诡域（如果在诡域中）
+        was_in_dungeon = player.is_in_dungeon()
+
+        # 推进导航进度
+        from ..models.navigation_task import NavigationTask
+        from ..world.navigation import _update_nav_position
+        nav_task = await session.get(NavigationTask, player.id)
+        if nav_task:
+            reached = await _update_nav_position(player, nav_task, session)
+            if reached:
+                await session.delete(nav_task)
+
+        player.exit_dungeon()
+        player.x = target_x
+        player.y = target_y
+
+        session.add(player)
+        await session.commit()
+
+        msg_lines = [
+            "🎅🛷 嘿！圣诞老人来了！",
+            "━━━━━━━━━━━━━",
+            f"❄️ 雪橇穿过风雪，将你送到了现实世界坐标 ({target_x}, {target_y})",
+        ]
+
+        if was_in_dungeon:
+            msg_lines.append("🌍 你已从诡域穿越回表世界")
+
+        msg_lines.extend([
+            "━━━━━━━━━━━━━",
+            "🎄 圣诞快乐！愿你心想事成！"
+        ])
+
+        return True, "\n".join(msg_lines)
+
+
+async def _get_tile_description_from_tile(session, player: Player, tile) -> str:
+    """根据tile对象生成描述（辅助函数）"""
+    from ..world.teleport import get_tile_description
+    region = f"{player.dungeon_level}层诡域" if player.is_in_dungeon() else player.region
+    return await get_tile_description(session, player, region, player.dungeon_x if player.is_in_dungeon() else player.x, player.dungeon_y if player.is_in_dungeon() else player.y)
