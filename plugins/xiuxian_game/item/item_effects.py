@@ -911,13 +911,13 @@ async def _santa_teleport(player: Player, cfg: ItemConfig, qty: int, ctx: dict, 
         await session.commit()
 
         msg_lines = [
-            "🎅🛷 嘿！圣诞老人来了！",
+            "🎅✨ 圣诞裂隙缓缓展开...",
             "━━━━━━━━━━━━━",
-            f"❄️ 雪橇穿过风雪，将你送到了第{dungeon_level}重诡域",
+            f"❄️ 你穿过了扭曲的时空，抵达了第{dungeon_level}重诡域",
             f"📍 当前位置：({player.dungeon_x}, {player.dungeon_y})",
             "━━━━━━━━━━━━━",
             tile_desc,
-            "🎄 圣诞快乐！祝你探险顺利！"
+            "🎄 圣诞快乐！愿你心想事成！"
         ]
 
         return True, "\n".join(msg_lines)
@@ -957,9 +957,9 @@ async def _santa_teleport(player: Player, cfg: ItemConfig, qty: int, ctx: dict, 
         await session.commit()
 
         msg_lines = [
-            "🎅🛷 嘿！圣诞老人来了！",
+            "🎅✨ 圣诞裂隙缓缓展开...",
             "━━━━━━━━━━━━━",
-            f"❄️ 雪橇穿过风雪，将你送到了现实世界坐标 ({target_x}, {target_y})",
+            f"❄️ 你穿过了扭曲的时空，抵达了现实世界坐标 ({target_x}, {target_y})",
         ]
 
         if was_in_dungeon:
