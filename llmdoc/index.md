@@ -74,32 +74,43 @@ LLM代理生成的调研和分析报告（仅保留系统分析和设计参考�
 
 **系统平衡与设计分析**:
 - `game_balance_analysis_2025_12_01.md` - 游戏平衡分析与漏洞修复报告 (2025-12-01)
-- `feature_flag_investigation_2025_12_02.md` - Feature Flag调查与架构决策记录
+- `feature_flag_investigation_2025_12_02.md` - Feature Flag调查与架构决策记录 (2025-12-02)
 - `doc_cleanup_investigation.md` - 文档清理调研报告（元文档）
 - `achievement_enhancement_2025_12_03.md` - 成就系统增强与Bug修复记录 (2025-12-03)
+- `achievement_integration_fix_2025_12_05.md` - 成就系统关键路径集成修复实施记录 (2025-12-05)
 - `anniversary_achievement_2025_12_03.md` - 周年庆典成就系统工作记录 (2025-12-03)
 - `map_visualization_optimization_implementation_2025_12_03.md` - 地图可视化系统性能优化与视觉美化 (2025-12-03)
 
 **核心游戏系统优化**:
 - `cyberpunk_hacking_solvability_analysis.md` - cyberpunk_hacking序列生成可解性深度分析 (2025-12-04)
 - `cyberpunk_hacking_limitation_investigation.md` - cyberpunk_hacking限制条件与成本调查 (2025-12-04)
-- `achievement_integration_fix_2025_12_05.md` - 成就系统关键路径集成修复实施记录 (2025-12-05)
+- `cyberpunk_hacking_hard_mode_investigation.md` - cyberpunk_hacking困难模式调查 (2025-12-04)
 
-**投资系统调研**:
-- `investment_system_investigation.md` - 投资系统初步调查报告（银行+股票）
-- `stock_system_files_investigation.md` - 投资系统文件清单调查
+**经济系统调研**:
+- `investment_system_investigation.md` - 投资系统初步调查报告（银行+股票）(2025-12-02)
+- `stock_system_files_investigation.md` - 投资系统文件清单调查 (2025-12-02)
+- `economy_gold_flow_investigation_2025_12_03.md` - 经济系统金币流动调查 (2025-12-03)
+- `material_scarcity_investigation_2025_12_03.md` - 材料稀缺性调查 (2025-12-03)
 
-**未来功能设计**:
+**NPC与对话系统**:
 - `ai_npc_implementation_investigation.md` - AI NPC系统架构设计（方案对比，已选择方案2实施）
+- `ai_npc_improvement_investigation.md` - AI NPC系统改进调查 (2025-12-07)
 - `agent_npc_autonomous_behavior_investigation.md` - Agent NPC自主行为调查
 - `npc_dialogue_system_implementation_status_2025_12_06.md` - NPC AI对话系统实施决策记录（方案2核心功能版选择理由）
+- `npc_long_term_memory_design.md` - NPC长期记忆系统设计 (2025-12-07)
+- `npc_cleanup_investigation.md` - NPC清单及服务功能分析报告
 
 **系统调研参考**:
-- `player_panel_investigation_2025_12_01.md` - 玩家面板系统调查
-- `cultivation_and_quest_investigation.md` - 修炼与任务系统调查
-- `code_logic_comparison_investigation.md` - 代码逻辑对比分析
+- `player_panel_investigation_2025_12_01.md` - 玩家面板系统调查 (2025-12-01)
+- `cultivation_and_quest_investigation.md` - 修炼与任务系统调查 (2025-12-01)
+- `code_logic_comparison_investigation.md` - 代码逻辑对比分析 (2025-12-02)
+- `single_player_bottleneck_investigation_2025_12_03.md` - 新手玩家单人可玩性瓶颈调研 (2025-12-03)
+- `single_player_systems_investigation_2025_12_03.md` - 单人可玩性系统调查 (2025-12-03)
+- `navigation_movement_investigation_2025_12_03.md` - 导航移动系统调查 (2025-12-03)
+- `task_system_location_investigation_2025_12_03.md` - 任务系统地点调查 (2025-12-03)
+- `map_visualization_optimization_investigation.md` - 地图可视化优化调查 (2025-12-03)
 
-**清理说明**: 已删除20个临时性bug修复调查文档（2025-12-06清理9个：银行利息、任务统计、成就进度、成就单点调查3个、连接泄漏2个；2025-12-03清理11个：装备bug、连接泄漏、ENUM修复等），这些问题均已解决且无长期参考价值。
+**清理说明**: 已删除29个临时性bug修复调查文档（2025-12-28清理9个：AI数据库查询、每日任务NPC匹配、公会炼丹房品质、抽奖奖励发放、留言板黑名单、面板命令、临时buff属性、股票退市调查、股票修复总结；2025-12-06清理9个；2025-12-03清理11个），这些问题均已解决且无长期参考价值。
 
 ### `/design/` - 系统设计方案
 游戏设计和系统重构方案:
