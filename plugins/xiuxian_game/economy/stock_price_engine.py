@@ -199,19 +199,31 @@ class StockPriceEngine:
 
         退市流程：
         1. 标记股票为已退市
-        2. 清空所有玩家持仓（通过后续定时任务处理）
+        2. 立即清空所有玩家持仓（玩家损失所有投资）
         3. 记录退市信息
+
+        注意：此方法在update_all_prices的session上下文中调用
+        不需要单独commit,由外层session统一管理事务
         """
         from ..models.stock import StockHolding
+        from ..infrastructure.repositories.stock_holding_repository import StockHoldingRepository
 
         # 标记为已退市
         stock.is_active = False
         stock.delisted_at = datetime.now()
         stock.delist_reason = "健康度归零"
 
-        # 注意：清空持仓的逻辑应该在 stock_service_new.py 中实现
-        # 这里只标记退市状态，实际清空操作由 StockService.delist_stock() 处理
-    
+        # 立即清空所有玩家持仓
+        stock_holding_repo = StockHoldingRepository(session)
+        holdings = await stock_holding_repo.get_all_holdings_by_stock(stock.id)
+
+        if holdings:
+            for holding in holdings:
+                # 删除持仓记录，玩家损失所有投资
+                await stock_holding_repo.delete_holding(holding)
+
+            # 注意：不在这里commit，由外层update_all_prices统一管理事务
+
     @classmethod
     async def get_price_trend(cls, session: AsyncSession, stock_id: int, days: int = 7) -> List[Dict]:
         """获取股票价格趋势"""
