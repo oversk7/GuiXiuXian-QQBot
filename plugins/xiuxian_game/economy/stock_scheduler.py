@@ -18,6 +18,7 @@ async def setup_stock_scheduler():
         existing_daily_job = scheduler.get_job("stock_daily_update")
         existing_holding_fee_job = scheduler.get_job("stock_daily_holding_fee")
         existing_black_swan_job = scheduler.get_job("stock_weekly_black_swan")
+        existing_relist_job = scheduler.get_job("stock_daily_relist_check")
 
         if existing_hourly_job:
             logger.info("⚠️ 股票备用更新定时任务已存在，跳过设置")
@@ -79,6 +80,21 @@ async def setup_stock_scheduler():
                 coalesce=True,
             )
             logger.info("✅ 黑天鹅事件定时任务已设置 - 每周一凌晨执行")
+
+        if existing_relist_job:
+            logger.info("⚠️ 股票重新上市检查定时任务已存在，跳过设置")
+        else:
+            # 添加每日重新上市检查任务（每天凌晨1点执行）
+            scheduler.add_job(
+                func=perform_daily_relist_check,
+                trigger="cron",
+                hour=1,  # 每天凌晨1点执行
+                id="stock_daily_relist_check",
+                replace_existing=True,
+                max_instances=1,
+                coalesce=True,
+            )
+            logger.info("✅ 股票重新上市检查定时任务已设置 - 每天凌晨1点执行")
 
     except Exception as e:
         logger.error(f"❌ 设置股票价格更新定时任务失败: {e}")
@@ -190,6 +206,36 @@ async def perform_weekly_black_swan_check():
         logger.error(f"❌ 黑天鹅事件检查失败: {e}", exc_info=True)
 
 
+async def perform_daily_relist_check():
+    """执行每日股票重新上市检查"""
+    try:
+        logger.info("🔄 开始检查股票重新上市...")
+
+        from .stock_relist_service import StockRelistService
+
+        # 1. 检查并重新上市符合条件的退市股票
+        relist_stats = await StockRelistService.check_and_relist_stocks()
+
+        # 2. 确保最小股票数量
+        ensure_stats = await StockRelistService.ensure_minimum_stocks()
+
+        total_relisted = relist_stats["relisted_count"] + ensure_stats["created_count"]
+        total_active = relist_stats["total_active"]
+
+        if total_relisted > 0:
+            logger.info(
+                f"✅ 股票重新上市检查完成: "
+                f"重新上市{relist_stats['relisted_count']}只, "
+                f"新建{ensure_stats['created_count']}只, "
+                f"当前活跃{total_active}只"
+            )
+        else:
+            logger.info(f"✅ 股票重新上市检查完成: 当前活跃{total_active}只,无需补充")
+
+    except Exception as e:
+        logger.error(f"❌ 股票重新上市检查失败: {e}", exc_info=True)
+
+
 @driver.on_shutdown
 async def cleanup_stock_scheduler():
     """清理股票调度器"""
@@ -209,6 +255,10 @@ async def cleanup_stock_scheduler():
         if scheduler.get_job("stock_weekly_black_swan"):
             scheduler.remove_job("stock_weekly_black_swan")
             logger.info("🧹 黑天鹅事件定时任务已清理")
+
+        if scheduler.get_job("stock_daily_relist_check"):
+            scheduler.remove_job("stock_daily_relist_check")
+            logger.info("🧹 股票重新上市检查定时任务已清理")
 
     except Exception as e:
         logger.error(f"❌ 清理股票定时任务失败: {e}")

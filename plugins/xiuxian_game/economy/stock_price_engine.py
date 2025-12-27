@@ -22,14 +22,14 @@ from ..models.db import safe_session
 class StockPriceEngine:
     """股票价格引擎"""
     
-    # 不同股票类型的基础波动率（大幅提高，让富人刺激）
+    # 不同股票类型的基础波动率（反套利设计值）
     TYPE_VOLATILITY = {
-        StockType.TECH: 0.15,       # 科技股波动巨大（原0.08）
-        StockType.FINANCE: 0.10,    # 金融股波动较大（原0.04）
-        StockType.ENERGY: 0.13,     # 能源股波动巨大（原0.06）
-        StockType.CONSUMER: 0.08,   # 消费股波动明显（原0.03）
-        StockType.HEALTHCARE: 0.11, # 医疗股波动较大（原0.05）
-        StockType.MATERIALS: 0.14,  # 材料股波动巨大（原0.07）
+        StockType.TECH: 0.08,       # 科技股波动率
+        StockType.FINANCE: 0.04,    # 金融股波动率
+        StockType.ENERGY: 0.06,     # 能源股波动率
+        StockType.CONSUMER: 0.03,   # 消费股波动率
+        StockType.HEALTHCARE: 0.05, # 医疗股波动率
+        StockType.MATERIALS: 0.07,  # 材料股波动率
     }
     
     # 市场情绪因子（全局影响）
@@ -110,8 +110,8 @@ class StockPriceEngine:
         # 4. 随机波动因子（正态分布，期望值=0）
         random_factor = random.gauss(0, total_volatility)
 
-        # 5. 市场情绪影响（加大波动，让富人刺激）
-        sentiment = random.choice([-0.05, -0.03, 0, 0.03, 0.05])  # -5%~+5%（原-2%~+2%）
+        # 5. 市场情绪影响（随机，期望=0）
+        sentiment = random.choice([-0.02, 0, 0.02])  # -2%, 0%, +2%
 
         # 6. 历史价格回归因子（防止价格偏离基础价格太远）
         regression_factor = cls._calculate_regression_factor(stock)
@@ -123,8 +123,8 @@ class StockPriceEngine:
             regression_factor         # 价格回归
         )
 
-        # 8. 限制单次变化幅度（提高到±25%，让富人梭哈更刺激）
-        total_change_rate = max(-0.25, min(0.25, total_change_rate))
+        # 8. 限制单次变化幅度（±15%）
+        total_change_rate = max(-0.15, min(0.15, total_change_rate))
 
         # 9. 计算新价格
         new_price = int(current_price * (1 + total_change_rate))
@@ -174,20 +174,20 @@ class StockPriceEngine:
 
     @classmethod
     def _update_health(cls, stock: Stock, change_rate: float) -> None:
-        """更新股票健康度（加快衰减，让富人赌博更刺激）
+        """更新股票健康度（反套利机制）
 
         规则：
-        1. 价格下跌时损耗健康度（跌1% = -1.5点健康，原-1点）
-        2. 价格上涨时恢复健康度（涨1% = +0.3点健康，原+0.5点，恢复更慢）
+        1. 价格下跌时损耗健康度（跌1% = -1点健康）
+        2. 价格上涨时恢复健康度（涨1% = +0.5点健康，恢复速度是损耗速度的一半）
         3. 健康度衰减速度由 health_decay_rate 控制
         """
         if change_rate < 0:
-            # 下跌：大幅损耗健康度（提高50%衰减速度）
-            health_loss = abs(change_rate) * 150 * stock.health_decay_rate
+            # 下跌：损耗健康度
+            health_loss = abs(change_rate) * 100 * stock.health_decay_rate
             stock.health -= int(health_loss)
         else:
-            # 上涨：缓慢恢复健康度（降低40%恢复速度）
-            health_gain = change_rate * 30 * stock.health_decay_rate
+            # 上涨：恢复健康度（恢复速度是损耗速度的一半）
+            health_gain = change_rate * 50 * stock.health_decay_rate
             stock.health += int(health_gain)
 
         # 限制健康度范围 [0, 100]

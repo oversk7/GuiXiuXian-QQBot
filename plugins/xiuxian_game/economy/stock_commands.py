@@ -773,4 +773,97 @@ async def handle_stock_events(event: MessageEvent):
         await stock_events_cmd.finish(result_msg)
 
 
+# 管理员命令: 重置所有退市股票
+stock_reset_all_cmd = on_command("重置所有股票", block=True, priority=5, permission=SUPERUSER)
+
+
+@stock_reset_all_cmd.handle()
+async def handle_reset_all_stocks(event: MessageEvent):
+    """重置所有退市股票（管理员命令）"""
+    try:
+        from .stock_relist_service import StockRelistService
+
+        # 重置所有退市股票
+        stats = await StockRelistService.reset_all_delisted_stocks()
+
+        # 构建返回消息
+        lines = [
+            "🔄 股票重置完成",
+            "━━━━━━━━━━━━━",
+            f"📊 重置数量: {stats['reset_count']}只",
+            f"✅ 当前活跃: {stats['total_active']}只",
+        ]
+
+        if stats['reset_symbols']:
+            lines.append("📋 重置列表:")
+            for symbol in stats['reset_symbols'][:10]:  # 最多显示10个
+                lines.append(f"   • {symbol}")
+            if len(stats['reset_symbols']) > 10:
+                lines.append(f"   ... 还有{len(stats['reset_symbols'])-10}只")
+
+        lines.append("━━━━━━━━━━━━━")
+        lines.append("💡 所有退市股票已重新上市")
+        lines.append("   健康度重置为100")
+        lines.append("   价格重置为基础价格")
+
+        result_msg = "\n".join(lines)
+        await stock_reset_all_cmd.finish(result_msg)
+
+    except Exception as e:
+        error_msg = f"❌ 重置股票失败: {str(e)}"
+        await stock_reset_all_cmd.finish(error_msg)
+
+
+# 管理员命令: 手动触发重新上市检查
+stock_check_relist_cmd = on_command("检查股票重新上市", block=True, priority=5, permission=SUPERUSER)
+
+
+@stock_check_relist_cmd.handle()
+async def handle_check_relist(event: MessageEvent):
+    """手动触发重新上市检查（管理员命令）"""
+    try:
+        from .stock_relist_service import StockRelistService
+
+        # 1. 检查并重新上市
+        relist_stats = await StockRelistService.check_and_relist_stocks()
+
+        # 2. 确保最小数量
+        ensure_stats = await StockRelistService.ensure_minimum_stocks()
+
+        total_relisted = relist_stats['relisted_count'] + ensure_stats['created_count']
+        total_active = relist_stats['total_active']
+
+        # 构建返回消息
+        lines = [
+            "🔄 股票重新上市检查完成",
+            "━━━━━━━━━━━━━",
+            f"✅ 当前活跃股票: {total_active}只",
+        ]
+
+        if total_relisted > 0:
+            lines.append(f"📈 重新上市: {relist_stats['relisted_count']}只")
+            lines.append(f"🆕 新建股票: {ensure_stats['created_count']}只")
+
+            if relist_stats['relisted_symbols']:
+                lines.append("📋 重新上市列表:")
+                for symbol in relist_stats['relisted_symbols']:
+                    lines.append(f"   • {symbol}")
+
+            if ensure_stats['created_symbols']:
+                lines.append("📋 新建股票列表:")
+                for symbol in ensure_stats['created_symbols']:
+                    lines.append(f"   • {symbol}")
+        else:
+            lines.append("💚 所有股票状态正常，无需补充")
+
+        lines.append("━━━━━━━━━━━━━")
+
+        result_msg = "\n".join(lines)
+        await stock_check_relist_cmd.finish(result_msg)
+
+    except Exception as e:
+        error_msg = f"❌ 检查重新上市失败: {str(e)}"
+        await stock_check_relist_cmd.finish(error_msg)
+
+
 
