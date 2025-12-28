@@ -284,8 +284,8 @@ async def handle_revive(event: MessageEvent):
 
         # 恢复满状态(包含临时buff加成)
         effective_attrs = await player.get_effective_attributes(session)
-        player.hp = effective_attrs.get('hp', player.max_hp)
-        player.mp = effective_attrs.get('mp', player.max_mp)
+        player.hp = effective_attrs.get('max_hp', player.max_hp)
+        player.mp = effective_attrs.get('max_mp', player.max_mp)
         
         # 使用新的双层坐标系统退出诡域
         # 退出前推进现实世界的导航进度，使返回位置为“导航后的最新位置”

@@ -178,8 +178,8 @@ async def _revive(player: Player, cfg: ItemConfig, qty: int, ctx: str, session=N
     # 获取包含临时buff的有效属性
     if session:
         effective_attrs = await player.get_effective_attributes(session)
-        max_hp = effective_attrs.get('hp', player.max_hp)
-        max_mp = effective_attrs.get('mp', player.max_mp)
+        max_hp = effective_attrs.get('max_hp', player.max_hp)
+        max_mp = effective_attrs.get('max_mp', player.max_mp)
     else:
         max_hp = player.max_hp
         max_mp = player.max_mp
