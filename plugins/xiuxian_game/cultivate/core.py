@@ -126,15 +126,14 @@ async def handle_cultivate(event: MessageEvent):
         # 获取阴宅修为加成（支持使用其他玩家的阴宅）
         mansion_cultivation_bonus = 0.0
         mansion_usage_msg = ""
-        from .mansion import MansionService
 
         # 检查当前位置是否有阴宅
         current_x, current_y = player.get_current_coordinates()
 
         from ..infrastructure.repositories.player_repository import PlayerRepository
-        from .mansion_service_new import MansionService as MansionServiceNew
+        from .mansion_service_new import MansionService
 
-        service = MansionServiceNew(
+        service = MansionService(
             player_repo=PlayerRepository(session),
         )
         mansion_owner = await service.find_mansion_owner_at_location(current_x, current_y)
@@ -283,15 +282,14 @@ async def handle_seclusion(event: MessageEvent):
 
         # 获取阴宅修为加成（闭关时只检查是否有阴宅，不支付费用）
         mansion_cultivation_bonus = 0.0
-        from .mansion import MansionService
 
         # 检查当前位置是否有阴宅
         current_x, current_y = player.get_current_coordinates()
 
         from ..infrastructure.repositories.player_repository import PlayerRepository
-        from .mansion_service_new import MansionService as MansionServiceNew
+        from .mansion_service_new import MansionService
 
-        service = MansionServiceNew(
+        service = MansionService(
             player_repo=PlayerRepository(session),
         )
         mansion_owner = await service.find_mansion_owner_at_location(current_x, current_y)
@@ -410,15 +408,14 @@ async def handle_out_seclusion(event: MessageEvent):
         # 获取阴宅修为加成（出关时支付使用费用并获得加成）
         mansion_cultivation_bonus = 0.0
         mansion_usage_msg = ""
-        from .mansion import MansionService
 
         # 检查当前位置是否有阴宅
         current_x, current_y = player.get_current_coordinates()
 
         from ..infrastructure.repositories.player_repository import PlayerRepository
-        from .mansion_service_new import MansionService as MansionServiceNew
+        from .mansion_service_new import MansionService
 
-        service = MansionServiceNew(
+        service = MansionService(
             player_repo=PlayerRepository(session),
         )
         mansion_owner = await service.find_mansion_owner_at_location(current_x, current_y)

@@ -13,7 +13,7 @@ from ..models.player import Player
 from ..utils import message_add_head
 from .location_service import LocationService
 from .npc_service import NPCService
-from ..cultivate.mansion import MansionService
+from ..cultivate.mansion_service_new import MansionService
 
 # ==================== Feature Flag ====================
 # 设置为True使用新版DI架构的LocationService，False使用旧版本
@@ -119,7 +119,6 @@ async def show_basic_location_info(session: AsyncSession, player: Player, x: int
     )
 
     # 获取附近的阴宅
-    from ..cultivate.mansion import MansionService
     from sqlalchemy import select, and_, func
     nearby_mansions = []
 
@@ -250,8 +249,11 @@ async def show_basic_location_info(session: AsyncSession, player: Player, x: int
 
 async def get_mansion_info_for_location(session: AsyncSession, player: Player, x: int, y: int) -> str | None:
     """获取指定位置的阴宅信息，用于在观察指令中显示"""
+    from ..infrastructure.repositories.player_repository import PlayerRepository
+
     # 查找当前位置的阴宅主人
-    mansion_owner = await MansionService.find_mansion_owner_at_location(session, x, y)
+    service = MansionService(player_repo=PlayerRepository(session))
+    mansion_owner = await service.find_mansion_owner_at_location(x, y)
 
     if not mansion_owner:
         return None
@@ -259,7 +261,7 @@ async def get_mansion_info_for_location(session: AsyncSession, player: Player, x
     mansion_info = MansionService.get_mansion_info(mansion_owner.mansion_level)
 
     # 检查是否可以使用
-    can_use, use_msg = await MansionService.can_use_mansion(session, player, mansion_owner)
+    can_use, use_msg = await service.can_use_mansion(player, mansion_owner)
 
     # 构建简化的阴宅信息
     if player.id == mansion_owner.id:

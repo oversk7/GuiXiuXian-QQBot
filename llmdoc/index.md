@@ -42,6 +42,7 @@
 - `achievement-system.md` - 微成就系统架构（配置驱动+统计追踪+即时反馈）
 - `cyberpunk_hacking_multipath_implementation.md` - cyberpunk_hacking多路径机制实施记录（可解性75-300倍提升）
 - `story-engine-enhanced-conditions.md` - Story Engine条件和跳转系统增强（and/or逻辑+多分支条件跳转）
+- `阴宅系统增强设计.md` - 阴宅系统增强方案（厨房、鱼塘、花园等功能模块设计）
 
 ### `/guides/` - 操作指南
 回答"如何执行X任务?":
@@ -68,6 +69,8 @@
 - `account-switching-api.md` - 账号切换系统API参考
 - `code-cleanup-2025-12-02.md` - 代码清理记录（Feature Flag删除、旧Service移除）
 - `story-engine-api.md` - Story Engine API参考（条件格式+跳转格式+API方法）
+- `阴宅系统现状调研.md` - 阴宅系统实现机制调研（数据模型、等级机制、升级逻辑）
+- `阴宅系统架构重构报告.md` - 阴宅系统架构重构记录（DI架构统一、双版本清理）
 
 ### `/agent/` - 代理调研文档
 LLM代理生成的调研和分析报告（仅保留系统分析和设计参考文档）:

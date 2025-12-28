@@ -139,24 +139,8 @@ class MansionService:
         Returns:
             阴宅主人玩家对象，如果没有找到则返回None
         """
-        # TODO: 需要在PlayerRepository中添加此方法
-        # 当前实现需要扩展PlayerRepository，添加：
-        # async def find_mansion_owner_at_location(self, x: int, y: int) -> Optional[Player]:
-        #     查询指定坐标的阴宅主人
-
-        # 临时实现（需要后续完善）
-        # 这里应该调用: return await self._player_repo.find_mansion_owner_at_location(x, y)
-        from sqlalchemy import select
-
-        stmt = select(Player).where(
-            Player.mansion_x == x,
-            Player.mansion_y == y,
-            Player.mansion_level > 0,
-            Player.mansion_x.isnot(None),
-            Player.mansion_y.isnot(None)
-        )
-        result = await self._player_repo._session.execute(stmt)
-        return result.scalar_one_or_none()
+        # 通过PlayerRepository查询阴宅主人
+        return await self._player_repo.find_mansion_owner_at_location(x, y)
 
     async def can_use_mansion(self, player: Player, mansion_owner: Player) -> tuple[bool, str]:
         """

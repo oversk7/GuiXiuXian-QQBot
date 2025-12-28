@@ -8,9 +8,7 @@ from nonebot.params import CommandArg
 from ..utils import message_add_head
 from ..models.db import safe_session
 from ..models.player import Player
-from .mansion import MansionService
 
-# Feature Flag: 控制是否使用新版MansionService (DI架构)
 # 阴宅相关命令
 mansion_status_cmd = on_command("阴宅", aliases={"阴宅状态", "查看阴宅"}, priority=4, block=True)
 purchase_mansion_cmd = on_command("购买阴宅", aliases={"买阴宅"}, priority=4, block=True)
@@ -24,16 +22,18 @@ migrate_mansion_cmd = on_command("迁移阴宅", aliases={"阴宅迁移"}, prior
 @mansion_status_cmd.handle()
 async def handle_mansion_status(event: MessageEvent):
     """查看阴宅状态"""
+    from .mansion_service_new import MansionService
+
     user_id = event.get_user_id()
     async with safe_session() as session:
         # 获取玩家数据
         player = await session.get(Player, user_id)
         if not player:
             await mansion_status_cmd.finish("⛔ 请先使用【注册】命令创建角色")
-        
+
         # 格式化阴宅状态信息
         status_msg = MansionService.format_mansion_status(player)
-        
+
         await mansion_status_cmd.finish(message_add_head(status_msg, event))
 
 
@@ -53,9 +53,9 @@ async def handle_purchase_mansion(event: MessageEvent):
         
         # 尝试购买阴宅
         from ..infrastructure.repositories.player_repository import PlayerRepository
-        from .mansion_service_new import MansionService as MansionServiceNew
+        from .mansion_service_new import MansionService
 
-        service = MansionServiceNew(
+        service = MansionService(
             player_repo=PlayerRepository(session),
         )
         success, result_msg = await service.purchase_mansion(player)
@@ -91,9 +91,9 @@ async def handle_upgrade_mansion(event: MessageEvent):
         
         # 尝试升级阴宅
         from ..infrastructure.repositories.player_repository import PlayerRepository
-        from .mansion_service_new import MansionService as MansionServiceNew
+        from .mansion_service_new import MansionService
 
-        service = MansionServiceNew(
+        service = MansionService(
             player_repo=PlayerRepository(session),
         )
         success, result_msg = await service.upgrade_mansion(player)
@@ -152,9 +152,9 @@ async def handle_set_mansion_fee(event: MessageEvent, args: Message = CommandArg
 
         # 设置阴宅使用费用
         from ..infrastructure.repositories.player_repository import PlayerRepository
-        from .mansion_service_new import MansionService as MansionServiceNew
+        from .mansion_service_new import MansionService
 
-        service = MansionServiceNew(
+        service = MansionService(
             player_repo=PlayerRepository(session),
         )
         success, result_msg = await service.set_mansion_usage_fee(player, fee)
@@ -178,9 +178,9 @@ async def handle_toggle_mansion_access(event: MessageEvent):
 
         # 切换阴宅访问权限
         from ..infrastructure.repositories.player_repository import PlayerRepository
-        from .mansion_service_new import MansionService as MansionServiceNew
+        from .mansion_service_new import MansionService
 
-        service = MansionServiceNew(
+        service = MansionService(
             player_repo=PlayerRepository(session),
         )
         success, result_msg = await service.toggle_mansion_access(player)
@@ -204,9 +204,9 @@ async def handle_toggle_mansion_payment(event: MessageEvent):
 
         # 切换阴宅付费使用意愿
         from ..infrastructure.repositories.player_repository import PlayerRepository
-        from .mansion_service_new import MansionService as MansionServiceNew
+        from .mansion_service_new import MansionService
 
-        service = MansionServiceNew(
+        service = MansionService(
             player_repo=PlayerRepository(session),
         )
         success, result_msg = await service.toggle_mansion_payment_willingness(player)

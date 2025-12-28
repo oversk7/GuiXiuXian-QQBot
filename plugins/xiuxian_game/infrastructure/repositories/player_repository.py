@@ -271,3 +271,24 @@ class PlayerRepository(IRepository[Player]):
         )
         result = await self._session.execute(stmt)
         return result.scalar_one_or_none()
+
+    async def find_mansion_owner_at_location(self, x: int, y: int) -> Optional[Player]:
+        """
+        查找指定坐标的阴宅主人
+
+        Args:
+            x: X坐标
+            y: Y坐标
+
+        Returns:
+            阴宅主人对象，如果该位置没有阴宅则返回 None
+        """
+        stmt = select(Player).where(
+            and_(
+                Player.mansion_x == x,
+                Player.mansion_y == y,
+                Player.mansion_level > 0
+            )
+        )
+        result = await self._session.execute(stmt)
+        return result.scalar_one_or_none()
