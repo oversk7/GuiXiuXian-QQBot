@@ -1,7 +1,7 @@
 """
 成就系统数据模型
 """
-from sqlalchemy import String, Integer, Boolean, DateTime, func, Index, ForeignKey, text
+from sqlalchemy import String, Integer, Boolean, DateTime, BigInteger, func, Index, ForeignKey, text
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from datetime import datetime
 from .db import Base
