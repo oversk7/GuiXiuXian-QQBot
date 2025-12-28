@@ -171,10 +171,6 @@ async def handle_stock_buy(event: MessageEvent, args: Message = CommandArg()):
 
     use_bank = len(parts) > 2 and parts[2] in ["银行", "bank"]
 
-    # 获取玩家ID
-    from ..platform_utils import get_platform_info
-    _, user_id = get_platform_info(event)
-
     # 执行买入
     # 新版本: 使用DI架构
     from ..infrastructure.uow.unit_of_work import UnitOfWork
@@ -185,6 +181,12 @@ async def handle_stock_buy(event: MessageEvent, args: Message = CommandArg()):
         return AsyncSessionLocal()
 
     async with UnitOfWork(session_factory) as uow:
+        # 获取统一账号(支持账号切换)
+        player = await get_unified_player(uow.session, event)
+        if not player:
+            await stock_buy_cmd.finish("⛔ 请先创建角色")
+            return
+
         # 创建StockService实例
         stock_service = StockServiceNew(
             player_repo=uow.players,
@@ -194,9 +196,9 @@ async def handle_stock_buy(event: MessageEvent, args: Message = CommandArg()):
             bank_account_repo=uow.bank_accounts
         )
 
-        # 使用新版本买入
+        # 使用统一账号ID执行买入
         success, message = await stock_service.buy_stock(
-            user_id, symbol, shares, use_bank
+            player.id, symbol, shares, use_bank
         )
     if success:
         await stock_buy_cmd.finish(message_add_head(f"✅ {message}", event))
@@ -225,10 +227,6 @@ async def handle_stock_sell(event: MessageEvent, args: Message = CommandArg()):
 
     to_bank = len(parts) > 2 and parts[2] in ["银行", "bank"]
 
-    # 获取玩家ID
-    from ..platform_utils import get_platform_info
-    _, user_id = get_platform_info(event)
-
     # 执行卖出
     # 新版本: 使用DI架构
     from ..infrastructure.uow.unit_of_work import UnitOfWork
@@ -239,6 +237,12 @@ async def handle_stock_sell(event: MessageEvent, args: Message = CommandArg()):
         return AsyncSessionLocal()
 
     async with UnitOfWork(session_factory) as uow:
+        # 获取统一账号(支持账号切换)
+        player = await get_unified_player(uow.session, event)
+        if not player:
+            await stock_sell_cmd.finish("⛔ 请先创建角色")
+            return
+
         # 创建StockService实例
         stock_service = StockServiceNew(
             player_repo=uow.players,
@@ -248,9 +252,9 @@ async def handle_stock_sell(event: MessageEvent, args: Message = CommandArg()):
             bank_account_repo=uow.bank_accounts
         )
 
-        # 使用新版本卖出
+        # 使用统一账号ID执行卖出
         success, message = await stock_service.sell_stock(
-            user_id, symbol, shares, to_bank
+            player.id, symbol, shares, to_bank
         )
     if success:
         await stock_sell_cmd.finish(message_add_head(f"✅ {message}", event))
@@ -261,11 +265,6 @@ async def handle_stock_sell(event: MessageEvent, args: Message = CommandArg()):
 @stock_holdings_cmd.handle()
 async def handle_stock_holdings(event: MessageEvent):
     """查看气运投资持仓"""
-    # 获取玩家ID
-    from ..platform_utils import get_platform_info
-    _, user_id = get_platform_info(event)
-
-    # 被动触发价格更新和获取持仓
     # 新版本: 使用DI架构
     from ..infrastructure.uow.unit_of_work import UnitOfWork
     from ..models.db import AsyncSessionLocal
@@ -275,6 +274,12 @@ async def handle_stock_holdings(event: MessageEvent):
         return AsyncSessionLocal()
 
     async with UnitOfWork(session_factory) as uow:
+        # 获取统一账号(支持账号切换)
+        player = await get_unified_player(uow.session, event)
+        if not player:
+            await stock_holdings_cmd.finish("⛔ 请先创建角色")
+            return
+
         # 创建StockService实例
         stock_service = StockServiceNew(
             player_repo=uow.players,
@@ -286,7 +291,7 @@ async def handle_stock_holdings(event: MessageEvent):
 
         # 使用新版本
         price_updated = await stock_service.check_and_update_prices()
-        holdings = await stock_service.get_player_holdings(user_id)
+        holdings = await stock_service.get_player_holdings(player.id)
     if not holdings:
         await stock_holdings_cmd.finish(message_add_head("� 您当前没有投资", event))
 
@@ -369,10 +374,6 @@ async def handle_stock_holdings(event: MessageEvent):
 @stock_transactions_cmd.handle()
 async def handle_stock_transactions(event: MessageEvent):
     """查看投资记录"""
-    # 获取玩家ID
-    from ..platform_utils import get_platform_info
-    _, user_id = get_platform_info(event)
-
     # 新版本: 使用DI架构
     from ..infrastructure.uow.unit_of_work import UnitOfWork
     from ..models.db import AsyncSessionLocal
@@ -382,6 +383,12 @@ async def handle_stock_transactions(event: MessageEvent):
         return AsyncSessionLocal()
 
     async with UnitOfWork(session_factory) as uow:
+        # 获取统一账号(支持账号切换)
+        player = await get_unified_player(uow.session, event)
+        if not player:
+            await stock_transactions_cmd.finish("⛔ 请先创建角色")
+            return
+
         # 创建StockService实例
         stock_service = StockServiceNew(
             player_repo=uow.players,
@@ -392,7 +399,7 @@ async def handle_stock_transactions(event: MessageEvent):
         )
 
         # 使用新版本
-        transactions = await stock_service.get_player_transactions(user_id, 10)
+        transactions = await stock_service.get_player_transactions(player.id, 10)
     if not transactions:
         await stock_transactions_cmd.finish(message_add_head("📋 您还没有投资记录", event))
 
