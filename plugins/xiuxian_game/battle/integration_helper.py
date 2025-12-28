@@ -206,7 +206,7 @@ class BattleIntegrationHelper:
             # 第一个玩家攻击
             if first_hp_ref[0] > 0 and second_hp_ref[0] > 0:
                 attack_result = engine.execute_player_turn(
-                    first_player, second_player, first_player.attack, False
+                    first_player, second_player, first_player._cached_attack, False
                 )
 
                 if attack_result["hit"]:
@@ -281,7 +281,7 @@ class BattleIntegrationHelper:
             # 第二个玩家攻击（如果还活着且第一个玩家也还活着）
             if second_hp_ref[0] > 0 and first_hp_ref[0] > 0:
                 attack_result = engine.execute_player_turn(
-                    second_player, first_player, second_player.attack, False
+                    second_player, first_player, second_player._cached_attack, False
                 )
 
                 if attack_result["hit"]:
@@ -1255,7 +1255,7 @@ class BattleIntegrationHelper:
                 # 玩家1先手
                 if player1_hp > 0 and player2_hp > 0:
                     attack_result = engine.execute_player_turn(
-                        player1, player2, player1.attack, is_skill=False
+                        player1, player2, player1._cached_attack, is_skill=False
                     )
 
                     if attack_result["hit"]:
@@ -1319,7 +1319,7 @@ class BattleIntegrationHelper:
                 # 玩家2反击（如果存活）
                 if player2_hp > 0 and player1_hp > 0:
                     attack_result = engine.execute_player_turn(
-                        player2, player1, player2.attack, is_skill=False
+                        player2, player1, player2._cached_attack, is_skill=False
                     )
 
                     if attack_result["hit"]:
@@ -1411,7 +1411,7 @@ class BattleIntegrationHelper:
                 # 玩家2先手
                 if player2_hp > 0 and player1_hp > 0:
                     attack_result = engine.execute_player_turn(
-                        player2, player1, player2.attack, is_skill=False
+                        player2, player1, player2._cached_attack, is_skill=False
                     )
 
                     if attack_result["hit"]:
@@ -1465,7 +1465,7 @@ class BattleIntegrationHelper:
                 # 玩家1反击（如果存活）
                 if player1_hp > 0 and player2_hp > 0:
                     attack_result = engine.execute_player_turn(
-                        player1, player2, player1.attack, is_skill=False
+                        player1, player2, player1._cached_attack, is_skill=False
                     )
 
                     if attack_result["hit"]:
