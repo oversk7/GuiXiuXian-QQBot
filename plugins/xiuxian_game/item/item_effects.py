@@ -262,6 +262,17 @@ async def _temporary_buff(player: Player, cfg: ItemConfig, qty: int, ctx: str, s
     from ..models.temporary_buff import TemporaryBuff
 
     buff_id = f"{cfg.item_id}_buff"
+
+    # 检查是否已有相同buff(用于提供友好提示)
+    existing_buffs = await TemporaryBuff.get_active_buffs(session, player.id)
+    has_existing = any(b.buff_id == buff_id for b in existing_buffs)
+
+    if has_existing:
+        # 找到现有buff
+        existing = next(b for b in existing_buffs if b.buff_id == buff_id)
+        remaining = existing.get_remaining_minutes()
+        return False, f"⛔ 已有{buff_name}效果,剩余{remaining}分钟,无法叠加使用"
+
     buff = await TemporaryBuff.create_buff(
         session=session,
         player_id=player.id,
@@ -452,7 +463,18 @@ async def _temporary_buff_percent(player: Player, cfg: ItemConfig, qty: int, ctx
     from ..models.temporary_buff import TemporaryBuff
 
     buff_id = f"{cfg.item_id}_buff"
-    await TemporaryBuff.create_buff(
+
+    # 检查是否已有相同buff(用于提供友好提示)
+    existing_buffs = await TemporaryBuff.get_active_buffs(session, player.id)
+    has_existing = any(b.buff_id == buff_id for b in existing_buffs)
+
+    if has_existing:
+        # 找到现有buff
+        existing = next(b for b in existing_buffs if b.buff_id == buff_id)
+        remaining = existing.get_remaining_minutes()
+        return False, f"⛔ 已有{buff_name}效果,剩余{remaining}分钟,无法叠加使用"
+
+    buff = await TemporaryBuff.create_buff(
         session=session,
         player_id=player.id,
         buff_id=buff_id,

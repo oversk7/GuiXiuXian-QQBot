@@ -124,12 +124,8 @@ class TemporaryBuff(Base):
         existing_buff = (await session.execute(existing_stmt)).scalars().first()
         
         if existing_buff:
-            # 如果已存在，延长时间并更新属性加成
-            existing_buff.expires_at = datetime.now() + timedelta(minutes=duration_minutes)
-            existing_buff.duration_minutes = duration_minutes
-            existing_buff.attribute_bonuses = attribute_bonuses
-            if extra_data:
-                existing_buff.extra_data = extra_data
+            # 如果已存在相同buff,拒绝叠加,返回现有buff
+            # 不延长时间,不刷新效果,强制等待过期后才能再次使用
             return existing_buff
         else:
             # 创建新buff
