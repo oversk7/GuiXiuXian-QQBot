@@ -343,28 +343,37 @@ async def _create_missing_tables(conn, verbose: bool) -> int:
 
 
 async def _add_missing_fields(conn, verbose: bool) -> int:
-    """添加缺失的字段"""
+    """添加缺失的字段或修改现有字段类型"""
     added_count = 0
 
     for table_name, fields in REQUIRED_FIELDS.items():
-        # 获取表的现有字段
-        def get_columns(connection):
+        # 获取表的现有字段及其类型
+        def get_columns_with_types(connection):
             inspector = inspect(connection)
             try:
-                return [col['name'] for col in inspector.get_columns(table_name)]
+                columns = {}
+                for col in inspector.get_columns(table_name):
+                    # 获取字段类型的大写名称
+                    type_name = str(col['type']).upper()
+                    columns[col['name']] = type_name
+                return columns
             except Exception:
-                return []  # 表不存在
+                return {}  # 表不存在
 
-        existing_columns = await conn.run_sync(get_columns)
+        existing_columns = await conn.run_sync(get_columns_with_types)
 
         if not existing_columns:
             if verbose:
                 logger.warning(f"[!] [自动迁移] 表 {table_name} 不存在，跳过字段检查")
             continue
 
-        # 检查并添加缺失的字段
+        # 检查并添加/修改字段
         for field_name, field_def in fields.items():
+            # 提取目标类型 (例如: "BIGINT DEFAULT 0" -> "BIGINT")
+            target_type = field_def.split()[0].upper()
+
             if field_name not in existing_columns:
+                # 字段不存在,添加新字段
                 try:
                     sql = f"ALTER TABLE {table_name} ADD COLUMN {field_name} {field_def}"
                     await conn.execute(text(sql))
@@ -376,12 +385,33 @@ async def _add_missing_fields(conn, verbose: bool) -> int:
 
                 except Exception as e:
                     error_msg = str(e).lower()
-                    # 忽略"字段已存在"错误
                     if "duplicate" in error_msg or "exists" in error_msg:
                         if verbose:
                             logger.debug(f"  [√] 字段 {table_name}.{field_name} 已存在")
                     else:
                         logger.error(f"[X] [自动迁移] 添加字段 {table_name}.{field_name} 失败: {e}")
+            else:
+                # 字段已存在,检查类型是否需要修改
+                current_type = existing_columns[field_name]
+                # 处理类型别名 (INT可能显示为INTEGER)
+                current_type_normalized = current_type.replace('INTEGER', 'INT')
+                target_type_normalized = target_type.replace('INTEGER', 'INT')
+
+                if current_type_normalized != target_type_normalized:
+                    try:
+                        sql = f"ALTER TABLE {table_name} MODIFY COLUMN {field_name} {field_def}"
+                        await conn.execute(text(sql))
+
+                        if verbose:
+                            print(f"  [*] 修改字段类型: {table_name}.{field_name} {current_type} -> {target_type}")
+
+                        added_count += 1
+
+                    except Exception as e:
+                        logger.error(f"[X] [自动迁移] 修改字段类型 {table_name}.{field_name} 失败: {e}")
+                else:
+                    if verbose:
+                        logger.debug(f"  [√] 字段 {table_name}.{field_name} 类型正确: {current_type}")
 
     return added_count
 
