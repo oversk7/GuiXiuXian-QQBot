@@ -36,6 +36,10 @@ REQUIRED_FIELDS: Dict[str, Dict[str, str]] = {
         "delisted_at": "DATETIME NULL COMMENT '退市时间'",
         "delist_reason": "VARCHAR(100) NULL COMMENT '退市原因'",
     },
+    "player_stats": {
+        "gold_earned_total": "BIGINT DEFAULT 0 COMMENT '累计获得金币'",
+        "gold_spent_total": "BIGINT DEFAULT 0 COMMENT '累计花费金币'",
+    },
     "navigation_task": {
         "initial_distance": "FLOAT NULL COMMENT '初始总距离（用于进度计算）'",
     },

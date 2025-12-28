@@ -47,8 +47,8 @@ class PlayerStats(Base):
     total_kills: Mapped[int] = mapped_column(Integer, default=0, server_default='0', comment="总击杀数")
 
     # 财富统计
-    gold_earned_total: Mapped[int] = mapped_column(Integer, default=0, server_default='0', comment="累计获得金币")
-    gold_spent_total: Mapped[int] = mapped_column(Integer, default=0, server_default='0', comment="累计花费金币")
+    gold_earned_total: Mapped[int] = mapped_column(BigInteger, default=0, server_default='0', comment="累计获得金币")
+    gold_spent_total: Mapped[int] = mapped_column(BigInteger, default=0, server_default='0', comment="累计花费金币")
 
     # 探索统计
     locations_visited: Mapped[int] = mapped_column(Integer, default=0, server_default='0', comment="探索过的地点数")
