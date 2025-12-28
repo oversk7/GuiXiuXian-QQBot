@@ -281,10 +281,11 @@ async def handle_revive(event: MessageEvent):
         # 记录返回前的位置信息
         was_in_dungeon = player.is_in_dungeon()
         dungeon_level = player.dungeon_level if was_in_dungeon else 0
-        
-        # 恢复满状态
-        player.hp = player.max_hp
-        player.mp = player.max_mp
+
+        # 恢复满状态(包含临时buff加成)
+        effective_attrs = await player.get_effective_attributes(session)
+        player.hp = effective_attrs.get('hp', player.max_hp)
+        player.mp = effective_attrs.get('mp', player.max_mp)
         
         # 使用新的双层坐标系统退出诡域
         # 退出前推进现实世界的导航进度，使返回位置为“导航后的最新位置”

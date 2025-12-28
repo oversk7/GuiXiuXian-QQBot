@@ -174,8 +174,18 @@ async def _revive(player: Player, cfg: ItemConfig, qty: int, ctx: str, session=N
     if player.hp > 0:
         return False, "🧐 你尚未死亡，无需复活"
     ratio = float(cfg.effect_params.get("rate", 1.0))
-    player.hp = max(1, int(player.max_hp * ratio))
-    player.mp = max(1, int(player.max_mp * ratio))
+
+    # 获取包含临时buff的有效属性
+    if session:
+        effective_attrs = await player.get_effective_attributes(session)
+        max_hp = effective_attrs.get('hp', player.max_hp)
+        max_mp = effective_attrs.get('mp', player.max_mp)
+    else:
+        max_hp = player.max_hp
+        max_mp = player.max_mp
+
+    player.hp = max(1, int(max_hp * ratio))
+    player.mp = max(1, int(max_mp * ratio))
     return True, "✨ 你死而复生，继续前进吧！"
 
 
