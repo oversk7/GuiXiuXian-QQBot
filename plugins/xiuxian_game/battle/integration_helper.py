@@ -16,6 +16,13 @@ except ImportError:
     IMAGE_SUPPORT = False
 
 
+def _get_cached_max_hp(player, default=None):
+    """获取玩家的max_hp,优先使用缓存值(包含临时buff)"""
+    if default is None:
+        default = player.max_hp
+    return getattr(player, '_cached_max_hp', default)
+
+
 def create_hp_bar(current_hp: int, max_hp: int, bar_length: int = 8, show_full: bool = False) -> str:
     """创建可视化血条
 
@@ -94,9 +101,41 @@ class BattleIntegrationHelper:
         )
         player2_equipped_items = (await session.execute(stmt2)).scalars().all()
 
-        # 创建增强战斗引擎
-        engine = EnhancedBattleEngine(seed)
+        # 创建增强战斗引擎(传递session用于查询临时buff)
+        engine = EnhancedBattleEngine(seed, session)
         battle_log = []
+
+        # 预计算包含临时buff的属性
+        # 1. 基础属性(attack, defense, hp等)
+        player1_base_attrs = await player1.get_effective_attributes(session)
+        player2_base_attrs = await player2.get_effective_attributes(session)
+
+        # 2. 战斗属性(critical_rate, dodge_rate等)
+        from .battle_attributes import BattleAttributeCalculator
+        player1_battle_attrs = await BattleAttributeCalculator.calculate_effective_attributes_async(player1, session)
+        player2_battle_attrs = await BattleAttributeCalculator.calculate_effective_attributes_async(player2, session)
+
+        # 将包含buff的属性值临时缓存到player对象上
+        # 基础属性缓存
+        player1._cached_attack = player1_base_attrs.get('attack', player1.attack)
+        player1._cached_defense = player1_base_attrs.get('defense', player1.defense)
+        player1._cached_hp = player1_base_attrs.get('hp', player1.hp)
+        player1._cached_max_hp = player1_base_attrs.get('max_hp', player1.max_hp)
+        player1._cached_mp = player1_base_attrs.get('mp', getattr(player1, 'mp', 0))
+        player1._cached_max_mp = player1_base_attrs.get('max_mp', getattr(player1, 'max_mp', 0))
+        player1._cached_agility = player1_base_attrs.get('agility', player1.agility)
+
+        player2._cached_attack = player2_base_attrs.get('attack', player2.attack)
+        player2._cached_defense = player2_base_attrs.get('defense', player2.defense)
+        player2._cached_hp = player2_base_attrs.get('hp', player2.hp)
+        player2._cached_max_hp = player2_base_attrs.get('max_hp', player2.max_hp)
+        player2._cached_mp = player2_base_attrs.get('mp', getattr(player2, 'mp', 0))
+        player2._cached_max_mp = player2_base_attrs.get('max_mp', getattr(player2, 'max_mp', 0))
+        player2._cached_agility = player2_base_attrs.get('agility', player2.agility)
+
+        # 战斗属性缓存
+        player1._cached_battle_attrs = player1_battle_attrs
+        player2._cached_battle_attrs = player2_battle_attrs
 
         # 执行处决阈值查询辅助
         from .battle_effects import EffectType
@@ -110,9 +149,9 @@ class BattleIntegrationHelper:
                         return 0
             return 0
 
-        # 初始化战斗状态
-        player1_hp = player1.hp
-        player2_hp = player2.hp
+        # 初始化战斗状态(使用缓存后的HP值)
+        player1_hp = player1._cached_hp
+        player2_hp = player2._cached_hp
         initial_player1_hp = player1_hp
         initial_player2_hp = player2_hp
 
@@ -404,10 +443,30 @@ class BattleIntegrationHelper:
         )
         equipped_items = (await session.execute(stmt)).scalars().all()
 
-        # 创建增强战斗引擎
-        engine = EnhancedBattleEngine(seed)
+        # 创建增强战斗引擎(传递session用于查询临时buff)
+        engine = EnhancedBattleEngine(seed, session)
         battle_log = []
         post_effects: list = []
+
+        # 预计算包含临时buff的属性
+        # 1. 基础属性(attack, defense, hp等)
+        player_base_attrs = await player.get_effective_attributes(session)
+
+        # 2. 战斗属性(critical_rate, dodge_rate等)
+        from .battle_attributes import BattleAttributeCalculator
+        player_battle_attrs = await BattleAttributeCalculator.calculate_effective_attributes_async(player, session)
+
+        # 将包含buff的属性值临时缓存到player对象上
+        player._cached_attack = player_base_attrs.get('attack', player.attack)
+        player._cached_defense = player_base_attrs.get('defense', player.defense)
+        player._cached_hp = player_base_attrs.get('hp', player.hp)
+        player._cached_max_hp = player_base_attrs.get('max_hp', player.max_hp)
+        player._cached_mp = player_base_attrs.get('mp', getattr(player, 'mp', 0))
+        player._cached_max_mp = player_base_attrs.get('max_mp', getattr(player, 'max_mp', 0))
+        player._cached_agility = player_base_attrs.get('agility', player.agility)
+
+        # 战斗属性缓存
+        player._cached_battle_attrs = player_battle_attrs
 
         # 处决阈值查询（从已注册的触发配置中读取）
         from .battle_effects import EffectType
@@ -424,8 +483,8 @@ class BattleIntegrationHelper:
         # 怪物ID统一使用 "enemy"
         monster_id = "enemy"
 
-        # 初始化战斗状态
-        player_hp = player.hp
+        # 初始化战斗状态(使用缓存后的HP值)
+        player_hp = player._cached_hp
         monster_hp = monster_stats["hp"]
         initial_player_hp = player_hp
 
@@ -1097,13 +1156,45 @@ class BattleIntegrationHelper:
         )
         player2_equipped_items = (await session.execute(stmt2)).scalars().all()
 
-        # 创建增强战斗引擎
-        engine = EnhancedBattleEngine(seed)
+        # 创建增强战斗引擎(传递session用于查询临时buff)
+        engine = EnhancedBattleEngine(seed, session)
         battle_log = []
 
-        # 初始化战斗状态
-        player1_hp = player1.hp
-        player2_hp = player2.hp
+        # 预计算包含临时buff的属性
+        # 1. 基础属性(attack, defense, hp等)
+        player1_base_attrs = await player1.get_effective_attributes(session)
+        player2_base_attrs = await player2.get_effective_attributes(session)
+
+        # 2. 战斗属性(critical_rate, dodge_rate等)
+        from .battle_attributes import BattleAttributeCalculator
+        player1_battle_attrs = await BattleAttributeCalculator.calculate_effective_attributes_async(player1, session)
+        player2_battle_attrs = await BattleAttributeCalculator.calculate_effective_attributes_async(player2, session)
+
+        # 将包含buff的属性值临时缓存到player对象上
+        # 基础属性缓存
+        player1._cached_attack = player1_base_attrs.get('attack', player1.attack)
+        player1._cached_defense = player1_base_attrs.get('defense', player1.defense)
+        player1._cached_hp = player1_base_attrs.get('hp', player1.hp)
+        player1._cached_max_hp = player1_base_attrs.get('max_hp', player1.max_hp)
+        player1._cached_mp = player1_base_attrs.get('mp', getattr(player1, 'mp', 0))
+        player1._cached_max_mp = player1_base_attrs.get('max_mp', getattr(player1, 'max_mp', 0))
+        player1._cached_agility = player1_base_attrs.get('agility', player1.agility)
+
+        player2._cached_attack = player2_base_attrs.get('attack', player2.attack)
+        player2._cached_defense = player2_base_attrs.get('defense', player2.defense)
+        player2._cached_hp = player2_base_attrs.get('hp', player2.hp)
+        player2._cached_max_hp = player2_base_attrs.get('max_hp', player2.max_hp)
+        player2._cached_mp = player2_base_attrs.get('mp', getattr(player2, 'mp', 0))
+        player2._cached_max_mp = player2_base_attrs.get('max_mp', getattr(player2, 'max_mp', 0))
+        player2._cached_agility = player2_base_attrs.get('agility', player2.agility)
+
+        # 战斗属性缓存
+        player1._cached_battle_attrs = player1_battle_attrs
+        player2._cached_battle_attrs = player2_battle_attrs
+
+        # 初始化战斗状态(使用缓存后的HP值)
+        player1_hp = player1._cached_hp
+        player2_hp = player2._cached_hp
         initial_player1_hp = player1_hp
         initial_player2_hp = player2_hp
 

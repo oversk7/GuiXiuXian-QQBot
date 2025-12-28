@@ -16,11 +16,12 @@ from .battle_effects import (
 class EnhancedBattleEngine:
     """增强战斗引擎 - 支持状态效果和触发系统"""
 
-    def __init__(self, seed: Optional[str] = None):
+    def __init__(self, seed: Optional[str] = None, session=None):
         """初始化增强战斗引擎
 
         Args:
             seed: 随机种子，用于确定性战斗
+            session: 数据库会话，用于查询临时buff
         """
         if seed:
             import hashlib
@@ -36,6 +37,8 @@ class EnhancedBattleEngine:
         self._temp_mp_from_hp: Dict[str, int] = {}
         # 缓存装备实例，用于检查每日触发限制
         self._equipped_items_cache: Dict[str, List] = {}
+        # 数据库会话，用于查询临时buff
+        self.session = session
 
 
     def start_battle(self, player: Player, enemy: Any, player_equipped_items: List = None):
@@ -643,8 +646,9 @@ class EnhancedBattleEngine:
         # 获取属性修正
         attack_modifier = self.effect_manager.calculate_attribute_modifier(attacker_id, "attack")
 
-        # 计算基础攻击力（可被外部覆盖）
-        base_attack = override_base_attack if override_base_attack is not None else int(attacker.attack * (1 + attack_modifier / 100))
+        # 计算基础攻击力（优先使用缓存的属性值，包含临时buff）
+        attacker_attack = getattr(attacker, '_cached_attack', attacker.attack)
+        base_attack = override_base_attack if override_base_attack is not None else int(attacker_attack * (1 + attack_modifier / 100))
 
         # 检查是否有真伤状态
         has_true_damage = len(self.effect_manager.get_active_effects(attacker_id, EffectType.TRUE_DAMAGE)) > 0
@@ -670,9 +674,15 @@ class EnhancedBattleEngine:
         # 执行基础攻击
         if hasattr(defender, 'defense'):
             # 对玩家 - 需要应用双方的战斗buff
-            # 获取双方基础属性
+            # 获取双方基础属性(优先使用缓存的战斗属性,包含临时buff)
             attacker_base_attrs = BattleAttributeCalculator.calculate_effective_attributes(attacker)
             defender_base_attrs = BattleAttributeCalculator.calculate_effective_attributes(defender)
+
+            # 如果有缓存的战斗属性,使用缓存值覆盖基础战斗属性
+            if hasattr(attacker, '_cached_battle_attrs'):
+                attacker_base_attrs.update(attacker._cached_battle_attrs)
+            if hasattr(defender, '_cached_battle_attrs'):
+                defender_base_attrs.update(defender._cached_battle_attrs)
 
             # 应用战斗buff
             attacker_attrs = self._get_effective_battle_attributes(attacker_id, attacker_base_attrs)
@@ -1285,10 +1295,11 @@ class EnhancedBattleEngine:
             is_critical = BattleAttributeCalculator.roll_critical_hit(effective_crit_rate, self.rng)
             result["is_critical"] = is_critical
 
-        # 4) 计算防御修正
+        # 4) 计算防御修正(优先使用缓存属性,包含临时buff)
         defender_id = defender.id if hasattr(defender, 'id') else "enemy"
         defense_modifier = self.effect_manager.calculate_attribute_modifier(defender_id, "defense")
-        effective_defense = int(defender.defense * (1 + defense_modifier / 100))
+        defender_defense = getattr(defender, '_cached_defense', defender.defense)
+        effective_defense = int(defender_defense * (1 + defense_modifier / 100))
 
         from ..utils import apply_defense_mitigation
 
