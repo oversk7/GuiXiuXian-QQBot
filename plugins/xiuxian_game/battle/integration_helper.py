@@ -116,21 +116,21 @@ class BattleIntegrationHelper:
         player2_battle_attrs = await BattleAttributeCalculator.calculate_effective_attributes_async(player2, session)
 
         # 将包含buff的属性值临时缓存到player对象上
-        # 基础属性缓存
+        # 基础属性缓存(注意:get_effective_attributes返回的是max_hp/max_mp,不是hp/mp)
         player1._cached_attack = player1_base_attrs.get('attack', player1.attack)
         player1._cached_defense = player1_base_attrs.get('defense', player1.defense)
-        player1._cached_hp = player1_base_attrs.get('hp', player1.hp)
-        player1._cached_max_hp = player1_base_attrs.get('max_hp', player1.max_hp)
-        player1._cached_mp = player1_base_attrs.get('mp', getattr(player1, 'mp', 0))
-        player1._cached_max_mp = player1_base_attrs.get('max_mp', getattr(player1, 'max_mp', 0))
+        player1._cached_hp = player1.hp  # 当前HP,不使用buff加成
+        player1._cached_max_hp = player1_base_attrs.get('max_hp', player1.max_hp)  # 最大HP,包含buff
+        player1._cached_mp = player1.mp  # 当前MP,不使用buff加成
+        player1._cached_max_mp = player1_base_attrs.get('max_mp', getattr(player1, 'max_mp', 0))  # 最大MP,包含buff
         player1._cached_agility = player1_base_attrs.get('agility', player1.agility)
 
         player2._cached_attack = player2_base_attrs.get('attack', player2.attack)
         player2._cached_defense = player2_base_attrs.get('defense', player2.defense)
-        player2._cached_hp = player2_base_attrs.get('hp', player2.hp)
-        player2._cached_max_hp = player2_base_attrs.get('max_hp', player2.max_hp)
-        player2._cached_mp = player2_base_attrs.get('mp', getattr(player2, 'mp', 0))
-        player2._cached_max_mp = player2_base_attrs.get('max_mp', getattr(player2, 'max_mp', 0))
+        player2._cached_hp = player2.hp  # 当前HP,不使用buff加成
+        player2._cached_max_hp = player2_base_attrs.get('max_hp', player2.max_hp)  # 最大HP,包含buff
+        player2._cached_mp = player2.mp  # 当前MP,不使用buff加成
+        player2._cached_max_mp = player2_base_attrs.get('max_mp', getattr(player2, 'max_mp', 0))  # 最大MP,包含buff
         player2._cached_agility = player2_base_attrs.get('agility', player2.agility)
 
         # 战斗属性缓存
@@ -457,12 +457,13 @@ class BattleIntegrationHelper:
         player_battle_attrs = await BattleAttributeCalculator.calculate_effective_attributes_async(player, session)
 
         # 将包含buff的属性值临时缓存到player对象上
+        # (注意:get_effective_attributes返回的是max_hp/max_mp,不是hp/mp)
         player._cached_attack = player_base_attrs.get('attack', player.attack)
         player._cached_defense = player_base_attrs.get('defense', player.defense)
-        player._cached_hp = player_base_attrs.get('hp', player.hp)
-        player._cached_max_hp = player_base_attrs.get('max_hp', player.max_hp)
-        player._cached_mp = player_base_attrs.get('mp', getattr(player, 'mp', 0))
-        player._cached_max_mp = player_base_attrs.get('max_mp', getattr(player, 'max_mp', 0))
+        player._cached_hp = player.hp  # 当前HP,不使用buff加成
+        player._cached_max_hp = player_base_attrs.get('max_hp', player.max_hp)  # 最大HP,包含buff
+        player._cached_mp = player.mp  # 当前MP,不使用buff加成
+        player._cached_max_mp = player_base_attrs.get('max_mp', getattr(player, 'max_mp', 0))  # 最大MP,包含buff
         player._cached_agility = player_base_attrs.get('agility', player.agility)
 
         # 战斗属性缓存
@@ -483,8 +484,8 @@ class BattleIntegrationHelper:
         # 怪物ID统一使用 "enemy"
         monster_id = "enemy"
 
-        # 初始化战斗状态(使用缓存后的HP值)
-        player_hp = player._cached_hp
+        # 初始化战斗状态(使用当前HP)
+        player_hp = player.hp
         monster_hp = monster_stats["hp"]
         initial_player_hp = player_hp
 
@@ -1171,28 +1172,28 @@ class BattleIntegrationHelper:
         player2_battle_attrs = await BattleAttributeCalculator.calculate_effective_attributes_async(player2, session)
 
         # 将包含buff的属性值临时缓存到player对象上
-        # 基础属性缓存
+        # 基础属性缓存(注意:get_effective_attributes返回的是max_hp/max_mp,不是hp/mp)
         player1._cached_attack = player1_base_attrs.get('attack', player1.attack)
         player1._cached_defense = player1_base_attrs.get('defense', player1.defense)
-        player1._cached_hp = player1_base_attrs.get('hp', player1.hp)
-        player1._cached_max_hp = player1_base_attrs.get('max_hp', player1.max_hp)
-        player1._cached_mp = player1_base_attrs.get('mp', getattr(player1, 'mp', 0))
-        player1._cached_max_mp = player1_base_attrs.get('max_mp', getattr(player1, 'max_mp', 0))
+        player1._cached_hp = player1.hp  # 当前HP,不使用buff加成
+        player1._cached_max_hp = player1_base_attrs.get('max_hp', player1.max_hp)  # 最大HP,包含buff
+        player1._cached_mp = player1.mp  # 当前MP,不使用buff加成
+        player1._cached_max_mp = player1_base_attrs.get('max_mp', getattr(player1, 'max_mp', 0))  # 最大MP,包含buff
         player1._cached_agility = player1_base_attrs.get('agility', player1.agility)
 
         player2._cached_attack = player2_base_attrs.get('attack', player2.attack)
         player2._cached_defense = player2_base_attrs.get('defense', player2.defense)
-        player2._cached_hp = player2_base_attrs.get('hp', player2.hp)
-        player2._cached_max_hp = player2_base_attrs.get('max_hp', player2.max_hp)
-        player2._cached_mp = player2_base_attrs.get('mp', getattr(player2, 'mp', 0))
-        player2._cached_max_mp = player2_base_attrs.get('max_mp', getattr(player2, 'max_mp', 0))
+        player2._cached_hp = player2.hp  # 当前HP,不使用buff加成
+        player2._cached_max_hp = player2_base_attrs.get('max_hp', player2.max_hp)  # 最大HP,包含buff
+        player2._cached_mp = player2.mp  # 当前MP,不使用buff加成
+        player2._cached_max_mp = player2_base_attrs.get('max_mp', getattr(player2, 'max_mp', 0))  # 最大MP,包含buff
         player2._cached_agility = player2_base_attrs.get('agility', player2.agility)
 
         # 战斗属性缓存
         player1._cached_battle_attrs = player1_battle_attrs
         player2._cached_battle_attrs = player2_battle_attrs
 
-        # 初始化战斗状态(使用缓存后的HP值)
+        # 初始化战斗状态(使用当前HP,但后续恢复时使用max_hp)
         player1_hp = player1._cached_hp
         player2_hp = player2._cached_hp
         initial_player1_hp = player1_hp
