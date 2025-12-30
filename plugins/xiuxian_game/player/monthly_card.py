@@ -10,6 +10,7 @@ from ..models.inventory import ItemInstance
 from ..models.monthly_card import MonthlyCard, CardType, get_player_card_benefits, get_card_benefits_config
 from ..utils import message_add_head
 from ..config import config
+from ..platform_utils import get_unified_player
 
 
 # ==================== 管理员指令：添加月卡 ====================
@@ -79,10 +80,9 @@ check_monthly_card_cmd = on_command("月卡", aliases={"我的月卡", "月卡�
 @check_monthly_card_cmd.handle()
 async def handle_check_monthly_card(event: MessageEvent):
     """查看玩家的月卡状态"""
-    user_id = event.get_user_id()
-    
     async with safe_session() as session:
-        player = await session.get(Player, user_id)
+        # 使用跨平台工具获取玩家数据
+        player = await get_unified_player(session, event)
         if not player:
             await check_monthly_card_cmd.finish("⛔ 请先创建角色")
         
@@ -285,10 +285,9 @@ auto_use_medicine_cmd = on_command("一键嗑药", aliases={"一键磕药", "自
 @auto_use_medicine_cmd.handle()
 async def handle_auto_use_medicine(event: MessageEvent, args: Message = CommandArg()):
     """一键嗑药 - 自动使用适量的回春散和凝神草补满血量和法力值"""
-    user_id = event.get_user_id()
-
     async with safe_session() as session:
-        player = await session.get(Player, user_id)
+        # 使用跨平台工具获取玩家数据
+        player = await get_unified_player(session, event)
         if not player:
             await auto_use_medicine_cmd.finish("⛔ 请先创建角色")
 
@@ -424,8 +423,6 @@ repair_all_equipment_cmd = on_command("一键修复", aliases={"一键修理", "
 @repair_all_equipment_cmd.handle()
 async def handle_repair_all_equipment(event: MessageEvent, args: Message = CommandArg()):
     """月卡权益：一键修复 [金币:怨念] - 修复所有装备，可指定比例，不指定默认全部金币支付"""
-    user_id = event.get_user_id()
-
     # 解析比例参数
     ratio_str = args.extract_plain_text().strip()
     if not ratio_str:
@@ -444,7 +441,8 @@ async def handle_repair_all_equipment(event: MessageEvent, args: Message = Comma
             await repair_all_equipment_cmd.finish("⛔ 比例格式错误，例如：1:0 (纯金币) 或 1:1 (金币:怨念)")
 
     async with safe_session() as session:
-        player = await session.get(Player, user_id)
+        # 使用跨平台工具获取玩家数据
+        player = await get_unified_player(session, event)
         if not player:
             await repair_all_equipment_cmd.finish("⛔ 请先创建角色")
 
@@ -459,7 +457,7 @@ async def handle_repair_all_equipment(event: MessageEvent, args: Message = Comma
         # 获取所有需要修复的装备
         equipment_ids = config.items_config["by_type"]["EQUIPMENT"]
         stmt = select(ItemInstance).where(
-            ItemInstance.player_id == user_id,
+            ItemInstance.player_id == player.id,
             ItemInstance.item_id.in_(equipment_ids)
         )
         all_equipment = (await session.execute(stmt)).scalars().all()

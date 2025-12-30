@@ -368,13 +368,12 @@ async def _handle_equipment_listing(event: MessageEvent, item_cfg, price: int):
 
         # 多件装备，保存状态并让玩家选择
         import time
-        user_id = event.get_user_id()
 
         # 只保存装备ID列表和基本信息，避免数据库会话问题
         equipment_ids = [eq.id for eq in equipment_list]
         equipment_summaries = [EquipmentTradeService.generate_equipment_summary(eq) for eq in equipment_list]
 
-        equipment_selection_state[user_id] = {
+        equipment_selection_state[player.id] = {
             "equipment_ids": equipment_ids,
             "equipment_summaries": equipment_summaries,
             "item_id": item_cfg.item_id,
@@ -468,17 +467,23 @@ async def _(event: MessageEvent):
     # 清理过期状态
     _cleanup_expired_states()
 
-    user_id = event.get_user_id()
+    # 使用跨平台工具获取玩家ID
+    player_id = None
+    async with safe_session() as session:
+        player = await get_unified_player(session, event)
+        if not player:
+            return
+        player_id = player.id
 
-    # 检查是否有待处理的装备选择状态
-    if user_id not in equipment_selection_state:
-        return
+        # 检查是否有待处理的装备选择状态
+        if player_id not in equipment_selection_state:
+            return
 
     message_text = event.get_message().extract_plain_text().strip()
 
     # 处理取消操作
     if message_text in ["取消", "cancel", "0"]:
-        del equipment_selection_state[user_id]
+        del equipment_selection_state[player_id]
         await equipment_selection_handler.finish("❌ 已取消装备挂牌")
 
     # 检查是否为数字
@@ -493,7 +498,7 @@ async def _(event: MessageEvent):
         return  # 无效数字，不处理
 
     # 获取状态信息
-    state = equipment_selection_state[user_id]
+    state = equipment_selection_state[player_id]
     equipment_ids = state["equipment_ids"]
     price = state["price"]
 
@@ -505,16 +510,16 @@ async def _(event: MessageEvent):
     equipment_id = equipment_ids[index]
 
     # 清除状态
-    del equipment_selection_state[user_id]
+    del equipment_selection_state[player_id]
 
     async with safe_session() as session:
-        player = await session.get(Player, user_id)
+        player = await session.get(Player, player_id)
         if not player:
             await equipment_selection_handler.finish("⛔ 请先创建角色")
 
         # 在新会话中重新获取装备对象
         equipment = await session.get(ItemInstance, equipment_id)
-        if not equipment or equipment.player_id != user_id:
+        if not equipment or equipment.player_id != player_id:
             await equipment_selection_handler.finish("⛔ 装备不存在或不属于你")
 
         await _create_equipment_order(session, player, equipment, price, event)
@@ -531,11 +536,14 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
     oid = int(oid_str)
 
     async with safe_session() as session:
-        order: MarketOrder | None = await session.get(MarketOrder, oid)
-        if not order or order.player_id != event.get_user_id():
-            await cancel_cmd.finish("⛔ 无效牌子")
-
+        # 使用跨平台工具获取玩家数据
         player = await get_unified_player(session, event)
+        if not player:
+            await cancel_cmd.finish("⛔ 请先创建角色")
+
+        order: MarketOrder | None = await session.get(MarketOrder, oid)
+        if not order or order.player_id != player.id:
+            await cancel_cmd.finish("⛔ 无效牌子")
 
         if order.side == OrderSide.SELL:
             if order.is_equipment_trade:
@@ -814,7 +822,7 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
             await equipment_appraise_cmd.finish("⛔ 请先创建角色")
 
         # 查找装备
-        equipment = await find_equipment_by_input(session, event.get_user_id(), arg)
+        equipment = await find_equipment_by_input(session, player.id, arg)
         if not equipment:
             await equipment_appraise_cmd.finish("⛔ 未找到指定装备，请使用装备栏中显示的编号或装备名称")
 

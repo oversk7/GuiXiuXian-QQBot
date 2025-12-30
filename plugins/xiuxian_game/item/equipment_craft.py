@@ -347,8 +347,13 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
         await repair_cmd.finish("⛔ 参数过多，格式：修理 装备编号/名称 [金币比例:怨念比例]")
 
     async with safe_session() as session:
+        # 使用跨平台工具获取玩家数据
+        player = await get_unified_player(session, event)
+        if not player:
+            await repair_cmd.finish("⛔ 请先创建角色")
+
         # 查找装备
-        equip = await find_equipment_by_input(session, event.get_user_id(), equipment_arg)
+        equip = await find_equipment_by_input(session, player.id, equipment_arg)
         if not equip:
             await repair_cmd.finish("⛔ 未找到指定装备，请使用装备栏中显示的编号或装备名称")
 
@@ -357,7 +362,7 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
             item_config = config.items_config["by_name"].get(equipment_arg)
             if item_config:
                 stmt = select(ItemInstance).where(
-                    ItemInstance.player_id == event.get_user_id(),
+                    ItemInstance.player_id == player.id,
                     ItemInstance.item_id == item_config.item_id
                 ).order_by(ItemInstance.durability.asc())
 
@@ -376,8 +381,6 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
         missing = tpl.durability - equip.durability
         cost_per = tpl.repair_cost if tpl.repair_cost is not None else max(1, int(tpl.price / max(1, tpl.durability)))
         total_cost = cost_per * missing
-
-        player = await get_unified_player(session, event)
 
         # 如果用户指定了比例
         if gold_ratio is not None and resentment_ratio is not None:
