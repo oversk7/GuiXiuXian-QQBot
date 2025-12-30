@@ -316,14 +316,14 @@ async def handle_auto_use_medicine(event: MessageEvent, args: Message = CommandA
 
         # 获取背包中的回春散和凝神草数量
         heal_potion_stmt = select(ItemInstance).where(
-            ItemInstance.player_id == user_id,
+            ItemInstance.player_id == player.id,
             ItemInstance.item_id == "heal_potion"
         )
         heal_potions = (await session.execute(heal_potion_stmt)).scalars().all()
         heal_potion_count = sum(item.quantity for item in heal_potions)
 
         spirit_herb_stmt = select(ItemInstance).where(
-            ItemInstance.player_id == user_id,
+            ItemInstance.player_id == player.id,
             ItemInstance.item_id == "spirit_herb"
         )
         spirit_herbs = (await session.execute(spirit_herb_stmt)).scalars().all()
