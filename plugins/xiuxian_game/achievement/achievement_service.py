@@ -213,6 +213,13 @@ class AchievementService:
 
         if location_key not in visited_list:
             visited_list.append(location_key)
+
+            # 限制最多记录1000个地点,防止数据无限增长
+            MAX_LOCATIONS = 1000
+            if len(visited_list) > MAX_LOCATIONS:
+                # 保留最新的1000个地点
+                visited_list = visited_list[-MAX_LOCATIONS:]
+
             stats.locations_visited_list = ",".join(visited_list)
             stats.locations_visited = len(visited_list)
             session.add(stats)

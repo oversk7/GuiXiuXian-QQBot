@@ -50,7 +50,8 @@ class Location(Base):
     # 时间戳
     created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now(), comment="创建时间")
     updated_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now(), onupdate=func.now(), comment="更新时间")
-    
+    expires_at: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True, comment="过期时间（临时地点自动删除）")
+
     # 关系
     npcs: Mapped[List["NPC"]] = relationship("NPC", back_populates="location", cascade="all, delete-orphan")
     

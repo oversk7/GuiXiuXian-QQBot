@@ -1,7 +1,7 @@
 """
 成就系统数据模型
 """
-from sqlalchemy import String, Integer, Boolean, DateTime, BigInteger, func, Index, ForeignKey, text
+from sqlalchemy import String, Integer, Boolean, DateTime, BigInteger, func, Index, ForeignKey, text, Text
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from datetime import datetime
 from .db import Base
@@ -52,7 +52,7 @@ class PlayerStats(Base):
 
     # 探索统计
     locations_visited: Mapped[int] = mapped_column(Integer, default=0, server_default='0', comment="探索过的地点数")
-    locations_visited_list: Mapped[Optional[str]] = mapped_column(String(1024), nullable=True, comment="探索过的地点列表(逗号分隔)")
+    locations_visited_list: Mapped[Optional[str]] = mapped_column(Text, nullable=True, comment="探索过的地点列表(逗号分隔)")
 
     # 装备统计
     equipment_obtained: Mapped[int] = mapped_column(Integer, default=0, server_default='0', comment="获得过的装备数")

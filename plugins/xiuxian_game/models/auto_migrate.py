@@ -39,6 +39,7 @@ REQUIRED_FIELDS: Dict[str, Dict[str, str]] = {
     "player_stats": {
         "gold_earned_total": "BIGINT DEFAULT 0 COMMENT '累计获得金币'",
         "gold_spent_total": "BIGINT DEFAULT 0 COMMENT '累计花费金币'",
+        "locations_visited_list": "TEXT NULL COMMENT '探索过的地点列表(逗号分隔)'",
     },
     "navigation_task": {
         "initial_distance": "FLOAT NULL COMMENT '初始总距离（用于进度计算）'",
@@ -47,6 +48,9 @@ REQUIRED_FIELDS: Dict[str, Dict[str, str]] = {
         "is_deleted": "BOOLEAN DEFAULT FALSE COMMENT '是否已删除（软删除）'",
         "deleted_by": "VARCHAR(32) NULL COMMENT '删除人ID'",
         "deleted_at": "DATETIME NULL COMMENT '删除时间'",
+    },
+    "location": {
+        "expires_at": "DATETIME NULL COMMENT '过期时间（临时地点自动删除）'",
     },
     # 未来需要添加更多字段时，直接在这里添加即可
     # "player": {
@@ -123,10 +127,10 @@ REQUIRED_TABLES: Dict[str, str] = {
             total_battles INT DEFAULT 0 COMMENT '总战斗次数',
             total_wins INT DEFAULT 0 COMMENT '总胜利次数',
             total_kills INT DEFAULT 0 COMMENT '总击杀数',
-            gold_earned_total INT DEFAULT 0 COMMENT '累计获得金币',
-            gold_spent_total INT DEFAULT 0 COMMENT '累计花费金币',
+            gold_earned_total BIGINT DEFAULT 0 COMMENT '累计获得金币',
+            gold_spent_total BIGINT DEFAULT 0 COMMENT '累计花费金币',
             locations_visited INT DEFAULT 0 COMMENT '探索过的地点数',
-            locations_visited_list VARCHAR(1024) NULL COMMENT '探索过的地点列表(逗号分隔)',
+            locations_visited_list TEXT NULL COMMENT '探索过的地点列表(逗号分隔)',
             equipment_obtained INT DEFAULT 0 COMMENT '获得过的装备数',
             last_login_date DATETIME NULL COMMENT '最后登录日期',
             consecutive_login_days INT DEFAULT 0 COMMENT '连续登录天数',
