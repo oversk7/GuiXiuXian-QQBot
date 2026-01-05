@@ -1,698 +1,759 @@
 {
-  "id": "阴婚冥契",
-  "title": "阴婚冥契",
-  "description": "红绸裹尸，喜轿藏魂。午夜子时，你踏入百年古宅，一纸冥契摆在案前。签或不签，都逃不过三魂被锁的宿命......",
+  "id": "冥契红绳",
+  "title": "冥契·红绳",
+  "description": "手腕上的红绳在午夜勒紧,你睁开眼,发现自己跪在一间百年古宅的堂前。案上摆着朱砂笔和婚书,背后传来女子幽幽的叹息: '既系红绳,便是夫妻,为何还不签呢?'",
   "start_node": "start",
   "nodes": {
     "start": {
       "type": "story",
-      "content": "🌙 午夜十二点的钟声刚落，你被一股无形的力量牵引，站在一座爬满枯藤的古宅门前。朱红大门虚掩，门缝里透出猩红的烛光，伴随着断断续续的唢呐声——那是迎亲的调子，却透着刺骨的寒意。\n【{player_name}】，你记得自己明明在家睡觉，怎么会出现在这里？古宅匾额上“张府”二字漆皮剥落，隐约能看到底下刻着的“冥府”二字。",
-      "next": "踏入古宅",
+      "content": "🏮 子夜三刻,你在刺骨的寒意中惊醒,发现自己正跪在一间古旧的婚房堂前。红烛摇曳,映出斑驳的墙影,空气中弥漫着腐朽的檀香味。\n【{player_name}】,你低头看去,左手腕上系着一根猩红的绳结,勒得皮肤生疼。前方案几上摊开一张泛黄的婚书,旁边放着朱砂笔。身后传来幽幽的叹息: '既已系了红绳,便是命中注定,夫君为何还不签呢?'\n你猛地回头,看见一个身着嫁衣的女子身影,正站在屏风后,面容模糊不清,只露出一双哀怨的眼眸。",
+      "next": "first_choice",
       "effects": {
         "variables": {
-          "time_left": 20,
-          "contract_signed": false,
-          "ghost_favor": 0,
-          "has_token": 0,
-          "taboo_broken": 0
+          "red_string_count": 3,
+          "obsession_shards": 0,
+          "has_knowledge": false,
+          "trust_yuniang": 0,
+          "explored_areas": [],
+          "deaths": 0
         }
       }
     },
-    "踏入古宅": {
-      "type": "story",
-      "content": "吱呀——你推开大门，院内铺满红色的纸钱，被夜风卷起，像无数只暗红的蝴蝶。正厅方向传来唢呐声和哭嫁的呜咽，诡异的是，哭嫁声里没有半分悲戚，只有说不出的阴冷。\n你走到正厅门口，看到案桌上摆着一套大红的婚服、一支凤钗、一碗交杯酒，还有一本用朱砂写就的《冥婚契书》。",
-      "next": "案前抉择",
-      "effects": {
-        "variables": {
-          "checked_hall": false,
-          "checked_backyard": false,
-          "checked_garret": false,
-          "checked_cellar": false
-        }
-      }
-    },
-    "案前抉择": {
+    "first_choice": {
       "type": "choice",
-      "content": "🏮 正厅烛火摇曳，案上的冥契自动翻开，第一页写着：“凡签此契者，与张家女鬼结为阴婚，共享阳寿；拒签者，三魂锁于古宅，永世为奴。”\n你注意到契书旁压着一张泛黄的纸条，上面写着三个禁忌：【忌碰婚服】【忌饮交杯酒】【忌拆凤钗】。\n⏰ 剩余时间：{time_left}分钟\n⚠️  时间≤5分钟时，将强制进入最终抉择！",
+      "content": "手机突然震动,屏幕在黑暗中亮起:【☠️ 冥契试炼 · 红绳索命】\n【规则:一、婚书不可签,签则魂归阴府。二、红绳保你三命,断则再无生机。三、收集执念碎片,解其心结方可脱身。四、卯时五刻天将明,未破冥契者永困此地。】\n红绳女鬼缓缓走近,声音凄切: '夫君,夜色将尽,你打算如何?'",
       "options": [
         {
           "id": 1,
-          "text": "直接签署冥契，保命为先",
-          "next": "sign_contract_directly",
+          "text": "直接询问她: '你是谁?为何要和我成亲?'",
+          "next": "ask_identity",
           "effects": {
             "variables": {
-              "contract_signed": true
+              "trust_yuniang": "+1",
+              "deaths": 0
             }
           }
         },
         {
           "id": 2,
-          "text": "不签契书，先搜查正厅线索",
-          "next": "search_hall",
-          "conditions": {
-            "checked_hall": {"==": false}
-          },
+          "text": "立刻站起来,试图寻找逃离的方法",
+          "next": "search_escape_immediate",
           "effects": {
             "variables": {
-              "checked_hall": true
+              "trust_yuniang": "-1"
             }
           }
         },
         {
           "id": 3,
-          "text": "避开正厅，去后院探查",
-          "next": "search_backyard",
-          "conditions": {
-            "checked_backyard": {"==": false}
-          },
+          "text": "拿起朱砂笔,假装要签婚书",
+          "next": "pretend_sign",
           "effects": {
             "variables": {
-              "checked_backyard": true
+              "trust_yuniang": "+2"
             }
           }
         },
         {
           "id": 4,
-          "text": "爬上阁楼，寻找逃生之路",
-          "next": "search_garret",
+          "text": "默默观察周围环境,寻找线索",
+          "next": "observe_surroundings",
+          "effects": {
+            "variables": {
+              "has_knowledge": true
+            }
+          }
+        }
+      ]
+    },
+    "ask_identity": {
+      "type": "story",
+      "content": "你鼓起勇气问道: '你是谁?为何要和我成亲?'\n屏风后的女鬼沉默片刻,缓缓走近,烛光映出她惨白的面容——眉目清秀,却布满尸斑。她凄然一笑: '妾身张玉娘,光绪三十年生人。张家以冥婚冲喜,将我活活钉入棺材,与早已死去三年的少东家结为阴婚。'\n她伸出苍白的手,指向婚书: '百年执念,只为寻一个能听见我说话的人。夫君既愿听,便帮我完成心愿吧。'",
+      "next": "explore_areas",
+      "effects": {
+        "variables": {
+          "know_yuniang_name": true,
+          "obsession_shards": "+1"
+        }
+      }
+    },
+    "search_escape_immediate": {
+      "type": "story",
+      "content": "你猛地站起来,推开跪垫,四处张望寻找出口。堂屋的正门紧闭,窗棂被铁皮封死,只有屏风后有一条通往后院的走廊。\n'夫君要去哪里?'玉娘的声音变得尖锐,红绳突然收紧,勒入你的皮肉!剧痛让你倒地不起,手机屏幕闪烁:【红绳警告:强闯者死,剩余生机{red_string_count}】\n玉娘的鬼影笼罩着你: '既已系了红绳,就别想逃......'",
+      "next": "forced_confrontation",
+      "effects": {
+        "variables": {
+          "red_string_count": "-1",
+          "deaths": "+1"
+        }
+      }
+    },
+    "pretend_sign": {
+      "type": "story",
+      "content": "你拿起朱砂笔,悬在婚书上,假装要签,眼神却观察四周。玉娘见状,眼中闪过一丝欣慰: '夫君终于肯了......'\n她靠近案几,手伸向你。你趁机放下笔,突然问道: '我想知道,张家为何要给你办冥婚?'\n玉娘的动作一滞,眼中露出痛苦神色: '因为......因为......'她的身体开始颤抖,周围的烛火剧烈摇曳,似乎有什么东西在抗拒这段记忆。",
+      "next": "yuniang_flashback",
+      "effects": {
+        "variables": {
+          "triggered_memory": true
+        }
+      }
+    },
+    "yuniang_flashback": {
+      "type": "choice",
+      "content": "玉娘陷入痛苦的回忆中,她的声音变得断断续续: '那一年......瘟疫......张家人都死了......只剩我和少东家的尸骨......他们说我命硬......要把我......要把我......'\n她的形象开始扭曲,一会儿是正常的新娘,一会儿是腐烂的尸首。手机震动,出现选项:",
+      "options": [
+        {
+          "id": 1,
+          "text": "温和地安抚她: '慢慢说,我在听'",
+          "next": "gentle_comfort",
+          "effects": {
+            "variables": {
+              "trust_yuniang": "+3",
+              "obsession_shards": "+1"
+            }
+          }
+        },
+        {
+          "id": 2,
+          "text": "趁机追问: '把你怎么样了?快说!'",
+          "next": "aggressive_question",
+          "effects": {
+            "variables": {
+              "trust_yuniang": "-2",
+              "red_string_count": "-1"
+            }
+          }
+        },
+        {
+          "id": 3,
+          "text": "保持沉默,等待她自己平静",
+          "next": "silent_wait",
+          "effects": {
+            "variables": {
+              "trust_yuniang": "+1"
+            }
+          }
+        }
+      ]
+    },
+    "gentle_comfort": {
+      "type": "story",
+      "content": "你轻声安抚: '慢慢说,我在听。'\n玉娘渐渐平复,眼中涌出泪水——是黑浊的血泪。她哽咽道: '张家人说我命硬,克死了全族,要把我活祭少东家......他们把我钉入棺材,说阴阳调和,能保张家香火不绝......我在黑暗中喊了三天三夜,没人听见,最后......最后我也变成了他们中的一员......'\n【获得执念碎片:苦命新娘】\n玉娘擦去眼泪,声音坚定了一些: '多谢夫君愿意听我说话。你若帮我解开这冥契,我便放你生路。'",
+      "next": "explore_areas",
+      "effects": {
+        "variables": {
+          "obsession_shards": "+2"
+        }
+      }
+    },
+    "aggressive_question": {
+      "type": "story",
+      "content": "你厉声喝问: '把你怎么样了?快说!'\n玉娘被你的语气激怒,双眼通红: '你和他一样......你们都一样......'\n她猛地扑向你,红绳收紧,勒断你的呼吸!你感到喉咙骨头碎裂,眼前一黑。\n手机屏幕闪烁:【红绳警告:激怒亡魂,剩余生机{red_string_count}】\n你猛地惊醒,发现自己还跪在堂前,玉娘站在屏风后,眼中满是警惕。",
+      "next": "first_choice",
+      "effects": {
+        "variables": {
+          "red_string_count": "-1",
+          "deaths": "+1",
+          "angered_yuniang": true
+        }
+      }
+    },
+    "silent_wait": {
+      "type": "story",
+      "content": "你保持沉默,静静等待。玉娘的呼吸渐渐平复,她愧疚地看着你: '抱歉,妾身失态了。'\n她退回屏风后,声音恢复平静: '夫君既不愿签婚书,那便帮我寻几样东西吧。找到了,我就告诉你破解冥契的方法。'\n【获得任务:寻找三样遗物】",
+      "next": "explore_areas",
+      "effects": {
+        "variables": {
+          "has_quest": true
+        }
+      }
+    },
+    "observe_surroundings": {
+      "type": "story",
+      "content": "你冷静地观察四周。堂屋正中摆着八仙桌,上面除了婚书,还有一本泛黄的账簿、一把断裂的木梳、一个缺口的瓷碗。墙上挂着张家祖训,字迹已模糊不清。屏风后通往后院,隐约能看见一口水缸和一棵枯树。\n你注意到,婚书上除了你的名字,还有一行朱砂批注: '阴阳调和,生生不息'。\n手机记下这条线索:【张家似乎执着于'生生不息'】",
+      "next": "explore_areas",
+      "effects": {
+        "variables": {
+          "found_clue": true
+        }
+      }
+    },
+    "forced_confrontation": {
+      "type": "choice",
+      "content": "你倒在地上,红绳勒住脖颈,玉娘的鬼影笼罩着你: '既已系了红绳,就别想逃......'\n她的利爪抬起,就要刺穿你的心脏!手机震动,屏幕出现选项:",
+      "options": [
+        {
+          "id": 1,
+          "text": "大喊: '等等!我可以帮你!'",
+          "next": "plead_help",
+          "effects": {
+            "variables": {
+              "trust_yuniang": "+1"
+            }
+          }
+        },
+        {
+          "id": 2,
+          "text": "挣扎着抓向桌上的朱砂笔,反击",
+          "next": "fight_back",
+          "effects": {
+            "variables": {
+              "is_fighting": true
+            }
+          }
+        },
+        {
+          "id": 3,
+          "text": "放弃抵抗,闭眼等死",
+          "next": "give_up_death",
+          "effects": {}
+        }
+      ]
+    },
+    "plead_help": {
+      "type": "story",
+      "content": "你拼尽全力喊道: '等等!我可以帮你!'\n玉娘的动作停在半空,她狐疑地看着你: '帮我?......你能帮我做什么?'\n你喘着气: '我......我可以看到你的执念,可以帮你解脱。'\n她沉默片刻,缓缓收回利爪: '......好吧,我给你一个机会。去后院,找到我的嫁妆箱,里面有我生前最珍视的东西。'\n红绳松开,你瘫坐在地,大口呼吸。",
+      "next": "explore_areas",
+      "effects": {
+        "variables": {
+          "trust_yuniang": "+2"
+        }
+      }
+    },
+    "fight_back": {
+      "type": "end",
+      "content": "你挣扎着抓向朱砂笔,刺向玉娘的鬼影!笔尖穿透她的身体,她发出凄厉的尖叫,化作一团黑烟钻入你的身体!\n'既不愿合作,那便融为一体吧......'\n你感到体内有无数黑线蔓延,意识逐渐模糊。手机屏幕闪烁:【试炼失败 · 冥契已成】\n你被女鬼附身,成为张家第13代阴婚新郎,永生永世被囚禁在这座古宅中......",
+      "effects": {
+        "player": {
+          "hp": "-20",
+          "exp": "-50"
+        }
+      }
+    },
+    "give_up_death": {
+      "type": "end",
+      "content": "你闭上眼睛,放弃抵抗。玉娘的利爪刺穿你的心脏,你感到一阵剧痛,随后是温暖的黑暗。\n'又是一个......不情愿的......'她叹息着,将你的尸首拖入棺材。\n手机屏幕闪烁:【试炼失败 · 心死身灭】",
+      "effects": {
+        "player": {
+          "hp": "-10"
+        }
+      }
+    },
+    "explore_areas": {
+      "type": "choice",
+      "content": "玉娘退回屏风后,声音幽幽传来: '卯时五刻之前,帮我寻回三样遗物,我便告诉你破解冥契之法。'\n手机显示:【执念碎片 {obsession_shards}/5 · 剩余生机 {red_string_count} · 时间流逝中...】\n你可以探索以下区域:",
+      "options": [
+        {
+          "id": 1,
+          "text": "后院水缸 - 可能藏有水相关线索",
+          "next": "explore_water_jar",
           "conditions": {
-            "checked_garret": {"==": false}
+            "explored_areas": {
+              "!=": "water_jar"
+            }
           },
           "effects": {
             "variables": {
-              "checked_garret": true
+              "explored_areas": "water_jar"
+            }
+          }
+        },
+        {
+          "id": 2,
+          "text": "枯树之下 - 可能藏有土相关线索",
+          "next": "explore_dead_tree",
+          "conditions": {
+            "explored_areas": {
+              "!=": "dead_tree"
+            }
+          },
+          "effects": {
+            "variables": {
+              "explored_areas": "dead_tree"
+            }
+          }
+        },
+        {
+          "id": 3,
+          "text": "堂内八仙桌 - 检查账簿和物品",
+          "next": "explore_table",
+          "conditions": {
+            "explored_areas": {
+              "!=": "table"
+            }
+          },
+          "effects": {
+            "variables": {
+              "explored_areas": "table"
+            }
+          }
+        },
+        {
+          "id": 4,
+          "text": "与玉娘对话 - 加深好感度/获取提示",
+          "next": "talk_yuniang",
+          "conditions": {
+            "trust_yuniang": {
+              ">=": 1
             }
           }
         },
         {
           "id": 5,
-          "text": "潜入地窖，探查古宅根基",
-          "next": "search_cellar",
+          "text": "所有线索收集完毕,尝试破解冥契",
+          "next": "attempt_break_curse",
           "conditions": {
-            "checked_cellar": {"==": false}
-          },
-          "effects": {
-            "variables": {
-              "checked_cellar": true
-            }
-          }
-        },
-        {
-        "id": 6,
-        "text": "前往最终抉择",
-        "next": "final_choice",
-        "conditions": {
-                  "and": [
-
-                             {"checked_cellar": {"==": true}},
-                             {"checked_garret": {"==": true}},
-                             {"checked_hall": {"==": true}},
-                             {"checked_backyard": {"==": true}}
-
-                  
-                  ]
-
-                }
-            
-             
-           
-         }
-       ]
-    },
-    
-    "sign_contract_directly": {
-      "type": "story",
-      "content": "你拿起案上的朱砂笔，颤抖着在冥契上签下自己的名字。笔尖落下的瞬间，婚服突然无风自动，交杯酒泛起血泡，唢呐声变得尖锐刺耳！\n“夫君，既已签约，便随我入地府吧......”一个冰冷的女声在你耳边响起，一双惨白的手从婚服里伸出，死死抓住你的手腕。",
-      "next": "forced_ghost_marriage",
-      "effects": {
-        "variables": {
-          "taboo_broken": 1
-        }
-      }
-    },
-    "forced_ghost_marriage": {
-      "type": "end",
-      "content": "💀 你被女鬼拖拽着向地府坠去，眼前最后看到的，是她腐烂的脸上挂着诡异的笑容。\n“签了契书，便是我的人，永世不得超生......”\n\n【试炼失败！】\n|【生命值-10】|【理智-20】|【敏捷-1】|",
-      "effects": {
-        "player": {
-          "hp": "-10",
-          "mp": "-20",
-          "agility": "-1"
-        }
-      }
-    },
-    "search_hall": {
-      "type": "story",
-      "content": "你绕开案桌，在正厅角落的神龛后找到一个上锁的木盒。神龛上供奉着一尊没有五官的新娘雕像，底座刻着“光绪三十年，张氏玉娘”。\n突然，雕像的脖颈转动了一下，对准你的方向。你吓得后退半步，却发现神龛上掉下来一把铜钥匙——钥匙上缠绕着一缕黑发。",
-      "next": "open_wooden_box",
-      "effects": {
-        "variables": {
-          "has_key": true
-        }
-      }
-    },
-    "open_wooden_box": {
-      "type": "choice",
-      "content": "🔑 你捡起铜钥匙，看着神龛后的木盒。盒身刻着“玉娘妆奁”，缝隙里渗出暗红色的液体，像是干涸的血迹。你决定？",
-      "options": [
-        {
-          "id": 1,
-          "text": "用钥匙打开木盒，查看里面的东西",
-          "next": "box_content",
-          "conditions": {
-            "has_key": {"==": true}
-          }
-        },
-        {
-          "id": 2,
-          "text": "不敢碰诡异的木盒，继续搜查其他地方",
-          "next": "案前抉择",
-          "effects": {
-            "variables": {
-              "time_left": "-5"
-            }
-          }
-        },
-        {
-          "id": 3,
-          "text": "觉得钥匙不祥，扔掉钥匙并签署冥契",
-          "next": "sign_contract_directly",
-          "effects": {
-            "variables": {
-              "has_key": false,
-              "contract_signed": true
+            "obsession_shards": {
+              ">=": 5
             }
           }
         }
       ]
     },
-    "box_content": {
+    "explore_water_jar": {
       "type": "story",
-      "content": "你用铜钥匙打开木盒，里面没有金银珠宝，只有一本泛黄的日记和半块玉佩。\n【获得 玉娘日记！】【获得 半块凤纹玉佩！】\n日记首页写着：“父母逼我嫁与病秧子，宁死不从。午夜逃婚，却被抓回锁于阁楼，一杯毒酒了结此生......”\n玉佩背面刻着“断契”二字，触摸时传来一阵温热。",
-      "next": "read_diary_choice",
+      "content": "你来到后院,月光下看见一口破旧的水缸。缸里的水早已干涸,底部铺着一层厚厚的黑色淤泥。你伸手探入淤泥,摸到一个冰冷的硬物——是一枚玉镯!\n【获得物品:玉娘的玉镯】\n玉镯内侧刻着一行小字: '玉娘吾爱,生生不离'。\n你正要收起玉镯,水缸里突然伸出一只苍白的手,抓住了你的手腕!一个溺水的女鬼从淤泥中升起: '还给我......那是我的......'",
+      "next": "water_ghost_encounter",
       "effects": {
         "variables": {
-          "has_token": 1,
-          "ghost_favor": 5
+          "has_jade_bracelet": true
         }
       }
     },
-    "read_diary_choice": {
+    "water_ghost_encounter": {
       "type": "choice",
-      "content": "📜 日记里记录着玉娘的悲惨遭遇：她本是富家千金，因抗拒包办婚姻被家人毒杀，怨气凝结成魂，设下阴婚陷阱报复世人。最后一页写着：“解契需凑齐双玉，焚契需用阳火，避魂需沾童子血......”\n你决定？",
+      "content": "女鬼死死抓住你的手腕,红绳开始收紧!手机屏幕闪烁:【警告:遭遇执念分身】",
       "options": [
         {
           "id": 1,
-          "text": "仔细读完日记，寻找解契线索",
-          "next": "read_full_diary",
+          "text": "大喊: '玉娘!这是你的玉镯吗?'",
+          "next": "call_yuniang_water",
           "effects": {
             "variables": {
-              "ghost_favor": 10
+              "trust_yuniang": "+1"
             }
           }
         },
         {
           "id": 2,
-          "text": "扔掉日记，拿着半块玉佩继续搜查",
-          "next": "案前抉择",
+          "text": "用玉镯敲击女鬼的头",
+          "next": "hit_water_ghost",
           "effects": {
             "variables": {
-              "time_left": "-5"
+              "is_attacking": true
             }
           }
         },
         {
           "id": 3,
-          "text": "烧毁日记，断绝与女鬼的联系",
-          "next": "burn_diary",
+          "text": "冷静地说: '我是在帮玉娘找遗物'",
+          "next": "calm_talk",
+          "effects": {}
+        }
+      ]
+    },
+    "call_yuniang_water": {
+      "type": "story",
+      "content": "你大声呼喊: '玉娘!这是你的玉镯吗?'\n玉娘的身影出现在后院门口,她看到水缸里的女鬼,眼中露出惊恐: '姐姐......你怎么......'\n水鬼女鬼看到玉娘,突然松开你的手腕,钻入淤泥消失。玉娘颤抖着说: '那是我姐姐......当年和我一起......一起被钉入棺材......'\n【获得执念碎片:姐妹情深】\n玉娘感激地看着你: '多谢夫君唤我前来......'",
+      "next": "explore_areas",
+      "effects": {
+        "variables": {
+          "obsession_shards": "+2",
+          "saw_sister_ghost": true
+        }
+      }
+    },
+    "hit_water_ghost": {
+      "type": "story",
+      "content": "你举起玉镯,狠狠砸向女鬼的头!玉镯碎裂,女鬼发出凄厉的尖叫,化作一滩黑水!但玉镯也毁了——\n【失去物品:玉娘的玉镯】\n玉娘出现在门口,看着碎裂的玉镯,眼中露出悲伤: '那是我姐姐生前最珍爱的......算了,也罢。'\n她递给你一块玉佩: '这是我自己的,或许也能用。'\n【获得物品:玉娘的玉佩】\n但你失去了重要线索,执念碎片收集进度受阻。",
+      "next": "explore_areas",
+      "effects": {
+        "variables": {
+          "jade_bracelet_broken": true,
+          "has_jade_pendant": true
+        }
+      }
+    },
+    "calm_talk": {
+      "type": "story",
+      "content": "你冷静地说: '我是在帮玉娘找遗物。'\n女鬼愣了一下,渐渐松开手: '帮她......?那好,你拿去吧......告诉她,我好想她......'\n女鬼沉入淤泥消失。你获得完整的玉镯,并得知了玉娘和她姐姐的故事。\n【获得执念碎片:姐妹记忆】\n【获得完整物品:玉镯】",
+      "next": "explore_areas",
+      "effects": {
+        "variables": {
+          "obsession_shards": "+2",
+          "water_ghost_peaceful": true
+        }
+      }
+    },
+    "explore_dead_tree": {
+      "type": "story",
+      "content": "你来到枯树下,发现树根处有一个被挖开的土坑,里面是一具小小的骸骨!骸骨旁边散落着几个生锈的铁钉——和钉棺材的钉子一模一样!\n【发现线索:孩童骸骨】\n你仔细检查骸骨,发现它的头骨上有被钝器击打的痕迹。骸骨怀里抱着一个布偶,布偶的脸上用红线缝出了'张家'二字。\n突然,枯树开始剧烈摇晃,一个孩童的哭声从地下传来: '好疼......好疼啊......'",
+      "next": "child_ghost_encounter",
+      "effects": {
+        "variables": {
+          "found_child_bones": true
+        }
+      }
+    },
+    "child_ghost_encounter": {
+      "type": "choice",
+      "content": "一个只有上半身的孩童鬼魂从地下钻出!它的脸是破碎的,一只眼睛挂在眼眶外面。它看到你,发出刺耳的尖叫: '坏人!打死坏人!'\n它扑向你的腿,张开嘴就要咬!",
+      "options": [
+        {
+          "id": 1,
+          "text": "把布偶递给它: '这是你的吗?'",
+          "next": "give_doll",
           "effects": {
             "variables": {
-              "ghost_favor": -10,
-              "taboo_broken": 1
+              "trust_yuniang": "+1"
+            }
+          }
+        },
+        {
+          "id": 2,
+          "text": "逃跑,回到堂屋",
+          "next": "run_to_hall",
+          "effects": {
+            "variables": {
+              "is_running": true
+            }
+          }
+        },
+        {
+          "id": 3,
+          "text": "大喊: '玉娘!这孩子是怎么回事?'",
+          "next": "call_yuniang_tree",
+          "effects": {}
+        }
+      ]
+    },
+    "give_doll": {
+      "type": "story",
+      "content": "你捡起布偶,递给孩童鬼魂: '这是你的吗?'\n孩童鬼魂愣住了,它小心翼翼地接过布偶,抱在怀里: '妈妈......妈妈给我做的......'\n它停止了攻击,眼中流出血泪: '坏人把我打死......埋在树下......我好想妈妈......'\n【获得执念碎片:孩童怨念】\n【获得物品:布偶】\n孩童鬼魂渐渐消失,你松了口气。",
+      "next": "explore_areas",
+      "effects": {
+        "variables": {
+          "obsession_shards": "+2",
+          "has_doll": true,
+          "child_ghost_peaceful": true
+        }
+      }
+    },
+    "run_to_hall": {
+      "type": "story",
+      "content": "你转身就跑!孩童鬼魂紧追不舍,它的速度惊人!你刚跑回堂屋,它就扑了上来,咬住你的腿!\n'好疼!你也尝尝被咬的滋味!'\n红绳收紧,你感到生命在流逝——手机屏幕闪烁:【红绳警告:被孩童怨念所伤,剩余生机{red_string_count}】\n你昏死过去,醒来时发现自己还跪在堂前,但腿上有明显的牙印。",
+      "next": "explore_areas",
+      "effects": {
+        "variables": {
+          "red_string_count": "-1",
+          "deaths": "+1",
+          "leg_injured": true
+        }
+      }
+    },
+    "call_yuniang_tree": {
+      "type": "story",
+      "content": "你大喊: '玉娘!这孩子是怎么回事?'\n玉娘出现在你身边,看到孩童鬼魂,眼中露出愧疚: '小宝......对不起......'\n孩童鬼魂看到玉娘,扑进她怀里: '妈妈!我好想你!'\n玉娘抱着孩童,眼泪止不住地流: '妈妈对不起你......妈妈不该......'\n【获得执念碎片:母子真相】\n原来玉娘生前已有身孕,被张家强行钉入棺材时,孩子还未出生......",
+      "next": "explore_areas",
+      "effects": {
+        "variables": {
+          "obsession_shards": "+3",
+          "knows_pregnancy_truth": true
+        }
+      }
+    },
+    "explore_table": {
+      "type": "story",
+      "content": "你回到堂屋,仔细检查八仙桌上的物品。\n【账簿】:记录着张家族人的生卒年月,最后一页写着:'光绪三十年,张家男丁尽殁,唯余玉娘腹中子嗣,需以冥婚延续香火。'\n【木梳】:断裂的梳子,上面缠绕着几缕黑发。\n【瓷碗】:缺口碗,碗底有暗红色的污渍,像是干涸的血。\n你突然注意到,婚书背面的夹层里,有一张泛黄的纸条!",
+      "next": "found_hidden_note",
+      "effects": {
+        "variables": {
+          "read_account_book": true
+        }
+      }
+    },
+    "found_hidden_note": {
+      "type": "choice",
+      "content": "你抽出纸条,上面用血写着:'张家以活人祭阴宅,生生不息乃是谎言。冥契不是婚书,是卖身契!签了的人,魂归张家,永世为奴!'\n纸条背面还画着一幅简图,显示:'冥契的破解之法:水、土、血、火四物齐备,合而焚之。'\n手机记下:【破解线索:水土血火,四物焚契】\n你正在思考,玉娘突然出现在你身后: '夫君,你发现了什么?'",
+      "options": [
+        {
+          "id": 1,
+          "text": "把纸条给她看: '这是什么意思?'",
+          "next": "show_note_yuniang",
+          "effects": {
+            "variables": {
+              "trust_yuniang": "+2"
+            }
+          }
+        },
+        {
+          "id": 2,
+          "text": "藏起纸条: '没什么,只是些旧纸'",
+          "next": "hide_note",
+          "effects": {
+            "variables": {
+              "trust_yuniang": "-1"
+            }
+          }
+        },
+        {
+          "id": 3,
+          "text": "直接质问她: '冥契根本不是婚书,对吗?'",
+          "next": "confront_yuniang",
+          "effects": {
+            "variables": {
+              "is_confronting": true
             }
           }
         }
       ]
     },
-    "read_full_diary": {
+    "show_note_yuniang": {
       "type": "story",
-      "content": "你通读日记，发现玉娘的怨气源于家人的逼迫和背叛。她在日记中提到：“另一半玉佩藏于地窖石棺下，乃我生母所赠；阳火需取阁楼窗台上的日光镜聚阳而成；童子血......其实是朱砂混合公鸡血的替代品，藏于后院香炉下。”\n读完最后一个字，日记化作一缕青烟，你手心的半块玉佩变得更加温热。",
-      "next": "案前抉择",
+      "content": "你把纸条递给玉娘,她看完后,脸色变得惨白: '这......这是......'\n她开始颤抖,周围的红烛剧烈摇曳: '他们骗我......他们说冥婚是为了和我丈夫团聚......原来是......原来是卖身契......!'\n【获得执念碎片:真相大白】\n玉娘抬头看你,眼中满含泪水: '夫君,多谢你告诉我真相......我......我愿意帮你破除冥契......'",
+      "next": "explore_areas",
       "effects": {
         "variables": {
-          "ghost_favor": 15,
-          "clue_full": true,
-          "time_left": "-5"
+          "obsession_shards": "+3",
+          "yuniang_cooperative": true
         }
       }
     },
-    "burn_diary": {
+    "hide_note": {
       "type": "story",
-      "content": "你点燃日记，火焰却呈现诡异的青黑色。“你竟敢焚我遗物！”女鬼的怒吼震得房梁发抖，正厅的烛火瞬间熄灭，只有案上的冥契散发着猩红的光。\n你感到后背一阵冰凉，转头看到一个穿着大红婚服的女鬼，长发遮面，双手滴落着黑色的血。",
-      "next": "ghost_anger_1",
-      "effects": {
-        "player": {
-          "hp": "-5"
-        }
-      }
-    },
-    "ghost_anger_1": {
-      "type": "end",
-      "content": "👻 女鬼伸出利爪，刺穿了你的胸膛。你在剧痛中失去意识，魂魄被她撕碎，永世困在古宅之中。\n“敢毁我念想，便让你万劫不复......”\n\n【试炼失败！】\n|【生命值-15】|【防御-1】|",
-      "effects": {
-        "player": {
-          "hp": "-15",
-          "defense": "-1"
-        }
-      }
-    },
-    "search_backyard": {
-      "type": "story",
-      "content": "你穿过正厅，来到后院。后院荒草丛生，中间有一口枯井，井口缠绕着铁链，铁链上挂着无数个红色的香囊。荒草深处有一个香炉，香炉里插着三根未燃尽的香，香灰呈黑色。\n你走近香炉，发现底下压着一个小瓷瓶，瓶身刻着“替身血”三个字。",
-      "next": "take_substitute_blood",
+      "content": "你藏起纸条,假装无事。玉娘狐疑地看着你: '夫君,你似乎在隐瞒什么......'\n她伸出苍白的手: '给我看看。'\n红绳突然收紧,她的眼神变得凌厉: '我不想用强,但你不该骗我......'\n【失去信任值】\n你只好拿出纸条,她看完后,眼中露出受伤的神色: '你......你不信我......'",
+      "next": "explore_areas",
       "effects": {
         "variables": {
-          "has_substitute": false
+          "trust_yuniang": "-3",
+          "yuniang_hurt": true
         }
       }
     },
-    "take_substitute_blood": {
+    "confront_yuniang": {
+      "type": "story",
+      "content": "你直接质问: '冥契根本不是婚书,对吗?是卖身契!'\n玉娘愣住了,她的形象开始扭曲,一会儿是正常的新娘,一会儿是腐烂的尸首: '你......你知道了......'\n她突然尖叫起来,周围的温度骤降!红绳疯狂收紧,勒断你的肋骨!\n'你和他一样......你们都想利用我......!'\n你感到生命在流逝——手机屏幕闪烁:【红绳警告:激怒执念之主,剩余生机{red_string_count}】",
+      "next": "red_string_death",
+      "effects": {
+        "variables": {
+          "red_string_count": "-1",
+          "deaths": "+1",
+          "angered_yuniang": true
+        }
+      }
+    },
+    "red_string_death": {
+      "type": "story",
+      "content": "你猛地惊醒,发现自己还跪在堂前,玉娘站在屏风后,眼神冰冷: '夫君,你刚才说了什么?'\n手机提示:【红绳断裂一次,剩余{red_string_count}次。你保留了上次死亡的记忆,但必须改变对话方式。】\n你知道,如果再次激怒她,下次就没有机会了......",
+      "next": "first_choice",
+      "effects": {
+        "variables": {
+          "has_death_memory": true
+        }
+      }
+    },
+    "talk_yuniang": {
       "type": "choice",
-      "content": "🏺 你拿起瓷瓶，摇了摇，里面有液体晃动的声音。香炉旁的地面刻着一行小字：“替身血可避阴魂，然擅动者需以阳气偿之。”\n此时，枯井里传来女子的呜咽声，像是在求救。你决定？",
+      "content": "你走到屏风后,玉娘正坐在梳妆台前,背影凄清。她转过身,眼中满是哀愁: '夫君,有事吗?'",
       "options": [
         {
           "id": 1,
-          "text": "收起瓷瓶，作为防身之物",
-          "next": "案前抉择",
+          "text": "询问她的过去: '你还记得生前的事吗?'",
+          "next": "yuniang_past",
           "effects": {
             "variables": {
-              "has_substitute": true,
-              "ghost_favor": 3,
-              "time_left": "-5"
+              "trust_yuniang": "+2"
             }
           }
         },
         {
           "id": 2,
-          "text": "打开瓷瓶，将液体洒向枯井",
-          "next": "spill_blood_well",
-          "effects": {
-            "variables": {
-              "taboo_broken": 1
+          "text": "直接询问破解之法: '怎么才能破除冥契?'",
+          "next": "ask_break_method",
+          "conditions": {
+            "trust_yuniang": {
+              ">=": 3
             }
           }
         },
         {
           "id": 3,
-          "text": "觉得危险，放回瓷瓶并离开后院",
-          "next": "案前抉择",
+          "text": "表达同情: '你一定很痛苦吧'",
+          "next": "comfort_yuniang",
           "effects": {
             "variables": {
-              "time_left": "-5"
+              "trust_yuniang": "+3"
             }
           }
         },
         {
           "id": 4,
-          "text": "探头看向枯井，查看求救者",
-          "next": "look_well",
-          "effects": {
-            "variables": {
-              "taboo_broken": 1
-            }
-          }
+          "text": "沉默离开",
+          "next": "explore_areas",
+          "effects": {}
         }
       ]
     },
-    "spill_blood_well": {
+    "yuniang_past": {
       "type": "story",
-      "content": "你打开瓷瓶，将里面的红色液体洒向枯井。液体接触到井壁的瞬间，发出“滋滋”的腐蚀声，枯井里的呜咽声变成了凄厉的惨叫。\n“你毁我替身！我要你偿命！”女鬼的身影从枯井中爬出，红色的指甲长达三寸，直奔你的面门。",
-      "next": "ghost_anger_2",
-      "effects": {
-        "player": {
-          "hp": "-8",
-          "agility": "-1"
-        }
-      }
-    },
-    "ghost_anger_2": {
-      "type": "end",
-      "content": "💥 你被女鬼拖入枯井，井壁爬满了怨魂的手，撕扯着你的身体。最后一刻，你看到井底堆积如山的白骨，每一根骨头上都缠着红色的婚绳。\n\n【试炼失败！】\n|【生命值-20】|【幸运-1】|",
-      "effects": {
-        "player": {
-          "hp": "-20",
-          "luck": "-1"
-        }
-      }
-    },
-    "look_well": {
-      "type": "story",
-      "content": "你探头看向枯井，井底没有水，只有一片漆黑。突然，一双惨白的手从黑暗中伸出，抓住你的头发，用力向下拖拽！\n“又来一个送死的......”女鬼的声音在井底回荡，带着得逞的笑意。",
-      "next": "pulled_well",
-      "effects": {
-        "player": {
-          "hp": "-10"
-        }
-      }
-    },
-    "pulled_well": {
-      "type": "end",
-      "content": "🩸 你被拖入井底，无数怨魂蜂拥而上，啃噬你的血肉。你的惨叫声被枯井吞噬，永远消失在午夜的古宅里。\n\n【试炼失败！】\n|【生命值清零】|【防御-1】|",
-      "effects": {
-        "player": {
-          "hp": "0",
-          "defense": "-1"
-        }
-      }
-    },
-    "search_garret": {
-      "type": "story",
-      "content": "你顺着吱呀作响的木梯爬上阁楼。阁楼里布满灰尘，角落里锁着一扇铁门，铁门上贴着一张泛黄的符纸，符纸已经破损大半。\n窗台上放着一面铜镜，镜面光滑，刻着“日光镜”三个字。铜镜旁有一本道士笔记，上面写着：“此镜可聚阳火，焚冥契解阴婚，但需以自身阳气为引，阳气不足者反遭反噬。”",
-      "next": "take_sun_mirror",
+      "content": "玉娘眼中浮现回忆的光芒: '我记得......光绪二十六年,我嫁入张家,丈夫是张家的小儿子,温柔儒雅,待我极好。可惜好景不长,光绪二十八年,瘟疫席卷,张家人一个个倒下......丈夫也没能逃过......'\n她擦去眼泪: '他们说我命硬,克死了丈夫,要把我陪葬。后来......后来我就什么都不知道了,醒来时,已经在这座古宅,变成了这个样子......'\n【获得执念片段:玉娘的记忆】",
+      "next": "explore_areas",
       "effects": {
         "variables": {
-          "has_mirror": false
+          "obsession_shards": "+1"
         }
       }
     },
-    "take_sun_mirror": {
+    "ask_break_method": {
+      "type": "story",
+      "content": "你直接询问: '怎么才能破除冥契?'\n玉娘沉默片刻: '其实......我也不知道。但我记得,张家有一个密室,里面藏着'生生不息'的真相。或许那里有答案。'\n她指向枯树: '密室的入口,就在那棵树下。但树下有东西守着,我......我不敢过去......'\n【获得线索:密室位置】",
+      "next": "explore_areas",
+      "effects": {
+        "variables": {
+          "knows_secret_room": true
+        }
+      }
+    },
+    "comfort_yuniang": {
+      "type": "story",
+      "content": "你轻声说: '你一定很痛苦吧......'\n玉娘愣住了,她从未听过这样的话。眼泪从她的眼眶涌出: '有......有人心疼我了......'\n她泣不成声: '百年了......百年了,所有人都怕我、恨我......你是第一个......第一个心疼我的人......'\n【获得执念碎片:第一次的温暖】\n【玉娘好感度大幅提升】",
+      "next": "explore_areas",
+      "effects": {
+        "variables": {
+          "obsession_shards": "+2",
+          "trust_yuniang": "+5"
+        }
+      }
+    },
+    "attempt_break_curse": {
       "type": "choice",
-      "content": "🪞 你拿起日光镜，镜面反射出阁楼的景象，却在角落的位置看到一个穿着婚服的影子——那影子没有五官，正对着你“看”。\n铁门后传来撞击声，像是有人在里面拼命想要出来。你决定？",
+      "content": "你收集了足够的执念碎片,现在可以尝试破除冥契。手机显示:【执念碎片 {obsession_shards}/5 已集齐】\n你回到堂屋,玉娘站在屏风后,眼神复杂地看着你: '夫君,时辰快到了......'\n你决定:",
       "options": [
         {
           "id": 1,
-          "text": "收起日光镜，寻找破解之法",
-          "next": "案前抉择",
-          "effects": {
-            "variables": {
-              "has_mirror": true,
-              "ghost_favor": 3,
-              "time_left": "-5"
+          "text": "按照纸条提示:水、土、血、火,四物焚契",
+          "next": "four_elements_break",
+          "conditions": {
+            "found_clue": {
+              "==": true
             }
           }
         },
         {
           "id": 2,
-          "text": "用日光镜照射铁门，尝试破门",
-          "next": "mirror_iron_door",
-          "effects": {
-            "variables": {
-              "taboo_broken": 1
+          "text": "利用玉娘的信任,让她主动解除冥契",
+          "next": "trust_break",
+          "conditions": {
+            "trust_yuniang": {
+              ">=": 5
             }
           }
         },
         {
           "id": 3,
-          "text": "扔掉日光镜，逃离阁楼",
-          "next": "案前抉择",
+          "text": "强行撕毁婚书",
+          "next": "force_tear_contract",
           "effects": {
             "variables": {
-              "time_left": "-5"
+              "is_forcing": true
             }
           }
         },
         {
           "id": 4,
-          "text": "撕下符纸，打开铁门查看",
-          "next": "open_iron_door",
-          "effects": {
-            "variables": {
-              "taboo_broken": 1
-            }
-          }
+          "text": "放弃破解,等待天明",
+          "next": "wait_dawn",
+          "effects": {}
         }
       ]
     },
-    "mirror_iron_door": {
+    "four_elements_break": {
       "type": "story",
-      "content": "你举起日光镜，对准铁门照射。镜面上射出一道微弱的金光，接触到铁门的瞬间，符纸燃烧起来，发出刺鼻的黑烟。\n铁门后的撞击声变得更加剧烈，伴随着女鬼的嘶吼：“你敢破我封印！”\n突然，日光镜变得滚烫，灼烧着你的手掌，你被迫松开手，镜子掉在地上摔成碎片。",
-      "next": "mirror_broken",
-      "effects": {
-        "player": {
-          "hp": "-7"
-        }
-      }
-    },
-    "mirror_broken": {
-      "type": "end",
-      "content": "🔥 日光镜破碎，阳气外泄，女鬼冲破铁门，化作一道红影扑向你。你被她的怨气包裹，全身皮肤灼烧般疼痛，最后在绝望中化为灰烬。\n\n【试炼失败！】\n|【生命值-18】|【理智-25】|【敏捷-1】|",
-      "effects": {
-        "player": {
-          "hp": "-18",
-          "mp": "-25",
-          "agility": "-1"
-        }
-      }
-    },
-    "open_iron_door": {
-      "type": "story",
-      "content": "你撕下符纸，符纸一落地就化作灰烬。你用力拉开铁门，里面没有任何人，只有一具穿着婚服的枯骨，枯骨的手指上戴着半块玉佩——与你在正厅找到的正好契合。\n“终于有人来陪我了......”枯骨突然动了起来，伸手抓住你的手腕，婚服上的红绸缠绕住你的身体。",
-      "next": "bone_attack",
-      "effects": {
-        "player": {
-          "hp": "-12",
-          "defense": "-1"
-        }
-      }
-    },
-    "bone_attack": {
-      "type": "end",
-      "content": "💀 枯骨吸干了你的阳气，你变成了新的“祭品”，枯骨则换上你的皮囊，继续等待下一个闯入者。\n古宅的唢呐声再次响起，这一次，是为你而奏的迎亲曲。\n\n【试炼失败！】\n|【生命值-25】|【攻击-1】|",
-      "effects": {
-        "player": {
-          "hp": "-25",
-          "attack": "-1"
-        }
-      }
-    },
-    "search_cellar": {
-      "type": "story",
-      "content": "你顺着石阶走进地窖，地窖里弥漫着腐臭的气息，墙壁上渗出暗红色的液体。正中央摆放着一口石棺，石棺上刻着“张府玉娘之墓”，棺盖已经被推开一条缝。\n你走近石棺，看到棺底放着半块玉佩，与你在正厅找到的刚好匹配。石棺旁的墙壁上刻着一行血字：“双玉合一，冥契自解。”",
-      "next": "take_second_jade",
+      "content": "你按照纸条提示,收集四物:\n【水】:水缸里的淤泥水\n【土】:枯树下的泥土\n【血】:你咬破手指,滴下鲜血\n【火】:点燃红烛\n你将四物倒在婚书上,红烛的火焰腾起,婚书开始燃烧!玉娘的身影也开始变得透明,她微笑着看着你: '多谢夫君......我终于解脱了......'\n【冥契正在破解】",
+      "next": "curse_breaking_success",
       "effects": {
         "variables": {
-          "has_second_jade": false
+          "curse_break_method": "four_elements"
         }
       }
     },
-    "take_second_jade": {
-      "type": "choice",
-      "content": "💀 你伸手去拿棺底的玉佩，指尖刚碰到玉佩，石棺里突然传来呼吸声。棺盖缓缓打开，里面躺着一个穿着大红婚服的女子，面容苍白如纸，正是玉娘的鬼魂。\n“你终于来了......”她睁开眼睛，眼球是纯黑色的，没有一丝眼白。你决定？",
-      "options": [
-        {
-          "id": 1,
-          "text": "拿起玉佩，与手中的玉佩合并",
-          "next": "merge_jade",
-          "effects": {
-            "variables": {
-              "has_second_jade": true,
-              "has_token": 2
-            }
-          }
-        },
-        {
-          "id": 2,
-          "text": "缩回手，跪拜玉娘，请求放过",
-          "next": "kneel_ghost"
-        },
-        {
-          "id": 3,
-          "text": "转身就跑，逃离地窖",
-          "next": "run_cellar",
-          "effects": {
-            "variables": {
-              "taboo_broken": 1
-            }
-          }
-        }
-      ]
-    },
-    "merge_jade": {
+    "trust_break": {
       "type": "story",
-      "content": "你拿起棺底的玉佩，两块玉佩自动贴合，发出柔和的金光。“双玉合一，怨气消散......”玉娘的声音变得温柔，她的鬼魂逐渐变得透明。\n“我本无意害人，只是怨气难平。多谢你帮我集齐双玉，解我执念。”她递给你一张泛黄的纸，“这是解契咒，配合日光镜和替身血，可彻底销毁冥契。”",
-      "next": "案前抉择",
+      "content": "你走到玉娘面前,握住她苍白的手: '玉娘,我已经知道了真相。冥契不是婚书,是卖身契。但我愿意帮你解脱,不是作为你的丈夫,而是作为你的朋友。'\n玉娘愣住了,她眼中涌出泪水: '朋友......?'\n她缓缓点头,伸出手,撕毁了婚书: '好......我愿意......'\n【冥契被玉娘亲手撕毁】\n她的身影开始消散,脸上露出释然的笑容: '谢谢......谢谢你把我当作人,而不是鬼......'",
+      "next": "curse_breaking_success_trust",
       "effects": {
         "variables": {
-          "ghost_favor": 20,
-          "jade_merged": true,
-          "time_left": "-5"
+          "curse_break_method": "trust",
+          "perfect_ending": true
         }
       }
     },
-    "kneel_ghost": {
-      "type": "story",
-      "content": "你跪拜在石棺前，玉娘的鬼魂从棺中飘出，绕着你转了一圈。“你虽无恶意，但未解我执念，冥契仍在，你终究难逃一劫。”她的声音带着一丝惋惜。\n突然，她的面容变得狰狞：“不过，你这般恭敬，我可以让你死得痛快些！”",
-      "next": "ghost_kill",
-      "effects": {
-        "player": {
-          "hp": "-10"
-        }
-      }
-    },
-    "ghost_kill": {
+    "force_tear_contract": {
       "type": "end",
-      "content": "👻 玉娘的利爪刺穿了你的心脏，你在剧痛中死去。她吸走了你的魂魄，用来增强自己的怨气。\n“下一个......”古宅的唢呐声再次响起，等待着新的祭品。\n\n【试炼失败！】\n|【生命值-30】|【攻击-1】|【幸运-1】|",
+      "content": "你冲上前,强行撕毁婚书!但冥契发出刺眼的血光,一股力量将你击飞!\n'竟敢破坏冥契——!'\n玉娘的身体开始剧烈扭曲,她发出非人的尖叫,红绳疯狂收紧,勒断你的喉咙!\n手机屏幕闪烁:【试炼失败 · 强破冥契,反噬而亡】\n你的鲁莽激怒了冥契背后的力量,你付出了生命的代价......",
       "effects": {
         "player": {
-          "hp": "-30",
-          "attack": "-1",
-          "luck": "-1"
+          "hp": "-30"
         }
       }
     },
-    "run_cellar": {
-      "type": "story",
-      "content": "你转身就跑，玉娘的鬼魂在身后嘶吼：“敢闯我墓地，还想跑？”\n地窖的石阶突然消失，你掉进一片黑暗之中，无数只手从黑暗中伸出，抓住你的四肢，将你向深处拖拽。",
-      "next": "fall_dark",
-      "effects": {
-        "player": {
-          "hp": "-15"
-        }
-      }
-    },
-    "fall_dark": {
+    "wait_dawn": {
       "type": "end",
-      "content": "🌑 你被拖入无尽黑暗，永远迷失在阴曹地府的边缘。你的惨叫声成为了古宅新的“迎亲曲”，循环往复，永世不得安宁。\n\n【试炼失败！】\n|【生命值清零】|【防御-1】||",
+      "content": "你放弃破解,静静等待天明。玉娘看着你,眼中露出失望: '夫君,你......你不想帮我吗......?'\n你沉默不语。卯时五刻,鸡鸣响起,第一缕阳光透过窗棂照进堂屋。玉娘的身影在阳光中逐渐消散,她最后看了你一眼,眼中满是哀伤。\n手机屏幕闪烁:【试炼失败 · 放弃解脱,永困遗憾】\n你活下来了,但玉娘继续被囚禁在冥契之中......\n【获得成就:冷漠的旁观者】",
       "effects": {
         "player": {
-          "hp": "0",
-          "defense": "-1"
+          "exp": "+20"
         }
       }
     },
-    "final_choice": {
-      "type": "choice",
-      "content": "⏰ 时间仅剩{time_left}分钟！古宅开始剧烈摇晃，猩红烛光疯狂闪烁，女鬼的笑声近在耳边！\n你已集齐双玉（{has_token}/2）、日光镜（{has_mirror}）、替身血（{has_substitute}），并知晓解契咒（{clue_full}）。\n案上的冥契散发着刺眼红光，再不抉择将被永远困住！你决定？",
-      "options": [
-        {
-          "id": 1,
-          "text": "按照玉娘的指引，用双玉+日光镜+替身血+解契咒销毁冥契",
-          "next": "destroy_contract",
-          "conditions": {
-            "and": [
-              {"has_token": {"==": 2}},
-              {"has_mirror": {"==": true}},
-              {"has_substitute": {"==": true}},
-              {"clue_full": {"==": true}}
-            ]
-          }
-        },
-        {
-          "id": 2,
-          "text": "签署冥契，尝试与女鬼谈判",
-          "next": "negotiate_ghost",
-          "conditions": {
-            "ghost_favor": {">=": 10}
-          }
-        },
-        {
-          "id": 3,
-          "text": "放弃破解，拼命逃离古宅",
-          "next": "escape_attempt",
-          "effects": {
-            "variables": {
-              "taboo_broken": 2
-            }
-          }
-        },
-        {
-          "id": 4,
-          "text": "用现有道具强行对抗女鬼",
-          "next": "fight_ghost",
-          "conditions": {
-            "or": [
-              {"has_token": {">=": 1}},
-              {"has_mirror": {"==": true}},
-              {"has_substitute": {"==": true}}
-            ]
-          }
-        }
-      ]
-    },
-    "destroy_contract": {
+    "curse_breaking_success": {
       "type": "story",
-      "content": "你将双玉放在冥契两侧，举起日光镜对准烛光，聚起一道阳火。你打开替身血，洒在冥契上，同时念起解契咒：“双玉合璧，阳火焚契，替身避魂，怨气消散！”\n阳火接触到沾了替身血的冥契，瞬间燃起熊熊烈火，冥契上的朱砂字在火中扭曲、消失。\n“多谢你......”玉娘的声音变得温柔，她的鬼魂化作一道白光，消散在空气中。古宅的红光褪去，唢呐声停止，寒意消失。",
-      "next": "success_ending",
+      "content": "婚书燃烧殆尽,玉娘的身影变得透明。她微笑着看着你: '多谢夫君......我终于解脱了......'\n她的身体逐渐消散,化作点点光尘。红绳自动脱落,你的手腕上留下一个浅浅的绳印。\n手机屏幕闪烁:【冥契已破】\n周围的环境开始崩塌,古宅化作飞灰。你站在晨光中,耳边传来玉娘最后的声音: '若有来世......愿能再见......'\n阳光洒在身上,你发现自己回到了现实世界,左手腕上,那个绳印还在,提醒你这不是梦。",
+      "next": "end_success",
       "effects": {
         "variables": {
-          "contract_destroyed": true
+          "trial_success": true
         }
       }
     },
-    "negotiate_ghost": {
+    "curse_breaking_success_trust": {
       "type": "story",
-      "content": "你签署冥契，但没有被女鬼拖拽。“你帮我解了部分执念，我愿与你达成约定。”玉娘的鬼魂出现在你面前，面容已经恢复正常。\n“我不锁你魂魄，你需帮我完成一个心愿：将我的日记带出古宅，公之于众，让世人知道张家的恶行。”她递给你一枚玉佩，“这是阴婚信物，可保你平安离开。”",
-      "next": "negotiate_success",
+      "content": "玉娘亲手撕毁婚书,冥契瞬间破碎!她的身体化作温暖的白色光尘,包裹住你。你感到一阵暖流涌遍全身,所有的伤痛都被治愈。\n'谢谢你......'她的声音在你耳边响起,'我会记住你的......'\n光尘消散,你站在晨光中,左手腕上,绳印变成了一条细细的白色疤痕,像是一个纪念。\n手机屏幕闪烁:【冥契已破 · 完美结局】\n你不仅破解了冥契,还解开了玉娘百年的心结。她的执念化作祝福,留在了你的身体里。",
+      "next": "end_perfect",
       "effects": {
         "variables": {
-          "ghost_agreement": true
+          "trial_success": true,
+          "perfect_ending": true
         }
       }
     },
-    "negotiate_success": {
+    "end_success": {
       "type": "end",
-      "content": "🎎 你带着玉娘的日记离开古宅，午夜的古宅在你身后缓缓消失。你遵守承诺，将玉娘的遭遇公之于众，张家的恶行被揭露，得到了应有的惩罚。\n玉娘的玉佩一直护佑着你，让你免受阴邪之物侵扰。\n\n【试炼成功（妥协结局）！】\n\n获得奖励【经验值+88】【金币+70】【防御+1】",
+      "content": "☀️ 晨光破晓,你站在古宅外的空地上,身后是渐渐消散的废墟。你低头看左手腕,那个绳印还在,提醒你昨夜的经历不是梦。\n手机屏幕显示:【试炼成功 · 冥契破解】\n\n【奖励】:\n• 经验值+100\n• 金币+80\n• 敏捷+1\n• 幸运+1\n• 特殊物品:玉娘的祝福(佩戴时,鬼怪对你的敌意降低20%)\n\n你救了一个被困百年的冤魂,也证明了自己的勇气和智慧。红绳虽然脱落,但那段经历,将永远留在你的记忆里......",
       "effects": {
         "player": {
-          "exp": "+88",
-          "gold": "+70",
-          "defense": "+1"
-        }
-      }
-    },
-    "escape_attempt": {
-      "type": "story",
-      "content": "你冲向古宅大门，却发现大门已经消失，取而代之的是一面镜子，镜子里映出你扭曲的面容。“既然来了，就别想走！”女鬼的声音在你耳边响起，无数只手从镜子里伸出，抓住你的身体。",
-      "next": "escape_fail",
-      "effects": {
-        "player": {
-          "hp": "-12"
-        }
-      }
-    },
-    "escape_fail": {
-      "type": "end",
-      "content": "🔒 你被拖进镜子里，永远困在镜像世界，成为了古宅新的“守门人”。每当有新的闯入者，你就会化作怨魂，重复着当年玉娘的遭遇。\n\n【试炼失败！】\n|【生命值-22】|【敏捷-1】|",
-      "effects": {
-        "player": {
-          "hp": "-22",
-          "agility": "-1"
-        }
-      }
-    },
-    "fight_ghost": {
-      "type": "story",
-      "content": "你举起手中的道具，试图对抗女鬼。如果拿着双玉，玉佩发出的金光让女鬼后退半步；如果拿着日光镜，阳火灼烧着她的魂魄；如果拿着替身血，液体洒在她身上发出滋滋声。\n但单凭一件道具，无法彻底消灭她。“不自量力！”女鬼怒吼着，发动全力攻击你。",
-      "next": "fight_result",
-      "effects": {
-        "player": {
-          "hp": "-18"
-        }
-      }
-    },
-    "fight_result": {
-      "type": "end",
-      "content": "⚔️ 你拼尽全力抵抗，但女鬼的怨气太过强大。你被她打成重伤，魂魄受损，勉强逃出古宅，却留下了永久的后遗症。\n古宅的阴影一直笼罩着你，让你日夜不得安宁。\n\n【试炼失败（惨胜结局）！】\n|【生命值-28】|【攻击-1】|【防御-1】|",
-      "effects": {
-        "player": {
-          "hp": "-28",
-          "attack": "-1",
-          "defense": "-1"
-        }
-      }
-    },
-    "success_ending": {
-      "type": "end",
-      "content": "☀️ 古宅在阳火中逐渐消散，你站在晨光里，手中的双玉化作一道暖流，融入你的体内。玉娘的怨气彻底消散，你成功破解了阴婚陷阱，拯救了自己，也解脱了一个被困百年的冤魂。\n耳边传来玉娘最后的道谢声，带着释然与祝福。\n\n【试炼成功（完美结局）！】\n\n获得奖励【经验值+120】【金币+100】【攻击+1】【敏捷+1】\n\n循环游玩该试炼会被纳入黑名单",
-      "effects": {
-        "player": {
-          "exp": "+120",
-          "gold": "+100",
-          "attack": "+1",
-          "agility": "+1"
+          "exp": "+100",
+          "gold": "+80",
+          "agility": "+1",
+          "luck": "+1"
         },
         "variables": {
-          "trial_success": 1
+          "reward_obtained": true
+        }
+      }
+    },
+    "end_perfect": {
+      "type": "end",
+      "content": "☀️ 晨光温柔地洒在你身上,你站在古宅外,感到前所未有的轻松。左手腕上的白色疤痕,在阳光下闪着微光,像是一个守护的印记。\n手机屏幕显示:【试炼完美完成 · 冥契破解+执念解脱】\n\n【特殊奖励】:\n• 经验值+150\n• 金币+120\n• 敏捷+2\n• 幸运+2\n• 特殊物品:玉娘的守护(佩戴时,免疫部分鬼怪攻击,获得'鬼缘'称号)\n• 成就:【执念终结者】(与鬼魂交流时,好感度获取速度+50%)\n\n你不仅破解了冥契,还用信任和同理心,解开了玉娘百年的心结。她的执念化作祝福,永远守护着你。\n耳边传来玉娘最后的声音: '若有来世......愿能再见......'\n\n【完美结局达成】",
+      "effects": {
+        "player": {
+          "exp": "+150",
+          "gold": "+120",
+          "agility": "+2",
+          "luck": "+2"
+        },
+        "variables": {
+          "perfect_reward_obtained": true
         }
       }
     }

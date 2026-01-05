@@ -56,8 +56,8 @@
 - `achievement-system-guide.md` - 如何使用和扩展成就系统
 - `story-creation-guide.md` - 如何创建剧情（Story Engine使用指南）
 
-**已归档** (Feature Flag已移除):
-- `feature-flag-control.md` - 已过时（Feature Flag已全部删除，详见2025-12-02代码清理记录）
+**已删除** (Feature Flag已移除):
+- `feature-flag-control.md` - 已删除（Feature Flag已全部删除于2025-12-02）
 
 ### `/reference/` - 参考资料
 回答"X的具体定义是什么?":
@@ -77,12 +77,11 @@ LLM代理生成的调研和分析报告（仅保留系统分析和设计参考�
 
 **系统平衡与设计分析**:
 - `game_balance_analysis_2025_12_01.md` - 游戏平衡分析与漏洞修复报告 (2025-12-01)
-- `feature_flag_investigation_2025_12_02.md` - Feature Flag调查与架构决策记录 (2025-12-02)
-- `doc_cleanup_investigation.md` - 文档清理调研报告（元文档）
 - `achievement_enhancement_2025_12_03.md` - 成就系统增强与Bug修复记录 (2025-12-03)
 - `achievement_integration_fix_2025_12_05.md` - 成就系统关键路径集成修复实施记录 (2025-12-05)
 - `anniversary_achievement_2025_12_03.md` - 周年庆典成就系统工作记录 (2025-12-03)
 - `map_visualization_optimization_implementation_2025_12_03.md` - 地图可视化系统性能优化与视觉美化 (2025-12-03)
+- `doc_cleanup_analysis_2025_01_05.md` - 文档系统深度清理分析报告 (2025-01-05)
 
 **核心游戏系统优化**:
 - `cyberpunk_hacking_solvability_analysis.md` - cyberpunk_hacking序列生成可解性深度分析 (2025-12-04)
@@ -90,8 +89,6 @@ LLM代理生成的调研和分析报告（仅保留系统分析和设计参考�
 - `cyberpunk_hacking_hard_mode_investigation.md` - cyberpunk_hacking困难模式调查 (2025-12-04)
 
 **经济系统调研**:
-- `investment_system_investigation.md` - 投资系统初步调查报告（银行+股票）(2025-12-02)
-- `stock_system_files_investigation.md` - 投资系统文件清单调查 (2025-12-02)
 - `economy_gold_flow_investigation_2025_12_03.md` - 经济系统金币流动调查 (2025-12-03)
 - `material_scarcity_investigation_2025_12_03.md` - 材料稀缺性调查 (2025-12-03)
 
@@ -104,21 +101,18 @@ LLM代理生成的调研和分析报告（仅保留系统分析和设计参考�
 - `npc_cleanup_investigation.md` - NPC清单及服务功能分析报告
 
 **系统调研参考**:
-- `player_panel_investigation_2025_12_01.md` - 玩家面板系统调查 (2025-12-01)
-- `cultivation_and_quest_investigation.md` - 修炼与任务系统调查 (2025-12-01)
-- `code_logic_comparison_investigation.md` - 代码逻辑对比分析 (2025-12-02)
 - `single_player_bottleneck_investigation_2025_12_03.md` - 新手玩家单人可玩性瓶颈调研 (2025-12-03)
-- `single_player_systems_investigation_2025_12_03.md` - 单人可玩性系统调查 (2025-12-03)
-- `navigation_movement_investigation_2025_12_03.md` - 导航移动系统调查 (2025-12-03)
-- `task_system_location_investigation_2025_12_03.md` - 任务系统地点调查 (2025-12-03)
-- `map_visualization_optimization_investigation.md` - 地图可视化优化调查 (2025-12-03)
 
 **战斗系统Bug修复**:
 - `切磋战斗临时buff调查_2025_12_28.md` - 切磋战斗临时buff问题调查报告 (2025-12-28)
 - `切磋战斗临时buff修复_2025_12_28.md` - 切磋战斗临时buff属性加成修复记录 (2025-12-28)
-- `洗点丹逻辑验证_2025_12_28.md` - 洗点丹逻辑验证报告(已正确排除装备加成,防止利用装备以少换多) (2025-12-28)
 
-**清理说明**: 已删除29个临时性bug修复调查文档（2025-12-28清理9个：AI数据库查询、每日任务NPC匹配、公会炼丹房品质、抽奖奖励发放、留言板黑名单、面板命令、临时buff属性、股票退市调查、股票修复总结；2025-12-06清理9个；2025-12-03清理11个），这些问题均已解决且无长期参考价值。
+**清理说明**:
+- **2025-01-05**: 删除15个临时性和重复文档(元文档1个、过时指南1个、冗余设计2个、Bug修复临时文档2个、重复调查9个)
+- **2025-12-28**: 清理9个bug修复调查文档(AI数据库查询、每日任务NPC匹配、公会炼丹房品质、抽奖奖励发放、留言板黑名单、面板命令、临时buff属性、股票退市调查、股票修复总结)
+- **2025-12-06**: 清理9个bug修复调查文档
+- **2025-12-03**: 清理11个bug修复调查文档
+- 已归档Feature Flag调查和投资系统初版设计到archive目录
 
 ### `/design/` - 系统设计方案
 游戏设计和系统重构方案:
@@ -134,7 +128,7 @@ LLM代理生成的调研和分析报告（仅保留系统分析和设计参考�
 **投资系统反套利实施** (2025-12-02):
 - `investment_anti_arbitrage_redesign.md` - 反套利设计方案（最终方案，191行）
 - `investment_implementation_summary.md` - 实施总结（代码修改清单+部署指南，325行）
-- `investment_system_redesign_2025_12_02.md` - 初版设计方案（已被反套利方案取代）
+- ~~`investment_system_redesign_2025_12_02.md`~~ - 初版设计方案（已移至archive目录）
 
 ### `/archive/` - 历史文档归档
 已归档的历史调研报告和重构文档:
@@ -515,6 +509,24 @@ LLM代理生成的调研和分析报告（仅保留系统分析和设计参考�
 - ✅ 保留历史归档（追踪决策变化）
 - ❌ 删除一次性bug修复调查（问题已解决，无复现风险）
 - ❌ 删除重构过程、进度跟踪等临时性文档
+
+### 文档清理 (2025-01-05)
+
+**清理目标**: 精简文档系统,删除元文档、过时指南、冗余设计和重复调查文档
+
+**清理成果**:
+- 删除15个临时性和重复文档（约8,000行，占27%）:
+  - 元文档污染 (1个): doc_cleanup_investigation.md
+  - 过时指南 (1个): feature-flag-control.md
+  - 冗余设计 (2个): bank_system_redesign_2025_12_03.md, 洗点丹逻辑验证_2025_12_28.md, npc_accumulation_investigation_2025_12_30.md
+  - 重复调查 (9个): investment_system_investigation.md, stock_system_files_investigation.md, map_visualization_optimization_investigation.md, single_player_systems_investigation_2025_12_03.md, task_system_location_investigation_2025_12_03.md, navigation_movement_investigation_2025_12_03.md, player_panel_investigation_2025_12_01.md, cultivation_and_quest_investigation.md, code_logic_comparison_investigation.md, npc_cleanup_investigation.md
+- 归档2个历史文档: feature_flag_investigation_2025_12_02.md, investment_system_redesign_2025_12_02.md
+- `/agent/`目录从33个精简到19个(-42%)
+
+**预期效果**:
+- 文档总量减少27%，检索效率提升20-25%
+- 消除元文档污染和内容重复
+- 建立文档生命周期管理机制
 
 ---
 

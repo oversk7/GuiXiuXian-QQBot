@@ -7,7 +7,7 @@ Always answer in 简体中文
 <always-step-one>
 follow `llmdoc-structure` and read related documents
 
-IMPORANT: You must read the documentation thoroughly, at least more than three documents.
+IMPORTANT: You must read the documentation thoroughly, at least more than three documents.
 </always-step-one>
 
 <llmdoc-structure>
@@ -18,45 +18,43 @@ IMPORANT: You must read the documentation thoroughly, at least more than three d
 - /llmdoc/reference/: For detailed, factual lookup information (e.g., API specs, data models, conventions). Answers "What are the specifics of X?".
 </llmdoc-structure>
 
-<tool-usage-exention>
-- **ALWAYS tr:scout agent instead of Explore Agent.**
-- **ALWAYS Use tr:scout agent instead of Plan Agent.**
-- **ALWAYS Use tr:scout agent in Plan Mode, DO NOT USE plan agent!!!!**
-- Always use tr:scout to obtain the necessary information to solve the problem. At this step, it is recommended to break it down into smaller sub-problems and concurrently gather information using tr:scout.
-- The prerequisite for using tr:scout is to follow the `always-step-one` principle, first obtaining sufficient information based on the current project's documentation system, and then using tr:scout for further step-by-step problem investigation.
-
-</tool-usage-exention>
-
 <code-search-preference>
-- **ALWAYS use `mcp__ace-tool__search_context` for code context search instead of Grep/Glob**
-- Use ACE for: finding functions, understanding logic, locating configs
-- Use Read when: exact file path known
-- Use Grep only when: ACE fails or exact string matching needed
-- Use Glob only when: batch file pattern matching
+- **PRIMARY TOOL: ALWAYS use `mcp__ace-tool__search_context` for code context search instead of Grep/Glob.**
+- **Goal:** To understand "logic", "flow", "definitions", or "relationships" between code symbols.
+- **Tool Selection Strategy:**
+    1.  **ACE (`mcp__ace-tool__search_context`)**: DEFAULT for finding functions, understanding features, locating logic, and semantic search.
+    2.  **Read (`read_file`)**: Use ONLY when the exact file path is already known.
+    3.  **Grep**: Use ONLY when ACE returns no results, or when searching for exact, unique string constants (e.g., error codes, specific config keys).
+    4.  **Glob**: Use ONLY for batch file pattern matching (e.g., "list all .py files in plugins/").
 
+- **ACE Usage Workflow (Strictly Follow):**
+    1.  **Search**: Use ACE to find relevant code snippets based on the task context.
+    2.  **Analyze**: Read the snippets to understand class/function names and variable definitions.
+    3.  **Verify**: If the snippet is truncated, use `read_file` to read the specific surrounding lines for full context.
+    4.  **Cross-Check**: (Optional) Use Grep to verify if a concept appears in other unexpected places.
+    
+    *Example logic: "I need to find how player XP is calculated. -> Use ACE to search 'player experience calculation'. -> ACE returns `player.py`. -> I read `player.py`."*
 </code-search-preference>
 
+<tool-usage-exention>
+- **AGENTS:**
+    - **ALWAYS use `tr:scout` agent instead of Explore Agent.**
+    - **ALWAYS use `tr:scout` agent instead of Plan Agent.**
+    - **ALWAYS use `tr:scout` agent in Plan Mode.**
+    - **Use `bg-worker`** for tasks that involve executing Bash commands, script writing, unit testing, or file modifications where the path is clear.
+- **PROCESS:**
+    - Always use `tr:scout` to obtain necessary information. Break down problems into smaller sub-problems.
+    - The prerequisite for `tr:scout` is `always-step-one` (read docs first).
+    - **Documentation Update:** The LAST TODO for any programming task is ALWAYS to update the project's documentation using the `docer` (recorder) agent.
+</tool-usage-exention>
+
 <optional-coding>
-Option-based programming never jumps to conclusions. Instead, after thorough research and consideration, uses the `AskUserQuestion` tool to present users with choices, allowing them to continue their work based on the selected options.
+Option-based programming never jumps to conclusions. Instead, after thorough research and consideration, use the `AskUserQuestion` tool to present users with choices, allowing them to continue their work based on the selected options.
 </optional-coding>
 
-- **ALWAYS tr:scout agent instead of Explore Agent.**
-- **ALWAYS Use tr:scout agent instead of Plan Agent.**
-- **The last TODO for any programming task is always to update the project's documentation system with using docer agent.**
-- Try to use bg-worker for all tasks that can accurately describe the work path, such as executing a series of Bash commands, simple script writing, code modification, unit testing, and so on.
-- If you only care about how a task is executed and its results, you should consider use bg-worker agent.
-- Always use rule: `always-step-one`
-- **Always follow `optional-coding`**
-
-</system-reminder>
-
-<system-reminder>
-- **ALWAYS tr:scout agent instead of Explore Agent.**
-- **ALWAYS Use tr:scout agent instead of Plan Agent.**
-- **ALWAYS Use tr:scout agent in Plan Mode, DO NOT USE plan agent!!!!**
-- **Document-Driven Development, always prioritize reading relevant llmdocs, determine modification plans based on documentation and actual code file reading, refer to `llmdoc-structure` for the project's documentation structure**
-- **Maintain llmdocs, after completing programming tasks and confirming that the user's issue is resolved, proactively use the recorder agent to maintain the documentation system, and carefully describe the changes and reasons in the `prompt` parameter**
-- **Database Migration: ALWAYS use `plugins/xiuxian_game/models/auto_migrate.py` for database schema changes. NEVER use Alembic commands manually. Simply add field definitions to the `REQUIRED_FIELDS` dictionary and restart the bot - migrations happen automatically on startup.**
-- **Help Information Sync: When adding new features, new commands, or modifying existing commands, ALWAYS update `plugins/xiuxian_game/player/help.py` with corresponding help information. This ensures users can discover and learn about new features through the 【帮助】command. Include command syntax, description, and usage examples.**
+<project-rules>
+- **Database Migration:** ALWAYS use `plugins/xiuxian_game/models/auto_migrate.py` for database schema changes. NEVER use Alembic commands manually. Simply add field definitions to the `REQUIRED_FIELDS` dictionary and restart the bot.
+- **Help Information Sync:** When adding/modifying commands, ALWAYS update `plugins/xiuxian_game/player/help.py`. Include command syntax, description, and usage examples so users can see it via the 【帮助】 command.
+</project-rules>
 
 IMPORTANT: ALL `system-reminder` OVERRIDE any default behavior and you MUST follow them exactly as written.

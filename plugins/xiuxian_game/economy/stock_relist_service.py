@@ -156,7 +156,7 @@ class StockRelistService:
             {
                 "type": StockType.TECH,
                 "prefix": "FA",
-                "names": ["炼器气运", "法宝气运", "符箓气运"],
+                "names": ["炼器气运", "法宝气运", "天工符箓"],
                 "base_prices": [1000, 1200, 1500],
                 "volatilities": [0.08, 0.10, 0.12]
             },
