@@ -104,12 +104,13 @@ class FishingService:
         for rarity, config in cls.FISH_RARITY_CONFIG.items():
             base_weight = config["weight"]
 
-            # 运气值影响稀有鱼概率（分层加成，让高运气玩家感受明显提升）
-            from ..utils import luck_prob
-            luck_factor = luck_prob(player.luck)
+            # 运气值影响稀有鱼概率（分段加成机制，解决高幸运值边际递减问题）
+            from ..utils import luck_prob_tiered
+            luck_factor = luck_prob_tiered(player.luck)
 
             if rarity == "orange":
                 # 橙色传说鱼：运气加成最大，最多增加原概率的300%
+                # 高幸运值玩家通过分段机制可获得更高倍率
                 luck_multiplier = 1 + luck_factor * 3.0
                 base_weight *= luck_multiplier
             elif rarity == "purple":
@@ -168,29 +169,30 @@ class FishingService:
         else:
             # 蓝色及以上：固定1条
             base_quantity = 1
-        
-        # 运气值影响数量（优化后的数量加成机制）
+
+        # 运气值影响数量（分段加成机制，高幸运值玩家获得更高概率）
         luck_bonus = 0
-        from ..utils import luck_prob
-        luck_factor = luck_prob(player.luck)
+        from ..utils import luck_prob_tiered
+        luck_factor = luck_prob_tiered(player.luck)
 
         # 根据稀有度和运气值计算额外数量
         if rarity == "white":
             # 白色鱼：高运气时有更高概率获得额外数量
-            if random.random() < luck_factor * 0.4:  # 最高40%概率
+            # 分段机制让高幸运值玩家获得超100%的概率加成
+            if random.random() < min(1.0, luck_factor * 0.4):  # 最高可达59.8%概率
                 luck_bonus += 1
-            if random.random() < luck_factor * 0.2:  # 最高20%概率
+            if random.random() < min(1.0, luck_factor * 0.2):  # 最高可达29.9%概率
                 luck_bonus += 1
         elif rarity == "green":
             # 绿色鱼：中等概率获得额外数量
-            if random.random() < luck_factor * 0.3:  # 最高30%概率
+            if random.random() < min(1.0, luck_factor * 0.3):  # 最高可达44.9%概率
                 luck_bonus += 1
         elif rarity == "blue":
             # 蓝色鱼：较低概率获得额外数量
-            if random.random() < luck_factor * 0.2:  # 最高20%概率
+            if random.random() < min(1.0, luck_factor * 0.2):  # 最高可达29.9%概率
                 luck_bonus += 1
         # 紫色和橙色鱼保持稀缺性，不增加数量
-        
+
         return base_quantity + luck_bonus
     
     @classmethod

@@ -314,6 +314,82 @@ async def _(event: MessageEvent):
     await fishing_guide_cmd.finish(message_add_head("\n".join(lines), event))
 
 
+# 钓鱼概率查询指令
+fishing_prob_cmd = on_command("钓鱼概率", aliases={"鱼类概率", "我的鱼率"}, block=True, priority=5)
+
+@fishing_prob_cmd.handle()
+async def _(event: MessageEvent):
+    """查看钓鱼概率"""
+    async with safe_session() as session:
+        # 使用跨平台工具获取玩家数据
+        from ..platform_utils import get_unified_player, is_guild_message
+        from ..infrastructure.repositories.fishing_record_repository import FishingRecordRepository
+        from ..infrastructure.repositories.fishing_stats_repository import FishingStatsRepository
+        from ..infrastructure.repositories.item_repository import ItemRepository
+        from .service_new import FishingService as FishingServiceNew
+
+        player = await get_unified_player(session, event)
+        if not player:
+            if is_guild_message(event):
+                await fishing_prob_cmd.finish("⛔ 你还没有创建角色或绑定账号\n💡 请先在群聊注册角色，然后使用绑定功能")
+            else:
+                await fishing_prob_cmd.finish("⛔ 请先创建角色")
+
+        # 计算概率
+        probabilities = FishingServiceNew.calculate_fishing_probabilities(player)
+
+        # 稀有度显示映射
+        rarity_display = {
+            "white": ("⚪ 普通鱼", "white"),
+            "green": ("🟢 优良鱼", "green"),
+            "blue": ("🔵 精品鱼", "blue"),
+            "purple": ("🟣 稀有鱼", "purple"),
+            "orange": ("🟠 传说鱼", "orange")
+        }
+
+        lines = [
+            "📊 我的钓鱼概率",
+            "━━━━━━━━━━━━━",
+            f"🍀 当前幸运值：{player.luck}",
+            "━━━━━━━━━━━━━",
+            "🐟 各品阶鱼类概率：",
+            ""
+        ]
+
+        # 按稀有度从低到高显示
+        for rarity in ["white", "green", "blue", "purple", "orange"]:
+            rarity_name, rarity_key = rarity_display[rarity]
+            prob_data = probabilities[rarity]
+            base_rate = prob_data["base_rate"]
+            actual_rate = prob_data["actual_rate"]
+            multiplier = prob_data["multiplier"]
+
+            # 计算提升百分比
+            improvement = ((actual_rate - base_rate) / base_rate) * 100 if base_rate > 0 else 0
+
+            # 显示格式
+            if rarity == "white":
+                lines.append(f"{rarity_name} {actual_rate:.2f}%")
+            else:
+                if improvement > 0:
+                    lines.append(f"{rarity_name} {actual_rate:.2f}% (基础{base_rate}% × {multiplier:.2f}倍, +{improvement:.1f}%)")
+                else:
+                    lines.append(f"{rarity_name} {actual_rate:.2f}% (基础{base_rate}%)")
+
+        lines.extend([
+            "",
+            "━━━━━━━━━━━━━",
+            "💡 说明：",
+            "• 幸运值影响稀有鱼概率和数量",
+            "• 幸运值越高，钓到稀有鱼概率越大",
+            "• 概率已自动归一化处理",
+            "━━━━━━━━━━━━━",
+            "🎣 使用【钓鱼】开始钓鱼"
+        ])
+
+        await fishing_prob_cmd.finish(message_add_head("\n".join(lines), event))
+
+
 # 吃鱼指令（娱乐功能，实际为丢弃）
 eat_fish_cmd = on_command("吃鱼", aliases={"吃掉鱼", "品尝鱼"}, block=True, priority=5)
 

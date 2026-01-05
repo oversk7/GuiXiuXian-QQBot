@@ -155,7 +155,7 @@ def luck_prob(
     midpoint: float = 60,
     steepness: float = 30,
 ) -> float:
-    """根据 *Luck* 值返回 0‒1 之间的触发概率，符合“先稳后急再缓”的 S 型。
+    """根据 *Luck* 值返回 0‒1 之间的触发概率，符合"先稳后急再缓"的 S 型。
 
     参数
     ------
@@ -177,6 +177,66 @@ def luck_prob(
 
     # 理论上已在 (0,1) 内，这里做硬裁剪避免浮点误差
     return max(0.0, min(prob, 1.0))
+
+
+def luck_prob_tiered(luck_value: int | float) -> float:
+    """分段幸运概率函数 - 解决高幸运值边际递减问题
+
+    分段机制 (倍率模式):
+    - 0-149: 使用原Logistic曲线 (基础段,最大~0.997)
+    - 150-499: 基础 + 0.2倍率 = 最大~1.197
+    - 500-999: 基础 + 0.3倍率 = 最大~1.297
+    - 1000-1999: 基础 + 0.4倍率 = 最大~1.397
+    - 2000-2999: 基础 + 0.5倍率 = 最大~1.497
+    - 3000-4999: 基础 + 0.6倍率 = 最大~1.597
+    - 5000-7999: 基础 + 0.7倍率 = 最大~1.697
+    - 8000-9999: 基础 + 0.8倍率 = 最大~1.797
+    - 10000+: 基础 + 1.0倍率 = 最大~1.997 (传说段)
+
+    参数
+    ------
+    luck_value : int | float
+        玩家当前 Luck 值。
+
+    返回
+    ----
+    float
+        概率因子 (可以超过1.0,用于倍率计算)
+
+    示例
+    ----
+    >>> luck_prob_tiered(90)    # ~0.882 (基础段)
+    >>> luck_prob_tiered(150)   # ~1.197 (第2段)
+    >>> luck_prob_tiered(2000)  # ~1.497 (第5段)
+    >>> luck_prob_tiered(3000)  # ~1.597 (第6段)
+    >>> luck_prob_tiered(10000) # ~1.997 (第9段传说)
+    """
+    # 基础段 (原Logistic曲线)
+    base_prob = luck_prob(luck_value, midpoint=60, steepness=30)
+
+    # 分段额外加成 (9段制)
+    tier_bonus = 0.0
+
+    if luck_value >= 10000:
+        tier_bonus = 1.0  # 传说段
+    elif luck_value >= 8000:
+        tier_bonus = 0.8  # 第8段
+    elif luck_value >= 5000:
+        tier_bonus = 0.7  # 第7段
+    elif luck_value >= 3000:
+        tier_bonus = 0.6  # 第6段
+    elif luck_value >= 2000:
+        tier_bonus = 0.5  # 第5段
+    elif luck_value >= 1000:
+        tier_bonus = 0.4  # 第4段
+    elif luck_value >= 500:
+        tier_bonus = 0.3  # 第3段
+    elif luck_value >= 150:
+        tier_bonus = 0.2  # 第2段
+
+    # 组合: 基础概率 + 分段加成 (无上限,允许>1.0)
+    final_prob = base_prob + tier_bonus
+    return final_prob
 
 
 def damage_reduction_rate(defense: int | float) -> float:
