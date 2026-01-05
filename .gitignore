@@ -154,3 +154,4 @@ backups/
 
 # MySQL Migration - Temporary files
 scripts/.migrate_status
+.ace-tool/

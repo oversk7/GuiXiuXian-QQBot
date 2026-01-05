@@ -434,13 +434,14 @@ LLM代理生成的调研和分析报告（仅保留系统分析和设计参考�
 
 ### 面向LLM代理
 1. **优先读取 `/llmdoc/index.md`** (本文档) 建立全局认知
-2. **根据任务类型选择对应分类**:
+2. **代码上下文搜索优先使用ACE MCP**: 使用 `mcp__ace-tool__search_context` 进行语义搜索，而非Grep/Glob
+3. **根据任务类型选择对应分类**:
    - 理解项目 → `/overview/`
    - 了解实现 → `/architecture/`
    - 执行任务 → `/guides/`
    - 查阅细节 → `/reference/`
-3. **使用文件路径引用代码**: 格式 `path/to/file.ext:line-range`
-4. **避免复制大段代码**: 优先引用文件位置
+4. **使用文件路径引用代码**: 格式 `path/to/file.ext:line-range`
+5. **避免复制大段代码**: 优先引用文件位置
 
 ### 面向人类开发者
 1. 从 `/overview/project-overview.md` 开始了解项目

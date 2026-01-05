@@ -27,6 +27,15 @@ IMPORANT: You must read the documentation thoroughly, at least more than three d
 
 </tool-usage-exention>
 
+<code-search-preference>
+- **ALWAYS use `mcp__ace-tool__search_context` for code context search instead of Grep/Glob**
+- Use ACE for: finding functions, understanding logic, locating configs
+- Use Read when: exact file path known
+- Use Grep only when: ACE fails or exact string matching needed
+- Use Glob only when: batch file pattern matching
+
+</code-search-preference>
+
 <optional-coding>
 Option-based programming never jumps to conclusions. Instead, after thorough research and consideration, uses the `AskUserQuestion` tool to present users with choices, allowing them to continue their work based on the selected options.
 </optional-coding>
