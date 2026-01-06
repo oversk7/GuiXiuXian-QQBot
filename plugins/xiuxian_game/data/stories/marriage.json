@@ -1,6 +1,6 @@
 {
   "id": "冥契红绳",
-  "title": "冥契·红绳",
+  "title": "冥契红绳",
   "description": "手腕上的红绳在午夜勒紧,你睁开眼,发现自己跪在一间百年古宅的堂前。案上摆着朱砂笔和婚书,背后传来女子幽幽的叹息: '既系红绳,便是夫妻,为何还不签呢?'",
   "start_node": "start",
   "nodes": {
@@ -14,7 +14,9 @@
           "obsession_shards": 0,
           "has_knowledge": false,
           "trust_yuniang": 0,
-          "explored_areas": [],
+          "explored_water_jar": false,
+          "explored_dead_tree": false,
+          "explored_table": false,
           "deaths": 0
         }
       }
@@ -248,13 +250,13 @@
           "text": "后院水缸 - 可能藏有水相关线索",
           "next": "explore_water_jar",
           "conditions": {
-            "explored_areas": {
-              "!=": "water_jar"
+            "explored_water_jar": {
+              "==": false
             }
           },
           "effects": {
             "variables": {
-              "explored_areas": "water_jar"
+              "explored_water_jar": true
             }
           }
         },
@@ -263,13 +265,13 @@
           "text": "枯树之下 - 可能藏有土相关线索",
           "next": "explore_dead_tree",
           "conditions": {
-            "explored_areas": {
-              "!=": "dead_tree"
+            "explored_dead_tree": {
+              "==": false
             }
           },
           "effects": {
             "variables": {
-              "explored_areas": "dead_tree"
+              "explored_dead_tree": true
             }
           }
         },
@@ -278,13 +280,13 @@
           "text": "堂内八仙桌 - 检查账簿和物品",
           "next": "explore_table",
           "conditions": {
-            "explored_areas": {
-              "!=": "table"
+            "explored_table": {
+              "==": false
             }
           },
           "effects": {
             "variables": {
-              "explored_areas": "table"
+              "explored_table": true
             }
           }
         },
@@ -295,6 +297,11 @@
           "conditions": {
             "trust_yuniang": {
               ">=": 1
+            }
+          },
+          "effects": {
+            "variables": {
+              "talked_to_yuniang": true
             }
           }
         },
@@ -560,9 +567,15 @@
           "id": 1,
           "text": "询问她的过去: '你还记得生前的事吗?'",
           "next": "yuniang_past",
+          "conditions": {
+            "asked_past": {
+              "==": false
+            }
+          },
           "effects": {
             "variables": {
-              "trust_yuniang": "+2"
+              "trust_yuniang": "+2",
+              "asked_past": true
             }
           }
         },
@@ -573,6 +586,14 @@
           "conditions": {
             "trust_yuniang": {
               ">=": 3
+            },
+            "asked_break_method": {
+              "==": false
+            }
+          },
+          "effects": {
+            "variables": {
+              "asked_break_method": true
             }
           }
         },
@@ -580,9 +601,15 @@
           "id": 3,
           "text": "表达同情: '你一定很痛苦吧'",
           "next": "comfort_yuniang",
+          "conditions": {
+            "comforted_yuniang": {
+              "==": false
+            }
+          },
           "effects": {
             "variables": {
-              "trust_yuniang": "+3"
+              "trust_yuniang": "+3",
+              "comforted_yuniang": true
             }
           }
         },
@@ -729,7 +756,41 @@
     },
     "end_success": {
       "type": "end",
-      "content": "☀️ 晨光破晓,你站在古宅外的空地上,身后是渐渐消散的废墟。你低头看左手腕,那个绳印还在,提醒你昨夜的经历不是梦。\n手机屏幕显示:【试炼成功 · 冥契破解】\n\n【奖励】:\n• 经验值+100\n• 金币+80\n• 敏捷+1\n• 幸运+1\n• 特殊物品:玉娘的祝福(佩戴时,鬼怪对你的敌意降低20%)\n\n你救了一个被困百年的冤魂,也证明了自己的勇气和智慧。红绳虽然脱落,但那段经历,将永远留在你的记忆里......",
+      "content": "☀️ 晨光破晓,你站在古宅外的空地上,身后是渐渐消散的废墟。你低头看左手腕,那个绳印还在,提醒你昨夜的经历不是梦。\n手机屏幕显示:【试炼成功 · 冥契破解】\n\n{reward_text}\n你救了一个被困百年的冤魂,也证明了自己的勇气和智慧。红绳虽然脱落,但那段经历,将永远留在你的记忆里......",
+      "next": "check_first_completion",
+      "effects": {
+        "variables": {
+          "trial_success": true
+        }
+      }
+    },
+    "end_perfect": {
+      "type": "end",
+      "content": "☀️ 晨光温柔地洒在你身上,你站在古宅外,感到前所未有的轻松。左手腕上的白色疤痕,在阳光下闪着微光,像是一个守护的印记。\n手机屏幕显示:【试炼完美完成 · 冥契破解+执念解脱】\n\n{reward_text}\n你不仅破解了冥契,还用信任和同理心,解开了玉娘百年的心结。她的执念化作祝福,永远守护着你。\n耳边传来玉娘最后的声音: '若有来世......愿能再见......'\n\n【完美结局达成】",
+      "next": "check_first_perfect_completion",
+      "effects": {
+        "variables": {
+          "trial_success": true,
+          "perfect_ending": true
+        }
+      }
+    },
+    "check_first_completion": [
+      {
+        "if": {
+          "reward_obtained": {
+            "==": false
+          }
+        },
+        "goto": "end_success_first_time"
+      },
+      {
+        "goto": "end_success_repeat"
+      }
+    ],
+    "end_success_first_time": {
+      "type": "end",
+      "content": "☀️ 晨光破晓,你站在古宅外的空地上,身后是渐渐消散的废墟。你低头看左手腕,那个绳印还在,提醒你昨夜的经历不是梦。\n手机屏幕显示:【试炼成功 · 冥契破解】\n\n【奖励】:\n• 经验值+100\n• 金币+80\n• 敏捷+1\n• 幸运+1\n\n你救了一个被困百年的冤魂,也证明了自己的勇气和智慧。红绳虽然脱落,但那段经历,将永远留在你的记忆里......",
       "effects": {
         "player": {
           "exp": "+100",
@@ -742,9 +803,26 @@
         }
       }
     },
-    "end_perfect": {
+    "end_success_repeat": {
       "type": "end",
-      "content": "☀️ 晨光温柔地洒在你身上,你站在古宅外,感到前所未有的轻松。左手腕上的白色疤痕,在阳光下闪着微光,像是一个守护的印记。\n手机屏幕显示:【试炼完美完成 · 冥契破解+执念解脱】\n\n【特殊奖励】:\n• 经验值+150\n• 金币+120\n• 敏捷+2\n• 幸运+2\n• 特殊物品:玉娘的守护(佩戴时,免疫部分鬼怪攻击,获得'鬼缘'称号)\n• 成就:【执念终结者】(与鬼魂交流时,好感度获取速度+50%)\n\n你不仅破解了冥契,还用信任和同理心,解开了玉娘百年的心结。她的执念化作祝福,永远守护着你。\n耳边传来玉娘最后的声音: '若有来世......愿能再见......'\n\n【完美结局达成】",
+      "content": "☀️ 晨光破晓,你站在古宅外的空地上,身后是渐渐消散的废墟。你低头看左手腕,那个绳印还在,提醒你昨夜的经历不是梦。\n手机屏幕显示:【试炼成功 · 冥契破解】\n\n⚠️ 你已通关过此试炼,不再获得奖励。\n你救了一个被困百年的冤魂,也证明了自己的勇气和智慧。红绳虽然脱落,但那段经历,将永远留在你的记忆里......"
+    },
+    "check_first_perfect_completion": [
+      {
+        "if": {
+          "perfect_reward_obtained": {
+            "==": false
+          }
+        },
+        "goto": "end_perfect_first_time"
+      },
+      {
+        "goto": "end_perfect_repeat"
+      }
+    ],
+    "end_perfect_first_time": {
+      "type": "end",
+      "content": "☀️ 晨光温柔地洒在你身上,你站在古宅外,感到前所未有的轻松。左手腕上的白色疤痕,在阳光下闪着微光,像是一个守护的印记。\n手机屏幕显示:【试炼完美完成 · 冥契破解+执念解脱】\n\n【特殊奖励】:\n• 经验值+150\n• 金币+120\n• 敏捷+2\n• 幸运+2\n• 成就:【执念终结者】(与鬼魂交流时,好感度获取速度+50%)\n\n你不仅破解了冥契,还用信任和同理心,解开了玉娘百年的心结。她的执念化作祝福,永远守护着你。\n耳边传来玉娘最后的声音: '若有来世......愿能再见......'\n\n【完美结局达成】",
       "effects": {
         "player": {
           "exp": "+150",
@@ -756,6 +834,10 @@
           "perfect_reward_obtained": true
         }
       }
+    },
+    "end_perfect_repeat": {
+      "type": "end",
+      "content": "☀️ 晨光温柔地洒在你身上,你站在古宅外,感到前所未有的轻松。左手腕上的白色疤痕,在阳光下闪着微光,像是一个守护的印记。\n手机屏幕显示:【试炼完美完成 · 冥契破解+执念解脱】\n\n⚠️ 你已通关过此试炼,不再获得奖励。\n你不仅破解了冥契,还用信任和同理心,解开了玉娘百年的心结。她的执念化作祝福,永远守护着你。\n耳边传来玉娘最后的声音: '若有来世......愿能再见......'\n\n【完美结局达成】"
     }
   }
 }
