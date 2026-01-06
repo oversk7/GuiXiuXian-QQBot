@@ -778,14 +778,18 @@
     "check_first_completion": [
       {
         "if": {
-          "reward_obtained": {
-            "==": false
-          }
+          "or": [
+            {
+              "player_completed_trials": {
+                "contains": "冥契红绳"
+              }
+            }
+          ]
         },
-        "goto": "end_success_first_time"
+        "goto": "end_success_repeat"
       },
       {
-        "goto": "end_success_repeat"
+        "goto": "end_success_first_time"
       }
     ],
     "end_success_first_time": {
@@ -797,9 +801,6 @@
           "gold": "+80",
           "agility": "+1",
           "luck": "+1"
-        },
-        "variables": {
-          "reward_obtained": true
         }
       }
     },
@@ -810,14 +811,18 @@
     "check_first_perfect_completion": [
       {
         "if": {
-          "perfect_reward_obtained": {
-            "==": false
-          }
+          "or": [
+            {
+              "player_completed_trials": {
+                "contains": "冥契红绳_完美"
+              }
+            }
+          ]
         },
-        "goto": "end_perfect_first_time"
+        "goto": "end_perfect_repeat"
       },
       {
-        "goto": "end_perfect_repeat"
+        "goto": "end_perfect_first_time"
       }
     ],
     "end_perfect_first_time": {

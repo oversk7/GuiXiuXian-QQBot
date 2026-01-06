@@ -75,6 +75,7 @@ class Player(Base):
     
     last_sign: Mapped[datetime] = mapped_column(DateTime, nullable=True, comment="上次签到日期")
     sign_streak: Mapped[int] = mapped_column(Integer, default=0, server_default='0', comment="连续签到天数")
+    completed_trials: Mapped[str | None] = mapped_column(Text, nullable=True, comment="已通关的试炼列表(JSON数组)")
     created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now(), comment="创建时间")
     last_cultivation: Mapped[datetime] = mapped_column(DateTime, nullable=True, comment="上次修炼时间")
 
@@ -96,6 +97,28 @@ class Player(Base):
             return f"{self.dungeon_level or 0}层诡域"
         else:
             return "大都会"
+
+    def get_completed_trials(self) -> list:
+        """获取已通关的试炼列表"""
+        import json
+        if self.completed_trials:
+            try:
+                return json.loads(self.completed_trials)
+            except:
+                return []
+        return []
+
+    def is_trial_completed(self, trial_id: str) -> bool:
+        """检查指定试炼是否已通关"""
+        return trial_id in self.get_completed_trials()
+
+    def add_completed_trial(self, trial_id: str):
+        """记录试炼通关"""
+        import json
+        completed = self.get_completed_trials()
+        if trial_id not in completed:
+            completed.append(trial_id)
+            self.completed_trials = json.dumps(completed, ensure_ascii=False)
 
     def enter_dungeon(self, level: int):
         """进入指定层级诡域"""

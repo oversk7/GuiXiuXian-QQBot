@@ -52,10 +52,9 @@ REQUIRED_FIELDS: Dict[str, Dict[str, str]] = {
     "location": {
         "expires_at": "DATETIME NULL COMMENT '过期时间（临时地点自动删除）'",
     },
-    # 未来需要添加更多字段时，直接在这里添加即可
-    # "player": {
-    #     "new_field": "VARCHAR(100) NULL COMMENT '新字段说明'",
-    # },
+    "player": {
+        "completed_trials": "TEXT NULL COMMENT '已通关的试炼列表(JSON数组,如[\"冥契红绳\",\"灵异拼图\"])'",
+    },
 }
 
 

@@ -95,7 +95,20 @@ class StoryEngine:
                 if key.startswith("player_"):
                     # 玩家属性检查
                     attr_name = key[7:]  # 去掉 "player_" 前缀
-                    player_value = getattr(player, attr_name, 0)
+
+                    # 特殊处理 completed_trials
+                    if attr_name == "completed_trials":
+                        import json
+                        completed_trials = player.get_completed_trials()
+                        # 检查是否包含指定的试炼ID
+                        if "contains" in check:
+                            required_id = check["contains"]
+                            player_value = required_id in completed_trials
+                        else:
+                            player_value = completed_trials
+                    else:
+                        player_value = getattr(player, attr_name, 0)
+
                     if not self._check_value(player_value, check):
                         return False
                 elif key.startswith("story_"):
@@ -201,6 +214,15 @@ class StoryEngine:
     async def apply_special_effects(self, effects: Dict[str, Any], player: Player, variables: Dict[str, Any], session: AsyncSession) -> Tuple[Player, Dict[str, Any], str]:
         """应用特殊效果，如首次试炼奖励"""
         reward_message = ""
+
+        # 处理试炼通关记录
+        if "trial_success" in effects and effects["trial_success"]:
+            story_id = variables.get("current_story_id", "")
+            if story_id:
+                # 检查是否完美结局
+                is_perfect = variables.get("perfect_ending", False)
+                trial_id = f"{story_id}_完美" if is_perfect else story_id
+                player.add_completed_trial(trial_id)
 
         # 处理首次试炼奖励
         if "first_trial_reward" in effects and effects["first_trial_reward"]:

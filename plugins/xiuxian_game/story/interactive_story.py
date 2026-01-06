@@ -88,6 +88,9 @@ async def handle_start_story(event: MessageEvent, args: Message = CommandArg()):
         story_session = await StorySession.create_session(
             session, player.id, story_id, story.get("start_node", "start")
         )
+
+        # 记录story_id到variables,用于通关记录
+        story_session.set_variable("current_story_id", story_id)
         
         # 获取起始节点
         current_node = story_engine.get_current_node(story_session, player)
