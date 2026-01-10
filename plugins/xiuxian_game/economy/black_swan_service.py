@@ -118,6 +118,14 @@ class BlackSwanService:
             affected_type = event_config['affected_type']
             session = self.stock_repo._session  # 使用_session而不是session
 
+            # 先查询所有活跃气运,用于调试
+            all_stocks_stmt = select(Stock).where(Stock.is_active == True)
+            all_stocks_result = await session.execute(all_stocks_stmt)
+            all_stocks = all_stocks_result.scalars().all()
+
+            logger.debug(f"   🔍 查找类型 {affected_type} 的气运")
+            logger.debug(f"   📊 当前活跃气运类型: {[s.stock_type for s in all_stocks]}")
+
             stmt = (
                 select(Stock)
                 .where(
@@ -132,6 +140,7 @@ class BlackSwanService:
 
             if not affected_stocks:
                 logger.warning(f"未找到类型为 {affected_type} 的活跃气运")
+                logger.warning(f"可用的气运类型: {set(s.stock_type for s in all_stocks)}")
                 return None
 
             # 随机选择一只气运作为主要受影响对象
