@@ -137,11 +137,14 @@ settings:
   enabled: true
 
   # 同一类型气运的事件冷却期（天）- 缩短冷却期让事件更频繁
-  cooldown_days: 3
+  cooldown_days: 1  # 缩短为1天,让事件更频繁
 
   # 全局触发概率调整系数（1.0=正常，0.5=减半，2.0=翻倍）
-  # 设置为1.5倍，让事件触发更频繁
-  global_probability_multiplier: 1.5
+  # 设置为3.0倍，大幅提高触发概率
+  global_probability_multiplier: 3.0
+
+  # 调试模式: 启用后每次检查必定触发至少一个事件
+  debug_mode: false
 
   # 是否群公告通知
   enable_group_broadcast: true

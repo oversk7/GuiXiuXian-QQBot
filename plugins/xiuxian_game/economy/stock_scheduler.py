@@ -68,18 +68,17 @@ async def setup_stock_scheduler():
         if existing_black_swan_job:
             logger.info("⚠️ 黑天鹅事件定时任务已存在，跳过设置")
         else:
-            # 添加每周黑天鹅事件检查（每周一凌晨执行）
+            # 添加每日黑天鹅事件检查（每天凌晨2点执行）- 提高触发频率
             scheduler.add_job(
                 func=perform_weekly_black_swan_check,
                 trigger="cron",
-                day_of_week="mon",
-                hour=0,  # 每周一凌晨0点执行
+                hour=2,  # 每天凌晨2点执行（避开其他任务）
                 id="stock_weekly_black_swan",
                 replace_existing=True,
                 max_instances=1,
                 coalesce=True,
             )
-            logger.info("✅ 黑天鹅事件定时任务已设置 - 每周一凌晨执行")
+            logger.info("✅ 黑天鹅事件定时任务已设置 - 每天凌晨2点执行")
 
         if existing_relist_job:
             logger.info("⚠️ 股票重新上市检查定时任务已存在，跳过设置")

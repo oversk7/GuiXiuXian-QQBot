@@ -36,20 +36,30 @@ class BlackSwanService:
         config = self._load_config()
 
         if not config['settings'].get('enabled', False):
-            logger.info("黑天鹅事件系统已禁用")
+            logger.info("⚠️ 黑天鹅事件系统已禁用")
             return []
+
+        logger.info("🦢 开始检查黑天鹅事件...")
+        logger.info(f"   - 全局概率倍率: {config['settings'].get('global_probability_multiplier', 1.0)}x")
+        logger.info(f"   - 冷却期: {config['settings'].get('cooldown_days', 7)}天")
+        logger.info(f"   - 可用事件数量: {len(config['events'])}个")
 
         triggered_events = []
         global_multiplier = config['settings'].get('global_probability_multiplier', 1.0)
         cooldown_days = config['settings'].get('cooldown_days', 7)
 
         for event_config in config['events']:
+            # 计算实际概率
+            actual_probability = event_config['probability'] * global_multiplier
+            logger.debug(f"   检查事件: {event_config['name']} (概率: {actual_probability:.2%})")
+
             # 检查是否应该触发
             if await self._should_trigger_event(event_config, global_multiplier, cooldown_days):
                 triggered_event = await self._trigger_event(event_config)
                 if triggered_event:
                     triggered_events.append(triggered_event)
 
+        logger.info(f"🦢 黑天鹅事件检查完成: 触发了 {len(triggered_events)} 个事件")
         return triggered_events
 
     async def _should_trigger_event(
@@ -61,9 +71,16 @@ class BlackSwanService:
         """判断是否应该触发事件"""
         # 计算实际触发概率
         probability = event_config['probability'] * global_multiplier
+        roll = random.random()
+
+        logger.debug(
+            f"   🎲 概率判定: {event_config['name']} - "
+            f"需要 {probability:.2%}, 随出 {roll:.2%}"
+        )
 
         # 随机判断
-        if random.random() > probability:
+        if roll > probability:
+            logger.debug(f"   ❌ {event_config['name']} 未通过概率判定")
             return False
 
         # 检查冷却期（同一类型气运的事件不能在冷却期内重复触发）

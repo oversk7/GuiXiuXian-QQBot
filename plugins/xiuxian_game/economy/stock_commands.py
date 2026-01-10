@@ -39,6 +39,7 @@ stock_history_cmd = on_command("气运历史", aliases={"价格历史"}, block=T
 stock_analysis_cmd = on_command("气运分析", aliases={"投资分析"}, block=True, priority=5)
 stock_init_cmd = on_command("初始化气运", block=True, priority=5, permission=SUPERUSER)
 stock_update_cmd = on_command("更新气运价格", aliases={"刷新气运价格"}, block=True, priority=5, permission=SUPERUSER)
+stock_trigger_black_swan_cmd = on_command("触发黑天鹅", block=True, priority=5, permission=SUPERUSER)  # 新增: 手动触发黑天鹅事件
 stock_events_cmd = on_command("气运事件", aliases={"市场事件", "黑天鹅事件"}, block=True, priority=5)
 
 
@@ -871,6 +872,60 @@ async def handle_check_relist(event: MessageEvent):
     except Exception as e:
         error_msg = f"❌ 检查重新上市失败: {str(e)}"
         await stock_check_relist_cmd.finish(error_msg)
+
+
+@stock_trigger_black_swan_cmd.handle()
+async def handle_trigger_black_swan(event: MessageEvent):
+    """手动触发黑天鹅事件检查（管理员命令）"""
+    try:
+        from ..infrastructure.uow.unit_of_work import UnitOfWork
+        from ..models.db import AsyncSessionLocal
+        from .black_swan_service import BlackSwanService
+
+        def session_factory():
+            return AsyncSessionLocal()
+
+        async with UnitOfWork(session_factory) as uow:
+            black_swan_service = BlackSwanService(
+                stock_repo=uow.stocks,
+                stock_event_repo=uow.stock_events
+            )
+
+            triggered_events = await black_swan_service.check_and_trigger_events()
+            await uow.commit()
+
+        # 构建返回消息
+        lines = [
+            "🦢 黑天鹅事件检查完成",
+            "━━━━━━━━━━━━━",
+        ]
+
+        if triggered_events:
+            lines.append(f"✅ 触发了 {len(triggered_events)} 个事件:")
+            for evt in triggered_events:
+                lines.append("")
+                lines.append(f"⚡ {evt['event_name']}")
+                lines.append(f"   📊 受影响气运: {evt['stock_name']} ({evt['stock_symbol']})")
+                lines.append(f"   💰 价格: {evt['old_price']:,.0f} → {evt['new_price']:,.0f} ({evt['price_impact']*100:+.1f}%)")
+                lines.append(f"   ❤️  健康度: {evt['health_impact']:+d}")
+
+                if evt['is_delisted']:
+                    lines.append(f"   ⚠️  {evt['stock_name']} 已退市!")
+        else:
+            lines.append("ℹ️  本次未触发任何事件")
+            lines.append("")
+            lines.append("💡 提示: 事件触发基于概率配置")
+            lines.append("   可在 data/black_swan_events.yaml 中调整")
+
+        result_msg = "\n".join(lines)
+        result_msg = message_add_head(event, result_msg)
+        await stock_trigger_black_swan_cmd.finish(result_msg)
+
+    except Exception as e:
+        import traceback
+        error_msg = f"❌ 触发黑天鹅事件失败: {str(e)}\n\n{traceback.format_exc()}"
+        await stock_trigger_black_swan_cmd.finish(error_msg)
+
 
 
 
