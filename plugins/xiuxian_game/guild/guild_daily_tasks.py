@@ -30,5 +30,8 @@ class GuildDailyTasks:
 
         if generated > 0:
             result["message"] = f"丹房产出了{generated}个新丹药！"
+        elif generated == -1:
+            # 存储已满的特殊提示
+            result["message"] = "⚠️ 丹房存储已满,请先兑换一些丹药"
 
         return result

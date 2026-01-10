@@ -1306,16 +1306,20 @@ async def handle_guild_alchemy(event: MessageEvent):
 
         if not productions:
             msg = f"🧪 公会『{guild.name}』丹房\n━━━━━━━━━━\n暂无可兑换的丹药"
-            # 如果有新产出，显示提示
+            # 如果有新产出或存储已满，显示提示
             if refresh_result["alchemy_generated"] > 0:
                 msg += f"\n✨ {refresh_result['message']}"
+            elif refresh_result["alchemy_generated"] == -1:
+                msg += f"\n{refresh_result['message']}"
         else:
             lines = [f"🧪 公会『{guild.name}』丹房", "━━━━━━━━━━"]
             lines.append(f"💰 你的积分：{player.gold2}")
 
-            # 如果有新产出，显示提示
+            # 如果有新产出或存储已满，显示提示
             if refresh_result["alchemy_generated"] > 0:
                 lines.append(f"✨ {refresh_result['message']}")
+            elif refresh_result["alchemy_generated"] == -1:
+                lines.append(f"{refresh_result['message']}")
 
             lines.append("━━━━━━━━━━")
 

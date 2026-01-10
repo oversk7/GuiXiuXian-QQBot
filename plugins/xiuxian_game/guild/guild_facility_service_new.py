@@ -75,6 +75,24 @@ class GuildFacilityService:
         ]
     }
 
+    # 跨池产出配置：高级品质池可以产出低级池的热门丹药
+    # 格式: {"当前品质": {"包含品质": 权重百分比(0-100)}}
+    # 例如: "master"可以产出30%的advanced丹药
+    CROSS_POOL_CONFIG = {
+        "master": {
+            "advanced": 25,  # 25%概率产出advanced池丹药(含虚眼丹等)
+            "current": 75   # 75%概率产出master池丹药
+        },
+        "legendary": {
+            "master": 20,    # 20%概率产出master池丹药
+            "advanced": 15,  # 15%概率产出advanced池丹药(含虚眼丹等)
+            "current": 65    # 65%概率产出legendary池丹药
+        }
+    }
+
+    # 丹房存储上限配置（按日产量倍数）
+    STORAGE_CAPACITY_MULTIPLIER = 3  # 存储上限 = 日产量 * 3
+
     def __init__(
         self,
         guild_repo: GuildRepository,
@@ -362,6 +380,81 @@ class GuildFacilityService:
 
         return True, f"成功兑换{item_name}×{quantity}，消耗{total_points_cost}积分"
 
+    async def get_alchemy_storage_capacity(self, guild_id: int) -> int:
+        """
+        获取丹房存储上限
+
+        Args:
+            guild_id: 公会ID
+
+        Returns:
+            存储上限数量
+
+        对应原代码:
+            新增功能
+        """
+        alchemy_building = await self._building_repo.get_by_guild_and_type(
+            guild_id, BuildingType.ALCHEMY_ROOM
+        )
+
+        if not alchemy_building:
+            return 0
+
+        building_service = GuildBuildingServiceNew(
+            self._guild_repo, self._building_repo, self._item_repo
+        )
+        config_dict = building_service.BUILDING_CONFIGS[BuildingType.ALCHEMY_ROOM]
+        effects = config_dict["effects"][alchemy_building.level]
+        daily_production = effects["daily_production"]
+
+        # 存储上限 = 日产量 * 倍数
+        return daily_production * self.STORAGE_CAPACITY_MULTIPLIER
+
+    async def get_alchemy_storage_used(self, guild_id: int) -> int:
+        """
+        获取丹房当前已使用的存储空间
+
+        Args:
+            guild_id: 公会ID
+
+        Returns:
+            已使用的存储数量
+
+        对应原代码:
+            新增功能
+        """
+        unclaimed_productions = await self._alchemy_production_repo.get_unclaimed_productions(guild_id)
+        return len(unclaimed_productions)
+
+    def _select_pill_pool(self, primary_quality: str) -> str:
+        """
+        根据跨池配置选择实际使用的丹药池
+
+        Args:
+            primary_quality: 主要品质(如"master", "legendary")
+
+        Returns:
+            实际使用的丹药池品质
+
+        对应原代码:
+            新增功能
+        """
+        # 检查是否有跨池配置
+        cross_pool_config = self.CROSS_POOL_CONFIG.get(primary_quality)
+        if not cross_pool_config:
+            return primary_quality
+
+        # 按权重随机选择池
+        rand_value = random.randint(1, 100)
+        current_percentage = 0
+
+        for pool_quality, percentage in cross_pool_config.items():
+            current_percentage += percentage
+            if rand_value <= current_percentage:
+                return pool_quality if pool_quality != "current" else primary_quality
+
+        return primary_quality
+
     async def generate_daily_alchemy_production(self, guild_id: int) -> int:
         """
         生成每日丹房产出
@@ -386,6 +479,13 @@ class GuildFacilityService:
         daily_production = effects["daily_production"]
         pill_quality = effects["pill_quality"]
 
+        # 检查存储空间
+        storage_capacity = await self.get_alchemy_storage_capacity(guild_id)
+        storage_used = await self.get_alchemy_storage_used(guild_id)
+
+        if storage_used >= storage_capacity:
+            return -1  # 存储已满,返回特殊值
+
         # 检查今日是否已生成
         today = date.today()
         today_count = await self._alchemy_production_repo.get_today_production_count(guild_id, today)
@@ -394,12 +494,15 @@ class GuildFacilityService:
             return 0  # 今日已生成足够数量
 
         # 生成丹药
-        pills_to_generate = daily_production - today_count
+        pills_to_generate = min(daily_production - today_count, storage_capacity - storage_used)
         generated_count = 0
 
         for _ in range(pills_to_generate):
+            # 根据跨池配置选择实际使用的丹药池
+            actual_pill_quality = self._select_pill_pool(pill_quality)
+
             # 根据品质随机选择丹药
-            pill_pool = self.ALCHEMY_PILLS.get(pill_quality, [])
+            pill_pool = self.ALCHEMY_PILLS.get(actual_pill_quality, [])
             if not pill_pool:
                 continue
 

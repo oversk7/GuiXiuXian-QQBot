@@ -35,33 +35,55 @@ class GuildFacilityService:
             {"item_id": "iron_body_elixir", "weight": 10},  # 金刚体丹
         ],
         "advanced": [
-            {"item_id": "night_soul_elixir", "weight": 20},  # 夜魂丹（经验类）
-            {"item_id": "great_life_recovery_elixir", "weight": 18},  # 大回生丹（恢复类）
-            {"item_id": "great_soul_recovery_elixir", "weight": 18},  # 大凝魂丹（恢复类）
-            {"item_id": "supreme_revive_elixir", "weight": 10},  # 真还魂丹（复活类）
-            {"item_id": "battle_god_elixir", "weight": 10},  # 战神丹（战斗buff）
-            {"item_id": "wisdom_elixir", "weight": 8},  # 悟道丹（修炼buff）
+            {"item_id": "night_soul_elixir", "weight": 18},  # 夜魂丹
+            {"item_id": "divine_blessing_elixir", "weight": 12},  # 神明恩赐丹
+            {"item_id": "supreme_revive_elixir", "weight": 8},  # 真还魂丹
+            {"item_id": "void_eye_elixir", "weight": 10},  # 虚眼丹
+            {"item_id": "battle_god_elixir", "weight": 10},  # 战神丹
+            {"item_id": "fortune_elixir", "weight": 10},  # 鸿运丹
+            {"item_id": "wisdom_elixir", "weight": 8},  # 悟道丹
         ],
         "master": [
-            {"item_id": "night_soul_elixir", "weight": 18},  # 夜魂丹（经验类）
-            {"item_id": "divine_blessing_elixir", "weight": 12},  # 神明恩赐丹（经验类）
-            {"item_id": "great_life_recovery_elixir", "weight": 15},  # 大回生丹（恢复类）
-            {"item_id": "great_soul_recovery_elixir", "weight": 15},  # 大凝魂丹（恢复类）
-            {"item_id": "berserker_elixir", "weight": 10},  # 狂战丹（战斗buff）
-            {"item_id": "shadow_step_elixir", "weight": 10},  # 影步丹（战斗buff）
-            {"item_id": "combo_master_elixir", "weight": 8},  # 连击丹（战斗buff）
+            {"item_id": "world_power_elixir", "weight": 6},  # 世界之力丹
+            {"item_id": "berserker_elixir", "weight": 10},  # 狂战丹
+            {"item_id": "shadow_step_elixir", "weight": 10},  # 影步丹
+            {"item_id": "eagle_eye_elixir", "weight": 8},  # 鹰眼丹
+            {"item_id": "combo_master_elixir", "weight": 6},  # 连击丹
+            {"item_id": "vitality_elixir", "weight": 8},  # 生机丹
+            {"item_id": "swift_wind_elixir", "weight": 8},  # 疾风丹
         ],
         "legendary": [
-            {"item_id": "divine_blessing_elixir", "weight": 20},  # 神明恩赐丹（经验类）
-            {"item_id": "night_soul_elixir", "weight": 18},  # 夜魂丹（经验类）
-            {"item_id": "supreme_revive_elixir", "weight": 12},  # 真还魂丹（复活类）
-            {"item_id": "berserk_fury_elixir", "weight": 10},  # 暴怒丹（战斗buff）
-            {"item_id": "strength_essence_elixir", "weight": 6},  # 力之精华丹（永久属性）
-            {"item_id": "agility_essence_elixir", "weight": 6},  # 敏之精华丹（永久属性）
-            {"item_id": "defense_essence_elixir", "weight": 6},  # 防之精华丹（永久属性）
-            {"item_id": "vitality_essence_elixir", "weight": 6},  # 体之精华丹（永久属性）
+            {"item_id": "berserk_fury_elixir", "weight": 8},  # 暴怒丹
+            {"item_id": "strength_essence_elixir", "weight": 4},  # 力之精华丹
+            {"item_id": "agility_essence_elixir", "weight": 4},  # 敏之精华丹
+            {"item_id": "defense_essence_elixir", "weight": 4},  # 防之精华丹
+            {"item_id": "vitality_essence_elixir", "weight": 4},  # 体之精华丹
+            {"item_id": "reforge_strength_elixir", "weight": 3},  # 归元破力丹
+            {"item_id": "reforge_agility_elixir", "weight": 3},  # 归元化敏丹
+            {"item_id": "reforge_defense_elixir", "weight": 3},  # 归元散防丹
+            {"item_id": "reforge_vitality_elixir", "weight": 3},  # 归元化体丹
+            {"item_id": "reforge_wisdom_elixir", "weight": 3},  # 归元凝神丹
+            {"item_id": "reforge_luck_elixir", "weight": 3},  # 归元化运丹
         ]
     }
+
+    # 跨池产出配置：高级品质池可以产出低级池的热门丹药
+    # 格式: {"当前品质": {"包含品质": 权重百分比(0-100)}}
+    # 例如: "master"可以产出30%的advanced丹药
+    CROSS_POOL_CONFIG = {
+        "master": {
+            "advanced": 25,  # 25%概率产出advanced池丹药(含虚眼丹等)
+            "current": 75   # 75%概率产出master池丹药
+        },
+        "legendary": {
+            "master": 20,    # 20%概率产出master池丹药
+            "advanced": 15,  # 15%概率产出advanced池丹药(含虚眼丹等)
+            "current": 65    # 65%概率产出legendary池丹药
+        }
+    }
+
+    # 丹房存储上限配置（按日产量倍数）
+    STORAGE_CAPACITY_MULTIPLIER = 3  # 存储上限 = 日产量 * 3
 
     @staticmethod
     def get_pill_quality_chinese(quality: str) -> str:
@@ -318,6 +340,33 @@ class GuildFacilityService:
         return True, f"成功兑换{item_name}×{quantity}，消耗{total_points_cost}积分"
     
     @staticmethod
+    def _select_pill_pool_static(primary_quality: str) -> str:
+        """
+        根据跨池配置选择实际使用的丹药池(静态方法版本)
+
+        Args:
+            primary_quality: 主要品质(如"master", "legendary")
+
+        Returns:
+            实际使用的丹药池品质
+        """
+        # 检查是否有跨池配置
+        cross_pool_config = GuildFacilityService.CROSS_POOL_CONFIG.get(primary_quality)
+        if not cross_pool_config:
+            return primary_quality
+
+        # 按权重随机选择池
+        rand_value = random.randint(1, 100)
+        current_percentage = 0
+
+        for pool_quality, percentage in cross_pool_config.items():
+            current_percentage += percentage
+            if rand_value <= current_percentage:
+                return pool_quality if pool_quality != "current" else primary_quality
+
+        return primary_quality
+
+    @staticmethod
     async def generate_daily_alchemy_production(session: AsyncSession, guild_id: int) -> int:
         """生成每日丹房产出"""
         # 检查是否有丹房
@@ -325,21 +374,37 @@ class GuildFacilityService:
             and_(GuildBuilding.guild_id == guild_id, GuildBuilding.building_type == BuildingType.ALCHEMY_ROOM)
         )
         alchemy_building = (await session.execute(stmt)).scalars().first()
-        
+
         if not alchemy_building:
             return 0
-        
+
         # 获取丹房效果
         config = GuildBuildingService.BUILDING_CONFIGS[BuildingType.ALCHEMY_ROOM]
         effects = config["effects"][alchemy_building.level]
         daily_production = effects["daily_production"]
         pill_quality = effects["pill_quality"]
-        
+
+        # 检查存储空间
+        storage_capacity = daily_production * GuildFacilityService.STORAGE_CAPACITY_MULTIPLIER
+
+        stmt = select(func.count(GuildAlchemyProduction.id)).where(
+            and_(
+                GuildAlchemyProduction.guild_id == guild_id,
+                GuildAlchemyProduction.claimed == False
+            )
+        )
+        storage_used = (await session.execute(stmt)).scalar_one()
+
+        # 存储已满时的友好提示
+        if storage_used >= storage_capacity:
+            # 不生成丹药,但允许玩家查看时看到提示
+            return -1  # 特殊返回值表示存储已满
+
         # 检查今日是否已生成
         today = date.today()
         today_start = datetime.combine(today, datetime.min.time())
         today_end = datetime.combine(today, datetime.max.time())
-        
+
         stmt = select(func.count(GuildAlchemyProduction.id)).where(
             and_(
                 GuildAlchemyProduction.guild_id == guild_id,
@@ -348,24 +413,27 @@ class GuildFacilityService:
             )
         )
         today_count = (await session.execute(stmt)).scalar_one()
-        
+
         if today_count >= daily_production:
             return 0  # 今日已生成足够数量
-        
+
         # 生成丹药
-        pills_to_generate = daily_production - today_count
+        pills_to_generate = min(daily_production - today_count, storage_capacity - storage_used)
         generated_count = 0
-        
+
         for _ in range(pills_to_generate):
+            # 根据跨池配置选择实际使用的丹药池
+            actual_pill_quality = GuildFacilityService._select_pill_pool_static(pill_quality)
+
             # 根据品质随机选择丹药
-            pill_pool = GuildFacilityService.ALCHEMY_PILLS.get(pill_quality, [])
+            pill_pool = GuildFacilityService.ALCHEMY_PILLS.get(actual_pill_quality, [])
             if not pill_pool:
                 continue
-            
+
             # 按权重随机选择
             total_weight = sum(pill["weight"] for pill in pill_pool)
             rand_value = random.randint(1, total_weight)
-            
+
             current_weight = 0
             selected_pill = None
             for pill in pill_pool:
@@ -373,7 +441,7 @@ class GuildFacilityService:
                 if rand_value <= current_weight:
                     selected_pill = pill
                     break
-            
+
             if selected_pill:
                 production = GuildAlchemyProduction(
                     guild_id=guild_id,
@@ -382,7 +450,7 @@ class GuildFacilityService:
                 )
                 session.add(production)
                 generated_count += 1
-        
+
         return generated_count
 
     @staticmethod
