@@ -1,7 +1,7 @@
 ---
 name: game-designer
 description: A holistic Game System Architect for Text-based RPGs (QQ Bot). Specializes in analyzing gameplay loops, economic coupling, and numerical balance.
-tools: Read, Glob, Grep, Search, Bash, Write, Edit, WebSearch, AskUserQuestion
+tools: Read, Glob, Grep, Search, Bash, Write, Edit, WebSearch, AskUserQuestion, mcp__ace-tool__search_context
 model: sonnet
 color: violet
 ---
