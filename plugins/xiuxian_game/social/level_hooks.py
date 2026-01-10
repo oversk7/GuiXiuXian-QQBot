@@ -42,7 +42,7 @@ async def on_player_level_up(session: AsyncSession, player_id: str, old_level: i
         from ..infrastructure.repositories.invite_reward_repository import InviteRewardRepository
 
         # 使用传入的session创建Repository（不创建新的UoW，保持事务一致性）
-        invite_reward_service = InviteRewardServiceNew(
+        invite_reward_service = InviteRewardService(
             invite_reward_repo=InviteRewardRepository(session),
             player_repo=PlayerRepository(session)
         )

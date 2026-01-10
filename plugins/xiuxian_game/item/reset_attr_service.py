@@ -12,7 +12,7 @@ from ..infrastructure.repositories.item_repository import ItemRepository
 from ..infrastructure.repositories.elixir_usage_repository import ElixirUsageRepository
 from ..infrastructure.repositories.vip_equipment_bonus_repository import VIPEquipmentBonusRepository
 from ..domain.effects import EffectResult
-from ..cultivate.reincarnation import ReincarnationService
+from ..cultivate.reincarnation_service_new import ReincarnationService
 
 
 class ResetAttrService:
