@@ -9,7 +9,7 @@ from ..models.db import safe_session
 from ..models.player import Player
 from ..models.invite_reward import InviteReward
 from ..utils import message_add_head
-from .invite_reward_service import InviteRewardService
+from .invite_reward_service_new import InviteRewardService
 from sqlalchemy import select
 from ..platform_utils import get_unified_player
 
@@ -94,7 +94,6 @@ async def _(event: MessageEvent):
     # 新版本: 使用DI架构
     from ..infrastructure.uow.unit_of_work import UnitOfWork
     from ..models.db import AsyncSessionLocal
-    from .invite_reward_service_new import InviteRewardService as InviteRewardServiceNew
 
     def session_factory():
         return AsyncSessionLocal()
@@ -148,7 +147,6 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
     # 新版本: 使用DI架构
     from ..infrastructure.uow.unit_of_work import UnitOfWork
     from ..models.db import AsyncSessionLocal
-    from .invite_reward_service_new import InviteRewardService as InviteRewardServiceNew
 
     def session_factory():
         return AsyncSessionLocal()
@@ -231,7 +229,6 @@ async def _(event: MessageEvent):
     # 新版本: 使用DI架构
     from ..infrastructure.uow.unit_of_work import UnitOfWork
     from ..models.db import AsyncSessionLocal
-    from .invite_reward_service_new import InviteRewardService as InviteRewardServiceNew
 
     def session_factory():
         return AsyncSessionLocal()

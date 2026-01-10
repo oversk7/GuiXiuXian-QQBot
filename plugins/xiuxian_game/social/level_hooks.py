@@ -3,7 +3,7 @@
 """
 from sqlalchemy.ext.asyncio import AsyncSession
 from .mentorship_service import MentorshipService
-from ..player.invite_reward_service import InviteRewardService
+from ..player.invite_reward_service_new import InviteRewardService
 from ..player.feature_unlock import get_breakthrough_unlock_message
 
 # ==================== Feature Flag ====================
@@ -38,7 +38,6 @@ async def on_player_level_up(session: AsyncSession, player_id: str, old_level: i
         await service.update_mentor_points(player_id, level_increase)
         # 检查并发放邀请奖励
         # 新版本: 使用DI架构（使用传入的session，因为调用方已管理事务）
-        from ..player.invite_reward_service_new import InviteRewardService as InviteRewardServiceNew
         from ..infrastructure.repositories.player_repository import PlayerRepository
         from ..infrastructure.repositories.invite_reward_repository import InviteRewardRepository
 

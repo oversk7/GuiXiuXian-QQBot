@@ -6,7 +6,7 @@ from nonebot.adapters.qq import MessageEvent
 from ..models.db import safe_session
 from ..models.player import Player
 from ..utils import message_add_head
-from .reincarnation import ReincarnationService
+from .reincarnation_service_new import ReincarnationService
 from ..platform_utils import get_unified_player, is_guild_message
 
 # Feature Flag: 控制是否使用新版ReincarnationService (DI架构)
