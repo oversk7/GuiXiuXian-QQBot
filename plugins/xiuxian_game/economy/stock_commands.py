@@ -918,7 +918,7 @@ async def handle_trigger_black_swan(event: MessageEvent):
             lines.append("   可在 data/black_swan_events.yaml 中调整")
 
         result_msg = "\n".join(lines)
-        result_msg = message_add_head(event, result_msg)
+        result_msg = message_add_head(result_msg, event)  # 修正参数顺序
         await stock_trigger_black_swan_cmd.finish(result_msg)
 
     except Exception as e:

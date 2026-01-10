@@ -87,7 +87,7 @@ class BlackSwanService:
         affected_type = event_config['affected_type']
         cooldown_end = datetime.now() - timedelta(days=cooldown_days)
 
-        session = self.stock_event_repo.session
+        session = self.stock_event_repo._session  # 使用_session而不是session
 
         # 查询该类型气运最近的事件
         stmt = (
@@ -116,7 +116,7 @@ class BlackSwanService:
         try:
             # 查找受影响类型的所有活跃气运
             affected_type = event_config['affected_type']
-            session = self.stock_repo.session
+            session = self.stock_repo._session  # 使用_session而不是session
 
             stmt = (
                 select(Stock)
@@ -198,7 +198,7 @@ class BlackSwanService:
 
     async def get_recent_events(self, limit: int = 10) -> List[Dict]:
         """获取最近的黑天鹅事件"""
-        session = self.stock_event_repo.session
+        session = self.stock_event_repo._session  # 使用_session而不是session
 
         stmt = (
             select(StockEvent, Stock)
