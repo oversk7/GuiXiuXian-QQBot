@@ -923,7 +923,12 @@ async def handle_trigger_black_swan(event: MessageEvent):
 
     except Exception as e:
         import traceback
-        error_msg = f"❌ 触发黑天鹅事件失败: {str(e)}\n\n{traceback.format_exc()}"
+        # 移除traceback中的URL信息,避免被QQ拦截
+        error_lines = traceback.format_exc().split('\n')
+        safe_lines = [line for line in error_lines if 'http' not in line.lower()]
+        safe_traceback = '\n'.join(safe_lines[:20])  # 限制行数避免消息过长
+
+        error_msg = f"❌ 触发黑天鹅事件失败\n{str(e)}\n\n{safe_traceback}"
         await stock_trigger_black_swan_cmd.finish(error_msg)
 
 
