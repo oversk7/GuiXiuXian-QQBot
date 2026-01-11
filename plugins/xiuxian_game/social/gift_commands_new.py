@@ -7,7 +7,7 @@
 """
 import re
 from nonebot import on_command
-from nonebot.adapters.onebot.v11 import MessageEvent, Message
+from nonebot.adapters.qq import MessageEvent, Message
 from nonebot.params import CommandArg
 from nonebot.exception import FinishedException
 
@@ -17,7 +17,7 @@ from ..models.db import AsyncSessionLocal
 from .relationship_service import RelationshipService
 
 # 创建命令
-gift_command = on_command("赠礼", priority=5, block=True)
+gift_command = on_command("赠礼", aliases={"送礼"}, priority=5, block=True)
 transfer_command = on_command("转移", priority=5, block=True)
 
 
