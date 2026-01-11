@@ -182,6 +182,24 @@ class ItemRepository(IRepository[ItemInstance]):
         except ValueError:
             return False
 
+    async def has_item(self, player_id: str, item_id: str, quantity: int = 1) -> bool:
+        """
+        检查玩家是否有足够的物品
+
+        Args:
+            player_id: 玩家ID
+            item_id: 物品ID
+            quantity: 需要的数量（默认1）
+
+        Returns:
+            是否有足够的物品
+
+        Note:
+            此方法通过聚合查询玩家指定物品的总数量
+        """
+        total = await self.get_material_total_quantity(player_id, item_id)
+        return total >= quantity
+
     async def get_by_player_and_item_id(
         self, player_id: str, item_id: str
     ) -> List[ItemInstance]:
