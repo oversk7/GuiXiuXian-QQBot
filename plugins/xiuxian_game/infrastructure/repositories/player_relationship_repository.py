@@ -29,7 +29,7 @@ class PlayerRelationshipRepository(IRepository[PlayerRelationship]):
         Args:
             session: SQLAlchemy异步会话
         """
-        super().__init__(session)
+        # 不需要调用 super().__init__(),因为 IRepository 是抽象基类,没有 __init__ 方法
         self._session = session
 
     async def get_by_id(self, relationship_id: int) -> Optional[PlayerRelationship]:
