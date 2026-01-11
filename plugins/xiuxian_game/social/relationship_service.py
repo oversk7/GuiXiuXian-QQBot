@@ -226,40 +226,24 @@ class RelationshipService:
         if not has_item:
             return False, f"你没有足够的「{item_name}」"
 
-        # 7. 检查接收者背包空间
-        receiver_space = await self._item_repo.get_available_space(receiver.id)
-        if receiver_space <= 0:
-            return False, f"{receiver.nickname}的背包已满,无法接收物品"
-
-        # 8. 计算实际可转移数量(考虑背包限制)
-        max_addable = min(quantity, receiver_space)
-
-        # 9. 扣除发送者物品
-        success = await self._item_repo.consume_item(sender_id, item_config.item_id, max_addable)
+        # 7. 扣除发送者物品
+        success = await self._item_repo.consume_item(sender_id, item_config.item_id, quantity)
         if not success:
             return False, f"你没有足够的「{item_name}」"
 
-        # 10. 添加到接收者背包
+        # 8. 添加到接收者背包(自动检查背包空间)
         try:
-            await self._item_repo.add_item(receiver.id, item_config.item_id, max_addable)
+            await self._item_repo.add_item(receiver.id, item_config.item_id, quantity)
         except ValueError as e:
-            # 理论上不会发生(已预估容量),兜底:返还给发送者
-            await self._item_repo.add_item(sender_id, item_config.item_id, max_addable)
-            return False, f"送礼失败,物品已退还:{str(e)}"
+            # 背包空间不足,退还物品给发送者
+            await self._item_repo.add_item(sender_id, item_config.item_id, quantity)
+            return False, f"{receiver.nickname}的背包已满,无法接收物品"
 
-        # 11. 返回成功消息
-        if max_addable < quantity:
-            leftover = quantity - max_addable
-            return (
-                True,
-                f"成功向{receiver.nickname}当面送出{max_addable}个「{item_name}」\n"
-                f"(剩余{leftover}个因背包空间不足未送出)"
-            )
-        else:
-            return (
-                True,
-                f"成功向{receiver.nickname}当面送出{max_addable}个「{item_name}」"
-            )
+        # 9. 返回成功消息
+        return (
+            True,
+            f"成功向{receiver.nickname}当面送出{quantity}个「{item_name}」"
+        )
 
     async def get_favorability(
         self,

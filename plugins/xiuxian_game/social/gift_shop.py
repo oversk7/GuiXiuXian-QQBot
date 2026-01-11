@@ -157,17 +157,14 @@ async def handle_buy_gift(event: MessageEvent, args: Message = CommandArg()):
             # 扣除金币
             player.gold -= total_price
 
-            # 添加物品到背包
-            from ..infrastructure.repositories.item_repository import ItemRepository
-            item_repo = ItemRepository(uow.session)
+            # 添加物品到背包(自动检查背包空间)
+            from ..models.inventory import ItemInstance
 
-            # 检查背包空间
-            available_space = await item_repo.get_available_space(player_id)
-            if available_space <= 0:
-                await buy_gift_cmd.finish(message_add_head("❌ 背包已满，无法购买", event))
-
-            # 添加物品
-            await item_repo.add_item(player_id, item_config.item_id, quantity)
+            try:
+                await ItemInstance.add_item(uow.session, player_id, item_config.item_id, quantity)
+            except ValueError as e:
+                # 背包空间不足
+                await buy_gift_cmd.finish(message_add_head(f"❌ 背包已满，无法购买", event))
 
             # 提交事务
             await uow.commit()
