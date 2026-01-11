@@ -4,30 +4,35 @@
 处理玩家与月老的交互,提供结婚功能
 """
 from nonebot.adapters.qq import MessageEvent
+from sqlalchemy.ext.asyncio import AsyncSession
 
+from ..models.player import Player
 from ..infrastructure.uow.unit_of_work import UnitOfWork
-from ..models.db import AsyncSessionLocal
 from ..utils import message_add_head
-from ..platform_utils import get_unified_player
 from .relationship_service import RelationshipService
 from ..models.player_relationship import RelationshipType
 
 
-async def handle_matchmaker_interaction(event: MessageEvent, dialogue_content: str = ""):
+async def handle_matchmaker_interaction(
+    session: AsyncSession,
+    player: Player,
+    npc,
+    event: MessageEvent,
+    dialogue_content: str = ""
+):
     """
     处理与月老的交互
 
     Args:
+        session: 数据库会话
+        player: 玩家对象
+        npc: NPC对象
         event: 消息事件
         dialogue_content: 对话内容
     """
-    player = await get_unified_player(event)
-    if not player:
-        return "⛔ 请先创建角色"
-
     dialogue_content = dialogue_content.strip().lower()
 
-    async with UnitOfWork(AsyncSessionLocal) as uow:
+    async with UnitOfWork(lambda: session) as uow:
         service = RelationshipService(
             player_repo=uow.players,
             relationship_repo=uow.player_relationships,
@@ -88,11 +93,11 @@ def get_matchmaker_menu() -> str:
 今世良缘，月老牵线，祝天下有情人终成眷属！"""
 
 
-async def check_marriage_status(player, uow: UnitOfWork) -> str:
+async def check_marriage_status(player: Player, uow: UnitOfWork) -> str:
     """查询婚姻状况"""
     from sqlalchemy import select, and_, or_
 
-    # 查询婚姻关系
+    # 查询婚姻关系 - 查找player参与的任一婚姻关系
     stmt = select(uow.player_relationships.model).where(
         and_(
             or_(
@@ -122,8 +127,6 @@ async def check_marriage_status(player, uow: UnitOfWork) -> str:
 ━━━━━━━━━━━━━
 当前状态: 已婚
 配偶: {spouse_name}
-结婚时间: {marriage.established_at.strftime('%Y-%m-%d') if marriage.established_at else '未知'}
-━━━━━━━━━━━━━
-愿你们白头偕老,永结同心！
+💡 愿你们白头偕老,永结同心！
 💔 如需解除关系,请使用【离婚】命令(需支付10万金币)
 """

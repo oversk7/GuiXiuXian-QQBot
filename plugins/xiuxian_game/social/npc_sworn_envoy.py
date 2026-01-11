@@ -4,30 +4,35 @@
 处理玩家与结义使者的交互,提供结义功能
 """
 from nonebot.adapters.qq import MessageEvent
+from sqlalchemy.ext.asyncio import AsyncSession
 
+from ..models.player import Player
 from ..infrastructure.uow.unit_of_work import UnitOfWork
-from ..models.db import AsyncSessionLocal
 from ..utils import message_add_head
-from ..platform_utils import get_unified_player
 from .relationship_service import RelationshipService
 from ..models.player_relationship import RelationshipType
 
 
-async def handle_sworn_envoy_interaction(event: MessageEvent, dialogue_content: str = ""):
+async def handle_sworn_envoy_interaction(
+    session: AsyncSession,
+    player: Player,
+    npc,
+    event: MessageEvent,
+    dialogue_content: str = ""
+):
     """
     处理与结义使者的交互
 
     Args:
+        session: 数据库会话
+        player: 玩家对象
+        npc: NPC对象
         event: 消息事件
         dialogue_content: 对话内容
     """
-    player = await get_unified_player(event)
-    if not player:
-        return "⛔ 请先创建角色"
-
     dialogue_content = dialogue_content.strip().lower()
 
-    async with UnitOfWork(AsyncSessionLocal) as uow:
+    async with UnitOfWork(lambda: session) as uow:
         service = RelationshipService(
             player_repo=uow.players,
             relationship_repo=uow.player_relationships,

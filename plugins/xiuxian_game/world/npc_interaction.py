@@ -319,22 +319,18 @@ async def handle_special_vendor_interaction(session, player: Player, npc, event:
 async def handle_matchmaker_interaction(session, player: Player, npc, event: MessageEvent, dialogue_content: str = None):
     """处理月老NPC交互"""
     from ..social.npc_matchmaker import handle_matchmaker_interaction as handle_matchmaker
-    from ..models.db import AsyncSessionLocal
-    from ..infrastructure.uow.unit_of_work import UnitOfWork
 
-    # 调用月老处理器
-    message = await handle_matchmaker(event, dialogue_content or "")
+    # 调用月老处理器,传递所有参数
+    message = await handle_matchmaker(session, player, npc, event, dialogue_content or "")
     await interact_cmd.finish(message_add_head(message, event))
 
 
 async def handle_sworn_envoy_interaction(session, player: Player, npc, event: MessageEvent, dialogue_content: str = None):
     """处理结义使者NPC交互"""
     from ..social.npc_sworn_envoy import handle_sworn_envoy_interaction as handle_sworn_envoy
-    from ..models.db import AsyncSessionLocal
-    from ..infrastructure.uow.unit_of_work import UnitOfWork
 
-    # 调用结义使者处理器
-    message = await handle_sworn_envoy(event, dialogue_content or "")
+    # 调用结义使者处理器,传递所有参数
+    message = await handle_sworn_envoy(session, player, npc, event, dialogue_content or "")
     await interact_cmd.finish(message_add_head(message, event))
 
 
