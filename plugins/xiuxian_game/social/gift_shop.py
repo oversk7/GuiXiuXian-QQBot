@@ -182,6 +182,8 @@ async def handle_buy_gift(event: MessageEvent, args: Message = CommandArg()):
 
             await buy_gift_cmd.finish(message_add_head(message, event))
 
+    except FinishedException:
+        raise
     except Exception as e:
         from nonebot import logger
         logger.error(f"买礼物命令处理失败: {e}", exc_info=True)
