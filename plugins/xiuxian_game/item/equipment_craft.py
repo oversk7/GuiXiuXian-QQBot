@@ -219,9 +219,23 @@ craft_cmd = on_command("锻造", aliases={"装备锻造"}, block=True, priority=
 async def _(event: MessageEvent, args: Message = CommandArg()):
     arg_text = args.extract_plain_text().strip()
     if not arg_text:
-        await craft_cmd.finish("⛔ 格式：锻造 装备名称")
+        await craft_cmd.finish("⛔ 格式：锻造 装备名称 [数量]\n💡 示例：锻造 白骨护甲 5")
 
-    equip_name = arg_text
+    # 解析参数
+    parts = arg_text.split()
+    equip_name = parts[0]
+    quantity = 1  # 默认数量
+
+    # 解析数量
+    if len(parts) >= 2:
+        try:
+            quantity = int(parts[1])
+            if quantity <= 0:
+                await craft_cmd.finish("⛔ 数量必须大于0")
+            if quantity > 100:
+                await craft_cmd.finish("⛔ 单次最多锻造100个装备")
+        except ValueError:
+            await craft_cmd.finish("⛔ 数量格式错误，请输入数字")
 
     # 获取装备模板
     item_cfg = config.items_config["by_name"].get(equip_name)
@@ -238,6 +252,10 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
     # 强制要求血肉结晶至少 1 个
     req_materials["flesh_crystal"] = max(req_materials.get("flesh_crystal", 0), 1)
     req_gold: int = int(recipe.get("gold", 0))
+
+    # 计算总需求
+    total_gold = req_gold * quantity
+    total_materials = {item_id: qty * quantity for item_id, qty in req_materials.items()}
 
     async with safe_session() as session:
         player: Player | None = await get_unified_player(session, event)
@@ -264,12 +282,12 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
                 f"💡 发送【锻造列表】查看可锻造城镇", event))
 
         # 金币校验
-        if player.gold < req_gold:
-            await craft_cmd.finish(f"⛔ 金币不足，需要 {req_gold}💰，当前 {player.gold}💰")
+        if player.gold < total_gold:
+            await craft_cmd.finish(f"⛔ 金币不足，需要 {total_gold}💰，当前 {player.gold}💰")
 
         # 材料校验
         lacking_msgs = []
-        for item_id, req_qty in req_materials.items():
+        for item_id, req_qty in total_materials.items():
             rows = (await session.execute(
                 select(ItemInstance).where(ItemInstance.player_id == player.id, ItemInstance.item_id == item_id)
             )).scalars().all()
@@ -282,30 +300,28 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
             await craft_cmd.finish("⛔ 材料不足：\n" + "\n".join(lacking_msgs))
 
         # 扣除材料 & 金币
-        consumed_materials = {}  # 记录已扣除的材料，用于回滚
-        for item_id, need_qty in req_materials.items():
+        for item_id, need_qty in total_materials.items():
             success_consume = await ItemInstance.consume_item(session, player.id, item_id, need_qty)
             if not success_consume:
                 await session.rollback()
                 await craft_cmd.finish("⛔ 扣除材料失败")
-            consumed_materials[item_id] = need_qty
-        player.gold -= req_gold
+        player.gold -= total_gold
 
-        # 添加装备到背包
+        # 批量添加装备到背包
         try:
-            await ItemInstance.add_item(session, player.id, item_cfg.item_id, quantity=1, durability=item_cfg.durability)
+            await ItemInstance.add_item(session, player.id, item_cfg.item_id, quantity=quantity, durability=item_cfg.durability)
         except ValueError as e:
             # 背包空间不足，恢复金币（材料已通过 rollback 恢复）
-            player.gold += req_gold
+            player.gold += total_gold
             await session.rollback()
             await craft_cmd.finish(f"⛔ {e}")
 
         await session.commit()
 
-        mat_msg = " ".join([f"{config.items_config['by_id'][mid].name}✖️{qty}" for mid, qty in req_materials.items()])
+        mat_msg = " ".join([f"{config.items_config['by_id'][mid].name}✖️{qty*quantity}" for mid, qty in req_materials.items()])
         reply = (
-            f"✅ 成功锻造 {item_cfg.name}！\n"
-            f"🔨 消耗：{mat_msg} 以及 金币 {req_gold}💰"
+            f"✅ 成功锻造 {item_cfg.name}✖️{quantity}！\n"
+            f"🔨 消耗：{mat_msg} 以及 金币 {total_gold}💰"
         )
         await craft_cmd.finish(message_add_head(reply, event))
 
