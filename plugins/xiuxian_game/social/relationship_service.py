@@ -227,28 +227,12 @@ class RelationshipService:
             return False, f"你没有足够的「{item_name}」"
 
         # 7. 检查接收者背包空间
-        # 获取接收者已使用的背包格数
-        receiver_items = await self._item_repo.get_all_non_equipment_non_fish(receiver.id)
-        used_slots = len(receiver_items)
-
-        # 获取接收者的有效背包容量
-        effective_capacity = await receiver.get_effective_inventory_capacity(self._uow.session)
-
-        available_space = effective_capacity - used_slots
-
-        if available_space <= 0:
+        receiver_space = await self._item_repo.get_available_space(receiver.id)
+        if receiver_space <= 0:
             return False, f"{receiver.nickname}的背包已满,无法接收物品"
 
         # 8. 计算实际可转移数量(考虑背包限制)
-        # 如果物品可堆叠且已有相同物品,可以全部转移
-        # 否则受限于可用格数
-        max_addable = quantity  # 默认可以全部转移
-
-        # 检查接收者是否已有该物品
-        existing_items = await self._item_repo.get_items_by_item_id(receiver.id, item_config.item_id)
-        if not existing_items:
-            # 没有该物品,需要占用新格子
-            max_addable = min(quantity, available_space)
+        max_addable = min(quantity, receiver_space)
 
         # 9. 扣除发送者物品
         success = await self._item_repo.consume_item(sender_id, item_config.item_id, max_addable)
@@ -379,12 +363,7 @@ class RelationshipService:
             if relationship_type.value == current_type:
                 return False, f"你们已经是{self._get_relationship_name(relationship_type)}关系了"
             else:
-                # 从字符串获取枚举值
-                try:
-                    current_enum = RelationshipType(current_type)
-                except ValueError:
-                    current_enum = RelationshipType.NONE
-                return False, f"你们已有{self._get_relationship_name(current_enum)}关系,无法建立{self._get_relationship_name(relationship_type)}关系"
+                return False, f"你们已有{self._get_relationship_name(RelationshipType(current_type))}关系,无法建立{self._get_relationship_name(relationship_type)}关系"
 
         # 检查好感度要求
         favorability = relationship.favorability

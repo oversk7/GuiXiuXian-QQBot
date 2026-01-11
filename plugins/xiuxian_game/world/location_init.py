@@ -569,24 +569,6 @@ async def init_social_npcs(session) -> int:
         session.add(sworn_npc)
         created_count += 1
 
-    # 3. 创建礼品店NPC
-    gift_shop_npc_id = "gift_shop_shangjing"
-    existing_gift_shop = await NPCService.get_npc_by_id(session, gift_shop_npc_id)
-
-    if not existing_gift_shop:
-        gift_shop_npc = NPC(
-            npc_id=gift_shop_npc_id,
-            name="礼品店老板",
-            description="经营礼品店的老板,这里有各种精美礼品,是表达心意的最佳选择",
-            npc_type=NPCType.SPECIAL_VENDOR,
-            location_id=shangjing_market.id,
-            is_killable=False,
-            is_active=True
-        )
-        gift_shop_npc.add_function("gift_shop", {"enabled": True})
-        session.add(gift_shop_npc)
-        created_count += 1
-
     return created_count
 
 
