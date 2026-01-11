@@ -379,7 +379,12 @@ class RelationshipService:
             if relationship_type.value == current_type:
                 return False, f"你们已经是{self._get_relationship_name(relationship_type)}关系了"
             else:
-                return False, f"你们已有{self._get_relationship_name(RelationshipType(current_type))}关系,无法建立{self._get_relationship_name(relationship_type)}关系"
+                # 从字符串获取枚举值
+                try:
+                    current_enum = RelationshipType(current_type)
+                except ValueError:
+                    current_enum = RelationshipType.NONE
+                return False, f"你们已有{self._get_relationship_name(current_enum)}关系,无法建立{self._get_relationship_name(relationship_type)}关系"
 
         # 检查好感度要求
         favorability = relationship.favorability
