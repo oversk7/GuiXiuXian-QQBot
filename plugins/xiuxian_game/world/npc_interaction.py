@@ -206,7 +206,11 @@ async def handle_npc_type_interaction(session, player: Player, npc, interaction_
     elif npc_type == NPCType.GHOST:
         await handle_ghost_interaction(session, player, npc, event)
     elif npc_type == NPCType.SPECIAL_VENDOR:
-        await handle_special_vendor_interaction(session, player, npc, event)
+        # 检查是否是礼品店
+        if npc.npc_id == "gift_shop_shangjing":
+            await handle_gift_shop_interaction(session, player, npc, event, dialogue_content)
+        else:
+            await handle_special_vendor_interaction(session, player, npc, event)
     elif npc.npc_id == "matchmaker_shangjing":
         # 月老NPC - 通过npc_id判断
         await handle_matchmaker_interaction(session, player, npc, event, dialogue_content)
@@ -352,6 +356,112 @@ async def handle_generic_interaction(session, player: Player, npc, event: Messag
     ]
 
     await interact_cmd.finish(message_add_head("\n".join(lines), event))
+
+
+async def handle_gift_shop_interaction(session, player: Player, npc, event: MessageEvent, dialogue_content: str = None):
+    """处理礼品店NPC交互"""
+    from ..config import config
+
+    dialogue_content = (dialogue_content or "").strip().lower()
+
+    # 显示礼品列表
+    if not dialogue_content or dialogue_content in ["菜单", "帮助", "列表"]:
+        lines = [
+            "🎁 礼品店 🎁",
+            "━━━━━━━━━━━━━",
+            f"💬 {npc.name}：欢迎光临！这里有各种精美礼品,是表达心意的最佳选择。",
+            "",
+            "📋 可购买礼物：",
+            "",
+            "🌸 白色品质(入门级)：",
+            "  小野花 - 50金币 - 好感度+3",
+            "  康乃馨 - 100金币 - 好感度+5",
+            "",
+            "🌷 绿色品质(进阶级)：",
+            "  红玫瑰 - 300金币 - 好感度+8",
+            "  粉玫瑰 - 300金币 - 好感度+8",
+            "  郁金香 - 500金币 - 好感度+10",
+            "",
+            "💙 蓝色品质(中级)：",
+            "  蓝玫瑰 - 800金币 - 好感度+12",
+            "  百合花 - 800金币 - 好感度+12",
+            "  兰花 - 1200金币 - 好感度+15",
+            "",
+            "💫 紫色品质(高级)：",
+            "  银手链 - 2000金币 - 好感度+15",
+            "  金项链 - 5000金币 - 好感度+20",
+            "  珍珠项链 - 5000金币 - 好感度+20",
+            "",
+            "💎 橙色品质(顶级)：",
+            "  钻戒 - 15000金币 - 好感度+30",
+            "",
+            "💡 使用【购买 <礼物名> <数量>】购买礼物",
+            "💡 使用【赠礼 UID 礼物名】赠送礼物给其他玩家",
+            "━━━━━━━━━━━━━",
+            "💕 礼物会被消耗,转化为好感度和魅力值",
+            "💕 使用【转移】可以转移礼物(不消耗)",
+        ]
+        await interact_cmd.finish(message_add_head("\n".join(lines), event))
+
+    # 购买礼物
+    elif dialogue_content.startswith("购买 "):
+        parts = dialogue_content.split()
+        if len(parts) < 2:
+            await interact_cmd.finish(message_add_head("⛔ 格式错误，正确格式：购买 <礼物名> [数量]\n示例：购买 红玫瑰 10", event))
+
+        gift_name = parts[1]
+        quantity = 1
+        if len(parts) >= 3:
+            try:
+                quantity = int(parts[2])
+                if quantity <= 0:
+                    await interact_cmd.finish(message_add_head("⛔ 数量必须大于0", event))
+            except ValueError:
+                await interact_cmd.finish(message_add_head("⛔ 数量格式错误，请输入数字", event))
+
+        # 查找礼物
+        gift_config = None
+        for item_config in config.items_config["by_type"].get("GIFT", []):
+            cfg = config.items_config["by_id"][item_config]
+            if cfg.name == gift_name:
+                gift_config = cfg
+                break
+
+        if not gift_config:
+            await interact_cmd.finish(message_add_head(f"❌ 找不到礼物：{gift_name}\n💡 请使用【交互 礼品店老板】查看礼物列表", event))
+
+        # 计算总价
+        total_cost = gift_config.price * quantity
+
+        # 检查金币
+        if player.gold < total_cost:
+            await interact_cmd.finish(message_add_head(f"❌ 金币不足！\n━━━━━━━━━━━━━\n需要：{total_cost} 金币\n当前：{player.gold} 金币", event))
+
+        # 添加物品到背包
+        try:
+            from ..models.inventory import ItemInstance
+            await ItemInstance.add_item(session, player.id, gift_config.item_id, quantity)
+        except ValueError as e:
+            await interact_cmd.finish(message_add_head(f"❌ {e}", event))
+
+        # 扣除金币
+        player.gold -= total_cost
+        await session.commit()
+
+        await interact_cmd.finish(message_add_head(
+            f"✅ 购买成功！\n"
+            f"━━━━━━━━━━━━━\n"
+            f"📦 获得：{gift_config.name} ×{quantity}\n"
+            f"💸 花费：{total_cost} 金币\n"
+            f"💰 剩余：{player.gold} 金币\n"
+            f"━━━━━━━━━━━━━\n"
+            f"💡 使用【赠礼 UID {gift_config.name}】赠送礼物", event
+        ))
+
+    else:
+        # 默认显示菜单
+        await handle_gift_shop_interaction(session, player, npc, event, "")
+
 
 
 async def handle_neutral_npc_interaction(session, player: Player, npc, event: MessageEvent):
