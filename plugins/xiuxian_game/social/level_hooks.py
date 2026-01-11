@@ -2,14 +2,8 @@
 升级钩子系统 - 在玩家升级时触发社交系统相关更新
 """
 from sqlalchemy.ext.asyncio import AsyncSession
-from .mentorship_service import MentorshipService
 from ..player.invite_reward_service_new import InviteRewardService
 from ..player.feature_unlock import get_breakthrough_unlock_message
-
-# ==================== Feature Flag ====================
-# 设置为True使用新版DI架构的InviteRewardService，False使用旧版本
-# 设置为True使用新版DI架构的MentorshipService，False使用旧版本
-# =====================================================
 
 
 async def on_player_level_up(session: AsyncSession, player_id: str, old_level: int, new_level: int):
@@ -24,18 +18,6 @@ async def on_player_level_up(session: AsyncSession, player_id: str, old_level: i
     """
     level_increase = new_level - old_level
     if level_increase > 0:
-        # 更新师父的恩师点
-        from ..infrastructure.repositories.player_repository import PlayerRepository
-        from ..infrastructure.repositories.social_application_repository import SocialApplicationRepository
-        from ..infrastructure.repositories.mentorship_repository import MentorshipRepository
-        from .mentorship_service_new import MentorshipService as MentorshipServiceNew
-
-        service = MentorshipServiceNew(
-            player_repo=PlayerRepository(session),
-            social_app_repo=SocialApplicationRepository(session),
-            mentorship_repo=MentorshipRepository(session),
-        )
-        await service.update_mentor_points(player_id, level_increase)
         # 检查并发放邀请奖励
         # 新版本: 使用DI架构（使用传入的session，因为调用方已管理事务）
         from ..infrastructure.repositories.player_repository import PlayerRepository
