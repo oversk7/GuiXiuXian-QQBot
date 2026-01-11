@@ -55,6 +55,7 @@ REQUIRED_FIELDS: Dict[str, Dict[str, str]] = {
     "player": {
         "completed_trials": "TEXT NULL COMMENT '已通关的试炼列表(JSON数组,如[\"冥契红绳\",\"灵异拼图\"])'",
         "charm": "INT DEFAULT 0 COMMENT '魅力值(通过收礼获得)'",
+        "daily_gift_purchases": "TEXT NULL COMMENT '每日礼物购买记录(JSON格式: {\"item_id\": {\"date\": \"YYYY-MM-DD\", \"count\": N}})'",
     },
 }
 

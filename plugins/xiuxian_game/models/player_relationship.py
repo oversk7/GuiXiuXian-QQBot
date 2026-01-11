@@ -24,9 +24,9 @@ class PlayerRelationship(Base):
 
     设计要点:
     - 双向关系: player_id和target_id通过排序确保唯一性
-    - 好感度: 0-100,通过送礼等行为增加
-    - 每日上限: 防止刷好感度,每天对同一人最多获得30好感度
-    - 关系类型: 达到好感度阈值后可通过NPC建立正式关系
+    - 好感度: 0-10000,通过送礼等行为增加
+    - 每日上限: 防止刷好感度,每天对同一人最多获得500好感度
+    - 关系类型: 达到好感度阈值后可通过NPC建立正式关系(结婚/结义需要5000好感度)
     """
     __tablename__ = "player_relationship"
 
@@ -44,14 +44,14 @@ class PlayerRelationship(Base):
         comment="玩家B的ID"
     )
 
-    # 好感度数据 (0-100)
+    # 好感度数据 (0-10000)
     favorability: Mapped[int] = mapped_column(
         Integer,
         default=0,
-        comment="好感度(0-100)"
+        comment="好感度(0-10000)"
     )
 
-    # 今日送礼统计 (每日上限30)
+    # 今日送礼统计 (每日上限500)
     today_favorability_gain: Mapped[int] = mapped_column(
         Integer,
         default=0,

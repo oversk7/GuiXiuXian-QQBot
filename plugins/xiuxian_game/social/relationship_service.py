@@ -60,7 +60,7 @@ class RelationshipService:
         receiver_uid: int,
         item_name: str,
         quantity: int,
-        daily_limit: int = 30
+        daily_limit: int = 500
     ) -> Tuple[bool, str]:
         """
         送好感度礼物(远程,消耗型)
@@ -77,7 +77,7 @@ class RelationshipService:
             receiver_uid: 接收者UID
             item_name: 礼物名称
             quantity: 数量
-            daily_limit: 每日好感度上限(默认30)
+            daily_limit: 每日好感度上限(默认500)
 
         Returns:
             (是否成功, 提示信息)
@@ -149,7 +149,7 @@ class RelationshipService:
 
         # 10. 增加双向好感度
         old_favorability = relationship.favorability
-        relationship.favorability = min(100, relationship.favorability + total_favorability)
+        relationship.favorability = min(10000, relationship.favorability + total_favorability)
         relationship.today_favorability_gain += total_favorability
         relationship.total_gifts += quantity
         relationship.last_interaction_date = datetime.now()
@@ -663,7 +663,7 @@ class RelationshipService:
         """获取建立关系所需的最小好感度"""
         requirements = {
             RelationshipType.MENTORSHIP: 40,
-            RelationshipType.SWORN: 60,
-            RelationshipType.MARRIAGE: 80
+            RelationshipType.SWORN: 5000,
+            RelationshipType.MARRIAGE: 5000
         }
         return requirements.get(relationship_type, 0)

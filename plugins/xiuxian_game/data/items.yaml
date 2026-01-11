@@ -2624,6 +2624,7 @@ items:
       rarity: "white"
       price: 50
       favorability: 3
+      daily_limit: 20  # 每日限购20个
 
     - item_id: "gift_carnation"
       name: "康乃馨"
@@ -2632,6 +2633,7 @@ items:
       rarity: "white"
       price: 100
       favorability: 5
+      daily_limit: 20  # 每日限购20个
 
     # ========== 绿色品质(进阶级) ==========
     - item_id: "gift_rose"
@@ -2641,6 +2643,7 @@ items:
       rarity: "green"
       price: 300
       favorability: 8
+      daily_limit: 10  # 每日限购10个
 
     - item_id: "gift_pink_rose"
       name: "粉玫瑰"
@@ -2649,6 +2652,7 @@ items:
       rarity: "green"
       price: 300
       favorability: 8
+      daily_limit: 10  # 每日限购10个
 
     - item_id: "gift_tulip"
       name: "郁金香"
@@ -2657,6 +2661,7 @@ items:
       rarity: "green"
       price: 500
       favorability: 10
+      daily_limit: 10  # 每日限购10个
 
     # ========== 蓝色品质(中级) ==========
     - item_id: "gift_blue_rose"
@@ -2666,6 +2671,7 @@ items:
       rarity: "blue"
       price: 800
       favorability: 12
+      daily_limit: 5  # 每日限购5个
 
     - item_id: "gift_lily"
       name: "百合花"
@@ -2674,6 +2680,7 @@ items:
       rarity: "blue"
       price: 800
       favorability: 12
+      daily_limit: 5  # 每日限购5个
 
     - item_id: "gift_orchid"
       name: "兰花"
@@ -2682,6 +2689,7 @@ items:
       rarity: "blue"
       price: 1200
       favorability: 15
+      daily_limit: 5  # 每日限购5个
 
     # ========== 紫色品质(高级) ==========
     - item_id: "gift_silver_bracelet"
@@ -2691,6 +2699,7 @@ items:
       rarity: "purple"
       price: 2000
       favorability: 15
+      daily_limit: 3  # 每日限购3个
 
     - item_id: "gift_gold_necklace"
       name: "金项链"
@@ -2699,6 +2708,7 @@ items:
       rarity: "purple"
       price: 5000
       favorability: 20
+      daily_limit: 3  # 每日限购3个
 
     - item_id: "gift_pearl_necklace"
       name: "珍珠项链"
@@ -2707,6 +2717,7 @@ items:
       rarity: "purple"
       price: 5000
       favorability: 20
+      daily_limit: 3  # 每日限购3个
 
     # ========== 橙色品质(顶级) ==========
     - item_id: "gift_diamond_ring"
@@ -2716,6 +2727,7 @@ items:
       rarity: "orange"
       price: 15000
       favorability: 30
+      daily_limit: 2  # 每日限购2个
 
     # ========== 红色品质(传说级) ==========
     - item_id: "gift_eternal_rose"
@@ -2725,4 +2737,5 @@ items:
       rarity: "red"
       price: 50000
       favorability: 50
+      daily_limit: 1  # 每日限购1个
 
