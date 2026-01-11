@@ -96,15 +96,16 @@ def get_matchmaker_menu() -> str:
 async def check_marriage_status(player: Player, uow: UnitOfWork) -> str:
     """查询婚姻状况"""
     from sqlalchemy import select, and_, or_
+    from ..models.player_relationship import PlayerRelationship
 
     # 查询婚姻关系 - 查找player参与的任一婚姻关系
-    stmt = select(uow.player_relationships.model).where(
+    stmt = select(PlayerRelationship).where(
         and_(
             or_(
-                uow.player_relationships.model.player_id == player.id,
-                uow.player_relationships.model.target_id == player.id
+                PlayerRelationship.player_id == player.id,
+                PlayerRelationship.target_id == player.id
             ),
-            uow.player_relationships.model.relationship_type == RelationshipType.MARRIAGE.value
+            PlayerRelationship.relationship_type == RelationshipType.MARRIAGE.value
         )
     )
     result = await uow.session.execute(stmt)

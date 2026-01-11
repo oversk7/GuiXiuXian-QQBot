@@ -48,9 +48,9 @@ async def handle_charm_ranking(event: MessageEvent):
         from sqlalchemy import desc
 
         result = await uow.session.execute(
-            select(uow.players.model.nickname, uow.players.model.charm)
-            .where(uow.players.model.charm > 0)
-            .order_by(desc(uow.players.model.charm))
+            select(Player.nickname, Player.charm)
+            .where(Player.charm > 0)
+            .order_by(desc(Player.charm))
             .limit(100)
         )
 

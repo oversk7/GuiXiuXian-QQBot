@@ -102,15 +102,16 @@ def get_sworn_menu() -> str:
 async def check_sworn_status(player, uow: UnitOfWork) -> str:
     """查询结义状况"""
     from sqlalchemy import select, and_, or_
+    from ..models.player_relationship import PlayerRelationship
 
     # 查询所有结义关系
-    stmt = select(uow.player_relationships.model).where(
+    stmt = select(PlayerRelationship).where(
         and_(
             or_(
-                uow.player_relationships.model.player_id == player.id,
-                uow.player_relationships.model.target_id == player.id
+                PlayerRelationship.player_id == player.id,
+                PlayerRelationship.target_id == player.id
             ),
-            uow.player_relationships.model.relationship_type == RelationshipType.SWORN.value
+            PlayerRelationship.relationship_type == RelationshipType.SWORN.value
         )
     )
     result = await uow.session.execute(stmt)

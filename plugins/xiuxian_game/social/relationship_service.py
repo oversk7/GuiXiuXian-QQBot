@@ -311,10 +311,11 @@ class RelationshipService:
             [(玩家昵称, 魅力值, 排名), ...]
         """
         from sqlalchemy import desc
+        from ..models.player import Player
 
         result = await self._uow.session.execute(
-            select(self._player_repo.model.nickname, self._player_repo.model.charm)
-            .order_by(desc(self._player_repo.model.charm))
+            select(Player.nickname, Player.charm)
+            .order_by(desc(Player.charm))
             .limit(limit)
         )
 
