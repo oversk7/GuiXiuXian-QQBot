@@ -119,7 +119,6 @@ async def handle_transfer_command(event: MessageEvent, args: Message = CommandAr
     - 转移 123 回春散 5
     - 转移 456 白骨护甲 1
     """
-    from nonebot import logger
     try:
         # 1. 获取玩家ID
         player_id = event.get_user_id()
@@ -158,21 +157,16 @@ async def handle_transfer_command(event: MessageEvent, args: Message = CommandAr
                 await transfer_command.finish("⛔ 数量格式错误，请输入数字")
 
         # 3. 执行转移
-        logger.info(f"[转移命令] 开始执行转移: sender_id={player_id}, receiver_uid={receiver_uid}, item={item_name}, quantity={quantity}")
         async with UnitOfWork(AsyncSessionLocal) as uow:
-            logger.debug(f"[转移命令] UnitOfWork 会话创建成功")
             # 创建服务
-            logger.debug(f"[转移命令] 开始创建 RelationshipService")
             relationship_service = RelationshipService(
                 player_repo=uow.players,
                 relationship_repo=uow.player_relationships,
                 item_repo=uow.items,
                 uow=uow
             )
-            logger.debug(f"[转移命令] RelationshipService 创建成功")
 
             # 调用当面送礼逻辑
-            logger.debug(f"[转移命令] 开始调用 send_gift_face_to_face")
             success, message = await relationship_service.send_gift_face_to_face(
                 sender_id=player_id,
                 receiver_uid=receiver_uid,
@@ -181,7 +175,6 @@ async def handle_transfer_command(event: MessageEvent, args: Message = CommandAr
             )
 
             # 4. 返回结果
-            logger.info(f"[转移命令] 转移完成: success={success}, message={message}")
             if success:
                 await transfer_command.finish(f"✅ {message}")
             else:
