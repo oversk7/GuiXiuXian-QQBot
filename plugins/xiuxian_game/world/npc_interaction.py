@@ -207,6 +207,12 @@ async def handle_npc_type_interaction(session, player: Player, npc, interaction_
         await handle_ghost_interaction(session, player, npc, event)
     elif npc_type == NPCType.SPECIAL_VENDOR:
         await handle_special_vendor_interaction(session, player, npc, event)
+    elif npc.npc_id == "matchmaker_shangjing":
+        # 月老NPC - 通过npc_id判断
+        await handle_matchmaker_interaction(session, player, npc, event, dialogue_content)
+    elif npc.npc_id == "sworn_envoy_shangjing":
+        # 结义使者NPC - 通过npc_id判断
+        await handle_sworn_envoy_interaction(session, player, npc, event, dialogue_content)
     else:
         await handle_generic_interaction(session, player, npc, event, dialogue_content)
 
@@ -308,6 +314,28 @@ async def handle_special_vendor_interaction(session, player: Player, npc, event:
     ]
 
     await interact_cmd.finish(message_add_head("\n".join(lines), event))
+
+
+async def handle_matchmaker_interaction(session, player: Player, npc, event: MessageEvent, dialogue_content: str = None):
+    """处理月老NPC交互"""
+    from ..social.npc_matchmaker import handle_matchmaker_interaction as handle_matchmaker
+    from ..models.db import AsyncSessionLocal
+    from ..infrastructure.uow.unit_of_work import UnitOfWork
+
+    # 调用月老处理器
+    message = await handle_matchmaker(event, dialogue_content or "")
+    await interact_cmd.finish(message_add_head(message, event))
+
+
+async def handle_sworn_envoy_interaction(session, player: Player, npc, event: MessageEvent, dialogue_content: str = None):
+    """处理结义使者NPC交互"""
+    from ..social.npc_sworn_envoy import handle_sworn_envoy_interaction as handle_sworn_envoy
+    from ..models.db import AsyncSessionLocal
+    from ..infrastructure.uow.unit_of_work import UnitOfWork
+
+    # 调用结义使者处理器
+    message = await handle_sworn_envoy(event, dialogue_content or "")
+    await interact_cmd.finish(message_add_head(message, event))
 
 
 async def handle_generic_interaction(session, player: Player, npc, event: MessageEvent, dialogue_content: str = None):

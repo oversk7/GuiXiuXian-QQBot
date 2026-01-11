@@ -7,8 +7,6 @@ from .db import Base
 
 class ApplicationType(str, PyEnum):
     """申请类型"""
-    MARRIAGE = "marriage"  # 求婚申请
-    MENTORSHIP = "mentorship"  # 拜师申请
     GUILD_JOIN = "guild_join"  # 公会入会申请
 
 
@@ -20,7 +18,7 @@ class ApplicationStatus(str, PyEnum):
 
 
 class SocialApplication(Base):
-    """社交申请记录表（求婚、拜师、公会入会等）"""
+    """社交申请记录表（公会入会等）"""
     __tablename__ = "social_application"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)

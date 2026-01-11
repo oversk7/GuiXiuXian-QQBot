@@ -2614,3 +2614,115 @@ items:
       rarity: "purple"
       price: 300000
       attr_bonus: {"anti_crit_rate": 12}
+
+  gifts:  # 好感度礼物(消耗型,增加好感度和魅力值)
+    # ========== 白色品质(入门级) ==========
+    - item_id: "gift_wildflower"
+      name: "小野花"
+      description: "路边采摘的小野花,虽不起眼,却包含着纯真的心意。好感度+3 🌸"
+      type: "GIFT"
+      rarity: "white"
+      price: 50
+      favorability: 3
+
+    - item_id: "gift_carnation"
+      name: "康乃馨"
+      description: "温馨的康乃馨,象征着感激与祝福。好感度+5 🌺"
+      type: "GIFT"
+      rarity: "white"
+      price: 100
+      favorability: 5
+
+    # ========== 绿色品质(进阶级) ==========
+    - item_id: "gift_rose"
+      name: "红玫瑰"
+      description: "鲜艳的红玫瑰,热情如火,是表达爱意的经典之选。好感度+8 🌹"
+      type: "GIFT"
+      rarity: "green"
+      price: 300
+      favorability: 8
+
+    - item_id: "gift_pink_rose"
+      name: "粉玫瑰"
+      description: "温柔的粉玫瑰,代表着初恋与关怀。好感度+8 🌷"
+      type: "GIFT"
+      rarity: "green"
+      price: 300
+      favorability: 8
+
+    - item_id: "gift_tulip"
+      name: "郁金香"
+      description: "高雅的郁金香,寓意着高贵与典雅。好感度+10 🌷"
+      type: "GIFT"
+      rarity: "green"
+      price: 500
+      favorability: 10
+
+    # ========== 蓝色品质(中级) ==========
+    - item_id: "gift_blue_rose"
+      name: "蓝玫瑰"
+      description: "珍稀的蓝玫瑰,寓意奇迹与不可能。好感度+12 💙"
+      type: "GIFT"
+      rarity: "blue"
+      price: 800
+      favorability: 12
+
+    - item_id: "gift_lily"
+      name: "百合花"
+      description: "纯洁的百合花,寓意百年好合。好感度+12 ⚪"
+      type: "GIFT"
+      rarity: "blue"
+      price: 800
+      favorability: 12
+
+    - item_id: "gift_orchid"
+      name: "兰花"
+      description: "高洁的兰花,象征着君子之交。好感度+15 🌼"
+      type: "GIFT"
+      rarity: "blue"
+      price: 1200
+      favorability: 15
+
+    # ========== 紫色品质(高级) ==========
+    - item_id: "gift_silver_bracelet"
+      name: "银手链"
+      description: "精致的银手链,手工打造,彰显心意。好感度+15 💫"
+      type: "GIFT"
+      rarity: "purple"
+      price: 2000
+      favorability: 15
+
+    - item_id: "gift_gold_necklace"
+      name: "金项链"
+      description: "纯金打造的金项链,华贵典雅。好感度+20 ✨"
+      type: "GIFT"
+      rarity: "purple"
+      price: 5000
+      favorability: 20
+
+    - item_id: "gift_pearl_necklace"
+      name: "珍珠项链"
+      description: "圆润的珍珠项链,温润如玉。好感度+20 ⚪"
+      type: "GIFT"
+      rarity: "purple"
+      price: 5000
+      favorability: 20
+
+    # ========== 橙色品质(顶级) ==========
+    - item_id: "gift_diamond_ring"
+      name: "钻戒"
+      description: "璀璨的钻石戒指,永恒爱情的象征。好感度+30 💎"
+      type: "GIFT"
+      rarity: "orange"
+      price: 15000
+      favorability: 30
+
+    # ========== 红色品质(传说级) ==========
+    - item_id: "gift_eternal_rose"
+      name: "永恒玫瑰"
+      description: "永不凋零的永恒玫瑰,代表着至死不渝的爱意。好感度+50 ❤️"
+      type: "GIFT"
+      rarity: "red"
+      price: 50000
+      favorability: 50
+

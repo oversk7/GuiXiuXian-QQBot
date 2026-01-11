@@ -90,6 +90,9 @@ class UnitOfWork:
         # 任务相关仓储
         self._player_task_stats = None
 
+        # 关系相关仓储
+        self._player_relationships = None
+
     @property
     def players(self):
         """玩家仓储"""
@@ -273,6 +276,14 @@ class UnitOfWork:
             from ..repositories.player_task_stats_repository import PlayerTaskStatsRepository
             self._player_task_stats = PlayerTaskStatsRepository(self._session)
         return self._player_task_stats
+
+    @property
+    def player_relationships(self):
+        """玩家关系仓储"""
+        if self._player_relationships is None:
+            from ..repositories.player_relationship_repository import PlayerRelationshipRepository
+            self._player_relationships = PlayerRelationshipRepository(self._session)
+        return self._player_relationships
 
     @property
     def session(self) -> AsyncSession:

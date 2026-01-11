@@ -18,6 +18,7 @@ class ItemType(str,PyEnum):
     GHOST_FRAGMENT = "GHOST_FRAGMENT"
     GEM = "GEM"
     FISH = "FISH"
+    GIFT = "GIFT"  # 好感度礼物
 
 class ItemEffectType(str, PyEnum):
     RESTORE_HP = "RESTORE_HP"

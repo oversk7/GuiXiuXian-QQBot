@@ -42,6 +42,9 @@ async def handle_init_locations(event: MessageEvent):
             # 初始化特殊商店和NPC
             special_count = await init_special_locations(session)
 
+            # 初始化社交NPC(月老、结义使者)
+            social_count = await init_social_npcs(session)
+
             # 初始化中立NPC（已禁用 - 2025-12-07）
             # neutral_count = await init_neutral_npcs(session)
             neutral_count = 0  # 不再生成中立NPC
@@ -55,6 +58,7 @@ async def handle_init_locations(event: MessageEvent):
                 f"💼 打工雇主NPC：{job_count}个\n"
                 f"⚒️ 工匠NPC：{workshop_count}个\n"
                 f"🏛️ 特殊NPC：{special_count}个\n"
+                f"💕 社交NPC：{social_count}个\n"
                 f"👤 中立NPC：{neutral_count}个\n"
                 "━━━━━━━━━━━━━\n"
                 "📍 所有NPC已添加到现有地点中\n"
@@ -491,6 +495,78 @@ async def init_special_locations(session) -> int:
         )
         admin_npc.add_function("headquarters_shop", {"enabled": True})
         session.add(admin_npc)
+        created_count += 1
+
+    return created_count
+
+
+async def init_social_npcs(session) -> int:
+    """
+    初始化社交NPC(月老、结义使者)
+
+    在上京(0,0)添加月老和结义使者
+    """
+    from ..models.npc import NPC, NPCType
+    from ..economy.merchants import MARKETS
+
+    created_count = 0
+
+    # 找到上京市集地点
+    shangjing_market = None
+    for market in MARKETS:
+        if market.name == "上京":
+            # 查找上京市集对应的地点
+            shangjing_market = await LocationService.get_location_by_coordinates(
+                session, market.x, market.y, "大都会"
+            )
+            break
+
+    if not shangjing_market:
+        # 如果找不到上京，就不创建
+        return 0
+
+    # 确保functions字段不为None
+    if shangjing_market.functions is None:
+        shangjing_market.functions = {}
+
+    # 添加社交功能
+    if not shangjing_market.has_function("social"):
+        shangjing_market.add_function("social", {"enabled": True})
+
+    # 1. 创建月老NPC
+    matchmaker_npc_id = "matchmaker_shangjing"
+    existing_matchmaker = await NPCService.get_npc_by_id(session, matchmaker_npc_id)
+
+    if not existing_matchmaker:
+        matchmaker_npc = NPC(
+            npc_id=matchmaker_npc_id,
+            name="月老",
+            description="掌管天下姻缘的老人，手持红绳，据说能牵起千里良缘",
+            npc_type=NPCType.NORMAL,
+            location_id=shangjing_market.id,
+            is_killable=False,
+            is_active=True
+        )
+        matchmaker_npc.add_function("matchmaker", {"enabled": True})
+        session.add(matchmaker_npc)
+        created_count += 1
+
+    # 2. 创建结义使者NPC
+    sworn_npc_id = "sworn_envoy_shangjing"
+    existing_sworn = await NPCService.get_npc_by_id(session, sworn_npc_id)
+
+    if not existing_sworn:
+        sworn_npc = NPC(
+            npc_id=sworn_npc_id,
+            name="结义使者",
+            description="负责见证江湖义气的使者，曾为无数英雄豪杰主持结义仪式",
+            npc_type=NPCType.NORMAL,
+            location_id=shangjing_market.id,
+            is_killable=False,
+            is_active=True
+        )
+        sworn_npc.add_function("sworn_ceremony", {"enabled": True})
+        session.add(sworn_npc)
         created_count += 1
 
     return created_count

@@ -54,6 +54,7 @@ REQUIRED_FIELDS: Dict[str, Dict[str, str]] = {
     },
     "player": {
         "completed_trials": "TEXT NULL COMMENT '已通关的试炼列表(JSON数组,如[\"冥契红绳\",\"灵异拼图\"])'",
+        "charm": "INT DEFAULT 0 COMMENT '魅力值(通过收礼获得)'",
     },
 }
 
@@ -251,6 +252,24 @@ REQUIRED_TABLES: Dict[str, str] = {
             FOREIGN KEY (player_id) REFERENCES player(id) ON DELETE CASCADE,
             FOREIGN KEY (admin_id) REFERENCES player(id)
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='全局玩家封禁表'
+    """,
+    "player_relationship": """
+        CREATE TABLE IF NOT EXISTS player_relationship (
+            id INT AUTO_INCREMENT PRIMARY KEY COMMENT 'ID',
+            player_id VARCHAR(32) NOT NULL COMMENT '玩家A的ID',
+            target_id VARCHAR(32) NOT NULL COMMENT '玩家B的ID',
+            favorability INT DEFAULT 0 COMMENT '好感度(0-100)',
+            today_favorability_gain INT DEFAULT 0 COMMENT '今日已获得好感度',
+            last_gift_date DATETIME NULL COMMENT '最后送礼日期',
+            total_gifts INT DEFAULT 0 COMMENT '双方送礼总次数',
+            last_interaction_date DATETIME NULL COMMENT '最后互动日期',
+            relationship_type VARCHAR(20) DEFAULT 'none' COMMENT '关系类型: none/mentorship/sworn/marriage',
+            UNIQUE INDEX uk_player_relationship (player_id, target_id),
+            INDEX idx_favorability (favorability),
+            INDEX idx_relationship_type (relationship_type),
+            FOREIGN KEY (player_id) REFERENCES player(id) ON DELETE CASCADE,
+            FOREIGN KEY (target_id) REFERENCES player(id) ON DELETE CASCADE
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='玩家间关系表'
     """,
 }
 
