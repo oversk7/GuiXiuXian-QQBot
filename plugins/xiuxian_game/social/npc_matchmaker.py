@@ -32,38 +32,42 @@ async def handle_matchmaker_interaction(
     """
     dialogue_content = dialogue_content.strip().lower()
 
-    async with UnitOfWork(lambda: session) as uow:
-        service = RelationshipService(
-            player_repo=uow.players,
-            relationship_repo=uow.player_relationships,
-            item_repo=uow.items,
-            uow=uow
-        )
+    # 创建UnitOfWork,使用传入的session
+    from ..infrastructure.uow.unit_of_work import UnitOfWork
+    uow = UnitOfWork(lambda: session)
+    uow._session = session
 
-        # 显示菜单
-        if not dialogue_content or dialogue_content in ["菜单", "帮助"]:
-            return get_matchmaker_menu()
+    service = RelationshipService(
+        player_repo=uow.players,
+        relationship_repo=uow.player_relationships,
+        item_repo=uow.items,
+        uow=uow
+    )
 
-        # 查询婚姻状况
-        elif dialogue_content in ["查询", "状况", "婚姻状况"]:
-            return await check_marriage_status(player, uow)
+    # 显示菜单
+    if not dialogue_content or dialogue_content in ["菜单", "帮助"]:
+        return get_matchmaker_menu()
 
-        # 结婚
-        elif dialogue_content.startswith("结婚 "):
-            try:
-                target_uid = int(dialogue_content.split()[1])
-                success, message = await service.establish_marriage(player.id, target_uid)
+    # 查询婚姻状况
+    elif dialogue_content in ["查询", "状况", "婚姻状况"]:
+        return await check_marriage_status(player, uow)
 
-                if success:
-                    await uow.commit()
+    # 结婚
+    elif dialogue_content.startswith("结婚 "):
+        try:
+            target_uid = int(dialogue_content.split()[1])
+            success, message = await service.establish_marriage(player.id, target_uid)
 
-                return message
-            except (ValueError, IndexError):
-                return "⛔ 格式错误，正确格式：结婚 UID\n示例：结婚 123"
+            if success:
+                await uow.commit()
 
-        # 默认返回帮助
-        else:
-            return get_matchmaker_menu()
+            return message
+        except (ValueError, IndexError):
+            return "⛔ 格式错误，正确格式：结婚 UID\n示例：结婚 123"
+
+    # 默认返回帮助
+    else:
+        return get_matchmaker_menu()
 
 
 def get_matchmaker_menu() -> str:

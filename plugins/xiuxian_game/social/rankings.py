@@ -57,13 +57,13 @@ async def handle_charm_ranking(event: MessageEvent):
         ranking = list(result.all())
 
         if not ranking:
-            await charm_ranking_cmd.finish(message_add_head("💖 全服魅力榜 💖\n━━━━━━━━━━━━━━━━━━━━\n\n暂无数据", event))
+            await charm_ranking_cmd.finish(message_add_head("💖 全服魅力榜 💖\n━━━━━━━━━━━━━\n\n暂无数据", event))
             return
 
         # 格式化输出
         lines = [
             "💖 全服魅力榜 💖",
-            "━━━━━━━━━━━━━━━━━━━━",
+            "━━━━━━━━━━━━━",
             ""
         ]
 
