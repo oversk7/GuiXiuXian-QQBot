@@ -760,7 +760,7 @@ async def handle_guild_help(event: MessageEvent, args: Message = CommandArg()):
 social_help_cmd = on_command("社交系统", aliases={"社交帮助"}, priority=4, block=True)
 
 @social_help_cmd.handle()
-async def handle_social_help(event: MessageEvent, args: CommandArg()):
+async def handle_social_help(event: MessageEvent, args: Message = CommandArg()):
     msg = (
         "✨ 社交系统帮助 ✨\n"
         "送礼传情，结伴江湖，建立深厚的羁绊\n"
