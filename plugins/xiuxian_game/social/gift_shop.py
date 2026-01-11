@@ -65,12 +65,8 @@ async def get_gift_shop_menu() -> str:
         items = sorted(rarity_groups[rarity], key=lambda x: x.price)
 
         for item in items:
-            favorability = item.item_id.split("_")[1] if "favorability" not in item.__dict__ else item.favorability
-            # 从配置中获取favorability值
-            favorability_value = config.items_config["by_id"][item.item_id].__dict__.get("favorability", 0)
-
             lines.append(
-                f"  • {item.name} - {item.price}金币 (好感+{favorability_value})"
+                f"  • {item.name} - {item.price}金币 (好感+{item.favorability})"
             )
 
     lines.extend([
@@ -177,14 +173,13 @@ async def handle_buy_gift(event: MessageEvent, args: Message = CommandArg()):
             await uow.commit()
 
             # 返回成功消息
-            favorability = item_config.__dict__.get("favorability", 0)
             message = f"""✅ 购买成功！
 ━━━━━━━━━━━━━
 物品: {item_config.name}
 数量: {quantity}
 单价: {item_config.price}金币
 总价: {total_price}金币
-好感度: +{favorability} (每个)
+好感度: +{item_config.favorability} (每个)
 
 💡 使用【赠礼 UID {item_config.name}】赠送礼物"""
 

@@ -81,6 +81,9 @@ class ItemConfig:
         # 特殊效果配置(增强战斗系统)
         self.special_effects = data.get("special_effects", [])  # 特殊效果列表
 
+        # 礼物系统: 好感度加成
+        self.favorability = data.get("favorability", 0)  # 赠送时增加的好感度
+
     def get_rarity_display(self) -> str:
         """获取稀有度显示文本"""
         rarity_map = {
