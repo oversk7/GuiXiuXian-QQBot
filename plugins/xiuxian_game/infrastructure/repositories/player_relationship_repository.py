@@ -7,7 +7,7 @@ from sqlalchemy import select, and_, func
 from sqlalchemy.ext.asyncio import AsyncSession
 from typing import Optional, List
 
-from ..domain.repositories.base import IRepository
+from ...domain.repositories.base import IRepository
 from ...models.player_relationship import PlayerRelationship, RelationshipType
 
 
