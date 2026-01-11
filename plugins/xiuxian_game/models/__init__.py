@@ -33,6 +33,8 @@ from .dungeon_chest_record import DungeonChestRecord
 # 地点和NPC管理系统模型
 from .location import Location
 from .npc import NPC, NPCType, NPCStatus
+from .npc_dialogue_history import NPCDialogueHistory
+from .npc_favorability import NPCFavorability
 # 临时buff系统模型
 from .temporary_buff import TemporaryBuff
 # 钓鱼系统模型
@@ -58,6 +60,7 @@ __all__ = [
     "WorldBossCycle", "WorldBossDamage",
     "InviteReward", "DungeonChestRecord",
     "Location", "NPC", "NPCType", "NPCStatus",
+    "NPCDialogueHistory", "NPCFavorability",
     "TemporaryBuff", "FishingRecord", "FishingStats",
     "Lottery", "LotteryParticipant", "LotteryType", "LotteryStatus",
     "PvpLog", "VIPEquipmentBonus",
