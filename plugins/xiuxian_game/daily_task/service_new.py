@@ -357,8 +357,11 @@ class DailyTaskService:
             if ghost_npc.extra_data is None:
                 ghost_npc.extra_data = {}
             ghost_npc.extra_data["task_id"] = task.id
-            # task.task_type是枚举对象,需要转换为字符串
-            ghost_npc.extra_data["task_type"] = task.task_type.value
+            # task.task_type可能是枚举对象或字符串,需要转换为字符串
+            if hasattr(task.task_type, 'value'):
+                ghost_npc.extra_data["task_type"] = task.task_type.value
+            else:
+                ghost_npc.extra_data["task_type"] = str(task.task_type)
 
             return ghost_npc
 
