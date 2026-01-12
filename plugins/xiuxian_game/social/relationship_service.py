@@ -182,6 +182,7 @@ class RelationshipService:
         2. 不能转移跑商商品(GOODS类型)
         3. 可以转移材料、装备、好感度礼物(GIFT类型不消耗)
         4. 物品实际转移到接收者背包,不增加好感度
+        5. 装备类型需要选择具体实例(如果有多件)
 
         Args:
             sender_id: 发送者ID
@@ -219,19 +220,36 @@ class RelationshipService:
         if item_config.type == ItemType.GOODS:
             return False, f"禁止转移跑商商品类物品"
 
+        # 6. 特殊处理: 装备类型需要返回信息供Command处理
+        if item_config.type == ItemType.EQUIPMENT:
+            # 获取玩家装备列表
+            equipment_list = await self._item_repo.get_player_equipment_list(
+                sender_id, item_config.item_id, equipped=False
+            )
+
+            if not equipment_list:
+                return False, f"你没有可转移的「{item_name}」"
+
+            # 返回特殊标记,通知Command需要处理装备选择
+            return (
+                False,
+                f"__EQUIPMENT_SELECTION__:{item_config.item_id}:{item_config.name}:{len(equipment_list)}"
+            )
+
+        # 7. 普通物品处理流程
         # 注意: 允许转移GIFT类型,但不消耗也不加好感度(仅物理转移)
 
-        # 6. 检查背包数量
+        # 检查背包数量
         has_item = await self._item_repo.has_item(sender_id, item_config.item_id, quantity)
         if not has_item:
             return False, f"你没有足够的「{item_name}」"
 
-        # 7. 扣除发送者物品
+        # 扣除发送者物品
         success = await self._item_repo.consume_item(sender_id, item_config.item_id, quantity)
         if not success:
             return False, f"你没有足够的「{item_name}」"
 
-        # 8. 添加到接收者背包(自动检查背包空间)
+        # 添加到接收者背包(自动检查背包空间)
         try:
             await self._item_repo.add_item(receiver.id, item_config.item_id, quantity)
         except ValueError as e:
@@ -239,10 +257,74 @@ class RelationshipService:
             await self._item_repo.add_item(sender_id, item_config.item_id, quantity)
             return False, f"{receiver.nickname}的背包已满,无法接收物品"
 
-        # 9. 返回成功消息
+        # 返回成功消息
         return (
             True,
             f"成功向{receiver.nickname}当面送出{quantity}个「{item_name}」"
+        )
+
+    async def transfer_equipment_face_to_face(
+        self,
+        sender_id: str,
+        receiver_uid: int,
+        equipment_instance_id: int
+    ) -> Tuple[bool, str]:
+        """
+        当面转移装备(选择具体实例后调用)
+
+        规则:
+        1. 必须在同一市集(region)
+        2. 使用 transfer_equipment 方法转移装备实例
+        3. 不增加好感度
+
+        Args:
+            sender_id: 发送者ID
+            receiver_uid: 接收者UID
+            equipment_instance_id: 装备实例ID
+
+        Returns:
+            (是否成功, 提示信息)
+        """
+        from ..economy.equipment_trade_service import EquipmentTradeService
+
+        # 1. 获取发送者和接收者
+        sender = await self._player_repo.get_by_id(sender_id)
+        if not sender:
+            return False, "发送者不存在"
+
+        receiver = await self._player_repo.get_by_uid(receiver_uid)
+        if not receiver:
+            return False, f"未找到UID为{receiver_uid}的玩家"
+
+        # 2. 获取装备实例
+        equipment = await self._item_repo.get_by_id(equipment_instance_id)
+        if not equipment:
+            return False, "装备不存在"
+
+        if equipment.player_id != sender_id:
+            return False, "该装备不属于你"
+
+        if equipment.equipped:
+            return False, "不能转移已装备的装备,请先卸下"
+
+        # 3. 检查地理约束(同一市集)
+        if sender.region != receiver.region:
+            return False, f"必须和{receiver.nickname}在同一地点才能当面转移装备\n当前位置: {sender.region}\n对方位置: {receiver.region}"
+
+        # 4. 转移装备
+        # 使用EquipmentTradeService的transfer_equipment方法
+        success = await EquipmentTradeService.transfer_equipment(
+            self._uow.session, equipment, receiver.id
+        )
+
+        if not success:
+            return False, "转移装备失败"
+
+        # 5. 返回成功消息
+        summary = EquipmentTradeService.generate_equipment_summary(equipment)
+        return (
+            True,
+            f"成功向{receiver.nickname}转移装备: {summary}"
         )
 
     async def get_favorability(
