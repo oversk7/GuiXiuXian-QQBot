@@ -25,13 +25,13 @@ async def handle_favorability(event: MessageEvent, args: Message = CommandArg())
     args_text = args.extract_plain_text().strip()
 
     # 获取玩家
-    player = await get_unified_player(event)
-    if not player:
-        await favorability_cmd.finish(message_add_head("⛔ 请先创建角色", event))
+    async with UnitOfWork(AsyncSessionLocal) as uow:
+        player = await get_unified_player(uow.session, event)
+        if not player:
+            await favorability_cmd.finish(message_add_head("⛔ 请先创建角色", event))
 
-    if not args_text:
-        # 没有参数,显示当前所有关系
-        async with UnitOfWork(AsyncSessionLocal) as uow:
+        if not args_text:
+            # 没有参数,显示当前所有关系
             service = RelationshipService(
                 player_repo=uow.players,
                 relationship_repo=uow.player_relationships,
@@ -79,15 +79,14 @@ async def handle_favorability(event: MessageEvent, args: Message = CommandArg())
 
             lines.append("", "💡 使用【好感度 UID】查看详细信息")
             await favorability_cmd.finish(message_add_head("\n".join(lines), event))
-    else:
-        # 有参数,查询指定玩家的好感度
-        try:
-            target_uid = int(args_text.strip())
-        except ValueError:
-            await favorability_cmd.finish(message_add_head("⛔ UID格式错误,请输入数字", event))
-            return
+        else:
+            # 有参数,查询指定玩家的好感度
+            try:
+                target_uid = int(args_text.strip())
+            except ValueError:
+                await favorability_cmd.finish(message_add_head("⛔ UID格式错误,请输入数字", event))
+                return
 
-        async with UnitOfWork(AsyncSessionLocal) as uow:
             service = RelationshipService(
                 player_repo=uow.players,
                 relationship_repo=uow.player_relationships,
@@ -126,11 +125,11 @@ divorce_cmd = on_command("离婚", priority=5, block=True)
 @divorce_cmd.handle()
 async def handle_divorce(event: MessageEvent):
     """离婚命令 - 单方面离婚,需要支付10万金币"""
-    player = await get_unified_player(event)
-    if not player:
-        await divorce_cmd.finish(message_add_head("⛔ 请先创建角色", event))
-
     async with UnitOfWork(AsyncSessionLocal) as uow:
+        player = await get_unified_player(uow.session, event)
+        if not player:
+            await divorce_cmd.finish(message_add_head("⛔ 请先创建角色", event))
+
         service = RelationshipService(
             player_repo=uow.players,
             relationship_repo=uow.player_relationships,
@@ -152,11 +151,11 @@ break_sworn_cmd = on_command("断义", aliases={"脱离结义"}, priority=5, blo
 @break_sworn_cmd.handle()
 async def handle_break_sworn(event: MessageEvent):
     """断义命令 - 解除所有结义关系"""
-    player = await get_unified_player(event)
-    if not player:
-        await break_sworn_cmd.finish(message_add_head("⛔ 请先创建角色", event))
-
     async with UnitOfWork(AsyncSessionLocal) as uow:
+        player = await get_unified_player(uow.session, event)
+        if not player:
+            await break_sworn_cmd.finish(message_add_head("⛔ 请先创建角色", event))
+
         service = RelationshipService(
             player_repo=uow.players,
             relationship_repo=uow.player_relationships,
@@ -178,11 +177,11 @@ end_mentorship_cmd = on_command("脱离师门", aliases={"逐出师门"}, priori
 @end_mentorship_cmd.handle()
 async def handle_end_mentorship(event: MessageEvent):
     """结束师徒关系命令"""
-    player = await get_unified_player(event)
-    if not player:
-        await end_mentorship_cmd.finish(message_add_head("⛔ 请先创建角色", event))
-
     async with UnitOfWork(AsyncSessionLocal) as uow:
+        player = await get_unified_player(uow.session, event)
+        if not player:
+            await end_mentorship_cmd.finish(message_add_head("⛔ 请先创建角色", event))
+
         service = RelationshipService(
             player_repo=uow.players,
             relationship_repo=uow.player_relationships,
