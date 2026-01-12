@@ -73,7 +73,25 @@ async def handle_favorability(event: MessageEvent, args: Message = CommandArg())
                     elif rel.relationship_type == RelationshipType.MENTORSHIP.value:
                         rel_desc = "🎓 师徒"
                     else:
-                        rel_desc = f"{favorability} 好感"
+                        # 美化好感度显示
+                        if favorability >= 80:
+                            rel_desc = f"❤️ 深爱({favorability})"
+                        elif favorability >= 60:
+                            rel_desc = f"💕 亲密({favorability})"
+                        elif favorability >= 40:
+                            rel_desc = f"💖 喜爱({favorability})"
+                        elif favorability >= 20:
+                            rel_desc = "😊 友好"
+                        elif favorability > 0:
+                            rel_desc = "🙂 认识"
+                        elif favorability == 0:
+                            rel_desc = "➖ 陌生"
+                        elif favorability >= -20:
+                            rel_desc = "😒 不悦"
+                        elif favorability >= -40:
+                            rel_desc = "😠 厌恶"
+                        else:
+                            rel_desc = f"💔 仇视({favorability})"
 
                     lines.append(f"{other.nickname}[UID:{other.uid}] - {rel_desc}")
 
