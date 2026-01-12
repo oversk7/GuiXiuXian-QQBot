@@ -77,7 +77,8 @@ async def handle_favorability(event: MessageEvent, args: Message = CommandArg())
 
                     lines.append(f"{other.nickname}[UID:{other.uid}] - {rel_desc}")
 
-            lines.append("", "💡 使用【好感度 UID】查看详细信息")
+            lines.append("")
+            lines.append("💡 使用【好感度 UID】查看详细信息")
             await favorability_cmd.finish(message_add_head("\n".join(lines), event))
         else:
             # 有参数,查询指定玩家的好感度
