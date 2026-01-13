@@ -210,6 +210,7 @@ class Player(Base):
     seclusion_start_time: Mapped[datetime] = mapped_column(DateTime, nullable=True, comment="闭关开始时间")
     last_message_board_check: Mapped[datetime] = mapped_column(DateTime, nullable=True, comment="最后查看世界留言时间")
     last_private_message_check: Mapped[datetime] = mapped_column(DateTime, nullable=True, comment="最后查看私信时间")
+    daily_gift_purchases: Mapped[str | None] = mapped_column(Text, nullable=True, comment="每日礼物购买记录(JSON格式)")
 
     # 阴宅系统
     mansion_level: Mapped[int] = mapped_column(Integer, default=0, server_default='0', comment="阴宅等级(0表示未拥有)")
