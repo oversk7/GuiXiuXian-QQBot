@@ -535,7 +535,7 @@ class RelationshipService:
                             p1.id, p2.id
                         )
                         favorability = relationship.favorability if relationship else 0
-                        return False, f"{p1.nickname}与{p2.nickname}的好感度不足(需要60,当前{favorability})"
+                        return False, f"{p1.nickname}与{p2.nickname}的好感度不足(需要5000,当前{favorability})"
                     return False, msg
 
         # 建立所有两两之间的结义关系
@@ -744,8 +744,8 @@ class RelationshipService:
     def _get_min_favorability(self, relationship_type: RelationshipType) -> int:
         """获取建立关系所需的最小好感度"""
         requirements = {
-            RelationshipType.MENTORSHIP: 40,
-            RelationshipType.SWORN: 5000,
-            RelationshipType.MARRIAGE: 5000
+            RelationshipType.MENTORSHIP: 0,      # 拜师不需要好感度
+            RelationshipType.SWORN: 5000,        # 结义需要5000好感度
+            RelationshipType.MARRIAGE: 5000      # 结婚需要5000好感度
         }
         return requirements.get(relationship_type, 0)
