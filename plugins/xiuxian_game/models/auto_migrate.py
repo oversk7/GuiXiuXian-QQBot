@@ -23,19 +23,15 @@ logger = logging.getLogger(__name__)
 # 定义需要自动添加的字段
 # 格式: {表名: {字段名: 字段定义}}
 REQUIRED_FIELDS: Dict[str, Dict[str, str]] = {
-    # 以下字段已在模型中定义,不再需要自动迁移:
+    # 所有字段迁移已完成,无需额外配置
+    # 注释: 以下字段已通过多次重启完成迁移:
     # - daily_task: quest_chain_id, quest_step, is_tutorial, auto_accept
     # - stocks: health, health_decay_rate, is_active, delisted_at, delist_reason
     # - player: completed_trials, charm, daily_gift_purchases
     # - navigation_task: initial_distance
     # - player_stats: gold_earned_total, gold_spent_total, locations_visited_list
     # - location: expires_at
-
-    "world_message": {
-        "is_deleted": "BOOLEAN DEFAULT FALSE COMMENT '是否已删除（软删除）'",
-        "deleted_by": "VARCHAR(32) NULL COMMENT '删除人ID'",
-        "deleted_at": "DATETIME NULL COMMENT '删除时间'",
-    },
+    # - world_message: is_deleted, deleted_by, deleted_at
 }
 
 
