@@ -23,26 +23,16 @@ logger = logging.getLogger(__name__)
 # 定义需要自动添加的字段
 # 格式: {表名: {字段名: 字段定义}}
 REQUIRED_FIELDS: Dict[str, Dict[str, str]] = {
-    "daily_task": {
-        "quest_chain_id": "VARCHAR(50) NULL COMMENT '任务链ID（如novice_basic）'",
-        "quest_step": "INT NULL COMMENT '任务链步骤（1、2、3...）'",
-        "is_tutorial": "BOOLEAN DEFAULT FALSE COMMENT '是否为新手教程任务'",
-        "auto_accept": "BOOLEAN DEFAULT FALSE COMMENT '是否自动接取'",
-    },
-    "stocks": {
-        "health": "INT DEFAULT 100 COMMENT '健康度(100-0)'",
-        "health_decay_rate": "FLOAT DEFAULT 1.0 COMMENT '健康度衰减速度倍率'",
-        "is_active": "BOOLEAN DEFAULT TRUE COMMENT '是否活跃（未退市）'",
-        "delisted_at": "DATETIME NULL COMMENT '退市时间'",
-        "delist_reason": "VARCHAR(100) NULL COMMENT '退市原因'",
-    },
+    # 以下字段已在模型中定义,不再需要自动迁移:
+    # - daily_task: quest_chain_id, quest_step, is_tutorial, auto_accept
+    # - stocks: health, health_decay_rate, is_active, delisted_at, delist_reason
+    # - player: completed_trials, charm, daily_gift_purchases
+    # - navigation_task: initial_distance
+
     "player_stats": {
         "gold_earned_total": "BIGINT DEFAULT 0 COMMENT '累计获得金币'",
         "gold_spent_total": "BIGINT DEFAULT 0 COMMENT '累计花费金币'",
         "locations_visited_list": "TEXT NULL COMMENT '探索过的地点列表(逗号分隔)'",
-    },
-    "navigation_task": {
-        "initial_distance": "FLOAT NULL COMMENT '初始总距离（用于进度计算）'",
     },
     "world_message": {
         "is_deleted": "BOOLEAN DEFAULT FALSE COMMENT '是否已删除（软删除）'",
@@ -51,11 +41,6 @@ REQUIRED_FIELDS: Dict[str, Dict[str, str]] = {
     },
     "location": {
         "expires_at": "DATETIME NULL COMMENT '过期时间（临时地点自动删除）'",
-    },
-    "player": {
-        "completed_trials": "TEXT NULL COMMENT '已通关的试炼列表(JSON数组,如[\"冥契红绳\",\"灵异拼图\"])'",
-        "charm": "INT DEFAULT 0 COMMENT '魅力值(通过收礼获得)'",
-        "daily_gift_purchases": "TEXT NULL COMMENT '每日礼物购买记录(JSON格式: {\"item_id\": {\"date\": \"YYYY-MM-DD\", \"count\": N}})'",
     },
 }
 
