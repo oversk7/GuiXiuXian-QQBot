@@ -1653,11 +1653,11 @@ items:
       type: "GOODS"
       price: 2000
 
-    - item_id: "diamond_ring"
-      name: "钻戒"
-      description: "切割星光的锋芒，象征欲望"
+    - item_id: "jade_bracelet"
+      name: "翡翠手镯"
+      description: "温润的翡翠手镯，透着幽绿光泽，蕴含着岁月的沉淀"
       type: "GOODS"
-      price: 3000
+      price: 2800
 
     - item_id: "silk_scarf"
       name: "丝巾"

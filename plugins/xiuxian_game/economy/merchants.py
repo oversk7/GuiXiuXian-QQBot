@@ -55,7 +55,7 @@ class MarketConfig:
 
 # 所有跑商商品列表（包含血契丹和阴冥草，用于市场配置和分析）
 ALL_GOODS = [
-    "lux_perfume", "red_wine", "gold_watch", "diamond_ring", "silk_scarf",
+    "lux_perfume", "red_wine", "gold_watch", "jade_bracelet", "silk_scarf",
     "dslr_camera", "smartphone", "gaming_console", "designer_bag", "luxury_chocolate",
     "art_book", "concert_ticket", "fountain_pen", "sneakers", "noise_headphones",
     "yin_grass", "blood_pact"
@@ -63,7 +63,7 @@ ALL_GOODS = [
 
 # 受携带限制的商品列表（不包含血契丹、阴冥草和鱼类）
 LIMITED_GOODS = [
-    "lux_perfume", "red_wine", "gold_watch", "diamond_ring", "silk_scarf",
+    "lux_perfume", "red_wine", "gold_watch", "jade_bracelet", "silk_scarf",
     "dslr_camera", "smartphone", "gaming_console", "designer_bag", "luxury_chocolate",
     "art_book", "concert_ticket", "fountain_pen", "sneakers", "noise_headphones"
 ]
@@ -90,8 +90,8 @@ MARKET_CONFIGS = {
     "merchant1": {
         "name": "上京",
         "coord": (0, 0),
-        "sellable": ["gold_watch", "diamond_ring", "lux_perfume", "designer_bag", "red_wine"],
-        "buyable": ["gold_watch", "diamond_ring", "lux_perfume", "designer_bag", "red_wine", "art_book"]
+        "sellable": ["gold_watch", "jade_bracelet", "lux_perfume", "designer_bag", "red_wine"],
+        "buyable": ["gold_watch", "jade_bracelet", "lux_perfume", "designer_bag", "red_wine", "art_book"]
     },
 
     # 北郊 (100,460) - 工业区，电子产品集中
@@ -123,7 +123,7 @@ MARKET_CONFIGS = {
         "name": "南郊",
         "coord": (-100, -480),
         "sellable": ["red_wine", "luxury_chocolate", "designer_bag", "dslr_camera", "gold_watch"],
-        "buyable": ["red_wine", "luxury_chocolate", "dslr_camera", "gold_watch", "diamond_ring", "gaming_console"]
+        "buyable": ["red_wine", "luxury_chocolate", "dslr_camera", "gold_watch", "jade_bracelet", "gaming_console"]
     },
 
     # 金陵 (220,-350) - 古都，传统与现代结合
@@ -131,7 +131,7 @@ MARKET_CONFIGS = {
         "name": "金陵",
         "coord": (220, -350),
         "sellable": ["gold_watch", "art_book", "fountain_pen", "silk_scarf", "yin_grass"],
-        "buyable": ["gold_watch", "art_book", "silk_scarf", "yin_grass", "sneakers", "concert_ticket", "diamond_ring"]
+        "buyable": ["gold_watch", "art_book", "silk_scarf", "yin_grass", "sneakers", "concert_ticket", "jade_bracelet"]
     },
 
     # 云岭 (-250,490) - 山区，药材丰富
@@ -171,15 +171,15 @@ MARKET_CONFIGS = {
         "name": "风雪镇",
         "coord": (-5, 390),
         "sellable": ["blood_pact", "yin_grass", "concert_ticket", "art_book"],
-        "buyable": ["blood_pact", "yin_grass", "concert_ticket", "diamond_ring", "gold_watch"]
+        "buyable": ["blood_pact", "yin_grass", "concert_ticket", "jade_bracelet", "gold_watch"]
     },
 
     # 舟山 (200,-200) - 海岛城市，海外商品 + 鱼类收购
     "merchant12": {
         "name": "舟山",
         "coord": (200, -200),
-        "sellable": ["diamond_ring", "red_wine", "dslr_camera", "designer_bag"],
-        "buyable": ["diamond_ring", "red_wine", "dslr_camera", "designer_bag", "gaming_console", "smartphone"] + ALL_FISH
+        "sellable": ["jade_bracelet", "red_wine", "dslr_camera", "designer_bag"],
+        "buyable": ["jade_bracelet", "red_wine", "dslr_camera", "designer_bag", "gaming_console", "smartphone"] + ALL_FISH
     },
 
     # 大昌市 (-400,-240) - 西南商埠，综合贸易
