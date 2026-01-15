@@ -176,12 +176,22 @@ class Player(Base):
             self.y = self.real_world_y
 
     def can_enter_dungeon_level(self, level: int) -> bool:
-        """检查是否可以进入指定层级诡域"""
+        """检查是否可以进入指定层级诡域
+
+        规则:
+        - 第1层总是可以进入
+        - 可以进入所有已解锁的层级(1 到 max_dungeon_level)
+        - 可以进入下一层(max_dungeon_level + 1)用于逐层探索
+        - 超过 max_dungeon_level + 1 的层不能进入(需要逐层解锁)
+        """
         if level <= 0:
             return False
         if level == 1:
             return True  # 第1层总是可以进入
-        return level <= (self.max_dungeon_level or 0) + 1  # 只能进入已通过层级+1
+
+        max_level = self.max_dungeon_level or 0
+        # 可以进入所有已解锁的层级 + 下一层(用于逐层探索)
+        return level <= max_level + 1
 
     def unlock_next_dungeon_level(self):
         """解锁下一层诡域（击败当前层怪物后调用）"""
