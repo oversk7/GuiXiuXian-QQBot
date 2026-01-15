@@ -331,17 +331,14 @@ async def auto_migrate(engine: AsyncEngine, verbose: bool = True):
         # 3. 创建缺失的索引
         indexes_added = await _add_missing_indexes(conn, verbose)
 
-        # 4. 检测并修复 ENUM 列（新增）
+        # 4. 检测并修复 ENUM 列
         enums_fixed = await _fix_enum_columns(conn, verbose)
 
-        # 5. 数据迁移：将旧的 diamond_ring 迁移为 jade_bracelet（新增）
-        items_migrated = await _migrate_legacy_items(conn, verbose)
-
         if verbose:
-            if tables_created > 0 or fields_added > 0 or indexes_added > 0 or enums_fixed > 0 or items_migrated > 0:
+            if tables_created > 0 or fields_added > 0 or indexes_added > 0 or enums_fixed > 0:
                 print(f"[√] [自动迁移] 完成！创建了 {tables_created} 个表，"
                       f"添加了 {fields_added} 个字段，{indexes_added} 个索引，"
-                      f"修复了 {enums_fixed} 个 ENUM 列，迁移了 {items_migrated} 个旧物品")
+                      f"修复了 {enums_fixed} 个 ENUM 列")
             else:
                 print("[√] [自动迁移] 数据库结构已是最新")
 
@@ -739,69 +736,3 @@ async def _rebuild_enum_column(
         except:
             pass
         raise
-
-
-async def _migrate_legacy_items(conn, verbose: bool) -> int:
-    """
-    迁移旧物品ID到新物品ID
-
-    当前迁移:
-    - diamond_ring (跑商钻戒) -> jade_bracelet (翡翠手镯)
-
-    Returns:
-        迁移的物品数量
-    """
-    migrated_count = 0
-
-    try:
-        # 迁移背包中的物品
-        result = await conn.execute(text("""
-            UPDATE inventory
-            SET item_id = 'jade_bracelet'
-            WHERE item_id = 'diamond_ring'
-        """))
-        migrated_count += result.rowcount
-
-        # 迁移市场订单中的物品 (如果有market_orders表)
-        try:
-            result = await conn.execute(text("""
-                UPDATE market_orders
-                SET item_id = 'jade_bracelet'
-                WHERE item_id = 'diamond_ring'
-            """))
-            migrated_count += result.rowcount
-        except Exception:
-            # 表可能不存在或列不存在,忽略
-            pass
-
-        # 迁移市场状态中的物品 (如果有market_states表)
-        try:
-            result = await conn.execute(text("""
-                UPDATE market_states
-                SET item_id = 'jade_bracelet'
-                WHERE item_id = 'diamond_ring'
-            """))
-            migrated_count += result.rowcount
-        except Exception:
-            # 表可能不存在或列不存在,忽略
-            pass
-
-        # 迁移交易记录中的物品 (如果有trade_records表)
-        try:
-            result = await conn.execute(text("""
-                UPDATE trade_records
-                SET item_id = 'jade_bracelet'
-                WHERE item_id = 'diamond_ring'
-            """))
-            migrated_count += result.rowcount
-        except Exception:
-            # 表可能不存在或列不存在,忽略
-            pass
-
-        if migrated_count > 0 and verbose:
-            print(f"  [迁移] 将 {migrated_count} 个旧物品 'diamond_ring' 迁移为 'jade_bracelet'")
-
-    except Exception as e:
-        logger.error(f"迁移旧物品失败: {e}")
-
-    return migrated_count
