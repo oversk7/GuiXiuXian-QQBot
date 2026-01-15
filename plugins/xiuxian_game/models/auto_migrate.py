@@ -28,19 +28,13 @@ REQUIRED_FIELDS: Dict[str, Dict[str, str]] = {
     # - stocks: health, health_decay_rate, is_active, delisted_at, delist_reason
     # - player: completed_trials, charm, daily_gift_purchases
     # - navigation_task: initial_distance
+    # - player_stats: gold_earned_total, gold_spent_total, locations_visited_list
+    # - location: expires_at
 
-    "player_stats": {
-        "gold_earned_total": "BIGINT DEFAULT 0 COMMENT '累计获得金币'",
-        "gold_spent_total": "BIGINT DEFAULT 0 COMMENT '累计花费金币'",
-        "locations_visited_list": "TEXT NULL COMMENT '探索过的地点列表(逗号分隔)'",
-    },
     "world_message": {
         "is_deleted": "BOOLEAN DEFAULT FALSE COMMENT '是否已删除（软删除）'",
         "deleted_by": "VARCHAR(32) NULL COMMENT '删除人ID'",
         "deleted_at": "DATETIME NULL COMMENT '删除时间'",
-    },
-    "location": {
-        "expires_at": "DATETIME NULL COMMENT '过期时间（临时地点自动删除）'",
     },
 }
 
