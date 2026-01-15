@@ -38,224 +38,23 @@ REQUIRED_FIELDS: Dict[str, Dict[str, str]] = {
 # 定义需要自动创建的表（仅用于新表创建，不修改已有表）
 # 注意：这会调用 CREATE TABLE IF NOT EXISTS
 REQUIRED_TABLES: Dict[str, str] = {
-    "stock_events": """
-        CREATE TABLE IF NOT EXISTS stock_events (
-            id INT AUTO_INCREMENT PRIMARY KEY COMMENT 'ID',
-            event_id VARCHAR(50) NOT NULL COMMENT '事件ID',
-            event_name VARCHAR(100) NOT NULL COMMENT '事件名称',
-            description VARCHAR(500) NOT NULL COMMENT '事件描述',
-            affected_stock_id INT NOT NULL COMMENT '受影响股票ID',
-            price_impact FLOAT NOT NULL COMMENT '价格影响（-0.4表示跌40%）',
-            health_impact INT NOT NULL COMMENT '健康度影响',
-            trigger_date DATETIME NOT NULL COMMENT '触发时间',
-            duration_days INT NOT NULL COMMENT '持续天数',
-            is_active BOOLEAN DEFAULT TRUE COMMENT '是否生效中',
-            created_at DATETIME DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
-            INDEX idx_stock_event (affected_stock_id, is_active),
-            FOREIGN KEY (affected_stock_id) REFERENCES stocks(id)
-        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='股票突发事件表'
-    """,
-    "bank_fund": """
-        CREATE TABLE IF NOT EXISTS bank_fund (
-            id INT AUTO_INCREMENT PRIMARY KEY COMMENT '基金ID',
-            fund_name VARCHAR(100) NOT NULL COMMENT '基金名称',
-            fund_type VARCHAR(50) DEFAULT 'lively' COMMENT '基金类型(lively=活期)',
-            daily_return FLOAT DEFAULT 0.0 COMMENT '当日收益率',
-            total_scale BIGINT DEFAULT 0 COMMENT '基金总规模(金币)',
-            participant_count INT DEFAULT 0 COMMENT '参与人数',
-            created_at DATETIME DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
-            updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间'
-        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='银行理财基金表'
-    """,
-    "fund_holding": """
-        CREATE TABLE IF NOT EXISTS fund_holding (
-            id INT AUTO_INCREMENT PRIMARY KEY COMMENT '持仓ID',
-            player_id VARCHAR(32) NOT NULL COMMENT '玩家ID',
-            fund_id INT NOT NULL COMMENT '基金ID',
-            principal BIGINT NOT NULL COMMENT '本金(金币)',
-            current_value BIGINT NOT NULL COMMENT '当前市值(金币)',
-            accumulated_profit BIGINT DEFAULT 0 COMMENT '累计盈亏(金币)',
-            buy_date DATETIME DEFAULT CURRENT_TIMESTAMP COMMENT '购买时间',
-            last_settlement DATETIME DEFAULT CURRENT_TIMESTAMP COMMENT '最后结算时间',
-            is_active BOOLEAN DEFAULT TRUE COMMENT '是否持有中',
-            INDEX idx_player_holding (player_id, is_active),
-            INDEX idx_fund_holding (fund_id, is_active)
-        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='理财持仓表'
-    """,
-    "player_achievement": """
-        CREATE TABLE IF NOT EXISTS player_achievement (
-            id INT AUTO_INCREMENT PRIMARY KEY COMMENT 'ID',
-            player_id VARCHAR(32) NOT NULL COMMENT '玩家ID',
-            achievement_id VARCHAR(64) NOT NULL COMMENT '成就ID',
-            unlocked_at DATETIME DEFAULT CURRENT_TIMESTAMP COMMENT '解锁时间',
-            progress INT DEFAULT 0 COMMENT '当前进度',
-            is_completed BOOLEAN DEFAULT FALSE COMMENT '是否已完成',
-            reward_claimed BOOLEAN DEFAULT FALSE COMMENT '是否已领取奖励',
-            UNIQUE INDEX idx_player_achievement (player_id, achievement_id),
-            INDEX idx_player_completed (player_id, is_completed),
-            FOREIGN KEY (player_id) REFERENCES player(id)
-        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='玩家成就表'
-    """,
-    "player_stats": """
-        CREATE TABLE IF NOT EXISTS player_stats (
-            player_id VARCHAR(32) PRIMARY KEY COMMENT '玩家ID',
-            cultivation_count INT DEFAULT 0 COMMENT '累计修炼次数',
-            total_battles INT DEFAULT 0 COMMENT '总战斗次数',
-            total_wins INT DEFAULT 0 COMMENT '总胜利次数',
-            total_kills INT DEFAULT 0 COMMENT '总击杀数',
-            gold_earned_total BIGINT DEFAULT 0 COMMENT '累计获得金币',
-            gold_spent_total BIGINT DEFAULT 0 COMMENT '累计花费金币',
-            locations_visited INT DEFAULT 0 COMMENT '探索过的地点数',
-            locations_visited_list TEXT NULL COMMENT '探索过的地点列表(逗号分隔)',
-            equipment_obtained INT DEFAULT 0 COMMENT '获得过的装备数',
-            last_login_date DATETIME NULL COMMENT '最后登录日期',
-            consecutive_login_days INT DEFAULT 0 COMMENT '连续登录天数',
-            total_login_days INT DEFAULT 0 COMMENT '总登录天数',
-            updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
-            FOREIGN KEY (player_id) REFERENCES player(id)
-        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='玩家统计数据表'
-    """,
-    "npc_dialogue_history": """
-        CREATE TABLE IF NOT EXISTS npc_dialogue_history (
-            id INT AUTO_INCREMENT PRIMARY KEY COMMENT 'ID',
-            npc_id INT NOT NULL COMMENT 'NPC ID',
-            player_id VARCHAR(32) NOT NULL COMMENT '玩家ID',
-            dialogue_type VARCHAR(20) NOT NULL COMMENT '对话类型: natural_dialogue | game_command',
-            player_input TEXT NOT NULL COMMENT '玩家输入',
-            npc_response TEXT NOT NULL COMMENT 'NPC回复',
-            game_command VARCHAR(255) NULL COMMENT '游戏指令内容（仅game_command类型）',
-            game_output TEXT NULL COMMENT '游戏指令执行结果',
-            game_command_status VARCHAR(20) DEFAULT 'success' COMMENT '指令执行状态: success | failed | partial',
-            favorability_change INT DEFAULT 0 COMMENT '本次对话导致的好感度变化',
-            favorability_after INT DEFAULT 50 COMMENT '本次对话后的总好感度',
-            dialogue_duration_seconds INT DEFAULT 0 COMMENT '对话耗时(秒)',
-            ai_tokens_used INT NULL COMMENT 'AI调用消耗的token数',
-            ai_cost INT NULL COMMENT 'AI调用成本(分，人民币)',
-            created_at DATETIME DEFAULT CURRENT_TIMESTAMP COMMENT '对话时间',
-            INDEX idx_npc_id (npc_id),
-            INDEX idx_player_id (player_id),
-            INDEX idx_created_at (created_at),
-            INDEX idx_npc_player_created (npc_id, player_id, created_at),
-            FOREIGN KEY (npc_id) REFERENCES npc(id) ON DELETE CASCADE,
-            FOREIGN KEY (player_id) REFERENCES player(id) ON DELETE CASCADE
-        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='NPC对话历史表'
-    """,
-    "npc_favorability": """
-        CREATE TABLE IF NOT EXISTS npc_favorability (
-            id INT AUTO_INCREMENT PRIMARY KEY COMMENT 'ID',
-            npc_id INT NOT NULL COMMENT 'NPC ID',
-            player_id VARCHAR(32) NOT NULL COMMENT '玩家ID',
-            current_favorability INT DEFAULT 50 COMMENT '当前好感度(0-100)',
-            total_interactions INT DEFAULT 0 COMMENT '累计互动次数',
-            total_favorability_gained INT DEFAULT 0 COMMENT '累计好感度获得（可为负）',
-            relationship_level VARCHAR(20) DEFAULT '陌生人' COMMENT '关系等级: 陌生人|熟识|友好|亲密|知心',
-            is_follower BOOLEAN DEFAULT FALSE COMMENT '是否跟随关系',
-            is_partner BOOLEAN DEFAULT FALSE COMMENT '是否伴侣关系',
-            milestone_events JSON NULL COMMENT '关键事件记录',
-            first_interaction_at DATETIME DEFAULT CURRENT_TIMESTAMP COMMENT '首次互动时间',
-            last_interaction_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '最后互动时间',
-            updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '记录更新时间',
-            UNIQUE INDEX idx_npc_player_unique (npc_id, player_id),
-            INDEX idx_npc_id (npc_id),
-            INDEX idx_player_id (player_id),
-            FOREIGN KEY (npc_id) REFERENCES npc(id) ON DELETE CASCADE,
-            FOREIGN KEY (player_id) REFERENCES player(id) ON DELETE CASCADE
-        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='NPC好感度表'
-    """,
-    "npc_long_term_memory": """
-        CREATE TABLE IF NOT EXISTS npc_long_term_memory (
-            id INT AUTO_INCREMENT PRIMARY KEY COMMENT 'ID',
-            npc_id INT NOT NULL COMMENT 'NPC ID',
-            player_id VARCHAR(32) NOT NULL COMMENT '玩家ID',
-            memory_type VARCHAR(20) NOT NULL COMMENT '记忆类型: summary(对话总结) | event(关键事件)',
-            content TEXT NOT NULL COMMENT '记忆内容（对话总结或事件描述）',
-            event_type VARCHAR(20) NULL COMMENT '事件类型: gift|quest|promise|conflict|emotion|other',
-            importance_score INT DEFAULT 5 COMMENT '重要性评分(1-10)',
-            emotion_change INT DEFAULT 0 COMMENT '情感变化值（好感度变化）',
-            created_at DATETIME DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
-            weight FLOAT DEFAULT 1.0 COMMENT '记忆权重（随时间衰减）',
-            last_accessed_at DATETIME DEFAULT CURRENT_TIMESTAMP COMMENT '最后访问时间',
-            from_dialogue_id INT NULL COMMENT '关联的起始对话ID',
-            to_dialogue_id INT NULL COMMENT '关联的结束对话ID',
-            extra_metadata JSON NULL COMMENT '额外元数据',
-            INDEX idx_npc_player_time (npc_id, player_id, created_at),
-            INDEX idx_memory_type (memory_type),
-            INDEX idx_importance (importance_score),
-            INDEX idx_weight (weight)
-        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='NPC长期记忆表'
-    """,
-    "npc_dialogue_summary_checkpoint": """
-        CREATE TABLE IF NOT EXISTS npc_dialogue_summary_checkpoint (
-            id INT AUTO_INCREMENT PRIMARY KEY COMMENT 'ID',
-            npc_id INT NOT NULL COMMENT 'NPC ID',
-            player_id VARCHAR(32) NOT NULL COMMENT '玩家ID',
-            last_summarized_dialogue_id INT NOT NULL COMMENT '最后总结的对话ID',
-            total_dialogues_summarized INT DEFAULT 0 COMMENT '已总结的对话总数',
-            last_summary_time DATETIME DEFAULT CURRENT_TIMESTAMP COMMENT '最后总结时间',
-            next_summary_threshold INT DEFAULT 20 COMMENT '下次总结的对话数阈值',
-            UNIQUE INDEX idx_npc_player_checkpoint (npc_id, player_id)
-        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='NPC对话总结检查点表'
-    """,
-    "message_board_blacklist": """
-        CREATE TABLE IF NOT EXISTS message_board_blacklist (
-            id INT AUTO_INCREMENT PRIMARY KEY COMMENT 'ID',
-            target_player_id VARCHAR(32) NOT NULL COMMENT '被禁言玩家ID',
-            admin_id VARCHAR(32) NOT NULL COMMENT '操作管理员ID',
-            reason VARCHAR(200) NULL COMMENT '禁言原因',
-            created_at DATETIME DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
-            expires_at DATETIME NULL COMMENT '过期时间（NULL表示永久禁言）',
-            is_active BOOLEAN DEFAULT TRUE COMMENT '是否生效中',
-            UNIQUE INDEX idx_target_player (target_player_id),
-            INDEX idx_admin_id (admin_id),
-            INDEX idx_is_active (is_active),
-            FOREIGN KEY (target_player_id) REFERENCES player(id) ON DELETE CASCADE,
-            FOREIGN KEY (admin_id) REFERENCES player(id)
-        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='留言板黑名单表'
-    """,
-    "player_ban": """
-        CREATE TABLE IF NOT EXISTS player_ban (
-            id INT AUTO_INCREMENT PRIMARY KEY COMMENT 'ID',
-            player_id VARCHAR(32) NOT NULL COMMENT '被封禁玩家ID',
-            admin_id VARCHAR(32) NOT NULL COMMENT '操作管理员ID',
-            reason VARCHAR(500) NULL COMMENT '封禁原因',
-            ban_type VARCHAR(20) DEFAULT 'permanent' COMMENT '封禁类型：permanent(永久) | temporary(临时)',
-            created_at DATETIME DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
-            expires_at DATETIME NULL COMMENT '过期时间（NULL表示永久封禁）',
-            is_active BOOLEAN DEFAULT TRUE COMMENT '是否生效中',
-            UNIQUE INDEX idx_player_id (player_id),
-            INDEX idx_admin_id (admin_id),
-            INDEX idx_is_active (is_active),
-            FOREIGN KEY (player_id) REFERENCES player(id) ON DELETE CASCADE,
-            FOREIGN KEY (admin_id) REFERENCES player(id)
-        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='全局玩家封禁表'
-    """,
-    "player_relationship": """
-        CREATE TABLE IF NOT EXISTS player_relationship (
-            id INT AUTO_INCREMENT PRIMARY KEY COMMENT 'ID',
-            player_id VARCHAR(32) NOT NULL COMMENT '玩家A的ID',
-            target_id VARCHAR(32) NOT NULL COMMENT '玩家B的ID',
-            favorability INT DEFAULT 0 COMMENT '好感度(0-100)',
-            today_favorability_gain INT DEFAULT 0 COMMENT '今日已获得好感度',
-            last_gift_date DATETIME NULL COMMENT '最后送礼日期',
-            total_gifts INT DEFAULT 0 COMMENT '双方送礼总次数',
-            last_interaction_date DATETIME NULL COMMENT '最后互动日期',
-            relationship_type VARCHAR(20) DEFAULT 'none' COMMENT '关系类型: none/mentorship/sworn/marriage',
-            UNIQUE INDEX uk_player_relationship (player_id, target_id),
-            INDEX idx_favorability (favorability),
-            INDEX idx_relationship_type (relationship_type),
-            FOREIGN KEY (player_id) REFERENCES player(id) ON DELETE CASCADE,
-            FOREIGN KEY (target_id) REFERENCES player(id) ON DELETE CASCADE
-        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='玩家间关系表'
-    """,
+    # 所有表均已通过多次重启创建完成,无需额外配置
+    # 注释: 以下表已创建完成:
+    # - stock_events, bank_fund, fund_holding, player_achievement, player_stats
+    # - npc_dialogue_history, npc_favorability, npc_long_term_memory, npc_dialogue_summary_checkpoint
+    # - message_board_blacklist, player_ban, player_relationship
+    # - invite_reward, dungeon_chest_record, russian_roulette_room, russian_roulette_game
+    # - guild_task_record, player_task_stats, part_time_job, job_location, player_job_stats
+    # - world_boss_cycle, world_boss_damage, alchemy_record
 }
 
 
 # 定义需要自动创建的索引
 # 格式: [(表名, 索引名, 索引列)]
 REQUIRED_INDEXES: List[Tuple[str, str, str]] = [
-    ("daily_task", "idx_daily_task_tutorial", "player_id, is_tutorial, status"),
-    ("daily_task", "idx_daily_task_quest_chain", "player_id, quest_chain_id, quest_step"),
-    # 未来需要添加更多索引时，直接在这里添加即可
+    # 所有索引均已创建完成,无需额外配置
+    # 注释: 以下索引已创建完成:
+    # - idx_daily_task_tutorial, idx_daily_task_quest_chain
 ]
 
 
