@@ -719,7 +719,6 @@ async def handle_guild_help(event: MessageEvent, args: Message = CommandArg()):
         "【创建公会 <公会名>】 创建公会（消耗会长委任书）\n"
         "【我的公会】 查看公会信息\n"
         "【公会成员 [页码]】 查看成员列表\n"
-        "【公会列表 [页码]】 查看公会排行榜\n"
         "【加入公会 <公会ID>】 加入公会\n"
         "【退会】 退出公会（清空积分和贡献）\n"
         "━━━━━━━━━━━━━\n"

@@ -635,56 +635,6 @@ async def handle_transfer(event: MessageEvent, args: Message = CommandArg()):
         msg = f"👑 会长职位已转让给 {target_player.nickname}[UID:{target_player.uid}]"
         await transfer_cmd.finish(message_add_head(msg, event))
 
-# ==================== 公会列表 ====================
-list_guilds_cmd = on_command("公会列表", aliases={"公会排行"}, block=True, priority=5)
-
-@list_guilds_cmd.handle()
-async def handle_list_guilds(event: MessageEvent, args: Message = CommandArg()):
-    page_size = 10
-    arg = args.extract_plain_text().strip()
-    try:
-        page = int(arg) if arg else 1
-    except ValueError:
-        page = 1
-    page = max(1, page)
-
-    async with safe_session() as session:
-        # 统计总数
-        total = (await session.execute(select(_func.count(Guild.id)))).scalar_one()
-        if total == 0:
-            await list_guilds_cmd.finish("暂无公会")
-        total_pages = (total - 1) // page_size + 1
-        page = min(page, total_pages)
-
-        offset = (page - 1) * page_size
-        stmt = (
-            select(Guild)
-            .order_by(Guild.level.desc(), Guild.exp.desc())
-            .offset(offset)
-            .limit(page_size)
-        )
-        guilds = (await session.execute(stmt)).scalars().all()
-
-    # 容量计算公式：基础10人，每级 +5 人
-    def _capacity(lv: int) -> int:
-        return 10 + (lv - 1) * 5
-
-    lines = [f"🏰 公会排行榜 (第{page}/{total_pages}页)", "━━━━━━━━━━"]
-    start_idx = offset + 1
-    # 统计成员数量
-    for idx, g in enumerate(guilds, start_idx):
-        cnt = (await session.execute(select(_func.count(Player.id)).where(Player.guild_id == g.id))).scalar_one()
-        cap = _capacity(g.level)
-        base_info = ""
-        if g.base_x is not None and g.base_y is not None:
-            base_info = f" 基地:({g.base_x},{g.base_y}) 势力:{g.territory_range}"
-        lines.append(f"{idx}. 『{g.name}』[ID:{g.id}] Lv.{g.level} ({cnt}/{cap}){base_info}")
-
-    lines.append("━━━━━━━━━━")
-    lines.append("💡 使用【加入公会 公会ID】申请加入公会")
-
-    await list_guilds_cmd.finish(message_add_head("\n".join(lines), event))
-
 # ==================== 申请列表 ====================
 application_list_cmd = on_command("申请列表", block=True, priority=5)
 
