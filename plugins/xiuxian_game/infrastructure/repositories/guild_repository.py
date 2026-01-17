@@ -11,8 +11,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import joinedload
 
 from ...domain.repositories.base import IRepository
-from ...models.guild import Guild, GuildMember, GuildPosition
-from ...models.guild_alchemy_record import GuildAlchemyRecord
+from ...models.guild import Guild, GuildMember, GuildPosition, GuildAlchemyProduction
 from ...models.guild_task_record import GuildTaskRecord
 
 
@@ -211,7 +210,7 @@ class GuildRepository(IRepository[Guild]):
 
         此方法会删除:
         1. 公会成员记录 (guild_member)
-        2. 公会丹房产出记录 (guild_alchemy_record)
+        2. 公会丹房产出记录 (guild_alchemy_production)
         3. 公会任务记录 (guild_task_record)
         4. 公会建筑记录 (guild_building) - 通过 cascade 自动删除
         5. 公会主记录 (guild)
@@ -238,7 +237,7 @@ class GuildRepository(IRepository[Guild]):
             deleted_count += deleted_members
 
             # 3. 删除公会丹房产出记录
-            stmt_alchemy = delete(GuildAlchemyRecord).where(GuildAlchemyRecord.guild_id == guild_id)
+            stmt_alchemy = delete(GuildAlchemyProduction).where(GuildAlchemyProduction.guild_id == guild_id)
             result_alchemy = await self._session.execute(stmt_alchemy)
             deleted_alchemy = result_alchemy.rowcount
             deleted_count += deleted_alchemy
