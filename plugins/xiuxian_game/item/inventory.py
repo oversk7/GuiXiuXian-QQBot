@@ -889,19 +889,12 @@ async def handle_organize_inventory(event: MessageEvent):
 # 新增：管理员专用物品转移指令
 transfer_item_cmd = on_command("转移物品", block=True, priority=2)
 
-# 新增副管理员判断
 from ..ai_guide import is_admin
-from ..config import Config
-
-def is_sub_admin(user_id: str) -> bool:
-    config = Config()
-    sub_admin_ids = config.game_config.get("admin", {}).get("sub_admin_ids", [])
-    return user_id in sub_admin_ids
 
 @transfer_item_cmd.handle()
 async def handle_transfer_item(event: MessageEvent, args: Message = CommandArg()):
     """
-    管理员/副管理员专用：将某玩家背包中的物品转移到另一玩家背包
+    管理员专用：将某玩家背包中的物品转移到另一玩家背包
     用法：转移物品 UID1 UID2 物品名 数量
     """
     from ..models.player import get_player_by_uid
@@ -919,9 +912,9 @@ async def handle_transfer_item(event: MessageEvent, args: Message = CommandArg()
     except ValueError:
         await transfer_item_cmd.finish("⛔ 数量必须为正整数")
 
-    # 权限校验（管理员或副管理员）
-    if not (is_admin(event.get_user_id()) or is_sub_admin(event.get_user_id())):
-        await transfer_item_cmd.finish("⛔ 只有管理员或副管理员可以使用此指令")
+    # 权限校验（仅管理员）
+    if not is_admin(event.get_user_id()):
+        await transfer_item_cmd.finish("⛔ 只有管理员可以使用此指令")
 
     async with safe_session() as session:
         # 获取玩家对象
