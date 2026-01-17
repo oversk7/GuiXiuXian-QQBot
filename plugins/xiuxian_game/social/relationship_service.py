@@ -178,7 +178,7 @@ class RelationshipService:
         当面送礼(物品转移)
 
         规则:
-        1. 必须在同一市集(region)
+        1. 必须在同一坐标(x,y完全相同)
         2. 不能转移跑商商品(GOODS类型)
         3. 可以转移材料、装备、好感度礼物(GIFT类型不消耗)
         4. 物品实际转移到接收者背包,不增加好感度
@@ -206,10 +206,16 @@ class RelationshipService:
         if sender_id == receiver.id:
             return False, "不能给自己送东西"
 
-        # 3. 检查地理约束(同一市集)
-        # 使用region字段判断(市场位置)
-        if sender.region != receiver.region:
-            return False, f"必须和{receiver.nickname}在同一地点才能当面送礼\n当前位置: {sender.region}\n对方位置: {receiver.region}"
+        # 3. 检查地理约束(同一坐标)
+        # 使用精确坐标判断
+        sender_x, sender_y = sender.get_current_coordinates()
+        receiver_x, receiver_y = receiver.get_current_coordinates()
+
+        # 检查是否在同一坐标
+        if sender_x != receiver_x or sender_y != receiver_y:
+            sender_region = sender.get_current_region()
+            receiver_region = receiver.get_current_region()
+            return False, f"必须和{receiver.nickname}在同一坐标才能当面送礼\n你的位置: {sender_region}({sender_x},{sender_y})\n对方位置: {receiver_region}({receiver_x},{receiver_y})"
 
         # 4. 获取物品配置
         item_config = config.items_config["by_name"].get(item_name)
@@ -273,7 +279,7 @@ class RelationshipService:
         当面转移装备(选择具体实例后调用)
 
         规则:
-        1. 必须在同一市集(region)
+        1. 必须在同一坐标(x,y完全相同)
         2. 使用 transfer_equipment 方法转移装备实例
         3. 不增加好感度
 
@@ -307,9 +313,16 @@ class RelationshipService:
         if equipment.equipped:
             return False, "不能转移已装备的装备,请先卸下"
 
-        # 3. 检查地理约束(同一市集)
-        if sender.region != receiver.region:
-            return False, f"必须和{receiver.nickname}在同一地点才能当面转移装备\n当前位置: {sender.region}\n对方位置: {receiver.region}"
+        # 3. 检查地理约束(同一坐标)
+        # 使用精确坐标判断
+        sender_x, sender_y = sender.get_current_coordinates()
+        receiver_x, receiver_y = receiver.get_current_coordinates()
+
+        # 检查是否在同一坐标
+        if sender_x != receiver_x or sender_y != receiver_y:
+            sender_region = sender.get_current_region()
+            receiver_region = receiver.get_current_region()
+            return False, f"必须和{receiver.nickname}在同一坐标才能当面转移装备\n你的位置: {sender_region}({sender_x},{sender_y})\n对方位置: {receiver_region}({receiver_x},{receiver_y})"
 
         # 4. 转移装备
         # 使用EquipmentTradeService的transfer_equipment方法
