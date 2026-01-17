@@ -151,14 +151,15 @@ async def _(event: MessageEvent):
             await claim_cmd.finish("⛔ 请先创建角色")
 
         # 新版：使用DI架构Service
+        alchemy_record_repo = AlchemyRecordRepository(session)
         service = AlchemyServiceNew(
             item_repo=ItemRepository(session),
-            alchemy_record_repo=AlchemyRecordRepository(session)
+            alchemy_record_repo=alchemy_record_repo
         )
-        records = await service.get_player_records(player.id)
 
-        # 找到所有已完成但未领取的记录
-        claimable_records = [r for r in records if r.is_finished() and not r.claimed]
+        # 【关键修复】使用带锁的方法获取可领取记录
+        # 这会锁定记录，防止并发领取
+        claimable_records = await alchemy_record_repo.get_claimable_by_player_id(player.id)
 
         if not claimable_records:
             await claim_cmd.finish("📭 没有可领取的炼丹奖励")
@@ -166,7 +167,13 @@ async def _(event: MessageEvent):
         # 批量领取所有可领取的奖励
         messages = []
         for record in claimable_records:
-            success, msg = await service.claim_reward(record)
+            # 重新使用带锁的查询，确保原子性
+            locked_record = await alchemy_record_repo.get_by_id_with_lock(record.id)
+            if not locked_record or locked_record.claimed:
+                # 如果记录已被其他并发请求领取，跳过
+                continue
+
+            success, msg = await service.claim_reward(locked_record)
             if success:
                 messages.append(msg)
 
@@ -174,4 +181,4 @@ async def _(event: MessageEvent):
             await session.commit()
             await claim_cmd.finish(message_add_head("\n".join(messages), event))
         else:
-            await claim_cmd.finish("⛔ 领取失败")
+            await claim_cmd.finish("⛔ 领取失败或已被领取")

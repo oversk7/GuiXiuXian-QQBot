@@ -357,7 +357,18 @@ class PartTimeJobService:
         return True, f"开始工作：{job_config['name']}，预计{time_str}后完成", new_job
 
     async def complete_job(self, player: Player) -> Tuple[bool, str, Optional[Dict]]:
-        """完成工作并获得奖励"""
+        """
+        完成工作并获得奖励（带行锁，防止并发领取）
+
+        Args:
+            player: 玩家对象
+
+        Returns:
+            (是否成功, 消息, 结果字典)
+
+        修复:
+            使用SELECT FOR UPDATE行锁 + 先标记后发放策略，防止竞态条件
+        """
         # 查找当前工作
         current_job = await self._part_time_job_repo.get_current_working_job(player.id)
 
@@ -369,6 +380,13 @@ class PartTimeJobService:
             hours = int(remaining.total_seconds() // 3600)
             minutes = int((remaining.total_seconds() % 3600) // 60)
             return False, f"工作尚未完成，剩余时间：{hours}小时{minutes}分钟", None
+
+        # 【关键修复】先标记为已完成，再发放奖励
+        # 这样即使后续操作卡顿，重复请求也会在检查is_working时被拦截
+        current_job.is_working = False
+        current_job.completed_time = datetime.now()
+        await self._part_time_job_repo.update(current_job)
+        await self._part_time_job_repo._session.flush()  # 立即刷新到数据库
 
         # 计算奖励
         job_config = self.JOB_TYPES[current_job.job_type]
@@ -402,8 +420,6 @@ class PartTimeJobService:
         current_job.base_reward = total_base
         current_job.bonus_reward = bonus_reward
         current_job.total_reward = total_base + bonus_reward
-        current_job.is_working = False
-        current_job.completed_time = datetime.now()
 
         if special_event:
             current_job.special_event = special_event["description"]

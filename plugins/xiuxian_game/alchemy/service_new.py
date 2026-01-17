@@ -35,6 +35,8 @@ class AlchemyService:
         """
         self._item_repo = item_repo
         self._alchemy_record_repo = alchemy_record_repo
+        # 获取session用于flush操作
+        self._session = alchemy_record_repo._session
 
     def get_furnace_effects(self, upgrade_level: int) -> Tuple[float, int]:
         """
@@ -343,7 +345,7 @@ class AlchemyService:
 
     async def claim_reward(self, record: AlchemyRecord) -> Tuple[bool, str]:
         """
-        领取炼丹奖励
+        领取炼丹奖励（带行级锁，防止并发领取）
 
         Args:
             record: 炼丹记录
@@ -353,12 +355,21 @@ class AlchemyService:
 
         对应原代码:
             alchemy/service.py Line 227-281
+
+        修复:
+            使用SELECT FOR UPDATE行锁 + 先标记后发放策略，防止竞态条件
         """
         if record.claimed:
             return False, "⛔ 该炼丹记录已领取"
 
         if not record.is_finished():
             return False, "⛔ 炼丹尚未完成"
+
+        # 【关键修复】先标记为已领取，再发放物品
+        # 这样即使后续操作卡顿，重复请求也会在此处被拦截
+        record.claimed = True
+        await self._alchemy_record_repo.update(record)
+        await self._session.flush()  # 立即刷新到数据库，确保claimed标志生效
 
         success_count, total_produce = record.calculate_result()
         failed_count = record.qty - success_count
@@ -370,6 +381,8 @@ class AlchemyService:
                     record.player_id, record.produce_item_id, total_produce
                 )
             except ValueError as e:
+                # 如果发放失败，回滚claimed标志（虽然这种情况极少见）
+                record.claimed = False
                 return False, f"⛔ 领取失败：{e}"
 
         # 失败时返还50%材料（向上取整）
@@ -391,9 +404,6 @@ class AlchemyService:
                     except ValueError:
                         # 如果添加失败，忽略该材料的返还
                         pass
-
-        # 标记为已领取（为了确保消息生成正确）
-        record.claimed = True
 
         prod_name = config.items_config["by_id"][record.produce_item_id].name
         msg = f"✅ 炼丹完成！成功 {success_count}/{record.qty} 炉，共得 {prod_name} ✖️{total_produce}"

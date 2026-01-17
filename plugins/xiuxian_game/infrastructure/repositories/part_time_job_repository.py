@@ -90,6 +90,28 @@ class PartTimeJobRepository(IRepository[PartTimeJob]):
         result = await self._session.execute(stmt)
         return result.scalars().first()
 
+    async def get_current_working_job_with_lock(self, player_id: str) -> Optional[PartTimeJob]:
+        """
+        获取玩家当前正在进行的工作并加行锁（防止竞态条件）
+
+        Args:
+            player_id: 玩家ID
+
+        Returns:
+            正在进行的打工记录，如果不存在则返回None
+
+        Note:
+            使用SELECT FOR UPDATE进行行级锁，防止并发领取
+        """
+        stmt = select(PartTimeJob).where(
+            and_(
+                PartTimeJob.player_id == player_id,
+                PartTimeJob.is_working == True
+            )
+        ).with_for_update()
+        result = await self._session.execute(stmt)
+        return result.scalars().first()
+
     async def get_completed_jobs(
         self, player_id: str, limit: int = 10
     ) -> List[PartTimeJob]:

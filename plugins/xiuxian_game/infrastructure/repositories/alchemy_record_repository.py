@@ -135,6 +135,26 @@ class AlchemyRecordRepository(IRepository[AlchemyRecord]):
         """
         await self._session.delete(record)
 
+    async def get_by_id_with_lock(self, record_id: int) -> Optional[AlchemyRecord]:
+        """
+        根据ID获取炼丹记录并加行锁（用于防止竞态条件）
+
+        Args:
+            record_id: 记录ID
+
+        Returns:
+            炼丹记录实例，不存在返回None
+
+        Note:
+            使用SELECT ... FOR UPDATE进行行级锁，防止并发领取
+            这会锁定该记录直到事务提交或回滚
+        """
+        stmt = select(AlchemyRecord).where(
+            AlchemyRecord.id == record_id
+        ).with_for_update()
+        result = await self._session.execute(stmt)
+        return result.scalar_one_or_none()
+
     async def exists(self, record_id: int) -> bool:
         """
         检查炼丹记录是否存在
