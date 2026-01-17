@@ -151,8 +151,8 @@ async def handle_list_guilds(event: MessageEvent, args: Message = CommandArg()):
         end_idx = start_idx + page_size
         guilds_page = guilds[start_idx:end_idx]
 
-        # 构建消息
-        lines = [f"📋 公会列表 (第 {page}/{(total_guilds + page_size - 1) // page_size} 页)"]
+        # 构建消息 - 优化版，信息密度最大化
+        lines = [f"📋 公会列表 (第{page}/{(total_guilds + page_size - 1) // page_size}页 | 共{total_guilds}个)"]
         lines.append("━━━━━━━━━━━━━")
 
         for guild in guilds_page:
@@ -163,19 +163,18 @@ async def handle_list_guilds(event: MessageEvent, args: Message = CommandArg()):
 
             # 获取成员数量
             member_count = await uow.guilds.get_member_count(guild.id)
+            max_members = 10 + (guild.level - 1) * 5
 
+            # 紧凑格式，所有信息在一行显示
             lines.append(
-                f"🏰 {guild.name}\n"
-                f"  ID: {guild.id} | 等级: Lv{guild.level}\n"
-                f"  会长: {president_name}[UID:{president_uid}]\n"
-                f"  成员: {member_count} 人\n"
-                f"  资金: {guild.treasury} | 经验: {guild.exp}"
+                f"🏰{guild.name} | Lv{guild.level} | {member_count}/{max_members}人 | "
+                f"💰{guild.treasury:,} | ⭐{guild.exp:,}\n"
+                f"   会长: {president_name}[UID:{president_uid}]"
             )
-            lines.append("─────────────")
 
         lines.append("━━━━━━━━━━━━━")
-        lines.append(f"总计 {total_guilds} 个公会")
+        lines.append("💡 玩家可通过UID联系会长申请加入")
         if total_guilds > page_size:
-            lines.append(f"💡 使用【公会列表 {page + 1}】查看下一页")
+            lines.append(f"💡 查看更多: 【公会列表 {page + 1}】")
 
     await list_guilds_cmd.finish(message_add_head("\n".join(lines), event))
