@@ -93,7 +93,8 @@ class ItemEffectAdapter(BaseItemEffect):
         player = context.player
         item_cfg = context.item_config
         quantity = context.quantity or 1
-        ctx = context.context_type or "world"
+        # 修复: 当metadata存在dict时传递metadata,否则传递context_type
+        ctx = context.metadata if isinstance(context.metadata, dict) and context.metadata else (context.context_type or "world")
         session = context.session
 
         logger.debug(
