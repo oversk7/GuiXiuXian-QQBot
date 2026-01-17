@@ -319,3 +319,46 @@ class GuildService:
             })
 
         return members
+
+    async def completely_delete_guild(self, guild_id: int) -> Tuple[bool, str]:
+        """
+        全面删除公会及其所有相关数据
+
+        此方法会:
+        1. 清空所有成员的公会相关字段 (guild_id, guild_contribution, gold2)
+        2. 删除公会所有相关记录
+        3. 确保数据库中不留下任何痕迹
+
+        Args:
+            guild_id: 公会ID
+
+        Returns:
+            (是否成功, 消息)
+        """
+        if not self._uow:
+            raise ValueError("completely_delete_guild需要UoW以访问PlayerRepository")
+
+        try:
+            # 1. 获取公会所有成员
+            members = await self._guild_repo.get_members(guild_id)
+
+            # 2. 清空所有成员的公会相关数据
+            for member in members:
+                player = await self._player_repo.get_by_id(member.player_id)
+                if player:
+                    player.guild_id = None
+                    player.guild_contribution = 0
+                    player.gold2 = 0
+                    await self._player_repo.update(player)
+
+            # 3. 调用Repository的全面删除方法
+            success, message = await self._guild_repo.completely_delete_guild(guild_id)
+
+            if success:
+                member_count = len(members)
+                message += f"，已清空 {member_count} 名成员的公会数据"
+
+            return success, message
+
+        except Exception as e:
+            return False, f"删除公会时发生错误: {str(e)}"

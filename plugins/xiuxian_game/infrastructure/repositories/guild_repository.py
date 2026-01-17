@@ -6,12 +6,14 @@
 """
 
 from typing import Optional, List
-from sqlalchemy import select, func, and_
+from sqlalchemy import select, func, and_, delete
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import joinedload
 
 from ...domain.repositories.base import IRepository
 from ...models.guild import Guild, GuildMember, GuildPosition
+from ...models.guild_alchemy_record import GuildAlchemyRecord
+from ...models.guild_task_record import GuildTaskRecord
 
 
 class GuildRepository(IRepository[Guild]):
@@ -202,3 +204,56 @@ class GuildRepository(IRepository[Guild]):
             await self._session.delete(member)
             return True
         return False
+
+    async def completely_delete_guild(self, guild_id: int) -> tuple[bool, str]:
+        """
+        全面删除公会及其所有相关数据
+
+        此方法会删除:
+        1. 公会成员记录 (guild_member)
+        2. 公会丹房产出记录 (guild_alchemy_record)
+        3. 公会任务记录 (guild_task_record)
+        4. 公会建筑记录 (guild_building) - 通过 cascade 自动删除
+        5. 公会主记录 (guild)
+
+        Args:
+            guild_id: 公会ID
+
+        Returns:
+            (是否成功, 消息)
+        """
+        try:
+            # 1. 检查公会是否存在
+            guild = await self.get_by_id(guild_id)
+            if not guild:
+                return False, f"公会 ID {guild_id} 不存在"
+
+            deleted_count = 0
+            guild_name = guild.name
+
+            # 2. 删除公会成员记录
+            stmt_members = delete(GuildMember).where(GuildMember.guild_id == guild_id)
+            result_members = await self._session.execute(stmt_members)
+            deleted_members = result_members.rowcount
+            deleted_count += deleted_members
+
+            # 3. 删除公会丹房产出记录
+            stmt_alchemy = delete(GuildAlchemyRecord).where(GuildAlchemyRecord.guild_id == guild_id)
+            result_alchemy = await self._session.execute(stmt_alchemy)
+            deleted_alchemy = result_alchemy.rowcount
+            deleted_count += deleted_alchemy
+
+            # 4. 删除公会任务记录
+            stmt_tasks = delete(GuildTaskRecord).where(GuildTaskRecord.guild_id == guild_id)
+            result_tasks = await self._session.execute(stmt_tasks)
+            deleted_tasks = result_tasks.rowcount
+            deleted_count += deleted_tasks
+
+            # 5. 删除公会主记录（会自动级联删除 guild_building）
+            await self._session.delete(guild)
+            deleted_count += 1
+
+            return True, f"已删除公会『{guild_name}』(ID:{guild_id})，共清除 {deleted_count} 条相关记录"
+
+        except Exception as e:
+            return False, f"删除公会时发生错误: {str(e)}"

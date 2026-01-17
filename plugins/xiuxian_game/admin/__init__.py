@@ -3,3 +3,4 @@
 from . import lottery_commands
 from . import market_cleanup_commands
 from . import ban_commands  # 全局封禁管理命令
+from . import guild_admin_commands  # 公会管理命令
