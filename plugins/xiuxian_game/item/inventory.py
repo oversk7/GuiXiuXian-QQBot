@@ -91,6 +91,7 @@ CATEGORY_MAPPING = {
     "丹药": "ELIXIR",  # 特殊标记，实质为 CONSUMABLE 下的一类
     "宝石": "GEM",
     "鱼类": "FISH",
+    "礼物": "GIFT",
 }
 
 # 物品类型中文映射（用于显示）
@@ -101,6 +102,7 @@ TYPE_NAME_MAP = {
     "GOODS": "商品",
     "GEM": "宝石",
     "FISH": "鱼类",
+    "GIFT": "礼物",
 }
 
 # 默认展示顺序（决定排序权重）
@@ -108,6 +110,7 @@ CATEGORY_ORDER = [
     "CONSUMABLE_NON_ELIXIR",  # 普通消耗品（不含丹药）
     "MATERIAL",
     "GOODS",
+    "GIFT",                  # 礼物
     "ELIXIR",                # 丹药（item_id 以 _elixir 结尾）
     "GEM",                   # 宝石
     "EQUIPMENT"

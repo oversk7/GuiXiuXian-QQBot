@@ -546,7 +546,7 @@ bag_cmd = on_command("背包系统", aliases={"背包帮助"}, priority=4, block
 async def handle_bag(event: MessageEvent, args: Message = CommandArg()):
     msg = (
         "✨ 背包系统帮助 ✨\n"
-        "管理物品，使用道具，查看图鉴。类别可选：消耗品、材料、商品、丹药、装备、宝石\n"
+        "管理物品，使用道具，查看图鉴。类别可选：消耗品、材料、商品、丹药、装备、宝石、礼物\n"
         "━━━━━━━━━━━━━\n"
         "💡 装备不占用背包容量，请使用【装备栏】查看装备\n"
         "━━━━━━━━━━━━━\n"
@@ -580,6 +580,7 @@ async def handle_bag(event: MessageEvent, args: Message = CommandArg()):
         "💡 物品查询示例：\n"
         "• 【背包 回春散】 查询回春散的数量\n"
         "• 【背包 装备】 查看所有装备\n"
+        "• 【背包 礼物】 查看所有礼物\n"
         "• 【背包 2】 查看第2页物品\n"
     )
     await bag_cmd.finish(Message(msg))
