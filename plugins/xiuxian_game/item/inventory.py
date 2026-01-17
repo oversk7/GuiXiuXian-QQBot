@@ -150,7 +150,13 @@ async def handle_use_item(event: MessageEvent, args: Message = CommandArg()):
             quantity = 1
         elif item_config.effect_type == ItemEffectType.SANTA_TELEPORT:
             # 圣诞裂隙：需要提供目标位置
-            if len(remaining_args) < 2:
+            # 支持两种格式:
+            # 1. 坐标: 使用 圣诞裂隙 x y (需要2个参数)
+            # 2. 诡域: 使用 圣诞裂隙 N层诡域 (只需要1个参数)
+            if len(remaining_args) < 1:
+                await use_item.finish("⛔ 请提供目标位置，例如：使用 圣诞裂隙 100 -200 或 使用 圣诞裂隙 5层诡域")
+            # 检查是否是诡域传送格式(单个参数包含"层诡域")
+            if len(remaining_args) == 1 and "层诡域" not in remaining_args[0]:
                 await use_item.finish("⛔ 请提供目标坐标，例如：使用 圣诞裂隙 100 -200 或 使用 圣诞裂隙 5层诡域")
             ctx_payload = {"scene": "world", "target": remaining_args}
             quantity = 1
