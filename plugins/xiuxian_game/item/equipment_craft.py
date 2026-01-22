@@ -275,8 +275,13 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
         # 城市锻造白名单校验
         nearest = min(forge_locs, key=lambda loc: abs(loc.x - x) + abs(loc.y - y))
         forge_cfg = nearest.get_function_config("forge") or {}
-        allow_ids: list[str] = forge_cfg.get("allow_items", [])
-        if allow_ids and item_cfg.item_id not in allow_ids:
+        allow_ids: list[str] | None = forge_cfg.get("allow_items")
+
+        # 白名单逻辑：
+        # - None = 未配置，无限制（兼容老数据）
+        # - [] = 空列表，明确禁止锻造所有装备
+        # - [...] = 只能锻造列表中的装备
+        if allow_ids is not None and item_cfg.item_id not in allow_ids:
             await craft_cmd.finish(message_add_head(
                 f"⛔ {nearest.name} 的工匠尚未掌握『{item_cfg.name}』的锻造\n"
                 f"💡 发送【锻造列表】查看可锻造城镇", event))
