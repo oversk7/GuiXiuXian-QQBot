@@ -286,7 +286,7 @@ async def init_workshop_locations(session) -> int:
         if existing_location.functions is None:
             existing_location.functions = {}
 
-        # 为地点添加锻造功能，并写入“城市专属锻造白名单”
+        # 为地点添加锻造功能，并写入"城市专属锻造白名单"
         if not existing_location.has_function("forge"):
             forge_config = {
                 "enabled": True,
@@ -294,6 +294,8 @@ async def init_workshop_locations(session) -> int:
                 "allow_items": CITY_FORGE_WHITELIST.get(m.name, [])
             }
             existing_location.add_function("forge", forge_config)
+            # 显式回写以触发 SQLAlchemy MutableDict 变更跟踪
+            existing_location.functions["forge"] = forge_config
         else:
             # 已存在锻造功能则补齐白名单字段
             cfg = existing_location.get_function_config("forge")
@@ -411,6 +413,8 @@ async def handle_refresh_workshops(event: MessageEvent, args: Message = CommandA
                         "allow_items": []
                     }
                     loc.add_function("forge", forge_config)
+                    # 显式回写以触发 SQLAlchemy MutableDict 变更跟踪
+                    loc.functions["forge"] = forge_config
                     created_forge += 1
 
                 # 覆盖 allow_items（注意：为触发 SQLAlchemy 变更跟踪，需要回写到 functions）
