@@ -50,16 +50,22 @@ async def handle_markdown_template_test(event: MessageEvent, args: Message = Com
             })
 
     # 创建Markdown模版消息
-    markdown = MessageMarkdown(
-        template_id=102499345_1768473387,
-        params=template_params
-    )
+    # 注意: params参数应该是一个字典列表,每个字典包含key和values
+    try:
+        # 方式1: 尝试使用keyword参数
+        markdown = MessageMarkdown(
+            template_id="102499345_1768473387",
+            params=template_params
+        )
 
-    # 发送测试消息
-    test_msg = Message("🧪 Markdown模版测试\n━━━━━━━━━━━━━\n模版ID: 102499345_1768473387")
-    test_msg.append(MessageSegment.markdown(markdown))
+        # 发送测试消息 - 只发送markdown,不要附加其他文本
+        test_msg = Message()
+        test_msg.append(MessageSegment.markdown(markdown))
 
-    await markdown_template_test_cmd.finish(test_msg)
+        await markdown_template_test_cmd.finish(test_msg)
+    except Exception as e:
+        # 如果失败,尝试方式2: 直接使用content
+        await markdown_template_test_cmd.finish(f"❌ Markdown模版测试失败\n━━━━━━━━━━━━━\n错误: {str(e)}\n\n💡 可能原因:\n1. 模版ID不正确\n2. 群消息不支持Markdown模版\n3. 参数格式不正确\n\n调试信息:\n模版参数: {template_params}")
 
 
 # 帮助指令
