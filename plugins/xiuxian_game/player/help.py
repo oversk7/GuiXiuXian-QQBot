@@ -1,8 +1,8 @@
 from nonebot import on_command
 from nonebot.permission import SUPERUSER
 from nonebot.adapters.qq import MessageEvent, Message, MessageSegment
-from nonebot.adapters.qq.message import MessageKeyboard,MessageArk, MessageMarkdown
-from nonebot.adapters.qq.models import MessageArkKv, MessageArk, MessageArkObj, MessageArkObjKv, MessageMarkdownParams
+from nonebot.adapters.qq.message import MessageKeyboard,MessageArk
+from nonebot.adapters.qq.models import MessageArkKv, MessageArk, MessageArkObj, MessageArkObjKv
 from nonebot.params import CommandArg
 import os
 from ..models import Player
@@ -23,7 +23,6 @@ async def handle_generate_exp_table(event: MessageEvent, args: Message = Command
 help_cmd = on_command("帮助", aliases={"help","菜单"}, priority=5, block=True)
 @help_cmd.handle()
 async def handle_help(event: MessageEvent, args: Message = CommandArg()):
-    # 先发送帮助文本
     msg = (
         "✨ 欢迎使用帮助系统 ✨\n"
         "═════════════\n"
@@ -44,34 +43,9 @@ async def handle_help(event: MessageEvent, args: Message = CommandArg()):
         "💡 发送/邀请码 邀请好友获得分级奖励，最高可获得3万+金币\n"
         "💡 不会玩加频道：https://Pd.qq.Com/s/d0g9cvds4\n"
         "💡 教程：https://Tutorials.Bossjlb.Top\n"
-        "💡 官群：962494679\n\n"
-        "👇 快捷操作菜单:"
+        "💡 官群：962494679"
     )
-
-    # 创建Markdown快捷菜单
-    template_params = [
-        MessageMarkdownParams(key="t1", values=["修炼"]),
-        MessageMarkdownParams(key="t2", values=["面板"]),
-        MessageMarkdownParams(key="t3", values=["修炼系统"]),
-        MessageMarkdownParams(key="t4", values=["背包"]),
-        MessageMarkdownParams(key="t5", values=["装备系统"]),
-        MessageMarkdownParams(key="t6", values=["战斗系统"]),
-        MessageMarkdownParams(key="t7", values=["探索系统"]),
-        MessageMarkdownParams(key="t8", values=["经济系统"]),
-        MessageMarkdownParams(key="t9", values=["帮助"]),
-        MessageMarkdownParams(key="t10", values=["md测试"]),
-    ]
-
-    markdown = MessageMarkdown(
-        custom_template_id="102499345_1768473387",
-        params=template_params
-    )
-
-    # 组合消息:先文本,再Markdown
-    final_message = Message(msg)
-    final_message.append(MessageSegment.markdown(markdown))
-
-    await help_cmd.finish(final_message)
+    await help_cmd.finish(Message(msg))
 
 # 经济系统（整合跑商、银行）
 economy_cmd = on_command("经济系统",aliases={"经济帮助","跑商系统","跑商帮助","银行系统","银行帮助"}, block=True, priority=5)
