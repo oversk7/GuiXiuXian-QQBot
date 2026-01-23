@@ -1,5 +1,7 @@
 from nonebot import on_command
-from nonebot.adapters.qq import MessageEvent, Message
+from nonebot.adapters.qq import MessageEvent, Message, MessageSegment
+from nonebot.adapters.qq.message import MessageMarkdown
+from nonebot.adapters.qq.models import MessageMarkdownParams
 from nonebot.params import CommandArg
 from ..utils import  message_add_head, calculate_level_up_exp, generate_progress_bar, calculate_cultivation_times_needed
 from ..models.db import safe_session
@@ -13,6 +15,103 @@ from ..models.monthly_card import get_player_card_benefits
 
 # Feature Flag: 控制是否使用新版MansionService (DI架构)
 cfg = config.game_config["cultivate"]
+
+
+def create_cultivation_quick_markdown(can_breakthrough: bool = True) -> MessageMarkdown:
+    """
+    创建修炼快捷操作的Markdown模版
+    Args:
+        can_breakthrough: 是否可以突破(经验是否足够)
+    """
+    if can_breakthrough:
+        # 经验足够,突出显示突破
+        template_params = [
+            MessageMarkdownParams(key="t1", values=["突破"]),  # 主要操作
+            MessageMarkdownParams(key="t2", values=["修炼"]),  # 继续修炼
+            MessageMarkdownParams(key="t3", values=["突破 棺材钉"]),  # 安全突破
+            MessageMarkdownParams(key="t4", values=["面板"]),  # 查看面板
+            MessageMarkdownParams(key="t5", values=["加点 力 1"]),
+            MessageMarkdownParams(key="t6", values=["加点 运 1"]),
+            MessageMarkdownParams(key="t7", values=["加点"]),
+            MessageMarkdownParams(key="t8", values=["闭关"]),
+            MessageMarkdownParams(key="t9", values=["修炼系统"]),
+            MessageMarkdownParams(key="t10", values=["帮助"]),
+        ]
+    else:
+        # 经验不足,突出显示修炼
+        template_params = [
+            MessageMarkdownParams(key="t1", values=["修炼"]),  # 主要操作
+            MessageMarkdownParams(key="t2", values=["闭关"]),  # 闭关修炼
+            MessageMarkdownParams(key="t3", values=["面板"]),  # 查看面板
+            MessageMarkdownParams(key="t4", values=["加点 力 1"]),
+            MessageMarkdownParams(key="t5", values=["加点 运 1"]),
+            MessageMarkdownParams(key="t6", values=["加点"]),
+            MessageMarkdownParams(key="t7", values=["献祭 病历单 1"]),
+            MessageMarkdownParams(key="t8", values=["战力"]),
+            MessageMarkdownParams(key="t9", values=["修炼系统"]),
+            MessageMarkdownParams(key="t10", values=["帮助"]),
+        ]
+
+    return MessageMarkdown(
+        custom_template_id="102499345_1768473387",
+        params=template_params
+    )
+
+
+def create_breakthrough_quick_markdown(has_resentment: bool = False, has_coffin_nail: bool = False) -> MessageMarkdown:
+    """
+    创建突破快捷操作的Markdown模版
+    Args:
+        has_resentment: 是否有怨念值
+        has_coffin_nail: 是否有棺材钉
+    """
+    if has_coffin_nail:
+        # 优先显示棺材钉突破
+        template_params = [
+            MessageMarkdownParams(key="t1", values=["突破 棺材钉"]),
+            MessageMarkdownParams(key="t2", values=["突破"]),
+            MessageMarkdownParams(key="t3", values=["突破 镇厄"]),
+            MessageMarkdownParams(key="t4", values=["连续突破"]),
+            MessageMarkdownParams(key="t5", values=["连续突破 棺材钉"]),
+            MessageMarkdownParams(key="t6", values=["修炼"]),
+            MessageMarkdownParams(key="t7", values=["面板"]),
+            MessageMarkdownParams(key="t8", values=["加点"]),
+            MessageMarkdownParams(key="t9", values=["修炼系统"]),
+            MessageMarkdownParams(key="t10", values=["帮助"]),
+        ]
+    elif has_resentment:
+        # 显示怨念突破
+        template_params = [
+            MessageMarkdownParams(key="t1", values=["突破 镇厄"]),
+            MessageMarkdownParams(key="t2", values=["突破"]),
+            MessageMarkdownParams(key="t3", values=["连续突破"]),
+            MessageMarkdownParams(key="t4", values=["连续突破 镇厄"]),
+            MessageMarkdownParams(key="t5", values=["修炼"]),
+            MessageMarkdownParams(key="t6", values=["面板"]),
+            MessageMarkdownParams(key="t7", values=["加点"]),
+            MessageMarkdownParams(key="t8", values=["献祭 病历单 1"]),
+            MessageMarkdownParams(key="t9", values=["修炼系统"]),
+            MessageMarkdownParams(key="t10", values=["帮助"]),
+        ]
+    else:
+        # 仅显示普通突破
+        template_params = [
+            MessageMarkdownParams(key="t1", values=["突破"]),
+            MessageMarkdownParams(key="t2", values=["修炼"]),
+            MessageMarkdownParams(key="t3", values=["献祭 病历单 1"]),
+            MessageMarkdownParams(key="t4", values=["面板"]),
+            MessageMarkdownParams(key="t5", values=["加点"]),
+            MessageMarkdownParams(key="t6", values=["闭关"]),
+            MessageMarkdownParams(key="t7", values=["修炼系统"]),
+            MessageMarkdownParams(key="t8", values=["战力"]),
+            MessageMarkdownParams(key="t9", values=["帮助"]),
+            MessageMarkdownParams(key="t10", values=[""]),
+        ]
+
+    return MessageMarkdown(
+        custom_template_id="102499345_1768473387",
+        params=template_params
+    )
 
 # 修炼文案池 - 增加修炼时的沉浸感和新鲜感
 CULTIVATE_FLAVOR_TEXTS = [
@@ -244,7 +343,13 @@ async def handle_cultivate(event: MessageEvent):
         if achievement_msgs:
             msg += "\n\n" + "\n\n".join(achievement_msgs)
 
-        await cultivate.finish(message_add_head(msg, event))
+        # 创建Markdown快捷菜单(根据是否可以突破显示不同按钮)
+        can_breakthrough = player.exp >= exp_max
+        markdown = create_cultivation_quick_markdown(can_breakthrough)
+        final_message = message_add_head(msg, event)
+        final_message.append(MessageSegment.markdown(markdown))
+
+        await cultivate.finish(final_message)
 
 @seclusion.handle()
 async def handle_seclusion(event: MessageEvent):
