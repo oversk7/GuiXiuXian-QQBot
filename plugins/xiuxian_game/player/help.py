@@ -1021,6 +1021,33 @@ async def handle_button_test(event: MessageEvent, args: Message = CommandArg()):
     await button_test_cmd.finish(MessageSegment.keyboard(keyboard))
 
 
+# Markdown模版测试
+md_test_help_info_cmd = on_command("md测试帮助", aliases={"markdown测试帮助", "模版测试帮助"}, priority=4, block=True)
+
+@md_test_help_info_cmd.handle()
+async def handle_md_test_help_info(event: MessageEvent, args: Message = CommandArg()):
+    msg = (
+        "✨ Markdown模版测试帮助 ✨\n"
+        "━━━━━━━━━━━━━\n"
+        "📝 测试指令：\n"
+        "【md测试】 使用默认值测试模版\n"
+        "【md测试 参数1 参数2 ...】 自定义参数测试\n"
+        "━━━━━━━━━━━━━\n"
+        "🎯 模版信息：\n"
+        "• 模版ID: 102499345_1768473387\n"
+        "• 支持参数: t1-t10 (10个输入框)\n"
+        "• 参数类型: 文本输入\n"
+        "━━━━━━━━━━━━━\n"
+        "💡 使用示例：\n"
+        "• /md测试\n"
+        "• /md测试 签到 修炼 突破\n"
+        "• /md测试 测试1 测试2 测试3 测试4 测试5\n"
+        "━━━━━━━━━━━━━\n"
+        "⚠️ 仅支持QQ官方平台"
+    )
+    await md_test_help_info_cmd.finish(Message(msg))
+
+
 # 赞助码
 support_cmd = on_command("赞助", aliases={"赞赏","充值","打赏","氪金"}, priority=4, block=True)
 @support_cmd.handle()
