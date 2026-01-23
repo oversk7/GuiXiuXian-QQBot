@@ -23,7 +23,7 @@ async def handle_generate_exp_table(event: MessageEvent, args: Message = Command
 help_cmd = on_command("帮助", aliases={"help","菜单"}, priority=5, block=True)
 @help_cmd.handle()
 async def handle_help(event: MessageEvent, args: Message = CommandArg()):
-    # 创建主帮助文本
+    # 先发送帮助文本
     msg = (
         "✨ 欢迎使用帮助系统 ✨\n"
         "═════════════\n"
@@ -44,7 +44,8 @@ async def handle_help(event: MessageEvent, args: Message = CommandArg()):
         "💡 发送/邀请码 邀请好友获得分级奖励，最高可获得3万+金币\n"
         "💡 不会玩加频道：https://Pd.qq.Com/s/d0g9cvds4\n"
         "💡 教程：https://Tutorials.Bossjlb.Top\n"
-        "💡 官群：962494679"
+        "💡 官群：962494679\n\n"
+        "👇 快捷操作菜单:"
     )
 
     # 创建Markdown快捷菜单
@@ -66,7 +67,7 @@ async def handle_help(event: MessageEvent, args: Message = CommandArg()):
         params=template_params
     )
 
-    # 组合消息
+    # 组合消息:先文本,再Markdown
     final_message = Message(msg)
     final_message.append(MessageSegment.markdown(markdown))
 
