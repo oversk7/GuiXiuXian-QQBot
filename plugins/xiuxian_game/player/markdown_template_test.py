@@ -4,7 +4,7 @@ QQ官方平台Markdown模版测试指令
 """
 from nonebot import on_command
 from nonebot.adapters.qq import MessageEvent, Message, MessageSegment
-from nonebot.adapters.qq.message import MessageMarkdown, MessageMarkdownParams
+from nonebot.adapters.qq.models.common import MessageMarkdown, MessageMarkdownParams, MessageKeyboard
 from nonebot.params import CommandArg
 
 
