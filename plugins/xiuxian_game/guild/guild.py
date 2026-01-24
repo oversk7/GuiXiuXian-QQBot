@@ -698,7 +698,7 @@ async def handle_list_guilds(event: MessageEvent, args: Message = CommandArg()):
 
             # 紧凑格式，所有信息在一行显示
             lines.append(
-                f"🏰{guild.name} | Lv{guild.level} | {member_count}/{max_members}人 | "
+                f"🏰{guild.name} [ID:{guild.id}] | Lv{guild.level} | {member_count}/{max_members}人 | "
                 f"💰{guild.treasury:,} | ⭐{guild.exp:,}\n"
                 f"   会长: {president_name}[UID:{president_uid}]"
             )
