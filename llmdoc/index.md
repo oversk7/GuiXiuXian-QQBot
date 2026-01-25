@@ -104,9 +104,9 @@
 
 ### NPC与对话
 - **[故事对话系统](/llmdoc/agent/scout_story_dialogue_investigation_2025_01_10.md)** - AI对话引擎、NPC人设、长期记忆
-  - AI NPC支持自然对话和游戏指令角色扮演
-  - 每20轮对话自动总结,提取关键事件
-  - 好感度递减防止刷好感度
+   - AI NPC支持自然对话和游戏指令角色扮演
+   - 每20轮对话自动总结,提取关键事件
+   - 好感度递减防止刷好感度
 
 ---
 
@@ -146,6 +146,8 @@
 - **缓存优化** - 60秒TTL缓存减少90%临时buff查询
 - **属性持久化** - 装备加成预计算并持久化到player表
 
+
+
 ---
 
 ## 使用指南
@@ -164,17 +166,17 @@
 
 ### 开发规范
 - **[编码规范](/llmdoc/reference/coding-conventions.md)** - Python代码风格、命名约定、文件组织、设计模式
-  - 强制类型注解,ORM字段使用Mapped[T]语法
-  - 类命名PascalCase,函数命名snake_case
-  - Repository实现IRepository[T]接口
-  - UoW外部调用finish()防止连接泄漏
-
-- **[Git规范](/llmdoc/reference/git-conventions.md)** - 提交信息格式、分支策略、代码审查
+   - 强制类型注解,ORM字段使用Mapped[T]语法
+   - 类命名PascalCase,函数命名snake_case
+   - Repository实现IRepository[T]接口
+   - UoW外部调用finish()防止连接泄漏
 
 ### 帮助信息更新
 - **[帮助系统](/llmdoc/overview/project-overview.md#104-帮助信息更新)** - 添加/修改命令时更新help.py
   - 位置: plugins/xiuxian_game/player/help.py
   - 格式: {"命令名": {"usage": "...", "description": "...", "examples": [...]}}
+
+
 
 ---
 
@@ -186,6 +188,8 @@
   - 突破配置: change_level: 30, fail_keep_ratio: 0.7
   - 掉落率: 白色30%,绿色15%,蓝色8%,紫色3%,橙色1%
   - 经济倍率: MATERIAL 0.7x, GEM 2.0x, EQUIPMENT 4.0x
+
+
 
 ### 配置文件
 - **NoneBot配置** (`.env`) - ENVIRONMENT, LOG_LEVEL, COMMAND_START, SUPERUSERS
@@ -266,10 +270,9 @@
 ## 技术债务与改进方向
 
 ### 已知问题
-1. ~~**新旧架构迁移未完成**~~ - ✅ **已完成** (2026-01-10: 100%架构统一)
-2. **属性计算复杂** - 多层叠加可能导致性能问题
-3. **经济平衡** - 长期通胀压力,高玩财富集中
-4. **新手门槛** - 300级才能转生,前期体验较长
+1. **属性计算复杂** - 多层叠加可能导致性能问题
+2. **经济平衡** - 长期通胀压力,高玩财富集中
+3. **新手门槛** - 300级才能转生,前期体验较长
 
 ### 改进方向
 1. ~~**完成架构迁移**~~ - ✅ **已完成** (2026-01-10: 26/26服务全部迁移到DI架构)
@@ -331,11 +334,11 @@
 
 ---
 
-**版本**: 3.0
-**最后更新**: 2026-01-10
+**版本**: 3.3
+**最后更新**: 2026-01-24
 **维护者**: 项目架构组
 **文档生成器**: recorder (Claude Code Agent)
-**最近更新**: ✨ 完成完整legacy代码清理,实现100%架构统一! 🎉
+**最近更新**: 清理不准确的文档内容，删除未实现的 Markdown 模版相关文档
 
 ---
 
