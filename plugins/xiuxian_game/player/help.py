@@ -3,6 +3,7 @@ from nonebot.permission import SUPERUSER
 from nonebot.adapters.qq import MessageEvent, Message, MessageSegment
 from nonebot.adapters.qq.message import MessageKeyboard,MessageArk
 from nonebot.adapters.qq.models import MessageArkKv, MessageArk, MessageArkObj, MessageArkObjKv
+from nonebot.adapters.qq.models.common import MessageMarkdown, MessageMarkdownParams
 from nonebot.params import CommandArg
 import os
 from ..models import Player
@@ -23,95 +24,105 @@ async def handle_generate_exp_table(event: MessageEvent, args: Message = Command
 help_cmd = on_command("帮助", aliases={"help","菜单"}, priority=5, block=True)
 @help_cmd.handle()
 async def handle_help(event: MessageEvent, args: Message = CommandArg()):
-    msg = (
+    """
+    使用Markdown模版的帮助菜单
+    模版ID: 102499345_1769177949 (物品列表类)
+    """
+    # 构建10个快捷按钮
+    buttons = [
+        "修炼系统",
+        "玩家系统",
+        "背包系统",
+        "装备系统",
+        "战斗系统",
+        "探索系统",
+        "经济系统",
+        "公会系统",
+        "社交系统",
+        "娱乐系统"
+    ]
+
+    # 构建模版参数
+    template_params = [
+        MessageMarkdownParams(key=f"btn{i+1}", values=[btn])
+        for i, btn in enumerate(buttons)
+    ]
+
+    # 创建Markdown消息
+    markdown = MessageMarkdown(
+        custom_template_id="102499345_1769177949",
+        params=template_params
+    )
+
+    # 发送带说明的消息
+    msg = Message(
         "✨ 欢迎使用帮助系统 ✨\n"
         "═════════════\n"
-        "🧘 修炼系统  🎭 玩家系统\n"
-        "🎒 背包系统  🛒 装备系统\n"
-        "⚔️ 战斗系统  🗺️ 探索系统\n"
-        "🏰 副本系统  🏛️ 委托系统\n"
-        "💰 经济系统  📦 交易系统\n"
-        "🎮 公会系统  💕 社交系统\n"
-        "🔮 炼丹系统  🏠 阴宅系统\n"
-        "💼 打工系统  🎣 钓鱼系统\n"
-        "🎮 娱乐系统  🎁 抽奖系统\n"
-        "📱 账号管理\n"
-        "═════════════\n"
-        "💡 发送对应系统查看详细指令，【赞助】支持诡修仙\n"
-        "💡 【】括号里是指令，<>里是必填，[]里是选填\n"
-        "💡 发送【问 你的问题】使用AI助手获得游戏指引\n"
-        "💡 发送/邀请码 邀请好友获得分级奖励，最高可获得3万+金币\n"
+        "🎮 点击下方按钮查看对应系统详情\n"
+        "💡 发送【问 你的问题】使用AI助手\n"
+        "💡 发送/邀请码 邀请好友获得奖励\n"
         "💡 不会玩加频道：https://Pd.qq.Com/s/d0g9cvds4\n"
         "💡 教程：https://Tutorials.Bossjlb.Top\n"
         "💡 官群：962494679\n"
-        "═════════════\n"
-        "🎨 新功能：Markdown交互式帮助\n"
-        "💡 发送【帮助md】体验可点击按钮版本\n"
-        "💡 发送【快捷面板】快速访问常用功能"
+        "═════════════"
     )
-    await help_cmd.finish(Message(msg))
+    msg.append(MessageSegment.markdown(markdown))
+
+    await help_cmd.finish(msg)
 
 # 经济系统（整合跑商、银行）
 economy_cmd = on_command("经济系统",aliases={"经济帮助","跑商系统","跑商帮助","银行系统","银行帮助"}, block=True, priority=5)
 @economy_cmd.handle()
 async def handle_economy(event: MessageEvent, args: Message = CommandArg()):
-    msg = (
-        "✨ 经济系统帮助 ✨\n"
-        "管理金币、跑商赚钱、银行理财\n"
+    """
+    使用Markdown模版的经济系统帮助
+    模版ID: 102499345_1769177016 (反馈类)
+    """
+    title = "✨ 经济系统"
+    # 注意：模版参数不能包含markdown语法，移除【】<>等符号
+    result = (
+        "管理金币、跑商赚钱、银行理财\n\n"
         "━━━━━━━━━━━━━\n"
         "💰 银行系统：\n"
-        "【存 <金额>】 存入冥行\n"
-        "【取 <金额>】 从冥行取出\n"
-        "【余额】 查询冥行存款\n"
-        "【存款榜】 查看冥行存款排行榜\n"
-        "【转账 <UID> <金额>】 银行转账（手续费3%）\n"
-        "━━━━━━━━━━━━━\n"
-        "💎 理财产品：\n"
-        "【理财产品】 查看可购买的理财产品\n"
-        "【购买理财 <金额> [银行]】 购买活期理财\n"
-        "【我的理财】 查看理财持仓和收益\n"
-        "【赎回理财 <编号> [银行]】 赎回理财产品\n"
-        "• 最低投资1万，最高100万金币\n"
-        "• 每日收益波动±5%，管理费0.1%/天\n"
-        "• 可随时赎回，每日自动结算\n"
-        "⚠️ 理财有风险，投资需谨慎！\n"
-        "━━━━━━━━━━━━━\n"
-        "📈 气运投资：\n"
-        "【投资系统】或【气运投资】 查看详细投资教程\n"
-        "【投资行情】 查看可投资气运\n"
-        "【我的投资】 查看持仓情况\n"
-        "⚠️ 高风险玩法，新手建议先看【投资系统】教程！\n"
-        "━━━━━━━━━━━━━\n"
+        "存/取 金额 - 存取冥行\n"
+        "余额 - 查询存款\n"
+        "转账 UID 金额 - 银行转账(手续费3%)\n\n"
         "🏪 跑商系统：\n"
-        "【市集】 查看当前坐标市场价格表\n"
-        "【市集列表】 查看全部市集坐标\n"
-        "【市集详情 <市集名称>】 查看指定市集商品\n"
-        "【市价 <物品名称>】 查看某物品在各市集的买/卖价\n"
-        "【购买 <物品> <数量>】 消耗金币购买\n"
-        "【出售 <物品> <数量>】 将背包物品卖给市场\n"
-        "【自动出售】 一键出售背包中所有可出售商品\n"
-        "【跑商记录 [页数]】 查看市集购买历史\n"
-        "【跑商推荐】 查看个性化盈利路线推荐\n"
-        "【交易限制】 查看当前交易限制情况\n"
-        "━━━━━━━━━━━━━\n"
-        "🕳️ 黑市：\n"
-        "【黑市】 查看今日上架与基础物品\n"
-        "• 基础物品（药、改名卡等）原价售卖\n"
-        "• 其他道具每日09:00随机上架，远超市价，限量出售\n"
-        "• 除基础物品外，每人每天总计限购50件\n"
-        "• 使用【购买 物品 数量】直接购买\n"
-        "━━━━━━━━━━━━━\n"
-        "🏛️ 缉邪司总部商店：\n"
-        "【缉邪司总部】 查看总部商店（风雪镇 -5,390）\n"
-        "【总部兑换 <物品名称> [数量]】 用积分兑换升阶材料\n"
-        "• 专售装备升阶相关特殊物品、镶嵌物\n"
-        "• 使用公会积分兑换，无需加入公会\n"
-        "━━━━━━━━━━━━━\n"
-        "📢 银行改革公告：已取消存款利息，新增理财产品\n"
-        "⚠️ 跑商防刷钱：在某地购买的商品，4小时内不可在同地出售\n"
-        "⚖️ 携带限制：背包中商品总量不能超过500个"
+        "市集 - 查看当前市场\n"
+        "购买/出售 物品 数量\n"
+        "跑商推荐 - 查看盈利路线\n\n"
+        "💎 理财产品：\n"
+        "理财产品 - 查看产品\n"
+        "我的理财 - 查看持仓\n\n"
+        "💡 跑商是新手快速赚钱的方式"
     )
-    await economy_cmd.finish(Message(msg))
+
+    buttons = [
+        "市集",
+        "余额",
+        "跑商推荐",
+        "市集列表",
+        "黑市",
+        "理财产品",
+        "我的理财",
+        "帮助"
+    ]
+
+    template_params = [
+        MessageMarkdownParams(key="title", values=[title]),
+        MessageMarkdownParams(key="result", values=[result])
+    ]
+    template_params.extend([
+        MessageMarkdownParams(key=f"btn{i+1}", values=[btn])
+        for i, btn in enumerate(buttons)
+    ])
+
+    markdown = MessageMarkdown(
+        custom_template_id="102499345_1769177016",
+        params=template_params
+    )
+
+    await economy_cmd.finish(MessageSegment.markdown(markdown))
 
 # 投资系统（独立详细教程）
 investment_cmd = on_command("投资系统", aliases={"气运投资", "投资帮助"}, block=True, priority=5)
@@ -261,36 +272,53 @@ async def handle_alchemy(event: MessageEvent, args: Message = CommandArg()):
 battle_cmd = on_command("战斗系统",aliases={"战斗帮助","PVP系统"}, priority=4, block=True)
 @battle_cmd.handle()
 async def handle_battle(event: MessageEvent, args: Message = CommandArg()):
-    msg = (
-        "✨ 战斗系统帮助 ✨\n"
-        "玩家对战、NPC战斗、世界BOSS挑战\n"
+    """
+    使用Markdown模版的战斗系统帮助
+    模版ID: 102499345_1769177016 (反馈类)
+    """
+    title = "✨ 战斗系统"
+    # 注意：模版参数不能包含markdown语法，移除【】<>等符号
+    result = (
+        "玩家对战、NPC战斗、世界BOSS挑战\n\n"
         "━━━━━━━━━━━━━\n"
         "⚔️ 玩家对战：\n"
-        "【切磋 <UID>】 友好切磋，无损失\n"
-        "【模拟战斗 <UID1> <UID2>】 观看两个玩家的模拟战斗\n"
-        "【攻击 <玩家UID/NPC名称>】 攻击目标\n"
-        "  • 城镇安全区：友好切磋，无损失\n"
-        "  • 荒野/诡域：真实死斗，败者掉落物品\n"
-        "【死斗日志 [页码]】 查看PVP日志\n"
-        "━━━━━━━━━━━━━\n"
+        "切磋 UID - 友好切磋，无损失\n"
+        "攻击 UID/NPC - 攻击目标\n"
+        "  • 城镇安全区：友好切磋\n"
+        "  • 荒野/诡域：真实死斗\n\n"
         "🌟 世界BOSS：\n"
-        "【世界BOSS】 查看BOSS信息与规则\n"
-        "【讨伐BOSS】 攻击BOSS（每日3次）\n"
-        "【BOSS排行】 查看伤害排行榜\n"
-        "【开启深渊宝箱】 开启获得的深渊宝箱奖励\n"
-        "━━━━━━━━━━━━━\n"
-        "� 战力系统：\n"
-        "【战力】 查看自身完整属性\n"
-        "【战力说明】 查看各项战斗属性的作用\n"
-        "【加点帮助】 查看基本属性加点指南\n"
-        "━━━━━━━━━━━━━\n"
-        "⚡ 战斗机制：\n"
-        "• 敏捷高的玩家更容易获得先手\n"
-        "• 支持暴击、连击、反击、闪避等效果\n"
-        "• 最多进行30回合，超时则平局\n"
-        "� 城镇安全区包括：市集、总部、打工地点附近5格"
+        "世界BOSS - 查看BOSS信息\n"
+        "讨伐BOSS - 攻击BOSS(每日3次)\n"
+        "BOSS排行 - 查看伤害排行\n\n"
+        "💡 敏捷高的玩家更容易先手"
     )
-    await battle_cmd.finish(Message(msg))
+
+    buttons = [
+        "战力",
+        "战力说明",
+        "世界BOSS",
+        "讨伐BOSS",
+        "BOSS排行",
+        "死斗日志",
+        "加点帮助",
+        "帮助"
+    ]
+
+    template_params = [
+        MessageMarkdownParams(key="title", values=[title]),
+        MessageMarkdownParams(key="result", values=[result])
+    ]
+    template_params.extend([
+        MessageMarkdownParams(key=f"btn{i+1}", values=[btn])
+        for i, btn in enumerate(buttons)
+    ])
+
+    markdown = MessageMarkdown(
+        custom_template_id="102499345_1769177016",
+        params=template_params
+    )
+
+    await battle_cmd.finish(MessageSegment.markdown(markdown))
 
 # 打工系统
 part_time_job_cmd = on_command("打工系统", aliases={"打工帮助"}, priority=4, block=True)
@@ -449,27 +477,53 @@ xiu_lian_cmd = on_command("修炼系统", aliases={"修炼帮助"}, priority=4, 
 
 @xiu_lian_cmd.handle()
 async def handle_xiu_lian(event: MessageEvent, args: Message = CommandArg()):
-    msg = (
-        "✨ 修炼系统帮助 ✨\n"
-        "突破境界获得属性点，献祭材料获取怨念保驾护航\n"
+    """
+    使用Markdown模版的修炼系统帮助
+    模版ID: 102499345_1769177016 (反馈类)
+    """
+    title = "✨ 修炼系统"
+    # 注意：模版参数不能包含markdown语法，移除【】<>等符号
+    result = (
+        "突破境界获得属性点，献祭材料获取怨念保驾护航\n\n"
         "━━━━━━━━━━━━━\n"
-        "【修炼】 获取经验，冷却时间5分钟\n"
-        "【闭关】 闭关修炼，挂机升级，但效率减半\n"
-        "【出关】 出关后可继续修炼\n"
-        "【突破 [镇厄|棺材钉]】 突破境界，可消耗怨念或棺材钉确保成功\n"
-        "【连续突破 [镇厄]】 连续突破直到修为或怨念耗尽\n"
-        "【冥返】 300级满级后，冥返重塑根基，获得更强潜力\n"
-        "【加点 <属性> <点数>】 分配突破获得的属性点\n"
-        "【加点帮助】 查看属性详解和推荐加点方案\n"
-        "【免费洗点】 新手专用，30级以下消耗5点咒抗重置属性点\n"
-        "【献祭 <材料名> <数量>】 献祭材料以获取怨念值\n"
-        "【一键献祭 <材料1> [材料2...]】 月卡专属，批量献祭指定材料\n"
+        "修炼 - 获取经验，冷却5分钟\n"
+        "闭关 - 挂机升级，效率减半\n"
+        "出关 - 出关后可继续修炼\n"
+        "突破 - 突破境界，可消耗怨念确保成功\n"
+        "加点 属性 点数 - 分配属性点\n"
+        "献祭 材料 数量 - 获取怨念值\n"
         "━━━━━━━━━━━━━\n"
-        "💡 突破失败会损失部分修为，使用怨念或棺材钉可确保成功\n"
-        "💡 属性点分配影响战斗力，发送【加点帮助】查看详细指南\n"
-        "💡 一键献祭会献上背包中所有指定材料，请谨慎选择\n"
+        "💡 突破失败会损失部分修为\n"
+        "💡 使用怨念或棺材钉可确保成功\n"
+        "💡 发送 加点帮助 查看详细指南"
     )
-    await xiu_lian_cmd.finish(Message(msg))
+
+    buttons = [
+        "修炼",
+        "闭关",
+        "突破",
+        "面板",
+        "加点帮助",
+        "战力",
+        "背包",
+        "帮助"
+    ]
+
+    template_params = [
+        MessageMarkdownParams(key="title", values=[title]),
+        MessageMarkdownParams(key="result", values=[result])
+    ]
+    template_params.extend([
+        MessageMarkdownParams(key=f"btn{i+1}", values=[btn])
+        for i, btn in enumerate(buttons)
+    ])
+
+    markdown = MessageMarkdown(
+        custom_template_id="102499345_1769177016",
+        params=template_params
+    )
+
+    await xiu_lian_cmd.finish(MessageSegment.markdown(markdown))
 
 
 # 阴宅系统
@@ -548,46 +602,49 @@ async def handle_entertainment(event: MessageEvent, args: Message = CommandArg()
 bag_cmd = on_command("背包系统", aliases={"背包帮助"}, priority=4, block=True)
 @bag_cmd.handle()
 async def handle_bag(event: MessageEvent, args: Message = CommandArg()):
-    msg = (
-        "✨ 背包系统帮助 ✨\n"
-        "管理物品，使用道具，查看图鉴。类别可选：消耗品、材料、商品、丹药、装备、宝石、礼物\n"
-        "━━━━━━━━━━━━━\n"
-        "💡 装备不占用背包容量，请使用【装备栏】查看装备\n"
-        "━━━━━━━━━━━━━\n"
-        "【背包 [类别/物品名] [页码]】 类别用于过滤，页码用于翻页，不填则查看所有\n"
-        "【背包 <物品名>】 查询指定物品的数量和详细信息\n"
-        "【使用 <物品名> <数量>】 使用指定道具\n"
-        "【一键嗑药】 自动使用回春散和凝神草补满血量和法力值\n"
-        "【丢弃 <物品名> <数量>】 丢弃指定道具\n"
-        "【整理背包】 将同类型可堆叠物品合并，释放背包空间\n"
-        "【图鉴 <关键词>】 查看物品或装备描述，丹药会显示每日限制\n"
-        "【耐药性】 查看今日丹药使用状态\n"
-        "【丹药加成】 查看历史服用丹药的总属性加成\n"
-        "【欺骗帮助】 想想骗人鬼会怎么做？(材料转换)\n"
-        "━━━━━━━━━━━━━\n"
-        "✨ 临时增益系统：\n"
-        "【增益状态】 查看当前临时增益效果\n"
-        "【清理增益】 手动清理过期的增益效果\n"
-        "【属性分解】 查看属性来源详细分解（基础/装备/特殊装备/丹药/临时）\n"
-        "【属性检查】 检查属性数据是否正常，发现异常会提示\n"
-        "━━━━━━━━━━━━━\n"
-        "📊 属性分解说明：\n"
-        "• 基础属性：初始值 + 加点增长（不含丹药）\n"
-        "• 装备加成：所有已装备装备提供的属性加成\n"
-        "• 特殊装备：VIP定制装备带来的永久属性加成（如斩龙闪、镜怨之衣）\n"
-        "• 丹药加成：历史服用永久丹药的累计加成\n"
-        "• 临时增益：当前生效的临时buff加成\n"
-        "━━━━━━━━━━━━━\n"
-        "💊 丹药使用限制：\n"
-        "• 每种丹药都有每日服用上限，合理安排使用计划\n"
-        "• 图鉴指令可查看丹药限制和使用状态\n"
-        "💡 物品查询示例：\n"
-        "• 【背包 回春散】 查询回春散的数量\n"
-        "• 【背包 装备】 查看所有装备\n"
-        "• 【背包 礼物】 查看所有礼物\n"
-        "• 【背包 2】 查看第2页物品\n"
+    """
+    使用Markdown模版的背包系统帮助
+    模版ID: 102499345_1769177949 (物品列表类)
+    """
+    # 10个快捷按钮
+    buttons = [
+        "背包",
+        "背包 消耗品",
+        "背包 材料",
+        "背包 装备",
+        "使用 回春散 1",
+        "一键嗑药",
+        "图鉴",
+        "耐药性",
+        "整理背包",
+        "帮助"
+    ]
+
+    # 构建模版参数
+    template_params = [
+        MessageMarkdownParams(key=f"btn{i+1}", values=[btn])
+        for i, btn in enumerate(buttons)
+    ]
+
+    # 创建Markdown消息
+    markdown = MessageMarkdown(
+        custom_template_id="102499345_1769177949",
+        params=template_params
     )
-    await bag_cmd.finish(Message(msg))
+
+    # 发送带说明的消息
+    msg = Message(
+        "✨ 背包系统 ✨\n"
+        "━━━━━━━━━━━━━\n"
+        "管理物品，使用道具，查看图鉴\n"
+        "💡 装备不占用背包容量\n"
+        "💡 点击下方按钮快速操作\n"
+        "━━━━━━━━━━━━━\n"
+        "类别可选：消耗品、材料、商品、丹药、装备、宝石、礼物"
+    )
+    msg.append(MessageSegment.markdown(markdown))
+
+    await bag_cmd.finish(msg)
 
 # 探索系统
 explore_cmd = on_command("探索系统", aliases={"世界系统","世界帮助","探索帮助"}, priority=4, block=True)

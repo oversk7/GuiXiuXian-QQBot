@@ -53,3 +53,7 @@
 ```
 <qqbot-cmd-input text="{{.t1}}" /><qqbot-cmd-input text="{{.t2}}" /><qqbot-cmd-input text="{{.t3}}" /><qqbot-cmd-input text="{{.t4}}" /><qqbot-cmd-input text="{{.t5}}" /><qqbot-cmd-input text="{{.t6}}" /><qqbot-cmd-input text="{{.t7}}" /><qqbot-cmd-input text="{{.t8}}" /><qqbot-cmd-input text="{{.t9}}" /><qqbot-cmd-input text="{{.t10}}" />
 ```
+
+
+### 注意
+模版参数中不能包含markdown语法

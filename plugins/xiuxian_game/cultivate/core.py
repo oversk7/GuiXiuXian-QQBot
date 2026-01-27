@@ -1,5 +1,6 @@
 from nonebot import on_command
-from nonebot.adapters.qq import MessageEvent, Message
+from nonebot.adapters.qq import MessageEvent, Message, MessageSegment
+from nonebot.adapters.qq.models.common import MessageMarkdown, MessageMarkdownParams
 from nonebot.params import CommandArg
 from ..utils import  message_add_head, calculate_level_up_exp, generate_progress_bar, calculate_cultivation_times_needed
 from ..models.db import safe_session
@@ -208,7 +209,7 @@ async def handle_cultivate(event: MessageEvent):
 
         # 智能提示文本
         if player.exp >= exp_max:
-            hint_text = f"💡 【突破】境界壁垒已松动"
+            hint_text = f"💡 突破 境界壁垒已松动"
         else:
             if cultivation_times <= 5:
                 hint_text = f"💡 还需修炼约{cultivation_times}次可突破 (约{hours_needed:.1f}小时，基于当前加成)"
@@ -244,7 +245,37 @@ async def handle_cultivate(event: MessageEvent):
         if achievement_msgs:
             msg += "\n\n" + "\n\n".join(achievement_msgs)
 
-        await cultivate.finish(message_add_head(msg, event))
+        # 使用Markdown模版发送修炼结果
+        title = "✨ 修炼完成"
+        result = msg  # 使用构建好的消息作为result
+
+        # 8个快捷按钮
+        buttons = [
+            "修炼",
+            "闭关",
+            "突破",
+            "面板",
+            "背包",
+            "战力",
+            "签到",
+            "帮助"
+        ]
+
+        template_params = [
+            MessageMarkdownParams(key="title", values=[title]),
+            MessageMarkdownParams(key="result", values=[result])
+        ]
+        template_params.extend([
+            MessageMarkdownParams(key=f"btn{i+1}", values=[btn])
+            for i, btn in enumerate(buttons)
+        ])
+
+        markdown = MessageMarkdown(
+            custom_template_id="102499345_1769177016",
+            params=template_params
+        )
+
+        await cultivate.finish(MessageSegment.markdown(markdown))
 
 @seclusion.handle()
 async def handle_seclusion(event: MessageEvent):
@@ -367,9 +398,39 @@ async def handle_seclusion(event: MessageEvent):
             f"{efficiency_detail}\n"
             f"⏰ 时长上限 {seclusion_hours}小时 | 期间无法普通修炼\n"
             "━━━━━━━━━━━━━\n"
-            "💡 【出关】推开棺盖并结算怨炁"
+            "💡 出关 推开棺盖并结算怨炁"
         )
-        await seclusion.finish(message_add_head(msg_secl, event))
+
+        # 使用Markdown模版发送闭关开始消息
+        title = "⚰️ 闭关开始"
+        result = msg_secl
+
+        buttons = [
+            "出关",
+            "面板",
+            "背包",
+            "战力",
+            "阴宅",
+            "签到",
+            "市集",
+            "帮助"
+        ]
+
+        template_params = [
+            MessageMarkdownParams(key="title", values=[title]),
+            MessageMarkdownParams(key="result", values=[result])
+        ]
+        template_params.extend([
+            MessageMarkdownParams(key=f"btn{i+1}", values=[btn])
+            for i, btn in enumerate(buttons)
+        ])
+
+        markdown = MessageMarkdown(
+            custom_template_id="102499345_1769177016",
+            params=template_params
+        )
+
+        await seclusion.finish(MessageSegment.markdown(markdown))
 
 @out_seclusion.handle()
 async def handle_out_seclusion(event: MessageEvent):
@@ -519,9 +580,9 @@ async def handle_out_seclusion(event: MessageEvent):
 
         # 智能提示
         if player.exp >= exp_max2:
-            hint_text = "💡 【突破】境界壁垒已松动"
+            hint_text = "💡 突破 境界壁垒已松动"
         else:
-            hint_text = "💡 【修炼】继续积累怨炁"
+            hint_text = "💡 修炼 继续积累怨炁"
 
         msg_out = (
             f"🔓 {out_seclusion_flavor_text}\n"
@@ -531,7 +592,37 @@ async def handle_out_seclusion(event: MessageEvent):
             f"⏰ 闭关时长 {duration_str}\n"
             f"{hint_text}"
         )
-        await out_seclusion.finish(message_add_head(msg_out, event))
+
+        # 使用Markdown模版发送出关结果
+        title = "🔓 出关完成"
+        result = msg_out
+
+        buttons = [
+            "修炼",
+            "突破",
+            "面板",
+            "背包",
+            "战力",
+            "闭关",
+            "签到",
+            "帮助"
+        ]
+
+        template_params = [
+            MessageMarkdownParams(key="title", values=[title]),
+            MessageMarkdownParams(key="result", values=[result])
+        ]
+        template_params.extend([
+            MessageMarkdownParams(key=f"btn{i+1}", values=[btn])
+            for i, btn in enumerate(buttons)
+        ])
+
+        markdown = MessageMarkdown(
+            custom_template_id="102499345_1769177016",
+            params=template_params
+        )
+
+        await out_seclusion.finish(MessageSegment.markdown(markdown))
 
 @breakthrough.handle()
 async def handle_breakthrough(event: MessageEvent, args: Message = CommandArg()):
