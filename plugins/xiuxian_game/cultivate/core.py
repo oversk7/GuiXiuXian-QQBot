@@ -247,7 +247,7 @@ async def handle_cultivate(event: MessageEvent):
 
         # 使用Markdown模版发送修炼结果
         title = "✨ 修炼完成"
-        result = msg.replace("\n", " ")  # 移除换行符，官方限制参数不能包含换行符
+        result = msg.replace("\n", "\r")  # 官方要求换行符用\r
 
         # 8个快捷按钮
         buttons = [
@@ -258,6 +258,7 @@ async def handle_cultivate(event: MessageEvent):
             "背包",
             "战力",
             "签到",
+            "帮助"
         ]
 
         template_params = [
