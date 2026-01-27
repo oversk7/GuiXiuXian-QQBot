@@ -86,6 +86,8 @@ async def get_unified_player(session: AsyncSession, event: MessageEvent) -> Opti
         temp_player_id = _admin_temp_switch[user_id]
         temp_player = await session.get(Player, temp_player_id)
         if temp_player:
+            # 刷新对象以获取最新数据库状态，避免session缓存问题
+            await session.refresh(temp_player)
             return temp_player
 
     # 2. 使用 PlayerRepository 查询激活的账号
@@ -95,6 +97,10 @@ async def get_unified_player(session: AsyncSession, event: MessageEvent) -> Opti
     # 3. 如果没有激活账号记录（用户未使用账号切换系统），回退到直接查询
     if player is None:
         player = await session.get(Player, user_id)
+
+    # 刷新对象以获取最新数据库状态，避免session缓存导致的闭关状态不同步问题
+    if player is not None:
+        await session.refresh(player)
 
     return player
 

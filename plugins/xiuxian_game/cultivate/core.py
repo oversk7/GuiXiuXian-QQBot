@@ -247,7 +247,7 @@ async def handle_cultivate(event: MessageEvent):
 
         # 使用Markdown模版发送修炼结果
         title = "✨ 修炼完成"
-        result = msg  # 使用构建好的消息作为result
+        result = msg.replace("\n", " ")  # 移除换行符，官方限制参数不能包含换行符
 
         # 8个快捷按钮
         buttons = [
@@ -403,7 +403,7 @@ async def handle_seclusion(event: MessageEvent):
 
         # 使用Markdown模版发送闭关开始消息
         title = "⚰️ 闭关开始"
-        result = msg_secl
+        result = msg_secl.replace("\n", " ")  # 移除换行符，官方限制参数不能包含换行符
 
         buttons = [
             "出关",
@@ -595,7 +595,7 @@ async def handle_out_seclusion(event: MessageEvent):
 
         # 使用Markdown模版发送出关结果
         title = "🔓 出关完成"
-        result = msg_out
+        result = msg_out.replace("\n", " ")  # 移除换行符，官方限制参数不能包含换行符
 
         buttons = [
             "修炼",

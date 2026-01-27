@@ -54,7 +54,7 @@ async def handle_help(event: MessageEvent, args: Message = CommandArg()):
         params=template_params
     )
 
-    # 发送带说明的消息
+    # 发送带说明的消息（注意：Message文本部分不受换行符限制，只有markdown模版参数受限制）
     msg = Message(
         "✨ 欢迎使用帮助系统 ✨\n"
         "═════════════\n"
@@ -79,23 +79,8 @@ async def handle_economy(event: MessageEvent, args: Message = CommandArg()):
     模版ID: 102499345_1769177016 (反馈类)
     """
     title = "✨ 经济系统"
-    # 注意：模版参数不能包含markdown语法，移除【】<>等符号
-    result = (
-        "管理金币、跑商赚钱、银行理财\n\n"
-        "━━━━━━━━━━━━━\n"
-        "💰 银行系统：\n"
-        "存/取 金额 - 存取冥行\n"
-        "余额 - 查询存款\n"
-        "转账 UID 金额 - 银行转账(手续费3%)\n\n"
-        "🏪 跑商系统：\n"
-        "市集 - 查看当前市场\n"
-        "购买/出售 物品 数量\n"
-        "跑商推荐 - 查看盈利路线\n\n"
-        "💎 理财产品：\n"
-        "理财产品 - 查看产品\n"
-        "我的理财 - 查看持仓\n\n"
-        "💡 跑商是新手快速赚钱的方式"
-    )
+    # 注意：模版参数不能包含markdown语法和换行符
+    result = "管理金币、跑商赚钱、银行理财 ━━━━━━━━━━━━━ 💰 银行系统： 存/取 金额 - 存取冥行 | 余额 - 查询存款 | 转账 UID 金额 - 银行转账(手续费3%) ━━━━━━━━━━━━━ 🏪 跑商系统： 市集 - 查看当前市场 | 购买/出售 物品 数量 | 跑商推荐 - 查看盈利路线 ━━━━━━━━━━━━━ 💎 理财产品： 理财产品 - 查看产品 | 我的理财 - 查看持仓 ━━━━━━━━━━━━━ 💡 跑商是新手快速赚钱的方式"
 
     buttons = [
         "市集",
@@ -277,21 +262,8 @@ async def handle_battle(event: MessageEvent, args: Message = CommandArg()):
     模版ID: 102499345_1769177016 (反馈类)
     """
     title = "✨ 战斗系统"
-    # 注意：模版参数不能包含markdown语法，移除【】<>等符号
-    result = (
-        "玩家对战、NPC战斗、世界BOSS挑战\n\n"
-        "━━━━━━━━━━━━━\n"
-        "⚔️ 玩家对战：\n"
-        "切磋 UID - 友好切磋，无损失\n"
-        "攻击 UID/NPC - 攻击目标\n"
-        "  • 城镇安全区：友好切磋\n"
-        "  • 荒野/诡域：真实死斗\n\n"
-        "🌟 世界BOSS：\n"
-        "世界BOSS - 查看BOSS信息\n"
-        "讨伐BOSS - 攻击BOSS(每日3次)\n"
-        "BOSS排行 - 查看伤害排行\n\n"
-        "💡 敏捷高的玩家更容易先手"
-    )
+    # 注意：模版参数不能包含markdown语法和换行符
+    result = "玩家对战、NPC战斗、世界BOSS挑战 ━━━━━━━━━━━━━ ⚔️ 玩家对战： 切磋 UID - 友好切磋，无损失 | 攻击 UID/NPC - 攻击目标 | • 城镇安全区：友好切磋 | • 荒野/诡域：真实死斗 ━━━━━━━━━━━━━ 🌟 世界BOSS： 世界BOSS - 查看BOSS信息 | 讨伐BOSS - 攻击BOSS(每日3次) | BOSS排行 - 查看伤害排行 ━━━━━━━━━━━━━ 💡 敏捷高的玩家更容易先手"
 
     buttons = [
         "战力",
@@ -482,21 +454,8 @@ async def handle_xiu_lian(event: MessageEvent, args: Message = CommandArg()):
     模版ID: 102499345_1769177016 (反馈类)
     """
     title = "✨ 修炼系统"
-    # 注意：模版参数不能包含markdown语法，移除【】<>等符号
-    result = (
-        "突破境界获得属性点，献祭材料获取怨念保驾护航\n\n"
-        "━━━━━━━━━━━━━\n"
-        "修炼 - 获取经验，冷却5分钟\n"
-        "闭关 - 挂机升级，效率减半\n"
-        "出关 - 出关后可继续修炼\n"
-        "突破 - 突破境界，可消耗怨念确保成功\n"
-        "加点 属性 点数 - 分配属性点\n"
-        "献祭 材料 数量 - 获取怨念值\n"
-        "━━━━━━━━━━━━━\n"
-        "💡 突破失败会损失部分修为\n"
-        "💡 使用怨念或棺材钉可确保成功\n"
-        "💡 发送 加点帮助 查看详细指南"
-    )
+    # 注意：模版参数不能包含markdown语法和换行符
+    result = "突破境界获得属性点，献祭材料获取怨念保驾护航 ━━━━━━━━━━━━━ 修炼 - 获取经验，冷却5分钟 | 闭关 - 挂机升级，效率减半 | 出关 - 出关后可继续修炼 | 突破 - 突破境界，可消耗怨念确保成功 | 加点 属性 点数 - 分配属性点 | 献祭 材料 数量 - 获取怨念值 ━━━━━━━━━━━━━ 💡 突破失败会损失部分修为 | 💡 使用怨念或棺材钉可确保成功 | 💡 发送 加点帮助 查看详细指南"
 
     buttons = [
         "修炼",
@@ -632,7 +591,7 @@ async def handle_bag(event: MessageEvent, args: Message = CommandArg()):
         params=template_params
     )
 
-    # 发送带说明的消息
+    # 发送带说明的消息（注意：Message文本部分不受换行符限制，只有markdown模版参数受限制）
     msg = Message(
         "✨ 背包系统 ✨\n"
         "━━━━━━━━━━━━━\n"
@@ -1080,33 +1039,6 @@ async def handle_button_test(event: MessageEvent, args: Message = CommandArg()):
     }
     keyboard = MessageKeyboard(id="102499345_1738493417",content=btn_json)
     await button_test_cmd.finish(MessageSegment.keyboard(keyboard))
-
-
-# Markdown模版测试
-md_test_help_info_cmd = on_command("md测试帮助", aliases={"markdown测试帮助", "模版测试帮助"}, priority=4, block=True)
-
-@md_test_help_info_cmd.handle()
-async def handle_md_test_help_info(event: MessageEvent, args: Message = CommandArg()):
-    msg = (
-        "✨ Markdown模版测试帮助 ✨\n"
-        "━━━━━━━━━━━━━\n"
-        "📝 测试指令：\n"
-        "【md测试】 使用默认值测试模版\n"
-        "【md测试 参数1 参数2 ...】 自定义参数测试\n"
-        "━━━━━━━━━━━━━\n"
-        "🎯 模版信息：\n"
-        "• 模版ID: 102499345_1768473387\n"
-        "• 支持参数: t1-t10 (10个输入框)\n"
-        "• 参数类型: 文本输入\n"
-        "━━━━━━━━━━━━━\n"
-        "💡 使用示例：\n"
-        "• /md测试\n"
-        "• /md测试 签到 修炼 突破\n"
-        "• /md测试 测试1 测试2 测试3 测试4 测试5\n"
-        "━━━━━━━━━━━━━\n"
-        "⚠️ 仅支持QQ官方平台"
-    )
-    await md_test_help_info_cmd.finish(Message(msg))
 
 
 # 赞助码
