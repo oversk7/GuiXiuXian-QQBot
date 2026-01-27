@@ -245,33 +245,29 @@ async def handle_cultivate(event: MessageEvent):
         if achievement_msgs:
             msg += "\n\n" + "\n\n".join(achievement_msgs)
 
-        # 使用Markdown模版发送修炼结果
+        # 使用图鉴模版发送修炼结果
         title = "✨ 修炼完成"
-        result = msg.replace("\n", "\r")  # 官方要求换行符用\r
+        desc = msg.replace("\n", "\r")
 
-        # 8个快捷按钮
-        buttons = [
-            "修炼",
-            "闭关",
-            "突破",
-            "面板",
-            "背包",
-            "战力",
-            "签到",
-            "帮助"
-        ]
+        # 获取玩家头像链接
+        from ..platform_utils import get_platform_info
+        _, user_id = get_platform_info(event)
+        avatar_url = f"https://thirdqq.qlogo.cn/qqapp/102499345/{user_id}/0"
+
+        # 快捷操作提示
+        hint = "快捷操作: 修炼 | 闭关 | 突破 | 面板 | 背包 | 战力 | 签到 | 帮助"
 
         template_params = [
             MessageMarkdownParams(key="title", values=[title]),
-            MessageMarkdownParams(key="result", values=[result])
+            MessageMarkdownParams(key="desc", values=[desc]),
+            MessageMarkdownParams(key="imgurl", values=[avatar_url]),
+            MessageMarkdownParams(key="width", values=["100"]),
+            MessageMarkdownParams(key="height", values=["100"]),
+            MessageMarkdownParams(key="hint", values=[hint])
         ]
-        template_params.extend([
-            MessageMarkdownParams(key=f"btn{i+1}", values=[btn])
-            for i, btn in enumerate(buttons)
-        ])
 
         markdown = MessageMarkdown(
-            custom_template_id="102499345_1769177016",
+            custom_template_id="102499345_1769178984",
             params=template_params
         )
 
@@ -403,7 +399,7 @@ async def handle_seclusion(event: MessageEvent):
 
         # 使用Markdown模版发送闭关开始消息
         title = "⚰️ 闭关开始"
-        result = msg_secl.replace("\n", " ")  # 移除换行符，官方限制参数不能包含换行符
+        result = msg_secl.replace("\n", "\r")
 
         buttons = [
             "出关",
@@ -593,32 +589,29 @@ async def handle_out_seclusion(event: MessageEvent):
             f"{hint_text}"
         )
 
-        # 使用Markdown模版发送出关结果
+        # 使用图鉴模版发送出关结果
         title = "🔓 出关完成"
-        result = msg_out.replace("\n", " ")  # 移除换行符，官方限制参数不能包含换行符
+        desc = msg_out.replace("\n", "\r")
 
-        buttons = [
-            "修炼",
-            "突破",
-            "面板",
-            "背包",
-            "战力",
-            "闭关",
-            "签到",
-            "帮助"
-        ]
+        # 获取玩家头像链接
+        from ..platform_utils import get_platform_info
+        _, user_id = get_platform_info(event)
+        avatar_url = f"https://thirdqq.qlogo.cn/qqapp/102499345/{user_id}/0"
+
+        # 快捷操作提示
+        hint = "快捷操作: 修炼 | 突破 | 面板 | 背包 | 战力 | 闭关 | 签到 | 帮助"
 
         template_params = [
             MessageMarkdownParams(key="title", values=[title]),
-            MessageMarkdownParams(key="result", values=[result])
+            MessageMarkdownParams(key="desc", values=[desc]),
+            MessageMarkdownParams(key="imgurl", values=[avatar_url]),
+            MessageMarkdownParams(key="width", values=["100"]),
+            MessageMarkdownParams(key="height", values=["100"]),
+            MessageMarkdownParams(key="hint", values=[hint])
         ]
-        template_params.extend([
-            MessageMarkdownParams(key=f"btn{i+1}", values=[btn])
-            for i, btn in enumerate(buttons)
-        ])
 
         markdown = MessageMarkdown(
-            custom_template_id="102499345_1769177016",
+            custom_template_id="102499345_1769178984",
             params=template_params
         )
 

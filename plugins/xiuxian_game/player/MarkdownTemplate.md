@@ -56,4 +56,5 @@
 
 
 ### 注意
-模版参数中不能包含markdown语法，不能有换行符
+模版参数中不能包含markdown语法，换行符必须使用\r而不是\n
+玩家头像获取链接：https://thirdqq.qlogo.cn/qqapp/102499345/玩家在QQ官方的id/0
