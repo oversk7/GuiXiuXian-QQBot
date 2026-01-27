@@ -161,16 +161,75 @@ def _get_item_image_url(item_id: str) -> str:
     return images.get(item_id, "")
 
 
-async def _get_image_dimensions(image_url: str, max_size: int = 300) -> tuple[str, str]:
-    """获取图片尺寸并按比例缩放
+def _load_image_dimensions_cache() -> dict:
+    """加载图片尺寸缓存
+
+    Returns:
+        物品ID到图片信息的映射字典 {item_id: {"url": "...", "width": 300, "height": 200}}
+    """
+    cache_path = Path(__file__).parent.parent.parent.parent / "data" / "item_image_dimensions.yaml"
+
+    if not cache_path.exists():
+        return {}
+
+    try:
+        with open(cache_path, 'r', encoding='utf-8') as f:
+            data = yaml.safe_load(f)
+            return data if data else {}
+    except Exception as e:
+        print(f"加载图片尺寸缓存失败: {e}")
+        return {}
+
+
+def _save_image_dimensions_cache(data: dict) -> bool:
+    """保存图片尺寸缓存
 
     Args:
+        data: 缓存数据字典
+
+    Returns:
+        是否保存成功
+    """
+    try:
+        cache_path = Path(__file__).parent.parent.parent.parent / "data" / "item_image_dimensions.yaml"
+        # 确保目录存在
+        cache_path.parent.mkdir(parents=True, exist_ok=True)
+
+        with open(cache_path, 'w', encoding='utf-8') as f:
+            yaml.dump(data, f, allow_unicode=True, default_flow_style=False)
+        return True
+    except Exception as e:
+        print(f"保存图片尺寸缓存失败: {e}")
+        return False
+
+
+async def _get_image_dimensions_with_cache(item_id: str, image_url: str, max_size: int = 300) -> tuple[str, str]:
+    """获取图片尺寸并按比例缩放（带缓存）
+
+    Args:
+        item_id: 物品ID
         image_url: 图片URL
         max_size: 最大尺寸限制（宽度或高度的最大值）
 
     Returns:
         (width, height) 缩放后的宽度和高度字符串
     """
+    # 加载缓存
+    cache = _load_image_dimensions_cache()
+
+    # 检查缓存是否有效
+    if item_id in cache:
+        cached_info = cache[item_id]
+        # 如果URL没有变化，直接使用缓存
+        if cached_info.get("url") == image_url:
+            width = cached_info.get("width", 200)
+            height = cached_info.get("height", 200)
+            print(f"使用缓存的图片尺寸: {item_id} -> {width}x{height}")
+            return str(width), str(height)
+
+    # 缓存无效或不存在，需要下载图片获取尺寸
+    print(f"下载图片获取尺寸: {image_url}")
+
     try:
         # 设置超时时间
         timeout = aiohttp.ClientTimeout(total=10)
@@ -204,6 +263,15 @@ async def _get_image_dimensions(image_url: str, max_size: int = 300) -> tuple[st
                     # 不需要缩放
                     new_width = original_width
                     new_height = original_height
+
+                # 更新缓存
+                cache[item_id] = {
+                    "url": image_url,
+                    "width": new_width,
+                    "height": new_height
+                }
+                _save_image_dimensions_cache(cache)
+                print(f"已缓存图片尺寸: {item_id} -> {new_width}x{new_height}")
 
                 return str(new_width), str(new_height)
 
@@ -509,8 +577,8 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
             width = "0"
             height = "0"
         else:
-            # 获取图片实际尺寸并等比缩放
-            width, height = await _get_image_dimensions(item_image_url)
+            # 获取图片实际尺寸并等比缩放（带缓存）
+            width, height = await _get_image_dimensions_with_cache(cfg.item_id, item_image_url)
 
         # 构建Markdown模板参数
         template_params = [

@@ -45,6 +45,36 @@ def _save_item_images(data: dict) -> bool:
         return False
 
 
+def _clear_image_dimensions_cache(item_id: str) -> None:
+    """清除指定物品的图片尺寸缓存
+
+    Args:
+        item_id: 物品ID
+    """
+    try:
+        cache_path = ITEM_IMAGES_CONFIG.parent / "item_image_dimensions.yaml"
+
+        if not cache_path.exists():
+            return
+
+        with open(cache_path, 'r', encoding='utf-8') as f:
+            cache = yaml.safe_load(f)
+
+        if not cache:
+            return
+
+        # 删除该物品的缓存
+        if item_id in cache:
+            del cache[item_id]
+
+            # 保存更新后的缓存
+            with open(cache_path, 'w', encoding='utf-8') as f:
+                yaml.dump(cache, f, allow_unicode=True, default_flow_style=False)
+            print(f"已清除物品 {item_id} 的图片尺寸缓存")
+    except Exception as e:
+        print(f"清除图片尺寸缓存失败: {e}")
+
+
 # 设置物品图片
 set_item_image_cmd = on_command("设置物品图片", permission=SUPERUSER, priority=4, block=True)
 
@@ -74,6 +104,9 @@ async def handle_set_item_image(event: MessageEvent, args: Message = CommandArg(
 
     # 保存配置
     if _save_item_images(images):
+        # 清除旧的尺寸缓存（因为URL可能变化了）
+        _clear_image_dimensions_cache(item_cfg.item_id)
+
         # URL转大写以避免QQ官方的URL检测
         display_url = image_url.upper()
         msg = (
@@ -121,6 +154,9 @@ async def handle_delete_item_image(event: MessageEvent, args: Message = CommandA
 
     # 保存配置
     if _save_item_images(images):
+        # 清除尺寸缓存
+        _clear_image_dimensions_cache(item_cfg.item_id)
+
         msg = (
             f"✅ 删除成功\n"
             f"━━━━━━━━━━━━━\n"
