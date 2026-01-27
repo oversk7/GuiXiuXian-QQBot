@@ -1,6 +1,7 @@
 """
 物品图片管理命令
 管理员可以设置、删除和查看物品图片配置
+玩家（等级>50）可以为没有图片的物品提供图片
 """
 from nonebot import on_command
 from nonebot.permission import SUPERUSER
@@ -8,9 +9,12 @@ from nonebot.adapters.qq import MessageEvent, Message
 from nonebot.params import CommandArg
 import yaml
 from pathlib import Path
+from sqlalchemy import select
 
 from ..config import config
 from ..utils import message_add_head
+from ..models.db import safe_session
+from ..platform_utils import get_unified_player
 
 
 # 配置文件路径
@@ -203,3 +207,73 @@ async def handle_item_images_list(event: MessageEvent, args: Message = CommandAr
     lines.append("💡 使用【删除物品图片 物品名】删除配置")
 
     await item_images_list_cmd.finish(message_add_head("\n".join(lines), event))
+
+
+# ==================== 玩家命令 ====================
+
+# 玩家提交物品图片（等级>50）
+submit_item_image_cmd = on_command("提交物品图片", aliases={"上传物品图片"}, priority=4, block=True)
+
+@submit_item_image_cmd.handle()
+async def handle_submit_item_image(event: MessageEvent, args: Message = CommandArg()):
+    """玩家提交物品图片URL（等级>50，只能为没有图片的物品提供）
+
+    格式：提交物品图片 物品名 图片URL
+    """
+    params = args.extract_plain_text().strip().split(maxsplit=1)
+
+    if len(params) != 2:
+        await submit_item_image_cmd.finish("⛔ 格式错误\n正确格式：提交物品图片 物品名 图片URL")
+
+    item_name, image_url = params
+
+    # 获取玩家信息
+    async with safe_session() as session:
+        player = await get_unified_player(session, event)
+        if not player:
+            await submit_item_image_cmd.finish("⛔ 请先使用【我的信息】创建角色")
+
+        # 检查等级限制
+        if player.level <= 50:
+            await submit_item_image_cmd.finish(f"⛔ 等级限制\n当前等级：{player.level}\n需要等级：>50\n💡 继续修炼提升等级后即可提交图片")
+
+    # 查找物品配置
+    item_cfg = config.items_config["by_name"].get(item_name)
+    if not item_cfg:
+        await submit_item_image_cmd.finish(f"⛔ 未找到物品：{item_name}")
+
+    # 加载配置
+    images = _load_item_images()
+
+    # 检查是否已有图片（玩家只能为没有图片的物品提供）
+    if item_cfg.item_id in images:
+        await submit_item_image_cmd.finish(
+            f"⛔ 该物品已有图片配置\n"
+            f"━━━━━━━━━━━━━\n"
+            f"物品：{item_cfg.name}\n"
+            f"💡 如需修改图片，请联系管理员"
+        )
+
+    # 设置图片URL
+    images[item_cfg.item_id] = image_url
+
+    # 保存配置
+    if _save_item_images(images):
+        # 清除旧的尺寸缓存
+        _clear_image_dimensions_cache(item_cfg.item_id)
+
+        # URL转大写以避免QQ官方的URL检测
+        display_url = image_url.upper()
+        msg = (
+            f"✅ 提交成功\n"
+            f"━━━━━━━━━━━━━\n"
+            f"物品：{item_cfg.name}\n"
+            f"物品ID：{item_cfg.item_id}\n"
+            f"图片URL：{display_url}\n"
+            f"━━━━━━━━━━━━━\n"
+            f"💡 使用【图鉴 {item_name}】查看效果\n"
+            f"🎉 感谢你为图鉴系统做出的贡献！"
+        )
+        await submit_item_image_cmd.finish(message_add_head(msg, event))
+    else:
+        await submit_item_image_cmd.finish("⛔ 保存配置失败")
