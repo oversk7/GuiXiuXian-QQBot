@@ -20,6 +20,11 @@ from ..platform_utils import get_unified_player
 # 配置文件路径
 ITEM_IMAGES_CONFIG = Path(__file__).parent.parent.parent.parent / "data" / "item_images.yaml"
 
+# 允许的图床URL前缀（白名单）
+ALLOWED_IMAGE_PREFIXES = [
+    "https://wdcdn.qpic.cn/",  # QQ邮箱图床
+]
+
 
 def _load_item_images() -> dict:
     """加载物品图片配置"""
@@ -77,6 +82,33 @@ def _clear_image_dimensions_cache(item_id: str) -> None:
             print(f"已清除物品 {item_id} 的图片尺寸缓存")
     except Exception as e:
         print(f"清除图片尺寸缓存失败: {e}")
+
+
+def _validate_image_url(image_url: str) -> tuple[bool, str]:
+    """验证图片URL是否符合白名单要求
+
+    Args:
+        image_url: 图片URL
+
+    Returns:
+        (是否有效, 错误信息)
+    """
+    # 检查是否以允许的前缀开头
+    for prefix in ALLOWED_IMAGE_PREFIXES:
+        if image_url.startswith(prefix):
+            return True, ""
+
+    # 如果不匹配任何白名单前缀
+    allowed_list = "\n".join(f"• {prefix}" for prefix in ALLOWED_IMAGE_PREFIXES)
+    error_msg = (
+        f"⛔ 图片链接不符合要求\n"
+        f"━━━━━━━━━━━━━\n"
+        f"仅支持以下图床：\n"
+        f"{allowed_list}\n"
+        f"━━━━━━━━━━━━━\n"
+        f"💡 推荐使用QQ邮箱图床上传图片"
+    )
+    return False, error_msg
 
 
 # 设置物品图片
@@ -226,6 +258,11 @@ async def handle_submit_item_image(event: MessageEvent, args: Message = CommandA
         await submit_item_image_cmd.finish("⛔ 格式错误\n正确格式：提交物品图片 物品名 图片URL")
 
     item_name, image_url = params
+
+    # 验证图片URL
+    is_valid, error_msg = _validate_image_url(image_url)
+    if not is_valid:
+        await submit_item_image_cmd.finish(error_msg)
 
     # 获取玩家信息
     async with safe_session() as session:
