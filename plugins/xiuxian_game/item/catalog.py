@@ -4,7 +4,7 @@ from nonebot.adapters.qq.models.common import MessageMarkdown, MessageMarkdownPa
 from nonebot.params import CommandArg
 from sqlalchemy import select
 from datetime import date
-import os
+import yaml
 from pathlib import Path
 
 from ..config import config
@@ -124,30 +124,37 @@ def _get_material_obtain_methods(item_id: str, rarity: str) -> str:
     return "\n".join(f"• {method}" for method in methods) if methods else "暂无获取途径"
 
 
-def _get_fish_image_url(item_id: str) -> str:
-    """获取鱼类图片URL
+def _load_item_images() -> dict:
+    """加载物品图片配置
+
+    Returns:
+        物品ID到图片URL的映射字典
+    """
+    config_path = Path(__file__).parent.parent.parent.parent / "data" / "item_images.yaml"
+
+    if not config_path.exists():
+        return {}
+
+    try:
+        with open(config_path, 'r', encoding='utf-8') as f:
+            data = yaml.safe_load(f)
+            return data if data else {}
+    except Exception as e:
+        print(f"加载物品图片配置失败: {e}")
+        return {}
+
+
+def _get_item_image_url(item_id: str) -> str:
+    """获取物品图片URL
 
     Args:
         item_id: 物品ID
 
     Returns:
-        图片URL，如果图片不存在则返回空字符串
+        图片URL，如果没有配置则返回空字符串
     """
-    # 图片存储路径
-    base_path = Path(__file__).parent.parent.parent.parent / "data" / "images" / "fish"
-
-    # 支持的图片格式
-    extensions = ['.png', '.jpg', '.jpeg', '.gif', '.webp']
-
-    for ext in extensions:
-        image_path = base_path / f"{item_id}{ext}"
-        if image_path.exists():
-            # 返回本地文件路径（使用file://协议）
-            # Windows路径需要转换为正斜杠
-            local_path = str(image_path.absolute()).replace('\\', '/')
-            return f"file:///{local_path}"
-
-    return ""
+    images = _load_item_images()
+    return images.get(item_id, "")
 
 
 # 图鉴命令：查询物品、装备和鬼怪的详细信息
@@ -366,54 +373,105 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
 
         lines.append(f"✨ {cfg.name} ✨  [{type_cn}]\n{cfg.description}{extra_info}")
 
-    # 如果只有一个匹配结果且为鱼类，尝试使用Markdown模板展示
-    if len(item_matches) == 1 and item_matches[0].type.value == "FISH":
+    # 如果只有一个匹配结果，尝试使用Markdown模板展示（支持所有物品类型）
+    if len(item_matches) == 1:
         cfg = item_matches[0]
-        fish_image_url = _get_fish_image_url(cfg.item_id)
+        item_image_url = _get_item_image_url(cfg.item_id)
 
-        # 如果有配图，使用Markdown模板
-        if fish_image_url:
-            # 构建描述信息
-            rarity_display = cfg.get_rarity_display()
-            rarity_map = {
-                "white": "普通",
-                "green": "优良",
-                "blue": "精品",
-                "purple": "稀有",
-                "orange": "传说"
-            }
-            rarity_name = rarity_map.get(cfg.rarity, cfg.rarity)
+        # 构建描述信息（根据物品类型定制）
+        rarity_display = cfg.get_rarity_display()
+        rarity_map = {
+            "white": "普通",
+            "green": "优良" if cfg.type.value == "FISH" else "优秀",
+            "blue": "精品" if cfg.type.value == "FISH" else "稀有",
+            "purple": "稀有" if cfg.type.value == "FISH" else "史诗",
+            "orange": "传说",
+            "red": "永恒"
+        }
+        rarity_name = rarity_map.get(cfg.rarity, cfg.rarity)
 
-            desc_parts = [
-                f"{cfg.description}",
-                f"",
-                f"⭐ 稀有度：{rarity_display}{rarity_name}",
-                f"💰 价值：{cfg.price:,} 金币",
-                f"🎣 获取方式：钓鱼系统"
-            ]
-            desc = "\r".join(desc_parts)
+        # 根据物品类型构建描述
+        desc_parts = [f"{cfg.description}", ""]
 
-            # 快捷操作提示
-            hint = "快捷操作: 钓鱼 | 鱼栏 | 钓鱼记录 | 钓鱼排行 | 钓鱼图鉴 | 背包 | 帮助"
+        # 添加稀有度和价值信息
+        if hasattr(cfg, 'rarity') and cfg.rarity:
+            desc_parts.append(f"⭐ 稀有度：{rarity_display}{rarity_name}")
+        if cfg.price > 0:
+            desc_parts.append(f"💰 价值：{cfg.price:,} 金币")
 
-            # 构建Markdown模板参数
-            template_params = [
-                MessageMarkdownParams(key="title", values=[f"🐟 {cfg.name}"]),
-                MessageMarkdownParams(key="desc", values=[desc]),
-                MessageMarkdownParams(key="imgurl", values=[fish_image_url]),
-                MessageMarkdownParams(key="width", values=["0"]),
-                MessageMarkdownParams(key="height", values=["0"]),
-                MessageMarkdownParams(key="hint", values=[hint])
-            ]
+        # 根据物品类型添加特定信息
+        if cfg.type.value == "FISH":
+            desc_parts.append(f"🎣 获取方式：钓鱼系统")
+        elif cfg.type.value == "MATERIAL":
+            desc_parts.append(f"📦 类型：材料")
+            if cfg.grudge_value > 0:
+                desc_parts.append(f"😈 怨念值：{cfg.grudge_value}")
+        elif cfg.type.value == "EQUIPMENT":
+            desc_parts.append(f"⚔️ 类型：装备")
+            if hasattr(cfg, 'required_level'):
+                desc_parts.append(f"📊 等级要求：Lv.{cfg.required_level}")
+        elif cfg.type.value == "CONSUMABLE":
+            desc_parts.append(f"💊 类型：消耗品")
+        elif cfg.type.value == "GEM":
+            desc_parts.append(f"💎 类型：镶嵌物")
+        elif cfg.type.value == "GIFT":
+            desc_parts.append(f"🎁 类型：礼物")
+            if hasattr(cfg, 'favorability') and cfg.favorability > 0:
+                desc_parts.append(f"💝 好感度：+{cfg.favorability}")
 
-            markdown = MessageMarkdown(
-                custom_template_id="102499345_1769178984",
-                params=template_params
-            )
+        desc = "\r".join(desc_parts)
 
-            # 发送Markdown消息
-            msg = Message("📖 鱼类图鉴")
-            msg.append(MessageSegment.markdown(markdown))
-            await catalog_cmd.finish(msg)
+        # 根据物品类型定制快捷操作提示
+        type_hints = {
+            "FISH": "快捷操作: 钓鱼 | 鱼栏 | 钓鱼记录 | 钓鱼排行 | 钓鱼图鉴 | 背包 | 帮助",
+            "MATERIAL": "快捷操作: 背包 | 背包 材料 | 锻造列表 | 市集 | 帮助",
+            "EQUIPMENT": "快捷操作: 装备栏 | 装备详情 | 锻造列表 | 升阶列表 | 背包 | 帮助",
+            "CONSUMABLE": "快捷操作: 背包 | 背包 消耗品 | 使用 | 一键嗑药 | 帮助",
+            "GEM": "快捷操作: 背包 | 背包 宝石 | 镶嵌物品 | 孔位 | 帮助",
+            "GIFT": "快捷操作: 背包 | 背包 礼物 | 赠送 | 社交系统 | 帮助",
+            "GOODS": "快捷操作: 背包 | 背包 商品 | 市集 | 帮助"
+        }
+        hint = type_hints.get(cfg.type.value, "快捷操作: 背包 | 图鉴 | 帮助")
+
+        # 根据物品类型定制标题图标
+        type_icons = {
+            "FISH": "🐟",
+            "MATERIAL": "📦",
+            "EQUIPMENT": "⚔️",
+            "CONSUMABLE": "💊",
+            "GEM": "💎",
+            "GIFT": "🎁",
+            "GOODS": "🏪"
+        }
+        icon = type_icons.get(cfg.type.value, "📖")
+
+        # 如果没有配图，使用空URL和0尺寸
+        if not item_image_url:
+            item_image_url = ""
+            width = "0"
+            height = "0"
+        else:
+            width = "200"
+            height = "200"
+
+        # 构建Markdown模板参数
+        template_params = [
+            MessageMarkdownParams(key="title", values=[f"{icon} {cfg.name}"]),
+            MessageMarkdownParams(key="desc", values=[desc]),
+            MessageMarkdownParams(key="imgurl", values=[item_image_url]),
+            MessageMarkdownParams(key="width", values=[width]),
+            MessageMarkdownParams(key="height", values=[height]),
+            MessageMarkdownParams(key="hint", values=[hint])
+        ]
+
+        markdown = MessageMarkdown(
+            custom_template_id="102499345_1769178984",
+            params=template_params
+        )
+
+        # 发送Markdown消息
+        msg = Message("📖 物品图鉴")
+        msg.append(MessageSegment.markdown(markdown))
+        await catalog_cmd.finish(msg)
 
     await catalog_cmd.finish(message_add_head("\n".join(lines), event))

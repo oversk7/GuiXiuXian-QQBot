@@ -1,0 +1,48 @@
+# 物品图片配置文件
+# 格式：item_id: 图床URL
+#
+# 使用说明：
+# 1. 将物品图片上传到图床（如QQ官方图床、GitHub、图床服务等）
+# 2. 在此文件中添加物品ID和图床URL的映射
+# 3. 使用管理员指令【设置物品图片 物品名 图片URL】来添加或更新
+# 4. 使用【删除物品图片 物品名】来删除图片配置
+# 5. 使用【物品图片列表】查看所有已配置的物品图片
+#
+# 支持的物品类型：
+# - 鱼类 (FISH)
+# - 材料 (MATERIAL)
+# - 装备 (EQUIPMENT)
+# - 消耗品 (CONSUMABLE)
+# - 宝石/镶嵌物 (GEM)
+# - 礼物 (GIFT)
+# - 商品 (GOODS)
+#
+# 示例：
+# common_carp: "https://example.com/images/common_carp.png"
+# heal_potion: "https://example.com/images/heal_potion.png"
+# iron_sword: "https://example.com/images/iron_sword.png"
+
+# 配置示例（取消注释并填入真实URL）
+# 鱼类
+# common_carp: ""
+# salmon: ""
+
+# 消耗品
+# heal_potion: ""
+# spirit_herb: ""
+
+# 装备
+# iron_sword: ""
+# leather_armor: ""
+
+# 材料
+# iron_ore: ""
+# wood: ""
+
+# 宝石
+# ruby: ""
+# sapphire: ""
+
+# 礼物
+# gift_rose: ""
+# gift_carnation: ""
