@@ -258,7 +258,6 @@ async def handle_cultivate(event: MessageEvent):
             "背包",
             "战力",
             "签到",
-            "帮助"
         ]
 
         template_params = [

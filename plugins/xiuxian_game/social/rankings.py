@@ -64,7 +64,6 @@ async def handle_charm_ranking(event: MessageEvent):
         lines = [
             "💖 全服魅力榜 💖",
             "━━━━━━━━━━━━━",
-            ""
         ]
 
         for idx, (nickname, uid, charm) in enumerate(ranking, start=1):
@@ -78,10 +77,10 @@ async def handle_charm_ranking(event: MessageEvent):
             else:
                 medal = "  "
 
-            lines.append(f"{medal} #{idx:3d} {nickname}[UID:{uid}]: {charm} 魅力值")
+            lines.append(f"{medal} #{idx:3d} {nickname}[UID:{uid}]: {charm} 🍫")
 
         lines.append("")
-        lines.append("━━━━━━━━━━━━━━━━━━━━")
+        lines.append("━━━━━━━━━━━━━")
         lines.append("💡 提示: 收到好感度礼物可增加魅力值")
 
         await charm_ranking_cmd.finish(message_add_head("\n".join(lines), event))

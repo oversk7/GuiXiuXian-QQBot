@@ -367,16 +367,12 @@ async def _(event: MessageEvent):
             lines.append("━━━━━━━━━━━━━\n🧭 前往对应坐标后输入【市集】联系当地商人\n🧭 使用【导航 x y】前往")
             await market_cmd.finish(message_add_head("\n".join(lines), event))
 
-        # 使用Markdown物品列表模版展示市集商品
-        from nonebot.adapters.qq import MessageSegment
-        from nonebot.adapters.qq.models.common import MessageMarkdown, MessageMarkdownParams
-
-        # 收集所有商品信息（最多10个按钮）
-        item_lines = []
+        lines = [f"🏪 {market.name} ({market.x},{market.y})", "━━━━━━━━━━━━━"]
 
         # 显示可购买的商品
         if market.sellable_items:
-            for iid in market.sellable_items[:8]:  # 最多8个商品，留2个按钮给其他功能
+            lines.append("📦 可购买商品：")
+            for iid in market.sellable_items:
                 item_cfg = config.items_config["by_id"].get(iid)
                 sell_p, _ = await _price_for(session, market, iid)
 
@@ -385,55 +381,19 @@ async def _(event: MessageEvent):
                 stock_status = market_state.get_stock_status()
                 stock_info = f"({market_state.current_stock})"
 
-                # 格式：物品名 | 售价 XXX | 库存(XXX)状态
-                item_lines.append(f"{item_cfg.name} | 售价 {sell_p} | 库存{stock_info}{stock_status}")
+                lines.append(f"  {item_cfg.name}│售价 {sell_p}│库存{stock_info}{stock_status}")
 
-        # 显示可出售的商品（如果与可购买不同，且还有按钮空间）
+        # 显示可出售的商品（如果与可购买不同）
         buyable_only = set(market.buyable_items) - set(market.sellable_items)
-        if buyable_only and len(item_lines) < 8:
-            remaining_slots = 8 - len(item_lines)
-            for iid in list(buyable_only)[:remaining_slots]:
+        if buyable_only:
+            lines.append("💰 额外收购商品：")
+            for iid in buyable_only:
                 item_cfg = config.items_config["by_id"].get(iid)
                 _, buy_p = await _price_for(session, market, iid)
-                item_lines.append(f"{item_cfg.name} | 收价 {buy_p}")
+                lines.append(f"  {item_cfg.name}│收价 {buy_p}")
 
-        # 构建按钮列表（10个按钮）
-        buttons = []
-        for item_line in item_lines:
-            buttons.append(item_line)
-
-        # 填充剩余按钮
-        while len(buttons) < 8:
-            buttons.append("---")
-
-        # 添加功能按钮
-        buttons.append("市集列表")
-        buttons.append("帮助")
-
-        # 构建模版参数
-        template_params = [
-            MessageMarkdownParams(key=f"btn{i+1}", values=[btn])
-            for i, btn in enumerate(buttons)
-        ]
-
-        # 创建Markdown消息
-        markdown = MessageMarkdown(
-            custom_template_id="102499345_1769177949",
-            params=template_params
-        )
-
-        # 发送带说明的消息
-        from nonebot.adapters.qq import Message
-        msg = Message(
-            f"🏪 {market.name} ({market.x},{market.y})\n"
-            "━━━━━━━━━━━━━\n"
-            "💡 价格受供需影响，库存有限先到先得\n"
-            "💡 使用 购买 物品名 数量 进行购买\n"
-            "💡 使用 出售 物品名 数量 出售物品"
-        )
-        msg.append(MessageSegment.markdown(markdown))
-
-        await market_cmd.finish(msg)
+        lines.append("━━━━━━━━━━━━━\n💡 价格受供需影响，库存有限先到先得")
+        await market_cmd.finish(message_add_head("\n".join(lines), event))
 
 buy_cmd = on_command("购买", block=True, priority=5)
 
