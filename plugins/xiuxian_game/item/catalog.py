@@ -401,8 +401,8 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
                 MessageMarkdownParams(key="title", values=[f"🐟 {cfg.name}"]),
                 MessageMarkdownParams(key="desc", values=[desc]),
                 MessageMarkdownParams(key="imgurl", values=[fish_image_url]),
-                MessageMarkdownParams(key="width", values=["200"]),
-                MessageMarkdownParams(key="height", values=["200"]),
+                MessageMarkdownParams(key="width", values=["0"]),
+                MessageMarkdownParams(key="height", values=["0"]),
                 MessageMarkdownParams(key="hint", values=[hint])
             ]
 
