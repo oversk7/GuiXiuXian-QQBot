@@ -1,8 +1,11 @@
 from nonebot import on_command
-from nonebot.adapters.qq import MessageEvent, Message
+from nonebot.adapters.qq import MessageEvent, Message, MessageSegment
+from nonebot.adapters.qq.models.common import MessageMarkdown, MessageMarkdownParams
 from nonebot.params import CommandArg
 from sqlalchemy import select
 from datetime import date
+import os
+from pathlib import Path
 
 from ..config import config
 from ..utils import message_add_head
@@ -119,6 +122,33 @@ def _get_material_obtain_methods(item_id: str, rarity: str) -> str:
         _append_scope(methods, "诡域商人售卖", merchant_tiers, merchant_regions)
 
     return "\n".join(f"• {method}" for method in methods) if methods else "暂无获取途径"
+
+
+def _get_fish_image_url(item_id: str) -> str:
+    """获取鱼类图片URL
+
+    Args:
+        item_id: 物品ID
+
+    Returns:
+        图片URL，如果图片不存在则返回空字符串
+    """
+    # 图片存储路径
+    base_path = Path(__file__).parent.parent.parent.parent / "data" / "images" / "fish"
+
+    # 支持的图片格式
+    extensions = ['.png', '.jpg', '.jpeg', '.gif', '.webp']
+
+    for ext in extensions:
+        image_path = base_path / f"{item_id}{ext}"
+        if image_path.exists():
+            # 返回本地文件路径（使用file://协议）
+            # Windows路径需要转换为正斜杠
+            local_path = str(image_path.absolute()).replace('\\', '/')
+            return f"file:///{local_path}"
+
+    return ""
+
 
 # 图鉴命令：查询物品、装备和鬼怪的详细信息
 catalog_cmd = on_command("图鉴", aliases={"查看","查看物品","详情"}, block=True, priority=5)
@@ -316,6 +346,74 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
 
             extra_info = "\n" + "\n".join(limit_info)
 
+        # 若为鱼类，展示稀有度和价格信息
+        elif cfg.type.value == "FISH":
+            rarity_display = cfg.get_rarity_display()
+            rarity_map = {
+                "white": "普通",
+                "green": "优良",
+                "blue": "精品",
+                "purple": "稀有",
+                "orange": "传说"
+            }
+            rarity_name = rarity_map.get(cfg.rarity, cfg.rarity)
+            fish_info = [
+                f"⭐ 稀有度：{rarity_display}{rarity_name}",
+                f"💰 价值：{cfg.price:,} 金币",
+                f"🎣 获取方式：钓鱼系统"
+            ]
+            extra_info = "\n" + "\n".join(fish_info)
+
         lines.append(f"✨ {cfg.name} ✨  [{type_cn}]\n{cfg.description}{extra_info}")
+
+    # 如果只有一个匹配结果且为鱼类，尝试使用Markdown模板展示
+    if len(item_matches) == 1 and item_matches[0].type.value == "FISH":
+        cfg = item_matches[0]
+        fish_image_url = _get_fish_image_url(cfg.item_id)
+
+        # 如果有配图，使用Markdown模板
+        if fish_image_url:
+            # 构建描述信息
+            rarity_display = cfg.get_rarity_display()
+            rarity_map = {
+                "white": "普通",
+                "green": "优良",
+                "blue": "精品",
+                "purple": "稀有",
+                "orange": "传说"
+            }
+            rarity_name = rarity_map.get(cfg.rarity, cfg.rarity)
+
+            desc_parts = [
+                f"{cfg.description}",
+                f"",
+                f"⭐ 稀有度：{rarity_display}{rarity_name}",
+                f"💰 价值：{cfg.price:,} 金币",
+                f"🎣 获取方式：钓鱼系统"
+            ]
+            desc = "\r".join(desc_parts)
+
+            # 快捷操作提示
+            hint = "快捷操作: 钓鱼 | 鱼栏 | 钓鱼记录 | 钓鱼排行 | 钓鱼图鉴 | 背包 | 帮助"
+
+            # 构建Markdown模板参数
+            template_params = [
+                MessageMarkdownParams(key="title", values=[f"🐟 {cfg.name}"]),
+                MessageMarkdownParams(key="desc", values=[desc]),
+                MessageMarkdownParams(key="imgurl", values=[fish_image_url]),
+                MessageMarkdownParams(key="width", values=["200"]),
+                MessageMarkdownParams(key="height", values=["200"]),
+                MessageMarkdownParams(key="hint", values=[hint])
+            ]
+
+            markdown = MessageMarkdown(
+                custom_template_id="102499345_1769178984",
+                params=template_params
+            )
+
+            # 发送Markdown消息
+            msg = Message("📖 鱼类图鉴")
+            msg.append(MessageSegment.markdown(markdown))
+            await catalog_cmd.finish(msg)
 
     await catalog_cmd.finish(message_add_head("\n".join(lines), event))
