@@ -10,6 +10,10 @@ from nonebot.params import CommandArg
 import yaml
 from pathlib import Path
 from sqlalchemy import select
+import aiohttp
+import asyncio
+from io import BytesIO
+from PIL import Image
 
 from ..config import config
 from ..utils import message_add_head
@@ -109,6 +113,118 @@ def _validate_image_url(image_url: str) -> tuple[bool, str]:
         f"💡 推荐使用QQ邮箱图床上传图片"
     )
     return False, error_msg
+
+
+def _load_image_dimensions_cache() -> dict:
+    """加载图片尺寸缓存
+
+    Returns:
+        物品ID到图片信息的映射字典 {item_id: {"url": "...", "width": 300, "height": 200}}
+    """
+    cache_path = ITEM_IMAGES_CONFIG.parent / "item_image_dimensions.yaml"
+
+    if not cache_path.exists():
+        return {}
+
+    try:
+        with open(cache_path, 'r', encoding='utf-8') as f:
+            data = yaml.safe_load(f)
+            return data if data else {}
+    except Exception as e:
+        print(f"加载图片尺寸缓存失败: {e}")
+        return {}
+
+
+def _save_image_dimensions_cache(data: dict) -> bool:
+    """保存图片尺寸缓存
+
+    Args:
+        data: 缓存数据字典
+
+    Returns:
+        是否保存成功
+    """
+    try:
+        cache_path = ITEM_IMAGES_CONFIG.parent / "item_image_dimensions.yaml"
+        # 确保目录存在
+        cache_path.parent.mkdir(parents=True, exist_ok=True)
+
+        with open(cache_path, 'w', encoding='utf-8') as f:
+            yaml.dump(data, f, allow_unicode=True, default_flow_style=False)
+        return True
+    except Exception as e:
+        print(f"保存图片尺寸缓存失败: {e}")
+        return False
+
+
+async def _prefetch_image_dimensions(item_id: str, image_url: str, max_size: int = 300) -> tuple[bool, str]:
+    """预先获取并缓存图片尺寸
+
+    Args:
+        item_id: 物品ID
+        image_url: 图片URL
+        max_size: 最大尺寸限制（宽度或高度的最大值）
+
+    Returns:
+        (是否成功, 错误信息)
+    """
+    try:
+        print(f"预先获取图片尺寸: {image_url}")
+
+        # 设置超时时间
+        timeout = aiohttp.ClientTimeout(total=10)
+
+        async with aiohttp.ClientSession(timeout=timeout) as session:
+            async with session.get(image_url) as response:
+                if response.status != 200:
+                    error_msg = f"获取图片失败: HTTP {response.status}"
+                    print(error_msg)
+                    return False, error_msg
+
+                # 读取图片数据
+                image_data = await response.read()
+
+                # 使用PIL解析图片尺寸
+                image = Image.open(BytesIO(image_data))
+                original_width, original_height = image.size
+
+                # 计算等比缩放
+                if original_width > max_size or original_height > max_size:
+                    # 需要缩放
+                    if original_width > original_height:
+                        # 宽度更大，以宽度为基准
+                        scale = max_size / original_width
+                    else:
+                        # 高度更大，以高度为基准
+                        scale = max_size / original_height
+
+                    new_width = int(original_width * scale)
+                    new_height = int(original_height * scale)
+                else:
+                    # 不需要缩放
+                    new_width = original_width
+                    new_height = original_height
+
+                # 保存到缓存
+                cache = _load_image_dimensions_cache()
+                cache[item_id] = {
+                    "url": image_url,
+                    "width": new_width,
+                    "height": new_height
+                }
+                _save_image_dimensions_cache(cache)
+                print(f"已缓存图片尺寸: {item_id} -> {new_width}x{new_height}")
+
+                return True, ""
+
+    except asyncio.TimeoutError:
+        error_msg = f"获取图片尺寸超时（10秒）"
+        print(error_msg)
+        return False, error_msg
+    except Exception as e:
+        error_msg = f"获取图片尺寸失败: {str(e)}"
+        print(error_msg)
+        return False, error_msg
 
 
 # 设置物品图片
@@ -291,14 +407,23 @@ async def handle_submit_item_image(event: MessageEvent, args: Message = CommandA
             f"💡 如需修改图片，请联系管理员"
         )
 
+    # 预先获取图片尺寸并缓存
+    success, fetch_error = await _prefetch_image_dimensions(item_cfg.item_id, image_url)
+    if not success:
+        await submit_item_image_cmd.finish(
+            f"⛔ 图片验证失败\n"
+            f"━━━━━━━━━━━━━\n"
+            f"错误信息：{fetch_error}\n"
+            f"━━━━━━━━━━━━━\n"
+            f"💡 请检查图片链接是否正确\n"
+            f"💡 确保图片可以正常访问"
+        )
+
     # 设置图片URL
     images[item_cfg.item_id] = image_url
 
     # 保存配置
     if _save_item_images(images):
-        # 清除旧的尺寸缓存
-        _clear_image_dimensions_cache(item_cfg.item_id)
-
         # URL转大写以避免QQ官方的URL检测
         display_url = image_url.upper()
         msg = (
