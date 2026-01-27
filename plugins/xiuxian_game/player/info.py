@@ -1,6 +1,7 @@
 from nonebot import on_command
 from nonebot.params import CommandArg, ArgPlainText
-from nonebot.adapters.qq import MessageEvent, Message
+from nonebot.adapters.qq import MessageEvent, Message, MessageSegment
+from nonebot.adapters.qq.models import MessageMarkdown, MessageMarkdownParams
 from nonebot.typing import T_State
 from ..models.db import safe_session, AsyncSessionLocal
 from ..models.player import Player
@@ -223,17 +224,11 @@ async def _(event: MessageEvent, state: T_State, args: Message = CommandArg()):
         # 如果清理了输入，给出提示
         if cleaned_nickname != parsed_nickname:
             result = await create_player(event, cleaned_nickname, parsed_gender)
-            success_msg = f"✅ 已自动识别并清理输入，你的角色昵称为：{cleaned_nickname}，性别：{parsed_gender.value}\n{result}"
-            await register.finish(message_add_head(success_msg, event))
+            await register.finish(result)
         else:
             # 正常情况，直接创建角色
             result = await create_player(event, cleaned_nickname, parsed_gender)
-            # 如果检测到了性别参数，给出提示
-            if parsed_gender != Gender.MALE or ' ' in nickname:
-                success_msg = f"✅ 角色创建成功！昵称：{cleaned_nickname}，性别：{parsed_gender.value}\n{result}"
-                await register.finish(message_add_head(success_msg, event))
-            else:
-                await register.finish(message_add_head(result, event))
+            await register.finish(result)
 
     # 开始分步注册流程，保存用户ID到状态中
     state["user_id"] = event.get_user_id()
@@ -260,12 +255,11 @@ async def _(event: MessageEvent, nickname: str = ArgPlainText()):
         else:
             # 提示用户我们已经自动清理了输入
             result = await create_player(event, cleaned_nickname, Gender.MALE)
-            success_msg = f"✅ 已自动识别并清理输入，你的角色昵称为：{cleaned_nickname}\n{result}"
-            await register.finish(message_add_head(success_msg, event))
+            await register.finish(result)
 
     # 正常情况，直接创建角色
     result = await create_player(event, nickname, Gender.MALE)
-    await register.finish(message_add_head(result, event))
+    await register.finish(result)
 
 
 def _parse_nickname_and_gender(input_text: str) -> tuple[str, Gender]:
@@ -331,15 +325,15 @@ def _clean_nickname_input(nickname: str) -> str:
     return nickname
 
 
-async def create_player(event: MessageEvent, nickname: str, gender: Gender) -> str:
-    """创建新玩家角色，返回成功消息"""
+async def create_player(event: MessageEvent, nickname: str, gender: Gender) -> Message:
+    """创建新玩家角色，返回Markdown卡片消息"""
     async with safe_session() as session:
         # 再次检查是否已有角色（防止在会话过程中创建）
         result = await session.execute(
             select(Player).where(Player.id == event.get_user_id())
         )
         if result.scalars().first():
-            return "⛔ 你已经创建过角色了"
+            return Message("⛔ 你已经创建过角色了")
 
         # 检查是否有账号转让历史（防止转让后重复创建）
         transfer_log_repo = AccountTransferLogRepository(session)
@@ -348,7 +342,7 @@ async def create_player(event: MessageEvent, nickname: str, gender: Gender) -> s
             limit=1
         )
         if transfer_history:
-            return (
+            return Message(
                 "⛔ 你的账号曾有转让记录，无法再次创建角色\n"
                 "💡 如果这是误操作，请联系管理员"
             )
@@ -375,35 +369,54 @@ async def create_player(event: MessageEvent, nickname: str, gender: Gender) -> s
         await NoviceQuestService.init_novice_quests(session, new_player)
 
         card_type = random.choice(('🎲','🀄️','🀃','🀅','🀆','🀀','🀁','🀂','🀒','🀚','🀣'))
-        content = (
-            "⚰️ 棺盖移位，黑暗替你呼吸——欢迎回到人间。\n"
-            "━━━━━━━━━━━━━\n"
-            f"┌── 🃏新牌出世🃏 ──┐\n"
-            f"🪬 道号  : {card_type}{nickname}\n"
-            f"🆔 UID   : {new_player.uid}\n"
-            f"⚧️ 性别  : {new_player.sex.value}\n"
-            "━━━━━━━━━━━━━\n"
-            "🔰 新手必读 - 指令格式说明：\n"
-            "💡 【】括号里的才是指令，外面是指令说明！\n"
-            "💡 括号不要一起发出来，有的空格不能少！\n"
-            "💡 例如'加点 力 5'表示给力量属性加5点\n"
-            "━━━━━━━━━━━━━\n"
-            "🎯 新手起步 - 核心功能：\n"
-            "⚔️ 【修炼】提升等级获得怨炁\n"
-            "💼 【打工】赚取金币购买装备\n"
-            "🛒 【市场】买卖物品升级装备\n"
-            "📍 【查看】探索当前位置\n"
-            "━━━━━━━━━━━━━\n"
-            "📚 更多功能：\n"
-            "• 【面板】查看角色信息\n"
-            "• 【加点帮助】了解属性加点\n"
-            "• 【签到】领取每日礼包\n"
-            "• 【新手指引】完整指令教程\n"
-            "• 【帮助】查看所有命令\n"
-            "━━━━━━━━━━━━━\n"
-            "💡 提示：输入【修炼】开始你的修仙之旅！"
+
+        # 使用反馈类模版 (102499345_1769177016)
+        title = f"⚰️ 棺盖移位，黑暗替你呼吸——欢迎回到人间"
+
+        result_text = (
+            f"┌── 🃏新牌出世🃏 ──┐\r"
+            f"🪬 道号  : {card_type}{nickname}\r"
+            f"🆔 UID   : {new_player.uid}\r"
+            f"⚧️ 性别  : {new_player.sex.value}\r"
+            f"━━━━━━━━━━━━━\r"
+            f"🔰 新手必读 - 指令格式说明：\r"
+            f"💡 【】括号里的才是指令，外面是指令说明！\r"
+            f"💡 括号不要一起发出来，有的空格不能少！\r"
+            f"💡 例如'加点 力 5'表示给力量属性加5点\r"
+            f"━━━━━━━━━━━━━\r"
+            f"🎯 新手起步 - 核心功能：\r"
+            f"⚔️ 【修炼】提升等级获得怨炁\r"
+            f"💼 【打工】赚取金币购买装备\r"
+            f"🛒 【市场】买卖物品升级装备\r"
+            f"📍 【查看】探索当前位置\r"
+            f"━━━━━━━━━━━━━\r"
+            f"✨ 惊艳体验 - 试试这个：\r"
+            f"🐟 【图鉴 虚空鱼】感受精美图鉴系统！"
         )
-        return content
+
+        # 构建Markdown模板参数
+        template_params = [
+            MessageMarkdownParams(key="title", values=[title]),
+            MessageMarkdownParams(key="result", values=[result_text]),
+            MessageMarkdownParams(key="btn1", values=["修炼"]),
+            MessageMarkdownParams(key="btn2", values=["打工"]),
+            MessageMarkdownParams(key="btn3", values=["市场"]),
+            MessageMarkdownParams(key="btn4", values=["查看"]),
+            MessageMarkdownParams(key="btn5", values=["图鉴 虚空鱼"]),
+            MessageMarkdownParams(key="btn6", values=["面板"]),
+            MessageMarkdownParams(key="btn7", values=["新手指引"]),
+            MessageMarkdownParams(key="btn8", values=["帮助"]),
+        ]
+
+        markdown = MessageMarkdown(
+            custom_template_id="102499345_1769177016",
+            params=template_params
+        )
+
+        # 构建消息
+        msg = Message("🎉 角色创建成功")
+        msg.append(MessageSegment.markdown(markdown))
+        return msg
 
 
 @change_gender.handle()
