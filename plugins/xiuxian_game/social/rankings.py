@@ -48,7 +48,7 @@ async def handle_charm_ranking(event: MessageEvent):
         from sqlalchemy import desc
 
         result = await uow.session.execute(
-            select(Player.nickname, Player.charm)
+            select(Player.nickname, Player.uid, Player.charm)
             .where(Player.charm > 0)
             .order_by(desc(Player.charm))
             .limit(100)
@@ -67,7 +67,7 @@ async def handle_charm_ranking(event: MessageEvent):
             ""
         ]
 
-        for idx, (nickname, charm) in enumerate(ranking, start=1):
+        for idx, (nickname, uid, charm) in enumerate(ranking, start=1):
             # 前三名特殊标识
             if idx == 1:
                 medal = "🥇"
@@ -78,7 +78,7 @@ async def handle_charm_ranking(event: MessageEvent):
             else:
                 medal = "  "
 
-            lines.append(f"{medal} #{idx:3d} {nickname}: {charm} 魅力值")
+            lines.append(f"{medal} #{idx:3d} {nickname}[UID:{uid}]: {charm} 魅力值")
 
         lines.append("")
         lines.append("━━━━━━━━━━━━━━━━━━━━")

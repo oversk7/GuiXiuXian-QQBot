@@ -694,32 +694,66 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
         sell_lines_raw: list[str] = list(filter(None, (_fmt_sell(r) for r in sells)))
         buy_lines_raw: list[str] = list(filter(None, (_fmt_buy(r) for r in buys)))
 
+        # 使用Markdown物品列表模版展示交易清单
+        from nonebot.adapters.qq import MessageSegment
+        from nonebot.adapters.qq.models.common import MessageMarkdown, MessageMarkdownParams
+
+        # 合并在售和求购信息，最多显示10个按钮
+        all_items = []
+
+        # 先添加在售商品（最多5个）
+        for item_line in sell_lines_raw[:5]:
+            all_items.append(item_line)
+
+        # 再添加求购商品（最多5个）
+        for item_line in buy_lines_raw[:5]:
+            all_items.append(item_line)
+
+        # 构建按钮列表（10个按钮）
+        buttons = []
+        for item_line in all_items:
+            buttons.append(item_line)
+
+        # 填充剩余按钮
+        while len(buttons) < 8:
+            buttons.append("---")
+
+        # 添加功能按钮
+        buttons.append("我的挂牌")
+        buttons.append("帮助")
+
+        # 计算总页数
         PAGE_SIZE = 10
-
-        def _paginate(lst: list[str]):
-            total_pages = (len(lst) - 1) // PAGE_SIZE + 1 if lst else 1
-            p = max(1, min(page, total_pages))
-            start = (p - 1) * PAGE_SIZE
-            end = start + PAGE_SIZE
-            return lst[start:end], total_pages, p
-
-        sell_page, total_pages_sell, cur_page = _paginate(sell_lines_raw)
-        buy_page, total_pages_buy, _ = _paginate(buy_lines_raw)
+        total_pages_sell = (len(sell_lines_raw) - 1) // PAGE_SIZE + 1 if sell_lines_raw else 1
+        total_pages_buy = (len(buy_lines_raw) - 1) // PAGE_SIZE + 1 if buy_lines_raw else 1
         total_pages = max(total_pages_sell, total_pages_buy)
 
-        lines: list[str] = [f"📊 市场总览 第{cur_page}/{total_pages}页"]
-        lines.append(heavy_divider(f"{EMOJI_SELL} 在售"))
-        if sell_page:
-            lines.extend(sell_page)
-        else:
-            lines.append("(空)")
-        lines.append(heavy_divider(f"{EMOJI_BUY} 收购"))
-        if buy_page:
-            lines.extend(buy_page)
-        else:
-            lines.append("(空)")
-        lines.append("⬇️ 【查牌 <物品名> [页数]】 查看物品买卖行情")
-        await overview_cmd.finish(message_add_head("\n".join(lines), event))
+        # 构建模版参数
+        template_params = [
+            MessageMarkdownParams(key=f"btn{i+1}", values=[btn])
+            for i, btn in enumerate(buttons)
+        ]
+
+        # 创建Markdown消息
+        markdown = MessageMarkdown(
+            custom_template_id="102499345_1769177949",
+            params=template_params
+        )
+
+        # 发送带说明的消息
+        from nonebot.adapters.qq import Message
+        msg = Message(
+            f"📊 市场总览 第{page}/{total_pages}页\n"
+            "━━━━━━━━━━━━━\n"
+            f"📈 在售商品：{len(sell_lines_raw)}种\n"
+            f"📉 求购商品：{len(buy_lines_raw)}种\n"
+            "━━━━━━━━━━━━━\n"
+            "💡 使用 查牌 物品名 查看详细行情\n"
+            "💡 使用 挂牌 出售/收购 物品名 单价 数量"
+        )
+        msg.append(MessageSegment.markdown(markdown))
+
+        await overview_cmd.finish(msg)
 
 # ---------------- 指令：我的挂牌 ----------------
 my_orders_cmd = on_command("我的挂牌", aliases={"查看我的挂牌", "我的牌子"}, block=True, priority=5)
