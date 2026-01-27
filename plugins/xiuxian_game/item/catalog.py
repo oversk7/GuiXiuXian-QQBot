@@ -445,9 +445,9 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
         }
         icon = type_icons.get(cfg.type.value, "📖")
 
-        # 如果没有配图，使用空URL和0尺寸
+        # 如果没有配图，使用占位URL和0尺寸
         if not item_image_url:
-            item_image_url = ""
+            item_image_url = "https://example.com/placeholder.png"  # 占位URL
             width = "0"
             height = "0"
         else:
