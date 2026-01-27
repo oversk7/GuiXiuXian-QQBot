@@ -10,3 +10,4 @@ from . import gem_upgrade_service_new as gem_upgrade_service
 from . import deception
 from . import buff_commands
 from . import material_stats
+from . import item_image_admin  # 物品图片管理命令
