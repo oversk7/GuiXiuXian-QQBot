@@ -397,32 +397,29 @@ async def handle_seclusion(event: MessageEvent):
             "💡 出关 推开棺盖并结算怨炁"
         )
 
-        # 使用Markdown模版发送闭关开始消息
+        # 使用图鉴模版发送闭关开始消息
         title = "⚰️ 闭关开始"
-        result = msg_secl.replace("\n", "\r")
+        desc = msg_secl.replace("\n", "\r")
 
-        buttons = [
-            "出关",
-            "面板",
-            "背包",
-            "战力",
-            "阴宅",
-            "签到",
-            "市集",
-            "帮助"
-        ]
+        # 获取玩家头像链接
+        from ..platform_utils import get_platform_info
+        _, user_id = get_platform_info(event)
+        avatar_url = f"https://thirdqq.qlogo.cn/qqapp/102499345/{user_id}/0"
+
+        # 快捷操作提示
+        hint = "快捷操作: 出关 | 面板 | 背包 | 战力 | 阴宅 | 签到 | 市集 | 帮助"
 
         template_params = [
             MessageMarkdownParams(key="title", values=[title]),
-            MessageMarkdownParams(key="result", values=[result])
+            MessageMarkdownParams(key="desc", values=[desc]),
+            MessageMarkdownParams(key="imgurl", values=[avatar_url]),
+            MessageMarkdownParams(key="width", values=["100"]),
+            MessageMarkdownParams(key="height", values=["100"]),
+            MessageMarkdownParams(key="hint", values=[hint])
         ]
-        template_params.extend([
-            MessageMarkdownParams(key=f"btn{i+1}", values=[btn])
-            for i, btn in enumerate(buttons)
-        ])
 
         markdown = MessageMarkdown(
-            custom_template_id="102499345_1769177016",
+            custom_template_id="102499345_1769178984",
             params=template_params
         )
 
