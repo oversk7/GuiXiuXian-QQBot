@@ -74,12 +74,14 @@ async def handle_set_item_image(event: MessageEvent, args: Message = CommandArg(
 
     # 保存配置
     if _save_item_images(images):
+        # URL转大写以避免QQ官方的URL检测
+        display_url = image_url.upper()
         msg = (
             f"✅ 设置成功\n"
             f"━━━━━━━━━━━━━\n"
             f"物品：{item_cfg.name}\n"
             f"物品ID：{item_cfg.item_id}\n"
-            f"图片URL：{image_url}\n"
+            f"图片URL：{display_url}\n"
             f"━━━━━━━━━━━━━\n"
             f"💡 使用【图鉴 {item_name}】查看效果"
         )

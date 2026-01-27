@@ -6,6 +6,10 @@ from sqlalchemy import select
 from datetime import date
 import yaml
 from pathlib import Path
+import aiohttp
+import asyncio
+from io import BytesIO
+from PIL import Image
 
 from ..config import config
 from ..utils import message_add_head
@@ -155,6 +159,60 @@ def _get_item_image_url(item_id: str) -> str:
     """
     images = _load_item_images()
     return images.get(item_id, "")
+
+
+async def _get_image_dimensions(image_url: str, max_size: int = 300) -> tuple[str, str]:
+    """获取图片尺寸并按比例缩放
+
+    Args:
+        image_url: 图片URL
+        max_size: 最大尺寸限制（宽度或高度的最大值）
+
+    Returns:
+        (width, height) 缩放后的宽度和高度字符串
+    """
+    try:
+        # 设置超时时间
+        timeout = aiohttp.ClientTimeout(total=10)
+
+        async with aiohttp.ClientSession(timeout=timeout) as session:
+            async with session.get(image_url) as response:
+                if response.status != 200:
+                    print(f"获取图片失败: HTTP {response.status}")
+                    return "200", "200"  # 返回默认尺寸
+
+                # 读取图片数据
+                image_data = await response.read()
+
+                # 使用PIL解析图片尺寸
+                image = Image.open(BytesIO(image_data))
+                original_width, original_height = image.size
+
+                # 计算等比缩放
+                if original_width > max_size or original_height > max_size:
+                    # 需要缩放
+                    if original_width > original_height:
+                        # 宽度更大，以宽度为基准
+                        scale = max_size / original_width
+                    else:
+                        # 高度更大，以高度为基准
+                        scale = max_size / original_height
+
+                    new_width = int(original_width * scale)
+                    new_height = int(original_height * scale)
+                else:
+                    # 不需要缩放
+                    new_width = original_width
+                    new_height = original_height
+
+                return str(new_width), str(new_height)
+
+    except asyncio.TimeoutError:
+        print(f"获取图片尺寸超时: {image_url}")
+        return "200", "200"  # 返回默认尺寸
+    except Exception as e:
+        print(f"获取图片尺寸失败: {e}")
+        return "200", "200"  # 返回默认尺寸
 
 
 # 图鉴命令：查询物品、装备和鬼怪的详细信息
@@ -451,8 +509,8 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
             width = "0"
             height = "0"
         else:
-            width = "200"
-            height = "200"
+            # 获取图片实际尺寸并等比缩放
+            width, height = await _get_image_dimensions(item_image_url)
 
         # 构建Markdown模板参数
         template_params = [
