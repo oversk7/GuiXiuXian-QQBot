@@ -8,6 +8,7 @@ from __future__ import annotations
 
 from nonebot import on_command, on_regex
 from nonebot.adapters.qq import MessageEvent, Message, MessageSegment
+from nonebot.adapters.qq.models.common import MessageMarkdown, MessageMarkdownParams
 from nonebot.params import CommandArg
 from typing import Tuple, Dict
 from datetime import datetime, date, timedelta
@@ -1270,7 +1271,37 @@ async def _(event: MessageEvent):
         await session.commit()
 
     header = f"🧭位置 {current_region} ({current_x},{current_y})"
-    await explore_cmd.finish(f"{header}\n{log}")
+
+    # 构建诡域探索操作面板按钮
+    buttons = [
+        "上",
+        "下",
+        "左",
+        "右",
+        "探索",
+        "收集",
+        "上一层",
+        "下一层",
+        "返回",
+        "我的状态"
+    ]
+
+    # 构建模版参数
+    template_params = [
+        MessageMarkdownParams(key=f"btn{i+1}", values=[btn])
+        for i, btn in enumerate(buttons)
+    ]
+
+    # 使用Markdown模版发送消息
+    markdown_msg = MessageMarkdown(
+        custom_template_id="102499345_1769177949",
+        params=template_params
+    )
+
+    await explore_cmd.finish(
+        MessageSegment.markdown(markdown_msg) +
+        MessageSegment.text(f"{header}\n{log}")
+    )
 
 # ==================== 购买指令 ====================
 buy_cmd = on_command("购买", block=True, priority=5)
