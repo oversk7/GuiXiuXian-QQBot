@@ -1272,7 +1272,12 @@ async def _(event: MessageEvent):
 
     header = f"🧭位置 {current_region} ({current_x},{current_y})"
 
-    # 构建诡域探索操作面板按钮
+    # 使用反馈类模板（102499345_1769177016）同时显示文字和按钮
+    # 注意：模版参数不能包含markdown语法，换行符使用\r
+    title = f"诡域探索 - {current_region}"
+    result_text = f"{header}\r{log}".replace("\n", "\r")
+
+    # 构建8个按钮（反馈类模板支持8个按钮）
     buttons = [
         "上",
         "下",
@@ -1281,27 +1286,26 @@ async def _(event: MessageEvent):
         "探索",
         "收集",
         "上一层",
-        "下一层",
-        "返回",
-        "我的状态"
+        "下一层"
     ]
 
     # 构建模版参数
     template_params = [
+        MessageMarkdownParams(key="title", values=[title]),
+        MessageMarkdownParams(key="result", values=[result_text])
+    ]
+    template_params.extend([
         MessageMarkdownParams(key=f"btn{i+1}", values=[btn])
         for i, btn in enumerate(buttons)
-    ]
+    ])
 
-    # 使用Markdown模版发送消息
+    # 使用反馈类Markdown模版发送消息
     markdown_msg = MessageMarkdown(
-        custom_template_id="102499345_1769177949",
+        custom_template_id="102499345_1769177016",
         params=template_params
     )
 
-    await explore_cmd.finish(
-        MessageSegment.markdown(markdown_msg) +
-        MessageSegment.text(f"{header}\n{log}")
-    )
+    await explore_cmd.finish(MessageSegment.markdown(markdown_msg))
 
 # ==================== 购买指令 ====================
 buy_cmd = on_command("购买", block=True, priority=5)
