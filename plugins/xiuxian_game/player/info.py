@@ -219,7 +219,7 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
                 f"📍{_format_player_location(player)}"
             )
 
-            # 玩家头像URL（16x16小头像）
+            # 玩家头像URL
             avatar_url = f"https://thirdqq.qlogo.cn/qqapp/102499345/{qq_openid}/0"
 
             # 提示信息（留言板状态，使用\r换行）
@@ -229,6 +229,79 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
             if unread_notice:
                 clean_notice = unread_notice.replace('\n', '\r')
                 hint += f"\r{clean_notice}"
+
+            # 清理所有参数中的\n换行符，确保只使用\r
+            title = title.replace('\n', '\r')
+            desc = desc.replace('\n', '\r')
+            hint = hint.replace('\n', '\r')
+
+            # 构建模板参数
+            template_params = [
+                MessageMarkdownParams(key="title", values=[title]),
+                MessageMarkdownParams(key="desc", values=[desc]),
+                MessageMarkdownParams(key="width", values=["32"]),
+                MessageMarkdownParams(key="height", values=["32"]),
+                MessageMarkdownParams(key="imgurl", values=[avatar_url]),
+                MessageMarkdownParams(key="hint", values=[hint])
+            ]
+
+            # 使用图鉴类Markdown模版
+            markdown_msg = MessageMarkdown(
+                custom_template_id="102499345_1769178984",
+                params=template_params
+            )
+            await profile.finish(MessageSegment.markdown(markdown_msg))
+        except Exception as e:
+            # 如果模板发送失败，回退到文字版本
+            # formatted_content = format_platform_message(content, event)
+            # await profile.finish(message_add_head(formatted_content, event))
+            raise  # 重新抛出异常，让用户看到错误
+    else:
+        # 查看他人面板时也使用MD版本
+        # 注释掉文字版，保留代码
+        # formatted_content = format_platform_message(content, event)
+        # await profile.finish(message_add_head(formatted_content, event))
+
+        # 查看他人面板时，使用对方的UID获取头像
+        try:
+            # 如果是查看他人，使用目标玩家的UID
+            if target_uid:
+                # 需要获取目标玩家的QQ openid，但这里没有，所以使用默认头像
+                qq_openid = event.get_user_id() if hasattr(event, 'get_user_id') else "default"
+            else:
+                qq_openid = event.get_user_id() if hasattr(event, 'get_user_id') else "default"
+
+            # 构建图鉴模板参数
+            title = f"{player.nickname} [UID:{player.uid}]"
+
+            # 描述信息（所有玩家信息，使用\r换行）
+            desc = (
+                f"Lv.{player.level} · {realm_name} | {player.sex}\r"
+                f"☯公会 {guild_name}\r"
+                f"Exp {player.exp}/{exp_max}\r"
+                f"━━━ 状态 ━━━\r"
+                f"❤️生命 {cur_hp}/{hp_max_str}\r"
+                f"🧠理智 {cur_mp}/{mp_max_str}\r"
+                f"⚔力 {atk_str}  🛡防 {def_str}\r"
+                f"👟敏 {agi_str}  🍀运 {luk_str}\r"
+                f"🔮咒抗 {player.stamina}\r"
+                f"━━━ 资产 ━━━\r"
+                f"🪙金币 {player.gold}\r"
+                f"💀怨念 {player.resentment}  ✨点数 {player.attribute_points}\r"
+                f"━━━ 位置 ━━━\r"
+                f"📍{_format_player_location(player)}"
+            )
+
+            # 玩家头像URL（16x16小头像）
+            avatar_url = f"https://thirdqq.qlogo.cn/qqapp/102499345/{qq_openid}/0"
+
+            # 提示信息（留言板状态，使用\r换行）
+            hint = "☞【装备栏】【社交系统】"
+
+            # 查看他人面板时不显示未读消息
+            # if unread_notice:
+            #     clean_notice = unread_notice.replace('\n', '\r')
+            #     hint += f"\r{clean_notice}"
 
             # 清理所有参数中的\n换行符，确保只使用\r
             title = title.replace('\n', '\r')
@@ -251,22 +324,12 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
                 params=template_params
             )
 
-            logger.info(f"[面板MD] MD模板构建成功，准备发送")
             await profile.finish(MessageSegment.markdown(markdown_msg))
         except Exception as e:
-            # 如果模板发送失败，回退到文字版本
             import logging
             logger = logging.getLogger(__name__)
-            logger.error(f"[面板MD] MD模板发送失败: {e}", exc_info=True)
-            formatted_content = format_platform_message(content, event)
-            await profile.finish(message_add_head(formatted_content, event))
-    else:
-        # 查看他人面板时使用文字版本
-        import logging
-        logger = logging.getLogger(__name__)
-        logger.info(f"[面板MD] 使用文字版本，target_uid={target_uid}, has_get_user_id={hasattr(event, 'get_user_id')}")
-        formatted_content = format_platform_message(content, event)
-        await profile.finish(message_add_head(formatted_content, event))
+            logger.error(f"[面板MD] 查看他人面板MD发送失败: {e}", exc_info=True)
+            raise  # 重新抛出异常
 
 @register.handle()
 async def _(event: MessageEvent, state: T_State, args: Message = CommandArg()):
