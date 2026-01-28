@@ -193,6 +193,11 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
             # 获取玩家QQ官方ID（用于头像）
             qq_openid = event.get_user_id()
 
+            # 调试日志
+            import logging
+            logger = logging.getLogger(__name__)
+            logger.info(f"[面板MD] 尝试发送MD模板，qq_openid={qq_openid}")
+
             # 构建图鉴模板参数
             title = f"{player.nickname} [UID:{player.uid}]"
 
@@ -237,13 +242,20 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
                 params=template_params
             )
 
+            logger.info(f"[面板MD] MD模板构建成功，准备发送")
             await profile.finish(MessageSegment.markdown(markdown_msg))
         except Exception as e:
             # 如果模板发送失败，回退到文字版本
+            import logging
+            logger = logging.getLogger(__name__)
+            logger.error(f"[面板MD] MD模板发送失败: {e}", exc_info=True)
             formatted_content = format_platform_message(content, event)
             await profile.finish(message_add_head(formatted_content, event))
     else:
         # 查看他人面板时使用文字版本
+        import logging
+        logger = logging.getLogger(__name__)
+        logger.info(f"[面板MD] 使用文字版本，target_uid={target_uid}, has_get_user_id={hasattr(event, 'get_user_id')}")
         formatted_content = format_platform_message(content, event)
         await profile.finish(message_add_head(formatted_content, event))
 
