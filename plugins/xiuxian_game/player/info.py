@@ -201,15 +201,11 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
             # 构建图鉴模板参数
             title = f"{player.nickname} [UID:{player.uid}]"
 
-            # 描述信息（基础信息，使用\r换行）
-            desc = f"Lv.{player.level} · {realm_name}\r{player.sex} | {guild_name}\rExp {player.exp}/{exp_max}"
-
-            # 玩家头像URL（16x16小头像）
-            avatar_url = f"https://thirdqq.qlogo.cn/qqapp/102499345/{qq_openid}/0"
-
-            # 提示信息（详细属性，使用\r换行）
-            # 注意：所有字符串必须清理\n，只使用\r
-            hint = (
+            # 描述信息（所有玩家信息，使用\r换行）
+            desc = (
+                f"Lv.{player.level} · {realm_name} | {player.sex}\r"
+                f"☯公会 {guild_name}\r"
+                f"Exp {player.exp}/{exp_max}\r"
                 f"━━━ 状态 ━━━\r"
                 f"❤️生命 {cur_hp}/{hp_max_str}\r"
                 f"🧠理智 {cur_mp}/{mp_max_str}\r"
@@ -223,7 +219,13 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
                 f"📍{_format_player_location(player)}"
             )
 
-            # 添加未读消息提示（清理换行符）
+            # 玩家头像URL（16x16小头像）
+            avatar_url = f"https://thirdqq.qlogo.cn/qqapp/102499345/{qq_openid}/0"
+
+            # 提示信息（留言板状态，使用\r换行）
+            hint = "☞【装备栏】【社交系统】"
+
+            # 添加未读消息提示
             if unread_notice:
                 clean_notice = unread_notice.replace('\n', '\r')
                 hint += f"\r{clean_notice}"
