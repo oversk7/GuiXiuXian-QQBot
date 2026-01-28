@@ -200,7 +200,7 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
             desc = f"Lv.{player.level} · {realm_name}\r{player.sex} | {guild_name}\rExp {player.exp}/{exp_max}"
 
             # 玩家头像URL（16x16小头像）
-            avatar_url = f"https://thirdqq.qlogo.cn/qqapp/102499345/{qq_openid}/0"
+            avatar_url = f"https://thirdqq.qlogo.cn/qqapp/102499345/{qq_openid}/1"
 
             # 提示信息（详细属性，使用\r换行）
             hint = (
