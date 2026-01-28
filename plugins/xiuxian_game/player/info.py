@@ -196,34 +196,37 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
             # 构建图鉴模板参数
             title = f"{player.nickname} [UID:{player.uid}]"
 
-            # 描述信息（不能包含markdown语法，使用|分隔）
-            desc = f"Lv.{player.level} · {realm_name} | {player.sex} | {guild_name}"
+            # 描述信息（基础信息，使用\r换行）
+            desc = f"Lv.{player.level} · {realm_name}\r{player.sex} | {guild_name}\rExp {player.exp}/{exp_max}"
 
-            # 玩家头像URL
+            # 玩家头像URL（16x16小头像）
             avatar_url = f"https://thirdqq.qlogo.cn/qqapp/102499345/{qq_openid}/0"
 
-            # 提示信息（属性详情，使用|代替换行）
+            # 提示信息（详细属性，使用\r换行）
             hint = (
-                f"❤️生命 {cur_hp}/{hp_max_str} | "
-                f"🧠理智 {cur_mp}/{mp_max_str} | "
-                f"⚔力 {atk_str} 🛡防 {def_str} | "
-                f"👟敏 {agi_str} 🍀运 {luk_str} | "
-                f"🔮咒抗 {player.stamina} | "
-                f"🪙金币 {player.gold} | "
-                f"💀怨念 {player.resentment} ✨点数 {player.attribute_points} | "
+                f"━━━ 状态 ━━━\r"
+                f"❤️生命 {cur_hp}/{hp_max_str}\r"
+                f"🧠理智 {cur_mp}/{mp_max_str}\r"
+                f"⚔力 {atk_str}  🛡防 {def_str}\r"
+                f"👟敏 {agi_str}  🍀运 {luk_str}\r"
+                f"🔮咒抗 {player.stamina}\r"
+                f"━━━ 资产 ━━━\r"
+                f"🪙金币 {player.gold}\r"
+                f"💀怨念 {player.resentment}  ✨点数 {player.attribute_points}\r"
+                f"━━━ 位置 ━━━\r"
                 f"📍{_format_player_location(player)}"
             )
 
-            # 添加成就和任务提示
-            if quest_completed and quest_msg:
-                hint += f" | {quest_msg.replace(chr(10), ' ')}"
+            # 添加未读消息提示
+            if unread_notice:
+                hint += f"\r{unread_notice}"
 
             # 构建模板参数
             template_params = [
                 MessageMarkdownParams(key="title", values=[title]),
                 MessageMarkdownParams(key="desc", values=[desc]),
-                MessageMarkdownParams(key="width", values=["200"]),
-                MessageMarkdownParams(key="height", values=["200"]),
+                MessageMarkdownParams(key="width", values=["16"]),
+                MessageMarkdownParams(key="height", values=["16"]),
                 MessageMarkdownParams(key="imgurl", values=[avatar_url]),
                 MessageMarkdownParams(key="hint", values=[hint])
             ]
