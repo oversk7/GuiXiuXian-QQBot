@@ -117,14 +117,13 @@ async def _(event: MessageEvent):
         desc = "\r".join(desc_lines)
 
         # 获取鱼类图片（使用catalog.py中的函数）
-        from ..item.catalog import _get_item_image_url, _get_image_dimensions_with_cache
+        from ..item.catalog import _get_item_image_url
         fish_image_url = _get_item_image_url(result["fish_id"])
 
-        # 图片尺寸（参考图鉴指令的实现）
+        # 图片尺寸（鱼类图片统一尺寸：宽300x高163）
         if fish_image_url:
-            # 有图片时使用缓存的尺寸或默认尺寸
-            width_str, height_str = await _get_image_dimensions_with_cache(result["fish_id"], fish_image_url, max_size=300)
-            width, height = int(width_str), int(height_str)
+            # 有图片时使用鱼类固定尺寸
+            width, height = 300, 163
         else:
             # 无图片时使用占位符
             fish_image_url = "https://q.qlogo.cn/g?b=qq&nk=0&s=640"

@@ -576,8 +576,11 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
             item_image_url = "https://example.com/placeholder.png"  # 占位URL
             width = "0"
             height = "0"
+        elif cfg.type.value == "FISH":
+            # 鱼类图片统一尺寸：宽300x高163
+            width, height = "300", "163"
         else:
-            # 获取图片实际尺寸并等比缩放（带缓存）
+            # 其他类型物品获取图片实际尺寸并等比缩放（带缓存）
             width, height = await _get_image_dimensions_with_cache(cfg.item_id, item_image_url)
 
         # 构建Markdown模板参数
