@@ -187,9 +187,62 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
         if achievement_msgs:
             content += "\n\n" + "\n".join(achievement_msgs)
 
-    # 使用平台格式化工具
-    formatted_content = format_platform_message(content, event)
-    await profile.finish(message_add_head(formatted_content, event))
+    # 使用图鉴类模板美化显示（仅在QQ平台且查看自己面板时使用）
+    if target_uid is None and hasattr(event, 'get_user_id'):
+        try:
+            # 获取玩家QQ官方ID（用于头像）
+            qq_openid = event.get_user_id()
+
+            # 构建图鉴模板参数
+            title = f"{player.nickname} [UID:{player.uid}]"
+
+            # 描述信息（不能包含markdown语法，使用|分隔）
+            desc = f"Lv.{player.level} · {realm_name} | {player.sex} | {guild_name}"
+
+            # 玩家头像URL
+            avatar_url = f"https://thirdqq.qlogo.cn/qqapp/102499345/{qq_openid}/0"
+
+            # 提示信息（属性详情，使用|代替换行）
+            hint = (
+                f"❤️生命 {cur_hp}/{hp_max_str} | "
+                f"🧠理智 {cur_mp}/{mp_max_str} | "
+                f"⚔力 {atk_str} 🛡防 {def_str} | "
+                f"👟敏 {agi_str} 🍀运 {luk_str} | "
+                f"🔮咒抗 {player.stamina} | "
+                f"🪙金币 {player.gold} | "
+                f"💀怨念 {player.resentment} ✨点数 {player.attribute_points} | "
+                f"📍{_format_player_location(player)}"
+            )
+
+            # 添加成就和任务提示
+            if quest_completed and quest_msg:
+                hint += f" | {quest_msg.replace(chr(10), ' ')}"
+
+            # 构建模板参数
+            template_params = [
+                MessageMarkdownParams(key="title", values=[title]),
+                MessageMarkdownParams(key="desc", values=[desc]),
+                MessageMarkdownParams(key="width", values=["200"]),
+                MessageMarkdownParams(key="height", values=["200"]),
+                MessageMarkdownParams(key="imgurl", values=[avatar_url]),
+                MessageMarkdownParams(key="hint", values=[hint])
+            ]
+
+            # 使用图鉴类Markdown模版
+            markdown_msg = MessageMarkdown(
+                custom_template_id="102499345_1769178984",
+                params=template_params
+            )
+
+            await profile.finish(MessageSegment.markdown(markdown_msg))
+        except Exception as e:
+            # 如果模板发送失败，回退到文字版本
+            formatted_content = format_platform_message(content, event)
+            await profile.finish(message_add_head(formatted_content, event))
+    else:
+        # 查看他人面板时使用文字版本
+        formatted_content = format_platform_message(content, event)
+        await profile.finish(message_add_head(formatted_content, event))
 
 @register.handle()
 async def _(event: MessageEvent, state: T_State, args: Message = CommandArg()):
