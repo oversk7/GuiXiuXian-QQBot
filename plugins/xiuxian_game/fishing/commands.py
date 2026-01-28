@@ -56,7 +56,8 @@ async def _(event: MessageEvent):
             if "unsupported operand type(s) for +=: 'NoneType' and 'int'" in str(e):
                 await fishing_cmd.finish(message_add_head("⛔ 钓鱼数据异常，请联系管理员处理", event))
             else:
-                raise
+                # 其他TypeError也正常finish，不要raise
+                await fishing_cmd.finish(message_add_head(f"⛔ 钓鱼发生错误：{str(e)}", event))
 
         # ⚠️ 关键修复：必须在finish()之前commit，否则finish()抛出的异常会导致rollback
         await session.commit()
@@ -85,87 +86,10 @@ async def _(event: MessageEvent):
         quantity_text = f"×{result['quantity']}" if result['quantity'] > 1 else ""
 
         # 使用图鉴MD模版 (102499345_1769178984)
-        try:
-            # 获取鱼类配置
-            fish_config = config.items_config["by_id"].get(result["fish_id"])
-            if not fish_config:
-                # 如果没有配置，回退到文字版本
-                message = (
-                    f"{celebration}\n"
-                    f"━━━━━━━━━━━━━\n"
-                    f"🐟 {emoji}{result['fish_name']}{quantity_text}\n"
-                    f"💰 价值：{result['value']} 金币\n"
-                    f"━━━━━━━━━━━━━\n"
-                    f"🎣 继续钓鱼需等待 {FishingService.FISHING_COOLDOWN} 分钟"
-                )
-                await fishing_cmd.finish(message_add_head(message, event))
-
-            # 标题
-            title = celebration
-
-            # 描述信息（使用\r换行）
-            desc_lines = [
-                f"🐟 {emoji}{result['fish_name']}{quantity_text}",
-                f"💰 价值：{result['value']} 金币",
-            ]
-
-            # 添加鱼类描述
-            if fish_config.description:
-                desc_lines.append(f"━━━━━━━━━━━━━")
-                desc_lines.append(f"📖 {fish_config.description}")
-
-            desc = "\r".join(desc_lines)
-
-            # 获取鱼类图片
-            from ..item.item_image_service import ItemImageService
-            fish_image_url = await ItemImageService.get_item_image_url(session, result["fish_id"])
-
-            # 图片尺寸（参考图鉴指令的实现）
-            if fish_image_url:
-                # 有图片时使用缓存的尺寸或默认尺寸
-                from ..item.item_image_service import ItemImageService
-                cached_dimensions = await ItemImageService.get_cached_image_dimensions(session, result["fish_id"])
-                if cached_dimensions:
-                    width, height = cached_dimensions
-                else:
-                    width, height = 200, 200  # 默认尺寸
-            else:
-                # 无图片时使用占位符
-                fish_image_url = "https://q.qlogo.cn/g?b=qq&nk=0&s=640"
-                width, height = 100, 100
-
-            # 提示信息（灰色）
-            hint = f"🎣 继续钓鱼需等待 {FishingService.FISHING_COOLDOWN} 分钟\r☞【鱼栏】【钓鱼记录】【钓鱼排行】"
-
-            # 清理所有参数中的\n换行符，确保只使用\r
-            title = title.replace('\n', '\r')
-            desc = desc.replace('\n', '\r')
-            hint = hint.replace('\n', '\r')
-
-            # 构建模版参数
-            template_params = [
-                MessageMarkdownParams(key="title", values=[title]),
-                MessageMarkdownParams(key="desc", values=[desc]),
-                MessageMarkdownParams(key="width", values=[str(width)]),
-                MessageMarkdownParams(key="height", values=[str(height)]),
-                MessageMarkdownParams(key="imgurl", values=[fish_image_url]),
-                MessageMarkdownParams(key="hint", values=[hint])
-            ]
-
-            # 使用图鉴类Markdown模版
-            markdown_msg = MessageMarkdown(
-                custom_template_id="102499345_1769178984",
-                params=template_params
-            )
-
-            await fishing_cmd.finish(MessageSegment.markdown(markdown_msg))
-
-        except Exception as e:
-            # 如果MD模版发送失败，回退到文字版本
-            import logging
-            logger = logging.getLogger(__name__)
-            logger.error(f"[钓鱼MD] 发送失败: {e}", exc_info=True)
-
+        # 获取鱼类配置
+        fish_config = config.items_config["by_id"].get(result["fish_id"])
+        if not fish_config:
+            # 如果没有配置，使用文字版本
             message = (
                 f"{celebration}\n"
                 f"━━━━━━━━━━━━━\n"
@@ -175,6 +99,62 @@ async def _(event: MessageEvent):
                 f"🎣 继续钓鱼需等待 {FishingService.FISHING_COOLDOWN} 分钟"
             )
             await fishing_cmd.finish(message_add_head(message, event))
+
+        # 标题
+        title = celebration
+
+        # 描述信息（使用\r换行）
+        desc_lines = [
+            f"🐟 {emoji}{result['fish_name']}{quantity_text}",
+            f"💰 价值：{result['value']} 金币",
+        ]
+
+        # 添加鱼类描述
+        if fish_config.description:
+            desc_lines.append(f"━━━━━━━━━━━━━")
+            desc_lines.append(f"📖 {fish_config.description}")
+
+        desc = "\r".join(desc_lines)
+
+        # 获取鱼类图片（使用catalog.py中的函数）
+        from ..item.catalog import _get_item_image_url, _get_image_dimensions_with_cache
+        fish_image_url = _get_item_image_url(result["fish_id"])
+
+        # 图片尺寸（参考图鉴指令的实现）
+        if fish_image_url:
+            # 有图片时使用缓存的尺寸或默认尺寸
+            width_str, height_str = await _get_image_dimensions_with_cache(result["fish_id"], fish_image_url, max_size=300)
+            width, height = int(width_str), int(height_str)
+        else:
+            # 无图片时使用占位符
+            fish_image_url = "https://q.qlogo.cn/g?b=qq&nk=0&s=640"
+            width, height = 100, 100
+
+        # 提示信息（灰色）
+        hint = f"🎣 继续钓鱼需等待 {FishingService.FISHING_COOLDOWN} 分钟\r☞【鱼栏】【钓鱼记录】【钓鱼排行】"
+
+        # 清理所有参数中的\n换行符，确保只使用\r
+        title = title.replace('\n', '\r')
+        desc = desc.replace('\n', '\r')
+        hint = hint.replace('\n', '\r')
+
+        # 构建模版参数
+        template_params = [
+            MessageMarkdownParams(key="title", values=[title]),
+            MessageMarkdownParams(key="desc", values=[desc]),
+            MessageMarkdownParams(key="width", values=[str(width)]),
+            MessageMarkdownParams(key="height", values=[str(height)]),
+            MessageMarkdownParams(key="imgurl", values=[fish_image_url]),
+            MessageMarkdownParams(key="hint", values=[hint])
+        ]
+
+        # 使用图鉴类Markdown模版
+        markdown_msg = MessageMarkdown(
+            custom_template_id="102499345_1769178984",
+            params=template_params
+        )
+
+        await fishing_cmd.finish(MessageSegment.markdown(markdown_msg))
 
 
 # 钓鱼记录指令
