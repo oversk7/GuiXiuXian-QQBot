@@ -59,16 +59,15 @@ async def handle_help(event: MessageEvent, args: Message = CommandArg()):
         "✨ 欢迎使用帮助系统 ✨\n"
         "═════════════\n"
         "🎮 点击下方按钮查看对应系统详情\n"
-        "💡 发送【问 你的问题】使用AI助手\n"
+        "💡 发送【问 你的问题】询问机器人\n"
         "💡 发送/邀请码 邀请好友获得奖励\n"
         "💡 不会玩加频道：https://Pd.qq.Com/s/d0g9cvds4\n"
         "💡 教程：https://Tutorials.Bossjlb.Top\n"
         "💡 官群：962494679\n"
         "═════════════"
     )
-    msg.append(MessageSegment.markdown(markdown))
-
-    await help_cmd.finish(msg)
+    await help_cmd.send(msg)
+    await help_cmd.finish(MessageSegment.markdown(markdown))
 
 # 经济系统（整合跑商、银行）
 economy_cmd = on_command("经济系统",aliases={"经济帮助","跑商系统","跑商帮助","银行系统","银行帮助"}, block=True, priority=5)
