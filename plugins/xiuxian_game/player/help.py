@@ -1260,18 +1260,23 @@ async def handle_account_help(event: MessageEvent, args: Message = CommandArg())
     await account_help_cmd.finish(Message(msg))
 
 
-# ==================== 完整帮助系统（突破10个按钮限制）====================
+# ==================== 完整帮助系统（分页导航）====================
 full_help_cmd = on_command("完整帮助", aliases={"全部帮助", "帮助大全"}, priority=5, block=True)
 
 @full_help_cmd.handle()
 async def handle_full_help(event: MessageEvent, args: Message = CommandArg()):
     """
-    使用参数注入技术突破10个按钮限制的完整帮助系统
-    模版ID: 102499345_1768473387 (无换行的连续按钮)
+    使用分页导航展示所有游戏系统帮助
+    每页显示10个按钮,通过"上一页/下一页"切换
 
-    核心原理：通过字符串拆分，将10个占位符扩展成110个按钮
+    注意:参数注入技术已被QQ平台检测并限制,因此采用分页方案
     """
-    # 所有系统帮助命令列表（最多110个）
+    # 获取页码参数
+    page_str = args.extract_plain_text().strip()
+    page = int(page_str) if page_str.isdigit() else 1
+    page = max(1, page)  # 确保页码至少为1
+
+    # 所有系统帮助命令列表
     all_systems = [
         # 基础系统 (10个)
         ("修炼系统", "查看修炼、突破、加点等核心成长系统"),
@@ -1295,59 +1300,45 @@ async def handle_full_help(event: MessageEvent, args: Message = CommandArg()):
         ("委托系统", "查看每日委托、任务奖励等"),
         ("抽奖系统", "查看抽奖活动、参与抽奖等"),
         ("赞助", "查看赞助码、月卡权益等"),
+        # 账号管理 (2个)
         ("账号管理", "查看多账号切换、管理等功能"),
         ("备份系统", "查看数据备份、恢复等功能"),
+        # 管理员 (2个)
         ("管理员系统", "查看管理员专用指令（仅管理员）"),
         ("帮助", "返回主帮助菜单"),
     ]
 
-    # 使用参数注入技术：每个key生成11个按钮
-    template_params = []
-    buttons_per_key = 11  # 每个key生成11个按钮（10个values）
+    # 分页配置
+    items_per_page = 10  # QQ Markdown模板限制:最多10个按钮
+    total_pages = (len(all_systems) - 1) // items_per_page + 1
+    page = min(page, total_pages)  # 确保页码不超过总页数
 
-    for key_idx in range(10):
-        key_name = f"t{key_idx + 1}"
-        values = []
+    # 计算当前页的系统范围
+    start_idx = (page - 1) * items_per_page
+    end_idx = min(start_idx + items_per_page, len(all_systems))
+    current_systems = all_systems[start_idx:end_idx]
 
-        # 计算当前key负责的按钮索引范围
-        start_idx = key_idx * buttons_per_key
-        end_idx = min(start_idx + buttons_per_key, len(all_systems))
+    # 构建按钮列表
+    buttons = [cmd for cmd, _ in current_systems]
 
-        # 生成按钮片段（关键：字符串拆分）
-        # 模板结构：<qqbot-cmd-input text="{{.t1}}" />
-        # 目标：一个占位符生成11个完整按钮
-        for i in range(start_idx, end_idx):
-            cmd, desc = all_systems[i]
+    # 添加分页按钮(如果有下一页或不是第一页)
+    if page > 1:
+        buttons.insert(0, f"完整帮助 {page - 1}")  # 上一页
+    if page < total_pages:
+        buttons.append(f"完整帮助 {page + 1}")  # 下一页
 
-            if i == start_idx:
-                # 第1个片段：第1个按钮的text值 + 第1个按钮结束 + 第2个按钮开始 + 第2个按钮的text值
-                if i + 1 < end_idx:
-                    next_cmd, next_desc = all_systems[i + 1]
-                    # 模板：<qqbot-cmd-input text="{t1}" />
-                    # 拼接后：<qqbot-cmd-input text="修炼系统" show="..." /><qqbot-cmd-input text="玩家系统" show="玩家系统
-                    fragment = f'{cmd}" show="{desc}" /><qqbot-cmd-input text="{next_cmd}" show="{next_desc}'
-                    values.append(fragment)
-                else:
-                    # 如果只有1个按钮，直接填入text值
-                    values.append(cmd)
-            elif i < end_idx - 1:
-                # 中间片段：上一个按钮结束 + 下一个按钮开始 + 下一个按钮的text值
-                next_cmd, next_desc = all_systems[i + 1]
-                fragment = f'" /><qqbot-cmd-input text="{next_cmd}" show="{next_desc}'
-                values.append(fragment)
-            else:
-                # 最后1个片段：补全上一个按钮
-                values.append('" />')
+    # 确保不超过10个按钮
+    buttons = buttons[:10]
 
-        # 填充空字符串确保每个key有10个values
-        while len(values) < 10:
-            values.append("")
+    # 构建模版参数
+    template_params = [
+        MessageMarkdownParams(key=f"btn{i+1}", values=[btn])
+        for i, btn in enumerate(buttons)
+    ]
 
-        template_params.append(MessageMarkdownParams(key=key_name, values=values))
-
-    # 创建Markdown消息
+    # 创建Markdown消息(使用物品列表类模板)
     markdown = MessageMarkdown(
-        custom_template_id="102499345_1768473387",
+        custom_template_id="102499345_1769177949",
         params=template_params
     )
 
@@ -1355,9 +1346,9 @@ async def handle_full_help(event: MessageEvent, args: Message = CommandArg()):
     msg = Message(
         "✨ 完整帮助系统 ✨\r\n"
         "═════════════\r\n"
-        "🎮 下方展示所有游戏系统帮助\r\n"
-        f"📚 共有{len(all_systems)}个系统可供查看\r\n"
-        "💡 点击对应按钮查看详细帮助\r\n"
+        f"📖 第 {page}/{total_pages} 页\r\n"
+        f"📚 共 {len(all_systems)} 个系统\r\n"
+        "💡 点击按钮查看详细帮助\r\n"
         "═════════════"
     )
 
