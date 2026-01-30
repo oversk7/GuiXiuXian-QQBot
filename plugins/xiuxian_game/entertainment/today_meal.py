@@ -6,13 +6,12 @@ import requests
 import json
 import logging
 from nonebot import on_command
-from nonebot.adapters.qq import MessageEvent, MessageSegment
-from nonebot.adapters.qq import Message
+from nonebot.adapters.qq import MessageEvent, Message, MessageSegment
+from nonebot.adapters.qq.models.common import MessageMarkdown, MessageMarkdownParams
 from nonebot.params import CommandArg
 from ..models.db import safe_session
 from ..models.player import Player
 from ..utils import message_add_head, check_action_limit, record_action
-from nonebot.adapters.qq.markdown import MessageMarkdown, MessageMarkdownParams
 
 logger = logging.getLogger(__name__)
 
