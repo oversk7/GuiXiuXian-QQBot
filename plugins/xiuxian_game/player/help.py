@@ -1268,10 +1268,12 @@ async def handle_full_help(event: MessageEvent, args: Message = CommandArg()):
     """
     使用参数注入技术突破10个按钮限制的完整帮助系统
     模版ID: 102499345_1768473387 (无换行的连续按钮)
+
+    核心原理：通过字符串拆分，将10个占位符扩展成110个按钮
     """
-    # 所有系统帮助命令列表
+    # 所有系统帮助命令列表（最多110个）
     all_systems = [
-        # 基础系统
+        # 基础系统 (10个)
         ("修炼系统", "查看修炼、突破、加点等核心成长系统"),
         ("玩家系统", "查看面板、排行榜、成就等玩家信息"),
         ("背包系统", "查看物品管理、使用道具、图鉴等功能"),
@@ -1282,7 +1284,7 @@ async def handle_full_help(event: MessageEvent, args: Message = CommandArg()):
         ("公会系统", "查看公会创建、管理、建筑等功能"),
         ("社交系统", "查看好友、聊天、赠送等社交功能"),
         ("娱乐系统", "查看签到、小游戏、月卡等休闲内容"),
-        # 进阶系统
+        # 进阶系统 (14个)
         ("阴宅系统", "查看阴宅探索、诡异战斗等内容"),
         ("副本系统", "查看副本挑战、自动采集等功能"),
         ("交易系统", "查看玩家交易、市场挂单等功能"),
@@ -1293,43 +1295,52 @@ async def handle_full_help(event: MessageEvent, args: Message = CommandArg()):
         ("委托系统", "查看每日委托、任务奖励等"),
         ("抽奖系统", "查看抽奖活动、参与抽奖等"),
         ("赞助", "查看赞助码、月卡权益等"),
-        # 账号管理
         ("账号管理", "查看多账号切换、管理等功能"),
         ("备份系统", "查看数据备份、恢复等功能"),
-        # 管理员系统
         ("管理员系统", "查看管理员专用指令（仅管理员）"),
-        # 返回主帮助
         ("帮助", "返回主帮助菜单"),
     ]
 
-    # 使用参数注入技术构建按钮
-    # 根据MarkdownTemplate.md的说明，通过字符串拆分实现110个按钮
+    # 使用参数注入技术：每个key生成11个按钮
     template_params = []
-
-    # 将所有系统按顺序分配到10个key中
-    systems_per_key = 11  # 每个key处理11个系统
+    buttons_per_key = 11  # 每个key生成11个按钮（10个values）
 
     for key_idx in range(10):
         key_name = f"t{key_idx + 1}"
         values = []
 
-        # 计算当前key负责的系统索引范围
-        start_idx = key_idx * systems_per_key
-        end_idx = min(start_idx + systems_per_key, len(all_systems))
+        # 计算当前key负责的按钮索引范围
+        start_idx = key_idx * buttons_per_key
+        end_idx = min(start_idx + buttons_per_key, len(all_systems))
 
-        # 生成该key的按钮片段
+        # 生成按钮片段（关键：字符串拆分）
+        # 模板结构：<qqbot-cmd-input text="{{.t1}}" />
+        # 目标：一个占位符生成11个完整按钮
         for i in range(start_idx, end_idx):
-            system_name, system_desc = all_systems[i]
+            cmd, desc = all_systems[i]
 
             if i == start_idx:
-                # 第一个按钮：完整标签
-                values.append(rf'<qqbot-cmd-input text="{system_name}" show="{system_desc}" />')
+                # 第1个片段：第1个按钮的text值 + 第1个按钮结束 + 第2个按钮开始 + 第2个按钮的text值
+                if i + 1 < end_idx:
+                    next_cmd, next_desc = all_systems[i + 1]
+                    # 模板：<qqbot-cmd-input text="{t1}" />
+                    # 拼接后：<qqbot-cmd-input text="修炼系统" show="..." /><qqbot-cmd-input text="玩家系统" show="玩家系统
+                    fragment = f'{cmd}" show="{desc}" /><qqbot-cmd-input text="{next_cmd}" show="{next_desc}'
+                    values.append(fragment)
+                else:
+                    # 如果只有1个按钮，直接填入text值
+                    values.append(cmd)
+            elif i < end_idx - 1:
+                # 中间片段：上一个按钮结束 + 下一个按钮开始 + 下一个按钮的text值
+                next_cmd, next_desc = all_systems[i + 1]
+                fragment = f'" /><qqbot-cmd-input text="{next_cmd}" show="{next_desc}'
+                values.append(fragment)
             else:
-                # 后续按钮：直接拼接
-                values.append(rf'<qqbot-cmd-input text="{system_name}" show="{system_desc}" />')
+                # 最后1个片段：补全上一个按钮
+                values.append('" />')
 
-        # 填充空字符串确保每个key有11个values
-        while len(values) < systems_per_key:
+        # 填充空字符串确保每个key有10个values
+        while len(values) < 10:
             values.append("")
 
         template_params.append(MessageMarkdownParams(key=key_name, values=values))
