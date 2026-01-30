@@ -545,6 +545,7 @@ async def handle_entertainment(event: MessageEvent, args: Message = CommandArg()
         "【抽签 [你的问题]】 中国传统诸葛灵签，显示卦象、签诗、解签\n"
         "【摸鱼日历】 获取今日摸鱼日历和日报图片\n"
         "【每日一言】 获取励志名言警句\n"
+        "【今天吃什么】 获取随机食谱推荐，含食材和制作步骤\n"
         "━━━━━━━━━━━━━\n"
         "🎮 小游戏：\n"
         "【恶魔轮盘帮助】 PVP对战赌博游戏（3%税收）\n"
@@ -557,7 +558,7 @@ async def handle_entertainment(event: MessageEvent, args: Message = CommandArg()
         "• 签到获得月卡宝箱\n"
         "• 一键献祭、一键修复等便捷功能\n"
         "━━━━━━━━━━━━━\n"
-        "� 发送【赞助】查看月卡购买方式"
+        "📱 发送【赞助】查看月卡购买方式"
     )
     await entertainment_cmd.finish(Message(msg))
 
