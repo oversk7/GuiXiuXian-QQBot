@@ -66,10 +66,6 @@ def _format_meal_description(meal_data: dict) -> str:
 
         lines.append("")
 
-    # 视频链接（如果有）
-    if meal_data.get("strYoutube"):
-        lines.append(f"🎬 视频教程: {meal_data['strYoutube']}")
-
     # 来源信息
     lines.append("")
     lines.append("📖 数据来源: TheMealDB")
