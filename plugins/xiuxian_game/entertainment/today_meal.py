@@ -43,59 +43,7 @@ def _format_meal_description(meal_data: dict) -> str:
 
     lines.append("")
 
-    # 食材清单
-    ingredients = _extract_ingredients(meal_data)
-    if ingredients:
-        lines.append("📋 食材清单:")
-        for ing, measure in ingredients:
-            lines.append(f"   • {ing}: {measure}")
-        lines.append("")
-
-    # 制作说明
-    instructions = meal_data.get("strInstructions", "")
-    if instructions:
-        # 清理和格式化制作步骤
-        lines.append("👨‍🍳 制作步骤:")
-        # 按句子分割，每句前面加序号
-        sentences = [s.strip() for s in instructions.split('.') if s.strip()]
-        for idx, sentence in enumerate(sentences[:8], 1):  # 限制显示前8步
-            lines.append(f"   {idx}. {sentence}.")
-
-        if len(sentences) > 8:
-            lines.append(f"   ... (还有{len(sentences)-8}步)")
-
-        lines.append("")
-
-    # 来源信息
-    lines.append("")
-    lines.append("📖 数据来源: TheMealDB")
-
     return "\r".join(lines)  # 使用\r换行符以适配Markdown模版
-
-
-def _extract_ingredients(meal_data: dict) -> list:
-    """
-    提取食材和用量
-
-    Returns:
-        list of tuples: [(ingredient_name, measurement), ...]
-    """
-    ingredients = []
-
-    # TheMealDB API返回20个食材字段
-    for i in range(1, 21):
-        ing_key = f"strIngredient{i}"
-        measure_key = f"strMeasure{i}"
-
-        ingredient = meal_data.get(ing_key, "").strip()
-        measure = meal_data.get(measure_key, "").strip()
-
-        if ingredient:  # 只要有食材就添加
-            if not measure:
-                measure = "适量"
-            ingredients.append((ingredient, measure))
-
-    return ingredients
 
 
 async def _get_random_meal() -> tuple[bool, dict, str]:
@@ -151,57 +99,52 @@ async def handle_today_meal(event: MessageEvent):
         if not player:
             await today_meal_cmd.finish("您还没有创建角色，请先注册。")
 
-    try:
-        await today_meal_cmd.send("🍽️ 正在为您寻找今日食谱...")
+    await today_meal_cmd.send("🍽️ 正在为您寻找今日食谱...")
 
-        # 获取随机食谱
-        success, meal_data, error_msg = await _get_random_meal()
+    # 获取随机食谱
+    success, meal_data, error_msg = await _get_random_meal()
 
-        if not success:
-            await today_meal_cmd.finish(f"❌ 获取食谱失败: {error_msg}")
+    if not success:
+        await today_meal_cmd.finish(f"❌ 获取食谱失败: {error_msg}")
 
-        # 记录操作
-        record_action(user_id, "today_meal")
+    # 记录操作
+    record_action(user_id, "today_meal")
 
-        # 构建图鉴模版消息
-        title = "🍽️ 今天吃什么"
-        desc = _format_meal_description(meal_data)
+    # 构建图鉴模版消息
+    title = "🍽️ 今天吃什么"
+    desc = _format_meal_description(meal_data)
 
-        # 获取食谱图片
-        meal_image_url = meal_data.get("strMealThumb", "")
-        if not meal_image_url:
-            # 使用默认图片
-            meal_image_url = "https://www.themealdb.com/images/ingredients/lime.png"
+    # 获取食谱图片
+    meal_image_url = meal_data.get("strMealThumb", "")
+    if not meal_image_url:
+        # 使用默认图片
+        meal_image_url = "https://www.themealdb.com/images/ingredients/lime.png"
 
-        # 快捷操作提示
-        hint = "🔄 换一个: 今天吃什么 | ☞【娱乐系统】查看更多娱乐功能"
+    # 快捷操作提示
+    hint = "🔄 换一个: 今天吃什么 | ☞【娱乐系统】查看更多娱乐功能"
 
-        # 清理所有参数中的\n换行符，确保只使用\r
-        title = title.replace('\n', '\r')
-        desc = desc.replace('\n', '\r')
-        hint = hint.replace('\n', '\r')
+    # 清理所有参数中的\n换行符，确保只使用\r
+    title = title.replace('\n', '\r')
+    desc = desc.replace('\n', '\r')
+    hint = hint.replace('\n', '\r')
 
-        # 构建模版参数
-        template_params = [
-            MessageMarkdownParams(key="title", values=[title]),
-            MessageMarkdownParams(key="desc", values=[desc]),
-            MessageMarkdownParams(key="imgurl", values=[meal_image_url]),
-            MessageMarkdownParams(key="width", values=["200"]),
-            MessageMarkdownParams(key="height", values=["200"]),
-            MessageMarkdownParams(key="hint", values=[hint])
-        ]
+    # 构建模版参数
+    template_params = [
+        MessageMarkdownParams(key="title", values=[title]),
+        MessageMarkdownParams(key="desc", values=[desc]),
+        MessageMarkdownParams(key="imgurl", values=[meal_image_url]),
+        MessageMarkdownParams(key="width", values=["200"]),
+        MessageMarkdownParams(key="height", values=["200"]),
+        MessageMarkdownParams(key="hint", values=[hint])
+    ]
 
-        # 使用图鉴类Markdown模版
-        markdown_msg = MessageMarkdown(
-            custom_template_id="102499345_1769178984",
-            params=template_params
-        )
+    # 使用图鉴类Markdown模版
+    markdown_msg = MessageMarkdown(
+        custom_template_id="102499345_1769178984",
+        params=template_params
+    )
 
-        await today_meal_cmd.finish(MessageSegment.markdown(markdown_msg))
-
-    except Exception as e:
-        logger.error(f"今天吃什么功能处理失败: {e}")
-        await today_meal_cmd.finish("❌ 处理失败，请稍后再试")
+    await today_meal_cmd.finish(MessageSegment.markdown(markdown_msg))
 
 
 # 注册频率限制配置
