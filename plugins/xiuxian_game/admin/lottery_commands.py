@@ -26,7 +26,7 @@ def is_admin(user_id: str) -> bool:
 
 def is_sub_admin(user_id: str) -> bool:
     """检查是否是子管理员"""
-    from ..item.inventory import is_sub_admin as check_sub_admin
+    from ..ai_guide import is_sub_admin as check_sub_admin
     return check_sub_admin(user_id)
 
 

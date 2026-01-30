@@ -1258,3 +1258,98 @@ async def handle_account_help(event: MessageEvent, args: Message = CommandArg())
         "• 快速切换：无需退出登录即可切换角色"
     )
     await account_help_cmd.finish(Message(msg))
+
+
+# ==================== 完整帮助系统（突破10个按钮限制）====================
+full_help_cmd = on_command("完整帮助", aliases={"全部帮助", "帮助大全"}, priority=5, block=True)
+
+@full_help_cmd.handle()
+async def handle_full_help(event: MessageEvent, args: CommandArg()):
+    """
+    使用参数注入技术突破10个按钮限制的完整帮助系统
+    模版ID: 102499345_1768473387 (无换行的连续按钮)
+    """
+    # 所有系统帮助命令列表
+    all_systems = [
+        # 基础系统
+        ("修炼系统", "查看修炼、突破、加点等核心成长系统"),
+        ("玩家系统", "查看面板、排行榜、成就等玩家信息"),
+        ("背包系统", "查看物品管理、使用道具、图鉴等功能"),
+        ("装备系统", "查看装备锻造、升阶、镶嵌等系统"),
+        ("战斗系统", "查看PVP、世界BOSS、战力等战斗内容"),
+        ("探索系统", "查看地图导航、NPC交互、地点探索"),
+        ("经济系统", "查看银行、跑商、理财、投资等经济功能"),
+        ("公会系统", "查看公会创建、管理、建筑等功能"),
+        ("社交系统", "查看好友、聊天、赠送等社交功能"),
+        ("娱乐系统", "查看签到、小游戏、月卡等休闲内容"),
+        # 进阶系统
+        ("阴宅系统", "查看阴宅探索、诡异战斗等内容"),
+        ("副本系统", "查看副本挑战、自动采集等功能"),
+        ("交易系统", "查看玩家交易、市场挂单等功能"),
+        ("钓鱼系统", "查看钓鱼玩法、鱼类图鉴等"),
+        ("炼丹系统", "查看丹药炼制、丹方配方等"),
+        ("打工系统", "查看打工赚钱、工作地点等"),
+        ("投资系统", "查看气运投资、投资理财等"),
+        ("委托系统", "查看每日委托、任务奖励等"),
+        ("抽奖系统", "查看抽奖活动、参与抽奖等"),
+        ("赞助", "查看赞助码、月卡权益等"),
+        # 账号管理
+        ("账号管理", "查看多账号切换、管理等功能"),
+        ("备份系统", "查看数据备份、恢复等功能"),
+        # 管理员系统
+        ("管理员系统", "查看管理员专用指令（仅管理员）"),
+        # 返回主帮助
+        ("帮助", "返回主帮助菜单"),
+    ]
+
+    # 使用参数注入技术构建按钮
+    # 根据MarkdownTemplate.md的说明，通过字符串拆分实现110个按钮
+    template_params = []
+
+    # 将所有系统按顺序分配到10个key中
+    systems_per_key = 11  # 每个key处理11个系统
+
+    for key_idx in range(10):
+        key_name = f"t{key_idx + 1}"
+        values = []
+
+        # 计算当前key负责的系统索引范围
+        start_idx = key_idx * systems_per_key
+        end_idx = min(start_idx + systems_per_key, len(all_systems))
+
+        # 生成该key的按钮片段
+        for i in range(start_idx, end_idx):
+            system_name, system_desc = all_systems[i]
+
+            if i == start_idx:
+                # 第一个按钮：完整标签
+                values.append(rf'<qqbot-cmd-input text="{system_name}" show="{system_desc}" />')
+            else:
+                # 后续按钮：直接拼接
+                values.append(rf'<qqbot-cmd-input text="{system_name}" show="{system_desc}" />')
+
+        # 填充空字符串确保每个key有11个values
+        while len(values) < systems_per_key:
+            values.append("")
+
+        template_params.append(MessageMarkdownParams(key=key_name, values=values))
+
+    # 创建Markdown消息
+    markdown = MessageMarkdown(
+        custom_template_id="102499345_1768473387",
+        params=template_params
+    )
+
+    # 发送带说明的消息
+    msg = Message(
+        "✨ 完整帮助系统 ✨\r\n"
+        "═════════════\r\n"
+        "🎮 下方展示所有游戏系统帮助\r\n"
+        f"📚 共有{len(all_systems)}个系统可供查看\r\n"
+        "💡 点击对应按钮查看详细帮助\r\n"
+        "═════════════"
+    )
+
+    await full_help_cmd.send(msg)
+    await full_help_cmd.finish(MessageSegment.markdown(markdown))
+

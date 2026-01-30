@@ -121,6 +121,14 @@ def is_admin(user_id: str) -> bool:
     admin_ids = config.game_config.get("admin", {}).get("admin_ids", [])
     return user_id in admin_ids
 
+
+def is_sub_admin(user_id: str) -> bool:
+    """检查用户是否为子管理员"""
+    config = Config()
+    sub_admin_ids = config.game_config.get("admin", {}).get("sub_admin_ids", [])
+    return user_id in sub_admin_ids
+
+
 async def call_zhipu_api(messages, model="GLM-4.5-Flash", timeout=30):
     """调用智谱AI API（异步版本）"""
     from .config import config
