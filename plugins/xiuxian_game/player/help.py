@@ -1264,7 +1264,7 @@ async def handle_account_help(event: MessageEvent, args: Message = CommandArg())
 full_help_cmd = on_command("完整帮助", aliases={"全部帮助", "帮助大全"}, priority=5, block=True)
 
 @full_help_cmd.handle()
-async def handle_full_help(event: MessageEvent, args: CommandArg()):
+async def handle_full_help(event: MessageEvent, args: Message = CommandArg()):
     """
     使用参数注入技术突破10个按钮限制的完整帮助系统
     模版ID: 102499345_1768473387 (无换行的连续按钮)
