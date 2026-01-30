@@ -574,7 +574,7 @@ async def get_or_create_tile(session, region: str, x: int, y: int) -> WorldTile:
 
 
 # ----------------- 指令：移动 -----------------
-move_cmd = on_regex(r"^(上|下|左|右)$", block=True, priority=5)
+move_cmd = on_regex(r"^\s*(上|下|左|右)\s*$", block=True, priority=5)
 
 @move_cmd.handle()
 async def _(event: MessageEvent):
