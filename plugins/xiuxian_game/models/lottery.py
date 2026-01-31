@@ -34,6 +34,7 @@ class Lottery(Base):
     lottery_type: Mapped[LotteryType] = mapped_column(SQLEnum(LotteryType, values_callable=lambda x: [e.value for e in x]), nullable=False, comment="抽奖类型")
     item_id: Mapped[str] = mapped_column(String(64), nullable=True, comment="物品/装备ID")
     item_name: Mapped[str] = mapped_column(String(64), nullable=False, comment="奖品名称")
+    description: Mapped[str | None] = mapped_column(String(200), nullable=True, comment="抽奖描述")
 
     # 奖品配置
     winner_count: Mapped[int] = mapped_column(Integer, nullable=False, comment="中奖人数")

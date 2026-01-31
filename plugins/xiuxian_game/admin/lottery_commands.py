@@ -42,9 +42,9 @@ create_lottery_cmd = on_command("发起抽奖", block=True, priority=2)
 @create_lottery_cmd.handle()
 async def handle_create_lottery(event: MessageEvent, args: Message = CommandArg()):
     """
-    发起抽奖：发起抽奖 物品名/装备名/金币 中奖人数 每人数量 [最低等级]
+    发起抽奖：发起抽奖 物品名/装备名/金币 中奖人数 每人数量 [最低等级 [最高等级]] [-描述]
     例如：发起抽奖 棺材钉 10 10
-    例如：发起抽奖 金币 5 1000 50
+    例如：发起抽奖 金币 5 1000 50 120 -庆祝新年活动
     """
     user_id = event.get_user_id()
 
@@ -52,22 +52,37 @@ async def handle_create_lottery(event: MessageEvent, args: Message = CommandArg(
     if not can_create_lottery(user_id):
         await create_lottery_cmd.finish("⛔ 只有管理员和子管理员可以发起抽奖")
 
-    params = args.extract_plain_text().strip().split()
+    # 解析参数，支持描述
+    args_text = args.extract_plain_text().strip()
+    description = None
+
+    # 检查是否有描述（用 - 分隔）
+    if " -" in args_text:
+        parts = args_text.split(" -", 1)
+        args_text = parts[0].strip()
+        description = parts[1].strip()
+        # 限制描述长度
+        if len(description) > 200:
+            await create_lottery_cmd.finish("⛔ 描述长度不能超过200个字符")
+
+    params = args_text.split()
     if len(params) < 3 or len(params) > 5:
         await create_lottery_cmd.finish(
             "⛔ 格式错误\n"
             "━━━━━━━━━━━━━\n"
             "正确格式：\n"
-            "【发起抽奖 物品名 中奖人数 每人数量 [最低等级 [最高等级]]】\n"
-            "【发起抽奖 装备名 中奖人数 每人数量 [最低等级 [最高等级]]】\n"
-            "【发起抽奖 金币 中奖人数 每人数量 [最低等级 [最高等级]]】\n"
+            "【发起抽奖 物品名 中奖人数 每人数量 [最低等级 [最高等级]] [-描述]】\n"
+            "【发起抽奖 装备名 中奖人数 每人数量 [最低等级 [最高等级]] [-描述]】\n"
+            "【发起抽奖 金币 中奖人数 每人数量 [最低等级 [最高等级]] [-描述]】\n"
             "━━━━━━━━━━━━━\n"
             "示例：\n"
             "发起抽奖 棺材钉 10 10\n"
             "发起抽奖 金币 5 1000 50 120\n"
+            "发起抽奖 棺材钉 5 20 -庆祝新年活动\n"
             "━━━━━━━━━━━━━\n"
             "💡 最低等级默认为1，可选填防止小号参与\n"
-            "💡 最高等级默认为不限，可选填限制高等级玩家"
+            "💡 最高等级默认为不限，可选填限制高等级玩家\n"
+            "💡 描述是可选的，用 - 开头"
         )
 
     prize_name = params[0]
@@ -75,7 +90,7 @@ async def handle_create_lottery(event: MessageEvent, args: Message = CommandArg(
     prize_per_winner_str = params[2]
     min_level_str = params[3] if len(params) >= 4 else "1"
     max_level_str = params[4] if len(params) >= 5 else None
-    
+
     # 参数校验
     max_level = None
 
@@ -92,18 +107,18 @@ async def handle_create_lottery(event: MessageEvent, args: Message = CommandArg(
             raise ValueError
     except ValueError:
         await create_lottery_cmd.finish("⛔ 中奖人数、每人数量以及等级要求必须为正整数，且最高等级需不小于最低等级")
-    
+
     async with safe_session() as session:
         # 获取发起人信息
         creator = await session.get(Player, user_id)
         if not creator:
             await create_lottery_cmd.finish("⛔ 请先创建角色")
-        
+
         # 判断抽奖类型
         lottery_type = None
         item_id = None
         total_prize = winner_count * prize_per_winner
-        
+
         if prize_name == "金币":
             lottery_type = LotteryType.GOLD
             # 检查金币是否足够
@@ -121,15 +136,15 @@ async def handle_create_lottery(event: MessageEvent, args: Message = CommandArg(
             item_cfg = config.items_config["by_name"].get(prize_name)
             if not item_cfg:
                 await create_lottery_cmd.finish(f"⛔ 不存在物品：{prize_name}")
-            
+
             item_id = item_cfg.item_id
-            
+
             # 判断是装备还是普通物品
             if item_cfg.type == ItemType.EQUIPMENT:
                 lottery_type = LotteryType.EQUIPMENT
             else:
                 lottery_type = LotteryType.ITEM
-            
+
             # 检查背包物品数量
             stmt = select(ItemInstance).where(
                 ItemInstance.player_id == creator.id,
@@ -137,20 +152,20 @@ async def handle_create_lottery(event: MessageEvent, args: Message = CommandArg(
             )
             items = (await session.execute(stmt)).scalars().all()
             total_owned = sum(item.quantity for item in items)
-            
+
             if total_owned < total_prize:
                 await create_lottery_cmd.finish(
                     f"⛔ {prize_name} 数量不足\n"
                     f"需要：{total_prize} 个\n"
                     f"拥有：{total_owned} 个"
                 )
-            
+
             # 扣除物品
             try:
                 await ItemInstance.consume_item(session, creator.id, item_id, total_prize)
             except ValueError as e:
                 await create_lottery_cmd.finish(f"⛔ 扣除物品失败：{e}")
-        
+
         # 获取群组ID（如果是群聊）
         session_id = event.get_session_id()
         group_id = None
@@ -159,7 +174,7 @@ async def handle_create_lottery(event: MessageEvent, args: Message = CommandArg(
             parts = session_id.split("_")
             if len(parts) >= 2:
                 group_id = parts[1]
-        
+
         # 创建抽奖活动
         lottery = Lottery(
             creator_id=creator.id,
@@ -168,6 +183,7 @@ async def handle_create_lottery(event: MessageEvent, args: Message = CommandArg(
             lottery_type=lottery_type,
             item_id=item_id,
             item_name=prize_name,
+            description=description,
             winner_count=winner_count,
             prize_per_winner=prize_per_winner,
             total_prize=total_prize,
@@ -178,9 +194,9 @@ async def handle_create_lottery(event: MessageEvent, args: Message = CommandArg(
         )
         session.add(lottery)
         await session.flush()  # 获取lottery.id
-        
+
         await session.commit()
-        
+
         # 构建消息
         msg_lines = [
             f"🎉 抽奖活动已发起！",
@@ -191,6 +207,10 @@ async def handle_create_lottery(event: MessageEvent, args: Message = CommandArg(
             f"📦 每人获得：{prize_per_winner} 个",
             f"💰 奖品总数：{total_prize} 个",
         ]
+
+        # 显示描述
+        if description:
+            msg_lines.append(f"📝 说明：{description}")
 
         if min_level > 1 or max_level is not None:
             if max_level is None:
@@ -208,7 +228,7 @@ async def handle_create_lottery(event: MessageEvent, args: Message = CommandArg(
         ])
 
         msg = "\n".join(msg_lines)
-        
+
         await create_lottery_cmd.finish(message_add_head(msg, event))
 
 
@@ -492,6 +512,10 @@ async def handle_lottery_info(event: MessageEvent, args: Message = CommandArg())
             f"📦 每人获得：{lottery.prize_per_winner} 个",
             f"💰 奖品总数：{lottery.total_prize} 个",
         ]
+
+        # 显示描述
+        if lottery.description:
+            msg_lines.append(f"📝 说明：{lottery.description}")
 
         if lottery.min_level > 1 or lottery.max_level is not None:
             if lottery.max_level is None:

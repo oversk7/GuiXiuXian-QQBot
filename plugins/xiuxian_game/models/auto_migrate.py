@@ -26,6 +26,9 @@ REQUIRED_FIELDS: Dict[str, Dict[str, str]] = {
     "stocks": {
         "relisted_at": "DATETIME NULL COMMENT '重新上市时间'",
         "relist_reason": "VARCHAR(100) NULL COMMENT '重新上市原因'"
+    },
+    "lottery": {
+        "description": "VARCHAR(200) NULL COMMENT '抽奖描述'"
     }
     # 注释: 以下字段已通过多次重启完成迁移:
     # - daily_task: quest_chain_id, quest_step, is_tutorial, auto_accept
