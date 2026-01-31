@@ -45,7 +45,6 @@ IMPORTANT: You must read the documentation thoroughly, at least more than three 
 - **PROCESS:**
     - Always use `tr:scout` to obtain necessary information. Break down problems into smaller sub-problems.
     - The prerequisite for `tr:scout` is `always-step-one` (read docs first).
-    - **Documentation Update:** The LAST TODO for any programming task is ALWAYS to update the project's documentation using the `docer` (recorder) agent.
 </tool-usage-exention>
 
 <optional-coding>
