@@ -228,7 +228,7 @@ async def _prefetch_image_dimensions(item_id: str, image_url: str, max_size: int
 
 
 # 设置物品图片
-set_item_image_cmd = on_command("设置物品图片", permission=SUPERUSER, priority=4, block=True)
+set_item_image_cmd = on_command("设置物品图片", priority=4, block=True)
 
 @set_item_image_cmd.handle()
 async def handle_set_item_image(event: MessageEvent, args: Message = CommandArg()):
