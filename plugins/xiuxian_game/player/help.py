@@ -29,7 +29,7 @@ async def handle_help(event: MessageEvent, args: Message = CommandArg()):
     """
     msg = (
         "✨ 欢迎使用帮助系统 ✨\n"
-        "═════════════════════\n"
+        "━━━━━━━━━━━━━\n"
         "📚 发送系统名查看详细帮助\n"
         "\n"
         "🎮 核心玩法系统：\n"
@@ -68,7 +68,7 @@ async def handle_help(event: MessageEvent, args: Message = CommandArg()):
         "【账号管理】 多账号切换\n"
         "【完整帮助】 查看所有系统\n"
         "\n"
-        "═════════════════════\n"
+        "━━━━━━━━━━━━━\n"
         "💡 发送【问 你的问题】询问机器人\n"
         "💡 发送/邀请码 邀请好友获得奖励\n"
         "💡 不会玩加频道：https://Pd.qq.Com/s/d0g9cvds4\n"
