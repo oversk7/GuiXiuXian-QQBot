@@ -219,7 +219,8 @@ async def perform_daily_relist_check():
         ensure_stats = await StockRelistService.ensure_minimum_stocks()
 
         total_relisted = relist_stats["relisted_count"] + ensure_stats["created_count"]
-        total_active = relist_stats["total_active"]
+        # 使用 ensure_stats 的统计数据，因为它在最后执行，包含了所有变化
+        total_active = ensure_stats["total_active"]
 
         if total_relisted > 0:
             logger.info(

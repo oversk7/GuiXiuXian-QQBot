@@ -82,20 +82,23 @@ class StockRelistService:
         Args:
             stock: 要重新上市的股票对象
         """
-        # 重置所有状态
+        # 记录重新上市信息
         stock.is_active = True
         stock.health = 100
         stock.current_price = stock.base_price
-        stock.delisted_at = None
-        stock.delist_reason = None
+        stock.relisted_at = datetime.now()
+        stock.relist_reason = f"退市{cls.RELIST_DAYS}天后自动重新上市"
 
-        logger.debug(f"重新上市股票: {stock.symbol} - {stock.name}")
+        # 清空退市信息（保留历史记录字段）
+        # delisted_at 和 delist_reason 保留，用于历史查询
+
+        logger.debug(f"重新上市股票: {stock.symbol} - {stock.name}, 原因: {stock.relist_reason}")
 
     @classmethod
     async def ensure_minimum_stocks(cls) -> dict:
         """确保系统中有最少12只活跃股票
 
-        如果现有股票+可重新上市股票不足12只，则创建新股票
+        直接检查活跃股票数量，不足则创建新股票
 
         Returns:
             dict: 补充统计信息
@@ -108,25 +111,24 @@ class StockRelistService:
 
         try:
             async with safe_session() as session:
-                # 1. 统计当前活跃股票和可重新上市股票
+                # 1. 查询所有股票（活跃+退市）
+                all_stocks_stmt = select(Stock)
+                all_stocks = (await session.execute(all_stocks_stmt)).scalars().all()
+
+                # 2. 统计当前活跃股票
                 active_stmt = select(Stock).where(Stock.is_active == True)
                 active_stocks = (await session.execute(active_stmt)).scalars().all()
+                active_count = len(active_stocks)
 
-                relist_threshold = datetime.now() - timedelta(days=cls.RELIST_DAYS)
-                delisted_stmt = select(Stock).where(
-                    Stock.is_active == False,
-                    Stock.delisted_at < relist_threshold
-                )
-                delisted_stocks = (await session.execute(delisted_stmt)).scalars().all()
+                # 3. 如果活跃股票不足12只，创建新股票
+                if active_count < cls.MIN_ACTIVE_STOCKS:
+                    needed = cls.MIN_ACTIVE_STOCKS - active_count
 
-                available_count = len(active_stocks) + len(delisted_stocks)
-
-                # 2. 如果仍然不足，创建新股票
-                if available_count < cls.MIN_ACTIVE_STOCKS:
-                    needed = cls.MIN_ACTIVE_STOCKS - available_count
+                    # 使用总股票数作为起始索引，避免symbol冲突
+                    start_index = len(all_stocks) + 1
 
                     for i in range(needed):
-                        new_stock = cls._create_new_stock(len(active_stocks) + i + 1)
+                        new_stock = cls._create_new_stock(start_index + i)
                         session.add(new_stock)
                         stats["created_count"] += 1
                         stats["created_symbols"].append(new_stock.symbol)
@@ -134,7 +136,10 @@ class StockRelistService:
 
                     await session.commit()
 
-                stats["total_active"] = len(active_stocks)
+                    # 重新查询活跃股票数（包含新创建的）
+                    active_count = active_count + needed
+
+                stats["total_active"] = active_count
                 return stats
 
         except Exception as e:

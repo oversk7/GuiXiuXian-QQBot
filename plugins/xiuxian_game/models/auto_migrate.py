@@ -23,7 +23,10 @@ logger = logging.getLogger(__name__)
 # 定义需要自动添加的字段
 # 格式: {表名: {字段名: 字段定义}}
 REQUIRED_FIELDS: Dict[str, Dict[str, str]] = {
-    # 所有字段迁移已完成,无需额外配置
+    "stocks": {
+        "relisted_at": "DATETIME NULL COMMENT '重新上市时间'",
+        "relist_reason": "VARCHAR(100) NULL COMMENT '重新上市原因'"
+    }
     # 注释: 以下字段已通过多次重启完成迁移:
     # - daily_task: quest_chain_id, quest_step, is_tutorial, auto_accept
     # - stocks: health, health_decay_rate, is_active, delisted_at, delist_reason

@@ -51,6 +51,8 @@ class Stock(Base):
     is_active: Mapped[bool] = mapped_column(Boolean, default=True, comment="是否活跃（未退市）")
     delisted_at: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True, comment="退市时间")
     delist_reason: Mapped[Optional[str]] = mapped_column(String(100), nullable=True, comment="退市原因")
+    relisted_at: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True, comment="重新上市时间")
+    relist_reason: Mapped[Optional[str]] = mapped_column(String(100), nullable=True, comment="重新上市原因")
 
     # 时间戳
     created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
