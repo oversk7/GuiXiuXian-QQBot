@@ -93,7 +93,23 @@ QQ Markdown模板引擎支持一个占位符对应**多个values**，这些value
             r'" />文本10<qqbot-cmd-input show="按钮11" text="输入按钮11',
         ]
     },
-    # t2-t10 类似结构...
+    {
+        "key": "t2",
+        "values": [
+            r'输入按钮12" show="按钮12" />文本11<qqbot-cmd-input text="输入按钮13" show="按钮13',
+            r'" />文本12<qqbot-cmd-input text="输入按钮14" show="按钮14',
+            r'" />文本13<qqbot-cmd-input text="输入按钮15" show="按钮15',
+            r'" />文本14<qqbot-cmd-input text="输入按钮16" show="按钮16',
+            r'" />文本15<qqbot-cmd-input text="输入按钮17" show="按钮17',
+            r'" />文本16<qqbot-cmd-input text="输入按钮18" show="按钮18',
+            r'" />文本17<qqbot-cmd-input text="输入按钮19" show="按钮19',
+            r'" />文本18<qqbot-cmd-input text="输入按钮20" show="按钮20',
+            r'" />文本19<qqbot-cmd-input text="输入按钮21" show="按钮21',
+            r'" />文本20<qqbot-cmd-input show="按钮22" text="输入按钮22',
+        ]
+    },
+    
+    # t3-t10 类似结构...
 ]
 ```
 

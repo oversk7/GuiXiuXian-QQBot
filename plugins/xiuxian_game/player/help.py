@@ -1260,85 +1260,92 @@ async def handle_account_help(event: MessageEvent, args: Message = CommandArg())
     await account_help_cmd.finish(Message(msg))
 
 
-# ==================== 完整帮助系统（分页导航）====================
+# ==================== 完整帮助系统（参数注入实现）====================
 full_help_cmd = on_command("完整帮助", aliases={"全部帮助", "帮助大全"}, priority=5, block=True)
 
 @full_help_cmd.handle()
 async def handle_full_help(event: MessageEvent, args: Message = CommandArg()):
     """
-    使用分页导航展示所有游戏系统帮助
-    每页显示10个按钮,通过"上一页/下一页"切换
+    使用参数注入技术展示所有游戏系统帮助
+    利用 MarkdownTemplate.md 中的参数注入技巧突破10个按钮限制
 
-    注意:参数注入技术已被QQ平台检测并限制,因此采用分页方案
+    模板: 无换行的连续按钮 (102499345_1768473387)
+    原理: 每个占位符对应多个values，依次拼接形成完整按钮序列
     """
-    # 获取页码参数
-    page_str = args.extract_plain_text().strip()
-    page = int(page_str) if page_str.isdigit() else 1
-    page = max(1, page)  # 确保页码至少为1
-
-    # 所有系统帮助命令列表
+    # 所有游戏系统列表（一级目录，共20个）
+    # 排除：管理员系统、备份系统、账号管理
     all_systems = [
-        # 基础系统 (10个)
-        ("修炼系统", "查看修炼、突破、加点等核心成长系统"),
-        ("玩家系统", "查看面板、排行榜、成就等玩家信息"),
-        ("背包系统", "查看物品管理、使用道具、图鉴等功能"),
-        ("装备系统", "查看装备锻造、升阶、镶嵌等系统"),
-        ("战斗系统", "查看PVP、世界BOSS、战力等战斗内容"),
-        ("探索系统", "查看地图导航、NPC交互、地点探索"),
-        ("经济系统", "查看银行、跑商、理财、投资等经济功能"),
-        ("公会系统", "查看公会创建、管理、建筑等功能"),
-        ("社交系统", "查看好友、聊天、赠送等社交功能"),
-        ("娱乐系统", "查看签到、小游戏、月卡等休闲内容"),
-        # 进阶系统 (14个)
-        ("阴宅系统", "查看阴宅探索、诡异战斗等内容"),
-        ("副本系统", "查看副本挑战、自动采集等功能"),
-        ("交易系统", "查看玩家交易、市场挂单等功能"),
-        ("钓鱼系统", "查看钓鱼玩法、鱼类图鉴等"),
-        ("炼丹系统", "查看丹药炼制、丹方配方等"),
-        ("打工系统", "查看打工赚钱、工作地点等"),
-        ("投资系统", "查看气运投资、投资理财等"),
-        ("委托系统", "查看每日委托、任务奖励等"),
-        ("抽奖系统", "查看抽奖活动、参与抽奖等"),
-        ("赞助", "查看赞助码、月卡权益等"),
-        # 账号管理 (2个)
-        ("账号管理", "查看多账号切换、管理等功能"),
-        ("备份系统", "查看数据备份、恢复等功能"),
-        # 管理员 (2个)
-        ("管理员系统", "查看管理员专用指令（仅管理员）"),
-        ("帮助", "返回主帮助菜单"),
+        "修炼系统", "玩家系统", "背包系统", "装备系统", "战斗系统",
+        "探索系统", "经济系统", "公会系统", "社交系统", "娱乐系统",
+        "阴宅系统", "副本系统", "交易系统", "钓鱼系统", "炼丹系统",
+        "打工系统", "投资系统", "委托系统", "抽奖系统", "赞助"
     ]
 
-    # 分页配置
-    items_per_page = 10  # QQ Markdown模板限制:最多10个按钮
-    total_pages = (len(all_systems) - 1) // items_per_page + 1
-    page = min(page, total_pages)  # 确保页码不超过总页数
+    # 参数注入策略：使用10个key，每个key生成2个系统按钮
+    # t1: 修炼系统、玩家系统
+    # t2: 背包系统、装备系统
+    # t3: 战斗系统、探索系统
+    # t4: 经济系统、公会系统
+    # t5: 社交系统、娱乐系统
+    # t6: 阴宅系统、副本系统
+    # t7: 交易系统、钓鱼系统
+    # t8: 炼丹系统、打工系统
+    # t9: 投资系统、委托系统
+    # t10: 抽奖系统、赞助
 
-    # 计算当前页的系统范围
-    start_idx = (page - 1) * items_per_page
-    end_idx = min(start_idx + items_per_page, len(all_systems))
-    current_systems = all_systems[start_idx:end_idx]
+    def build_two_buttons_values(cmd1, cmd2):
+        """
+        构建2个按钮的参数注入values数组
 
-    # 构建按钮列表
-    buttons = [cmd for cmd, _ in current_systems]
+        参数:
+            cmd1: 第一个按钮文本
+            cmd2: 第二个按钮文本
 
-    # 添加分页按钮(如果有下一页或不是第一页)
-    if page > 1:
-        buttons.insert(0, f"完整帮助 {page - 1}")  # 上一页
-    if page < total_pages:
-        buttons.append(f"完整帮助 {page + 1}")  # 下一页
+        返回:
+            values数组(10个字符串片段)
 
-    # 确保不超过10个按钮
-    buttons = buttons[:10]
+        拼接逻辑:
+        模板原始: <qqbot-cmd-input text="{{.t1}}" />
+        拼接后: <qqbot-cmd-input text="cmd1" /><qqbot-cmd-input text="cmd2" />
 
-    # 构建模版参数
-    template_params = [
-        MessageMarkdownParams(key=f"btn{i+1}", values=[btn])
-        for i, btn in enumerate(buttons)
-    ]
+        - values[0]: cmd1" /><qqbot-cmd-input text="cmd2
+        - values[1]: " />
+        - values[2-9]: 填充占位（用实际文本避免空值）
+        """
+        values = []
 
-    # 创建Markdown消息(使用物品列表类模板)
+        # 第一个片段: cmd1完整 + cmd2开始
+        values.append(f'{cmd1}" /><qqbot-cmd-input text="{cmd2}')
+
+        # 第二个片段: 补全cmd2的闭合标签
+        values.append('" />')
+
+        # 剩余8个片段：填充占位文本（避免空值）
+        for i in range(8):
+            values.append(".")  # 使用点号作为占位符
+
+        return values
+
+    # 构建10组参数，每组2个系统
+    template_params = []
+
+    # 将20个系统两两分组
+    for i in range(10):
+        idx = i * 2
+        if idx < len(all_systems):
+            cmd1 = all_systems[idx]
+            cmd2 = all_systems[idx + 1] if idx + 1 < len(all_systems) else "帮助"
+
+            template_params.append(
+                MessageMarkdownParams(
+                    key=f"t{i+1}",
+                    values=build_two_buttons_values(cmd1, cmd2)
+                )
+            )
+
+    # 创建Markdown消息(使用无换行连续按钮模板)
     markdown = MessageMarkdown(
-        custom_template_id="102499345_1769177949",
+        custom_template_id="102499345_1768473387",
         params=template_params
     )
 
@@ -1346,9 +1353,9 @@ async def handle_full_help(event: MessageEvent, args: Message = CommandArg()):
     msg = Message(
         "✨ 完整帮助系统 ✨\r\n"
         "═════════════\r\n"
-        f"📖 第 {page}/{total_pages} 页\r\n"
-        f"📚 共 {len(all_systems)} 个系统\r\n"
-        "💡 点击按钮查看详细帮助\r\n"
+        f"📚 共 {len(all_systems)} 个游戏系统\r\n"
+        "💡 点击按钮查看系统详细帮助\r\n"
+        "🔧 使用参数注入技术展示所有系统\r\n"
         "═════════════"
     )
 
