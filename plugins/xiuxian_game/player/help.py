@@ -1306,23 +1306,21 @@ async def handle_full_help(event: MessageEvent, args: Message = CommandArg()):
 
         拼接逻辑:
         模板原始: <qqbot-cmd-input text="{{.t1}}" />
-        拼接后: <qqbot-cmd-input text="cmd1" /> | <qqbot-cmd-input text="cmd2" />
+        values拼接后替换{{.t1}}，模板最后自带" />闭合
+
+        最终效果: <qqbot-cmd-input text="cmd1" /> | <qqbot-cmd-input text="cmd2" />
 
         - values[0]: cmd1" /> | <qqbot-cmd-input text="cmd2
-        - values[1]: " />
-        - values[2-9]: 空格占位（避免空字符串）
+        - values[1-9]: 零宽空格（不可见但非空，满足官方要求）
         """
         values = []
 
-        # 第一个片段: cmd1完整 + 分隔符 + cmd2开始
+        # 第一个片段: cmd1完整 + 分隔符 + cmd2开始（不闭合，由模板闭合）
         values.append(f'{cmd1}" /> | <qqbot-cmd-input text="{cmd2}')
 
-        # 第二个片段: 补全cmd2的闭合标签
-        values.append('" />')
-
-        # 剩余8个片段：使用空格作为占位符（不会显示）
-        for i in range(8):
-            values.append(" ")  # 使用空格替代点号
+        # 剩余9个片段：使用零宽空格（不可见但非空）
+        for i in range(9):
+            values.append("\u200b")  # 零宽空格，不会显示但不是空字符串
 
         return values
 
