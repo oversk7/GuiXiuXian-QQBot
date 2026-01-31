@@ -19,6 +19,7 @@ from ..config import config
 from ..utils import message_add_head
 from ..models.db import safe_session
 from ..platform_utils import get_unified_player
+from ..ai_guide import is_admin
 
 
 # 配置文件路径
@@ -250,6 +251,17 @@ async def handle_set_item_image(event: MessageEvent, args: Message = CommandArg(
 
     # 加载配置
     images = _load_item_images()
+
+    # 检查是否已有图片（只有管理员才能覆盖）
+    user_id = event.get_user_id()
+    if item_cfg.item_id in images and not is_admin(user_id):
+        await set_item_image_cmd.finish(
+            f"⛔ 该物品已有图片配置\n"
+            f"━━━━━━━━━━━━━\n"
+            f"物品：{item_cfg.name}\n"
+            f"💡 只有管理员才能覆盖已有图片\n"
+            f"💡 如需修改图片，请联系管理员"
+        )
 
     # 设置图片URL
     images[item_cfg.item_id] = image_url
