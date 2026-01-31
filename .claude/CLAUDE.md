@@ -38,12 +38,18 @@ IMPORTANT: You must read the documentation thoroughly, at least more than three 
 
 <tool-usage-exention>
 - **AGENTS:**
-    - **ALWAYS use `tr:scout` agent instead of Explore Agent.**
-    - **ALWAYS use `tr:scout` agent instead of Plan Agent.**
-    - **ALWAYS use `tr:scout` agent in Plan Mode.**
-    - **Use `bg-worker`** for tasks that involve executing Bash commands, script writing, unit testing, or file modifications where the path is clear.
+    - **Use `tr:scout` agent for COMPLEX tasks only:**
+      - Deep codebase investigation (e.g., "How does the entire combat system work?")
+      - Multi-file feature analysis (e.g., "Find all places where player attributes are modified")
+      - Unclear requirements that need extensive research
+    - **DO NOT use `tr:scout` for simple tasks:**
+      - Reading a single known file
+      - Simple code searches with ACE tool
+      - Direct edits when the file path is clear
+    - **Use `tr:worker`** for tasks that involve executing Bash commands, script writing, unit testing, or file modifications where the path is clear.
 - **PROCESS:**
-    - Always use `tr:scout` to obtain necessary information. Break down problems into smaller sub-problems.
+    - For simple tasks: Use ACE tool + Read tool directly
+    - For complex tasks: Use `tr:scout` to investigate first, then execute
     - The prerequisite for `tr:scout` is `always-step-one` (read docs first).
 </tool-usage-exention>
 
