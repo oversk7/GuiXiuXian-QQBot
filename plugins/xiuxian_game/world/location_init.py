@@ -573,6 +573,24 @@ async def init_social_npcs(session) -> int:
         session.add(sworn_npc)
         created_count += 1
 
+    # 3. 创建师徒使者NPC
+    mentor_npc_id = "mentor_envoy_shangjing"
+    existing_mentor = await NPCService.get_npc_by_id(session, mentor_npc_id)
+
+    if not existing_mentor:
+        mentor_npc = NPC(
+            npc_id=mentor_npc_id,
+            name="师徒使者",
+            description="传承之道的见证者，师徒关系的缔结者",
+            npc_type=NPCType.NORMAL,
+            location_id=shangjing_market.id,
+            is_killable=False,
+            is_active=True
+        )
+        mentor_npc.add_function("mentorship", {"enabled": True})
+        session.add(mentor_npc)
+        created_count += 1
+
     return created_count
 
 

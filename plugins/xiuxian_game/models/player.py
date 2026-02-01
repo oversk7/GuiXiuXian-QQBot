@@ -230,6 +230,11 @@ class Player(Base):
     mansion_allow_others: Mapped[bool] = mapped_column(Boolean, default=True, server_default=text('1'), comment="是否允许其他玩家使用阴宅")
     mansion_willing_to_pay: Mapped[bool] = mapped_column(Boolean, default=True, server_default=text('1'), comment="是否愿意支付费用使用他人阴宅")
 
+    # 师徒系统
+    incense: Mapped[int] = mapped_column(Integer, default=0, server_default='0', comment="香火点数")
+    max_apprentice_slots: Mapped[int] = mapped_column(Integer, default=3, server_default='3', comment="最大徒弟位")
+    mentor_cooldown_until: Mapped[datetime | None] = mapped_column(DateTime, nullable=True, comment="师徒操作冷却结束时间")
+
     monthly_cards: Mapped[list["MonthlyCard"]] = relationship("MonthlyCard", back_populates="player")
 
     # 表约束

@@ -84,6 +84,30 @@ class PlayerRelationship(Base):
         comment="关系类型: none/mentorship/sworn/marriage"
     )
 
+    # 师徒系统专用字段
+    master_id: Mapped[str | None] = mapped_column(
+        String(32),
+        nullable=True,
+        default=None,
+        comment="师父ID(师徒关系专用,用于明确谁是师父)"
+    )
+    apprentice_level_at_start: Mapped[int] = mapped_column(
+        Integer,
+        default=0,
+        comment="拜师时徒弟等级"
+    )
+    total_incense_contributed: Mapped[int] = mapped_column(
+        Integer,
+        default=0,
+        comment="累计贡献香火"
+    )
+    established_at: Mapped[datetime | None] = mapped_column(
+        DateTime,
+        default=None,
+        nullable=True,
+        comment="关系建立时间"
+    )
+
     # 索引和约束
     __table_args__ = (
         UniqueConstraint(

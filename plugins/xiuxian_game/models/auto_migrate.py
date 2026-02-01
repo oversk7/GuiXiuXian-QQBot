@@ -29,6 +29,18 @@ REQUIRED_FIELDS: Dict[str, Dict[str, str]] = {
     },
     "lottery": {
         "description": "VARCHAR(200) NULL COMMENT '抽奖描述'"
+    },
+    # 师徒系统字段
+    "player": {
+        "incense": "INT DEFAULT 0 COMMENT '香火点数'",
+        "max_apprentice_slots": "INT DEFAULT 3 COMMENT '最大徒弟位'",
+        "mentor_cooldown_until": "DATETIME NULL COMMENT '师徒操作冷却结束时间'"
+    },
+    "player_relationship": {
+        "master_id": "VARCHAR(32) NULL COMMENT '师父ID(师徒关系专用)'",
+        "apprentice_level_at_start": "INT DEFAULT 0 COMMENT '拜师时徒弟等级'",
+        "total_incense_contributed": "INT DEFAULT 0 COMMENT '累计贡献香火'",
+        "established_at": "DATETIME NULL COMMENT '关系建立时间'"
     }
     # 注释: 以下字段已通过多次重启完成迁移:
     # - daily_task: quest_chain_id, quest_step, is_tutorial, auto_accept

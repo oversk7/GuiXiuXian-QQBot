@@ -213,6 +213,9 @@ async def handle_npc_type_interaction(session, player: Player, npc, interaction_
     elif npc.npc_id == "sworn_envoy_shangjing":
         # 结义使者NPC - 通过npc_id判断
         await handle_sworn_envoy_interaction(session, player, npc, event, dialogue_content)
+    elif npc.npc_id == "mentor_envoy_shangjing":
+        # 师徒使者NPC - 通过npc_id判断
+        await handle_mentor_envoy_interaction(session, player, npc, event, dialogue_content)
     else:
         await handle_generic_interaction(session, player, npc, event, dialogue_content)
 
@@ -331,6 +334,15 @@ async def handle_sworn_envoy_interaction(session, player: Player, npc, event: Me
 
     # 调用结义使者处理器,传递所有参数
     message = await handle_sworn_envoy(session, player, npc, event, dialogue_content or "")
+    await interact_cmd.finish(message_add_head(message, event))
+
+
+async def handle_mentor_envoy_interaction(session, player: Player, npc, event: MessageEvent, dialogue_content: str = None):
+    """处理师徒使者NPC交互"""
+    from ..social.npc_mentor import handle_mentor_interaction
+
+    # 调用师徒使者处理器,传递所有参数
+    message = await handle_mentor_interaction(session, player, npc, event, dialogue_content or "")
     await interact_cmd.finish(message_add_head(message, event))
 
 

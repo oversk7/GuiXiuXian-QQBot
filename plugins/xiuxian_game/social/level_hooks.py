@@ -37,6 +37,22 @@ async def on_player_level_up(session: AsyncSession, player_id: str, old_level: i
         if unlock_message:
             reward_messages.append(unlock_message)
 
+        # 发放师徒系统香火奖励
+        from .mentorship_system_service import MentorshipSystemService
+        from ..infrastructure.repositories.player_relationship_repository import PlayerRelationshipRepository
+
+        # 创建师徒服务
+        mentorship_service = MentorshipSystemService(
+            player_repo=PlayerRepository(session),
+            relationship_repo=PlayerRelationshipRepository(session),
+            session=session
+        )
+
+        # 发放香火（异步调用）
+        incense_msg = await mentorship_service.grant_incense_on_level_up(player_id, old_level, new_level)
+        if incense_msg:
+            reward_messages.append(incense_msg)
+
         # 返回奖励消息，供调用方使用
         return reward_messages
 
