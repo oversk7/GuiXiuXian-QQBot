@@ -1,5 +1,6 @@
 from nonebot import on_command
-from nonebot.adapters.qq import MessageEvent
+from nonebot.adapters.qq import MessageEvent, Message, MessageSegment
+from nonebot.adapters.qq.models import MessageMarkdown, MessageMarkdownParams
 from datetime import datetime, timedelta
 from sqlalchemy import select
 from ..models import Player, ItemInstance
@@ -211,12 +212,116 @@ async def handle_sign(event: MessageEvent):
         # 先提交数据库事务，确保数据保存成功
         await session.commit()
 
-        # 构建响应消息
-        response_msg = f"🛞{player.nickname}[{player.uid}] 连续签到 {streak} 天！获得 {base_reward} 金币！\n{lucky_msg}{bonus_msg}{stamina_msg}{monthly_card_msg}{sweep_token_msg}{vip_medal_msg}{new_msg}{guild_msg}"
+        # 尝试使用图鉴类Markdown模板展示签到结果（仅在QQ平台）
+        if hasattr(event, 'get_user_id'):
+            try:
+                # 获取玩家QQ官方ID（用于头像）
+                qq_openid = event.get_user_id()
 
-        # 附加成就解锁消息
-        if achievement_msgs:
-            response_msg += "\n\n" + "\n".join(achievement_msgs)
+                # 构建标题
+                title = f"🎉 签到成功 · 连续{streak}天"
 
-        # 发送响应消息
-        await sign.send(response_msg)
+                # 构建描述信息（使用\r换行）
+                desc_parts = [
+                    f"👤 {player.nickname} [UID:{player.uid}]",
+                    f"💰 金币奖励：+{base_reward}"
+                ]
+
+                # 添加幸运翻倍消息
+                if lucky_msg:
+                    desc_parts.append(lucky_msg.strip())
+
+                # 添加官群奖励或提示
+                if bonus_msg:
+                    clean_bonus = bonus_msg.strip().replace('\n', '\r')
+                    desc_parts.append(clean_bonus)
+
+                # 添加咒抗恢复
+                if stamina_msg:
+                    desc_parts.append(stamina_msg.strip())
+
+                # 添加月卡宝箱
+                if monthly_card_msg:
+                    desc_parts.append(monthly_card_msg.strip())
+
+                # 添加扫荡令
+                if sweep_token_msg:
+                    desc_parts.append(sweep_token_msg.strip())
+
+                # 添加VIP勋章加成
+                if vip_medal_msg:
+                    desc_parts.append(vip_medal_msg.strip())
+
+                # 添加新手大礼包
+                if new_msg:
+                    desc_parts.append(new_msg.strip())
+
+                # 添加公会奖励
+                if guild_msg:
+                    desc_parts.append(guild_msg.strip())
+
+                # 添加成就解锁消息
+                if achievement_msgs:
+                    desc_parts.append("━━━ 成就解锁 ━━━")
+                    for ach_msg in achievement_msgs:
+                        desc_parts.append(ach_msg.strip())
+
+                # 使用\r拼接描述
+                desc = "\r".join(desc_parts)
+
+                # 玩家头像URL（32x32小头像）
+                avatar_url = f"https://thirdqq.qlogo.cn/qqapp/102499345/{qq_openid}/0"
+
+                # 提示信息
+                hint = "快捷操作: 面板 | 背包 | 修炼 | 打工 | 帮助"
+
+                # 清理所有参数中的\n换行符，确保只使用\r
+                title = title.replace('\n', '\r')
+                desc = desc.replace('\n', '\r')
+                hint = hint.replace('\n', '\r')
+
+                # 构建模板参数
+                template_params = [
+                    MessageMarkdownParams(key="title", values=[title]),
+                    MessageMarkdownParams(key="desc", values=[desc]),
+                    MessageMarkdownParams(key="width", values=["32"]),
+                    MessageMarkdownParams(key="height", values=["32"]),
+                    MessageMarkdownParams(key="imgurl", values=[avatar_url]),
+                    MessageMarkdownParams(key="hint", values=[hint])
+                ]
+
+                # 使用图鉴类Markdown模版
+                markdown_msg = MessageMarkdown(
+                    custom_template_id="102499345_1769178984",
+                    params=template_params
+                )
+
+                # 发送Markdown消息
+                msg = Message("🎉 签到成功")
+                msg.append(MessageSegment.markdown(markdown_msg))
+                await sign.send(msg)
+            except Exception as e:
+                # 如果Markdown模板发送失败，回退到文字版本
+                import logging
+                logger = logging.getLogger(__name__)
+                logger.error(f"[签到MD] 发送失败，回退到文本版本: {e}", exc_info=True)
+
+                # 构建纯文本响应消息
+                response_msg = f"🛞{player.nickname}[{player.uid}] 连续签到 {streak} 天！获得 {base_reward} 金币！\n{lucky_msg}{bonus_msg}{stamina_msg}{monthly_card_msg}{sweep_token_msg}{vip_medal_msg}{new_msg}{guild_msg}"
+
+                # 附加成就解锁消息
+                if achievement_msgs:
+                    response_msg += "\n\n" + "\n".join(achievement_msgs)
+
+                # 发送纯文本消息
+                await sign.send(response_msg)
+        else:
+            # 非QQ平台，使用纯文本版本
+            response_msg = f"🛞{player.nickname}[{player.uid}] 连续签到 {streak} 天！获得 {base_reward} 金币！\n{lucky_msg}{bonus_msg}{stamina_msg}{monthly_card_msg}{sweep_token_msg}{vip_medal_msg}{new_msg}{guild_msg}"
+
+            # 附加成就解锁消息
+            if achievement_msgs:
+                response_msg += "\n\n" + "\n".join(achievement_msgs)
+
+            # 发送纯文本消息
+            await sign.send(response_msg)
