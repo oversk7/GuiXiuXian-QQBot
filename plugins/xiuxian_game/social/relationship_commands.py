@@ -126,58 +126,6 @@ async def handle_favorability(event: MessageEvent, args: Message = CommandArg())
             await favorability_cmd.finish(message_add_head("\n".join(lines), event))
 
 
-# ==================== 离婚 ====================
-divorce_cmd = on_command("离婚", priority=5, block=True)
-
-@divorce_cmd.handle()
-async def handle_divorce(event: MessageEvent):
-    """离婚命令 - 单方面离婚,需要支付10万金币"""
-    async with UnitOfWork(AsyncSessionLocal) as uow:
-        player = await get_unified_player(uow.session, event)
-        if not player:
-            await divorce_cmd.finish(message_add_head("⛔ 请先创建角色", event))
-
-        service = RelationshipService(
-            player_repo=uow.players,
-            relationship_repo=uow.player_relationships,
-            item_repo=uow.items,
-            uow=uow
-        )
-
-        success, message = await service.divorce(player.id, cost=100000)
-
-        if success:
-            await uow.commit()
-
-        await divorce_cmd.finish(message_add_head(message, event))
-
-
-# ==================== 断义 ====================
-break_sworn_cmd = on_command("断义", aliases={"脱离结义"}, priority=5, block=True)
-
-@break_sworn_cmd.handle()
-async def handle_break_sworn(event: MessageEvent):
-    """断义命令 - 解除所有结义关系"""
-    async with UnitOfWork(AsyncSessionLocal) as uow:
-        player = await get_unified_player(uow.session, event)
-        if not player:
-            await break_sworn_cmd.finish(message_add_head("⛔ 请先创建角色", event))
-
-        service = RelationshipService(
-            player_repo=uow.players,
-            relationship_repo=uow.player_relationships,
-            item_repo=uow.items,
-            uow=uow
-        )
-
-        success, message = await service.break_sworn(player.id)
-
-        if success:
-            await uow.commit()
-
-        await break_sworn_cmd.finish(message_add_head(message, event))
-
-
 # ==================== 脱离师门/逐出师门 ====================
 end_mentorship_cmd = on_command("脱离师门", aliases={"逐出师门"}, priority=5, block=True)
 
@@ -202,3 +150,123 @@ async def handle_end_mentorship(event: MessageEvent):
             await uow.commit()
 
         await end_mentorship_cmd.finish(message_add_head(message, event))
+
+
+# ==================== 师徒信息查询 ====================
+mentorship_info_cmd = on_command("师徒信息", aliases={"师徒状况", "查看师徒"}, priority=5, block=True)
+
+@mentorship_info_cmd.handle()
+async def handle_mentorship_info(event: MessageEvent):
+    """查看师徒信息"""
+    async with UnitOfWork(AsyncSessionLocal) as uow:
+        player = await get_unified_player(uow.session, event)
+        if not player:
+            await mentorship_info_cmd.finish(message_add_head("⛔ 请先创建角色", event))
+
+        from .mentorship_system_service import MentorshipSystemService
+        from ..infrastructure.repositories.player_repository import PlayerRepository
+        from ..infrastructure.repositories.player_relationship_repository import PlayerRelationshipRepository
+
+        player_repo = PlayerRepository(uow.session)
+        relationship_repo = PlayerRelationshipRepository(uow.session)
+        service = MentorshipSystemService(player_repo, relationship_repo, uow.session)
+
+        info_msg = await service.get_mentorship_info(player.id)
+        await mentorship_info_cmd.finish(message_add_head(info_msg, event))
+
+
+# ==================== 婚姻信息查询 ====================
+marriage_info_cmd = on_command("婚姻信息", aliases={"婚姻状况", "查看婚姻"}, priority=5, block=True)
+
+@marriage_info_cmd.handle()
+async def handle_marriage_info(event: MessageEvent):
+    """查看婚姻信息"""
+    async with UnitOfWork(AsyncSessionLocal) as uow:
+        player = await get_unified_player(uow.session, event)
+        if not player:
+            await marriage_info_cmd.finish(message_add_head("⛔ 请先创建角色", event))
+
+        # 查询婚姻关系
+        stmt = select(PlayerRelationship).where(
+            and_(
+                or_(
+                    PlayerRelationship.player_id == player.id,
+                    PlayerRelationship.target_id == player.id
+                ),
+                PlayerRelationship.relationship_type == RelationshipType.MARRIAGE.value
+            )
+        )
+        result = await uow.session.execute(stmt)
+        marriage = result.scalar_one_or_none()
+
+        if not marriage:
+            msg = """💕 你的婚姻状况
+━━━━━━━━━━━━━
+当前状态: 单身
+💡 前往上京(0,0)找月老，使用【交互 月老 结婚 UID】与心爱的人结为夫妻"""
+        else:
+            # 获取配偶信息
+            spouse_id = marriage.target_id if marriage.player_id == player.id else marriage.player_id
+            spouse = await uow.players.get_by_id(spouse_id)
+            spouse_name = spouse.nickname if spouse else "未知"
+
+            msg = f"""💕 你的婚姻状况
+━━━━━━━━━━━━━
+当前状态: 已婚
+配偶: {spouse_name}
+💡 愿你们白头偕老,永结同心！
+💔 如需解除关系,请前往上京(0,0)找月老使用【交互 月老 离婚】(需支付10万金币)"""
+
+        await marriage_info_cmd.finish(message_add_head(msg, event))
+
+
+# ==================== 结义信息查询 ====================
+sworn_info_cmd = on_command("结义信息", aliases={"结义状况", "查看结义"}, priority=5, block=True)
+
+@sworn_info_cmd.handle()
+async def handle_sworn_info(event: MessageEvent):
+    """查看结义信息"""
+    async with UnitOfWork(AsyncSessionLocal) as uow:
+        player = await get_unified_player(uow.session, event)
+        if not player:
+            await sworn_info_cmd.finish(message_add_head("⛔ 请先创建角色", event))
+
+        # 查询所有结义关系
+        stmt = select(PlayerRelationship).where(
+            and_(
+                or_(
+                    PlayerRelationship.player_id == player.id,
+                    PlayerRelationship.target_id == player.id
+                ),
+                PlayerRelationship.relationship_type == RelationshipType.SWORN.value
+            )
+        )
+        result = await uow.session.execute(stmt)
+        relationships = result.scalars().all()
+
+        if not relationships:
+            msg = """🤝 你的结义状况
+━━━━━━━━━━━━━
+当前状态: 无结义关系
+💡 前往上京(0,0)找结义使者，使用【交互 结义使者 结义 UID1 UID2...】与兄弟结义"""
+        else:
+            # 获取所有结义兄弟
+            brothers = []
+            for rel in relationships:
+                brother_id = rel.target_id if rel.player_id == player.id else rel.player_id
+                brother = await uow.players.get_by_id(brother_id)
+                if brother:
+                    brothers.append(brother.nickname)
+
+            brothers_list = "、".join(brothers)
+
+            msg = f"""🤝 你的结义状况
+━━━━━━━━━━━━━
+当前状态: 已结义
+结义兄弟: {brothers_list}
+兄弟人数: {len(brothers)}人
+━━━━━━━━━━━━━
+江湖义气，生死与共！
+💔 如需解除关系,请前往上京(0,0)找结义使者使用【交互 结义使者 断义】"""
+
+        await sworn_info_cmd.finish(message_add_head(msg, event))

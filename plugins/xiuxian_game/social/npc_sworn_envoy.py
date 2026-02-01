@@ -68,6 +68,15 @@ async def handle_sworn_envoy_interaction(
         except ValueError:
             return "⛔ 格式错误，正确格式：结义 UID1 UID2...\n示例：结义 123 456"
 
+    # 断义
+    elif dialogue_content in ["断义", "解除结义", "脱离结义"]:
+        success, message = await service.break_sworn(player.id)
+
+        if success:
+            await uow.commit()
+
+        return message
+
     # 默认返回帮助
     else:
         return get_sworn_menu()
@@ -143,5 +152,5 @@ async def check_sworn_status(player, uow: UnitOfWork) -> str:
 兄弟人数: {len(brothers)}人
 ━━━━━━━━━━━━━
 江湖义气，生死与共！
-💔 如需解除关系,请使用【断义】命令
+💔 如需解除关系,请使用【交互 结义使者 断义】
 """

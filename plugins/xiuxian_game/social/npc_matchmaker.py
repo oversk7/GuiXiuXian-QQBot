@@ -65,6 +65,15 @@ async def handle_matchmaker_interaction(
         except (ValueError, IndexError):
             return "⛔ 格式错误，正确格式：结婚 UID\n示例：结婚 123"
 
+    # 离婚
+    elif dialogue_content in ["离婚", "解除婚姻"]:
+        success, message = await service.divorce(player.id, cost=100000)
+
+        if success:
+            await uow.commit()
+
+        return message
+
     # 默认返回帮助
     else:
         return get_matchmaker_menu()
@@ -131,5 +140,5 @@ async def check_marriage_status(player: Player, uow: UnitOfWork) -> str:
 当前状态: 已婚
 配偶: {spouse_name}
 💡 愿你们白头偕老,永结同心！
-💔 如需解除关系,请使用【离婚】命令(需支付10万金币)
+💔 如需解除关系,请使用【交互 月老 离婚】(需支付10万金币)
 """
