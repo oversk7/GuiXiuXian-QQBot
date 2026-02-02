@@ -1,10 +1,11 @@
 """
-师徒使者NPC交互处理器
+师徒使者NPC交互处理器（新版-拜师申请流程）
 
-处理玩家与师徒使者的交互,提供拜师/收徒/出师等功能
+处理玩家与师徒使者的交互,提供拜师申请/收徒/出师等功能
 """
 from nonebot.adapters.qq import MessageEvent
 from sqlalchemy.ext.asyncio import AsyncSession
+from datetime import datetime, timedelta
 
 from ..models.player import Player
 from ..infrastructure.uow.unit_of_work import UnitOfWork
@@ -19,7 +20,7 @@ async def handle_mentor_interaction(
     dialogue_content: str = ""
 ):
     """
-    处理与师徒使者的交互
+    处理与师徒使者的交互（拜师申请流程）
 
     Args:
         session: 数据库会话
@@ -48,18 +49,106 @@ async def handle_mentor_interaction(
     elif dialogue_content in ["查询", "状况", "师徒状况", "师徒信息"]:
         return await service.get_mentorship_info(player.id)
 
-    # 收徒
-    elif dialogue_content.startswith("收徒 "):
+    # ==================== 新：拜师申请流程 ====================
+
+    # 拜师 - 徒弟发起申请
+    elif dialogue_content.startswith("拜师 "):
         try:
             target_uid = int(dialogue_content.split()[1])
-            success, message = await service.establish_mentorship(player.id, target_uid)
+            success, message = await service.submit_mentorship_request(player.id, target_uid)
 
             if success:
                 await uow.commit()
 
             return message
         except (ValueError, IndexError):
-            return "格式错误，正确格式：收徒 UID\n示例：收徒 123"
+            return "格式错误，正确格式：拜师 UID\n示例：拜师 123"
+
+    # 拜师申请 / 拜师申请列表 - 查看收到的申请
+    elif dialogue_content in ["拜师申请", "拜师申请列表", "申请列表"]:
+        requests = await service.get_pending_requests(player.id)
+
+        if not requests:
+            return "你暂时没有收到拜师申请"
+
+        lines = [
+            "📋 拜师申请列表",
+            "━━━━━━━━━━━━━"
+        ]
+
+        for i, (apprentice, rel) in enumerate(requests, 1):
+            # 计算申请时间
+            time_ago = ""
+            if rel.mentorship_request_time:
+                delta = datetime.now() - rel.mentorship_request_time
+                if delta.days > 0:
+                    time_ago = f"{delta.days}天前"
+                elif delta.seconds >= 3600:
+                    time_ago = f"{delta.seconds // 3600}小时前"
+                else:
+                    time_ago = f"{delta.seconds // 60}分钟前"
+
+            lines.append(
+                f"{i}. 【{apprentice.nickname}】(UID: {apprentice.uid})\n"
+                f"   等级: Lv.{apprentice.level} | {time_ago}"
+            )
+
+        lines.extend([
+            "━━━━━━━━━━━━━",
+            "💡 使用【交互 师徒使者 同意拜师 UID】接受申请",
+            "💡 使用【交互 师徒使者 拒绝拜师 UID】拒绝申请"
+        ])
+
+        return "\n".join(lines)
+
+    # 同意拜师 - 师父同意申请
+    elif dialogue_content.startswith("同意拜师 ") or dialogue_content.startswith("同意 "):
+        try:
+            # 支持两种格式：同意拜师 123 或 同意 123
+            parts = dialogue_content.split()
+            target_uid = int(parts[-1])  # 取最后一个参数作为UID
+
+            success, message = await service.approve_mentorship_request(player.id, target_uid)
+
+            if success:
+                await uow.commit()
+
+            return message
+        except (ValueError, IndexError):
+            return "格式错误，正确格式：同意拜师 UID\n示例：同意拜师 123"
+
+    # 拒绝拜师 - 师父拒绝申请
+    elif dialogue_content.startswith("拒绝拜师 ") or dialogue_content.startswith("拒绝 "):
+        try:
+            # 支持两种格式：拒绝拜师 123 或 拒绝 123
+            parts = dialogue_content.split()
+            target_uid = int(parts[-1])
+
+            success, message = await service.reject_mentorship_request(player.id, target_uid)
+
+            if success:
+                await uow.commit()
+
+            return message
+        except (ValueError, IndexError):
+            return "格式错误，正确格式：拒绝拜师 UID\n示例：拒绝拜师 123"
+
+    # 撤销拜师 - 徒弟撤销申请
+    elif dialogue_content.startswith("撤销拜师 ") or dialogue_content.startswith("撤销 "):
+        try:
+            parts = dialogue_content.split()
+            target_uid = int(parts[-1])
+
+            success, message = await service.cancel_mentorship_request(player.id, target_uid)
+
+            if success:
+                await uow.commit()
+
+            return message
+        except (ValueError, IndexError):
+            return "格式错误，正确格式：撤销拜师 UID\n示例：撤销拜师 123"
+
+    # ==================== 保留原有功能 ====================
 
     # 出师
     elif dialogue_content.startswith("出师 "):
@@ -126,11 +215,23 @@ def get_mentor_menu(player: Player) -> str:
 
 【你的香火】{incense} | 徒弟位：{max_slots}
 
-【功能列表】
-收徒 UID - 收某玩家为徒
-  • 需要境界高于徒弟50级或转数更高
-  • 需要有空余徒弟位
+【新：拜师申请流程】
+拜师 UID - 向某玩家发起拜师申请
+  • 徒弟主动发起，师父确认
+  • 对方需境界高于你50级或转数更高
 
+拜师申请 - 查看收到的拜师申请列表
+  • 显示所有待处理的申请
+
+同意拜师 UID - 同意某人的拜师申请
+  • 建立师徒关系
+
+拒绝拜师 UID - 拒绝某人的拜师申请
+  • 对方24小时内不能再次申请
+
+撤销拜师 UID - 撤销自己发出的申请
+
+【师父功能】
 出师 UID - 让徒弟正常出师
   • 师徒关系解除
   • 双方进入3天冷却期
@@ -139,11 +240,13 @@ def get_mentor_menu(player: Player) -> str:
   • 师徒关系解除
   • 双方进入3天冷却期
 
+【徒弟功能】
 叛师 - 主动叛离师门
   • 损失10-20%属性
   • 师父损失你贡献香火的50%
   • 双方进入7天冷却期
 
+【其他】
 查询 - 查看师徒状况
 香火商店 - 查看香火兑换
 购买徒弟位 - 花费500香火扩展1个徒弟位
@@ -158,6 +261,7 @@ def get_mentor_menu(player: Player) -> str:
 • 徒弟需注册满24小时才能拜师
 • 每收一个徒弟，修炼效率-1%
 • 徒弟一转后应考虑让其出师
+• 拜师申请7天后自动过期
 ━━━━━━━━━━━━━
 师恩如海，传承不息！"""
 

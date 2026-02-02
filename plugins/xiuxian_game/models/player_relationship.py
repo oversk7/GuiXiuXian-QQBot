@@ -108,6 +108,26 @@ class PlayerRelationship(Base):
         comment="关系建立时间"
     )
 
+    # 拜师申请相关字段
+    mentorship_request_status: Mapped[str | None] = mapped_column(
+        String(20),
+        nullable=True,
+        default=None,
+        comment="拜师申请状态(pending=待处理, rejected=已拒绝, None=无申请或已处理)"
+    )
+    mentorship_request_time: Mapped[datetime | None] = mapped_column(
+        DateTime,
+        default=None,
+        nullable=True,
+        comment="拜师申请发起时间"
+    )
+    mentorship_reject_time: Mapped[datetime | None] = mapped_column(
+        DateTime,
+        default=None,
+        nullable=True,
+        comment="拜师申请被拒绝时间(用于24小时冷却)"
+    )
+
     # 索引和约束
     __table_args__ = (
         UniqueConstraint(

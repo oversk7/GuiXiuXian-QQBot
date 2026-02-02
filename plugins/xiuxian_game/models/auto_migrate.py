@@ -40,7 +40,10 @@ REQUIRED_FIELDS: Dict[str, Dict[str, str]] = {
         "master_id": "VARCHAR(32) NULL COMMENT '师父ID(师徒关系专用)'",
         "apprentice_level_at_start": "INT DEFAULT 0 COMMENT '拜师时徒弟等级'",
         "total_incense_contributed": "INT DEFAULT 0 COMMENT '累计贡献香火'",
-        "established_at": "DATETIME NULL COMMENT '关系建立时间'"
+        "established_at": "DATETIME NULL COMMENT '关系建立时间'",
+        "mentorship_request_status": "VARCHAR(20) NULL COMMENT '拜师申请状态(pending/rejected)'",
+        "mentorship_request_time": "DATETIME NULL COMMENT '拜师申请发起时间'",
+        "mentorship_reject_time": "DATETIME NULL COMMENT '拜师申请被拒绝时间'"
     }
     # 注释: 以下字段已通过多次重启完成迁移:
     # - daily_task: quest_chain_id, quest_step, is_tutorial, auto_accept

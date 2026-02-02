@@ -37,6 +37,10 @@ from ..utils import calculate_level_up_exp
 COOLDOWN_BETRAY = 7  # 叛师/被逐出后的冷却
 COOLDOWN_NORMAL = 3  # 正常出师后的冷却
 
+# 拜师申请配置
+REQUEST_EXPIRE_DAYS = 7  # 申请7天未处理自动过期
+REQUEST_REJECT_COOLDOWN_HOURS = 24  # 被拒绝后24小时内不能再次申请同一师父
+
 # 香火计算配置
 INCENSE_DIVISOR = 5000  # 香火 = ceil(升级经验 / 5000)
 
@@ -260,6 +264,296 @@ class MentorshipSystemService:
         relationship.established_at = datetime.now()
 
         return True, f"恭喜！【{apprentice.nickname}】正式拜【{master.nickname}】为师！\n徒弟当前等级：Lv.{apprentice.level}"
+    # ==================== 拜师申请方法 ====================
+
+    # 拜师申请配置常量
+    REQUEST_EXPIRE_DAYS = 7  # 申请7天未处理自动过期
+    REQUEST_REJECT_COOLDOWN_HOURS = 24  # 被拒绝后24小时内不能再次申请同一师父
+
+    async def submit_mentorship_request(
+        self,
+        apprentice_id: str,
+        master_uid: int
+    ) -> Tuple[bool, str]:
+        """
+        徒弟发起拜师申请
+
+        Args:
+            apprentice_id: 徒弟ID
+            master_uid: 师父UID
+
+        Returns:
+            (是否成功, 消息)
+        """
+        # 获取徒弟和师父
+        apprentice = await self._player_repo.get_by_id(apprentice_id)
+        master = await self._player_repo.get_by_uid(master_uid)
+
+        if not apprentice:
+            return False, "玩家不存在"
+        if not master:
+            return False, f"未找到UID为{master_uid}的玩家"
+        if master.id == apprentice.id:
+            return False, "不能拜自己为师"
+
+        # 检查徒弟资格
+        can_be_apprentice, msg = await self.can_become_apprentice(apprentice)
+        if not can_be_apprentice:
+            return False, msg
+
+        # 检查师父资格
+        can_accept, msg = await self.can_accept_apprentice(master, apprentice)
+        if not can_accept:
+            return False, msg
+
+        # 获取或创建关系记录
+        relationship = await self._relationship_repo.get_or_create_relationship(
+            apprentice.id, master.id
+        )
+
+        # 检查是否已有其他关系
+        if relationship.relationship_type != RelationshipType.NONE.value:
+            current_type = relationship.relationship_type
+            type_names = {
+                RelationshipType.MENTORSHIP.value: "师徒",
+                RelationshipType.SWORN.value: "结义",
+                RelationshipType.MARRIAGE.value: "夫妻"
+            }
+            return False, f"你们已有{type_names.get(current_type, '其他')}关系"
+
+        # 检查是否有待处理的申请
+        if relationship.mentorship_request_status == "pending":
+            return False, f"你已经向【{master.nickname}】发起过拜师申请，请等待处理"
+
+        # 检查被拒绝后的冷却期
+        if relationship.mentorship_reject_time:
+            cooldown_end = relationship.mentorship_reject_time + timedelta(hours=REQUEST_REJECT_COOLDOWN_HOURS)
+            if datetime.now() < cooldown_end:
+                remaining_hours = (cooldown_end - datetime.now()).total_seconds() / 3600
+                return False, f"你的申请被拒绝后需要等待24小时才能再次申请，剩余{remaining_hours:.1f}小时"
+
+        # 创建申请
+        relationship.mentorship_request_status = "pending"
+        relationship.mentorship_request_time = datetime.now()
+        relationship.mentorship_reject_time = None
+        relationship.master_id = master.id  # 暂时标记一下谁是师父
+
+        return True, (
+            f"✅ 已向【{master.nickname}】(UID: {master.uid})发起拜师申请！\n"
+            f"━━━━━━━━━━━━━\n"
+            f"对方可通过【交互 师徒使者 拜师申请】查看\n"
+            f"申请将在7天后自动过期"
+        )
+
+
+    async def get_pending_requests(self, master_id: str) -> List[Tuple[Player, PlayerRelationship]]:
+        """
+        获取师父收到的待处理拜师申请列表
+
+        Returns:
+            [(徒弟Player对象, 关系记录), ...]
+        """
+        # 查询所有pending状态的申请，且master_id匹配
+        stmt = select(PlayerRelationship).where(
+            and_(
+                PlayerRelationship.mentorship_request_status == "pending",
+                PlayerRelationship.master_id == master_id
+            )
+        )
+        result = await self._session.execute(stmt)
+        relationships = list(result.scalars().all())
+
+        # 过滤过期申请并获取徒弟信息
+        valid_requests = []
+        now = datetime.now()
+
+        for rel in relationships:
+            # 检查是否过期
+            if rel.mentorship_request_time:
+                expire_time = rel.mentorship_request_time + timedelta(days=REQUEST_EXPIRE_DAYS)
+                if now > expire_time:
+                    # 过期了，清除申请状态
+                    rel.mentorship_request_status = None
+                    rel.mentorship_request_time = None
+                    rel.master_id = None
+                    continue
+
+            # 获取徒弟信息
+            apprentice_id = rel.player_id if rel.target_id == master_id else rel.target_id
+            apprentice = await self._player_repo.get_by_id(apprentice_id)
+            if apprentice:
+                valid_requests.append((apprentice, rel))
+
+        return valid_requests
+
+
+    async def approve_mentorship_request(
+        self,
+        master_id: str,
+        apprentice_uid: int
+    ) -> Tuple[bool, str]:
+        """
+        师父同意拜师申请
+
+        Args:
+            master_id: 师父ID
+            apprentice_uid: 徒弟UID
+
+        Returns:
+            (是否成功, 消息)
+        """
+        # 获取师父和徒弟
+        master = await self._player_repo.get_by_id(master_id)
+        apprentice = await self._player_repo.get_by_uid(apprentice_uid)
+
+        if not master:
+            return False, "玩家不存在"
+        if not apprentice:
+            return False, f"未找到UID为{apprentice_uid}的玩家"
+
+        # 查找关系记录
+        relationship = await self._relationship_repo.get_or_create_relationship(
+            apprentice.id, master.id
+        )
+
+        # 检查申请状态
+        if relationship.mentorship_request_status != "pending":
+            return False, f"【{apprentice.nickname}】没有向你发起拜师申请"
+
+        if relationship.master_id != master_id:
+            return False, f"申请的师父不是你"
+
+        # 检查申请是否过期
+        if relationship.mentorship_request_time:
+            expire_time = relationship.mentorship_request_time + timedelta(days=REQUEST_EXPIRE_DAYS)
+            if datetime.now() > expire_time:
+                # 过期了，清除申请
+                relationship.mentorship_request_status = None
+                relationship.mentorship_request_time = None
+                relationship.master_id = None
+                return False, "申请已过期"
+
+        # 再次检查师父资格（可能状态已变化）
+        can_accept, msg = await self.can_accept_apprentice(master, apprentice)
+        if not can_accept:
+            # 清除申请状态
+            relationship.mentorship_request_status = None
+            relationship.mentorship_request_time = None
+            relationship.master_id = None
+            return False, f"收徒条件不满足：{msg}"
+
+        # 建立师徒关系
+        relationship.relationship_type = RelationshipType.MENTORSHIP.value
+        relationship.master_id = master.id
+        relationship.apprentice_level_at_start = apprentice.level
+        relationship.total_incense_contributed = 0
+        relationship.established_at = datetime.now()
+
+        # 清除申请状态
+        relationship.mentorship_request_status = None
+        relationship.mentorship_request_time = None
+
+        return True, (
+            f"🎉 恭喜！【{apprentice.nickname}】正式拜你为师！\n"
+            f"━━━━━━━━━━━━━\n"
+            f"徒弟当前等级：Lv.{apprentice.level}\n"
+            f"徒弟一转前升级将贡献香火\n"
+            f"师徒缘分，传承不息！"
+        )
+
+
+    async def reject_mentorship_request(
+        self,
+        master_id: str,
+        apprentice_uid: int
+    ) -> Tuple[bool, str]:
+        """
+        师父拒绝拜师申请
+
+        Args:
+            master_id: 师父ID
+            apprentice_uid: 徒弟UID
+
+        Returns:
+            (是否成功, 消息)
+        """
+        # 获取师父和徒弟
+        master = await self._player_repo.get_by_id(master_id)
+        apprentice = await self._player_repo.get_by_uid(apprentice_uid)
+
+        if not master:
+            return False, "玩家不存在"
+        if not apprentice:
+            return False, f"未找到UID为{apprentice_uid}的玩家"
+
+        # 查找关系记录
+        relationship = await self._relationship_repo.get_or_create_relationship(
+            apprentice.id, master.id
+        )
+
+        # 检查申请状态
+        if relationship.mentorship_request_status != "pending":
+            return False, f"【{apprentice.nickname}】没有向你发起拜师申请"
+
+        if relationship.master_id != master_id:
+            return False, f"申请的师父不是你"
+
+        # 拒绝申请
+        relationship.mentorship_request_status = None
+        relationship.mentorship_request_time = None
+        relationship.mentorship_reject_time = datetime.now()  # 记录拒绝时间，用于冷却
+        relationship.master_id = None
+
+        return True, (
+            f"已拒绝【{apprentice.nickname}】的拜师申请\n"
+            f"对方24小时内不能再次申请"
+        )
+
+
+    async def cancel_mentorship_request(
+        self,
+        apprentice_id: str,
+        master_uid: int
+    ) -> Tuple[bool, str]:
+        """
+        徒弟撤销拜师申请
+
+        Args:
+            apprentice_id: 徒弟ID
+            master_uid: 师父UID
+
+        Returns:
+            (是否成功, 消息)
+        """
+        # 获取徒弟和师父
+        apprentice = await self._player_repo.get_by_id(apprentice_id)
+        master = await self._player_repo.get_by_uid(master_uid)
+
+        if not apprentice:
+            return False, "玩家不存在"
+        if not master:
+            return False, f"未找到UID为{master_uid}的玩家"
+
+        # 查找关系记录
+        relationship = await self._relationship_repo.get_or_create_relationship(
+            apprentice.id, master.id
+        )
+
+        # 检查申请状态
+        if relationship.mentorship_request_status != "pending":
+            return False, f"你没有向【{master.nickname}】发起拜师申请"
+
+        if relationship.master_id != master.id:
+            return False, "申请记录异常"
+
+        # 撤销申请
+        relationship.mentorship_request_status = None
+        relationship.mentorship_request_time = None
+        relationship.master_id = None
+
+        return True, f"已撤销向【{master.nickname}】的拜师申请"
+
+
 
     async def betray_master(self, apprentice_id: str) -> Tuple[bool, str]:
         """

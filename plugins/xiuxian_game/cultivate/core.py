@@ -152,21 +152,36 @@ async def handle_cultivate(event: MessageEvent):
                 else:
                     # 支付失败，无法使用阴宅加成
                     mansion_cultivation_bonus = 0.0
-        # 分别计算各种加成（都基于基础经验）
+        # 获取师徒惩罚
+        from ..infrastructure.repositories.player_relationship_repository import PlayerRelationshipRepository
+        from ..social.mentorship_system_service import MentorshipSystemService
+
+        mentorship_service = MentorshipSystemService(
+            player_repo=PlayerRepository(session),
+            relationship_repo=PlayerRelationshipRepository(session),
+            session=session
+        )
+        mentorship_penalty_rate = await mentorship_service.get_cultivation_penalty(player.id)
+        mentorship_penalty = int(base_exp_gain * mentorship_penalty_rate)
+
+        # 应用师徒惩罚到基础经验
+        base_exp_gain_after_penalty = base_exp_gain - mentorship_penalty
+
+        # 分别计算各种加成（都基于惩罚后的基础经验）
         from .reincarnation_service_new import ReincarnationService
         reincarnation_bonus_rate = ReincarnationService.get_cultivation_efficiency_bonus(player.reincarnation_level)
 
         # 月卡加成
-        card_bonus = int(base_exp_gain * benefits["cultivation_efficiency"])
+        card_bonus = int(base_exp_gain_after_penalty * benefits["cultivation_efficiency"])
         # 转数加成
-        reincarnation_bonus = int(base_exp_gain * reincarnation_bonus_rate)
+        reincarnation_bonus = int(base_exp_gain_after_penalty * reincarnation_bonus_rate)
         # 公会加成
-        guild_bonus = int(base_exp_gain * guild_cultivation_bonus)
+        guild_bonus = int(base_exp_gain_after_penalty * guild_cultivation_bonus)
         # 阴宅加成
-        mansion_bonus = int(base_exp_gain * mansion_cultivation_bonus)
+        mansion_bonus = int(base_exp_gain_after_penalty * mansion_cultivation_bonus)
 
-        # 总经验 = 基础经验 + 各种加成
-        exp_gain = base_exp_gain + card_bonus + reincarnation_bonus + guild_bonus + mansion_bonus
+        # 总经验 = 惩罚后的基础经验 + 各种加成
+        exp_gain = base_exp_gain_after_penalty + card_bonus + reincarnation_bonus + guild_bonus + mansion_bonus
 
         # 更新数据
         player.last_cultivation = datetime.now()
@@ -186,8 +201,8 @@ async def handle_cultivate(event: MessageEvent):
         # 构建加成明细行（折叠式）
         total_bonus = card_bonus + reincarnation_bonus + guild_bonus + mansion_bonus
         bonus_detail_line = ""
-        if total_bonus > 0:
-            bonus_percent = (total_bonus / base_exp_gain) * 100
+        if total_bonus > 0 or mentorship_penalty > 0:
+            bonus_percent = (total_bonus / base_exp_gain) * 100 if base_exp_gain > 0 else 0
             bonus_parts = []
 
             # 按顺序显示有效加成
@@ -199,9 +214,12 @@ async def handle_cultivate(event: MessageEvent):
                 bonus_parts.append(f"公会+{guild_bonus}")
             if mansion_bonus > 0:
                 bonus_parts.append(f"阴宅+{mansion_bonus}")
+            if mentorship_penalty > 0:
+                apprentice_count = await mentorship_service.get_apprentice_count(player.id)
+                bonus_parts.append(f"徒弟-{mentorship_penalty}({apprentice_count}人)")
 
             bonus_detail = " ".join(bonus_parts)
-            bonus_detail_line = f"\n   ↳ 基础+{base_exp_gain} {bonus_detail} (总加成+{bonus_percent:.0f}%)"
+            bonus_detail_line = f"\n   ↳ 基础+{base_exp_gain} {bonus_detail} (总加成{total_bonus - mentorship_penalty:+d})"
 
         # 计算还需修炼次数
         cultivation_times = calculate_cultivation_times_needed(player.exp, exp_max, exp_gain)
@@ -340,6 +358,18 @@ async def handle_seclusion(event: MessageEvent):
         from .reincarnation_service_new import ReincarnationService
         reincarnation_seclusion_bonus = ReincarnationService.get_seclusion_efficiency_bonus(player.reincarnation_level)
 
+        # 获取师徒惩罚
+        from ..infrastructure.repositories.player_relationship_repository import PlayerRelationshipRepository
+        from ..social.mentorship_system_service import MentorshipSystemService
+
+        mentorship_service = MentorshipSystemService(
+            player_repo=PlayerRepository(session),
+            relationship_repo=PlayerRelationshipRepository(session),
+            session=session
+        )
+        mentorship_penalty_rate = await mentorship_service.get_cultivation_penalty(player.id)
+        mentorship_penalty_percent = mentorship_penalty_rate * 100  # 转换为百分比
+
         player.is_secluded = True
         player.seclusion_start_time = datetime.now()
         session.add(player)
@@ -377,6 +407,11 @@ async def handle_seclusion(event: MessageEvent):
             total_efficiency += mansion_efficiency
             efficiency_parts.append("阴宅")
 
+        if mentorship_penalty_percent > 0:
+            apprentice_count = await mentorship_service.get_apprentice_count(player.id)
+            total_efficiency -= mentorship_penalty_percent
+            efficiency_parts.append(f"徒弟-{mentorship_penalty_percent:.0f}%({apprentice_count}人)")
+
         seclusion_hours = benefits["seclusion_time_limit"] // 3600
 
         # 随机选择闭关文案
@@ -390,7 +425,7 @@ async def handle_seclusion(event: MessageEvent):
         msg_secl = (
             f"⚰️ {seclusion_flavor_text}\n"
             "━━━━━━━━━━━━━\n"
-            f"🔥 离线修炼已开始 | 总效率加成 +{total_efficiency:.1f}%"
+            f"🔥 离线修炼已开始 | 总效率加成 {total_efficiency:+.1f}%"
             f"{efficiency_detail}\n"
             f"⏰ 时长上限 {seclusion_hours}小时 | 期间无法普通修炼\n"
             "━━━━━━━━━━━━━\n"
@@ -503,27 +538,42 @@ async def handle_out_seclusion(event: MessageEvent):
         # 计算基础经验
         base_exp_gain = int(delta_time / cfg["cool_down"] * base_gain * 0.5)
 
-        # 分别计算各种加成（都基于基础经验）
+        # 获取师徒惩罚
+        from ..infrastructure.repositories.player_relationship_repository import PlayerRelationshipRepository
+        from ..social.mentorship_system_service import MentorshipSystemService
+
+        mentorship_service = MentorshipSystemService(
+            player_repo=PlayerRepository(session),
+            relationship_repo=PlayerRelationshipRepository(session),
+            session=session
+        )
+        mentorship_penalty_rate = await mentorship_service.get_cultivation_penalty(player.id)
+        mentorship_penalty = int(base_exp_gain * mentorship_penalty_rate)
+
+        # 应用师徒惩罚到基础经验
+        base_exp_gain_after_penalty = base_exp_gain - mentorship_penalty
+
+        # 分别计算各种加成（都基于惩罚后的基础经验）
         # 棺材钉加成
         coffin_nail_efficiency = (effective_coffin_nail_count * 0.005)  # 每个棺材钉提升0.5%效率
-        coffin_nail_bonus = int(base_exp_gain * coffin_nail_efficiency)
+        coffin_nail_bonus = int(base_exp_gain_after_penalty * coffin_nail_efficiency)
 
         # 月卡闭关效率加成
-        card_bonus = int(base_exp_gain * benefits["seclusion_efficiency"])
+        card_bonus = int(base_exp_gain_after_penalty * benefits["seclusion_efficiency"])
 
         # 转数闭关效率加成
         from .reincarnation_service_new import ReincarnationService
         reincarnation_bonus_rate = ReincarnationService.get_seclusion_efficiency_bonus(player.reincarnation_level)
-        reincarnation_exp_bonus = int(base_exp_gain * reincarnation_bonus_rate)
+        reincarnation_exp_bonus = int(base_exp_gain_after_penalty * reincarnation_bonus_rate)
 
         # 公会修为加成
-        guild_bonus = int(base_exp_gain * guild_cultivation_bonus)
+        guild_bonus = int(base_exp_gain_after_penalty * guild_cultivation_bonus)
 
         # 阴宅修为加成
-        mansion_bonus = int(base_exp_gain * mansion_cultivation_bonus)
+        mansion_bonus = int(base_exp_gain_after_penalty * mansion_cultivation_bonus)
 
-        # 总经验 = 基础经验 + 各种加成
-        exp_gain = base_exp_gain + coffin_nail_bonus + card_bonus + reincarnation_exp_bonus + guild_bonus + mansion_bonus
+        # 总经验 = 惩罚后的基础经验 + 各种加成
+        exp_gain = base_exp_gain_after_penalty + coffin_nail_bonus + card_bonus + reincarnation_exp_bonus + guild_bonus + mansion_bonus
 
         player.exp += exp_gain
 
@@ -550,13 +600,16 @@ async def handle_out_seclusion(event: MessageEvent):
             bonus_parts.append(f"公会+{guild_bonus}")
         if mansion_bonus > 0:
             bonus_parts.append(f"阴宅+{mansion_bonus}")
+        if mentorship_penalty > 0:
+            apprentice_count = await mentorship_service.get_apprentice_count(player.id)
+            bonus_parts.append(f"徒弟-{mentorship_penalty}({apprentice_count}人)")
 
         bonus_detail_line = ""
         if bonus_parts:
-            total_bonus = exp_gain - base_exp_gain
-            bonus_percent = (total_bonus / base_exp_gain) * 100 if base_exp_gain > 0 else 0
+            total_bonus = coffin_nail_bonus + card_bonus + reincarnation_exp_bonus + guild_bonus + mansion_bonus
+            total_effect = total_bonus - mentorship_penalty
             bonus_detail = " ".join(bonus_parts)
-            bonus_detail_line = f"\n   ↳ 基础+{base_exp_gain} {bonus_detail} (总加成+{bonus_percent:.0f}%)"
+            bonus_detail_line = f"\n   ↳ 基础+{base_exp_gain} {bonus_detail} (总加成{total_effect:+d})"
 
         # 添加阴宅费用提示
         if mansion_usage_msg:
