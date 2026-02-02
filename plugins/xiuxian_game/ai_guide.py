@@ -941,7 +941,7 @@ async def handle_ai_guide(event: MessageEvent, args: Message = CommandArg()):
         # 如果没有提供问题，返回使用说明
         if not user_message:
             await ai_guide.finish(message_add_head(
-                "💡 AI助手使用说明\n"
+                "💡 助手使用说明\n"
                 "━━━━━━━━━━━━━\n"
                 "使用方式：【问 你的问题】\n"
                 "示例：\n"
