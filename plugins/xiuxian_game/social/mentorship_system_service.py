@@ -461,6 +461,10 @@ class MentorshipSystemService:
         """
         徒弟升级时给师父发放香火
 
+        规则：
+        - 徒弟一转（reincarnation_level >= 1）后，升级不再贡献香火
+        - 师父应考虑让徒弟出师
+
         Returns:
             奖励消息（如果有师父），否则返回None
         """
@@ -473,6 +477,18 @@ class MentorshipSystemService:
         relationship = await self.get_mentorship_relationship(apprentice_id)
         if not relationship:
             return None
+
+        # 获取徒弟信息，检查转数
+        apprentice = await self._player_repo.get_by_id(apprentice_id)
+        if not apprentice:
+            return None
+
+        # 检查徒弟转数：一转及以上不再贡献香火
+        if apprentice.reincarnation_level >= 1:
+            return (
+                f"💡 徒弟【{apprentice.nickname}】已达一转境界，升级不再贡献香火\n"
+                f"师父可考虑让其【出师】，为新徒弟腾位"
+            )
 
         # 计算总香火（可能一次升多级）
         total_incense = 0
