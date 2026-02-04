@@ -43,6 +43,7 @@ REQUEST_REJECT_COOLDOWN_HOURS = 24  # 被拒绝后24小时内不能再次申请�
 
 # 香火计算配置
 INCENSE_DIVISOR = 5000  # 香火 = ceil(升级经验 / 5000)
+POST_REINCARNATION_INCENSE = 15  # 一转后每级固定贡献香火
 
 # 叛师惩罚配置
 BETRAY_ATTRIBUTE_LOSS_MIN = 0.10  # 叛师最小属性损失比例
@@ -756,8 +757,8 @@ class MentorshipSystemService:
         徒弟升级时给师父发放香火
 
         规则：
-        - 徒弟一转（reincarnation_level >= 1）后，升级不再贡献香火
-        - 师父应考虑让徒弟出师
+        - 徒弟一转前：根据升级经验计算香火（公式：ceil(经验/5000)）
+        - 徒弟一转后：每级固定贡献少量香火（鼓励师父让徒弟出师，收新徒弟）
 
         Returns:
             奖励消息（如果有师父），否则返回None
@@ -777,23 +778,32 @@ class MentorshipSystemService:
         if not apprentice:
             return None
 
-        # 检查徒弟转数：一转及以上不再贡献香火
-        if apprentice.reincarnation_level >= 1:
-            return (
-                f"💡 徒弟【{apprentice.nickname}】已达一转境界，升级不再贡献香火\n"
-                f"师父可考虑让其【出师】，为新徒弟腾位"
-            )
-
         # 计算总香火（可能一次升多级）
         total_incense = 0
-        for level in range(old_level + 1, new_level + 1):
-            total_incense += self.calculate_incense_reward(level)
+        level_count = new_level - old_level
+
+        if apprentice.reincarnation_level >= 1:
+            # 一转后：每级固定少量香火
+            total_incense = POST_REINCARNATION_INCENSE * level_count
+            incense_type = "（一转后固定）"
+        else:
+            # 一转前：根据经验计算
+            for level in range(old_level + 1, new_level + 1):
+                total_incense += self.calculate_incense_reward(level)
+            incense_type = "（升级奖励）"
 
         # 发放香火
         master.incense = (master.incense or 0) + total_incense
         relationship.total_incense_contributed = (relationship.total_incense_contributed or 0) + total_incense
 
-        return f"师父【{master.nickname}】获得香火 +{total_incense}（徒弟升级奖励）"
+        # 构建消息
+        msg = f"师父【{master.nickname}】获得香火 +{total_incense}{incense_type}"
+
+        # 一转后提示出师
+        if apprentice.reincarnation_level >= 1:
+            msg += f"\n💡 徒弟【{apprentice.nickname}】已一转，建议让其出师收新徒获取更多香火"
+
+        return msg
 
     async def purchase_apprentice_slot(self, player_id: str) -> Tuple[bool, str]:
         """
