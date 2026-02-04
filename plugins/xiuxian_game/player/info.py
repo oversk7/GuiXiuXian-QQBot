@@ -264,10 +264,9 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
 
         # 查看他人面板时，使用对方的UID获取头像
         try:
-            # 如果是查看他人，使用目标玩家的UID
+            # 如果是查看他人，使用目标玩家的ID（openid）
             if target_uid:
-                # 需要获取目标玩家的QQ openid，但这里没有，所以使用默认头像
-                qq_openid = event.get_user_id() if hasattr(event, 'get_user_id') else "default"
+                qq_openid = player.id
             else:
                 qq_openid = event.get_user_id() if hasattr(event, 'get_user_id') else "default"
 
