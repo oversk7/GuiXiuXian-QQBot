@@ -570,13 +570,15 @@ class MentorshipSystemService:
         if not apprentice:
             return False, "玩家不存在"
 
-        # 获取师徒关系
-        relationship = await self.get_mentorship_relationship(apprentice_id)
-        if not relationship or relationship.master_id == apprentice_id:
+        # 获取师父
+        master = await self.get_master(apprentice_id)
+        if not master:
             return False, "你当前没有师父"
 
-        # 获取师父
-        master = await self._player_repo.get_by_id(relationship.master_id)
+        # 获取师徒关系（直接查询两个人之间的关系，避免多条记录问题）
+        relationship = await self._relationship_repo.get_relationship(apprentice_id, master.id)
+        if not relationship:
+            return False, "师徒关系记录不存在"
         master_name = master.nickname if master else "未知"
 
         # 计算徒弟属性惩罚
@@ -650,8 +652,8 @@ class MentorshipSystemService:
         if not apprentice:
             return False, f"未找到UID为{apprentice_uid}的徒弟"
 
-        # 获取师徒关系
-        relationship = await self.get_mentorship_relationship(apprentice.id)
+        # 获取师徒关系（直接查询两个人之间的关系，避免多条记录问题）
+        relationship = await self._relationship_repo.get_relationship(apprentice.id, master_id)
         if not relationship or relationship.master_id != master_id:
             return False, f"【{apprentice.nickname}】不是你的徒弟"
 
@@ -698,8 +700,8 @@ class MentorshipSystemService:
         if not apprentice:
             return False, f"未找到UID为{apprentice_uid}的徒弟"
 
-        # 获取师徒关系
-        relationship = await self.get_mentorship_relationship(apprentice.id)
+        # 获取师徒关系（直接查询两个人之间的关系，避免多条记录问题）
+        relationship = await self._relationship_repo.get_relationship(apprentice.id, master_id)
         if not relationship or relationship.master_id != master_id:
             return False, f"【{apprentice.nickname}】不是你的徒弟"
 
@@ -768,8 +770,8 @@ class MentorshipSystemService:
         if not master:
             return None
 
-        # 获取师徒关系
-        relationship = await self.get_mentorship_relationship(apprentice_id)
+        # 获取师徒关系（直接查询两个人之间的关系，避免多条记录问题）
+        relationship = await self._relationship_repo.get_relationship(apprentice_id, master.id)
         if not relationship:
             return None
 
@@ -867,7 +869,8 @@ class MentorshipSystemService:
         # 师父信息
         master = await self.get_master(player_id)
         if master:
-            relationship = await self.get_mentorship_relationship(player_id)
+            # 获取师徒关系（直接查询两个人之间的关系，避免多条记录问题）
+            relationship = await self._relationship_repo.get_relationship(player_id, master.id)
             lines.append("")
             lines.append("👨‍🏫 我的师父")
             lines.append(f"  {master.nickname} [UID:{master.uid}]")

@@ -9,6 +9,17 @@
 >{{.hint}}
 ```
 
+### 带按钮的图鉴类模版
+模板ID：102499345_1769693953
+```
+#{{.title}}
+*{{.desc}}*
+​
+![img #{{.width}}px #{{.height}}px]({{.imgurl}})
+***
+>{{.hint}} <qqbot-cmd-input text="{{.t1}}" /><qqbot-cmd-input text="{{.t2}}" /><qqbot-cmd-input text="{{.t3}}" /><qqbot-cmd-input text="{{.t4}}" />
+```
+
 ### 物品列表类模版
 模版ID：102499345_1769177949
 ```
