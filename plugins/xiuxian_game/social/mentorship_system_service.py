@@ -373,9 +373,9 @@ class MentorshipSystemService:
             if rel.mentorship_request_time:
                 expire_time = rel.mentorship_request_time + timedelta(days=REQUEST_EXPIRE_DAYS)
                 if now > expire_time:
-                    # 过期了，清除申请状态
+                    # 过期了，清除申请状态（保留申请时间作为历史记录）
                     rel.mentorship_request_status = None
-                    rel.mentorship_request_time = None
+                    # rel.mentorship_request_time 保留不清空
                     rel.master_id = None
                     continue
 
@@ -428,18 +428,18 @@ class MentorshipSystemService:
         if relationship.mentorship_request_time:
             expire_time = relationship.mentorship_request_time + timedelta(days=REQUEST_EXPIRE_DAYS)
             if datetime.now() > expire_time:
-                # 过期了，清除申请
+                # 过期了，清除申请状态（保留申请时间作为历史记录）
                 relationship.mentorship_request_status = None
-                relationship.mentorship_request_time = None
+                # relationship.mentorship_request_time 保留不清空
                 relationship.master_id = None
                 return False, "申请已过期"
 
         # 再次检查师父资格（可能状态已变化）
         can_accept, msg = await self.can_accept_apprentice(master, apprentice)
         if not can_accept:
-            # 清除申请状态
+            # 清除申请状态（保留申请时间作为历史记录）
             relationship.mentorship_request_status = None
-            relationship.mentorship_request_time = None
+            # relationship.mentorship_request_time 保留不清空
             relationship.master_id = None
             return False, f"收徒条件不满足：{msg}"
 
@@ -450,9 +450,9 @@ class MentorshipSystemService:
         relationship.total_incense_contributed = 0
         relationship.established_at = datetime.now()
 
-        # 清除申请状态
+        # 清除申请状态（保留申请时间作为历史记录）
         relationship.mentorship_request_status = None
-        relationship.mentorship_request_time = None
+        # relationship.mentorship_request_time 保留不清空
 
         return True, (
             f"🎉 恭喜！【{apprentice.nickname}】正式拜你为师！\n"
@@ -499,9 +499,9 @@ class MentorshipSystemService:
         if relationship.master_id != master_id:
             return False, f"申请的师父不是你"
 
-        # 拒绝申请
+        # 拒绝申请（保留申请时间作为历史记录）
         relationship.mentorship_request_status = None
-        relationship.mentorship_request_time = None
+        # relationship.mentorship_request_time 保留不清空
         relationship.mentorship_reject_time = datetime.now()  # 记录拒绝时间，用于冷却
         relationship.master_id = None
 
@@ -547,9 +547,9 @@ class MentorshipSystemService:
         if relationship.master_id != master.id:
             return False, "申请记录异常"
 
-        # 撤销申请
+        # 撤销申请（保留申请时间作为历史记录）
         relationship.mentorship_request_status = None
-        relationship.mentorship_request_time = None
+        # relationship.mentorship_request_time 保留不清空
         relationship.master_id = None
 
         return True, f"已撤销向【{master.nickname}】的拜师申请"

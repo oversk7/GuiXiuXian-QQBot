@@ -43,7 +43,17 @@ REQUIRED_FIELDS: Dict[str, Dict[str, str]] = {
         "established_at": "DATETIME NULL COMMENT '关系建立时间'",
         "mentorship_request_status": "VARCHAR(20) NULL COMMENT '拜师申请状态(pending/rejected)'",
         "mentorship_request_time": "DATETIME NULL COMMENT '拜师申请发起时间'",
-        "mentorship_reject_time": "DATETIME NULL COMMENT '拜师申请被拒绝时间'"
+        "mentorship_reject_time": "DATETIME NULL COMMENT '拜师申请被拒绝时间'",
+        # 结婚申请相关字段
+        "marriage_request_status": "VARCHAR(20) NULL COMMENT '结婚申请状态(pending/rejected)'",
+        "marriage_request_time": "DATETIME NULL COMMENT '结婚申请发起时间'",
+        "marriage_reject_time": "DATETIME NULL COMMENT '结婚申请被拒绝时间'",
+        "marriage_proposer_id": "VARCHAR(32) NULL COMMENT '结婚申请发起者ID'",
+        # 结义申请相关字段
+        "sworn_request_status": "VARCHAR(20) NULL COMMENT '结义申请状态(pending/rejected)'",
+        "sworn_request_time": "DATETIME NULL COMMENT '结义申请发起时间'",
+        "sworn_reject_time": "DATETIME NULL COMMENT '结义申请被拒绝时间'",
+        "sworn_proposer_id": "VARCHAR(32) NULL COMMENT '结义申请发起者ID'"
     }
     # 注释: 以下字段已通过多次重启完成迁移:
     # - daily_task: quest_chain_id, quest_step, is_tutorial, auto_accept

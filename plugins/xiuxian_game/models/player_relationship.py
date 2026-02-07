@@ -128,6 +128,58 @@ class PlayerRelationship(Base):
         comment="拜师申请被拒绝时间(用于24小时冷却)"
     )
 
+    # 结婚申请相关字段
+    marriage_request_status: Mapped[str | None] = mapped_column(
+        String(20),
+        nullable=True,
+        default=None,
+        comment="结婚申请状态(pending=待处理, rejected=已拒绝, None=无申请或已处理)"
+    )
+    marriage_request_time: Mapped[datetime | None] = mapped_column(
+        DateTime,
+        default=None,
+        nullable=True,
+        comment="结婚申请发起时间"
+    )
+    marriage_reject_time: Mapped[datetime | None] = mapped_column(
+        DateTime,
+        default=None,
+        nullable=True,
+        comment="结婚申请被拒绝时间(用于24小时冷却)"
+    )
+    marriage_proposer_id: Mapped[str | None] = mapped_column(
+        String(32),
+        nullable=True,
+        default=None,
+        comment="结婚申请发起者ID(用于确定谁向谁求婚)"
+    )
+
+    # 结义申请相关字段
+    sworn_request_status: Mapped[str | None] = mapped_column(
+        String(20),
+        nullable=True,
+        default=None,
+        comment="结义申请状态(pending=待处理, rejected=已拒绝, None=无申请或已处理)"
+    )
+    sworn_request_time: Mapped[datetime | None] = mapped_column(
+        DateTime,
+        default=None,
+        nullable=True,
+        comment="结义申请发起时间"
+    )
+    sworn_reject_time: Mapped[datetime | None] = mapped_column(
+        DateTime,
+        default=None,
+        nullable=True,
+        comment="结义申请被拒绝时间(用于24小时冷却)"
+    )
+    sworn_proposer_id: Mapped[str | None] = mapped_column(
+        String(32),
+        nullable=True,
+        default=None,
+        comment="结义申请发起者ID"
+    )
+
     # 索引和约束
     __table_args__ = (
         UniqueConstraint(

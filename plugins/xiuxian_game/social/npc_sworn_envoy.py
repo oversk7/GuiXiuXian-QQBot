@@ -52,21 +52,94 @@ async def handle_sworn_envoy_interaction(
     elif dialogue_content in ["查询", "状况", "结义状况"]:
         return await check_sworn_status(player, uow)
 
-    # 结义
+    # ==================== 结义申请流程(2人) ====================
+
+    # 结义(判断2人或多人)
     elif dialogue_content.startswith("结义 "):
         try:
             # 解析UID列表
             uid_strs = dialogue_content.split()[1:]
             target_uids = [int(uid) for uid in uid_strs]
 
-            success, message = await service.establish_sworn(player.id, target_uids)
+            # 2人结义: 发起申请,需要对方同意
+            if len(target_uids) == 1:
+                success, message = await service.submit_sworn_proposal(player.id, target_uids[0])
+            # 3-4人结义: 直接建立(保持原逻辑,所有人必须在场)
+            else:
+                success, message = await service.establish_sworn(player.id, target_uids)
 
             if success:
                 await uow.commit()
 
             return message
         except ValueError:
-            return "⛔ 格式错误，正确格式：结义 UID1 UID2...\n示例：结义 123 456"
+            return "⛔ 格式错误，正确格式：\n• 2人结义: 结义 UID\n• 多人结义: 结义 UID1 UID2...\n示例：结义 123 或 结义 123 456"
+
+    # 结义申请 - 查看收到的结义申请
+    elif dialogue_content in ["结义申请", "申请列表"]:
+        proposals = await service.get_sworn_proposals(player.id)
+
+        if not proposals:
+            return "🤝 当前没有收到结义申请"
+
+        lines = ["🤝 收到的结义申请", "━━━━━━━━━━━━━"]
+        for i, prop in enumerate(proposals, 1):
+            time_str = prop["request_time"].strftime("%m月%d日 %H:%M")
+            lines.append(f"{i}. 【{prop['proposer_name']}】(UID: {prop['proposer_uid']})")
+            lines.append(f"   申请时间: {time_str}")
+            lines.append(f"   ❤️ 同意结义 {prop['proposer_uid']}")
+            lines.append(f"   💔 拒绝结义 {prop['proposer_uid']}")
+            lines.append("")
+
+        lines.append("━━━━━━━━━━━━━")
+        lines.append("💡 使用【同意结义 UID】或【拒绝结义 UID】处理申请")
+
+        return "\n".join(lines)
+
+    # 同意结义
+    elif dialogue_content.startswith("同意结义 ") or dialogue_content.startswith("同意 "):
+        try:
+            parts = dialogue_content.split()
+            target_uid = int(parts[-1])  # 取最后一个参数作为UID
+
+            success, message = await service.approve_sworn_proposal(player.id, target_uid)
+
+            if success:
+                await uow.commit()
+
+            return message
+        except (ValueError, IndexError):
+            return "⛔ 格式错误，正确格式：同意结义 UID\n示例：同意结义 123"
+
+    # 拒绝结义
+    elif dialogue_content.startswith("拒绝结义 ") or dialogue_content.startswith("拒绝 "):
+        try:
+            parts = dialogue_content.split()
+            target_uid = int(parts[-1])
+
+            success, message = await service.reject_sworn_proposal(player.id, target_uid)
+
+            if success:
+                await uow.commit()
+
+            return message
+        except (ValueError, IndexError):
+            return "⛔ 格式错误，正确格式：拒绝结义 UID\n示例：拒绝结义 123"
+
+    # 撤销结义
+    elif dialogue_content.startswith("撤销结义 ") or dialogue_content.startswith("撤销 "):
+        try:
+            parts = dialogue_content.split()
+            target_uid = int(parts[-1])
+
+            success, message = await service.cancel_sworn_proposal(player.id, target_uid)
+
+            if success:
+                await uow.commit()
+
+            return message
+        except (ValueError, IndexError):
+            return "⛔ 格式错误，正确格式：撤销结义 UID\n示例：撤销结义 123"
 
     # 断义
     elif dialogue_content in ["断义", "解除结义", "脱离结义"]:
@@ -90,17 +163,28 @@ def get_sworn_menu() -> str:
 有福同享，有难同当，这才是真正的兄弟情义！
 
 【功能列表】
-🤝 结义 UID1 UID2... - 与兄弟结为异姓兄弟
-  • 支持2-4人结义
+🤝 结义 UID - 向兄弟发起2人结义申请(需对方同意)
+  • 需要双方好感度达到5000
+  • 双方必须在同一地点
+  • 对方同意后才能成为结义兄弟
+
+🤝 结义 UID1 UID2... - 3-4人结义(所有人必须在场)
+  • 支持3-4人同时结义
   • 每两人之间需要5000好感度
-  • 所有人必须在上京(0,0)
-  • 建立后成为结义兄弟
+  • 所有人必须在同一地点
+  • 立即建立结义关系
+
+🤝 结义申请 - 查看收到的结义申请列表
+❤️ 同意结义 UID - 同意对方的结义申请
+💔 拒绝结义 UID - 拒绝对方的结义申请
+🔄 撤销结义 UID - 撤销自己发起的结义申请
 
 📊 查询 - 查看当前结义状况
 💡 帮助 - 显示此菜单
 
-【好感度提示】
-• 结义需要5000好感度
+【注意事项】
+• 2人结义申请7天未处理将自动过期
+• 被拒绝后需等待24小时才能再次申请
 • 使用【赠礼 UID 礼物名】赠送礼物增加好感度
 
 【解除关系】
@@ -132,7 +216,9 @@ async def check_sworn_status(player, uow: UnitOfWork) -> str:
         return """🤝 你的结义状况
 ━━━━━━━━━━━━━
 当前状态: 无结义关系
-💡 你可以使用【结义 UID1 UID2...】与兄弟结义
+💡 2人结义: 【结义 UID】发起申请,对方同意后成立
+💡 多人结义: 【结义 UID1 UID2...】所有人在场立即成立
+🤝 使用【结义申请】查看收到的申请
 """
 
     # 获取所有结义兄弟

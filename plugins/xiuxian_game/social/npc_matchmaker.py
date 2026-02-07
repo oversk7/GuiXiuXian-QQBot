@@ -52,18 +52,92 @@ async def handle_matchmaker_interaction(
     elif dialogue_content in ["查询", "状况", "婚姻状况"]:
         return await check_marriage_status(player, uow)
 
-    # 结婚
-    elif dialogue_content.startswith("结婚 "):
+    # ==================== 新：求婚申请流程 ====================
+
+    # 求婚 - 发起求婚申请
+    elif dialogue_content.startswith("求婚 "):
         try:
             target_uid = int(dialogue_content.split()[1])
-            success, message = await service.establish_marriage(player.id, target_uid)
+            success, message = await service.submit_marriage_proposal(player.id, target_uid)
 
             if success:
                 await uow.commit()
 
             return message
         except (ValueError, IndexError):
-            return "⛔ 格式错误，正确格式：结婚 UID\n示例：结婚 123"
+            return "⛔ 格式错误，正确格式：求婚 UID\n示例：求婚 123"
+
+    # 求婚申请 - 查看收到的求婚申请
+    elif dialogue_content in ["求婚申请", "申请列表"]:
+        proposals = await service.get_marriage_proposals(player.id)
+
+        if not proposals:
+            return "💌 当前没有收到求婚申请"
+
+        lines = ["💌 收到的求婚申请", "━━━━━━━━━━━━━"]
+        for i, prop in enumerate(proposals, 1):
+            time_str = prop["request_time"].strftime("%m月%d日 %H:%M")
+            lines.append(f"{i}. 【{prop['proposer_name']}】(UID: {prop['proposer_uid']})")
+            lines.append(f"   申请时间: {time_str}")
+            lines.append(f"   ❤️ 同意求婚 {prop['proposer_uid']}")
+            lines.append(f"   💔 拒绝求婚 {prop['proposer_uid']}")
+            lines.append("")
+
+        lines.append("━━━━━━━━━━━━━")
+        lines.append("💡 使用【同意求婚 UID】或【拒绝求婚 UID】处理申请")
+
+        return "\n".join(lines)
+
+    # 同意求婚
+    elif dialogue_content.startswith("同意求婚 ") or dialogue_content.startswith("同意 "):
+        try:
+            parts = dialogue_content.split()
+            target_uid = int(parts[-1])  # 取最后一个参数作为UID
+
+            success, message = await service.approve_marriage_proposal(player.id, target_uid)
+
+            if success:
+                await uow.commit()
+
+            return message
+        except (ValueError, IndexError):
+            return "⛔ 格式错误，正确格式：同意求婚 UID\n示例：同意求婚 123"
+
+    # 拒绝求婚
+    elif dialogue_content.startswith("拒绝求婚 ") or dialogue_content.startswith("拒绝 "):
+        try:
+            parts = dialogue_content.split()
+            target_uid = int(parts[-1])
+
+            success, message = await service.reject_marriage_proposal(player.id, target_uid)
+
+            if success:
+                await uow.commit()
+
+            return message
+        except (ValueError, IndexError):
+            return "⛔ 格式错误，正确格式：拒绝求婚 UID\n示例：拒绝求婚 123"
+
+    # 撤销求婚
+    elif dialogue_content.startswith("撤销求婚 ") or dialogue_content.startswith("撤销 "):
+        try:
+            parts = dialogue_content.split()
+            target_uid = int(parts[-1])
+
+            success, message = await service.cancel_marriage_proposal(player.id, target_uid)
+
+            if success:
+                await uow.commit()
+
+            return message
+        except (ValueError, IndexError):
+            return "⛔ 格式错误，正确格式：撤销求婚 UID\n示例：撤销求婚 123"
+
+    # ==================== 旧：直接结婚(已弃用,保留兼容性) ====================
+
+    # 结婚 - 直接建立婚姻(已改为需要双向确认)
+    elif dialogue_content.startswith("结婚 "):
+        return "💡 现已改为求婚申请机制！\n请使用【求婚 UID】向对方发起求婚申请\n对方同意后即可结为夫妻"
 
     # 离婚
     elif dialogue_content in ["离婚", "解除婚姻"]:
@@ -83,19 +157,25 @@ def get_matchmaker_menu() -> str:
     """获取月老菜单"""
     return """💒 月老的红线姻缘
 ━━━━━━━━━━━━━
-我是月老，掌管天下姻缘。有情人终成眷属，只需你们心意相通。
+我是月老，掌管天下姻缘。有情人终成眷属，需双方同意方可成婚。
 
 【功能列表】
-💕 结婚 UID - 与心爱的人结为夫妻
+💕 求婚 UID - 向心爱的人发起求婚申请
   • 需要双方好感度达到5000
-  • 双方必须在上京(0,0)
-  • 建立后成为夫妻关系
+  • 双方必须在同一地点
+  • 对方同意后才能成为夫妻
+
+💌 求婚申请 - 查看收到的求婚申请列表
+❤️ 同意求婚 UID - 同意对方的求婚申请
+💔 拒绝求婚 UID - 拒绝对方的求婚申请
+🔄 撤销求婚 UID - 撤销自己发起的求婚申请
 
 📊 查询 - 查看当前婚姻状况
 💡 帮助 - 显示此菜单
 
-【好感度提示】
-• 结婚需要5000好感度
+【注意事项】
+• 求婚申请7天未处理将自动过期
+• 被拒绝后需等待24小时才能再次申请
 • 使用【赠礼 UID 礼物名】赠送礼物增加好感度
 
 【解除关系】
@@ -126,7 +206,8 @@ async def check_marriage_status(player: Player, uow: UnitOfWork) -> str:
         return """💕 你的婚姻状况
 ━━━━━━━━━━━━━
 当前状态: 单身
-💡 你可以使用【结婚 UID】与心爱的人结为夫妻
+💡 你可以使用【求婚 UID】向心爱的人发起求婚申请
+💌 使用【求婚申请】查看收到的申请
 """
 
     # 获取配偶信息

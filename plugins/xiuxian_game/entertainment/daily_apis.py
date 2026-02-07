@@ -1,6 +1,6 @@
 """
 日常API娱乐功能模块
-包含摸鱼日历、摸鱼日报、抽签等功能
+包含抽签、每日一言、吃掉头像、答案之书、驾考题目、微博热搜等功能
 """
 import requests
 from nonebot import on_command
@@ -565,6 +565,98 @@ async def handle_driving_test(event: MessageEvent, args: Message = CommandArg())
         await driving_test.finish(message_add_head("❌ 数据解析失败", event))
 
 
+# 微博热搜功能
+weibo_hot = on_command("微博热搜", aliases={"热搜", "微博", "热榜"}, block=True, priority=5)
+
+@weibo_hot.handle()
+async def handle_weibo_hot(event: MessageEvent):
+    """获取微博热搜榜"""
+    user_id = event.get_user_id()
+
+    # 检查频率限制
+    allowed, error_msg = check_action_limit(user_id, "daily_api")
+    if not allowed:
+        await weibo_hot.finish(error_msg)
+
+    try:
+        # 检查玩家是否存在
+        async with safe_session() as session:
+            player = await session.get(Player, user_id)
+            if not player:
+                await weibo_hot.finish("您还没有创建角色,请先注册。")
+
+        # 发送等待提示
+        await weibo_hot.send(message_add_head("📱 正在获取微博热搜榜...", event))
+
+        # 请求微博热搜API
+        api_url = "https://v2.xxapi.cn/api/weibohot"
+        headers = {
+            'User-Agent': 'xiaoxiaoapi/1.0.0'
+        }
+
+        response = requests.get(api_url, headers=headers, timeout=15)
+
+        if response.status_code != 200:
+            await weibo_hot.finish(message_add_head(f"❌ API请求失败,状态码: {response.status_code}", event))
+
+        # 解析JSON响应
+        data = response.json()
+        logger.info(f"微博热搜API响应数据条数: {len(data.get('data', []))}")
+
+        if data.get("code") != 200:
+            error_msg = data.get("msg", "未知错误")
+            await weibo_hot.finish(message_add_head(f"❌ API返回错误: {error_msg}", event))
+
+        # 提取热搜数据
+        hot_list = data.get("data")
+        if not hot_list:
+            await weibo_hot.finish(message_add_head("❌ API未返回热搜数据", event))
+
+        # 记录操作
+        record_action(user_id, "daily_api")
+
+        # 构建消息内容 - 显示前20条热搜
+        msg_content = (
+            "🔥 微博热搜榜 TOP20\n"
+            "━━━━━━━━━━━━━\n"
+        )
+
+        # 只显示前20条
+        display_count = min(20, len(hot_list))
+        for i in range(display_count):
+            item = hot_list[i]
+            index = item.get("index", i + 1)
+            title = item.get("title", "未知")
+            hot = item.get("hot", "")
+
+            # 为前三名添加特殊标记
+            if index == 1:
+                prefix = "🥇"
+            elif index == 2:
+                prefix = "🥈"
+            elif index == 3:
+                prefix = "🥉"
+            else:
+                prefix = f"{index}."
+
+            msg_content += f"{prefix} {title}"
+            if hot:
+                msg_content += f" ({hot})"
+            msg_content += "\n"
+
+        msg_content += (
+            "━━━━━━━━━━━━━\n"
+            "💡 数据来源: 微博热搜榜"
+        )
+
+        await weibo_hot.finish(message_add_head(msg_content, event))
+
+    except requests.RequestException as e:
+        logger.error(f"微博热搜API请求失败: {e}")
+        await weibo_hot.finish(message_add_head("❌ 网络请求失败,请稍后再试", event))
+    except json.JSONDecodeError as e:
+        logger.error(f"微博热搜JSON解析失败: {e}")
+        await weibo_hot.finish(message_add_head("❌ 数据解析失败", event))
 
 
 

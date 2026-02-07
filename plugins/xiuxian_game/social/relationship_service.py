@@ -495,6 +495,292 @@ class RelationshipService:
         else:
             return False, "关系记录不存在"
 
+    # ==================== 婚姻申请方法 ====================
+
+    # 婚姻申请配置常量
+    MARRIAGE_REQUEST_EXPIRE_DAYS = 7  # 申请7天未处理自动过期
+    MARRIAGE_REQUEST_REJECT_COOLDOWN_HOURS = 24  # 被拒绝后24小时内不能再次申请
+
+    async def submit_marriage_proposal(
+        self,
+        proposer_id: str,
+        target_uid: int
+    ) -> Tuple[bool, str]:
+        """
+        发起求婚申请
+
+        Args:
+            proposer_id: 求婚者ID
+            target_uid: 对方UID
+
+        Returns:
+            (是否成功, 消息)
+        """
+        from datetime import timedelta
+
+        # 获取求婚者和对方
+        proposer = await self._player_repo.get_by_id(proposer_id)
+        target = await self._player_repo.get_by_uid(target_uid)
+
+        if not proposer:
+            return False, "玩家不存在"
+        if not target:
+            return False, f"未找到UID为{target_uid}的玩家"
+        if proposer.id == target.id:
+            return False, "不能向自己求婚"
+
+        # 检查是否可以建立婚姻关系
+        can, msg = await self.can_establish_relationship(
+            proposer_id, target_uid, RelationshipType.MARRIAGE
+        )
+        if not can:
+            return False, msg
+
+        # 获取或创建关系记录
+        relationship = await self._relationship_repo.get_or_create_relationship(
+            proposer.id, target.id
+        )
+
+        # 检查是否已有待处理的申请
+        if relationship.marriage_request_status == "pending":
+            # 检查是谁发起的申请
+            if relationship.marriage_proposer_id == proposer_id:
+                return False, f"你已经向【{target.nickname}】发起过求婚申请，请等待对方处理"
+            else:
+                return False, f"【{target.nickname}】已向你发起求婚申请，请先处理该申请"
+
+        # 检查被拒绝后的冷却期
+        if relationship.marriage_reject_time:
+            cooldown_end = relationship.marriage_reject_time + timedelta(hours=self.MARRIAGE_REQUEST_REJECT_COOLDOWN_HOURS)
+            if datetime.now() < cooldown_end:
+                remaining_hours = (cooldown_end - datetime.now()).total_seconds() / 3600
+                return False, f"求婚被拒绝后需要等待24小时才能再次申请，剩余{remaining_hours:.1f}小时"
+
+        # 创建申请
+        relationship.marriage_request_status = "pending"
+        relationship.marriage_request_time = datetime.now()
+        relationship.marriage_reject_time = None
+        relationship.marriage_proposer_id = proposer.id
+
+        return True, (
+            f"✅ 已向【{target.nickname}】(UID: {target.uid})发起求婚申请！\n"
+            f"━━━━━━━━━━━━━\n"
+            f"对方可通过【交互 月老 求婚申请】查看\n"
+            f"申请将在7天后自动过期"
+        )
+
+    async def get_marriage_proposals(
+        self,
+        player_id: str
+    ) -> List[dict]:
+        """
+        查询收到的求婚申请列表
+
+        Args:
+            player_id: 玩家ID
+
+        Returns:
+            申请列表
+        """
+        from datetime import timedelta
+
+        # 查询所有与该玩家相关的待处理求婚申请
+        stmt = select(PlayerRelationship).where(
+            and_(
+                PlayerRelationship.marriage_request_status == "pending",
+                PlayerRelationship.marriage_proposer_id != player_id,  # 不是自己发起的
+                # 该玩家是关系的一方
+                (PlayerRelationship.player_id == player_id) | (PlayerRelationship.target_id == player_id)
+            )
+        )
+        result = await self._uow.session.execute(stmt)
+        relationships = result.scalars().all()
+
+        proposals = []
+        for rel in relationships:
+            # 检查申请是否过期
+            if rel.marriage_request_time:
+                expire_time = rel.marriage_request_time + timedelta(days=self.MARRIAGE_REQUEST_EXPIRE_DAYS)
+                if datetime.now() > expire_time:
+                    # 过期了，清除申请状态（保留申请时间作为历史记录）
+                    rel.marriage_request_status = None
+                    # rel.marriage_request_time 保留不清空
+                    rel.marriage_proposer_id = None
+                    continue
+
+            # 获取求婚者信息
+            proposer = await self._player_repo.get_by_id(rel.marriage_proposer_id)
+            if proposer:
+                proposals.append({
+                    "proposer_uid": proposer.uid,
+                    "proposer_name": proposer.nickname,
+                    "request_time": rel.marriage_request_time
+                })
+
+        return proposals
+
+    async def approve_marriage_proposal(
+        self,
+        responder_id: str,
+        proposer_uid: int
+    ) -> Tuple[bool, str]:
+        """
+        同意求婚申请
+
+        Args:
+            responder_id: 被求婚者ID
+            proposer_uid: 求婚者UID
+
+        Returns:
+            (是否成功, 消息)
+        """
+        from datetime import timedelta
+
+        # 获取双方
+        responder = await self._player_repo.get_by_id(responder_id)
+        proposer = await self._player_repo.get_by_uid(proposer_uid)
+
+        if not responder:
+            return False, "玩家不存在"
+        if not proposer:
+            return False, f"未找到UID为{proposer_uid}的玩家"
+
+        # 查找关系记录
+        relationship = await self._relationship_repo.get_or_create_relationship(
+            responder.id, proposer.id
+        )
+
+        # 检查申请状态
+        if relationship.marriage_request_status != "pending":
+            return False, f"【{proposer.nickname}】没有向你发起求婚申请"
+
+        if relationship.marriage_proposer_id != proposer.id:
+            return False, f"该求婚申请不是【{proposer.nickname}】发起的"
+
+        # 检查申请是否过期
+        if relationship.marriage_request_time:
+            expire_time = relationship.marriage_request_time + timedelta(days=self.MARRIAGE_REQUEST_EXPIRE_DAYS)
+            if datetime.now() > expire_time:
+                # 过期了，清除申请状态（保留申请时间作为历史记录）
+                relationship.marriage_request_status = None
+                # relationship.marriage_request_time 保留不清空
+                relationship.marriage_proposer_id = None
+                return False, "申请已过期"
+
+        # 再次检查是否可以建立婚姻关系（可能状态已变化）
+        can, msg = await self.can_establish_relationship(
+            responder_id, proposer_uid, RelationshipType.MARRIAGE
+        )
+        if not can:
+            # 清除申请状态（保留申请时间作为历史记录）
+            relationship.marriage_request_status = None
+            # relationship.marriage_request_time 保留不清空
+            relationship.marriage_proposer_id = None
+            return False, f"无法建立婚姻关系：{msg}"
+
+        # 建立婚姻关系
+        relationship.relationship_type = RelationshipType.MARRIAGE.value
+        relationship.established_at = datetime.now()
+
+        # 清除申请状态（保留申请时间作为历史记录）
+        relationship.marriage_request_status = None
+        # relationship.marriage_request_time 保留不清空
+        relationship.marriage_proposer_id = None
+        relationship.marriage_reject_time = None
+
+        return True, (
+            f"🎉 恭喜！你与【{proposer.nickname}】喜结连理，成为夫妻！\n"
+            f"━━━━━━━━━━━━━\n"
+            f"愿你们白头偕老，永结同心！"
+        )
+
+    async def reject_marriage_proposal(
+        self,
+        responder_id: str,
+        proposer_uid: int
+    ) -> Tuple[bool, str]:
+        """
+        拒绝求婚申请
+
+        Args:
+            responder_id: 被求婚者ID
+            proposer_uid: 求婚者UID
+
+        Returns:
+            (是否成功, 消息)
+        """
+        # 获取双方
+        responder = await self._player_repo.get_by_id(responder_id)
+        proposer = await self._player_repo.get_by_uid(proposer_uid)
+
+        if not responder:
+            return False, "玩家不存在"
+        if not proposer:
+            return False, f"未找到UID为{proposer_uid}的玩家"
+
+        # 查找关系记录
+        relationship = await self._relationship_repo.get_or_create_relationship(
+            responder.id, proposer.id
+        )
+
+        # 检查申请状态
+        if relationship.marriage_request_status != "pending":
+            return False, f"【{proposer.nickname}】没有向你发起求婚申请"
+
+        if relationship.marriage_proposer_id != proposer.id:
+            return False, f"该求婚申请不是【{proposer.nickname}】发起的"
+
+        # 拒绝申请（保留申请时间作为历史记录）
+        relationship.marriage_request_status = None
+        # relationship.marriage_request_time 保留不清空
+        relationship.marriage_proposer_id = None
+        relationship.marriage_reject_time = datetime.now()
+
+        return True, f"已拒绝【{proposer.nickname}】的求婚申请"
+
+    async def cancel_marriage_proposal(
+        self,
+        proposer_id: str,
+        target_uid: int
+    ) -> Tuple[bool, str]:
+        """
+        撤销求婚申请
+
+        Args:
+            proposer_id: 求婚者ID
+            target_uid: 对方UID
+
+        Returns:
+            (是否成功, 消息)
+        """
+        # 获取双方
+        proposer = await self._player_repo.get_by_id(proposer_id)
+        target = await self._player_repo.get_by_uid(target_uid)
+
+        if not proposer:
+            return False, "玩家不存在"
+        if not target:
+            return False, f"未找到UID为{target_uid}的玩家"
+
+        # 查找关系记录
+        relationship = await self._relationship_repo.get_or_create_relationship(
+            proposer.id, target.id
+        )
+
+        # 检查申请状态
+        if relationship.marriage_request_status != "pending":
+            return False, f"你没有向【{target.nickname}】发起求婚申请"
+
+        if relationship.marriage_proposer_id != proposer_id:
+            return False, f"该求婚申请不是你发起的"
+
+        # 撤销申请（保留申请时间作为历史记录）
+        relationship.marriage_request_status = None
+        # relationship.marriage_request_time 保留不清空
+        relationship.marriage_proposer_id = None
+
+        return True, f"已撤销向【{target.nickname}】的求婚申请"
+
     async def establish_sworn(
         self,
         player_id: str,
@@ -563,6 +849,293 @@ class RelationshipService:
 
         names_str = "、".join(player_names)
         return True, f"恭喜！{names_str}在上京城结为异姓兄弟，从此有福同享，有难同当！"
+
+    # ==================== 结义申请方法(2人) ====================
+
+    # 结义申请配置常量
+    SWORN_REQUEST_EXPIRE_DAYS = 7  # 申请7天未处理自动过期
+    SWORN_REQUEST_REJECT_COOLDOWN_HOURS = 24  # 被拒绝后24小时内不能再次申请
+
+    async def submit_sworn_proposal(
+        self,
+        proposer_id: str,
+        target_uid: int
+    ) -> Tuple[bool, str]:
+        """
+        发起结义申请(仅支持2人结义)
+
+        Args:
+            proposer_id: 发起者ID
+            target_uid: 对方UID
+
+        Returns:
+            (是否成功, 消息)
+        """
+        from datetime import timedelta
+
+        # 获取发起者和对方
+        proposer = await self._player_repo.get_by_id(proposer_id)
+        target = await self._player_repo.get_by_uid(target_uid)
+
+        if not proposer:
+            return False, "玩家不存在"
+        if not target:
+            return False, f"未找到UID为{target_uid}的玩家"
+        if proposer.id == target.id:
+            return False, "不能与自己结义"
+
+        # 检查是否可以建立结义关系
+        can, msg = await self.can_establish_relationship(
+            proposer_id, target_uid, RelationshipType.SWORN
+        )
+        if not can:
+            return False, msg
+
+        # 获取或创建关系记录
+        relationship = await self._relationship_repo.get_or_create_relationship(
+            proposer.id, target.id
+        )
+
+        # 检查是否已有待处理的申请
+        if relationship.sworn_request_status == "pending":
+            # 检查是谁发起的申请
+            if relationship.sworn_proposer_id == proposer_id:
+                return False, f"你已经向【{target.nickname}】发起过结义申请，请等待对方处理"
+            else:
+                return False, f"【{target.nickname}】已向你发起结义申请，请先处理该申请"
+
+        # 检查被拒绝后的冷却期
+        if relationship.sworn_reject_time:
+            cooldown_end = relationship.sworn_reject_time + timedelta(hours=self.SWORN_REQUEST_REJECT_COOLDOWN_HOURS)
+            if datetime.now() < cooldown_end:
+                remaining_hours = (cooldown_end - datetime.now()).total_seconds() / 3600
+                return False, f"结义被拒绝后需要等待24小时才能再次申请，剩余{remaining_hours:.1f}小时"
+
+        # 创建申请
+        relationship.sworn_request_status = "pending"
+        relationship.sworn_request_time = datetime.now()
+        relationship.sworn_reject_time = None
+        relationship.sworn_proposer_id = proposer.id
+
+        return True, (
+            f"✅ 已向【{target.nickname}】(UID: {target.uid})发起结义申请！\n"
+            f"━━━━━━━━━━━━━\n"
+            f"对方可通过【交互 结义使者 结义申请】查看\n"
+            f"申请将在7天后自动过期\n"
+            f"💡 提示: 3-4人结义仍需所有人在场使用【结义 UID1 UID2...】"
+        )
+
+    async def get_sworn_proposals(
+        self,
+        player_id: str
+    ) -> List[dict]:
+        """
+        查询收到的结义申请列表
+
+        Args:
+            player_id: 玩家ID
+
+        Returns:
+            申请列表
+        """
+        from datetime import timedelta
+
+        # 查询所有与该玩家相关的待处理结义申请
+        stmt = select(PlayerRelationship).where(
+            and_(
+                PlayerRelationship.sworn_request_status == "pending",
+                PlayerRelationship.sworn_proposer_id != player_id,  # 不是自己发起的
+                # 该玩家是关系的一方
+                (PlayerRelationship.player_id == player_id) | (PlayerRelationship.target_id == player_id)
+            )
+        )
+        result = await self._uow.session.execute(stmt)
+        relationships = result.scalars().all()
+
+        proposals = []
+        for rel in relationships:
+            # 检查申请是否过期
+            if rel.sworn_request_time:
+                expire_time = rel.sworn_request_time + timedelta(days=self.SWORN_REQUEST_EXPIRE_DAYS)
+                if datetime.now() > expire_time:
+                    # 过期了，清除申请状态（保留申请时间作为历史记录）
+                    rel.sworn_request_status = None
+                    # rel.sworn_request_time 保留不清空
+                    rel.sworn_proposer_id = None
+                    continue
+
+            # 获取发起者信息
+            proposer = await self._player_repo.get_by_id(rel.sworn_proposer_id)
+            if proposer:
+                proposals.append({
+                    "proposer_uid": proposer.uid,
+                    "proposer_name": proposer.nickname,
+                    "request_time": rel.sworn_request_time
+                })
+
+        return proposals
+
+    async def approve_sworn_proposal(
+        self,
+        responder_id: str,
+        proposer_uid: int
+    ) -> Tuple[bool, str]:
+        """
+        同意结义申请
+
+        Args:
+            responder_id: 被邀请者ID
+            proposer_uid: 发起者UID
+
+        Returns:
+            (是否成功, 消息)
+        """
+        from datetime import timedelta
+
+        # 获取双方
+        responder = await self._player_repo.get_by_id(responder_id)
+        proposer = await self._player_repo.get_by_uid(proposer_uid)
+
+        if not responder:
+            return False, "玩家不存在"
+        if not proposer:
+            return False, f"未找到UID为{proposer_uid}的玩家"
+
+        # 查找关系记录
+        relationship = await self._relationship_repo.get_or_create_relationship(
+            responder.id, proposer.id
+        )
+
+        # 检查申请状态
+        if relationship.sworn_request_status != "pending":
+            return False, f"【{proposer.nickname}】没有向你发起结义申请"
+
+        if relationship.sworn_proposer_id != proposer.id:
+            return False, f"该结义申请不是【{proposer.nickname}】发起的"
+
+        # 检查申请是否过期
+        if relationship.sworn_request_time:
+            expire_time = relationship.sworn_request_time + timedelta(days=self.SWORN_REQUEST_EXPIRE_DAYS)
+            if datetime.now() > expire_time:
+                # 过期了，清除申请状态（保留申请时间作为历史记录）
+                relationship.sworn_request_status = None
+                # relationship.sworn_request_time 保留不清空
+                relationship.sworn_proposer_id = None
+                return False, "申请已过期"
+
+        # 再次检查是否可以建立结义关系（可能状态已变化）
+        can, msg = await self.can_establish_relationship(
+            responder_id, proposer_uid, RelationshipType.SWORN
+        )
+        if not can:
+            # 清除申请状态（保留申请时间作为历史记录）
+            relationship.sworn_request_status = None
+            # relationship.sworn_request_time 保留不清空
+            relationship.sworn_proposer_id = None
+            return False, f"无法建立结义关系：{msg}"
+
+        # 建立结义关系
+        relationship.relationship_type = RelationshipType.SWORN.value
+        relationship.established_at = datetime.now()
+
+        # 清除申请状态（保留申请时间作为历史记录）
+        relationship.sworn_request_status = None
+        # relationship.sworn_request_time 保留不清空
+        relationship.sworn_proposer_id = None
+        relationship.sworn_reject_time = None
+
+        return True, (
+            f"🎉 恭喜！你与【{proposer.nickname}】结为异姓兄弟！\n"
+            f"━━━━━━━━━━━━━\n"
+            f"有福同享，有难同当！江湖义气永存！"
+        )
+
+    async def reject_sworn_proposal(
+        self,
+        responder_id: str,
+        proposer_uid: int
+    ) -> Tuple[bool, str]:
+        """
+        拒绝结义申请
+
+        Args:
+            responder_id: 被邀请者ID
+            proposer_uid: 发起者UID
+
+        Returns:
+            (是否成功, 消息)
+        """
+        # 获取双方
+        responder = await self._player_repo.get_by_id(responder_id)
+        proposer = await self._player_repo.get_by_uid(proposer_uid)
+
+        if not responder:
+            return False, "玩家不存在"
+        if not proposer:
+            return False, f"未找到UID为{proposer_uid}的玩家"
+
+        # 查找关系记录
+        relationship = await self._relationship_repo.get_or_create_relationship(
+            responder.id, proposer.id
+        )
+
+        # 检查申请状态
+        if relationship.sworn_request_status != "pending":
+            return False, f"【{proposer.nickname}】没有向你发起结义申请"
+
+        if relationship.sworn_proposer_id != proposer.id:
+            return False, f"该结义申请不是【{proposer.nickname}】发起的"
+
+        # 拒绝申请（保留申请时间作为历史记录）
+        relationship.sworn_request_status = None
+        # relationship.sworn_request_time 保留不清空
+        relationship.sworn_proposer_id = None
+        relationship.sworn_reject_time = datetime.now()
+
+        return True, f"已拒绝【{proposer.nickname}】的结义申请"
+
+    async def cancel_sworn_proposal(
+        self,
+        proposer_id: str,
+        target_uid: int
+    ) -> Tuple[bool, str]:
+        """
+        撤销结义申请
+
+        Args:
+            proposer_id: 发起者ID
+            target_uid: 对方UID
+
+        Returns:
+            (是否成功, 消息)
+        """
+        # 获取双方
+        proposer = await self._player_repo.get_by_id(proposer_id)
+        target = await self._player_repo.get_by_uid(target_uid)
+
+        if not proposer:
+            return False, "玩家不存在"
+        if not target:
+            return False, f"未找到UID为{target_uid}的玩家"
+
+        # 查找关系记录
+        relationship = await self._relationship_repo.get_or_create_relationship(
+            proposer.id, target.id
+        )
+
+        # 检查申请状态
+        if relationship.sworn_request_status != "pending":
+            return False, f"你没有向【{target.nickname}】发起结义申请"
+
+        if relationship.sworn_proposer_id != proposer_id:
+            return False, f"该结义申请不是你发起的"
+
+        # 撤销申请（保留申请时间作为历史记录）
+        relationship.sworn_request_status = None
+        # relationship.sworn_request_time 保留不清空
+        relationship.sworn_proposer_id = None
+
+        return True, f"已撤销向【{target.nickname}】的结义申请"
 
     async def establish_mentorship(
         self,
