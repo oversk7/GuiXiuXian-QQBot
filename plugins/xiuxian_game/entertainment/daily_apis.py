@@ -336,53 +336,116 @@ daily_quote = on_command("每日一言", aliases={"一言", "名言"}, block=Tru
 async def handle_daily_quote(event: MessageEvent):
     """获取每日一言"""
     user_id = event.get_user_id()
-    
+
     # 检查频率限制
     allowed, error_msg = check_action_limit(user_id, "daily_api")
     if not allowed:
         await daily_quote.finish(error_msg)
-    
+
     try:
         # 检查玩家是否存在
         async with safe_session() as session:
             player = await session.get(Player, user_id)
             if not player:
-                await daily_quote.finish("您还没有创建角色，请先注册。")
-        
+                await daily_quote.finish("您还没有创建角色,请先注册。")
+
         # 请求一言API
         response = requests.get("https://v1.hitokoto.cn/", timeout=10)
-        
+
         if response.status_code == 200:
             data = response.json()
-            
+
             # 记录操作
             record_action(user_id, "daily_api")
-            
+
             # 解析数据
             content = data.get("hitokoto", "获取失败")
             author = data.get("from_who", "")
             source = data.get("from", "")
-            
+
             # 构建回复消息
             msg_content = "✨ 每日一言\n"
             msg_content += "=" * 15 + "\n"
             msg_content += f"💭 {content}\n\n"
-            
+
             if author and source:
                 msg_content += f"📖 —— {author}《{source}》"
             elif source:
                 msg_content += f"📖 —— 《{source}》"
             elif author:
                 msg_content += f"📖 —— {author}"
-            
+
             await daily_quote.finish(message_add_head(msg_content, event))
         else:
-            await daily_quote.finish("❌ 每日一言获取失败，请稍后再试")
-            
+            await daily_quote.finish("❌ 每日一言获取失败,请稍后再试")
+
     except requests.RequestException:
-        await daily_quote.finish("❌ 网络请求失败，请检查网络连接")
+        await daily_quote.finish("❌ 网络请求失败,请检查网络连接")
     except json.JSONDecodeError:
         await daily_quote.finish("❌ 数据解析失败")
+
+
+# 吃掉头像功能
+bite_avatar = on_command("吃掉", block=True, priority=5)
+
+@bite_avatar.handle()
+async def handle_bite_avatar(event: MessageEvent, args: Message = CommandArg()):
+    """吃掉某人的头像生成GIF动图"""
+    user_id = event.get_user_id()
+
+    # 检查频率限制
+    allowed, error_msg = check_action_limit(user_id, "daily_api")
+    if not allowed:
+        await bite_avatar.finish(error_msg)
+
+    try:
+        # 获取目标QQ号
+        target_qq = args.extract_plain_text().strip()
+
+        if not target_qq:
+            await bite_avatar.finish("❌ 请输入QQ号,例如:【吃掉 2595557847】")
+
+        # 验证QQ号格式
+        if not target_qq.isdigit():
+            await bite_avatar.finish("❌ QQ号必须是纯数字")
+
+        # 检查玩家是否存在
+        async with safe_session() as session:
+            player = await session.get(Player, user_id)
+            if not player:
+                await bite_avatar.finish("您还没有创建角色,请先注册。")
+
+        # 发送等待提示
+        await bite_avatar.send(message_add_head(f"🍽️ 正在准备吃掉 {target_qq} 的头像,请稍候...", event))
+
+        # 请求API生成GIF
+        api_url = f"https://v2.xxapi.cn/api/bite?qq={target_qq}"
+        headers = {
+            'User-Agent': 'xiaoxiaoapi/1.0.0'
+        }
+
+        response = requests.get(api_url, headers=headers, timeout=15)
+
+        if response.status_code == 200:
+            # 记录操作
+            record_action(user_id, "daily_api")
+
+            # 将图片转为base64
+            gif_b64 = base64.b64encode(response.content).decode("utf-8")
+            gif_img = MessageSegment.file_image(gif_b64)
+
+            # 发送GIF图片
+            msg = Message(f"🍽️ 成功吃掉了 {target_qq} 的头像!").append(gif_img)
+            await bite_avatar.finish(message_add_head(msg, event))
+        else:
+            await bite_avatar.finish(message_add_head(f"❌ 生成失败,API返回状态码: {response.status_code}", event))
+
+    except requests.RequestException as e:
+        logger.error(f"吃掉头像API请求失败: {e}")
+        await bite_avatar.finish(message_add_head("❌ 网络请求失败,请稍后再试", event))
+    except Exception as e:
+        logger.error(f"吃掉头像功能异常: {e}")
+        await bite_avatar.finish(message_add_head("❌ 处理失败,请稍后再试", event))
 
 
 
