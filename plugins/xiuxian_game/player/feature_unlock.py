@@ -78,7 +78,7 @@ def get_feature_unlock_message(new_level: int, old_level: int = None) -> Optiona
 
     Args:
         new_level: 当前等级
-        old_level: 突破前等级(可选),用于判断是否跨区间
+        old_level: 突破前等级(可选), 用于判断是否跨区间
 
     Returns:
         功能解锁提示消息,如果没有跨区间则返回None
