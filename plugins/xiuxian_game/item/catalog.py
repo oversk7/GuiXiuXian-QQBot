@@ -547,17 +547,20 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
 
         desc = "\r".join(desc_parts)
 
-        # 根据物品类型定制快捷操作提示
-        type_hints = {
-            "FISH": "快捷操作: 钓鱼 | 鱼栏 | 钓鱼记录 | 钓鱼排行 | 钓鱼图鉴 | 背包 | 帮助",
-            "MATERIAL": "快捷操作: 背包 | 背包 材料 | 锻造列表 | 市集 | 帮助",
-            "EQUIPMENT": "快捷操作: 装备栏 | 装备详情 | 锻造列表 | 升阶列表 | 背包 | 帮助",
-            "CONSUMABLE": "快捷操作: 背包 | 背包 消耗品 | 使用 | 一键嗑药 | 帮助",
-            "GEM": "快捷操作: 背包 | 背包 宝石 | 镶嵌物品 | 孔位 | 帮助",
-            "GIFT": "快捷操作: 背包 | 背包 礼物 | 赠送 | 社交系统 | 帮助",
-            "GOODS": "快捷操作: 背包 | 背包 商品 | 市集 | 帮助"
+        # 根据物品类型定制快捷操作按钮（4个）
+        type_buttons = {
+            "FISH": ["钓鱼", "鱼栏", "钓鱼记录", "钓鱼排行"],
+            "MATERIAL": ["背包", "锻造列表", "市集", "帮助"],
+            "EQUIPMENT": ["装备栏", "锻造列表", "升阶列表", "背包"],
+            "CONSUMABLE": ["背包", "使用", "一键嗑药", "帮助"],
+            "GEM": ["背包", "镶嵌物品", "孔位", "帮助"],
+            "GIFT": ["背包", "赠送", "社交系统", "帮助"],
+            "GOODS": ["背包", "市集", "帮助", "图鉴"]
         }
-        hint = type_hints.get(cfg.type.value, "快捷操作: 背包 | 图鉴 | 帮助")
+        buttons = type_buttons.get(cfg.type.value, ["背包", "图鉴", "帮助", "面板"])
+
+        # 提示信息（简化版，因为按钮已经独立出来）
+        hint = "💡 点击下方按钮快速操作"
 
         # 根据物品类型定制标题图标
         type_icons = {
@@ -583,18 +586,22 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
             # 其他类型物品获取图片实际尺寸并等比缩放（带缓存）
             width, height = await _get_image_dimensions_with_cache(cfg.item_id, item_image_url)
 
-        # 构建Markdown模板参数
+        # 构建Markdown模板参数（使用带按钮的图鉴类模版）
         template_params = [
             MessageMarkdownParams(key="title", values=[f"{icon} {cfg.name}"]),
             MessageMarkdownParams(key="desc", values=[desc]),
             MessageMarkdownParams(key="imgurl", values=[item_image_url]),
             MessageMarkdownParams(key="width", values=[width]),
             MessageMarkdownParams(key="height", values=[height]),
-            MessageMarkdownParams(key="hint", values=[hint])
+            MessageMarkdownParams(key="hint", values=[hint]),
+            MessageMarkdownParams(key="t1", values=[buttons[0]]),
+            MessageMarkdownParams(key="t2", values=[buttons[1]]),
+            MessageMarkdownParams(key="t3", values=[buttons[2]]),
+            MessageMarkdownParams(key="t4", values=[buttons[3]])
         ]
 
         markdown = MessageMarkdown(
-            custom_template_id="102499345_1769178984",
+            custom_template_id="102499345_1769693953",
             params=template_params
         )
 

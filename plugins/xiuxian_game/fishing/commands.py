@@ -130,26 +130,36 @@ async def _(event: MessageEvent):
             width, height = 100, 100
 
         # 提示信息（灰色）
-        hint = f"🎣 继续钓鱼需等待 {FishingService.FISHING_COOLDOWN} 分钟\r☞【鱼栏】【钓鱼记录】【钓鱼排行】"
+        hint = f"🎣 继续钓鱼需等待 {FishingService.FISHING_COOLDOWN} 分钟"
+
+        # 快捷操作按钮（4个）
+        btn1 = "鱼栏"
+        btn2 = "钓鱼记录"
+        btn3 = "钓鱼排行"
+        btn4 = "钓鱼图鉴"
 
         # 清理所有参数中的\n换行符，确保只使用\r
         title = title.replace('\n', '\r')
         desc = desc.replace('\n', '\r')
         hint = hint.replace('\n', '\r')
 
-        # 构建模版参数
+        # 构建模版参数（使用带按钮的图鉴类模版）
         template_params = [
             MessageMarkdownParams(key="title", values=[title]),
             MessageMarkdownParams(key="desc", values=[desc]),
             MessageMarkdownParams(key="width", values=[str(width)]),
             MessageMarkdownParams(key="height", values=[str(height)]),
             MessageMarkdownParams(key="imgurl", values=[fish_image_url]),
-            MessageMarkdownParams(key="hint", values=[hint])
+            MessageMarkdownParams(key="hint", values=[hint]),
+            MessageMarkdownParams(key="t1", values=[btn1]),
+            MessageMarkdownParams(key="t2", values=[btn2]),
+            MessageMarkdownParams(key="t3", values=[btn3]),
+            MessageMarkdownParams(key="t4", values=[btn4])
         ]
 
-        # 使用图鉴类Markdown模版
+        # 使用带按钮的图鉴类Markdown模版
         markdown_msg = MessageMarkdown(
-            custom_template_id="102499345_1769178984",
+            custom_template_id="102499345_1769693953",
             params=template_params
         )
 

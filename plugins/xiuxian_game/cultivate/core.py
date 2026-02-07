@@ -442,7 +442,13 @@ async def handle_seclusion(event: MessageEvent):
         avatar_url = f"https://thirdqq.qlogo.cn/qqapp/102499345/{user_id}/0"
 
         # 快捷操作提示
-        hint = "快捷操作: 出关 | 面板 | 背包 | 战力 | 阴宅 | 签到 | 市集 | 帮助"
+        hint = "💡 点击下方按钮快速操作"
+
+        # 快捷操作按钮（4个）
+        btn1 = "出关"
+        btn2 = "面板"
+        btn3 = "背包"
+        btn4 = "战力"
 
         template_params = [
             MessageMarkdownParams(key="title", values=[title]),
@@ -450,11 +456,15 @@ async def handle_seclusion(event: MessageEvent):
             MessageMarkdownParams(key="imgurl", values=[avatar_url]),
             MessageMarkdownParams(key="width", values=["100"]),
             MessageMarkdownParams(key="height", values=["100"]),
-            MessageMarkdownParams(key="hint", values=[hint])
+            MessageMarkdownParams(key="hint", values=[hint]),
+            MessageMarkdownParams(key="t1", values=[btn1]),
+            MessageMarkdownParams(key="t2", values=[btn2]),
+            MessageMarkdownParams(key="t3", values=[btn3]),
+            MessageMarkdownParams(key="t4", values=[btn4])
         ]
 
         markdown = MessageMarkdown(
-            custom_template_id="102499345_1769178984",
+            custom_template_id="102499345_1769693953",
             params=template_params
         )
 
@@ -649,7 +659,13 @@ async def handle_out_seclusion(event: MessageEvent):
         avatar_url = f"https://thirdqq.qlogo.cn/qqapp/102499345/{user_id}/0"
 
         # 快捷操作提示
-        hint = "快捷操作: 修炼 | 突破 | 面板 | 背包 | 战力 | 闭关 | 签到 | 帮助"
+        hint = "💡 点击下方按钮快速操作"
+
+        # 快捷操作按钮（4个）
+        btn1 = "修炼"
+        btn2 = "突破"
+        btn3 = "面板"
+        btn4 = "闭关"
 
         template_params = [
             MessageMarkdownParams(key="title", values=[title]),
@@ -657,11 +673,15 @@ async def handle_out_seclusion(event: MessageEvent):
             MessageMarkdownParams(key="imgurl", values=[avatar_url]),
             MessageMarkdownParams(key="width", values=["100"]),
             MessageMarkdownParams(key="height", values=["100"]),
-            MessageMarkdownParams(key="hint", values=[hint])
+            MessageMarkdownParams(key="hint", values=[hint]),
+            MessageMarkdownParams(key="t1", values=[btn1]),
+            MessageMarkdownParams(key="t2", values=[btn2]),
+            MessageMarkdownParams(key="t3", values=[btn3]),
+            MessageMarkdownParams(key="t4", values=[btn4])
         ]
 
         markdown = MessageMarkdown(
-            custom_template_id="102499345_1769178984",
+            custom_template_id="102499345_1769693953",
             params=template_params
         )
 
