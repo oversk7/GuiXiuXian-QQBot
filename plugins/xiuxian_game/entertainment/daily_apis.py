@@ -17,316 +17,168 @@ import re
 logger = logging.getLogger(__name__)
 
 
-def _format_fortune_result(fortune_text: str, draw_time: str, question: str = "") -> str:
-    """
-    格式化抽签结果，提供专业的排版
-    """
-    # 解析签文内容
-    parts = _parse_fortune_text(fortune_text)
-
-    # 构建消息头部
-    msg_lines = [
-        "🔮✨ 抽签占卜 ✨🔮",
-        "━━━━━━━━━━━━━",
-    ]
-
-    # 添加问题（如果有）
-    if question:
-        msg_lines.extend([
-            f"🤔 所问之事：{question}",
-            "━━━━━━━━━━━━━",
-            ""
-        ])
-
-    # 添加卦象信息
-    if parts.get("gua_name"):
-        msg_lines.extend([
-            f"📿 卦象：{parts['gua_name']}",
-            f"🔸 符号：{parts.get('level', '未知')}",
-            ""
-        ])
-
-    # 添加签诗
-    if parts.get("poem"):
-        msg_lines.extend([
-            "📜 签诗：",
-            f"   {parts['poem']}",
-            ""
-        ])
-
-    # 添加演义（在解签前面）
-    if parts.get("interpretation"):
-        msg_lines.extend([
-            "💭 演义：",
-            f"   {parts['interpretation']}",
-            ""
-        ])
-
-    # 添加解释
-    if parts.get("explanation"):
-        msg_lines.extend([
-            "🔍 解签：",
-            f"   {parts['explanation']}",
-            ""
-        ])
-
-    # 添加时间和提示
-    msg_lines.extend([
-        "━━━━━━━━━━━━━",
-        f"⏰ {draw_time}",
-        "",
-        "💡 签文仅供娱乐参考，切勿过分迷信",
-        "━━━━━━━━━━━━━"
-    ])
-
-    return "\n".join(msg_lines)
-
-
-def _parse_fortune_text(text: str) -> dict:
-    """
-    解析签文内容，提取各个部分
-    """
-    result = {}
-
-    # 提取卦名和等级
-    gua_match = re.search(r'※\s*([^◎]+)', text)
-    if gua_match:
-        result["gua_name"] = gua_match.group(1).strip()
-
-    # 提取等级符号，直接显示原文符号
-    level_match = re.search(r'◎+', text)
-    if level_match:
-        level_symbols = level_match.group()
-        result["level"] = level_symbols
-
-    # 提取签诗（四句诗）
-    # 先找到◎符号后的内容，然后提取四句诗
-    poem_start = text.find('◎')
-    if poem_start != -1:
-        # 从◎符号后开始查找诗句
-        poem_section = text[poem_start:]
-        # 匹配四句诗的模式：每句以，结尾，最后一句以。结尾
-        poem_match = re.search(r'◎+\s*([^演]+?)(?=演：)', poem_section)
-        if poem_match:
-            poem_raw = poem_match.group(1).strip()
-            # 按标点符号分割并格式化
-            sentences = re.split(r'[，。]', poem_raw)
-            # 过滤空字符串并重新组合
-            sentences = [s.strip() for s in sentences if s.strip()]
-            if len(sentences) >= 4:
-                result["poem"] = f"{sentences[0]}，\n   {sentences[1]}，\n   {sentences[2]}，\n   {sentences[3]}。"
-
-    # 提取演义部分（去掉其中的解签内容）
-    interpretation_match = re.search(r'演：(.+?)(?:\(解签：|$)', text)
-    if interpretation_match:
-        interpretation_text = interpretation_match.group(1).strip()
-        # 去掉演义末尾可能存在的解签引用
-        interpretation_text = re.sub(r'[（(]解签[：:].*?[）)]', '', interpretation_text).strip()
-        result["interpretation"] = interpretation_text
-
-    # 提取解签部分 - 处理括号内的解签
-    explanation_match = re.search(r'\(解签：(.+?)\)', text)
-    if explanation_match:
-        explanation_text = explanation_match.group(1).strip()
-        # 如果解签内容很长，可以考虑分段显示
-        result["explanation"] = explanation_text
-    else:
-        # 如果没有括号格式，尝试查找其他解签格式
-        explanation_match2 = re.search(r'解签[：:](.+?)(?:\(|$|。)', text)
-        if explanation_match2:
-            result["explanation"] = explanation_match2.group(1).strip()
-
-    return result
-
-
-# 摸鱼日历（合并日历和日报）
-moyu_calendar = on_command("摸鱼日历", aliases={"摸鱼", "日历", "摸鱼日报", "日报"}, block=True, priority=5)
-
-async def _get_moyu_calendar_from_backup() -> tuple[bool, str]:
-    """
-    从备用源获取摸鱼日历
-    返回: (成功标志, base64图片数据或错误信息)
-    """
-    try:
-        headers = {
-            'Content-Type': 'application/x-www-form-urlencoded;charset:utf-8;'
-        }
-        api_url = "https://www.52api.cn/api/moyu"
-        params = {
-            'key': '3VgDmAiNNGpjLRvjhvmLMTDGxk'
-        }
-
-        logger.info(f"请求备用源: {api_url} with params: {params}")
-        response = requests.get(api_url, params=params, headers=headers, timeout=15)
-
-        logger.info(f"备用源响应状态: {response.status_code}")
-        logger.info(f"备用源响应Content-Type: {response.headers.get('content-type', 'unknown')}")
-
-        if response.status_code == 200:
-            # 检查Content-Type，如果是图片则直接处理
-            content_type = response.headers.get('content-type', '').lower()
-
-            if 'image/' in content_type:
-                # 直接返回图片的base64编码
-                logger.info("备用源直接返回图片数据")
-                if response.content:
-                    calendar_b64 = base64.b64encode(response.content).decode("utf-8")
-                    return True, calendar_b64
-                else:
-                    return False, "备用源返回空图片数据"
-
-            elif 'application/json' in content_type:
-                # 如果是JSON格式，按原逻辑处理
-                try:
-                    data = response.json()
-                    logger.info(f"备用源JSON解析成功: {data}")
-
-                    if data.get("code") == 200:
-                        # 备用API返回的是图片URL，需要再次请求获取图片
-                        image_url = data.get("data")
-                        if image_url:
-                            logger.info(f"获取到图片URL: {image_url}")
-                            img_response = requests.get(image_url, timeout=15)
-                            if img_response.status_code == 200:
-                                calendar_b64 = base64.b64encode(img_response.content).decode("utf-8")
-                                return True, calendar_b64
-                            else:
-                                return False, f"备用源图片下载失败: {img_response.status_code}"
-                        else:
-                            return False, "备用源未返回图片URL"
-                    else:
-                        return False, f"备用源API错误: {data.get('msg', '未知错误')}"
-                except json.JSONDecodeError as e:
-                    logger.error(f"备用源JSON解析失败: {e}")
-                    return False, f"备用源数据解析失败: {str(e)}"
-
-            else:
-                # 未知的Content-Type
-                logger.warning(f"备用源返回未知Content-Type: {content_type}")
-                return False, f"备用源返回未知格式: {content_type}"
-        else:
-            return False, f"备用源请求失败: {response.status_code}"
-
-    except requests.RequestException as e:
-        logger.error(f"备用源网络请求异常: {e}")
-        return False, f"备用源网络请求失败: {str(e)}"
-
-
-@moyu_calendar.handle()
-async def handle_moyu_calendar(event: MessageEvent):
-    """获取摸鱼日历和日报图片"""
-    user_id = event.get_user_id()
-
-    # 检查频率限制
-    allowed, error_msg = check_action_limit(user_id, "daily_api")
-    if not allowed:
-        await moyu_calendar.finish(error_msg)
-    await moyu_calendar.send("📅 正在获取摸鱼日历与日报，请耐心等待10s...")
-    try:
-        # 记录操作
-        record_action(user_id, "daily_api")
-
-        messages = []
-
-        # 获取日历图片 - 主源 + 备用源
-        calendar_success = False
-        try:
-            # 尝试主源
-            response = requests.get("https://www.yviii.com/moyu/moyu.php", timeout=15)
-            if response.status_code == 200:
-                calendar_b64 = base64.b64encode(response.content).decode("utf-8")
-                calendar_img = MessageSegment.file_image(calendar_b64)
-                messages.append(Message("📅 今日摸鱼日历来啦！").append(calendar_img))
-                calendar_success = True
-            else:
-                logger.warning(f"主源摸鱼日历获取失败: {response.status_code}")
-        except requests.RequestException as e:
-            logger.warning(f"主源摸鱼日历网络请求失败: {e}")
-
-        # 如果主源失败，尝试备用源
-        if not calendar_success:
-            logger.info("尝试使用备用源获取摸鱼日历")
-            backup_success, backup_result = await _get_moyu_calendar_from_backup()
-            if backup_success:
-                calendar_img = MessageSegment.file_image(backup_result)
-                messages.append(Message("📅 今日摸鱼日历来啦！").append(calendar_img))
-                calendar_success = True
-            else:
-                logger.error(f"备用源摸鱼日历获取失败: {backup_result}")
-                messages.append(Message("❌ 摸鱼日历获取失败"))
-
-        # 获取日报图片 - 仅主源
-        try:
-            response = requests.get("https://www.yviii.com/moyu/moyu2.php", timeout=10)
-            if response.status_code == 200:
-                daily_b64 = base64.b64encode(response.content).decode("utf-8")
-                daily_img = MessageSegment.file_image(daily_b64)
-                messages.append(Message("📰 今日摸鱼日报新鲜出炉！").append(daily_img))
-            else:
-                messages.append(Message("❌ 摸鱼日报获取失败"))
-        except requests.RequestException:
-            messages.append(Message("❌ 摸鱼日报网络请求失败"))
-
-        # 发送所有消息
-        if messages:
-            for msg in messages:
-                await moyu_calendar.send(msg)
-            await moyu_calendar.finish()
-        else:
-            await moyu_calendar.finish("❌ 摸鱼内容获取失败，请稍后再试")
-
-    except ValueError as e:
-        logger.error(f"摸鱼功能处理失败: {e}")
-        await moyu_calendar.finish("❌ 处理失败，请稍后再试")
-
-
-# 抽签功能
-draw_fortune = on_command("抽签", aliases={"求签", "占卜"}, block=True, priority=5)
+# 观音灵签抽签功能
+draw_fortune = on_command("抽签", aliases={"求签", "占卜", "灵签"}, block=True, priority=5)
 
 @draw_fortune.handle()
 async def handle_draw_fortune(event: MessageEvent, args: Message = CommandArg()):
-    """抽签占卜功能"""
+    """观音灵签抽签功能"""
     user_id = event.get_user_id()
-    
+
     # 检查频率限制
     allowed, error_msg = check_action_limit(user_id, "fortune")
     if not allowed:
         await draw_fortune.finish(error_msg)
-    
+
     try:
         # 获取用户输入的问题（可选）
         question = args.extract_plain_text().strip()
-        
-        # 请求抽签API
-        api_key = "***REMOVED***"
-        api_url = f"https://api.t1qq.com/api/tool/cg?key={api_key}"
 
-        response = requests.get(api_url, timeout=10)
+        # 检查玩家是否存在
+        async with safe_session() as session:
+            player = await session.get(Player, user_id)
+            if not player:
+                await draw_fortune.finish("您还没有创建角色,请先注册。")
 
-        if response.status_code == 200:
-            data = response.json()
-
-            if data.get("code") == 200:
-                # 记录操作
-                record_action(user_id, "fortune")
-
-                # 解析返回数据
-                fortune_text = data.get("g", "签文获取失败")
-                draw_time = data.get("time", "")
-
-                # 构建回复消息
-                msg_content = _format_fortune_result(fortune_text, draw_time, question)
-
-                await draw_fortune.finish(message_add_head(msg_content, event))
-            else:
-                await draw_fortune.finish("❌ 抽签失败：" + data.get("msg", "未知错误"))
+        # 发送等待提示
+        if question:
+            await draw_fortune.send(message_add_head(f"🙏 正在为你抽取观音灵签,寻找「{question}」的答案...", event))
         else:
-            await draw_fortune.finish("❌ 抽签服务暂时不可用，请稍后再试")
-            
-    except requests.RequestException:
-        await draw_fortune.finish("❌ 网络请求失败，请检查网络连接")
-    except json.JSONDecodeError:
-        await draw_fortune.finish("❌ 抽签数据解析失败")
+            await draw_fortune.send(message_add_head("🙏 正在为你抽取观音灵签...", event))
+
+        # 请求观音灵签API
+        api_url = "https://v2.xxapi.cn/api/guanyinrandom"
+        headers = {
+            'User-Agent': 'xiaoxiaoapi/1.0.0'
+        }
+
+        response = requests.get(api_url, headers=headers, timeout=15)
+
+        if response.status_code != 200:
+            await draw_fortune.finish(message_add_head(f"❌ API请求失败,状态码: {response.status_code}", event))
+
+        # 解析JSON响应
+        data = response.json()
+        logger.info(f"观音灵签API响应: {data}")
+
+        if data.get("code") != 200:
+            error_msg = data.get("msg", "未知错误")
+            await draw_fortune.finish(message_add_head(f"❌ API返回错误: {error_msg}", event))
+
+        # 提取签文数据
+        sign_data = data.get("data")
+        if not sign_data:
+            await draw_fortune.finish(message_add_head("❌ API未返回签文数据", event))
+
+        # 记录操作
+        record_action(user_id, "fortune")
+
+        # 提取签文信息
+        name = sign_data.get("name", "未知")
+        fortune = sign_data.get("fortune", "")
+        palace = sign_data.get("palace", "")
+        poem_v1 = sign_data.get("poem_version_1", "")
+        poem_v2 = sign_data.get("poem_version_2", "")
+        meaning = sign_data.get("meaning", "")
+        explanation = sign_data.get("explanation", "")
+        image_url = sign_data.get("image", "")
+
+        # 格式化签诗（使用版本1）
+        poem_lines = []
+        if poem_v1:
+            # 将签诗按空格分割成四句
+            verses = poem_v1.split()
+            for verse in verses[:4]:  # 最多取4句
+                poem_lines.append(verse)
+
+        # 构建描述文本（用于Markdown模版）
+        desc_parts = []
+
+        # 添加问题
+        if question:
+            desc_parts.append(f"🤔 所问之事: {question}")
+            desc_parts.append("")
+
+        # 添加签运和宫位
+        if fortune or palace:
+            info_line = "🔮 "
+            if fortune:
+                info_line += f"{fortune}"
+            if palace:
+                info_line += f" · {palace}"
+            desc_parts.append(info_line)
+            desc_parts.append("")
+
+        # 添加签诗
+        if poem_lines:
+            desc_parts.append("📜 签诗:")
+            for line in poem_lines:
+                desc_parts.append(f"   {line}")
+            desc_parts.append("")
+
+        # 添加卦象
+        if meaning:
+            desc_parts.append(f"💭 卦象: {meaning}")
+            desc_parts.append("")
+
+        # 添加解签
+        if explanation:
+            desc_parts.append(f"🔍 解签: {explanation}")
+            desc_parts.append("")
+
+        desc_parts.append("💡 签文仅供娱乐参考,切勿过分迷信")
+
+        # 使用\r换行符（Markdown模版要求）
+        desc = "\r".join(desc_parts)
+
+        # 如果没有图片URL，使用默认图片
+        if not image_url:
+            image_url = "https://cdn.xxhzm.cn/api/guanyin/default.gif"
+
+        # 构建图鉴模版消息
+        title = f"🙏 观音灵签 · {name}"
+        hint = "💡 点击下方按钮快速操作"
+
+        # 快捷操作按钮
+        btn1 = "抽签"
+        btn2 = "娱乐系统"
+        btn3 = "面板"
+        btn4 = "帮助"
+
+        # 导入MessageMarkdown
+        from nonebot.adapters.qq.models.common import MessageMarkdown, MessageMarkdownParams
+
+        # 构建模版参数
+        template_params = [
+            MessageMarkdownParams(key="title", values=[title]),
+            MessageMarkdownParams(key="desc", values=[desc]),
+            MessageMarkdownParams(key="imgurl", values=[image_url]),
+            MessageMarkdownParams(key="width", values=["300"]),
+            MessageMarkdownParams(key="height", values=["300"]),
+            MessageMarkdownParams(key="hint", values=[hint]),
+            MessageMarkdownParams(key="t1", values=[btn1]),
+            MessageMarkdownParams(key="t2", values=[btn2]),
+            MessageMarkdownParams(key="t3", values=[btn3]),
+            MessageMarkdownParams(key="t4", values=[btn4])
+        ]
+
+        # 使用图鉴类Markdown模版
+        markdown_msg = MessageMarkdown(
+            custom_template_id="102499345_1769693953",
+            params=template_params
+        )
+
+        await draw_fortune.finish(MessageSegment.markdown(markdown_msg))
+
+    except requests.RequestException as e:
+        logger.error(f"观音灵签API请求失败: {e}")
+        await draw_fortune.finish(message_add_head("❌ 网络请求失败,请稍后再试", event))
+    except json.JSONDecodeError as e:
+        logger.error(f"观音灵签JSON解析失败: {e}")
+        await draw_fortune.finish(message_add_head("❌ 数据解析失败", event))
+    except Exception as e:
+        logger.error(f"观音灵签功能异常: {e}")
+        await draw_fortune.finish(message_add_head("❌ 处理失败,请稍后再试", event))
 
 
 # 每日一言
@@ -487,6 +339,237 @@ async def handle_bite_avatar(event: MessageEvent, args: Message = CommandArg()):
     )
 
     await bite_avatar.finish(MessageSegment.markdown(markdown_msg))
+
+
+# 答案之书功能
+answer_book = on_command("答案之书", aliases={"答案", "问答之书"}, block=True, priority=5)
+
+@answer_book.handle()
+async def handle_answer_book(event: MessageEvent, args: Message = CommandArg()):
+    """答案之书 - 向宇宙提问获得指引"""
+    user_id = event.get_user_id()
+
+    # 检查频率限制
+    allowed, error_msg = check_action_limit(user_id, "fortune")
+    if not allowed:
+        await answer_book.finish(error_msg)
+
+    try:
+        # 获取用户的问题
+        question = args.extract_plain_text().strip()
+
+        if not question:
+            await answer_book.finish("❌ 请输入你的问题,例如:【答案之书 我该继续吗】")
+
+        # 检查玩家是否存在
+        async with safe_session() as session:
+            player = await session.get(Player, user_id)
+            if not player:
+                await answer_book.finish("您还没有创建角色,请先注册。")
+
+        # 发送等待提示
+        await answer_book.send(message_add_head(f"📖 正在翻阅答案之书,寻找关于「{question}」的答案...", event))
+
+        # 请求API
+        api_url = f"https://v2.xxapi.cn/api/answers"
+        headers = {
+            'User-Agent': 'xiaoxiaoapi/1.0.0'
+        }
+        params = {
+            'question': question
+        }
+
+        response = requests.get(api_url, headers=headers, params=params, timeout=15)
+
+        if response.status_code != 200:
+            await answer_book.finish(message_add_head(f"❌ API请求失败,状态码: {response.status_code}", event))
+
+        # 解析JSON响应
+        data = response.json()
+        logger.info(f"答案之书API响应: {data}")
+
+        if data.get("code") != 200:
+            error_msg = data.get("msg", "未知错误")
+            await answer_book.finish(message_add_head(f"❌ API返回错误: {error_msg}", event))
+
+        # 提取答案数据
+        answer_data = data.get("data")
+        if not answer_data:
+            await answer_book.finish(message_add_head("❌ API未返回答案数据", event))
+
+        # 记录操作
+        record_action(user_id, "fortune")
+
+        # 提取中文标题和描述
+        title_zh = answer_data.get("title_zh", "未知")
+        desc_zh = answer_data.get("description_zh", "")
+        title_en = answer_data.get("title_en", "")
+        desc_en = answer_data.get("description_en", "")
+
+        # 构建消息内容
+        msg_content = (
+            "📖✨ 答案之书 ✨📖\n"
+            "━━━━━━━━━━━━━\n"
+            f"🤔 你的问题: {question}\n"
+            "━━━━━━━━━━━━━\n\n"
+            f"💡 答案: {title_zh}\n\n"
+            f"📝 指引: {desc_zh}\n"
+        )
+
+        # 如果有英文内容,也显示出来
+        if title_en:
+            msg_content += f"\n🌍 {title_en}\n"
+        if desc_en:
+            msg_content += f"   {desc_en}\n"
+
+        msg_content += (
+            "\n━━━━━━━━━━━━━\n"
+            "💭 答案仅供参考,人生由你掌控\n"
+            "━━━━━━━━━━━━━"
+        )
+
+        await answer_book.finish(message_add_head(msg_content, event))
+
+    except requests.RequestException as e:
+        logger.error(f"答案之书API请求失败: {e}")
+        await answer_book.finish(message_add_head("❌ 网络请求失败,请稍后再试", event))
+    except json.JSONDecodeError as e:
+        logger.error(f"答案之书JSON解析失败: {e}")
+        await answer_book.finish(message_add_head("❌ 数据解析失败", event))
+    except Exception as e:
+        logger.error(f"答案之书功能异常: {e}")
+        await answer_book.finish(message_add_head("❌ 处理失败,请稍后再试", event))
+
+
+# 驾考题目功能
+driving_test = on_command("驾考题目", aliases={"驾考", "科目一", "科目四"}, block=True, priority=5)
+
+@driving_test.handle()
+async def handle_driving_test(event: MessageEvent, args: Message = CommandArg()):
+    """随机驾考题目"""
+    user_id = event.get_user_id()
+
+    # 检查频率限制
+    allowed, error_msg = check_action_limit(user_id, "daily_api")
+    if not allowed:
+        await driving_test.finish(error_msg)
+
+    try:
+        # 获取用户输入的科目（可选）
+        subject_text = args.extract_plain_text().strip()
+
+        # 默认科目1
+        subject = "1"
+        subject_name = "科目一"
+
+        # 解析科目参数
+        if subject_text:
+            if "1" in subject_text or "一" in subject_text:
+                subject = "1"
+                subject_name = "科目一"
+            elif "2" in subject_text or "二" in subject_text:
+                subject = "2"
+                subject_name = "科目二"
+            elif "3" in subject_text or "三" in subject_text:
+                subject = "3"
+                subject_name = "科目三"
+            elif "4" in subject_text or "四" in subject_text:
+                subject = "4"
+                subject_name = "科目四"
+
+        # 检查玩家是否存在
+        async with safe_session() as session:
+            player = await session.get(Player, user_id)
+            if not player:
+                await driving_test.finish("您还没有创建角色,请先注册。")
+
+        # 发送等待提示
+        await driving_test.send(message_add_head(f"🚗 正在获取{subject_name}随机题目...", event))
+
+        # 请求驾考API
+        api_url = f"https://v2.xxapi.cn/api/jiakao?subject={subject}"
+        headers = {
+            'User-Agent': 'xiaoxiaoapi/1.0.0'
+        }
+
+        response = requests.get(api_url, headers=headers, timeout=15)
+
+        if response.status_code != 200:
+            await driving_test.finish(message_add_head(f"❌ API请求失败,状态码: {response.status_code}", event))
+
+        # 解析JSON响应
+        data = response.json()
+        logger.info(f"驾考题目API响应: {data}")
+
+        if data.get("code") != 200:
+            error_msg = data.get("msg", "未知错误")
+            await driving_test.finish(message_add_head(f"❌ API返回错误: {error_msg}", event))
+
+        # 提取题目数据
+        question_data = data.get("data")
+        if not question_data:
+            await driving_test.finish(message_add_head("❌ API未返回题目数据", event))
+
+        # 记录操作
+        record_action(user_id, "daily_api")
+
+        # 提取题目信息
+        question = question_data.get("question", "")
+        answer = question_data.get("answer", "")
+        chapter = question_data.get("chapter", "")
+        explain = question_data.get("explain", "")
+        option1 = question_data.get("option1", "")
+        option2 = question_data.get("option2", "")
+        option3 = question_data.get("option3", "")
+        option4 = question_data.get("option4", "")
+        q_type = question_data.get("type", "")
+
+        # 构建消息内容
+        msg_content = (
+            f"🚗 驾考题目 · {subject_name}\n"
+            "━━━━━━━━━━━━━\n"
+            f"📚 章节: {chapter}\n"
+            f"📝 适用: {q_type}\n"
+            "━━━━━━━━━━━━━\n\n"
+            f"❓ 题目:\n{question}\n\n"
+        )
+
+        # 添加选项
+        options = []
+        if option1:
+            options.append(option1)
+        if option2:
+            options.append(option2)
+        if option3:
+            options.append(option3)
+        if option4:
+            options.append(option4)
+
+        if options:
+            msg_content += "选项:\n"
+            for opt in options:
+                msg_content += f"  {opt}\n"
+            msg_content += "\n"
+
+        # 添加答案和解释
+        msg_content += (
+            f"✅ 正确答案: {answer}\n\n"
+            f"💡 解释:\n{explain}\n"
+            "━━━━━━━━━━━━━\n"
+            "📖 题目来源: 公安部题库"
+        )
+
+        await driving_test.finish(message_add_head(msg_content, event))
+
+    except requests.RequestException as e:
+        logger.error(f"驾考题目API请求失败: {e}")
+        await driving_test.finish(message_add_head("❌ 网络请求失败,请稍后再试", event))
+    except json.JSONDecodeError as e:
+        logger.error(f"驾考题目JSON解析失败: {e}")
+        await driving_test.finish(message_add_head("❌ 数据解析失败", event))
+    except Exception as e:
+        logger.error(f"驾考题目功能异常: {e}")
+        await driving_test.finish(message_add_head("❌ 处理失败,请稍后再试", event))
 
 
 
