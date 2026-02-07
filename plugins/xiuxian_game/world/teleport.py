@@ -478,7 +478,7 @@ async def _handle_reality_rest(session, player: Player, event: MessageEvent, cmd
     effective_attrs = await player.get_effective_attributes(session)
     player.hp = effective_attrs.get('max_hp', player.max_hp)
     player.mp = effective_attrs.get('max_mp', player.max_mp)
-    player.stamina = effective_attrs.get('max_stamina', player.max_stamina)
+    # stamina 是固定属性（咒抗），不需要恢复
 
     session.add(player)
     await session.commit()
@@ -488,7 +488,7 @@ async def _handle_reality_rest(session, player: Player, event: MessageEvent, cmd
         "━━━━━━━━━━━━━",
         f"✧ 生命值：{player.hp}/{player.max_hp}",
         f"✧ 法力值：{player.mp}/{player.max_mp}",
-        f"✧ 咒抗：{player.stamina}/{player.max_stamina}",
+        f"✧ 咒抗：{player.stamina}",
         "━━━━━━━━━━━━━",
         "🧭 使用【导航 <x> <y>】开始经商",
         "🌌 使用【传送 N层诡域】进入诡域探索",

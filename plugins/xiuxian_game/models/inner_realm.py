@@ -62,6 +62,14 @@ class InnerRealmSession(Base):
         comment="救出幸存者数量"
     )
 
+    # 理智系统
+    sanity: Mapped[int] = mapped_column(
+        Integer,
+        default=100,
+        server_default='100',
+        comment="当前理智值（0-100）"
+    )
+
     # 收集线索（JSON数组）
     clue_collected: Mapped[str] = mapped_column(
         Text,
