@@ -721,7 +721,7 @@ async def _(event: MessageEvent):
         await move_cmd.finish(message_add_head(f"{header}\n{event_desc}{auto_collect_msg}", event))
 
 # ----------------- 指令：战斗 -----------------
-explore_cmd = on_command("探索", aliases={"战斗", "收集", "休息"}, block=True, priority=5)
+explore_cmd = on_command("探索", aliases={"战斗", "收集"}, block=True, priority=5)
 
 # 事件处理器映射
 async def _handle_material(session, tile: WorldTile, player: Player) -> str:

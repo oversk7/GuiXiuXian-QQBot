@@ -93,6 +93,10 @@ class UnitOfWork:
         # 关系相关仓储
         self._player_relationships = None
 
+        # 里界系统仓储
+        self._inner_realm_sessions = None
+        self._inner_realm_tiles = None
+
     @property
     def players(self):
         """玩家仓储"""
@@ -284,6 +288,22 @@ class UnitOfWork:
             from ..repositories.player_relationship_repository import PlayerRelationshipRepository
             self._player_relationships = PlayerRelationshipRepository(self._session)
         return self._player_relationships
+
+    @property
+    def inner_realm_sessions(self):
+        """里界会话仓储"""
+        if self._inner_realm_sessions is None:
+            from ..repositories.inner_realm_session_repository import InnerRealmSessionRepository
+            self._inner_realm_sessions = InnerRealmSessionRepository(self._session)
+        return self._inner_realm_sessions
+
+    @property
+    def inner_realm_tiles(self):
+        """里界地块仓储"""
+        if self._inner_realm_tiles is None:
+            from ..repositories.inner_realm_tile_repository import InnerRealmTileRepository
+            self._inner_realm_tiles = InnerRealmTileRepository(self._session)
+        return self._inner_realm_tiles
 
     @property
     def session(self) -> AsyncSession:

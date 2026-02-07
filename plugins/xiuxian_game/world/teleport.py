@@ -26,6 +26,7 @@ revive_cmd = on_command("返回", aliases={"复活"}, block=True, priority=5)
 # 层级切换指令
 prev_level_cmd = on_command("上一层", aliases={"上层"}, block=True, priority=5)
 next_level_cmd = on_command("下一层", aliases={"下层"}, block=True, priority=5)
+rest_cmd = on_command("休息", block=True, priority=5)
 
 
 async def get_tile_description(session, player: Player, region: str, x: int, y: int) -> str:
@@ -277,7 +278,10 @@ async def handle_revive(event: MessageEvent):
         player = await get_unified_player(session, event)
         if not player:
             await revive_cmd.finish("⛔ 请先创建角色")
-        
+
+        if not player.is_in_dungeon():
+            await revive_cmd.finish("⛔ 你已经在现实世界了，无法使用返回指令\n💡 请使用【休息】指令恢复状态")
+
         # 记录返回前的位置信息
         was_in_dungeon = player.is_in_dungeon()
         dungeon_level = player.dungeon_level if was_in_dungeon else 0
@@ -425,3 +429,69 @@ async def handle_next_level(event: MessageEvent):
 
         msg = "\n".join(msg_lines)
         await next_level_cmd.finish(message_add_head(msg, event))
+
+
+@rest_cmd.handle()
+async def handle_rest(event: MessageEvent):
+    async with safe_session() as session:
+        player = await get_unified_player(session, event)
+        if not player:
+            await rest_cmd.finish("⛔ 请先创建角色")
+
+        if player.is_in_dungeon():
+            await _handle_dungeon_rest(session, player, event, rest_cmd)
+        else:
+            await _handle_reality_rest(session, player, event, rest_cmd)
+
+
+async def _handle_dungeon_rest(session, player: Player, event: MessageEvent, cmd_handler):
+    from .dungeon_battle import get_or_create_tile
+
+    region_name = f"{player.dungeon_level}层诡域"
+    tile = await get_or_create_tile(session, region_name, player.dungeon_x, player.dungeon_y)
+
+    if tile.event_type != "REST":
+        msg_lines = [
+            "⛔ 这里不是驿站，无法休息",
+            "━━━━━━━━━━━━━",
+            "🌫️ 你需要找到【驿站】格子才能休息恢复生命",
+            "🧭 使用【上下左右】移动探索",
+        ]
+        msg = "\n".join(msg_lines)
+        await cmd_handler.finish(message_add_head(msg, event))
+
+    player.hp = player.max_hp
+    session.add(player)
+    await session.commit()
+
+    msg_lines = [
+        "🌫️ 你在驿站休息了一晚，恢复了体力，生命值已满。",
+        "━━━━━━━━━━━━━",
+        f"✧ 生命值：{player.hp}/{player.max_hp}",
+        "🧭 继续探索诡域吧！",
+    ]
+    msg = "\n".join(msg_lines)
+    await cmd_handler.finish(message_add_head(msg, event))
+
+
+async def _handle_reality_rest(session, player: Player, event: MessageEvent, cmd_handler):
+    effective_attrs = await player.get_effective_attributes(session)
+    player.hp = effective_attrs.get('max_hp', player.max_hp)
+    player.mp = effective_attrs.get('max_mp', player.max_mp)
+    player.stamina = effective_attrs.get('max_stamina', player.max_stamina)
+
+    session.add(player)
+    await session.commit()
+
+    msg_lines = [
+        "💤 你在现实世界好好休息了一觉，精力充沛。",
+        "━━━━━━━━━━━━━",
+        f"✧ 生命值：{player.hp}/{player.max_hp}",
+        f"✧ 法力值：{player.mp}/{player.max_mp}",
+        f"✧ 咒抗：{player.stamina}/{player.max_stamina}",
+        "━━━━━━━━━━━━━",
+        "🧭 使用【导航 <x> <y>】开始经商",
+        "🌌 使用【传送 N层诡域】进入诡域探索",
+    ]
+    msg = "\n".join(msg_lines)
+    await cmd_handler.finish(message_add_head(msg, event))

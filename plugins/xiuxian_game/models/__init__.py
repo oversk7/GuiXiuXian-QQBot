@@ -47,6 +47,8 @@ from .vip_equipment_bonus import VIPEquipmentBonus
 # 账号所有权系统模型
 from .account_ownership import AccountOwnership
 from .account_transfer_log import AccountTransferLog
+# 里界系统模型
+from .inner_realm import InnerRealmSession, InnerRealmTile
 
 
 __all__ = [
@@ -64,5 +66,6 @@ __all__ = [
     "TemporaryBuff", "FishingRecord", "FishingStats",
     "Lottery", "LotteryParticipant", "LotteryType", "LotteryStatus",
     "PvpLog", "VIPEquipmentBonus",
-    "AccountOwnership", "AccountTransferLog"
+    "AccountOwnership", "AccountTransferLog",
+    "InnerRealmSession", "InnerRealmTile"
 ]
