@@ -4,6 +4,7 @@
 from nonebot import on_command
 from nonebot.adapters.qq import MessageEvent, Message
 from nonebot.params import CommandArg
+from nonebot.rule import Rule
 
 from ..platform_utils import get_unified_player
 from ..infrastructure.uow.unit_of_work import UnitOfWork
@@ -12,12 +13,35 @@ from .service import InnerRealmService
 from .config import InnerRealmConfig
 import json
 
+
+# ==================== 规则定义 ====================
+async def in_inner_realm_rule(event: MessageEvent) -> bool:
+    """检查玩家是否在里界中"""
+    def session_factory():
+        return AsyncSessionLocal()
+
+    try:
+        async with UnitOfWork(session_factory) as uow:
+            player = await get_unified_player(uow.session, event)
+            return player is not None and player.inner_realm is not None
+    except Exception:
+        return False
+
+
+# ==================== 命令注册 ====================
 # 注册命令
 realms_list_cmd = on_command("里界", aliases={"里界列表"}, block=True, priority=5)
 enter_realm_cmd = on_command("传送", block=True, priority=5)
 realm_info_cmd = on_command("里界信息", block=True, priority=5)
 # 里界的返回命令优先级更高（4），在诡域返回命令（5）之前处理
-exit_realm_cmd = on_command("返回", aliases={"离开里界"}, block=True, priority=4)
+# 使用 Rule 确保只有在里界时才匹配此命令
+exit_realm_cmd = on_command(
+    "返回",
+    aliases={"离开里界"},
+    rule=in_inner_realm_rule,
+    block=True,
+    priority=4
+)
 
 
 @realms_list_cmd.handle()
@@ -214,13 +238,11 @@ async def handle_exit_realm(event: MessageEvent):
     async with UnitOfWork(session_factory) as uow:
         player = await get_unified_player(uow.session, event)
         if not player:
-            # 玩家不存在，不处理，让其他系统继续
-            return
+            await exit_realm_cmd.finish("⛔ 请先创建角色")
 
-        # 直接通过 player.inner_realm 判断
-        if not player.inner_realm:
-            # 玩家不在里界中，不处理，让诡域系统的返回命令继续处理
-            return
+        # Rule 已经保证玩家在里界中，这里无需再次检查
+        # if not player.inner_realm:
+        #     return  # 不再需要这个判断
 
         service = InnerRealmService(uow)
         realm_config = InnerRealmConfig.get_realm_config(player.inner_realm)
