@@ -2,7 +2,8 @@ from enum import Enum
 import re
 from datetime import datetime, timedelta
 
-from nonebot import on_command
+from nonebot import on_command, logger
+import requests
 from nonebot.adapters.qq import MessageEvent, Message
 from nonebot.params import CommandArg
 from sqlalchemy import and_, or_, select
@@ -56,19 +57,65 @@ delete_msg_cmd = on_command("删除留言", block=True, priority=5)
 latest_update_cmd = on_command("更新", aliases={"最近更新"}, block=True, priority=5)
 
 
+async def check_prohibited_content(text: str) -> tuple[bool, list, str, str]:
+    """
+    使用API检测违禁内容
+
+    Args:
+        text: 待检测的文本
+
+    Returns:
+        (is_prohibited, words, label_desc, sub_label_desc):
+        是否违禁, 违禁词列表, 标签描述, 子标签描述
+    """
+    if not text:
+        return False, [], "", ""
+
+    try:
+        url = f"https://api.lolimi.cn/API/wjc/api.php?msg={requests.utils.quote(text)}"
+
+        response = requests.get(url, timeout=5)
+        response.raise_for_status()
+
+        data = response.json()
+
+        # API响应格式:
+        # 正常: {"code": 200, "message": "合规", "words": [], ...}
+        # 违禁: {"code": -200, "message": "不合规", "words": [...], "labelDesc": "...", "subLabelDesc": "..."}
+        code = data.get("code", 0)
+
+        if code == -200:
+            # 检测到违禁内容
+            words = data.get("words", [])
+            label_desc = data.get("labelDesc", "")
+            sub_label_desc = data.get("subLabelDesc", "")
+            return True, words, label_desc, sub_label_desc
+        elif code == 200:
+            # 正常内容
+            return False, [], "", ""
+        else:
+            # 未知状态码
+            logger.warning(f"违禁词API返回未知状态码: {code}, 数据: {data}")
+            return False, [], "", ""
+
+    except requests.RequestException as e:
+        logger.error(f"违禁词检测API请求失败: {e}")
+        # API失败时返回False,不阻止用户发言
+        return False, [], "", ""
+    except Exception as e:
+        logger.error(f"违禁词检测出现异常: {e}")
+        return False, [], "", ""
+
+
 def filter_banned_words(content: str) -> str:
-    """过滤违禁词，将违禁词替换为 *"""
-
-    if not content:
-        return content
-
-    filtered_content = content
-    for banned_word in BANNED_WORDS:
-        pattern = re.compile(re.escape(banned_word), re.IGNORECASE)
-        if pattern.search(filtered_content):
-            replacement = "*" * len(banned_word)
-            filtered_content = pattern.sub(replacement, filtered_content)
-    return filtered_content
+    """
+    过滤违禁词,将违禁词替换为 *
+    保留此函数以兼容旧代码,但功能已改为使用API检测
+    注意: 此函数是同步的,实际检测应使用 check_prohibited_content
+    """
+    # 此函数保留仅用于向后兼容
+    # 实际使用时应该调用 check_prohibited_content
+    return content
 
 
 def clean_message_content(content: str) -> str:
@@ -320,14 +367,24 @@ async def handle_leave_msg(event: MessageEvent, args: Message = CommandArg()):
         if is_banned:
             await leave_msg_cmd.finish(f"⛔ 你已被禁言，剩余时间：{remaining_time}")
 
-        filtered_content = filter_banned_words(content)
-        if filtered_content != content:
-            await leave_msg_cmd.send(message_add_head("⚠️ 检测到敏感词汇，已自动过滤", event))
+        # 使用新API检测违禁内容
+        is_prohibited, words, label_desc, sub_label_desc = await check_prohibited_content(content)
+        if is_prohibited:
+            # 如果检测到违禁内容,直接拒绝发布
+            words_info = f"违禁词: {', '.join(words[:5])}" if words else ""  # 最多显示5个
+            label_info = f"\n类型: {label_desc}" if label_desc else ""
+            sub_label_info = f" - {sub_label_desc}" if sub_label_desc else ""
+
+            await leave_msg_cmd.finish(
+                f"⛔ 检测到违规内容,留言发布失败\n"
+                f"{words_info}{label_info}{sub_label_info}\n"
+                f"请修改后重试"
+            )
 
         msg_rec = WorldMessage(
             player_id=player.id,
             recipient_id=None,
-            content=filtered_content,
+            content=content,
             created_at=datetime.now(),
         )
         session.add(msg_rec)
@@ -395,9 +452,19 @@ async def handle_private_message(event: MessageEvent, args: Message = CommandArg
         if is_banned:
             await private_msg_cmd.finish(f"⛔ 你已被禁言，剩余时间：{remaining_time}")
 
-        filtered_content = filter_banned_words(message_body)
-        if filtered_content != message_body:
-            await private_msg_cmd.send(message_add_head("⚠️ 检测到敏感词汇，已自动过滤", event))
+        # 使用新API检测违禁内容
+        is_prohibited, words, label_desc, sub_label_desc = await check_prohibited_content(message_body)
+        if is_prohibited:
+            # 如果检测到违禁内容,直接拒绝发送
+            words_info = f"违禁词: {', '.join(words[:5])}" if words else ""  # 最多显示5个
+            label_info = f"\n类型: {label_desc}" if label_desc else ""
+            sub_label_info = f" - {sub_label_desc}" if sub_label_desc else ""
+
+            await private_msg_cmd.finish(
+                f"⛔ 检测到违规内容,私信发送失败\n"
+                f"{words_info}{label_info}{sub_label_info}\n"
+                f"请修改后重试"
+            )
 
         sender_last_check = sender.last_private_message_check
 
@@ -413,7 +480,7 @@ async def handle_private_message(event: MessageEvent, args: Message = CommandArg
         msg_rec = WorldMessage(
             player_id=sender.id,
             recipient_id=target.id,
-            content=filtered_content,
+            content=message_body,
             created_at=datetime.now(),
         )
         session.add(msg_rec)
