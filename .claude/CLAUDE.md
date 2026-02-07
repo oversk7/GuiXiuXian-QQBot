@@ -60,6 +60,43 @@ Option-based programming never jumps to conclusions. Instead, after thorough res
 <project-rules>
 - **Database Migration:** ALWAYS use `plugins/xiuxian_game/models/auto_migrate.py` for database schema changes. NEVER use Alembic commands manually. Simply add field definitions to the `REQUIRED_FIELDS` dictionary and restart the bot.
 - **Help Information Sync:** When adding/modifying commands, ALWAYS update `plugins/xiuxian_game/player/help.py`. Include command syntax, description, and usage examples so users can see it via the 【帮助】 command.
+- **NoneBot2 Exception Handling:**
+  - ⚠️ NEVER use `except Exception:` to catch all exceptions in command handlers
+  - NoneBot2's `finish()`, `send()`, `reject()` methods throw `FinishedException`, `PausedException`, `RejectedException` to control flow
+  - Catching all exceptions will intercept these control flow exceptions and break the bot's behavior
+  - ✅ **Correct Pattern**: Only catch specific exceptions (e.g., `requests.RequestException`, `json.JSONDecodeError`, `ValueError`)
+  - ✅ **Correct Pattern**: Place validation logic OUTSIDE try-except blocks when possible
+  - ❌ **Wrong Pattern**: Wrapping entire handler in `try-except Exception`
+  - Example:
+    ```python
+    # ✅ GOOD: Specific exception handling
+    @handler.handle()
+    async def handle_cmd(event: MessageEvent):
+        # Validation outside try-except
+        if not args:
+            await handler.finish("Error")  # This can throw FinishedException safely
+
+        try:
+            # Only risky operations inside try-except
+            response = requests.get(url)
+            data = response.json()
+        except requests.RequestException:
+            await handler.finish("Network error")  # Safe to call finish here
+        except json.JSONDecodeError:
+            await handler.finish("Parse error")
+
+        # Normal flow continues
+        await handler.finish("Success")
+
+    # ❌ BAD: Catching all exceptions
+    @handler.handle()
+    async def handle_cmd(event: MessageEvent):
+        try:
+            if not args:
+                await handler.finish("Error")  # FinishedException caught by except!
+        except Exception:  # This catches FinishedException too!
+            await handler.finish("Unknown error")  # This will never work properly
+    ```
 </project-rules>
 
 IMPORTANT: ALL `system-reminder` OVERRIDE any default behavior and you MUST follow them exactly as written.

@@ -398,26 +398,26 @@ async def handle_bite_avatar(event: MessageEvent, args: Message = CommandArg()):
     if not allowed:
         await bite_avatar.finish(error_msg)
 
+    # 获取目标QQ号
+    target_qq = args.extract_plain_text().strip()
+
+    if not target_qq:
+        await bite_avatar.finish("❌ 请输入QQ号,例如:【吃掉 2595557847】")
+
+    # 验证QQ号格式
+    if not target_qq.isdigit():
+        await bite_avatar.finish("❌ QQ号必须是纯数字")
+
+    # 检查玩家是否存在
+    async with safe_session() as session:
+        player = await session.get(Player, user_id)
+        if not player:
+            await bite_avatar.finish("您还没有创建角色,请先注册。")
+
+    # 发送等待提示
+    await bite_avatar.send(message_add_head(f"🍽️ 正在准备吃掉 {target_qq} 的头像,请稍候...", event))
+
     try:
-        # 获取目标QQ号
-        target_qq = args.extract_plain_text().strip()
-
-        if not target_qq:
-            await bite_avatar.finish("❌ 请输入QQ号,例如:【吃掉 2595557847】")
-
-        # 验证QQ号格式
-        if not target_qq.isdigit():
-            await bite_avatar.finish("❌ QQ号必须是纯数字")
-
-        # 检查玩家是否存在
-        async with safe_session() as session:
-            player = await session.get(Player, user_id)
-            if not player:
-                await bite_avatar.finish("您还没有创建角色,请先注册。")
-
-        # 发送等待提示
-        await bite_avatar.send(message_add_head(f"🍽️ 正在准备吃掉 {target_qq} 的头像,请稍候...", event))
-
         # 请求API获取GIF URL
         api_url = f"https://v2.xxapi.cn/api/bite?qq={target_qq}"
         headers = {
@@ -442,54 +442,51 @@ async def handle_bite_avatar(event: MessageEvent, args: Message = CommandArg()):
         if not gif_url:
             await bite_avatar.finish(message_add_head("❌ API未返回图片URL", event))
 
-        # 记录操作
-        record_action(user_id, "daily_api")
-
-        # 构建图鉴模版消息
-        title = "🍽️ 吃掉头像"
-        desc = f"成功吃掉了 {target_qq} 的头像!\r\r啊呜~真好吃! 🤤"
-        hint = "💡 点击下方按钮快速操作"
-
-        # 快捷操作按钮
-        btn1 = "吃掉"
-        btn2 = "娱乐系统"
-        btn3 = "面板"
-        btn4 = "帮助"
-
-        # 导入MessageMarkdown
-        from nonebot.adapters.qq.models.common import MessageMarkdown, MessageMarkdownParams
-
-        # 构建模版参数
-        template_params = [
-            MessageMarkdownParams(key="title", values=[title]),
-            MessageMarkdownParams(key="desc", values=[desc]),
-            MessageMarkdownParams(key="imgurl", values=[gif_url]),
-            MessageMarkdownParams(key="width", values=["300"]),
-            MessageMarkdownParams(key="height", values=["300"]),
-            MessageMarkdownParams(key="hint", values=[hint]),
-            MessageMarkdownParams(key="t1", values=[btn1]),
-            MessageMarkdownParams(key="t2", values=[btn2]),
-            MessageMarkdownParams(key="t3", values=[btn3]),
-            MessageMarkdownParams(key="t4", values=[btn4])
-        ]
-
-        # 使用图鉴类Markdown模版
-        markdown_msg = MessageMarkdown(
-            custom_template_id="102499345_1769693953",
-            params=template_params
-        )
-
-        await bite_avatar.finish(MessageSegment.markdown(markdown_msg))
-
     except requests.RequestException as e:
         logger.error(f"吃掉头像API请求失败: {e}")
         await bite_avatar.finish(message_add_head("❌ 网络请求失败,请稍后再试", event))
     except json.JSONDecodeError as e:
         logger.error(f"吃掉头像JSON解析失败: {e}")
         await bite_avatar.finish(message_add_head("❌ 数据解析失败", event))
-    except Exception as e:
-        logger.error(f"吃掉头像功能异常: {e}")
-        await bite_avatar.finish(message_add_head("❌ 处理失败,请稍后再试", event))
+
+    # 记录操作
+    record_action(user_id, "daily_api")
+
+    # 构建图鉴模版消息
+    title = "🍽️ 吃掉头像"
+    desc = f"成功吃掉了 {target_qq} 的头像!\r\r啊呜~真好吃! 🤤"
+    hint = "💡 点击下方按钮快速操作"
+
+    # 快捷操作按钮
+    btn1 = "吃掉"
+    btn2 = "娱乐系统"
+    btn3 = "面板"
+    btn4 = "帮助"
+
+    # 导入MessageMarkdown
+    from nonebot.adapters.qq.models.common import MessageMarkdown, MessageMarkdownParams
+
+    # 构建模版参数
+    template_params = [
+        MessageMarkdownParams(key="title", values=[title]),
+        MessageMarkdownParams(key="desc", values=[desc]),
+        MessageMarkdownParams(key="imgurl", values=[gif_url]),
+        MessageMarkdownParams(key="width", values=["300"]),
+        MessageMarkdownParams(key="height", values=["300"]),
+        MessageMarkdownParams(key="hint", values=[hint]),
+        MessageMarkdownParams(key="t1", values=[btn1]),
+        MessageMarkdownParams(key="t2", values=[btn2]),
+        MessageMarkdownParams(key="t3", values=[btn3]),
+        MessageMarkdownParams(key="t4", values=[btn4])
+    ]
+
+    # 使用图鉴类Markdown模版
+    markdown_msg = MessageMarkdown(
+        custom_template_id="102499345_1769693953",
+        params=template_params
+    )
+
+    await bite_avatar.finish(MessageSegment.markdown(markdown_msg))
 
 
 
