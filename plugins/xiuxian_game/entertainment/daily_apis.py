@@ -418,11 +418,32 @@ async def handle_bite_avatar(event: MessageEvent, args: Message = CommandArg()):
         # 发送等待提示
         await bite_avatar.send(message_add_head(f"🍽️ 正在准备吃掉 {target_qq} 的头像,请稍候...", event))
 
+        # 请求API获取GIF URL
+        api_url = f"https://v2.xxapi.cn/api/bite?qq={target_qq}"
+        headers = {
+            'User-Agent': 'xiaoxiaoapi/1.0.0'
+        }
+
+        response = requests.get(api_url, headers=headers, timeout=15)
+
+        if response.status_code != 200:
+            await bite_avatar.finish(message_add_head(f"❌ API请求失败,状态码: {response.status_code}", event))
+
+        # 解析JSON响应
+        data = response.json()
+        logger.info(f"吃掉头像API响应: {data}")
+
+        if data.get("code") != 200:
+            error_msg = data.get("msg", "未知错误")
+            await bite_avatar.finish(message_add_head(f"❌ API返回错误: {error_msg}", event))
+
+        # 提取GIF URL
+        gif_url = data.get("data")
+        if not gif_url:
+            await bite_avatar.finish(message_add_head("❌ API未返回图片URL", event))
+
         # 记录操作
         record_action(user_id, "daily_api")
-
-        # API直接返回图片URL
-        gif_url = f"https://v2.xxapi.cn/api/bite?qq={target_qq}"
 
         # 构建图鉴模版消息
         title = "🍽️ 吃掉头像"
@@ -463,6 +484,9 @@ async def handle_bite_avatar(event: MessageEvent, args: Message = CommandArg()):
     except requests.RequestException as e:
         logger.error(f"吃掉头像API请求失败: {e}")
         await bite_avatar.finish(message_add_head("❌ 网络请求失败,请稍后再试", event))
+    except json.JSONDecodeError as e:
+        logger.error(f"吃掉头像JSON解析失败: {e}")
+        await bite_avatar.finish(message_add_head("❌ 数据解析失败", event))
     except Exception as e:
         logger.error(f"吃掉头像功能异常: {e}")
         await bite_avatar.finish(message_add_head("❌ 处理失败,请稍后再试", event))
