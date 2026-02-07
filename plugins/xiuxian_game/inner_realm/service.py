@@ -862,6 +862,86 @@ class InnerRealmService:
                 "rewards": []
             }
 
+    # ==================== 奖励发放系统 ====================
+
+    async def _distribute_loot(
+        self,
+        player: Player,
+        loot_config: list,
+        multiplier: float = 1.0
+    ) -> Tuple[str, int, list]:
+        """
+        发放奖励物品和金币
+
+        Args:
+            player: 玩家对象
+            loot_config: 奖励配置列表，格式：[{"item_id": "xxx", "quantity": 1, "probability": 0.5}, {"gold": 100}]
+            multiplier: 奖励倍数（大成功时使用）
+
+        Returns:
+            (奖励描述文本, 金币总计, 物品列表)
+        """
+        from ..models.inventory import ItemInstance
+        from ..config import config
+
+        rewards_text = []
+        total_gold = 0
+        items_obtained = []
+
+        for reward in loot_config:
+            # 检查概率
+            probability = reward.get("probability", 1.0)
+            if random.random() > probability:
+                continue
+
+            # 金币奖励
+            if "gold" in reward:
+                gold_amount = int(reward["gold"] * multiplier)
+                player.gold += gold_amount
+                total_gold += gold_amount
+                rewards_text.append(f"💰 {gold_amount} 金币")
+
+                # 更新财富成就统计
+                from ..achievement.achievement_service import AchievementService
+                await AchievementService.update_stat(
+                    self.uow.session,
+                    player.id,
+                    "gold_earned_total",
+                    increment=gold_amount,
+                    auto_commit=False
+                )
+
+            # 物品奖励
+            elif "item_id" in reward:
+                item_id = reward["item_id"]
+                quantity = int(reward.get("quantity", 1) * multiplier)
+
+                # 检查物品是否存在
+                item_config = config.items_config["by_id"].get(item_id)
+                if not item_config:
+                    logger.warning(f"奖励物品不存在: {item_id}")
+                    continue
+
+                try:
+                    # 添加物品到背包
+                    await ItemInstance.add_item(self.uow.session, player.id, item_id, quantity)
+                    items_obtained.append({"item_id": item_id, "quantity": quantity})
+
+                    # 格式化物品名称（带稀有度标识）
+                    item_display_name = item_config.get_display_name()
+                    rewards_text.append(f"📦 {item_display_name} x{quantity}")
+
+                except ValueError as e:
+                    # 背包满了，记录但不阻止流程
+                    logger.warning(f"发放奖励失败（背包满）: {item_id} x{quantity}")
+                    rewards_text.append(f"⚠️ 背包已满，无法获得 {item_config.name} x{quantity}")
+
+        # 保存玩家数据变更
+        self.uow.session.add(player)
+
+        reward_desc = "\n".join(rewards_text) if rewards_text else "什么也没得到..."
+        return reward_desc, total_gold, items_obtained
+
     # ==================== 事件触发系统 ====================
 
     async def perform_search(
@@ -915,20 +995,33 @@ class InnerRealmService:
 
             else:
                 # 成功：获得物品
-                # TODO: 后续实现物品系统后，这里会发放实际物品
+                loot_items = state.get("items", [])
+
+                # 大成功获得双倍奖励
+                multiplier = 2.0 if result.result_level == "critical_success" else 1.0
+
+                # 发放奖励
+                reward_desc, total_gold, items = await self._distribute_loot(
+                    player, loot_items, multiplier
+                )
+
+                # 标记为已搜刮
                 state["looted"] = True
                 tile.state = json.dumps(state, ensure_ascii=False)
                 tile.is_triggered = True
                 await self.uow.commit()
 
-                reward_desc = "获得了一些物品"  # 暂时占位
-                if result.result_level == "critical_success":
-                    reward_desc = "发现了隐藏的宝箱！获得了大量物品！"
+                # 构建结果消息
+                result_text = reward_desc if reward_desc != "什么也没得到..." else "你翻遍了这里，但什么也没找到..."
+                if result.result_level == "critical_success" and reward_desc != "什么也没得到...":
+                    result_text = f"🌟 大成功！发现了隐藏的宝箱！\n\n获得奖励（双倍）：\n{reward_desc}"
+                elif reward_desc != "什么也没得到...":
+                    result_text = f"获得奖励：\n{reward_desc}"
 
                 return True, self.format_dice_roll_message(
                     "搜刮检定",
                     result,
-                    reward_desc
+                    result_text
                 )
 
         elif tile.event_type == "CLUE":
@@ -1008,22 +1101,32 @@ class InnerRealmService:
         else:
             # 成功：目标屈服，交出物品/信息
             威吓_success = state.get("威吓_success", f"{target_name}颤抖着交出了一些东西...")
-
-            # TODO: 后续实现物品系统后，这里会发放实际物品
             loot_items = state.get("loot", [])
+
+            # 大成功获得双倍奖励
+            multiplier = 2.0 if result.result_level == "critical_success" else 1.0
+
+            # 发放奖励
+            reward_desc, total_gold, items = await self._distribute_loot(
+                player, loot_items, multiplier
+            )
 
             # 标记为已威吓
             tile.is_triggered = True
             await self.uow.commit()
 
-            bonus_desc = ""
-            if result.result_level == "critical_success":
-                bonus_desc = "\n🌟 大成功！获得了双倍物品！"
+            # 构建结果消息
+            result_text = 威吓_success
+            if reward_desc != "什么也没得到...":
+                if result.result_level == "critical_success":
+                    result_text += f"\n\n🌟 大成功！获得双倍奖励：\n{reward_desc}"
+                else:
+                    result_text += f"\n\n获得：\n{reward_desc}"
 
             return True, self.format_dice_roll_message(
                 "威吓检定",
                 result,
-                f"{威吓_success}{bonus_desc}"
+                result_text
             )
 
     async def perform_assassination(
@@ -1096,13 +1199,26 @@ class InnerRealmService:
             if target_type == "civilian" or tile.event_type == "SURVIVOR":
                 await self.trigger_sanity_loss(session, "kill_innocent")
 
+            # 发放战利品
+            loot_items = state.get("loot", [])
+            multiplier = 1.5 if result.result_level == "critical_success" else 1.0
+            reward_desc, total_gold, items = await self._distribute_loot(
+                player, loot_items, multiplier
+            )
+
             await self.uow.commit()
 
+            # 构建结果消息
             success_desc = f"你悄无声息地解决了{target_name}..."
             if result.result_level == "critical_success":
                 success_desc = f"完美！你如鬼魅般抹去了{target_name}的生命，没有留下任何痕迹！"
 
-            # 获得战利品（TODO: 后续实现）
+            if reward_desc != "什么也没得到...":
+                if result.result_level == "critical_success":
+                    success_desc += f"\n\n🌟 搜刮尸体，获得额外奖励（×1.5）：\n{reward_desc}"
+                else:
+                    success_desc += f"\n\n搜刮尸体，获得：\n{reward_desc}"
+
             return True, self.format_dice_roll_message(
                 "处决检定",
                 result,
@@ -1270,6 +1386,12 @@ class InnerRealmService:
         # 触发理智恢复
         recovered, _ = await self.trigger_sanity_recovery(session, "rescue_survivor")
 
+        # 发放幸存者奖励
+        save_rewards = state.get("save_reward", [])
+        reward_desc, total_gold, items = await self._distribute_loot(
+            player, save_rewards, multiplier=1.0
+        )
+
         await self.uow.commit()
 
         # 随机选择一句感激的话
@@ -1289,7 +1411,10 @@ class InnerRealmService:
         if recovered > 0:
             lines.append(f"🧠 理智恢复 +{recovered}")
 
-        # TODO: 后续实现奖励发放
+        # 显示奖励
+        if reward_desc != "什么也没得到...":
+            lines.append(f"\n🎁 获得感谢礼物：\n{reward_desc}")
+
         lines.append("\n💡 提示: 救助幸存者会影响最终结局")
 
         return True, "\n".join(lines)
