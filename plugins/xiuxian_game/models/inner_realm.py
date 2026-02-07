@@ -66,7 +66,6 @@ class InnerRealmSession(Base):
     clue_collected: Mapped[str] = mapped_column(
         Text,
         default='[]',
-        server_default='[]',
         comment="已收集的线索ID列表（JSON数组）"
     )
 
@@ -88,7 +87,6 @@ class InnerRealmSession(Base):
     state: Mapped[str] = mapped_column(
         Text,
         default='{}',
-        server_default='{}',
         comment="探索状态（JSON对象，存储自定义数据）"
     )
 
@@ -159,7 +157,6 @@ class InnerRealmTile(Base):
     state: Mapped[str] = mapped_column(
         Text,
         default='{}',
-        server_default='{}',
         comment="地块状态（JSON对象，如NPC血量、是否已搜刮等）"
     )
 
