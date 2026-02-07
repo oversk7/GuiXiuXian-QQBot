@@ -3,7 +3,8 @@
 """
 import json
 from nonebot import on_command
-from nonebot.adapters.qq import Bot, MessageEvent, Message
+from nonebot.adapters.qq import Bot, MessageEvent, Message, MessageSegment
+from nonebot.adapters.qq.models.common import MessageMarkdown, MessageMarkdownParams
 from nonebot.params import CommandArg
 from nonebot.permission import SUPERUSER
 from sqlalchemy import select
@@ -50,6 +51,45 @@ def _format_player_items(items_json: str, player_name: str) -> str:
             item_lines.append(f"❓ 未知道具: {item_str} x{count}")
 
     return "\n".join(item_lines)
+
+
+def _create_game_action_message(title: str, result: str, buttons: list) -> MessageSegment:
+    """
+    创建带按钮的游戏操作消息
+
+    Args:
+        title: 消息标题
+        result: 消息主体内容
+        buttons: 按钮文本列表,最多8个按钮
+
+    Returns:
+        MessageSegment.markdown对象
+    """
+    # 清理换行符,模版参数必须使用\r而不是\n
+    title = title.replace('\n', '\r')
+    result = result.replace('\n', '\r')
+
+    # 构建模版参数
+    template_params = [
+        MessageMarkdownParams(key="title", values=[title]),
+        MessageMarkdownParams(key="result", values=[result])
+    ]
+
+    # 添加按钮(最多8个)
+    for i in range(8):
+        if i < len(buttons):
+            template_params.append(MessageMarkdownParams(key=f"btn{i+1}", values=[buttons[i]]))
+        else:
+            # 空按钮用空格填充
+            template_params.append(MessageMarkdownParams(key=f"btn{i+1}", values=[" "]))
+
+    # 使用反馈类Markdown模版 (102499345_1769177016)
+    markdown_msg = MessageMarkdown(
+        custom_template_id="102499345_1769177016",
+        params=template_params
+    )
+
+    return MessageSegment.markdown(markdown_msg)
 
 
 # ==================== 房间管理指令 ====================
@@ -296,14 +336,14 @@ async def handle_create_room(bot: Bot, event: MessageEvent, args: Message = Comm
                 }
 
                 display = RussianRouletteCore.get_game_display(game_state, room_info, player_names)
-                recommended = RussianRouletteCore.get_recommended_commands(game_state, room.player1_id)
 
                 # 显示初始弹药配置
                 bullets = json.loads(game.bullets)
                 live_count = sum(1 for b in bullets if b)
                 blank_count = sum(1 for b in bullets if not b)
 
-                result_msg = (
+                # 构建游戏状态消息
+                result_text = (
                     f"{display}\n"
                     f"━━━━━━━━━━━━━\n"
                     f"👥 对战双方：\n"
@@ -311,12 +351,27 @@ async def handle_create_room(bot: Bot, event: MessageEvent, args: Message = Comm
                     f"  🔵 {player2.nickname}[UID:{player2.uid}]\n"
                     f"━━━━━━━━━━━━━\n"
                     f"💥 本轮配置：{live_count}发实弹 + {blank_count}发空包弹\n"
-                    f"🎯 {player1.nickname} 先手！\n"
-                    f"{recommended}"
+                    f"🎯 {player1.nickname} 先手！"
                 )
 
+                # 构建按钮列表(根据先手玩家的道具)
+                player1_items = json.loads(game.player1_items or "[]")
+                buttons = ["开枪 自己", "开枪 对手", "查看道具", "房间状态"]
+
+                # 如果有常用道具,添加到按钮中
+                if "magnifier" in player1_items:
+                    buttons.append("使用道具 放大镜")
+                elif "cigarette" in player1_items:
+                    buttons.append("使用道具 香烟")
+                elif "knife" in player1_items:
+                    buttons.append("使用道具 小刀")
+
+                # 使用Markdown模版发送带按钮的消息
+                title = "🎮 恶魔轮盘赌游戏开始"
+                markdown_msg = _create_game_action_message(title, result_text, buttons)
+
                 # 先发送游戏开始消息
-                await bot.send(event, message_add_head(result_msg, event))
+                await bot.send(event, markdown_msg)
 
                 # 延迟一下，然后分两次发送道具信息
                 import asyncio
@@ -497,9 +552,7 @@ async def handle_shoot(bot: Bot, event: MessageEvent, args: Message = CommandArg
             if target == "自己" and not hit:
                 # 对自己开空包弹，继续行动
                 result_msg += f"\n🔄 {player.nickname} 继续行动\n\n{game_display}"
-                # 添加推荐指令
-                recommended = RussianRouletteCore.get_recommended_commands(display_game_state, player.id)
-                result_msg += f"\n{recommended}"
+                current_player_id = player.id
             else:
                 # 切换回合
                 opponent_id = room.get_opponent_id(player.id)
@@ -512,43 +565,64 @@ async def handle_shoot(bot: Bot, event: MessageEvent, args: Message = CommandArg
                     opponent = await session.get(Player, opponent_id)
                     result_msg += f"\n⛓️ {opponent.nickname} 被手铐限制，跳过回合"
                     result_msg += f"\n🔄 {player.nickname} 继续行动\n\n{game_display}"
-                    # 添加推荐指令
-                    recommended = RussianRouletteCore.get_recommended_commands(display_game_state, player.id)
-                    result_msg += f"\n{recommended}"
+                    current_player_id = player.id
                 else:
                     # 正常切换回合
                     game.current_player_id = opponent_id
                     opponent = await session.get(Player, opponent_id)
                     result_msg += f"\n🔄 轮到 {opponent.nickname} 行动\n\n{game_display}"
-                    # 添加推荐指令
-                    recommended = RussianRouletteCore.get_recommended_commands(display_game_state, opponent_id)
-                    result_msg += f"\n{recommended}"
+                    current_player_id = opponent_id
 
         await session.commit()
 
-        # 如果重新装弹了，需要分别发送道具信息
-        if reloaded:
-            # 先发送基础消息
-            await bot.send(event, message_add_head(result_msg, event))
-
-            # 延迟一下，然后分两次发送道具信息
-            import asyncio
-            await asyncio.sleep(1)
-
-            # 发送玩家1的道具
-            player1_items_msg = _format_player_items(game.player1_items, player1.nickname)
-            await bot.send(event, message_add_head(player1_items_msg, event))
-
-            await asyncio.sleep(1)
-
-            # 发送玩家2的道具
-            player2_items_msg = _format_player_items(game.player2_items, player2.nickname)
-            await bot.send(event, message_add_head(player2_items_msg, event))
-
-            return  # 使用return而不是finish，因为已经发送了消息
+        # 处理游戏结束的消息发送
+        if game_over:
+            # 如果重新装弹了，需要分别发送道具信息
+            if reloaded:
+                await bot.send(event, message_add_head(result_msg, event))
+                import asyncio
+                await asyncio.sleep(1)
+                player1_items_msg = _format_player_items(game.player1_items, player1.nickname)
+                await bot.send(event, message_add_head(player1_items_msg, event))
+                await asyncio.sleep(1)
+                player2_items_msg = _format_player_items(game.player2_items, player2.nickname)
+                await bot.send(event, message_add_head(player2_items_msg, event))
+            else:
+                await shoot_cmd.finish(message_add_head(result_msg, event))
         else:
-            # 没有重新装弹，正常发送消息
-            await shoot_cmd.finish(message_add_head(result_msg, event))
+            # 游戏继续 - 使用Markdown模版发送带按钮的消息
+            # 构建按钮列表
+            current_items = json.loads(display_game_state.get(f"{current_player_id}_items", "[]"))
+            buttons = ["开枪 自己", "开枪 对手", "查看道具", "房间状态"]
+
+            # 添加常用道具按钮
+            if "magnifier" in current_items:
+                buttons.append("使用道具 放大镜")
+            elif "cigarette" in current_items:
+                buttons.append("使用道具 香烟")
+            elif "knife" in current_items:
+                buttons.append("使用道具 小刀")
+            elif "beer" in current_items:
+                buttons.append("使用道具 啤酒")
+
+            # 使用Markdown模版发送带按钮的消息
+            title = "🔫 射击结果"
+            markdown_msg = _create_game_action_message(title, result_msg, buttons)
+
+            # 如果重新装弹了，需要分别发送道具信息
+            if reloaded:
+                await bot.send(event, markdown_msg)
+                import asyncio
+                await asyncio.sleep(1)
+                player1_items_msg = _format_player_items(game.player1_items, player1.nickname)
+                await bot.send(event, message_add_head(player1_items_msg, event))
+                await asyncio.sleep(1)
+                player2_items_msg = _format_player_items(game.player2_items, player2.nickname)
+                await bot.send(event, message_add_head(player2_items_msg, event))
+                return
+            else:
+                # 没有重新装弹，正常发送消息
+                await shoot_cmd.finish(markdown_msg)
 
 
 # 使用道具指令
@@ -1226,8 +1300,8 @@ async def handle_view_items(event: MessageEvent):
         if not player_items:
             await view_items_cmd.finish(message_add_head("🎒 你没有任何道具", event))
 
-        # 构建道具列表
-        item_lines = ["🎒 你的道具", "━━━━━━━━━━━━━"]
+        # 构建道具列表文本
+        item_lines = []
 
         # 统计道具数量
         from collections import Counter
@@ -1242,10 +1316,44 @@ async def handle_view_items(event: MessageEvent):
             except (ValueError, KeyError):
                 item_lines.append(f"❓ 未知道具: {item_str} x{count}")
 
-        item_lines.append("━━━━━━━━━━━━━")
-        item_lines.append("📝 使用：使用道具 [道具名]")
+        result_text = "\n".join(item_lines)
 
-        await view_items_cmd.finish(message_add_head("\n".join(item_lines), event))
+        # 构建使用道具的按钮(最多8个)
+        buttons = []
+        道具名映射 = {
+            ItemType.KNIFE: "小刀",
+            ItemType.HANDCUFFS: "手铐",
+            ItemType.CIGARETTE: "香烟",
+            ItemType.MAGNIFIER: "放大镜",
+            ItemType.BEER: "啤酒",
+            ItemType.ADRENALINE: "肾上腺素",
+            ItemType.EXPIRED_MEDICINE: "过期药物",
+            ItemType.INVERTER: "逆转器",
+            ItemType.PHONE: "电话",
+            ItemType.DICE: "骰子"
+        }
+
+        # 按优先级排序道具按钮
+        按钮优先级 = [ItemType.MAGNIFIER, ItemType.CIGARETTE, ItemType.KNIFE, ItemType.BEER,
+                    ItemType.PHONE, ItemType.INVERTER, ItemType.EXPIRED_MEDICINE, ItemType.DICE]
+
+        for item_type in 按钮优先级:
+            if item_type.value in player_items and len(buttons) < 8:
+                道具名 = 道具名映射.get(item_type, "")
+                if 道具名:
+                    buttons.append(f"使用道具 {道具名}")
+
+        # 添加其他操作按钮
+        if len(buttons) < 7:
+            buttons.append("开枪 自己")
+        if len(buttons) < 8:
+            buttons.append("开枪 对手")
+
+        # 使用Markdown模版发送带按钮的消息
+        title = "🎒 你的道具"
+        markdown_msg = _create_game_action_message(title, result_text, buttons)
+
+        await view_items_cmd.finish(markdown_msg)
 
 
 # 手动清理房间（管理员指令）
