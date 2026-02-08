@@ -56,6 +56,12 @@ REQUIRED_FIELDS: Dict[str, Dict[str, str]] = {
         "sworn_request_time": "DATETIME NULL COMMENT '结义申请发起时间'",
         "sworn_reject_time": "DATETIME NULL COMMENT '结义申请被拒绝时间'",
         "sworn_proposer_id": "VARCHAR(32) NULL COMMENT '结义申请发起者ID'"
+    },
+    # 里界系统表
+    "inner_realm_session": {
+        "sanity": "INT DEFAULT 100 COMMENT '当前理智值(0-100)'",
+        "clue_collected": "TEXT COMMENT '已收集的线索ID列表(JSON数组)'",
+        "state": "TEXT COMMENT '探索状态(JSON对象,存储自定义数据)'"
     }
     # 注释: 以下字段已通过多次重启完成迁移:
     # - daily_task: quest_chain_id, quest_step, is_tutorial, auto_accept
