@@ -10,14 +10,14 @@
 """
 
 from nonebot import on_command
-from nonebot.adapters.onebot.v11 import MessageEvent, GroupMessageEvent
+from nonebot.adapters.qq import MessageEvent
 from nonebot.params import CommandArg
 from nonebot.typing import T_State
-from nonebot.adapters.onebot.v11 import Message
+from nonebot.adapters.qq import Message
 
 from ..infrastructure.database import AsyncSessionLocal
 from ..infrastructure.uow.unit_of_work import UnitOfWork
-from ..player.util import get_unified_player
+from ..platform_utils import get_unified_player
 from .cooking_service import CookingService, RecipeManager
 from .chef_service import ChefService
 from .restaurant_service import RestaurantService
