@@ -30,6 +30,7 @@ from . import (
     battle,  # 战斗系统（包含PVP切磋）
     world_boss,
     fishing,
+    cooking,  # 烹饪与餐厅经营系统
     admin,  # 管理员功能（包含抽奖系统）
     achievement,  # 成就系统
     dialogue,  # NPC AI对话系统（包含管理员命令）
