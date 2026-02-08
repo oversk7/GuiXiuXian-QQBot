@@ -607,12 +607,12 @@ async def handle_view_clues(event: MessageEvent):
 
 # ==================== 移动命令 ====================
 
-# 移动命令
-move_cmd = on_command("移动", block=True, priority=4)
-up_cmd = on_command("上", block=True, priority=4)
-down_cmd = on_command("下", block=True, priority=4)
-left_cmd = on_command("左", block=True, priority=4)
-right_cmd = on_command("右", block=True, priority=4)
+# 移动命令 - 使用 Rule 确保只在里界时才匹配，避免与诡域系统冲突
+move_cmd = on_command("移动", rule=in_inner_realm_rule, block=True, priority=4)
+up_cmd = on_command("上", rule=in_inner_realm_rule, block=True, priority=4)
+down_cmd = on_command("下", rule=in_inner_realm_rule, block=True, priority=4)
+left_cmd = on_command("左", rule=in_inner_realm_rule, block=True, priority=4)
+right_cmd = on_command("右", rule=in_inner_realm_rule, block=True, priority=4)
 
 
 async def _handle_move(event: MessageEvent, dx: int, dy: int):
