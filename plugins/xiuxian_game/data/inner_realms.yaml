@@ -1,0 +1,453 @@
+# 里界系统配置文件
+# 定义所有里界的基本信息、事件、NPC、线索和结局
+
+# 全局设置
+global:
+  # 地图尺寸（25x25）
+  map_size: 25
+  # 每日刷新时间（0点）
+  refresh_hour: 0
+  # 理智系统
+  sanity_system:
+    max_sanity: 100       # 最大理智值
+    initial_sanity: 100   # 初始理智值
+    warning_threshold: 50 # 警告阈值
+    danger_threshold: 30  # 危险阈值
+    critical_threshold: 10 # 极度危险阈值
+
+# 时间系统
+time_system:
+  # 白昼 (6:00-18:00)
+  day:
+    start_hour: 6
+    end_hour: 18
+    bonuses:
+      search: 1  # 搜刮判定+1
+      combat: 0
+  # 黄昏 (18:00-22:00)
+  dusk:
+    start_hour: 18
+    end_hour: 22
+    bonuses:
+      search: 0
+      combat: 0
+  # 深夜 (22:00-6:00)
+  night:
+    start_hour: 22
+    end_hour: 6
+    bonuses:
+      search: 0
+      combat: 1  # 战斗判定+1
+
+# 认知篡改系统
+cognition_tamper_system:
+  # 篡改类型定义
+  tamper_types:
+    # 假象NPC - 看到不存在的NPC
+    phantom_npc:
+      name: "幻影"
+      description: "你看到了一个人影，但当你靠近时..."
+      trigger_chance: 0.15  # 理智<50时触发概率
+      sanity_cost: -5
+      effects:
+        - "生成虚假NPC"
+        - "攻击时发现是幻觉"
+        - "理智-5"
+
+    # 记忆篡改 - 篡改击杀记录
+    memory_alteration:
+      name: "记忆错乱"
+      description: "你的记忆开始模糊..."
+      trigger_chance: 0.10
+      sanity_cost: -10
+      effects:
+        - "击杀数±1-3"
+        - "坐标记忆偏移"
+        - "理智-10"
+
+    # 感官扭曲 - 看到错误的事件类型
+    sensory_distortion:
+      name: "感官扭曲"
+      description: "你的眼前开始出现重影..."
+      trigger_chance: 0.20
+      sanity_cost: -3
+      effects:
+        - "EMPTY显示为NPC"
+        - "LOOT显示为CLUE"
+        - "理智-3"
+
+    # 时间错觉 - 感觉时间流逝异常
+    time_dilation:
+      name: "时间错乱"
+      description: "时钟的指针开始倒转..."
+      trigger_chance: 0.08
+      sanity_cost: -8
+      effects:
+        - "时间显示错误"
+        - "冷却时间感知错误"
+        - "理智-8"
+
+    # 身份混淆 - 最恐怖的篡改
+    identity_confusion:
+      name: "我是谁？"
+      description: "「等等...我来这里是为了什么？」"
+      trigger_chance: 0.05  # 理智<30时才可能触发
+      sanity_cost: -20
+      effects:
+        - "暂时忘记进入里界的目的"
+        - "看到的NPC对话变成自己的独白"
+        - "理智-20"
+      critical: true  # 极度危险的篡改
+
+    # 反转真相 - 真假颠倒
+    truth_inversion:
+      name: "真相反转"
+      description: "也许...一切都反过来了？"
+      trigger_chance: 0.03
+      sanity_cost: -15
+      effects:
+        - "线索内容反转（受害者变成施暴者）"
+        - "NPC台词含义反转"
+        - "理智-15"
+      critical: true
+
+  # 理智损失触发器
+  sanity_loss_triggers:
+    witness_death:
+      amount: -5
+      description: "目睹死亡"
+
+    read_disturbing_clue:
+      amount: -8
+      description: "阅读令人不安的线索"
+
+    encounter_boss:
+      amount: -15
+      description: "遭遇核心诡异"
+
+    critical_failure:
+      amount: -10
+      description: "判定大失败"
+
+    kill_innocent:
+      amount: -3
+      description: "击杀无辜者"
+
+    stay_too_long:
+      amount: -2
+      description: "在里界停留过久（每小时）"
+
+  # 理智恢复方式
+  sanity_recovery:
+    rescue_survivor:
+      amount: 5
+      description: "救出幸存者"
+
+    reveal_truth:
+      amount: 10
+      description: "揭示真相（收集线索）"
+
+    leave_realm:
+      amount: 20
+      description: "离开里界"
+
+    defeat_boss:
+      amount: 15
+      description: "击败核心诡异"
+
+# 里界定义
+realms:
+  # ==================== 第三病栋 ====================
+  third_ward:
+    # 基础信息
+    display_name: "第三病栋"
+    description: "废弃的精神病院第三病栋，传闻这里进行过非人道的实验..."
+    level_requirement: 50
+    size: 25
+    narrative_type: "puzzle"  # 碎片拼图叙事
+
+    # 事件生成权重（总和建议100）
+    event_weights:
+      NPC: 15          # NPC事件（15%）
+      LOOT: 20         # 战利品事件（20%）
+      CLUE: 10         # 线索事件（10%）
+      EMPTY: 48        # 空地块（48%）
+      BOSS: 1          # BOSS事件（1%，通常只有1个）
+      SURVIVOR: 4      # 幸存者事件（4%）
+      COGNITION_TAMPER: 2  # 认知篡改触发点（2%）
+
+    # NPC配置
+    npcs:
+      # 特殊NPC
+      - id: "head_nurse"
+        name: "值班护士长"
+        type: "special"
+        hp: 300
+        attack: 80
+        defense: 40
+        description: "身穿沾血白大褂的护士长，眼神空洞"
+        dialogue:
+          - "又来了新的...病人..."
+          - "实验...必须继续..."
+        loot:
+          - item_id: "medical_record_key"
+            quantity: 1
+            probability: 1.0
+          - item_id: "corrupted_bandage"
+            quantity: 1
+            probability: 0.8
+          - gold: 200
+        威吓_success: "护士长颤抖着交出了钥匙和一叠病历"
+        威吓_fail: "护士长发出刺耳的尖叫，惊动了整个病房！"
+
+      - id: "doctor"
+        name: "主治医生"
+        type: "special"
+        hp: 400
+        attack: 100
+        defense: 60
+        description: "戴着口罩的医生，手术刀上还残留着血迹"
+        dialogue:
+          - "这次的'病人'质量不错..."
+          - "别紧张，只是小手术..."
+        loot:
+          - item_id: "surgery_notes"
+            quantity: 1
+            probability: 1.0
+          - item_id: "scalpel"
+            quantity: 1
+            probability: 0.5
+          - gold: 300
+        威吓_success: "医生慌乱地扔下笔记本逃走了"
+        威吓_fail: "医生冷笑一声，按下了警报按钮"
+
+      # 普通NPC
+      - id: "patient"
+        name: "病患"
+        type: "civilian"
+        hp: 100
+        attack: 30
+        defense: 10
+        description: "穿着病号服的人，表情呆滞"
+        loot:
+          - gold: 100
+          - item_id: "broken_id"
+            quantity: 1
+            probability: 0.3
+
+      # 伪装者
+      - id: "mimic_patient"
+        name: "病患"  # 外表与普通病患相同
+        type: "disguised"
+        hp: 250
+        attack: 120
+        defense: 40
+        description: "看起来是普通病患，但攻击后会暴露真身..."
+        reveal_description: "病患的皮肤开始扭曲，露出腐烂的内脏！"
+        loot:
+          - item_id: "twisted_flesh"
+            quantity: 1
+            probability: 0.9
+          - item_id: "corrupted_core"
+            quantity: 1
+            probability: 0.3
+          - gold: 500
+
+    # 幸存者配置
+    survivors:
+      - id: "hiding_patient"
+        name: "躲藏的病患"
+        description: "蜷缩在病床下的瘦弱身影"
+        dialogue:
+          - "求求你...不要杀我..."
+          - "我只是来看病的...他们把我关在这里..."
+        save_reward:
+          - item_id: "favor_token"
+            quantity: 1
+            probability: 1.0
+
+      - id: "trapped_visitor"
+        name: "被困的访客"
+        description: "被锁在病房里的年轻人"
+        dialogue:
+          - "我是来看朋友的...结果被困在这里..."
+          - "这里不对劲...所有人都疯了..."
+        save_reward:
+          - item_id: "visitor_pass"
+            quantity: 1
+            probability: 1.0
+
+    # 线索配置
+    clues:
+      - id: "patient_record_1"
+        name: "1号病历"
+        description: "患者：张三，入院原因：健康体检。症状：无。备注：器官质量优良"
+        reveal: "所谓的'病人'都是被绑架的健康人"
+
+      - id: "patient_record_2"
+        name: "2号病历"
+        description: "患者：李四，入院原因：失眠。症状：无。备注：肾脏已摘取，心脏待用"
+
+      - id: "nurse_diary"
+        name: "护士日记"
+        description: "今天又送来一批'病人'...院长说这是为了医学进步...但那些惨叫声..."
+        reveal: "护士们知道真相，但被迫执行"
+
+      - id: "surgery_schedule"
+        name: "手术排期表"
+        description: "密密麻麻的手术记录，每天都有数十台'器官摘取手术'"
+        reveal: "这是一个器官摘取工厂"
+
+      - id: "director_memo"
+        name: "院长备忘录"
+        description: "黑市需求旺盛，本月目标：心脏20颗、肾脏40颗、肝脏15颗..."
+        reveal: "院长是幕后主谋，为黑市提供器官"
+
+    # BOSS配置
+    boss:
+      id: "director"
+      name: "院长·器官贩子"
+      hp: 1500
+      attack: 200
+      defense: 100
+      description: "戴着金丝眼镜的中年男人，笑容和蔼，但眼神冰冷"
+      dialogue:
+        - "欢迎来到第三病栋，我们这里医疗水平一流..."
+        - "不用担心，手术很快就结束了..."
+      special_skills:
+        - "召唤护士（召唤2个护士NPC）"
+        - "器官窃取（造成伤害并恢复自身生命）"
+      loot:
+        - item_id: "director_key"
+          quantity: 1
+          probability: 1.0
+        - item_id: "organ_trafficking_ledger"
+          quantity: 1
+          probability: 1.0
+        - item_id: "cursed_mirror_shard"
+          quantity: 1
+          probability: 0.5
+        - gold: 2000
+
+    # 结局配置
+    endings:
+      # 屠夫结局
+      butcher:
+        display_name: "屠夫"
+        condition: "killed_count >= 20"
+        description: "你杀光了病栋里的所有生命，血流成河。第三病栋在你的屠杀下崩塌，化为虚无..."
+        rewards:
+          - item_id: "grave_soil"
+            quantity: 50
+            probability: 1.0
+          - item_id: "soul_essence"
+            quantity: 10
+            probability: 1.0
+          - gold: 5000
+
+      # 真相结局
+      truth:
+        display_name: "真相揭露"
+        condition: "clue_collected >= 5"
+        description: "你拼凑出了完整的真相：这是一个器官摘取工厂。你发现了院长的罪证，第三病栋的秘密终于大白..."
+        rewards:
+          - item_id: "cursed_mirror_shard"
+            quantity: 1
+            probability: 1.0
+          - item_id: "achievement_truth_seeker"
+            quantity: 1
+            probability: 1.0
+
+      # 救世结局
+      rescue:
+        display_name: "救世主"
+        condition: "saved_count >= 3"
+        description: "你救出了病栋里的幸存者，他们感激涕零。虽然无法阻止过去的悲剧，但你至少拯救了这些无辜的生命..."
+        rewards:
+          - item_id: "favor_token"
+            quantity: 5
+            probability: 1.0
+          - item_id: "achievement_savior"
+            quantity: 1
+            probability: 1.0
+          - gold: 3000
+
+      # 猎人结局
+      hunter:
+        display_name: "猎诡者"
+        condition: "boss_defeated"
+        description: "你击败了院长，摧毁了这个罪恶的器官工厂。第三病栋被封印，再也不会有人受害..."
+        rewards:
+          - item_id: "director_key"
+            quantity: 1
+            probability: 1.0
+          - item_id: "organ_trafficking_ledger"
+            quantity: 1
+            probability: 1.0
+          - gold: 8000
+
+      # 毁灭结局（最高奖励）
+      annihilation:
+        display_name: "完全毁灭"
+        condition: "killed_count >= 20 AND boss_defeated"
+        description: "你杀光了病栋里的一切生命，包括幕后黑手院长。第三病栋在血与火中彻底毁灭，不留任何痕迹..."
+        rewards:
+          - item_id: "grave_soil"
+            quantity: 100
+            probability: 1.0
+          - item_id: "soul_essence"
+            quantity: 20
+            probability: 1.0
+          - item_id: "cursed_mirror_shard"
+            quantity: 2
+            probability: 1.0
+          - item_id: "achievement_annihilator"
+            quantity: 1
+            probability: 1.0
+          - gold: 15000
+
+# 属性修正映射
+attribute_modifiers:
+  # 搜刮判定
+  search:
+    primary: "luck"  # 主要属性：幸运
+    scale: 0.01      # 每点幸运+0.01修正值
+  # 威吓判定
+  intimidate:
+    primary: "attack"
+    scale: 0.005     # 每点攻击+0.005修正值
+  # 处决判定
+  assassination:
+    primary: "agility"
+    scale: 0.008     # 每点敏捷+0.008修正值
+  # 解读判定
+  decipher:
+    primary: "intelligence"
+    scale: 0.008     # 每点智力+0.008修正值
+  # 潜行判定
+  stealth:
+    primary: "agility"
+    scale: 0.008
+
+# 骰子判定结果表
+dice_results:
+  critical_failure:  # 2-3: 大失败
+    min: 2
+    max: 3
+    label: "💀 大失败"
+  failure:           # 4-6: 失败
+    min: 4
+    max: 6
+    label: "❌ 失败"
+  normal_success:    # 7-9: 普通成功
+    min: 7
+    max: 9
+    label: "⚖️ 普通成功"
+  success:           # 10-11: 成功
+    min: 10
+    max: 11
+    label: "✅ 成功"
+  critical_success:  # 12+: 大成功
+    min: 12
+    max: 999
+    label: "🌟 大成功"

@@ -5,6 +5,8 @@
 data/
 plugins/xiuxian_game/data/invite_records.yaml
 plugins/xiuxian_game/data/cache/
+!plugins/xiuxian_game/data/
+!plugins/xiuxian_game/data/inner_realms.yaml
 *.db
 ### Python ###
 # Byte-compiled / optimized / DLL files
