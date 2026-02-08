@@ -30,17 +30,17 @@ class RestaurantService:
     - 营业菜单设置
     """
 
-    # 餐厅升级消耗配置
+    # 餐厅升级消耗配置（参考公会建筑规模）
     UPGRADE_COSTS = {
-        1: {"coin": 5000, "materials": {"bone": 5}},
-        2: {"coin": 15000, "materials": {"bone": 10, "rust": 10}},
-        3: {"coin": 50000, "materials": {"malice_essence": 5, "nightmare_thread": 3}},
-        4: {"coin": 150000, "materials": {"flesh_crystal": 3}},
-        5: {"coin": 300000, "materials": {"flesh_crystal": 5, "soul_crystal": 2}},
-        6: {"coin": 500000, "materials": {"soul_crystal": 3, "curse_lens": 2}},
-        7: {"coin": 800000, "materials": {"demon_heart": 1, "void_essence": 1}},
-        8: {"coin": 1200000, "materials": {"demon_heart": 2}},
-        9: {"coin": 2000000, "materials": {"god_tear": 1}},
+        1: {"coin": 50000, "materials": {"spirit_bone": 100, "iron_rust": 80}},
+        2: {"coin": 100000, "materials": {"spirit_bone": 150, "iron_rust": 120, "grave_soil": 200}},
+        3: {"coin": 200000, "materials": {"yin_essence": 80, "nightmare_silk": 50, "grave_soil": 300}},
+        4: {"coin": 400000, "materials": {"yin_essence": 120, "nightmare_silk": 80, "flesh_crystal": 50}},
+        5: {"coin": 800000, "materials": {"flesh_crystal": 100, "soul_crystal": 60, "cursed_mirror_shard": 40}},
+        6: {"coin": 1500000, "materials": {"flesh_crystal": 150, "soul_crystal": 100, "cursed_mirror_shard": 70}},
+        7: {"coin": 2500000, "materials": {"soul_crystal": 150, "cursed_mirror_shard": 100, "demon_heart": 30}},
+        8: {"coin": 4000000, "materials": {"demon_heart": 50, "void_essence": 40, "cursed_mirror_shard": 120}},
+        9: {"coin": 6000000, "materials": {"demon_heart": 80, "void_essence": 60, "god_tear": 20}},
     }
 
     # 面积扩张消耗(每次+5席位)
