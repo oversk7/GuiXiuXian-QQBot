@@ -337,11 +337,11 @@ realms:
         condition: "killed_count >= 20"
         description: "你杀光了病栋里的所有生命，血流成河。第三病栋在你的屠杀下崩塌，化为虚无..."
         rewards:
-          - item_id: "grave_soil"
+          - item_id: "corrupted_bandage"
             quantity: 50
             probability: 1.0
-          - item_id: "soul_essence"
-            quantity: 10
+          - item_id: "twisted_flesh"
+            quantity: 20
             probability: 1.0
           - gold: 5000
 
@@ -351,7 +351,7 @@ realms:
         condition: "clue_collected >= 5"
         description: "你拼凑出了完整的真相：这是一个器官摘取工厂。你发现了院长的罪证，第三病栋的秘密终于大白..."
         rewards:
-          - item_id: "cursed_mirror_shard"
+          - item_id: "corrupted_core"
             quantity: 1
             probability: 1.0
           - item_id: "achievement_truth_seeker"
@@ -392,14 +392,14 @@ realms:
         condition: "killed_count >= 20 AND boss_defeated"
         description: "你杀光了病栋里的一切生命，包括幕后黑手院长。第三病栋在血与火中彻底毁灭，不留任何痕迹..."
         rewards:
-          - item_id: "grave_soil"
+          - item_id: "corrupted_bandage"
             quantity: 100
             probability: 1.0
-          - item_id: "soul_essence"
-            quantity: 20
+          - item_id: "twisted_flesh"
+            quantity: 30
             probability: 1.0
-          - item_id: "cursed_mirror_shard"
-            quantity: 2
+          - item_id: "corrupted_core"
+            quantity: 3
             probability: 1.0
           - item_id: "achievement_annihilator"
             quantity: 1

@@ -1,10 +1,13 @@
 """
 里界系统命令处理器
+
+⚠️ 注意：里界系统当前处于迭代开发阶段，仅管理员可用
 """
 from nonebot import on_command
 from nonebot.adapters.qq import MessageEvent, Message
 from nonebot.params import CommandArg
 from nonebot.rule import Rule
+from nonebot.permission import SUPERUSER
 
 from ..platform_utils import get_unified_player
 from ..infrastructure.uow.unit_of_work import UnitOfWork
@@ -29,12 +32,13 @@ async def in_inner_realm_rule(event: MessageEvent) -> bool:
 
 
 # ==================== 命令注册 ====================
+# ⚠️ 里界系统处于迭代开发阶段，所有命令仅限管理员使用
 # 注册命令
-realms_list_cmd = on_command("里界", aliases={"里界列表"}, block=True, priority=5)
+realms_list_cmd = on_command("里界", aliases={"里界列表"}, block=True, priority=5, permission=SUPERUSER)
 # 里界传送命令优先级为4（高于诡域的5），使用智能识别
 # block=False 允许在不匹配里界时继续传递给诡域系统
-enter_realm_cmd = on_command("传送", aliases={"进入里界"}, block=False, priority=4)
-realm_info_cmd = on_command("里界信息", block=True, priority=5)
+enter_realm_cmd = on_command("传送", aliases={"进入里界"}, block=False, priority=4, permission=SUPERUSER)
+realm_info_cmd = on_command("里界信息", block=True, priority=5, permission=SUPERUSER)
 # 里界的返回命令优先级更高（4），在诡域返回命令（5）之前处理
 # 使用 Rule 确保只有在里界时才匹配此命令
 exit_realm_cmd = on_command(
@@ -42,7 +46,8 @@ exit_realm_cmd = on_command(
     aliases={"离开里界"},
     rule=in_inner_realm_rule,
     block=True,
-    priority=4
+    priority=4,
+    permission=SUPERUSER
 )
 
 
@@ -303,7 +308,7 @@ async def handle_exit_realm(event: MessageEvent):
 # ==================== 事件触发命令 ====================
 
 # 搜刮命令
-search_cmd = on_command("搜刮", block=True, priority=4)
+search_cmd = on_command("搜刮", block=True, priority=4, permission=SUPERUSER)
 
 @search_cmd.handle()
 async def handle_search(event: MessageEvent):
@@ -340,7 +345,7 @@ async def handle_search(event: MessageEvent):
 
 
 # 威吓命令
-intimidate_cmd = on_command("威吓", block=True, priority=4)
+intimidate_cmd = on_command("威吓", block=True, priority=4, permission=SUPERUSER)
 
 @intimidate_cmd.handle()
 async def handle_intimidate(event: MessageEvent, args: Message = CommandArg()):
@@ -380,7 +385,7 @@ async def handle_intimidate(event: MessageEvent, args: Message = CommandArg()):
 
 
 # 处决命令
-assassination_cmd = on_command("处决", block=True, priority=4)
+assassination_cmd = on_command("处决", block=True, priority=4, permission=SUPERUSER)
 
 @assassination_cmd.handle()
 async def handle_assassination(event: MessageEvent, args: Message = CommandArg()):
@@ -420,7 +425,7 @@ async def handle_assassination(event: MessageEvent, args: Message = CommandArg()
 
 
 # 交谈命令
-talk_cmd = on_command("交谈", block=True, priority=4)
+talk_cmd = on_command("交谈", block=True, priority=4, permission=SUPERUSER)
 
 @talk_cmd.handle()
 async def handle_talk(event: MessageEvent, args: Message = CommandArg()):
@@ -460,7 +465,7 @@ async def handle_talk(event: MessageEvent, args: Message = CommandArg()):
 
 
 # 救助命令
-rescue_cmd = on_command("救助", aliases={"救出"}, block=True, priority=4)
+rescue_cmd = on_command("救助", aliases={"救出"}, block=True, priority=4, permission=SUPERUSER)
 
 @rescue_cmd.handle()
 async def handle_rescue(event: MessageEvent):
@@ -497,7 +502,7 @@ async def handle_rescue(event: MessageEvent):
 
 
 # 攻击命令（主动发起战斗）
-attack_cmd = on_command("攻击", block=True, priority=4)
+attack_cmd = on_command("攻击", block=True, priority=4, permission=SUPERUSER)
 
 @attack_cmd.handle()
 async def handle_attack(event: MessageEvent):
@@ -545,7 +550,7 @@ async def handle_attack(event: MessageEvent):
 
 
 # 查看线索命令
-view_clues_cmd = on_command("查看线索", aliases={"线索列表", "已收集线索"}, block=True, priority=4)
+view_clues_cmd = on_command("查看线索", aliases={"线索列表", "已收集线索"}, block=True, priority=4, permission=SUPERUSER)
 
 @view_clues_cmd.handle()
 async def handle_view_clues(event: MessageEvent):
@@ -608,11 +613,11 @@ async def handle_view_clues(event: MessageEvent):
 # ==================== 移动命令 ====================
 
 # 移动命令 - 使用 Rule 确保只在里界时才匹配，避免与诡域系统冲突
-move_cmd = on_command("移动", rule=in_inner_realm_rule, block=True, priority=4)
-up_cmd = on_command("上", rule=in_inner_realm_rule, block=True, priority=4)
-down_cmd = on_command("下", rule=in_inner_realm_rule, block=True, priority=4)
-left_cmd = on_command("左", rule=in_inner_realm_rule, block=True, priority=4)
-right_cmd = on_command("右", rule=in_inner_realm_rule, block=True, priority=4)
+move_cmd = on_command("移动", rule=in_inner_realm_rule, block=True, priority=4, permission=SUPERUSER)
+up_cmd = on_command("上", rule=in_inner_realm_rule, block=True, priority=4, permission=SUPERUSER)
+down_cmd = on_command("下", rule=in_inner_realm_rule, block=True, priority=4, permission=SUPERUSER)
+left_cmd = on_command("左", rule=in_inner_realm_rule, block=True, priority=4, permission=SUPERUSER)
+right_cmd = on_command("右", rule=in_inner_realm_rule, block=True, priority=4, permission=SUPERUSER)
 
 
 async def _handle_move(event: MessageEvent, dx: int, dy: int):

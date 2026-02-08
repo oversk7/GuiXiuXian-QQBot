@@ -426,18 +426,20 @@ class InnerRealmService:
             # 基础奖励：金币
             gold_amount = random.randint(100, 300)
 
-            # 随机材料奖励（1-2个）
+            # 随机材料奖励（1-2个）- 仅使用里界专属物品
             material_pool = [
-                {"item_id": "grave_soil", "quantity": random.randint(1, 5), "probability": 0.8},
-                {"item_id": "corrupted_bandage", "quantity": 1, "probability": 0.5},
-                {"item_id": "broken_id", "quantity": 1, "probability": 0.6},
+                {"item_id": "broken_id", "quantity": random.randint(1, 3), "probability": 0.8},  # 白色 - 破损证件
+                {"item_id": "corrupted_bandage", "quantity": 1, "probability": 0.5},  # 绿色 - 污染绷带（里界材料）
+                {"item_id": "scalpel", "quantity": 1, "probability": 0.6},  # 绿色 - 手术刀（里界专属）
+                {"item_id": "visitor_pass", "quantity": 1, "probability": 0.4},  # 绿色 - 访客通行证
             ]
 
-            # 稀有材料（低概率）
+            # 稀有材料（低概率）- 仅使用里界专属物品
             rare_pool = [
-                {"item_id": "twisted_flesh", "quantity": 1, "probability": 0.2},
-                {"item_id": "soul_essence", "quantity": 1, "probability": 0.15},
-                {"item_id": "cursed_mirror_shard", "quantity": 1, "probability": 0.05},
+                {"item_id": "twisted_flesh", "quantity": 1, "probability": 0.2},  # 蓝色 - 扭曲血肉（里界专属）
+                {"item_id": "corrupted_core", "quantity": 1, "probability": 0.15},  # 紫色 - 腐化之心（里界专属）
+                {"item_id": "medical_record_key", "quantity": 1, "probability": 0.1},  # 蓝色 - 病历室钥匙
+                {"item_id": "surgery_notes", "quantity": 1, "probability": 0.08},  # 蓝色 - 手术笔记
             ]
 
             # 添加金币奖励
