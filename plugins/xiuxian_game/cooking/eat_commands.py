@@ -13,7 +13,7 @@ from nonebot.adapters.qq import MessageEvent
 from nonebot.params import CommandArg
 from nonebot.adapters.qq import Message
 
-from ..infrastructure.database import AsyncSessionLocal
+from ..models.db import AsyncSessionLocal
 from ..infrastructure.uow.unit_of_work import UnitOfWork
 from ..platform_utils import get_unified_player
 from ..models.inventory import ItemType

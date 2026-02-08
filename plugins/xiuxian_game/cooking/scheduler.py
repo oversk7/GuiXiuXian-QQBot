@@ -7,7 +7,7 @@
 from nonebot import require, get_driver, logger
 from nonebot_plugin_apscheduler import scheduler
 
-from ..infrastructure.database import AsyncSessionLocal
+from ..models.db import AsyncSessionLocal
 from ..infrastructure.uow.unit_of_work import UnitOfWork
 from .settlement_service import SettlementService
 
