@@ -76,12 +76,14 @@ RARITY_WEIGHTS = {
 }
 
 def get_materials_by_rarity(rarity: str) -> list:
-    """获取指定稀有度的所有材料"""
+    """获取指定稀有度的所有材料(排除里界专属材料)"""
     materials = []
     for item_id in config.items_config["by_type"]["MATERIAL"]:
         item_config = config.items_config["by_id"].get(item_id)
         if item_config and item_config.rarity == rarity:
-            materials.append(item_id)
+            # 过滤掉里界专属材料
+            if "inner_realm_only" not in item_config.tags:
+                materials.append(item_id)
     return materials
 
 def get_region_materials(region: str) -> dict:

@@ -2748,6 +2748,7 @@ items:
       type: "MATERIAL"
       rarity: "blue"
       price: 0  # 任务物品，不可交易
+      tags: ["inner_realm_only"]
 
     - item_id: "surgery_notes"
       name: "手术笔记"
@@ -2755,6 +2756,7 @@ items:
       type: "MATERIAL"
       rarity: "blue"
       price: 0
+      tags: ["inner_realm_only"]
 
     - item_id: "director_key"
       name: "院长密钥"
@@ -2762,6 +2764,7 @@ items:
       type: "MATERIAL"
       rarity: "purple"
       price: 0
+      tags: ["inner_realm_only"]
 
     - item_id: "organ_trafficking_ledger"
       name: "器官交易账本"
@@ -2769,6 +2772,7 @@ items:
       type: "MATERIAL"
       rarity: "purple"
       price: 0
+      tags: ["inner_realm_only"]
 
     - item_id: "scalpel"
       name: "手术刀"
@@ -2776,6 +2780,7 @@ items:
       type: "MATERIAL"
       rarity: "green"
       price: 500
+      tags: ["inner_realm_only"]
 
     - item_id: "broken_id"
       name: "破损证件"
@@ -2783,6 +2788,7 @@ items:
       type: "MATERIAL"
       rarity: "white"
       price: 50
+      tags: ["inner_realm_only"]
 
     - item_id: "visitor_pass"
       name: "访客通行证"
@@ -2790,6 +2796,7 @@ items:
       type: "MATERIAL"
       rarity: "green"
       price: 200
+      tags: ["inner_realm_only"]
 
     # ========== 里界材料（战利品） ==========
     - item_id: "corrupted_bandage"
@@ -2799,6 +2806,7 @@ items:
       rarity: "green"
       price: 800
       grudge_value: 50
+      tags: ["inner_realm_only"]
 
     - item_id: "twisted_flesh"
       name: "扭曲血肉"
@@ -2807,6 +2815,7 @@ items:
       rarity: "blue"
       price: 2000
       grudge_value: 150
+      tags: ["inner_realm_only"]
 
     - item_id: "corrupted_core"
       name: "腐化之心"
@@ -2815,6 +2824,7 @@ items:
       rarity: "purple"
       price: 5000
       grudge_value: 500
+      tags: ["inner_realm_only"]
 
     - item_id: "cursed_mirror_shard"
       name: "诅咒镜片"
@@ -2823,6 +2833,7 @@ items:
       rarity: "purple"
       price: 8000
       grudge_value: 800
+      tags: ["inner_realm_only"]
 
     - item_id: "soul_essence"
       name: "游魂精华"
@@ -2831,6 +2842,7 @@ items:
       rarity: "blue"
       price: 3000
       grudge_value: 300
+      tags: ["inner_realm_only"]
 
     # ========== 幸存者奖励 ==========
     - item_id: "favor_token"
@@ -2840,6 +2852,7 @@ items:
       rarity: "green"
       price: 1000
       grudge_value: 100
+      tags: ["inner_realm_only"]
 
     # ========== 成就物品（仅作标记） ==========
     - item_id: "achievement_truth_seeker"
@@ -2848,6 +2861,7 @@ items:
       type: "MATERIAL"
       rarity: "purple"
       price: 0
+      tags: ["inner_realm_only"]
 
     - item_id: "achievement_savior"
       name: "成就：救世主"
@@ -2855,6 +2869,7 @@ items:
       type: "MATERIAL"
       rarity: "purple"
       price: 0
+      tags: ["inner_realm_only"]
 
     - item_id: "achievement_annihilator"
       name: "成就：毁灭使者"
@@ -2862,4 +2877,5 @@ items:
       type: "MATERIAL"
       rarity: "red"
       price: 0
+      tags: ["inner_realm_only"]
 
