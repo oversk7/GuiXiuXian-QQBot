@@ -420,10 +420,41 @@ class InnerRealmService:
 
         elif event_type == "LOOT":
             # 生成随机物品
-            # 这里暂时返回空,等后续实现物品系统
+            # 根据里界等级和位置生成不同品质的物品
+            items = []
+
+            # 基础奖励：金币
+            gold_amount = random.randint(100, 300)
+
+            # 随机材料奖励（1-2个）
+            material_pool = [
+                {"item_id": "grave_soil", "quantity": random.randint(1, 5), "probability": 0.8},
+                {"item_id": "corrupted_bandage", "quantity": 1, "probability": 0.5},
+                {"item_id": "broken_id", "quantity": 1, "probability": 0.6},
+            ]
+
+            # 稀有材料（低概率）
+            rare_pool = [
+                {"item_id": "twisted_flesh", "quantity": 1, "probability": 0.2},
+                {"item_id": "soul_essence", "quantity": 1, "probability": 0.15},
+                {"item_id": "cursed_mirror_shard", "quantity": 1, "probability": 0.05},
+            ]
+
+            # 添加金币奖励
+            items.append({"gold": gold_amount})
+
+            # 添加1-2个普通材料
+            selected_materials = random.sample(material_pool, k=min(2, len(material_pool)))
+            items.extend(selected_materials)
+
+            # 有概率添加稀有材料
+            if random.random() < 0.3:  # 30%概率
+                rare_item = random.choice(rare_pool)
+                items.append(rare_item)
+
             return {
                 "looted": False,
-                "items": []  # 后续填充物品列表
+                "items": items
             }
 
         elif event_type == "CLUE":
@@ -942,7 +973,120 @@ class InnerRealmService:
         reward_desc = "\n".join(rewards_text) if rewards_text else "什么也没得到..."
         return reward_desc, total_gold, items_obtained
 
-    # ==================== 事件触发系统 ====================
+    # ==================== 战斗系统集成 ====================
+
+    async def start_battle_with_npc(
+        self,
+        player: Player,
+        tile: InnerRealmTile,
+        session: InnerRealmSession
+    ) -> Tuple[bool, str, dict]:
+        """
+        与NPC/BOSS发起战斗
+
+        Args:
+            player: 玩家对象
+            tile: 地块对象
+            session: 里界会话
+
+        Returns:
+            (是否胜利, 战斗描述, 战斗奖励)
+        """
+        from ..battle.integration_helper import BattleIntegrationHelper
+        import time
+
+        state = json.loads(tile.state) if tile.state else {}
+
+        # 获取敌人信息
+        enemy_name = state.get("name", "未知敌人")
+        enemy_hp = state.get("hp", 100)
+        enemy_max_hp = state.get("max_hp", enemy_hp)
+        enemy_attack = state.get("attack", 30)
+        enemy_defense = state.get("defense", 10)
+        enemy_agility = state.get("agility", 10)
+        is_boss = tile.event_type == "BOSS"
+
+        # 构建敌人属性
+        monster_stats = {
+            "hp": enemy_hp,
+            "attack": enemy_attack,
+            "defense": enemy_defense,
+            "agility": enemy_agility
+        }
+
+        # 创建战斗种子
+        battle_timestamp = int(time.time() * 1000)
+        seed = f"InnerRealm_{session.id}:{tile.x}:{tile.y}:{battle_timestamp}"
+
+        # 执行战斗
+        victory, battle_log, damage_taken = await BattleIntegrationHelper.enhanced_player_vs_monster_battle_v2(
+            player, monster_stats, enemy_name, self.uow.session, seed=seed, max_rounds=30
+        )
+
+        # 更新玩家血量
+        player.hp = max(0, player.hp - damage_taken)
+        self.uow.session.add(player)
+
+        # 构建战斗结果
+        result_lines = []
+        rewards = {}
+
+        if victory:
+            # 战斗胜利
+            result_lines.extend([
+                "━━━━━━━━━━━━━",
+                "✅ 战斗胜利！",
+                "━━━━━━━━━━━━━"
+            ])
+
+            # 标记敌人已死亡
+            state["alive"] = False
+            tile.state = json.dumps(state, ensure_ascii=False)
+            tile.is_triggered = True
+
+            # 增加击杀计数
+            session.killed_count += 1
+
+            # 发放战利品
+            loot_items = state.get("loot", [])
+            reward_desc, total_gold, items = await self._distribute_loot(
+                player, loot_items, multiplier=1.0
+            )
+            rewards = {"description": reward_desc, "gold": total_gold, "items": items}
+
+            if reward_desc != "什么也没得到...":
+                result_lines.append(f"🎁 获得战利品：\n{reward_desc}")
+
+            # BOSS击败额外处理
+            if is_boss:
+                state_obj = json.loads(session.state) if session.state else {}
+                state_obj["boss_defeated"] = True
+                session.state = json.dumps(state_obj, ensure_ascii=False)
+                await self.trigger_sanity_recovery(session, "defeat_boss")
+                result_lines.append("\n🏆 击败了核心BOSS！理智恢复+15")
+
+        else:
+            # 战斗失败
+            result_lines.extend([
+                "━━━━━━━━━━━━━",
+                "💀 战斗失败...",
+                f"💔 受到 {damage_taken} 点伤害",
+                "━━━━━━━━━━━━━"
+            ])
+
+            # 理智损失
+            if is_boss:
+                await self.trigger_sanity_loss(session, "encounter_boss")
+                result_lines.append("🧠 遭遇强大的诡异，理智严重受损...")
+
+        await self.uow.commit()
+
+        # 组合完整战斗消息
+        full_message = "\n".join(battle_log) + "\n" + "\n".join(result_lines)
+
+        return victory, full_message, rewards
+
+    # ==================== 事件触发系统（原有代码）====================
 
     async def perform_search(
         self,
@@ -1074,13 +1218,22 @@ class InnerRealmService:
         if result.result_level == "critical_failure":
             # 大失败：目标逃跑或变异
             if target_type == "disguised":
-                # 伪装者暴露真身并攻击
+                # 伪装者暴露真身并攻击 - 进入战斗
                 reveal_desc = state.get("reveal_description", "目标突然暴露真身！")
-                return False, self.format_dice_roll_message(
+
+                # 自动进入战斗
+                battle_msg = self.format_dice_roll_message(
                     "威吓检定",
                     result,
-                    f"{reveal_desc}\n⚠️ 进入战斗状态！（战斗系统待实现）"
+                    f"{reveal_desc}\n⚠️ 战斗开始！"
                 )
+
+                # 发起战斗
+                victory, battle_result, rewards = await self.start_battle_with_npc(
+                    player, tile, session
+                )
+
+                return victory, f"{battle_msg}\n\n{battle_result}"
             else:
                 # 普通NPC逃跑或惊动其他人
                 威吓_fail = state.get("威吓_fail", f"{target_name}惊恐地逃走了，惊动了周围的其他人！")
@@ -1091,12 +1244,27 @@ class InnerRealmService:
                 )
 
         elif result.result_level == "failure":
-            # 失败：目标拒绝，可能会攻击
-            return False, self.format_dice_roll_message(
-                "威吓检定",
-                result,
-                f"{target_name}没有被吓倒，反而更加警惕了..."
-            )
+            # 失败：目标拒绝，可能会攻击 - 进入战斗
+            # 只有特殊NPC和伪装者会反击
+            if target_type in ["special", "disguised"]:
+                battle_msg = self.format_dice_roll_message(
+                    "威吓检定",
+                    result,
+                    f"{target_name}没有被吓倒，开始反击！\n⚠️ 战斗开始！"
+                )
+
+                # 发起战斗
+                victory, battle_result, rewards = await self.start_battle_with_npc(
+                    player, tile, session
+                )
+
+                return victory, f"{battle_msg}\n\n{battle_result}"
+            else:
+                return False, self.format_dice_roll_message(
+                    "威吓检定",
+                    result,
+                    f"{target_name}没有被吓倒，反而更加警惕了..."
+                )
 
         else:
             # 成功：目标屈服，交出物品/信息
@@ -1177,11 +1345,18 @@ class InnerRealmService:
 
         elif result.result_level == "failure":
             # 失败：目标挣扎，进入战斗
-            return False, self.format_dice_roll_message(
+            battle_msg = self.format_dice_roll_message(
                 "处决检定",
                 result,
-                f"{target_name}察觉到危险，开始挣扎！\n⚠️ 进入战斗状态！（战斗系统待实现）"
+                f"{target_name}察觉到危险，开始挣扎！\n⚠️ 战斗开始！"
             )
+
+            # 发起战斗
+            victory, battle_result, rewards = await self.start_battle_with_npc(
+                player, tile, session
+            )
+
+            return victory, f"{battle_msg}\n\n{battle_result}"
 
         else:
             # 成功：无声击杀

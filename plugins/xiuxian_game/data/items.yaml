@@ -2739,3 +2739,127 @@ items:
       favorability: 50
       daily_limit: 1  # 每日限购1个
 
+  # ==================== 里界专属物品 ====================
+  inner_realm_items:
+    # ========== 特殊道具（任务物品） ==========
+    - item_id: "medical_record_key"
+      name: "病历室钥匙"
+      description: "生锈的铁钥匙，上面沾满了血迹。似乎可以打开某个房间的门 🔑"
+      type: "MATERIAL"
+      rarity: "blue"
+      price: 0  # 任务物品，不可交易
+
+    - item_id: "surgery_notes"
+      name: "手术笔记"
+      description: "沾满血污的笔记本，记录着一场场非人道的器官摘取手术 📖"
+      type: "MATERIAL"
+      rarity: "blue"
+      price: 0
+
+    - item_id: "director_key"
+      name: "院长密钥"
+      description: "金色的精致钥匙，院长的专属钥匙，能打开最深处的秘密 🔑"
+      type: "MATERIAL"
+      rarity: "purple"
+      price: 0
+
+    - item_id: "organ_trafficking_ledger"
+      name: "器官交易账本"
+      description: "详细记录了黑市器官交易的账本，每一页都浸满了罪恶 📕"
+      type: "MATERIAL"
+      rarity: "purple"
+      price: 0
+
+    - item_id: "scalpel"
+      name: "手术刀"
+      description: "锋利的手术刀，刀刃上还残留着干涸的血迹 🔪"
+      type: "MATERIAL"
+      rarity: "green"
+      price: 500
+
+    - item_id: "broken_id"
+      name: "破损证件"
+      description: "沾满污渍的身份证件，记录着失踪者的身份 📇"
+      type: "MATERIAL"
+      rarity: "white"
+      price: 50
+
+    - item_id: "visitor_pass"
+      name: "访客通行证"
+      description: "医院的访客通行证，已经过期很久了 📇"
+      type: "MATERIAL"
+      rarity: "green"
+      price: 200
+
+    # ========== 里界材料（战利品） ==========
+    - item_id: "corrupted_bandage"
+      name: "污染绷带"
+      description: "被诡异力量污染的医用绷带，散发着不详的气息 🩹"
+      type: "MATERIAL"
+      rarity: "green"
+      price: 800
+      grudge_value: 50
+
+    - item_id: "twisted_flesh"
+      name: "扭曲血肉"
+      description: "从伪装者身上剥离的扭曲血肉，仍在微微蠕动 🥩"
+      type: "MATERIAL"
+      rarity: "blue"
+      price: 2000
+      grudge_value: 150
+
+    - item_id: "corrupted_core"
+      name: "腐化之心"
+      description: "诡异的核心结晶，蕴含着强大的污染之力 💎"
+      type: "MATERIAL"
+      rarity: "purple"
+      price: 5000
+      grudge_value: 500
+
+    - item_id: "cursed_mirror_shard"
+      name: "诅咒镜片"
+      description: "散发着不祥光芒的镜片碎片，凝视它会看到扭曲的真相 🪞"
+      type: "MATERIAL"
+      rarity: "purple"
+      price: 8000
+      grudge_value: 800
+
+    - item_id: "soul_essence"
+      name: "游魂精华"
+      description: "从里界收集的游魂精华，可用于强化装备或炼丹 👻"
+      type: "MATERIAL"
+      rarity: "blue"
+      price: 3000
+      grudge_value: 300
+
+    # ========== 幸存者奖励 ==========
+    - item_id: "favor_token"
+      name: "感激信物"
+      description: "幸存者赠予的感激信物，蕴含着一丝微弱的祝福之力 🎖️"
+      type: "MATERIAL"
+      rarity: "green"
+      price: 1000
+      grudge_value: 100
+
+    # ========== 成就物品（仅作标记） ==========
+    - item_id: "achievement_truth_seeker"
+      name: "成就：真相探寻者"
+      description: "在第三病栋揭示了完整真相的证明 🏆"
+      type: "MATERIAL"
+      rarity: "purple"
+      price: 0
+
+    - item_id: "achievement_savior"
+      name: "成就：救世主"
+      description: "在里界中拯救了大量幸存者的证明 🛡️"
+      type: "MATERIAL"
+      rarity: "purple"
+      price: 0
+
+    - item_id: "achievement_annihilator"
+      name: "成就：毁灭使者"
+      description: "完全摧毁里界的恐怖证明 ☠️"
+      type: "MATERIAL"
+      rarity: "red"
+      price: 0
+

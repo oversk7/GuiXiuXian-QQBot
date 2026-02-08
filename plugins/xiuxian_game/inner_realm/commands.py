@@ -490,6 +490,54 @@ async def handle_rescue(event: MessageEvent):
         await rescue_cmd.finish(message)
 
 
+# 攻击命令（主动发起战斗）
+attack_cmd = on_command("攻击", block=True, priority=4)
+
+@attack_cmd.handle()
+async def handle_attack(event: MessageEvent):
+    """主动攻击当前位置的NPC或BOSS"""
+
+    def session_factory():
+        return AsyncSessionLocal()
+
+    async with UnitOfWork(session_factory) as uow:
+        player = await get_unified_player(uow.session, event)
+        if not player:
+            await attack_cmd.finish("⛔ 请先创建角色")
+
+        # 检查是否在里界中
+        if not player.inner_realm:
+            await attack_cmd.finish("⛔ 你不在任何里界中")
+
+        service = InnerRealmService(uow)
+
+        # 获取活跃会话
+        active_session = await service.get_active_session(player.id, player.inner_realm)
+        if not active_session:
+            await attack_cmd.finish("⛔ 会话数据错误")
+
+        # 获取当前位置地块
+        current_tile = await service.get_current_tile(active_session)
+        if not current_tile:
+            await attack_cmd.finish("⛔ 地块数据错误")
+
+        # 检查是否可以攻击
+        if current_tile.event_type not in ["NPC", "BOSS"]:
+            await attack_cmd.finish("⛔ 这里没有可以攻击的目标...")
+
+        state = json.loads(current_tile.state) if current_tile.state else {}
+
+        if not state.get("alive"):
+            await attack_cmd.finish("⛔ 这里只剩下一具尸体...")
+
+        # 发起战斗
+        victory, message, rewards = await service.start_battle_with_npc(
+            player, current_tile, active_session
+        )
+
+        await attack_cmd.finish(message)
+
+
 # 查看线索命令
 view_clues_cmd = on_command("查看线索", aliases={"线索列表", "已收集线索"}, block=True, priority=4)
 
@@ -549,3 +597,104 @@ async def handle_view_clues(event: MessageEvent):
         lines.append("💡 收集全部线索可以触发【真相】结局")
 
         await view_clues_cmd.finish("\n".join(lines))
+
+
+# ==================== 移动命令 ====================
+
+# 移动命令
+move_cmd = on_command("移动", block=True, priority=4)
+up_cmd = on_command("上", block=True, priority=4)
+down_cmd = on_command("下", block=True, priority=4)
+left_cmd = on_command("左", block=True, priority=4)
+right_cmd = on_command("右", block=True, priority=4)
+
+
+async def _handle_move(event: MessageEvent, dx: int, dy: int):
+    """统一的移动处理函数"""
+    def session_factory():
+        return AsyncSessionLocal()
+
+    async with UnitOfWork(session_factory) as uow:
+        player = await get_unified_player(uow.session, event)
+        if not player:
+            return "⛔ 请先创建角色"
+
+        # 检查是否在里界中
+        if not player.inner_realm:
+            return "⛔ 你不在任何里界中\n💡 使用【里界】查看可进入的里界列表"
+
+        service = InnerRealmService(uow)
+
+        # 获取活跃会话
+        active_session = await service.get_active_session(player.id, player.inner_realm)
+        if not active_session:
+            return "⛔ 会话数据错误"
+
+        # 获取里界配置
+        realm_config = InnerRealmConfig.get_realm_config(player.inner_realm)
+        if not realm_config:
+            return "⛔ 里界配置错误"
+
+        # 执行移动
+        success, message = await service.move_in_realm(active_session, dx, dy, realm_config)
+
+        # 检查是否触发认知篡改
+        tamper_warning = ""
+        tamper_event = await service.check_cognition_tamper(active_session)
+        if tamper_event:
+            tamper_desc = await service.apply_cognition_tamper(active_session, tamper_event)
+            tamper_warning = f"\n\n{tamper_desc}"
+
+        return f"{message}{tamper_warning}"
+
+
+@move_cmd.handle()
+async def handle_move(event: MessageEvent, args: Message = CommandArg()):
+    """移动命令"""
+    arg_text = args.extract_plain_text().strip()
+
+    if not arg_text:
+        await move_cmd.finish("⛔ 格式错误\n正确格式：移动 <方向>\n方向：上/下/左/右")
+
+    # 解析方向
+    direction_map = {
+        "上": (0, -1),
+        "下": (0, 1),
+        "左": (-1, 0),
+        "右": (1, 0)
+    }
+
+    if arg_text not in direction_map:
+        await move_cmd.finish("⛔ 方向错误\n可用方向：上/下/左/右")
+
+    dx, dy = direction_map[arg_text]
+    result_msg = await _handle_move(event, dx, dy)
+    await move_cmd.finish(result_msg)
+
+
+@up_cmd.handle()
+async def handle_up(event: MessageEvent):
+    """向上移动"""
+    result_msg = await _handle_move(event, 0, -1)
+    await up_cmd.finish(result_msg)
+
+
+@down_cmd.handle()
+async def handle_down(event: MessageEvent):
+    """向下移动"""
+    result_msg = await _handle_move(event, 0, 1)
+    await down_cmd.finish(result_msg)
+
+
+@left_cmd.handle()
+async def handle_left(event: MessageEvent):
+    """向左移动"""
+    result_msg = await _handle_move(event, -1, 0)
+    await left_cmd.finish(result_msg)
+
+
+@right_cmd.handle()
+async def handle_right(event: MessageEvent):
+    """向右移动"""
+    result_msg = await _handle_move(event, 1, 0)
+    await right_cmd.finish(result_msg)
