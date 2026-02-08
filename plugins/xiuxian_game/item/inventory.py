@@ -332,7 +332,7 @@ async def handle_elixir_bonus(event: MessageEvent):
         }
 
         # 构建详细报告
-        lines = ["💊 丹药总加成统计", "=" * 30]
+        lines = ["💊 丹药总加成统计", "━━━━━━━━━━━━━"]
 
         # 按丹药分类显示
         for item_id, total_qty in elixir_usage_total.items():
