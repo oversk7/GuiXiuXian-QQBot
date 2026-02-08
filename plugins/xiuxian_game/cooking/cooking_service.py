@@ -226,13 +226,13 @@ class CookingService:
                 if item.quantity >= remaining:
                     item.quantity -= remaining
                     if item.quantity == 0:
-                        await uow.items.delete(item)
+                        await uow.items.delete(item.id)
                     else:
                         await uow.items.update(item)
                     remaining = 0
                 else:
                     remaining -= item.quantity
-                    await uow.items.delete(item)
+                    await uow.items.delete(item.id)
 
         # 6. 添加菜肴到背包(作为DISH类型物品)
         for dish in results:

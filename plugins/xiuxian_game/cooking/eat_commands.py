@@ -122,13 +122,13 @@ async def _eat_fish(uow: UnitOfWork, player, fish_item_id: str, quantity: int) -
         if item.quantity >= remaining:
             item.quantity -= remaining
             if item.quantity == 0:
-                await uow.items.delete(item)
+                await uow.items.delete(item.id)
             else:
                 await uow.items.update(item)
             remaining = 0
         else:
             remaining -= item.quantity
-            await uow.items.delete(item)
+            await uow.items.delete(item.id)
 
     await uow.commit()
 
@@ -188,13 +188,13 @@ async def _eat_dish(
         if item.quantity >= remaining:
             item.quantity -= remaining
             if item.quantity == 0:
-                await uow.items.delete(item)
+                await uow.items.delete(item.id)
             else:
                 await uow.items.update(item)
             remaining = 0
         else:
             remaining -= item.quantity
-            await uow.items.delete(item)
+            await uow.items.delete(item.id)
 
     # 应用效果
     total_sanity_gain = 0

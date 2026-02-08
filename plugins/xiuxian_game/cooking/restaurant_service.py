@@ -179,13 +179,13 @@ class RestaurantService:
                 if item.quantity >= remaining:
                     item.quantity -= remaining
                     if item.quantity == 0:
-                        await uow.items.delete(item)
+                        await uow.items.delete(item.id)
                     else:
                         await uow.items.update(item)
                     remaining = 0
                 else:
                     remaining -= item.quantity
-                    await uow.items.delete(item)
+                    await uow.items.delete(item.id)
 
         # 升级餐厅
         old_level = restaurant.level
@@ -388,13 +388,13 @@ class RestaurantService:
             if item.quantity >= remaining:
                 item.quantity -= remaining
                 if item.quantity == 0:
-                    await uow.items.delete(item)
+                    await uow.items.delete(item.id)
                 else:
                     await uow.items.update(item)
                 remaining = 0
             else:
                 remaining -= item.quantity
-                await uow.items.delete(item)
+                await uow.items.delete(item.id)
 
         # 4. 添加到餐厅仓库
         storage = await uow.restaurant_storage.get_by_restaurant_and_item(restaurant.id, item_id)
