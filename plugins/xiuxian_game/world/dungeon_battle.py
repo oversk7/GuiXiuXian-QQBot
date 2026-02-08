@@ -659,11 +659,11 @@ async def _(event: MessageEvent):
                 looted_by = t.state.get("looted_by", [])
                 if player.id in looted_by or t.state.get("looted"):
                     return f"🪨 这里曾经散落着 {item_name} ✖️{qty}，但已被搜刮一空。"
-                return f"✨ 你发现了材料 {item_name} ✖️{qty}，可输入 [收集] 获取。"
+                return f"✨ 你发现了材料 {item_name} ✖️{qty}，可输入 【收集】 获取。"
             elif t.event_type == "TREASURE":
                 if t.state.get("looted"):
                     return "🪨 破碎的宝箱静静躺在尘埃中，没有任何价值。"
-                return "🎁 你注意到一个尘封宝箱，输入 [探索] 能打开它。"
+                return "🎁 你注意到一个尘封宝箱，输入 【探索】 能打开它。"
             elif t.event_type == "EMPTY":
                 if player.id in t.state.get("defeated_by", []):
                     return "🪨 这里只剩下诡异的残骸，散发着淡淡的血腥味。"
@@ -686,13 +686,13 @@ async def _(event: MessageEvent):
                     if special_attrs:
                         special_info = f"\n🔥 特殊能力：{' '.join(special_attrs)}"
 
-                return f"🌫️ 空间扭曲中传来异响，似乎有 {monster}(Lv{monster_level}) 在此游荡。{special_info}\n若想挑战，可输入 [探索] 进行调查。"
+                return f"🌫️ 空间扭曲中传来异响，似乎有 {monster}(Lv{monster_level}) 在此游荡。{special_info}\n若想挑战，可输入 【探索】 进行调查。"
             elif t.event_type == "REST":
-                return "🌫️ 你发现了一家驿站，可输入 [探索] 恢复生命。"
+                return "🌫️ 你发现了一家驿站，可输入 【探索】 恢复生命。"
             elif t.event_type == "MERCHANT":
                 if player.id in t.state.get("visited_by", []):
                     return "🏪 卖货郎已经离开了，只留下空荡荡的摊位。"
-                return "🏪 你遇到了神秘卖货郎，输入 [探索] 查看他的商品。"
+                return "🏪 你遇到了神秘卖货郎，输入 【探索】 查看他的商品。"
             elif t.event_type == "ELITE":
                 if player.id in t.state.get("defeated_by", []):
                     return "⚰️ 精英诡异的残骸散落一地，散发着不祥的气息。"
@@ -715,7 +715,7 @@ async def _(event: MessageEvent):
                     if special_attrs:
                         special_info = f"\n🔥 特殊能力：{' '.join(special_attrs)}"
 
-                return f"⚔️ 空间深处传来恶意的窥视，{monster_name}(Lv{monster_level}) 作为这重诡域的诡异存在正盯着你！{special_info}\n输入 [探索] 迎战。"
+                return f"⚔️ 空间深处传来恶意的窥视，{monster_name}(Lv{monster_level}) 作为这重诡域的诡异存在正盯着你！{special_info}\n输入 【探索】 迎战。"
             return "⁉️ 未知事件。"
 
         event_desc = describe_tile(tile)
