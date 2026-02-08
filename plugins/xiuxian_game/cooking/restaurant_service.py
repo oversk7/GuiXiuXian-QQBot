@@ -153,9 +153,13 @@ class RestaurantService:
         missing_materials = []
 
         for material_id, needed_qty in materials.items():
-            material_count = await uow.items.count_by_player_and_item(player_id, material_id)
+            material_count = await uow.items.get_material_total_quantity(player_id, material_id)
             if material_count < needed_qty:
-                missing_materials.append(f"{material_id}(需要{needed_qty},拥有{material_count})")
+                # 获取材料中文名称
+                from ..config import config
+                material_cfg = config.items_config["by_id"].get(material_id)
+                material_name = material_cfg.name if material_cfg else material_id
+                missing_materials.append(f"{material_name}(需要{needed_qty},拥有{material_count})")
 
         if missing_materials:
             return False, f"⛔ 材料不足: {', '.join(missing_materials)}"
@@ -166,7 +170,7 @@ class RestaurantService:
 
         # 扣除材料
         for material_id, qty in materials.items():
-            items = await uow.items.get_by_player_and_item(player_id, material_id)
+            items = await uow.items.get_by_player_and_item_id(player_id, material_id)
             remaining = qty
             for item in items:
                 if remaining <= 0:
@@ -365,7 +369,7 @@ class RestaurantService:
             return False, "⛔ 你还没有餐厅，请先创建"
 
         # 1. 检查背包中是否有足够食材
-        item_count = await uow.items.count_by_player_and_item(player_id, item_id)
+        item_count = await uow.items.get_material_total_quantity(player_id, item_id)
         if item_count < quantity:
             return False, f"⛔ 背包中食材不足(需要 {quantity},拥有 {item_count})"
 
@@ -375,7 +379,7 @@ class RestaurantService:
             return False, f"⛔ 餐厅仓库容量不足(当前 {current_storage}/{restaurant.storage_capacity})"
 
         # 3. 从背包扣除食材
-        items = await uow.items.get_by_player_and_item(player_id, item_id)
+        items = await uow.items.get_by_player_and_item_id(player_id, item_id)
         remaining = quantity
         for item in items:
             if remaining <= 0:

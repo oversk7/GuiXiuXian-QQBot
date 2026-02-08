@@ -106,13 +106,13 @@ async def _eat_fish(uow: UnitOfWork, player, fish_item_id: str, quantity: int) -
     fish_name = fish_config.name if fish_config else fish_item_id
 
     # 检查物品数量
-    fish_count = await uow.items.count_by_player_and_item(player.id, fish_item_id)
+    fish_count = await uow.items.get_material_total_quantity(player.id, fish_item_id)
 
     if fish_count < quantity:
         return f"⛔ 你没有足够的{fish_name}(拥有 {fish_count})"
 
     # 扣除鱼
-    items = await uow.items.get_by_player_and_item(player.id, fish_item_id)
+    items = await uow.items.get_by_player_and_item_id(player.id, fish_item_id)
     remaining = quantity
 
     for item in items:
@@ -172,13 +172,13 @@ async def _eat_dish(
     dish_name = dish_config.name if dish_config else dish_item_id
 
     # 检查物品数量
-    dish_count = await uow.items.count_by_player_and_item(player.id, dish_item_id)
+    dish_count = await uow.items.get_material_total_quantity(player.id, dish_item_id)
 
     if dish_count < quantity:
         return f"⛔ 你没有足够的{dish_name}(拥有 {dish_count})"
 
     # 扣除菜肴
-    items = await uow.items.get_by_player_and_item(player.id, dish_item_id)
+    items = await uow.items.get_by_player_and_item_id(player.id, dish_item_id)
     remaining = quantity
 
     for item in items:

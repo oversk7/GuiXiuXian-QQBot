@@ -165,10 +165,14 @@ class CookingService:
             total_needed = needed_qty * quantity
 
             # 获取玩家背包中的该物品数量
-            item_count = await uow.items.count_by_player_and_item(player_id, item_id)
+            item_count = await uow.items.get_material_total_quantity(player_id, item_id)
 
             if item_count < total_needed:
-                return False, f"⛔ 食材不足: {item_id} (需要 {total_needed}，拥有 {item_count})", None
+                # 获取食材中文名称
+                from ..config import config
+                item_cfg = config.items_config["by_id"].get(item_id)
+                item_name = item_cfg.name if item_cfg else item_id
+                return False, f"⛔ 食材不足: {item_name} (需要 {total_needed}，拥有 {item_count})", None
 
         # 4. 执行烹饪并生成菜肴
         results = []
@@ -212,7 +216,7 @@ class CookingService:
         # 5. 扣除食材
         for item_id, consumed_qty in total_consumed.items():
             # 从玩家背包扣除食材
-            items = await uow.items.get_by_player_and_item(player_id, item_id)
+            items = await uow.items.get_by_player_and_item_id(player_id, item_id)
 
             remaining = consumed_qty
             for item in items:

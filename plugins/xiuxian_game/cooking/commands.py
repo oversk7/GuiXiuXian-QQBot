@@ -122,7 +122,15 @@ async def handle_recipes(event: MessageEvent):
             if tier_recipes:
                 msg += f"{tier_name}\n"
                 for recipe in tier_recipes:
-                    ingredients_text = " + ".join([f"{item_id}×{qty}" for item_id, qty in recipe.ingredients.items()])
+                    # 将食材ID转换为中文名称
+                    from ..config import config
+                    ingredients_parts = []
+                    for item_id, qty in recipe.ingredients.items():
+                        item_cfg = config.items_config["by_id"].get(item_id)
+                        item_name = item_cfg.name if item_cfg else item_id
+                        ingredients_parts.append(f"{item_name}×{qty}")
+                    ingredients_text = " + ".join(ingredients_parts)
+
                     msg += f"  • {recipe.name} ({recipe.base_price}金)\n"
                     msg += f"    {ingredients_text}\n"
                 msg += "\n"
