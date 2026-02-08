@@ -31,7 +31,9 @@ async def in_inner_realm_rule(event: MessageEvent) -> bool:
 # ==================== 命令注册 ====================
 # 注册命令
 realms_list_cmd = on_command("里界", aliases={"里界列表"}, block=True, priority=5)
-enter_realm_cmd = on_command("传送", block=True, priority=5)
+# 里界传送命令优先级为4（高于诡域的5），使用智能识别
+# block=False 允许在不匹配里界时继续传递给诡域系统
+enter_realm_cmd = on_command("传送", aliases={"进入里界"}, block=False, priority=4)
 realm_info_cmd = on_command("里界信息", block=True, priority=5)
 # 里界的返回命令优先级更高（4），在诡域返回命令（5）之前处理
 # 使用 Rule 确保只有在里界时才匹配此命令
@@ -93,11 +95,16 @@ async def handle_realms_list(event: MessageEvent):
 
 @enter_realm_cmd.handle()
 async def handle_enter_realm(event: MessageEvent, args: Message = CommandArg()):
-    """传送到指定里界"""
+    """传送到指定里界（智能识别，不匹配则传递给诡域系统）"""
     arg_text = args.extract_plain_text().strip()
 
+    # 如果没有参数，交给诡域系统处理
     if not arg_text:
-        await enter_realm_cmd.finish("⛔ 格式错误\n正确格式：传送 <里界名>\n例如：传送 第三病栋")
+        return
+
+    # 检查是否是诡域格式（包含"层诡域"），如果是则交给诡域系统
+    if "层诡域" in arg_text or arg_text == "诡域":
+        return
 
     # 解析里界名称
     realm_display_name = arg_text
@@ -108,40 +115,39 @@ async def handle_enter_realm(event: MessageEvent, args: Message = CommandArg()):
     async with UnitOfWork(session_factory) as uow:
         player = await get_unified_player(uow.session, event)
         if not player:
-            error_msg = "⛔ 请先创建角色"
+            # 未找到玩家，也可能是诡域命令，不finish，继续传递
+            return
+
+        # 根据显示名称找到里界配置key
+        all_realms = InnerRealmConfig.get_all_realms()
+        realm_key = None
+
+        for key, config in all_realms.items():
+            if config.get("display_name") == realm_display_name:
+                realm_key = key
+                break
+
+        # 如果不是里界名称，交给诡域系统处理
+        if not realm_key:
+            return
+
+        # 确认是里界命令，开始处理
+        service = InnerRealmService(uow)
+        success, message, session = await service.enter_realm(player, realm_key)
+
+        if success:
+            realm_config = InnerRealmConfig.get_realm_config(realm_key)
+            result_msg = (
+                f"{message}\n"
+                f"━━━━━━━━━━━━━\n"
+                f"📍 当前位置: ({session.x}, {session.y})\n"
+                f"💡 使用【里界信息】查看探索进度\n"
+                f"💡 使用【返回】离开并结算"
+            )
         else:
-            error_msg = None
+            result_msg = message
 
-            # 根据显示名称找到里界配置key
-            all_realms = InnerRealmConfig.get_all_realms()
-            realm_key = None
-
-            for key, config in all_realms.items():
-                if config.get("display_name") == realm_display_name:
-                    realm_key = key
-                    break
-
-            if not realm_key:
-                result_msg = f"⛔ 未找到里界 '{realm_display_name}'\n💡 使用【里界】查看可进入的里界列表"
-            else:
-                service = InnerRealmService(uow)
-                success, message, session = await service.enter_realm(player, realm_key)
-
-                if success:
-                    realm_config = InnerRealmConfig.get_realm_config(realm_key)
-                    result_msg = (
-                        f"{message}\n"
-                        f"━━━━━━━━━━━━━\n"
-                        f"📍 当前位置: ({session.x}, {session.y})\n"
-                        f"💡 使用【里界信息】查看探索进度\n"
-                        f"💡 使用【返回】离开并结算"
-                    )
-                else:
-                    result_msg = message
-
-    if error_msg:
-        await enter_realm_cmd.finish(error_msg)
-    else:
+        # 只有确认是里界命令时才finish（阻断后续处理）
         await enter_realm_cmd.finish(result_msg)
 
 
