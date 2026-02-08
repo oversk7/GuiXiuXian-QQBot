@@ -401,7 +401,7 @@ async def handle_player(event: MessageEvent, args: Message = CommandArg()):
         "• 🎂 老玩家专属周年成就等你解锁！\n"
         "━━━━━━━━━━━━━\n"
         "【注册】 注册角色\n"
-        "【改名 <新名字>】 改名\n"
+        "【改名 <新名字>】 改名（需消耗改名卡）\n"
         "【改性别 <男/女>】 修改角色性别\n"
         "【邀请码】 查看我的邀请码和分级奖励说明\n"
         "【绑定邀请码 <邀请码>】 绑定好友邀请码获得奖励\n"
@@ -409,6 +409,10 @@ async def handle_player(event: MessageEvent, args: Message = CommandArg()):
         "━━━━━━━━━━━━━\n"
         "💡 新手注册：发送【注册】，系统会引导你输入昵称\n"
         "💡 快速注册：发送【注册 昵称】，如：注册 道爷\n"
+        "⚠️ 昵称规则：\n"
+        "   • 长度至少2个字符，最长12个字符\n"
+        "   • 不能包含违禁词和敏感内容\n"
+        "   • 不能包含游戏名称「诡修仙」\n"
         "💡 不知道怎么加点？发送【加点帮助】查看详细指南"
     )
     await player_cmd.finish(Message(msg))

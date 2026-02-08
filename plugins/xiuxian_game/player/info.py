@@ -360,6 +360,12 @@ async def _(event: MessageEvent, state: T_State, args: Message = CommandArg()):
                 "⚠️ 昵称长度至少2个字符"
             )
 
+        # 验证昵称是否合法（违禁词 + 游戏名称检查）
+        from .nickname_validator import validate_nickname
+        is_valid, error_msg = await validate_nickname(cleaned_nickname)
+        if not is_valid:
+            await register.finish(f"⛔ {error_msg}")
+
         # 如果清理了输入，给出提示
         if cleaned_nickname != parsed_nickname:
             result = await create_player(event, cleaned_nickname, parsed_gender)
@@ -392,9 +398,21 @@ async def _(event: MessageEvent, nickname: str = ArgPlainText()):
                 "🔄 请重新输入你的角色昵称："
             )
         else:
+            # 验证昵称是否合法（违禁词 + 游戏名称检查）
+            from .nickname_validator import validate_nickname
+            is_valid, error_msg = await validate_nickname(cleaned_nickname)
+            if not is_valid:
+                await register.reject(f"⛔ {error_msg}\n🔄 请重新输入你的角色昵称：")
+
             # 提示用户我们已经自动清理了输入
             result = await create_player(event, cleaned_nickname, Gender.MALE)
             await register.finish(result)
+
+    # 验证昵称是否合法（违禁词 + 游戏名称检查）
+    from .nickname_validator import validate_nickname
+    is_valid, error_msg = await validate_nickname(nickname)
+    if not is_valid:
+        await register.reject(f"⛔ {error_msg}\n🔄 请重新输入你的角色昵称：")
 
     # 正常情况，直接创建角色
     result = await create_player(event, nickname, Gender.MALE)

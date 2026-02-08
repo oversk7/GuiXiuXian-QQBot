@@ -666,6 +666,12 @@ async def handle_rename(event: MessageEvent, args: Message = CommandArg()):
     if not new_name or len(new_name) > 12:
         await rename_cmd.finish("⛔ 名称不能为空且最长12个字符")
 
+    # 验证昵称是否合法（违禁词 + 游戏名称检查）
+    from ..player.nickname_validator import validate_nickname
+    is_valid, error_msg = await validate_nickname(new_name)
+    if not is_valid:
+        await rename_cmd.finish(f"⛔ {error_msg}")
+
     async with safe_session() as session:
         # 获取玩家和改名卡信息
         from ..platform_utils import get_unified_player
@@ -688,7 +694,7 @@ async def handle_rename(event: MessageEvent, args: Message = CommandArg()):
         inventory.quantity -= 1
         if inventory.quantity <= 0:
             await session.delete(inventory)
-        
+
         player.nickname = new_name
         session.add(player)
         await session.commit()
