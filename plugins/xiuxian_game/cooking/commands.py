@@ -71,7 +71,7 @@ async def handle_cook(event: MessageEvent, args: Message = CommandArg()):
 
         # 烹饪
         success, msg, dishes = await cooking_service.cook_dish(
-            uow, player.user_id, recipe.recipe_id, quantity
+            uow, player.id, recipe.recipe_id, quantity
         )
 
         await cook_cmd.finish(msg)
@@ -89,7 +89,7 @@ async def handle_recipes(event: MessageEvent):
         if not player:
             await recipes_cmd.finish("⛔ 请先创建角色")
 
-        recipes = await cooking_service.get_player_recipes(uow, player.user_id)
+        recipes = await cooking_service.get_player_recipes(uow, player.id)
 
         if not recipes:
             await recipes_cmd.finish("⛔ 你还没有学会任何食谱")
@@ -146,7 +146,7 @@ async def handle_create_restaurant(event: MessageEvent):
         if not player:
             await create_restaurant_cmd.finish("⛔ 请先创建角色")
 
-        success, msg = await restaurant_service.create_restaurant(uow, player.user_id)
+        success, msg = await restaurant_service.create_restaurant(uow, player.id)
         await create_restaurant_cmd.finish(msg)
 
 
@@ -162,7 +162,7 @@ async def handle_restaurant(event: MessageEvent):
         if not player:
             await restaurant_cmd.finish("⛔ 请先创建角色")
 
-        success, msg, restaurant = await restaurant_service.get_restaurant_status(uow, player.user_id)
+        success, msg, restaurant = await restaurant_service.get_restaurant_status(uow, player.id)
         await restaurant_cmd.finish(msg)
 
 
@@ -178,7 +178,7 @@ async def handle_upgrade_restaurant(event: MessageEvent):
         if not player:
             await upgrade_restaurant_cmd.finish("⛔ 请先创建角色")
 
-        success, msg = await restaurant_service.upgrade_restaurant(uow, player.user_id)
+        success, msg = await restaurant_service.upgrade_restaurant(uow, player.id)
         await upgrade_restaurant_cmd.finish(msg)
 
 
@@ -194,7 +194,7 @@ async def handle_expand_restaurant(event: MessageEvent):
         if not player:
             await expand_restaurant_cmd.finish("⛔ 请先创建角色")
 
-        success, msg = await restaurant_service.expand_area(uow, player.user_id)
+        success, msg = await restaurant_service.expand_area(uow, player.id)
         await expand_restaurant_cmd.finish(msg)
 
 
@@ -210,7 +210,7 @@ async def handle_upgrade_kitchen(event: MessageEvent):
         if not player:
             await upgrade_kitchen_cmd.finish("⛔ 请先创建角色")
 
-        success, msg = await restaurant_service.upgrade_kitchen(uow, player.user_id)
+        success, msg = await restaurant_service.upgrade_kitchen(uow, player.id)
         await upgrade_kitchen_cmd.finish(msg)
 
 
@@ -226,7 +226,7 @@ async def handle_open_restaurant(event: MessageEvent):
         if not player:
             await open_restaurant_cmd.finish("⛔ 请先创建角色")
 
-        success, msg = await restaurant_service.toggle_open(uow, player.user_id, True)
+        success, msg = await restaurant_service.toggle_open(uow, player.id, True)
         await open_restaurant_cmd.finish(msg)
 
 
@@ -242,7 +242,7 @@ async def handle_close_restaurant(event: MessageEvent):
         if not player:
             await close_restaurant_cmd.finish("⛔ 请先创建角色")
 
-        success, msg = await restaurant_service.toggle_open(uow, player.user_id, False)
+        success, msg = await restaurant_service.toggle_open(uow, player.id, False)
         await close_restaurant_cmd.finish(msg)
 
 
@@ -261,7 +261,7 @@ async def handle_recruit_chef(event: MessageEvent):
             await recruit_chef_cmd.finish("⛔ 请先创建角色")
 
         # 检查是否有餐厅
-        restaurant = await uow.restaurants.get_by_player_id(player.user_id)
+        restaurant = await uow.restaurants.get_by_player_id(player.id)
         if not restaurant:
             await recruit_chef_cmd.finish("⛔ 你还没有餐厅，请先使用【创建餐厅】")
 
@@ -275,7 +275,7 @@ async def handle_recruit_chef(event: MessageEvent):
         await uow.players.update(player)
 
         # 生成候选
-        success, msg, candidates = await chef_service.recruit_chefs(uow, player.user_id, count=4)
+        success, msg, candidates = await chef_service.recruit_chefs(uow, player.id, count=4)
 
         await recruit_chef_cmd.finish(msg)
 
@@ -303,11 +303,11 @@ async def handle_hire_chef(event: MessageEvent, args: Message = CommandArg()):
             await hire_chef_cmd.finish("⛔ 请先创建角色")
 
         # 获取餐厅
-        restaurant = await uow.restaurants.get_by_player_id(player.user_id)
+        restaurant = await uow.restaurants.get_by_player_id(player.id)
         if not restaurant:
             await hire_chef_cmd.finish("⛔ 你还没有餐厅")
 
-        success, msg = await chef_service.hire_chef(uow, player.user_id, candidate_index, restaurant.id)
+        success, msg = await chef_service.hire_chef(uow, player.id, candidate_index, restaurant.id)
         await hire_chef_cmd.finish(msg)
 
 
@@ -329,7 +329,7 @@ async def handle_fire_chef(event: MessageEvent, args: Message = CommandArg()):
             await fire_chef_cmd.finish("⛔ 请先创建角色")
 
         # 获取餐厅
-        restaurant = await uow.restaurants.get_by_player_id(player.user_id)
+        restaurant = await uow.restaurants.get_by_player_id(player.id)
         if not restaurant:
             await fire_chef_cmd.finish("⛔ 你还没有餐厅")
 
@@ -350,7 +350,7 @@ async def handle_my_chefs(event: MessageEvent):
             await my_chefs_cmd.finish("⛔ 请先创建角色")
 
         # 获取餐厅
-        restaurant = await uow.restaurants.get_by_player_id(player.user_id)
+        restaurant = await uow.restaurants.get_by_player_id(player.id)
         if not restaurant:
             await my_chefs_cmd.finish("⛔ 你还没有餐厅")
 
@@ -404,7 +404,7 @@ async def handle_report(event: MessageEvent):
             await report_cmd.finish("⛔ 请先创建角色")
 
         # 获取餐厅
-        restaurant = await uow.restaurants.get_by_player_id(player.user_id)
+        restaurant = await uow.restaurants.get_by_player_id(player.id)
         if not restaurant:
             await report_cmd.finish("⛔ 你还没有餐厅")
 
@@ -426,7 +426,7 @@ async def handle_log(event: MessageEvent):
             await log_cmd.finish("⛔ 请先创建角色")
 
         # 获取餐厅
-        restaurant = await uow.restaurants.get_by_player_id(player.user_id)
+        restaurant = await uow.restaurants.get_by_player_id(player.id)
         if not restaurant:
             await log_cmd.finish("⛔ 你还没有餐厅")
 
