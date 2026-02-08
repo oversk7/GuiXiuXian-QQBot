@@ -219,7 +219,7 @@ class Player(Base):
             available_levels.append(level)
         return available_levels
 
-    inventory_capacity: Mapped[int] = mapped_column(Integer, default=50, server_default='50', nullable=False, comment="背包容量")
+    inventory_capacity: Mapped[int] = mapped_column(Integer, default=100, server_default='80', nullable=False, comment="背包容量")
     is_secluded: Mapped[bool] = mapped_column(Boolean, default=False, server_default=text('0'), comment="是否闭关")
     seclusion_start_time: Mapped[datetime] = mapped_column(DateTime, nullable=True, comment="闭关开始时间")
     last_message_board_check: Mapped[datetime] = mapped_column(DateTime, nullable=True, comment="最后查看世界留言时间")
