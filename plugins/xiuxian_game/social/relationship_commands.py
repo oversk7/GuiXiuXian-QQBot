@@ -67,11 +67,11 @@ async def handle_favorability(event: MessageEvent, args: Message = CommandArg())
                     favorability = rel.favorability
                     # 获取关系描述
                     if rel.relationship_type == RelationshipType.MARRIAGE.value:
-                        rel_desc = "💒 夫妻"
+                        rel_desc = f"💒 夫妻 (好感度: {favorability})"
                     elif rel.relationship_type == RelationshipType.SWORN.value:
-                        rel_desc = "🤝 结义"
+                        rel_desc = f"🤝 结义 (好感度: {favorability})"
                     elif rel.relationship_type == RelationshipType.MENTORSHIP.value:
-                        rel_desc = "🎓 师徒"
+                        rel_desc = f"🎓 师徒 (好感度: {favorability})"
                     else:
                         # 美化好感度显示 - 使用颜色符号,不划分等级
                         if favorability > 0:
