@@ -90,7 +90,7 @@ MARKET_CONFIGS = {
     "merchant1": {
         "name": "上京",
         "coord": (0, 0),
-        "sellable": ["gold_watch", "jade_bracelet", "lux_perfume", "designer_bag", "red_wine"],
+        "sellable": ["gold_watch", "jade_bracelet", "lux_perfume", "designer_bag", "red_wine", "spice"],
         "buyable": ["gold_watch", "jade_bracelet", "lux_perfume", "designer_bag", "red_wine", "art_book"]
     },
 
@@ -154,7 +154,7 @@ MARKET_CONFIGS = {
     "merchant9": {
         "name": "荔湾镇",
         "coord": (120, 200),
-        "sellable": ["silk_scarf", "luxury_chocolate", "fountain_pen", "sneakers"],
+        "sellable": ["silk_scarf", "luxury_chocolate", "fountain_pen", "sneakers", "spice"],
         "buyable": ["silk_scarf", "luxury_chocolate", "fountain_pen", "sneakers", "art_book", "noise_headphones"]
     },
 
@@ -178,7 +178,7 @@ MARKET_CONFIGS = {
     "merchant12": {
         "name": "舟山",
         "coord": (200, -200),
-        "sellable": ["jade_bracelet", "red_wine", "dslr_camera", "designer_bag"],
+        "sellable": ["jade_bracelet", "red_wine", "dslr_camera", "designer_bag", "wasabi"],
         "buyable": ["jade_bracelet", "red_wine", "dslr_camera", "designer_bag", "gaming_console", "smartphone"] + ALL_FISH
     },
 
@@ -186,7 +186,7 @@ MARKET_CONFIGS = {
     "merchant13": {
         "name": "大昌市",
         "coord": (-400, -240),
-        "sellable": ["smartphone", "sneakers", "noise_headphones", "designer_bag", "concert_ticket"],
+        "sellable": ["smartphone", "sneakers", "noise_headphones", "designer_bag", "concert_ticket", "spice"],
         "buyable": ["smartphone", "sneakers", "noise_headphones", "designer_bag", "gaming_console", "lux_perfume"]
     }
 }
@@ -1114,7 +1114,9 @@ async def _(event: MessageEvent):
 
 # 系统商店基础物品（保留原价）
 SHOP_ITEMS = [
-    "revive_potion", "rename_card", "president_letter", "territory_expansion_scroll", "heal_potion", "spirit_herb"
+    "revive_potion", "rename_card", "president_letter", "territory_expansion_scroll", "heal_potion", "spirit_herb",
+    # 基础调料（烹饪系统）
+    "salt", "soy_sauce", "vinegar", "sugar"
 ]
 
 # 黑市配置
