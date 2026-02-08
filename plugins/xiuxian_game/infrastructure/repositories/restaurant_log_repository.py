@@ -5,7 +5,7 @@ from typing import Optional, List
 from sqlalchemy import select, and_, delete
 from sqlalchemy.ext.asyncio import AsyncSession
 from datetime import datetime, timedelta
-from ..domain.repositories.base import IRepository
+from ...domain.repositories.base import IRepository
 from ...models.restaurant_log import RestaurantLog
 
 

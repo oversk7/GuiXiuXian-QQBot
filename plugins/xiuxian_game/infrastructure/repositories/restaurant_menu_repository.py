@@ -4,7 +4,7 @@
 from typing import Optional, List
 from sqlalchemy import select, delete as sql_delete
 from sqlalchemy.ext.asyncio import AsyncSession
-from ..domain.repositories.base import IRepository
+from ...domain.repositories.base import IRepository
 from ...models.restaurant import RestaurantMenu
 
 
