@@ -19,6 +19,9 @@ class ItemType(str,PyEnum):
     GEM = "GEM"
     FISH = "FISH"
     GIFT = "GIFT"  # 好感度礼物
+    SEASONING = "SEASONING"  # 调料
+    DISH = "DISH"  # 菜肴
+    RECIPE = "RECIPE"  # 食谱
 
 class ItemEffectType(str, PyEnum):
     RESTORE_HP = "RESTORE_HP"

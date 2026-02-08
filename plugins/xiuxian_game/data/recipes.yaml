@@ -1,0 +1,309 @@
+# ====================================================================
+# 烹饪系统 - 食谱配置
+# ====================================================================
+# 本文件定义所有烹饪食谱的配置
+# 每个食谱包含：名称、类别、稀有度、所需食材、基础售价、描述、buff效果
+# ====================================================================
+
+recipes:
+  # ========== 白色家常菜 (开餐厅默认获得) ==========
+
+  - recipe_id: "braised_carp"
+    name: "红烧鲤鱼"
+    category: "fish"       # 鱼鲜类
+    tier: "white"
+    kitchen_level: 1       # 厨房等级要求
+    ingredients:
+      common_carp: 1       # 鲤鱼
+      soy_sauce: 1         # 酱油
+    base_price: 120
+    description: "色泽红亮，肉质鲜嫩的经典家常菜"
+
+  - recipe_id: "steamed_crucian"
+    name: "清蒸鲫鱼"
+    category: "steam"      # 蒸煮类
+    tier: "white"
+    kitchen_level: 1
+    ingredients:
+      crucian_carp: 1      # 鲫鱼
+      salt: 1              # 盐
+    base_price: 95
+    description: "清淡鲜美，保留鱼肉原汁原味"
+
+  - recipe_id: "grass_carp_soup"
+    name: "草鱼豆腐汤"
+    category: "soup"       # 汤煲类
+    tier: "white"
+    kitchen_level: 1
+    ingredients:
+      grass_carp: 1        # 草鱼
+      salt: 1              # 盐
+    base_price: 130
+    description: "汤白如乳，鲜美无比"
+
+  - recipe_id: "silver_carp_head_soup"
+    name: "鲢鱼头汤"
+    category: "soup"       # 汤煲类
+    tier: "white"
+    kitchen_level: 1
+    ingredients:
+      silver_carp: 1       # 鲢鱼
+      salt: 1
+      sugar: 1
+    base_price: 110
+    description: "浓郁鲜香的鱼头汤"
+
+  - recipe_id: "fried_catfish"
+    name: "香煎鲶鱼"
+    category: "grill"      # 烤制类
+    tier: "white"
+    kitchen_level: 1
+    ingredients:
+      catfish: 1           # 鲶鱼
+      salt: 1
+    base_price: 150
+    description: "外酥里嫩，香气四溢"
+
+  # ========== 绿色特色菜 (商店购买，500-1500金) ==========
+
+  - recipe_id: "sweet_sour_bass"
+    name: "糖醋鲈鱼"
+    category: "fish"       # 鱼鲜类
+    tier: "green"
+    kitchen_level: 2
+    ingredients:
+      bass: 1              # 鲈鱼
+      vinegar: 1           # 醋
+      sugar: 1             # 糖
+    base_price: 320
+    description: "酸甜适口，外酥内嫩"
+
+  - recipe_id: "braised_mandarin_fish"
+    name: "酱焖桂鱼"
+    category: "fish"       # 鱼鲜类
+    tier: "green"
+    kitchen_level: 2
+    ingredients:
+      mandarin_fish: 1     # 桂鱼
+      soy_sauce: 2         # 酱油×2
+      spice: 1             # 香料
+    base_price: 420
+    description: "浓郁酱香，肉质细嫩"
+
+  - recipe_id: "yellow_croaker_soup"
+    name: "黄花鱼羹"
+    category: "soup"       # 汤煲类
+    tier: "green"
+    kitchen_level: 2
+    ingredients:
+      yellow_croaker: 1    # 黄花鱼
+      salt: 1
+      spice: 1
+    base_price: 450
+    description: "鲜美浓稠的鱼羹"
+
+  - recipe_id: "steamed_pomfret"
+    name: "清蒸鲳鱼"
+    category: "steam"      # 蒸煮类
+    tier: "green"
+    kitchen_level: 2
+    ingredients:
+      pomfret: 1           # 鲳鱼
+      soy_sauce: 1
+      spice: 1
+    base_price: 380
+    description: "鲜嫩爽滑，回味无穷"
+
+  - recipe_id: "grilled_snapper"
+    name: "炭烤鲷鱼"
+    category: "grill"      # 烤制类
+    tier: "green"
+    kitchen_level: 2
+    ingredients:
+      snapper: 1           # 鲷鱼
+      salt: 1
+      spice: 1
+    base_price: 500
+    description: "表面焦香，内里多汁"
+
+  # ========== 蓝色招牌菜 (商店购买/好感度奖励，3000-8000金) ==========
+
+  - recipe_id: "salmon_sashimi"
+    name: "三文鱼刺身"
+    category: "fish"       # 鱼鲜类
+    tier: "blue"
+    kitchen_level: 3
+    ingredients:
+      salmon: 1            # 三文鱼
+      wasabi: 1            # 芥末
+      soy_sauce: 1
+    base_price: 900
+    description: "新鲜肥美的顶级刺身"
+
+  - recipe_id: "tuna_sushi"
+    name: "金枪鱼寿司"
+    category: "fish"       # 鱼鲜类
+    tier: "blue"
+    kitchen_level: 3
+    ingredients:
+      tuna: 1              # 金枪鱼
+      vinegar: 1
+      sugar: 1
+      wasabi: 1
+    base_price: 1050
+    description: "口感绝佳的握寿司"
+
+  - recipe_id: "grouper_hotpot"
+    name: "石斑鱼火锅"
+    category: "soup"       # 汤煲类
+    tier: "blue"
+    kitchen_level: 3
+    ingredients:
+      grouper: 1           # 石斑鱼
+      spice: 2
+      lingzhi_powder: 1    # 灵芝粉
+    base_price: 1200
+    description: "鲜美滚烫，暖身补气"
+
+  - recipe_id: "grilled_eel"
+    name: "蒲烧鳗鱼"
+    category: "grill"      # 烤制类
+    tier: "blue"
+    kitchen_level: 3
+    ingredients:
+      eel: 1               # 鳗鱼
+      soy_sauce: 2
+      sugar: 1
+      spice: 1
+    base_price: 980
+    description: "酱汁浓郁，肉质绵密"
+
+  - recipe_id: "turbot_feast"
+    name: "清蒸多宝鱼"
+    category: "steam"      # 蒸煮类
+    tier: "blue"
+    kitchen_level: 3
+    ingredients:
+      turbot: 1            # 多宝鱼
+      spice: 1
+      lingzhi_powder: 1
+    base_price: 1100
+    description: "原汁原味的高端海鲜"
+
+  # ========== 紫色宴席菜 (诡域掉落/特殊任务) ==========
+
+  - recipe_id: "sturgeon_banquet"
+    name: "鲟鱼全席"
+    category: "fish"       # 鱼鲜类
+    tier: "purple"
+    kitchen_level: 4
+    ingredients:
+      chinese_sturgeon: 1  # 中华鲟
+      lingzhi_powder: 2    # 灵芝粉×2
+      spice: 2
+      secret_sauce: 1      # 秘制酱料
+    base_price: 3500
+    buff:
+      sanity: 8            # 完美品质时回复8点理智
+    description: "以珍稀中华鲟为主料的豪华宴席"
+
+  - recipe_id: "arowana_feast"
+    name: "龙鱼宴"
+    category: "fish"       # 鱼鲜类
+    tier: "purple"
+    kitchen_level: 4
+    ingredients:
+      arowana: 1           # 龙鱼
+      lingzhi_powder: 1
+      spice: 2
+      flesh_crystal: 1     # 血肉结晶(现有材料)
+    base_price: 4200
+    buff:
+      sanity: 10
+    description: "龙鱼入馔，尊贵非凡"
+
+  - recipe_id: "giant_catfish_stew"
+    name: "巨鲶秘炖"
+    category: "soup"       # 汤煲类
+    tier: "purple"
+    kitchen_level: 4
+    ingredients:
+      giant_catfish: 1     # 巨型鲶鱼
+      lingzhi_powder: 1
+      secret_sauce: 1
+      soul_crystal: 1      # 魂魄结晶(现有材料)
+    base_price: 3800
+    buff:
+      sanity: 6
+    description: "用深渊食材慢炖的神秘汤品"
+
+  - recipe_id: "bluefin_tuna_omakase"
+    name: "蓝鳍料理长"
+    category: "fish"       # 鱼鲜类
+    tier: "purple"
+    kitchen_level: 4
+    ingredients:
+      bluefin_tuna: 1      # 蓝鳍金枪鱼
+      wasabi: 2
+      soy_sauce: 2
+      secret_sauce: 1
+    base_price: 3200
+    buff:
+      sanity: 5
+    description: "极致鲜美的蓝鳍盛宴"
+
+  # ========== 橙色传说菜 (氪金/极稀有掉落) ==========
+
+  - recipe_id: "golden_dragon_feast"
+    name: "金龙盛宴"
+    category: "fish"       # 鱼鲜类
+    tier: "orange"
+    kitchen_level: 5
+    ingredients:
+      golden_dragon_fish: 1  # 金龙鱼
+      god_tear: 1            # 神明之泪(现有材料)
+      lingzhi_powder: 2
+      secret_sauce: 2
+      immortal_oil: 1        # 仙厨秘油
+    base_price: 15000
+    buff:
+      sanity: 20
+      luck: 5
+      duration: 30         # 30分钟幸运+5
+    description: "以金龙鱼和神明之泪烹制的天界珍馐"
+
+  - recipe_id: "phoenix_nirvana_fish"
+    name: "凤凰涅槃鱼"
+    category: "grill"      # 烤制类
+    tier: "orange"
+    kitchen_level: 5
+    ingredients:
+      phoenix_fish: 1      # 凤凰鱼
+      lingzhi_powder: 2
+      secret_sauce: 2
+      immortal_oil: 1
+      demon_heart: 1       # 恶魔之心(现有材料)
+    base_price: 18000
+    buff:
+      sanity: 15
+      max_hp: 200
+      duration: 60         # 60分钟最大生命+200
+    description: "浴火重生的传说料理，食之如获新生"
+
+  - recipe_id: "void_fish_enigma"
+    name: "虚空秘境鱼"
+    category: "steam"      # 蒸煮类
+    tier: "orange"
+    kitchen_level: 5
+    ingredients:
+      void_fish: 1         # 虚空鱼
+      void_essence: 1      # 虚无精华(现有材料)
+      immortal_oil: 1
+      secret_sauce: 1
+      lingzhi_powder: 2
+    base_price: 20000
+    buff:
+      sanity: 25
+      luck: 8
+      duration: 45         # 45分钟幸运+8
+    description: "超越现实的诡异料理，品尝者将短暂触碰虚空的真相"

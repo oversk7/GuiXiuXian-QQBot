@@ -2879,3 +2879,73 @@ items:
       price: 0
       tags: ["inner_realm_only"]
 
+
+  # ========== 烹饪调料（Seasonings） ==========
+  seasonings:
+    # ========== 白色（基础调料,NPC商店常驻） ==========
+    - item_id: "salt"
+      name: "盐"
+      type: "SEASONING"
+      rarity: "white"
+      price: 5
+      description: "基础调味料,百味之首"
+
+    - item_id: "soy_sauce"
+      name: "酱油"
+      type: "SEASONING"
+      rarity: "white"
+      price: 8
+      description: "酿造酱油,增色提鲜"
+
+    - item_id: "vinegar"
+      name: "醋"
+      type: "SEASONING"
+      rarity: "white"
+      price: 8
+      description: "陈年老醋,酸香醇厚"
+
+    - item_id: "sugar"
+      name: "糖"
+      type: "SEASONING"
+      rarity: "white"
+      price: 6
+      description: "甜蜜调味,中和苦涩"
+
+    # ========== 绿色（进阶调料,NPC商店/跑商市集） ==========
+    - item_id: "spice"
+      name: "香料"
+      type: "SEASONING"
+      rarity: "green"
+      price: 30
+      description: "混合香辛料,增添风味层次"
+
+    - item_id: "wasabi"
+      name: "芥末"
+      type: "SEASONING"
+      rarity: "green"
+      price: 40
+      description: "冲鼻辛辣,刺身绝配,舟山特产"
+
+    # ========== 蓝色（高级调料,跑商/诡域） ==========
+    - item_id: "lingzhi_powder"
+      name: "灵芝粉"
+      type: "SEASONING"
+      rarity: "blue"
+      price: 150
+      description: "磨碎的灵芝粉末,入菜可增益身心"
+
+    # ========== 紫色（稀有调料） ==========
+    - item_id: "secret_sauce"
+      name: "秘制酱料"
+      type: "SEASONING"
+      rarity: "purple"
+      price: 500
+      description: "以十二味珍稀食材秘制而成的神秘酱料"
+
+    # ========== 橙色（传说调料） ==========
+    - item_id: "immortal_oil"
+      name: "仙厨秘油"
+      type: "SEASONING"
+      rarity: "orange"
+      price: 2000
+      description: "传说中仙人炼制的烹饪用油,沾之生香"

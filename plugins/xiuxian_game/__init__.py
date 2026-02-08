@@ -71,6 +71,20 @@ async def _():
         import traceback
         traceback.print_exc()
 
+    # 动态注册菜肴物品配置
+    try:
+        from .cooking.cooking_service import RecipeManager
+        from .cooking.dish_item_generator import DishItemGenerator
+        from .config import config
+
+        recipe_manager = RecipeManager()
+        DishItemGenerator.register_dish_items_to_config(config, recipe_manager)
+        logger.success("[CookingSystem] 菜肴物品配置已动态注册")
+    except Exception as e:
+        logger.error(f"[CookingSystem] 注册菜肴物品配置失败: {e}")
+        import traceback
+        traceback.print_exc()
+
     # 加载NPC人设配置
     try:
         from pathlib import Path

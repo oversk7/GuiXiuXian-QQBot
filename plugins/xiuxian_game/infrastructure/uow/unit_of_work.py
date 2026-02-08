@@ -97,6 +97,15 @@ class UnitOfWork:
         self._inner_realm_sessions = None
         self._inner_realm_tiles = None
 
+        # 烹饪餐厅系统仓储
+        self._restaurants = None
+        self._restaurant_storage = None
+        self._restaurant_menus = None
+        self._chefs = None
+        self._chef_candidates = None
+        self._restaurant_logs = None
+        self._player_recipes = None
+
     @property
     def players(self):
         """玩家仓储"""
@@ -304,6 +313,62 @@ class UnitOfWork:
             from ..repositories.inner_realm_tile_repository import InnerRealmTileRepository
             self._inner_realm_tiles = InnerRealmTileRepository(self._session)
         return self._inner_realm_tiles
+
+    @property
+    def restaurants(self):
+        """餐厅仓储"""
+        if self._restaurants is None:
+            from ..repositories.restaurant_repository import RestaurantRepository
+            self._restaurants = RestaurantRepository(self._session)
+        return self._restaurants
+
+    @property
+    def restaurant_storage(self):
+        """餐厅仓库仓储"""
+        if self._restaurant_storage is None:
+            from ..repositories.restaurant_storage_repository import RestaurantStorageRepository
+            self._restaurant_storage = RestaurantStorageRepository(self._session)
+        return self._restaurant_storage
+
+    @property
+    def restaurant_menus(self):
+        """餐厅菜单仓储"""
+        if self._restaurant_menus is None:
+            from ..repositories.restaurant_menu_repository import RestaurantMenuRepository
+            self._restaurant_menus = RestaurantMenuRepository(self._session)
+        return self._restaurant_menus
+
+    @property
+    def chefs(self):
+        """厨师仓储"""
+        if self._chefs is None:
+            from ..repositories.chef_repository import ChefRepository
+            self._chefs = ChefRepository(self._session)
+        return self._chefs
+
+    @property
+    def chef_candidates(self):
+        """厨师候选仓储"""
+        if self._chef_candidates is None:
+            from ..repositories.chef_repository import ChefCandidateRepository
+            self._chef_candidates = ChefCandidateRepository(self._session)
+        return self._chef_candidates
+
+    @property
+    def restaurant_logs(self):
+        """餐厅日志仓储"""
+        if self._restaurant_logs is None:
+            from ..repositories.restaurant_log_repository import RestaurantLogRepository
+            self._restaurant_logs = RestaurantLogRepository(self._session)
+        return self._restaurant_logs
+
+    @property
+    def player_recipes(self):
+        """玩家食谱仓储"""
+        if self._player_recipes is None:
+            from ..repositories.player_recipe_repository import PlayerRecipeRepository
+            self._player_recipes = PlayerRecipeRepository(self._session)
+        return self._player_recipes
 
     @property
     def session(self) -> AsyncSession:

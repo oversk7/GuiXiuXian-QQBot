@@ -49,6 +49,11 @@ from .account_ownership import AccountOwnership
 from .account_transfer_log import AccountTransferLog
 # 里界系统模型
 from .inner_realm import InnerRealmSession, InnerRealmTile
+# 烹饪餐厅系统模型
+from .restaurant import Restaurant, RestaurantStorage, RestaurantMenu
+from .chef import Chef, ChefCandidate, ChefTier, CookingCategory, ChefPersonality
+from .restaurant_log import RestaurantLog
+from .player_recipe import PlayerRecipe
 
 
 __all__ = [
@@ -67,5 +72,8 @@ __all__ = [
     "Lottery", "LotteryParticipant", "LotteryType", "LotteryStatus",
     "PvpLog", "VIPEquipmentBonus",
     "AccountOwnership", "AccountTransferLog",
-    "InnerRealmSession", "InnerRealmTile"
+    "InnerRealmSession", "InnerRealmTile",
+    "Restaurant", "RestaurantStorage", "RestaurantMenu",
+    "Chef", "ChefCandidate", "ChefTier", "CookingCategory", "ChefPersonality",
+    "RestaurantLog", "PlayerRecipe"
 ]

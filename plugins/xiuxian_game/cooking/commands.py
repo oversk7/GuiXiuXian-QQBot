@@ -1,0 +1,478 @@
+"""
+烹饪与餐厅系统 - 指令处理器
+
+包含所有烹饪和餐厅相关的指令:
+- 烹饪、食谱
+- 餐厅创建、升级、状态查看
+- 开店、打烊
+- 厨师招募、雇佣、解雇、查看
+- 经营报表
+"""
+
+from nonebot import on_command
+from nonebot.adapters.onebot.v11 import MessageEvent, GroupMessageEvent
+from nonebot.params import CommandArg
+from nonebot.typing import T_State
+from nonebot.adapters.onebot.v11 import Message
+
+from ..infrastructure.database import AsyncSessionLocal
+from ..infrastructure.uow.unit_of_work import UnitOfWork
+from ..player.util import get_unified_player
+from .cooking_service import CookingService, RecipeManager
+from .chef_service import ChefService
+from .restaurant_service import RestaurantService
+from .settlement_service import SettlementService
+
+# ==================== 服务实例 ====================
+
+cooking_service = CookingService()
+chef_service = ChefService()
+restaurant_service = RestaurantService()
+settlement_service = SettlementService()
+recipe_manager = RecipeManager()
+
+# ==================== 烹饪相关指令 ====================
+
+cook_cmd = on_command("烹饪", aliases={"做菜", "制作菜肴"}, priority=5, block=True)
+
+
+@cook_cmd.handle()
+async def handle_cook(event: MessageEvent, args: Message = CommandArg()):
+    """【烹饪 菜名 数量】- 手动制作菜肴"""
+
+    args_text = args.extract_plain_text().strip()
+
+    if not args_text:
+        await cook_cmd.finish("⛔ 用法: 烹饪 <菜名> [数量]\n例如: 烹饪 红烧鲤鱼 2")
+
+    # 解析参数
+    parts = args_text.split()
+    dish_name = parts[0]
+    quantity = 1
+
+    if len(parts) > 1:
+        try:
+            quantity = int(parts[1])
+            if quantity <= 0 or quantity > 99:
+                await cook_cmd.finish("⛔ 数量必须在 1-99 之间")
+        except ValueError:
+            await cook_cmd.finish("⛔ 数量必须是数字")
+
+    async with UnitOfWork(AsyncSessionLocal) as uow:
+        # 获取玩家
+        player = await get_unified_player(uow.session, event)
+        if not player:
+            await cook_cmd.finish("⛔ 请先创建角色")
+
+        # 根据菜名查找食谱
+        recipe = recipe_manager.get_recipe_by_name(dish_name)
+        if not recipe:
+            await cook_cmd.finish(f"⛔ 未找到菜肴【{dish_name}】\n使用【食谱】查看已学会的食谱")
+
+        # 烹饪
+        success, msg, dishes = await cooking_service.cook_dish(
+            uow, player.user_id, recipe.recipe_id, quantity
+        )
+
+        await cook_cmd.finish(msg)
+
+
+recipes_cmd = on_command("食谱", aliases={"我的食谱", "已学食谱"}, priority=5, block=True)
+
+
+@recipes_cmd.handle()
+async def handle_recipes(event: MessageEvent):
+    """【食谱】- 查看已学会的食谱"""
+
+    async with UnitOfWork(AsyncSessionLocal) as uow:
+        player = await get_unified_player(uow.session, event)
+        if not player:
+            await recipes_cmd.finish("⛔ 请先创建角色")
+
+        recipes = await cooking_service.get_player_recipes(uow, player.user_id)
+
+        if not recipes:
+            await recipes_cmd.finish("⛔ 你还没有学会任何食谱")
+
+        # 按稀有度分组
+        recipes_by_tier = {
+            "white": [],
+            "green": [],
+            "blue": [],
+            "purple": [],
+            "orange": []
+        }
+
+        for recipe in recipes:
+            recipes_by_tier[recipe.tier].append(recipe)
+
+        # 生成消息
+        msg = "📖 已学会的食谱\n\n"
+
+        tier_names = {
+            "white": "⚪ 家常菜",
+            "green": "🟢 特色菜",
+            "blue": "🔵 招牌菜",
+            "purple": "🟣 宴席菜",
+            "orange": "🟠 传说菜"
+        }
+
+        for tier, tier_name in tier_names.items():
+            tier_recipes = recipes_by_tier[tier]
+            if tier_recipes:
+                msg += f"{tier_name}\n"
+                for recipe in tier_recipes:
+                    ingredients_text = " + ".join([f"{item_id}×{qty}" for item_id, qty in recipe.ingredients.items()])
+                    msg += f"  • {recipe.name} ({recipe.base_price}金)\n"
+                    msg += f"    {ingredients_text}\n"
+                msg += "\n"
+
+        msg += "使用【烹饪 菜名 数量】开始制作"
+
+        await recipes_cmd.finish(msg)
+
+
+# ==================== 餐厅相关指令 ====================
+
+create_restaurant_cmd = on_command("创建餐厅", aliases={"开餐厅"}, priority=5, block=True)
+
+
+@create_restaurant_cmd.handle()
+async def handle_create_restaurant(event: MessageEvent):
+    """【创建餐厅】- 创建你的餐厅"""
+
+    async with UnitOfWork(AsyncSessionLocal) as uow:
+        player = await get_unified_player(uow.session, event)
+        if not player:
+            await create_restaurant_cmd.finish("⛔ 请先创建角色")
+
+        success, msg = await restaurant_service.create_restaurant(uow, player.user_id)
+        await create_restaurant_cmd.finish(msg)
+
+
+restaurant_cmd = on_command("餐厅", aliases={"我的餐厅", "餐厅状态"}, priority=5, block=True)
+
+
+@restaurant_cmd.handle()
+async def handle_restaurant(event: MessageEvent):
+    """【餐厅】- 查看餐厅状态"""
+
+    async with UnitOfWork(AsyncSessionLocal) as uow:
+        player = await get_unified_player(uow.session, event)
+        if not player:
+            await restaurant_cmd.finish("⛔ 请先创建角色")
+
+        success, msg, restaurant = await restaurant_service.get_restaurant_status(uow, player.user_id)
+        await restaurant_cmd.finish(msg)
+
+
+upgrade_restaurant_cmd = on_command("餐厅升级", aliases={"升级餐厅"}, priority=5, block=True)
+
+
+@upgrade_restaurant_cmd.handle()
+async def handle_upgrade_restaurant(event: MessageEvent):
+    """【餐厅升级】- 升级餐厅等级"""
+
+    async with UnitOfWork(AsyncSessionLocal) as uow:
+        player = await get_unified_player(uow.session, event)
+        if not player:
+            await upgrade_restaurant_cmd.finish("⛔ 请先创建角色")
+
+        success, msg = await restaurant_service.upgrade_restaurant(uow, player.user_id)
+        await upgrade_restaurant_cmd.finish(msg)
+
+
+expand_restaurant_cmd = on_command("扩张餐厅", aliases={"餐厅扩张", "扩大面积"}, priority=5, block=True)
+
+
+@expand_restaurant_cmd.handle()
+async def handle_expand_restaurant(event: MessageEvent):
+    """【扩张餐厅】- 扩展餐厅面积"""
+
+    async with UnitOfWork(AsyncSessionLocal) as uow:
+        player = await get_unified_player(uow.session, event)
+        if not player:
+            await expand_restaurant_cmd.finish("⛔ 请先创建角色")
+
+        success, msg = await restaurant_service.expand_area(uow, player.user_id)
+        await expand_restaurant_cmd.finish(msg)
+
+
+upgrade_kitchen_cmd = on_command("升级厨房", aliases={"厨房升级"}, priority=5, block=True)
+
+
+@upgrade_kitchen_cmd.handle()
+async def handle_upgrade_kitchen(event: MessageEvent):
+    """【升级厨房】- 升级厨房等级"""
+
+    async with UnitOfWork(AsyncSessionLocal) as uow:
+        player = await get_unified_player(uow.session, event)
+        if not player:
+            await upgrade_kitchen_cmd.finish("⛔ 请先创建角色")
+
+        success, msg = await restaurant_service.upgrade_kitchen(uow, player.user_id)
+        await upgrade_kitchen_cmd.finish(msg)
+
+
+open_restaurant_cmd = on_command("开店", aliases={"营业", "开始营业"}, priority=5, block=True)
+
+
+@open_restaurant_cmd.handle()
+async def handle_open_restaurant(event: MessageEvent):
+    """【开店】- 开始营业"""
+
+    async with UnitOfWork(AsyncSessionLocal) as uow:
+        player = await get_unified_player(uow.session, event)
+        if not player:
+            await open_restaurant_cmd.finish("⛔ 请先创建角色")
+
+        success, msg = await restaurant_service.toggle_open(uow, player.user_id, True)
+        await open_restaurant_cmd.finish(msg)
+
+
+close_restaurant_cmd = on_command("打烊", aliases={"关店", "停止营业"}, priority=5, block=True)
+
+
+@close_restaurant_cmd.handle()
+async def handle_close_restaurant(event: MessageEvent):
+    """【打烊】- 暂停营业"""
+
+    async with UnitOfWork(AsyncSessionLocal) as uow:
+        player = await get_unified_player(uow.session, event)
+        if not player:
+            await close_restaurant_cmd.finish("⛔ 请先创建角色")
+
+        success, msg = await restaurant_service.toggle_open(uow, player.user_id, False)
+        await close_restaurant_cmd.finish(msg)
+
+
+# ==================== 厨师相关指令 ====================
+
+recruit_chef_cmd = on_command("招募厨师", aliases={"招募", "招厨师"}, priority=5, block=True)
+
+
+@recruit_chef_cmd.handle()
+async def handle_recruit_chef(event: MessageEvent):
+    """【招募厨师】- 生成随机厨师候选"""
+
+    async with UnitOfWork(AsyncSessionLocal) as uow:
+        player = await get_unified_player(uow.session, event)
+        if not player:
+            await recruit_chef_cmd.finish("⛔ 请先创建角色")
+
+        # 检查是否有餐厅
+        restaurant = await uow.restaurants.get_by_player_id(player.user_id)
+        if not restaurant:
+            await recruit_chef_cmd.finish("⛔ 你还没有餐厅，请先使用【创建餐厅】")
+
+        # 招募消耗
+        recruit_cost = 500
+        if player.coin < recruit_cost:
+            await recruit_chef_cmd.finish(f"⛔ 招募费不足! 需要 {recruit_cost}金币")
+
+        # 扣除招募费
+        player.coin -= recruit_cost
+        await uow.players.update(player)
+
+        # 生成候选
+        success, msg, candidates = await chef_service.recruit_chefs(uow, player.user_id, count=4)
+
+        await recruit_chef_cmd.finish(msg)
+
+
+hire_chef_cmd = on_command("雇佣", aliases={"雇佣厨师"}, priority=5, block=True)
+
+
+@hire_chef_cmd.handle()
+async def handle_hire_chef(event: MessageEvent, args: Message = CommandArg()):
+    """【雇佣 编号】- 雇佣候选厨师"""
+
+    args_text = args.extract_plain_text().strip()
+
+    if not args_text:
+        await hire_chef_cmd.finish("⛔ 用法: 雇佣 <编号>\n例如: 雇佣 1")
+
+    try:
+        candidate_index = int(args_text)
+    except ValueError:
+        await hire_chef_cmd.finish("⛔ 编号必须是数字")
+
+    async with UnitOfWork(AsyncSessionLocal) as uow:
+        player = await get_unified_player(uow.session, event)
+        if not player:
+            await hire_chef_cmd.finish("⛔ 请先创建角色")
+
+        # 获取餐厅
+        restaurant = await uow.restaurants.get_by_player_id(player.user_id)
+        if not restaurant:
+            await hire_chef_cmd.finish("⛔ 你还没有餐厅")
+
+        success, msg = await chef_service.hire_chef(uow, player.user_id, candidate_index, restaurant.id)
+        await hire_chef_cmd.finish(msg)
+
+
+fire_chef_cmd = on_command("解雇", aliases={"解雇厨师", "开除"}, priority=5, block=True)
+
+
+@fire_chef_cmd.handle()
+async def handle_fire_chef(event: MessageEvent, args: Message = CommandArg()):
+    """【解雇 厨师名】- 解雇厨师"""
+
+    chef_name = args.extract_plain_text().strip()
+
+    if not chef_name:
+        await fire_chef_cmd.finish("⛔ 用法: 解雇 <厨师名>\n例如: 解雇 小福贵")
+
+    async with UnitOfWork(AsyncSessionLocal) as uow:
+        player = await get_unified_player(uow.session, event)
+        if not player:
+            await fire_chef_cmd.finish("⛔ 请先创建角色")
+
+        # 获取餐厅
+        restaurant = await uow.restaurants.get_by_player_id(player.user_id)
+        if not restaurant:
+            await fire_chef_cmd.finish("⛔ 你还没有餐厅")
+
+        success, msg = await chef_service.fire_chef(uow, restaurant.id, chef_name)
+        await fire_chef_cmd.finish(msg)
+
+
+my_chefs_cmd = on_command("我的厨师", aliases={"厨师", "厨师列表"}, priority=5, block=True)
+
+
+@my_chefs_cmd.handle()
+async def handle_my_chefs(event: MessageEvent):
+    """【我的厨师】- 查看已雇佣的厨师"""
+
+    async with UnitOfWork(AsyncSessionLocal) as uow:
+        player = await get_unified_player(uow.session, event)
+        if not player:
+            await my_chefs_cmd.finish("⛔ 请先创建角色")
+
+        # 获取餐厅
+        restaurant = await uow.restaurants.get_by_player_id(player.user_id)
+        if not restaurant:
+            await my_chefs_cmd.finish("⛔ 你还没有餐厅")
+
+        chefs = await chef_service.get_restaurant_chefs(uow, restaurant.id)
+
+        if not chefs:
+            await my_chefs_cmd.finish("⛔ 还没有雇佣厨师\n使用【招募厨师】开始招募")
+
+        # 生成消息
+        msg = f"👨‍🍳 我的厨师 ({len(chefs)}/{restaurant.max_chefs})\n\n"
+
+        tier_names = {
+            "apprentice": "学徒厨师",
+            "helper": "帮厨",
+            "cook": "厨师",
+            "head_chef": "大厨",
+            "master_chef": "特级厨师"
+        }
+
+        category_names = {
+            "fish": "鱼鲜",
+            "soup": "汤煲",
+            "grill": "烤制",
+            "steam": "蒸煮",
+            "dessert": "甜点"
+        }
+
+        for chef in chefs:
+            tier_name = tier_names.get(chef.tier, chef.tier)
+            specialty_name = category_names.get(chef.specialty, chef.specialty)
+
+            msg += f"• {chef.name} ({tier_name})\n"
+            msg += f"  厨艺: {chef.skill} | 速度: {chef.speed}道/时\n"
+            msg += f"  擅长: {specialty_name} | 时薪: {chef.salary}金\n\n"
+
+        await my_chefs_cmd.finish(msg)
+
+
+# ==================== 经营报表 ====================
+
+report_cmd = on_command("经营报表", aliases={"报表", "餐厅报表"}, priority=5, block=True)
+
+
+@report_cmd.handle()
+async def handle_report(event: MessageEvent):
+    """【经营报表】- 查看经营统计"""
+
+    async with UnitOfWork(AsyncSessionLocal) as uow:
+        player = await get_unified_player(uow.session, event)
+        if not player:
+            await report_cmd.finish("⛔ 请先创建角色")
+
+        # 获取餐厅
+        restaurant = await uow.restaurants.get_by_player_id(player.user_id)
+        if not restaurant:
+            await report_cmd.finish("⛔ 你还没有餐厅")
+
+        msg = await settlement_service.get_settlement_report(uow, restaurant.id, hours=24)
+        await report_cmd.finish(msg)
+
+
+log_cmd = on_command("经营日志", aliases={"日志", "餐厅日志"}, priority=5, block=True)
+
+
+@log_cmd.handle()
+async def handle_log(event: MessageEvent):
+    """【经营日志】- 查看最近一次的详细经营日志"""
+    import json
+
+    async with UnitOfWork(AsyncSessionLocal) as uow:
+        player = await get_unified_player(uow.session, event)
+        if not player:
+            await log_cmd.finish("⛔ 请先创建角色")
+
+        # 获取餐厅
+        restaurant = await uow.restaurants.get_by_player_id(player.user_id)
+        if not restaurant:
+            await log_cmd.finish("⛔ 你还没有餐厅")
+
+        # 获取最近一次的日志
+        logs = await uow.restaurant_logs.get_by_restaurant_id(restaurant.id, limit=1)
+        if not logs:
+            await log_cmd.finish("⛔ 还没有经营日志")
+
+        log = logs[0]
+        details = json.loads(log.details_json)
+
+        msg_lines = [
+            "📜 餐厅经营日志",
+            "━━━━━━━━━━━━━",
+            f"⏰ 时段: {log.period_start.strftime('%m-%d %H:%M')}",
+            f"💰 收入: {log.income}金 | 支出: {log.expense}金",
+            f"📈 净利润: {log.income - log.expense}金",
+            f"👥 顾客数: {log.customers}人",
+            f"🍽️ 制作菜品: {log.dishes_made}道 | 失败: {log.dishes_failed}道",
+            f"⭐ 声望变化: {log.reputation_change:+d}",
+            "",
+            "👨‍🍳 厨师工作详情:",
+            "━━━━━━━━━━━━━"
+        ]
+
+        # 展示每个厨师的详细情况
+        chef_details = details.get("chef_details", [])
+        for chef_detail in chef_details:
+            chef_name = chef_detail.get("chef_name", "未知厨师")
+            dishes = chef_detail.get("dishes", [])
+            failed = chef_detail.get("failed", 0)
+            comments = chef_detail.get("personality_comments", [])
+
+            msg_lines.append(f"\n👨‍🍳 {chef_name}:")
+            msg_lines.append(f"  制作: {len(dishes)}道 | 失败: {failed}道")
+
+            # 展示性格旁白(随机选择2-3条)
+            if comments:
+                sample_count = min(3, len(comments))
+                import random
+                sampled_comments = random.sample(comments, sample_count)
+                msg_lines.append("  💬 性格片段:")
+                for comment in sampled_comments:
+                    msg_lines.append(f"    「{comment}」")
+
+        msg_lines.append("")
+        msg_lines.append("💡 使用【经营报表】查看汇总数据")
+
+        await log_cmd.finish("\n".join(msg_lines))
