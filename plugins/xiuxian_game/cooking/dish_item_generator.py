@@ -64,7 +64,7 @@ class DishItemGenerator:
                     "rarity": rarity,
                     "description": f"{recipe.description} (品质:{quality_name if quality_name else '普通'})",
                     "price": dish_price,
-                    "effect_type": "CONSUMABLE",
+                    "effect_type": "BUFF",  # 菜肴使用BUFF效果类型
                     "effect_params": {},
                     "tags": ["dish", f"tier_{recipe.tier}", f"quality_{quality}"]
                 }
