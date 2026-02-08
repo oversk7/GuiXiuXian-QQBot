@@ -275,11 +275,11 @@ async def handle_recruit_chef(event: MessageEvent):
 
         # 招募消耗
         recruit_cost = 500
-        if player.coin < recruit_cost:
+        if player.gold < recruit_cost:
             await recruit_chef_cmd.finish(f"⛔ 招募费不足! 需要 {recruit_cost}金币")
 
         # 扣除招募费
-        player.coin -= recruit_cost
+        player.gold -= recruit_cost
         await uow.players.update(player)
 
         # 生成候选

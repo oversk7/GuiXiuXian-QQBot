@@ -205,11 +205,11 @@ class ChefService:
         player = await uow.players.get_by_id(player_id)
         hire_cost = self.CHEF_TIER_CONFIG[candidate.tier]["hire_cost"]
 
-        if player.coin < hire_cost:
+        if player.gold < hire_cost:
             return False, f"⛔ 签约费不足! 需要 {hire_cost}金币"
 
         # 扣除签约费
-        player.coin -= hire_cost
+        player.gold -= hire_cost
         await uow.players.update(player)
 
         # 创建厨师

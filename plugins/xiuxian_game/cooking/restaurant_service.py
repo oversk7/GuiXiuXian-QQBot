@@ -145,7 +145,7 @@ class RestaurantService:
 
         # 检查金币
         player = await uow.players.get_by_id(player_id)
-        if player.coin < cost_config["coin"]:
+        if player.gold < cost_config["coin"]:
             return False, f"⛔ 金币不足! 需要 {cost_config['coin']}金币"
 
         # 检查材料
@@ -165,7 +165,7 @@ class RestaurantService:
             return False, f"⛔ 材料不足: {', '.join(missing_materials)}"
 
         # 扣除消耗
-        player.coin -= cost_config["coin"]
+        player.gold -= cost_config["coin"]
         await uow.players.update(player)
 
         # 扣除材料
@@ -233,11 +233,11 @@ class RestaurantService:
 
         # 检查金币
         player = await uow.players.get_by_id(player_id)
-        if player.coin < cost:
+        if player.gold < cost:
             return False, f"⛔ 金币不足! 需要 {cost}金币"
 
         # 扣除金币
-        player.coin -= cost
+        player.gold -= cost
         await uow.players.update(player)
 
         # 扩张面积
