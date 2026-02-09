@@ -564,6 +564,51 @@ async def handle_restock(event: MessageEvent, args: Message = CommandArg()):
         await restock_cmd.finish(msg)
 
 
+withdraw_cmd = on_command("取货", aliases={"餐厅取货", "取出食材"}, priority=5, block=True)
+
+
+@withdraw_cmd.handle()
+async def handle_withdraw(event: MessageEvent, args: Message = CommandArg()):
+    """【取货 食材名 数量】- 从餐厅仓库取出食材到背包"""
+
+    args_text = args.extract_plain_text().strip()
+
+    if not args_text:
+        await withdraw_cmd.finish("⛔ 用法: 取货 <食材名> <数量>\n例如: 取货 鲤鱼 10")
+
+    # 解析参数
+    parts = args_text.split()
+    if len(parts) < 2:
+        await withdraw_cmd.finish("⛔ 用法: 取货 <食材名> <数量>\n例如: 取货 鲤鱼 10")
+
+    item_name = parts[0]
+    try:
+        quantity = int(parts[1])
+        if quantity <= 0:
+            await withdraw_cmd.finish("⛔ 数量必须大于0")
+    except ValueError:
+        await withdraw_cmd.finish("⛔ 数量必须是数字")
+
+    async with UnitOfWork(AsyncSessionLocal) as uow:
+        player = await get_unified_player(uow.session, event)
+        if not player:
+            await withdraw_cmd.finish("⛔ 请先创建角色")
+
+        # 根据物品名查找物品ID
+        from ..config import config
+        item_id = None
+        for iid, item_cfg in config.items_config["by_id"].items():
+            if item_cfg.name == item_name:
+                item_id = iid
+                break
+
+        if not item_id:
+            await withdraw_cmd.finish(f"⛔ 未找到食材: {item_name}")
+
+        success, msg = await restaurant_service.withdraw_ingredient(uow, player.id, item_id, quantity)
+        await withdraw_cmd.finish(msg)
+
+
 storage_cmd = on_command("餐厅仓库", aliases={"仓库", "查看仓库"}, priority=5, block=True)
 
 
@@ -587,7 +632,8 @@ async def handle_storage(event: MessageEvent):
             await storage_cmd.finish(
                 f"📦 餐厅仓库 (0/{restaurant.storage_capacity})\n\n"
                 f"⚠️ 仓库空空如也\n"
-                f"使用【补货 食材名 数量】补充食材"
+                f"💡 使用【补货 食材名 数量】补充食材\n"
+                f"💡 使用【取货 食材名 数量】取出食材"
             )
 
         # 计算总量
@@ -621,7 +667,8 @@ async def handle_storage(event: MessageEvent):
         if other_items:
             msg += "📦 其他:\n" + "\n".join(other_items) + "\n\n"
 
-        msg += "💡 使用【补货 食材名 数量】补充食材"
+        msg += "💡 使用【补货 食材名 数量】补充食材\n"
+        msg += "💡 使用【取货 食材名 数量】取出食材"
 
         await storage_cmd.finish(msg)
 

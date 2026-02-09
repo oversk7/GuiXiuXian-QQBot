@@ -10,7 +10,9 @@ class Config(BaseSettings):
     map_file: Path = data_dir / "map.yaml"
     elixirs_file: Path = data_dir / "elixirs.yaml"
 
-    
+    # 缓存 items_config，避免每次访问都重新生成
+    _cached_items_config: dict = None
+
     @property
     def game_config(self) -> dict:
         """获取游戏配置"""
@@ -18,7 +20,12 @@ class Config(BaseSettings):
 
     @property
     def items_config(self) -> dict:
-        """返回结构化物品配置"""
+        """返回结构化物品配置（缓存版本，支持动态注册）"""
+        # 如果已经缓存，直接返回
+        if self._cached_items_config is not None:
+            return self._cached_items_config
+
+        # 首次加载：从 YAML 文件加载并建立索引
         from .models.inventory import ItemConfig, ItemType
         items = _load_config(self.items_file)
         # 建立三种索引
@@ -31,7 +38,10 @@ class Config(BaseSettings):
                 configs[item["item_id"]] = config
                 name_index[item["name"]] = config
                 type_index[config.type.value].append(config.item_id)
-        return {"by_id": configs, "by_name": name_index, "by_type": type_index}
+
+        # 缓存结果
+        self._cached_items_config = {"by_id": configs, "by_name": name_index, "by_type": type_index}
+        return self._cached_items_config
 
     @property
     def map_config(self) -> dict:

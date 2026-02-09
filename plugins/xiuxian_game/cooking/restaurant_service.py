@@ -411,7 +411,73 @@ class RestaurantService:
             )
             await uow.restaurant_storage.add(new_storage)
 
-        return True, f"✅ 成功补货 {item_id} × {quantity}\n当前仓库: {current_storage + quantity}/{restaurant.storage_capacity}"
+        await uow.commit()
+
+        # 获取物品名称用于显示
+        from ..config import config
+        item_cfg = config.items_config["by_id"].get(item_id)
+        item_name = item_cfg.name if item_cfg else item_id
+
+        return True, f"✅ 成功补货【{item_name}】× {quantity}\n当前仓库: {current_storage + quantity}/{restaurant.storage_capacity}"
+
+    async def withdraw_ingredient(
+        self,
+        uow: UnitOfWork,
+        player_id: str,
+        item_id: str,
+        quantity: int
+    ) -> Tuple[bool, str]:
+        """
+        取货(从餐厅仓库转移食材到玩家背包)
+
+        Args:
+            uow: 工作单元
+            player_id: 玩家ID
+            item_id: 食材ID
+            quantity: 数量
+
+        Returns:
+            (是否成功, 消息)
+        """
+
+        restaurant = await uow.restaurants.get_by_player_id(player_id)
+        if not restaurant:
+            return False, "⛔ 你还没有餐厅，请先创建"
+
+        # 1. 检查仓库中是否有足够食材
+        storage = await uow.restaurant_storage.get_by_restaurant_and_item(restaurant.id, item_id)
+        if not storage or storage.quantity < quantity:
+            current_qty = storage.quantity if storage else 0
+            return False, f"⛔ 仓库中食材不足(需要 {quantity},拥有 {current_qty})"
+
+        # 2. 检查背包容量
+        from ..models.inventory import ItemInstance
+        try:
+            # 尝试添加到背包(会自动检查容量)
+            await ItemInstance.add_item(uow.session, player_id, item_id, quantity)
+        except ValueError as e:
+            return False, f"⛔ 背包空间不足: {str(e)}"
+
+        # 3. 从仓库扣除食材
+        storage.quantity -= quantity
+        if storage.quantity == 0:
+            # 数量归零,删除仓库记录
+            await uow.restaurant_storage.delete(storage)
+        else:
+            # 更新仓库记录
+            await uow.restaurant_storage.update(storage)
+
+        await uow.commit()
+
+        # 获取物品名称用于显示
+        from ..config import config
+        item_cfg = config.items_config["by_id"].get(item_id)
+        item_name = item_cfg.name if item_cfg else item_id
+
+        # 计算当前仓库总量
+        current_storage = await uow.restaurant_storage.get_total_quantity_by_restaurant(restaurant.id)
+
+        return True, f"✅ 成功取货【{item_name}】× {quantity}\n当前仓库: {current_storage}/{restaurant.storage_capacity}"
 
     async def set_menu(
         self,
