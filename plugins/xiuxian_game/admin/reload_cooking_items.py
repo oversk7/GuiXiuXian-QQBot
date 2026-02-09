@@ -21,7 +21,8 @@ async def handle_reload_cooking_items(event: Event):
         from ..cooking.dish_item_generator import DishItemGenerator
         from ..config import config
 
-        # 重新加载食谱
+        # 强制重新加载食谱
+        RecipeManager.reload()
         recipe_manager = RecipeManager()
         recipe_count = len(recipe_manager._recipes)
 

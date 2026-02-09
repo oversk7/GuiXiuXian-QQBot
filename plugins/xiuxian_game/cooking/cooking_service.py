@@ -97,6 +97,19 @@ class RecipeManager:
         """获取默认食谱ID列表(白色家常菜)"""
         return [recipe.recipe_id for recipe in self._recipes_by_tier["white"]]
 
+    @classmethod
+    def reload(cls):
+        """强制重新加载食谱配置"""
+        # 清空缓存
+        cls._recipes.clear()
+        for tier_list in cls._recipes_by_tier.values():
+            tier_list.clear()
+
+        # 重置单例实例，强制下次调用时重新加载
+        if cls._instance is not None:
+            cls._instance._load_recipes()
+            logger.info(f"🔄 强制重新加载食谱: {len(cls._recipes)} 个")
+
 
 class DishQuality:
     """菜肴品质枚举"""

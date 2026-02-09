@@ -401,8 +401,7 @@ class UnitOfWork:
                 try:
                     from nonebot.exception import FinishedException, PausedException, RejectedException
                     if exc_type in (FinishedException, PausedException, RejectedException):
-                        # 流程控制异常：提交事务
-                        logger.debug(f"✅ [UnitOfWork] 会话 {id(self._session)} 提交（流程控制异常: {exc_type.__name__}）")
+                        # 流程控制异常：静默提交事务（不记录日志）
                         await self._session.commit()
                     else:
                         # 其他异常：回滚事务

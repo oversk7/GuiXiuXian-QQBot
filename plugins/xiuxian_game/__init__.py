@@ -78,9 +78,21 @@ async def _():
         from .cooking.dish_item_generator import DishItemGenerator
         from .config import config
 
+        # 强制加载食谱
+        RecipeManager.reload()
         recipe_manager = RecipeManager()
-        DishItemGenerator.register_dish_items_to_config(config, recipe_manager)
-        logger.success("[CookingSystem] 菜肴物品配置已动态注册")
+        recipe_count = len(recipe_manager._recipes)
+
+        if recipe_count == 0:
+            logger.warning("[CookingSystem] 食谱配置为空！请检查 data/recipes.yaml 文件")
+        else:
+            # 注册菜肴物品配置
+            DishItemGenerator.register_dish_items_to_config(config, recipe_manager)
+
+            # 验证注册结果
+            dish_count = sum(1 for k in config.items_config.get("by_id", {}).keys() if k.startswith("dish_"))
+            logger.success(f"[CookingSystem] 菜肴物品配置已动态注册: {recipe_count}个食谱 -> {dish_count}个菜肴物品")
+
     except Exception as e:
         logger.error(f"[CookingSystem] 注册菜肴物品配置失败: {e}")
         import traceback
