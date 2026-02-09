@@ -21,7 +21,7 @@ async def handle_generate_exp_table(event: MessageEvent, args: Message = Command
 
 
 # 帮助
-help_cmd = on_command("帮助", aliases={"help","菜单"}, priority=5, block=True)
+help_cmd = on_command("帮助", aliases={"help","怎么玩"}, priority=5, block=True)
 @help_cmd.handle()
 async def handle_help(event: MessageEvent, args: Message = CommandArg()):
     """
@@ -42,7 +42,7 @@ async def handle_help(event: MessageEvent, args: Message = CommandArg()):
         "【背包系统】 物品管理、使用道具\n"
         "【炼丹系统】 炼制丹药、提升属性\n"
         "【钓鱼系统】 钓鱼玩法、鱼栏管理\n"
-        "【烹饪系统】 开餐厅、雇厨师、自动经营\n"
+        "【餐厅系统】 开餐厅、雇厨师、自动经营\n"
         "\n"
         "🗺️ 探索冒险：\n"
         "【探索系统】 地图导航、NPC交互\n"
@@ -1244,7 +1244,8 @@ async def handle_support(event: MessageEvent, args: Message = CommandArg()):
         "   • 签到获得月卡宝箱*3，咒抗+5\n"
         "🔸 5元 - 永久背包扩容+5格\n"
         "   • 永久增加背包容量5格，可重复购买\n"
-        
+        "🔸 5元 - 棺材钉\n"
+        "   • 持有者增加0.5%修炼效率，上限50%\n"
         "🔸 2元 - 哭坟帽\n"
         "   • 使用后直接获得1w怨念值\n"
         "🔸 后续将推出【诡烛】作为赞助兑换专属货币\n"
