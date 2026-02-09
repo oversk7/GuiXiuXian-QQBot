@@ -51,6 +51,24 @@ class Restaurant(Base):
         comment="上次结算时间"
     )
 
+    # 厨师招募冷却系统
+    last_recruit_time: Mapped[datetime | None] = mapped_column(
+        DateTime,
+        nullable=True,
+        comment="上次招募厨师时间"
+    )
+    daily_recruit_count: Mapped[int] = mapped_column(
+        Integer,
+        default=0,
+        server_default="0",
+        comment="当日招募次数(用于递增费用计算)"
+    )
+    last_recruit_date: Mapped[str | None] = mapped_column(
+        String(10),
+        nullable=True,
+        comment="上次招募日期(YYYY-MM-DD格式,用于每日重置)"
+    )
+
 
 class RestaurantStorage(Base):
     """餐厅食材仓库

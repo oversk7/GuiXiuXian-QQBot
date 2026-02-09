@@ -8,8 +8,8 @@
 """
 
 import random
-from typing import List, Tuple
-from datetime import datetime
+from typing import List, Tuple, Optional
+from datetime import datetime, timedelta
 from nonebot import logger
 
 from ..infrastructure.uow.unit_of_work import UnitOfWork
@@ -25,7 +25,25 @@ class ChefService:
     - 雇佣厨师到餐厅
     - 解雇厨师
     - 厨师属性生成和名字随机化
+    - 招募冷却和费用管理
     """
+
+    # 招募冷却时间配置（秒）
+    BASE_RECRUIT_COOLDOWN = 4 * 60 * 60  # 4小时
+    BASIC_CARD_REDUCTION = 1 * 60 * 60   # 基础月卡减少1小时
+    PREMIUM_CARD_REDUCTION = 2 * 60 * 60 # 高级月卡减少2小时
+
+    # 招募费用配置
+    BASE_RECRUIT_COST = 500     # 基础费用
+    RECRUIT_COST_SCALING = {    # 当日第N次招募费用
+        0: 500,    # 首次
+        1: 1000,   # 第2次(2倍)
+        2: 2000,   # 第3次(4倍)
+        3: 5000    # 第4次及以上(10倍)
+    }
+
+    # 候选过期时间
+    CANDIDATE_EXPIRE_HOURS = 24  # 24小时后过期
 
     # 厨师等级配置
     CHEF_TIER_CONFIG = {
@@ -105,10 +123,123 @@ class ChefService:
     def __init__(self):
         pass
 
+    async def check_recruit_cooldown(
+        self,
+        uow: UnitOfWork,
+        restaurant_id: int,
+        player_id: str
+    ) -> Tuple[bool, Optional[str], Optional[int]]:
+        """
+        检查招募冷却时间
+
+        Args:
+            uow: 工作单元
+            restaurant_id: 餐厅ID
+            player_id: 玩家ID
+
+        Returns:
+            (是否可招募, 错误消息, 剩余冷却秒数)
+        """
+        restaurant = await uow.restaurants.get_by_id(restaurant_id)
+        if not restaurant:
+            return False, "⛔ 餐厅不存在", None
+
+        # 如果从未招募过，可以招募
+        if not restaurant.last_recruit_time:
+            return True, None, None
+
+        # 计算冷却时间（考虑月卡加成）
+        from ..models.monthly_card import get_player_card_benefits
+
+        benefits = await get_player_card_benefits(uow.session, player_id)
+        cooldown_reduction = 0
+
+        if benefits["premium_active"]:
+            # 高级月卡：减少2小时
+            cooldown_reduction = self.PREMIUM_CARD_REDUCTION
+        elif benefits["basic_active"]:
+            # 基础月卡：减少1小时
+            cooldown_reduction = self.BASIC_CARD_REDUCTION
+
+        effective_cooldown = self.BASE_RECRUIT_COOLDOWN - cooldown_reduction
+
+        # 计算剩余冷却时间
+        now = datetime.now()
+        elapsed = (now - restaurant.last_recruit_time).total_seconds()
+        remaining = int(effective_cooldown - elapsed)
+
+        if remaining > 0:
+            # 格式化剩余时间
+            hours = remaining // 3600
+            minutes = (remaining % 3600) // 60
+            time_str = f"{hours}小时{minutes}分钟" if hours > 0 else f"{minutes}分钟"
+
+            return False, f"⏰ 招募冷却中，剩余{time_str}", remaining
+        else:
+            return True, None, None
+
+    def calculate_recruit_cost(self, restaurant) -> int:
+        """
+        计算本次招募费用（考虑当日招募次数）
+
+        Args:
+            restaurant: 餐厅实体
+
+        Returns:
+            招募费用
+        """
+        # 检查是否需要重置当日计数
+        today = datetime.now().strftime("%Y-%m-%d")
+        if restaurant.last_recruit_date != today:
+            # 新的一天，重置计数
+            return self.BASE_RECRUIT_COST
+
+        # 根据当日招募次数计算费用
+        count = restaurant.daily_recruit_count
+        if count in self.RECRUIT_COST_SCALING:
+            return self.RECRUIT_COST_SCALING[count]
+        else:
+            # 超过3次，使用最高档费用
+            return self.RECRUIT_COST_SCALING[3]
+
+    async def clean_expired_candidates(
+        self,
+        uow: UnitOfWork,
+        player_id: str
+    ) -> int:
+        """
+        清理过期的候选厨师
+
+        Args:
+            uow: 工作单元
+            player_id: 玩家ID
+
+        Returns:
+            清理的数量
+        """
+        candidates = await uow.chef_candidates.get_by_player_id(player_id)
+        if not candidates:
+            return 0
+
+        now = datetime.now()
+        expired_count = 0
+
+        for candidate in candidates:
+            # 检查是否过期（24小时）
+            if (now - candidate.created_at).total_seconds() > self.CANDIDATE_EXPIRE_HOURS * 3600:
+                await uow.chef_candidates.delete(candidate)
+                expired_count += 1
+
+        if expired_count > 0:
+            await uow.commit()
+
+        return expired_count
+
     async def recruit_chefs(
         self,
         uow: UnitOfWork,
         player_id: str,
+        restaurant_id: int,
         count: int = 4
     ) -> Tuple[bool, str, List[ChefCandidate]]:
         """
@@ -117,13 +248,14 @@ class ChefService:
         Args:
             uow: 工作单元
             player_id: 玩家ID
+            restaurant_id: 餐厅ID
             count: 生成候选数量(3-5)
 
         Returns:
             (是否成功, 消息, 候选列表)
         """
 
-        # 清除玩家旧的候选
+        # 清除玩家旧的候选（包括过期的）
         await uow.chef_candidates.clear_by_player(player_id)
 
         # 生成新候选
@@ -133,6 +265,21 @@ class ChefService:
             candidate = self._generate_chef_candidate(player_id, tier)
             await uow.chef_candidates.add(candidate)
             candidates.append(candidate)
+
+        # 更新餐厅招募状态
+        restaurant = await uow.restaurants.get_by_id(restaurant_id)
+        if restaurant:
+            today = datetime.now().strftime("%Y-%m-%d")
+
+            # 检查是否需要重置当日计数
+            if restaurant.last_recruit_date != today:
+                restaurant.daily_recruit_count = 0
+                restaurant.last_recruit_date = today
+
+            # 更新招募时间和次数
+            restaurant.last_recruit_time = datetime.now()
+            restaurant.daily_recruit_count += 1
+            await uow.restaurants.update(restaurant)
 
         await uow.commit()
 
@@ -151,6 +298,7 @@ class ChefService:
             msg += f"  🔹 擅长: {specialty_name} | 性格: {personality_name}\n"
             msg += f"  💰 时薪: {candidate.salary}金 | 签约费: {config['hire_cost']}金\n\n"
 
+        msg += "⏰ 候选有效期: 24小时\n"
         msg += "使用【雇佣 编号】来选择雇佣"
 
         return True, msg, candidates

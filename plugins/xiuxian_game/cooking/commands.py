@@ -273,19 +273,50 @@ async def handle_recruit_chef(event: MessageEvent):
         if not restaurant:
             await recruit_chef_cmd.finish("⛔ 你还没有餐厅，请先使用【创建餐厅】")
 
-        # 招募消耗
-        recruit_cost = 500
+        # 清理过期候选
+        expired = await chef_service.clean_expired_candidates(uow, player.id)
+
+        # 检查冷却时间
+        can_recruit, cooldown_msg, remaining = await chef_service.check_recruit_cooldown(
+            uow, restaurant.id, player.id
+        )
+        if not can_recruit:
+            await recruit_chef_cmd.finish(cooldown_msg)
+
+        # 计算招募费用
+        recruit_cost = chef_service.calculate_recruit_cost(restaurant)
+
+        # 检查金币
         if player.gold < recruit_cost:
-            await recruit_chef_cmd.finish(f"⛔ 招募费不足! 需要 {recruit_cost}金币")
+            await recruit_chef_cmd.finish(
+                f"⛔ 招募费不足! 需要 {recruit_cost}金币\n"
+                f"💡 提示: 当日招募次数越多,费用越高\n"
+                f"   首次500金 → 第2次1000金 → 第3次2000金 → 第4次+5000金"
+            )
 
         # 扣除招募费
         player.gold -= recruit_cost
         await uow.players.update(player)
 
         # 生成候选
-        success, msg, candidates = await chef_service.recruit_chefs(uow, player.id, count=4)
+        success, msg, candidates = await chef_service.recruit_chefs(
+            uow, player.id, restaurant.id, count=4
+        )
 
-        await recruit_chef_cmd.finish(msg)
+        # 显示费用信息
+        today_count = restaurant.daily_recruit_count + 1  # 包含本次
+        next_cost_info = ""
+        if today_count < 3:
+            next_cost = chef_service.RECRUIT_COST_SCALING.get(today_count, 5000)
+            next_cost_info = f"\n💰 下次招募费用: {next_cost}金币 (当日第{today_count + 1}次)"
+
+        final_msg = (
+            f"💰 支付招募费: {recruit_cost}金币 (当日第{today_count}次)"
+            f"{next_cost_info}\n\n"
+            f"{msg}"
+        )
+
+        await recruit_chef_cmd.finish(final_msg)
 
 
 hire_chef_cmd = on_command("雇佣", aliases={"雇佣厨师"}, priority=5, block=True)
