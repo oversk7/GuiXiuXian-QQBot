@@ -2799,7 +2799,7 @@ items:
       tags: ["inner_realm_only"]
 
     # ========== 里界材料（战利品） ==========
-    - item_id: "corrupted_bandage"
+    - item_id: "inner_corrupted_bandage"
       name: "污染绷带"
       description: "被诡异力量污染的医用绷带，散发着不详的气息 🩹"
       type: "MATERIAL"

@@ -429,7 +429,7 @@ class InnerRealmService:
             # 随机材料奖励（1-2个）- 仅使用里界专属物品
             material_pool = [
                 {"item_id": "broken_id", "quantity": random.randint(1, 3), "probability": 0.8},  # 白色 - 破损证件
-                {"item_id": "corrupted_bandage", "quantity": 1, "probability": 0.5},  # 绿色 - 污染绷带（里界材料）
+                {"item_id": "inner_corrupted_bandage", "quantity": 1, "probability": 0.5},  # 绿色 - 污染绷带（里界材料）
                 {"item_id": "scalpel", "quantity": 1, "probability": 0.6},  # 绿色 - 手术刀（里界专属）
                 {"item_id": "visitor_pass", "quantity": 1, "probability": 0.4},  # 绿色 - 访客通行证
             ]

@@ -193,7 +193,7 @@ realms:
           - item_id: "medical_record_key"
             quantity: 1
             probability: 1.0
-          - item_id: "corrupted_bandage"
+          - item_id: "inner_corrupted_bandage"
             quantity: 1
             probability: 0.8
           - gold: 200
@@ -337,7 +337,7 @@ realms:
         condition: "killed_count >= 20"
         description: "你杀光了病栋里的所有生命，血流成河。第三病栋在你的屠杀下崩塌，化为虚无..."
         rewards:
-          - item_id: "corrupted_bandage"
+          - item_id: "inner_corrupted_bandage"
             quantity: 50
             probability: 1.0
           - item_id: "twisted_flesh"
@@ -392,7 +392,7 @@ realms:
         condition: "killed_count >= 20 AND boss_defeated"
         description: "你杀光了病栋里的一切生命，包括幕后黑手院长。第三病栋在血与火中彻底毁灭，不留任何痕迹..."
         rewards:
-          - item_id: "corrupted_bandage"
+          - item_id: "inner_corrupted_bandage"
             quantity: 100
             probability: 1.0
           - item_id: "twisted_flesh"
