@@ -657,7 +657,7 @@ async def handle_set_menu(event: MessageEvent, args: Message = CommandArg()):
         recipe_ids = []
         for dish_name in dish_names:
             found = False
-            for recipe_id, recipe in recipe_manager.recipes.items():
+            for recipe_id, recipe in recipe_manager._recipes.items():
                 if recipe.name == dish_name:
                     recipe_ids.append(recipe_id)
                     found = True
