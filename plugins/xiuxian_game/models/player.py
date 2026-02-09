@@ -75,6 +75,7 @@ class Player(Base):
     vip: Mapped[int] = mapped_column(Integer, default=0, server_default='0', comment="VIP等级")
     gold: Mapped[int] = mapped_column(BigInteger, default=1000, server_default='1000', comment="货币")
     gold2: Mapped[int] = mapped_column(BigInteger, default=0, server_default='0', comment="积分")
+    gui_zhu: Mapped[int] = mapped_column(BigInteger, default=0, server_default='0', comment="诡烛(氪金专属货币)")
     mini_game_score: Mapped[int] = mapped_column(Integer, default=0, server_default='0', comment="小游戏积分")
     charm: Mapped[int] = mapped_column(Integer, default=0, server_default='0', comment="魅力值(通过收礼获得)")
     

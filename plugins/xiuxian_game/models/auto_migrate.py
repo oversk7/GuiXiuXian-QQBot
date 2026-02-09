@@ -36,7 +36,9 @@ REQUIRED_FIELDS: Dict[str, Dict[str, str]] = {
         "max_apprentice_slots": "INT DEFAULT 3 COMMENT '最大徒弟位'",
         "mentor_cooldown_until": "DATETIME NULL COMMENT '师徒操作冷却结束时间'",
         # 里界系统字段
-        "inner_realm": "VARCHAR(64) NULL COMMENT '当前所在里界(None=不在里界)'"
+        "inner_realm": "VARCHAR(64) NULL COMMENT '当前所在里界(None=不在里界)'",
+        # 诡烛氪金货币
+        "gui_zhu": "BIGINT DEFAULT 0 COMMENT '诡烛(氪金专属货币)'"
     },
     "player_relationship": {
         "master_id": "VARCHAR(32) NULL COMMENT '师父ID(师徒关系专用)'",

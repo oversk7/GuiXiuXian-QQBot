@@ -1127,6 +1127,7 @@ async def handle_admin_help(event: MessageEvent, args: Message = CommandArg()):
         "🔧 物品管理：\n"
         "【发物品 <UID> <物品名> [数量]】 给玩家发放物品\n"
         "【发装备 <UID> <装备名> [数量]】 给玩家发放装备\n"
+        "【发诡烛 <UID> <数量>】 给玩家发放诡烛(氪金货币)\n"
         "【转移物品 <UID1> <UID2> <物品名> <数量>】 转移物品\n"
         "━━━━━━━━━━━━━\n"
         "🎁 抽奖系统：\n"
@@ -1386,6 +1387,43 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
             await give_item_cmd.finish(f"❌ 失败：{e}")
 
         await give_item_cmd.finish(f"✅ 已给予 UID:{target_uid} {tpl.name} ✖️{qty}")
+
+
+# ------------------ 管理员：发诡烛 ------------------
+
+give_guizhu_cmd = on_command("发诡烛", aliases={"给诡烛", "增加诡烛"}, priority=2, block=True, permission=SUPERUSER)
+
+
+@give_guizhu_cmd.handle()
+async def _(event: MessageEvent, args: Message = CommandArg()):
+    """管理员指令：发诡烛 UID 数量"""
+    parts = args.extract_plain_text().strip().split()
+    if len(parts) != 2:
+        await give_guizhu_cmd.finish("格式：发诡烛 UID 数量")
+
+    uid_str, amount_str = parts[0], parts[1]
+
+    if not uid_str.isdigit():
+        await give_guizhu_cmd.finish("UID 必须为数字")
+    if not amount_str.isdigit() or int(amount_str) < 1:
+        await give_guizhu_cmd.finish("数量必须为正整数")
+
+    target_uid = int(uid_str)
+    amount = int(amount_str)
+
+    async with safe_session() as session:
+        from sqlalchemy import select
+        player = (await session.execute(select(Player).where(Player.uid == target_uid))).scalars().first()
+        if not player:
+            await give_guizhu_cmd.finish(f"❌ 未找到 UID 为 {target_uid} 的玩家")
+
+        player.gui_zhu += amount
+        await session.commit()
+
+        await give_guizhu_cmd.finish(
+            f"✅ 已给予 UID:{target_uid}({player.nickname}) 诡烛 ×{amount}\n"
+            f"💎 当前诡烛：{player.gui_zhu}"
+        )
 
 
 # ==================== 账号管理帮助 ====================
