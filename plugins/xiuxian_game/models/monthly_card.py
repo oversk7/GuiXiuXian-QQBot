@@ -156,6 +156,8 @@ async def get_player_card_benefits(session, player_id: str) -> dict:
         "sign_stamina_bonus": 0,  # 签到咒抗上限增加
         "sign_monthly_card_boxes": 0,  # 签到获得月卡宝箱数量
         "breakthrough_protection": 0.0,  # 突破失败保护（修为保留比例）
+        "basic_active": False,  # 基础月卡是否激活
+        "premium_active": False,  # 高级月卡是否激活
     }
 
     active_cards = await MonthlyCard.get_all_active_cards(session, player_id)
@@ -165,6 +167,12 @@ async def get_player_card_benefits(session, player_id: str) -> dict:
 
     for card in active_cards:
         card_benefits = card_config.get(card.card_type, {})
+
+        # 标记月卡激活状态
+        if card.card_type == CardType.BASIC:
+            benefits["basic_active"] = True
+        elif card.card_type == CardType.PREMIUM:
+            benefits["premium_active"] = True
 
         # 累加数值型权益
         benefits["cultivation_efficiency"] += card_benefits.get("cultivation_efficiency", 0)
