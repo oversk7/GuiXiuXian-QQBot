@@ -810,10 +810,17 @@ async def _process_application(event: MessageEvent, args: Message, approve: bool
             if not success:
                 await (approve_cmd if approve else reject_cmd).finish(message_add_head(f"⛔ {reason}", event))
 
-            # 使用DI架构Service批准申请
-            await app_service.approve_application(app, guild_obj)
-
-            result_msg = f"✅ 已同意 {applicant.nickname}[UID:{target_uid}] 加入公会"
+            # 使用DI架构Service批准申请（检查返回值）
+            approve_success, approve_reason = await app_service.approve_application(app, guild_obj)
+            if not approve_success:
+                # 批准申请失败，但玩家已经加入公会了，这是一个不一致的状态
+                # 记录警告并继续（因为玩家实际上已经加入了）
+                from nonebot import logger
+                logger.warning(f"⚠️ [公会] 玩家 {applicant.nickname}[{target_uid}] 已加入公会，但批准申请失败: {approve_reason}")
+                # 仍然显示成功消息，因为玩家已经实际加入了公会
+                result_msg = f"✅ 已同意 {applicant.nickname}[UID:{target_uid}] 加入公会（申请状态更新异常）"
+            else:
+                result_msg = f"✅ 已同意 {applicant.nickname}[UID:{target_uid}] 加入公会"
         else:
             # 使用DI架构Service拒绝申请
             await app_service.reject_application(app)

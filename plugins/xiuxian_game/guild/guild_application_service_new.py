@@ -185,27 +185,34 @@ class GuildApplicationService:
             ⚠️ 原代码有P0问题：Line 130和153有内部commit
             新版本移除了内部commit，由调用方控制事务边界
         """
-        # 再次检查公会容量（防止并发问题）
-        member_count = await self._guild_repo.get_member_count(guild.id)
-        capacity = self._get_guild_capacity(guild.level)
-
-        if member_count >= capacity:
-            return False, "公会人数已满，无法同意"
-
         # 获取申请人
         applicant = await self._player_repo.get_by_id(application.applicant_id)
         if not applicant:
             return False, "申请人不存在"
 
-        # 检查申请人是否已加入其他公会
-        if applicant.guild_id is not None and applicant.guild_id != guild.id:
-            await self._application_repo.reject_application(application)
-            # ❌ 移除内部commit，由调用方控制事务边界
-            return False, "该玩家已加入其他公会，无法同意"
+        # 检查申请人是否已经加入当前公会（可能在调用此方法前已通过join_guild加入）
+        already_joined_current_guild = (applicant.guild_id == guild.id)
 
-        # 批准申请
-        applicant.guild_id = guild.id
-        await self._player_repo.update(applicant)
+        # 如果申请人还未加入当前公会，需要检查容量
+        if not already_joined_current_guild:
+            # 再次检查公会容量（防止并发问题）
+            member_count = await self._guild_repo.get_member_count(guild.id)
+            capacity = self._get_guild_capacity(guild.level)
+
+            if member_count >= capacity:
+                return False, "公会人数已满，无法同意"
+
+            # 检查申请人是否已加入其他公会
+            if applicant.guild_id is not None and applicant.guild_id != guild.id:
+                await self._application_repo.reject_application(application)
+                # ❌ 移除内部commit，由调用方控制事务边界
+                return False, "该玩家已加入其他公会，无法同意"
+
+            # 批准申请：设置公会ID
+            applicant.guild_id = guild.id
+            await self._player_repo.update(applicant)
+
+        # 更新申请状态（无论申请人是否已加入，都要更新状态）
         await self._application_repo.approve_application(application)
 
         # 将该玩家其他待处理的公会申请全部标记为拒绝
