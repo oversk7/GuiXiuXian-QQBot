@@ -698,14 +698,18 @@ async def handle_view_menu(event: MessageEvent):
 
         msg = "📋 营业菜单\n\n"
 
+        from ..config import config
+
         for menu in menu_items:
             recipe = recipe_manager.get_recipe(menu.recipe_id)
             if recipe:
                 # 显示食谱信息和所需食材
-                ingredients_str = ", ".join([
-                    f"{recipe_manager._get_item_name(item_id)}×{qty}"
-                    for item_id, qty in recipe.ingredients.items()
-                ])
+                ingredients_parts = []
+                for item_id, qty in recipe.ingredients.items():
+                    item_cfg = config.items_config["by_id"].get(item_id)
+                    item_name = item_cfg.name if item_cfg else item_id
+                    ingredients_parts.append(f"{item_name}×{qty}")
+                ingredients_str = ", ".join(ingredients_parts)
 
                 rarity_emoji = {
                     "white": "⚪",
