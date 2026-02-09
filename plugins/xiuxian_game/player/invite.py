@@ -106,7 +106,7 @@ async def _(event: MessageEvent):
         code = generate_invite_code(player.uid)
 
         # 创建InviteRewardService实例
-        invite_reward_service = InviteRewardServiceNew(
+        invite_reward_service = InviteRewardService(
             invite_reward_repo=uow.invite_rewards,
             player_repo=uow.players
         )
@@ -182,7 +182,7 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
             await bind_cmd.finish("⛔ 邀请码无效或邀请者不存在")
 
         # 创建InviteRewardService实例
-        invite_reward_service = InviteRewardServiceNew(
+        invite_reward_service = InviteRewardService(
             invite_reward_repo=uow.invite_rewards,
             player_repo=uow.players
         )
@@ -198,7 +198,7 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
         # 如果玩家已经达到1级，立即发放1级奖励
         level_1_reward_msg = ""
         if player.level >= 1:
-            level_1_reward = InviteRewardServiceNew.LEVEL_REWARDS[1]
+            level_1_reward = InviteRewardService.LEVEL_REWARDS[1]
             player.gold += level_1_reward["invitee_gold"]
             inviter.gold += level_1_reward["inviter_gold"]
             invite_record.level_1_rewarded = True
@@ -239,7 +239,7 @@ async def _(event: MessageEvent):
             await invite_status_cmd.finish("⛔ 请先创建角色")
 
         # 创建InviteRewardService实例
-        invite_reward_service = InviteRewardServiceNew(
+        invite_reward_service = InviteRewardService(
             invite_reward_repo=uow.invite_rewards,
             player_repo=uow.players
         )
