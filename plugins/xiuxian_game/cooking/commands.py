@@ -515,3 +515,212 @@ async def handle_log(event: MessageEvent):
         msg_lines.append("💡 使用【经营报表】查看汇总数据")
 
         await log_cmd.finish("\n".join(msg_lines))
+
+
+# ==================== 仓库管理 ====================
+
+restock_cmd = on_command("补货", aliases={"餐厅补货", "转移食材"}, priority=5, block=True)
+
+
+@restock_cmd.handle()
+async def handle_restock(event: MessageEvent, args: Message = CommandArg()):
+    """【补货 食材名 数量】- 从背包转移食材到餐厅仓库"""
+
+    args_text = args.extract_plain_text().strip()
+
+    if not args_text:
+        await restock_cmd.finish("⛔ 用法: 补货 <食材名> <数量>\n例如: 补货 鲤鱼 10")
+
+    # 解析参数
+    parts = args_text.split()
+    if len(parts) < 2:
+        await restock_cmd.finish("⛔ 用法: 补货 <食材名> <数量>\n例如: 补货 鲤鱼 10")
+
+    item_name = parts[0]
+    try:
+        quantity = int(parts[1])
+        if quantity <= 0:
+            await restock_cmd.finish("⛔ 数量必须大于0")
+    except ValueError:
+        await restock_cmd.finish("⛔ 数量必须是数字")
+
+    async with UnitOfWork(AsyncSessionLocal) as uow:
+        player = await get_unified_player(uow.session, event)
+        if not player:
+            await restock_cmd.finish("⛔ 请先创建角色")
+
+        # 根据物品名查找物品ID
+        from ..config import config
+        item_id = None
+        for iid, item_cfg in config.items_config["by_id"].items():
+            if item_cfg.name == item_name:
+                item_id = iid
+                break
+
+        if not item_id:
+            await restock_cmd.finish(f"⛔ 未找到食材: {item_name}")
+
+        success, msg = await restaurant_service.restock_ingredient(uow, player.id, item_id, quantity)
+        await restock_cmd.finish(msg)
+
+
+storage_cmd = on_command("餐厅仓库", aliases={"仓库", "查看仓库"}, priority=5, block=True)
+
+
+@storage_cmd.handle()
+async def handle_storage(event: MessageEvent):
+    """【餐厅仓库】- 查看餐厅仓库中的食材"""
+
+    async with UnitOfWork(AsyncSessionLocal) as uow:
+        player = await get_unified_player(uow.session, event)
+        if not player:
+            await storage_cmd.finish("⛔ 请先创建角色")
+
+        restaurant = await uow.restaurants.get_by_player_id(player.id)
+        if not restaurant:
+            await storage_cmd.finish("⛔ 你还没有餐厅")
+
+        # 获取仓库中的所有食材
+        storage_items = await uow.restaurant_storage.get_by_restaurant(restaurant.id)
+
+        if not storage_items:
+            await storage_cmd.finish(
+                f"📦 餐厅仓库 (0/{restaurant.storage_capacity})\n\n"
+                f"⚠️ 仓库空空如也\n"
+                f"使用【补货 食材名 数量】补充食材"
+            )
+
+        # 计算总量
+        total_quantity = sum(item.quantity for item in storage_items)
+
+        # 分类展示食材
+        from ..config import config
+        fish_items = []
+        seasoning_items = []
+        other_items = []
+
+        for storage in storage_items:
+            item_cfg = config.items_config["by_id"].get(storage.item_id)
+            if item_cfg:
+                item_info = f"  {item_cfg.name} × {storage.quantity}"
+                if item_cfg.type.value == "FISH":
+                    fish_items.append(item_info)
+                elif item_cfg.type.value == "SEASONING":
+                    seasoning_items.append(item_info)
+                else:
+                    other_items.append(item_info)
+
+        msg = f"📦 餐厅仓库 ({total_quantity}/{restaurant.storage_capacity})\n\n"
+
+        if fish_items:
+            msg += "🐟 鱼类食材:\n" + "\n".join(fish_items) + "\n\n"
+
+        if seasoning_items:
+            msg += "🧂 调料:\n" + "\n".join(seasoning_items) + "\n\n"
+
+        if other_items:
+            msg += "📦 其他:\n" + "\n".join(other_items) + "\n\n"
+
+        msg += "💡 使用【补货 食材名 数量】补充食材"
+
+        await storage_cmd.finish(msg)
+
+
+# ==================== 菜单管理 ====================
+
+set_menu_cmd = on_command("设置菜单", aliases={"菜单设置", "更新菜单"}, priority=5, block=True)
+
+
+@set_menu_cmd.handle()
+async def handle_set_menu(event: MessageEvent, args: Message = CommandArg()):
+    """【设置菜单 菜名1 菜名2 ...】- 设置餐厅营业菜单"""
+
+    args_text = args.extract_plain_text().strip()
+
+    if not args_text:
+        await set_menu_cmd.finish(
+            "⛔ 用法: 设置菜单 <菜名1> [菜名2] [菜名3] ...\n"
+            "例如: 设置菜单 红烧鲤鱼 清蒸鲫鱼\n"
+            "💡 使用【食谱】查看已学会的菜谱"
+        )
+
+    # 解析菜名
+    dish_names = args_text.split()
+
+    async with UnitOfWork(AsyncSessionLocal) as uow:
+        player = await get_unified_player(uow.session, event)
+        if not player:
+            await set_menu_cmd.finish("⛔ 请先创建角色")
+
+        # 根据菜名查找食谱ID
+        from ..config import config
+        recipe_ids = []
+        for dish_name in dish_names:
+            found = False
+            for recipe_id, recipe in recipe_manager.recipes.items():
+                if recipe.name == dish_name:
+                    recipe_ids.append(recipe_id)
+                    found = True
+                    break
+            if not found:
+                await set_menu_cmd.finish(f"⛔ 未找到菜谱: {dish_name}")
+
+        success, msg = await restaurant_service.set_menu(uow, player.id, recipe_ids)
+        await set_menu_cmd.finish(msg)
+
+
+view_menu_cmd = on_command("菜单", aliases={"查看菜单", "营业菜单"}, priority=5, block=True)
+
+
+@view_menu_cmd.handle()
+async def handle_view_menu(event: MessageEvent):
+    """【菜单】- 查看当前营业菜单"""
+
+    async with UnitOfWork(AsyncSessionLocal) as uow:
+        player = await get_unified_player(uow.session, event)
+        if not player:
+            await view_menu_cmd.finish("⛔ 请先创建角色")
+
+        restaurant = await uow.restaurants.get_by_player_id(player.id)
+        if not restaurant:
+            await view_menu_cmd.finish("⛔ 你还没有餐厅")
+
+        # 获取菜单
+        menu_items = await uow.restaurant_menus.get_active_menu(restaurant.id)
+
+        if not menu_items:
+            await view_menu_cmd.finish(
+                "📋 营业菜单\n\n"
+                "⚠️ 还未设置菜单\n"
+                "使用【设置菜单 菜名1 菜名2】设置营业菜品\n"
+                "使用【食谱】查看已学会的菜谱"
+            )
+
+        msg = "📋 营业菜单\n\n"
+
+        for menu in menu_items:
+            recipe = recipe_manager.get_recipe(menu.recipe_id)
+            if recipe:
+                # 显示食谱信息和所需食材
+                ingredients_str = ", ".join([
+                    f"{recipe_manager._get_item_name(item_id)}×{qty}"
+                    for item_id, qty in recipe.ingredients.items()
+                ])
+
+                rarity_emoji = {
+                    "white": "⚪",
+                    "green": "🟢",
+                    "blue": "🔵",
+                    "purple": "🟣",
+                    "orange": "🟠"
+                }
+
+                msg += (
+                    f"{rarity_emoji.get(recipe.tier, '⚪')} {recipe.name}\n"
+                    f"  售价: {recipe.base_price}金\n"
+                    f"  食材: {ingredients_str}\n\n"
+                )
+
+        msg += "💡 使用【设置菜单 菜名1 菜名2】更新菜单"
+
+        await view_menu_cmd.finish(msg)
