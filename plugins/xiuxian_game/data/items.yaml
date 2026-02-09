@@ -2826,15 +2826,6 @@ items:
       grudge_value: 500
       tags: ["inner_realm_only"]
 
-    - item_id: "cursed_mirror_shard"
-      name: "诅咒镜片"
-      description: "散发着不祥光芒的镜片碎片，凝视它会看到扭曲的真相 🪞"
-      type: "MATERIAL"
-      rarity: "purple"
-      price: 8000
-      grudge_value: 800
-      tags: ["inner_realm_only"]
-
     - item_id: "soul_essence"
       name: "游魂精华"
       description: "从里界收集的游魂精华，可用于强化装备或炼丹 👻"
