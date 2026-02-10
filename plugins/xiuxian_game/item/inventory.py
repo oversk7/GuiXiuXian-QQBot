@@ -92,6 +92,10 @@ CATEGORY_MAPPING = {
     "宝石": "GEM",
     "鱼类": "FISH",
     "礼物": "GIFT",
+    "调味品": "SEASONING",
+    "调料": "SEASONING",
+    "菜肴": "DISH",
+    "食谱": "RECIPE",
 }
 
 # 物品类型中文映射（用于显示）
@@ -103,6 +107,9 @@ TYPE_NAME_MAP = {
     "GEM": "宝石",
     "FISH": "鱼类",
     "GIFT": "礼物",
+    "SEASONING": "调味品",
+    "DISH": "菜肴",
+    "RECIPE": "食谱",
 }
 
 # 默认展示顺序（决定排序权重）
@@ -111,6 +118,9 @@ CATEGORY_ORDER = [
     "MATERIAL",
     "GOODS",
     "GIFT",                  # 礼物
+    "SEASONING",             # 调味品
+    "DISH",                  # 菜肴
+    "RECIPE",                # 食谱
     "ELIXIR",                # 丹药（item_id 以 _elixir 结尾）
     "GEM",                   # 宝石
     "EQUIPMENT"
