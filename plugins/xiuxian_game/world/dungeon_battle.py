@@ -759,7 +759,7 @@ async def _handle_material(session, tile: WorldTile, player: Player) -> str:
     base_msg = f"✨ 你采集到了 {item_cfg.get_display_name()} ✖️{quantity}!"
     if luck_bonus:
         base_msg += "\n🍀 幸运闪现！材料翻倍。"
-    base_msg += "\n⬇️ 【图鉴 <物品名>】 查看描述"
+    base_msg += "\n⬇️ 【图鉴 物品名】 查看描述"
     return base_msg
 
 
