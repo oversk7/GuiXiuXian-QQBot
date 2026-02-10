@@ -536,6 +536,56 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
             desc_parts.append(f"⚔️ 类型：装备")
             if hasattr(cfg, 'required_level'):
                 desc_parts.append(f"📊 等级要求：Lv.{cfg.required_level}")
+
+            # 属性加成
+            ATTR_CN = {
+                "attack": "力",
+                "defense": "防",
+                "agility": "敏",
+                "luck": "运",
+                "max_hp": "体",
+                "max_mp": "智",
+                "hp": "体",
+                "mp": "智",
+            }
+            bonus_parts = []
+            if cfg.attr_bonus:
+                for k, v in cfg.attr_bonus.items():
+                    cn = ATTR_CN.get(k, k)
+                    bonus_parts.append(f"{cn}+{v}")
+            if cfg.attr_ratio:
+                for k, v in cfg.attr_ratio.items():
+                    if v:
+                        cn = ATTR_CN.get(k, k)
+                        bonus_parts.append(f"{cn}+{int(v*100)}%")
+            if bonus_parts:
+                desc_parts.append("🔧 属性加成：" + " 、".join(bonus_parts))
+
+            # 宝石孔位信息
+            if hasattr(cfg, 'gem_slots') and cfg.gem_slots > 0:
+                desc_parts.append(f"💎 宝石孔位：{cfg.gem_slots}个")
+
+            # 特殊效果信息（显示解锁条件）
+            if hasattr(cfg, 'special_effects') and cfg.special_effects:
+                # VIP定制装备列表（0阶即全解锁）
+                VIP_EQUIPMENT_IDS = {"vip_blade_zhanlongshan", "vip_robe_jingyuanzhiyi"}
+                is_vip_equipment = cfg.item_id in VIP_EQUIPMENT_IDS
+
+                if is_vip_equipment:
+                    desc_parts.append("✨ 特殊效果（VIP定制，0阶全解锁）：")
+                    for effect in cfg.special_effects:
+                        effect_desc = effect.get('description', '')
+                        if effect_desc:
+                            desc_parts.append(f"  • {effect_desc}")
+                else:
+                    desc_parts.append("✨ 特殊效果（升阶解锁）：")
+                    for idx, effect in enumerate(cfg.special_effects, start=1):
+                        # 获取效果描述
+                        effect_desc = effect.get('description', '')
+                        if effect_desc:
+                            # 计算解锁所需的升阶等级
+                            required_level = idx * 2
+                            desc_parts.append(f"  • [{idx}] {effect_desc} (+{required_level}阶解锁)")
         elif cfg.type.value == "CONSUMABLE":
             desc_parts.append(f"💊 类型：消耗品")
         elif cfg.type.value == "GEM":
@@ -546,6 +596,8 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
                 desc_parts.append(f"💝 好感度：+{cfg.favorability}")
 
         desc = "\r".join(desc_parts)
+        # 清理所有参数中的\n换行符，确保只使用\r（因为配置文件中的描述可能包含\n）
+        desc = desc.replace('\n', '\r')
 
         # 根据物品类型定制快捷操作按钮（4个）
         type_buttons = {
