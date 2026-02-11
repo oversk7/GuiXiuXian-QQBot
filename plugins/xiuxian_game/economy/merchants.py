@@ -445,25 +445,26 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
                 await buy_cmd.finish(f"❌ 库存不足！当前库存：{market_state.current_stock}，需要：{qty}")
 
             # 检查背包商品总量限制（防止高等级玩家垄断库存）
-            # 注意：血契丹、阴冥草和鱼类不占用携带上限
-            result_inv = await session.execute(
-                select(ItemInstance).where(
-                    ItemInstance.player_id == player.id,
-                    ItemInstance.item_id.in_(LIMITED_GOODS)  # 仅统计受限商品
+            # 注意：血契丹、阴冥草、鱼类和调味料(SEASONING)不占用携带上限
+            if item_cfg.item_id in LIMITED_GOODS:
+                result_inv = await session.execute(
+                    select(ItemInstance).where(
+                        ItemInstance.player_id == player.id,
+                        ItemInstance.item_id.in_(LIMITED_GOODS)  # 仅统计受限商品
+                    )
                 )
-            )
-            current_goods = result_inv.scalars().all()
-            current_goods_total = sum(item.quantity for item in current_goods)
+                current_goods = result_inv.scalars().all()
+                current_goods_total = sum(item.quantity for item in current_goods)
 
-            if current_goods_total + qty > 500:
-                await buy_cmd.finish(message_add_head(
-                    f"❌ 商品携带量限制！\n"
-                    f"━━━━━━━━━━━━━\n"
-                    f"📦 当前商品总量：{current_goods_total}\n"
-                    f"🛒 尝试购买：{qty}\n"
-                    f"⚖️ 携带上限：500\n"
-                    f"━━━━━━━━━━━━━\n"
-                    f"💡 请先出售部分商品再购买", event))
+                if current_goods_total + qty > 500:
+                    await buy_cmd.finish(message_add_head(
+                        f"❌ 商品携带量限制！\n"
+                        f"━━━━━━━━━━━━━\n"
+                        f"📦 当前商品总量：{current_goods_total}\n"
+                        f"🛒 尝试购买：{qty}\n"
+                        f"⚖️ 携带上限：500\n"
+                        f"━━━━━━━━━━━━━\n"
+                        f"💡 请先出售部分商品再购买", event))
 
             # 获取当前价格
             sell_price, _ = await _price_for(session, market, item_cfg.item_id)
