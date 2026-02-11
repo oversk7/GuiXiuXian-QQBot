@@ -226,6 +226,11 @@ class RelationshipService:
         if item_config.type == ItemType.GOODS:
             return False, f"禁止转移跑商商品类物品"
 
+        # 5.1 VIP定制装备禁止转移
+        VIP_EQUIPMENT_IDS = {"vip_blade_zhanlongshan", "vip_robe_jingyuanzhiyi", "heaven_retreat_star_blade"}
+        if item_config.item_id in VIP_EQUIPMENT_IDS:
+            return False, "VIP定制装备为专属装备，不可转移"
+
         # 6. 特殊处理: 装备类型需要返回信息供Command处理
         if item_config.type == ItemType.EQUIPMENT:
             # 获取玩家装备列表

@@ -250,6 +250,11 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
     if not item_cfg:
         await list_cmd.finish(f"⛔ 不存在物品：{item_name}")
 
+    # VIP定制装备禁止交易
+    VIP_EQUIPMENT_IDS = {"vip_blade_zhanlongshan", "vip_robe_jingyuanzhiyi", "heaven_retreat_star_blade"}
+    if item_cfg.item_id in VIP_EQUIPMENT_IDS:
+        await list_cmd.finish("⛔ VIP定制装备为专属装备，不可交易")
+
     # 装备交易特殊处理
     is_equipment = EquipmentTradeService.is_equipment_trade(item_cfg.item_id)
     if is_equipment and side == OrderSide.SELL:

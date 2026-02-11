@@ -318,7 +318,7 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
             lines.append("✨ 特殊效果：")
 
             # VIP定制装备列表（0阶即全解锁）
-            VIP_EQUIPMENT_IDS = {"vip_blade_zhanlongshan", "vip_robe_jingyuanzhiyi"}
+            VIP_EQUIPMENT_IDS = {"vip_blade_zhanlongshan", "vip_robe_jingyuanzhiyi", "heaven_retreat_star_blade"}
             is_vip_equipment = equip.item_id in VIP_EQUIPMENT_IDS
 
             if is_vip_equipment:

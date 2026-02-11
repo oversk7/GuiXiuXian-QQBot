@@ -1051,42 +1051,6 @@ items:
           duration: 2
           description: "暴击后伤害+40%(持续2回合)"
 
-    - item_id: "heaven_retreat_star_blade"
-      name: "天退星刀"
-      description: "外号「插翅虎」，星位「天退星」雷横的专属兵刃。以子弹为燃，灌入刀背推进器，瞬燃增压，刀势暴涨如雷；本不应现于此界，却不知何故坠落于斯。“有两下子，看来不是浪费我子弹的家伙”。（专属｜UID:1331）"
-      type: "EQUIPMENT"
-      price: 320000
-      durability: 230
-      attr_bonus: {"attack": 85, "agility": 55}
-      attr_ratio: {"attack": 0.60, "agility": 0.45}
-      repair_cost: 110
-      required_level: 220
-      gem_slots: 5
-      rarity: "red"
-      special_effects:
-        - trigger: "first_turn"
-          chance: 100
-          effect: "tiger_bullet"
-          value: 30
-          duration: 0
-          max_trigger_count: 3
-          next_effect: "fierce_tiger_bullet"
-          description: "虎标弹：造成伤害提高30%(最多生效3次主动攻击)"
-        - trigger: "first_turn"
-          chance: 0
-          effect: "fierce_tiger_bullet"
-          value: 50
-          duration: 0
-          max_trigger_count: 3
-          next_effect: "rigid_qi_heart"
-          description: "猛虎标弹：虎标弹失效后自动激活，造成伤害提高50%，受到伤害降低30%(最多生效3次主动攻击)"
-        - trigger: "first_turn"
-          chance: 0
-          effect: "rigid_qi_heart"
-          value: 60
-          duration: 3
-          description: "刚气-心：猛虎标弹失效后触发，受到伤害降低60%，造成伤害降低30%(持续3回合)"
-
     - item_id: "shroud_of_eternity"
       name: "寿衣"
       description: "用死者的怨念与神明之泪编织而成的诡异寿衣，每一根丝线都浸透着亡魂的哀嚎。穿戴者的血肉将与布料融为一体，获得不死不灭的诅咒庇护，但代价是永远无法安息... 👻"
@@ -1115,11 +1079,9 @@ items:
           duration: 999
           description: "低血量时防御+60%(诅咒庇护)"
 
-    # ========== Boss掉落专属装备（不可锻造）==========
-
     - item_id: "lucky_scissors"
       name: "幸运剪刀"
-      description: "这把血迹斑斑的剪刀和幸运完全沾不上边，可它就是被命名为幸运。（开膛手套装）⚠️ Boss掉落专属"
+      description: "这把血迹斑斑的剪刀和幸运完全沾不上边，可它就是被命名为幸运。（开膛手套装）"
       type: "EQUIPMENT"
       price: 80000
       durability: 100
@@ -1132,7 +1094,7 @@ items:
 
     - item_id: "black_envelope"
       name: "黑色信封"
-      description: "开膛手曾留下署名，将死者的器官装入信封，寄送给当地的报社。（开膛手套装）⚠️ Boss掉落专属"
+      description: "开膛手曾留下署名，将死者的器官装入信封，寄送给当地的报社。（开膛手套装）"
       type: "EQUIPMENT"
       price: 100000
       durability: 100
@@ -1145,20 +1107,20 @@ items:
 
     - item_id: "skull_suit"
       name: "碎颅制服"
-      description: "克劳瑞在精神病院里工作了二十年，长时间接触患者让他的精神饱受折磨，终于有一天他决定结束这一切。病态和疯狂浸透入骨髓，他手持铁锤想要从根本上治疗好自己的患者！⚠️ Boss掉落专属"
+      description: "克劳瑞在精神病院里工作了二十年，长时间接触患者让他的精神饱受折磨，终于有一天他决定结束这一切。病态和疯狂浸透入骨髓，他手持铁锤想要从根本上治疗好自己的患者！"
       type: "EQUIPMENT"
       price: 150000
       durability: 100
       attr_bonus: {"attack": 70, "defense": 30}
       attr_ratio: {"attack": 0.65, "defense": 0.25}
-      repair_cost: 100   # Boss掉落，不可锻造
+      repair_cost: 100
       required_level: 130
       gem_slots: 4
       rarity: "purple"
 
     - item_id: "faceless_suit"
       name: "无脸制服"
-      description: "珍妮是碎颅医生克劳瑞的妻子，那天晚上她亲眼目睹丈夫手持铁锤走入病室，她不清楚自己最爱的丈夫想要做什么，直到那高高举起的铁锤砸向她的脸时，她才反应过来。⚠️ Boss掉落专属"
+      description: "珍妮是碎颅医生克劳瑞的妻子，那天晚上她亲眼目睹丈夫手持铁锤走入病室，她不清楚自己最爱的丈夫想要做什么，直到那高高举起的铁锤砸向她的脸时，她才反应过来。"
       type: "EQUIPMENT"
       price: 120000
       durability: 100
@@ -1183,6 +1145,42 @@ items:
           spirit_bone: 25
 
     # ========== VIP定制装备 ==========
+
+    - item_id: "heaven_retreat_star_blade"
+      name: "天退星刀"
+      description: "外号「插翅虎」，星位「天退星」雷横的专属兵刃。以子弹为燃，灌入刀背推进器，瞬燃增压，刀势暴涨如雷；本不应现于此界，却不知何故坠落于斯。"有两下子，看来不是浪费我子弹的家伙"。"
+      type: "EQUIPMENT"
+      price: 320000
+      durability: 230
+      attr_bonus: {"attack": 100, "agility": 100}
+      attr_ratio: {"attack": 1.0, "agility": 1.0}
+      repair_cost: 110
+      required_level: 10
+      gem_slots: 5
+      rarity: "red"
+      special_effects:
+        - trigger: "first_turn"
+          chance: 100
+          effect: "tiger_bullet"
+          value: 80
+          duration: 0
+          max_trigger_count: 3
+          next_effect: "fierce_tiger_bullet"
+          description: "虎标弹：造成伤害提高80%(最多生效3次主动攻击)"
+        - trigger: "first_turn"
+          chance: 0
+          effect: "fierce_tiger_bullet"
+          value: 100
+          duration: 0
+          max_trigger_count: 3
+          next_effect: "rigid_qi_heart"
+          description: "猛虎标弹：虎标弹失效后自动激活，造成伤害提高100%，受到伤害降低30%(最多生效3次主动攻击)"
+        - trigger: "first_turn"
+          chance: 0
+          effect: "rigid_qi_heart"
+          value: 60
+          duration: 3
+          description: "刚气-心：猛虎标弹失效后触发，受到伤害降低60%，造成伤害降低10%(持续3回合)"
 
     - item_id: "vip_blade_zhanlongshan"
       name: "斩龙闪"
@@ -1233,8 +1231,8 @@ items:
       rarity: "red"
       durability: 300
       required_level: 10
-      attr_bonus: {"hp": 100, "attack": 80, "agility": 60, "defense": 60}
-      attr_ratio: {"hp": 1.0, "attack": 0.80, "agility": 0.60, "defense": 0.60}
+      attr_bonus: {"hp": 100, "attack": 100, "agility": 100, "defense": 100}
+      attr_ratio: {"hp": 1.0, "attack": 1.0, "agility": 1.0, "defense": 1.0}
       special_effects:
         - trigger: "on_attacked"
           effect: "reflect_death"

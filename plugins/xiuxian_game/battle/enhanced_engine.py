@@ -285,10 +285,10 @@ class EnhancedBattleEngine:
 
         特殊效果解锁规则：
         - 普通装备：+2阶解锁第1个效果，+4阶解锁第2个效果，依此类推
-        - VIP定制装备（斩龙闪、镜怨之衣）：0阶即解锁全部效果
+        - VIP定制装备（斩龙闪、镜怨之衣、天退星刀）：0阶即解锁全部效果
         """
         # VIP定制装备列表（0阶即全解锁）
-        VIP_EQUIPMENT_IDS = {"vip_blade_zhanlongshan", "vip_robe_jingyuanzhiyi"}
+        VIP_EQUIPMENT_IDS = {"vip_blade_zhanlongshan", "vip_robe_jingyuanzhiyi", "heaven_retreat_star_blade"}
 
         for item in equipped_items:
             # 从装备配置中获取special_effects

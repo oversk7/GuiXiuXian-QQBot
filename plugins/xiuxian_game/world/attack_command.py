@@ -458,6 +458,12 @@ async def handle_player_attack(session, attacker: Player, target: Player, event:
     except ImportError:
         pass
 
+    # 荒野死斗不允许对子管理员发起
+    if not in_town:
+        from ..ai_guide import is_sub_admin
+        if is_sub_admin(target.id):
+            await attack_cmd.finish("⛔ 不允许对子管理员发起荒野死斗")
+
     # 死斗前镜怨体质（自保）判定：仅在荒野/诡域且为被动防御方触发
     if not in_town:
         # 检查目标是否穿戴镜怨之衣
