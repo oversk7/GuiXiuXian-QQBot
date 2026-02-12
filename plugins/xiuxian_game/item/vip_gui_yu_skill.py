@@ -9,6 +9,7 @@
 - 锚点              查看锚点列表
 """
 
+import copy
 from datetime import datetime, timedelta
 from nonebot import on_command
 from nonebot.params import CommandArg
@@ -45,15 +46,15 @@ async def _get_gui_yu_instance(session, player_id: str) -> ItemInstance | None:
 
 
 def _get_anchors(player: Player) -> list[dict]:
-    """获取玩家的锚点列表"""
+    """获取玩家的锚点列表（返回深拷贝，避免意外修改MutableDict内部数据）"""
     data = player.vip_equipment_data or {}
-    return data.get("gui_yu_anchors", [])
+    return copy.deepcopy(data.get("gui_yu_anchors", []))
 
 
 def _set_anchors(player: Player, anchors: list[dict]):
-    """设置玩家的锚点列表"""
+    """设置玩家的锚点列表（通过重建整个dict确保SQLAlchemy检测到变更）"""
     data = dict(player.vip_equipment_data or {})
-    data["gui_yu_anchors"] = anchors
+    data["gui_yu_anchors"] = copy.deepcopy(anchors)
     player.vip_equipment_data = data
 
 
