@@ -278,8 +278,25 @@ SHOP_ITEMS: List[ShopItem] = [
 
     # 【限定收藏区】
     ShopItem("knocker_relic", "叩门者残骸", 80, daily_limit=0, event_limit=1, category="限定收藏"),
-    ShopItem("knocker_title", '"封门人"称号', 150, daily_limit=0, event_limit=1, category="限定收藏"),
+
+    # 【称号收藏区】
+    ShopItem("knocker_title_jixie", '"缉邪使"称号', 80, daily_limit=0, event_limit=1, category="称号收藏"),
+    ShopItem("knocker_title_dengxia", '"灯下行者"称号', 120, daily_limit=0, event_limit=1, category="称号收藏"),
+    ShopItem("knocker_title", '"封门人"称号', 150, daily_limit=0, event_limit=1, category="称号收藏"),
+    ShopItem("knocker_title_jinsheng", '"禁声者"称号', 200, daily_limit=0, event_limit=1, category="称号收藏"),
+    ShopItem("knocker_title_终结", '"叩门终结者"称号', 300, daily_limit=0, event_limit=1, category="称号收藏"),
 ]
+
+
+# ==================== 称号映射表 ====================
+# item_id -> 称号显示名
+TITLE_ITEMS: Dict[str, str] = {
+    "knocker_title_jixie": "缉邪使",
+    "knocker_title_dengxia": "灯下行者",
+    "knocker_title": "封门人",
+    "knocker_title_jinsheng": "禁声者",
+    "knocker_title_终结": "叩门终结者",
+}
 
 
 # ==================== 全服播报模板 ====================

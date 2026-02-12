@@ -33,7 +33,8 @@ from .knocker_config import (
     DEFAULT_DURATION_HOURS,
     TELEPORT_MAX_DISTANCE, TELEPORT_COOLDOWN, TELEPORT_COORD_RANGE,
     TELEPORT_TEXT,
-    LEVEL_OFFSET_BY_TIER,  # 新增：导入动态等级偏移配置
+    LEVEL_OFFSET_BY_TIER,
+    TITLE_ITEMS,  # 称号映射表
 )
 
 
@@ -781,6 +782,7 @@ class KnockerEventService:
             "稀有宝物": "💎",
             "食谱解锁": "📜",
             "限定收藏": "🌟",
+            "称号收藏": "🏅",
         }
 
         lines = [
@@ -841,6 +843,8 @@ class KnockerEventService:
             "━━━━━━━━━━━━━",
             "💡 【活动商店 兑换 物品名】购买",
             "💡 【活动商店 兑换 物品名 数量】批量购买",
+            "💡 【切换称号 称号名】切换已拥有的称号",
+            "💡 【卸下称号】取消称号展示",
         ])
 
         return "\n".join(lines)
@@ -892,10 +896,16 @@ class KnockerEventService:
         if shards < total_cost:
             return False, f"碎片不足! 需要 {total_cost} 碎片, 当前 {shards}"
 
-        # 特殊处理: 称号
-        if shop_item.item_id == "knocker_title":
+        # 特殊处理: 称号（使用TITLE_ITEMS映射表统一处理所有称号）
+        if shop_item.item_id in TITLE_ITEMS:
+            title_name = TITLE_ITEMS[shop_item.item_id]
             # 称号直接记录到活动数据
-            pdata["title"] = "封门人"
+            pdata["title"] = title_name
+            # 记录到已拥有称号列表
+            owned_titles = pdata.get("owned_titles", [])
+            if title_name not in owned_titles:
+                owned_titles.append(title_name)
+            pdata["owned_titles"] = owned_titles
             pdata["shards"] = shards - total_cost
             if shop_item.item_id not in purchased:
                 purchased[shop_item.item_id] = {}
@@ -903,7 +913,12 @@ class KnockerEventService:
             purchased[shop_item.item_id][f"daily_{today_str}"] = daily_bought + quantity
             pdata["purchased"] = purchased
             cls._set_player_data(player, pdata)
-            return True, f"兑换成功! 获得限定称号「封门人」\n🔮 剩余碎片: {pdata['shards']}"
+            return True, (
+                f"兑换成功! 获得限定称号「{title_name}」\n"
+                f"已自动装备为当前称号\n"
+                f"💡 使用【切换称号】查看和切换已有称号\n"
+                f"🔮 剩余碎片: {pdata['shards']}"
+            )
 
         # 特殊处理: 永久属性丹(使用VIPEquipmentBonus记录,确保轮回后保留)
         attr_items = {
@@ -1087,6 +1102,83 @@ class KnockerEventService:
         """获取玩家活动称号(如果有)"""
         pdata = cls._get_player_data(player)
         return pdata.get("title")
+
+    @classmethod
+    def get_owned_titles(cls, player: Player) -> List[str]:
+        """获取玩家已拥有的所有称号"""
+        pdata = cls._get_player_data(player)
+        owned = pdata.get("owned_titles", [])
+        # 兼容旧数据：如果有title但owned_titles为空，补充进去
+        current_title = pdata.get("title")
+        if current_title and current_title not in owned:
+            owned.append(current_title)
+        return owned
+
+    @classmethod
+    def handle_title_switch(cls, player: Player, title_name: str) -> Tuple[bool, str]:
+        """切换称号
+
+        Args:
+            player: 玩家对象
+            title_name: 要切换的称号名，空字符串表示卸下
+
+        Returns:
+            (成功, 结果消息)
+        """
+        pdata = cls._get_player_data(player)
+        owned_titles = cls.get_owned_titles(player)
+
+        if not owned_titles:
+            return False, "你还没有任何称号，请在【活动商店】兑换"
+
+        # 卸下称号
+        if not title_name:
+            if not pdata.get("title"):
+                return False, "当前没有装备称号"
+            pdata["title"] = ""
+            cls._set_player_data(player, pdata)
+            return True, "已卸下称号"
+
+        # 检查是否拥有该称号
+        if title_name not in owned_titles:
+            titles_str = "、".join(f"「{t}」" for t in owned_titles)
+            return False, f"你没有称号「{title_name}」\n已拥有: {titles_str}"
+
+        # 检查是否已经是当前称号
+        if pdata.get("title") == title_name:
+            return False, f"「{title_name}」已经是你的当前称号"
+
+        # 切换称号
+        pdata["title"] = title_name
+        cls._set_player_data(player, pdata)
+        return True, f"称号已切换为「{title_name}」"
+
+    @classmethod
+    def handle_title_list(cls, player: Player) -> str:
+        """查看已拥有的称号列表"""
+        owned_titles = cls.get_owned_titles(player)
+        pdata = cls._get_player_data(player)
+        current_title = pdata.get("title", "")
+
+        lines = [
+            "🏅 我的称号收藏",
+            "━━━━━━━━━━━━━",
+        ]
+
+        if not owned_titles:
+            lines.append("暂无称号，请在【活动商店】兑换")
+        else:
+            for t in owned_titles:
+                mark = " ◀ 当前" if t == current_title else ""
+                lines.append(f"  🏷️ 「{t}」{mark}")
+
+        lines.extend([
+            "━━━━━━━━━━━━━",
+            "💡 【切换称号 称号名】切换展示",
+            "💡 【卸下称号】取消展示",
+        ])
+
+        return "\n".join(lines)
 
     @classmethod
     def get_ghost_narrative(cls, npc: NPC) -> Optional[str]:

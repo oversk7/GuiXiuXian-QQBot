@@ -32,6 +32,10 @@ ranking_cmd = on_command("叩门排行", block=True, priority=5)
 
 shop_cmd = on_command("活动商店", aliases={"叩门商店"}, block=True, priority=5)
 
+title_switch_cmd = on_command("切换称号", block=True, priority=5)
+
+title_remove_cmd = on_command("卸下称号", block=True, priority=5)
+
 
 # ==================== 管理命令 ====================
 
@@ -171,6 +175,52 @@ async def handle_shop(event: MessageEvent, args: Message = CommandArg()):
             result = await KnockerEventService.handle_shop_view(player)
 
         await shop_cmd.finish(message_add_head(result, event))
+
+
+# ==================== 切换称号 ====================
+
+@title_switch_cmd.handle()
+async def handle_title_switch(event: MessageEvent, args: Message = CommandArg()):
+    """切换称号 [称号名]"""
+    args_text = args.extract_plain_text().strip()
+
+    async with safe_session() as session:
+        player = await get_unified_player(session, event)
+        if not player:
+            if is_guild_message(event):
+                await title_switch_cmd.finish(
+                    "你还没有创建角色或绑定账号\n请先在群聊注册角色，然后使用绑定功能"
+                )
+            else:
+                await title_switch_cmd.finish("请先创建角色")
+
+        if not args_text:
+            # 无参数：显示称号列表
+            result = KnockerEventService.handle_title_list(player)
+            await title_switch_cmd.finish(message_add_head(result, event))
+
+        # 有参数：切换到指定称号
+        success, msg = KnockerEventService.handle_title_switch(player, args_text)
+
+    await title_switch_cmd.finish(message_add_head(msg, event))
+
+
+@title_remove_cmd.handle()
+async def handle_title_remove(event: MessageEvent):
+    """卸下称号"""
+    async with safe_session() as session:
+        player = await get_unified_player(session, event)
+        if not player:
+            if is_guild_message(event):
+                await title_remove_cmd.finish(
+                    "你还没有创建角色或绑定账号\n请先在群聊注册角色，然后使用绑定功能"
+                )
+            else:
+                await title_remove_cmd.finish("请先创建角色")
+
+        success, msg = KnockerEventService.handle_title_switch(player, "")
+
+    await title_remove_cmd.finish(message_add_head(msg, event))
 
 
 # ==================== 管理员: 开启活动 ====================
