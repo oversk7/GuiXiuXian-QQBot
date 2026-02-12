@@ -257,11 +257,29 @@ async def handle_attack(event: MessageEvent, args: Message = CommandArg()):
 
 
 async def parse_attack_target(session, target_name: str, x: int, y: int, region: str, player_id: str = None):
-    """解析攻击目标"""
+    """解析攻击目标（优先检查活动鬼怪）"""
     from sqlalchemy import select, and_
+    from ..event.knocker_event import KnockerEventService
 
     target_player = None
     target_npc = None
+
+    # 【新增】优先检查活动鬼怪（玩家个人鬼怪）
+    if player_id:
+        player_stmt = select(Player).where(Player.id == player_id)
+        player_result = await session.execute(player_stmt)
+        player = player_result.scalar_one_or_none()
+
+        if player and KnockerEventService.is_active():
+            # 查找玩家个人的活动鬼怪
+            ghost_data = KnockerEventService.find_player_ghost_by_name(player, target_name)
+            if ghost_data:
+                # 动态创建临时NPC用于战斗
+                target_npc = KnockerEventService.create_temp_npc_from_ghost_data(ghost_data, session)
+                # 在extra_data中标记这是个人鬼怪，方便后续处理
+                target_npc.extra_data["is_personal_ghost"] = True
+                target_npc.extra_data["ghost_data"] = ghost_data
+                return None, target_npc
 
     # 尝试按UID查找玩家
     if target_name.isdigit():
@@ -799,17 +817,25 @@ async def handle_player_attack(session, attacker: Player, target: Player, event:
 
 
 async def handle_npc_attack(session, attacker: Player, target_npc, event: MessageEvent):
-    """处理玩家vs NPC攻击"""
-    # 检查是否为活动鬼怪（个人事件模式：鬼怪不会真正死亡，每人只能打一次）
+    """处理玩家vs NPC攻击（支持个人鬼怪）"""
     from ..event.knocker_event import KnockerEventService
+
+    # 检查是否为个人活动鬼怪
+    extra = target_npc.extra_data or {}
+    is_personal_ghost = extra.get("is_personal_ghost", False)
+    ghost_data = extra.get("ghost_data")  # 个人鬼怪数据
+
+    # 旧的活动鬼怪检查（兼容性保留，但应该不会触发了）
     is_knocker = KnockerEventService.is_knocker_npc(target_npc)
 
-    if is_knocker:
-        # 活动鬼怪：检查玩家是否已击杀过
-        extra = target_npc.extra_data or {}
+    if is_personal_ghost:
+        # 个人活动鬼怪：已在数据中，无需额外检查
+        pass
+    elif is_knocker:
+        # 旧的活动鬼怪（如果还存在）：检查是否已击杀
         knocker_event_id = extra.get("knocker_event_id", "")
-        if KnockerEventService.has_player_killed(attacker, knocker_event_id):
-            await attack_cmd.finish(f"⛔ 你已经解决过{target_npc.name}了，去寻找其他诡事点吧！")
+        # 注意：旧系统没有个人鬼怪数据，跳过检查或提示重新刷新
+        pass
     else:
         # 非活动鬼怪：检查NPC状态
         if target_npc.is_dead():
@@ -850,41 +876,47 @@ async def handle_npc_attack(session, attacker: Player, target_npc, event: Messag
             "━━━━━━━━━━━━━"
         ]
 
-        # 展示战斗过程，方便玩家了解每一回合的战况
+        # 展示战斗过程
         result_lines.extend(battle_log)
-
         result_lines.append("━━━━━━━━━━━━━")
 
         if victory:
-            # 玩家胜利，NPC死亡
+            # 玩家胜利
             if target_npc.is_killable:
-                # 活动鬼怪不真正死亡（个人事件模式：其他玩家仍可攻击）
-                if not is_knocker:
+                # 个人活动鬼怪不操作数据库NPC
+                if not is_personal_ghost and not is_knocker:
                     target_npc.kill()
+
                 result_lines.append(f"💀 {target_npc.name}被击杀")
-                if not is_knocker and target_npc.respawn_duration_minutes > 0:
+
+                if not is_personal_ghost and not is_knocker and target_npc.respawn_duration_minutes > 0:
                     result_lines.append(f"⏰ {target_npc.respawn_duration_minutes}分钟后复活")
 
             # 鬼怪特殊奖励
             if target_npc.npc_type == NPCType.GHOST:
-                # 先检查是否为活动鬼怪
-                if is_knocker:
-                    # 活动鬼怪: 使用活动奖励系统
+                # 个人活动鬼怪奖励
+                if is_personal_ghost and ghost_data:
+                    event_id = ghost_data["event_id"]
                     knocker_lines = await KnockerEventService.on_ghost_killed(
-                        session, attacker, target_npc
+                        session, attacker, event_id, ghost_data
                     )
                     if knocker_lines:
                         result_lines.extend(knocker_lines)
 
-                    # 检查是否为Boss级, 生成全服播报
-                    boss_broadcast = KnockerEventService.get_boss_kill_broadcast(
-                        attacker, target_npc
-                    )
-                    if boss_broadcast:
+                    # 检查是否为Boss级（通过tier判断）
+                    if ghost_data.get("tier_id") == "boss":
+                        boss_broadcast = (
+                            f"🎆 {attacker.nickname} 封印了 {target_npc.name}！\n"
+                            f"坐标: ({ghost_data['x']}, {ghost_data['y']})"
+                        )
                         result_lines.append("")
                         result_lines.append(boss_broadcast)
-                        # 发送系统消息到留言板（全服播报）
+                        # 发送全服播报
                         await KnockerEventService._send_system_message(session, boss_broadcast)
+
+                elif is_knocker:
+                    # 旧的活动鬼怪（不应该存在了，但保留兼容性）
+                    result_lines.append("⚠️ 检测到旧版活动鬼怪，请重新刷新活动列表")
                 else:
                     # 普通鬼怪: 原有奖励逻辑
                     exp_gain = target_npc.level * 10
