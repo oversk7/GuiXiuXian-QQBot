@@ -25,9 +25,10 @@ from ..ai_guide import is_admin
 # 配置文件路径
 ITEM_IMAGES_CONFIG = Path(__file__).parent.parent.parent.parent / "data" / "item_images.yaml"
 
-# 允许的图床URL前缀（白名单）
+# 允许的图床URL前缀（不再限制特定图床，只要求HTTPS）
 ALLOWED_IMAGE_PREFIXES = [
-    "https://wdcdn.qpic.cn/",  # QQ邮箱图床
+    "https://",  # 允许所有HTTPS链接
+    "http://",   # 允许所有HTTP链接
 ]
 
 
@@ -103,15 +104,13 @@ def _validate_image_url(image_url: str) -> tuple[bool, str]:
         if image_url.startswith(prefix):
             return True, ""
 
-    # 如果不匹配任何白名单前缀
-    allowed_list = "\n".join(f"• {prefix}" for prefix in ALLOWED_IMAGE_PREFIXES)
+    # 如果不匹配任何前缀（不是有效的URL）
     error_msg = (
         f"⛔ 图片链接不符合要求\n"
         f"━━━━━━━━━━━━━\n"
-        f"仅支持以下图床：\n"
-        f"{allowed_list}\n"
+        f"请提供有效的图片URL（以http://或https://开头）\n"
         f"━━━━━━━━━━━━━\n"
-        f"💡 推荐使用QQ邮箱图床上传图片"
+        f"💡 请确保链接可以直接访问到图片"
     )
     return False, error_msg
 
