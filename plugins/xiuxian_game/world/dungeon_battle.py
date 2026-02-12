@@ -1004,6 +1004,7 @@ async def _handle_personal_monster(session, tile: WorldTile, player: Player) -> 
         from sqlalchemy import select as _select
         from datetime import datetime as _dt
         from ..models.inventory import ItemInstance as _ItemInstance
+        from ..models.vip_equipment_bonus import VIPEquipmentBonus as _VIPBonus
         def _today_key() -> str:
             return _dt.now().strftime("%Y%m%d")
         async def _apply_blade_daily_random_on_death(_player):

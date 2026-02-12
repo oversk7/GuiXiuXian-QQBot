@@ -778,8 +778,14 @@ class KnockerEventService:
     # ==================== 鬼域瞬移 ====================
 
     @classmethod
-    def handle_teleport(cls, player: Player, target_x: int, target_y: int) -> Tuple[bool, str]:
+    def handle_teleport(cls, session, player: Player, target_x: int, target_y: int) -> Tuple[bool, str]:
         """处理鬼域瞬移
+
+        Args:
+            session: 数据库会话(用于标记player对象需要更新)
+            player: 玩家对象
+            target_x: 目标X坐标
+            target_y: 目标Y坐标
 
         Returns:
             (成功, 结果消息)
@@ -825,6 +831,9 @@ class KnockerEventService:
         pdata["last_teleport"] = now
         cls._set_player_data(player, pdata)
 
+        # 关键修复: 标记player对象需要更新,确保坐标和冷却时间都保存到数据库
+        session.add(player)
+
         text = TELEPORT_TEXT.format(x=target_x, y=target_y)
         return True, text
 
@@ -839,12 +848,17 @@ class KnockerEventService:
     @classmethod
     def _set_player_data(cls, player: Player, data: dict):
         """设置玩家活动数据(写入extra_attrs)"""
+        from sqlalchemy.orm.attributes import flag_modified
+
         if not hasattr(player, 'extra_attrs') or player.extra_attrs is None:
             player.extra_attrs = {}
         # 触发SQLAlchemy变更检测
         extra = dict(player.extra_attrs)
         extra["knocker_event"] = data
         player.extra_attrs = extra
+
+        # 显式标记JSON字段已修改,确保SQLAlchemy跟踪变化
+        flag_modified(player, "extra_attrs")
 
     # ==================== 辅助方法 ====================
 

@@ -72,7 +72,7 @@ async def handle_event_status(event: MessageEvent):
         "━━━━━━━━━━━━━\n"
         "💡 碎片可用于兑换稀有道具和食谱\n"
         "💡 击杀Boss级鬼怪可获得全服播报\n"
-        "💡 瞬移距离上限100格（曼哈顿距离）"
+        "💡 瞬移距离上限200格（曼哈顿距离）"
     )
 
     await event_status_cmd.finish(message_add_head(result + help_section, event))
@@ -90,7 +90,7 @@ async def handle_teleport(event: MessageEvent, args: Message = CommandArg()):
             "鬼域瞬移\n"
             "━━━━━━━━━━━━━\n"
             "用法: 【鬼域瞬移 x y】\n"
-            "曼哈顿距离上限: 100格\n"
+            "曼哈顿距离上限: 200格\n"
             "冷却时间: 3分钟\n"
             "━━━━━━━━━━━━━\n"
             "示例: 鬼域瞬移 120 -50"
@@ -117,7 +117,7 @@ async def handle_teleport(event: MessageEvent, args: Message = CommandArg()):
             else:
                 await teleport_cmd.finish("请先创建角色")
 
-        success, msg = KnockerEventService.handle_teleport(player, target_x, target_y)
+        success, msg = KnockerEventService.handle_teleport(session, player, target_x, target_y)
 
     await teleport_cmd.finish(message_add_head(msg, event))
 

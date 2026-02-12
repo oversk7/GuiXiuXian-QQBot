@@ -136,7 +136,7 @@ EVENT_LIFETIME_MINUTES = 30    # 鬼怪存活时间(分钟) - 从60分钟缩短�
 
 # ==================== 瞬移参数 ====================
 
-TELEPORT_MAX_DISTANCE = 100    # 瞬移最大曼哈顿距离
+TELEPORT_MAX_DISTANCE = 200    # 瞬移最大曼哈顿距离 - 从100改为200,提高活动参与度
 TELEPORT_COOLDOWN = 180        # 瞬移冷却时间(秒)
 TELEPORT_COORD_RANGE = 500     # 瞬移坐标范围
 
