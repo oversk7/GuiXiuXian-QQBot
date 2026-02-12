@@ -200,22 +200,14 @@ MAX_ACTIVE_EVENTS = 25         # 同时存在上限 - 从15提升到25,容纳更
 COORD_RANGE = 300              # 坐标范围(-300~300)
 EVENT_LIFETIME_MINUTES = 30    # 鬼怪存活时间(分钟) - 从60分钟缩短到30分钟,避免堆积
 
-# ==================== 分层鬼怪配置 ====================
+# ==================== 动态等级配置 ====================
 
-@dataclass
-class GhostTier:
-    """鬼怪等级段定义"""
-    tier_id: str          # 等级段ID
-    name: str             # 等级段名称
-    level_range: Tuple[int, int]  # 等级范围
-    spawn_weight: int     # 刷新权重
-    icon: str             # 显示图标
-
-# 鬼怪等级段（低中高三档，适配不同等级玩家）
-GHOST_TIERS: Dict[str, GhostTier] = {
-    "low": GhostTier("low", "低级鬼怪", (1, 30), 5, "🔹"),
-    "mid": GhostTier("mid", "中级鬼怪", (31, 80), 3, "🔸"),
-    "high": GhostTier("high", "高级鬼怪", (81, 999), 2, "⚡"),
+# 根据鬼怪强度计算相对玩家等级的偏移量
+LEVEL_OFFSET_BY_TIER = {
+    "basic": (-5, 5),      # 普通：玩家等级±5（50%概率低于玩家，50%高于）
+    "medium": (0, 10),     # 精英：玩家等级+0到+10（略高但能打）
+    "elite": (5, 15),      # 头目：玩家等级+5到+15（挑战性）
+    "boss": (10, 25),      # BOSS：玩家等级+10到+25（困难但可挑战）
 }
 
 
