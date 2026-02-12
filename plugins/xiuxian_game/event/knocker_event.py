@@ -32,6 +32,7 @@ from .knocker_config import (
     DEFAULT_DURATION_HOURS,
     TELEPORT_MAX_DISTANCE, TELEPORT_COOLDOWN, TELEPORT_COORD_RANGE,
     TELEPORT_TEXT,
+    GHOST_TIERS, GhostTier,  # 新增：导入等级段配置
 )
 
 
@@ -52,6 +53,8 @@ class ActiveGhostEvent:
     city_name: str         # 地名
     narrative: str         # 叙事文本
     spawn_time: float      # 生成时间戳
+    level: int             # 鬼怪等级（新增）
+    tier_id: str           # 等级段ID: low/mid/high（新增）
     is_alive: bool = True  # 是否存活
 
     @property
@@ -217,14 +220,23 @@ class KnockerEventService:
             cls._last_refresh_time = time.time()
             return None
 
-        # 按权重随机选择类型
+        # 按权重随机选择鬼怪类型
         type_ids = list(GHOST_EVENT_TYPES.keys())
-        weights = [GHOST_EVENT_TYPES[t].weight for t in type_ids]
+        type_weights = [GHOST_EVENT_TYPES[t].weight for t in type_ids]
+
+        # 按权重随机选择等级段（low:mid:high = 5:3:2）
+        tier_ids = list(GHOST_TIERS.keys())
+        tier_weights = [GHOST_TIERS[t].spawn_weight for t in tier_ids]
 
         new_events: List[ActiveGhostEvent] = []
         for _ in range(spawn_count):
-            type_id = random.choices(type_ids, weights=weights, k=1)[0]
+            # 随机选择诡事类型
+            type_id = random.choices(type_ids, weights=type_weights, k=1)[0]
             ghost_type = GHOST_EVENT_TYPES[type_id]
+
+            # 随机选择等级段
+            tier_id = random.choices(tier_ids, weights=tier_weights, k=1)[0]
+            tier_config = GHOST_TIERS[tier_id]
 
             # 生成坐标
             x = random.randint(-COORD_RANGE, COORD_RANGE)
@@ -244,9 +256,12 @@ class KnockerEventService:
             event_id = f"knocker_{cls._event_counter}"
             npc_id = f"knocker_ghost_{cls._event_counter}"
 
-            # 计算鬼怪属性(基于全服活跃玩家中位等级)
-            median_level = await cls._get_median_player_level(session)
-            base_stats = DailyTaskService._calculate_enemy_stats(median_level)
+            # 根据等级段随机生成鬼怪等级（修改点）
+            min_level, max_level = tier_config.level_range
+            ghost_level = random.randint(min_level, max_level)
+
+            # 计算鬼怪属性（基于等级段等级，而非全服中位）
+            base_stats = DailyTaskService._calculate_enemy_stats(ghost_level)
             stats = {
                 "hp": int(base_stats["hp"] * ghost_type.hp_mult),
                 "attack": int(base_stats["attack"] * ghost_type.atk_mult),
@@ -286,7 +301,7 @@ class KnockerEventService:
                 npc_id=npc_id,
                 name=npc_display_name,
                 location_id=location.id,
-                level=median_level,
+                level=ghost_level,  # 使用等级段生成的等级
                 hp=stats["hp"],
                 attack=stats["attack"],
                 defense=stats["defense"],
@@ -295,6 +310,7 @@ class KnockerEventService:
             npc.extra_data = {
                 "knocker_event_id": event_id,
                 "knocker_type": type_id,
+                "knocker_tier": tier_id,  # 新增：存储等级段信息
                 "knocker_city": city,
                 "shard_reward": ghost_type.shard_reward,
                 "reward_mult": ghost_type.reward_mult,
@@ -316,6 +332,8 @@ class KnockerEventService:
                 city_name=city,
                 narrative=narrative,
                 spawn_time=time.time(),
+                level=ghost_level,  # 新增：鬼怪等级
+                tier_id=tier_id,    # 新增：等级段ID
             )
             cls._active_events[event_id] = active_event
             new_events.append(active_event)
@@ -329,10 +347,11 @@ class KnockerEventService:
         # 构建播报文本
         event_list_lines = []
         for e in new_events:
-            tier_icon = {"basic": "🔹", "medium": "🔸", "elite": "⚡", "boss": "💀"}.get(
-                e.type_config.tier, "🔹"
-            )
-            event_list_lines.append(f"· {tier_icon}{e.type_config.name} — ({e.x},{e.y})")
+            # 获取等级段图标（优先使用等级段图标）
+            tier_icon = GHOST_TIERS[e.tier_id].icon
+            # 构建完整描述（包含等级和等级段信息）
+            level_text = f"Lv.{e.level}"
+            event_list_lines.append(f"· {tier_icon}{e.npc_name}({level_text}) — ({e.x},{e.y})")
             # 添加叙事描述(缩进显示)
             event_list_lines.append(f"  {e.narrative}")
 
@@ -378,7 +397,7 @@ class KnockerEventService:
 
     @classmethod
     def get_event_status(cls, player) -> str:
-        """获取活动状态文本(含个人进度)"""
+        """获取活动状态文本(含个人进度和分层推荐)"""
         if not cls.is_active():
             return "━━━━━━━━━━━━━\n除夕叩门活动当前未开启\n━━━━━━━━━━━━━"
 
@@ -398,6 +417,18 @@ class KnockerEventService:
 
         active_events.sort(key=distance)
 
+        # 判断玩家适合的等级段
+        player_level = player.level
+        recommended_tier = None
+        for tier_id, tier_config in GHOST_TIERS.items():
+            min_level, max_level = tier_config.level_range
+            if min_level <= player_level <= max_level:
+                recommended_tier = tier_id
+                break
+        # 如果玩家等级超过所有等级段，推荐最高等级段
+        if not recommended_tier:
+            recommended_tier = "high"
+
         lines = [
             "咚...咚...咚...",
             "━━ 除夕叩门·缉邪令 ━━",
@@ -408,16 +439,32 @@ class KnockerEventService:
         ]
 
         if active_events:
-            lines.append(f"📍 当前诡事点 ({len(active_events)}个):")
-            for ev in active_events[:15]:
-                tier_icon = {"basic": "🔹", "medium": "🔸", "elite": "⚡", "boss": "💀"}.get(
-                    ev.type_config.tier, "🔹"
-                )
-                dist = abs(ev.x - px) + abs(ev.y - py)
-                lines.append(f"  {tier_icon}{ev.npc_name} ({ev.x},{ev.y}) 距{dist}格")
-                # 显示叙事描述(缩进增加氛围感)
-                lines.append(f"     {ev.narrative}")
-                lines.append("")  # 空行分隔
+            # 分层显示诡事（优先推荐合适等级段）
+            recommended_events = [e for e in active_events if e.tier_id == recommended_tier]
+            other_events = [e for e in active_events if e.tier_id != recommended_tier]
+
+            # 显示推荐目标
+            if recommended_events:
+                tier_config = GHOST_TIERS[recommended_tier]
+                lines.append(f"🎯 推荐目标 (Lv.{tier_config.level_range[0]}-{tier_config.level_range[1]}):")
+                for ev in recommended_events[:8]:  # 推荐最多8个
+                    tier_icon = tier_config.icon
+                    dist = abs(ev.x - px) + abs(ev.y - py)
+                    lines.append(f"  {tier_icon}{ev.npc_name}(Lv.{ev.level}) ({ev.x},{ev.y}) 距{dist}格")
+                    # 显示叙事描述(缩进增加氛围感)
+                    lines.append(f"     {ev.narrative}")
+                    lines.append("")  # 空行分隔
+
+            # 显示其他等级段鬼怪
+            if other_events and len(recommended_events) < 8:
+                lines.append(f"📍 其他诡事 ({len(other_events)}个):")
+                for ev in other_events[:7]:  # 其他最多7个
+                    tier_icon = GHOST_TIERS[ev.tier_id].icon
+                    dist = abs(ev.x - px) + abs(ev.y - py)
+                    tier_name = GHOST_TIERS[ev.tier_id].name
+                    lines.append(f"  {tier_icon}{ev.npc_name}(Lv.{ev.level}) ({ev.x},{ev.y}) 距{dist}格")
+                    lines.append(f"     {ev.narrative}")
+                    lines.append("")  # 空行分隔
         else:
             lines.append("📍 当前无活跃诡事点")
             lines.append(f"   下波刷新于{REFRESH_INTERVAL_MINUTES}分钟内")
