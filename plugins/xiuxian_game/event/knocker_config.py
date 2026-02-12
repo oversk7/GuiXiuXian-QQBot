@@ -111,7 +111,7 @@ GHOST_EVENT_TYPES: Dict[str, GhostEventType] = {
         type_id="silent_curse",
         name="禁字之祸",
         npc_prefix="禁字之祸",
-        description=""静悄悄"的物质化分身",
+        description='"静悄悄"的物质化分身',
         tier="boss",
         weight=7,
         hp_mult=3.0, atk_mult=2.0, def_mult=1.8, agi_mult=1.5,
