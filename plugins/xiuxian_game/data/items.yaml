@@ -1255,7 +1255,7 @@ items:
 
     - item_id: "vip_gui_yu"
       name: "归雨"
-      description: "雨落下之前，你已经不在这里了。"
+      description: "："
       type: "EQUIPMENT"
       rarity: "red"
       durability: 360

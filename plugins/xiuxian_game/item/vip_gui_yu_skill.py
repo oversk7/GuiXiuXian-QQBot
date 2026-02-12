@@ -13,7 +13,8 @@ import copy
 from datetime import datetime, timedelta
 from nonebot import on_command
 from nonebot.params import CommandArg
-from nonebot.adapters.qq import MessageEvent, Message
+from nonebot.adapters.qq import MessageEvent, Message, MessageSegment
+from nonebot.adapters.qq.models.common import MessageMarkdown, MessageMarkdownParams
 from sqlalchemy import select
 
 from ..models.db import safe_session
@@ -286,14 +287,50 @@ async def _handle_teleport(session, player: Player, parts: list, event: MessageE
     to_x, to_y = player.get_current_coordinates()
     to_region = player.get_current_region()
 
-    await anchor_cmd.finish(message_add_head(
-        f"☂️ 你踏入伞影，身形消散——\n"
-        f"📍 {from_region} ({from_x},{from_y}) → {to_region} ({to_x},{to_y})\n"
-        f"🎯 抵达锚点「{anchor['name']}」\n"
-        f"💧 消耗理智 {mp_cost}，剩余 {player.mp}/{player.max_mp}\n"
-        f"⏱️ 冷却 {TELEPORT_CD_SECONDS // 60} 分钟",
-        event
-    ))
+    # 使用Markdown模板发送传送反馈
+    try:
+        title = "☂️ 归雨 · 踏入伞影"
+        desc = (
+            f"🌂 伞面收拢的一瞬，雨声忽远忽近。\r"
+            f"你从伞影里"掉"出来，鞋底先落地，影子却慢半拍才跟上。\r"
+            f"\r"
+            f"📍 {from_region} ({from_x},{from_y}) → {to_region} ({to_x},{to_y})\r"
+            f"🎯 抵达锚点「{anchor['name']}」\r"
+            f"💧 消耗理智 {mp_cost}，剩余 {player.mp}/{player.max_mp}\r"
+            f"⏱️ 冷却 {TELEPORT_CD_SECONDS // 60} 分钟"
+        )
+        img_url = "https://wdcdn.qpic.cn/MTMxMDI2NjM3MjM0Njk2MTE_59001_A9dXjBV6LK2wDOCq_1770915268"
+        hint = "快捷操作"
+
+        template_params = [
+            MessageMarkdownParams(key="title", values=[title]),
+            MessageMarkdownParams(key="desc", values=[desc]),
+            MessageMarkdownParams(key="imgurl", values=[img_url]),
+            MessageMarkdownParams(key="width", values=["300"]),
+            MessageMarkdownParams(key="height", values=["300"]),
+            MessageMarkdownParams(key="hint", values=[hint]),
+            MessageMarkdownParams(key="t1", values=["锚点"]),
+            MessageMarkdownParams(key="t2", values=["面板"]),
+            MessageMarkdownParams(key="t3", values=["修炼"]),
+            MessageMarkdownParams(key="t4", values=["背包"]),
+        ]
+
+        markdown_msg = MessageMarkdown(
+            custom_template_id="102499345_1769693953",
+            params=template_params
+        )
+
+        await anchor_cmd.finish(MessageSegment.markdown(markdown_msg))
+    except (ValueError, TypeError, KeyError):
+        # Markdown构建失败，回退到纯文本
+        await anchor_cmd.finish(message_add_head(
+            f"☂️ 你踏入伞影，身形消散——\n"
+            f"📍 {from_region} ({from_x},{from_y}) → {to_region} ({to_x},{to_y})\n"
+            f"🎯 抵达锚点「{anchor['name']}」\n"
+            f"💧 消耗理智 {mp_cost}，剩余 {player.mp}/{player.max_mp}\n"
+            f"⏱️ 冷却 {TELEPORT_CD_SECONDS // 60} 分钟",
+            event
+        ))
 
 
 async def _handle_carry(session, player: Player, parts: list, event: MessageEvent):
