@@ -883,6 +883,8 @@ async def handle_npc_attack(session, attacker: Player, target_npc, event: Messag
                     if boss_broadcast:
                         result_lines.append("")
                         result_lines.append(boss_broadcast)
+                        # 发送系统消息到留言板（全服播报）
+                        await KnockerEventService._send_system_message(session, boss_broadcast)
                 else:
                     # 普通鬼怪: 原有奖励逻辑
                     exp_gain = target_npc.level * 10

@@ -19,6 +19,7 @@ from sqlalchemy import select, func, desc
 from ..models.player import Player
 from ..models.npc import NPC, NPCType
 from ..models.inventory import ItemInstance
+from ..models.world_message import WorldMessage
 from ..daily_task.service_new import DailyTaskService
 
 from .knocker_config import (
@@ -359,6 +360,10 @@ class KnockerEventService:
             count=len(new_events),
             event_list="\n".join(event_list_lines) + "\n",
         )
+
+        # 发送系统消息到留言板（全服播报）
+        await cls._send_system_message(session, broadcast)
+
         return broadcast
 
     @classmethod
@@ -936,6 +941,28 @@ class KnockerEventService:
         flag_modified(player, "extra_attrs")
 
     # ==================== 辅助方法 ====================
+
+    @classmethod
+    async def _send_system_message(cls, session, content: str):
+        """发送系统消息到留言板（全服可见）
+
+        Args:
+            session: 数据库会话
+            content: 消息内容
+        """
+        try:
+            # 使用特殊ID "SYSTEM" 作为系统发送者
+            msg = WorldMessage(
+                player_id="SYSTEM",
+                recipient_id=None,  # None表示世界留言板（全服可见）
+                content=content,
+                created_at=datetime.now(),
+            )
+            session.add(msg)
+            await session.flush()
+            logger.info(f"[叩门活动] 系统消息已发送到留言板: {content[:50]}...")
+        except Exception as e:
+            logger.error(f"[叩门活动] 发送系统消息失败: {e}")
 
     @classmethod
     def _get_level_material(cls, player_level: int) -> Optional[str]:

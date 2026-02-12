@@ -284,10 +284,19 @@ def _format_message_lines(
     lines = [f"{title} (第{page}/{total_pages}页)", "━━━━━━━━━━"]
 
     for rec in records:
+        time_str = rec.created_at.strftime("%m-%d %H:%M")
+
+        # 特殊处理：系统消息（player_id == "SYSTEM"）
+        if rec.player_id == "SYSTEM":
+            if scope is MessageScope.WORLD:
+                lines.append(
+                    f">📢 系统消息 ({time_str})\n{rec.content}"
+                )
+            continue
+
         sender = players.get(rec.player_id)
         if not sender:
             continue
-        time_str = rec.created_at.strftime("%m-%d %H:%M")
         if scope is MessageScope.WORLD:
             lines.append(
                 f">{sender.nickname}[UID:{sender.uid}] ({time_str})\n{rec.content}"
