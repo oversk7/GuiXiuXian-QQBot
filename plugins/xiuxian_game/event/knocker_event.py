@@ -110,8 +110,16 @@ class KnockerEventService:
     # ==================== 活动开关 ====================
 
     @classmethod
-    def start_event(cls, duration_hours: int = DEFAULT_DURATION_HOURS) -> str:
-        """开启活动"""
+    async def start_event(cls, duration_hours: int = DEFAULT_DURATION_HOURS, session=None) -> str:
+        """开启活动
+
+        Args:
+            duration_hours: 活动持续时间(小时)
+            session: 数据库会话,用于立即刷新诡事点(可选)
+
+        Returns:
+            活动开启播报文本
+        """
         now = time.time()
         cls._is_active = True
         cls._start_time = now
@@ -120,7 +128,8 @@ class KnockerEventService:
         cls._last_refresh_time = 0
         cls._save_state()
         end_dt = datetime.fromtimestamp(cls._end_time).strftime("%m月%d日 %H:%M")
-        return (
+
+        broadcast = (
             "咚...咚...咚...\n"
             "━━━━━━━━━━━━━\n"
             "缉邪司甲级通报：除夕夜，大都会多处出现异常诡象！\n"
@@ -129,6 +138,17 @@ class KnockerEventService:
             "所有修士即刻响应！\n"
             "使用【除夕活动】查看详情"
         )
+
+        # 如果提供了session,立即刷新一波诡事点
+        if session is not None:
+            try:
+                spawn_broadcast = await cls.refresh_events(session)
+                if spawn_broadcast:
+                    broadcast += "\n\n" + spawn_broadcast
+            except Exception as e:
+                logger.error(f"[叩门活动] 开启活动时立即刷新失败: {e}")
+
+        return broadcast
 
     @classmethod
     def stop_event(cls) -> str:

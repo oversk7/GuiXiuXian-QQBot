@@ -44,7 +44,7 @@ stop_event_cmd = on_command("关闭活动", block=True, priority=4, permission=S
 
 @event_status_cmd.handle()
 async def handle_event_status(event: MessageEvent):
-    """查看活动状态 + 个人进度 + 附近诡事点"""
+    """查看活动状态 + 个人进度 + 附近诡事点 + 完整帮助"""
     async with safe_session() as session:
         player = await get_unified_player(session, event)
         if not player:
@@ -57,7 +57,25 @@ async def handle_event_status(event: MessageEvent):
 
         result = KnockerEventService.get_event_status(player)
 
-    await event_status_cmd.finish(message_add_head(result, event))
+    # 在结果末尾添加完整的指令帮助
+    help_section = (
+        "\n"
+        "━━━━━━━━━━━━━\n"
+        "🎆 除夕叩门活动指令\n"
+        "━━━━━━━━━━━━━\n"
+        "【除夕活动】查看活动状态、进度、附近诡事点\n"
+        "【鬼域瞬移 x y】快速移动到目标坐标（冷却3分钟）\n"
+        "【叩门排行】查看击杀排行榜\n"
+        "【活动商店】查看碎片商店\n"
+        "【活动商店 兑换 物品名 [数量]】兑换商品\n"
+        "【攻击 鬼怪名】击杀活动鬼怪获取碎片\n"
+        "━━━━━━━━━━━━━\n"
+        "💡 碎片可用于兑换稀有道具和食谱\n"
+        "💡 击杀Boss级鬼怪可获得全服播报\n"
+        "💡 瞬移距离上限100格（曼哈顿距离）"
+    )
+
+    await event_status_cmd.finish(message_add_head(result + help_section, event))
 
 
 # ==================== 鬼域瞬移 ====================
@@ -188,7 +206,11 @@ async def handle_start_event(event: MessageEvent, args: Message = CommandArg()):
         except ValueError:
             await start_event_cmd.finish("格式: 开启活动 [小时数]，如: 开启活动 72")
 
-    broadcast = KnockerEventService.start_event(duration)
+    # 使用UnitOfWork提供session,立即刷新诡事点
+    async with UnitOfWork(AsyncSessionLocal) as uow:
+        broadcast = await KnockerEventService.start_event(duration, uow.session)
+        # UnitOfWork会自动commit
+
     await start_event_cmd.finish(broadcast)
 
 
