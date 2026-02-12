@@ -38,7 +38,9 @@ REQUIRED_FIELDS: Dict[str, Dict[str, str]] = {
         # 里界系统字段
         "inner_realm": "VARCHAR(64) NULL COMMENT '当前所在里界(None=不在里界)'",
         # 诡烛氪金货币
-        "gui_zhu": "BIGINT DEFAULT 0 COMMENT '诡烛(氪金专属货币)'"
+        "gui_zhu": "BIGINT DEFAULT 0 COMMENT '诡烛(氪金专属货币)'",
+        # 扩展数据字段(活动数据等)
+        "extra_attrs": "JSON NULL COMMENT '扩展数据JSON(活动数据、特殊系统数据等)'"
     },
     "player_relationship": {
         "master_id": "VARCHAR(32) NULL COMMENT '师父ID(师徒关系专用)'",

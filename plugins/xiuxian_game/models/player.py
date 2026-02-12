@@ -1,5 +1,6 @@
-from sqlalchemy import Integer, BigInteger, String, DateTime, func, Boolean, Index, text, Text
+from sqlalchemy import Integer, BigInteger, String, DateTime, func, Boolean, Index, text, Text, JSON
 from sqlalchemy.orm import Mapped, mapped_column, relationship
+from sqlalchemy.ext.mutable import MutableDict
 from datetime import datetime
 from .db import Base
 from enum import Enum as PyEnum
@@ -239,6 +240,14 @@ class Player(Base):
     incense: Mapped[int] = mapped_column(Integer, default=0, server_default='0', comment="香火点数")
     max_apprentice_slots: Mapped[int] = mapped_column(Integer, default=3, server_default='3', comment="最大徒弟位")
     mentor_cooldown_until: Mapped[datetime | None] = mapped_column(DateTime, nullable=True, comment="师徒操作冷却结束时间")
+
+    # 扩展数据(活动、特殊系统等)
+    extra_attrs: Mapped[dict] = mapped_column(
+        MutableDict.as_mutable(JSON),
+        default=dict,
+        server_default='{}',
+        comment="扩展数据JSON(活动数据、特殊系统数据等)"
+    )
 
     monthly_cards: Mapped[list["MonthlyCard"]] = relationship("MonthlyCard", back_populates="player")
 
