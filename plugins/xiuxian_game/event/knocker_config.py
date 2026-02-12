@@ -198,7 +198,7 @@ REFRESH_INTERVAL_MINUTES = 10  # 刷新间隔(分钟) - 从30分钟改为10分�
 SPAWN_COUNT_RANGE = (3, 5)     # 每波生成数量范围
 MAX_ACTIVE_EVENTS = 25         # 同时存在上限 - 从15提升到25,容纳更多鬼怪
 COORD_RANGE = 300              # 坐标范围(-300~300)
-EVENT_LIFETIME_MINUTES = 30    # 鬼怪存活时间(分钟) - 从60分钟缩短到30分钟,避免堆积
+EVENT_LIFETIME_MINUTES = 10    # 鬼怪存活时间(分钟) - 10分钟未击杀自动清理,避免囤积
 
 # ==================== 动态等级配置 ====================
 

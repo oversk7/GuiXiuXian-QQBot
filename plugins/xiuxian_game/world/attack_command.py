@@ -274,7 +274,27 @@ async def parse_attack_target(session, target_name: str, x: int, y: int, region:
             # 查找玩家个人的活动鬼怪
             ghost_data = KnockerEventService.find_player_ghost_by_name(player, target_name)
             if ghost_data:
-                # 动态创建临时NPC用于战斗
+                # 检查距离（曼哈顿距离）
+                ghost_x = ghost_data.get("x", 0)
+                ghost_y = ghost_data.get("y", 0)
+                player_x, player_y = player.get_current_coordinates()
+                distance = abs(player_x - ghost_x) + abs(player_y - ghost_y)
+
+                # 攻击距离限制为2（与PvP一致）
+                if distance > 2:
+                    from nonebot import logger
+                    logger.info(f"[除夕活动] 玩家{player.nickname}与鬼怪{ghost_data['npc_name']}距离过远: {distance}")
+                    raise ValueError(
+                        f"❌ 距离过远！\n"
+                        f"🎯 {ghost_data['npc_name']} 位于 ({ghost_x}, {ghost_y})\n"
+                        f"📍 你当前位于 ({player_x}, {player_y})\n"
+                        f"📏 曼哈顿距离: {distance}（需要 ≤ 2）\n\n"
+                        f"💡 提示：\n"
+                        f"• 使用【前往 {ghost_x} {ghost_y}】移动到鬼怪位置\n"
+                        f"• 或使用【鬼域瞬移 {ghost_x} {ghost_y}】快速传送（冷却3分钟）"
+                    )
+
+                # 距离合适，创建临时NPC用于战斗
                 target_npc = KnockerEventService.create_temp_npc_from_ghost_data(ghost_data, session)
                 # 在extra_data中标记这是个人鬼怪，方便后续处理
                 target_npc.extra_data["is_personal_ghost"] = True
