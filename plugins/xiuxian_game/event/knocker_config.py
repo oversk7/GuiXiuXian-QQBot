@@ -198,7 +198,7 @@ SHOP_ITEMS: List[ShopItem] = [
 
     # 【限定收藏区】
     ShopItem("knocker_relic", "叩门者残骸", 80, daily_limit=0, event_limit=1, category="限定收藏"),
-    ShopItem("knocker_title", ""封门人"称号", 150, daily_limit=0, event_limit=1, category="限定收藏"),
+    ShopItem("knocker_title", '"封门人"称号', 150, daily_limit=0, event_limit=1, category="限定收藏"),
 ]
 
 
