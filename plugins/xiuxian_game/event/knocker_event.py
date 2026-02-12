@@ -333,6 +333,8 @@ class KnockerEventService:
                 e.type_config.tier, "🔹"
             )
             event_list_lines.append(f"· {tier_icon}{e.type_config.name} — ({e.x},{e.y})")
+            # 添加叙事描述(缩进显示)
+            event_list_lines.append(f"  {e.narrative}")
 
         broadcast = BROADCAST_SPAWN.format(
             count=len(new_events),
@@ -413,6 +415,9 @@ class KnockerEventService:
                 )
                 dist = abs(ev.x - px) + abs(ev.y - py)
                 lines.append(f"  {tier_icon}{ev.npc_name} ({ev.x},{ev.y}) 距{dist}格")
+                # 显示叙事描述(缩进增加氛围感)
+                lines.append(f"     {ev.narrative}")
+                lines.append("")  # 空行分隔
         else:
             lines.append("📍 当前无活跃诡事点")
             lines.append(f"   下波刷新于{REFRESH_INTERVAL_MINUTES}分钟内")
@@ -481,6 +486,9 @@ class KnockerEventService:
         pdata["shards"] = pdata.get("shards", 0) + shard_reward
         pdata["kills"] = pdata.get("kills", 0) + 1
         cls._set_player_data(player, pdata)
+
+        # 关键修复: 明确标记player对象需要更新,确保SQLAlchemy跟踪变化
+        session.add(player)
 
         result_lines.append("")
         result_lines.append("🎆 除夕叩门·缉邪奖励")
@@ -751,7 +759,7 @@ class KnockerEventService:
         py = player.real_world_y or player.y or 0
         distance = abs(target_x - px) + abs(target_y - py)
         if distance > TELEPORT_MAX_DISTANCE:
-            return False, f"距离过远! 曼哈顿距离 {distance} 格(上限 {TELEPORT_MAX_DISTANCE} 格)"
+            return False, f"距离过远! 曼哈顿距离(x距离+y距离)不能超过{TELEPORT_MAX_DISTANCE} 格，当前{distance} 格)"
 
         # 检查冷却
         pdata = cls._get_player_data(player)
@@ -816,6 +824,27 @@ class KnockerEventService:
         """获取玩家活动称号(如果有)"""
         pdata = cls._get_player_data(player)
         return pdata.get("title")
+
+    @classmethod
+    def get_ghost_narrative(cls, npc: NPC) -> Optional[str]:
+        """获取活动鬼怪的叙事文本
+
+        Args:
+            npc: NPC对象
+
+        Returns:
+            叙事文本,如果不是活动鬼怪则返回None
+        """
+        if not cls.is_active():
+            return None
+
+        extra = npc.extra_data or {}
+        event_id = extra.get("knocker_event_id")
+        if not event_id or event_id not in cls._active_events:
+            return None
+
+        active_event = cls._active_events[event_id]
+        return active_event.narrative
 
 
 # 启动时加载状态

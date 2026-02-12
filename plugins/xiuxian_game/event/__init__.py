@@ -26,7 +26,7 @@ event_status_cmd = on_command(
     "除夕活动", aliases={"叩门活动", "新年活动"}, block=True, priority=5
 )
 
-teleport_cmd = on_command("鬼域瞬移", block=True, priority=5)
+teleport_cmd = on_command("鬼域瞬移",aliases={"诡域瞬移"}, block=True, priority=5)
 
 ranking_cmd = on_command("叩门排行", block=True, priority=5)
 

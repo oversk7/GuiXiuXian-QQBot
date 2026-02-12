@@ -127,11 +127,11 @@ GHOST_EVENT_TYPES: Dict[str, GhostEventType] = {
 
 # ==================== 刷新参数 ====================
 
-REFRESH_INTERVAL_MINUTES = 30  # 刷新间隔(分钟)
+REFRESH_INTERVAL_MINUTES = 10  # 刷新间隔(分钟) - 从30分钟改为10分钟,提高参与感
 SPAWN_COUNT_RANGE = (3, 5)     # 每波生成数量范围
-MAX_ACTIVE_EVENTS = 15         # 同时存在上限
+MAX_ACTIVE_EVENTS = 25         # 同时存在上限 - 从15提升到25,容纳更多鬼怪
 COORD_RANGE = 300              # 坐标范围(-300~300)
-EVENT_LIFETIME_MINUTES = 60    # 鬼怪存活时间(分钟)
+EVENT_LIFETIME_MINUTES = 30    # 鬼怪存活时间(分钟) - 从60分钟缩短到30分钟,避免堆积
 
 
 # ==================== 瞬移参数 ====================
@@ -143,10 +143,11 @@ TELEPORT_COORD_RANGE = 500     # 瞬移坐标范围
 
 # ==================== 奖励公式参数 ====================
 
-BASE_EXP = 500           # 基础经验
-EXP_PER_LEVEL = 10       # 每等级经验加成
-BASE_GOLD = 300          # 基础金币
-GOLD_PER_LEVEL = 5       # 每等级金币加成
+# 注意: 刷新频率从30分钟提升到10分钟(3倍),单次奖励降低为1/3,保持总奖励不变
+BASE_EXP = 167           # 基础经验 (原500÷3 ≈ 167)
+EXP_PER_LEVEL = 3        # 每等级经验加成 (原10÷3.3 ≈ 3)
+BASE_GOLD = 100          # 基础金币 (原300÷3 ≈ 100)
+GOLD_PER_LEVEL = 2       # 每等级金币加成 (原5÷2.5 = 2)
 
 
 # ==================== 活动商店配置 ====================

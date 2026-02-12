@@ -287,6 +287,17 @@ async def handle_ghost_interaction(session, player: Player, npc, event: MessageE
     lines = [
         f"👻 {npc.name}",
         "━━━━━━━━━━━━━",
+    ]
+
+    # 检查是否为活动鬼怪,如果是则展示叙事文本
+    from ..event.knocker_event import KnockerEventService
+    narrative = KnockerEventService.get_ghost_narrative(npc)
+    if narrative:
+        lines.append(f"🎆 除夕诡象·缉邪通报")
+        lines.append(narrative)
+        lines.append("")
+
+    lines.extend([
         f"💀 {npc.name}发出阴森的笑声，散发着不祥的气息...",
         f"⚔️ 等级：{npc.level}",
         f"❤️ 血量：{npc.hp}/{npc.max_hp}",
@@ -297,7 +308,7 @@ async def handle_ghost_interaction(session, player: Player, npc, event: MessageE
         f"• 【攻击 {npc.name}】与鬼怪战斗",
         "",
         "⚠️ 警告：战斗可能造成伤亡，请谨慎行事！"
-    ]
+    ])
 
     await interact_cmd.finish(message_add_head("\n".join(lines), event))
 
