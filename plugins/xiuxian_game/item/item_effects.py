@@ -1010,3 +1010,31 @@ async def _get_tile_description_from_tile(session, player: Player, tile) -> str:
     from ..world.teleport import get_tile_description
     region = f"{player.dungeon_level}层诡域" if player.is_in_dungeon() else player.region
     return await get_tile_description(session, player, region, player.dungeon_x if player.is_in_dungeon() else player.x, player.dungeon_y if player.is_in_dungeon() else player.y)
+
+
+@register(ItemEffectType.LEARN_RECIPE)
+async def _learn_recipe(player: Player, cfg: ItemConfig, qty: int, ctx: object, session=None) -> Tuple[bool, str]:
+    """学习食谱：解锁烹饪食谱"""
+    if not session:
+        return False, "⛔ 系统错误：缺少数据库会话"
+
+    recipe_id = cfg.effect_params.get("recipe_id")
+    if not recipe_id:
+        return False, "⛔ 该食谱物品配置错误（缺少recipe_id）"
+
+    from ..cooking.cooking_service import CookingService, RecipeManager
+    from ..infrastructure.uow.unit_of_work import UnitOfWork
+    from ..models.db import AsyncSessionLocal
+
+    # 验证食谱存在
+    recipe_manager = RecipeManager()
+    recipe = recipe_manager.get_recipe(recipe_id)
+    if not recipe:
+        return False, f"⛔ 未找到对应食谱: {recipe_id}"
+
+    # 使用独立UoW来学习食谱（避免与外层session冲突）
+    cooking_service = CookingService()
+    async with UnitOfWork(AsyncSessionLocal) as uow:
+        success, msg = await cooking_service.learn_recipe(uow, player.id, recipe_id)
+
+    return success, msg

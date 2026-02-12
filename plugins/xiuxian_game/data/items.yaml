@@ -2938,3 +2938,149 @@ items:
       rarity: "orange"
       price: 2000
       description: "传说中仙人炼制的烹饪用油,沾之生香"
+
+    # ========== 除夕叩门活动物品 ==========
+
+    # --- 日用补给 ---
+    - item_id: "knocker_zhenhunxiang"
+      name: "镇魂香"
+      type: "CONSUMABLE"
+      rarity: "green"
+      price: 200
+      description: "燃烧后散发安神气息的线香,可恢复20%生命值和10%理智值。据说能暂时驱散叩门声。"
+      effects:
+        heal_hp_percent: 20
+        heal_mp_percent: 10
+
+    - item_id: "knocker_bixiongfu"
+      name: "避凶符"
+      type: "CONSUMABLE"
+      rarity: "green"
+      price: 300
+      description: "缉邪司特制的护身符,使用后防御提升15%,持续30分钟。符纸上画着一只紧闭的眼睛。"
+      effects:
+        buff_defense_percent: 15
+        buff_duration_minutes: 30
+
+    - item_id: "knocker_zhoupodan"
+      name: "咒破丹"
+      type: "CONSUMABLE"
+      rarity: "blue"
+      price: 350
+      description: "以诅咒残渣炼制的丹药,服用后攻击提升12%、暴击率提升5%,持续20分钟。入口冰凉刺骨。"
+      effects:
+        buff_attack_percent: 12
+        buff_crit_percent: 5
+        buff_duration_minutes: 20
+
+    # --- 永久属性丹(商店特殊处理) ---
+    - item_id: "knocker_bone_elixir"
+      name: "敲门鬼的指骨"
+      type: "CONSUMABLE"
+      rarity: "purple"
+      price: 0
+      description: "一截枯黑的指骨,握紧时能感受到规律的脉动——仿佛它还在叩门。使用后永久攻击+2、防御+2。"
+
+    - item_id: "knocker_wish_elixir"
+      name: "路灯鬼的愿望"
+      type: "CONSUMABLE"
+      rarity: "purple"
+      price: 0
+      description: "一张写满字迹的半透明贴纸,字迹在灯光下才能看见。使用后永久敏捷+2、幸运+2。"
+
+    - item_id: "knocker_silence_elixir"
+      name: ""静悄悄"的沉默"
+      type: "CONSUMABLE"
+      rarity: "purple"
+      price: 0
+      description: "一小瓶沉默的空气,打开瓶盖会让周围一切声音消失三秒。使用后永久生命上限+3、理智上限+3。"
+
+    # --- 限定收藏 ---
+    - item_id: "knocker_relic"
+      name: "叩门者残骸"
+      type: "MATERIAL"
+      rarity: "purple"
+      price: 0
+      description: "一截枯黑的手指骨,指节处仍保持着叩门的弯曲弧度。靠近时能听到极轻微的、有节奏的叩击声。"
+
+    # --- 食谱解锁 ---
+    - item_id: "recipe_sweet_sour_bass"
+      name: "食谱·糖醋鲈鱼"
+      type: "CONSUMABLE"
+      rarity: "green"
+      price: 500
+      effect_type: "LEARN_RECIPE"
+      effect_params: {"recipe_id": "sweet_sour_bass"}
+      description: "糖醋鲈鱼的制作方法,学习后可在餐厅烹饪此菜品。"
+
+    - item_id: "recipe_braised_mandarin"
+      name: "食谱·酱焖桂鱼"
+      type: "CONSUMABLE"
+      rarity: "green"
+      price: 500
+      effect_type: "LEARN_RECIPE"
+      effect_params: {"recipe_id": "braised_mandarin_fish"}
+      description: "酱焖桂鱼的制作方法,学习后可在餐厅烹饪此菜品。"
+
+    - item_id: "recipe_yellow_croaker_soup"
+      name: "食谱·黄花鱼羹"
+      type: "CONSUMABLE"
+      rarity: "green"
+      price: 500
+      effect_type: "LEARN_RECIPE"
+      effect_params: {"recipe_id": "yellow_croaker_soup"}
+      description: "黄花鱼羹的制作方法,学习后可在餐厅烹饪此菜品。"
+
+    - item_id: "recipe_steamed_pomfret"
+      name: "食谱·清蒸鲳鱼"
+      type: "CONSUMABLE"
+      rarity: "green"
+      price: 500
+      effect_type: "LEARN_RECIPE"
+      effect_params: {"recipe_id": "steamed_pomfret"}
+      description: "清蒸鲳鱼的制作方法,学习后可在餐厅烹饪此菜品。"
+
+    - item_id: "recipe_grilled_sea_bream"
+      name: "食谱·炭烤鲷鱼"
+      type: "CONSUMABLE"
+      rarity: "green"
+      price: 500
+      effect_type: "LEARN_RECIPE"
+      effect_params: {"recipe_id": "grilled_snapper"}
+      description: "炭烤鲷鱼的制作方法,学习后可在餐厅烹饪此菜品。"
+
+    - item_id: "recipe_salmon_sashimi"
+      name: "食谱·三文鱼刺身"
+      type: "CONSUMABLE"
+      rarity: "blue"
+      price: 1000
+      effect_type: "LEARN_RECIPE"
+      effect_params: {"recipe_id": "salmon_sashimi"}
+      description: "三文鱼刺身的制作方法,学习后可在餐厅烹饪此菜品。"
+
+    - item_id: "recipe_grilled_eel"
+      name: "食谱·蒲烧鳗鱼"
+      type: "CONSUMABLE"
+      rarity: "blue"
+      price: 1000
+      effect_type: "LEARN_RECIPE"
+      effect_params: {"recipe_id": "grilled_eel"}
+      description: "蒲烧鳗鱼的制作方法,学习后可在餐厅烹饪此菜品。"
+
+    - item_id: "recipe_steamed_turbot"
+      name: "食谱·清蒸多宝鱼"
+      type: "CONSUMABLE"
+      rarity: "blue"
+      price: 1200
+      effect_type: "LEARN_RECIPE"
+      effect_params: {"recipe_id": "turbot_feast"}
+      description: "清蒸多宝鱼的制作方法,学习后可在餐厅烹饪此菜品。"
+
+    - item_id: "recipe_sturgeon_feast"
+      name: "食谱·鲟鱼全席"
+      type: "CONSUMABLE"
+      rarity: "purple"
+      price: 3000
+      effect_type: "LEARN_RECIPE"
+      effect_params: {"recipe_id": "sturgeon_banquet"}
+      description: "鲟鱼全席的制作方法,包含前菜到主菜的完整流程。传说级食谱。"

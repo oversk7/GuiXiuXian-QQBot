@@ -36,6 +36,7 @@ from . import (
     dialogue,  # NPC AI对话系统（包含管理员命令）
     global_ban_interceptor,  # 全局封禁拦截器
     inner_realm,  # 里界系统
+    event,  # 除夕叩门活动系统
 )
 
 driver = get_driver()

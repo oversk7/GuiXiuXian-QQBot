@@ -854,11 +854,30 @@ async def handle_npc_attack(session, attacker: Player, target_npc, event: Messag
 
             # 鬼怪特殊奖励
             if target_npc.npc_type == NPCType.GHOST:
-                exp_gain = target_npc.level * 10
-                gold_gain = target_npc.level * 5
-                attacker.exp += exp_gain
-                attacker.gold += gold_gain
-                result_lines.append(f"🎉 击杀鬼怪获得 {exp_gain} EXP，{gold_gain} 金币")
+                # 先检查是否为活动鬼怪
+                from ..event.knocker_event import KnockerEventService
+                if KnockerEventService.is_knocker_npc(target_npc):
+                    # 活动鬼怪: 使用活动奖励系统
+                    knocker_lines = await KnockerEventService.on_ghost_killed(
+                        session, attacker, target_npc
+                    )
+                    if knocker_lines:
+                        result_lines.extend(knocker_lines)
+
+                    # 检查是否为Boss级, 生成全服播报
+                    boss_broadcast = KnockerEventService.get_boss_kill_broadcast(
+                        attacker, target_npc
+                    )
+                    if boss_broadcast:
+                        result_lines.append("")
+                        result_lines.append(boss_broadcast)
+                else:
+                    # 普通鬼怪: 原有奖励逻辑
+                    exp_gain = target_npc.level * 10
+                    gold_gain = target_npc.level * 5
+                    attacker.exp += exp_gain
+                    attacker.gold += gold_gain
+                    result_lines.append(f"🎉 击杀鬼怪获得 {exp_gain} EXP，{gold_gain} 金币")
             # 结算VIP定制装备（斩龙闪）的战后永久加成（如“噬灵者”）
             if victory and post_effects:
                 from sqlalchemy import select as _select
