@@ -180,7 +180,7 @@ SHOP_ITEMS: List[ShopItem] = [
     # 【稀有宝物区】
     ShopItem("knocker_bone_elixir", "敲门鬼的指骨", 30, daily_limit=0, event_limit=3, category="稀有宝物"),
     ShopItem("knocker_wish_elixir", "路灯鬼的愿望", 30, daily_limit=0, event_limit=3, category="稀有宝物"),
-    ShopItem("knocker_silence_elixir", ""静悄悄"的沉默", 30, daily_limit=0, event_limit=3, category="稀有宝物"),
+    ShopItem("knocker_silence_elixir", '"静悄悄"的沉默', 30, daily_limit=0, event_limit=3, category="稀有宝物"),
     ShopItem("critical_bead_3", "三级暴击佛珠", 35, daily_limit=0, event_limit=2, category="稀有宝物"),
     ShopItem("penetration_crystal_3", "三级穿透水晶", 35, daily_limit=0, event_limit=2, category="稀有宝物"),
     ShopItem("stabilizer_crystal", "稳定水晶", 50, daily_limit=0, event_limit=1, category="稀有宝物"),
