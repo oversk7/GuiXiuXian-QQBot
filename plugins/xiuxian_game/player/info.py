@@ -143,7 +143,8 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
     # 获取活动称号（如有）
     from ..event.knocker_event import KnockerEventService
     player_title = KnockerEventService.get_player_title(player)
-    display_name = f"{player.nickname}·{player_title}" if player_title else player.nickname
+    display_name = player.nickname  # 称号不再拼接到昵称，单独展示
+    title_line = f"🏅称号 「{player_title}」" if player_title else ""
 
     # 检查未读的留言板与私信状态
     has_world_unread, has_private_unread = await get_unread_message_status(player.id)
@@ -208,23 +209,28 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
             title = f"{display_name} [UID:{player.uid}]"
 
             # 描述信息（所有玩家信息，使用\r换行）
-            desc = (
-                f"Lv.{player.level} · {realm_name} | {player.sex}\r"
-                f"☯公会 {guild_name}\r"
-                f"Exp {player.exp}/{exp_max}\r"
-                f"━━━ 状态 ━━━\r"
-                f"❤️生命 {cur_hp}/{hp_max_str}\r"
-                f"🧠理智 {cur_mp}/{mp_max_str}\r"
-                f"⚔力 {atk_str}  🛡防 {def_str}\r"
-                f"👟敏 {agi_str}  🍀运 {luk_str}\r"
-                f"🔮咒抗 {player.stamina}\r"
-                f"━━━ 资产 ━━━\r"
-                f"🪙金币 {player.gold}  💎积分 {player.gold2}\r"
-                f"🕯️诡烛 {player.gui_zhu}\r"
-                f"💀怨念 {player.resentment}  ✨点数 {player.attribute_points}\r"
-                f"━━━ 位置 ━━━\r"
-                f"📍{_format_player_location(player)}"
-            )
+            desc_lines = [
+                f"Lv.{player.level} · {realm_name} | {player.sex}",
+            ]
+            if title_line:
+                desc_lines.append(title_line)
+            desc_lines.extend([
+                f"☯公会 {guild_name}",
+                f"Exp {player.exp}/{exp_max}",
+                f"━━━ 状态 ━━━",
+                f"❤️生命 {cur_hp}/{hp_max_str}",
+                f"🧠理智 {cur_mp}/{mp_max_str}",
+                f"⚔力 {atk_str}  🛡防 {def_str}",
+                f"👟敏 {agi_str}  🍀运 {luk_str}",
+                f"🔮咒抗 {player.stamina}",
+                f"━━━ 资产 ━━━",
+                f"🪙金币 {player.gold}  💎积分 {player.gold2}",
+                f"🕯️诡烛 {player.gui_zhu}",
+                f"💀怨念 {player.resentment}  ✨点数 {player.attribute_points}",
+                f"━━━ 位置 ━━━",
+                f"📍{_format_player_location(player)}",
+            ])
+            desc = "\r".join(desc_lines)
 
             # 玩家头像URL
             avatar_url = f"https://thirdqq.qlogo.cn/qqapp/102499345/{qq_openid}/0"
@@ -281,23 +287,28 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
             title = f"{display_name} [UID:{player.uid}]"
 
             # 描述信息（所有玩家信息，使用\r换行）
-            desc = (
-                f"Lv.{player.level} · {realm_name} | {player.sex}\r"
-                f"☯公会 {guild_name}\r"
-                f"Exp {player.exp}/{exp_max}\r"
-                f"━━━ 状态 ━━━\r"
-                f"❤️生命 {cur_hp}/{hp_max_str}\r"
-                f"🧠理智 {cur_mp}/{mp_max_str}\r"
-                f"⚔力 {atk_str}  🛡防 {def_str}\r"
-                f"👟敏 {agi_str}  🍀运 {luk_str}\r"
-                f"🔮咒抗 {player.stamina}\r"
-                f"━━━ 资产 ━━━\r"
-                f"🪙金币 {player.gold}  💎积分 {player.gold2}\r"
-                f"🕯️诡烛 {player.gui_zhu}\r"
-                f"💀怨念 {player.resentment}  ✨点数 {player.attribute_points}\r"
-                f"━━━ 位置 ━━━\r"
-                f"📍{_format_player_location(player)}"
-            )
+            desc_lines = [
+                f"Lv.{player.level} · {realm_name} | {player.sex}",
+            ]
+            if title_line:
+                desc_lines.append(title_line)
+            desc_lines.extend([
+                f"☯公会 {guild_name}",
+                f"Exp {player.exp}/{exp_max}",
+                f"━━━ 状态 ━━━",
+                f"❤️生命 {cur_hp}/{hp_max_str}",
+                f"🧠理智 {cur_mp}/{mp_max_str}",
+                f"⚔力 {atk_str}  🛡防 {def_str}",
+                f"👟敏 {agi_str}  🍀运 {luk_str}",
+                f"🔮咒抗 {player.stamina}",
+                f"━━━ 资产 ━━━",
+                f"🪙金币 {player.gold}  💎积分 {player.gold2}",
+                f"🕯️诡烛 {player.gui_zhu}",
+                f"💀怨念 {player.resentment}  ✨点数 {player.attribute_points}",
+                f"━━━ 位置 ━━━",
+                f"📍{_format_player_location(player)}",
+            ])
+            desc = "\r".join(desc_lines)
 
             # 玩家头像URL（16x16小头像）
             avatar_url = f"https://thirdqq.qlogo.cn/qqapp/102499345/{qq_openid}/0"
@@ -853,7 +864,8 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
     # 获取活动称号（如有）
     from ..event.knocker_event import KnockerEventService
     player_title = KnockerEventService.get_player_title(player)
-    display_name_full = f"{player.nickname}·{player_title}" if player_title else player.nickname
+    display_name_full = player.nickname  # 称号不再拼接到昵称，单独展示
+    title_line_full = f"┃ 🏅称号 「{player_title}」\n" if player_title else ""
 
     # 9. 格式化注册时间
     created_at = player.created_at
@@ -881,6 +893,7 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
         f"┏━━ 信息 ━━━━\n"
         f"┃{display_name_full}[UID:{player.uid}]「{player.sex}」\n"
         f"┃ Lv.{player.level} · {realm_name}\n"
+        f"{title_line_full}"
         f"┃ Exp {player.exp}/{exp_max}\n"
         f"┃ 📅注册 {created_info}\n"
         "┣━━ 状态 ━━━━\n"
