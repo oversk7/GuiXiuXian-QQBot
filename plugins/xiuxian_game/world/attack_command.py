@@ -923,11 +923,16 @@ async def handle_npc_attack(session, attacker: Player, target_npc, event: Messag
                     if knocker_lines:
                         result_lines.extend(knocker_lines)
 
-                    # 检查是否为Boss级（通过tier判断）
-                    if ghost_data.get("tier_id") == "boss":
+                    # 检查是否为Boss级（通过tier_id判断）
+                    tier_id = ghost_data.get("tier_id", "")
+                    if tier_id == "boss":
                         boss_broadcast = (
-                            f"🎆 {attacker.nickname} 封印了 {target_npc.name}！\n"
-                            f"坐标: ({ghost_data['x']}, {ghost_data['y']})"
+                            f"🎆 除夕活动·BOSS击杀播报 🎆\n"
+                            f"━━━━━━━━━━━━━\n"
+                            f"🔴 {attacker.nickname} 封印了甲级诡象 {target_npc.name}！\n"
+                            f"📍 坐标: ({ghost_data['x']}, {ghost_data['y']})\n"
+                            f"💀 {ghost_data.get('city_name', '未知地点')}的恐怖传说终于画上句号...\n"
+                            f"━━━━━━━━━━━━━"
                         )
                         result_lines.append("")
                         result_lines.append(boss_broadcast)

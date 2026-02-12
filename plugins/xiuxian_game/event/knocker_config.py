@@ -167,9 +167,11 @@ GHOST_EVENT_TYPES: Dict[str, GhostEventType] = {
         npc_prefix="禁字之祸",
         description='"静悄悄"的物质化分身',
         tier="boss",
-        weight=7,
+        weight=2,  # 降低刷新概率：从7降到2，使BOSS更加稀有（约2%概率）
         hp_mult=3.0, atk_mult=2.0, def_mult=1.8, agi_mult=1.5,
-        reward_mult=3.5, shard_reward=5, material_drop_rate=0.40,
+        reward_mult=5.0,  # 增加奖励倍率：从3.5提升到5.0
+        shard_reward=10,  # 增加碎片奖励：从5提升到10
+        material_drop_rate=0.60,  # 增加材料掉落率：从0.40提升到0.60
         narratives=[
             "{地名}出现甲级诡象。一名修士在通讯中说了那个字，话音未落，身边凭空出现一个脏兮兮的小女孩——没有鼻子和嘴巴，只有两个漆黑的眼洞和一双耳朵。修士当场重伤。它在听。",
             "{地名}学堂内，一名教书先生在课上讲到某个字时，教室角落里多了一个人。所有孩子都看到了她——穿着脏污连衣裙，浑身淤青，空洞的眼眶对着先生的方向。现在整间学堂被封锁。",

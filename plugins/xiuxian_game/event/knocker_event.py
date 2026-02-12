@@ -297,6 +297,7 @@ class KnockerEventService:
             # 保存到玩家个人数据（不创建NPC，战斗时再动态创建）
             personal_events[event_id] = {
                 "type_id": type_id,
+                "tier_id": ghost_type.tier,  # 新增：保存强度等级，方便判断是否为BOSS
                 "npc_name": npc_display_name,
                 "ghost_name": ghost_name,  # 保存原始名字
                 "x": x,
@@ -640,6 +641,17 @@ class KnockerEventService:
         exp_reward = int((BASE_EXP + player.level * EXP_PER_LEVEL) * reward_mult)
         gold_reward = int((BASE_GOLD + player.level * GOLD_PER_LEVEL) * reward_mult)
 
+        # 检查是否为BOSS，给予额外奖励
+        tier_id = ghost_data.get("tier_id", "")
+        is_boss = tier_id == "boss"
+
+        if is_boss:
+            # BOSS额外奖励：经验和金币翻倍
+            bonus_exp = exp_reward
+            bonus_gold = gold_reward
+            exp_reward += bonus_exp
+            gold_reward += bonus_gold
+
         # 发放经验和金币
         player.exp += exp_reward
         player.gold += gold_reward
@@ -648,21 +660,33 @@ class KnockerEventService:
         session.add(player)
 
         result_lines.append("")
-        result_lines.append("🎆 除夕叩门·缉邪奖励")
+        if is_boss:
+            result_lines.append("🔴 BOSS击杀·特殊奖励 🔴")
+        else:
+            result_lines.append("🎆 除夕叩门·缉邪奖励")
         result_lines.append(f"  ✨ 经验 +{exp_reward}")
         result_lines.append(f"  💰 金币 +{gold_reward}")
         result_lines.append(f"  🔮 封门符碎片 +{shard_reward}")
+
+        if is_boss:
+            result_lines.append("")
+            result_lines.append("  💥 BOSS击杀奖励已翻倍！")
 
         # 材料掉落判定
         if random.random() < material_drop_rate:
             material_id = cls._get_level_material(player.level)
             if material_id:
                 try:
-                    await ItemInstance.add_item(session, player.id, material_id, 1)
+                    # BOSS材料掉落数量翻倍
+                    material_count = 2 if is_boss else 1
+                    await ItemInstance.add_item(session, player.id, material_id, material_count)
                     from ..config import config
                     item_cfg = config.items_config["by_id"].get(material_id)
                     if item_cfg:
-                        result_lines.append(f"  💎 掉落: {item_cfg.get_display_name()}")
+                        if material_count > 1:
+                            result_lines.append(f"  💎 掉落: {item_cfg.get_display_name()} x{material_count}")
+                        else:
+                            result_lines.append(f"  💎 掉落: {item_cfg.get_display_name()}")
                 except ValueError:
                     result_lines.append("  📦 背包已满,材料掉落失败")
 
