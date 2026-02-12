@@ -583,6 +583,25 @@ class KnockerEventService:
         shards = pdata.get("shards", 0)
         purchased = pdata.get("purchased", {})
 
+        # 稀有度图标映射
+        rarity_icons = {
+            "white": "⚪",
+            "green": "🟢",
+            "blue": "🔵",
+            "purple": "🟣",
+            "orange": "🟠",
+            "red": "❤️",
+        }
+
+        # 分类装饰图标
+        category_icons = {
+            "日用补给": "📦",
+            "成长加速": "⚡",
+            "稀有宝物": "💎",
+            "食谱解锁": "📜",
+            "限定收藏": "🌟",
+        }
+
         lines = [
             "🏪 除夕叩门·活动商店",
             f"🔮 封门符碎片: {shards}",
@@ -593,10 +612,17 @@ class KnockerEventService:
         today_str = datetime.now().strftime("%Y%m%d")
 
         for item in SHOP_ITEMS:
-            # 分区标题
+            # 分区标题(带装饰)
             if item.category != current_category:
                 current_category = item.category
-                lines.append(f"\n【{current_category}】")
+                category_icon = category_icons.get(current_category, "📍")
+                lines.append(f"\n{category_icon} 【{current_category}】")
+
+            # 从config中获取物品配置以读取稀有度
+            from ..config import config
+            item_config = config.items_config["by_id"].get(item.item_id)
+            rarity = getattr(item_config, 'rarity', 'white') if item_config else 'white'
+            rarity_icon = rarity_icons.get(rarity, "⚪")
 
             # 计算已购数量
             item_purchased = purchased.get(item.item_id, {})
@@ -617,8 +643,17 @@ class KnockerEventService:
                     sold_out = True
                 limit_text = f"活动限{item.event_limit}"
 
+            # 构建展示行
             status = "售罄" if sold_out else f"{item.shard_cost}碎片"
-            lines.append(f"  {'❌' if sold_out else '·'} {item.name} — {status} [{limit_text}]")
+            status_icon = "❌" if sold_out else "✨"
+
+            # 特殊标记:限定收藏区的物品
+            special_mark = ""
+            if item.category == "限定收藏":
+                special_mark = "🎁 "
+
+            lines.append(f"  {status_icon} {rarity_icon} {special_mark}{item.name}")
+            lines.append(f"     💰 {status} • 📊 {limit_text}")
 
         lines.extend([
             "",
@@ -689,17 +724,28 @@ class KnockerEventService:
             cls._set_player_data(player, pdata)
             return True, f"兑换成功! 获得限定称号「封门人」\n🔮 剩余碎片: {pdata['shards']}"
 
-        # 特殊处理: 永久属性丹(直接加属性)
+        # 特殊处理: 永久属性丹(使用VIPEquipmentBonus记录,确保轮回后保留)
         attr_items = {
             "knocker_bone_elixir": {"attack": 2, "defense": 2},
             "knocker_wish_elixir": {"agility": 2, "luck": 2},
             "knocker_silence_elixir": {"max_hp": 3, "max_mp": 3},
         }
         if shop_item.item_id in attr_items:
+            from ..models.vip_equipment_bonus import VIPEquipmentBonus
+
             attrs = attr_items[shop_item.item_id]
+
+            # 使用VIPEquipmentBonus表持久化,确保轮回后不会丢失
+            vip_bonus = await VIPEquipmentBonus.get_or_create(session, player.id)
             for attr, val in attrs.items():
+                total_add = val * quantity
+                # 记录到VIPEquipmentBonus表
+                vip_bonus.add_bonus(attr, total_add)
+                # 同时增加当前属性
                 current = getattr(player, attr, 0)
-                setattr(player, attr, current + val * quantity)
+                setattr(player, attr, current + total_add)
+
+            session.add(vip_bonus)  # 确保保存
 
             pdata["shards"] = shards - total_cost
             if shop_item.item_id not in purchased:
@@ -710,7 +756,7 @@ class KnockerEventService:
             cls._set_player_data(player, pdata)
 
             attr_text = ", ".join(f"{k}+{v * quantity}" for k, v in attrs.items())
-            return True, f"兑换成功! 永久属性提升: {attr_text}\n🔮 剩余碎片: {pdata['shards']}"
+            return True, f"兑换成功! 永久属性提升: {attr_text} (轮回后保留)\n🔮 剩余碎片: {pdata['shards']}"
 
         # 通用物品: 添加到背包
         try:
