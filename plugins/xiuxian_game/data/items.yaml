@@ -2989,7 +2989,7 @@ items:
       description: "一张写满字迹的半透明贴纸,字迹在灯光下才能看见。使用后永久敏捷+2、幸运+2。"
 
     - item_id: "knocker_silence_elixir"
-      name: ""静悄悄"的沉默"
+      name: '"静悄悄"的沉默'
       type: "CONSUMABLE"
       rarity: "purple"
       price: 0
