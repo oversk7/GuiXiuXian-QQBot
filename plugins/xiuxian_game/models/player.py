@@ -249,6 +249,20 @@ class Player(Base):
         comment="扩展数据JSON(活动数据、特殊系统数据等)"
     )
 
+    # VIP装备专属数据
+    vip_equipment_data: Mapped[dict] = mapped_column(
+        MutableDict.as_mutable(JSON),
+        default=dict,
+        server_default='{}',
+        comment="VIP装备专属数据(锚点坐标、快照等)"
+    )
+    vip_skill_cooldown: Mapped[dict] = mapped_column(
+        MutableDict.as_mutable(JSON),
+        default=dict,
+        server_default='{}',
+        comment="VIP技能冷却时间戳"
+    )
+
     monthly_cards: Mapped[list["MonthlyCard"]] = relationship("MonthlyCard", back_populates="player")
 
     # 表约束

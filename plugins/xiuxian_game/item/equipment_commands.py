@@ -318,7 +318,7 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
             lines.append("✨ 特殊效果：")
 
             # VIP定制装备列表（0阶即全解锁）
-            VIP_EQUIPMENT_IDS = {"vip_blade_zhanlongshan", "vip_robe_jingyuanzhiyi", "heaven_retreat_star_blade"}
+            VIP_EQUIPMENT_IDS = {"vip_blade_zhanlongshan", "vip_robe_jingyuanzhiyi", "heaven_retreat_star_blade", "vip_gui_yu"}
             is_vip_equipment = equip.item_id in VIP_EQUIPMENT_IDS
 
             if is_vip_equipment:
@@ -686,4 +686,111 @@ async def _(event: MessageEvent):
         await unwear_all_equipment.finish(result_msg)
 
 
+# ==================== 装备菜单（VIP定制装备专属技能） ====================
+
+# VIP装备技能帮助信息注册表
+# 格式: item_id -> { "name": 装备名, "icon": 图标, "skills": 技能说明文本 }
+_VIP_EQUIPMENT_SKILL_MENUS: dict[str, dict] = {
+    "vip_blade_zhanlongshan": {
+        "name": "斩龙闪",
+        "icon": "⚔️",
+        "skills": (
+            "⚔️ 斩龙闪 · 灭法之影\n"
+            "━━━━━━━━━━━━━\n"
+            "🔥 被动效果（战斗中自动生效）：\n"
+            "  [1] 灵影体质·lv.EX：最大生命值40%转化为理智上限\n"
+            "  [2] 绝魔体质：无视敌人50%特殊效果\n"
+            "  [3] 噬灵者：击杀+6生命值（每日20次）\n"
+            "  [4] 至尊锋刃：30%伤害无视防御\n"
+            "  [5] 余烬：低血量时+30%攻击+20%暴击\n"
+            "  [6] 刃之魔灵：每日首战随机属性+40（永久）"
+        ),
+    },
+    "vip_robe_jingyuanzhiyi": {
+        "name": "镜怨披风",
+        "icon": "🪞",
+        "skills": (
+            "🪞 镜怨披风 · 镜中怨灵\n"
+            "━━━━━━━━━━━━━\n"
+            "🔥 被动效果（战斗中自动生效）：\n"
+            "  [1] 镜怨体质：PvP被攻击时，攻击者直接死亡\n"
+            "  [2] 怨息环流：被攻击后回复10%生命\n"
+            "  [3] 镜怨自噬：每次死亡永久+2攻击（每日20次）"
+        ),
+    },
+    "vip_gui_yu": {
+        "name": "归雨",
+        "icon": "☂️",
+        "skills": (
+            "☂️ 归雨 · 鬼域雨钉\n"
+            "━━━━━━━━━━━━━\n"
+            "🔥 被动效果（战斗中自动生效）：\n"
+            "  [1] 伞骨穿：攻击25%概率无视30%防御（2回合）\n"
+            "  [2] 噬雨：暴击吸血15%\n"
+            "  [3] 化雨身：闪避后+15%闪避率（2回合）\n"
+            "  [4] 伞下：每回合受伤-5%（叠加上限50%）\n"
+            "  [5] 夺伞步：击杀永久+2敏捷（每日20次，上限+40）\n"
+            "━━━━━━━━━━━━━\n"
+            "🌧️ 主动技能 — 鬼域雨钉（锚点传送）：\n"
+            "【锚点】 查看已设置的雨钉锚点\n"
+            "【锚点 设置 <名称>】 钉下雨钉（最多3个）\n"
+            "【锚点 传送 <编号>】 传送（CD5分钟，耗5%理智）\n"
+            "【锚点 携带 <UID> <编号>】 携带他人传送（耗10%理智）\n"
+            "【锚点 删除 <编号>】 拔除雨钉\n"
+            "【同意传送】/【拒绝传送】 回应携带邀请"
+        ),
+    },
+    "heaven_retreat_star_blade": {
+        "name": "天退星刀",
+        "icon": "🔫",
+        "skills": (
+            "🔫 天退星刀 · 插翅虎\n"
+            "━━━━━━━━━━━━━\n"
+            "🔥 被动效果（战斗中自动生效）：\n"
+            "  [1] 虎标弹：前3次攻击伤害+80%\n"
+            "  [2] 猛虎标弹：虎标弹耗尽后，伤害+100%减伤30%（3次）\n"
+            "  [3] 刚气·心：猛虎标弹耗尽后，减伤60%但伤害-10%（3回合）"
+        ),
+    },
+}
+
+
+equip_menu_cmd = on_command("装备菜单", aliases={"装备技能", "VIP技能"}, block=True, priority=5)
+
+
+@equip_menu_cmd.handle()
+async def handle_equip_menu(event: MessageEvent):
+    async with safe_session() as session:
+        player = await get_unified_player(session, event)
+        if not player:
+            await equip_menu_cmd.finish("⛔ 请先创建角色")
+
+        # 查询玩家已装备的所有装备
+        stmt = select(ItemInstance).where(
+            ItemInstance.player_id == player.id,
+            ItemInstance.equipped == True,
+            ItemInstance.item_id.in_(list(_VIP_EQUIPMENT_SKILL_MENUS.keys()))
+        )
+        equipped_vip = (await session.execute(stmt)).scalars().all()
+
+        if not equipped_vip:
+            await equip_menu_cmd.finish(
+                "⛔ 你当前没有装备任何VIP定制装备\n"
+                "💡 VIP定制装备需穿戴后才能查看专属技能菜单"
+            )
+
+        # 按装备构建帮助信息
+        lines = ["✨ 你的VIP定制装备技能菜单 ✨", "━━━━━━━━━━━━━"]
+
+        for eq in equipped_vip:
+            menu = _VIP_EQUIPMENT_SKILL_MENUS.get(eq.item_id)
+            if menu:
+                lines.append("")
+                lines.append(menu["skills"])
+
+        lines.append("")
+        lines.append("━━━━━━━━━━━━━")
+        lines.append(f"📌 当前装备了 {len(equipped_vip)} 件VIP定制装备")
+
+        await equip_menu_cmd.finish(message_add_head("\n".join(lines), event))
 

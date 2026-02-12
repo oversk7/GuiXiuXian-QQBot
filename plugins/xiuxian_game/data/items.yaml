@@ -1253,6 +1253,51 @@ items:
       required_level: 10
       gem_slots: 5
 
+    - item_id: "vip_gui_yu"
+      name: "归雨"
+      description: "雨落下之前，你已经不在这里了。"
+      type: "EQUIPMENT"
+      rarity: "red"
+      durability: 360
+      required_level: 10
+      attr_bonus: {"attack": 100, "mp": 300, "hp": 100}
+      attr_ratio: {"attack": 1.0, "mp": 3.0, "hp": 1.0}
+      gem_slots: 5
+      special_effects:
+        - trigger: "on_attack"
+          chance: 25
+          effect: "defense_penetration"
+          value: 30
+          duration: 2
+          description: "[1] 伞骨穿：攻击时25%概率，伞骨自伞檐下无声探出；对方尚未看清，已被刺入要害——无视敌人30%防御(持续2回合)"
+        - trigger: "on_critical"
+          chance: 100
+          effect: "lifesteal"
+          value: 15
+          duration: 0
+          description: "[2] 噬雨：暴击时鲜血溅上伞面，来不及落下便被伞布吞尽；伞色似乎更深了一分——吸取造成伤害的15%作为生命值"
+        - trigger: "on_dodge"
+          chance: 100
+          effect: "buff_dodge"
+          value: 15
+          duration: 2
+          description: "[3] 化雨身：闪避时你只是偏了一步，但在对方眼里，你像被雨洗散的影子——闪避率+15%(持续2回合)"
+        - trigger: "each_turn"
+          chance: 100
+          effect: "damage_reduction"
+          value: 5
+          duration: 999
+          description: "[4] 伞下：你撑伞而立，心里生出一种不该有的安稳；可对方看见伞下那道影子，分明不像你——受到伤害减少5%"
+        - trigger: "on_kill"
+          effect: "gain_agility"
+          is_percentage: false
+          value: 2
+          description: "[5] 夺伞步：击杀后脚步更轻，低头才发现伞柄上又多了一道细纹，像在记名——永久+2敏捷(每日20次，上限+40敏捷)"
+        - trigger: "passive"
+          effect: "none"
+          description: "[6] 鬼域雨钉：可设置3个传送锚点。\n【锚点 设置 名称】在当前位置钉下\"雨钉\"\n【锚点 传送 1】踏入伞影即走(CD5分钟，消耗5%理智)\n【锚点 携带 UID 1】将对方一并送走(对方回复【同意传送】后生效)\n【锚点】查看列表"
+      repair_cost: 5
+
     - item_id: "vip_medal_tiandi"
       name: "天帝残勋"
       description: |

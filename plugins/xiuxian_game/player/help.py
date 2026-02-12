@@ -553,7 +553,8 @@ async def handle_equip(event: MessageEvent, args: Message = CommandArg()):
         "【总部商店】北极风雪镇(-5,390)\n"
         "【总部兑换 <物品> [数量]】 用积分兑换材料\n"
         "━━━━━━━━━━━━━\n"
-        "⚠️ 最多穿戴4件装备，不能重复穿戴"
+        "⚠️ 最多穿戴4件装备，不能重复穿戴\n"
+        "💡 VIP定制装备持有者可发送【装备菜单】查看专属技能"
     )
     await equip_cmd.finish(Message(msg))
 
@@ -1527,6 +1528,7 @@ async def handle_full_help(event: MessageEvent, args: Message = CommandArg()):
         "【升阶信息】【升阶 编号/名称】【升阶列表】\n"
         "【孔位】【镶嵌】【拆卸】【镶嵌物品】\n"
         "【合成镶嵌物】【总部商店】【总部兑换】\n"
+        "【装备菜单】VIP定制装备专属技能\n"
         "\n"
         "━━━━━━━━━━━━━━━━━━━\n"
         "🎒 背包系统\n"

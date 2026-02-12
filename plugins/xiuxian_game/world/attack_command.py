@@ -703,6 +703,37 @@ async def handle_player_attack(session, attacker: Player, target: Player, event:
                 inst.extra_attrs = extra
                 return f"🪞 镜怨自噬：死亡化怨，攻击+2（今日{extra['robe_die_cnt']}/20）"
 
+            async def _apply_gui_yu_kill_agility(winner: Player):
+                """归雨「夺伞步」：击杀永久+2敏捷（每日20次，累计上限+40）"""
+                stmt = select(ItemInstance).where(
+                    ItemInstance.player_id == winner.id,
+                    ItemInstance.equipped == True,
+                    ItemInstance.item_id == "vip_gui_yu"
+                )
+                inst = (await session.execute(stmt)).scalars().first()
+                if not inst:
+                    return None
+                extra = inst.extra_attrs or {}
+                day = _today_key()
+                if extra.get("gy_kill_day") != day:
+                    extra["gy_kill_day"] = day
+                    extra["gy_kill_cnt"] = 0
+                current_cnt = int(extra.get("gy_kill_cnt", 0))
+                if current_cnt >= 20:
+                    return f"👣 夺伞步：今日已达上限（{current_cnt}/20）"
+                vip_bonus = await VIPEquipmentBonus.get_or_create(session, winner.id)
+                total_agility = vip_bonus.get_total_bonus().get("agility", 0)
+                if total_agility >= 40:
+                    return f"👣 夺伞步：敏捷加成已达上限（+{total_agility}/40）"
+                val = min(2, 40 - total_agility)
+                if val <= 0:
+                    return None
+                vip_bonus.add_bonus("agility", val)
+                winner.agility = winner.agility + val
+                extra["gy_kill_cnt"] = current_cnt + 1
+                inst.extra_attrs = extra
+                return f"👣 夺伞步：脚步更轻，敏捷+{val}（今日{extra['gy_kill_cnt']}/20，累计+{total_agility + val}/40）"
+
             # 每日随机属性（双方）
             msg_a = await _apply_blade_daily_random(attacker)
             if msg_a:
@@ -716,6 +747,10 @@ async def handle_player_attack(session, attacker: Player, target: Player, event:
                 gain_msg = await _apply_blade_kill_mp(attacker)
                 if gain_msg:
                     result_lines.append(gain_msg)
+                # 归雨击杀收益
+                gy_msg = await _apply_gui_yu_kill_agility(attacker)
+                if gy_msg:
+                    result_lines.append(gy_msg)
                 # 败者死亡自噬
                 robemsg = await _apply_robe_self_siphon(target)
                 if robemsg:
@@ -724,6 +759,10 @@ async def handle_player_attack(session, attacker: Player, target: Player, event:
                 gain_msg = await _apply_blade_kill_mp(target)
                 if gain_msg:
                     result_lines.append(gain_msg)
+                # 归雨击杀收益
+                gy_msg = await _apply_gui_yu_kill_agility(target)
+                if gy_msg:
+                    result_lines.append(gy_msg)
                 robemsg = await _apply_robe_self_siphon(attacker)
                 if robemsg:
                     result_lines.append(robemsg)
@@ -1009,6 +1048,49 @@ async def handle_npc_attack(session, attacker: Player, target_npc, event: Messag
                     inst.extra_attrs = extra
                     session.add(inst)
                     session.add(attacker)
+
+                # 归雨「夺伞步」：击杀永久+2敏捷（每日20次，上限+40）
+                gui_yu_effects = [e for e in post_effects if e.get("type") == "gain_agility"]
+                if gui_yu_effects:
+                    stmt_gy = _select(_ItemInstance).where(
+                        _ItemInstance.player_id == attacker.id,
+                        _ItemInstance.equipped == True,
+                        _ItemInstance.item_id == "vip_gui_yu",
+                    )
+                    gy_inst = (await session.execute(stmt_gy)).scalars().first()
+                    if gy_inst:
+                        gy_extra = dict(gy_inst.extra_attrs or {})
+                        gy_day = _today_key()
+                        if gy_extra.get("gy_kill_day") != gy_day:
+                            gy_extra["gy_kill_day"] = gy_day
+                            gy_extra["gy_kill_cnt"] = 0
+                        gy_cnt = int(gy_extra.get("gy_kill_cnt", 0))
+                        # 每日上限20次，每次+2敏捷，总上限+40
+                        gy_bonus = await _VIPBonus.get_or_create(session, attacker.id)
+                        total_agility_gained = gy_bonus.get_total_bonus().get("agility", 0)
+                        for eff_gy in gui_yu_effects:
+                            if gy_cnt >= 20:
+                                result_lines.append(f"👣 夺伞步：今日已达上限（{gy_cnt}/20）")
+                                break
+                            if total_agility_gained >= 40:
+                                result_lines.append(f"👣 夺伞步：敏捷加成已达上限（+{total_agility_gained}/40）")
+                                break
+                            val = int(eff_gy.get("value", 2) or 2)
+                            # 不超过总上限
+                            val = min(val, 40 - total_agility_gained)
+                            if val <= 0:
+                                break
+                            gy_bonus.add_bonus("agility", val)
+                            attacker.agility = attacker.agility + val
+                            gy_cnt += 1
+                            total_agility_gained += val
+                            gy_extra["gy_kill_cnt"] = gy_cnt
+                            result_lines.append(
+                                f"👣 夺伞步：脚步更轻，敏捷+{val}（今日{gy_cnt}/20，累计+{total_agility_gained}/40）"
+                            )
+                        gy_inst.extra_attrs = gy_extra
+                        session.add(gy_inst)
+                        session.add(attacker)
 
         else:
             # 玩家失败

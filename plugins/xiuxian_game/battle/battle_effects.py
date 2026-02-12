@@ -70,9 +70,14 @@ class EffectType(str, Enum):
     IGNORE_SPECIAL = "ignore_special"       # 绝魔体质：无视特殊效果
     GAIN_MP = "gain_mp"                     # 噬灵者：永久获得理智值
     GAIN_HP = "gain_hp"                     # 噬灵者（变更）：永久获得最大生命值
-    IGNORE_DEFENSE = "ignore_defense"       # 至尊锋刃：无视防御（已调整为“必中伤害占比”语义）
+    IGNORE_DEFENSE = "ignore_defense"       # 至尊锋刃：无视防御（已调整为"必中伤害占比"语义）
     GAIN_RANDOM_ATTR = "gain_random_attr"   # 刃之魔灵：获得随机属性
     GAIN_ATTACK = "gain_attack"             # 自噬：永久获得攻击力
+
+    # VIP定制装备效果（归雨）
+    DEFENSE_PENETRATION = "defense_penetration"  # 伞骨穿：无视敌人一定比例防御
+    DAMAGE_REDUCTION = "damage_reduction"        # 伞下：受到伤害减少百分比
+    GAIN_AGILITY = "gain_agility"                # 夺伞步：永久获得敏捷
 
 
 @dataclass
@@ -414,7 +419,10 @@ def format_effect_message(effect: BattleEffect, target_name: str, is_trigger: bo
         EffectType.HEAL: "💚",
         EffectType.SHIELD: "🛡️",
         EffectType.REFLECT: "↩️",
-        EffectType.INVINCIBLE: "✨"
+        EffectType.INVINCIBLE: "✨",
+        EffectType.DEFENSE_PENETRATION: "☂️",
+        EffectType.DAMAGE_REDUCTION: "☂️",
+        EffectType.GAIN_AGILITY: "👣",
     }
 
     emoji = emoji_map.get(effect.effect_type, "✨")
@@ -444,6 +452,12 @@ def format_effect_message(effect: BattleEffect, target_name: str, is_trigger: bo
         msg = f"{emoji} {target_name}每回合回复{effect.value:.0f}%生命值"
     elif effect.effect_type == EffectType.SHIELD:
         msg = f"{emoji} {target_name}获得{effect.value:.0f}点护盾"
+    elif effect.effect_type == EffectType.DEFENSE_PENETRATION:
+        duration_info = f"{effect.duration}回合" if effect.duration > 0 else "永久"
+        msg = f"{emoji} {target_name}无视敌人{effect.value:.0f}%防御，持续{duration_info}"
+    elif effect.effect_type == EffectType.DAMAGE_REDUCTION:
+        duration_info = f"{effect.duration}回合" if effect.duration > 0 else "永久"
+        msg = f"{emoji} {target_name}受到伤害减少{effect.value:.0f}%，持续{duration_info}"
     elif effect.description:
         msg = f"{emoji} {effect.description}"
     else:

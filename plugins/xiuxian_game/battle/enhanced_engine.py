@@ -285,10 +285,10 @@ class EnhancedBattleEngine:
 
         特殊效果解锁规则：
         - 普通装备：+2阶解锁第1个效果，+4阶解锁第2个效果，依此类推
-        - VIP定制装备（斩龙闪、镜怨之衣、天退星刀）：0阶即解锁全部效果
+        - VIP定制装备（斩龙闪、镜怨之衣、天退星刀、归雨）：0阶即解锁全部效果
         """
         # VIP定制装备列表（0阶即全解锁）
-        VIP_EQUIPMENT_IDS = {"vip_blade_zhanlongshan", "vip_robe_jingyuanzhiyi", "heaven_retreat_star_blade"}
+        VIP_EQUIPMENT_IDS = {"vip_blade_zhanlongshan", "vip_robe_jingyuanzhiyi", "heaven_retreat_star_blade", "vip_gui_yu"}
 
         for item in equipped_items:
             # 从装备配置中获取special_effects
@@ -604,6 +604,18 @@ class EnhancedBattleEngine:
                         'value': val
                     })
 
+            elif effect.effect_type == EffectType.GAIN_AGILITY:
+                # 夺伞步（归雨）：永久获得敏捷（需要在战斗结束后持久化）
+                attr_points = int(effect.value)
+                result["messages"].append(f"👣 夺伞步：脚步更轻，敏捷+{attr_points}（战后结算）")
+                result["effects_triggered"].append("gain_agility")
+                if not hasattr(result, 'post_battle_effects'):
+                    result['post_battle_effects'] = []
+                result['post_battle_effects'].append({
+                    'type': 'gain_agility',
+                    'value': attr_points
+                })
+
             elif effect.duration > 0:
                 # 持续性效果
                 self.effect_manager.add_effect(killer_id, effect)
@@ -668,6 +680,13 @@ class EnhancedBattleEngine:
             if eff.effect_type == EffectType.IGNORE_DEFENSE:
                 val = float(getattr(eff, 'value', 0))
                 ignore_defense_ratio += max(0.0, val) / 100.0
+
+        # 检查DEFENSE_PENETRATION持续效果（归雨·伞骨穿）
+        defense_pen_effects = self.effect_manager.get_active_effects(attacker_id, EffectType.DEFENSE_PENETRATION)
+        defense_pen_ratio = 0.0
+        for eff in defense_pen_effects:
+            defense_pen_ratio += max(0.0, float(getattr(eff, 'value', 0))) / 100.0
+        defense_pen_ratio = min(1.0, defense_pen_ratio)
         # 组合用于护盾/无敌等通用绕过比例
         bypass_fraction = 1.0 - (1.0 - min(1.0, ignore_special_ratio)) * (1.0 - min(1.0, ignore_defense_ratio))
 
@@ -692,7 +711,7 @@ class EnhancedBattleEngine:
             attack_result = self._process_pvp_attack(
                 attacker, defender, base_attack, is_skill,
                 attacker_attrs, defender_attrs, has_true_damage,
-                ignore_defense_ratio=0.0,
+                ignore_defense_ratio=defense_pen_ratio,
                 ignore_special_ratio=ignore_special_ratio,
                 guaranteed_fraction=ignore_defense_ratio,
             )
@@ -700,7 +719,7 @@ class EnhancedBattleEngine:
             # 对怪物（真伤在判定内处理）
             attack_result = self._process_monster_attack(
                 attacker, defender, base_attack, is_skill, has_true_damage,
-                ignore_defense_ratio=0.0,
+                ignore_defense_ratio=defense_pen_ratio,
                 ignore_special_ratio=ignore_special_ratio,
                 guaranteed_fraction=ignore_defense_ratio,
             )
@@ -839,6 +858,18 @@ class EnhancedBattleEngine:
             damage += fear_bonus
             result["messages"].append(f"😱 恐惧加深伤害 +{fear_bonus}")
 
+        # 伞下：受到伤害减少（归雨DAMAGE_REDUCTION效果）
+        dmg_reduction_effects = self.effect_manager.get_active_effects(defender_id, EffectType.DAMAGE_REDUCTION)
+        total_reduction_pct = 0.0
+        for dr_eff in dmg_reduction_effects:
+            total_reduction_pct += float(getattr(dr_eff, 'value', 0))
+        total_reduction_pct = min(50.0, total_reduction_pct)  # 上限50%减伤
+        if total_reduction_pct > 0 and damage > 0:
+            reduction_amount = int(damage * total_reduction_pct / 100)
+            damage -= reduction_amount
+            damage = max(1, damage)  # 至少造成1点伤害
+            result["messages"].append(f"☂️ 伞下减伤{total_reduction_pct:.0f}% (-{reduction_amount})")
+
         # 检查防御者是否有护盾（可被部分无视）
         shield_effects = self.effect_manager.get_active_effects(defender_id, EffectType.SHIELD)
         absorbed_by_shield = 0
@@ -963,6 +994,12 @@ class EnhancedBattleEngine:
                 result["total_damage"] += boost_damage
                 result["messages"].append(f"💥 伤害提升！额外造成{boost_damage}伤害")
                 result["effects_triggered"].append("damage_boost")
+
+            elif effect.effect_type == EffectType.DEFENSE_PENETRATION:
+                # 伞骨穿：无视防御持续效果，添加到攻击者身上
+                self.effect_manager.add_effect(attacker_id, effect)
+                result["messages"].append(f"☂️ 伞骨穿！无视敌人{effect.value:.0f}%防御(持续{effect.duration}回合)")
+                result["effects_triggered"].append("defense_penetration")
 
             elif effect.duration > 0:
                 # 其他持续性效果
