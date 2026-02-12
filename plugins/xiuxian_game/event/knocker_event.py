@@ -470,11 +470,11 @@ class KnockerEventService:
 
     @classmethod
     def find_player_ghost_by_name(cls, player: Player, npc_name: str) -> Optional[dict]:
-        """通过鬼怪名字查找玩家个人鬼怪
+        """通过鬼怪名字查找玩家个人鬼怪（支持部分匹配）
 
         Args:
             player: 玩家对象
-            npc_name: 鬼怪名字（完整名称，如"鬼仆·守岁者"）
+            npc_name: 鬼怪名字（支持完整名称或部分名称，如"守岁者"可匹配"鬼仆·守岁者"）
 
         Returns:
             鬼怪数据字典（包含event_id），如果未找到或已击杀则返回None
@@ -483,11 +483,13 @@ class KnockerEventService:
         personal_events = pdata.get("personal_events", {})
         now = time.time()
 
-        for event_id, ev_data in personal_events.items():
-            # 检查名字匹配
-            if ev_data.get("npc_name") != npc_name:
-                continue
+        # 清理输入名称
+        clean_target = npc_name.strip().lower()
 
+        # 收集所有有效的匹配候选
+        candidates = []
+
+        for event_id, ev_data in personal_events.items():
             # 检查是否已过期
             spawn_time = ev_data.get("spawn_time", 0)
             if now - spawn_time > EVENT_LIFETIME_MINUTES * 60:
@@ -497,10 +499,35 @@ class KnockerEventService:
             if ev_data.get("killed", False):
                 continue
 
-            # 返回包含event_id的完整数据
-            result = dict(ev_data)
-            result["event_id"] = event_id
-            return result
+            # 获取鬼怪名称并进行智能匹配
+            ghost_name = ev_data.get("npc_name", "")
+            ghost_name_lower = ghost_name.lower()
+
+            # 匹配优先级（数字越小优先级越高）
+            priority = None
+
+            # 1. 精确匹配（优先级最高）
+            if ghost_name_lower == clean_target:
+                priority = 0
+            # 2. 完整包含目标名称
+            elif clean_target in ghost_name_lower:
+                priority = 1
+            # 3. 点号后匹配（如"守岁者"匹配"鬼仆·守岁者"）
+            elif f"·{clean_target}" in ghost_name_lower:
+                priority = 2
+            # 4. 点号前匹配（如"鬼仆"匹配"鬼仆·守岁者"）
+            elif f"{clean_target}·" in ghost_name_lower:
+                priority = 3
+
+            if priority is not None:
+                result = dict(ev_data)
+                result["event_id"] = event_id
+                candidates.append((priority, result))
+
+        # 如果找到匹配，返回优先级最高的
+        if candidates:
+            candidates.sort(key=lambda x: x[0])
+            return candidates[0][1]
 
         return None
 
