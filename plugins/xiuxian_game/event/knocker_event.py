@@ -200,36 +200,63 @@ class KnockerEventService:
         return now - cls._last_refresh_time >= REFRESH_INTERVAL_MINUTES * 60
 
     @classmethod
-    async def refresh_events(cls, session) -> Optional[str]:
-        """刷新诡事点, 返回全服播报文本"""
+    async def refresh_player_events(cls, session, player: Player) -> int:
+        """为单个玩家刷新诡事点（个人独立模式）
+
+        Args:
+            session: 数据库会话
+            player: 玩家对象
+
+        Returns:
+            本次刷新生成的鬼怪数量
+        """
         if not cls.is_active():
-            return None
+            return 0
 
-        # 清理已过期或已死亡的诡事
-        cls._cleanup_expired()
+        # 获取玩家活动数据
+        pdata = cls._get_player_data(player)
+        last_refresh = pdata.get("last_refresh", 0)
+        personal_events = pdata.get("personal_events", {})
 
-        # 检查是否达到上限（个人事件模式：只统计未过期的）
-        alive_count = sum(1 for e in cls._active_events.values() if not e.is_expired())
+        # 检查刷新冷却（10分钟）
+        now = time.time()
+        if now - last_refresh < REFRESH_INTERVAL_MINUTES * 60:
+            return 0
+
+        # 清理已过期的诡事
+        to_remove = []
+        for event_id, ev_data in personal_events.items():
+            spawn_time = ev_data.get("spawn_time", 0)
+            if now - spawn_time > EVENT_LIFETIME_MINUTES * 60:
+                to_remove.append(event_id)
+        for event_id in to_remove:
+            del personal_events[event_id]
+
+        # 统计未过期且未击杀的鬼怪数量
+        alive_count = sum(1 for ev in personal_events.values()
+                         if not ev.get("killed", False))
+
         if alive_count >= MAX_ACTIVE_EVENTS:
-            cls._last_refresh_time = time.time()
-            return None
+            pdata["last_refresh"] = now
+            cls._set_player_data(player, pdata)
+            return 0
 
         # 计算本波生成数量
         max_spawn = MAX_ACTIVE_EVENTS - alive_count
         spawn_count = min(random.randint(*SPAWN_COUNT_RANGE), max_spawn)
         if spawn_count <= 0:
-            cls._last_refresh_time = time.time()
-            return None
+            pdata["last_refresh"] = now
+            cls._set_player_data(player, pdata)
+            return 0
 
-        # 按权重随机选择鬼怪类型
+        # 按权重随机选择鬼怪类型和等级段
         type_ids = list(GHOST_EVENT_TYPES.keys())
         type_weights = [GHOST_EVENT_TYPES[t].weight for t in type_ids]
-
-        # 按权重随机选择等级段（low:mid:high = 5:3:2）
         tier_ids = list(GHOST_TIERS.keys())
         tier_weights = [GHOST_TIERS[t].spawn_weight for t in tier_ids]
 
-        new_events: List[ActiveGhostEvent] = []
+        # 生成新鬼怪（只保存数据，不创建NPC对象）
+        new_count = 0
         for _ in range(spawn_count):
             # 随机选择诡事类型
             type_id = random.choices(type_ids, weights=type_weights, k=1)[0]
@@ -252,16 +279,14 @@ class KnockerEventService:
             narrative_template = random.choice(ghost_type.narratives)
             narrative = narrative_template.replace("{地名}", city)
 
-            # 生成唯一ID
-            cls._event_counter += 1
-            event_id = f"knocker_{cls._event_counter}"
-            npc_id = f"knocker_ghost_{cls._event_counter}"
+            # 生成唯一ID（玩家ID + 时间戳 + 随机数）
+            event_id = f"p{player.id}_t{int(now)}_{random.randint(1000, 9999)}"
 
-            # 根据等级段随机生成鬼怪等级（修改点）
+            # 根据等级段随机生成鬼怪等级
             min_level, max_level = tier_config.level_range
             ghost_level = random.randint(min_level, max_level)
 
-            # 计算鬼怪属性（基于等级段等级，而非全服中位）
+            # 计算鬼怪属性（存储为字典）
             base_stats = DailyTaskService._calculate_enemy_stats(ghost_level)
             stats = {
                 "hp": int(base_stats["hp"] * ghost_type.hp_mult),
@@ -270,105 +295,44 @@ class KnockerEventService:
                 "agility": int(base_stats["agility"] * ghost_type.agi_mult),
             }
 
-            # 创建NPC
-            # 先查找或创建地点
-            from ..world.location_service_new import LocationService
-            from ..infrastructure.repositories.location_repository import LocationRepository
-            from ..infrastructure.repositories.npc_repository import NPCRepository
-
-            loc_repo = LocationRepository(session)
-            npc_repo = NPCRepository(session)
-            loc_service = LocationService(loc_repo)
-            npc_service_inst = __import__(
-                "plugins.xiuxian_game.world.npc_service_new",
-                fromlist=["NPCService"]
-            )
-
-            # 查找或创建地点
-            location_id_str = f"knocker_loc_{x}_{y}"
-            location = await loc_service.get_location_by_id(location_id_str)
-            if not location:
-                location = await loc_service.create_location(
-                    location_id=location_id_str,
-                    name=f"{city}({x},{y})",
-                    x=x, y=y,
-                    location_type="normal",
-                    description="除夕夜出现诡象的地点...",
-                    region="大都会"
-                )
-
-            # 创建鬼怪NPC
-            npc = NPC.create_ghost(
-                npc_id=npc_id,
-                name=npc_display_name,
-                location_id=location.id,
-                level=ghost_level,  # 使用等级段生成的等级
-                hp=stats["hp"],
-                attack=stats["attack"],
-                defense=stats["defense"],
-                agility=stats["agility"],
-            )
-            npc.extra_data = {
-                "knocker_event_id": event_id,
-                "knocker_type": type_id,
-                "knocker_tier": tier_id,  # 新增：存储等级段信息
-                "knocker_city": city,
+            # 保存到玩家个人数据（不创建NPC，战斗时再动态创建）
+            personal_events[event_id] = {
+                "type_id": type_id,
+                "tier_id": tier_id,
+                "npc_name": npc_display_name,
+                "ghost_name": ghost_name,  # 保存原始名字
+                "x": x,
+                "y": y,
+                "city_name": city,
+                "narrative": narrative,
+                "spawn_time": now,
+                "level": ghost_level,
+                "stats": stats,  # 保存属性
                 "shard_reward": ghost_type.shard_reward,
                 "reward_mult": ghost_type.reward_mult,
                 "material_drop_rate": ghost_type.material_drop_rate,
+                "special_mechanic": ghost_type.special_mechanic if ghost_type.special_mechanic else None,
+                "killed": False,
             }
-            if ghost_type.special_mechanic:
-                npc.extra_data["special_mechanic"] = ghost_type.special_mechanic
+            new_count += 1
 
-            session.add(npc)
-            await session.flush()
-
-            # 添加到内存缓存
-            active_event = ActiveGhostEvent(
-                event_id=event_id,
-                type_id=type_id,
-                npc_id=npc_id,
-                npc_name=npc_display_name,
-                x=x, y=y,
-                city_name=city,
-                narrative=narrative,
-                spawn_time=time.time(),
-                level=ghost_level,  # 新增：鬼怪等级
-                tier_id=tier_id,    # 新增：等级段ID
-            )
-            cls._active_events[event_id] = active_event
-            new_events.append(active_event)
-
-        cls._last_refresh_time = time.time()
+        # 更新玩家数据
+        pdata["personal_events"] = personal_events
+        pdata["last_refresh"] = now
+        cls._set_player_data(player, pdata)
+        cls._event_counter += new_count
         cls._save_state()
 
-        if not new_events:
-            return None
+        return new_count
 
-        # 构建播报文本
-        event_list_lines = []
-        for e in new_events:
-            # 获取等级段图标（优先使用等级段图标）
-            tier_icon = GHOST_TIERS[e.tier_id].icon
-            # 构建完整描述（包含等级和等级段信息）
-            level_text = f"Lv.{e.level}"
-            event_list_lines.append(f"· {tier_icon}{e.npc_name}({level_text}) — ({e.x},{e.y})")
-            # 添加叙事描述(缩进显示)
-            event_list_lines.append(f"  {e.narrative}")
-
-        broadcast = BROADCAST_SPAWN.format(
-            count=len(new_events),
-            event_list="\n".join(event_list_lines) + "\n",
-        )
-
-        # 发送系统消息到留言板（全服播报）
-        await cls._send_system_message(session, broadcast)
-
-        return broadcast
+    @classmethod
+    async def refresh_events(cls, session) -> Optional[str]:
+        """【已废弃】旧的全服刷新逻辑，保留以兼容旧代码调用"""
+        return None
 
     @classmethod
     def _cleanup_expired(cls):
-        """清理已过期的诡事（个人事件模式：只清理过期的，不清理已击杀的）"""
+        """清理已过期的诡事（个人事件模式：已移至refresh_player_events内部）"""
         to_remove = []
         for eid, ev in cls._active_events.items():
             if ev.is_expired():
@@ -395,31 +359,55 @@ class KnockerEventService:
     # ==================== 活动信息查询 ====================
 
     @classmethod
-    def get_active_events_list(cls) -> List[ActiveGhostEvent]:
-        """获取当前未过期的诡事列表（个人事件模式：不过滤已击杀的）"""
-        cls._cleanup_expired()
-        return [e for e in cls._active_events.values() if not e.is_expired()]
+    def get_player_active_events(cls, player: Player) -> List[dict]:
+        """获取玩家个人的活跃诡事列表（未过期且未击杀）
+
+        Returns:
+            鬼怪数据字典列表，每个字典包含event_id和鬼怪信息
+        """
+        pdata = cls._get_player_data(player)
+        personal_events = pdata.get("personal_events", {})
+        now = time.time()
+
+        active_list = []
+        for event_id, ev_data in personal_events.items():
+            # 过滤已过期或已击杀的
+            spawn_time = ev_data.get("spawn_time", 0)
+            if now - spawn_time > EVENT_LIFETIME_MINUTES * 60:
+                continue
+            if ev_data.get("killed", False):
+                continue
+
+            # 添加event_id到字典
+            ev_with_id = dict(ev_data)
+            ev_with_id["event_id"] = event_id
+            active_list.append(ev_with_id)
+
+        return active_list
 
     @classmethod
-    def get_event_status(cls, player) -> str:
-        """获取活动状态文本(含个人进度和分层推荐)"""
+    async def get_event_status(cls, session, player) -> str:
+        """获取活动状态文本(含个人进度，自动触发刷新)"""
         if not cls.is_active():
             return "━━━━━━━━━━━━━\n除夕叩门活动当前未开启\n━━━━━━━━━━━━━"
+
+        # 自动刷新玩家个人诡事
+        new_count = await cls.refresh_player_events(session, player)
+        refresh_tip = f"\n🆕 刷新了{new_count}个新诡事" if new_count > 0 else ""
 
         # 获取玩家活动数据
         pdata = cls._get_player_data(player)
         shards = pdata.get("shards", 0)
         kills = pdata.get("kills", 0)
-        killed_events = pdata.get("killed_events", [])
 
-        # 当前诡事列表
-        active_events = cls.get_active_events_list()
+        # 获取玩家个人的诡事列表
+        active_events = cls.get_player_active_events(player)
 
-        # 按距离排序(基于玩家坐标)
+        # 按距离排序
         px, py = player.real_world_x or 0, player.real_world_y or 0
 
         def distance(ev):
-            return abs(ev.x - px) + abs(ev.y - py)
+            return abs(ev["x"] - px) + abs(ev["y"] - py)
 
         active_events.sort(key=distance)
 
@@ -431,7 +419,6 @@ class KnockerEventService:
             if min_level <= player_level <= max_level:
                 recommended_tier = tier_id
                 break
-        # 如果玩家等级超过所有等级段，推荐最高等级段
         if not recommended_tier:
             recommended_tier = "high"
 
@@ -441,49 +428,47 @@ class KnockerEventService:
             f"⏰ 剩余时间: {cls.get_remaining_time()}",
             f"🔮 封门符碎片: {shards}",
             f"💀 已解决诡事: {kills}",
-            "",
         ]
 
+        if refresh_tip:
+            lines.append(refresh_tip)
+
+        lines.append("")
+
         if active_events:
-            # 分层显示诡事（优先推荐合适等级段）
-            recommended_events = [e for e in active_events if e.tier_id == recommended_tier]
-            other_events = [e for e in active_events if e.tier_id != recommended_tier]
+            # 分层显示诡事
+            recommended_events = [e for e in active_events if e["tier_id"] == recommended_tier]
+            other_events = [e for e in active_events if e["tier_id"] != recommended_tier]
 
             # 显示推荐目标
             if recommended_events:
                 tier_config = GHOST_TIERS[recommended_tier]
                 lines.append(f"🎯 推荐目标 (Lv.{tier_config.level_range[0]}-{tier_config.level_range[1]}):")
-                for ev in recommended_events[:8]:  # 推荐最多8个
+                for ev in recommended_events[:8]:
                     tier_icon = tier_config.icon
-                    dist = abs(ev.x - px) + abs(ev.y - py)
-                    # 标记已击杀的鬼怪
-                    killed_mark = "✅" if ev.event_id in killed_events else "⚔️"
-                    lines.append(f"  {killed_mark}{tier_icon}{ev.npc_name}(Lv.{ev.level}) ({ev.x},{ev.y}) 距{dist}格")
-                    # 显示叙事描述(缩进增加氛围感)
-                    lines.append(f"     {ev.narrative}")
-                    lines.append("")  # 空行分隔
+                    dist = distance(ev)
+                    lines.append(f"  ⚔️{tier_icon}{ev['npc_name']}(Lv.{ev['level']}) ({ev['x']},{ev['y']}) 距{dist}格")
+                    lines.append(f"     {ev['narrative']}")
+                    lines.append("")
 
             # 显示其他等级段鬼怪
             if other_events and len(recommended_events) < 8:
                 lines.append(f"📍 其他诡事 ({len(other_events)}个):")
-                for ev in other_events[:7]:  # 其他最多7个
-                    tier_icon = GHOST_TIERS[ev.tier_id].icon
-                    dist = abs(ev.x - px) + abs(ev.y - py)
-                    tier_name = GHOST_TIERS[ev.tier_id].name
-                    # 标记已击杀的鬼怪
-                    killed_mark = "✅" if ev.event_id in killed_events else "⚔️"
-                    lines.append(f"  {killed_mark}{tier_icon}{ev.npc_name}(Lv.{ev.level}) ({ev.x},{ev.y}) 距{dist}格")
-                    lines.append(f"     {ev.narrative}")
-                    lines.append("")  # 空行分隔
+                for ev in other_events[:7]:
+                    tier_icon = GHOST_TIERS[ev["tier_id"]].icon
+                    dist = distance(ev)
+                    lines.append(f"  ⚔️{tier_icon}{ev['npc_name']}(Lv.{ev['level']}) ({ev['x']},{ev['y']}) 距{dist}格")
+                    lines.append(f"     {ev['narrative']}")
+                    lines.append("")
         else:
             lines.append("📍 当前无活跃诡事点")
-            lines.append("   缉邪司正在追踪新的诡象，十分钟以内会有新消息...")
+            lines.append("   十分钟后可刷新新的诡事...")
 
         lines.extend([
             "",
             "━━━━━━━━━━━━━",
             "💡 【鬼域瞬移 x y】快速移动",
-            "💡 【攻击 NPC名】击杀鬼怪",
+            "💡 【攻击 鬼怪名】击杀鬼怪",
             "💡 【活动商店】碎片兑换奖励",
             "💡 【叩门排行】查看排名",
         ])
@@ -491,6 +476,102 @@ class KnockerEventService:
         return "\n".join(lines)
 
     # ==================== 击杀回调 ====================
+
+    @classmethod
+    def find_player_ghost_by_name(cls, player: Player, npc_name: str) -> Optional[dict]:
+        """通过鬼怪名字查找玩家个人鬼怪
+
+        Args:
+            player: 玩家对象
+            npc_name: 鬼怪名字（完整名称，如"鬼仆·守岁者"）
+
+        Returns:
+            鬼怪数据字典（包含event_id），如果未找到或已击杀则返回None
+        """
+        pdata = cls._get_player_data(player)
+        personal_events = pdata.get("personal_events", {})
+        now = time.time()
+
+        for event_id, ev_data in personal_events.items():
+            # 检查名字匹配
+            if ev_data.get("npc_name") != npc_name:
+                continue
+
+            # 检查是否已过期
+            spawn_time = ev_data.get("spawn_time", 0)
+            if now - spawn_time > EVENT_LIFETIME_MINUTES * 60:
+                continue
+
+            # 检查是否已击杀
+            if ev_data.get("killed", False):
+                continue
+
+            # 返回包含event_id的完整数据
+            result = dict(ev_data)
+            result["event_id"] = event_id
+            return result
+
+        return None
+
+    @classmethod
+    def mark_player_ghost_killed(cls, player: Player, event_id: str):
+        """标记玩家个人鬼怪为已击杀
+
+        Args:
+            player: 玩家对象
+            event_id: 鬼怪事件ID
+        """
+        pdata = cls._get_player_data(player)
+        personal_events = pdata.get("personal_events", {})
+
+        if event_id in personal_events:
+            personal_events[event_id]["killed"] = True
+
+        pdata["personal_events"] = personal_events
+        pdata["shards"] = pdata.get("shards", 0)
+        pdata["kills"] = pdata.get("kills", 0)
+        cls._set_player_data(player, pdata)
+
+    @classmethod
+    def create_temp_npc_from_ghost_data(cls, ghost_data: dict, session) -> NPC:
+        """从鬼怪数据动态创建临时NPC对象（用于战斗）
+
+        Args:
+            ghost_data: 鬼怪数据字典（来自个人诡事）
+            session: 数据库会话
+
+        Returns:
+            临时NPC对象（不持久化到数据库）
+        """
+        stats = ghost_data["stats"]
+        event_id = ghost_data["event_id"]
+        type_id = ghost_data["type_id"]
+
+        # 创建临时NPC对象
+        npc = NPC(
+            npc_id=f"temp_{event_id}",
+            name=ghost_data["npc_name"],
+            npc_type=NPCType.GHOST,
+            level=ghost_data["level"],
+            hp=stats["hp"],
+            max_hp=stats["hp"],
+            attack=stats["attack"],
+            defense=stats["defense"],
+            agility=stats["agility"],
+            location_id=None,  # 临时对象不需要位置
+        )
+        npc.extra_data = {
+            "knocker_event_id": event_id,
+            "knocker_type": type_id,
+            "knocker_tier": ghost_data["tier_id"],
+            "shard_reward": ghost_data["shard_reward"],
+            "reward_mult": ghost_data["reward_mult"],
+            "material_drop_rate": ghost_data["material_drop_rate"],
+        }
+        if ghost_data.get("special_mechanic"):
+            npc.extra_data["special_mechanic"] = ghost_data["special_mechanic"]
+
+        return npc
 
     @classmethod
     def is_knocker_npc(cls, npc: NPC) -> bool:
@@ -501,23 +582,14 @@ class KnockerEventService:
         return "knocker_event_id" in extra
 
     @classmethod
-    def has_player_killed(cls, player: Player, event_id: str) -> bool:
-        """检查玩家是否已击杀过某个活动鬼怪
+    async def on_ghost_killed(cls, session, player: Player, event_id: str, ghost_data: dict) -> List[str]:
+        """活动鬼怪被击杀的回调（个人事件模式）
 
         Args:
+            session: 数据库会话
             player: 玩家对象
             event_id: 鬼怪事件ID
-
-        Returns:
-            是否已击杀过
-        """
-        pdata = cls._get_player_data(player)
-        killed_events = pdata.get("killed_events", [])
-        return event_id in killed_events
-
-    @classmethod
-    async def on_ghost_killed(cls, session, player: Player, npc: NPC) -> List[str]:
-        """活动鬼怪被击杀的回调（个人事件模式：不消灭鬼怪，记录玩家已击杀）
+            ghost_data: 鬼怪数据字典
 
         Returns:
             附加的结果行列表
@@ -525,28 +597,25 @@ class KnockerEventService:
         if not cls.is_active():
             return []
 
-        extra = npc.extra_data or {}
-        event_id = extra.get("knocker_event_id")
-        type_id = extra.get("knocker_type")
-        shard_reward = extra.get("shard_reward", 1)
-        reward_mult = extra.get("reward_mult", 1.0)
-        material_drop_rate = extra.get("material_drop_rate", 0.05)
-
-        if not event_id or not type_id:
-            return []
+        type_id = ghost_data.get("type_id")
+        shard_reward = ghost_data.get("shard_reward", 1)
+        reward_mult = ghost_data.get("reward_mult", 1.0)
+        material_drop_rate = ghost_data.get("material_drop_rate", 0.05)
 
         ghost_type = GHOST_EVENT_TYPES.get(type_id)
         if not ghost_type:
             return []
 
-        # 检查玩家是否已击杀过此鬼怪（个人事件：每人每只鬼怪只能打一次）
-        if cls.has_player_killed(player, event_id):
-            return ["⚠️ 你已经解决过这个诡象了，去寻找其他诡事点吧！"]
-
         result_lines = []
 
-        # 不再标记鬼怪为死亡，改为记录玩家已击杀的event_id
-        # （鬼怪对其他玩家仍然存在）
+        # 标记为已击杀
+        cls.mark_player_ghost_killed(player, event_id)
+
+        # 更新击杀计数
+        pdata = cls._get_player_data(player)
+        pdata["shards"] = pdata.get("shards", 0) + shard_reward
+        pdata["kills"] = pdata.get("kills", 0) + 1
+        cls._set_player_data(player, pdata)
 
         # 计算奖励
         exp_reward = int((BASE_EXP + player.level * EXP_PER_LEVEL) * reward_mult)
@@ -556,18 +625,7 @@ class KnockerEventService:
         player.exp += exp_reward
         player.gold += gold_reward
 
-        # 发放碎片(更新player活动数据) + 记录已击杀的event_id
-        pdata = cls._get_player_data(player)
-        pdata["shards"] = pdata.get("shards", 0) + shard_reward
-        pdata["kills"] = pdata.get("kills", 0) + 1
-        # 记录玩家已击杀的event_id（个人事件：防止重复击杀）
-        killed_events = pdata.get("killed_events", [])
-        if event_id not in killed_events:
-            killed_events.append(event_id)
-        pdata["killed_events"] = killed_events
-        cls._set_player_data(player, pdata)
-
-        # 关键修复: 明确标记player对象需要更新,确保SQLAlchemy跟踪变化
+        # 关键修复: 明确标记player对象需要更新
         session.add(player)
 
         result_lines.append("")

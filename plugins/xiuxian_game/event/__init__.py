@@ -44,7 +44,7 @@ stop_event_cmd = on_command("关闭活动", block=True, priority=4, permission=S
 
 @event_status_cmd.handle()
 async def handle_event_status(event: MessageEvent):
-    """查看活动状态 + 个人进度 + 附近诡事点 + 完整帮助"""
+    """查看活动状态 + 个人进度 + 个人鬼怪列表 + 自动刷新"""
     async with safe_session() as session:
         player = await get_unified_player(session, event)
         if not player:
@@ -55,28 +55,10 @@ async def handle_event_status(event: MessageEvent):
             else:
                 await event_status_cmd.finish("请先创建角色")
 
-        result = KnockerEventService.get_event_status(player)
+        # 传入session，触发个人刷新
+        result = await KnockerEventService.get_event_status(session, player)
 
-    # 在结果末尾添加完整的指令帮助
-    help_section = (
-        "\n"
-        "━━━━━━━━━━━━━\n"
-        "🎆 除夕叩门活动指令\n"
-        "━━━━━━━━━━━━━\n"
-        "【除夕活动】查看活动状态、进度、附近诡事点\n"
-        "【鬼域瞬移 x y】快速移动到目标坐标（冷却3分钟）\n"
-        "【叩门排行】查看击杀排行榜\n"
-        "【活动商店】查看碎片商店\n"
-        "【活动商店 兑换 物品名 [数量]】兑换商品\n"
-        "【攻击 鬼怪名】击杀活动鬼怪获取碎片\n"
-        "━━━━━━━━━━━━━\n"
-        "💡 每个诡象每人只能解决一次，已解决的会标记✅\n"
-        "💡 碎片可用于兑换稀有道具和食谱\n"
-        "💡 击杀Boss级鬼怪可获得全服播报\n"
-        "💡 瞬移距离上限200格（曼哈顿距离）"
-    )
-
-    await event_status_cmd.finish(message_add_head(result + help_section, event))
+    await event_status_cmd.finish(message_add_head(result, event))
 
 
 # ==================== 鬼域瞬移 ====================
@@ -227,32 +209,8 @@ async def handle_stop_event(event: MessageEvent):
     await stop_event_cmd.finish(broadcast)
 
 
-# ==================== 定时任务: 诡事刷新 ====================
-
-@scheduler.scheduled_job("interval", minutes=5, id="knocker_event_refresh")
-async def knocker_event_refresh():
-    """每5分钟检查并刷新诡事点"""
-    if not KnockerEventService.is_active():
-        return
-
-    if not KnockerEventService.should_refresh():
-        return
-
-    try:
-        async with UnitOfWork(AsyncSessionLocal) as uow:
-            broadcast = await KnockerEventService.refresh_events(uow.session)
-            if broadcast:
-                logger.info(f"[叩门活动] 刷新诡事点, 播报: {broadcast[:50]}...")
-                # 尝试广播到所有群
-                try:
-                    bot = get_bot()
-                    # QQ适配器发送群消息
-                    # 此处依赖具体适配器实现; 如果无法广播则仅记录日志
-                    logger.info(f"[叩门活动] 诡事刷新播报已生成(需手动/自动分发)")
-                except Exception as e:
-                    logger.debug(f"[叩门活动] 广播跳过: {e}")
-    except Exception as e:
-        logger.error(f"[叩门活动] 刷新任务失败: {e}")
+# ==================== 定时任务: 已废弃 ====================
+# 个人模式下，鬼怪由玩家查询时自动刷新，无需全服定时任务
 
 
 # ==================== 启动日志 ====================
@@ -265,6 +223,6 @@ async def on_knocker_startup():
     """Bot启动时记录活动系统状态"""
     status = "开启" if KnockerEventService.is_active() else "关闭"
     logger.info(f"[叩门活动] 活动系统已加载, 当前状态: {status}")
-    logger.info("  - 定时刷新: 每5分钟检查")
+    logger.info("  - 个人刷新: 玩家查询时自动触发")
     logger.info("  - 玩家命令: 除夕活动/鬼域瞬移/叩门排行/活动商店")
     logger.info("  - 管理命令: 开启活动/关闭活动")
