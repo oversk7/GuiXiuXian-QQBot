@@ -140,6 +140,11 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
     realm_name = realm_by_level_and_reincarnation(player.level, player.reincarnation_level)
     exp_max = calculate_level_up_exp(player.level)
 
+    # 获取活动称号（如有）
+    from ..event.knocker_event import KnockerEventService
+    player_title = KnockerEventService.get_player_title(player)
+    display_name = f"{player.nickname}·{player_title}" if player_title else player.nickname
+
     # 检查未读的留言板与私信状态
     has_world_unread, has_private_unread = await get_unread_message_status(player.id)
     unread_notice = ""
@@ -153,7 +158,7 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
 
     content = (
         f"┏━━ 信息 ━━━━\n"
-        f"┃{player.nickname}[UID:{player.uid}]「{player.sex}」\n"
+        f"┃{display_name}[UID:{player.uid}]「{player.sex}」\n"
         f"┃ Lv.{player.level} · {realm_name}\n"
         f"┃ Exp {player.exp}/{exp_max}\n"
         "┣━━ 状态 ━━━━\n"
@@ -200,7 +205,7 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
             logger.info(f"[面板MD] 尝试发送MD模板，qq_openid={qq_openid}")
 
             # 构建图鉴模板参数
-            title = f"{player.nickname} [UID:{player.uid}]"
+            title = f"{display_name} [UID:{player.uid}]"
 
             # 描述信息（所有玩家信息，使用\r换行）
             desc = (
@@ -273,7 +278,7 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
                 qq_openid = event.get_user_id() if hasattr(event, 'get_user_id') else "default"
 
             # 构建图鉴模板参数
-            title = f"{player.nickname} [UID:{player.uid}]"
+            title = f"{display_name} [UID:{player.uid}]"
 
             # 描述信息（所有玩家信息，使用\r换行）
             desc = (
@@ -609,10 +614,15 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
         session.add(player)
         await session.commit()
 
+        # 获取活动称号（如有）
+        from ..event.knocker_event import KnockerEventService
+        player_title = KnockerEventService.get_player_title(player)
+        display_name = f"{player.nickname}·{player_title}" if player_title else player.nickname
+
         await change_gender.finish(message_add_head(
             f"✨ 性别修改成功！\n"
             f"🔄 {old_gender} → {gender.value}\n"
-            f"👤 {player.nickname}[UID:{player.uid}]",
+            f"👤 {display_name}[UID:{player.uid}]",
             event
         ))
 
@@ -840,6 +850,11 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
     realm_name = realm_by_level_and_reincarnation(player.level, player.reincarnation_level)
     exp_max = calculate_level_up_exp(player.level)
 
+    # 获取活动称号（如有）
+    from ..event.knocker_event import KnockerEventService
+    player_title = KnockerEventService.get_player_title(player)
+    display_name_full = f"{player.nickname}·{player_title}" if player_title else player.nickname
+
     # 9. 格式化注册时间
     created_at = player.created_at
     if created_at:
@@ -864,7 +879,7 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
     # 11. 组装完整面板内容
     content = (
         f"┏━━ 信息 ━━━━\n"
-        f"┃{player.nickname}[UID:{player.uid}]「{player.sex}」\n"
+        f"┃{display_name_full}[UID:{player.uid}]「{player.sex}」\n"
         f"┃ Lv.{player.level} · {realm_name}\n"
         f"┃ Exp {player.exp}/{exp_max}\n"
         f"┃ 📅注册 {created_info}\n"

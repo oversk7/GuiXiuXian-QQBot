@@ -800,14 +800,25 @@ async def handle_player_attack(session, attacker: Player, target: Player, event:
 
 async def handle_npc_attack(session, attacker: Player, target_npc, event: MessageEvent):
     """处理玩家vs NPC攻击"""
-    # 检查NPC状态
-    if target_npc.is_dead():
-        await attack_cmd.finish(f"⛔ {target_npc.name}已经死亡")
+    # 检查是否为活动鬼怪（个人事件模式：鬼怪不会真正死亡，每人只能打一次）
+    from ..event.knocker_event import KnockerEventService
+    is_knocker = KnockerEventService.is_knocker_npc(target_npc)
 
-    if target_npc.is_respawning():
-        remaining = target_npc.respawn_time - target_npc.death_time
-        minutes = int(remaining.total_seconds() / 60)
-        await attack_cmd.finish(f"⛔ {target_npc.name}正在复活中，还需{minutes}分钟")
+    if is_knocker:
+        # 活动鬼怪：检查玩家是否已击杀过
+        extra = target_npc.extra_data or {}
+        knocker_event_id = extra.get("knocker_event_id", "")
+        if KnockerEventService.has_player_killed(attacker, knocker_event_id):
+            await attack_cmd.finish(f"⛔ 你已经解决过{target_npc.name}了，去寻找其他诡事点吧！")
+    else:
+        # 非活动鬼怪：检查NPC状态
+        if target_npc.is_dead():
+            await attack_cmd.finish(f"⛔ {target_npc.name}已经死亡")
+
+        if target_npc.is_respawning():
+            remaining = target_npc.respawn_time - target_npc.death_time
+            minutes = int(remaining.total_seconds() / 60)
+            await attack_cmd.finish(f"⛔ {target_npc.name}正在复活中，还需{minutes}分钟")
 
     # 检查是否可以攻击
     if not target_npc.is_killable and target_npc.npc_type != NPCType.GHOST:
@@ -847,16 +858,17 @@ async def handle_npc_attack(session, attacker: Player, target_npc, event: Messag
         if victory:
             # 玩家胜利，NPC死亡
             if target_npc.is_killable:
-                target_npc.kill()
+                # 活动鬼怪不真正死亡（个人事件模式：其他玩家仍可攻击）
+                if not is_knocker:
+                    target_npc.kill()
                 result_lines.append(f"💀 {target_npc.name}被击杀")
-                if target_npc.respawn_duration_minutes > 0:
+                if not is_knocker and target_npc.respawn_duration_minutes > 0:
                     result_lines.append(f"⏰ {target_npc.respawn_duration_minutes}分钟后复活")
 
             # 鬼怪特殊奖励
             if target_npc.npc_type == NPCType.GHOST:
                 # 先检查是否为活动鬼怪
-                from ..event.knocker_event import KnockerEventService
-                if KnockerEventService.is_knocker_npc(target_npc):
+                if is_knocker:
                     # 活动鬼怪: 使用活动奖励系统
                     knocker_lines = await KnockerEventService.on_ghost_killed(
                         session, attacker, target_npc

@@ -207,8 +207,8 @@ class KnockerEventService:
         # 清理已过期或已死亡的诡事
         cls._cleanup_expired()
 
-        # 检查是否达到上限
-        alive_count = sum(1 for e in cls._active_events.values() if e.is_alive and not e.is_expired())
+        # 检查是否达到上限（个人事件模式：只统计未过期的）
+        alive_count = sum(1 for e in cls._active_events.values() if not e.is_expired())
         if alive_count >= MAX_ACTIVE_EVENTS:
             cls._last_refresh_time = time.time()
             return None
@@ -363,10 +363,10 @@ class KnockerEventService:
 
     @classmethod
     def _cleanup_expired(cls):
-        """清理已过期或已死亡的诡事"""
+        """清理已过期的诡事（个人事件模式：只清理过期的，不清理已击杀的）"""
         to_remove = []
         for eid, ev in cls._active_events.items():
-            if not ev.is_alive or ev.is_expired():
+            if ev.is_expired():
                 to_remove.append(eid)
         for eid in to_remove:
             del cls._active_events[eid]
@@ -391,9 +391,9 @@ class KnockerEventService:
 
     @classmethod
     def get_active_events_list(cls) -> List[ActiveGhostEvent]:
-        """获取当前存活的诡事列表"""
+        """获取当前未过期的诡事列表（个人事件模式：不过滤已击杀的）"""
         cls._cleanup_expired()
-        return [e for e in cls._active_events.values() if e.is_alive]
+        return [e for e in cls._active_events.values() if not e.is_expired()]
 
     @classmethod
     def get_event_status(cls, player) -> str:
@@ -405,6 +405,7 @@ class KnockerEventService:
         pdata = cls._get_player_data(player)
         shards = pdata.get("shards", 0)
         kills = pdata.get("kills", 0)
+        killed_events = pdata.get("killed_events", [])
 
         # 当前诡事列表
         active_events = cls.get_active_events_list()
@@ -450,7 +451,9 @@ class KnockerEventService:
                 for ev in recommended_events[:8]:  # 推荐最多8个
                     tier_icon = tier_config.icon
                     dist = abs(ev.x - px) + abs(ev.y - py)
-                    lines.append(f"  {tier_icon}{ev.npc_name}(Lv.{ev.level}) ({ev.x},{ev.y}) 距{dist}格")
+                    # 标记已击杀的鬼怪
+                    killed_mark = "✅" if ev.event_id in killed_events else "⚔️"
+                    lines.append(f"  {killed_mark}{tier_icon}{ev.npc_name}(Lv.{ev.level}) ({ev.x},{ev.y}) 距{dist}格")
                     # 显示叙事描述(缩进增加氛围感)
                     lines.append(f"     {ev.narrative}")
                     lines.append("")  # 空行分隔
@@ -462,12 +465,14 @@ class KnockerEventService:
                     tier_icon = GHOST_TIERS[ev.tier_id].icon
                     dist = abs(ev.x - px) + abs(ev.y - py)
                     tier_name = GHOST_TIERS[ev.tier_id].name
-                    lines.append(f"  {tier_icon}{ev.npc_name}(Lv.{ev.level}) ({ev.x},{ev.y}) 距{dist}格")
+                    # 标记已击杀的鬼怪
+                    killed_mark = "✅" if ev.event_id in killed_events else "⚔️"
+                    lines.append(f"  {killed_mark}{tier_icon}{ev.npc_name}(Lv.{ev.level}) ({ev.x},{ev.y}) 距{dist}格")
                     lines.append(f"     {ev.narrative}")
                     lines.append("")  # 空行分隔
         else:
             lines.append("📍 当前无活跃诡事点")
-            lines.append(f"   下波刷新于{REFRESH_INTERVAL_MINUTES}分钟内")
+            lines.append("   缉邪司正在追踪新的诡象，十分钟以内会有新消息...")
 
         lines.extend([
             "",
@@ -491,8 +496,23 @@ class KnockerEventService:
         return "knocker_event_id" in extra
 
     @classmethod
+    def has_player_killed(cls, player: Player, event_id: str) -> bool:
+        """检查玩家是否已击杀过某个活动鬼怪
+
+        Args:
+            player: 玩家对象
+            event_id: 鬼怪事件ID
+
+        Returns:
+            是否已击杀过
+        """
+        pdata = cls._get_player_data(player)
+        killed_events = pdata.get("killed_events", [])
+        return event_id in killed_events
+
+    @classmethod
     async def on_ghost_killed(cls, session, player: Player, npc: NPC) -> List[str]:
-        """活动鬼怪被击杀的回调
+        """活动鬼怪被击杀的回调（个人事件模式：不消灭鬼怪，记录玩家已击杀）
 
         Returns:
             附加的结果行列表
@@ -514,11 +534,14 @@ class KnockerEventService:
         if not ghost_type:
             return []
 
+        # 检查玩家是否已击杀过此鬼怪（个人事件：每人每只鬼怪只能打一次）
+        if cls.has_player_killed(player, event_id):
+            return ["⚠️ 你已经解决过这个诡象了，去寻找其他诡事点吧！"]
+
         result_lines = []
 
-        # 标记诡事为已完成
-        if event_id in cls._active_events:
-            cls._active_events[event_id].is_alive = False
+        # 不再标记鬼怪为死亡，改为记录玩家已击杀的event_id
+        # （鬼怪对其他玩家仍然存在）
 
         # 计算奖励
         exp_reward = int((BASE_EXP + player.level * EXP_PER_LEVEL) * reward_mult)
@@ -528,10 +551,15 @@ class KnockerEventService:
         player.exp += exp_reward
         player.gold += gold_reward
 
-        # 发放碎片(更新player活动数据)
+        # 发放碎片(更新player活动数据) + 记录已击杀的event_id
         pdata = cls._get_player_data(player)
         pdata["shards"] = pdata.get("shards", 0) + shard_reward
         pdata["kills"] = pdata.get("kills", 0) + 1
+        # 记录玩家已击杀的event_id（个人事件：防止重复击杀）
+        killed_events = pdata.get("killed_events", [])
+        if event_id not in killed_events:
+            killed_events.append(event_id)
+        pdata["killed_events"] = killed_events
         cls._set_player_data(player, pdata)
 
         # 关键修复: 明确标记player对象需要更新,确保SQLAlchemy跟踪变化
