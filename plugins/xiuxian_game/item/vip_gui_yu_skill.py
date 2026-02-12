@@ -292,7 +292,7 @@ async def _handle_teleport(session, player: Player, parts: list, event: MessageE
         title = "☂️ 归雨 · 踏入伞影"
         desc = (
             f"🌂 伞面收拢的一瞬，雨声忽远忽近。\r"
-            f"你从伞影里"掉"出来，鞋底先落地，影子却慢半拍才跟上。\r"
+            f'你从伞影里"掉"出来，鞋底先落地，影子却慢半拍才跟上。\r'
             f"\r"
             f"📍 {from_region} ({from_x},{from_y}) → {to_region} ({to_x},{to_y})\r"
             f"🎯 抵达锚点「{anchor['name']}」\r"
