@@ -2922,28 +2922,28 @@ items:
       type: "SEASONING"
       rarity: "white"
       price: 5
-      description: "基础调味料,百味之首"
+      description: "基础调味料,百味之首。获取：任意商店【购买 盐】"
 
     - item_id: "soy_sauce"
       name: "酱油"
       type: "SEASONING"
       rarity: "white"
       price: 8
-      description: "酿造酱油,增色提鲜"
+      description: "酿造酱油,增色提鲜。获取：任意商店【购买 酱油】"
 
     - item_id: "vinegar"
       name: "醋"
       type: "SEASONING"
       rarity: "white"
       price: 8
-      description: "陈年老醋,酸香醇厚"
+      description: "陈年老醋,酸香醇厚。获取：任意商店【购买 醋】"
 
     - item_id: "sugar"
       name: "糖"
       type: "SEASONING"
       rarity: "white"
       price: 6
-      description: "甜蜜调味,中和苦涩"
+      description: "甜蜜调味,中和苦涩。获取：任意商店【购买 糖】"
 
     # ========== 绿色（进阶调料,NPC商店/跑商市集） ==========
     - item_id: "spice"
@@ -2951,14 +2951,14 @@ items:
       type: "SEASONING"
       rarity: "green"
       price: 30
-      description: "混合香辛料,增添风味层次"
+      description: "混合香辛料,增添风味层次。获取：上京/荔湾镇/大昌市市集购买"
 
     - item_id: "wasabi"
       name: "芥末"
       type: "SEASONING"
       rarity: "green"
       price: 40
-      description: "冲鼻辛辣,刺身绝配,舟山特产"
+      description: "冲鼻辛辣,刺身绝配,舟山特产。获取：舟山市集购买"
 
     # ========== 蓝色（高级调料,跑商/诡域） ==========
     - item_id: "lingzhi_powder"
@@ -2966,7 +2966,7 @@ items:
       type: "SEASONING"
       rarity: "blue"
       price: 150
-      description: "磨碎的灵芝粉末,入菜可增益身心"
+      description: "磨碎的灵芝粉末,入菜可增益身心。获取：诡域探索掉落 / 市场交易"
 
     # ========== 紫色（稀有调料） ==========
     - item_id: "secret_sauce"
@@ -2974,7 +2974,7 @@ items:
       type: "SEASONING"
       rarity: "purple"
       price: 500
-      description: "以十二味珍稀食材秘制而成的神秘酱料"
+      description: "以十二味珍稀食材秘制而成的神秘酱料。获取：诡域深层稀有掉落 / 市场交易"
 
     # ========== 橙色（传说调料） ==========
     - item_id: "immortal_oil"
@@ -2982,7 +2982,7 @@ items:
       type: "SEASONING"
       rarity: "orange"
       price: 2000
-      description: "传说中仙人炼制的烹饪用油,沾之生香"
+      description: "传说中仙人炼制的烹饪用油,沾之生香。获取：诡域极稀有掉落 / 市场交易"
 
     # ========== 除夕叩门活动物品 ==========
 

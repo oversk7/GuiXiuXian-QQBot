@@ -345,6 +345,10 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
         "GOODS": "商品",
         "GEM": "镶嵌物",
         "FISH": "鱼类",
+        "SEASONING": "调味料",
+        "DISH": "菜肴",
+        "RECIPE": "食谱",
+        "GIFT": "礼物",
     }
 
     lines = ["📖 图鉴查询结果 ✨", "━━━━━━━━━━"]
@@ -497,6 +501,37 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
             ]
             extra_info = "\n" + "\n".join(fish_info)
 
+        # 若为调味料，展示稀有度、价格和获取来源
+        elif cfg.type.value == "SEASONING":
+            rarity_display = cfg.get_rarity_display()
+            rarity_map = {
+                "white": "普通",
+                "green": "优秀",
+                "blue": "稀有",
+                "purple": "史诗",
+                "orange": "传说"
+            }
+            rarity_name = rarity_map.get(cfg.rarity, cfg.rarity)
+            # 根据具体物品确定获取来源
+            obtain_map = {
+                "salt": "任意商店【购买 盐】",
+                "soy_sauce": "任意商店【购买 酱油】",
+                "vinegar": "任意商店【购买 醋】",
+                "sugar": "任意商店【购买 糖】",
+                "spice": "上京/荔湾镇/大昌市市集购买",
+                "wasabi": "舟山市集购买",
+                "lingzhi_powder": "诡域探索掉落 / 市场交易",
+                "secret_sauce": "诡域深层稀有掉落 / 市场交易",
+                "immortal_oil": "诡域极稀有掉落 / 市场交易"
+            }
+            obtain_method = obtain_map.get(cfg.item_id, "未知")
+            seasoning_info = [
+                f"⭐ 稀有度：{rarity_display}{rarity_name}",
+                f"💰 价值：{cfg.price:,} 金币",
+                f"📍 获取来源：{obtain_method}"
+            ]
+            extra_info = "\n" + "\n".join(seasoning_info)
+
         lines.append(f"✨ {cfg.name} ✨  [{type_cn}]\n{cfg.description}{extra_info}")
 
     # 如果只有一个匹配结果，尝试使用Markdown模板展示（支持所有物品类型）
@@ -594,6 +629,22 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
             desc_parts.append(f"🎁 类型：礼物")
             if hasattr(cfg, 'favorability') and cfg.favorability > 0:
                 desc_parts.append(f"💝 好感度：+{cfg.favorability}")
+        elif cfg.type.value == "SEASONING":
+            desc_parts.append(f"🧂 类型：调味料")
+            # 根据具体物品确定获取来源
+            obtain_map = {
+                "salt": "任意商店【购买 盐】",
+                "soy_sauce": "任意商店【购买 酱油】",
+                "vinegar": "任意商店【购买 醋】",
+                "sugar": "任意商店【购买 糖】",
+                "spice": "上京/荔湾镇/大昌市市集购买",
+                "wasabi": "舟山市集购买",
+                "lingzhi_powder": "诡域探索掉落 / 市场交易",
+                "secret_sauce": "诡域深层稀有掉落 / 市场交易",
+                "immortal_oil": "诡域极稀有掉落 / 市场交易"
+            }
+            obtain_method = obtain_map.get(cfg.item_id, "未知")
+            desc_parts.append(f"📍 获取来源：{obtain_method}")
 
         desc = "\r".join(desc_parts)
         # 清理所有参数中的\n换行符，确保只使用\r（因为配置文件中的描述可能包含\n）
@@ -607,7 +658,10 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
             "CONSUMABLE": ["背包", "使用", "一键嗑药", "帮助"],
             "GEM": ["背包", "镶嵌物品", "孔位", "帮助"],
             "GIFT": ["背包", "赠送", "社交系统", "帮助"],
-            "GOODS": ["背包", "市集", "帮助", "图鉴"]
+            "GOODS": ["背包", "市集", "帮助", "图鉴"],
+            "SEASONING": ["背包", "餐厅", "菜单", "食谱"],
+            "DISH": ["背包", "餐厅", "吃", "帮助"],
+            "RECIPE": ["背包", "食谱", "餐厅", "帮助"]
         }
         buttons = type_buttons.get(cfg.type.value, ["背包", "图鉴", "帮助", "面板"])
 
@@ -622,7 +676,10 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
             "CONSUMABLE": "💊",
             "GEM": "💎",
             "GIFT": "🎁",
-            "GOODS": "🏪"
+            "GOODS": "🏪",
+            "SEASONING": "🧂",
+            "DISH": "🍽️",
+            "RECIPE": "📜"
         }
         icon = type_icons.get(cfg.type.value, "📖")
 
