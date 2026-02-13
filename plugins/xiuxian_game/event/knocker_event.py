@@ -243,18 +243,12 @@ class KnockerEventService:
         if now - last_refresh < REFRESH_INTERVAL_MINUTES * 60:
             return 0
 
-        # 清理已过期的诡事
-        to_remove = []
-        for event_id, ev_data in personal_events.items():
-            spawn_time = ev_data.get("spawn_time", 0)
-            if now - spawn_time > EVENT_LIFETIME_MINUTES * 60:
-                to_remove.append(event_id)
-        for event_id in to_remove:
-            del personal_events[event_id]
+        # 手动刷新时清理上一轮的鬼怪（已击杀的 + 所有未击杀的旧鬼怪）
+        # 刷新 = 清除全部旧鬼怪 + 生成新一轮
+        personal_events.clear()
 
-        # 统计未过期且未击杀的鬼怪数量
-        alive_count = sum(1 for ev in personal_events.values()
-                         if not ev.get("killed", False))
+        # 统计未击杀的鬼怪数量（清除后应为0）
+        alive_count = 0
 
         if alive_count >= MAX_ACTIVE_EVENTS:
             pdata["last_refresh"] = now
@@ -379,21 +373,17 @@ class KnockerEventService:
 
     @classmethod
     def get_player_active_events(cls, player: Player) -> List[dict]:
-        """获取玩家个人的活跃诡事列表（未过期且未击杀）
+        """获取玩家个人的活跃诡事列表（未击杀的）
 
         Returns:
             鬼怪数据字典列表，每个字典包含event_id和鬼怪信息
         """
         pdata = cls._get_player_data(player)
         personal_events = pdata.get("personal_events", {})
-        now = time.time()
 
         active_list = []
         for event_id, ev_data in personal_events.items():
-            # 过滤已过期或已击杀的
-            spawn_time = ev_data.get("spawn_time", 0)
-            if now - spawn_time > EVENT_LIFETIME_MINUTES * 60:
-                continue
+            # 仅过滤已击杀的
             if ev_data.get("killed", False):
                 continue
 
@@ -488,7 +478,7 @@ class KnockerEventService:
             "💡 【活动商店】碎片兑换奖励",
             "💡 【叩门排行】查看排名",
             "",
-            "⚠️ 注意：鬼怪刷新后10分钟内未击杀将自动消失",
+            "⚠️ 鬼怪不会自动消失，刷新时会替换为新一轮",
         ])
 
         return "\n".join(lines)
@@ -508,7 +498,6 @@ class KnockerEventService:
         """
         pdata = cls._get_player_data(player)
         personal_events = pdata.get("personal_events", {})
-        now = time.time()
 
         # 清理输入名称
         clean_target = npc_name.strip().lower()
@@ -517,11 +506,6 @@ class KnockerEventService:
         candidates = []
 
         for event_id, ev_data in personal_events.items():
-            # 检查是否已过期
-            spawn_time = ev_data.get("spawn_time", 0)
-            if now - spawn_time > EVENT_LIFETIME_MINUTES * 60:
-                continue
-
             # 检查是否已击杀
             if ev_data.get("killed", False):
                 continue
