@@ -270,6 +270,12 @@ class KnockerEventService:
         # 获取玩家等级
         player_level = player.level
 
+        # 收集当前存活鬼怪的显示名称，用于去重
+        used_display_names = set()
+        for ev_data in personal_events.values():
+            if not ev_data.get("killed", False):
+                used_display_names.add(ev_data.get("npc_name", ""))
+
         # 生成新鬼怪（只保存数据，不创建NPC对象）
         new_count = 0
         for _ in range(spawn_count):
@@ -287,10 +293,16 @@ class KnockerEventService:
             x = random.randint(-COORD_RANGE, COORD_RANGE)
             y = random.randint(-COORD_RANGE, COORD_RANGE)
 
-            # 选择城市和名字
+            # 选择城市和名字（尽量避免与现有鬼怪重名）
             city = random.choice(CITY_NAMES)
-            ghost_name = random.choice(GHOST_NAMES)
+            # 优先从未使用的名字中选择
+            available_names = [n for n in GHOST_NAMES if f"{ghost_type.npc_prefix}·{n}" not in used_display_names]
+            if not available_names:
+                # 所有名字都用过了，回退到随机选择（距离优先会兜底）
+                available_names = GHOST_NAMES
+            ghost_name = random.choice(available_names)
             npc_display_name = f"{ghost_type.npc_prefix}·{ghost_name}"
+            used_display_names.add(npc_display_name)
 
             # 选择叙事
             narrative_template = random.choice(ghost_type.narratives)
@@ -489,6 +501,9 @@ class KnockerEventService:
     def find_player_ghost_by_name(cls, player: Player, npc_name: str) -> Optional[dict]:
         """通过鬼怪名字查找玩家个人鬼怪（支持部分匹配）
 
+        当存在多个同名鬼怪时，优先返回离玩家最近的那个，
+        避免匹配到远处的同名鬼怪导致"距离过远"误报。
+
         Args:
             player: 玩家对象
             npc_name: 鬼怪名字（支持完整名称或部分名称，如"守岁者"可匹配"鬼仆·守岁者"）
@@ -501,6 +516,9 @@ class KnockerEventService:
 
         # 清理输入名称
         clean_target = npc_name.strip().lower()
+
+        # 获取玩家当前坐标，用于距离排序
+        player_x, player_y = player.get_current_coordinates()
 
         # 收集所有有效的匹配候选
         candidates = []
@@ -531,14 +549,19 @@ class KnockerEventService:
                 priority = 3
 
             if priority is not None:
+                # 计算曼哈顿距离，用于同优先级时的排序
+                ghost_x = ev_data.get("x", 0)
+                ghost_y = ev_data.get("y", 0)
+                distance = abs(player_x - ghost_x) + abs(player_y - ghost_y)
+
                 result = dict(ev_data)
                 result["event_id"] = event_id
-                candidates.append((priority, result))
+                candidates.append((priority, distance, result))
 
-        # 如果找到匹配，返回优先级最高的
+        # 如果找到匹配，按优先级排序，同优先级按距离从近到远排序
         if candidates:
-            candidates.sort(key=lambda x: x[0])
-            return candidates[0][1]
+            candidates.sort(key=lambda x: (x[0], x[1]))
+            return candidates[0][2]
 
         return None
 
