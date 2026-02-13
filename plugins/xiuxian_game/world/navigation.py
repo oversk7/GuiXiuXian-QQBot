@@ -41,7 +41,21 @@ stop_nav_cmd = on_command("中断导航", aliases={"停止导航", "取消导航
 
 
 def _tiles_per_second(agility: int) -> float:
-    return max(0.01, agility / 2500)
+    """敏捷→移动速度（格/秒）
+
+    使用 平方根曲线 + 基础速度 实现前期增幅快、后期递减的效果。
+    旧公式: agility / 2500（纯线性，新手极慢）
+    新公式: 0.1 + 0.04 * sqrt(agility)
+
+    速度参考（200格路程耗时）:
+      敏捷  5  (1级新手)  → 0.19格/秒 ≈ 18分钟
+      敏捷 14  (10级)     → 0.25格/秒 ≈ 13分钟
+      敏捷 50  (中期)     → 0.38格/秒 ≈ 9分钟
+      敏捷 200 (后期)     → 0.67格/秒 ≈ 5分钟
+      敏捷 500 (高端)     → 0.99格/秒 ≈ 3.4分钟
+      敏捷 1000(极高)     → 1.37格/秒 ≈ 2.4分钟
+    """
+    return 0.1 + 0.04 * (agility ** 0.5)
 
 
 def _euclidean_distance(x1: int, y1: int, x2: int, y2: int) -> float:
