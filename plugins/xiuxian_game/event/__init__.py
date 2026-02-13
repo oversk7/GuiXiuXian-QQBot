@@ -1,9 +1,8 @@
 """
-除夕叩门活动 — 命令注册 + 定时刷新
+除夕叩门活动 — 命令注册 + 手动刷新
 
-玩家命令: 除夕活动 / 鬼域瞬移 / 叩门排行 / 活动商店
+玩家命令: 除夕活动 / 刷新诡事 / 鬼域瞬移 / 叩门排行 / 活动商店
 管理命令: 开启活动 / 关闭活动
-定时任务: 每5分钟检测是否需要刷新诡事点
 """
 
 from nonebot import on_command, get_bot, get_driver, logger
@@ -25,6 +24,8 @@ from .knocker_event import KnockerEventService
 event_status_cmd = on_command(
     "除夕活动", aliases={"叩门活动", "新年活动"}, block=True, priority=5
 )
+
+refresh_cmd = on_command("刷新诡事", aliases={"刷新鬼怪", "刷新活动"}, block=True, priority=5)
 
 teleport_cmd = on_command("鬼域瞬移",aliases={"诡域瞬移"}, block=True, priority=5)
 
@@ -48,7 +49,7 @@ stop_event_cmd = on_command("关闭活动", block=True, priority=4, permission=S
 
 @event_status_cmd.handle()
 async def handle_event_status(event: MessageEvent):
-    """查看活动状态 + 个人进度 + 个人鬼怪列表 + 自动刷新"""
+    """查看活动状态 + 个人进度 + 个人鬼怪列表（不自动刷新）"""
     async with safe_session() as session:
         player = await get_unified_player(session, event)
         if not player:
@@ -59,10 +60,44 @@ async def handle_event_status(event: MessageEvent):
             else:
                 await event_status_cmd.finish("请先创建角色")
 
-        # 传入session，触发个人刷新
+        # 仅查看，不触发刷新
         result = await KnockerEventService.get_event_status(session, player)
 
     await event_status_cmd.finish(message_add_head(result, event))
+
+
+# ==================== 手动刷新诡事 ====================
+
+@refresh_cmd.handle()
+async def handle_refresh(event: MessageEvent):
+    """手动刷新诡事点，CD 10分钟"""
+    async with safe_session() as session:
+        player = await get_unified_player(session, event)
+        if not player:
+            if is_guild_message(event):
+                await refresh_cmd.finish(
+                    "你还没有创建角色或绑定账号\n请先在群聊注册角色，然后使用绑定功能"
+                )
+            else:
+                await refresh_cmd.finish("请先创建角色")
+
+        if not KnockerEventService.is_active():
+            await refresh_cmd.finish("除夕叩门活动当前未开启")
+
+        # 检查CD
+        cd_remaining = KnockerEventService.get_refresh_cooldown(player)
+        if cd_remaining > 0:
+            minutes = int(cd_remaining // 60)
+            seconds = int(cd_remaining % 60)
+            await refresh_cmd.finish(f"刷新冷却中，还需 {minutes}分{seconds}秒")
+
+        # 执行刷新
+        new_count = await KnockerEventService.refresh_player_events(session, player)
+
+    if new_count > 0:
+        await refresh_cmd.finish(message_add_head(f"刷新成功！生成了 {new_count} 个新诡事\n使用【除夕活动】查看详情", event))
+    else:
+        await refresh_cmd.finish(message_add_head("当前鬼怪数量已达上限，无法刷新更多\n击杀现有鬼怪后再来刷新吧", event))
 
 
 # ==================== 鬼域瞬移 ====================
@@ -260,7 +295,7 @@ async def handle_stop_event(event: MessageEvent):
 
 
 # ==================== 定时任务: 已废弃 ====================
-# 个人模式下，鬼怪由玩家查询时自动刷新，无需全服定时任务
+# 手动刷新模式，玩家使用【刷新诡事】命令主动刷新，无需定时任务
 
 
 # ==================== 启动日志 ====================
@@ -273,6 +308,6 @@ async def on_knocker_startup():
     """Bot启动时记录活动系统状态"""
     status = "开启" if KnockerEventService.is_active() else "关闭"
     logger.info(f"[叩门活动] 活动系统已加载, 当前状态: {status}")
-    logger.info("  - 个人刷新: 玩家查询时自动触发")
-    logger.info("  - 玩家命令: 除夕活动/鬼域瞬移/叩门排行/活动商店")
+    logger.info("  - 手动刷新: 玩家使用【刷新诡事】命令触发, CD 10分钟")
+    logger.info("  - 玩家命令: 除夕活动/刷新诡事/鬼域瞬移/叩门排行/活动商店")
     logger.info("  - 管理命令: 开启活动/关闭活动")

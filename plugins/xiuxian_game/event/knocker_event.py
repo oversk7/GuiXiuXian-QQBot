@@ -201,6 +201,25 @@ class KnockerEventService:
         return now - cls._last_refresh_time >= REFRESH_INTERVAL_MINUTES * 60
 
     @classmethod
+    def get_refresh_cooldown(cls, player: Player) -> float:
+        """获取玩家刷新CD剩余秒数
+
+        Args:
+            player: 玩家对象
+
+        Returns:
+            剩余CD秒数，0表示可以刷新
+        """
+        pdata = cls._get_player_data(player)
+        last_refresh = pdata.get("last_refresh", 0)
+        now = time.time()
+        elapsed = now - last_refresh
+        cd_total = REFRESH_INTERVAL_MINUTES * 60
+        if elapsed >= cd_total:
+            return 0
+        return cd_total - elapsed
+
+    @classmethod
     async def refresh_player_events(cls, session, player: Player) -> int:
         """为单个玩家刷新诡事点（个人独立模式）
 
@@ -387,18 +406,23 @@ class KnockerEventService:
 
     @classmethod
     async def get_event_status(cls, session, player) -> str:
-        """获取活动状态文本(含个人进度，自动触发刷新)"""
+        """获取活动状态文本(含个人进度，不触发刷新)"""
         if not cls.is_active():
             return "━━━━━━━━━━━━━\n除夕叩门活动当前未开启\n━━━━━━━━━━━━━"
-
-        # 自动刷新玩家个人诡事
-        new_count = await cls.refresh_player_events(session, player)
-        refresh_tip = f"\n🆕 刷新了{new_count}个新诡事" if new_count > 0 else ""
 
         # 获取玩家活动数据
         pdata = cls._get_player_data(player)
         shards = pdata.get("shards", 0)
         kills = pdata.get("kills", 0)
+
+        # 获取刷新CD信息
+        cd_remaining = cls.get_refresh_cooldown(player)
+        if cd_remaining > 0:
+            cd_min = int(cd_remaining // 60)
+            cd_sec = int(cd_remaining % 60)
+            cd_text = f"⏳ 刷新冷却: {cd_min}分{cd_sec}秒"
+        else:
+            cd_text = "✅ 可以刷新！使用【刷新诡事】获取新鬼怪"
 
         # 获取玩家个人的诡事列表
         active_events = cls.get_player_active_events(player)
@@ -433,10 +457,8 @@ class KnockerEventService:
             f"⏰ 剩余时间: {cls.get_remaining_time()}",
             f"🔮 封门符碎片: {shards}",
             f"💀 已解决诡事: {kills}",
+            cd_text,
         ]
-
-        if refresh_tip:
-            lines.append(refresh_tip)
 
         lines.append("")
 
@@ -451,7 +473,7 @@ class KnockerEventService:
                 lines.append("")
         else:
             lines.append("📍 当前无活跃诡事点")
-            lines.append("   十分钟后可刷新新的诡事...")
+            lines.append("   使用【刷新诡事】获取新的鬼怪")
 
         lines.extend([
             "",
@@ -460,6 +482,7 @@ class KnockerEventService:
             "   🟢普通（等级±5） 🔵精英（等级+0~10）",
             "   🟣头目（等级+5~15） 🔴BOSS（等级+10~25）",
             "",
+            "💡 【刷新诡事】手动刷新鬼怪（CD 10分钟）",
             "💡 【鬼域瞬移 x y】快速移动",
             "💡 【攻击 鬼怪名】击杀鬼怪（需距离≤2格）",
             "💡 【活动商店】碎片兑换奖励",
