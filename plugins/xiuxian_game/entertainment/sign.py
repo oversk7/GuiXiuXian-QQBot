@@ -41,7 +41,16 @@ async def handle_sign(event: MessageEvent):
             return
 
         # 计算连续签到
-        if last_sign_date == (today - timedelta(days=1)):
+        # 检查是否为「拨针·签到」重置的二次签到，是则不增加streak
+        vip_data = player.vip_equipment_data or {}
+        is_dial_reset = vip_data.get("dial_sign_reset", False)
+
+        if is_dial_reset:
+            # 拨针重置的签到：保持streak不变，清除标记
+            data = dict(vip_data)
+            data.pop("dial_sign_reset", None)
+            player.vip_equipment_data = data
+        elif last_sign_date == (today - timedelta(days=1)):
             player.sign_streak += 1
         else:
             player.sign_streak = 1

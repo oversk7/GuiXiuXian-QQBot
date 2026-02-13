@@ -205,7 +205,11 @@ async def _handle_dial_sign(session: AsyncSession, player: Player, watch: ItemIn
 
     # 执行：将 last_sign 设为昨天，使签到系统允许再次签到
     player.last_sign = datetime.now() - timedelta(days=1)
-    # 注意：不改变 sign_streak，避免连续签到天数被额外累加
+
+    # 设置标记，让签到系统识别"拨针重置"，不增加连续签到天数
+    data = dict(player.vip_equipment_data or {})
+    data["dial_sign_reset"] = True
+    player.vip_equipment_data = data
 
     # 标记已用 + 扣耐久
     _mark_dial_used(dial, "sign")
