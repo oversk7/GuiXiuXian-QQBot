@@ -555,19 +555,15 @@ async def create_player(event: MessageEvent, nickname: str, gender: Gender) -> M
             f"🆔 UID   : {new_player.uid}\r"
             f"⚧️ 性别  : {new_player.sex.value}\r"
             f"━━━━━━━━━━━━━\r"
-            f"🔰 新手必读 - 指令格式说明：\r"
-            f"💡 【】括号里的才是指令，外面是指令说明！\r"
-            f"💡 括号不要一起发出来，有的空格不能少！\r"
-            f"💡 例如'加点 力 5'表示给力量属性加5点\r"
+            f"📜 你的第一天路线：\r"
+            f"1. 【修炼】提升等级 → 攒够经验后【突破】\r"
+            f"2. 【打工】赚金币 → 用来买装备和药品\r"
+            f"3. 【签到】领每日奖励\r"
+            f"4. 【面板】查看自己的状态\r"
             f"━━━━━━━━━━━━━\r"
-            f"🎯 新手起步 - 核心功能：\r"
-            f"⚔️ 【修炼】提升等级获得怨炁\r"
-            f"💼 【打工】赚取金币购买装备\r"
-            f"🛒 【市场】买卖物品升级装备\r"
-            f"📍 【查看】探索当前位置\r"
-            f"━━━━━━━━━━━━━\r"
-            f"✨ 惊艳体验 - 试试这个：\r"
-            f"🐟 【图鉴 虚空鱼】感受精美图鉴系统！"
+            f"💡 新手任务已开启，跟着做就能快速变强！\r"
+            f"💡 发送【新手指引】查看完整成长路线\r"
+            f"💡 指令不要带【】括号，空格不能少"
         )
 
         # 构建Markdown模板参数
@@ -576,11 +572,11 @@ async def create_player(event: MessageEvent, nickname: str, gender: Gender) -> M
             MessageMarkdownParams(key="result", values=[result_text]),
             MessageMarkdownParams(key="btn1", values=["修炼"]),
             MessageMarkdownParams(key="btn2", values=["打工"]),
-            MessageMarkdownParams(key="btn3", values=["市场"]),
-            MessageMarkdownParams(key="btn4", values=["查看"]),
-            MessageMarkdownParams(key="btn5", values=["图鉴 虚空鱼"]),
-            MessageMarkdownParams(key="btn6", values=["面板"]),
-            MessageMarkdownParams(key="btn7", values=["新手指引"]),
+            MessageMarkdownParams(key="btn3", values=["签到"]),
+            MessageMarkdownParams(key="btn4", values=["面板"]),
+            MessageMarkdownParams(key="btn5", values=["新手指引"]),
+            MessageMarkdownParams(key="btn6", values=["突破"]),
+            MessageMarkdownParams(key="btn7", values=["背包"]),
             MessageMarkdownParams(key="btn8", values=["帮助"]),
         ]
 
@@ -653,38 +649,47 @@ async def _(event: MessageEvent):
                 await newbie_guide.finish("⛔ 请先创建角色，发送【注册】开始游戏")
 
     content = (
-        "🔰 新手指引 - 指令格式详解\n"
+        "📜 新手指引 - 你该干什么\n"
         "━━━━━━━━━━━━━\n"
-        "📖 基础知识：\n"
-        "• 【】方括号里的是指令名称\n"
-        "• <> 尖括号表示必填参数\n"
-        "• [] 方括号表示选填参数\n"
-        "• 指令和参数之间用空格分隔\n"
         "\n"
-        "🎯 常见错误示例：\n"
-        "❌ 加点运5 (缺少空格)\n"
-        "❌ 加点［属性］［点数］加点运5 (照抄帮助格式)\n"
-        "❌ 加点[属性运][点数5] (照抄帮助格式)\n"
-        "❌ 【加点 运 5】(不要输入方括号)\n"
+        "🔰 第一天（立刻做）：\n"
+        "【修炼】 获取经验（5分钟冷却）\n"
+        "【突破】 经验够了就突破升级\n"
+        "【加点 属性 点数】 突破后分配属性点\n"
+        "【签到】 每日签到领奖励\n"
+        "【打工】 赚金币（到工作地点后使用）\n"
+        "💡 加点不会？发【加点帮助】看推荐方案\n"
         "\n"
-        "✅ 正确示例：\n"
-        "✅ 加点 运 5 (给运气加5点)\n"
-        "✅ 加点 力 3 (给力量加3点)\n"
-        "✅ 面板 560 (查看UID为560的玩家)\n"
-        "✅ 面板 (查看自己的面板)\n"
+        "⚔️ 站稳脚跟（1-30级）：\n"
+        "【每日委托】 接取缉邪任务赚经验金币\n"
+        "【进入 1层诡域】 刷副本获取材料\n"
+        "【锻造列表】 查看可锻造的装备\n"
+        "【丹方】 查看可炼制的丹药\n"
+        "【闭关】 离线挂机修炼（最长9-12小时）\n"
         "\n"
-        "🎮 实战练习：\n"
-        "现在试试发送：加点 智 1\n"
-        "如果你有属性点的话，这会给你的理智+1\n"
+        "📈 进阶发展（30级+）：\n"
+        "【市集】 跑商低买高卖赚差价\n"
+        "【投资行情】 气运投资（高风险高回报）\n"
+        "【公会列表】 加入公会享受建筑加成\n"
+        "【购买阴宅】 拥有阴宅大幅提升修炼效率\n"
+        "【钓鱼】 钓鱼获取食材\n"
         "\n"
-        "💡 记住：看到帮助文档中的【指令 <参数>】格式时\n"
-        "只需要输入：指令 参数值 (中间用空格分开)\n"
+        "━━━━━━━━━━━━━\n"
+        "💎 核心循环：\n"
+        "变强 = 修炼突破 + 装备锻造 + 丹药炼制\n"
+        "赚钱 = 打工(稳) + 跑商(中) + 投资(险)\n"
+        "刷材料 = 诡域副本 + 每日委托 + 探索\n"
         "\n"
-        "🆘 如果还是不会，可以：\n"
-        "• 发送【加点帮助】查看属性加点指南\n"
-        "• 发送【修炼系统】查看修炼相关指令\n"
+        "━━━━━━━━━━━━━\n"
+        "📖 指令格式提醒：\n"
+        "• 【】里的是指令，不要把括号打出来\n"
+        "• 指令和参数之间用空格隔开\n"
+        "• 例：加点 力 5（给力量加5点）\n"
+        "\n"
+        "🆘 还是不懂？\n"
         "• 发送【帮助】查看所有系统\n"
-        "• 加入官群：962494679 询问其他玩家"
+        "• 加官群：962494679 问老玩家\n"
+        "• 教程：https://Tutorials.Bossjlb.Top"
     )
 
     await newbie_guide.finish(message_add_head(content, event))
