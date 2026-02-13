@@ -1335,6 +1335,9 @@ items:
           is_percentage: false
           value: 2
           description: "[5] 终焉铭刻：每一次终结都被怀表铭刻为'注定之事'——永久+2攻击力(战后结算；每日最多20次，共+40攻击力)"
+        - trigger: "passive"
+          effect: "none"
+          description: "[6] 拨针系统：怀表操控日常时间线，每日可拨针一次。\n【拨针 签到】重置签到，可再签一次(耐久-3)\n【拨针 闭关】闭关立即按上限时长结算出关(耐久-5)\n【拨针 讨伐】世界BOSS攻击次数+1(耐久-5)\n【拨针 委托】额外刷新一个每日委托(耐久-3)\n【折光年】查看怀表状态面板"
       repair_cost: 5
 
     - item_id: "vip_medal_tiandi"
