@@ -1298,6 +1298,45 @@ items:
           description: "[6] 鬼域雨钉：可设置3个传送锚点。\n【锚点 设置 名称】在当前位置钉下\"雨钉\"\n【锚点 传送 1】踏入伞影即走(CD5分钟，消耗5%理智)\n【锚点 携带 UID 1】将对方一并送走(对方回复【同意传送】后生效)\n【锚点】查看列表"
       repair_cost: 5
 
+    - item_id: "vip_chrono_watch"
+      name: "折光年"
+      description: "一只黑银怀表，表盖薄得像刀片。打开时，秒针会跳过一小段空白——像把某个人的一秒折走了。合上后，你会发现自己总比别人快半步。"
+      type: "EQUIPMENT"
+      rarity: "red"
+      durability: 360
+      required_level: 10
+      attr_bonus: {"attack": 100, "hp": 100, "agility": 100, "defense": 100}
+      attr_ratio: {"attack": 1.0, "hp": 1.0, "agility": 1.0, "defense": 1.0}
+      gem_slots: 5
+      special_effects:
+        - trigger: "first_turn"
+          effect: "buff_combo"
+          value: 20
+          duration: 2
+          description: "[1] 零时域：战斗开始时怀表指针倒转，你的出手永远快对方一拍——前2回合连击率+20%"
+        - trigger: "on_hit"
+          effect: "execute"
+          is_percentage: true
+          value: 20
+          description: "[2] 终末审判：当敌人生命低于20%时，怀表指针归零——时间到了，无视任何效果直接终结"
+        - trigger: "each_turn"
+          chance: 100
+          effect: "damage_reduction"
+          value: 10
+          duration: 999
+          description: "[3] 缓释之壳：怀表周围的时间流速略慢，一切攻击都像穿过粘稠的空气——受到伤害减少10%"
+        - trigger: "on_kill"
+          effect: "gain_hp"
+          is_percentage: false
+          value: 2
+          description: "[4] 时间掠夺：击杀敌人时夺取对方'剩余寿命'——永久+2体质(+6生命值；战后结算；每日最多20次，共+120生命值)"
+        - trigger: "on_kill"
+          effect: "gain_attack"
+          is_percentage: false
+          value: 2
+          description: "[5] 终焉铭刻：每一次终结都被怀表铭刻为'注定之事'——永久+2攻击力(战后结算；每日最多20次，共+40攻击力)"
+      repair_cost: 5
+
     - item_id: "vip_medal_tiandi"
       name: "天帝残勋"
       description: |

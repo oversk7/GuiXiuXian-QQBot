@@ -12,3 +12,4 @@ from . import buff_commands
 from . import material_stats
 from . import item_image_admin  # 物品图片管理命令
 from . import vip_gui_yu_skill  # VIP定制装备「归雨」主动技能
+from . import vip_chrono_watch_skill  # VIP定制装备「折光年」主动技能
