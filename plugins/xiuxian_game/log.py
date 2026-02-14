@@ -10,6 +10,7 @@ from .models.db import safe_session
 from .models.player import Player
 from .utils import message_add_head
 from .platform_utils import get_unified_player
+from .ai_guide import is_admin
 
 # 不阻拦也不回复，仅后台记录
 log_uid_matcher = on_message(priority=1, block=False)
@@ -112,6 +113,10 @@ async def handle_recent_activity(event: MessageEvent, args: Message = CommandArg
         records = []
         for user_id, record in data.items():
             if record.get("last_active") and record.get("uid"):
+                # 过滤掉主管理员的记录，保护管理员隐私
+                if is_admin(str(user_id)):
+                    continue
+
                 # 如果指定了UID，只收集该玩家的记录
                 if target_uid is not None and record.get("uid") != target_uid:
                     continue
