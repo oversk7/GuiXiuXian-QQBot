@@ -285,10 +285,10 @@ class EnhancedBattleEngine:
 
         特殊效果解锁规则：
         - 普通装备：+2阶解锁第1个效果，+4阶解锁第2个效果，依此类推
-        - VIP定制装备（斩龙闪、镜怨之衣、天退星刀、归雨）：0阶即解锁全部效果
+        - VIP定制装备（斩龙闪、镜怨之衣、天退星刀、归雨、折光年）：0阶即解锁全部效果
         """
         # VIP定制装备列表（0阶即全解锁）
-        VIP_EQUIPMENT_IDS = {"vip_blade_zhanlongshan", "vip_robe_jingyuanzhiyi", "heaven_retreat_star_blade", "vip_gui_yu"}
+        VIP_EQUIPMENT_IDS = {"vip_blade_zhanlongshan", "vip_robe_jingyuanzhiyi", "heaven_retreat_star_blade", "vip_gui_yu", "vip_chrono_watch"}
 
         for item in equipped_items:
             # 从装备配置中获取special_effects
@@ -549,7 +549,7 @@ class EnhancedBattleEngine:
                 result["messages"].append(f"👻 噬灵者：剥离灵魂，理智值+{int(effect.value)}（战后结算）")
                 result["effects_triggered"].append("gain_mp")
                 # 标记需要在战斗结束后处理
-                if not hasattr(result, 'post_battle_effects'):
+                if 'post_battle_effects' not in result:
                     result['post_battle_effects'] = []
                 result['post_battle_effects'].append({
                     'type': 'gain_mp',
@@ -563,7 +563,7 @@ class EnhancedBattleEngine:
                 actual_hp = attr_points * 3  # 转换为实际生命值
                 result["messages"].append(f"💓 噬灵者：剥离血肉，最大生命值+{actual_hp}（战后结算）")
                 result["effects_triggered"].append("gain_max_hp")
-                if not hasattr(result, 'post_battle_effects'):
+                if 'post_battle_effects' not in result:
                     result['post_battle_effects'] = []
                 result['post_battle_effects'].append({
                     'type': 'gain_max_hp',
@@ -596,7 +596,7 @@ class EnhancedBattleEngine:
                     )
                     result["effects_triggered"].append("gain_random_attr")
                     # 标记需要在战后结算中处理（包含已抽取的属性名）
-                    if not hasattr(result, 'post_battle_effects'):
+                    if 'post_battle_effects' not in result:
                         result['post_battle_effects'] = []
                     result['post_battle_effects'].append({
                         'type': 'gain_random_attr',
@@ -609,10 +609,22 @@ class EnhancedBattleEngine:
                 attr_points = int(effect.value)
                 result["messages"].append(f"👣 夺伞步：脚步更轻，敏捷+{attr_points}（战后结算）")
                 result["effects_triggered"].append("gain_agility")
-                if not hasattr(result, 'post_battle_effects'):
+                if 'post_battle_effects' not in result:
                     result['post_battle_effects'] = []
                 result['post_battle_effects'].append({
                     'type': 'gain_agility',
+                    'value': attr_points
+                })
+
+            elif effect.effect_type == EffectType.GAIN_ATTACK:
+                # 终焉铭刻（折光年）：永久获得攻击力（需要在战斗结束后持久化）
+                attr_points = int(effect.value)
+                result["messages"].append(f"⏱️ 终焉铭刻：终结被铭刻，攻击力+{attr_points}（战后结算）")
+                result["effects_triggered"].append("gain_attack")
+                if 'post_battle_effects' not in result:
+                    result['post_battle_effects'] = []
+                result['post_battle_effects'].append({
+                    'type': 'gain_attack',
                     'value': attr_points
                 })
 

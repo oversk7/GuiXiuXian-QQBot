@@ -1002,6 +1002,64 @@ async def _handle_personal_monster(session, tile: WorldTile, player: Player) -> 
                         session.add(gy_inst)
                         session.add(player)
                         await session.commit()
+
+                # 折光年「时间掠夺」+「终焉铭刻」：击杀永久+2体质/+2攻击（每日各20次）
+                chrono_effects = [e for e in post_effects if e.get("type") in ("gain_max_hp", "gain_attack")]
+                if chrono_effects:
+                    stmt_cw = _select(_ItemInstance).where(
+                        _ItemInstance.player_id == player.id,
+                        _ItemInstance.equipped == True,
+                        _ItemInstance.item_id == "vip_chrono_watch",
+                    )
+                    cw_inst = (await session.execute(stmt_cw)).scalars().first()
+                    if cw_inst:
+                        cw_extra = dict(cw_inst.extra_attrs or {})
+                        cw_day = _today_key()
+                        cw_bonus = await _VIPBonus.get_or_create(session, player.id)
+
+                        # 时间掠夺（gain_max_hp）：每日20次，每次+2体质(+6生命值)
+                        if cw_extra.get("cw_hp_day") != cw_day:
+                            cw_extra["cw_hp_day"] = cw_day
+                            cw_extra["cw_hp_cnt"] = 0
+                        cw_hp_cnt = int(cw_extra.get("cw_hp_cnt", 0))
+
+                        # 终焉铭刻（gain_attack）：每日20次，每次+2攻击
+                        if cw_extra.get("cw_atk_day") != cw_day:
+                            cw_extra["cw_atk_day"] = cw_day
+                            cw_extra["cw_atk_cnt"] = 0
+                        cw_atk_cnt = int(cw_extra.get("cw_atk_cnt", 0))
+
+                        for eff_cw in chrono_effects:
+                            cw_type = eff_cw.get("type")
+                            val = int(eff_cw.get("value", 2) or 2)
+
+                            if cw_type == "gain_max_hp" and cw_hp_cnt < 20:
+                                actual_hp = val * 3  # 1属性点=3生命值
+                                cw_bonus.add_bonus("max_hp", actual_hp)
+                                player.max_hp = player.max_hp + actual_hp
+                                cw_hp_cnt += 1
+                                cw_extra["cw_hp_cnt"] = cw_hp_cnt
+                                battle_summary.append(
+                                    f"⏱️ 时间掠夺：夺取寿命，生命上限+{actual_hp}（今日{cw_hp_cnt}/20）"
+                                )
+                            elif cw_type == "gain_max_hp" and cw_hp_cnt >= 20:
+                                battle_summary.append("⏱️ 时间掠夺：今日已达上限（+120/120）")
+
+                            elif cw_type == "gain_attack" and cw_atk_cnt < 20:
+                                cw_bonus.add_bonus("attack", val)
+                                player.attack = player.attack + val
+                                cw_atk_cnt += 1
+                                cw_extra["cw_atk_cnt"] = cw_atk_cnt
+                                battle_summary.append(
+                                    f"⏱️ 终焉铭刻：铭刻终结，攻击力+{val}（今日{cw_atk_cnt}/20）"
+                                )
+                            elif cw_type == "gain_attack" and cw_atk_cnt >= 20:
+                                battle_summary.append("⏱️ 终焉铭刻：今日已达上限（+40/40）")
+
+                        cw_inst.extra_attrs = cw_extra
+                        session.add(cw_inst)
+                        session.add(player)
+                        await session.commit()
         except Exception:
             # 不影响战斗主流程
             pass

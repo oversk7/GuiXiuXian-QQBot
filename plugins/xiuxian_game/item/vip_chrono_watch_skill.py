@@ -526,19 +526,18 @@ async def handle_panel(event: MessageEvent):
             else:
                 lines.append(f"  {name}：✅ 可用 (0/1)")
 
-        # 今日成长统计（从 vip_equipment_data 读取）
-        # gain_hp 和 gain_attack 的每日成长记录在战斗系统中
-        # 这里尝试读取 extra_attrs 中的今日成长数据
-        extra = player.extra_attrs or {}
+        # 今日成长统计（从折光年装备的 extra_attrs 读取）
+        # 战后持久化写入 cw_hp_cnt / cw_atk_cnt
+        extra = watch.extra_attrs or {}
         today_str = date.today().isoformat()
-        daily_gains = extra.get("daily_gains", {})
 
         hp_gains_today = 0
         atk_gains_today = 0
 
-        if daily_gains.get("date") == today_str:
-            hp_gains_today = daily_gains.get("gain_hp_count", 0)
-            atk_gains_today = daily_gains.get("gain_attack_count", 0)
+        if extra.get("cw_hp_day") == today_str:
+            hp_gains_today = int(extra.get("cw_hp_cnt", 0))
+        if extra.get("cw_atk_day") == today_str:
+            atk_gains_today = int(extra.get("cw_atk_cnt", 0))
 
         lines.extend([
             "━━━━━━━━━━━━━",

@@ -6,11 +6,11 @@
 - 锚点 传送 <编号>   踏入伞影即走（CD5分钟，消耗5%最大理智）
 - 锚点 携带 <UID> <编号>  将对方一并送走（对方需回复【同意传送】）
 - 锚点 删除 <编号>   拔除指定雨钉
-- 锚点              查看锚点列表
+- 锚点              查看归雨状态面板（含锚点列表）
 """
 
 import copy
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, date
 from nonebot import on_command
 from nonebot.params import CommandArg
 from nonebot.adapters.qq import MessageEvent, Message, MessageSegment
@@ -29,9 +29,40 @@ TELEPORT_CD_SECONDS = 300  # 传送冷却5分钟
 MP_COST_RATIO = 0.05     # 消耗5%最大理智
 CARRY_TIMEOUT_SECONDS = 120  # 携带传送等待超时2分钟
 
+# 归雨配图（复用传送反馈的图片）
+GUI_YU_IMG_URL = "https://wdcdn.qpic.cn/MTMxMDI2NjM3MjM0Njk2MTE_59001_A9dXjBV6LK2wDOCq_1770915268"
+MARKDOWN_TEMPLATE_ID = "102499345_1769693953"
+
 # 临时存储：等待确认的携带传送请求
 # 格式: {target_player_id: {"from_id": str, "anchor": dict, "expire": datetime}}
 _pending_carry_requests: dict = {}
+
+
+async def _send_gui_yu_markdown(handler, title: str, desc: str, fallback_text: str, event: MessageEvent):
+    """使用Markdown模板发送归雨反馈，失败时回退到纯文本"""
+    try:
+        template_params = [
+            MessageMarkdownParams(key="title", values=[title]),
+            MessageMarkdownParams(key="desc", values=[desc]),
+            MessageMarkdownParams(key="imgurl", values=[GUI_YU_IMG_URL]),
+            MessageMarkdownParams(key="width", values=["360"]),
+            MessageMarkdownParams(key="height", values=["201"]),
+            MessageMarkdownParams(key="hint", values=["快捷操作"]),
+            MessageMarkdownParams(key="t1", values=["锚点"]),
+            MessageMarkdownParams(key="t2", values=["面板"]),
+            MessageMarkdownParams(key="t3", values=["签到"]),
+            MessageMarkdownParams(key="t4", values=["修炼"]),
+        ]
+
+        markdown_msg = MessageMarkdown(
+            custom_template_id=MARKDOWN_TEMPLATE_ID,
+            params=template_params
+        )
+
+        await handler.finish(MessageSegment.markdown(markdown_msg))
+    except (ValueError, TypeError, KeyError):
+        # Markdown构建失败，回退到纯文本
+        await handler.finish(message_add_head(fallback_text, event))
 
 
 # ==================== 辅助函数 ====================
@@ -530,3 +561,90 @@ async def handle_reject_carry(event: MessageEvent):
             f"☂️ 你推开了伸来的伞——传送已拒绝",
             event
         ))
+
+
+# ==================== 指令：归雨（状态面板） ====================
+gui_yu_panel_cmd = on_command("归雨", block=True, priority=5)
+
+
+@gui_yu_panel_cmd.handle()
+async def handle_gui_yu_panel(event: MessageEvent):
+    async with safe_session() as session:
+        player = await get_unified_player(session, event)
+        if not player:
+            if is_guild_message(event):
+                await gui_yu_panel_cmd.finish("⛔ 你还没有创建角色或绑定账号")
+            else:
+                await gui_yu_panel_cmd.finish("⛔ 请先创建角色")
+
+        # 检查是否装备了归雨
+        gui_yu = await _get_gui_yu_instance(session, player.id)
+        if not gui_yu:
+            await gui_yu_panel_cmd.finish("⛔ 你未装备「归雨」")
+
+        # ---- 锚点列表 ----
+        anchors = _get_anchors(player)
+        if anchors:
+            anchor_lines = []
+            for idx, anchor in enumerate(anchors, 1):
+                anchor_lines.append(_format_anchor(idx, anchor))
+            anchor_text = "\n".join(anchor_lines)
+            anchor_md_text = "\r".join(anchor_lines)
+        else:
+            anchor_text = "  暂无锚点"
+            anchor_md_text = "  暂无锚点"
+
+        # ---- 冷却状态 ----
+        cd_end = _get_teleport_cd(player)
+        if cd_end and cd_end > datetime.now():
+            remaining = int((cd_end - datetime.now()).total_seconds())
+            cd_text = f"⏱️ 传送冷却：{remaining}秒"
+        else:
+            cd_text = "✅ 传送就绪"
+
+        # ---- 每日成长（夺伞步：+2敏捷/次，每日20次） ----
+        extra = gui_yu.extra_attrs or {}
+        today_str = date.today().isoformat()
+        gy_kill_cnt = 0
+        if extra.get("gy_kill_day") == today_str:
+            gy_kill_cnt = int(extra.get("gy_kill_cnt", 0))
+
+        # ---- 构建纯文本面板 ----
+        lines = [
+            "☂️ 归雨",
+            "━━━━━━━━━━━━━",
+            f"🔋 耐久：{gui_yu.durability}/360",
+            "━━━━━━━━━━━━━",
+            "📍 鬼域雨钉：",
+            anchor_text,
+            f"  📌 已设置 {len(anchors)}/{MAX_ANCHORS} 个锚点",
+            f"  {cd_text}",
+            "━━━━━━━━━━━━━",
+            "📊 今日成长：",
+            f"  夺伞步：+{gy_kill_cnt * 2}敏捷 ({gy_kill_cnt}/20)",
+            "━━━━━━━━━━━━━",
+            "💡 操作：",
+            "【锚点 设置 名称】钉下雨钉",
+            "【锚点 传送 编号】传送到锚点",
+            "【锚点 携带 UID 编号】携带他人传送",
+            "【锚点 删除 编号】拔除雨钉",
+        ]
+        fallback_text = "\n".join(lines)
+
+        # ---- 构建Markdown desc ----
+        title = "☂️ 归雨 · 伞下世界"
+        desc = (
+            f"🌂 雨落下之前，你已经不在这里了。\r"
+            f"\r"
+            f"🔋 耐久：{gui_yu.durability}/360\r"
+            f"\r"
+            f"📍 鬼域雨钉：\r"
+            f"{anchor_md_text}\r"
+            f"  📌 已设置 {len(anchors)}/{MAX_ANCHORS} 个锚点\r"
+            f"  {cd_text}\r"
+            f"\r"
+            f"📊 今日成长：\r"
+            f"  夺伞步：+{gy_kill_cnt * 2}敏捷 ({gy_kill_cnt}/20)"
+        )
+
+        await _send_gui_yu_markdown(gui_yu_panel_cmd, title, desc, fallback_text, event)
