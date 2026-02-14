@@ -278,10 +278,24 @@ class Player(Base):
     )
 
     async def get_effective_inventory_capacity(self, session) -> int:
-        """获取有效背包容量（包含月卡加成）"""
+        """获取有效背包容量（包含月卡加成和VIP装备加成）"""
         from .monthly_card import get_player_card_benefits
         benefits = await get_player_card_benefits(session, self.id)
-        return self.inventory_capacity + benefits["inventory_bonus"]
+        bonus = benefits["inventory_bonus"]
+
+        # VIP装备背包加成（龙影闪: +10%基础容量）
+        from sqlalchemy import select
+        from .inventory import ItemInstance
+        stmt = select(ItemInstance.id).where(
+            ItemInstance.player_id == self.id,
+            ItemInstance.equipped == True,
+            ItemInstance.item_id == "vip_longying_flash"
+        )
+        result = await session.execute(stmt)
+        if result.scalars().first():
+            bonus += int(self.inventory_capacity * 0.10)
+
+        return self.inventory_capacity + bonus
 
     async def get_effective_attributes(self, session=None) -> dict:
         """获取有效属性（包含装备加成、丹药加成和临时buff加成）

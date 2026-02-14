@@ -1340,6 +1340,33 @@ items:
           description: "[6] 拨针系统：怀表操控日常时间线，每日可拨针一次。\n【拨针 签到】重置签到，可再签一次(耐久-3)\n【拨针 闭关】闭关立即按上限时长结算出关(耐久-5)\n【拨针 讨伐】世界BOSS攻击次数+1(耐久-5)\n【拨针 委托】额外刷新一个每日委托(耐久-3)\n【折光年】查看怀表状态面板"
       repair_cost: 5
 
+    - item_id: "vip_longying_flash"
+      name: "龙影闪"
+      description: "你踏出的那一步，已经不在这个世界了。\n灭法之影套装之二"
+      type: "EQUIPMENT"
+      rarity: "red"
+      durability: 360
+      required_level: 10
+      attr_bonus: {"hp": 200, "mp": 200}
+      attr_ratio: {"hp": 2.0, "mp": 2.0}
+      gem_slots: 5
+      special_effects:
+        - trigger: "on_attacked"
+          effect: "reflect_death"
+          is_percentage: false
+          value: 0
+          description: "[1] 虚界反噬：野外被死斗时，虚界裂隙撕开空间——攻击者直接死亡(自保)"
+        - trigger: "passive"
+          effect: "none"
+          description: "[2] 虚界夹层：背包空间+10%"
+        - trigger: "on_dodge"
+          chance: 100
+          effect: "heal"
+          is_percentage: true
+          value: 5
+          description: "[3] 虚界闪渡：闪避时，虚界裂隙中泄出的灵气修复身躯——回复5%最大生命值"
+      repair_cost: 5
+
     - item_id: "vip_medal_tiandi"
       name: "天帝残勋"
       description: |

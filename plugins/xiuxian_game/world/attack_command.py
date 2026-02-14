@@ -584,6 +584,83 @@ async def handle_player_attack(session, attacker: Player, target: Player, event:
 
             await attack_cmd.finish(message_add_head("\n".join(result_lines), event))
 
+    # 死斗前龙影闪虚界反噬判定：仅在荒野/诡域触发
+    if not in_town:
+        try:
+            stmt = select(ItemInstance).where(
+                ItemInstance.player_id == target.id,
+                ItemInstance.equipped == True,
+                ItemInstance.item_id == "vip_longying_flash"
+            )
+            target_longying = (await session.execute(stmt)).scalars().first()
+        except SQLAlchemyError:
+            target_longying = None
+        if target_longying:
+            # 虚界反噬：攻击者被虚界裂隙吞噬
+            loser = attacker
+            winner = target
+            result_lines = [
+                "⚠️ 死斗触发前置判定",
+                "━━━━━━━━━━━━━",
+                f"🌀 {target.nickname}的『龙影闪』[虚界反噬]撕开空间裂隙",
+                f"⚰️ {attacker.nickname}被虚界裂隙吞噬！(虚界反噬·自保)",
+                "━━━━━━━━━━━━━",
+            ]
+            attacker_damage = attacker.hp
+            target_damage = 0
+            attacker.hp = 0
+            # 掉落（含保护）
+            now_ts = time.time()
+            last_ts = _last_pvp_drop_time.get(loser.id, 0)
+            if now_ts - last_ts < DROP_PROTECTION_SECONDS:
+                result_lines.append("🛡️ 掉落保护生效：短时间内不再掉落物品")
+                drop_summary = "🛡️ 掉落保护生效"
+            else:
+                drop_msg = await handle_wilderness_drops(session, loser, winner)
+                _last_pvp_drop_time[loser.id] = now_ts
+                if drop_msg:
+                    result_lines.append(drop_msg)
+                    drop_summary = drop_msg.replace("\n", "；")
+                else:
+                    drop_summary = "无掉落"
+
+            # 记录死斗日志
+            try:
+                bt_simple = "诡域" if current_region != "大都会" else "荒野"
+                log = PvpLog(
+                    ts=int(time.time()),
+                    region=current_region,
+                    x=attacker_x,
+                    y=attacker_y,
+                    attacker_id=attacker.id,
+                    defender_id=target.id,
+                    attacker_uid=attacker.uid,
+                    defender_uid=target.uid,
+                    attacker_name=attacker.nickname,
+                    defender_name=target.nickname,
+                    battle_type=bt_simple,
+                    attacker_victory=0,
+                    attacker_damage=attacker_damage,
+                    defender_damage=target_damage,
+                    drop_summary=drop_summary,
+                )
+                session.add(log)
+            except (ValueError, SQLAlchemyError):
+                pass
+
+            await session.commit()
+
+            # 检查新手任务
+            from ..quest.novice_quest_service import NoviceQuestService
+            quest_completed, quest_msg = await NoviceQuestService.check_and_advance_quest(
+                session, attacker, "command", {"command": "攻击"}
+            )
+
+            if quest_completed and quest_msg:
+                result_lines.append("")
+                result_lines.append(quest_msg)
+
+            await attack_cmd.finish(message_add_head("\n".join(result_lines), event))
 
     # 执行PVP战斗
     battle_timestamp = int(time.time() * 1000)
