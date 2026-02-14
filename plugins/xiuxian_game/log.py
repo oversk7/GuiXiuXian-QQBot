@@ -70,6 +70,95 @@ def _update_last_active(player: Player | None, user_id: str, command: str) -> No
         pass
 
 
+# ==================== 活动隐私设置 ====================
+hide_activity_cmd = on_command("隐藏活动", aliases={"隐藏动态"}, block=True, priority=5)
+show_activity_cmd = on_command("显示活动", aliases={"显示动态"}, block=True, priority=5)
+
+
+def _get_hidden_uids() -> set:
+    """从 last_active.json 中获取所有设置了隐藏活动的玩家UID集合"""
+    log_dir = Path(__file__).parent.parent.parent / "logs"
+    path = log_dir / "last_active.json"
+    hidden = set()
+    try:
+        if path.exists():
+            with open(path, "r", encoding="utf-8") as f:
+                data = json.load(f)
+            if isinstance(data, dict):
+                for user_id, record in data.items():
+                    if record.get("hide_activity") and record.get("uid"):
+                        hidden.add(record["uid"])
+    except (json.JSONDecodeError, OSError):
+        pass
+    return hidden
+
+
+def _set_hide_activity(user_id: str, hide: bool) -> None:
+    """设置指定玩家的活动隐藏状态"""
+    log_dir = Path(__file__).parent.parent.parent / "logs"
+    log_dir.mkdir(parents=True, exist_ok=True)
+    path = log_dir / "last_active.json"
+
+    data = {}
+    try:
+        if path.exists():
+            with open(path, "r", encoding="utf-8") as f:
+                loaded = json.load(f)
+                if isinstance(loaded, dict):
+                    data = loaded
+    except (json.JSONDecodeError, OSError):
+        data = {}
+
+    if user_id in data:
+        data[user_id]["hide_activity"] = hide
+    else:
+        data[user_id] = {"hide_activity": hide}
+
+    try:
+        with open(path, "w", encoding="utf-8") as f:
+            json.dump(data, f, ensure_ascii=False, indent=2)
+    except OSError:
+        pass
+
+
+@hide_activity_cmd.handle()
+async def handle_hide_activity(event: MessageEvent):
+    """设置隐藏自己的活动记录，不被其他玩家查询到"""
+    user_id = event.get_user_id()
+
+    async with safe_session() as session:
+        player = await get_unified_player(session, event)
+    if not player:
+        await hide_activity_cmd.finish("⛔ 请先创建角色")
+
+    _set_hide_activity(user_id, True)
+    await hide_activity_cmd.finish(message_add_head(
+        "✅ 已开启活动隐私保护\n"
+        "其他玩家将无法在【最近活动】中看到你的记录\n"
+        "💡 使用【显示活动】可以恢复公开",
+        event
+    ))
+
+
+@show_activity_cmd.handle()
+async def handle_show_activity(event: MessageEvent):
+    """取消隐藏活动记录，恢复公开"""
+    user_id = event.get_user_id()
+
+    async with safe_session() as session:
+        player = await get_unified_player(session, event)
+    if not player:
+        await show_activity_cmd.finish("⛔ 请先创建角色")
+
+    _set_hide_activity(user_id, False)
+    await show_activity_cmd.finish(message_add_head(
+        "✅ 已关闭活动隐私保护\n"
+        "你的活动记录将恢复公开显示\n"
+        "💡 使用【隐藏活动】可以重新隐藏",
+        event
+    ))
+
+
 # ==================== 查看全服最近活动记录 ====================
 recent_activity_cmd = on_command("最近活动", aliases={"活动记录", "全服活动"}, block=True, priority=5)
 
@@ -109,6 +198,13 @@ async def handle_recent_activity(event: MessageEvent, args: Message = CommandArg
         if not isinstance(data, dict) or not data:
             await recent_activity_cmd.finish(message_add_head("❌ 暂无活动记录", event))
 
+        # 获取当前查询者的UID，用于判断是否查看自己
+        querier_id = event.get_user_id()
+        querier_uid = data.get(querier_id, {}).get("uid")
+
+        # 获取隐藏活动的玩家UID集合
+        hidden_uids = _get_hidden_uids()
+
         # 将所有记录转换为列表，并按时间排序
         records = []
         for user_id, record in data.items():
@@ -117,9 +213,20 @@ async def handle_recent_activity(event: MessageEvent, args: Message = CommandArg
                 if is_admin(str(user_id)):
                     continue
 
+                record_uid = record.get("uid")
+
                 # 如果指定了UID，只收集该玩家的记录
-                if target_uid is not None and record.get("uid") != target_uid:
+                if target_uid is not None and record_uid != target_uid:
                     continue
+
+                # 隐私过滤：隐藏了活动的玩家不在全服列表中显示
+                # 但玩家查自己的活动不受影响
+                if record_uid in hidden_uids:
+                    # 查看指定UID且是自己的，允许通过
+                    if target_uid is not None and querier_uid == target_uid:
+                        pass
+                    else:
+                        continue
 
                 try:
                     # 解析时间字符串
@@ -135,6 +242,9 @@ async def handle_recent_activity(event: MessageEvent, args: Message = CommandArg
 
         if not records:
             if target_uid is not None:
+                # 检查是否是因为隐私设置导致看不到
+                if target_uid in hidden_uids and querier_uid != target_uid:
+                    await recent_activity_cmd.finish(message_add_head(f"🔒 UID:{target_uid}的玩家已开启活动隐私保护", event))
                 await recent_activity_cmd.finish(message_add_head(f"❌ 未找到UID:{target_uid}的活动记录", event))
             else:
                 await recent_activity_cmd.finish(message_add_head("❌ 暂无有效活动记录", event))
@@ -199,6 +309,7 @@ async def handle_recent_activity(event: MessageEvent, args: Message = CommandArg
         else:
             msg_lines.append(f"💡 使用【最近活动 数量】查看更多（最多50条）")
             msg_lines.append(f"💡 使用【最近活动 UID】查看指定玩家活动")
+        msg_lines.append(f"💡 使用【隐藏活动】可隐藏自己的活动记录")
 
         message = "\n".join(msg_lines)
         await recent_activity_cmd.finish(message_add_head(message, event))
