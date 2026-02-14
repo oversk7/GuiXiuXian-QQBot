@@ -1295,7 +1295,7 @@ items:
           description: "[5] 夺伞步：击杀后脚步更轻，低头才发现伞柄上又多了一道细纹，像在记名——永久+2敏捷(每日20次，上限+40敏捷)"
         - trigger: "passive"
           effect: "none"
-          description: "[6] 鬼域雨钉：可设置3个传送锚点。\n【锚点 设置 名称】在当前位置钉下\"雨钉\"\n【锚点 传送 1】踏入伞影即走(CD5分钟，消耗5%理智)\n【锚点 携带 UID 1】将对方一并送走(对方回复【同意传送】后生效)\n【锚点】查看列表"
+          description: "[6] 拥有主动特技（详见【装备菜单】）"
       repair_cost: 5
 
     - item_id: "vip_chrono_watch"
@@ -1337,12 +1337,12 @@ items:
           description: "[5] 终焉铭刻：每一次终结都被怀表铭刻为'注定之事'——永久+2攻击力(战后结算；每日最多20次，共+40攻击力)"
         - trigger: "passive"
           effect: "none"
-          description: "[6] 拨针系统：怀表操控日常时间线，每日可拨针一次。\n【拨针 签到】重置签到，可再签一次(耐久-3)\n【拨针 闭关】闭关立即按上限时长结算出关(耐久-5)\n【拨针 讨伐】世界BOSS攻击次数+1(耐久-5)\n【拨针 委托】额外刷新一个每日委托(耐久-3)\n【折光年】查看怀表状态面板"
+          description: "[6] 拥有主动特技（详见【装备菜单】）"
       repair_cost: 5
 
     - item_id: "vip_longying_flash"
       name: "龙影闪"
-      description: "你踏出的那一步，已经不在这个世界了。灭法之影套装之二"
+      description: "你踏出的那一步，已经不在这个世界了。\n🌟灭法之影套装之二"
       type: "EQUIPMENT"
       rarity: "red"
       durability: 360
