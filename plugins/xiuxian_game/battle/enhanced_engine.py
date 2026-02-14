@@ -39,6 +39,10 @@ class EnhancedBattleEngine:
         self._equipped_items_cache: Dict[str, List] = {}
         # 数据库会话，用于查询临时buff
         self.session = session
+        # 战斗发起者ID：用于判断镜怨体质(REFLECT_DEATH)是否触发
+        # 仅当防御方不是战斗发起者时才触发镜怨体质（即被动防守方才能反杀）
+        # None表示不限制（PvE等场景）
+        self.battle_initiator_id: Optional[str] = None
 
 
     def start_battle(self, player: Player, enemy: Any, player_equipped_items: List = None):
@@ -1054,10 +1058,21 @@ class EnhancedBattleEngine:
 
         for effect in defense_effects:
             if effect.effect_type == EffectType.REFLECT_DEATH:
-                # 镜怨体质：反射死亡(可被“绝魔体质”按概率压制)
+                # 镜怨体质：反射死亡(可被"绝魔体质"按概率压制)
+                # 仅当防御方是被动应战方时触发（防御方不是战斗发起者）
+                # 如果battle_initiator_id为None（PvE等），不限制触发
+                defender_is_initiator = (
+                    self.battle_initiator_id is not None
+                    and hasattr(defender, 'id')
+                    and str(defender.id) == str(self.battle_initiator_id)
+                )
+                if defender_is_initiator:
+                    # 防御方是战斗发起者（主动攻击别人），镜怨体质不触发
+                    continue
+
                 apply_instant_death = True
                 if 'ignore_special_ratio' in locals() and ignore_special_ratio > 0:
-                    # 将“必死”视为100%概率效果，被忽视50%后 -> 仅有(1-忽视)的概率生效
+                    # 将"必死"视为100%概率效果，被忽视50%后 -> 仅有(1-忽视)的概率生效
                     if self.rng.random() < min(1.0, ignore_special_ratio):
                         apply_instant_death = False
                         result["messages"].append("🪞 镜怨体质被斩龙闪压制，必死效果本次未触发")

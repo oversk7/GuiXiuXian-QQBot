@@ -103,6 +103,9 @@ class BattleIntegrationHelper:
 
         # 创建增强战斗引擎(传递session用于查询临时buff)
         engine = EnhancedBattleEngine(seed, session)
+        # 记录战斗发起者(player1为挑战者/攻击者)
+        # 镜怨体质(REFLECT_DEATH)仅在防御方是被动应战方时触发
+        engine.battle_initiator_id = player1.id
         battle_log = []
 
         # 预计算包含临时buff的属性
@@ -898,6 +901,9 @@ class BattleIntegrationHelper:
 
         # 创建增强战斗引擎(传递session用于查询临时buff)
         engine = EnhancedBattleEngine(seed, session)
+        # 记录战斗发起者(player1为挑战者/攻击者)
+        # 镜怨体质(REFLECT_DEATH)仅在防御方是被动应战方时触发
+        engine.battle_initiator_id = player1.id
         battle_log = []
 
         # 预计算包含临时buff的属性
