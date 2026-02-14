@@ -47,7 +47,7 @@ DIAL_NAMES = {
 
 # 折光年配图
 CHRONO_WATCH_IMG_URL = "https://wdcdn.qpic.cn/MTMxMDI2NjM3MjM0Njk2MTE_994029_sMhbTp-Np0a2gakM_1771007639"
-MARKDOWN_TEMPLATE_ID = "102499345_1769693953"
+MARKDOWN_TEMPLATE_ID = "102499345_1770445216"
 
 
 async def _send_chrono_markdown(handler, title: str, desc: str, fallback_text: str, event: MessageEvent):
@@ -395,16 +395,15 @@ async def _handle_dial_task(session: AsyncSession, player: Player, watch: ItemIn
     if watch.durability < cost:
         await dial_cmd.finish(f"⛔ 折光年耐久不足（需要{cost}，当前{watch.durability}）\n💡 请先修理装备")
 
-    # 使用 DailyTaskService 强制生成新任务
+    # 强制生成新任务（无视上限，VIP特权）
     from ..infrastructure.repositories.daily_task_repository import DailyTaskRepository
     from ..daily_task.service_new import DailyTaskService
 
     task_repo = DailyTaskRepository(session)
-    task_service = DailyTaskService(daily_task_repo=task_repo)
 
-    # 获取今日已有任务数（用于显示）
+    # 获取今日已有任务数（用于显示）——直接用 repo 查询，无需完整 Service
     today = date.today()
-    existing_tasks = await task_service.get_player_daily_tasks(player.id, today)
+    existing_tasks = await task_repo.find_all_by_player_and_date(player.id, today)
     current_count = len(existing_tasks)
 
     # 强制生成（即使达到上限也生成，这是VIP特权）

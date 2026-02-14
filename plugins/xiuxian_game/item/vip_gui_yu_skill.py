@@ -31,7 +31,7 @@ CARRY_TIMEOUT_SECONDS = 120  # 携带传送等待超时2分钟
 
 # 归雨配图（复用传送反馈的图片）
 GUI_YU_IMG_URL = "https://wdcdn.qpic.cn/MTMxMDI2NjM3MjM0Njk2MTE_59001_A9dXjBV6LK2wDOCq_1770915268"
-MARKDOWN_TEMPLATE_ID = "102499345_1769693953"
+MARKDOWN_TEMPLATE_ID = "102499345_1770445216"
 
 # 临时存储：等待确认的携带传送请求
 # 格式: {target_player_id: {"from_id": str, "anchor": dict, "expire": datetime}}
@@ -347,7 +347,7 @@ async def _handle_teleport(session, player: Player, parts: list, event: MessageE
         ]
 
         markdown_msg = MessageMarkdown(
-            custom_template_id="102499345_1769693953",
+            custom_template_id="102499345_1770445216",
             params=template_params
         )
 

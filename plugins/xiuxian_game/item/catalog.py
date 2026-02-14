@@ -710,7 +710,7 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
         ]
 
         markdown = MessageMarkdown(
-            custom_template_id="102499345_1769693953",
+            custom_template_id="102499345_1770445216",
             params=template_params
         )
 

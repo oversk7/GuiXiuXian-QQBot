@@ -464,7 +464,7 @@ async def handle_seclusion(event: MessageEvent):
         ]
 
         markdown = MessageMarkdown(
-            custom_template_id="102499345_1769693953",
+            custom_template_id="102499345_1770445216",
             params=template_params
         )
 
@@ -681,7 +681,7 @@ async def handle_out_seclusion(event: MessageEvent):
         ]
 
         markdown = MessageMarkdown(
-            custom_template_id="102499345_1769693953",
+            custom_template_id="102499345_1770445216",
             params=template_params
         )
 

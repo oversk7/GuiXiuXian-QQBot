@@ -150,7 +150,7 @@ async def handle_today_meal(event: MessageEvent):
 
     # 使用带按钮的图鉴类Markdown模版
     markdown_msg = MessageMarkdown(
-        custom_template_id="102499345_1769693953",
+        custom_template_id="102499345_1770445216",
         params=template_params
     )
 
