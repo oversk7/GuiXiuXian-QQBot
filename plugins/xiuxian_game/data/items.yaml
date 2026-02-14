@@ -1342,7 +1342,7 @@ items:
 
     - item_id: "vip_longying_flash"
       name: "龙影闪"
-      description: "你踏出的那一步，已经不在这个世界了。\n灭法之影套装之二"
+      description: "你踏出的那一步，已经不在这个世界了。灭法之影套装之二"
       type: "EQUIPMENT"
       rarity: "red"
       durability: 360
