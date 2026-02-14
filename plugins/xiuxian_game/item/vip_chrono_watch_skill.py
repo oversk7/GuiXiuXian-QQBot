@@ -324,7 +324,7 @@ async def _handle_dial_boss(session: AsyncSession, player: Player, watch: ItemIn
     damage_repo = WorldBossDamageRepository(session)
 
     # 获取当前活跃周期
-    current_cycle = await cycle_repo.get_latest_cycle()
+    current_cycle = await cycle_repo.get_current_cycle()
     if not current_cycle:
         await dial_cmd.finish("⛔ 当前没有活跃的世界BOSS\n💡 等待下次世界BOSS刷新")
 

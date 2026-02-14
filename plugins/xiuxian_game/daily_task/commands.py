@@ -169,10 +169,10 @@ async def handle_accept_task(event: MessageEvent, args: Message = CommandArg()):
             if task_number_text:
                 try:
                     task_index = int(task_number_text)
-                    if task_index < 1 or task_index > 3:
-                        await accept_task_cmd.finish("⛔ 委托编号必须是1-3之间的数字")
+                    if task_index < 1:
+                        await accept_task_cmd.finish("⛔ 委托编号必须是正整数")
                 except ValueError:
-                    await accept_task_cmd.finish("⛔ 请输入正确的委托编号（1-3）")
+                    await accept_task_cmd.finish("⛔ 请输入正确的委托编号")
 
         # 实例化依赖Service
         location_service = LocationService(uow.locations)
