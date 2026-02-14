@@ -17,6 +17,7 @@ from nonebot.adapters.qq import MessageEvent, Message, MessageSegment
 from nonebot.adapters.qq.models.common import MessageMarkdown, MessageMarkdownParams
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm.attributes import flag_modified
 
 from ..models.db import safe_session
 from ..models.player import Player
@@ -105,10 +106,12 @@ def _get_dial_data(player: Player) -> dict:
 
 
 def _set_dial_data(player: Player, dial: dict):
-    """保存拨针数据（通过重建dict确保SQLAlchemy检测到变更）"""
+    """保存拨针数据（通过重建dict + flag_modified确保SQLAlchemy一定写入数据库）"""
     data = dict(player.vip_equipment_data or {})
     data[DIAL_KEY] = copy.deepcopy(dial)
     player.vip_equipment_data = data
+    # 强制标记字段为已修改，防止MutableDict/JSON变更检测失败导致数据未持久化
+    flag_modified(player, "vip_equipment_data")
 
 
 def _check_dial_available(dial: dict, skill_key: str) -> bool:
