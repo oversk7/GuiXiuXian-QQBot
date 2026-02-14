@@ -612,11 +612,6 @@ async def handle_longying_panel(event: MessageEvent):
             f"  📌 已设置 {len(anchors)}/{MAX_ANCHORS} 个锚钉",
             f"  {cd_text}",
             "━━━━━━━━━━━━━",
-            "🔥 被动效果：",
-            "  [1] 虚界反噬：野外被死斗时攻击者直接死亡",
-            "  [2] 虚界夹层：背包空间+10%",
-            "  [3] 虚界闪渡：闪避时回复5%最大生命值",
-            "━━━━━━━━━━━━━",
             "💡 操作：",
             "【锚钉 设置 名称】撕开裂隙设锚钉",
             "【锚钉 传送 编号】穿越虚界传送",
@@ -635,12 +630,7 @@ async def handle_longying_panel(event: MessageEvent):
             f"📍 虚界锚钉：\r"
             f"{anchor_md_text}\r"
             f"  📌 已设置 {len(anchors)}/{MAX_ANCHORS} 个锚钉\r"
-            f"  {cd_text}\r"
-            f"\r"
-            f"🔥 被动效果：\r"
-            f"  [1] 虚界反噬：野外被死斗时攻击者直接死亡\r"
-            f"  [2] 虚界夹层：背包空间+10格\r"
-            f"  [3] 虚界闪渡：闪避时回复5%最大生命值"
+            f"  {cd_text}"
         )
 
         await _send_longying_markdown(longying_panel_cmd, title, desc, fallback_text, event)
