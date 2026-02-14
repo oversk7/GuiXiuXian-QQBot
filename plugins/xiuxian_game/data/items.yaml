@@ -1300,13 +1300,13 @@ items:
 
     - item_id: "vip_chrono_watch"
       name: "折光年"
-      description: "一只黑银怀表，表盖薄得像刀片。打开时，秒针会跳过一小段空白——像把某个人的一秒折走了。合上后，你会发现自己总比别人快半步。"
+      description: "光会拐弯，时间也会。"
       type: "EQUIPMENT"
       rarity: "red"
       durability: 360
       required_level: 10
-      attr_bonus: {"attack": 100, "hp": 100, "agility": 100, "defense": 100}
-      attr_ratio: {"attack": 1.0, "hp": 1.0, "agility": 1.0, "defense": 1.0}
+      attr_bonus: {"attack": 100, "hp": 100, "mp": 100, "defense": 100}
+      attr_ratio: {"attack": 5.0, "hp": 3.0, "mp": 3.0, "defense": 3.0}
       gem_slots: 5
       special_effects:
         - trigger: "first_turn"

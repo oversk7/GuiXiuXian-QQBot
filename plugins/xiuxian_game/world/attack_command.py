@@ -704,7 +704,7 @@ async def handle_player_attack(session, attacker: Player, target: Player, event:
                 return f"🪞 镜怨自噬：死亡化怨，攻击+2（今日{extra['robe_die_cnt']}/20）"
 
             async def _apply_gui_yu_kill_agility(winner: Player):
-                """归雨「夺伞步」：击杀永久+2敏捷（每日20次，累计上限+40）"""
+                """归雨「夺伞步」：击杀永久+2敏捷（每日20次）"""
                 stmt = select(ItemInstance).where(
                     ItemInstance.player_id == winner.id,
                     ItemInstance.equipped == True,
@@ -720,19 +720,15 @@ async def handle_player_attack(session, attacker: Player, target: Player, event:
                     extra["gy_kill_cnt"] = 0
                 current_cnt = int(extra.get("gy_kill_cnt", 0))
                 if current_cnt >= 20:
-                    return f"👣 夺伞步：今日已达上限（{current_cnt}/20）"
+                    return f"👣 夺伞步：今日已达上限（+40/40）"
                 vip_bonus = await VIPEquipmentBonus.get_or_create(session, winner.id)
                 total_agility = vip_bonus.get_total_bonus().get("agility", 0)
-                if total_agility >= 40:
-                    return f"👣 夺伞步：敏捷加成已达上限（+{total_agility}/40）"
-                val = min(2, 40 - total_agility)
-                if val <= 0:
-                    return None
+                val = 2
                 vip_bonus.add_bonus("agility", val)
                 winner.agility = winner.agility + val
                 extra["gy_kill_cnt"] = current_cnt + 1
                 inst.extra_attrs = extra
-                return f"👣 夺伞步：脚步更轻，敏捷+{val}（今日{extra['gy_kill_cnt']}/20，累计+{total_agility + val}/40）"
+                return f"👣 夺伞步：脚步更轻，敏捷+{val}（今日+{extra['gy_kill_cnt'] * 2}/40）"
 
             # 每日随机属性（双方）
             msg_a = await _apply_blade_daily_random(attacker)
@@ -1049,7 +1045,7 @@ async def handle_npc_attack(session, attacker: Player, target_npc, event: Messag
                     session.add(inst)
                     session.add(attacker)
 
-                # 归雨「夺伞步」：击杀永久+2敏捷（每日20次，上限+40）
+                # 归雨「夺伞步」：击杀永久+2敏捷（每日20次）
                 gui_yu_effects = [e for e in post_effects if e.get("type") == "gain_agility"]
                 if gui_yu_effects:
                     stmt_gy = _select(_ItemInstance).where(
@@ -1065,28 +1061,21 @@ async def handle_npc_attack(session, attacker: Player, target_npc, event: Messag
                             gy_extra["gy_kill_day"] = gy_day
                             gy_extra["gy_kill_cnt"] = 0
                         gy_cnt = int(gy_extra.get("gy_kill_cnt", 0))
-                        # 每日上限20次，每次+2敏捷，总上限+40
+                        # 每日上限20次，每次+2敏捷
                         gy_bonus = await _VIPBonus.get_or_create(session, attacker.id)
                         total_agility_gained = gy_bonus.get_total_bonus().get("agility", 0)
                         for eff_gy in gui_yu_effects:
                             if gy_cnt >= 20:
-                                result_lines.append(f"👣 夺伞步：今日已达上限（{gy_cnt}/20）")
-                                break
-                            if total_agility_gained >= 40:
-                                result_lines.append(f"👣 夺伞步：敏捷加成已达上限（+{total_agility_gained}/40）")
+                                result_lines.append(f"👣 夺伞步：今日已达上限（+40/40）")
                                 break
                             val = int(eff_gy.get("value", 2) or 2)
-                            # 不超过总上限
-                            val = min(val, 40 - total_agility_gained)
-                            if val <= 0:
-                                break
                             gy_bonus.add_bonus("agility", val)
                             attacker.agility = attacker.agility + val
                             gy_cnt += 1
                             total_agility_gained += val
                             gy_extra["gy_kill_cnt"] = gy_cnt
                             result_lines.append(
-                                f"👣 夺伞步：脚步更轻，敏捷+{val}（今日{gy_cnt}/20，累计+{total_agility_gained}/40）"
+                                f"👣 夺伞步：脚步更轻，敏捷+{val}（今日+{gy_cnt * 2}/40）"
                             )
                         gy_inst.extra_attrs = gy_extra
                         session.add(gy_inst)

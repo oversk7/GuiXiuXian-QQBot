@@ -967,7 +967,7 @@ async def _handle_personal_monster(session, tile: WorldTile, player: Player) -> 
                     session.add(player)
                     await session.commit()
 
-                # 归雨「夺伞步」：击杀永久+2敏捷（每日20次，累计上限+40）
+                # 归雨「夺伞步」：击杀永久+2敏捷（每日20次）
                 gui_yu_effects = [e for e in post_effects if e.get("type") == "gain_agility"]
                 if gui_yu_effects:
                     stmt_gy = _select(_ItemInstance).where(
@@ -987,22 +987,16 @@ async def _handle_personal_monster(session, tile: WorldTile, player: Player) -> 
                         total_agility = gy_bonus.get_total_bonus().get("agility", 0)
                         for eff_gy in gui_yu_effects:
                             if gy_cnt >= 20:
-                                battle_summary.append(f"👣 夺伞步：今日已达上限（{gy_cnt}/20）")
-                                break
-                            if total_agility >= 40:
-                                battle_summary.append(f"👣 夺伞步：敏捷加成已达上限（+{total_agility}/40）")
+                                battle_summary.append(f"👣 夺伞步：今日已达上限（+40/40）")
                                 break
                             val = int(eff_gy.get("value", 2) or 2)
-                            val = min(val, 40 - total_agility)
-                            if val <= 0:
-                                break
                             gy_bonus.add_bonus("agility", val)
                             player.agility = player.agility + val
                             gy_cnt += 1
                             total_agility += val
                             gy_extra["gy_kill_cnt"] = gy_cnt
                             battle_summary.append(
-                                f"👣 夺伞步：脚步更轻，敏捷+{val}（今日{gy_cnt}/20，累计+{total_agility}/40）"
+                                f"👣 夺伞步：脚步更轻，敏捷+{val}（今日+{gy_cnt * 2}/40）"
                             )
                         gy_inst.extra_attrs = gy_extra
                         session.add(gy_inst)
