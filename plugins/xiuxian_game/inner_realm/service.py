@@ -1048,7 +1048,7 @@ class InnerRealmService:
         seed = f"InnerRealm_{session.id}:{tile.x}:{tile.y}:{battle_timestamp}"
 
         # 执行战斗
-        victory, battle_log, damage_taken = await BattleIntegrationHelper.enhanced_player_vs_monster_battle_v2(
+        victory, battle_log, damage_taken, post_effects = await BattleIntegrationHelper.enhanced_player_vs_monster_battle_v2(
             player, monster_stats, enemy_name, self.uow.session, seed=seed, max_rounds=30
         )
 
