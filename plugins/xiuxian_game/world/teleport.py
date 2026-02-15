@@ -186,8 +186,15 @@ async def _handle_teleport_logic(event: MessageEvent, target_region: str, cmd_ha
         if not player:
             await cmd_handler.finish("⛔ 请先创建角色")
 
+        # 判断是否已在诡域中（诡域内跳转免咒抗）
+        already_in_dungeon = player.is_in_dungeon()
+
         # 检查层级解锁限制（爬塔系统）
         if dungeon_level:
+            # 已在诡域中且目标层就是当前层，提示无需跳转
+            if already_in_dungeon and player.dungeon_level == dungeon_level:
+                await cmd_handler.finish(f"📍 你已经在第{dungeon_level}重诡域了")
+
             if not player.can_enter_dungeon_level(dungeon_level):
                 max_level = player.max_dungeon_level or 0
                 await cmd_handler.finish(
@@ -205,30 +212,38 @@ async def _handle_teleport_logic(event: MessageEvent, target_region: str, cmd_ha
                 if player.level < required_level:
                     await cmd_handler.finish(f"⛔ 你的修为不足以进入『{target_region}』，需要达到 Lv.{required_level}")
 
-        if player.stamina < STAM_COST:
-            await cmd_handler.finish(f"⛔ 你的咒抗不足以在传送过程中维持清醒，需要 {STAM_COST}，当前 {player.stamina}")
-        if player.hp < 5:
-            await cmd_handler.finish(f"⛔ 你的生命值过低：当前 {player.hp}/{player.max_hp}")
-        
-        # 查询是否存在导航任务
-        nav_task: NavigationTask | None = await session.get(NavigationTask, player.id)
+        nav_task = None
+        if already_in_dungeon and dungeon_level:
+            # 已在诡域中跳转到其他层级：免咒抗，无需处理导航
+            pass
+        else:
+            # 从现实世界进入诡域：消耗咒抗
+            if player.stamina < STAM_COST:
+                await cmd_handler.finish(f"⛔ 你的咒抗不足以在传送过程中维持清醒，需要 {STAM_COST}，当前 {player.stamina}")
+            if player.hp < 5:
+                await cmd_handler.finish(f"⛔ 你的生命值过低：当前 {player.hp}/{player.max_hp}")
 
-        # 在进入诡域前，若存在导航，则推进至当前时间（作用于现实世界坐标）
-        if nav_task:
-            from ..world.navigation import _update_nav_position
-            await _update_nav_position(player, nav_task, session)
-            # 不删除任务，保留以便返回后继续/完成
+            # 查询是否存在导航任务
+            nav_task = await session.get(NavigationTask, player.id)
 
-        # 扣除咒抗
-        player.stamina -= STAM_COST
+            # 在进入诡域前，若存在导航，则推进至当前时间（作用于现实世界坐标）
+            if nav_task:
+                from ..world.navigation import _update_nav_position
+                await _update_nav_position(player, nav_task, session)
+                # 不删除任务，保留以便返回后继续/完成
+
+            # 扣除咒抗
+            player.stamina -= STAM_COST
 
         # 使用新的双层坐标系统
         if dungeon_level:
+            current_level_before = player.dungeon_level if already_in_dungeon else None
             # 进入层级诡域（enter_dungeon 会保存当前现实世界坐标至 real_world_x/y）
             player.enter_dungeon(dungeon_level)
             target_name = f"{dungeon_level}层诡域"
             current_pos = f"({player.dungeon_x},{player.dungeon_y})"
         else:
+            current_level_before = None
             # 兼容旧系统
             player.region = target_region
             target_name = target_region
@@ -242,16 +257,25 @@ async def _handle_teleport_logic(event: MessageEvent, target_region: str, cmd_ha
         if dungeon_level:
             tile_desc = await get_tile_description(session, player, target_name, player.dungeon_x, player.dungeon_y)
 
-    msg_lines = [
-        f"🚪 你耗费 {STAM_COST} 咒抗跨越裂隙，抵达『{target_name}』",
-        f"当前位置：{target_name} {current_pos}",
-    ]
-    if nav_task:
-        msg_lines.insert(1, "🧭 现实世界导航仍在静默进行中")
+    # 构建响应消息
+    if already_in_dungeon and dungeon_level:
+        # 诡域内跳转：不同的提示文案
+        msg_lines = [
+            f"🌀 你穿越空间裂隙，从第{current_level_before}重诡域跳转到第{dungeon_level}重诡域",
+            f"📍 当前位置：{target_name} {current_pos}",
+        ]
+    else:
+        msg_lines = [
+            f"🚪 你耗费 {STAM_COST} 咒抗跨越裂隙，抵达『{target_name}』",
+            f"当前位置：{target_name} {current_pos}",
+        ]
+        if nav_task:
+            msg_lines.insert(1, "🧭 现实世界导航仍在静默进行中")
 
     if dungeon_level:
         msg_lines.append("━━━━━━━━━━━━━")
-        msg_lines.append("🌀 你穿越了空间裂隙，进入了诡域")
+        if not already_in_dungeon:
+            msg_lines.append("🌀 你穿越了空间裂隙，进入了诡域")
         msg_lines.append("🗺️ 这是一个10x10的独立空间")
         msg_lines.append("📍 坐标范围：(-5,-5) 到 (5,5)")
         msg_lines.append("🧭 使用【上下左右】移动，【探索】调查")
@@ -262,6 +286,7 @@ async def _handle_teleport_logic(event: MessageEvent, target_region: str, cmd_ha
             msg_lines.append(tile_desc)
         msg_lines.append("⬆️ 【上一层】切换到更浅的诡域")
         msg_lines.append("⬇️ 【下一层】切换到更深的诡域")
+        msg_lines.append("🚀 【传送 N层诡域】跳转到已解锁的任意层")
         msg_lines.append("🏠 【返回】穿越回表世界")
 
         # 检查是否有可领取的深渊探索者宝箱
@@ -279,7 +304,7 @@ async def _handle_teleport_logic(event: MessageEvent, target_region: str, cmd_ha
                 msg_lines.append("━━━━━━━━━━━━━")
                 msg_lines.append("🎁 征服这层就可以再领取一个探索者宝箱了！")
                 msg_lines.append("💎 【领取宝箱】一键领取所有可领取的宝箱")
-    
+
     msg = "\n".join(msg_lines)
     await cmd_handler.finish(message_add_head(msg, event))
 
@@ -383,6 +408,7 @@ async def handle_prev_level(event: MessageEvent):
             "🧭 使用【上下左右】移动，【探索】调查",
             "⬆️ 【上一层】切换到更浅的诡域",
             "⬇️ 【下一层】切换到更深的诡域",
+            "🚀 【传送 N层诡域】跳转到已解锁的任意层",
             "🏠 【返回】穿越回表世界",
             "━━━━━━━━━━━━━",
             tile_desc
@@ -435,6 +461,7 @@ async def handle_next_level(event: MessageEvent):
             "🧭 使用【上下左右】移动，【探索】调查",
             "⬆️ 【上一层】切换到更浅的诡域",
             "⬇️ 【下一层】切换到更深的诡域",
+            "🚀 【传送 N层诡域】跳转到已解锁的任意层",
             "🏠 【返回】穿越回表世界",
             "━━━━━━━━━━━━━",
             tile_desc
