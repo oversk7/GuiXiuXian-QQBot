@@ -10,7 +10,30 @@ from ..models.player import Player
 from ..models.bank_account import BankAccount
 from ..models.stock import StockHolding, Stock
 from ..utils import message_add_head
+from ..platform_utils import get_unified_player
 from .realm_utils import realm_by_level_and_reincarnation, number_to_chinese
+
+
+def _calculate_centered_offset(player_rank: int, total_count: int, page_size: int = 10) -> int:
+    """计算以玩家为中心的显示偏移量
+
+    当玩家前面不足half个人时，从头开始往后凑够page_size个。
+    当玩家后面不足时，向前推移以凑够page_size个。
+
+    Args:
+        player_rank: 玩家排名（1-indexed）
+        total_count: 总参与人数
+        page_size: 显示条目数
+
+    Returns:
+        0-indexed的查询偏移量
+    """
+    rank_idx = player_rank - 1
+    half = page_size // 2
+    start = max(0, rank_idx - half)
+    if start + page_size > total_count:
+        start = max(0, total_count - page_size)
+    return start
 
 
 def _format_wealth(amount: int) -> str:
@@ -42,36 +65,69 @@ level_rank_cmd = on_command("修为榜", aliases={"等级榜"}, block=True, prio
 
 @level_rank_cmd.handle()
 async def _(event: MessageEvent, args: Message = CommandArg()):
-    """按等级 (level) 及经验排序的前 30 名玩家排行榜，支持分页"""
-    # 解析页码参数
+    """按等级及经验排序的玩家排行榜，无参数时以自己为中心展示"""
     page_text = args.extract_plain_text().strip()
-    try:
-        page = int(page_text) if page_text else 1
-    except ValueError:
-        page = 1
-    page = max(1, min(page, 3))  # 限制在1-3页
-    
     page_size = 10
-    offset = (page - 1) * page_size
-    
+    page = None
+    player = None
+    player_rank = None
+
     async with safe_session() as session:
-        stmt = select(Player).order_by(Player.reincarnation_level.desc(), Player.level.desc(), Player.exp.desc()).offset(offset).limit(page_size)
+        total_count = (await session.execute(select(func.count()).select_from(Player))).scalar_one()
+        if total_count == 0:
+            await level_rank_cmd.finish("暂无排行榜数据")
+
+        if not page_text:
+            player = await get_unified_player(session, event)
+            if player:
+                rank_stmt = select(func.count()).select_from(Player).where(
+                    (Player.reincarnation_level > player.reincarnation_level) |
+                    (
+                        (Player.reincarnation_level == player.reincarnation_level) &
+                        (Player.level > player.level)
+                    ) |
+                    (
+                        (Player.reincarnation_level == player.reincarnation_level) &
+                        (Player.level == player.level) &
+                        (Player.exp > player.exp)
+                    )
+                )
+                players_above = (await session.execute(rank_stmt)).scalar_one()
+                player_rank = players_above + 1
+                offset = _calculate_centered_offset(player_rank, total_count, page_size)
+            else:
+                offset = 0
+        else:
+            try:
+                page = int(page_text)
+            except ValueError:
+                page = 1
+            page = max(1, min(page, 3))
+            offset = (page - 1) * page_size
+
+        stmt = select(Player).order_by(
+            Player.reincarnation_level.desc(), Player.level.desc(), Player.exp.desc()
+        ).offset(offset).limit(page_size)
         players = (await session.execute(stmt)).scalars().all()
 
     if not players:
         await level_rank_cmd.finish("暂无排行榜数据")
 
-    lines = [f"📈 修为排行榜 (第{page}/3页)", "━━━━━━━━━━━━━"]
+    if player_rank is not None:
+        lines = [f"📈 修为排行榜 (你的排名: 第{player_rank}名)", "━━━━━━━━━━━━━"]
+    elif page is not None:
+        lines = [f"📈 修为排行榜 (第{page}/3页)", "━━━━━━━━━━━━━"]
+    else:
+        lines = ["📈 修为排行榜", "━━━━━━━━━━━━━"]
+
     for idx, p in enumerate(players, start=offset + 1):
-        # 使用新的境界显示函数，包含转生信息
         realm_name = realm_by_level_and_reincarnation(p.level, p.reincarnation_level)
-        # 使用emoji装饰前三名
         rank_emoji = "🥇" if idx == 1 else "🥈" if idx == 2 else "🥉" if idx == 3 else f"{idx}."
-        lines.append(f"{rank_emoji} {p.nickname}[UID:{p.uid}] - Lv.{p.level}『{realm_name}』 ({p.exp} EXP)")
-    
-    if page < 3:
-        lines.append("━━━━━━━━━━━━━")
-        lines.append("💡 使用【修为榜 页码】查看其他页")
+        marker = " ◀" if player and p.id == player.id else ""
+        lines.append(f"{rank_emoji} {p.nickname}[UID:{p.uid}] - Lv.{p.level}『{realm_name}』 ({p.exp} EXP){marker}")
+
+    lines.append("━━━━━━━━━━━━━")
+    lines.append("💡 使用【修为榜 页码】查看指定页(1-3)")
 
     await level_rank_cmd.finish(message_add_head("\n".join(lines), event))
 
@@ -112,25 +168,36 @@ def _luck_title(luck: int) -> str:
 
 @luck_rank_cmd.handle()
 async def _(event: MessageEvent, args: Message = CommandArg()):
-    """显示幸运值最高的玩家排行榜，支持分页"""
+    """显示幸运值最高的玩家排行榜，无参数时以自己为中心展示"""
     page_text = args.extract_plain_text().strip()
-    try:
-        page = int(page_text) if page_text else 1
-    except ValueError:
-        page = 1
-    page = max(1, min(page, 3))
-
     page_size = 10
+    page = None
+    player = None
+    player_rank = None
 
     async with safe_session() as session:
         total_count = (await session.execute(select(func.count()).select_from(Player))).scalar_one()
         if total_count == 0:
             await luck_rank_cmd.finish("暂无排行榜数据")
 
-        total_pages = max(1, ceil(total_count / page_size))
-        total_pages = min(3, total_pages)
-        page = min(page, total_pages)
-        offset = (page - 1) * page_size
+        if not page_text:
+            player = await get_unified_player(session, event)
+            if player:
+                players_above = (await session.execute(
+                    select(func.count()).select_from(Player).where(Player.luck > player.luck)
+                )).scalar_one()
+                player_rank = players_above + 1
+                offset = _calculate_centered_offset(player_rank, total_count, page_size)
+            else:
+                offset = 0
+        else:
+            try:
+                page = int(page_text)
+            except ValueError:
+                page = 1
+            total_pages = min(3, max(1, ceil(total_count / page_size)))
+            page = max(1, min(page, total_pages))
+            offset = (page - 1) * page_size
 
         stmt = select(Player).order_by(Player.luck.desc()).offset(offset).limit(page_size)
         players = (await session.execute(stmt)).scalars().all()
@@ -143,17 +210,23 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
         "这份加点，不是侥幸，是宣言：你相信，那1%的闪光，足以点亮100%的征程。",
         "凡俗眼中的偶然，是你掌中的必然。",
     ])
-    lines = [f"🍀 幸运排行榜 (第{page}/{total_pages}页)", wishes, "━━━━━━━━━━━━━"]
+
+    if player_rank is not None:
+        lines = [f"🍀 幸运排行榜 (你的排名: 第{player_rank}名)", wishes, "━━━━━━━━━━━━━"]
+    elif page is not None:
+        total_pages = min(3, max(1, ceil(total_count / page_size)))
+        lines = [f"🍀 幸运排行榜 (第{page}/{total_pages}页)", wishes, "━━━━━━━━━━━━━"]
+    else:
+        lines = ["🍀 幸运排行榜", wishes, "━━━━━━━━━━━━━"]
+
     for idx, p in enumerate(players, start=offset + 1):
         rank_emoji = "🥇" if idx == 1 else "🥈" if idx == 2 else "🥉" if idx == 3 else f"{idx}."
-
         title = _luck_title(p.luck)
+        marker = " ◀" if player and p.id == player.id else ""
+        lines.append(f"{rank_emoji} {p.nickname}[UID:{p.uid}] - {title} 🍀{p.luck}{marker}")
 
-        lines.append(f"{rank_emoji} {p.nickname}[UID:{p.uid}] - {title} 🍀{p.luck}")
-
-    if page < total_pages:
-        lines.append("━━━━━━━━━━━━━")
-        lines.append("💡 使用【幸运榜 页码】查看其他页")
+    lines.append("━━━━━━━━━━━━━")
+    lines.append("💡 使用【幸运榜 页码】查看指定页")
 
     await luck_rank_cmd.finish(message_add_head("\n".join(lines), event))
 
@@ -163,21 +236,20 @@ wealth_rank_cmd = on_command("财富榜", aliases={"财富排行榜"}, block=Tru
 
 @wealth_rank_cmd.handle()
 async def _(event: MessageEvent, args: Message = CommandArg()):
-    """显示总财富最多的前30名玩家，支持分页
+    """显示总财富最多的玩家排行榜，无参数时以自己为中心展示
     总财富 = 面板金币 + 银行余额 + 投资价值
     """
-    # 解析页码参数
     page_text = args.extract_plain_text().strip()
-    try:
-        page = int(page_text) if page_text else 1
-    except ValueError:
-        page = 1
-    page = max(1, min(page, 3))  # 限制在1-3页
-
     page_size = 10
-    offset = (page - 1) * page_size
+    page = None
+    player = None
+    player_rank = None
 
     async with safe_session() as session:
+        # 获取当前玩家（无论是否指定页码，财富榜需要构建候选列表）
+        if not page_text:
+            player = await get_unified_player(session, event)
+
         # 组合候选玩家：金币前50 + 存款前50 + 投资市值前50，确保高额投资者不会遗漏
         gold_top_ids = (await session.execute(select(Player.id).order_by(Player.gold.desc()).limit(50))).scalars().all()
         bank_top_ids = (await session.execute(select(BankAccount.player_id).order_by(BankAccount.balance.desc()).limit(50))).scalars().all()
@@ -192,6 +264,10 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
         )).scalars().all()
         player_ids = list({*gold_top_ids, *bank_top_ids, *invest_top_ids})
 
+        # 确保当前玩家在候选列表中（用于centered view）
+        if player and player.id not in player_ids:
+            player_ids.append(player.id)
+
         if not player_ids:
             await wealth_rank_cmd.finish("暂无排行榜数据")
 
@@ -199,10 +275,9 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
         all_players_stmt = select(Player).where(Player.id.in_(player_ids))
         all_players = (await session.execute(all_players_stmt)).scalars().all()
 
-        # 批量查询银行余额（已取消利息结算，参见bank.py:12-16银行改革说明）
+        # 批量查询银行余额
         bank_stmt = select(BankAccount).where(BankAccount.player_id.in_(player_ids))
         bank_accounts = (await session.execute(bank_stmt)).scalars().all()
-        # 银行系统于2025-12-03改革，取消存款利息机制，直接使用现有余额
         bank_map = {acc.player_id: acc.balance for acc in bank_accounts}
 
         # 批量查询投资持仓
@@ -224,50 +299,60 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
 
         # 计算每个玩家的总财富
         wealth_data = []
-        for player in all_players:
-            # 面板金币
-            gold = player.gold
-
-            # 银行余额
-            bank_balance = bank_map.get(player.id, 0)
-
-            # 投资价值
-            investment_value = investment_map.get(player.id, 0)
-
-            # 总财富
+        for p in all_players:
+            gold = p.gold
+            bank_balance = bank_map.get(p.id, 0)
+            investment_value = investment_map.get(p.id, 0)
             total_wealth = gold + bank_balance + investment_value
-
             wealth_data.append({
-                'player': player,
-                'gold': gold,
-                'bank_balance': bank_balance,
-                'investment_value': investment_value,
+                'player': p,
                 'total_wealth': total_wealth
             })
 
         # 按总财富排序
         wealth_data.sort(key=lambda x: x['total_wealth'], reverse=True)
 
+        if not page_text and player:
+            # 以自己为中心展示
+            for idx, data in enumerate(wealth_data, 1):
+                if data['player'].id == player.id:
+                    player_rank = idx
+                    break
+            if player_rank:
+                offset = _calculate_centered_offset(player_rank, len(wealth_data), page_size)
+            else:
+                offset = 0
+        elif page_text:
+            try:
+                page = int(page_text)
+            except ValueError:
+                page = 1
+            page = max(1, min(page, 3))
+            offset = (page - 1) * page_size
+        else:
+            offset = 0
+
         # 分页处理
         page_data = wealth_data[offset:offset + page_size]
 
-        lines = [f"💰 财富排行榜 (第{page}/3页)", "━━━━━━━━━━━━━"]
+        if player_rank is not None:
+            lines = [f"💰 财富排行榜 (你的排名: 第{player_rank}名)", "━━━━━━━━━━━━━"]
+        elif page is not None:
+            lines = [f"💰 财富排行榜 (第{page}/3页)", "━━━━━━━━━━━━━"]
+        else:
+            lines = ["💰 财富排行榜", "━━━━━━━━━━━━━"]
+
         for idx, data in enumerate(page_data, start=offset + 1):
             p = data['player']
             total = data['total_wealth']
-
-            # 使用emoji装饰前三名
             rank_emoji = "🥇" if idx == 1 else "🥈" if idx == 2 else "🥉" if idx == 3 else f"{idx}."
-
-            # 格式化金额显示
             formatted_wealth = _format_wealth(total)
+            marker = " ◀" if player and p.id == player.id else ""
+            lines.append(f"{rank_emoji} {p.nickname}[UID:{p.uid}] - {formatted_wealth}{marker}")
 
-            lines.append(f"{rank_emoji} {p.nickname}[UID:{p.uid}] - {formatted_wealth}")
-
-        if page < 3:
-            lines.append("━━━━━━━━━━━━━")
-            lines.append("💡 使用【财富榜 页码】查看其他页")
-            lines.append("💡 总财富 = 面板金币 + 银行余额 + 投资价值")
+        lines.append("━━━━━━━━━━━━━")
+        lines.append("💡 使用【财富榜 页码】查看指定页(1-3)")
+        lines.append("💡 总财富 = 面板金币 + 银行余额 + 投资价值")
 
     await wealth_rank_cmd.finish(message_add_head("\n".join(lines), event))
 
@@ -277,9 +362,39 @@ exploration_rank_cmd = on_command("探索榜", aliases={"探索排行榜", "诡�
 
 @exploration_rank_cmd.handle()
 async def _(event: MessageEvent, args: Message = CommandArg()):
-    """显示最高探索层数的前10名玩家"""
+    """显示最高探索层数的玩家排行榜，无参数时以自己为中心展示"""
+    page_text = args.extract_plain_text().strip()
+    page_size = 10
+    page = None
+    player = None
+    player_rank = None
+
     async with safe_session() as session:
-        stmt = select(Player).order_by(Player.max_dungeon_level.desc()).limit(10)
+        total_count = (await session.execute(select(func.count()).select_from(Player))).scalar_one()
+        if total_count == 0:
+            await exploration_rank_cmd.finish("暂无排行榜数据")
+
+        if not page_text:
+            player = await get_unified_player(session, event)
+            if player:
+                players_above = (await session.execute(
+                    select(func.count()).select_from(Player).where(
+                        Player.max_dungeon_level > player.max_dungeon_level
+                    )
+                )).scalar_one()
+                player_rank = players_above + 1
+                offset = _calculate_centered_offset(player_rank, total_count, page_size)
+            else:
+                offset = 0
+        else:
+            try:
+                page = int(page_text)
+            except ValueError:
+                page = 1
+            page = max(1, min(page, 3))
+            offset = (page - 1) * page_size
+
+        stmt = select(Player).order_by(Player.max_dungeon_level.desc()).offset(offset).limit(page_size)
         players = (await session.execute(stmt)).scalars().all()
 
     if not players:
@@ -294,13 +409,17 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
     ]
 
     quote = random.choice(exploration_quotes)
-    lines = ["🌀 探索排行榜", quote, "━━━━━━━━━━━━━"]
 
-    for idx, p in enumerate(players, 1):
-        # 使用emoji装饰前三名
+    if player_rank is not None:
+        lines = [f"🌀 探索排行榜 (你的排名: 第{player_rank}名)", quote, "━━━━━━━━━━━━━"]
+    elif page is not None:
+        lines = [f"🌀 探索排行榜 (第{page}/3页)", quote, "━━━━━━━━━━━━━"]
+    else:
+        lines = ["🌀 探索排行榜", quote, "━━━━━━━━━━━━━"]
+
+    for idx, p in enumerate(players, start=offset + 1):
         rank_emoji = "🥇" if idx == 1 else "🥈" if idx == 2 else "🥉" if idx == 3 else f"{idx}."
 
-        # 根据探索层数显示不同的称号（扩充高阶段位）
         lvl = p.max_dungeon_level
         if lvl == 0:
             title = "🌱新手探索者"
@@ -325,7 +444,11 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
         else:
             title = "🌌不可名状的先驱"
 
-        lines.append(f"{rank_emoji} {p.nickname}[UID:{p.uid}] - {title} 第{p.max_dungeon_level}层")
+        marker = " ◀" if player and p.id == player.id else ""
+        lines.append(f"{rank_emoji} {p.nickname}[UID:{p.uid}] - {title} 第{p.max_dungeon_level}层{marker}")
+
+    lines.append("━━━━━━━━━━━━━")
+    lines.append("💡 使用【探索榜 页码】查看指定页(1-3)")
 
     await exploration_rank_cmd.finish(message_add_head("\n".join(lines), event))
 
@@ -335,9 +458,37 @@ agility_rank_cmd = on_command("敏捷榜", aliases={"速度榜", "敏捷排行�
 
 @agility_rank_cmd.handle()
 async def _(event: MessageEvent, args: Message = CommandArg()):
-    """显示敏捷值最高的前10名玩家"""
+    """显示敏捷值排行榜，无参数时以自己为中心展示"""
+    page_text = args.extract_plain_text().strip()
+    page_size = 10
+    page = None
+    player = None
+    player_rank = None
+
     async with safe_session() as session:
-        stmt = select(Player).order_by(Player.agility.desc()).limit(10)
+        total_count = (await session.execute(select(func.count()).select_from(Player))).scalar_one()
+        if total_count == 0:
+            await agility_rank_cmd.finish("暂无排行榜数据")
+
+        if not page_text:
+            player = await get_unified_player(session, event)
+            if player:
+                players_above = (await session.execute(
+                    select(func.count()).select_from(Player).where(Player.agility > player.agility)
+                )).scalar_one()
+                player_rank = players_above + 1
+                offset = _calculate_centered_offset(player_rank, total_count, page_size)
+            else:
+                offset = 0
+        else:
+            try:
+                page = int(page_text)
+            except ValueError:
+                page = 1
+            page = max(1, min(page, 3))
+            offset = (page - 1) * page_size
+
+        stmt = select(Player).order_by(Player.agility.desc()).offset(offset).limit(page_size)
         players = (await session.execute(stmt)).scalars().all()
 
     if not players:
@@ -352,13 +503,17 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
     ]
 
     quote = random.choice(agility_quotes)
-    lines = ["⚡ 敏捷排行榜", quote, "━━━━━━━━━━━━━"]
 
-    for idx, p in enumerate(players, 1):
-        # 使用emoji装饰前三名
+    if player_rank is not None:
+        lines = [f"⚡ 敏捷排行榜 (你的排名: 第{player_rank}名)", quote, "━━━━━━━━━━━━━"]
+    elif page is not None:
+        lines = [f"⚡ 敏捷排行榜 (第{page}/3页)", quote, "━━━━━━━━━━━━━"]
+    else:
+        lines = ["⚡ 敏捷排行榜", quote, "━━━━━━━━━━━━━"]
+
+    for idx, p in enumerate(players, start=offset + 1):
         rank_emoji = "🥇" if idx == 1 else "🥈" if idx == 2 else "🥉" if idx == 3 else f"{idx}."
 
-        # 根据敏捷值显示不同的称号（扩充高阶段位）
         agi = p.agility
         if agi < 10:
             title = "🐌迟缓者"
@@ -385,7 +540,11 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
         else:
             title = "🌀相位神行者"
 
-        lines.append(f"{rank_emoji} {p.nickname}[UID:{p.uid}] - {title} ⚡{p.agility}")
+        marker = " ◀" if player and p.id == player.id else ""
+        lines.append(f"{rank_emoji} {p.nickname}[UID:{p.uid}] - {title} ⚡{p.agility}{marker}")
+
+    lines.append("━━━━━━━━━━━━━")
+    lines.append("💡 使用【敏捷榜 页码】查看指定页(1-3)")
 
     await agility_rank_cmd.finish(message_add_head("\n".join(lines), event))
 
@@ -395,9 +554,39 @@ mini_game_rank_cmd = on_command("小游戏榜", aliases={"游戏榜", "小游戏
 
 @mini_game_rank_cmd.handle()
 async def _(event: MessageEvent, args: Message = CommandArg()):
-    """显示小游戏积分最高的前10名玩家"""
+    """显示小游戏积分排行榜，无参数时以自己为中心展示"""
+    page_text = args.extract_plain_text().strip()
+    page_size = 10
+    page = None
+    player = None
+    player_rank = None
+
     async with safe_session() as session:
-        stmt = select(Player).order_by(Player.mini_game_score.desc()).limit(10)
+        total_count = (await session.execute(select(func.count()).select_from(Player))).scalar_one()
+        if total_count == 0:
+            await mini_game_rank_cmd.finish("暂无排行榜数据")
+
+        if not page_text:
+            player = await get_unified_player(session, event)
+            if player:
+                players_above = (await session.execute(
+                    select(func.count()).select_from(Player).where(
+                        Player.mini_game_score > player.mini_game_score
+                    )
+                )).scalar_one()
+                player_rank = players_above + 1
+                offset = _calculate_centered_offset(player_rank, total_count, page_size)
+            else:
+                offset = 0
+        else:
+            try:
+                page = int(page_text)
+            except ValueError:
+                page = 1
+            page = max(1, min(page, 3))
+            offset = (page - 1) * page_size
+
+        stmt = select(Player).order_by(Player.mini_game_score.desc()).offset(offset).limit(page_size)
         players = (await session.execute(stmt)).scalars().all()
 
     if not players:
@@ -412,13 +601,17 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
     ]
 
     quote = random.choice(game_quotes)
-    lines = ["🎮 小游戏排行榜", quote, "━━━━━━━━━━━━━"]
 
-    for idx, p in enumerate(players, 1):
-        # 使用emoji装饰前三名
+    if player_rank is not None:
+        lines = [f"🎮 小游戏排行榜 (你的排名: 第{player_rank}名)", quote, "━━━━━━━━━━━━━"]
+    elif page is not None:
+        lines = [f"🎮 小游戏排行榜 (第{page}/3页)", quote, "━━━━━━━━━━━━━"]
+    else:
+        lines = ["🎮 小游戏排行榜", quote, "━━━━━━━━━━━━━"]
+
+    for idx, p in enumerate(players, start=offset + 1):
         rank_emoji = "🥇" if idx == 1 else "🥈" if idx == 2 else "🥉" if idx == 3 else f"{idx}."
 
-        # 根据积分显示不同的称号
         if p.mini_game_score == 0:
             title = "🌱游戏新手"
         elif p.mini_game_score < 10:
@@ -434,7 +627,11 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
         else:
             title = "🌟传奇玩家"
 
-        lines.append(f"{rank_emoji} {p.nickname}[UID:{p.uid}] - {title} 🎮{p.mini_game_score}分")
+        marker = " ◀" if player and p.id == player.id else ""
+        lines.append(f"{rank_emoji} {p.nickname}[UID:{p.uid}] - {title} 🎮{p.mini_game_score}分{marker}")
+
+    lines.append("━━━━━━━━━━━━━")
+    lines.append("💡 使用【小游戏榜 页码】查看指定页(1-3)")
 
     await mini_game_rank_cmd.finish(message_add_head("\n".join(lines), event))
 

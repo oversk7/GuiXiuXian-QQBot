@@ -2,12 +2,14 @@ from nonebot import on_command
 from nonebot.adapters.qq import MessageEvent, Message
 from nonebot.params import CommandArg
 from datetime import datetime
-from sqlalchemy import select
+from sqlalchemy import select, func
+from sqlalchemy.orm import joinedload
 
 from ..models.db import safe_session
 from ..models.player import Player
 from ..models.bank_account import BankAccount
 from ..utils import message_add_head
+from ..platform_utils import get_unified_player
 
 # ==================== 银行系统改革说明 ====================
 # 【2025-12-03】银行系统已取消存款利息
@@ -217,61 +219,81 @@ async def handle_transfer(event: MessageEvent, args: Message = CommandArg()):
 
 @deposit_rank_cmd.handle()
 async def handle_deposit_rank(event: MessageEvent, args: Message = CommandArg()):
-    """显示存款最多的前30名玩家，支持分页"""
-    # 解析页码参数
+    """显示存款排行榜，无参数时以自己为中心展示"""
     page_text = args.extract_plain_text().strip()
-    try:
-        page = int(page_text) if page_text else 1
-    except ValueError:
-        page = 1
-    page = max(1, min(page, 3))  # 限制在1-3页
-    
     page_size = 10
-    offset = (page - 1) * page_size
-    
-    async with safe_session() as session:
-        # 先取前30余额账号，再结息，避免遍历全库
-        from sqlalchemy import func as _func
-        from sqlalchemy.orm import joinedload
+    page = None
+    player = None
+    player_rank = None
 
-        # 使用joinedload预加载Player，避免N+1查询（11次→1次）
-        sub_stmt = (
+    async with safe_session() as session:
+        total_count = (await session.execute(
+            select(func.count()).select_from(BankAccount)
+        )).scalar_one()
+        if total_count == 0:
+            await deposit_rank_cmd.finish("暂无存款数据")
+
+        if not page_text:
+            player = await get_unified_player(session, event)
+            if player:
+                player_acc = (await session.execute(
+                    select(BankAccount).where(BankAccount.player_id == player.id)
+                )).scalar_one_or_none()
+                if player_acc:
+                    players_above = (await session.execute(
+                        select(func.count()).select_from(BankAccount).where(
+                            BankAccount.balance > player_acc.balance
+                        )
+                    )).scalar_one()
+                    player_rank = players_above + 1
+                    rank_idx = player_rank - 1
+                    half = page_size // 2
+                    offset = max(0, rank_idx - half)
+                    if offset + page_size > total_count:
+                        offset = max(0, total_count - page_size)
+                else:
+                    offset = 0
+            else:
+                offset = 0
+        else:
+            try:
+                page = int(page_text)
+            except ValueError:
+                page = 1
+            page = max(1, min(page, 3))
+            offset = (page - 1) * page_size
+
+        stmt = (
             select(BankAccount)
             .options(joinedload(BankAccount.player))
             .order_by(BankAccount.balance.desc())
-            .limit(30)
+            .offset(offset)
+            .limit(page_size)
         )
-        accounts = (await session.execute(sub_stmt)).scalars().all()
+        accounts = (await session.execute(stmt)).scalars().all()
+
         if not accounts:
             await deposit_rank_cmd.finish("暂无存款数据")
 
-        # 已取消利息计算，直接排序
+        if player_rank is not None:
+            lines = [f"🏦 存款排行榜 (你的排名: 第{player_rank}名)", "━━━━━━━━━━━━━"]
+        elif page is not None:
+            lines = [f"🏦 存款排行榜 (第{page}/3页)", "━━━━━━━━━━━━━"]
+        else:
+            lines = ["🏦 存款排行榜", "━━━━━━━━━━━━━"]
 
-        # 按余额排序
-        accounts.sort(key=lambda x: x.balance, reverse=True)
-        
-        # 分页处理
-        page_accounts = accounts[offset:offset + page_size]
-        
-        # 自动提交利息写回
-        session.add_all(accounts)
-        await session.commit()
-        
-        lines = [f"🏦 存款排行榜 (第{page}/3页)", "━━━━━━━━━━━━━"]
-        for idx, acc in enumerate(page_accounts, start=offset + 1):
-            # 直接使用预加载的player，避免N+1查询
+        for idx, acc in enumerate(accounts, start=offset + 1):
             p = acc.player
             if not p:
                 continue
-            # 使用emoji装饰前三名
             rank_emoji = "🥇" if idx == 1 else "🥈" if idx == 2 else "🥉" if idx == 3 else f"{idx}."
-            lines.append(f"{rank_emoji} {p.nickname}[UID:{p.uid}] - {acc.balance}💰")
-        
-        if page < 3:
-            lines.append("━━━━━━━━━━━━━")
-            lines.append("💡 使用【存款榜 页码】查看其他页")
-        
-        await deposit_rank_cmd.finish(message_add_head("\n".join(lines), event))
+            marker = " ◀" if player and p.id == player.id else ""
+            lines.append(f"{rank_emoji} {p.nickname}[UID:{p.uid}] - {acc.balance}💰{marker}")
+
+        lines.append("━━━━━━━━━━━━━")
+        lines.append("💡 使用【存款榜 页码】查看指定页(1-3)")
+
+    await deposit_rank_cmd.finish(message_add_head("\n".join(lines), event))
 
 
 @bank_invest_cmd.handle()

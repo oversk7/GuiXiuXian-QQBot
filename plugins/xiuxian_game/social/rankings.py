@@ -1,10 +1,12 @@
 from nonebot import on_command
-from nonebot.adapters.qq import MessageEvent
+from nonebot.adapters.qq import MessageEvent, Message
+from nonebot.params import CommandArg
 from sqlalchemy import select, func
 
 from ..models.db import safe_session
 from ..models.player import Player
 from ..utils import message_add_head
+from ..platform_utils import get_unified_player
 
 
 # ==================== 社交统计 ====================
@@ -38,49 +40,69 @@ async def handle_social_stats(event: MessageEvent):
 charm_ranking_cmd = on_command("魅力榜", aliases={"魅力排行榜"}, block=True, priority=5)
 
 @charm_ranking_cmd.handle()
-async def handle_charm_ranking(event: MessageEvent):
-    """魅力榜命令 - 显示全服魅力值Top100"""
-    from ..infrastructure.uow.unit_of_work import UnitOfWork
-    from ..models.db import AsyncSessionLocal
+async def handle_charm_ranking(event: MessageEvent, args: Message = CommandArg()):
+    """显示魅力值排行榜，无参数时以自己为中心展示"""
+    page_text = args.extract_plain_text().strip()
+    page_size = 10
+    page = None
+    player = None
+    player_rank = None
 
-    async with UnitOfWork(AsyncSessionLocal) as uow:
-        # 获取魅力值Top100
-        from sqlalchemy import desc
+    async with safe_session() as session:
+        total_count = (await session.execute(
+            select(func.count()).select_from(Player).where(Player.charm > 0)
+        )).scalar_one()
+        if total_count == 0:
+            await charm_ranking_cmd.finish(message_add_head("💖 魅力排行榜\n━━━━━━━━━━━━━\n暂无数据", event))
 
-        result = await uow.session.execute(
-            select(Player.nickname, Player.uid, Player.charm)
-            .where(Player.charm > 0)
-            .order_by(desc(Player.charm))
-            .limit(100)
-        )
-
-        ranking = list(result.all())
-
-        if not ranking:
-            await charm_ranking_cmd.finish(message_add_head("💖 全服魅力榜 💖\n━━━━━━━━━━━━━\n\n暂无数据", event))
-            return
-
-        # 格式化输出
-        lines = [
-            "💖 全服魅力榜 💖",
-            "━━━━━━━━━━━━━",
-        ]
-
-        for idx, (nickname, uid, charm) in enumerate(ranking, start=1):
-            # 前三名特殊标识
-            if idx == 1:
-                medal = "🥇"
-            elif idx == 2:
-                medal = "🥈"
-            elif idx == 3:
-                medal = "🥉"
+        if not page_text:
+            player = await get_unified_player(session, event)
+            if player and player.charm > 0:
+                players_above = (await session.execute(
+                    select(func.count()).select_from(Player).where(Player.charm > player.charm)
+                )).scalar_one()
+                player_rank = players_above + 1
+                rank_idx = player_rank - 1
+                half = page_size // 2
+                offset = max(0, rank_idx - half)
+                if offset + page_size > total_count:
+                    offset = max(0, total_count - page_size)
             else:
-                medal = "  "
+                offset = 0
+        else:
+            try:
+                page = int(page_text)
+            except ValueError:
+                page = 1
+            page = max(1, min(page, 3))
+            offset = (page - 1) * page_size
 
-            lines.append(f"{medal} #{idx:3d} {nickname}[UID:{uid}]: {charm} 🍫")
+        stmt = (
+            select(Player)
+            .where(Player.charm > 0)
+            .order_by(Player.charm.desc())
+            .offset(offset)
+            .limit(page_size)
+        )
+        players = (await session.execute(stmt)).scalars().all()
 
-        lines.append("")
-        lines.append("━━━━━━━━━━━━━")
-        lines.append("💡 提示: 收到好感度礼物可增加魅力值")
+    if not players:
+        await charm_ranking_cmd.finish(message_add_head("💖 魅力排行榜\n━━━━━━━━━━━━━\n暂无数据", event))
 
-        await charm_ranking_cmd.finish(message_add_head("\n".join(lines), event))
+    if player_rank is not None:
+        lines = [f"💖 魅力排行榜 (你的排名: 第{player_rank}名)", "━━━━━━━━━━━━━"]
+    elif page is not None:
+        lines = [f"💖 魅力排行榜 (第{page}/3页)", "━━━━━━━━━━━━━"]
+    else:
+        lines = ["💖 魅力排行榜", "━━━━━━━━━━━━━"]
+
+    for idx, p in enumerate(players, start=offset + 1):
+        rank_emoji = "🥇" if idx == 1 else "🥈" if idx == 2 else "🥉" if idx == 3 else f"{idx}."
+        marker = " ◀" if player and p.id == player.id else ""
+        lines.append(f"{rank_emoji} {p.nickname}[UID:{p.uid}] - {p.charm} 🍫{marker}")
+
+    lines.append("━━━━━━━━━━━━━")
+    lines.append("💡 使用【魅力榜 页码】查看指定页(1-3)")
+    lines.append("💡 收到好感度礼物可增加魅力值")
+
+    await charm_ranking_cmd.finish(message_add_head("\n".join(lines), event))
