@@ -283,7 +283,7 @@ class Player(Base):
         benefits = await get_player_card_benefits(session, self.id)
         bonus = benefits["inventory_bonus"]
 
-        # VIP装备背包加成（龙影闪: +10%基础容量）
+        # VIP装备背包加成（龙影闪: +200格，再额外+10%）
         from sqlalchemy import select
         from .inventory import ItemInstance
         stmt = select(ItemInstance.id).where(
@@ -293,7 +293,7 @@ class Player(Base):
         )
         result = await session.execute(stmt)
         if result.scalars().first():
-            bonus += int(self.inventory_capacity * 0.10)
+            bonus += 200 + int((self.inventory_capacity + 200) * 0.10)
 
         return self.inventory_capacity + bonus
 

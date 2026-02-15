@@ -1347,24 +1347,24 @@ items:
       rarity: "red"
       durability: 360
       required_level: 10
-      attr_bonus: {"hp": 200, "mp": 200}
-      attr_ratio: {"hp": 2.0, "mp": 2.0}
+      attr_bonus: {"hp": 300, "mp": 300, attack: 300}
+      attr_ratio: {"hp": 3.0, "mp": 3.0}
       gem_slots: 5
       special_effects:
         - trigger: "on_attacked"
           effect: "reflect_death"
           is_percentage: false
           value: 0
-          description: "[1] 虚界反噬：野外被死斗时，虚界裂隙撕开空间——攻击者直接死亡(自保)"
+          description: "[1] 虚界反噬：野外被恶意攻击时，虚界裂隙撕开空间——攻击者直接死亡"
         - trigger: "passive"
           effect: "none"
-          description: "[2] 虚界夹层：背包空间+10%"
-        - trigger: "on_dodge"
+          description: "[2] 虚界夹层：背包空间+200格，并额外增加10%"
+        - trigger: "on_attack"
           chance: 100
           effect: "heal"
           is_percentage: true
           value: 5
-          description: "[3] 虚界闪渡：闪避时，虚界裂隙中泄出的灵气修复身躯——回复5%最大生命值"
+          description: "[3] 虚界闪渡：攻击时，虚界裂隙中泄出的灵气修复身躯——回复5%最大生命值"
       repair_cost: 5
 
     - item_id: "vip_medal_tiandi"

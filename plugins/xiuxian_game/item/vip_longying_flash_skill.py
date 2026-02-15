@@ -31,7 +31,7 @@ MP_COST_RATIO = 0.05     # 消耗5%最大理智
 CARRY_TIMEOUT_SECONDS = 120  # 携带穿越等待超时2分钟
 
 # 龙影闪配图
-LONGYING_IMG_URL = "https://wdcdn.qpic.cn/MTMxMDI2NjM3MjM0Njk2MTE_204285_PNKpCp4Am42F73ha_1771075031"
+LONGYING_IMG_URL = "https://wdcdn.qpic.cn/MTMxMDI2NjM3MjM0Njk2MTE_885885_Y_YQIqWr8ubL6pAL_1771136869"
 MARKDOWN_TEMPLATE_ID = "102499345_1770445216"
 
 # 临时存储：等待确认的携带穿越请求（独立于归雨的字典）
@@ -336,7 +336,7 @@ async def _handle_teleport(session, player: Player, parts: list, event: MessageE
             MessageMarkdownParams(key="title", values=[title]),
             MessageMarkdownParams(key="desc", values=[desc]),
             MessageMarkdownParams(key="imgurl", values=[LONGYING_IMG_URL]),
-            MessageMarkdownParams(key="width", values=["360"]),
+            MessageMarkdownParams(key="width", values=["368"]),
             MessageMarkdownParams(key="height", values=["201"]),
             MessageMarkdownParams(key="hint", values=["快捷操作"]),
             MessageMarkdownParams(key="t1", values=["锚钉"]),
