@@ -282,6 +282,22 @@ class InnerRealmService:
         if existing_session:
             return True, f"📍 你已经在 {realm_config['display_name']} 中了", existing_session
 
+        # 清理已结算的旧会话（唯一索引 player_id+realm_name 不含 is_settled）
+        from sqlalchemy import select, and_
+        stmt = select(InnerRealmSession).where(
+            and_(
+                InnerRealmSession.player_id == player.id,
+                InnerRealmSession.realm_name == realm_name,
+                InnerRealmSession.is_settled == True
+            )
+        )
+        result = await self.uow.session.execute(stmt)
+        old_sessions = result.scalars().all()
+        for old_session in old_sessions:
+            await self.uow.session.delete(old_session)
+        if old_sessions:
+            await self.uow.session.flush()
+
         # 获取初始理智值
         sanity_config = InnerRealmConfig.get_global_config().get("sanity_system", {})
         initial_sanity = sanity_config.get("initial_sanity", 100)
