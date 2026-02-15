@@ -531,7 +531,7 @@ async def handle_panel(event: MessageEvent):
         # 今日成长统计（从折光年装备的 extra_attrs 读取）
         # 战后持久化写入 cw_hp_cnt / cw_atk_cnt
         extra = watch.extra_attrs or {}
-        today_str = date.today().isoformat()
+        today_str = date.today().strftime("%Y%m%d")
 
         hp_gains_today = 0
         atk_gains_today = 0
