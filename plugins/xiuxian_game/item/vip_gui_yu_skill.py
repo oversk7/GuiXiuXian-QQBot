@@ -399,19 +399,6 @@ async def _handle_carry(session, player: Player, parts: list, event: MessageEven
     if target.id == player.id:
         await anchor_cmd.finish("⛔ 不能携带自己，请直接使用【锚点 传送 编号】")
 
-    # 检查目标距离（需要在附近3格以内）
-    px, py = player.get_current_coordinates()
-    tx, ty = target.get_current_coordinates()
-    p_region = player.get_current_region()
-    t_region = target.get_current_region()
-
-    if p_region != t_region:
-        await anchor_cmd.finish(f"⛔ {target.nickname} 与你不在同一区域")
-
-    distance = abs(px - tx) + abs(py - ty)
-    if distance > 3:
-        await anchor_cmd.finish(f"⛔ {target.nickname} 距离过远（距离{distance}格），需要在3格以内")
-
     anchor = anchors[idx - 1]
 
     # 创建携带传送请求
@@ -507,22 +494,35 @@ async def handle_accept_carry(event: MessageEvent):
 
         anchor = request["anchor"]
 
-        # 如果目标是诡域，检查双方是否已解锁
+        # 如果目标是诡域，检查发起者是否已解锁
         target_dungeon = anchor.get("dungeon_level", 0)
+        carried_to_max = False
+        carried_level = 0
         if target_dungeon > 0:
             if not from_player.can_enter_dungeon_level(target_dungeon):
                 _pending_carry_requests.pop(player.id, None)
                 await accept_carry_cmd.finish(f"⛔ 发起者尚未解锁{target_dungeon}层诡域")
             if not player.can_enter_dungeon_level(target_dungeon):
-                _pending_carry_requests.pop(player.id, None)
-                await accept_carry_cmd.finish(f"⛔ 你尚未解锁{target_dungeon}层诡域，无法被传送")
+                # 被携带者未解锁目标层，自动送到其已达最高层
+                carried_to_max = True
+                carried_level = max(player.max_dungeon_level or 0, 1)
 
         # 消耗发起者理智
         from_player.mp -= mp_cost
 
-        # 传送双方
+        # 传送发起者到锚点
         _teleport_player_to_anchor(from_player, anchor)
-        _teleport_player_to_anchor(player, anchor)
+
+        # 传送被携带者
+        if carried_to_max:
+            # 被携带者送到其最高已解锁层的起始位置(0,0)
+            carried_anchor = dict(anchor)
+            carried_anchor["dungeon_level"] = carried_level
+            carried_anchor["x"] = 0
+            carried_anchor["y"] = 0
+            _teleport_player_to_anchor(player, carried_anchor)
+        else:
+            _teleport_player_to_anchor(player, anchor)
 
         # 设置冷却
         _set_teleport_cd(from_player)
@@ -537,13 +537,23 @@ async def handle_accept_carry(event: MessageEvent):
         to_region = anchor.get("region", "未知")
         to_x, to_y = anchor.get("x", 0), anchor.get("y", 0)
 
-        await accept_carry_cmd.finish(message_add_head(
-            f"☂️ 伞影笼罩两人，身形一同消散——\n"
-            f"🎯 抵达「{anchor['name']}」— {to_region} ({to_x},{to_y})\n"
-            f"👥 {request['from_name']} 携带 {player.nickname} 一同传送\n"
-            f"💧 消耗 {request['from_name']} 理智 {mp_cost}",
-            event
-        ))
+        if carried_to_max:
+            await accept_carry_cmd.finish(message_add_head(
+                f"☂️ 伞影笼罩两人，但空间在中途分岔——\n"
+                f"🎯 {request['from_name']} → 「{anchor['name']}」— {to_region} ({to_x},{to_y})\n"
+                f"🎯 {player.nickname} → 第{carried_level}重诡域 (0,0)（已达最深层）\n"
+                f"⚠️ {player.nickname} 未解锁第{target_dungeon}重诡域，已自动送至最深探索层\n"
+                f"💧 消耗 {request['from_name']} 理智 {mp_cost}",
+                event
+            ))
+        else:
+            await accept_carry_cmd.finish(message_add_head(
+                f"☂️ 伞影笼罩两人，身形一同消散——\n"
+                f"🎯 抵达「{anchor['name']}」— {to_region} ({to_x},{to_y})\n"
+                f"👥 {request['from_name']} 携带 {player.nickname} 一同传送\n"
+                f"💧 消耗 {request['from_name']} 理智 {mp_cost}",
+                event
+            ))
 
 
 @reject_carry_cmd.handle()
