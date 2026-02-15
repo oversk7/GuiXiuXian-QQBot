@@ -610,6 +610,46 @@ async def handle_view_clues(event: MessageEvent):
         await view_clues_cmd.finish("\n".join(lines))
 
 
+# ==================== 观察命令 ====================
+
+observe_cmd = on_command("观察", aliases={"环顾", "查看环境"},
+                         rule=in_inner_realm_rule, block=True,
+                         priority=4, permission=SUPERUSER)
+
+
+@observe_cmd.handle()
+async def handle_observe(event: MessageEvent):
+    """仔细观察当前位置和周围环境"""
+
+    def session_factory():
+        return AsyncSessionLocal()
+
+    async with UnitOfWork(session_factory) as uow:
+        player = await get_unified_player(uow.session, event)
+        if not player:
+            await observe_cmd.finish("⛔ 请先创建角色")
+
+        if not player.inner_realm:
+            await observe_cmd.finish("⛔ 你不在任何里界中")
+
+        service = InnerRealmService(uow)
+
+        # 获取活跃会话
+        active_session = await service.get_active_session(player.id, player.inner_realm)
+        if not active_session:
+            await observe_cmd.finish("⛔ 会话数据错误")
+
+        # 获取里界配置
+        realm_config = InnerRealmConfig.get_realm_config(player.inner_realm)
+        if not realm_config:
+            await observe_cmd.finish("⛔ 里界配置错误")
+
+        # 生成详细观察信息
+        result_msg = await service.observe_surroundings(active_session, realm_config)
+
+        await observe_cmd.finish(result_msg)
+
+
 # ==================== 移动命令 ====================
 
 # 移动命令 - 使用 Rule 确保只在里界时才匹配，避免与诡域系统冲突
@@ -649,6 +689,12 @@ async def _handle_move(event: MessageEvent, dx: int, dy: int):
         # 执行移动
         success, message = await service.move_in_realm(active_session, dx, dy, realm_config)
 
+        if not success:
+            return message
+
+        # 移动成功后生成完整反馈
+        feedback = await service.generate_move_feedback(active_session, realm_config)
+
         # 检查是否触发认知篡改
         tamper_warning = ""
         tamper_event = await service.check_cognition_tamper(active_session)
@@ -656,7 +702,7 @@ async def _handle_move(event: MessageEvent, dx: int, dy: int):
             tamper_desc = await service.apply_cognition_tamper(active_session, tamper_event)
             tamper_warning = f"\n\n{tamper_desc}"
 
-        return f"{message}{tamper_warning}"
+        return f"{feedback}{tamper_warning}"
 
 
 @move_cmd.handle()

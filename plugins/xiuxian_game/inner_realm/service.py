@@ -287,6 +287,9 @@ class InnerRealmService:
         initial_sanity = sanity_config.get("initial_sanity", 100)
 
         # 创建新会话
+        # 初始化state，包含已访问坐标集合
+        initial_state = {"visited": ["0,0"]}
+
         new_session = InnerRealmSession(
             player_id=player.id,
             realm_name=realm_name,
@@ -298,7 +301,7 @@ class InnerRealmService:
             clue_collected="[]",
             x=0,
             y=0,
-            state="{}",
+            state=json.dumps(initial_state, ensure_ascii=False),
             is_settled=False
         )
 
@@ -566,6 +569,14 @@ class InnerRealmService:
         # 更新位置
         session.x = new_x
         session.y = new_y
+
+        # 追踪已访问坐标
+        state = json.loads(session.state) if session.state else {}
+        visited = set(state.get("visited", []))
+        visited.add(f"{new_x},{new_y}")
+        state["visited"] = list(visited)
+        session.state = json.dumps(state, ensure_ascii=False)
+
         await self.uow.commit()
 
         # 获取新位置的地块信息
@@ -1595,3 +1606,611 @@ class InnerRealmService:
         lines.append("\n💡 提示: 救助幸存者会影响最终结局")
 
         return True, "\n".join(lines)
+
+    # ==================== 迷你地图与环境感知系统 ====================
+
+    def _get_tile_emoji(self, tile: InnerRealmTile, visited: set) -> str:
+        """
+        根据地块类型和状态返回对应emoji
+
+        Args:
+            tile: 地块对象
+            visited: 已访问坐标集合
+
+        Returns:
+            对应的emoji字符
+        """
+        coord_key = f"{tile.x},{tile.y}"
+
+        # 未访问过的地块显示迷雾
+        if coord_key not in visited:
+            return "▪️"
+
+        state = json.loads(tile.state) if tile.state else {}
+
+        if tile.event_type == "EMPTY":
+            return "▫️"
+
+        elif tile.event_type == "NPC":
+            if state.get("alive", True):
+                return "👤"
+            else:
+                return "💀"
+
+        elif tile.event_type == "LOOT":
+            if state.get("looted", False):
+                return "◽"
+            else:
+                return "📦"
+
+        elif tile.event_type == "CLUE":
+            if state.get("collected", False):
+                return "✅"
+            else:
+                return "📜"
+
+        elif tile.event_type == "BOSS":
+            if state.get("alive", True):
+                return "👹"
+            else:
+                return "🏆"
+
+        elif tile.event_type == "SURVIVOR":
+            if state.get("saved", False) or state.get("killed", False):
+                return "◽"
+            else:
+                return "🆘"
+
+        elif tile.event_type == "COGNITION_TAMPER":
+            # 伪装成空地
+            return "▫️"
+
+        return "▫️"
+
+    async def _render_minimap(
+        self,
+        session: InnerRealmSession,
+        realm_config: Dict[str, Any]
+    ) -> str:
+        """
+        渲染5x5迷你地图
+
+        Args:
+            session: 会话对象
+            realm_config: 里界配置
+
+        Returns:
+            渲染后的地图字符串
+        """
+        map_size = realm_config.get("size", 25)
+        cx, cy = session.x, session.y
+
+        # 获取已访问坐标
+        state = json.loads(session.state) if session.state else {}
+        visited = set(state.get("visited", []))
+
+        # 获取5x5范围内的地块 (radius=2)
+        nearby_tiles = await self.uow.inner_realm_tiles.get_nearby_tiles(
+            session.id, cx, cy, radius=2
+        )
+
+        # 构建坐标到地块的映射
+        tile_map = {(t.x, t.y): t for t in nearby_tiles}
+
+        rows = []
+        for dy in range(-2, 3):
+            row_emojis = []
+            for dx in range(-2, 3):
+                tx, ty = cx + dx, cy + dy
+
+                # 当前位置
+                if tx == cx and ty == cy:
+                    row_emojis.append("🧭")
+                # 超出地图边界
+                elif not (0 <= tx < map_size and 0 <= ty < map_size):
+                    row_emojis.append("⬛")
+                # 有地块数据
+                elif (tx, ty) in tile_map:
+                    row_emojis.append(self._get_tile_emoji(tile_map[(tx, ty)], visited))
+                # 未知区域（迷雾）
+                else:
+                    row_emojis.append("▪️")
+
+            rows.append("".join(row_emojis))
+
+        return "\n".join(rows)
+
+    def _calc_direction(self, cx: int, cy: int, tx: int, ty: int) -> str:
+        """
+        计算目标相对于中心的8方向文字
+
+        Args:
+            cx, cy: 中心坐标
+            tx, ty: 目标坐标
+
+        Returns:
+            方向文字
+        """
+        dx = tx - cx
+        dy = ty - cy
+
+        if dx == 0 and dy < 0:
+            return "北方"
+        elif dx == 0 and dy > 0:
+            return "南方"
+        elif dx > 0 and dy == 0:
+            return "东方"
+        elif dx < 0 and dy == 0:
+            return "西方"
+        elif dx > 0 and dy < 0:
+            return "东北方"
+        elif dx < 0 and dy < 0:
+            return "西北方"
+        elif dx > 0 and dy > 0:
+            return "东南方"
+        elif dx < 0 and dy > 0:
+            return "西南方"
+
+        return "附近"
+
+    def _get_direction_hints(
+        self,
+        session: InnerRealmSession,
+        nearby_tiles: List[InnerRealmTile],
+        max_hints: int = 3
+    ) -> List[str]:
+        """
+        生成方向提示
+
+        Args:
+            session: 会话对象
+            nearby_tiles: 附近地块列表
+            max_hints: 最大提示数量
+
+        Returns:
+            方向提示列表
+        """
+        cx, cy = session.x, session.y
+        state = json.loads(session.state) if session.state else {}
+        visited = set(state.get("visited", []))
+
+        hints = []
+
+        for tile in nearby_tiles:
+            # 跳过当前位置和空地
+            if (tile.x == cx and tile.y == cy) or tile.event_type == "EMPTY":
+                continue
+
+            # 跳过认知篡改地块（伪装成空地）
+            if tile.event_type == "COGNITION_TAMPER":
+                continue
+
+            tile_state = json.loads(tile.state) if tile.state else {}
+            coord_key = f"{tile.x},{tile.y}"
+            direction = self._calc_direction(cx, cy, tile.x, tile.y)
+            distance = abs(tile.x - cx) + abs(tile.y - cy)
+
+            # 已访问区域给明确提示
+            if coord_key in visited:
+                # 已处理的事件跳过
+                if tile.event_type == "NPC" and not tile_state.get("alive", True):
+                    continue
+                if tile.event_type == "LOOT" and tile_state.get("looted", False):
+                    continue
+                if tile.event_type == "CLUE" and tile_state.get("collected", False):
+                    continue
+                if tile.event_type == "BOSS" and not tile_state.get("alive", True):
+                    continue
+                if tile.event_type == "SURVIVOR" and (tile_state.get("saved") or tile_state.get("killed")):
+                    continue
+
+                name = tile_state.get("name", "")
+                if tile.event_type == "NPC":
+                    hint = f"👤 {direction}有{name}" if name else f"👤 {direction}有一个人"
+                elif tile.event_type == "LOOT":
+                    hint = f"📦 {direction}有可搜刮的物资"
+                elif tile.event_type == "CLUE":
+                    hint = f"📜 {direction}有{name}" if name else f"📜 {direction}有线索"
+                elif tile.event_type == "BOSS":
+                    hint = f"👹 {direction}有{name}！" if name else f"👹 {direction}有强大的存在！"
+                elif tile.event_type == "SURVIVOR":
+                    hint = f"🆘 {direction}有{name}" if name else f"🆘 {direction}有幸存者"
+                else:
+                    continue
+            else:
+                # 未访问区域给模糊感知提示
+                if tile.event_type == "NPC":
+                    hint = f"👤 {direction}隐约有人影"
+                elif tile.event_type == "LOOT":
+                    hint = f"📦 {direction}似乎有什么东西"
+                elif tile.event_type == "CLUE":
+                    hint = f"📜 {direction}有可疑的痕迹"
+                elif tile.event_type == "BOSS":
+                    hint = f"👹 {direction}传来强烈的压迫感！"
+                elif tile.event_type == "SURVIVOR":
+                    hint = f"🆘 {direction}传来微弱呼救声"
+                else:
+                    continue
+
+            hints.append((distance, hint))
+
+        # 按距离排序，取最多max_hints条
+        hints.sort(key=lambda x: x[0])
+        return [h[1] for h in hints[:max_hints]]
+
+    def _generate_atmosphere_description(
+        self,
+        tile: InnerRealmTile,
+        sanity: int
+    ) -> str:
+        """
+        根据事件类型和理智值生成氛围描述
+
+        Args:
+            tile: 当前地块
+            sanity: 当前理智值
+
+        Returns:
+            氛围描述文字
+        """
+        tile_state = json.loads(tile.state) if tile.state else {}
+
+        # EMPTY类型
+        if tile.event_type == "EMPTY":
+            if sanity < 30:
+                descriptions = [
+                    "墙壁在蠕动...不，是你的错觉...吗？",
+                    "地板上的影子似乎在移动，它们不属于任何物体...",
+                    "你听到了自己的心跳声，不，那不是你的心跳...",
+                    "空气中弥漫着腐烂的甜味，你的手在不受控制地颤抖...",
+                ]
+            elif sanity < 50:
+                descriptions = [
+                    "走廊里隐约传来脚步声，但回头看时什么都没有...",
+                    "灯光忽明忽暗，墙上的污渍看起来像是文字...",
+                    "这里的空气沉重而压抑，呼吸变得困难...",
+                    "你总感觉有什么东西在角落里注视着你...",
+                ]
+            else:
+                descriptions = [
+                    "这里一片寂静...",
+                    "空荡荡的走廊延伸向远处...",
+                    "这里弥漫着刺鼻的消毒水味...",
+                    "天花板上的日光灯发出微弱的嗡嗡声...",
+                    "地板上有拖拽过的痕迹，已经干涸...",
+                    "墙壁上的油漆已经剥落，露出灰色的水泥...",
+                ]
+            return random.choice(descriptions)
+
+        # NPC类型
+        elif tile.event_type == "NPC":
+            name = tile_state.get("name", "一个人影")
+            if not tile_state.get("alive", True):
+                descriptions = [
+                    f"{name}的尸体倒在地上，空洞的眼神凝视着天花板...",
+                    f"这里残留着{name}最后的气息...",
+                    f"一具已经冰冷的尸体，曾经是{name}...",
+                ]
+            else:
+                desc = tile_state.get("description", "")
+                if desc:
+                    return desc
+                descriptions = [
+                    f"{name}正在这里...",
+                    f"你看到了{name}的身影...",
+                ]
+            return random.choice(descriptions)
+
+        # LOOT类型
+        elif tile.event_type == "LOOT":
+            if tile_state.get("looted", False):
+                descriptions = [
+                    "这里已经被翻过了，只剩下散落的碎屑...",
+                    "空空如也，所有有价值的东西都已经被拿走了...",
+                ]
+            else:
+                descriptions = [
+                    "角落里有一个落满灰尘的储物柜，似乎还没人打开过...",
+                    "这里散落着一些物品，看起来还有可用的东西...",
+                    "桌子上放着一个箱子，上面还带着锁...",
+                    "地上有一个被遗弃的医疗包...",
+                ]
+            return random.choice(descriptions)
+
+        # CLUE类型
+        elif tile.event_type == "CLUE":
+            if tile_state.get("collected", False):
+                return "你已经收集过这里的线索了..."
+            else:
+                name = tile_state.get("name", "")
+                descriptions = [
+                    f"这里有一份引人注目的文件——{name}..." if name else "这里有可疑的痕迹...",
+                    "墙上贴着一张已经泛黄的纸条...",
+                    "地板下面似乎藏着什么东西...",
+                ]
+                return random.choice(descriptions)
+
+        # BOSS类型
+        elif tile.event_type == "BOSS":
+            name = tile_state.get("name", "未知存在")
+            if not tile_state.get("alive", True):
+                return f"⚠️ {name}的残骸散落在地，威胁已经解除..."
+            else:
+                desc = tile_state.get("description", "")
+                if desc:
+                    return f"⚠️ {desc}"
+                return f"⚠️ {name}在这里！空气中充满了杀意！"
+
+        # SURVIVOR类型
+        elif tile.event_type == "SURVIVOR":
+            name = tile_state.get("name", "幸存者")
+            if tile_state.get("saved") or tile_state.get("killed"):
+                return f"{name}已经离开了这里..."
+            else:
+                desc = tile_state.get("description", "")
+                if desc:
+                    return desc
+                return f"{name}蜷缩在角落里，浑身颤抖..."
+
+        # COGNITION_TAMPER
+        elif tile.event_type == "COGNITION_TAMPER":
+            if sanity < 50:
+                descriptions = [
+                    "空气突然变得粘稠，你的视线开始模糊...",
+                    "你感到一阵眩晕，世界开始扭曲...",
+                ]
+                return random.choice(descriptions)
+            return "这里一片寂静..."
+
+        return "..."
+
+    def _get_current_time_period(self) -> Tuple[str, str]:
+        """
+        获取当前时段信息
+
+        Returns:
+            (时段名称, 时段emoji)
+        """
+        time_config = InnerRealmConfig.get_time_system_config()
+        current_hour = datetime.now().hour
+
+        for period_name, period_config in time_config.items():
+            start_hour = period_config["start_hour"]
+            end_hour = period_config["end_hour"]
+
+            if start_hour > end_hour:
+                if current_hour >= start_hour or current_hour < end_hour:
+                    if period_name == "night":
+                        return "深夜", "🌙"
+                    return period_name, "🌙"
+            else:
+                if start_hour <= current_hour < end_hour:
+                    if period_name == "day":
+                        return "白昼", "☀️"
+                    elif period_name == "dusk":
+                        return "黄昏", "🌅"
+                    return period_name, "🌅"
+
+        return "未知", "❓"
+
+    async def generate_move_feedback(
+        self,
+        session: InnerRealmSession,
+        realm_config: Dict[str, Any]
+    ) -> str:
+        """
+        生成移动后的完整反馈信息
+
+        Args:
+            session: 会话对象
+            realm_config: 里界配置
+
+        Returns:
+            完整的移动反馈消息
+        """
+        display_name = realm_config.get("display_name", "未知里界")
+
+        # 获取当前地块
+        tile = await self.get_current_tile(session)
+
+        # 解析会话状态
+        clue_count = len(json.loads(session.clue_collected) if session.clue_collected else [])
+
+        # 理智状态指示器
+        sanity_icon = "🟢"
+        if session.sanity <= 10:
+            sanity_icon = "💀"
+        elif session.sanity <= 30:
+            sanity_icon = "🔴"
+        elif session.sanity <= 50:
+            sanity_icon = "🟡"
+
+        # 渲染迷你地图
+        minimap = await self._render_minimap(session, realm_config)
+
+        # 获取方向提示
+        nearby_tiles = await self.uow.inner_realm_tiles.get_nearby_tiles(
+            session.id, session.x, session.y, radius=2
+        )
+        direction_hints = self._get_direction_hints(session, nearby_tiles, max_hints=3)
+
+        # 生成氛围描述
+        atmosphere = ""
+        if tile:
+            atmosphere = self._generate_atmosphere_description(tile, session.sanity)
+
+        # 组装完整消息
+        lines = [
+            f"🌌 {display_name} · ({session.x}, {session.y})",
+            "━━━━━━━━━━━━━",
+            minimap,
+            "━━━━━━━━━━━━━",
+            f"{sanity_icon} 理智:{session.sanity} | ⚔️{session.killed_count} | 🛡️{session.saved_count} | 📖{clue_count}/5",
+        ]
+
+        # 添加方向提示
+        if direction_hints:
+            lines.append("━━━━━━━━━━━━━")
+            for hint in direction_hints:
+                lines.append(hint)
+
+        # 添加氛围描述
+        if atmosphere:
+            lines.append("━━━━━━━━━━━━━")
+            lines.append(atmosphere)
+
+        return "\n".join(lines)
+
+    async def observe_surroundings(
+        self,
+        session: InnerRealmSession,
+        realm_config: Dict[str, Any]
+    ) -> str:
+        """
+        观察周围环境（比移动反馈更详细）
+
+        Args:
+            session: 会话对象
+            realm_config: 里界配置
+
+        Returns:
+            详细的观察信息
+        """
+        display_name = realm_config.get("display_name", "未知里界")
+        time_period_name, time_emoji = self._get_current_time_period()
+
+        # 获取当前地块
+        tile = await self.get_current_tile(session)
+
+        # 解析会话状态
+        session_state = json.loads(session.state) if session.state else {}
+        clue_count = len(json.loads(session.clue_collected) if session.clue_collected else [])
+        boss_defeated = session_state.get("boss_defeated", False)
+
+        # 理智状态指示器
+        sanity_icon = "🟢"
+        if session.sanity <= 10:
+            sanity_icon = "💀"
+        elif session.sanity <= 30:
+            sanity_icon = "🔴"
+        elif session.sanity <= 50:
+            sanity_icon = "🟡"
+
+        # 渲染迷你地图
+        minimap = await self._render_minimap(session, realm_config)
+
+        # 获取方向提示（增加到4条）
+        nearby_tiles = await self.uow.inner_realm_tiles.get_nearby_tiles(
+            session.id, session.x, session.y, radius=2
+        )
+        direction_hints = self._get_direction_hints(session, nearby_tiles, max_hints=4)
+
+        # 生成氛围描述
+        atmosphere = ""
+        if tile:
+            atmosphere = self._generate_atmosphere_description(tile, session.sanity)
+
+        # 组装详细观察消息
+        lines = [
+            f"🌌 {display_name} · ({session.x}, {session.y})",
+            f"{time_emoji} 时段：{time_period_name}",
+            "━━━━━━━━━━━━━",
+            minimap,
+            "━━━━━━━━━━━━━",
+            f"{sanity_icon} 理智:{session.sanity}/100 | ⚔️击杀:{session.killed_count} | 🛡️救出:{session.saved_count} | 📖线索:{clue_count}/5",
+        ]
+
+        if boss_defeated:
+            lines.append("🏆 核心BOSS已击败")
+
+        # 当前位置可交互目标
+        if tile:
+            tile_state = json.loads(tile.state) if tile.state else {}
+            interact_lines = self._get_interaction_options(tile, tile_state)
+            if interact_lines:
+                lines.append("━━━━━━━━━━━━━")
+                lines.append("🎯 当前位置：")
+                lines.extend(interact_lines)
+
+        # 添加方向提示
+        if direction_hints:
+            lines.append("━━━━━━━━━━━━━")
+            lines.append("📡 周围感知：")
+            for hint in direction_hints:
+                lines.append(f"  {hint}")
+
+        # 添加氛围描述
+        if atmosphere:
+            lines.append("━━━━━━━━━━━━━")
+            lines.append(atmosphere)
+
+        # 可用操作提示
+        lines.append("━━━━━━━━━━━━━")
+        lines.append("💡 可用命令：【上/下/左/右】移动 | 【里界信息】查看进度 | 【返回】离开")
+
+        return "\n".join(lines)
+
+    def _get_interaction_options(
+        self,
+        tile: InnerRealmTile,
+        tile_state: Dict[str, Any]
+    ) -> List[str]:
+        """
+        获取当前位置的可交互选项
+
+        Args:
+            tile: 当前地块
+            tile_state: 地块状态
+
+        Returns:
+            交互选项文字列表
+        """
+        options = []
+
+        if tile.event_type == "NPC":
+            name = tile_state.get("name", "未知NPC")
+            if tile_state.get("alive", True):
+                hp = tile_state.get("hp", 0)
+                max_hp = tile_state.get("max_hp", hp)
+                options.append(f"  👤 {name} (HP:{hp}/{max_hp})")
+                options.append("  → 【交谈】【威吓】【处决】【攻击】")
+            else:
+                options.append(f"  💀 {name} (已死亡)")
+
+        elif tile.event_type == "LOOT":
+            if tile_state.get("looted", False):
+                options.append("  ◽ 已搜刮完毕")
+            else:
+                options.append("  📦 可搜刮的物资")
+                options.append("  → 【搜刮】")
+
+        elif tile.event_type == "CLUE":
+            name = tile_state.get("name", "线索")
+            if tile_state.get("collected", False):
+                options.append(f"  ✅ {name} (已收集)")
+            else:
+                options.append(f"  📜 {name}")
+                options.append("  → 【搜刮】收集线索")
+
+        elif tile.event_type == "BOSS":
+            name = tile_state.get("name", "核心BOSS")
+            if tile_state.get("alive", True):
+                hp = tile_state.get("hp", 0)
+                max_hp = tile_state.get("max_hp", hp)
+                options.append(f"  👹 {name} (HP:{hp}/{max_hp})")
+                options.append("  → 【攻击】【交谈】【威吓】")
+            else:
+                options.append(f"  🏆 {name} (已击败)")
+
+        elif tile.event_type == "SURVIVOR":
+            name = tile_state.get("name", "幸存者")
+            if tile_state.get("saved") or tile_state.get("killed"):
+                options.append(f"  ◽ {name} (已处理)")
+            else:
+                options.append(f"  🆘 {name}")
+                options.append("  → 【救助】【交谈】【处决】")
+
+        elif tile.event_type == "EMPTY":
+            options.append("  ▫️ 空旷区域")
+
+        return options

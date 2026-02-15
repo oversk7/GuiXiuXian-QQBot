@@ -1977,6 +1977,7 @@ async def handle_inner_realm_help(event: MessageEvent, args: Message = CommandAr
         "【传送 里界名】 进入指定里界\n"
         "【上/下/左/右】 在地图上移动（25×25地图）\n"
         "【移动 方向】 移动（方向：上/下/左/右）\n"
+        "【观察】 仔细查看当前位置和周围环境\n"
         "【里界信息】 查看当前里界统计\n"
         "【返回】 离开里界并结算结局\n"
         "\n"
