@@ -1231,8 +1231,8 @@ items:
       rarity: "red"
       durability: 300
       required_level: 10
-      attr_bonus: {"hp": 100, "attack": 100, "agility": 100, "defense": 100}
-      attr_ratio: {"hp": 1.0, "attack": 1.0, "agility": 1.0, "defense": 1.0}
+      attr_bonus: {"hp": 100, "attack": 100, "agility": 100}
+      attr_ratio: {"hp": 3.0, "attack": 2.0, "agility": 2.0}
       special_effects:
         - trigger: "on_attacked"
           effect: "reflect_death"
