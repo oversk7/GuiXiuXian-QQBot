@@ -196,11 +196,15 @@ realms:
         dialogue:
           - "又来了新的...病人..."
           - "实验...必须继续..."
+          - "你的体检报告呢？没有？那先去三楼抽个血吧...抽完就不疼了"
+          - "今晚的手术排到凌晨三点了。你排在...让我看看...第七台"
+          - "上一个护士辞职了。不对，是'出院'了。她的器官...我是说她的离职手续办得很顺利"
+          - "别去地下室。不是因为危险，是因为你还没到该去的时候"
         loot:
           - item_id: "medical_record_key"
             quantity: 1
             probability: 1.0
-          - item_id: "inner_corrupted_bandage"
+          - item_id: "stained_infusion_bag"
             quantity: 1
             probability: 0.8
           - gold: 200
@@ -217,6 +221,10 @@ realms:
         dialogue:
           - "这次的'病人'质量不错..."
           - "别紧张，只是小手术..."
+          - "你有医保吗？没有也没关系。你身上的东西...比医保值钱多了"
+          - "我已经做了一千三百台手术了。成功率百分之百——当然，成功的标准是器官完好取出"
+          - "我劝你别乱跑。不是为了你好，是因为运动后的器官质量会下降"
+          - "上个月有个病人试图逃跑。他跑到大门口才发现，大门外面还是走廊"
         loot:
           - item_id: "surgery_notes"
             quantity: 1
@@ -236,6 +244,11 @@ realms:
         attack: 30
         defense: 10
         description: "穿着病号服的人，表情呆滞"
+        dialogue:
+          - "我忘了自己是怎么来的了...我一直在这里吗？"
+          - "你也是来体检的？真巧...这个月来体检的人特别多"
+          - "我的室友昨晚被推去做检查，到现在都没回来。不过护士说一切正常"
+          - "你有没有觉得这里的饭菜味道怪怪的？吃完以后总是特别困"
         loot:
           - gold: 100
           - item_id: "broken_id"
@@ -251,11 +264,16 @@ realms:
         defense: 40
         description: "看起来是普通病患，但攻击后会暴露真身..."
         reveal_description: "病患的皮肤开始扭曲，露出腐烂的内脏！"
+        dialogue:
+          - "你能帮我找一下我的病历吗？我记得放在...你身体里面"
+          - "我在这里住了很久了。久到我都忘了自己原来长什么样"
+          - "你闻到了吗？好香...是从你身上传来的"
+          - "别看我的眼睛。不是我不让你看——是那不是我的眼睛"
         loot:
-          - item_id: "twisted_flesh"
+          - item_id: "discolored_meal_tray"
             quantity: 1
             probability: 0.9
-          - item_id: "corrupted_core"
+          - item_id: "cracked_specimen_jar"
             quantity: 1
             probability: 0.3
           - gold: 500
@@ -268,6 +286,8 @@ realms:
         dialogue:
           - "求求你...不要杀我..."
           - "我只是来看病的...他们把我关在这里..."
+          - "他们说我的体检结果'非常优秀'，然后就再也没让我出去过"
+          - "你有手机吗？我想打个电话...不，算了，上一个借我手机的人第二天就不见了"
         save_reward:
           - item_id: "favor_token"
             quantity: 1
@@ -279,6 +299,8 @@ realms:
         dialogue:
           - "我是来看朋友的...结果被困在这里..."
           - "这里不对劲...所有人都疯了..."
+          - "我朋友上周住进来做个小手术，但我来的时候他的床位已经空了。护士说他'康复出院'了——可他的手机和钱包还在枕头下面"
+          - "你听到了吗？墙壁里面有声音。不是水管的声音，是...呼吸声"
         save_reward:
           - item_id: "visitor_pass"
             quantity: 1
@@ -288,27 +310,28 @@ realms:
     clues:
       - id: "patient_record_1"
         name: "1号病历"
-        description: "患者：张三，入院原因：健康体检。症状：无。备注：器官质量优良"
-        reveal: "所谓的'病人'都是被绑架的健康人"
+        description: "患者：张三。入院原因：年度体检。备注栏用红笔写着六个字——'心、肝、脾、肺、肾'，每个字后面都打了勾。最后一行手写：'全部合格，优先处理。'"
+        reveal: "所谓的'体检'是对器官的评估。这里的'病人'从未生过病"
 
       - id: "patient_record_2"
         name: "2号病历"
-        description: "患者：李四，入院原因：失眠。症状：无。备注：肾脏已摘取，心脏待用"
+        description: "患者：李四。入院原因：失眠。症状一栏写着'无'。但在第三页夹着一张配型报告——血型B+，HLA六位点全合。病历最后的签名日期是入院当天，出院日期也是入院当天"
+        reveal: "从入院到'出院'只用了一天。失眠只是诱饵，配型才是目的"
 
       - id: "nurse_diary"
         name: "护士日记"
-        description: "今天又送来一批'病人'...院长说这是为了医学进步...但那些惨叫声..."
-        reveal: "护士们知道真相，但被迫执行"
+        description: "字迹从第一页的工整渐渐变得潦草。最后几页写着：'今天又送来一批。院长说这是救人，我起初也这么相信。但被救的人我一个都没见过，被送走的人我再也没见过。冰柜里的箱子越来越多。我数了，四十七个。'"
+        reveal: "护士们从一开始就被蒙在鼓里。等到明白真相的时候，她们已经是共犯了"
 
       - id: "surgery_schedule"
         name: "手术排期表"
-        description: "密密麻麻的手术记录，每天都有数十台'器官摘取手术'"
-        reveal: "这是一个器官摘取工厂"
+        description: "一份密密麻麻的排期表，每天安排八到十二台手术，全部标注为'器官摘取'。最后一栏不是'术后护理'，而是'处理方式'——大部分写着'焚化'，少数几个写着'回收利用'"
+        reveal: "手术不是为了治病，而是一条流水线。病人进去，器官出来，剩下的部分被当作医疗废物处理"
 
       - id: "director_memo"
         name: "院长备忘录"
-        description: "黑市需求旺盛，本月目标：心脏20颗、肾脏40颗、肝脏15颗..."
-        reveal: "院长是幕后主谋，为黑市提供器官"
+        description: "一份手写备忘录，语气平静得像在记账：'本月目标——心脏20颗、肾脏40颗、肝脏15颗。王总催得紧，东南亚那边的订单积压了。另：三号病房的那个记者处理掉，她问的问题太多了。'"
+        reveal: "院长不只是执行者，他是整条黑色产业链的核心节点。那个'问太多问题的记者'，可能就是下一个消失的人"
 
     # BOSS配置
     boss:
@@ -321,6 +344,9 @@ realms:
       dialogue:
         - "欢迎来到第三病栋，我们这里医疗水平一流..."
         - "不用担心，手术很快就结束了..."
+        - "你知道一颗健康的心脏在黑市上值多少钱吗？比你想象的多得多。而你的心跳听起来非常...值钱"
+        - "每一个进来的人都说要揭发我们。但你猜怎么着？他们最后都'出院'了——以另一种方式"
+        - "我不是坏人。我只是在做一门生意。你的身体是原材料，仅此而已"
       special_skills:
         - "召唤护士（召唤2个护士NPC）"
         - "器官窃取（造成伤害并恢复自身生命）"
@@ -342,12 +368,12 @@ realms:
       butcher:
         display_name: "屠夫"
         condition: "killed_count >= 20"
-        description: "你杀光了病栋里的所有生命，血流成河。第三病栋在你的屠杀下崩塌，化为虚无..."
+        description: "你杀光了病栋里的所有生命。走廊安静下来的时候，你才注意到自己身上的病号服不知道什么时候换成了白大褂。监控室的屏幕上播放着你的画面，下方滚动着一行字：'新任值班医生已就位。'你想脱下白大褂，但它已经长在了你的皮肤上"
         rewards:
-          - item_id: "inner_corrupted_bandage"
+          - item_id: "stained_infusion_bag"
             quantity: 50
             probability: 1.0
-          - item_id: "twisted_flesh"
+          - item_id: "discolored_meal_tray"
             quantity: 20
             probability: 1.0
           - gold: 5000
@@ -356,9 +382,9 @@ realms:
       truth:
         display_name: "真相揭露"
         condition: "clue_collected >= 5"
-        description: "你拼凑出了完整的真相：这是一个器官摘取工厂。你发现了院长的罪证，第三病栋的秘密终于大白..."
+        description: "你拼凑出了完整的真相——器官摘取、黑市交易、失踪的记者。你把所有证据装进包里冲出了大门。三天后，你坐在派出所里把一切都说了。警察认真地做了笔录，最后问了一句：'您说的这家医院...我们的系统里查不到任何记录。您确定它存在过吗？'"
         rewards:
-          - item_id: "corrupted_core"
+          - item_id: "cracked_specimen_jar"
             quantity: 1
             probability: 1.0
           - item_id: "achievement_truth_seeker"
@@ -369,7 +395,7 @@ realms:
       rescue:
         display_name: "救世主"
         condition: "saved_count >= 3"
-        description: "你救出了病栋里的幸存者，他们感激涕零。虽然无法阻止过去的悲剧，但你至少拯救了这些无辜的生命..."
+        description: "你带着幸存者们找到了出口。阳光刺得所有人睁不开眼。你数了数人头，三个人，和你进来时救下的数目一致。但当你再仔细看的时候——他们的脸你一个都不认识了。他们也用陌生的眼神看着你，好像从来不记得你救过他们"
         rewards:
           - item_id: "favor_token"
             quantity: 5
@@ -383,7 +409,7 @@ realms:
       hunter:
         display_name: "猎诡者"
         condition: "boss_defeated"
-        description: "你击败了院长，摧毁了这个罪恶的器官工厂。第三病栋被封印，再也不会有人受害..."
+        description: "院长倒在血泊中，金丝眼镜碎成两半。你从他口袋里翻出一本通讯录——上面密密麻麻写满了名字和电话。你认出其中一个号码。那是你自己的。旁边用红笔标注着：'心脏A+，年轻健康，已确认入院时间。'"
         rewards:
           - item_id: "director_key"
             quantity: 1
@@ -397,21 +423,80 @@ realms:
       annihilation:
         display_name: "完全毁灭"
         condition: "killed_count >= 20 AND boss_defeated"
-        description: "你杀光了病栋里的一切生命，包括幕后黑手院长。第三病栋在血与火中彻底毁灭，不留任何痕迹..."
+        description: "一切都结束了。病栋在你身后坍塌，化为一片废墟。你站在瓦砾上大口呼吸着新鲜空气。手机突然响了，是一条短信：'您预约的年度体检已确认，地点：第四病栋。'你从未预约过任何体检"
         rewards:
-          - item_id: "inner_corrupted_bandage"
+          - item_id: "stained_infusion_bag"
             quantity: 100
             probability: 1.0
-          - item_id: "twisted_flesh"
+          - item_id: "discolored_meal_tray"
             quantity: 30
             probability: 1.0
-          - item_id: "corrupted_core"
+          - item_id: "cracked_specimen_jar"
             quantity: 3
             probability: 1.0
           - item_id: "achievement_annihilator"
             quantity: 1
             probability: 1.0
           - gold: 15000
+
+    # 特殊事件配置（EMPTY地块概率触发的交互式隐藏事件）
+    special_events:
+      - id: "phantom_phone"
+        name: "公用电话"
+        description: "走廊尽头的公用电话突然响了起来。在这个废弃的病栋里，不应该有电话还能工作。铃声在空旷的走廊里回荡，固执而有节奏，像是某种邀请"
+        trigger_chance: 0.08
+        sanity_threshold: 70
+        once_per_session: true
+        choices:
+          - id: "answer"
+            label: "接听电话"
+            text: "你拿起听筒，里面传来沙沙的白噪音。然后一个声音说：'你的检查结果出来了，一切正常。请到三楼护士站办理出院手续。'你从未在这里做过任何检查。听筒那头传来一声叹息，然后电话断了"
+            sanity_change: -8
+            bonus_clue: "patient_record_1"
+          - id: "ignore"
+            label: "无视它"
+            text: "你转身走开。电话还在响。你走了二十步，三十步，五十步——铃声的音量没有变化，就像它一直就在你耳边"
+            sanity_change: -3
+
+      - id: "mirror_self"
+        name: "走廊镜子"
+        description: "走廊拐角处有一面落地镜。你从余光里看到镜中的自己——但它没有跟着你走。它停在原地，歪着头看着你，嘴角似乎在微微上扬"
+        trigger_chance: 0.06
+        sanity_threshold: 50
+        once_per_session: true
+        choices:
+          - id: "look_closer"
+            label: "仔细观察"
+            text: "你走近镜子。镜中的你也走近了。你看清了它的脸——和你一模一样，除了嘴巴。它的嘴角裂到了耳根。它贴着镜面，用你的声音说：'我才是真的那个。你才是倒影'"
+            sanity_change: -15
+            effect: "identity_confusion"
+          - id: "smash"
+            label: "砸碎镜子"
+            text: "你一拳砸碎了镜面。碎片散落一地，每一片里都映着你的脸。但角度不对——它们映出的不是现在的你，而是躺在手术台上的你"
+            sanity_change: -10
+            item_reward: "flickering_night_light"
+          - id: "walk_away"
+            label: "快步走开"
+            text: "你加快脚步离开。身后传来'咚咚咚'的声音，像是有人在用拳头敲玻璃。你没有回头"
+            sanity_change: -5
+
+      - id: "hidden_recording"
+        name: "录音设备"
+        description: "护士站的抽屉里有一台老式录音机，磁带还在慢慢转动。旁边贴着一张纸条：'如需帮助请播放此录音'"
+        trigger_chance: 0.05
+        sanity_threshold: 999
+        once_per_session: true
+        choices:
+          - id: "play"
+            label: "播放录音"
+            text: "录音里是一个女人的声音，语速很快，像是在偷偷说话：'如果你能听到这段话，说明你还活着。不要相信任何穿白大褂的人。出口不在一楼——在地下。他们每天凌晨三点换班，那是唯一的窗口。'录音到这里突然中断，然后是一声尖叫"
+            sanity_change: 5
+            bonus_clue: "nurse_diary"
+          - id: "take_tape"
+            label: "取走磁带"
+            text: "你把磁带装进口袋。磁带的标签上写着一个名字——和你在护士签到表上看到的最后一个名字一样。她留下了这段录音，然后就'出院'了"
+            sanity_change: 0
+            item_reward: "stained_infusion_bag"
 
 # 属性修正映射
 attribute_modifiers:

@@ -701,6 +701,14 @@ async def _handle_move(event: MessageEvent, dx: int, dy: int):
         # 移动成功后生成完整反馈
         feedback = await service.generate_move_feedback(active_session, realm_config)
 
+        # 检查是否触发特殊事件（在认知篡改之前）
+        tile = await service.get_current_tile(active_session)
+        if tile:
+            special_event = await service.check_special_event(active_session, tile)
+            if special_event:
+                event_desc = await service.present_special_event(active_session, special_event)
+                return f"{feedback}\n\n{event_desc}"
+
         # 检查是否触发认知篡改
         tamper_warning = ""
         tamper_event = await service.check_cognition_tamper(active_session)
@@ -761,3 +769,41 @@ async def handle_right(event: MessageEvent):
     """向右移动"""
     result_msg = await _handle_move(event, 1, 0)
     await right_cmd.finish(result_msg)
+
+
+# ==================== 特殊事件选择命令 ====================
+choose_cmd = on_command("选择", rule=in_inner_realm_rule, block=True, priority=4, permission=SUPERUSER)
+
+
+@choose_cmd.handle()
+async def handle_choose(event: MessageEvent, args: Message = CommandArg()):
+    """处理特殊事件选择"""
+    arg_text = args.extract_plain_text().strip()
+
+    if not arg_text:
+        await choose_cmd.finish("⛔ 格式错误\n正确格式：选择 <选项名>")
+
+    def session_factory():
+        return AsyncSessionLocal()
+
+    async with UnitOfWork(session_factory) as uow:
+        player = await get_unified_player(uow.session, event)
+        if not player:
+            error_msg = "⛔ 请先创建角色"
+        elif not player.inner_realm:
+            error_msg = "⛔ 你不在任何里界中"
+        else:
+            error_msg = None
+            service = InnerRealmService(uow)
+
+            active_session = await service.get_active_session(player.id, player.inner_realm)
+            if not active_session:
+                error_msg = "⛔ 会话数据错误"
+            else:
+                success, result = await service.resolve_special_event(player, active_session, arg_text)
+                result_msg = result
+
+    if error_msg:
+        await choose_cmd.finish(error_msg)
+    else:
+        await choose_cmd.finish(result_msg)

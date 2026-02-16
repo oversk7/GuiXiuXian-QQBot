@@ -2911,36 +2911,36 @@ items:
       tags: ["inner_realm_only"]
 
     # ========== 里界材料（战利品） ==========
-    - item_id: "inner_corrupted_bandage"
-      name: "污染绷带"
-      description: "被诡异力量污染的医用绷带，散发着不详的气息 🩹"
+    - item_id: "stained_infusion_bag"
+      name: "发黄的输液袋"
+      description: "塑料已经发黄发脆，里面残留的液体呈现不正常的暗红色。标签上写着一个从未听说过的药品名"
       type: "MATERIAL"
       rarity: "green"
       price: 800
       grudge_value: 50
       tags: ["inner_realm_only"]
 
-    - item_id: "twisted_flesh"
-      name: "扭曲血肉"
-      description: "从伪装者身上剥离的扭曲血肉，仍在微微蠕动 🥩"
+    - item_id: "discolored_meal_tray"
+      name: "变色的病号餐"
+      description: "铝制餐盘上的食物早已辨认不出原样。米饭变成了灰紫色，最诡异的是这份餐食似乎还在微微冒着热气"
       type: "MATERIAL"
       rarity: "blue"
       price: 2000
       grudge_value: 150
       tags: ["inner_realm_only"]
 
-    - item_id: "corrupted_core"
-      name: "腐化之心"
-      description: "诡异的核心结晶，蕴含着强大的污染之力 💎"
+    - item_id: "cracked_specimen_jar"
+      name: "碎裂的标本瓶"
+      description: "玻璃瓶身布满蛛网状裂纹，福尔马林早已蒸发殆尽。标签上隐约看到'正常'两个字"
       type: "MATERIAL"
       rarity: "purple"
       price: 5000
       grudge_value: 500
       tags: ["inner_realm_only"]
 
-    - item_id: "soul_essence"
-      name: "游魂精华"
-      description: "从里界收集的游魂精华，可用于强化装备或炼丹 👻"
+    - item_id: "flickering_night_light"
+      name: "忽明忽暗的夜灯"
+      description: "床头小夜灯，插头早已不在插座上却仍在一闪一闪地发着光。灯罩内壁凝结着一层白色的雾气"
       type: "MATERIAL"
       rarity: "blue"
       price: 3000

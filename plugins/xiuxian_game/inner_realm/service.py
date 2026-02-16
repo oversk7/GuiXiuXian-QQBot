@@ -49,6 +49,10 @@ class InnerRealmService:
             "风从不知道哪里吹来，带着消毒水的味道",
             "地板上有一串干涸的脚印，延伸向远处",
             "你踩到了什么东西——是一颗掉落的纽扣",
+            "墙上的挂钟还在走动。但秒针每走一格都要停顿两秒",
+            "护士站签到表上最后一个日期是三年前。但墨水看起来是湿的",
+            "走廊里的饮水机发出咕噜声，水箱里还有大半桶水。这不应该",
+            "你经过一间病房，七张床七个枕头上都有凹陷的头印",
         ],
         "medium": [  # 理智 30-50
             "你确信刚才有人在你身后，但转身后什么也没有...",
@@ -57,6 +61,10 @@ class InnerRealmService:
             "你闻到一股若有若无的血腥味...",
             "走廊的灯光突然变成了暗红色，几秒后恢复正常",
             "你的影子似乎比平时更长了...",
+            "广播系统突然播报：'三号病房的患者请回到床位。' 声音听起来像是你自己的",
+            "你数了一下走廊两侧的门——去的时候十二扇，回来的时候变成了十三扇",
+            "有人在护士站留了一杯咖啡。杯壁是温热的。但这层楼除了你没有活人",
+            "地板上的脚印突然中断了。你低头看了看自己的脚——你也没有留下脚印",
         ],
         "low": [  # 理智 < 30
             "地面在你脚下蠕动...",
@@ -65,6 +73,10 @@ class InnerRealmService:
             "你看到了另一个自己站在走廊尽头，对你微笑...",
             "天花板上的裂缝组成了一张脸，正在对你说话...",
             "你的手指开始变得透明...摇了摇头，恢复了正常",
+            "你发现手术台上躺着的人穿着跟你一模一样的衣服。你没有走近去看脸",
+            "手机显示一条未读消息：'别回头。' 发送者是你自己，发送时间是明天",
+            "你走过一面镜子，镜子里的你没有跟着走。它站在原地，慢慢转过头来看着你",
+            "电梯门开了，里面站满了人，全都面朝墙壁。你按下关门键，电梯开始下行——但这栋楼没有地下室",
         ],
     }
 
@@ -402,7 +414,9 @@ class InnerRealmService:
                      "sensory_distorted", "sensory_remaining_steps",
                      "time_dilated", "time_dilation_remaining_steps",
                      "identity_confused", "identity_confusion_uses",
-                     "truth_inverted"]:
+                     "truth_inverted", "truth_inversion_remaining_steps",
+                     "tamper_cooldown",
+                     "pending_special_event", "triggered_special_events"]:
             state.pop(key, None)
         session.state = json.dumps(state, ensure_ascii=False)
 
@@ -657,15 +671,15 @@ class InnerRealmService:
             # 随机材料奖励（1-2个）- 仅使用里界专属物品
             material_pool = [
                 {"item_id": "broken_id", "quantity": random.randint(1, 3), "probability": 0.8},  # 白色 - 破损证件
-                {"item_id": "inner_corrupted_bandage", "quantity": 1, "probability": 0.5},  # 绿色 - 污染绷带（里界材料）
+                {"item_id": "stained_infusion_bag", "quantity": 1, "probability": 0.5},  # 绿色 - 污染绷带（里界材料）
                 {"item_id": "scalpel", "quantity": 1, "probability": 0.6},  # 绿色 - 手术刀（里界专属）
                 {"item_id": "visitor_pass", "quantity": 1, "probability": 0.4},  # 绿色 - 访客通行证
             ]
 
             # 稀有材料（低概率）- 仅使用里界专属物品
             rare_pool = [
-                {"item_id": "twisted_flesh", "quantity": 1, "probability": 0.2},  # 蓝色 - 扭曲血肉（里界专属）
-                {"item_id": "corrupted_core", "quantity": 1, "probability": 0.15},  # 紫色 - 腐化之心（里界专属）
+                {"item_id": "discolored_meal_tray", "quantity": 1, "probability": 0.2},  # 蓝色 - 扭曲血肉（里界专属）
+                {"item_id": "cracked_specimen_jar", "quantity": 1, "probability": 0.15},  # 紫色 - 腐化之心（里界专属）
                 {"item_id": "medical_record_key", "quantity": 1, "probability": 0.1},  # 蓝色 - 病历室钥匙
                 {"item_id": "surgery_notes", "quantity": 1, "probability": 0.08},  # 蓝色 - 手术笔记
             ]
@@ -819,6 +833,15 @@ class InnerRealmService:
             if state["time_dilation_remaining_steps"] <= 0:
                 state["time_dilated"] = False
                 del state["time_dilation_remaining_steps"]
+        # 真相反转消退
+        if state.get("truth_inverted") and "truth_inversion_remaining_steps" in state:
+            state["truth_inversion_remaining_steps"] -= 1
+            if state["truth_inversion_remaining_steps"] <= 0:
+                state["truth_inverted"] = False
+                del state["truth_inversion_remaining_steps"]
+        # 认知篡改触发冷却递减
+        if state.get("tamper_cooldown", 0) > 0:
+            state["tamper_cooldown"] -= 1
 
         session.state = json.dumps(state, ensure_ascii=False)
 
@@ -985,12 +1008,51 @@ class InnerRealmService:
         Returns:
             触发的篡改事件配置，未触发返回None
         """
+        # 理智雪崩保护：理智为0时不再触发新篡改
+        if session.sanity <= 0:
+            return None
+
+        state = json.loads(session.state) if session.state else {}
+
+        # 触发冷却检查
+        if state.get("tamper_cooldown", 0) > 0:
+            return None
+
+        # 统计当前已激活的篡改效果数量，最多同时2种
+        active_tamper_count = 0
+        active_tamper_ids = set()
+        if state.get("phantom_npc_active"):
+            active_tamper_count += 1
+            active_tamper_ids.add("phantom_npc")
+        if state.get("memory_altered"):
+            active_tamper_count += 1
+            active_tamper_ids.add("memory_alteration")
+        if state.get("sensory_distorted"):
+            active_tamper_count += 1
+            active_tamper_ids.add("sensory_distortion")
+        if state.get("time_dilated"):
+            active_tamper_count += 1
+            active_tamper_ids.add("time_dilation")
+        if state.get("identity_confused"):
+            active_tamper_count += 1
+            active_tamper_ids.add("identity_confusion")
+        if state.get("truth_inverted"):
+            active_tamper_count += 1
+            active_tamper_ids.add("truth_inversion")
+
+        if active_tamper_count >= 2:
+            return None
+
         cognition_config = InnerRealmConfig.get_global_config().get("cognition_tamper_system", {})
         tamper_types = cognition_config.get("tamper_types", {})
 
         # 根据理智值过滤可触发的篡改
         available_tampers = []
         for tamper_id, tamper_config in tamper_types.items():
+            # 跳过已激活的同类型篡改
+            if tamper_id in active_tamper_ids:
+                continue
+
             # 检查是否是极度危险的篡改（只在理智<30时触发）
             is_critical = tamper_config.get("critical", False)
             if is_critical and session.sanity >= 30:
@@ -999,12 +1061,12 @@ class InnerRealmService:
             # 检查触发概率
             trigger_chance = tamper_config.get("trigger_chance", 0)
 
-            # 理智值越低，触发概率越高
+            # 理智值越低，触发概率越高（降低倍率防止雪崩）
             sanity_multiplier = 1.0
             if session.sanity < 30:
-                sanity_multiplier = 2.0
+                sanity_multiplier = 1.8
             elif session.sanity < 50:
-                sanity_multiplier = 1.5
+                sanity_multiplier = 1.3
 
             adjusted_chance = min(1.0, trigger_chance * sanity_multiplier)
 
@@ -1080,8 +1142,12 @@ class InnerRealmService:
             state["identity_confusion_uses"] = 1  # 使用一次后消失
 
         elif tamper_id == "truth_inversion":
-            # 真相反转
+            # 真相反转（增加消退步数）
             state["truth_inverted"] = True
+            state["truth_inversion_remaining_steps"] = 10
+
+        # 设置触发冷却（3步内不再触发新篡改）
+        state["tamper_cooldown"] = 3
 
         # 保存状态
         session.state = json.dumps(state, ensure_ascii=False)
@@ -1099,6 +1165,220 @@ class InnerRealmService:
         lines.extend([f"  • {effect}" for effect in effects])
 
         return "\n".join(lines)
+
+    # ==================== 特殊事件系统 ====================
+
+    async def check_special_event(
+        self,
+        session: InnerRealmSession,
+        tile: InnerRealmTile
+    ) -> Optional[Dict[str, Any]]:
+        """
+        检查EMPTY地块是否触发特殊事件
+
+        Args:
+            session: 会话对象
+            tile: 当前地块
+
+        Returns:
+            触发的特殊事件配置，未触发返回None
+        """
+        # 只在EMPTY地块触发
+        if tile.event_type != "EMPTY":
+            return None
+
+        # 获取里界配置
+        realm_config = InnerRealmConfig.get_realm_config(session.realm_name)
+        if not realm_config:
+            return None
+
+        special_events = realm_config.get("special_events", [])
+        if not special_events:
+            return None
+
+        state = json.loads(session.state) if session.state else {}
+        triggered_events = state.get("triggered_special_events", [])
+
+        for event in special_events:
+            event_id = event["id"]
+
+            # once_per_session 检查
+            if event.get("once_per_session", True) and event_id in triggered_events:
+                continue
+
+            # 理智阈值检查
+            sanity_threshold = event.get("sanity_threshold", 999)
+            if session.sanity >= sanity_threshold:
+                continue
+
+            # 概率触发
+            trigger_chance = event.get("trigger_chance", 0)
+            if random.random() < trigger_chance:
+                return event
+
+        return None
+
+    async def present_special_event(
+        self,
+        session: InnerRealmSession,
+        event: Dict[str, Any]
+    ) -> str:
+        """
+        展示特殊事件描述和选项，将待处理事件存入session.state
+
+        Args:
+            session: 会话对象
+            event: 事件配置
+
+        Returns:
+            事件描述和选项提示文本
+        """
+        state = json.loads(session.state) if session.state else {}
+        state["pending_special_event"] = event["id"]
+        session.state = json.dumps(state, ensure_ascii=False)
+        await self.uow.commit()
+
+        lines = [
+            "━━━━━━━━━━━━━",
+            f"🔮 {event['name']}",
+            "━━━━━━━━━━━━━",
+            event.get("description", ""),
+            "",
+            "你要怎么做？"
+        ]
+
+        for choice in event.get("choices", []):
+            lines.append(f"  ▸ 【选择 {choice['label']}】")
+
+        return "\n".join(lines)
+
+    async def resolve_special_event(
+        self,
+        player: Player,
+        session: InnerRealmSession,
+        choice_label: str
+    ) -> Tuple[bool, str]:
+        """
+        解析特殊事件选择，应用效果
+
+        Args:
+            player: 玩家对象
+            session: 会话对象
+            choice_label: 玩家选择的标签
+
+        Returns:
+            (成功与否, 结果描述)
+        """
+        state = json.loads(session.state) if session.state else {}
+        pending_event_id = state.get("pending_special_event")
+
+        if not pending_event_id:
+            return False, "⛔ 当前没有待处理的事件"
+
+        # 获取事件配置
+        realm_config = InnerRealmConfig.get_realm_config(session.realm_name)
+        if not realm_config:
+            return False, "⛔ 配置错误"
+
+        special_events = realm_config.get("special_events", [])
+        event = None
+        for e in special_events:
+            if e["id"] == pending_event_id:
+                event = e
+                break
+
+        if not event:
+            return False, "⛔ 事件不存在"
+
+        # 查找匹配的选项
+        matched_choice = None
+        for choice in event.get("choices", []):
+            if choice["label"] == choice_label:
+                matched_choice = choice
+                break
+
+        if not matched_choice:
+            available = "、".join([c["label"] for c in event.get("choices", [])])
+            return False, f"⛔ 无效选择，可选项：{available}"
+
+        # 清除pending状态
+        del state["pending_special_event"]
+
+        # 记录已触发事件
+        triggered_events = state.get("triggered_special_events", [])
+        if pending_event_id not in triggered_events:
+            triggered_events.append(pending_event_id)
+            state["triggered_special_events"] = triggered_events
+
+        # 应用理智变化
+        sanity_change = matched_choice.get("sanity_change", 0)
+        if sanity_change != 0:
+            await self.modify_sanity(session, sanity_change, f"特殊事件：{event['name']}")
+
+        # 应用认知篡改效果
+        effect = matched_choice.get("effect")
+        if effect:
+            if effect == "identity_confusion":
+                state["identity_confused"] = True
+                state["identity_confusion_uses"] = 1
+
+        # 应用物品奖励
+        item_desc = ""
+        item_reward_id = matched_choice.get("item_reward")
+        if item_reward_id:
+            from ..models.inventory import ItemInstance
+            from ..config import config
+
+            item_data = config.get_item_by_id(item_reward_id)
+            if item_data:
+                item_instance = ItemInstance(
+                    player_id=player.id,
+                    item_id=item_reward_id,
+                    quantity=1,
+                    is_equipped=False
+                )
+                self.uow.session.add(item_instance)
+                item_desc = f"\n📦 获得：{item_data.get('name', item_reward_id)} x1"
+
+        # 应用额外线索
+        clue_desc = ""
+        bonus_clue = matched_choice.get("bonus_clue")
+        if bonus_clue:
+            clue_collected = json.loads(session.clue_collected) if session.clue_collected else []
+            if bonus_clue not in clue_collected:
+                clue_collected.append(bonus_clue)
+                session.clue_collected = json.dumps(clue_collected, ensure_ascii=False)
+                # 查找线索名称
+                clues = realm_config.get("clues", [])
+                clue_name = bonus_clue
+                for c in clues:
+                    if c["id"] == bonus_clue:
+                        clue_name = c["name"]
+                        break
+                clue_desc = f"\n🔍 发现线索：{clue_name}"
+
+        session.state = json.dumps(state, ensure_ascii=False)
+        await self.uow.commit()
+
+        # 构建结果消息
+        result_text = matched_choice.get("text", "...")
+        sanity_text = ""
+        if sanity_change > 0:
+            sanity_text = f"\n💚 理智 +{sanity_change}"
+        elif sanity_change < 0:
+            sanity_text = f"\n💔 理智 {sanity_change}"
+
+        lines = [
+            "━━━━━━━━━━━━━",
+            f"🔮 {event['name']} — {matched_choice['label']}",
+            "━━━━━━━━━━━━━",
+            result_text,
+            sanity_text,
+            item_desc,
+            clue_desc
+        ]
+
+        return True, "\n".join([l for l in lines if l])
 
     # ==================== 结局结算 ====================
 
