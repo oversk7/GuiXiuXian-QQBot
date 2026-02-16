@@ -9,8 +9,9 @@ from ..models.player import Player
 from ..models.inventory import ItemInstance
 from ..models.inventory import ItemType, ItemEffectType
 from ..utils import message_add_head, paginate_items
-from sqlalchemy import select
+from sqlalchemy import select, func
 from ..config import config
+from ..queries.inventory_queries import query_inventory_page, query_inventory_usage
 from .item_effects import apply_effect
 from datetime import date
 from ..models.elixir_usage import ElixirUsageLog
@@ -443,9 +444,14 @@ async def handle_inventory(event: MessageEvent, args: Message = CommandArg()):
     elif len(params) > 2:
         await inventory_cmd.finish("⛔ 格式错误，正确格式：背包 [类型/物品名称] [页数]")
 
-    # --- 获取背包数据 ---
+    # 装备/鱼类提前拦截（无需查 DB）
+    if category_key == "EQUIPMENT":
+        await inventory_cmd.finish("⚔️ 装备不在背包中显示\n💡 请使用 /装备栏 查看装备信息")
+    if category_key == "FISH":
+        await inventory_cmd.finish("🐟 鱼类不再占用背包空间\n💡 请使用 /鱼栏 查看鱼类存量")
+
+    # --- 获取玩家身份 ---
     async with safe_session() as session:
-        # 使用跨平台工具获取玩家数据
         from ..platform_utils import get_unified_player, is_guild_message
         player = await get_unified_player(session, event)
         if not player:
@@ -453,138 +459,105 @@ async def handle_inventory(event: MessageEvent, args: Message = CommandArg()):
                 await inventory_cmd.finish("⛔ 你还没有创建角色或绑定账号\n💡 请先在群聊注册角色，然后使用绑定功能")
             else:
                 await inventory_cmd.finish("⛔ 请先创建角色")
+        player_id = player.id
+        inventory_capacity = player.inventory_capacity
+        effective_capacity = await player.get_effective_inventory_capacity(session)
 
+    # --- 处理查询特定物品（SQL SUM） ---
+    if query_item_name:
+        item_config = config.items_config["by_name"].get(query_item_name)
+        if not item_config:
+            await inventory_cmd.finish(f"⛔ 不存在物品：{query_item_name}")
+
+        if item_config.type == ItemType.EQUIPMENT:
+            await inventory_cmd.finish(f"⚔️ {query_item_name} 是装备类物品\n💡 请使用 /装备栏 查看装备信息")
+        if item_config.is_fish:
+            await inventory_cmd.finish(f"🐟 {query_item_name} 存放在鱼栏中\n💡 请使用 /鱼栏 查看鱼类存量")
+
+        from ..queries import readonly_session as _readonly_session
+        async with _readonly_session() as session:
+            total_quantity = (await session.execute(
+                select(func.sum(ItemInstance.quantity))
+                .where(
+                    ItemInstance.player_id == player_id,
+                    ItemInstance.item_id == item_config.item_id,
+                    ItemInstance.quantity > 0,
+                )
+            )).scalar() or 0
+
+        if total_quantity == 0:
+            await inventory_cmd.finish(f"🎒 背包中没有 {query_item_name}")
+
+        type_cn = TYPE_NAME_MAP.get(item_config.type.value, item_config.type.value)
+        if item_config.item_id.endswith("_elixir"):
+            type_cn = "丹药"
+
+        lines = [
+            f"🔍 物品查询结果",
+            f"━━━━━━━━━━━━━",
+            f"📦 物品名称：{item_config.name}",
+            f"🔢 拥有数量：{total_quantity}",
+            f"📋 物品类型：{type_cn}",
+            f"📝 物品描述：{item_config.description}"
+        ]
+        await inventory_cmd.finish(message_add_head("\n".join(lines), event))
+
+    # --- 分类查看：DB 层过滤 + 分页 ---
+    page_size = config.game_config["game"]["inventory_page_size"]
+
+    if category_key:
+        items, total = await query_inventory_page(
+            player_id=player_id,
+            category=category_key,
+            page=page,
+            page_size=page_size,
+        )
+        if not items:
+            await inventory_cmd.finish("🎒 该分类下暂无物品")
+
+        used_slots = await query_inventory_usage(player_id)
+        capacity_info = f"📦 容量：{used_slots}/{effective_capacity}"
+        if effective_capacity > inventory_capacity:
+            capacity_info += f" (💳+{effective_capacity - inventory_capacity})"
+
+        # query_inventory_page 已完成分页，此处 page=1 以输出全部返回条目
+        formatted = await paginate_items(items, 1, page_size=page_size, capacity_info=capacity_info)
+        await inventory_cmd.finish(message_add_head(formatted, event))
+
+    # --- 全背包视图：Python 端跨分类排序 ---
+    from ..queries import readonly_session as _readonly_session
+    async with _readonly_session() as session:
         result = await session.execute(
             select(ItemInstance)
-            .where(ItemInstance.player_id == player.id)
-            .where(ItemInstance.quantity > 0)
+            .where(ItemInstance.player_id == player_id, ItemInstance.quantity > 0)
         )
-        all_items: list[ItemInstance] = result.scalars().all()
+        all_items: list[ItemInstance] = list(result.scalars().all())
 
-        # 过滤掉装备，装备不在背包中显示
-        inventory_items: list[ItemInstance] = [item for item in all_items if not item.is_equipment and not item.is_fish]
-        items: list[ItemInstance] = list(inventory_items)
+    inventory_items = [item for item in all_items if not item.is_equipment and not item.is_fish]
+    if not inventory_items:
+        await inventory_cmd.finish("🎒 你的背包空无一物")
 
-        if not inventory_items:
-            await inventory_cmd.finish("🎒 你的背包空无一物")
+    def _is_elixir(inst: ItemInstance) -> bool:
+        return inst.config.item_id.endswith("_elixir")
 
-        # --- 处理查询特定物品 ---
-        if query_item_name:
-            # 查找物品配置
-            item_config = config.items_config["by_name"].get(query_item_name)
-            if not item_config:
-                await inventory_cmd.finish(f"⛔ 不存在物品：{query_item_name}")
+    def _category_id(inst: ItemInstance) -> str:
+        if inst.config.type == ItemType.CONSUMABLE:
+            return "ELIXIR" if _is_elixir(inst) else "CONSUMABLE_NON_ELIXIR"
+        return inst.config.type.value
 
-            # 如果查询的是装备，提示使用装备栏查看
-            if item_config.type == ItemType.EQUIPMENT:
-                await inventory_cmd.finish(f"⚔️ {query_item_name} 是装备类物品\n💡 请使用 /装备栏 查看装备信息")
+    order_map = {k: i for i, k in enumerate(CATEGORY_ORDER)}
+    inventory_items.sort(key=lambda it: (order_map.get(_category_id(it), 99), it.config.name))
 
-            if item_config.is_fish:
-                await inventory_cmd.finish(f"🐟 {query_item_name} 存放在鱼栏中\n💡 请使用 /鱼栏 查看鱼类存量")
+    total_pages = (len(inventory_items) - 1) // page_size + 1
+    page = max(1, min(page, total_pages))
 
-            # 统计该物品的总数量（从所有物品中查找，不只是背包物品）
-            matching_items = [item for item in all_items if item.item_id == item_config.item_id]
+    used_slots = len(inventory_items)
+    capacity_info = f"📦 容量：{used_slots}/{effective_capacity}"
+    if effective_capacity > inventory_capacity:
+        capacity_info += f" (💳+{effective_capacity - inventory_capacity})"
 
-            if not matching_items:
-                await inventory_cmd.finish(f"� 背包中没有 {query_item_name}")
-
-            # 普通物品显示总数量
-            total_quantity = sum(item.quantity for item in matching_items)
-
-            # 获取物品类型的中文名称
-            type_cn = TYPE_NAME_MAP.get(item_config.type.value, item_config.type.value)
-
-            # 特殊处理丹药类型
-            if item_config.item_id.endswith("_elixir"):
-                type_cn = "丹药"
-
-            lines = [
-                f"🔍 物品查询结果",
-                f"━━━━━━━━━━━━━",
-                f"📦 物品名称：{item_config.name}",
-                f"🔢 拥有数量：{total_quantity}",
-                f"📋 物品类型：{type_cn}",
-                f"📝 物品描述：{item_config.description}"
-            ]
-
-            result_msg = "\n".join(lines)
-            await inventory_cmd.finish(message_add_head(result_msg, event))
-
-        # ----------- Python 端分类过滤 -----------
-        def _is_elixir(inst: ItemInstance) -> bool:
-            return inst.config.item_id.endswith("_elixir")
-
-        def _category_id(inst: ItemInstance) -> str:
-            if inst.config.type == ItemType.CONSUMABLE:
-                return "ELIXIR" if _is_elixir(inst) else "CONSUMABLE_NON_ELIXIR"
-            return inst.config.type.value  # MATERIAL / GOODS / EQUIPMENT
-
-        if category_key:
-            if category_key == "EQUIPMENT":
-                # 装备不在背包中显示，提示使用装备栏
-                await inventory_cmd.finish("⚔️ 装备不在背包中显示\n💡 请使用 /装备栏 查看装备信息")
-            elif category_key == "FISH":
-                await inventory_cmd.finish("🐟 鱼类不再占用背包空间\n💡 请使用 /鱼栏 查看鱼类存量")
-            elif category_key == "ELIXIR":
-                items = [it for it in items if _is_elixir(it)]
-            elif category_key == "CONSUMABLE":
-                items = [it for it in items if it.config.type == ItemType.CONSUMABLE and not _is_elixir(it)]
-            else:
-                items = [it for it in items if it.config.type.value == category_key]
-
-            if not items:
-                await inventory_cmd.finish("🎒 该分类下暂无物品")
-
-        # 排序（仅全背包视图按固定顺序）
-        if not category_key:
-            order_map = {k: i for i, k in enumerate(CATEGORY_ORDER)}
-            items.sort(key=lambda it: (order_map.get(_category_id(it), 99), it.config.name))
-        else:
-            # 指定分类时按名称排序即可
-            items.sort(key=lambda it: it.config.name)
-
-        # ---------- 分页 ----------
-        page_size = config.game_config["game"]["inventory_page_size"]
-        total_pages = (len(items) - 1) // page_size + 1
-        page = max(1, min(page, total_pages))
-
-        # 获取容量信息（包含月卡加成）
-        effective_capacity = await player.get_effective_inventory_capacity(session)
-        # 计算已使用的背包格数（装备不计入）
-        used_slots = len(inventory_items)
-        capacity_info = f"📦 容量：{used_slots}/{effective_capacity}"
-
-        # 如果有月卡加成，显示详细信息
-        if effective_capacity > player.inventory_capacity:
-            bonus = effective_capacity - player.inventory_capacity
-            capacity_info += f" (💳+{bonus})"
-
-        try:
-            formatted = await paginate_items(items, page, page_size=page_size, capacity_info=capacity_info)
-            print(f"[背包调试] paginate_items 成功，formatted 类型: {type(formatted)}")
-
-            final_message = message_add_head(formatted, event)
-            print(f"[背包调试] message_add_head 成功，final_message 类型: {type(final_message)}")
-
-            # 调试信息：在控制台打印发送给玩家的完整消息
-            print(f"[背包调试] 玩家 {player.nickname}(UID:{player.uid}) 查看背包第{page}页:")
-            print("=" * 50)
-            print(final_message)
-            print("=" * 50)
-
-            print(f"[背包调试] 准备调用 inventory_cmd.send()")
-            print(f"[背包调试] final_message 内容长度: {len(str(final_message))}")
-            print(f"[背包调试] final_message 内容预览: {str(final_message)[:200]}...")
-
-            try:
-                await inventory_cmd.send(final_message)
-            except Exception as send_error:
-                print(f"[背包调试] send() 调用失败: {type(send_error).__name__}: {send_error}")
-        except Exception as e:
-            print(f"[背包调试] 发生异常: {type(e).__name__}: {e}")
-            import traceback
-            traceback.print_exc()
-            raise
+    formatted = await paginate_items(inventory_items, page, page_size=page_size, capacity_info=capacity_info)
+    await inventory_cmd.finish(message_add_head(formatted, event))
 
 
 @fish_inventory_cmd.handle()

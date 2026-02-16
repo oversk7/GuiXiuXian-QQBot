@@ -20,6 +20,7 @@ from ..config import config
 from ..infrastructure.uow import UnitOfWork
 from ..domain.attributes import get_effective_attributes_v2
 from ..infrastructure.repositories.account_transfer_log_repository import AccountTransferLogRepository
+from ..queries.player_queries import query_player_profile
 
 
 def _format_player_location(player: Player) -> str:
@@ -60,66 +61,76 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
         except ValueError:
             await profile.finish("⛔ UID 必须为数字")
 
-    # 使用UnitOfWork统一所有查询，确保事务原子性
-    async with UnitOfWork(AsyncSessionLocal) as uow:
-        # 1. 获取玩家
-        if target_uid is not None:
-            stmt = select(Player).where(Player.uid == target_uid)
-            result = await uow.session.execute(stmt)
-            player = result.scalars().first()
-            if not player:
-                await profile.finish("⛔ 未找到该 UID")
-        else:
-            # 使用跨平台工具获取玩家数据
+    quest_extra = ""  # 存储任务/成就检查结果
+
+    # ===== 查看他人面板：纯只读路径 =====
+    if target_uid is not None:
+        profile_data = await query_player_profile(target_uid)
+        if not profile_data:
+            await profile.finish("⛔ 未找到该 UID")
+        player = profile_data.player
+        effective_attrs = profile_data.effective_attrs
+        bonus = profile_data.equipment_bonus
+        guild_name = profile_data.guild_name
+    else:
+        # ===== 查看自己面板：保留 UoW 路径（含导航更新等写操作） =====
+        async with UnitOfWork(AsyncSessionLocal) as uow:
             player = await get_unified_player(uow.session, event)
 
-        if not player:
-            if is_guild_message(event):
-                await profile.finish("⛔ 你还没有创建角色或绑定账号\n💡 请先在群聊注册角色，然后使用绑定功能")
-            else:
-                await profile.finish("⛔ 你还没有创建角色")
+            if not player:
+                if is_guild_message(event):
+                    await profile.finish("⛔ 你还没有创建角色或绑定账号\n💡 请先在群聊注册角色，然后使用绑定功能")
+                else:
+                    await profile.finish("⛔ 你还没有创建角色")
 
-        # 2. 更新坐标（若在自动导航）
-        player_upd = await uow.session.get(Player, player.id)
-        task = await uow.session.get(NavigationTask, player.id)
-        if player_upd and task:
-            reached = await _update_nav_position(player_upd, task, uow.session)
-            if reached:
-                await uow.session.delete(task)
-            await uow.commit()  # 立即提交导航更新
-            # 同步内存对象用于展示
-            # 只有在现实世界时才同步x,y坐标，在副本中保持副本坐标
-            if not player.is_in_dungeon():
-                player.x = player_upd.x
-                player.y = player_upd.y
-            # 始终同步现实世界坐标
-            if hasattr(player, "real_world_x"):
-                player.real_world_x = player_upd.real_world_x
-                player.real_world_y = player_upd.real_world_y
+            # 更新坐标（若在自动导航）
+            player_upd = await uow.session.get(Player, player.id)
+            task = await uow.session.get(NavigationTask, player.id)
+            if player_upd and task:
+                reached = await _update_nav_position(player_upd, task, uow.session)
+                if reached:
+                    await uow.session.delete(task)
+                await uow.commit()
+                if not player.is_in_dungeon():
+                    player.x = player_upd.x
+                    player.y = player_upd.y
+                if hasattr(player, "real_world_x"):
+                    player.real_world_x = player_upd.real_world_x
+                    player.real_world_y = player_upd.real_world_y
 
-        # 3. 获取有效属性（使用AttributeCalculator v2）
-        effective_attrs = await get_effective_attributes_v2(player, uow.session)
+            effective_attrs = await get_effective_attributes_v2(player, uow.session)
 
-        # 4. 统计装备加成用于显示
-        bonus = defaultdict(int)
-        equip_ids = config.items_config["by_type"]["EQUIPMENT"]
-        eq_stmt = select(ItemInstance).where(
-            ItemInstance.player_id == player.id,
-            ItemInstance.equipped == True,
-            ItemInstance.item_id.in_(equip_ids)
-        )
-        equiped_list = (await uow.session.execute(eq_stmt)).scalars().all()
-        for eq in equiped_list:
-            delta = (eq.extra_attrs or {}).get("_persist_bonus", {})
-            for k, v in delta.items():
-                bonus[k] += int(v)
+            bonus = defaultdict(int)
+            equip_ids = config.items_config["by_type"]["EQUIPMENT"]
+            eq_stmt = select(ItemInstance).where(
+                ItemInstance.player_id == player.id,
+                ItemInstance.equipped == True,
+                ItemInstance.item_id.in_(equip_ids)
+            )
+            equiped_list = (await uow.session.execute(eq_stmt)).scalars().all()
+            for eq in equiped_list:
+                delta = (eq.extra_attrs or {}).get("_persist_bonus", {})
+                for k, v in delta.items():
+                    bonus[k] += int(v)
 
-        # 5. 获取公会信息
-        guild_name = "无所属"
-        if player.guild_id:
-            g_obj = await uow.session.get(Guild, player.guild_id)
-            if g_obj:
-                guild_name = g_obj.name
+            guild_name = "无所属"
+            if player.guild_id:
+                g_obj = await uow.session.get(Guild, player.guild_id)
+                if g_obj:
+                    guild_name = g_obj.name
+
+            # 新手任务和成就检查（需要活跃的 session）
+            from ..quest.novice_quest_service import NoviceQuestService
+            quest_completed, quest_msg = await NoviceQuestService.check_and_advance_quest(
+                uow.session, player, "command", {"command": "角色"}
+            )
+            if quest_completed and quest_msg:
+                quest_extra = f"\n\n{quest_msg}"
+
+            from ..achievement.achievement_service import AchievementService
+            achievement_msgs = await AchievementService.check_achievements(uow.session, player)
+            if achievement_msgs:
+                quest_extra += "\n\n" + "\n".join(achievement_msgs)
 
     # 7. 格式化属性显示
     def fmt(attr_key: str, effective_value: int):
@@ -178,21 +189,8 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
         f"┃☞【装备栏】【社交系统】{unread_notice}"
     )
 
-    # 检查新手任务（仅检查自己的面板，不检查查询他人）
-    if target_uid is None:
-        from ..quest.novice_quest_service import NoviceQuestService
-        quest_completed, quest_msg = await NoviceQuestService.check_and_advance_quest(
-            uow.session, player, "command", {"command": "角色"}
-        )
-
-        if quest_completed and quest_msg:
-            content += f"\n\n{quest_msg}"
-
-        # 检查财富类成就（查看面板时统一检查）
-        from ..achievement.achievement_service import AchievementService
-        achievement_msgs = await AchievementService.check_achievements(uow.session, player)
-        if achievement_msgs:
-            content += "\n\n" + "\n".join(achievement_msgs)
+    # 附加任务/成就检查结果（仅查看自己面板时有值）
+    content += quest_extra
 
     # 使用图鉴类模板美化显示（仅在QQ平台且查看自己面板时使用）
     if target_uid is None and hasattr(event, 'get_user_id'):
