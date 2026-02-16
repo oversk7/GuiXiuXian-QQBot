@@ -101,21 +101,34 @@ async def generate_exp_table(max_level: int = 100) -> str:
     return str(output_path)
 
 
-async def paginate_items(items: list, page: int, page_size: Optional[int] = None, capacity_info: str = None) -> str:
+async def paginate_items(items: list, page: int, page_size: Optional[int] = None, capacity_info: str = None, total_items: Optional[int] = None) -> str:
     """分页格式化背包物品
 
     • 普通物品显示数量：✖️{qty}
     • 装备显示耐久：🛠️ {cur}/{max}
+
+    Args:
+        total_items: 当调用方已在 DB 层完成分页时，传入过滤后的真实总条目数。
+                     此时 items 被视为"当前页"，不再做 Python 切片。
+                     未提供时退化为 len(items) 并在 Python 端切片。
     """
     # 从配置获取分页大小
     cfg_page_size = config.game_config["game"]["inventory_page_size"]
     page_size = page_size or cfg_page_size
-    start = (page - 1) * page_size
-    end = start + page_size
-    current_page_items = items[start:end]
 
-    # 计算总页数时使用实际分页大小
-    total_pages = (len(items) - 1) // page_size + 1
+    if total_items is not None:
+        # DB 层已分页：items 就是当前页，不再切片
+        current_page_items = items
+        start = (page - 1) * page_size
+        count = total_items
+    else:
+        # Python 端切片
+        start = (page - 1) * page_size
+        end = start + page_size
+        current_page_items = items[start:end]
+        count = len(items)
+
+    total_pages = max(1, (count - 1) // page_size + 1)
     page_info = f"\n📖 第 {page} 页（共 {total_pages} 页)"
 
     # 添加容量信息

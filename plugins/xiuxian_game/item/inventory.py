@@ -520,8 +520,8 @@ async def handle_inventory(event: MessageEvent, args: Message = CommandArg()):
         if effective_capacity > inventory_capacity:
             capacity_info += f" (💳+{effective_capacity - inventory_capacity})"
 
-        # query_inventory_page 已完成分页，此处 page=1 以输出全部返回条目
-        formatted = await paginate_items(items, 1, page_size=page_size, capacity_info=capacity_info)
+        # query_inventory_page 已完成 DB 层分页，传入 page 和 total_items 以正确显示页码
+        formatted = await paginate_items(items, page, page_size=page_size, capacity_info=capacity_info, total_items=total)
         await inventory_cmd.finish(message_add_head(formatted, event))
 
     # --- 全背包视图：Python 端跨分类排序 ---
