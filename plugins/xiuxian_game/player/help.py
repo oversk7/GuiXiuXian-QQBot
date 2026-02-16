@@ -1,10 +1,11 @@
-from nonebot import on_command
+from nonebot import on_command, on_message
 from nonebot.permission import SUPERUSER
 from nonebot.adapters.qq import MessageEvent, Message, MessageSegment
 from nonebot.adapters.qq.message import MessageKeyboard,MessageArk
 from nonebot.adapters.qq.models import MessageArkKv, MessageArk, MessageArkObj, MessageArkObjKv
 from nonebot.adapters.qq.models.common import MessageMarkdown, MessageMarkdownParams
 from nonebot.params import CommandArg
+from nonebot.rule import to_me
 import os
 from ..models import Player
 from ..models.inventory import ItemInstance, ItemType
@@ -54,6 +55,16 @@ async def handle_help(event: MessageEvent, args: Message = CommandArg()):
         "💡 官群：962494679"
     )
     await help_cmd.finish(Message(msg))
+
+# 空消息@机器人 → 触发帮助
+empty_at_cmd = on_message(rule=to_me(), priority=99, block=True)
+@empty_at_cmd.handle()
+async def handle_empty_at(event: MessageEvent):
+    """用户仅@机器人不说话时，等同于触发帮助"""
+    text = event.get_plaintext().strip()
+    if text:
+        return
+    await handle_help(event, Message())
 
 # ==================== 8大帮助模块 ====================
 
