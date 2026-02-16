@@ -27,7 +27,7 @@ async def in_inner_realm_rule(event: MessageEvent) -> bool:
         async with UnitOfWork(session_factory) as uow:
             player = await get_unified_player(uow.session, event)
             return player is not None and player.inner_realm is not None
-    except Exception:
+    except (ValueError, AttributeError, KeyError):
         return False
 
 
@@ -290,16 +290,12 @@ async def handle_exit_realm(event: MessageEvent):
             f"🧠 最终理智: {final_sanity}/100 (+{recovered_amount})"
         ]
 
-        # 显示奖励（当前暂不发放，Phase 2实现）
-        if ending_info.get("rewards"):
+        # 显示实际发放的奖励
+        reward_desc = ending_info.get("reward_desc", "")
+        if reward_desc and reward_desc != "无" and reward_desc != "什么也没得到...":
             lines.append("━━━━━━━━━━━━━")
             lines.append("🎁 获得奖励:")
-            for reward in ending_info["rewards"]:
-                item_name = reward.get("name", "未知物品")
-                amount = reward.get("amount", 1)
-                lines.append(f"  • {item_name} x{amount}")
-
-            lines.append("\n💡 提示: 奖励发放功能将在后续版本实现")
+            lines.append(reward_desc)
 
         result_msg = "\n".join(lines)
         await exit_realm_cmd.finish(result_msg)
@@ -589,6 +585,10 @@ async def handle_view_clues(event: MessageEvent):
         # 获取线索详情
         all_clues = {c["id"]: c for c in realm_config.get("clues", [])}
 
+        # 检查真相反转状态
+        state = json.loads(active_session.state) if active_session.state else {}
+        truth_inverted = state.get("truth_inverted", False)
+
         lines = [
             "📖 已收集线索",
             "━━━━━━━━━━━━━",
@@ -601,7 +601,10 @@ async def handle_view_clues(event: MessageEvent):
             lines.append(f"📝 {clue.get('name', clue_id)}")
             lines.append(f"   {clue.get('description', '...')}")
             if clue.get("reveal"):
-                lines.append(f"   💡 {clue.get('reveal')}")
+                reveal_text = clue.get('reveal')
+                if truth_inverted:
+                    reveal_text = f"（以上是谎言）{reveal_text}"
+                lines.append(f"   💡 {reveal_text}")
             lines.append("")
 
         lines.append("━━━━━━━━━━━━━")
@@ -680,6 +683,9 @@ async def _handle_move(event: MessageEvent, dx: int, dy: int):
         active_session = await service.get_active_session(player.id, player.inner_realm)
         if not active_session:
             return "⛔ 会话数据错误"
+
+        # 检查每日刷新
+        await service.check_and_refresh_session(active_session)
 
         # 获取里界配置
         realm_config = InnerRealmConfig.get_realm_config(player.inner_realm)

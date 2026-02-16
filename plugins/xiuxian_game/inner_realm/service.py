@@ -40,6 +40,34 @@ class DiceRollResult:
 class InnerRealmService:
     """里界系统核心服务"""
 
+    # EMPTY 地块随机遭遇文本池（按理智分级）
+    EMPTY_ENCOUNTERS = {
+        "high": [  # 理智 > 50
+            "走廊尽头传来若有若无的脚步声...",
+            "你看到墙上有一道奇怪的划痕",
+            "天花板上的灯管闪烁了一下",
+            "风从不知道哪里吹来，带着消毒水的味道",
+            "地板上有一串干涸的脚印，延伸向远处",
+            "你踩到了什么东西——是一颗掉落的纽扣",
+        ],
+        "medium": [  # 理智 30-50
+            "你确信刚才有人在你身后，但转身后什么也没有...",
+            "墙壁上的涂鸦似乎在变化...",
+            "远处传来金属碰撞的声音，像是有人在拖拽什么",
+            "你闻到一股若有若无的血腥味...",
+            "走廊的灯光突然变成了暗红色，几秒后恢复正常",
+            "你的影子似乎比平时更长了...",
+        ],
+        "low": [  # 理智 < 30
+            "地面在你脚下蠕动...",
+            "你听到了自己的名字，但声音是从你体内传来的...",
+            "墙壁开始流血...不，那只是生锈的水管...",
+            "你看到了另一个自己站在走廊尽头，对你微笑...",
+            "天花板上的裂缝组成了一张脸，正在对你说话...",
+            "你的手指开始变得透明...摇了摇头，恢复了正常",
+        ],
+    }
+
     def __init__(self, uow: UnitOfWork):
         """
         初始化里界服务
@@ -49,15 +77,63 @@ class InnerRealmService:
         """
         self.uow = uow
 
+    # ==================== 冷却系统 ====================
+
+    def check_action_cooldown(self, session: InnerRealmSession, action: str) -> Tuple[bool, int]:
+        """
+        检查操作冷却。
+
+        Args:
+            session: 会话对象
+            action: 操作类型（search/intimidate/assassination/move/battle）
+
+        Returns:
+            (是否可操作, 剩余秒数)
+        """
+        cooldowns_config = InnerRealmConfig.get_global_config().get("cooldowns", {})
+        cooldown_seconds = cooldowns_config.get(action, 0)
+        if cooldown_seconds <= 0:
+            return True, 0
+
+        state = json.loads(session.state) if session.state else {}
+        last_action_times = state.get("last_action_time", {})
+        last_time_str = last_action_times.get(action)
+
+        if not last_time_str:
+            return True, 0
+
+        last_time = datetime.fromisoformat(last_time_str)
+        elapsed = (datetime.now() - last_time).total_seconds()
+        remaining = cooldown_seconds - elapsed
+
+        if remaining > 0:
+            return False, int(remaining) + 1
+        return True, 0
+
+    async def update_action_cooldown(self, session: InnerRealmSession, action: str):
+        """
+        更新操作冷却时间戳。
+
+        Args:
+            session: 会话对象
+            action: 操作类型
+        """
+        state = json.loads(session.state) if session.state else {}
+        if "last_action_time" not in state:
+            state["last_action_time"] = {}
+        state["last_action_time"][action] = datetime.now().isoformat()
+        session.state = json.dumps(state, ensure_ascii=False)
+
     # ==================== 骰子判定系统 ====================
 
-    def roll_2d6(self, attribute_modifier: int = 0, time_bonus: int = 0) -> DiceRollResult:
+    def roll_2d6(self, attribute_modifier: int = 0, time_bonus: int = 0, session: InnerRealmSession = None) -> DiceRollResult:
         """
         执行2D6骰子判定
 
         Args:
             attribute_modifier: 属性修正值
             time_bonus: 时间加成
+            session: 会话对象（可选，用于检查身份混淆）
 
         Returns:
             骰子判定结果
@@ -67,8 +143,20 @@ class InnerRealmService:
         dice2 = random.randint(1, 6)
         base_total = dice1 + dice2
 
+        # 身份混淆惩罚：-3
+        identity_penalty = 0
+        if session:
+            state = json.loads(session.state) if session.state else {}
+            if state.get("identity_confused") and state.get("identity_confusion_uses", 0) > 0:
+                identity_penalty = -3
+                state["identity_confusion_uses"] -= 1
+                if state["identity_confusion_uses"] <= 0:
+                    state["identity_confused"] = False
+                    del state["identity_confusion_uses"]
+                session.state = json.dumps(state, ensure_ascii=False)
+
         # 计算最终结果
-        final_total = base_total + attribute_modifier + time_bonus
+        final_total = base_total + attribute_modifier + time_bonus + identity_penalty
 
         # 判断结果等级
         dice_config = InnerRealmConfig.get_dice_results_config()
@@ -130,12 +218,13 @@ class InnerRealmService:
         # 计算修正值
         return int(attr_value * scale)
 
-    def get_time_bonus(self, action_type: str) -> int:
+    def get_time_bonus(self, action_type: str, session: InnerRealmSession = None) -> int:
         """
         获取当前时间的加成
 
         Args:
             action_type: 行动类型
+            session: 会话对象（可选，用于检查时间错乱）
 
         Returns:
             时间加成值
@@ -143,26 +232,60 @@ class InnerRealmService:
         time_config = InnerRealmConfig.get_time_system_config()
         current_hour = datetime.now().hour
 
-        # 判断当前时段
+        # 时间错乱效果：反转时间加成
+        time_dilated = False
+        if session:
+            state = json.loads(session.state) if session.state else {}
+            time_dilated = state.get("time_dilated", False)
+
+        # 收集所有时段的加成
+        day_bonus = 0
+        night_bonus = 0
+
+        for period_name, period_config in time_config.items():
+            bonuses = period_config.get("bonuses", {})
+            if action_type == "search":
+                bonus_val = bonuses.get("search", 0)
+            elif action_type in ["intimidate", "assassination"]:
+                bonus_val = bonuses.get("combat", 0)
+            else:
+                bonus_val = 0
+
+            if period_name == "day":
+                day_bonus = bonus_val
+            elif period_name == "night":
+                night_bonus = bonus_val
+
+        # 判断当前时段并返回加成
         for period_name, period_config in time_config.items():
             start_hour = period_config["start_hour"]
             end_hour = period_config["end_hour"]
 
-            # 处理跨日情况（如22:00-6:00）
+            in_period = False
             if start_hour > end_hour:
                 if current_hour >= start_hour or current_hour < end_hour:
-                    bonuses = period_config.get("bonuses", {})
-                    if action_type == "search":
-                        return bonuses.get("search", 0)
-                    elif action_type in ["intimidate", "assassination"]:
-                        return bonuses.get("combat", 0)
+                    in_period = True
             else:
                 if start_hour <= current_hour < end_hour:
-                    bonuses = period_config.get("bonuses", {})
-                    if action_type == "search":
-                        return bonuses.get("search", 0)
-                    elif action_type in ["intimidate", "assassination"]:
-                        return bonuses.get("combat", 0)
+                    in_period = True
+
+            if in_period:
+                bonuses = period_config.get("bonuses", {})
+                if action_type == "search":
+                    bonus = bonuses.get("search", 0)
+                elif action_type in ["intimidate", "assassination"]:
+                    bonus = bonuses.get("combat", 0)
+                else:
+                    bonus = 0
+
+                # 时间错乱：反转加成（白天给夜晚bonus，夜晚给白天bonus）
+                if time_dilated and bonus != 0:
+                    if period_name == "day":
+                        return night_bonus
+                    elif period_name == "night":
+                        return day_bonus
+
+                return bonus
 
         return 0
 
@@ -206,6 +329,85 @@ class InnerRealmService:
         return "\n".join(lines)
 
     # ==================== 里界管理 ====================
+
+    async def check_and_refresh_session(self, session: InnerRealmSession):
+        """
+        检查并执行每日刷新（被动检查模式）。
+        比较 session.last_refresh 与今天日期，跨天则重置可重复资源。
+
+        Args:
+            session: 会话对象
+        """
+        from datetime import date
+
+        last_date = session.last_refresh.date() if session.last_refresh else None
+        today = date.today()
+
+        if last_date and last_date >= today:
+            return  # 今天已刷新过
+
+        logger.info(f"会话 {session.id} 跨天刷新: {last_date} -> {today}")
+
+        # 获取该会话的所有地块
+        from sqlalchemy import select
+        stmt = select(InnerRealmTile).where(InnerRealmTile.session_id == session.id)
+        result = await self.uow.session.execute(stmt)
+        tiles = result.scalars().all()
+
+        refreshed_count = 0
+        for tile in tiles:
+            tile_state = json.loads(tile.state) if tile.state else {}
+
+            if tile.event_type == "LOOT" and tile_state.get("looted"):
+                # 重置 LOOT 地块
+                tile_state["looted"] = False
+                tile.state = json.dumps(tile_state, ensure_ascii=False)
+                tile.is_triggered = False
+                refreshed_count += 1
+
+            elif tile.event_type == "NPC" and not tile_state.get("alive", True):
+                # 复活 NPC
+                tile_state["alive"] = True
+                tile_state["hp"] = tile_state.get("max_hp", 100)
+                tile.state = json.dumps(tile_state, ensure_ascii=False)
+                tile.is_triggered = False
+                refreshed_count += 1
+
+            elif tile.event_type == "SURVIVOR":
+                if tile_state.get("saved") or tile_state.get("killed"):
+                    # 重置幸存者
+                    tile_state["saved"] = False
+                    tile_state["killed"] = False
+                    tile.state = json.dumps(tile_state, ensure_ascii=False)
+                    tile.is_triggered = False
+                    refreshed_count += 1
+
+            elif tile.event_type == "COGNITION_TAMPER" and tile_state.get("triggered"):
+                # 重置认知篡改触发点
+                tile_state["triggered"] = False
+                tile.state = json.dumps(tile_state, ensure_ascii=False)
+                tile.is_triggered = False
+                refreshed_count += 1
+
+            # 注意：CLUE 和 BOSS 不重置（保留进度）
+
+        # 更新刷新时间
+        session.last_refresh = datetime.now()
+
+        # 清除冷却记录和认知篡改状态
+        state = json.loads(session.state) if session.state else {}
+        state.pop("last_action_time", None)
+        # 清除所有认知篡改标记
+        for key in ["phantom_npc_active", "memory_altered",
+                     "sensory_distorted", "sensory_remaining_steps",
+                     "time_dilated", "time_dilation_remaining_steps",
+                     "identity_confused", "identity_confusion_uses",
+                     "truth_inverted"]:
+            state.pop(key, None)
+        session.state = json.dumps(state, ensure_ascii=False)
+
+        await self.uow.commit()
+        logger.info(f"会话 {session.id} 刷新完成，重置了 {refreshed_count} 个地块")
 
     async def get_available_realms(self, player: Player) -> List[Dict[str, Any]]:
         """
@@ -280,6 +482,8 @@ class InnerRealmService:
         # 检查是否已有活跃会话
         existing_session = await self.get_active_session(player.id, realm_name)
         if existing_session:
+            # 检查每日刷新
+            await self.check_and_refresh_session(existing_session)
             return True, f"📍 你已经在 {realm_config['display_name']} 中了", existing_session
 
         # 清理已结算的旧会话（唯一索引 player_id+realm_name 不含 is_settled）
@@ -352,13 +556,23 @@ class InnerRealmService:
         map_size = realm_config.get("size", 25)
         event_weights = realm_config.get("event_weights", {})
 
-        # 创建事件类型池
+        # 创建事件类型池（排除 BOSS，BOSS 单独放置）
         event_pool = []
         for event_type, weight in event_weights.items():
+            if event_type == "BOSS":
+                continue  # BOSS 不进入随机池
             event_pool.extend([event_type] * weight)
 
+        # BOSS 固定生成在远角区域 (18-24, 18-24)
+        boss_x = random.randint(18, min(24, map_size - 1))
+        boss_y = random.randint(18, min(24, map_size - 1))
+
+        # 将 BOSS 坐标存入 session state 以供线索引导使用
+        state = json.loads(session.state) if session.state else {}
+        state["boss_position"] = {"x": boss_x, "y": boss_y}
+        session.state = json.dumps(state, ensure_ascii=False)
+
         tiles = []
-        boss_placed = False  # 确保只生成一个BOSS
 
         for x in range(map_size):
             for y in range(map_size):
@@ -366,18 +580,13 @@ class InnerRealmService:
                 if x == 0 and y == 0:
                     event_type = "EMPTY"
                     state_data = {}
+                # BOSS 固定位置
+                elif x == boss_x and y == boss_y:
+                    event_type = "BOSS"
+                    state_data = self._generate_event_data(event_type, realm_config)
                 else:
                     event_type = random.choice(event_pool)
-
-                    # 如果是BOSS且已经放置过,改为EMPTY
-                    if event_type == "BOSS" and boss_placed:
-                        event_type = "EMPTY"
-
-                    # 为不同事件类型生成具体数据
                     state_data = self._generate_event_data(event_type, realm_config)
-
-                    if event_type == "BOSS":
-                        boss_placed = True
 
                 tile = InnerRealmTile(
                     session_id=session.id,
@@ -393,7 +602,7 @@ class InnerRealmService:
         # 批量添加地块
         await self.uow.inner_realm_tiles.batch_add(tiles)
 
-        logger.info(f"为会话 {session.id} 生成了 {len(tiles)} 个地块")
+        logger.info(f"为会话 {session.id} 生成了 {len(tiles)} 个地块，BOSS位置: ({boss_x}, {boss_y})")
 
     def _generate_event_data(
         self,
@@ -582,6 +791,11 @@ class InnerRealmService:
         if not (0 <= new_x < map_size and 0 <= new_y < map_size):
             return False, "⛔ 超出地图边界"
 
+        # 检查移动冷却
+        can_act, remaining = self.check_action_cooldown(session, "move")
+        if not can_act:
+            return False, f"⏳ 移动冷却中，还需等待 {remaining} 秒"
+
         # 更新位置
         session.x = new_x
         session.y = new_y
@@ -591,7 +805,25 @@ class InnerRealmService:
         visited = set(state.get("visited", []))
         visited.add(f"{new_x},{new_y}")
         state["visited"] = list(visited)
+
+        # 认知篡改步数递减
+        # 感官扭曲递减
+        if state.get("sensory_distorted") and "sensory_remaining_steps" in state:
+            state["sensory_remaining_steps"] -= 1
+            if state["sensory_remaining_steps"] <= 0:
+                state["sensory_distorted"] = False
+                del state["sensory_remaining_steps"]
+        # 时间错乱递减
+        if state.get("time_dilated") and "time_dilation_remaining_steps" in state:
+            state["time_dilation_remaining_steps"] -= 1
+            if state["time_dilation_remaining_steps"] <= 0:
+                state["time_dilated"] = False
+                del state["time_dilation_remaining_steps"]
+
         session.state = json.dumps(state, ensure_ascii=False)
+
+        # 更新移动冷却
+        await self.update_action_cooldown(session, "move")
 
         await self.uow.commit()
 
@@ -601,14 +833,40 @@ class InnerRealmService:
             return True, f"📍 移动到 ({new_x}, {new_y})"
 
         # 根据事件类型返回提示
+        # 感官扭曲效果：交换事件类型显示
+        display_event_type = tile.event_type
+        session_state_check = json.loads(session.state) if session.state else {}
+        if session_state_check.get("sensory_distorted"):
+            swap_map = {
+                "LOOT": "CLUE", "CLUE": "LOOT",
+                "NPC": "EMPTY", "EMPTY": "NPC",
+                "SURVIVOR": "LOOT",
+            }
+            display_event_type = swap_map.get(tile.event_type, tile.event_type)
+
         event_desc = {
-            "EMPTY": "这里一片寂静...",
             "NPC": "你发现了一个人影...",
             "LOOT": "这里似乎有什么东西...",
             "CLUE": "你注意到了一些可疑的痕迹...",
             "BOSS": "⚠️ 一股强大的压迫感袭来！",
             "SURVIVOR": "你听到了微弱的呼救声..."
-        }.get(tile.event_type, "...")
+        }.get(display_event_type, "...")
+
+        # EMPTY 地块 30% 概率触发随机氛围文本
+        if tile.event_type == "EMPTY":
+            # 幻影 NPC 效果：EMPTY 伪装成 NPC
+            if session_state_check.get("phantom_npc_active"):
+                event_desc = "你发现了一个人影..."
+            elif random.random() < 0.3:
+                if session.sanity < 30:
+                    tier = "low"
+                elif session.sanity < 50:
+                    tier = "medium"
+                else:
+                    tier = "high"
+                event_desc = random.choice(self.EMPTY_ENCOUNTERS[tier])
+            else:
+                event_desc = "这里一片寂静..."
 
         return True, f"📍 移动到 ({new_x}, {new_y})\n{event_desc}"
 
@@ -807,16 +1065,19 @@ class InnerRealmService:
             logger.info(f"记忆篡改: 击杀数 {old_count} -> {session.killed_count}")
 
         elif tamper_id == "sensory_distortion":
-            # 标记感官扭曲
+            # 标记感官扭曲，持续5步
             state["sensory_distorted"] = True
+            state["sensory_remaining_steps"] = 5
 
         elif tamper_id == "time_dilation":
-            # 标记时间错乱
+            # 标记时间错乱，持续3步
             state["time_dilated"] = True
+            state["time_dilation_remaining_steps"] = 3
 
         elif tamper_id == "identity_confusion":
-            # 身份混淆（最恐怖）
+            # 身份混淆（最恐怖）- 下一次判定骰子 -3
             state["identity_confused"] = True
+            state["identity_confusion_uses"] = 1  # 使用一次后消失
 
         elif tamper_id == "truth_inversion":
             # 真相反转
@@ -896,6 +1157,17 @@ class InnerRealmService:
             if session.saved_count >= 3:
                 matched_ending = ("rescue", ending)
 
+        # 发放结局奖励
+        if matched_ending:
+            ending_key, ending_config = matched_ending
+            rewards_config = ending_config.get("rewards", [])
+            reward_desc, total_gold, items_obtained = await self._distribute_loot(
+                player, rewards_config, multiplier=1.0
+            )
+        else:
+            ending_key = "default"
+            reward_desc, total_gold, items_obtained = "无", 0, []
+
         # 标记会话已结算
         session.is_settled = True
 
@@ -906,12 +1178,11 @@ class InnerRealmService:
         await self.uow.commit()
 
         if matched_ending:
-            ending_key, ending_config = matched_ending
             return {
                 "ending_key": ending_key,
                 "display_name": ending_config.get("display_name", "未知结局"),
                 "description": ending_config.get("description", ""),
-                "rewards": ending_config.get("rewards", [])
+                "reward_desc": reward_desc,
             }
         else:
             # 默认结局
@@ -919,7 +1190,7 @@ class InnerRealmService:
                 "ending_key": "default",
                 "display_name": "离开",
                 "description": "你离开了这个诡异的地方...",
-                "rewards": []
+                "reward_desc": reward_desc,
             }
 
     # ==================== 奖励发放系统 ====================
@@ -1134,6 +1405,21 @@ class InnerRealmService:
         Returns:
             (是否成功, 结果描述)
         """
+        # 检查搜刮冷却
+        can_act, remaining = self.check_action_cooldown(session, "search")
+        if not can_act:
+            return False, f"⏳ 搜刮冷却中，还需等待 {remaining} 秒"
+
+        # 幻影 NPC 检查：EMPTY 地块上操作时发现是幻觉
+        if tile.event_type == "EMPTY":
+            session_state = json.loads(session.state) if session.state else {}
+            if session_state.get("phantom_npc_active"):
+                session_state["phantom_npc_active"] = False
+                session.state = json.dumps(session_state, ensure_ascii=False)
+                await self.modify_sanity(session, -3, "幻影消散")
+                await self.update_action_cooldown(session, "search")
+                return False, "👻 你伸手触碰那个身影，但手穿过了它——那只是一个幻觉...\n🧠 理智 -3"
+
         # 检查地块类型
         if tile.event_type == "EMPTY":
             return False, "⛔ 这里一片荒芜，没有什么可以搜刮的..."
@@ -1145,13 +1431,14 @@ class InnerRealmService:
 
             # 执行2D6+幸运判定
             modifier = self.calculate_attribute_modifier(player, "search")
-            time_bonus = self.get_time_bonus("search")
-            result = self.roll_2d6(modifier, time_bonus)
+            time_bonus = self.get_time_bonus("search", session)
+            result = self.roll_2d6(modifier, time_bonus, session)
 
             # 根据判定结果给予奖励
             if result.result_level == "critical_failure":
                 # 大失败：触发陷阱，损失理智
                 await self.modify_sanity(session, -10, "搜刮触发陷阱")
+                await self.update_action_cooldown(session, "search")
                 return False, self.format_dice_roll_message(
                     "搜刮检定",
                     result,
@@ -1160,6 +1447,7 @@ class InnerRealmService:
 
             elif result.result_level == "failure":
                 # 失败：没找到东西
+                await self.update_action_cooldown(session, "search")
                 return False, self.format_dice_roll_message(
                     "搜刮检定",
                     result,
@@ -1182,6 +1470,7 @@ class InnerRealmService:
                 state["looted"] = True
                 tile.state = json.dumps(state, ensure_ascii=False)
                 tile.is_triggered = True
+                await self.update_action_cooldown(session, "search")
                 await self.uow.commit()
 
                 # 构建结果消息
@@ -1222,6 +1511,21 @@ class InnerRealmService:
         Returns:
             (是否成功, 结果描述)
         """
+        # 检查威吓冷却
+        can_act, remaining = self.check_action_cooldown(session, "intimidate")
+        if not can_act:
+            return False, f"⏳ 威吓冷却中，还需等待 {remaining} 秒"
+
+        # 幻影 NPC 检查
+        if tile.event_type == "EMPTY":
+            session_state = json.loads(session.state) if session.state else {}
+            if session_state.get("phantom_npc_active"):
+                session_state["phantom_npc_active"] = False
+                session.state = json.dumps(session_state, ensure_ascii=False)
+                await self.modify_sanity(session, -3, "幻影消散")
+                await self.update_action_cooldown(session, "intimidate")
+                return False, "👻 你对着那个身影大声呵斥，但它像烟雾一样消散了...\n🧠 理智 -3"
+
         # 检查地块类型
         if tile.event_type not in ["NPC", "BOSS", "SURVIVOR"]:
             return False, "⛔ 这里没有可以威吓的目标..."
@@ -1241,8 +1545,8 @@ class InnerRealmService:
 
         # 执行2D6+攻击判定
         modifier = self.calculate_attribute_modifier(player, "intimidate")
-        time_bonus = self.get_time_bonus("intimidate")
-        result = self.roll_2d6(modifier, time_bonus)
+        time_bonus = self.get_time_bonus("intimidate", session)
+        result = self.roll_2d6(modifier, time_bonus, session)
 
         if result.result_level == "critical_failure":
             # 大失败：目标逃跑或变异
@@ -1310,6 +1614,7 @@ class InnerRealmService:
 
             # 标记为已威吓
             tile.is_triggered = True
+            await self.update_action_cooldown(session, "intimidate")
             await self.uow.commit()
 
             # 构建结果消息
@@ -1345,6 +1650,21 @@ class InnerRealmService:
         Returns:
             (是否成功, 结果描述)
         """
+        # 检查处决冷却
+        can_act, remaining = self.check_action_cooldown(session, "assassination")
+        if not can_act:
+            return False, f"⏳ 处决冷却中，还需等待 {remaining} 秒"
+
+        # 幻影 NPC 检查
+        if tile.event_type == "EMPTY":
+            session_state = json.loads(session.state) if session.state else {}
+            if session_state.get("phantom_npc_active"):
+                session_state["phantom_npc_active"] = False
+                session.state = json.dumps(session_state, ensure_ascii=False)
+                await self.modify_sanity(session, -3, "幻影消散")
+                await self.update_action_cooldown(session, "assassination")
+                return False, "👻 你的刀刃划过那个身影——什么也没有切到，那只是虚无...\n🧠 理智 -3"
+
         # 检查地块类型
         if tile.event_type not in ["NPC", "SURVIVOR"]:
             return False, "⛔ 这里没有可以处决的目标..."
@@ -1360,12 +1680,13 @@ class InnerRealmService:
 
         # 执行2D6+敏捷判定
         modifier = self.calculate_attribute_modifier(player, "assassination")
-        time_bonus = self.get_time_bonus("assassination")
-        result = self.roll_2d6(modifier, time_bonus)
+        time_bonus = self.get_time_bonus("assassination", session)
+        result = self.roll_2d6(modifier, time_bonus, session)
 
         if result.result_level == "critical_failure":
             # 大失败：目标惨叫，惊动所有人
             await self.modify_sanity(session, -5, "处决失败")
+            await self.update_action_cooldown(session, "assassination")
             return False, self.format_dice_roll_message(
                 "处决检定",
                 result,
@@ -1374,6 +1695,7 @@ class InnerRealmService:
 
         elif result.result_level == "failure":
             # 失败：目标挣扎，进入战斗
+            await self.update_action_cooldown(session, "assassination")
             battle_msg = self.format_dice_roll_message(
                 "处决检定",
                 result,
@@ -1410,6 +1732,7 @@ class InnerRealmService:
                 player, loot_items, multiplier
             )
 
+            await self.update_action_cooldown(session, "assassination")
             await self.uow.commit()
 
             # 构建结果消息
@@ -1536,6 +1859,10 @@ class InnerRealmService:
         ]
 
         if clue_reveal:
+            # 真相反转效果
+            session_state_for_truth = json.loads(session.state) if session.state else {}
+            if session_state_for_truth.get("truth_inverted"):
+                clue_reveal = f"（以上是谎言）{clue_reveal}"
             lines.extend([
                 "",
                 "━━━━━━━━━━━━━",
@@ -1544,6 +1871,21 @@ class InnerRealmService:
 
         if recovered > 0:
             lines.append(f"\n🧠 理智恢复 +{recovered}")
+
+        # BOSS 方位暗示（根据已收集线索数量递进提示）
+        clue_count = len(clue_list)
+        session_state = json.loads(session.state) if session.state else {}
+        boss_pos = session_state.get("boss_position")
+        if boss_pos and clue_count >= 2:
+            lines.append("")
+            if clue_count == 2:
+                lines.append("🔮 你感觉到东南方向有一股强大的气息...")
+            elif clue_count == 3:
+                lines.append("🔮 那股力量来自地图的右下角区域...")
+            elif clue_count == 4:
+                lines.append("🔮 你已经很接近了，BOSS似乎在坐标 (18-24, 18-24) 范围内")
+            elif clue_count >= 5:
+                lines.append(f"🔮 完整的真相指向了一个确切位置... ({boss_pos['x']}, {boss_pos['y']})")
 
         return True, "\n".join(lines)
 

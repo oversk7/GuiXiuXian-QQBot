@@ -7,6 +7,13 @@ global:
   map_size: 25
   # 每日刷新时间（0点）
   refresh_hour: 0
+  # 操作冷却（秒）
+  cooldowns:
+    search: 15        # 搜刮冷却 15 秒
+    intimidate: 15    # 威吓冷却 15 秒
+    assassination: 20 # 处决冷却 20 秒
+    move: 3           # 移动冷却 3 秒
+    battle: 0         # 战斗无冷却
   # 理智系统
   sanity_system:
     max_sanity: 100       # 最大理智值
@@ -168,13 +175,13 @@ realms:
 
     # 事件生成权重（总和建议100）
     event_weights:
-      NPC: 15          # NPC事件（15%）
-      LOOT: 20         # 战利品事件（20%）
+      NPC: 18          # NPC事件（18%）
+      LOOT: 25         # 战利品事件（25%）
       CLUE: 10         # 线索事件（10%）
-      EMPTY: 48        # 空地块（48%）
+      EMPTY: 35        # 空地块（35%）
       BOSS: 1          # BOSS事件（1%，通常只有1个）
-      SURVIVOR: 4      # 幸存者事件（4%）
-      COGNITION_TAMPER: 2  # 认知篡改触发点（2%）
+      SURVIVOR: 6      # 幸存者事件（6%）
+      COGNITION_TAMPER: 5  # 认知篡改触发点（5%）
 
     # NPC配置
     npcs:
