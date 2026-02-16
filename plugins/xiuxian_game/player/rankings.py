@@ -55,6 +55,18 @@ def _format_wealth(amount: int) -> str:
         return f"{amount}💰"
 
 
+async def _ensure_player_in_list(
+    ranked_list: list[RankedPlayer],
+    player_rank: int | None,
+    query_fn,
+    page_size: int = 10,
+) -> list[RankedPlayer]:
+    """当玩家排名超出缓存列表时，扩大查询范围以确保玩家可见"""
+    if player_rank and player_rank > len(ranked_list):
+        return await query_fn(limit=player_rank + page_size)
+    return ranked_list
+
+
 def _paginate_ranking(
     ranked_list: list[RankedPlayer],
     page: int | None,
@@ -244,6 +256,7 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
     ranked_list = await query_level_ranking()
     if not ranked_list:
         await level_rank_cmd.finish("暂无排行榜数据")
+    ranked_list = await _ensure_player_in_list(ranked_list, player_rank, query_level_ranking)
 
     page_data, offset = _paginate_ranking(ranked_list, page, player_rank, player_id)
     if not page_data:
@@ -278,6 +291,7 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
     ranked_list = await query_luck_ranking()
     if not ranked_list:
         await luck_rank_cmd.finish("暂无排行榜数据")
+    ranked_list = await _ensure_player_in_list(ranked_list, player_rank, query_luck_ranking)
 
     page_data, offset = _paginate_ranking(ranked_list, page, player_rank, player_id)
     if not page_data:
@@ -312,6 +326,7 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
     ranked_list = await query_wealth_ranking()
     if not ranked_list:
         await wealth_rank_cmd.finish("暂无排行榜数据")
+    ranked_list = await _ensure_player_in_list(ranked_list, player_rank, query_wealth_ranking)
 
     page_data, offset = _paginate_ranking(ranked_list, page, player_rank, player_id)
     if not page_data:
@@ -342,6 +357,7 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
     ranked_list = await query_exploration_ranking()
     if not ranked_list:
         await exploration_rank_cmd.finish("暂无排行榜数据")
+    ranked_list = await _ensure_player_in_list(ranked_list, player_rank, query_exploration_ranking)
 
     page_data, offset = _paginate_ranking(ranked_list, page, player_rank, player_id)
     if not page_data:
@@ -378,6 +394,7 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
     ranked_list = await query_agility_ranking()
     if not ranked_list:
         await agility_rank_cmd.finish("暂无排行榜数据")
+    ranked_list = await _ensure_player_in_list(ranked_list, player_rank, query_agility_ranking)
 
     page_data, offset = _paginate_ranking(ranked_list, page, player_rank, player_id)
     if not page_data:
@@ -414,6 +431,7 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
     ranked_list = await query_mini_game_ranking()
     if not ranked_list:
         await mini_game_rank_cmd.finish("暂无排行榜数据")
+    ranked_list = await _ensure_player_in_list(ranked_list, player_rank, query_mini_game_ranking)
 
     page_data, offset = _paginate_ranking(ranked_list, page, player_rank, player_id)
     if not page_data:
