@@ -43,6 +43,8 @@ class EnhancedBattleEngine:
         # 仅当防御方不是战斗发起者时才触发镜怨体质（即被动防守方才能反杀）
         # None表示不限制（PvE等场景）
         self.battle_initiator_id: Optional[str] = None
+        # 切磋模式：切磋不触发镜怨体质(REFLECT_DEATH)等致死效果
+        self.is_sparring: bool = False
 
 
     def start_battle(self, player: Player, enemy: Any, player_equipped_items: List = None):
@@ -1059,6 +1061,9 @@ class EnhancedBattleEngine:
         for effect in defense_effects:
             if effect.effect_type == EffectType.REFLECT_DEATH:
                 # 镜怨体质：反射死亡(可被"绝魔体质"按概率压制)
+                # 切磋模式下不触发镜怨体质（切磋不算死斗）
+                if self.is_sparring:
+                    continue
                 # 仅当防御方是被动应战方时触发（防御方不是战斗发起者）
                 # 如果battle_initiator_id为None（PvE等），不限制触发
                 defender_is_initiator = (
@@ -1081,9 +1086,9 @@ class EnhancedBattleEngine:
                     result["messages"].append(f"🪞 镜怨体质！{attacker_name}的攻击被镜像反噬，灵魂瞬间破碎——直接死亡！")
                     result["messages"].append("💀 镜中之人，以己之力斩己之形。")
                     result["effects_triggered"].append("reflect_death")
-                # 标记攻击者需要立即死亡
-                if hasattr(attacker, 'hp'):
-                    attacker.hp = 0
+                    # 标记攻击者需要立即死亡
+                    if hasattr(attacker, 'hp'):
+                        attacker.hp = 0
 
             elif effect.effect_type == EffectType.REFLECT:
                 # 反弹伤害（实际扣血），可被“绝魔体质”部分无视

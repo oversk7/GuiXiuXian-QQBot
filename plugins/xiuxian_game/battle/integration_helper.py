@@ -71,7 +71,8 @@ class BattleIntegrationHelper:
         player2: Player,
         session,
         seed: Optional[str] = None,
-        max_rounds: int = 30
+        max_rounds: int = 30,
+        is_sparring: bool = False
     ) -> Tuple[bool, List[str], int, int]:
         """增强版玩家vs玩家战斗（PVP切磋）
 
@@ -81,6 +82,7 @@ class BattleIntegrationHelper:
             session: 数据库会话
             seed: 随机种子
             max_rounds: 最大回合数
+            is_sparring: 是否为切磋模式（切磋不触发镜怨体质等致死效果）
 
         Returns:
             (player1是否胜利, 战斗日志, player1受到的伤害, player2受到的伤害)
@@ -106,6 +108,8 @@ class BattleIntegrationHelper:
         # 记录战斗发起者(player1为挑战者/攻击者)
         # 镜怨体质(REFLECT_DEATH)仅在防御方是被动应战方时触发
         engine.battle_initiator_id = player1.id
+        # 切磋模式下不触发镜怨体质等致死效果
+        engine.is_sparring = is_sparring
         battle_log = []
 
         # 预计算包含临时buff的属性
@@ -904,6 +908,8 @@ class BattleIntegrationHelper:
         # 记录战斗发起者(player1为挑战者/攻击者)
         # 镜怨体质(REFLECT_DEATH)仅在防御方是被动应战方时触发
         engine.battle_initiator_id = player1.id
+        # 切磋模式：不触发镜怨体质等致死效果
+        engine.is_sparring = True
         battle_log = []
 
         # 预计算包含临时buff的属性
