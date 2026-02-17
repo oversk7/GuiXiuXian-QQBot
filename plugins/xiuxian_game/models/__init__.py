@@ -54,6 +54,8 @@ from .restaurant import Restaurant, RestaurantStorage, RestaurantMenu
 from .chef import Chef, ChefCandidate, ChefTier, CookingCategory, ChefPersonality
 from .restaurant_log import RestaurantLog
 from .player_recipe import PlayerRecipe
+# 红包系统模型
+from .red_envelope import RedEnvelope, RedEnvelopeStatus
 
 
 __all__ = [
@@ -75,5 +77,6 @@ __all__ = [
     "InnerRealmSession", "InnerRealmTile",
     "Restaurant", "RestaurantStorage", "RestaurantMenu",
     "Chef", "ChefCandidate", "ChefTier", "CookingCategory", "ChefPersonality",
-    "RestaurantLog", "PlayerRecipe"
+    "RestaurantLog", "PlayerRecipe",
+    "RedEnvelope", "RedEnvelopeStatus"
 ]
