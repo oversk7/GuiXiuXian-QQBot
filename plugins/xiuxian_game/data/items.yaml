@@ -1153,7 +1153,7 @@ items:
       price: 320000
       durability: 230
       attr_bonus: {"attack": 100, "agility": 100}
-      attr_ratio: {"attack": 1.0, "agility": 1.0}
+      attr_ratio: {"attack": 6.0, "agility": 1.0}
       repair_cost: 110
       required_level: 10
       gem_slots: 5
