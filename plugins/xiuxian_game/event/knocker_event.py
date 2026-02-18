@@ -950,40 +950,6 @@ class KnockerEventService:
                 f"🔮 剩余碎片: {pdata['shards']}"
             )
 
-        # 特殊处理: 永久属性丹(使用VIPEquipmentBonus记录,确保轮回后保留)
-        attr_items = {
-            "knocker_bone_elixir": {"attack": 2, "defense": 2},
-            "knocker_wish_elixir": {"agility": 2, "luck": 2},
-            "knocker_silence_elixir": {"max_hp": 3, "max_mp": 3},
-        }
-        if shop_item.item_id in attr_items:
-            from ..models.vip_equipment_bonus import VIPEquipmentBonus
-
-            attrs = attr_items[shop_item.item_id]
-
-            # 使用VIPEquipmentBonus表持久化,确保轮回后不会丢失
-            vip_bonus = await VIPEquipmentBonus.get_or_create(session, player.id)
-            for attr, val in attrs.items():
-                total_add = val * quantity
-                # 记录到VIPEquipmentBonus表
-                vip_bonus.add_bonus(attr, total_add)
-                # 同时增加当前属性
-                current = getattr(player, attr, 0)
-                setattr(player, attr, current + total_add)
-
-            session.add(vip_bonus)  # 确保保存
-
-            pdata["shards"] = shards - total_cost
-            if shop_item.item_id not in purchased:
-                purchased[shop_item.item_id] = {}
-            purchased[shop_item.item_id]["event_total"] = event_bought + quantity
-            purchased[shop_item.item_id][f"daily_{today_str}"] = daily_bought + quantity
-            pdata["purchased"] = purchased
-            cls._set_player_data(player, pdata)
-
-            attr_text = ", ".join(f"{k}+{v * quantity}" for k, v in attrs.items())
-            return True, f"兑换成功! 永久属性提升: {attr_text} (轮回后保留)\n🔮 剩余碎片: {pdata['shards']}"
-
         # 通用物品: 添加到背包
         try:
             await ItemInstance.add_item(session, player.id, shop_item.item_id, quantity)

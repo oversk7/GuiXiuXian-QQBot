@@ -418,7 +418,12 @@ async def _buff_percent(player: Player, cfg: ItemConfig, qty: int, ctx: str, ses
 
 @register(ItemEffectType.TEMPORARY_BUFF_PERCENT)
 async def _temporary_buff_percent(player: Player, cfg: ItemConfig, qty: int, ctx: str, session=None) -> Tuple[bool, str]:
-    """临时百分比属性加成：按当前基础属性的百分比创建临时buff"""
+    """临时百分比属性加成：按当前基础属性的百分比创建临时buff
+
+    支持两种键格式：
+    - xxx_pct: N  → 将当前属性值按N%计算为加成（百分比模式）
+    - attr_name: N → 直接按绝对值添加（混合绝对值模式）
+    """
     if not session:
         return False, "⛔ 系统错误：缺少数据库会话"
 
@@ -441,11 +446,14 @@ async def _temporary_buff_percent(player: Player, cfg: ItemConfig, qty: int, ctx
         "dodge_rate": "闪避率", "accuracy_rate": "命中率",
     }
 
+    _reserved = {"duration_minutes", "buff_name"}
+
     for key, value in effect_params.items():
-        if key in ["duration_minutes", "buff_name"]:
+        if key in _reserved:
             continue
 
         if key.endswith("_pct"):
+            # 百分比模式：N% of current attribute
             attr_name = key.replace("_pct", "")
             if hasattr(player, attr_name):
                 base_value = getattr(player, attr_name)
@@ -453,8 +461,19 @@ async def _temporary_buff_percent(player: Player, cfg: ItemConfig, qty: int, ctx
                 increase = int(base_value * percent * qty)
                 if increase == 0 and percent > 0:
                     increase = 1
-                attribute_bonuses[attr_name] = increase
+                elif increase == 0 and percent < 0:
+                    increase = -1
+                attribute_bonuses[attr_name] = attribute_bonuses.get(attr_name, 0) + increase
                 bonus_display.append(f"{ATTRIBUTE_MAP.get(attr_name, attr_name)}+{increase}({int(float(value)*qty)}%)")
+        elif hasattr(player, key):
+            # 绝对值模式：直接加减固定数值
+            abs_val = int(value) * qty
+            if abs_val != 0:
+                attribute_bonuses[key] = attribute_bonuses.get(key, 0) + abs_val
+                if abs_val > 0:
+                    bonus_display.append(f"{ATTRIBUTE_MAP.get(key, key)}+{abs_val}")
+                else:
+                    bonus_display.append(f"{ATTRIBUTE_MAP.get(key, key)}{abs_val}")
 
     if not attribute_bonuses:
         return False, "⛔ 该丹药没有有效的属性加成"
@@ -1038,3 +1057,78 @@ async def _learn_recipe(player: Player, cfg: ItemConfig, qty: int, ctx: object, 
         success, msg = await cooking_service.learn_recipe(uow, player.id, recipe_id)
 
     return success, msg
+
+
+# ============== 活动道具专用效果 ==============
+
+@register(ItemEffectType.RESTORE_HP_MP_PERCENT)
+async def _restore_hp_mp_percent(player: Player, cfg: ItemConfig, qty: int, ctx: str, session=None) -> Tuple[bool, str]:
+    """同时按百分比恢复生命值和理智值"""
+    if player.hp <= 0:
+        return False, "🧐 你已经死亡，无法恢复"
+
+    hp_percent = float(cfg.effect_params.get("hp_percent", 0))
+    mp_percent = float(cfg.effect_params.get("mp_percent", 0))
+
+    effective_max_hp = player.max_hp
+    effective_max_mp = player.max_mp
+    if session:
+        effective_attrs = await player.get_effective_attributes(session)
+        effective_max_hp = effective_attrs.get("max_hp", effective_max_hp)
+        effective_max_mp = effective_attrs.get("max_mp", effective_max_mp)
+
+    msgs = []
+    hp_healed = 0
+    mp_healed = 0
+
+    if hp_percent > 0 and player.hp < effective_max_hp:
+        hp_healed = int(effective_max_hp * hp_percent * qty)
+        player.hp = min(effective_max_hp, player.hp + hp_healed)
+        msgs.append(f"❤️ 恢复 {int(hp_percent * 100 * qty)}% 生命值（+{hp_healed}）")
+
+    if mp_percent > 0 and player.mp < effective_max_mp:
+        mp_healed = int(effective_max_mp * mp_percent * qty)
+        player.mp = min(effective_max_mp, player.mp + mp_healed)
+        msgs.append(f"🧠 恢复 {int(mp_percent * 100 * qty)}% 理智值（+{mp_healed}）")
+
+    if not msgs:
+        return False, "🧐 生命值和理智值已满，无需恢复"
+
+    return True, "\n".join(msgs)
+
+
+_ATTR_CN_MAP = {
+    "attack": "攻击",
+    "defense": "防御",
+    "agility": "敏捷",
+    "luck": "气运",
+    "max_hp": "生命上限",
+    "max_mp": "理智上限",
+}
+
+
+@register(ItemEffectType.PERMANENT_ATTR_VIP)
+async def _permanent_attr_vip(player: Player, cfg: ItemConfig, qty: int, ctx: str, session=None) -> Tuple[bool, str]:
+    """永久属性加成（轮回后保留）：使用VIPEquipmentBonus表持久化"""
+    if not session:
+        return False, "⛔ 系统错误：缺少数据库会话"
+
+    attrs = {k: int(v) for k, v in cfg.effect_params.items() if hasattr(player, k)}
+    if not attrs:
+        return False, "⛔ 该道具没有有效的属性配置"
+
+    from ..models.vip_equipment_bonus import VIPEquipmentBonus
+    vip_bonus = await VIPEquipmentBonus.get_or_create(session, player.id)
+
+    changed = []
+    for attr, val in attrs.items():
+        total_add = val * qty
+        vip_bonus.add_bonus(attr, total_add)
+        current = getattr(player, attr, 0)
+        setattr(player, attr, current + total_add)
+        cn_name = _ATTR_CN_MAP.get(attr, attr)
+        changed.append(f"{cn_name}+{total_add}")
+
+    session.add(vip_bonus)
+
+    return True, f"✨ 永久属性提升（轮回后保留）：{', '.join(changed)}"

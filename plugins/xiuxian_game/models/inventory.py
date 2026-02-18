@@ -45,6 +45,8 @@ class ItemEffectType(str, PyEnum):
     DIVINE_PUNISHMENT = "DIVINE_PUNISHMENT"  # 天罚符：强制击杀指定目标
     SANTA_TELEPORT = "SANTA_TELEPORT"  # 圣诞老人代驾券：瞬移到任意位置
     LEARN_RECIPE = "LEARN_RECIPE"  # 学习食谱：解锁烹饪食谱
+    RESTORE_HP_MP_PERCENT = "RESTORE_HP_MP_PERCENT"  # 同时按百分比回复生命和理智
+    PERMANENT_ATTR_VIP = "PERMANENT_ATTR_VIP"  # 永久属性加成（轮回后保留，使用VIPEquipmentBonus）
     # 以下类型不使用 apply_effect 处理
     CHANGE_NAME = "CHANGE_NAME"
     TELEPORT = "TELEPORT"
