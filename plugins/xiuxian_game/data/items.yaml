@@ -1261,7 +1261,7 @@ items:
       durability: 360
       required_level: 10
       attr_bonus: {"attack": 100, "mp": 300, "hp": 100}
-      attr_ratio: {"attack": 1.0, "mp": 3.0, "hp": 1.0}
+      attr_ratio: {"attack": 3.0, "mp": 3.0, "hp": 4.0}
       gem_slots: 5
       special_effects:
         - trigger: "on_attack"
