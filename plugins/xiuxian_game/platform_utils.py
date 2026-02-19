@@ -3,6 +3,7 @@
 提供消息来源识别和统一的玩家数据访问接口
 """
 from typing import Optional, Tuple, Dict
+from datetime import datetime
 from nonebot.adapters.qq import MessageEvent
 from sqlalchemy.ext.asyncio import AsyncSession
 from .models.player import Player
@@ -101,6 +102,8 @@ async def get_unified_player(session: AsyncSession, event: MessageEvent) -> Opti
     # 刷新对象以获取最新数据库状态，避免session缓存导致的闭关状态不同步问题
     if player is not None:
         await session.refresh(player)
+        # 更新最后活跃时间（灵田窃灵判定用）
+        player.last_active_at = datetime.now()
 
     return player
 

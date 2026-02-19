@@ -30,6 +30,7 @@ class CookingCategory(str, PyEnum):
     GRILL = "grill"        # 烤制类
     STEAM = "steam"        # 蒸煮类
     DESSERT = "dessert"    # 甜点类
+    VEGETABLE = "vegetable"  # 灵蔬类
 
 
 class ChefPersonality(str, PyEnum):

@@ -22,6 +22,10 @@ class ItemType(str,PyEnum):
     SEASONING = "SEASONING"  # 调料
     DISH = "DISH"  # 菜肴
     RECIPE = "RECIPE"  # 食谱
+    VEGETABLE = "VEGETABLE"  # 灵蔬(灵田产出，联动烹饪)
+    HERB = "HERB"  # 诡药(灵田产出，联动炼丹)
+    SEED = "SEED"  # 灵种(灵田种子)
+    GUARDIAN_BEAST = "GUARDIAN_BEAST"  # 诡兽(守田用)
 
 class ItemEffectType(str, PyEnum):
     RESTORE_HP = "RESTORE_HP"

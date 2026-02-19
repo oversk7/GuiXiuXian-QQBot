@@ -521,6 +521,47 @@ class MansionService:
         return True, success_msg
 
     @staticmethod
+    def get_field_bonus(mansion_level: int) -> dict:
+        """
+        获取阴宅对灵田的加成
+
+        Args:
+            mansion_level: 阴宅等级
+
+        Returns:
+            {"growth_acceleration": float, "yield_bonus": float}
+            growth_acceleration: 成长加速百分比 (0.0~0.7)
+            yield_bonus: 产量加成百分比 (0.0~0.55)
+        """
+        if mansion_level <= 0:
+            return {"growth_acceleration": 0.0, "yield_bonus": 0.0}
+
+        # 成长加速
+        if mansion_level <= 5:
+            growth = mansion_level * 0.05
+        elif mansion_level <= 10:
+            growth = 0.25 + (mansion_level - 5) * 0.03
+        elif mansion_level <= 20:
+            growth = 0.40 + (mansion_level - 10) * 0.02
+        else:
+            growth = 0.60 + (mansion_level - 20) * 0.01
+
+        # 产量加成
+        if mansion_level <= 5:
+            yield_bonus = 0.0
+        elif mansion_level <= 10:
+            yield_bonus = (mansion_level - 5) * 0.05
+        elif mansion_level <= 20:
+            yield_bonus = 0.25 + (mansion_level - 10) * 0.02
+        else:
+            yield_bonus = 0.45 + (mansion_level - 20) * 0.01
+
+        return {
+            "growth_acceleration": min(growth, 0.70),
+            "yield_bonus": min(yield_bonus, 0.55),
+        }
+
+    @staticmethod
     def check_distance_from_towns(x: int, y: int) -> tuple[bool, str]:
         """
         检查指定位置是否距离城镇市集过近

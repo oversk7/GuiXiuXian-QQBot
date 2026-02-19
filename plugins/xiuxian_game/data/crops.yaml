@@ -1,0 +1,219 @@
+# ====================================================================
+# 灵田系统 - 作物配置
+# ====================================================================
+# 作物分两类: VEGETABLE(灵蔬,联动烹饪) 和 HERB(诡药,联动炼丹)
+# 成长时间单位: 小时(h)
+# ====================================================================
+
+crops:
+  # ========== 灵蔬 (VEGETABLE - 联动烹饪) ==========
+
+  - crop_id: "spirit_cabbage"
+    name: "灵芹菜"
+    type: "VEGETABLE"
+    rarity: "white"
+    grow_hours: 2
+    min_yield: 3
+    max_yield: 5
+    seed_id: "seed_spirit_cabbage"
+    harvest_item_id: "spirit_cabbage"
+    seed_price: 30
+    sell_price: 25
+    description: "沾染灵气的芹菜，清脆爽口"
+
+  - crop_id: "spirit_radish"
+    name: "灵萝卜"
+    type: "VEGETABLE"
+    rarity: "white"
+    grow_hours: 2
+    min_yield: 3
+    max_yield: 5
+    seed_id: "seed_spirit_radish"
+    harvest_item_id: "spirit_radish"
+    seed_price: 35
+    sell_price: 30
+    description: "灵气浸润的萝卜，甘甜多汁"
+
+  - crop_id: "spirit_mushroom"
+    name: "灵菇"
+    type: "VEGETABLE"
+    rarity: "white"
+    grow_hours: 3
+    min_yield: 2
+    max_yield: 4
+    seed_id: "seed_spirit_mushroom"
+    harvest_item_id: "spirit_mushroom"
+    seed_price: 50
+    sell_price: 45
+    description: "生长在灵气充沛处的菇类，鲜香四溢"
+
+  - crop_id: "spirit_pepper"
+    name: "灵椒"
+    type: "VEGETABLE"
+    rarity: "green"
+    grow_hours: 4
+    min_yield: 2
+    max_yield: 3
+    seed_id: "seed_spirit_pepper"
+    harvest_item_id: "spirit_pepper"
+    seed_price: 120
+    sell_price: 90
+    description: "以灵火淬炼的辣椒，辣中带灵"
+
+  - crop_id: "spirit_gourd"
+    name: "灵葫芦"
+    type: "VEGETABLE"
+    rarity: "green"
+    grow_hours: 4
+    min_yield: 2
+    max_yield: 3
+    seed_id: "seed_spirit_gourd"
+    harvest_item_id: "spirit_gourd"
+    seed_price: 150
+    sell_price: 110
+    description: "外形圆润的灵葫芦，可入药可入菜"
+
+  - crop_id: "spirit_lotus_root"
+    name: "灵莲藕"
+    type: "VEGETABLE"
+    rarity: "blue"
+    grow_hours: 6
+    min_yield: 1
+    max_yield: 2
+    seed_id: "seed_spirit_lotus_root"
+    harvest_item_id: "spirit_lotus_root"
+    seed_price: 350
+    sell_price: 280
+    description: "灵池中生长的莲藕，藕断丝连皆含灵力"
+
+  - crop_id: "spirit_bamboo_shoot"
+    name: "灵笋"
+    type: "VEGETABLE"
+    rarity: "blue"
+    grow_hours: 6
+    min_yield: 1
+    max_yield: 2
+    seed_id: "seed_spirit_bamboo_shoot"
+    harvest_item_id: "spirit_bamboo_shoot"
+    seed_price: 400
+    sell_price: 320
+    description: "灵竹林中破土而出的嫩笋，脆嫩鲜美"
+
+  - crop_id: "spirit_ginseng_leaf"
+    name: "灵参叶"
+    type: "VEGETABLE"
+    rarity: "purple"
+    grow_hours: 10
+    min_yield: 1
+    max_yield: 1
+    seed_id: "seed_spirit_ginseng_leaf"
+    harvest_item_id: "spirit_ginseng_leaf"
+    seed_price: 800
+    sell_price: 700
+    description: "千年灵参的叶片，入口回甘，灵力充盈"
+
+  - crop_id: "spirit_phoenix_grass"
+    name: "凤凰灵草"
+    type: "VEGETABLE"
+    rarity: "orange"
+    grow_hours: 18
+    min_yield: 1
+    max_yield: 1
+    seed_id: "seed_spirit_phoenix_grass"
+    harvest_item_id: "spirit_phoenix_grass"
+    seed_price: 2500
+    sell_price: 2200
+    description: "传说中凤凰涅槃处生长的灵草，极为珍稀"
+
+  # ========== 诡药 (HERB - 联动炼丹/消耗品) ==========
+
+  - crop_id: "ghost_weed"
+    name: "鬼草"
+    type: "HERB"
+    rarity: "white"
+    grow_hours: 2
+    min_yield: 3
+    max_yield: 5
+    seed_id: "seed_ghost_weed"
+    harvest_item_id: "ghost_weed"
+    seed_price: 40
+    sell_price: 35
+    description: "阴气滋养的草药，散发幽幽鬼光"
+
+  - crop_id: "yin_berry"
+    name: "阴莓"
+    type: "HERB"
+    rarity: "white"
+    grow_hours: 3
+    min_yield: 2
+    max_yield: 4
+    seed_id: "seed_yin_berry"
+    harvest_item_id: "yin_berry"
+    seed_price: 55
+    sell_price: 50
+    description: "生长在极阴之地的浆果，汁液冰凉"
+
+  - crop_id: "soul_vine"
+    name: "魂藤"
+    type: "HERB"
+    rarity: "green"
+    grow_hours: 4
+    min_yield: 2
+    max_yield: 3
+    seed_id: "seed_soul_vine"
+    harvest_item_id: "soul_vine"
+    seed_price: 130
+    sell_price: 100
+    description: "能感知灵魂的藤蔓，触碰时会微微颤抖"
+
+  - crop_id: "blood_orchid"
+    name: "血兰"
+    type: "HERB"
+    rarity: "green"
+    grow_hours: 5
+    min_yield: 1
+    max_yield: 2
+    seed_id: "seed_blood_orchid"
+    harvest_item_id: "blood_orchid"
+    seed_price: 180
+    sell_price: 150
+    description: "花瓣殷红如血的兰花，是炼丹的上等材料"
+
+  - crop_id: "nightmare_flower"
+    name: "噩梦花"
+    type: "HERB"
+    rarity: "blue"
+    grow_hours: 8
+    min_yield: 1
+    max_yield: 2
+    seed_id: "seed_nightmare_flower"
+    harvest_item_id: "nightmare_flower"
+    seed_price: 400
+    sell_price: 350
+    description: "盛开在梦境与现实交界处的花朵，散发迷幻香气"
+
+  - crop_id: "cursed_root"
+    name: "诅咒之根"
+    type: "HERB"
+    rarity: "purple"
+    grow_hours: 12
+    min_yield: 1
+    max_yield: 1
+    seed_id: "seed_cursed_root"
+    harvest_item_id: "cursed_root"
+    seed_price: 1000
+    sell_price: 900
+    description: "被诅咒侵蚀的根茎，蕴含强大的诡异力量"
+
+  - crop_id: "void_bloom"
+    name: "虚空绽"
+    type: "HERB"
+    rarity: "orange"
+    grow_hours: 20
+    min_yield: 1
+    max_yield: 1
+    seed_id: "seed_void_bloom"
+    harvest_item_id: "void_bloom"
+    seed_price: 3000
+    sell_price: 2800
+    description: "绽放在虚空裂缝中的奇花，触碰现实的边界"

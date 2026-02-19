@@ -1,0 +1,56 @@
+# ====================================================================
+# 灵田系统 - 诡兽配置
+# ====================================================================
+# 诡兽守田：替代QQ农场的狗看家，拦截窃灵者
+# ====================================================================
+
+guardian_beasts:
+  - beast_id: "guard_dog"
+    name: "看田犬"
+    rarity: "white"
+    intercept_rate: 30
+    penalty_gold: 50
+    daily_feed_cost: 10
+    item_id: "guardian_guard_dog"
+    shop_price: 3000
+    description: "忠诚的看田犬，虽然普通但尽职尽责"
+
+  - beast_id: "ghost_cat"
+    name: "诡猫"
+    rarity: "green"
+    intercept_rate: 45
+    penalty_gold: 100
+    daily_feed_cost: 20
+    item_id: "guardian_ghost_cat"
+    shop_price: 10000
+    description: "诡异的猫咪，能感知窃灵者的气息"
+
+  - beast_id: "ghost_hawk"
+    name: "鬼隼"
+    rarity: "blue"
+    intercept_rate: 60
+    penalty_gold: 200
+    daily_feed_cost: 30
+    item_id: "guardian_ghost_hawk"
+    shop_price: 30000
+    description: "翱翔于阴气之中的猛禽，视野极广"
+
+  - beast_id: "nightmare_wolf"
+    name: "噩梦狼"
+    rarity: "purple"
+    intercept_rate: 75
+    penalty_gold: 500
+    daily_feed_cost: 40
+    item_id: "guardian_nightmare_wolf"
+    shop_price: 0
+    description: "出没于噩梦中的凶狼，令窃灵者胆寒"
+
+  - beast_id: "void_serpent"
+    name: "虚空蛇"
+    rarity: "orange"
+    intercept_rate: 85
+    penalty_gold: 1000
+    daily_feed_cost: 50
+    item_id: "guardian_void_serpent"
+    shop_price: 0
+    description: "来自虚空的巨蛇，几乎无法逃脱它的缠绕"

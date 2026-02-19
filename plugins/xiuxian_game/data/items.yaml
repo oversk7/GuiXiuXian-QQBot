@@ -3214,4 +3214,251 @@ items:
       price: 3000
       effect_type: "LEARN_RECIPE"
       effect_params: {"recipe_id": "sturgeon_banquet"}
+
+  # ====================================================================
+  # 灵田系统 - 灵种(种子)
+  # ====================================================================
+  seeds:
+    # 白色灵种
+    - item_id: "seed_spirit_cabbage"
+      name: "灵芹菜种子"
+      type: "SEED"
+      rarity: "white"
+      price: 30
+      description: "灵芹菜的种子，种植后2小时成熟"
+    - item_id: "seed_spirit_radish"
+      name: "灵萝卜种子"
+      type: "SEED"
+      rarity: "white"
+      price: 35
+      description: "灵萝卜的种子，种植后2小时成熟"
+    - item_id: "seed_spirit_mushroom"
+      name: "灵菇种子"
+      type: "SEED"
+      rarity: "white"
+      price: 50
+      description: "灵菇的孢子，种植后3小时成熟"
+    - item_id: "seed_ghost_weed"
+      name: "鬼草种子"
+      type: "SEED"
+      rarity: "white"
+      price: 40
+      description: "鬼草的种子，种植后2小时成熟"
+    - item_id: "seed_yin_berry"
+      name: "阴莓种子"
+      type: "SEED"
+      rarity: "white"
+      price: 55
+      description: "阴莓的种子，种植后3小时成熟"
+    # 绿色灵种
+    - item_id: "seed_spirit_pepper"
+      name: "灵椒种子"
+      type: "SEED"
+      rarity: "green"
+      price: 120
+      description: "灵椒的种子，种植后4小时成熟"
+    - item_id: "seed_spirit_gourd"
+      name: "灵葫芦种子"
+      type: "SEED"
+      rarity: "green"
+      price: 150
+      description: "灵葫芦的种子，种植后4小时成熟"
+    - item_id: "seed_soul_vine"
+      name: "魂藤种子"
+      type: "SEED"
+      rarity: "green"
+      price: 130
+      description: "魂藤的种子，种植后4小时成熟"
+    - item_id: "seed_blood_orchid"
+      name: "血兰种子"
+      type: "SEED"
+      rarity: "green"
+      price: 180
+      description: "血兰的种子，种植后5小时成熟"
+    # 蓝色灵种
+    - item_id: "seed_spirit_lotus_root"
+      name: "灵莲藕种子"
+      type: "SEED"
+      rarity: "blue"
+      price: 350
+      description: "灵莲藕的藕节，种植后6小时成熟"
+    - item_id: "seed_spirit_bamboo_shoot"
+      name: "灵笋种子"
+      type: "SEED"
+      rarity: "blue"
+      price: 400
+      description: "灵笋的根茎，种植后6小时成熟"
+    - item_id: "seed_nightmare_flower"
+      name: "噩梦花种子"
+      type: "SEED"
+      rarity: "blue"
+      price: 400
+      description: "噩梦花的种子，种植后8小时成熟"
+    # 紫色灵种
+    - item_id: "seed_spirit_ginseng_leaf"
+      name: "灵参叶种子"
+      type: "SEED"
+      rarity: "purple"
+      price: 800
+      description: "灵参的根须，种植后10小时成熟"
+    - item_id: "seed_cursed_root"
+      name: "诅咒之根种子"
+      type: "SEED"
+      rarity: "purple"
+      price: 1000
+      description: "诅咒之根的碎片，种植后12小时成熟"
+    # 橙色灵种
+    - item_id: "seed_spirit_phoenix_grass"
+      name: "凤凰灵草种子"
+      type: "SEED"
+      rarity: "orange"
+      price: 2500
+      description: "凤凰灵草的种子，种植后18小时成熟"
+    - item_id: "seed_void_bloom"
+      name: "虚空绽种子"
+      type: "SEED"
+      rarity: "orange"
+      price: 3000
+      description: "虚空绽的种子，种植后20小时成熟"
+
+  # ====================================================================
+  # 灵田系统 - 灵蔬(产出物)
+  # ====================================================================
+  vegetables:
+    - item_id: "spirit_cabbage"
+      name: "灵芹菜"
+      type: "VEGETABLE"
+      rarity: "white"
+      price: 25
+      description: "沾染灵气的芹菜，可用于烹饪"
+    - item_id: "spirit_radish"
+      name: "灵萝卜"
+      type: "VEGETABLE"
+      rarity: "white"
+      price: 30
+      description: "灵气浸润的萝卜，可用于烹饪"
+    - item_id: "spirit_mushroom"
+      name: "灵菇"
+      type: "VEGETABLE"
+      rarity: "white"
+      price: 45
+      description: "灵气充沛处的菇类，可用于烹饪"
+    - item_id: "spirit_pepper"
+      name: "灵椒"
+      type: "VEGETABLE"
+      rarity: "green"
+      price: 90
+      description: "灵火淬炼的辣椒，可用于烹饪"
+    - item_id: "spirit_gourd"
+      name: "灵葫芦"
+      type: "VEGETABLE"
+      rarity: "green"
+      price: 110
+      description: "圆润的灵葫芦，可用于烹饪"
+    - item_id: "spirit_lotus_root"
+      name: "灵莲藕"
+      type: "VEGETABLE"
+      rarity: "blue"
+      price: 280
+      description: "灵池中的莲藕，可用于烹饪"
+    - item_id: "spirit_bamboo_shoot"
+      name: "灵笋"
+      type: "VEGETABLE"
+      rarity: "blue"
+      price: 320
+      description: "灵竹林中的嫩笋，可用于烹饪"
+    - item_id: "spirit_ginseng_leaf"
+      name: "灵参叶"
+      type: "VEGETABLE"
+      rarity: "purple"
+      price: 700
+      description: "千年灵参的叶片，珍稀烹饪食材"
+    - item_id: "spirit_phoenix_grass"
+      name: "凤凰灵草"
+      type: "VEGETABLE"
+      rarity: "orange"
+      price: 2200
+      description: "凤凰涅槃处的灵草，传说级烹饪食材"
+
+  # ====================================================================
+  # 灵田系统 - 诡药(产出物)
+  # ====================================================================
+  herbs:
+    - item_id: "ghost_weed"
+      name: "鬼草"
+      type: "HERB"
+      rarity: "white"
+      price: 35
+      description: "阴气滋养的草药，可用于炼丹"
+    - item_id: "yin_berry"
+      name: "阴莓"
+      type: "HERB"
+      rarity: "white"
+      price: 50
+      description: "极阴之地的浆果，可用于炼丹"
+    - item_id: "soul_vine"
+      name: "魂藤"
+      type: "HERB"
+      rarity: "green"
+      price: 100
+      description: "能感知灵魂的藤蔓，可用于炼丹"
+    - item_id: "blood_orchid"
+      name: "血兰"
+      type: "HERB"
+      rarity: "green"
+      price: 150
+      description: "殷红如血的兰花，炼丹上等材料"
+    - item_id: "nightmare_flower"
+      name: "噩梦花"
+      type: "HERB"
+      rarity: "blue"
+      price: 350
+      description: "梦境与现实交界处的花朵，可用于炼丹"
+    - item_id: "cursed_root"
+      name: "诅咒之根"
+      type: "HERB"
+      rarity: "purple"
+      price: 900
+      description: "被诅咒侵蚀的根茎，炼丹珍稀材料"
+    - item_id: "void_bloom"
+      name: "虚空绽"
+      type: "HERB"
+      rarity: "orange"
+      price: 2800
+      description: "虚空裂缝中的奇花，传说级炼丹材料"
+
+  # ====================================================================
+  # 灵田系统 - 诡兽(守田用)
+  # ====================================================================
+  guardian_beasts:
+    - item_id: "guardian_guard_dog"
+      name: "看田犬"
+      type: "GUARDIAN_BEAST"
+      rarity: "white"
+      price: 3000
+      description: "忠诚的看田犬，拦截率30%"
+    - item_id: "guardian_ghost_cat"
+      name: "诡猫"
+      type: "GUARDIAN_BEAST"
+      rarity: "green"
+      price: 10000
+      description: "诡异的猫咪，拦截率45%"
+    - item_id: "guardian_ghost_hawk"
+      name: "鬼隼"
+      type: "GUARDIAN_BEAST"
+      rarity: "blue"
+      price: 30000
+      description: "翱翔于阴气中的猛禽，拦截率60%"
+    - item_id: "guardian_nightmare_wolf"
+      name: "噩梦狼"
+      type: "GUARDIAN_BEAST"
+      rarity: "purple"
+      price: 0
+      description: "噩梦中的凶狼，拦截率75%（诡域掉落）"
+    - item_id: "guardian_void_serpent"
+      name: "虚空蛇"
+      type: "GUARDIAN_BEAST"
+      rarity: "orange"
+      price: 0
+      description: "虚空巨蛇，拦截率85%（稀有掉落）"
       description: "鲟鱼全席的制作方法,包含前菜到主菜的完整流程。传说级食谱。"

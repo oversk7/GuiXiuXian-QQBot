@@ -106,6 +106,11 @@ class UnitOfWork:
         self._restaurant_logs = None
         self._player_recipes = None
 
+        # 灵田系统仓储
+        self._spirit_fields = None
+        self._spirit_field_plots = None
+        self._spirit_field_steal_logs = None
+
     @property
     def players(self):
         """玩家仓储"""
@@ -369,6 +374,30 @@ class UnitOfWork:
             from ..repositories.player_recipe_repository import PlayerRecipeRepository
             self._player_recipes = PlayerRecipeRepository(self._session)
         return self._player_recipes
+
+    @property
+    def spirit_fields(self):
+        """灵田仓储"""
+        if self._spirit_fields is None:
+            from ..repositories.spirit_field_repository import SpiritFieldRepository
+            self._spirit_fields = SpiritFieldRepository(self._session)
+        return self._spirit_fields
+
+    @property
+    def spirit_field_plots(self):
+        """灵田地块仓储"""
+        if self._spirit_field_plots is None:
+            from ..repositories.spirit_field_plot_repository import SpiritFieldPlotRepository
+            self._spirit_field_plots = SpiritFieldPlotRepository(self._session)
+        return self._spirit_field_plots
+
+    @property
+    def spirit_field_steal_logs(self):
+        """窃灵记录仓储"""
+        if self._spirit_field_steal_logs is None:
+            from ..repositories.spirit_field_steal_log_repository import SpiritFieldStealLogRepository
+            self._spirit_field_steal_logs = SpiritFieldStealLogRepository(self._session)
+        return self._spirit_field_steal_logs
 
     @property
     def session(self) -> AsyncSession:

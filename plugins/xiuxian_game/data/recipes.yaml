@@ -307,3 +307,117 @@ recipes:
       luck: 8
       duration: 45         # 45分钟幸运+8
     description: "超越现实的诡异料理，品尝者将短暂触碰虚空的真相"
+
+  # ========== 灵蔬食谱 (vegetable类别) ==========
+
+  # 白色灵蔬食谱
+  - recipe_id: "stir_fried_spirit_cabbage"
+    name: "清炒灵芹"
+    category: "vegetable"
+    tier: "white"
+    kitchen_level: 1
+    ingredients:
+      spirit_cabbage: 2
+      salt: 1
+    base_price: 80
+    description: "清炒灵芹菜，清香爽口，灵气扑鼻"
+
+  - recipe_id: "spirit_radish_soup"
+    name: "灵萝卜汤"
+    category: "vegetable"
+    tier: "white"
+    kitchen_level: 1
+    ingredients:
+      spirit_radish: 2
+      salt: 1
+    base_price: 90
+    description: "灵萝卜熬制的浓汤，甘甜温润"
+
+  - recipe_id: "grilled_spirit_mushroom"
+    name: "炙烤灵菇"
+    category: "vegetable"
+    tier: "white"
+    kitchen_level: 1
+    ingredients:
+      spirit_mushroom: 2
+      salt: 1
+    base_price: 110
+    description: "炭火炙烤的灵菇，外焦里嫩，鲜香四溢"
+
+  # 绿色灵蔬食谱
+  - recipe_id: "spirit_pepper_fish"
+    name: "灵椒煮鱼"
+    category: "vegetable"
+    tier: "green"
+    kitchen_level: 2
+    ingredients:
+      spirit_pepper: 1
+      common_carp: 1
+      soy_sauce: 1
+    base_price: 350
+    description: "灵椒与鲜鱼的完美结合，鲜辣灵动"
+
+  - recipe_id: "spirit_gourd_stew"
+    name: "灵葫芦炖盅"
+    category: "vegetable"
+    tier: "green"
+    kitchen_level: 2
+    ingredients:
+      spirit_gourd: 2
+      spice: 1
+    base_price: 380
+    description: "以灵葫芦为容器慢炖的滋补盅品"
+
+  # 蓝色灵蔬食谱
+  - recipe_id: "spirit_lotus_root_fish_soup"
+    name: "灵莲藕鱼汤"
+    category: "vegetable"
+    tier: "blue"
+    kitchen_level: 3
+    ingredients:
+      spirit_lotus_root: 1
+      grass_carp: 1
+      lingzhi_powder: 1
+    base_price: 950
+    description: "灵莲藕与鲜鱼共炖的滋补汤品，灵力充沛"
+
+  - recipe_id: "spirit_bamboo_shoot_feast"
+    name: "灵笋宴"
+    category: "vegetable"
+    tier: "blue"
+    kitchen_level: 3
+    ingredients:
+      spirit_bamboo_shoot: 2
+      spice: 1
+      soy_sauce: 1
+    base_price: 1050
+    description: "多种烹饪手法呈现的灵笋盛宴"
+
+  # 紫色灵蔬食谱
+  - recipe_id: "spirit_ginseng_leaf_feast"
+    name: "灵参叶全席"
+    category: "vegetable"
+    tier: "purple"
+    kitchen_level: 4
+    ingredients:
+      spirit_ginseng_leaf: 1
+      lingzhi_powder: 1
+      secret_sauce: 1
+    base_price: 3200
+    buff: { sanity: 6 }
+    description: "以灵参叶为主料的滋补全席，食之神清气爽"
+
+  # 橙色灵蔬食谱
+  - recipe_id: "phoenix_grass_delicacy"
+    name: "凤凰灵草奇膳"
+    category: "vegetable"
+    tier: "orange"
+    kitchen_level: 5
+    ingredients:
+      spirit_phoenix_grass: 1
+      lingzhi_powder: 2
+      secret_sauce: 1
+      immortal_oil: 1
+    base_price: 16000
+    buff: { sanity: 18, luck: 3, duration: 30 }
+    description: "以凤凰灵草烹制的传说料理，食之如沐仙光"

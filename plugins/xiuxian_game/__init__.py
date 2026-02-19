@@ -31,6 +31,7 @@ from . import (
     world_boss,
     fishing,
     cooking,  # 烹饪与餐厅经营系统
+    spirit_field,  # 灵田系统（种植/窃灵/诡兽守田）
     admin,  # 管理员功能（包含抽奖系统）
     achievement,  # 成就系统
     dialogue,  # NPC AI对话系统（包含管理员命令）
