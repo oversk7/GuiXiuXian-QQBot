@@ -1,5 +1,5 @@
 """
-窃灵服务 - 偷菜逻辑+诡兽拦截
+偷菜服务 - 偷菜逻辑+诡兽拦截
 """
 import random
 import math
@@ -21,7 +21,7 @@ from .config import (
 
 
 class StealService:
-    """窃灵服务"""
+    """偷菜服务"""
 
     def __init__(self):
         self.crop_manager = CropManager()
@@ -35,7 +35,7 @@ class StealService:
         # 检查每日次数
         steal_count = await uow.spirit_field_steal_logs.get_today_steal_count(player_id, today)
         if steal_count >= STEAL_MAX_PER_DAY:
-            return False, f"今日窃灵次数已用完({steal_count}/{STEAL_MAX_PER_DAY})"
+            return False, f"今日偷菜次数已用完({steal_count}/{STEAL_MAX_PER_DAY})"
 
         # 查找有成熟作物的活跃玩家
         active_threshold = now - timedelta(hours=STEAL_TARGET_ACTIVE_HOURS)
@@ -89,9 +89,9 @@ class StealService:
                 break
 
         if not targets:
-            return False, "当前没有可窃灵的目标"
+            return False, "当前没有可偷菜的目标"
 
-        msg = f"可窃灵目标 ({steal_count}/{STEAL_MAX_PER_DAY}次已用)\n━━━━━━━━━━━━━\n"
+        msg = f"可偷菜目标 ({steal_count}/{STEAL_MAX_PER_DAY}次已用)\n━━━━━━━━━━━━━\n"
         for t in targets:
             p = t["player"]
             beast_info = ""
@@ -108,7 +108,7 @@ class StealService:
     async def steal_from(
         self, uow: UnitOfWork, thief_id: str, victim_uid: int
     ) -> Tuple[bool, str]:
-        """执行窃灵"""
+        """执行偷菜"""
         today = datetime.now().strftime("%Y-%m-%d")
         now = datetime.now()
 
@@ -118,12 +118,12 @@ class StealService:
             elapsed = (now - last_steal.created_at).total_seconds() / 60
             if elapsed < STEAL_COOLDOWN_MINUTES:
                 remaining = int(STEAL_COOLDOWN_MINUTES - elapsed)
-                return False, f"窃灵冷却中，还需{remaining}分钟"
+                return False, f"偷菜冷却中，还需{remaining}分钟"
 
         # 检查每日次数
         steal_count = await uow.spirit_field_steal_logs.get_today_steal_count(thief_id, today)
         if steal_count >= STEAL_MAX_PER_DAY:
-            return False, f"今日窃灵次数已用完({STEAL_MAX_PER_DAY}次)"
+            return False, f"今日偷菜次数已用完({STEAL_MAX_PER_DAY}次)"
 
         # 查找目标
         stmt = select(Player).where(Player.uid == victim_uid)
@@ -199,7 +199,7 @@ class StealService:
             beast_name = beast.name if beast else "诡兽"
 
             return False, (
-                f"窃灵失败!\n"
+                f"偷菜失败!\n"
                 f"{victim.nickname}的{beast_name}发现了你!\n"
                 f"被罚金: {actual_penalty}金币"
             )
@@ -252,7 +252,7 @@ class StealService:
             thief_field.total_stolen_by_me += sum(stolen_items.values())
             await uow.spirit_fields.update(thief_field)
 
-        msg = f"窃灵成功!\n从{victim.nickname}偷到:\n"
+        msg = f"偷菜成功!\n从{victim.nickname}偷到:\n"
         for name, qty in stolen_items.items():
             msg += f"  {name} x{qty}\n"
 
@@ -261,7 +261,7 @@ class StealService:
     async def get_steal_logs(
         self, uow: UnitOfWork, player_id: str
     ) -> Tuple[bool, str]:
-        """查看窃灵记录"""
+        """查看偷菜记录"""
         # 被偷记录
         stolen_from_logs = await uow.spirit_field_steal_logs.get_recent_logs_for_victim(player_id, 5)
         # 偷别人记录
@@ -270,7 +270,7 @@ class StealService:
         msg = "灵田记录\n━━━━━━━━━━━━━\n"
 
         if stolen_from_logs:
-            msg += "被窃灵记录:\n"
+            msg += "被偷菜记录:\n"
             for log in stolen_from_logs:
                 thief = await uow.players.get_by_id(log.thief_id)
                 thief_name = thief.nickname if thief else "未知"
@@ -281,12 +281,12 @@ class StealService:
                     crop_name = crop.name if crop else "未知"
                     msg += f"  {thief_name} 偷走{crop_name}x{log.quantity}\n"
         else:
-            msg += "暂无被窃灵记录\n"
+            msg += "暂无被偷菜记录\n"
 
         msg += "━━━━━━━━━━━━━\n"
 
         if stolen_by_logs:
-            msg += "我的窃灵记录:\n"
+            msg += "我的偷菜记录:\n"
             for log in stolen_by_logs:
                 victim = await uow.players.get_by_id(log.victim_id)
                 victim_name = victim.nickname if victim else "未知"
@@ -297,6 +297,6 @@ class StealService:
                     crop_name = crop.name if crop else "未知"
                     msg += f"  偷{victim_name} {crop_name}x{log.quantity}\n"
         else:
-            msg += "暂无窃灵记录\n"
+            msg += "暂无偷菜记录\n"
 
         return True, msg

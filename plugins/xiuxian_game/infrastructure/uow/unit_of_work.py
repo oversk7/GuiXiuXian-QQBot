@@ -393,7 +393,7 @@ class UnitOfWork:
 
     @property
     def spirit_field_steal_logs(self):
-        """窃灵记录仓储"""
+        """偷菜记录仓储"""
         if self._spirit_field_steal_logs is None:
             from ..repositories.spirit_field_steal_log_repository import SpiritFieldStealLogRepository
             self._spirit_field_steal_logs = SpiritFieldStealLogRepository(self._session)

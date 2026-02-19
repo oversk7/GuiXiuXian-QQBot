@@ -1,7 +1,7 @@
 # ====================================================================
 # 灵田系统 - 诡兽配置
 # ====================================================================
-# 诡兽守田：替代QQ农场的狗看家，拦截窃灵者
+# 诡兽守田：替代QQ农场的狗看家，拦截偷菜者
 # ====================================================================
 
 guardian_beasts:
@@ -13,7 +13,7 @@ guardian_beasts:
     daily_feed_cost: 10
     item_id: "guardian_guard_dog"
     shop_price: 3000
-    description: "双目泛着幽光的黑犬，能嗅到窃灵者身上的活人气息"
+    description: "双目泛着幽光的黑犬，能嗅到偷菜者身上的活人气息"
 
   - beast_id: "ghost_cat"
     name: "诡猫"
@@ -23,7 +23,7 @@ guardian_beasts:
     daily_feed_cost: 20
     item_id: "guardian_ghost_cat"
     shop_price: 10000
-    description: "诡异的猫咪，瞳孔倒映着窃灵者的身影，被盯上者毛骨悚然"
+    description: "诡异的猫咪，瞳孔倒映着偷菜者的身影，被盯上者毛骨悚然"
 
   - beast_id: "ghost_hawk"
     name: "鬼隼"
@@ -43,7 +43,7 @@ guardian_beasts:
     daily_feed_cost: 40
     item_id: "guardian_nightmare_wolf"
     shop_price: 0
-    description: "噩梦中撕咬灵魂的凶狼，窃灵者听到嚎叫便双腿发软"
+    description: "噩梦中撕咬灵魂的凶狼，偷菜者听到嚎叫便双腿发软"
 
   - beast_id: "void_serpent"
     name: "虚空蛇"

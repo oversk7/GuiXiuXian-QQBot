@@ -6,7 +6,7 @@
 - 种植、一键种植
 - 灌溉、一键灌溉
 - 采收
-- 窃灵(偷菜)
+- 偷菜(偷菜)
 - 诡兽守田管理
 - 灵种商店
 - 灵田记录
@@ -205,14 +205,14 @@ async def handle_harvest(event: MessageEvent):
         await harvest_cmd.finish(msg)
 
 
-# ==================== 窃灵(偷菜) ====================
+# ==================== 偷菜(偷菜) ====================
 
 steal_cmd = on_command("偷菜", priority=5, block=True)
 
 
 @steal_cmd.handle()
 async def handle_steal(event: MessageEvent, args: Message = CommandArg()):
-    """【窃灵】查看目标 / 【窃灵 UID】执行偷菜"""
+    """【偷菜】查看目标 / 【偷菜 UID】执行偷菜"""
     args_text = args.extract_plain_text().strip()
 
     async with UnitOfWork(AsyncSessionLocal) as uow:
@@ -294,7 +294,7 @@ async def handle_feed_guardian(event: MessageEvent):
 
 # ==================== 灵种商店 ====================
 
-seed_shop_cmd = on_command("种子商店", priority=5, block=True)
+seed_shop_cmd = on_command("种子商店", aliases={"灵种商店"}, priority=5, block=True)
 
 
 @seed_shop_cmd.handle()
@@ -477,7 +477,7 @@ field_log_cmd = on_command("偷菜记录", priority=5, block=True)
 
 @field_log_cmd.handle()
 async def handle_field_log(event: MessageEvent):
-    """【灵田记录】- 查看窃灵日志"""
+    """【灵田记录】- 查看偷菜日志"""
     async with UnitOfWork(AsyncSessionLocal) as uow:
         player = await get_unified_player(uow.session, event)
         if not player:

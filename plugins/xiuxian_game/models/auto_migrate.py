@@ -45,7 +45,7 @@ REQUIRED_FIELDS: Dict[str, Dict[str, str]] = {
         "vip_equipment_data": "JSON NULL COMMENT 'VIP装备专属数据(锚点坐标、快照等)'",
         "vip_skill_cooldown": "JSON NULL COMMENT 'VIP技能冷却时间戳'",
         # 灵田系统 - 玩家活跃时间
-        "last_active_at": "DATETIME NULL COMMENT '最后活跃时间(灵田窃灵判定用)'"
+        "last_active_at": "DATETIME NULL COMMENT '最后活跃时间(灵田偷菜判定用)'"
     },
     "player_relationship": {
         "master_id": "VARCHAR(32) NULL COMMENT '师父ID(师徒关系专用)'",

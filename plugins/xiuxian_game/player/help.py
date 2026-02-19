@@ -2151,7 +2151,7 @@ async def handle_spirit_field_help(event: MessageEvent, args: Message = CommandA
         "【放置诡兽 诡兽名】 放置诡兽守田\n"
         "【收回诡兽】 收回诡兽到背包\n"
         "【喂养诡兽】 喂食诡兽（消耗怨念，防止饥饿）\n"
-        "  • 诡兽可拦截窃灵者\n"
+        "  • 诡兽可拦截偷菜者\n"
         "  • 24小时未喂食→饥饿→拦截率减半\n"
         "  • 每日自动扣除怨念（不足则诡兽饥饿）\n"
         "━━━━━━━━━━━━━\n"

@@ -4,7 +4,7 @@
 包含:
 - SpiritField: 灵田(每玩家一块)
 - SpiritFieldPlot: 灵壤/地块
-- SpiritFieldStealLog: 窃灵记录
+- SpiritFieldStealLog: 偷菜记录
 """
 from sqlalchemy import String, Integer, DateTime, ForeignKey, Index, Boolean, BigInteger
 from sqlalchemy.orm import Mapped, mapped_column
@@ -109,7 +109,7 @@ class SpiritFieldPlot(Base):
 
 
 class SpiritFieldStealLog(Base):
-    """窃灵记录模型"""
+    """偷菜记录模型"""
     __tablename__ = "spirit_field_steal_log"
 
     __table_args__ = (

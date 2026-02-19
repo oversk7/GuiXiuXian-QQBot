@@ -55,10 +55,10 @@ WATER_MAX_PER_DAY = 3        # 每地块每日灌溉上限
 WATER_COOLDOWN_MINUTES = 30  # 灌溉冷却(分钟)
 WATER_TIME_REDUCE_PERCENT = 0.15  # 每次灌溉减少15%剩余成长时间
 
-# ==================== 窃灵配置 ====================
+# ==================== 偷菜配置 ====================
 
-STEAL_MAX_PER_DAY = 5         # 每日窃灵总次数上限
-STEAL_COOLDOWN_MINUTES = 15   # 窃灵冷却(分钟)
+STEAL_MAX_PER_DAY = 5         # 每日偷菜总次数上限
+STEAL_COOLDOWN_MINUTES = 15   # 偷菜冷却(分钟)
 STEAL_PERCENT = 0.20          # 每次偷取上限(目标每种成熟作物的20%)
 STEAL_MIN_QUANTITY = 1        # 至少偷1株
 STEAL_TARGET_ACTIVE_HOURS = 48  # 目标范围:48小时内有活跃记录
