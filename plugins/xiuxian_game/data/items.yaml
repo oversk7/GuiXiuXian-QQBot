@@ -3319,7 +3319,7 @@ items:
       price: 18000
       effect_type: "LEARN_RECIPE"
       effect_params: {"recipe_id": "golden_dragon_feast"}
-      description: "金龙盛宴的制作方法,传说级料理,完美品质时附加幸运+5加成。"
+      description: "金龙盛宴的制作方法,传说级料理,完美品质时回复理智+20，并永久增加幸运+5（本轮回有效，冥返后重置）。"
 
     - item_id: "recipe_phoenix_nirvana_fish"
       name: "食谱·凤凰涅槃鱼"
@@ -3328,7 +3328,7 @@ items:
       price: 20000
       effect_type: "LEARN_RECIPE"
       effect_params: {"recipe_id": "phoenix_nirvana_fish"}
-      description: "凤凰涅槃鱼的制作方法,传说级料理,完美品质时最大生命+200。"
+      description: "凤凰涅槃鱼的制作方法,传说级料理,完美品质时回复理智+15，并永久增加气血上限+200（本轮回有效，冥返后重置）。"
 
     - item_id: "recipe_void_fish_enigma"
       name: "食谱·虚空秘境鱼"
@@ -3337,7 +3337,7 @@ items:
       price: 22000
       effect_type: "LEARN_RECIPE"
       effect_params: {"recipe_id": "void_fish_enigma"}
-      description: "虚空秘境鱼的制作方法,传说级料理,完美品质时附加幸运+8加成。"
+      description: "虚空秘境鱼的制作方法,传说级料理,完美品质时回复理智+25，并永久增加幸运+8（本轮回有效，冥返后重置）。"
 
     # --- 橙色灵蔬食谱 ---
     - item_id: "recipe_phoenix_grass_delicacy"
@@ -3347,7 +3347,7 @@ items:
       price: 18000
       effect_type: "LEARN_RECIPE"
       effect_params: {"recipe_id": "phoenix_grass_delicacy"}
-      description: "浴火仙草奇膳的制作方法,传说级灵蔬料理,完美品质时附加幸运+3加成。"
+      description: "浴火仙草奇膳的制作方法,传说级灵蔬料理,完美品质时回复理智+18，并永久增加幸运+3（本轮回有效，冥返后重置）。"
 
   # ====================================================================
   # 灵田系统 - 灵种(种子)

@@ -215,13 +215,27 @@ async def _eat_dish(
         msg = f"{quality_emoji} 美味的菜肴!\n理智 +{sanity_gain}"
 
     elif dish_quality == DishQuality.PERFECT:
-        # 完美:回复理智 + buff
+        # 完美:回复理智 + 本轮回永久属性加成（直接写入Player，冥返时重置）
         if dish_buff and "sanity" in dish_buff:
             sanity_gain = dish_buff["sanity"] * quantity
             player.sanity = min(100, player.sanity + sanity_gain)
             total_sanity_gain = sanity_gain
 
+        attr_effects = []
+        if dish_buff:
+            if "luck" in dish_buff:
+                luck_gain = dish_buff["luck"] * quantity
+                player.luck += luck_gain
+                attr_effects.append(f"幸运+{luck_gain}")
+            if "max_hp" in dish_buff:
+                hp_gain = dish_buff["max_hp"] * quantity
+                player.max_hp += hp_gain
+                player.hp = min(player.hp + hp_gain, player.max_hp)
+                attr_effects.append(f"气血上限+{hp_gain}")
+
         msg = f"🌟 完美的菜肴!\n理智 +{total_sanity_gain}"
+        if attr_effects:
+            msg += f"\n✨ 本轮回永久: {' | '.join(attr_effects)}"
 
     else:
         msg = f"🍴 你吃了 {dish_name}"
