@@ -3432,11 +3432,11 @@ items:
   # ====================================================================
   guardian_beasts:
     - item_id: "guardian_guard_dog"
-      name: "看田犬"
+      name: "冥犬"
       type: "GUARDIAN_BEAST"
       rarity: "white"
       price: 3000
-      description: "忠诚的看田犬，拦截率30%"
+      description: "双目泛着幽光的黑犬，拦截率30%"
     - item_id: "guardian_ghost_cat"
       name: "诡猫"
       type: "GUARDIAN_BEAST"

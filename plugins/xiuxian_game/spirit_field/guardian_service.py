@@ -50,7 +50,7 @@ class GuardianService:
         return True, (
             f"成功放置【{beast_config.name}】守田!\n"
             f"拦截率: {beast_config.intercept_rate}%\n"
-            f"每日灵食费: {beast_config.daily_feed_cost}金"
+            f"每日怨念费: {beast_config.daily_feed_cost}怨念"
         )
 
     async def remove_guardian(
@@ -95,10 +95,10 @@ class GuardianService:
             return False, "诡兽配置异常"
 
         player = await uow.players.get_by_id(player_id)
-        if player.gold < beast.daily_feed_cost:
-            return False, f"金币不足，喂养需要{beast.daily_feed_cost}金币"
+        if player.resentment < beast.daily_feed_cost:
+            return False, f"怨念不足，喂养需要{beast.daily_feed_cost}点怨念（当前{player.resentment}）"
 
-        player.gold -= beast.daily_feed_cost
+        player.resentment -= beast.daily_feed_cost
         await uow.players.update(player)
 
         field.guardian_fed_at = datetime.now()
@@ -106,7 +106,7 @@ class GuardianService:
 
         return True, (
             f"已喂养【{beast.name}】\n"
-            f"消耗: {beast.daily_feed_cost}金币\n"
+            f"消耗: {beast.daily_feed_cost}点怨念\n"
             f"状态: 精力充沛"
         )
 
@@ -129,12 +129,12 @@ class GuardianService:
             if not player:
                 continue
 
-            if player.gold >= beast.daily_feed_cost:
-                player.gold -= beast.daily_feed_cost
+            if player.resentment >= beast.daily_feed_cost:
+                player.resentment -= beast.daily_feed_cost
                 field.guardian_fed_at = datetime.now()
                 await uow.players.update(player)
                 await uow.spirit_fields.update(field)
                 fed_count += 1
-            # 金币不足不自动喂食，让诡兽进入饥饿状态
+            # 怨念不足不自动喂食，让诡兽进入饥饿状态
 
         return fed_count

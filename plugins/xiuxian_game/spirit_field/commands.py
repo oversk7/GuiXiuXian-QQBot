@@ -345,7 +345,7 @@ async def handle_seed_shop(event: MessageEvent):
         # 诡兽商店
         shop_beasts = beast_manager.get_shop_beasts()
         if shop_beasts:
-            msg += f"\n\n诡兽:\n"
+            msg += f"\n诡兽（【买诡兽 名称】购买）:\n"
             for beast in shop_beasts:
                 icon = rarity_icons.get(beast.rarity, "⚪")
                 msg += f"  {icon}{beast.name} {beast.shop_price:,}金 (拦截{beast.intercept_rate}%)\n"
@@ -360,7 +360,7 @@ buy_seed_cmd = on_command("买种子", priority=5, block=True)
 
 @buy_seed_cmd.handle()
 async def handle_buy_seed(event: MessageEvent, args: Message = CommandArg()):
-    """【购买灵种 名称 数量】- 购买种子"""
+    """【买种子 名称 数量】- 购买种子"""
     args_text = args.extract_plain_text().strip()
     if not args_text:
         await buy_seed_cmd.finish("用法: 买种子 <名称> [数量]\n例如: 买种子 灵芹菜 5")
@@ -386,29 +386,6 @@ async def handle_buy_seed(event: MessageEvent, args: Message = CommandArg()):
         if not field:
             await buy_seed_cmd.finish("你还没有灵田")
 
-        # 检查是否购买诡兽
-        beast = beast_manager.get_beast_by_name(item_name)
-        if beast:
-            if beast.shop_price <= 0:
-                await buy_seed_cmd.finish(f"【{beast.name}】无法在商店购买")
-
-            total_cost = beast.shop_price * quantity
-            if player.gold < total_cost:
-                await buy_seed_cmd.finish(f"金币不足，需要{total_cost:,}金币")
-
-            player.gold -= total_cost
-            await uow.players.update(player)
-
-            from ..models.inventory import ItemInstance
-            await ItemInstance.add_item(uow.session, player.id, beast.item_id, quantity)
-
-            await buy_seed_cmd.finish(
-                f"购买成功!\n"
-                f"{beast.name} x{quantity}\n"
-                f"消耗: {total_cost:,}金币\n"
-                f"使用【放置诡兽 {beast.name}】守田"
-            )
-
         # 购买种子
         crop = crop_manager.get_crop_by_name(item_name)
         if not crop:
@@ -432,6 +409,64 @@ async def handle_buy_seed(event: MessageEvent, args: Message = CommandArg()):
             f"购买成功!\n"
             f"{crop.name}种子 x{quantity}\n"
             f"消耗: {total_cost:,}金币"
+        )
+
+
+# ==================== 买诡兽 ====================
+
+buy_beast_cmd = on_command("买诡兽", priority=5, block=True)
+
+
+@buy_beast_cmd.handle()
+async def handle_buy_beast(event: MessageEvent, args: Message = CommandArg()):
+    """【买诡兽 名称 [数量]】- 购买守田诡兽"""
+    args_text = args.extract_plain_text().strip()
+    if not args_text:
+        await buy_beast_cmd.finish("用法: 买诡兽 <名称> [数量]\n例如: 买诡兽 冥犬")
+
+    parts = args_text.split()
+    beast_name = parts[0]
+    quantity = 1
+
+    if len(parts) > 1:
+        try:
+            quantity = int(parts[1])
+            if quantity <= 0 or quantity > 10:
+                await buy_beast_cmd.finish("数量必须在 1-10 之间")
+        except ValueError:
+            await buy_beast_cmd.finish("数量必须是数字")
+
+    async with UnitOfWork(AsyncSessionLocal) as uow:
+        player = await get_unified_player(uow.session, event)
+        if not player:
+            await buy_beast_cmd.finish("请先创建角色")
+
+        field = await uow.spirit_fields.get_by_player_id(player.id)
+        if not field:
+            await buy_beast_cmd.finish("你还没有灵田")
+
+        beast = beast_manager.get_beast_by_name(beast_name)
+        if not beast:
+            await buy_beast_cmd.finish(f"未找到诡兽【{beast_name}】\n使用【种子商店】查看可购买列表")
+
+        if beast.shop_price <= 0:
+            await buy_beast_cmd.finish(f"【{beast.name}】无法在商店购买，需要诡域掉落")
+
+        total_cost = beast.shop_price * quantity
+        if player.gold < total_cost:
+            await buy_beast_cmd.finish(f"金币不足，需要{total_cost:,}金币")
+
+        player.gold -= total_cost
+        await uow.players.update(player)
+
+        from ..models.inventory import ItemInstance
+        await ItemInstance.add_item(uow.session, player.id, beast.item_id, quantity)
+
+        await buy_beast_cmd.finish(
+            f"购买成功!\n"
+            f"{beast.name} x{quantity}\n"
+            f"消耗: {total_cost:,}金币\n"
+            f"使用【放置诡兽 {beast.name}】守田"
         )
 
 
