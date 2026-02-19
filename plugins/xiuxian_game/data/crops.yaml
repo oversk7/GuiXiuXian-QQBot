@@ -9,7 +9,7 @@ crops:
   # ========== 灵蔬 (VEGETABLE - 联动烹饪) ==========
 
   - crop_id: "spirit_cabbage"
-    name: "灵芹菜"
+    name: "碧冥芹"
     type: "VEGETABLE"
     rarity: "white"
     grow_hours: 2
@@ -19,10 +19,10 @@ crops:
     harvest_item_id: "spirit_cabbage"
     seed_price: 30
     sell_price: 25
-    description: "沾染灵气的芹菜，清脆爽口"
+    description: "冥界碧泉旁生长的芹菜，茎叶翠绿如玉，入口清冽回甘"
 
   - crop_id: "spirit_radish"
-    name: "灵萝卜"
+    name: "玉骨萝"
     type: "VEGETABLE"
     rarity: "white"
     grow_hours: 2
@@ -32,10 +32,10 @@ crops:
     harvest_item_id: "spirit_radish"
     seed_price: 35
     sell_price: 30
-    description: "灵气浸润的萝卜，甘甜多汁"
+    description: "色白如骨的萝卜，质地细腻似玉，甘甜中带一丝冷冽"
 
   - crop_id: "spirit_mushroom"
-    name: "灵菇"
+    name: "幽光菇"
     type: "VEGETABLE"
     rarity: "white"
     grow_hours: 3
@@ -45,10 +45,10 @@ crops:
     harvest_item_id: "spirit_mushroom"
     seed_price: 50
     sell_price: 45
-    description: "生长在灵气充沛处的菇类，鲜香四溢"
+    description: "夜间散发幽幽荧光的菇类，鲜香浓郁，烹饪后光华不散"
 
   - crop_id: "spirit_pepper"
-    name: "灵椒"
+    name: "赤魂椒"
     type: "VEGETABLE"
     rarity: "green"
     grow_hours: 4
@@ -58,10 +58,10 @@ crops:
     harvest_item_id: "spirit_pepper"
     seed_price: 120
     sell_price: 90
-    description: "以灵火淬炼的辣椒，辣中带灵"
+    description: "通红似血的赤魂椒，辣意直透魂魄，食之通体生热"
 
   - crop_id: "spirit_gourd"
-    name: "灵葫芦"
+    name: "灵壶葫"
     type: "VEGETABLE"
     rarity: "green"
     grow_hours: 4
@@ -71,10 +71,10 @@ crops:
     harvest_item_id: "spirit_gourd"
     seed_price: 150
     sell_price: 110
-    description: "外形圆润的灵葫芦，可入药可入菜"
+    description: "形似壶器的灵壶葫，传说可纳灵气于中，可入药可入菜"
 
   - crop_id: "spirit_lotus_root"
-    name: "灵莲藕"
+    name: "寒玉藕"
     type: "VEGETABLE"
     rarity: "blue"
     grow_hours: 6
@@ -84,10 +84,10 @@ crops:
     harvest_item_id: "spirit_lotus_root"
     seed_price: 350
     sell_price: 280
-    description: "灵池中生长的莲藕，藕断丝连皆含灵力"
+    description: "生于冥泉深处的莲藕，藕身似寒玉，断处丝丝含灵"
 
   - crop_id: "spirit_bamboo_shoot"
-    name: "灵笋"
+    name: "翠骨笋"
     type: "VEGETABLE"
     rarity: "blue"
     grow_hours: 6
@@ -97,10 +97,10 @@ crops:
     harvest_item_id: "spirit_bamboo_shoot"
     seed_price: 400
     sell_price: 320
-    description: "灵竹林中破土而出的嫩笋，脆嫩鲜美"
+    description: "色如翡翠、质硬如骨的翠骨笋，脆嫩鲜美，生机盎然"
 
   - crop_id: "spirit_ginseng_leaf"
-    name: "灵参叶"
+    name: "九幽参"
     type: "VEGETABLE"
     rarity: "purple"
     grow_hours: 10
@@ -110,10 +110,10 @@ crops:
     harvest_item_id: "spirit_ginseng_leaf"
     seed_price: 800
     sell_price: 700
-    description: "千年灵参的叶片，入口回甘，灵力充盈"
+    description: "九层幽冥深处的参叶，入口回甘，食之灵力充盈"
 
   - crop_id: "spirit_phoenix_grass"
-    name: "凤凰灵草"
+    name: "浴火仙草"
     type: "VEGETABLE"
     rarity: "orange"
     grow_hours: 18
@@ -123,7 +123,7 @@ crops:
     harvest_item_id: "spirit_phoenix_grass"
     seed_price: 2500
     sell_price: 2200
-    description: "传说中凤凰涅槃处生长的灵草，极为珍稀"
+    description: "传说经火焰淬炼方生的仙草，极为珍稀，蕴含涅槃之力"
 
   # ========== 诡药 (HERB - 联动炼丹/消耗品) ==========
 

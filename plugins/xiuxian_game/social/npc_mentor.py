@@ -198,6 +198,14 @@ async def handle_mentor_interaction(
     elif dialogue_content in ["香火商店", "商店"]:
         return get_incense_shop_menu(player)
 
+    # 买食谱
+    elif dialogue_content.startswith("买食谱 ") or dialogue_content.startswith("购买食谱 "):
+        parts = dialogue_content.split(maxsplit=1)
+        recipe_name = parts[1].strip() if len(parts) > 1 else ""
+        if not recipe_name:
+            return "请输入食谱名称，例如：买食谱 食谱·龙鱼宴"
+        return await _buy_recipe(uow, session, player, recipe_name)
+
     # 默认返回帮助
     else:
         return get_mentor_menu(player)
@@ -248,7 +256,7 @@ def get_mentor_menu(player: Player) -> str:
 
 【其他】
 查询 - 查看师徒状况
-香火商店 - 查看香火兑换
+香火商店 - 查看香火兑换（含烹饪食谱）
 购买徒弟位 - 花费500香火扩展1个徒弟位
 帮助 - 显示此菜单
 
@@ -270,18 +278,139 @@ def get_incense_shop_menu(player: Player) -> str:
     """获取香火商店菜单"""
     incense = player.incense or 0
 
-    return f"""香火商店
-━━━━━━━━━━━━━
-香火是师徒传承的见证，可兑换珍稀物品。
+    green_recipes = [
+        ("食谱·糖醋鲈鱼", 80), ("食谱·酱焖桂鱼", 80), ("食谱·黄花鱼羹", 80),
+        ("食谱·清蒸鲳鱼", 80), ("食谱·炭烤鲷鱼", 80),
+        ("食谱·赤魂椒煮鱼", 80), ("食谱·灵壶葫炖盅", 80),
+    ]
+    blue_recipes = [
+        ("食谱·三文鱼刺身", 250), ("食谱·蒲烧鳗鱼", 250), ("食谱·清蒸多宝鱼", 250),
+        ("食谱·金枪鱼寿司", 250), ("食谱·石斑鱼火锅", 300),
+        ("食谱·寒玉藕鱼汤", 250), ("食谱·翠骨笋宴", 250),
+    ]
+    purple_recipes = [
+        ("食谱·鲟鱼全席", 800), ("食谱·龙鱼宴", 1000), ("食谱·巨鲶秘炖", 900),
+        ("食谱·蓝鳍料理长", 800), ("食谱·九幽参全席", 900),
+    ]
+    orange_recipes = [
+        ("食谱·金龙盛宴", 3000), ("食谱·凤凰涅槃鱼", 3500),
+        ("食谱·虚空秘境鱼", 4000), ("食谱·浴火仙草奇膳", 3000),
+    ]
 
-【你的香火】{incense}
+    lines = [
+        "香火商店",
+        "━━━━━━━━━━━━━",
+        "香火是师徒传承的见证，可兑换珍稀物品。",
+        "",
+        f"【你的香火】{incense}",
+        "",
+        "【兑换列表】",
+        "购买徒弟位 - 500香火",
+        "  • 永久增加1个徒弟位",
+        "",
+        "📖 烹饪食谱（使用【交互 师徒使者 买食谱 食谱名】购买）",
+        "━━━━━━━━━━━━━",
+        "🟢 绿色食谱（80香火/个）：",
+    ]
+    for name, _ in green_recipes:
+        lines.append(f"  {name}")
 
-【兑换列表】
-购买徒弟位 - 500香火
-  • 永久增加1个徒弟位
+    lines.extend([
+        "🔵 蓝色食谱（250-300香火/个）：",
+    ])
+    for name, cost in blue_recipes:
+        lines.append(f"  {name}（{cost}香火）")
 
-【更多兑换】
-敬请期待...
+    lines.extend([
+        "🟣 紫色食谱（800-1000香火/个）：",
+    ])
+    for name, cost in purple_recipes:
+        lines.append(f"  {name}（{cost}香火）")
 
-━━━━━━━━━━━━━
-积善成德，香火绵延！"""
+    lines.extend([
+        "🟠 橙色食谱（3000-4000香火/个）：",
+    ])
+    for name, cost in orange_recipes:
+        lines.append(f"  {name}（{cost}香火）")
+
+    lines.extend([
+        "━━━━━━━━━━━━━",
+        "积善成德，香火绵延！",
+    ])
+
+    return "\n".join(lines)
+
+
+# 香火商店食谱配置：物品名 -> (item_id, 香火价格)
+INCENSE_RECIPE_SHOP = {
+    "食谱·糖醋鲈鱼": ("recipe_sweet_sour_bass", 80),
+    "食谱·酱焖桂鱼": ("recipe_braised_mandarin", 80),
+    "食谱·黄花鱼羹": ("recipe_yellow_croaker_soup", 80),
+    "食谱·清蒸鲳鱼": ("recipe_steamed_pomfret", 80),
+    "食谱·炭烤鲷鱼": ("recipe_grilled_sea_bream", 80),
+    "食谱·赤魂椒煮鱼": ("recipe_spirit_pepper_fish", 80),
+    "食谱·灵壶葫炖盅": ("recipe_spirit_gourd_stew", 80),
+    "食谱·三文鱼刺身": ("recipe_salmon_sashimi", 250),
+    "食谱·蒲烧鳗鱼": ("recipe_grilled_eel", 250),
+    "食谱·清蒸多宝鱼": ("recipe_steamed_turbot", 250),
+    "食谱·金枪鱼寿司": ("recipe_tuna_sushi", 250),
+    "食谱·石斑鱼火锅": ("recipe_grouper_hotpot", 300),
+    "食谱·寒玉藕鱼汤": ("recipe_spirit_lotus_root_fish_soup", 250),
+    "食谱·翠骨笋宴": ("recipe_spirit_bamboo_shoot_feast", 250),
+    "食谱·鲟鱼全席": ("recipe_sturgeon_feast", 800),
+    "食谱·龙鱼宴": ("recipe_arowana_feast", 1000),
+    "食谱·巨鲶秘炖": ("recipe_giant_catfish_stew", 900),
+    "食谱·蓝鳍料理长": ("recipe_bluefin_tuna_omakase", 800),
+    "食谱·九幽参全席": ("recipe_spirit_ginseng_leaf_feast", 900),
+    "食谱·金龙盛宴": ("recipe_golden_dragon_feast", 3000),
+    "食谱·凤凰涅槃鱼": ("recipe_phoenix_nirvana_fish", 3500),
+    "食谱·虚空秘境鱼": ("recipe_void_fish_enigma", 4000),
+    "食谱·浴火仙草奇膳": ("recipe_phoenix_grass_delicacy", 3000),
+}
+
+
+async def _buy_recipe(uow, session, player: Player, recipe_name: str) -> str:
+    """香火商店购买食谱"""
+    from ..models.inventory import ItemInstance
+    from ..config import config
+
+    entry = INCENSE_RECIPE_SHOP.get(recipe_name)
+    if not entry:
+        # 尝试不带"食谱·"前缀匹配
+        if not recipe_name.startswith("食谱·"):
+            entry = INCENSE_RECIPE_SHOP.get(f"食谱·{recipe_name}")
+    if not entry:
+        available = "、".join(INCENSE_RECIPE_SHOP.keys())
+        return f"未找到食谱【{recipe_name}】\n使用【交互 师徒使者 香火商店】查看可购买列表"
+
+    item_id, cost = entry
+    incense = player.incense or 0
+
+    if incense < cost:
+        return f"香火不足！购买【{recipe_name}】需要{cost}香火，当前{incense}香火"
+
+    # 检查物品配置
+    item_cfg = config.items_config["by_id"].get(item_id)
+    if not item_cfg:
+        return f"⛔ 系统错误：找不到物品配置({item_id})"
+
+    # 扣除香火
+    player.incense = incense - cost
+
+    # 添加物品到背包
+    try:
+        await ItemInstance.add_item(session, player.id, item_id, 1)
+    except ValueError:
+        # 回滚香火
+        player.incense = incense
+        return "⛔ 背包已满，无法购买"
+
+    await uow.commit()
+
+    return (
+        f"购买成功！\n"
+        f"获得：{recipe_name}\n"
+        f"消耗：{cost}香火\n"
+        f"剩余：{player.incense}香火\n"
+        f"使用【使用 {recipe_name}】学习食谱"
+    )

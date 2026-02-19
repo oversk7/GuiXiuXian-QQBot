@@ -97,7 +97,7 @@ async def handle_plant(event: MessageEvent, args: Message = CommandArg()):
     """【种植 作物名 [地块号]】- 指定地块种植"""
     args_text = args.extract_plain_text().strip()
     if not args_text:
-        await plant_cmd.finish("用法: 种植 <作物名> [地块号]\n例如: 种植 灵芹菜 1")
+        await plant_cmd.finish("用法: 种植 <作物名> [地块号]\n例如: 种植 碧冥芹 1")
 
     parts = args_text.split()
     crop_name = parts[0]
@@ -130,7 +130,7 @@ async def handle_plant_all(event: MessageEvent, args: Message = CommandArg()):
     """【一键种植 作物名】- 全部空地块种植"""
     args_text = args.extract_plain_text().strip()
     if not args_text:
-        await plant_all_cmd.finish("用法: 一键种植 <作物名>\n例如: 一键种植 灵芹菜")
+        await plant_all_cmd.finish("用法: 一键种植 <作物名>\n例如: 一键种植 碧冥芹")
 
     crop_name = args_text.split()[0]
 
@@ -363,7 +363,7 @@ async def handle_buy_seed(event: MessageEvent, args: Message = CommandArg()):
     """【买种子 名称 数量】- 购买种子"""
     args_text = args.extract_plain_text().strip()
     if not args_text:
-        await buy_seed_cmd.finish("用法: 买种子 <名称> [数量]\n例如: 买种子 灵芹菜 5")
+        await buy_seed_cmd.finish("用法: 买种子 <名称> [数量]\n例如: 买种子 碧冥芹 5")
 
     parts = args_text.split()
     item_name = parts[0]
