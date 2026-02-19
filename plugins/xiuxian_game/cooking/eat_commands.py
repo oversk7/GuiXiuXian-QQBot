@@ -198,7 +198,6 @@ async def _eat_dish(
 
     # 应用效果
     total_sanity_gain = 0
-    buff_msg = ""
 
     if dish_quality == DishQuality.DARK:
         # 黑暗料理:扣2理智
@@ -224,25 +223,10 @@ async def _eat_dish(
 
         msg = f"🌟 完美的菜肴!\n理智 +{total_sanity_gain}"
 
-        # 应用临时buff(如果有)
-        if dish_buff:
-            # TODO: 实现临时buff系统(需要buff仓储)
-            buff_effects = []
-            if "luck" in dish_buff:
-                buff_effects.append(f"幸运+{dish_buff['luck']}")
-            if "max_hp" in dish_buff:
-                buff_effects.append(f"生命+{dish_buff['max_hp']}")
-            if "duration" in dish_buff:
-                duration = dish_buff["duration"]
-                buff_effects.append(f"持续{duration}分钟")
-
-            if buff_effects:
-                buff_msg = f"\n✨ Buff: {' | '.join(buff_effects)}"
-
     else:
         msg = f"🍴 你吃了 {dish_name}"
 
     await uow.players.update(player)
     await uow.commit()
 
-    return msg + buff_msg
+    return msg

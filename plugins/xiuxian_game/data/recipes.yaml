@@ -163,7 +163,7 @@ recipes:
       spice: 2
       lingzhi_powder: 1    # 灵芝粉
     base_price: 1200
-    description: "鲜美滚烫，暖身补气"
+    description: "鲜美滚烫，入口暖胃"
 
   - recipe_id: "grilled_eel"
     name: "蒲烧鳗鱼"
@@ -379,7 +379,7 @@ recipes:
       grass_carp: 1
       lingzhi_powder: 1
     base_price: 950
-    description: "寒玉藕与鲜鱼共炖的滋补汤品，灵力充沛"
+    description: "寒玉藕与鲜鱼共炖，汤色清白，鲜甜温润"
 
   - recipe_id: "spirit_bamboo_shoot_feast"
     name: "翠骨笋宴"
