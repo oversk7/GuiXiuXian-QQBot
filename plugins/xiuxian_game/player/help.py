@@ -2140,6 +2140,7 @@ async def handle_spirit_field_help(event: MessageEvent, args: Message = CommandA
         "【买种子 名称 [数量]】 购买种子\n"
         "━━━━━━━━━━━━━\n"
         "🥷 偷菜：\n"
+        "【拜访灵田 UID】 查看他人灵田状态（无需成熟作物）\n"
         "【偷菜】 查看可偷目标列表\n"
         "【偷菜 UID】 偷指定玩家的成熟作物\n"
         "【偷菜记录】 查看偷菜日志\n"

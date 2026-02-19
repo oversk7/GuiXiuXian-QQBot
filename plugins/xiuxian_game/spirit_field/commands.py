@@ -470,6 +470,32 @@ async def handle_buy_beast(event: MessageEvent, args: Message = CommandArg()):
         )
 
 
+# ==================== 拜访灵田 ====================
+
+visit_other_field_cmd = on_command("拜访灵田", aliases={"查看灵田"}, priority=5, block=True)
+
+
+@visit_other_field_cmd.handle()
+async def handle_visit_other_field(event: MessageEvent, args: Message = CommandArg()):
+    """【拜访灵田 UID】- 查看他人灵田状态，包括作物剩余成熟时间"""
+    args_text = args.extract_plain_text().strip()
+    if not args_text:
+        await visit_other_field_cmd.finish("用法: 拜访灵田 <UID>\n例如: 拜访灵田 12345")
+
+    try:
+        target_uid = int(args_text.strip())
+    except ValueError:
+        await visit_other_field_cmd.finish("UID必须是数字")
+
+    async with UnitOfWork(AsyncSessionLocal) as uow:
+        player = await get_unified_player(uow.session, event)
+        if not player:
+            await visit_other_field_cmd.finish("请先创建角色")
+
+        success, msg = await field_service.visit_field(uow, player.id, target_uid)
+        await visit_other_field_cmd.finish(msg)
+
+
 # ==================== 灵田记录 ====================
 
 field_log_cmd = on_command("偷菜记录", priority=5, block=True)

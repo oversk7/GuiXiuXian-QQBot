@@ -6,10 +6,12 @@ import math
 from datetime import datetime, timedelta
 from typing import Tuple, List, Optional, Dict
 from nonebot import logger
+from sqlalchemy import select
 
 from ..infrastructure.uow.unit_of_work import UnitOfWork
 from ..models.spirit_field import SpiritField, SpiritFieldPlot
 from ..models.inventory import ItemInstance
+from ..models.player import Player
 from .config import (
     FIELD_LEVEL_PLOTS, FIELD_UPGRADE_COST, FIELD_LEVEL_UNLOCK_RARITY,
     WATER_MAX_PER_DAY, WATER_COOLDOWN_MINUTES, WATER_TIME_REDUCE_PERCENT,
@@ -600,5 +602,74 @@ class SpiritFieldService:
 
         if mature_count > 0:
             msg += f"━━━━━━━━━━━━━\n有{mature_count}块作物可采收，使用【采收】收获"
+
+        return True, msg
+
+    # ==================== 拜访他人灵田 ====================
+
+    async def visit_field(self, uow: UnitOfWork, visitor_id: str, target_uid: int) -> Tuple[bool, str]:
+        """查看他人灵田状态（不需要有成熟作物）"""
+        stmt = select(Player).where(Player.uid == target_uid)
+        result = await uow.session.execute(stmt)
+        target = result.scalar_one_or_none()
+        if not target:
+            return False, f"未找到UID为{target_uid}的玩家"
+
+        if target.id == visitor_id:
+            return False, "请使用【灵田】查看自己的灵田"
+
+        field = await uow.spirit_fields.get_by_player_id(target.id)
+        if not field:
+            return False, f"{target.nickname}还没有灵田"
+
+        plots = await uow.spirit_field_plots.get_plots_by_field_id(field.id)
+        now = datetime.now()
+
+        # 更新成熟状态
+        for plot in plots:
+            if not plot.is_mature and plot.mature_at and plot.mature_at <= now:
+                plot.is_mature = True
+                await uow.spirit_field_plots.update(plot)
+
+        total_plots = FIELD_LEVEL_PLOTS[field.level]
+        empty_count = sum(1 for p in plots if p.crop_id is None)
+        mature_count = sum(1 for p in plots if p.is_mature and p.crop_id is not None)
+        growing_count = sum(1 for p in plots if p.crop_id is not None and not p.is_mature)
+
+        msg = (
+            f"拜访 {target.nickname} 的灵田\n"
+            f"━━━━━━━━━━━━━\n"
+            f"等级: {field.level}级 | 灵壤: {total_plots}块\n"
+            f"空闲: {empty_count} | 生长中: {growing_count} | 成熟: {mature_count}\n"
+        )
+
+        # 诡兽信息
+        if field.guardian_beast_id:
+            beast = self.beast_manager.get_beast_by_item_id(field.guardian_beast_id)
+            if beast:
+                msg += f"诡兽守田: {beast.name} (拦截{beast.intercept_rate}%)\n"
+
+        msg += f"━━━━━━━━━━━━━\n"
+
+        for plot in plots:
+            if plot.crop_id is None:
+                msg += f"[{plot.plot_index}] 空地\n"
+            else:
+                crop = self.crop_manager.get_crop(plot.crop_id)
+                crop_name = crop.name if crop else "未知"
+
+                if plot.is_mature:
+                    msg += f"[{plot.plot_index}] {crop_name} - 已成熟\n"
+                else:
+                    remaining = (plot.mature_at - now).total_seconds() if plot.mature_at else 0
+                    if remaining <= 0:
+                        msg += f"[{plot.plot_index}] {crop_name} - 已成熟\n"
+                    else:
+                        h = int(remaining / 3600)
+                        m = int((remaining % 3600) / 60)
+                        msg += f"[{plot.plot_index}] {crop_name} - 剩余{h}时{m}分\n"
+
+        if mature_count > 0:
+            msg += f"━━━━━━━━━━━━━\n使用【偷菜 {target_uid}】偷取成熟作物"
 
         return True, msg
