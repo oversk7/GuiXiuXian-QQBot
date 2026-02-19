@@ -130,7 +130,7 @@ class ItemInstance(Base):
     
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
     player_id: Mapped[str] = mapped_column(String(32), ForeignKey("player.id"), index=True)
-    item_id: Mapped[str] = mapped_column(String(32), index=True, comment="items.yaml 内物品模板 ID")
+    item_id: Mapped[str] = mapped_column(String(64), index=True, comment="items.yaml 内物品模板 ID")
     quantity: Mapped[int] = mapped_column(Integer, default=1, server_default="1", comment="数量（装备固定为1）")
     durability: Mapped[int] = mapped_column(Integer, default=0, server_default="0",comment="当前耐久度（仅装备有效）")
     equipped: Mapped[bool] = mapped_column(Boolean, default=False, server_default="0", comment="是否已穿戴（仅装备有效）")

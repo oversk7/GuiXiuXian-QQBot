@@ -77,6 +77,10 @@ REQUIRED_FIELDS: Dict[str, Dict[str, str]] = {
         "last_recruit_time": "DATETIME NULL COMMENT '上次招募厨师时间'",
         "daily_recruit_count": "INT DEFAULT 0 COMMENT '当日招募次数(用于递增费用计算)'",
         "last_recruit_date": "VARCHAR(10) NULL COMMENT '上次招募日期(YYYY-MM-DD格式,用于每日重置)'"
+    },
+    # 背包表 - 扩展item_id长度以支持更长的食谱ID
+    "inventory": {
+        "item_id": "VARCHAR(64) NOT NULL COMMENT '物品模板ID'"
     }
     # 注释: 以下字段已通过多次重启完成迁移:
     # - daily_task: quest_chain_id, quest_step, is_tutorial, auto_accept
