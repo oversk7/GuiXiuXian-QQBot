@@ -701,16 +701,15 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
 
         PAGE_SIZE = 10
 
-        def _paginate(lst: list[str]):
-            total_pages = (len(lst) - 1) // PAGE_SIZE + 1 if lst else 1
-            p = max(1, min(page, total_pages))
-            start = (p - 1) * PAGE_SIZE
-            end = start + PAGE_SIZE
-            return lst[start:end], total_pages, p
-
-        sell_page, total_pages_sell, cur_page = _paginate(sell_lines_raw)
-        buy_page, total_pages_buy, _ = _paginate(buy_lines_raw)
+        total_pages_sell = (len(sell_lines_raw) - 1) // PAGE_SIZE + 1 if sell_lines_raw else 1
+        total_pages_buy = (len(buy_lines_raw) - 1) // PAGE_SIZE + 1 if buy_lines_raw else 1
         total_pages = max(total_pages_sell, total_pages_buy)
+        cur_page = max(1, min(page, total_pages))
+
+        start = (cur_page - 1) * PAGE_SIZE
+        end = start + PAGE_SIZE
+        sell_page = sell_lines_raw[start:end]
+        buy_page = buy_lines_raw[start:end]
 
         lines: list[str] = [f"📊 市场总览 第{cur_page}/{total_pages}页"]
         lines.append(heavy_divider(f"{EMOJI_SELL} 在售"))

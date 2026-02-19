@@ -1232,7 +1232,7 @@ items:
       durability: 300
       required_level: 10
       attr_bonus: {"hp": 100, "attack": 100, "agility": 100}
-      attr_ratio: {"hp": 3.0, "attack": 2.0, "agility": 2.0}
+      attr_ratio: {"hp": 4.0, "attack": 2.0, "agility": 2.0}
       special_effects:
         - trigger: "on_attacked"
           effect: "reflect_death"
