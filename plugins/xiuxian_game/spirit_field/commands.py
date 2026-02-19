@@ -5,7 +5,7 @@
 - 开辟灵田、查看灵田、升级灵田
 - 种植、一键种植
 - 灌溉、一键灌溉
-- 采收
+- 收菜
 - 偷菜(偷菜)
 - 诡兽守田管理
 - 灵种商店
@@ -188,14 +188,14 @@ async def handle_water_all(event: MessageEvent):
         await water_all_cmd.finish(msg)
 
 
-# ==================== 采收 ====================
+# ==================== 收菜 ====================
 
 harvest_cmd = on_command("收菜", aliases={"收获"}, priority=5, block=True)
 
 
 @harvest_cmd.handle()
 async def handle_harvest(event: MessageEvent):
-    """【采收】- 收获所有成熟作物"""
+    """【收菜】- 收获所有成熟作物"""
     async with UnitOfWork(AsyncSessionLocal) as uow:
         player = await get_unified_player(uow.session, event)
         if not player:

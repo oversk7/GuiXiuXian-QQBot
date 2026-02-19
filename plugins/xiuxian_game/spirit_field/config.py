@@ -69,7 +69,7 @@ STEAL_TARGET_LIST_LIMIT = 10   # 可偷目标列表最多显示
 GUARDIAN_HUNGRY_HOURS = 24     # 24小时未喂食进入饥饿状态
 GUARDIAN_HUNGRY_RATE_PENALTY = 0.5  # 饥饿状态拦截率减半
 
-# ==================== 采收配置 ====================
+# ==================== 收菜配置 ====================
 
 HARVEST_SEED_RETURN_CHANCE = 0.10  # 10%概率额外获得1颗同种种子
 

@@ -1,5 +1,5 @@
 """
-灵田核心服务 - 开田/升级/种植/灌溉/采收
+灵田核心服务 - 开田/升级/种植/灌溉/收菜
 """
 import random
 import math
@@ -452,7 +452,7 @@ class SpiritFieldService:
             f"跳过: {skipped}块"
         )
 
-    # ==================== 采收 ====================
+    # ==================== 收菜 ====================
 
     async def harvest(self, uow: UnitOfWork, player_id: str) -> Tuple[bool, str]:
         """收获所有成熟作物"""
@@ -470,7 +470,7 @@ class SpiritFieldService:
 
         mature_plots = await uow.spirit_field_plots.get_mature_plots(field.id)
         if not mature_plots:
-            return False, "没有成熟的作物可以采收"
+            return False, "没有成熟的作物可以收菜"
 
         harvest_results: Dict[str, int] = {}  # {crop_name: total_quantity}
         seed_returns: Dict[str, int] = {}
@@ -489,7 +489,7 @@ class SpiritFieldService:
                     harvest_results[crop.name] = harvest_results.get(crop.name, 0) + actual_yield
                     total_harvested += actual_yield
                 except ValueError as e:
-                    logger.warning(f"采收失败(背包满?): {e}")
+                    logger.warning(f"收菜失败(背包满?): {e}")
 
             # 10%概率返还种子
             if random.random() < HARVEST_SEED_RETURN_CHANCE:
@@ -515,7 +515,7 @@ class SpiritFieldService:
         await uow.spirit_fields.update(field)
 
         # 构建结果消息
-        msg = f"采收完成!\n━━━━━━━━━━━━━\n"
+        msg = f"收菜完成!\n━━━━━━━━━━━━━\n"
         for name, qty in harvest_results.items():
             msg += f"  {name} x{qty}\n"
 
@@ -601,7 +601,7 @@ class SpiritFieldService:
                         msg += f"[{plot.plot_index}] {crop_name} - 剩余{h}时{m}分\n"
 
         if mature_count > 0:
-            msg += f"━━━━━━━━━━━━━\n有{mature_count}块作物可采收，使用【采收】收获"
+            msg += f"━━━━━━━━━━━━━\n有{mature_count}块作物可收菜，使用【收菜】收获"
 
         return True, msg
 

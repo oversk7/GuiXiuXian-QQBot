@@ -39,7 +39,7 @@ class SpiritField(Base):
         comment="诡兽上次喂食时间"
     )
     total_harvested: Mapped[int] = mapped_column(
-        Integer, default=0, server_default="0", comment="累计采收次数"
+        Integer, default=0, server_default="0", comment="累计收菜次数"
     )
     total_stolen_from: Mapped[int] = mapped_column(
         Integer, default=0, server_default="0", comment="被偷次数"
