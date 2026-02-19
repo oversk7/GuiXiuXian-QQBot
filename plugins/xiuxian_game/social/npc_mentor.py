@@ -3,13 +3,18 @@
 
 处理玩家与师徒使者的交互,提供拜师申请/收徒/出师等功能
 """
-from nonebot.adapters.qq import MessageEvent
+from nonebot import on_command
+from nonebot.adapters.qq import MessageEvent, Message
+from nonebot.params import CommandArg
 from sqlalchemy.ext.asyncio import AsyncSession
 from datetime import datetime, timedelta
 
 from ..models.player import Player
+from ..models.db import AsyncSessionLocal
 from ..infrastructure.uow.unit_of_work import UnitOfWork
 from .mentorship_system_service import MentorshipSystemService
+from ..utils import message_add_head
+from ..platform_utils import get_unified_player
 
 
 async def handle_mentor_interaction(
@@ -308,7 +313,7 @@ def get_incense_shop_menu(player: Player) -> str:
         "购买徒弟位 - 500香火",
         "  • 永久增加1个徒弟位",
         "",
-        "📖 烹饪食谱（使用【交互 师徒使者 买食谱 食谱名】购买）",
+        "📖 烹饪食谱（使用【买食谱 食谱名】购买）",
         "━━━━━━━━━━━━━",
         "🟢 绿色食谱（80香火/个）：",
     ]
@@ -381,7 +386,7 @@ async def _buy_recipe(uow, session, player: Player, recipe_name: str) -> str:
             entry = INCENSE_RECIPE_SHOP.get(f"食谱·{recipe_name}")
     if not entry:
         available = "、".join(INCENSE_RECIPE_SHOP.keys())
-        return f"未找到食谱【{recipe_name}】\n使用【交互 师徒使者 香火商店】查看可购买列表"
+        return f"未找到食谱【{recipe_name}】\n使用【香火商店】查看可购买列表"
 
     item_id, cost = entry
     incense = player.incense or 0
@@ -414,3 +419,39 @@ async def _buy_recipe(uow, session, player: Player, recipe_name: str) -> str:
         f"剩余：{player.incense}香火\n"
         f"使用【使用 {recipe_name}】学习食谱"
     )
+
+
+# ==================== 独立香火商店指令 ====================
+
+incense_shop_cmd = on_command("香火商店", priority=5, block=True)
+
+
+@incense_shop_cmd.handle()
+async def handle_incense_shop(event: MessageEvent):
+    """【香火商店】- 查看香火兑换列表"""
+    async with UnitOfWork(AsyncSessionLocal) as uow:
+        player = await get_unified_player(uow.session, event)
+        if not player:
+            await incense_shop_cmd.finish("⛔ 请先创建角色")
+
+        menu = get_incense_shop_menu(player)
+        await incense_shop_cmd.finish(message_add_head(menu, event))
+
+
+buy_recipe_cmd = on_command("买食谱", aliases={"购买食谱"}, priority=5, block=True)
+
+
+@buy_recipe_cmd.handle()
+async def handle_buy_recipe_cmd(event: MessageEvent, args: Message = CommandArg()):
+    """【买食谱 食谱名】- 用香火购买烹饪食谱"""
+    recipe_name = args.extract_plain_text().strip()
+    if not recipe_name:
+        await buy_recipe_cmd.finish("⛔ 用法：买食谱 <食谱名>\n例如：买食谱 食谱·龙鱼宴\n使用【香火商店】查看可购列表")
+
+    async with UnitOfWork(AsyncSessionLocal) as uow:
+        player = await get_unified_player(uow.session, event)
+        if not player:
+            await buy_recipe_cmd.finish("⛔ 请先创建角色")
+
+        result = await _buy_recipe(uow, uow.session, player, recipe_name)
+        await buy_recipe_cmd.finish(message_add_head(result, event))
