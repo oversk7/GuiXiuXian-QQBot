@@ -349,6 +349,11 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
         "DISH": "菜肴",
         "RECIPE": "食谱",
         "GIFT": "礼物",
+        "GHOST_FRAGMENT": "鬼魂碎片",
+        "VEGETABLE": "灵蔬",
+        "HERB": "诡药",
+        "SEED": "灵种",
+        "GUARDIAN_BEAST": "守护兽",
     }
 
     lines = ["📖 图鉴查询结果 ✨", "━━━━━━━━━━"]
