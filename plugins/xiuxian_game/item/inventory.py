@@ -97,6 +97,14 @@ CATEGORY_MAPPING = {
     "调料": "SEASONING",
     "菜肴": "DISH",
     "食谱": "RECIPE",
+    "灵蔬": "VEGETABLE",
+    "蔬菜": "VEGETABLE",
+    "诡药": "HERB",
+    "草药": "HERB",
+    "灵种": "SEED",
+    "种子": "SEED",
+    "守护兽": "GUARDIAN_BEAST",
+    "诡兽": "GUARDIAN_BEAST",
 }
 
 # 物品类型中文映射（用于显示）
@@ -111,6 +119,10 @@ TYPE_NAME_MAP = {
     "SEASONING": "调味品",
     "DISH": "菜肴",
     "RECIPE": "食谱",
+    "VEGETABLE": "灵蔬",
+    "HERB": "诡药",
+    "SEED": "灵种",
+    "GUARDIAN_BEAST": "守护兽",
 }
 
 # 默认展示顺序（决定排序权重）
@@ -122,6 +134,10 @@ CATEGORY_ORDER = [
     "SEASONING",             # 调味品
     "DISH",                  # 菜肴
     "RECIPE",                # 食谱
+    "VEGETABLE",             # 灵蔬
+    "HERB",                  # 诡药
+    "SEED",                  # 灵种
+    "GUARDIAN_BEAST",        # 守护兽
     "ELIXIR",                # 丹药（item_id 以 _elixir 结尾）
     "GEM",                   # 宝石
     "EQUIPMENT"
