@@ -42,9 +42,9 @@ class SpiritFieldStealLogRepository(IRepository[SpiritFieldStealLog]):
         return result.scalar_one()
 
     async def get_today_steal_count(self, thief_id: str, today: str) -> int:
-        """获取今日偷菜总次数"""
+        """获取今日偷菜总次数（按偷过的不同玩家数计算）"""
         result = await self._session.execute(
-            select(func.count(SpiritFieldStealLog.id)).where(
+            select(func.count(func.distinct(SpiritFieldStealLog.victim_id))).where(
                 SpiritFieldStealLog.thief_id == thief_id,
                 SpiritFieldStealLog.steal_date == today
             )
