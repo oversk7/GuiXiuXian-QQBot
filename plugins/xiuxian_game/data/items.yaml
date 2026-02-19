@@ -3214,6 +3214,7 @@ items:
       price: 3000
       effect_type: "LEARN_RECIPE"
       effect_params: {"recipe_id": "sturgeon_banquet"}
+      description: "鲟鱼全席的制作方法,学习后可在餐厅烹饪此菜品。"
 
   # ====================================================================
   # 灵田系统 - 灵种(种子)
