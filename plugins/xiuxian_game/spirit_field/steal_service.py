@@ -14,7 +14,7 @@ from ..models.spirit_field import SpiritField, SpiritFieldPlot, SpiritFieldSteal
 from ..models.player import Player
 from ..models.inventory import ItemInstance
 from .config import (
-    STEAL_MAX_PER_DAY, STEAL_COOLDOWN_MINUTES, STEAL_PERCENT, STEAL_PROTECT_PERCENT,
+    STEAL_MAX_PER_DAY, STEAL_COOLDOWN_MINUTES, STEAL_PROTECT_PERCENT,
     STEAL_TARGET_LIST_LIMIT,
     GUARDIAN_HUNGRY_HOURS, GUARDIAN_HUNGRY_RATE_PENALTY,
     CropManager, GuardianBeastManager,
@@ -65,19 +65,20 @@ class StealService:
                 player_id, field.player_id, today
             )
 
-            # 检查实际可偷数量（主人保底70%：累计被偷不超过总产量30%）
-            # 可偷判断：用全部剩余量算20%，但总被偷量不超过上限
+            # 检查实际可偷数量（主人保底70%，每块随机0%~30%比例）
+            # 用最大随机比例(30%)估算，≥1株则视为有希望偷到
+            max_random_pct = 1 - STEAL_PROTECT_PERCENT
             stealable_plots = 0
             for p in mature_plots:
-                max_stealable = math.floor(p.yield_quantity * (1 - STEAL_PROTECT_PERCENT))
+                max_stealable = math.floor(p.yield_quantity * max_random_pct)
                 if p.stolen_quantity >= max_stealable:
                     continue  # 已达保底上限
                 available = p.yield_quantity - p.stolen_quantity
-                steal_qty = min(
-                    math.floor(available * STEAL_PERCENT),
+                best_case = min(
+                    math.floor(available * max_random_pct),
                     max_stealable - p.stolen_quantity,
                 )
-                if steal_qty >= 1:
+                if best_case >= 1:
                     stealable_plots += 1
 
             victim = await uow.players.get_by_id(field.player_id)
@@ -268,16 +269,18 @@ class StealService:
                 f"这次偷鸡不成蚀把米..."
             )
 
-        # 偷取成功 - 用全部剩余量算20%，但总被偷量不超过总产量30%（主人保底70%）
+        # 偷取成功 - 每块地独立随机偷取比例（0%~30%），主人保底70%总产量
+        max_random_pct = 1 - STEAL_PROTECT_PERCENT
         stolen_items = {}
         for plot in mature_plots:
-            max_stealable = math.floor(plot.yield_quantity * (1 - STEAL_PROTECT_PERCENT))
+            max_stealable = math.floor(plot.yield_quantity * max_random_pct)
             if plot.stolen_quantity >= max_stealable:
                 continue  # 已达保底上限
 
             available = plot.yield_quantity - plot.stolen_quantity
+            random_pct = random.uniform(0.0, max_random_pct)
             steal_qty = min(
-                math.floor(available * STEAL_PERCENT),
+                math.floor(available * random_pct),
                 max_stealable - plot.stolen_quantity,
             )
             if steal_qty <= 0:
