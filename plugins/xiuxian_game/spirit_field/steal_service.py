@@ -252,10 +252,10 @@ class StealService:
 
             return False, (
                 f"『当场被抓』\n"
-                f"─────────────────\n"
+                f"━━━━━━━━━━━━━\n"
                 f"{victim.nickname} 的{beast_name}扑了上来！\n"
                 f"罚没金币：{actual_penalty:,}\n"
-                f"─────────────────\n"
+                f"━━━━━━━━━━━━━\n"
                 f"这次偷鸡不成蚀把米..."
             )
 
@@ -311,11 +311,11 @@ class StealService:
             await uow.spirit_fields.update(thief_field)
 
         msg = f"『夜袭得手』\n"
-        msg += f"─────────────────\n"
+        msg += f"━━━━━━━━━━━━━\n"
         msg += f"目标：{victim.nickname}\n"
         for name, qty in stolen_items.items():
             msg += f"  {name}  ×{qty}\n"
-        msg += f"─────────────────\n"
+        msg += f"━━━━━━━━━━━━━\n"
         msg += f"共获得 {total_qty} 株灵草"
 
         return True, msg
@@ -338,7 +338,7 @@ class StealService:
         thief_pages = max(1, math.ceil(total_thief / PAGE_SIZE))
 
         msg = f"『灵田档案』第 {page} 页\n"
-        msg += "─────────────────\n"
+        msg += "━━━━━━━━━━━━━\n"
 
         if stolen_from_logs:
             msg += f"□ 我的损失  ({page}/{victim_pages}页)\n"
@@ -359,7 +359,7 @@ class StealService:
         else:
             msg += "□ 我的损失  暂无记录\n"
 
-        msg += "─────────────────\n"
+        msg += "━━━━━━━━━━━━━\n"
 
         if stolen_by_logs:
             msg += f"■ 我的收获  ({page}/{thief_pages}页)\n"
@@ -380,6 +380,6 @@ class StealService:
         else:
             msg += "■ 我的收获  暂无记录\n"
 
-        msg += "─────────────────\n"
+        msg += "━━━━━━━━━━━━━\n"
         msg += "发送「偷菜记录 页码」翻页"
         return True, msg

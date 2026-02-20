@@ -459,12 +459,12 @@ class SpiritFieldService:
             return False, "没有可灌溉的地块(可能已达今日上限或在冷却中)"
 
         msg = "『一键浇水』\n"
-        msg += "─────────────────\n"
+        msg += "━━━━━━━━━━━━━\n"
         for line in watered_lines:
             msg += line + "\n"
         for line in matured_lines:
             msg += line + "\n"
-        msg += "─────────────────\n"
+        msg += "━━━━━━━━━━━━━\n"
         summary_parts = [f"浇水 {total_watered} 块"]
         if skipped:
             summary_parts.append(f"跳过 {skipped} 块")
