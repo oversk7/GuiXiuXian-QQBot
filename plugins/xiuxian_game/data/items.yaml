@@ -1749,6 +1749,90 @@ items:
         attr_name: "运气"
       daily_limit: 5
 
+    # ========== 灵田联动 - 诡药炼丹系列 ==========
+
+    - item_id: "weed_heal_elixir"
+      name: "幽草愈灵丹"
+      description: "以鬼草为引炼成，同时恢复15%生命值和15%理智值"
+      type: "CONSUMABLE"
+      price: 600
+      effect_type: "RESTORE_HP_MP_PERCENT"
+      effect_params:
+        hp_percent: 0.15
+        mp_percent: 0.15
+      daily_limit: 5
+
+    - item_id: "berry_shield_elixir"
+      name: "阴莓护体丹"
+      description: "以阴莓为引炼成，防御+20%，持续20分钟"
+      type: "CONSUMABLE"
+      price: 800
+      effect_type: "TEMPORARY_BUFF_PERCENT"
+      effect_params:
+        buff_name: "阴莓护体"
+        defense_pct: 20
+        duration_minutes: 20
+      daily_limit: 3
+
+    - item_id: "vine_body_elixir"
+      name: "魂藤淬骨丹"
+      description: "以魂藤为引炼成，生命上限+25%，持续30分钟"
+      type: "CONSUMABLE"
+      price: 12000
+      effect_type: "TEMPORARY_BUFF_PERCENT"
+      effect_params:
+        buff_name: "魂藤淬骨"
+        max_hp_pct: 25
+        duration_minutes: 30
+      daily_limit: 3
+
+    - item_id: "orchid_battle_elixir"
+      name: "血兰战魄丹"
+      description: "以血兰为引炼成，攻击+20%，持续20分钟"
+      type: "CONSUMABLE"
+      price: 15000
+      effect_type: "TEMPORARY_BUFF_PERCENT"
+      effect_params:
+        buff_name: "血兰战魄"
+        attack_pct: 20
+        duration_minutes: 20
+      daily_limit: 3
+
+    - item_id: "nightmare_break_elixir"
+      name: "噩梦破境丹"
+      description: "以噩梦花为引炼成，攻击+15%、敏捷+10%，持续30分钟"
+      type: "CONSUMABLE"
+      price: 40000
+      effect_type: "TEMPORARY_BUFF_PERCENT"
+      effect_params:
+        buff_name: "噩梦破境"
+        attack_pct: 15
+        agility_pct: 10
+        duration_minutes: 30
+      daily_limit: 3
+
+    - item_id: "cursed_essence_elixir"
+      name: "诅咒精魄丹"
+      description: "以诅咒之根为引炼成，永久提升攻击+30、防御+30"
+      type: "CONSUMABLE"
+      price: 120000
+      effect_type: "BUFF"
+      effect_params:
+        attack: 30
+        defense: 30
+      daily_limit: 1
+
+    - item_id: "void_restore_elixir"
+      name: "虚空归元丹"
+      description: "以虚空绽为引炼成，完全恢复生命值与理智值"
+      type: "CONSUMABLE"
+      price: 500000
+      effect_type: "RESTORE_HP_MP_PERCENT"
+      effect_params:
+        hp_percent: 1.0
+        mp_percent: 1.0
+      daily_limit: 1
+
   goods:  # 仅用于跑商系统倒卖的奢侈品
     - item_id: "lux_perfume"
       name: "香水"
@@ -3466,55 +3550,55 @@ items:
       name: "碧冥芹"
       type: "VEGETABLE"
       rarity: "white"
-      price: 25
+      price: 5
       description: "冥界碧泉旁的芹菜，茎叶翠绿，可用于烹饪"
     - item_id: "spirit_radish"
       name: "玉骨萝"
       type: "VEGETABLE"
       rarity: "white"
-      price: 30
+      price: 6
       description: "色白如骨的萝卜，甘甜冷冽，可用于烹饪"
     - item_id: "spirit_mushroom"
       name: "幽光菇"
       type: "VEGETABLE"
       rarity: "white"
-      price: 45
+      price: 9
       description: "散发幽幽荧光的菇类，可用于烹饪"
     - item_id: "spirit_pepper"
       name: "赤魂椒"
       type: "VEGETABLE"
       rarity: "green"
-      price: 90
+      price: 18
       description: "通红似血的赤魂椒，辣意透魂，可用于烹饪"
     - item_id: "spirit_gourd"
       name: "灵壶葫"
       type: "VEGETABLE"
       rarity: "green"
-      price: 110
+      price: 22
       description: "形似壶器的灵壶葫，可纳灵气于中，可用于烹饪"
     - item_id: "spirit_lotus_root"
       name: "寒玉藕"
       type: "VEGETABLE"
       rarity: "blue"
-      price: 280
+      price: 56
       description: "生于冥泉深处的莲藕，藕身似寒玉，可用于烹饪"
     - item_id: "spirit_bamboo_shoot"
       name: "翠骨笋"
       type: "VEGETABLE"
       rarity: "blue"
-      price: 320
+      price: 64
       description: "色如翡翠质硬如骨的翠骨笋，可用于烹饪"
     - item_id: "spirit_ginseng_leaf"
       name: "九幽参"
       type: "VEGETABLE"
       rarity: "purple"
-      price: 700
+      price: 140
       description: "九层幽冥深处的参叶，珍稀烹饪食材"
     - item_id: "spirit_phoenix_grass"
       name: "浴火仙草"
       type: "VEGETABLE"
       rarity: "orange"
-      price: 2200
+      price: 440
       description: "经火焰淬炼方生的仙草，传说级烹饪食材"
 
   # ====================================================================
@@ -3525,43 +3609,43 @@ items:
       name: "鬼草"
       type: "HERB"
       rarity: "white"
-      price: 35
+      price: 7
       description: "阴气滋养的草药，可用于炼丹"
     - item_id: "yin_berry"
       name: "阴莓"
       type: "HERB"
       rarity: "white"
-      price: 50
+      price: 10
       description: "极阴之地的浆果，可用于炼丹"
     - item_id: "soul_vine"
       name: "魂藤"
       type: "HERB"
       rarity: "green"
-      price: 100
+      price: 20
       description: "能感知灵魂的藤蔓，可用于炼丹"
     - item_id: "blood_orchid"
       name: "血兰"
       type: "HERB"
       rarity: "green"
-      price: 150
+      price: 30
       description: "殷红如血的兰花，炼丹上等材料"
     - item_id: "nightmare_flower"
       name: "噩梦花"
       type: "HERB"
       rarity: "blue"
-      price: 350
+      price: 70
       description: "梦境与现实交界处的花朵，可用于炼丹"
     - item_id: "cursed_root"
       name: "诅咒之根"
       type: "HERB"
       rarity: "purple"
-      price: 900
+      price: 180
       description: "被诅咒侵蚀的根茎，炼丹珍稀材料"
     - item_id: "void_bloom"
       name: "虚空绽"
       type: "HERB"
       rarity: "orange"
-      price: 2800
+      price: 560
       description: "虚空裂缝中的奇花，传说级炼丹材料"
 
   # ====================================================================

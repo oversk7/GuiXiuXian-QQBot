@@ -383,14 +383,89 @@ elixirs:
     quantity: 1
     base_success: 0.65
 
-  # 归元化运丹（转换运气）
-  reforge_luck:
-    produce_item_id: "reforge_luck_elixir"
-    materials:
-      cursed_mirror_shard: 5 # 蓝色材料
-      phantom_thread: 4     # 蓝色材料
-      withered_flower: 12  # 绿色材料
-      ghost_tears: 45      # 白色材料
-      grouper: 2           # 蓝色鱼类（钓鱼联动）
     quantity: 1
     base_success: 0.65
+
+  # ========== 灵田联动 - 诡药炼丹系列 ==========
+
+  # 初级双恢复 - 幽草愈灵丹（鬼草×15）
+  herb_weed_heal:
+    produce_item_id: "weed_heal_elixir"
+    materials:
+      ghost_weed: 15      # 白色诡药（灵田）
+      rotten_core: 8      # 白色材料
+      ghost_tears: 5      # 白色材料
+      common_carp: 2      # 白色鱼类
+    quantity: 1
+    base_success: 0.85
+
+  # 初级防御丹 - 阴莓护体丹（阴莓×12）
+  herb_berry_shield:
+    produce_item_id: "berry_shield_elixir"
+    materials:
+      yin_berry: 12       # 白色诡药（灵田）
+      cursed_silk: 10     # 白色材料
+      bone_fragment: 8    # 白色材料
+      crucian_carp: 2     # 白色鱼类
+    quantity: 1
+    base_success: 0.85
+
+  # 中级生命丹 - 魂藤淬骨丹（魂藤×10）
+  herb_vine_body:
+    produce_item_id: "vine_body_elixir"
+    materials:
+      soul_vine: 10       # 绿色诡药（灵田）
+      yin_essence: 5      # 绿色材料
+      spirit_bone: 20     # 白色材料
+      stabilizer_crystal: 2 # 蓝色材料（稳定水晶）
+      mandarin_fish: 2    # 绿色鱼类
+    quantity: 1
+    base_success: 0.75
+
+  # 中级攻击丹 - 血兰战魄丹（血兰×8）
+  herb_orchid_battle:
+    produce_item_id: "orchid_battle_elixir"
+    materials:
+      blood_orchid: 8     # 绿色诡药（灵田）
+      corrupted_bandage: 6 # 绿色材料
+      iron_rust: 15       # 白色材料
+      pomfret: 2          # 绿色鱼类
+    quantity: 1
+    base_success: 0.75
+
+  # 高级攻敏双属性丹 - 噩梦破境丹（噩梦花×6）
+  herb_nightmare_break:
+    produce_item_id: "nightmare_break_elixir"
+    materials:
+      nightmare_flower: 6 # 蓝色诡药（灵田）
+      flesh_crystal: 4    # 蓝色材料
+      strange_stone: 3    # 蓝色材料（诡异石）
+      nightmare_silk: 10  # 绿色材料
+      eel: 1              # 蓝色鱼类
+    quantity: 1
+    base_success: 0.65
+
+  # 顶级永久属性丹 - 诅咒精魄丹（诅咒之根×3）
+  herb_cursed_essence:
+    produce_item_id: "cursed_essence_elixir"
+    materials:
+      cursed_root: 3      # 紫色诡药（灵田）
+      demon_heart: 1      # 紫色材料
+      spirit_stone: 2     # 紫色材料（灵石）
+      soul_crystal: 5     # 蓝色材料
+      arowana: 1          # 紫色鱼类
+    quantity: 1
+    base_success: 0.50
+
+  # 传说全恢复丹 - 虚空归元丹（虚空绽×2）
+  herb_void_restore:
+    produce_item_id: "void_restore_elixir"
+    materials:
+      void_bloom: 2       # 橙色诡药（灵田）
+      void_essence: 3     # 紫色材料
+      demon_heart: 4      # 紫色材料
+      wanted_poster: 1    # 紫色材料（寻人启事）
+      kissed_phone_number: 1 # 紫色材料（被死者亲吻的号码）
+      golden_dragon_fish: 1 # 橙色鱼类
+    quantity: 1
+    base_success: 0.30
