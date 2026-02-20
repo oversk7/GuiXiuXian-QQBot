@@ -4,10 +4,10 @@
 import random
 import math
 import json
-from datetime import datetime, timedelta
+from datetime import datetime
 from typing import Tuple, List, Optional
 from nonebot import logger
-from sqlalchemy import select, and_
+from sqlalchemy import select
 
 from ..infrastructure.uow.unit_of_work import UnitOfWork
 from ..models.spirit_field import SpiritField, SpiritFieldPlot, SpiritFieldStealLog
@@ -15,7 +15,7 @@ from ..models.player import Player
 from ..models.inventory import ItemInstance
 from .config import (
     STEAL_MAX_PER_DAY, STEAL_COOLDOWN_MINUTES, STEAL_PERCENT,
-    STEAL_TARGET_ACTIVE_HOURS, STEAL_TARGET_LIST_LIMIT,
+    STEAL_TARGET_LIST_LIMIT,
     GUARDIAN_HUNGRY_HOURS, GUARDIAN_HUNGRY_RATE_PENALTY,
     CropManager, GuardianBeastManager,
 )
@@ -29,7 +29,7 @@ class StealService:
         self.beast_manager = GuardianBeastManager()
 
     async def get_steal_targets(self, uow: UnitOfWork, player_id: str) -> Tuple[bool, str]:
-        """获取可偷目标列表"""
+        """获取可偷目标列表（含未成熟作物概况）"""
         today = datetime.now().strftime("%Y-%m-%d")
         now = datetime.now()
 
@@ -38,71 +38,122 @@ class StealService:
         if steal_count >= STEAL_MAX_PER_DAY:
             return False, f"今日偷菜次数已用完({steal_count}/{STEAL_MAX_PER_DAY})"
 
-        # 查找有成熟作物的活跃玩家
-        active_threshold = now - timedelta(hours=STEAL_TARGET_ACTIVE_HOURS)
-
-        # 获取所有灵田
+        # 获取所有其他玩家灵田
         stmt = select(SpiritField).where(SpiritField.player_id != player_id)
         result = await uow.session.execute(stmt)
         all_fields = result.scalars().all()
 
-        targets = []
+        ready_targets = []   # 有成熟作物且可偷
+        pending_targets = [] # 有在种作物但暂不可偷
+
         for field in all_fields:
-            # 先更新成熟状态
+            # 获取所有种植中的地块并更新成熟状态
             plots = await uow.spirit_field_plots.get_planted_plots(field.id)
+            if not plots:
+                continue
+
             for plot in plots:
                 if not plot.is_mature and plot.mature_at and plot.mature_at <= now:
                     plot.is_mature = True
                     await uow.spirit_field_plots.update(plot)
 
-            mature_plots = await uow.spirit_field_plots.get_mature_plots(field.id)
-            if not mature_plots:
-                continue
+            mature_plots = [p for p in plots if p.is_mature]
+            growing_plots = [p for p in plots if not p.is_mature and p.mature_at]
 
             # 检查是否今日已偷过
             already_stolen = await uow.spirit_field_steal_logs.has_stolen_from_today(
                 player_id, field.player_id, today
             )
-            if already_stolen:
-                continue
 
-            # 检查可偷数量
-            stealable = sum(
-                max(0, p.yield_quantity - p.stolen_quantity)
-                for p in mature_plots
+            # 检查实际可偷数量（需≥5才能偷到1个）
+            stealable_plots = sum(
+                1 for p in mature_plots
+                if math.floor(max(0, p.yield_quantity - p.stolen_quantity) * STEAL_PERCENT) >= 1
             )
-            if stealable <= 0:
-                continue
 
-            # 获取玩家信息
             victim = await uow.players.get_by_id(field.player_id)
             if not victim:
                 continue
 
-            targets.append({
-                "player": victim,
-                "field": field,
-                "mature_count": len(mature_plots),
-                "stealable": stealable,
-            })
+            if mature_plots and not already_stolen and stealable_plots > 0:
+                # 可立即偷取
+                ready_targets.append({
+                    "player": victim,
+                    "field": field,
+                    "mature_count": len(mature_plots),
+                    "stealable_plots": stealable_plots,
+                })
+            else:
+                # 暂不可偷：记录在种概况
+                all_growing = growing_plots[:]
+                # 已成熟但今日已偷或已被偷完的也算在内
+                if mature_plots and (already_stolen or stealable_plots == 0):
+                    all_growing = mature_plots + growing_plots
 
-            if len(targets) >= STEAL_TARGET_LIST_LIMIT:
-                break
+                if not all_growing and not mature_plots:
+                    continue
 
-        if not targets:
-            return False, "当前没有可偷菜的目标"
+                # 最早成熟时间（只看未成熟的）
+                min_mature_at = None
+                if growing_plots:
+                    min_mature_at = min(p.mature_at for p in growing_plots)
 
-        msg = f"可偷菜目标 ({steal_count}/{STEAL_MAX_PER_DAY}次已用)\n━━━━━━━━━━━━━\n"
-        for t in targets:
-            p = t["player"]
-            beast_info = ""
-            if t["field"].guardian_beast_id:
-                beast = self.beast_manager.get_beast_by_item_id(t["field"].guardian_beast_id)
-                if beast:
-                    beast_info = f" [{beast.name}守田]"
-            msg += f"UID:{p.uid} {p.nickname} - 成熟{t['mature_count']}块{beast_info}\n"
+                pending_targets.append({
+                    "player": victim,
+                    "field": field,
+                    "growing_count": len(plots),  # 总种植数
+                    "mature_count": len(mature_plots),
+                    "min_mature_at": min_mature_at,
+                    "already_stolen": already_stolen,
+                    "stealable_plots": stealable_plots,
+                })
 
-        msg += f"━━━━━━━━━━━━━\n使用【偷菜 UID】偷取"
+        if not ready_targets and not pending_targets:
+            return False, "当前没有任何玩家种有作物"
+
+        remaining_chances = STEAL_MAX_PER_DAY - steal_count
+        msg = f"『灵田侦查』今日剩余 {remaining_chances} 次\n"
+
+        # 可立即偷取部分
+        msg += "─────────────────\n"
+        if ready_targets:
+            msg += "✦ 可立即行窃\n"
+            for t in ready_targets[:STEAL_TARGET_LIST_LIMIT]:
+                p = t["player"]
+                beast_line = ""
+                if t["field"].guardian_beast_id:
+                    beast = self.beast_manager.get_beast_by_item_id(t["field"].guardian_beast_id)
+                    if beast:
+                        beast_line = f"\n     └⚠ {beast.name}守田"
+                msg += f"▸ {p.uid}·{p.nickname}  熟 {t['mature_count']} 块{beast_line}\n"
+        else:
+            msg += "✦ 可立即行窃  暂无目标\n"
+
+        # 在种未成熟部分
+        if pending_targets:
+            msg += "─────────────────\n"
+            msg += "✧ 暗中窥探\n"
+            for t in pending_targets[:STEAL_TARGET_LIST_LIMIT]:
+                p = t["player"]
+                tags = []
+
+                if t["already_stolen"]:
+                    tags.append("今日已偷")
+                elif t["stealable_plots"] == 0 and t["mature_count"] > 0:
+                    tags.append("成熟量不足")
+
+                if t["min_mature_at"]:
+                    remaining = (t["min_mature_at"] - now).total_seconds()
+                    if remaining > 0:
+                        h = int(remaining // 3600)
+                        m = int((remaining % 3600) // 60)
+                        tags.append(f"{h}h{m}m后可偷" if h > 0 else f"{m}分钟后可偷")
+
+                tag_str = f"  {'·'.join(tags)}" if tags else ""
+                msg += f"▹ {p.uid}·{p.nickname}  种 {t['growing_count']} 块{tag_str}\n"
+
+        msg += "─────────────────\n"
+        msg += "发送「偷菜 UID」出手"
 
         return True, msg
 
@@ -200,9 +251,12 @@ class StealService:
             beast_name = beast.name if beast else "诡兽"
 
             return False, (
-                f"偷菜失败!\n"
-                f"{victim.nickname}的{beast_name}发现了你!\n"
-                f"被罚金: {actual_penalty}金币"
+                f"『当场被抓』\n"
+                f"─────────────────\n"
+                f"{victim.nickname} 的{beast_name}扑了上来！\n"
+                f"罚没金币：{actual_penalty:,}\n"
+                f"─────────────────\n"
+                f"这次偷鸡不成蚀把米..."
             )
 
         # 偷取成功 - 每种作物偷20%（向下取整，产量不足5个时可能偷不到）
@@ -256,9 +310,13 @@ class StealService:
             thief_field.total_stolen_by_me += sum(stolen_items.values())
             await uow.spirit_fields.update(thief_field)
 
-        msg = f"偷菜成功!\n从{victim.nickname}偷到:\n"
+        msg = f"『夜袭得手』\n"
+        msg += f"─────────────────\n"
+        msg += f"目标：{victim.nickname}\n"
         for name, qty in stolen_items.items():
-            msg += f"  {name} x{qty}\n"
+            msg += f"  {name}  ×{qty}\n"
+        msg += f"─────────────────\n"
+        msg += f"共获得 {total_qty} 株灵草"
 
         return True, msg
 
@@ -279,49 +337,49 @@ class StealService:
         stolen_by_logs = await uow.spirit_field_steal_logs.get_recent_logs_for_thief(player_id, PAGE_SIZE, offset)
         thief_pages = max(1, math.ceil(total_thief / PAGE_SIZE))
 
-        msg = f"灵田记录 第{page}页\n━━━━━━━━━━━━━\n"
+        msg = f"『灵田档案』第 {page} 页\n"
+        msg += "─────────────────\n"
 
         if stolen_from_logs:
-            msg += f"被偷菜记录 ({page}/{victim_pages}页):\n"
+            msg += f"□ 我的损失  ({page}/{victim_pages}页)\n"
             for log in stolen_from_logs:
                 thief = await uow.players.get_by_id(log.thief_id)
                 thief_name = thief.nickname if thief else "未知"
                 time_str = log.created_at.strftime("%m-%d %H:%M")
                 if log.was_caught:
-                    msg += f"  [{time_str}] {thief_name} 被诡兽拦截 (罚{log.penalty_gold}金)\n"
+                    msg += f"  {time_str}  {thief_name} 被诡兽拦截 +{log.penalty_gold:,}金\n"
                 elif log.stolen_summary:
                     items = json.loads(log.stolen_summary)
-                    items_str = " ".join(f"{name}x{qty}" for name, qty in items.items())
-                    msg += f"  [{time_str}] {thief_name} 偷走 {items_str}\n"
+                    items_str = "  ".join(f"{name}×{qty}" for name, qty in items.items())
+                    msg += f"  {time_str}  {thief_name} 偷走 {items_str}\n"
                 else:
-                    # 兼容旧格式记录
                     crop = self.crop_manager.get_crop(log.crop_id)
                     crop_name = crop.name if crop else "未知"
-                    msg += f"  [{time_str}] {thief_name} 偷走{crop_name}x{log.quantity}\n"
+                    msg += f"  {time_str}  {thief_name} 偷走 {crop_name}×{log.quantity}\n"
         else:
-            msg += "暂无被偷菜记录\n"
+            msg += "□ 我的损失  暂无记录\n"
 
-        msg += "━━━━━━━━━━━━━\n"
+        msg += "─────────────────\n"
 
         if stolen_by_logs:
-            msg += f"我的偷菜记录 ({page}/{thief_pages}页):\n"
+            msg += f"■ 我的收获  ({page}/{thief_pages}页)\n"
             for log in stolen_by_logs:
                 victim = await uow.players.get_by_id(log.victim_id)
                 victim_name = victim.nickname if victim else "未知"
                 time_str = log.created_at.strftime("%m-%d %H:%M")
                 if log.was_caught:
-                    msg += f"  [{time_str}] 偷{victim_name}失败 (罚{log.penalty_gold}金)\n"
+                    msg += f"  {time_str}  偷 {victim_name} 被抓 -{log.penalty_gold:,}金\n"
                 elif log.stolen_summary:
                     items = json.loads(log.stolen_summary)
-                    items_str = " ".join(f"{name}x{qty}" for name, qty in items.items())
-                    msg += f"  [{time_str}] 偷{victim_name} {items_str}\n"
+                    items_str = "  ".join(f"{name}×{qty}" for name, qty in items.items())
+                    msg += f"  {time_str}  偷 {victim_name}  {items_str}\n"
                 else:
-                    # 兼容旧格式记录
                     crop = self.crop_manager.get_crop(log.crop_id)
                     crop_name = crop.name if crop else "未知"
-                    msg += f"  [{time_str}] 偷{victim_name} {crop_name}x{log.quantity}\n"
+                    msg += f"  {time_str}  偷 {victim_name}  {crop_name}×{log.quantity}\n"
         else:
-            msg += "暂无偷菜记录\n"
+            msg += "■ 我的收获  暂无记录\n"
 
-        msg += f"━━━━━━━━━━━━━\n【偷菜记录 页码】查看更多"
+        msg += "─────────────────\n"
+        msg += "发送「偷菜记录 页码」翻页"
         return True, msg
