@@ -90,7 +90,7 @@ MARKET_CONFIGS = {
     "merchant1": {
         "name": "上京",
         "coord": (0, 0),
-        "sellable": ["gold_watch", "jade_bracelet", "lux_perfume", "designer_bag", "red_wine", "spice"],
+        "sellable": ["gold_watch", "jade_bracelet", "lux_perfume", "designer_bag", "red_wine", "spice", "secret_sauce", "immortal_oil"],
         "buyable": ["gold_watch", "jade_bracelet", "lux_perfume", "designer_bag", "red_wine", "art_book"]
     },
 
@@ -138,7 +138,7 @@ MARKET_CONFIGS = {
     "merchant7": {
         "name": "云岭",
         "coord": (-250, 490),
-        "sellable": ["yin_grass", "blood_pact", "luxury_chocolate", "art_book", "gaming_console"],
+        "sellable": ["yin_grass", "blood_pact", "luxury_chocolate", "art_book", "gaming_console", "lingzhi_powder"],
         "buyable": ["yin_grass", "blood_pact", "luxury_chocolate", "silk_scarf", "fountain_pen"]
     },
 
@@ -170,7 +170,7 @@ MARKET_CONFIGS = {
     "merchant11": {
         "name": "风雪镇",
         "coord": (-5, 390),
-        "sellable": ["blood_pact", "yin_grass", "concert_ticket", "art_book"],
+        "sellable": ["blood_pact", "yin_grass", "concert_ticket", "art_book", "lingzhi_powder"],
         "buyable": ["blood_pact", "yin_grass", "concert_ticket", "jade_bracelet", "gold_watch"]
     },
 
