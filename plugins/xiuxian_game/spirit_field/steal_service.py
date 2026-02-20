@@ -65,12 +65,19 @@ class StealService:
                 player_id, field.player_id, today
             )
 
-            # 检查实际可偷数量（主人保底70%，累计被偷不超过总产量30%）
+            # 检查实际可偷数量（主人保底70%：累计被偷不超过总产量30%）
+            # 可偷判断：用全部剩余量算20%，但总被偷量不超过上限
             stealable_plots = 0
             for p in mature_plots:
                 max_stealable = math.floor(p.yield_quantity * (1 - STEAL_PROTECT_PERCENT))
-                available = max(0, max_stealable - p.stolen_quantity)
-                if math.floor(available * STEAL_PERCENT) >= 1:
+                if p.stolen_quantity >= max_stealable:
+                    continue  # 已达保底上限
+                available = p.yield_quantity - p.stolen_quantity
+                steal_qty = min(
+                    math.floor(available * STEAL_PERCENT),
+                    max_stealable - p.stolen_quantity,
+                )
+                if steal_qty >= 1:
                     stealable_plots += 1
 
             victim = await uow.players.get_by_id(field.player_id)
@@ -261,15 +268,18 @@ class StealService:
                 f"这次偷鸡不成蚀把米..."
             )
 
-        # 偷取成功 - 每地块最多偷可偷余量的20%，主人保底70%总产量
+        # 偷取成功 - 用全部剩余量算20%，但总被偷量不超过总产量30%（主人保底70%）
         stolen_items = {}
         for plot in mature_plots:
             max_stealable = math.floor(plot.yield_quantity * (1 - STEAL_PROTECT_PERCENT))
-            available = max(0, max_stealable - plot.stolen_quantity)
-            if available <= 0:
-                continue
+            if plot.stolen_quantity >= max_stealable:
+                continue  # 已达保底上限
 
-            steal_qty = math.floor(available * STEAL_PERCENT)
+            available = plot.yield_quantity - plot.stolen_quantity
+            steal_qty = min(
+                math.floor(available * STEAL_PERCENT),
+                max_stealable - plot.stolen_quantity,
+            )
             if steal_qty <= 0:
                 continue
 
