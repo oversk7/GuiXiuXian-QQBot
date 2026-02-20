@@ -56,23 +56,37 @@ def heavy_divider(title: str) -> str:
 
 def calculate_transaction_tax(amount: int) -> int:
     """
-    计算阶梯交易税率
-    5000以下免税
-    5000-20000: 5%
-    20000-50000: 10%
-    50000-100000: 15%
-    100000以上: 20%
+    计算分段累进交易税率（仅对超出部分征税，消除断崖效应）
+    ≤5,000: 免税 (0%)
+    5,001-20,000: 超出部分 5%
+    20,001-50,000: 超出部分 10%
+    50,001-100,000: 超出部分 15%
+    >100,000: 超出部分 20%
+
+    示例：交易额 25,000 → 0 + 15000*5% + 5000*10% = 1,250（而非旧版 25000*10%=2,500）
     """
     if amount <= 5000:
         return 0
-    elif amount <= 20000:
-        return int(amount * 0.05)
-    elif amount <= 50000:
-        return int(amount * 0.10)
-    elif amount <= 100000:
-        return int(amount * 0.15)
-    else:
-        return int(amount * 0.20)
+
+    tax = 0
+    brackets = [
+        (5000, 20000, 0.05),      # 5,001-20,000: 5%
+        (20000, 50000, 0.10),     # 20,001-50,000: 10%
+        (50000, 100000, 0.15),    # 50,001-100,000: 15%
+        (100000, float('inf'), 0.20),  # >100,000: 20%
+    ]
+
+    remaining = amount - 5000  # 5,000以下免税
+
+    for lower, upper, rate in brackets:
+        if remaining <= 0:
+            break
+        bracket_size = upper - lower
+        taxable = min(remaining, bracket_size)
+        tax += int(taxable * rate)
+        remaining -= taxable
+
+    return tax
 # ====== 价格基础与底价吸附（调低整体物价与门槛） ======
 PRICE_FLOOR_ALPHA = 0.6   # 参考价折扣系数（底价≈参考价*alpha 与 经济基础价 取最大）
 MIN_UNIT_PRICE = 10       # 系统绝对最小单价下限（如需进一步降低门槛可改为 5）
@@ -214,6 +228,44 @@ async def _compute_equipment_floor_price(session, equipment) -> int:
     min_price, _ = EquipmentTradeService.calculate_equipment_value_range(equipment)
     scale = await _get_wealth_scale(session)
     return max(int(min_price * EQUIPMENT_FLOOR_MULT * scale), MIN_UNIT_PRICE)
+
+
+async def _get_market_reference(session, item_cfg) -> str | None:
+    """查询近7日市场参考数据，返回格式化的信息行。无数据时返回 None。"""
+    is_equipment = EquipmentTradeService.is_equipment_trade(item_cfg.item_id)
+    lookback_since = datetime.now() - timedelta(days=TRADE_REF_LOOKBACK_DAYS)
+
+    # 查询近7日成交记录（跑商系统的交易数据）
+    trade_stmt = (
+        select(
+            func.count().label("cnt"),
+            func.avg(TradeRecord.unit_price).label("avg_price"),
+        )
+        .where(
+            TradeRecord.item_id == item_cfg.item_id,
+            TradeRecord.trade_time >= lookback_since,
+        )
+    )
+    row = (await session.execute(trade_stmt)).one()
+    trade_count = int(row.cnt or 0)
+    avg_price = int(row.avg_price) if row.avg_price else None
+
+    parts: list[str] = []
+
+    # 底价（仅非装备物品展示，装备因实例而异）
+    if not is_equipment:
+        floor_price = await _compute_item_floor_price(session, item_cfg)
+        parts.append(f"底价:{floor_price:,}💰")
+
+    # 近7日均价和成交量
+    if avg_price is not None and trade_count > 0:
+        parts.append(f"7日均价:{avg_price:,}💰({trade_count}笔)")
+    else:
+        parts.append("7日无成交记录")
+
+    if not parts:
+        return None
+    return "📊 " + " ┃ ".join(parts)
 
 
 # ---------------- 指令：挂牌 ----------------
@@ -611,6 +663,9 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
         sells = (await session.execute(stmt_sell)).scalars().all()
         buys = (await session.execute(stmt_buy)).scalars().all()
 
+        # ---- 查询近7日市场参考数据 ----
+        ref_info = await _get_market_reference(session, item_cfg)
+
         def _fmt(order: MarketOrder):
             if order.is_equipment_trade:
                 # 装备显示格式：🆔001┃💰50,000┃⭐+5阶 [💎2/3] 耐久160/160
@@ -631,6 +686,9 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
         buy_page, _, _ = _paginate(buys)
 
         lines = [f"📋 {item_cfg.name} 市场牌子 · 第{cur_page}/{sell_total}页"]
+        # 插入市场参考信息行
+        if ref_info:
+            lines.append(ref_info)
         lines.append(heavy_divider(f"{EMOJI_SELL} 出售"))
         if sell_page:
             lines.extend(_fmt(o) for o in sell_page)
@@ -794,18 +852,19 @@ tax_info_cmd = on_command("税率", aliases={"交易税率", "查看税率"}, bl
 
 @tax_info_cmd.handle()
 async def _(event: MessageEvent):
-    """查看当前的阶梯交易税率"""
+    """查看当前的分段累进交易税率"""
     lines = [
-        "💰 交易税率表",
-        heavy_divider("阶梯税率"),
-        "💚 5,000金币以下：免税 (0%)",
-        "💛 5,001-20,000金币：5%",
-        "🧡 20,001-50,000金币：10%",
-        "❤️ 50,001-100,000金币：15%",
-        "💜 100,001金币以上：20%",
+        "💰 交易税率表（分段累进）",
+        heavy_divider("税率区间"),
+        "💚 ≤5,000金币：免税 (0%)",
+        "💛 5,001~20,000金币：超出部分 5%",
+        "🧡 20,001~50,000金币：超出部分 10%",
+        "❤️ 50,001~100,000金币：超出部分 15%",
+        "💜 >100,000金币：超出部分 20%",
         "",
-        "📝 说明：税收从卖家收入中扣除",
-        "⚠️ 高价交易将产生大量税收损失"
+        "📝 仅对超出部分征税，不会因多挂1金币多交一大笔",
+        f"💡 举例：交易额 25,000 → 税收 {calculate_transaction_tax(25000):,}（而非2,500）",
+        "⚠️ 税收从卖家收入中扣除，直接销毁"
     ]
     await tax_info_cmd.finish(message_add_head("\n".join(lines), event))
 

@@ -193,7 +193,7 @@ items:
       description: "从梦境中提取的透明丝线，触碰时会浮现幻象 🕸️"
       type: "MATERIAL"
       rarity: "green"
-      price: 350
+      price: 200
       grudge_value: 15
 
     # ========== 蓝色（稀有）材料 ==========
@@ -236,7 +236,7 @@ items:
       description: "姐姐把石头绑在了我的腿上，身体在下沉，我看见水库里面有很多黑乎乎的水草"
       type: "MATERIAL"
       rarity: "green"
-      price: 320
+      price: 200
       grudge_value: 8
 
     - item_id: "corrupted_bandage"
@@ -252,7 +252,7 @@ items:
       description: "破碎的校钟残片，每当午夜时分仍会发出微弱的钟声 🔔"
       type: "MATERIAL"
       rarity: "green"
-      price: 300
+      price: 200
       grudge_value: 18
 
     - item_id: "withered_flower"
@@ -269,7 +269,7 @@ items:
       description: "凝聚了无数怨魂的透明晶体，内部游荡着模糊的人影 👻"
       type: "MATERIAL"
       rarity: "blue"
-      price: 700
+      price: 450
       grudge_value: 25
 
     - item_id: "cursed_mirror_shard"
@@ -277,7 +277,7 @@ items:
       description: "破碎的魔镜碎片，映照出的不是你的容貌，而是你的恐惧 🪞"
       type: "MATERIAL"
       rarity: "blue"
-      price: 800
+      price: 450
       grudge_value: 30
 
     - item_id: "phantom_thread"
@@ -327,7 +327,7 @@ items:
       description: "时间流逝时留下的微尘，每一粒都承载着无数个瞬间的记忆 ⏳"
       type: "MATERIAL"
       rarity: "orange"
-      price: 10000
+      price: 6000
       grudge_value: 500
 
     # ========== 公会建筑专用材料 ==========
@@ -336,7 +336,7 @@ items:
       description: "散发着诡异气息的黑色石头，是建造高级公会建筑的重要材料 🪨"
       type: "MATERIAL"
       rarity: "blue"
-      price: 800
+      price: 450
       grudge_value: 25
 
     - item_id: "spirit_stone"
@@ -467,7 +467,7 @@ items:
       name: "白骨护甲"
       description: "用兽骨拼接而成的简陋护甲，能提供基础防护。"
       type: "EQUIPMENT"
-      price: 3000
+      price: 6840
       durability: 80
       attr_bonus: {"hp": 40, "defense": 8}
       recipe:
@@ -485,7 +485,7 @@ items:
       name: "鬼泪吊坠"
       description: "用鬼泪制成的吊坠，能稍微安抚心神。"
       type: "EQUIPMENT"
-      price: 2500
+      price: 5280
       durability: 60
       attr_bonus: {"mp": 35, "luck": 8}
       recipe:
@@ -732,7 +732,7 @@ items:
       name: "哭泣的磁带"
       description: "他第一次听这盘磁带时就发现了问题，空白的磁带里有一段无法消除的杂音，他尝试各种办法最终还原出了杂音的内容。原来，那是他临死时挣扎求救的声音。"
       type: "EQUIPMENT"
-      price: 25000
+      price: 11880
       durability: 120
       attr_bonus: {"luck": 15, "mp": 60}
       attr_ratio: {"mp": 0.20, "luck": 0.08}
@@ -751,7 +751,7 @@ items:
       name: "镜片战甲"
       description: "用诅咒镜片拼接而成的战甲，映照出敌人的恐惧。"
       type: "EQUIPMENT"
-      price: 35000
+      price: 15900
       durability: 140
       attr_bonus: {"defense": 15, "hp": 60}
       attr_ratio: {"hp": 0.25, "defense": 0.15}
@@ -789,7 +789,7 @@ items:
       name: "幽魂斗篷"
       description: "由幽魂丝线编织的斗篷，穿戴者如鬼魅般难以捉摸。"
       type: "EQUIPMENT"
-      price: 30000
+      price: 15360
       durability: 130
       attr_bonus: {"agility": 20}
       attr_ratio: {"agility": 0.25}
@@ -808,7 +808,7 @@ items:
       name: "雾都风衣"
       description: "这件风衣可以遮住你的面容，隐藏你的体型，掩盖你犯下的所有罪行。（开膛手套装）"
       type: "EQUIPMENT"
-      price: 32000
+      price: 16560
       durability: 100
       attr_bonus: {"agility": 15}
       attr_ratio: {"agility": 0.25, "luck": 0.08}
@@ -827,7 +827,7 @@ items:
       name: "镇魂幡"
       description: "幡不动，魂不散。幡若动，是谁在召唤？"
       type: "EQUIPMENT"
-      price: 80000
+      price: 25140
       durability: 100
       attr_bonus: {"mp": 50, "attack": 20}
       attr_ratio: {"attack": 0.25, "mp": 0.15}
@@ -855,7 +855,7 @@ items:
       name: "抽屉"
       description: "我总觉有人在偷看我，他可能就藏在这个房间里，但是我找遍了所有能够藏人的地方都没有找到它。我越来越害怕，每当我背对客厅坐在桌边工作时，那种被窥伺的感觉就会冒出来。他一定在看着我，我很担心他在我背对客厅时，悄悄走到我的身后。为了防身，我在书桌的抽屉里藏了一把刀。某天深夜，那种被窥伺的感觉又出现了，我忍无可忍打开抽屉想要拿出那把刀。可等我打开抽屉的时候才发现，原来那个人并不是藏在客厅里"
       type: "EQUIPMENT"
-      price: 60000
+      price: 31740
       durability: 150
       attr_bonus: {"hp": 100, "attack": 30}
       attr_ratio: {"hp": 0.30, "attack": 0.18}
@@ -881,7 +881,7 @@ items:
       name: "嫁衣"
       description: "我用我的骨做针，用我的血做线，用我的皮做衣，希望你不会嫌弃我这件血红色的嫁衣。"
       type: "EQUIPMENT"
-      price: 80000
+      price: 40560
       durability: 160
       attr_bonus: {"attack": 50, "agility": 25}
       attr_ratio: {"attack": 0.40, "agility": 0.25}
@@ -909,7 +909,7 @@ items:
       name: "虚无之冠"
       description: "凝聚虚无精华制成的王冠，佩戴者将感受到存在的虚无与力量。"
       type: "EQUIPMENT"
-      price: 100000
+      price: 51240
       durability: 180
       attr_bonus: {"mp": 80, "luck": 40, "attack": 35}
       attr_ratio: {"mp": 0.35, "luck": 0.30, "attack": 0.25}
@@ -996,7 +996,7 @@ items:
       name: "神泪护符"
       description: "用神明之泪制成的护符，蕴含着无尽的慈悲与力量。"
       type: "EQUIPMENT"
-      price: 200000
+      price: 86040
       durability: 200
       attr_bonus: {"hp": 150, "mp": 120, "defense": 60}
       attr_ratio: {"hp": 0.45, "mp": 0.45, "defense": 0.35}
@@ -1023,7 +1023,7 @@ items:
       name: "世界碎片之刃"
       description: "用世界碎片锻造的神兵，每一击都能撕裂现实。"
       type: "EQUIPMENT"
-      price: 300000
+      price: 123840
       durability: 220
       attr_bonus: {"attack": 80, "agility": 50}
       attr_ratio: {"attack": 0.55, "agility": 0.40, "luck": 0.3}
@@ -1055,7 +1055,7 @@ items:
       name: "寿衣"
       description: "用死者的怨念与神明之泪编织而成的诡异寿衣，每一根丝线都浸透着亡魂的哀嚎。穿戴者的血肉将与布料融为一体，获得不死不灭的诅咒庇护，但代价是永远无法安息... 👻"
       type: "EQUIPMENT"
-      price: 250000
+      price: 130800
       durability: 240
       attr_bonus: {"hp": 200, "defense": 80}
       attr_ratio: {"hp": 0.50, "defense": 0.45}
@@ -1137,7 +1137,7 @@ items:
       name: "炼丹炉"
       description: "可升阶的炼丹炉，等级越高成功率越高"
       type: "EQUIPMENT"
-      price: 8000
+      price: 3600
       durability: 100
       recipe:
         materials:
@@ -1894,7 +1894,7 @@ items:
       description: "金黄色的海鱼，肉质鲜嫩，是制作鱼丸的上等原料 🐟"
       type: "FISH"
       rarity: "green"
-      price: 180
+      price: 120
 
     - item_id: "pomfret"
       name: "鲳鱼"
@@ -1908,7 +1908,7 @@ items:
       description: "高档海鱼，肉质紧实，口感极佳 🐟"
       type: "FISH"
       rarity: "green"
-      price: 200
+      price: 120
 
     # ========== 蓝色品质鱼类 ==========
     - item_id: "salmon"
@@ -1930,7 +1930,7 @@ items:
       description: "名贵的海鱼，肉质鲜美，营养价值极高 🐟"
       type: "FISH"
       rarity: "blue"
-      price: 450
+      price: 281
 
     - item_id: "eel"
       name: "鳗鱼"
@@ -1981,7 +1981,7 @@ items:
       description: "传说中的神鱼，全身金光闪闪，据说食用后能增强修为 🐟✨"
       type: "FISH"
       rarity: "orange"
-      price: 2000
+      price: 4500
 
     - item_id: "phoenix_fish"
       name: "凤凰鱼"
@@ -2020,7 +2020,7 @@ items:
       description: "蕴含微弱杀意的血红佛珠，镶嵌后增加4%暴击率 💥"
       type: "GEM"
       rarity: "white"
-      price: 60000
+      price: 40000
       attr_bonus: {"critical_rate": 4}
 
     - item_id: "critical_bead_4"
@@ -2085,7 +2085,7 @@ items:
       description: "蕴含微弱连绵之力的金色佛珠，镶嵌后增加1%连击率 🔄"
       type: "GEM"
       rarity: "white"
-      price: 20000
+      price: 10000
       attr_bonus: {"combo_rate": 1}
 
     - item_id: "combo_bead_2"
@@ -2093,7 +2093,7 @@ items:
       description: "蕴含微弱连绵之力的金色佛珠，镶嵌后增加2%连击率 🔄"
       type: "GEM"
       rarity: "white"
-      price: 40000
+      price: 20000
       attr_bonus: {"combo_rate": 2}
 
     - item_id: "combo_bead_3"
@@ -2125,7 +2125,7 @@ items:
       description: "蕴含一般连绵之力的金色佛珠，镶嵌后增加8%连击率 🔄"
       type: "GEM"
       rarity: "green"
-      price: 120000
+      price: 80000
       attr_bonus: {"combo_rate": 8}
 
     - item_id: "combo_bead_7"
@@ -2166,7 +2166,7 @@ items:
       description: "蕴含微弱虚无之力的透明佛珠，镶嵌后增加1%闪避率 👻"
       type: "GEM"
       rarity: "white"
-      price: 20000
+      price: 10000
       attr_bonus: {"dodge_rate": 1}
 
     - item_id: "dodge_bead_2"
@@ -2174,7 +2174,7 @@ items:
       description: "蕴含微弱虚无之力的透明佛珠，镶嵌后增加2%闪避率 👻"
       type: "GEM"
       rarity: "white"
-      price: 40000
+      price: 20000
       attr_bonus: {"dodge_rate": 2}
 
     - item_id: "dodge_bead_3"
@@ -2182,7 +2182,7 @@ items:
       description: "蕴含微弱虚无之力的透明佛珠，镶嵌后增加3%闪避率 👻"
       type: "GEM"
       rarity: "white"
-      price: 60000
+      price: 30000
       attr_bonus: {"dodge_rate": 3}
 
     - item_id: "dodge_bead_4"
@@ -2190,7 +2190,7 @@ items:
       description: "蕴含一般虚无之力的透明佛珠，镶嵌后增加4%闪避率 👻"
       type: "GEM"
       rarity: "green"
-      price: 80000
+      price: 40000
       attr_bonus: {"dodge_rate": 4}
 
     - item_id: "dodge_bead_5"
@@ -2198,7 +2198,7 @@ items:
       description: "蕴含一般虚无之力的透明佛珠，镶嵌后增加5%闪避率 👻"
       type: "GEM"
       rarity: "green"
-      price: 100000
+      price: 50000
       attr_bonus: {"dodge_rate": 5}
 
     - item_id: "dodge_bead_6"
@@ -2206,7 +2206,7 @@ items:
       description: "蕴含一般虚无之力的透明佛珠，镶嵌后增加6%闪避率 👻"
       type: "GEM"
       rarity: "green"
-      price: 120000
+      price: 60000
       attr_bonus: {"dodge_rate": 6}
 
     - item_id: "dodge_bead_7"
@@ -2214,7 +2214,7 @@ items:
       description: "蕴含强大虚无之力的透明佛珠，镶嵌后增加7%闪避率 👻"
       type: "GEM"
       rarity: "blue"
-      price: 140000
+      price: 70000
       attr_bonus: {"dodge_rate": 7}
 
     - item_id: "dodge_bead_8"
@@ -2222,7 +2222,7 @@ items:
       description: "蕴含强大虚无之力的透明佛珠，镶嵌后增加8%闪避率 👻"
       type: "GEM"
       rarity: "blue"
-      price: 160000
+      price: 80000
       attr_bonus: {"dodge_rate": 8}
 
     - item_id: "dodge_bead_9"
@@ -2230,7 +2230,7 @@ items:
       description: "蕴含强大虚无之力的透明佛珠，镶嵌后增加9%闪避率 👻"
       type: "GEM"
       rarity: "blue"
-      price: 180000
+      price: 90000
       attr_bonus: {"dodge_rate": 9}
 
     - item_id: "dodge_bead_10"
@@ -2238,7 +2238,7 @@ items:
       description: "蕴含极致虚无之力的透明佛珠，镶嵌后增加10%闪避率 👻"
       type: "GEM"
       rarity: "purple"
-      price: 200000
+      price: 100000
       attr_bonus: {"dodge_rate": 10}
 
     # ========== 命中佛珠系列（1-10级）==========
@@ -2247,7 +2247,7 @@ items:
       description: "蕴含微弱精准之力的白色佛珠，镶嵌后增加1%命中率 🎯"
       type: "GEM"
       rarity: "white"
-      price: 20000
+      price: 5000
       attr_bonus: {"accuracy_rate": 1}
 
     - item_id: "accuracy_bead_2"
@@ -2255,7 +2255,7 @@ items:
       description: "蕴含微弱精准之力的白色佛珠，镶嵌后增加2%命中率 🎯"
       type: "GEM"
       rarity: "white"
-      price: 40000
+      price: 10000
       attr_bonus: {"accuracy_rate": 2}
 
     - item_id: "accuracy_bead_3"
@@ -2263,7 +2263,7 @@ items:
       description: "蕴含微弱精准之力的白色佛珠，镶嵌后增加3%命中率 🎯"
       type: "GEM"
       rarity: "white"
-      price: 60000
+      price: 15000
       attr_bonus: {"accuracy_rate": 3}
 
     - item_id: "accuracy_bead_4"
@@ -2271,7 +2271,7 @@ items:
       description: "蕴含一般精准之力的白色佛珠，镶嵌后增加4%命中率 🎯"
       type: "GEM"
       rarity: "green"
-      price: 80000
+      price: 20000
       attr_bonus: {"accuracy_rate": 4}
 
     - item_id: "accuracy_bead_5"
@@ -2279,7 +2279,7 @@ items:
       description: "蕴含一般精准之力的白色佛珠，镶嵌后增加5%命中率 🎯"
       type: "GEM"
       rarity: "green"
-      price: 100000
+      price: 25000
       attr_bonus: {"accuracy_rate": 5}
 
     - item_id: "accuracy_bead_6"
@@ -2287,7 +2287,7 @@ items:
       description: "蕴含一般精准之力的白色佛珠，镶嵌后增加6%命中率 🎯"
       type: "GEM"
       rarity: "green"
-      price: 120000
+      price: 30000
       attr_bonus: {"accuracy_rate": 6}
 
     - item_id: "accuracy_bead_7"
@@ -2295,7 +2295,7 @@ items:
       description: "蕴含强大精准之力的白色佛珠，镶嵌后增加7%命中率 🎯"
       type: "GEM"
       rarity: "blue"
-      price: 140000
+      price: 35000
       attr_bonus: {"accuracy_rate": 7}
 
     - item_id: "accuracy_bead_8"
@@ -2303,7 +2303,7 @@ items:
       description: "蕴含强大精准之力的白色佛珠，镶嵌后增加8%命中率 🎯"
       type: "GEM"
       rarity: "blue"
-      price: 160000
+      price: 40000
       attr_bonus: {"accuracy_rate": 8}
 
     - item_id: "accuracy_bead_9"
@@ -2311,7 +2311,7 @@ items:
       description: "蕴含强大精准之力的白色佛珠，镶嵌后增加9%命中率 🎯"
       type: "GEM"
       rarity: "blue"
-      price: 180000
+      price: 45000
       attr_bonus: {"accuracy_rate": 9}
 
     - item_id: "accuracy_bead_10"
@@ -2319,7 +2319,7 @@ items:
       description: "蕴含极致精准之力的白色佛珠，镶嵌后增加10%命中率 🎯"
       type: "GEM"
       rarity: "purple"
-      price: 200000
+      price: 50000
       attr_bonus: {"accuracy_rate": 10}
 
     # ========== 反击翡翠系列（1-10级）==========
@@ -2328,7 +2328,7 @@ items:
       description: "蕴含微弱反击之力的翠绿宝石，镶嵌后增加1%反击率 🔄"
       type: "GEM"
       rarity: "white"
-      price: 25000
+      price: 8000
       attr_bonus: {"counter_rate": 1}
 
     - item_id: "counter_jade_2"
@@ -2336,7 +2336,7 @@ items:
       description: "蕴含微弱反击之力的翠绿宝石，镶嵌后增加2%反击率 🔄"
       type: "GEM"
       rarity: "white"
-      price: 50000
+      price: 16000
       attr_bonus: {"counter_rate": 2}
 
     - item_id: "counter_jade_3"
@@ -2344,7 +2344,7 @@ items:
       description: "蕴含微弱反击之力的翠绿宝石，镶嵌后增加3%反击率 🔄"
       type: "GEM"
       rarity: "white"
-      price: 75000
+      price: 24000
       attr_bonus: {"counter_rate": 3}
 
     - item_id: "counter_jade_4"
@@ -2352,7 +2352,7 @@ items:
       description: "蕴含一般反击之力的翠绿宝石，镶嵌后增加4%反击率 🔄"
       type: "GEM"
       rarity: "green"
-      price: 100000
+      price: 32000
       attr_bonus: {"counter_rate": 4}
 
     - item_id: "counter_jade_5"
@@ -2360,7 +2360,7 @@ items:
       description: "蕴含一般反击之力的翠绿宝石，镶嵌后增加5%反击率 🔄"
       type: "GEM"
       rarity: "green"
-      price: 125000
+      price: 40000
       attr_bonus: {"counter_rate": 5}
 
     - item_id: "counter_jade_6"
@@ -2368,7 +2368,7 @@ items:
       description: "蕴含一般反击之力的翠绿宝石，镶嵌后增加6%反击率 🔄"
       type: "GEM"
       rarity: "green"
-      price: 150000
+      price: 48000
       attr_bonus: {"counter_rate": 6}
 
     - item_id: "counter_jade_7"
@@ -2376,7 +2376,7 @@ items:
       description: "蕴含强大反击之力的翠绿宝石，镶嵌后增加7%反击率 🔄"
       type: "GEM"
       rarity: "blue"
-      price: 175000
+      price: 56000
       attr_bonus: {"counter_rate": 7}
 
     - item_id: "counter_jade_8"
@@ -2384,7 +2384,7 @@ items:
       description: "蕴含强大反击之力的翠绿宝石，镶嵌后增加8%反击率 🔄"
       type: "GEM"
       rarity: "blue"
-      price: 200000
+      price: 64000
       attr_bonus: {"counter_rate": 8}
 
     - item_id: "counter_jade_9"
@@ -2392,7 +2392,7 @@ items:
       description: "蕴含强大反击之力的翠绿宝石，镶嵌后增加9%反击率 🔄"
       type: "GEM"
       rarity: "blue"
-      price: 225000
+      price: 72000
       attr_bonus: {"counter_rate": 9}
 
     - item_id: "counter_jade_10"
@@ -2400,7 +2400,7 @@ items:
       description: "蕴含极致反击之力的翠绿宝石，镶嵌后增加10%反击率 🔄"
       type: "GEM"
       rarity: "purple"
-      price: 250000
+      price: 80000
       attr_bonus: {"counter_rate": 10}
 
     # ========== 暴击力玛瑙系列（1-10级）==========
@@ -2490,7 +2490,7 @@ items:
       description: "蕴含微弱穿透之力的透明水晶，镶嵌后增加2%穿透率 🔹"
       type: "GEM"
       rarity: "white"
-      price: 25000
+      price: 10000
       attr_bonus: {"penetration_rate": 2}
 
     - item_id: "penetration_crystal_2"
@@ -2498,7 +2498,7 @@ items:
       description: "蕴含微弱穿透之力的透明水晶，镶嵌后增加4%穿透率 🔹"
       type: "GEM"
       rarity: "white"
-      price: 50000
+      price: 20000
       attr_bonus: {"penetration_rate": 4}
 
     - item_id: "penetration_crystal_3"
@@ -2506,7 +2506,7 @@ items:
       description: "蕴含微弱穿透之力的透明水晶，镶嵌后增加6%穿透率 🔹"
       type: "GEM"
       rarity: "white"
-      price: 75000
+      price: 30000
       attr_bonus: {"penetration_rate": 6}
 
     - item_id: "penetration_crystal_4"
@@ -2514,7 +2514,7 @@ items:
       description: "蕴含一般穿透之力的透明水晶，镶嵌后增加8%穿透率 🔹"
       type: "GEM"
       rarity: "green"
-      price: 100000
+      price: 40000
       attr_bonus: {"penetration_rate": 8}
 
     - item_id: "penetration_crystal_5"
@@ -2522,7 +2522,7 @@ items:
       description: "蕴含一般穿透之力的透明水晶，镶嵌后增加10%穿透率 🔹"
       type: "GEM"
       rarity: "green"
-      price: 125000
+      price: 50000
       attr_bonus: {"penetration_rate": 10}
 
     - item_id: "penetration_crystal_6"
@@ -2530,7 +2530,7 @@ items:
       description: "蕴含一般穿透之力的透明水晶，镶嵌后增加12%穿透率 🔹"
       type: "GEM"
       rarity: "green"
-      price: 150000
+      price: 60000
       attr_bonus: {"penetration_rate": 12}
 
     - item_id: "penetration_crystal_7"
@@ -2538,7 +2538,7 @@ items:
       description: "蕴含强大穿透之力的透明水晶，镶嵌后增加14%穿透率 🔹"
       type: "GEM"
       rarity: "blue"
-      price: 175000
+      price: 70000
       attr_bonus: {"penetration_rate": 14}
 
     - item_id: "penetration_crystal_8"
@@ -2546,7 +2546,7 @@ items:
       description: "蕴含强大穿透之力的透明水晶，镶嵌后增加16%穿透率 🔹"
       type: "GEM"
       rarity: "blue"
-      price: 200000
+      price: 80000
       attr_bonus: {"penetration_rate": 16}
 
     - item_id: "penetration_crystal_9"
@@ -2554,7 +2554,7 @@ items:
       description: "蕴含强大穿透之力的透明水晶，镶嵌后增加18%穿透率 🔹"
       type: "GEM"
       rarity: "blue"
-      price: 225000
+      price: 90000
       attr_bonus: {"penetration_rate": 18}
 
     - item_id: "penetration_crystal_10"
@@ -2562,7 +2562,7 @@ items:
       description: "蕴含极致穿透之力的透明水晶，镶嵌后增加20%穿透率 🔹"
       type: "GEM"
       rarity: "purple"
-      price: 250000
+      price: 100000
       attr_bonus: {"penetration_rate": 20}
 
     # ========== 灵爆紫晶系列（1-10级）==========
@@ -2571,7 +2571,7 @@ items:
       description: "蕴含微弱灵爆之力的紫色水晶，镶嵌后增加1%灵爆率 💜"
       type: "GEM"
       rarity: "white"
-      price: 30000
+      price: 5000
       attr_bonus: {"skill_crit_rate": 1}
 
     - item_id: "spirit_burst_amethyst_2"
@@ -2579,7 +2579,7 @@ items:
       description: "蕴含微弱灵爆之力的紫色水晶，镶嵌后增加2%灵爆率 💜"
       type: "GEM"
       rarity: "white"
-      price: 60000
+      price: 10000
       attr_bonus: {"skill_crit_rate": 2}
 
     - item_id: "spirit_burst_amethyst_3"
@@ -2587,7 +2587,7 @@ items:
       description: "蕴含微弱灵爆之力的紫色水晶，镶嵌后增加3%灵爆率 💜"
       type: "GEM"
       rarity: "white"
-      price: 90000
+      price: 15000
       attr_bonus: {"skill_crit_rate": 3}
 
     - item_id: "spirit_burst_amethyst_4"
@@ -2595,7 +2595,7 @@ items:
       description: "蕴含一般灵爆之力的紫色水晶，镶嵌后增加4%灵爆率 💜"
       type: "GEM"
       rarity: "green"
-      price: 120000
+      price: 20000
       attr_bonus: {"skill_crit_rate": 4}
 
     - item_id: "spirit_burst_amethyst_5"
@@ -2603,7 +2603,7 @@ items:
       description: "蕴含一般灵爆之力的紫色水晶，镶嵌后增加5%灵爆率 💜"
       type: "GEM"
       rarity: "green"
-      price: 150000
+      price: 25000
       attr_bonus: {"skill_crit_rate": 5}
 
     - item_id: "spirit_burst_amethyst_6"
@@ -2611,7 +2611,7 @@ items:
       description: "蕴含一般灵爆之力的紫色水晶，镶嵌后增加6%灵爆率 💜"
       type: "GEM"
       rarity: "green"
-      price: 180000
+      price: 30000
       attr_bonus: {"skill_crit_rate": 6}
 
     - item_id: "spirit_burst_amethyst_7"
@@ -2619,7 +2619,7 @@ items:
       description: "蕴含强大灵爆之力的紫色水晶，镶嵌后增加7%灵爆率 💜"
       type: "GEM"
       rarity: "blue"
-      price: 210000
+      price: 35000
       attr_bonus: {"skill_crit_rate": 7}
 
     - item_id: "spirit_burst_amethyst_8"
@@ -2627,7 +2627,7 @@ items:
       description: "蕴含强大灵爆之力的紫色水晶，镶嵌后增加8%灵爆率 💜"
       type: "GEM"
       rarity: "blue"
-      price: 240000
+      price: 40000
       attr_bonus: {"skill_crit_rate": 8}
 
     - item_id: "spirit_burst_amethyst_9"
@@ -2635,7 +2635,7 @@ items:
       description: "蕴含强大灵爆之力的紫色水晶，镶嵌后增加9%灵爆率 💜"
       type: "GEM"
       rarity: "blue"
-      price: 270000
+      price: 45000
       attr_bonus: {"skill_crit_rate": 9}
 
     - item_id: "spirit_burst_amethyst_10"
@@ -2643,7 +2643,7 @@ items:
       description: "蕴含极致灵爆之力的紫色水晶，镶嵌后增加10%灵爆率 💜"
       type: "GEM"
       rarity: "purple"
-      price: 300000
+      price: 50000
       attr_bonus: {"skill_crit_rate": 10}
 
     # ========== 抗暴符文系列（1-10级）==========
@@ -2660,7 +2660,7 @@ items:
       description: "蕴含微弱防护之力的银色符文，镶嵌后增加3%抗暴率 🛡️"
       type: "GEM"
       rarity: "white"
-      price: 40000
+      price: 24000
       attr_bonus: {"anti_crit_rate": 3}
 
     - item_id: "anti_crit_rune_3"
@@ -2668,7 +2668,7 @@ items:
       description: "蕴含微弱防护之力的银色符文，镶嵌后增加4%抗暴率 🛡️"
       type: "GEM"
       rarity: "white"
-      price: 60000
+      price: 32000
       attr_bonus: {"anti_crit_rate": 4}
 
     - item_id: "anti_crit_rune_4"
@@ -2676,7 +2676,7 @@ items:
       description: "蕴含一般防护之力的银色符文，镶嵌后增加5%抗暴率 🛡️"
       type: "GEM"
       rarity: "green"
-      price: 80000
+      price: 40000
       attr_bonus: {"anti_crit_rate": 5}
 
     - item_id: "anti_crit_rune_5"
@@ -2684,7 +2684,7 @@ items:
       description: "蕴含一般防护之力的银色符文，镶嵌后增加6%抗暴率 🛡️"
       type: "GEM"
       rarity: "green"
-      price: 100000
+      price: 48000
       attr_bonus: {"anti_crit_rate": 6}
 
     - item_id: "anti_crit_rune_6"
@@ -2692,7 +2692,7 @@ items:
       description: "蕴含一般防护之力的银色符文，镶嵌后增加7%抗暴率 🛡️"
       type: "GEM"
       rarity: "green"
-      price: 120000
+      price: 56000
       attr_bonus: {"anti_crit_rate": 7}
 
     - item_id: "anti_crit_rune_7"
@@ -2700,7 +2700,7 @@ items:
       description: "蕴含强大防护之力的银色符文，镶嵌后增加8%抗暴率 🛡️"
       type: "GEM"
       rarity: "blue"
-      price: 140000
+      price: 64000
       attr_bonus: {"anti_crit_rate": 8}
 
     - item_id: "anti_crit_rune_8"
@@ -2708,7 +2708,7 @@ items:
       description: "蕴含强大防护之力的银色符文，镶嵌后增加9%抗暴率 🛡️"
       type: "GEM"
       rarity: "blue"
-      price: 180000
+      price: 72000
       attr_bonus: {"anti_crit_rate": 9}
 
     - item_id: "anti_crit_rune_9"
@@ -2716,7 +2716,7 @@ items:
       description: "蕴含强大防护之力的银色符文，镶嵌后增加10%抗暴率 🛡️"
       type: "GEM"
       rarity: "blue"
-      price: 240000
+      price: 80000
       attr_bonus: {"anti_crit_rate": 10}
 
     - item_id: "anti_crit_rune_10"
@@ -2724,7 +2724,7 @@ items:
       description: "蕴含极致防护之力的银色符文，镶嵌后增加12%抗暴率 🛡️"
       type: "GEM"
       rarity: "purple"
-      price: 300000
+      price: 96000
       attr_bonus: {"anti_crit_rate": 12}
 
   gifts:  # 好感度礼物(消耗型,增加好感度和魅力值)
@@ -2891,7 +2891,7 @@ items:
       description: "锋利的手术刀，刀刃上还残留着干涸的血迹 🔪"
       type: "MATERIAL"
       rarity: "green"
-      price: 500
+      price: 200
       tags: ["inner_realm_only"]
 
     - item_id: "broken_id"
@@ -2916,7 +2916,7 @@ items:
       description: "塑料已经发黄发脆，里面残留的液体呈现不正常的暗红色。标签上写着一个从未听说过的药品名"
       type: "MATERIAL"
       rarity: "green"
-      price: 800
+      price: 200
       grudge_value: 50
       tags: ["inner_realm_only"]
 
@@ -2925,7 +2925,7 @@ items:
       description: "铝制餐盘上的食物早已辨认不出原样。米饭变成了灰紫色，最诡异的是这份餐食似乎还在微微冒着热气"
       type: "MATERIAL"
       rarity: "blue"
-      price: 2000
+      price: 450
       grudge_value: 150
       tags: ["inner_realm_only"]
 
@@ -2934,7 +2934,7 @@ items:
       description: "玻璃瓶身布满蛛网状裂纹，福尔马林早已蒸发殆尽。标签上隐约看到'正常'两个字"
       type: "MATERIAL"
       rarity: "purple"
-      price: 5000
+      price: 1600
       grudge_value: 500
       tags: ["inner_realm_only"]
 
@@ -2943,7 +2943,7 @@ items:
       description: "床头小夜灯，插头早已不在插座上却仍在一闪一闪地发着光。灯罩内壁凝结着一层白色的雾气"
       type: "MATERIAL"
       rarity: "blue"
-      price: 3000
+      price: 450
       grudge_value: 300
       tags: ["inner_realm_only"]
 
@@ -2953,7 +2953,7 @@ items:
       description: "幸存者赠予的感激信物，蕴含着一丝微弱的祝福之力 🎖️"
       type: "MATERIAL"
       rarity: "green"
-      price: 1000
+      price: 200
       grudge_value: 100
       tags: ["inner_realm_only"]
 
