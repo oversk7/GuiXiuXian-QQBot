@@ -15,7 +15,7 @@ from ..models.player import Player
 from ..models.inventory import ItemInstance
 from .config import (
     STEAL_MAX_PER_DAY, STEAL_COOLDOWN_MINUTES, STEAL_PERCENT,
-    STEAL_MIN_QUANTITY, STEAL_TARGET_ACTIVE_HOURS, STEAL_TARGET_LIST_LIMIT,
+    STEAL_TARGET_ACTIVE_HOURS, STEAL_TARGET_LIST_LIMIT,
     GUARDIAN_HUNGRY_HOURS, GUARDIAN_HUNGRY_RATE_PENALTY,
     CropManager, GuardianBeastManager,
 )
@@ -205,15 +205,16 @@ class StealService:
                 f"被罚金: {actual_penalty}金币"
             )
 
-        # 偷取成功 - 每种作物偷20%
+        # 偷取成功 - 每种作物偷20%（向下取整，产量不足5个时可能偷不到）
         stolen_items = {}
         for plot in mature_plots:
             available = max(0, plot.yield_quantity - plot.stolen_quantity)
             if available <= 0:
                 continue
 
-            steal_qty = max(STEAL_MIN_QUANTITY, math.floor(available * STEAL_PERCENT))
-            steal_qty = min(steal_qty, available)
+            steal_qty = math.floor(available * STEAL_PERCENT)
+            if steal_qty <= 0:
+                continue
 
             crop = self.crop_manager.get_crop(plot.crop_id)
             if not crop:
