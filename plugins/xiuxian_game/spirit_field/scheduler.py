@@ -3,7 +3,6 @@
 
 使用 APScheduler 实现:
 - 每日灌溉次数重置
-- 每日诡兽自动扣费
 """
 
 from nonebot import get_driver, logger

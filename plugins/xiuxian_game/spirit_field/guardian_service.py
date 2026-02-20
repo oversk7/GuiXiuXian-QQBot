@@ -109,32 +109,3 @@ class GuardianService:
             f"消耗: {beast.daily_feed_cost}点怨念\n"
             f"状态: 精力充沛"
         )
-
-    async def auto_feed_all(self, uow: UnitOfWork) -> int:
-        """定时任务: 自动扣除所有诡兽灵食费"""
-        from sqlalchemy import select
-        from ..models.spirit_field import SpiritField
-
-        stmt = select(SpiritField).where(SpiritField.guardian_beast_id != None)
-        result = await uow.session.execute(stmt)
-        fields = result.scalars().all()
-
-        fed_count = 0
-        for field in fields:
-            beast = self.beast_manager.get_beast_by_item_id(field.guardian_beast_id)
-            if not beast:
-                continue
-
-            player = await uow.players.get_by_id(field.player_id)
-            if not player:
-                continue
-
-            if player.resentment >= beast.daily_feed_cost:
-                player.resentment -= beast.daily_feed_cost
-                field.guardian_fed_at = datetime.now()
-                await uow.players.update(player)
-                await uow.spirit_fields.update(field)
-                fed_count += 1
-            # 怨念不足不自动喂食，让诡兽进入饥饿状态
-
-        return fed_count
