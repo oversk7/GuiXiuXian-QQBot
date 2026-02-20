@@ -1,5 +1,5 @@
 from nonebot import on_command
-from nonebot.adapters.qq import MessageEvent, Message
+from nonebot.adapters.qq import MessageEvent, Message, MessageSegment
 from nonebot.params import CommandArg
 from sqlalchemy import select, func as _func
 from datetime import datetime, date
@@ -656,7 +656,7 @@ async def handle_list_guilds(event: MessageEvent, args: Message = CommandArg()):
         page = 1
     page = max(1, page)
 
-    page_size = 20
+    page_size = 5
 
     # 使用 DI 架构
     from ..infrastructure.uow.unit_of_work import UnitOfWork
@@ -678,38 +678,49 @@ async def handle_list_guilds(event: MessageEvent, args: Message = CommandArg()):
 
         # 分页
         total_guilds = len(guilds)
+        total_pages = (total_guilds + page_size - 1) // page_size
         start_idx = (page - 1) * page_size
         end_idx = start_idx + page_size
         guilds_page = guilds[start_idx:end_idx]
 
-        # 构建消息 - 优化版，信息密度最大化
-        lines = [f"📋 公会列表 (第{page}/{(total_guilds + page_size - 1) // page_size}页 | 共{total_guilds}个)"]
-        lines.append("━━━━━━━━━━━━━")
-
+        # 构建 desc（用 \r 换行，不能含markdown语法）
+        guild_blocks = []
         for guild in guilds_page:
-            # 获取会长信息
             president = await uow.session.get(Player, guild.president_id)
             president_name = president.nickname if president else "未知"
             president_uid = president.uid if president else "N/A"
-
-            # 获取成员数量
             member_count = await uow.guilds.get_member_count(guild.id)
             max_members = 10 + (guild.level - 1) * 5
-
-            # 紧凑格式，所有信息在一行显示
-            lines.append(
-                f"🏰{guild.name} [ID:{guild.id}] | Lv{guild.level} | {member_count}/{max_members}人 | "
-                f"💰{guild.treasury:,} | ⭐{guild.exp:,}\n"
-                f"   会长: {president_name}[UID:{president_uid}]"
+            guild_blocks.append(
+                f"【{guild.name}】ID:{guild.id} Lv.{guild.level}\r"
+                f"成员:{member_count}/{max_members} 💰{_fmt_w(guild.treasury)} ⭐{_fmt_w(guild.exp)}\r"
+                f"会长:{president_name} [UID:{president_uid}]"
             )
 
-        lines.append("━━━━━━━━━━━━━")
-        lines.append("💡 使用【加入公会 公会ID】申请加入")
-        lines.append("💡 或通过UID联系会长了解详情")
-        if total_guilds > page_size:
-            lines.append(f"💡 查看更多: 【公会列表 {page + 1}】")
+        desc = "\r----------\r".join(guild_blocks)
+        title = f"公会列表  第{page}/{total_pages}页  共{total_guilds}个"
 
-    await list_guilds_cmd.finish(message_add_head("\n".join(lines), event))
+        # 快捷按钮
+        t1 = "加入公会"
+        t2 = "公会信息"
+        t3 = f"公会列表 {page + 1}" if page < total_pages else "公会列表 1"
+        t4 = "帮助"
+
+    # 使用文字展示 Markdown 模版
+    from nonebot.adapters.qq.models.common import MessageMarkdown, MessageMarkdownParams
+    template_params = [
+        MessageMarkdownParams(key="title", values=[title]),
+        MessageMarkdownParams(key="desc", values=[desc]),
+        MessageMarkdownParams(key="t1", values=[t1]),
+        MessageMarkdownParams(key="t2", values=[t2]),
+        MessageMarkdownParams(key="t3", values=[t3]),
+        MessageMarkdownParams(key="t4", values=[t4]),
+    ]
+    markdown_msg = MessageMarkdown(
+        custom_template_id="102499345_1770890617",
+        params=template_params
+    )
+    await list_guilds_cmd.finish(MessageSegment.markdown(markdown_msg))
 
 # ==================== 申请列表 ====================
 application_list_cmd = on_command("申请列表", block=True, priority=5)
