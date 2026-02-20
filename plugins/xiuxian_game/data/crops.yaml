@@ -3,6 +3,7 @@
 # ====================================================================
 # 作物分两类: VEGETABLE(灵蔬,联动烹饪) 和 HERB(诡药,联动炼丹)
 # 成长时间单位: 小时(h)
+# 产量×5 / 单价÷5，总利润不变，偷菜乐趣提升
 # ====================================================================
 
 crops:
@@ -13,12 +14,12 @@ crops:
     type: "VEGETABLE"
     rarity: "white"
     grow_hours: 2
-    min_yield: 3
-    max_yield: 5
+    min_yield: 15
+    max_yield: 25
     seed_id: "seed_spirit_cabbage"
     harvest_item_id: "spirit_cabbage"
     seed_price: 30
-    sell_price: 25
+    sell_price: 5
     description: "冥界碧泉旁生长的芹菜，茎叶翠绿如玉，入口清冽回甘"
 
   - crop_id: "spirit_radish"
@@ -26,12 +27,12 @@ crops:
     type: "VEGETABLE"
     rarity: "white"
     grow_hours: 2
-    min_yield: 3
-    max_yield: 5
+    min_yield: 15
+    max_yield: 25
     seed_id: "seed_spirit_radish"
     harvest_item_id: "spirit_radish"
     seed_price: 35
-    sell_price: 30
+    sell_price: 6
     description: "色白如骨的萝卜，质地细腻似玉，甘甜中带一丝冷冽"
 
   - crop_id: "spirit_mushroom"
@@ -39,12 +40,12 @@ crops:
     type: "VEGETABLE"
     rarity: "white"
     grow_hours: 3
-    min_yield: 2
-    max_yield: 4
+    min_yield: 10
+    max_yield: 20
     seed_id: "seed_spirit_mushroom"
     harvest_item_id: "spirit_mushroom"
     seed_price: 50
-    sell_price: 45
+    sell_price: 9
     description: "夜间散发幽幽荧光的菇类，鲜香浓郁，烹饪后光华不散"
 
   - crop_id: "spirit_pepper"
@@ -52,12 +53,12 @@ crops:
     type: "VEGETABLE"
     rarity: "green"
     grow_hours: 4
-    min_yield: 2
-    max_yield: 3
+    min_yield: 10
+    max_yield: 15
     seed_id: "seed_spirit_pepper"
     harvest_item_id: "spirit_pepper"
     seed_price: 120
-    sell_price: 90
+    sell_price: 18
     description: "通红似血的赤魂椒，辣意直透魂魄，食之通体生热"
 
   - crop_id: "spirit_gourd"
@@ -65,12 +66,12 @@ crops:
     type: "VEGETABLE"
     rarity: "green"
     grow_hours: 4
-    min_yield: 2
-    max_yield: 3
+    min_yield: 10
+    max_yield: 15
     seed_id: "seed_spirit_gourd"
     harvest_item_id: "spirit_gourd"
     seed_price: 150
-    sell_price: 110
+    sell_price: 22
     description: "形似壶器的灵壶葫，传说可纳灵气于中，可入药可入菜"
 
   - crop_id: "spirit_lotus_root"
@@ -78,12 +79,12 @@ crops:
     type: "VEGETABLE"
     rarity: "blue"
     grow_hours: 6
-    min_yield: 1
-    max_yield: 2
+    min_yield: 5
+    max_yield: 10
     seed_id: "seed_spirit_lotus_root"
     harvest_item_id: "spirit_lotus_root"
     seed_price: 350
-    sell_price: 280
+    sell_price: 56
     description: "生于冥泉深处的莲藕，藕身似寒玉，断处丝丝含灵"
 
   - crop_id: "spirit_bamboo_shoot"
@@ -91,12 +92,12 @@ crops:
     type: "VEGETABLE"
     rarity: "blue"
     grow_hours: 6
-    min_yield: 1
-    max_yield: 2
+    min_yield: 5
+    max_yield: 10
     seed_id: "seed_spirit_bamboo_shoot"
     harvest_item_id: "spirit_bamboo_shoot"
     seed_price: 400
-    sell_price: 320
+    sell_price: 64
     description: "色如翡翠、质硬如骨的翠骨笋，脆嫩鲜美，生机盎然"
 
   - crop_id: "spirit_ginseng_leaf"
@@ -104,12 +105,12 @@ crops:
     type: "VEGETABLE"
     rarity: "purple"
     grow_hours: 10
-    min_yield: 1
-    max_yield: 1
+    min_yield: 5
+    max_yield: 5
     seed_id: "seed_spirit_ginseng_leaf"
     harvest_item_id: "spirit_ginseng_leaf"
     seed_price: 800
-    sell_price: 700
+    sell_price: 140
     description: "九层幽冥深处的参叶，入口回甘，食之灵力充盈"
 
   - crop_id: "spirit_phoenix_grass"
@@ -117,12 +118,12 @@ crops:
     type: "VEGETABLE"
     rarity: "orange"
     grow_hours: 18
-    min_yield: 1
-    max_yield: 1
+    min_yield: 5
+    max_yield: 5
     seed_id: "seed_spirit_phoenix_grass"
     harvest_item_id: "spirit_phoenix_grass"
     seed_price: 2500
-    sell_price: 2200
+    sell_price: 440
     description: "传说经火焰淬炼方生的仙草，极为珍稀，蕴含涅槃之力"
 
   # ========== 诡药 (HERB - 联动炼丹/消耗品) ==========
@@ -132,12 +133,12 @@ crops:
     type: "HERB"
     rarity: "white"
     grow_hours: 2
-    min_yield: 3
-    max_yield: 5
+    min_yield: 15
+    max_yield: 25
     seed_id: "seed_ghost_weed"
     harvest_item_id: "ghost_weed"
     seed_price: 40
-    sell_price: 35
+    sell_price: 7
     description: "阴气滋养的草药，散发幽幽鬼光"
 
   - crop_id: "yin_berry"
@@ -145,12 +146,12 @@ crops:
     type: "HERB"
     rarity: "white"
     grow_hours: 3
-    min_yield: 2
-    max_yield: 4
+    min_yield: 10
+    max_yield: 20
     seed_id: "seed_yin_berry"
     harvest_item_id: "yin_berry"
     seed_price: 55
-    sell_price: 50
+    sell_price: 10
     description: "生长在极阴之地的浆果，汁液冰凉"
 
   - crop_id: "soul_vine"
@@ -158,12 +159,12 @@ crops:
     type: "HERB"
     rarity: "green"
     grow_hours: 4
-    min_yield: 2
-    max_yield: 3
+    min_yield: 10
+    max_yield: 15
     seed_id: "seed_soul_vine"
     harvest_item_id: "soul_vine"
     seed_price: 130
-    sell_price: 100
+    sell_price: 20
     description: "能感知灵魂的藤蔓，触碰时会微微颤抖"
 
   - crop_id: "blood_orchid"
@@ -171,12 +172,12 @@ crops:
     type: "HERB"
     rarity: "green"
     grow_hours: 5
-    min_yield: 1
-    max_yield: 2
+    min_yield: 5
+    max_yield: 10
     seed_id: "seed_blood_orchid"
     harvest_item_id: "blood_orchid"
     seed_price: 180
-    sell_price: 150
+    sell_price: 30
     description: "花瓣殷红如血的兰花，是炼丹的上等材料"
 
   - crop_id: "nightmare_flower"
@@ -184,12 +185,12 @@ crops:
     type: "HERB"
     rarity: "blue"
     grow_hours: 8
-    min_yield: 1
-    max_yield: 2
+    min_yield: 5
+    max_yield: 10
     seed_id: "seed_nightmare_flower"
     harvest_item_id: "nightmare_flower"
     seed_price: 400
-    sell_price: 350
+    sell_price: 70
     description: "盛开在梦境与现实交界处的花朵，散发迷幻香气"
 
   - crop_id: "cursed_root"
@@ -197,12 +198,12 @@ crops:
     type: "HERB"
     rarity: "purple"
     grow_hours: 12
-    min_yield: 1
-    max_yield: 1
+    min_yield: 5
+    max_yield: 5
     seed_id: "seed_cursed_root"
     harvest_item_id: "cursed_root"
     seed_price: 1000
-    sell_price: 900
+    sell_price: 180
     description: "被诅咒侵蚀的根茎，蕴含强大的诡异力量"
 
   - crop_id: "void_bloom"
@@ -210,10 +211,10 @@ crops:
     type: "HERB"
     rarity: "orange"
     grow_hours: 20
-    min_yield: 1
-    max_yield: 1
+    min_yield: 5
+    max_yield: 5
     seed_id: "seed_void_bloom"
     harvest_item_id: "void_bloom"
     seed_price: 3000
-    sell_price: 2800
+    sell_price: 560
     description: "绽放在虚空裂缝中的奇花，触碰现实的边界"

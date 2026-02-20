@@ -14,7 +14,7 @@ from ..models.spirit_field import SpiritField, SpiritFieldPlot, SpiritFieldSteal
 from ..models.player import Player
 from ..models.inventory import ItemInstance
 from .config import (
-    STEAL_MAX_PER_DAY, STEAL_COOLDOWN_MINUTES, STEAL_PERCENT,
+    STEAL_MAX_PER_DAY, STEAL_COOLDOWN_MINUTES, STEAL_PERCENT, STEAL_PROTECT_PERCENT,
     STEAL_TARGET_LIST_LIMIT,
     GUARDIAN_HUNGRY_HOURS, GUARDIAN_HUNGRY_RATE_PENALTY,
     CropManager, GuardianBeastManager,
@@ -65,11 +65,13 @@ class StealService:
                 player_id, field.player_id, today
             )
 
-            # 检查实际可偷数量（需≥5才能偷到1个）
-            stealable_plots = sum(
-                1 for p in mature_plots
-                if math.floor(max(0, p.yield_quantity - p.stolen_quantity) * STEAL_PERCENT) >= 1
-            )
+            # 检查实际可偷数量（主人保底70%，累计被偷不超过总产量30%）
+            stealable_plots = 0
+            for p in mature_plots:
+                max_stealable = math.floor(p.yield_quantity * (1 - STEAL_PROTECT_PERCENT))
+                available = max(0, max_stealable - p.stolen_quantity)
+                if math.floor(available * STEAL_PERCENT) >= 1:
+                    stealable_plots += 1
 
             victim = await uow.players.get_by_id(field.player_id)
             if not victim:
@@ -259,10 +261,11 @@ class StealService:
                 f"这次偷鸡不成蚀把米..."
             )
 
-        # 偷取成功 - 每种作物偷20%（向下取整，产量不足5个时可能偷不到）
+        # 偷取成功 - 每地块最多偷可偷余量的20%，主人保底70%总产量
         stolen_items = {}
         for plot in mature_plots:
-            available = max(0, plot.yield_quantity - plot.stolen_quantity)
+            max_stealable = math.floor(plot.yield_quantity * (1 - STEAL_PROTECT_PERCENT))
+            available = max(0, max_stealable - plot.stolen_quantity)
             if available <= 0:
                 continue
 

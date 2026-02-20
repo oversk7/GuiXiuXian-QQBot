@@ -59,7 +59,8 @@ WATER_TIME_REDUCE_PERCENT = 0.15  # 每次灌溉减少15%剩余成长时间
 
 STEAL_MAX_PER_DAY = 5         # 每日偷菜总次数上限
 STEAL_COOLDOWN_MINUTES = 15   # 偷菜冷却(分钟)
-STEAL_PERCENT = 0.20          # 每次偷取上限(目标每种成熟作物的20%)
+STEAL_PERCENT = 0.20          # 每次偷取上限(可偷余量的20%)
+STEAL_PROTECT_PERCENT = 0.70  # 主人保底比例(总产量的70%不可被偷)
 STEAL_MIN_QUANTITY = 1        # 至少偷1株
 STEAL_TARGET_ACTIVE_HOURS = 48  # 目标范围:48小时内有活跃记录
 STEAL_TARGET_LIST_LIMIT = 10   # 可偷目标列表最多显示
