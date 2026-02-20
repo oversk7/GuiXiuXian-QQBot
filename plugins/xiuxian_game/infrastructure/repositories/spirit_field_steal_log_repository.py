@@ -62,23 +62,43 @@ class SpiritFieldStealLogRepository(IRepository[SpiritFieldStealLog]):
         )
         return result.scalar_one() > 0
 
-    async def get_recent_logs_for_victim(self, victim_id: str, limit: int = 10) -> List[SpiritFieldStealLog]:
-        """获取被偷记录(最近N条)"""
+    async def get_total_count_for_victim(self, victim_id: str) -> int:
+        """获取被偷记录总数"""
+        result = await self._session.execute(
+            select(func.count(SpiritFieldStealLog.id)).where(
+                SpiritFieldStealLog.victim_id == victim_id
+            )
+        )
+        return result.scalar_one()
+
+    async def get_total_count_for_thief(self, thief_id: str) -> int:
+        """获取偷菜记录总数"""
+        result = await self._session.execute(
+            select(func.count(SpiritFieldStealLog.id)).where(
+                SpiritFieldStealLog.thief_id == thief_id
+            )
+        )
+        return result.scalar_one()
+
+    async def get_recent_logs_for_victim(self, victim_id: str, limit: int = 10, offset: int = 0) -> List[SpiritFieldStealLog]:
+        """获取被偷记录(最近N条，支持分页)"""
         stmt = (
             select(SpiritFieldStealLog)
             .where(SpiritFieldStealLog.victim_id == victim_id)
             .order_by(SpiritFieldStealLog.created_at.desc())
+            .offset(offset)
             .limit(limit)
         )
         result = await self._session.execute(stmt)
         return list(result.scalars().all())
 
-    async def get_recent_logs_for_thief(self, thief_id: str, limit: int = 10) -> List[SpiritFieldStealLog]:
-        """获取偷菜记录(最近N条)"""
+    async def get_recent_logs_for_thief(self, thief_id: str, limit: int = 10, offset: int = 0) -> List[SpiritFieldStealLog]:
+        """获取偷菜记录(最近N条，支持分页)"""
         stmt = (
             select(SpiritFieldStealLog)
             .where(SpiritFieldStealLog.thief_id == thief_id)
             .order_by(SpiritFieldStealLog.created_at.desc())
+            .offset(offset)
             .limit(limit)
         )
         result = await self._session.execute(stmt)

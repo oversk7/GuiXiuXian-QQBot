@@ -81,6 +81,10 @@ REQUIRED_FIELDS: Dict[str, Dict[str, str]] = {
     # 背包表 - 扩展item_id长度以支持更长的食谱ID
     "inventory": {
         "item_id": "VARCHAR(64) NOT NULL COMMENT '物品模板ID'"
+    },
+    # 灵田偷菜记录 - 汇总字段
+    "spirit_field_steal_log": {
+        "stolen_summary": "TEXT NULL COMMENT '偷取作物汇总JSON，格式:{作物名:数量}'"
     }
     # 注释: 以下字段已通过多次重启完成迁移:
     # - daily_task: quest_chain_id, quest_step, is_tutorial, auto_accept

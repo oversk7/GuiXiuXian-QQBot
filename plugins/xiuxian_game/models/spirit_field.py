@@ -6,7 +6,7 @@
 - SpiritFieldPlot: 灵壤/地块
 - SpiritFieldStealLog: 偷菜记录
 """
-from sqlalchemy import String, Integer, DateTime, ForeignKey, Index, Boolean, BigInteger
+from sqlalchemy import String, Integer, DateTime, ForeignKey, Index, Boolean, BigInteger, Text
 from sqlalchemy.orm import Mapped, mapped_column
 from datetime import datetime
 from .db import Base
@@ -130,8 +130,13 @@ class SpiritFieldStealLog(Base):
         index=True,
         comment="被偷者ID"
     )
-    crop_id: Mapped[str] = mapped_column(String(32), comment="被偷作物ID")
-    quantity: Mapped[int] = mapped_column(Integer, comment="偷取数量")
+    crop_id: Mapped[str] = mapped_column(String(32), default="", server_default="", comment="被偷作物ID(兼容旧数据，新记录用stolen_summary)")
+    quantity: Mapped[int] = mapped_column(Integer, default=0, server_default="0", comment="偷取总数量")
+    stolen_summary: Mapped[str | None] = mapped_column(
+        Text,
+        nullable=True,
+        comment="偷取作物汇总JSON，格式:{作物名:数量}"
+    )
     was_caught: Mapped[bool] = mapped_column(
         Boolean, default=False, server_default="0", comment="是否被诡兽拦截"
     )

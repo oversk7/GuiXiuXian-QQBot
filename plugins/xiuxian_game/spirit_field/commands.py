@@ -502,12 +502,22 @@ field_log_cmd = on_command("偷菜记录", priority=5, block=True)
 
 
 @field_log_cmd.handle()
-async def handle_field_log(event: MessageEvent):
-    """【灵田记录】- 查看偷菜日志"""
+async def handle_field_log(event: MessageEvent, args: Message = CommandArg()):
+    """【灵田记录】- 查看偷菜日志，支持分页"""
+    args_text = args.extract_plain_text().strip()
+    page = 1
+    if args_text:
+        try:
+            page = int(args_text)
+            if page < 1:
+                page = 1
+        except ValueError:
+            await field_log_cmd.finish("页码请输入数字，例如：偷菜记录 2")
+
     async with UnitOfWork(AsyncSessionLocal) as uow:
         player = await get_unified_player(uow.session, event)
         if not player:
             await field_log_cmd.finish("请先创建角色")
 
-        success, msg = await steal_service.get_steal_logs(uow, player.id)
+        success, msg = await steal_service.get_steal_logs(uow, player.id, page)
         await field_log_cmd.finish(msg)

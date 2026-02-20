@@ -3,6 +3,7 @@
 """
 import random
 import math
+import json
 from datetime import datetime, timedelta
 from typing import Tuple, List, Optional
 from nonebot import logger
@@ -228,20 +229,22 @@ class StealService:
             except ValueError:
                 pass
 
-            # 记录日志
-            log = SpiritFieldStealLog(
-                thief_id=thief_id,
-                victim_id=victim.id,
-                crop_id=plot.crop_id,
-                quantity=steal_qty,
-                was_caught=False,
-                penalty_gold=0,
-                steal_date=today,
-            )
-            await uow.spirit_field_steal_logs.add(log)
-
         if not stolen_items:
             return False, "没有可偷取的作物"
+
+        # 写一条汇总日志（一次偷菜行为 = 一条记录）
+        total_qty = sum(stolen_items.values())
+        log = SpiritFieldStealLog(
+            thief_id=thief_id,
+            victim_id=victim.id,
+            crop_id="",
+            quantity=total_qty,
+            stolen_summary=json.dumps(stolen_items, ensure_ascii=False),
+            was_caught=False,
+            penalty_gold=0,
+            steal_date=today,
+        )
+        await uow.spirit_field_steal_logs.add(log)
 
         # 更新统计
         field.total_stolen_from += sum(stolen_items.values())
@@ -259,44 +262,65 @@ class StealService:
         return True, msg
 
     async def get_steal_logs(
-        self, uow: UnitOfWork, player_id: str
+        self, uow: UnitOfWork, player_id: str, page: int = 1
     ) -> Tuple[bool, str]:
-        """查看偷菜记录"""
-        # 被偷记录
-        stolen_from_logs = await uow.spirit_field_steal_logs.get_recent_logs_for_victim(player_id, 5)
-        # 偷别人记录
-        stolen_by_logs = await uow.spirit_field_steal_logs.get_recent_logs_for_thief(player_id, 5)
+        """查看偷菜记录（支持分页，每页5条）"""
+        PAGE_SIZE = 5
+        offset = (page - 1) * PAGE_SIZE
 
-        msg = "灵田记录\n━━━━━━━━━━━━━\n"
+        # 被偷记录
+        total_victim = await uow.spirit_field_steal_logs.get_total_count_for_victim(player_id)
+        stolen_from_logs = await uow.spirit_field_steal_logs.get_recent_logs_for_victim(player_id, PAGE_SIZE, offset)
+        victim_pages = max(1, math.ceil(total_victim / PAGE_SIZE))
+
+        # 偷别人记录
+        total_thief = await uow.spirit_field_steal_logs.get_total_count_for_thief(player_id)
+        stolen_by_logs = await uow.spirit_field_steal_logs.get_recent_logs_for_thief(player_id, PAGE_SIZE, offset)
+        thief_pages = max(1, math.ceil(total_thief / PAGE_SIZE))
+
+        msg = f"灵田记录 第{page}页\n━━━━━━━━━━━━━\n"
 
         if stolen_from_logs:
-            msg += "被偷菜记录:\n"
+            msg += f"被偷菜记录 ({page}/{victim_pages}页):\n"
             for log in stolen_from_logs:
                 thief = await uow.players.get_by_id(log.thief_id)
                 thief_name = thief.nickname if thief else "未知"
+                time_str = log.created_at.strftime("%m-%d %H:%M")
                 if log.was_caught:
-                    msg += f"  {thief_name} 被诡兽拦截 (罚{log.penalty_gold}金)\n"
+                    msg += f"  [{time_str}] {thief_name} 被诡兽拦截 (罚{log.penalty_gold}金)\n"
+                elif log.stolen_summary:
+                    items = json.loads(log.stolen_summary)
+                    items_str = " ".join(f"{name}x{qty}" for name, qty in items.items())
+                    msg += f"  [{time_str}] {thief_name} 偷走 {items_str}\n"
                 else:
+                    # 兼容旧格式记录
                     crop = self.crop_manager.get_crop(log.crop_id)
                     crop_name = crop.name if crop else "未知"
-                    msg += f"  {thief_name} 偷走{crop_name}x{log.quantity}\n"
+                    msg += f"  [{time_str}] {thief_name} 偷走{crop_name}x{log.quantity}\n"
         else:
             msg += "暂无被偷菜记录\n"
 
         msg += "━━━━━━━━━━━━━\n"
 
         if stolen_by_logs:
-            msg += "我的偷菜记录:\n"
+            msg += f"我的偷菜记录 ({page}/{thief_pages}页):\n"
             for log in stolen_by_logs:
                 victim = await uow.players.get_by_id(log.victim_id)
                 victim_name = victim.nickname if victim else "未知"
+                time_str = log.created_at.strftime("%m-%d %H:%M")
                 if log.was_caught:
-                    msg += f"  偷{victim_name}失败 (罚{log.penalty_gold}金)\n"
+                    msg += f"  [{time_str}] 偷{victim_name}失败 (罚{log.penalty_gold}金)\n"
+                elif log.stolen_summary:
+                    items = json.loads(log.stolen_summary)
+                    items_str = " ".join(f"{name}x{qty}" for name, qty in items.items())
+                    msg += f"  [{time_str}] 偷{victim_name} {items_str}\n"
                 else:
+                    # 兼容旧格式记录
                     crop = self.crop_manager.get_crop(log.crop_id)
                     crop_name = crop.name if crop else "未知"
-                    msg += f"  偷{victim_name} {crop_name}x{log.quantity}\n"
+                    msg += f"  [{time_str}] 偷{victim_name} {crop_name}x{log.quantity}\n"
         else:
             msg += "暂无偷菜记录\n"
 
+        msg += f"━━━━━━━━━━━━━\n【偷菜记录 页码】查看更多"
         return True, msg
