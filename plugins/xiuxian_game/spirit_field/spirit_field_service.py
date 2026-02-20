@@ -405,11 +405,14 @@ class SpiritFieldService:
         planted = await uow.spirit_field_plots.get_planted_plots(field.id)
         now = datetime.now()
 
-        watered = 0
+        watered_lines = []  # 成功浇水的详情
+        matured_lines = []  # 浇水后直接成熟的
         skipped = 0
-        matured = 0
 
         for plot in planted:
+            crop = self.crop_manager.get_crop(plot.crop_id)
+            crop_name = crop.name if crop else f"未知"
+
             if plot.is_mature:
                 skipped += 1
                 continue
@@ -426,7 +429,7 @@ class SpiritFieldService:
             if remaining_time <= 0:
                 plot.is_mature = True
                 await uow.spirit_field_plots.update(plot)
-                matured += 1
+                matured_lines.append(f"  [{plot.plot_index}] {crop_name}  已成熟!")
                 continue
 
             reduce_seconds = remaining_time * WATER_TIME_REDUCE_PERCENT
@@ -435,22 +438,39 @@ class SpiritFieldService:
             plot.water_count += 1
             plot.last_water_at = now
 
+            # 格式化减少的时间
+            reduced_min = int(reduce_seconds / 60)
+            reduced_str = f"{reduced_min // 60}h{reduced_min % 60}m" if reduced_min >= 60 else f"{reduced_min}min"
+
             if new_mature_at <= now:
                 plot.is_mature = True
-                matured += 1
+                matured_lines.append(f"  [{plot.plot_index}] {crop_name}  -{reduced_str} → 已成熟!")
+            else:
+                new_remaining = (new_mature_at - now).total_seconds()
+                h = int(new_remaining // 3600)
+                m = int((new_remaining % 3600) // 60)
+                remain_str = f"{h}h{m}m" if h > 0 else f"{m}min"
+                watered_lines.append(f"  [{plot.plot_index}] {crop_name}  -{reduced_str} → 剩{remain_str}")
 
             await uow.spirit_field_plots.update(plot)
-            watered += 1
 
-        if watered == 0 and matured == 0:
+        total_watered = len(watered_lines) + len(matured_lines)
+        if total_watered == 0:
             return False, "没有可灌溉的地块(可能已达今日上限或在冷却中)"
 
-        return True, (
-            f"一键灌溉完成!\n"
-            f"成功灌溉: {watered}块\n"
-            f"已成熟: {matured}块\n"
-            f"跳过: {skipped}块"
-        )
+        msg = "『一键浇水』\n"
+        msg += "─────────────────\n"
+        for line in watered_lines:
+            msg += line + "\n"
+        for line in matured_lines:
+            msg += line + "\n"
+        msg += "─────────────────\n"
+        summary_parts = [f"浇水 {total_watered} 块"]
+        if skipped:
+            summary_parts.append(f"跳过 {skipped} 块")
+        msg += " · ".join(summary_parts)
+
+        return True, msg
 
     # ==================== 收菜 ====================
 

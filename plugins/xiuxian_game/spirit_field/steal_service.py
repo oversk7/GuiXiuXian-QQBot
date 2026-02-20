@@ -115,7 +115,7 @@ class StealService:
         msg = f"『灵田侦查』今日剩余 {remaining_chances} 次\n"
 
         # 可立即偷取部分
-        msg += "─────────────────\n"
+        msg += "━━━━━━━━━━━━━\n"
         if ready_targets:
             msg += "✦ 可立即行窃\n"
             for t in ready_targets[:STEAL_TARGET_LIST_LIMIT]:
@@ -131,7 +131,7 @@ class StealService:
 
         # 在种未成熟部分
         if pending_targets:
-            msg += "─────────────────\n"
+            msg += "━━━━━━━━━━━━━\n"
             msg += "✧ 暗中窥探\n"
             for t in pending_targets[:STEAL_TARGET_LIST_LIMIT]:
                 p = t["player"]
@@ -152,7 +152,7 @@ class StealService:
                 tag_str = f"  {'·'.join(tags)}" if tags else ""
                 msg += f"▹ {p.uid}·{p.nickname}  种 {t['growing_count']} 块{tag_str}\n"
 
-        msg += "─────────────────\n"
+        msg += "━━━━━━━━━━━━━\n"
         msg += "发送「偷菜 UID」出手"
 
         return True, msg
