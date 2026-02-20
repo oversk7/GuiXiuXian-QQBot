@@ -1249,6 +1249,9 @@ items:
           is_percentage: false
           value: 2
           description: "[3] 自噬：每被击杀一次（死亡后复活），自身的力量上限提高2点，直至永恒。（每天最多永久提升20点）"
+        - trigger: "passive"
+          effect: "none"
+          description: "[4] 怨灵拾荒：你的倒影会在你不注意时悄悄离开，替你捡些东西回来。\n【怨灵拾荒】派出怨灵（每日1次，2小时后归来带回材料和金币）\n【镜怨披风】查看状态面板"
       repair_cost: 5
       required_level: 10
       gem_slots: 5
