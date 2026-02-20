@@ -880,8 +880,13 @@ async def _monthly_card_box(player: Player, cfg: ItemConfig, qty: int, ctx: str,
     from ..config import config
     from ..models.inventory import ItemInstance
 
-    # 获取所有材料类型的物品
-    material_items = config.items_config["by_type"].get("MATERIAL", [])
+    # 获取所有材料类型的物品，过滤掉里界专属材料（带 inner_realm_only 标签）
+    all_material_items = config.items_config["by_type"].get("MATERIAL", [])
+    material_items = [
+        item_id for item_id in all_material_items
+        if (item_cfg := config.items_config["by_id"].get(item_id)) is not None
+        and "inner_realm_only" not in item_cfg.tags
+    ]
     if not material_items:
         return False, "⛔ 系统错误：未找到材料配置"
 
