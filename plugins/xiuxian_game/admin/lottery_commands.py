@@ -268,12 +268,24 @@ async def handle_join_lottery(event: MessageEvent, args: Message = CommandArg())
         if player.id == lottery.creator_id:
             await join_lottery_cmd.finish("⛔ 发起人不能参与自己的抽奖")
 
-        # 检查等级要求
-        if player.level < lottery.min_level:
+        # 检查等级要求（考虑轮回：用历史最高等级判断）
+        effective_level = player.level
+        if player.reincarnation_level > 0:
+            from ..cultivate.reincarnation_service_new import ReincarnationService
+            # 玩家完成第N次轮回，说明曾达到对应要求等级
+            historical_max = ReincarnationService.get_required_level_for_reincarnation(
+                player.reincarnation_level - 1
+            )
+            effective_level = max(player.level, historical_max)
+
+        if effective_level < lottery.min_level:
+            level_info = f"当前等级：{player.level}级"
+            if player.reincarnation_level > 0:
+                level_info += f"（{player.reincarnation_level}转，历史最高{effective_level}级）"
             await join_lottery_cmd.finish(
                 f"⛔ 等级不足\n"
                 f"需要等级：{lottery.min_level}级\n"
-                f"当前等级：{player.level}级"
+                f"{level_info}"
             )
 
         if lottery.max_level is not None and player.level > lottery.max_level:
