@@ -1210,7 +1210,11 @@ async def _handle_personal_monster(session, tile: WorldTile, player: Player) -> 
             # 耐久耗尽：自动卸下且不可穿戴，保留物品
             delta = (eq.extra_attrs or {}).get("_persist_bonus", {})
             for k, v in delta.items():
-                setattr(player, k, getattr(player, k) - v)
+                current_value = getattr(player, k, 0)
+                setattr(player, k, max(0, current_value - v))
+            # 清除 _persist_bonus，防止修复后重穿时 recalc 重复扣减属性
+            if "_persist_bonus" in (eq.extra_attrs or {}):
+                eq.extra_attrs = {k: v for k, v in eq.extra_attrs.items() if k != "_persist_bonus"}
             eq.equipped = False
             broken_msgs.append(
                 f"━━━━━━━━━━━━━\n"
