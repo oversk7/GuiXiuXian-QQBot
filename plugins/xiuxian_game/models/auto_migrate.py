@@ -85,6 +85,10 @@ REQUIRED_FIELDS: Dict[str, Dict[str, str]] = {
     # 灵田偷菜记录 - 汇总字段
     "spirit_field_steal_log": {
         "stolen_summary": "TEXT NULL COMMENT '偷取作物汇总JSON，格式:{作物名:数量}'"
+    },
+    # 天灾山寨 - 战斗冷却字段
+    "lower_world_stronghold": {
+        "last_battle_at": "DATETIME NULL COMMENT '最后一次迎战时间（战斗冷却用）'"
     }
     # 注释: 以下字段已通过多次重启完成迁移:
     # - daily_task: quest_chain_id, quest_step, is_tutorial, auto_accept

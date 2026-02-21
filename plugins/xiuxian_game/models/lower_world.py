@@ -33,6 +33,9 @@ class LowerWorldStronghold(Base):
     total_waves_won: Mapped[int] = mapped_column(
         Integer, default=0, server_default="0", comment="历史总胜场"
     )
+    last_battle_at: Mapped[Optional[datetime]] = mapped_column(
+        DateTime, nullable=True, comment="最后一次迎战时间（战斗冷却用）"
+    )
     created_at: Mapped[datetime] = mapped_column(
         DateTime, default=datetime.now, comment="首次降临时间"
     )

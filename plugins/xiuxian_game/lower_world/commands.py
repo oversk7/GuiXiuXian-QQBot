@@ -2,6 +2,7 @@
 下位世界命令处理器
 包括：降临、镇守、迎战、天灾商店、兑换
 """
+import random
 from nonebot import on_command
 from nonebot.adapters.qq import MessageEvent, Message
 from nonebot.params import CommandArg
@@ -22,6 +23,7 @@ from .service import (
     SHOP_ITEMS,
     WAVE_INTERVAL_HOURS,
     HERO_TIMEOUT_HOURS,
+    BATTLE_COOLDOWN_MINUTES,
 )
 from .hero_generator import hero_from_json
 from ..battle.integration_helper import BattleIntegrationHelper
@@ -251,6 +253,20 @@ async def handle_battle_hero(event: MessageEvent):
         # 获取英雄数据
         hero = hero_from_json(stronghold.pending_hero)
 
+        # ── 战斗冷却检查（5分钟）──
+        if stronghold.last_battle_at:
+            elapsed = datetime.now() - stronghold.last_battle_at
+            cooldown = timedelta(minutes=BATTLE_COOLDOWN_MINUTES)
+            if elapsed < cooldown:
+                remaining_cd = cooldown - elapsed
+                remaining_cd_min = int(remaining_cd.total_seconds() // 60)
+                remaining_cd_sec = int(remaining_cd.total_seconds() % 60)
+                cd_str = f"{remaining_cd_min}分{remaining_cd_sec}秒" if remaining_cd_min > 0 else f"{remaining_cd_sec}秒"
+                await battle_hero_cmd.finish(
+                    f"鬼域的余波还未散去，你需要稍作恢复。\n"
+                    f"（{BATTLE_COOLDOWN_MINUTES}分钟内只能迎战一次，还剩 {cd_str}）"
+                )
+
         # 临时保存玩家HP（天灾玩法不消耗真实HP）
         original_hp = player.hp
 
@@ -279,7 +295,10 @@ async def handle_battle_hero(event: MessageEvent):
 
         # 恢复玩家HP
         player.hp = original_hp
+        # 记录本次迎战时间（冷却用）
+        stronghold.last_battle_at = datetime.now()
         uow.session.add(player)
+        uow.session.add(stronghold)
 
         # 处理战斗结果
         if victory:
@@ -290,19 +309,52 @@ async def handle_battle_hero(event: MessageEvent):
             # 使用 he/she 代词
             pronoun = "他" if "男" in hero.get("title", "") or any(x in hero["name"] for x in ["艾伦", "托尔", "克劳德", "赛勒斯", "加文", "罗伦", "赫克托"]) else "她"
 
+            victory_endings = [
+                (
+                    f"……{hero['name']} 倒下了。\n"
+                    "\n"
+                    f"{pronoun}望着你，没有仇恨，只是问：\n"
+                    "「你们那边……也会有人哭吗？」\n"
+                    "\n"
+                    "你没有回答。\n"
+                    "你身后，诡异继续往外涌。"
+                ),
+                (
+                    f"……{hero['name']} 跪倒在地。\n"
+                    "\n"
+                    f"剑没有落下。\n"
+                    f"{pronoun}只是沉默地看着远处的鬼域。\n"
+                    f"「我保护的那些人，现在还安全吗。」\n"
+                    "\n"
+                    "不是问你，只是问自己。"
+                ),
+                (
+                    f"……战斗结束了。\n"
+                    "\n"
+                    f"{hero['name']} 靠在断壁上，抬头看天。\n"
+                    "「你有名字吗，天灾？」\n"
+                    "\n"
+                    "你没有回答。\n"
+                    "天空是另一种颜色。这里没有你认识的星座。"
+                ),
+                (
+                    f"……{hero['name']} 的武器落地，发出沉重的声响。\n"
+                    "\n"
+                    f"{pronoun}抬头，只说了一句：\n"
+                    "「下次……我会更强的。」\n"
+                    "\n"
+                    "你不知道下次是什么时候。\n"
+                    "你们都不知道。"
+                ),
+            ]
+
             msg = (
-                f"{battle_log}\n"
+                "\n".join(battle_log) + "\n"
                 "\n"
                 "━━━━━━━━━━━━━\n"
-                f"……{hero['name']} 倒下了。\n"
+                + random.choice(victory_endings) + "\n"
                 "\n"
-                f"{pronoun}望着你,没有仇恨,只是问:\n"
-                "「你们那边……也会有人哭吗?」\n"
-                "\n"
-                "你没有回答。\n"
-                "你身后,诡异继续往外涌。\n"
-                "\n"
-                f"+{points}天灾点(当前:{stronghold.calamity_points}点)\n"
+                f"+{points}天灾点（当前：{stronghold.calamity_points}点）\n"
                 "「大都会那边有人因此平安了。\n"
                 " 他们不知道你的名字。」\n"
                 "\n"
@@ -314,17 +366,46 @@ async def handle_battle_hero(event: MessageEvent):
             await process_battle_defeat(uow, stronghold)
             await uow.commit()
 
+            defeat_endings = [
+                (
+                    f"{hero['name']} 没有趁机补刀，只是站在原地，\n"
+                    "把武器插回剑鞘。\n"
+                    "\n"
+                    "「走吧，天灾。\n"
+                    " 今天先到这里。」"
+                ),
+                (
+                    f"地面是另一种触感。\n"
+                    f"{hero['name']} 蹲下来看了你一眼，\n"
+                    "没有鄙视，只是说：\n"
+                    "「下次我还会来的。」\n"
+                    "\n"
+                    "然后转身走了。"
+                ),
+                (
+                    f"{hero['name']} 没有说话。\n"
+                    "只是从腰间取出一小瓶药水，放在你手边。\n"
+                    "然后站起来，背对着你，\n"
+                    "长久地望着鬼域的方向。\n"
+                    "\n"
+                    "最后离开了。"
+                ),
+                (
+                    f"你听见 {hero['name']} 的脚步声渐渐远去。\n"
+                    "\n"
+                    "没有庆祝，没有欢呼。\n"
+                    "只有风吹过鬼域裂缝，\n"
+                    "发出低沉的叩门声。"
+                ),
+            ]
+
             msg = (
-                f"{battle_log}\n"
+                "\n".join(battle_log) + "\n"
                 "\n"
                 "━━━━━━━━━━━━━\n"
                 "你倒下了。\n"
                 "\n"
-                f"{hero['name']} 没有趁机补刀,只是站在原地,\n"
-                "把武器插回剑鞘。\n"
-                "\n"
-                "「走吧,天灾。\n"
-                " 今天先到这里。」\n"
+                + random.choice(defeat_endings) + "\n"
                 "\n"
                 "⛓️ 你被封印24小时"
             )

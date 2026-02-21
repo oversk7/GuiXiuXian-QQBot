@@ -15,6 +15,8 @@ WAVE_INTERVAL_HOURS = 2
 HERO_TIMEOUT_HOURS = 4
 # 封印时长（24小时）
 SEAL_DURATION_HOURS = 24
+# 战斗冷却（5分钟）
+BATTLE_COOLDOWN_MINUTES = 5
 
 
 def get_wave_reward(wave_number: int) -> int:
