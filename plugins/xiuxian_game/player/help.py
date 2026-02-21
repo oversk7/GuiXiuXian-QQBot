@@ -46,6 +46,7 @@ async def handle_help(event: MessageEvent, args: Message = CommandArg()):
         "🎆 活动：\n"
         "除夕活动已结束\n"
         "【切换称号】 查看/切换称号\n"
+        "【赞助商店】 使用诡烛购买相关服务\n"
         "\n"
         "━━━━━━━━━━━━━\n"
         "💡 新手？发送【新手指引】看成长路线\n"

@@ -1095,15 +1095,20 @@ class KnockerEventService:
 
     @classmethod
     def get_player_title(cls, player: Player) -> Optional[str]:
-        """获取玩家活动称号(如果有)"""
+        """获取玩家当前激活称号（活动称号优先，无则取赞助自定义称号）"""
         pdata = cls._get_player_data(player)
-        return pdata.get("title")
+        event_title = pdata.get("title") or None
+        if event_title:
+            return event_title
+        # 无活动称号时，尝试取赞助自定义称号
+        from ..sponsor.service import SponsorShopService
+        return SponsorShopService.get_active_custom_title(player)
 
     @classmethod
     def get_owned_titles(cls, player: Player) -> List[str]:
-        """获取玩家已拥有的所有称号"""
+        """获取玩家已拥有的所有称号（含活动称号+赞助自定义称号）"""
         pdata = cls._get_player_data(player)
-        owned = pdata.get("owned_titles", [])
+        owned = list(pdata.get("owned_titles", []))
         # 兼容旧数据：如果有title但owned_titles为空，补充进去
         current_title = pdata.get("title")
         if current_title and current_title not in owned:
@@ -1112,61 +1117,87 @@ class KnockerEventService:
 
     @classmethod
     def handle_title_switch(cls, player: Player, title_name: str) -> Tuple[bool, str]:
-        """切换称号
+        """切换称号（支持活动称号和赞助自定义称号）
 
         Args:
             player: 玩家对象
-            title_name: 要切换的称号名，空字符串表示卸下
+            title_name: 要切换的称号名，空字符串表示卸下所有称号
 
         Returns:
             (成功, 结果消息)
         """
+        from ..sponsor.service import SponsorShopService
+
         pdata = cls._get_player_data(player)
-        owned_titles = cls.get_owned_titles(player)
+        event_titles = cls.get_owned_titles(player)
+        sponsor_titles = SponsorShopService.get_owned_custom_titles(player)
+        all_titles = event_titles + [t for t in sponsor_titles if t not in event_titles]
 
-        if not owned_titles:
-            return False, "你还没有任何称号，请在【活动商店】兑换"
+        if not all_titles:
+            return False, "你还没有任何称号\n💡 【活动商店】兑换活动称号\n💡 【赞助商店】购买自定义称号"
 
-        # 卸下称号
+        # 卸下所有称号
         if not title_name:
-            if not pdata.get("title"):
+            has_active = pdata.get("title") or SponsorShopService.get_active_custom_title(player)
+            if not has_active:
                 return False, "当前没有装备称号"
             pdata["title"] = ""
             cls._set_player_data(player, pdata)
+            SponsorShopService.switch_custom_title(player, "")
             return True, "已卸下称号"
 
-        # 检查是否拥有该称号
-        if title_name not in owned_titles:
-            titles_str = "、".join(f"「{t}」" for t in owned_titles)
-            return False, f"你没有称号「{title_name}」\n已拥有: {titles_str}"
+        # 优先匹配活动称号
+        if title_name in event_titles:
+            if pdata.get("title") == title_name:
+                return False, f"「{title_name}」已经是你的当前称号"
+            pdata["title"] = title_name
+            cls._set_player_data(player, pdata)
+            # 同时清除赞助自定义称号激活状态，保证只展示一个
+            SponsorShopService.switch_custom_title(player, "")
+            return True, f"称号已切换为「{title_name}」"
 
-        # 检查是否已经是当前称号
-        if pdata.get("title") == title_name:
-            return False, f"「{title_name}」已经是你的当前称号"
+        # 匹配赞助自定义称号
+        if title_name in sponsor_titles:
+            if SponsorShopService.get_active_custom_title(player) == title_name:
+                return False, f"「{title_name}」已经是你的当前称号"
+            # 清除活动称号，激活自定义称号
+            pdata["title"] = ""
+            cls._set_player_data(player, pdata)
+            SponsorShopService.switch_custom_title(player, title_name)
+            return True, f"称号已切换为「{title_name}」"
 
-        # 切换称号
-        pdata["title"] = title_name
-        cls._set_player_data(player, pdata)
-        return True, f"称号已切换为「{title_name}」"
+        titles_str = "、".join(f"「{t}」" for t in all_titles)
+        return False, f"你没有称号「{title_name}」\n已拥有: {titles_str}"
 
     @classmethod
     def handle_title_list(cls, player: Player) -> str:
-        """查看已拥有的称号列表"""
-        owned_titles = cls.get_owned_titles(player)
+        """查看已拥有的称号列表（含活动称号和赞助自定义称号）"""
+        from ..sponsor.service import SponsorShopService
+
+        event_titles = cls.get_owned_titles(player)
         pdata = cls._get_player_data(player)
-        current_title = pdata.get("title", "")
+        event_active = pdata.get("title", "")
+        sponsor_titles = SponsorShopService.get_owned_custom_titles(player)
+        sponsor_active = SponsorShopService.get_active_custom_title(player) or ""
 
         lines = [
             "🏅 我的称号收藏",
             "━━━━━━━━━━━━━",
         ]
 
-        if not owned_titles:
-            lines.append("暂无称号，请在【活动商店】兑换")
+        if not event_titles and not sponsor_titles:
+            lines.append("暂无称号\n💡 【活动商店】兑换活动称号\n💡 【赞助商店】购买自定义称号")
         else:
-            for t in owned_titles:
-                mark = " ◀ 当前" if t == current_title else ""
-                lines.append(f"  🏷️ 「{t}」{mark}")
+            if event_titles:
+                lines.append("🎪 活动称号:")
+                for t in event_titles:
+                    mark = " ◀ 当前" if t == event_active else ""
+                    lines.append(f"  🏷️ 「{t}」{mark}")
+            if sponsor_titles:
+                lines.append("🕯️ 自定义称号:")
+                for t in sponsor_titles:
+                    mark = " ◀ 当前" if t == sponsor_active else ""
+                    lines.append(f"  📛 「{t}」{mark}")
 
         lines.extend([
             "━━━━━━━━━━━━━",

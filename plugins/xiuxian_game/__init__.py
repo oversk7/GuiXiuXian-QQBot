@@ -39,6 +39,7 @@ from . import (
     inner_realm,  # 里界系统
     event,  # 除夕叩门活动系统
     lower_world,  # 下位世界·第四天灾入侵系统
+    sponsor,  # 赞助商店系统（诡烛氪金货币）
 )
 
 driver = get_driver()
