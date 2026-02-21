@@ -148,7 +148,7 @@ class StealService:
                 tags = []
 
                 if t["already_stolen"]:
-                    tags.append("今日已偷")
+                    tags.append("今日已成功偷")
                 elif t["stealable_plots"] == 0 and t["mature_count"] > 0:
                     tags.append("成熟量不足")
 
@@ -202,7 +202,7 @@ class StealService:
             thief_id, victim.id, today
         )
         if already_stolen:
-            return False, f"今日已偷过{victim.nickname}，每人每日限偷1次"
+            return False, f"今日已成功偷过{victim.nickname}，每人每日限成功1次"
 
         # 获取目标灵田
         field = await uow.spirit_fields.get_by_player_id(victim.id)

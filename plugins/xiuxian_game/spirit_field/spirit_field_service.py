@@ -614,11 +614,12 @@ class SpiritFieldService:
                 else:
                     remaining = (plot.mature_at - now).total_seconds()
                     if remaining <= 0:
-                        msg += f"[{plot.plot_index}] {crop_name} - 已成熟\n"
+                        actual = max(0, plot.yield_quantity - plot.stolen_quantity)
+                        msg += f"[{plot.plot_index}] {crop_name} - 已成熟 (产量:{actual})\n"
                     else:
                         h = int(remaining / 3600)
                         m = int((remaining % 3600) / 60)
-                        msg += f"[{plot.plot_index}] {crop_name} - 剩余{h}时{m}分\n"
+                        msg += f"[{plot.plot_index}] {crop_name} - 剩余{h}时{m}分 (产量:{plot.yield_quantity})\n"
 
         if mature_count > 0:
             msg += f"━━━━━━━━━━━━━\n有{mature_count}块作物可收菜，使用【收菜】收获"
@@ -679,15 +680,17 @@ class SpiritFieldService:
                 crop_name = crop.name if crop else "未知"
 
                 if plot.is_mature:
-                    msg += f"[{plot.plot_index}] {crop_name} - 已成熟\n"
+                    actual = max(0, plot.yield_quantity - plot.stolen_quantity)
+                    msg += f"[{plot.plot_index}] {crop_name} - 已成熟 (产量:{actual})\n"
                 else:
                     remaining = (plot.mature_at - now).total_seconds() if plot.mature_at else 0
                     if remaining <= 0:
-                        msg += f"[{plot.plot_index}] {crop_name} - 已成熟\n"
+                        actual = max(0, plot.yield_quantity - plot.stolen_quantity)
+                        msg += f"[{plot.plot_index}] {crop_name} - 已成熟 (产量:{actual})\n"
                     else:
                         h = int(remaining / 3600)
                         m = int((remaining % 3600) / 60)
-                        msg += f"[{plot.plot_index}] {crop_name} - 剩余{h}时{m}分\n"
+                        msg += f"[{plot.plot_index}] {crop_name} - 剩余{h}时{m}分 (产量:{plot.yield_quantity})\n"
 
         if mature_count > 0:
             msg += f"━━━━━━━━━━━━━\n使用【偷菜 {target_uid}】偷取成熟作物"

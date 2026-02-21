@@ -42,22 +42,24 @@ class SpiritFieldStealLogRepository(IRepository[SpiritFieldStealLog]):
         return result.scalar_one()
 
     async def get_today_steal_count(self, thief_id: str, today: str) -> int:
-        """获取今日偷菜总次数（按偷过的不同玩家数计算）"""
+        """获取今日成功偷菜总次数（按成功偷过的不同玩家数计算，被诡兽拦截不计入）"""
         result = await self._session.execute(
             select(func.count(func.distinct(SpiritFieldStealLog.victim_id))).where(
                 SpiritFieldStealLog.thief_id == thief_id,
-                SpiritFieldStealLog.steal_date == today
+                SpiritFieldStealLog.steal_date == today,
+                SpiritFieldStealLog.was_caught == False,
             )
         )
         return result.scalar_one()
 
     async def has_stolen_from_today(self, thief_id: str, victim_id: str, today: str) -> bool:
-        """今日是否已偷过该玩家"""
+        """今日是否已成功偷过该玩家（被诡兽拦截不算，失败可再次尝试）"""
         result = await self._session.execute(
             select(func.count(SpiritFieldStealLog.id)).where(
                 SpiritFieldStealLog.thief_id == thief_id,
                 SpiritFieldStealLog.victim_id == victim_id,
-                SpiritFieldStealLog.steal_date == today
+                SpiritFieldStealLog.steal_date == today,
+                SpiritFieldStealLog.was_caught == False,
             )
         )
         return result.scalar_one() > 0
