@@ -106,6 +106,10 @@ class BattleEffect:
 
     def tick(self) -> bool:
         """回合结算，返回是否还有效"""
+        # 计数型效果（max_trigger_count > 0）：由 consume_trigger() + remove_effect() 管理生命周期
+        # tick 不负责移除，避免 duration=0 被误判为"立即过期"
+        if self.max_trigger_count > 0:
+            return True
         if self.duration > 0:
             self.duration -= 1
         return self.duration > 0 or self.duration == -1  # -1表示永久效果
