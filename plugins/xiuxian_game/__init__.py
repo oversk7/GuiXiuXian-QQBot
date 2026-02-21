@@ -38,6 +38,7 @@ from . import (
     global_ban_interceptor,  # 全局封禁拦截器
     inner_realm,  # 里界系统
     event,  # 除夕叩门活动系统
+    lower_world,  # 下位世界·第四天灾入侵系统
 )
 
 driver = get_driver()
