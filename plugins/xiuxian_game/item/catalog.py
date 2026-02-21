@@ -525,9 +525,9 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
                 "sugar": "任意商店【购买 糖】",
                 "spice": "上京/荔湾镇/大昌市市集购买",
                 "wasabi": "舟山市集购买",
-                "lingzhi_powder": "诡域探索掉落 / 市场交易",
-                "secret_sauce": "诡域深层稀有掉落 / 市场交易",
-                "immortal_oil": "诡域极稀有掉落 / 市场交易"
+                "lingzhi_powder": "云岭/风雪镇市集购买",
+                "secret_sauce": "上京市集购买",
+                "immortal_oil": "上京市集购买"
             }
             obtain_method = obtain_map.get(cfg.item_id, "未知")
             seasoning_info = [
@@ -644,9 +644,9 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
                 "sugar": "任意商店【购买 糖】",
                 "spice": "上京/荔湾镇/大昌市市集购买",
                 "wasabi": "舟山市集购买",
-                "lingzhi_powder": "诡域探索掉落 / 市场交易",
-                "secret_sauce": "诡域深层稀有掉落 / 市场交易",
-                "immortal_oil": "诡域极稀有掉落 / 市场交易"
+                "lingzhi_powder": "云岭/风雪镇市集购买",
+                "secret_sauce": "上京市集购买",
+                "immortal_oil": "上京市集购买"
             }
             obtain_method = obtain_map.get(cfg.item_id, "未知")
             desc_parts.append(f"📍 获取来源：{obtain_method}")

@@ -3133,7 +3133,7 @@ items:
       type: "SEASONING"
       rarity: "blue"
       price: 150
-      description: "磨碎的灵芝粉末,入菜可增益身心。获取：诡域探索掉落 / 市场交易"
+      description: "磨碎的灵芝粉末,入菜可增益身心。获取：云岭/风雪镇市集购买"
 
     # ========== 紫色（稀有调料） ==========
     - item_id: "secret_sauce"
@@ -3141,7 +3141,7 @@ items:
       type: "SEASONING"
       rarity: "purple"
       price: 500
-      description: "以十二味珍稀食材秘制而成的神秘酱料。获取：诡域深层稀有掉落 / 市场交易"
+      description: "以十二味珍稀食材秘制而成的神秘酱料。获取：上京市集购买"
 
     # ========== 橙色（传说调料） ==========
     - item_id: "immortal_oil"
@@ -3149,7 +3149,7 @@ items:
       type: "SEASONING"
       rarity: "orange"
       price: 2000
-      description: "传说中仙人炼制的烹饪用油,沾之生香。获取：诡域极稀有掉落 / 市场交易"
+      description: "传说中仙人炼制的烹饪用油,沾之生香。获取：上京市集购买"
 
     # ========== 除夕叩门活动物品 ==========
 
