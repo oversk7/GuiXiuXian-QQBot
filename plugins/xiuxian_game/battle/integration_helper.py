@@ -1038,8 +1038,9 @@ class BattleIntegrationHelper:
 
                         effect_text = "".join(effects)
 
-                        # 计算格挡伤害（基础攻击力 - 实际伤害）
-                        blocked_damage = player1._cached_attack - damage
+                        # 计算格挡伤害（防御实际吸收量，与技能伤害提升无关）
+                        _pre_boost1 = attack_result.get("pre_boost_damage", damage)
+                        blocked_damage = player1._cached_attack - _pre_boost1
                         if blocked_damage > 0:
                             # 斩龙闪：在紧凑日志中给出20%/80%拆分
                             _gd = attack_result.get("guaranteed_damage", 0)
@@ -1131,8 +1132,9 @@ class BattleIntegrationHelper:
 
                         effect_text = "".join(effects)
 
-                        # 计算格挡伤害（基础攻击力 - 实际伤害）
-                        blocked_damage = player2._cached_attack - damage
+                        # 计算格挡伤害（防御实际吸收量，与技能伤害提升无关）
+                        _pre_boost2 = attack_result.get("pre_boost_damage", damage)
+                        blocked_damage = player2._cached_attack - _pre_boost2
                         if blocked_damage > 0:
                             _gd = attack_result.get("guaranteed_damage", 0)
                             _nd = attack_result.get("normal_damage", 0)
@@ -1189,8 +1191,9 @@ class BattleIntegrationHelper:
 
                         effect_text = "".join(effects)
 
-                        # 计算格挡伤害（基础攻击力 - 实际伤害）
-                        blocked_damage = player2._cached_attack - damage
+                        # 计算格挡伤害（防御实际吸收量，与技能伤害提升无关）
+                        _pre_boost2b = attack_result.get("pre_boost_damage", damage)
+                        blocked_damage = player2._cached_attack - _pre_boost2b
                         if blocked_damage > 0:
                             round_actions.append(f"{effect_text}{player2.nickname}→{damage}🛡️挡{blocked_damage}")
                         else:
@@ -1251,8 +1254,9 @@ class BattleIntegrationHelper:
 
                         effect_text = "".join(effects)
 
-                        # 计算格挡伤害（基础攻击力 - 实际伤害）
-                        blocked_damage = player1._cached_attack - damage
+                        # 计算格挡伤害（防御实际吸收量，与技能伤害提升无关）
+                        _pre_boost1b = attack_result.get("pre_boost_damage", damage)
+                        blocked_damage = player1._cached_attack - _pre_boost1b
                         if blocked_damage > 0:
                             round_actions.append(f"{effect_text}{player1.nickname}→{damage}🛡️挡{blocked_damage}")
                         else:

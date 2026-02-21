@@ -479,6 +479,7 @@ class EnhancedBattleEngine:
             "hit": unified.get("hit", False),
             "damage": unified.get("total_damage", 0),
             "total_damage": unified.get("total_damage", 0),
+            "pre_boost_damage": unified.get("pre_boost_damage", unified.get("total_damage", 0)),
             "is_critical": unified.get("is_critical", False),
             "combo_count": unified.get("combo_count", 1),
             "is_penetration": unified.get("is_penetration", False),
@@ -782,6 +783,8 @@ class EnhancedBattleEngine:
         result["is_penetration"] = attack_result.get("is_penetration", False)
         # 标记是否包含必中20%
         has_guaranteed = guaranteed_damage > 0
+        # 记录防御减伤后、技能提升前的基础伤害，供战斗日志正确显示"格挡"
+        result["pre_boost_damage"] = total_damage_from_attack
 
         # 检查并应用虎标弹等计数型伤害加成效果
         tiger_bullet_effects = self.effect_manager.get_active_effects(attacker_id, EffectType.TIGER_BULLET)
