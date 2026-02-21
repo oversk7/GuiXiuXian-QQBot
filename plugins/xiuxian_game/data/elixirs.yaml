@@ -388,7 +388,7 @@ elixirs:
 
   # ========== 灵田联动 - 诡药炼丹系列 ==========
 
-  # 初级双恢复 - 幽草愈灵丹（鬼草×15）
+  # 初级防御运气丹 - 幽草培元丹（鬼草×15）
   herb_weed_heal:
     produce_item_id: "weed_heal_elixir"
     materials:
@@ -445,7 +445,7 @@ elixirs:
     quantity: 1
     base_success: 0.65
 
-  # 顶级永久属性丹 - 诅咒精魄丹（诅咒之根×3）
+  # 顶级全属性永久丹 - 诅咒精魄丹（诅咒之根×3，攻+防+敏三属性）
   herb_cursed_essence:
     produce_item_id: "cursed_essence_elixir"
     materials:
@@ -457,7 +457,7 @@ elixirs:
     quantity: 1
     base_success: 0.50
 
-  # 传说全恢复丹 - 虚空归元丹（虚空绽×2）
+  # 传说多属性洗髓丹 - 虚空归元丹（虚空绽×2，攻+防+敏各5%洗髓，归元系列上位）
   herb_void_restore:
     produce_item_id: "void_restore_elixir"
     materials:

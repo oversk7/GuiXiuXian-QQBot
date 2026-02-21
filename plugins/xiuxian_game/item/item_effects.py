@@ -670,6 +670,145 @@ async def _reforge_attr(player: Player, cfg: ItemConfig, qty: int, ctx: str, ses
         f"💡 使用【加点】指令分配属性点"
     )
 
+
+@register(ItemEffectType.REFORGE_MULTI_ATTR)
+async def _reforge_multi_attr(player: Player, cfg: ItemConfig, qty: int, ctx: str, session=None) -> Tuple[bool, str]:
+    """多属性洗髓丹药：同时将多种属性的百分比转换为可分配属性点
+
+    配置格式：
+    effect_params:
+        sources:
+            - source_attr: "attack"
+              percent: 5
+              attr_name: "攻击力"
+            - source_attr: "defense"
+              percent: 5
+              attr_name: "防御力"
+    """
+    if not session:
+        return False, "⛔ 系统错误：缺少数据库会话"
+
+    sources = cfg.effect_params.get("sources", [])
+    if not sources:
+        return False, "⛔ 该丹药配置错误"
+
+    from ..config import config as gcfg
+    from sqlalchemy import select
+
+    stmt = select(ItemInstance).where(
+        ItemInstance.player_id == player.id,
+        ItemInstance.equipped == True,
+        ItemInstance.item_id.in_(gcfg.items_config["by_type"]["EQUIPMENT"]),
+    )
+    equipped_items = (await session.execute(stmt)).scalars().all()
+
+    attributes_base = (
+        gcfg.game_config.get("cultivate", {}).get("attributes_base", {})
+        if hasattr(gcfg, "game_config")
+        else {}
+    )
+
+    total_points = 0
+    result_lines = []
+
+    for source_cfg in sources:
+        source_attr = source_cfg.get("source_attr")
+        percent = float(source_cfg.get("percent", 0))
+        attr_name = source_cfg.get("attr_name", source_attr)
+
+        if not source_attr or percent <= 0 or not hasattr(player, source_attr):
+            continue
+
+        current_value = getattr(player, source_attr)
+        if current_value <= 0:
+            result_lines.append(f"⚠️ {attr_name}不足，跳过")
+            continue
+
+        base_value = Decimal(str(current_value))
+        for eq in equipped_items:
+            delta = (eq.extra_attrs or {}).get("_persist_bonus", {})
+            bonus = delta.get(source_attr)
+            if isinstance(bonus, (int, float, Decimal)):
+                base_value -= Decimal(str(bonus))
+
+        base_value = base_value.to_integral_value(rounding=ROUND_HALF_UP)
+        base_value_int = int(base_value)
+
+        if base_value_int <= 0:
+            result_lines.append(f"⚠️ {attr_name}基础值不足，跳过")
+            continue
+
+        min_value = 10 if source_attr in ["max_hp", "max_mp"] else 1
+        max_convertible = base_value_int - min_value
+        if max_convertible <= 0:
+            result_lines.append(f"⚠️ {attr_name}过低（至少需保留{min_value}点），跳过")
+            continue
+
+        percent_ratio = Decimal(str(percent)) / Decimal("100")
+        convert_amount_decimal = Decimal(base_value_int) * percent_ratio * Decimal(qty)
+        convert_amount = int(convert_amount_decimal.to_integral_value(rounding=ROUND_DOWN))
+
+        ratio_raw = attributes_base.get(source_attr, 1)
+        try:
+            convert_ratio = int(ratio_raw)
+        except (TypeError, ValueError):
+            convert_ratio = 1
+        if convert_ratio <= 0:
+            convert_ratio = 1
+
+        if convert_ratio > 1:
+            max_points = max_convertible // convert_ratio
+            if max_points <= 0:
+                result_lines.append(f"⚠️ {attr_name}过低，跳过")
+                continue
+            if convert_amount <= 0:
+                convert_amount = convert_ratio
+            points_gain = convert_amount // convert_ratio
+            if points_gain <= 0:
+                points_gain = 1
+            if points_gain > max_points:
+                points_gain = max_points
+            convert_amount = points_gain * convert_ratio
+        else:
+            if convert_amount <= 0:
+                convert_amount = 1
+            if convert_amount > max_convertible:
+                convert_amount = max_convertible
+            points_gain = convert_amount
+
+        if convert_amount <= 0 or points_gain <= 0 or base_value_int - convert_amount < min_value:
+            result_lines.append(f"⚠️ {attr_name}过低，跳过")
+            continue
+
+        setattr(player, source_attr, current_value - convert_amount)
+        total_points += points_gain
+
+        if source_attr == "max_hp" and player.hp > player.max_hp:
+            player.hp = player.max_hp
+        elif source_attr == "max_mp" and player.mp > player.max_mp:
+            player.mp = player.max_mp
+
+        result_lines.append(f"{attr_name} -{convert_amount}（{int(percent * qty)}%）→ 属性点 +{points_gain}")
+
+    if total_points == 0:
+        return False, "⛔ 无法洗髓：所有属性值均不足"
+
+    player.attribute_points += total_points
+    await _recalculate_equipment_bonus(session, player)
+    await update_elixir_usage(session, player, cfg, qty)
+
+    detail = "\n".join(result_lines)
+    return True, (
+        f"🌀 虚空归元成功！\n"
+        f"━━━━━━━━━━━━━\n"
+        f"{detail}\n"
+        f"━━━━━━━━━━━━━\n"
+        f"共获得：可分配属性点 +{total_points}\n"
+        f"当前可分配属性点：{player.attribute_points}\n"
+        f"💡 使用【加点】指令分配属性点"
+    )
+
+
 @register(ItemEffectType.SWEEP_DUNGEON)
 async def _sweep_dungeon(player: Player, cfg: ItemConfig, qty: int, ctx: str, session=None) -> Tuple[bool, str]:
     """扫荡当前诡域，获得经验和材料奖励"""
