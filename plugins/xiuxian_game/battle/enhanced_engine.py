@@ -786,12 +786,12 @@ class EnhancedBattleEngine:
         # 检查并应用虎标弹等计数型伤害加成效果
         tiger_bullet_effects = self.effect_manager.get_active_effects(attacker_id, EffectType.TIGER_BULLET)
         for tiger_effect in tiger_bullet_effects:
-            if tiger_effect.consume_trigger():
-                # 还有剩余次数，应用伤害加成
-                boost_damage = int(damage * tiger_effect.value / 100)
-                damage += boost_damage
-                result["messages"].append(f"🐯 虎标弹！伤害提升{tiger_effect.value:.0f}% (+{boost_damage})")
-            else:
+            # 先应用伤害加成（本次攻击有效）
+            boost_damage = int(damage * tiger_effect.value / 100)
+            damage += boost_damage
+            result["messages"].append(f"🐯 虎标弹！伤害提升{tiger_effect.value:.0f}% (+{boost_damage})")
+            # 再消耗次数，判断是否需要触发下一个效果
+            if not tiger_effect.consume_trigger():
                 # 次数用尽，移除效果并触发下一个效果
                 self.effect_manager.remove_effect(attacker_id, tiger_effect)
                 result["messages"].append(f"🐯 虎标弹效果结束")
@@ -801,7 +801,7 @@ class EnhancedBattleEngine:
                     from .battle_effects import BattleEffect
                     fierce_effect = BattleEffect(
                         effect_type=EffectType.FIERCE_TIGER_BULLET,
-                        value=50,  # 造成伤害提高50%
+                        value=100,  # 造成伤害提高100%
                         duration=0,
                         source=tiger_effect.source,
                         description="猛虎标弹",
@@ -814,12 +814,12 @@ class EnhancedBattleEngine:
         # 检查并应用猛虎标弹效果
         fierce_tiger_effects = self.effect_manager.get_active_effects(attacker_id, EffectType.FIERCE_TIGER_BULLET)
         for fierce_effect in fierce_tiger_effects:
-            if fierce_effect.consume_trigger():
-                # 还有剩余次数，应用伤害加成
-                boost_damage = int(damage * fierce_effect.value / 100)
-                damage += boost_damage
-                result["messages"].append(f"🐅 猛虎标弹！伤害提升{fierce_effect.value:.0f}% (+{boost_damage})")
-            else:
+            # 先应用伤害加成（本次攻击有效）
+            boost_damage = int(damage * fierce_effect.value / 100)
+            damage += boost_damage
+            result["messages"].append(f"🐅 猛虎标弹！伤害提升{fierce_effect.value:.0f}% (+{boost_damage})")
+            # 再消耗次数，判断是否需要触发下一个效果
+            if not fierce_effect.consume_trigger():
                 # 次数用尽，移除效果并触发刚气-心
                 self.effect_manager.remove_effect(attacker_id, fierce_effect)
                 result["messages"].append(f"🐅 猛虎标弹效果结束")
@@ -841,10 +841,10 @@ class EnhancedBattleEngine:
         rigid_qi_effects = self.effect_manager.get_active_effects(attacker_id, EffectType.RIGID_QI_HEART)
         if rigid_qi_effects:
             for rigid_effect in rigid_qi_effects:
-                # 刚气-心：造成伤害降低30%
-                damage_reduction = int(damage * 30 / 100)
+                # 刚气-心：造成伤害降低10%
+                damage_reduction = int(damage * 10 / 100)
                 damage -= damage_reduction
-                result["messages"].append(f"💪 刚气-心：造成伤害降低30% (-{damage_reduction})")
+                result["messages"].append(f"💪 刚气-心：造成伤害降低10% (-{damage_reduction})")
 
         # 检查防御者是否有无敌状态（可被“绝魔体质/至尊锋刃”部分无视）
         invincible_effects = self.effect_manager.get_active_effects(defender_id, EffectType.INVINCIBLE)
@@ -887,6 +887,26 @@ class EnhancedBattleEngine:
             damage -= reduction_amount
             damage = max(1, damage)  # 至少造成1点伤害
             result["messages"].append(f"☂️ 伞下减伤{total_reduction_pct:.0f}% (-{reduction_amount})")
+
+        # 猛虎标弹：防御者受到伤害降低30%（天退星刀专属）
+        fierce_tiger_def_effects = self.effect_manager.get_active_effects(defender_id, EffectType.FIERCE_TIGER_BULLET)
+        if fierce_tiger_def_effects and damage > 0:
+            for _ in fierce_tiger_def_effects:
+                reduction_amount = int(damage * 30 / 100)
+                damage -= reduction_amount
+                damage = max(1, damage)
+                result["messages"].append(f"🐅 猛虎标弹！{defender_name}受到伤害降低30% (-{reduction_amount})")
+                break  # 多个效果只应用一次
+
+        # 刚气-心：防御者受到伤害降低60%（天退星刀专属）
+        rigid_qi_def_effects = self.effect_manager.get_active_effects(defender_id, EffectType.RIGID_QI_HEART)
+        if rigid_qi_def_effects and damage > 0:
+            for rigid_def_effect in rigid_qi_def_effects:
+                reduction_amount = int(damage * rigid_def_effect.value / 100)
+                damage -= reduction_amount
+                damage = max(1, damage)
+                result["messages"].append(f"💪 刚气-心！{defender_name}受到伤害降低{rigid_def_effect.value:.0f}% (-{reduction_amount})")
+                break  # 多个效果只应用一次
 
         # 检查防御者是否有护盾（可被部分无视）
         shield_effects = self.effect_manager.get_active_effects(defender_id, EffectType.SHIELD)
