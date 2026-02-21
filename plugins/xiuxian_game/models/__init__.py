@@ -58,6 +58,8 @@ from .player_recipe import PlayerRecipe
 from .red_envelope import RedEnvelope, RedEnvelopeStatus
 # 灵田系统模型
 from .spirit_field import SpiritField, SpiritFieldPlot, SpiritFieldStealLog
+# 下位世界·天灾山寨系统模型
+from .lower_world import LowerWorldStronghold
 
 
 __all__ = [
@@ -81,5 +83,6 @@ __all__ = [
     "Chef", "ChefCandidate", "ChefTier", "CookingCategory", "ChefPersonality",
     "RestaurantLog", "PlayerRecipe",
     "RedEnvelope", "RedEnvelopeStatus",
-    "SpiritField", "SpiritFieldPlot", "SpiritFieldStealLog"
+    "SpiritField", "SpiritFieldPlot", "SpiritFieldStealLog",
+    "LowerWorldStronghold"
 ]
