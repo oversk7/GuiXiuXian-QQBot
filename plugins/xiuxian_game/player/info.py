@@ -538,6 +538,10 @@ async def create_player(event: MessageEvent, nickname: str, gender: Gender) -> M
         session.add(new_player)
         await session.commit()
 
+        # 新手礼包：1张改名卡（此后改名卡仅通过赞助商店获取）
+        from ..models.inventory import ItemInstance
+        await ItemInstance.add_item(session, new_player.id, "rename_card", 1)
+
         # 初始化新手任务
         from ..quest.novice_quest_service import NoviceQuestService
         await NoviceQuestService.init_novice_quests(session, new_player)

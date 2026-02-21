@@ -1115,7 +1115,7 @@ async def _(event: MessageEvent):
 
 # 系统商店基础物品（保留原价）
 SHOP_ITEMS = [
-    "revive_potion", "rename_card", "president_letter", "territory_expansion_scroll", "heal_potion", "spirit_herb",
+    "revive_potion", "president_letter", "territory_expansion_scroll", "heal_potion", "spirit_herb",
     # 基础调料（烹饪系统）
     "salt", "soy_sauce", "vinegar", "sugar"
 ]
