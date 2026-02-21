@@ -111,6 +111,9 @@ class UnitOfWork:
         self._spirit_field_plots = None
         self._spirit_field_steal_logs = None
 
+        # 下位世界系统仓储
+        self._lower_world_strongholds = None
+
     @property
     def players(self):
         """玩家仓储"""
@@ -398,6 +401,14 @@ class UnitOfWork:
             from ..repositories.spirit_field_steal_log_repository import SpiritFieldStealLogRepository
             self._spirit_field_steal_logs = SpiritFieldStealLogRepository(self._session)
         return self._spirit_field_steal_logs
+
+    @property
+    def lower_world_strongholds(self):
+        """下位世界山寨仓储"""
+        if self._lower_world_strongholds is None:
+            from ..repositories.lower_world_repository import LowerWorldRepository
+            self._lower_world_strongholds = LowerWorldRepository(self._session)
+        return self._lower_world_strongholds
 
     @property
     def session(self) -> AsyncSession:
