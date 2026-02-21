@@ -591,7 +591,7 @@ class WorldBossService:
         results = await self._damage_repo.get_ranking(cycle.id, limit=50)
 
         if not results:
-            return f"🌟 世界BOSS：{cycle.boss_name}\n👑 {cycle.boss_title}\n━━━━━━━━━━━━━━━━━━━━\n\n💀 暂无勇士敢于挑战这位深渊霸主...\n\n⏳ 结算时间：{cycle.next_refresh_at.strftime('%m-%d %H:%M')}"
+            return f"🌟 世界BOSS：{cycle.boss_name}\n👑 {cycle.boss_title}\n━━━━━━━━━━━━━━━━━\n\n💀 暂无勇士敢于挑战这位深渊霸主...\n\n⏳ 结算时间：{cycle.next_refresh_at.strftime('%m-%d %H:%M')}"
 
         # 构建排行榜
         lines = [

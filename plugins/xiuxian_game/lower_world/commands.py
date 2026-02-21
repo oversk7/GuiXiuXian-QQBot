@@ -106,7 +106,7 @@ async def _show_stronghold_status(stronghold, player_level: int):
     sealed, remaining = is_sealed(stronghold)
     if sealed:
         msg = (
-            "━━━━━━━━━━━━━━━━\n"
+            "━━━━━━━━━━━━━\n"
             "🏴‍☠️ 下位世界·山寨状态\n"
             f"📍 第 {stronghold.wave_number} 波\n"
             f"💎 天灾点：{stronghold.calamity_points}\n"
@@ -130,7 +130,7 @@ async def _show_stronghold_status(stronghold, player_level: int):
         remaining_until_timeout = timeout - datetime.now()
 
         msg = (
-            "━━━━━━━━━━━━━━━━\n"
+            "━━━━━━━━━━━━━\n"
             "🏴‍☠️ 下位世界·山寨状态\n"
             f"📍 第 {stronghold.wave_number} 波\n"
             f"💎 天灾点：{stronghold.calamity_points}\n"
@@ -158,7 +158,7 @@ async def _show_stronghold_status(stronghold, player_level: int):
             await uow.commit()
 
         msg = (
-            "━━━━━━━━━━━━━━━━\n"
+            "━━━━━━━━━━━━━\n"
             "🏴‍☠️ 下位世界·山寨状态\n"
             f"📍 第 {stronghold.wave_number} 波\n"
             f"💎 天灾点：{stronghold.calamity_points}\n"
@@ -172,7 +172,7 @@ async def _show_stronghold_status(stronghold, player_level: int):
     # 正在等待下一波英雄
     time_until_next = stronghold.next_wave_at - datetime.now()
     msg = (
-        "━━━━━━━━━━━━━━━━\n"
+        "━━━━━━━━━━━━━\n"
         "🏴‍☠️ 下位世界·山寨状态\n"
         f"📍 第 {stronghold.wave_number} 波\n"
         f"💎 天灾点：{stronghold.calamity_points}\n"
@@ -293,7 +293,7 @@ async def handle_battle_hero(event: MessageEvent):
             msg = (
                 f"{battle_log}\n"
                 "\n"
-                "━━━━━━━━━━━━━━━━\n"
+                "━━━━━━━━━━━━━\n"
                 f"……{hero['name']} 倒下了。\n"
                 "\n"
                 f"{pronoun}望着你,没有仇恨,只是问:\n"
@@ -317,7 +317,7 @@ async def handle_battle_hero(event: MessageEvent):
             msg = (
                 f"{battle_log}\n"
                 "\n"
-                "━━━━━━━━━━━━━━━━\n"
+                "━━━━━━━━━━━━━\n"
                 "你倒下了。\n"
                 "\n"
                 f"{hero['name']} 没有趁机补刀,只是站在原地,\n"
