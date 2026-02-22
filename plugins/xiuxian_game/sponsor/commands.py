@@ -8,6 +8,7 @@
   【购买称号 <文字>】     购买自定义称号（500诡烛）
   【购买棺材钉】          购买棺材钉（50诡烛）
   【购买哭坟帽】          购买哭坟帽（20诡烛）
+  【背包扩容 N】          背包永久扩容N格（10诡烛/格）
   【购买初级月卡】        购买30天初级月卡（88诡烛）
   【购买高级月卡】        购买30天高级月卡（288诡烛）
 """
@@ -30,6 +31,7 @@ guild_rename_cmd = on_command("公会改名", aliases={"改名公会"}, priority
 buy_title_cmd = on_command("购买称号", priority=5, block=True)
 buy_coffin_nail_cmd = on_command("购买棺材钉", priority=5, block=True)
 buy_crying_tomb_hat_cmd = on_command("购买哭坟帽", priority=5, block=True)
+expand_inventory_cmd = on_command("背包扩容", aliases={"扩容背包"}, priority=5, block=True)
 buy_basic_monthly_card_cmd = on_command("购买初级月卡", aliases={"兑换初级月卡"}, priority=5, block=True)
 buy_premium_monthly_card_cmd = on_command("购买高级月卡", aliases={"兑换高级月卡"}, priority=5, block=True)
 
@@ -143,6 +145,33 @@ async def handle_buy_crying_tomb_hat(event: MessageEvent):
         success, msg = await SponsorShopService.buy_crying_tomb_hat(player, session)
 
     await buy_crying_tomb_hat_cmd.finish(message_add_head(msg, event))
+
+
+# ==================== 背包扩容 ====================
+
+@expand_inventory_cmd.handle()
+async def handle_expand_inventory(event: MessageEvent, args: Message = CommandArg()):
+    """背包永久扩容（10诡烛/格）"""
+    arg_text = args.extract_plain_text().strip()
+
+    slots = 1
+    if arg_text:
+        if not arg_text.isdigit() or int(arg_text) <= 0:
+            await expand_inventory_cmd.finish(message_add_head(
+                "🎒 背包扩容\n"
+                "━━━━━━━━━━━━━\n"
+                "用法：【背包扩容 格数】\n"
+                "示例：【背包扩容 5】\n"
+                f"价格：10 诡烛/格，永久有效",
+                event
+            ))
+        slots = int(arg_text)
+
+    async with safe_session() as session:
+        player = await _get_player_or_finish(session, event, expand_inventory_cmd)
+        success, msg = SponsorShopService.expand_inventory(player, slots)
+
+    await expand_inventory_cmd.finish(message_add_head(msg, event))
 
 
 # ==================== 购买初级月卡 ====================

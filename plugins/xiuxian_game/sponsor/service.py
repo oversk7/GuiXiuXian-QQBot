@@ -24,6 +24,8 @@ COFFIN_NAIL_PRICE = 50      # 棺材钉（诡烛）
 CRYING_TOMB_HAT_PRICE = 20  # 哭坟帽（诡烛）
 BASIC_MONTHLY_CARD_PRICE = 88    # 初级月卡（诡烛/月）
 PREMIUM_MONTHLY_CARD_PRICE = 288 # 高级月卡（诡烛/月）
+INVENTORY_EXPAND_PRICE = 10      # 背包扩容（诡烛/格）
+INVENTORY_EXPAND_MAX = 1000      # 背包容量上限
 
 # 称号字符限制
 TITLE_MIN_LEN = 1
@@ -282,8 +284,9 @@ class SponsorShopService:
             )
 
         from ..models.inventory import ItemInstance
-        success = await ItemInstance.add_item(session, player.id, "coffin_nail", 1)
-        if not success:
+        try:
+            await ItemInstance.add_item(session, player.id, "coffin_nail", 1)
+        except ValueError:
             return False, "⛔ 背包已满，无法添加棺材钉"
 
         player.gui_zhu -= COFFIN_NAIL_PRICE
@@ -311,8 +314,9 @@ class SponsorShopService:
             )
 
         from ..models.inventory import ItemInstance
-        success = await ItemInstance.add_item(session, player.id, "resentment_crystal", 1)
-        if not success:
+        try:
+            await ItemInstance.add_item(session, player.id, "resentment_crystal", 1)
+        except ValueError:
             return False, "⛔ 背包已满，无法添加哭坟帽"
 
         player.gui_zhu -= CRYING_TOMB_HAT_PRICE
@@ -321,6 +325,47 @@ class SponsorShopService:
             f"💡 使用后直接获得1万怨念值\n"
             f"🔮 剩余诡烛: {player.gui_zhu}"
         )
+
+    # ==================== 背包扩容 ====================
+
+    @classmethod
+    def expand_inventory(cls, player: Player, slots: int = 1) -> Tuple[bool, str]:
+        """
+        背包永久扩容（10诡烛/格，纯内存操作，由调用方提交事务）
+
+        Returns:
+            (成功, 结果消息)
+        """
+        if slots <= 0:
+            return False, "⛔ 扩容格数必须大于0"
+
+        old_capacity = player.inventory_capacity
+        if old_capacity >= INVENTORY_EXPAND_MAX:
+            return False, f"⛔ 背包已达上限 {INVENTORY_EXPAND_MAX} 格，无法继续扩容"
+
+        # 先算实际可扩格数（受上限约束），再按实际格数收费
+        actual_slots = min(slots, INVENTORY_EXPAND_MAX - old_capacity)
+        total_cost = INVENTORY_EXPAND_PRICE * actual_slots
+
+        if player.gui_zhu < total_cost:
+            return False, (
+                f"⛔ 诡烛不足\n"
+                f"需要: {total_cost} 诡烛（{actual_slots}格 × {INVENTORY_EXPAND_PRICE}诡烛）\n"
+                f"当前: {player.gui_zhu} 诡烛"
+            )
+
+        new_capacity = old_capacity + actual_slots
+        player.inventory_capacity = new_capacity
+        player.gui_zhu -= total_cost
+
+        msg = (
+            f"✅ 背包扩容成功！永久增加 {actual_slots} 格\n"
+            f"📦 背包容量: {old_capacity} → {new_capacity}\n"
+            f"🔮 剩余诡烛: {player.gui_zhu}"
+        )
+        if actual_slots < slots:
+            msg += f"\n⚠️ 已接近上限，实际扩容 {actual_slots} 格"
+        return True, msg
 
     # ==================== 月卡购买 ====================
 
@@ -384,6 +429,8 @@ class SponsorShopService:
             f"     闭关效率+0.5%（最多100根，+50%）",
             f"  🎩  哭坟帽          [{CRYING_TOMB_HAT_PRICE} 诡烛]",
             f"     使用后获得1万怨念值",
+            f"  🎒  背包扩容        [{INVENTORY_EXPAND_PRICE} 诡烛/格]",
+            f"     永久增加1格背包容量，上限{INVENTORY_EXPAND_MAX}格",
             f"  💳  初级月卡        [{BASIC_MONTHLY_CARD_PRICE} 诡烛/月]",
             f"     修炼+20%，闭关9h，背包+5，突破保护75%",
             f"  💎  高级月卡        [{PREMIUM_MONTHLY_CARD_PRICE} 诡烛/月]",
@@ -409,6 +456,7 @@ class SponsorShopService:
             "📖 使用方法:",
             "【购买棺材钉】       获得1根棺材钉",
             "【购买哭坟帽】       获得1顶哭坟帽",
+            "【背包扩容 N】       永久扩容N格（10诡烛/格）",
             "【购买初级月卡】     购买30天初级月卡",
             "【购买高级月卡】     购买30天高级月卡",
             "【购买改名卡】       获得1张改名卡",
