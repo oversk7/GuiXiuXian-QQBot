@@ -23,13 +23,58 @@ FONT_PATHS = [
 ]
 
 # ── Emoji字体优先级（单色TrueType，PIL可直接渲染）─────────────
-EMOJI_FONT_PATHS = [
+# 硬编码候选路径（快速检查）
+_EMOJI_FONT_CANDIDATES = [
     '/usr/share/fonts/truetype/noto/NotoEmoji-Regular.ttf',
     '/usr/share/fonts/truetype/noto/NotoEmoji-Bold.ttf',
+    '/usr/share/fonts/noto/NotoEmoji-Regular.ttf',
     '/usr/share/fonts/noto-emoji/NotoEmoji-Regular.ttf',
+    '/usr/share/fonts/opentype/noto/NotoEmoji-Regular.otf',
     '/usr/share/fonts/truetype/ancient-scripts/Symbola_hint.ttf',
-    'C:/Windows/Fonts/seguisym.ttf',   # Segoe UI Symbol（单色，PIL可用）
+    'C:/Windows/Fonts/seguisym.ttf',
 ]
+
+
+def _find_emoji_font_path() -> Optional[str]:
+    """
+    先检查硬编码候选路径，找不到则调用 fc-list 动态查找。
+    返回可用的 emoji 字体路径，或 None。
+    """
+    # 1. 快速检查硬编码路径
+    for p in _EMOJI_FONT_CANDIDATES:
+        if os.path.exists(p):
+            return p
+
+    # 2. 通过 fc-list 动态查找（仅在 Linux/macOS 上有效）
+    try:
+        import subprocess
+        result = subprocess.run(
+            ['fc-list', '--format=%{file}\n'],
+            capture_output=True, text=True, timeout=5
+        )
+        for line in result.stdout.splitlines():
+            line = line.strip()
+            # 优先 NotoEmoji，其次 Symbola，排除彩色字体（PIL不支持）
+            lower = line.lower()
+            if 'notoemoji' in lower and 'color' not in lower and os.path.exists(line):
+                return line
+        # 次选：Symbola
+        for line in result.stdout.splitlines():
+            line = line.strip()
+            if 'symbola' in line.lower() and os.path.exists(line):
+                return line
+    except Exception:
+        pass
+
+    return None
+
+
+# 启动时查找一次，缓存结果
+_EMOJI_FONT_PATH: Optional[str] = _find_emoji_font_path()
+if _EMOJI_FONT_PATH:
+    print(f"[battle_image] 找到emoji字体: {_EMOJI_FONT_PATH}")
+else:
+    print("[battle_image] 未找到emoji字体，将使用文字标签替代")
 
 # ── Emoji字符 → 简化替换（仅在无emoji字体时使用）────────────
 EMOJI_FALLBACK_MAP = {
@@ -136,13 +181,13 @@ def _load_font(size: int) -> ImageFont.FreeTypeFont:
 
 
 def _load_emoji_font(size: int) -> Optional[ImageFont.FreeTypeFont]:
-    for path in EMOJI_FONT_PATHS:
-        if os.path.exists(path):
-            try:
-                return ImageFont.truetype(path, size)
-            except Exception:
-                continue
-    return None
+    """加载emoji字体，使用启动时已找到的路径"""
+    if _EMOJI_FONT_PATH is None:
+        return None
+    try:
+        return ImageFont.truetype(_EMOJI_FONT_PATH, size)
+    except Exception:
+        return None
 
 
 def _draw_mixed_text(
