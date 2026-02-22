@@ -65,7 +65,7 @@ def _is_emoji_cp(cp: int) -> bool:
         0x1F300 <= cp <= 0x1FFFF or  # Misc Symbols & Pictographs, Emoticons, etc.
         0x2600  <= cp <= 0x26FF  or  # Misc Symbols（⚡⚔ etc.）
         0x2700  <= cp <= 0x27BF  or  # Dingbats
-        0x2300  <= cp <= 0x23FF  or  # Misc Technical（⏰ etc.）
+        0x2300  <= cp <= 0x23FF      # Misc Technical（⏰ etc.）
     )
 
 
