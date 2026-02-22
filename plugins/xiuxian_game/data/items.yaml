@@ -3231,6 +3231,7 @@ items:
       rarity: "purple"
       price: 0
       description: "一截枯黑的手指骨,指节处仍保持着叩门的弯曲弧度。靠近时能听到极轻微的、有节奏的叩击声。"
+      tags: ["event_only"]
 
     # --- 食谱解锁 ---
     - item_id: "recipe_sweet_sour_bass"

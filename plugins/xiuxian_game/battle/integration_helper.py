@@ -986,20 +986,20 @@ class BattleIntegrationHelper:
             if player1_hp <= 0 or player2_hp <= 0:
                 break
 
-            round_actions = []  # 紧凑模式的单行显示
+            battle_log.append(f"━━━ 第{round_num}回合 ━━━")
 
             # 处理回合开始效果（regen等）
             # 玩家1 regen
             _, player1_hp_restored = engine._process_turn_start(player1.id, player1)
             if player1_hp_restored > 0:
                 player1_hp = min(player1.max_hp, player1_hp + player1_hp_restored)
-                round_actions.append(f"💚{player1.nickname}+{player1_hp_restored}")
+                battle_log.append(f"💚 {player1.nickname}回复{player1_hp_restored}HP")
 
             # 玩家2 regen
             _, player2_hp_restored = engine._process_turn_start(player2.id, player2)
             if player2_hp_restored > 0:
                 player2_hp = min(player2.max_hp, player2_hp + player2_hp_restored)
-                round_actions.append(f"💚{player2.nickname}+{player2_hp_restored}")
+                battle_log.append(f"💚 {player2.nickname}回复{player2_hp_restored}HP")
 
             # 根据先后手判定执行攻击顺序
             if player1_first:
@@ -1017,56 +1017,44 @@ class BattleIntegrationHelper:
                         if exec_thr > 0 and player2_hp > 0:
                             if player2_hp < int(player2.max_hp * exec_thr / 100):
                                 player2_hp = 0
-                                round_actions.append("⚰️处决！")
-                        # 防守方受击触发（如镜怨披风·怨息环流）
-                        # 只有在防守方还活着时才能回血，避免死人复活
+                                battle_log.append(f"⚰️ {player1.nickname}发动处决，{player2.nickname}被弑灭！")
+                        # 防守方受击触发
                         heal_def = attack_result.get("defender_hp_restored", 0)
                         if heal_def > 0 and player2_hp > 0:
                             player2_hp = min(player2.max_hp, player2_hp + heal_def)
-                            round_actions.append(f"💚{player2.nickname}+{heal_def}")
+                            battle_log.append(f"💚 {player2.nickname}回复{heal_def}HP")
 
-                        # 紧凑格式：显示效果和伤害
                         effects = []
                         if attack_result.get("is_critical"):
-                            effects.append("💥")
+                            effects.append("💥暴击")
                         if attack_result.get("combo_count", 1) > 1:
-                            effects.append(f"🔄x{attack_result['combo_count']}")
+                            effects.append(f"🔄连击x{attack_result['combo_count']}")
                         if attack_result.get("is_penetration", False):
-                            effects.append("🗡️")
+                            effects.append("🗡️穿透")
                         if any(isinstance(t, str) and "GUARANTEED_20%" in t for t in attack_result.get("effects", [])):
-                            effects.append("🎯")
+                            effects.append("🎯斩龙")
+                        effect_str = f" ({' '.join(effects)})" if effects else ""
 
-                        effect_text = "".join(effects)
-
-                        # 计算格挡伤害（防御实际吸收量，与技能伤害提升无关）
                         _pre_boost1 = attack_result.get("pre_boost_damage", damage)
                         blocked_damage = player1._cached_attack - _pre_boost1
+                        _gd = attack_result.get("guaranteed_damage", 0)
+                        _nd = attack_result.get("normal_damage", 0)
+                        _split = ""
+                        if any(isinstance(t, str) and "GUARANTEED_20%" in t for t in attack_result.get("effects", [])):
+                            _nd_text = "被闪避" if attack_result.get("normal_missed") else str(_nd)
+                            _split = f" [20%:{_gd}+80%:{_nd_text}]"
+                        battle_log.append(f"⚔️ {player1.nickname} 攻击 {player2.nickname}{effect_str}，造成{damage}伤害{_split}")
                         if blocked_damage > 0:
-                            # 斩龙闪：在紧凑日志中给出20%/80%拆分
-                            _gd = attack_result.get("guaranteed_damage", 0)
-                            _nd = attack_result.get("normal_damage", 0)
-                            _split = ""
-                            if any(isinstance(t, str) and "GUARANTEED_20%" in t for t in attack_result.get("effects", [])):
-                                _nd_text = "被闪避" if attack_result.get("normal_missed") else str(_nd)
-                                _split = f" [20%:{_gd} + 80%:{_nd_text}]"
-                            round_actions.append(f"{effect_text}{player1.nickname}→{damage}🛡️挡{blocked_damage}{_split}")
-                        else:
-                            _gd = attack_result.get("guaranteed_damage", 0)
-                            _nd = attack_result.get("normal_damage", 0)
-                            _split = ""
-                            if any(isinstance(t, str) and "GUARANTEED_20%" in t for t in attack_result.get("effects", [])):
-                                _nd_text = "被闪避" if attack_result.get("normal_missed") else str(_nd)
-                                _split = f" [20%:{_gd} + 80%:{_nd_text}]"
-                            round_actions.append(f"{effect_text}{player1.nickname}→{damage}{_split}")
+                            battle_log.append(f"  🛡️ {player2.nickname}防御吸收{blocked_damage}")
 
                         # 检查击杀并触发击杀效果
                         if player2_hp <= 0:
                             kill_result = engine.trigger_on_kill(player1, player2)
                             if kill_result.get("hp_restored", 0) > 0:
                                 player1_hp = min(player1.max_hp, player1_hp + kill_result["hp_restored"])
-                                round_actions.append(f"💚+{kill_result['hp_restored']}")
+                                battle_log.append(f"💚 {player1.nickname}击杀回血+{kill_result['hp_restored']}HP")
                     else:
-                        round_actions.append(f"{player1.nickname}→被闪避")
+                        battle_log.append(f"⚡ {player1.nickname}攻击被闪避")
 
                 # 玩家2反击（如果存活）
                 if player2_hp > 0 and player1_hp > 0:
@@ -1077,89 +1065,50 @@ class BattleIntegrationHelper:
                     if attack_result["hit"]:
                         damage = attack_result["damage"]
                         player1_hp = max(0, player1_hp - damage)
-                        # 
-                        # 
-                        # 
-                        # 
-                        # 
-                        # 
-                        # 
-                        # 
-                        # 
-                        # 
-                        # 
-                        # 
-                        # 
-                        # 
-                        # 
-                        # 
-                        # 
-                        # 
-                        # 
-                        # 
-                        # 
-                        # 
-                        # 
-                        # 
-                        # 
-                        # 防守方受击触发（如镜怨披风·怨息环流）
-                        # 只有在防守方还活着时才能回血，避免死人复活
+                        # 防守方受击触发
                         heal_def = attack_result.get("defender_hp_restored", 0)
                         if heal_def > 0 and player1_hp > 0:
                             player1_hp = min(player1.max_hp, player1_hp + heal_def)
-                            round_actions.append(f"💚{player1.nickname}+{heal_def}")
-
-                        # 紧凑格式：显示效果和伤害
-                        effects = []
-                        if attack_result.get("is_critical"):
-                            effects.append("💥")
-                        if attack_result.get("combo_count", 1) > 1:
-                            effects.append(f"🔄x{attack_result['combo_count']}")
-                        if attack_result.get("is_penetration", False):
-                            effects.append("🗡️")
-
+                            battle_log.append(f"💚 {player1.nickname}回复{heal_def}HP")
 
                         # 处决判定（玩家2对玩家1）
                         _thr = _get_exec_thr(player2.id)
                         if _thr > 0 and player1_hp > 0:
                             if player1_hp < int(player1.max_hp * _thr / 100):
                                 player1_hp = 0
-                                round_actions.append("⚰️处决！")
+                                battle_log.append(f"⚰️ {player2.nickname}发动处决，{player1.nickname}被弑灭！")
 
-
+                        effects = []
+                        if attack_result.get("is_critical"):
+                            effects.append("💥暴击")
+                        if attack_result.get("combo_count", 1) > 1:
+                            effects.append(f"🔄连击x{attack_result['combo_count']}")
+                        if attack_result.get("is_penetration", False):
+                            effects.append("🗡️穿透")
                         if any(isinstance(t, str) and "GUARANTEED_20%" in t for t in attack_result.get("effects", [])):
-                            effects.append("🎯")
+                            effects.append("🎯斩龙")
+                        effect_str = f" ({' '.join(effects)})" if effects else ""
 
-                        effect_text = "".join(effects)
-
-                        # 计算格挡伤害（防御实际吸收量，与技能伤害提升无关）
                         _pre_boost2 = attack_result.get("pre_boost_damage", damage)
                         blocked_damage = player2._cached_attack - _pre_boost2
+                        _gd = attack_result.get("guaranteed_damage", 0)
+                        _nd = attack_result.get("normal_damage", 0)
+                        _split = ""
+                        if any(isinstance(t, str) and "GUARANTEED_20%" in t for t in attack_result.get("effects", [])):
+                            _nd_text = "被闪避" if attack_result.get("normal_missed") else str(_nd)
+                            _split = f" [20%:{_gd}+80%:{_nd_text}]"
+                        battle_log.append(f"⚔️ {player2.nickname} 攻击 {player1.nickname}{effect_str}，造成{damage}伤害{_split}")
                         if blocked_damage > 0:
-                            _gd = attack_result.get("guaranteed_damage", 0)
-                            _nd = attack_result.get("normal_damage", 0)
-                            _split = ""
-                            if any(isinstance(t, str) and "GUARANTEED_20%" in t for t in attack_result.get("effects", [])):
-                                _nd_text = "被闪避" if attack_result.get("normal_missed") else str(_nd)
-                                _split = f" [20%:{_gd} + 80%:{_nd_text}]"
-                            round_actions.append(f"{effect_text}{player2.nickname}→{damage}🛡️挡{blocked_damage}{_split}")
-                        else:
-                            _gd = attack_result.get("guaranteed_damage", 0)
-                            _nd = attack_result.get("normal_damage", 0)
-                            _split = ""
-                            if any(isinstance(t, str) and "GUARANTEED_20%" in t for t in attack_result.get("effects", [])):
-                                _nd_text = "被闪避" if attack_result.get("normal_missed") else str(_nd)
-                                _split = f" [20%:{_gd} + 80%:{_nd_text}]"
-                            round_actions.append(f"{effect_text}{player2.nickname}→{damage}{_split}")
+                            battle_log.append(f"  🛡️ {player1.nickname}防御吸收{blocked_damage}")
 
                         # 检查击杀并触发击杀效果
                         if player1_hp <= 0:
                             kill_result = engine.trigger_on_kill(player2, player1)
                             if kill_result.get("hp_restored", 0) > 0:
                                 player2_hp = min(player2.max_hp, player2_hp + kill_result["hp_restored"])
-                                round_actions.append(f"💚+{kill_result['hp_restored']}")
+                                battle_log.append(f"💚 {player2.nickname}击杀回血+{kill_result['hp_restored']}HP")
                     else:
-                        round_actions.append(f"{player2.nickname}→被闪避")
+                        battle_log.append(f"⚡ {player2.nickname}攻击被闪避")
             else:
                 # 玩家2先手
                 if player2_hp > 0 and player1_hp > 0:
@@ -1170,51 +1119,51 @@ class BattleIntegrationHelper:
                     if attack_result["hit"]:
                         damage = attack_result["damage"]
                         player1_hp = max(0, player1_hp - damage)
-                        # 防守方受击触发（如镜怨披风·怨息环流）
-                        # 只有在防守方还活着时才能回血，避免死人复活
+                        # 防守方受击触发
                         heal_def = attack_result.get("defender_hp_restored", 0)
                         if heal_def > 0 and player1_hp > 0:
                             player1_hp = min(player1.max_hp, player1_hp + heal_def)
-                            round_actions.append(f"💚{player1.nickname}+{heal_def}")
+                            battle_log.append(f"💚 {player1.nickname}回复{heal_def}HP")
 
-                        # 紧凑格式：显示效果和伤害
                         effects = []
                         if attack_result.get("is_critical"):
-                            effects.append("💥")
+                            effects.append("💥暴击")
                         if attack_result.get("combo_count", 1) > 1:
-                            effects.append(f"🔄x{attack_result['combo_count']}")
+                            effects.append(f"🔄连击x{attack_result['combo_count']}")
                         if attack_result.get("is_penetration", False):
-                            effects.append("🗡️")
-
+                            effects.append("🗡️穿透")
                         if any(isinstance(t, str) and "GUARANTEED_20%" in t for t in attack_result.get("effects", [])):
-                            effects.append("🎯")
+                            effects.append("🎯斩龙")
+                        effect_str = f" ({' '.join(effects)})" if effects else ""
 
-                        effect_text = "".join(effects)
-
-                        # 计算格挡伤害（防御实际吸收量，与技能伤害提升无关）
                         _pre_boost2b = attack_result.get("pre_boost_damage", damage)
                         blocked_damage = player2._cached_attack - _pre_boost2b
-                        if blocked_damage > 0:
-                            round_actions.append(f"{effect_text}{player2.nickname}→{damage}🛡️挡{blocked_damage}")
-                        else:
-                            round_actions.append(f"{effect_text}{player2.nickname}→{damage}")
-
 
                         # 处决判定（玩家2对玩家1）
                         _thr = _get_exec_thr(player2.id)
                         if _thr > 0 and player1_hp > 0:
                             if player1_hp < int(player1.max_hp * _thr / 100):
                                 player1_hp = 0
-                                round_actions.append("⚰️处决！")
+                                battle_log.append(f"⚰️ {player2.nickname}发动处决，{player1.nickname}被弑灭！")
+
+                        _gd = attack_result.get("guaranteed_damage", 0)
+                        _nd = attack_result.get("normal_damage", 0)
+                        _split = ""
+                        if any(isinstance(t, str) and "GUARANTEED_20%" in t for t in attack_result.get("effects", [])):
+                            _nd_text = "被闪避" if attack_result.get("normal_missed") else str(_nd)
+                            _split = f" [20%:{_gd}+80%:{_nd_text}]"
+                        battle_log.append(f"⚔️ {player2.nickname} 攻击 {player1.nickname}{effect_str}，造成{damage}伤害{_split}")
+                        if blocked_damage > 0:
+                            battle_log.append(f"  🛡️ {player1.nickname}防御吸收{blocked_damage}")
 
                         # 检查击杀并触发击杀效果
                         if player1_hp <= 0:
                             kill_result = engine.trigger_on_kill(player2, player1)
                             if kill_result.get("hp_restored", 0) > 0:
                                 player2_hp = min(player2.max_hp, player2_hp + kill_result["hp_restored"])
-                                round_actions.append(f"💚+{kill_result['hp_restored']}")
+                                battle_log.append(f"💚 {player2.nickname}击杀回血+{kill_result['hp_restored']}HP")
                     else:
-                        round_actions.append(f"{player2.nickname}→被闪避")
+                        battle_log.append(f"⚡ {player2.nickname}攻击被闪避")
 
                 # 玩家1反击（如果存活）
                 if player1_hp > 0 and player2_hp > 0:
@@ -1231,49 +1180,45 @@ class BattleIntegrationHelper:
                         if _thr2 > 0 and player2_hp > 0:
                             if player2_hp < int(player2.max_hp * _thr2 / 100):
                                 player2_hp = 0
-                                round_actions.append("⚰️处决！")
-                        # 防守方受击触发（如镜怨披风·怨息环流）
-                        # 只有在防守方还活着时才能回血，避免死人复活
+                                battle_log.append(f"⚰️ {player1.nickname}发动处决，{player2.nickname}被弑灭！")
+                        # 防守方受击触发
                         heal_def = attack_result.get("defender_hp_restored", 0)
                         if heal_def > 0 and player2_hp > 0:
                             player2_hp = min(player2.max_hp, player2_hp + heal_def)
-                            round_actions.append(f"�{player2.nickname}+{heal_def}")
+                            battle_log.append(f"💚 {player2.nickname}回复{heal_def}HP")
 
-                        # 紧凑格式：显示效果和伤害
                         effects = []
                         if attack_result.get("is_critical"):
-                            effects.append("💥")
+                            effects.append("💥暴击")
                         if attack_result.get("combo_count", 1) > 1:
-                            effects.append(f"�x{attack_result['combo_count']}")
-
+                            effects.append(f"🔄连击x{attack_result['combo_count']}")
                         if attack_result.get("is_penetration", False):
-                            effects.append("🗡️")
-
+                            effects.append("🗡️穿透")
                         if any(isinstance(t, str) and "GUARANTEED_20%" in t for t in attack_result.get("effects", [])):
-                            effects.append("🎯")
+                            effects.append("🎯斩龙")
+                        effect_str = f" ({' '.join(effects)})" if effects else ""
 
-                        effect_text = "".join(effects)
-
-                        # 计算格挡伤害（防御实际吸收量，与技能伤害提升无关）
                         _pre_boost1b = attack_result.get("pre_boost_damage", damage)
                         blocked_damage = player1._cached_attack - _pre_boost1b
+
+                        _gd = attack_result.get("guaranteed_damage", 0)
+                        _nd = attack_result.get("normal_damage", 0)
+                        _split = ""
+                        if any(isinstance(t, str) and "GUARANTEED_20%" in t for t in attack_result.get("effects", [])):
+                            _nd_text = "被闪避" if attack_result.get("normal_missed") else str(_nd)
+                            _split = f" [20%:{_gd}+80%:{_nd_text}]"
+                        battle_log.append(f"⚔️ {player1.nickname} 攻击 {player2.nickname}{effect_str}，造成{damage}伤害{_split}")
                         if blocked_damage > 0:
-                            round_actions.append(f"{effect_text}{player1.nickname}→{damage}🛡️挡{blocked_damage}")
-                        else:
-                            round_actions.append(f"{effect_text}{player1.nickname}→{damage}")
+                            battle_log.append(f"  🛡️ {player2.nickname}防御吸收{blocked_damage}")
 
                         # 检查击杀并触发击杀效果
                         if player2_hp <= 0:
                             kill_result = engine.trigger_on_kill(player1, player2)
                             if kill_result.get("hp_restored", 0) > 0:
                                 player1_hp = min(player1.max_hp, player1_hp + kill_result["hp_restored"])
-                                round_actions.append(f"💚+{kill_result['hp_restored']}")
+                                battle_log.append(f"💚 {player1.nickname}击杀回血+{kill_result['hp_restored']}HP")
                     else:
-                        round_actions.append(f"{player1.nickname}→被闪避")
-
-            # 将回合动作合并为一行
-            if round_actions:
-                battle_log.append(f"R{round_num}: " + " | ".join(round_actions))
+                        battle_log.append(f"⚡ {player1.nickname}攻击被闪避")
 
             # 每回合结束后显示双方血量（只显示百分比）
             player1_hp_bar = create_hp_bar(player1_hp, player1.max_hp, show_full=False)
@@ -1282,6 +1227,7 @@ class BattleIntegrationHelper:
             battle_log.append(f"    {player1_hp_bar}")
             battle_log.append(f"  {player2.nickname}:")
             battle_log.append(f"    {player2_hp_bar}")
+
 
         # 计算伤害
         player1_damage_taken = initial_player1_hp - player1_hp
