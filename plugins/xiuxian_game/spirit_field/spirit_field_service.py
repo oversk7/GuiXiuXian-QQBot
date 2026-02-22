@@ -232,16 +232,14 @@ class SpiritFieldService:
         minutes = int((actual_grow_hours - hours) * 60)
         time_str = f"{hours}小时{minutes}分钟" if minutes > 0 else f"{hours}小时"
 
+        yield_str = f"{total_yield}（基础{base_yield} + 阴宅+{bonus_yield}）" if bonus_yield > 0 else str(total_yield)
+        time_str_full = f"{time_str}（阴宅加速-{growth_bonus:.0f}%）" if growth_bonus > 0 else time_str
         msg = (
             f"成功种植【{crop.name}】!\n"
             f"地块: {plot.plot_index}号\n"
-            f"预计产量: {total_yield}\n"
-            f"成熟时间: {time_str}"
+            f"预计产量: {yield_str}\n"
+            f"成熟时间: {time_str_full}"
         )
-        if growth_bonus > 0:
-            msg += f"\n阴宅加速: -{growth_bonus:.0f}%"
-        if bonus_yield > 0:
-            msg += f"\n阴宅产量: +{bonus_yield}"
 
         return True, msg
 
@@ -281,11 +279,15 @@ class SpiritFieldService:
         mature_time = now + timedelta(hours=actual_grow_hours)
 
         total_yield = 0
+        total_base_yield = 0
+        total_bonus_yield = 0
         for i in range(plant_count):
             base_yield = random.randint(crop.min_yield, crop.max_yield)
             bonus_yield = math.floor(base_yield * yield_bonus / 100.0)
             plot_yield = base_yield + bonus_yield
             total_yield += plot_yield
+            total_base_yield += base_yield
+            total_bonus_yield += bonus_yield
 
             plot = empty_plots[i]
             plot.crop_id = crop.crop_id
@@ -305,13 +307,16 @@ class SpiritFieldService:
         minutes = int((actual_grow_hours - hours) * 60)
         time_str = f"{hours}小时{minutes}分钟" if minutes > 0 else f"{hours}小时"
 
+        yield_str = f"{total_yield}（基础{total_base_yield} + 阴宅+{total_bonus_yield}）" if total_bonus_yield > 0 else str(total_yield)
+        time_str_full = f"{time_str}（阴宅加速-{growth_bonus:.0f}%）" if growth_bonus > 0 else time_str
+
         return True, (
             f"一键种植完成!\n"
             f"━━━━━━━━━━━━━\n"
             f"作物: {crop.name}\n"
             f"种植: {plant_count}块\n"
-            f"总产量: {total_yield}\n"
-            f"成熟时间: {time_str}\n"
+            f"总产量: {yield_str}\n"
+            f"成熟时间: {time_str_full}\n"
             f"消耗种子: {plant_count}颗\n"
             f"━━━━━━━━━━━━━"
         )
