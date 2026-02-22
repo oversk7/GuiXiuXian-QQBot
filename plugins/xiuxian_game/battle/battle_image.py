@@ -117,6 +117,35 @@ def _replace_emoji(text: str) -> str:
     return result
 
 
+def _clean_for_render(text: str) -> str:
+    """
+    先替换已知Emoji，再过滤字体无法渲染的Unicode字符。
+    保留：ASCII、中文（BMP CJK）、常用标点、盒状绘图、块元素。
+    删除：变体选择符、BMP杂项符号/Dingbats、非BMP字符（几乎全是emoji）。
+    """
+    text = _replace_emoji(text)
+    safe = []
+    for ch in text:
+        cp = ord(ch)
+        # 非BMP（U+10000以上）：几乎全是emoji，跳过
+        if cp > 0xFFFF:
+            continue
+        # 变体选择符 U+FE00-U+FE0F
+        if 0xFE00 <= cp <= 0xFE0F:
+            continue
+        # 杂项符号 U+2600-U+26FF（天气、棋子、星座等emoji）
+        if 0x2600 <= cp <= 0x26FF:
+            continue
+        # Dingbats U+2700-U+27BF
+        if 0x2700 <= cp <= 0x27BF:
+            continue
+        # 零宽连接符、零宽不连字等
+        if cp in (0x200B, 0x200C, 0x200D, 0xFEFF):
+            continue
+        safe.append(ch)
+    return ''.join(safe)
+
+
 def _load_font(size: int) -> ImageFont.FreeTypeFont:
     """加载字体，按优先级尝试"""
     for font_path in FONT_PATHS:
@@ -192,7 +221,7 @@ class BattleImageGenerator:
         line_specs = []  # [(cleaned_text, color, font_size, line_height)]
         for raw_line in battle_log:
             color, fsize, lh = _classify_line_color(raw_line)
-            cleaned = _replace_emoji(raw_line)
+            cleaned = _clean_for_render(raw_line)
             line_specs.append((cleaned, color, fsize, lh))
 
         # 第二步：计算总高度
@@ -201,7 +230,9 @@ class BattleImageGenerator:
         SEP_MARGIN = 12
         LOG_TOP_MARGIN = 14
         LOG_BOTTOM_MARGIN = 14
-        RESULT_SECTION_H = 80   # 结果 + 两个血条
+        # 每个血条区块 = 名字行(18px) + 间距(4px) + 血条(16px) + 下边距(6px) = 44px
+        HP_BLOCK_H = 44
+        RESULT_SECTION_H = 32 + HP_BLOCK_H * 2 + 10  # 结果文字 + 两个血条区块 + 底部
 
         log_height = sum(lh for _, _, _, lh in line_specs)
         total_height = (
@@ -274,15 +305,15 @@ class BattleImageGenerator:
 
         # ── 结果区 ──
         if winner_name:
-            result_text = f"{_replace_emoji(winner_name)} 获得胜利！"
+            result_text = f"{_clean_for_render(winner_name)} 获得胜利！"
             draw.text((self.PADDING, y), result_text, fill=COLOR_VICTORY, font=self.font_body)
         else:
             draw.text((self.PADDING, y), "战斗平局！", fill=COLOR_DEFAULT, font=self.font_body)
-        y += 26
+        y += 32
 
-        # 血条：玩家1
+        # 血条：玩家1（名字 + bar，各占 HP_BLOCK_H）
         self._draw_hp_bar(draw, self.PADDING, y, player1_name, player1_hp, player1_max_hp)
-        y += 24
+        y += HP_BLOCK_H
 
         # 血条：玩家2
         self._draw_hp_bar(draw, self.PADDING, y, player2_name, player2_hp, player2_max_hp)
@@ -302,48 +333,45 @@ class BattleImageGenerator:
         current_hp: int,
         max_hp: int,
     ):
-        """绘制渐变血条"""
-        bar_total_w = self.WIDTH - self.PADDING * 2 - 160
+        """绘制血条：名字在上（y），血条在下（y+20）"""
+        # 名字行
+        short_name = self._truncate(name, 18)
+        draw.text((x, y), short_name, fill=(190, 195, 220), font=self.font_small)
+
+        # 血条行（名字下方 20px）
+        bar_y = y + 20
+        bar_total_w = self.WIDTH - self.PADDING * 2 - 150
         filled_w = int(bar_total_w * current_hp / max_hp) if max_hp > 0 else 0
         filled_w = max(0, min(filled_w, bar_total_w))
 
         bar_color = self.HP_FULL_COLOR if current_hp > 0 else self.HP_DEAD_COLOR
 
-        # 空血条
+        # 空血条底色
         draw.rectangle(
-            [(x, y), (x + bar_total_w, y + self.HP_BAR_HEIGHT)],
+            [(x, bar_y), (x + bar_total_w, bar_y + self.HP_BAR_HEIGHT)],
             fill=self.HP_EMPTY_COLOR,
             outline=(60, 65, 80),
         )
         # 实际血量
         if filled_w > 0:
             draw.rectangle(
-                [(x, y), (x + filled_w, y + self.HP_BAR_HEIGHT)],
+                [(x, bar_y), (x + filled_w, bar_y + self.HP_BAR_HEIGHT)],
                 fill=bar_color,
             )
 
-        # HP数值文字
+        # HP 数值（血条右侧）
         hp_pct = (current_hp / max_hp * 100) if max_hp > 0 else 0
         hp_text = f"{current_hp}/{max_hp}  {hp_pct:.0f}%"
         draw.text(
-            (x + bar_total_w + 8, y),
+            (x + bar_total_w + 8, bar_y),
             hp_text,
             fill=(180, 190, 210),
             font=self.font_small,
         )
 
-        # 名字（显示在血条下方）
-        short_name = self._truncate(name, 12)
-        draw.text(
-            (x, y - 14) if y > 14 else (x, y),
-            short_name,
-            fill=(190, 195, 220),
-            font=self.font_small,
-        )
-
     def _truncate(self, text: str, max_chars: int) -> str:
         """截断过长文字"""
-        cleaned = _replace_emoji(text)
+        cleaned = _clean_for_render(text)
         if len(cleaned) <= max_chars:
             return cleaned
         return cleaned[:max_chars - 1] + "…"
