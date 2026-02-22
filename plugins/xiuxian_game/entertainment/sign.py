@@ -35,6 +35,9 @@ async def handle_sign(event: MessageEvent):
         last_sign_date = player.last_sign.date() if player.last_sign else None
         today = now.date()
 
+        # 记录是否为首次签到
+        is_first_sign = player.last_sign is None
+
         # 已签到检查
         if last_sign_date == today:
             await sign.send("您今天已经签到过了，请勿重复签到！")
@@ -133,6 +136,15 @@ async def handle_sign(event: MessageEvent):
         except ValueError as e:
             # 如果添加物品失败，记录错误但不影响签到
             sweep_token_msg = f"\n⚠️ 扫荡令发放失败：{e}"
+
+        # 首次签到赠改名卡
+        first_sign_msg = ""
+        if is_first_sign:
+            try:
+                await ItemInstance.add_item(session, user_id, "rename_card", 1)
+                first_sign_msg = "\n🎁 首次签到奖励：改名卡 ×1（使用【改名 新名字】修改道号）"
+            except ValueError as e:
+                first_sign_msg = f"\n⚠️ 改名卡发放失败：{e}"
 
         vip_medal_msg = ""
         stmt_medal = select(ItemInstance).where(
@@ -257,6 +269,10 @@ async def handle_sign(event: MessageEvent):
                 if sweep_token_msg:
                     desc_parts.append(sweep_token_msg.strip())
 
+                # 添加首次签到改名卡
+                if first_sign_msg:
+                    desc_parts.append(first_sign_msg.strip())
+
                 # 添加VIP勋章加成
                 if vip_medal_msg:
                     desc_parts.append(vip_medal_msg.strip())
@@ -326,7 +342,7 @@ async def handle_sign(event: MessageEvent):
                 logger.error(f"[签到MD] 发送失败，回退到文本版本: {e}", exc_info=True)
 
                 # 构建纯文本响应消息
-                response_msg = f"🛞{player.nickname}[{player.uid}] 连续签到 {streak} 天！获得 {base_reward} 金币！\n{lucky_msg}{bonus_msg}{stamina_msg}{monthly_card_msg}{sweep_token_msg}{vip_medal_msg}{new_msg}{guild_msg}"
+                response_msg = f"🛞{player.nickname}[{player.uid}] 连续签到 {streak} 天！获得 {base_reward} 金币！\n{lucky_msg}{bonus_msg}{stamina_msg}{monthly_card_msg}{sweep_token_msg}{first_sign_msg}{vip_medal_msg}{new_msg}{guild_msg}"
 
                 # 附加成就解锁消息
                 if achievement_msgs:
@@ -336,7 +352,7 @@ async def handle_sign(event: MessageEvent):
                 await sign.send(response_msg)
         else:
             # 非QQ平台，使用纯文本版本
-            response_msg = f"🛞{player.nickname}[{player.uid}] 连续签到 {streak} 天！获得 {base_reward} 金币！\n{lucky_msg}{bonus_msg}{stamina_msg}{monthly_card_msg}{sweep_token_msg}{vip_medal_msg}{new_msg}{guild_msg}"
+            response_msg = f"🛞{player.nickname}[{player.uid}] 连续签到 {streak} 天！获得 {base_reward} 金币！\n{lucky_msg}{bonus_msg}{stamina_msg}{monthly_card_msg}{sweep_token_msg}{first_sign_msg}{vip_medal_msg}{new_msg}{guild_msg}"
 
             # 附加成就解锁消息
             if achievement_msgs:

@@ -357,115 +357,36 @@ async def _(event: MessageEvent, state: T_State, args: Message = CommandArg()):
         if result.scalars().first():
             await register.finish("⛔ 你已经创建过角色了")
 
-    # 获取参数
-    nickname = args.extract_plain_text().strip()
+    arg_text = args.extract_plain_text().strip()
+    if arg_text in ["男", "女"]:
+        gender = Gender.MALE if arg_text == "男" else Gender.FEMALE
+        async with safe_session() as session:
+            nickname = await generate_random_nickname(session)
+        result = await create_player(event, nickname, gender)
+        await register.finish(result)
 
-    # 如果直接提供了昵称，直接创建角色
-    if nickname:
-        # 检查是否为旧格式：昵称 性别
-        parsed_nickname, parsed_gender = _parse_nickname_and_gender(nickname)
-
-        # 清理可能的误输入
-        cleaned_nickname = _clean_nickname_input(parsed_nickname)
-
-        # 检查清理后的昵称是否有效
-        if not cleaned_nickname or len(cleaned_nickname) < 2:
-            await register.finish(
-                "⛔ 昵称格式错误\n"
-                "💡 正确格式：/注册 [昵称] 或 /注册 [昵称] [男/女] 或直接发送 /注册 然后按提示输入\n"
-                "📝 例如：/注册 张三 或 /注册 张三 女\n"
-                "⚠️ 昵称长度至少2个字符"
-            )
-
-        # 验证昵称是否合法（违禁词 + 游戏名称检查）
-        from .nickname_validator import validate_nickname
-        is_valid, error_msg = await validate_nickname(cleaned_nickname)
-        if not is_valid:
-            await register.finish(f"⛔ {error_msg}")
-
-        # 如果清理了输入，给出提示
-        if cleaned_nickname != parsed_nickname:
-            result = await create_player(event, cleaned_nickname, parsed_gender)
-            await register.finish(result)
-        else:
-            # 正常情况，直接创建角色
-            result = await create_player(event, cleaned_nickname, parsed_gender)
-            await register.finish(result)
-
-    # 开始分步注册流程，保存用户ID到状态中
+    if arg_text:
+        await register.finish(
+            "⛔ 格式错误\n💡 用法：【注册 男】或【注册 女】\n"
+            "或直接发送【注册】按提示选择"
+        )
     state["user_id"] = event.get_user_id()
 
 
-@register.got("nickname", prompt="🀄️ 新人指引  ──────────\n✨ 欢迎来到诡修仙世界！\n👤 请输入你的角色昵称（直接发名字，不要带多余的字，请谨慎对待）：")
-async def _(event: MessageEvent, nickname: str = ArgPlainText()):
-    nickname = nickname.strip()
-
-    if not nickname or nickname in ["修炼"]:
-        await register.reject("⛔ 昵称不能为空或者是指令，请重新输入")
-
-    # 检查并处理常见的误输入情况
-    cleaned_nickname = _clean_nickname_input(nickname)
-    if cleaned_nickname != nickname:
-        # 如果清理后的昵称为空或过短，提示重新输入
-        if not cleaned_nickname or len(cleaned_nickname) < 2:
-            await register.reject(
-                "⛔ 检测到你可能误输入了指令前缀\n"
-                "💡 请只输入角色昵称，不要包含 /注册 等指令前缀\n"
-                "📝 例如：直接输入「张三」而不是「/注册 张三」\n"
-                "🔄 请重新输入你的角色昵称："
-            )
-        else:
-            # 验证昵称是否合法（违禁词 + 游戏名称检查）
-            from .nickname_validator import validate_nickname
-            is_valid, error_msg = await validate_nickname(cleaned_nickname)
-            if not is_valid:
-                await register.reject(f"⛔ {error_msg}\n🔄 请重新输入你的角色昵称：")
-
-            # 提示用户我们已经自动清理了输入
-            result = await create_player(event, cleaned_nickname, Gender.MALE)
-            await register.finish(result)
-
-    # 验证昵称是否合法（违禁词 + 游戏名称检查）
-    from .nickname_validator import validate_nickname
-    is_valid, error_msg = await validate_nickname(nickname)
-    if not is_valid:
-        await register.reject(f"⛔ {error_msg}\n🔄 请重新输入你的角色昵称：")
-
-    # 正常情况，直接创建角色
-    result = await create_player(event, nickname, Gender.MALE)
+@register.got("gender", prompt=(
+    "🀄️ 欢迎来到诡修仙世界！\n"
+    "──────────────\n"
+    "⚧️ 请选择你的性别，回复 【男】 或 【女】："
+))
+async def _(event: MessageEvent, gender_input: str = ArgPlainText()):
+    gender_input = gender_input.strip()
+    if gender_input not in ["男", "女"]:
+        await register.reject("⛔ 请回复「男」或「女」")
+    gender = Gender.MALE if gender_input == "男" else Gender.FEMALE
+    async with safe_session() as session:
+        nickname = await generate_random_nickname(session)
+    result = await create_player(event, nickname, gender)
     await register.finish(result)
-
-
-def _parse_nickname_and_gender(input_text: str) -> tuple[str, Gender]:
-    """解析输入文本，分离昵称和性别
-
-    支持格式：
-    - "昵称 男" -> ("昵称", Gender.MALE)
-    - "昵称 女" -> ("昵称", Gender.FEMALE)
-    - "昵称" -> ("昵称", Gender.MALE)  # 默认男性
-
-    Args:
-        input_text: 用户输入的文本
-
-    Returns:
-        tuple: (昵称, 性别)
-    """
-    input_text = input_text.strip()
-
-    # 检查是否包含空格
-    if ' ' in input_text:
-        parts = input_text.split()
-        if len(parts) >= 2:
-            # 最后一个部分可能是性别
-            potential_gender = parts[-1]
-            if potential_gender in ['男', '女']:
-                # 昵称是除了最后一个部分的所有内容
-                nickname = ' '.join(parts[:-1])
-                gender = Gender.MALE if potential_gender == '男' else Gender.FEMALE
-                return nickname, gender
-
-    # 如果没有检测到性别，返回原文本和默认性别
-    return input_text, Gender.MALE
 
 
 def _clean_nickname_input(nickname: str) -> str:
@@ -497,6 +418,41 @@ def _clean_nickname_input(nickname: str) -> str:
             break
 
     return nickname
+
+
+async def generate_random_nickname(session) -> str:
+    """生成随机修仙风格昵称，保证与数据库现有玩家不重复"""
+    SURNAMES = [
+        "李", "王", "张", "刘", "陈", "杨", "黄", "周", "吴", "徐",
+        "孙", "马", "朱", "林", "何", "郭", "罗", "梁", "宋", "唐",
+        "叶", "慕", "夜", "冥", "玄", "凌", "沈", "裴", "顾", "白",
+        "苍", "幽", "魂", "灰", "霜", "寒", "暗", "虚", "骸", "煞",
+    ]
+    DARK_CHARS = [
+        "玄", "冥", "幽", "魂", "骸", "殇", "焰", "渊", "墟", "炁",
+        "寂", "祸", "蛊", "苍", "枯", "暗", "影", "刃", "戾", "邪",
+        "厄", "咒", "逝", "灭", "荒", "孽", "怨", "狱", "伐", "屠",
+        "陨", "腐", "瘴", "噩", "孤", "悸", "蛮", "契", "乱", "煞",
+    ]
+    NORMAL_CHARS = [
+        "伟", "明", "强", "敏", "峰", "云", "风", "月", "雪", "星",
+        "阳", "龙", "凤", "飞", "涛", "雨", "洁", "文", "武", "晨",
+    ]
+    for _ in range(10):
+        surname = random.choice(SURNAMES)
+        r = random.random()
+        if r < 0.15:   # 15% 三字名（姓+暗黑字+暗黑字）
+            c1 = random.choice(DARK_CHARS)
+            c2 = random.choice([c for c in DARK_CHARS if c != c1])
+            nickname = surname + c1 + c2
+        elif r < 0.35:  # 20% 普通字
+            nickname = surname + random.choice(NORMAL_CHARS)
+        else:           # 65% 修仙暗黑字
+            nickname = surname + random.choice(DARK_CHARS)
+        existing = await session.execute(select(Player).where(Player.nickname == nickname))
+        if not existing.scalars().first():
+            return nickname
+    return nickname + str(random.randint(10, 99))  # 兜底：加后缀
 
 
 async def create_player(event: MessageEvent, nickname: str, gender: Gender) -> Message:
@@ -538,9 +494,7 @@ async def create_player(event: MessageEvent, nickname: str, gender: Gender) -> M
         session.add(new_player)
         await session.commit()
 
-        # 新手礼包：1张改名卡（此后改名卡仅通过赞助商店获取）
-        from ..models.inventory import ItemInstance
-        await ItemInstance.add_item(session, new_player.id, "rename_card", 1)
+        # 💡 改名卡由首次签到时赠送，见 entertainment/sign.py
 
         # 初始化新手任务
         from ..quest.novice_quest_service import NoviceQuestService
@@ -563,6 +517,7 @@ async def create_player(event: MessageEvent, nickname: str, gender: Gender) -> M
             f"3. 【签到】领每日奖励\r"
             f"4. 【面板】查看自己的状态\r"
             f"━━━━━━━━━━━━━\r"
+            f"💡 系统为你生成了道号，可签到后用改名卡修改\r"
             f"💡 新手任务已开启，跟着做就能快速变强！\r"
             f"💡 发送【新手指引】查看完整成长路线\r"
             f"💡 指令不要带【】括号，空格不能少"
