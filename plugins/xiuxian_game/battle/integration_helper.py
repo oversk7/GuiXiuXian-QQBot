@@ -29,27 +29,37 @@ def create_hp_bar(current_hp: int, max_hp: int, bar_length: int = 8, show_full: 
     Args:
         current_hp: 当前血量
         max_hp: 最大血量
-        bar_length: 血条长度（字符数，默认8，图片模式忽略）
+        bar_length: 血条长度（字符数，默认8）
         show_full: 是否显示完整信息（数值+百分比），False时只显示百分比
 
     Returns:
-        格式化的血条字符串（图片模式由battle_image.py解析为矩形血条）
-        show_full=True:  [HP:1234/5000]  1234/5000 (24.7%)
-        show_full=False: [HP:1234/5000]  (24.7%)
+        格式化的血条字符串
+        show_full=True: ❤️❤️❤️❤️🖤🖤🖤🖤 1234/5000 (24.7%)
+        show_full=False: ❤️❤️❤️❤️🖤🖤🖤🖤 (24.7%)
     """
     if max_hp <= 0:
         if show_full:
-            return "[HP:0/0]  0/0 (0.0%)"
+            return "🖤" * bar_length + " 0/0 (0.0%)"
         else:
-            return "[HP:0/0]  (0.0%)"
+            return "🖤" * bar_length + " (0.0%)"
 
+    # 计算血量百分比
     hp_percent = (current_hp / max_hp) * 100
-    tag = f"[HP:{current_hp}/{max_hp}]"
 
+    # 计算填充的心形数量
+    filled_hearts = int((current_hp / max_hp) * bar_length)
+    empty_hearts = bar_length - filled_hearts
+
+    # 构建血条
+    hp_bar = "❤️" * filled_hearts + "🖤" * empty_hearts
+
+    # 根据show_full决定显示格式
     if show_full:
-        return f"{tag}  {current_hp}/{max_hp} ({hp_percent:.1f}%)"
+        hp_text = f"{hp_bar} {current_hp}/{max_hp} ({hp_percent:.1f}%)"
     else:
-        return f"{tag}  ({hp_percent:.1f}%)"
+        hp_text = f"{hp_bar} ({hp_percent:.1f}%)"
+
+    return hp_text
 
 
 class BattleIntegrationHelper:
