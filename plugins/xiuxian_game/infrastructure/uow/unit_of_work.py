@@ -114,6 +114,9 @@ class UnitOfWork:
         # 下位世界系统仓储
         self._lower_world_strongholds = None
 
+        # 阴宅仓库系统仓储
+        self._mansion_warehouse_items = None
+
     @property
     def players(self):
         """玩家仓储"""
@@ -409,6 +412,14 @@ class UnitOfWork:
             from ..repositories.lower_world_repository import LowerWorldRepository
             self._lower_world_strongholds = LowerWorldRepository(self._session)
         return self._lower_world_strongholds
+
+    @property
+    def mansion_warehouse_items(self):
+        """阴宅仓库物品仓储"""
+        if self._mansion_warehouse_items is None:
+            from ..repositories.mansion_warehouse_item_repository import MansionWarehouseItemRepository
+            self._mansion_warehouse_items = MansionWarehouseItemRepository(self._session)
+        return self._mansion_warehouse_items
 
     @property
     def session(self) -> AsyncSession:

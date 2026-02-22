@@ -60,6 +60,8 @@ from .red_envelope import RedEnvelope, RedEnvelopeStatus
 from .spirit_field import SpiritField, SpiritFieldPlot, SpiritFieldStealLog
 # 下位世界·天灾山寨系统模型
 from .lower_world import LowerWorldStronghold
+# 阴宅仓库系统模型
+from .mansion_warehouse import MansionWarehouseItem
 
 
 __all__ = [
@@ -84,5 +86,6 @@ __all__ = [
     "RestaurantLog", "PlayerRecipe",
     "RedEnvelope", "RedEnvelopeStatus",
     "SpiritField", "SpiritFieldPlot", "SpiritFieldStealLog",
-    "LowerWorldStronghold"
+    "LowerWorldStronghold",
+    "MansionWarehouseItem"
 ]
