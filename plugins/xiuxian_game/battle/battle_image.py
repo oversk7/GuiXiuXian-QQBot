@@ -44,15 +44,27 @@ _SYMBOLS_FONT_CANDIDATES = [
 ]
 
 
+def _can_render_emoji(font_path: str) -> bool:
+    """验证字体能在Pillow中实际渲染出像素（彩色字体/COLRv1会输出空白）"""
+    try:
+        font = ImageFont.truetype(font_path, 20)
+        img = Image.new('L', (32, 32), 0)
+        draw = ImageDraw.Draw(img)
+        draw.text((2, 2), "⚡", font=font, fill=255)
+        return max(img.getdata()) > 30
+    except Exception:
+        return False
+
+
 def _find_emoji_font_info() -> Optional[Tuple[str, bool]]:
     """
     返回 (字体路径, is_full) 或 None。
     is_full=True : 全覆盖（NotoEmoji/Symbola），可渲染补充平面emoji
     is_full=False: 部分覆盖（NotoSansSymbols），仅BMP符号 U+2300-U+27BF
     """
-    # 1. 快速检查全覆盖候选
+    # 1. 快速检查全覆盖候选（需验证Pillow能实际渲染，COLRv1彩色字体会输出空白）
     for p in _EMOJI_FONT_CANDIDATES:
-        if os.path.exists(p):
+        if os.path.exists(p) and _can_render_emoji(p):
             return (p, True)
 
     # 2. fc-list 动态查找全覆盖字体（Linux/macOS）
@@ -65,17 +77,17 @@ def _find_emoji_font_info() -> Optional[Tuple[str, bool]]:
         lines = [l.strip() for l in result.stdout.splitlines()]
         for line in lines:
             lower = line.lower()
-            if 'notoemoji' in lower and 'color' not in lower and os.path.exists(line):
+            if 'notoemoji' in lower and 'color' not in lower and os.path.exists(line) and _can_render_emoji(line):
                 return (line, True)
         for line in lines:
-            if 'symbola' in line.lower() and os.path.exists(line):
+            if 'symbola' in line.lower() and os.path.exists(line) and _can_render_emoji(line):
                 return (line, True)
     except Exception:
         pass
 
     # 3. 部分覆盖：NotoSansSymbols（BMP符号兜底）
     for p in _SYMBOLS_FONT_CANDIDATES:
-        if os.path.exists(p):
+        if os.path.exists(p) and _can_render_emoji(p):
             return (p, False)
 
     return None
