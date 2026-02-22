@@ -1046,6 +1046,8 @@ class BattleIntegrationHelper:
                         battle_log.append(f"⚔️ {player1.nickname} 攻击 {player2.nickname}{effect_str}，造成{damage}伤害{_split}")
                         if blocked_damage > 0:
                             battle_log.append(f"  🛡️ {player2.nickname}防御吸收{blocked_damage}")
+                        for eff_msg in attack_result.get("messages", []):
+                            battle_log.append(f"  └ {eff_msg}")
 
                         # 检查击杀并触发击杀效果
                         if player2_hp <= 0:
@@ -1100,6 +1102,8 @@ class BattleIntegrationHelper:
                         battle_log.append(f"⚔️ {player2.nickname} 攻击 {player1.nickname}{effect_str}，造成{damage}伤害{_split}")
                         if blocked_damage > 0:
                             battle_log.append(f"  🛡️ {player1.nickname}防御吸收{blocked_damage}")
+                        for eff_msg in attack_result.get("messages", []):
+                            battle_log.append(f"  └ {eff_msg}")
 
                         # 检查击杀并触发击杀效果
                         if player1_hp <= 0:
@@ -1155,6 +1159,8 @@ class BattleIntegrationHelper:
                         battle_log.append(f"⚔️ {player2.nickname} 攻击 {player1.nickname}{effect_str}，造成{damage}伤害{_split}")
                         if blocked_damage > 0:
                             battle_log.append(f"  🛡️ {player1.nickname}防御吸收{blocked_damage}")
+                        for eff_msg in attack_result.get("messages", []):
+                            battle_log.append(f"  └ {eff_msg}")
 
                         # 检查击杀并触发击杀效果
                         if player1_hp <= 0:
@@ -1210,6 +1216,8 @@ class BattleIntegrationHelper:
                         battle_log.append(f"⚔️ {player1.nickname} 攻击 {player2.nickname}{effect_str}，造成{damage}伤害{_split}")
                         if blocked_damage > 0:
                             battle_log.append(f"  🛡️ {player2.nickname}防御吸收{blocked_damage}")
+                        for eff_msg in attack_result.get("messages", []):
+                            battle_log.append(f"  └ {eff_msg}")
 
                         # 检查击杀并触发击杀效果
                         if player2_hp <= 0:
