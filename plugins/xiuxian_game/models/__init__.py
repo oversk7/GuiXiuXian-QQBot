@@ -62,6 +62,8 @@ from .spirit_field import SpiritField, SpiritFieldPlot, SpiritFieldStealLog
 from .lower_world import LowerWorldStronghold
 # 阴宅仓库系统模型
 from .mansion_warehouse import MansionWarehouseItem
+# 赞助商店日志模型
+from .sponsor_shop_log import SponsorShopLog
 
 
 __all__ = [
@@ -87,5 +89,6 @@ __all__ = [
     "RedEnvelope", "RedEnvelopeStatus",
     "SpiritField", "SpiritFieldPlot", "SpiritFieldStealLog",
     "LowerWorldStronghold",
-    "MansionWarehouseItem"
+    "MansionWarehouseItem",
+    "SponsorShopLog",
 ]

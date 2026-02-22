@@ -16,6 +16,7 @@
 from nonebot import on_command
 from nonebot.adapters.qq import MessageEvent, Message
 from nonebot.params import CommandArg
+from sqlalchemy import select
 
 from ..models.db import safe_session
 from ..platform_utils import get_unified_player, is_guild_message
@@ -34,6 +35,8 @@ buy_crying_tomb_hat_cmd = on_command("购买哭坟帽", priority=5, block=True)
 expand_inventory_cmd = on_command("背包扩容", aliases={"扩容背包"}, priority=5, block=True)
 buy_basic_monthly_card_cmd = on_command("购买初级月卡", aliases={"兑换初级月卡"}, priority=5, block=True)
 buy_premium_monthly_card_cmd = on_command("购买高级月卡", aliases={"兑换高级月卡"}, priority=5, block=True)
+my_sponsor_log_cmd = on_command("我的赞助记录", aliases={"赞助记录"}, priority=5, block=True)
+admin_sponsor_log_cmd = on_command("查赞助记录", priority=2, block=True)
 
 
 # ==================== 工具函数 ====================
@@ -118,7 +121,7 @@ async def handle_buy_title(event: MessageEvent, args: Message = CommandArg()):
 
     async with safe_session() as session:
         player = await _get_player_or_finish(session, event, buy_title_cmd)
-        success, msg = SponsorShopService.buy_custom_title(player, title_text)
+        success, msg = await SponsorShopService.buy_custom_title(player, title_text, session)
 
     await buy_title_cmd.finish(message_add_head(msg, event))
 
@@ -169,7 +172,7 @@ async def handle_expand_inventory(event: MessageEvent, args: Message = CommandAr
 
     async with safe_session() as session:
         player = await _get_player_or_finish(session, event, expand_inventory_cmd)
-        success, msg = SponsorShopService.expand_inventory(player, slots)
+        success, msg = await SponsorShopService.expand_inventory(player, slots, session)
 
     await expand_inventory_cmd.finish(message_add_head(msg, event))
 
@@ -196,3 +199,100 @@ async def handle_buy_premium_monthly_card(event: MessageEvent):
         success, msg = await SponsorShopService.buy_monthly_card(player, "premium", session)
 
     await buy_premium_monthly_card_cmd.finish(message_add_head(msg, event))
+
+
+# ==================== 玩家自查兑换记录 ====================
+
+@my_sponsor_log_cmd.handle()
+async def handle_my_sponsor_log(event: MessageEvent, args: Message = CommandArg()):
+    """查看自己的近期兑换记录（默认最近10条）"""
+    from ..models.sponsor_shop_log import SponsorShopLog
+    from ..models.player import Player
+
+    arg_text = args.extract_plain_text().strip()
+    limit = 10
+    if arg_text.isdigit():
+        limit = min(int(arg_text), 30)  # 最多30条
+
+    async with safe_session() as session:
+        player = await _get_player_or_finish(session, event, my_sponsor_log_cmd)
+        logs = (
+            await session.execute(
+                select(SponsorShopLog)
+                .where(SponsorShopLog.player_id == player.id)
+                .order_by(SponsorShopLog.created_at.desc())
+                .limit(limit)
+            )
+        ).scalars().all()
+
+    if not logs:
+        await my_sponsor_log_cmd.finish(message_add_head("📋 暂无兑换记录", event))
+
+    lines = [
+        "🕯️ 我的赞助兑换记录",
+        "━━━━━━━━━━━━━",
+    ]
+    for log in logs:
+        lines.append(
+            f"[{log.created_at.strftime('%m-%d %H:%M')}] {log.action}"
+            + (f"({log.detail})" if log.detail else "")
+            + f" -{log.cost}诡烛 余额:{log.balance_after}"
+        )
+    lines.append("━━━━━━━━━━━━━")
+
+    await my_sponsor_log_cmd.finish(message_add_head("\n".join(lines), event))
+
+
+# ==================== 管理员查任意玩家记录 ====================
+
+@admin_sponsor_log_cmd.handle()
+async def handle_admin_sponsor_log(event: MessageEvent, args: Message = CommandArg()):
+    """管理员查询玩家兑换记录：【查赞助记录 UID [条数]】"""
+    from ..ai_guide import is_admin
+    from ..models.sponsor_shop_log import SponsorShopLog
+    from ..models.player import Player
+
+    if not is_admin(event.get_user_id()):
+        await admin_sponsor_log_cmd.finish("⛔ 权限不足，仅管理员可用")
+
+    parts = args.extract_plain_text().strip().split()
+    if not parts or not parts[0].isdigit():
+        await admin_sponsor_log_cmd.finish("用法：【查赞助记录 UID】或【查赞助记录 UID 条数】")
+
+    target_uid = int(parts[0])
+    limit = int(parts[1]) if len(parts) > 1 and parts[1].isdigit() else 20
+    limit = min(limit, 100)
+
+    async with safe_session() as session:
+        target = (
+            await session.execute(select(Player).where(Player.uid == target_uid))
+        ).scalars().first()
+        if not target:
+            await admin_sponsor_log_cmd.finish(f"⛔ 未找到 UID={target_uid} 的玩家")
+
+        logs = (
+            await session.execute(
+                select(SponsorShopLog)
+                .where(SponsorShopLog.player_id == target.id)
+                .order_by(SponsorShopLog.created_at.desc())
+                .limit(limit)
+            )
+        ).scalars().all()
+
+    if not logs:
+        await admin_sponsor_log_cmd.finish(f"📋 玩家 {target.nickname}[{target_uid}] 暂无兑换记录")
+
+    lines = [
+        f"🕯️ {target.nickname}[UID:{target_uid}] 兑换记录",
+        "━━━━━━━━━━━━━",
+    ]
+    for log in logs:
+        lines.append(
+            f"[{log.created_at.strftime('%Y-%m-%d %H:%M')}] {log.action}"
+            + (f"({log.detail})" if log.detail else "")
+            + f" -{log.cost}诡烛 余:{log.balance_after}"
+        )
+    lines.append("━━━━━━━━━━━━━")
+    lines.append(f"共 {len(logs)} 条，总消耗 {sum(l.cost for l in logs)} 诡烛")
+
+    await admin_sponsor_log_cmd.finish(message_add_head("\n".join(lines), event))

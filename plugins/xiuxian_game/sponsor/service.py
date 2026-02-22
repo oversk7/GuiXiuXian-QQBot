@@ -104,9 +104,9 @@ class SponsorShopService:
         return True, ""
 
     @classmethod
-    def buy_custom_title(cls, player: Player, title_text: str) -> Tuple[bool, str]:
+    async def buy_custom_title(cls, player: Player, title_text: str, session: AsyncSession) -> Tuple[bool, str]:
         """
-        购买自定义称号（纯内存操作，由调用方提交事务）
+        购买自定义称号（500诡烛）
 
         Returns:
             (成功, 结果消息)
@@ -128,6 +128,7 @@ class SponsorShopService:
                 f"当前: {player.gui_zhu} 诡烛"
             )
 
+        balance_before = player.gui_zhu
         player.gui_zhu -= CUSTOM_TITLE_PRICE
         sdata = cls._get_sponsor_data(player)
         owned_list = sdata.get(_OWNED_TITLES_KEY, [])
@@ -135,6 +136,9 @@ class SponsorShopService:
         sdata[_OWNED_TITLES_KEY] = owned_list
         sdata[_CUSTOM_TITLE_KEY] = title_text
         cls._set_sponsor_data(player, sdata)
+
+        from ..models.sponsor_shop_log import SponsorShopLog
+        await SponsorShopLog.add_log(session, player, "自定义称号", title_text, CUSTOM_TITLE_PRICE, balance_before)
 
         return True, (
             f"✅ 购买成功！获得自定义称号「{title_text}」\n"
@@ -192,7 +196,12 @@ class SponsorShopService:
         if not success:
             return False, "⛔ 背包已满，无法添加改名卡"
 
+        balance_before = player.gui_zhu
         player.gui_zhu -= RENAME_CARD_PRICE
+
+        from ..models.sponsor_shop_log import SponsorShopLog
+        await SponsorShopLog.add_log(session, player, "改名卡", "×1", RENAME_CARD_PRICE, balance_before)
+
         return True, (
             f"✅ 购买成功！获得改名卡 ×1\n"
             f"💡 使用【改名 新名字】修改角色昵称\n"
@@ -258,7 +267,11 @@ class SponsorShopService:
         old_name = guild.name
         guild.name = new_name
         session.add(guild)
+        balance_before = player.gui_zhu
         player.gui_zhu -= GUILD_RENAME_PRICE
+
+        from ..models.sponsor_shop_log import SponsorShopLog
+        await SponsorShopLog.add_log(session, player, "公会改名", f"{old_name}→{new_name}", GUILD_RENAME_PRICE, balance_before)
 
         return True, (
             f"✅ 公会改名成功！\n"
@@ -289,7 +302,12 @@ class SponsorShopService:
         except ValueError:
             return False, "⛔ 背包已满，无法添加棺材钉"
 
+        balance_before = player.gui_zhu
         player.gui_zhu -= COFFIN_NAIL_PRICE
+
+        from ..models.sponsor_shop_log import SponsorShopLog
+        await SponsorShopLog.add_log(session, player, "棺材钉", "×1", COFFIN_NAIL_PRICE, balance_before)
+
         return True, (
             f"✅ 购买成功！获得棺材钉 ×1\n"
             f"💡 持有棺材钉可提升闭关效率（最多100根，+50%）\n"
@@ -319,7 +337,12 @@ class SponsorShopService:
         except ValueError:
             return False, "⛔ 背包已满，无法添加哭坟帽"
 
+        balance_before = player.gui_zhu
         player.gui_zhu -= CRYING_TOMB_HAT_PRICE
+
+        from ..models.sponsor_shop_log import SponsorShopLog
+        await SponsorShopLog.add_log(session, player, "哭坟帽", "×1", CRYING_TOMB_HAT_PRICE, balance_before)
+
         return True, (
             f"✅ 购买成功！获得哭坟帽 ×1\n"
             f"💡 使用后直接获得1万怨念值\n"
@@ -329,9 +352,9 @@ class SponsorShopService:
     # ==================== 背包扩容 ====================
 
     @classmethod
-    def expand_inventory(cls, player: Player, slots: int = 1) -> Tuple[bool, str]:
+    async def expand_inventory(cls, player: Player, slots: int, session: AsyncSession) -> Tuple[bool, str]:
         """
-        背包永久扩容（10诡烛/格，纯内存操作，由调用方提交事务）
+        背包永久扩容（10诡烛/格）
 
         Returns:
             (成功, 结果消息)
@@ -355,8 +378,12 @@ class SponsorShopService:
             )
 
         new_capacity = old_capacity + actual_slots
+        balance_before = player.gui_zhu
         player.inventory_capacity = new_capacity
         player.gui_zhu -= total_cost
+
+        from ..models.sponsor_shop_log import SponsorShopLog
+        await SponsorShopLog.add_log(session, player, "背包扩容", f"+{actual_slots}格({old_capacity}→{new_capacity})", total_cost, balance_before)
 
         msg = (
             f"✅ 背包扩容成功！永久增加 {actual_slots} 格\n"
@@ -398,10 +425,14 @@ class SponsorShopService:
             )
 
         card = await MonthlyCard.add_monthly_card(session, player.id, ct, months=1)
+        balance_before = player.gui_zhu
         player.gui_zhu -= price
 
         card_config = get_card_benefits_config()
         card_name = card_config[ct]["name"]
+
+        from ..models.sponsor_shop_log import SponsorShopLog
+        await SponsorShopLog.add_log(session, player, card_name, f"至{card.end_time.strftime('%Y-%m-%d')}", price, balance_before)
 
         return True, (
             f"✅ 购买成功！获得{card_name} ×1个月\n"
