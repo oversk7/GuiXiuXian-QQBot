@@ -4,8 +4,8 @@
 提供扫荡诡域的核心业务逻辑：
 1. 诡域配置解析（支持层级诡域和命名诡域）
 2. 资源消耗计算（理智、血量、装备耐久度限制）
-3. 格子分配（材料、宝藏、怪物、休息）
-4. 奖励计算（经验、材料、金币）
+3. 格子分配（材料、怪物、休息）——不含宝箱和商人格子，鼓励手动探索
+4. 奖励计算（经验、材料）
 5. 幸运值影响
 6. 装备耐久度扣除和自动卸下
 7. Feature Flag集成（USE_NEW_EQUIPMENT_SERVICE）
@@ -110,9 +110,9 @@ class SweepDungeonService:
         avg_level = (level_range[0] + level_range[1]) // 2
         mp_cost_per_tile = region_config.get("mp_cost", 1)  # 每格理智消耗
 
-        # 计算怪物格子比例 (x)
-        tile_weights = [15, 5, 75, 5]  # 材料、宝藏、怪物、休息
-        monster_ratio = tile_weights[2] / 100  # 怪物格子比例 x = 0.75
+        # 计算怪物格子比例 (x)（扫荡令不含宝箱格子和商人格子）
+        tile_weights = [20, 75, 5]  # 材料、怪物、休息
+        monster_ratio = tile_weights[1] / 100  # 怪物格子比例 x = 0.75
 
         # 计算怪物平均伤害
         monster_attrs = calculate_monster_attributes(avg_level, is_elite=False)
@@ -160,15 +160,14 @@ class SweepDungeonService:
         results.append(f"🗺️ 探索格子共计: {total_tiles}个")
         results.append(f"📊 限制因素: 理智({mp_limit}) 耐久({durability_limit if durability_limit != float('inf') else '∞'}) (生命限制已取消)")
 
-        # 按世界地图格子概率分配格子类型
-        tile_weights = [15, 5, 75, 5]  # 材料、宝藏、怪物(避开)、休息
-        tile_types = ["MATERIAL", "TREASURE", "EMPTY", "REST"]
+        # 按世界地图格子概率分配格子类型（扫荡令不含宝箱格子和商人格子，鼓励玩家手动探索）
+        tile_weights = [20, 75, 5]  # 材料、怪物、休息
+        tile_types = ["MATERIAL", "EMPTY", "REST"]
 
         # 分配各类型格子数量
         material_tiles = tile_weights[0] * total_tiles // 100
-        treasure_tiles = tile_weights[1] * total_tiles // 100
-        monster_tiles = tile_weights[2] * total_tiles // 100
-        rest_tiles = tile_weights[3] * total_tiles // 100
+        monster_tiles = tile_weights[1] * total_tiles // 100
+        rest_tiles = tile_weights[2] * total_tiles // 100
 
         # 探索经验
         exploration_exp = monster_tiles * random.randint(1, 4) * avg_level
@@ -190,16 +189,6 @@ class SweepDungeonService:
             materials_gained = await self._calculate_material_rewards(
                 player, material_tiles
             )
-
-        # 计算金币奖励（来自宝藏格子）
-        total_gold = 0
-        if treasure_tiles > 0:
-            total_gold = self._calculate_treasure_rewards(player, treasure_tiles)
-            player.gold += total_gold
-            # 更新财富成就统计
-            from ..achievement.achievement_service import AchievementService
-            await AchievementService.update_stat(self._player_repo._session, player.id, "gold_earned_total", increment=total_gold, auto_commit=False)
-            results.append(f"💰 发现宝藏获得金币: {total_gold} (宝藏格子×{treasure_tiles})")
 
         # 处理材料奖励 - 合并相同材料
         if materials_gained:
@@ -245,7 +234,6 @@ class SweepDungeonService:
             message="\n".join(results),
             attribute_changes={
                 "exp": exploration_exp,
-                "gold": total_gold,
                 "stamina": -quantity,
                 "mp": -mp_consumed,
                 "hp": -hp_consumed
@@ -400,32 +388,6 @@ class SweepDungeonService:
                     materials_gained.append((material_id, base_quantity))
 
         return materials_gained
-
-    def _calculate_treasure_rewards(
-        self,
-        player: Player,
-        treasure_tiles: int
-    ) -> int:
-        """
-        计算金币奖励（来自宝藏格子）
-
-        Args:
-            player: 玩家对象
-            treasure_tiles: 宝藏格子数
-
-        Returns:
-            总金币数量
-        """
-        total_gold = 0
-        for _ in range(treasure_tiles):
-            # 单个宝藏格子金币
-            base_gold = random.randint(50, 200)
-            # 幸运加成
-            if random.random() < luck_prob(player.luck):
-                base_gold = int(base_gold * 1.3)  # 幸运1.3倍
-            total_gold += base_gold
-
-        return total_gold
 
     async def _process_material_rewards(
         self,

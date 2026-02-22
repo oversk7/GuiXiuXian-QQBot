@@ -241,7 +241,7 @@ def calculate_monster_attributes(monster_level: int, is_elite: bool = False) -> 
     return result
 
 def generate_merchant_goods(region: str, tier: int, rng) -> list:
-    """生成商人商品列表 - 专门出售高价值材料"""
+    """生成商人商品列表 - 专门出售高价值材料和低级宝石"""
     goods = []
     region_materials = get_region_materials(region)
 
@@ -280,6 +280,24 @@ def generate_merchant_goods(region: str, tier: int, rng) -> list:
                     "quantity": quantity,
                     "price": price
                 })
+
+    # 50%概率追加1-2个低级宝石，价格为原价3-5倍（稀缺高价）
+    if rng.random() < 0.5:
+        gem_ids = [item_id for item_id in config.items_config["by_type"].get("GEM", [])
+                   if config.items_config["by_id"].get(item_id) and
+                   config.items_config["by_id"][item_id].rarity == "white"]
+        if gem_ids:
+            gem_count = rng.randint(1, 2)
+            for _ in range(gem_count):
+                gem_id = rng.choice(gem_ids)
+                gem_cfg = config.items_config["by_id"].get(gem_id)
+                if gem_cfg and gem_cfg.price > 0:
+                    gem_price = int(gem_cfg.price * rng.uniform(3.0, 5.0))
+                    goods.append({
+                        "item_id": gem_id,
+                        "quantity": 1,
+                        "price": gem_price
+                    })
 
     return goods
 
@@ -770,7 +788,7 @@ async def _handle_treasure(session, tile: WorldTile, player: Player) -> str:
     import time
     treasure_timestamp = int(time.time() * 1000)
     rng = random.Random(hash(f"{tile.seed}:{player.id}:{treasure_timestamp}"))
-    base_gold = rng.randint(100, 1000)
+    base_gold = rng.randint(2000, 8000)
     from ..utils import luck_prob
     multiplier = 1 + luck_prob(player.luck)  # 1~2 倍区间
     gold_gain = int(base_gold * multiplier)
@@ -784,6 +802,18 @@ async def _handle_treasure(session, tile: WorldTile, player: Player) -> str:
     msg = f"🔑 你在龟裂神像内抠出 {base_gold}💰！"
     if multiplier > 1.01:
         msg += f"\n🍀幸运改写中...金币变为{gold_gain}！"
+    # 极低概率掉落稀有诡兽（0.5%，鼓励手动探索）
+    if rng.random() < 0.005:
+        beast_id = rng.choice(["guardian_void_serpent", "guardian_nightmare_wolf"])
+        try:
+            await ItemInstance.add_item(session, player.id, beast_id, 1)
+            beast_cfg = config.items_config["by_id"].get(beast_id)
+            if beast_cfg:
+                msg += f"\n\n🎊 奇迹降临！宝箱深处竟藏着一只【{beast_cfg.name}】！"
+                msg += f"\n✨ {beast_cfg.description}"
+                msg += f"\n⚠️ 此诡兽极为罕见，请妥善保管！"
+        except ValueError:
+            pass
     return msg
 
 

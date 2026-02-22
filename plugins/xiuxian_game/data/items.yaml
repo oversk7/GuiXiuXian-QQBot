@@ -3687,10 +3687,10 @@ items:
       type: "GUARDIAN_BEAST"
       rarity: "purple"
       price: 0
-      description: "噩梦中的凶狼，拦截率75%"
+      description: "噩梦中的凶狼，拦截率75%。极为罕见，只能从诡域宝箱中获得。"
     - item_id: "guardian_void_serpent"
       name: "虚空蛇"
       type: "GUARDIAN_BEAST"
       rarity: "orange"
       price: 0
-      description: "虚空巨蛇，拦截率85%"
+      description: "虚空巨蛇，拦截率85%。极为罕见，只能从诡域宝箱中获得。"

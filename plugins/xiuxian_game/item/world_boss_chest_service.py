@@ -36,7 +36,6 @@ class WorldBossChestService:
                 ("counter_jade_4", 1, 0.1),
                 ("critical_power_agate_4", 1, 0.1),
                 ("penetration_crystal_4", 1, 0.1),
-                ("spirit_burst_amethyst_4", 1, 0.1),
                 ("anti_crit_rune_4", 1, 0.1),
             ],
             "materials": [
@@ -53,7 +52,6 @@ class WorldBossChestService:
                 ("counter_jade_3", 1, 0.1),
                 ("critical_power_agate_3", 1, 0.1),
                 ("penetration_crystal_3", 1, 0.1),
-                ("spirit_burst_amethyst_3", 1, 0.1),
                 ("anti_crit_rune_3", 1, 0.1),
             ],
             "materials": [
@@ -70,7 +68,6 @@ class WorldBossChestService:
                 ("counter_jade_2", 1, 0.1),
                 ("critical_power_agate_2", 1, 0.1),
                 ("penetration_crystal_2", 1, 0.1),
-                ("spirit_burst_amethyst_2", 1, 0.1),
                 ("anti_crit_rune_2", 1, 0.1),
             ],
             "materials": [
