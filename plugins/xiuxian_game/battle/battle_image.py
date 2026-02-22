@@ -22,8 +22,7 @@ FONT_PATHS = [
     'C:/Windows/Fonts/simsun.ttc',
 ]
 
-# ── Emoji字体优先级（单色TrueType，PIL可直接渲染）─────────────
-# 硬编码候选路径（快速检查）
+# ── 全覆盖Emoji字体（含补充平面U+1F000+）优先级 ─────────────
 _EMOJI_FONT_CANDIDATES = [
     '/usr/share/fonts/truetype/noto/NotoEmoji-Regular.ttf',
     '/usr/share/fonts/truetype/noto/NotoEmoji-Bold.ttf',
@@ -34,45 +33,62 @@ _EMOJI_FONT_CANDIDATES = [
     'C:/Windows/Fonts/seguisym.ttf',
 ]
 
+# ── 部分覆盖符号字体（仅BMP U+2300-U+27BF，如⚡⚔⚰✨⏰）────
+_SYMBOLS_FONT_CANDIDATES = [
+    '/usr/share/fonts/truetype/noto/NotoSansSymbols-Medium.ttf',
+    '/usr/share/fonts/truetype/noto/NotoSansSymbols-Regular.ttf',
+    '/usr/share/fonts/truetype/noto/NotoSansSymbols2-Regular.ttf',
+    '/usr/share/fonts/truetype/noto/NotoSansSymbols-Black.ttf',
+    '/usr/share/fonts/truetype/noto/NotoSansSymbols-Bold.ttf',
+    'C:/Windows/Fonts/seguisym.ttf',
+]
 
-def _find_emoji_font_path() -> Optional[str]:
+
+def _find_emoji_font_info() -> Optional[Tuple[str, bool]]:
     """
-    先检查硬编码候选路径，找不到则调用 fc-list 动态查找。
-    返回可用的 emoji 字体路径，或 None。
+    返回 (字体路径, is_full) 或 None。
+    is_full=True : 全覆盖（NotoEmoji/Symbola），可渲染补充平面emoji
+    is_full=False: 部分覆盖（NotoSansSymbols），仅BMP符号 U+2300-U+27BF
     """
-    # 1. 快速检查硬编码路径
+    # 1. 快速检查全覆盖候选
     for p in _EMOJI_FONT_CANDIDATES:
         if os.path.exists(p):
-            return p
+            return (p, True)
 
-    # 2. 通过 fc-list 动态查找（仅在 Linux/macOS 上有效）
+    # 2. fc-list 动态查找全覆盖字体（Linux/macOS）
     try:
         import subprocess
         result = subprocess.run(
             ['fc-list', '--format=%{file}\n'],
             capture_output=True, text=True, timeout=5
         )
-        for line in result.stdout.splitlines():
-            line = line.strip()
-            # 优先 NotoEmoji，其次 Symbola，排除彩色字体（PIL不支持）
+        lines = [l.strip() for l in result.stdout.splitlines()]
+        for line in lines:
             lower = line.lower()
             if 'notoemoji' in lower and 'color' not in lower and os.path.exists(line):
-                return line
-        # 次选：Symbola
-        for line in result.stdout.splitlines():
-            line = line.strip()
+                return (line, True)
+        for line in lines:
             if 'symbola' in line.lower() and os.path.exists(line):
-                return line
+                return (line, True)
     except Exception:
         pass
+
+    # 3. 部分覆盖：NotoSansSymbols（BMP符号兜底）
+    for p in _SYMBOLS_FONT_CANDIDATES:
+        if os.path.exists(p):
+            return (p, False)
 
     return None
 
 
 # 启动时查找一次，缓存结果
-_EMOJI_FONT_PATH: Optional[str] = _find_emoji_font_path()
-if _EMOJI_FONT_PATH:
-    print(f"[battle_image] 找到emoji字体: {_EMOJI_FONT_PATH}")
+_emoji_info = _find_emoji_font_info()
+_EMOJI_FONT_PATH: Optional[str] = _emoji_info[0] if _emoji_info else None
+_EMOJI_FONT_FULL: bool          = _emoji_info[1] if _emoji_info else False
+
+if _emoji_info:
+    _coverage = "全覆盖" if _emoji_info[1] else "BMP符号"
+    print(f"[battle_image] 找到emoji字体({_coverage}): {_emoji_info[0]}")
 else:
     print("[battle_image] 未找到emoji字体，将使用文字标签替代")
 
@@ -85,6 +101,15 @@ EMOJI_FALLBACK_MAP = {
     "💀": "[败]", "❤️": "[心]", "🌟": "[星]",
     # ━ 换为普通横线（任何字体均支持）
     "━": "─",
+}
+
+# ── 补充平面emoji → 标签（仅部分覆盖模式使用）────────────────
+# NotoSansSymbols 能渲染 BMP 符号（⚡⚔⚰✨⏰等），但无法渲染以下 U+1F000+ 字符
+SUPPLEMENTARY_EMOJI_FALLBACK = {
+    "💥": "[暴]", "🔄": "[连]", "🗡️": "[穿]", "🛡️": "[防]",
+    "💚": "[回]", "🧡": "[吸]", "🎯": "[龙]", "🪞": "[镜]",
+    "🔥": "[火]", "🆚": "VS",  "🎉": "[胜]", "💀": "[败]",
+    "❤️": "[心]", "🌟": "[星]",
 }
 
 # ── 行类型颜色配置 ────────────────────────────────────────────
@@ -131,6 +156,20 @@ def _replace_emoji_fallback(text: str) -> str:
         if 0xFE00 <= cp <= 0xFE0F: continue  # 变体选择符
         if 0x2600 <= cp <= 0x26FF: continue  # Misc Symbols（已被fallback map处理）
         if 0x2700 <= cp <= 0x27BF: continue  # Dingbats
+        if cp in (0x200B, 0x200C, 0x200D, 0xFEFF): continue
+        safe.append(ch)
+    return ''.join(safe)
+
+
+def _replace_supplementary_emoji(text: str) -> str:
+    """部分覆盖模式（NotoSansSymbols）：仅替换补充平面emoji，BMP符号保留由字体渲染"""
+    for emoji, repl in SUPPLEMENTARY_EMOJI_FALLBACK.items():
+        text = text.replace(emoji, repl)
+    # 过滤剩余non-BMP字符（已被SUPPLEMENTARY_EMOJI_FALLBACK处理之外的）
+    safe = []
+    for ch in text:
+        cp = ord(ch)
+        if cp > 0xFFFF:  continue  # 非BMP残余
         if cp in (0x200B, 0x200C, 0x200D, 0xFEFF): continue
         safe.append(ch)
     return ''.join(safe)
@@ -247,6 +286,7 @@ class BattleImageGenerator:
         self.emoji_sub   = _load_emoji_font(15)
         self.emoji_small = _load_emoji_font(14)
         self.has_emoji   = self.emoji_body is not None
+        self.emoji_is_full = _EMOJI_FONT_FULL  # True=全覆盖, False=仅BMP符号
 
     def _main_font(self, size: int) -> ImageFont.FreeTypeFont:
         if size >= 20: return self.font_title
@@ -278,10 +318,16 @@ class BattleImageGenerator:
             draw.text((x, y), text, font=font, fill=fill)
 
     def _prepare_line(self, raw: str) -> str:
-        """根据是否有emoji字体决定文字处理方式"""
+        """根据字体覆盖等级决定文字处理方式"""
         if self.has_emoji:
-            return _strip_variation_selectors(_normalize_line(raw))
+            if self.emoji_is_full:
+                # 全覆盖（NotoEmoji/Symbola）：保留所有emoji，仅标准化
+                return _strip_variation_selectors(_normalize_line(raw))
+            else:
+                # 部分覆盖（NotoSansSymbols）：替换补充平面emoji，BMP符号保留给字体渲染
+                return _strip_variation_selectors(_replace_supplementary_emoji(_normalize_line(raw)))
         else:
+            # 无emoji字体：全部替换为文字标签
             return _replace_emoji_fallback(raw)
 
     def _truncate(self, text: str, max_chars: int) -> str:
