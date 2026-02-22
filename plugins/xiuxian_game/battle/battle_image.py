@@ -8,6 +8,7 @@ from typing import List, Optional, Tuple
 from PIL import Image, ImageDraw, ImageFont
 import io
 import os
+import re
 
 
 # ── 主字体（CJK中文）优先级 ──────────────────────────────────
@@ -192,10 +193,26 @@ def _normalize_line(text: str) -> str:
     return text.replace("━", "─")
 
 
+# ── HP血条标记解析 ────────────────────────────────────────────
+_HP_BAR_RE = re.compile(r'^\s*\[HP:(\d+)/(\d+)\]')
+
+
+def _parse_hp_bar(text: str) -> Optional[Tuple[int, int]]:
+    """若是HP血条行，返回 (current_hp, max_hp)，否则返回 None"""
+    m = _HP_BAR_RE.match(text)
+    if m:
+        return int(m.group(1)), int(m.group(2))
+    return None
+
+
 def _classify_line_color(line: str) -> Tuple[Tuple[int, int, int], int, int]:
     """返回 (颜色, 字号, 行高)"""
     if line.startswith("  └"):
         return COLOR_EFFECT_SUB, 15, 22
+
+    # HP血条行：行高需容纳矩形条
+    if _HP_BAR_RE.match(line):
+        return COLOR_HEAL, 14, 26
 
     # 回合标题：含"第N回合"且含横线
     if "回合" in line and ("━" in line or "─" in line):
@@ -418,13 +435,20 @@ class BattleImageGenerator:
         y += LOG_TOP
         for text, color, fsize, lh in line_specs:
             font = self._main_font(fsize)
-            if color == COLOR_ROUND_TITLE:
-                draw.rectangle(
-                    [(self.PADDING, y), (self.WIDTH - self.PADDING, y + lh)],
-                    fill=(30, 35, 55),
-                )
-            x_off = self.PADDING + 12 if text.startswith("  ") else self.PADDING
-            self._render(draw, (x_off, y + 2), text, font, color, fsize)
+            hp_info = _parse_hp_bar(text)
+            if hp_info:
+                # HP血条行：用矩形绘制，无字体依赖
+                indent = self.PADDING + 24
+                bar_h = lh - 10
+                self._draw_mini_hp_bar(draw, indent, y + 5, hp_info[0], hp_info[1], bar_h)
+            else:
+                if color == COLOR_ROUND_TITLE:
+                    draw.rectangle(
+                        [(self.PADDING, y), (self.WIDTH - self.PADDING, y + lh)],
+                        fill=(30, 35, 55),
+                    )
+                x_off = self.PADDING + 12 if text.startswith("  ") else self.PADDING
+                self._render(draw, (x_off, y + 2), text, font, color, fsize)
             y += lh
 
         y += LOG_BOT
@@ -484,6 +508,32 @@ class BattleImageGenerator:
         hp_text = f"{current_hp}/{max_hp}  {hp_pct:.0f}%"
         draw.text((x + bar_w + 8, bar_y), hp_text,
                   fill=(180, 190, 210), font=self.font_small)
+
+    def _draw_mini_hp_bar(
+        self,
+        draw: ImageDraw.ImageDraw,
+        x: int,
+        y: int,
+        current_hp: int,
+        max_hp: int,
+        bar_h: int = 10,
+    ):
+        """在日志行内绘制迷你矩形血条（无需字体，100%可靠）"""
+        bar_w = self.WIDTH - x - self.PADDING - 120
+        filled = int(bar_w * current_hp / max_hp) if max_hp > 0 else 0
+        filled = max(0, min(filled, bar_w))
+        bar_color = self.HP_FULL if current_hp > 0 else self.HP_DEAD
+
+        draw.rectangle([(x, y), (x + bar_w, y + bar_h)],
+                       fill=self.HP_EMPTY, outline=(60, 65, 80))
+        if filled > 0:
+            draw.rectangle([(x, y), (x + filled, y + bar_h)],
+                           fill=bar_color)
+
+        hp_pct  = (current_hp / max_hp * 100) if max_hp > 0 else 0
+        hp_text = f"{current_hp}/{max_hp} ({hp_pct:.0f}%)"
+        draw.text((x + bar_w + 6, y - 1), hp_text,
+                  fill=(160, 175, 200), font=self.font_small)
 
 
 # ── 单例接口（保持不变）─────────────────────────────────────

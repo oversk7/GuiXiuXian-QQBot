@@ -221,6 +221,9 @@ async def handle_toggle_mansion_payment(event: MessageEvent):
 @migrate_mansion_cmd.handle()
 async def handle_migrate_mansion(event: MessageEvent, args: Message = CommandArg()):
     """迁移阴宅"""
+    from ..infrastructure.repositories.player_repository import PlayerRepository
+    from .mansion_service_new import MansionService
+
     user_id = event.get_user_id()
 
     # 解析参数
@@ -246,10 +249,7 @@ async def handle_migrate_mansion(event: MessageEvent, args: Message = CommandArg
             target_x, target_y = player.get_current_coordinates()
 
             # 检查是否可以迁移
-            from ..infrastructure.repositories.player_repository import PlayerRepository
-            from .mansion_service_new import MansionService as MansionServiceNew
-
-            service = MansionServiceNew(
+            service = MansionService(
                 player_repo=PlayerRepository(session),
             )
             can_migrate, error_msg = await service.can_migrate_mansion(player, target_x, target_y)
@@ -282,10 +282,7 @@ async def handle_migrate_mansion(event: MessageEvent, args: Message = CommandArg
             target_x, target_y = player.get_current_coordinates()
 
             # 执行迁移
-            from ..infrastructure.repositories.player_repository import PlayerRepository
-            from .mansion_service_new import MansionService as MansionServiceNew
-
-            service = MansionServiceNew(
+            service = MansionService(
                 player_repo=PlayerRepository(session),
             )
             success, result_msg = await service.migrate_mansion(player, target_x, target_y)
