@@ -5,6 +5,10 @@
 - 购买自定义称号（500诡烛）
 - 购买改名卡（10诡烛）
 - 公会改名（200诡烛）
+- 购买棺材钉（50诡烛）
+- 购买哭坟帽（20诡烛）
+- 购买初级月卡（88诡烛/月）
+- 购买高级月卡（288诡烛/月）
 """
 from typing import Optional, List, Tuple
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -16,6 +20,10 @@ from ..models.player import Player
 CUSTOM_TITLE_PRICE = 500    # 自定义称号（诡烛）
 RENAME_CARD_PRICE = 10      # 改名卡（诡烛）
 GUILD_RENAME_PRICE = 200    # 公会改名（诡烛）
+COFFIN_NAIL_PRICE = 50      # 棺材钉（诡烛）
+CRYING_TOMB_HAT_PRICE = 20  # 哭坟帽（诡烛）
+BASIC_MONTHLY_CARD_PRICE = 88    # 初级月卡（诡烛/月）
+PREMIUM_MONTHLY_CARD_PRICE = 288 # 高级月卡（诡烛/月）
 
 # 称号字符限制
 TITLE_MIN_LEN = 1
@@ -256,6 +264,107 @@ class SponsorShopService:
             f"🔮 剩余诡烛: {player.gui_zhu}"
         )
 
+    # ==================== 棺材钉购买 ====================
+
+    @classmethod
+    async def buy_coffin_nail(cls, player: Player, session: AsyncSession) -> Tuple[bool, str]:
+        """
+        购买棺材钉（50诡烛，获得1根棺材钉进背包）
+
+        Returns:
+            (成功, 结果消息)
+        """
+        if player.gui_zhu < COFFIN_NAIL_PRICE:
+            return False, (
+                f"⛔ 诡烛不足\n"
+                f"需要: {COFFIN_NAIL_PRICE} 诡烛\n"
+                f"当前: {player.gui_zhu} 诡烛"
+            )
+
+        from ..models.inventory import ItemInstance
+        success = await ItemInstance.add_item(session, player.id, "coffin_nail", 1)
+        if not success:
+            return False, "⛔ 背包已满，无法添加棺材钉"
+
+        player.gui_zhu -= COFFIN_NAIL_PRICE
+        return True, (
+            f"✅ 购买成功！获得棺材钉 ×1\n"
+            f"💡 持有棺材钉可提升闭关效率（最多100根，+50%）\n"
+            f"🔮 剩余诡烛: {player.gui_zhu}"
+        )
+
+    # ==================== 哭坟帽购买 ====================
+
+    @classmethod
+    async def buy_crying_tomb_hat(cls, player: Player, session: AsyncSession) -> Tuple[bool, str]:
+        """
+        购买哭坟帽（20诡烛，获得1顶哭坟帽进背包）
+
+        Returns:
+            (成功, 结果消息)
+        """
+        if player.gui_zhu < CRYING_TOMB_HAT_PRICE:
+            return False, (
+                f"⛔ 诡烛不足\n"
+                f"需要: {CRYING_TOMB_HAT_PRICE} 诡烛\n"
+                f"当前: {player.gui_zhu} 诡烛"
+            )
+
+        from ..models.inventory import ItemInstance
+        success = await ItemInstance.add_item(session, player.id, "resentment_crystal", 1)
+        if not success:
+            return False, "⛔ 背包已满，无法添加哭坟帽"
+
+        player.gui_zhu -= CRYING_TOMB_HAT_PRICE
+        return True, (
+            f"✅ 购买成功！获得哭坟帽 ×1\n"
+            f"💡 使用后直接获得1万怨念值\n"
+            f"🔮 剩余诡烛: {player.gui_zhu}"
+        )
+
+    # ==================== 月卡购买 ====================
+
+    @classmethod
+    async def buy_monthly_card(
+        cls, player: Player, card_type: str, session: AsyncSession
+    ) -> Tuple[bool, str]:
+        """
+        购买月卡（初级88诡烛/高级288诡烛，30天有效期，可叠加）
+
+        card_type: "basic" | "premium"
+
+        Returns:
+            (成功, 结果消息)
+        """
+        from ..models.monthly_card import MonthlyCard, CardType, get_card_benefits_config
+
+        if card_type == "basic":
+            price = BASIC_MONTHLY_CARD_PRICE
+            ct = CardType.BASIC
+        else:
+            price = PREMIUM_MONTHLY_CARD_PRICE
+            ct = CardType.PREMIUM
+
+        if player.gui_zhu < price:
+            return False, (
+                f"⛔ 诡烛不足\n"
+                f"需要: {price} 诡烛\n"
+                f"当前: {player.gui_zhu} 诡烛"
+            )
+
+        card = await MonthlyCard.add_monthly_card(session, player.id, ct, months=1)
+        player.gui_zhu -= price
+
+        card_config = get_card_benefits_config()
+        card_name = card_config[ct]["name"]
+
+        return True, (
+            f"✅ 购买成功！获得{card_name} ×1个月\n"
+            f"⏰ 到期时间: {card.end_time.strftime('%Y-%m-%d %H:%M')}\n"
+            f"💡 使用【月卡】查看当前权益\n"
+            f"🔮 剩余诡烛: {player.gui_zhu}"
+        )
+
     # ==================== 商店展示 ====================
 
     @classmethod
@@ -271,6 +380,14 @@ class SponsorShopService:
             f"💰 诡烛余额: {balance} 诡烛",
             "",
             "🛒 商品列表:",
+            f"  ⚰️  棺材钉          [{COFFIN_NAIL_PRICE} 诡烛]",
+            f"     闭关效率+0.5%（最多100根，+50%）",
+            f"  🎩  哭坟帽          [{CRYING_TOMB_HAT_PRICE} 诡烛]",
+            f"     使用后获得1万怨念值",
+            f"  💳  初级月卡        [{BASIC_MONTHLY_CARD_PRICE} 诡烛/月]",
+            f"     修炼+20%，闭关9h，背包+5，突破保护75%",
+            f"  💎  高级月卡        [{PREMIUM_MONTHLY_CARD_PRICE} 诡烛/月]",
+            f"     修炼+50%，闭关12h，背包+20，自动采集",
             f"  ✍️  改名卡          [{RENAME_CARD_PRICE} 诡烛]",
             f"     修改一次角色名称",
             f"  🏛️  公会改名        [{GUILD_RENAME_PRICE} 诡烛]",
@@ -290,6 +407,10 @@ class SponsorShopService:
         lines.extend([
             "━━━━━━━━━━━━━",
             "📖 使用方法:",
+            "【购买棺材钉】       获得1根棺材钉",
+            "【购买哭坟帽】       获得1顶哭坟帽",
+            "【购买初级月卡】     购买30天初级月卡",
+            "【购买高级月卡】     购买30天高级月卡",
             "【购买改名卡】       获得1张改名卡",
             "【购买称号 内容】    购买自定义称号",
             "【公会改名 新名称】  修改公会名称（会长）",

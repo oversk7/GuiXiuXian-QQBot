@@ -6,6 +6,10 @@
   【购买改名卡】          购买改名卡（10诡烛）
   【公会改名 <新名称>】   公会改名（200诡烛，会长专属）
   【购买称号 <文字>】     购买自定义称号（500诡烛）
+  【购买棺材钉】          购买棺材钉（50诡烛）
+  【购买哭坟帽】          购买哭坟帽（20诡烛）
+  【购买初级月卡】        购买30天初级月卡（88诡烛）
+  【购买高级月卡】        购买30天高级月卡（288诡烛）
 """
 
 from nonebot import on_command
@@ -24,6 +28,10 @@ sponsor_shop_cmd = on_command("赞助商店", aliases={"诡烛商店"}, priority
 buy_rename_card_cmd = on_command("购买改名卡", aliases={"赞助改名卡"}, priority=5, block=True)
 guild_rename_cmd = on_command("公会改名", aliases={"改名公会"}, priority=5, block=True)
 buy_title_cmd = on_command("购买称号", priority=5, block=True)
+buy_coffin_nail_cmd = on_command("购买棺材钉", priority=5, block=True)
+buy_crying_tomb_hat_cmd = on_command("购买哭坟帽", priority=5, block=True)
+buy_basic_monthly_card_cmd = on_command("购买初级月卡", aliases={"兑换初级月卡"}, priority=5, block=True)
+buy_premium_monthly_card_cmd = on_command("购买高级月卡", aliases={"兑换高级月卡"}, priority=5, block=True)
 
 
 # ==================== 工具函数 ====================
@@ -111,3 +119,51 @@ async def handle_buy_title(event: MessageEvent, args: Message = CommandArg()):
         success, msg = SponsorShopService.buy_custom_title(player, title_text)
 
     await buy_title_cmd.finish(message_add_head(msg, event))
+
+
+# ==================== 购买棺材钉 ====================
+
+@buy_coffin_nail_cmd.handle()
+async def handle_buy_coffin_nail(event: MessageEvent):
+    """购买棺材钉（50诡烛）"""
+    async with safe_session() as session:
+        player = await _get_player_or_finish(session, event, buy_coffin_nail_cmd)
+        success, msg = await SponsorShopService.buy_coffin_nail(player, session)
+
+    await buy_coffin_nail_cmd.finish(message_add_head(msg, event))
+
+
+# ==================== 购买哭坟帽 ====================
+
+@buy_crying_tomb_hat_cmd.handle()
+async def handle_buy_crying_tomb_hat(event: MessageEvent):
+    """购买哭坟帽（20诡烛）"""
+    async with safe_session() as session:
+        player = await _get_player_or_finish(session, event, buy_crying_tomb_hat_cmd)
+        success, msg = await SponsorShopService.buy_crying_tomb_hat(player, session)
+
+    await buy_crying_tomb_hat_cmd.finish(message_add_head(msg, event))
+
+
+# ==================== 购买初级月卡 ====================
+
+@buy_basic_monthly_card_cmd.handle()
+async def handle_buy_basic_monthly_card(event: MessageEvent):
+    """购买初级月卡（88诡烛，30天）"""
+    async with safe_session() as session:
+        player = await _get_player_or_finish(session, event, buy_basic_monthly_card_cmd)
+        success, msg = await SponsorShopService.buy_monthly_card(player, "basic", session)
+
+    await buy_basic_monthly_card_cmd.finish(message_add_head(msg, event))
+
+
+# ==================== 购买高级月卡 ====================
+
+@buy_premium_monthly_card_cmd.handle()
+async def handle_buy_premium_monthly_card(event: MessageEvent):
+    """购买高级月卡（288诡烛，30天）"""
+    async with safe_session() as session:
+        player = await _get_player_or_finish(session, event, buy_premium_monthly_card_cmd)
+        success, msg = await SponsorShopService.buy_monthly_card(player, "premium", session)
+
+    await buy_premium_monthly_card_cmd.finish(message_add_head(msg, event))
