@@ -37,7 +37,7 @@ GHOST_DICE_IMG_URL = "https://wdcdn.qpic.cn/MTMxMDI2NjM3MjM0Njk2MTE_350520_RPoKZ
 
 # 八面骰对应的8种特殊属性（排除灵爆率 skill_crit_rate）
 DICE_FACES = [
-    {"attribute": "critical_power",   "cn": "暴击伤害", "icon": "💥", "desc": "暴击伤害+100%"},
+    {"attribute": "critical_power",   "cn": "暴击伤害", "icon": "💥", "desc": "暴击力翻倍"},
     {"attribute": "combo_rate",       "cn": "连击率",   "icon": "⚡", "desc": "连击率+100%"},
     {"attribute": "counter_rate",     "cn": "反击率",   "icon": "🛡️", "desc": "反击率+100%"},
     {"attribute": "dodge_rate",       "cn": "闪避率",   "icon": "💨", "desc": "闪避率+100%"},

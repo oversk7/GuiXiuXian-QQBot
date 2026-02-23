@@ -16,6 +16,16 @@ from ..utils import message_add_head
 from ..models.db import safe_session
 from ..models.player import Player
 from ..models.elixir_usage import ElixirUsageLog
+from ..models.inventory import ItemInstance
+
+# 具有主动技能的VIP装备ID集合（图鉴中不显示技能详情，仅对持有者提示）
+_VIP_ACTIVE_SKILL_IDS: set[str] = {
+    "vip_robe_jingyuanzhiyi",  # 镜怨披风
+    "vip_gui_yu",              # 归雨
+    "vip_chrono_watch",        # 折光年
+    "vip_longying_flash",      # 龙影闪
+    "vip_ghost_dice",          # 诡面骰
+}
 
 
 def _get_material_obtain_methods(item_id: str, rarity: str) -> str:
@@ -300,6 +310,7 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
     from ..platform_utils import get_unified_player
     player = None
     elixir_usage_map = {}
+    player_active_equip_ids: set[str] = set()
     async with safe_session() as session:
         # 使用跨平台工具获取玩家数据
         player = await get_unified_player(session, event)
@@ -311,6 +322,13 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
             )
             logs = (await session.execute(stmt)).scalars().all()
             elixir_usage_map = {log.item_id: log.quantity for log in logs}
+
+            # 查询玩家持有的具有主动技能的VIP装备（用于图鉴提示控制）
+            stmt2 = select(ItemInstance.item_id).where(
+                ItemInstance.player_id == player.id,
+                ItemInstance.item_id.in_(list(_VIP_ACTIVE_SKILL_IDS))
+            )
+            player_active_equip_ids = set((await session.execute(stmt2)).scalars().all())
 
     # 搜索物品
     item_matches = []
@@ -422,12 +440,26 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
                 VIP_EQUIPMENT_IDS = {"vip_blade_zhanlongshan", "vip_robe_jingyuanzhiyi", "heaven_retreat_star_blade", "vip_gui_yu", "vip_chrono_watch", "vip_longying_flash", "vip_ghost_dice"}
                 is_vip_equipment = cfg.item_id in VIP_EQUIPMENT_IDS
 
-                if is_vip_equipment:
+                if is_vip_equipment and cfg.item_id in _VIP_ACTIVE_SKILL_IDS:
+                    # 有主动技能的VIP装备：被动效果全部展示，主动技能只提示
                     effects_lines = ["✨ 特殊效果（VIP定制，0阶全解锁）："]
                     for effect in cfg.special_effects:
                         desc = effect.get('description', '')
                         if desc:
                             effects_lines.append(f"  • {desc}")
+                    equipment_info.extend(effects_lines)
+                    # 所有人都能看到有主动技能，但具体内容仅持有者可查
+                    if cfg.item_id in player_active_equip_ids:
+                        equipment_info.append(f"🌟 主动技能：发送【{cfg.name}】查看")
+                    else:
+                        equipment_info.append("🌟 主动技能：（持有者专属）")
+                elif is_vip_equipment:
+                    effects_lines = ["✨ 特殊效果（VIP定制，0阶全解锁）："]
+                    for effect in cfg.special_effects:
+                        desc = effect.get('description', '')
+                        if desc:
+                            effects_lines.append(f"  • {desc}")
+                    equipment_info.extend(effects_lines)
                 else:
                     effects_lines = ["✨ 特殊效果（升阶解锁）："]
                     for idx, effect in enumerate(cfg.special_effects, start=1):
@@ -437,7 +469,7 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
                             # 计算解锁所需的升阶等级
                             required_level = idx * 2
                             effects_lines.append(f"  • [{idx}] {desc} (+{required_level}阶解锁)")
-                equipment_info.extend(effects_lines)
+                    equipment_info.extend(effects_lines)
 
             if equipment_info:
                 extra_info = "\n" + "\n".join(equipment_info)
@@ -611,7 +643,19 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
                 VIP_EQUIPMENT_IDS = {"vip_blade_zhanlongshan", "vip_robe_jingyuanzhiyi", "heaven_retreat_star_blade", "vip_gui_yu", "vip_chrono_watch", "vip_longying_flash", "vip_ghost_dice"}
                 is_vip_equipment = cfg.item_id in VIP_EQUIPMENT_IDS
 
-                if is_vip_equipment:
+                if is_vip_equipment and cfg.item_id in _VIP_ACTIVE_SKILL_IDS:
+                    # 有主动技能的VIP装备：被动效果全部展示，主动技能只提示
+                    desc_parts.append("✨ 特殊效果（VIP定制，0阶全解锁）：")
+                    for effect in cfg.special_effects:
+                        effect_desc = effect.get('description', '')
+                        if effect_desc:
+                            desc_parts.append(f"  • {effect_desc}")
+                    # 所有人都能看到有主动技能，但具体内容仅持有者可查
+                    if cfg.item_id in player_active_equip_ids:
+                        desc_parts.append(f"🌟 主动技能：发送【{cfg.name}】查看")
+                    else:
+                        desc_parts.append("🌟 主动技能：（持有者专属）")
+                elif is_vip_equipment:
                     desc_parts.append("✨ 特殊效果（VIP定制，0阶全解锁）：")
                     for effect in cfg.special_effects:
                         effect_desc = effect.get('description', '')
