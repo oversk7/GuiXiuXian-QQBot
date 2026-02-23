@@ -1354,7 +1354,7 @@ items:
       attr_ratio: {"attack": 11.0, "hp": 1.0, "mp": 2.0}
       gem_slots: 5
       special_effects:
-        - trigger: "first_turn"
+        - trigger: "passive"
           effect: "hp_from_attack"
           is_percentage: true
           value: 50

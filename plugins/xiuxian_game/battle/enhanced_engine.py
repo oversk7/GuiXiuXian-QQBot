@@ -35,7 +35,7 @@ class EnhancedBattleEngine:
         # 记录首回合临时加成（需战后回退）
         self._temp_hp_from_mp: Dict[str, int] = {}
         self._temp_mp_from_hp: Dict[str, int] = {}
-        self._temp_hp_from_attack: Dict[str, int] = {}
+
         # 骰子buff临时加成（诡面骰）：{player_id: (attr_name, original_value)}
         self._temp_dice_buff: Dict[str, tuple] = {}
         # 绝魔体质对敌方特殊属性的临时削减：{target_id: {attr_name: original_value}}
@@ -160,25 +160,6 @@ class EnhancedBattleEngine:
                 # 记录临时加成，战斗结束回退
                 self._temp_mp_from_hp[player.id] = self._temp_mp_from_hp.get(player.id, 0) + mp_bonus_total
                 self.battle_log.append(f"✨ 灵影体质·反：最大理智+{mp_bonus_total}（生命值的{total_pct_mp:.0f}%）")
-        except AttributeError:
-            pass
-
-        # 首回合：骰相·命 - 按最大攻击力增加最大生命值（诡面骰 HP_FROM_ATTACK）
-        try:
-            player_max_attack = getattr(player, 'attack', 0)
-            hp_from_attack_effects = self.effect_manager.get_active_effects(player.id, EffectType.HP_FROM_ATTACK)
-            total_pct_hfa = 0
-            for eff in hp_from_attack_effects:
-                if eff.is_percentage:
-                    total_pct_hfa += eff.value
-            if total_pct_hfa > 0:
-                base_hp_hfa = player.hp
-                hp_bonus_hfa = int(player_max_attack * total_pct_hfa / 100)
-                player.max_hp += hp_bonus_hfa
-                hp_inc_cur_hfa = int(base_hp_hfa * total_pct_hfa / 100)
-                player.hp = min(player.max_hp, base_hp_hfa + hp_inc_cur_hfa)
-                self._temp_hp_from_attack[player.id] = self._temp_hp_from_attack.get(player.id, 0) + hp_bonus_hfa
-                self.battle_log.append(f"🎲 骰相·命：最大生命值+{hp_bonus_hfa}（攻击力的{total_pct_hfa:.0f}%），当前生命值+{hp_inc_cur_hfa}")
         except AttributeError:
             pass
 
@@ -338,28 +319,6 @@ class EnhancedBattleEngine:
         except AttributeError:
             pass
 
-        # 敌方同理处理骰相·命（HP_FROM_ATTACK）：最大生命值按攻击力百分比提升
-        try:
-            enemy_attack = getattr(enemy, 'attack', 0) if hasattr(enemy, 'attack') else 0
-            hp_from_attack_enemy = self.effect_manager.get_active_effects(enemy_id, EffectType.HP_FROM_ATTACK)
-            total_pct_hfa_e = 0
-            for eff in hp_from_attack_enemy:
-                if eff.is_percentage:
-                    total_pct_hfa_e += eff.value
-            if total_pct_hfa_e > 0 and hasattr(enemy, 'max_hp'):
-                base_hp_hfa_e = enemy.hp if hasattr(enemy, 'hp') else 0
-                hp_bonus_hfa_e = int(enemy_attack * total_pct_hfa_e / 100)
-                enemy.max_hp += hp_bonus_hfa_e
-                hp_inc_hfa_e = int(base_hp_hfa_e * total_pct_hfa_e / 100)
-                if hasattr(enemy, 'hp'):
-                    enemy.hp = min(enemy.max_hp, base_hp_hfa_e + hp_inc_hfa_e)
-                if hasattr(enemy, 'id'):
-                    self._temp_hp_from_attack[enemy.id] = self._temp_hp_from_attack.get(enemy.id, 0) + hp_bonus_hfa_e
-                enemy_name = enemy.nickname if hasattr(enemy, 'nickname') else '敌人'
-                self.battle_log.append(f"🎲 {enemy_name}的骰相·命：最大生命值+{hp_bonus_hfa_e}（攻击力的{total_pct_hfa_e:.0f}%）")
-        except AttributeError:
-            pass
-
         # 敌方同理处理骰子buff（诡面骰）
         try:
             enemy_vip_data = getattr(enemy, 'vip_equipment_data', None) or {}
@@ -442,10 +401,14 @@ class EnhancedBattleEngine:
                 if not trigger.description:
                     trigger.description = f"{config.name}的特殊效果"
 
-            # 针对“斩龙闪”：其“生命→理智”的加成应为全局被动，面板可见，不在战斗内首回合生效
+            # 针对"斩龙闪"：其"生命→理智"的加成应为全局被动，面板可见，不在战斗内首回合生效
             # 因此这里过滤掉其 MP_FROM_HP 的战斗触发器，避免与全局持久化重复
             if item_id == "vip_blade_zhanlongshan":
                 triggers = [t for t in triggers if t.effect != EffectType.MP_FROM_HP]
+
+            # 针对"诡面骰"：其"攻击力→生命值"的加成已在穿戴时持久写入，不在战斗内重复生效
+            if item_id == "vip_ghost_dice":
+                triggers = [t for t in triggers if t.effect != EffectType.HP_FROM_ATTACK]
 
             self.effect_manager.register_triggers(unit_id, triggers)
 
@@ -1779,18 +1742,6 @@ class EnhancedBattleEngine:
             unit.max_mp = new_max_mp
             if hasattr(unit, 'mp'):
                 unit.mp = int(max(0, min(new_max_mp, ratio_mp * new_max_mp)))
-        # 回退首回合由攻击力转生命（HP_FROM_ATTACK，诡面骰）
-        bonus_hp_atk = self._temp_hp_from_attack.pop(unit_id, 0) if hasattr(self, '_temp_hp_from_attack') else 0
-        if bonus_hp_atk > 0 and hasattr(unit, 'max_hp'):
-            old_max_atk = unit.max_hp
-            new_max_atk = max(1, old_max_atk - bonus_hp_atk)
-            if hasattr(unit, 'hp') and old_max_atk > 0:
-                ratio_atk = unit.hp / float(old_max_atk)
-            else:
-                ratio_atk = 0.0
-            unit.max_hp = new_max_atk
-            if hasattr(unit, 'hp'):
-                unit.hp = int(max(0, min(new_max_atk, ratio_atk * new_max_atk)))
         # 回退骰子buff临时属性（诡面骰·骰相·乱）
         dice_info = self._temp_dice_buff.pop(unit_id, None) if hasattr(self, '_temp_dice_buff') else None
         if dice_info:

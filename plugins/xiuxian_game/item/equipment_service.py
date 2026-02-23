@@ -4,7 +4,8 @@
 提供装备相关的核心业务逻辑：
 1. 重新计算装备属性加成
 2. 处理 mp_from_hp 特效
-3. 装备相关常量定义
+3. 处理 hp_from_attack 特效（诡面骰）
+4. 装备相关常量定义
 
 注：此模块从 equipment_commands.py 中提取，解决模块耦合问题
 """
@@ -88,6 +89,66 @@ def _apply_mp_from_hp_effects(player: Player, equipped_items: list[ItemInstance]
         session.add(eq)
 
 
+def _apply_hp_from_attack_effects(player: Player, equipped_items: list[ItemInstance], session) -> None:
+    """将拥有 hp_from_attack 特效的装备的加成持久写入玩家属性。
+
+    以穿装备后的总攻击力为基数，按百分比计算 max_hp 加成，
+    写入 player.max_hp 并记录到 _persist_bonus["max_hp"]。
+    """
+    if not equipped_items:
+        return
+
+    hp_from_attack_effects: list[tuple[ItemInstance, float]] = []
+    total_pct = 0.0
+
+    for eq in equipped_items:
+        if not getattr(eq, "equipped", False):
+            continue
+        cfg = eq.config if hasattr(eq, "config") else None
+        if not cfg or not getattr(cfg, "special_effects", None):
+            continue
+
+        for eff in cfg.special_effects:
+            if eff.get("effect") != "hp_from_attack":
+                continue
+            if bool(eff.get("is_percentage", True)):
+                val_pct = float(eff.get("value", 0) or 0)
+                if val_pct > 0:
+                    total_pct += val_pct
+                    hp_from_attack_effects.append((eq, val_pct))
+
+    if not hp_from_attack_effects:
+        return
+
+    # 以穿装备后的总攻击力为基数（此时 player.attack 已含诡面骰自身加成）
+    current_attack = int(getattr(player, "attack", 0) or 0)
+    base_for_convert = max(1, current_attack)
+    total_bonus_hp = int(base_for_convert * total_pct / 100.0)
+    if total_bonus_hp <= 0:
+        return
+
+    remaining = total_bonus_hp
+    for idx, (eq, pct) in enumerate(hp_from_attack_effects):
+        part = int(base_for_convert * pct / 100.0)
+        if idx == len(hp_from_attack_effects) - 1:
+            part = remaining
+        else:
+            part = min(part, remaining)
+
+        if part <= 0:
+            continue
+
+        remaining = max(0, remaining - part)
+        player.max_hp = int(getattr(player, "max_hp", 0)) + part
+
+        extra = eq.extra_attrs or {}
+        persist = dict(extra.get("_persist_bonus", {}))
+        persist["max_hp"] = int(persist.get("max_hp", 0)) + part
+        extra["_persist_bonus"] = persist
+        eq.extra_attrs = extra
+        session.add(eq)
+
+
 async def recalc_equipment_attributes(
     session,
     player: Player,
@@ -165,6 +226,9 @@ async def recalc_equipment_attributes(
     # 4. 再处理 mp_from_hp 类全局被动（只处理equipped=True的装备）
     equipped_only = [eq for eq in equipped_items if getattr(eq, "equipped", False)]
     _apply_mp_from_hp_effects(player, equipped_only, session)
+
+    # 4b. 再处理 hp_from_attack 类全局被动（诡面骰骰相·命，以总攻击力为基数）
+    _apply_hp_from_attack_effects(player, equipped_only, session)
 
     # 5. 确保当前 HP/MP 不超过新的上限
     if player.hp > player.max_hp:
