@@ -42,7 +42,7 @@ DICE_FACES = [
     {"attribute": "counter_rate",     "cn": "反击率",   "icon": "🛡️", "desc": "反击触发概率翻倍"},
     {"attribute": "dodge_rate",       "cn": "闪避率",   "icon": "💨", "desc": "闪避触发概率翻倍"},
     {"attribute": "accuracy_rate",    "cn": "命中率",   "icon": "🎯", "desc": "命中率翻倍"},
-    {"attribute": "skill_crit_rate",  "cn": "灵爆率",   "icon": "🔮", "desc": "灵爆触发概率翻倍"},
+    {"attribute": "critical_rate",    "cn": "暴击率",   "icon": "🔮", "desc": "暴击触发概率翻倍"},
     {"attribute": "penetration_rate", "cn": "穿透率",   "icon": "🗡️", "desc": "穿透比例翻倍"},
     {"attribute": "anti_crit_rate",   "cn": "抗暴率",   "icon": "🪨", "desc": "抗暴率翻倍"},
 ]

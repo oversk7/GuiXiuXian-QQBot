@@ -189,8 +189,8 @@ class EnhancedBattleEngine:
             if dice_buff and not dice_buff.get("consumed"):
                 attr_name = dice_buff.get("attribute", "")
                 attr_cn = dice_buff.get("attribute_cn", attr_name)
-                valid_attrs = ["critical_power", "combo_rate", "counter_rate", "dodge_rate",
-                               "accuracy_rate", "skill_crit_rate", "penetration_rate", "anti_crit_rate"]
+                valid_attrs = ["critical_rate", "critical_power", "combo_rate", "counter_rate", "dodge_rate",
+                               "accuracy_rate", "penetration_rate", "anti_crit_rate"]
                 if attr_name in valid_attrs and hasattr(player, attr_name):
                     original_value = getattr(player, attr_name, 0)
                     boosted_value = original_value * 2
@@ -359,8 +359,8 @@ class EnhancedBattleEngine:
             if enemy_dice and not enemy_dice.get("consumed") and hasattr(enemy, 'id'):
                 e_attr = enemy_dice.get("attribute", "")
                 e_attr_cn = enemy_dice.get("attribute_cn", e_attr)
-                valid_attrs = ["critical_power", "combo_rate", "counter_rate", "dodge_rate",
-                               "accuracy_rate", "skill_crit_rate", "penetration_rate", "anti_crit_rate"]
+                valid_attrs = ["critical_rate", "critical_power", "combo_rate", "counter_rate", "dodge_rate",
+                               "accuracy_rate", "penetration_rate", "anti_crit_rate"]
                 if e_attr in valid_attrs and hasattr(enemy, e_attr):
                     e_orig = getattr(enemy, e_attr, 0)
                     e_boosted = e_orig * 2
