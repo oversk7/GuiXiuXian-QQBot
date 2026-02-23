@@ -123,7 +123,7 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
         end_idx = start_idx + page_size
         current_page_equips = equips[start_idx:end_idx]
 
-        lines = [f"🎽 装备栏 ({equipped_count}/4)", "━━━━━━━━━━━━━"]
+        lines = [f"🎽 装备栏 ({equipped_count}/5)", "━━━━━━━━━━━━━"]
 
         # 为装备分配简短编号（全局编号）
         for i, eq in enumerate(current_page_equips, start=start_idx + 1):
@@ -418,7 +418,7 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
         if same_type_equipped:
             await wear_equipment.finish(f"⛔ 已装备同名装备 {equip.config.name}，不能重复穿戴")
 
-        # 检查装备数量限制（最多4件）
+        # 检查装备数量限制（最多5件）
         all_equipped_stmt = select(ItemInstance).where(
             ItemInstance.player_id == player.id,
             ItemInstance.equipped == True,
@@ -426,8 +426,8 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
         )
         all_equipped = (await session.execute(all_equipped_stmt)).scalars().all()
 
-        if len(all_equipped) >= 4:
-            await wear_equipment.finish("⛔ 装备栏已满，最多只能穿戴4件装备，请先卸下其他装备")
+        if len(all_equipped) >= 5:
+            await wear_equipment.finish("⛔ 装备栏已满，最多只能穿戴5件装备，请先卸下其他装备")
 
         # 标记新装备为已装备
         equip.equipped = True
