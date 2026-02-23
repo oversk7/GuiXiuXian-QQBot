@@ -378,7 +378,7 @@ async def _(event: MessageEvent, state: T_State, args: Message = CommandArg()):
     "──────────────\n"
     "⚧️ 请选择你的性别，回复 【男】 或 【女】："
 ))
-async def _(event: MessageEvent, gender_input: str = ArgPlainText()):
+async def _(event: MessageEvent, gender_input: str = ArgPlainText("gender")):
     gender_input = gender_input.strip()
     if gender_input not in ["男", "女"]:
         await register.reject("⛔ 请回复「男」或「女」")
