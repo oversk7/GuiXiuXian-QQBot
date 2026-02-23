@@ -71,8 +71,10 @@ class Config(BaseSettings):
         creature_level_min = max(1, base_creature_level - variance)
         creature_level_max = base_creature_level + variance
 
-        # 计算理智消耗（每10重+1）
-        mp_cost = max(1, 1 + (level - 1) // 10)
+        # 计算理智消耗（前缓后陡：前期线性，50重后二次加速）
+        # 公式：level // 5 + (level // 30)²
+        # 第10重:2 | 第30重:7 | 第50重:11 | 第60重:16 | 第100重:29
+        mp_cost = max(1, level // 5 + (level // 30) ** 2)
 
         # 随机选择诡异名称
         creature_names = rules.get("monster_names", ["未知诡异"])
