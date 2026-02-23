@@ -252,9 +252,25 @@ async def _handle_teleport_logic(event: MessageEvent, target_region: str, cmd_ha
         session.add(player)
         await session.commit()
 
-        # 获取当前位置格子描述
+        # 获取当前位置格子描述，并检查月卡自动采集
         tile_desc = None
+        auto_collect_msg = ""
         if dungeon_level:
+            from .dungeon_battle import get_or_create_tile, _handle_material, _handle_treasure
+            from ..models.monthly_card import get_player_card_benefits
+
+            tile = await get_or_create_tile(session, target_name, player.dungeon_x, player.dungeon_y)
+            benefits = await get_player_card_benefits(session, player.id)
+            if benefits.get("auto_collect", False):
+                if tile.event_type == "MATERIAL":
+                    if player.id not in tile.state.get("looted_by", []) and not tile.state.get("looted"):
+                        collect_result = await _handle_material(session, tile, player)
+                        auto_collect_msg = f"\n💳 月卡自动采集：\n{collect_result}"
+                elif tile.event_type == "TREASURE":
+                    if not tile.state.get("looted"):
+                        collect_result = await _handle_treasure(session, tile, player)
+                        auto_collect_msg = f"\n💳 月卡自动收集：\n{collect_result}"
+
             tile_desc = await get_tile_description(session, player, target_name, player.dungeon_x, player.dungeon_y)
 
     # 构建响应消息
@@ -284,6 +300,8 @@ async def _handle_teleport_logic(event: MessageEvent, target_region: str, cmd_ha
         if tile_desc:
             msg_lines.append("━━━━━━━━━━━━━")
             msg_lines.append(tile_desc)
+        if auto_collect_msg:
+            msg_lines.append(auto_collect_msg)
         msg_lines.append("⬆️ 【上一层】切换到更浅的诡域")
         msg_lines.append("⬇️ 【下一层】切换到更深的诡域")
         msg_lines.append("🚀 【传送 N层诡域】跳转到已解锁的任意层")
@@ -396,8 +414,26 @@ async def handle_prev_level(event: MessageEvent):
         session.add(player)
         await session.commit()
 
+        # 检查月卡自动采集
+        from .dungeon_battle import get_or_create_tile, _handle_material, _handle_treasure
+        from ..models.monthly_card import get_player_card_benefits
+
+        region_name = f"{target_level}层诡域"
+        tile = await get_or_create_tile(session, region_name, player.dungeon_x, player.dungeon_y)
+        benefits = await get_player_card_benefits(session, player.id)
+        auto_collect_msg = ""
+        if benefits.get("auto_collect", False):
+            if tile.event_type == "MATERIAL":
+                if player.id not in tile.state.get("looted_by", []) and not tile.state.get("looted"):
+                    collect_result = await _handle_material(session, tile, player)
+                    auto_collect_msg = f"\n💳 月卡自动采集：\n{collect_result}"
+            elif tile.event_type == "TREASURE":
+                if not tile.state.get("looted"):
+                    collect_result = await _handle_treasure(session, tile, player)
+                    auto_collect_msg = f"\n💳 月卡自动收集：\n{collect_result}"
+
         # 获取当前位置格子描述
-        tile_desc = await get_tile_description(session, player, f"{target_level}层诡域", player.dungeon_x, player.dungeon_y)
+        tile_desc = await get_tile_description(session, player, region_name, player.dungeon_x, player.dungeon_y)
 
         msg_lines = [
             f"🌀 你穿越空间裂隙，从第{current_level}重诡域来到第{target_level}重诡域",
@@ -413,6 +449,8 @@ async def handle_prev_level(event: MessageEvent):
             "━━━━━━━━━━━━━",
             tile_desc
         ]
+        if auto_collect_msg:
+            msg_lines.append(auto_collect_msg)
 
         msg = "\n".join(msg_lines)
         await prev_level_cmd.finish(message_add_head(msg, event))
@@ -449,8 +487,26 @@ async def handle_next_level(event: MessageEvent):
         session.add(player)
         await session.commit()
 
+        # 检查月卡自动采集
+        from .dungeon_battle import get_or_create_tile, _handle_material, _handle_treasure
+        from ..models.monthly_card import get_player_card_benefits
+
+        region_name = f"{target_level}层诡域"
+        tile = await get_or_create_tile(session, region_name, player.dungeon_x, player.dungeon_y)
+        benefits = await get_player_card_benefits(session, player.id)
+        auto_collect_msg = ""
+        if benefits.get("auto_collect", False):
+            if tile.event_type == "MATERIAL":
+                if player.id not in tile.state.get("looted_by", []) and not tile.state.get("looted"):
+                    collect_result = await _handle_material(session, tile, player)
+                    auto_collect_msg = f"\n💳 月卡自动采集：\n{collect_result}"
+            elif tile.event_type == "TREASURE":
+                if not tile.state.get("looted"):
+                    collect_result = await _handle_treasure(session, tile, player)
+                    auto_collect_msg = f"\n💳 月卡自动收集：\n{collect_result}"
+
         # 获取当前位置格子描述
-        tile_desc = await get_tile_description(session, player, f"{target_level}层诡域", player.dungeon_x, player.dungeon_y)
+        tile_desc = await get_tile_description(session, player, region_name, player.dungeon_x, player.dungeon_y)
 
         msg_lines = [
             f"🌀 你穿越空间裂隙，从第{current_level}重诡域来到第{target_level}重诡域",
@@ -466,6 +522,8 @@ async def handle_next_level(event: MessageEvent):
             "━━━━━━━━━━━━━",
             tile_desc
         ]
+        if auto_collect_msg:
+            msg_lines.append(auto_collect_msg)
 
         msg = "\n".join(msg_lines)
         await next_level_cmd.finish(message_add_head(msg, event))

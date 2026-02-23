@@ -35,7 +35,7 @@ buy_crying_tomb_hat_cmd = on_command("购买哭坟帽", priority=5, block=True)
 expand_inventory_cmd = on_command("背包扩容", aliases={"扩容背包"}, priority=5, block=True)
 buy_basic_monthly_card_cmd = on_command("购买初级月卡", aliases={"兑换初级月卡"}, priority=5, block=True)
 buy_premium_monthly_card_cmd = on_command("购买高级月卡", aliases={"兑换高级月卡"}, priority=5, block=True)
-my_sponsor_log_cmd = on_command("我的赞助记录", aliases={"赞助记录"}, priority=5, block=True)
+my_sponsor_log_cmd = on_command("赞助兑换记录", aliases={"赞助记录"}, priority=5, block=True)
 admin_sponsor_log_cmd = on_command("查赞助记录", priority=2, block=True)
 
 
