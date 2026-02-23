@@ -1408,20 +1408,45 @@ class BattleIntegrationHelper:
         from .battle_attributes import BattleAttributeCalculator
         attrs = await BattleAttributeCalculator.calculate_effective_attributes_async(player, session)
 
+        # 检查是否有未消耗的诡面骰buff
+        dice_buff_attr = None
+        vip_data = getattr(player, 'vip_equipment_data', None) or {}
+        dice_buff = vip_data.get("dice_buff")
+        if dice_buff and not dice_buff.get("consumed"):
+            dice_buff_attr = dice_buff.get("attribute")
+
+        def _fmt(attr_name: str, label: str, value, suffix: str = "%") -> str:
+            """格式化属性行，有骰子buff时追加标注"""
+            text = f"{label}: {value:.1f}{suffix}"
+            if dice_buff_attr == attr_name:
+                boosted = value * 2
+                text += f" → 🎲{boosted:.1f}{suffix}"
+            return text
+
         # 计算暴击倍数显示（基础1.5倍 + 暴击力*0.1倍）
         crit_multiplier = 1.5 + (attrs['critical_power'] * 0.1)
 
         lines = [
             "⚔️ 战斗属性 ⚔️",
-            f"💥 暴击率: {attrs['critical_rate']:.1f}%",
-            f"💢 暴击力: {crit_multiplier:.1f}倍",
-            f"🔄 连击率: {attrs['combo_rate']:.1f}%",
-            f"🛡️ 反击率: {attrs['counter_rate']:.1f}%",
-            f"⚡ 闪避率: {attrs['dodge_rate']:.1f}%",
-            f"🎯 命中率: {attrs['accuracy_rate']:.1f}%",
-            f"✨ 灵爆率: {attrs['skill_crit_rate']:.1f}%",
-            f"🗡️ 穿透率: {attrs['penetration_rate']:.1f}%",
-            f"🛡️ 抗暴率: {attrs['anti_crit_rate']:.1f}%"
+            f"💥 {_fmt('critical_rate', '暴击率', attrs['critical_rate'])}",
         ]
+        # 暴击力特殊处理（单位是倍而非%）
+        crit_power_text = f"暴击力: {crit_multiplier:.1f}倍"
+        if dice_buff_attr == "critical_power":
+            boosted_multiplier = 1.5 + (attrs['critical_power'] * 2 * 0.1)
+            crit_power_text += f" → 🎲{boosted_multiplier:.1f}倍"
+        lines.append(f"💢 {crit_power_text}")
+        lines.extend([
+            f"🔄 {_fmt('combo_rate', '连击率', attrs['combo_rate'])}",
+            f"🛡️ {_fmt('counter_rate', '反击率', attrs['counter_rate'])}",
+            f"⚡ {_fmt('dodge_rate', '闪避率', attrs['dodge_rate'])}",
+            f"🎯 {_fmt('accuracy_rate', '命中率', attrs['accuracy_rate'])}",
+            f"✨ 灵爆率: {attrs['skill_crit_rate']:.1f}%",
+            f"🗡️ {_fmt('penetration_rate', '穿透率', attrs['penetration_rate'])}",
+            f"🛡️ {_fmt('anti_crit_rate', '抗暴率', attrs['anti_crit_rate'])}",
+        ])
+
+        if dice_buff_attr:
+            lines.append("🎲 诡面骰buff：下场战斗生效")
 
         return "\n".join(lines)

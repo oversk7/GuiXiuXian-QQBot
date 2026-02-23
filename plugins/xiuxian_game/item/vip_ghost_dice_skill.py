@@ -35,16 +35,16 @@ MARKDOWN_TEMPLATE_ID = "102499345_1770445216"
 # 诡面骰配图
 GHOST_DICE_IMG_URL = "https://wdcdn.qpic.cn/MTMxMDI2NjM3MjM0Njk2MTE_350520_RPoKZCpD58Z3cLIm_1771857949"
 
-# 八面骰对应的8种特殊属性（排除暴击率 critical_rate）
+# 八面骰对应的8种特殊属性（排除灵爆率 skill_crit_rate）
 DICE_FACES = [
-    {"attribute": "critical_power",   "cn": "暴击伤害", "icon": "💥", "desc": "暴击时伤害翻倍"},
-    {"attribute": "combo_rate",       "cn": "连击率",   "icon": "⚡", "desc": "连击触发概率翻倍"},
-    {"attribute": "counter_rate",     "cn": "反击率",   "icon": "🛡️", "desc": "反击触发概率翻倍"},
-    {"attribute": "dodge_rate",       "cn": "闪避率",   "icon": "💨", "desc": "闪避触发概率翻倍"},
-    {"attribute": "accuracy_rate",    "cn": "命中率",   "icon": "🎯", "desc": "命中率翻倍"},
-    {"attribute": "critical_rate",    "cn": "暴击率",   "icon": "🔮", "desc": "暴击触发概率翻倍"},
-    {"attribute": "penetration_rate", "cn": "穿透率",   "icon": "🗡️", "desc": "穿透比例翻倍"},
-    {"attribute": "anti_crit_rate",   "cn": "抗暴率",   "icon": "🪨", "desc": "抗暴率翻倍"},
+    {"attribute": "critical_power",   "cn": "暴击伤害", "icon": "💥", "desc": "暴击伤害+100%"},
+    {"attribute": "combo_rate",       "cn": "连击率",   "icon": "⚡", "desc": "连击率+100%"},
+    {"attribute": "counter_rate",     "cn": "反击率",   "icon": "🛡️", "desc": "反击率+100%"},
+    {"attribute": "dodge_rate",       "cn": "闪避率",   "icon": "💨", "desc": "闪避率+100%"},
+    {"attribute": "accuracy_rate",    "cn": "命中率",   "icon": "🎯", "desc": "命中率+100%"},
+    {"attribute": "critical_rate",    "cn": "暴击率",   "icon": "🔮", "desc": "暴击率+100%"},
+    {"attribute": "penetration_rate", "cn": "穿透率",   "icon": "🗡️", "desc": "穿透率+100%"},
+    {"attribute": "anti_crit_rate",   "cn": "抗暴率",   "icon": "🪨", "desc": "抗暴率+100%"},
 ]
 
 
