@@ -40,10 +40,7 @@ class DishItemGenerator:
         dish_items = {}
         recipes = recipe_manager._recipes
 
-        logger.info(f"🔍 [DEBUG] 开始生成菜肴物品，食谱数量: {len(recipes)}")
-
         for recipe_id, recipe in recipes.items():
-            logger.debug(f"  处理食谱: {recipe_id} - {recipe.name}")
             # 为每个食谱的每种品质生成菜肴物品
             for quality, quality_name in DishItemGenerator.QUALITY_NAMES.items():
                 dish_item_id = f"dish_{recipe_id}_{quality}"
@@ -79,7 +76,6 @@ class DishItemGenerator:
                 try:
                     dish_config = ItemConfig(item_data)
                     dish_items[dish_item_id] = dish_config
-                    logger.debug(f"    ✅ 生成菜肴: {dish_item_id} - {dish_name}")
                 except Exception as e:
                     logger.error(f"    ❌ 生成菜肴失败 {dish_item_id}: {e}")
 
@@ -95,24 +91,15 @@ class DishItemGenerator:
             config_instance: 配置实例
             recipe_manager: RecipeManager实例
         """
-        logger.info(f"🔍 [DEBUG] 开始注册菜肴物品到配置系统")
-        logger.info(f"🔍 [DEBUG] 当前 config.items_config['by_id'] 中的物品数: {len(config_instance.items_config.get('by_id', {}))}")
-
         dish_items = DishItemGenerator.generate_dish_items(recipe_manager)
-
-        logger.info(f"🔍 [DEBUG] generate_dish_items 返回了 {len(dish_items)} 个菜肴")
 
         # 注册到 by_id
         if "by_id" not in config_instance.items_config:
             config_instance.items_config["by_id"] = {}
             logger.warning(f"⚠️ items_config 中没有 by_id，已创建")
 
-        registered_count = 0
         for item_id, item_config in dish_items.items():
             config_instance.items_config["by_id"][item_id] = item_config
-            registered_count += 1
-            if registered_count <= 5:  # 只显示前5个
-                logger.debug(f"  注册到 by_id: {item_id} -> {item_config.name}")
 
         # 注册到 by_name
         if "by_name" not in config_instance.items_config:
@@ -122,9 +109,4 @@ class DishItemGenerator:
         for item_id, item_config in dish_items.items():
             config_instance.items_config["by_name"][item_config.name] = item_config
 
-        logger.info(f"✅ 成功注册 {len(dish_items)} 个菜肴物品到配置系统")
-        logger.info(f"🔍 [DEBUG] 注册后 config.items_config['by_id'] 中的物品数: {len(config_instance.items_config['by_id'])}")
-
-        # 验证注册结果
-        dish_count_check = sum(1 for k in config_instance.items_config["by_id"].keys() if k.startswith("dish_"))
-        logger.info(f"🔍 [DEBUG] 验证: by_id 中以 'dish_' 开头的物品数: {dish_count_check}")
+        logger.info(f"[CookingSystem] 成功注册 {len(dish_items)} 个菜肴物品到配置系统")

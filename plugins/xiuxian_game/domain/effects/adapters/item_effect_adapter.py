@@ -224,8 +224,6 @@ def create_adapter_for_all_legacy_effects() -> Dict[str, type[ItemEffectAdapter]
 
         adapters[effect_id] = adapter_class
 
-        logger.debug(f"[AdapterFactory] 为旧效果 {effect_type.name} 创建适配器: {effect_id}")
-
     logger.info(f"[AdapterFactory] 成功创建 {len(adapters)} 个物品效果适配器")
 
     return adapters

@@ -54,17 +54,10 @@ def register_all_item_effect_adapters() -> Dict[str, Type[ItemEffectAdapter]]:
             # 使用装饰器注册
             register_effect(effect_id)(adapter_class)
             _registered_adapters[effect_id] = adapter_class
-            logger.debug(f"[AdapterRegistry] 注册适配器: {effect_id}")
         except Exception as e:
             logger.error(f"[AdapterRegistry] 注册适配器 {effect_id} 失败: {e}")
 
     logger.info(f"[AdapterRegistry] 成功注册 {len(_registered_adapters)} 个物品效果适配器")
-
-    # 打印注册清单（DEBUG级别）
-    if _registered_adapters:
-        logger.debug("[AdapterRegistry] 注册清单:")
-        for idx, effect_id in enumerate(_registered_adapters.keys(), 1):
-            logger.debug(f"  {idx:2d}. {effect_id}")
 
     return _registered_adapters
 

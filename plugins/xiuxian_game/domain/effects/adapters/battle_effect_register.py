@@ -78,12 +78,6 @@ def create_bridges_from_equipment_config(
 
         bridges.append(bridge)
 
-        logger.debug(
-            f"[BattleEffectRegister] 为装备 {item_name}({item_id}) "
-            f"创建桥接器 {i+1}/{len(trigger_configs)}: {bridge.effect_id} "
-            f"(效果: {trigger_config.effect.value})"
-        )
-
     return bridges
 
 
@@ -171,11 +165,6 @@ def register_all_battle_effect_bridges() -> Dict[str, Type[BattleEffectBridge]]:
             _registered_bridges[bridge.effect_id] = type(bridge)
 
             total_bridges += 1
-
-            logger.debug(
-                f"[BattleEffectRegister] 注册桥接器: {bridge.effect_id} "
-                f"(装备: {item_config.name}, 效果: {bridge.trigger_config.effect.value})"
-            )
 
     logger.success(
         f"[BattleEffectRegister] 批量注册完成: "
