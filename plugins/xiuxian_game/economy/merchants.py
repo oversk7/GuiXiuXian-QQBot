@@ -293,6 +293,8 @@ async def _price_for(session, market: MarketConfig, item_id: str) -> Tuple[int, 
 
     # 检查是否需要每日刷新
     await market_state.check_daily_refresh(session)
+    # 分时补货
+    await market_state.check_restock(session)
 
     # -------- 基础随机波动（调整到±30%，平衡价格差异与游戏平衡） --------
     seed_str = f"{market.id}:{item_id}:{_current_seed_day().isoformat()}"
@@ -317,6 +319,73 @@ async def _price_for(session, market: MarketConfig, item_id: str) -> Tuple[int, 
     buy_price = max(1, int(sell_price * buy_price_ratio))
 
     return sell_price, buy_price
+
+
+# ------------------- 阶梯加价系统 -------------------
+TIERED_PRICE_BRACKETS = [
+    (50,     1.00),   # 1-50: 原价
+    (100,    1.15),   # 51-100: 1.15x
+    (200,    1.30),   # 101-200: 1.30x
+    (999999, 1.50),   # 200+: 1.50x
+]
+
+
+def _calculate_tiered_multiplier(already_bought: int, qty: int) -> float:
+    """按档位拆分购买量，加权平均计算阶梯加价倍率
+
+    Args:
+        already_bought: 今日已购买数量
+        qty: 本次购买数量
+
+    Returns:
+        float: 加权平均价格倍率
+    """
+    if qty <= 0:
+        return 1.0
+
+    total_cost_weight = 0.0
+    remaining = qty
+    current_pos = already_bought
+
+    for bracket_end, multiplier in TIERED_PRICE_BRACKETS:
+        if remaining <= 0:
+            break
+        # 当前档位可容纳的数量
+        available_in_bracket = max(0, bracket_end - current_pos)
+        if available_in_bracket <= 0:
+            continue
+        # 本档位实际使用的数量
+        use = min(remaining, available_in_bracket)
+        total_cost_weight += use * multiplier
+        remaining -= use
+        current_pos += use
+
+    return total_cost_weight / qty
+
+
+# ------------------- 跑商奖励递减系统 -------------------
+TRADE_BONUS_BRACKETS = [
+    (3,  0.10),   # 第1-3笔: 10%
+    (6,  0.05),   # 第4-6笔: 5%
+    (10, 0.02),   # 第7-10笔: 2%
+]
+
+
+def _get_cross_market_bonus_rate(sell_count: int) -> float:
+    """根据已完成跑商笔数获取奖励比例
+
+    Args:
+        sell_count: 今日已完成的跨市场出售笔数（本次为第 sell_count+1 笔）
+
+    Returns:
+        float: 奖励比例 (0.0 - 0.10)
+    """
+    current_trade = sell_count + 1  # 本次是第几笔
+    for bracket_end, rate in TRADE_BONUS_BRACKETS:
+        if current_trade <= bracket_end:
+            return rate
+    return 0.0  # 超过所有档位，无奖励
+
 
 # ------------------- 指令 -------------------
 market_cmd = on_command("市集", aliases={"商店", "市场"}, block=True, priority=5)
@@ -439,6 +508,7 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
             # 获取市场状态
             market_state = await MarketState.get_or_create(session, market.id, item_cfg.item_id)
             await market_state.check_daily_refresh(session)
+            await market_state.check_restock(session)
 
             # 检查库存
             if not market_state.can_purchase(qty):
@@ -468,7 +538,13 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
 
             # 获取当前价格
             sell_price, _ = await _price_for(session, market, item_cfg.item_id)
-            total_cost = sell_price * qty
+
+            # 阶梯加价：查询今日已购量并计算加价倍率
+            already_bought = await TradeRecord.get_daily_purchase_quantity(
+                session, player.id, market.id, item_cfg.item_id)
+            tiered_multiplier = _calculate_tiered_multiplier(already_bought, qty)
+            effective_unit_price = max(1, int(sell_price * tiered_multiplier))
+            total_cost = effective_unit_price * qty
 
             if player.gold < total_cost:
                 await buy_cmd.finish(f"❌ 金币不足，需要 {total_cost} (当前 {player.gold})")
@@ -491,15 +567,20 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
                 market_id=market.id,
                 item_id=item_cfg.item_id,
                 quantity=qty,
-                unit_price=sell_price,
+                unit_price=effective_unit_price,
                 total_amount=total_cost
             )
 
             session.add_all([player, market_state])
             await session.commit()
 
+            # 构建购买成功消息
+            tiered_note = ""
+            if tiered_multiplier > 1.001:
+                tiered_note = f"\n📊 商人加价：×{tiered_multiplier:.2f} (今日已购{already_bought+qty}个)"
+
             await buy_cmd.finish(message_add_head(
-                f"✅ 购买 {item_cfg.name}×{qty} 成功！\n💸 花费 {total_cost} 金币\n"
+                f"✅ 购买 {item_cfg.name}×{qty} 成功！\n💸 花费 {total_cost} 金币{tiered_note}\n"
                 f"📦 剩余库存：{market_state.current_stock}", event))
 
         # 黑市/基础商店逻辑
@@ -648,6 +729,7 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
         # 获取市场状态和当前价格
         market_state = await MarketState.get_or_create(session, market.id, item_cfg.item_id)
         await market_state.check_daily_refresh(session)
+        await market_state.check_restock(session)
 
         _, buy_price = await _price_for(session, market, item_cfg.item_id)
         total_gain = buy_price * qty
@@ -658,16 +740,21 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
             await session.rollback()
             await sell_cmd.finish("❌ 扣除物品失败")
 
-        # 计算跑商奖励（异地出售奖励）
+        # 计算跑商奖励（异地出售奖励，递减机制）
         bonus = 0
         bonus_msg = ""
         # 检查是否为跨市场交易（在不同市场出售）
         recent_purchases = await TradeRecord.get_recent_purchases_at_market(session, player.id, market.id, item_cfg.item_id, hours=24)
         if not recent_purchases:  # 没有在本地购买记录，说明是从其他地方运来的
-            # 给予5%的跑商奖励
-            bonus = int(total_gain * 0.05)
-            if bonus > 0:
-                bonus_msg = f"\n🎁 跨市场交易奖励：+{bonus} 金币"
+            # 查询今日已完成的跨市场出售笔数，获取递减奖励比例
+            daily_sell_count = await TradeRecord.get_daily_cross_market_sell_count(session, player.id)
+            bonus_rate = _get_cross_market_bonus_rate(daily_sell_count)
+            if bonus_rate > 0:
+                bonus = int(total_gain * bonus_rate)
+                if bonus > 0:
+                    bonus_msg = f"\n🎁 跑商奖励(第{daily_sell_count+1}笔,{bonus_rate*100:.0f}%)：+{bonus} 金币"
+            else:
+                bonus_msg = "\n💤 今日跑商奖励已用尽，明日刷新"
 
         # 更新玩家金币和市场状态
         player.gold += total_gain + bonus
@@ -771,17 +858,23 @@ async def _(event: MessageEvent):
             # 获取市场状态和价格
             market_state = await MarketState.get_or_create(session, market.id, item_id)
             await market_state.check_daily_refresh(session)
+            await market_state.check_restock(session)
 
             _, buy_price = await _price_for(session, market, item_id)
             item_gain = buy_price * quantity
 
-            # 计算跑商奖励
+            # 计算跑商奖励（递减机制）
             bonus = 0
+            bonus_rate = 0.0
             recent_purchases = await TradeRecord.get_recent_purchases_at_market(
                 session, player.id, market.id, item_id, hours=24
             )
             if not recent_purchases:
-                bonus = int(item_gain * 0.05)
+                # 查询今日已完成的跨市场出售笔数
+                daily_sell_count = await TradeRecord.get_daily_cross_market_sell_count(session, player.id)
+                bonus_rate = _get_cross_market_bonus_rate(daily_sell_count)
+                if bonus_rate > 0:
+                    bonus = int(item_gain * bonus_rate)
 
             # 扣除物品
             try:
@@ -808,6 +901,8 @@ async def _(event: MessageEvent):
                 unit_price=buy_price,
                 total_amount=item_gain
             )
+            # flush 确保下一轮循环能查到本次记录（递减笔数统计）
+            await session.flush()
 
             total_gain += item_gain
             total_bonus += bonus
@@ -816,7 +911,8 @@ async def _(event: MessageEvent):
                 "quantity": quantity,
                 "unit_price": buy_price,
                 "total": item_gain,
-                "bonus": bonus
+                "bonus": bonus,
+                "bonus_rate": bonus_rate
             })
 
             session.add(market_state)
@@ -839,7 +935,9 @@ async def _(event: MessageEvent):
         ]
 
         for item in sold_items:
-            bonus_text = f" (+{item['bonus']}跑商奖励)" if item['bonus'] > 0 else ""
+            bonus_text = ""
+            if item['bonus'] > 0:
+                bonus_text = f" (+{item['bonus']}奖励{item['bonus_rate']*100:.0f}%)"
             lines.append(f"• {item['name']} ×{item['quantity']} = {item['total']}金币{bonus_text}")
 
         lines.extend([
@@ -849,7 +947,7 @@ async def _(event: MessageEvent):
         ])
 
         if total_bonus > 0:
-            lines.append(f"🎁 跨市场交易奖励：{total_bonus} 金币")
+            lines.append(f"🎁 跑商奖励合计：{total_bonus} 金币")
 
         await auto_sell_cmd.finish(message_add_head("\n".join(lines), event))
 
@@ -1038,20 +1136,28 @@ async def _(event: MessageEvent):
                     continue
 
                 sell_p_src, _ = await _price_for(session, src, iid)
+
+                # 查询玩家在源市场的当日已购量，计算阶梯加价后的实际买入价（按50个估算）
+                already_bought_src = await TradeRecord.get_daily_purchase_quantity(
+                    session, player.id, src.id, iid)
+                recommend_qty = 50
+                tiered_mult_src = _calculate_tiered_multiplier(already_bought_src, recommend_qty)
+                effective_buy_price = max(1, int(sell_p_src * tiered_mult_src))
+
                 for dst in MARKETS:
                     if dst is src or not dst.can_buy_from_player(iid):  # 检查目标市场是否收购此商品
                         continue
                     _, buy_p_dst = await _price_for(session, dst, iid)
-                    profit = buy_p_dst - sell_p_src
+                    profit = buy_p_dst - effective_buy_price
                     if profit > 0:
                         item_cfg = config.items_config["by_id"].get(iid)
-                        margin = profit / sell_p_src if sell_p_src else 0
+                        margin = profit / effective_buy_price if effective_buy_price else 0
 
                         # 限制利润率不超过100%
                         if margin > 1.0:  # 利润率超过100%
                             # 调整收购价，使利润率刚好为100%
-                            buy_p_dst = sell_p_src * 2  # 100%利润率
-                            profit = buy_p_dst - sell_p_src
+                            buy_p_dst = effective_buy_price * 2  # 100%利润率
+                            profit = buy_p_dst - effective_buy_price
                             margin = 1.0
 
                         # 检查玩家是否可以在目标市场出售该商品（考虑原地交易限制）
@@ -1063,11 +1169,15 @@ async def _(event: MessageEvent):
                             filtered_count += 1
                             continue  # 跳过这个机会，因为玩家在目标市场有交易限制
 
+                        tiered_note = ""
+                        if tiered_mult_src > 1.001:
+                            tiered_note = f" [加价×{tiered_mult_src:.2f}]"
+
                         opportunities.append({
                             "item": item_cfg.name,
                             "from": src.name,
                             "to": dst.name,
-                            "buy": sell_p_src,
+                            "buy": effective_buy_price,
                             "sell": buy_p_dst,
                             "profit": profit,
                             "margin": margin,
@@ -1075,6 +1185,7 @@ async def _(event: MessageEvent):
                             "src_id": src.id,
                             "dst_id": dst.id,
                             "item_id": iid,
+                            "tiered_note": tiered_note,
                         })
 
         if not opportunities:
@@ -1099,8 +1210,9 @@ async def _(event: MessageEvent):
             lines.append("━━━━━━━━━━━━━")
 
         for op in sample:
+            tiered_tag = op.get('tiered_note', '')
             lines.append(
-                f"📦 {op['item']} (库存:{op['src_stock']})\n🛒 {op['from']} → {op['to']}  "+
+                f"📦 {op['item']} (库存:{op['src_stock']}){tiered_tag}\n🛒 {op['from']} → {op['to']}  "+
                 f"💸 {op['buy']} → 💰 {op['sell']}  "+
                 f"📈 +{op['profit']} ({op['margin']*100:.0f}%)"
             )

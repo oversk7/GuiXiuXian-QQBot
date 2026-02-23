@@ -142,6 +142,77 @@ class TradeRecord(Base):
         return True, ""
 
     @classmethod
+    async def get_daily_purchase_quantity(cls, session, player_id: str, market_id: str, item_id: str) -> int:
+        """
+        查询玩家当日在指定市场购买指定商品的总数量（使用09:00日切）
+
+        Args:
+            session: 数据库会话
+            player_id: 玩家ID
+            market_id: 市场ID
+            item_id: 商品ID
+
+        Returns:
+            int: 当日已购买总数量
+        """
+        from sqlalchemy import select, and_, func as sa_func
+        from datetime import time, timedelta, date
+
+        # 与 _current_seed_day() 一致的 09:00 日切逻辑
+        now = datetime.now()
+        day = now.date()
+        if now.time() < time(hour=9):
+            day -= timedelta(days=1)
+        day_start = datetime.combine(day, time(hour=9))
+
+        stmt = select(sa_func.coalesce(sa_func.sum(cls.quantity), 0)).where(
+            and_(
+                cls.player_id == player_id,
+                cls.market_id == market_id,
+                cls.item_id == item_id,
+                cls.trade_type == TradeType.BUY,
+                cls.trade_time >= day_start
+            )
+        )
+
+        result = await session.execute(stmt)
+        return result.scalar() or 0
+
+    @classmethod
+    async def get_daily_cross_market_sell_count(cls, session, player_id: str) -> int:
+        """
+        查询玩家当日跨市场出售笔数（使用09:00日切，排除黑市）
+
+        Args:
+            session: 数据库会话
+            player_id: 玩家ID
+
+        Returns:
+            int: 当日跨市场出售笔数
+        """
+        from sqlalchemy import select, and_, func as sa_func
+        from datetime import time, timedelta, date
+
+        # 与 _current_seed_day() 一致的 09:00 日切逻辑
+        now = datetime.now()
+        day = now.date()
+        if now.time() < time(hour=9):
+            day -= timedelta(days=1)
+        day_start = datetime.combine(day, time(hour=9))
+
+        stmt = select(sa_func.count(cls.id)).where(
+            and_(
+                cls.player_id == player_id,
+                cls.trade_type == TradeType.SELL,
+                cls.trade_time >= day_start,
+                cls.market_id != 'black_market'
+            )
+        )
+
+        result = await session.execute(stmt)
+        return result.scalar() or 0
+
+    @classmethod
     async def record_trade(cls, session, player_id: str, trade_type: TradeType, market_id: str,
                           item_id: str, quantity: int, unit_price: int, total_amount: int):
         """

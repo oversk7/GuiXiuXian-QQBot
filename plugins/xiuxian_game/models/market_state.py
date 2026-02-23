@@ -1,9 +1,13 @@
 from sqlalchemy import Integer, BigInteger, String, DateTime, Date, Float, func, JSON
 from sqlalchemy.orm import Mapped, mapped_column
-from datetime import datetime, date
+from datetime import datetime, date, timedelta
+from typing import Dict, Any, Optional
 from .db import Base
-from typing import Dict, Any
 import random
+
+# 分时补货常量
+RESTOCK_INTERVAL_HOURS = 6   # 每6小时补货一次
+RESTOCK_RATIO = 0.20         # 每次补货最大库存的20%
 
 
 class MarketState(Base):
@@ -28,6 +32,11 @@ class MarketState(Base):
     last_refresh_date: Mapped[date] = mapped_column(Date, default=date.today, comment="上次刷新日期")
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.now, server_default=func.now(), comment="创建时间")
     updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.now, onupdate=datetime.now, comment="更新时间")
+
+    # 分时补货时间
+    last_restock_time: Mapped[Optional[datetime]] = mapped_column(
+        DateTime, nullable=True, default=None, comment="上次分时补货时间"
+    )
     
     # 扩展数据（JSON格式存储额外信息）
     extra_data: Mapped[Dict[str, Any]] = mapped_column(JSON, default=dict, comment="扩展数据")
@@ -82,25 +91,51 @@ class MarketState(Base):
     async def daily_refresh(self, session):
         """每日刷新市场状态"""
         today = date.today()
-        
+
         # 重置每日统计
         self.daily_sold = 0
         self.daily_bought = 0
-        
-        # 库存恢复（增加恢复量，提高市场活跃度）
-        stock_recovery = min(50, self.max_stock - self.current_stock)  # 每日恢复50个或补满
-        self.current_stock = min(self.max_stock, self.current_stock + stock_recovery)
-        
+
+        # 库存补充完全交由 check_restock 分时补货处理
+
         # 价格因子衰减（逐渐回归1.0）
         self.demand_factor = self.demand_factor * 0.8 + 1.0 * 0.2  # 20%回归正常
         self.supply_factor = self.supply_factor * 0.8 + 1.0 * 0.2
-        
+
         # 更新刷新日期
         self.last_refresh_date = today
         self.updated_at = datetime.now()
-        
+
         session.add(self)
-    
+
+    async def check_restock(self, session):
+        """分时补货：每 RESTOCK_INTERVAL_HOURS 小时补货 max_stock * RESTOCK_RATIO"""
+        now = datetime.now()
+
+        if self.last_restock_time is None:
+            # 首次遇到 NULL，初始化为当前时间，不触发补货
+            self.last_restock_time = now
+            self.updated_at = now
+            session.add(self)
+            return
+
+        hours_since_restock = (now - self.last_restock_time).total_seconds() / 3600.0
+        if hours_since_restock < RESTOCK_INTERVAL_HOURS:
+            return  # 未到补货时间
+
+        # 计算经过了多少个补货周期
+        cycles = int(hours_since_restock // RESTOCK_INTERVAL_HOURS)
+        restock_per_cycle = int(self.max_stock * RESTOCK_RATIO)
+        total_restock = restock_per_cycle * cycles
+
+        if total_restock > 0 and self.current_stock < self.max_stock:
+            self.current_stock = min(self.max_stock, self.current_stock + total_restock)
+
+        # 更新补货时间（推进整数个周期，而非直接设为now，避免时间漂移）
+        self.last_restock_time = self.last_restock_time + timedelta(hours=RESTOCK_INTERVAL_HOURS * cycles)
+        self.updated_at = now
+        session.add(self)
+
     def apply_purchase(self, quantity: int):
         """应用购买操作对市场状态的影响"""
         # 减少库存

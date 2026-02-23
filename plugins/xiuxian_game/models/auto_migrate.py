@@ -89,6 +89,10 @@ REQUIRED_FIELDS: Dict[str, Dict[str, str]] = {
     # 天灾山寨 - 战斗冷却字段
     "lower_world_stronghold": {
         "last_battle_at": "DATETIME NULL COMMENT '最后一次迎战时间（战斗冷却用）'"
+    },
+    # 市场状态 - 分时补货
+    "market_state": {
+        "last_restock_time": "DATETIME NULL COMMENT '上次分时补货时间'"
     }
     # 注释: 以下字段已通过多次重启完成迁移:
     # - daily_task: quest_chain_id, quest_step, is_tutorial, auto_accept
