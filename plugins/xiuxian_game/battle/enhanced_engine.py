@@ -186,17 +186,23 @@ class EnhancedBattleEngine:
         try:
             vip_data = getattr(player, 'vip_equipment_data', None) or {}
             dice_buff = vip_data.get("dice_buff")
-            if dice_buff and not dice_buff.get("consumed"):
+            if dice_buff and not dice_buff.get("consumed") and not self.is_sparring:
                 attr_name = dice_buff.get("attribute", "")
                 attr_cn = dice_buff.get("attribute_cn", attr_name)
                 valid_attrs = ["critical_rate", "critical_power", "combo_rate", "counter_rate", "dodge_rate",
                                "accuracy_rate", "penetration_rate", "anti_crit_rate"]
                 if attr_name in valid_attrs and hasattr(player, attr_name):
                     original_value = getattr(player, attr_name, 0)
-                    boosted_value = original_value * 2
+                    # 暴击力特殊处理：翻倍（其余属性+100百分点）
+                    if attr_name == "critical_power":
+                        boosted_value = original_value * 2
+                        log_suffix = f"{original_value:.0f}→{boosted_value:.0f} (×2)"
+                    else:
+                        boosted_value = original_value + 100
+                        log_suffix = f"{original_value:.0f}%→{boosted_value:.0f}% (+100%点)"
                     setattr(player, attr_name, boosted_value)
                     self._temp_dice_buff[player.id] = (attr_name, original_value)
-                    self.battle_log.append(f"🎲 骰相·乱：{attr_cn} {original_value:.0f}→{boosted_value:.0f} (+100%)")
+                    self.battle_log.append(f"🎲 骰相·乱：{attr_cn} {log_suffix}")
                     # 标记为已消耗（战后持久化）
                     import copy
                     new_data = copy.deepcopy(dict(vip_data))
@@ -356,18 +362,23 @@ class EnhancedBattleEngine:
         try:
             enemy_vip_data = getattr(enemy, 'vip_equipment_data', None) or {}
             enemy_dice = enemy_vip_data.get("dice_buff")
-            if enemy_dice and not enemy_dice.get("consumed") and hasattr(enemy, 'id'):
+            if enemy_dice and not enemy_dice.get("consumed") and hasattr(enemy, 'id') and not self.is_sparring:
                 e_attr = enemy_dice.get("attribute", "")
                 e_attr_cn = enemy_dice.get("attribute_cn", e_attr)
                 valid_attrs = ["critical_rate", "critical_power", "combo_rate", "counter_rate", "dodge_rate",
                                "accuracy_rate", "penetration_rate", "anti_crit_rate"]
                 if e_attr in valid_attrs and hasattr(enemy, e_attr):
                     e_orig = getattr(enemy, e_attr, 0)
-                    e_boosted = e_orig * 2
+                    if e_attr == "critical_power":
+                        e_boosted = e_orig * 2
+                        e_log_suffix = f"{e_orig:.0f}→{e_boosted:.0f} (×2)"
+                    else:
+                        e_boosted = e_orig + 100
+                        e_log_suffix = f"{e_orig:.0f}%→{e_boosted:.0f}% (+100%点)"
                     setattr(enemy, e_attr, e_boosted)
                     self._temp_dice_buff[enemy.id] = (e_attr, e_orig)
                     enemy_name = enemy.nickname if hasattr(enemy, 'nickname') else '敌人'
-                    self.battle_log.append(f"🎲 {enemy_name}的骰相·乱：{e_attr_cn} {e_orig:.0f}→{e_boosted:.0f} (+100%)")
+                    self.battle_log.append(f"🎲 {enemy_name}的骰相·乱：{e_attr_cn} {e_log_suffix}")
                     import copy
                     new_edata = copy.deepcopy(dict(enemy_vip_data))
                     new_edata["dice_buff"]["consumed"] = True

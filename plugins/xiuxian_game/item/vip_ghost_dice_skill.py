@@ -2,7 +2,7 @@
 诡面骰·骰相·乱 —— VIP定制装备「诡面骰」主动技能模块
 
 功能：
-- 掷骰        摇动八面骰，随机+100%一项特殊属性（持续一场战斗，每日1次）
+- 掷骰        摇动八面骰，随机+100%点一项特殊属性（持续一场战斗，每日10次）
 - 诡面骰      查看诡面骰状态面板
 """
 
@@ -37,7 +37,7 @@ GHOST_DICE_IMG_URL = "https://wdcdn.qpic.cn/MTMxMDI2NjM3MjM0Njk2MTE_350520_RPoKZ
 
 # 八面骰对应的8种特殊属性（排除灵爆率 skill_crit_rate）
 DICE_FACES = [
-    {"attribute": "critical_power",   "cn": "暴击伤害", "icon": "💥", "desc": "暴击力翻倍"},
+    {"attribute": "critical_power",   "cn": "暴击伤害", "icon": "💥", "desc": "暴击力翻倍（×2）"},
     {"attribute": "combo_rate",       "cn": "连击率",   "icon": "⚡", "desc": "连击率+100%"},
     {"attribute": "counter_rate",     "cn": "反击率",   "icon": "🛡️", "desc": "反击率+100%"},
     {"attribute": "dodge_rate",       "cn": "闪避率",   "icon": "💨", "desc": "闪避率+100%"},
@@ -160,14 +160,8 @@ async def handle_roll_dice(event: MessageEvent):
         if used >= DAILY_ROLL_LIMIT:
             await roll_dice_cmd.finish(f"⛔ 今日掷骰次数已用完（{DAILY_ROLL_LIMIT}/{DAILY_ROLL_LIMIT}）\n💡 明日重置")
 
-        # 检查是否有未消耗的buff
+        # 检查是否有未消耗的buff（有则覆盖，给出提示）
         existing_buff = _get_dice_buff(player)
-        if existing_buff:
-            attr_cn = existing_buff.get("attribute_cn", "未知")
-            await roll_dice_cmd.finish(
-                f"⛔ 你还有未消耗的骰子buff：{attr_cn}+100%\n"
-                "💡 进入一场战斗后自动生效并消耗"
-            )
 
         # 掷骰！
         face = random.choice(DICE_FACES)
@@ -195,7 +189,8 @@ async def handle_roll_dice(event: MessageEvent):
             f"✨ 下一场战斗中 {face['cn']} +100%\r"
             f"💡 {face['desc']}\r"
             f"\r"
-            f"🔋 耐久 -{DURABILITY_COST}（剩余 {dice_item.durability}/360）\r"
+            + (f"⚠️ 已覆盖：{existing_buff.get('attribute_cn','')}+100%\r" if existing_buff else "")
+            + f"🔋 耐久 -{DURABILITY_COST}（剩余 {dice_item.durability}/360）\r"
             f"💡 今日掷骰 ({used + 1}/{DAILY_ROLL_LIMIT})"
         )
         fallback = (
@@ -206,7 +201,8 @@ async def handle_roll_dice(event: MessageEvent):
             f"✨ 下一场战斗中 {face['cn']} +100%\n"
             f"💡 {face['desc']}\n"
             "━━━━━━━━━━━━━\n"
-            f"🔋 耐久 -{DURABILITY_COST}（剩余 {dice_item.durability}/360）\n"
+            + (f"⚠️ 已覆盖：{existing_buff.get('attribute_cn','')}\n" if existing_buff else "")
+            + f"🔋 耐久 -{DURABILITY_COST}（剩余 {dice_item.durability}/360）\n"
             f"💡 今日掷骰 ({used + 1}/{DAILY_ROLL_LIMIT})"
         )
         await _send_dice_markdown(roll_dice_cmd, title, desc, fallback, event)
