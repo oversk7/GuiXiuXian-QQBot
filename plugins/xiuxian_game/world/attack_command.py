@@ -1004,11 +1004,10 @@ async def handle_npc_attack(session, attacker: Player, target_npc, event: Messag
 
         # 构建战斗结果
         result_lines = [
-            f"⚔️ {attacker.nickname} VS {target_npc.name}",
             "━━━━━━━━━━━━━"
         ]
 
-        # 展示战斗过程
+        # 展示战斗过程（battle_log 已包含 VS 标题行）
         result_lines.extend(battle_log)
         result_lines.append("━━━━━━━━━━━━━")
 
@@ -1159,7 +1158,9 @@ async def handle_npc_attack(session, attacker: Player, target_npc, event: Messag
                         session.add(attacker)
 
                 # 折光年「时间掠夺」+「终焉铭刻」：击杀永久+2体质/+2攻击（每日各20次）
-                chrono_effects = [e for e in post_effects if e.get("type") in ("gain_max_hp", "gain_attack")]
+                # 区分折光年(终焉铭刻)和诡面骰(骰相·噬)的gain_attack
+                chrono_effects = [e for e in post_effects if e.get("type") in ("gain_max_hp",) or
+                                  (e.get("type") == "gain_attack" and "骰相" not in e.get("description", ""))]
                 if chrono_effects:
                     stmt_cw = _select(_ItemInstance).where(
                         _ItemInstance.player_id == attacker.id,
@@ -1213,6 +1214,42 @@ async def handle_npc_attack(session, attacker: Player, target_npc, event: Messag
 
                         cw_inst.extra_attrs = cw_extra
                         session.add(cw_inst)
+                        session.add(attacker)
+
+                # 诡面骰「骰相·噬」：击杀永久+2攻击（每日20次，独立计数）
+                dice_atk_effects = [e for e in post_effects if e.get("type") == "gain_attack" and "骰相" in e.get("description", "")]
+                if dice_atk_effects:
+                    stmt_dice = _select(_ItemInstance).where(
+                        _ItemInstance.player_id == attacker.id,
+                        _ItemInstance.equipped == True,
+                        _ItemInstance.item_id == "vip_ghost_dice",
+                    )
+                    dice_inst = (await session.execute(stmt_dice)).scalars().first()
+                    if dice_inst:
+                        dice_extra = dict(dice_inst.extra_attrs or {})
+                        dice_day = _today_key()
+                        dice_bonus = await _VIPBonus.get_or_create(session, attacker.id)
+
+                        if dice_extra.get("dice_atk_day") != dice_day:
+                            dice_extra["dice_atk_day"] = dice_day
+                            dice_extra["dice_atk_cnt"] = 0
+                        dice_atk_cnt = int(dice_extra.get("dice_atk_cnt", 0))
+
+                        for eff_dice in dice_atk_effects:
+                            val = int(eff_dice.get("value", 2) or 2)
+                            if dice_atk_cnt < 20:
+                                dice_bonus.add_bonus("attack", val)
+                                attacker.attack = attacker.attack + val
+                                dice_atk_cnt += 1
+                                dice_extra["dice_atk_cnt"] = dice_atk_cnt
+                                result_lines.append(
+                                    f"🎲 骰相·噬：骰纹加深，攻击力+{val}（今日{dice_atk_cnt}/20）"
+                                )
+                            else:
+                                result_lines.append("🎲 骰相·噬：今日已达上限（+40/40）")
+
+                        dice_inst.extra_attrs = dice_extra
+                        session.add(dice_inst)
                         session.add(attacker)
 
         else:

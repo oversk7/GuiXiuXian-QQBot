@@ -699,15 +699,21 @@ class EnhancedBattleEngine:
                 })
 
             elif effect.effect_type == EffectType.GAIN_ATTACK:
-                # 终焉铭刻（折光年）：永久获得攻击力（需要在战斗结束后持久化）
+                # 永久获得攻击力（需要在战斗结束后持久化）
+                # 区分不同来源：折光年的「终焉铭刻」vs 诡面骰的「骰相·噬」
                 attr_points = int(effect.value)
-                result["messages"].append(f"⏱️ 终焉铭刻：终结被铭刻，攻击力+{attr_points}（战后结算）")
+                desc = effect.description or ""
+                if "骰相" in desc:
+                    result["messages"].append(f"🎲 骰相·噬：骰纹加深，攻击力+{attr_points}（战后结算）")
+                else:
+                    result["messages"].append(f"⏱️ 终焉铭刻：终结被铭刻，攻击力+{attr_points}（战后结算）")
                 result["effects_triggered"].append("gain_attack")
                 if 'post_battle_effects' not in result:
                     result['post_battle_effects'] = []
                 result['post_battle_effects'].append({
                     'type': 'gain_attack',
-                    'value': attr_points
+                    'value': attr_points,
+                    'description': desc
                 })
 
             elif effect.duration > 0:
@@ -864,8 +870,9 @@ class EnhancedBattleEngine:
         # 检查并应用虎标弹等计数型伤害加成效果
         tiger_bullet_effects = self.effect_manager.get_active_effects(attacker_id, EffectType.TIGER_BULLET)
         for tiger_effect in tiger_bullet_effects:
-            # 先应用伤害加成（本次攻击有效）
-            boost_damage = int(damage * tiger_effect.value / 100)
+            # 先应用伤害加成（本次攻击有效）- 基于全部伤害(含必中部分)计算
+            total_current = guaranteed_damage + damage
+            boost_damage = int(total_current * tiger_effect.value / 100)
             damage += boost_damage
             result["messages"].append(f"🐯 虎标弹！伤害提升{tiger_effect.value:.0f}% (+{boost_damage})")
             # 再消耗次数，判断是否需要触发下一个效果
@@ -892,8 +899,9 @@ class EnhancedBattleEngine:
         # 检查并应用猛虎标弹效果
         fierce_tiger_effects = self.effect_manager.get_active_effects(attacker_id, EffectType.FIERCE_TIGER_BULLET)
         for fierce_effect in fierce_tiger_effects:
-            # 先应用伤害加成（本次攻击有效）
-            boost_damage = int(damage * fierce_effect.value / 100)
+            # 先应用伤害加成（本次攻击有效）- 基于全部伤害(含必中部分)计算
+            total_current = guaranteed_damage + damage
+            boost_damage = int(total_current * fierce_effect.value / 100)
             damage += boost_damage
             result["messages"].append(f"🐅 猛虎标弹！伤害提升{fierce_effect.value:.0f}% (+{boost_damage})")
             # 再消耗次数，判断是否需要触发下一个效果
