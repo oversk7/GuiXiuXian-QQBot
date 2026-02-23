@@ -71,10 +71,26 @@ class Config(BaseSettings):
         creature_level_min = max(1, base_creature_level - variance)
         creature_level_max = base_creature_level + variance
 
-        # 计算理智消耗（前缓后陡：前期线性，50重后二次加速）
-        # 公式：level // 5 + (level // 30)²
-        # 第10重:2 | 第30重:7 | 第50重:11 | 第60重:16 | 第100重:29
-        mp_cost = max(1, level // 5 + (level // 30) ** 2)
+        # 计算理智消耗（分段函数）
+        # 设计原则：10000层以前难度低，鼓励探索；10000层以上陡增，作为挑战门槛
+        #
+        # 分段一  1–100层:    max(1, level // 20)                         第100重: 5
+        # 分段二  101–1000层: 5  + (level - 100)  // 50                   第1000重: 23
+        # 分段三  1001–5000层: 23 + (level - 1000) // 100                 第2000重: 33 | 第2600重: 39 | 第5000重: 63
+        # 分段四  5001–10000层: 63 + (level - 5000) // 50                 第10000重: 163
+        # 分段五  10001层+:   163 + (level-10000)//10 + ((level-10000)//200)²  第20000重: 3663
+        if level <= 100:
+            mp_cost = max(1, level // 20)
+        elif level <= 1000:
+            mp_cost = 5 + (level - 100) // 50
+        elif level <= 5000:
+            mp_cost = 23 + (level - 1000) // 100
+        elif level <= 10000:
+            mp_cost = 63 + (level - 5000) // 50
+        else:
+            excess = level - 10000
+            mp_cost = 163 + excess // 10 + (excess // 200) ** 2
+        mp_cost = max(1, mp_cost)
 
         # 随机选择诡异名称
         creature_names = rules.get("monster_names", ["未知诡异"])

@@ -7,7 +7,7 @@
 dungeon_generation_rules:
   # 基础配置
   base_mp_cost: 1                    # 基础理智消耗（参考值，实际公式见config.py）
-  mp_cost_increment: 0.1             # 已废弃，实际使用前缓后陡公式：level//5 + (level//30)²
+  mp_cost_increment: 0.1             # 已废弃，实际使用分段函数（见config.py）：1-100/101-1000/1001-5000/5001-10000/10001+
 
   # 诡异等级计算规则
   monster_level_formula: "level * 5"  # 诡异等级 = 诡域深度 * 5
