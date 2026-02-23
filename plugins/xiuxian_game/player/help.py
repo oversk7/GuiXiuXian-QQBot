@@ -1780,16 +1780,29 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
 
     async with safe_session() as session:
         from sqlalchemy import select
+        from datetime import datetime
+        from ..models.world_message import WorldMessage
+
         player = (await session.execute(select(Player).where(Player.uid == target_uid))).scalars().first()
         if not player:
             await give_guizhu_cmd.finish(f"❌ 未找到 UID 为 {target_uid} 的玩家")
 
         player.gui_zhu += amount
+
+        # 给玩家发送系统私信通知诡烛到账
+        notice = WorldMessage(
+            player_id="SYSTEM",
+            recipient_id=player.id,
+            content=f"🕯️ 诡烛到账通知：您已收到 {amount} 诡烛，当前余额 {player.gui_zhu}。感谢支持！",
+            created_at=datetime.now(),
+        )
+        session.add(notice)
         await session.commit()
 
         await give_guizhu_cmd.finish(
             f"✅ 已给予 UID:{target_uid}({player.nickname}) 诡烛 ×{amount}\n"
-            f"💎 当前诡烛：{player.gui_zhu}"
+            f"💎 当前诡烛：{player.gui_zhu}\n"
+            f"📬 已发送到账通知至玩家私信"
         )
 
 
