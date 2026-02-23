@@ -35,6 +35,11 @@ class EnhancedBattleEngine:
         # 记录首回合临时加成（需战后回退）
         self._temp_hp_from_mp: Dict[str, int] = {}
         self._temp_mp_from_hp: Dict[str, int] = {}
+        self._temp_hp_from_attack: Dict[str, int] = {}
+        # 骰子buff临时加成（诡面骰）：{player_id: (attr_name, original_value)}
+        self._temp_dice_buff: Dict[str, tuple] = {}
+        # 绝魔体质对敌方特殊属性的临时削减：{target_id: {attr_name: original_value}}
+        self._temp_ignore_special_debuff: Dict[str, Dict[str, float]] = {}
         # 缓存装备实例，用于检查每日触发限制
         self._equipped_items_cache: Dict[str, List] = {}
         # 数据库会话，用于查询临时buff
@@ -156,6 +161,48 @@ class EnhancedBattleEngine:
                 self._temp_mp_from_hp[player.id] = self._temp_mp_from_hp.get(player.id, 0) + mp_bonus_total
                 self.battle_log.append(f"✨ 灵影体质·反：最大理智+{mp_bonus_total}（生命值的{total_pct_mp:.0f}%）")
         except AttributeError:
+            pass
+
+        # 首回合：骰相·命 - 按最大攻击力增加最大生命值（诡面骰 HP_FROM_ATTACK）
+        try:
+            player_max_attack = getattr(player, 'attack', 0)
+            hp_from_attack_effects = self.effect_manager.get_active_effects(player.id, EffectType.HP_FROM_ATTACK)
+            total_pct_hfa = 0
+            for eff in hp_from_attack_effects:
+                if eff.is_percentage:
+                    total_pct_hfa += eff.value
+            if total_pct_hfa > 0:
+                base_hp_hfa = player.hp
+                hp_bonus_hfa = int(player_max_attack * total_pct_hfa / 100)
+                player.max_hp += hp_bonus_hfa
+                hp_inc_cur_hfa = int(base_hp_hfa * total_pct_hfa / 100)
+                player.hp = min(player.max_hp, base_hp_hfa + hp_inc_cur_hfa)
+                self._temp_hp_from_attack[player.id] = self._temp_hp_from_attack.get(player.id, 0) + hp_bonus_hfa
+                self.battle_log.append(f"🎲 骰相·命：最大生命值+{hp_bonus_hfa}（攻击力的{total_pct_hfa:.0f}%），当前生命值+{hp_inc_cur_hfa}")
+        except AttributeError:
+            pass
+
+        # 首回合：诡面骰骰子buff - 从vip_equipment_data读取未消耗的骰子buff并应用
+        try:
+            vip_data = getattr(player, 'vip_equipment_data', None) or {}
+            dice_buff = vip_data.get("dice_buff")
+            if dice_buff and not dice_buff.get("consumed"):
+                attr_name = dice_buff.get("attribute", "")
+                attr_cn = dice_buff.get("attribute_cn", attr_name)
+                valid_attrs = ["critical_power", "combo_rate", "counter_rate", "dodge_rate",
+                               "accuracy_rate", "skill_crit_rate", "penetration_rate", "anti_crit_rate"]
+                if attr_name in valid_attrs and hasattr(player, attr_name):
+                    original_value = getattr(player, attr_name, 0)
+                    boosted_value = original_value * 2
+                    setattr(player, attr_name, boosted_value)
+                    self._temp_dice_buff[player.id] = (attr_name, original_value)
+                    self.battle_log.append(f"🎲 骰相·乱：{attr_cn} {original_value:.0f}→{boosted_value:.0f} (+100%)")
+                    # 标记为已消耗（战后持久化）
+                    import copy
+                    new_data = copy.deepcopy(dict(vip_data))
+                    new_data["dice_buff"]["consumed"] = True
+                    player.vip_equipment_data = new_data
+        except (AttributeError, TypeError, KeyError):
             pass
 
         # 触发敌方首回合效果（对称处理）
@@ -283,8 +330,58 @@ class EnhancedBattleEngine:
         except AttributeError:
             pass
 
+        # 敌方同理处理骰相·命（HP_FROM_ATTACK）：最大生命值按攻击力百分比提升
+        try:
+            enemy_attack = getattr(enemy, 'attack', 0) if hasattr(enemy, 'attack') else 0
+            hp_from_attack_enemy = self.effect_manager.get_active_effects(enemy_id, EffectType.HP_FROM_ATTACK)
+            total_pct_hfa_e = 0
+            for eff in hp_from_attack_enemy:
+                if eff.is_percentage:
+                    total_pct_hfa_e += eff.value
+            if total_pct_hfa_e > 0 and hasattr(enemy, 'max_hp'):
+                base_hp_hfa_e = enemy.hp if hasattr(enemy, 'hp') else 0
+                hp_bonus_hfa_e = int(enemy_attack * total_pct_hfa_e / 100)
+                enemy.max_hp += hp_bonus_hfa_e
+                hp_inc_hfa_e = int(base_hp_hfa_e * total_pct_hfa_e / 100)
+                if hasattr(enemy, 'hp'):
+                    enemy.hp = min(enemy.max_hp, base_hp_hfa_e + hp_inc_hfa_e)
+                if hasattr(enemy, 'id'):
+                    self._temp_hp_from_attack[enemy.id] = self._temp_hp_from_attack.get(enemy.id, 0) + hp_bonus_hfa_e
+                enemy_name = enemy.nickname if hasattr(enemy, 'nickname') else '敌人'
+                self.battle_log.append(f"🎲 {enemy_name}的骰相·命：最大生命值+{hp_bonus_hfa_e}（攻击力的{total_pct_hfa_e:.0f}%）")
+        except AttributeError:
+            pass
+
+        # 敌方同理处理骰子buff（诡面骰）
+        try:
+            enemy_vip_data = getattr(enemy, 'vip_equipment_data', None) or {}
+            enemy_dice = enemy_vip_data.get("dice_buff")
+            if enemy_dice and not enemy_dice.get("consumed") and hasattr(enemy, 'id'):
+                e_attr = enemy_dice.get("attribute", "")
+                e_attr_cn = enemy_dice.get("attribute_cn", e_attr)
+                valid_attrs = ["critical_power", "combo_rate", "counter_rate", "dodge_rate",
+                               "accuracy_rate", "skill_crit_rate", "penetration_rate", "anti_crit_rate"]
+                if e_attr in valid_attrs and hasattr(enemy, e_attr):
+                    e_orig = getattr(enemy, e_attr, 0)
+                    e_boosted = e_orig * 2
+                    setattr(enemy, e_attr, e_boosted)
+                    self._temp_dice_buff[enemy.id] = (e_attr, e_orig)
+                    enemy_name = enemy.nickname if hasattr(enemy, 'nickname') else '敌人'
+                    self.battle_log.append(f"🎲 {enemy_name}的骰相·乱：{e_attr_cn} {e_orig:.0f}→{e_boosted:.0f} (+100%)")
+                    import copy
+                    new_edata = copy.deepcopy(dict(enemy_vip_data))
+                    new_edata["dice_buff"]["consumed"] = True
+                    enemy.vip_equipment_data = new_edata
+        except (AttributeError, TypeError, KeyError):
+            pass
+
         for effect in enemy_triggered:
             self.effect_manager.add_effect(enemy_id, effect)
+
+        # 应用"绝魔体质"对敌方特殊属性的战前削减（IGNORE_SPECIAL）
+        # 拥有IGNORE_SPECIAL的一方 → 对手的9种特殊属性按比例削弱
+        self.apply_ignore_special_debuff(player.id, enemy, enemy_id)
+        self.apply_ignore_special_debuff(enemy_id, player, player.id)
 
     def _register_equipment_triggers(self, unit_id: str, equipped_items: List):
         """注册装备的触发器
@@ -294,7 +391,7 @@ class EnhancedBattleEngine:
         - VIP定制装备（斩龙闪、镜怨之衣、天退星刀、归雨、折光年）：0阶即解锁全部效果
         """
         # VIP定制装备列表（0阶即全解锁）
-        VIP_EQUIPMENT_IDS = {"vip_blade_zhanlongshan", "vip_robe_jingyuanzhiyi", "heaven_retreat_star_blade", "vip_gui_yu", "vip_chrono_watch", "vip_longying_flash"}
+        VIP_EQUIPMENT_IDS = {"vip_blade_zhanlongshan", "vip_robe_jingyuanzhiyi", "heaven_retreat_star_blade", "vip_gui_yu", "vip_chrono_watch", "vip_longying_flash", "vip_ghost_dice"}
 
         for item in equipped_items:
             # 从装备配置中获取special_effects
@@ -1578,6 +1675,63 @@ class EnhancedBattleEngine:
         )
         return attack_result
 
+    # ==================== 绝魔体质：无视特殊属性 ====================
+
+    # 需要削减的9种特殊战斗属性
+    _IGNORE_SPECIAL_ATTRS = [
+        "critical_rate", "critical_power", "combo_rate", "counter_rate",
+        "dodge_rate", "accuracy_rate", "skill_crit_rate",
+        "penetration_rate", "anti_crit_rate",
+    ]
+
+    def apply_ignore_special_debuff(self, holder_id: str, target: Any, target_id: str):
+        """应用绝魔体质：将对手的特殊属性按 ignore_special 比例削减
+
+        在战斗开始时调用。拥有 IGNORE_SPECIAL 被动的一方，会使对方的 9 种
+        特殊战斗属性（暴击率/暴击伤害/连击率/反击率/闪避率/命中率/灵爆率/穿透率/抗暴率）
+        按比例削弱，从而在整场战斗中持续生效。战后通过 reset_temp_bonuses 回退。
+        """
+        ignore_effects = self.effect_manager.get_active_effects(holder_id, EffectType.IGNORE_SPECIAL)
+        ratio = 0.0
+        for eff in ignore_effects:
+            ratio += max(0.0, float(getattr(eff, 'value', 0))) / 100.0
+        ratio = min(1.0, ratio)
+        if ratio <= 0:
+            return
+
+        # 避免重复削减（同一 target 只削减一次）
+        if target_id in self._temp_ignore_special_debuff:
+            return
+
+        originals: Dict[str, float] = {}
+        is_dict = isinstance(target, dict)
+
+        for attr in self._IGNORE_SPECIAL_ATTRS:
+            if is_dict:
+                old_val = float(target.get(attr, 0))
+            elif hasattr(target, attr):
+                old_val = float(getattr(target, attr, 0))
+            else:
+                continue
+
+            if old_val <= 0:
+                continue
+
+            new_val = old_val * (1.0 - ratio)
+            if is_dict:
+                target[attr] = new_val
+            else:
+                setattr(target, attr, new_val)
+            originals[attr] = old_val
+
+        if originals:
+            self._temp_ignore_special_debuff[target_id] = originals
+            target_name = (target.get("name", "敌人") if is_dict
+                           else getattr(target, 'nickname', '敌人'))
+            self.battle_log.append(
+                f"🔮 绝魔体质：{target_name}的特殊属性被削弱{ratio * 100:.0f}%"
+            )
+
     def reset_temp_bonuses(self, unit: Any):
         """回退首回合临时增加的最大生命值等（如灵影体质）"""
         try:
@@ -1610,6 +1764,33 @@ class EnhancedBattleEngine:
             unit.max_mp = new_max_mp
             if hasattr(unit, 'mp'):
                 unit.mp = int(max(0, min(new_max_mp, ratio_mp * new_max_mp)))
+        # 回退首回合由攻击力转生命（HP_FROM_ATTACK，诡面骰）
+        bonus_hp_atk = self._temp_hp_from_attack.pop(unit_id, 0) if hasattr(self, '_temp_hp_from_attack') else 0
+        if bonus_hp_atk > 0 and hasattr(unit, 'max_hp'):
+            old_max_atk = unit.max_hp
+            new_max_atk = max(1, old_max_atk - bonus_hp_atk)
+            if hasattr(unit, 'hp') and old_max_atk > 0:
+                ratio_atk = unit.hp / float(old_max_atk)
+            else:
+                ratio_atk = 0.0
+            unit.max_hp = new_max_atk
+            if hasattr(unit, 'hp'):
+                unit.hp = int(max(0, min(new_max_atk, ratio_atk * new_max_atk)))
+        # 回退骰子buff临时属性（诡面骰·骰相·乱）
+        dice_info = self._temp_dice_buff.pop(unit_id, None) if hasattr(self, '_temp_dice_buff') else None
+        if dice_info:
+            attr_name, original_value = dice_info
+            if hasattr(unit, attr_name):
+                setattr(unit, attr_name, original_value)
+        # 回退绝魔体质对特殊属性的削减（IGNORE_SPECIAL）
+        ignore_debuff = self._temp_ignore_special_debuff.pop(unit_id, None) if hasattr(self, '_temp_ignore_special_debuff') else None
+        if ignore_debuff:
+            is_dict = isinstance(unit, dict)
+            for attr, original_value in ignore_debuff.items():
+                if is_dict:
+                    unit[attr] = original_value
+                elif hasattr(unit, attr):
+                    setattr(unit, attr, original_value)
 
     def get_battle_log(self) -> List[str]:
         """获取战斗日志"""

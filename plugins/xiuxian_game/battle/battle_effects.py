@@ -79,6 +79,9 @@ class EffectType(str, Enum):
     DAMAGE_REDUCTION = "damage_reduction"        # 伞下：受到伤害减少百分比
     GAIN_AGILITY = "gain_agility"                # 夺伞步：永久获得敏捷
 
+    # VIP定制装备效果（诡面骰）
+    HP_FROM_ATTACK = "hp_from_attack"            # 骰相·命：按最大攻击力增加最大生命值（首回合）
+
 
 @dataclass
 class BattleEffect:

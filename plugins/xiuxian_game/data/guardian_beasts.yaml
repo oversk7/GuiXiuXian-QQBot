@@ -46,7 +46,7 @@ guardian_beasts:
     description: "噩梦中撕咬灵魂的凶狼，偷菜者听到嚎叫便双腿发软"
 
   - beast_id: "void_serpent"
-    name: "虚空蛇"
+    name: "虚空蟒"
     rarity: "orange"
     intercept_rate: 85
     penalty_gold: 5000

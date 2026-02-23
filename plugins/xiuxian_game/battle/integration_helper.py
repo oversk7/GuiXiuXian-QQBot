@@ -169,7 +169,26 @@ class BattleIntegrationHelper:
         # 为玩家2也注册装备触发器
         if player2_equipped_items:
             engine._register_equipment_triggers(player2.id, player2_equipped_items)
-        # 同步首回合临时增益导致的即时生命值变化（如“灵影体质”）
+        # 补触发player2的被动+首回合效果（start_battle中仅处理player1侧）
+        from .battle_effects import TriggerType as _TT
+        try:
+            from ..utils import get_weekly_theme as _gwt
+            _theme2 = _gwt()["name"]
+        except Exception:
+            _theme2 = ""
+        _p2_region = player2.get_current_region() if hasattr(player2, 'get_current_region') else getattr(player2, 'region', "")
+        _p2_ctx = {
+            "source": "战斗开始", "current_hp": player2.hp, "max_hp": player2.max_hp,
+            "current_mp": getattr(player2, 'mp', 0), "max_mp": getattr(player2, 'max_mp', 0),
+            "region": _p2_region, "theme": _theme2,
+        }
+        for _eff in engine.effect_manager.check_triggers(player2.id, _TT.PASSIVE, _p2_ctx):
+            engine.effect_manager.add_effect(player2.id, _eff)
+        for _eff in engine.effect_manager.check_triggers(player2.id, _TT.FIRST_TURN, _p2_ctx):
+            engine.effect_manager.add_effect(player2.id, _eff)
+        # player2的绝魔体质削弱player1特殊属性
+        engine.apply_ignore_special_debuff(player2.id, player1, player1.id)
+        # 同步首回合临时增益导致的即时生命值变化（如"灵影体质"）
         player1_hp = player1.hp
         player2_hp = player2.hp
         initial_player1_hp = player1_hp
@@ -957,6 +976,25 @@ class BattleIntegrationHelper:
         # 为玩家2也注册装备触发器
         if player2_equipped_items:
             engine._register_equipment_triggers(player2.id, player2_equipped_items)
+        # 补触发player2的被动+首回合效果（start_battle中仅处理player1侧）
+        from .battle_effects import TriggerType as _TT2
+        try:
+            from ..utils import get_weekly_theme as _gwt2
+            _theme2b = _gwt2()["name"]
+        except Exception:
+            _theme2b = ""
+        _p2r2 = player2.get_current_region() if hasattr(player2, 'get_current_region') else getattr(player2, 'region', "")
+        _p2c2 = {
+            "source": "战斗开始", "current_hp": player2.hp, "max_hp": player2.max_hp,
+            "current_mp": getattr(player2, 'mp', 0), "max_mp": getattr(player2, 'max_mp', 0),
+            "region": _p2r2, "theme": _theme2b,
+        }
+        for _e2 in engine.effect_manager.check_triggers(player2.id, _TT2.PASSIVE, _p2c2):
+            engine.effect_manager.add_effect(player2.id, _e2)
+        for _e2 in engine.effect_manager.check_triggers(player2.id, _TT2.FIRST_TURN, _p2c2):
+            engine.effect_manager.add_effect(player2.id, _e2)
+        # player2的绝魔体质削弱player1特殊属性
+        engine.apply_ignore_special_debuff(player2.id, player1, player1.id)
         # 同步首回合临时增益导致的即时生命值变化（如“灵影体质”）
         player1_hp = player1.hp
         player2_hp = player2.hp

@@ -1343,6 +1343,48 @@ items:
           description: "[6] 拥有主动特技（详见【装备菜单】）"
       repair_cost: 5
 
+    - item_id: "vip_ghost_dice"
+      name: "诡面骰"
+      description: "八面各刻一道诡纹，掷下时，命运便不再是你的了。"
+      type: "EQUIPMENT"
+      rarity: "red"
+      durability: 360
+      required_level: 10
+      attr_bonus: {"attack": 100, "hp": 100, "mp": 100}
+      attr_ratio: {"attack": 2.0, "hp": 1.0, "mp": 1.0}
+      gem_slots: 5
+      special_effects:
+        - trigger: "first_turn"
+          effect: "hp_from_attack"
+          is_percentage: true
+          value: 50
+          description: "[1] 骰相·命：你的力量越强，身躯便越难被击碎——以自身最大攻击力的50%转化为最大体力值提升。"
+        - trigger: "passive"
+          effect: "ignore_special"
+          is_percentage: true
+          value: 50
+          description: "[2] 骰相·空：骰子转动时，一切诡术都像隔着一层雾——无视敌人任何形式的特殊效果、特殊属性50%影响。"
+        - trigger: "on_attack"
+          effect: "ignore_defense"
+          is_percentage: true
+          value: 20
+          description: "[3] 骰相·定：命运已定的伤害，无人可挡——自身造成的伤害中，20%伤害必中，其余80%的伤害才参与命中/暴击/穿透/减免等判定。"
+        - trigger: "on_kill"
+          effect: "gain_attack"
+          is_percentage: false
+          value: 2
+          description: "[4] 骰相·噬：骰面上的诡纹又深了一分——击杀后永久+2攻击力（战后结算；每日最多20次，共+40攻击力）。"
+        - trigger: "on_critical"
+          chance: 100
+          effect: "lifesteal"
+          value: 15
+          duration: 0
+          description: "[5] 骰相·饮：暴击时鲜血沿着骰面的纹路流淌，骰子微微发热——吸取造成伤害的15%作为生命值。"
+        - trigger: "passive"
+          effect: "none"
+          description: "[6] 骰相·乱：骰子在指尖旋转，八面诡纹明灭不定——使用【掷骰】摇动命运，随机强化一项特殊属性+100%，持续一场战斗。\n【掷骰】摇动命运（每日10次，耐久-5）\n【诡面骰】查看状态面板"
+      repair_cost: 5
+
     - item_id: "vip_longying_flash"
       name: "龙影闪"
       description: "你踏出的那一步，已经不在这个世界了。\n🌟灭法之影套装之二"
@@ -3689,7 +3731,7 @@ items:
       price: 0
       description: "噩梦中的凶狼，拦截率75%。极为罕见，只能从诡域宝箱中获得。"
     - item_id: "guardian_void_serpent"
-      name: "虚空蛇"
+      name: "虚空蟒"
       type: "GUARDIAN_BEAST"
       rarity: "orange"
       price: 0
