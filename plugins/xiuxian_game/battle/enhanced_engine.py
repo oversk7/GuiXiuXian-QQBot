@@ -186,7 +186,9 @@ class EnhancedBattleEngine:
         try:
             vip_data = getattr(player, 'vip_equipment_data', None) or {}
             dice_buff = vip_data.get("dice_buff")
-            if dice_buff and not dice_buff.get("consumed") and not self.is_sparring:
+            if dice_buff and not dice_buff.get("consumed") and not (
+                self.is_sparring and self.battle_initiator_id and str(player.id) != str(self.battle_initiator_id)
+            ):
                 attr_name = dice_buff.get("attribute", "")
                 attr_cn = dice_buff.get("attribute_cn", attr_name)
                 valid_attrs = ["critical_rate", "critical_power", "combo_rate", "counter_rate", "dodge_rate",
@@ -362,7 +364,9 @@ class EnhancedBattleEngine:
         try:
             enemy_vip_data = getattr(enemy, 'vip_equipment_data', None) or {}
             enemy_dice = enemy_vip_data.get("dice_buff")
-            if enemy_dice and not enemy_dice.get("consumed") and hasattr(enemy, 'id') and not self.is_sparring:
+            if enemy_dice and not enemy_dice.get("consumed") and hasattr(enemy, 'id') and not (
+                self.is_sparring and self.battle_initiator_id and str(enemy.id) != str(self.battle_initiator_id)
+            ):
                 e_attr = enemy_dice.get("attribute", "")
                 e_attr_cn = enemy_dice.get("attribute_cn", e_attr)
                 valid_attrs = ["critical_rate", "critical_power", "combo_rate", "counter_rate", "dodge_rate",
