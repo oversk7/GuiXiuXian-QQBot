@@ -99,13 +99,12 @@ class PlayerDonationLogRepository(IRepository[PlayerDonationLog]):
             donation_log: 捐献日志实例
 
         Returns:
-            添加后的记录（包含生成的ID）
+            添加后的记录（ID在事务提交时生成）
 
         对应原代码:
             guild_economy_service.py Line 94-99
         """
         self._session.add(donation_log)
-        await self._session.flush()  # 刷新以获取生成的ID
         return donation_log
 
     async def update(self, donation_log: PlayerDonationLog) -> PlayerDonationLog:
