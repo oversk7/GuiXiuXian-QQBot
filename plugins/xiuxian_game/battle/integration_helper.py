@@ -1203,6 +1203,13 @@ class BattleIntegrationHelper:
             battle_log.append(f"  {player2.nickname}:")
             battle_log.append(f"    {player2_hp_bar}")
 
+        # 战斗结束：回退双方首回合临时增益（如灵影体质、绝魔体质削减、骰子buff等）
+        try:
+            engine.reset_temp_bonuses(player1)
+            engine.reset_temp_bonuses(player2)
+        except Exception:
+            pass
+
         return player1_victory, battle_log, player1_damage_taken, player2_damage_taken
 
     @staticmethod
