@@ -45,6 +45,7 @@ class WorldBossDamage(Base):
     last_attack_ts: Mapped[int] = mapped_column(BigInteger, default=0, server_default="0", comment="上次攻击的UNIX秒")
     attacks_today: Mapped[int] = mapped_column(Integer, default=0, server_default="0", comment="今日已攻击次数")
     attacks_reset_date: Mapped[str] = mapped_column(String(10), default="", server_default="", comment="YYYY-MM-DD")
+    reincarnation_snapshot: Mapped[int] = mapped_column(Integer, default=-1, server_default="-1", comment="首次攻击时的转数快照（-1表示未攻击）")
 
     __table_args__ = (
         UniqueConstraint('cycle_id', 'player_id', name='uq_cycle_player'),

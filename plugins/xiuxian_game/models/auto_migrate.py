@@ -93,6 +93,10 @@ REQUIRED_FIELDS: Dict[str, Dict[str, str]] = {
     # 市场状态 - 分时补货
     "market_state": {
         "last_restock_time": "DATETIME NULL COMMENT '上次分时补货时间'"
+    },
+    # 世界BOSS - 分段排行快照
+    "world_boss_damage": {
+        "reincarnation_snapshot": "INT DEFAULT -1 COMMENT '首次攻击时的转数快照(-1表示未攻击)'"
     }
     # 注释: 以下字段已通过多次重启完成迁移:
     # - daily_task: quest_chain_id, quest_step, is_tutorial, auto_accept

@@ -77,6 +77,27 @@ class WorldBossService:
     DAILY_ATTACK_LIMIT = 3
     ATTACK_COOLDOWN = 1  # 秒
 
+    # 段位名称（每两转一段，0转单独一段）
+    TIER_NAMES = ["凡尘段", "轮回段", "超脱段", "传说段", "永恒段", "无上段"]
+
+    @staticmethod
+    def get_reincarnation_tier(reincarnation_level: int) -> int:
+        """获取转数对应的段位编号（0=凡尘/0转，1=轮回/1-2转，2=超脱/3-4转，...）"""
+        if reincarnation_level <= 0:
+            return 0
+        return (reincarnation_level - 1) // 2 + 1
+
+    @staticmethod
+    def get_tier_label(tier: int) -> str:
+        """获取段位展示名称，如'轮回段（1-2转）'"""
+        names = WorldBossService.TIER_NAMES
+        name = names[tier] if tier < len(names) else f"第{tier+1}段"
+        if tier == 0:
+            return f"{name}（0转）"
+        low = (tier - 1) * 2 + 1
+        high = tier * 2
+        return f"{name}（{low}-{high}转）"
+
     # 理智削减配置
     SANITY_DAMAGE_CONFIG = {
         "low_level_threshold": 50,  # 低等级阈值
@@ -194,13 +215,7 @@ class WorldBossService:
         return current_cycle, None
 
     async def _settle_cycle(self, cycle: WorldBossCycle) -> str:
-        """结算周期奖励
-
-        改造说明:
-            - 原Line 137内部commit()已移除，由调用方控制事务
-            - 使用self._damage_repo和self._player_repo替代session.execute
-        """
-        # 获取排行榜（使用Repository预加载优化）
+        """结算周期奖励（按段位分组，各段独立排名）"""
         results = await self._damage_repo.get_ranking(cycle.id, limit=999999)
 
         if not results:
@@ -208,41 +223,49 @@ class WorldBossService:
             await self._cycle_repo.update(cycle)
             return f"⚰️ {cycle.boss_name} 消散在虚空中，无人获得其力量..."
 
-        # 分发奖励
-        reward_count = 0
-        for rank, (damage_record, nickname, uid) in enumerate(results, 1):
+        # 按段位分组
+        from collections import defaultdict
+        tier_groups: dict = defaultdict(list)
+        for damage_record, nickname, uid in results:
             if damage_record.total_damage <= 0:
                 continue
+            snapshot = damage_record.reincarnation_snapshot
+            if snapshot == -1:
+                snapshot = 0  # 兜底：无快照视为0转
+            tier = WorldBossService.get_reincarnation_tier(snapshot)
+            tier_groups[tier].append((damage_record, nickname, uid))
 
-            # 确定奖励等级
-            chest_type = None
-            for tier in WorldBossService.REWARD_TIERS:
-                if tier["rank_range"][0] <= rank <= tier["rank_range"][1]:
-                    chest_type = tier["chest"]
-                    break
+        # 每个段位独立排名发奖
+        reward_count = 0
+        chest_item_id_map = {
+            "深渊霸主宝箱": "abyss_overlord_chest",
+            "深渊王者宝箱": "abyss_king_chest",
+            "深渊勇士宝箱": "abyss_warrior_chest",
+            "深渊探索者宝箱": "abyss_explorer_chest",
+            "深渊挑战者宝箱": "abyss_challenger_chest",
+            "深渊参与者宝箱": "abyss_participant_chest"
+        }
 
-            if chest_type:
-                # 根据宝箱类型确定item_id
-                chest_item_id_map = {
-                    "深渊霸主宝箱": "abyss_overlord_chest",
-                    "深渊王者宝箱": "abyss_king_chest",
-                    "深渊勇士宝箱": "abyss_warrior_chest",
-                    "深渊探索者宝箱": "abyss_explorer_chest",
-                    "深渊挑战者宝箱": "abyss_challenger_chest",
-                    "深渊参与者宝箱": "abyss_participant_chest"
-                }
+        for tier, group in tier_groups.items():
+            # 组内已按伤害降序（来自get_ranking），直接遍历
+            for rank, (damage_record, nickname, uid) in enumerate(group, 1):
+                chest_type = None
+                for reward_tier in WorldBossService.REWARD_TIERS:
+                    if reward_tier["rank_range"][0] <= rank <= reward_tier["rank_range"][1]:
+                        chest_type = reward_tier["chest"]
+                        break
 
-                chest_item_id = chest_item_id_map.get(chest_type)
-                if chest_item_id:
-                    # 创建宝箱物品实例
-                    chest_item = ItemInstance(
-                        player_id=damage_record.player_id,
-                        item_id=chest_item_id,
-                        quantity=1,
-                        created_at=datetime.now()
-                    )
-                    await self._item_repo.add(chest_item)
-                    reward_count += 1
+                if chest_type:
+                    chest_item_id = chest_item_id_map.get(chest_type)
+                    if chest_item_id:
+                        chest_item = ItemInstance(
+                            player_id=damage_record.player_id,
+                            item_id=chest_item_id,
+                            quantity=1,
+                            created_at=datetime.now()
+                        )
+                        await self._item_repo.add(chest_item)
+                        reward_count += 1
 
         cycle.settled = True
         await self._cycle_repo.mark_as_settled(cycle)
@@ -262,6 +285,12 @@ class WorldBossService:
 
         # 获取玩家攻击状态
         damage_record = await self._damage_repo.get_or_create(cycle.id, player.id)
+
+        # 确定玩家段位（优先使用快照，未攻击过则用当前转数预测）
+        snapshot = damage_record.reincarnation_snapshot
+        display_reincarnation = snapshot if snapshot != -1 else player.reincarnation_level
+        player_tier = WorldBossService.get_reincarnation_tier(display_reincarnation)
+        tier_label = WorldBossService.get_tier_label(player_tier)
 
         # 检查今日攻击次数
         today = datetime.now().strftime("%Y-%m-%d")
@@ -297,6 +326,7 @@ class WorldBossService:
             f"🛡️ 当前防御：{boss_stats['defense']:,}",
             f"⚡ 当前敏捷：{boss_stats['agility']:,}",
             "",
+            f"🎖️ 你的段位：{tier_label}",
             f"⚔️ 你的累计伤害：{damage_record.total_damage:,}",
             f"🎯 今日剩余攻击次数：{remaining_attacks}/{WorldBossService.DAILY_ATTACK_LIMIT}",
         ]
@@ -310,13 +340,15 @@ class WorldBossService:
             f"💥 累计伤害：{total_damage:,}",
             f"⏳ 结算时间：{cycle.next_refresh_at.strftime('%m-%d %H:%M')}",
             "",
-            "💎 奖励预览：",
-            "🏆 第1名：深渊霸主宝箱",
-            "🥈 第2-3名：深渊王者宝箱",
-            "🥉 第4-10名：深渊勇士宝箱",
-            "🎖️ 第11-30名：深渊探索者宝箱",
-            "🏅 第31-100名：深渊挑战者宝箱",
-            "🎁 参与奖：深渊参与者宝箱"
+            "💎 奖励预览（各段位独立排名）：",
+            "🏆 段内第1名：深渊霸主宝箱",
+            "🥈 段内第2-3名：深渊王者宝箱",
+            "🥉 段内第4-10名：深渊勇士宝箱",
+            "🎖️ 段内第11-30名：深渊探索者宝箱",
+            "🏅 段内第31-100名：深渊挑战者宝箱",
+            "🎁 参与奖：深渊参与者宝箱",
+            "",
+            "📊 段位划分：凡尘(0转) / 轮回(1-2转) / 超脱(3-4转) / 传说(5-6转)..."
         ])
 
         return "\n".join(lines)
@@ -342,6 +374,11 @@ class WorldBossService:
         """
         # 获取伤害记录
         damage_record = await self._get_or_create_damage_record(cycle.id, player.id)
+
+        # 首次攻击时记录转数快照（用于分段排行）
+        if damage_record.reincarnation_snapshot == -1:
+            damage_record.reincarnation_snapshot = player.reincarnation_level
+            await self._damage_repo.update(damage_record)
 
         # 检查今日攻击次数
         today = datetime.now().strftime("%Y-%m-%d")
@@ -586,63 +623,74 @@ class WorldBossService:
 
 
     async def build_ranking_view(self, cycle: WorldBossCycle) -> str:
-        """构建排行榜视图"""
-        # 获取排行榜数据（使用Repository预加载优化）
-        results = await self._damage_repo.get_ranking(cycle.id, limit=50)
+        """构建分段排行榜视图"""
+        results = await self._damage_repo.get_ranking(cycle.id, limit=999999)
 
-        if not results:
-            return f"🌟 世界BOSS：{cycle.boss_name}\n👑 {cycle.boss_title}\n━━━━━━━━━━━━━━━━━\n\n💀 暂无勇士敢于挑战这位深渊霸主...\n\n⏳ 结算时间：{cycle.next_refresh_at.strftime('%m-%d %H:%M')}"
-
-        # 构建排行榜
-        lines = [
+        header = [
             f"🌟 世界BOSS：{cycle.boss_name}",
             f"👑 {cycle.boss_title}",
             "━━━━━━━━━━━━━",
-            "🏆 伤害排行榜",
-            ""
         ]
 
-        # 显示前20名
-        for rank, (damage_record, nickname, uid) in enumerate(results[:20], 1):
-            # 确定奖励等级
-            reward_desc = "🎁 参与奖"
-            for tier in WorldBossService.REWARD_TIERS:
-                if tier["rank_range"][0] <= rank <= tier["rank_range"][1]:
-                    reward_desc = tier["description"]
-                    break
+        if not results:
+            return "\n".join(header + [
+                "",
+                "💀 暂无勇士敢于挑战这位深渊霸主...",
+                "",
+                f"⏳ 结算时间：{cycle.next_refresh_at.strftime('%m-%d %H:%M')}"
+            ])
 
-            # 排名图标
-            if rank == 1:
-                rank_icon = "🥇"
-            elif rank == 2:
-                rank_icon = "🥈"
-            elif rank == 3:
-                rank_icon = "🥉"
-            elif rank <= 10:
-                rank_icon = "🎖️"
-            else:
-                rank_icon = "🏅"
+        # 按段位分组（已按伤害降序，维持顺序）
+        from collections import defaultdict
+        tier_groups: dict = defaultdict(list)
+        for damage_record, nickname, uid in results:
+            if damage_record.total_damage <= 0:
+                continue
+            snapshot = damage_record.reincarnation_snapshot
+            if snapshot == -1:
+                snapshot = 0
+            tier = WorldBossService.get_reincarnation_tier(snapshot)
+            tier_groups[tier].append((damage_record, nickname, uid))
 
-            lines.append(f"{rank_icon} {rank:2d}. {nickname}({uid}) - {damage_record.total_damage:,}")
+        lines = header[:]
 
-        if len(results) > 20:
-            lines.append(f"... 还有 {len(results) - 20} 名勇士参与挑战")
+        # 按段位从高到低展示（高段在上）
+        for tier in sorted(tier_groups.keys(), reverse=True):
+            group = tier_groups[tier]
+            tier_label = WorldBossService.get_tier_label(tier)
+            lines.extend(["", f"🏛️ {tier_label}"])
 
-        # 统计信息
-        total_damage = sum(record.total_damage for record, _, _ in results)
+            for rank, (damage_record, nickname, uid) in enumerate(group[:10], 1):
+                reward_desc = "🎁 参与奖"
+                for reward_tier in WorldBossService.REWARD_TIERS:
+                    if reward_tier["rank_range"][0] <= rank <= reward_tier["rank_range"][1]:
+                        reward_desc = reward_tier["description"]
+                        break
+
+                if rank == 1:
+                    icon = "🥇"
+                elif rank == 2:
+                    icon = "🥈"
+                elif rank == 3:
+                    icon = "🥉"
+                else:
+                    icon = "🎖️"
+
+                lines.append(f"{icon} {rank}. {nickname}({uid}) - {damage_record.total_damage:,}")
+
+            if len(group) > 10:
+                lines.append(f"   ... 还有 {len(group) - 10} 名勇士参与")
+
+        total_participants = sum(len(g) for g in tier_groups.values())
+        total_damage = sum(r.total_damage for r, _, _ in results if r.total_damage > 0)
         lines.extend([
             "",
-            f"👥 参与勇士：{len(results)} 人",
-            f"💥 累计伤害：{total_damage:,}",
+            "━━━━━━━━━━━━━",
+            f"👥 总参与：{total_participants} 人  💥 总伤害：{total_damage:,}",
             f"⏳ 结算时间：{cycle.next_refresh_at.strftime('%m-%d %H:%M')}",
             "",
-            "💎 奖励区间：",
-            "🏆 第1名：深渊霸主宝箱",
-            "🥈 第2-3名：深渊王者宝箱",
-            "🥉 第4-10名：深渊勇士宝箱",
-            "🎖️ 第11-30名：深渊探索者宝箱",
-            "🏅 第31-100名：深渊挑战者宝箱",
-            "🎁 参与奖：深渊参与者宝箱"
+            "💎 各段位独立排名，同等奖励",
+            "📊 段位：凡尘(0转) / 轮回(1-2转) / 超脱(3-4转) / 传说(5-6转)..."
         ])
 
         return "\n".join(lines)
