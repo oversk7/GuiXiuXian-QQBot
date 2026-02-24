@@ -71,25 +71,16 @@ class Config(BaseSettings):
         creature_level_min = max(1, base_creature_level - variance)
         creature_level_max = base_creature_level + variance
 
-        # 计算理智消耗（分段函数）
-        # 设计原则：10000层以前难度低，鼓励探索；10000层以上陡增，作为挑战门槛
-        #
-        # 分段一  1–100层:    max(1, level // 20)                         第100重: 5
-        # 分段二  101–1000层: 5  + (level - 100)  // 50                   第1000重: 23
-        # 分段三  1001–5000层: 23 + (level - 1000) // 100                 第2000重: 33 | 第2600重: 39 | 第5000重: 63
-        # 分段四  5001–10000层: 63 + (level - 5000) // 50                 第10000重: 163
-        # 分段五  10001层+:   163 + (level-10000)//10 + ((level-10000)//200)²  第20000重: 3663
-        if level <= 100:
-            mp_cost = max(1, level // 20)
-        elif level <= 1000:
-            mp_cost = 5 + (level - 100) // 50
-        elif level <= 5000:
-            mp_cost = 23 + (level - 1000) // 100
-        elif level <= 10000:
-            mp_cost = 63 + (level - 5000) // 50
+        # 计算理智消耗（两段式）
+        # 前10000层：线性递增  level // 10
+        #   第10层=1, 第100层=10, 第1000层=100, 第5000层=500, 第10000层=1000
+        # 10001层+：平方增长  1000 + ((level-10000) // 50)²
+        #   第11000层=1400, 第15000层=11000, 第20000层=41000
+        if level <= 10000:
+            mp_cost = max(1, level // 10)
         else:
             excess = level - 10000
-            mp_cost = 163 + excess // 10 + (excess // 200) ** 2
+            mp_cost = 1000 + (excess // 50) ** 2
         mp_cost = max(1, mp_cost)
 
         # 随机选择诡异名称
