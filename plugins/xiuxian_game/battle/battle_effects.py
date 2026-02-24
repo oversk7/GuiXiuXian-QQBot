@@ -8,6 +8,7 @@ from dataclasses import dataclass, field
 from typing import Dict, List, Optional, Any
 import random
 import copy
+import re
 
 
 class TriggerType(str, Enum):
@@ -390,7 +391,7 @@ def parse_triggers_from_yaml(special_effects: List[Dict]) -> List[TriggerConfig]
                 duration=int(effect_data.get("duration", 0)),
                 max_stacks=int(effect_data.get("max_stacks", 1)),
                 threshold=float(effect_data.get("threshold", 0)),
-                description=effect_data.get("description", ""),
+                description=re.sub(r'^\[\d+\]\s*', '', effect_data.get("description", "")),
                 is_percentage=effect_data.get("is_percentage", True),
                 max_trigger_count=int(effect_data.get("max_trigger_count", 0)),
                 next_effect=effect_data.get("next_effect", ""),
