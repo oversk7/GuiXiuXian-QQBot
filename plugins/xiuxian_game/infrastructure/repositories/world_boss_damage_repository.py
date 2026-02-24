@@ -117,32 +117,22 @@ class WorldBossDamageRepository(IRepository[WorldBossDamage]):
 
     async def get_ranking(
         self, cycle_id: int, limit: int = 50
-    ) -> List[Tuple[WorldBossDamage, str, int]]:
+    ) -> List[Tuple[WorldBossDamage, str, int, int]]:
         """
         获取排行榜（按伤害降序，预加载玩家信息）
 
-        Args:
-            cycle_id: 周期ID
-            limit: 返回数量限制
-
         Returns:
-            排行榜列表 [(WorldBossDamage, nickname, uid), ...]
-
-        对应原代码:
-            world_boss/service.py Line 562-569（获取排行榜）
-
-        Note:
-            使用join预加载Player信息，避免N+1查询问题
+            排行榜列表 [(WorldBossDamage, nickname, uid, reincarnation_level), ...]
         """
         stmt = (
-            select(WorldBossDamage, Player.nickname, Player.uid)
+            select(WorldBossDamage, Player.nickname, Player.uid, Player.reincarnation_level)
             .join(Player, WorldBossDamage.player_id == Player.id)
             .where(WorldBossDamage.cycle_id == cycle_id)
             .order_by(WorldBossDamage.total_damage.desc())
             .limit(limit)
         )
         result = await self._session.execute(stmt)
-        return [(damage, nickname, uid) for damage, nickname, uid in result]
+        return [(damage, nickname, uid, reincarnation_level) for damage, nickname, uid, reincarnation_level in result]
 
     async def update_damage(
         self, cycle_id: int, player_id: str, damage_delta: int

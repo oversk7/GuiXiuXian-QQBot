@@ -226,13 +226,13 @@ class WorldBossService:
         # 按段位分组
         from collections import defaultdict
         tier_groups: dict = defaultdict(list)
-        for damage_record, nickname, uid in results:
+        for damage_record, nickname, uid, player_reincarnation in results:
             if damage_record.total_damage <= 0:
                 continue
             snapshot = damage_record.reincarnation_snapshot
-            if snapshot == -1:
-                snapshot = 0  # 兜底：无快照视为0转
-            tier = WorldBossService.get_reincarnation_tier(snapshot)
+            # 快照为-1说明是旧数据，回退到玩家当前转数
+            effective_reincarnation = snapshot if snapshot != -1 else player_reincarnation
+            tier = WorldBossService.get_reincarnation_tier(effective_reincarnation)
             tier_groups[tier].append((damage_record, nickname, uid))
 
         # 每个段位独立排名发奖
@@ -643,13 +643,12 @@ class WorldBossService:
         # 按段位分组（已按伤害降序，维持顺序）
         from collections import defaultdict
         tier_groups: dict = defaultdict(list)
-        for damage_record, nickname, uid in results:
+        for damage_record, nickname, uid, player_reincarnation in results:
             if damage_record.total_damage <= 0:
                 continue
             snapshot = damage_record.reincarnation_snapshot
-            if snapshot == -1:
-                snapshot = 0
-            tier = WorldBossService.get_reincarnation_tier(snapshot)
+            effective_reincarnation = snapshot if snapshot != -1 else player_reincarnation
+            tier = WorldBossService.get_reincarnation_tier(effective_reincarnation)
             tier_groups[tier].append((damage_record, nickname, uid))
 
         lines = header[:]
@@ -682,7 +681,7 @@ class WorldBossService:
                 lines.append(f"   ... 还有 {len(group) - 10} 名勇士参与")
 
         total_participants = sum(len(g) for g in tier_groups.values())
-        total_damage = sum(r.total_damage for r, _, _ in results if r.total_damage > 0)
+        total_damage = sum(r.total_damage for r, _, _, _ in results if r.total_damage > 0)
         lines.extend([
             "",
             "━━━━━━━━━━━━━",
