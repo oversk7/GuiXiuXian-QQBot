@@ -222,9 +222,10 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
                 f"👟敏 {agi_str}  🍀运 {luk_str}",
                 f"🔮咒抗 {player.stamina}",
                 f"━━━ 资产 ━━━",
-                f"🪙金币 {player.gold}  💎积分 {player.gold2}",
-                f"🕯️诡烛 {player.gui_zhu}",
-                f"💀怨念 {player.resentment}  ✨点数 {player.attribute_points}",
+                f"🪙金币 {player.gold}",
+                f"💎积分 {player.gold2}",
+                f"💀怨念 {player.resentment} ✨点数 {player.attribute_points}",
+                f"🕯️诡烛 {player.gui_zhu} 🙏香火 {player.incense}",
                 f"━━━ 位置 ━━━",
                 f"📍{_format_player_location(player)}",
             ])
