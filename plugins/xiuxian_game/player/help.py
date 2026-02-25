@@ -364,7 +364,7 @@ async def handle_fun_module(event: MessageEvent, args: Message = CommandArg()):
         "【抽签 你的问题】 观音灵签占卜\n"
         "【答案之书 你的问题】 宇宙智慧\n"
         "【驾考题目】 随机驾考题\n"
-        "【恶魔轮盘帮助】 PVP赌博游戏\n"
+        "【恶魔轮盘帮助】 PVP赌博游戏（三~六命房/旁观下注）\n"
         "【试炼列表】 互动剧情\n"
         "━━━━━━━━━━━━━\n"
         "🎉 休闲功能：\n"

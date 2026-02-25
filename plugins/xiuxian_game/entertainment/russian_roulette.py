@@ -122,7 +122,8 @@ async def handle_create_room(bot: Bot, event: MessageEvent, args: Message = Comm
             "▫️ 可使用道具增加战术性\n"
             "━━━━━━━━━━━━━\n"
             "📝 房间指令：\n"
-            "▫️ 【恶魔轮盘 创建】 - 创建游戏房间\n"
+            "▫️ 【恶魔轮盘 创建】 - 创建三命房（默认）\n"
+            "▫️ 【恶魔轮盘 创建 4】 - 创建四命房（3-6可选）\n"
             "▫️ 【恶魔轮盘 加入】 - 自动加入本群房间\n"
             "▫️ 【退出房间】 - 游戏开始前退出房间\n"
             "▫️ 【恶魔轮盘 开始】 - 开始游戏\n"
@@ -134,6 +135,11 @@ async def handle_create_room(bot: Bot, event: MessageEvent, args: Message = Comm
             "▫️ 第二位下注者的金额需 ≥ 第一位下注者\n"
             "▫️ 注意：系统将抽取3%税收\n"
             "━━━━━━━━━━━━━\n"
+            "🎲 旁观下注：\n"
+            "▫️ 【轮盘下注 玩家名 金币数】 - 支持某玩家\n"
+            "▫️ 【查看下注】 - 查看房间下注情况\n"
+            "▫️ 赢家支持者按比例瓜分输家支持者的金币\n"
+            "━━━━━━━━━━━━━\n"
             "🎲 游戏指令：\n"
             "▫️ 【开枪 <自己/对手>】 - 选择射击目标\n"
             "▫️ 【查看道具】 - 查看可用道具\n"
@@ -141,17 +147,17 @@ async def handle_create_room(bot: Bot, event: MessageEvent, args: Message = Comm
             "▫️ 【使用道具 肾上腺素 <道具名>】 - 偷取指定道具并立刻使用\n"
             "▫️ 【预知】 - 私聊指令，查看预知结果\n"
             "━━━━━━━━━━━━━\n"
-            "🎒 道具说明：\n"
-            "▫️ 🔪小刀 - 下次射击伤害翻倍\n"
-            "▫️ ⛓️手铐 - 限制对手下回合行动\n"
-            "▫️ 🚬香烟 - 恢复1点血量\n"
-            "▫️ 🔍放大镜 - 查看当前弹药类型\n"
-            "▫️ 🍺啤酒 - 退掉当前弹药\n"
-            "▫️ 💉肾上腺素 - 偷取对手道具并立刻使用\n"
-            "▫️ 💊过期药物 - 40%恢复2血量，否则扣1血量\n"
-            "▫️ 🔄逆转器 - 转换当前弹药类型\n"
-            "▫️ 📞电话 - 随机预知一发弹药位置\n"
-            "▫️ 🎲骰子 - 打乱剩余子弹顺序，使预知失效\n"
+            "🎒 道具说明（概率）：\n"
+            "▫️ 🔍放大镜(25%) - 查看下一发子弹类型\n"
+            "▫️ 🚬香烟(20%) - 恢复1点血量\n"
+            "▫️ ⛓️手铐(15%) - 跳过对手下一回合\n"
+            "▫️ 🪚手锯(15%) - 下一发实弹伤害+1\n"
+            "▫️ 🍺啤酒(15%) - 退膛当前子弹\n"
+            "▫️ 🔄逆转器(5%) - 转换当前子弹类型\n"
+            "▫️ 💉肾上腺素(3%) - 偷取并使用对手道具\n"
+            "▫️ 💊过期药(2%) - 50%回复2血/50%扣1血\n"
+            "▫️ 📱电话(1%) - 随机提示弹仓子弹类型\n"
+            "▫️ 🎲骰子(1%) - 打乱剩余子弹顺序，使预知失效\n"
             "━━━━━━━━━━━━━\n"
             "💡 注意：预知类道具需要私聊机器人查看结果"
         )
@@ -162,19 +168,31 @@ async def handle_create_room(bot: Bot, event: MessageEvent, args: Message = Comm
         if not player:
             await create_room_cmd.finish("⛔ 请先创建角色")
         
-        if args_text == "创建":
+        if args_text == "创建" or args_text.startswith("创建"):
+            # 解析血量参数：恶魔轮盘 创建 [3/4/5/6]
+            max_hp = 3
+            parts = args_text.split()
+            if len(parts) >= 2:
+                hp_arg = parts[1]
+                if hp_arg in ("3", "4", "5", "6"):
+                    max_hp = int(hp_arg)
+                else:
+                    await create_room_cmd.finish("⛔ 血量参数无效，请填入 3/4/5/6\n例如：恶魔轮盘 创建 4（四命房）")
+
             service = RussianRouletteServiceNew(
                 room_repo=RussianRouletteRoomRepository(session),
                 game_repo=RussianRouletteGameRepository(session),
                 player_repo=PlayerRepository(session)
             )
-            success, msg, room = await service.create_room(player.id, group_id)
+            hp_names = {3: "三命房", 4: "四命房", 5: "五命房", 6: "六命房"}
+            success, msg, room = await service.create_room(player.id, group_id, max_hp=max_hp)
             if success:
                 result_msg = (
                     f"🎮 恶魔轮盘赌房间创建成功！\n"
                     f"━━━━━━━━━━━━━\n"
                     f"🏠 房间ID：{room.room_id}\n"
                     f"👤 房主：{player.nickname}[UID:{player.uid}]\n"
+                    f"❤️ 模式：{hp_names.get(max_hp, f'{max_hp}命房')}（双方初始{max_hp}血）\n"
                     f"📍 绑定群聊：当前群\n"
                     f"━━━━━━━━━━━━━\n"
                     f"💡 等待其他玩家加入...\n"
@@ -332,10 +350,9 @@ async def handle_create_room(bot: Bot, event: MessageEvent, args: Message = Comm
 
                 room_info = {
                     "player1_id": room.player1_id,
-                    "player2_id": room.player2_id
+                    "player2_id": room.player2_id,
+                    "max_hp": room.max_hp
                 }
-
-                display = RussianRouletteCore.get_game_display(game_state, room_info, player_names)
 
                 # 显示初始弹药配置
                 bullets = json.loads(game.bullets)
@@ -364,7 +381,7 @@ async def handle_create_room(bot: Bot, event: MessageEvent, args: Message = Comm
                 elif "cigarette" in player1_items:
                     buttons.append("使用道具 香烟")
                 elif "knife" in player1_items:
-                    buttons.append("使用道具 小刀")
+                    buttons.append("使用道具 手锯")
 
                 # 使用Markdown模版发送带按钮的消息
                 title = "🎮 恶魔轮盘赌游戏开始"
@@ -511,7 +528,8 @@ async def handle_shoot(bot: Bot, event: MessageEvent, args: Message = CommandArg
 
         room_info = {
             "player1_id": room.player1_id,
-            "player2_id": room.player2_id
+            "player2_id": room.player2_id,
+            "max_hp": room.max_hp
         }
 
         # 构建基础消息
@@ -601,7 +619,7 @@ async def handle_shoot(bot: Bot, event: MessageEvent, args: Message = CommandArg
             elif "cigarette" in current_items:
                 buttons.append("使用道具 香烟")
             elif "knife" in current_items:
-                buttons.append("使用道具 小刀")
+                buttons.append("使用道具 手锯")
             elif "beer" in current_items:
                 buttons.append("使用道具 啤酒")
 
@@ -641,16 +659,16 @@ async def handle_use_adrenaline(bot: Bot, event: MessageEvent, args: Message = C
 
     target_item_name = args.extract_plain_text().strip()
     if not target_item_name:
-        await use_adrenaline_cmd.finish("⛔ 请指定要偷取的道具名称\n📝 示例：使用道具 肾上腺素 小刀")
+        await use_adrenaline_cmd.finish("⛔ 请指定要偷取的道具名称\n📝 示例：使用道具 肾上腺素 手锯")
 
     # 道具名称映射（肾上腺素不能偷取肾上腺素）
     item_mapping = {
-        "小刀": ItemType.KNIFE,
+        "手锯": ItemType.KNIFE,
         "手铐": ItemType.HANDCUFFS,
         "香烟": ItemType.CIGARETTE,
         "放大镜": ItemType.MAGNIFIER,
         "啤酒": ItemType.BEER,
-        "过期药物": ItemType.EXPIRED_MEDICINE,
+        "过期药": ItemType.EXPIRED_MEDICINE,
         "逆转器": ItemType.INVERTER,
         "电话": ItemType.PHONE,
         "骰子": ItemType.DICE
@@ -825,17 +843,17 @@ async def handle_use_item(bot: Bot, event: MessageEvent, args: Message = Command
 
     item_name = args.extract_plain_text().strip()
     if not item_name:
-        await use_item_cmd.finish("⛔ 请指定道具名称，如：使用道具 小刀")
+        await use_item_cmd.finish("⛔ 请指定道具名称，如：使用道具 手锯")
 
     # 道具名称映射
     item_mapping = {
-        "小刀": ItemType.KNIFE,
+        "手锯": ItemType.KNIFE,
         "手铐": ItemType.HANDCUFFS,
         "香烟": ItemType.CIGARETTE,
         "放大镜": ItemType.MAGNIFIER,
         "啤酒": ItemType.BEER,
         "肾上腺素": ItemType.ADRENALINE,
-        "过期药物": ItemType.EXPIRED_MEDICINE,
+        "过期药": ItemType.EXPIRED_MEDICINE,
         "逆转器": ItemType.INVERTER,
         "电话": ItemType.PHONE,
         "骰子": ItemType.DICE
@@ -938,7 +956,7 @@ async def handle_use_item(bot: Bot, event: MessageEvent, args: Message = Command
             success, result_msg = RussianRouletteCore.use_beer(game_state)
         elif item_type == ItemType.ADRENALINE:
             # 肾上腺素需要指定偷取的道具，这里提示用户使用正确格式
-            await use_item_cmd.finish(message_add_head("⛔ 肾上腺素需要指定偷取的道具\n📝 使用格式：使用道具 肾上腺素 [道具名]\n📝 示例：使用道具 肾上腺素 小刀", event))
+            await use_item_cmd.finish(message_add_head("⛔ 肾上腺素需要指定偷取的道具\n📝 使用格式：使用道具 肾上腺素 [道具名]\n📝 示例：使用道具 肾上腺素 手锯", event))
         elif item_type == ItemType.EXPIRED_MEDICINE:
             success, result_msg = RussianRouletteCore.use_expired_medicine(game_state, player.id, room.max_hp)
         elif item_type == ItemType.INVERTER:
@@ -1321,13 +1339,13 @@ async def handle_view_items(event: MessageEvent):
         # 构建使用道具的按钮(最多8个)
         buttons = []
         道具名映射 = {
-            ItemType.KNIFE: "小刀",
+            ItemType.KNIFE: "手锯",
             ItemType.HANDCUFFS: "手铐",
             ItemType.CIGARETTE: "香烟",
             ItemType.MAGNIFIER: "放大镜",
             ItemType.BEER: "啤酒",
             ItemType.ADRENALINE: "肾上腺素",
-            ItemType.EXPIRED_MEDICINE: "过期药物",
+            ItemType.EXPIRED_MEDICINE: "过期药",
             ItemType.INVERTER: "逆转器",
             ItemType.PHONE: "电话",
             ItemType.DICE: "骰子"
@@ -1354,6 +1372,140 @@ async def handle_view_items(event: MessageEvent):
         markdown_msg = _create_game_action_message(title, result_text, buttons)
 
         await view_items_cmd.finish(markdown_msg)
+
+
+# 旁观者下注
+bet_cmd = on_command("轮盘下注", aliases={"下注轮盘"}, block=True, priority=5)
+
+@bet_cmd.handle()
+async def handle_bet(event: MessageEvent, args: Message = CommandArg()):
+    """旁观者为轮盘赌玩家下注"""
+    session_id = event.get_session_id()
+    if not session_id.startswith("group_"):
+        await bet_cmd.finish("⛔ 下注指令只能在群聊中使用")
+
+    group_id = session_id.split("_")[1]
+    args_text = args.extract_plain_text().strip()
+    parts = args_text.split()
+
+    if len(parts) < 2:
+        await bet_cmd.finish(
+            "📝 用法：轮盘下注 [玩家昵称/UID] [金币数]\n"
+            "示例：轮盘下注 张三 500\n"
+            "⏰ 只能在双方匹配后、游戏开始前下注"
+        )
+
+    target_name = " ".join(parts[:-1])
+    gold_str = parts[-1]
+
+    try:
+        gold_amount = int(gold_str)
+    except ValueError:
+        await bet_cmd.finish("⛔ 金币数必须为数字")
+
+    async with safe_session() as session:
+        bettor = await get_unified_player(session, event)
+        if not bettor:
+            await bet_cmd.finish("⛔ 请先创建角色")
+
+        # 查找当前群的活跃房间
+        service = RussianRouletteServiceNew(
+            room_repo=RussianRouletteRoomRepository(session),
+            game_repo=RussianRouletteGameRepository(session),
+            player_repo=PlayerRepository(session)
+        )
+        room = await service._room_repo.find_group_active_room(group_id)
+        if not room:
+            await bet_cmd.finish("⛔ 本群暂无活跃的轮盘赌房间")
+
+        # 获取双方玩家信息
+        player1 = await session.get(Player, room.player1_id)
+        player2 = await session.get(Player, room.player2_id) if room.player2_id else None
+
+        # 匹配目标玩家（按昵称或UID）
+        target_player = None
+        for p in [player1, player2]:
+            if p and (p.nickname == target_name or str(p.uid) == target_name):
+                target_player = p
+                break
+
+        if not target_player:
+            p1_name = player1.nickname if player1 else "?"
+            p2_name = player2.nickname if player2 else "?"
+            await bet_cmd.finish(
+                f"⛔ 找不到玩家「{target_name}」\n"
+                f"当前房间玩家：{p1_name} / {p2_name}"
+            )
+
+        success, msg = await service.place_bet(bettor.id, room.room_id, target_player.id, gold_amount)
+        if success:
+            await bet_cmd.finish(message_add_head(
+                f"🎲 下注成功！\n"
+                f"━━━━━━━━━━━━━\n"
+                f"🎯 支持玩家：{target_player.nickname}\n"
+                f"💰 下注金额：{gold_amount}金币\n"
+                f"💡 游戏结束后自动结算",
+                event
+            ))
+        else:
+            await bet_cmd.finish(message_add_head(f"❌ {msg}", event))
+
+
+# 查看下注情况
+view_bets_cmd = on_command("查看下注", aliases={"下注情况", "轮盘下注情况"}, block=True, priority=5)
+
+@view_bets_cmd.handle()
+async def handle_view_bets(event: MessageEvent):
+    """查看当前房间的下注情况"""
+    session_id = event.get_session_id()
+    if not session_id.startswith("group_"):
+        await view_bets_cmd.finish("⛔ 此指令只能在群聊中使用")
+
+    group_id = session_id.split("_")[1]
+
+    async with safe_session() as session:
+        player = await get_unified_player(session, event)
+        if not player:
+            await view_bets_cmd.finish("⛔ 请先创建角色")
+
+        service = RussianRouletteServiceNew(
+            room_repo=RussianRouletteRoomRepository(session),
+            game_repo=RussianRouletteGameRepository(session),
+            player_repo=PlayerRepository(session)
+        )
+        room = await service._room_repo.find_group_active_room(group_id)
+        if not room:
+            await view_bets_cmd.finish("⛔ 本群暂无活跃的轮盘赌房间")
+
+        all_bets = await service.get_room_bets(room.room_id)
+
+        player1 = await session.get(Player, room.player1_id)
+        player2 = await session.get(Player, room.player2_id) if room.player2_id else None
+        p1_name = player1.nickname if player1 else "玩家1"
+        p2_name = player2.nickname if player2 else "玩家2"
+
+        if not all_bets:
+            await view_bets_cmd.finish(message_add_head(
+                f"🎲 本局暂无旁观者下注\n"
+                f"━━━━━━━━━━━━━\n"
+                f"下注方式：轮盘下注 [玩家名] [金币数]",
+                event
+            ))
+
+        p1_bets = [b for b in all_bets if b.target_player_id == room.player1_id]
+        p2_bets = [b for b in all_bets if b.target_player_id == room.player2_id]
+        p1_total = sum(b.gold_amount for b in p1_bets)
+        p2_total = sum(b.gold_amount for b in p2_bets)
+
+        lines = [
+            "🎲 旁观者下注情况",
+            "━━━━━━━━━━━━━",
+            f"🔴 支持 {p1_name}：{len(p1_bets)}人，共{p1_total}金币",
+            f"🔵 支持 {p2_name}：{len(p2_bets)}人，共{p2_total}金币",
+            "━━━━━━━━━━━━━",
+            "💡 赢家支持者按比例瓜分输家支持者的金币"
+        ]
+        await view_bets_cmd.finish(message_add_head("\n".join(lines), event))
 
 
 # 手动清理房间（管理员指令）

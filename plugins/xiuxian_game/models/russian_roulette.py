@@ -166,3 +166,15 @@ class RussianRouletteGame(Base):
     def get_player_ids_from_room(self, room: 'RussianRouletteRoom') -> tuple[str, str]:
         """从房间获取玩家ID"""
         return room.player1_id, room.player2_id
+
+
+class RussianRouletteBet(Base):
+    """恶魔轮盘赌旁观者下注表"""
+    __tablename__ = "russian_roulette_bet"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    room_id: Mapped[str] = mapped_column(String(32), index=True, comment="房间ID")
+    bettor_id: Mapped[str] = mapped_column(String(32), index=True, comment="下注者玩家ID")
+    target_player_id: Mapped[str] = mapped_column(String(32), index=True, comment="被支持的玩家ID")
+    gold_amount: Mapped[int] = mapped_column(Integer, default=0, comment="下注金额")
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.now, comment="下注时间")

@@ -120,6 +120,7 @@ REQUIRED_TABLES: Dict[str, str] = {
     # - invite_reward, dungeon_chest_record, russian_roulette_room, russian_roulette_game
     # - guild_task_record, player_task_stats, part_time_job, job_location, player_job_stats
     # - world_boss_cycle, world_boss_damage, alchemy_record
+    # - russian_roulette_bet（新增：旁观者下注记录，通过ORM Base.metadata.create_all自动建表）
 }
 
 

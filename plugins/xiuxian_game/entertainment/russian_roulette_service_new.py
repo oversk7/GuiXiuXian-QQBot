@@ -12,9 +12,10 @@
 import json
 import uuid
 from typing import Optional, Tuple, List, Dict
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from ..models.russian_roulette import RussianRouletteRoom, RussianRouletteGame, RoomStatus, GameStatus
+from ..models.russian_roulette import RussianRouletteRoom, RussianRouletteGame, RussianRouletteBet, RoomStatus, GameStatus
 from ..models.player import Player
 from ..infrastructure.repositories.russian_roulette_room_repository import RussianRouletteRoomRepository
 from ..infrastructure.repositories.russian_roulette_game_repository import RussianRouletteGameRepository
@@ -47,17 +48,21 @@ class RussianRouletteService:
         self._player_repo = player_repo
 
     async def create_room(
-        self, creator_id: str, group_id: str
+        self, creator_id: str, group_id: str, max_hp: int = 3
     ) -> Tuple[bool, str, Optional[RussianRouletteRoom]]:
         """创建游戏房间
 
         Args:
             creator_id: 创建者玩家ID
             group_id: 群组ID
+            max_hp: 双方初始血量（3-6），默认3
 
         Returns:
             (成功标志, 消息, 房间对象)
         """
+        if max_hp not in (3, 4, 5, 6):
+            return False, "初始血量必须在3到6之间（三命房/四命房/五命房/六命房）", None
+
         # 检查玩家是否已在其他房间中
         existing_room = await self.get_player_active_room(creator_id)
         if existing_room:
@@ -77,7 +82,8 @@ class RussianRouletteService:
             group_id=group_id,
             creator_id=creator_id,
             player1_id=creator_id,
-            status=RoomStatus.WAITING.value
+            status=RoomStatus.WAITING.value,
+            max_hp=max_hp
         )
 
         created_room = await self._room_repo.create(room)
@@ -406,4 +412,137 @@ class RussianRouletteService:
             f"🎮 小游戏积分：获胜者+2分，失败者+1分"
         )
 
+        # ===== 旁观者下注结算 =====
+        session = self._room_repo._session
+        stmt = select(RussianRouletteBet).where(RussianRouletteBet.room_id == room_id)
+        all_bets = list((await session.execute(stmt)).scalars().all())
+
+        if all_bets:
+            winner_bets = [b for b in all_bets if b.target_player_id == winner_id]
+            loser_bets = [b for b in all_bets if b.target_player_id != winner_id]
+
+            total_winner_pool = sum(b.gold_amount for b in winner_bets)
+            total_loser_pool = sum(b.gold_amount for b in loser_bets)
+
+            if total_loser_pool == 0:
+                # 没有输家支持者，退还赢家支持者的下注
+                for bet in winner_bets:
+                    bettor = await self._player_repo.get_by_id(bet.bettor_id)
+                    if bettor:
+                        bettor.gold += bet.gold_amount
+                        await self._player_repo.update(bettor)
+                reward_msg += f"\n━━━━━━━━━━━━━\n🎲 旁观下注：无人支持输家，{len(winner_bets)}位旁观者退还下注"
+            elif total_winner_pool == 0:
+                # 没有赢家支持者，输家支持者的钱转给赢家玩家本人
+                if winner:
+                    winner.gold += total_loser_pool
+                    await self._player_repo.update(winner)
+                reward_msg += (
+                    f"\n━━━━━━━━━━━━━\n"
+                    f"🎲 旁观下注：无人支持赢家\n"
+                    f"💸 输家支持者总计{total_loser_pool}金币转给赢家"
+                )
+            else:
+                # 正常结算：赢家支持者按比例瓜分输家支持者金币
+                bet_lines = []
+                for bet in winner_bets:
+                    share = int(total_loser_pool * bet.gold_amount / total_winner_pool)
+                    payout = bet.gold_amount + share  # 本金 + 利润
+                    bettor = await self._player_repo.get_by_id(bet.bettor_id)
+                    if bettor:
+                        bettor.gold += payout
+                        await self._player_repo.update(bettor)
+                        bet_lines.append(f"  +{share}（共{payout}）")
+                reward_msg += (
+                    f"\n━━━━━━━━━━━━━\n"
+                    f"🎲 旁观下注结算\n"
+                    f"📊 赢家支持者共{len(winner_bets)}人，"
+                    f"瓜分输家方{total_loser_pool}金币"
+                )
+
         return True, reward_msg
+
+    async def place_bet(
+        self, bettor_id: str, room_id: str, target_player_id: str, gold_amount: int
+    ) -> Tuple[bool, str]:
+        """旁观者下注支持某玩家
+
+        Args:
+            bettor_id: 下注者玩家ID
+            room_id: 房间ID
+            target_player_id: 被支持的游戏玩家ID
+            gold_amount: 下注金额
+
+        Returns:
+            (成功标志, 消息)
+        """
+        if gold_amount <= 0:
+            return False, "下注金额必须大于0"
+
+        room = await self.get_room_by_id(room_id)
+        if not room:
+            return False, "房间不存在"
+
+        # 只允许在 BETTING 阶段下注（双方匹配后、游戏开始前）
+        if room.status != RoomStatus.BETTING.value:
+            if room.status == RoomStatus.WAITING.value:
+                return False, "等待另一名玩家加入后才能下注"
+            elif room.status == RoomStatus.PLAYING.value:
+                return False, "游戏已开始，不能再下注"
+            else:
+                return False, "房间已结束，无法下注"
+
+        # 不能是游戏参与者
+        if room.is_player_in_room(bettor_id):
+            return False, "游戏参与者不能下注"
+
+        # 被支持的玩家必须是游戏参与者
+        if target_player_id not in (room.player1_id, room.player2_id):
+            return False, "只能支持游戏内的玩家"
+
+        # 检查下注者资金
+        bettor = await self._player_repo.get_by_id(bettor_id)
+        if not bettor:
+            return False, "玩家不存在"
+        if bettor.gold < gold_amount:
+            return False, f"金币不足！你有{bettor.gold}金币，需要{gold_amount}金币"
+
+        session = self._room_repo._session
+
+        # 检查是否已有下注，允许重复下注同一玩家（视为累加）
+        stmt = select(RussianRouletteBet).where(
+            RussianRouletteBet.room_id == room_id,
+            RussianRouletteBet.bettor_id == bettor_id
+        )
+        existing_bet = (await session.execute(stmt)).scalars().first()
+        if existing_bet:
+            return False, "你已经在这局下注了，每局只能下注一次"
+
+        # 扣除金币
+        bettor.gold -= gold_amount
+        await self._player_repo.update(bettor)
+
+        # 写入下注记录
+        bet = RussianRouletteBet(
+            room_id=room_id,
+            bettor_id=bettor_id,
+            target_player_id=target_player_id,
+            gold_amount=gold_amount
+        )
+        session.add(bet)
+        await session.flush()
+
+        return True, f"下注成功！已扣除{gold_amount}金币"
+
+    async def get_room_bets(self, room_id: str) -> List[RussianRouletteBet]:
+        """获取房间所有下注记录
+
+        Args:
+            room_id: 房间ID
+
+        Returns:
+            下注记录列表
+        """
+        session = self._room_repo._session
+        stmt = select(RussianRouletteBet).where(RussianRouletteBet.room_id == room_id)
+        return list((await session.execute(stmt)).scalars().all())

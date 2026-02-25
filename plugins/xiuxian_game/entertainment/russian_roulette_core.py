@@ -26,16 +26,30 @@ class RussianRouletteCore:
     
     # 道具配置
     ITEM_CONFIGS = {
-        ItemType.KNIFE: {"name": "🔪小刀", "description": "下次射击伤害翻倍"},
-        ItemType.HANDCUFFS: {"name": "⛓️手铐", "description": "限制对手下回合行动"},
+        ItemType.KNIFE: {"name": "🪚手锯", "description": "下一发实弹伤害+1"},
+        ItemType.HANDCUFFS: {"name": "⛓️手铐", "description": "跳过对手下一回合"},
         ItemType.CIGARETTE: {"name": "🚬香烟", "description": "恢复1点血量"},
-        ItemType.MAGNIFIER: {"name": "🔍放大镜", "description": "查看当前弹药类型"},
-        ItemType.BEER: {"name": "🍺啤酒", "description": "退掉当前弹药"},
-        ItemType.ADRENALINE: {"name": "💉肾上腺素", "description": "偷取对手一个道具并立刻使用"},
-        ItemType.EXPIRED_MEDICINE: {"name": "💊过期药物", "description": "40%恢复2血量，否则扣1血量"},
-        ItemType.INVERTER: {"name": "🔄逆转器", "description": "转换当前弹药类型"},
-        ItemType.PHONE: {"name": "📞电话", "description": "随机预知一发弹药位置"},
+        ItemType.MAGNIFIER: {"name": "🔍放大镜", "description": "查看下一发子弹类型"},
+        ItemType.BEER: {"name": "🍺啤酒", "description": "退膛当前子弹"},
+        ItemType.ADRENALINE: {"name": "💉肾上腺素", "description": "偷取并使用对手道具"},
+        ItemType.EXPIRED_MEDICINE: {"name": "💊过期药", "description": "50%恢复2血量，50%扣1血量"},
+        ItemType.INVERTER: {"name": "🔄逆转器", "description": "转换当前子弹类型"},
+        ItemType.PHONE: {"name": "📞电话", "description": "随机提示弹仓某发子弹类型"},
         ItemType.DICE: {"name": "🎲骰子", "description": "打乱剩余子弹顺序，使预知失效"}
+    }
+
+    # 道具权重（用于加权随机生成）
+    ITEM_WEIGHTS = {
+        ItemType.MAGNIFIER: 25,
+        ItemType.CIGARETTE: 20,
+        ItemType.HANDCUFFS: 15,
+        ItemType.KNIFE: 15,
+        ItemType.BEER: 15,
+        ItemType.INVERTER: 5,
+        ItemType.ADRENALINE: 3,
+        ItemType.EXPIRED_MEDICINE: 2,
+        ItemType.PHONE: 1,
+        ItemType.DICE: 1,
     }
     
     @staticmethod
@@ -56,35 +70,35 @@ class RussianRouletteCore:
     
     @staticmethod
     def generate_items(count: int = 4) -> List[ItemType]:
-        """生成随机道具，确保同一种道具最多出现两次"""
+        """按权重生成随机道具，确保同一种道具最多出现两次"""
         if count <= 0:
             return []
 
-        available_items = list(ItemType)
+        available_items = list(RussianRouletteCore.ITEM_WEIGHTS.keys())
+        weights = [RussianRouletteCore.ITEM_WEIGHTS[item] for item in available_items]
         max_per_item = 2
         max_total = len(available_items) * max_per_item
 
-        # 如果需求超过可分配上限，则截断到最大可分配数量
         target_count = min(count, max_total)
 
         items: List[ItemType] = []
         item_counts: Dict[ItemType, int] = {item: 0 for item in available_items}
 
-        while len(items) < target_count:
-            item = random.choice(available_items)
-            if item_counts[item] >= max_per_item:
-                continue
-
-            items.append(item)
-            item_counts[item] += 1
+        attempt = 0
+        while len(items) < target_count and attempt < target_count * 20:
+            attempt += 1
+            chosen = random.choices(available_items, weights=weights, k=1)[0]
+            if item_counts[chosen] < max_per_item:
+                items.append(chosen)
+                item_counts[chosen] += 1
 
         return items
     
     @staticmethod
     def use_knife(game_state: dict) -> Tuple[bool, str]:
-        """使用小刀"""
+        """使用手锯"""
         game_state["is_sawed_off"] = True
-        return True, "🔪 小刀已使用！下次射击伤害翻倍"
+        return True, "🪚 手锯已使用！下一发实弹伤害+1"
     
     @staticmethod
     def use_handcuffs(game_state: dict, target_player_id: str) -> Tuple[bool, str]:
@@ -209,20 +223,20 @@ class RussianRouletteCore:
     
     @staticmethod
     def use_expired_medicine(game_state: dict, player_id: str, max_hp: int = 3) -> Tuple[bool, str]:
-        """使用过期药物"""
+        """使用过期药"""
         current_hp = game_state.get(f"{player_id}_hp", 0)
-        
-        # 40%概率成功
-        if random.random() < 0.4:
+
+        # 50%概率成功
+        if random.random() < 0.5:
             # 成功：恢复2血量
             new_hp = min(max_hp, current_hp + 2)
             game_state[f"{player_id}_hp"] = new_hp
-            return True, f"💊 过期药物生效！恢复2点血量"
+            return True, f"💊 过期药生效！恢复2点血量"
         else:
             # 失败：扣除1血量
             new_hp = max(0, current_hp - 1)
             game_state[f"{player_id}_hp"] = new_hp
-            return True, f"💊 过期药物副作用！扣除1点血量"
+            return True, f"💊 过期药副作用！扣除1点血量"
     
     @staticmethod
     def use_inverter(game_state: dict) -> Tuple[bool, str]:
@@ -248,7 +262,7 @@ class RussianRouletteCore:
 
         remaining_bullets = bullets[current_index:]
         if not remaining_bullets:
-            return False, "📞 弹夹已空，无法使用电话"
+            return False, "📱 弹夹已空，无法使用电话"
 
         # 随机选择一发剩余弹药进行预知
         random_index = random.randint(0, len(remaining_bullets) - 1)
@@ -264,7 +278,7 @@ class RussianRouletteCore:
         }
         game_state["phone_info"] = json.dumps(phone_info)
 
-        return True, f"📞 电话已使用！请私聊机器人，发送【预知】查看结果"
+        return True, f"📱 电话已使用！请私聊机器人，发送【预知】查看结果"
 
     @staticmethod
     def use_dice(game_state: dict) -> Tuple[bool, str]:
@@ -416,10 +430,11 @@ class RussianRouletteCore:
         if fired_live_count > 0 or fired_blank_count > 0:
             display.append(f"📊 已打出：{fired_live_count}发实弹 + {fired_blank_count}发空包弹")
 
+        max_hp = room_info.get("max_hp", 3)
         display.extend([
             f"❤️ 血量状态：",
-            f"  {player1_name}: {'❤️' * player1_hp}{'🖤' * (3 - player1_hp)}",
-            f"  {player2_name}: {'❤️' * player2_hp}{'🖤' * (3 - player2_hp)}",
+            f"  {player1_name}: {'❤️' * player1_hp}{'🖤' * (max_hp - player1_hp)}",
+            f"  {player2_name}: {'❤️' * player2_hp}{'🖤' * (max_hp - player2_hp)}",
         ])
 
         # 显示道具信息
@@ -436,7 +451,7 @@ class RussianRouletteCore:
         # 特殊状态
         special_effects = []
         if game_state.get("is_sawed_off"):
-            special_effects.append("🔪 小刀效果：下次射击伤害翻倍")
+            special_effects.append("🪚 手锯效果：下一发实弹伤害+1")
 
         handcuffed = game_state.get("handcuffed_player_id")
         if handcuffed:
@@ -468,15 +483,16 @@ class RussianRouletteCore:
             from collections import Counter
             item_counts = Counter(player_items)
 
-            # 推荐常用道具
-            priority_items = ["magnifier", "cigarette", "knife", "beer", "phone", "dice"]
-            for item_type in priority_items:
-                if item_type in item_counts:
-                    item_config = RussianRouletteCore.ITEM_CONFIGS.get(ItemType(item_type))
-                    if item_config:
-                        item_name = item_config["name"].replace("🔍", "").replace("🚬", "").replace("🔪", "").replace("🍺", "").replace("📞", "").replace("🎲", "")
-                        commands.append(f"【使用道具 {item_name.strip()}】")
-                        break  # 只推荐一个道具，避免太多选择
+        # 推荐常用道具
+        priority_items = ["magnifier", "cigarette", "knife", "beer", "phone", "dice"]
+        item_name_map = {
+            "magnifier": "放大镜", "cigarette": "香烟", "knife": "手锯",
+            "beer": "啤酒", "phone": "电话", "dice": "骰子"
+        }
+        for item_type in priority_items:
+            if item_type in item_counts:
+                commands.append(f"【使用道具 {item_name_map[item_type]}】")
+                break  # 只推荐一个道具，避免太多选择
 
         # 其他常用指令
         commands.extend([
