@@ -362,7 +362,7 @@ async def handle_create_room(bot: Bot, event: MessageEvent, args: Message = Comm
 
                 # 构建游戏状态消息
                 result_text = (
-                    f"{display}\n"
+                    f"{msg}\n"
                     f"━━━━━━━━━━━━━\n"
                     f"👥 对战双方：\n"
                     f"  🔴 {player1.nickname}[UID:{player1.uid}]\n"
