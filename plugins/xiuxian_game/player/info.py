@@ -301,24 +301,20 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
                 f"👟敏 {agi_str}  🍀运 {luk_str}",
                 f"🔮咒抗 {player.stamina}",
                 f"━━━ 资产 ━━━",
-                f"🪙金币 {player.gold}  💎积分 {player.gold2}",
-                f"🕯️诡烛 {player.gui_zhu}",
-                f"💀怨念 {player.resentment}  ✨点数 {player.attribute_points}",
+                f"🪙金币 {player.gold}",
+                f"💎积分 {player.gold2}",
+                f"💀怨念 {player.resentment} ✨点数 {player.attribute_points}",
+                f"🕯️诡烛 {player.gui_zhu} 🙏香火 {player.incense}",
                 f"━━━ 位置 ━━━",
                 f"📍{_format_player_location(player)}",
             ])
             desc = "\r".join(desc_lines)
 
-            # 玩家头像URL（16x16小头像）
+            # 玩家头像URL
             avatar_url = f"https://thirdqq.qlogo.cn/qqapp/102499345/{qq_openid}/0"
 
             # 提示信息（留言板状态，使用\r换行）
             hint = "☞【装备栏】【社交系统】"
-
-            # 查看他人面板时不显示未读消息
-            # if unread_notice:
-            #     clean_notice = unread_notice.replace('\n', '\r')
-            #     hint += f"\r{clean_notice}"
 
             # 清理所有参数中的\n换行符，确保只使用\r
             title = title.replace('\n', '\r')
@@ -329,8 +325,8 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
             template_params = [
                 MessageMarkdownParams(key="title", values=[title]),
                 MessageMarkdownParams(key="desc", values=[desc]),
-                MessageMarkdownParams(key="width", values=["16"]),
-                MessageMarkdownParams(key="height", values=["16"]),
+                MessageMarkdownParams(key="width", values=["32"]),
+                MessageMarkdownParams(key="height", values=["32"]),
                 MessageMarkdownParams(key="imgurl", values=[avatar_url]),
                 MessageMarkdownParams(key="hint", values=[hint])
             ]
