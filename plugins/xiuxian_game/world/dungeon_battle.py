@@ -75,6 +75,67 @@ RARITY_WEIGHTS = {
     "orange": 2     # 橙色材料权重
 }
 
+# -------- 怪物原型配置 --------
+MONSTER_ARCHETYPES = {
+    "balanced": {  # 平衡型：无前缀，属性均衡
+        "name": "平衡", "prefix": "", "icon": "",
+        "stat_mult": {"hp": 1.0, "attack": 1.0, "agility": 1.0},
+        "special_profile": {"crit_rate": 1.0, "combo_rate": 1.0, "counter_rate": 1.0, "anti_crit_rate": 1.0, "true_damage_rate": 0, "defense_ratio": 0.0},
+        "weight": {"low": 50, "mid": 30, "high": 15}, "elite_weight": 3,
+    },
+    "berserker": {  # 狂暴型：高暴击高攻，脆皮
+        "name": "狂暴", "prefix": "狂暴·", "icon": "🔥",
+        "stat_mult": {"hp": 0.7, "attack": 1.35, "agility": 1.0},
+        "special_profile": {"crit_rate": 2.5, "combo_rate": 0.5, "counter_rate": 0.3, "anti_crit_rate": 0.0, "true_damage_rate": 0, "defense_ratio": 0.0},
+        "weight": {"low": 10, "mid": 20, "high": 20}, "elite_weight": 15,
+    },
+    "tank": {  # 坚韧型：高HP高防高抗暴，低攻
+        "name": "坚韧", "prefix": "坚韧·", "icon": "🛡️",
+        "stat_mult": {"hp": 1.5, "attack": 0.65, "agility": 0.7},
+        "special_profile": {"crit_rate": 0.0, "combo_rate": 0.0, "counter_rate": 0.8, "anti_crit_rate": 1.5, "true_damage_rate": 0, "defense_ratio": 0.35},
+        "weight": {"low": 10, "mid": 15, "high": 18}, "elite_weight": 15,
+    },
+    "swift": {  # 迅捷型：高敏捷高连击高反击
+        "name": "迅捷", "prefix": "迅捷·", "icon": "💨",
+        "stat_mult": {"hp": 0.85, "attack": 0.9, "agility": 1.6},
+        "special_profile": {"crit_rate": 0.5, "combo_rate": 2.5, "counter_rate": 2.0, "anti_crit_rate": 0.3, "true_damage_rate": 0, "defense_ratio": 0.0},
+        "weight": {"low": 8, "mid": 18, "high": 18}, "elite_weight": 15,
+    },
+    "piercer": {  # 穿透型：有真伤，高攻，低HP
+        "name": "穿透", "prefix": "穿透·", "icon": "🗡️",
+        "stat_mult": {"hp": 0.65, "attack": 1.2, "agility": 0.9},
+        "special_profile": {"crit_rate": 0.8, "combo_rate": 0.3, "counter_rate": 0.5, "anti_crit_rate": 0.3, "true_damage_rate": 15, "defense_ratio": 0.0},
+        "weight": {"low": 2, "mid": 8, "high": 12}, "elite_weight": 12,
+    },
+    "trickster": {  # 诡诈型：高反击高抗暴
+        "name": "诡诈", "prefix": "诡诈·", "icon": "🎭",
+        "stat_mult": {"hp": 1.0, "attack": 0.95, "agility": 1.1},
+        "special_profile": {"crit_rate": 0.6, "combo_rate": 0.4, "counter_rate": 2.5, "anti_crit_rate": 1.8, "true_damage_rate": 0, "defense_ratio": 0.1},
+        "weight": {"low": 5, "mid": 10, "high": 12}, "elite_weight": 12,
+    },
+    "devourer": {  # 噬魂型：高暴击+真伤，稀有强力型
+        "name": "噬魂", "prefix": "噬魂·", "icon": "👁️",
+        "stat_mult": {"hp": 0.75, "attack": 1.3, "agility": 1.1},
+        "special_profile": {"crit_rate": 2.0, "combo_rate": 1.0, "counter_rate": 0.5, "anti_crit_rate": 0.5, "true_damage_rate": 10, "defense_ratio": 0.0},
+        "weight": {"low": 0, "mid": 2, "high": 5}, "elite_weight": 8,
+    },
+    "guardian": {  # 守卫型：极高防御和HP，极低攻击
+        "name": "守卫", "prefix": "守卫·", "icon": "🏰",
+        "stat_mult": {"hp": 1.8, "attack": 0.5, "agility": 0.5},
+        "special_profile": {"crit_rate": 0.0, "combo_rate": 0.0, "counter_rate": 1.2, "anti_crit_rate": 2.0, "true_damage_rate": 0, "defense_ratio": 0.5},
+        "weight": {"low": 5, "mid": 7, "high": 10}, "elite_weight": 8,
+    },
+}
+
+# 怪物特殊属性上限
+MONSTER_SPECIAL_CAPS = {
+    "crit_rate": (50, 65),         # (普通上限, 精英上限)
+    "combo_rate": (30, 40),
+    "counter_rate": (60, 75),
+    "anti_crit_rate": (95, 99),
+    "true_damage_rate": (25, 35),
+}
+
 def get_materials_by_rarity(rarity: str) -> list:
     """获取指定稀有度的所有材料(排除里界专属材料和活动限定材料)"""
     materials = []
@@ -117,11 +178,56 @@ def get_region_materials(region: str) -> dict:
         "basic": region_config.get("basic_materials", [])         # 基础材料（材料格子）
     }
 
-def calculate_monster_attributes(monster_level: int, is_elite: bool = False) -> dict:
+def select_monster_archetype(monster_level: int, is_elite: bool, rng) -> str | None:
+    """根据怪物等级选择原型，200级以下返回None"""
+    if monster_level < 200:
+        return None
+
+    # 确定权重档位
+    if monster_level < 500:
+        tier_key = "low"
+    elif monster_level < 2000:
+        tier_key = "mid"
+    else:
+        tier_key = "high"
+
+    archetypes = list(MONSTER_ARCHETYPES.keys())
+    if is_elite:
+        weights = []
+        for key in archetypes:
+            arch = MONSTER_ARCHETYPES[key]
+            w = arch["elite_weight"]
+            # 精英怪中平衡型权重降到 1/3
+            if key == "balanced":
+                w = max(1, w // 3)
+            weights.append(w)
+    else:
+        weights = [MONSTER_ARCHETYPES[key]["weight"][tier_key] for key in archetypes]
+
+    return rng.choices(archetypes, weights=weights, k=1)[0]
+
+
+def get_monster_display_name(base_name: str, archetype: str | None, is_elite: bool) -> str:
+    """生成怪物显示名称（含原型前缀和精英标记）"""
+    if not archetype or archetype == "balanced":
+        prefix = ""
+    else:
+        arch = MONSTER_ARCHETYPES[archetype]
+        prefix = f"{arch['icon']}{arch['prefix']}"
+
+    if is_elite:
+        return f"精英·{prefix}{base_name}"
+    return f"{prefix}{base_name}"
+
+
+def calculate_monster_attributes(monster_level: int, is_elite: bool = False, archetype: str | None = None, rng_instance=None) -> dict:
     """
-    计算诡异属性，支持无限层级（200+级开始有特殊属性）
+    计算诡异属性，支持无限层级（200+级开始有特殊属性）和怪物原型
     爬塔系统：诡异强度逐层递增，保持挑战性
     200层以后（约1000级）大幅提高抗暴率，应对高暴击伤害玩家
+
+    archetype: 怪物原型key（如"berserker"），None时走原有逻辑
+    rng_instance: 外部传入的随机数生成器，None时创建新实例
     """
     import random
 
@@ -153,7 +259,7 @@ def calculate_monster_attributes(monster_level: int, is_elite: bool = False) -> 
         base_agility = 0.8 * monster_level + 100
 
     # 添加随机波动（±5%，减少波动保持平衡）
-    rng = random.Random()
+    rng = rng_instance if rng_instance else random.Random()
     hp_variation = rng.uniform(0.95, 1.05)
     attack_variation = rng.uniform(0.95, 1.05)
     agility_variation = rng.uniform(0.95, 1.05)
@@ -179,60 +285,105 @@ def calculate_monster_attributes(monster_level: int, is_elite: bool = False) -> 
 
     # 为200级以后的诡异添加特殊战斗属性（200层约1000级怪物）
     special_attributes = {}
+    defense = 0
+    true_damage_rate = 0
+
     if monster_level >= 200:
         # 基础特殊属性计算（基于层级）
         level_factor = (monster_level - 200) / 100  # 每100级为一个档次
 
         # 200-999级：基础特殊属性
         if monster_level < 1000:
-            # 暴击率：200级起2%，每100级+1%，最高8%
             crit_rate = min(8, 2 + level_factor * 1)
-            # 连击率：200级起1%，每100级+0.5%，最高5%
             combo_rate = min(5, 1 + level_factor * 0.5)
-            # 反击率：200级起3%，每100级+1%，最高10%
             counter_rate = min(10, 3 + level_factor * 1)
-            # 抗暴率：200级起15%，每100级+3%，最高40%（大幅提高）
             anti_crit_rate = min(40, 15 + level_factor * 3)
         else:
             # 1000级以后：超高特殊属性（200层以后）
             high_level_factor = (monster_level - 1000) / 100
-
-            # 暴击率：1000级起5%，每100级+2%，最高25%
             crit_rate = min(25, 5 + high_level_factor * 2)
-            # 连击率：1000级起3%，每100级+1.5%，最高15%
             combo_rate = min(15, 3 + high_level_factor * 1.5)
-            # 反击率：1000级起8%，每100级+2%，最高30%
             counter_rate = min(30, 8 + high_level_factor * 2)
-            # 抗暴率：1000级起50%，每100级+5%，最高80%（超高抗暴）
             anti_crit_rate = min(80, 50 + high_level_factor * 5)
 
-        # 精英诡异特殊属性加成
-        if is_elite:
-            if monster_level < 1000:
-                # 200-999级精英怪加成
-                crit_rate = min(15, crit_rate * 1.5)      # 精英诡异暴击率1.5倍，上限15%
-                combo_rate = min(8, combo_rate * 1.3)     # 精英怪连击率1.3倍，上限8%
-                counter_rate = min(15, counter_rate * 1.2) # 精英怪反击率1.2倍，上限15%
-                anti_crit_rate = min(60, anti_crit_rate * 1.4) # 精英怪抗暴率1.4倍，上限60%
-            else:
-                # 1000级以后精英怪加成
-                crit_rate = min(35, crit_rate * 1.3)      # 精英诡异暴击率1.3倍，上限35%
-                combo_rate = min(20, combo_rate * 1.2)    # 精英怪连击率1.2倍，上限20%
-                counter_rate = min(40, counter_rate * 1.2) # 精英怪反击率1.2倍，上限40%
-                anti_crit_rate = min(95, anti_crit_rate * 1.15) # 精英怪抗暴率1.15倍，上限95%
+        if archetype and archetype in MONSTER_ARCHETYPES:
+            # ---- 原型系统：应用原型倍率 ----
+            arch = MONSTER_ARCHETYPES[archetype]
+            profile = arch["special_profile"]
+
+            # 三维属性应用原型倍率
+            hp = int(hp * arch["stat_mult"]["hp"])
+            attack = int(attack * arch["stat_mult"]["attack"])
+            agility = int(agility * arch["stat_mult"]["agility"])
+
+            # 特殊属性应用原型倍率
+            crit_rate *= profile["crit_rate"]
+            combo_rate *= profile["combo_rate"]
+            counter_rate *= profile["counter_rate"]
+            anti_crit_rate *= profile["anti_crit_rate"]
+
+            # 精英怪原型强化：倍率>1.0的属性额外×1.3
+            if is_elite:
+                if profile["crit_rate"] > 1.0:
+                    crit_rate *= 1.3
+                if profile["combo_rate"] > 1.0:
+                    combo_rate *= 1.3
+                if profile["counter_rate"] > 1.0:
+                    counter_rate *= 1.3
+                if profile["anti_crit_rate"] > 1.0:
+                    anti_crit_rate *= 1.3
+
+            # 计算防御（基于当前攻击力）
+            if profile["defense_ratio"] > 0:
+                defense = int(attack * profile["defense_ratio"])
+
+            # 设置真伤率（固定值）
+            true_damage_rate = profile["true_damage_rate"]
+
+            # 精英怪真伤强化
+            if is_elite and true_damage_rate > 0:
+                true_damage_rate *= 1.3
+
+            # 应用特殊属性上限
+            cap_idx = 1 if is_elite else 0
+            crit_rate = min(crit_rate, MONSTER_SPECIAL_CAPS["crit_rate"][cap_idx])
+            combo_rate = min(combo_rate, MONSTER_SPECIAL_CAPS["combo_rate"][cap_idx])
+            counter_rate = min(counter_rate, MONSTER_SPECIAL_CAPS["counter_rate"][cap_idx])
+            anti_crit_rate = min(anti_crit_rate, MONSTER_SPECIAL_CAPS["anti_crit_rate"][cap_idx])
+            true_damage_rate = min(true_damage_rate, MONSTER_SPECIAL_CAPS["true_damage_rate"][cap_idx])
+        else:
+            # ---- 无原型：保持原有精英加成逻辑 ----
+            if is_elite:
+                if monster_level < 1000:
+                    crit_rate = min(15, crit_rate * 1.5)
+                    combo_rate = min(8, combo_rate * 1.3)
+                    counter_rate = min(15, counter_rate * 1.2)
+                    anti_crit_rate = min(60, anti_crit_rate * 1.4)
+                else:
+                    crit_rate = min(35, crit_rate * 1.3)
+                    combo_rate = min(20, combo_rate * 1.2)
+                    counter_rate = min(40, counter_rate * 1.2)
+                    anti_crit_rate = min(95, anti_crit_rate * 1.15)
 
         special_attributes = {
-            "crit_rate": round(crit_rate, 1),           # 暴击率
-            "combo_rate": round(combo_rate, 1),         # 连击率
-            "counter_rate": round(counter_rate, 1),     # 反击率
-            "anti_crit_rate": round(anti_crit_rate, 1), # 抗暴率
+            "crit_rate": round(crit_rate, 1),
+            "combo_rate": round(combo_rate, 1),
+            "counter_rate": round(counter_rate, 1),
+            "anti_crit_rate": round(anti_crit_rate, 1),
         }
 
     result = {
         "hp": hp,
         "attack": attack,
-        "agility": agility
+        "agility": agility,
+        "defense": defense,
     }
+
+    if archetype:
+        result["archetype"] = archetype
+
+    if true_damage_rate > 0:
+        result["true_damage_rate"] = round(true_damage_rate, 1)
 
     # 如果有特殊属性，添加到结果中
     if special_attributes:
@@ -475,18 +626,25 @@ async def get_or_create_tile(session, region: str, x: int, y: int) -> WorldTile:
             if region_config and region_config.get("monsters"):
                 monster = rng.choice(region_config["monsters"])
                 level_range = region_config.get("level_range", [1, 10])
-                monster_level = random.randint(level_range[0], level_range[1])
+                monster_level = rng.randint(level_range[0], level_range[1])
 
+                # 选择怪物原型
+                archetype = select_monster_archetype(monster_level, False, rng)
                 # 使用新的诡异属性计算函数
-                monster_attrs = calculate_monster_attributes(monster_level, is_elite=False)
+                monster_attrs = calculate_monster_attributes(monster_level, is_elite=False, archetype=archetype, rng_instance=rng)
+                display_name = get_monster_display_name(monster, archetype, False)
                 tile.state = {
-                    "name": monster,
+                    "name": display_name,
+                    "base_name": monster,
                     "level": monster_level,
                     "hp": monster_attrs["hp"],
                     "attack": monster_attrs["attack"],
                     "agility": monster_attrs["agility"],
+                    "defense": monster_attrs.get("defense", 0),
                     "defeated_by": []  # 记录击败过的玩家，避免原地无限刷
                 }
+                if archetype:
+                    tile.state["archetype"] = archetype
 
                 # 为200级以后的诡异添加特殊属性
                 if monster_level >= 200:
@@ -496,6 +654,8 @@ async def get_or_create_tile(session, region: str, x: int, y: int) -> WorldTile:
                         "counter_rate": monster_attrs.get("counter_rate", 0),
                         "anti_crit_rate": monster_attrs.get("anti_crit_rate", 0)
                     })
+                    if monster_attrs.get("true_damage_rate", 0) > 0:
+                        tile.state["true_damage_rate"] = monster_attrs["true_damage_rate"]
             else:
                 # 默认诡异配置
                 tile.state = {
@@ -539,17 +699,24 @@ async def get_or_create_tile(session, region: str, x: int, y: int) -> WorldTile:
                 level_range = region_config.get("level_range", [1, 10])
                 monster_level = rng.randint(level_range[0], level_range[1])
 
+                # 选择怪物原型
+                archetype = select_monster_archetype(monster_level, True, rng)
                 # 使用新的诡异属性计算函数（精英版）
-                monster_attrs = calculate_monster_attributes(monster_level, is_elite=True)
+                monster_attrs = calculate_monster_attributes(monster_level, is_elite=True, archetype=archetype, rng_instance=rng)
+                display_name = get_monster_display_name(monster, archetype, True)
                 tile.state = {
-                    "name": f"精英·{monster}",
+                    "name": display_name,
+                    "base_name": monster,
                     "level": monster_level,
                     "hp": monster_attrs["hp"],
                     "attack": monster_attrs["attack"],
                     "agility": monster_attrs["agility"],
+                    "defense": monster_attrs.get("defense", 0),
                     "is_elite": True,
                     "defeated_by": []  # 记录击败过的玩家
                 }
+                if archetype:
+                    tile.state["archetype"] = archetype
 
                 # 为200级以后的精英诡异添加特殊属性
                 if monster_level >= 200:
@@ -559,6 +726,8 @@ async def get_or_create_tile(session, region: str, x: int, y: int) -> WorldTile:
                         "counter_rate": monster_attrs.get("counter_rate", 0),
                         "anti_crit_rate": monster_attrs.get("anti_crit_rate", 0)
                     })
+                    if monster_attrs.get("true_damage_rate", 0) > 0:
+                        tile.state["true_damage_rate"] = monster_attrs["true_damage_rate"]
             else:
                 # 默认精英怪配置
                 tile.state = {
@@ -700,6 +869,10 @@ async def _(event: MessageEvent):
                         special_attrs.append(f"⚡反击{t.state['counter_rate']:.1f}%")
                     if t.state.get("anti_crit_rate", 0) > 0:
                         special_attrs.append(f"🛡️抗暴{t.state['anti_crit_rate']:.1f}%")
+                    if t.state.get("defense", 0) > 0:
+                        special_attrs.append(f"🪨防{t.state['defense']}")
+                    if t.state.get("true_damage_rate", 0) > 0:
+                        special_attrs.append(f"🗡️真伤{t.state['true_damage_rate']:.1f}%")
 
                     if special_attrs:
                         special_info = f"\n🔥 特殊能力：{' '.join(special_attrs)}"
@@ -729,6 +902,10 @@ async def _(event: MessageEvent):
                         special_attrs.append(f"⚡反击{t.state['counter_rate']:.1f}%")
                     if t.state.get("anti_crit_rate", 0) > 0:
                         special_attrs.append(f"🛡️抗暴{t.state['anti_crit_rate']:.1f}%")
+                    if t.state.get("defense", 0) > 0:
+                        special_attrs.append(f"🪨防{t.state['defense']}")
+                    if t.state.get("true_damage_rate", 0) > 0:
+                        special_attrs.append(f"🗡️真伤{t.state['true_damage_rate']:.1f}%")
 
                     if special_attrs:
                         special_info = f"\n🔥 特殊能力：{' '.join(special_attrs)}"
@@ -832,7 +1009,7 @@ async def _handle_personal_monster(session, tile: WorldTile, player: Player) -> 
         "hp": tile.state.get("hp", 0),
         "attack": tile.state.get("attack", 0),
         "agility": tile.state.get("agility", 0),
-        "defense": 0  # 诡异默认无防御
+        "defense": tile.state.get("defense", 0),
     }
 
     # 为200级以后的诡异添加特殊属性
@@ -842,7 +1019,8 @@ async def _handle_personal_monster(session, tile: WorldTile, player: Player) -> 
             "crit_rate": tile.state.get("crit_rate", 0),
             "combo_rate": tile.state.get("combo_rate", 0),
             "counter_rate": tile.state.get("counter_rate", 0),
-            "anti_crit_rate": tile.state.get("anti_crit_rate", 0)
+            "anti_crit_rate": tile.state.get("anti_crit_rate", 0),
+            "true_damage_rate": tile.state.get("true_damage_rate", 0),
         })
 
     monster_name = tile.state.get("name", "未知诡影")
@@ -860,6 +1038,10 @@ async def _handle_personal_monster(session, tile: WorldTile, player: Player) -> 
             special_attrs.append(f"⚡{monster_stats['counter_rate']:.1f}%")
         if monster_stats.get("anti_crit_rate", 0) > 0:
             special_attrs.append(f"🛡️{monster_stats['anti_crit_rate']:.1f}%")
+        if monster_stats.get("defense", 0) > 0:
+            special_attrs.append(f"🪨防{monster_stats['defense']}")
+        if monster_stats.get("true_damage_rate", 0) > 0:
+            special_attrs.append(f"🗡️真伤{monster_stats['true_damage_rate']:.1f}%")
 
         if special_attrs:
             monster_full_display += f" [{' '.join(special_attrs)}]"

@@ -77,6 +77,10 @@ async def get_tile_description(session, player: Player, region: str, x: int, y: 
                 special_attrs.append(f"⚡反击{tile.state['counter_rate']:.1f}%")
             if tile.state.get("anti_crit_rate", 0) > 0:
                 special_attrs.append(f"🛡️抗暴{tile.state['anti_crit_rate']:.1f}%")
+            if tile.state.get("defense", 0) > 0:
+                special_attrs.append(f"🪨防{tile.state['defense']}")
+            if tile.state.get("true_damage_rate", 0) > 0:
+                special_attrs.append(f"🗡️真伤{tile.state['true_damage_rate']:.1f}%")
 
             if special_attrs:
                 special_info = f"\n🔥 特殊能力：{' '.join(special_attrs)}"
@@ -105,6 +109,10 @@ async def get_tile_description(session, player: Player, region: str, x: int, y: 
             special_attrs.append(f"⚡反击{tile.state['counter_rate']:.1f}%")
         if tile.state.get("anti_crit_rate", 0) > 0:
             special_attrs.append(f"🛡️抗暴{tile.state['anti_crit_rate']:.1f}%")
+        if tile.state.get("defense", 0) > 0:
+            special_attrs.append(f"🪨防{tile.state['defense']}")
+        if tile.state.get("true_damage_rate", 0) > 0:
+            special_attrs.append(f"🗡️真伤{tile.state['true_damage_rate']:.1f}%")
 
         if special_attrs:
             special_info = f"\n🔥 特殊能力：{' '.join(special_attrs)}"
