@@ -2222,7 +2222,7 @@ items:
     # ========== 连击佛珠系列（1-10级）==========
     - item_id: "combo_bead_1"
       name: "连击佛珠"
-      description: "蕴含微弱连绵之力的金色佛珠，镶嵌后增加1%连击率 🔄"
+      description: "蕴含微弱连绵之力的金色佛珠，镶嵌后增加1%连击率 ⏩"
       type: "GEM"
       rarity: "white"
       price: 10000
@@ -2230,7 +2230,7 @@ items:
 
     - item_id: "combo_bead_2"
       name: "二级连击佛珠"
-      description: "蕴含微弱连绵之力的金色佛珠，镶嵌后增加2%连击率 🔄"
+      description: "蕴含微弱连绵之力的金色佛珠，镶嵌后增加2%连击率 ⏩"
       type: "GEM"
       rarity: "white"
       price: 20000
@@ -2238,7 +2238,7 @@ items:
 
     - item_id: "combo_bead_3"
       name: "三级连击佛珠"
-      description: "蕴含微弱连绵之力的金色佛珠，镶嵌后增加5%连击率 🔄"
+      description: "蕴含微弱连绵之力的金色佛珠，镶嵌后增加5%连击率 ⏩"
       type: "GEM"
       rarity: "white"
       price: 60000
@@ -2246,7 +2246,7 @@ items:
 
     - item_id: "combo_bead_4"
       name: "四级连击佛珠"
-      description: "蕴含一般连绵之力的金色佛珠，镶嵌后增加6%连击率 🔄"
+      description: "蕴含一般连绵之力的金色佛珠，镶嵌后增加6%连击率 ⏩"
       type: "GEM"
       rarity: "green"
       price: 80000
@@ -2254,7 +2254,7 @@ items:
 
     - item_id: "combo_bead_5"
       name: "五级连击佛珠"
-      description: "蕴含一般连绵之力的金色佛珠，镶嵌后增加7%连击率 🔄"
+      description: "蕴含一般连绵之力的金色佛珠，镶嵌后增加7%连击率 ⏩"
       type: "GEM"
       rarity: "green"
       price: 100000
@@ -2262,7 +2262,7 @@ items:
 
     - item_id: "combo_bead_6"
       name: "六级连击佛珠"
-      description: "蕴含一般连绵之力的金色佛珠，镶嵌后增加8%连击率 🔄"
+      description: "蕴含一般连绵之力的金色佛珠，镶嵌后增加8%连击率 ⏩"
       type: "GEM"
       rarity: "green"
       price: 80000
@@ -2270,7 +2270,7 @@ items:
 
     - item_id: "combo_bead_7"
       name: "七级连击佛珠"
-      description: "蕴含强大连绵之力的金色佛珠，镶嵌后增加10%连击率 🔄"
+      description: "蕴含强大连绵之力的金色佛珠，镶嵌后增加10%连击率 ⏩"
       type: "GEM"
       rarity: "blue"
       price: 140000
@@ -2278,7 +2278,7 @@ items:
 
     - item_id: "combo_bead_8"
       name: "八级连击佛珠"
-      description: "蕴含强大连绵之力的金色佛珠，镶嵌后增加12%连击率 🔄"
+      description: "蕴含强大连绵之力的金色佛珠，镶嵌后增加12%连击率 ⏩"
       type: "GEM"
       rarity: "blue"
       price: 160000
@@ -2286,7 +2286,7 @@ items:
 
     - item_id: "combo_bead_9"
       name: "九级连击佛珠"
-      description: "蕴含强大连绵之力的金色佛珠，镶嵌后增加15%连击率 🔄"
+      description: "蕴含强大连绵之力的金色佛珠，镶嵌后增加15%连击率 ⏩"
       type: "GEM"
       rarity: "blue"
       price: 180000
@@ -2294,7 +2294,7 @@ items:
 
     - item_id: "combo_bead_10"
       name: "十级连击佛珠"
-      description: "蕴含极致连绵之力的金色佛珠，镶嵌后增加20%连击率 🔄"
+      description: "蕴含极致连绵之力的金色佛珠，镶嵌后增加20%连击率 ⏩"
       type: "GEM"
       rarity: "purple"
       price: 200000
