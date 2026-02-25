@@ -86,18 +86,6 @@ class ResetAttrService:
             "luck": 1,
         }
 
-        # 累计装备 bonus
-        equipment_bonus = {k: 0 for k in INIT}
-        # 从 Session 中预加载玩家装备
-        eq_list = player.__dict__.get("item_instances")
-        if eq_list:
-            for eq in eq_list:
-                if getattr(eq, "equipped", False) and eq.config and eq.config.type == ItemType.EQUIPMENT:
-                    delta = (eq.extra_attrs or {}).get("_persist_bonus", {})
-                    for k, v in delta.items():
-                        if k in equipment_bonus:
-                            equipment_bonus[k] += int(v)
-
         # 计算丹药加成
         elixir_bonus = {k: 0 for k in INIT}
         # 获取所有丹药使用记录（不限日期，因为丹药效果是永久的）
@@ -196,30 +184,29 @@ class ResetAttrService:
             extra["_persist_bonus"] = new_delta
             eq.extra_attrs = extra
 
-        # 批量更新装备的extra_attrs
+        # 批量更新装备的extra_attrs（基础加成部分）
         await self._item_repo.update_extra_attrs_batch(equipped_items)
 
-        # 保证当前 HP/MP 不超上限
-        if player.hp > player.max_hp:
-            player.hp = player.max_hp
-        if player.mp > player.max_mp:
-            player.mp = player.max_mp
+        # 处理 mp_from_hp / hp_from_attack 等特效装备，并更新玩家记录
+        # recalc_equipment_attributes 会：
+        # 1. 先移除刚刚应用的加成，再重新计算（结果一致）
+        # 2. 额外处理 mp_from_hp/hp_from_attack 特效
+        # 3. 确保 HP/MP 不超上限
+        from .equipment_service_new import EquipmentService
+        equipment_service = EquipmentService(
+            item_repo=self._item_repo,
+            player_repo=self._player_repo
+        )
+        await equipment_service.recalc_equipment_attributes(player, equipped_items)
 
         # 生成详细的重置信息
         bonus_info = []
 
-        # 检查是否有装备加成（重新计算后的）
-        has_equipment_bonus = False
-        # 重新获取装备加成信息用于显示
-        equipped_items_display = await self._item_repo.get_equipped_equipment(
-            player.id,
-            gcfg.items_config["by_type"]["EQUIPMENT"]
+        # 检查是否有装备加成（用已处理好的列表，无需再次查询DB）
+        has_equipment_bonus = any(
+            any((eq.extra_attrs or {}).get("_persist_bonus", {}).values())
+            for eq in equipped_items
         )
-        for eq in equipped_items_display:
-            delta = (eq.extra_attrs or {}).get("_persist_bonus", {})
-            if any(delta.values()):
-                has_equipment_bonus = True
-                break
 
         if has_equipment_bonus:
             bonus_info.append("装备加成已保留")

@@ -7,6 +7,7 @@
 - 公会改名（200诡烛）
 - 购买棺材钉（50诡烛）
 - 购买哭坟帽（20诡烛）
+- 购买重启符（1000诡烛/张）
 - 购买初级月卡（88诡烛/月）
 - 购买高级月卡（288诡烛/月）
 """
@@ -26,6 +27,7 @@ BASIC_MONTHLY_CARD_PRICE = 88    # 初级月卡（诡烛/月）
 PREMIUM_MONTHLY_CARD_PRICE = 288 # 高级月卡（诡烛/月）
 INVENTORY_EXPAND_PRICE = 10      # 背包扩容（诡烛/格）
 INVENTORY_EXPAND_MAX = 1000      # 背包容量上限
+RESET_TALISMAN_PRICE = 1000      # 重启符（诡烛/张）
 
 # 称号字符限制
 TITLE_MIN_LEN = 1
@@ -394,6 +396,47 @@ class SponsorShopService:
             msg += f"\n⚠️ 已接近上限，实际扩容 {actual_slots} 格"
         return True, msg
 
+    # ==================== 重启符购买 ====================
+
+    @classmethod
+    async def buy_reset_talisman(cls, player: Player, quantity: int, session: AsyncSession) -> Tuple[bool, str]:
+        """
+        购买重启符（1000诡烛/张，进背包使用）
+
+        Returns:
+            (成功, 结果消息)
+        """
+        if quantity <= 0:
+            return False, "⛔ 购买数量必须大于0"
+
+        total_cost = RESET_TALISMAN_PRICE * quantity
+
+        if player.gui_zhu < total_cost:
+            return False, (
+                f"⛔ 诡烛不足\n"
+                f"需要: {total_cost} 诡烛（{quantity}张 × {RESET_TALISMAN_PRICE}诡烛）\n"
+                f"当前: {player.gui_zhu} 诡烛"
+            )
+
+        from ..models.inventory import ItemInstance
+        try:
+            await ItemInstance.add_item(session, player.id, "reset_scroll", quantity)
+        except ValueError:
+            return False, "⛔ 背包已满，无法添加重启符"
+
+        balance_before = player.gui_zhu
+        player.gui_zhu -= total_cost
+
+        from ..models.sponsor_shop_log import SponsorShopLog
+        await SponsorShopLog.add_log(session, player, "重启符", f"×{quantity}", total_cost, balance_before)
+
+        return True, (
+            f"✅ 购买成功！获得重启符 ×{quantity}\n"
+            f"💡 使用【使用 重启符】可重置所有已分配属性点\n"
+            f"💡 装备加成、丹药加成、VIP加成均会保留\n"
+            f"🔮 剩余诡烛: {player.gui_zhu}"
+        )
+
     # ==================== 月卡购买 ====================
 
     @classmethod
@@ -460,6 +503,8 @@ class SponsorShopService:
             f"     闭关效率+0.5%（最多100根，+50%）",
             f"  🎩  哭坟帽          [{CRYING_TOMB_HAT_PRICE} 诡烛]",
             f"     使用后获得1万怨念值",
+            f"  🔄  重启符          [{RESET_TALISMAN_PRICE} 诡烛/张]",
+            f"     重置所有属性点，装备/丹药/VIP加成保留",
             f"  🎒  背包扩容        [{INVENTORY_EXPAND_PRICE} 诡烛/格]",
             f"     永久增加1格背包容量，上限{INVENTORY_EXPAND_MAX}格",
             f"  💳  初级月卡        [{BASIC_MONTHLY_CARD_PRICE} 诡烛/月]",
@@ -487,6 +532,7 @@ class SponsorShopService:
             "📖 使用方法:",
             "【购买棺材钉】       获得1根棺材钉",
             "【购买哭坟帽】       获得1顶哭坟帽",
+            "【购买重启符 N】     购买N张重启符（默认1张）",
             "【背包扩容 N】       永久扩容N格（10诡烛/格）",
             "【购买初级月卡】     购买30天初级月卡",
             "【购买高级月卡】     购买30天高级月卡",

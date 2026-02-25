@@ -8,6 +8,7 @@
   【购买称号 <文字>】     购买自定义称号（500诡烛）
   【购买棺材钉】          购买棺材钉（50诡烛）
   【购买哭坟帽】          购买哭坟帽（20诡烛）
+  【购买重启符 [N]】      购买重启符（1000诡烛/张）
   【背包扩容 N】          背包永久扩容N格（10诡烛/格）
   【购买初级月卡】        购买30天初级月卡（88诡烛）
   【购买高级月卡】        购买30天高级月卡（288诡烛）
@@ -32,6 +33,7 @@ guild_rename_cmd = on_command("公会改名", aliases={"改名公会"}, priority
 buy_title_cmd = on_command("购买称号", priority=5, block=True)
 buy_coffin_nail_cmd = on_command("购买棺材钉", priority=5, block=True)
 buy_crying_tomb_hat_cmd = on_command("购买哭坟帽", priority=5, block=True)
+buy_reset_talisman_cmd = on_command("购买重启符", aliases={"兑换重启符"}, priority=5, block=True)
 expand_inventory_cmd = on_command("背包扩容", aliases={"扩容背包"}, priority=5, block=True)
 buy_basic_monthly_card_cmd = on_command("购买初级月卡", aliases={"兑换初级月卡"}, priority=5, block=True)
 buy_premium_monthly_card_cmd = on_command("购买高级月卡", aliases={"兑换高级月卡"}, priority=5, block=True)
@@ -148,6 +150,35 @@ async def handle_buy_crying_tomb_hat(event: MessageEvent):
         success, msg = await SponsorShopService.buy_crying_tomb_hat(player, session)
 
     await buy_crying_tomb_hat_cmd.finish(message_add_head(msg, event))
+
+
+# ==================== 购买重启符 ====================
+
+@buy_reset_talisman_cmd.handle()
+async def handle_buy_reset_talisman(event: MessageEvent, args: Message = CommandArg()):
+    """购买重启符（1000诡烛/张）"""
+    arg_text = args.extract_plain_text().strip()
+
+    quantity = 1
+    if arg_text:
+        if not arg_text.isdigit() or int(arg_text) <= 0:
+            await buy_reset_talisman_cmd.finish(message_add_head(
+                "🔄 购买重启符\n"
+                "━━━━━━━━━━━━━\n"
+                "用法：【购买重启符 [数量]】\n"
+                "示例：【购买重启符】【购买重启符 3】\n"
+                f"价格：1000 诡烛/张\n"
+                "效果：使用后重置所有属性点，可重新分配\n"
+                "保留：装备加成、丹药加成、VIP装备加成",
+                event
+            ))
+        quantity = int(arg_text)
+
+    async with safe_session() as session:
+        player = await _get_player_or_finish(session, event, buy_reset_talisman_cmd)
+        success, msg = await SponsorShopService.buy_reset_talisman(player, quantity, session)
+
+    await buy_reset_talisman_cmd.finish(message_add_head(msg, event))
 
 
 # ==================== 背包扩容 ====================
