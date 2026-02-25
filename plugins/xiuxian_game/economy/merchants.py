@@ -345,7 +345,7 @@ def _calculate_tiered_multiplier(already_bought: int, qty: int) -> float:
 
     total_cost_weight = 0.0
     remaining = qty
-    current_pos = already_bought
+    current_pos = int(already_bought)
 
     for bracket_end, multiplier in TIERED_PRICE_BRACKETS:
         if remaining <= 0:
