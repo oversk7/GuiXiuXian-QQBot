@@ -359,6 +359,11 @@ class RussianRouletteService:
     ) -> Tuple[bool, str]:
         """结束游戏并分配奖励
 
+        结算原则：风险对等 + 零和
+        - 赢方总投入 = 赢家主押注 + 赢家支持者押注
+        - 输方总资产 = 输家主押注 + 输家支持者押注
+        - 从输方总资产扣3%税收后，剩余按各人投入比例分配给赢方所有人
+
         Args:
             room_id: 房间ID
             winner_id: 获胜者玩家ID
@@ -372,28 +377,46 @@ class RussianRouletteService:
         if not room or not game:
             return False, "房间或游戏不存在"
 
-        # 计算总金币奖池
-        total_gold = room.player1_gold_bet + room.player2_gold_bet
-
-        # 抽取3%税收
-        tax_rate = 0.03
-        tax_amount = int(total_gold * tax_rate)
-        final_reward = total_gold - tax_amount
-
-        # 批量获取获胜者和失败者（优化N+1查询）
         loser_id = room.player1_id if winner_id == room.player2_id else room.player2_id
+
+        # 获取所有旁观下注记录
+        session = self._room_repo._session
+        stmt = select(RussianRouletteBet).where(RussianRouletteBet.room_id == room_id)
+        all_bets = list((await session.execute(stmt)).scalars().all())
+
+        winner_bets = [b for b in all_bets if b.target_player_id == winner_id]
+        loser_bets = [b for b in all_bets if b.target_player_id == loser_id]
+
+        # 计算各方总投入
+        winner_main_bet = room.player1_gold_bet if winner_id == room.player1_id else room.player2_gold_bet
+        loser_main_bet = room.player1_gold_bet if loser_id == room.player1_id else room.player2_gold_bet
+        winner_support_total = sum(b.gold_amount for b in winner_bets)
+        loser_support_total = sum(b.gold_amount for b in loser_bets)
+
+        # 赢方总投入 / 输方总资产
+        total_winner_side = winner_main_bet + winner_support_total
+        total_loser_side = loser_main_bet + loser_support_total
+
+        # 从输方总资产抽取3%税收
+        tax_rate = 0.03
+        tax_amount = int(total_loser_side * tax_rate)
+        distributable = total_loser_side - tax_amount  # 输方可分配资产
+
+        # 赢家玩家按投入比例分得输方资产（本金已在游戏开始时扣除，此处一并发回）
+        winner_player_profit = int(distributable * winner_main_bet / total_winner_side)
+        winner_player_payout = winner_main_bet + winner_player_profit
+
+        # 批量获取玩家对象
         players = await self._player_repo.get_many_by_ids([winner_id, loser_id])
         winner = next((p for p in players if p.id == winner_id), None)
         loser = next((p for p in players if p.id == loser_id), None)
 
         if winner:
-            winner.gold += final_reward
-            # 获胜者获得2分小游戏积分
+            winner.gold += winner_player_payout
             winner.mini_game_score += 2
             await self._player_repo.update(winner)
 
         if loser:
-            # 失败者获得1分小游戏积分
             loser.mini_game_score += 1
             await self._player_repo.update(loser)
 
@@ -404,61 +427,34 @@ class RussianRouletteService:
         await self._room_repo.update(room)
         await self._game_repo.update(game)
 
-        # 构建奖励消息
+        # 构建结算消息
         reward_msg = (
-            f"💰 奖池总额：{total_gold}金币\n"
+            f"📊 赢方总投入：{total_winner_side}金币（主押{winner_main_bet} + 支持者{winner_support_total}）\n"
+            f"📊 输方总资产：{total_loser_side}金币（主押{loser_main_bet} + 支持者{loser_support_total}）\n"
             f"💸 系统税收：{tax_amount}金币 (3%)\n"
-            f"🏆 实际获得：{final_reward}金币\n"
+            f"🏆 赢家玩家：本金{winner_main_bet} + 分红{winner_player_profit} = {winner_player_payout}金币\n"
             f"🎮 小游戏积分：获胜者+2分，失败者+1分"
         )
 
-        # ===== 旁观者下注结算 =====
-        session = self._room_repo._session
-        stmt = select(RussianRouletteBet).where(RussianRouletteBet.room_id == room_id)
-        all_bets = list((await session.execute(stmt)).scalars().all())
+        # 赢家支持者按投入比例分得输方资产
+        if winner_bets:
+            bet_lines = []
+            for bet in winner_bets:
+                profit = int(distributable * bet.gold_amount / total_winner_side)
+                payout = bet.gold_amount + profit
+                bettor = await self._player_repo.get_by_id(bet.bettor_id)
+                if bettor:
+                    bettor.gold += payout
+                    await self._player_repo.update(bettor)
+                    bet_lines.append(f"  本金{bet.gold_amount} + 分红{profit} = {payout}金币")
+            reward_msg += (
+                f"\n━━━━━━━━━━━━━\n"
+                f"🎲 赢家支持者结算（{len(winner_bets)}人）\n"
+                + "\n".join(bet_lines)
+            )
 
-        if all_bets:
-            winner_bets = [b for b in all_bets if b.target_player_id == winner_id]
-            loser_bets = [b for b in all_bets if b.target_player_id != winner_id]
-
-            total_winner_pool = sum(b.gold_amount for b in winner_bets)
-            total_loser_pool = sum(b.gold_amount for b in loser_bets)
-
-            if total_loser_pool == 0:
-                # 没有输家支持者，退还赢家支持者的下注
-                for bet in winner_bets:
-                    bettor = await self._player_repo.get_by_id(bet.bettor_id)
-                    if bettor:
-                        bettor.gold += bet.gold_amount
-                        await self._player_repo.update(bettor)
-                reward_msg += f"\n━━━━━━━━━━━━━\n🎲 旁观下注：无人支持输家，{len(winner_bets)}位旁观者退还下注"
-            elif total_winner_pool == 0:
-                # 没有赢家支持者，输家支持者的钱转给赢家玩家本人
-                if winner:
-                    winner.gold += total_loser_pool
-                    await self._player_repo.update(winner)
-                reward_msg += (
-                    f"\n━━━━━━━━━━━━━\n"
-                    f"🎲 旁观下注：无人支持赢家\n"
-                    f"💸 输家支持者总计{total_loser_pool}金币转给赢家"
-                )
-            else:
-                # 正常结算：赢家支持者按比例瓜分输家支持者金币
-                bet_lines = []
-                for bet in winner_bets:
-                    share = int(total_loser_pool * bet.gold_amount / total_winner_pool)
-                    payout = bet.gold_amount + share  # 本金 + 利润
-                    bettor = await self._player_repo.get_by_id(bet.bettor_id)
-                    if bettor:
-                        bettor.gold += payout
-                        await self._player_repo.update(bettor)
-                        bet_lines.append(f"  +{share}（共{payout}）")
-                reward_msg += (
-                    f"\n━━━━━━━━━━━━━\n"
-                    f"🎲 旁观下注结算\n"
-                    f"📊 赢家支持者共{len(winner_bets)}人，"
-                    f"瓜分输家方{total_loser_pool}金币"
-                )
+        if loser_bets:
+            reward_msg += f"\n━━━━━━━━━━━━━\n💸 {len(loser_bets)}位输家支持者共损失{loser_support_total}金币"
 
         return True, reward_msg
 
