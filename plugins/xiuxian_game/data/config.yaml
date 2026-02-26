@@ -105,9 +105,9 @@ ai_dialogue:
   # 302.ai配置（免费，主用）
   ai302:
     api_key: "***REMOVED***"  # 302.ai API密钥（需填写）
-    model: "glm-4.5-flash"  # 默认模型
+    model: "glm-z1-flash"  # 默认模型
     max_tokens: 8192  # 单次对话最大token数
-    temperature: 0.5  # 温度参数（0-1）
+    temperature: 0.6  # 温度参数（0-1）
     timeout: 30  # API调用超时时间（秒）
 
   # 降级策略配置
