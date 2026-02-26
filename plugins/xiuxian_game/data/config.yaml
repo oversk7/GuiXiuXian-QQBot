@@ -94,7 +94,7 @@ ai_dialogue:
   # LLM服务商配置
   provider: "ai302"  # zhipu | ai302 | openai | claude | local
 
-  # 智谱AI配置（免费，备用）
+  # 智谱AI配置（付费，备用）
   zhipu:
     api_key: "***REMOVED***"  # 智谱AI API密钥
     model: "GLM-4-Flash-250414"  # 默认模型
@@ -102,7 +102,7 @@ ai_dialogue:
     temperature: 0.1  # 温度参数（0-1）
     timeout: 30  # API调用超时时间（秒）
 
-  # 302.ai配置（付费，主用）
+  # 302.ai配置（免费，主用）
   ai302:
     api_key: "***REMOVED***"  # 302.ai API密钥（需填写）
     model: "glm-z1-flash"  # 默认模型

@@ -18,6 +18,17 @@ from .config import Config
 
 logger = logging.getLogger(__name__)
 
+def _strip_think_tags(response: dict) -> dict:
+    """清除AI回复中的<think>...</think>思考内容"""
+    try:
+        content = response['choices'][0]['message']['content']
+        if content and '<think>' in content:
+            content = re.sub(r'<think>[\s\S]*?</think>', '', content).strip()
+            response['choices'][0]['message']['content'] = content
+    except (KeyError, IndexError, TypeError):
+        pass
+    return response
+
 async def call_ai_with_fallback(messages: list) -> dict:
     """
     调用AI API并支持fallback降级机制
@@ -159,7 +170,7 @@ async def call_zhipu_api(messages, model="GLM-4.5-Flash", timeout=30):
         async with aiohttp.ClientSession(timeout=aiohttp.ClientTimeout(total=timeout)) as session:
             async with session.post(url, headers=headers, json=data) as response:
                 if response.status == 200:
-                    return await response.json()
+                    return _strip_think_tags(await response.json())
                 else:
                     response_text = await response.text()
                     raise aiohttp.ClientResponseError(
@@ -212,7 +223,7 @@ async def call_302ai_api(messages, model="gpt-3.5-turbo", timeout=30):
         async with aiohttp.ClientSession(timeout=aiohttp.ClientTimeout(total=timeout)) as session:
             async with session.post(url, headers=headers, json=data) as response:
                 if response.status == 200:
-                    return await response.json()
+                    return _strip_think_tags(await response.json())
                 else:
                     response_text = await response.text()
                     raise aiohttp.ClientResponseError(
