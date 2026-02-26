@@ -362,6 +362,20 @@ def execute_ai_turn(session_data: dict) -> Tuple[List[str], bool]:
 
         if not continue_turn:
             session_data["current_turn"] = "player"
+            # 交还回合给玩家前，检查弹药是否耗尽需要重装
+            gs = session_data["game_state"]
+            reloaded, reload_msg = RussianRouletteCore.check_and_reload(gs, "player", "ai")
+            if reloaded:
+                messages.append(reload_msg)
+                bullets = json.loads(gs["bullets"])
+                session_data["bullet_counts"] = {
+                    "total_live": sum(1 for b in bullets if b),
+                    "total_blank": sum(1 for b in bullets if not b),
+                    "fired_live": 0,
+                    "fired_blank": 0,
+                }
+                session_data["ai_known_bullet"] = None
+                session_data["ai_known_phone"] = None
             break
 
         # 继续 AI 行动前，再检查一下弹药
