@@ -270,7 +270,7 @@ async def handle_pve(bot: Bot, event: MessageEvent, args: Message = CommandArg()
             "▫️【pve开枪 自己/对手】射击\n"
             "▫️【pve道具 <道具名>】使用道具\n"
             "▫️【pve道具 肾上腺素 <道具名>】偷取道具\n"
-            "▫️【pve状态】查看当前状态\n"
+            "▫️【pve状态】查看当前状态和道具详情\n"
             "▫️【pve预知】查看预知结果\n"
             "━━━━━━━━━━━━━\n"
             "💰 经济：\n"
@@ -363,7 +363,8 @@ async def handle_pve(bot: Bot, event: MessageEvent, args: Message = CommandArg()
         f"━━━━━━━━━━━━━\n"
         f"🤖 AI的道具：\n{ai_items_text}\n"
         f"━━━━━━━━━━━━━\n"
-        f"📝 操作：【pve开枪 自己/对手】或【pve道具 <道具名>】"
+        f"📝 操作：【pve开枪 自己/对手】或【pve道具 <道具名>】\n"
+        f"📝 查看道具：【pve状态】"
     )
 
     if first_turn == "ai":
@@ -416,7 +417,8 @@ async def _handle_double(bot: Bot, event: MessageEvent):
             f"━━━━━━━━━━━━━\n"
             f"🤖 AI的道具：\n{ai_items_text}\n"
             f"━━━━━━━━━━━━━\n"
-            f"📝 操作：【pve开枪 自己/对手】或【pve道具 <道具名>】"
+            f"📝 操作：【pve开枪 自己/对手】或【pve道具 <道具名>】\n"
+            f"📝 查看道具：【pve状态】"
         )
 
         if first_turn == "ai":
