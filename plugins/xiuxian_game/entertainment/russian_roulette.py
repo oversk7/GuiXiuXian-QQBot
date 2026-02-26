@@ -160,6 +160,16 @@ async def handle_create_room(bot: Bot, event: MessageEvent, args: Message = Comm
             "▫️ 📱电话(1%) - 随机提示弹仓子弹类型\n"
             "▫️ 🎲骰子(1%) - 打乱剩余子弹顺序，使预知失效\n"
             "━━━━━━━━━━━━━\n"
+            "🤖 人机模式（私聊）：\n"
+            "▫️ 【人机轮盘 <金额>】 - 开始人机对战\n"
+            "▫️ 【人机轮盘 <金额> <血量>】 - 自定义血量（3-6）\n"
+            "▫️ 【pve开枪 自己/对手】 - 射击\n"
+            "▫️ 【pve道具 <道具名>】 - 使用道具\n"
+            "▫️ 【pve道具 肾上腺素 <道具名>】 - 偷取道具\n"
+            "▫️ 【pve状态】 - 查看当前状态\n"
+            "▫️ 【pve预知】 - 查看预知结果\n"
+            "▫️ 赢后可选择加倍续战或收手\n"
+            "━━━━━━━━━━━━━\n"
             "💡 注意：预知类道具需要私聊机器人查看结果"
         )
         await create_room_cmd.finish(message_add_head(help_msg, event))
