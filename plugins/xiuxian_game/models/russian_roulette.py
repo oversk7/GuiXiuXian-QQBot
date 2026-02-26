@@ -1,3 +1,4 @@
+from typing import Optional
 from sqlalchemy import String, Integer, Boolean, DateTime, Text, JSON
 from sqlalchemy.orm import Mapped, mapped_column
 from datetime import datetime
@@ -178,3 +179,47 @@ class RussianRouletteBet(Base):
     target_player_id: Mapped[str] = mapped_column(String(32), index=True, comment="被支持的玩家ID")
     gold_amount: Mapped[int] = mapped_column(Integer, default=0, comment="下注金额")
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.now, comment="下注时间")
+
+
+class PvEGameStatus(Enum):
+    """PvE 游戏状态枚举"""
+    PLAYING = "playing"    # 游戏进行中
+    WON = "won"            # 玩家已胜利（待加倍/收手）
+
+
+class RussianRoulettePvEGame(Base):
+    """恶魔轮盘 PvE 人机模式游戏状态表
+
+    只保存 playing 和 won 状态的记录，输了/收手后直接删除。
+    一个玩家同时只有一条活跃记录。
+    """
+    __tablename__ = "russian_roulette_pve_game"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    player_id: Mapped[str] = mapped_column(String(32), index=True, comment="玩家ID")
+
+    # 经济数据
+    initial_bet: Mapped[int] = mapped_column(Integer, comment="初始赌注")
+    pot: Mapped[int] = mapped_column(Integer, comment="当前奖池")
+    double_count: Mapped[int] = mapped_column(Integer, default=0, comment="加倍次数")
+
+    # 游戏设置
+    max_hp: Mapped[int] = mapped_column(Integer, default=3, comment="血量上限")
+
+    # 完整游戏状态（JSON TEXT）
+    game_state: Mapped[str] = mapped_column(Text, comment="完整game_state字典(JSON)")
+
+    # 回合控制
+    current_turn: Mapped[str] = mapped_column(String(16), comment="当前回合: player / ai")
+    status: Mapped[str] = mapped_column(String(16), default=PvEGameStatus.PLAYING.value, comment="游戏状态: playing / won")
+
+    # AI 预知信息
+    ai_known_bullet: Mapped[Optional[bool]] = mapped_column(Boolean, nullable=True, comment="AI预知的当前弹药(True=实弹)")
+    ai_known_phone: Mapped[Optional[str]] = mapped_column(Text, nullable=True, comment="AI电话预知信息(JSON)")
+
+    # 弹药统计
+    bullet_counts: Mapped[str] = mapped_column(Text, comment="弹药统计(JSON: total_live, total_blank, fired_live, fired_blank)")
+
+    # 时间戳
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.now, comment="创建时间")
+    updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.now, onupdate=datetime.now, comment="更新时间")

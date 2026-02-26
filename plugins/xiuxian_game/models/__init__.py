@@ -19,7 +19,7 @@ from .trade_record import TradeRecord
 from .daily_task import DailyTask, TaskType, TaskStatus
 # 公会任务系统
 from .guild_task_record import GuildTaskRecord, GuildTaskType, PlayerTaskStats
-from .russian_roulette import RussianRouletteRoom, RussianRouletteGame, RussianRouletteBet
+from .russian_roulette import RussianRouletteRoom, RussianRouletteGame, RussianRouletteBet, RussianRoulettePvEGame
 # 股票系统模型
 from .stock import Stock, StockHolding, StockTransaction, StockPriceHistory
 # 打工系统模型
@@ -69,7 +69,7 @@ from .sponsor_shop_log import SponsorShopLog
 __all__ = [
     "Player", "Guild", "GuildMember", "GuildBuilding", "GuildPosition", "BuildingType", "WorldMessage", "BankAccount", "ItemInstance", "WorldTile", "NavigationTask", "AlchemyRecord", "MarketOrder",
     "SocialApplication", "GiftRecord", "StorySession", "PlayerDonationLog", "ElixirUsageLog", "GuildTeleportLog",
-    "MonthlyCard", "MarketState", "RussianRouletteRoom", "RussianRouletteGame", "RussianRouletteBet",
+    "MonthlyCard", "MarketState", "RussianRouletteRoom", "RussianRouletteGame", "RussianRouletteBet", "RussianRoulettePvEGame",
     "Stock", "StockHolding", "StockTransaction", "StockPriceHistory", "TradeRecord",
     "PartTimeJob", "JobLocation", "PlayerJobStats",
     "DailyTask", "TaskType", "TaskStatus",

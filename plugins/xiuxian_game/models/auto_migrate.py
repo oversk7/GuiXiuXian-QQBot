@@ -97,6 +97,22 @@ REQUIRED_FIELDS: Dict[str, Dict[str, str]] = {
     # 世界BOSS - 分段排行快照
     "world_boss_damage": {
         "reincarnation_snapshot": "INT DEFAULT -1 COMMENT '首次攻击时的转数快照(-1表示未攻击)'"
+    },
+    # 恶魔轮盘PvE人机模式
+    "russian_roulette_pve_game": {
+        "player_id": "VARCHAR(32) NOT NULL COMMENT '玩家ID'",
+        "initial_bet": "INT NOT NULL COMMENT '初始赌注'",
+        "pot": "INT NOT NULL COMMENT '当前奖池'",
+        "double_count": "INT DEFAULT 0 COMMENT '加倍次数'",
+        "max_hp": "INT DEFAULT 3 COMMENT '血量上限'",
+        "game_state": "TEXT NOT NULL COMMENT '完整game_state字典(JSON)'",
+        "current_turn": "VARCHAR(16) NOT NULL COMMENT '当前回合: player / ai'",
+        "status": "VARCHAR(16) DEFAULT 'playing' COMMENT '游戏状态: playing / won'",
+        "ai_known_bullet": "BOOLEAN NULL COMMENT 'AI预知的当前弹药(True=实弹)'",
+        "ai_known_phone": "TEXT NULL COMMENT 'AI电话预知信息(JSON)'",
+        "bullet_counts": "TEXT NOT NULL COMMENT '弹药统计(JSON)'",
+        "created_at": "DATETIME NULL COMMENT '创建时间'",
+        "updated_at": "DATETIME NULL COMMENT '更新时间'"
     }
     # 注释: 以下字段已通过多次重启完成迁移:
     # - daily_task: quest_chain_id, quest_step, is_tutorial, auto_accept
