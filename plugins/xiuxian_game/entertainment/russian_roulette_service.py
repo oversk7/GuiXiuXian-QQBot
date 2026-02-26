@@ -2,6 +2,7 @@
 恶魔轮盘赌房间管理服务
 """
 import json
+import random
 import uuid
 from typing import Optional, Tuple, List, Dict
 from sqlalchemy import select, and_, or_
@@ -187,8 +188,9 @@ class RussianRouletteService:
         
         # 生成游戏状态
         bullets = RussianRouletteCore.generate_bullets()  # 随机选择弹药配置(2+4, 3+3, 4+2)
-        player1_items = RussianRouletteCore.generate_items(4)
-        player2_items = RussianRouletteCore.generate_items(4)
+        initial_item_count = random.randint(2, 4)  # 2-4个，双方数量相同
+        player1_items = RussianRouletteCore.generate_items(initial_item_count)
+        player2_items = RussianRouletteCore.generate_items(initial_item_count)
         
         game = RussianRouletteGame(
             room_id=room_id,

@@ -226,6 +226,13 @@ async def handle_create_room(bot: Bot, event: MessageEvent, args: Message = Comm
                 success, msg = await service.join_room(player.id, room_id, group_id)
 
             if success:
+                # 获取房间信息用于旁观下注提示
+                joined_room = await service.get_player_active_room(player.id)
+                p1_name = "玩家1"
+                if joined_room and joined_room.player1_id:
+                    p1 = await session.get(Player, joined_room.player1_id)
+                    p1_name = f"{p1.nickname}[UID:{p1.uid}]" if p1 else "玩家1"
+                p2_name = f"{player.nickname}[UID:{player.uid}]"
                 result_msg = (
                     f"✅ 成功加入房间！\n"
                     f"━━━━━━━━━━━━━\n"
@@ -234,7 +241,12 @@ async def handle_create_room(bot: Bot, event: MessageEvent, args: Message = Comm
                     f"💰 现在可以设置筹码\n"
                     f"📝 使用：恶魔轮盘 筹码 [金币数]\n"
                     f"📝 示例：恶魔轮盘 筹码 1000\n"
-                    f"💸 注意：系统将抽取3%税收"
+                    f"💸 注意：系统将抽取3%税收\n"
+                    f"━━━━━━━━━━━━━\n"
+                    f"🎲 旁观者快来押注！\n"
+                    f"🔴 {p1_name}\n"
+                    f"🔵 {p2_name}\n"
+                    f"📝 下注指令：轮盘下注 [玩家名] [金币数]"
                 )
                 await create_room_cmd.finish(message_add_head(result_msg, event))
             else:
@@ -305,6 +317,19 @@ async def handle_create_room(bot: Bot, event: MessageEvent, args: Message = Comm
                     ])
 
                 result_lines.append("📝 双方设置完成后使用：恶魔轮盘 开始")
+
+                # 旁观者下注提示（两名玩家已入场，随时可下注）
+                p1 = await session.get(Player, room.player1_id)
+                p2 = await session.get(Player, room.player2_id) if room.player2_id else None
+                p1_name = f"{p1.nickname}[UID:{p1.uid}]" if p1 else "玩家1"
+                p2_name = f"{p2.nickname}[UID:{p2.uid}]" if p2 else "玩家2"
+                result_lines.extend([
+                    "━━━━━━━━━━━━━",
+                    "🎲 旁观者快来押注！",
+                    f"🔴 {p1_name}",
+                    f"🔵 {p2_name}",
+                    "📝 下注指令：轮盘下注 [玩家名] [金币数]"
+                ])
 
                 result_msg = "\n".join(result_lines)
                 await create_room_cmd.finish(message_add_head(result_msg, event))

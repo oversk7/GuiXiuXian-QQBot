@@ -368,11 +368,29 @@ class RussianRouletteCore:
                 live_count = sum(1 for b in new_bullets if b)
                 blank_count = sum(1 for b in new_bullets if not b)
 
-                # 补满道具（每人4个）
-                player1_items = RussianRouletteCore.generate_items(4)
-                player2_items = RussianRouletteCore.generate_items(4)
-                game_state[f"{player1_id}_items"] = json.dumps([item.value for item in player1_items])
-                game_state[f"{player2_id}_items"] = json.dumps([item.value for item in player2_items])
+                # 随机补发道具（2-4个，双方数量相同，累加到已有道具，上限8个）
+                MAX_ITEMS = 8
+                new_count = random.randint(2, 4)
+                p1_existing = json.loads(game_state.get(f"{player1_id}_items") or "[]")
+                p2_existing = json.loads(game_state.get(f"{player2_id}_items") or "[]")
+
+                p1_space = max(0, MAX_ITEMS - len(p1_existing))
+                p2_space = max(0, MAX_ITEMS - len(p2_existing))
+
+                if p1_space > 0:
+                    p1_new = RussianRouletteCore.generate_items(min(new_count, p1_space))
+                    p1_existing.extend([item.value for item in p1_new])
+                if p2_space > 0:
+                    p2_new = RussianRouletteCore.generate_items(min(new_count, p2_space))
+                    p2_existing.extend([item.value for item in p2_new])
+
+                game_state[f"{player1_id}_items"] = json.dumps(p1_existing)
+                game_state[f"{player2_id}_items"] = json.dumps(p2_existing)
+
+                if p1_space == 0 and p2_space == 0:
+                    item_tip = "道具已满（上限8个），未补充新道具"
+                else:
+                    item_tip = f"各补充 {new_count} 个新道具（上限8个）"
 
                 # 清除特殊状态
                 game_state["is_sawed_off"] = False
@@ -380,7 +398,7 @@ class RussianRouletteCore:
                 game_state["magnifier_info"] = None
                 game_state["phone_info"] = None
 
-                return True, f"🔄 弹夹已空！重新装填弹药并补充道具\n💥 本轮配置：{live_count}发实弹 + {blank_count}发空包弹"
+                return True, f"🔄 弹夹已空！重新装填弹药并补充道具\n💥 本轮配置：{live_count}发实弹 + {blank_count}发空包弹\n🎒 {item_tip}"
 
         return False, ""
     
