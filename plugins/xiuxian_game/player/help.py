@@ -1552,6 +1552,13 @@ async def handle_admin_help(event: MessageEvent, args: Message = CommandArg()):
         "🎆 活动管理：\n"
         "【开启活动 [小时数]】 开启除夕叩门活动（默认48小时）\n"
         "【关闭活动】 关闭除夕叩门活动\n"
+        "━━━━━━━━━━━━━\n"
+        "🤖 AI数据库操作：\n"
+        "【管理员要求 <需求描述>】 用自然语言查询/修改数据库\n"
+        "  示例：【管理员要求 查看等级前10的玩家】\n"
+        "  示例：【管理员要求 把UID1001的金币改为50000】\n"
+        "  别名：管理员请求、管理员查询\n"
+        "  ⚠️ 支持SELECT和UPDATE，禁止DELETE/DROP等危险操作\n"
 
     )
     await admin_help_cmd.finish(Message(msg))

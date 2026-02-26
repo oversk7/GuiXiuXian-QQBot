@@ -152,7 +152,7 @@ async def call_zhipu_api(messages, model="GLM-4.5-Flash", timeout=30):
         "model": model,
         "messages": messages,
         "temperature": 0.1,
-        "thinking.type": "disabled"
+        "thinking": {"type": "disabled"}
     }
 
     try:
@@ -204,7 +204,8 @@ async def call_302ai_api(messages, model="gpt-3.5-turbo", timeout=30):
 
     data = {
         "model": model,
-        "messages": formatted_messages
+        "messages": formatted_messages,
+        "thinking": {"type": "disabled"}
     }
 
     try:
@@ -589,43 +590,16 @@ SQL语句：{sql_query}
 
         return formatted_result
 
-def is_database_query(user_message: str) -> bool:
-    """判断用户消息是否可能是数据库查询或修改请求"""
-    # 数据库查询关键词
-    query_keywords = [
-        "查询", "查看", "统计", "排行", "排名", "最高", "最多", "最少", "最大", "最小",
-        "有多少", "多少个", "哪个", "哪些", "什么", "谁", "前", "名", "榜",
-        "玩家", "公会", "等级", "金币", "财富", "修为", "结婚", "师徒", "银行",
-        "存款", "攻击", "伤害", "BOSS", "今天", "昨天", "最近"
-    ]
+async def handle_admin_database_query(user_message: str, event, matcher=None):
+    """处理管理员数据库查询和修改
 
-    # 数据库修改关键词
-    modify_keywords = [
-        "修改", "更改", "设置", "改为", "调整", "变更", "更新", "改成",
-        "坐标改为", "等级改为", "金币改为", "属性改为", "位置改为",
-        "传送到", "移动到", "设为", "调为"
-    ]
-
-    # 检查是否包含查询关键词
-    for keyword in query_keywords:
-        if keyword in user_message:
-            return True
-
-    # 检查是否包含修改关键词
-    for keyword in modify_keywords:
-        if keyword in user_message:
-            return True
-
-    # 检查是否是疑问句
-    question_patterns = ["？", "?", "吗", "呢", "啊"]
-    for pattern in question_patterns:
-        if pattern in user_message:
-            return True
-
-    return False
-
-async def handle_admin_database_query(user_message: str, event):
-    """处理管理员数据库查询和修改"""
+    Args:
+        user_message: 用户的自然语言查询/修改需求
+        event: 消息事件
+        matcher: NoneBot matcher对象，用于发送消息（默认使用admin_request）
+    """
+    if matcher is None:
+        matcher = admin_request
     try:
         # 判断是查询还是修改操作
         is_modify = any(keyword in user_message for keyword in [
@@ -635,34 +609,34 @@ async def handle_admin_database_query(user_message: str, event):
         ])
 
         if is_modify:
-            await ai_guide.send(message_add_head("🔧 管理员修改模式：正在分析您的修改需求...", event))
+            await matcher.send(message_add_head("🔧 管理员修改模式：正在分析您的修改需求...", event))
         else:
-            await ai_guide.send(message_add_head("🔍 管理员查询模式：正在分析您的查询需求...", event))
+            await matcher.send(message_add_head("🔍 管理员查询模式：正在分析您的查询需求...", event))
 
         # 调用AI生成SQL
         sql_query = await generate_sql_from_natural_language(user_message)
         print(sql_query)
         if not sql_query:
-            await ai_guide.finish(message_add_head("❌ 无法理解需求，请重新描述或使用游戏指令", event))
+            await matcher.finish(message_add_head("❌ 无法理解需求，请重新描述或使用游戏指令", event))
             return
 
         # 执行SQL
         if is_modify:
-            await ai_guide.send(message_add_head("⚡ 正在执行修改操作...", event))
+            await matcher.send(message_add_head("⚡ 正在执行修改操作...", event))
         else:
-            await ai_guide.send(message_add_head("⚡ 正在执行查询...", event))
+            await matcher.send(message_add_head("⚡ 正在执行查询...", event))
 
         result = await execute_sql_query(sql_query)
 
         # 处理不同类型的结果
         if sql_query.upper().startswith('UPDATE'):
             # UPDATE操作的结果处理
-            await ai_guide.finish(message_add_head("✅ 修改操作执行成功！", event))
+            await matcher.finish(message_add_head("✅ 修改操作执行成功！", event))
             return
         else:
             # SELECT操作的结果处理
             if not result:
-                await ai_guide.finish(message_add_head("📭 查询完成，但没有找到匹配的数据", event))
+                await matcher.finish(message_add_head("📭 查询完成，但没有找到匹配的数据", event))
                 return
 
             # 调用AI整理结果
@@ -671,17 +645,17 @@ async def handle_admin_database_query(user_message: str, event):
             # 添加管理员标识
             admin_result = f"🛡️ 管理员查询结果\n\n{formatted_result}"
 
-            await ai_guide.finish(message_add_head(admin_result, event))
+            await matcher.finish(message_add_head(admin_result, event))
             return
 
     except TimeoutError:
-        await ai_guide.finish(message_add_head("⏰ AI分析超时，请稍后重试或使用游戏指令", event))
+        await matcher.finish(message_add_head("⏰ AI分析超时，请稍后重试或使用游戏指令", event))
         return
     except (aiohttp.ClientError, aiohttp.ClientResponseError):
-        await ai_guide.finish(message_add_head("🌐 网络连接失败，请稍后重试", event))
+        await matcher.finish(message_add_head("🌐 网络连接失败，请稍后重试", event))
         return
     except ValueError as e:
-        await ai_guide.finish(message_add_head(f"❌ 操作执行失败：{str(e)}", event))
+        await matcher.finish(message_add_head(f"❌ 操作执行失败：{str(e)}", event))
         return
 
 # 预先格式化的AI指令知识库字符串常量 - 避免每次调用时重新拼接
@@ -1131,7 +1105,7 @@ ai_guide = on_command("问", aliases={"请问", "提问", "咨询"}, priority=5,
 
 @ai_guide.handle()
 async def handle_ai_guide(event: MessageEvent, args: Message = CommandArg()):
-    """AI引导处理器 - 需要明确的命令前缀"""
+    """AI引导处理器 - 所有玩家可用，仅提供游戏问答"""
     try:
         user_message = args.extract_plain_text().strip()
 
@@ -1162,13 +1136,6 @@ async def handle_ai_guide(event: MessageEvent, args: Message = CommandArg()):
                 ))
                 return  # finish后立即返回
 
-            # 检查是否为管理员的数据库查询请求
-            if is_admin(event.get_user_id()):
-                # 判断是否可能是数据库查询请求
-                if is_database_query(user_message):
-                    await handle_admin_database_query(user_message, event)
-                    return
-
             # 先发送搜索提示
             await ai_guide.send(message_add_head("🤔 正在思考您的问题...", event))
 
@@ -1188,6 +1155,53 @@ async def handle_ai_guide(event: MessageEvent, args: Message = CommandArg()):
         logger.error(f"AI引导处理失败: {e}")
         await ai_guide.finish(message_add_head(
             "❌ AI助手处理失败，请发送【帮助】查看游戏指令",
+            event
+        ))
+        return
+
+
+# ==================== 管理员数据库操作指令 ====================
+admin_request = on_command("管理员要求", aliases={"管理员请求", "管理员查询"}, priority=3, block=True)
+
+@admin_request.handle()
+async def handle_admin_request(event: MessageEvent, args: Message = CommandArg()):
+    """管理员专用数据库操作 - 仅管理员可用"""
+    try:
+        user_id = event.get_user_id()
+
+        # 权限检查
+        if not is_admin(user_id):
+            await admin_request.finish(message_add_head(
+                "⛔ 该指令仅管理员可用",
+                event
+            ))
+            return
+
+        user_message = args.extract_plain_text().strip()
+
+        if not user_message:
+            await admin_request.finish(message_add_head(
+                "🔧 管理员数据库操作\n"
+                "━━━━━━━━━━━━━\n"
+                "使用方式：【管理员要求 你的需求】\n"
+                "示例：\n"
+                "• 【管理员要求 查看等级前10的玩家】\n"
+                "• 【管理员要求 把UID1001的金币改为50000】\n"
+                "• 【管理员要求 统计全服金币总量】\n",
+                event
+            ))
+            return
+
+        await handle_admin_database_query(user_message, event)
+
+    except Exception as e:
+        from nonebot.exception import FinishedException
+        if isinstance(e, FinishedException):
+            return
+
+        logger.error(f"管理员数据库操作失败: {e}")
+        await admin_request.finish(message_add_head(
+            "❌ 管理员操作失败，请检查需求描述后重试",
             event
         ))
         return
