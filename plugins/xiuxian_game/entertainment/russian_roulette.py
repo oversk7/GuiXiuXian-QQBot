@@ -523,9 +523,11 @@ async def handle_shoot(bot: Bot, event: MessageEvent, args: Message = CommandArg
             "is_sawed_off": game.is_sawed_off,
             "handcuffed_player_id": game.handcuffed_player_id,
             "handcuffs_skip_turn": getattr(game, 'handcuffs_skip_turn', False),
-            "handcuffs_cooldown_player_id": getattr(game, "handcuffs_cooldown_player_id", None)
+            "handcuffs_cooldown_player_id": getattr(game, "handcuffs_cooldown_player_id", None),
+            f"{room.player1_id}_items": game.player1_items,
+            f"{room.player2_id}_items": game.player2_items,
         }
-        
+
         # 执行射击
         hit, shoot_msg, game_over = RussianRouletteCore.shoot(
             game_state, player.id, target_id
@@ -1015,6 +1017,10 @@ async def handle_use_item(bot: Bot, event: MessageEvent, args: Message = Command
             game.player1_items = json.dumps(player_items)
         else:
             game.player2_items = json.dumps(player_items)
+
+        # 同步 game_state 中的道具字段，确保 check_and_reload 使用消耗后的最新数据
+        game_state[f"{room.player1_id}_items"] = game.player1_items
+        game_state[f"{room.player2_id}_items"] = game.player2_items
 
         # 更新游戏状态
         game.bullets = game_state["bullets"]
