@@ -55,14 +55,12 @@ class RussianRouletteCore:
     @staticmethod
     def generate_bullets(live_count: int = None, blank_count: int = None) -> List[bool]:
         """生成随机弹药序列"""
-        # 如果没有指定数量，则从预设配置中随机选择
+        # 如果没有指定数量，则完全随机生成：总子弹数3-8，至少1实弹1空弹
         if live_count is None or blank_count is None:
-            bullet_configs = [
-                (2, 4),  # 2实弹 + 4空包弹
-                (3, 3),  # 3实弹 + 3空包弹
-                (4, 2),  # 4实弹 + 2空包弹
-            ]
-            live_count, blank_count = random.choice(bullet_configs)
+            total = random.randint(3, 8)
+            # live_count 在 [1, total-1] 之间随机，保证两种弹都有
+            live_count = random.randint(1, total - 1)
+            blank_count = total - live_count
 
         bullets = [True] * live_count + [False] * blank_count
         random.shuffle(bullets)

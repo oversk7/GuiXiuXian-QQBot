@@ -427,13 +427,22 @@ class RussianRouletteService:
         await self._room_repo.update(room)
         await self._game_repo.update(game)
 
-        # 构建结算消息
+        # 构建结算消息（精美排版，详细到每人收益）
+        winner_name = f"{winner.nickname}[UID:{winner.uid}]" if winner else "?"
+        loser_name = f"{loser.nickname}[UID:{loser.uid}]" if loser else "?"
+
         reward_msg = (
-            f"📊 赢方总投入：{total_winner_side}金币（主押{winner_main_bet} + 支持者{winner_support_total}）\n"
-            f"📊 输方总资产：{total_loser_side}金币（主押{loser_main_bet} + 支持者{loser_support_total}）\n"
-            f"💸 系统税收：{tax_amount}金币 (3%)\n"
-            f"🏆 赢家玩家：本金{winner_main_bet} + 分红{winner_player_profit} = {winner_player_payout}金币\n"
-            f"🎮 小游戏积分：获胜者+2分，失败者+1分"
+            f"━━━━━━━━━━━━━\n"
+            f"📊 战局数据\n"
+            f"  🔴 获胜：{winner_name}\n"
+            f"  🔵 落败：{loser_name}\n"
+            f"  赢方总投入：{total_winner_side}金币（主押{winner_main_bet} + 支持者{winner_support_total}）\n"
+            f"  输方总资产：{total_loser_side}金币（主押{loser_main_bet} + 支持者{loser_support_total}）\n"
+            f"  💸 系统税收：{tax_amount}金币（3%）\n"
+            f"━━━━━━━━━━━━━\n"
+            f"💰 金币结算明细\n"
+            f"🏆 {winner_name}\n"
+            f"   +{winner_player_payout}金币（本金{winner_main_bet} + 分红{winner_player_profit}）\n"
         )
 
         # 赢家支持者按投入比例分得输方资产
@@ -446,15 +455,29 @@ class RussianRouletteService:
                 if bettor:
                     bettor.gold += payout
                     await self._player_repo.update(bettor)
-                    bet_lines.append(f"  本金{bet.gold_amount} + 分红{profit} = {payout}金币")
+                    bet_lines.append(
+                        f"🎲 {bettor.nickname}[UID:{bettor.uid}]\n"
+                        f"   +{payout}金币（本金{bet.gold_amount} + 分红{profit}）"
+                    )
+            if bet_lines:
+                reward_msg += "\n".join(bet_lines) + "\n"
+
+        # 输家支持者——查询每人显示损失明细
+        if loser_bets:
+            loser_bet_lines = []
+            for bet in loser_bets:
+                bettor = await self._player_repo.get_by_id(bet.bettor_id)
+                if bettor:
+                    loser_bet_lines.append(
+                        f"💸 {bettor.nickname}[UID:{bettor.uid}]：-{bet.gold_amount}金币"
+                    )
             reward_msg += (
-                f"\n━━━━━━━━━━━━━\n"
-                f"🎲 赢家支持者结算（{len(winner_bets)}人）\n"
-                + "\n".join(bet_lines)
+                f"━━━━━━━━━━━━━\n"
+                f"😔 落败方支持者（{len(loser_bets)}人共损失{loser_support_total}金币）\n"
+                + "\n".join(loser_bet_lines) + "\n"
             )
 
-        if loser_bets:
-            reward_msg += f"\n━━━━━━━━━━━━━\n💸 {len(loser_bets)}位输家支持者共损失{loser_support_total}金币"
+        reward_msg += f"━━━━━━━━━━━━━\n🎮 小游戏积分：获胜者+2，失败者+1"
 
         return True, reward_msg
 

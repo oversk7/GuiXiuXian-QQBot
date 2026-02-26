@@ -552,7 +552,7 @@ async def handle_shoot(bot: Bot, event: MessageEvent, args: Message = CommandArg
                 player_repo=PlayerRepository(session)
             )
             _, reward_msg = await service.finish_game(room.room_id, winner_id)
-            result_msg += f"\n🏆 {winner.nickname} 获胜！\n{reward_msg}"
+            result_msg += f"\n\n🎊 游戏结束！{winner.nickname}[UID:{winner.uid}] 获胜！\n{reward_msg}"
         else:
             # 游戏继续 - 构建完整的游戏状态用于显示
             display_game_state = {
@@ -803,7 +803,7 @@ async def handle_use_adrenaline(bot: Bot, event: MessageEvent, args: Message = C
                 player_repo=PlayerRepository(session)
             )
             _, reward_msg = await service.finish_game(room.room_id, winner_id)
-            final_msg += f"\n🏆 {winner.nickname} 获胜！\n{reward_msg}"
+            final_msg += f"\n\n🎊 游戏结束！{winner.nickname}[UID:{winner.uid}] 获胜！\n{reward_msg}"
 
         # 如果重新装弹了且游戏未结束，需要分别发送道具信息
         if reloaded and not game_over:
@@ -1033,7 +1033,7 @@ async def handle_use_item(bot: Bot, event: MessageEvent, args: Message = Command
                 player_repo=PlayerRepository(session)
             )
             _, reward_msg = await service.finish_game(room.room_id, winner_id)
-            final_msg += f"\n🏆 {winner.nickname} 获胜！\n{reward_msg}"
+            final_msg += f"\n\n🎊 游戏结束！{winner.nickname}[UID:{winner.uid}] 获胜！\n{reward_msg}"
         elif item_type == ItemType.HANDCUFFS and success:
             # 如果使用了手铐且游戏未结束，添加连续行动提示
             final_msg += f"\n🔄 {player.nickname} 可以继续行动"
@@ -1369,7 +1369,7 @@ async def handle_view_items(event: MessageEvent):
             buttons.append("开枪 对手")
 
         # 使用Markdown模版发送带按钮的消息
-        title = "🎒 你的道具"
+        title = f"🎒 {player.nickname}[UID:{player.uid}]的道具"
         markdown_msg = _create_game_action_message(title, result_text, buttons)
 
         await view_items_cmd.finish(markdown_msg)
@@ -1390,11 +1390,36 @@ async def handle_bet(event: MessageEvent, args: Message = CommandArg()):
     parts = args_text.split()
 
     if len(parts) < 2:
-        await bet_cmd.finish(
-            "📝 用法：轮盘下注 [玩家昵称/UID] [金币数]\n"
-            "示例：轮盘下注 张三 500\n"
-            "⏰ 只能在双方匹配后、游戏开始前下注"
-        )
+        # 查询房间信息，展示可下注的玩家
+        async with safe_session() as session:
+            service = RussianRouletteServiceNew(
+                room_repo=RussianRouletteRoomRepository(session),
+                game_repo=RussianRouletteGameRepository(session),
+                player_repo=PlayerRepository(session)
+            )
+            room = await service._room_repo.find_group_active_room(group_id)
+            if room and room.player1_id:
+                player1 = await session.get(Player, room.player1_id)
+                player2 = await session.get(Player, room.player2_id) if room.player2_id else None
+                p1_info = f"{player1.nickname}（UID:{player1.uid}）" if player1 else "未知"
+                p2_info = f"{player2.nickname}（UID:{player2.uid}）" if player2 else "等待加入..."
+                example_name = player1.nickname if player1 else "张三"
+                await bet_cmd.finish(
+                    f"📝 用法：轮盘下注 [玩家昵称/UID] [金币数]\n"
+                    f"━━━━━━━━━━━━━\n"
+                    f"🔴 玩家1：{p1_info}\n"
+                    f"🔵 玩家2：{p2_info}\n"
+                    f"━━━━━━━━━━━━━\n"
+                    f"示例：轮盘下注 {example_name} 500\n"
+                    f"⏰ 只能在双方匹配后、游戏开始前下注"
+                )
+            else:
+                await bet_cmd.finish(
+                    "📝 用法：轮盘下注 [玩家昵称/UID] [金币数]\n"
+                    "示例：轮盘下注 张三 500\n"
+                    "⏰ 只能在双方匹配后、游戏开始前下注\n"
+                    "⚠️ 本群暂无活跃房间"
+                )
 
     target_name = " ".join(parts[:-1])
     gold_str = parts[-1]
@@ -1431,11 +1456,13 @@ async def handle_bet(event: MessageEvent, args: Message = CommandArg()):
                 break
 
         if not target_player:
-            p1_name = player1.nickname if player1 else "?"
-            p2_name = player2.nickname if player2 else "?"
+            p1_info = f"{player1.nickname}（UID:{player1.uid}）" if player1 else "?"
+            p2_info = f"{player2.nickname}（UID:{player2.uid}）" if player2 else "等待加入"
             await bet_cmd.finish(
                 f"⛔ 找不到玩家「{target_name}」\n"
-                f"当前房间玩家：{p1_name} / {p2_name}"
+                f"━━━━━━━━━━━━━\n"
+                f"🔴 玩家1：{p1_info}\n"
+                f"🔵 玩家2：{p2_info}"
             )
 
         success, msg = await service.place_bet(bettor.id, room.room_id, target_player.id, gold_amount)
