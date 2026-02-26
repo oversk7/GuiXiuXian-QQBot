@@ -303,10 +303,13 @@ class RussianRouletteService:
         player1_items = RussianRouletteCore.generate_items(initial_item_count)
         player2_items = RussianRouletteCore.generate_items(initial_item_count)
 
+        # 随机决定先手
+        first_player_id = random.choice([room.player1_id, room.player2_id])
+
         game = RussianRouletteGame(
             room_id=room_id,
             status=GameStatus.PLAYING.value,
-            current_player_id=room.player1_id,  # 玩家1先手
+            current_player_id=first_player_id,  # 随机先手
             player1_hp=room.max_hp,
             player2_hp=room.max_hp,
             bullets=json.dumps(bullets),

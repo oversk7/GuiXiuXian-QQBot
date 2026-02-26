@@ -386,6 +386,9 @@ async def handle_create_room(bot: Bot, event: MessageEvent, args: Message = Comm
                 blank_count = sum(1 for b in bullets if not b)
 
                 # 构建游戏状态消息
+                # 获取先手玩家信息
+                first_player = player1 if game.current_player_id == room.player1_id else player2
+
                 result_text = (
                     f"{msg}\n"
                     f"━━━━━━━━━━━━━\n"
@@ -394,19 +397,20 @@ async def handle_create_room(bot: Bot, event: MessageEvent, args: Message = Comm
                     f"  🔵 {player2.nickname}[UID:{player2.uid}]\n"
                     f"━━━━━━━━━━━━━\n"
                     f"💥 本轮配置：{live_count}发实弹 + {blank_count}发空包弹\n"
-                    f"🎯 {player1.nickname} 先手！"
+                    f"🎯 {first_player.nickname} 先手！"
                 )
 
                 # 构建按钮列表(根据先手玩家的道具)
-                player1_items = json.loads(game.player1_items or "[]")
+                first_player_items_json = game.player1_items if game.current_player_id == room.player1_id else game.player2_items
+                first_player_items = json.loads(first_player_items_json or "[]")
                 buttons = ["开枪 自己", "开枪 对手", "查看道具", "房间状态"]
 
                 # 如果有常用道具,添加到按钮中
-                if "magnifier" in player1_items:
+                if "magnifier" in first_player_items:
                     buttons.append("使用道具 放大镜")
-                elif "cigarette" in player1_items:
+                elif "cigarette" in first_player_items:
                     buttons.append("使用道具 香烟")
-                elif "knife" in player1_items:
+                elif "knife" in first_player_items:
                     buttons.append("使用道具 手锯")
 
                 # 使用Markdown模版发送带按钮的消息
