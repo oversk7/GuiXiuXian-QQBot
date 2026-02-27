@@ -181,7 +181,7 @@ async def handle_create_room(bot: Bot, event: MessageEvent, args: Message = Comm
         
         if args_text == "创建" or args_text.startswith("创建"):
             # 解析血量参数：恶魔轮盘 创建 [3/4/5/6]
-            max_hp = 3
+            max_hp = 4
             parts = args_text.split()
             if len(parts) >= 2:
                 hp_arg = parts[1]

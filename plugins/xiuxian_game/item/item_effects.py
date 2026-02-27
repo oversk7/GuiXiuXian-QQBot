@@ -1047,6 +1047,8 @@ async def _monthly_card_box(player: Player, cfg: ItemConfig, qty: int, ctx: str,
             # 使用get_display_name()方法获取带稀有度emoji的材料名称
             results.append(f"💎 {material_config.get_display_name()} ×{quantity}")
         except ValueError as e:
+            if "背包空间不足" in str(e):
+                return False, f"⛔ 背包空间不足，无法开启月卡宝箱\n💡 请先整理背包腾出空间再使用"
             results.append(f"⚠️ {material_config.get_display_name()} 添加失败：{e}")
 
     if not results:

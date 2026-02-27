@@ -49,14 +49,14 @@ class RussianRouletteService:
         self._player_repo = player_repo
 
     async def create_room(
-        self, creator_id: str, group_id: str, max_hp: int = 3
+        self, creator_id: str, group_id: str, max_hp: int = 4
     ) -> Tuple[bool, str, Optional[RussianRouletteRoom]]:
         """创建游戏房间
 
         Args:
             creator_id: 创建者玩家ID
             group_id: 群组ID
-            max_hp: 双方初始血量（3-6），默认3
+            max_hp: 双方初始血量（3-6），默认4
 
         Returns:
             (成功标志, 消息, 房间对象)
