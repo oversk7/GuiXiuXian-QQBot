@@ -157,12 +157,12 @@ def _get_pve_display(session_data: dict) -> str:
     ])
 
     # 道具
-    player_items = json.loads(gs.get("player_items", "[]"))
-    ai_items = json.loads(gs.get("ai_items", "[]"))
+    player_items_inline = _format_items_inline(gs.get("player_items", "[]"))
+    ai_items_inline = _format_items_inline(gs.get("ai_items", "[]"))
     display.extend([
         "━━━━━━━━━━━━━",
-        f"🎒 你的道具：{len(player_items)}个",
-        f"🤖 AI道具：{len(ai_items)}个",
+        f"🎒 你的道具：{player_items_inline}",
+        f"🤖 AI道具：{ai_items_inline}",
     ])
 
     # 特殊状态
@@ -180,7 +180,7 @@ def _get_pve_display(session_data: dict) -> str:
 
 
 def _format_items_list(items_json: str) -> str:
-    """格式化道具列表"""
+    """格式化道具列表（详细格式，含描述）"""
     items = json.loads(items_json or "[]")
     if not items:
         return "无道具"
@@ -198,6 +198,26 @@ def _format_items_list(items_json: str) -> str:
         except (ValueError, KeyError):
             lines.append(f"❓ 未知: {item_str} x{count}")
     return "\n".join(lines)
+
+
+def _format_items_inline(items_json: str) -> str:
+    """格式化道具列表（简短内联格式，用于状态显示）"""
+    items = json.loads(items_json or "[]")
+    if not items:
+        return "无"
+    item_counts = Counter(items)
+    parts = []
+    for item_str, count in item_counts.items():
+        try:
+            item_type = ItemType(item_str)
+            cfg = RussianRouletteCore.ITEM_CONFIGS[item_type]
+            if count > 1:
+                parts.append(f"{cfg['name']}x{count}")
+            else:
+                parts.append(cfg['name'])
+        except (ValueError, KeyError):
+            parts.append(f"❓{item_str}")
+    return " ".join(parts)
 
 
 def _reset_round(session_data: dict):
@@ -798,6 +818,25 @@ async def handle_pve_item(bot: Bot, event: MessageEvent, args: Message = Command
             if not success:
                 await pve_item_cmd.finish(message_add_head(f"❌ {result_msg}", event))
 
+            # 私聊模式下直接显示放大镜/电话预知结果（无需再发送【预知】指令）
+            if stolen_type == ItemType.MAGNIFIER:
+                mag_data = json.loads(gs.get("magnifier_info") or "{}")
+                if mag_data.get("player_id") == "player":
+                    bullet_type = mag_data["bullet_type"]
+                    result_msg = f"💉 肾上腺素已使用！偷取了AI的🔍放大镜并立刻使用\n🔍 放大镜结果：当前弹药是 {bullet_type}"
+            elif stolen_type == ItemType.PHONE:
+                phone_data = json.loads(gs.get("phone_info") or "{}")
+                if phone_data.get("player_id") == "player":
+                    pos = phone_data["bullet_position"]
+                    bt = phone_data["bullet_type"]
+                    result_msg = f"💉 肾上腺素已使用！偷取了AI的📞电话并立刻使用\n📞 电话结果：第{pos}发弹药是 {bt}"
+            elif stolen_type == ItemType.BEER:
+                # 更新弹药统计（啤酒退膛）
+                if "实弹" in result_msg:
+                    sd["bullet_counts"]["fired_live"] += 1
+                else:
+                    sd["bullet_counts"]["fired_blank"] += 1
+
             # 检查肾上腺素使用后的状态变化
             _update_after_item(sd, stolen_type)
 
@@ -926,6 +965,7 @@ async def handle_pve_status(event: MessageEvent):
 
         # 显示玩家道具详情
         player_items_text = _format_items_list(gs["player_items"])
+        ai_items_text = _format_items_list(gs["ai_items"])
 
         turn_text = "你的回合" if sd["current_turn"] == "player" else "AI 的回合"
         msg = (
@@ -933,7 +973,11 @@ async def handle_pve_status(event: MessageEvent):
             f"━━━━━━━━━━━━━\n"
             f"🔄 当前：{turn_text}\n"
             f"━━━━━━━━━━━━━\n"
-            f"🎒 你的道具详情：\n{player_items_text}"
+            f"🎒 你的道具详情：\n{player_items_text}\n"
+            f"━━━━━━━━━━━━━\n"
+            f"🤖 AI道具详情：\n{ai_items_text}\n"
+            f"━━━━━━━━━━━━━\n"
+            f"💡 使用肾上腺素：【pve道具 肾上腺素 <AI道具名>】"
         )
         await pve_status_cmd.finish(message_add_head(msg, event))
 
