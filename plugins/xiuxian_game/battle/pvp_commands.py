@@ -29,7 +29,7 @@ def _send_battle_markdown(handler, title: str, battle_log: list, hint: str = "�
         MessageMarkdownParams(key="t3", values=["背包"]),
     ]
     markdown_msg = MessageMarkdown(
-        custom_template_id="102499345_1771611841",
+        custom_template_id="102499345_1772280837",
         params=template_params
     )
     return MessageSegment.markdown(markdown_msg)
