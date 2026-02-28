@@ -51,8 +51,9 @@ async def handle_help(event: MessageEvent, args: Message = CommandArg()):
         "━━━━━━━━━━━━━\n"
         "💡 新手？发送【新手指引】看成长路线\n"
         "💡 发送【问 你的问题】询问机器人\n"
-        "💡 发送【完整帮助】查看所有指令\n"
-        "💡 官群：962494679"
+        "💡 发送【完整帮助】查看所有功能\n"
+        "💡 官群：962494679\n"
+        "💡 部分游戏资料：HTTPS://GITEE.COM/ling-gtq/TheWestTutorial"
     )
     await help_cmd.finish(Message(msg))
 
