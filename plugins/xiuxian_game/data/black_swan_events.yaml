@@ -7,9 +7,9 @@ events:
     name: "冥行挤兑风波"
     description: "冥界银行爆发挤兑危机，金融类气运遭受重创"
     affected_type: "FINANCE"
-    probability: 0.15  # 每周15%触发概率（提高5倍）
-    price_impact: -0.50  # 暴跌50%（原40%）
-    health_impact: -60  # 健康度损失60点（原50点）
+    probability: 0.07  # 每周7%触发概率
+    price_impact: -0.50
+    health_impact: -60
     duration_days: 3
     announcement: "⚡【黑天鹅】冥行挤兑风波爆发！金融类气运暴跌50%，灵力大损！"
 
@@ -17,7 +17,7 @@ events:
     name: "账房司舞弊案"
     description: "账房司爆出重大舞弊丑闻，金融气运信任崩塌"
     affected_type: "FINANCE"
-    probability: 0.12
+    probability: 0.05
     price_impact: -0.45
     health_impact: -55
     duration_days: 2
@@ -28,7 +28,7 @@ events:
     name: "诡域矿脉枯竭"
     description: "主要诡域矿脉突然枯竭，材料供应链崩溃"
     affected_type: "MATERIALS"
-    probability: 0.15
+    probability: 0.07
     price_impact: -0.48
     health_impact: -58
     duration_days: 3
@@ -38,7 +38,7 @@ events:
     name: "魔族入侵矿区"
     description: "魔族大军入侵主要矿区，材料产量骤降"
     affected_type: "MATERIALS"
-    probability: 0.12
+    probability: 0.05
     price_impact: -0.42
     health_impact: -52
     duration_days: 2
@@ -49,7 +49,7 @@ events:
     name: "灵石矿危机"
     description: "主要灵石矿突发坍塌，能源供应告急"
     affected_type: "ENERGY"
-    probability: 0.15
+    probability: 0.07
     price_impact: -0.52
     health_impact: -62
     duration_days: 3
@@ -59,7 +59,7 @@ events:
     name: "灵力禁运"
     description: "仙盟对修仙界实施灵力禁运，能源价格崩塌"
     affected_type: "ENERGY"
-    probability: 0.12
+    probability: 0.05
     price_impact: -0.46
     health_impact: -56
     duration_days: 2
@@ -70,7 +70,7 @@ events:
     name: "诡瘟爆发"
     description: "诡异瘟疫在城镇间蔓延，消费市场陷入恐慌"
     affected_type: "CONSUMER"
-    probability: 0.13
+    probability: 0.06
     price_impact: -0.44
     health_impact: -54
     duration_days: 3
@@ -80,7 +80,7 @@ events:
     name: "市集大火"
     description: "上京商业中心发生大火，消费市场受创"
     affected_type: "CONSUMER"
-    probability: 0.10
+    probability: 0.05
     price_impact: -0.38
     health_impact: -48
     duration_days: 2
@@ -91,7 +91,7 @@ events:
     name: "丹药造假丑闻"
     description: "知名丹坊爆出造假丑闻，医疗气运信任崩塌"
     affected_type: "HEALTHCARE"
-    probability: 0.13
+    probability: 0.06
     price_impact: -0.49
     health_impact: -59
     duration_days: 3
@@ -101,7 +101,7 @@ events:
     name: "灵草污染事件"
     description: "主要灵草产地遭受污染，医疗市场震荡"
     affected_type: "HEALTHCARE"
-    probability: 0.10
+    probability: 0.05
     price_impact: -0.40
     health_impact: -50
     duration_days: 2
@@ -112,7 +112,7 @@ events:
     name: "法器大规模失灵"
     description: "传送阵法器系统大规模失灵，科技气运受挫"
     affected_type: "TECH"
-    probability: 0.13
+    probability: 0.06
     price_impact: -0.47
     health_impact: -57
     duration_days: 3
@@ -122,7 +122,7 @@ events:
     name: "阵法研究失败"
     description: "缉邪司重大阵法研究失败，科技信心崩盘"
     affected_type: "TECH"
-    probability: 0.10
+    probability: 0.05
     price_impact: -0.39
     health_impact: -49
     duration_days: 2
@@ -136,12 +136,11 @@ settings:
   # 是否启用黑天鹅事件
   enabled: true
 
-  # 同一类型气运的事件冷却期（天）- 缩短冷却期让事件更频繁
-  cooldown_days: 1  # 缩短为1天,让事件更频繁
+  # 同一类型气运的事件冷却期（天）- 14天冷却防止同类型连续触发
+  cooldown_days: 14
 
-  # 全局触发概率调整系数（1.0=正常，0.5=减半，2.0=翻倍）
-  # 设置为3.0倍，大幅提高触发概率
-  global_probability_multiplier: 3.0
+  # 全局触发概率调整系数（1.0=正常）
+  global_probability_multiplier: 1.0
 
   # 调试模式: 启用后每次检查必定触发至少一个事件
   debug_mode: false
