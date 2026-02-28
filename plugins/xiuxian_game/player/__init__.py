@@ -1,1 +1,1 @@
-from . import info, help, rankings, invite, monthly_card, battle_info, markdown_template_test
+from . import info, help, rankings, invite, monthly_card, battle_info
