@@ -180,8 +180,17 @@ async def handle_cultivate(event: MessageEvent):
         # 阴宅加成
         mansion_bonus = int(base_exp_gain_after_penalty * mansion_cultivation_bonus)
 
+        # 天灾修炼加速buff（读取TemporaryBuff的extra_data.cultivation_efficiency）
+        from ..models.temporary_buff import TemporaryBuff as _TmpBuff
+        _calamity_rate = 0.0
+        _active_buffs = await _TmpBuff.get_active_buffs(session, player.id)
+        for _buff in _active_buffs:
+            _extra = _buff.extra_data or {}
+            _calamity_rate += _extra.get("cultivation_efficiency", 0.0)
+        calamity_bonus = int(base_exp_gain_after_penalty * _calamity_rate)
+
         # 总经验 = 惩罚后的基础经验 + 各种加成
-        exp_gain = base_exp_gain_after_penalty + card_bonus + reincarnation_bonus + guild_bonus + mansion_bonus
+        exp_gain = base_exp_gain_after_penalty + card_bonus + reincarnation_bonus + guild_bonus + mansion_bonus + calamity_bonus
 
         # 更新数据
         player.last_cultivation = datetime.now()
@@ -199,7 +208,7 @@ async def handle_cultivate(event: MessageEvent):
         progress_bar = generate_progress_bar(player.exp, exp_max)
 
         # 构建加成明细行（折叠式）
-        total_bonus = card_bonus + reincarnation_bonus + guild_bonus + mansion_bonus
+        total_bonus = card_bonus + reincarnation_bonus + guild_bonus + mansion_bonus + calamity_bonus
         bonus_detail_line = ""
         if total_bonus > 0 or mentorship_penalty > 0:
             bonus_percent = (total_bonus / base_exp_gain) * 100 if base_exp_gain > 0 else 0
@@ -214,6 +223,8 @@ async def handle_cultivate(event: MessageEvent):
                 bonus_parts.append(f"公会+{guild_bonus}")
             if mansion_bonus > 0:
                 bonus_parts.append(f"阴宅+{mansion_bonus}")
+            if calamity_bonus > 0:
+                bonus_parts.append(f"天灾+{calamity_bonus}")
             if mentorship_penalty > 0:
                 apprentice_count = await mentorship_service.get_apprentice_count(player.id)
                 bonus_parts.append(f"徒弟-{mentorship_penalty}({apprentice_count}人)")

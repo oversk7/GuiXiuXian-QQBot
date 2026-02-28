@@ -131,6 +131,10 @@ async def _show_stronghold_status(stronghold, player_level: int):
         timeout = stronghold.next_wave_at + timedelta(hours=HERO_TIMEOUT_HOURS)
         remaining_until_timeout = timeout - datetime.now()
 
+        affix_line = ""
+        if hero.get("affixes"):
+            affix_line = f"🔮 词缀：{'、'.join(hero['affixes'])}\n"
+
         msg = (
             "━━━━━━━━━━━━━\n"
             "🏴‍☠️ 下位世界·山寨状态\n"
@@ -140,6 +144,7 @@ async def _show_stronghold_status(stronghold, player_level: int):
             "\n"
             f"⚔️ 英雄已到达：{hero['name']}\n"
             f"🎖️ Lv.{hero['level']}\n"
+            f"{affix_line}"
             f"📝 {hero['flavour']}\n"
             "\n"
             f"⏳ {format_time_remaining(remaining_until_timeout)}后撤退\n"
@@ -173,12 +178,48 @@ async def _show_stronghold_status(stronghold, player_level: int):
 
     # 正在等待下一波英雄
     time_until_next = stronghold.next_wave_at - datetime.now()
+    wave = stronghold.wave_number
+
+    # 按波次呈现不同深度的叙事文案
+    if wave <= 5:
+        _narratives = [
+            "鬼域裂缝才刚刚张开。\n附近有村民绕远路走，不肯从这里经过。",
+            "叩门声从你的影子里往外渗，\n地面龟裂处长出了不知名的灰色植物。",
+            "有人在你山寨外的土地上画了驱邪符。\n那些符到第二天就自己烂掉了。",
+            "你带来的鬼域正在这里生根。\n这里的人还不知道，这只是开始。",
+        ]
+    elif wave <= 10:
+        _narratives = [
+            "下位世界的人把这里叫做「灾地」。\n村子里已经有人说：墙壁会动。",
+            "附近的牲畜开始不安。\n鸟不往这边飞了。方圆三里内安静得不对劲。",
+            "有人来这里立碑，碑上刻着诅咒。\n第二天碑不见了——不是被人搬走的。",
+            "诡异已经漫过了山寨的边界。\n你听见的叩门声，现在附近的人也听得见了。",
+        ]
+    elif wave <= 20:
+        _narratives = [
+            "这里的孩子已经不哭了。\n他们从小就知道，哭声会引来东西。",
+            "有人组建了讨伐队来过，没有人回去。\n不是被你打死的——你不记得见过他们。",
+            "鬼域的叩门声已经成了这里的背景音。\n有个老人说：还不如以前的风声好听。",
+            "你在这里待得越久，\n这个世界接受你的速度就越快。\n这是好事还是坏事，你说不清。",
+        ]
+    else:
+        _narratives = [
+            "他们开始叫你「那个」。\n不是天灾，不是怪物——只是「那个」。\n有些词，说出来才会变成真的。",
+            "有年轻的骑士专门来挑战你，\n说这是他们的成人礼。\n不是每一个都能活着回去。",
+            "下位世界已经有了「天灾朝圣路」。\n地图上标着你的山寨，旁边注着：不要独行。",
+            "鬼域和这里的土地已经分不清边界了。\n你站在山寨里，脚下是两个世界。",
+        ]
+
+    narrative = random.choice(_narratives)
+
     msg = (
         "━━━━━━━━━━━━━\n"
         "🏴‍☠️ 下位世界·山寨状态\n"
-        f"📍 第 {stronghold.wave_number} 波\n"
+        f"📍 第 {wave} 波\n"
         f"💎 天灾点：{stronghold.calamity_points}\n"
         f"🏆 已胜利波次：{stronghold.total_waves_won}\n"
+        "\n"
+        f"{narrative}\n"
         "\n"
         f"⏳ 下一波英雄将于 {format_time_remaining(time_until_next)} 后到达"
     )
@@ -300,53 +341,178 @@ async def handle_battle_hero(event: MessageEvent):
         uow.session.add(player)
         uow.session.add(stronghold)
 
+        # 消耗战意加持buff（1场战斗即消耗）
+        from ..models.temporary_buff import TemporaryBuff
+        from sqlalchemy import select as _sel_cb
+        _cb_stmt = _sel_cb(TemporaryBuff).where(
+            TemporaryBuff.player_id == player.id,
+            TemporaryBuff.buff_id == "lower_world_combat_boost",
+            TemporaryBuff.is_active == True,
+            TemporaryBuff.expires_at > datetime.now(),
+        )
+        _combat_buff = (await uow.session.execute(_cb_stmt)).scalars().first()
+        if _combat_buff:
+            _combat_buff.is_active = False
+            _combat_buff.expires_at = datetime.now()
+            uow.session.add(_combat_buff)
+
         # 处理战斗结果
         if victory:
             # 胜利
             points = await process_battle_victory(uow, stronghold, player.level)
             await uow.commit()
 
-            # 使用 he/she 代词
-            pronoun = "他" if "男" in hero.get("title", "") or any(x in hero["name"] for x in ["艾伦", "托尔", "克劳德", "赛勒斯", "加文", "罗伦", "赫克托"]) else "她"
+            # 代词判断（按女性名字列表）
+            _female_names = {"席拉", "伊莲娜", "芙蕾雅", "奥尔加", "米雷亚", "艾莉丝", "薇薇安"}
+            pronoun = "她" if any(fn in hero["name"] for fn in _female_names) else "他"
 
-            victory_endings = [
-                (
-                    f"……{hero['name']} 倒下了。\n"
-                    "\n"
-                    f"{pronoun}望着你，没有仇恨，只是问：\n"
-                    "「你们那边……也会有人哭吗？」\n"
-                    "\n"
-                    "你没有回答。\n"
-                    "你身后，诡异继续往外涌。"
-                ),
-                (
-                    f"……{hero['name']} 跪倒在地。\n"
-                    "\n"
-                    f"剑没有落下。\n"
-                    f"{pronoun}只是沉默地看着远处的鬼域。\n"
-                    f"「我保护的那些人，现在还安全吗。」\n"
-                    "\n"
-                    "不是问你，只是问自己。"
-                ),
-                (
-                    f"……战斗结束了。\n"
-                    "\n"
-                    f"{hero['name']} 靠在断壁上，抬头看天。\n"
-                    "「你有名字吗，天灾？」\n"
-                    "\n"
-                    "你没有回答。\n"
-                    "天空是另一种颜色。这里没有你认识的星座。"
-                ),
-                (
-                    f"……{hero['name']} 的武器落地，发出沉重的声响。\n"
-                    "\n"
-                    f"{pronoun}抬头，只说了一句：\n"
-                    "「下次……我会更强的。」\n"
-                    "\n"
-                    "你不知道下次是什么时候。\n"
-                    "你们都不知道。"
-                ),
-            ]
+            # 普通英雄（1-10波）vs 勇者（11+波）使用不同文案池
+            if stronghold.wave_number <= 10:
+                victory_endings = [
+                    (
+                        f"……{hero['name']} 倒下了。\n"
+                        "\n"
+                        f"{pronoun}望着你，没有仇恨，只是问：\n"
+                        "「你们那边……也会有人哭吗？」\n"
+                        "\n"
+                        "你没有回答。\n"
+                        "你身后，诡异继续往外涌。"
+                    ),
+                    (
+                        f"……{hero['name']} 跪倒在地。\n"
+                        "\n"
+                        "剑没有落下。\n"
+                        f"{pronoun}只是沉默地看着远处的鬼域。\n"
+                        "「我保护的那些人，现在还安全吗。」\n"
+                        "\n"
+                        "不是问你，只是问自己。"
+                    ),
+                    (
+                        f"……战斗结束了。\n"
+                        "\n"
+                        f"{hero['name']} 靠在断壁上，抬头看天。\n"
+                        "「你有名字吗，天灾？」\n"
+                        "\n"
+                        "你没有回答。\n"
+                        "天空是另一种颜色。这里没有你认识的星座。"
+                    ),
+                    (
+                        f"……{hero['name']} 的武器落地，发出沉重的声响。\n"
+                        "\n"
+                        f"{pronoun}抬头，只说了一句：\n"
+                        "「下次……我会更强的。」\n"
+                        "\n"
+                        "你不知道下次是什么时候。\n"
+                        "你们都不知道。"
+                    ),
+                    (
+                        f"……{hero['name']} 倒下之前，低声说了一个名字。\n"
+                        "\n"
+                        "不是你的名字。\n"
+                        f"然后{pronoun}闭上眼，等了很久，睁开。\n"
+                        "「原来还活着。」\n"
+                        f"{pronoun}自己也没想到。"
+                    ),
+                    (
+                        f"你站在原地，看着 {hero['name']} 缓缓坐起来。\n"
+                        "\n"
+                        f"{pronoun}没有看你，只是把地上的武器拾起，轻轻放好。\n"
+                        "最后说了一句：\n"
+                        "「谢谢你手下留情。」\n"
+                        "\n"
+                        "——然后你意识到，你并没有。"
+                    ),
+                    (
+                        f"战斗结束。{hero['name']} 没有立刻离开，\n"
+                        f"只是坐在山寨门口，看了很久的鬼域。\n"
+                        "\n"
+                        f"最后{pronoun}站起来，没有回头，走了。"
+                    ),
+                    (
+                        f"……{hero['name']} 在倒下前，把腰间的水囊递了过来。\n"
+                        "\n"
+                        "你没有接。\n"
+                        f"{pronoun}就放在地上了。\n"
+                        "\n"
+                        "「那边的人……过得好吗。」\n"
+                        "你不知道怎么回答。"
+                    ),
+                ]
+            else:
+                # 勇者文案池（11+波，史诗感更强，内疚更深）
+                victory_endings = [
+                    (
+                        f"……{hero['name']} 倒下了。\n"
+                        "\n"
+                        f"{pronoun}抬起头：\n"
+                        "「所以天灾……也会感到疲倦吗。」\n"
+                        "\n"
+                        "你没有回答。\n"
+                        "你身后，诡异继续往外涌。"
+                    ),
+                    (
+                        f"战斗的尘埃落定。\n"
+                        f"{hero['name']} 没有倒，只是站在那里，像一棵被雷劈过的树。\n"
+                        "\n"
+                        "「召唤我的那些人说——击败天灾，世界就得救了。」\n"
+                        f"{pronoun}停顿了一下。\n"
+                        "「但我赢不了你。」"
+                    ),
+                    (
+                        f"……{hero['name']} 跪下的一瞬间，手里还握着武器。\n"
+                        "\n"
+                        "没有松开，只是膝盖软了。\n"
+                        "良久，轻声问：\n"
+                        "「鬼域那边的世界……和这里一样吗？\n"
+                        " 有村子吗？有人种田吗？」"
+                    ),
+                    (
+                        f"传说击败勇者会带来诅咒。\n"
+                        "\n"
+                        "没有。\n"
+                        f"你只是站在那里，{hero['name']} 倒在地上，\n"
+                        "两个人都没有说话。\n"
+                        "\n"
+                        "风吹过，诡异继续往外渗。\n"
+                        "什么都没有改变——什么都会改变。"
+                    ),
+                    (
+                        f"{hero['name']} 抬头。\n"
+                        f"圣光还在{pronoun}身上燃烧，缓缓熄灭。\n"
+                        "\n"
+                        "「这是命运吗。」\n"
+                        "你不知道。\n"
+                        "「……还是运气不好。」\n"
+                        f"{pronoun}笑了一下，声音很轻。"
+                    ),
+                    (
+                        f"武器落在地面的声音传出去很远。\n"
+                        f"{hero['name']} 闭着眼，像是在等什么。\n"
+                        "\n"
+                        "然后发现什么都没来。\n"
+                        f"{pronoun}睁开眼，撑着地面站起来，走了。\n"
+                        "一步都没有回头。"
+                    ),
+                    (
+                        f"「我知道我赢不了。」\n"
+                        f"{hero['name']} 在战斗最开始就说了这句话。\n"
+                        "\n"
+                        "你以为是场面话。\n"
+                        "「但我要试过才算。\n"
+                        " 不是为了赢，是为了——」\n"
+                        "\n"
+                        "最后一个字没说出来。"
+                    ),
+                    (
+                        f"鬼域的叩门声在 {hero['name']} 倒下的一刻暂停了一秒，\n"
+                        "然后继续。\n"
+                        "\n"
+                        "好像什么都没发生。\n"
+                        "好像这场战斗对整个世界毫无意义。\n"
+                        "\n"
+                        "也许真的没有。"
+                    ),
+                ]
 
             msg = (
                 "\n".join(battle_log) + "\n"
@@ -366,38 +532,130 @@ async def handle_battle_hero(event: MessageEvent):
             await process_battle_defeat(uow, stronghold)
             await uow.commit()
 
-            defeat_endings = [
-                (
-                    f"{hero['name']} 没有趁机补刀，只是站在原地，\n"
-                    "把武器插回剑鞘。\n"
-                    "\n"
-                    "「走吧，天灾。\n"
-                    " 今天先到这里。」"
-                ),
-                (
-                    f"地面是另一种触感。\n"
-                    f"{hero['name']} 蹲下来看了你一眼，\n"
-                    "没有鄙视，只是说：\n"
-                    "「下次我还会来的。」\n"
-                    "\n"
-                    "然后转身走了。"
-                ),
-                (
-                    f"{hero['name']} 没有说话。\n"
-                    "只是从腰间取出一小瓶药水，放在你手边。\n"
-                    "然后站起来，背对着你，\n"
-                    "长久地望着鬼域的方向。\n"
-                    "\n"
-                    "最后离开了。"
-                ),
-                (
-                    f"你听见 {hero['name']} 的脚步声渐渐远去。\n"
-                    "\n"
-                    "没有庆祝，没有欢呼。\n"
-                    "只有风吹过鬼域裂缝，\n"
-                    "发出低沉的叩门声。"
-                ),
-            ]
+            _female_names = {"席拉", "伊莲娜", "芙蕾雅", "奥尔加", "米雷亚", "艾莉丝", "薇薇安"}
+            pronoun = "她" if any(fn in hero["name"] for fn in _female_names) else "他"
+
+            if stronghold.wave_number <= 10:
+                defeat_endings = [
+                    (
+                        f"{hero['name']} 没有趁机补刀，只是站在原地，\n"
+                        "把武器插回剑鞘。\n"
+                        "\n"
+                        "「走吧，天灾。\n"
+                        " 今天先到这里。」"
+                    ),
+                    (
+                        f"地面是另一种触感。\n"
+                        f"{hero['name']} 蹲下来看了你一眼，\n"
+                        "没有鄙视，只是说：\n"
+                        "「下次我还会来的。」\n"
+                        "\n"
+                        "然后转身走了。"
+                    ),
+                    (
+                        f"{hero['name']} 没有说话。\n"
+                        "只是从腰间取出一小瓶药水，放在你手边。\n"
+                        "然后站起来，背对着你，\n"
+                        "长久地望着鬼域的方向。\n"
+                        "\n"
+                        "最后离开了。"
+                    ),
+                    (
+                        f"你听见 {hero['name']} 的脚步声渐渐远去。\n"
+                        "\n"
+                        "没有庆祝，没有欢呼。\n"
+                        "只有风吹过鬼域裂缝，\n"
+                        "发出低沉的叩门声。"
+                    ),
+                    (
+                        f"{hero['name']} 扶了你一下，然后放开了手。\n"
+                        "\n"
+                        "什么都没说，走了。\n"
+                        f"你不知道{pronoun}为什么要扶你，\n"
+                        f"{pronoun}大概也不知道。"
+                    ),
+                    (
+                        f"{hero['name']} 在你倒下的地方放了一块石头。\n"
+                        "\n"
+                        "不知道是记号还是悼念，\n"
+                        "或者只是顺手捡的。\n"
+                        "然后离开了。"
+                    ),
+                    (
+                        f"临走前，{hero['name']} 回头看了你一眼，欲言又止。\n"
+                        "\n"
+                        "「你……不是坏人吧？」\n"
+                        f"然后{pronoun}自己摇了摇头：「算了。」\n"
+                        "\n"
+                        "走了。"
+                    ),
+                    (
+                        f"{hero['name']} 没有庆祝，\n"
+                        "在山寨外站了一会——\n"
+                        "大概是确认你还活着——\n"
+                        "然后才离开。"
+                    ),
+                ]
+            else:
+                # 勇者失败文案（沉重、命运感）
+                defeat_endings = [
+                    (
+                        f"{hero['name']} 收起武器，轻轻说：\n"
+                        "「就这样吧。我们都没有选择。」\n"
+                        "\n"
+                        "然后离开了。"
+                    ),
+                    (
+                        "传说勇者击败天灾后会得到鲜花和欢呼。\n"
+                        "\n"
+                        f"没有。{hero['name']} 走进风里，\n"
+                        "没有人知道这里发生了什么。"
+                    ),
+                    (
+                        f"{hero['name']} 赢了。\n"
+                        f"但{pronoun}没有高兴。\n"
+                        "只是站在鬼域边缘，看了很久。\n"
+                        "\n"
+                        "最后说了一声：\n"
+                        "「下次……再战。」\n"
+                        "声音里听不出任何情绪。"
+                    ),
+                    (
+                        f"你倒下时，最后看到的是 {hero['name']} 的背影——\n"
+                        f"{pronoun}已经朝着鬼域的方向走去，在研究什么。\n"
+                        "\n"
+                        "像是在寻找答案。\n"
+                        f"{pronoun}大概不会找到。"
+                    ),
+                    (
+                        f"胜负已分。{hero['name']} 把封印刻在你额头，\n"
+                        "手很稳，字迹工整。\n"
+                        "\n"
+                        f"然后{pronoun}站起来，低声说了一句你听不懂的祈祷词。"
+                    ),
+                    (
+                        f"「我本来以为，击败你，世界就会变好。」\n"
+                        f"{hero['name']} 停顿了一下，转身走了。\n"
+                        "\n"
+                        "没有说后半句。\n"
+                        "你也不需要听后半句。"
+                    ),
+                    (
+                        f"{hero['name']} 在离开前，看了一眼你身后的鬼域。\n"
+                        "\n"
+                        "那道缝还在，叩门声还在。\n"
+                        "什么都没有停下。\n"
+                        f"{pronoun}叹了口气，背起武器，走了。"
+                    ),
+                    (
+                        f"你听见远处有人在喊 {hero['name']} 的名字。\n"
+                        "\n"
+                        f"{pronoun}回头望了一眼，然后快步离开，\n"
+                        "没有再看你。\n"
+                        "\n"
+                        f"有人在等{pronoun}回去。"
+                    ),
+                ]
 
             msg = (
                 "\n".join(battle_log) + "\n"
@@ -485,17 +743,147 @@ async def handle_redeem(event: MessageEvent, args: Message = CommandArg()):
         stronghold.calamity_points -= item["price"]
         uow.session.add(stronghold)
 
-        # TODO: 根据商品ID发放奖励（需要在后续任务实现）
-        # 这里仅作为占位符，实际效果需要与buff系统、称号系统集成
-        msg = (
-            f"✅ 兑换成功！\n"
-            f"获得：{item['name']}\n"
-            f"剩余天灾点：{stronghold.calamity_points}\n"
-            "\n"
-            f"📝 {item['desc']}\n"
-            "\n"
-            "⚠️ 商品效果将在后续版本中实装"
-        )
+        # ─── 实装各商品效果 ───
+        from ..models.temporary_buff import TemporaryBuff
+        from sqlalchemy import select as _sel
 
-        await uow.commit()
+        if item["id"] == "cultivate_boost":
+            # 检查是否已有未过期的修炼加速buff
+            existing_stmt = _sel(TemporaryBuff).where(
+                TemporaryBuff.player_id == player.id,
+                TemporaryBuff.buff_id == "lower_world_cultivate_boost",
+                TemporaryBuff.is_active == True,
+                TemporaryBuff.expires_at > datetime.now(),
+            )
+            existing = (await uow.session.execute(existing_stmt)).scalars().first()
+            if existing:
+                # 退还天灾点
+                stronghold.calamity_points += item["price"]
+                uow.session.add(stronghold)
+                await uow.commit()
+                remaining_min = existing.get_remaining_minutes()
+                await redeem_cmd.finish(
+                    f"你已有「修炼加速」效果，剩余 {remaining_min} 分钟\n"
+                    "无法叠加，天灾点已退还。"
+                )
+
+            buff = TemporaryBuff(
+                player_id=player.id,
+                buff_id="lower_world_cultivate_boost",
+                buff_name="天灾修炼加速",
+                attribute_bonuses={},
+                duration_minutes=120,
+                expires_at=datetime.now() + timedelta(minutes=120),
+                source_item_id="lower_world_cultivate_boost",
+                source_description="天灾商店：修炼加速（2小时）",
+                extra_data={"cultivation_efficiency": 0.5},
+            )
+            uow.session.add(buff)
+            await uow.commit()
+            msg = (
+                "✅ 兑换成功！\n"
+                "「大都会的账款已到位。」\n"
+                "\n"
+                "🌀 修炼效率+50%（持续2小时）\n"
+                "下次修炼时自动生效，不需要额外操作。"
+            )
+
+        elif item["id"] == "battle_boost":
+            # 战意加持：按玩家当前属性计算10%固定加成，创建短时buff
+            existing_stmt = _sel(TemporaryBuff).where(
+                TemporaryBuff.player_id == player.id,
+                TemporaryBuff.buff_id == "lower_world_combat_boost",
+                TemporaryBuff.is_active == True,
+                TemporaryBuff.expires_at > datetime.now(),
+            )
+            existing = (await uow.session.execute(existing_stmt)).scalars().first()
+            if existing:
+                stronghold.calamity_points += item["price"]
+                uow.session.add(stronghold)
+                await uow.commit()
+                remaining_min = existing.get_remaining_minutes()
+                await redeem_cmd.finish(
+                    f"你已有「战意加持」效果，剩余 {remaining_min} 分钟\n"
+                    "无法叠加，天灾点已退还。"
+                )
+
+            # 计算10%属性加成（固定值）
+            atk_bonus = max(1, int(player.attack * 0.10))
+            def_bonus = max(1, int(player.defense * 0.10))
+            agi_bonus = max(1, int(player.agility * 0.10))
+            hp_bonus = max(1, int(player.max_hp * 0.10))
+            buff = TemporaryBuff(
+                player_id=player.id,
+                buff_id="lower_world_combat_boost",
+                buff_name="天灾战意加持",
+                attribute_bonuses={
+                    "attack": atk_bonus,
+                    "defense": def_bonus,
+                    "agility": agi_bonus,
+                    "max_hp": hp_bonus,
+                },
+                duration_minutes=10,
+                expires_at=datetime.now() + timedelta(minutes=10),
+                source_item_id="lower_world_combat_boost",
+                source_description="天灾商店：战意加持（1场）",
+                extra_data={"single_battle": True},
+            )
+            uow.session.add(buff)
+            await uow.commit()
+            msg = (
+                "✅ 兑换成功！\n"
+                "「战意已传输完毕。」\n"
+                "\n"
+                f"⚔️ 全属性+10%（10分钟内1场战斗）\n"
+                f"力+{atk_bonus} 防+{def_bonus} 敏+{agi_bonus} 体+{hp_bonus}\n"
+                "使用【迎战】后自动消耗。"
+            )
+
+        elif item["id"] == "title_calamity":
+            # 称号「第四天灾」
+            from ..event.knocker_event import KnockerEventService
+            from sqlalchemy.orm.attributes import flag_modified
+
+            title_name = "第四天灾"
+            pdata = KnockerEventService._get_player_data(player)
+            owned_titles = pdata.get("owned_titles", [])
+
+            if title_name in owned_titles:
+                # 已拥有，退还天灾点
+                stronghold.calamity_points += item["price"]
+                uow.session.add(stronghold)
+                await uow.commit()
+                await redeem_cmd.finish(
+                    f"你已拥有称号「{title_name}」\n"
+                    "天灾点已退还。\n"
+                    "💡 使用【切换称号 第四天灾】重新佩戴。"
+                )
+
+            owned_titles.append(title_name)
+            pdata["owned_titles"] = owned_titles
+            pdata["title"] = title_name  # 自动设为当前称号
+            KnockerEventService._set_player_data(player, pdata)
+            uow.session.add(player)
+            await uow.commit()
+            msg = (
+                "✅ 兑换成功！\n"
+                "\n"
+                "「你的存在已被记录。\n"
+                " 大都会第七分部永久备案：\n"
+                " 第四天灾·导流节点·永久认证。」\n"
+                "\n"
+                "🏷️ 称号「第四天灾」已佩戴\n"
+                "💡 使用【切换称号】管理所有称号"
+            )
+
+        else:
+            await uow.commit()
+            msg = (
+                f"✅ 兑换成功！\n"
+                f"获得：{item['name']}\n"
+                f"剩余天灾点：{stronghold.calamity_points}\n"
+                "\n"
+                f"📝 {item['desc']}"
+            )
+
         await redeem_cmd.finish(msg)

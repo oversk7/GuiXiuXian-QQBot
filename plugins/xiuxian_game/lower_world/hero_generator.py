@@ -137,6 +137,80 @@ HERO_CLASSES = [
 ]
 
 
+# 词缀池（21+波勇者专属强化）
+AFFIXES = [
+    {
+        "id": "sacred",
+        "prefix": "神圣加护的",
+        "hp_mult": 1.3, "atk_mult": 1.2,
+        "flavour_suffix": "圣光在{pronoun}身上燃得格外炽烈，像是神明亲自在场。",
+    },
+    {
+        "id": "berserk",
+        "prefix": "狂暴之怒附身的",
+        "atk_mult": 1.5, "def_mult": 0.7,
+        "flavour_suffix": "{pronoun}的眼睛红了，理智在燃烧中渐渐消退。",
+    },
+    {
+        "id": "guardian",
+        "prefix": "守护之志加身的",
+        "def_mult": 1.8, "hp_mult": 1.2, "atk_mult": 0.7,
+        "flavour_suffix": "{pronoun}背后仿佛有千万人在看着，那些人不能倒。",
+    },
+    {
+        "id": "swift",
+        "prefix": "疾风加持的",
+        "agi_mult": 1.8,
+        "combo_rate": 20,
+        "flavour_suffix": "{pronoun}的速度快到影子跟不上，像风一样来了又走。",
+    },
+    {
+        "id": "divine",
+        "prefix": "神明祝福降临的",
+        "hp_mult": 1.2, "atk_mult": 1.2, "def_mult": 1.2, "agi_mult": 1.2,
+        "flavour_suffix": "有什么东西在{pronoun}的血液里流动——那不是{pronoun}自己的力量。",
+    },
+    {
+        "id": "cursed",
+        "prefix": "诅咒之刃缠绕的",
+        "atk_mult": 1.3,
+        "lifesteal": 25,
+        "flavour_suffix": "{pronoun}的伤口不会流血，失去的力气会以另一种方式回来。",
+    },
+    {
+        "id": "veteran",
+        "prefix": "百战不死的",
+        "hp_mult": 1.1, "atk_mult": 1.1, "def_mult": 1.1, "agi_mult": 1.1,
+        "counter_rate": 20,
+        "flavour_suffix": "{pronoun}见过太多，早已知道什么招数接什么招数。",
+    },
+    {
+        "id": "desperate",
+        "prefix": "破釜沉舟的",
+        "atk_mult": 1.5, "hp_mult": 0.7,
+        "crit_rate": 25,
+        "flavour_suffix": "{pronoun}把退路全堵死了——赢了回家，输了就在这里。",
+    },
+]
+
+
+def apply_affixes(stats: dict, affixes: list) -> dict:
+    """将词缀叠加应用到属性上"""
+    result = dict(stats)
+    for affix in affixes:
+        for key in ("hp_mult", "atk_mult", "def_mult", "agi_mult"):
+            attr = key.replace("_mult", "")
+            attr_map = {"hp": "hp", "atk": "attack", "def": "defense", "agi": "agility"}
+            real_key = attr_map.get(attr, attr)
+            if key in affix and real_key in result:
+                result[real_key] = int(result[real_key] * affix[key])
+        # 特殊战斗属性（叠加取较大值，不重复累加）
+        for special in ("crit_rate", "combo_rate", "counter_rate", "lifesteal", "ignore_defense"):
+            if special in affix:
+                result[special] = max(result.get(special, 0), affix[special])
+    return result
+
+
 def calculate_hero_level(player_level: int, wave_number: int) -> int:
     """计算英雄等级：英雄等级 = 玩家等级 × (0.6 + 波次 × 0.04)"""
     ratio = 0.6 + wave_number * 0.04
@@ -168,6 +242,7 @@ def generate_hero(player_level: int, wave_number: int) -> Dict:
             "level": int,
             "hp": int, "attack": int, "defense": int, "agility": int,
             "flavour": str,   # 一句话背景
+            "affixes": list,  # 词缀列表（21+波才有）
             ... 其他特殊属性
         }
     """
@@ -185,11 +260,34 @@ def generate_hero(player_level: int, wave_number: int) -> Dict:
     stats = calculate_hero_stats(hero_level, hero_class)
     flavour = random.choice(hero_class["flavour_pool"])
 
+    # 21+波：随机附加词缀强化
+    selected_affixes = []
+    affix_names = []
+    if wave_number > 20:
+        # 波次越高词缀越多：21-30波1个，31+波2个
+        affix_count = 2 if wave_number > 30 else 1
+        selected_affixes = random.sample(AFFIXES, min(affix_count, len(AFFIXES)))
+        stats = apply_affixes(stats, selected_affixes)
+        affix_names = [a["prefix"] for a in selected_affixes]
+
+        # 在名字前加词缀修饰
+        prefix_str = "、".join(affix_names)
+        full_name = f"{prefix_str}{full_name}"
+
+        # 添加词缀flavour（检测代词）
+        _female = {"席拉", "伊莲娜", "芙蕾雅", "奥尔加", "米雷亚", "艾莉丝", "薇薇安"}
+        pron = "她" if any(fn in name_part for fn in _female) else "他"
+        affix_flavour = "　".join(
+            a["flavour_suffix"].format(pronoun=pron) for a in selected_affixes
+        )
+        flavour = f"{flavour}\n{affix_flavour}"
+
     return {
         "name": full_name,
         "title": hero_class["title"],
         "level": hero_level,
         "flavour": flavour,
+        "affixes": affix_names,
         **stats,
     }
 
