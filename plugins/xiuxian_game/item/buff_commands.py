@@ -191,3 +191,98 @@ async def handle_attribute_breakdown(event: MessageEvent):
             lines.append("⚠️ 检测到基础属性异常，建议联系管理员处理")
 
         await attribute_breakdown_cmd.finish(message_add_head("\n".join(lines), event))
+
+
+# ---------------- 指令：一键嗑药 ----------------
+auto_use_medicine_cmd = on_command("一键嗑药", aliases={"一键磕药", "自动嗑药"}, block=True, priority=5)
+
+@auto_use_medicine_cmd.handle()
+async def handle_auto_use_medicine(event: MessageEvent):
+    """一键嗑药 - 自动使用适量的回春散和凝神草补满血量和法力值"""
+    from sqlalchemy import select
+    from ..models.inventory import ItemInstance
+    from ..config import config
+    from .item_effects import apply_effect
+
+    async with safe_session() as session:
+        from ..platform_utils import get_unified_player
+        player = await get_unified_player(session, event)
+        if not player:
+            await auto_use_medicine_cmd.finish("⛔ 请先创建角色")
+
+        if player.hp <= 0:
+            await auto_use_medicine_cmd.finish(message_add_head(
+                "💀 你已经死亡，无法使用药品，请先复活", event
+            ))
+
+        effective_attrs = await player.get_effective_attributes(session)
+        effective_max_hp = effective_attrs.get("max_hp", player.max_hp)
+        effective_max_mp = effective_attrs.get("max_mp", player.max_mp)
+        current_hp = min(player.hp, effective_max_hp)
+        current_mp = min(player.mp, effective_max_mp)
+
+        hp_needed = max(0, effective_max_hp - current_hp)
+        mp_needed = max(0, effective_max_mp - current_mp)
+
+        if hp_needed <= 0 and mp_needed <= 0:
+            await auto_use_medicine_cmd.finish(message_add_head(
+                "✨ 你的血量和法力值都已满，无需嗑药", event
+            ))
+
+        heal_potions = (await session.execute(
+            select(ItemInstance).where(ItemInstance.player_id == player.id, ItemInstance.item_id == "heal_potion")
+        )).scalars().all()
+        heal_potion_count = sum(i.quantity for i in heal_potions)
+
+        spirit_herbs = (await session.execute(
+            select(ItemInstance).where(ItemInstance.player_id == player.id, ItemInstance.item_id == "spirit_herb")
+        )).scalars().all()
+        spirit_herb_count = sum(i.quantity for i in spirit_herbs)
+
+        heal_potion_needed = min((hp_needed + 39) // 40, heal_potion_count) if hp_needed > 0 else 0
+        spirit_herb_needed = min((mp_needed + 39) // 40, spirit_herb_count) if mp_needed > 0 else 0
+
+        if heal_potion_needed == 0 and spirit_herb_needed == 0:
+            missing = []
+            if hp_needed > 0:
+                missing.append("回春散")
+            if mp_needed > 0:
+                missing.append("凝神草")
+            await auto_use_medicine_cmd.finish(message_add_head(
+                f"⛔ 背包中没有足够的药品：{' 和 '.join(missing)}", event
+            ))
+
+        used_items = []
+        total_hp_restored = 0
+        total_mp_restored = 0
+
+        if heal_potion_needed > 0:
+            success, _ = await apply_effect(player, config.items_config["by_id"]["heal_potion"], heal_potion_needed, ctx="world", session=session)
+            if success:
+                await ItemInstance.consume_item(session, player.id, "heal_potion", heal_potion_needed)
+                used_items.append(f"回春散*{heal_potion_needed}")
+                total_hp_restored = min(heal_potion_needed * 40, hp_needed)
+
+        if spirit_herb_needed > 0:
+            success, _ = await apply_effect(player, config.items_config["by_id"]["spirit_herb"], spirit_herb_needed, ctx="world", session=session)
+            if success:
+                await ItemInstance.consume_item(session, player.id, "spirit_herb", spirit_herb_needed)
+                used_items.append(f"凝神草*{spirit_herb_needed}")
+                total_mp_restored = min(spirit_herb_needed * 40, mp_needed)
+
+        if not used_items:
+            await auto_use_medicine_cmd.finish(message_add_head("⛔ 药品使用失败，请重试", event))
+
+        session.add(player)
+        await session.commit()
+
+        result_msg = ["💊 一键嗑药完成", "━━━━━━━━━━━━━", f"🎯 使用药品：{' + '.join(used_items)}"]
+        if total_hp_restored > 0:
+            result_msg.append(f"❤️ 恢复生命值：{total_hp_restored}")
+        if total_mp_restored > 0:
+            result_msg.append(f"💙 恢复法力值：{total_mp_restored}")
+        result_msg.extend([
+            f"📊 当前状态：{min(player.hp, effective_max_hp)}/{effective_max_hp} HP | {min(player.mp, effective_max_mp)}/{effective_max_mp} MP",
+            "━━━━━━━━━━━━━"
+        ])
+        await auto_use_medicine_cmd.finish(message_add_head("\n".join(result_msg), event))

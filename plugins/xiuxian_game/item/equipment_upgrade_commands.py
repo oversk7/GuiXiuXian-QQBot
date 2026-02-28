@@ -292,4 +292,147 @@ async def _(event: MessageEvent):
         lines.append("💡 使用 /升阶信息 装备ID 查看详细信息")
 
         await upgrade_list_cmd.finish(message_add_head("\n".join(lines), event))
+
+# ---------------- 指令：一键升阶 ----------------
+auto_upgrade_cmd = on_command("一键升阶", block=True, priority=5, force_whitespace=True)
+
+@auto_upgrade_cmd.handle()
+async def _(event: MessageEvent, args: Message = CommandArg()):
+    arg_text = args.extract_plain_text().strip()
+    if not arg_text:
+        await auto_upgrade_cmd.finish("⛔ 格式：一键升阶 装备编号/名称 目标阶数 [稳定水晶]\n示例：一键升阶 1 5")
+
+    # 解析参数
+    parts = arg_text.split()
+    if len(parts) < 2:
+        await auto_upgrade_cmd.finish("⛔ 格式：一键升阶 装备编号/名称 目标阶数 [稳定水晶]")
+
+    equipment_arg = parts[0]
+    use_protection = len(parts) > 2 and ("稳定水晶" in parts[2] or "护身符" in parts[2])
+
+    # 解析目标阶数
+    try:
+        target_level = int(parts[1])
+    except ValueError:
+        await auto_upgrade_cmd.finish("⛔ 目标阶数必须是数字（1-10）")
+
+    if target_level < 1 or target_level > 10:
+        await auto_upgrade_cmd.finish("⛔ 目标阶数范围：1-10")
+
+    async with safe_session() as session:
+        player = await get_unified_player(session, event)
+        if not player:
+            await auto_upgrade_cmd.finish("⛔ 请先创建角色")
+
+        # 查找装备
+        equip = await find_equipment_by_input(session, event.get_user_id(), equipment_arg)
+        if not equip:
+            await auto_upgrade_cmd.finish("⛔ 未找到指定装备，请使用装备栏中显示的编号或装备名称")
+
+        if not equip.is_equipment:
+            await auto_upgrade_cmd.finish("⛔ 该物品不是装备")
+
+        if equip.upgrade_level >= target_level:
+            await auto_upgrade_cmd.finish(f"⛔ 装备当前已是 +{equip.upgrade_level}阶，无需升阶")
+
+        if equip.equipped:
+            await auto_upgrade_cmd.finish("⛔ 请先卸下装备再进行升阶")
+
+        # 检查月卡权益
+        from ..models.monthly_card import MonthlyCard as MonthlyCardModel
+        active_cards = await MonthlyCardModel.get_all_active_cards(session, player.id)
+        if not active_cards:
+            await auto_upgrade_cmd.finish(message_add_head(
+                "⛔ 一键升阶是月卡专属功能，请先购买月卡\n💡 发送【赞助】了解月卡权益",
+                event
+            ))
+
+        from ..infrastructure.repositories.item_repository import ItemRepository
+        from ..infrastructure.repositories.player_repository import PlayerRepository
+
+        upgrade_service = EquipmentUpgradeService(
+            item_repo=ItemRepository(session),
+            player_repo=PlayerRepository(session)
+        )
+
+        # 记录初始状态
+        start_level = equip.upgrade_level
+        equip_name = equip.config.name
+        attempts = 0
+        successes = 0
+        failures = 0
+        destroyed = False
+        final_level = start_level
+        stop_reason = ""
+        round_logs = []  # 记录每轮简要结果
+
+        # 循环升阶直到达到目标或无法继续
+        while equip.upgrade_level < target_level:
+            # 检查是否可以升阶（材料/金币等）
+            can_upgrade, reason = await upgrade_service.can_upgrade(equip, player)
+            if not can_upgrade:
+                stop_reason = reason
+                break
+
+            attempts += 1
+            success, message, result_info = await upgrade_service.perform_upgrade(equip, player, use_protection)
+            result_type = result_info.get("result", "")
+
+            if result_type == "destroyed":
+                destroyed = True
+                stop_reason = "装备已损坏"
+                round_logs.append(f"第{attempts}次：💀 损坏")
+                break
+
+            new_level = result_info.get("new_level", equip.upgrade_level)
+
+            if success:
+                successes += 1
+                round_logs.append(f"第{attempts}次：✅ →+{new_level}阶")
+            else:
+                failures += 1
+                if result_type == "downgraded":
+                    round_logs.append(f"第{attempts}次：📉 降到+{new_level}阶")
+                elif result_type == "failed_protected":
+                    round_logs.append(f"第{attempts}次：🛡️ 失败保护(+{new_level}阶)")
+                else:
+                    round_logs.append(f"第{attempts}次：❌ 失败(+{new_level}阶)")
+
+        if not destroyed:
+            final_level = equip.upgrade_level
+
+        await session.commit()
+
+        # 构建结果消息
+        lines = ["⚔️ 一键升阶完成", "━━━━━━━━━━━━━"]
+        if destroyed:
+            lines.append(f"🎯 {equip_name}：+{start_level}阶 → 💀 已损坏")
+        else:
+            lines.append(f"🎯 {equip_name}：+{start_level}阶 → +{final_level}阶")
+
+        lines.append(f"📊 共尝试 {attempts} 次（成功 {successes} 次 / 失败 {failures} 次）")
+
+        # 显示轮次日志（最多显示最后15条）
+        if round_logs:
+            lines.append("")
+            if len(round_logs) > 15:
+                lines.append(f"（仅显示最后15次，共 {len(round_logs)} 次）")
+                display_logs = round_logs[-15:]
+            else:
+                display_logs = round_logs
+            lines.extend(display_logs)
+
+        lines.append("")
+        if destroyed:
+            lines.append("💀 装备已在升阶中损坏！")
+        elif final_level >= target_level:
+            lines.append(f"✅ 已成功达到目标 +{target_level}阶！")
+        elif attempts == 0:
+            lines.append(f"⛔ 无法开始升阶：{stop_reason}")
+        else:
+            lines.append(f"⛔ 中途停止：{stop_reason}")
+
+        await auto_upgrade_cmd.finish(message_add_head("\n".join(lines), event))
+
+
 # ---------------- 辅助函数 ----------------
