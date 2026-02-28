@@ -739,16 +739,12 @@ async def handle_redeem(event: MessageEvent, args: Message = CommandArg()):
                 f"当前：{stronghold.calamity_points}点"
             )
 
-        # 扣除天灾点
-        stronghold.calamity_points -= item["price"]
-        uow.session.add(stronghold)
-
-        # ─── 实装各商品效果 ───
+        # ─── 实装各商品效果（先检查重复，通过后再扣天灾点）───
         from ..models.temporary_buff import TemporaryBuff
         from sqlalchemy import select as _sel
 
         if item["id"] == "cultivate_boost":
-            # 检查是否已有未过期的修炼加速buff
+            # 先检查是否已有未过期的修炼加速buff
             existing_stmt = _sel(TemporaryBuff).where(
                 TemporaryBuff.player_id == player.id,
                 TemporaryBuff.buff_id == "lower_world_cultivate_boost",
@@ -757,16 +753,14 @@ async def handle_redeem(event: MessageEvent, args: Message = CommandArg()):
             )
             existing = (await uow.session.execute(existing_stmt)).scalars().first()
             if existing:
-                # 退还天灾点
-                stronghold.calamity_points += item["price"]
-                uow.session.add(stronghold)
-                await uow.commit()
                 remaining_min = existing.get_remaining_minutes()
                 await redeem_cmd.finish(
                     f"你已有「修炼加速」效果，剩余 {remaining_min} 分钟\n"
-                    "无法叠加，天灾点已退还。"
+                    "无法叠加，天灾点未扣除。"
                 )
 
+            stronghold.calamity_points -= item["price"]
+            uow.session.add(stronghold)
             buff = TemporaryBuff(
                 player_id=player.id,
                 buff_id="lower_world_cultivate_boost",
@@ -789,7 +783,7 @@ async def handle_redeem(event: MessageEvent, args: Message = CommandArg()):
             )
 
         elif item["id"] == "battle_boost":
-            # 战意加持：按玩家当前属性计算10%固定加成，创建短时buff
+            # 先检查是否已有未过期的战意加持buff
             existing_stmt = _sel(TemporaryBuff).where(
                 TemporaryBuff.player_id == player.id,
                 TemporaryBuff.buff_id == "lower_world_combat_boost",
@@ -798,13 +792,10 @@ async def handle_redeem(event: MessageEvent, args: Message = CommandArg()):
             )
             existing = (await uow.session.execute(existing_stmt)).scalars().first()
             if existing:
-                stronghold.calamity_points += item["price"]
-                uow.session.add(stronghold)
-                await uow.commit()
                 remaining_min = existing.get_remaining_minutes()
                 await redeem_cmd.finish(
                     f"你已有「战意加持」效果，剩余 {remaining_min} 分钟\n"
-                    "无法叠加，天灾点已退还。"
+                    "无法叠加，天灾点未扣除。"
                 )
 
             # 计算10%属性加成（固定值）
@@ -812,6 +803,8 @@ async def handle_redeem(event: MessageEvent, args: Message = CommandArg()):
             def_bonus = max(1, int(player.defense * 0.10))
             agi_bonus = max(1, int(player.agility * 0.10))
             hp_bonus = max(1, int(player.max_hp * 0.10))
+            stronghold.calamity_points -= item["price"]
+            uow.session.add(stronghold)
             buff = TemporaryBuff(
                 player_id=player.id,
                 buff_id="lower_world_combat_boost",
@@ -840,7 +833,7 @@ async def handle_redeem(event: MessageEvent, args: Message = CommandArg()):
             )
 
         elif item["id"] == "title_calamity":
-            # 称号「第四天灾」
+            # 先检查是否已拥有称号
             from ..event.knocker_event import KnockerEventService
             from sqlalchemy.orm.attributes import flag_modified
 
@@ -849,16 +842,14 @@ async def handle_redeem(event: MessageEvent, args: Message = CommandArg()):
             owned_titles = pdata.get("owned_titles", [])
 
             if title_name in owned_titles:
-                # 已拥有，退还天灾点
-                stronghold.calamity_points += item["price"]
-                uow.session.add(stronghold)
-                await uow.commit()
                 await redeem_cmd.finish(
                     f"你已拥有称号「{title_name}」\n"
-                    "天灾点已退还。\n"
+                    "天灾点未扣除。\n"
                     "💡 使用【切换称号 第四天灾】重新佩戴。"
                 )
 
+            stronghold.calamity_points -= item["price"]
+            uow.session.add(stronghold)
             owned_titles.append(title_name)
             pdata["owned_titles"] = owned_titles
             pdata["title"] = title_name  # 自动设为当前称号
@@ -877,6 +868,8 @@ async def handle_redeem(event: MessageEvent, args: Message = CommandArg()):
             )
 
         else:
+            stronghold.calamity_points -= item["price"]
+            uow.session.add(stronghold)
             await uow.commit()
             msg = (
                 f"✅ 兑换成功！\n"
