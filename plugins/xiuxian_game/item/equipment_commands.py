@@ -363,7 +363,9 @@ wear_equipment = on_command("装备", aliases={"穿戴", "佩戴"}, block=True, 
 async def _(event: MessageEvent, args: Message = CommandArg()):
     arg = args.extract_plain_text().strip()
     if not arg:
-        await wear_equipment.finish("⛔ 格式：装备 装备编号/名称")
+        await wear_equipment.finish("⛔ 格式：装备 装备编号/名称 [编号2 编号3 ...]")
+
+    arg_list = arg.split()
 
     async with safe_session() as session:
         # 使用跨平台工具获取玩家数据
@@ -375,86 +377,159 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
             else:
                 await wear_equipment.finish("⛔ 请先创建角色")
 
-        # 查找装备
-        equip = await find_equipment_by_input(session, player.id, arg)
-        if not equip:
-            await wear_equipment.finish("⛔ 未找到指定装备，请使用装备栏中显示的编号或装备名称")
+        if len(arg_list) == 1:
+            # ---- 单件装备：原有逻辑 ----
+            equip = await find_equipment_by_input(session, player.id, arg)
+            if not equip:
+                await wear_equipment.finish("⛔ 未找到指定装备，请使用装备栏中显示的编号或装备名称")
 
-        # 如果是按名称查找且有多个同名装备，优先选择耐久度最高的未装备装备
-        if not arg.isdigit():
-            item_config = config.items_config["by_name"].get(arg)
-            if item_config:
-                stmt = select(ItemInstance).where(
-                    ItemInstance.player_id == player.id,
-                    ItemInstance.item_id == item_config.item_id,
-                    ItemInstance.equipped == False
-                ).order_by(ItemInstance.durability.desc())
+            # 如果是按名称查找且有多个同名装备，优先选择耐久度最高的未装备装备
+            if not arg.isdigit():
+                item_config = config.items_config["by_name"].get(arg)
+                if item_config:
+                    stmt = select(ItemInstance).where(
+                        ItemInstance.player_id == player.id,
+                        ItemInstance.item_id == item_config.item_id,
+                        ItemInstance.equipped == False
+                    ).order_by(ItemInstance.durability.desc())
 
-                unequipped_items = (await session.execute(stmt)).scalars().all()
-                if unequipped_items:
-                    equip = unequipped_items[0]  # 选择耐久度最高的那件
+                    unequipped_items = (await session.execute(stmt)).scalars().all()
+                    if unequipped_items:
+                        equip = unequipped_items[0]  # 选择耐久度最高的那件
 
-        # 检查是否已装备
-        if equip.equipped:
-            await wear_equipment.finish("⛔ 该装备已经穿戴")
+            if equip.equipped:
+                await wear_equipment.finish("⛔ 该装备已经穿戴")
+            if equip.config.required_level > player.level:
+                await wear_equipment.finish(f"⛔ 等级不足，需要 Lv.{equip.config.required_level}")
+            if equip.durability <= 0:
+                await wear_equipment.finish("⛔ 该装备已损坏（耐久为0），请先修理后再穿戴")
 
-        # 检查等级要求
-        if equip.config.required_level > player.level:
-            await wear_equipment.finish(f"⛔ 等级不足，需要 Lv.{equip.config.required_level}")
+            same_type_stmt = select(ItemInstance).where(
+                ItemInstance.player_id == player.id,
+                ItemInstance.item_id == equip.item_id,
+                ItemInstance.equipped == True
+            )
+            same_type_equipped = (await session.execute(same_type_stmt)).scalars().all()
+            if same_type_equipped:
+                await wear_equipment.finish(f"⛔ 已装备同名装备 {equip.config.name}，不能重复穿戴")
 
+            all_equipped_stmt = select(ItemInstance).where(
+                ItemInstance.player_id == player.id,
+                ItemInstance.equipped == True,
+                ItemInstance.item_id.in_(EQUIP_ITEM_IDS)
+            )
+            all_equipped = (await session.execute(all_equipped_stmt)).scalars().all()
+            if len(all_equipped) >= 5:
+                await wear_equipment.finish("⛔ 装备栏已满，最多只能穿戴5件装备，请先卸下其他装备")
 
-        # 检查耐久是否为0（损坏）
-        if equip.durability <= 0:
-            await wear_equipment.finish("⛔ 该装备已损坏（耐久为0），请先修理后再穿戴")
+            equip.equipped = True
+            session.add(equip)
 
-        # 检查是否有同名装备已装备
-        same_type_stmt = select(ItemInstance).where(
-            ItemInstance.player_id == player.id,
-            ItemInstance.item_id == equip.item_id,
-            ItemInstance.equipped == True
-        )
-        same_type_equipped = (await session.execute(same_type_stmt)).scalars().all()
+            from ..infrastructure.repositories.item_repository import ItemRepository
+            from ..infrastructure.repositories.player_repository import PlayerRepository
+            from .equipment_service_new import EquipmentService
 
-        if same_type_equipped:
-            await wear_equipment.finish(f"⛔ 已装备同名装备 {equip.config.name}，不能重复穿戴")
+            equipment_service = EquipmentService(
+                item_repo=ItemRepository(session),
+                player_repo=PlayerRepository(session)
+            )
+            await equipment_service.recalc_equipment_attributes(player)
+            session.add(player)
+            await session.commit()
 
-        # 检查装备数量限制（最多5件）
-        all_equipped_stmt = select(ItemInstance).where(
-            ItemInstance.player_id == player.id,
-            ItemInstance.equipped == True,
-            ItemInstance.item_id.in_(EQUIP_ITEM_IDS)
-        )
-        all_equipped = (await session.execute(all_equipped_stmt)).scalars().all()
+            durability_info = f" (ID:{equip.id}, 耐久:{equip.durability}/{equip.config.durability})"
+            if equip.durability == 0:
+                await wear_equipment.finish(f"⛔ {equip.config.name} 耐久为0，已自动卸下，请先修理")
+            await wear_equipment.finish(f"✅ 成功穿戴 {equip.config.name}{durability_info}")
 
-        if len(all_equipped) >= 5:
-            await wear_equipment.finish("⛔ 装备栏已满，最多只能穿戴5件装备，请先卸下其他装备")
+        else:
+            # ---- 批量装备：依次装备，每件完成后立即重算属性并提交 ----
+            # 初始化装备服务（整个批次共用）
+            from ..infrastructure.repositories.item_repository import ItemRepository
+            from ..infrastructure.repositories.player_repository import PlayerRepository
+            from .equipment_service_new import EquipmentService
 
-        # 标记新装备为已装备
-        equip.equipped = True
-        session.add(equip)
+            equipment_service = EquipmentService(
+                item_repo=ItemRepository(session),
+                player_repo=PlayerRepository(session)
+            )
 
-        # 重新计算装备属性
-        # 新版本: 使用DI架构的EquipmentService（通过当前session创建Repository）
-        from ..infrastructure.repositories.item_repository import ItemRepository
-        from ..infrastructure.repositories.player_repository import PlayerRepository
-        from .equipment_service_new import EquipmentService
+            # 查询当前已装备状态，用于本地维护
+            all_equipped_stmt = select(ItemInstance).where(
+                ItemInstance.player_id == player.id,
+                ItemInstance.equipped == True,
+                ItemInstance.item_id.in_(EQUIP_ITEM_IDS)
+            )
+            currently_equipped = list((await session.execute(all_equipped_stmt)).scalars().all())
+            equipped_count = len(currently_equipped)
+            equipped_item_ids = set(e.item_id for e in currently_equipped)
+            equipped_instance_ids = set(e.id for e in currently_equipped)
 
-        equipment_service = EquipmentService(
-            item_repo=ItemRepository(session),
-            player_repo=PlayerRepository(session)
-        )
+            success_list = []
+            fail_list = []
 
-        # 重新计算装备属性（包括所有已装备的装备）
-        await equipment_service.recalc_equipment_attributes(player)
-        session.add(player)
+            for single_arg in arg_list:
+                if equipped_count >= 5:
+                    fail_list.append(f"{single_arg}: 装备栏已满")
+                    continue
 
-        await session.commit()
+                equip = await find_equipment_by_input(session, player.id, single_arg)
+                if not equip:
+                    fail_list.append(f"{single_arg}: 未找到")
+                    continue
 
-        # 显示穿戴的装备信息，包括ID和耐久度
-        durability_info = f" (ID:{equip.id}, 耐久:{equip.durability}/{equip.config.durability})"
-        if equip.durability == 0:
-            await wear_equipment.finish(f"⛔ {equip.config.name} 耐久为0，已自动卸下，请先修理")
-        await wear_equipment.finish(f"✅ 成功穿戴 {equip.config.name}{durability_info}")
+                # 名称查找时，优先选择耐久最高的未装备装备（排除本次已装备的）
+                if not single_arg.isdigit():
+                    item_config = config.items_config["by_name"].get(single_arg)
+                    if item_config:
+                        stmt = select(ItemInstance).where(
+                            ItemInstance.player_id == player.id,
+                            ItemInstance.item_id == item_config.item_id,
+                            ItemInstance.equipped == False
+                        ).order_by(ItemInstance.durability.desc())
+                        unequipped_items = [
+                            i for i in (await session.execute(stmt)).scalars().all()
+                            if i.id not in equipped_instance_ids
+                        ]
+                        if unequipped_items:
+                            equip = unequipped_items[0]
+
+                if equip.equipped or equip.id in equipped_instance_ids:
+                    fail_list.append(f"{equip.config.name}(#{single_arg}): 已穿戴")
+                    continue
+                if equip.config.required_level > player.level:
+                    fail_list.append(f"{equip.config.name}(#{single_arg}): 等级不足(需Lv.{equip.config.required_level})")
+                    continue
+                if equip.durability <= 0:
+                    fail_list.append(f"{equip.config.name}(#{single_arg}): 已损坏需修理")
+                    continue
+                if equip.item_id in equipped_item_ids:
+                    fail_list.append(f"{equip.config.name}(#{single_arg}): 已装备同名装备")
+                    continue
+
+                # 标记为已装备，立即重算并提交（与单独执行"装备"指令效果完全一致）
+                equip.equipped = True
+                session.add(equip)
+                await equipment_service.recalc_equipment_attributes(player)
+                session.add(player)
+                await session.commit()
+
+                # 更新本地状态，供后续装备的检查使用
+                equipped_count += 1
+                equipped_item_ids.add(equip.item_id)
+                equipped_instance_ids.add(equip.id)
+                success_list.append(f"{equip.config.name}(ID:{equip.id})")
+
+            lines = []
+            if success_list:
+                lines.append(f"✅ 成功穿戴：{', '.join(success_list)}")
+            if fail_list:
+                lines.append("❌ 以下装备失败：")
+                lines.extend([f"  • {f}" for f in fail_list])
+            if not success_list and not fail_list:
+                lines.append("⛔ 未处理任何装备")
+
+            await wear_equipment.finish(message_add_head("\n".join(lines), event))
 
 
 # ---------------- 指令：卸下装备 ----------------
