@@ -253,13 +253,14 @@ class EquipmentService:
 
         current_attack = int(getattr(player, "attack", 0) or 0)
         base_for_convert = max(1, current_attack)
-        total_bonus_hp = int(base_for_convert * total_pct / 100.0)
+        # 体力加点比例是攻击力的3倍（1体力=3攻击点数），故转换时乘以3
+        total_bonus_hp = int(base_for_convert * total_pct / 100.0 * 3)
         if total_bonus_hp <= 0:
             return
 
         remaining = total_bonus_hp
         for idx, (eq, pct) in enumerate(hp_from_attack_effects):
-            part = int(base_for_convert * pct / 100.0)
+            part = int(base_for_convert * pct / 100.0 * 3)
             if idx == len(hp_from_attack_effects) - 1:
                 part = remaining
             else:

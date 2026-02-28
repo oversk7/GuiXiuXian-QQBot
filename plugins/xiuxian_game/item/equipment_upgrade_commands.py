@@ -134,6 +134,30 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
             "• 优先消耗耐久度较低的装备"
         ])
 
+        # 宝石状态提醒
+        gem_warn_lines = []
+        # 主装备宝石
+        main_gem_count = sum(1 for v in (equip.gem_slots_data or {}).values() if v)
+        # 副装备（将被消耗的）宝石
+        consumed_equips = [eq for eq in available_equipment if eq.id != equip.id]
+        consumed_gem_total = sum(
+            sum(1 for v in (eq.gem_slots_data or {}).values() if v)
+            for eq in consumed_equips
+        )
+        consequence = upgrade_service.FAILURE_CONSEQUENCES.get(target_level, {"downgrade": 0, "destroy": 0.0})
+
+        if main_gem_count > 0 or consumed_gem_total > 0:
+            gem_warn_lines.append("")
+            gem_warn_lines.append("🔮 宝石提醒：")
+        if consumed_gem_total > 0:
+            gem_warn_lines.append(f"  💎 副装备上共有 {consumed_gem_total} 个宝石，升阶时将自动全量回收到背包")
+        if main_gem_count > 0 and consequence["destroy"] > 0:
+            gem_warn_lines.append(f"  ⚠️ 该装备已镶嵌 {main_gem_count} 个宝石")
+            gem_warn_lines.append(f"  🎲 此阶段有 {consequence['destroy']:.0%} 装备损坏风险，损坏时每个宝石独立 50% 存活")
+            gem_warn_lines.append("  🛡️ 使用稳定水晶可防止装备损坏，宝石全部保留")
+
+        lines.extend(gem_warn_lines)
+
         await upgrade_info_cmd.finish(message_add_head("\n".join(lines), event))
 
 

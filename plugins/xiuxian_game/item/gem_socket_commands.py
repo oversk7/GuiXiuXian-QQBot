@@ -76,8 +76,9 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
         lines.extend([
             "",
             "💡 使用方法：",
-            f"• 镶嵌 {arg} 孔位号 宝石名称",
-            f"• 拆卸 {arg} 孔位号"
+            f"• 镶嵌 {arg} 孔位号 宝石名称（消耗：镶嵌锤×1 + 1000金币）",
+            f"• 拆卸 {arg} 孔位号（消耗：拆卸凿×1 + 500金币，15%宝石损坏风险）",
+            f"• 拆卸 {arg} 孔位号 稳定水晶（额外消耗稳定水晶×1，消除所有风险）"
         ])
 
         await gem_slots_cmd.finish(message_add_head("\n".join(lines), event))
@@ -153,12 +154,12 @@ remove_gem_cmd = on_command("拆卸", aliases={"宝石拆卸"}, block=True, prio
 async def _(event: MessageEvent, args: Message = CommandArg()):
     arg_text = args.extract_plain_text().strip()
     if not arg_text:
-        await remove_gem_cmd.finish("⛔ 格式：拆卸 装备编号/名称 孔位号")
+        await remove_gem_cmd.finish("⛔ 格式：拆卸 装备编号/名称 孔位号 [稳定水晶]")
 
     # 解析参数
     parts = arg_text.split()
     if len(parts) < 2:
-        await remove_gem_cmd.finish("⛔ 格式：拆卸 装备编号/名称 孔位号")
+        await remove_gem_cmd.finish("⛔ 格式：拆卸 装备编号/名称 孔位号 [稳定水晶]")
 
     equipment_arg = parts[0]
     try:
@@ -166,6 +167,8 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
         slot_index = slot_number - 1  # 转换为0基索引
     except ValueError:
         await remove_gem_cmd.finish("⛔ 孔位号必须是数字")
+
+    use_protection = len(parts) > 2 and "稳定水晶" in " ".join(parts[2:])
 
     async with safe_session() as session:
         # 使用跨平台工具获取玩家数据
@@ -191,7 +194,7 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
             item_repo=ItemRepository(session),
             player_repo=PlayerRepository(session),
         )
-        success, message = await service.remove_gem(equip, slot_index, player)
+        success, message = await service.remove_gem(equip, slot_index, player, use_protection)
         await session.commit()
 
         if success:

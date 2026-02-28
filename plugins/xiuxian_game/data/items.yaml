@@ -1357,8 +1357,8 @@ items:
         - trigger: "passive"
           effect: "hp_from_attack"
           is_percentage: true
-          value: 50
-          description: "[1] 骰相·命：你的力量越强，身躯便越难被击碎——以自身最大攻击力的50%转化为最大体力值提升。"
+          value: 40
+          description: "[1] 骰相·命：你的力量越强，身躯便越难被击碎——以自身最大攻击力的40%转化为最大体力点提升。"
         - trigger: "passive"
           effect: "ignore_special"
           is_percentage: true

@@ -331,10 +331,14 @@ class EquipmentUpgradeService:
                 return False, "缺少稳定水晶", {}
             consumed_materials["stabilizer_crystal"] = 1
 
-        # 消耗装备
+        # 消耗装备（先回收副装备上的宝石，避免宝石静默丢失）
         consumed_equipment_names = []
+        gems_from_consumed: List[str] = []
         for eq in equipment_to_consume:
             consumed_equipment_names.append(f"{eq.config.name}(ID:{eq.id})")
+            if eq.gem_slots_data:
+                recovered = await self._recover_gems_from_equipment(eq, player, all_survive=True)
+                gems_from_consumed.extend(recovered)
             await self._item_repo.delete_item_instance(eq)
 
         player.gold -= required_gold
@@ -348,15 +352,17 @@ class EquipmentUpgradeService:
             "consumed_materials": consumed_materials,
             "consumed_equipment": consumed_equipment_names,
             "consumed_gold": required_gold,
-            "used_protection": use_protection
+            "used_protection": use_protection,
+            "recovered_from_consumed": gems_from_consumed,
         }
+        gems_suffix = f"\n💎 副装备回收宝石：{', '.join(gems_from_consumed)}" if gems_from_consumed else ""
 
         if is_success:
             # 升阶成功
             equipment.upgrade_level = target_level
             result_info["result"] = "success"
             result_info["new_level"] = target_level
-            return True, f"升阶成功！装备升级到 +{target_level} 阶", result_info
+            return True, f"升阶成功！装备升级到 +{target_level} 阶{gems_suffix}", result_info
         else:
             # 升阶失败
             consequence = self.FAILURE_CONSEQUENCES.get(target_level, {"downgrade": 0, "destroy": 0.0})
@@ -364,23 +370,23 @@ class EquipmentUpgradeService:
             # 稳定水晶保护
             if use_protection:
                 result_info["result"] = "failed_protected"
-                return False, f"升阶失败，但稳定水晶保护了装备", result_info
+                return False, f"升阶失败，但稳定水晶保护了装备{gems_suffix}", result_info
 
             # 检查是否损坏
             if random.random() < consequence["destroy"]:
-                # 装备损坏前，先回收镶嵌的宝石
-                recovered_gems = await self._recover_gems_from_equipment(equipment, player)
+                # 装备损坏前，先回收镶嵌的宝石（每个宝石独立50%存活率）
+                recovered_gems = await self._recover_gems_from_equipment(equipment, player, all_survive=False)
 
                 # 删除装备
                 await self._item_repo.delete_item_instance(equipment)
                 result_info["result"] = "destroyed"
 
-                # 构建消息
                 message = "升阶失败，装备已损坏！"
                 if recovered_gems:
-                    message += f"\n随机回收镶嵌物：{', '.join(recovered_gems)}"
+                    message += f"\n回收镶嵌物：{', '.join(recovered_gems)}"
                 else:
-                    message += "\n装备上没有镶嵌物可回收"
+                    message += "\n装备上的镶嵌物全部损毁"
+                message += gems_suffix
 
                 return False, message, result_info
 
@@ -391,50 +397,41 @@ class EquipmentUpgradeService:
                 equipment.upgrade_level = new_level
                 result_info["result"] = "downgraded"
                 result_info["new_level"] = new_level
-                return False, f"升阶失败，装备降级到 +{new_level} 阶", result_info
+                return False, f"升阶失败，装备降级到 +{new_level} 阶{gems_suffix}", result_info
             else:
                 result_info["result"] = "failed_no_change"
-                return False, f"升阶失败，装备等级不变", result_info
+                return False, f"升阶失败，装备等级不变{gems_suffix}", result_info
 
-    async def _recover_gems_from_equipment(self, equipment: ItemInstance, player: Player) -> List[str]:
+    async def _recover_gems_from_equipment(self, equipment: ItemInstance, player: Player, all_survive: bool = False) -> List[str]:
         """
-        从装备中随机回收一个镶嵌的宝石
-        返回回收的宝石名称列表
+        从装备中回收镶嵌的宝石
+        - all_survive=True：全量回收（用于消耗副装备前的清理）
+        - all_survive=False：每个宝石独立50%存活率（用于装备意外损坏时）
+        返回成功回收的宝石名称列表
         """
         recovered_gems = []
 
         if not equipment.is_equipment or not equipment.gem_slots_data:
             return recovered_gems
 
-        # 收集所有镶嵌的宝石
-        available_gems = []
-        for slot_index, gem_item_id in equipment.gem_slots_data.items():
-            if gem_item_id:
-                available_gems.append(gem_item_id)
+        for gem_item_id in equipment.gem_slots_data.values():
+            if not gem_item_id:
+                continue
 
-        # 如果没有镶嵌的宝石，直接返回
-        if not available_gems:
-            return recovered_gems
+            # 非全量模式下，每个宝石独立50%存活
+            if not all_survive and random.random() < 0.5:
+                continue
 
-        # 随机选择一个宝石进行回收
-        selected_gem_id = random.choice(available_gems)
-        gem_config = config.items_config["by_id"].get(selected_gem_id)
-        gem_name = gem_config.name if gem_config else selected_gem_id
+            gem_config = config.items_config["by_id"].get(gem_item_id)
+            gem_name = gem_config.name if gem_config else gem_item_id
 
-        try:
-            # 尝试将宝石添加到背包
-            await self._item_repo.add_item(player.id, selected_gem_id, 1)
-            recovered_gems.append(gem_name)
-        except ValueError:
-            # 背包空间不足，转换为金币
-            if gem_config and gem_config.price:
-                gold_value = gem_config.price
+            try:
+                await self._item_repo.add_item(player.id, gem_item_id, 1)
+                recovered_gems.append(gem_name)
+            except ValueError:
+                # 背包空间不足，转换为金币
+                gold_value = gem_config.price if (gem_config and gem_config.price) else 1000
                 player.gold += gold_value
                 recovered_gems.append(f"{gem_name}(转为{gold_value}金币)")
-            else:
-                # 没有价格配置，按默认价格处理
-                default_gold = 1000
-                player.gold += default_gold
-                recovered_gems.append(f"{gem_name}(转为{default_gold}金币)")
 
         return recovered_gems

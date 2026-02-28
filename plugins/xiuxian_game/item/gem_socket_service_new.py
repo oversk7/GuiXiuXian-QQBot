@@ -275,7 +275,7 @@ class GemSocketService:
 
         return True, f"✨ 成功镶嵌 {gem_type}：{gem_name} 到孔位 {slot_index + 1}"
 
-    async def can_remove_gem(self, equipment: ItemInstance, slot_index: int, player: Player) -> Tuple[bool, str]:
+    async def can_remove_gem(self, equipment: ItemInstance, slot_index: int, player: Player, use_protection: bool = False) -> Tuple[bool, str]:
         """
         检查是否可以拆卸宝石
 
@@ -283,6 +283,7 @@ class GemSocketService:
             equipment: 装备实例
             slot_index: 孔位索引
             player: 玩家对象
+            use_protection: 是否使用稳定水晶（消除宝石损坏和装备损伤风险）
 
         Returns:
             (是否可以拆卸, 提示信息)
@@ -309,13 +310,17 @@ class GemSocketService:
         if not await self._has_item(player.id, "gem_chisel", 1):
             return False, "缺少拆卸凿"
 
+        # 使用稳定水晶时，额外检查是否拥有稳定水晶
+        if use_protection and not await self._has_item(player.id, "stabilizer_crystal", 1):
+            return False, "缺少稳定水晶"
+
         # 检查金币
         if player.gold < self.REMOVE_COSTS["gold"]:
             return False, f"金币不足，需要 {self.REMOVE_COSTS['gold']} 金币"
 
         return True, "可以拆卸"
 
-    async def remove_gem(self, equipment: ItemInstance, slot_index: int, player: Player) -> Tuple[bool, str]:
+    async def remove_gem(self, equipment: ItemInstance, slot_index: int, player: Player, use_protection: bool = False) -> Tuple[bool, str]:
         """
         拆卸宝石
 
@@ -323,6 +328,7 @@ class GemSocketService:
             equipment: 装备实例
             slot_index: 孔位索引
             player: 玩家对象
+            use_protection: 是否使用稳定水晶（消除15%宝石损坏和5%装备损伤风险）
 
         Returns:
             (是否成功, 提示信息)
@@ -336,7 +342,7 @@ class GemSocketService:
             - 使用Repository方法替代ItemInstance静态方法
         """
         # 检查是否可以拆卸
-        can_remove, reason = await self.can_remove_gem(equipment, slot_index, player)
+        can_remove, reason = await self.can_remove_gem(equipment, slot_index, player, use_protection)
         if not can_remove:
             return False, reason
 
@@ -348,35 +354,47 @@ class GemSocketService:
         # 消耗工具和金币
         chisel_success = await self._item_repo.consume_item(player.id, "gem_chisel", 1)
         if not chisel_success:
-            # 改造点: 移除rollback，直接抛出异常由外层处理
             raise ValueError("消耗拆卸凿失败")
+
+        # 消耗稳定水晶（如果使用）
+        if use_protection:
+            crystal_success = await self._item_repo.consume_item(player.id, "stabilizer_crystal", 1)
+            if not crystal_success:
+                raise ValueError("消耗稳定水晶失败")
 
         player.gold -= self.REMOVE_COSTS["gold"]
         await self._player_repo.update(player)
-
-        # 拆卸风险判定
-        gem_destroyed = random.random() < self.REMOVE_RISKS["gem_destroy_rate"]
-        equipment_damaged = random.random() < self.REMOVE_RISKS["equipment_damage_rate"]
 
         # 移除宝石
         equipment.set_gem_in_slot(slot_index, None)
 
         result_messages = []
 
-        if gem_destroyed:
-            result_messages.append(f"💔 {gem_type} {gem_name} 在拆卸过程中损坏了")
-        else:
-            # 返还宝石到背包
+        if use_protection:
+            # 稳定水晶：保证宝石完好归还，装备不受损
             try:
                 await self._item_repo.add_item(player.id, gem_item_id, 1)
                 result_messages.append(f"✅ 成功拆卸 {gem_type}：{gem_name}")
+                result_messages.append("🛡️ 稳定水晶保护生效，宝石和装备完好无损")
             except ValueError:
                 result_messages.append(f"💔 背包空间不足，{gem_type} {gem_name} 丢失了")
+        else:
+            # 拆卸风险判定
+            gem_destroyed = random.random() < self.REMOVE_RISKS["gem_destroy_rate"]
+            equipment_damaged = random.random() < self.REMOVE_RISKS["equipment_damage_rate"]
 
-        if equipment_damaged:
-            # 装备耐久度损失
-            damage = max(1, equipment.config.durability // 10)  # 损失10%耐久度
-            equipment.durability = max(0, equipment.durability - damage)
-            result_messages.append(f"⚠️ 装备在拆卸过程中受损，耐久度 -{damage}")
+            if gem_destroyed:
+                result_messages.append(f"💔 {gem_type} {gem_name} 在拆卸过程中损坏了")
+            else:
+                try:
+                    await self._item_repo.add_item(player.id, gem_item_id, 1)
+                    result_messages.append(f"✅ 成功拆卸 {gem_type}：{gem_name}")
+                except ValueError:
+                    result_messages.append(f"💔 背包空间不足，{gem_type} {gem_name} 丢失了")
+
+            if equipment_damaged:
+                damage = max(1, equipment.config.durability // 10)
+                equipment.durability = max(0, equipment.durability - damage)
+                result_messages.append(f"⚠️ 装备在拆卸过程中受损，耐久度 -{damage}")
 
         return True, "\n".join(result_messages)
