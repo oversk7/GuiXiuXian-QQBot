@@ -19,7 +19,7 @@ from nonebot import logger
 from ..infrastructure.uow.unit_of_work import UnitOfWork
 from ..models.restaurant_log import RestaurantLog
 from ..models.chef import ChefPersonality
-from .cooking_service import RecipeManager, DishQuality
+from .cooking_service import CookingService, RecipeManager, DishQuality
 
 
 class SettlementService:
@@ -37,6 +37,7 @@ class SettlementService:
 
     def __init__(self):
         self.recipe_manager = RecipeManager()
+        self.cooking_service = CookingService()
 
     async def settle_all_restaurants(self, uow: UnitOfWork) -> int:
         """
@@ -255,20 +256,17 @@ class SettlementService:
                 continue
 
             # 3. 判定烹饪成功/失败
-            from .cooking_service import CookingService
-            cooking_service = CookingService()
-
-            success_rate = cooking_service._calculate_success_rate(
+            success_rate = self.cooking_service._calculate_success_rate(
                 chef.skill, recipe.category, chef.specialty
             )
             is_success = random.random() * 100 < success_rate
 
             if is_success:
                 # 4a. 成功 - 判定品质
-                quality = cooking_service._determine_quality(
+                quality = self.cooking_service._determine_quality(
                     chef.skill, recipe.category, chef.specialty
                 )
-                quality_multiplier = cooking_service._get_quality_multiplier(quality)
+                quality_multiplier = self.cooking_service._get_quality_multiplier(quality)
                 dish_price = int(recipe.base_price * quality_multiplier)
 
                 dishes.append({

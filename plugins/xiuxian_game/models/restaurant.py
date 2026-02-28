@@ -34,6 +34,7 @@ class Restaurant(Base):
     kitchen_level: Mapped[int] = mapped_column(Integer, default=1, server_default="1", comment="厨房等级(1-5)")
     reputation: Mapped[int] = mapped_column(Integer, default=0, server_default="0", comment="声望(0-10000)")
     max_chefs: Mapped[int] = mapped_column(Integer, default=1, server_default="1", comment="厨师上限")
+    storage_level: Mapped[int] = mapped_column(Integer, default=1, server_default="1", comment="仓库等级(1-5)")
     storage_capacity: Mapped[int] = mapped_column(Integer, default=50, server_default="50", comment="仓库容量")
     is_open: Mapped[bool] = mapped_column(Boolean, default=False, server_default="0", comment="是否营业中")
     total_income: Mapped[int] = mapped_column(BigInteger, default=0, server_default="0", comment="累计总收入")

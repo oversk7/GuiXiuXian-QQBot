@@ -72,11 +72,12 @@ REQUIRED_FIELDS: Dict[str, Dict[str, str]] = {
         "clue_collected": "TEXT COMMENT '已收集的线索ID列表(JSON数组)'",
         "state": "TEXT COMMENT '探索状态(JSON对象,存储自定义数据)'"
     },
-    # 烹饪系统 - 餐厅招募冷却
+    # 烹饪系统 - 餐厅招募冷却 & 仓库等级
     "restaurant": {
         "last_recruit_time": "DATETIME NULL COMMENT '上次招募厨师时间'",
         "daily_recruit_count": "INT DEFAULT 0 COMMENT '当日招募次数(用于递增费用计算)'",
-        "last_recruit_date": "VARCHAR(10) NULL COMMENT '上次招募日期(YYYY-MM-DD格式,用于每日重置)'"
+        "last_recruit_date": "VARCHAR(10) NULL COMMENT '上次招募日期(YYYY-MM-DD格式,用于每日重置)'",
+        "storage_level": "INT DEFAULT 1 COMMENT '仓库等级(1-5)'"
     },
     # 背包表 - 扩展item_id长度以支持更长的食谱ID
     "inventory": {

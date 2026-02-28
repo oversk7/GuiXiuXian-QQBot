@@ -46,6 +46,22 @@ class RestaurantService:
     # 面积扩张消耗(每次+5席位)
     AREA_EXPANSION_BASE_COST = 2000  # 基础消耗,每次翻倍
 
+    # 厨房升级费用配置
+    KITCHEN_UPGRADE_COSTS = {
+        2: 20000,   # Lv1→2
+        3: 80000,   # Lv2→3
+        4: 300000,  # Lv3→4
+        5: 800000,  # Lv4→5
+    }
+
+    # 仓库升级配置 {仓库等级: (容量, 餐厅等级要求, 金币费用)}
+    STORAGE_UPGRADE_CONFIG = {
+        2: (100, 2, 5000),
+        3: (180, 4, 20000),
+        4: (300, 6, 80000),
+        5: (500, 8, 200000),
+    }
+
     def __init__(self):
         self.recipe_manager = RecipeManager()
 
@@ -290,7 +306,16 @@ class RestaurantService:
         if restaurant.level < required_level:
             return False, f"⛔ 需要餐厅等级达到 Lv.{required_level} 才能升级厨房"
 
-        # 升级厨房(暂不消耗,包含在餐厅升级消耗中)
+        # 检查并扣除升级费用
+        cost = self.KITCHEN_UPGRADE_COSTS.get(next_kitchen_level, 0)
+        if cost > 0:
+            player = await uow.players.get_by_id(player_id)
+            if player.gold < cost:
+                return False, f"⛔ 金币不足! 升级厨房需要 {cost}金币"
+            player.gold -= cost
+            await uow.players.update(player)
+
+        # 升级厨房
         old_kitchen_level = restaurant.kitchen_level
         restaurant.kitchen_level = next_kitchen_level
         await uow.restaurants.update(restaurant)
@@ -308,7 +333,62 @@ class RestaurantService:
         return True, (
             f"✅ 厨房升级成功!\n\n"
             f"📊 Lv.{old_kitchen_level} → Lv.{next_kitchen_level}\n"
+            f"💰 消耗: {cost}金币\n"
             f"🎉 解锁: {unlock_msg.get(next_kitchen_level, '')}"
+        )
+
+    async def upgrade_storage(
+        self,
+        uow: UnitOfWork,
+        player_id: str
+    ) -> Tuple[bool, str]:
+        """
+        升级仓库等级(Lv.1-5)
+
+        Args:
+            uow: 工作单元
+            player_id: 玩家ID
+
+        Returns:
+            (是否成功, 消息)
+        """
+
+        restaurant = await uow.restaurants.get_by_player_id(player_id)
+        if not restaurant:
+            return False, "⛔ 你还没有餐厅，请先创建"
+
+        if restaurant.storage_level >= 5:
+            return False, "⛔ 仓库已达最高等级(Lv.5，容量500)"
+
+        next_level = restaurant.storage_level + 1
+        new_capacity, required_restaurant_level, cost = self.STORAGE_UPGRADE_CONFIG[next_level]
+
+        if restaurant.level < required_restaurant_level:
+            return False, (
+                f"⛔ 仓库升至 Lv.{next_level} 需要餐厅等级达到 Lv.{required_restaurant_level}\n"
+                f"当前餐厅等级: Lv.{restaurant.level}"
+            )
+
+        player = await uow.players.get_by_id(player_id)
+        if player.gold < cost:
+            return False, f"⛔ 金币不足! 升级仓库需要 {cost}金币"
+
+        player.gold -= cost
+        await uow.players.update(player)
+
+        old_level = restaurant.storage_level
+        old_capacity = restaurant.storage_capacity
+        restaurant.storage_level = next_level
+        restaurant.storage_capacity = new_capacity
+        await uow.restaurants.update(restaurant)
+
+        await uow.commit()
+
+        return True, (
+            f"✅ 仓库升级成功!\n\n"
+            f"📊 Lv.{old_level} → Lv.{next_level}\n"
+            f"📦 容量: {old_capacity} → {new_capacity}\n"
+            f"💰 消耗: {cost}金币"
         )
 
     async def toggle_open(
@@ -336,6 +416,16 @@ class RestaurantService:
         if restaurant.is_open == is_open:
             status_text = "营业中" if is_open else "打烊"
             return False, f"⛔ 餐厅已经是{status_text}状态"
+
+        # 开店时的前置检验
+        if is_open:
+            chef_count = await uow.chefs.count_by_restaurant(restaurant.id)
+            if chef_count == 0:
+                return False, "⛔ 无法开店：还没有雇佣任何厨师\n使用【招募厨师】开始招募"
+
+            menu_items = await uow.restaurant_menus.get_active_menu(restaurant.id)
+            if not menu_items:
+                return False, "⛔ 无法开店：还未设置营业菜单\n使用【设置菜单 菜名1 菜名2】设置菜品"
 
         restaurant.is_open = is_open
         await uow.restaurants.update(restaurant)
@@ -562,6 +652,9 @@ class RestaurantService:
         # 获取厨师数量
         chef_count = await uow.chefs.count_by_restaurant(restaurant.id)
 
+        # 获取仓库使用量
+        used_storage = await uow.restaurant_storage.get_total_quantity_by_restaurant(restaurant.id)
+
         # 营业状态
         status_emoji = "🟢" if restaurant.is_open else "🔴"
         status_text = "营业中" if restaurant.is_open else "打烊"
@@ -572,7 +665,7 @@ class RestaurantService:
             f"🪑 面积: {restaurant.area}席 | {status_emoji} {status_text}\n"
             f"👨‍🍳 厨师: {chef_count}/{restaurant.max_chefs}人\n"
             f"⭐ 声望: {restaurant.reputation}\n"
-            f"📦 仓库容量: {restaurant.storage_capacity}\n\n"
+            f"📦 仓库: Lv.{restaurant.storage_level} | {used_storage}/{restaurant.storage_capacity}\n\n"
             f"💰 累计收入: {restaurant.total_income}金\n"
             f"💸 累计支出: {restaurant.total_expense}金\n"
             f"📈 净利润: {restaurant.total_income - restaurant.total_expense}金"

@@ -775,3 +775,46 @@ async def handle_view_menu(event: MessageEvent):
         msg += "💡 使用【设置菜单 菜名1 菜名2】更新菜单"
 
         await view_menu_cmd.finish(msg)
+
+
+# ==================== 仓库升级 ====================
+
+upgrade_storage_cmd = on_command("升级仓库", aliases={"扩建仓库", "仓库升级"}, priority=5, block=True)
+
+
+@upgrade_storage_cmd.handle()
+async def handle_upgrade_storage(event: MessageEvent):
+    """【升级仓库】- 升级仓库等级(Lv.1-5)"""
+
+    async with UnitOfWork(AsyncSessionLocal) as uow:
+        player = await get_unified_player(uow.session, event)
+        if not player:
+            await upgrade_storage_cmd.finish("⛔ 请先创建角色")
+
+        # 先显示当前仓库信息和下级配置
+        restaurant = await uow.restaurants.get_by_player_id(player.id)
+        if not restaurant:
+            await upgrade_storage_cmd.finish("⛔ 你还没有餐厅，请先创建")
+
+        if restaurant.storage_level >= 5:
+            await upgrade_storage_cmd.finish(
+                f"⛔ 仓库已达最高等级(Lv.5，容量500)\n"
+                f"📦 当前仓库: Lv.5 | 容量500"
+            )
+
+        # 显示升级信息供参考
+        config = restaurant_service.STORAGE_UPGRADE_CONFIG
+        next_level = restaurant.storage_level + 1
+        new_capacity, req_restaurant_level, cost = config[next_level]
+
+        info = (
+            f"📦 仓库升级\n"
+            f"━━━━━━━━━━━━━\n"
+            f"当前: Lv.{restaurant.storage_level} | 容量{restaurant.storage_capacity}\n"
+            f"升级: Lv.{next_level} | 容量{new_capacity}\n"
+            f"需要: 餐厅Lv.{req_restaurant_level} | {cost}金币\n"
+            f"━━━━━━━━━━━━━\n"
+        )
+
+        success, msg = await restaurant_service.upgrade_storage(uow, player.id)
+        await upgrade_storage_cmd.finish(info + msg)
