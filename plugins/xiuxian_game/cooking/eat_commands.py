@@ -202,13 +202,13 @@ async def _eat_dish(
     if dish_quality == DishQuality.DARK:
         # 黑暗料理:扣2理智
         sanity_loss = 2 * quantity
-        player.sanity = max(0, player.sanity - sanity_loss)
+        player.mp = max(0, player.mp - sanity_loss)
         msg = f"💀 你硬着头皮吃下了黑暗料理...\n理智 -{sanity_loss}"
 
     elif dish_quality == DishQuality.NORMAL or dish_quality == DishQuality.FINE:
         # 普通/精致:恢复1~3理智
         sanity_gain = random.randint(1, 3) * quantity
-        player.sanity = min(100, player.sanity + sanity_gain)
+        player.mp = min(player.max_mp, player.mp + sanity_gain)
         total_sanity_gain = sanity_gain
 
         quality_emoji = "🍽️" if dish_quality == DishQuality.NORMAL else "✨"
@@ -218,7 +218,7 @@ async def _eat_dish(
         # 完美:回复理智 + 本轮回永久属性加成（直接写入Player，冥返时重置）
         if dish_buff and "sanity" in dish_buff:
             sanity_gain = dish_buff["sanity"] * quantity
-            player.sanity = min(100, player.sanity + sanity_gain)
+            player.mp = min(player.max_mp, player.mp + sanity_gain)
             total_sanity_gain = sanity_gain
 
         attr_effects = []
