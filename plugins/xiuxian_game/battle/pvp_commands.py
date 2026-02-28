@@ -4,9 +4,10 @@ PVP切磋系统命令模块
 提供玩家间自由切磋的功能，不造成任何损失，不需要双方同意
 """
 
+import base64
+
 from nonebot import on_command
 from nonebot.adapters.qq import MessageEvent, Message, MessageSegment
-from nonebot.adapters.qq.models.common import MessageMarkdown, MessageMarkdownParams
 from nonebot.params import CommandArg
 from sqlalchemy import select
 
@@ -14,25 +15,8 @@ from ..models.db import safe_session
 from ..models.player import Player
 from ..utils import message_add_head
 from .integration_helper import BattleIntegrationHelper
+from .battle_image import get_battle_image_generator
 import time
-
-
-def _send_battle_markdown(handler, title: str, battle_log: list, hint: str = "快捷操作"):
-    """构建长文字展示模版的战斗结果消息（战斗日志放代码块内，结果标题在外）"""
-    desc = "\r".join(battle_log)
-    template_params = [
-        MessageMarkdownParams(key="title", values=[title]),
-        MessageMarkdownParams(key="desc", values=[desc]),
-        MessageMarkdownParams(key="hint", values=[hint]),
-        MessageMarkdownParams(key="t1", values=["切磋"]),
-        MessageMarkdownParams(key="t2", values=["面板"]),
-        MessageMarkdownParams(key="t3", values=["背包"]),
-    ]
-    markdown_msg = MessageMarkdown(
-        custom_template_id="102499345_1772280837",
-        params=template_params
-    )
-    return MessageSegment.markdown(markdown_msg)
 
 
 # ==================== PVP切磋指令 ====================
@@ -114,22 +98,37 @@ async def handle_pvp(event: MessageEvent, args: Message = CommandArg()):
                 challenger, target_player, session, seed=seed, max_rounds=30
             )
 
-            # 计算最终血量，判断胜负
+            # 计算最终血量
             p1_final_hp = max(0, challenger.hp - challenger_damage)
             p2_final_hp = max(0, target_player.hp - target_damage)
 
+            # 判断胜负
             if p2_final_hp == 0 and p1_final_hp > 0:
-                result_text = f"{challenger.nickname}[{challenger.uid}] 获得胜利！"
+                winner_name = challenger.nickname
             elif p1_final_hp == 0:
-                result_text = f"{target_player.nickname}[{target_player.uid}] 获得胜利！"
+                winner_name = target_player.nickname
             else:
-                result_text = "战斗平局"
+                winner_name = None  # 平局
 
-            title = f"⚔️ {challenger.nickname} VS {target_player.nickname} — {result_text}"
+            # 生成战斗图片
+            gen = get_battle_image_generator()
+            img_bytes = gen.generate_battle_image(
+                battle_log=battle_log,
+                player1_name=f"{challenger.nickname}[{challenger.uid}]",
+                player2_name=f"{target_player.nickname}[{target_player.uid}]",
+                player1_level=challenger.level,
+                player2_level=target_player.level,
+                player1_hp=p1_final_hp,
+                player1_max_hp=challenger.max_hp,
+                player2_hp=p2_final_hp,
+                player2_max_hp=target_player.max_hp,
+                winner_name=winner_name,
+            )
 
-            # 使用长文字展示模版：标题显示结果，代码块内放详细日志
-            md_seg = _send_battle_markdown(pvp_cmd, title, battle_log)
-            await pvp_cmd.finish(md_seg)
+            img_b64 = base64.b64encode(img_bytes).decode()
+            msg = message_add_head("⚔️ 战斗结束，查看图片获取详情", event)
+            msg.append(MessageSegment.file_image(img_b64))
+            await pvp_cmd.finish(msg)
 
         except ValueError as e:
             await pvp_cmd.finish(f"⛔ 战斗过程中发生错误：{str(e)}")
@@ -198,22 +197,37 @@ async def handle_simulate(event: MessageEvent, args: Message = CommandArg()):
                 player1, player2, session, seed=seed, max_rounds=30
             )
 
-            # 计算最终血量，判断胜负
+            # 计算最终血量
             p1_final_hp = max(0, player1.hp - p1_damage)
             p2_final_hp = max(0, player2.hp - p2_damage)
 
+            # 判断胜负
             if p2_final_hp == 0 and p1_final_hp > 0:
-                result_text = f"{player1.nickname}[{player1.uid}] 获得胜利！"
+                winner_name = player1.nickname
             elif p1_final_hp == 0:
-                result_text = f"{player2.nickname}[{player2.uid}] 获得胜利！"
+                winner_name = player2.nickname
             else:
-                result_text = "战斗平局"
+                winner_name = None  # 平局
 
-            title = f"🎮 {player1.nickname} VS {player2.nickname} — {result_text}"
+            # 生成战斗图片
+            gen = get_battle_image_generator()
+            img_bytes = gen.generate_battle_image(
+                battle_log=battle_log,
+                player1_name=f"{player1.nickname}[{player1.uid}]",
+                player2_name=f"{player2.nickname}[{player2.uid}]",
+                player1_level=player1.level,
+                player2_level=player2.level,
+                player1_hp=p1_final_hp,
+                player1_max_hp=player1.max_hp,
+                player2_hp=p2_final_hp,
+                player2_max_hp=player2.max_hp,
+                winner_name=winner_name,
+            )
 
-            # 使用长文字展示模版：标题显示结果，代码块内放详细日志
-            md_seg = _send_battle_markdown(simulate_cmd, title, battle_log)
-            await simulate_cmd.finish(md_seg)
+            img_b64 = base64.b64encode(img_bytes).decode()
+            msg = message_add_head("🎮 模拟战斗结束，查看图片获取详情", event)
+            msg.append(MessageSegment.file_image(img_b64))
+            await simulate_cmd.finish(msg)
 
         except ValueError as e:
             await simulate_cmd.finish(f"⛔ 模拟战斗过程中发生错误：{str(e)}")
