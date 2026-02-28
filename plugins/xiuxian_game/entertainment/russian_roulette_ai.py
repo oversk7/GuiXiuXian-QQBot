@@ -109,8 +109,8 @@ def decide_action(session_data: dict) -> AIAction:
         return AIAction("use_item", item=ItemType.BEER.value)
 
     # === 5. 战术道具 ===
-    # 手铐
-    if _has_item(ai_items, ItemType.HANDCUFFS) and handcuffed != "player":
+    # 手铐（实弹概率低时不用，宁可对自己开空枪多保一次行动权）
+    if _has_item(ai_items, ItemType.HANDCUFFS) and handcuffed != "player" and p_live >= 0.5:
         cooldown = gs.get("handcuffs_cooldown_player_id")
         if cooldown != "player":
             return AIAction("use_item", item=ItemType.HANDCUFFS.value)
@@ -121,7 +121,7 @@ def decide_action(session_data: dict) -> AIAction:
 
     # 肾上腺素（偷取对手高价值道具）
     if _has_item(ai_items, ItemType.ADRENALINE) and player_items:
-        steal_target = _pick_steal_target(player_items)
+        steal_target = _pick_steal_target(player_items, ai_hp)
         if steal_target:
             return AIAction("use_item", item=ItemType.ADRENALINE.value, steal_item=steal_target)
 
@@ -154,8 +154,14 @@ def decide_action(session_data: dict) -> AIAction:
         return AIAction("shoot", target="opponent")
 
 
-def _pick_steal_target(player_items: list) -> Optional[str]:
-    """选择肾上腺素偷取目标（按优先级）"""
+def _pick_steal_target(player_items: list, ai_hp: int = 999) -> Optional[str]:
+    """选择肾上腺素偷取目标（按优先级，低血时优先偷回血道具）"""
+    # 濒死时优先偷回血道具续命
+    if ai_hp <= 2:
+        for item_type in [ItemType.CIGARETTE, ItemType.EXPIRED_MEDICINE]:
+            if item_type.value in player_items:
+                return item_type.value
+
     priority = [
         ItemType.MAGNIFIER,
         ItemType.KNIFE,
@@ -197,7 +203,7 @@ def execute_ai_action(session_data: dict, action: AIAction) -> Tuple[str, bool, 
         session_data["ai_known_bullet"] = None
 
         target_text = "自己" if action.target == "self" else "对手"
-        msg = f"🤖 AI 对{target_text}开枪\n{shoot_msg}"
+        msg = f"🤖 花花对{target_text}开枪\n{shoot_msg}"
 
         if game_over:
             return msg, True, False
@@ -239,7 +245,7 @@ def execute_ai_action(session_data: dict, action: AIAction) -> Tuple[str, bool, 
                 magnifier_data = json.loads(gs.get("magnifier_info", "{}"))
                 if magnifier_data.get("player_id") == "ai":
                     session_data["ai_known_bullet"] = magnifier_data.get("is_live")
-                result_msg = "🔍 AI 使用了放大镜查看了当前弹药"
+                result_msg = "🔍 花花使用了放大镜查看了当前弹药"
         elif item_type == ItemType.BEER:
             success, result_msg = RussianRouletteCore.use_beer(gs)
             if success:
@@ -251,10 +257,11 @@ def execute_ai_action(session_data: dict, action: AIAction) -> Tuple[str, bool, 
                 # 清除 AI 预知信息
                 session_data["ai_known_bullet"] = None
         elif item_type == ItemType.INVERTER:
+            known_before = session_data.get("ai_known_bullet")
             success, result_msg = RussianRouletteCore.use_inverter(gs)
             if success:
-                # 逆转器改变了当前弹药，清除预知
-                session_data["ai_known_bullet"] = None
+                # 逆转器翻转弹药：已知则取反，未知时因使用条件p_live>0.6故翻转后为空弹
+                session_data["ai_known_bullet"] = (not known_before) if known_before is not None else False
         elif item_type == ItemType.PHONE:
             success, result_msg = RussianRouletteCore.use_phone(gs, "ai")
             if success:
@@ -264,7 +271,7 @@ def execute_ai_action(session_data: dict, action: AIAction) -> Tuple[str, bool, 
                     # 如果电话透露的是当前弹药（position=1），直接记录
                     if phone_data.get("bullet_position") == 1:
                         session_data["ai_known_bullet"] = phone_data.get("is_live")
-                result_msg = "📞 AI 使用了电话获取了弹药信息"
+                result_msg = "📞 花花使用了电话获取了弹药信息"
         elif item_type == ItemType.EXPIRED_MEDICINE:
             success, result_msg = RussianRouletteCore.use_expired_medicine(gs, "ai", max_hp)
         elif item_type == ItemType.DICE:
@@ -303,18 +310,18 @@ def execute_ai_action(session_data: dict, action: AIAction) -> Tuple[str, bool, 
                         session_data["ai_known_bullet"] = None
                         session_data["ai_known_phone"] = None
             else:
-                return f"🤖 AI 想用肾上腺素但没找到合适目标", False, True
+                return f"🤖 花花想用肾上腺素但没找到合适目标", False, True
 
         if not success:
             # 道具使用失败，继续决策（不消耗道具）
-            return f"🤖 AI 尝试使用{item_name}但失败了: {result_msg}", False, True
+            return f"🤖 花花尝试使用{item_name}但失败了: {result_msg}", False, True
 
         # 消耗道具（对于肾上腺素，Core 已经处理了消耗）
         if item_type != ItemType.ADRENALINE:
             ai_items.remove(item_type.value)
             gs["ai_items"] = json.dumps(ai_items)
 
-        msg = f"🤖 AI 使用了{item_name}\n{result_msg}"
+        msg = f"🤖 花花使用了{item_name}\n{result_msg}"
 
         # 检查道具使用后是否有人死亡（过期药可能自杀）
         game_over = gs.get("ai_hp", 1) <= 0 or gs.get("player_hp", 1) <= 0

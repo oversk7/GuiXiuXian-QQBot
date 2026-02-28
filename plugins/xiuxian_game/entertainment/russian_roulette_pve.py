@@ -39,7 +39,7 @@ ADRENALINE_STEAL_MAP = {k: v for k, v in ITEM_NAME_MAP.items() if v != ItemType.
 
 BET_MIN = 100
 BET_MAX = 500000
-DEFAULT_HP = 3
+DEFAULT_HP = 4
 MIN_HP = 3
 MAX_HP = 6
 
@@ -93,7 +93,7 @@ def _create_pve_session(player_id: str, bet: int, max_hp: int = DEFAULT_HP) -> d
     session_data = {
         "player_id": player_id,
         "initial_bet": bet,
-        "pot": bet,
+        "pot": bet * 2,
         "double_count": 0,
         "max_hp": max_hp,
         "game_state": {
@@ -153,7 +153,7 @@ def _get_pve_display(session_data: dict) -> str:
     display.extend([
         "❤️ 血量状态：",
         f"  玩家: {'❤️' * player_hp}{'🖤' * (max_hp - player_hp)}",
-        f"  AI: {'❤️' * ai_hp}{'🖤' * (max_hp - ai_hp)}",
+        f"  花花: {'❤️' * ai_hp}{'🖤' * (max_hp - ai_hp)}",
     ])
 
     # 道具
@@ -162,7 +162,7 @@ def _get_pve_display(session_data: dict) -> str:
     display.extend([
         "━━━━━━━━━━━━━",
         f"🎒 你的道具：{player_items_inline}",
-        f"🤖 AI道具：{ai_items_inline}",
+        f"🤖 花花道具：{ai_items_inline}",
     ])
 
     # 特殊状态
@@ -171,7 +171,7 @@ def _get_pve_display(session_data: dict) -> str:
         effects.append("🪚 手锯效果：下一发实弹伤害+1")
     handcuffed = gs.get("handcuffed_player_id")
     if handcuffed:
-        name = "玩家" if handcuffed == "player" else "AI"
+        name = "玩家" if handcuffed == "player" else "花花"
         effects.append(f"⛓️ 手铐效果：{name}下回合被限制")
     if effects:
         display.extend(["━━━━━━━━━━━━━"] + effects)
@@ -286,7 +286,7 @@ async def _do_ai_turn(
             result = (
                 f"{ai_text}\n"
                 f"━━━━━━━━━━━━━\n"
-                f"🎉 你击败了 AI！\n"
+                f"🎉 你击败了花花！\n"
                 f"💰 当前奖池：{pot}金币\n"
                 f"━━━━━━━━━━━━━\n"
                 f"📝 选择：\n"
@@ -350,7 +350,7 @@ async def _finish_item_use(
             pot = sd["pot"]
             final_msg += (
                 f"\n━━━━━━━━━━━━━\n"
-                f"🎉 你击败了 AI！\n"
+                f"🎉 你击败了花花！\n"
                 f"💰 当前奖池：{pot}金币\n"
                 f"━━━━━━━━━━━━━\n"
                 f"📝 选择：\n"
@@ -393,8 +393,8 @@ async def handle_pve(bot: Bot, event: MessageEvent, args: Message = CommandArg()
             "🎮 恶魔轮盘 · 人机模式\n"
             "━━━━━━━━━━━━━\n"
             "🎯 规则：\n"
-            "▫️ 私聊对战 AI，默认3血（可选3-6）\n"
-            "▫️ 将 AI 血量降为0即获胜\n"
+            "▫️ 私聊对战花花，默认4血（可选3-6）\n"
+            "▫️ 将花花血量降为0即获胜\n"
             "▫️ 赢后可选择加倍续战或收手\n"
             "━━━━━━━━━━━━━\n"
             "📝 指令：\n"
@@ -499,19 +499,19 @@ async def handle_pve(bot: Bot, event: MessageEvent, args: Message = CommandArg()
         ai_items_text = _format_items_list(gs["ai_items"])
 
         first_turn = session_data["current_turn"]
-        first_text = "你先手！" if first_turn == "player" else "AI 先手！"
+        first_text = "你先手！" if first_turn == "player" else "花花先手！"
 
         start_msg = (
             f"🎮 恶魔轮盘 · 人机模式 开始！\n"
             f"━━━━━━━━━━━━━\n"
-            f"💰 赌注：{bet}金币\n"
+            f"💰 赌注：{bet}金币（庄家跟注，初始奖池：{session_data['pot']}金币）\n"
             f"💥 弹药配置：{bc['total_live']}发实弹 + {bc['total_blank']}发空包弹\n"
             f"❤️ 双方血量：{max_hp}\n"
             f"🎯 {first_text}\n"
             f"━━━━━━━━━━━━━\n"
             f"🎒 你的道具：\n{player_items_text}\n"
             f"━━━━━━━━━━━━━\n"
-            f"🤖 AI的道具：\n{ai_items_text}\n"
+            f"🤖 花花的道具：\n{ai_items_text}\n"
             f"━━━━━━━━━━━━━\n"
             f"📝 操作：【pve开枪 自己/对手】或【pve道具 <道具名>】\n"
             f"📝 查看道具：【pve状态】"
@@ -557,7 +557,7 @@ async def _handle_double(bot: Bot, event: MessageEvent):
         ai_items_text = _format_items_list(gs["ai_items"])
 
         first_turn = sd["current_turn"]
-        first_text = "你先手！" if first_turn == "player" else "AI 先手！"
+        first_text = "你先手！" if first_turn == "player" else "花花先手！"
 
         msg = (
             f"🔥 加倍续战！第 {sd['double_count']} 次加倍\n"
@@ -569,7 +569,7 @@ async def _handle_double(bot: Bot, event: MessageEvent):
             f"━━━━━━━━━━━━━\n"
             f"🎒 你的道具：\n{player_items_text}\n"
             f"━━━━━━━━━━━━━\n"
-            f"🤖 AI的道具：\n{ai_items_text}\n"
+            f"🤖 花花的道具：\n{ai_items_text}\n"
             f"━━━━━━━━━━━━━\n"
             f"📝 操作：【pve开枪 自己/对手】或【pve道具 <道具名>】\n"
             f"📝 查看道具：【pve状态】"
@@ -665,7 +665,7 @@ async def handle_pve_shoot(bot: Bot, event: MessageEvent, args: Message = Comman
             gs["handcuffed_player_id"] = None
             sd["current_turn"] = "ai"
             _session_to_db(sd, pve_game)
-            await bot.send(event, message_add_head("⛓️ 你被手铐限制，跳过本回合\n🔄 轮到 AI 行动", event))
+            await bot.send(event, message_add_head("⛓️ 你被手铐限制，跳过本回合\n🔄 轮到花花行动", event))
             await asyncio.sleep(1)
             await _do_ai_turn(bot, event, sd, pve_game, repo)
             return
@@ -681,7 +681,7 @@ async def handle_pve_shoot(bot: Bot, event: MessageEvent, args: Message = Comman
         else:
             sd["bullet_counts"]["fired_blank"] += 1
 
-        target_text = "自己" if target == "自己" else "AI"
+        target_text = "自己" if target == "自己" else "花花"
         result_msg = f"🎯 你对{target_text}开枪\n{shoot_msg}"
 
         if game_over:
@@ -692,7 +692,7 @@ async def handle_pve_shoot(bot: Bot, event: MessageEvent, args: Message = Comman
                 pot = sd["pot"]
                 result_msg += (
                     f"\n━━━━━━━━━━━━━\n"
-                    f"🎉 你击败了 AI！\n"
+                    f"🎉 你击败了花花！\n"
                     f"💰 当前奖池：{pot}金币\n"
                     f"━━━━━━━━━━━━━\n"
                     f"📝 选择：\n"
@@ -735,7 +735,7 @@ async def handle_pve_shoot(bot: Bot, event: MessageEvent, args: Message = Comman
             # 检查对手被手铐
             if gs.get("handcuffed_player_id") == "ai":
                 gs["handcuffed_player_id"] = None
-                result_msg += "\n⛓️ AI 被手铐限制，跳过回合\n🔄 你继续行动"
+                result_msg += "\n⛓️ 花花被手铐限制，跳过回合\n🔄 你继续行动"
                 _session_to_db(sd, pve_game)
                 status_display = _get_pve_display(sd)
                 result_msg += f"\n\n{status_display}"
@@ -744,7 +744,7 @@ async def handle_pve_shoot(bot: Bot, event: MessageEvent, args: Message = Comman
             # 切换到 AI 回合
             sd["current_turn"] = "ai"
             _session_to_db(sd, pve_game)
-            result_msg += "\n🔄 轮到 AI 行动..."
+            result_msg += "\n🔄 轮到花花行动..."
             await bot.send(event, message_add_head(result_msg, event))
             await asyncio.sleep(1)
             await _do_ai_turn(bot, event, sd, pve_game, repo)
@@ -792,7 +792,7 @@ async def handle_pve_item(bot: Bot, event: MessageEvent, args: Message = Command
             gs["handcuffed_player_id"] = None
             sd["current_turn"] = "ai"
             _session_to_db(sd, pve_game)
-            await bot.send(event, message_add_head("⛓️ 你被手铐限制，跳过本回合\n🔄 轮到 AI 行动", event))
+            await bot.send(event, message_add_head("⛓️ 你被手铐限制，跳过本回合\n🔄 轮到花花行动", event))
             await asyncio.sleep(1)
             await _do_ai_turn(bot, event, sd, pve_game, repo)
             return
@@ -823,13 +823,13 @@ async def handle_pve_item(bot: Bot, event: MessageEvent, args: Message = Command
                 mag_data = json.loads(gs.get("magnifier_info") or "{}")
                 if mag_data.get("player_id") == "player":
                     bullet_type = mag_data["bullet_type"]
-                    result_msg = f"💉 肾上腺素已使用！偷取了AI的🔍放大镜并立刻使用\n🔍 放大镜结果：当前弹药是 {bullet_type}"
+                    result_msg = f"💉 肾上腺素已使用！偷取了花花的🔍放大镜并立刻使用\n🔍 放大镜结果：当前弹药是 {bullet_type}"
             elif stolen_type == ItemType.PHONE:
                 phone_data = json.loads(gs.get("phone_info") or "{}")
                 if phone_data.get("player_id") == "player":
                     pos = phone_data["bullet_position"]
                     bt = phone_data["bullet_type"]
-                    result_msg = f"💉 肾上腺素已使用！偷取了AI的📞电话并立刻使用\n📞 电话结果：第{pos}发弹药是 {bt}"
+                    result_msg = f"💉 肾上腺素已使用！偷取了花花的📞电话并立刻使用\n📞 电话结果：第{pos}发弹药是 {bt}"
             elif stolen_type == ItemType.BEER:
                 # 更新弹药统计（啤酒退膛）
                 if "实弹" in result_msg:
@@ -862,10 +862,10 @@ async def handle_pve_item(bot: Bot, event: MessageEvent, args: Message = Command
         # 手铐额外检查
         if item_type == ItemType.HANDCUFFS:
             if gs.get("handcuffed_player_id") == "ai":
-                await pve_item_cmd.finish("⛔ AI 已被手铐限制")
+                await pve_item_cmd.finish("⛔ 花花已被手铐限制")
             cooldown = gs.get("handcuffs_cooldown_player_id")
             if cooldown == "ai":
-                await pve_item_cmd.finish("⛔ AI 刚刚被手铐限制，需其行动一次后才能再次使用")
+                await pve_item_cmd.finish("⛔ 花花刚刚被手铐限制，需其行动一次后才能再次使用")
 
         # 使用道具
         success = False
@@ -967,7 +967,7 @@ async def handle_pve_status(event: MessageEvent):
         player_items_text = _format_items_list(gs["player_items"])
         ai_items_text = _format_items_list(gs["ai_items"])
 
-        turn_text = "你的回合" if sd["current_turn"] == "player" else "AI 的回合"
+        turn_text = "你的回合" if sd["current_turn"] == "player" else "花花的回合"
         msg = (
             f"{display}\n"
             f"━━━━━━━━━━━━━\n"
@@ -975,9 +975,9 @@ async def handle_pve_status(event: MessageEvent):
             f"━━━━━━━━━━━━━\n"
             f"🎒 你的道具详情：\n{player_items_text}\n"
             f"━━━━━━━━━━━━━\n"
-            f"🤖 AI道具详情：\n{ai_items_text}\n"
+            f"🤖 花花道具详情：\n{ai_items_text}\n"
             f"━━━━━━━━━━━━━\n"
-            f"💡 使用肾上腺素：【pve道具 肾上腺素 <AI道具名>】"
+            f"💡 使用肾上腺素：【pve道具 肾上腺素 <花花道具名>】"
         )
         await pve_status_cmd.finish(message_add_head(msg, event))
 
