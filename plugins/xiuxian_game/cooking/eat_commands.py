@@ -215,7 +215,7 @@ async def _eat_dish(
         msg = f"{quality_emoji} 美味的菜肴!\n理智 +{sanity_gain}"
 
     elif dish_quality == DishQuality.PERFECT:
-        # 完美:回复理智 + 本轮回永久属性加成（直接写入Player，冥返时重置）
+        # 完美:回复理智 + 临时属性buff
         if dish_buff and "sanity" in dish_buff:
             sanity_gain = dish_buff["sanity"] * quantity
             player.mp = min(player.max_mp, player.mp + sanity_gain)
@@ -223,19 +223,51 @@ async def _eat_dish(
 
         attr_effects = []
         if dish_buff:
-            if "luck" in dish_buff:
-                luck_gain = dish_buff["luck"] * quantity
-                player.luck += luck_gain
-                attr_effects.append(f"幸运+{luck_gain}")
-            if "max_hp" in dish_buff:
-                hp_gain = dish_buff["max_hp"] * quantity
-                player.max_hp += hp_gain
-                player.hp = min(player.hp + hp_gain, player.max_hp)
-                attr_effects.append(f"气血上限+{hp_gain}")
+            # 构建临时buff属性加成字典
+            TIMED_ATTRS = {"luck": "幸运", "max_hp": "气血上限"}
+            attribute_bonuses = {
+                attr: dish_buff[attr] * quantity
+                for attr in TIMED_ATTRS
+                if attr in dish_buff
+            }
+
+            if attribute_bonuses:
+                from ..models.temporary_buff import TemporaryBuff
+
+                duration_minutes = dish_buff.get("duration", 30)
+                buff_id = f"{dish_item_id}_buff"
+                buff_name = f"{dish_name}·完美效果"
+
+                existing_buffs = await TemporaryBuff.get_active_buffs(uow.session, player.id)
+                has_existing = any(b.buff_id == buff_id for b in existing_buffs)
+
+                if has_existing:
+                    existing = next(b for b in existing_buffs if b.buff_id == buff_id)
+                    remaining = existing.get_remaining_minutes()
+                    attr_effects.append(f"⚠️ 已有相同效果，剩余{remaining}分钟")
+                else:
+                    await TemporaryBuff.create_buff(
+                        session=uow.session,
+                        player_id=player.id,
+                        buff_id=buff_id,
+                        buff_name=buff_name,
+                        attribute_bonuses=attribute_bonuses,
+                        duration_minutes=duration_minutes,
+                        source_item_id=dish_item_id,
+                        source_description=f"食用{dish_name}获得"
+                    )
+
+                    bonus_strs = [f"{TIMED_ATTRS[k]}+{v}" for k, v in attribute_bonuses.items()]
+                    if duration_minutes >= 60:
+                        h, m = divmod(duration_minutes, 60)
+                        time_str = f"{h}小时{m}分钟" if m else f"{h}小时"
+                    else:
+                        time_str = f"{duration_minutes}分钟"
+                    attr_effects.append(f"{' | '.join(bonus_strs)}（{time_str}）")
 
         msg = f"🌟 完美的菜肴!\n理智 +{total_sanity_gain}"
         if attr_effects:
-            msg += f"\n✨ 本轮回永久: {' | '.join(attr_effects)}"
+            msg += f"\n✨ 临时增益: {' '.join(attr_effects)}"
 
     else:
         msg = f"🍴 你吃了 {dish_name}"
