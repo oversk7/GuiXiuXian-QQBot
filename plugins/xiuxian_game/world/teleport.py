@@ -222,8 +222,20 @@ async def _handle_teleport_logic(event: MessageEvent, target_region: str, cmd_ha
 
         nav_task = None
         if already_in_dungeon and dungeon_level:
-            # 已在诡域中跳转到其他层级：免咒抗，无需处理导航
-            pass
+            # 已在诡域中跳转到其他层级：免咒抗，但消耗目标层理智
+            _tele_cfg = config.map_config.get("dungeon_levels", {}).get(dungeon_level)
+            if not _tele_cfg:
+                _tele_cfg = config._generate_dungeon_level_config(
+                    dungeon_level, config.map_config.get("dungeon_generation_rules", {})
+                )
+            _mp_cost = _tele_cfg.get("mp_cost", 1)
+            if player.mp < _mp_cost:
+                await cmd_handler.finish(
+                    f"⛔ 理智不足以穿越空间裂隙！需要 {_mp_cost} 点理智，当前 {player.mp}"
+                )
+            player.mp = max(0, player.mp - _mp_cost)
+            if player.mp == 0 and player.hp > 0:
+                player.hp = 0  # 理智耗尽即"疯狂身亡"
         else:
             # 从现实世界进入诡域：消耗咒抗
             if player.stamina < STAM_COST:
@@ -285,7 +297,7 @@ async def _handle_teleport_logic(event: MessageEvent, target_region: str, cmd_ha
     if already_in_dungeon and dungeon_level:
         # 诡域内跳转：不同的提示文案
         msg_lines = [
-            f"🌀 你穿越空间裂隙，从第{current_level_before}重诡域跳转到第{dungeon_level}重诡域",
+            f"🌀 你穿越空间裂隙，从第{current_level_before}重诡域跳转到第{dungeon_level}重诡域（消耗理智 {_mp_cost}）",
             f"📍 当前位置：{target_name} {current_pos}",
         ]
     else:
@@ -417,6 +429,23 @@ async def handle_prev_level(event: MessageEvent):
         if not player.can_enter_dungeon_level(target_level):
             await prev_level_cmd.finish(f"⛔ 无法进入第{target_level}重诡域，你尚未解锁该层级")
 
+        # 计算目标层理智消耗并检查是否足够
+        _prev_cfg = config.map_config.get("dungeon_levels", {}).get(target_level)
+        if not _prev_cfg:
+            _prev_cfg = config._generate_dungeon_level_config(
+                target_level, config.map_config.get("dungeon_generation_rules", {})
+            )
+        mp_cost = _prev_cfg.get("mp_cost", 1)
+        if player.mp < mp_cost:
+            await prev_level_cmd.finish(
+                f"⛔ 理智不足以穿越空间裂隙！需要 {mp_cost} 点理智，当前 {player.mp}"
+            )
+
+        # 扣除理智
+        player.mp = max(0, player.mp - mp_cost)
+        if player.mp == 0 and player.hp > 0:
+            player.hp = 0  # 理智耗尽即"疯狂身亡"
+
         # 切换到目标层级
         player.enter_dungeon(target_level)
         session.add(player)
@@ -444,7 +473,7 @@ async def handle_prev_level(event: MessageEvent):
         tile_desc = await get_tile_description(session, player, region_name, player.dungeon_x, player.dungeon_y)
 
         msg_lines = [
-            f"🌀 你穿越空间裂隙，从第{current_level}重诡域来到第{target_level}重诡域",
+            f"🌀 你穿越空间裂隙，从第{current_level}重诡域来到第{target_level}重诡域（消耗理智 {mp_cost}）",
             f"📍 当前位置：{target_level}层诡域 ({player.dungeon_x},{player.dungeon_y})",
             "━━━━━━━━━━━━━",
             "🗺️ 这是一个10x10的独立空间",
@@ -490,6 +519,23 @@ async def handle_next_level(event: MessageEvent):
                 f"💡 需要在当前层击败诡异解锁更深的诡域"
             )
 
+        # 计算目标层理智消耗并检查是否足够
+        _next_cfg = config.map_config.get("dungeon_levels", {}).get(target_level)
+        if not _next_cfg:
+            _next_cfg = config._generate_dungeon_level_config(
+                target_level, config.map_config.get("dungeon_generation_rules", {})
+            )
+        mp_cost = _next_cfg.get("mp_cost", 1)
+        if player.mp < mp_cost:
+            await next_level_cmd.finish(
+                f"⛔ 理智不足以穿越空间裂隙！需要 {mp_cost} 点理智，当前 {player.mp}"
+            )
+
+        # 扣除理智
+        player.mp = max(0, player.mp - mp_cost)
+        if player.mp == 0 and player.hp > 0:
+            player.hp = 0  # 理智耗尽即"疯狂身亡"
+
         # 切换到目标层级
         player.enter_dungeon(target_level)
         session.add(player)
@@ -517,7 +563,7 @@ async def handle_next_level(event: MessageEvent):
         tile_desc = await get_tile_description(session, player, region_name, player.dungeon_x, player.dungeon_y)
 
         msg_lines = [
-            f"🌀 你穿越空间裂隙，从第{current_level}重诡域来到第{target_level}重诡域",
+            f"🌀 你穿越空间裂隙，从第{current_level}重诡域来到第{target_level}重诡域（消耗理智 {mp_cost}）",
             f"📍 当前位置：{target_level}层诡域 ({player.dungeon_x},{player.dungeon_y})",
             "━━━━━━━━━━━━━",
             "🗺️ 这是一个10x10的独立空间",
