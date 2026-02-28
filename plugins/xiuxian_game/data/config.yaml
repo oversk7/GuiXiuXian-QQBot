@@ -52,6 +52,8 @@ cultivate:
         fail_bonus_enabled: true  # 是否启用失败累加机制
         fail_bonus_rate: 0.01     # 每次失败增加的成功率(1%)
         fail_bonus_max_rate: 0.95 # 成功率上限(95%)
+        # 保底机制
+        pity_threshold: 10        # 连续失败次数达到此值后必定成功
     attributes_base:
         max_hp: 3    # 体 (max_hp) 基础增量
         max_mp: 1    # 智 (max_mp) 基础增量

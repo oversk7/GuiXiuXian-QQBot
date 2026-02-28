@@ -743,6 +743,11 @@ async def handle_breakthrough(event: MessageEvent, args: Message = CommandArg())
                 max_rate = cfg_break.get("fail_bonus_max_rate", 0.95)
                 success_chance = min(success_chance, max_rate)
 
+            # 保底机制：连续失败达到阈值则必定成功
+            pity_threshold = cfg_break.get("pity_threshold", 10)
+            if player.breakthrough_fail_count >= pity_threshold:
+                success_chance = 1.0
+
         # 护航或使用棺材钉则必定成功
         if use_guardian or use_coffin_nail:
             success_chance = 1.0
@@ -933,6 +938,10 @@ async def handle_breakthrough(event: MessageEvent, args: Message = CommandArg())
                     fail_bonus_rate = cfg_break.get("fail_bonus_rate", 0.01)
                     next_bonus = player.breakthrough_fail_count * fail_bonus_rate
 
+                # 保底进度
+                pity_threshold = cfg_break.get("pity_threshold", 10)
+                pity_reached = player.breakthrough_fail_count >= pity_threshold
+
                 msg_lines = ["💥 镇厄崩散，修为反噬席卷脏腑。", "━━━━━━━━━━━━━"]
                 if protection_msg:
                     msg_lines.append(protection_msg)
@@ -942,6 +951,7 @@ async def handle_breakthrough(event: MessageEvent, args: Message = CommandArg())
                     f"✧ 本次理论成功率 {int(success_chance*100)}%",
                     f"✧ 连续失败 {player.breakthrough_fail_count} 次",
                     f"✧ 下次成功率加成 +{int(next_bonus*100)}%",
+                    f"✧ 保底进度 {player.breakthrough_fail_count}/{pity_threshold}{'【下次必定成功！】' if pity_reached else ''}",
                     "━━━━━━━━━━━━━",
                     "⬇️ 建议【突破 镇厄】以怨念护体",
                     "⬇️ 或者【突破 棺材钉】消耗棺材钉"
@@ -1037,6 +1047,11 @@ async def handle_continuous_breakthrough(event: MessageEvent, args: Message = Co
                     # 应用成功率上限
                     max_rate = cfg_break.get("fail_bonus_max_rate", 0.95)
                     success_chance = min(success_chance, max_rate)
+
+                # 保底机制：连续失败达到阈值则必定成功
+                pity_threshold = cfg_break.get("pity_threshold", 10)
+                if player.breakthrough_fail_count >= pity_threshold:
+                    success_chance = 1.0
 
             # 镇厄则必定成功
             if use_guardian:
