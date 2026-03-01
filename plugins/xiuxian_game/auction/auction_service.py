@@ -35,7 +35,6 @@ MAX_AUCTION_LISTINGS = 3         # 每人最多同时上架拍卖品数量
 MIN_DURATION_HOURS = 1           # 最短拍卖时长（小时）
 MAX_DURATION_HOURS = 72          # 最长拍卖时长（小时）
 MIN_BID_RATIO = 1.05             # 每次出价至少高于当前价的比例
-MIN_START_PRICE = 100            # 最低起拍价
 
 
 def _make_item_display(auction: AuctionItem) -> str:
@@ -93,9 +92,6 @@ async def list_auction(
         (success, message)
     """
     # 1. 参数验证
-    if start_price < MIN_START_PRICE:
-        return False, f"⛔ 起拍价不能低于 {MIN_START_PRICE}💰"
-
     if not (MIN_DURATION_HOURS <= duration_hours <= MAX_DURATION_HOURS):
         return False, f"⛔ 拍卖时长必须在 {MIN_DURATION_HOURS}~{MAX_DURATION_HOURS} 小时之间"
 
@@ -154,6 +150,11 @@ async def _list_equipment_auction(
 
     # 如果有多件，选第一件（后续可扩展为让玩家选择）
     equipment = available[0]
+
+    # 检查起拍价不低于系统估价下界
+    min_price, _ = EquipmentTradeService.calculate_equipment_value_range(equipment)
+    if min_price > 0 and start_price < min_price:
+        return False, f"⛔ 起拍价不能低于系统估价 {min_price:,}💰\n💡 使用【估价 装备名/编号】查看详细估价"
 
     # 检查是否已在市场挂牌
     existing_order = await uow.auction_items.find_by_equipment_instance(equipment.id)
@@ -218,6 +219,11 @@ async def _list_normal_auction(
     """上架普通物品拍卖（固定1件）"""
     session = uow.session
     quantity = 1
+
+    # 检查起拍价不低于物品基础价格（系统估价）
+    base_price = getattr(item_cfg, "price", 0) or 0
+    if base_price > 0 and start_price < base_price:
+        return False, f"⛔ 起拍价不能低于系统估价 {base_price:,}💰\n💡 使用【图鉴 {item_cfg.name}】查看物品基础价值"
 
     # 检查背包中是否有该物品
     stmt = select(ItemInstance).where(

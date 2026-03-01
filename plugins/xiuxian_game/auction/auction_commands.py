@@ -63,8 +63,8 @@ cancel_auction_cmd = on_command(
 async def handle_list_auction(event: MessageEvent, args: Message = CommandArg()):
     """
     格式：上架拍卖 物品名 起拍价 时长(h) [一口价]
-    例如：上架拍卖 玄铁剑 50000 12
-         上架拍卖 玄铁剑 50000 24 200000
+    例如：上架拍卖 碎颅制服 50000 12
+         上架拍卖 碎颅制服 50000 24 200000
     """
     raw = args.extract_plain_text().strip()
     parts = raw.split()
@@ -75,10 +75,10 @@ async def handle_list_auction(event: MessageEvent, args: Message = CommandArg())
             "【上架拍卖 物品名 起拍价 时长(小时) [一口价]】\n"
             "━━━━━━━━━━━━━\n"
             "示例：\n"
-            "• 上架拍卖 玄铁剑 50000 12\n"
-            "• 上架拍卖 玄铁剑 50000 24 200000（带一口价）\n"
+            "• 上架拍卖 碎颅制服 50000 12\n"
+            "• 上架拍卖 碎颅制服 50000 24 200000（带一口价）\n"
             f"⏰ 时长范围：{auction_service.MIN_DURATION_HOURS}~{auction_service.MAX_DURATION_HOURS}小时\n"
-            f"💰 起拍价最低：{auction_service.MIN_START_PRICE}💰\n"
+            "💰 起拍价最低：物品系统估价\n"
             "⚠️ 跑商商品不可拍卖",
             event
         ))
