@@ -117,6 +117,9 @@ class UnitOfWork:
         # 阴宅仓库系统仓储
         self._mansion_warehouse_items = None
 
+        # 拍卖行系统仓储
+        self._auction_items = None
+
     @property
     def players(self):
         """玩家仓储"""
@@ -420,6 +423,14 @@ class UnitOfWork:
             from ..repositories.mansion_warehouse_item_repository import MansionWarehouseItemRepository
             self._mansion_warehouse_items = MansionWarehouseItemRepository(self._session)
         return self._mansion_warehouse_items
+
+    @property
+    def auction_items(self):
+        """拍卖行仓储"""
+        if self._auction_items is None:
+            from ..repositories.auction_repository import AuctionRepository
+            self._auction_items = AuctionRepository(self._session)
+        return self._auction_items
 
     @property
     def session(self) -> AsyncSession:
