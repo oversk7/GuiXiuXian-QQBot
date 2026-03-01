@@ -153,9 +153,9 @@ async def _show_stronghold_status(stronghold, player_level: int):
         )
         await descend_cmd.finish(msg)
 
-    # 检查英雄是否已超时撤退
-    if stronghold.next_wave_at and datetime.now() > stronghold.next_wave_at + timedelta(hours=HERO_TIMEOUT_HOURS):
-        # 英雄已撤退，安排下一波
+    # 检查英雄是否已超时撤退，或 next_wave_at 为空（封印结束后尚未安排下一波）
+    if not stronghold.next_wave_at or datetime.now() > stronghold.next_wave_at + timedelta(hours=HERO_TIMEOUT_HOURS):
+        # 英雄已撤退或尚未安排下一波，立即安排下一波
         def session_factory():
             return AsyncSessionLocal()
 
