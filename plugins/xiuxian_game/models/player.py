@@ -78,6 +78,7 @@ class Player(Base):
     gold2: Mapped[int] = mapped_column(BigInteger, default=0, server_default='0', comment="积分")
     gui_zhu: Mapped[int] = mapped_column(BigInteger, default=0, server_default='0', comment="诡烛(氪金专属货币)")
     mini_game_score: Mapped[int] = mapped_column(Integer, default=0, server_default='0', comment="小游戏积分")
+    demon_coins: Mapped[int] = mapped_column(BigInteger, default=0, server_default='0', comment="恶魔币(恶魔轮盘排行积分)")
     charm: Mapped[int] = mapped_column(Integer, default=0, server_default='0', comment="魅力值(通过收礼获得)")
     
     last_sign: Mapped[datetime] = mapped_column(DateTime, nullable=True, comment="上次签到日期")

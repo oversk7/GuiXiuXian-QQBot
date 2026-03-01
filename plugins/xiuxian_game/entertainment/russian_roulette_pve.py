@@ -46,7 +46,6 @@ MAX_HP = 6
 # 加倍经济参数
 DOUBLE_MULTIPLIERS = [2.0, 1.7, 1.5, 1.3, 1.2]  # 第1~5次加倍的倍率
 MAX_DOUBLES = 5  # 最多加倍次数
-CASH_OUT_TAX_RATE = 0.10  # 收手时10%税收（金币销毁）
 
 
 # ==================== DB ↔ session_data 转换 ====================
@@ -147,7 +146,7 @@ def _get_pve_display(session_data: dict) -> str:
 
     display = [
         "🎮 恶魔轮盘 · 人机模式",
-        f"💰 当前奖池：{session_data['pot']}金币",
+        f"🎰 当前奖池：{session_data['pot']} 恶魔币",
         "━━━━━━━━━━━━━",
         f"🔫 剩余弹药：{total_remaining}发",
     ]
@@ -226,16 +225,14 @@ def _format_items_inline(items_json: str) -> str:
 
 
 def _get_won_options(sd: dict) -> str:
-    """获取胜利后的选项文本（含递减倍率和税收提示）"""
+    """获取胜利后的选项文本"""
     pot = sd["pot"]
-    tax = int(pot * CASH_OUT_TAX_RATE)
-    actual = pot - tax
 
     if sd["double_count"] >= MAX_DOUBLES:
         return (
             f"━━━━━━━━━━━━━\n"
             f"⚠️ 已达最大加倍次数（{MAX_DOUBLES}次）\n"
-            f"📝 请发送【人机轮盘 收手】拿走奖池（实得 {actual} 金币，含10%税）"
+            f"📝 请发送【人机轮盘 收手】领取 {pot} 恶魔币"
         )
 
     next_idx = min(sd["double_count"], len(DOUBLE_MULTIPLIERS) - 1)
@@ -245,8 +242,8 @@ def _get_won_options(sd: dict) -> str:
     return (
         f"━━━━━━━━━━━━━\n"
         f"📝 选择：\n"
-        f"▫️【人机轮盘 加倍】奖池×{next_mult} → {next_pot}金币\n"
-        f"▫️【人机轮盘 收手】拿走奖池（实得 {actual} 金币，含10%税）"
+        f"▫️【人机轮盘 加倍】奖池×{next_mult} → {next_pot} 恶魔币\n"
+        f"▫️【人机轮盘 收手】领取 {pot} 恶魔币"
     )
 
 
@@ -305,7 +302,7 @@ async def _do_ai_turn(
                 f"{ai_text}\n"
                 f"━━━━━━━━━━━━━\n"
                 f"💀 你被击败了！\n"
-                f"💰 失去了奖池中的 {sd['pot']} 金币"
+                f"🎰 {sd['pot']} 恶魔币已清零"
             )
             await repo.delete_entity(pve_game)
             await bot.send(event, message_add_head(result, event))
@@ -318,7 +315,7 @@ async def _do_ai_turn(
                 f"{ai_text}\n"
                 f"━━━━━━━━━━━━━\n"
                 f"🎉 你击败了花花！\n"
-                f"💰 当前奖池：{pot}金币\n"
+                f"🎰 当前奖池：{pot} 恶魔币\n"
                 f"{options}"
             )
             await bot.send(event, message_add_head(result, event))
@@ -380,7 +377,7 @@ async def _finish_item_use(
             final_msg += (
                 f"\n━━━━━━━━━━━━━\n"
                 f"🎉 你击败了花花！\n"
-                f"💰 当前奖池：{pot}金币\n"
+                f"🎰 当前奖池：{pot} 恶魔币\n"
                 f"{options}"
             )
             await bot.send(event, message_add_head(final_msg, event))
@@ -388,7 +385,7 @@ async def _finish_item_use(
             final_msg += (
                 f"\n━━━━━━━━━━━━━\n"
                 f"💀 你被击败了！\n"
-                f"💰 失去了 {sd['pot']} 金币"
+                f"🎰 {sd['pot']} 恶魔币已清零"
             )
             await repo.delete_entity(pve_game)
             await bot.send(event, message_add_head(final_msg, event))
@@ -434,11 +431,11 @@ async def handle_pve(bot: Bot, event: MessageEvent, args: Message = CommandArg()
             "▫️【pve预知】查看预知结果\n"
             "━━━━━━━━━━━━━\n"
             "💰 经济：\n"
-            "▫️ 开局扣除赌注金额\n"
+            "▫️ 金币作为入场费（消耗不退还）\n"
+            "▫️ 奖池以恶魔币计算（排行积分）\n"
             f"▫️ 赢后可加倍（最多{MAX_DOUBLES}次），倍率递减\n"
             f"▫️ 加倍倍率：{' → '.join(f'×{m}' for m in DOUBLE_MULTIPLIERS)}\n"
-            "▫️ 收手时扣除10%税收\n"
-            "▫️ 输了失去奖池中的金额\n"
+            "▫️ 收手领取恶魔币，输了恶魔币清零\n"
             "━━━━━━━━━━━━━\n"
             "🎒 道具与PVP相同，详见【恶魔轮盘帮助】"
         )
@@ -471,7 +468,7 @@ async def handle_pve(bot: Bot, event: MessageEvent, args: Message = CommandArg()
             await pve_cmd.finish(f"⛔ 血量范围：{MIN_HP} ~ {MAX_HP}\n📝 示例：人机轮盘 1000 4（四命）")
 
     if bet < BET_MIN or bet > BET_MAX:
-        await pve_cmd.finish(f"⛔ 赌注范围：{BET_MIN} ~ {BET_MAX} 金币")
+        await pve_cmd.finish(f"⛔ 入场费范围：{BET_MIN} ~ {BET_MAX} 金币")
 
     async with safe_session() as session:
         player = await get_unified_player(session, event)
@@ -532,7 +529,8 @@ async def handle_pve(bot: Bot, event: MessageEvent, args: Message = CommandArg()
         start_msg = (
             f"🎮 恶魔轮盘 · 人机模式 开始！\n"
             f"━━━━━━━━━━━━━\n"
-            f"💰 赌注：{bet}金币（庄家跟注，初始奖池：{session_data['pot']}金币）\n"
+            f"💰 入场费：{bet} 金币（已扣除）\n"
+            f"🎰 初始奖池：{session_data['pot']} 恶魔币\n"
             f"💥 弹药配置：{bc['total_live']}发实弹 + {bc['total_blank']}发空包弹\n"
             f"❤️ 双方血量：{max_hp}\n"
             f"🎯 {first_text}\n"
@@ -596,7 +594,7 @@ async def _handle_double(bot: Bot, event: MessageEvent):
         msg = (
             f"🔥 加倍续战！第 {sd['double_count']} 次加倍（×{multiplier}）\n"
             f"━━━━━━━━━━━━━\n"
-            f"💰 当前奖池：{sd['pot']}金币\n"
+            f"🎰 当前奖池：{sd['pot']} 恶魔币\n"
             f"💥 弹药配置：{bc['total_live']}发实弹 + {bc['total_blank']}发空包弹\n"
             f"❤️ 双方血量已重置\n"
             f"🎯 {first_text}\n"
@@ -636,13 +634,9 @@ async def _handle_cash_out(bot: Bot, event: MessageEvent):
         pot = pve_game.pot
         double_count = pve_game.double_count
 
-        # 收手抽税10%（金币销毁回收）
-        tax = int(pot * CASH_OUT_TAX_RATE)
-        actual_payout = pot - tax
-
-        # 发放奖励
-        player.gold += actual_payout
-        # 积分：基础1分 + 每次加倍额外1分
+        # 发放恶魔币（排行积分，不产出金币）
+        player.demon_coins += pot
+        # 小游戏积分：基础1分 + 每次加倍额外1分
         score_gain = 1 + double_count
         player.mini_game_score += score_gain
 
@@ -652,11 +646,10 @@ async def _handle_cash_out(bot: Bot, event: MessageEvent):
         msg = (
             f"💰 收手成功！\n"
             f"━━━━━━━━━━━━━\n"
-            f"🏆 奖池 {pot} 金币\n"
-            f"💸 税收 -{tax} 金币（10%）\n"
-            f"✅ 实得 {actual_payout} 金币\n"
+            f"🎰 获得 {pot} 恶魔币\n"
             f"🎮 加倍次数：{double_count}\n"
             f"⭐ 小游戏积分 +{score_gain}\n"
+            f"🏆 当前恶魔币总计：{player.demon_coins}\n"
             f"━━━━━━━━━━━━━\n"
             f"💡 再来一局？发送【人机轮盘 <金额>】"
         )
@@ -734,7 +727,7 @@ async def handle_pve_shoot(bot: Bot, event: MessageEvent, args: Message = Comman
                 result_msg += (
                     f"\n━━━━━━━━━━━━━\n"
                     f"🎉 你击败了花花！\n"
-                    f"💰 当前奖池：{pot}金币\n"
+                    f"🎰 当前奖池：{pot} 恶魔币\n"
                     f"{options}"
                 )
                 await pve_shoot_cmd.finish(message_add_head(result_msg, event))
@@ -743,7 +736,7 @@ async def handle_pve_shoot(bot: Bot, event: MessageEvent, args: Message = Comman
                 result_msg += (
                     f"\n━━━━━━━━━━━━━\n"
                     f"💀 你被击败了！\n"
-                    f"💰 失去了 {sd['pot']} 金币"
+                    f"🎰 {sd['pot']} 恶魔币已清零"
                 )
                 await repo.delete_entity(pve_game)
                 await pve_shoot_cmd.finish(message_add_head(result_msg, event))
@@ -989,7 +982,7 @@ async def handle_pve_status(event: MessageEvent):
             msg = (
                 f"🎮 人机轮盘 - 已胜利\n"
                 f"━━━━━━━━━━━━━\n"
-                f"💰 当前奖池：{pot}金币\n"
+                f"🎰 当前奖池：{pot} 恶魔币\n"
                 f"🎮 加倍次数：{sd['double_count']}\n"
                 f"{options}"
             )
