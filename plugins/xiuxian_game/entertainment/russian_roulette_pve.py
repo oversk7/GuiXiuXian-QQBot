@@ -326,7 +326,8 @@ async def _do_ai_turn(
             await bot.send(event, message_add_head(result, event))
         return
 
-    # AI 回合结束，轮到玩家 - 保存状态
+    # AI 回合结束，轮到玩家 - 确保回合正确切换后保存状态
+    sd["current_turn"] = "player"
     _session_to_db(sd, pve_game)
     status = _get_pve_display(sd)
     full_msg = f"{ai_text}\n━━━━━━━━━━━━━\n🔄 轮到你行动\n\n{status}"
