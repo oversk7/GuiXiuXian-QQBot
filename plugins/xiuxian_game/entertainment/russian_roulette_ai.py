@@ -432,6 +432,11 @@ def execute_ai_turn(session_data: dict) -> Tuple[List[str], bool]:
     messages = []
     max_actions = 20  # 防止无限循环
 
+    # AI 开始行动，清除针对 AI 的手铐冷却（AI 已完成被跳过的回合，可以被再次手铐）
+    gs = session_data["game_state"]
+    if gs.get("handcuffs_cooldown_player_id") == "ai" and gs.get("handcuffed_player_id") != "ai":
+        gs["handcuffs_cooldown_player_id"] = None
+
     for _ in range(max_actions):
         if session_data["current_turn"] != "ai":
             break

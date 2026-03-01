@@ -708,6 +708,10 @@ async def handle_pve_shoot(bot: Bot, event: MessageEvent, args: Message = Comman
             await _do_ai_turn(bot, event, sd, pve_game, repo)
             return
 
+        # 玩家开始正常行动，清除针对玩家的手铐冷却
+        if gs.get("handcuffs_cooldown_player_id") == "player" and gs.get("handcuffed_player_id") != "player":
+            gs["handcuffs_cooldown_player_id"] = None
+
         # 执行射击
         shooter_id = "player"
         target_id = "player" if target == "自己" else "ai"
@@ -832,6 +836,10 @@ async def handle_pve_item(bot: Bot, event: MessageEvent, args: Message = Command
             await asyncio.sleep(1)
             await _do_ai_turn(bot, event, sd, pve_game, repo)
             return
+
+        # 玩家开始正常行动，清除针对玩家的手铐冷却
+        if gs.get("handcuffs_cooldown_player_id") == "player" and gs.get("handcuffed_player_id") != "player":
+            gs["handcuffs_cooldown_player_id"] = None
 
         # 解析肾上腺素特殊格式: pve道具 肾上腺素 <目标道具>
         parts = args_text.split(maxsplit=1)

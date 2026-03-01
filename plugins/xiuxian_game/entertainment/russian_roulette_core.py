@@ -395,6 +395,7 @@ class RussianRouletteCore:
                 # 清除特殊状态
                 game_state["is_sawed_off"] = False
                 game_state["handcuffed_player_id"] = None
+                game_state["handcuffs_cooldown_player_id"] = None
                 game_state["magnifier_info"] = None
                 game_state["phone_info"] = None
 
