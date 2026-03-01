@@ -314,6 +314,8 @@ async def _do_ai_turn(
         else:
             sd["status"] = "won"
             _session_to_db(sd, pve_game)
+            await repo.update(pve_game)
+            await repo._session.commit()
             pot = sd["pot"]
             options = _get_won_options(sd)
             result = (
@@ -329,6 +331,8 @@ async def _do_ai_turn(
     # AI 回合结束，轮到玩家 - 确保回合正确切换后保存状态
     sd["current_turn"] = "player"
     _session_to_db(sd, pve_game)
+    await repo.update(pve_game)
+    await repo._session.commit()
     status = _get_pve_display(sd)
     full_msg = f"{ai_text}\n━━━━━━━━━━━━━\n🔄 轮到你行动\n\n{status}"
     await bot.send(event, message_add_head(full_msg, event))
@@ -378,6 +382,8 @@ async def _finish_item_use(
         if gs.get("ai_hp", 0) <= 0:
             sd["status"] = "won"
             _session_to_db(sd, pve_game)
+            await repo.update(pve_game)
+            await repo._session.commit()
             pot = sd["pot"]
             options = _get_won_options(sd)
             final_msg += (
@@ -394,11 +400,14 @@ async def _finish_item_use(
                 f"🎰 {sd['pot']} 恶魔币已清零"
             )
             await repo.delete_entity(pve_game)
+            await repo._session.commit()
             await bot.send(event, message_add_head(final_msg, event))
         return
 
     # 道具使用后继续行动（不切换回合），保存并刷新显示
     _session_to_db(sd, pve_game)
+    await repo.update(pve_game)
+    await repo._session.commit()
     status_display = _get_pve_display(sd)
     final_msg += f"\n🔄 你可以继续行动\n\n{status_display}"
     await bot.send(event, message_add_head(final_msg, event))
@@ -704,6 +713,8 @@ async def handle_pve_shoot(bot: Bot, event: MessageEvent, args: Message = Comman
             gs["handcuffed_player_id"] = None
             sd["current_turn"] = "ai"
             _session_to_db(sd, pve_game)
+            await repo.update(pve_game)
+            await repo._session.commit()
             await bot.send(event, message_add_head("⛓️ 你被手铐限制，跳过本回合\n🔄 轮到花花行动", event))
             await asyncio.sleep(1)
             await _do_ai_turn(bot, event, sd, pve_game, repo)
@@ -785,6 +796,8 @@ async def handle_pve_shoot(bot: Bot, event: MessageEvent, args: Message = Comman
             # 切换到 AI 回合
             sd["current_turn"] = "ai"
             _session_to_db(sd, pve_game)
+            await repo.update(pve_game)
+            await repo._session.commit()
             result_msg += "\n🔄 轮到花花行动..."
             await bot.send(event, message_add_head(result_msg, event))
             await asyncio.sleep(1)
@@ -833,6 +846,8 @@ async def handle_pve_item(bot: Bot, event: MessageEvent, args: Message = Command
             gs["handcuffed_player_id"] = None
             sd["current_turn"] = "ai"
             _session_to_db(sd, pve_game)
+            await repo.update(pve_game)
+            await repo._session.commit()
             await bot.send(event, message_add_head("⛓️ 你被手铐限制，跳过本回合\n🔄 轮到花花行动", event))
             await asyncio.sleep(1)
             await _do_ai_turn(bot, event, sd, pve_game, repo)

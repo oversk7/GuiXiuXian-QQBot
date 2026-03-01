@@ -146,6 +146,9 @@ async def handle_enter(event: MessageEvent, args: Message = CommandArg()):
 
 async def _handle_teleport_logic(event: MessageEvent, target_region: str, cmd_handler):
     """共同的传送处理逻辑"""
+    # 兼容"鬼域"别名（玩家常见笔误）
+    target_region = target_region.replace("鬼域", "诡域")
+
     # 优先检查是否是里界名称,如果是则跳过(由里界系统处理)
     # 避免与里界传送命令冲突
     try:
