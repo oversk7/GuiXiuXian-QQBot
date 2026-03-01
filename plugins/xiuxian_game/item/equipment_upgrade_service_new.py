@@ -402,6 +402,82 @@ class EquipmentUpgradeService:
                 result_info["result"] = "failed_no_change"
                 return False, f"升阶失败，装备等级不变{gems_suffix}", result_info
 
+    async def _get_side_pieces(
+        self, player_id: str, item_id: str, level: int, exclude_id: int
+    ) -> List[ItemInstance]:
+        """获取指定等级的辅助装备（排除主装备）"""
+        all_pieces = await self._item_repo.get_available_equipment_for_upgrade(
+            player_id, item_id, level
+        )
+        return [eq for eq in all_pieces if eq.id != exclude_id]
+
+    async def _prepare_one_side_piece(
+        self,
+        target_level: int,
+        item_id: str,
+        player: Player,
+        exclude_id: int,
+        logs: List[str],
+        stats: Dict,
+        depth: int = 0,
+    ) -> bool:
+        """
+        递归准备一个target_level阶的辅助装备。
+        不使用稳定水晶保护（只保护主装备）。
+        返回True表示成功准备了一个target_level阶装备。
+        """
+        MAX_DEPTH = 10
+        if depth > MAX_DEPTH or target_level == 0:
+            return False  # 无法无中生有0阶装备
+
+        lower_level = target_level - 1
+        needed = self.get_equipment_requirements(lower_level, item_id)
+
+        # 获取lower_level的辅助装备，不足则递归准备
+        lower_pieces = await self._get_side_pieces(player.id, item_id, lower_level, exclude_id)
+
+        fill_attempts = 0
+        while len(lower_pieces) < needed and fill_attempts < 20:
+            fill_attempts += 1
+            ok = await self._prepare_one_side_piece(
+                lower_level, item_id, player, exclude_id, logs, stats, depth + 1
+            )
+            if not ok:
+                break
+            lower_pieces = await self._get_side_pieces(player.id, item_id, lower_level, exclude_id)
+
+        if len(lower_pieces) < needed:
+            return False  # 无法凑足素材
+
+        # 挑选候选装备（耐久度最低的，即列表第一个）
+        candidate = lower_pieces[0]
+
+        # 检查升阶石/金币是否足够
+        can_up, reason = await self.can_upgrade(candidate, player)
+        if not can_up:
+            logs.append(f"  ⛔ 素材准备受阻：{reason}")
+            return False
+
+        success, _, info = await self.perform_upgrade(candidate, player, False)  # 不用稳定水晶
+        stats["attempts"] = stats.get("attempts", 0) + 1
+
+        result_type = info.get("result", "")
+        if success:
+            stats["successes"] = stats.get("successes", 0) + 1
+            logs.append(f"  📦 {candidate.config.name} +{lower_level}→+{target_level} ✅")
+            return True
+        else:
+            stats["failures"] = stats.get("failures", 0) + 1
+            if result_type == "destroyed":
+                logs.append(f"  💀 {candidate.config.name} 损坏，继续尝试其他装备")
+                return False
+            elif result_type == "downgraded":
+                logs.append(f"  📉 {candidate.config.name} 降级到+{info.get('new_level')}阶")
+                return False
+            else:
+                logs.append(f"  ❌ {candidate.config.name} 升阶失败（等级不变）")
+                return False
+
     async def _recover_gems_from_equipment(self, equipment: ItemInstance, player: Player, all_survive: bool = False) -> List[str]:
         """
         从装备中回收镶嵌的宝石

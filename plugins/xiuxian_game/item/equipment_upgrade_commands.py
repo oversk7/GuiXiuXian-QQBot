@@ -365,10 +365,41 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
         final_level = start_level
         stop_reason = ""
         round_logs = []  # 记录每轮简要结果
+        prepare_logs = []  # 素材准备日志（独立展示）
+
+        MAX_ATTEMPTS = 200  # 防止无限循环
 
         # 循环升阶直到达到目标或无法继续
-        while equip.upgrade_level < target_level:
-            # 检查是否可以升阶（材料/金币等）
+        while equip.upgrade_level < target_level and attempts < MAX_ATTEMPTS:
+            current_level = equip.upgrade_level
+            required_side_count = upgrade_service.get_equipment_requirements(current_level, equip.item_id) - 1
+
+            # --- 阶段一：准备足够的辅助装备 ---
+            side_pieces = await upgrade_service._get_side_pieces(
+                player.id, equip.item_id, current_level, equip.id
+            )
+
+            prepare_fail = False
+            while len(side_pieces) < required_side_count:
+                ok = await upgrade_service._prepare_one_side_piece(
+                    current_level, equip.item_id, player, equip.id,
+                    prepare_logs, {"attempts": attempts, "successes": successes, "failures": failures}
+                )
+                if not ok:
+                    stop_reason = (
+                        f"无法凑足 +{current_level}阶素材"
+                        f"（需要{required_side_count}个，现有{len(side_pieces)}个）"
+                    )
+                    prepare_fail = True
+                    break
+                side_pieces = await upgrade_service._get_side_pieces(
+                    player.id, equip.item_id, current_level, equip.id
+                )
+
+            if prepare_fail:
+                break
+
+            # --- 阶段二：升阶主装备 ---
             can_upgrade, reason = await upgrade_service.can_upgrade(equip, player)
             if not can_upgrade:
                 stop_reason = reason
@@ -380,23 +411,23 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
 
             if result_type == "destroyed":
                 destroyed = True
-                stop_reason = "装备已损坏"
-                round_logs.append(f"第{attempts}次：💀 损坏")
+                stop_reason = "主装备已损坏"
+                round_logs.append(f"第{attempts}次主升：💀 损坏")
                 break
 
             new_level = result_info.get("new_level", equip.upgrade_level)
 
             if success:
                 successes += 1
-                round_logs.append(f"第{attempts}次：✅ →+{new_level}阶")
+                round_logs.append(f"第{attempts}次主升：✅ →+{new_level}阶")
             else:
                 failures += 1
                 if result_type == "downgraded":
-                    round_logs.append(f"第{attempts}次：📉 降到+{new_level}阶")
+                    round_logs.append(f"第{attempts}次主升：📉 降到+{new_level}阶")
                 elif result_type == "failed_protected":
-                    round_logs.append(f"第{attempts}次：🛡️ 失败保护(+{new_level}阶)")
+                    round_logs.append(f"第{attempts}次主升：🛡️ 水晶保护(+{new_level}阶)")
                 else:
-                    round_logs.append(f"第{attempts}次：❌ 失败(+{new_level}阶)")
+                    round_logs.append(f"第{attempts}次主升：❌ 失败(+{new_level}阶)")
 
         if not destroyed:
             final_level = equip.upgrade_level
@@ -422,13 +453,25 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
                 display_logs = round_logs
             lines.extend(display_logs)
 
+        # 素材准备日志（最多显示10条）
+        if prepare_logs:
+            lines.append("")
+            lines.append("📦 素材准备过程：")
+            if len(prepare_logs) > 10:
+                lines.append(f"（仅显示最后10条，共{len(prepare_logs)}条）")
+                lines.extend(prepare_logs[-10:])
+            else:
+                lines.extend(prepare_logs)
+
         lines.append("")
         if destroyed:
             lines.append("💀 装备已在升阶中损坏！")
         elif final_level >= target_level:
             lines.append(f"✅ 已成功达到目标 +{target_level}阶！")
-        elif attempts == 0:
+        elif attempts == 0 and not prepare_logs:
             lines.append(f"⛔ 无法开始升阶：{stop_reason}")
+        elif attempts >= MAX_ATTEMPTS:
+            lines.append(f"⛔ 已达最大尝试次数（{MAX_ATTEMPTS}次），停止升阶")
         else:
             lines.append(f"⛔ 中途停止：{stop_reason}")
 
