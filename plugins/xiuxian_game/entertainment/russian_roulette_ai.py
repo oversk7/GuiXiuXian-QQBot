@@ -12,11 +12,11 @@ from .russian_roulette_core import RussianRouletteCore, ItemType
 # AI 有概率"直觉感知"当前弹药，概率随加倍次数递增
 # 对玩家完全不可见，只影响 ai_known_bullet 字段
 
-_PEEK_BASE_CHANCE = 0.15       # 基础透视概率 15%
-_PEEK_PER_DOUBLE = 0.08        # 每次加倍增加 8%
-_PEEK_MAX_CHANCE = 0.55         # 最高 55%
-_PEEK_BLANK_USE_RATE = 0.75    # 透视到空弹时使用信息的概率（偶尔"忽略"以掩饰）
-_PEEK_LIVE_USE_RATE = 0.92     # 透视到实弹时使用信息的概率
+_PEEK_BASE_CHANCE = 0.20       # 基础透视概率 20%
+_PEEK_PER_DOUBLE = 0.10        # 每次加倍增加 10%
+_PEEK_MAX_CHANCE = 0.65         # 最高 65%
+_PEEK_BLANK_USE_RATE = 0.85    # 透视到空弹时使用信息的概率（偶尔"忽略"以掩饰）
+_PEEK_LIVE_USE_RATE = 0.95     # 透视到实弹时使用信息的概率
 
 
 def _maybe_peek_bullet(session_data: dict) -> None:
@@ -125,10 +125,22 @@ def decide_action(session_data: dict) -> AIAction:
     # === 2. 已知弹药时的操作 ===
     if known_current_bullet is not None:
         if known_current_bullet is False:
-            # 已知空包弹 -> 对自己开枪保留行动权
+            # 已知空包弹
+            if is_sawed_off:
+                # 手锯激活时不能浪费在空弹上！
+                # 优先逆转器：空弹→实弹→配合手锯打出2伤害
+                if _has_item(ai_items, ItemType.INVERTER):
+                    return AIAction("use_item", item=ItemType.INVERTER.value)
+                # 啤酒退掉空弹，保留手锯效果给下一发
+                if _has_item(ai_items, ItemType.BEER):
+                    return AIAction("use_item", item=ItemType.BEER.value)
+            elif _has_item(ai_items, ItemType.KNIFE) and _has_item(ai_items, ItemType.INVERTER):
+                # 有手锯+逆转器→翻转空弹为实弹→可打出手锯2伤害连招
+                return AIAction("use_item", item=ItemType.INVERTER.value)
+            # 普通空包弹 → 对自己开枪保留行动权
             return AIAction("shoot", target="self")
         else:
-            # 已知实弹 -> 准备对对手开枪（完整连招：手铐→手锯→开枪）
+            # 已知实弹 → 准备对对手开枪（完整连招：手铐→手锯→开枪）
             # 优先手铐限制对手（锁住对手后打出实弹，对手无法反击）
             if _has_item(ai_items, ItemType.HANDCUFFS) and handcuffed != "player":
                 cooldown = gs.get("handcuffs_cooldown_player_id")
@@ -137,6 +149,9 @@ def decide_action(session_data: dict) -> AIAction:
             # 再用手锯增伤
             if _has_item(ai_items, ItemType.KNIFE) and not is_sawed_off:
                 return AIAction("use_item", item=ItemType.KNIFE.value)
+            # 无手锯但有逆转器→翻转为空弹→射自己保留回合权（比直接打对手1伤害更优）
+            if _has_item(ai_items, ItemType.INVERTER) and not is_sawed_off:
+                return AIAction("use_item", item=ItemType.INVERTER.value)
             # 对对手开枪
             return AIAction("shoot", target="opponent")
 

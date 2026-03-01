@@ -249,9 +249,14 @@ def _get_won_options(sd: dict) -> str:
 
 def _reset_round(session_data: dict):
     """加倍时重置游戏状态（新一轮）"""
+    double_count = session_data["double_count"]
+
     bullets = RussianRouletteCore.generate_bullets()
     player_items = RussianRouletteCore.generate_items(4)
-    ai_items = RussianRouletteCore.generate_items(4)
+
+    # AI 道具优势：加倍后AI获得额外道具（每次加倍+1，最多+3）
+    ai_bonus = min(double_count, 3)
+    ai_items = RussianRouletteCore.generate_items(4 + ai_bonus)
 
     live_count = sum(1 for b in bullets if b)
     blank_count = sum(1 for b in bullets if not b)

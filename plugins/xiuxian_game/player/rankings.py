@@ -16,6 +16,7 @@ from ..queries.ranking_queries import (
     query_exploration_ranking,
     query_agility_ranking,
     query_mini_game_ranking,
+    query_demon_coins_ranking,
     query_player_rank,
     query_player_rank_by_counting,
 )
@@ -456,6 +457,69 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
     await mini_game_rank_cmd.finish(message_add_head("\n".join(lines), event))
 
 
+# ==================== 恶魔币榜 ====================
+
+def _demon_coins_title(coins: int) -> str:
+    if coins == 0:
+        return "🌑赌场过客"
+    if coins < 100_000:
+        return "🎲轮盘新手"
+    if coins < 1_000_000:
+        return "🔫恶魔学徒"
+    if coins < 5_000_000:
+        return "💀恶魔猎手"
+    if coins < 10_000_000:
+        return "🩸血色赌徒"
+    if coins < 30_000_000:
+        return "👿恶魔使者"
+    if coins < 50_000_000:
+        return "😈恶魔领主"
+    if coins < 100_000_000:
+        return "🔥地狱君王"
+    if coins < 500_000_000:
+        return "👹恶魔至尊"
+    if coins < 1_000_000_000:
+        return "🕳️深渊主宰"
+    return "👑万魔之王"
+
+
+demon_coins_rank_cmd = on_command("恶魔币榜", aliases={"恶魔轮盘榜", "恶魔币排行榜"}, block=True, priority=5)
+
+@demon_coins_rank_cmd.handle()
+async def _(event: MessageEvent, args: Message = CommandArg()):
+    """显示恶魔币排行榜"""
+    page_text = args.extract_plain_text().strip()
+    player_id, player_rank, page = await _resolve_player_and_rank(event, "demon_coins", page_text)
+
+    ranked_list = await query_demon_coins_ranking()
+    if not ranked_list:
+        await demon_coins_rank_cmd.finish("暂无恶魔币排行数据\n💡 通过【人机轮盘】赢取恶魔币上榜")
+    ranked_list = await _ensure_player_in_list(ranked_list, player_rank, query_demon_coins_ranking)
+
+    page_data, offset = _paginate_ranking(ranked_list, page, player_rank, player_id)
+    if not page_data:
+        await demon_coins_rank_cmd.finish("暂无恶魔币排行数据")
+
+    quote = random.choice([
+        "与恶魔对赌的人，要么一无所有，要么名留千古。",
+        "每一枚恶魔币，都是从死神手中夺来的战利品。",
+        "轮盘转动之际，勇气与命运交汇。",
+        "真正的赌徒不畏惧失去，因为他们早已将一切押上。",
+        "恶魔的游戏，只有最狡猾的灵魂才能胜出。",
+    ])
+    lines = _build_header("🎰", "恶魔币排行榜", player_rank, page, quote)
+
+    for entry in page_data:
+        title = _demon_coins_title(entry.value)
+        marker = " ◀" if player_id and entry.player_id == player_id else ""
+        lines.append(f"{_rank_emoji(entry.rank)} {entry.nickname}[UID:{entry.uid}] - {title} 🎰{entry.value}{marker}")
+
+    lines.append("━━━━━━━━━━━━━")
+    lines.append("💡 使用【恶魔币榜 页码】查看指定页(1-3)")
+    lines.append("💡 通过【人机轮盘】赢取恶魔币上榜")
+    await demon_coins_rank_cmd.finish(message_add_head("\n".join(lines), event))
+
+
 # ==================== 排行榜总览 ====================
 all_rankings_cmd = on_command("排行榜", aliases={"榜单", "排行榜总览"}, block=True, priority=5)
 
@@ -472,6 +536,7 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
         "🌀 【探索榜】 - 查看探索排行",
         "⚡ 【敏捷榜】 - 查看敏捷排行",
         "🎮 【小游戏榜】 - 查看小游戏排行",
+        "🎰 【恶魔币榜】 - 查看恶魔轮盘排行",
         "🎣 【钓鱼排行】 - 查看钓鱼排行",
         "",
         "🏛️ 系统排行榜：",

@@ -160,6 +160,30 @@ async def query_mini_game_ranking(limit: int = 30) -> list[RankedPlayer]:
     ]
 
 
+@cached(ttl_seconds=300)
+async def query_demon_coins_ranking(limit: int = 30) -> list[RankedPlayer]:
+    """恶魔币排行榜：按 demon_coins DESC"""
+    async with readonly_session() as session:
+        stmt = (
+            select(Player.id, Player.uid, Player.nickname, Player.demon_coins)
+            .where(Player.demon_coins > 0)
+            .order_by(Player.demon_coins.desc())
+            .limit(limit)
+        )
+        rows = (await session.execute(stmt)).all()
+
+    return [
+        RankedPlayer(
+            rank=i,
+            player_id=row.id,
+            uid=row.uid,
+            nickname=row.nickname,
+            value=row.demon_coins,
+        )
+        for i, row in enumerate(rows, start=1)
+    ]
+
+
 # ==================== 财富榜专用查询 ====================
 
 @cached(ttl_seconds=300)
@@ -248,6 +272,7 @@ async def query_player_rank(
         "exploration": query_exploration_ranking,
         "agility": query_agility_ranking,
         "mini_game": query_mini_game_ranking,
+        "demon_coins": query_demon_coins_ranking,
     }
 
     query_fn = query_map.get(ranking_type)
@@ -308,6 +333,10 @@ async def query_player_rank_by_counting(
         elif ranking_type == "mini_game":
             count_stmt = select(func.count()).select_from(Player).where(
                 Player.mini_game_score > player.mini_game_score
+            )
+        elif ranking_type == "demon_coins":
+            count_stmt = select(func.count()).select_from(Player).where(
+                Player.demon_coins > player.demon_coins
             )
         elif ranking_type == "wealth":
             # 财富排名需要特殊处理，先计算该玩家的总财富
