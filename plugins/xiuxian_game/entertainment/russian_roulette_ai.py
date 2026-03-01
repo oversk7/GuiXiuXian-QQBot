@@ -8,6 +8,50 @@ from typing import Optional, List, Tuple
 from .russian_roulette_core import RussianRouletteCore, ItemType
 
 
+# ==================== 隐藏透视机制 ====================
+# AI 有概率"直觉感知"当前弹药，概率随加倍次数递增
+# 对玩家完全不可见，只影响 ai_known_bullet 字段
+
+_PEEK_BASE_CHANCE = 0.15       # 基础透视概率 15%
+_PEEK_PER_DOUBLE = 0.08        # 每次加倍增加 8%
+_PEEK_MAX_CHANCE = 0.55         # 最高 55%
+_PEEK_BLANK_USE_RATE = 0.75    # 透视到空弹时使用信息的概率（偶尔"忽略"以掩饰）
+_PEEK_LIVE_USE_RATE = 0.92     # 透视到实弹时使用信息的概率
+
+
+def _maybe_peek_bullet(session_data: dict) -> None:
+    """
+    AI 隐藏透视：有概率直接获知当前弹药类型
+    - 对玩家完全不可见（不产生任何消息）
+    - 概率随 double_count 递增
+    - 偶尔故意"忽略"透视结果以降低可疑度
+    """
+    # 如果已经知道当前弹药，不需要透视
+    if session_data.get("ai_known_bullet") is not None:
+        return
+
+    double_count = session_data.get("double_count", 0)
+    peek_chance = min(_PEEK_BASE_CHANCE + double_count * _PEEK_PER_DOUBLE, _PEEK_MAX_CHANCE)
+
+    if random.random() >= peek_chance:
+        return  # 未触发透视
+
+    # 透视成功 - 偷看当前弹药
+    gs = session_data["game_state"]
+    bullets = json.loads(gs["bullets"])
+    current_index = gs["current_bullet_index"]
+
+    if current_index >= len(bullets):
+        return  # 弹仓已空
+
+    actual_bullet = bullets[current_index]
+
+    # 偶尔故意"忽略"透视结果，避免AI表现过于完美
+    use_rate = _PEEK_LIVE_USE_RATE if actual_bullet else _PEEK_BLANK_USE_RATE
+    if random.random() < use_rate:
+        session_data["ai_known_bullet"] = actual_bullet
+
+
 class AIAction:
     """AI 动作"""
     def __init__(self, action_type: str, target: str = None, item: str = None, steal_item: str = None):
@@ -61,10 +105,14 @@ def decide_action(session_data: dict) -> AIAction:
     max_hp = session_data["max_hp"]
     is_sawed_off = gs.get("is_sawed_off", False)
     handcuffed = gs.get("handcuffed_player_id")
+    double_count = session_data.get("double_count", 0)
 
     # AI 的已知信息
     known_current_bullet = session_data.get("ai_known_bullet")  # True=实弹, False=空包弹, None=未知
     p_live = _get_bullet_probability(session_data)
+
+    # HP 差值用于动态调整策略
+    hp_diff = ai_hp - player_hp  # 正=AI优势, 负=AI劣势
 
     # === 1. 预知阶段：使用放大镜或电话获取信息 ===
     if known_current_bullet is None:
@@ -80,48 +128,57 @@ def decide_action(session_data: dict) -> AIAction:
             # 已知空包弹 -> 对自己开枪保留行动权
             return AIAction("shoot", target="self")
         else:
-            # 已知实弹 -> 准备对对手开枪
-            # 先用手锯增伤
-            if _has_item(ai_items, ItemType.KNIFE) and not is_sawed_off:
-                return AIAction("use_item", item=ItemType.KNIFE.value)
-            # 用手铐限制对手
+            # 已知实弹 -> 准备对对手开枪（完整连招：手铐→手锯→开枪）
+            # 优先手铐限制对手（锁住对手后打出实弹，对手无法反击）
             if _has_item(ai_items, ItemType.HANDCUFFS) and handcuffed != "player":
                 cooldown = gs.get("handcuffs_cooldown_player_id")
                 if cooldown != "player":
                     return AIAction("use_item", item=ItemType.HANDCUFFS.value)
+            # 再用手锯增伤
+            if _has_item(ai_items, ItemType.KNIFE) and not is_sawed_off:
+                return AIAction("use_item", item=ItemType.KNIFE.value)
             # 对对手开枪
             return AIAction("shoot", target="opponent")
 
-    # === 3. 生存优先 ===
+    # === 3. 生存优先（低血时更激进地使用回血道具）===
     if ai_hp < max_hp:
-        if ai_hp <= 2 and _has_item(ai_items, ItemType.CIGARETTE):
+        # 残血或落后时积极回血
+        heal_threshold = 2 if hp_diff >= 0 else max_hp - 1
+        if ai_hp <= heal_threshold and _has_item(ai_items, ItemType.CIGARETTE):
             return AIAction("use_item", item=ItemType.CIGARETTE.value)
+        # 只剩1血时赌过期药（50%回2血 vs 50%扣1血）
         if ai_hp == 1 and _has_item(ai_items, ItemType.EXPIRED_MEDICINE):
             return AIAction("use_item", item=ItemType.EXPIRED_MEDICINE.value)
 
     # === 4. 弹药操控 ===
+    # 降低阈值：劣势时更积极地操控弹药
+    manipulate_threshold = 0.5 if hp_diff >= 0 else 0.45
+
     # 如果实弹概率高且打算对自己开枪，可以用逆转器
-    if _has_item(ai_items, ItemType.INVERTER) and p_live > 0.6 and not is_sawed_off:
+    if _has_item(ai_items, ItemType.INVERTER) and p_live > manipulate_threshold and not is_sawed_off:
         return AIAction("use_item", item=ItemType.INVERTER.value)
 
     # 用啤酒退膛（实弹概率高时退膛有利）
-    if _has_item(ai_items, ItemType.BEER) and p_live > 0.6:
+    if _has_item(ai_items, ItemType.BEER) and p_live > manipulate_threshold:
         return AIAction("use_item", item=ItemType.BEER.value)
 
     # === 5. 战术道具 ===
-    # 手铐（实弹概率低时不用，宁可对自己开空枪多保一次行动权）
-    if _has_item(ai_items, ItemType.HANDCUFFS) and handcuffed != "player" and p_live >= 0.5:
+    # 降低战术阈值：加倍次数越高、血量差距越大，AI越激进
+    tactic_threshold = max(0.35, 0.5 - double_count * 0.03 - max(0, -hp_diff) * 0.05)
+
+    # 手铐
+    if _has_item(ai_items, ItemType.HANDCUFFS) and handcuffed != "player" and p_live >= tactic_threshold:
         cooldown = gs.get("handcuffs_cooldown_player_id")
         if cooldown != "player":
             return AIAction("use_item", item=ItemType.HANDCUFFS.value)
 
     # 手锯（仅在打算对对手开枪时）
-    if _has_item(ai_items, ItemType.KNIFE) and not is_sawed_off and p_live >= 0.5:
+    if _has_item(ai_items, ItemType.KNIFE) and not is_sawed_off and p_live >= tactic_threshold:
         return AIAction("use_item", item=ItemType.KNIFE.value)
 
     # 肾上腺素（偷取对手高价值道具）
     if _has_item(ai_items, ItemType.ADRENALINE) and player_items:
-        steal_target = _pick_steal_target(player_items, ai_hp)
+        steal_target = _pick_steal_target(player_items, ai_hp, p_live)
         if steal_target:
             return AIAction("use_item", item=ItemType.ADRENALINE.value, steal_item=steal_target)
 
@@ -146,7 +203,11 @@ def decide_action(session_data: dict) -> AIAction:
         # 手锯已激活，必须对对手开枪
         return AIAction("shoot", target="opponent")
 
-    if p_live < 0.5:
+    # 根据局势调整射击阈值
+    # 落后时更激进（更愿意对对手开枪赌实弹）
+    shoot_self_threshold = 0.5 if hp_diff >= 0 else 0.55
+
+    if p_live < shoot_self_threshold:
         # 空包弹概率较高，对自己开枪保留行动权
         return AIAction("shoot", target="self")
     else:
@@ -154,25 +215,42 @@ def decide_action(session_data: dict) -> AIAction:
         return AIAction("shoot", target="opponent")
 
 
-def _pick_steal_target(player_items: list, ai_hp: int = 999) -> Optional[str]:
-    """选择肾上腺素偷取目标（按优先级，低血时优先偷回血道具）"""
+def _pick_steal_target(player_items: list, ai_hp: int = 999, p_live: float = 0.5) -> Optional[str]:
+    """选择肾上腺素偷取目标（按优先级，考虑血量和弹药情况）"""
     # 濒死时优先偷回血道具续命
     if ai_hp <= 2:
         for item_type in [ItemType.CIGARETTE, ItemType.EXPIRED_MEDICINE]:
             if item_type.value in player_items:
                 return item_type.value
 
-    priority = [
-        ItemType.MAGNIFIER,
-        ItemType.KNIFE,
-        ItemType.CIGARETTE,
-        ItemType.BEER,
-        ItemType.INVERTER,
-        ItemType.PHONE,
-        ItemType.HANDCUFFS,
-        ItemType.EXPIRED_MEDICINE,
-        ItemType.DICE,
-    ]
+    # 根据实弹概率动态调整优先级
+    if p_live >= 0.5:
+        # 实弹概率高 -> 偷逆转器/啤酒（操控弹药）和放大镜（信息）更有价值
+        priority = [
+            ItemType.MAGNIFIER,
+            ItemType.INVERTER,
+            ItemType.KNIFE,
+            ItemType.BEER,
+            ItemType.CIGARETTE,
+            ItemType.PHONE,
+            ItemType.HANDCUFFS,
+            ItemType.EXPIRED_MEDICINE,
+            ItemType.DICE,
+        ]
+    else:
+        # 空弹概率高 -> 偷放大镜和手锯/手铐更有价值
+        priority = [
+            ItemType.MAGNIFIER,
+            ItemType.KNIFE,
+            ItemType.HANDCUFFS,
+            ItemType.CIGARETTE,
+            ItemType.BEER,
+            ItemType.INVERTER,
+            ItemType.PHONE,
+            ItemType.EXPIRED_MEDICINE,
+            ItemType.DICE,
+        ]
+
     for item_type in priority:
         if item_type.value in player_items:
             return item_type.value
@@ -359,6 +437,9 @@ def execute_ai_turn(session_data: dict) -> Tuple[List[str], bool]:
             # 清除 AI 预知信息
             session_data["ai_known_bullet"] = None
             session_data["ai_known_phone"] = None
+
+        # 隐藏透视：AI 有概率直觉感知当前弹药
+        _maybe_peek_bullet(session_data)
 
         action = decide_action(session_data)
         msg, game_over, continue_turn = execute_ai_action(session_data, action)
