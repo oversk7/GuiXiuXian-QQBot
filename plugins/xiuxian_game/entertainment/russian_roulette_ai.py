@@ -188,6 +188,121 @@ def _score_shoot_target(
     return p_live * damage * opp_damage_value - p_blank * lose_turn_cost
 
 
+def _choose_best_item_action(
+    session_data: dict,
+    ai_items: list,
+    player_items: list,
+    ai_hp: int,
+    max_hp: int,
+    hp_diff: int,
+    p_live: float,
+    known_current_bullet: Optional[bool],
+    known_phone_pos: Optional[int],
+    is_sawed_off: bool,
+    handcuffed: Optional[str],
+) -> Optional[AIAction]:
+    """
+    道具评分选择器。
+    只处理“非硬规则”的常规道具决策，硬连招留在 decide_action 的前置分支。
+    """
+    gs = session_data["game_state"]
+    ai_known_phone = session_data.get("ai_known_phone")
+    magnifier_info = gs.get("magnifier_info")
+    phone_info = gs.get("phone_info")
+
+    candidates: list[tuple[float, AIAction]] = []
+
+    def push(score: float, action: AIAction):
+        candidates.append((score, action))
+
+    # 放大镜：未知当前弹时信息价值最高
+    if _has_item(ai_items, ItemType.MAGNIFIER) and known_current_bullet is None:
+        info_score = 2.2 + (0.2 if hp_diff < 0 else 0.0)
+        push(info_score, AIAction("use_item", item=ItemType.MAGNIFIER.value))
+
+    # 电话：已有电话情报时避免重复
+    if _has_item(ai_items, ItemType.PHONE) and known_current_bullet is None and not ai_known_phone:
+        phone_score = 1.6 + (0.2 if hp_diff < 0 else 0.0)
+        push(phone_score, AIAction("use_item", item=ItemType.PHONE.value))
+
+    # 香烟：稳定回血
+    if _has_item(ai_items, ItemType.CIGARETTE) and ai_hp < max_hp:
+        heal_score = 1.0 + (0.7 if ai_hp <= 2 else 0.0) + (0.25 if hp_diff < 0 else 0.0)
+        push(heal_score, AIAction("use_item", item=ItemType.CIGARETTE.value))
+
+    # 过期药：仅在低血时有价值
+    if _has_item(ai_items, ItemType.EXPIRED_MEDICINE) and ai_hp <= 2:
+        med_score = 1.25 + (0.35 if ai_hp == 1 else 0.0)
+        push(med_score, AIAction("use_item", item=ItemType.EXPIRED_MEDICINE.value))
+
+    # 手铐：对手跳回合价值高，尤其当前实弹概率高时
+    if _has_item(ai_items, ItemType.HANDCUFFS) and handcuffed != "player":
+        cooldown = gs.get("handcuffs_cooldown_player_id")
+        if cooldown != "player":
+            cuff_score = 1.15 + (0.45 if p_live >= 0.5 else 0.0) + (0.35 if known_current_bullet is True else 0.0)
+            push(cuff_score, AIAction("use_item", item=ItemType.HANDCUFFS.value))
+
+    # 手锯：提高下一发实弹收益
+    if _has_item(ai_items, ItemType.KNIFE) and not is_sawed_off:
+        knife_score = 0.95 + (0.55 if p_live >= 0.55 else 0.0) + (0.45 if known_current_bullet is True else 0.0)
+        push(knife_score, AIAction("use_item", item=ItemType.KNIFE.value))
+
+    # 逆转器：高实弹概率时用于降风险；已知空弹+手锯时前置硬规则已覆盖
+    if _has_item(ai_items, ItemType.INVERTER):
+        inv_score = 0.45
+        if known_current_bullet is True and not is_sawed_off:
+            inv_score = 1.3
+        elif known_current_bullet is None and p_live > 0.58 and not is_sawed_off:
+            inv_score = 1.0
+        push(inv_score, AIAction("use_item", item=ItemType.INVERTER.value))
+
+    # 啤酒：推进弹仓，电话已知下一发时价值更高
+    if _has_item(ai_items, ItemType.BEER):
+        beer_score = 0.4
+        if known_phone_pos == 2:
+            beer_score = 2.25
+        elif known_current_bullet is False:
+            beer_score = 1.2
+        elif p_live > 0.55:
+            beer_score = 0.95
+        push(beer_score, AIAction("use_item", item=ItemType.BEER.value))
+
+    # 肾上腺素：偷取高价值道具
+    if _has_item(ai_items, ItemType.ADRENALINE) and player_items:
+        steal_target = _pick_steal_target(player_items, ai_hp, p_live)
+        if steal_target:
+            steal_bonus = 0.0
+            if steal_target in (ItemType.MAGNIFIER.value, ItemType.HANDCUFFS.value, ItemType.KNIFE.value):
+                steal_bonus = 0.45
+            elif steal_target in (ItemType.CIGARETTE.value, ItemType.EXPIRED_MEDICINE.value):
+                steal_bonus = 0.35 if ai_hp <= 2 else 0.1
+            adr_score = 1.05 + steal_bonus
+            push(adr_score, AIAction("use_item", item=ItemType.ADRENALINE.value, steal_item=steal_target))
+
+    # 骰子：对手存在预知信息时打乱价值更高
+    if _has_item(ai_items, ItemType.DICE):
+        has_player_info = False
+        if magnifier_info:
+            info = json.loads(magnifier_info)
+            has_player_info = has_player_info or info.get("player_id") == "player"
+        if phone_info:
+            info = json.loads(phone_info)
+            has_player_info = has_player_info or info.get("player_id") == "player"
+        if has_player_info:
+            dice_score = 1.2 + (0.2 if hp_diff < 0 else 0.0)
+            push(dice_score, AIAction("use_item", item=ItemType.DICE.value))
+
+    if not candidates:
+        return None
+
+    # 落后时更愿意用道具，领先时略保守
+    min_item_score = 0.85 if hp_diff < 0 else 1.0
+    best_score, best_action = max(candidates, key=lambda x: x[0])
+    if best_score < min_item_score:
+        return None
+    return best_action
+
+
 def decide_action(session_data: dict) -> AIAction:
     """
     AI 决策：基于当前状态选择最优操作
@@ -201,8 +316,6 @@ def decide_action(session_data: dict) -> AIAction:
     max_hp = session_data["max_hp"]
     is_sawed_off = gs.get("is_sawed_off", False)
     handcuffed = gs.get("handcuffed_player_id")
-    double_count = session_data.get("double_count", 0)
-
     # AI 的已知信息
     _ensure_knowledge_consistency(session_data)
     _sync_phone_knowledge(session_data)
@@ -231,11 +344,21 @@ def decide_action(session_data: dict) -> AIAction:
         return AIAction("use_item", item=ItemType.BEER.value)
 
     if known_current_bullet is None:
-        if _has_item(ai_items, ItemType.MAGNIFIER):
-            return AIAction("use_item", item=ItemType.MAGNIFIER.value)
-
-        if _has_item(ai_items, ItemType.PHONE) and not session_data.get("ai_known_phone"):
-            return AIAction("use_item", item=ItemType.PHONE.value)
+        item_action = _choose_best_item_action(
+            session_data=session_data,
+            ai_items=ai_items,
+            player_items=player_items,
+            ai_hp=ai_hp,
+            max_hp=max_hp,
+            hp_diff=hp_diff,
+            p_live=p_live,
+            known_current_bullet=known_current_bullet,
+            known_phone_pos=known_phone_pos,
+            is_sawed_off=is_sawed_off,
+            handcuffed=handcuffed,
+        )
+        if item_action:
+            return item_action
 
     # === 2. 已知弹药时的操作 ===
     if known_current_bullet is not None:
@@ -270,63 +393,22 @@ def decide_action(session_data: dict) -> AIAction:
             # 对对手开枪
             return AIAction("shoot", target="opponent")
 
-    # === 3. 生存优先（低血时更激进地使用回血道具）===
-    if ai_hp < max_hp:
-        # 残血或落后时积极回血
-        heal_threshold = 2 if hp_diff >= 0 else max_hp - 1
-        if ai_hp <= heal_threshold and _has_item(ai_items, ItemType.CIGARETTE):
-            return AIAction("use_item", item=ItemType.CIGARETTE.value)
-        # 只剩1血时赌过期药（50%回2血 vs 50%扣1血）
-        if ai_hp == 1 and _has_item(ai_items, ItemType.EXPIRED_MEDICINE):
-            return AIAction("use_item", item=ItemType.EXPIRED_MEDICINE.value)
-
-    # === 4. 弹药操控 ===
-    # 降低阈值：劣势时更积极地操控弹药
-    manipulate_threshold = 0.5 if hp_diff >= 0 else 0.45
-
-    # 如果实弹概率高且打算对自己开枪，可以用逆转器
-    if _has_item(ai_items, ItemType.INVERTER) and p_live > manipulate_threshold and not is_sawed_off:
-        return AIAction("use_item", item=ItemType.INVERTER.value)
-
-    # 用啤酒退膛（实弹概率高时退膛有利）
-    if _has_item(ai_items, ItemType.BEER) and p_live > manipulate_threshold:
-        return AIAction("use_item", item=ItemType.BEER.value)
-
-    # === 5. 战术道具 ===
-    # 降低战术阈值：加倍次数越高、血量差距越大，AI越激进
-    tactic_threshold = max(0.35, 0.5 - double_count * 0.03 - max(0, -hp_diff) * 0.05)
-
-    # 手铐
-    if _has_item(ai_items, ItemType.HANDCUFFS) and handcuffed != "player" and p_live >= tactic_threshold:
-        cooldown = gs.get("handcuffs_cooldown_player_id")
-        if cooldown != "player":
-            return AIAction("use_item", item=ItemType.HANDCUFFS.value)
-
-    # 手锯（仅在打算对对手开枪时）
-    if _has_item(ai_items, ItemType.KNIFE) and not is_sawed_off and p_live >= tactic_threshold:
-        return AIAction("use_item", item=ItemType.KNIFE.value)
-
-    # 肾上腺素（偷取对手高价值道具）
-    if _has_item(ai_items, ItemType.ADRENALINE) and player_items:
-        steal_target = _pick_steal_target(player_items, ai_hp, p_live)
-        if steal_target:
-            return AIAction("use_item", item=ItemType.ADRENALINE.value, steal_item=steal_target)
-
-    # 骰子（如果自己没有预知信息，打乱来破坏对手可能的预知）
-    if _has_item(ai_items, ItemType.DICE):
-        # 只在可能对对手有利时使用
-        magnifier_info = gs.get("magnifier_info")
-        phone_info = gs.get("phone_info")
-        if magnifier_info or phone_info:
-            # 检查是否是玩家的预知信息
-            if magnifier_info:
-                info = json.loads(magnifier_info)
-                if info.get("player_id") == "player":
-                    return AIAction("use_item", item=ItemType.DICE.value)
-            if phone_info:
-                info = json.loads(phone_info)
-                if info.get("player_id") == "player":
-                    return AIAction("use_item", item=ItemType.DICE.value)
+    # 常规道具改为评分选择（已知弹药的硬规则在前面已处理）
+    item_action = _choose_best_item_action(
+        session_data=session_data,
+        ai_items=ai_items,
+        player_items=player_items,
+        ai_hp=ai_hp,
+        max_hp=max_hp,
+        hp_diff=hp_diff,
+        p_live=p_live,
+        known_current_bullet=known_current_bullet,
+        known_phone_pos=known_phone_pos,
+        is_sawed_off=is_sawed_off,
+        handcuffed=handcuffed,
+    )
+    if item_action:
+        return item_action
 
     # === 6. 射击决策（信息价值加权评分）===
     if is_sawed_off:
