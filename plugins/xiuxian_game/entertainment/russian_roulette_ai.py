@@ -12,6 +12,7 @@ from .russian_roulette_core import RussianRouletteCore, ItemType
 # AI 有概率"直觉感知"当前弹药，概率随加倍次数递增
 # 对玩家完全不可见，只影响 ai_known_bullet 字段
 
+_ENABLE_HIDDEN_PEEK = False  # 默认关闭“透视”作弊
 _PEEK_BASE_CHANCE = 0.20       # 基础透视概率 20%
 _PEEK_PER_DOUBLE = 0.10        # 每次加倍增加 10%
 _PEEK_MAX_CHANCE = 0.65         # 最高 65%
@@ -26,6 +27,9 @@ def _maybe_peek_bullet(session_data: dict) -> None:
     - 概率随 double_count 递增
     - 偶尔故意"忽略"透视结果以降低可疑度
     """
+    if not _ENABLE_HIDDEN_PEEK:
+        return
+
     # 如果已经知道当前弹药，不需要透视
     if session_data.get("ai_known_bullet") is not None:
         return
@@ -92,6 +96,98 @@ def _has_item(items: list, item_type: ItemType) -> bool:
     return item_type.value in items
 
 
+def _sync_phone_knowledge(session_data: dict) -> None:
+    """
+    同步 AI 电话情报到当前子弹认知。
+    """
+    phone_info = session_data.get("ai_known_phone")
+    if not phone_info:
+        return
+
+    gs = session_data["game_state"]
+    current_index = gs.get("current_bullet_index", 0)
+
+    absolute_index = phone_info.get("absolute_index")
+    if absolute_index is None:
+        relative_pos = phone_info.get("bullet_position")
+        if not isinstance(relative_pos, int) or relative_pos <= 0:
+            session_data["ai_known_phone"] = None
+            return
+        absolute_index = current_index + relative_pos - 1
+        phone_info["absolute_index"] = absolute_index
+        session_data["ai_known_phone"] = phone_info
+
+    if absolute_index < current_index:
+        session_data["ai_known_phone"] = None
+        return
+
+    if absolute_index == current_index:
+        session_data["ai_known_bullet"] = phone_info.get("is_live")
+
+
+def _get_phone_relative_position(session_data: dict) -> Optional[int]:
+    """返回电话情报相对当前位置（1=当前弹位）。"""
+    phone_info = session_data.get("ai_known_phone")
+    if not phone_info:
+        return None
+
+    gs = session_data["game_state"]
+    current_index = gs.get("current_bullet_index", 0)
+    absolute_index = phone_info.get("absolute_index")
+    if absolute_index is None:
+        return None
+    return absolute_index - current_index + 1
+
+
+def _ensure_knowledge_consistency(session_data: dict) -> None:
+    """
+    保证 AI 侧缓存情报与 game_state 一致。
+    特别处理：骰子会清空 phone_info/magnifier_info，避免继续使用旧电话情报。
+    """
+    gs = session_data["game_state"]
+    bullets = json.loads(gs.get("bullets", "[]"))
+    current_index = gs.get("current_bullet_index", 0)
+
+    phone_info_raw = gs.get("phone_info")
+    if not phone_info_raw and session_data.get("ai_known_phone"):
+        session_data["ai_known_phone"] = None
+
+    # 当前弹位越界时，不应保留“已知当前弹药”
+    if current_index >= len(bullets):
+        session_data["ai_known_bullet"] = None
+        session_data["ai_known_phone"] = None
+        return
+
+    known_phone = session_data.get("ai_known_phone")
+    if known_phone:
+        absolute_index = known_phone.get("absolute_index")
+        if isinstance(absolute_index, int) and absolute_index >= len(bullets):
+            session_data["ai_known_phone"] = None
+
+
+def _score_shoot_target(
+    target: str,
+    p_live: float,
+    is_sawed_off: bool,
+    hp_diff: int,
+) -> float:
+    """
+    对射击目标做期望收益评分，分数高者优先。
+    """
+    damage = 2.0 if is_sawed_off else 1.0
+    p_blank = 1.0 - p_live
+
+    # 价值权重：击伤对手 > 自身受伤惩罚；领先时更保守，落后时更激进
+    opp_damage_value = 1.30 + (0.18 if hp_diff < 0 else 0.0)
+    self_damage_cost = 1.15 + (0.20 if hp_diff > 0 else 0.0)
+    keep_turn_value = 0.55 + (0.10 if hp_diff < 0 else 0.0)
+    lose_turn_cost = 0.22
+
+    if target == "self":
+        return p_blank * keep_turn_value - p_live * damage * self_damage_cost
+    return p_live * damage * opp_damage_value - p_blank * lose_turn_cost
+
+
 def decide_action(session_data: dict) -> AIAction:
     """
     AI 决策：基于当前状态选择最优操作
@@ -108,13 +204,32 @@ def decide_action(session_data: dict) -> AIAction:
     double_count = session_data.get("double_count", 0)
 
     # AI 的已知信息
+    _ensure_knowledge_consistency(session_data)
+    _sync_phone_knowledge(session_data)
     known_current_bullet = session_data.get("ai_known_bullet")  # True=实弹, False=空包弹, None=未知
+    known_phone_pos = _get_phone_relative_position(session_data)
+    known_phone_live = None
+    if session_data.get("ai_known_phone"):
+        known_phone_live = session_data["ai_known_phone"].get("is_live")
     p_live = _get_bullet_probability(session_data)
 
     # HP 差值用于动态调整策略
     hp_diff = ai_hp - player_hp  # 正=AI优势, 负=AI劣势
 
     # === 1. 预知阶段：使用放大镜或电话获取信息 ===
+    if (
+        known_current_bullet is None
+        and known_phone_pos == 2
+        and known_phone_live is True
+        and _has_item(ai_items, ItemType.INVERTER)
+        and _has_item(ai_items, ItemType.BEER)
+        and not is_sawed_off
+    ):
+        return AIAction("use_item", item=ItemType.INVERTER.value)
+
+    if known_current_bullet is None and known_phone_pos == 2 and _has_item(ai_items, ItemType.BEER):
+        return AIAction("use_item", item=ItemType.BEER.value)
+
     if known_current_bullet is None:
         if _has_item(ai_items, ItemType.MAGNIFIER):
             return AIAction("use_item", item=ItemType.MAGNIFIER.value)
@@ -213,21 +328,17 @@ def decide_action(session_data: dict) -> AIAction:
                 if info.get("player_id") == "player":
                     return AIAction("use_item", item=ItemType.DICE.value)
 
-    # === 6. 射击决策（无预知信息时）===
+    # === 6. 射击决策（信息价值加权评分）===
     if is_sawed_off:
         # 手锯已激活，必须对对手开枪
         return AIAction("shoot", target="opponent")
 
-    # 根据局势调整射击阈值
-    # 落后时更激进（更愿意对对手开枪赌实弹）
-    shoot_self_threshold = 0.5 if hp_diff >= 0 else 0.55
-
-    if p_live < shoot_self_threshold:
-        # 空包弹概率较高，对自己开枪保留行动权
+    # 评分法：融合实弹概率、回合价值、血量差，替代硬阈值
+    score_self = _score_shoot_target("self", p_live, is_sawed_off, hp_diff)
+    score_opp = _score_shoot_target("opponent", p_live, is_sawed_off, hp_diff)
+    if score_self > score_opp:
         return AIAction("shoot", target="self")
-    else:
-        # 实弹概率较高或相等，对对手开枪
-        return AIAction("shoot", target="opponent")
+    return AIAction("shoot", target="opponent")
 
 
 def _pick_steal_target(player_items: list, ai_hp: int = 999, p_live: float = 0.5) -> Optional[str]:
@@ -360,6 +471,10 @@ def execute_ai_action(session_data: dict, action: AIAction) -> Tuple[str, bool, 
             if success:
                 phone_data = json.loads(gs.get("phone_info", "{}"))
                 if phone_data.get("player_id") == "ai":
+                    current_index = gs.get("current_bullet_index", 0)
+                    bullet_position = phone_data.get("bullet_position")
+                    if isinstance(bullet_position, int) and bullet_position > 0:
+                        phone_data["absolute_index"] = current_index + bullet_position - 1
                     session_data["ai_known_phone"] = phone_data
                     # 如果电话透露的是当前弹药（position=1），直接记录
                     if phone_data.get("bullet_position") == 1:
@@ -396,6 +511,10 @@ def execute_ai_action(session_data: dict, action: AIAction) -> Tuple[str, bool, 
                     elif stolen_type == ItemType.PHONE:
                         phone_data = json.loads(gs.get("phone_info", "{}"))
                         if phone_data.get("player_id") == "ai":
+                            current_index = gs.get("current_bullet_index", 0)
+                            bullet_position = phone_data.get("bullet_position")
+                            if isinstance(bullet_position, int) and bullet_position > 0:
+                                phone_data["absolute_index"] = current_index + bullet_position - 1
                             session_data["ai_known_phone"] = phone_data
                             if phone_data.get("bullet_position") == 1:
                                 session_data["ai_known_bullet"] = phone_data.get("is_live")
