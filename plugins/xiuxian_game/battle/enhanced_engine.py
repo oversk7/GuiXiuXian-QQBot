@@ -1750,12 +1750,15 @@ class EnhancedBattleEngine:
             unit.max_mp = new_max_mp
             if hasattr(unit, 'mp'):
                 unit.mp = int(max(0, min(new_max_mp, ratio_mp * new_max_mp)))
-        # 回退骰子buff临时属性（诡面骰·骰相·乱）
-        dice_info = self._temp_dice_buff.pop(unit_id, None) if hasattr(self, '_temp_dice_buff') else None
-        if dice_info:
-            attr_name, original_value = dice_info
-            if hasattr(unit, attr_name):
-                setattr(unit, attr_name, original_value)
+        # 回退骰子buff临时属性（诡面骰·骰相·乱）- 独立异常保护，确保一定执行
+        try:
+            dice_info = self._temp_dice_buff.pop(unit_id, None) if hasattr(self, '_temp_dice_buff') else None
+            if dice_info:
+                attr_name, original_value = dice_info
+                if hasattr(unit, attr_name):
+                    setattr(unit, attr_name, original_value)
+        except Exception:
+            pass
         # 回退绝魔体质对特殊属性的削减（IGNORE_SPECIAL）
         ignore_debuff = self._temp_ignore_special_debuff.pop(unit_id, None) if hasattr(self, '_temp_ignore_special_debuff') else None
         if ignore_debuff:

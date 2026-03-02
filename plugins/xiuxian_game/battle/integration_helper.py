@@ -426,9 +426,12 @@ class BattleIntegrationHelper:
             battle_log.append(f"   {player2.nickname} 剩余血量：{player2_hp}/{initial_player2_hp}")
 
 
-        # 战斗结束：回退双方首回合临时增益（如灵影体质）
+        # 战斗结束：回退双方首回合临时增益（如灵影体质）- 各自独立保护，互不影响
         try:
             engine.reset_temp_bonuses(player1)
+        except Exception:
+            pass
+        try:
             engine.reset_temp_bonuses(player2)
         except Exception:
             pass
@@ -1203,9 +1206,12 @@ class BattleIntegrationHelper:
             battle_log.append(f"  {player2.nickname}:")
             battle_log.append(f"    {player2_hp_bar}")
 
-        # 战斗结束：回退双方首回合临时增益（如灵影体质、绝魔体质削减、骰子buff等）
+        # 战斗结束：回退双方首回合临时增益（如灵影体质、绝魔体质削减、骰子buff等）- 各自独立保护，互不影响
         try:
             engine.reset_temp_bonuses(player1)
+        except Exception:
+            pass
+        try:
             engine.reset_temp_bonuses(player2)
         except Exception:
             pass
