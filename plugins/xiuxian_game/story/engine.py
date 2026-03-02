@@ -56,7 +56,7 @@ class StoryEngine:
     def get_story_list(self) -> List[Dict[str, str]]:
         """获取可用剧情列表（只用元数据，无需加载完整内容）"""
         stories = [{"id": story_id, **meta} for story_id, meta in self._story_meta.items()]
-        stories.sort(key=lambda s: (0 if s["id"] == "ghost_town" else 1))
+        stories.sort(key=lambda s: (0 if s["id"] == "荔湾鬼镇" else 1))
         return stories
 
     def get_story(self, story_id: str) -> Optional[Dict[str, Any]]:
