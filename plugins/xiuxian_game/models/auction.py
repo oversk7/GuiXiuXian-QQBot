@@ -35,6 +35,9 @@ class AuctionItem(Base):
     seller_id: Mapped[str] = mapped_column(
         String(32), index=True, comment="卖家平台ID（player.id）"
     )
+    seller_uid: Mapped[Optional[int]] = mapped_column(
+        Integer, nullable=True, comment="卖家游戏UID（player.uid，自增整数）"
+    )
     seller_name: Mapped[Optional[str]] = mapped_column(
         String(64), nullable=True, comment="卖家昵称快照（防止改名后丢失）"
     )
@@ -70,6 +73,9 @@ class AuctionItem(Base):
     # ==================== 竞价信息 ====================
     current_bidder_id: Mapped[Optional[str]] = mapped_column(
         String(32), nullable=True, comment="当前最高出价人ID（NULL表示无人出价）"
+    )
+    current_bidder_uid: Mapped[Optional[int]] = mapped_column(
+        Integer, nullable=True, comment="当前最高出价人游戏UID（player.uid）"
     )
     current_bidder_name: Mapped[Optional[str]] = mapped_column(
         String(64), nullable=True, comment="当前最高出价人昵称快照（NULL表示无人出价）"
@@ -141,6 +147,9 @@ class AuctionBidHistory(Base):
     # ==================== 出价人信息 ====================
     bidder_id: Mapped[str] = mapped_column(
         String(32), comment="出价人玩家ID"
+    )
+    bidder_uid: Mapped[Optional[int]] = mapped_column(
+        Integer, nullable=True, comment="出价人游戏UID（player.uid）"
     )
     bidder_name: Mapped[str] = mapped_column(
         String(64), comment="出价人昵称（快照，防止改名后丢失）"

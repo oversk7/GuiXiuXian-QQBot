@@ -382,9 +382,9 @@ async def handle_auction_hall(event: MessageEvent, args: Message = CommandArg())
                 remain_m = int((remaining.total_seconds() % 3600) // 60)
                 remain_str = f"{remain_h}h{remain_m}m" if remain_h > 0 else f"{remain_m}m"
 
-                bid_info = f"{a.current_price:,}💰（{a.current_bidder_name} [UID:{a.current_bidder_id}] 领先）" if a.has_bidder else f"起拍 {a.current_price:,}💰"
+                bid_info = f"{a.current_price:,}💰（{a.current_bidder_name} [UID:{a.current_bidder_uid}] 领先）" if a.has_bidder else f"起拍 {a.current_price:,}💰"
                 buyout_str = f"\n   🎯 一口价：{a.buyout_price:,}💰" if a.buyout_price else ""
-                seller_str = f"{a.seller_name or '未知'} [UID:{a.seller_id}]"
+                seller_str = f"{a.seller_name or '未知'} [UID:{a.seller_uid}]"
 
                 lines.append(
                     f"#{a.id} {item_name}\n"
@@ -435,7 +435,7 @@ async def handle_my_auction(event: MessageEvent):
                     remain_str = f"{remain_h}h{remain_m}m" if remain_h > 0 else f"{remain_m}m"
 
                     if a.has_bidder:
-                        bid_info = f"当前价：{a.current_price:,}💰\n   📌 领先者：{a.current_bidder_name} [UID:{a.current_bidder_id}]（{a.bid_count}次出价）"
+                        bid_info = f"当前价：{a.current_price:,}💰\n   📌 领先者：{a.current_bidder_name} [UID:{a.current_bidder_uid}]（{a.bid_count}次出价）"
                     else:
                         bid_info = "暂无人出价"
 
@@ -536,13 +536,13 @@ async def handle_auction_detail(event: MessageEvent, args: Message = CommandArg(
                 f"🏛️ 拍卖详情 #{auction.id}",
                 "━━━━━━━━━━━━━",
                 f"📦 {item_name}",
-                f"👤 卖家：{auction.seller_name or '未知'} [UID:{auction.seller_id}]",
+                f"👤 卖家：{auction.seller_name or '未知'} [UID:{auction.seller_uid}]",
                 f"💰 起拍价：{auction.start_price:,}💰",
             ]
             if auction.buyout_price:
                 lines.append(f"🎯 一口价：{auction.buyout_price:,}💰")
             if auction.has_bidder:
-                lines.append(f"📈 当前价：{auction.current_price:,}💰（{auction.current_bidder_name} [UID:{auction.current_bidder_id}]，共{auction.bid_count}次出价）")
+                lines.append(f"📈 当前价：{auction.current_price:,}💰（{auction.current_bidder_name} [UID:{auction.current_bidder_uid}]，共{auction.bid_count}次出价）")
             else:
                 lines.append("📊 暂无人出价")
 
@@ -567,7 +567,7 @@ async def handle_auction_detail(event: MessageEvent, args: Message = CommandArg(
                 for i, bid in enumerate(bids, 1):
                     bid_time = bid.bid_at.strftime("%m-%d %H:%M")
                     crown = "🥇" if i == 1 else f"{i}."
-                    lines.append(f"  {crown} {bid.bidder_name} [UID:{bid.bidder_id}]  {bid.amount:,}💰  {bid_time}")
+                    lines.append(f"  {crown} {bid.bidder_name} [UID:{bid.bidder_uid}]  {bid.amount:,}💰  {bid_time}")
 
             if auction.status == "active":
                 lines.append("━━━━━━━━━━━━━")

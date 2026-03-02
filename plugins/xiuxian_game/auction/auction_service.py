@@ -185,6 +185,7 @@ async def _list_equipment_auction(
     end_at = datetime.now() + timedelta(hours=duration_hours)
     auction = AuctionItem(
         seller_id=seller.id,
+        seller_uid=seller.uid,
         seller_name=seller.nickname,
         item_id=item_cfg.item_id,
         quantity=1,
@@ -257,6 +258,7 @@ async def _list_normal_auction(
     end_at = datetime.now() + timedelta(hours=duration_hours)
     auction = AuctionItem(
         seller_id=seller.id,
+        seller_uid=seller.uid,
         seller_name=seller.nickname,
         item_id=item_cfg.item_id,
         quantity=quantity,
@@ -363,6 +365,7 @@ async def place_bid(
     # 9. 更新拍卖条目
     auction.current_price = bid_amount
     auction.current_bidder_id = bidder.id
+    auction.current_bidder_uid = bidder.uid
     auction.current_bidder_name = bidder.nickname
     auction.bid_count += 1
     session.add(auction)
@@ -372,6 +375,7 @@ async def place_bid(
     bid_record = AuctionBidHistory(
         auction_id=auction.id,
         bidder_id=bidder.id,
+        bidder_uid=bidder.uid,
         bidder_name=bidder.nickname,
         amount=bid_amount,
         bid_at=datetime.now(),
