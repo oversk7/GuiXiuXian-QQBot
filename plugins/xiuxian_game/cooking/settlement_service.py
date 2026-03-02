@@ -421,6 +421,6 @@ class SettlementService:
         msg += f"👥 总顾客: {stats['total_customers']}人\n"
         msg += f"🍽️ 制作: {stats['total_dishes_made']}道\n"
         msg += f"💀 失败: {stats['total_dishes_failed']}道\n"
-        msg += f"⭐ 声望变化: {stats['total_reputation_change']:+d}\n"
+        msg += f"⭐ 声望变化: {int(stats['total_reputation_change']):+d}\n"
 
         return msg
