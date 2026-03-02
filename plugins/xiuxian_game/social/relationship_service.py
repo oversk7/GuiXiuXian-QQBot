@@ -1279,47 +1279,6 @@ class RelationshipService:
 
         return True, f"你已断义,解除了{count}段结义关系"
 
-    async def end_mentorship(
-        self,
-        player_id: str
-    ) -> Tuple[bool, str]:
-        """
-        结束师徒关系
-
-        Args:
-            player_id: 玩家ID
-
-        Returns:
-            (是否成功, 提示信息)
-        """
-        # 查找师徒关系
-        from sqlalchemy import or_
-        stmt = select(PlayerRelationship).where(
-            and_(
-                or_(
-                    PlayerRelationship.player_id == player_id,
-                    PlayerRelationship.target_id == player_id
-                ),
-                PlayerRelationship.relationship_type == RelationshipType.MENTORSHIP.value
-            )
-        )
-        result = await self._uow.session.execute(stmt)
-        relationship = result.scalar_one_or_none()
-
-        if not relationship:
-            return False, "你当前没有师徒关系"
-
-        # 获取师/徒ID
-        other_id = relationship.target_id if relationship.player_id == player_id else relationship.player_id
-        other = await self._player_repo.get_by_id(other_id)
-
-        # 解除师徒关系
-        relationship.relationship_type = RelationshipType.NONE.value
-        relationship.established_at = None
-
-        role = "师父" if relationship.player_id == player_id else "徒弟"
-        return True, f"你已与{other.nickname if other else '对方'}解除师徒关系"
-
     # ==================== 辅助方法 ====================
 
     def _get_relationship_name(self, relationship_type: RelationshipType) -> str:

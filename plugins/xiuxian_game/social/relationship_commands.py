@@ -126,30 +126,71 @@ async def handle_favorability(event: MessageEvent, args: Message = CommandArg())
             await favorability_cmd.finish(message_add_head("\n".join(lines), event))
 
 
-# ==================== 脱离师门/逐出师门 ====================
-end_mentorship_cmd = on_command("脱离师门", aliases={"逐出师门"}, priority=5, block=True)
+# ==================== 脱离师门（徒弟叛师，有惩罚） ====================
+betray_cmd = on_command("脱离师门", priority=5, block=True)
 
-@end_mentorship_cmd.handle()
-async def handle_end_mentorship(event: MessageEvent):
-    """结束师徒关系命令"""
+@betray_cmd.handle()
+async def handle_betray_master(event: MessageEvent):
+    """徒弟主动脱离师门（扣属性+7天冷却）"""
     async with UnitOfWork(AsyncSessionLocal) as uow:
         player = await get_unified_player(uow.session, event)
         if not player:
-            await end_mentorship_cmd.finish(message_add_head("⛔ 请先创建角色", event))
+            await betray_cmd.finish(message_add_head("⛔ 请先创建角色", event))
 
-        service = RelationshipService(
-            player_repo=uow.players,
-            relationship_repo=uow.player_relationships,
-            item_repo=uow.items,
-            uow=uow
+        from .mentorship_system_service import MentorshipSystemService
+        from ..infrastructure.repositories.player_repository import PlayerRepository
+        from ..infrastructure.repositories.player_relationship_repository import PlayerRelationshipRepository
+
+        service = MentorshipSystemService(
+            player_repo=PlayerRepository(uow.session),
+            relationship_repo=PlayerRelationshipRepository(uow.session),
+            session=uow.session
         )
 
-        success, message = await service.end_mentorship(player.id)
+        success, message = await service.betray_master(player.id)
 
         if success:
             await uow.commit()
 
-        await end_mentorship_cmd.finish(message_add_head(message, event))
+        await betray_cmd.finish(message_add_head(message, event))
+
+
+# ==================== 逐出师门（师父驱逐徒弟，有冷却） ====================
+expel_cmd = on_command("逐出师门", priority=5, block=True)
+
+@expel_cmd.handle()
+async def handle_expel_apprentice(event: MessageEvent, args: Message = CommandArg()):
+    """师父逐出指定徒弟（3天冷却）"""
+    uid_text = args.extract_plain_text().strip()
+    if not uid_text:
+        await expel_cmd.finish(message_add_head("⛔ 用法：逐出师门 <徒弟UID>", event))
+
+    try:
+        target_uid = int(uid_text)
+    except ValueError:
+        await expel_cmd.finish(message_add_head("⛔ UID必须是数字", event))
+
+    async with UnitOfWork(AsyncSessionLocal) as uow:
+        player = await get_unified_player(uow.session, event)
+        if not player:
+            await expel_cmd.finish(message_add_head("⛔ 请先创建角色", event))
+
+        from .mentorship_system_service import MentorshipSystemService
+        from ..infrastructure.repositories.player_repository import PlayerRepository
+        from ..infrastructure.repositories.player_relationship_repository import PlayerRelationshipRepository
+
+        service = MentorshipSystemService(
+            player_repo=PlayerRepository(uow.session),
+            relationship_repo=PlayerRelationshipRepository(uow.session),
+            session=uow.session
+        )
+
+        success, message = await service.expel_apprentice(player.id, target_uid)
+
+        if success:
+            await uow.commit()
+
+        await expel_cmd.finish(message_add_head(message, event))
 
 
 # ==================== 师徒信息查询 ====================

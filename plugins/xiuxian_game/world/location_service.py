@@ -189,12 +189,14 @@ class LocationService:
         location = location_summary["location"]
         npcs_by_type = location_summary["npcs_by_type"]
         
+        coord_str = f"({location.x},{location.y})"
+        name_display = location.name if coord_str in location.name else f"{location.name}{coord_str}"
         lines = [
-            f"所在地 ※ {location.name}({location.x},{location.y})",
+            f"所在地 ※ {name_display}",
             location.description,
             ""
         ]
-        
+
         # 显示附近玩家
         if nearby_players:
             player_count = len(nearby_players)
