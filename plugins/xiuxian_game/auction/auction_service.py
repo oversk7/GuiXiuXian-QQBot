@@ -23,7 +23,7 @@ from ..economy.equipment_trade_service import EquipmentTradeService
 from ..infrastructure.repositories.item_repository import ItemRepository
 from ..infrastructure.repositories.market_order_repository import MarketOrderRepository
 from ..infrastructure.uow.unit_of_work import UnitOfWork
-from ..models.auction import AuctionItem
+from ..models.auction import AuctionItem, AuctionBidHistory
 from ..models.inventory import ItemInstance, ItemType
 from ..models.player import Player
 from ..models.world_message import WorldMessage
@@ -351,13 +351,24 @@ async def place_bid(
     # 9. 更新拍卖条目
     auction.current_price = bid_amount
     auction.current_bidder_id = bidder.id
+    auction.current_bidder_name = bidder.nickname
     auction.bid_count += 1
     session.add(auction)
     await session.flush()
 
+    # 10. 记录竞价历史
+    bid_record = AuctionBidHistory(
+        auction_id=auction.id,
+        bidder_id=bidder.id,
+        bidder_name=bidder.nickname,
+        amount=bid_amount,
+        bid_at=datetime.now(),
+    )
+    await uow.auction_bid_histories.add(bid_record)
+
     item_display = _make_item_display(auction)
 
-    # 10. 检查是否触发一口价
+    # 11. 检查是否触发一口价
     if auction.buyout_price and bid_amount >= auction.buyout_price:
         success, settle_msg = await _settle_auction(uow, auction, buyout=True)
         if success:

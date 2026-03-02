@@ -1230,6 +1230,7 @@ async def handle_auction_help(event: MessageEvent, args: Message = CommandArg())
         "【拍卖行 [页码]】 查看当前所有进行中的拍卖\n"
         "【上架拍卖 物品名 起拍价 时长 [一口价]】 发起拍卖\n"
         "【出价 拍卖编号 金额】 参与竞价\n"
+        "【拍卖详情 拍卖编号】 查看竞价历史（出价人、金额、时间）\n"
         "【我的拍卖】 查看自己发起的拍卖\n"
         "【撤拍 拍卖编号】 撤回拍卖（仅无人出价时可用）\n"
         "━━━━━━━━━━━━━\n"
@@ -1263,6 +1264,7 @@ async def handle_auction_help(event: MessageEvent, args: Message = CommandArg())
         "上架拍卖 碎颅制服 50000 12\n"
         "上架拍卖 碎颅制服 50000 24 200000（带一口价）\n"
         "出价 5 88000\n"
+        "拍卖详情 5\n"
         "━━━━━━━━━━━━━\n"
         "💡 发送【交易系统】查看挂牌市场帮助"
     )

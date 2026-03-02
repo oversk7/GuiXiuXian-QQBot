@@ -65,7 +65,7 @@ from .mansion_warehouse import MansionWarehouseItem
 # 赞助商店日志模型
 from .sponsor_shop_log import SponsorShopLog
 # 拍卖行系统模型
-from .auction import AuctionItem
+from .auction import AuctionItem, AuctionBidHistory
 
 
 __all__ = [
@@ -93,5 +93,5 @@ __all__ = [
     "LowerWorldStronghold",
     "MansionWarehouseItem",
     "SponsorShopLog",
-    "AuctionItem",
+    "AuctionItem", "AuctionBidHistory",
 ]

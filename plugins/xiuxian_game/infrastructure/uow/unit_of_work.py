@@ -119,6 +119,7 @@ class UnitOfWork:
 
         # 拍卖行系统仓储
         self._auction_items = None
+        self._auction_bid_histories = None
 
     @property
     def players(self):
@@ -431,6 +432,14 @@ class UnitOfWork:
             from ..repositories.auction_repository import AuctionRepository
             self._auction_items = AuctionRepository(self._session)
         return self._auction_items
+
+    @property
+    def auction_bid_histories(self):
+        """竞价历史仓储"""
+        if self._auction_bid_histories is None:
+            from ..repositories.auction_repository import AuctionBidHistoryRepository
+            self._auction_bid_histories = AuctionBidHistoryRepository(self._session)
+        return self._auction_bid_histories
 
     @property
     def session(self) -> AsyncSession:

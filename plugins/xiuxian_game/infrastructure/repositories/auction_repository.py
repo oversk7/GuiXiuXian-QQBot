@@ -16,7 +16,7 @@ from sqlalchemy import and_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from ...domain.repositories.base import IRepository
-from ...models.auction import AuctionItem
+from ...models.auction import AuctionItem, AuctionBidHistory
 
 
 class AuctionRepository(IRepository[AuctionItem]):
@@ -155,3 +155,28 @@ class AuctionRepository(IRepository[AuctionItem]):
         )
         result = await self._session.execute(stmt)
         return result.scalars().first()
+
+
+class AuctionBidHistoryRepository:
+    """竞价历史仓储"""
+
+    def __init__(self, session: AsyncSession):
+        self._session = session
+
+    async def add(self, entity: AuctionBidHistory) -> AuctionBidHistory:
+        """记录一条竞价历史"""
+        self._session.add(entity)
+        await self._session.flush()
+        return entity
+
+    async def find_by_auction(self, auction_id: int, limit: int = 10) -> List[AuctionBidHistory]:
+        """按拍卖编号查询竞价历史（最新的在最前）"""
+        stmt = (
+            select(AuctionBidHistory)
+            .where(AuctionBidHistory.auction_id == auction_id)
+            .order_by(AuctionBidHistory.bid_at.desc())
+            .limit(limit)
+        )
+        result = await self._session.execute(stmt)
+        return result.scalars().all()
+

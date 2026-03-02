@@ -7,6 +7,7 @@
 - 【拍卖行 [页码]】                              - 查看当前拍卖列表
 - 【我的拍卖】                                   - 查看自己的拍卖
 - 【撤拍 拍卖ID】                               - 撤回拍卖（无人出价时）
+- 【拍卖详情 拍卖ID】                            - 查看竞价历史（出价人、金额、时间）
 """
 
 from datetime import datetime
@@ -52,6 +53,12 @@ my_auction_cmd = on_command(
 cancel_auction_cmd = on_command(
     "撤拍",
     aliases={"取消拍卖", "拍卖撤回"},
+    block=True,
+    priority=5,
+)
+auction_detail_cmd = on_command(
+    "拍卖详情",
+    aliases={"竞价记录", "拍卖记录"},
     block=True,
     priority=5,
 )
@@ -203,7 +210,7 @@ async def handle_auction_hall(event: MessageEvent, args: Message = CommandArg())
                 remain_m = int((remaining.total_seconds() % 3600) // 60)
                 remain_str = f"{remain_h}h{remain_m}m" if remain_h > 0 else f"{remain_m}m"
 
-                bid_info = f"{a.current_price:,}💰" if a.has_bidder else f"起拍{a.current_price:,}💰"
+                bid_info = f"{a.current_price:,}💰（{a.current_bidder_name}领先）" if a.has_bidder else f"起拍{a.current_price:,}💰"
                 buyout_str = f" | 一口价{a.buyout_price:,}💰" if a.buyout_price else ""
 
                 lines.append(
@@ -253,7 +260,7 @@ async def handle_my_auction(event: MessageEvent):
                     remain_str = f"{remain_h}h{remain_m}m" if remain_h > 0 else f"{remain_m}m"
 
                     if a.has_bidder:
-                        bid_info = f"当前价：{a.current_price:,}💰（{a.bid_count}次出价）"
+                        bid_info = f"当前价：{a.current_price:,}💰 · {a.current_bidder_name}领先（{a.bid_count}次出价）"
                     else:
                         bid_info = "暂无人出价"
 
@@ -305,3 +312,91 @@ async def handle_cancel_auction(event: MessageEvent, args: Message = CommandArg(
             result_msg = msg
 
     await cancel_auction_cmd.finish(message_add_head(result_msg, event))
+
+
+# ==================== 拍卖详情 ====================
+
+@auction_detail_cmd.handle()
+async def handle_auction_detail(event: MessageEvent, args: Message = CommandArg()):
+    """
+    格式：拍卖详情 拍卖ID
+    查看拍卖品详情及完整竞价历史（出价人、金额、时间）
+    """
+    raw = args.extract_plain_text().strip()
+    result_msg = ""
+
+    if not raw:
+        await auction_detail_cmd.finish(message_add_head(
+            "📋 格式：【拍卖详情 拍卖编号】\n"
+            "💡 使用【拍卖行】查看当前拍卖编号",
+            event
+        ))
+
+    try:
+        auction_id = int(raw)
+    except ValueError:
+        await auction_detail_cmd.finish(message_add_head("⛔ 拍卖编号必须是整数", event))
+
+    async with UnitOfWork(AsyncSessionLocal) as uow:
+        auction = await uow.auction_items.get_by_id(auction_id)
+        if not auction:
+            result_msg = f"⛔ 拍卖 #{auction_id} 不存在"
+        else:
+            item_cfg = config.items_config["by_id"].get(auction.item_id)
+            item_name = item_cfg.get_display_name() if item_cfg else auction.item_id
+            if auction.equipment_summary:
+                item_name += f"（{auction.equipment_summary}）"
+            elif auction.quantity > 1:
+                item_name += f" ×{auction.quantity}"
+
+            status_map = {
+                "active": "进行中",
+                "sold": "已成交",
+                "cancelled": "已撤拍",
+                "expired": "流拍",
+            }
+            status_str = status_map.get(auction.status, auction.status)
+
+            lines = [
+                f"🏛️ 拍卖详情 #{auction.id}",
+                "━━━━━━━━━━━━━",
+                f"📦 {item_name}",
+                f"💰 起拍价：{auction.start_price:,}💰",
+            ]
+            if auction.buyout_price:
+                lines.append(f"🎯 一口价：{auction.buyout_price:,}💰")
+            if auction.has_bidder:
+                lines.append(f"📈 当前价：{auction.current_price:,}💰（共{auction.bid_count}次出价）")
+            else:
+                lines.append("📊 暂无人出价")
+
+            if auction.status == "active":
+                now = datetime.now()
+                remaining = auction.end_at - now
+                remain_h = int(remaining.total_seconds() // 3600)
+                remain_m = int((remaining.total_seconds() % 3600) // 60)
+                remain_str = f"{remain_h}h{remain_m}m" if remain_h > 0 else f"{remain_m}m"
+                lines.append(f"⏰ 截止：{auction.end_at.strftime('%m-%d %H:%M')}（剩余{remain_str}）")
+            else:
+                lines.append(f"🏷️ 状态：{status_str}")
+
+            lines.append("━━━━━━━━━━━━━")
+
+            # 查询竞价历史
+            bids = await uow.auction_bid_histories.find_by_auction(auction.id, limit=10)
+            if not bids:
+                lines.append("📋 竞价历史：暂无记录")
+            else:
+                lines.append(f"📋 竞价历史（最近{len(bids)}条）")
+                for i, bid in enumerate(bids, 1):
+                    bid_time = bid.bid_at.strftime("%m-%d %H:%M")
+                    crown = "🥇" if i == 1 else f"{i}."
+                    lines.append(f"  {crown} {bid.bidder_name}  {bid.amount:,}💰  {bid_time}")
+
+            if auction.status == "active":
+                lines.append("━━━━━━━━━━━━━")
+                lines.append(f"💡【出价 {auction.id} 金额】参与竞价")
+
+            result_msg = "\n".join(lines)
+
+    await auction_detail_cmd.finish(message_add_head(result_msg, event))

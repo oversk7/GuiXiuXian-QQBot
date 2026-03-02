@@ -2,6 +2,7 @@
 拍卖行数据模型
 
 拍卖品表：记录所有拍卖条目，包括上架信息、出价信息、结算状态。
+竞价历史表：记录每一笔竞价的人、金额和时间。
 """
 
 from __future__ import annotations
@@ -9,7 +10,7 @@ from __future__ import annotations
 from datetime import datetime
 from typing import Optional
 
-from sqlalchemy import BigInteger, Boolean, DateTime, Integer, String
+from sqlalchemy import BigInteger, Boolean, DateTime, ForeignKey, Index, Integer, String
 from sqlalchemy.orm import Mapped, mapped_column
 from sqlalchemy.sql import func
 
@@ -67,6 +68,9 @@ class AuctionItem(Base):
     current_bidder_id: Mapped[Optional[str]] = mapped_column(
         String(32), nullable=True, comment="当前最高出价人ID（NULL表示无人出价）"
     )
+    current_bidder_name: Mapped[Optional[str]] = mapped_column(
+        String(64), nullable=True, comment="当前最高出价人昵称快照（NULL表示无人出价）"
+    )
     bid_count: Mapped[int] = mapped_column(
         Integer, default=0, server_default="0", comment="总出价次数"
     )
@@ -111,3 +115,51 @@ class AuctionItem(Base):
         if not self.has_bidder:
             return self.start_price
         return max(self.current_price + 1, int(self.current_price * 1.05))
+
+
+class AuctionBidHistory(Base):
+    """竞价历史记录
+
+    每次出价都会在此表中留下一条记录，可用于查看竞价人、金额和时间。
+    """
+
+    __tablename__ = "auction_bid_history"
+
+    id: Mapped[int] = mapped_column(
+        Integer, primary_key=True, autoincrement=True
+    )
+
+    # ==================== 关联信息 ====================
+    auction_id: Mapped[int] = mapped_column(
+        Integer, ForeignKey("auction_item.id", ondelete="CASCADE"),
+        index=True, comment="拍卖编号"
+    )
+
+    # ==================== 出价人信息 ====================
+    bidder_id: Mapped[str] = mapped_column(
+        String(32), comment="出价人玩家ID"
+    )
+    bidder_name: Mapped[str] = mapped_column(
+        String(64), comment="出价人昵称（快照，防止改名后丢失）"
+    )
+
+    # ==================== 出价信息 ====================
+    amount: Mapped[int] = mapped_column(
+        BigInteger, comment="出价金额（金币）"
+    )
+
+    # ==================== 时间 ====================
+    bid_at: Mapped[datetime] = mapped_column(
+        DateTime, default=datetime.now, server_default=func.now(),
+        comment="出价时间"
+    )
+
+    __table_args__ = (
+        Index("idx_auction_bid_history_auction_id", "auction_id"),
+    )
+
+    def __repr__(self) -> str:
+        return (
+            f"<AuctionBidHistory id={self.id} auction_id={self.auction_id} "
+            f"bidder={self.bidder_name} amount={self.amount}>"
+        )
