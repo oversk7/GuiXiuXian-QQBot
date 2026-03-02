@@ -1432,7 +1432,7 @@ class BattleIntegrationHelper:
             """格式化属性行，有骰子buff时追加标注"""
             text = f"{label}: {value:.1f}{suffix}"
             if dice_buff_attr == attr_name:
-                boosted = value * 2
+                boosted = value + 100
                 text += f" → 🎲{boosted:.1f}{suffix}"
             return text
 
