@@ -35,6 +35,9 @@ class AuctionItem(Base):
     seller_id: Mapped[str] = mapped_column(
         String(32), index=True, comment="卖家平台ID（player.id）"
     )
+    seller_name: Mapped[Optional[str]] = mapped_column(
+        String(64), nullable=True, comment="卖家昵称快照（防止改名后丢失）"
+    )
 
     # ==================== 物品信息 ====================
     item_id: Mapped[str] = mapped_column(

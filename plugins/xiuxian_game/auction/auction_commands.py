@@ -2,7 +2,7 @@
 拍卖行命令处理器
 
 命令列表：
-- 【上架拍卖 物品名 起拍价 时长(h) [一口价]】 - 发起拍卖
+- 【上架拍卖 物品名 起拍价 时长(h) [一口价]】 - 发起拍卖（装备会弹出选择列表）
 - 【出价 拍卖ID 金额】                          - 参与竞价
 - 【拍卖行 [页码]】                              - 查看当前拍卖列表
 - 【我的拍卖】                                   - 查看自己的拍卖
@@ -10,15 +10,19 @@
 - 【拍卖详情 拍卖ID】                            - 查看竞价历史（出价人、金额、时间）
 """
 
+import time
 from datetime import datetime
 from typing import Optional
 
-from nonebot import on_command
+from nonebot import on_command, on_message
 from nonebot.adapters.qq import Message, MessageEvent
 from nonebot.params import CommandArg
+from sqlalchemy import select
 
 from ..infrastructure.uow.unit_of_work import UnitOfWork
 from ..models.db import AsyncSessionLocal
+from ..models.inventory import ItemInstance, ItemType
+from ..economy.equipment_trade_service import EquipmentTradeService
 from ..platform_utils import get_unified_player, is_guild_message
 from ..utils import message_add_head
 from ..config import config
@@ -63,6 +67,27 @@ auction_detail_cmd = on_command(
     priority=5,
 )
 
+# ==================== 装备选择状态管理 ====================
+
+# {player_id: {"equipment_ids": [...], "equipment_summaries": [...],
+#              "item_name": str, "start_price": int, "duration_hours": int,
+#              "buyout_price": int|None, "timestamp": float}}
+_auction_equipment_selection_state: dict = {}
+_AUCTION_SELECTION_EXPIRE = 120  # 秒，超时自动清理
+
+
+def _cleanup_expired_auction_states():
+    now = time.time()
+    expired = [
+        uid for uid, s in _auction_equipment_selection_state.items()
+        if now - s.get("timestamp", 0) > _AUCTION_SELECTION_EXPIRE
+    ]
+    for uid in expired:
+        del _auction_equipment_selection_state[uid]
+
+
+# 用于捕获玩家回复序号的消息处理器（低优先级，不阻断其他命令）
+auction_equipment_selection_handler = on_message(priority=6, block=False)
 
 # ==================== 上架拍卖 ====================
 
@@ -70,7 +95,7 @@ auction_detail_cmd = on_command(
 async def handle_list_auction(event: MessageEvent, args: Message = CommandArg()):
     """
     格式：上架拍卖 物品名 起拍价 时长(h) [一口价]
-    例如：上架拍卖 碎颅制服 50000 12
+    例如：上架拍卖 棺材钉 50000 12
          上架拍卖 碎颅制服 50000 24 200000
     """
     raw = args.extract_plain_text().strip()
@@ -82,7 +107,7 @@ async def handle_list_auction(event: MessageEvent, args: Message = CommandArg())
             "【上架拍卖 物品名 起拍价 时长(小时) [一口价]】\n"
             "━━━━━━━━━━━━━\n"
             "示例：\n"
-            "• 上架拍卖 碎颅制服 50000 12\n"
+            "• 上架拍卖 棺材钉 50000 12\n"
             "• 上架拍卖 碎颅制服 50000 24 200000（带一口价）\n"
             f"⏰ 时长范围：{auction_service.MIN_DURATION_HOURS}~{auction_service.MAX_DURATION_HOURS}小时\n"
             "💰 起拍价最低：物品系统估价\n"
@@ -91,7 +116,6 @@ async def handle_list_auction(event: MessageEvent, args: Message = CommandArg())
         ))
 
     item_name = parts[0]
-    result_msg = ""
 
     try:
         start_price = int(parts[1])
@@ -100,6 +124,17 @@ async def handle_list_auction(event: MessageEvent, args: Message = CommandArg())
     except ValueError:
         await list_auction_cmd.finish(message_add_head("⛔ 价格和时长必须是整数", event))
 
+    # 提前识别物品配置，装备走选择流程
+    item_cfg = config.items_config["by_name"].get(item_name)
+    if not item_cfg:
+        await list_auction_cmd.finish(message_add_head(f"⛔ 未找到物品「{item_name}」", event))
+
+    if item_cfg.type == ItemType.EQUIPMENT:
+        await _handle_equipment_auction_listing(event, item_cfg, start_price, duration_hours, buyout_price)
+        return  # finish() 已在内部调用，此行不会执行
+
+    # 普通物品：直接上架
+    result_msg = ""
     async with UnitOfWork(AsyncSessionLocal) as uow:
         player = await get_unified_player(uow.session, event)
         if not player:
@@ -116,6 +151,143 @@ async def handle_list_auction(event: MessageEvent, args: Message = CommandArg())
             result_msg = msg
 
     await list_auction_cmd.finish(message_add_head(result_msg, event))
+
+
+async def _handle_equipment_auction_listing(
+    event: MessageEvent,
+    item_cfg,
+    start_price: int,
+    duration_hours: int,
+    buyout_price: Optional[int],
+):
+    """装备拍卖：查询可用实例，单件直接上架，多件让玩家选择"""
+    async with UnitOfWork(AsyncSessionLocal) as uow:
+        player = await get_unified_player(uow.session, event)
+        if not player:
+            if is_guild_message(event):
+                await list_auction_cmd.finish(message_add_head("⛔ 你还没有创建角色或绑定账号", event))
+            else:
+                await list_auction_cmd.finish(message_add_head("⛔ 请先创建角色", event))
+
+        # 提前检查上架数量限制，避免展示选择菜单后再失败
+        active_auctions = await uow.auction_items.find_seller_active_auctions(player.id)
+        if len(active_auctions) >= auction_service.MAX_AUCTION_LISTINGS:
+            await list_auction_cmd.finish(message_add_head(
+                f"⛔ 你已有 {auction_service.MAX_AUCTION_LISTINGS} 件物品正在拍卖，无法继续上架", event
+            ))
+
+        # 查询背包中所有该装备的可用实例
+        stmt = select(ItemInstance).where(
+            ItemInstance.player_id == player.id,
+            ItemInstance.item_id == item_cfg.item_id,
+            ItemInstance.equipped == False,
+        )
+        res = await uow.session.execute(stmt)
+        candidates = res.scalars().all()
+        available = [
+            e for e in candidates
+            if not (e.extra_attrs or {}).get("_frozen_for_trade")
+            and not (e.extra_attrs or {}).get("_frozen_for_auction")
+        ]
+
+        if not available:
+            await list_auction_cmd.finish(message_add_head(
+                f"⛔ 背包中没有可拍卖的「{item_cfg.name}」（请确认未装备且未在市场挂牌）", event
+            ))
+
+        if len(available) == 1:
+            # 只有一件，直接上架
+            success, msg = await auction_service.list_auction(
+                uow, player, item_cfg.name, start_price, duration_hours, buyout_price,
+                equipment_instance_id=available[0].id,
+            )
+            if success:
+                await uow.commit()
+            await list_auction_cmd.finish(message_add_head(msg, event))
+
+        # 多件装备：生成摘要，保存选择状态，展示列表
+        summaries = [EquipmentTradeService.generate_equipment_summary(e) for e in available]
+        equipment_ids = [e.id for e in available]
+
+        _cleanup_expired_auction_states()
+        _auction_equipment_selection_state[player.id] = {
+            "equipment_ids": equipment_ids,
+            "equipment_summaries": summaries,
+            "item_name": item_cfg.name,
+            "start_price": start_price,
+            "duration_hours": duration_hours,
+            "buyout_price": buyout_price,
+            "timestamp": time.time(),
+        }
+
+        lines = [
+            f"📋 选择要上架拍卖的「{item_cfg.name}」：",
+            "━━━━━━━━━━━━━",
+        ]
+        for i, (eq_id, summary) in enumerate(zip(equipment_ids, summaries), 1):
+            lines.append(f"{i}. 🆔{eq_id} {summary}")
+        lines.extend(["━━━━━━━━━━━━━", "💡 回复序号选择（如：1），或回复 取消"])
+
+        await list_auction_cmd.finish(message_add_head("\n".join(lines), event))
+
+
+@auction_equipment_selection_handler.handle()
+async def handle_auction_equipment_selection(event: MessageEvent):
+    """捕获玩家回复的装备序号，完成装备拍卖上架"""
+    _cleanup_expired_auction_states()
+
+    async with UnitOfWork(AsyncSessionLocal) as uow:
+        player = await get_unified_player(uow.session, event)
+        if not player:
+            return
+        if player.id not in _auction_equipment_selection_state:
+            return
+
+        message_text = event.get_message().extract_plain_text().strip()
+
+        # 取消
+        if message_text in ["取消", "cancel", "0"]:
+            del _auction_equipment_selection_state[player.id]
+            await auction_equipment_selection_handler.finish(
+                message_add_head("❌ 已取消装备拍卖", event)
+            )
+
+        # 非数字直接放行，不处理
+        if not message_text.isdigit():
+            return
+
+        try:
+            index = int(message_text) - 1
+            if index < 0:
+                raise ValueError
+        except ValueError:
+            return
+
+        state = _auction_equipment_selection_state[player.id]
+        equipment_ids = state["equipment_ids"]
+
+        if index >= len(equipment_ids):
+            await auction_equipment_selection_handler.finish(
+                message_add_head("⛔ 无效的序号，请重新选择或回复 取消", event)
+            )
+
+        equipment_id = equipment_ids[index]
+        item_name = state["item_name"]
+        start_price = state["start_price"]
+        duration_hours = state["duration_hours"]
+        buyout_price = state["buyout_price"]
+
+        del _auction_equipment_selection_state[player.id]
+
+        success, msg = await auction_service.list_auction(
+            uow, player, item_name, start_price, duration_hours, buyout_price,
+            equipment_instance_id=equipment_id,
+        )
+        if success:
+            await uow.commit()
+        await auction_equipment_selection_handler.finish(message_add_head(msg, event))
+
+
 
 
 # ==================== 出价竞拍 ====================
@@ -210,12 +382,15 @@ async def handle_auction_hall(event: MessageEvent, args: Message = CommandArg())
                 remain_m = int((remaining.total_seconds() % 3600) // 60)
                 remain_str = f"{remain_h}h{remain_m}m" if remain_h > 0 else f"{remain_m}m"
 
-                bid_info = f"{a.current_price:,}💰（{a.current_bidder_name}领先）" if a.has_bidder else f"起拍{a.current_price:,}💰"
-                buyout_str = f" | 一口价{a.buyout_price:,}💰" if a.buyout_price else ""
+                bid_info = f"{a.current_price:,}💰（{a.current_bidder_name} [UID:{a.current_bidder_id}] 领先）" if a.has_bidder else f"起拍 {a.current_price:,}💰"
+                buyout_str = f"\n   🎯 一口价：{a.buyout_price:,}💰" if a.buyout_price else ""
+                seller_str = f"{a.seller_name or '未知'} [UID:{a.seller_id}]"
 
                 lines.append(
                     f"#{a.id} {item_name}\n"
-                    f"   💰{bid_info}{buyout_str} | ⏰{remain_str}剩余 | 📊{a.bid_count}次出价"
+                    f"   👤 卖家：{seller_str}\n"
+                    f"   💰 {bid_info}{buyout_str}\n"
+                    f"   ⏰ {remain_str}剩余 | 📊{a.bid_count}次出价"
                 )
 
             lines.append("━━━━━━━━━━━━━")
@@ -260,7 +435,7 @@ async def handle_my_auction(event: MessageEvent):
                     remain_str = f"{remain_h}h{remain_m}m" if remain_h > 0 else f"{remain_m}m"
 
                     if a.has_bidder:
-                        bid_info = f"当前价：{a.current_price:,}💰 · {a.current_bidder_name}领先（{a.bid_count}次出价）"
+                        bid_info = f"当前价：{a.current_price:,}💰\n   📌 领先者：{a.current_bidder_name} [UID:{a.current_bidder_id}]（{a.bid_count}次出价）"
                     else:
                         bid_info = "暂无人出价"
 
@@ -361,12 +536,13 @@ async def handle_auction_detail(event: MessageEvent, args: Message = CommandArg(
                 f"🏛️ 拍卖详情 #{auction.id}",
                 "━━━━━━━━━━━━━",
                 f"📦 {item_name}",
+                f"👤 卖家：{auction.seller_name or '未知'} [UID:{auction.seller_id}]",
                 f"💰 起拍价：{auction.start_price:,}💰",
             ]
             if auction.buyout_price:
                 lines.append(f"🎯 一口价：{auction.buyout_price:,}💰")
             if auction.has_bidder:
-                lines.append(f"📈 当前价：{auction.current_price:,}💰（共{auction.bid_count}次出价）")
+                lines.append(f"📈 当前价：{auction.current_price:,}💰（{auction.current_bidder_name} [UID:{auction.current_bidder_id}]，共{auction.bid_count}次出价）")
             else:
                 lines.append("📊 暂无人出价")
 
@@ -391,7 +567,7 @@ async def handle_auction_detail(event: MessageEvent, args: Message = CommandArg(
                 for i, bid in enumerate(bids, 1):
                     bid_time = bid.bid_at.strftime("%m-%d %H:%M")
                     crown = "🥇" if i == 1 else f"{i}."
-                    lines.append(f"  {crown} {bid.bidder_name}  {bid.amount:,}💰  {bid_time}")
+                    lines.append(f"  {crown} {bid.bidder_name} [UID:{bid.bidder_id}]  {bid.amount:,}💰  {bid_time}")
 
             if auction.status == "active":
                 lines.append("━━━━━━━━━━━━━")

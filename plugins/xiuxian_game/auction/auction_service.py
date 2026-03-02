@@ -72,6 +72,7 @@ async def list_auction(
     start_price: int,
     duration_hours: int,
     buyout_price: Optional[int] = None,
+    equipment_instance_id: Optional[int] = None,
 ) -> Tuple[bool, str]:
     """
     上架拍卖
@@ -87,6 +88,7 @@ async def list_auction(
         start_price: 起拍价
         duration_hours: 拍卖时长（小时）
         buyout_price: 一口价（None表示不设置）
+        equipment_instance_id: 装备实例ID（仅装备拍卖时使用，None则自动选择）
 
     Returns:
         (success, message)
@@ -115,7 +117,8 @@ async def list_auction(
     # 5. 根据物品类型分支处理
     if item_cfg.type == ItemType.EQUIPMENT:
         return await _list_equipment_auction(
-            uow, seller, item_cfg, start_price, duration_hours, buyout_price
+            uow, seller, item_cfg, start_price, duration_hours, buyout_price,
+            equipment_instance_id=equipment_instance_id,
         )
     else:
         return await _list_normal_auction(
@@ -124,32 +127,39 @@ async def list_auction(
 
 
 async def _list_equipment_auction(
-    uow, seller, item_cfg, start_price, duration_hours, buyout_price
+    uow, seller, item_cfg, start_price, duration_hours, buyout_price,
+    equipment_instance_id: Optional[int] = None,
 ) -> Tuple[bool, str]:
     """上架装备拍卖"""
     session = uow.session
 
-    # 查找玩家背包中的该装备实例
-    stmt = select(ItemInstance).where(
-        ItemInstance.player_id == seller.id,
-        ItemInstance.item_id == item_cfg.item_id,
-        ItemInstance.equipped == False,
-    )
-    result = await session.execute(stmt)
-    candidates = result.scalars().all()
-
-    # 过滤掉已冻结的
-    available = [
-        e for e in candidates
-        if not (e.extra_attrs or {}).get("_frozen_for_trade")
-        and not (e.extra_attrs or {}).get("_frozen_for_auction")
-    ]
-
-    if not available:
-        return False, f"⛔ 背包中没有可拍卖的「{item_cfg.name}」（请确认未装备且未在市场挂牌）"
-
-    # 如果有多件，选第一件（后续可扩展为让玩家选择）
-    equipment = available[0]
+    if equipment_instance_id is not None:
+        # 命令层已选好具体实例，直接使用
+        equipment = await session.get(ItemInstance, equipment_instance_id)
+        if not equipment or equipment.player_id != seller.id:
+            return False, "⛔ 装备实例不存在或不属于你"
+        if equipment.equipped:
+            return False, "⛔ 该装备正在装备中，无法上架"
+        extra = equipment.extra_attrs or {}
+        if extra.get("_frozen_for_trade") or extra.get("_frozen_for_auction"):
+            return False, "⛔ 该装备已在交易中，无法上架"
+    else:
+        # 兜底：自动选择第一件可用装备（背包只有一件时命令层也会走这里）
+        stmt = select(ItemInstance).where(
+            ItemInstance.player_id == seller.id,
+            ItemInstance.item_id == item_cfg.item_id,
+            ItemInstance.equipped == False,
+        )
+        result = await session.execute(stmt)
+        candidates = result.scalars().all()
+        available = [
+            e for e in candidates
+            if not (e.extra_attrs or {}).get("_frozen_for_trade")
+            and not (e.extra_attrs or {}).get("_frozen_for_auction")
+        ]
+        if not available:
+            return False, f"⛔ 背包中没有可拍卖的「{item_cfg.name}」（请确认未装备且未在市场挂牌）"
+        equipment = available[0]
 
     # 检查起拍价不低于系统估价下界
     min_price, _ = EquipmentTradeService.calculate_equipment_value_range(equipment)
@@ -175,6 +185,7 @@ async def _list_equipment_auction(
     end_at = datetime.now() + timedelta(hours=duration_hours)
     auction = AuctionItem(
         seller_id=seller.id,
+        seller_name=seller.nickname,
         item_id=item_cfg.item_id,
         quantity=1,
         is_instance_trade=True,
@@ -246,6 +257,7 @@ async def _list_normal_auction(
     end_at = datetime.now() + timedelta(hours=duration_hours)
     auction = AuctionItem(
         seller_id=seller.id,
+        seller_name=seller.nickname,
         item_id=item_cfg.item_id,
         quantity=quantity,
         is_instance_trade=False,

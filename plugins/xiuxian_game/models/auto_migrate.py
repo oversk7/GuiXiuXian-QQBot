@@ -101,9 +101,10 @@ REQUIRED_FIELDS: Dict[str, Dict[str, str]] = {
     "world_boss_damage": {
         "reincarnation_snapshot": "INT DEFAULT -1 COMMENT '首次攻击时的转数快照(-1表示未攻击)'"
     },
-    # 拍卖行 - 缓存当前出价人昵称，避免列表页额外查询
+    # 拍卖行 - 缓存当前出价人昵称，避免列表页额外查询；卖家昵称快照
     "auction_item": {
-        "current_bidder_name": "VARCHAR(64) NULL COMMENT '当前最高出价人昵称（快照）'"
+        "current_bidder_name": "VARCHAR(64) NULL COMMENT '当前最高出价人昵称（快照）'",
+        "seller_name": "VARCHAR(64) NULL COMMENT '卖家昵称快照（防止改名后丢失）'"
     },
     # 恶魔轮盘PvE人机模式
     "russian_roulette_pve_game": {
