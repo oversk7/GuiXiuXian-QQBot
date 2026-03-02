@@ -42,7 +42,7 @@ async def handle_story_list(event: MessageEvent):
         
         stories = story_engine.get_story_list()
         if not stories:
-            await story_list_cmd.finish(f"📚 暂无可用试炼\n调试信息: 引擎中有 {len(story_engine.stories)} 个试炼")
+            await story_list_cmd.finish(f"📚 暂无可用试炼\n调试信息: 引擎中有 {len(story_engine._story_index)} 个试炼")
         
         msg_lines = ["📚 可用试炼列表", "━━━━━━━━━━━━━"]
         for i, story in enumerate(stories, 1):
@@ -76,7 +76,7 @@ async def handle_start_story(event: MessageEvent, args: Message = CommandArg()):
         # 检查试炼是否存在
         story = story_engine.get_story(story_id)
         if not story:
-            available_stories = list(story_engine.stories.keys())
+            available_stories = list(story_engine._story_index.keys())
             await start_story_cmd.finish(f"❌ 试炼不存在\n可用试炼: {available_stories}\n你输入的: '{story_id}'")
         
         # 检查是否已有活跃试炼

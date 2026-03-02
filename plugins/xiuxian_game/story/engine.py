@@ -16,14 +16,15 @@ from ..config import config
 
 class StoryEngine:
     """剧情状态机处理器"""
-    
+
     def __init__(self):
-        self.stories: Dict[str, Dict[str, Any]] = {}
+        self._story_index: Dict[str, Path] = {}          # story_id -> 文件路径
+        self._story_meta: Dict[str, Dict[str, str]] = {} # story_id -> {title, description}
         self.story_dir = Path(__file__).parent.parent / "data" / "stories"
-        self._load_stories()
-    
-    def _load_stories(self):
-        """加载所有剧情文件"""
+        self._build_index()
+
+    def _build_index(self):
+        """扫描剧情目录，只读取元数据建立索引，不加载完整内容"""
         print(f"[StoryEngine] 剧情目录: {self.story_dir}")
         if not self.story_dir.exists():
             print(f"[StoryEngine] [ERROR] 剧情目录不存在，创建目录: {self.story_dir}")
@@ -31,38 +32,45 @@ class StoryEngine:
             return
 
         json_files = list(self.story_dir.glob("*.json"))
-        print(f"[StoryEngine] 找到 {len(json_files)} 个剧情文件")
+        print(f"[StoryEngine] 找到 {len(json_files)} 个剧情文件，建立索引中...")
 
         for file_path in json_files:
             try:
-                print(f"[StoryEngine] 加载剧情文件: {file_path}")
                 with open(file_path, 'r', encoding='utf-8') as f:
                     story_data = json.load(f)
-                    story_id = story_data.get('id')
-                    if story_id:
-                        self.stories[story_id] = story_data
-                        print(f"[StoryEngine] [SUCCESS] 成功加载剧情: {story_id}")
-                    else:
-                        print(f"[StoryEngine] [WARNING] 剧情文件缺少ID: {file_path}")
+                story_id = story_data.get('id')
+                if story_id:
+                    self._story_index[story_id] = file_path
+                    self._story_meta[story_id] = {
+                        "title": story_data.get("title", "未命名剧情"),
+                        "description": story_data.get("description", "暂无描述"),
+                    }
+                    print(f"[StoryEngine] 已索引: {story_id}")
+                else:
+                    print(f"[StoryEngine] [WARNING] 剧情文件缺少ID: {file_path}")
             except Exception as e:
-                print(f"[StoryEngine] [ERROR] 加载剧情文件失败 {file_path}: {e}")
+                print(f"[StoryEngine] [ERROR] 索引剧情文件失败 {file_path}: {e}")
 
-        print(f"[StoryEngine] 总共加载了 {len(self.stories)} 个剧情: {list(self.stories.keys())}")
-    
+        print(f"[StoryEngine] 索引完成，共 {len(self._story_index)} 个剧情: {list(self._story_index.keys())}")
+
     def get_story_list(self) -> List[Dict[str, str]]:
-        """获取可用剧情列表"""
-        return [
-            {
-                "id": story_id,
-                "title": story_data.get("title", "未命名剧情"),
-                "description": story_data.get("description", "暂无描述")
-            }
-            for story_id, story_data in self.stories.items()
-        ]
-    
+        """获取可用剧情列表（只用元数据，无需加载完整内容）"""
+        stories = [{"id": story_id, **meta} for story_id, meta in self._story_meta.items()]
+        stories.sort(key=lambda s: (0 if s["id"] == "ghost_town" else 1))
+        return stories
+
     def get_story(self, story_id: str) -> Optional[Dict[str, Any]]:
-        """获取指定剧情"""
-        return self.stories.get(story_id)
+        """获取指定剧情（每次从磁盘读取，访问频率低无需缓存）"""
+        file_path = self._story_index.get(story_id)
+        if not file_path:
+            return None
+
+        try:
+            with open(file_path, 'r', encoding='utf-8') as f:
+                return json.load(f)
+        except Exception as e:
+            print(f"[StoryEngine] [ERROR] 加载剧情失败 {file_path}: {e}")
+            return None
     
     def evaluate_condition(self, condition: Dict[str, Any], player: Player, variables: Dict[str, Any]) -> bool:
         """
