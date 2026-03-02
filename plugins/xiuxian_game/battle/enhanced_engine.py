@@ -183,7 +183,7 @@ class EnhancedBattleEngine:
                     else:
                         boosted_value = original_value + 100
                         log_suffix = f"{original_value:.0f}%→{boosted_value:.0f}% (+100%点)"
-                    setattr(player, attr_name, boosted_value)
+                    self._sync_unit_attr(player, attr_name, boosted_value)
                     self._temp_dice_buff[player.id] = (attr_name, original_value)
                     self.battle_log.append(f"🎲 骰相·乱：{attr_cn} {log_suffix}")
                     # 标记为已消耗（战后持久化）
@@ -338,7 +338,7 @@ class EnhancedBattleEngine:
                     else:
                         e_boosted = e_orig + 100
                         e_log_suffix = f"{e_orig:.0f}%→{e_boosted:.0f}% (+100%点)"
-                    setattr(enemy, e_attr, e_boosted)
+                    self._sync_unit_attr(enemy, e_attr, e_boosted)
                     self._temp_dice_buff[enemy.id] = (e_attr, e_orig)
                     enemy_name = enemy.nickname if hasattr(enemy, 'nickname') else '敌人'
                     self.battle_log.append(f"🎲 {enemy_name}的骰相·乱：{e_attr_cn} {e_log_suffix}")
@@ -1718,6 +1718,18 @@ class EnhancedBattleEngine:
                 f"🔮 绝魔体质：{target_name}的特殊属性被削弱{ratio * 100:.0f}%"
             )
 
+    @staticmethod
+    def _sync_unit_attr(unit: Any, attr_name: str, value: float) -> None:
+        """设置单位属性，并同步更新战斗属性缓存。
+
+        临时属性修改（如诡面骰骰子buff）需要同时反映到 _cached_battle_attrs，
+        否则战斗中每次攻击判定用缓存覆盖实时值时，修改会被悄无声息地丢弃。
+        """
+        setattr(unit, attr_name, value)
+        cached = getattr(unit, '_cached_battle_attrs', None)
+        if isinstance(cached, dict) and attr_name in cached:
+            cached[attr_name] = value
+
     def reset_temp_bonuses(self, unit: Any):
         """回退首回合临时增加的最大生命值等（如灵影体质）"""
         try:
@@ -1756,7 +1768,7 @@ class EnhancedBattleEngine:
             if dice_info:
                 attr_name, original_value = dice_info
                 if hasattr(unit, attr_name):
-                    setattr(unit, attr_name, original_value)
+                    self._sync_unit_attr(unit, attr_name, original_value)
         except Exception:
             pass
         # 回退绝魔体质对特殊属性的削减（IGNORE_SPECIAL）
