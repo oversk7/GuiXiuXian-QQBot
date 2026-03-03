@@ -16,7 +16,7 @@ GIFT_WHITELIST: dict[str, tuple[str, int]] = {
     "阴冥草": ("yin_grass",   1),
 }
 
-_GIFT_PATTERN = re.compile(r'\[赠[:：](.+?)[:：](\d+)\]')
+_GIFT_PATTERN = re.compile(r'[\[（(]赠[:：](.+?)[:：](\d+)[\]）)]')
 
 
 def parse_npc_gift(
