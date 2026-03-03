@@ -19,7 +19,7 @@ from ..infrastructure.repositories.player_repository import PlayerRepository
 class GemUpgradeService:
     """镶嵌物升级服务类 (DI架构版本)"""
 
-    # 升级成功率配置
+    # 升级成功率配置（与装备升阶保持一致）
     SUCCESS_RATES = {
         1: 0.95,   # 1->2级 95%
         2: 0.90,   # 2->3级 90%
@@ -27,9 +27,9 @@ class GemUpgradeService:
         4: 0.80,   # 4->5级 80%
         5: 0.75,   # 5->6级 75%
         6: 0.70,   # 6->7级 70%
-        7: 0.65,   # 7->8级 65%
-        8: 0.60,   # 8->9级 60%
-        9: 0.50,   # 9->10级 50%
+        7: 0.60,   # 7->8级 60%
+        8: 0.50,   # 8->9级 50%
+        9: 0.40,   # 9->10级 40%
     }
 
     # 升级金币消耗
@@ -237,15 +237,8 @@ class GemUpgradeService:
         if current_level >= 10:
             return 0
 
-        # 升级需要的镶嵌物数量（包括自己）
-        if current_level <= 3:
-            return 2  # 需要2个相同镶嵌物
-        elif current_level <= 6:
-            return 3  # 需要3个相同镶嵌物
-        elif current_level <= 9:
-            return 4  # 需要4个相同镶嵌物
-        else:
-            return 5  # 9->10级需要5个
+        # 升级需要的镶嵌物数量（二合一，与装备升阶保持一致）
+        return 2
 
     @staticmethod
     def get_upgrade_gold_cost(current_level: int) -> int:
