@@ -1,4 +1,4 @@
-"""NPC礼物系统 - 允许NPC在对话中赠送少量恢复药品"""
+"""NPC礼物系统 - 允许NPC在对话中赠送少量恢复药品或金币"""
 import re
 import logging
 from datetime import date
@@ -9,11 +9,13 @@ from ..models.player import Player
 logger = logging.getLogger(__name__)
 
 # 允许赠送的物品白名单：物品名 -> (item_id, 每次最多数量)
+# item_id 为 "_gold" 时表示金币，直接修改 player.gold
 GIFT_WHITELIST: dict[str, tuple[str, int]] = {
     "回春散": ("heal_potion", 2),
     "凝神草": ("spirit_herb", 2),
     "血契丹": ("blood_pact",  1),
     "阴冥草": ("yin_grass",   1),
+    "金币":   ("_gold", 100),
 }
 
 _GIFT_PATTERN = re.compile(r'[\[（(]赠[:：](.+?)[:：](\d+)[\]）)]')
@@ -67,11 +69,16 @@ async def apply_npc_gift(
     qty: int,
     item_name: str,
 ) -> bool:
-    """执行赠送：写入背包，更新冷却记录"""
-    from ..models.inventory import ItemInstance
+    """执行赠送：写入背包或增加金币，更新冷却记录"""
     from sqlalchemy.orm.attributes import flag_modified
 
-    success = await ItemInstance.add_item(session, player.id, item_id, qty)
+    if item_id == "_gold":
+        player.gold += qty
+        success = True
+    else:
+        from ..models.inventory import ItemInstance
+        success = await ItemInstance.add_item(session, player.id, item_id, qty)
+
     if success:
         today = str(date.today())
         gift_log = npc.extra_data.get("gift_log", {})
@@ -82,3 +89,4 @@ async def apply_npc_gift(
     else:
         logger.warning(f"NPC {npc.name} 赠送 {item_name}×{qty} 失败（背包已满？）")
     return success
+
