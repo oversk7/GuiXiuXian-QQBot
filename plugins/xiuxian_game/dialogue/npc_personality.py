@@ -6,39 +6,14 @@ from pathlib import Path
 
 # 游戏世界常识，注入到所有NPC的系统提示词中，防止AI胡说设定
 _WORLD_KNOWLEDGE = """
-【世界常识】
-你生活在《诡修仙》的世界里，以下是你必须了解并严格遵守的世界设定：
 
-▍两个世界
-- 【现实】：大都会，玩家平时生活的地方。可以修炼、打工、跑商、与他人社交、逛市集、经营餐厅、钓鱼。
-- 【诡域】：消耗咒抗进入的异界副本，充斥着鬼怪与诡异。玩家在此刷怪获取经验和材料。诡域按层数划分深度（如"1层诡域"、"50层诡域"），越深层怪越强、材料越好。
+你对这个世界了如指掌。大都会是你扎根的地方，街上有市集、茶馆、镖局，形形色色的人来来往往——有在修炼攒经验的，有打工赚金币的，有跑商倒卖货物的，还有去钓鱼消遣的。出城往深处走是荒野，再往里是诡域——那是另一层空间，传送过去的瞬间身体会受到空间撕裂的侵蚀，咒抗就是抵御这种侵蚀的，咒抗耗尽就撑不住了，得出来。诡域越深层越危险，材料也越好。
 
-▍修炼体系（境界由低到高）
-满级后可【冥返】转生，重置等级但获得永久加成，转生后境界上限提高
+修炼是这里的主旋律，人人讲境界。等级上来了，突破到下一境界，30级以前随便破，往后越来越难，有概率失败。资历老的修真人会走冥返转生这条路——要到300级才够格，转生后修炼效率翻倍、属性加强，代价是等级归零重练。
 
-▍冥返转生
-- 第1次冥返需300级，第2次500级，第3次1000级，第4次1500级，第5次2000级
-- 转生后每级获得更多属性点（0转10点/级，1转15点/级，依次递增）
-- 修炼效率每转提升50%
+钱方面，金币最常用，打工跑商钓鱼副本都能赚；诡烛是稀罕货；积分可以去缉邪司兑换东西；怨念是献祭材料换来的，拿来"镇厄"能保底突破。
 
-▍货币与资源
-- 【金币】：主要货币，打工/跑商/钓鱼/副本/委托可获取
-- 【诡烛】：高级货币，赞助专属，购买特殊服务
-- 【积分】：完成委托和活动获取，在缉邪司总部兑换道具
-- 【怨念】：献祭材料获得，消耗怨念可为突破"镇厄"（保证成功）
-- 【咒抗】：每日签到刷新，消耗后可传送进入诡域
-
-▍核心玩法
-- 【修炼】：5分钟冷却，获取经验
-- 【突破】：经验满后突破到下一境界，30级前100%成功，之后有失败概率
-- 【闭关】：挂机修炼，效率减半但可离线
-- 【加点】：突破获得属性点，分配到生命/法力/攻击/防御/敏捷/运气
-- 【跑商】：在不同市集之间倒卖货物赚差价
-
-▍注意事项
-- 可以根据以上设定合理编造小剧情
-- 游戏指令用【】括号，如【修炼】【突破】【市集】【传送 N层诡域】
-"""
+如果聊到游戏操作，就用【】括号写指令名，比如【修炼】【传送 N层诡域】【市集】之类的。你可以聊这世界里的事，或者说说街边听来的八卦，随你发挥——但别什么话都往诡域、鬼怪那边扯，人家没问你就别没事找事。"""
 
 
 @dataclass
@@ -81,80 +56,57 @@ class PersonalityTemplate:
         """构建AI系统提示词"""
         context = context or {}
 
-        # 根据好感度确定态度
-        attitude = self._get_attitude_by_favorability(favorability)
+        player_name = context.get('player_name', '道友')
+        player_level = context.get('player_level', '?')
+        location_name = context.get('location_name', '这里')
 
-        # 构建性格描述
-        personality_desc = ", ".join([
-            f"{trait}度{value}/100"
-            for trait, value in self.personality_traits.items()
-        ])
+        # 自称与口头习惯
+        pronouns_text = '或'.join(self.pronouns) if self.pronouns else '我'
+        speech_text = '、'.join(self.speech_patterns) if self.speech_patterns else ''
+        keywords_text = '"、"'.join(self.key_words) if self.key_words else ''
 
-        # 构建关系描述
-        relationships_desc = "\n".join([
-            f"- {name}: {relation}"
-            for name, relation in self.relationships.items()
-        ])
+        # 关系网络
+        relationships_text = ''
+        if self.relationships:
+            parts = [f"{name}（{rel}）" for name, rel in self.relationships.items()]
+            relationships_text = f"认识的人里有{'、'.join(parts)}。"
 
-        # 构建行为规则
-        rules_desc = "\n".join([f"- {rule}" for rule in self.behavioral_rules])
+        # 行为习惯
+        rules_text = ''
+        if self.behavioral_rules:
+            rules_text = ' '.join(r.rstrip('。') + '。' for r in self.behavioral_rules)
 
-        prompt = f"""你是一个修仙游戏中的NPC角色，扮演{self.name}。
+        # 专长
+        knowledge_text = ''
+        if self.knowledge_domain:
+            knowledge_text = f"最熟的是{'、'.join(self.knowledge_domain)}这一块。"
 
-【角色身份】
-- 名称: {self.name}
-- 角色: {self.role}
-- 背景: {self.background}
+        # 好感度→关系描述
+        relationship_desc = self._get_relationship_desc(favorability)
 
-【语言风格】
-- 自称: 使用{', '.join(self.pronouns)}（如"俺"、"本大爷"等）
-- 性格: {', '.join(self.speech_patterns)}
-- 常用词汇: {', '.join(self.key_words)}
+        prompt = f"""你叫{self.name}，{self.role}。{self.background}
 
-【性格数值】
-{personality_desc}
+{'说话' + speech_text + '，' if speech_text else ''}自称"{pronouns_text}"。{'嘴边爱带"' + keywords_text + '"这些词。' if keywords_text else ''}{rules_text} {relationships_text} {knowledge_text}
 
-【人物关系】
-{relationships_desc if relationships_desc else '暂无特殊关系'}
+现在你在{location_name}，眼前这个人叫{player_name}（{player_level}级）。{relationship_desc}
 
-【行为准则】
-{rules_desc if rules_desc else '遵循基本道德规范'}
+就按你平时说话的方式来——几句话就够了，不用长篇大论。有时候插一点动作描写也行，用括号括起来，比如（拍了拍肩膀）、（皱了皱眉），但别滥用。聊到哪儿算哪儿，对方问什么就答什么，不用刻意往别的话题扯。敏感话题（政治、色情、赌博诈骗）不碰，也别说自己是AI。"""
 
-【知识领域】
-你擅长: {', '.join(self.knowledge_domain) if self.knowledge_domain else '无特殊专长'}
-
-【对话风格】
-- 好感度{favorability}时，用{attitude}的态度说话
-- 回复要短小精悍，不超过150字
-- 要体现NPC的性格特征和背景
-- 适度添加诡异怪谈世界观元素
-
-【内容限制】
-- 不要讨论政治、色情、暴力、赌博、诈骗等敏感话题
-- 不要透露你是AI，保持角色扮演
-- 玩家问起游戏功能时，引导玩家使用对应指令（如【锻造】、【市集】）
-- 但不要刻意引导，顺着对话聊就行，就好像一个活生生的人
-
-【当前场景】
-- 地点: {context.get('location_name', '未知')}
-- 玩家: {context.get('player_name', '道友')}（等级{context.get('player_level', '?')}）
-"""
         prompt += _WORLD_KNOWLEDGE
-
         return prompt
 
-    def _get_attitude_by_favorability(self, favorability: int) -> str:
-        """根据好感度返回对应的态度描述"""
+    def _get_relationship_desc(self, favorability: int) -> str:
+        """根据好感度返回自然的关系状态描述"""
         if favorability <= 20:
-            return "冷漠、敷衍"
+            return "你不太认识这人，礼貌但话不多，没必要热情。"
         elif favorability <= 40:
-            return "友好、配合"
+            return "见过几面，还算合得来，就普通相识的感觉，随意聊几句。"
         elif favorability <= 60:
-            return "热情、主动"
+            return "关系不错，愿意多聊，说话自在。"
         elif favorability <= 80:
-            return "亲切、信任"
+            return "比较熟了，说话不用客气，当朋友对待，什么都能聊两句。"
         else:
-            return "忠诚、无条件"
+            return "老朋友，不见外，说话直来直去。"
 
     @classmethod
     def from_dict(cls, data: dict) -> "PersonalityTemplate":

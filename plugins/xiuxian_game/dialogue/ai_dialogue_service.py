@@ -24,7 +24,7 @@ class AIDialogueService:
         self.zhipu_config = ai_config.get("zhipu", {})
         self.ai302_config = ai_config.get("ai302", {})
         self.max_tokens = self.zhipu_config.get("max_tokens", 300)
-        self.temperature = self.zhipu_config.get("temperature", 0.1)
+        self.temperature = self.zhipu_config.get("temperature", 0.75)
         provider_config = self.zhipu_config if self.provider == "zhipu" else self.ai302_config
         self.timeout = provider_config.get("timeout", 30)
 
@@ -150,21 +150,10 @@ class AIDialogueService:
             # 添加指令执行风格指导
             system_prompt += """
 
-【指令执行回复风格】
-当你执行游戏指令后：
-1. 用一句角色扮演的台词表现你的态度（符合人设和好感度）
-2. 可选：用(动作描写)表现你的行为，如(拿起追风膏，熟练地涂抹开来)
-3. 执行指令后，再用一句台词总结你的感受
-4. 保持简洁，不超过100字
-"""
+执行完了，就顺口说几句你的感受，一两句台词就够，不用多。如果有动作就用括号带一笔，比如（接过东西看了看）。别拿这当正式汇报，随意聊就行，不超过100字。"""
 
             # 构建用户消息
-            user_message = f"""
-执行的指令: {action}
-游戏输出: {game_output}
-
-请以{npc.name}的身份，用角色扮演的方式回复这个指令的执行结果。
-"""
+            user_message = f"刚才{action}了，结果是：{game_output}"
 
             # 调用AI（支持fallback降级）
             messages = [
@@ -286,7 +275,8 @@ class AIDialogueService:
                 result = await call_zhipu_api(
                     messages,
                     model=self.zhipu_config.get("model", "GLM-4-Flash-250414"),
-                    timeout=self.timeout
+                    timeout=self.timeout,
+                    temperature=self.temperature
                 )
                 logger.info(f"[AIDialogue] 智谱AI调用成功")
                 return result
@@ -295,7 +285,8 @@ class AIDialogueService:
                 result = await call_302ai_api(
                     messages,
                     model=self.ai302_config.get("model", "gpt-3.5-turbo"),
-                    timeout=self.timeout
+                    timeout=self.timeout,
+                    temperature=self.temperature
                 )
                 logger.info(f"[AIDialogue] 302.ai调用成功")
                 return result
@@ -324,7 +315,8 @@ class AIDialogueService:
                     result = await call_zhipu_api(
                         messages,
                         model=self.zhipu_config.get("model", "GLM-4-Flash-250414"),
-                        timeout=self.timeout
+                        timeout=self.timeout,
+                        temperature=self.temperature
                     )
                     logger.info(f"[AIDialogue] 备用provider {fallback} 调用成功")
                     return result
@@ -332,7 +324,8 @@ class AIDialogueService:
                     result = await call_302ai_api(
                         messages,
                         model=self.ai302_config.get("model", "gpt-3.5-turbo"),
-                        timeout=self.timeout
+                        timeout=self.timeout,
+                        temperature=self.temperature
                     )
                     logger.info(f"[AIDialogue] 备用provider {fallback} 调用成功")
                     return result

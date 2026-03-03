@@ -141,7 +141,7 @@ def is_sub_admin(user_id: str) -> bool:
     return user_id in sub_admin_ids
 
 
-async def call_zhipu_api(messages, model="GLM-4.5-Flash", timeout=30):
+async def call_zhipu_api(messages, model="GLM-4.5-Flash", timeout=30, temperature=0.75):
     """调用智谱AI API（异步版本）"""
     from .config import config
 
@@ -163,7 +163,7 @@ async def call_zhipu_api(messages, model="GLM-4.5-Flash", timeout=30):
     data = {
         "model": model,
         "messages": messages,
-        "temperature": 0.1,
+        "temperature": temperature,
         "thinking": {"type": "disabled"}
     }
 
@@ -186,7 +186,7 @@ async def call_zhipu_api(messages, model="GLM-4.5-Flash", timeout=30):
         raise aiohttp.ClientError(f"网络请求失败: {str(e)}")
 
 
-async def call_302ai_api(messages, model="gpt-3.5-turbo", timeout=30):
+async def call_302ai_api(messages, model="gpt-3.5-turbo", timeout=30, temperature=0.75):
     """调用302.ai API（异步版本，OpenAI兼容接口）"""
     from .config import config
 
@@ -217,6 +217,7 @@ async def call_302ai_api(messages, model="gpt-3.5-turbo", timeout=30):
     data = {
         "model": model,
         "messages": formatted_messages,
+        "temperature": temperature,
         "thinking": {"type": "disabled"}
     }
 
