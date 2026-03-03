@@ -13,6 +13,7 @@ from ..models.db import safe_session
 from ..models.player import Player
 from ..models.world_message import WorldMessage
 from ..models.message_blacklist import MessageBoardBlacklist
+from ..models.guild import Guild
 from ..utils import message_add_head
 from ..platform_utils import get_unified_player
 from ..ai_guide import is_admin
@@ -317,13 +318,14 @@ def _format_message_lines(
     players: dict[str, Player | None],
     viewer_id: str,
     last_check: datetime | None = None,
+    guild_name: str | None = None,
 ) -> str:
 
     titles = {
         MessageScope.WORLD: "🌐 世界频道",
         MessageScope.PRIVATE: "📬 私信",
         MessageScope.SYSTEM: "📢 系统公告",
-        MessageScope.GUILD: "🏯 公会频道",
+        MessageScope.GUILD: f"🏯 {guild_name} 公会频道" if guild_name else "🏯 公会频道",
     }
     title = titles.get(scope, "📋 消息")
 
@@ -463,6 +465,7 @@ async def handle_send_msg(event: MessageEvent, args: Message = CommandArg()):
         await send_msg_cmd.finish(f"⛔ 消息不能超过 {MAX_LEN} 字符")
 
     player_guild_id = None
+    player_guild_name = None
 
     async with safe_session() as session:
         player = await get_unified_player(session, event)
@@ -479,6 +482,8 @@ async def handle_send_msg(event: MessageEvent, args: Message = CommandArg()):
             if not player.guild_id:
                 await send_msg_cmd.finish("⛔ 你未加入任何公会，无法发送公会消息")
             player_guild_id = player.guild_id
+            guild = await session.get(Guild, player_guild_id)
+            player_guild_name = guild.name if guild else None
 
         # 世界频道：等级 + 黑名单
         else:
@@ -538,6 +543,7 @@ async def handle_send_msg(event: MessageEvent, args: Message = CommandArg()):
         players_map,
         event.get_user_id(),
         None,
+        player_guild_name,
     )
     await send_msg_cmd.finish(message_add_head(lines, event))
 
@@ -641,6 +647,10 @@ async def handle_view_board(event: MessageEvent, args: Message = CommandArg()):
 
     async with safe_session() as session:
         player = await session.get(Player, player_id)
+        guild_name = None
+        if scope is MessageScope.GUILD and player and player.guild_id:
+            guild = await session.get(Guild, player.guild_id)
+            guild_name = guild.name if guild else None
     if not player:
         await view_board_cmd.finish("⛔ 请先创建角色")
 
@@ -666,6 +676,7 @@ async def handle_view_board(event: MessageEvent, args: Message = CommandArg()):
         players,
         player_id,
         last_check,
+        guild_name,
     )
     await view_board_cmd.finish(message_add_head(lines, event))
 
