@@ -49,7 +49,8 @@ async def call_ai_with_fallback(messages: list) -> dict:
     provider = ai_config.get("provider", "zhipu")
     zhipu_config = ai_config.get("zhipu", {})
     ai302_config = ai_config.get("ai302", {})
-    timeout = zhipu_config.get("timeout", 30)
+    provider_config = zhipu_config if provider == "zhipu" else ai302_config
+    timeout = provider_config.get("timeout", 30)
 
     # 降级策略配置
     fallback_config = ai_config.get("fallback", {})

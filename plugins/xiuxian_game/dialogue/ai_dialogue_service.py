@@ -25,7 +25,8 @@ class AIDialogueService:
         self.ai302_config = ai_config.get("ai302", {})
         self.max_tokens = self.zhipu_config.get("max_tokens", 300)
         self.temperature = self.zhipu_config.get("temperature", 0.1)
-        self.timeout = self.zhipu_config.get("timeout", 30)
+        provider_config = self.zhipu_config if self.provider == "zhipu" else self.ai302_config
+        self.timeout = provider_config.get("timeout", 30)
 
         # 降级策略配置
         fallback_config = ai_config.get("fallback", {})
