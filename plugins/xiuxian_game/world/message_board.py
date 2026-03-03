@@ -542,6 +542,7 @@ async def handle_private_message(event: MessageEvent, args: Message = CommandArg
         msg_rec = WorldMessage(
             player_id=sender.id,
             recipient_id=target.id,
+            scope="private",
             content=message_body,
             created_at=datetime.now(),
         )

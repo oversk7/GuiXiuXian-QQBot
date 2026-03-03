@@ -54,6 +54,7 @@ async def _broadcast(session, content: str):
         msg = WorldMessage(
             player_id="SYSTEM",
             recipient_id=None,
+            scope="system",
             content=content,
             created_at=datetime.now(),
         )

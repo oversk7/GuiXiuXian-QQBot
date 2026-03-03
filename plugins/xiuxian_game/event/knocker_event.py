@@ -1066,7 +1066,8 @@ class KnockerEventService:
             # 使用特殊ID "SYSTEM" 作为系统发送者
             msg = WorldMessage(
                 player_id="SYSTEM",
-                recipient_id=None,  # None表示世界留言板（全服可见）
+                recipient_id=None,
+                scope="system",
                 content=content,
                 created_at=datetime.now(),
             )

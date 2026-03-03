@@ -1880,6 +1880,7 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
         notice = WorldMessage(
             player_id="SYSTEM",
             recipient_id=player.id,
+            scope="private",
             content=f"🕯️ 诡烛到账通知：您已收到 {amount} 诡烛，当前余额 {player.gui_zhu}。感谢支持！",
             created_at=datetime.now(),
         )
