@@ -215,23 +215,31 @@ async def _eat_dish(
         msg = f"{quality_emoji} 美味的菜肴!\n理智 +{sanity_gain}"
 
     elif dish_quality == DishQuality.PERFECT:
-        # 完美:回复理智 + 临时属性buff
+        # 完美:回复理智 + 永久幸运加成 + 其他临时buff
         if dish_buff and "sanity" in dish_buff:
             sanity_gain = dish_buff["sanity"] * quantity
             player.mp = min(player.max_mp, player.mp + sanity_gain)
             total_sanity_gain = sanity_gain
 
-        attr_effects = []
+        perm_effects = []
+        timed_effects = []
+
         if dish_buff:
-            # 构建临时buff属性加成字典
-            TIMED_ATTRS = {"luck": "幸运", "max_hp": "气血上限"}
-            attribute_bonuses = {
+            # 幸运永久增加（本轮回有效，冥返后重置）
+            if "luck" in dish_buff:
+                luck_gain = dish_buff["luck"] * quantity
+                player.luck += luck_gain
+                perm_effects.append(f"幸运+{luck_gain}")
+
+            # 其他属性仍走临时buff（如气血上限）
+            TIMED_ATTRS = {"max_hp": "气血上限"}
+            timed_bonuses = {
                 attr: dish_buff[attr] * quantity
                 for attr in TIMED_ATTRS
                 if attr in dish_buff
             }
 
-            if attribute_bonuses:
+            if timed_bonuses:
                 from ..models.temporary_buff import TemporaryBuff
 
                 duration_minutes = dish_buff.get("duration", 30)
@@ -244,30 +252,32 @@ async def _eat_dish(
                 if has_existing:
                     existing = next(b for b in existing_buffs if b.buff_id == buff_id)
                     remaining = existing.get_remaining_minutes()
-                    attr_effects.append(f"⚠️ 已有相同效果，剩余{remaining}分钟")
+                    timed_effects.append(f"⚠️ 已有相同效果，剩余{remaining}分钟")
                 else:
                     await TemporaryBuff.create_buff(
                         session=uow.session,
                         player_id=player.id,
                         buff_id=buff_id,
                         buff_name=buff_name,
-                        attribute_bonuses=attribute_bonuses,
+                        attribute_bonuses=timed_bonuses,
                         duration_minutes=duration_minutes,
                         source_item_id=dish_item_id,
                         source_description=f"食用{dish_name}获得"
                     )
 
-                    bonus_strs = [f"{TIMED_ATTRS[k]}+{v}" for k, v in attribute_bonuses.items()]
+                    bonus_strs = [f"{TIMED_ATTRS[k]}+{v}" for k, v in timed_bonuses.items()]
                     if duration_minutes >= 60:
                         h, m = divmod(duration_minutes, 60)
                         time_str = f"{h}小时{m}分钟" if m else f"{h}小时"
                     else:
                         time_str = f"{duration_minutes}分钟"
-                    attr_effects.append(f"{' | '.join(bonus_strs)}（{time_str}）")
+                    timed_effects.append(f"{' '.join(bonus_strs)}（{time_str}）")
 
         msg = f"🌟 完美的菜肴!\n理智 +{total_sanity_gain}"
-        if attr_effects:
-            msg += f"\n✨ 临时增益: {' '.join(attr_effects)}"
+        if perm_effects:
+            msg += f"\n⭐ 永久增益(本轮回): {' | '.join(perm_effects)}"
+        if timed_effects:
+            msg += f"\n✨ 临时增益: {' '.join(timed_effects)}"
 
     else:
         msg = f"🍴 你吃了 {dish_name}"

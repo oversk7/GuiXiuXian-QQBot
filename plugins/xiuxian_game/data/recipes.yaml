@@ -269,8 +269,7 @@ recipes:
     buff:
       sanity: 20
       luck: 5
-      duration: 30         # 30分钟幸运+5
-    description: "以金龙鱼和神明之泪烹制的天界珍馐，完美品质可永久增加幸运（本轮回）"
+    description: "以金龙鱼和神明之泪烹制的天界珍馐，完美品质永久增加幸运+5（冥返后重置）"
 
   - recipe_id: "phoenix_nirvana_fish"
     name: "凤凰涅槃鱼"
@@ -288,7 +287,7 @@ recipes:
       sanity: 15
       max_hp: 200
       duration: 60         # 60分钟最大生命+200
-    description: "浴火重生的传说料理，完美品质可永久增加气血上限（本轮回）"
+    description: "浴火重生的传说料理，完美品质临时增加气血上限+200（持续1小时）"
 
   - recipe_id: "void_fish_enigma"
     name: "虚空秘境鱼"
@@ -305,8 +304,7 @@ recipes:
     buff:
       sanity: 25
       luck: 8
-      duration: 45         # 45分钟幸运+8
-    description: "超越现实的诡异料理，完美品质可永久增加幸运（本轮回）"
+    description: "超越现实的诡异料理，完美品质永久增加幸运+8（冥返后重置）"
 
   # ========== 灵蔬食谱 (vegetable类别) ==========
 
@@ -419,5 +417,5 @@ recipes:
       secret_sauce: 1
       immortal_oil: 1
     base_price: 16000
-    buff: { sanity: 18, luck: 3, duration: 30 }
-    description: "以浴火仙草烹制的传说料理，完美品质可永久增加幸运（本轮回）"
+    buff: { sanity: 18, luck: 3 }
+    description: "以浴火仙草烹制的传说料理，完美品质永久增加幸运+3（冥返后重置）"
