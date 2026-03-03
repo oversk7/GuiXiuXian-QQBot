@@ -615,6 +615,13 @@ async def handle_ai_dialogue_interaction(session, player: Player, npc, event: Me
             context=context
         )
 
+        # 解析并处理NPC礼物
+        from ..dialogue.npc_gift_service import parse_npc_gift, apply_npc_gift
+        npc_response, gift_item_id, gift_qty, gift_name = parse_npc_gift(npc, player.id, npc_response)
+        gift_given = False
+        if gift_item_id:
+            gift_given = await apply_npc_gift(session, npc, player, gift_item_id, gift_qty, gift_name)
+
         # 根据对话内容更新好感度（使用之前分析的sentiment）
         fav_delta = fav_service.get_favorability_change_by_interaction_type(
             "dialogue",
@@ -704,6 +711,8 @@ async def handle_ai_dialogue_interaction(session, player: Player, npc, event: Me
         lines.append("🗨️ 当前对话：")
         lines.append(f"  【你】: {question}")
         lines.append(f"  【{npc.name}】: {npc_response}")
+        if gift_given:
+            lines.append(f"  🎁 {npc.name} 赠送了你 {gift_name}×{gift_qty}")
         lines.append("")
 
         # 显示好感度变化（带情感指示）
