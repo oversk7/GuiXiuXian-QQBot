@@ -45,7 +45,7 @@ MAX_LEN = 120
 PAGE_SIZE = 10
 MIN_LEVEL_TO_POST = 10  # 最低发言等级，可以在config.yaml中配置
 
-leave_msg_cmd = on_command("留言", block=True, priority=5)
+send_msg_cmd = on_command("发消息", aliases={"留言"}, block=True, priority=5)
 view_board_cmd = on_command("消息", aliases={"留言板"}, block=True, priority=5)
 private_msg_cmd = on_command("私信", aliases={"私聊"}, block=True, priority=5)
 
@@ -55,8 +55,6 @@ unban_cmd = on_command("解禁", block=True, priority=5)
 blacklist_cmd = on_command("黑名单", aliases={"黑名单列表"}, block=True, priority=5)
 delete_msg_cmd = on_command("删除留言", block=True, priority=5)
 
-# ==================== 最近更新 ====================
-latest_update_cmd = on_command("更新", aliases={"最近更新"}, block=True, priority=5)
 
 
 async def check_prohibited_content(text: str) -> tuple[bool, list, str, str]:
@@ -173,16 +171,17 @@ def check_level_requirement(player_level: int) -> tuple[bool, str]:
     return True, ""
 
 
-async def get_unread_message_status(player_id: str) -> tuple[bool, bool]:
-    """检查玩家的世界留言板与私信的未读状态"""
+async def get_unread_message_status(player_id: str) -> tuple[bool, bool, bool, bool]:
+    """检查玩家各频道未读状态，返回 (world, private, system, guild)"""
 
     async with safe_session() as session:
         player = await session.get(Player, player_id)
         if not player:
-            return False, False
+            return False, False, False, False
 
+        # 世界频道
         world_query = select(_func.count(WorldMessage.id)).where(
-            WorldMessage.recipient_id.is_(None)
+            WorldMessage.scope == "world"
         )
         if player.last_message_board_check:
             world_query = world_query.where(
@@ -190,8 +189,10 @@ async def get_unread_message_status(player_id: str) -> tuple[bool, bool]:
             )
         world_count = (await session.execute(world_query)).scalar_one()
 
+        # 私信
         private_query = select(_func.count(WorldMessage.id)).where(
-            WorldMessage.recipient_id == player_id
+            WorldMessage.scope == "private",
+            WorldMessage.recipient_id == player_id,
         )
         if player.last_private_message_check:
             private_query = private_query.where(
@@ -199,7 +200,32 @@ async def get_unread_message_status(player_id: str) -> tuple[bool, bool]:
             )
         private_count = (await session.execute(private_query)).scalar_one()
 
-        return world_count > 0, private_count > 0
+        # 系统频道
+        system_query = select(_func.count(WorldMessage.id)).where(
+            WorldMessage.scope == "system"
+        )
+        last_system = getattr(player, "last_system_check", None)
+        if last_system:
+            system_query = system_query.where(
+                WorldMessage.created_at > last_system
+            )
+        system_count = (await session.execute(system_query)).scalar_one()
+
+        # 公会频道
+        guild_count = 0
+        if player.guild_id:
+            guild_query = select(_func.count(WorldMessage.id)).where(
+                WorldMessage.scope == "guild",
+                WorldMessage.guild_id == player.guild_id,
+            )
+            last_guild = getattr(player, "last_guild_check", None)
+            if last_guild:
+                guild_query = guild_query.where(
+                    WorldMessage.created_at > last_guild
+                )
+            guild_count = (await session.execute(guild_query)).scalar_one()
+
+        return world_count > 0, private_count > 0, system_count > 0, guild_count > 0
 
 
 async def mark_scope_messages_as_read(player_id: str, scope: MessageScope):
@@ -404,74 +430,116 @@ def _parse_board_args(raw_text: str) -> tuple[MessageScope, int]:
     return scope, max(1, page)
 
 
-@leave_msg_cmd.handle()
-async def handle_leave_msg(event: MessageEvent, args: Message = CommandArg()):
-    raw_content = args.extract_plain_text().strip()
-    content = clean_message_content(raw_content)
+@send_msg_cmd.handle()
+async def handle_send_msg(event: MessageEvent, args: Message = CommandArg()):
+    raw_text = args.extract_plain_text().strip()
+
+    # 解析频道前缀
+    tokens = re.split(r"\s+", raw_text, maxsplit=1)
+    scope = MessageScope.WORLD
+    content_raw = raw_text
+
+    if tokens:
+        first = tokens[0]
+        if first in {"公会", "宗门", "帮派"}:
+            scope = MessageScope.GUILD
+            content_raw = tokens[1] if len(tokens) > 1 else ""
+        elif first in {"系统"}:
+            scope = MessageScope.SYSTEM
+            content_raw = tokens[1] if len(tokens) > 1 else ""
+        elif first in {"世界", "公共"}:
+            scope = MessageScope.WORLD
+            content_raw = tokens[1] if len(tokens) > 1 else ""
+
+    content = clean_message_content(content_raw)
 
     if not content:
-        await leave_msg_cmd.finish("⛔ 请输入留言内容，例如：留言 今天好开心！")
+        await send_msg_cmd.finish(
+            "⛔ 请输入消息内容\n"
+            "格式：【发消息 内容】\n"
+            "或指定频道：【发消息 世界/公会/系统 内容】"
+        )
     if len(content) > MAX_LEN:
-        await leave_msg_cmd.finish(f"⛔ 留言不能超过 {MAX_LEN} 字符")
+        await send_msg_cmd.finish(f"⛔ 消息不能超过 {MAX_LEN} 字符")
+
+    player_guild_id = None
 
     async with safe_session() as session:
         player = await get_unified_player(session, event)
         if not player:
-            await leave_msg_cmd.finish("⛔ 请先创建角色")
+            await send_msg_cmd.finish("⛔ 请先创建角色")
 
-        # 检查等级限制
-        is_allowed, level_msg = check_level_requirement(player.level)
-        if not is_allowed:
-            await leave_msg_cmd.finish(level_msg)
+        # 系统频道：仅管理员
+        if scope is MessageScope.SYSTEM:
+            if not is_admin(event.get_user_id()):
+                await send_msg_cmd.finish("⛔ 权限不足，系统频道仅管理员可用")
 
-        # 检查黑名单
-        is_banned, remaining_time = await check_blacklist(player.id)
-        if is_banned:
-            await leave_msg_cmd.finish(f"⛔ 你已被禁言，剩余时间：{remaining_time}")
+        # 公会频道：必须有公会
+        elif scope is MessageScope.GUILD:
+            if not player.guild_id:
+                await send_msg_cmd.finish("⛔ 你未加入任何公会，无法发送公会消息")
+            player_guild_id = player.guild_id
 
-        # 使用新API检测违禁内容
-        is_prohibited, words, label_desc, sub_label_desc = await check_prohibited_content(content)
-        if is_prohibited:
-            # 如果检测到违禁内容,直接拒绝发布
-            words_info = f"违禁词: {', '.join(words[:5])}" if words else ""  # 最多显示5个
-            label_info = f"\n类型: {label_desc}" if label_desc else ""
-            sub_label_info = f" - {sub_label_desc}" if sub_label_desc else ""
+        # 世界频道：等级 + 黑名单
+        else:
+            is_allowed, level_msg = check_level_requirement(player.level)
+            if not is_allowed:
+                await send_msg_cmd.finish(level_msg)
 
-            await leave_msg_cmd.finish(
-                f"⛔ 检测到违规内容,留言发布失败\n"
-                f"{words_info}{label_info}{sub_label_info}\n"
-                f"请修改后重试"
-            )
+            is_banned, remaining_time = await check_blacklist(player.id)
+            if is_banned:
+                await send_msg_cmd.finish(f"⛔ 你已被禁言，剩余时间：{remaining_time}")
+
+        # 违禁词检查（管理员发系统消息跳过）
+        if scope is not MessageScope.SYSTEM:
+            is_prohibited, words, label_desc, sub_label_desc = await check_prohibited_content(content)
+            if is_prohibited:
+                words_info = f"违禁词: {', '.join(words[:5])}" if words else ""
+                label_info = f"\n类型: {label_desc}" if label_desc else ""
+                sub_label_info = f" - {sub_label_desc}" if sub_label_desc else ""
+                await send_msg_cmd.finish(
+                    f"⛔ 检测到违规内容，消息发送失败\n"
+                    f"{words_info}{label_info}{sub_label_info}\n"
+                    f"请修改后重试"
+                )
 
         msg_rec = WorldMessage(
             player_id=player.id,
             recipient_id=None,
+            scope=scope.value,
+            guild_id=player_guild_id,
             content=content,
             created_at=datetime.now(),
         )
         session.add(msg_rec)
         await session.commit()
 
-    await mark_scope_messages_as_read(event.get_user_id(), MessageScope.WORLD)
+    channel_names = {
+        MessageScope.WORLD: "世界频道",
+        MessageScope.GUILD: "公会频道",
+        MessageScope.SYSTEM: "系统频道",
+    }
+    channel_name = channel_names.get(scope, "世界频道")
 
-    await leave_msg_cmd.send(message_add_head("✅ 留言已发布！", event))
+    await mark_scope_messages_as_read(event.get_user_id(), scope)
+    await send_msg_cmd.send(message_add_head(f"✅ 消息已发送至{channel_name}！", event))
 
-    total, total_pages, page, records, players = await _get_message_page(
-        MessageScope.WORLD, event.get_user_id(), 1
+    total, total_pages, page, records, players_map = await _get_message_page(
+        scope, event.get_user_id(), 1, guild_id=player_guild_id
     )
     if total == 0:
-        await leave_msg_cmd.finish("🗒️ 留言板空空如也，快来留下第一条留言吧！")
+        await send_msg_cmd.finish(f"📭 {channel_name}暂无消息")
 
     lines = _format_message_lines(
-        MessageScope.WORLD,
+        scope,
         page,
         total_pages,
         records,
-        players,
+        players_map,
         event.get_user_id(),
         None,
     )
-    await leave_msg_cmd.finish(message_add_head(lines, event))
+    await send_msg_cmd.finish(message_add_head(lines, event))
 
 
 @private_msg_cmd.handle()
@@ -812,30 +880,3 @@ async def handle_delete_message(event: MessageEvent, args: Message = CommandArg(
 
     msg = f"✅ 已删除留言 ID:{message_id}\n发送者：{sender_name}"
     await delete_msg_cmd.finish(message_add_head(msg, event))
-
-
-# ==================== 最近更新 ====================
-
-@latest_update_cmd.handle()
-async def handle_latest_update(event: MessageEvent):
-    async with safe_session() as session:
-        rec = (
-            await session.execute(
-                select(WorldMessage)
-                .where(
-                    WorldMessage.player_id == 'D6A7BB606845F1AFF40ADA517F7BF306',
-                    WorldMessage.recipient_id.is_(None),
-                )
-                .order_by(WorldMessage.created_at.desc())
-                .limit(1)
-            )
-        ).scalars().first()
-        if not rec:
-            await latest_update_cmd.finish("暂无更新记录")
-        player = await session.get(Player, rec.player_id)
-        if not player:
-            await latest_update_cmd.finish("暂无更新记录")
-        time_str = rec.created_at.strftime("%m-%d")
-        msg = f"📜 最近更新 ({time_str})\n{rec.content}"
-        await latest_update_cmd.finish(message_add_head(msg, event))
-

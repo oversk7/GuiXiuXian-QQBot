@@ -157,14 +157,18 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
     display_name = player.nickname  # 称号不再拼接到昵称，单独展示
     title_line = f"🏅称号 「{player_title}」" if player_title else ""
 
-    # 检查未读的留言板与私信状态
-    has_world_unread, has_private_unread = await get_unread_message_status(player.id)
+    # 检查各频道未读状态
+    has_world_unread, has_private_unread, has_system_unread, has_guild_unread = await get_unread_message_status(player.id)
     unread_notice = ""
     notice_lines: list[str] = []
     if has_private_unread:
-        notice_lines.append("📬 有新私信未读！输入【留言板 私信】查看")
+        notice_lines.append("📬 有新私信！【消息 私信】查看")
+    if has_system_unread:
+        notice_lines.append("📢 有新系统公告！【消息 系统】查看")
+    if has_guild_unread:
+        notice_lines.append("🏯 公会频道有新消息！【消息 公会】查看")
     if has_world_unread:
-        notice_lines.append("🗒️ 世界留言板有新内容！输入【留言板】查看")
+        notice_lines.append("🌐 世界频道有新内容！【消息】查看")
     if notice_lines:
         unread_notice = "".join(f"\n┃{line}" for line in notice_lines)
 
@@ -844,14 +848,18 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
     else:
         created_info = "未知"
 
-    # 10. 检查未读的留言板与私信状态
-    has_world_unread, has_private_unread = await get_unread_message_status(player.id)
+    # 10. 检查各频道未读状态
+    has_world_unread, has_private_unread, has_system_unread, has_guild_unread = await get_unread_message_status(player.id)
     unread_notice = ""
     notice_lines: list[str] = []
     if has_private_unread:
-        notice_lines.append("📬 有新私信未读！输入【留言板 私信】查看")
+        notice_lines.append("📬 有新私信！【消息 私信】查看")
+    if has_system_unread:
+        notice_lines.append("📢 有新系统公告！【消息 系统】查看")
+    if has_guild_unread:
+        notice_lines.append("🏯 公会频道有新消息！【消息 公会】查看")
     if has_world_unread:
-        notice_lines.append("🗒️ 世界留言板有新内容！输入【留言板】查看")
+        notice_lines.append("🌐 世界频道有新内容！【消息】查看")
     if notice_lines:
         unread_notice = "".join(f"\n┃{line}" for line in notice_lines)
 
