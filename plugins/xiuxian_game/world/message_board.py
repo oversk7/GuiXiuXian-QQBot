@@ -334,14 +334,14 @@ def _format_message_lines(
         new_flag = "🆕 " if (last_check and rec.created_at > last_check) else ""
 
         if scope is MessageScope.SYSTEM or rec.player_id == "SYSTEM":
-            lines.append(f">📢 ({time_str})\n{rec.content}")
+            lines.append(f"〓📢 ({time_str})\n{rec.content}")
             continue
 
         if scope is MessageScope.GUILD:
             sender = players.get(rec.player_id)
             if sender:
                 lines.append(
-                    f">{new_flag}{sender.nickname}[UID:{sender.uid}] ({time_str})\n{rec.content}"
+                    f"〓{new_flag}{sender.nickname}[UID:{sender.uid}] ({time_str})\n{rec.content}"
                 )
             continue
 
@@ -349,7 +349,7 @@ def _format_message_lines(
             sender = players.get(rec.player_id)
             if sender:
                 lines.append(
-                    f">{new_flag}{sender.nickname}[UID:{sender.uid}] ({time_str})\n{rec.content}"
+                    f"〓{new_flag}{sender.nickname}[UID:{sender.uid}] ({time_str})\n{rec.content}"
                 )
             continue
 
@@ -360,11 +360,11 @@ def _format_message_lines(
 
         if rec.recipient_id == viewer_id:
             lines.append(
-                f">{new_flag}📥 来自 {sender.nickname}[UID:{sender.uid}] ({time_str})\n{rec.content}"
+                f"〓{new_flag}📥 来自 {sender.nickname}[UID:{sender.uid}] ({time_str})\n{rec.content}"
             )
         elif rec.player_id == viewer_id:
             lines.append(
-                f">📤 发给 {recipient.nickname}[UID:{recipient.uid}] ({time_str})\n{rec.content}"
+                f"〓📤 发给 {recipient.nickname}[UID:{recipient.uid}] ({time_str})\n{rec.content}"
             )
 
     if len(lines) == 2:
