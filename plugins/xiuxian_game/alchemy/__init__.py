@@ -98,7 +98,7 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
 
         # 开始炼丹
         success, msg, record = await service.start_alchemy(
-            player.id, best_furnace.id, recipe_key, recipe, qty
+            player.id, best_furnace.id, recipe_key, recipe, qty, player_luck=player.luck
         )
 
         if success:

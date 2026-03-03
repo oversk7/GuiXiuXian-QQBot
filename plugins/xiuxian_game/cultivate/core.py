@@ -189,8 +189,13 @@ async def handle_cultivate(event: MessageEvent):
             _calamity_rate += _extra.get("cultivation_efficiency", 0.0)
         calamity_bonus = int(base_exp_gain_after_penalty * _calamity_rate)
 
+        # 运气修炼加成（S型曲线：midpoint=800, steepness=400, 上限+10%）
+        from ..utils import luck_prob
+        luck_cultivation_rate = luck_prob(player.luck, midpoint=800, steepness=400) * 0.10
+        luck_cultivation_bonus = int(base_exp_gain_after_penalty * luck_cultivation_rate)
+
         # 总经验 = 惩罚后的基础经验 + 各种加成
-        exp_gain = base_exp_gain_after_penalty + card_bonus + reincarnation_bonus + guild_bonus + mansion_bonus + calamity_bonus
+        exp_gain = base_exp_gain_after_penalty + card_bonus + reincarnation_bonus + guild_bonus + mansion_bonus + calamity_bonus + luck_cultivation_bonus
 
         # 更新数据
         player.last_cultivation = datetime.now()
@@ -208,7 +213,7 @@ async def handle_cultivate(event: MessageEvent):
         progress_bar = generate_progress_bar(player.exp, exp_max)
 
         # 构建加成明细行（折叠式）
-        total_bonus = card_bonus + reincarnation_bonus + guild_bonus + mansion_bonus + calamity_bonus
+        total_bonus = card_bonus + reincarnation_bonus + guild_bonus + mansion_bonus + calamity_bonus + luck_cultivation_bonus
         bonus_detail_line = ""
         if total_bonus > 0 or mentorship_penalty > 0:
             bonus_percent = (total_bonus / base_exp_gain) * 100 if base_exp_gain > 0 else 0
@@ -225,6 +230,8 @@ async def handle_cultivate(event: MessageEvent):
                 bonus_parts.append(f"阴宅+{mansion_bonus}")
             if calamity_bonus > 0:
                 bonus_parts.append(f"天灾+{calamity_bonus}")
+            if luck_cultivation_bonus > 0:
+                bonus_parts.append(f"运气+{luck_cultivation_bonus}")
             if mentorship_penalty > 0:
                 apprentice_count = await mentorship_service.get_apprentice_count(player.id)
                 bonus_parts.append(f"徒弟-{mentorship_penalty}({apprentice_count}人)")
@@ -593,8 +600,13 @@ async def handle_out_seclusion(event: MessageEvent):
         # 阴宅修为加成
         mansion_bonus = int(base_exp_gain_after_penalty * mansion_cultivation_bonus)
 
+        # 运气闭关加成（S型曲线：midpoint=800, steepness=400, 上限+10%）
+        from ..utils import luck_prob
+        luck_seclusion_rate = luck_prob(player.luck, midpoint=800, steepness=400) * 0.10
+        luck_seclusion_bonus = int(base_exp_gain_after_penalty * luck_seclusion_rate)
+
         # 总经验 = 惩罚后的基础经验 + 各种加成
-        exp_gain = base_exp_gain_after_penalty + coffin_nail_bonus + card_bonus + reincarnation_exp_bonus + guild_bonus + mansion_bonus
+        exp_gain = base_exp_gain_after_penalty + coffin_nail_bonus + card_bonus + reincarnation_exp_bonus + guild_bonus + mansion_bonus + luck_seclusion_bonus
 
         player.exp += exp_gain
 
@@ -621,13 +633,15 @@ async def handle_out_seclusion(event: MessageEvent):
             bonus_parts.append(f"公会+{guild_bonus}")
         if mansion_bonus > 0:
             bonus_parts.append(f"阴宅+{mansion_bonus}")
+        if luck_seclusion_bonus > 0:
+            bonus_parts.append(f"运气+{luck_seclusion_bonus}")
         if mentorship_penalty > 0:
             apprentice_count = await mentorship_service.get_apprentice_count(player.id)
             bonus_parts.append(f"徒弟-{mentorship_penalty}({apprentice_count}人)")
 
         bonus_detail_line = ""
         if bonus_parts:
-            total_bonus = coffin_nail_bonus + card_bonus + reincarnation_exp_bonus + guild_bonus + mansion_bonus
+            total_bonus = coffin_nail_bonus + card_bonus + reincarnation_exp_bonus + guild_bonus + mansion_bonus + luck_seclusion_bonus
             total_effect = total_bonus - mentorship_penalty
             bonus_detail = " ".join(bonus_parts)
             bonus_detail_line = f"\n   ↳ 基础+{base_exp_gain} {bonus_detail} (总加成{total_effect:+d})"
@@ -725,6 +739,7 @@ async def handle_breakthrough(event: MessageEvent, args: Message = CommandArg())
         guardian_cost = base_cost + player.level * per_level_inc
         
         # 计算成功率
+        luck_break_bonus = 0.0
         if player.level < cfg_break["change_level"]:
             success_chance = 1.0
         else:
@@ -742,6 +757,11 @@ async def handle_breakthrough(event: MessageEvent, args: Message = CommandArg())
                 # 应用成功率上限
                 max_rate = cfg_break.get("fail_bonus_max_rate", 0.95)
                 success_chance = min(success_chance, max_rate)
+
+            # 运气突破加成（S型曲线：midpoint=800, steepness=400, 上限+10%）
+            from ..utils import luck_prob
+            luck_break_bonus = luck_prob(player.luck, midpoint=800, steepness=400) * 0.10
+            success_chance = min(success_chance + luck_break_bonus, cfg_break.get("fail_bonus_max_rate", 0.95))
 
             # 保底机制：连续失败达到阈值则必定成功
             pity_threshold = cfg_break.get("pity_threshold", 10)
@@ -948,7 +968,7 @@ async def handle_breakthrough(event: MessageEvent, args: Message = CommandArg())
                 msg_lines.extend([
                     f"✧ 剩余修为 {player.exp}",
                     f"✧ 修为保留 {int(keep_ratio*100)}%",
-                    f"✧ 本次理论成功率 {int(success_chance*100)}%",
+                    f"✧ 本次理论成功率 {int(success_chance*100)}%（含运气+{int(luck_break_bonus*100)}%）",
                     f"✧ 连续失败 {player.breakthrough_fail_count} 次",
                     f"✧ 下次成功率加成 +{int(next_bonus*100)}%",
                     f"✧ 保底进度 {player.breakthrough_fail_count}/{pity_threshold}{'【下次必定成功！】' if pity_reached else ''}",
@@ -1047,6 +1067,11 @@ async def handle_continuous_breakthrough(event: MessageEvent, args: Message = Co
                     # 应用成功率上限
                     max_rate = cfg_break.get("fail_bonus_max_rate", 0.95)
                     success_chance = min(success_chance, max_rate)
+
+                # 运气突破加成（S型曲线：midpoint=800, steepness=400, 上限+10%）
+                from ..utils import luck_prob
+                _luck_break_bonus = luck_prob(player.luck, midpoint=800, steepness=400) * 0.10
+                success_chance = min(success_chance + _luck_break_bonus, cfg_break.get("fail_bonus_max_rate", 0.95))
 
                 # 保底机制：连续失败达到阈值则必定成功
                 pity_threshold = cfg_break.get("pity_threshold", 10)

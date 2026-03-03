@@ -241,6 +241,7 @@ class AlchemyService:
         recipe_key: str,
         recipe: dict,
         qty: int,
+        player_luck: int = 0,
     ) -> Tuple[bool, str, Optional[AlchemyRecord]]:
         """
         开始炼丹
@@ -296,7 +297,11 @@ class AlchemyService:
             pass
 
         # 创建炼丹记录
-        success_rate = min(0.95, recipe["base_success"] * coeff)
+        # 运气炼丹加成（S型曲线：midpoint=1000, steepness=500, 上限+6%）
+        # 上限保守设计：避免与炼丹炉升阶加成（最高2x）叠加过强
+        from ..utils import luck_prob
+        luck_alchemy_bonus = luck_prob(player_luck, midpoint=1000, steepness=500) * 0.06
+        success_rate = min(0.95, recipe["base_success"] * coeff + luck_alchemy_bonus)
         duration_minutes = self.BASE_TIME_MINUTES * qty
 
         # 记录使用的材料
@@ -319,9 +324,10 @@ class AlchemyService:
 
         prod_name = config.items_config["by_id"][recipe["produce_item_id"]].name
         finish_time = record.get_finish_time()
+        luck_line = f"\n🍀 运气加成：+{int(luck_alchemy_bonus * 100)}%" if luck_alchemy_bonus > 0.001 else ""
         msg = (
             f"🕰️ 炼丹开始：{prod_name} ✖️{qty} 炉\n"
-            f"🎯 理论成功率：{int(success_rate*100)}%\n"
+            f"🎯 理论成功率：{int(success_rate*100)}%{luck_line}\n"
             f"⏳ 预计完成时间点：{finish_time.strftime('%H:%M:%S')}\n"
             f"🔧 炉子状况 {furnace_note}"
         )
