@@ -33,10 +33,12 @@ BANNED_WORDS = [
 
 
 class MessageScope(str, Enum):
-    """留言范围类型"""
+    """消息频道类型"""
 
     WORLD = "world"
     PRIVATE = "private"
+    SYSTEM = "system"
+    GUILD = "guild"
 
 
 MAX_LEN = 120
@@ -44,7 +46,7 @@ PAGE_SIZE = 10
 MIN_LEVEL_TO_POST = 10  # 最低发言等级，可以在config.yaml中配置
 
 leave_msg_cmd = on_command("留言", block=True, priority=5)
-view_board_cmd = on_command("留言板", block=True, priority=5)
+view_board_cmd = on_command("消息", aliases={"留言板"}, block=True, priority=5)
 private_msg_cmd = on_command("私信", aliases={"私聊"}, block=True, priority=5)
 
 # ==================== 管理员命令 ====================
@@ -216,20 +218,36 @@ async def mark_scope_messages_as_read(player_id: str, scope: MessageScope):
         await session.commit()
 
 
-async def _get_message_page(scope: MessageScope, viewer_id: str, page: int):
-    """获取指定范围的消息分页数据"""
+async def _get_message_page(
+    scope: MessageScope, viewer_id: str, page: int, guild_id: int | None = None
+):
+    """获取指定频道的消息分页数据"""
 
     async with safe_session() as session:
+        viewer = await session.get(Player, viewer_id)
+
         if scope is MessageScope.WORLD:
-            filter_expr = WorldMessage.recipient_id.is_(None)
-        else:
+            filter_expr = WorldMessage.scope == "world"
+        elif scope is MessageScope.PRIVATE:
             filter_expr = and_(
-                WorldMessage.recipient_id.is_not(None),
+                WorldMessage.scope == "private",
                 or_(
                     WorldMessage.recipient_id == viewer_id,
                     WorldMessage.player_id == viewer_id,
                 ),
             )
+        elif scope is MessageScope.SYSTEM:
+            filter_expr = WorldMessage.scope == "system"
+        elif scope is MessageScope.GUILD:
+            if guild_id:
+                target_guild_id = guild_id
+            elif viewer and viewer.guild_id:
+                target_guild_id = viewer.guild_id
+            else:
+                return 0, 0, page, [], {}
+            filter_expr = WorldMessage.guild_id == target_guild_id
+        else:
+            filter_expr = WorldMessage.scope == "world"
 
         total = (
             await session.execute(
@@ -253,7 +271,7 @@ async def _get_message_page(scope: MessageScope, viewer_id: str, page: int):
 
         player_ids: set[str] = set()
         for rec in records:
-            if rec.player_id:
+            if rec.player_id and rec.player_id != "SYSTEM":
                 player_ids.add(rec.player_id)
             if rec.recipient_id:
                 player_ids.add(rec.recipient_id)
@@ -272,44 +290,49 @@ def _format_message_lines(
     records: list[WorldMessage],
     players: dict[str, Player | None],
     viewer_id: str,
-    last_private_check: datetime | None,
+    last_check: datetime | None = None,
 ) -> str:
-    """格式化消息列表"""
 
-    if scope is MessageScope.WORLD:
-        title = "🗒️ 世界留言板"
-    else:
-        title = "📬 私信箱"
+    titles = {
+        MessageScope.WORLD: "🌐 世界频道",
+        MessageScope.PRIVATE: "📬 私信",
+        MessageScope.SYSTEM: "📢 系统公告",
+        MessageScope.GUILD: "🏯 公会频道",
+    }
+    title = titles.get(scope, "📋 消息")
 
     lines = [f"{title} (第{page}/{total_pages}页)", "━━━━━━━━━━"]
 
     for rec in records:
         time_str = rec.created_at.strftime("%m-%d %H:%M")
+        new_flag = "🆕 " if (last_check and rec.created_at > last_check) else ""
 
-        # 特殊处理：系统消息（player_id == "SYSTEM"）
-        if rec.player_id == "SYSTEM":
-            if scope is MessageScope.WORLD:
+        if scope is MessageScope.SYSTEM or rec.player_id == "SYSTEM":
+            lines.append(f">📢 ({time_str})\n{rec.content}")
+            continue
+
+        if scope is MessageScope.GUILD:
+            sender = players.get(rec.player_id)
+            if sender:
                 lines.append(
-                    f">📢 系统消息 ({time_str})\n{rec.content}"
+                    f">{new_flag}{sender.nickname}[UID:{sender.uid}] ({time_str})\n{rec.content}"
+                )
+            continue
+
+        if scope is MessageScope.WORLD:
+            sender = players.get(rec.player_id)
+            if sender:
+                lines.append(
+                    f">{new_flag}{sender.nickname}[UID:{sender.uid}] ({time_str})\n{rec.content}"
                 )
             continue
 
         sender = players.get(rec.player_id)
-        if not sender:
-            continue
-        if scope is MessageScope.WORLD:
-            lines.append(
-                f">{sender.nickname}[UID:{sender.uid}] ({time_str})\n{rec.content}"
-            )
-            continue
-
         recipient = players.get(rec.recipient_id) if rec.recipient_id else None
-        if not recipient:
-            # 如果收件人不存在，跳过这条记录
+        if not sender or not recipient:
             continue
 
         if rec.recipient_id == viewer_id:
-            new_flag = "🆕 " if (not last_private_check or rec.created_at > last_private_check) else ""
             lines.append(
                 f">{new_flag}📥 来自 {sender.nickname}[UID:{sender.uid}] ({time_str})\n{rec.content}"
             )
@@ -319,15 +342,39 @@ def _format_message_lines(
             )
 
     if len(lines) == 2:
-        if scope is MessageScope.WORLD:
-            return "🗒️ 留言板空空如也，快来留下第一条留言吧！"
-        return "📭 暂无任何私信。发送【私信 UID 内容】与他人沟通吧！"
+        empty_msgs = {
+            MessageScope.WORLD: "🌐 世界频道空空如也，快来留下第一条消息吧！",
+            MessageScope.PRIVATE: "📭 暂无私信。发送【私信 UID 内容】与他人沟通吧！",
+            MessageScope.SYSTEM: "📭 暂无系统公告",
+            MessageScope.GUILD: "📭 暂无公会消息",
+        }
+        return empty_msgs.get(scope, "📭 暂无消息")
 
     return "\n".join(lines)
 
 
+async def mark_scope_messages_as_read(player_id: str, scope: MessageScope):
+    """标记指定频道的消息为已读"""
+    async with safe_session() as session:
+        player = await session.get(Player, player_id)
+        if not player:
+            return
+
+        now = datetime.now()
+        if scope is MessageScope.WORLD:
+            player.last_message_board_check = now
+        elif scope is MessageScope.PRIVATE:
+            player.last_private_message_check = now
+        elif scope is MessageScope.SYSTEM:
+            player.last_system_check = now
+        elif scope is MessageScope.GUILD:
+            player.last_guild_check = now
+
+        await session.commit()
+
+
 def _parse_board_args(raw_text: str) -> tuple[MessageScope, int]:
-    """解析留言板命令参数"""
+    """解析消息命令参数，返回(频道, 页码)"""
 
     tokens = [token for token in re.split(r"\s+", raw_text) if token]
     scope = MessageScope.WORLD
@@ -337,6 +384,12 @@ def _parse_board_args(raw_text: str) -> tuple[MessageScope, int]:
         first = tokens[0]
         if first in {"私信", "私聊", "信箱"}:
             scope = MessageScope.PRIVATE
+            tokens = tokens[1:]
+        elif first in {"系统", "系统消息", "公告"}:
+            scope = MessageScope.SYSTEM
+            tokens = tokens[1:]
+        elif first in {"公会", "宗门", "帮派"}:
+            scope = MessageScope.GUILD
             tokens = tokens[1:]
         elif first in {"世界", "公共", "世界频道"}:
             scope = MessageScope.WORLD
@@ -522,19 +575,19 @@ async def handle_view_board(event: MessageEvent, args: Message = CommandArg()):
     if not player:
         await view_board_cmd.finish("⛔ 请先创建角色")
 
-    if scope is MessageScope.WORLD:
-        await mark_scope_messages_as_read(player_id, MessageScope.WORLD)
-    else:
-        await mark_scope_messages_as_read(player_id, MessageScope.PRIVATE)
+    await mark_scope_messages_as_read(player_id, scope)
 
     total, total_pages, page, records, players = await _get_message_page(
         scope, player_id, page
     )
 
-    if total == 0:
-        if scope is MessageScope.WORLD:
-            await view_board_cmd.finish("🗒️ 留言板空空如也，快来留下第一条留言吧！")
-        await view_board_cmd.finish("📭 暂无任何私信。发送【私信 UID 内容】与他人沟通吧！")
+    last_check = None
+    if scope is MessageScope.PRIVATE:
+        last_check = player.last_private_message_check
+    elif scope is MessageScope.SYSTEM:
+        last_check = getattr(player, "last_system_check", None)
+    elif scope is MessageScope.GUILD:
+        last_check = getattr(player, "last_guild_check", None)
 
     lines = _format_message_lines(
         scope,
@@ -543,7 +596,7 @@ async def handle_view_board(event: MessageEvent, args: Message = CommandArg()):
         records,
         players,
         player_id,
-        player.last_private_message_check,
+        last_check,
     )
     await view_board_cmd.finish(message_add_head(lines, event))
 

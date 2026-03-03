@@ -47,7 +47,10 @@ REQUIRED_FIELDS: Dict[str, Dict[str, str]] = {
         # 灵田系统 - 玩家活跃时间
         "last_active_at": "DATETIME NULL COMMENT '最后活跃时间(灵田偷菜判定用)'",
         # 恶魔轮盘排行积分
-        "demon_coins": "BIGINT DEFAULT 0 COMMENT '恶魔币(恶魔轮盘排行积分)'"
+        "demon_coins": "BIGINT DEFAULT 0 COMMENT '恶魔币(恶魔轮盘排行积分)'",
+        # 消息系统字段
+        "last_system_check": "DATETIME NULL COMMENT '最后查看系统公告时间'",
+        "last_guild_check": "DATETIME NULL COMMENT '最后查看公会消息时间'"
     },
     "player_relationship": {
         "master_id": "VARCHAR(32) NULL COMMENT '师父ID(师徒关系专用)'",
@@ -92,6 +95,11 @@ REQUIRED_FIELDS: Dict[str, Dict[str, str]] = {
     # 天灾山寨 - 战斗冷却字段
     "lower_world_stronghold": {
         "last_battle_at": "DATETIME NULL COMMENT '最后一次迎战时间（战斗冷却用）'"
+    },
+    # 世界消息 - 新增scope和guild_id字段
+    "world_message": {
+        "scope": "VARCHAR(20) DEFAULT 'world' COMMENT '消息范围: world/private/system/guild'",
+        "guild_id": "INT NULL COMMENT '公会ID(公会频道专用)'"
     },
     # 市场状态 - 分时补货
     "market_state": {
