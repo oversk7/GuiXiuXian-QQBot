@@ -420,10 +420,11 @@ class EquipmentUpgradeService:
         logs: List[str],
         stats: Dict,
         depth: int = 0,
+        use_protection: bool = False,
     ) -> bool:
         """
         递归准备一个target_level阶的辅助装备。
-        不使用稳定水晶保护（只保护主装备）。
+        use_protection: 是否使用稳定水晶保护辅助装备升阶。
         返回True表示成功准备了一个target_level阶装备。
         """
         MAX_DEPTH = 10
@@ -440,7 +441,7 @@ class EquipmentUpgradeService:
         while len(lower_pieces) < needed and fill_attempts < 20:
             fill_attempts += 1
             ok = await self._prepare_one_side_piece(
-                lower_level, item_id, player, exclude_id, logs, stats, depth + 1
+                lower_level, item_id, player, exclude_id, logs, stats, depth + 1, use_protection
             )
             if not ok:
                 break
@@ -458,7 +459,7 @@ class EquipmentUpgradeService:
             logs.append(f"  ⛔ 素材准备受阻：{reason}")
             return False
 
-        success, _, info = await self.perform_upgrade(candidate, player, False)  # 不用稳定水晶
+        success, _, info = await self.perform_upgrade(candidate, player, use_protection)
         stats["attempts"] = stats.get("attempts", 0) + 1
 
         result_type = info.get("result", "")
@@ -473,6 +474,9 @@ class EquipmentUpgradeService:
                 return False
             elif result_type == "downgraded":
                 logs.append(f"  📉 {candidate.config.name} 降级到+{info.get('new_level')}阶")
+                return False
+            elif result_type == "failed_protected":
+                logs.append(f"  🛡️ {candidate.config.name} 水晶保护(+{candidate.upgrade_level}阶)")
                 return False
             else:
                 logs.append(f"  ❌ {candidate.config.name} 升阶失败（等级不变）")

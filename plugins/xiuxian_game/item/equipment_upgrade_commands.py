@@ -383,7 +383,8 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
             while len(side_pieces) < required_side_count:
                 ok = await upgrade_service._prepare_one_side_piece(
                     current_level, equip.item_id, player, equip.id,
-                    prepare_logs, {"attempts": attempts, "successes": successes, "failures": failures}
+                    prepare_logs, {"attempts": attempts, "successes": successes, "failures": failures},
+                    depth=0, use_protection=use_protection
                 )
                 if not ok:
                     stop_reason = (
