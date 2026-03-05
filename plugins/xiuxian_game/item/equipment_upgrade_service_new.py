@@ -254,6 +254,11 @@ class EquipmentUpgradeService:
         if equipment.equipped:
             return False, "请先卸下装备再进行升阶"
 
+        # 检查装备是否在市场中挂牌（被冻结）
+        extra_attrs = equipment.extra_attrs or {}
+        if extra_attrs.get("_frozen_for_trade"):
+            return False, "该装备正在市场中挂牌，请先撤牌再进行升阶"
+
         # 检查相同装备数量
         required_equipment_count = self.get_equipment_requirements(equipment.upgrade_level, equipment.item_id)
         available_equipment = await self._item_repo.get_available_equipment_for_upgrade(

@@ -138,9 +138,20 @@ class ItemRepository(IRepository[ItemInstance]):
         """
         删除物品实例
 
+        如果是装备实例，会同时清理相关的市场订单（防止数据不一致）
+
         Args:
             item: 要删除的物品实例
         """
+        # 如果是装备实例，先清理相关的市场订单
+        if item.is_equipment:
+            from ...models.market_order import MarketOrder
+            stmt = select(MarketOrder).where(MarketOrder.item_instance_id == item.id)
+            result = await self._session.execute(stmt)
+            orders = result.scalars().all()
+            for order in orders:
+                await self._session.delete(order)
+
         await self._session.delete(item)
 
     async def add_item(
