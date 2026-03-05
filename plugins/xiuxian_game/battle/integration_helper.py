@@ -623,7 +623,10 @@ class BattleIntegrationHelper:
 
             # 怪物回合
             if monster_hp > 0 and player_hp > 0:
-                # 处理怪物回合开始效果（包括regen）
+                # 先检查控制效果（必须在 tick 之前），避免 tick 把 duration=1 的恐惧消耗后检查失效
+                monster_is_controlled = engine.effect_manager.has_control_effect(monster_id)
+
+                # 处理怪物回合开始效果（包括regen、tick效果持续时间）
                 monster_turn_start_msgs, monster_hp_restored = engine._process_turn_start(monster_id, monster_stats)
                 if monster_turn_start_msgs:
                     battle_log.extend(monster_turn_start_msgs)
@@ -631,7 +634,7 @@ class BattleIntegrationHelper:
                     monster_hp = min(monster_stats["hp"], monster_hp + monster_hp_restored)
 
                 # 检查怪物是否被恐惧
-                if engine.effect_manager.has_control_effect(monster_id):
+                if monster_is_controlled:
                     battle_log.append(f"😱 {monster_name}被恐惧，无法行动")
                 else:
                     monster_damage = monster_stats["attack"]

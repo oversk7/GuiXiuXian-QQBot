@@ -435,13 +435,16 @@ class EnhancedBattleEngine:
         attacker_id = attacker.id
         defender_id = defender.id if hasattr(defender, 'id') else "enemy"
 
-        # 回合开始效果
+        # 先检查控制效果（必须在 tick 之前），避免 tick 把 duration=1 的恐惧消耗后检查失效
+        is_controlled = self.effect_manager.has_control_effect(attacker_id)
+
+        # 回合开始效果（内部会 tick 效果持续时间）
         turn_start_msgs, turn_start_hp = self._process_turn_start(attacker_id, attacker)
         turn_result["messages"].extend(turn_start_msgs)
         turn_result["hp_restored"] += turn_start_hp
 
         # 检查是否被控制
-        if self.effect_manager.has_control_effect(attacker_id):
+        if is_controlled:
             turn_result["messages"].append(f"😱 {attacker.nickname}被恐惧，无法行动")
             return turn_result
 
