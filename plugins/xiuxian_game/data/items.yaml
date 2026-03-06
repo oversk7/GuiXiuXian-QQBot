@@ -1718,6 +1718,15 @@ items:
       effect_params: {"max_hp": 5}
       daily_limit: 1
 
+    - item_id: "fate_contract_elixir"
+      name: "命运契丹"
+      description: "以两份命运执念为引，墓土为炉，岁月铁锈为火候，凝练而成。服下后命运之力融入血脉，永久提升运气+5（本轮回有效）"
+      type: "CONSUMABLE"
+      price: 200000
+      effect_type: "BUFF"
+      effect_params: {"luck": 5}
+      daily_limit: 1
+
     # ========== 洗髓类丹药 - 属性重置玩法 ==========
     - item_id: "reforge_strength_elixir"
       name: "归元破力丹"

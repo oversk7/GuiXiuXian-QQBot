@@ -321,6 +321,18 @@ elixirs:
     quantity: 1
     base_success: 0.5
 
+  # 运之精华丹 - 命运契丹（永久运气+5）
+  fate_contract:
+    produce_item_id: "fate_contract_elixir"
+    materials:
+      grave_soil: 30          # 白色材料 - 仅凝魂丹用过，命运沉淀于墓土之中
+      iron_rust: 25           # 白色材料 - 铁锈蕴含时光之力，运气类丹方首用
+      wanted_poster: 2        # 紫色材料 - 仅虚空归元丹用过，命运牵引的执念
+      kissed_phone_number: 2  # 紫色材料 - 仅虚空归元丹用过，死者与命运的最后羁绊
+      bluefin_tuna: 1         # 紫色鱼类 - 仅真还魂丹用过（钓鱼联动）
+    quantity: 1
+    base_success: 0.50
+
   # ========== 洗髓类丹药配方（归元系列）==========
 
   # 归元破力丹（转换攻击力）
