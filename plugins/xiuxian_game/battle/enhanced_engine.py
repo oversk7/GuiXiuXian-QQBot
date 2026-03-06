@@ -1765,16 +1765,10 @@ class EnhancedBattleEngine:
             unit.max_mp = new_max_mp
             if hasattr(unit, 'mp'):
                 unit.mp = int(max(0, min(new_max_mp, ratio_mp * new_max_mp)))
-        # 回退骰子buff临时属性（诡面骰·骰相·乱）- 独立异常保护，确保一定执行
-        try:
-            dice_info = self._temp_dice_buff.pop(unit_id, None) if hasattr(self, '_temp_dice_buff') else None
-            if dice_info:
-                attr_name, original_value = dice_info
-                if hasattr(unit, attr_name):
-                    self._sync_unit_attr(unit, attr_name, original_value)
-        except Exception:
-            pass
-        # 回退绝魔体质对特殊属性的削减（IGNORE_SPECIAL）
+        # 回退绝魔体质对特殊属性的削减（IGNORE_SPECIAL）- 必须在骰子buff之前还原
+        # 原因：IGNORE_SPECIAL 记录的是被削减前的值（可能是骰子加成后的中间值），
+        # 若先还原骰子buff（→原始值），再还原IGNORE_SPECIAL（→中间值），会覆盖正确结果。
+        # 正确顺序是逆应用顺序：先撤销IGNORE_SPECIAL，再撤销骰子buff。
         ignore_debuff = self._temp_ignore_special_debuff.pop(unit_id, None) if hasattr(self, '_temp_ignore_special_debuff') else None
         if ignore_debuff:
             is_dict = isinstance(unit, dict)
@@ -1783,6 +1777,16 @@ class EnhancedBattleEngine:
                     unit[attr] = original_value
                 elif hasattr(unit, attr):
                     setattr(unit, attr, original_value)
+        # 回退骰子buff临时属性（诡面骰·骰相·乱）- 独立异常保护，确保一定执行
+        # 最后还原，保证骰子buff的原始值（应用前的真实DB值）是最终写入的值
+        try:
+            dice_info = self._temp_dice_buff.pop(unit_id, None) if hasattr(self, '_temp_dice_buff') else None
+            if dice_info:
+                attr_name, original_value = dice_info
+                if hasattr(unit, attr_name):
+                    self._sync_unit_attr(unit, attr_name, original_value)
+        except Exception:
+            pass
 
     def get_battle_log(self) -> List[str]:
         """获取战斗日志"""
