@@ -1720,7 +1720,7 @@ items:
 
     - item_id: "fate_contract_elixir"
       name: "命运契丹"
-      description: "以两份命运执念为引，墓土为炉，岁月铁锈为火候，凝练而成。服下后命运之力融入血脉，永久提升运气+5（本轮回有效）"
+      description: "以两份命运执念为引，墓土为炉，岁月铁锈为火候，凝练而成。服下后命运之力永久融入血脉，运气+5（冥返后保留）"
       type: "CONSUMABLE"
       price: 200000
       effect_type: "BUFF"
