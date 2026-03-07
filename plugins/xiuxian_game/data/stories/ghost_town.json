@@ -409,7 +409,11 @@
       "type": "end",
       "content": "你等旅馆的人死光后，再将牙齿丢进她的嘴里。怪物逐渐复苏，她睁开眼睛，与侵入地盘的提头女鬼厮杀起来，最后提头女鬼被冰箱女鬼吃掉了...她似乎更加庞大了。\n你趁机离开了旅馆，天色蒙蒙亮，恭喜你在荔湾镇存活一晚！试炼完成。",
       "effects": {
-        "first_trial_reward": true
+        "trial_success": true,
+        "first_trial_reward": true,
+        "variables": {
+          "perfect_ending": true
+        }
       }
     }
   }
