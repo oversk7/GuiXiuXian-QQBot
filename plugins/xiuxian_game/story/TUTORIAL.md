@@ -502,6 +502,42 @@ if (player.gold > 1000) {
 
 试炼作者可以查询玩家的历史通关记录，实现试炼之间的联动。
 
+### 如何标记通关（重要！）
+
+在结束节点中使用特殊效果标记试炼通关：
+
+```json
+"normal_ending": {
+  "type": "end",
+  "content": "试炼结束！",
+  "effects": {
+    "trial_success": true  // 标记试炼成功，会记录到玩家的通关列表
+  }
+}
+```
+
+**标记完美结局：**
+
+```json
+"perfect_ending": {
+  "type": "end",
+  "content": "完美通关！",
+  "effects": {
+    "trial_success": true,
+    "variables": {
+      "perfect_ending": true  // 标记为完美结局
+    }
+  }
+}
+```
+
+**记录规则：**
+- 普通通关：记录为 `荔湾鬼镇`
+- 完美通关：记录为 `荔湾鬼镇_完美`
+- 如果不设置 `trial_success: true`，则不会记录通关
+
+---
+
 ### 方式1: 在剧情文本中使用变量
 
 在剧情文本中使用 `{trial_completed_<试炼ID>}` 变量，会自动替换为 `True` 或 `False`。
