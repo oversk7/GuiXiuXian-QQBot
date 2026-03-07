@@ -9,8 +9,9 @@
 5. [跳转系统](#跳转系统)
 6. [效果系统](#效果系统)
 7. [变量系统](#变量系统)
-8. [完整示例](#完整示例)
-9. [最佳实践](#最佳实践)
+8. [已通关试炼查询](#已通关试炼查询)
+9. [完整示例](#完整示例)
+10. [最佳实践](#最佳实践)
 
 ---
 
@@ -494,6 +495,114 @@ if (player.gold > 1000) {
 - `{player_hp}` - 生命值
 - `{player_attack}` - 攻击力
 - 以及所有剧情变量: `{变量名}`
+
+---
+
+## 已通关试炼查询
+
+试炼作者可以查询玩家的历史通关记录，实现试炼之间的联动。
+
+### 方式1: 在剧情文本中使用变量
+
+在剧情文本中使用 `{trial_completed_<试炼ID>}` 变量，会自动替换为 `True` 或 `False`。
+
+```json
+"content": "荔湾鬼镇通关状态：{trial_completed_荔湾鬼镇}\n完美通关状态：{trial_completed_荔湾鬼镇_完美}"
+```
+
+**输出示例:**
+- 如果玩家已通关"荔湾鬼镇": `荔湾鬼镇通关状态：True`
+- 如果玩家未通关: `荔湾鬼镇通关状态：False`
+
+### 方式2: 在条件判断中使用
+
+使用 `player_completed_trials` 配合 `contains` 操作符检查玩家是否通关了指定试炼。
+
+```json
+"conditions": {
+  "player_completed_trials": {"contains": "荔湾鬼镇"}
+}
+```
+
+**等价于C++:**
+```cpp
+if (player.completed_trials.contains("荔湾鬼镇")) {
+    // 玩家已通关"荔湾鬼镇"
+}
+```
+
+### 完整示例: 根据通关记录提供不同剧情
+
+```json
+{
+  "id": "sequel_story",
+  "title": "续章试炼",
+  "description": "根据玩家的历史通关记录提供不同剧情",
+  "start_node": "check_history",
+  "nodes": {
+    "check_history": {
+      "type": "story",
+      "content": "你来到了熟悉的地方...\n\n荔湾鬼镇通关：{trial_completed_荔湾鬼镇}\n完美通关：{trial_completed_荔湾鬼镇_完美}",
+      "next": [
+        {
+          "if": {"player_completed_trials": {"contains": "荔湾鬼镇_完美"}},
+          "goto": "veteran_path"
+        },
+        {
+          "if": {"player_completed_trials": {"contains": "荔湾鬼镇"}},
+          "goto": "experienced_path"
+        },
+        {
+          "goto": "newbie_path"
+        }
+      ]
+    },
+
+    "veteran_path": {
+      "type": "story",
+      "content": "「又是你...上次的完美表现让我印象深刻。」\n\n神秘人递给你一把钥匙。",
+      "effects": {
+        "variables": {"has_special_key": true}
+      },
+      "next": "continue_story"
+    },
+
+    "experienced_path": {
+      "type": "story",
+      "content": "「你曾经来过这里...但似乎还有未完成的事。」",
+      "next": "continue_story"
+    },
+
+    "newbie_path": {
+      "type": "story",
+      "content": "「第一次来？小心点，这里很危险。」",
+      "next": "continue_story"
+    },
+
+    "continue_story": {
+      "type": "end",
+      "content": "试炼继续..."
+    }
+  }
+}
+```
+
+### 组合条件: 检查多个试炼
+
+```json
+"conditions": {
+  "and": [
+    {"player_completed_trials": {"contains": "荔湾鬼镇"}},
+    {"player_completed_trials": {"contains": "另一个试炼"}},
+    {"player_level": {">=": 20}}
+  ]
+}
+```
+
+**说明:** 玩家必须同时满足：
+- 通关了"荔湾鬼镇"
+- 通关了"另一个试炼"
+- 等级达到20级
 
 ---
 

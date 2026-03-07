@@ -4,6 +4,7 @@
 import json
 import os
 import random
+import re
 from typing import Dict, Any, List, Optional, Tuple
 from pathlib import Path
 from sqlalchemy import select
@@ -247,6 +248,14 @@ class StoryEngine:
 
     def format_content(self, content: str, player: Player, variables: Dict[str, Any]) -> str:
         """格式化内容，替换变量"""
+        completed_trials = set(player.get_completed_trials())
+
+        def replace_trial_completed(match):
+            trial_id = match.group(1)
+            return str(trial_id in completed_trials)
+
+        content = re.sub(r"\{trial_completed_([^{}]+)\}", replace_trial_completed, content)
+
         # 替换玩家基本信息
         content = content.replace("{player_name}", player.nickname)
         content = content.replace("{player_uid}", str(player.uid))

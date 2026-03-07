@@ -21,6 +21,7 @@ story_engine = StoryEngine()
 
 # 命令处理器
 story_list_cmd = on_command("试炼列表", aliases={"试炼"}, block=True, priority=5)
+completed_trials_cmd = on_command("已通关试炼", aliases={"试炼记录", "通关试炼"}, block=True, priority=5)
 start_story_cmd = on_command("开始试炼", block=True, priority=5)
 story_status_cmd = on_command("试炼状态", block=True, priority=5)
 quit_story_cmd = on_command("退出试炼", block=True, priority=5)
@@ -39,17 +40,17 @@ async def handle_story_list(event: MessageEvent):
         player = await get_unified_player(session, event)
         if not player:
             await story_list_cmd.finish("⛔ 请先创建角色")
-        
+
         stories = story_engine.get_story_list()
         if not stories:
             await story_list_cmd.finish(f"📚 暂无可用试炼\n调试信息: 引擎中有 {len(story_engine._story_index)} 个试炼")
-        
+
         msg_lines = ["📚 可用试炼列表", "━━━━━━━━━━━━━"]
         for i, story in enumerate(stories, 1):
             msg_lines.append(f"{i}. 【{story['title']}】")
             msg_lines.append(f"   {story['description']}")
             msg_lines.append("")
-        
+
         msg_lines.extend([
             "━━━━━━━━━━━━━",
             "💡 使用方法：",
@@ -57,8 +58,27 @@ async def handle_story_list(event: MessageEvent):
             "▫️ 【试炼状态】 - 查看当前试炼进度",
             "▫️ 【退出试炼】 - 结束当前试炼"
         ])
-        
+
         await story_list_cmd.finish(message_add_head("\n".join(msg_lines), event))
+
+
+@completed_trials_cmd.handle()
+async def handle_completed_trials(event: MessageEvent):
+    """显示玩家已通关的试炼列表"""
+    async with safe_session() as session:
+        player = await get_unified_player(session, event)
+        if not player:
+            await completed_trials_cmd.finish("⛔ 请先创建角色")
+
+        completed_trials = player.get_completed_trials()
+        if not completed_trials:
+            await completed_trials_cmd.finish(message_add_head("📚 你还没有已通关的试炼记录", event))
+
+        msg_lines = ["📚 已通关试炼", "━━━━━━━━━━━━━"]
+        for i, trial_id in enumerate(completed_trials, 1):
+            msg_lines.append(f"{i}. {trial_id}")
+
+        await completed_trials_cmd.finish(message_add_head("\n".join(msg_lines), event))
 
 
 @start_story_cmd.handle()
