@@ -1422,6 +1422,7 @@ class BattleIntegrationHelper:
             格式化的战斗属性显示
         """
         from .battle_attributes import BattleAttributeCalculator
+        from ..utils import damage_reduction_rate
         attrs = await BattleAttributeCalculator.calculate_effective_attributes_async(player, session)
 
         # 检查是否有未消耗的诡面骰buff
@@ -1442,6 +1443,11 @@ class BattleIntegrationHelper:
         # 计算暴击倍数显示（基础1.5倍 + 暴击力*0.1倍）
         crit_multiplier = 1.5 + (attrs['critical_power'] * 0.1)
 
+        # 计算防御减伤显示
+        defense = getattr(player, '_cached_defense', player.defense)
+        pct_reduction = damage_reduction_rate(defense)
+        flat_reduction = int(defense * 0.2)
+
         lines = [
             "⚔️ 战斗属性 ⚔️",
             f"💥 {_fmt('critical_rate', '暴击率', attrs['critical_rate'])}",
@@ -1460,6 +1466,7 @@ class BattleIntegrationHelper:
             f"✨ 灵爆率: {attrs['skill_crit_rate']:.1f}%",
             f"🗡️ {_fmt('penetration_rate', '穿透率', attrs['penetration_rate'])}",
             f"🛡️ {_fmt('anti_crit_rate', '抗暴率', attrs['anti_crit_rate'])}",
+            f"🛡️ 防御减伤: 比例{pct_reduction*100:.1f}% + 固定{flat_reduction}",
         ])
 
         if dice_buff_attr:
