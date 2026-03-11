@@ -255,13 +255,13 @@ def luck_prob_tiered(luck_value: int | float) -> float:
 def damage_reduction_rate(defense: int | float) -> float:
     """计算防御力对应的免伤率
 
-    使用调整后的公式：免伤率 = 防御 / (防御 + 300)
+    使用平方根调节公式：免伤率 = 防御 / (防御 + 300 + 30√防御)
 
     这个公式的特点：
     1. 收益递减：防御越高，每点防御带来的免伤提升越小
-    2. 更温和的增长：100防御 = 25%免伤，300防御 = 50%免伤
-    3. 适合本游戏：考虑到防御值容易获得，降低了免伤率增长速度
-    4. 自然上限：理论上永远无法达到100%免伤
+    2. 全程有效：100-3000防御区间每个阶段都有可见收益
+    3. 约2850防御触及60%硬顶，不会过早封顶
+    4. 与原公式同形（d/(d+K)），只是K随防御值缓慢增大
 
     参数
     ------
@@ -276,9 +276,10 @@ def damage_reduction_rate(defense: int | float) -> float:
     if defense <= 0:
         return 0.0
 
-    # 调整后的公式：防御 / (防御 + 300)
-    # 这样100防御只有25%免伤，300防御才有50%免伤
-    reduction = defense / (defense + 300)
+    # 平方根调节公式：d / (d + 300 + 30*sqrt(d))
+    # 相比原公式 d/(d+300)，分母多了 30*sqrt(d) 项
+    # 使曲线在高防御区间增长更缓慢，封顶点从450推迟到约2850
+    reduction = defense / (defense + 300 + 30 * math.sqrt(defense))
 
     # 硬性上限60%，确保至少40%伤害穿透
     return min(reduction, 0.6)

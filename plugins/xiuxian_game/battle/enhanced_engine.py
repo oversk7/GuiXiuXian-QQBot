@@ -753,6 +753,10 @@ class EnhancedBattleEngine:
             "is_penetration": False
         }
 
+        # 子效果行（缩进显示在攻击消息后）和状态变更消息
+        sub_lines = []
+        status_lines = []
+
         attacker_id = attacker.id
         defender_id = defender.id if hasattr(defender, 'id') else "enemy"
         attacker_name = attacker.nickname
@@ -767,7 +771,7 @@ class EnhancedBattleEngine:
 
         # 检查是否有真伤状态
         has_true_damage = len(self.effect_manager.get_active_effects(attacker_id, EffectType.TRUE_DAMAGE)) > 0
-        # 预取“无视类”效果：
+        # 预取"无视类"效果：
         # - IGNORE_SPECIAL（绝魔体质，来自PASSIVE）
         # - IGNORE_DEFENSE（至尊锋刃，ON_ATTACK逐次判定）
         ignore_special_effects = self.effect_manager.get_active_effects(attacker_id, EffectType.IGNORE_SPECIAL)
@@ -877,12 +881,12 @@ class EnhancedBattleEngine:
             total_current = guaranteed_damage + damage
             boost_damage = int(total_current * tiger_effect.value / 100)
             damage += boost_damage
-            result["messages"].append(f"🐯 虎标弹！伤害提升{tiger_effect.value:.0f}% (+{boost_damage})")
+            sub_lines.append(f"  └ 🐯 虎标弹 +{tiger_effect.value:.0f}% (+{boost_damage})")
             # 再消耗次数，判断是否需要触发下一个效果
             if not tiger_effect.consume_trigger():
                 # 次数用尽，移除效果并触发下一个效果
                 self.effect_manager.remove_effect(attacker_id, tiger_effect)
-                result["messages"].append(f"🐯 虎标弹效果结束")
+                status_lines.append(f"🐯 虎标弹效果结束")
 
                 # 触发猛虎标弹
                 if tiger_effect.next_effect == "fierce_tiger_bullet":
@@ -897,7 +901,7 @@ class EnhancedBattleEngine:
                         next_effect="rigid_qi_heart"
                     )
                     self.effect_manager.add_effect(attacker_id, fierce_effect)
-                    result["messages"].append(f"🐅 猛虎标弹激活！")
+                    status_lines.append(f"🐅 猛虎标弹激活！")
 
         # 检查并应用猛虎标弹效果
         fierce_tiger_effects = self.effect_manager.get_active_effects(attacker_id, EffectType.FIERCE_TIGER_BULLET)
@@ -906,12 +910,12 @@ class EnhancedBattleEngine:
             total_current = guaranteed_damage + damage
             boost_damage = int(total_current * fierce_effect.value / 100)
             damage += boost_damage
-            result["messages"].append(f"🐅 猛虎标弹！伤害提升{fierce_effect.value:.0f}% (+{boost_damage})")
+            sub_lines.append(f"  └ 🐅 猛虎标弹 +{fierce_effect.value:.0f}% (+{boost_damage})")
             # 再消耗次数，判断是否需要触发下一个效果
             if not fierce_effect.consume_trigger():
                 # 次数用尽，移除效果并触发刚气-心
                 self.effect_manager.remove_effect(attacker_id, fierce_effect)
-                result["messages"].append(f"🐅 猛虎标弹效果结束")
+                status_lines.append(f"🐅 猛虎标弹效果结束")
 
                 # 触发刚气-心
                 if fierce_effect.next_effect == "rigid_qi_heart":
@@ -924,7 +928,7 @@ class EnhancedBattleEngine:
                         description="刚气-心"
                     )
                     self.effect_manager.add_effect(attacker_id, rigid_effect)
-                    result["messages"].append(f"💪 刚气-心触发！受到伤害降低60%(持续3回合)")
+                    status_lines.append(f"💪 刚气-心触发！受到伤害降低60%(持续3回合)")
 
         # 检查刚气-心状态，降低造成的伤害
         rigid_qi_effects = self.effect_manager.get_active_effects(attacker_id, EffectType.RIGID_QI_HEART)
@@ -933,29 +937,31 @@ class EnhancedBattleEngine:
                 # 刚气-心：造成伤害降低10%
                 damage_reduction = int(damage * 10 / 100)
                 damage -= damage_reduction
-                result["messages"].append(f"💪 刚气-心：造成伤害降低10% (-{damage_reduction})")
+                sub_lines.append(f"  └ 💪 刚气-心自损 -10% (-{damage_reduction})")
 
-        # 检查防御者是否有无敌状态（可被“绝魔体质/至尊锋刃”部分无视）
+        # 检查防御者是否有无敌状态（可被"绝魔体质/至尊锋刃"部分无视）
         invincible_effects = self.effect_manager.get_active_effects(defender_id, EffectType.INVINCIBLE)
         if invincible_effects:
             bypass = 0.0
             if 'bypass_fraction' in locals():
                 bypass = min(1.0, max(0.0, bypass_fraction))
-            invincible_msg = f"✨ {defender_name}处于无敌状态，"
+            invincible_msg = f"  └ ✨ {defender_name}无敌，"
             if damage > 0:
                 if bypass > 0:
                     partial = max(1, int(damage * bypass))
-                    invincible_msg += f"但被锋刃/绝魔部分无视，常规伤害仍造成{partial}！"
+                    invincible_msg += f"锋刃/绝魔部分无视，常规伤害{partial}"
                     damage = partial
                 else:
-                    invincible_msg += "常规伤害被完全免疫！"
+                    invincible_msg += "常规伤害免疫"
                     damage = 0
             else:
-                invincible_msg += "常规伤害被完全免疫！"
+                invincible_msg += "常规伤害免疫"
             if guaranteed_damage > 0:
-                invincible_msg += f"必中段无视无敌，造成{guaranteed_damage}伤害！"
-            result["messages"].append(invincible_msg)
+                invincible_msg += f"，必中段{guaranteed_damage}"
+            sub_lines.append(invincible_msg)
             if damage == 0 and guaranteed_damage <= 0:
+                result["messages"].extend(sub_lines)
+                result["messages"].extend(status_lines)
                 return result
 
         # 恐惧状态增伤（联动增强）
@@ -963,7 +969,7 @@ class EnhancedBattleEngine:
         if fear_effects:
             fear_bonus = int(damage * 0.2)
             damage += fear_bonus
-            result["messages"].append(f"😱 恐惧加深伤害 +{fear_bonus}")
+            sub_lines.append(f"  └ 😱 恐惧增伤 +20% (+{fear_bonus})")
 
         # 伞下：受到伤害减少（归雨DAMAGE_REDUCTION效果）
         dmg_reduction_effects = self.effect_manager.get_active_effects(defender_id, EffectType.DAMAGE_REDUCTION)
@@ -975,7 +981,7 @@ class EnhancedBattleEngine:
             reduction_amount = int(damage * total_reduction_pct / 100)
             damage -= reduction_amount
             damage = max(1, damage)  # 至少造成1点伤害
-            result["messages"].append(f"☂️ 伞下减伤{total_reduction_pct:.0f}% (-{reduction_amount})")
+            sub_lines.append(f"  └ ☂️ 伞下减伤 -{total_reduction_pct:.0f}% (-{reduction_amount})")
 
         # 猛虎标弹：防御者受到伤害降低30%（天退星刀专属）
         fierce_tiger_def_effects = self.effect_manager.get_active_effects(defender_id, EffectType.FIERCE_TIGER_BULLET)
@@ -984,7 +990,7 @@ class EnhancedBattleEngine:
                 reduction_amount = int(damage * 30 / 100)
                 damage -= reduction_amount
                 damage = max(1, damage)
-                result["messages"].append(f"🐅 猛虎标弹！{defender_name}受到伤害降低30% (-{reduction_amount})")
+                sub_lines.append(f"  └ 🐅 猛虎标弹减伤 -30% (-{reduction_amount})")
                 break  # 多个效果只应用一次
 
         # 刚气-心：防御者受到伤害降低60%（天退星刀专属）
@@ -994,7 +1000,7 @@ class EnhancedBattleEngine:
                 reduction_amount = int(damage * rigid_def_effect.value / 100)
                 damage -= reduction_amount
                 damage = max(1, damage)
-                result["messages"].append(f"💪 刚气-心！{defender_name}受到伤害降低{rigid_def_effect.value:.0f}% (-{reduction_amount})")
+                sub_lines.append(f"  └ 💪 刚气-心减伤 -{rigid_def_effect.value:.0f}% (-{reduction_amount})")
                 break  # 多个效果只应用一次
 
         # 检查防御者是否有护盾（可被部分无视）
@@ -1014,18 +1020,26 @@ class EnhancedBattleEngine:
                     absorbed_by_shield += damage_for_shield
                     shield_effect.shield_value -= damage_for_shield
                     damage_for_shield = 0
-                    result["messages"].append(f"🛡️ 护盾吸收{absorbed_by_shield}伤害，剩余{shield_effect.shield_value}点护盾")
+                    sub_lines.append(f"  └ 🛡️ 护盾吸收{absorbed_by_shield} 剩余{shield_effect.shield_value}")
                     break
                 else:
                     # 护盾部分吸收
                     absorbed_by_shield += shield_effect.shield_value
                     damage_for_shield -= shield_effect.shield_value
-                    result["messages"].append(f"🛡️ 护盾吸收{shield_effect.shield_value}伤害后破碎")
+                    sub_lines.append(f"  └ 🛡️ 护盾吸收{shield_effect.shield_value}后破碎")
                     shield_effect.shield_value = 0
                     # 护盾破碎，移除效果
                     self.effect_manager.remove_effect(defender_id, shield_effect)
         # 合并护盾绕过与护盾结算后的伤害
         damage = pre_bypass + damage_for_shield
+
+        # 新增防御减伤子行
+        defense_mit = attack_result.get("defense_mitigation")
+        if defense_mit and defense_mit.get("blocked", 0) > 0:
+            blocked = defense_mit["blocked"]
+            flat = defense_mit.get("flat_reduction", 0)
+            pct = defense_mit["percent_reduction"] * 100
+            sub_lines.append(f"  └ 🛡️ 防御减伤 -{blocked} (数值减伤{flat} + 比例减伤{pct:.0f}%)")
 
         # 构建攻击消息
         if is_combo:
@@ -1044,21 +1058,24 @@ class EnhancedBattleEngine:
             attack_msg += " 💥暴击！"
 
         # 显示实际伤害（扣除护盾后）
-        # 斩龙闪：在文案中直观展示20%必中与80%常规的拆分
         _normal_missed = attack_result.get("normal_missed", False)
         normal_after_mod = damage
-        _split_suffix = ""
+
+        # 斩龙闪拆分信息改为子行
         if has_guaranteed:
             _nd_text = "被闪避" if _normal_missed else str(normal_after_mod)
-            _split_suffix = f" [20%:{guaranteed_damage} + 80%:{_nd_text}]"
+            sub_lines.append(f"  └ 📊 必中:{guaranteed_damage} + 常规:{_nd_text}")
 
         final_damage = guaranteed_damage + damage
         if absorbed_by_shield > 0:
-            attack_msg += f" 造成{final_damage}伤害(护盾吸收{absorbed_by_shield})" + _split_suffix
+            attack_msg += f" 造成{final_damage}伤害(护盾吸收{absorbed_by_shield})"
         else:
-            attack_msg += f" 造成{final_damage}伤害" + _split_suffix
+            attack_msg += f" 造成{final_damage}伤害"
 
+        # 消息组装：攻击主消息在前，子效果行紧随，状态变更最后
         result["messages"].append(attack_msg)
+        result["messages"].extend(sub_lines)
+        result["messages"].extend(status_lines)
         result["total_damage"] = final_damage
         damage = final_damage
 
@@ -1200,7 +1217,7 @@ class EnhancedBattleEngine:
                         attacker.hp = 0
 
             elif effect.effect_type == EffectType.REFLECT:
-                # 反弹伤害（实际扣血），可被“绝魔体质”部分无视
+                # 反弹伤害（实际扣血），可被"绝魔体质"部分无视
                 reflect_damage = int(damage * effect.value / 100)
                 reduce_factor = 1.0
                 if 'ignore_special_ratio' in locals() and ignore_special_ratio > 0:
@@ -1421,7 +1438,7 @@ class EnhancedBattleEngine:
         """处理PVP攻击（使用已应用buff的属性）
 
         规则调整：
-        - guaranteed_fraction 部分的伤害“必中”（绕过命中判定），且直接结算为最终伤害，
+        - guaranteed_fraction 部分的伤害"必中"（绕过命中判定），且直接结算为最终伤害，
           不参与暴击、连击、额外穿透或任何形式的减伤。
         - 其余 (1 - guaranteed_fraction) 部分按原有流程进行完整判定。
         """
@@ -1508,6 +1525,11 @@ class EnhancedBattleEngine:
                         mit = apply_defense_mitigation(normal_damage_part, effective_defense)
                         dmg = true_damage_part + mit["final_damage"]
                         result["effects"].append("TRUE_DAMAGE(绝魔免疫50%)")
+                    result["defense_mitigation"] = {
+                        "blocked": mit["blocked"],
+                        "flat_reduction": mit["flat_reduction"],
+                        "percent_reduction": mit["percent_reduction"],
+                    }
                 else:
                     result["effects"].append("TRUE_DAMAGE")
             else:
@@ -1518,6 +1540,11 @@ class EnhancedBattleEngine:
                 else:
                     mit = apply_defense_mitigation(dmg, effective_defense)
                     dmg = mit["final_damage"]
+                result["defense_mitigation"] = {
+                    "blocked": mit["blocked"],
+                    "flat_reduction": mit["flat_reduction"],
+                    "percent_reduction": mit["percent_reduction"],
+                }
             normal_final = dmg
 
         total = guaranteed_final + normal_final
@@ -1613,6 +1640,11 @@ class EnhancedBattleEngine:
                 else:
                     mit = apply_defense_mitigation(dmg, monster_defense)
                     dmg = mit["final_damage"]
+                result["defense_mitigation"] = {
+                    "blocked": mit["blocked"],
+                    "flat_reduction": mit["flat_reduction"],
+                    "percent_reduction": mit["percent_reduction"],
+                }
             normal_final = dmg
 
         total = guaranteed_final + normal_final

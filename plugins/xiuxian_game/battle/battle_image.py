@@ -138,6 +138,8 @@ COLOR_EFFECT_SUB  = (180, 150, 255)
 COLOR_VICTORY     = (100, 255, 150)
 COLOR_DEFAULT     = (200, 200, 210)
 COLOR_SEPARATOR   = (80,  90,  110)
+COLOR_DEFENSE     = (100, 180, 220)   # 防御减伤 - 蓝绿色
+COLOR_BOOST       = (255, 200, 80)    # 伤害加成 - 金色
 
 
 # ── 工具函数 ──────────────────────────────────────────────────
@@ -208,6 +210,14 @@ def _parse_hp_bar(text: str) -> Optional[Tuple[int, int]]:
 def _classify_line_color(line: str) -> Tuple[Tuple[int, int, int], int, int]:
     """返回 (颜色, 字号, 行高)"""
     if line.startswith("  └"):
+        if "防御减伤" in line:
+            return COLOR_DEFENSE, 15, 22
+        if "虎标弹" in line or "猛虎标弹" in line:
+            return COLOR_BOOST, 15, 22
+        if "恐惧增伤" in line:
+            return COLOR_CRITICAL, 15, 22
+        if "伞下减伤" in line or "刚气" in line:
+            return COLOR_COMBO, 15, 22
         return COLOR_EFFECT_SUB, 15, 22
 
     # HP血条行：行高需容纳矩形条
