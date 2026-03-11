@@ -40,7 +40,7 @@ class Player(Base):
     mp: Mapped[int] = mapped_column(Integer, default=20, server_default='20', comment="理智值")
     max_mp: Mapped[int] = mapped_column(Integer, default=20, server_default='20', comment="最大理智值")
     attack: Mapped[int] = mapped_column(Integer, default=1, server_default='1', comment="攻击力")
-    defense: Mapped[int] = mapped_column(Integer, default=5, server_default='5', comment="防御")
+    defense: Mapped[int] = mapped_column(Integer, default=0, server_default='0', comment="防御")
     agility: Mapped[int] = mapped_column(Integer, default=5, server_default='5', comment="敏捷")
     stamina: Mapped[int] = mapped_column(Integer, default=10, server_default='10', comment="咒抗")
     luck: Mapped[int] = mapped_column(Integer, default=1, server_default='1', comment="运气")
@@ -392,7 +392,7 @@ class Player(Base):
             "max_hp": 20,
             "max_mp": 20,
             "attack": 1,
-            "defense": 5,
+            "defense": 0,
             "agility": 5,
             "luck": 1,
             "critical_rate": 5,
