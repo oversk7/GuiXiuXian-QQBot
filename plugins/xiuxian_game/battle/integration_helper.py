@@ -9,12 +9,6 @@ from typing import Dict, List, Tuple, Optional, Any
 from ..models.player import Player
 from .enhanced_engine import EnhancedBattleEngine
 
-try:
-    from .battle_image import get_battle_image_generator, should_use_image
-    IMAGE_SUPPORT = True
-except ImportError:
-    IMAGE_SUPPORT = False
-
 
 def _get_cached_max_hp(player, default=None):
     """获取玩家的max_hp,优先使用缓存值(包含临时buff)"""
