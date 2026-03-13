@@ -1560,7 +1560,7 @@ class InnerRealmService:
         player: Player,
         tile: InnerRealmTile,
         session: InnerRealmSession
-    ) -> Tuple[bool, list, list, dict]:
+    ) -> Tuple[bool, list[str], list[str], dict]:
         """
         与NPC/BOSS发起战斗
 
@@ -1843,7 +1843,8 @@ class InnerRealmService:
                     player, tile, session
                 )
 
-                return victory, f"{battle_msg}\n\n{chr(10).join(log_lines + result_lines)}"
+                battle_result = "\n".join(log_lines + result_lines)
+                return victory, f"{battle_msg}\n\n{battle_result}"
             else:
                 # 普通NPC逃跑或惊动其他人
                 威吓_fail = state.get("威吓_fail", f"{target_name}惊恐地逃走了，惊动了周围的其他人！")
@@ -1868,7 +1869,8 @@ class InnerRealmService:
                     player, tile, session
                 )
 
-                return victory, f"{battle_msg}\n\n{chr(10).join(log_lines + result_lines)}"
+                battle_result = "\n".join(log_lines + result_lines)
+                return victory, f"{battle_msg}\n\n{battle_result}"
             else:
                 return False, self.format_dice_roll_message(
                     "威吓检定",
@@ -1984,7 +1986,8 @@ class InnerRealmService:
                 player, tile, session
             )
 
-            return victory, f"{battle_msg}\n\n{chr(10).join(log_lines + result_lines)}"
+            battle_result = "\n".join(log_lines + result_lines)
+            return victory, f"{battle_msg}\n\n{battle_result}"
 
         else:
             # 成功：无声击杀
