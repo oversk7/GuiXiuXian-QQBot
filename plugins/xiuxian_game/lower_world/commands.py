@@ -27,6 +27,7 @@ from .service import (
 )
 from .hero_generator import hero_from_json
 from ..battle.integration_helper import BattleIntegrationHelper
+from ..battle.battle_markdown import build_battle_markdown
 
 
 # ==================== 命令注册 ====================
@@ -514,19 +515,25 @@ async def handle_battle_hero(event: MessageEvent):
                     ),
                 ]
 
-            msg = (
-                "\n".join(battle_log) + "\n"
-                "\n"
-                "━━━━━━━━━━━━━\n"
-                + random.choice(victory_endings) + "\n"
-                "\n"
-                f"+{points}天灾点（当前：{stronghold.calamity_points}点）\n"
-                "「大都会那边有人因此平安了。\n"
-                " 他们不知道你的名字。」\n"
-                "\n"
-                f"⏳ 下一波英雄将于 {WAVE_INTERVAL_HOURS} 小时后到达"
-            )
-            await battle_hero_cmd.finish(msg)
+            victory_ending = random.choice(victory_endings)
+            log_lines = list(battle_log) + [
+                "━━━━━━━━━━━━━",
+                victory_ending,
+                "",
+                f"+{points}天灾点（当前：{stronghold.calamity_points}点）",
+                "「大都会那边有人因此平安了。",
+                " 他们不知道你的名字。」",
+                "",
+                f"⏳ 下一波英雄将于 {WAVE_INTERVAL_HOURS} 小时后到达",
+            ]
+            await battle_hero_cmd.finish(build_battle_markdown(
+                title=f"🏰 迎战结果 · {hero['name']}",
+                battle_log=log_lines,
+                hint="快捷操作: 迎战 | 镇守 | 天灾商店",
+                btn1="迎战",
+                btn2="镇守",
+                btn3="天灾商店",
+            ))
         else:
             # 失败
             await process_battle_defeat(uow, stronghold)
@@ -657,17 +664,23 @@ async def handle_battle_hero(event: MessageEvent):
                     ),
                 ]
 
-            msg = (
-                "\n".join(battle_log) + "\n"
-                "\n"
-                "━━━━━━━━━━━━━\n"
-                "你倒下了。\n"
-                "\n"
-                + random.choice(defeat_endings) + "\n"
-                "\n"
-                "⛓️ 你被封印24小时"
-            )
-            await battle_hero_cmd.finish(msg)
+            defeat_ending = random.choice(defeat_endings)
+            log_lines = list(battle_log) + [
+                "━━━━━━━━━━━━━",
+                "你倒下了。",
+                "",
+                defeat_ending,
+                "",
+                "⛓️ 你被封印24小时",
+            ]
+            await battle_hero_cmd.finish(build_battle_markdown(
+                title=f"🏰 迎战结果 · {hero['name']}",
+                battle_log=log_lines,
+                hint="快捷操作: 迎战 | 镇守 | 天灾商店",
+                btn1="迎战",
+                btn2="镇守",
+                btn3="天灾商店",
+            ))
 
 
 # ==================== 【天灾商店】 ====================
