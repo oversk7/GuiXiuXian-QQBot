@@ -1412,6 +1412,39 @@ items:
           description: "[3] 虚界闪渡：攻击时，虚界裂隙中泄出的灵气修复身躯——回复5%最大生命值"
       repair_cost: 5
 
+    - item_id: "vip_shoes_longren"
+      name: "龙刃鞋"
+      description: "龙纹刻于鞋底，踏出的每一步都带着刃光。"
+      type: "EQUIPMENT"
+      rarity: "red"
+      durability: 300
+      required_level: 10
+      attr_bonus: {"attack": 2000, "agility": 2000}
+      gem_slots: 5
+      special_effects:
+        - trigger: "first_turn"
+          chance: 100
+          effect: "buff_dodge"
+          is_percentage: true
+          value: 10
+          duration: 3
+          description: "[1] 龙踏闪步：踏出第一步，气流随刃散开——前3回合闪避率+10%"
+        - trigger: "on_dodge"
+          chance: 100
+          effect: "damage_boost"
+          is_percentage: true
+          value: 15
+          duration: 2
+          description: "[2] 风刃反击：刃从脚下穿出，闪过的瞬间反手踏击——闪避时伤害提升15%（持续2回合）"
+        - trigger: "each_turn"
+          chance: 100
+          effect: "damage_reduction"
+          is_percentage: true
+          value: 3
+          duration: 999
+          description: "[3] 龙鳞护足：鞋面龙纹暗涌护气，步步皆盾——受到伤害减少3%"
+      repair_cost: 5
+
     - item_id: "vip_medal_tiandi"
       name: "天帝残勋"
       description: |
