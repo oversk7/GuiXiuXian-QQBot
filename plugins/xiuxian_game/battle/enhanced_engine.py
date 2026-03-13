@@ -365,7 +365,7 @@ class EnhancedBattleEngine:
         - VIP定制装备（斩龙闪、镜怨之衣、天退星刀、归雨、折光年）：0阶即解锁全部效果
         """
         # VIP定制装备列表（0阶即全解锁）
-        VIP_EQUIPMENT_IDS = {"vip_blade_zhanlongshan", "vip_robe_jingyuanzhiyi", "heaven_retreat_star_blade", "vip_gui_yu", "vip_chrono_watch", "vip_longying_flash", "vip_ghost_dice"}
+        VIP_EQUIPMENT_IDS = {"vip_blade_zhanlongshan", "vip_robe_jingyuanzhiyi", "heaven_retreat_star_blade", "vip_gui_yu", "vip_chrono_watch", "vip_longying_flash", "vip_ghost_dice", "vip_shoes_longren"}
 
         for item in equipped_items:
             # 从装备配置中获取special_effects
