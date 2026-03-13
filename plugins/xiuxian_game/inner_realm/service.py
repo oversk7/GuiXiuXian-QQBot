@@ -1560,7 +1560,7 @@ class InnerRealmService:
         player: Player,
         tile: InnerRealmTile,
         session: InnerRealmSession
-    ) -> Tuple[bool, str, dict]:
+    ) -> Tuple[bool, list, list, dict]:
         """
         与NPC/BOSS发起战斗
 
@@ -1570,7 +1570,7 @@ class InnerRealmService:
             session: 里界会话
 
         Returns:
-            (是否胜利, 战斗描述, 战斗奖励)
+            (是否胜利, 战斗日志行列表, 结果行列表, 战斗奖励)
         """
         from ..battle.integration_helper import BattleIntegrationHelper
         import time
@@ -1661,10 +1661,7 @@ class InnerRealmService:
 
         await self.uow.commit()
 
-        # 组合完整战斗消息
-        full_message = "\n".join(battle_log) + "\n" + "\n".join(result_lines)
-
-        return victory, full_message, rewards
+        return victory, list(battle_log), list(result_lines), rewards
 
     # ==================== 事件触发系统（原有代码）====================
 
@@ -1842,11 +1839,11 @@ class InnerRealmService:
                 )
 
                 # 发起战斗
-                victory, battle_result, rewards = await self.start_battle_with_npc(
+                victory, log_lines, result_lines, rewards = await self.start_battle_with_npc(
                     player, tile, session
                 )
 
-                return victory, f"{battle_msg}\n\n{battle_result}"
+                return victory, f"{battle_msg}\n\n{chr(10).join(log_lines + result_lines)}"
             else:
                 # 普通NPC逃跑或惊动其他人
                 威吓_fail = state.get("威吓_fail", f"{target_name}惊恐地逃走了，惊动了周围的其他人！")
@@ -1867,11 +1864,11 @@ class InnerRealmService:
                 )
 
                 # 发起战斗
-                victory, battle_result, rewards = await self.start_battle_with_npc(
+                victory, log_lines, result_lines, rewards = await self.start_battle_with_npc(
                     player, tile, session
                 )
 
-                return victory, f"{battle_msg}\n\n{battle_result}"
+                return victory, f"{battle_msg}\n\n{chr(10).join(log_lines + result_lines)}"
             else:
                 return False, self.format_dice_roll_message(
                     "威吓检定",
@@ -1983,11 +1980,11 @@ class InnerRealmService:
             )
 
             # 发起战斗
-            victory, battle_result, rewards = await self.start_battle_with_npc(
+            victory, log_lines, result_lines, rewards = await self.start_battle_with_npc(
                 player, tile, session
             )
 
-            return victory, f"{battle_msg}\n\n{battle_result}"
+            return victory, f"{battle_msg}\n\n{chr(10).join(log_lines + result_lines)}"
 
         else:
             # 成功：无声击杀
