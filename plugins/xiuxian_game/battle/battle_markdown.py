@@ -27,7 +27,7 @@ def _sanitize_desc(text: str) -> str:
 
 def build_battle_markdown(
     title: str,
-    battle_log: list,
+    battle_log: list[str],
     hint: str,
     btn1: str,
     btn2: str,
@@ -37,10 +37,12 @@ def build_battle_markdown(
     构建战斗长文字 Markdown 消息段。
 
     Args:
-        title:      模版标题（显示在代码块上方）
+        title:      模版标题（显示在代码块上方）；不会自动 sanitize，调用方需自行保证内容合法
         battle_log: 战斗日志行列表，各行用 \\r 连接后放入代码块
-        hint:       底部提示文字
-        btn1/2/3:   三个快捷按钮文字
+        hint:       底部提示文字；不会自动 sanitize，调用方需自行保证内容合法
+        btn1:       第一个快捷按钮文字
+        btn2:       第二个快捷按钮文字
+        btn3:       第三个快捷按钮文字
 
     Returns:
         MessageSegment，可直接 await cmd.finish(segment)
