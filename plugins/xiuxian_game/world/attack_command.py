@@ -20,6 +20,7 @@ from ..models.player import Player
 from ..models.npc import NPCType
 from ..models.inventory import ItemInstance
 from ..utils import message_add_head
+from ..battle.battle_markdown import build_battle_markdown
 from .location_service import LocationService
 from .npc_service import NPCService
 from ..player.realm_utils import realm_by_level_and_reincarnation
@@ -582,7 +583,14 @@ async def handle_player_attack(session, attacker: Player, target: Player, event:
                 result_lines.append("")
                 result_lines.append(quest_msg)
 
-            await attack_cmd.finish(message_add_head("\n".join(result_lines), event))
+            await attack_cmd.finish(build_battle_markdown(
+                title=f"⚔️ 战斗结果 · {attacker.nickname} vs {target.nickname}",
+                battle_log=result_lines,
+                hint="快捷操作: 探索 | 面板 | 背包",
+                btn1="探索",
+                btn2="面板",
+                btn3="背包",
+            ))
 
     # 死斗前龙影闪虚界反噬判定：仅在荒野/诡域触发
     if not in_town:
@@ -660,7 +668,14 @@ async def handle_player_attack(session, attacker: Player, target: Player, event:
                 result_lines.append("")
                 result_lines.append(quest_msg)
 
-            await attack_cmd.finish(message_add_head("\n".join(result_lines), event))
+            await attack_cmd.finish(build_battle_markdown(
+                title=f"⚔️ 战斗结果 · {attacker.nickname} vs {target.nickname}",
+                battle_log=result_lines,
+                hint="快捷操作: 探索 | 面板 | 背包",
+                btn1="探索",
+                btn2="面板",
+                btn3="背包",
+            ))
 
     # 执行PVP战斗
     battle_timestamp = int(time.time() * 1000)
@@ -942,7 +957,14 @@ async def handle_player_attack(session, attacker: Player, target: Player, event:
             result_lines.append("")
             result_lines.extend(achievement_msgs)
 
-        await attack_cmd.finish(message_add_head("\n".join(result_lines), event))
+        await attack_cmd.finish(build_battle_markdown(
+            title=f"{battle_type} · {attacker.nickname} vs {target.nickname}",
+            battle_log=result_lines,
+            hint="快捷操作: 探索 | 面板 | 背包",
+            btn1="探索",
+            btn2="面板",
+            btn3="背包",
+        ))
 
     except ValueError as e:
         await attack_cmd.finish(f"⛔ 战斗系统错误：{str(e)}")
@@ -1288,7 +1310,14 @@ async def handle_npc_attack(session, attacker: Player, target_npc, event: Messag
             result_lines.append("")
             result_lines.extend(achievement_msgs)
 
-        await attack_cmd.finish(message_add_head("\n".join(result_lines), event))
+        await attack_cmd.finish(build_battle_markdown(
+            title=f"⚔️ 战斗结果 · {attacker.nickname} vs {target_npc.name}",
+            battle_log=result_lines,
+            hint="快捷操作: 探索 | 面板 | 背包",
+            btn1="探索",
+            btn2="面板",
+            btn3="背包",
+        ))
 
     except ValueError as e:
         await attack_cmd.finish(f"⛔ 战斗系统错误：{str(e)}")
