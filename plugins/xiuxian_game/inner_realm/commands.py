@@ -14,6 +14,7 @@ from ..infrastructure.uow.unit_of_work import UnitOfWork
 from ..models.db import AsyncSessionLocal
 from .service import InnerRealmService
 from .config import InnerRealmConfig
+from ..battle.battle_markdown import build_battle_markdown
 import json
 
 
@@ -538,11 +539,18 @@ async def handle_attack(event: MessageEvent):
             await attack_cmd.finish("⛔ 这里只剩下一具尸体...")
 
         # 发起战斗
-        victory, message, rewards = await service.start_battle_with_npc(
+        victory, log_lines, result_lines, rewards = await service.start_battle_with_npc(
             player, current_tile, active_session
         )
 
-        await attack_cmd.finish(message)
+        await attack_cmd.finish(build_battle_markdown(
+            title="🌀 内界战斗结果",
+            battle_log=log_lines + result_lines,
+            hint="快捷操作: 探索 | 试炼状态 | 退出试炼",
+            btn1="探索",
+            btn2="试炼状态",
+            btn3="退出试炼",
+        ))
 
 
 # 查看线索命令
