@@ -303,7 +303,7 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
         await list_cmd.finish(f"⛔ 不存在物品：{item_name}")
 
     # VIP定制装备禁止交易
-    VIP_EQUIPMENT_IDS = {"vip_blade_zhanlongshan", "vip_robe_jingyuanzhiyi", "heaven_retreat_star_blade"}
+    VIP_EQUIPMENT_IDS = {"vip_blade_zhanlongshan", "vip_robe_jingyuanzhiyi", "heaven_retreat_star_blade", "vip_gui_yu", "vip_chrono_watch", "vip_longying_flash", "vip_ghost_dice", "vip_shoes_longren"}
     if item_cfg.item_id in VIP_EQUIPMENT_IDS:
         await list_cmd.finish("⛔ VIP定制装备为专属装备，不可交易")
 
