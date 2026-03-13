@@ -546,10 +546,10 @@ async def handle_attack(event: MessageEvent):
         await attack_cmd.finish(build_battle_markdown(
             title="🌀 内界战斗结果",
             battle_log=log_lines + result_lines,
-            hint="快捷操作: 探索 | 试炼状态 | 退出试炼",
-            btn1="探索",
-            btn2="试炼状态",
-            btn3="退出试炼",
+            hint="快捷操作: 攻击 | 里界信息 | 返回",
+            btn1="攻击",
+            btn2="里界信息",
+            btn3="返回",
         ))
 
 
