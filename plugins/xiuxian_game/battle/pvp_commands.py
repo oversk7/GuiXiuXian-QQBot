@@ -100,14 +100,6 @@ async def handle_pvp(event: MessageEvent, args: Message = CommandArg()):
             p1_final_hp = max(0, challenger.hp - challenger_damage)
             p2_final_hp = max(0, target_player.hp - target_damage)
 
-            # 判断胜负
-            if p2_final_hp == 0 and p1_final_hp > 0:
-                winner_name = challenger.nickname
-            elif p1_final_hp == 0:
-                winner_name = target_player.nickname
-            else:
-                winner_name = None  # 平局
-
             title = f"⚔️ 切磋结果 · {challenger.nickname} vs {target_player.nickname}"
             await pvp_cmd.finish(build_battle_markdown(
                 title=title,
@@ -188,14 +180,6 @@ async def handle_simulate(event: MessageEvent, args: Message = CommandArg()):
             # 计算最终血量
             p1_final_hp = max(0, player1.hp - p1_damage)
             p2_final_hp = max(0, player2.hp - p2_damage)
-
-            # 判断胜负
-            if p2_final_hp == 0 and p1_final_hp > 0:
-                winner_name = player1.nickname
-            elif p1_final_hp == 0:
-                winner_name = player2.nickname
-            else:
-                winner_name = None  # 平局
 
             title = f"🎮 模拟战斗 · {player1.nickname} vs {player2.nickname}"
             await simulate_cmd.finish(build_battle_markdown(
