@@ -527,9 +527,9 @@ async def handle_battle_hero(event: MessageEvent):
                 f"⏳ 下一波英雄将于 {WAVE_INTERVAL_HOURS} 小时后到达",
             ]
             await battle_hero_cmd.finish(build_battle_markdown(
-                title=f"🏰 迎战结果 · {hero['name']}",
+                title=f"🏰 {hero['name']} 倒下！",
                 battle_log=log_lines,
-                hint="快捷操作: 迎战 | 镇守 | 天灾商店",
+                hint=f"+{points}天灾点",
                 btn1="迎战",
                 btn2="镇守",
                 btn3="天灾商店",
@@ -674,9 +674,9 @@ async def handle_battle_hero(event: MessageEvent):
                 "⛓️ 你被封印24小时",
             ]
             await battle_hero_cmd.finish(build_battle_markdown(
-                title=f"🏰 迎战结果 · {hero['name']}",
+                title=f"🏰 被 {hero['name']} 击倒",
                 battle_log=log_lines,
-                hint="快捷操作: 迎战 | 镇守 | 天灾商店",
+                hint="封印24小时",
                 btn1="迎战",
                 btn2="镇守",
                 btn3="天灾商店",
