@@ -100,11 +100,11 @@ async def handle_pvp(event: MessageEvent, args: Message = CommandArg()):
             p1_final_hp = max(0, challenger.hp - challenger_damage)
             p2_final_hp = max(0, target_player.hp - target_damage)
 
-            title = f"⚔️ 切磋结果 · {challenger.nickname} vs {target_player.nickname}"
+            winner = challenger if victory else target_player
             await pvp_cmd.finish(build_battle_markdown(
-                title=title,
+                title=f"⚔️ {winner.nickname} 胜！",
                 battle_log=battle_log,
-                hint="快捷操作: 切磋 | 面板 | 战力",
+                hint="切磋不影响数据",
                 btn1="切磋",
                 btn2="面板",
                 btn3="战力",
@@ -173,7 +173,7 @@ async def handle_simulate(event: MessageEvent, args: Message = CommandArg()):
 
         # 执行模拟战斗（使用简洁格式）
         try:
-            _, battle_log, p1_damage, p2_damage = await BattleIntegrationHelper.compact_player_vs_player_battle(
+            victory, battle_log, p1_damage, p2_damage = await BattleIntegrationHelper.compact_player_vs_player_battle(
                 player1, player2, session, seed=seed, max_rounds=30
             )
 
@@ -181,11 +181,11 @@ async def handle_simulate(event: MessageEvent, args: Message = CommandArg()):
             p1_final_hp = max(0, player1.hp - p1_damage)
             p2_final_hp = max(0, player2.hp - p2_damage)
 
-            title = f"🎮 模拟战斗 · {player1.nickname} vs {player2.nickname}"
+            winner = player1 if victory else player2
             await simulate_cmd.finish(build_battle_markdown(
-                title=title,
+                title=f"🎮 {winner.nickname} 胜！",
                 battle_log=battle_log,
-                hint="快捷操作: 切磋 | 面板 | 战力",
+                hint="模拟 不影响数据",
                 btn1="切磋",
                 btn2="面板",
                 btn3="战力",
