@@ -9,6 +9,7 @@ from nonebot.params import CommandArg
 from ..models.db import safe_session
 from ..models.player import Player
 from ..utils import message_add_head, check_action_limit, record_action
+from ..ai_guide import call_ai_with_fallback
 import json
 import base64
 import logging
@@ -367,7 +368,7 @@ async def handle_answer_book(event: MessageEvent, args: Message = CommandArg()):
                 await answer_book.finish("您还没有创建角色,请先注册。")
 
         # 发送等待提示
-        await answer_book.send(message_add_head(f"📖 正在翻阅答案之书,寻找关于「{question}」的答案...", event))
+        await answer_book.send(message_add_head(f"📖 正在翻阅答案之书,寻找关于「{question}」的答案...\n🤖 同时邀请智者解读,请稍候...", event))
 
         # 请求API
         api_url = f"https://v2.xxapi.cn/api/answers"
@@ -405,6 +406,29 @@ async def handle_answer_book(event: MessageEvent, args: Message = CommandArg()):
         title_en = answer_data.get("title_en", "")
         desc_en = answer_data.get("description_en", "")
 
+        # 调用AI结合问题和答案进行个性化解读
+        ai_insight = ""
+        try:
+            ai_messages = [
+                {
+                    "role": "system",
+                    "content": (
+                        "你是一位神秘的智者，专门解读「答案之书」的指引。"
+                        "根据提问者的问题和答案之书给出的答案，用100字以内给出一段富有哲理、"
+                        "贴合问题的个性化解读。语气神秘而温和，像在指引迷途的旅人，"
+                        "不要重复答案原文，不要使用「答案之书」这个词。"
+                    )
+                },
+                {
+                    "role": "user",
+                    "content": f"问题：{question}\n答案之书的答案：{title_zh}\n答案说明：{desc_zh}"
+                }
+            ]
+            ai_result = await call_ai_with_fallback(ai_messages)
+            ai_insight = ai_result['choices'][0]['message']['content'].strip()
+        except Exception as e:
+            logger.warning(f"答案之书AI解读失败: {e}")
+
         # 构建消息内容
         msg_content = (
             "📖✨ 答案之书 ✨📖\n"
@@ -420,6 +444,13 @@ async def handle_answer_book(event: MessageEvent, args: Message = CommandArg()):
             msg_content += f"\n🌍 {title_en}\n"
         if desc_en:
             msg_content += f"   {desc_en}\n"
+
+        # 附加AI个性化解读
+        if ai_insight:
+            msg_content += (
+                "\n━━━━━━━━━━━━━\n"
+                f"🔮 智者解读:\n{ai_insight}\n"
+            )
 
         msg_content += (
             "\n━━━━━━━━━━━━━\n"

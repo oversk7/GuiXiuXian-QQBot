@@ -397,8 +397,8 @@ async def handle_submit_item_image(event: MessageEvent, args: Message = CommandA
         if not player:
             await submit_item_image_cmd.finish("⛔ 请先使用【我的信息】创建角色")
 
-        # 检查等级限制
-        if player.level <= 50:
+        # 检查等级限制（管理员跳过）
+        if not is_admin(event.get_user_id()) and player.level <= 50:
             await submit_item_image_cmd.finish(f"⛔ 等级限制\n当前等级：{player.level}\n需要等级：>50\n💡 继续修炼提升等级后即可提交图片")
 
     # 查找物品配置
