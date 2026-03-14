@@ -362,13 +362,13 @@ class WorldBossService:
         """
         return await self._damage_repo.get_or_create(cycle_id, player_id)
 
-    async def attack_boss(self, cycle: WorldBossCycle, player: Player) -> Tuple[bool, list]:
+    async def attack_boss(self, cycle: WorldBossCycle, player: Player) -> Tuple[bool, list, str, str]:
         """讨伐BOSS
 
         Returns:
-            (是否成功, 结果行列表)
-            ok=True:  list[str]，包含完整 battle_log 与摘要行
-            ok=False: list[str]，单行错误文字
+            (是否成功, 结果行列表, 标题字符串, 摘要字符串)
+            ok=True:  list[str]，包含完整 battle_log 与摘要行; title=造成伤害; hint=累计/余次
+            ok=False: list[str]，单行错误文字; title=""; hint=""
 
         改造说明:
             - 原Line 502, 514, 517内部commit()已移除，由调用方控制事务
@@ -390,17 +390,17 @@ class WorldBossService:
             await self._damage_repo.update(damage_record)
 
         if damage_record.attacks_today >= WorldBossService.DAILY_ATTACK_LIMIT:
-            return False, [f"⛔ 今日攻击次数已用完！明日20:00重置（{damage_record.attacks_today}/{WorldBossService.DAILY_ATTACK_LIMIT}）"]
+            return False, [f"⛔ 今日攻击次数已用完！明日20:00重置（{damage_record.attacks_today}/{WorldBossService.DAILY_ATTACK_LIMIT}）"], "", ""
 
         # 检查冷却时间
         now_ts = int(time.time())
         if now_ts - damage_record.last_attack_ts < WorldBossService.ATTACK_COOLDOWN:
             remaining = WorldBossService.ATTACK_COOLDOWN - (now_ts - damage_record.last_attack_ts)
-            return False, [f"⏰ 攻击冷却中，请等待 {remaining} 秒"]
+            return False, [f"⏰ 攻击冷却中，请等待 {remaining} 秒"], "", ""
 
         # 检查玩家状态
         if player.hp <= 0:
-            return False, ["💀 你已重伤倒地，无法参与战斗！请先恢复生命值"]
+            return False, ["💀 你已重伤倒地，无法参与战斗！请先恢复生命值"], "", ""
 
         # 构建BOSS属性（基于最高等级玩家）
         boss_stats = await self._calculate_boss_stats(cycle)
@@ -466,8 +466,11 @@ class WorldBossService:
         lines.append(random.choice(flavor_texts))
 
         # 组合完整战斗内容：battle_log + 分割线 + 摘要
+        remaining_attacks = WorldBossService.DAILY_ATTACK_LIMIT - damage_record.attacks_today
+        boss_title = f"🌑 造成 {damage_dealt:,} 伤害"
+        boss_hint = f"累计 {damage_record.total_damage:,} · 余{remaining_attacks}次"
         full_lines = list(battle_log) + ["━━━━━━━━━━━━━"] + lines
-        return True, full_lines
+        return True, full_lines, boss_title, boss_hint
 
     @staticmethod
     def _execute_sanity_battle(player: Player, boss_stats: Dict, boss_name: str,

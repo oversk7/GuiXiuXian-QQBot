@@ -90,14 +90,14 @@ async def handle_attack(event: MessageEvent, args: Message = CommandArg()):
             item_repo=ItemRepository(session)
         )
         cycle, tip = await service.check_and_refresh_cycle()
-        ok, lines = await service.attack_boss(cycle, player)
+        ok, lines, boss_title, boss_hint = await service.attack_boss(cycle, player)
         if ok:
             if tip:
                 lines = [tip, "━━━━━━━━━━━━━"] + lines
             await attack_cmd.finish(build_battle_markdown(
-                title=f"🌑 讨伐结果 · {cycle.boss_name}",
+                title=boss_title,
                 battle_log=lines,
-                hint="快捷操作: 讨伐BOSS | BOSS排行 | 面板",
+                hint=boss_hint,
                 btn1="讨伐BOSS",
                 btn2="BOSS排行",
                 btn3="面板",
