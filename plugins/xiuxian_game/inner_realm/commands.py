@@ -543,10 +543,18 @@ async def handle_attack(event: MessageEvent):
             player, current_tile, active_session
         )
 
+        if victory:
+            inner_title = "🌀 战斗胜利！"
+            reward_gold = rewards.get("gold", 0)
+            inner_hint = f"+{reward_gold}金币" if reward_gold > 0 else "战斗胜利"
+        else:
+            inner_title = "🌀 战斗失败"
+            inner_hint = "继续探索里界"
+
         await attack_cmd.finish(build_battle_markdown(
-            title="🌀 内界战斗结果",
+            title=inner_title,
             battle_log=log_lines + result_lines,
-            hint="快捷操作: 攻击 | 里界信息 | 返回",
+            hint=inner_hint,
             btn1="攻击",
             btn2="里界信息",
             btn3="返回",
