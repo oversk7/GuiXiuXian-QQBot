@@ -584,9 +584,9 @@ async def handle_player_attack(session, attacker: Player, target: Player, event:
                 result_lines.append(quest_msg)
 
             await attack_cmd.finish(build_battle_markdown(
-                title=f"⚔️ 战斗结果 · {attacker.nickname} vs {target.nickname}",
+                title=f"⚔️ {winner.nickname} 胜（镜怨反弹）",
                 battle_log=result_lines,
-                hint="快捷操作: 探索 | 面板 | 背包",
+                hint=drop_summary,
                 btn1="探索",
                 btn2="面板",
                 btn3="背包",
@@ -669,9 +669,9 @@ async def handle_player_attack(session, attacker: Player, target: Player, event:
                 result_lines.append(quest_msg)
 
             await attack_cmd.finish(build_battle_markdown(
-                title=f"⚔️ 战斗结果 · {attacker.nickname} vs {target.nickname}",
+                title=f"⚔️ {winner.nickname} 胜（虚界反噬）",
                 battle_log=result_lines,
-                hint="快捷操作: 探索 | 面板 | 背包",
+                hint=drop_summary,
                 btn1="探索",
                 btn2="面板",
                 btn3="背包",
@@ -957,10 +957,16 @@ async def handle_player_attack(session, attacker: Player, target: Player, event:
             result_lines.append("")
             result_lines.extend(achievement_msgs)
 
+        pvp_winner = attacker if victory else target
+        if in_town:
+            pvp_hint = "城镇切磋 无掉落"
+        else:
+            pvp_hint = drop_summary if drop_summary else "无物品掉落"
+
         await attack_cmd.finish(build_battle_markdown(
-            title=f"{battle_type} · {attacker.nickname} vs {target.nickname}",
+            title=f"{battle_type} · {pvp_winner.nickname} 胜！",
             battle_log=result_lines,
-            hint="快捷操作: 探索 | 面板 | 背包",
+            hint=pvp_hint,
             btn1="探索",
             btn2="面板",
             btn3="背包",
@@ -1028,6 +1034,7 @@ async def handle_npc_attack(session, attacker: Player, target_npc, event: Messag
         result_lines = [
             "━━━━━━━━━━━━━"
         ]
+        npc_reward_hint = ""
 
         # 展示战斗过程（battle_log 已包含 VS 标题行）
         result_lines.extend(battle_log)
@@ -1082,6 +1089,7 @@ async def handle_npc_attack(session, attacker: Player, target_npc, event: Messag
                     attacker.exp += exp_gain
                     attacker.gold += gold_gain
                     result_lines.append(f"🎉 击杀鬼怪获得 {exp_gain} EXP，{gold_gain} 金币")
+                    npc_reward_hint = f"+{exp_gain}EXP +{gold_gain}金"
             # 结算VIP定制装备（斩龙闪）的战后永久加成（如“噬灵者”）
             if victory and post_effects:
                 from sqlalchemy import select as _select
@@ -1280,6 +1288,7 @@ async def handle_npc_attack(session, attacker: Player, target_npc, event: Messag
                 result_lines.append("💀 你被击败了")
             else:
                 result_lines.append("⏰ 战斗超时，平局")
+            npc_reward_hint = "血量耗尽"
 
         await session.commit()
 
@@ -1310,10 +1319,14 @@ async def handle_npc_attack(session, attacker: Player, target_npc, event: Messag
             result_lines.append("")
             result_lines.extend(achievement_msgs)
 
+        npc_title = f"⚔️ {target_npc.name} 已击倒！" if victory else f"💀 败于 {target_npc.name}"
+        if not npc_reward_hint:
+            npc_reward_hint = "获得战斗奖励" if victory else "血量耗尽"
+
         await attack_cmd.finish(build_battle_markdown(
-            title=f"⚔️ 战斗结果 · {attacker.nickname} vs {target_npc.name}",
+            title=npc_title,
             battle_log=result_lines,
-            hint="快捷操作: 探索 | 面板 | 背包",
+            hint=npc_reward_hint,
             btn1="探索",
             btn2="面板",
             btn3="背包",
