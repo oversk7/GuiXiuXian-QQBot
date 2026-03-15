@@ -1651,6 +1651,20 @@ import math as _math
 
 _FENJIN_MAX_AMOUNT = 10_000_000_000   # 单次上限100亿，防止 math.floor(inf) OverflowError
 
+# 焚金氛围文案池 - 黄金隔绝灵异，焚烧后释放压缩的力量
+FENJIN_FLAVOR_TEXTS = [
+    "黄金在黑焰中融化，其中封印的灵异力量涌入你的经脉。",
+    "金币化作灰烬，曾被压制的怨炁如潮水般释放。",
+    "黄金的隔绝之力消散，无数被封印的灵异碎片融入你的身体。",
+    "金属熔化的瞬间，你感受到被黄金囚禁的力量终于获得自由。",
+    "每一枚金币都是一座牢笼，焚烧它们就是释放其中的囚徒。",
+    "黄金燃尽，曾被隔绝的灵异力量凝聚成纯粹的修为。",
+    "你将黄金投入虚空，封印破碎，力量回归本源。",
+    "金币在黑暗中消失，被压缩的怨炁结晶涌入你的灵魂。",
+    "黄金的光泽褪去，其中蕴藏的灵异本质显露无遗。",
+    "焚金的瞬间，你听见无数被封印之物的低语。",
+]
+
 fenjin = on_command("焚金", block=True, priority=5)
 
 @fenjin.handle()
@@ -1666,12 +1680,15 @@ async def handle_fenjin(event: MessageEvent, args: Message = CommandArg()):
         await fenjin.finish(
             "🔥 焚金仪式\n"
             "━━━━━━━━━━━━━\n"
+            "黄金隔绝灵异，焚烧释放封印之力。\n"
+            "将金币投入黑焰，压缩的怨炁化作修为。\n"
+            "━━━━━━━━━━━━━\n"
             "用法：【焚金 <金额>】\n"
             "示例：【焚金 100000】【焚金 1000000】\n"
-            "━━━━━━━━━━━━━\n"
-            "消耗金币换取修为，边际收益递减\n"
-            "等级越高，同等金币换取更多修为\n"
-            "最低消耗：1,000 金币"
+            "  • 消耗金币，直接获得修为\n"
+            "  • 边际递减：投入越多，每金所得越少\n"
+            "  • 等级联动：境界越高，转化效率越强\n"
+            "  • 无每日限制，最低消耗 1,000 金币"
         )
 
     amount = int(arg_text)
@@ -1715,8 +1732,11 @@ async def handle_fenjin(event: MessageEvent, args: Message = CommandArg()):
                 realm_name = realm_by_level_and_reincarnation(
                     player.level, player.reincarnation_level
                 )
+                flavor = random.choice(FENJIN_FLAVOR_TEXTS)
                 result_msg = (
                     f"🔥 焚金仪式\n"
+                    f"━━━━━━━━━━━━━\n"
+                    f"{flavor}\n"
                     f"━━━━━━━━━━━━━\n"
                     f"消耗: {amount:,} 金币\n"
                     f"境界: {realm_name} Lv.{player.level}（等级加成 ×{level_factor:.1f}）\n"
