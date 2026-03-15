@@ -106,6 +106,10 @@ REQUIRED_FIELDS: Dict[str, Dict[str, str]] = {
     "market_state": {
         "last_restock_time": "DATETIME NULL COMMENT '上次分时补货时间'"
     },
+    # 定期理财 - 到期时间字段
+    "fund_holding": {
+        "maturity_date": "DATETIME NULL COMMENT '到期时间(定期专用,活期为NULL)'"
+    },
     # 世界BOSS - 分段排行快照
     "world_boss_damage": {
         "reincarnation_snapshot": "INT DEFAULT -1 COMMENT '首次攻击时的转数快照(-1表示未攻击)'"

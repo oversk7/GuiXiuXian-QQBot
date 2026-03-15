@@ -34,6 +34,8 @@ class FundHolding(Base):
     buy_date: Mapped[datetime] = mapped_column(DateTime, server_default=func.now(), comment="购买时间")
     last_settlement: Mapped[datetime] = mapped_column(DateTime, server_default=func.now(), comment="最后结算时间")
     is_active: Mapped[bool] = mapped_column(Boolean, default=True, server_default='1', comment="是否持有中")
+    # 定期理财字段：None表示活期，有值表示定期到期时间
+    maturity_date: Mapped[datetime | None] = mapped_column(DateTime, nullable=True, comment="到期时间(定期专用,活期为NULL)")
 
     # 索引
     __table_args__ = (

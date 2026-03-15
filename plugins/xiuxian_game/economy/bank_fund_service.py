@@ -2,7 +2,7 @@
 银行理财产品Service
 基于DI架构,提供理财产品的核心业务逻辑
 """
-from datetime import datetime
+from datetime import datetime, timedelta
 import random
 from typing import Optional, List, Tuple
 
@@ -193,7 +193,7 @@ class BankFundService:
         return await self._holding_repo.get_player_holdings(player_id, active_only=True)
 
     async def daily_settlement(self) -> Tuple[float, int]:
-        """每日结算所有持仓（定时任务调用）
+        """每日结算所有活期持仓（定时任务调用）
 
         Returns:
             (今日收益率, 结算持仓数量)
@@ -204,13 +204,14 @@ class BankFundService:
         fund.daily_return = daily_return
         await self._fund_repo.update(fund)
 
-        # 2. 结算所有活跃持仓
-        holdings = await self._holding_repo.get_all_active_holdings()
+        # 2. 只结算活期持仓（maturity_date 为 None 的为活期）
+        all_holdings = await self._holding_repo.get_all_active_holdings()
+        lively_holdings = [h for h in all_holdings if h.maturity_date is None]
 
-        for holding in holdings:
+        for holding in lively_holdings:
             await self._settle_holding(holding, daily_return)
 
-        return daily_return, len(holdings)
+        return daily_return, len(lively_holdings)
 
     async def _settle_holding(self, holding: FundHolding, daily_return: float):
         """结算单个持仓"""
@@ -245,3 +246,168 @@ class BankFundService:
         )
 
         return daily_return
+
+    # ==================== 定期理财（七日定存）====================
+
+    # 七日定期理财配置
+    FIXED_WEEKLY_CONFIG = {
+        "min_investment": 50_000,      # 最低投资5万
+        "max_investment": 10_000_000,  # 最高投资1000万
+        "interest_rate": 0.05,         # 周利率5%（毛收益）
+        "fee_rate": 0.10,              # 管理费=利息的10%（货币回收）
+        "lock_days": 7,                # 锁定7天
+    }
+
+    async def get_or_create_fixed_weekly_fund(self) -> BankFund:
+        """获取或创建七日定存基金"""
+        fund = await self._fund_repo.get_by_type("fixed_weekly")
+        if not fund:
+            fund = BankFund(
+                fund_name="冥界七日定存",
+                fund_type="fixed_weekly",
+                daily_return=self.FIXED_WEEKLY_CONFIG["interest_rate"],
+                total_scale=0,
+                participant_count=0
+            )
+            fund = await self._fund_repo.add(fund)
+        return fund
+
+    async def buy_fixed_weekly(
+        self,
+        player: Player,
+        amount: int,
+        use_bank: bool = True
+    ) -> Tuple[bool, str]:
+        """
+        购买七日定存
+
+        Returns:
+            (成功标志, 消息)
+        """
+        cfg = self.FIXED_WEEKLY_CONFIG
+
+        if amount < cfg["min_investment"]:
+            return False, f"⛔ 最低投资 {cfg['min_investment']:,} 金币"
+        if amount > cfg["max_investment"]:
+            return False, f"⛔ 最高投资 {cfg['max_investment']:,} 金币"
+
+        # 扣款
+        if use_bank:
+            bank_acc = await self._bank_account_repo.get_by_id(player.id)
+            if not bank_acc or bank_acc.balance < amount:
+                return False, "⛔ 银行存款不足"
+            bank_acc.balance -= amount
+            await self._bank_account_repo.update(bank_acc)
+        else:
+            if player.gold < amount:
+                return False, "⛔ 金币不足"
+            player.gold -= amount
+            await self._player_repo.update(player)
+
+        fund = await self.get_or_create_fixed_weekly_fund()
+        now = datetime.now()
+        maturity = now + timedelta(days=cfg["lock_days"])
+
+        # 计算预期利息（仅用于展示，实际结算在赎回时计算）
+        gross_interest = int(amount * cfg["interest_rate"])
+        fee = int(gross_interest * cfg["fee_rate"])
+        net_interest = gross_interest - fee
+
+        holding = FundHolding(
+            player_id=player.id,
+            fund_id=fund.id,
+            principal=amount,
+            current_value=amount,
+            accumulated_profit=0,
+            buy_date=now,
+            last_settlement=now,
+            is_active=True,
+            maturity_date=maturity
+        )
+        holding = await self._holding_repo.add(holding)
+
+        fund.total_scale += amount
+        fund.participant_count += 1
+        await self._fund_repo.update(fund)
+
+        return True, (
+            f"✅ 定期存入成功\n"
+            f"━━━━━━━━━━━━━\n"
+            f"💰 投资金额：{amount:,} 金币\n"
+            f"📅 到期时间：{maturity.strftime('%Y-%m-%d %H:%M')}\n"
+            f"📈 预期利息：+{net_interest:,} 金币（净收益约 {net_interest/amount*100:.1f}%）\n"
+            f"⚠️ 锁定期间不可提前赎回\n"
+            f"💡 到期后使用「赎回定期 {holding.id}」取回"
+        )
+
+    async def redeem_fixed_weekly(
+        self,
+        player: Player,
+        holding_id: int,
+        to_bank: bool = True
+    ) -> Tuple[bool, str]:
+        """
+        赎回七日定存（仅限到期后）
+
+        Returns:
+            (成功标志, 消息)
+        """
+        holding = await self._holding_repo.get_by_id(holding_id)
+        if not holding or holding.player_id != player.id or not holding.is_active:
+            return False, "⛔ 持仓不存在或已赎回"
+        if holding.maturity_date is None:
+            return False, "⛔ 该持仓为活期理财，请使用「赎回理财」命令"
+
+        now = datetime.now()
+        if now < holding.maturity_date:
+            remaining = holding.maturity_date - now
+            hours = int(remaining.total_seconds() // 3600)
+            minutes = int((remaining.total_seconds() % 3600) // 60)
+            return False, (
+                f"⛔ 尚未到期，不可提前赎回\n"
+                f"⏳ 剩余：{hours} 小时 {minutes} 分钟\n"
+                f"📅 到期时间：{holding.maturity_date.strftime('%Y-%m-%d %H:%M')}"
+            )
+
+        # 计算利息
+        cfg = self.FIXED_WEEKLY_CONFIG
+        gross_interest = int(holding.principal * cfg["interest_rate"])
+        fee = int(gross_interest * cfg["fee_rate"])
+        net_interest = gross_interest - fee
+        payout = holding.principal + net_interest
+
+        # 结算
+        holding.current_value = payout
+        holding.accumulated_profit = net_interest
+        holding.is_active = False
+        await self._holding_repo.update(holding)
+
+        # 更新基金规模
+        fund = await self._fund_repo.get_by_id(holding.fund_id)
+        if fund:
+            fund.total_scale -= holding.principal
+            fund.participant_count -= 1
+            await self._fund_repo.update(fund)
+
+        # 发放资金
+        if to_bank:
+            bank_acc = await self._bank_account_repo.get_or_create(player.id)
+            bank_acc.balance += payout
+            await self._bank_account_repo.update(bank_acc)
+        else:
+            player.gold += payout
+            await self._player_repo.update(player)
+
+        return True, (
+            f"✅ 定期赎回成功\n"
+            f"━━━━━━━━━━━━━\n"
+            f"💰 本金：{holding.principal:,} 金币\n"
+            f"📈 利息收益：+{net_interest:,} 金币\n"
+            f"💎 到账金额：{payout:,} 金币\n"
+            f"💵 已{'存入银行' if to_bank else '转入现金'}"
+        )
+
+    async def get_player_fixed_holdings(self, player_id: str) -> List[FundHolding]:
+        """获取玩家的所有定期持仓"""
+        all_holdings = await self._holding_repo.get_player_holdings(player_id, active_only=True)
+        return [h for h in all_holdings if h.maturity_date is not None]

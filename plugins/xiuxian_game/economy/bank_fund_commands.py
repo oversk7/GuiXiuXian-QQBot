@@ -255,3 +255,203 @@ async def handle_fund_holdings(event: MessageEvent):
     lines.append("💡 使用「赎回理财 编号 银行」赎回到银行")
 
     await fund_holdings_cmd.finish(message_add_head("\n".join(lines), event))
+
+
+# ==================== 定期理财（七日定存）命令 ====================
+
+fixed_list_cmd = on_command("定期理财", block=True, priority=5)
+fixed_buy_cmd = on_command("购买定期", block=True, priority=5)
+fixed_holdings_cmd = on_command("我的定期", block=True, priority=5)
+fixed_redeem_cmd = on_command("赎回定期", block=True, priority=5)
+
+
+@fixed_list_cmd.handle()
+async def handle_fixed_list(event: MessageEvent):
+    """查看七日定存产品介绍"""
+    async with UnitOfWork(session_factory) as uow:
+        player = await get_unified_player(uow.session, event)
+        if not player:
+            error_msg = "⛔ 请先创建角色"
+        else:
+            error_msg = None
+            fund_service = BankFundService(
+                fund_repo=uow.bank_funds,
+                holding_repo=uow.fund_holdings,
+                bank_account_repo=uow.bank_accounts,
+                player_repo=uow.players
+            )
+            fund = await fund_service.get_or_create_fixed_weekly_fund()
+            await uow.commit()
+
+    if error_msg:
+        await fixed_list_cmd.finish(error_msg)
+
+    cfg = BankFundService.FIXED_WEEKLY_CONFIG
+    gross = cfg["interest_rate"] * 100
+    fee = cfg["interest_rate"] * cfg["fee_rate"] * 100
+    net = gross - fee
+
+    lines = [
+        "🏦 冥界七日定存",
+        "▃▃▃▃▃▃▃▃▃▃",
+        "",
+        f"📊 基金规模：{fund.total_scale:,} 金币",
+        f"👥 参与人数：{fund.participant_count} 人",
+        "",
+        "📝 产品说明",
+        f"  ▫️ 锁定期：7天（到期方可赎回）",
+        f"  ▫️ 周利率：{gross:.0f}%（毛）/ {net:.0f}%（净）",
+        f"  ▫️ 管理费：利息的 {cfg['fee_rate']*100:.0f}%",
+        f"  ▫️ 最低投资：{cfg['min_investment']:,} 金币",
+        f"  ▫️ 最高投资：{cfg['max_investment']:,} 金币",
+        "",
+        "⚠️ 注意：锁定期间不可提前赎回，请确保资金不急用",
+        "",
+        "💡 使用「购买定期 金额」从现金投资",
+        "💡 使用「购买定期 金额 银行」从银行账户投资",
+        "💡 使用「我的定期」查看持有中的定存",
+    ]
+    await fixed_list_cmd.finish(message_add_head("\n".join(lines), event))
+
+
+@fixed_buy_cmd.handle()
+async def handle_fixed_buy(event: MessageEvent, args: Message = CommandArg()):
+    """购买七日定存"""
+    args_text = args.extract_plain_text().strip()
+    if not args_text:
+        await fixed_buy_cmd.finish("⛔ 格式：购买定期 <金额> [银行]")
+
+    parts = args_text.split()
+    if not parts[0].isdigit():
+        await fixed_buy_cmd.finish("⛔ 金额必须为正整数")
+
+    amount = int(parts[0])
+    if amount <= 0:
+        await fixed_buy_cmd.finish("⛔ 金额必须为正整数")
+
+    use_bank = len(parts) > 1 and parts[1] in ["银行", "bank"]
+
+    async with UnitOfWork(session_factory) as uow:
+        player = await get_unified_player(uow.session, event)
+        if not player:
+            error_msg = "⛔ 请先创建角色"
+        else:
+            error_msg = None
+            fund_service = BankFundService(
+                fund_repo=uow.bank_funds,
+                holding_repo=uow.fund_holdings,
+                bank_account_repo=uow.bank_accounts,
+                player_repo=uow.players
+            )
+            success, message = await fund_service.buy_fixed_weekly(player, amount, use_bank)
+            if success:
+                await uow.commit()
+            else:
+                error_msg = message
+
+    if error_msg:
+        await fixed_buy_cmd.finish(error_msg)
+
+    await fixed_buy_cmd.finish(message_add_head(message, event))
+
+
+@fixed_holdings_cmd.handle()
+async def handle_fixed_holdings(event: MessageEvent):
+    """查看我的七日定存持仓"""
+    async with UnitOfWork(session_factory) as uow:
+        player = await get_unified_player(uow.session, event)
+        if not player:
+            error_msg = "⛔ 请先创建角色"
+        else:
+            error_msg = None
+            fund_service = BankFundService(
+                fund_repo=uow.bank_funds,
+                holding_repo=uow.fund_holdings,
+                bank_account_repo=uow.bank_accounts,
+                player_repo=uow.players
+            )
+            holdings = await fund_service.get_player_fixed_holdings(player.id)
+
+    if error_msg:
+        await fixed_holdings_cmd.finish(error_msg)
+
+    if not holdings:
+        await fixed_holdings_cmd.finish(message_add_head("📋 你目前没有持有七日定存", event))
+
+    cfg = BankFundService.FIXED_WEEKLY_CONFIG
+    now = datetime.now()
+
+    lines = ["📋 我的七日定存", "▃▃▃▃▃▃▃▃▃▃", ""]
+    total_principal = 0
+
+    for idx, h in enumerate(holdings, 1):
+        gross_interest = int(h.principal * cfg["interest_rate"])
+        fee = int(gross_interest * cfg["fee_rate"])
+        net_interest = gross_interest - fee
+
+        if now >= h.maturity_date:
+            status = "✅ 已到期（可赎回）"
+            countdown = ""
+        else:
+            remaining = h.maturity_date - now
+            hours = int(remaining.total_seconds() // 3600)
+            mins = int((remaining.total_seconds() % 3600) // 60)
+            status = f"⏳ 锁定中"
+            countdown = f"（剩余 {hours}小时{mins}分）"
+
+        lines.append(f"【{idx}】编号 {h.id}")
+        lines.append(f"  💰 本金：{h.principal:,} 金币")
+        lines.append(f"  📈 预期净收益：+{net_interest:,} 金币")
+        lines.append(f"  📅 到期时间：{h.maturity_date.strftime('%Y-%m-%d %H:%M')}")
+        lines.append(f"  🔒 状态：{status}{countdown}")
+        lines.append("")
+        total_principal += h.principal
+
+    lines.append("━━━━━━━━━━━━━")
+    lines.append(f"💰 定存总额：{total_principal:,} 金币")
+    lines.append("")
+    lines.append("💡 使用「赎回定期 编号」赎回到现金")
+    lines.append("💡 使用「赎回定期 编号 银行」赎回到银行")
+
+    await fixed_holdings_cmd.finish(message_add_head("\n".join(lines), event))
+
+
+@fixed_redeem_cmd.handle()
+async def handle_fixed_redeem(event: MessageEvent, args: Message = CommandArg()):
+    """赎回七日定存（仅限到期后）"""
+    args_text = args.extract_plain_text().strip()
+    if not args_text:
+        await fixed_redeem_cmd.finish("⛔ 格式：赎回定期 <编号> [银行]")
+
+    parts = args_text.split()
+    if not parts[0].isdigit():
+        await fixed_redeem_cmd.finish("⛔ 编号必须为正整数")
+
+    holding_id = int(parts[0])
+    if holding_id <= 0:
+        await fixed_redeem_cmd.finish("⛔ 编号必须为正整数")
+
+    to_bank = len(parts) > 1 and parts[1] in ["银行", "bank"]
+
+    async with UnitOfWork(session_factory) as uow:
+        player = await get_unified_player(uow.session, event)
+        if not player:
+            error_msg = "⛔ 请先创建角色"
+        else:
+            error_msg = None
+            fund_service = BankFundService(
+                fund_repo=uow.bank_funds,
+                holding_repo=uow.fund_holdings,
+                bank_account_repo=uow.bank_accounts,
+                player_repo=uow.players
+            )
+            success, message = await fund_service.redeem_fixed_weekly(player, holding_id, to_bank)
+            if success:
+                await uow.commit()
+            else:
+                error_msg = message
+
+    if error_msg:
+        await fixed_redeem_cmd.finish(error_msg)
+
+    await fixed_redeem_cmd.finish(message_add_head(message, event))
