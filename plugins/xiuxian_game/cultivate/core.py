@@ -1644,3 +1644,89 @@ async def handle_free_reset_points(event: MessageEvent):
         )
 
         await free_reset_points.finish(message_add_head(msg, event))
+
+
+# ==================== 焚金 ====================
+import math as _math
+
+_FENJIN_MAX_AMOUNT = 10_000_000_000   # 单次上限100亿，防止 math.floor(inf) OverflowError
+
+fenjin = on_command("焚金", block=True, priority=5)
+
+@fenjin.handle()
+async def handle_fenjin(event: MessageEvent, args: Message = CommandArg()):
+    """焚金 — 消耗金币换取修为（平方根递减 + 等级联动）"""
+    from ..platform_utils import get_unified_player
+    from ..player.realm_utils import realm_by_level_and_reincarnation
+
+    arg_text = args.extract_plain_text().strip()
+
+    # 参数校验在 session 外部
+    if not arg_text or not arg_text.isdigit():
+        await fenjin.finish(
+            "🔥 焚金仪式\n"
+            "━━━━━━━━━━━━━\n"
+            "用法：【焚金 <金额>】\n"
+            "示例：【焚金 100000】【焚金 1000000】\n"
+            "━━━━━━━━━━━━━\n"
+            "消耗金币换取修为，边际收益递减\n"
+            "等级越高，同等金币换取更多修为\n"
+            "最低消耗：1,000 金币"
+        )
+
+    amount = int(arg_text)
+    if amount < 1000:
+        await fenjin.finish("⛔ 焚金最低消耗 1,000 金币")
+    if amount > _FENJIN_MAX_AMOUNT:
+        await fenjin.finish(f"⛔ 单次焚金上限为 {_FENJIN_MAX_AMOUNT:,} 金币")
+
+    # 在 session 内收集结果，不调用 finish()
+    error_msg = None
+    result_msg = None
+
+    async with safe_session() as session:
+        player = await get_unified_player(session, event)
+        if not player:
+            error_msg = "⛔ 请先使用【注册】命令创建角色"
+        elif player.gold < amount:
+            error_msg = (
+                f"⛔ 金币不足\n"
+                f"当前: {player.gold:,} 金币\n"
+                f"需要: {amount:,} 金币"
+            )
+        else:
+            # 计算修为
+            # player.exp = 已积累修为（绝对值），exp_cap = 升级所需总修为（绝对值），同一量纲
+            level_factor = 1.0 + (player.level / 100.0)
+            exp_gain = _math.floor(
+                _math.sqrt(amount / 1000) * 100 * level_factor
+            )
+
+            exp_cap = calculate_level_up_exp(player.level)
+            exp_gain = min(exp_gain, max(0, exp_cap - player.exp))
+
+            if exp_gain <= 0:
+                error_msg = "⛔ 修为已满，请先使用【突破】提升境界"
+            else:
+                player.gold -= amount
+                player.exp += exp_gain
+                session.add(player)
+
+                realm_name = realm_by_level_and_reincarnation(
+                    player.level, player.reincarnation_level
+                )
+                result_msg = (
+                    f"🔥 焚金仪式\n"
+                    f"━━━━━━━━━━━━━\n"
+                    f"消耗: {amount:,} 金币\n"
+                    f"境界: {realm_name} Lv.{player.level}（等级加成 ×{level_factor:.1f}）\n"
+                    f"获得修为: +{exp_gain:,}\n"
+                    f"当前修为: {player.exp:,} / {exp_cap:,}\n"
+                    f"━━━━━━━━━━━━━\n"
+                    f"⚠️ 修为已积累，使用【突破】继续成长"
+                )
+
+    # session 关闭后再调用 finish()，避免连接泄漏
+    if error_msg:
+        await fenjin.finish(message_add_head(error_msg, event))
+    await fenjin.finish(message_add_head(result_msg, event))
