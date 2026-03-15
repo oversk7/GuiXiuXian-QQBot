@@ -595,18 +595,24 @@ class BattleIntegrationHelper:
 
                         from ..utils import apply_defense_mitigation
 
+                        # 怪物反击时应用穿透（ignore_defense）
+                        effective_def = player.defense
+                        monster_pen = monster_stats.get("ignore_defense", 0)
+                        if monster_pen > 0:
+                            effective_def = int(player.defense * (1 - monster_pen / 100))
+
                         if has_true_damage and ignore_special_ratio > 0:
                             # 50%真伤 + 50%普通伤害
                             true_damage_part = int(counter_damage * 0.5)
                             normal_damage_part = counter_damage - true_damage_part
-                            mitigation = apply_defense_mitigation(normal_damage_part, player.defense)
+                            mitigation = apply_defense_mitigation(normal_damage_part, effective_def)
                             final_counter_damage = true_damage_part + mitigation["final_damage"]
                         elif has_true_damage:
                             # 完全真伤
                             final_counter_damage = counter_damage
                         else:
                             # 普通伤害
-                            mitigation = apply_defense_mitigation(counter_damage, player.defense)
+                            mitigation = apply_defense_mitigation(counter_damage, effective_def)
                             final_counter_damage = mitigation["final_damage"]
 
                         player_hp = max(0, player_hp - final_counter_damage)
@@ -645,6 +651,12 @@ class BattleIntegrationHelper:
                         val = float(getattr(eff, 'value', 0))
                         ignore_special_ratio += max(0.0, val) / 100.0
 
+                    # 应用穿透（怪物 ignore_defense 削减玩家有效防御）
+                    effective_player_defense = player.defense
+                    monster_penetration = monster_stats.get("ignore_defense", 0)
+                    if monster_penetration > 0:
+                        effective_player_defense = int(player.defense * (1 - monster_penetration / 100))
+
                     # 应用防御减伤
                     from ..utils import apply_defense_mitigation
 
@@ -654,7 +666,7 @@ class BattleIntegrationHelper:
                             # 玩家有绝魔体质：50%真伤 + 50%普通伤害（受防御减伤）
                             true_damage_part = int(monster_damage * 0.5)
                             normal_damage_part = monster_damage - true_damage_part
-                            mitigation = apply_defense_mitigation(normal_damage_part, player.defense)
+                            mitigation = apply_defense_mitigation(normal_damage_part, effective_player_defense)
                             final_damage = true_damage_part + mitigation["final_damage"]
                             battle_log.append(f"🔥 {monster_name}的真伤被绝魔体质免疫50%！")
                         else:
@@ -663,7 +675,7 @@ class BattleIntegrationHelper:
                             battle_log.append(f"🔥 {monster_name}的真伤无视防御！")
                     else:
                         # 普通伤害，正常计算防御减伤
-                        mitigation = apply_defense_mitigation(monster_damage, player.defense)
+                        mitigation = apply_defense_mitigation(monster_damage, effective_player_defense)
                         final_damage = mitigation["final_damage"]
 
                     # 检查玩家是否有刚气-心效果（减少受到的伤害）
@@ -686,6 +698,13 @@ class BattleIntegrationHelper:
                     # 先扣血
                     player_hp = max(0, player_hp - final_damage)
                     battle_log.append(f"👹 {monster_name}攻击{player.nickname}，造成{final_damage}伤害")
+
+                    # 怪物吸血
+                    monster_lifesteal = monster_stats.get("lifesteal", 0)
+                    if monster_lifesteal > 0 and final_damage > 0:
+                        heal_amount = int(final_damage * monster_lifesteal / 100)
+                        monster_hp = min(monster_stats["hp"], monster_hp + heal_amount)
+                        battle_log.append(f"🧡 {monster_name}吸血恢复{heal_amount}HP")
 
                     # 被攻击方（玩家）受击触发：如镜怨披风·怨息环流（恢复10%）
                     # 只有在玩家还活着时才能回血，避免死人复活
