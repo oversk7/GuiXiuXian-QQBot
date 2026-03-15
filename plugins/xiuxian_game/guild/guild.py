@@ -1,13 +1,14 @@
 from nonebot import on_command
 from nonebot.adapters.qq import MessageEvent, Message
 from nonebot.params import CommandArg
-from sqlalchemy import select, func as _func
+from sqlalchemy import select, func as _func, delete as sql_delete
 from datetime import datetime, date
 
 from ..models.db import safe_session
 from ..models.player import Player
 from ..models.inventory import ItemInstance
-from ..models.guild import Guild, GuildMember, GuildPosition, BuildingType, GuildWarehouseItem
+from ..models.guild import Guild, GuildMember, GuildPosition, BuildingType, GuildWarehouseItem, GuildAlchemyProduction, GuildTeleportLog
+from ..models.guild_task_record import GuildTaskRecord
 from ..config import config
 from ..utils import message_add_head
 from ..models.social_application import SocialApplication, ApplicationType, ApplicationStatus
@@ -411,7 +412,13 @@ async def handle_dissolve_guild(event: MessageEvent):
             m.guild_id = None
             session.add(m)
 
-        # 删除公会
+        # 删除无 cascade 的关联记录（避免 MySQL 外键约束报错）
+        await session.execute(sql_delete(GuildTaskRecord).where(GuildTaskRecord.guild_id == guild_obj.id))
+        await session.execute(sql_delete(GuildWarehouseItem).where(GuildWarehouseItem.guild_id == guild_obj.id))
+        await session.execute(sql_delete(GuildAlchemyProduction).where(GuildAlchemyProduction.guild_id == guild_obj.id))
+        await session.execute(sql_delete(GuildTeleportLog).where(GuildTeleportLog.guild_id == guild_obj.id))
+
+        # 删除公会（GuildMember 和 GuildBuilding 由 cascade 自动删除）
         await session.delete(guild_obj)
         await session.commit()
 
