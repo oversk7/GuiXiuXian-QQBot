@@ -11,7 +11,9 @@
       "Bash(cat:*)",
       "Bash(dir:*)",
       "Bash(mysql:*)",
-      "mcp__ace-tool__search_context"
+      "mcp__ace-tool__search_context",
+      "Bash(git status:*)",
+      "Bash(git:*)"
     ],
     "deny": [],
     "ask": []

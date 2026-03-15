@@ -457,17 +457,18 @@ elixirs:
     quantity: 1
     base_success: 0.65
 
-  # 顶级全属性永久丹 - 诅咒精魄丹（诅咒之根×3，攻+防+敏三属性）
+  # 顶级全属性永久丹 - 诅咒精魄丹（诅咒之根×8，攻+防+敏三属性）
   herb_cursed_essence:
     produce_item_id: "cursed_essence_elixir"
     materials:
-      cursed_root: 3      # 紫色诡药（灵田）
-      demon_heart: 1      # 紫色材料
-      spirit_stone: 2     # 紫色材料（灵石）
-      soul_crystal: 5     # 蓝色材料
-      arowana: 1          # 紫色鱼类
+      cursed_root: 8      # 紫色诡药（灵田）- 大幅提升需求量
+      void_essence: 3     # 紫色材料 - 新增高阶材料要求
+      demon_heart: 3      # 紫色材料 - 提升需求量
+      spirit_stone: 4     # 紫色材料（灵石）- 提升需求量
+      soul_crystal: 10    # 蓝色材料 - 提升需求量
+      arowana: 2          # 紫色鱼类 - 提升需求量
     quantity: 1
-    base_success: 0.50
+    base_success: 0.35
 
   # 传说多属性洗髓丹 - 虚空归元丹（虚空绽×2，攻+防+敏各5%洗髓，归元系列上位）
   herb_void_restore:

@@ -1901,7 +1901,7 @@ items:
       name: "诅咒精魄丹"
       description: "以诅咒之根炼成，诅咒之力淬炼全身灵力，永久提升攻击+20、防御+20、敏捷+15"
       type: "CONSUMABLE"
-      price: 120000
+      price: 500000
       effect_type: "BUFF"
       effect_params:
         attack: 20
