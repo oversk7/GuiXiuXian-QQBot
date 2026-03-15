@@ -291,6 +291,16 @@ class BankFundService:
         if amount > cfg["max_investment"]:
             return False, f"⛔ 最高投资 {cfg['max_investment']:,} 金币"
 
+        # 检查是否已有活跃定存（每人同一时间只能持有一笔）
+        existing = await self.get_player_fixed_holdings(player.id)
+        if existing:
+            h = existing[0]
+            return False, (
+                f"⛔ 你已有一笔定存尚未到期\n"
+                f"📅 到期时间：{h.maturity_date.strftime('%Y-%m-%d %H:%M')}\n"
+                f"💡 到期赎回后才可再次购买"
+            )
+
         # 扣款
         if use_bank:
             bank_acc = await self._bank_account_repo.get_by_id(player.id)
