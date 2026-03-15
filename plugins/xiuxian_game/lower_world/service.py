@@ -14,7 +14,7 @@ WAVE_INTERVAL_HOURS = 2
 # 英雄等待超时（4小时后自动撤退）
 HERO_TIMEOUT_HOURS = 4
 # 封印时长（24小时）
-SEAL_DURATION_HOURS = 24
+SEAL_DURATION_HOURS = 12
 # 战斗冷却（5分钟）
 BATTLE_COOLDOWN_MINUTES = 5
 
@@ -101,6 +101,7 @@ async def process_battle_victory(uow: UnitOfWork, stronghold: LowerWorldStrongho
     stronghold.calamity_points += points
     stronghold.total_waves_won += 1
     stronghold.wave_number += 1
+    stronghold.best_wave = max(stronghold.best_wave or 1, stronghold.wave_number)
     stronghold.pending_hero = None
     stronghold.sealed_until = None
     await schedule_next_wave(uow, stronghold, player_level)
@@ -108,16 +109,22 @@ async def process_battle_victory(uow: UnitOfWork, stronghold: LowerWorldStrongho
     return points
 
 
-async def process_battle_defeat(uow: UnitOfWork, stronghold: LowerWorldStronghold):
+async def process_battle_defeat(uow: UnitOfWork, stronghold: LowerWorldStronghold) -> int:
     """
     处理战斗失败：
-    - 封印24小时
-    - 清除当前英雄（等封印结束后重新安排）
+    - 封印12小时
+    - 波次 -3（最低回到1）
+    - 清除当前英雄
+    返回降低的波次数
     """
     stronghold.sealed_until = datetime.now() + timedelta(hours=SEAL_DURATION_HOURS)
+    old_wave = stronghold.wave_number
+    stronghold.wave_number = max(1, stronghold.wave_number - 3)
+    wave_dropped = old_wave - stronghold.wave_number
     stronghold.pending_hero = None
     stronghold.next_wave_at = None
     uow.session.add(stronghold)
+    return wave_dropped
 
 
 # ==================== 天灾商店 ====================

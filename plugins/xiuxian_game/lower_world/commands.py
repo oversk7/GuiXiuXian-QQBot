@@ -103,7 +103,7 @@ async def handle_descend(event: MessageEvent):
         await _show_stronghold_status(stronghold, player.level)
 
 
-async def _show_stronghold_status(stronghold, player_level: int):
+async def _show_stronghold_status(stronghold, player_level: int, cmd=descend_cmd):
     """显示山寨状态（共用逻辑）"""
     # 检查封印状态
     sealed, remaining = is_sealed(stronghold)
@@ -114,6 +114,7 @@ async def _show_stronghold_status(stronghold, player_level: int):
             f"📍 第 {stronghold.wave_number} 波\n"
             f"💎 天灾点：{stronghold.calamity_points}\n"
             f"🏆 已胜利波次：{stronghold.total_waves_won}\n"
+            f"🏅 历史最高：第{stronghold.best_wave or stronghold.wave_number}波\n"
             "\n"
             f"⛓️ 封印中（剩余 {format_time_remaining(remaining)}）\n"
             "\n"
@@ -123,7 +124,7 @@ async def _show_stronghold_status(stronghold, player_level: int):
             "\n"
             "等封印解除后，会有新的英雄到来。"
         )
-        await descend_cmd.finish(msg)
+        await cmd.finish(msg)
 
     # 检查是否有待战斗的英雄
     if has_pending_hero(stronghold):
@@ -142,6 +143,7 @@ async def _show_stronghold_status(stronghold, player_level: int):
             f"📍 第 {stronghold.wave_number} 波\n"
             f"💎 天灾点：{stronghold.calamity_points}\n"
             f"🏆 已胜利波次：{stronghold.total_waves_won}\n"
+            f"🏅 历史最高：第{stronghold.best_wave or stronghold.wave_number}波\n"
             "\n"
             f"⚔️ 英雄已到达：{hero['name']}\n"
             f"🎖️ Lv.{hero['level']}\n"
@@ -152,7 +154,7 @@ async def _show_stronghold_status(stronghold, player_level: int):
             "\n"
             "使用【迎战】与英雄战斗"
         )
-        await descend_cmd.finish(msg)
+        await cmd.finish(msg)
 
     # 检查英雄是否已超时撤退，或 next_wave_at 为空（封印结束后尚未安排下一波）
     if not stronghold.next_wave_at or datetime.now() > stronghold.next_wave_at + timedelta(hours=HERO_TIMEOUT_HOURS):
@@ -171,11 +173,12 @@ async def _show_stronghold_status(stronghold, player_level: int):
             f"📍 第 {stronghold.wave_number} 波\n"
             f"💎 天灾点：{stronghold.calamity_points}\n"
             f"🏆 已胜利波次：{stronghold.total_waves_won}\n"
+            f"🏅 历史最高：第{stronghold.best_wave or stronghold.wave_number}波\n"
             "\n"
             "🚶 英雄等待超时，已撤退\n"
             f"⏳ 下一波英雄将于 {WAVE_INTERVAL_HOURS} 小时后到达"
         )
-        await descend_cmd.finish(msg)
+        await cmd.finish(msg)
 
     # 正在等待下一波英雄
     time_until_next = stronghold.next_wave_at - datetime.now()
@@ -224,7 +227,7 @@ async def _show_stronghold_status(stronghold, player_level: int):
         "\n"
         f"⏳ 下一波英雄将于 {format_time_remaining(time_until_next)} 后到达"
     )
-    await descend_cmd.finish(msg)
+    await cmd.finish(msg)
 
 
 # ==================== 【镇守】 ====================
@@ -246,7 +249,7 @@ async def handle_guard(event: MessageEvent):
             await guard_cmd.finish("你还未建立山寨。使用【降临】开始下位世界之旅")
 
         # 共用状态显示逻辑
-        await _show_stronghold_status(stronghold, player.level)
+        await _show_stronghold_status(stronghold, player.level, cmd=guard_cmd)
 
 
 # ==================== 【迎战】 ====================
@@ -286,6 +289,14 @@ async def handle_battle_hero(event: MessageEvent):
                     f"⏳ 下一波英雄将于 {WAVE_INTERVAL_HOURS} 小时后到达"
                 )
             else:
+                if not stronghold.next_wave_at:
+                    # 封印结束后 next_wave_at 为 None，立即安排下一波
+                    await schedule_next_wave(uow, stronghold, player.level)
+                    await uow.commit()
+                    await battle_hero_cmd.finish(
+                        f"⏳ 封印已解除，下一波英雄将于 {WAVE_INTERVAL_HOURS} 小时后到达\n"
+                        "请耐心等待。"
+                    )
                 time_until_next = stronghold.next_wave_at - datetime.now()
                 await battle_hero_cmd.finish(
                     f"⏳ 下一波英雄将于 {format_time_remaining(time_until_next)} 后到达\n"
@@ -536,7 +547,7 @@ async def handle_battle_hero(event: MessageEvent):
             ))
         else:
             # 失败
-            await process_battle_defeat(uow, stronghold)
+            wave_dropped = await process_battle_defeat(uow, stronghold)
             await uow.commit()
 
             _female_names = {"席拉", "伊莲娜", "芙蕾雅", "奥尔加", "米雷亚", "艾莉丝", "薇薇安"}
@@ -671,12 +682,12 @@ async def handle_battle_hero(event: MessageEvent):
                 "",
                 defeat_ending,
                 "",
-                "⛓️ 你被封印24小时",
+                f"⛓️ 你被封印{SEAL_DURATION_HOURS}小时" + (f"，波次降低{wave_dropped}波（当前第{stronghold.wave_number}波）" if wave_dropped > 0 else ""),
             ]
             await battle_hero_cmd.finish(build_battle_markdown(
                 title=f"🏰 被 {hero['name']} 击倒",
                 battle_log=log_lines,
-                hint="封印24小时",
+                hint=f"封印{SEAL_DURATION_HOURS}小时" + (f" · 降{wave_dropped}波" if wave_dropped > 0 else ""),
                 btn1="迎战",
                 btn2="镇守",
                 btn3="天灾商店",

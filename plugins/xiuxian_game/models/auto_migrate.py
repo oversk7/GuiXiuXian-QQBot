@@ -94,7 +94,8 @@ REQUIRED_FIELDS: Dict[str, Dict[str, str]] = {
     },
     # 天灾山寨 - 战斗冷却字段
     "lower_world_stronghold": {
-        "last_battle_at": "DATETIME NULL COMMENT '最后一次迎战时间（战斗冷却用）'"
+        "last_battle_at": "DATETIME NULL COMMENT '最后一次迎战时间（战斗冷却用）'",
+        "best_wave": "INT DEFAULT 1 COMMENT '历史最高波次'"
     },
     # 世界消息 - 新增scope和guild_id字段
     "world_message": {
