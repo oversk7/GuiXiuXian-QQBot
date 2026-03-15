@@ -107,7 +107,7 @@ HERO_CLASSES = [
     },
     {
         "title": "炮勇者",
-        "atk_mult": 2.0, "def_mult": 0.8, "agi_mult": 0.5, "hp_mult": 1.1,
+        "atk_mult": 1.6, "def_mult": 0.8, "agi_mult": 0.5, "hp_mult": 1.1,
         "crit_rate": 10,
         "flavour_pool": [
             "她的大炮重两百斤，她一个人扛着走来的。",
@@ -148,7 +148,7 @@ AFFIXES = [
     {
         "id": "berserk",
         "prefix": "狂暴之怒附身的",
-        "atk_mult": 1.5, "def_mult": 0.7,
+        "atk_mult": 1.3, "def_mult": 0.7,
         "flavour_suffix": "{pronoun}的眼睛红了，理智在燃烧中渐渐消退。",
     },
     {
@@ -187,7 +187,7 @@ AFFIXES = [
     {
         "id": "desperate",
         "prefix": "破釜沉舟的",
-        "atk_mult": 1.5, "hp_mult": 0.7,
+        "atk_mult": 1.3, "hp_mult": 0.7,
         "crit_rate": 25,
         "flavour_suffix": "{pronoun}把退路全堵死了——赢了回家，输了就在这里。",
     },
@@ -212,8 +212,19 @@ def apply_affixes(stats: dict, affixes: list) -> dict:
 
 
 def calculate_hero_level(player_level: int, wave_number: int) -> int:
-    """计算英雄等级：英雄等级 = 玩家等级 × (0.6 + 波次 × 0.04)"""
-    ratio = 0.6 + wave_number * 0.04
+    """
+    计算英雄等级：
+    - 1-20波：线性增长 0.6 + 波次 × 0.03
+    - 21+波：对数减速增长，避免数值爆炸
+    """
+    if wave_number <= 20:
+        ratio = 0.6 + wave_number * 0.03
+    else:
+        # 20波时 ratio=1.2，之后每10波约增长0.15，逐步放缓
+        import math
+        base_ratio = 1.2
+        extra = math.log(1 + (wave_number - 20) / 10) * 0.5
+        ratio = base_ratio + extra
     return max(1, int(player_level * ratio))
 
 
