@@ -170,6 +170,7 @@ enum State {
 | `<=` | 小于等于 | `{"<=": 50}` |
 | `in` | 包含于 | `{"in": [1, 2, 3]}` |
 | `not_in` | 不包含于 | `{"not_in": [4, 5, 6]}` |
+| `contains` | 集合包含 | `{"contains": "荔湾鬼镇"}` (仅用于 `player_completed_trials`) |
 
 ### 变量类型
 
@@ -440,6 +441,37 @@ if (player.gold > 1000) {
 }
 ```
 
+### 结束节点奖励显示
+
+在结束节点可以用 `rewards` 字段在界面中展示奖励文字（仅显示用，不自动修改属性）：
+
+```json
+"ending": {
+  "type": "end",
+  "content": "你通关了试炼！",
+  "effects": {
+    "trial_success": true,
+    "rewards": {
+      "灵石": "+500",
+      "经验": "+1000"
+    }
+  }
+}
+```
+
+### 为节点添加配图
+
+节点可以附带 `image` 字段，指向 `data/stories/` 目录下的图片文件（相对路径）：
+
+```json
+"intro": {
+  "type": "story",
+  "content": "你走进了鬼镇...",
+  "image": "ghost_town_entrance.jpg",
+  "next": "next_node"
+}
+```
+
 ---
 
 ## 变量系统
@@ -490,10 +522,27 @@ if (player.gold > 1000) {
 
 支持的占位符:
 - `{player_name}` - 玩家昵称
+- `{player_uid}` - 玩家ID
 - `{player_level}` - 等级
-- `{player_gold}` - 金币
-- `{player_hp}` - 生命值
+- `{player_sex}` - 性别
+- `{player_region}` - 所在区域
+- `{player_exp}` - 经验值
+- `{player_hp}` / `{player_max_hp}` - 生命值/上限
+- `{player_mp}` / `{player_max_mp}` - 法力值/上限
 - `{player_attack}` - 攻击力
+- `{player_defense}` - 防御力
+- `{player_agility}` - 敏捷
+- `{player_stamina}` - 体力
+- `{player_luck}` - 幸运
+- `{player_resentment}` - 怨念
+- `{player_gold}` - 金币
+- `{player_gold2}` - 积分
+- `{player_x}` / `{player_y}` - 当前坐标
+- `{player_guild_id}` - 宗门ID
+- `{player_guild_contribution}` - 宗门贡献
+- `{player_attribute_points}` - 可用属性点
+- `{player_sign_streak}` - 连续签到天数
+- `{trial_completed_<试炼ID>}` - 试炼通关状态（`True`/`False`）
 - 以及所有剧情变量: `{变量名}`
 
 ---

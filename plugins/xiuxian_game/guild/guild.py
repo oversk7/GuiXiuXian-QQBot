@@ -399,7 +399,10 @@ async def handle_dissolve_guild(event: MessageEvent):
             await session.commit()
             await dissolve_guild_cmd.finish("⚠️ 公会数据异常，已自动脱离")
 
-        if guild_obj.president_id != player.id:
+        # 通过 GuildMember 表检查职位（权威来源），同时兼容 president_id 直接比较
+        member_position = await GuildPermission.get_member_position(session, player.id, guild_obj.id)
+        is_president = (member_position == GuildPosition.PRESIDENT) or (guild_obj.president_id == player.id)
+        if not is_president:
             await dissolve_guild_cmd.finish("⛔ 只有会长才能解散公会")
 
         # 将所有成员 guild_id 置空
@@ -621,7 +624,13 @@ async def handle_transfer(event: MessageEvent, args: Message = CommandArg()):
         if not player or player.guild_id is None:
             await transfer_cmd.finish("⛔ 你未加入公会")
         guild_obj = await session.get(Guild, player.guild_id)
-        if guild_obj.president_id != player.id:
+        if not guild_obj:
+            await transfer_cmd.finish("⛔ 公会数据异常")
+
+        # 通过 GuildMember 表检查职位（权威来源），同时兼容 president_id 直接比较
+        member_position = await GuildPermission.get_member_position(session, player.id, guild_obj.id)
+        is_president = (member_position == GuildPosition.PRESIDENT) or (guild_obj.president_id == player.id)
+        if not is_president:
             await transfer_cmd.finish("⛔ 只有会长才能转让职位")
 
         target_player_stmt = select(Player).where(Player.uid == target_uid, Player.guild_id == guild_obj.id)
@@ -629,8 +638,23 @@ async def handle_transfer(event: MessageEvent, args: Message = CommandArg()):
         if not target_player:
             await transfer_cmd.finish("⛔ 未找到目标成员或对方不在本公会")
 
+        # 更新公会会长ID
         guild_obj.president_id = target_player.id
         session.add(guild_obj)
+
+        # 同步更新 GuildMember 职位（保持两表一致）
+        from sqlalchemy import update as sql_update
+        await session.execute(
+            sql_update(GuildMember)
+            .where(GuildMember.guild_id == guild_obj.id, GuildMember.player_id == player.id)
+            .values(position=GuildPosition.VICE_PRESIDENT)
+        )
+        await session.execute(
+            sql_update(GuildMember)
+            .where(GuildMember.guild_id == guild_obj.id, GuildMember.player_id == target_player.id)
+            .values(position=GuildPosition.PRESIDENT)
+        )
+
         await session.commit()
         msg = f"👑 会长职位已转让给 {target_player.nickname}[UID:{target_player.uid}]"
         await transfer_cmd.finish(message_add_head(msg, event))

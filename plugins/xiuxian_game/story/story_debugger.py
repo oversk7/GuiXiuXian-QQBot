@@ -303,7 +303,7 @@ class StoryDebugger:
 
         else:
             # 检查普通条件
-            valid_operators = ['==', '!=', '>', '>=', '<', '<=', 'in', 'not_in']
+            valid_operators = ['==', '!=', '>', '>=', '<', '<=', 'in', 'not_in', 'contains']
             for key, check in condition.items():
                 if not isinstance(check, dict):
                     self.errors.append(f"{location}: '{key}' 的检查必须是字典")
@@ -344,7 +344,7 @@ class StoryDebugger:
             self.errors.append(f"{location}: effects 必须是字典类型")
             return
 
-        valid_sections = ['player', 'variables']
+        valid_sections = ['player', 'variables', 'trial_success', 'first_trial_reward', 'rewards']
         for section in effects.keys():
             if section not in valid_sections:
                 self.warnings.append(f"{location}: 未知的 effects 段: '{section}'")
@@ -431,7 +431,7 @@ class InteractiveDebugger:
             'gold': 0,
             'hp': 100,
             'attack': 10,
-            'vip': 0
+            'completed_trials': []
         }
 
     def load(self) -> bool:
