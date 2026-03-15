@@ -24,6 +24,7 @@ from .service import (
     WAVE_INTERVAL_HOURS,
     HERO_TIMEOUT_HOURS,
     BATTLE_COOLDOWN_MINUTES,
+    SEAL_DURATION_HOURS,
 )
 from .hero_generator import hero_from_json
 from ..battle.integration_helper import BattleIntegrationHelper
@@ -36,6 +37,7 @@ guard_cmd = on_command("镇守", block=True, priority=5)
 battle_hero_cmd = on_command("迎战", block=True, priority=5)
 calamity_shop_cmd = on_command("天灾商店", block=True, priority=5)
 redeem_cmd = on_command("兑换", block=True, priority=5)
+scout_cmd = on_command("侦查", block=True, priority=5)
 
 
 # ==================== 【降临】 ====================
@@ -934,3 +936,105 @@ async def handle_redeem(event: MessageEvent, args: Message = CommandArg()):
             )
 
         await redeem_cmd.finish(msg)
+
+
+# 侦查消耗的天灾点
+SCOUT_COST = 10
+
+
+# ==================== 【侦查】 ====================
+@scout_cmd.handle()
+async def handle_scout(event: MessageEvent):
+    """
+    【侦查】- 消耗10天灾点查看下一波英雄的属性
+    """
+    def session_factory():
+        return AsyncSessionLocal()
+
+    async with UnitOfWork(session_factory) as uow:
+        player = await get_unified_player(uow.session, event)
+        if not player:
+            await scout_cmd.finish("请先【注册】后再使用该功能")
+
+        stronghold = await uow.lower_world_strongholds.get_by_player_id(player.id)
+        if not stronghold:
+            await scout_cmd.finish("你还未建立山寨。使用【降临】开始下位世界之旅")
+
+        # 检查封印状态
+        sealed, remaining = is_sealed(stronghold)
+        if sealed:
+            await scout_cmd.finish(
+                f"⛓️ 你被封印中，剩余 {format_time_remaining(remaining)}\n"
+                "封印期间无法侦查。"
+            )
+
+        # 检查天灾点
+        if stronghold.calamity_points < SCOUT_COST:
+            await scout_cmd.finish(
+                f"天灾点不足！侦查需要 {SCOUT_COST} 点\n"
+                f"当前：{stronghold.calamity_points} 点"
+            )
+
+        # 如果已有待挑战英雄，直接展示当前英雄的详细属性
+        if has_pending_hero(stronghold):
+            hero = hero_from_json(stronghold.pending_hero)
+            stronghold.calamity_points -= SCOUT_COST
+            uow.session.add(stronghold)
+            await uow.commit()
+
+            affix_line = ""
+            if hero.get("affixes"):
+                affix_line = f"🔮 词缀：{'、'.join(hero['affixes'])}\n"
+
+            special_lines = []
+            if hero.get("crit_rate"):
+                special_lines.append(f"💥 暴击率：{hero['crit_rate']}%")
+            if hero.get("combo_rate"):
+                special_lines.append(f"⚡ 连击率：{hero['combo_rate']}%")
+            if hero.get("counter_rate"):
+                special_lines.append(f"🛡️ 反击率：{hero['counter_rate']}%")
+            if hero.get("lifesteal"):
+                special_lines.append(f"🧡 吸血：{hero['lifesteal']}%")
+            if hero.get("ignore_defense"):
+                special_lines.append(f"☂️ 穿透：{hero['ignore_defense']}%")
+            special_str = "\n".join(special_lines) + "\n" if special_lines else ""
+
+            msg = (
+                f"🔍 侦查报告 （-{SCOUT_COST}天灾点）\n"
+                "━━━━━━━━━━━━━\n"
+                f"⚔️ {hero['name']}\n"
+                f"🎖️ Lv.{hero['level']}\n"
+                f"{affix_line}"
+                f"❤️ HP：{hero['hp']:,}\n"
+                f"⚔️ 攻击：{hero['attack']:,}\n"
+                f"🛡️ 防御：{hero['defense']:,}\n"
+                f"👟 敏捷：{hero['agility']:,}\n"
+                f"{special_str}"
+                "━━━━━━━━━━━━━\n"
+                f"📝 {hero['flavour']}\n"
+                "\n"
+                f"💎 剩余天灾点：{stronghold.calamity_points}"
+            )
+            await scout_cmd.finish(msg)
+
+        # 没有待挑战英雄：预览下一波英雄（不消耗，只展示预测）
+        from .hero_generator import generate_hero as _gen_hero
+        preview_hero = _gen_hero(player.level, stronghold.wave_number)
+        stronghold.calamity_points -= SCOUT_COST
+        uow.session.add(stronghold)
+        await uow.commit()
+
+        msg = (
+            f"🔍 侦查预测 （-{SCOUT_COST}天灾点）\n"
+            "━━━━━━━━━━━━━\n"
+            f"📍 第{stronghold.wave_number}波预计英雄强度：\n"
+            f"🎖️ 预估等级：Lv.{preview_hero['level']}\n"
+            f"❤️ HP范围：~{preview_hero['hp']:,}\n"
+            f"⚔️ 攻击范围：~{preview_hero['attack']:,}\n"
+            f"🛡️ 防御范围：~{preview_hero['defense']:,}\n"
+            "━━━━━━━━━━━━━\n"
+            "⚠️ 英雄未到达，属性仅供参考\n"
+            "\n"
+            f"💎 剩余天灾点：{stronghold.calamity_points}"
+        )
+        await scout_cmd.finish(msg)
