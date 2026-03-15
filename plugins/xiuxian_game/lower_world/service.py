@@ -143,6 +143,18 @@ SHOP_ITEMS = [
         "price": 30,
     },
     {
+        "id": "unseal",
+        "name": "解封令",
+        "desc": "立即解除封印状态",
+        "price": 40,
+    },
+    {
+        "id": "scout_intel",
+        "name": "侦查情报（1次）",
+        "desc": "查看下一波英雄的详细属性",
+        "price": 10,
+    },
+    {
         "id": "title_calamity",
         "name": "称号「第四天灾」",
         "desc": "永久专属称号，一次性购买",

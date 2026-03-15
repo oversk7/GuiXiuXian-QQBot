@@ -856,6 +856,36 @@ async def handle_redeem(event: MessageEvent, args: Message = CommandArg()):
                 "使用【迎战】后自动消耗。"
             )
 
+        elif item["id"] == "unseal":
+            # 检查是否处于封印状态
+            sealed, remaining = is_sealed(stronghold)
+            if not sealed:
+                await redeem_cmd.finish(
+                    "你当前没有被封印，无需使用解封令。\n"
+                    "天灾点未扣除。"
+                )
+
+            stronghold.calamity_points -= item["price"]
+            stronghold.sealed_until = None
+            uow.session.add(stronghold)
+            # 立即安排下一波
+            await schedule_next_wave(uow, stronghold, player.level)
+            await uow.commit()
+            msg = (
+                "✅ 兑换成功！\n"
+                "「大都会紧急解除了封印协议。」\n"
+                "\n"
+                "⛓️ 封印已解除\n"
+                f"⏳ 下一波英雄将于 {WAVE_INTERVAL_HOURS} 小时后到达"
+            )
+
+        elif item["id"] == "scout_intel":
+            # 侦查情报：直接提示使用【侦查】命令
+            await redeem_cmd.finish(
+                "💡 请直接使用【侦查】命令查看下一波英雄情报\n"
+                "（消耗10天灾点，无需提前购买）"
+            )
+
         elif item["id"] == "title_calamity":
             # 先检查是否已拥有称号
             from ..event.knocker_event import KnockerEventService
