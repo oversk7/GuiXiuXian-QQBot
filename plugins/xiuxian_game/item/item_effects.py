@@ -191,7 +191,7 @@ async def _revive(player: Player, cfg: ItemConfig, qty: int, ctx: str, session=N
 
 @register(ItemEffectType.BUFF)
 async def _buff(player: Player, cfg: ItemConfig, qty: int, ctx: str, session=None) -> Tuple[bool, str]:
-    """临时 BUFF：直接把属性累加到玩家本体上。复杂持续时间逻辑以后实现。"""
+    """给玩家叠加永久属性，即使轮回依旧可以累积"""
     attrs = cfg.effect_params or {}
     if not attrs:
         return False, "⛔ 该道具没有任何增益"
