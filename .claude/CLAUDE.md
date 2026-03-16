@@ -60,6 +60,7 @@ Option-based programming never jumps to conclusions. Instead, after thorough res
 <project-rules>
 - **Database Migration:** ALWAYS use `plugins/xiuxian_game/models/auto_migrate.py` for database schema changes. NEVER use Alembic commands manually. Simply add field definitions to the `REQUIRED_FIELDS` dictionary and restart the bot.
 - **Help Information Sync:** When adding/modifying commands, ALWAYS update `plugins/xiuxian_game/player/help.py`. Include command syntax, description, and usage examples so users can see it via the 【帮助】 command.
+- **AI Knowledge Base Sync:** After updating `help.py`, ALWAYS update the corresponding YAML file in `plugins/xiuxian_game/data/knowledge/`. Each YAML file maps 1:1 to a help system (e.g., `economy_system_help.yaml` ↔ `经济系统` handler). Copy the new `msg` text directly into the `body` field of the YAML. If a new help command is added with no matching YAML, create a new one following the same format.
 - **NoneBot2 Exception Handling:**
   - ⚠️ NEVER use `except Exception:` to catch all exceptions in command handlers
   - NoneBot2's `finish()`, `send()`, `reject()` methods throw `FinishedException`, `PausedException`, `RejectedException` to control flow

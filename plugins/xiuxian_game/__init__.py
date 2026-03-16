@@ -118,4 +118,14 @@ async def _():
     except Exception as e:
         logger.error(f"[NPCDialogue] 加载NPC人设配置失败: {e}")
         import traceback
-        traceback.print_exc() 
+        traceback.print_exc()
+
+    # 初始化 AI 知识库 BM25 检索器
+    try:
+        from .ai_knowledge_retriever import initialize_knowledge_retriever
+        initialize_knowledge_retriever()
+        logger.success("[KnowledgeRetriever] AI知识库BM25检索器初始化完成")
+    except Exception as e:
+        logger.error(f"[KnowledgeRetriever] AI知识库检索器初始化失败: {e}")
+        import traceback
+        traceback.print_exc()
