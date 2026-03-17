@@ -729,7 +729,7 @@ class EnhancedBattleEngine:
                 result['post_battle_effects'].append({
                     'type': 'gain_attack',
                     'value': attr_points,
-                    'description': desc
+                    'description': effect.description or ""
                 })
 
             elif effect.duration > 0:
