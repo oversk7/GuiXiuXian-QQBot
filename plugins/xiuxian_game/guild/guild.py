@@ -1545,7 +1545,7 @@ async def handle_guild_warehouse(event: MessageEvent):
 
             lines.append("━━━━━━━━━━")
             lines.append("💡 使用【存入仓库 <物品名> <数量>】存入物品")
-            lines.append("💡 使用【取出仓库 <序号> <数量>】取出物品")
+            lines.append("💡 使用【取出仓库 <物品名> <数量>】取出物品")
             msg = "\n".join(lines)
 
         await guild_warehouse_cmd.finish(message_add_head(msg, event))
@@ -1621,22 +1621,33 @@ withdraw_warehouse_cmd = on_command("取出仓库", block=True, priority=5)
 
 @withdraw_warehouse_cmd.handle()
 async def handle_withdraw_warehouse(event: MessageEvent, args: Message = CommandArg()):
-    """从公会仓库取出物品"""
+    """从公会仓库取出物品，支持物品名或序号"""
     args_text = args.extract_plain_text().strip()
     if not args_text:
-        await withdraw_warehouse_cmd.finish("⛔ 格式错误，正确格式：取出仓库 [序号] [数量]")
+        await withdraw_warehouse_cmd.finish("⛔ 格式错误，正确格式：取出仓库 [物品名] [数量] 或 取出仓库 [序号] [数量]")
 
-    parts = args_text.split()
+    parts = args_text.rsplit(maxsplit=1)
     if len(parts) < 2:
-        await withdraw_warehouse_cmd.finish("⛔ 格式错误，正确格式：取出仓库 [序号] [数量]")
+        await withdraw_warehouse_cmd.finish("⛔ 格式错误，正确格式：取出仓库 [物品名] [数量] 或 取出仓库 [序号] [数量]")
 
+    # 解析数量（最后一个参数）
     try:
-        index = int(parts[0])
         quantity = int(parts[1])
-        if index <= 0 or quantity <= 0:
+        if quantity <= 0:
             raise ValueError
     except ValueError:
-        await withdraw_warehouse_cmd.finish("⛔ 序号和数量必须是正整数")
+        await withdraw_warehouse_cmd.finish("⛔ 数量必须是正整数")
+
+    # 判断第一个参数是序号还是物品名
+    item_name = None
+    index = None
+    try:
+        index = int(parts[0])
+        if index <= 0:
+            raise ValueError
+    except ValueError:
+        # 不是数字，当作物品名处理
+        item_name = parts[0]
 
     async with safe_session() as session:
         player = await get_unified_player(session, event)
@@ -1668,9 +1679,17 @@ async def handle_withdraw_warehouse(event: MessageEvent, args: Message = Command
             alchemy_production_repo=GuildAlchemyProductionRepository(session),
             warehouse_item_repo=GuildWarehouseItemRepository(session),
         )
-        success, message = await facility_service.withdraw_from_warehouse(
-            player.id, player.guild_id, index, quantity
-        )
+
+        if item_name:
+            # 按物品名取出
+            success, message = await facility_service.withdraw_from_warehouse_by_name(
+                player.id, player.guild_id, item_name, quantity
+            )
+        else:
+            # 按序号取出
+            success, message = await facility_service.withdraw_from_warehouse(
+                player.id, player.guild_id, index, quantity
+            )
         if success:
             await session.commit()
             await withdraw_warehouse_cmd.finish(message_add_head(f"✅ {message}", event))

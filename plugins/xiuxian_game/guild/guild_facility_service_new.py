@@ -667,33 +667,17 @@ class GuildFacilityService:
 
         return True, f"成功存入{item_config.name}×{quantity}"
 
-    async def withdraw_from_warehouse(self, player_id: str, guild_id: int, item_index: int, quantity: int) -> Tuple[bool, str]:
-        """
-        从公会仓库取出物品
-
-        对应原代码:
-            guild_facility_service.py Line 526-570
-        """
-        # 获取仓库物品列表（合并显示的）
-        items = await self.get_warehouse_items(guild_id)
-
-        if item_index < 1 or item_index > len(items):
-            return False, "无效的物品序号"
-
-        selected_item = items[item_index - 1]
-
-        if selected_item["quantity"] < quantity:
-            return False, f"仓库中该物品数量不足（仅有{selected_item['quantity']}个）"
-
+    async def _do_withdraw(self, player_id: str, guild_id: int, item_id: str, item_name: str, quantity: int) -> Tuple[bool, str]:
+        """执行仓库取出的核心逻辑"""
         # 检查玩家背包容量
         try:
-            await ItemInstance.add_item(self._item_repo._session, player_id, selected_item["item_id"], quantity)
+            await ItemInstance.add_item(self._item_repo._session, player_id, item_id, quantity)
         except ValueError as e:
             return False, f"背包空间不足：{str(e)}"
 
         # 从实际的堆叠中扣除物品（按照存入时间降序，优先取出最新的）
         warehouse_stacks = await self._warehouse_item_repo.get_by_guild_and_item_id_desc(
-            guild_id, selected_item["item_id"]
+            guild_id, item_id
         )
 
         remaining_to_withdraw = quantity
@@ -710,7 +694,41 @@ class GuildFacilityService:
             else:
                 await self._warehouse_item_repo.update(stack)
 
-        item_config = config.items_config["by_id"].get(selected_item["item_id"])
-        item_name = item_config.name if item_config else selected_item["item_id"]
-
         return True, f"成功取出{item_name}×{quantity}"
+
+    async def withdraw_from_warehouse(self, player_id: str, guild_id: int, item_index: int, quantity: int) -> Tuple[bool, str]:
+        """从公会仓库按序号取出物品"""
+        # 获取仓库物品列表（合并显示的）
+        items = await self.get_warehouse_items(guild_id)
+
+        if item_index < 1 or item_index > len(items):
+            return False, "无效的物品序号"
+
+        selected_item = items[item_index - 1]
+
+        if selected_item["quantity"] < quantity:
+            return False, f"仓库中该物品数量不足（仅有{selected_item['quantity']}个）"
+
+        item_config = config.items_config["by_id"].get(selected_item["item_id"])
+        display_name = item_config.name if item_config else selected_item["item_id"]
+
+        return await self._do_withdraw(player_id, guild_id, selected_item["item_id"], display_name, quantity)
+
+    async def withdraw_from_warehouse_by_name(self, player_id: str, guild_id: int, item_name: str, quantity: int) -> Tuple[bool, str]:
+        """从公会仓库按物品名取出物品"""
+        # 通过物品名查找 item_id
+        item_config = config.items_config["by_name"].get(item_name)
+        if not item_config:
+            return False, f"未找到名为【{item_name}】的物品"
+
+        # 检查仓库中是否有该物品
+        warehouse_stacks = await self._warehouse_item_repo.get_by_guild_and_item_id_desc(
+            guild_id, item_config.item_id
+        )
+        total_quantity = sum(s.quantity for s in warehouse_stacks)
+        if total_quantity == 0:
+            return False, f"仓库中没有【{item_name}】"
+        if total_quantity < quantity:
+            return False, f"仓库中该物品数量不足（仅有{total_quantity}个）"
+
+        return await self._do_withdraw(player_id, guild_id, item_config.item_id, item_name, quantity)
