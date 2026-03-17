@@ -39,10 +39,10 @@ def get_player_log_mode(player) -> str:
     """获取玩家的战斗日志模式偏好
 
     Returns:
-        "simple" 或 "detailed"，默认 "simple"
+        "simple" 或 "detailed"，默认 "detailed"
     """
     extra = getattr(player, 'extra_attrs', None) or {}
-    return extra.get("battle_log_mode", "simple")
+    return extra.get("battle_log_mode", "detailed")
 
 
 def set_player_log_mode(player, mode: str):

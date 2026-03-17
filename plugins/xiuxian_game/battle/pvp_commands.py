@@ -190,7 +190,7 @@ async def handle_simulate(event: MessageEvent, args: Message = CommandArg()):
             # 获取发起者的日志偏好
             from ..platform_utils import get_unified_player
             requester = await get_unified_player(session, event)
-            log_mode = get_player_log_mode(requester) if requester else "simple"
+            log_mode = get_player_log_mode(requester) if requester else "detailed"
             filtered_log = filter_battle_log(battle_log, log_mode)
 
             winner = player1 if victory else player2
