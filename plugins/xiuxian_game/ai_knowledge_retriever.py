@@ -131,7 +131,7 @@ class KnowledgeRetriever:
 
         self._chunks = chunks
         self._bm25 = BM25Okapi(corpus)
-        logger.success(f"[KnowledgeRetriever] 已加载 {len(chunks)} 个知识块，BM25 索引构建完成")
+        logger.info(f"[KnowledgeRetriever] 已加载 {len(chunks)} 个知识块，BM25 索引构建完成")
 
     def search(self, query: str, top_k: int = 5, min_score: float = 0.0) -> List[Tuple[KnowledgeChunk, float]]:
         """
