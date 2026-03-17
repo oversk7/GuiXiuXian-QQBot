@@ -52,6 +52,13 @@ class Restaurant(Base):
         comment="上次结算时间"
     )
 
+    # 招牌菜
+    signature_recipe_id: Mapped[str | None] = mapped_column(
+        String(32),
+        nullable=True,
+        comment="招牌菜食谱ID"
+    )
+
     # 厨师招募冷却系统
     last_recruit_time: Mapped[datetime | None] = mapped_column(
         DateTime,

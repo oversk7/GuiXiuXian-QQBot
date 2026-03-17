@@ -140,6 +140,65 @@ async def handle_recipes(event: MessageEvent):
         await recipes_cmd.finish(msg)
 
 
+recipe_guide_cmd = on_command("食谱图鉴", aliases={"所有食谱", "全部食谱"}, priority=5, block=True)
+
+
+@recipe_guide_cmd.handle()
+async def handle_recipe_guide(event: MessageEvent):
+    """【食谱图鉴】- 查看所有食谱(含未学会)"""
+
+    async with UnitOfWork(AsyncSessionLocal) as uow:
+        player = await get_unified_player(uow.session, event)
+        if not player:
+            await recipe_guide_cmd.finish("⛔ 请先创建角色")
+
+        # 获取玩家已学食谱ID
+        learned_ids = set(await uow.player_recipes.get_recipe_ids_by_player(player.id))
+
+        # 获取所有食谱
+        all_recipes = recipe_manager.get_all_recipes()
+
+        tier_names = {
+            "white": "⚪ 家常菜 (厨房Lv.1)",
+            "green": "🟢 特色菜 (厨房Lv.2)",
+            "blue": "🔵 招牌菜 (厨房Lv.3)",
+            "purple": "🟣 宴席菜 (厨房Lv.4)",
+            "orange": "🟠 传说菜 (厨房Lv.5)"
+        }
+
+        tier_order = ["white", "green", "blue", "purple", "orange"]
+
+        # 按稀有度分组
+        recipes_by_tier = {t: [] for t in tier_order}
+        for recipe in all_recipes:
+            recipes_by_tier[recipe.tier].append(recipe)
+
+        learned_count = len(learned_ids)
+        total_count = len(all_recipes)
+
+        msg = f"📖 食谱图鉴 ({learned_count}/{total_count})\n\n"
+
+        for tier in tier_order:
+            tier_recipes = recipes_by_tier[tier]
+            if not tier_recipes:
+                continue
+
+            tier_learned = sum(1 for r in tier_recipes if r.recipe_id in learned_ids)
+            msg += f"{tier_names[tier]} ({tier_learned}/{len(tier_recipes)})\n"
+
+            for recipe in tier_recipes:
+                learned = recipe.recipe_id in learned_ids
+                status = "✅" if learned else "🔒"
+                msg += f"  {status} {recipe.name} ({recipe.base_price}金)\n"
+
+            msg += "\n"
+
+        msg += "✅ 已学会 | 🔒 未解锁\n"
+        msg += "使用【食谱】查看已学食谱的详细食材"
+
+        await recipe_guide_cmd.finish(msg)
+
+
 # ==================== 餐厅相关指令 ====================
 
 create_restaurant_cmd = on_command("创建餐厅", aliases={"开餐厅"}, priority=5, block=True)
@@ -423,9 +482,58 @@ async def handle_my_chefs(event: MessageEvent):
 
             msg += f"• {chef.name} ({tier_name})\n"
             msg += f"  厨艺: {chef.skill} | 速度: {chef.speed}道/时\n"
-            msg += f"  擅长: {specialty_name} | 时薪: {chef.salary}金\n\n"
+            msg += f"  擅长: {specialty_name} | 时薪: {chef.salary}金\n"
+
+            # 显示经验进度
+            from ..models.chef import ChefTier
+            current_tier = ChefTier(chef.tier)
+            required_exp = chef_service.PROMOTION_EXP.get(current_tier)
+            if required_exp:
+                exp = getattr(chef, 'experience', 0) or 0
+                progress = min(100, int(exp / required_exp * 100))
+                bar_filled = progress // 10
+                bar_empty = 10 - bar_filled
+                bar = "█" * bar_filled + "░" * bar_empty
+                msg += f"  经验: {exp}/{required_exp} [{bar}] {progress}%\n"
+            else:
+                msg += f"  经验: MAX (已满级)\n"
+
+            msg += "\n"
+
+        msg += "💡 经验满后使用【培训厨师 厨师名】升级"
 
         await my_chefs_cmd.finish(msg)
+
+
+promote_chef_cmd = on_command("培训厨师", aliases={"厨师培训", "升级厨师"}, priority=5, block=True)
+
+
+@promote_chef_cmd.handle()
+async def handle_promote_chef(event: MessageEvent, args: Message = CommandArg()):
+    """【培训厨师 厨师名】- 培训厨师升级"""
+
+    chef_name = args.extract_plain_text().strip()
+
+    if not chef_name:
+        await promote_chef_cmd.finish(
+            "⛔ 用法: 培训厨师 <厨师名>\n"
+            "例如: 培训厨师 小福贵\n"
+            "💡 厨师需要积累足够经验才能培训升级"
+        )
+
+    async with UnitOfWork(AsyncSessionLocal) as uow:
+        player = await get_unified_player(uow.session, event)
+        if not player:
+            await promote_chef_cmd.finish("⛔ 请先创建角色")
+
+        restaurant = await uow.restaurants.get_by_player_id(player.id)
+        if not restaurant:
+            await promote_chef_cmd.finish("⛔ 你还没有餐厅")
+
+        success, msg = await chef_service.promote_chef(
+            uow, player.id, restaurant.id, chef_name
+        )
+        await promote_chef_cmd.finish(msg)
 
 
 # ==================== 经营报表 ====================
@@ -510,6 +618,24 @@ async def handle_log(event: MessageEvent):
                 msg_lines.append("  💬 性格片段:")
                 for comment in sampled_comments:
                     msg_lines.append(f"    「{comment}」")
+
+        # 展示随机事件
+        event_data = details.get("event")
+        if event_data and event_data.get("name"):
+            msg_lines.append("")
+            msg_lines.append("━━━━━━━━━━━━━")
+            event_type_icon = "🎉" if event_data.get("income_bonus", 0) >= 0 and event_data.get("reputation_bonus", 0) >= 0 else "⚠️"
+            msg_lines.append(f"{event_type_icon} 经营事件: {event_data['name']}")
+            msg_lines.append(f"  {event_data.get('description', '')}")
+            if event_data.get("income_bonus", 0) != 0:
+                sign = "+" if event_data["income_bonus"] > 0 else ""
+                msg_lines.append(f"  💰 收入影响: {sign}{event_data['income_bonus']}金")
+            if event_data.get("expense_bonus", 0) != 0:
+                sign = "+" if event_data["expense_bonus"] > 0 else ""
+                msg_lines.append(f"  💸 支出影响: {sign}{event_data['expense_bonus']}金")
+            if event_data.get("reputation_bonus", 0) != 0:
+                sign = "+" if event_data["reputation_bonus"] > 0 else ""
+                msg_lines.append(f"  ⭐ 声望影响: {sign}{event_data['reputation_bonus']}")
 
         msg_lines.append("")
         msg_lines.append("💡 使用【经营报表】查看汇总数据")
@@ -766,9 +892,12 @@ async def handle_view_menu(event: MessageEvent):
                     "orange": "🟠"
                 }
 
+                is_signature = getattr(restaurant, 'signature_recipe_id', None) == recipe.recipe_id
+                sig_tag = " ⭐招牌" if is_signature else ""
+
                 msg += (
-                    f"{rarity_emoji.get(recipe.tier, '⚪')} {recipe.name}\n"
-                    f"  售价: {recipe.base_price}金\n"
+                    f"{rarity_emoji.get(recipe.tier, '⚪')} {recipe.name}{sig_tag}\n"
+                    f"  售价: {recipe.base_price}金{' (+30%)' if is_signature else ''}\n"
                     f"  食材: {ingredients_str}\n\n"
                 )
 
@@ -818,3 +947,75 @@ async def handle_upgrade_storage(event: MessageEvent):
 
         success, msg = await restaurant_service.upgrade_storage(uow, player.id)
         await upgrade_storage_cmd.finish(info + msg)
+
+
+# ==================== 招牌菜 ====================
+
+signature_dish_cmd = on_command("设置招牌菜", aliases={"招牌菜设置"}, priority=5, block=True)
+
+
+@signature_dish_cmd.handle()
+async def handle_signature_dish(event: MessageEvent, args: Message = CommandArg()):
+    """【设置招牌菜 菜名】- 设置餐厅招牌菜(售价+30%)"""
+
+    dish_name = args.extract_plain_text().strip()
+
+    if not dish_name:
+        await signature_dish_cmd.finish(
+            "⛔ 用法: 设置招牌菜 <菜名>\n"
+            "例如: 设置招牌菜 红烧鲤鱼\n"
+            "💡 招牌菜在营业时售价+30%，需为菜单中的菜品"
+        )
+
+    async with UnitOfWork(AsyncSessionLocal) as uow:
+        player = await get_unified_player(uow.session, event)
+        if not player:
+            await signature_dish_cmd.finish("⛔ 请先创建角色")
+
+        restaurant = await uow.restaurants.get_by_player_id(player.id)
+        if not restaurant:
+            await signature_dish_cmd.finish("⛔ 你还没有餐厅")
+
+        # 查找食谱
+        recipe = recipe_manager.get_recipe_by_name(dish_name)
+        if not recipe:
+            await signature_dish_cmd.finish(f"⛔ 未找到菜肴【{dish_name}】")
+
+        # 检查是否在菜单中
+        menu_items = await uow.restaurant_menus.get_active_menu(restaurant.id)
+        menu_recipe_ids = [m.recipe_id for m in menu_items] if menu_items else []
+
+        if recipe.recipe_id not in menu_recipe_ids:
+            await signature_dish_cmd.finish(
+                f"⛔ 【{dish_name}】不在当前菜单中\n"
+                f"请先使用【设置菜单】将它加入菜单"
+            )
+
+        # 设置招牌菜
+        restaurant.signature_recipe_id = recipe.recipe_id
+        await uow.restaurants.update(restaurant)
+        await uow.commit()
+
+        await signature_dish_cmd.finish(
+            f"⭐ 成功设置招牌菜: 【{dish_name}】\n"
+            f"营业时该菜品售价+30%!"
+        )
+
+
+# ==================== 餐厅排行榜 ====================
+
+restaurant_rank_cmd = on_command("餐厅排行", aliases={"餐厅排行榜", "餐厅榜"}, priority=5, block=True)
+
+
+@restaurant_rank_cmd.handle()
+async def handle_restaurant_rank(event: MessageEvent):
+    """【餐厅排行】- 查看餐厅排行榜"""
+
+    async with UnitOfWork(AsyncSessionLocal) as uow:
+        player = await get_unified_player(uow.session, event)
+        if not player:
+            await restaurant_rank_cmd.finish("⛔ 请先创建角色")
+
+        # 获取排行数据
+        msg = await restaurant_service.get_restaurant_ranking(uow, player.id)
+        await restaurant_rank_cmd.finish(msg)

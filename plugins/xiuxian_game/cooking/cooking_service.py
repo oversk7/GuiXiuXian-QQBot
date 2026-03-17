@@ -168,7 +168,19 @@ class CookingService:
         if not has_recipe:
             return False, f"⛔ 你还没有学会【{recipe.name}】的做法", None
 
-        # 3. 检查食材库存(从玩家背包)
+        # 3. 检查厨房等级是否满足食谱要求
+        restaurant = await uow.restaurants.get_by_player_id(player_id)
+        kitchen_level = restaurant.kitchen_level if restaurant else 0
+        if recipe.kitchen_level > kitchen_level:
+            if not restaurant:
+                return False, f"⛔ 【{recipe.name}】需要厨房Lv.{recipe.kitchen_level}，你还没有餐厅\n使用【创建餐厅】开始", None
+            return False, (
+                f"⛔ 【{recipe.name}】需要厨房Lv.{recipe.kitchen_level}，"
+                f"当前厨房Lv.{kitchen_level}\n"
+                f"使用【升级厨房】提升厨房等级"
+            ), None
+
+        # 4. 检查食材库存(从玩家背包)
         player = await uow.players.get_by_id(player_id)
         if not player:
             return False, "⛔ 玩家不存在", None
@@ -187,7 +199,7 @@ class CookingService:
                 item_name = item_cfg.name if item_cfg else item_id
                 return False, f"⛔ 食材不足: {item_name} (需要 {total_needed}，拥有 {item_count})", None
 
-        # 4. 执行烹饪并生成菜肴
+        # 5. 执行烹饪并生成菜肴
         results = []
         total_consumed = {}  # 记录总消耗食材
 
@@ -226,7 +238,7 @@ class CookingService:
                     consumed = int(qty * 0.5)
                     total_consumed[item_id] = total_consumed.get(item_id, 0) + consumed
 
-        # 5. 扣除食材
+        # 6. 扣除食材
         for item_id, consumed_qty in total_consumed.items():
             # 从玩家背包扣除食材
             items = await uow.items.get_by_player_and_item_id(player_id, item_id)
@@ -247,7 +259,7 @@ class CookingService:
                     remaining -= item.quantity
                     await uow.items.delete(item.id)
 
-        # 6. 添加菜肴到背包(作为DISH类型物品)
+        # 7. 添加菜肴到背包(作为DISH类型物品)
         for dish in results:
             # 动态生成菜肴的item_id: dish_{recipe_id}_{quality}
             # 例如: dish_braised_carp_normal, dish_braised_carp_perfect
@@ -262,10 +274,10 @@ class CookingService:
                 # 如果背包满了,返回错误
                 return False, f"⛔ 背包空间不足: {str(e)}", None
 
-        # 7. 提交事务
+        # 8. 提交事务
         await uow.commit()
 
-        # 8. 生成结果消息
+        # 9. 生成结果消息
         success_count = sum(1 for r in results if r["quality"] != DishQuality.DARK)
         fail_count = len(results) - success_count
 

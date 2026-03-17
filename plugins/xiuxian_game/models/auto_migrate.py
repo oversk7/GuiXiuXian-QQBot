@@ -82,7 +82,12 @@ REQUIRED_FIELDS: Dict[str, Dict[str, str]] = {
         "last_recruit_time": "DATETIME NULL COMMENT '上次招募厨师时间'",
         "daily_recruit_count": "INT DEFAULT 0 COMMENT '当日招募次数(用于递增费用计算)'",
         "last_recruit_date": "VARCHAR(10) NULL COMMENT '上次招募日期(YYYY-MM-DD格式,用于每日重置)'",
-        "storage_level": "INT DEFAULT 1 COMMENT '仓库等级(1-5)'"
+        "storage_level": "INT DEFAULT 1 COMMENT '仓库等级(1-5)'",
+        "signature_recipe_id": "VARCHAR(32) NULL COMMENT '招牌菜食谱ID'"
+    },
+    # 厨师成长系统 - 经验值
+    "chef": {
+        "experience": "INT DEFAULT 0 COMMENT '累计经验值(用于厨师成长升级)'"
     },
     # 背包表 - 扩展item_id长度以支持更长的食谱ID
     "inventory": {

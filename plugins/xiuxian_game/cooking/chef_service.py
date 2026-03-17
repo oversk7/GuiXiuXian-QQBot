@@ -108,6 +108,47 @@ class ChefService:
         ChefTier.MASTER_CHEF: 1,
     }
 
+    # 餐厅等级 → 可招募的最高厨师等级
+    RECRUIT_TIER_CAP = {
+        1: ChefTier.APPRENTICE,    # Lv.1-2: 最高学徒
+        2: ChefTier.APPRENTICE,
+        3: ChefTier.HELPER,        # Lv.3-4: 最高帮厨
+        4: ChefTier.HELPER,
+        5: ChefTier.COOK,          # Lv.5-6: 最高厨师
+        6: ChefTier.COOK,
+        7: ChefTier.HEAD_CHEF,     # Lv.7-8: 最高大厨
+        8: ChefTier.HEAD_CHEF,
+        9: ChefTier.MASTER_CHEF,   # Lv.9-10: 可招特级厨师
+        10: ChefTier.MASTER_CHEF,
+    }
+
+    # 厨师等级顺序(用于比较和升级)
+    TIER_ORDER = [
+        ChefTier.APPRENTICE, ChefTier.HELPER, ChefTier.COOK,
+        ChefTier.HEAD_CHEF, ChefTier.MASTER_CHEF
+    ]
+
+    # 厨师成长配置: {当前等级: 升级所需经验}
+    PROMOTION_EXP = {
+        ChefTier.APPRENTICE: 500,      # 学徒→帮厨
+        ChefTier.HELPER: 1500,         # 帮厨→厨师
+        ChefTier.COOK: 4000,           # 厨师→大厨
+        ChefTier.HEAD_CHEF: 10000,     # 大厨→特级厨师
+    }
+
+    # 培训费用: {目标等级: 金币}
+    PROMOTION_COST = {
+        ChefTier.HELPER: 1000,
+        ChefTier.COOK: 5000,
+        ChefTier.HEAD_CHEF: 20000,
+        ChefTier.MASTER_CHEF: 80000,
+    }
+
+    # 每次烹饪获得的经验
+    EXP_PER_DISH_SUCCESS = 10   # 成功
+    EXP_PER_DISH_PERFECT = 25   # 完美品质
+    EXP_PER_DISH_FAIL = 3       # 失败也给少量经验
+
     # 厨师名字库
     CHEF_NAMES = [
         # 致敬神厨小福贵
@@ -258,10 +299,14 @@ class ChefService:
         # 清除玩家旧的候选（包括过期的）
         await uow.chef_candidates.clear_by_player(player_id)
 
+        # 获取餐厅等级用于限制可招募厨师等级
+        restaurant = await uow.restaurants.get_by_id(restaurant_id)
+        restaurant_level = restaurant.level if restaurant else 1
+
         # 生成新候选
         candidates = []
         for i in range(count):
-            tier = self._roll_chef_tier()
+            tier = self._roll_chef_tier(restaurant_level)
             candidate = self._generate_chef_candidate(player_id, tier)
             await uow.chef_candidates.add(candidate)
             candidates.append(candidate)
@@ -284,7 +329,10 @@ class ChefService:
         await uow.commit()
 
         # 生成展示消息
-        msg = "🎲 厨师招募中...\n\n"
+        max_tier = self.RECRUIT_TIER_CAP.get(restaurant_level, ChefTier.MASTER_CHEF)
+        max_tier_name = self._get_tier_name(max_tier)
+        msg = "🎲 厨师招募中...\n"
+        msg += f"📍 餐厅Lv.{restaurant_level}，最高可招募: {max_tier_name}\n\n"
         msg += "以下是本次候选厨师:\n\n"
 
         for idx, candidate in enumerate(candidates, 1):
@@ -426,12 +474,118 @@ class ChefService:
         """
         return await uow.chefs.get_by_restaurant_id(restaurant_id)
 
+    async def promote_chef(
+        self,
+        uow: UnitOfWork,
+        player_id: str,
+        restaurant_id: int,
+        chef_name: str
+    ) -> Tuple[bool, str]:
+        """
+        培训厨师(升级到下一等级)
+
+        需要满足:
+        - 经验值达到要求
+        - 玩家金币足够支付培训费
+
+        Returns:
+            (是否成功, 消息)
+        """
+        chef = await uow.chefs.get_by_name(restaurant_id, chef_name)
+        if not chef:
+            return False, f"⛔ 未找到名为【{chef_name}】的厨师"
+
+        current_tier = ChefTier(chef.tier)
+        current_idx = self.TIER_ORDER.index(current_tier)
+
+        # 已是最高等级
+        if current_idx >= len(self.TIER_ORDER) - 1:
+            return False, f"⛔ 【{chef_name}】已是特级厨师，无法再升级"
+
+        # 检查经验是否足够
+        required_exp = self.PROMOTION_EXP.get(current_tier)
+        if required_exp is None:
+            return False, f"⛔ 【{chef_name}】无法升级"
+
+        if chef.experience < required_exp:
+            return False, (
+                f"⛔ 【{chef_name}】经验不足\n"
+                f"当前经验: {chef.experience}/{required_exp}\n"
+                f"💡 厨师在营业中做菜可积累经验"
+            )
+
+        # 检查金币
+        next_tier = self.TIER_ORDER[current_idx + 1]
+        cost = self.PROMOTION_COST.get(next_tier, 0)
+
+        player = await uow.players.get_by_id(player_id)
+        if not player:
+            return False, "⛔ 玩家不存在"
+
+        if player.gold < cost:
+            return False, f"⛔ 培训费不足! 需要 {cost}金币"
+
+        # 执行升级
+        player.gold -= cost
+        await uow.players.update(player)
+
+        old_tier_name = self._get_tier_name(current_tier)
+        new_tier_name = self._get_tier_name(next_tier)
+
+        # 更新厨师属性
+        new_config = self.CHEF_TIER_CONFIG[next_tier]
+        chef.tier = next_tier
+        chef.experience = 0  # 重置经验
+        chef.skill = max(chef.skill, new_config["skill_range"][0])  # 技能至少达到新等级下限
+        chef.speed = new_config["speed"]
+        chef.salary = new_config["salary"]
+        await uow.chefs.update(chef)
+
+        await uow.commit()
+
+        return True, (
+            f"🎉 培训成功!\n"
+            f"【{chef_name}】 {old_tier_name} → {new_tier_name}\n"
+            f"  厨艺: {chef.skill} | 速度: {chef.speed}道/时\n"
+            f"  时薪: {chef.salary}金\n"
+            f"💰 支付培训费: {cost}金币"
+        )
+
+    def add_chef_experience(self, chef, exp_amount: int) -> Tuple[int, bool]:
+        """
+        给厨师增加经验值
+
+        Args:
+            chef: 厨师对象
+            exp_amount: 经验值
+
+        Returns:
+            (实际增加的经验, 是否可以升级)
+        """
+        current_tier = ChefTier(chef.tier)
+        chef.experience += exp_amount
+
+        # 检查是否可以升级
+        required_exp = self.PROMOTION_EXP.get(current_tier)
+        can_promote = required_exp is not None and chef.experience >= required_exp
+
+        return exp_amount, can_promote
+
     # ==================== 私有方法 ====================
 
-    def _roll_chef_tier(self) -> str:
-        """随机roll厨师等级(根据稀有度权重)"""
-        tiers = list(self.RECRUIT_RARITY_WEIGHTS.keys())
-        weights = list(self.RECRUIT_RARITY_WEIGHTS.values())
+    def _roll_chef_tier(self, restaurant_level: int = 10) -> str:
+        """随机roll厨师等级(根据稀有度权重，受餐厅等级限制)"""
+        max_tier = self.RECRUIT_TIER_CAP.get(restaurant_level, ChefTier.MASTER_CHEF)
+        max_idx = self.TIER_ORDER.index(max_tier)
+
+        # 只保留不超过上限的等级
+        tiers = []
+        weights = []
+        for tier, weight in self.RECRUIT_RARITY_WEIGHTS.items():
+            if self.TIER_ORDER.index(tier) <= max_idx:
+                tiers.append(tier)
+                weights.append(weight)
+
         return random.choices(tiers, weights=weights, k=1)[0]
 
     def _generate_chef_candidate(self, player_id: str, tier: str) -> ChefCandidate:

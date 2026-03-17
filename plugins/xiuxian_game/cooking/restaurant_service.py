@@ -432,7 +432,18 @@ class RestaurantService:
         await uow.commit()
 
         status_text = "开始营业" if is_open else "暂停营业"
-        return True, f"✅ {status_text}!"
+        msg = f"✅ {status_text}!"
+
+        # 开店时检查仓库食材是否充足，给出警告（不阻止）
+        if is_open:
+            storage_items = await uow.restaurant_storage.get_by_restaurant(restaurant.id)
+            total_qty = sum(item.quantity for item in storage_items) if storage_items else 0
+            if total_qty == 0:
+                msg += "\n\n⚠️ 警告：仓库没有任何食材！厨师将无法制作菜品\n💡 使用【补货 食材名 数量】补充食材"
+            elif total_qty < 10:
+                msg += f"\n\n⚠️ 警告：仓库食材仅剩 {total_qty} 份，可能很快耗尽\n💡 使用【补货 食材名 数量】补充食材"
+
+        return True, msg
 
     async def restock_ingredient(
         self,
@@ -672,3 +683,47 @@ class RestaurantService:
         )
 
         return True, msg, restaurant
+
+    async def get_restaurant_ranking(
+        self,
+        uow: UnitOfWork,
+        player_id: str,
+        limit: int = 10
+    ) -> str:
+        """
+        获取餐厅排行榜(按声望排序)
+
+        Args:
+            uow: 工作单元
+            player_id: 当前玩家ID(用于标注自己)
+            limit: 显示数量
+
+        Returns:
+            排行榜文本
+        """
+        top_restaurants = await uow.restaurants.get_top_by_reputation(limit)
+
+        if not top_restaurants:
+            return "🏆 餐厅排行榜\n\n暂无餐厅数据"
+
+        msg = "🏆 餐厅排行榜 (按声望)\n━━━━━━━━━━━━━\n\n"
+
+        rank_icons = {1: "🥇", 2: "🥈", 3: "🥉"}
+
+        for idx, rest in enumerate(top_restaurants, 1):
+            icon = rank_icons.get(idx, f"{idx}.")
+            status = "🟢" if rest.is_open else "🔴"
+            is_me = " ← 你" if rest.player_id == player_id else ""
+
+            # 获取玩家名
+            owner = await uow.players.get_by_id(rest.player_id)
+            owner_name = owner.name if owner else "未知"
+
+            net_profit = rest.total_income - rest.total_expense
+            msg += (
+                f"{icon} {owner_name}的餐厅{is_me}\n"
+                f"  Lv.{rest.level} | ⭐{rest.reputation} | {status}\n"
+                f"  净利润: {net_profit}金\n\n"
+            )
+
+        return msg

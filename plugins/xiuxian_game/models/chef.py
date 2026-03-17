@@ -72,6 +72,10 @@ class Chef(Base):
         comment="性格: diligent/lazy/perfectionist/frugal/talkative"
     )
     salary: Mapped[int] = mapped_column(Integer, comment="时薪(金币)")
+    experience: Mapped[int] = mapped_column(
+        Integer, default=0, server_default="0",
+        comment="累计经验值(用于厨师成长升级)"
+    )
     hired_at: Mapped[datetime] = mapped_column(
         DateTime,
         default=datetime.now,
