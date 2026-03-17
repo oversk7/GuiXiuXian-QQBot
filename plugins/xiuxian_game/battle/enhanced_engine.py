@@ -1072,7 +1072,7 @@ class EnhancedBattleEngine:
         else:
             attack_msg += f" 造成{final_damage}伤害"
 
-        # 标签子行（真伤/必中/暴击等）
+        # 标签子行（真伤/必中/暴击/穿透等）
         tags = []
         if has_true_damage:
             tags.append("🔥真伤")
@@ -1081,6 +1081,9 @@ class EnhancedBattleEngine:
         if is_critical:
             crit_mult = attack_result.get("crit_multiplier", 1.5)
             tags.append(f"💥暴击x{crit_mult:.1f}")
+        if attack_result.get("is_penetration"):
+            pen_ratio = attack_result.get("penetration_ratio", 0)
+            tags.append(f"🗡️穿透{pen_ratio*100:.0f}%")
         if tags:
             sub_lines.insert(0, f"  └ {' | '.join(tags)}")
 
