@@ -1046,13 +1046,18 @@ class EnhancedBattleEngine:
         # 合并护盾绕过与护盾结算后的伤害
         damage = pre_bypass + damage_for_shield
 
-        # 新增防御减伤子行
+        # 防御减伤子行（含穿透收益）
         defense_mit = attack_result.get("defense_mitigation")
         if defense_mit and defense_mit.get("blocked", 0) > 0:
             blocked = defense_mit["blocked"]
             flat = defense_mit.get("flat_reduction", 0)
             pct = defense_mit["percent_reduction"] * 100
-            sub_lines.append(f"  └ 🛡️ 防御减伤 -{blocked} (数值减伤{flat} + 比例减伤{pct:.0f}%)")
+            pen_benefit = attack_result.get("penetration_benefit", 0)
+            pen_ratio = attack_result.get("penetration_ratio", 0)
+            mit_desc = f"  └ 🛡️ 防御减伤 -{blocked} (数值{flat} + 比例{pct:.0f}%)"
+            if pen_benefit > 0:
+                mit_desc += f" | 🗡️穿透{pen_ratio*100:.0f}%减免+{pen_benefit}"
+            sub_lines.append(mit_desc)
 
         # 构建攻击消息（主行只保留攻击+伤害，标签移到子行）
         if is_combo:
@@ -1072,7 +1077,7 @@ class EnhancedBattleEngine:
         else:
             attack_msg += f" 造成{final_damage}伤害"
 
-        # 标签子行（真伤/必中/暴击/穿透等）
+        # 标签子行（真伤/必中/暴击等，穿透已合并到防御减伤行）
         tags = []
         if has_true_damage:
             tags.append("🔥真伤")
@@ -1081,9 +1086,6 @@ class EnhancedBattleEngine:
         if is_critical:
             crit_mult = attack_result.get("crit_multiplier", 1.5)
             tags.append(f"💥暴击x{crit_mult:.1f}")
-        if attack_result.get("is_penetration"):
-            pen_ratio = attack_result.get("penetration_ratio", 0)
-            tags.append(f"🗡️穿透{pen_ratio*100:.0f}%")
         if tags:
             sub_lines.insert(0, f"  └ {' | '.join(tags)}")
 
@@ -1548,6 +1550,8 @@ class EnhancedBattleEngine:
                     # 普通伤害部分受防御减伤
                     if penetration_ratio > 0:
                         mit = apply_defense_mitigation(normal_damage_part, effective_defense, penetration_ratio)
+                        mit_no_pen = apply_defense_mitigation(normal_damage_part, effective_defense)
+                        result["penetration_benefit"] = mit_no_pen["blocked"] - mit["blocked"]
                         dmg = true_damage_part + mit["final_damage"]
                         result["effects"].append("TRUE_DAMAGE(绝魔免疫50%)+PENETRATION")
                     else:
@@ -1564,6 +1568,8 @@ class EnhancedBattleEngine:
             else:
                 if penetration_ratio > 0:
                     mit = apply_defense_mitigation(dmg, effective_defense, penetration_ratio)
+                    mit_no_pen = apply_defense_mitigation(dmg, effective_defense)
+                    result["penetration_benefit"] = mit_no_pen["blocked"] - mit["blocked"]
                     dmg = mit["final_damage"]
                     result["effects"].append("PENETRATION")
                 else:
@@ -1667,6 +1673,8 @@ class EnhancedBattleEngine:
             else:
                 if penetration_ratio > 0:
                     mit = apply_defense_mitigation(dmg, monster_defense, penetration_ratio)
+                    mit_no_pen = apply_defense_mitigation(dmg, monster_defense)
+                    result["penetration_benefit"] = mit_no_pen["blocked"] - mit["blocked"]
                     dmg = mit["final_damage"]
                     result["effects"].append("PENETRATION")
                 else:
