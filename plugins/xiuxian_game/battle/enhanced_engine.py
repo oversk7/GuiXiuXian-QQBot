@@ -1079,7 +1079,8 @@ class EnhancedBattleEngine:
         if has_guaranteed:
             tags.append("🎯必中20%")
         if is_critical:
-            tags.append("💥暴击")
+            crit_mult = attack_result.get("crit_multiplier", 1.5)
+            tags.append(f"💥暴击x{crit_mult:.1f}")
         if tags:
             sub_lines.insert(0, f"  └ {' | '.join(tags)}")
 
@@ -1366,7 +1367,8 @@ class EnhancedBattleEngine:
         if has_guaranteed:
             combo_tags.append("🎯必中20%")
         if is_critical:
-            combo_tags.append("💥暴击")
+            crit_mult = attack_result.get("crit_multiplier", 1.5)
+            combo_tags.append(f"💥暴击x{crit_mult:.1f}")
         if combo_tags:
             result["messages"].append(f"    └ {' | '.join(combo_tags)}")
         result["total_damage"] = damage
@@ -1529,7 +1531,10 @@ class EnhancedBattleEngine:
         if normal_hit and normal_base > 0:
             dmg = normal_base
             if is_critical:
-                dmg = BattleAttributeCalculator.calculate_critical_damage(dmg, attacker_attrs["critical_power"])
+                crit_power = attacker_attrs["critical_power"]
+                crit_multiplier = 1.5 + (crit_power * 0.1)
+                dmg = BattleAttributeCalculator.calculate_critical_damage(dmg, crit_power)
+                result["crit_multiplier"] = crit_multiplier
                 result["effects"].append("CRITICAL")
             if has_true_damage:
                 # 检查防御方是否有绝魔体质（免疫50%真伤）
@@ -1649,7 +1654,10 @@ class EnhancedBattleEngine:
         if normal_hit and normal_base > 0:
             dmg = normal_base
             if is_critical:
-                dmg = BattleAttributeCalculator.calculate_critical_damage(dmg, attacker_attrs["critical_power"])
+                crit_power = attacker_attrs["critical_power"]
+                crit_multiplier = 1.5 + (crit_power * 0.1)
+                dmg = BattleAttributeCalculator.calculate_critical_damage(dmg, crit_power)
+                result["crit_multiplier"] = crit_multiplier
                 result["effects"].append("CRITICAL")
             if has_true_damage:
                 result["effects"].append("TRUE_DAMAGE")
