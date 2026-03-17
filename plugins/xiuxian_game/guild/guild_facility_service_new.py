@@ -619,7 +619,7 @@ class GuildFacilityService:
         existing_quantity = sum(stack.quantity for stack in existing_stacks)
         new_total_quantity = existing_quantity + quantity
 
-        # 计算需要的格子数（按照玩家背包的堆叠规则）
+        # 计算需要的格子数（每格最多堆叠100个）
         from math import ceil
         new_slots_needed = ceil(new_total_quantity / STACK_SIZE)
         current_slots_for_this_item = len(existing_stacks)
@@ -629,7 +629,14 @@ class GuildFacilityService:
         current_total_slots = await self._warehouse_item_repo.get_total_slots_count(guild_id)
 
         if current_total_slots + additional_slots_needed > capacity:
-            return False, f"仓库格子不足，当前{current_total_slots}/{capacity}格，存入{quantity}个需要额外{additional_slots_needed}格"
+            # 计算当前最多能存入多少（现有堆叠剩余空间 + 空闲格子可容纳的数量）
+            existing_space = sum(STACK_SIZE - s.quantity for s in existing_stacks)
+            free_slots = capacity - current_total_slots
+            max_deposit = existing_space + free_slots * STACK_SIZE
+            return False, (
+                f"仓库格子不足（当前{current_total_slots}/{capacity}格），"
+                f"该物品最多还能存入{max_deposit}个"
+            )
 
         # 扣除玩家物品（使用统一的消耗方法处理多个堆叠）
         try:
