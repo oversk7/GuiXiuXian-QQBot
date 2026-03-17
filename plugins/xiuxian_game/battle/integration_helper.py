@@ -200,18 +200,18 @@ class BattleIntegrationHelper:
 
             battle_log.append(f"━━━ 第{round_num}回合 ━━━")
 
-            # 处理回合开始效果（regen等）
-            # 玩家1 regen
-            _, player1_hp_restored = engine._process_turn_start(player1.id, player1)
+            # 处理回合开始效果（regen、buff过期等）
+            # 玩家1 回合开始
+            p1_turn_msgs, player1_hp_restored = engine._process_turn_start(player1.id, player1)
             if player1_hp_restored > 0:
                 player1_hp = min(player1.max_hp, player1_hp + player1_hp_restored)
-                battle_log.append(f"💚 {player1.nickname}回复{player1_hp_restored}HP")
+            battle_log.extend(p1_turn_msgs)
 
-            # 玩家2 regen
-            _, player2_hp_restored = engine._process_turn_start(player2.id, player2)
+            # 玩家2 回合开始
+            p2_turn_msgs, player2_hp_restored = engine._process_turn_start(player2.id, player2)
             if player2_hp_restored > 0:
                 player2_hp = min(player2.max_hp, player2_hp + player2_hp_restored)
-                battle_log.append(f"💚 {player2.nickname}回复{player2_hp_restored}HP")
+            battle_log.extend(p2_turn_msgs)
 
             # 确定回合顺序
             if player1_first:
@@ -239,6 +239,13 @@ class BattleIntegrationHelper:
                         second_hp_ref[0] = min(second_player.max_hp, second_hp_ref[0] + heal_def)
                         battle_log.append(f"💚 {second_player.nickname}回复{heal_def}HP")
 
+                    # 反弹伤害（对攻击方造成伤害）
+                    _reflect = attack_result.get("reflect_damage", 0)
+                    if _reflect > 0:
+                        first_hp_ref[0] = max(0, first_hp_ref[0] - _reflect)
+                    # 镜怨体质即死（攻击方直接死亡）
+                    if attack_result.get("attacker_instant_death"):
+                        first_hp_ref[0] = 0
 
                     # 构建详细攻击描述
                     action_desc = f"⚔️ {first_player.nickname} 攻击 {second_player.nickname}"
@@ -323,6 +330,14 @@ class BattleIntegrationHelper:
                     if heal_def > 0 and first_hp_ref[0] > 0:
                         first_hp_ref[0] = min(first_player.max_hp, first_hp_ref[0] + heal_def)
                         battle_log.append(f"💚 {first_player.nickname}回复{heal_def}HP")
+
+                    # 反弹伤害（对攻击方造成伤害）
+                    _reflect = attack_result.get("reflect_damage", 0)
+                    if _reflect > 0:
+                        second_hp_ref[0] = max(0, second_hp_ref[0] - _reflect)
+                    # 镜怨体质即死（攻击方直接死亡）
+                    if attack_result.get("attacker_instant_death"):
+                        second_hp_ref[0] = 0
 
                     # 构建详细攻击描述
                     action_desc = f"⚔️ {second_player.nickname} 攻击 {first_player.nickname}"
@@ -1045,18 +1060,18 @@ class BattleIntegrationHelper:
 
             battle_log.append(f"━━━ 第{round_num}回合 ━━━")
 
-            # 处理回合开始效果（regen等）
-            # 玩家1 regen
-            _, player1_hp_restored = engine._process_turn_start(player1.id, player1)
+            # 处理回合开始效果（regen、buff过期等）
+            # 玩家1 回合开始
+            p1_turn_msgs, player1_hp_restored = engine._process_turn_start(player1.id, player1)
             if player1_hp_restored > 0:
                 player1_hp = min(player1.max_hp, player1_hp + player1_hp_restored)
-                battle_log.append(f"💚 {player1.nickname}回复{player1_hp_restored}HP")
+            battle_log.extend(p1_turn_msgs)
 
-            # 玩家2 regen
-            _, player2_hp_restored = engine._process_turn_start(player2.id, player2)
+            # 玩家2 回合开始
+            p2_turn_msgs, player2_hp_restored = engine._process_turn_start(player2.id, player2)
             if player2_hp_restored > 0:
                 player2_hp = min(player2.max_hp, player2_hp + player2_hp_restored)
-                battle_log.append(f"💚 {player2.nickname}回复{player2_hp_restored}HP")
+            battle_log.extend(p2_turn_msgs)
 
             # 根据先后手判定执行攻击顺序（日志格式与 PvE 一致：直接 extend 引擎消息）
             if player1_first:
@@ -1072,6 +1087,13 @@ class BattleIntegrationHelper:
                         # 攻击方回血（吸血等效果）
                         if attack_result.get("hp_restored", 0) > 0:
                             player1_hp = min(player1.max_hp, player1_hp + attack_result["hp_restored"])
+                        # 反弹伤害（对攻击方造成伤害）
+                        _reflect = attack_result.get("reflect_damage", 0)
+                        if _reflect > 0:
+                            player1_hp = max(0, player1_hp - _reflect)
+                        # 镜怨体质即死（攻击方直接死亡）
+                        if attack_result.get("attacker_instant_death"):
+                            player1_hp = 0
                         # 斩杀判定
                         exec_thr = _get_exec_thr(player1.id)
                         if exec_thr > 0 and player2_hp > 0:
@@ -1103,6 +1125,13 @@ class BattleIntegrationHelper:
                         # 攻击方回血（吸血等效果）
                         if attack_result.get("hp_restored", 0) > 0:
                             player2_hp = min(player2.max_hp, player2_hp + attack_result["hp_restored"])
+                        # 反弹伤害（对攻击方造成伤害）
+                        _reflect = attack_result.get("reflect_damage", 0)
+                        if _reflect > 0:
+                            player2_hp = max(0, player2_hp - _reflect)
+                        # 镜怨体质即死（攻击方直接死亡）
+                        if attack_result.get("attacker_instant_death"):
+                            player2_hp = 0
                         # 处决判定（玩家2对玩家1）
                         _thr = _get_exec_thr(player2.id)
                         if _thr > 0 and player1_hp > 0:
@@ -1134,6 +1163,13 @@ class BattleIntegrationHelper:
                         # 攻击方回血（吸血等效果）
                         if attack_result.get("hp_restored", 0) > 0:
                             player2_hp = min(player2.max_hp, player2_hp + attack_result["hp_restored"])
+                        # 反弹伤害（对攻击方造成伤害）
+                        _reflect = attack_result.get("reflect_damage", 0)
+                        if _reflect > 0:
+                            player2_hp = max(0, player2_hp - _reflect)
+                        # 镜怨体质即死（攻击方直接死亡）
+                        if attack_result.get("attacker_instant_death"):
+                            player2_hp = 0
                         # 处决判定（玩家2对玩家1）
                         _thr = _get_exec_thr(player2.id)
                         if _thr > 0 and player1_hp > 0:
@@ -1165,6 +1201,13 @@ class BattleIntegrationHelper:
                         # 攻击方回血（吸血等效果）
                         if attack_result.get("hp_restored", 0) > 0:
                             player1_hp = min(player1.max_hp, player1_hp + attack_result["hp_restored"])
+                        # 反弹伤害（对攻击方造成伤害）
+                        _reflect = attack_result.get("reflect_damage", 0)
+                        if _reflect > 0:
+                            player1_hp = max(0, player1_hp - _reflect)
+                        # 镜怨体质即死（攻击方直接死亡）
+                        if attack_result.get("attacker_instant_death"):
+                            player1_hp = 0
                         # 处决判定（玩家1对玩家2）
                         _thr2 = _get_exec_thr(player1.id)
                         if _thr2 > 0 and player2_hp > 0:

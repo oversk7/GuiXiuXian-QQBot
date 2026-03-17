@@ -14,6 +14,7 @@ from ..models.player import Player
 from ..utils import message_add_head
 from .integration_helper import BattleIntegrationHelper
 from .battle_markdown import build_battle_markdown
+from .battle_log_filter import filter_battle_log, get_player_log_mode, set_player_log_mode
 import time
 
 
@@ -100,13 +101,18 @@ async def handle_pvp(event: MessageEvent, args: Message = CommandArg()):
             p1_final_hp = max(0, challenger.hp - challenger_damage)
             p2_final_hp = max(0, target_player.hp - target_damage)
 
+            # 根据玩家偏好过滤日志
+            log_mode = get_player_log_mode(challenger)
+            filtered_log = filter_battle_log(battle_log, log_mode)
+
             winner = challenger if victory else target_player
+            mode_hint = "详细模式" if log_mode == "detailed" else "简洁模式"
             await pvp_cmd.finish(build_battle_markdown(
                 title=f"⚔️ {winner.nickname} 胜！",
-                battle_log=battle_log,
-                hint="切磋不影响数据",
+                battle_log=filtered_log,
+                hint=f"切磋不影响数据 | {mode_hint}",
                 btn1="切磋",
-                btn2="面板",
+                btn2="日志模式",
                 btn3="战力",
             ))
 
@@ -181,15 +187,82 @@ async def handle_simulate(event: MessageEvent, args: Message = CommandArg()):
             p1_final_hp = max(0, player1.hp - p1_damage)
             p2_final_hp = max(0, player2.hp - p2_damage)
 
+            # 获取发起者的日志偏好
+            from ..platform_utils import get_unified_player
+            requester = await get_unified_player(session, event)
+            log_mode = get_player_log_mode(requester) if requester else "simple"
+            filtered_log = filter_battle_log(battle_log, log_mode)
+
             winner = player1 if victory else player2
+            mode_hint = "详细模式" if log_mode == "detailed" else "简洁模式"
             await simulate_cmd.finish(build_battle_markdown(
                 title=f"🎮 {winner.nickname} 胜！",
-                battle_log=battle_log,
-                hint="模拟 不影响数据",
+                battle_log=filtered_log,
+                hint=f"模拟 不影响数据 | {mode_hint}",
                 btn1="切磋",
-                btn2="面板",
+                btn2="日志模式",
                 btn3="战力",
             ))
 
         except ValueError as e:
             await simulate_cmd.finish(f"⛔ 模拟战斗过程中发生错误：{str(e)}")
+
+
+# ==================== 战斗日志模式切换 ====================
+log_mode_cmd = on_command("日志模式", aliases={"战斗日志模式", "切换日志模式"}, block=True, priority=5)
+
+
+@log_mode_cmd.handle()
+async def handle_log_mode(event: MessageEvent, args: Message = CommandArg()):
+    """切换战斗日志的显示模式（详细/简洁）"""
+    args_text = args.extract_plain_text().strip()
+
+    async with safe_session() as session:
+        from ..platform_utils import get_unified_player
+        player = await get_unified_player(session, event)
+        if not player:
+            await log_mode_cmd.finish("⛔ 请先创建角色")
+
+        current_mode = get_player_log_mode(player)
+
+        if not args_text:
+            # 无参数：显示当前模式和帮助
+            mode_cn = "详细" if current_mode == "detailed" else "简洁"
+            msg = (
+                f"📋 战斗日志模式\n"
+                f"━━━━━━━━━━━━━\n"
+                f"当前模式：{mode_cn}\n"
+                f"\n"
+                f"【日志模式 详细】 显示完整战斗细节\n"
+                f"  含防御减伤、斩龙拆分、吸血/回血\n"
+                f"  buff触发/过期、护盾吸收等\n"
+                f"\n"
+                f"【日志模式 简洁】 仅显示攻击和结果\n"
+                f"  精简版，快速查看胜负\n"
+                f"━━━━━━━━━━━━━\n"
+                f"💡 适用于切磋/死斗/诡域等所有战斗"
+            )
+            await log_mode_cmd.finish(message_add_head(msg, event))
+
+        # 解析目标模式
+        if args_text in ("详细", "detailed", "全部"):
+            target_mode = "detailed"
+            mode_cn = "详细"
+        elif args_text in ("简洁", "simple", "精简", "简单"):
+            target_mode = "simple"
+            mode_cn = "简洁"
+        else:
+            await log_mode_cmd.finish("⛔ 请输入：日志模式 详细 或 日志模式 简洁")
+            return
+
+        if current_mode == target_mode:
+            await log_mode_cmd.finish(message_add_head(f"📋 当前已是{mode_cn}模式", event))
+
+        set_player_log_mode(player, target_mode)
+        await session.commit()
+
+        await log_mode_cmd.finish(message_add_head(
+            f"✅ 战斗日志已切换为【{mode_cn}模式】\n"
+            f"💡 下次战斗时生效",
+            event
+        ))

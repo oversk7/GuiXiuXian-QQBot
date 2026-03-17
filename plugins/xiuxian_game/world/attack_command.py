@@ -21,6 +21,7 @@ from ..models.npc import NPCType
 from ..models.inventory import ItemInstance
 from ..utils import message_add_head
 from ..battle.battle_markdown import build_battle_markdown
+from ..battle.battle_log_filter import filter_battle_log, get_player_log_mode
 from .location_service import LocationService
 from .npc_service import NPCService
 from ..player.realm_utils import realm_by_level_and_reincarnation
@@ -861,8 +862,9 @@ async def handle_player_attack(session, attacker: Player, target: Player, event:
             "━━━━━━━━━━━━━"
         ])
 
-        # 显示简洁的战斗日志
-        result_lines.extend(battle_log)
+        # 根据玩家偏好过滤战斗日志
+        log_mode = get_player_log_mode(attacker)
+        result_lines.extend(filter_battle_log(battle_log, log_mode))
 
         result_lines.append("━━━━━━━━━━━━━")
 
@@ -958,18 +960,20 @@ async def handle_player_attack(session, attacker: Player, target: Player, event:
             result_lines.extend(achievement_msgs)
 
         pvp_winner = attacker if victory else target
+        mode_hint = "详细模式" if log_mode == "detailed" else "简洁模式"
         if in_town:
-            pvp_hint = "城镇切磋 无掉落"
+            pvp_hint = f"城镇切磋 无掉落 | {mode_hint}"
         else:
-            pvp_hint = drop_summary if drop_summary else "无物品掉落"
+            base_hint = drop_summary if drop_summary else "无物品掉落"
+            pvp_hint = f"{base_hint} | {mode_hint}"
 
         await attack_cmd.finish(build_battle_markdown(
             title=f"{battle_type} · {pvp_winner.nickname} 胜！",
             battle_log=result_lines,
             hint=pvp_hint,
             btn1="探索",
-            btn2="面板",
-            btn3="背包",
+            btn2="日志模式",
+            btn3="面板",
         ))
 
     except ValueError as e:
@@ -1036,8 +1040,9 @@ async def handle_npc_attack(session, attacker: Player, target_npc, event: Messag
         ]
         npc_reward_hint = ""
 
-        # 展示战斗过程（battle_log 已包含 VS 标题行）
-        result_lines.extend(battle_log)
+        # 展示战斗过程（battle_log 已包含 VS 标题行），根据玩家偏好过滤
+        npc_log_mode = get_player_log_mode(attacker)
+        result_lines.extend(filter_battle_log(battle_log, npc_log_mode))
         result_lines.append("━━━━━━━━━━━━━")
 
         if victory:
@@ -1320,15 +1325,17 @@ async def handle_npc_attack(session, attacker: Player, target_npc, event: Messag
             result_lines.extend(achievement_msgs)
 
         npc_title = f"⚔️ {target_npc.name} 已击倒！" if victory else f"💀 败于 {target_npc.name}"
+        npc_mode_hint = "详细模式" if npc_log_mode == "detailed" else "简洁模式"
         if not npc_reward_hint:
             npc_reward_hint = "获得战斗奖励" if victory else "血量耗尽"
+        npc_reward_hint = f"{npc_reward_hint} | {npc_mode_hint}"
 
         await attack_cmd.finish(build_battle_markdown(
             title=npc_title,
             battle_log=result_lines,
             hint=npc_reward_hint,
             btn1="探索",
-            btn2="面板",
+            btn2="日志模式",
             btn3="背包",
         ))
 

@@ -27,6 +27,7 @@ from ..models.db import safe_session
 from ..models.player import Player
 from ..utils import message_add_head
 from ..battle.battle_markdown import build_battle_markdown
+from ..battle.battle_log_filter import filter_battle_log, get_player_log_mode
 from .service_new import WorldBossService
 from ..platform_utils import get_unified_player
 
@@ -92,14 +93,17 @@ async def handle_attack(event: MessageEvent, args: Message = CommandArg()):
         cycle, tip = await service.check_and_refresh_cycle()
         ok, lines, boss_title, boss_hint = await service.attack_boss(cycle, player)
         if ok:
+            boss_log_mode = get_player_log_mode(player)
+            lines = filter_battle_log(lines, boss_log_mode)
             if tip:
                 lines = [tip, "━━━━━━━━━━━━━"] + lines
+            boss_mode_label = "详细模式" if boss_log_mode == "detailed" else "简洁模式"
             await attack_cmd.finish(build_battle_markdown(
                 title=boss_title,
                 battle_log=lines,
-                hint=boss_hint,
+                hint=f"{boss_hint} | {boss_mode_label}",
                 btn1="讨伐BOSS",
-                btn2="BOSS排行",
+                btn2="日志模式",
                 btn3="面板",
             ))
         else:

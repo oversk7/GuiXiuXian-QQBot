@@ -15,6 +15,7 @@ from ..models.db import AsyncSessionLocal
 from .service import InnerRealmService
 from .config import InnerRealmConfig
 from ..battle.battle_markdown import build_battle_markdown
+from ..battle.battle_log_filter import filter_battle_log, get_player_log_mode
 import json
 
 
@@ -551,12 +552,15 @@ async def handle_attack(event: MessageEvent):
             inner_title = "🌀 战斗失败"
             inner_hint = "继续探索里界"
 
+        inner_log_mode = get_player_log_mode(player)
+        filtered_log = filter_battle_log(log_lines, inner_log_mode)
+        inner_mode_label = "详细模式" if inner_log_mode == "detailed" else "简洁模式"
         await attack_cmd.finish(build_battle_markdown(
             title=inner_title,
-            battle_log=log_lines + result_lines,
-            hint=inner_hint,
+            battle_log=filtered_log + result_lines,
+            hint=f"{inner_hint} | {inner_mode_label}",
             btn1="攻击",
-            btn2="里界信息",
+            btn2="日志模式",
             btn3="返回",
         ))
 

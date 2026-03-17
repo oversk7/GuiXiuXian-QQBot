@@ -98,6 +98,11 @@ class BattleEffect:
     trigger_count: int = 0          # 触发计数器（用于计数型效果，如虎标弹）
     max_trigger_count: int = 0      # 最大触发次数（0表示无限制）
     next_effect: str = ""           # 失效后触发的下一个效果类型
+    source_equipment: str = ""       # 来源装备标签（如"归雨·噬雨"）
+
+    def equip_tag(self) -> str:
+        """返回装备来源标签，如 '[归雨·噬雨]'，无来源时返回空字符串"""
+        return f"[{self.source_equipment}]" if self.source_equipment else ""
 
     def apply_stack(self, new_value: float = None) -> bool:
         """叠加效果"""
@@ -142,14 +147,11 @@ class TriggerConfig:
     next_effect: str = ""           # 失效后触发的下一个效果类型
     next_effect_value: float = 0    # 下一个效果的数值
     next_effect_duration: int = 0   # 下一个效果的持续时间
-    # 新增：上下文条件判断（都市怪谈风味）
-    ctx_mp_threshold: float = 0     # 理智值阈值（低于此值才触发，0表示不限制）
-    ctx_region_in: list = None      # 限定区域列表（如["医院","地铁"]，None表示不限制）
-    ctx_time_range: list = None     # 限定时间范围（如[22, 6]表示22点到次日6点，None表示不限制）
     # —— 环境/氛围条件（可选，未配置则无影响）——
     ctx_mp_max: float = 0           # 仅当当前理智(%) ≤ 该值时触发（0=不限制）
     ctx_region_in: list[str] | None = None  # 仅当所在区域在列表内时触发
     ctx_theme_in: list[str] | None = None   # 仅当本周主题在列表内时触发
+    source_equipment: str = ""              # 来源装备标签（如"归雨·噬雨"）
 
 
 class BattleEffectManager:
@@ -237,7 +239,8 @@ class BattleEffectManager:
                 description=trigger_config.description,
                 is_percentage=trigger_config.is_percentage,
                 max_trigger_count=trigger_config.max_trigger_count,
-                next_effect=trigger_config.next_effect
+                next_effect=trigger_config.next_effect,
+                source_equipment=trigger_config.source_equipment,
             )
 
             triggered_effects.append(effect)
@@ -412,6 +415,7 @@ def parse_triggers_from_yaml(special_effects: List[Dict]) -> List[TriggerConfig]
 
 def format_effect_message(effect: BattleEffect, target_name: str, is_trigger: bool = True) -> str:
     """格式化效果消息"""
+    _tag = effect.equip_tag()  # 装备来源标签
     emoji_map = {
         EffectType.LIFESTEAL: "🧡",
         EffectType.TRUE_DAMAGE: "🔥",
@@ -437,11 +441,11 @@ def format_effect_message(effect: BattleEffect, target_name: str, is_trigger: bo
 
     # 根据效果类型生成描述
     if effect.effect_type == EffectType.FEAR:
-        msg = f"{emoji} {target_name}被恐惧{effect.duration}回合"
+        msg = f"{emoji} {_tag}{target_name}被恐惧{effect.duration}回合"
     elif effect.effect_type == EffectType.LIFESTEAL:
-        msg = f"{emoji} 吸血{effect.value:.0f}%"
+        msg = f"{emoji} {_tag}吸血{effect.value:.0f}%"
     elif effect.effect_type == EffectType.TRUE_DAMAGE:
-        msg = f"{emoji} {target_name}进入真伤状态(持续{effect.duration}回合)"
+        msg = f"{emoji} {_tag}{target_name}进入真伤状态(持续{effect.duration}回合)"
     elif effect.effect_type in [EffectType.BUFF_ATTACK, EffectType.BUFF_DEFENSE,
                                 EffectType.BUFF_CRITICAL, EffectType.BUFF_DODGE,
                                 EffectType.BUFF_ACCURACY]:
@@ -455,20 +459,20 @@ def format_effect_message(effect: BattleEffect, target_name: str, is_trigger: bo
 
         stack_info = f"(第{effect.stacks}层)" if effect.max_stacks > 1 else ""
         duration_info = f"{effect.duration}回合" if effect.duration > 0 else "永久"
-        msg = f"{emoji} {target_name}{attr_name}+{effect.value:.0f}%{stack_info}，持续{duration_info}"
+        msg = f"{emoji} {_tag}{target_name}{attr_name}+{effect.value:.0f}%{stack_info}，持续{duration_info}"
     elif effect.effect_type == EffectType.REGEN:
-        msg = f"{emoji} {target_name}每回合回复{effect.value:.0f}%生命值"
+        msg = f"{emoji} {_tag}{target_name}每回合回复{effect.value:.0f}%生命值"
     elif effect.effect_type == EffectType.SHIELD:
-        msg = f"{emoji} {target_name}获得{effect.value:.0f}点护盾"
+        msg = f"{emoji} {_tag}{target_name}获得{effect.value:.0f}点护盾"
     elif effect.effect_type == EffectType.DEFENSE_PENETRATION:
         duration_info = f"{effect.duration}回合" if effect.duration > 0 else "永久"
-        msg = f"{emoji} {target_name}无视敌人{effect.value:.0f}%防御，持续{duration_info}"
+        msg = f"{emoji} {_tag}{target_name}无视敌人{effect.value:.0f}%防御，持续{duration_info}"
     elif effect.effect_type == EffectType.DAMAGE_REDUCTION:
         duration_info = f"{effect.duration}回合" if effect.duration > 0 else "永久"
-        msg = f"{emoji} {target_name}受到伤害减少{effect.value:.0f}%，持续{duration_info}"
+        msg = f"{emoji} {_tag}{target_name}受到伤害减少{effect.value:.0f}%，持续{duration_info}"
     elif effect.description:
-        msg = f"{emoji} {effect.description}"
+        msg = f"{emoji} {_tag}{effect.description}"
     else:
-        msg = f"{emoji} 未知效果"
+        msg = f"{emoji} {_tag}未知效果"
 
     return msg

@@ -29,6 +29,7 @@ from .service import (
 from .hero_generator import hero_from_json
 from ..battle.integration_helper import BattleIntegrationHelper
 from ..battle.battle_markdown import build_battle_markdown
+from ..battle.battle_log_filter import filter_battle_log, get_player_log_mode
 
 
 # ==================== 命令注册 ====================
@@ -529,7 +530,9 @@ async def handle_battle_hero(event: MessageEvent):
                 ]
 
             victory_ending = random.choice(victory_endings)
-            log_lines = list(battle_log) + [
+            lw_log_mode = get_player_log_mode(player)
+            filtered_bl = filter_battle_log(list(battle_log), lw_log_mode)
+            log_lines = filtered_bl + [
                 "━━━━━━━━━━━━━",
                 victory_ending,
                 "",
@@ -539,12 +542,13 @@ async def handle_battle_hero(event: MessageEvent):
                 "",
                 f"⏳ 下一波英雄将于 {WAVE_INTERVAL_HOURS} 小时后到达",
             ]
+            lw_mode_label = "详细模式" if lw_log_mode == "detailed" else "简洁模式"
             await battle_hero_cmd.finish(build_battle_markdown(
                 title=f"🏰 {hero['name']} 倒下！",
                 battle_log=log_lines,
-                hint=f"+{points}天灾点",
+                hint=f"+{points}天灾点 | {lw_mode_label}",
                 btn1="迎战",
-                btn2="镇守",
+                btn2="日志模式",
                 btn3="天灾商店",
             ))
         else:
@@ -678,7 +682,9 @@ async def handle_battle_hero(event: MessageEvent):
                 ]
 
             defeat_ending = random.choice(defeat_endings)
-            log_lines = list(battle_log) + [
+            lw_log_mode2 = get_player_log_mode(player)
+            filtered_bl2 = filter_battle_log(list(battle_log), lw_log_mode2)
+            log_lines = filtered_bl2 + [
                 "━━━━━━━━━━━━━",
                 "你倒下了。",
                 "",
@@ -686,12 +692,13 @@ async def handle_battle_hero(event: MessageEvent):
                 "",
                 f"⛓️ 你被封印{SEAL_DURATION_HOURS}小时" + (f"，波次降低{wave_dropped}波（当前第{stronghold.wave_number}波）" if wave_dropped > 0 else ""),
             ]
+            lw_mode_label2 = "详细模式" if lw_log_mode2 == "detailed" else "简洁模式"
             await battle_hero_cmd.finish(build_battle_markdown(
                 title=f"🏰 被 {hero['name']} 击倒",
                 battle_log=log_lines,
-                hint=f"封印{SEAL_DURATION_HOURS}小时" + (f" · 降{wave_dropped}波" if wave_dropped > 0 else ""),
+                hint=f"封印{SEAL_DURATION_HOURS}小时" + (f" · 降{wave_dropped}波" if wave_dropped > 0 else "") + f" | {lw_mode_label2}",
                 btn1="迎战",
-                btn2="镇守",
+                btn2="日志模式",
                 btn3="天灾商店",
             ))
 

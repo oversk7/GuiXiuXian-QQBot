@@ -396,10 +396,21 @@ class EnhancedBattleEngine:
             # 解析触发器配置
             triggers = parse_triggers_from_yaml(unlocked_effects)
 
-            # 为每个触发器添加来源信息
+            # 为每个触发器添加来源信息（装备名·技能名）
+            equip_name = config.name
             for trigger in triggers:
                 if not trigger.description:
                     trigger.description = f"{config.name}的特殊效果"
+                # 从description中提取技能名（取"："前的部分）
+                skill_name = ""
+                if trigger.description:
+                    parts = trigger.description.split("：", 1)
+                    if len(parts) > 1:
+                        skill_name = parts[0].strip()
+                if skill_name:
+                    trigger.source_equipment = f"{equip_name}·{skill_name}"
+                else:
+                    trigger.source_equipment = equip_name
 
             # 针对"斩龙闪"：其"生命→理智"的加成应为全局被动，面板可见，不在战斗内首回合生效
             # 因此这里过滤掉其 MP_FROM_HP 的战斗触发器，避免与全局持久化重复
@@ -553,7 +564,7 @@ class EnhancedBattleEngine:
         )
 
         # 保持原有返回字段
-        return {
+        ret = {
             "hit": unified.get("hit", False),
             "damage": unified.get("total_damage", 0),
             "total_damage": unified.get("total_damage", 0),
@@ -566,6 +577,12 @@ class EnhancedBattleEngine:
             "defender_hp_restored": unified.get("defender_hp_restored", 0),
             "effects_triggered": unified.get("effects_triggered", []),
         }
+        # 转发反弹伤害和即死效果，供上层正确结算HP
+        if unified.get("reflect_damage", 0) > 0:
+            ret["reflect_damage"] = unified["reflect_damage"]
+        if unified.get("attacker_instant_death"):
+            ret["attacker_instant_death"] = True
+        return ret
 
     def _check_blade_daily_random_available(self, player: Player) -> bool:
         """检查刃之魔灵效果今天是否可以触发
@@ -622,16 +639,17 @@ class EnhancedBattleEngine:
 
         # 处理击杀触发的效果
         for effect in kill_effects:
+            _ktag = effect.equip_tag()  # 装备来源标签
             if effect.effect_type == EffectType.HEAL:
                 # 立即回血
                 heal_amount = int(killer.max_hp * effect.value / 100) if effect.is_percentage else int(effect.value)
                 result["hp_restored"] += heal_amount
-                result["messages"].append(f"💚 击杀回复{heal_amount}HP")
+                result["messages"].append(f"💚 {_ktag}击杀回复{heal_amount}HP")
                 result["effects_triggered"].append("heal")
 
             elif effect.effect_type == EffectType.GAIN_MP:
                 # 噬灵者：永久获得理智值（需要在战斗结束后持久化）
-                result["messages"].append(f"👻 噬灵者：剥离灵魂，理智值+{int(effect.value)}（战后结算）")
+                result["messages"].append(f"👻 {_ktag}剥离灵魂，理智值+{int(effect.value)}（战后结算）")
                 result["effects_triggered"].append("gain_mp")
                 # 标记需要在战斗结束后处理
                 if 'post_battle_effects' not in result:
@@ -646,7 +664,7 @@ class EnhancedBattleEngine:
                 # value是属性点数，1属性点=3生命值
                 attr_points = int(effect.value)
                 actual_hp = attr_points * 3  # 转换为实际生命值
-                result["messages"].append(f"💓 噬灵者：剥离血肉，最大生命值+{actual_hp}（战后结算）")
+                result["messages"].append(f"💓 {_ktag}剥离血肉，最大生命值+{actual_hp}（战后结算）")
                 result["effects_triggered"].append("gain_max_hp")
                 if 'post_battle_effects' not in result:
                     result['post_battle_effects'] = []
@@ -677,7 +695,7 @@ class EnhancedBattleEngine:
                     chosen_attr = self.rng.choice(allowed_attrs)
                     val = int(effect.value)
                     result["messages"].append(
-                        f"⚔️ 刃之魔灵：掠夺灵魂，{attr_cn.get(chosen_attr, '随机属性')}+{val}（战后结算）"
+                        f"⚔️ {_ktag}掠夺灵魂，{attr_cn.get(chosen_attr, '随机属性')}+{val}（战后结算）"
                     )
                     result["effects_triggered"].append("gain_random_attr")
                     # 标记需要在战后结算中处理（包含已抽取的属性名）
@@ -692,7 +710,7 @@ class EnhancedBattleEngine:
             elif effect.effect_type == EffectType.GAIN_AGILITY:
                 # 夺伞步（归雨）：永久获得敏捷（需要在战斗结束后持久化）
                 attr_points = int(effect.value)
-                result["messages"].append(f"👣 夺伞步：脚步更轻，敏捷+{attr_points}（战后结算）")
+                result["messages"].append(f"👣 {_ktag}脚步更轻，敏捷+{attr_points}（战后结算）")
                 result["effects_triggered"].append("gain_agility")
                 if 'post_battle_effects' not in result:
                     result['post_battle_effects'] = []
@@ -703,13 +721,8 @@ class EnhancedBattleEngine:
 
             elif effect.effect_type == EffectType.GAIN_ATTACK:
                 # 永久获得攻击力（需要在战斗结束后持久化）
-                # 区分不同来源：折光年的「终焉铭刻」vs 诡面骰的「骰相·噬」
                 attr_points = int(effect.value)
-                desc = effect.description or ""
-                if "骰相" in desc:
-                    result["messages"].append(f"🎲 骰相·噬：骰纹加深，攻击力+{attr_points}（战后结算）")
-                else:
-                    result["messages"].append(f"⏱️ 终焉铭刻：终结被铭刻，攻击力+{attr_points}（战后结算）")
+                result["messages"].append(f"⏱️ {_ktag}攻击力+{attr_points}（战后结算）")
                 result["effects_triggered"].append("gain_attack")
                 if 'post_battle_effects' not in result:
                     result['post_battle_effects'] = []
@@ -1101,6 +1114,7 @@ class EnhancedBattleEngine:
 
         # 处理触发的效果
         for effect in attack_effects:
+            _tag = effect.equip_tag()  # 装备来源标签
             # 立即生效的效果
             if effect.effect_type == EffectType.LIFESTEAL:
                 lifesteal_amount = int(damage * effect.value / 100)
@@ -1109,40 +1123,40 @@ class EnhancedBattleEngine:
                     lifesteal_amount = int(lifesteal_amount * 1.5)
                 # 实际恢复HP（不超过最大值）
                 result["hp_restored"] += lifesteal_amount
-                result["messages"].append(f"🧡 吸血{lifesteal_amount}HP{'(暴击加强)' if is_critical else ''}")
+                result["messages"].append(f"🧡 {_tag}吸血{lifesteal_amount}HP{'(暴击加强)' if is_critical else ''}")
                 result["effects_triggered"].append("lifesteal")
 
             elif effect.effect_type == EffectType.HEAL:
                 # 立即回血效果
                 heal_amount = int(attacker.max_hp * effect.value / 100) if effect.is_percentage else int(effect.value)
                 result["hp_restored"] += heal_amount
-                result["messages"].append(f"💚 回复{heal_amount}HP")
+                result["messages"].append(f"💚 {_tag}回复{heal_amount}HP")
 
                 result["effects_triggered"].append("heal")
 
             elif effect.effect_type == EffectType.FEAR:
                 # 对敌人施加恐惧效果
                 self.effect_manager.add_effect(defender_id, effect)
-                result["messages"].append(f"😱 {defender_name}被恐惧{effect.duration}回合")
+                result["messages"].append(f"😱 {_tag}{defender_name}被恐惧{effect.duration}回合")
                 result["effects_triggered"].append("fear")
 
             elif effect.effect_type == EffectType.TRUE_DAMAGE:
                 # 真伤状态：添加到攻击者身上
                 self.effect_manager.add_effect(attacker_id, effect)
-                result["messages"].append(f"🔥 进入真伤状态！(持续{effect.duration}回合)")
+                result["messages"].append(f"🔥 {_tag}进入真伤状态！(持续{effect.duration}回合)")
                 result["effects_triggered"].append("true_damage")
 
             elif effect.effect_type == EffectType.DAMAGE_BOOST:
                 # 伤害提升效果（立即生效）
                 boost_damage = int(damage * effect.value / 100)
                 result["total_damage"] += boost_damage
-                result["messages"].append(f"💥 伤害提升！额外造成{boost_damage}伤害")
+                result["messages"].append(f"💥 {_tag}伤害提升！额外造成{boost_damage}伤害")
                 result["effects_triggered"].append("damage_boost")
 
             elif effect.effect_type == EffectType.DEFENSE_PENETRATION:
                 # 伞骨穿：无视防御持续效果，添加到攻击者身上
                 self.effect_manager.add_effect(attacker_id, effect)
-                result["messages"].append(f"☂️ 伞骨穿！无视敌人{effect.value:.0f}%防御(持续{effect.duration}回合)")
+                result["messages"].append(f"☂️ {_tag}无视敌人{effect.value:.0f}%防御(持续{effect.duration}回合)")
                 result["effects_triggered"].append("defense_penetration")
 
             elif effect.duration > 0:
@@ -1185,6 +1199,7 @@ class EnhancedBattleEngine:
                     eff.value = float(eff.value) * scale
 
         for effect in defense_effects:
+            _dtag = effect.equip_tag()  # 防御方装备来源标签
             if effect.effect_type == EffectType.REFLECT_DEATH:
                 # 镜怨体质：反射死亡(可被"绝魔体质"按概率压制)
                 # 切磋模式下不触发镜怨体质（切磋不算死斗）
@@ -1206,10 +1221,10 @@ class EnhancedBattleEngine:
                     # 将"必死"视为100%概率效果，被忽视50%后 -> 仅有(1-忽视)的概率生效
                     if self.rng.random() < min(1.0, ignore_special_ratio):
                         apply_instant_death = False
-                        result["messages"].append("🪞 镜怨体质被斩龙闪压制，必死效果本次未触发")
+                        result["messages"].append(f"🪞 {_dtag}镜怨体质被斩龙闪压制，必死效果本次未触发")
                 if apply_instant_death:
                     result["attacker_instant_death"] = True
-                    result["messages"].append(f"🪞 镜怨体质！{attacker_name}的攻击被镜像反噬，灵魂瞬间破碎——直接死亡！")
+                    result["messages"].append(f"🪞 {_dtag}镜怨体质！{attacker_name}的攻击被镜像反噬，灵魂瞬间破碎——直接死亡！")
                     result["messages"].append("💀 镜中之人，以己之力斩己之形。")
                     result["effects_triggered"].append("reflect_death")
                     # 标记攻击者需要立即死亡
@@ -1225,7 +1240,7 @@ class EnhancedBattleEngine:
                 reflect_damage = int(reflect_damage * reduce_factor)
                 if reflect_damage > 0:
                     result["reflect_damage"] = result.get("reflect_damage", 0) + reflect_damage
-                    result["messages"].append(f"↩️ {defender_name}反弹{reflect_damage}伤害给{attacker_name}")
+                    result["messages"].append(f"↩️ {_dtag}{defender_name}反弹{reflect_damage}伤害给{attacker_name}")
                     result["effects_triggered"].append("reflect")
 
             elif effect.effect_type == EffectType.SHIELD:
@@ -1234,14 +1249,14 @@ class EnhancedBattleEngine:
                 self.effect_manager.add_effect(defender_id, effect)
                 # 将护盾值存储在effect中
                 effect.shield_value = shield_value
-                result["messages"].append(f"🛡️ {defender_name}获得{shield_value}点护盾")
+                result["messages"].append(f"🛡️ {_dtag}{defender_name}获得{shield_value}点护盾")
                 result["effects_triggered"].append("shield")
 
             elif effect.effect_type == EffectType.HEAL:
                 # 立即回血
                 heal_amount = int(defender.max_hp * effect.value / 100) if effect.is_percentage else int(effect.value)
                 result["defender_hp_restored"] = result.get("defender_hp_restored", 0) + heal_amount
-                result["messages"].append(f"💚 {defender_name}回复{heal_amount}HP")
+                result["messages"].append(f"💚 {_dtag}{defender_name}回复{heal_amount}HP")
                 result["effects_triggered"].append("heal")
 
             else:
@@ -1373,30 +1388,31 @@ class EnhancedBattleEngine:
 
         # 处理触发的效果
         for effect in attack_effects:
+            _ctag = effect.equip_tag()  # 装备来源标签
             if effect.effect_type == EffectType.LIFESTEAL:
                 lifesteal_amount = int(damage * effect.value / 100)
                 # 暴击时吸血加强（联动增强）
                 if is_critical:
                     lifesteal_amount = int(lifesteal_amount * 1.5)
                 result["hp_restored"] += lifesteal_amount
-                result["messages"].append(f"    🧡 吸血{lifesteal_amount}HP{'(暴击加强)' if is_critical else ''}")
+                result["messages"].append(f"    🧡 {_ctag}吸血{lifesteal_amount}HP{'(暴击加强)' if is_critical else ''}")
                 result["effects_triggered"].append("lifesteal")
 
             elif effect.effect_type == EffectType.TRUE_DAMAGE:
                 # 真伤状态：添加到攻击者身上
                 self.effect_manager.add_effect(attacker_id, effect)
-                result["messages"].append(f"    🔥 进入真伤状态！(持续{effect.duration}回合)")
+                result["messages"].append(f"    🔥 {_ctag}进入真伤状态！(持续{effect.duration}回合)")
                 result["effects_triggered"].append("true_damage")
 
             elif effect.effect_type == EffectType.FEAR:
                 self.effect_manager.add_effect(defender_id, effect)
-                result["messages"].append(f"    😱 {defender_name}被恐惧{effect.duration}回合")
+                result["messages"].append(f"    😱 {_ctag}{defender_name}被恐惧{effect.duration}回合")
                 result["effects_triggered"].append("fear")
 
             elif effect.effect_type == EffectType.DAMAGE_BOOST:
                 boost_damage = int(damage * effect.value / 100)
                 result["total_damage"] += boost_damage
-                result["messages"].append(f"    💥 伤害提升！额外造成{boost_damage}伤害")
+                result["messages"].append(f"    💥 {_ctag}伤害提升！额外造成{boost_damage}伤害")
                 result["effects_triggered"].append("damage_boost")
 
             elif effect.duration > 0:

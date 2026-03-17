@@ -29,6 +29,7 @@ from ..config import config
 from ..utils import message_add_head, luck_prob
 from ..platform_utils import get_unified_player
 from ..item.equipment_service import recalc_equipment_attributes
+from ..battle.battle_log_filter import filter_battle_log, get_player_log_mode
 
 # Feature Flag（在文件顶部靠近其他导入的位置）
 async def check_equipment_durability(session, player_id: str) -> str:
@@ -1063,8 +1064,9 @@ async def _handle_personal_monster(session, tile: WorldTile, player: Player) -> 
     # 更新玩家血量
     player.hp = max(0, player.hp - damage_taken)
 
-    # 使用战斗日志作为基础，添加额外信息
-    battle_summary = battle_log.copy()
+    # 根据玩家偏好过滤战斗日志，再添加额外信息
+    dungeon_log_mode = get_player_log_mode(player)
+    battle_summary = filter_battle_log(battle_log, dungeon_log_mode)
 
     # 处理战斗结果
     if victory:
