@@ -1054,36 +1054,39 @@ class EnhancedBattleEngine:
             pct = defense_mit["percent_reduction"] * 100
             sub_lines.append(f"  └ 🛡️ 防御减伤 -{blocked} (数值减伤{flat} + 比例减伤{pct:.0f}%)")
 
-        # 构建攻击消息
+        # 构建攻击消息（主行只保留攻击+伤害，标签移到子行）
         if is_combo:
-            # 连击攻击的消息格式
             attack_msg = f"  🔄 连击"
         else:
             attack_msg = f"⚔️ {attacker_name}攻击{defender_name}"
             if combo_count > 1 and not is_counter:
                 attack_msg += f" 🔄x{combo_count}"
 
-        if has_true_damage:
-            attack_msg += " 🔥真伤！"
-        if has_guaranteed:
-            attack_msg += " 🎯必中20%"
-        if is_critical:
-            attack_msg += " 💥暴击！"
-
         # 显示实际伤害（扣除护盾后）
         _normal_missed = attack_result.get("normal_missed", False)
         normal_after_mod = damage
-
-        # 斩龙闪拆分信息改为子行
-        if has_guaranteed:
-            _nd_text = "被闪避" if _normal_missed else str(normal_after_mod)
-            sub_lines.append(f"  └ 📊 必中:{guaranteed_damage} + 常规:{_nd_text}")
 
         final_damage = guaranteed_damage + damage
         if absorbed_by_shield > 0:
             attack_msg += f" 造成{final_damage}伤害(护盾吸收{absorbed_by_shield})"
         else:
             attack_msg += f" 造成{final_damage}伤害"
+
+        # 标签子行（真伤/必中/暴击等）
+        tags = []
+        if has_true_damage:
+            tags.append("🔥真伤")
+        if has_guaranteed:
+            tags.append("🎯必中20%")
+        if is_critical:
+            tags.append("💥暴击")
+        if tags:
+            sub_lines.insert(0, f"  └ {' | '.join(tags)}")
+
+        # 斩龙闪拆分信息改为子行
+        if has_guaranteed:
+            _nd_text = "被闪避" if _normal_missed else str(normal_after_mod)
+            sub_lines.append(f"  └ 📊 必中:{guaranteed_damage} + 常规:{_nd_text}")
 
         # 消息组装：攻击主消息在前，子效果行紧随，状态变更最后
         result["messages"].append(attack_msg)
@@ -1354,16 +1357,18 @@ class EnhancedBattleEngine:
                 has_guaranteed = True
                 break
 
-        # 构建攻击消息
-        attack_msg = f"  🔄 连击第{combo_number}次"
-        if has_true_damage:
-            attack_msg += " 🔥真伤！"
-        if has_guaranteed:
-            attack_msg += " 🎯必中20%"
-        if is_critical:
-            attack_msg += " 💥暴击！"
-        attack_msg += f" 造成{damage}伤害"
+        # 构建攻击消息（主行只保留攻击+伤害，标签移到子行）
+        attack_msg = f"  🔄 连击第{combo_number}次 造成{damage}伤害"
         result["messages"].append(attack_msg)
+        combo_tags = []
+        if has_true_damage:
+            combo_tags.append("🔥真伤")
+        if has_guaranteed:
+            combo_tags.append("🎯必中20%")
+        if is_critical:
+            combo_tags.append("💥暴击")
+        if combo_tags:
+            result["messages"].append(f"    └ {' | '.join(combo_tags)}")
         result["total_damage"] = damage
 
         # 触发攻击时效果
