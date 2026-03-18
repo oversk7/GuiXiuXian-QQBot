@@ -12,7 +12,7 @@ from nonebot.adapters.onebot.v11 import MessageEvent, Message
 from nonebot.params import CommandArg
 from sqlalchemy import select
 
-from ..core.safe_session import safe_session
+from ..models.db import safe_session
 from ..models.player import Player
 from ..models.inventory import ItemInstance
 from ..config import config

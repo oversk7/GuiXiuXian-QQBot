@@ -937,7 +937,7 @@ inscription_list_cmd = on_command("铭文列表", aliases={"铭文背包", "我�
 
 @inscription_list_cmd.handle()
 async def handle_inscription_list(event: MessageEvent, args: Message = CommandArg()):
-    from ..core.safe_session import safe_session
+    from ..models.db import safe_session
     from .inscription_service import get_inscription_display_from_item
 
     msg = ""
