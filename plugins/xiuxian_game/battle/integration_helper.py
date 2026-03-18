@@ -111,10 +111,23 @@ class BattleIntegrationHelper:
         player1_base_attrs = await player1.get_effective_attributes(session)
         player2_base_attrs = await player2.get_effective_attributes(session)
 
-        # 2. 战斗属性(critical_rate, dodge_rate等)
+        # 2. 收集T1词缀加成
+        from ..item.affix_service import get_affixes_from_equipment, get_t1_battle_bonuses
+        affix_bonus_p1 = {}
+        for eq in player1_equipped_items:
+            affixes = get_affixes_from_equipment(getattr(eq, 'extra_attrs', None))
+            for attr, val in get_t1_battle_bonuses(affixes).items():
+                affix_bonus_p1[attr] = affix_bonus_p1.get(attr, 0) + val
+        affix_bonus_p2 = {}
+        for eq in player2_equipped_items:
+            affixes = get_affixes_from_equipment(getattr(eq, 'extra_attrs', None))
+            for attr, val in get_t1_battle_bonuses(affixes).items():
+                affix_bonus_p2[attr] = affix_bonus_p2.get(attr, 0) + val
+
+        # 3. 战斗属性(critical_rate, dodge_rate等) — 含T1词缀加成
         from .battle_attributes import BattleAttributeCalculator
-        player1_battle_attrs = await BattleAttributeCalculator.calculate_effective_attributes_async(player1, session)
-        player2_battle_attrs = await BattleAttributeCalculator.calculate_effective_attributes_async(player2, session)
+        player1_battle_attrs = await BattleAttributeCalculator.calculate_effective_attributes_async(player1, session, equipment_bonus=affix_bonus_p1)
+        player2_battle_attrs = await BattleAttributeCalculator.calculate_effective_attributes_async(player2, session, equipment_bonus=affix_bonus_p2)
 
         # 将包含buff的属性值临时缓存到player对象上
         # 基础属性缓存(注意:get_effective_attributes返回的是max_hp/max_mp,不是hp/mp)
@@ -490,9 +503,17 @@ class BattleIntegrationHelper:
         # 1. 基础属性(attack, defense, hp等)
         player_base_attrs = await player.get_effective_attributes(session)
 
-        # 2. 战斗属性(critical_rate, dodge_rate等)
+        # 2. 收集T1词缀加成
+        from ..item.affix_service import get_affixes_from_equipment, get_t1_battle_bonuses
+        affix_bonus = {}
+        for eq in equipped_items:
+            affixes = get_affixes_from_equipment(getattr(eq, 'extra_attrs', None))
+            for attr, val in get_t1_battle_bonuses(affixes).items():
+                affix_bonus[attr] = affix_bonus.get(attr, 0) + val
+
+        # 3. 战斗属性(critical_rate, dodge_rate等) — 含T1词缀加成
         from .battle_attributes import BattleAttributeCalculator
-        player_battle_attrs = await BattleAttributeCalculator.calculate_effective_attributes_async(player, session)
+        player_battle_attrs = await BattleAttributeCalculator.calculate_effective_attributes_async(player, session, equipment_bonus=affix_bonus)
 
         # 将包含buff的属性值临时缓存到player对象上
         # (注意:get_effective_attributes返回的是max_hp/max_mp,不是hp/mp)
@@ -970,10 +991,23 @@ class BattleIntegrationHelper:
         player1_base_attrs = await player1.get_effective_attributes(session)
         player2_base_attrs = await player2.get_effective_attributes(session)
 
-        # 2. 战斗属性(critical_rate, dodge_rate等)
+        # 2. 收集T1词缀加成
+        from ..item.affix_service import get_affixes_from_equipment, get_t1_battle_bonuses
+        affix_bonus_p1 = {}
+        for eq in player1_equipped_items:
+            affixes = get_affixes_from_equipment(getattr(eq, 'extra_attrs', None))
+            for attr, val in get_t1_battle_bonuses(affixes).items():
+                affix_bonus_p1[attr] = affix_bonus_p1.get(attr, 0) + val
+        affix_bonus_p2 = {}
+        for eq in player2_equipped_items:
+            affixes = get_affixes_from_equipment(getattr(eq, 'extra_attrs', None))
+            for attr, val in get_t1_battle_bonuses(affixes).items():
+                affix_bonus_p2[attr] = affix_bonus_p2.get(attr, 0) + val
+
+        # 3. 战斗属性(critical_rate, dodge_rate等) — 含T1词缀加成
         from .battle_attributes import BattleAttributeCalculator
-        player1_battle_attrs = await BattleAttributeCalculator.calculate_effective_attributes_async(player1, session)
-        player2_battle_attrs = await BattleAttributeCalculator.calculate_effective_attributes_async(player2, session)
+        player1_battle_attrs = await BattleAttributeCalculator.calculate_effective_attributes_async(player1, session, equipment_bonus=affix_bonus_p1)
+        player2_battle_attrs = await BattleAttributeCalculator.calculate_effective_attributes_async(player2, session, equipment_bonus=affix_bonus_p2)
 
         # 将包含buff的属性值临时缓存到player对象上
         # 基础属性缓存(注意:get_effective_attributes返回的是max_hp/max_mp,不是hp/mp)
@@ -1479,7 +1513,27 @@ class BattleIntegrationHelper:
         """
         from .battle_attributes import BattleAttributeCalculator
         from ..utils import damage_reduction_rate
-        attrs = await BattleAttributeCalculator.calculate_effective_attributes_async(player, session)
+
+        # 收集T1词缀加成用于面板显示
+        affix_bonus = {}
+        try:
+            from sqlalchemy import select
+            from ..models.inventory import ItemInstance
+            from ..item.affix_service import get_affixes_from_equipment, get_t1_battle_bonuses
+            if session:
+                stmt = select(ItemInstance).where(
+                    ItemInstance.player_id == player.id,
+                    ItemInstance.equipped == True
+                )
+                equipped = (await session.execute(stmt)).scalars().all()
+                for eq in equipped:
+                    affixes = get_affixes_from_equipment(getattr(eq, 'extra_attrs', None))
+                    for attr, val in get_t1_battle_bonuses(affixes).items():
+                        affix_bonus[attr] = affix_bonus.get(attr, 0) + val
+        except ImportError:
+            pass
+
+        attrs = await BattleAttributeCalculator.calculate_effective_attributes_async(player, session, equipment_bonus=affix_bonus)
 
         # 检查是否有未消耗的诡面骰buff
         dice_buff_attr = None

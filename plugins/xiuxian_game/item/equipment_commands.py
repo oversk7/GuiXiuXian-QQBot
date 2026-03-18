@@ -147,6 +147,12 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
             if eq.available_gem_slots > 0:
                 info_parts.append(f"💎{eq.used_gem_slots}/{eq.available_gem_slots}")
 
+            # 词缀标记
+            from .affix_service import get_affixes_from_equipment
+            affix_list = get_affixes_from_equipment(eq.extra_attrs)
+            if affix_list:
+                info_parts.append(f"🔮{len(affix_list)}词缀")
+
             # 装备状态
             info_parts.append(equip_state)
 
@@ -267,6 +273,15 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
                     else:
                         lines.append(f"  • {attr_name}：{base_ratio:.1f}%")
 
+            lines.append("")
+
+        # 词缀展示
+        from .affix_service import get_affixes_from_equipment, format_affixes_display
+
+        affixes = get_affixes_from_equipment(equip.extra_attrs)
+        if affixes:
+            lines.append("🔮 词缀：")
+            lines.extend(format_affixes_display(affixes))
             lines.append("")
 
         # 宝石镶嵌信息

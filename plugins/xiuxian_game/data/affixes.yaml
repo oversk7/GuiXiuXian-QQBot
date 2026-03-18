@@ -1,0 +1,536 @@
+# 装备词缀配置
+# T1: 数值型词缀 — 所有稀有度装备可出现，提供战斗属性固定百分比加成
+# T2: 触发型词缀 — 仅蓝色及以上装备可出现，提供概率触发的战斗效果
+
+# 词缀数量规则（按装备稀有度）
+affix_count_rules:
+  white:  {min: 0, max: 1, bonus_chance: 0.5}   # 50%概率带1条
+  green:  {min: 1, max: 2, bonus_chance: 0.5}   # 50%概率2条
+  blue:   {min: 2, max: 3, bonus_chance: 0.5}   # 50%概率3条
+  purple: {min: 3, max: 4, bonus_chance: 0.5}   # 50%概率4条
+  orange: {min: 4, max: 4, bonus_chance: 1.0}   # 必定4条
+
+affixes:
+  t1:
+    - affix_id: "critical_rate"
+      name: "锐利"
+      description: "暴击率+{value}%"
+      attribute: "critical_rate"
+      ranges:
+        white: [1.0, 2.0]
+        green: [2.0, 4.0]
+        blue: [3.0, 6.0]
+        purple: [5.0, 8.0]
+        orange: [7.0, 10.0]
+
+    - affix_id: "combo_rate"
+      name: "连斩"
+      description: "连击率+{value}%"
+      attribute: "combo_rate"
+      ranges:
+        white: [0.5, 1.5]
+        green: [1.0, 3.0]
+        blue: [2.0, 4.5]
+        purple: [3.5, 6.0]
+        orange: [5.0, 8.0]
+
+    - affix_id: "dodge_rate"
+      name: "灵巧"
+      description: "闪避率+{value}%"
+      attribute: "dodge_rate"
+      ranges:
+        white: [1.0, 2.0]
+        green: [2.0, 4.0]
+        blue: [3.0, 6.0]
+        purple: [5.0, 8.0]
+        orange: [7.0, 10.0]
+
+    - affix_id: "counter_rate"
+      name: "反击"
+      description: "反击率+{value}%"
+      attribute: "counter_rate"
+      ranges:
+        white: [0.5, 1.5]
+        green: [1.0, 3.0]
+        blue: [2.0, 5.0]
+        purple: [4.0, 7.0]
+        orange: [6.0, 9.0]
+
+    - affix_id: "penetration_rate"
+      name: "穿刺"
+      description: "穿透率+{value}%"
+      attribute: "penetration_rate"
+      ranges:
+        white: [0.5, 1.5]
+        green: [1.0, 3.0]
+        blue: [2.0, 5.0]
+        purple: [4.0, 7.0]
+        orange: [6.0, 10.0]
+
+    - affix_id: "anti_crit_rate"
+      name: "坚韧"
+      description: "抗暴率+{value}%"
+      attribute: "anti_crit_rate"
+      ranges:
+        white: [1.0, 2.0]
+        green: [2.0, 4.0]
+        blue: [3.0, 6.0]
+        purple: [5.0, 8.0]
+        orange: [7.0, 10.0]
+
+    - affix_id: "lifesteal_rate"
+      name: "嗜血"
+      description: "吸血率+{value}%"
+      attribute: "lifesteal_rate"
+      ranges:
+        white: [0.3, 0.8]
+        green: [0.5, 1.5]
+        blue: [1.0, 2.5]
+        purple: [2.0, 4.0]
+        orange: [3.0, 5.0]
+
+    - affix_id: "accuracy_rate"
+      name: "精准"
+      description: "命中率+{value}%"
+      attribute: "accuracy_rate"
+      ranges:
+        white: [1.0, 2.0]
+        green: [2.0, 4.0]
+        blue: [3.0, 6.0]
+        purple: [5.0, 8.0]
+        orange: [7.0, 10.0]
+
+    - affix_id: "critical_power"
+      name: "暴力"
+      description: "暴击伤害+{value}"
+      attribute: "critical_power"
+      ranges:
+        white: [1, 2]
+        green: [2, 4]
+        blue: [3, 6]
+        purple: [5, 8]
+        orange: [7, 10]
+
+    - affix_id: "skill_crit_rate"
+      name: "灵爆"
+      description: "灵爆率+{value}%"
+      attribute: "skill_crit_rate"
+      ranges:
+        white: [0.5, 1.5]
+        green: [1.0, 3.0]
+        blue: [2.0, 4.5]
+        purple: [3.5, 6.0]
+        orange: [5.0, 8.0]
+
+    - affix_id: "immobilize_rate"
+      name: "禁锢"
+      description: "定身率+{value}%"
+      attribute: "immobilize_rate"
+      ranges:
+        white: [0.3, 0.8]
+        green: [0.5, 1.5]
+        blue: [1.0, 2.5]
+        purple: [2.0, 3.5]
+        orange: [3.0, 5.0]
+
+    - affix_id: "regen_rate"
+      name: "回春"
+      description: "回复率+{value}%"
+      attribute: "regen_rate"
+      ranges:
+        white: [0.3, 0.8]
+        green: [0.5, 1.5]
+        blue: [1.0, 2.5]
+        purple: [2.0, 4.0]
+        orange: [3.0, 5.0]
+
+    - affix_id: "first_strike_rate"
+      name: "先手"
+      description: "先手率+{value}%"
+      attribute: "first_strike_rate"
+      ranges:
+        white: [0.5, 1.5]
+        green: [1.0, 3.0]
+        blue: [2.0, 4.5]
+        purple: [3.5, 6.0]
+        orange: [5.0, 8.0]
+
+    - affix_id: "tenacity"
+      name: "韧性"
+      description: "控制减免+{value}%"
+      attribute: "tenacity"
+      ranges:
+        white: [0.5, 1.5]
+        green: [1.0, 3.0]
+        blue: [2.0, 5.0]
+        purple: [4.0, 7.0]
+        orange: [6.0, 10.0]
+
+    - affix_id: "mp_cost_reduction"
+      name: "节能"
+      description: "理智消耗减免+{value}%"
+      attribute: "mp_cost_reduction"
+      ranges:
+        white: [0.5, 1.0]
+        green: [1.0, 2.0]
+        blue: [1.5, 3.0]
+        purple: [2.5, 4.0]
+        orange: [3.5, 5.0]
+
+    - affix_id: "ignore_defense"
+      name: "破甲"
+      description: "无视防御+{value}"
+      attribute: "ignore_defense"
+      is_percentage: false
+      ranges:
+        white: [2, 5]
+        green: [5, 12]
+        blue: [10, 25]
+        purple: [20, 40]
+        orange: [35, 60]
+
+    - affix_id: "block_reduction"
+      name: "格挡"
+      description: "格挡减伤+{value}%"
+      attribute: "block_reduction"
+      ranges:
+        white: [0.5, 1.5]
+        green: [1.0, 3.0]
+        blue: [2.0, 5.0]
+        purple: [4.0, 7.0]
+        orange: [6.0, 10.0]
+
+    - affix_id: "skill_crit_boost"
+      name: "灵威"
+      description: "技能暴击率+{value}%"
+      attribute: "skill_crit_rate"
+      ranges:
+        white: [0.5, 1.0]
+        green: [1.0, 2.0]
+        blue: [1.5, 3.5]
+        purple: [3.0, 5.0]
+        orange: [4.5, 7.0]
+
+    - affix_id: "true_damage_rate"
+      name: "真伤"
+      description: "真实伤害率+{value}%"
+      attribute: "true_damage_rate"
+      ranges:
+        white: [0.3, 0.8]
+        green: [0.5, 1.5]
+        blue: [1.0, 2.5]
+        purple: [2.0, 3.5]
+        orange: [3.0, 5.0]
+
+  t2:
+    - affix_id: "fear_strike"
+      name: "恐惧之力"
+      description: "攻击时{value}%概率使敌人恐惧{value2}回合"
+      trigger: "on_attack"
+      effect: "fear"
+      chance_ranges:
+        blue: [5, 8]
+        purple: [8, 12]
+        orange: [12, 15]
+      duration_ranges:
+        blue: [1, 1]
+        purple: [1, 1]
+        orange: [1, 2]
+
+    - affix_id: "defense_pierce"
+      name: "防御穿刺"
+      description: "攻击时{value}%概率无视敌人{value2}%防御(2回合)"
+      trigger: "on_attack"
+      effect: "defense_penetration"
+      chance_ranges:
+        blue: [10, 15]
+        purple: [15, 20]
+        orange: [20, 25]
+      value_ranges:
+        blue: [15, 20]
+        purple: [20, 25]
+        orange: [25, 30]
+      duration_ranges:
+        blue: [2, 2]
+        purple: [2, 2]
+        orange: [2, 3]
+
+    - affix_id: "crit_lifesteal"
+      name: "暴击吸血"
+      description: "暴击时{value}%概率回复{value2}%造成伤害"
+      trigger: "on_critical"
+      effect: "lifesteal"
+      chance_ranges:
+        blue: [20, 30]
+        purple: [30, 45]
+        orange: [45, 60]
+      value_ranges:
+        blue: [8, 12]
+        purple: [12, 18]
+        orange: [18, 25]
+
+    - affix_id: "damage_reflect"
+      name: "伤害反弹"
+      description: "被攻击时{value}%概率反弹{value2}%伤害"
+      trigger: "on_attacked"
+      effect: "reflect"
+      chance_ranges:
+        blue: [10, 15]
+        purple: [15, 22]
+        orange: [22, 30]
+      value_ranges:
+        blue: [5, 10]
+        purple: [10, 15]
+        orange: [15, 20]
+
+    - affix_id: "tough_reduce"
+      name: "坚韧减伤"
+      description: "被攻击时{value}%概率减少{value2}%伤害(1回合)"
+      trigger: "on_attacked"
+      effect: "damage_reduction"
+      chance_ranges:
+        blue: [15, 20]
+        purple: [20, 28]
+        orange: [28, 35]
+      value_ranges:
+        blue: [8, 12]
+        purple: [12, 18]
+        orange: [18, 25]
+      duration_ranges:
+        blue: [1, 1]
+        purple: [1, 1]
+        orange: [1, 2]
+
+    - affix_id: "true_damage_strike"
+      name: "真伤附加"
+      description: "攻击时{value}%概率附加{value2}%真实伤害(1回合)"
+      trigger: "on_attack"
+      effect: "true_damage"
+      chance_ranges:
+        blue: [8, 12]
+        purple: [12, 18]
+        orange: [18, 25]
+      value_ranges:
+        blue: [5, 10]
+        purple: [10, 15]
+        orange: [15, 20]
+      duration_ranges:
+        blue: [1, 1]
+        purple: [1, 1]
+        orange: [1, 2]
+
+    - affix_id: "first_strike_hit"
+      name: "先手打击"
+      description: "首回合{value}%概率提升{value2}%伤害(2回合)"
+      trigger: "first_turn"
+      effect: "damage_boost"
+      chance_ranges:
+        blue: [25, 35]
+        purple: [35, 50]
+        orange: [50, 65]
+      value_ranges:
+        blue: [10, 15]
+        purple: [15, 22]
+        orange: [22, 30]
+      duration_ranges:
+        blue: [2, 2]
+        purple: [2, 2]
+        orange: [2, 3]
+
+    - affix_id: "execute_boost"
+      name: "斩杀加伤"
+      description: "目标低于30%血量时{value}%概率伤害+{value2}%"
+      trigger: "on_attack"
+      effect: "damage_boost"
+      chance_ranges:
+        blue: [20, 30]
+        purple: [30, 45]
+        orange: [45, 60]
+      value_ranges:
+        blue: [15, 20]
+        purple: [20, 30]
+        orange: [30, 40]
+      threshold: 30
+
+    - affix_id: "shield_condense"
+      name: "护盾凝聚"
+      description: "首回合{value}%概率获得{value2}%最大生命护盾"
+      trigger: "first_turn"
+      effect: "shield"
+      chance_ranges:
+        blue: [20, 30]
+        purple: [30, 45]
+        orange: [45, 60]
+      value_ranges:
+        blue: [5, 8]
+        purple: [8, 12]
+        orange: [12, 18]
+
+    - affix_id: "kill_boost"
+      name: "击杀加伤"
+      description: "击杀后{value}%概率下次伤害+{value2}%"
+      trigger: "on_kill"
+      effect: "damage_boost"
+      chance_ranges:
+        blue: [30, 40]
+        purple: [40, 55]
+        orange: [55, 70]
+      value_ranges:
+        blue: [10, 15]
+        purple: [15, 22]
+        orange: [22, 30]
+      duration_ranges:
+        blue: [1, 1]
+        purple: [1, 1]
+        orange: [1, 2]
+
+    - affix_id: "dodge_crit"
+      name: "闪避必暴"
+      description: "闪避成功后{value}%概率下次暴击+{value2}%"
+      trigger: "on_dodge"
+      effect: "buff_critical"
+      chance_ranges:
+        blue: [20, 30]
+        purple: [30, 45]
+        orange: [45, 60]
+      value_ranges:
+        blue: [15, 25]
+        purple: [25, 40]
+        orange: [40, 60]
+      duration_ranges:
+        blue: [1, 1]
+        purple: [1, 1]
+        orange: [1, 2]
+
+    - affix_id: "desperation_crit"
+      name: "绝境暴击"
+      description: "低血量时{value}%概率暴击率+{value2}%"
+      trigger: "low_hp"
+      effect: "buff_critical"
+      chance_ranges:
+        blue: [30, 40]
+        purple: [40, 55]
+        orange: [55, 70]
+      value_ranges:
+        blue: [10, 18]
+        purple: [18, 28]
+        orange: [28, 40]
+      duration_ranges:
+        blue: [2, 2]
+        purple: [2, 3]
+        orange: [3, 3]
+
+    - affix_id: "soul_burn"
+      name: "灵魂灼烧"
+      description: "攻击时{value}%概率灼烧敌人{value2}%理智(2回合)"
+      trigger: "on_attack"
+      effect: "debuff_defense"
+      chance_ranges:
+        blue: [8, 12]
+        purple: [12, 18]
+        orange: [18, 25]
+      value_ranges:
+        blue: [5, 8]
+        purple: [8, 12]
+        orange: [12, 18]
+      duration_ranges:
+        blue: [2, 2]
+        purple: [2, 2]
+        orange: [2, 3]
+
+    - affix_id: "periodic_regen"
+      name: "周期回复"
+      description: "每回合{value}%概率回复{value2}%最大生命"
+      trigger: "each_turn"
+      effect: "regen"
+      chance_ranges:
+        blue: [25, 35]
+        purple: [35, 50]
+        orange: [50, 65]
+      value_ranges:
+        blue: [2, 3]
+        purple: [3, 5]
+        orange: [5, 8]
+
+    - affix_id: "cripple"
+      name: "致残"
+      description: "攻击时{value}%概率降低敌人{value2}%攻击(2回合)"
+      trigger: "on_attack"
+      effect: "debuff_attack"
+      chance_ranges:
+        blue: [10, 15]
+        purple: [15, 22]
+        orange: [22, 30]
+      value_ranges:
+        blue: [5, 10]
+        purple: [10, 15]
+        orange: [15, 22]
+      duration_ranges:
+        blue: [2, 2]
+        purple: [2, 2]
+        orange: [2, 3]
+
+    - affix_id: "weaken"
+      name: "弱化"
+      description: "攻击时{value}%概率降低敌人{value2}%防御(2回合)"
+      trigger: "on_attack"
+      effect: "debuff_defense"
+      chance_ranges:
+        blue: [10, 15]
+        purple: [15, 22]
+        orange: [22, 30]
+      value_ranges:
+        blue: [5, 10]
+        purple: [10, 15]
+        orange: [15, 22]
+      duration_ranges:
+        blue: [2, 2]
+        purple: [2, 2]
+        orange: [2, 3]
+
+    - affix_id: "combo_stack"
+      name: "连击叠伤"
+      description: "连击时{value}%概率每次伤害+{value2}%"
+      trigger: "on_attack"
+      effect: "damage_boost"
+      chance_ranges:
+        blue: [15, 22]
+        purple: [22, 30]
+        orange: [30, 40]
+      value_ranges:
+        blue: [3, 5]
+        purple: [5, 8]
+        orange: [8, 12]
+      duration_ranges:
+        blue: [1, 1]
+        purple: [1, 1]
+        orange: [1, 1]
+
+    - affix_id: "counter_stun"
+      name: "反制"
+      description: "被暴击时{value}%概率使敌人恐惧{value2}回合"
+      trigger: "on_attacked"
+      effect: "fear"
+      chance_ranges:
+        blue: [8, 12]
+        purple: [12, 18]
+        orange: [18, 25]
+      duration_ranges:
+        blue: [1, 1]
+        purple: [1, 1]
+        orange: [1, 2]
+
+    - affix_id: "doom_judgment"
+      name: "末日审判"
+      description: "攻击时{value}%概率对低血量敌人伤害+{value2}%"
+      trigger: "on_attack"
+      effect: "damage_boost"
+      chance_ranges:
+        blue: [10, 15]
+        purple: [15, 22]
+        orange: [22, 30]
+      value_ranges:
+        blue: [20, 30]
+        purple: [30, 45]
+        orange: [45, 60]
+      threshold: 20

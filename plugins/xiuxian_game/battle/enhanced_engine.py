@@ -423,6 +423,17 @@ class EnhancedBattleEngine:
 
             self.effect_manager.register_triggers(unit_id, triggers)
 
+        # 注册T2词缀触发器
+        from ..item.affix_service import get_affixes_from_equipment, get_t2_trigger_configs
+        for item in equipped_items:
+            affixes = get_affixes_from_equipment(getattr(item, 'extra_attrs', None))
+            if not affixes:
+                continue
+            equip_name = getattr(getattr(item, 'config', None), 'name', '装备')
+            t2_triggers = get_t2_trigger_configs(affixes, source_name=equip_name)
+            if t2_triggers:
+                self.effect_manager.register_triggers(unit_id, t2_triggers)
+
     def execute_turn(self, attacker: Player, defender: Any, is_player_turn: bool = True) -> Dict:
         """执行一个回合，包含效果处理
 

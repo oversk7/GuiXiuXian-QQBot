@@ -388,6 +388,15 @@ items:
       price: 5000
       grudge_value: 50
 
+    # ========== 词缀洗练材料 ==========
+    - item_id: "affix_reroll_stone"
+      name: "洗词石"
+      description: "蕴含混沌之力的奇石，可重新随机装备上的所有词缀（保留词缀数量）"
+      type: "CONSUMABLE"
+      rarity: "blue"
+      price: 50000
+      grudge_value: 30
+
 
 
     # ========== 镶嵌工具 ==========

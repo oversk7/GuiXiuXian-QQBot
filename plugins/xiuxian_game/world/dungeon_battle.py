@@ -539,6 +539,67 @@ async def handle_monster_drops(session, player: Player, monster_level: int, regi
                     # 背包满了，跳过这个掉落
                     pass
 
+    # ===== 装备掉落（词缀系统 Phase 1）=====
+    from ..item.affix_service import generate_affixes, VIP_EQUIPMENT_IDS
+
+    # 装备掉落率配置
+    if is_elite:
+        equip_drop_rate = 0.07  # 精英怪 7%
+        equip_rarities = ["green", "blue"]
+    elif monster_level > 100:
+        equip_drop_rate = 0.02  # 高级普通怪 2%
+        equip_rarities = ["white", "green"]
+    elif monster_level > 60:
+        equip_drop_rate = 0.015
+        equip_rarities = ["white", "green"]
+    else:
+        equip_drop_rate = 0.01  # 低级普通怪 1%
+        equip_rarities = ["white"]
+
+    # 幸运值加成
+    equip_drop_rate *= (1 + luck_prob(player.luck))
+
+    if rng.random() < equip_drop_rate:
+        # 选择掉落装备的稀有度
+        drop_rarity = rng.choice(equip_rarities)
+
+        # 从 items_config 中按稀有度筛选装备
+        candidate_equips = []
+        for eq_item_id in config.items_config["by_type"].get("EQUIPMENT", []):
+            eq_item_cfg = config.items_config["by_id"].get(eq_item_id)
+            if not eq_item_cfg:
+                continue
+            if eq_item_cfg.rarity != drop_rarity:
+                continue
+            if eq_item_id in VIP_EQUIPMENT_IDS:
+                continue
+            # 匹配怪物等级段
+            if eq_item_cfg.required_level <= monster_level:
+                candidate_equips.append(eq_item_id)
+
+        if candidate_equips:
+            chosen_equip_id = rng.choice(candidate_equips)
+            chosen_cfg = config.items_config["by_id"][chosen_equip_id]
+
+            # 生成词缀
+            affixes = generate_affixes(drop_rarity, rng)
+
+            # 创建装备实例
+            new_equip = ItemInstance(
+                player_id=player.id,
+                item_id=chosen_equip_id,
+                quantity=1,
+                durability=chosen_cfg.durability,
+                extra_attrs={"_affixes": affixes} if affixes else {},
+            )
+            session.add(new_equip)
+
+            # 展示掉落信息
+            affix_count = len(affixes)
+            affix_hint = f"({affix_count}条词缀)" if affix_count > 0 else "(素装)"
+            equip_display = f"{chosen_cfg.get_display_name()} {affix_hint}"
+            drops[f"⚔️{equip_display}"] = 1
+
     if drops:
         drop_texts = [f"{name} ✖️{quantity}" for name, quantity in drops.items()]
         return f"💎 战利品：{', '.join(drop_texts)}"
