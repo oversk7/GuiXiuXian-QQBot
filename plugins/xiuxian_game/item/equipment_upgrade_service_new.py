@@ -488,35 +488,48 @@ class EquipmentUpgradeService:
                 return False
 
     async def _recover_gems_from_equipment(self, equipment: ItemInstance, player: Player, all_survive: bool = False) -> List[str]:
-        """
-        从装备中回收镶嵌的宝石
-        - all_survive=True：全量回收（用于消耗副装备前的清理）
-        - all_survive=False：每个宝石独立50%存活率（用于装备意外损坏时）
-        返回成功回收的宝石名称列表
-        """
-        recovered_gems = []
+        """从装备中回收镶嵌的宝石和铭文"""
+        recovered = []
 
         if not equipment.is_equipment or not equipment.gem_slots_data:
-            return recovered_gems
+            return recovered
 
-        for gem_item_id in equipment.gem_slots_data.values():
-            if not gem_item_id:
+        for slot_val in equipment.gem_slots_data.values():
+            if not slot_val:
                 continue
 
-            # 非全量模式下，每个宝石独立50%存活
             if not all_survive and random.random() < 0.5:
                 continue
 
-            gem_config = config.items_config["by_id"].get(gem_item_id)
-            gem_name = gem_config.name if gem_config else gem_item_id
+            if isinstance(slot_val, dict):
+                # 铭文恢复
+                insc_id = slot_val.get("item_id", "")
+                insc_values = slot_val.get("values", {})
+                insc_cfg = config.items_config["by_id"].get(insc_id)
+                insc_name = insc_cfg.name if insc_cfg else insc_id
+                try:
+                    inst = ItemInstance(
+                        player_id=player.id,
+                        item_id=insc_id,
+                        quantity=1,
+                        extra_attrs={"_inscription_values": insc_values},
+                    )
+                    self._item_repo._session.add(inst)
+                    recovered.append(insc_name)
+                except Exception:
+                    gold_value = insc_cfg.price if (insc_cfg and insc_cfg.price) else 5000
+                    player.gold += gold_value
+                    recovered.append(f"{insc_name}(转为{gold_value}金币)")
+            else:
+                # 宝石恢复（原有逻辑）
+                gem_config = config.items_config["by_id"].get(slot_val)
+                gem_name = gem_config.name if gem_config else slot_val
+                try:
+                    await self._item_repo.add_item(player.id, slot_val, 1)
+                    recovered.append(gem_name)
+                except ValueError:
+                    gold_value = gem_config.price if (gem_config and gem_config.price) else 1000
+                    player.gold += gold_value
+                    recovered.append(f"{gem_name}(转为{gold_value}金币)")
 
-            try:
-                await self._item_repo.add_item(player.id, gem_item_id, 1)
-                recovered_gems.append(gem_name)
-            except ValueError:
-                # 背包空间不足，转换为金币
-                gold_value = gem_config.price if (gem_config and gem_config.price) else 1000
-                player.gold += gold_value
-                recovered_gems.append(f"{gem_name}(转为{gold_value}金币)")
-
-        return recovered_gems
+        return recovered

@@ -70,7 +70,7 @@ class GemSocketService:
             gem_socket_service.py Line 42-46
         """
         item_config = config.items_config["by_id"].get(item_id)
-        return item_config and item_config.type.value == "GEM"
+        return item_config and item_config.type.value in ("GEM", "INSCRIPTION")
 
     @staticmethod
     def get_gem_type(item_id: str) -> str:
@@ -86,6 +86,9 @@ class GemSocketService:
         对应原代码:
             gem_socket_service.py Line 48-81
         """
+        # 铭文类型
+        if item_id.startswith("inscription_"):
+            return "铭文"
         # 处理等级化镶嵌物（如 strength_gem_1）
         if "_gem_" in item_id:
             return "宝石"
@@ -120,38 +123,48 @@ class GemSocketService:
 
     @staticmethod
     def get_equipment_gem_info(equipment: ItemInstance) -> List[Dict]:
-        """
-        获取装备的宝石镶嵌信息
-
-        Args:
-            equipment: 装备实例
-
-        Returns:
-            宝石信息列表
-
-        对应原代码:
-            gem_socket_service.py Line 224-251
-        """
+        """获取装备的镶嵌物信息（宝石+铭文）"""
         if not equipment.is_equipment:
             return []
 
         gem_info = []
         for slot_index in range(equipment.available_gem_slots):
-            gem_item_id = equipment.get_gem_in_slot(slot_index)
+            slot_val = equipment.get_gem_in_slot(slot_index)
 
             slot_info = {
                 "slot_index": slot_index,
                 "slot_number": slot_index + 1,
-                "is_empty": gem_item_id is None
+                "is_empty": slot_val is None,
+                "is_inscription": False,
             }
 
-            if gem_item_id:
-                gem_config = config.items_config["by_id"].get(gem_item_id)
+            if slot_val is None:
                 slot_info.update({
-                    "gem_item_id": gem_item_id,
-                    "gem_name": gem_config.name if gem_config else gem_item_id,
-                    "gem_type": GemSocketService.get_gem_type(gem_item_id),
-                    "gem_config": gem_config
+                    "gem_item_id": None,
+                    "gem_name": "空",
+                    "gem_type": "空",
+                    "gem_config": None,
+                })
+            elif isinstance(slot_val, dict):
+                # 铭文
+                insc_item_id = slot_val.get("item_id", "")
+                insc_cfg = config.items_config["by_id"].get(insc_item_id)
+                slot_info.update({
+                    "gem_item_id": insc_item_id,
+                    "gem_name": insc_cfg.name if insc_cfg else insc_item_id,
+                    "gem_type": "铭文",
+                    "gem_config": insc_cfg,
+                    "is_inscription": True,
+                    "inscription_data": slot_val,
+                })
+            else:
+                # 宝石
+                gem_config = config.items_config["by_id"].get(slot_val)
+                slot_info.update({
+                    "gem_item_id": slot_val,
+                    "gem_name": gem_config.name if gem_config else slot_val,
+                    "gem_type": GemSocketService.get_gem_type(slot_val),
+                    "gem_config": gem_config,
                 })
 
             gem_info.append(slot_info)
@@ -228,52 +241,52 @@ class GemSocketService:
 
         return True, "可以镶嵌"
 
-    async def socket_gem(self, equipment: ItemInstance, gem_item_id: str, slot_index: int, player: Player) -> Tuple[bool, str]:
-        """
-        镶嵌宝石
+    async def socket_gem(self, equipment: ItemInstance, gem_item_id: str, slot_index: int, player: Player,
+                         inscription_instance: "ItemInstance" = None) -> Tuple[bool, str]:
+        """镶嵌宝石或铭文
 
         Args:
             equipment: 装备实例
-            gem_item_id: 宝石物品ID
+            gem_item_id: 宝石/铭文物品ID
             slot_index: 孔位索引
             player: 玩家对象
-
-        Returns:
-            (是否成功, 提示信息)
-
-        对应原代码:
-            gem_socket_service.py Line 120-146
-
-        改造点:
-            - 移除内部rollback()调用（Line 133）
-            - 异常由外层safe_session()处理
-            - 使用Repository方法替代ItemInstance静态方法
+            inscription_instance: 铭文物品实例（仅铭文镶嵌时传入，用于读取随机数值）
         """
-        # 检查是否可以镶嵌
         can_socket, reason = await self.can_socket_gem(equipment, gem_item_id, slot_index, player)
         if not can_socket:
             return False, reason
 
-        # 消耗材料
-        gem_success = await self._item_repo.consume_item(player.id, gem_item_id, 1)
-        hammer_success = await self._item_repo.consume_item(player.id, "gem_hammer", 1)
+        item_cfg = config.items_config["by_id"].get(gem_item_id)
+        is_inscription = item_cfg and item_cfg.type.value == "INSCRIPTION"
 
-        if not gem_success or not hammer_success:
-            # 改造点: 移除rollback，直接抛出异常由外层处理
-            raise ValueError("消耗材料失败")
-
-        # 消耗金币
-        player.gold -= self.SOCKET_COSTS["gold"]
-        await self._player_repo.update(player)
-
-        # 镶嵌宝石
-        equipment.set_gem_in_slot(slot_index, gem_item_id)
-
-        gem_config = config.items_config["by_id"].get(gem_item_id)
-        gem_name = gem_config.name if gem_config else gem_item_id
-        gem_type = self.get_gem_type(gem_item_id)
-
-        return True, f"✨ 成功镶嵌 {gem_type}：{gem_name} 到孔位 {slot_index + 1}"
+        if is_inscription and inscription_instance:
+            # 铭文镶嵌：读取随机数值，写入孔位为字典格式
+            insc_values = (inscription_instance.extra_attrs or {}).get("_inscription_values", {})
+            slot_data = {"item_id": gem_item_id, "values": insc_values}
+            # 删除铭文物品实例
+            await self._item_repo.delete_item_instance(inscription_instance)
+            # 消耗镶嵌锤
+            hammer_success = await self._item_repo.consume_item(player.id, "gem_hammer", 1)
+            if not hammer_success:
+                raise ValueError("消耗镶嵌锤失败")
+            player.gold -= self.SOCKET_COSTS["gold"]
+            await self._player_repo.update(player)
+            equipment.set_gem_in_slot(slot_index, slot_data)
+            insc_name = item_cfg.name if item_cfg else gem_item_id
+            return True, f"✨ 成功镶嵌铭文：{insc_name} 到孔位 {slot_index + 1}"
+        else:
+            # 宝石镶嵌：原有逻辑
+            gem_success = await self._item_repo.consume_item(player.id, gem_item_id, 1)
+            hammer_success = await self._item_repo.consume_item(player.id, "gem_hammer", 1)
+            if not gem_success or not hammer_success:
+                raise ValueError("消耗材料失败")
+            player.gold -= self.SOCKET_COSTS["gold"]
+            await self._player_repo.update(player)
+            equipment.set_gem_in_slot(slot_index, gem_item_id)
+            gem_config = config.items_config["by_id"].get(gem_item_id)
+            gem_name = gem_config.name if gem_config else gem_item_id
+            gem_type = self.get_gem_type(gem_item_id)
+            return True, f"✨ 成功镶嵌 {gem_type}：{gem_name} 到孔位 {slot_index + 1}"
 
     async def can_remove_gem(self, equipment: ItemInstance, slot_index: int, player: Player, use_protection: bool = False) -> Tuple[bool, str]:
         """
@@ -301,9 +314,9 @@ class GemSocketService:
         if slot_index < 0 or slot_index >= equipment.available_gem_slots:
             return False, f"无效的孔位，装备只有 {equipment.available_gem_slots} 个孔位"
 
-        # 检查孔位是否有宝石
-        gem_item_id = equipment.get_gem_in_slot(slot_index)
-        if gem_item_id is None:
+        # 检查孔位是否有宝石/铭文
+        slot_val = equipment.get_gem_in_slot(slot_index)
+        if slot_val is None:
             return False, f"孔位 {slot_index + 1} 没有镶嵌物品"
 
         # 检查拆卸工具
@@ -321,76 +334,69 @@ class GemSocketService:
         return True, "可以拆卸"
 
     async def remove_gem(self, equipment: ItemInstance, slot_index: int, player: Player, use_protection: bool = False) -> Tuple[bool, str]:
-        """
-        拆卸宝石
-
-        Args:
-            equipment: 装备实例
-            slot_index: 孔位索引
-            player: 玩家对象
-            use_protection: 是否使用稳定水晶（消除15%宝石损坏和5%装备损伤风险）
-
-        Returns:
-            (是否成功, 提示信息)
-
-        对应原代码:
-            gem_socket_service.py Line 176-222
-
-        改造点:
-            - 移除内部rollback()调用（Line 192）
-            - 异常由外层safe_session()处理
-            - 使用Repository方法替代ItemInstance静态方法
-        """
-        # 检查是否可以拆卸
+        """拆卸宝石或铭文"""
         can_remove, reason = await self.can_remove_gem(equipment, slot_index, player, use_protection)
         if not can_remove:
             return False, reason
 
-        gem_item_id = equipment.get_gem_in_slot(slot_index)
-        gem_config = config.items_config["by_id"].get(gem_item_id)
-        gem_name = gem_config.name if gem_config else gem_item_id
-        gem_type = self.get_gem_type(gem_item_id)
+        slot_val = equipment.get_gem_in_slot(slot_index)
+        is_inscription = isinstance(slot_val, dict)
+
+        if is_inscription:
+            insc_item_id = slot_val.get("item_id", "")
+            insc_values = slot_val.get("values", {})
+            item_cfg = config.items_config["by_id"].get(insc_item_id)
+            gem_name = item_cfg.name if item_cfg else insc_item_id
+            gem_type = "铭文"
+        else:
+            gem_item_id = slot_val
+            gem_config = config.items_config["by_id"].get(gem_item_id)
+            gem_name = gem_config.name if gem_config else gem_item_id
+            gem_type = self.get_gem_type(gem_item_id)
 
         # 消耗工具和金币
         chisel_success = await self._item_repo.consume_item(player.id, "gem_chisel", 1)
         if not chisel_success:
             raise ValueError("消耗拆卸凿失败")
-
-        # 消耗稳定水晶（如果使用）
         if use_protection:
             crystal_success = await self._item_repo.consume_item(player.id, "stabilizer_crystal", 1)
             if not crystal_success:
                 raise ValueError("消耗稳定水晶失败")
-
         player.gold -= self.REMOVE_COSTS["gold"]
         await self._player_repo.update(player)
 
-        # 移除宝石
+        # 移除孔位
         equipment.set_gem_in_slot(slot_index, None)
 
         result_messages = []
 
         if use_protection:
-            # 稳定水晶：保证宝石完好归还，装备不受损
-            try:
-                await self._item_repo.add_item(player.id, gem_item_id, 1)
+            if is_inscription:
+                await self._restore_inscription(player.id, insc_item_id, insc_values)
                 result_messages.append(f"✅ 成功拆卸 {gem_type}：{gem_name}")
-                result_messages.append("🛡️ 稳定水晶保护生效，宝石和装备完好无损")
-            except ValueError:
-                result_messages.append(f"💔 背包空间不足，{gem_type} {gem_name} 丢失了")
-        else:
-            # 拆卸风险判定
-            gem_destroyed = random.random() < self.REMOVE_RISKS["gem_destroy_rate"]
-            equipment_damaged = random.random() < self.REMOVE_RISKS["equipment_damage_rate"]
-
-            if gem_destroyed:
-                result_messages.append(f"💔 {gem_type} {gem_name} 在拆卸过程中损坏了")
             else:
                 try:
                     await self._item_repo.add_item(player.id, gem_item_id, 1)
                     result_messages.append(f"✅ 成功拆卸 {gem_type}：{gem_name}")
                 except ValueError:
                     result_messages.append(f"💔 背包空间不足，{gem_type} {gem_name} 丢失了")
+            result_messages.append("🛡️ 稳定水晶保护生效，物品和装备完好无损")
+        else:
+            gem_destroyed = random.random() < self.REMOVE_RISKS["gem_destroy_rate"]
+            equipment_damaged = random.random() < self.REMOVE_RISKS["equipment_damage_rate"]
+
+            if gem_destroyed:
+                result_messages.append(f"💔 {gem_type} {gem_name} 在拆卸过程中损坏了")
+            else:
+                if is_inscription:
+                    await self._restore_inscription(player.id, insc_item_id, insc_values)
+                    result_messages.append(f"✅ 成功拆卸 {gem_type}：{gem_name}")
+                else:
+                    try:
+                        await self._item_repo.add_item(player.id, gem_item_id, 1)
+                        result_messages.append(f"✅ 成功拆卸 {gem_type}：{gem_name}")
+                    except ValueError:
+                        result_messages.append(f"💔 背包空间不足，{gem_type} {gem_name} 丢失了")
 
             if equipment_damaged:
                 damage = max(1, equipment.config.durability // 10)
@@ -398,3 +404,14 @@ class GemSocketService:
                 result_messages.append(f"⚠️ 装备在拆卸过程中受损，耐久度 -{damage}")
 
         return True, "\n".join(result_messages)
+
+    async def _restore_inscription(self, player_id: str, item_id: str, values: dict):
+        """恢复铭文物品到背包（从孔位数据重建 ItemInstance）"""
+        inst = ItemInstance(
+            player_id=player_id,
+            item_id=item_id,
+            quantity=1,
+            extra_attrs={"_inscription_values": values},
+        )
+        self._item_repo._session.add(inst)
+        await self._item_repo._session.flush()

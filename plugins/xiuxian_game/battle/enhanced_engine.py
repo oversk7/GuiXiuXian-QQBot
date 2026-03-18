@@ -434,6 +434,18 @@ class EnhancedBattleEngine:
             if t2_triggers:
                 self.effect_manager.register_triggers(unit_id, t2_triggers)
 
+        # 注册铭文触发器
+        from ..item.inscription_service import get_inscriptions_from_equipment, inscription_to_trigger_config
+        for item in equipped_items:
+            inscriptions = get_inscriptions_from_equipment(getattr(item, 'gem_slots_data', None))
+            if not inscriptions:
+                continue
+            equip_name = getattr(getattr(item, 'config', None), 'name', '装备')
+            for insc_data in inscriptions:
+                tc = inscription_to_trigger_config(insc_data, source_name=equip_name)
+                if tc:
+                    self.effect_manager.register_triggers(unit_id, [tc])
+
     def execute_turn(self, attacker: Player, defender: Any, is_player_turn: bool = True) -> Dict:
         """执行一个回合，包含效果处理
 

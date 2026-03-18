@@ -282,3 +282,57 @@ def get_t2_trigger_configs(affixes: List[Dict], source_name: str = "词缀") -> 
         triggers.append(tc)
 
     return triggers
+
+
+def reroll_single_affix(affix_data: dict, rarity: str, rng: random.Random = None) -> Dict:
+    """洗炼单条词缀：类型不变，数值在原区间内重新随机"""
+    if rng is None:
+        rng = random.Random()
+
+    cfg = _load_affix_config()
+    affix_id = affix_data["affix_id"]
+    tier = affix_data["tier"]
+
+    pool_key = "t1" if tier == "T1" else "t2"
+    affix_cfg = None
+    for a in cfg["affixes"][pool_key]:
+        if a["affix_id"] == affix_id:
+            affix_cfg = a
+            break
+
+    if not affix_cfg:
+        return affix_data
+
+    return _roll_affix_values(tier, affix_cfg, rarity, rng)
+
+
+def get_affix_value_range_display(affix_data: dict, rarity: str) -> str:
+    """获取词缀数值区间的显示文本（洗炼预览用）"""
+    cfg = _load_affix_config()
+    affix_id = affix_data["affix_id"]
+    tier = affix_data["tier"]
+
+    pool_key = "t1" if tier == "T1" else "t2"
+    affix_cfg = None
+    for a in cfg["affixes"][pool_key]:
+        if a["affix_id"] == affix_id:
+            affix_cfg = a
+            break
+
+    if not affix_cfg:
+        return "区间：未知"
+
+    if tier == "T1":
+        value_range = affix_cfg.get("ranges", {}).get(rarity, [0, 0])
+        return f"区间：{value_range[0]}% ~ {value_range[1]}%"
+    else:
+        parts = []
+        chance_range = affix_cfg.get("chance_ranges", {}).get(rarity, [0, 0])
+        parts.append(f"概率区间：{chance_range[0]}% ~ {chance_range[1]}%")
+        if "value_ranges" in affix_cfg and rarity in affix_cfg["value_ranges"]:
+            v_range = affix_cfg["value_ranges"][rarity]
+            parts.append(f"效果区间：{v_range[0]} ~ {v_range[1]}")
+        if "duration_ranges" in affix_cfg and rarity in affix_cfg["duration_ranges"]:
+            d_range = affix_cfg["duration_ranges"][rarity]
+            parts.append(f"持续区间：{d_range[0]} ~ {d_range[1]}回合")
+        return " | ".join(parts)

@@ -284,20 +284,25 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
             lines.extend(format_affixes_display(affixes))
             lines.append("")
 
-        # 宝石镶嵌信息
+        # 宝石/铭文镶嵌信息
         if equip.available_gem_slots > 0:
-            lines.append("💎 宝石镶嵌：")
+            lines.append("💎 镶嵌孔位：")
             lines.append(f"  • 孔位：{equip.used_gem_slots}/{equip.available_gem_slots}")
 
             if equip.used_gem_slots > 0:
                 from .gem_socket_service_new import GemSocketService
-                gem_info = GemSocketService.get_equipment_gem_info(equip)  # 同步方法，不需要await
+                from .inscription_service import get_inscription_display
+                gem_info = GemSocketService.get_equipment_gem_info(equip)
                 for slot_info in gem_info:
                     if not slot_info["is_empty"]:
                         slot_num = slot_info["slot_number"]
-                        gem_name = slot_info["gem_name"]
-                        gem_type = slot_info["gem_type"]
-                        lines.append(f"  • 孔位{slot_num}：{gem_type} - {gem_name}")
+                        if slot_info.get("is_inscription"):
+                            display = get_inscription_display(slot_info["inscription_data"])
+                            lines.append(f"  • 孔位{slot_num}：📜 {display}")
+                        else:
+                            gem_name = slot_info["gem_name"]
+                            gem_type = slot_info["gem_type"]
+                            lines.append(f"  • 孔位{slot_num}：{gem_type} - {gem_name}")
 
             lines.append("")
 
@@ -925,3 +930,39 @@ async def handle_equip_menu(event: MessageEvent):
 
         await equip_menu_cmd.finish(message_add_head("\n".join(lines), event))
 
+
+# ==================== 铭文列表命令 ====================
+
+inscription_list_cmd = on_command("铭文列表", aliases={"铭文背包", "我的铭文"}, priority=5, block=True)
+
+@inscription_list_cmd.handle()
+async def handle_inscription_list(event: MessageEvent, args: Message = CommandArg()):
+    from ..core.safe_session import safe_session
+    from .inscription_service import get_inscription_display_from_item
+
+    msg = ""
+    async with safe_session() as session:
+        player = await Player.get_player_by_event(event, session)
+        if not player:
+            await inscription_list_cmd.finish("你还没有创建角色")
+
+        stmt = select(ItemInstance).where(
+            ItemInstance.player_id == player.id,
+            ItemInstance.item_id.like("inscription_%")
+        )
+        inscriptions = (await session.execute(stmt)).scalars().all()
+
+        if not inscriptions:
+            msg = "📜 你还没有铭文物品\n💡 分解带T2词缀的装备有概率获得铭文"
+        else:
+            lines = ["📜 铭文列表："]
+            rarity_map = {"white": "⚪", "green": "🟢", "blue": "🔵", "purple": "🟣", "orange": "🟠"}
+            for i, insc in enumerate(inscriptions, 1):
+                display = get_inscription_display_from_item(insc)
+                rarity = insc.config.rarity if insc.config else "unknown"
+                icon = rarity_map.get(rarity, "⚪")
+                lines.append(f"  [{i}] {icon} {display}")
+            lines.append(f"\n💡 使用【镶嵌 装备编号 孔位 铭文名】将铭文插入装备")
+            msg = "\n".join(lines)
+
+    await inscription_list_cmd.finish(Message(msg))

@@ -399,6 +399,187 @@ items:
 
 
 
+    # ========== 铭文物品 ==========
+    # 铭文为独立效果物品，可镶嵌到装备宝石孔位
+    # inscription_effect 定义效果参数; chance_range 为随机数值区间
+    # 铭文 ItemInstance 的 extra_attrs["_inscription_values"] 存储该实例的随机值
+
+    - item_id: "inscription_fear"
+      name: "铭文：恐惧之力"
+      description: "攻击时{chance}%概率使敌人恐惧1回合"
+      type: "INSCRIPTION"
+      rarity: "blue"
+      price: 15000
+      inscription_effect:
+        trigger: "on_attack"
+        effect: "fear"
+        duration: 1
+        chance_range: [5, 15]
+
+    - item_id: "inscription_defense_pierce"
+      name: "铭文：防御穿刺"
+      description: "攻击时{chance}%概率无视敌人{value}%防御(2回合)"
+      type: "INSCRIPTION"
+      rarity: "blue"
+      price: 18000
+      inscription_effect:
+        trigger: "on_attack"
+        effect: "defense_penetration"
+        duration: 2
+        chance_range: [8, 18]
+        value_range: [15, 30]
+
+    - item_id: "inscription_lifesteal"
+      name: "铭文：嗜血之力"
+      description: "暴击时{chance}%概率回复{value}%造成伤害"
+      type: "INSCRIPTION"
+      rarity: "blue"
+      price: 18000
+      inscription_effect:
+        trigger: "on_critical"
+        effect: "lifesteal"
+        chance_range: [10, 25]
+        value_range: [10, 30]
+
+    - item_id: "inscription_reflect"
+      name: "铭文：反弹之力"
+      description: "被攻击时{chance}%概率反弹{value}%伤害"
+      type: "INSCRIPTION"
+      rarity: "blue"
+      price: 16000
+      inscription_effect:
+        trigger: "on_attacked"
+        effect: "reflect"
+        chance_range: [8, 20]
+        value_range: [10, 25]
+
+    - item_id: "inscription_damage_reduction"
+      name: "铭文：坚韧之力"
+      description: "被攻击时{chance}%概率减少{value}%伤害(1回合)"
+      type: "INSCRIPTION"
+      rarity: "blue"
+      price: 16000
+      inscription_effect:
+        trigger: "on_attacked"
+        effect: "damage_reduction"
+        duration: 1
+        chance_range: [10, 22]
+        value_range: [8, 20]
+
+    - item_id: "inscription_true_damage"
+      name: "铭文：真伤之力"
+      description: "攻击时{chance}%概率附加{value}%真实伤害(1回合)"
+      type: "INSCRIPTION"
+      rarity: "purple"
+      price: 25000
+      inscription_effect:
+        trigger: "on_attack"
+        effect: "true_damage"
+        duration: 1
+        chance_range: [8, 18]
+        value_range: [10, 25]
+
+    - item_id: "inscription_damage_boost"
+      name: "铭文：狂暴之力"
+      description: "首回合{chance}%概率提升{value}%伤害(2回合)"
+      type: "INSCRIPTION"
+      rarity: "purple"
+      price: 22000
+      inscription_effect:
+        trigger: "first_turn"
+        effect: "damage_boost"
+        duration: 2
+        chance_range: [15, 35]
+        value_range: [15, 30]
+
+    - item_id: "inscription_execute"
+      name: "铭文：斩杀之力"
+      description: "目标低于30%血量时{chance}%概率伤害+{value}%"
+      type: "INSCRIPTION"
+      rarity: "purple"
+      price: 25000
+      inscription_effect:
+        trigger: "on_attack"
+        effect: "damage_boost"
+        threshold: 30
+        chance_range: [15, 30]
+        value_range: [20, 40]
+
+    - item_id: "inscription_shield"
+      name: "铭文：护盾之力"
+      description: "首回合{chance}%概率获得{value}%最大生命护盾"
+      type: "INSCRIPTION"
+      rarity: "purple"
+      price: 22000
+      inscription_effect:
+        trigger: "first_turn"
+        effect: "shield"
+        chance_range: [20, 40]
+        value_range: [8, 18]
+
+    - item_id: "inscription_regen"
+      name: "铭文：回春之力"
+      description: "每回合{chance}%概率回复{value}%最大生命"
+      type: "INSCRIPTION"
+      rarity: "blue"
+      price: 16000
+      inscription_effect:
+        trigger: "each_turn"
+        effect: "regen"
+        chance_range: [15, 35]
+        value_range: [3, 8]
+
+    - item_id: "inscription_debuff_attack"
+      name: "铭文：破攻之力"
+      description: "攻击时{chance}%概率降低敌人{value}%攻击(2回合)"
+      type: "INSCRIPTION"
+      rarity: "blue"
+      price: 15000
+      inscription_effect:
+        trigger: "on_attack"
+        effect: "debuff_attack"
+        duration: 2
+        chance_range: [10, 22]
+        value_range: [8, 18]
+
+    - item_id: "inscription_debuff_defense"
+      name: "铭文：破甲之力"
+      description: "攻击时{chance}%概率降低敌人{value}%防御(2回合)"
+      type: "INSCRIPTION"
+      rarity: "blue"
+      price: 15000
+      inscription_effect:
+        trigger: "on_attack"
+        effect: "debuff_defense"
+        duration: 2
+        chance_range: [10, 22]
+        value_range: [8, 18]
+
+    - item_id: "inscription_counter_fear"
+      name: "铭文：逆鳞之力"
+      description: "被暴击时{chance}%概率使敌人恐惧1回合"
+      type: "INSCRIPTION"
+      rarity: "purple"
+      price: 20000
+      inscription_effect:
+        trigger: "on_attacked"
+        effect: "fear"
+        duration: 1
+        chance_range: [10, 20]
+
+    - item_id: "inscription_buff_crit"
+      name: "铭文：暴击增幅"
+      description: "闪避成功后{chance}%概率暴击率+{value}%(1回合)"
+      type: "INSCRIPTION"
+      rarity: "blue"
+      price: 16000
+      inscription_effect:
+        trigger: "on_dodge"
+        effect: "buff_critical"
+        duration: 1
+        chance_range: [15, 30]
+        value_range: [20, 50]
+
     # ========== 镶嵌工具 ==========
     - item_id: "gem_hammer"
       name: "镶嵌锤"

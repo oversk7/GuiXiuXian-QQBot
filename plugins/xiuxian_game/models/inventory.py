@@ -26,6 +26,7 @@ class ItemType(str,PyEnum):
     HERB = "HERB"  # 诡药(灵田产出，联动炼丹)
     SEED = "SEED"  # 灵种(灵田种子)
     GUARDIAN_BEAST = "GUARDIAN_BEAST"  # 诡兽(守田用)
+    INSCRIPTION = "INSCRIPTION"        # 铭文(独立效果物品，插入宝石孔)
 
 class ItemEffectType(str, PyEnum):
     RESTORE_HP = "RESTORE_HP"
@@ -154,6 +155,11 @@ class ItemInstance(Base):
     def is_equipment(self) -> bool:
         """是否为装备"""
         return self.config and self.config.type == ItemType.EQUIPMENT
+
+    @property
+    def is_inscription(self) -> bool:
+        """是否为铭文物品"""
+        return self.config is not None and self.config.type == ItemType.INSCRIPTION
 
     @property
     def is_fish(self) -> bool:
@@ -285,24 +291,30 @@ class ItemInstance(Base):
         """获取剩余可用的宝石孔位数量"""
         return max(0, self.available_gem_slots - self.used_gem_slots)
 
-    def get_gem_in_slot(self, slot_index: int) -> str | None:
-        """获取指定孔位中的宝石ID"""
+    def get_gem_in_slot(self, slot_index: int) -> str | dict | None:
+        """获取指定孔位中的宝石ID或铭文数据
+
+        返回 str 表示宝石item_id，dict 表示铭文数据，None 表示空孔位
+        """
         if not self.is_equipment:
             return None
         return (self.gem_slots_data or {}).get(str(slot_index))
 
-    def set_gem_in_slot(self, slot_index: int, gem_item_id: str | None):
-        """在指定孔位设置宝石"""
+    def set_gem_in_slot(self, slot_index: int, value: str | dict | None):
+        """在指定孔位设置宝石或铭文
+
+        value 为 str 时表示宝石 item_id（向后兼容）
+        value 为 dict 时表示铭文数据 {"item_id": ..., "values": {...}}
+        value 为 None 时移除孔位内容
+        """
         if not self.is_equipment:
             return
         if self.gem_slots_data is None:
             self.gem_slots_data = {}
-        if gem_item_id is None:
-            # 移除宝石
+        if value is None:
             self.gem_slots_data.pop(str(slot_index), None)
         else:
-            # 设置宝石
-            self.gem_slots_data[str(slot_index)] = gem_item_id
+            self.gem_slots_data[str(slot_index)] = value
 
     def get_upgrade_bonus_multiplier(self) -> float:
         """获取升阶等级的属性加成倍率"""
@@ -328,6 +340,7 @@ class ItemInstance(Base):
         if not item_config:
             raise ValueError(f"物品模板 {template_id} 不存在")
         is_equipment = item_config.type == ItemType.EQUIPMENT
+        is_inscription = item_config.type == ItemType.INSCRIPTION
         is_fish = item_config.is_fish
 
         # 获取玩家和背包所有物品
@@ -340,27 +353,29 @@ class ItemInstance(Base):
         )
         stacks_all: list[ItemInstance] = result_inv.scalars().all()
 
-        # 计算已使用的背包格数（装备不计入）
-        used_slots = sum(1 for item in stacks_all if not item.is_equipment and not item.is_fish)
+        # 计算已使用的背包格数（装备和铭文不计入）
+        used_slots = sum(1 for item in stacks_all if not item.is_equipment and not item.is_fish and not item.is_inscription)
 
         # 获取有效背包容量（包含月卡加成）
         effective_capacity = await player.get_effective_inventory_capacity(session)
 
-        if is_equipment:
-            # 装备不占用背包容量，直接添加
-            equip_durability = durability if durability is not None else item_config.durability
+        if is_equipment or is_inscription:
+            # 装备/铭文不占用背包容量，直接添加（每件独立实例）
+            item_durability = durability if durability is not None else (item_config.durability if is_equipment else None)
             for _ in range(quantity):
-                session.add(ItemInstance(
+                inst = ItemInstance(
                     player_id=player_id,
                     item_id=template_id,
                     quantity=1,
-                    durability=equip_durability
-                ))
-            await session.flush()  # 确保装备立即可见
+                )
+                if item_durability is not None:
+                    inst.durability = item_durability
+                session.add(inst)
+            await session.flush()
 
-            # 更新成就统计（装备获得）
-            from ..achievement.achievement_service import AchievementService
-            await AchievementService.update_stat(session, player_id, "equipment_obtained", quantity)
+            if is_equipment:
+                from ..achievement.achievement_service import AchievementService
+                await AchievementService.update_stat(session, player_id, "equipment_obtained", quantity)
 
             return True
 
