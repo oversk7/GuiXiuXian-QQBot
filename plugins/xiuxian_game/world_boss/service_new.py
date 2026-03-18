@@ -80,6 +80,19 @@ class WorldBossService:
     # 段位名称（每两转一段，0转单独一段）
     TIER_NAMES = ["凡尘段", "轮回段", "超脱段", "传说段", "永恒段", "无上段"]
 
+    # C: 各段位BOSS属性倍率 (防御倍率, 敏捷倍率, 攻击=player.max_mp的百分比)
+    TIER_STATS_MULTIPLIERS = [
+        (0.30, 0.25, 0.07),  # tier 0: 凡尘(0转)
+        (0.50, 0.40, 0.09),  # tier 1: 轮回(1-2转)
+        (0.70, 0.60, 0.11),  # tier 2: 超脱(3-4转)
+        (1.00, 0.80, 0.13),  # tier 3: 传说(5-6转)
+        (1.30, 1.10, 0.16),  # tier 4: 永恒(7-8转)
+        (1.60, 1.40, 0.19),  # tier 5+: 无上(9+转)
+    ]
+
+    # E: Boss弱点类型（由cycle_key哈希确定，无需DB字段）
+    WEAKNESS_TYPES = ["暴击", "穿透", "连击"]
+
     @staticmethod
     def get_reincarnation_tier(reincarnation_level: int) -> int:
         """获取转数对应的段位编号（0=凡尘/0转，1=轮回/1-2转，2=超脱/3-4转，...）"""
@@ -98,12 +111,14 @@ class WorldBossService:
         high = tier * 2
         return f"{name}（{low}-{high}转）"
 
-    # 理智削减配置
-    SANITY_DAMAGE_CONFIG = {
-        "low_level_threshold": 50,  # 低等级阈值
-        "low_level_fixed_damage": (20, 40),  # 低等级固定伤害范围
-        "high_level_percentage": (0.09, 0.15),  # 高等级百分比伤害范围
-    }
+    # E: Boss弱点图标映射（便于内联使用）
+    WEAKNESS_ICONS = {"暴击": "💥", "穿透": "🔥", "连击": "⚡"}
+
+    @staticmethod
+    def get_boss_weakness(cycle: "WorldBossCycle") -> str:
+        """基于cycle_key哈希确定本期弱点（无需DB字段，可重现）"""
+        idx = abs(hash(cycle.cycle_key)) % len(WorldBossService.WEAKNESS_TYPES)
+        return WorldBossService.WEAKNESS_TYPES[idx]
 
     # 奖励区间配置（按累计伤害排名）
     REWARD_TIERS = [
@@ -313,8 +328,10 @@ class WorldBossService:
         total_participants = result[0] or 0
         total_damage = result[1] or 0
 
-        # 获取BOSS当前属性
-        boss_stats = await self._calculate_boss_stats(cycle)
+        # C: 按玩家段位计算BOSS属性；E: 获取弱点
+        boss_stats = await self._calculate_boss_stats(cycle, player)
+        weakness = WorldBossService.get_boss_weakness(cycle)
+        weakness_icon = {"暴击": "💥", "穿透": "🔥", "连击": "⚡"}.get(weakness, "🎯")
 
         # 构建消息
         lines = [
@@ -323,8 +340,9 @@ class WorldBossService:
             "━━━━━━━━━━━━━",
             f"📖 {description}",
             "",
-            f"🛡️ 当前防御：{boss_stats['defense']:,}",
-            f"⚡ 当前敏捷：{boss_stats['agility']:,}",
+            f"🛡️ 对你的防御：{boss_stats['defense']:,}",
+            f"⚡ 对你的敏捷：{boss_stats['agility']:,}",
+            f"{weakness_icon} 本期弱点：{weakness}（触发时伤害 ×1.5）",
             "",
             f"🎖️ 你的段位：{tier_label}",
             f"⚔️ 你的累计伤害：{damage_record.total_damage:,}",
@@ -347,6 +365,12 @@ class WorldBossService:
             "🎖️ 段内第11-30名：深渊探索者宝箱",
             "🏅 段内第31-100名：深渊挑战者宝箱",
             "🎁 参与奖：深渊参与者宝箱",
+            "",
+            "⚔️ 战斗机制：",
+            "  · 装备暴击/连击/穿透/吸血效果全部生效",
+            f"  · 命中弱点({weakness})伤害 ×1.5",
+            "  · 存活至战斗结束：总伤害 ×1.2",
+            "  · 理智防护：闪避可完全躲避，防御15%效益",
             "",
             "📊 段位划分：凡尘(0转) / 轮回(1-2转) / 超脱(3-4转) / 传说(5-6转)..."
         ])
@@ -402,19 +426,18 @@ class WorldBossService:
         if player.hp <= 0:
             return False, ["💀 你已重伤倒地，无法参与战斗！请先恢复生命值"], "", ""
 
-        # 构建BOSS属性（基于最高等级玩家）
-        boss_stats = await self._calculate_boss_stats(cycle)
+        # C: 按玩家段位计算BOSS属性；E: 获取本期弱点
+        boss_stats = await self._calculate_boss_stats(cycle, player)
+        weakness = WorldBossService.get_boss_weakness(cycle)
 
-        # 执行战斗（新的理智削减机制）
+        # A+B+D+E: 执行完整战斗，直接返回 total_damage_dealt
         battle_timestamp = int(time.time() * 1000)
         seed = f"WorldBoss_{cycle.id}:{player.id}:{battle_timestamp}"
 
-        victory, battle_log, sanity_damage = WorldBossService._execute_sanity_battle(
-            player, boss_stats, f"{cycle.boss_name}·{cycle.boss_title}", seed=seed, max_rounds=30
+        victory, battle_log, sanity_damage, damage_dealt = await self._execute_sanity_battle_v2(
+            player, boss_stats, f"{cycle.boss_name}·{cycle.boss_title}",
+            weakness=weakness, seed=seed, max_rounds=30
         )
-
-        # 从战斗日志中提取总伤害
-        damage_dealt = WorldBossService._extract_damage_from_battle_log(battle_log)
 
         # 更新玩家状态（理智削减）
         original_mp = player.mp
@@ -472,159 +495,191 @@ class WorldBossService:
         full_lines = list(battle_log) + ["━━━━━━━━━━━━━"] + lines
         return True, full_lines, boss_title, boss_hint
 
-    @staticmethod
-    def _execute_sanity_battle(player: Player, boss_stats: Dict, boss_name: str,
-                              seed: str = None, max_rounds: int = 30) -> Tuple[bool, List[str], int]:
-        """执行理智战斗（使用完整战斗属性系统）
+    async def _execute_sanity_battle_v2(
+        self,
+        player: Player,
+        boss_stats: Dict,
+        boss_name: str,
+        weakness: str,
+        seed: str = None,
+        max_rounds: int = 30,
+    ) -> Tuple[bool, List[str], int, int]:
+        """执行理智战斗 v2（A+D+E）
 
-        Args:
-            player: 玩家对象
-            boss_stats: BOSS属性
-            boss_name: BOSS名称
-            seed: 随机种子
-            max_rounds: 最大回合数
+        改进：
+        - A: 加载装备并初始化引擎，暴击/连击/穿透/吸血等装备效果全部生效
+        - B: 直接返回 total_damage_dealt，不再正则解析日志
+        - D: 存活30回合 → 伤害×1.2 奖励
+        - E: 命中弱点时该次伤害×1.5
 
         Returns:
-            (是否胜利, 战斗日志, 理智损失)
+            (是否胜利, 战斗日志, 理智损失, 本次总伤害)
         """
         from ..battle.enhanced_engine import EnhancedBattleEngine
         from ..battle.battle_attributes import BattleAttributeCalculator
+        from ..battle.integration_helper import BattleIntegrationHelper
+        from sqlalchemy import select as sa_select
+        from ..models.inventory import ItemInstance
 
-        # 初始化战斗引擎
+        # A: 加载已装备物品，初始化引擎触发器
+        stmt = sa_select(ItemInstance).where(
+            ItemInstance.player_id == player.id,
+            ItemInstance.equipped == True,
+        )
+        equipped_items = (await self._session.execute(stmt)).scalars().all()
+
         engine = EnhancedBattleEngine(seed)
-        battle_log = []
+        engine.start_battle(player, boss_stats, equipped_items)
+
+        battle_log: List[str] = []
         sanity_damage = 0
         total_damage_dealt = 0
 
         battle_log.append(f"⚔️ {player.nickname} VS {boss_name}")
+        if weakness:
+            weakness_icon = {"暴击": "💥", "穿透": "🔥", "连击": "⚡"}.get(weakness, "🎯")
+            battle_log.append(f"{weakness_icon} 弱点：{weakness}（触发时伤害 ×1.5）")
         battle_log.append("")
 
-        # 执行战斗回合
         for round_num in range(1, max_rounds + 1):
-            if player.mp <= 0:
+            if player.mp - sanity_damage <= 0:
                 break
 
             battle_log.append(f"━━━ 第{round_num}回合 ━━━")
 
-            # 玩家攻击BOSS（使用完整战斗属性系统）
-            base_attack = max(1, player.attack - boss_stats["defense"] // 2)
-            attack_result = engine.execute_player_turn(player, boss_stats, base_attack, False)
+            # 玩家攻击BOSS（完整属性系统：暴击/连击/穿透/吸血均生效）
+            attack_result = engine.execute_player_turn(player, boss_stats, player.attack, False)
 
             if attack_result["hit"]:
-                # 使用 total_damage 字段，它已经包含了所有伤害（包括连击）
                 damage = attack_result.get("total_damage", attack_result.get("damage", 0))
+                is_crit = attack_result.get("is_critical", False)
+                is_pen = attack_result.get("is_penetration", False)
+                combo_count = attack_result.get("combo_count", 1)
+
+                # E: 弱点加成
+                weakness_triggered = (
+                    (weakness == "暴击" and is_crit) or
+                    (weakness == "穿透" and is_pen) or
+                    (weakness == "连击" and combo_count > 1)
+                )
+                if weakness_triggered:
+                    damage = int(damage * 1.5)
+
                 total_damage_dealt += damage
 
-                # 构建攻击描述
-                attack_desc = f"⚔️ {player.nickname} 攻击 {boss_name}"
-
-                # 添加效果描述
                 effects = []
-                if attack_result.get("is_critical"):
+                if is_crit:
                     effects.append("💥暴击")
-                if attack_result.get("is_penetration"):
+                if is_pen:
                     effects.append("🔥穿透")
-                if attack_result.get("combo_count", 1) > 1:
-                    effects.append(f"⚡连击x{attack_result['combo_count']}")
+                if combo_count > 1:
+                    effects.append(f"⚡连击x{combo_count}")
+                if weakness_triggered:
+                    effects.append("🎯弱点")
 
+                attack_desc = f"⚔️ {player.nickname} 攻击 {boss_name}"
                 if effects:
                     attack_desc += f"({' '.join(effects)})"
-
                 attack_desc += f"，造成 {damage:,} 点伤害"
                 battle_log.append(attack_desc)
             else:
                 battle_log.append(f"💨 {player.nickname} 的攻击被 {boss_name} 闪避了")
 
-            # BOSS反击（固定理智削减）
-            round_sanity_damage = WorldBossService._calculate_sanity_damage(player, engine.rng)
-            sanity_damage += round_sanity_damage
+            # BOSS反击：通过完整怪物攻击逻辑计算理智侵蚀（玩家防御/闪避生效）
+            round_sanity = WorldBossService._calculate_sanity_damage_v2(boss_stats, player, engine)
+            sanity_damage += round_sanity
 
-            if round_sanity_damage > 0:
-                battle_log.append(f"🧠 {boss_name} 的攻击侵蚀了你的理智，损失 {round_sanity_damage} 点理智")
+            if round_sanity > 0:
+                battle_log.append(
+                    f"🧠 {boss_name} 侵蚀了你的理智，损失 {round_sanity} 点"
+                    f"（防御减免后）"
+                )
                 battle_log.append(f"   当前理智：{max(0, player.mp - sanity_damage)}")
+            else:
+                battle_log.append(f"💨 你成功闪避了 {boss_name} 的精神侵蚀！")
 
-            # 检查理智是否归零
             if player.mp - sanity_damage <= 0:
                 battle_log.append("💀 你的理智彻底崩溃，陷入了永恒的疯狂...")
                 break
 
             battle_log.append("")
 
-        # 战斗结果
         victory = player.mp - sanity_damage > 0
 
         if victory:
+            # D: 存活奖励：伤害 ×1.2
+            survival_bonus = int(total_damage_dealt * 0.2)
+            total_damage_dealt += survival_bonus
             battle_log.append(f"🎉 你成功抵抗了 {boss_name} 的疯狂侵蚀！")
+            battle_log.append(f"✨ 存活奖励 +20%：+{survival_bonus:,} 伤害")
         else:
             battle_log.append(f"💀 你被 {boss_name} 的疯狂力量彻底击垮...")
 
         battle_log.append("")
         battle_log.append(f"📊 本次讨伐总伤害：{total_damage_dealt:,}")
 
-        return victory, battle_log, sanity_damage
+        # 重置首回合临时加成（如灵影体质）
+        try:
+            engine.reset_temp_bonuses(player)
+        except Exception:
+            pass
+
+        return victory, battle_log, sanity_damage, total_damage_dealt
 
     @staticmethod
-    def _calculate_sanity_damage(player: Player, rng: random.Random) -> int:
-        """计算理智削减量
+    def _calculate_sanity_damage_v2(boss_stats: Dict, player: Player, engine: "EnhancedBattleEngine") -> int:
+        """计算理智侵蚀量（A: 玩家防御和闪避均有效）
 
-        Args:
-            player: 玩家对象
-            rng: 随机数生成器
-
-        Returns:
-            理智削减量
+        使用与普通怪物攻击相同的命中/减伤逻辑：
+        - 玩家闪避率可完全躲避
+        - 玩家防御力部分减免（理智侵蚀只受15%防御效益）
         """
-        config = WorldBossService.SANITY_DAMAGE_CONFIG
+        from ..battle.battle_attributes import BattleAttributeCalculator
+        from ..utils import apply_defense_mitigation
 
-        if player.level <= config["low_level_threshold"]:
-            # 低等级玩家：固定伤害
-            min_damage, max_damage = config["low_level_fixed_damage"]
-            return rng.randint(min_damage, max_damage)
-        else:
-            # 高等级玩家：百分比伤害
-            min_percent, max_percent = config["high_level_percentage"]
-            damage_percent = rng.uniform(min_percent, max_percent)
-            return max(1, int(player.max_mp * damage_percent))
+        base_attack = boss_stats.get("attack", 0)
+        if base_attack <= 0:
+            return 0
 
-    @staticmethod
-    def _extract_damage_from_battle_log(battle_log: List[str]) -> int:
-        """从战斗日志中提取总伤害"""
-        import re
-        total_damage = 0
+        # 闪避判定
+        player_attrs = BattleAttributeCalculator.calculate_effective_attributes(player)
+        dodge_rate = player_attrs.get("dodge_rate", 0)
+        if engine.rng.random() * 100 < dodge_rate:
+            return 0  # 闪避成功，本回合无理智损失
 
-        for line in battle_log:
-            # 查找包含总伤害的行
-            if "本次讨伐总伤害：" in line:
-                match = re.search(r"本次讨伐总伤害：([\d,]+)", line)
-                if match:
-                    damage_str = match.group(1).replace(",", "")
-                    total_damage = int(damage_str)
-                    break
+        # 防御减伤（只有15%效益体现在理智防护上，体现出"精神防御难以依赖肉体"）
+        effective_defense = int(player.defense * 0.15)
+        variation = engine.rng.uniform(0.85, 1.15)
+        raw = max(1, int(base_attack * variation))
+        mitigation = apply_defense_mitigation(raw, effective_defense)
+        return max(1, int(mitigation["final_damage"]))
 
-        return total_damage
-
-    async def _calculate_boss_stats(self, cycle: WorldBossCycle) -> Dict[str, int]:
-        """计算BOSS属性（基础属性受最高等级玩家影响但有独立的计算逻辑）"""
-        # 获取最高等级玩家
+    async def _calculate_boss_stats(self, cycle: WorldBossCycle, player: Player = None) -> Dict:
+        """计算BOSS属性（C: 按玩家段位分级，基准来自全服最高玩家）"""
+        # 获取最高等级玩家（基准参考）
         stmt = select(Player).order_by(desc(Player.level)).limit(1)
         top_player = (await self._session.execute(stmt)).scalars().first()
 
         if not top_player:
-            # 如果没有玩家，使用默认基础值
-            base_defense = 100
-            base_agility = 80
-        else:
-            # BOSS基础属性受最高玩家等级影响，但有独立的计算公式
-            # 防御力：基础值 + 玩家等级影响 + 玩家防御力的一定比例
-            base_defense = 10 + int(top_player.defense * 0.3)
+            return {"hp": 9_999_999_999, "defense": 100, "agility": 80, "attack": 50, "level": "???"}
 
-            # 敏捷：基础值 + 玩家等级影响 + 玩家敏捷的一定比例
-            base_agility = 10 + int(top_player.agility * 0.25)
+        # C: 根据当前玩家的段位选取倍率
+        ref = player if player else top_player
+        tier = WorldBossService.get_reincarnation_tier(ref.reincarnation_level)
+        tier_idx = min(tier, len(WorldBossService.TIER_STATS_MULTIPLIERS) - 1)
+        def_mult, agi_mult, atk_mult = WorldBossService.TIER_STATS_MULTIPLIERS[tier_idx]
+
+        base_defense = 10 + int(top_player.defense * def_mult)
+        base_agility = 10 + int(top_player.agility * agi_mult)
+        # 攻击力 = 玩家理智上限 × 倍率（用于削减玩家理智，受玩家防御/闪避减弱）
+        base_attack = int((ref.max_mp if ref.max_mp > 0 else 1000) * atk_mult)
 
         return {
+            "hp": 9_999_999_999,  # 实际无限血量
             "defense": int(base_defense),
             "agility": int(base_agility),
-            "level": "???"  # 等级显示为???
+            "attack": int(base_attack),
+            "level": "???"
         }
 
 
