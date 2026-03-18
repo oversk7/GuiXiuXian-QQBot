@@ -24,7 +24,7 @@ T2_AFFIX_TO_INSCRIPTION = {
     "damage_reflect": "inscription_reflect",
     "tough_reduce": "inscription_damage_reduction",
     "true_damage_strike": "inscription_true_damage",
-    "first_strike_hit": "inscription_damage_boost",
+    "first_strike_hit": "inscription_first_true",
     "execute_boost": "inscription_execute",
     "shield_condense": "inscription_shield",
     "periodic_regen": "inscription_regen",
@@ -32,11 +32,11 @@ T2_AFFIX_TO_INSCRIPTION = {
     "weaken": "inscription_debuff_defense",
     "counter_stun": "inscription_counter_fear",
     "dodge_crit": "inscription_buff_crit",
-    # 以下T2词缀映射到最近似的铭文
-    "kill_boost": "inscription_damage_boost",
-    "desperation_crit": "inscription_buff_crit",
-    "soul_burn": "inscription_debuff_defense",
-    "combo_stack": "inscription_damage_boost",
+    # 以下T2词缀映射到语义更匹配的新铭文
+    "kill_boost": "inscription_kill_attack",
+    "desperation_crit": "inscription_lowhp_damage",
+    "soul_burn": "inscription_hit_debuff_def",
+    "combo_stack": "inscription_crit_boost",
     "doom_judgment": "inscription_execute",
 }
 
@@ -167,7 +167,8 @@ def inscription_to_trigger_config(inscription_data: dict, source_name: str = "�
 
     trigger_type = TriggerType(effect_cfg["trigger"])
     effect_type = EffectType(effect_cfg["effect"])
-    chance = values.get("chance", 0)
+    # 无 chance_range 的铭文（如被动类）默认100%触发
+    chance = values.get("chance", 100 if not effect_cfg.get("chance_range") else 0)
     value = values.get("value", 0)
     duration = effect_cfg.get("duration", 0)
     threshold = effect_cfg.get("threshold", 0)

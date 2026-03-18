@@ -580,6 +580,259 @@ items:
         chance_range: [15, 30]
         value_range: [20, 50]
 
+    # ========== 新铭文（DNF风格命名） ==========
+
+    # --- 8个覆盖旧装备特效迁移的铭文 ---
+
+    - item_id: "inscription_defense_fear"
+      name: "铭文·骇骨"
+      description: "被攻击时{chance}%概率使敌人恐惧1回合"
+      type: "INSCRIPTION"
+      rarity: "blue"
+      price: 16000
+      inscription_effect:
+        trigger: "on_attacked"
+        effect: "fear"
+        duration: 1
+        chance_range: [8, 18]
+
+    - item_id: "inscription_attack_lifesteal"
+      name: "铭文·血宴"
+      description: "攻击时{chance}%概率吸取{value}%伤害为生命"
+      type: "INSCRIPTION"
+      rarity: "blue"
+      price: 18000
+      inscription_effect:
+        trigger: "on_attack"
+        effect: "lifesteal"
+        chance_range: [10, 22]
+        value_range: [8, 20]
+
+    - item_id: "inscription_dodge_regen"
+      name: "铭文·残影"
+      description: "闪避成功后{chance}%概率回复{value}%最大生命"
+      type: "INSCRIPTION"
+      rarity: "blue"
+      price: 15000
+      inscription_effect:
+        trigger: "on_dodge"
+        effect: "heal"
+        chance_range: [15, 30]
+        value_range: [5, 12]
+
+    - item_id: "inscription_crit_fear"
+      name: "铭文·裂魂"
+      description: "暴击时{chance}%概率使敌人恐惧1回合"
+      type: "INSCRIPTION"
+      rarity: "purple"
+      price: 22000
+      inscription_effect:
+        trigger: "on_critical"
+        effect: "fear"
+        duration: 1
+        chance_range: [12, 25]
+
+    - item_id: "inscription_lowhp_damage"
+      name: "铭文·穷途"
+      description: "低血量时攻击{chance}%概率伤害+{value}%"
+      type: "INSCRIPTION"
+      rarity: "purple"
+      price: 22000
+      inscription_effect:
+        trigger: "low_hp"
+        effect: "damage_boost"
+        chance_range: [20, 40]
+        value_range: [15, 35]
+
+    - item_id: "inscription_first_true"
+      name: "铭文·先声"
+      description: "首回合{chance}%概率附加{value}%真实伤害(2回合)"
+      type: "INSCRIPTION"
+      rarity: "purple"
+      price: 25000
+      inscription_effect:
+        trigger: "first_turn"
+        effect: "true_damage"
+        duration: 2
+        chance_range: [15, 30]
+        value_range: [10, 22]
+
+    - item_id: "inscription_crit_boost"
+      name: "铭文·暴裂"
+      description: "首回合{chance}%概率暴击率+{value}%(3回合)"
+      type: "INSCRIPTION"
+      rarity: "blue"
+      price: 16000
+      inscription_effect:
+        trigger: "first_turn"
+        effect: "buff_critical"
+        duration: 3
+        chance_range: [20, 40]
+        value_range: [15, 35]
+
+    - item_id: "inscription_lowhp_defense"
+      name: "铭文·回光"
+      description: "低血量时{chance}%概率防御+{value}%(2回合)"
+      type: "INSCRIPTION"
+      rarity: "blue"
+      price: 15000
+      inscription_effect:
+        trigger: "low_hp"
+        effect: "buff_defense"
+        duration: 2
+        chance_range: [20, 40]
+        value_range: [15, 30]
+
+    # --- 12个丰富市场流通的新铭文 ---
+
+    - item_id: "inscription_hit_lifesteal"
+      name: "铭文·噬心"
+      description: "命中时{chance}%概率吸取{value}%伤害为生命"
+      type: "INSCRIPTION"
+      rarity: "blue"
+      price: 16000
+      inscription_effect:
+        trigger: "on_hit"
+        effect: "lifesteal"
+        chance_range: [10, 25]
+        value_range: [5, 15]
+
+    - item_id: "inscription_kill_attack"
+      name: "铭文·弑神"
+      description: "击杀敌人时{chance}%概率攻击力+{value}%(3回合)"
+      type: "INSCRIPTION"
+      rarity: "purple"
+      price: 25000
+      inscription_effect:
+        trigger: "on_kill"
+        effect: "buff_attack"
+        duration: 3
+        chance_range: [30, 60]
+        value_range: [15, 30]
+
+    - item_id: "inscription_kill_heal"
+      name: "铭文·噬魂"
+      description: "击杀敌人时{chance}%概率回复{value}%最大生命"
+      type: "INSCRIPTION"
+      rarity: "blue"
+      price: 18000
+      inscription_effect:
+        trigger: "on_kill"
+        effect: "heal"
+        chance_range: [30, 60]
+        value_range: [10, 25]
+
+    - item_id: "inscription_hit_debuff_def"
+      name: "铭文·蚀甲"
+      description: "命中时{chance}%概率降低敌人{value}%防御(2回合)"
+      type: "INSCRIPTION"
+      rarity: "blue"
+      price: 16000
+      inscription_effect:
+        trigger: "on_hit"
+        effect: "debuff_defense"
+        duration: 2
+        chance_range: [8, 20]
+        value_range: [8, 18]
+
+    - item_id: "inscription_passive_dodge"
+      name: "铭文·幻步"
+      description: "被动闪避率+{value}%"
+      type: "INSCRIPTION"
+      rarity: "blue"
+      price: 15000
+      inscription_effect:
+        trigger: "passive"
+        effect: "buff_dodge"
+        value_range: [3, 8]
+
+    - item_id: "inscription_passive_accuracy"
+      name: "铭文·鹰瞳"
+      description: "被动命中率+{value}%"
+      type: "INSCRIPTION"
+      rarity: "blue"
+      price: 15000
+      inscription_effect:
+        trigger: "passive"
+        effect: "buff_accuracy"
+        value_range: [3, 8]
+
+    - item_id: "inscription_turn_shield"
+      name: "铭文·固壁"
+      description: "每回合{chance}%概率获得{value}%最大生命护盾"
+      type: "INSCRIPTION"
+      rarity: "purple"
+      price: 22000
+      inscription_effect:
+        trigger: "each_turn"
+        effect: "shield"
+        chance_range: [12, 25]
+        value_range: [5, 12]
+
+    - item_id: "inscription_attacked_buff_atk"
+      name: "铭文·怒焰"
+      description: "被攻击时{chance}%概率攻击力+{value}%(2回合)"
+      type: "INSCRIPTION"
+      rarity: "blue"
+      price: 16000
+      inscription_effect:
+        trigger: "on_attacked"
+        effect: "buff_attack"
+        duration: 2
+        chance_range: [10, 22]
+        value_range: [8, 18]
+
+    - item_id: "inscription_first_attack"
+      name: "铭文·战意"
+      description: "首回合{chance}%概率攻击力+{value}%(3回合)"
+      type: "INSCRIPTION"
+      rarity: "blue"
+      price: 16000
+      inscription_effect:
+        trigger: "first_turn"
+        effect: "buff_attack"
+        duration: 3
+        chance_range: [20, 40]
+        value_range: [10, 25]
+
+    - item_id: "inscription_dodge_dodge"
+      name: "铭文·风灵"
+      description: "闪避成功后{chance}%概率闪避率+{value}%(2回合)"
+      type: "INSCRIPTION"
+      rarity: "blue"
+      price: 15000
+      inscription_effect:
+        trigger: "on_dodge"
+        effect: "buff_dodge"
+        duration: 2
+        chance_range: [15, 30]
+        value_range: [10, 25]
+
+    - item_id: "inscription_lowhp_attack"
+      name: "铭文·血怒"
+      description: "低血量时{chance}%概率攻击力+{value}%(2回合)"
+      type: "INSCRIPTION"
+      rarity: "purple"
+      price: 20000
+      inscription_effect:
+        trigger: "low_hp"
+        effect: "buff_attack"
+        duration: 2
+        chance_range: [25, 45]
+        value_range: [15, 30]
+
+    - item_id: "inscription_attacked_heal"
+      name: "铭文·荆棘"
+      description: "被攻击时{chance}%概率回复{value}%最大生命"
+      type: "INSCRIPTION"
+      rarity: "blue"
+      price: 15000
+      inscription_effect:
+        trigger: "on_attacked"
+        effect: "heal"
+        chance_range: [10, 22]
+        value_range: [3, 8]
+
     # ========== 镶嵌工具 ==========
     - item_id: "gem_hammer"
       name: "镶嵌锤"
@@ -1032,12 +1285,6 @@ items:
       required_level: 90
       gem_slots: 3
       rarity: "blue"
-      special_effects:
-        - trigger: "on_attack"
-          chance: 15
-          effect: "fear"
-          duration: 1
-          description: "攻击时15%概率镇魂，使敌人恐惧1回合"
 
     # ========== 顶级装备 (101-150级) - 高比例加成，蓝色+紫色材料 ==========
 
@@ -1060,12 +1307,6 @@ items:
       required_level: 105
       gem_slots: 3
       rarity: "purple"
-      special_effects:
-        - trigger: "on_defense"
-          chance: 20
-          effect: "fear"
-          duration: 1
-          description: "被攻击时20%概率使敌人陷入恐惧"
 
     - item_id: "wedding_dress"
       name: "嫁衣"
@@ -1086,14 +1327,6 @@ items:
       required_level: 120
       gem_slots: 3
       rarity: "purple"
-      special_effects:
-        - trigger: "on_attack"
-          chance: 30
-          effect: "lifesteal"
-          value: 12
-          duration: 0
-          description: "攻击时30%概率触发吸血12%"
-
 
     - item_id: "void_essence_crown"
       name: "虚无之冠"
@@ -1114,13 +1347,6 @@ items:
       required_level: 140
       gem_slots: 4
       rarity: "purple"
-      special_effects:
-        - trigger: "on_dodge"
-          chance: 100
-          effect: "regen"
-          value: 5
-          duration: 2
-          description: "闪避后回血5%(持续2回合)"
 
     - item_id: "shock_therapy_device"
       name: "电击治疗仪"
@@ -1141,12 +1367,6 @@ items:
       required_level: 142
       gem_slots: 4
       rarity: "purple"
-      special_effects:
-        - trigger: "on_attack"
-          chance: 35
-          effect: "fear"
-          duration: 1
-          description: "攻击时35%概率电击敌人，使其恐惧1回合"
 
     # ========== 传说装备 (151+级) - 极高比例加成，紫色+橙色材料 ==========
 
@@ -1169,18 +1389,6 @@ items:
       required_level: 175
       gem_slots: 5
       rarity: "orange"
-      special_effects:
-        - trigger: "on_critical"
-          chance: 60
-          effect: "fear"
-          duration: 2
-          description: "暴击时60%概率使敌人恐惧2回合"
-        - trigger: "low_hp"
-          chance: 100
-          effect: "damage_boost"
-          value: 50
-          duration: 3
-          description: "低血量时伤害+50%(持续3回合)"
 
     - item_id: "god_tear_amulet"
       name: "神泪护符"
@@ -1201,13 +1409,6 @@ items:
       required_level: 180
       gem_slots: 4
       rarity: "orange"
-      special_effects:
-        - trigger: "each_turn"
-          chance: 100
-          effect: "regen"
-          value: 5
-          duration: 0
-          description: "每回合回血5%"
 
     - item_id: "world_fragment_blade"
       name: "世界碎片之刃"
@@ -1228,18 +1429,6 @@ items:
       required_level: 220
       gem_slots: 5
       rarity: "orange"
-      special_effects:
-        - trigger: "first_turn"
-          chance: 100
-          effect: "true_damage"
-          duration: 3
-          description: "战斗开始进入真伤状态(持续3回合，撕裂现实)"
-        - trigger: "on_critical"
-          chance: 100
-          effect: "damage_boost"
-          value: 40
-          duration: 2
-          description: "暴击后伤害+40%(持续2回合)"
 
     - item_id: "shroud_of_eternity"
       name: "寿衣"
@@ -1261,13 +1450,6 @@ items:
       required_level: 200
       gem_slots: 4
       rarity: "orange"
-      special_effects:
-        - trigger: "low_hp"
-          chance: 100
-          effect: "buff_defense"
-          value: 60
-          duration: 999
-          description: "低血量时防御+60%(诅咒庇护)"
 
     - item_id: "lucky_scissors"
       name: "幸运剪刀"
