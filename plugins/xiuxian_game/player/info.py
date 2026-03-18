@@ -20,6 +20,7 @@ from ..config import config
 from ..infrastructure.uow import UnitOfWork
 from ..domain.attributes import get_effective_attributes_v2
 from ..infrastructure.repositories.account_transfer_log_repository import AccountTransferLogRepository
+from ..models.account_ownership import AccountOwnership
 from ..queries.player_queries import query_player_profile
 
 
@@ -493,6 +494,18 @@ async def create_player(event: MessageEvent, nickname: str, gender: Gender) -> M
         )
 
         session.add(new_player)
+        await session.flush()
+
+        # 创建账号所有权记录（支持多账号切换和转让系统）
+        ownership = AccountOwnership(
+            owner_platform_id=event.get_user_id(),
+            player_id=new_player.id,
+            is_active=True,
+            display_name=nickname,
+            acquired_type="created",
+            acquired_at=datetime.now()
+        )
+        session.add(ownership)
         await session.commit()
 
         # 💡 改名卡由首次签到时赠送，见 entertainment/sign.py

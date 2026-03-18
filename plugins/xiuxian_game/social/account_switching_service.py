@@ -68,10 +68,27 @@ class AccountSwitchingService:
             - level: 等级
             - cultivation_level_name: 境界名称
         """
+        # 兜底：如果玩家存在但没有ownership记录（老玩家），自动补建
         ownerships = await self._ownership_repo.find_all_by_owner(
             owner_platform_id,
             include_player=True
         )
+
+        owned_player_ids = {o.player_id for o in ownerships}
+        original_player = await self._player_repo.get_by_id(owner_platform_id)
+        if original_player and original_player.id not in owned_player_ids:
+            new_ownership = AccountOwnership(
+                owner_platform_id=owner_platform_id,
+                player_id=original_player.id,
+                is_active=True if not ownerships else False,
+                display_name=original_player.nickname,
+                acquired_type="created",
+            )
+            await self._ownership_repo.create(new_ownership)
+            ownerships = await self._ownership_repo.find_all_by_owner(
+                owner_platform_id,
+                include_player=True
+            )
 
         accounts = []
         for ownership in ownerships:
