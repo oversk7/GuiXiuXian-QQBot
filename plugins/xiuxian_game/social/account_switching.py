@@ -6,10 +6,10 @@
 - 切换账号 <账号ID> - 切换到指定的游戏账号
 - 重命名账号 <账号ID> <新名称> - 重命名账号备注
 - 转让历史 - 查看账号买入/卖出历史
+- 接收账号 <转让密钥> - 使用转让密钥接收账号
 
 管理员命令（仅SUPERUSER）：
 - 生成转让密钥 <账号ID> - 为玩家生成账号转让密钥（账号买卖）
-- 接收账号 <转让密钥> - 使用转让密钥接收账号
 - 取消转让 <账号ID> - 取消账号的转让密钥
 - 临时切换 <UID> - 管理员临时切换到指定账号（不改变所有权）
 - 退出临时切换 - 管理员退出临时切换状态
@@ -218,7 +218,7 @@ async def handle_generate_transfer_key(event: MessageEvent, args: Message = Comm
 
 
 # ==================== 接收账号 ====================
-accept_transfer_cmd = on_command("接收账号", aliases={"使用转让密钥"}, block=True, priority=5, permission=SUPERUSER)
+accept_transfer_cmd = on_command("接收账号", aliases={"使用转让密钥"}, block=True, priority=5)
 
 @accept_transfer_cmd.handle()
 async def handle_accept_transfer(event: MessageEvent, args: Message = CommandArg()):
