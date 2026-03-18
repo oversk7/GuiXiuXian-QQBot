@@ -278,6 +278,7 @@ def get_t2_trigger_configs(affixes: List[Dict], source_name: str = "词缀") -> 
             threshold=float(threshold),
             description=f"词缀·{affix_cfg['name']}",
             source_equipment=source_name,
+            require_critical=bool(affix_cfg.get("require_critical", False)),
         )
         triggers.append(tc)
 

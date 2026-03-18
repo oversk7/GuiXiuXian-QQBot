@@ -152,6 +152,7 @@ class TriggerConfig:
     ctx_region_in: list[str] | None = None  # 仅当所在区域在列表内时触发
     ctx_theme_in: list[str] | None = None   # 仅当本周主题在列表内时触发
     source_equipment: str = ""              # 来源装备标签（如"归雨·噬雨"）
+    require_critical: bool = False          # 仅被暴击时才触发（用于被动反制类效果）
 
 
 class BattleEffectManager:
@@ -256,7 +257,19 @@ class BattleEffectManager:
             hp_percentage = (current_hp / max_hp) * 100 if max_hp > 0 else 0
             if not (hp_percentage <= (trigger.threshold or 30)):
                 return False
-        # 其它触发类型默认不额外限制（除非配置了环境条件）
+
+        # 被暴击条件判定
+        if trigger.require_critical and not context.get('is_critical', False):
+            return False
+
+        # 通用 threshold 判定：非 LOW_HP 触发器若配置了 threshold，
+        # 则检查目标血量百分比是否 <= threshold（如斩杀加伤、末日审判）
+        if trigger.trigger != TriggerType.LOW_HP and trigger.threshold and trigger.threshold > 0:
+            target_hp = context.get('target_hp', 100)
+            target_max_hp = context.get('target_max_hp', 100)
+            target_hp_pct = (target_hp / target_max_hp) * 100 if target_max_hp > 0 else 100
+            if target_hp_pct > trigger.threshold:
+                return False
 
         # 环境：理智上限（当前理智百分比必须≤阈值）
         if getattr(trigger, 'ctx_mp_max', 0):

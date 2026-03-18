@@ -144,61 +144,9 @@ affixes:
         purple: [2.0, 4.0]
         orange: [3.0, 5.0]
 
-    - affix_id: "first_strike_rate"
-      name: "先手"
-      description: "先手率+{value}%"
-      attribute: "first_strike_rate"
-      ranges:
-        white: [0.5, 1.5]
-        green: [1.0, 3.0]
-        blue: [2.0, 4.5]
-        purple: [3.5, 6.0]
-        orange: [5.0, 8.0]
-
-    - affix_id: "tenacity"
-      name: "韧性"
-      description: "控制减免+{value}%"
-      attribute: "tenacity"
-      ranges:
-        white: [0.5, 1.5]
-        green: [1.0, 3.0]
-        blue: [2.0, 5.0]
-        purple: [4.0, 7.0]
-        orange: [6.0, 10.0]
-
-    - affix_id: "mp_cost_reduction"
-      name: "节能"
-      description: "理智消耗减免+{value}%"
-      attribute: "mp_cost_reduction"
-      ranges:
-        white: [0.5, 1.0]
-        green: [1.0, 2.0]
-        blue: [1.5, 3.0]
-        purple: [2.5, 4.0]
-        orange: [3.5, 5.0]
-
-    - affix_id: "ignore_defense"
-      name: "破甲"
-      description: "无视防御+{value}"
-      attribute: "ignore_defense"
-      is_percentage: false
-      ranges:
-        white: [2, 5]
-        green: [5, 12]
-        blue: [10, 25]
-        purple: [20, 40]
-        orange: [35, 60]
-
-    - affix_id: "block_reduction"
-      name: "格挡"
-      description: "格挡减伤+{value}%"
-      attribute: "block_reduction"
-      ranges:
-        white: [0.5, 1.5]
-        green: [1.0, 3.0]
-        blue: [2.0, 5.0]
-        purple: [4.0, 7.0]
-        orange: [6.0, 10.0]
+    # 以下5个T1词缀暂未接入战斗属性系统，等待后续版本实现后恢复：
+    # first_strike_rate(先手), tenacity(韧性), mp_cost_reduction(节能),
+    # ignore_defense(破甲), block_reduction(格挡)
 
     - affix_id: "skill_crit_boost"
       name: "灵威"
@@ -511,6 +459,7 @@ affixes:
       description: "被暴击时{value}%概率使敌人恐惧{value2}回合"
       trigger: "on_attacked"
       effect: "fear"
+      require_critical: true
       chance_ranges:
         blue: [8, 12]
         purple: [12, 18]

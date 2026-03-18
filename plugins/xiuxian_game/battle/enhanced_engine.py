@@ -816,7 +816,8 @@ class EnhancedBattleEngine:
             val = float(getattr(eff, 'value', 0))
             ignore_special_ratio += max(0.0, val) / 100.0
         # ON_ATTACK 前置判定，仅提取 IGNORE_DEFENSE，用于本次攻击
-        pre_ctx = {"source": "pre_attack", "current_hp": getattr(attacker, 'hp', 0), "max_hp": getattr(attacker, 'max_hp', 0)}
+        pre_ctx = {"source": "pre_attack", "current_hp": getattr(attacker, 'hp', 0), "max_hp": getattr(attacker, 'max_hp', 0),
+                   "target_hp": getattr(defender, 'hp', 0), "target_max_hp": getattr(defender, 'max_hp', 0)}
         pre_attack_effects = self.effect_manager.check_triggers(attacker_id, TriggerType.ON_ATTACK, pre_ctx)
         ignore_defense_ratio = 0.0
         for eff in pre_attack_effects:
@@ -1130,7 +1131,9 @@ class EnhancedBattleEngine:
             "damage": damage,
             "is_critical": is_critical,
             "current_hp": attacker.hp,
-            "max_hp": attacker.max_hp
+            "max_hp": attacker.max_hp,
+            "target_hp": getattr(defender, 'hp', 0),
+            "target_max_hp": getattr(defender, 'max_hp', 0),
         }
 
         attack_effects = self.effect_manager.check_triggers(attacker_id, TriggerType.ON_ATTACK, context)
@@ -1210,6 +1213,7 @@ class EnhancedBattleEngine:
             "attacker": attacker_name,
             "attacker_id": attacker_id,
             "damage": damage,
+            "is_critical": is_critical,
             "current_hp": getattr(defender, 'hp', 100),
             "max_hp": getattr(defender, 'max_hp', 100),
             "current_mp": getattr(defender, 'mp', 0),
@@ -1407,7 +1411,9 @@ class EnhancedBattleEngine:
             "damage": damage,
             "is_critical": is_critical,
             "current_hp": attacker.hp,
-            "max_hp": attacker.max_hp
+            "max_hp": attacker.max_hp,
+            "target_hp": getattr(defender, 'hp', 0),
+            "target_max_hp": getattr(defender, 'max_hp', 0),
         }
 
         attack_effects = self.effect_manager.check_triggers(attacker_id, TriggerType.ON_ATTACK, context)

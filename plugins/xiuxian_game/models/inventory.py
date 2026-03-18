@@ -249,8 +249,10 @@ class ItemInstance(Base):
 
         from ..config import config
 
-        for slot_index, gem_item_id in self.gem_slots_data.items():
-            gem_config = config.items_config["by_id"].get(gem_item_id)
+        for slot_index, gem_data in self.gem_slots_data.items():
+            if isinstance(gem_data, dict):
+                continue  # 铭文不贡献属性加成，由战斗触发器处理
+            gem_config = config.items_config["by_id"].get(gem_data)
             if not gem_config:
                 continue
 
