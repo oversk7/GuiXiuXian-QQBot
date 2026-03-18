@@ -93,6 +93,9 @@ class ItemConfig:
         # 特殊效果配置(增强战斗系统)
         self.special_effects = data.get("special_effects", [])  # 特殊效果列表
 
+        # 铭文效果配置
+        self.inscription_effect = data.get("inscription_effect")
+
         # 礼物系统: 好感度加成
         self.favorability = data.get("favorability", 0)  # 赠送时增加的好感度
 

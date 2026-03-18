@@ -75,15 +75,7 @@ def _get_inscription_effect(item_id: str) -> Optional[dict]:
     item_cfg = config.items_config["by_id"].get(item_id)
     if not item_cfg:
         return None
-    # 尝试属性访问
-    effect_cfg = getattr(item_cfg, 'inscription_effect', None)
-    if effect_cfg:
-        return effect_cfg
-    # 兼容 raw dict (_raw_data 或其他字段)
-    raw = getattr(item_cfg, '_raw_data', None)
-    if raw and isinstance(raw, dict):
-        return raw.get("inscription_effect")
-    return None
+    return getattr(item_cfg, 'inscription_effect', None)
 
 
 def get_inscription_display(slot_data: dict) -> str:

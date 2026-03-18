@@ -122,12 +122,24 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
         if not equip:
             await socket_gem_cmd.finish("⛔ 未找到指定装备，请使用装备栏中显示的编号或装备名称")
 
-        # 查找宝石
+        # 查找宝石/铭文
         gem_config = config.items_config["by_name"].get(gem_name)
         if not gem_config:
-            await socket_gem_cmd.finish("⛔ 未找到指定宝石")
+            await socket_gem_cmd.finish("⛔ 未找到指定宝石或铭文")
 
         gem_item_id = gem_config.item_id
+
+        # 如果是铭文，需要查找背包中的铭文实例（带随机数值）
+        inscription_instance = None
+        if gem_config.type.value == "INSCRIPTION":
+            from sqlalchemy import select as sa_select
+            stmt = sa_select(ItemInstance).where(
+                ItemInstance.player_id == player.id,
+                ItemInstance.item_id == gem_item_id,
+            ).limit(1)
+            inscription_instance = (await session.execute(stmt)).scalars().first()
+            if not inscription_instance:
+                await socket_gem_cmd.finish(f"⛔ 背包中没有铭文：{gem_name}")
 
         # 执行镶嵌
         from ..infrastructure.repositories.item_repository import ItemRepository
@@ -138,7 +150,8 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
             item_repo=ItemRepository(session),
             player_repo=PlayerRepository(session),
         )
-        success, message = await service.socket_gem(equip, gem_item_id, slot_index, player)
+        success, message = await service.socket_gem(equip, gem_item_id, slot_index, player,
+                                                    inscription_instance=inscription_instance)
         await session.commit()
 
         if success:

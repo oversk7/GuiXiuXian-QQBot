@@ -507,19 +507,14 @@ class EquipmentUpgradeService:
                 insc_values = slot_val.get("values", {})
                 insc_cfg = config.items_config["by_id"].get(insc_id)
                 insc_name = insc_cfg.name if insc_cfg else insc_id
-                try:
-                    inst = ItemInstance(
-                        player_id=player.id,
-                        item_id=insc_id,
-                        quantity=1,
-                        extra_attrs={"_inscription_values": insc_values},
-                    )
-                    self._item_repo._session.add(inst)
-                    recovered.append(insc_name)
-                except Exception:
-                    gold_value = insc_cfg.price if (insc_cfg and insc_cfg.price) else 5000
-                    player.gold += gold_value
-                    recovered.append(f"{insc_name}(转为{gold_value}金币)")
+                inst = ItemInstance(
+                    player_id=player.id,
+                    item_id=insc_id,
+                    quantity=1,
+                    extra_attrs={"_inscription_values": insc_values},
+                )
+                self._item_repo._session.add(inst)
+                recovered.append(insc_name)
             else:
                 # 宝石恢复（原有逻辑）
                 gem_config = config.items_config["by_id"].get(slot_val)
