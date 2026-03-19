@@ -443,7 +443,7 @@ if (player.gold > 1000) {
 
 ### 结束节点奖励显示
 
-在结束节点可以用 `rewards` 字段在界面中展示奖励文字（仅显示用，不自动修改属性）：
+在结束节点可以用 `rewards` 字段在界面中展示奖励文字（**仅显示用，不自动修改属性**）：
 
 ```json
 "ending": {
@@ -459,18 +459,72 @@ if (player.gold > 1000) {
 }
 ```
 
+**⚠️ 重要：结束节点的效果限制**
+
+结束节点（`type: "end"`）**只会处理以下特殊效果**：
+- `trial_success: true` — 记录试炼通关
+- `first_trial_reward: true` — 首次试炼奖励（已下架）
+- `rewards` — 纯显示奖励文字
+
+结束节点中的 `player`（修改玩家属性）和 `variables`（修改剧情变量）**不会被执行**。如果需要在试炼结束前修改玩家属性，请在结束节点**之前**的节点中设置效果：
+
+```json
+// ✅ 正确：在结束前的节点应用效果
+"before_end": {
+  "type": "story",
+  "content": "你完成了挑战！",
+  "effects": {
+    "player": {
+      "gold": "+500",
+      "exp": "+1000"
+    }
+  },
+  "next": "ending"
+},
+"ending": {
+  "type": "end",
+  "content": "试炼结束！",
+  "effects": {
+    "trial_success": true,
+    "rewards": {
+      "灵石": "+500",
+      "经验": "+1000"
+    }
+  }
+}
+
+// ❌ 错误：结束节点中的 player 效果不会生效
+"ending": {
+  "type": "end",
+  "content": "试炼结束！",
+  "effects": {
+    "trial_success": true,
+    "player": {
+      "gold": "+500"
+    }
+  }
+}
+```
+
 ### 为节点添加配图
 
-节点可以附带 `image` 字段，指向 `data/stories/` 目录下的图片文件（相对路径）：
+节点可以附带 `image` 字段，路径相对于剧情JSON文件所在目录（`plugins/xiuxian_game/data/stories/`）。
+
+建议将图片统一放在 `images/` 子目录下：
 
 ```json
 "intro": {
   "type": "story",
   "content": "你走进了鬼镇...",
-  "image": "ghost_town_entrance.jpg",
+  "image": "images/ghost_town_entrance.png",
   "next": "next_node"
 }
 ```
+
+**注意事项：**
+- 图片会在文本内容**之前**显示
+- 支持常见图片格式（PNG、JPG等）
+- 图片文件需提前放入对应目录，引擎会读取文件并以 base64 方式发送
 
 ---
 
