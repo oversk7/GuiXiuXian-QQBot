@@ -833,6 +833,267 @@ items:
         chance_range: [10, 22]
         value_range: [3, 8]
 
+    # ========== 铭文碎片 ==========
+    - item_id: "inscription_fragment"
+      name: "铭文碎片"
+      description: "蕴含残缺铭文力量的碎片，收集5个可合成铭文"
+      type: "MATERIAL"
+      rarity: "blue"
+      price: 3000
+
+    # ========== 高级铭文（多效果模板，仅精英怪掉落） ==========
+
+    # --- 攻击型（4种） ---
+    - item_id: "adv_inscription_xiuluo"
+      name: "铭文·修罗血典"
+      description: "攻击附加真伤，暴击吸血"
+      type: "INSCRIPTION"
+      rarity: "purple"
+      price: 50000
+      inscription_type: "advanced"
+      inscription_effects:
+        - trigger: "on_attack"
+          effect: "true_damage"
+          duration: 1
+          chance_range: [6, 14]
+          value_range: [8, 20]
+        - trigger: "on_critical"
+          effect: "lifesteal"
+          chance_range: [8, 20]
+          value_range: [8, 22]
+
+    - item_id: "adv_inscription_mieshi"
+      name: "铭文·灭世天书"
+      description: "首回合增攻，攻击恐惧"
+      type: "INSCRIPTION"
+      rarity: "purple"
+      price: 50000
+      inscription_type: "advanced"
+      inscription_effects:
+        - trigger: "first_turn"
+          effect: "damage_boost"
+          duration: 2
+          chance_range: [12, 28]
+          value_range: [12, 25]
+        - trigger: "on_attack"
+          effect: "fear"
+          duration: 1
+          chance_range: [4, 12]
+
+    - item_id: "adv_inscription_shihun"
+      name: "铭文·噬魂魔经"
+      description: "破甲吸血，低血斩杀"
+      type: "INSCRIPTION"
+      rarity: "purple"
+      price: 55000
+      inscription_type: "advanced"
+      inscription_effects:
+        - trigger: "on_attack"
+          effect: "debuff_defense"
+          duration: 2
+          chance_range: [8, 18]
+          value_range: [6, 15]
+        - trigger: "on_attack"
+          effect: "lifesteal"
+          chance_range: [8, 18]
+          value_range: [6, 16]
+        - trigger: "on_attack"
+          effect: "damage_boost"
+          threshold: 30
+          chance_range: [12, 25]
+          value_range: [15, 32]
+
+    - item_id: "adv_inscription_tianfa"
+      name: "铭文·天罚雷章"
+      description: "真伤暴击恐惧三位一体"
+      type: "INSCRIPTION"
+      rarity: "orange"
+      price: 80000
+      inscription_type: "advanced"
+      inscription_effects:
+        - trigger: "on_attack"
+          effect: "true_damage"
+          duration: 1
+          chance_range: [8, 16]
+          value_range: [10, 22]
+        - trigger: "first_turn"
+          effect: "buff_critical"
+          duration: 3
+          chance_range: [16, 32]
+          value_range: [12, 28]
+        - trigger: "on_critical"
+          effect: "fear"
+          duration: 1
+          chance_range: [8, 18]
+
+    # --- 防御型（3种） ---
+    - item_id: "adv_inscription_bumie"
+      name: "铭文·不灭金身"
+      description: "减伤护盾双防护"
+      type: "INSCRIPTION"
+      rarity: "purple"
+      price: 50000
+      inscription_type: "advanced"
+      inscription_effects:
+        - trigger: "on_attacked"
+          effect: "damage_reduction"
+          duration: 1
+          chance_range: [8, 18]
+          value_range: [6, 16]
+        - trigger: "first_turn"
+          effect: "shield"
+          chance_range: [16, 32]
+          value_range: [6, 14]
+
+    - item_id: "adv_inscription_guixu"
+      name: "铭文·归墟道经"
+      description: "回血反伤绝境防御"
+      type: "INSCRIPTION"
+      rarity: "purple"
+      price: 55000
+      inscription_type: "advanced"
+      inscription_effects:
+        - trigger: "each_turn"
+          effect: "regen"
+          chance_range: [12, 28]
+          value_range: [2, 6]
+        - trigger: "on_attacked"
+          effect: "reflect"
+          chance_range: [6, 16]
+          value_range: [8, 20]
+        - trigger: "low_hp"
+          effect: "buff_defense"
+          duration: 2
+          chance_range: [16, 32]
+          value_range: [12, 25]
+
+    - item_id: "adv_inscription_taixu"
+      name: "铭文·太虚镜录"
+      description: "反伤恐惧护盾终极防御"
+      type: "INSCRIPTION"
+      rarity: "orange"
+      price: 80000
+      inscription_type: "advanced"
+      inscription_effects:
+        - trigger: "on_attacked"
+          effect: "reflect"
+          chance_range: [8, 20]
+          value_range: [10, 22]
+        - trigger: "on_attacked"
+          effect: "fear"
+          duration: 1
+          chance_range: [6, 14]
+        - trigger: "first_turn"
+          effect: "shield"
+          chance_range: [18, 36]
+          value_range: [8, 16]
+
+    # --- 控制型（3种） ---
+    - item_id: "adv_inscription_youming"
+      name: "铭文·幽冥咒典"
+      description: "恐惧破攻双控"
+      type: "INSCRIPTION"
+      rarity: "purple"
+      price: 48000
+      inscription_type: "advanced"
+      inscription_effects:
+        - trigger: "on_attack"
+          effect: "fear"
+          duration: 1
+          chance_range: [4, 12]
+        - trigger: "on_attack"
+          effect: "debuff_attack"
+          duration: 2
+          chance_range: [8, 18]
+          value_range: [6, 14]
+
+    - item_id: "adv_inscription_fengshen"
+      name: "铭文·封神禁录"
+      description: "破攻破甲逆鳞三控"
+      type: "INSCRIPTION"
+      rarity: "purple"
+      price: 55000
+      inscription_type: "advanced"
+      inscription_effects:
+        - trigger: "on_attack"
+          effect: "debuff_defense"
+          duration: 2
+          chance_range: [8, 18]
+          value_range: [6, 14]
+        - trigger: "on_attack"
+          effect: "debuff_attack"
+          duration: 2
+          chance_range: [8, 18]
+          value_range: [6, 14]
+        - trigger: "on_attacked"
+          effect: "fear"
+          duration: 1
+          chance_range: [8, 16]
+
+    - item_id: "adv_inscription_wanjie"
+      name: "铭文·万劫魔章"
+      description: "恐惧真伤破甲极控"
+      type: "INSCRIPTION"
+      rarity: "orange"
+      price: 80000
+      inscription_type: "advanced"
+      inscription_effects:
+        - trigger: "on_attack"
+          effect: "fear"
+          duration: 1
+          chance_range: [6, 14]
+        - trigger: "on_attack"
+          effect: "true_damage"
+          duration: 1
+          chance_range: [6, 14]
+          value_range: [8, 18]
+        - trigger: "on_attack"
+          effect: "debuff_defense"
+          duration: 2
+          chance_range: [8, 18]
+          value_range: [8, 16]
+
+    # --- 综合型（2种） ---
+    - item_id: "adv_inscription_lunhui"
+      name: "铭文·轮回仙典"
+      description: "增攻护盾回血全能"
+      type: "INSCRIPTION"
+      rarity: "orange"
+      price: 85000
+      inscription_type: "advanced"
+      inscription_effects:
+        - trigger: "first_turn"
+          effect: "damage_boost"
+          duration: 2
+          chance_range: [12, 25]
+          value_range: [10, 22]
+        - trigger: "first_turn"
+          effect: "shield"
+          chance_range: [16, 32]
+          value_range: [6, 14]
+        - trigger: "each_turn"
+          effect: "regen"
+          chance_range: [12, 25]
+          value_range: [2, 5]
+
+    - item_id: "adv_inscription_dujie"
+      name: "铭文·渡劫残页"
+      description: "闪避触发回血暴击"
+      type: "INSCRIPTION"
+      rarity: "purple"
+      price: 48000
+      inscription_type: "advanced"
+      inscription_effects:
+        - trigger: "on_dodge"
+          effect: "heal"
+          chance_range: [12, 25]
+          value_range: [4, 10]
+        - trigger: "on_dodge"
+          effect: "buff_critical"
+          duration: 1
+          chance_range: [12, 25]
+          value_range: [16, 40]
+
     # ========== 镶嵌工具 ==========
     - item_id: "gem_hammer"
       name: "镶嵌锤"
