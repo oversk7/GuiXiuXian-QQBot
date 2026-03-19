@@ -946,14 +946,18 @@ async def handle_inscription_list(event: MessageEvent, args: Message = CommandAr
         if not player:
             await inscription_list_cmd.finish("你还没有创建角色")
 
+        from sqlalchemy import or_
         stmt = select(ItemInstance).where(
             ItemInstance.player_id == player.id,
-            ItemInstance.item_id.like("inscription_%")
+            or_(
+                ItemInstance.item_id.like("inscription_%"),
+                ItemInstance.item_id.like("adv_inscription_%"),
+            )
         )
         inscriptions = (await session.execute(stmt)).scalars().all()
 
         if not inscriptions:
-            msg = "📜 你还没有铭文物品\n💡 分解带T2词缀的装备有概率获得铭文"
+            msg = "📜 你还没有铭文物品\n💡 击杀精英怪可掉落铭文，或用铭文碎片合成\n💡 发送【合成铭文】消耗5个碎片合成基础铭文"
         else:
             lines = ["📜 铭文列表："]
             rarity_map = {"white": "⚪", "green": "🟢", "blue": "🔵", "purple": "🟣", "orange": "🟠"}
