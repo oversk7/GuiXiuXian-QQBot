@@ -18,3 +18,4 @@ from . import vip_jingyuan_skill  # VIP定制装备「镜怨披风」主动技�
 from . import vip_ghost_dice_skill  # VIP定制装备「诡面骰」主动技能
 from . import decompose_commands  # 分解系统
 from . import reroll_commands  # 洗炼系统
+from . import inscription_commands  # 铭文合成
