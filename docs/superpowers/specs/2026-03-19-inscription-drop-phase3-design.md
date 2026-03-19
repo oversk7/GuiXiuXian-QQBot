@@ -40,8 +40,15 @@
 | 中品 | 25-65% | ~35% | 铭文·恐惧之力{中品} | 标准效果，实用水平 |
 | 上品 | 65-90% | ~20% | 铭文·度厄天书{上品} | 优秀数值，有交易价值 |
 | 极品 | 90-100% | ~5% | 铭文·度厄天书{极品} | 顶级数值，高收藏和交易价值 |
+| 仙品 | 特殊触发 | ~1% | 铭文·度厄天书{仙品} | 终极天花板，数值接近理论上限 |
 
 **品阶仅由数值质量决定**，不影响掉落概率。品阶的意义在于：同一铭文模板的极品版本比下品版本战斗效果强约2-3倍（因数值区间跨度大），构成铭文间的核心价值差异。
+
+**仙品特殊规则**:
+- 仅在3000级+精英怪掉落时有1%概率触发"仙品加持"
+- 仙品加持将所有数值roll到区间的95-100%范围内（而非正常uniform分布）
+- 仙品铭文显示金色特效文字，如 `铭文·天罚雷章{仙品}`
+- 仙品是高级玩家的终极追求目标：3000级+精英怪 x 5%铭文掉落 x 1%仙品 = 0.05%/次
 
 **品阶评定算法**: 对铭文所有随机数值取百分位均值，映射到品阶区间。
 
@@ -64,6 +71,7 @@ def evaluate_grade(effect_values: list[dict], effect_configs: list[dict]) -> str
                 percentiles.append(pct)
     avg_pct = sum(percentiles) / len(percentiles) if percentiles else 0.5
 
+    # 仙品由掉落时特殊触发，不在此函数判定（见第4.6节）
     if avg_pct >= 0.90:
         return "极品"
     elif avg_pct >= 0.65:
@@ -177,11 +185,16 @@ INSCRIPTION_DROP_RATES = {
     60: 0.0,     # 60级以下精英怪不掉铭文
     100: 0.03,   # 61-100级精英怪: 3%
     200: 0.04,   # 101-200级精英怪: 4%
-    9999: 0.05,  # 200级以上精英怪: 5%
+    9999: 0.05,  # 200级以上精英怪: 5%（封顶，高级玩家通过效率而非概率获利）
 }
 INSCRIPTION_TYPE_WEIGHTS = {"basic": 60, "advanced": 40}
 ADVANCED_RARITY_WEIGHTS = {"purple": 80, "orange": 20}
 ADVANCED_ORANGE_MIN_LEVEL = 150  # 橙色高级铭文最低怪物等级
+
+# 仙品触发（高级玩家天花板追求）
+CELESTIAL_GRADE_MIN_LEVEL = 3000   # 仙品触发最低怪物等级
+CELESTIAL_GRADE_CHANCE = 0.01      # 1%概率触发仙品加持
+CELESTIAL_VALUE_FLOOR = 0.95       # 仙品数值下限为区间的95%
 
 # 铭文碎片掉落（独立于铭文掉落判定）
 FRAGMENT_DROP_RATE = 0.20      # 精英怪20%概率掉碎片
@@ -207,7 +220,10 @@ FRAGMENT_DROP_QUANTITY = (1, 2) # 掉1-2个
   │       ├─ 60% 基础铭文: 从34种中随机选1种
   │       └─ 40% 高级铭文: 按稀有度权重选1种模板
   │           └─ 橙色需 monster_level >= 150，否则降为紫色
-  │   → 生成随机数值 → 评定品阶
+  │   → 生成随机数值
+  │   → 仙品判定: monster_level >= 3000 且 roll 1%？
+  │     → 是: 将所有数值重roll到[95%,100%]区间，品阶="仙品"
+  │     → 否: 正常评定品阶 (下品/中品/上品/极品)
   │   → try: 创建ItemInstance存入背包
   │     except ValueError: 提示"背包已满，铭文掉落未能入包"
   │
@@ -229,6 +245,8 @@ FRAGMENT_DROP_QUANTITY = (1, 2) # 掉1-2个
 | 任意高级橙色铭文 | 5% x 40% x 20% = 0.4% | ~250次 |
 | 特定高级橙色铭文 | 0.4% / 4 = 0.1% | ~1000次 |
 | 特定高级橙色·极品 | 0.1% x 5% = 0.005% | ~20000次 |
+| 任意铭文·仙品 (3000级+) | 5% x 1% = 0.05% | ~2000次 |
+| 特定高级橙色·仙品 (3000级+) | 0.4% x 1% / 4 = 0.001% | ~100000次 |
 | 铭文碎片 | 20% | ~5次 |
 
 ---
@@ -490,13 +508,15 @@ async def handle_synthesize(event: MessageEvent, args: Message = CommandArg()):
         import random
         rng = random.Random()
         basic_ids = [iid for iid in config.items_config["by_type"].get("INSCRIPTION", [])
-                     if not getattr(config.items_config["by_id"].get(iid), 'inscription_type', None)]
+                     if not getattr(config.items_config["by_id"].get(iid), 'inscription_type', None)
+                     and not iid.startswith("adv_")]
         chosen_id = rng.choice(basic_ids)
 
         # 生成随机数值 + 品阶评定
         values = generate_inscription_values(chosen_id, rng)
         values_list = [values]  # 标准化为列表
-        grade = evaluate_grade(values_list, chosen_id)
+        eff_cfg = getattr(config.items_config["by_id"].get(chosen_id), 'inscription_effect', {})
+        grade = evaluate_grade(values_list, [eff_cfg])
 
         # 创建铭文实例
         try:
