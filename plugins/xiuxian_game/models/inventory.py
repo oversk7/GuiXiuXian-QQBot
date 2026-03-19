@@ -95,6 +95,9 @@ class ItemConfig:
 
         # 铭文效果配置
         self.inscription_effect = data.get("inscription_effect")
+        # 高级铭文扩展
+        self.inscription_type = data.get("inscription_type")  # "advanced" 或 None
+        self.inscription_effects = data.get("inscription_effects")  # 多效果列表(高级铭文)
 
         # 礼物系统: 好感度加成
         self.favorability = data.get("favorability", 0)  # 赠送时增加的好感度
