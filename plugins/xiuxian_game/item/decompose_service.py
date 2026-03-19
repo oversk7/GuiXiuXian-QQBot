@@ -3,12 +3,12 @@
 
 功能：
 - 销毁装备获得洗词石
-- 带T2词缀的装备有概率提取铭文
+- 带T2词缀的装备产出铭文碎片
 """
 
 import random
-from typing import List, Tuple, Dict
-from dataclasses import dataclass, field
+from typing import Tuple
+from dataclasses import dataclass
 
 from ..item.affix_service import get_affixes_from_equipment, VIP_EQUIPMENT_IDS
 from ..config import config
@@ -18,7 +18,7 @@ from ..config import config
 class DecomposeResult:
     """分解结果"""
     reroll_stones: int = 0
-    inscriptions: List[Dict] = field(default_factory=list)  # [{"item_id": str, "name": str}]
+    fragment_count: int = 0
 
 
 # 分解产出表：{稀有度: (基础洗词石, 有词缀额外最小, 有词缀额外最大)}
@@ -30,26 +30,21 @@ DECOMPOSE_YIELDS = {
     "orange": (15, 4, 5),
 }
 
-# T2 词缀提取铭文概率
-INSCRIPTION_EXTRACT_CHANCE = 0.30
+FRAGMENT_ITEM_ID = "inscription_fragment"
 
 
 def validate_decompose(equipment) -> Tuple[bool, str]:
     """验证装备是否可分解"""
     if not equipment.is_equipment:
         return False, "只能分解装备"
-
     if equipment.equipped:
         return False, "请先卸下装备再分解"
-
     item_id = getattr(equipment, 'item_id', '')
     if item_id in VIP_EQUIPMENT_IDS:
         return False, "VIP定制装备不可分解"
-
     extra = equipment.extra_attrs or {}
     if extra.get("_frozen_for_trade") or extra.get("_frozen_for_auction"):
         return False, "正在交易/拍卖中的装备不可分解"
-
     return True, ""
 
 
@@ -69,19 +64,7 @@ def calculate_decompose_yields(equipment, rng: random.Random = None) -> Decompos
     if has_affixes:
         total_stones += rng.randint(extra_min, extra_max)
 
-    # T2 词缀提取铭文
-    extracted = []
-    from .inscription_service import get_affix_to_inscription_id
-    for affix in affixes:
-        if affix.get("tier") != "T2":
-            continue
-        affix_id = affix.get("affix_id", "")
-        inscription_id = get_affix_to_inscription_id(affix_id)
-        if not inscription_id:
-            continue
-        if rng.random() < INSCRIPTION_EXTRACT_CHANCE:
-            insc_cfg = config.items_config["by_id"].get(inscription_id)
-            insc_name = insc_cfg.name if insc_cfg else inscription_id
-            extracted.append({"item_id": inscription_id, "name": insc_name})
+    # T2 词缀 -> 铭文碎片（每个T2词缀必出1个碎片）
+    t2_count = sum(1 for a in affixes if a.get("tier") == "T2")
 
-    return DecomposeResult(reroll_stones=total_stones, inscriptions=extracted)
+    return DecomposeResult(reroll_stones=total_stones, fragment_count=t2_count)

@@ -2,7 +2,7 @@
 分解系统命令处理
 
 指令：
-- 【分解 装备编号/名称】 — 分解装备获得洗词石（+概率铭文）
+- 【分解 装备编号/名称】 - 分解装备获得洗词石+铭文碎片
 """
 
 import random
@@ -16,8 +16,7 @@ from ..models.db import safe_session
 from ..models.player import Player
 from ..models.inventory import ItemInstance
 from ..config import config
-from .decompose_service import validate_decompose, calculate_decompose_yields
-from .inscription_service import generate_inscription_values
+from .decompose_service import validate_decompose, calculate_decompose_yields, FRAGMENT_ITEM_ID
 
 
 decompose_cmd = on_command("分解", priority=5, block=True)
@@ -27,7 +26,7 @@ decompose_cmd = on_command("分解", priority=5, block=True)
 async def handle_decompose(event: MessageEvent, args: Message = CommandArg()):
     raw_args = args.extract_plain_text().strip()
     if not raw_args:
-        await decompose_cmd.finish("用法：【分解 装备编号/名称】\n分解装备获得洗词石，带T2词缀的装备有概率提取铭文")
+        await decompose_cmd.finish("用法：【分解 装备编号/名称】\n分解装备获得洗词石，带T2词缀的装备可获得铭文碎片")
 
     msg = ""
     async with safe_session() as session:
@@ -57,6 +56,8 @@ async def handle_decompose(event: MessageEvent, args: Message = CommandArg()):
                 if isinstance(slot_val, dict):
                     insc_id = slot_val.get("item_id", "")
                     insc_values = slot_val.get("values", {})
+                    if not isinstance(insc_values, list):
+                        insc_values = [insc_values]
                     inst = ItemInstance(
                         player_id=player.id,
                         item_id=insc_id,
@@ -81,30 +82,20 @@ async def handle_decompose(event: MessageEvent, args: Message = CommandArg()):
         if result.reroll_stones > 0:
             await ItemInstance.add_item(session, player.id, "affix_reroll_stone", result.reroll_stones)
 
-        # 发放铭文
-        inscription_names = []
-        for insc_info in result.inscriptions:
-            insc_id = insc_info["item_id"]
-            values = generate_inscription_values(insc_id, rng)
-            inst = ItemInstance(
-                player_id=player.id,
-                item_id=insc_id,
-                quantity=1,
-                extra_attrs={"_inscription_values": values},
-            )
-            session.add(inst)
-            inscription_names.append(insc_info["name"])
+        # 发放铭文碎片
+        if result.fragment_count > 0:
+            await ItemInstance.add_item(session, player.id, FRAGMENT_ITEM_ID, result.fragment_count)
 
         # 删除装备
         await session.delete(equipment)
 
         # 构建消息
-        lines = [f"🔨 分解成功：{equip_name}"]
-        lines.append(f"  💎 获得洗词石 ×{result.reroll_stones}")
-        for name in inscription_names:
-            lines.append(f"  📜 提取铭文：{name}")
+        lines = [f"分解成功：{equip_name}"]
+        lines.append(f"  获得洗词石 x{result.reroll_stones}")
+        if result.fragment_count > 0:
+            lines.append(f"  获得铭文碎片 x{result.fragment_count}")
         if recovered_items:
-            lines.append(f"  🔄 回收镶嵌物：{'、'.join(recovered_items)}")
+            lines.append(f"  回收镶嵌物：{'、'.join(recovered_items)}")
         msg = "\n".join(lines)
 
     await decompose_cmd.finish(Message(msg))
@@ -112,7 +103,6 @@ async def handle_decompose(event: MessageEvent, args: Message = CommandArg()):
 
 async def _find_equipment(session, player_id: str, keyword: str):
     """按编号或名称查找装备"""
-    # 尝试按编号查找
     try:
         idx = int(keyword)
         stmt = select(ItemInstance).where(
@@ -125,7 +115,6 @@ async def _find_equipment(session, player_id: str, keyword: str):
     except ValueError:
         pass
 
-    # 按名称模糊查找
     stmt = select(ItemInstance).where(
         ItemInstance.player_id == player_id,
     )
