@@ -5,8 +5,10 @@
 from typing import Optional, Tuple, Dict
 from datetime import datetime
 from nonebot.adapters.qq import MessageEvent
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from .models.player import Player
+from .models.account_ownership import AccountOwnership
 from .infrastructure.repositories.player_repository import PlayerRepository
 
 
@@ -95,9 +97,19 @@ async def get_unified_player(session: AsyncSession, event: MessageEvent) -> Opti
     player_repo = PlayerRepository(session)
     player = await player_repo.get_active_by_platform_id(user_id)
 
-    # 3. 如果没有激活账号记录（用户未使用账号切换系统），回退到直接查询
+    # 3. 如果没有激活账号记录，回退到直接查询（仅限没有ownership记录的老玩家）
     if player is None:
         player = await session.get(Player, user_id)
+        if player is not None:
+            # 检查该玩家是否有ownership记录（已被转让给他人）
+            stmt = select(AccountOwnership).where(
+                AccountOwnership.player_id == player.id
+            )
+            result = await session.execute(stmt)
+            ownership = result.scalars().first()
+            if ownership and ownership.owner_platform_id != user_id:
+                # 账号已转让给别人，当前用户无权操作
+                player = None
 
     # 刷新对象以获取最新数据库状态，避免session缓存导致的闭关状态不同步问题
     if player is not None:

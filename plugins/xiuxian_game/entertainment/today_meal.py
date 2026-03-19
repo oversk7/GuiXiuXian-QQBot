@@ -12,6 +12,7 @@ from nonebot.params import CommandArg
 from ..models.db import safe_session
 from ..models.player import Player
 from ..utils import message_add_head, check_action_limit, record_action
+from ..platform_utils import get_unified_player
 
 logger = logging.getLogger(__name__)
 
@@ -95,7 +96,7 @@ async def handle_today_meal(event: MessageEvent):
 
     # 检查玩家是否存在
     async with safe_session() as session:
-        player = await session.get(Player, user_id)
+        player = await get_unified_player(session, event)
         if not player:
             await today_meal_cmd.finish("您还没有创建角色，请先注册。")
 

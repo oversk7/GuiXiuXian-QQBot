@@ -21,6 +21,7 @@ from ..economy.equipment_trade_service import EquipmentTradeService
 from ..models.player import Player
 from ..models.inventory import ItemInstance
 from ..utils import message_add_head
+from ..platform_utils import get_unified_player
 
 # 创建命令
 gift_command = on_command("赠礼", aliases={"送礼"}, priority=5, block=True)
@@ -44,10 +45,7 @@ async def handle_gift_command(event: MessageEvent, args: Message = CommandArg())
     - 赠礼 456 钻戒 1
     """
     try:
-        # 1. 获取玩家ID
-        player_id = event.get_user_id()
-
-        # 2. 解析参数
+        # 1. 解析参数
         message_text = args.extract_plain_text().strip()
         if not message_text:
             await gift_command.finish("⛔ 格式错误，正确格式：赠礼 UID 礼物名 数量\n示例：赠礼 123 红玫瑰 10")
@@ -76,8 +74,14 @@ async def handle_gift_command(event: MessageEvent, args: Message = CommandArg())
             except ValueError:
                 await gift_command.finish("⛔ 数量格式错误，请输入数字")
 
-        # 3. 执行送礼
+        # 2. 执行送礼
         async with UnitOfWork(AsyncSessionLocal) as uow:
+            # 获取玩家（通过ownership系统）
+            player = await get_unified_player(uow.session, event)
+            if not player:
+                await gift_command.finish("⛔ 请先创建角色")
+            player_id = player.id
+
             # 创建服务
             relationship_service = RelationshipService(
                 player_repo=uow.players,
@@ -126,10 +130,7 @@ async def handle_transfer_command(event: MessageEvent, args: Message = CommandAr
     - 转移 456 白骨护甲 1
     """
     try:
-        # 1. 获取玩家ID
-        player_id = event.get_user_id()
-
-        # 2. 解析参数
+        # 1. 解析参数
         message_text = args.extract_plain_text().strip()
         if not message_text:
             await transfer_command.finish(
@@ -162,8 +163,14 @@ async def handle_transfer_command(event: MessageEvent, args: Message = CommandAr
             except ValueError:
                 await transfer_command.finish("⛔ 数量格式错误，请输入数字")
 
-        # 3. 执行转移
+        # 2. 执行转移
         async with UnitOfWork(AsyncSessionLocal) as uow:
+            # 获取玩家（通过ownership系统）
+            player = await get_unified_player(uow.session, event)
+            if not player:
+                await transfer_command.finish("⛔ 请先创建角色")
+            player_id = player.id
+
             # 创建服务
             relationship_service = RelationshipService(
                 player_repo=uow.players,
@@ -330,7 +337,6 @@ async def _(event: MessageEvent):
     await _cleanup_expired_transfer_states()
 
     # 获取玩家ID
-    from ..platform_utils import get_unified_player
     player_id = None
     async with safe_session() as session:
         player = await get_unified_player(session, event)

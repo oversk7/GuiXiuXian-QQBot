@@ -526,11 +526,11 @@ async def handle_send_msg(event: MessageEvent, args: Message = CommandArg()):
     }
     channel_name = channel_names.get(scope, "世界频道")
 
-    await mark_scope_messages_as_read(event.get_user_id(), scope)
+    await mark_scope_messages_as_read(player.id, scope)
     await send_msg_cmd.send(message_add_head(f"✅ 消息已发送至{channel_name}！", event))
 
     total, total_pages, page, records, players_map = await _get_message_page(
-        scope, event.get_user_id(), 1, guild_id=player_guild_id
+        scope, player.id, 1, guild_id=player_guild_id
     )
     if total == 0:
         await send_msg_cmd.finish(f"📭 {channel_name}暂无消息")
@@ -541,7 +541,7 @@ async def handle_send_msg(event: MessageEvent, args: Message = CommandArg()):
         total_pages,
         records,
         players_map,
-        event.get_user_id(),
+        player.id,
         None,
         player_guild_name,
     )
@@ -626,7 +626,7 @@ async def handle_private_message(event: MessageEvent, args: Message = CommandArg
     await private_msg_cmd.send(message_add_head("✅ 私信已发送！", event))
 
     total, total_pages, page, records, players = await _get_message_page(
-        MessageScope.PRIVATE, event.get_user_id(), 1
+        MessageScope.PRIVATE, sender.id, 1
     )
     lines = _format_message_lines(
         MessageScope.PRIVATE,
@@ -634,7 +634,7 @@ async def handle_private_message(event: MessageEvent, args: Message = CommandArg
         total_pages,
         records,
         players,
-        event.get_user_id(),
+        sender.id,
         sender_last_check,
     )
     await private_msg_cmd.finish(message_add_head(lines, event))
@@ -642,11 +642,10 @@ async def handle_private_message(event: MessageEvent, args: Message = CommandArg
 
 @view_board_cmd.handle()
 async def handle_view_board(event: MessageEvent, args: Message = CommandArg()):
-    player_id = event.get_user_id()
     scope, page = _parse_board_args(args.extract_plain_text().strip())
 
     async with safe_session() as session:
-        player = await session.get(Player, player_id)
+        player = await get_unified_player(session, event)
         guild_name = None
         if scope is MessageScope.GUILD and player and player.guild_id:
             guild = await session.get(Guild, player.guild_id)
@@ -654,6 +653,7 @@ async def handle_view_board(event: MessageEvent, args: Message = CommandArg()):
     if not player:
         await view_board_cmd.finish("⛔ 请先创建角色")
 
+    player_id = player.id
     await mark_scope_messages_as_read(player_id, scope)
 
     total, total_pages, page, records, players = await _get_message_page(

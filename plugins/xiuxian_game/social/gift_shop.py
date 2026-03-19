@@ -16,6 +16,7 @@ from ..models.db import AsyncSessionLocal
 from ..models.inventory import ItemType
 from ..utils import message_add_head
 from ..config import config
+from ..platform_utils import get_unified_player
 
 # 创建命令
 gift_shop_cmd = on_command("礼物商店", aliases={"礼物店", "礼品店"}, priority=5, block=True)
@@ -156,7 +157,10 @@ async def get_gift_shop_menu(player_id: str = None) -> str:
 @gift_shop_cmd.handle()
 async def handle_gift_shop(event: MessageEvent, args: Message = CommandArg()):
     """礼物商店命令 - 显示可购买的礼物列表"""
-    player_id = event.get_user_id()
+    from ..models.db import safe_session
+    async with safe_session() as session:
+        player = await get_unified_player(session, event)
+    player_id = player.id if player else None
     menu = await get_gift_shop_menu(player_id)
     await gift_shop_cmd.finish(message_add_head(menu, event))
 
@@ -175,10 +179,7 @@ async def handle_buy_gift(event: MessageEvent, args: Message = CommandArg()):
     注意: 每种礼物有每日购买限制,品质越高限制越严格
     """
     try:
-        # 1. 获取玩家ID
-        player_id = event.get_user_id()
-
-        # 2. 解析参数
+        # 1. 解析参数
         message_text = args.extract_plain_text().strip()
         if not message_text:
             await buy_gift_cmd.finish(
@@ -216,10 +217,9 @@ async def handle_buy_gift(event: MessageEvent, args: Message = CommandArg()):
         # 5. 检查每日购买限制
         daily_limit = getattr(item_config, 'daily_limit', 0)
         if daily_limit > 0:
-            # 执行购买
             async with UnitOfWork(AsyncSessionLocal) as uow:
-                # 获取玩家
-                player = await uow.players.get_by_id(player_id)
+                # 获取玩家（通过ownership系统）
+                player = await get_unified_player(uow.session, event)
                 if not player:
                     await buy_gift_cmd.finish(message_add_head("⛔ 请先创建角色", event))
 
@@ -243,10 +243,11 @@ async def handle_buy_gift(event: MessageEvent, args: Message = CommandArg()):
 
         # 7. 执行购买
         async with UnitOfWork(AsyncSessionLocal) as uow:
-            # 获取玩家
-            player = await uow.players.get_by_id(player_id)
+            # 获取玩家（通过ownership系统）
+            player = await get_unified_player(uow.session, event)
             if not player:
                 await buy_gift_cmd.finish(message_add_head("⛔ 请先创建角色", event))
+            player_id = player.id
 
             # 检查金币
             if player.gold < total_price:

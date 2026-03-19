@@ -23,11 +23,11 @@ migrate_mansion_cmd = on_command("迁移阴宅", aliases={"阴宅迁移"}, prior
 async def handle_mansion_status(event: MessageEvent):
     """查看阴宅状态"""
     from .mansion_service_new import MansionService
+    from ..platform_utils import get_unified_player
 
-    user_id = event.get_user_id()
     async with safe_session() as session:
         # 获取玩家数据
-        player = await session.get(Player, user_id)
+        player = await get_unified_player(session, event)
         if not player:
             await mansion_status_cmd.finish("⛔ 请先使用【注册】命令创建角色")
 
@@ -110,14 +110,14 @@ async def handle_upgrade_mansion(event: MessageEvent):
 @set_mansion_fee_cmd.handle()
 async def handle_set_mansion_fee(event: MessageEvent, args: Message = CommandArg()):
     """设置阴宅使用费用"""
-    user_id = event.get_user_id()
+    from ..platform_utils import get_unified_player
 
     # 解析参数
     arg_text = args.extract_plain_text().strip()
     if not arg_text:
         # 获取玩家数据以显示当前阴宅等级的最低费用要求
         async with safe_session() as temp_session:
-            temp_player = await temp_session.get(Player, user_id)
+            temp_player = await get_unified_player(temp_session, event)
             if temp_player and temp_player.mansion_level > 0:
                 min_fee = MansionService.get_min_usage_fee(temp_player.mansion_level)
                 fee_range_text = f"{min_fee:,}-{MansionService.MAX_USAGE_FEE:,}金币"
@@ -146,7 +146,7 @@ async def handle_set_mansion_fee(event: MessageEvent, args: Message = CommandArg
 
     async with safe_session() as session:
         # 获取玩家数据
-        player = await session.get(Player, user_id)
+        player = await get_unified_player(session, event)
         if not player:
             await set_mansion_fee_cmd.finish("⛔ 请先使用【注册】命令创建角色")
 
@@ -169,10 +169,10 @@ async def handle_set_mansion_fee(event: MessageEvent, args: Message = CommandArg
 @toggle_mansion_access_cmd.handle()
 async def handle_toggle_mansion_access(event: MessageEvent):
     """切换阴宅访问权限"""
-    user_id = event.get_user_id()
+    from ..platform_utils import get_unified_player
     async with safe_session() as session:
         # 获取玩家数据
-        player = await session.get(Player, user_id)
+        player = await get_unified_player(session, event)
         if not player:
             await toggle_mansion_access_cmd.finish("⛔ 请先使用【注册】命令创建角色")
 
@@ -195,10 +195,10 @@ async def handle_toggle_mansion_access(event: MessageEvent):
 @toggle_mansion_payment_cmd.handle()
 async def handle_toggle_mansion_payment(event: MessageEvent):
     """切换阴宅付费使用意愿"""
-    user_id = event.get_user_id()
+    from ..platform_utils import get_unified_player
     async with safe_session() as session:
         # 获取玩家数据
-        player = await session.get(Player, user_id)
+        player = await get_unified_player(session, event)
         if not player:
             await toggle_mansion_payment_cmd.finish("⛔ 请先使用【注册】命令创建角色")
 
@@ -222,16 +222,15 @@ async def handle_toggle_mansion_payment(event: MessageEvent):
 async def handle_migrate_mansion(event: MessageEvent, args: Message = CommandArg()):
     """迁移阴宅"""
     from ..infrastructure.repositories.player_repository import PlayerRepository
+    from ..platform_utils import get_unified_player
     from .mansion_service_new import MansionService
-
-    user_id = event.get_user_id()
 
     # 解析参数
     arg_text = args.extract_plain_text().strip()
 
     async with safe_session() as session:
         # 获取玩家数据
-        player = await session.get(Player, user_id)
+        player = await get_unified_player(session, event)
         if not player:
             await migrate_mansion_cmd.finish("⛔ 请先使用【注册】命令创建角色")
 

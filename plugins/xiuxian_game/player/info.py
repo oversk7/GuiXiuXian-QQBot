@@ -13,6 +13,7 @@ from ..models.inventory import ItemInstance, ItemType
 from collections import defaultdict
 from ..models.guild import Guild
 import random
+import uuid
 from ..models.navigation_task import NavigationTask
 from ..world.navigation import _update_nav_position
 from ..platform_utils import get_unified_player, format_platform_message, is_guild_message
@@ -351,13 +352,26 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
 
 @register.handle()
 async def _(event: MessageEvent, state: T_State, args: Message = CommandArg()):
-    # 检查是否已有角色
+    # 检查是否已有角色（通过ownership系统判断，支持转让后重新注册）
     async with safe_session() as session:
+        from ..infrastructure.repositories.account_ownership_repository import AccountOwnershipRepository
+        ownership_repo = AccountOwnershipRepository(session)
+        user_id = event.get_user_id()
+
+        # 检查是否拥有任何账号
+        owned_accounts = await ownership_repo.find_all_by_owner(user_id)
+        if owned_accounts:
+            await register.finish("⛔ 你已经拥有游戏账号了\n💡 使用「我的账号」查看")
+
+        # 兼容老玩家：无ownership记录但Player存在且未被转让
         result = await session.execute(
-            select(Player).where(Player.id == event.get_user_id())
+            select(Player).where(Player.id == user_id)
         )
-        if result.scalars().first():
-            await register.finish("⛔ 你已经创建过角色了")
+        existing_player = result.scalars().first()
+        if existing_player:
+            existing_ownership = await ownership_repo.find_by_player_id(existing_player.id)
+            if not existing_ownership or existing_ownership.owner_platform_id == user_id:
+                await register.finish("⛔ 你已经创建过角色了")
 
     arg_text = args.extract_plain_text().strip()
     if arg_text in ["男", "女"]:
@@ -460,24 +474,26 @@ async def generate_random_nickname(session) -> str:
 async def create_player(event: MessageEvent, nickname: str, gender: Gender) -> Message:
     """创建新玩家角色，返回Markdown卡片消息"""
     async with safe_session() as session:
-        # 再次检查是否已有角色（防止在会话过程中创建）
-        result = await session.execute(
-            select(Player).where(Player.id == event.get_user_id())
-        )
-        if result.scalars().first():
-            return Message("⛔ 你已经创建过角色了")
+        user_id = event.get_user_id()
 
-        # 检查是否有账号转让历史（防止转让后重复创建）
-        transfer_log_repo = AccountTransferLogRepository(session)
-        transfer_history = await transfer_log_repo.find_by_from_platform(
-            event.get_user_id(),
-            limit=1
+        # 检查是否拥有任何账号（通过ownership系统判断）
+        from ..infrastructure.repositories.account_ownership_repository import AccountOwnershipRepository
+        ownership_repo = AccountOwnershipRepository(session)
+        owned_accounts = await ownership_repo.find_all_by_owner(user_id)
+        if owned_accounts:
+            return Message("⛔ 你已经拥有游戏账号了\n💡 使用「我的账号」查看")
+
+        # 兼容老玩家：没有ownership记录但Player表中有记录，且未被转让
+        result = await session.execute(
+            select(Player).where(Player.id == user_id)
         )
-        if transfer_history:
-            return Message(
-                "⛔ 你的账号曾有转让记录，无法再次创建角色\n"
-                "💡 如果这是误操作，请联系管理员"
-            )
+        existing_player = result.scalars().first()
+        if existing_player:
+            # 检查该角色是否已被转让给他人
+            existing_ownership = await ownership_repo.find_by_player_id(existing_player.id)
+            if not existing_ownership or existing_ownership.owner_platform_id == user_id:
+                # 未被转让，仍属于自己（老玩家无ownership记录的情况）
+                return Message("⛔ 你已经创建过角色了")
 
         # 获取当前最大UID
         max_uid_result = await session.execute(
@@ -485,8 +501,11 @@ async def create_player(event: MessageEvent, nickname: str, gender: Gender) -> M
         )
         max_uid = max_uid_result.scalar() or 99
 
+        # 使用UUID作为Player.id，支持转让后重新注册
+        player_id = str(uuid.uuid4()).replace("-", "")[:32]
+
         new_player = Player(
-            id=event.get_user_id(),
+            id=player_id,
             uid=max_uid + 1,
             nickname=nickname,
             sex=gender,

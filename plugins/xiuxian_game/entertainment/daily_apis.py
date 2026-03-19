@@ -9,6 +9,7 @@ from nonebot.params import CommandArg
 from ..models.db import safe_session
 from ..models.player import Player
 from ..utils import message_add_head, check_action_limit, record_action
+from ..platform_utils import get_unified_player
 from ..ai_guide import call_ai_with_fallback
 import json
 import base64
@@ -37,7 +38,7 @@ async def handle_draw_fortune(event: MessageEvent, args: Message = CommandArg())
 
         # 检查玩家是否存在
         async with safe_session() as session:
-            player = await session.get(Player, user_id)
+            player = await get_unified_player(session, event)
             if not player:
                 await draw_fortune.finish("您还没有创建角色,请先注册。")
 
@@ -195,7 +196,7 @@ async def handle_daily_quote(event: MessageEvent):
     try:
         # 检查玩家是否存在
         async with safe_session() as session:
-            player = await session.get(Player, user_id)
+            player = await get_unified_player(session, event)
             if not player:
                 await daily_quote.finish("您还没有创建角色,请先注册。")
 
@@ -262,7 +263,7 @@ async def handle_bite_avatar(event: MessageEvent, args: Message = CommandArg()):
 
     # 检查玩家是否存在
     async with safe_session() as session:
-        player = await session.get(Player, user_id)
+        player = await get_unified_player(session, event)
         if not player:
             await bite_avatar.finish("您还没有创建角色,请先注册。")
 
@@ -363,7 +364,7 @@ async def handle_answer_book(event: MessageEvent, args: Message = CommandArg()):
 
         # 检查玩家是否存在
         async with safe_session() as session:
-            player = await session.get(Player, user_id)
+            player = await get_unified_player(session, event)
             if not player:
                 await answer_book.finish("您还没有创建角色,请先注册。")
 
@@ -506,7 +507,7 @@ async def handle_driving_test(event: MessageEvent, args: Message = CommandArg())
 
         # 检查玩家是否存在
         async with safe_session() as session:
-            player = await session.get(Player, user_id)
+            player = await get_unified_player(session, event)
             if not player:
                 await driving_test.finish("您还没有创建角色,请先注册。")
 
@@ -612,7 +613,7 @@ async def handle_weibo_hot(event: MessageEvent):
     try:
         # 检查玩家是否存在
         async with safe_session() as session:
-            player = await session.get(Player, user_id)
+            player = await get_unified_player(session, event)
             if not player:
                 await weibo_hot.finish("您还没有创建角色,请先注册。")
 
