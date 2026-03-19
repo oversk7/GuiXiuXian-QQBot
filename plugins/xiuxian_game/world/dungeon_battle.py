@@ -76,6 +76,15 @@ RARITY_WEIGHTS = {
     "orange": 2     # 橙色材料权重
 }
 
+# -------- 铭文掉落配置（Phase 3）--------
+INSCRIPTION_DROP_RATES = {60: 0.0, 100: 0.03, 200: 0.04, 9999: 0.05}
+INSCRIPTION_TYPE_WEIGHTS = {"basic": 60, "advanced": 40}
+ADVANCED_RARITY_WEIGHTS = {"purple": 80, "orange": 20}
+ADVANCED_ORANGE_MIN_LEVEL = 150
+CELESTIAL_GRADE_MIN_LEVEL = 3000
+FRAGMENT_DROP_RATE = 0.20
+FRAGMENT_ITEM_ID = "inscription_fragment"
+
 # -------- 怪物原型配置 --------
 MONSTER_ARCHETYPES = {
     "balanced": {  # 平衡型：无前缀，属性均衡
@@ -599,6 +608,76 @@ async def handle_monster_drops(session, player: Player, monster_level: int, regi
             affix_hint = f"({affix_count}条词缀)" if affix_count > 0 else "(素装)"
             equip_display = f"{chosen_cfg.get_display_name()} {affix_hint}"
             drops[f"⚔️{equip_display}"] = 1
+
+    # ===== 铭文掉落（Phase 3，仅精英怪）=====
+    if is_elite:
+        from ..item.inscription_service import generate_inscription_drop
+
+        # 确定铭文掉落率
+        insc_base_rate = 0.0
+        for level_cap, rate in sorted(INSCRIPTION_DROP_RATES.items()):
+            if monster_level <= level_cap:
+                insc_base_rate = rate
+                break
+        insc_final_rate = insc_base_rate * (1 + luck_prob(player.luck))
+
+        if insc_base_rate > 0 and rng.random() < insc_final_rate:
+            # 决定铭文类型：基础 or 高级
+            type_roll = rng.randint(1, 100)
+            if type_roll <= INSCRIPTION_TYPE_WEIGHTS["basic"]:
+                # 基础铭文：从34种中选1种（排除高级铭文）
+                basic_ids = [iid for iid in config.items_config["by_type"].get("INSCRIPTION", [])
+                             if not getattr(config.items_config["by_id"].get(iid), 'inscription_type', None)
+                             and not iid.startswith("adv_")]
+                if basic_ids:
+                    chosen_id = rng.choice(basic_ids)
+                    drop_attrs = generate_inscription_drop(chosen_id, rng, monster_level)
+                    try:
+                        insc_inst = ItemInstance(
+                            player_id=player.id, item_id=chosen_id, quantity=1,
+                            extra_attrs=drop_attrs,
+                        )
+                        session.add(insc_inst)
+                        insc_cfg = config.items_config["by_id"].get(chosen_id)
+                        grade = drop_attrs.get("_inscription_grade", "")
+                        grade_str = f"{{{grade}}}" if grade else ""
+                        drops[f"📜{insc_cfg.name}{grade_str}"] = 1
+                    except ValueError:
+                        pass
+            else:
+                # 高级铭文：按稀有度权重选
+                rarity_roll = rng.randint(1, 100)
+                target_rarity = "orange" if rarity_roll <= ADVANCED_RARITY_WEIGHTS["orange"] else "purple"
+                if target_rarity == "orange" and monster_level < ADVANCED_ORANGE_MIN_LEVEL:
+                    target_rarity = "purple"
+
+                adv_ids = [iid for iid in config.items_config["by_type"].get("INSCRIPTION", [])
+                           if getattr(config.items_config["by_id"].get(iid), 'inscription_type', None) == "advanced"
+                           and getattr(config.items_config["by_id"].get(iid), 'rarity', '') == target_rarity]
+                if adv_ids:
+                    chosen_id = rng.choice(adv_ids)
+                    drop_attrs = generate_inscription_drop(chosen_id, rng, monster_level)
+                    try:
+                        insc_inst = ItemInstance(
+                            player_id=player.id, item_id=chosen_id, quantity=1,
+                            extra_attrs=drop_attrs,
+                        )
+                        session.add(insc_inst)
+                        insc_cfg = config.items_config["by_id"].get(chosen_id)
+                        grade = drop_attrs.get("_inscription_grade", "")
+                        grade_str = f"{{{grade}}}" if grade else ""
+                        drops[f"📜{insc_cfg.name}{grade_str}"] = 1
+                    except ValueError:
+                        pass
+
+        # 铭文碎片掉落（独立于铭文判定）
+        if rng.random() < FRAGMENT_DROP_RATE * (1 + luck_prob(player.luck)):
+            frag_qty = rng.randint(1, 2)
+            try:
+                await ItemInstance.add_item(session, player.id, FRAGMENT_ITEM_ID, frag_qty)
+                drops[f"📜铭文碎片"] = drops.get("📜铭文碎片", 0) + frag_qty
+            except ValueError:
+                pass
 
     if drops:
         drop_texts = [f"{name} ✖️{quantity}" for name, quantity in drops.items()]
