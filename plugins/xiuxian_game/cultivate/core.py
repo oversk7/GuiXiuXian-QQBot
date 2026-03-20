@@ -436,7 +436,13 @@ async def handle_seclusion(event: MessageEvent):
             total_efficiency -= mentorship_penalty_percent
             efficiency_parts.append(f"徒弟-{mentorship_penalty_percent:.0f}%({apprentice_count}人)")
 
-        seclusion_hours = benefits["seclusion_time_limit"] // 3600
+        from ..sponsor.service import SponsorShopService
+        has_unlimited = SponsorShopService.is_privilege_active(player, "premium_seclusion_until")
+        if has_unlimited:
+            time_limit_str = "无限制🕯️"
+        else:
+            seclusion_hours = benefits["seclusion_time_limit"] // 3600
+            time_limit_str = f"{seclusion_hours}小时"
 
         # 随机选择闭关文案
         seclusion_flavor_text = random.choice(SECLUSION_FLAVOR_TEXTS).format(nickname=player.nickname)
@@ -451,7 +457,7 @@ async def handle_seclusion(event: MessageEvent):
             "━━━━━━━━━━━━━\n"
             f"🔥 离线修炼已开始 | 总效率加成 {total_efficiency:+.1f}%"
             f"{efficiency_detail}\n"
-            f"⏰ 时长上限 {seclusion_hours}小时 | 期间无法普通修炼\n"
+            f"⏰ 时长上限 {time_limit_str} | 期间无法普通修炼\n"
             "━━━━━━━━━━━━━\n"
             "💡 出关 推开棺盖并结算怨炁"
         )
@@ -568,9 +574,14 @@ async def handle_out_seclusion(event: MessageEvent):
         base_gain = cfg["base_exp"] * (1 + player.level / k)
         delta_time = int((datetime.now() - player.seclusion_start_time).total_seconds())
 
-        # 应用月卡时长限制
+        # 检查闭关无上限特权
+        from ..sponsor.service import SponsorShopService
+        has_unlimited_seclusion = SponsorShopService.is_privilege_active(player, "premium_seclusion_until")
+
+        # 应用月卡时长限制（有闭关特权则不限制）
         max_seclusion_time = benefits["seclusion_time_limit"]
-        delta_time = min(delta_time, max_seclusion_time)
+        if not has_unlimited_seclusion:
+            delta_time = min(delta_time, max_seclusion_time)
 
         # 计算基础经验
         base_exp_gain = int(delta_time / cfg["cool_down"] * base_gain * 0.5)
