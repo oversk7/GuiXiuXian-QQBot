@@ -1,0 +1,109 @@
+# ====================================================================
+# 宠物伴侣系统 - 饰品配置
+# ====================================================================
+# 饰品提供少量属性加成 + 文字描述变化
+
+slots:
+  - head      # 头饰
+  - neck      # 颈饰
+  - body      # 服饰
+
+accessories:
+  # ==================== 头饰 ====================
+  - accessory_id: "red_ribbon"
+    name: "红色蝴蝶结"
+    slot: "head"
+    rarity: "white"
+    price: 500
+    description_prefix: "戴着红色蝴蝶结的"
+    bonus:
+      attack: 5
+    description: "一个鲜红的蝴蝶结，系在头上俏皮可爱"
+
+  - accessory_id: "ghost_crown"
+    name: "幽冥小冠"
+    slot: "head"
+    rarity: "green"
+    price: 3000
+    description_prefix: "头戴幽冥小冠的"
+    bonus:
+      defense: 10
+      hp: 50
+    description: "以诡域灵石打造的小冠，散发着淡淡幽光"
+
+  - accessory_id: "flower_hairpin"
+    name: "灵花簪"
+    slot: "head"
+    rarity: "blue"
+    price: 10000
+    description_prefix: "簪着灵花的"
+    bonus:
+      attack: 15
+      crit_rate: 0.01
+    description: "以永不凋谢的灵花制成的发簪"
+
+  # ==================== 颈饰 ====================
+  - accessory_id: "bell_collar"
+    name: "铃铛项圈"
+    slot: "neck"
+    rarity: "white"
+    price: 500
+    description_prefix: ""
+    bonus:
+      dodge_rate: 0.005
+    description: "走路时会发出清脆响声的小铃铛"
+
+  - accessory_id: "soul_pendant"
+    name: "魂玉坠"
+    slot: "neck"
+    rarity: "green"
+    price: 3000
+    description_prefix: ""
+    bonus:
+      hp: 100
+      defense: 8
+    description: "蕴含微弱灵魂之力的玉坠"
+
+  - accessory_id: "void_choker"
+    name: "虚空锁链"
+    slot: "neck"
+    rarity: "purple"
+    price: 30000
+    description_prefix: ""
+    bonus:
+      attack: 20
+      defense: 15
+    description: "以虚空之力凝结的锁链，佩戴者与主人之间的羁绊更加牢固"
+
+  # ==================== 服饰 ====================
+  - accessory_id: "maid_outfit"
+    name: "女仆装"
+    slot: "body"
+    rarity: "green"
+    price: 5000
+    description_prefix: "穿着女仆装的"
+    bonus:
+      hp: 80
+    description: "一套精致的黑白女仆装，附带蕾丝围裙"
+
+  - accessory_id: "battle_armor"
+    name: "灵甲轻铠"
+    slot: "body"
+    rarity: "blue"
+    price: 15000
+    description_prefix: "身着灵甲的"
+    bonus:
+      defense: 20
+      hp: 150
+    description: "为诡兽量身打造的轻型灵甲"
+
+  - accessory_id: "kimono"
+    name: "诡纹和服"
+    slot: "body"
+    rarity: "purple"
+    price: 30000
+    description_prefix: "身穿诡纹和服的"
+    bonus:
+      attack: 15
+      crit_rate: 0.015
+    description: "绣有诡域纹章的华丽和服，散发着神秘气息"
