@@ -52,6 +52,31 @@ class PetPersonality:
     behavioral_rules: List[str]
 
 
+# 属性名中英翻译
+ATTR_NAME_CN = {
+    "attack": "攻击",
+    "defense": "防御",
+    "hp": "生命",
+    "max_hp": "生命上限",
+    "crit_rate": "暴击率",
+    "dodge_rate": "闪避率",
+    "accuracy": "命中率",
+    "agility": "敏捷",
+}
+
+
+def format_bonus(bonus: dict) -> str:
+    """将属性加成字典格式化为中文文本"""
+    parts = []
+    for k, v in bonus.items():
+        name = ATTR_NAME_CN.get(k, k)
+        if isinstance(v, float) and v < 1:
+            parts.append(f"{name}+{v:.1%}")
+        else:
+            parts.append(f"{name}+{v}")
+    return ", ".join(parts)
+
+
 class PetConfigManager:
     """宠物配置管理器（单例）"""
     _instance = None

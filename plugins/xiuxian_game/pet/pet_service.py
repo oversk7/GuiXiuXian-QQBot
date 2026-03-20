@@ -8,7 +8,7 @@ from ..infrastructure.uow.unit_of_work import UnitOfWork
 from ..models.pet_instance import PetInstance
 from ..models.inventory import ItemInstance, ItemType
 from ..domain.attributes.attribute_calculator_factory import AttributeCalculatorFactory
-from .config import PetConfigManager
+from .config import PetConfigManager, format_bonus
 
 
 class PetService:
@@ -274,7 +274,7 @@ class PetService:
         await uow.pets.update(pet)
         AttributeCalculatorFactory.invalidate_pet_cache(player_id)
 
-        bonus_text = ", ".join(f"{k}+{v}" for k, v in acc.bonus.items())
+        bonus_text = format_bonus(acc.bonus)
         return True, (
             f"给【{pet.nickname}】装备了【{accessory_name}】\n"
             f"槽位: {acc.slot}\n"

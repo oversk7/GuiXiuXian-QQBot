@@ -8,7 +8,7 @@ from ..infrastructure.uow.unit_of_work import UnitOfWork
 from ..platform_utils import get_unified_player
 from .pet_service import PetService
 from .pet_dialogue_service import PetDialogueService
-from .config import PetConfigManager
+from .config import PetConfigManager, format_bonus
 
 pet_service = PetService()
 dialogue_service = PetDialogueService()
@@ -200,7 +200,7 @@ async def handle_equip_accessory(event: MessageEvent, args: Message = CommandArg
             msg += f"\n{slot_names.get(slot, slot)}:\n"
             for acc in pet_config.get_accessories_by_slot(slot):
                 icon = rarity_names.get(acc.rarity, "⚪")
-                bonus_text = ", ".join(f"{k}+{v}" for k, v in acc.bonus.items())
+                bonus_text = format_bonus(acc.bonus)
                 msg += f"  {icon} {acc.name} {acc.price}金 ({bonus_text})\n"
         msg += "\n购买: 【买饰品 名称】\n装备: 【宠物装扮 名称】"
         await equip_acc_cmd.finish(msg)
