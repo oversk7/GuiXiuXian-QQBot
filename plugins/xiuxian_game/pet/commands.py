@@ -29,6 +29,16 @@ async def handle_tame(event: MessageEvent, args: Message = CommandArg()):
 
     beast_name, nickname = parts[0], parts[1]
 
+    # 昵称长度检查
+    if len(nickname) > 12:
+        await tame_cmd.finish("昵称最长12个字符")
+
+    # 敏感词检测
+    from ..player.nickname_validator import validate_nickname
+    is_valid, error_msg = await validate_nickname(nickname)
+    if not is_valid:
+        await tame_cmd.finish(f"⛔ {error_msg}")
+
     beast = pet_config.get_beast_by_name(beast_name)
     if not beast:
         await tame_cmd.finish(f"未找到诡兽【{beast_name}】")
