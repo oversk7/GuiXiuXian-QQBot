@@ -944,7 +944,7 @@ async def handle_equip_menu(event: MessageEvent):
 
 # ==================== 铭文列表命令 ====================
 
-inscription_list_cmd = on_command("铭文列表", aliases={"铭文背包", "我的铭文"}, priority=5, block=True)
+inscription_list_cmd = on_command("铭文列表", aliases={"铭文栏", "我的铭文"}, priority=5, block=True)
 
 @inscription_list_cmd.handle()
 async def handle_inscription_list(event: MessageEvent, args: Message = CommandArg()):
@@ -972,11 +972,36 @@ async def handle_inscription_list(event: MessageEvent, args: Message = CommandAr
         else:
             lines = ["📜 铭文列表："]
             rarity_map = {"white": "⚪", "green": "🟢", "blue": "🔵", "purple": "🟣", "orange": "🟠"}
-            for i, insc in enumerate(inscriptions, 1):
+            rarity_order = {"orange": 0, "purple": 1, "blue": 2, "green": 3, "white": 4}
+
+            # 分离铭文碎片和普通铭文
+            fragment_count = 0
+            normal_inscriptions = []
+            for insc in inscriptions:
+                if insc.item_id == "inscription_fragment":
+                    fragment_count += insc.quantity
+                else:
+                    normal_inscriptions.append(insc)
+
+            # 按品阶排序（橙>紫>蓝>绿>白）
+            normal_inscriptions.sort(
+                key=lambda x: rarity_order.get(
+                    x.config.rarity if x.config else "white", 99
+                )
+            )
+
+            idx = 1
+            for insc in normal_inscriptions:
                 display = get_inscription_display_from_item(insc)
                 rarity = insc.config.rarity if insc.config else "unknown"
                 icon = rarity_map.get(rarity, "⚪")
-                lines.append(f"  [{i}] {icon} {display}")
+                lines.append(f"  [{idx}] {icon} {display}")
+                idx += 1
+
+            # 铭文碎片合并为一行
+            if fragment_count > 0:
+                lines.append(f"  [{idx}] 🔵 铭文碎片 ×{fragment_count}（收集5个可【合成铭文】）")
+
             lines.append(f"\n💡 使用【镶嵌 装备编号 孔位 铭文名】将铭文插入装备")
             msg = "\n".join(lines)
 

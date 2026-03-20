@@ -1,0 +1,6 @@
+{
+  "enabledPlugins": {
+    "superpowers@superpowers-marketplace": true,
+    "tr@tokenroll-cc-plugin": true
+  }
+}
