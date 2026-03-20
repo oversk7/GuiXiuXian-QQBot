@@ -11,9 +11,14 @@ from __future__ import annotations
 import hashlib
 import random
 from dataclasses import dataclass, field
-from typing import List, Optional
+from datetime import date
+from typing import Dict, List, Optional
 
 from ..models.player import Player
+
+# 灵泉恢复咒抗每日限制
+_STAMINA_RESTORE_DAILY_LIMIT = 3
+_stamina_restore_counter: Dict[str, tuple[str, int]] = {}  # {player_id: (date_str, count)}
 
 
 @dataclass
@@ -65,7 +70,8 @@ def _good_events(player: Player, rng: random.Random) -> List[dict]:
             "icon": "💧",
             "description": f"发现一处灵泉，饮用后恢复了 {stamina_amount} 点咒抗",
             "stamina": stamina_amount,
-            "weight": 5,
+            "weight": 2,
+            "_stamina_restore": True,  # 标记，用于每日限次检查
         },
         {
             "icon": "🎁",
@@ -79,7 +85,6 @@ def _good_events(player: Player, rng: random.Random) -> List[dict]:
 def _bad_events(player: Player, rng: random.Random) -> List[dict]:
     """坏事模板列表（40%总概率中随机选一个）"""
     gold_loss = rng.randint(50, 200)
-    stamina_loss = rng.randint(2, 5)
     hp_loss_pct = rng.randint(5, 10) / 100.0  # 5%-10%
 
     return [
@@ -87,24 +92,18 @@ def _bad_events(player: Player, rng: random.Random) -> List[dict]:
             "icon": "💰",
             "description": f"遭遇山贼伏击，被抢走了 {gold_loss} 金币",
             "gold": -gold_loss,
-            "weight": 30,
+            "weight": 35,
         },
         {
             "icon": "🌫️",
             "description": f"误入迷雾区域，被诡异气息侵蚀，损失了 {int(hp_loss_pct*100)}% 生命值",
             "hp_percent": -hp_loss_pct,
-            "weight": 25,
-        },
-        {
-            "icon": "👻",
-            "description": f"途经阴气汇聚之地，咒抗被削弱了 {stamina_loss} 点",
-            "stamina": -stamina_loss,
-            "weight": 25,
+            "weight": 35,
         },
         {
             "icon": "🐺",
             "description": "遭遇野兽袭击，虽然击退了它，但衣物有些破损",
-            "weight": 20,
+            "weight": 30,
         },
     ]
 
@@ -129,15 +128,49 @@ def _resolve_random_material(rng: random.Random) -> tuple[Optional[str], str]:
     return item_id, item_config.name
 
 
+def _check_stamina_restore_limit(player_id: str) -> bool:
+    """检查灵泉恢复咒抗是否达到每日上限"""
+    today = date.today().isoformat()
+    if player_id in _stamina_restore_counter:
+        d, count = _stamina_restore_counter[player_id]
+        if d == today:
+            return count >= _STAMINA_RESTORE_DAILY_LIMIT
+    return False
+
+
+def _increment_stamina_restore(player_id: str):
+    """记录一次灵泉恢复"""
+    today = date.today().isoformat()
+    if player_id in _stamina_restore_counter:
+        d, count = _stamina_restore_counter[player_id]
+        if d == today:
+            _stamina_restore_counter[player_id] = (today, count + 1)
+        else:
+            _stamina_restore_counter[player_id] = (today, 1)
+    else:
+        _stamina_restore_counter[player_id] = (today, 1)
+
+
 def _pick_event(player: Player, rng: random.Random) -> NavigationEvent:
     """根据概率选一个事件"""
     is_good = rng.random() < 0.6
 
     templates = _good_events(player, rng) if is_good else _bad_events(player, rng)
 
+    # 如果灵泉恢复达到每日上限，移除该选项
+    if _check_stamina_restore_limit(player.id):
+        templates = [t for t in templates if not t.get("_stamina_restore")]
+        if not templates:
+            # 极端情况：所有好事都被过滤了（不会发生，但防御性处理）
+            templates = _bad_events(player, rng)
+
     # 加权随机
     weights = [t["weight"] for t in templates]
     chosen = rng.choices(templates, weights=weights, k=1)[0]
+
+    # 如果选中了灵泉恢复，记录次数
+    if chosen.get("_stamina_restore"):
+        _increment_stamina_restore(player.id)
 
     # 处理随机材料
     item_id = chosen.get("item_id")
