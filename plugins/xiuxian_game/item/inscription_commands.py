@@ -19,7 +19,7 @@ from ..models.inventory import ItemInstance
 from ..config import config
 from ..platform_utils import get_unified_player
 from .inscription_service import (
-    generate_inscription_drop,
+    generate_synthesis_inscription,
     get_inscription_display_from_item,
 )
 
@@ -95,7 +95,7 @@ async def handle_synthesize(event: MessageEvent, args: Message = CommandArg()):
             await synthesize_cmd.finish("系统错误：无可用铭文模板")
 
         chosen_id = rng.choice(basic_ids)
-        drop_attrs = generate_inscription_drop(chosen_id, rng)
+        drop_attrs = generate_synthesis_inscription(chosen_id, rng, player.luck)
 
         # 创建铭文实例
         inst = ItemInstance(

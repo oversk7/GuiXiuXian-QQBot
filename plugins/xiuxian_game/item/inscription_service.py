@@ -67,6 +67,29 @@ def _roll_effect_values(effect_cfg: dict, rng: random.Random) -> dict:
     return values
 
 
+def _roll_effect_values_biased(effect_cfg: dict, rng: random.Random,
+                                luck_bonus: float = 0.0) -> dict:
+    """合成专用：min(rand*4) 强偏低分布，幸运值缓和偏移
+
+    luck_bonus: 0~1，来自 luck_prob()，用于将分布从偏低拉回均匀
+        luck_bonus=0 → min(r1,r2,r3,r4)，概率集中在下品/中品
+        luck_bonus=1 → 接近均匀分布（高幸运玩家几乎无惩罚）
+
+    0幸运单维度概率：下品68% 中品30% 上品1.5% 极品0.01%
+    """
+    values = {}
+    for key in ("chance", "value"):
+        range_key = f"{key}_range"
+        r = effect_cfg.get(range_key)
+        if r:
+            t_biased = min(rng.random() for _ in range(4))
+            t_uniform = rng.random()
+            # 按幸运值在偏低分布和均匀分布之间插值
+            t = t_biased + (t_uniform - t_biased) * luck_bonus
+            values[key] = round(r[0] + t * (r[1] - r[0]), 1)
+    return values
+
+
 def _roll_celestial_values(effect_cfg: dict, rng: random.Random, floor: float = 0.95) -> dict:
     """仙品专用：数值roll到区间的 floor~100% 范围"""
     values = {}
@@ -106,6 +129,32 @@ def generate_advanced_inscription_values(item_id: str, rng: random.Random = None
     effects = getattr(item_cfg, 'inscription_effects', None) or []
     roll_fn = _roll_celestial_values if celestial else _roll_effect_values
     return [roll_fn(eff, rng) for eff in effects]
+
+
+def generate_synthesis_inscription(item_id: str, rng: random.Random,
+                                    player_luck: float = 0) -> dict:
+    """合成铭文专用：偏低分布 + 幸运缓和
+
+    Returns:
+        {"_inscription_values": [...], "_inscription_grade": "中品"}
+    """
+    from ..utils import luck_prob
+
+    item_cfg = config.items_config["by_id"].get(item_id)
+    if not item_cfg:
+        return {}
+
+    luck_bonus = luck_prob(player_luck, midpoint=800, steepness=400)
+    eff_cfg = _get_inscription_effect(item_id)
+    if not eff_cfg:
+        return {}
+    values = _roll_effect_values_biased(eff_cfg, rng, luck_bonus)
+    values_list = [values]
+    grade = evaluate_grade(values_list, [eff_cfg])
+    return {
+        "_inscription_values": values_list,
+        "_inscription_grade": grade,
+    }
 
 
 def generate_inscription_drop(item_id: str, rng: random.Random,
