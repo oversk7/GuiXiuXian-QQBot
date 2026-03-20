@@ -12,6 +12,10 @@
   【背包扩容 N】          背包永久扩容N格（10诡烛/格）
   【购买初级月卡】        购买30天初级月卡（88诡烛）
   【购买高级月卡】        购买30天高级月卡（288诡烛）
+  【购买闭关特权】        闭关无时间上限（180诡烛/月）
+  【购买远程仓库】        远程存取阴宅仓库（180诡烛/月）
+  【购买鱼竿特权】        每次多钓2条鱼（180诡烛/月）
+  【购买全视之眼】        俯瞰显示诡域全图（180诡烛/月）
 """
 
 from nonebot import on_command
@@ -37,6 +41,11 @@ buy_reset_talisman_cmd = on_command("购买重启符", aliases={"兑换重启符
 expand_inventory_cmd = on_command("背包扩容", aliases={"扩容背包"}, priority=5, block=True)
 buy_basic_monthly_card_cmd = on_command("购买初级月卡", aliases={"兑换初级月卡"}, priority=5, block=True)
 buy_premium_monthly_card_cmd = on_command("购买高级月卡", aliases={"兑换高级月卡"}, priority=5, block=True)
+# 赞助特权
+buy_premium_seclusion_cmd = on_command("购买闭关特权", aliases={"闭关特权"}, block=True, priority=5)
+buy_premium_warehouse_cmd = on_command("购买远程仓库", aliases={"远程仓库特权"}, block=True, priority=5)
+buy_premium_fishing_cmd = on_command("购买鱼竿特权", aliases={"鱼竿特权"}, block=True, priority=5)
+buy_premium_vision_cmd = on_command("购买全视之眼", aliases={"全视之眼特权"}, block=True, priority=5)
 my_sponsor_log_cmd = on_command("赞助兑换记录", aliases={"赞助记录"}, priority=5, block=True)
 admin_sponsor_log_cmd = on_command("查赞助记录", priority=2, block=True)
 
@@ -230,6 +239,60 @@ async def handle_buy_premium_monthly_card(event: MessageEvent):
         success, msg = await SponsorShopService.buy_monthly_card(player, "premium", session)
 
     await buy_premium_monthly_card_cmd.finish(message_add_head(msg, event))
+
+
+# ==================== 赞助特权购买 ====================
+
+@buy_premium_seclusion_cmd.handle()
+async def handle_buy_premium_seclusion(event: MessageEvent):
+    """购买闭关无上限特权（180诡烛/月）"""
+    from .service import PREMIUM_SECLUSION_PRICE
+    async with safe_session() as session:
+        player = await _get_player_or_finish(session, event, buy_premium_seclusion_cmd)
+        success, msg = await SponsorShopService.buy_premium_privilege(
+            player, "premium_seclusion_until", "闭关无上限特权",
+            PREMIUM_SECLUSION_PRICE, session
+        )
+    await buy_premium_seclusion_cmd.finish(message_add_head(msg, event))
+
+
+@buy_premium_warehouse_cmd.handle()
+async def handle_buy_premium_warehouse(event: MessageEvent):
+    """购买远程仓库特权（180诡烛/月）"""
+    from .service import PREMIUM_WAREHOUSE_PRICE
+    async with safe_session() as session:
+        player = await _get_player_or_finish(session, event, buy_premium_warehouse_cmd)
+        success, msg = await SponsorShopService.buy_premium_privilege(
+            player, "premium_warehouse_until", "远程仓库特权",
+            PREMIUM_WAREHOUSE_PRICE, session
+        )
+    await buy_premium_warehouse_cmd.finish(message_add_head(msg, event))
+
+
+@buy_premium_fishing_cmd.handle()
+async def handle_buy_premium_fishing(event: MessageEvent):
+    """购买鱼竿特权（180诡烛/月）"""
+    from .service import PREMIUM_FISHING_PRICE
+    async with safe_session() as session:
+        player = await _get_player_or_finish(session, event, buy_premium_fishing_cmd)
+        success, msg = await SponsorShopService.buy_premium_privilege(
+            player, "premium_fishing_until", "鱼竿特权",
+            PREMIUM_FISHING_PRICE, session
+        )
+    await buy_premium_fishing_cmd.finish(message_add_head(msg, event))
+
+
+@buy_premium_vision_cmd.handle()
+async def handle_buy_premium_vision(event: MessageEvent):
+    """购买全视之眼特权（180诡烛/月）"""
+    from .service import PREMIUM_VISION_PRICE
+    async with safe_session() as session:
+        player = await _get_player_or_finish(session, event, buy_premium_vision_cmd)
+        success, msg = await SponsorShopService.buy_premium_privilege(
+            player, "premium_vision_until", "全视之眼特权",
+            PREMIUM_VISION_PRICE, session
+        )
+    await buy_premium_vision_cmd.finish(message_add_head(msg, event))
 
 
 # ==================== 玩家自查兑换记录 ====================
