@@ -81,7 +81,7 @@ class ResetAttrService:
             "max_hp": 20,
             "max_mp": 20,
             "attack": 1,
-            "defense": 5,
+            "defense": 0,
             "agility": 5,
             "luck": 1,
         }
