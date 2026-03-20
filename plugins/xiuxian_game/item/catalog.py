@@ -351,10 +351,6 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
     if total_matches == 0:
         await catalog_cmd.finish("⛔ 未找到符合条件的物品/装备")
 
-    # 若匹配过多（>6），让用户缩小范围
-    if total_matches > 6:
-        await catalog_cmd.finish(f"⚠️ 匹配到 {total_matches} 条记录，请输入更精确的名称")
-
     # 类型映射
     TYPE_NAME_MAP = {
         "CONSUMABLE": "消耗品",
@@ -373,6 +369,69 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
         "SEED": "灵种",
         "GUARDIAN_BEAST": "守护兽",
     }
+
+    TYPE_ICON_MAP = {
+        "CONSUMABLE": "💊",
+        "MATERIAL": "📦",
+        "EQUIPMENT": "⚔️",
+        "GOODS": "🏪",
+        "GEM": "💎",
+        "FISH": "🐟",
+        "SEASONING": "🧂",
+        "DISH": "🍽️",
+        "RECIPE": "📜",
+        "GIFT": "🎁",
+        "GHOST_FRAGMENT": "👻",
+        "VEGETABLE": "🌿",
+        "HERB": "🌱",
+        "SEED": "🫘",
+        "GUARDIAN_BEAST": "🐾",
+    }
+
+    # 若匹配过多（>6），展示按类型分组的紧凑名称列表
+    if total_matches > 6:
+        # 按物品类型分组
+        from collections import defaultdict
+        grouped: dict[str, list] = defaultdict(list)
+        for cfg in item_matches:
+            grouped[cfg.type.value].append(cfg.name)
+
+        summary_lines = [f"📖 匹配到 {total_matches} 条【{keyword}】相关记录", "━━━━━━━━━━"]
+
+        for type_val, names in grouped.items():
+            type_cn = TYPE_NAME_MAP.get(type_val, type_val)
+            icon = TYPE_ICON_MAP.get(type_val, "📌")
+
+            # 尝试提取公共前缀以简化显示（如 "铭文·恐惧之力" → "恐惧之力"）
+            # 找到所有名称的最长公共前缀（至少含分隔符·才去除）
+            common_prefix = ""
+            if len(names) > 1:
+                prefix = names[0]
+                for n in names[1:]:
+                    while not n.startswith(prefix):
+                        prefix = prefix[:-1]
+                        if not prefix:
+                            break
+                    if not prefix:
+                        break
+                # 只有前缀包含分隔符时才去除（如"铭文·"），避免误删普通前缀
+                if prefix and ("·" in prefix or "：" in prefix or ":" in prefix):
+                    common_prefix = prefix
+
+            if common_prefix:
+                short_names = [n[len(common_prefix):] for n in names]
+                summary_lines.append(f"{icon} {type_cn}（{len(names)}种，{common_prefix}系列）：")
+            else:
+                short_names = names
+                summary_lines.append(f"{icon} {type_cn}（{len(names)}种）：")
+
+            # 每行展示多个名称，用顿号分隔
+            summary_lines.append("、".join(short_names))
+
+        summary_lines.append("━━━━━━━━━━")
+        summary_lines.append(f"💡 输入【图鉴 具体名称】查看详情")
+
+        await catalog_cmd.finish(message_add_head("\n".join(summary_lines), event))
 
     lines = ["📖 图鉴查询结果 ✨", "━━━━━━━━━━"]
 
