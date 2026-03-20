@@ -52,6 +52,28 @@ async def _(event: MessageEvent):
             result = await service.do_fishing(player)
             if not result["success"]:
                 await fishing_cmd.finish(message_add_head(result["message"], event))
+
+            # 鱼竿特权：额外多钓2条（独立计算品质）
+            from ..sponsor.service import SponsorShopService
+            extra_catches = []
+            if SponsorShopService.is_privilege_active(player, "premium_fishing_until"):
+                for _ in range(2):
+                    extra_rarity = FishingService.calculate_fish_rarity(player)
+                    extra_fish_id = FishingService.get_random_fish(extra_rarity)
+                    extra_fish_cfg = config.items_config["by_id"].get(extra_fish_id)
+                    if extra_fish_cfg:
+                        try:
+                            await service._item_repo.add_item(player.id, extra_fish_id, 1)
+                            fishing_stats_obj = await service._fishing_stats_repo.get_or_create(player.id)
+                            await service._fishing_stats_repo.update_stats(
+                                fishing_stats_obj, extra_fish_cfg.price, extra_rarity, 1
+                            )
+                            rarity_emoji_map = {"white": "⚪", "green": "🟢", "blue": "🔵", "purple": "🟣", "orange": "🟠"}
+                            extra_catches.append(
+                                f"{rarity_emoji_map.get(extra_rarity, '⚪')}{extra_fish_cfg.name}"
+                            )
+                        except ValueError:
+                            pass
         except TypeError as e:
             if "unsupported operand type(s) for +=: 'NoneType' and 'int'" in str(e):
                 await fishing_cmd.finish(message_add_head("⛔ 钓鱼数据异常，请联系管理员处理", event))
@@ -104,6 +126,8 @@ async def _(event: MessageEvent):
             )
             if quest_completed and quest_msg:
                 message += "\n\n" + quest_msg
+            if extra_catches:
+                message += "\n🎣 鱼竿特权额外收获：" + "、".join(extra_catches)
             await fishing_cmd.finish(message_add_head(message, event))
 
         # 标题
@@ -123,6 +147,10 @@ async def _(event: MessageEvent):
         # 添加新手任务消息
         if quest_completed and quest_msg:
             desc_lines.append(quest_msg.strip())
+
+        # 添加鱼竿特权额外收获
+        if extra_catches:
+            desc_lines.append(f"🎣 鱼竿特权额外收获：{'、'.join(extra_catches)}")
 
         desc = "\r".join(desc_lines)
 
