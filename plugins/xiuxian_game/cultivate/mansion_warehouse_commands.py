@@ -50,12 +50,16 @@ async def handle_mansion_warehouse(event: MessageEvent):
                 event
             ))
 
+        from ..sponsor.service import SponsorShopService
+        has_remote_warehouse = SponsorShopService.is_privilege_active(player, "premium_warehouse_until")
+
         from .mansion_service_new import MansionService
-        if not MansionService.is_at_mansion(player):
+        if not has_remote_warehouse and not MansionService.is_at_mansion(player):
             await mansion_warehouse_cmd.finish(message_add_head(
                 f"⛔ 你不在自己的阴宅位置\n"
                 f"💡 阴宅坐标：({player.mansion_x}, {player.mansion_y})\n"
-                f"💡 请移动到阴宅位置后再访问仓库",
+                f"💡 请移动到阴宅位置后再访问仓库\n"
+                f"💡 或购买【远程仓库特权】随时访问",
                 event
             ))
 
@@ -103,11 +107,16 @@ async def handle_deposit_mansion(event: MessageEvent, args: Message = CommandArg
                 "⛔ 你还没有阴宅，无法使用仓库", event
             ))
 
+        from ..sponsor.service import SponsorShopService
+        has_remote_warehouse = SponsorShopService.is_privilege_active(player, "premium_warehouse_until")
+
         from .mansion_service_new import MansionService
-        if not MansionService.is_at_mansion(player):
+        if not has_remote_warehouse and not MansionService.is_at_mansion(player):
             await deposit_mansion_cmd.finish(message_add_head(
                 f"⛔ 你不在自己的阴宅位置\n"
-                f"💡 阴宅坐标：({player.mansion_x}, {player.mansion_y})",
+                f"💡 阴宅坐标：({player.mansion_x}, {player.mansion_y})\n"
+                f"💡 请移动到阴宅位置后再访问仓库\n"
+                f"💡 或购买【远程仓库特权】随时访问",
                 event
             ))
 
@@ -171,11 +180,16 @@ async def handle_withdraw_mansion(event: MessageEvent, args: Message = CommandAr
                 "⛔ 你还没有阴宅，无法使用仓库", event
             ))
 
+        from ..sponsor.service import SponsorShopService
+        has_remote_warehouse = SponsorShopService.is_privilege_active(player, "premium_warehouse_until")
+
         from .mansion_service_new import MansionService
-        if not MansionService.is_at_mansion(player):
+        if not has_remote_warehouse and not MansionService.is_at_mansion(player):
             await withdraw_mansion_cmd.finish(message_add_head(
                 f"⛔ 你不在自己的阴宅位置\n"
-                f"💡 阴宅坐标：({player.mansion_x}, {player.mansion_y})",
+                f"💡 阴宅坐标：({player.mansion_x}, {player.mansion_y})\n"
+                f"💡 请移动到阴宅位置后再访问仓库\n"
+                f"💡 或购买【远程仓库特权】随时访问",
                 event
             ))
 
