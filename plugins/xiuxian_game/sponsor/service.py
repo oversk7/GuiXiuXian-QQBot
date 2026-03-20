@@ -29,6 +29,12 @@ INVENTORY_EXPAND_PRICE = 10      # 背包扩容（诡烛/格）
 INVENTORY_EXPAND_MAX = 1000      # 背包容量上限
 RESET_TALISMAN_PRICE = 1000      # 重启符（诡烛/张）
 
+# ==================== 月卡特权价格 ====================
+PREMIUM_SECLUSION_PRICE = 180     # 闭关无上限特权（诡烛/月）
+PREMIUM_WAREHOUSE_PRICE = 180     # 远程仓库特权（诡烛/月）
+PREMIUM_FISHING_PRICE = 180       # 鱼竿特权（诡烛/月）
+PREMIUM_VISION_PRICE = 180        # 全视之眼特权（诡烛/月）
+
 # 称号字符限制
 TITLE_MIN_LEN = 1
 TITLE_MAX_LEN = 8
@@ -484,6 +490,72 @@ class SponsorShopService:
             f"🔮 剩余诡烛: {player.gui_zhu}"
         )
 
+    # ==================== 月卡特权购买 ====================
+
+    @classmethod
+    async def buy_premium_privilege(
+        cls, player: Player, privilege_key: str, privilege_name: str, price: int, session: AsyncSession
+    ) -> Tuple[bool, str]:
+        """
+        购买月卡型特权（30天有效期，可叠加延长）
+        """
+        if player.gui_zhu < price:
+            return False, (
+                f"⛔ 诡烛不足\n"
+                f"需要: {price} 诡烛\n"
+                f"当前: {player.gui_zhu} 诡烛"
+            )
+
+        from datetime import datetime, timedelta
+
+        extra = player.extra_attrs or {}
+        current_until = extra.get(privilege_key)
+        now = datetime.now()
+
+        if current_until:
+            try:
+                existing_end = datetime.fromisoformat(current_until)
+                if existing_end > now:
+                    new_end = existing_end + timedelta(days=30)
+                else:
+                    new_end = now + timedelta(days=30)
+            except (ValueError, TypeError):
+                new_end = now + timedelta(days=30)
+        else:
+            new_end = now + timedelta(days=30)
+
+        extra[privilege_key] = new_end.isoformat()
+        player.extra_attrs = extra
+
+        balance_before = player.gui_zhu
+        player.gui_zhu -= price
+
+        from ..models.sponsor_shop_log import SponsorShopLog
+        await SponsorShopLog.add_log(
+            session, player, privilege_name,
+            f"至{new_end.strftime('%Y-%m-%d')}",
+            price, balance_before
+        )
+
+        return True, (
+            f"✅ 购买成功！{privilege_name}\n"
+            f"⏰ 有效期至: {new_end.strftime('%Y-%m-%d %H:%M')}\n"
+            f"🔮 剩余诡烛: {player.gui_zhu}"
+        )
+
+    @staticmethod
+    def is_privilege_active(player: Player, privilege_key: str) -> bool:
+        """检查玩家的某项月卡特权是否在有效期内"""
+        from datetime import datetime
+        extra = player.extra_attrs or {}
+        until_str = extra.get(privilege_key)
+        if not until_str:
+            return False
+        try:
+            return datetime.fromisoformat(until_str) > datetime.now()
+        except (ValueError, TypeError):
+            return False
+
     # ==================== 商店展示 ====================
 
     @classmethod
@@ -553,6 +625,34 @@ class SponsorShopService:
 
         lines.extend([
             "━━━━━━━━━━━━━",
+            "🐾 宠物饰品（诡烛专属）",
+            "─────────────",
+            "🟣 虚空锁链  [150 诡烛]  颈饰 攻+20 防+15",
+            "🟣 诡纹和服  [150 诡烛]  服饰 攻+15 暴击+1.5%",
+            "🟠 星辰发冠  [300 诡烛]  头饰 暴击率+3% 暴击伤害+10%",
+            "🟠 银铃璎珞  [300 诡烛]  颈饰 连击率+3% 穿透率+3%",
+            "🟠 流光羽衣  [300 诡烛]  服饰 闪避率+3% 反击率+3%",
+            "  💡 购买: 【买饰品 名称】",
+            "",
+            "━━━━━━━━━━━━━",
+            f"📜 月卡特权（180 诡烛/月）",
+            "─────────────",
+            f"⏰ 闭关无上限  [{PREMIUM_SECLUSION_PRICE} 诡烛/月]",
+            "  闭关不再有时间上限",
+            "",
+            f"🏠 远程仓库    [{PREMIUM_WAREHOUSE_PRICE} 诡烛/月]",
+            "  随时随地存取阴宅仓库",
+            "",
+            f"🎣 鱼竿特权    [{PREMIUM_FISHING_PRICE} 诡烛/月]",
+            "  每次钓鱼额外多钓2条",
+            "",
+            f"👁️ 全视之眼    [{PREMIUM_VISION_PRICE} 诡烛/月]",
+            "  俯瞰直接显示诡域全部方块",
+            "",
+        ])
+
+        lines.extend([
+            "━━━━━━━━━━━━━",
             "📖 使用方法:",
             "─────────────",
             "【购买棺材钉】       获得1根棺材钉",
@@ -565,6 +665,10 @@ class SponsorShopService:
             "【购买称号 内容】    购买自定义称号",
             "【公会改名 新名称】  修改公会名称（会长）",
             "【改名 新名字】      使用改名卡改名",
+            "【购买闭关特权】     闭关无时间上限（180诡烛/月）",
+            "【购买远程仓库】     随地存取阴宅仓库（180诡烛/月）",
+            "【购买鱼竿特权】     每次多钓2条鱼（180诡烛/月）",
+            "【购买全视之眼】     俯瞰显示全部方块（180诡烛/月）",
         ])
 
         return "\n".join(lines)
