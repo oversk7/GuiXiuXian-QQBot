@@ -182,12 +182,33 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
         if reached and task:
             # 已到达则删除任务记录并通知
             target_x, target_y = task.target_x, task.target_y
+            nav_distance = task.initial_distance or 0
+
+            # 生成并应用导航随机事件
+            from .navigation_events import (
+                generate_navigation_events,
+                apply_navigation_events,
+                format_navigation_events,
+            )
+            nav_events = generate_navigation_events(
+                player, nav_distance, target_x, target_y
+            )
+            if nav_events:
+                await apply_navigation_events(session, player, nav_events)
+
             await session.delete(task)
             await session.commit()
 
             rx, ry = (player.real_world_x or 0), (player.real_world_y or 0)
             arrival_msg = f"🎯 已到达目标位置 ({target_x},{target_y})\n"
             arrival_msg += "━━━━━━━━━━━━━\n"
+
+            # 展示途中见闻
+            events_text = format_navigation_events(nav_events)
+            if events_text:
+                arrival_msg += events_text + "\n"
+                arrival_msg += "━━━━━━━━━━━━━\n"
+
             arrival_msg += f"📍 当前坐标: ({rx},{ry})\n"
             arrival_msg += "✅ 导航任务已完成"
 

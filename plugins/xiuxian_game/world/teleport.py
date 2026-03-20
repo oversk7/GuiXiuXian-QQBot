@@ -388,6 +388,19 @@ async def handle_revive(event: MessageEvent):
         if nav_task:
             reached = await _update_nav_position(player, nav_task, session)
             if reached:
+                # 到达时静默应用导航随机事件
+                from .navigation_events import (
+                    generate_navigation_events,
+                    apply_navigation_events,
+                )
+                nav_events = generate_navigation_events(
+                    player,
+                    nav_task.initial_distance or 0,
+                    nav_task.target_x,
+                    nav_task.target_y,
+                )
+                if nav_events:
+                    await apply_navigation_events(session, player, nav_events)
                 await session.delete(nav_task)
 
         player.exit_dungeon()

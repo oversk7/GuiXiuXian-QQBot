@@ -91,6 +91,19 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
             if player_upd and task:
                 reached = await _update_nav_position(player_upd, task, uow.session)
                 if reached:
+                    # 到达时静默应用导航随机事件
+                    from ..world.navigation_events import (
+                        generate_navigation_events,
+                        apply_navigation_events,
+                    )
+                    nav_events = generate_navigation_events(
+                        player_upd,
+                        task.initial_distance or 0,
+                        task.target_x,
+                        task.target_y,
+                    )
+                    if nav_events:
+                        await apply_navigation_events(uow.session, player_upd, nav_events)
                     await uow.session.delete(task)
                 await uow.commit()
                 if not player.is_in_dungeon():
@@ -811,6 +824,19 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
         if player_upd and task:
             reached = await _update_nav_position(player_upd, task, uow.session)
             if reached:
+                # 到达时静默应用导航随机事件
+                from ..world.navigation_events import (
+                    generate_navigation_events,
+                    apply_navigation_events,
+                )
+                nav_events = generate_navigation_events(
+                    player_upd,
+                    task.initial_distance or 0,
+                    task.target_x,
+                    task.target_y,
+                )
+                if nav_events:
+                    await apply_navigation_events(uow.session, player_upd, nav_events)
                 await uow.session.delete(task)
             await uow.commit()  # 立即提交导航更新
             # 同步内存对象用于展示

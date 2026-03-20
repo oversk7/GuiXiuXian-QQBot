@@ -1193,6 +1193,7 @@ async def handle_explore(event: MessageEvent, args: Message = CommandArg()):
         "【附近地点】 查看附近100格内的地点和阴宅\n"
         "【导航 <地点名>】 快速导航到指定地点\n"
         "【导航 [x] [y]】 坐标导航\n"
+        "  💡 长途导航途中可能遭遇随机事件\n"
         "【查找 <NPC名>】 查询NPC位置\n"
         "【中断导航】 取消当前导航\n"
         "━━━━━━━━━━━━━\n"
