@@ -11,10 +11,36 @@ chains:
     unlock_after: null  # 初始解锁
 
     steps:
-      # 第1步：首次修炼
+      # 第1步：观察环境 —— 先认识你在哪
       - step: 1
+        title: "感知世界"
+        description: "你刚从棺材里爬出来，先看看周围有什么！\n发送【观察】查看当前位置的NPC、地点和其他玩家"
+        completion_type: "command"
+        completion_target: "观察"
+        completion_count: 1
+        rewards:
+          exp: 300
+          gold: 800
+        auto_accept: true
+        flavor_text: "睁开你的第三只眼，看清这个世界的真实面貌"
+
+      # 第2步：学会导航 —— 核心操作，学会移动
+      - step: 2
+        title: "寻路者"
+        description: "这个世界靠坐标移动，发送【前往 地点名】就能自动导航过去。\n💡 发送【附近地点】看看周围100格内有哪些地方可以去\n💡 发送【地图】查看所有重要地点坐标"
+        completion_type: "command"
+        completion_target: "前往"
+        completion_count: 1
+        rewards:
+          exp: 500
+          gold: 1000
+        auto_accept: true
+        flavor_text: "在诡异的世界中，迷路是最危险的事"
+
+      # 第3步：首次修炼 —— 开始变强
+      - step: 3
         title: "初识怨炁"
-        description: "尝试使用【修炼】指令，感受怨炁在体内流动的感觉"
+        description: "到达新地点后，尝试使用【修炼】指令，感受怨炁在体内流动的感觉"
         completion_type: "command"
         completion_target: "修炼"
         completion_count: 1
@@ -24,10 +50,10 @@ chains:
         auto_accept: true
         flavor_text: "黑暗中，有人在低语：'感受它，驾驭它...'"
 
-      # 第2步：修炼3次
-      - step: 2
+      # 第4步：修炼3次 —— 积累经验
+      - step: 4
         title: "汲取深渊之力"
-        description: "继续【修炼】3次，让怨炁在体内沉淀"
+        description: "继续【修炼】3次，让怨炁在体内沉淀（5分钟冷却）"
         completion_type: "command_count"
         completion_target: "修炼"
         completion_count: 3
@@ -40,10 +66,10 @@ chains:
         auto_accept: true
         flavor_text: "你的身体开始适应这股力量，但还需要更多..."
 
-      # 第3步：分配属性点
-      - step: 3
+      # 第5步：分配属性点
+      - step: 5
         title: "塑造新生"
-        description: "使用【加点】指令，分配你的属性点，塑造你的战斗形态"
+        description: "使用【加点】指令，分配你的属性点。\n💡 不知道怎么加？发送【加点帮助】看推荐方案\n💡 例：加点 力 5（给力量加5点）"
         completion_type: "command"
         completion_target: "加点"
         completion_count: 1
@@ -54,10 +80,10 @@ chains:
         auto_accept: true
         flavor_text: "缝合裂隙，塑形新肉。选择你的道路..."
 
-      # 第4步：首次突破
-      - step: 4
+      # 第6步：首次突破
+      - step: 6
         title: "破茧蜕变"
-        description: "积累足够怨炁后，使用【突破】指令，提升你的境界"
+        description: "经验够了就用【突破】指令提升境界！\n💡 30级前突破100%成功，大胆突破！"
         completion_type: "level_up"
         completion_target: 2
         completion_count: 1
@@ -70,10 +96,10 @@ chains:
         auto_accept: true
         flavor_text: "骨骼断裂的声音，是新生的前奏"
 
-      # 第5步：查看面板
-      - step: 5
+      # 第7步：查看面板 —— 审视成长结果
+      - step: 7
         title: "凝视深渊"
-        description: "使用【角色】【面板】或【状态】指令，查看你当前的状态"
+        description: "使用【面板】查看你当前的状态，看看突破后有什么变化"
         completion_type: "command"
         completion_target: "角色"
         completion_count: 1
@@ -83,52 +109,10 @@ chains:
         auto_accept: true
         flavor_text: "了解自己，才能超越自己"
 
-      # 第6步：探索周围
-      - step: 6
-        title: "感知世界"
-        description: "使用【观察】或【附近】指令，探索你所在的位置"
-        completion_type: "command"
-        completion_target: "观察"
-        completion_count: 1
-        rewards:
-          exp: 300
-          gold: 800
-        auto_accept: true
-        flavor_text: "睁开你的第三只眼，看清这个世界的真实面貌"
-
-      # 第7步：学会导航
-      - step: 7
-        title: "寻路者"
-        description: "使用【前往 地点名】指令移动到其他地点。\n💡 发送【附近】可查看周围有哪些地点可以前往"
-        completion_type: "command"
-        completion_target: "前往"
-        completion_count: 1
-        rewards:
-          exp: 500
-          gold: 1000
-        auto_accept: true
-        flavor_text: "在诡异的世界中，迷路是最危险的事"
-
-      # 第8步：初次战斗
+      # 第8步：使用物品
       - step: 8
-        title: "血之洗礼"
-        description: "先用【观察】查看当前位置有哪些可攻击的目标，然后用【攻击 目标名称】发起战斗。\n如果当前位置没有敌人，用【前往】移动到其他地点再观察。\n💡 提示：野外区域更容易遇到敌人"
-        completion_type: "command"
-        completion_target: "攻击"
-        completion_count: 1
-        rewards:
-          exp: 800
-          gold: 1500
-          items:
-            - item_id: "heal_potion"
-              quantity: 20
-        auto_accept: true
-        flavor_text: "鲜血与怨气的交织，这就是驭鬼者的宿命"
-
-      # 第9步：使用物品
-      - step: 9
         title: "生存之道"
-        description: "使用【背包】查看物品，然后使用【使用 回春散】恢复生命值"
+        description: "发送【背包】查看你拥有的物品，然后用【使用 回春散】恢复生命值。\n💡 之前任务奖励的回春散就在背包里"
         completion_type: "command"
         completion_target: "使用"
         completion_count: 1
@@ -141,8 +125,8 @@ chains:
         auto_accept: true
         flavor_text: "学会治愈自己，才能走得更远"
 
-      # 第10步：接取委托
-      - step: 10
+      # 第9步：接取委托
+      - step: 9
         title: "缉邪司的召唤"
         description: "使用【任务】查看每日委托，达到30级后可以接取任务赚取奖励"
         completion_type: "command"
@@ -157,6 +141,22 @@ chains:
               quantity: 2
         auto_accept: true
         flavor_text: "大都会缉邪司欢迎你，驭鬼者。去完成你的使命吧！"
+
+      # 第10步：初探诡域 —— 放最后，进诡域后很多事干不了
+      - step: 10
+        title: "深渊之门"
+        description: "准备好了吗？发送【传送 1层诡域】进入异世界！\n进去后用【上下左右】移动，用【探索】调查和战斗。\n💡 诡域是刷材料、变强的核心玩法\n💡 【返回】可以随时回到现实世界"
+        completion_type: "command"
+        completion_target: "传送"
+        completion_count: 1
+        rewards:
+          exp: 800
+          gold: 1500
+          items:
+            - item_id: "heal_potion"
+              quantity: 20
+        auto_accept: true
+        flavor_text: "深渊的彼端，回荡着无数冤魂的低语..."
 
     completion_reward:
       title: "驭鬼者之路已开启"

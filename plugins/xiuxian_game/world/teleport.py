@@ -275,6 +275,12 @@ async def _handle_teleport_logic(event: MessageEvent, target_region: str, cmd_ha
         session.add(player)
         await session.commit()
 
+        # 新手任务钩子
+        from ..quest.novice_quest_service import NoviceQuestService
+        quest_completed, quest_msg = await NoviceQuestService.check_and_advance_quest(
+            session, player, "command", {"command": "传送"}
+        )
+
         # 获取当前位置格子描述，并检查月卡自动采集
         tile_desc = None
         auto_collect_msg = ""
@@ -345,6 +351,10 @@ async def _handle_teleport_logic(event: MessageEvent, target_region: str, cmd_ha
                 msg_lines.append("━━━━━━━━━━━━━")
                 msg_lines.append("🎁 征服这层就可以再领取一个探索者宝箱了！")
                 msg_lines.append("💎 【领取宝箱】一键领取所有可领取的宝箱")
+
+    if quest_completed and quest_msg:
+        msg_lines.append("")
+        msg_lines.append(quest_msg)
 
     msg = "\n".join(msg_lines)
     await cmd_handler.finish(message_add_head(msg, event))
