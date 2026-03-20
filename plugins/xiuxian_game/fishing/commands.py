@@ -62,6 +62,10 @@ async def _(event: MessageEvent):
         # ⚠️ 关键修复：必须在finish()之前commit，否则finish()抛出的异常会导致rollback
         await session.commit()
 
+        # 新手任务钩子
+        from ..quest.novice_quest_service import NoviceQuestService
+        quest_completed, quest_msg = await NoviceQuestService.check_and_advance_quest(session, player, "command", {"command": "钓鱼"})
+
         # 构建成功消息 - 使用图鉴MD模版
         rarity_emoji = {
             "white": "⚪",
@@ -98,6 +102,8 @@ async def _(event: MessageEvent):
                 f"━━━━━━━━━━━━━\n"
                 f"🎣 继续钓鱼需等待 {FishingService.FISHING_COOLDOWN} 分钟"
             )
+            if quest_completed and quest_msg:
+                message += "\n\n" + quest_msg
             await fishing_cmd.finish(message_add_head(message, event))
 
         # 标题
@@ -113,6 +119,10 @@ async def _(event: MessageEvent):
         if fish_config.description:
             desc_lines.append(f"━━━━━━━━━━━━━")
             desc_lines.append(f"📖 {fish_config.description}")
+
+        # 添加新手任务消息
+        if quest_completed and quest_msg:
+            desc_lines.append(quest_msg.strip())
 
         desc = "\r".join(desc_lines)
 

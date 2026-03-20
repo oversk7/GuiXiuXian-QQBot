@@ -393,6 +393,12 @@ async def handle_seclusion(event: MessageEvent):
         session.add(player)
         await session.commit()
 
+        # 检查新手任务
+        from ..quest.novice_quest_service import NoviceQuestService
+        quest_completed, quest_msg = await NoviceQuestService.check_and_advance_quest(
+            session, player, "command", {"command": "闭关"}
+        )
+
         # 构建简洁版闭关消息（折叠式）
         # 计算总效率
         total_efficiency = efficiency_bonus
@@ -449,6 +455,9 @@ async def handle_seclusion(event: MessageEvent):
             "━━━━━━━━━━━━━\n"
             "💡 出关 推开棺盖并结算怨炁"
         )
+
+        if quest_completed and quest_msg:
+            msg_secl += f"\n\n{quest_msg}"
 
         # 使用图鉴模版发送闭关开始消息
         title = "⚰️ 闭关开始"

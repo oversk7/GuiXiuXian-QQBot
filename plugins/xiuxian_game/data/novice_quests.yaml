@@ -1,167 +1,343 @@
 # 新手任务链配置文件
 # 定义新手玩家的引导任务链，帮助玩家快速上手游戏
+# 支持多章节任务链，每章完成后自动解锁下一章
 
-novice_basic_chain:
-  chain_id: "novice_basic"
-  name: "驭鬼者的第一步"
-  description: "踏入诡异世界的入门引导"
+chains:
+  # ==================== 第一章：驭鬼者的第一步 ====================
+  - chain_id: "novice_basic"
+    name: "驭鬼者的第一步"
+    chapter: 1
+    description: "踏入诡异世界的入门引导"
+    unlock_after: null  # 初始解锁
 
-  steps:
-    # 第1步：首次修炼
-    - step: 1
-      title: "初识怨炁"
-      description: "尝试使用【修炼】指令，感受怨炁在体内流动的感觉"
-      completion_type: "command"
-      completion_target: "修炼"
-      completion_count: 1
-      rewards:
-        exp: 500
-        gold: 1000
-      auto_accept: true
-      flavor_text: "黑暗中，有人在低语：'感受它，驾驭它...'"
+    steps:
+      # 第1步：首次修炼
+      - step: 1
+        title: "初识怨炁"
+        description: "尝试使用【修炼】指令，感受怨炁在体内流动的感觉"
+        completion_type: "command"
+        completion_target: "修炼"
+        completion_count: 1
+        rewards:
+          exp: 500
+          gold: 1000
+        auto_accept: true
+        flavor_text: "黑暗中，有人在低语：'感受它，驾驭它...'"
 
-    # 第2步：修炼3次
-    - step: 2
-      title: "汲取深渊之力"
-      description: "继续【修炼】3次，让怨炁在体内沉淀"
-      completion_type: "command_count"
-      completion_target: "修炼"
-      completion_count: 3
-      rewards:
-        exp: 1000
-        gold: 2000
-        items:
-          - item_id: "heal_potion"
-            quantity: 10
-      auto_accept: true
-      flavor_text: "你的身体开始适应这股力量，但还需要更多..."
+      # 第2步：修炼3次
+      - step: 2
+        title: "汲取深渊之力"
+        description: "继续【修炼】3次，让怨炁在体内沉淀"
+        completion_type: "command_count"
+        completion_target: "修炼"
+        completion_count: 3
+        rewards:
+          exp: 1000
+          gold: 2000
+          items:
+            - item_id: "heal_potion"
+              quantity: 10
+        auto_accept: true
+        flavor_text: "你的身体开始适应这股力量，但还需要更多..."
 
-    # 第3步：分配属性点
-    - step: 3
-      title: "塑造新生"
-      description: "使用【加点】指令，分配你的属性点，塑造你的战斗形态"
-      completion_type: "command"
-      completion_target: "加点"
-      completion_count: 1
-      rewards:
-        exp: 300
-        gold: 500
-        attribute_points: 10
-      auto_accept: true
-      flavor_text: "缝合裂隙，塑形新肉。选择你的道路..."
+      # 第3步：分配属性点
+      - step: 3
+        title: "塑造新生"
+        description: "使用【加点】指令，分配你的属性点，塑造你的战斗形态"
+        completion_type: "command"
+        completion_target: "加点"
+        completion_count: 1
+        rewards:
+          exp: 300
+          gold: 500
+          attribute_points: 10
+        auto_accept: true
+        flavor_text: "缝合裂隙，塑形新肉。选择你的道路..."
 
-    # 第4步：首次突破
-    - step: 4
-      title: "破茧蜕变"
-      description: "积累足够怨炁后，使用【突破】指令，提升你的境界"
-      completion_type: "level_up"
-      completion_target: 2
-      completion_count: 1
-      rewards:
-        exp: 500
-        gold: 3000
-        items:
-          - item_id: "spirit_herb"
-            quantity: 10
-      auto_accept: true
-      flavor_text: "骨骼断裂的声音，是新生的前奏"
+      # 第4步：首次突破
+      - step: 4
+        title: "破茧蜕变"
+        description: "积累足够怨炁后，使用【突破】指令，提升你的境界"
+        completion_type: "level_up"
+        completion_target: 2
+        completion_count: 1
+        rewards:
+          exp: 500
+          gold: 3000
+          items:
+            - item_id: "spirit_herb"
+              quantity: 10
+        auto_accept: true
+        flavor_text: "骨骼断裂的声音，是新生的前奏"
 
-    # 第5步：查看面板
-    - step: 5
-      title: "凝视深渊"
-      description: "使用【角色】【面板】或【状态】指令，查看你当前的状态"
-      completion_type: "command"
-      completion_target: "角色"
-      completion_count: 1
-      rewards:
-        exp: 200
-        gold: 500
-      auto_accept: true
-      flavor_text: "了解自己，才能超越自己"
+      # 第5步：查看面板
+      - step: 5
+        title: "凝视深渊"
+        description: "使用【角色】【面板】或【状态】指令，查看你当前的状态"
+        completion_type: "command"
+        completion_target: "角色"
+        completion_count: 1
+        rewards:
+          exp: 200
+          gold: 500
+        auto_accept: true
+        flavor_text: "了解自己，才能超越自己"
 
-    # 第6步：探索周围
-    - step: 6
-      title: "感知世界"
-      description: "使用【观察】或【附近】指令，探索你所在的位置"
-      completion_type: "command"
-      completion_target: "观察"
-      completion_count: 1
-      rewards:
-        exp: 300
-        gold: 800
-      auto_accept: true
-      flavor_text: "睁开你的第三只眼，看清这个世界的真实面貌"
+      # 第6步：探索周围
+      - step: 6
+        title: "感知世界"
+        description: "使用【观察】或【附近】指令，探索你所在的位置"
+        completion_type: "command"
+        completion_target: "观察"
+        completion_count: 1
+        rewards:
+          exp: 300
+          gold: 800
+        auto_accept: true
+        flavor_text: "睁开你的第三只眼，看清这个世界的真实面貌"
 
-    # 第7步：学会导航
-    - step: 7
-      title: "寻路者"
-      description: "使用【前往 上京】指令，学习如何快速移动到其他地点"
-      completion_type: "command"
-      completion_target: "前往"
-      completion_count: 1
-      rewards:
-        exp: 500
-        gold: 1000
-      auto_accept: true
-      flavor_text: "在诡异的世界中，迷路是最危险的事"
+      # 第7步：学会导航
+      - step: 7
+        title: "寻路者"
+        description: "使用【前往 地点名】指令移动到其他地点。\n💡 发送【附近】可查看周围有哪些地点可以前往"
+        completion_type: "command"
+        completion_target: "前往"
+        completion_count: 1
+        rewards:
+          exp: 500
+          gold: 1000
+        auto_accept: true
+        flavor_text: "在诡异的世界中，迷路是最危险的事"
 
-    # 第8步：初次战斗
-    - step: 8
-      title: "血之洗礼"
-      description: "前往任意地点，使用【攻击】指令进行你的第一次战斗"
-      completion_type: "command"
-      completion_target: "攻击"
-      completion_count: 1
-      rewards:
-        exp: 800
-        gold: 1500
-        items:
-          - item_id: "heal_potion"
-            quantity: 20
-      auto_accept: true
-      flavor_text: "鲜血与怨气的交织，这就是驭鬼者的宿命"
+      # 第8步：初次战斗
+      - step: 8
+        title: "血之洗礼"
+        description: "先用【观察】查看当前位置有哪些可攻击的目标，然后用【攻击 目标名称】发起战斗。\n如果当前位置没有敌人，用【前往】移动到其他地点再观察。\n💡 提示：野外区域更容易遇到敌人"
+        completion_type: "command"
+        completion_target: "攻击"
+        completion_count: 1
+        rewards:
+          exp: 800
+          gold: 1500
+          items:
+            - item_id: "heal_potion"
+              quantity: 20
+        auto_accept: true
+        flavor_text: "鲜血与怨气的交织，这就是驭鬼者的宿命"
 
-    # 第9步：使用物品
-    - step: 9
-      title: "生存之道"
-      description: "使用【背包】查看物品，然后使用【使用 回春散】恢复生命值"
-      completion_type: "command"
-      completion_target: "使用"
-      completion_count: 1
-      rewards:
-        exp: 300
-        gold: 500
-        items:
-          - item_id: "spirit_herb"
-            quantity: 15
-      auto_accept: true
-      flavor_text: "学会治愈自己，才能走得更远"
+      # 第9步：使用物品
+      - step: 9
+        title: "生存之道"
+        description: "使用【背包】查看物品，然后使用【使用 回春散】恢复生命值"
+        completion_type: "command"
+        completion_target: "使用"
+        completion_count: 1
+        rewards:
+          exp: 300
+          gold: 500
+          items:
+            - item_id: "spirit_herb"
+              quantity: 15
+        auto_accept: true
+        flavor_text: "学会治愈自己，才能走得更远"
 
-    # 第10步：接取委托
-    - step: 10
-      title: "缉邪司的召唤"
-      description: "使用【任务】查看每日委托，达到30级后可以接取任务赚取奖励"
-      completion_type: "command"
-      completion_target: "任务"
-      completion_count: 1
-      rewards:
-        exp: 1000
-        gold: 2000
-        attribute_points: 20
-        items:
-          - item_id: "sweep_order"
-            quantity: 2
-      auto_accept: true
-      flavor_text: "大都会缉邪司欢迎你，驭鬼者。去完成你的使命吧！"
+      # 第10步：接取委托
+      - step: 10
+        title: "缉邪司的召唤"
+        description: "使用【任务】查看每日委托，达到30级后可以接取任务赚取奖励"
+        completion_type: "command"
+        completion_target: "任务"
+        completion_count: 1
+        rewards:
+          exp: 1000
+          gold: 2000
+          attribute_points: 20
+          items:
+            - item_id: "sweep_order"
+              quantity: 2
+        auto_accept: true
+        flavor_text: "大都会缉邪司欢迎你，驭鬼者。去完成你的使命吧！"
 
-# 完成新手任务链的总奖励
-completion_reward:
-  title: "驭鬼者之路已开启"
-  exp: 3000
-  gold: 10000
-  items:
-    - item_id: "sweep_order"
-      quantity: 5
-    - item_id: "heal_potion"
-      quantity: 50
-  achievement_title: "深渊行者"
+    completion_reward:
+      title: "驭鬼者之路已开启"
+      exp: 3000
+      gold: 10000
+      items:
+        - item_id: "sweep_order"
+          quantity: 5
+        - item_id: "heal_potion"
+          quantity: 50
+      achievement_title: "深渊行者"
+
+  # ==================== 第二章：生存之道 ====================
+  - chain_id: "novice_survival"
+    name: "生存之道"
+    chapter: 2
+    description: "掌握日常生存技能，武装自己"
+    unlock_after: "novice_basic"
+
+    steps:
+      # 第1步：每日签到
+      - step: 1
+        title: "每日祭礼"
+        description: "使用【签到】指令，完成每日祭礼。\n签到是最稳定的资源来源，连续签到天数越多，奖励越丰厚！"
+        completion_type: "command"
+        completion_target: "签到"
+        completion_count: 1
+        rewards:
+          exp: 800
+          gold: 2000
+        auto_accept: true
+        flavor_text: "晨钟暮鼓，日复一日。修行者的坚持，从不间断。"
+
+      # 第2步：打工赚钱
+      - step: 2
+        title: "谋生之道"
+        description: "使用【打工】指令，在城镇中寻找一份工作赚取金币。\n没有金币寸步难行，打工是新手最可靠的收入来源。\n💡 不同地点的打工报酬不同，试试在各处打工吧！"
+        completion_type: "command"
+        completion_target: "打工"
+        completion_count: 1
+        rewards:
+          exp: 500
+          gold: 3000
+        auto_accept: true
+        flavor_text: "金币虽俗，却是立身之本。"
+
+      # 第3步：穿戴装备（奖励锻造材料，为第4步做准备）
+      - step: 3
+        title: "武装自己"
+        description: "使用【装备 装备名称】指令，穿戴身上的装备。\n装备可以大幅提升你的战斗属性！\n💡 发送【背包】查看你拥有的装备，用【装备 名称】穿上它"
+        completion_type: "command"
+        completion_target: "装备"
+        completion_count: 1
+        rewards:
+          exp: 500
+          gold: 1000
+          items:
+            - item_id: "spirit_bone"
+              quantity: 20
+            - item_id: "bone_fragment"
+              quantity: 30
+            - item_id: "grave_soil"
+              quantity: 15
+        auto_accept: true
+        flavor_text: "赤手空拳终非长久之计。披甲执锐，方为正道。"
+
+      # 第4步：锻造装备
+      - step: 4
+        title: "铸器入门"
+        description: "使用【锻造 白骨护甲】指令，用材料锻造你的第一件装备！\n上一步获得的材料刚好够用，金币需要500。\n💡 发送【配方 白骨护甲】可查看所需材料"
+        completion_type: "command"
+        completion_target: "锻造"
+        completion_count: 1
+        rewards:
+          exp: 1000
+          gold: 2000
+        auto_accept: true
+        flavor_text: "亲手锻造的武器，比任何宝物都更值得信赖。"
+
+      # 第5步：闭关修炼
+      - step: 5
+        title: "闭棺修行"
+        description: "使用【闭关】指令，进入离线修炼状态。\n闭关期间即使不在线也能积累修为，是提升实力的重要手段！\n💡 睡觉前闭关，醒来后【出关】领取修为"
+        completion_type: "command"
+        completion_target: "闭关"
+        completion_count: 1
+        rewards:
+          exp: 800
+          gold: 1500
+        auto_accept: true
+        flavor_text: "钉入棺木，隔绝外界。在黑暗中，怨炁沉淀得更加纯粹。"
+
+    completion_reward:
+      title: "生存本能已觉醒"
+      exp: 5000
+      gold: 15000
+      achievement_title: "求生本能"
+
+  # ==================== 第三章：行走江湖 ====================
+  - chain_id: "novice_world"
+    name: "行走江湖"
+    chapter: 3
+    description: "探索更广阔的世界，融入江湖"
+    unlock_after: "novice_survival"
+
+    steps:
+      # 第1步：查看市集
+      - step: 1
+        title: "商道初探"
+        description: "发送【市集】查看当地可买卖的货物和价格。\n不同地点的市集价格不同，低价买入、异地高价卖出就是跑商！\n💡 发送【市集列表】可查看所有市集位置"
+        completion_type: "command"
+        completion_target: "市集"
+        completion_count: 1
+        rewards:
+          exp: 500
+          gold: 2000
+        auto_accept: true
+        flavor_text: "商人的眼中，处处都是机遇。"
+
+      # 第2步：首次购买（跑商入门）
+      - step: 2
+        title: "低买高卖"
+        description: "在市集发送【购买 物品名 数量】买入货物。\n然后用【前往 其他城市】移动到另一个市集，再发送【出售 物品名 数量】卖出赚差价！\n💡 发送【跑商推荐】可查看当前最佳套利路线"
+        completion_type: "command"
+        completion_target: "购买"
+        completion_count: 1
+        rewards:
+          exp: 800
+          gold: 5000
+        auto_accept: true
+        flavor_text: "天下熙熙皆为利来，天下攘攘皆为利往。"
+
+      # 第3步：钓鱼
+      - step: 3
+        title: "愿者上钩"
+        description: "使用【钓鱼】指令，在水边尝试垂钓。\n钓到的鱼可以烹饪成菜肴，也可以在市集出售赚钱。\n💡 不同地点能钓到不同的鱼，稀有鱼类价值连城！"
+        completion_type: "command"
+        completion_target: "钓鱼"
+        completion_count: 1
+        rewards:
+          exp: 500
+          gold: 1500
+          items:
+            - item_id: "bait"
+              quantity: 10
+        auto_accept: true
+        flavor_text: "垂竿碧波间，静候那一丝颤动。"
+
+      # 第4步：加入公会
+      - step: 4
+        title: "同道中人"
+        description: "使用【加入公会 公会名称】指令，加入一个公会（宗门）。\n公会成员享有修炼加成、专属任务和社交互动！\n💡 发送【公会列表】查看可加入的公会，或找群友邀请你"
+        completion_type: "command"
+        completion_target: "加入公会"
+        completion_count: 1
+        rewards:
+          exp: 1500
+          gold: 3000
+          attribute_points: 15
+        auto_accept: true
+        flavor_text: "独行快，众行远。找到你的同道，共赴修仙之路。"
+
+      # 第5步：PvP切磋
+      - step: 5
+        title: "以武会友"
+        description: "使用【切磋 @某人】指令，和群里的其他玩家比试一场！\n切磋是无损的，不会损失任何东西，放心比试吧。\n💡 也可以用【切磋 UID】指定对手"
+        completion_type: "command"
+        completion_target: "切磋"
+        completion_count: 1
+        rewards:
+          exp: 1000
+          gold: 2000
+          attribute_points: 10
+        auto_accept: true
+        flavor_text: "不与人争锋，怎知自身几斤几两？"
+
+    completion_reward:
+      title: "江湖之路已开启"
+      exp: 8000
+      gold: 20000
+      items:
+        - item_id: "sweep_order"
+          quantity: 10
+      achievement_title: "江湖新秀"

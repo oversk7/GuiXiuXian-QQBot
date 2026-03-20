@@ -107,10 +107,19 @@ async def handle_pvp(event: MessageEvent, args: Message = CommandArg()):
 
             winner = challenger if victory else target_player
             mode_hint = "详细模式" if log_mode == "detailed" else "简洁模式"
+
+            # 新手任务钩子
+            from ..quest.novice_quest_service import NoviceQuestService
+            quest_completed, quest_msg = await NoviceQuestService.check_and_advance_quest(session, challenger, "command", {"command": "切磋"})
+
+            hint_text = f"切磋不影响数据 | {mode_hint}"
+            if quest_completed and quest_msg:
+                hint_text += f"\n{quest_msg}"
+
             await pvp_cmd.finish(build_battle_markdown(
                 title=f"⚔️ {winner.nickname} 胜！",
                 battle_log=filtered_log,
-                hint=f"切磋不影响数据 | {mode_hint}",
+                hint=hint_text,
                 btn1="切磋",
                 btn2="日志模式",
                 btn3="战力",

@@ -323,11 +323,20 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
 
         await session.commit()
 
+        # 检查新手任务
+        from ..quest.novice_quest_service import NoviceQuestService
+        quest_completed, quest_msg = await NoviceQuestService.check_and_advance_quest(
+            session, player, "command", {"command": "锻造"}
+        )
+
         mat_msg = " ".join([f"{config.items_config['by_id'][mid].name}✖️{qty*quantity}" for mid, qty in req_materials.items()])
         reply = (
             f"✅ 成功锻造 {item_cfg.name}✖️{quantity}！\n"
             f"🔨 消耗：{mat_msg} 以及 金币 {total_gold}💰"
         )
+        if quest_completed and quest_msg:
+            reply += f"\n\n{quest_msg}"
+
         await craft_cmd.finish(message_add_head(reply, event))
 
 repair_cmd = on_command("修复", aliases={"修理"}, block=True, priority=5)

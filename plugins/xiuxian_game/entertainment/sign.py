@@ -233,6 +233,10 @@ async def handle_sign(event: MessageEvent):
         # 先提交数据库事务，确保数据保存成功
         await session.commit()
 
+        # 新手任务钩子
+        from ..quest.novice_quest_service import NoviceQuestService
+        quest_completed, quest_msg = await NoviceQuestService.check_and_advance_quest(session, player, "command", {"command": "签到"})
+
         # 尝试使用图鉴类Markdown模板展示签到结果（仅在QQ平台）
         if hasattr(event, 'get_user_id'):
             try:
@@ -291,6 +295,10 @@ async def handle_sign(event: MessageEvent):
                     for ach_msg in achievement_msgs:
                         desc_parts.append(ach_msg.strip())
 
+                # 添加新手任务消息
+                if quest_completed and quest_msg:
+                    desc_parts.append(quest_msg.strip())
+
                 # 使用\r拼接描述
                 desc = "\r".join(desc_parts)
 
@@ -348,6 +356,10 @@ async def handle_sign(event: MessageEvent):
                 if achievement_msgs:
                     response_msg += "\n\n" + "\n".join(achievement_msgs)
 
+                # 附加新手任务消息
+                if quest_completed and quest_msg:
+                    response_msg += "\n\n" + quest_msg
+
                 # 发送纯文本消息
                 await sign.send(response_msg)
         else:
@@ -357,6 +369,10 @@ async def handle_sign(event: MessageEvent):
             # 附加成就解锁消息
             if achievement_msgs:
                 response_msg += "\n\n" + "\n".join(achievement_msgs)
+
+            # 附加新手任务消息
+            if quest_completed and quest_msg:
+                response_msg += "\n\n" + quest_msg
 
             # 发送纯文本消息
             await sign.send(response_msg)

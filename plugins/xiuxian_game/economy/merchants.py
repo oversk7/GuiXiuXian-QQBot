@@ -462,6 +462,13 @@ async def _(event: MessageEvent):
                 lines.append(f"  {item_cfg.name}│收价 {buy_p}")
 
         lines.append("━━━━━━━━━━━━━\n💡 价格受供需影响，库存有限先到先得")
+
+        # 新手任务钩子
+        from ..quest.novice_quest_service import NoviceQuestService
+        quest_completed, quest_msg = await NoviceQuestService.check_and_advance_quest(session, player, "command", {"command": "市集"})
+        if quest_completed and quest_msg:
+            lines.append(f"\n{quest_msg}")
+
         await market_cmd.finish(message_add_head("\n".join(lines), event))
 
 buy_cmd = on_command("购买", block=True, priority=5)
@@ -579,9 +586,18 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
             if tiered_multiplier > 1.001:
                 tiered_note = f"\n📊 商人加价：×{tiered_multiplier:.2f} (今日已购{already_bought+qty}个)"
 
-            await buy_cmd.finish(message_add_head(
+            buy_msg = (
                 f"✅ 购买 {item_cfg.name}×{qty} 成功！\n💸 花费 {total_cost} 金币{tiered_note}\n"
-                f"📦 剩余库存：{market_state.current_stock}", event))
+                f"📦 剩余库存：{market_state.current_stock}"
+            )
+
+            # 新手任务钩子
+            from ..quest.novice_quest_service import NoviceQuestService
+            quest_completed, quest_msg = await NoviceQuestService.check_and_advance_quest(session, player, "command", {"command": "购买"})
+            if quest_completed and quest_msg:
+                buy_msg += f"\n\n{quest_msg}"
+
+            await buy_cmd.finish(message_add_head(buy_msg, event))
 
         # 黑市/基础商店逻辑
         else:

@@ -1,6 +1,6 @@
 """
 新手任务链服务
-处理新手玩家的引导任务系统
+处理新手玩家的引导任务系统，支持多章节任务链
 """
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, and_
@@ -14,7 +14,7 @@ from pathlib import Path
 
 
 class NoviceQuestService:
-    """新手任务链服务"""
+    """新手任务链服务（支持多章节）"""
 
     # 缓存配置文件
     _quest_config: Optional[Dict] = None
@@ -29,9 +29,46 @@ class NoviceQuestService:
         return cls._quest_config
 
     @classmethod
+    def _get_chain_config(cls, chain_id: str) -> Optional[Dict]:
+        """根据 chain_id 查找链配置"""
+        config_data = cls._load_quest_config()
+        chains = config_data.get("chains", [])
+        for chain in chains:
+            if chain["chain_id"] == chain_id:
+                return chain
+        # 向后兼容：旧格式 novice_basic_chain
+        if chain_id == "novice_basic" and "novice_basic_chain" in config_data:
+            return config_data["novice_basic_chain"]
+        return None
+
+    @classmethod
+    def _get_first_chain_id(cls) -> str:
+        """获取第一章的 chain_id"""
+        config_data = cls._load_quest_config()
+        chains = config_data.get("chains", [])
+        if chains:
+            # 找 unlock_after 为 null 的链
+            for chain in chains:
+                if chain.get("unlock_after") is None:
+                    return chain["chain_id"]
+            return chains[0]["chain_id"]
+        # 向后兼容
+        return "novice_basic"
+
+    @classmethod
+    def _get_next_chain_id(cls, current_chain_id: str) -> Optional[str]:
+        """查找当前链完成后应解锁的下一条链"""
+        config_data = cls._load_quest_config()
+        chains = config_data.get("chains", [])
+        for chain in chains:
+            if chain.get("unlock_after") == current_chain_id:
+                return chain["chain_id"]
+        return None
+
+    @classmethod
     async def init_novice_quests(cls, session: AsyncSession, player: Player) -> bool:
         """
-        为新玩家初始化新手任务链
+        为新玩家初始化新手任务链（第一章）
 
         Args:
             session: 数据库会话
@@ -56,15 +93,33 @@ class NoviceQuestService:
         if existing_quest.scalar_one_or_none():
             return False  # 已有新手任务，不重复初始化
 
-        # 加载配置
-        config_data = cls._load_quest_config()
-        chain_config = config_data.get("novice_basic_chain", {})
-        steps = chain_config.get("steps", [])
+        first_chain_id = cls._get_first_chain_id()
+        return await cls._init_chain(session, player, first_chain_id)
 
+    @classmethod
+    async def _init_chain(cls, session: AsyncSession, player: Player, chain_id: str) -> bool:
+        """初始化指定的任务链（创建第一个任务）"""
+        chain_config = cls._get_chain_config(chain_id)
+        if not chain_config:
+            return False
+
+        steps = chain_config.get("steps", [])
         if not steps:
             return False
 
-        # 创建第一个任务
+        # 检查该链是否已有任务（防止重复初始化）
+        existing = await session.execute(
+            select(DailyTask).where(
+                and_(
+                    DailyTask.player_id == player.id,
+                    DailyTask.quest_chain_id == chain_id,
+                    DailyTask.is_tutorial == True
+                )
+            )
+        )
+        if existing.scalar_one_or_none():
+            return False
+
         first_step = steps[0]
         quest = DailyTask(
             player_id=player.id,
@@ -74,14 +129,13 @@ class NoviceQuestService:
             target_region="新手区",
             target_x=0,
             target_y=0,
-            quest_chain_id="novice_basic",
+            quest_chain_id=chain_id,
             quest_step=1,
             is_tutorial=True,
             auto_accept=first_step.get("auto_accept", False),
             exp_reward=first_step["rewards"].get("exp", 0),
             gold_reward=first_step["rewards"].get("gold", 0),
             status=TaskStatus.ACCEPTED if first_step.get("auto_accept") else TaskStatus.AVAILABLE,
-            # 新手任务不需要战斗敌人
             enemy_name="",
             enemy_level=0,
             enemy_hp=0,
@@ -91,13 +145,12 @@ class NoviceQuestService:
         )
 
         session.add(quest)
-        await session.commit()
         return True
 
     @classmethod
     async def get_current_quest(cls, session: AsyncSession, player_id: str) -> Optional[DailyTask]:
         """
-        获取玩家当前的新手任务
+        获取玩家当前的新手任务（任意章节）
 
         Args:
             session: 数据库会话
@@ -144,9 +197,13 @@ class NoviceQuestService:
         if not current_quest:
             return False, None
 
-        # 加载配置
-        config_data = cls._load_quest_config()
-        chain_config = config_data.get("novice_basic_chain", {})
+        chain_id = current_quest.quest_chain_id or "novice_basic"
+
+        # 加载链配置
+        chain_config = cls._get_chain_config(chain_id)
+        if not chain_config:
+            return False, None
+
         steps = chain_config.get("steps", [])
 
         # 找到当前步骤配置
@@ -174,8 +231,11 @@ class NoviceQuestService:
         # 生成下一步任务
         next_step = current_quest.quest_step + 1
         next_task = None
+        chain_completed = False
+        chain_name = chain_config.get("name", "")
 
         if next_step <= len(steps):
+            # 本链还有下一步
             next_step_config = steps[next_step - 1]
             next_task = DailyTask(
                 player_id=player.id,
@@ -185,7 +245,7 @@ class NoviceQuestService:
                 target_region="新手区",
                 target_x=0,
                 target_y=0,
-                quest_chain_id="novice_basic",
+                quest_chain_id=chain_id,
                 quest_step=next_step,
                 is_tutorial=True,
                 auto_accept=next_step_config.get("auto_accept", False),
@@ -200,6 +260,21 @@ class NoviceQuestService:
                 enemy_agility=0
             )
             session.add(next_task)
+        else:
+            # 本链已完成
+            chain_completed = True
+
+            # 发放章节完成奖励
+            completion_reward = chain_config.get("completion_reward", {})
+            if completion_reward:
+                chain_reward_msg = await cls._give_rewards(session, player, completion_reward)
+            else:
+                chain_reward_msg = ""
+
+            # 尝试解锁下一条链
+            next_chain_id = cls._get_next_chain_id(chain_id)
+            if next_chain_id:
+                await cls._init_chain(session, player, next_chain_id)
 
         await session.commit()
 
@@ -212,7 +287,8 @@ class NoviceQuestService:
             f"{reward_msg}\n"
         )
 
-        if next_task:
+        if not chain_completed:
+            # 本链还有下一步
             completion_msg += (
                 f"━━━━━━━━━━━━━\n"
                 f"🎯 新任务：{next_task.title}\n"
@@ -221,13 +297,34 @@ class NoviceQuestService:
             if flavor_text:
                 completion_msg += f"🌙 {flavor_text}"
         else:
-            # 任务链完成
-            completion_reward = config_data.get("completion_reward", {})
+            # 章节完成
+            completion_reward = chain_config.get("completion_reward", {})
+            achievement_title = completion_reward.get("achievement_title", "")
             completion_msg += (
                 f"━━━━━━━━━━━━━\n"
-                f"🎊 恭喜！所有新手任务已完成！\n"
-                f"🏆 获得称号：{completion_reward.get('achievement_title', '初入深渊')}"
+                f"🎊 「{chain_name}」全部完成！\n"
             )
+            if chain_reward_msg:
+                completion_msg += f"{chain_reward_msg}\n"
+            if achievement_title:
+                completion_msg += f"🏆 获得称号：{achievement_title}\n"
+
+            # 提示下一章
+            next_chain_id = cls._get_next_chain_id(chain_id)
+            if next_chain_id:
+                next_chain_config = cls._get_chain_config(next_chain_id)
+                if next_chain_config:
+                    next_chain_name = next_chain_config.get("name", "")
+                    next_steps = next_chain_config.get("steps", [])
+                    if next_steps:
+                        completion_msg += (
+                            f"━━━━━━━━━━━━━\n"
+                            f"📖 新篇章解锁：「{next_chain_name}」\n"
+                            f"🎯 第一个任务：{next_steps[0]['title']}\n"
+                            f"💬 {next_steps[0]['description']}"
+                        )
+            else:
+                completion_msg += "🌟 所有新手引导已完成，自由探索诡异世界吧！"
 
         return True, completion_msg
 
@@ -239,18 +336,7 @@ class NoviceQuestService:
         action_data: Dict,
         player: Player
     ) -> bool:
-        """
-        检查任务完成条件
-
-        Args:
-            step_config: 步骤配置
-            action_type: 动作类型
-            action_data: 动作数据
-            player: 玩家对象
-
-        Returns:
-            bool: 是否完成
-        """
+        """检查任务完成条件"""
         completion_type = step_config.get("completion_type")
         completion_target = step_config.get("completion_target")
 
@@ -259,8 +345,7 @@ class NoviceQuestService:
             return action_type == "command" and action_data.get("command") == completion_target
 
         elif completion_type == "command_count":
-            # 多次指令完成（需要外部计数，这里简化为单次触发）
-            # 实际实现需要在Player模型中添加计数字段
+            # 多次指令完成（简化为单次触发）
             return action_type == "command" and action_data.get("command") == completion_target
 
         elif completion_type == "level_up":
@@ -276,17 +361,7 @@ class NoviceQuestService:
         player: Player,
         rewards: Dict
     ) -> str:
-        """
-        发放任务奖励
-
-        Args:
-            session: 数据库会话
-            player: 玩家对象
-            rewards: 奖励配置
-
-        Returns:
-            str: 奖励描述文本
-        """
+        """发放任务奖励"""
         reward_parts = []
 
         # 经验奖励

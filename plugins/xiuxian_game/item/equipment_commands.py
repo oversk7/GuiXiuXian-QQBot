@@ -460,7 +460,18 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
             durability_info = f" (ID:{equip.id}, 耐久:{equip.durability}/{equip.config.durability})"
             if equip.durability == 0:
                 await wear_equipment.finish(f"⛔ {equip.config.name} 耐久为0，已自动卸下，请先修理")
-            await wear_equipment.finish(f"✅ 成功穿戴 {equip.config.name}{durability_info}")
+
+            # 检查新手任务
+            from ..quest.novice_quest_service import NoviceQuestService
+            quest_completed, quest_msg = await NoviceQuestService.check_and_advance_quest(
+                session, player, "command", {"command": "装备"}
+            )
+
+            result_msg = f"✅ 成功穿戴 {equip.config.name}{durability_info}"
+            if quest_completed and quest_msg:
+                result_msg += f"\n\n{quest_msg}"
+
+            await wear_equipment.finish(result_msg)
 
         else:
             # ---- 批量装备：依次装备，每件完成后立即重算属性并提交 ----

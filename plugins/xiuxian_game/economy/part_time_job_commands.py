@@ -48,6 +48,8 @@ async def handle_work(event: MessageEvent, args: Message = CommandArg()):
     from ..models.db import AsyncSessionLocal
     from .part_time_job_service_new import PartTimeJobService as PartTimeJobServiceNew
 
+    quest_completed, quest_msg = False, None
+
     def session_factory():
         return AsyncSessionLocal()
 
@@ -86,6 +88,12 @@ async def handle_work(event: MessageEvent, args: Message = CommandArg()):
                 await work_cmd.finish(message_add_head(f"❌ 找不到工作：{args_text}\n💡 使用【打工】查看可用工作", event))
 
             success, msg, job = await part_time_job_service.start_job(player, job_type)
+
+            # 新手任务钩子（打工成功时）
+            if success:
+                from ..quest.novice_quest_service import NoviceQuestService
+                quest_completed, quest_msg = await NoviceQuestService.check_and_advance_quest(uow.session, player, "command", {"command": "打工"})
+
     # 共享的消息构建逻辑
     if not args_text:
         # 查看工作机会的消息
@@ -157,6 +165,10 @@ async def handle_work(event: MessageEvent, args: Message = CommandArg()):
             f"━━━━━━━━━━━━━\n"
             f"💡 使用【收工】完成工作并获得奖励"
         )
+
+        # 附加新手任务消息
+        if quest_completed and quest_msg:
+            result_msg += "\n\n" + quest_msg
 
         await work_cmd.finish(message_add_head(result_msg, event))
 

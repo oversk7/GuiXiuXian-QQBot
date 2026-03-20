@@ -344,7 +344,16 @@ async def handle_join_guild(event: MessageEvent, args: Message = CommandArg()):
         # 创建申请记录
         await service.create_guild_application(player.id, guild_id)
         await session.commit()  # 由调用方控制事务边界
-        await join_guild_cmd.finish(message_add_head(f"✅ 已向『{guild_obj.name}』提交入会申请，等待审核", event))
+
+        # 新手任务钩子
+        from ..quest.novice_quest_service import NoviceQuestService
+        quest_completed, quest_msg = await NoviceQuestService.check_and_advance_quest(session, player, "command", {"command": "加入公会"})
+
+        join_msg = f"✅ 已向『{guild_obj.name}』提交入会申请，等待审核"
+        if quest_completed and quest_msg:
+            join_msg += f"\n\n{quest_msg}"
+
+        await join_guild_cmd.finish(message_add_head(join_msg, event))
 
 # ==================== 退出公会 ====================
 quit_guild_cmd = on_command("退会", aliases={"退出公会"}, block=True, priority=5)
