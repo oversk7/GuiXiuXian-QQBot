@@ -315,21 +315,51 @@ class PetService:
     async def recall_from_guard(
         self, uow: UnitOfWork, player_id: str
     ) -> Tuple[bool, str]:
-        """召回守田宠物"""
+        """召回守田宠物（兼容旧系统遗留的诡兽）"""
         guarding = await uow.pets.get_guarding_pet(player_id)
-        if not guarding:
-            return False, "没有宠物在守田"
 
-        guarding.is_guarding = False
-        await uow.pets.update(guarding)
+        if guarding:
+            # 新系统宠物召回
+            guarding.is_guarding = False
+            await uow.pets.update(guarding)
 
+            field = await uow.spirit_fields.get_by_player_id(player_id)
+            if field:
+                field.guardian_beast_id = None
+                field.guardian_fed_at = None
+                await uow.spirit_fields.update(field)
+
+            return True, f"已召回【{guarding.nickname}】"
+
+        # 兼容旧系统：灵田上有guardian_beast_id但没有pet_instance
         field = await uow.spirit_fields.get_by_player_id(player_id)
-        if field:
+        if field and field.guardian_beast_id:
+            old_beast_id = field.guardian_beast_id
+            # 把旧诡兽物品还回背包
+            try:
+                await ItemInstance.add_item(uow.session, player_id, old_beast_id, 1)
+            except ValueError:
+                pass  # 背包满也继续清除守田状态
+
+            from .config import PetConfigManager
+            config = PetConfigManager()
+            # 从item_id反查名称
+            beast_name = old_beast_id
+            for beast in config.get_all_beasts():
+                if f"guardian_{beast.beast_id}" == old_beast_id:
+                    beast_name = beast.name
+                    break
+
             field.guardian_beast_id = None
             field.guardian_fed_at = None
             await uow.spirit_fields.update(field)
 
-        return True, f"已召回【{guarding.nickname}】"
+            return True, (
+                f"已召回旧系统的【{beast_name}】到背包\n"
+                f"提示: 使用【驯化诡兽 {beast_name} 昵称】将其升级为宠物伴侣"
+            )
+
+        return False, "没有宠物在守田"
 
     # ==================== 查看宠物 ====================
 
