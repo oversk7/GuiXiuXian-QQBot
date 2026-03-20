@@ -628,6 +628,45 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
 
     await cancel_cmd.finish(message_add_head(f"🗑️ 已撤回牌子 #{oid}", event))
 
+# ---------------- 指令：查牌主（查看订单归属） ----------------
+order_owner_cmd = on_command("查牌主", aliases={"牌主"}, block=True, priority=5)
+
+@order_owner_cmd.handle()
+async def _(event: MessageEvent, args: Message = CommandArg()):
+    oid_str = args.extract_plain_text().strip()
+    if not oid_str.isdigit():
+        await order_owner_cmd.finish("⛔ 格式：查牌主 订单ID")
+    oid = int(oid_str)
+
+    async with safe_session() as session:
+        stmt = select(MarketOrder).options(selectinload(MarketOrder.player)).where(
+            MarketOrder.id == oid
+        )
+        order: MarketOrder | None = (await session.execute(stmt)).scalar_one_or_none()
+        if not order:
+            await order_owner_cmd.finish("⛔ 未找到该订单，可能已撤牌或成交")
+
+        item_cfg = config.items_config["by_id"].get(order.item_id)
+        item_name = item_cfg.name if item_cfg else order.item_id
+        side_text = "📤 出售" if order.side == OrderSide.SELL else "📥 求购"
+        player_name = order.player.name if order.player else "未知"
+        player_uid = order.player.uid if order.player else "?"
+
+        lines = [
+            f"📋 订单 #{order.id} 详情",
+            "━━━━━━━━━━━━━",
+            f"{side_text} {item_name}",
+            f"💰 单价: {order.price:,}",
+        ]
+        if order.is_equipment_trade:
+            lines.append(f"⭐ {order.equipment_summary}")
+        else:
+            lines.append(f"📦 数量: {order.quantity}")
+        lines.append(f"👤 挂牌人: {player_name} (UID: {player_uid})")
+        lines.append(f"🕐 挂牌时间: {order.created_at.strftime('%Y-%m-%d %H:%M')}")
+
+        await order_owner_cmd.finish(message_add_head("\n".join(lines), event))
+
 # ---------------- 指令：查看牌子 ----------------
 view_cmd = on_command("查牌",aliases={"比价"}, block=True, priority=5)
 
