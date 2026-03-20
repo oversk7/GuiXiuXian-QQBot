@@ -53,15 +53,40 @@ class ReincarnationService:
         self._item_repo = item_repo
 
     async def can_reincarnate(self, player: Player) -> bool:
-        """检查玩家是否可以冥返"""
+        """检查玩家是否可以冥返（仅检查等级）"""
         required_level = self.get_required_level_for_reincarnation(player.reincarnation_level)
         return player.level >= required_level
+
+    @staticmethod
+    def get_reincarnation_resentment_cost(level: int) -> int:
+        """计算冥返所需怨念值 = 当前等级突破镇厄消耗的10倍"""
+        cfg_break = config.game_config.get("cultivate", {}).get("breakthrough", {})
+        guardian_cost_base = cfg_break.get("guardian_cost_base", 50)
+        guardian_cost_per_level = cfg_break.get("guardian_cost_per_level", 15)
+        return 10 * (guardian_cost_base + level * guardian_cost_per_level)
 
     async def perform_reincarnation(self, player: Player) -> str:
         """执行冥返操作"""
         if not await self.can_reincarnate(player):
             required_level = self.get_required_level_for_reincarnation(player.reincarnation_level)
             return f"⛔ 尚未达到冥返要求，需要达到 {required_level} 级才能进行第{player.reincarnation_level + 1}次冥返"
+
+        # 检查怨念值是否足够
+        resentment_cost = self.get_reincarnation_resentment_cost(player.level)
+        if player.resentment < resentment_cost:
+            return (
+                f"⛔ 怨念不足，无法冥返！\n"
+                f"━━━━━━━━━━━━━\n"
+                f"✧ 当前怨念：{player.resentment}\n"
+                f"✧ 冥返需要：{resentment_cost}\n"
+                f"✧ 还差：{resentment_cost - player.resentment}\n"
+                f"━━━━━━━━━━━━━\n"
+                f"💡 冥返代价 = 当前等级突破镇厄消耗 × 10\n"
+                f"⬇️ 【献祭】获取怨念值"
+            )
+
+        # 扣除怨念值
+        player.resentment -= resentment_cost
 
         # 获取丹药加成
         elixir_bonus = await self._get_elixir_bonus(player.id)
@@ -115,6 +140,7 @@ class ReincarnationService:
             "━━━━━━━━━━━━━\n"
             f"✧ 从 Lv.{old_level} 重塑为 Lv.1\n"
             f"✧ 转数：{old_reincarnation} → {player.reincarnation_level}\n"
+            f"✧ 消耗怨念：{resentment_cost}（剩余 {player.resentment}）\n"
             f"✧ 每级属性点：{self.get_attribute_points_per_level(player.reincarnation_level)}\n"
             f"✧ 修炼效率加成：+{self.get_cultivation_efficiency_bonus(player.reincarnation_level):.0%}\n"
             f"✧ 闭关效率加成：+{self.get_seclusion_efficiency_bonus(player.reincarnation_level):.0%}\n"

@@ -89,6 +89,8 @@ async def handle_newbie_module(event: MessageEvent, args: Message = CommandArg()
         "【出关】 结束闭关\n"
         "【突破】 经验满后升级境界\n"
         "【突破 镇厄】 消耗怨念确保突破成功\n"
+        "【冥返】 轮回转生（消耗怨念，等级重置获永久加成）\n"
+        "【冥返信息】 查看冥返要求和转数加成\n"
         "━━━━━━━━━━━━━\n"
         "📊 属性加点：\n"
         "【加点 属性 点数】 分配属性点\n"

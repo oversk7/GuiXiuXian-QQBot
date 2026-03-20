@@ -44,13 +44,16 @@ async def handle_reincarnate(event: MessageEvent):
         if not await service.can_reincarnate(player):
             required_level = ReincarnationService.get_required_level_for_reincarnation(player.reincarnation_level)
             reincarnation_count = player.reincarnation_level + 1
+            resentment_cost = ReincarnationService.get_reincarnation_resentment_cost(player.level)
             await reincarnate_cmd.finish(
                 f"⛔ 冥返条件不足！\n"
                 f"━━━━━━━━━━━━━\n"
                 f"✧ 当前等级：Lv.{player.level}\n"
                 f"✧ 需要等级：Lv.{required_level} (第{reincarnation_count}次冥返)\n"
+                f"✧ 怨念需求：{resentment_cost}（当前 {player.resentment}）\n"
                 f"━━━━━━━━━━━━━\n"
-                "⬇️ 【修炼】【突破】提升等级"
+                "⬇️ 【修炼】【突破】提升等级\n"
+                "⬇️ 【献祭】获取怨念值"
             )
 
         result_msg = await service.perform_reincarnation(player)
@@ -84,12 +87,17 @@ async def handle_reincarnation_info(event: MessageEvent):
         next_cultivation_bonus = ReincarnationService.get_cultivation_efficiency_bonus(next_reincarnation)
         next_seclusion_bonus = ReincarnationService.get_seclusion_efficiency_bonus(next_reincarnation)
 
+        # 计算怨念需求（基于当前等级）
+        resentment_cost = ReincarnationService.get_reincarnation_resentment_cost(current_level)
+        resentment_enough = player.resentment >= resentment_cost
+
         # 构建信息消息
         msg_lines = [
             "🌟 冥返轮回信息",
             "━━━━━━━━━━━━━",
             f"✧ 当前转数：{current_reincarnation}转",
             f"✧ 当前等级：Lv.{current_level}",
+            f"✧ 当前怨念：{player.resentment}",
             "",
             "【当前转数加成】",
             f"✧ 每级属性点：{attr_points_per_level}",
@@ -99,6 +107,7 @@ async def handle_reincarnation_info(event: MessageEvent):
             "【下次冥返要求】",
             f"✧ 需要等级：Lv.{required_level} (第{next_reincarnation}次冥返)",
             f"✧ 距离目标：{max(0, required_level - current_level)} 级",
+            f"✧ 怨念代价：{resentment_cost}{'✅' if resentment_enough else f'（还差 {resentment_cost - player.resentment}）'}",
             "",
             "【下次转数加成】",
             f"✧ 每级属性点：{next_attr_points} (+{next_attr_points - attr_points_per_level})",
@@ -108,9 +117,13 @@ async def handle_reincarnation_info(event: MessageEvent):
         ]
 
         # 如果已经可以冥返，添加提示
-        if current_level >= required_level:
+        if current_level >= required_level and resentment_enough:
             msg_lines.append("🎉 已达到冥返要求！使用【冥返】命令进行轮回")
+        elif current_level >= required_level:
+            msg_lines.append("⚠️ 等级已达标，但怨念不足！")
+            msg_lines.append("⬇️ 【献祭】获取怨念值")
         else:
             msg_lines.append("⬇️ 【修炼】【突破】提升等级")
+            msg_lines.append("⬇️ 【献祭】获取怨念值")
 
         await reincarnation_info_cmd.finish(message_add_head("\n".join(msg_lines), event))
