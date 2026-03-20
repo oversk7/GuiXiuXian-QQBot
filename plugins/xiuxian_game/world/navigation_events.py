@@ -79,7 +79,7 @@ def _good_events(player: Player, rng: random.Random) -> List[dict]:
 def _bad_events(player: Player, rng: random.Random) -> List[dict]:
     """坏事模板列表（40%总概率中随机选一个）"""
     gold_loss = rng.randint(50, 200)
-    stamina_loss = rng.randint(5, 15)
+    stamina_loss = rng.randint(2, 5)
     hp_loss_pct = rng.randint(5, 10) / 100.0  # 5%-10%
 
     return [
