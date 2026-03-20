@@ -6,7 +6,7 @@ from sqlalchemy.orm.attributes import flag_modified
 
 from ..infrastructure.uow.unit_of_work import UnitOfWork
 from ..models.pet_instance import PetInstance
-from ..models.inventory import ItemInstance
+from ..models.inventory import ItemInstance, ItemType
 from ..domain.attributes.attribute_calculator_factory import AttributeCalculatorFactory
 from .config import PetConfigManager
 
@@ -136,17 +136,17 @@ class PetService:
 
         from ..config import config as game_config
         dish_config = game_config.items_config.get("by_name", {}).get(dish_name)
-        if not dish_config or dish_config.get("type") != "DISH":
+        if not dish_config or dish_config.type != ItemType.DISH:
             return False, f"未找到菜肴【{dish_name}】"
 
-        dish_item_id = dish_config["item_id"]
+        dish_item_id = dish_config.item_id
         dish_count = await uow.items.get_material_total_quantity(player_id, dish_item_id)
         if dish_count < 1:
             return False, f"背包中没有【{dish_name}】"
 
         await ItemInstance.consume_item(uow.session, player_id, dish_item_id, 1)
 
-        rarity = dish_config.get("rarity", "white")
+        rarity = getattr(dish_config, "rarity", "white")
         rarity_bonus = {"white": 1, "green": 2, "blue": 3, "purple": 4, "orange": 5}
         multiplier = rarity_bonus.get(rarity, 1)
 
