@@ -35,7 +35,7 @@ class NavigationEvent:
 def _good_events(player: Player, rng: random.Random) -> List[dict]:
     """好事模板列表（60%总概率中随机选一个）"""
     gold_amount = rng.randint(100, 500)
-    stamina_amount = rng.randint(10, 30)
+    stamina_amount = rng.randint(2, 5)
 
     # 经验基于玩家等级：低级少给，高级多给，保持"有感知"
     base_exp = max(20, player.level * 3)
@@ -65,7 +65,7 @@ def _good_events(player: Player, rng: random.Random) -> List[dict]:
             "icon": "💧",
             "description": f"发现一处灵泉，饮用后恢复了 {stamina_amount} 点咒抗",
             "stamina": stamina_amount,
-            "weight": 15,
+            "weight": 5,
         },
         {
             "icon": "🎁",
