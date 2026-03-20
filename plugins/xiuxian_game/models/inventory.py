@@ -27,6 +27,7 @@ class ItemType(str,PyEnum):
     SEED = "SEED"  # 灵种(灵田种子)
     GUARDIAN_BEAST = "GUARDIAN_BEAST"  # 诡兽(守田用)
     INSCRIPTION = "INSCRIPTION"        # 铭文(独立效果物品，插入宝石孔)
+    PET_ACCESSORY = "PET_ACCESSORY"    # 宠物饰品
 
 class ItemEffectType(str, PyEnum):
     RESTORE_HP = "RESTORE_HP"

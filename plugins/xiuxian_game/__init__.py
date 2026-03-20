@@ -41,6 +41,7 @@ from . import (
     lower_world,  # 下位世界·第四天灾入侵系统
     sponsor,  # 赞助商店系统（诡烛氪金货币）
     auction,  # 拍卖行系统（稀有物品限时竞价）
+    pet,  # 宠物伴侣系统
 )
 
 driver = get_driver()

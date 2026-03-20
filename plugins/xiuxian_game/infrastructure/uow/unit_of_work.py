@@ -121,6 +121,10 @@ class UnitOfWork:
         self._auction_items = None
         self._auction_bid_histories = None
 
+        # 宠物伴侣系统仓储
+        self._pets = None
+        self._pet_dialogue_histories = None
+
     @property
     def players(self):
         """玩家仓储"""
@@ -440,6 +444,22 @@ class UnitOfWork:
             from ..repositories.auction_repository import AuctionBidHistoryRepository
             self._auction_bid_histories = AuctionBidHistoryRepository(self._session)
         return self._auction_bid_histories
+
+    @property
+    def pets(self):
+        """宠物仓储"""
+        if self._pets is None:
+            from ..repositories.pet_repository import PetRepository
+            self._pets = PetRepository(self._session)
+        return self._pets
+
+    @property
+    def pet_dialogue_histories(self):
+        """宠物对话历史仓储"""
+        if self._pet_dialogue_histories is None:
+            from ..repositories.pet_dialogue_history_repository import PetDialogueHistoryRepository
+            self._pet_dialogue_histories = PetDialogueHistoryRepository(self._session)
+        return self._pet_dialogue_histories
 
     @property
     def session(self) -> AsyncSession:

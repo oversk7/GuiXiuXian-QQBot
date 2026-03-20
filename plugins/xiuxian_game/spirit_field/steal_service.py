@@ -229,8 +229,21 @@ class StealService:
             if beast:
                 intercept_rate = beast.intercept_rate
                 beast_name = beast.name
-                # 检查饥饿状态
-                if field.guardian_fed_at:
+                # 检查宠物饱食度（优先）或旧的喂食时间
+                from ..models.pet_instance import PetInstance
+                from sqlalchemy import select as sa_select
+                pet_stmt = sa_select(PetInstance).where(
+                    PetInstance.player_id == field.player_id,
+                    PetInstance.is_guarding == True
+                )
+                pet_result = await uow.session.execute(pet_stmt)
+                guarding_pet = pet_result.scalar_one_or_none()
+                if guarding_pet:
+                    # 宠物系统：用饱食度判断饥饿
+                    if guarding_pet.hunger < 20:
+                        intercept_rate = int(intercept_rate * GUARDIAN_HUNGRY_RATE_PENALTY)
+                elif field.guardian_fed_at:
+                    # 兼容旧系统
                     hours_since_fed = (now - field.guardian_fed_at).total_seconds() / 3600
                     if hours_since_fed >= GUARDIAN_HUNGRY_HOURS:
                         intercept_rate = int(intercept_rate * GUARDIAN_HUNGRY_RATE_PENALTY)

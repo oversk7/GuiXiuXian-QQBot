@@ -66,6 +66,9 @@ from .mansion_warehouse import MansionWarehouseItem
 from .sponsor_shop_log import SponsorShopLog
 # 拍卖行系统模型
 from .auction import AuctionItem, AuctionBidHistory
+# 宠物伴侣系统模型
+from .pet_instance import PetInstance
+from .pet_dialogue_history import PetDialogueHistory
 
 
 __all__ = [
@@ -94,4 +97,5 @@ __all__ = [
     "MansionWarehouseItem",
     "SponsorShopLog",
     "AuctionItem", "AuctionBidHistory",
+    "PetInstance", "PetDialogueHistory",
 ]

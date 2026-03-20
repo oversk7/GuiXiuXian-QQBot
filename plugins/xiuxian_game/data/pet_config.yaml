@@ -1,0 +1,131 @@
+# ====================================================================
+# 宠物伴侣系统 - 主配置
+# ====================================================================
+
+# 全局常量
+settings:
+  max_pets_per_player: 10        # 每个玩家最多拥有宠物数
+  max_level: 100                 # 宠物最高等级
+  transform_level: 50            # 化形所需等级
+  transform_affection: 500       # 化形所需好感度
+  hunger_decay_per_hour: 2       # 每小时饱食度下降
+  mood_decay_per_hour: 1         # 每小时心情下降
+  hungry_threshold: 20           # 饥饿阈值（低于此值心情加速下降）
+  base_feed_resentment: 10       # 基础怨念喂食消耗
+  feed_hunger_restore: 30        # 怨念喂食恢复饱食度
+  dish_hunger_restore: 50        # 菜肴喂食恢复饱食度
+  dish_mood_bonus: 10            # 菜肴喂食额外心情加成
+  interact_cooldown_minutes: 5   # 互动冷却时间（分钟）
+  interact_affection_gain: 3     # 每次互动好感度增加
+  interact_mood_gain: 5          # 每次互动心情增加
+
+# 等级经验表（到达该等级所需的累计经验）
+level_exp_table:
+  1: 0
+  2: 100
+  3: 250
+  4: 450
+  5: 700
+  10: 3000
+  20: 15000
+  30: 45000
+  40: 100000
+  50: 200000
+  60: 350000
+  70: 550000
+  80: 800000
+  90: 1100000
+  100: 1500000
+
+# 每级属性成长（每升1级获得的属性点，按稀有度区分）
+growth_per_level:
+  white:
+    attack: 2
+    defense: 1
+    hp: 10
+    crit_rate: 0.001
+    dodge_rate: 0.001
+  green:
+    attack: 3
+    defense: 2
+    hp: 15
+    crit_rate: 0.0015
+    dodge_rate: 0.0012
+  blue:
+    attack: 5
+    defense: 3
+    hp: 25
+    crit_rate: 0.002
+    dodge_rate: 0.0015
+  purple:
+    attack: 8
+    defense: 5
+    hp: 40
+    crit_rate: 0.003
+    dodge_rate: 0.002
+  orange:
+    attack: 12
+    defense: 8
+    hp: 60
+    crit_rate: 0.004
+    dodge_rate: 0.003
+
+# 诡兽种族定义
+beasts:
+  guard_dog:
+    name: "冥犬"
+    rarity: "white"
+    intercept_rate: 30
+    description: "双目泛着幽光的黑犬，能嗅到偷菜者身上的活人气息"
+    transform_name: "犬灵少女"
+    transform_description: "化形为一位银发犬耳少女，尾巴会在高兴时摇个不停"
+
+  ghost_cat:
+    name: "诡猫"
+    rarity: "green"
+    intercept_rate: 45
+    description: "诡异的猫咪，瞳孔倒映着偷菜者的身影"
+    transform_name: "猫娘"
+    transform_description: "化形为一位慵懒的猫耳少女，喜欢蜷在主人身边打盹"
+
+  ghost_hawk:
+    name: "鬼隼"
+    rarity: "blue"
+    intercept_rate: 60
+    description: "翱翔于阴云中的猛禽，俯冲时拖着一道残影"
+    transform_name: "隼羽巫女"
+    transform_description: "化形为一位背生双翼的巫女，眼神锐利如鹰"
+
+  nightmare_wolf:
+    name: "噩梦狼"
+    rarity: "purple"
+    intercept_rate: 75
+    description: "噩梦中撕咬灵魂的凶狼，偷菜者听到嚎叫便双腿发软"
+    transform_name: "狼灵女仆"
+    transform_description: "化形为一位身着女仆装的狼耳少女，外冷内热，忠诚度极高"
+
+  void_serpent:
+    name: "虚空蟒"
+    rarity: "orange"
+    intercept_rate: 85
+    description: "盘踞在虚空裂缝中的巨蛇，靠近灵田者会被拖入短暂的虚无"
+    transform_name: "蛇姬"
+    transform_description: "化形为一位妖冶的蛇瞳女子，说话时舌尖微微吐信"
+
+# 心情等级对属性加成的影响倍率
+mood_multiplier:
+  0: 0.5
+  20: 0.7
+  40: 0.85
+  60: 1.0
+  80: 1.1
+  100: 1.2
+
+# 好感度等级
+affection_levels:
+  0: "陌生"
+  50: "熟悉"
+  150: "信赖"
+  300: "亲密"
+  500: "羁绊"
+  800: "心意相通"
