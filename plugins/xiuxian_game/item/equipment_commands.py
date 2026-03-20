@@ -942,7 +942,7 @@ async def handle_inscription_list(event: MessageEvent, args: Message = CommandAr
 
     msg = ""
     async with safe_session() as session:
-        player = await Player.get_player_by_event(event, session)
+        player = await get_unified_player(session, event)
         if not player:
             await inscription_list_cmd.finish("你还没有创建角色")
 

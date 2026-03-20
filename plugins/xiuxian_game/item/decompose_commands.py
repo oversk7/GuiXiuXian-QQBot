@@ -8,7 +8,7 @@
 import random
 
 from nonebot import on_command
-from nonebot.adapters.onebot.v11 import MessageEvent, Message
+from nonebot.adapters.qq import MessageEvent, Message
 from nonebot.params import CommandArg
 from sqlalchemy import select
 
@@ -16,6 +16,7 @@ from ..models.db import safe_session
 from ..models.player import Player
 from ..models.inventory import ItemInstance
 from ..config import config
+from ..platform_utils import get_unified_player
 from .decompose_service import validate_decompose, calculate_decompose_yields, FRAGMENT_ITEM_ID
 
 
@@ -30,7 +31,7 @@ async def handle_decompose(event: MessageEvent, args: Message = CommandArg()):
 
     msg = ""
     async with safe_session() as session:
-        player = await Player.get_player_by_event(event, session)
+        player = await get_unified_player(session, event)
         if not player:
             await decompose_cmd.finish("你还没有创建角色")
 

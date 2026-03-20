@@ -8,7 +8,7 @@
 import random
 
 from nonebot import on_command
-from nonebot.adapters.onebot.v11 import MessageEvent, Message
+from nonebot.adapters.qq import MessageEvent, Message
 from nonebot.params import CommandArg
 from sqlalchemy import select
 
@@ -16,6 +16,7 @@ from ..models.db import safe_session
 from ..models.player import Player
 from ..models.inventory import ItemInstance
 from ..config import config
+from ..platform_utils import get_unified_player
 from .inscription_service import (
     generate_inscription_drop,
     get_inscription_display_from_item,
@@ -30,7 +31,7 @@ synthesize_cmd = on_command("合成铭文", priority=5, block=True)
 @synthesize_cmd.handle()
 async def handle_synthesize(event: MessageEvent, args: Message = CommandArg()):
     async with safe_session() as session:
-        player = await Player.get_player_by_event(event, session)
+        player = await get_unified_player(session, event)
         if not player:
             await synthesize_cmd.finish("你还没有创建角色")
 

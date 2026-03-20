@@ -411,8 +411,9 @@ class Player(Base):
             "regen_rate": 0,
         }
 
-        # 计算丹药加成
+        # 计算丹药加成和洗髓减成
         elixir_bonus = {k: 0 for k in INIT_ATTRS}
+        reforge_reduction = {k: 0 for k in INIT_ATTRS}
         if session:
             stmt = select(ElixirUsageLog).where(ElixirUsageLog.player_id == self.id)
             logs = (await session.execute(stmt)).scalars().all()
@@ -425,7 +426,10 @@ class Player(Base):
 
             for item_id, total_qty in elixir_usage_total.items():
                 item_cfg = gcfg.items_config["by_id"].get(item_id)
-                if item_cfg and item_cfg.effect_type.value == "BUFF":
+                if not item_cfg:
+                    continue
+                effect_type = item_cfg.effect_type.value
+                if effect_type == "BUFF":
                     effect_params = item_cfg.effect_params or {}
                     for attr, value in effect_params.items():
                         if attr in elixir_bonus:
@@ -471,17 +475,22 @@ class Player(Base):
                     temporary_bonus[attr] = bonus
 
         # 计算基础属性（初始值 + 加点，不含丹药和VIP装备永久加成）
-        # 注意：Player表存储的属性值 = 基础 + 装备 + 永久丹药 + VIP装备
+        # 注意：Player表存储的属性值 = 基础 + 装备 + 永久丹药 + VIP装备 - 洗髓减成
         # 临时buff不会写入Player表，只在get_effective_attributes查询时动态合并
-        # 所以基础属性 = 当前存储值 - 装备 - 丹药 - VIP装备（不减临时buff）
+        # 所以：raw_base = 当前存储值 - 装备 - 丹药 - VIP装备
+        # 如果 raw_base < 初始值，说明有洗髓减成，差值归入 reforge_reduction
         base_attrs = {}
         for attr in INIT_ATTRS:
             current_value = getattr(self, attr, INIT_ATTRS[attr])
-            base_value = current_value - equipment_bonus[attr] - elixir_bonus[attr] - vip_equipment_bonus[attr]
-            # 确保基础属性不会小于初始值（防止数据异常）
-            base_attrs[attr] = max(base_value, INIT_ATTRS[attr])
+            raw_base = current_value - equipment_bonus[attr] - elixir_bonus[attr] - vip_equipment_bonus[attr]
+            if raw_base < INIT_ATTRS[attr]:
+                # 洗髓导致基础值低于初始值，差值记为洗髓减成
+                reforge_reduction[attr] = raw_base - INIT_ATTRS[attr]  # 负值
+                base_attrs[attr] = INIT_ATTRS[attr]
+            else:
+                base_attrs[attr] = raw_base
 
-        # 计算最终属性（应该等于当前属性值）
+        # 计算最终属性（应该等于当前属性值 + 临时buff）
         total_attrs = {}
         for attr in INIT_ATTRS:
             total_attrs[attr] = (
@@ -489,6 +498,7 @@ class Player(Base):
                 elixir_bonus[attr] +
                 vip_equipment_bonus[attr] +
                 equipment_bonus[attr] +
+                reforge_reduction[attr] +
                 temporary_bonus[attr]
             )
 
@@ -497,6 +507,7 @@ class Player(Base):
             "equipment": equipment_bonus,
             "elixir": elixir_bonus,
             "vip_equipment": vip_equipment_bonus,
+            "reforge": reforge_reduction,
             "temporary": temporary_bonus,
             "total": total_attrs
         }

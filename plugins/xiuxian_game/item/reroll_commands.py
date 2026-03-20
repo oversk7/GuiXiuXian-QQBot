@@ -9,13 +9,14 @@
 import random
 
 from nonebot import on_command
-from nonebot.adapters.onebot.v11 import MessageEvent, Message
+from nonebot.adapters.qq import MessageEvent, Message
 from nonebot.params import CommandArg
 from sqlalchemy import select
 
 from ..models.db import safe_session
 from ..models.player import Player
 from ..models.inventory import ItemInstance
+from ..platform_utils import get_unified_player
 from .affix_service import (
     get_affixes_from_equipment, get_affix_display_name,
     get_affix_value_range_display, reroll_single_affix,
@@ -47,7 +48,7 @@ async def handle_reroll(event: MessageEvent, args: Message = CommandArg()):
     msg = ""
 
     async with safe_session() as session:
-        player = await Player.get_player_by_event(event, session)
+        player = await get_unified_player(session, event)
         if not player:
             await reroll_cmd.finish("你还没有创建角色")
 
@@ -116,7 +117,7 @@ async def handle_confirm_reroll(event: MessageEvent):
     msg = ""
 
     async with safe_session() as session:
-        player = await Player.get_player_by_event(event, session)
+        player = await get_unified_player(session, event)
         if not player:
             await confirm_reroll_cmd.finish("你还没有创建角色")
 
