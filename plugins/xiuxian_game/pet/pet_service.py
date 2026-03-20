@@ -425,7 +425,7 @@ class PetService:
         if not pets:
             return False, "你还没有宠物，使用【驯化诡兽 名称 昵称】获取"
 
-        msg = f"伴侣列表 ({len(pets)}位)\n{'━' * 16}\n"
+        msg = f"宠物列表 ({len(pets)}只)\n{'━' * 16}\n"
         for pet in pets:
             beast = self.config.get_beast(pet.beast_id)
             display_name = beast.transform_name if pet.is_transformed else beast.name

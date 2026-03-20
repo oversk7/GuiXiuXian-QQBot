@@ -2641,7 +2641,7 @@ async def handle_pet_help(event: MessageEvent, args: Message = CommandArg()):
         "🐾 获取与管理：\n"
         "【驯化诡兽 名称 昵称】 驯化背包中的诡兽\n"
         "【宠物】 查看当前伴侣状态\n"
-        "【伴侣列表】 查看所有伴侣\n"
+        "【宠物列表】 查看所有宠物\n"
         "【切换伴侣 宠物ID】 切换当前伴侣\n"
         "━━━━━━━━━━━━━\n"
         "💬 互动与对话：\n"

@@ -71,13 +71,13 @@ async def handle_pet_info(event: MessageEvent):
         await pet_info_cmd.finish(msg)
 
 
-# ==================== 伴侣列表 ====================
-nest_cmd = on_command("伴侣列表", aliases={"宠物列表", "诡兽巢穴"}, priority=5, block=True)
+# ==================== 宠物列表 ====================
+nest_cmd = on_command("宠物列表", aliases={"诡兽巢穴"}, priority=5, block=True)
 
 
 @nest_cmd.handle()
 async def handle_nest(event: MessageEvent):
-    """【伴侣列表】- 查看所有伴侣"""
+    """【宠物列表】- 查看所有宠物"""
     async with UnitOfWork(AsyncSessionLocal) as uow:
         player = await get_unified_player(uow.session, event)
         if not player:
@@ -96,7 +96,7 @@ async def handle_switch(event: MessageEvent, args: Message = CommandArg()):
     """【切换伴侣 宠物ID】- 切换当前伴侣"""
     args_text = args.extract_plain_text().strip()
     if not args_text:
-        await switch_cmd.finish("用法: 切换伴侣 <宠物ID>\n使用【伴侣列表】查看ID")
+        await switch_cmd.finish("用法: 切换伴侣 <宠物ID>\n使用【宠物列表】查看ID")
 
     try:
         pet_id = int(args_text)
