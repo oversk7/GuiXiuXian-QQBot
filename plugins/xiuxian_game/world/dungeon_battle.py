@@ -2053,8 +2053,12 @@ async def generate_player_centered_overview_image(region: str, session, center_x
             tile = tile_map.get((world_x, world_y))
 
             if tile:
-                # 根据事件类型选择颜色，不区分消耗状态
-                color = event_colors.get(tile.event_type, (102, 102, 102))  # 默认灰色
+                base_color = event_colors.get(tile.event_type, (102, 102, 102))  # 默认灰色
+                # 全视之眼预览格子用暗色显示（颜色减为1/3亮度）
+                if (tile.state or {}).get("preview"):
+                    color = (base_color[0] // 3, base_color[1] // 3, base_color[2] // 3)
+                else:
+                    color = base_color
                 colored_tiles_count += 1
             else:
                 # 未探索的区域使用深灰色
@@ -2292,8 +2296,12 @@ async def generate_region_overview_image(region: str, session, player_x: int = N
             tile = tile_map.get((world_x, world_y))
 
             if tile:
-                # 根据事件类型选择颜色，不区分消耗状态
-                color = event_colors.get(tile.event_type, (102, 102, 102))  # 默认灰色
+                base_color = event_colors.get(tile.event_type, (102, 102, 102))  # 默认灰色
+                # 全视之眼预览格子用暗色显示（颜色减为1/3亮度）
+                if (tile.state or {}).get("preview"):
+                    color = (base_color[0] // 3, base_color[1] // 3, base_color[2] // 3)
+                else:
+                    color = base_color
                 colored_tiles_count += 1
             else:
                 # 未探索的区域使用深灰色
@@ -2413,9 +2421,29 @@ async def handle_region_overview(event: MessageEvent, args: Message = CommandArg
                     # 全视之眼赞助特权：预生成所有格子
                     from ..sponsor.service import SponsorShopService
                     if SponsorShopService.is_privilege_active(player, "premium_vision_until"):
+                        # 记录已存在的格子坐标（玩家实际探索过的）
+                        from sqlalchemy import and_
+                        today = date.today()
+                        today_start = datetime.combine(today, datetime.min.time())
+                        tomorrow_start = today_start + timedelta(days=1)
+                        existing_stmt = select(WorldTile.x, WorldTile.y).where(
+                            and_(
+                                WorldTile.region == current_region,
+                                WorldTile.refreshed_at >= today_start,
+                                WorldTile.refreshed_at < tomorrow_start
+                            )
+                        )
+                        existing_result = await session.execute(existing_stmt)
+                        existing_coords = {(r[0], r[1]) for r in existing_result}
+                        # 预生成所有格子，新格子标记为预览
                         for tx in range(-5, 6):
                             for ty in range(-5, 6):
-                                await get_or_create_tile(session, current_region, tx, ty)
+                                if (tx, ty) not in existing_coords:
+                                    tile = await get_or_create_tile(session, current_region, tx, ty)
+                                    # 标记为预览格子
+                                    state = tile.state or {}
+                                    state["preview"] = True
+                                    tile.state = state
                         await session.flush()
                     # 诡域内：生成固定的10x10地图（-5到5的范围），以(0,0)为中心但显示玩家实际位置
                     img_data, (min_x, max_x, min_y, max_y) = await generate_player_centered_overview_image(
@@ -2450,6 +2478,7 @@ async def handle_region_overview(event: MessageEvent, args: Message = CommandArg
                     "🟣 紫色：商人格子",
                     "🟠 橙色：精英怪格子",
                     "⬛ 灰色：未探索区域",
+                    "🔲 暗色：全视之眼揭示（未探索）",
                     f"🟡 亮黄圆圈：你的位置 ({current_x},{current_y})",
                 ]
 
@@ -2502,9 +2531,29 @@ async def handle_region_overview(event: MessageEvent, args: Message = CommandArg
                     # 全视之眼赞助特权：预生成所有格子
                     from ..sponsor.service import SponsorShopService
                     if SponsorShopService.is_privilege_active(player, "premium_vision_until"):
+                        # 记录已存在的格子坐标（玩家实际探索过的）
+                        from sqlalchemy import and_
+                        today = date.today()
+                        today_start = datetime.combine(today, datetime.min.time())
+                        tomorrow_start = today_start + timedelta(days=1)
+                        existing_stmt = select(WorldTile.x, WorldTile.y).where(
+                            and_(
+                                WorldTile.region == region,
+                                WorldTile.refreshed_at >= today_start,
+                                WorldTile.refreshed_at < tomorrow_start
+                            )
+                        )
+                        existing_result = await session.execute(existing_stmt)
+                        existing_coords = {(r[0], r[1]) for r in existing_result}
+                        # 预生成所有格子，新格子标记为预览
                         for tx in range(-5, 6):
                             for ty in range(-5, 6):
-                                await get_or_create_tile(session, region, tx, ty)
+                                if (tx, ty) not in existing_coords:
+                                    tile = await get_or_create_tile(session, region, tx, ty)
+                                    # 标记为预览格子
+                                    state = tile.state or {}
+                                    state["preview"] = True
+                                    tile.state = state
                         await session.flush()
                     # 诡域使用固定的10x10范围（-5到5），如果玩家在当前诡域则以玩家为中心
                     center_x, center_y = 0, 0  # 默认以(0,0)为中心
@@ -2550,7 +2599,8 @@ async def handle_region_overview(event: MessageEvent, args: Message = CommandArg
                     "🔵 蓝色：休息格子",
                     "🟣 紫色：商人格子",
                     "🟠 橙色：精英怪格子",
-                    "⬛ 灰色：未探索区域"
+                    "⬛ 灰色：未探索区域",
+                    "🔲 暗色：全视之眼揭示（未探索）"
                 ])
 
                 # 如果玩家在当前诡域，添加位置说明
