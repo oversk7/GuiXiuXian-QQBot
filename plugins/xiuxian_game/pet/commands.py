@@ -4,6 +4,7 @@ from nonebot.params import CommandArg
 from nonebot.adapters.qq import MessageEvent, Message
 
 from ..models.db import AsyncSessionLocal
+from ..models.inventory import ItemInstance
 from ..infrastructure.uow.unit_of_work import UnitOfWork
 from ..platform_utils import get_unified_player
 from .pet_service import PetService
@@ -211,7 +212,8 @@ async def handle_equip_accessory(event: MessageEvent, args: Message = CommandArg
             for acc in pet_config.get_accessories_by_slot(slot):
                 icon = rarity_names.get(acc.rarity, "⚪")
                 bonus_text = format_bonus(acc.bonus)
-                msg += f"  {icon} {acc.name} {acc.price}金 ({bonus_text})\n"
+                currency = "诡烛" if acc.rarity in ("purple", "orange") else "金"
+                msg += f"  {icon} {acc.name} {acc.price}{currency} ({bonus_text})\n"
         msg += "\n购买: 【买饰品 名称】\n装备: 【宠物装扮 名称】"
         await equip_acc_cmd.finish(msg)
 
@@ -239,15 +241,23 @@ async def handle_buy_accessory(event: MessageEvent, args: Message = CommandArg()
     if not acc:
         await buy_acc_cmd.finish(f"未找到饰品【{args_text}】")
 
+    # 紫色/橙色饰品使用诡烛购买
+    use_gui_zhu = acc.rarity in ("purple", "orange")
+
     async with UnitOfWork(AsyncSessionLocal) as uow:
         player = await get_unified_player(uow.session, event)
         if not player:
             await buy_acc_cmd.finish("请先创建角色")
 
-        if player.gold < acc.price:
-            await buy_acc_cmd.finish(f"金币不足，需要{acc.price}金（当前{player.gold:,}）")
+        if use_gui_zhu:
+            if player.gui_zhu < acc.price:
+                await buy_acc_cmd.finish(f"诡烛不足，需要{acc.price}诡烛（当前{player.gui_zhu}）")
+            player.gui_zhu -= acc.price
+        else:
+            if player.gold < acc.price:
+                await buy_acc_cmd.finish(f"金币不足，需要{acc.price}金（当前{player.gold:,}）")
+            player.gold -= acc.price
 
-        player.gold -= acc.price
         await uow.players.update(player)
 
         acc_item_id = f"pet_acc_{acc.accessory_id}"
@@ -256,9 +266,10 @@ async def handle_buy_accessory(event: MessageEvent, args: Message = CommandArg()
         except ValueError as e:
             await buy_acc_cmd.finish(f"购买失败: {e}")
 
+        currency = "诡烛" if use_gui_zhu else "金"
         await buy_acc_cmd.finish(
             f"成功购买【{acc.name}】!\n"
-            f"消耗: {acc.price}金\n"
+            f"消耗: {acc.price}{currency}\n"
             f"使用【宠物装扮 {acc.name}】装备"
         )
 
