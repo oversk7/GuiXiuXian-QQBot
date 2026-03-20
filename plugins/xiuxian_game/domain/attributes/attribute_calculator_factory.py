@@ -28,6 +28,7 @@ class AttributeCalculatorFactory:
 
     _instance: Optional[AttributeCalculator] = None
     _buff_source: Optional[BuffAttributeSource] = None
+    _pet_source: Optional['PetAttributeSource'] = None
 
     @classmethod
     def get_instance(cls, cache_ttl: float = 60.0) -> AttributeCalculator:
@@ -58,9 +59,10 @@ class AttributeCalculatorFactory:
         equipment_source = EquipmentAttributeSource()
         calculator.add_source(equipment_source)
 
-        # 未来可以添加更多属性来源：
-        # calculator.add_source(VIPAttributeSource())
-        # calculator.add_source(ElixirAttributeSource())
+        # 宠物伴侣属性来源
+        from .attribute_sources.pet_source import PetAttributeSource
+        cls._pet_source = PetAttributeSource(cache_ttl=cache_ttl)
+        calculator.add_source(cls._pet_source)
 
         cls._instance = calculator
 
@@ -79,6 +81,12 @@ class AttributeCalculatorFactory:
         """
         if cls._buff_source:
             cls._buff_source.invalidate_cache(player_id)
+
+    @classmethod
+    def invalidate_pet_cache(cls, player_id: str):
+        """使指定玩家的宠物属性缓存失效"""
+        if cls._pet_source:
+            cls._pet_source.invalidate_cache(player_id)
 
     @classmethod
     def get_cache_stats(cls) -> dict:
@@ -103,5 +111,8 @@ class AttributeCalculatorFactory:
         """
         if cls._buff_source:
             cls._buff_source.clear_cache()
+        if cls._pet_source:
+            cls._pet_source.clear_cache()
         cls._instance = None
         cls._buff_source = None
+        cls._pet_source = None
