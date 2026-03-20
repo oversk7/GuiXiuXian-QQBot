@@ -283,6 +283,9 @@ def get_incense_shop_menu(player: Player) -> str:
     """获取香火商店菜单"""
     incense = player.incense or 0
 
+    white_recipes = [
+        ("食谱·清炒碧冥芹", 80), ("食谱·玉骨萝汤", 90), ("食谱·炙烤幽光菇", 110),
+    ]
     green_recipes = [
         ("食谱·糖醋鲈鱼", 80), ("食谱·酱焖桂鱼", 80), ("食谱·黄花鱼羹", 80),
         ("食谱·清蒸鲳鱼", 80), ("食谱·炭烤鲷鱼", 80),
@@ -315,8 +318,14 @@ def get_incense_shop_menu(player: Player) -> str:
         "",
         "📖 烹饪食谱（使用【买食谱 食谱名】购买）",
         "━━━━━━━━━━━━━",
-        "🟢 绿色食谱（80香火/个）：",
+        "⚪ 白色食谱（80-110香火/个）：",
     ]
+    for name, cost in white_recipes:
+        lines.append(f"  {name}（{cost}香火）")
+
+    lines.extend([
+        "🟢 绿色食谱（80香火/个）：",
+    ])
     for name, _ in green_recipes:
         lines.append(f"  {name}")
 
@@ -348,6 +357,9 @@ def get_incense_shop_menu(player: Player) -> str:
 
 # 香火商店食谱配置：物品名 -> (item_id, 香火价格)
 INCENSE_RECIPE_SHOP = {
+    "食谱·清炒碧冥芹": ("recipe_stir_fried_spirit_cabbage", 80),
+    "食谱·玉骨萝汤": ("recipe_spirit_radish_soup", 90),
+    "食谱·炙烤幽光菇": ("recipe_grilled_spirit_mushroom", 110),
     "食谱·糖醋鲈鱼": ("recipe_sweet_sour_bass", 80),
     "食谱·酱焖桂鱼": ("recipe_braised_mandarin", 80),
     "食谱·黄花鱼羹": ("recipe_yellow_croaker_soup", 80),

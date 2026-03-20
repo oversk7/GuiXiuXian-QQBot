@@ -4165,6 +4165,34 @@ items:
       effect_params: {"recipe_id": "phoenix_grass_delicacy"}
       description: "浴火仙草奇膳的制作方法,传说级灵蔬料理,完美品质时回复理智+18，并永久增加幸运+3（本轮回有效，冥返后重置）。"
 
+    # --- 白色灵蔬食谱 ---
+    - item_id: "recipe_stir_fried_spirit_cabbage"
+      name: "食谱·清炒碧冥芹"
+      type: "CONSUMABLE"
+      rarity: "white"
+      price: 80
+      effect_type: "LEARN_RECIPE"
+      effect_params: {"recipe_id": "stir_fried_spirit_cabbage"}
+      description: "清炒碧冥芹的制作方法,学习后可在餐厅烹饪此菜品。"
+
+    - item_id: "recipe_spirit_radish_soup"
+      name: "食谱·玉骨萝汤"
+      type: "CONSUMABLE"
+      rarity: "white"
+      price: 90
+      effect_type: "LEARN_RECIPE"
+      effect_params: {"recipe_id": "spirit_radish_soup"}
+      description: "玉骨萝汤的制作方法,学习后可在餐厅烹饪此菜品。"
+
+    - item_id: "recipe_grilled_spirit_mushroom"
+      name: "食谱·炙烤幽光菇"
+      type: "CONSUMABLE"
+      rarity: "white"
+      price: 110
+      effect_type: "LEARN_RECIPE"
+      effect_params: {"recipe_id": "grilled_spirit_mushroom"}
+      description: "炙烤幽光菇的制作方法,学习后可在餐厅烹饪此菜品。"
+
   # ====================================================================
   # 灵田系统 - 灵种(种子)
   # ====================================================================
