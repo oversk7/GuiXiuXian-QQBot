@@ -324,9 +324,21 @@ def get_inscription_display_from_item(item_instance) -> str:
         desc = item_cfg.description or ""
         values = values_list[0] if values_list else {}
         chance = values.get("chance")
+        value = values.get("value")
+        # Fallback: 当铭文无存储数值时（旧数据），从配置范围取中位值
+        if chance is None or value is None:
+            eff_cfg = getattr(item_cfg, 'inscription_effect', None)
+            if eff_cfg:
+                if chance is None:
+                    cr = eff_cfg.get("chance_range")
+                    if cr and len(cr) == 2:
+                        chance = round((cr[0] + cr[1]) / 2, 1)
+                if value is None:
+                    vr = eff_cfg.get("value_range")
+                    if vr and len(vr) == 2:
+                        value = round((vr[0] + vr[1]) / 2, 1)
         if chance is not None:
             desc = desc.replace("{chance}", f"{chance}")
-        value = values.get("value")
         if value is not None:
             desc = desc.replace("{value}", f"{value}")
         return f"{name}{grade_str}（{desc}）"
