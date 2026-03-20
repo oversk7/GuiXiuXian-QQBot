@@ -318,6 +318,59 @@ class AchievementService:
                 max_upgrade_items = equipment_result.scalars().all()
                 # 检查是否有装备（通过is_equipment属性判断）
                 is_unlocked = any(item.is_equipment for item in max_upgrade_items)
+            elif condition_type == "npc_gifts_received":
+                # NPC赠礼次数
+                is_unlocked = stats.npc_gifts_received >= condition_value
+            elif condition_type == "has_marriage":
+                # 是否已结婚
+                from ..models.player_relationship import PlayerRelationship, RelationshipType
+                marriage_result = await session.execute(
+                    select(PlayerRelationship).where(
+                        and_(
+                            or_(
+                                PlayerRelationship.player_id == player.id,
+                                PlayerRelationship.target_id == player.id
+                            ),
+                            PlayerRelationship.relationship_type == RelationshipType.MARRIAGE.value
+                        )
+                    ).limit(1)
+                )
+                is_unlocked = marriage_result.scalar_one_or_none() is not None
+            elif condition_type == "has_guild":
+                # 是否加入公会
+                is_unlocked = player.guild_id is not None
+            elif condition_type == "reincarnation_reached":
+                # 转生次数
+                is_unlocked = player.reincarnation_level >= condition_value
+            elif condition_type == "dungeon_depth_reached":
+                # 诡域最深层数
+                is_unlocked = (player.max_dungeon_level or 0) >= condition_value
+            elif condition_type == "trade_count":
+                # 跑商交易次数
+                from ..models.trade_record import TradeRecord
+                from sqlalchemy import func as sql_func
+                trade_result = await session.execute(
+                    select(sql_func.count()).select_from(TradeRecord).where(
+                        TradeRecord.player_id == player.id
+                    )
+                )
+                trade_total = trade_result.scalar() or 0
+                is_unlocked = trade_total >= condition_value
+            elif condition_type == "fish_caught":
+                # 钓鱼总数
+                from ..models.fishing_record import FishingStats
+                fish_result = await session.execute(
+                    select(FishingStats).where(FishingStats.player_id == player.id)
+                )
+                fish_stats = fish_result.scalar_one_or_none()
+                is_unlocked = fish_stats is not None and fish_stats.total_fish_caught >= condition_value
+            elif condition_type == "has_restaurant":
+                # 是否开了餐厅
+                from ..models.restaurant import Restaurant
+                restaurant_result = await session.execute(
+                    select(Restaurant).where(Restaurant.player_id == player.id).limit(1)
+                )
+                is_unlocked = restaurant_result.scalar_one_or_none() is not None
             elif condition_type == "account_age":
                 # 账号创建时间检查（用于周年成就）
                 from datetime import datetime
@@ -522,6 +575,50 @@ class AchievementService:
                         current_progress = stats.consecutive_login_days
                     elif condition_type == "total_login_days":
                         current_progress = stats.total_login_days
+                    elif condition_type == "npc_gifts_received":
+                        current_progress = stats.npc_gifts_received
+                    elif condition_type == "has_marriage":
+                        from ..models.player_relationship import PlayerRelationship, RelationshipType
+                        marriage_result = await session.execute(
+                            select(PlayerRelationship).where(
+                                and_(
+                                    or_(
+                                        PlayerRelationship.player_id == player.id,
+                                        PlayerRelationship.target_id == player.id
+                                    ),
+                                    PlayerRelationship.relationship_type == RelationshipType.MARRIAGE.value
+                                )
+                            ).limit(1)
+                        )
+                        current_progress = 1 if marriage_result.scalar_one_or_none() else 0
+                    elif condition_type == "has_guild":
+                        current_progress = 1 if (player and player.guild_id) else 0
+                    elif condition_type == "reincarnation_reached":
+                        current_progress = player.reincarnation_level if player else 0
+                    elif condition_type == "dungeon_depth_reached":
+                        current_progress = (player.max_dungeon_level or 0) if player else 0
+                    elif condition_type == "trade_count":
+                        from ..models.trade_record import TradeRecord
+                        from sqlalchemy import func as sql_func
+                        trade_result = await session.execute(
+                            select(sql_func.count()).select_from(TradeRecord).where(
+                                TradeRecord.player_id == player.id
+                            )
+                        )
+                        current_progress = trade_result.scalar() or 0
+                    elif condition_type == "fish_caught":
+                        from ..models.fishing_record import FishingStats
+                        fish_result = await session.execute(
+                            select(FishingStats).where(FishingStats.player_id == player.id)
+                        )
+                        fish_stats = fish_result.scalar_one_or_none()
+                        current_progress = fish_stats.total_fish_caught if fish_stats else 0
+                    elif condition_type == "has_restaurant":
+                        from ..models.restaurant import Restaurant
+                        restaurant_result = await session.execute(
+                            select(Restaurant).where(Restaurant.player_id == player.id).limit(1)
+                        )
+                        current_progress = 1 if restaurant_result.scalar_one_or_none() else 0
                     elif condition_type == "account_age":
                         # 账号年龄检查：如果满足条件显示1，否则显示0
                         from datetime import datetime

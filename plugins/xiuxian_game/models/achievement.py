@@ -62,6 +62,9 @@ class PlayerStats(Base):
     consecutive_login_days: Mapped[int] = mapped_column(Integer, default=0, server_default='0', comment="连续登录天数")
     total_login_days: Mapped[int] = mapped_column(Integer, default=0, server_default='0', comment="总登录天数")
 
+    # NPC赠礼统计
+    npc_gifts_received: Mapped[int] = mapped_column(Integer, default=0, server_default='0', comment="累计收到NPC赠礼次数")
+
     # 更新时间
     updated_at: Mapped[datetime] = mapped_column(DateTime, nullable=False, server_default=func.now(), onupdate=func.now(), comment="更新时间")
 

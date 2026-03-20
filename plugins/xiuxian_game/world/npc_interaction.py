@@ -621,6 +621,10 @@ async def handle_ai_dialogue_interaction(session, player: Player, npc, event: Me
         gift_given = False
         if gift_item_id:
             gift_given = await apply_npc_gift(session, npc, player, gift_item_id, gift_qty, gift_name)
+            if gift_given:
+                # 更新NPC赠礼成就统计
+                from ..achievement.achievement_service import AchievementService
+                await AchievementService.update_stat(session, player.id, "npc_gifts_received", auto_commit=False)
 
         # 根据对话内容更新好感度（使用之前分析的sentiment）
         fav_delta = fav_service.get_favorability_change_by_interaction_type(
@@ -713,6 +717,11 @@ async def handle_ai_dialogue_interaction(session, player: Player, npc, event: Me
         lines.append(f"  【{npc.name}】: {npc_response}")
         if gift_given:
             lines.append(f"  🎁 {npc.name} 赠送了你 {gift_name}×{gift_qty}")
+            # 检查NPC赠礼相关成就
+            from ..achievement.achievement_service import AchievementService
+            achievement_msgs = await AchievementService.check_achievements(session, player)
+            if achievement_msgs:
+                lines.extend([""] + achievement_msgs)
         lines.append("")
 
         # 显示好感度变化（带情感指示）

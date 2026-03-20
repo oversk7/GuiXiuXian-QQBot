@@ -144,7 +144,10 @@ REQUIRED_FIELDS: Dict[str, Dict[str, str]] = {
         "bullet_counts": "TEXT NOT NULL COMMENT '弹药统计(JSON)'",
         "created_at": "DATETIME NULL COMMENT '创建时间'",
         "updated_at": "DATETIME NULL COMMENT '更新时间'"
-    }
+    },
+    "player_stats": {
+        "npc_gifts_received": "INT DEFAULT 0 COMMENT '累计收到NPC赠礼次数'",
+    },
     # 注释: 以下字段已通过多次重启完成迁移:
     # - daily_task: quest_chain_id, quest_step, is_tutorial, auto_accept
     # - stocks: health, health_decay_rate, is_active, delisted_at, delist_reason

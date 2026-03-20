@@ -431,6 +431,126 @@ advanced_achievements:
     flavor_text: "百日相伴，终身成就，感谢有你。"
     hidden: false
 
+  # 社交系列
+  npc_gift_beggar:
+    id: "npc_gift_beggar"
+    title: "化缘大师"
+    description: "成功从NPC那里讨到金币或药品"
+    icon: "🤲"
+    condition_type: "npc_gifts_received"
+    condition_target: "npc_gifts"
+    condition_value: 1
+    rewards:
+      gold: 3000
+      exp: 800
+    flavor_text: "脸皮够厚，天下我有。"
+    hidden: false
+
+  tied_the_knot:
+    id: "tied_the_knot"
+    title: "执子之手"
+    description: "与另一位修士结为道侣"
+    icon: "💍"
+    condition_type: "has_marriage"
+    condition_target: "marriage"
+    condition_value: 1
+    rewards:
+      gold: 5000
+      exp: 1500
+      attribute_points: 5
+    flavor_text: "与子偕老，生死相依。连鬼都要羡慕你们。"
+    hidden: false
+
+  joined_guild:
+    id: "joined_guild"
+    title: "归属感"
+    description: "加入一个公会，不再是孤身一人"
+    icon: "🏰"
+    condition_type: "has_guild"
+    condition_target: "guild"
+    condition_value: 1
+    rewards:
+      gold: 2000
+      exp: 500
+    flavor_text: "独行快，众行远。有了组织就是不一样。"
+    hidden: false
+
+  # 战斗冒险系列
+  first_reincarnation:
+    id: "first_reincarnation"
+    title: "涅槃重生"
+    description: "完成第一次冥返转生，浴火重生"
+    icon: "🔄"
+    condition_type: "reincarnation_reached"
+    condition_target: "reincarnation_level"
+    condition_value: 1
+    rewards:
+      gold: 50000
+      exp: 10000
+      attribute_points: 30
+    flavor_text: "大死大活，方知天道。转生之后，世界焕然一新。"
+    hidden: false
+
+  abyss_walker:
+    id: "abyss_walker"
+    title: "深渊行者"
+    description: "深入诡域第10层，在疯狂边缘行走"
+    icon: "🌀"
+    condition_type: "dungeon_depth_reached"
+    condition_target: "max_dungeon_level"
+    condition_value: 10
+    rewards:
+      gold: 15000
+      exp: 4000
+      attribute_points: 10
+    flavor_text: "凝视深渊太久，深渊也开始对你点头哈腰。"
+    hidden: false
+
+  # 经济大亨系列
+  first_trade:
+    id: "first_trade"
+    title: "商道初开"
+    description: "完成第一笔跑商交易"
+    icon: "🏪"
+    condition_type: "trade_count"
+    condition_target: "trade_record"
+    condition_value: 1
+    rewards:
+      gold: 2000
+      exp: 500
+    flavor_text: "万贯家财，始于一笔买卖。"
+    hidden: false
+
+  # 生活休闲系列
+  fishing_enthusiast:
+    id: "fishing_enthusiast"
+    title: "愿者上钩"
+    description: "累计钓到50条鱼，成为钓鱼老手"
+    icon: "🎣"
+    condition_type: "fish_caught"
+    condition_target: "total_fish"
+    condition_value: 50
+    rewards:
+      gold: 10000
+      exp: 3000
+      attribute_points: 8
+    flavor_text: "姜太公钓鱼，愿者上钩。你比他强，五十条鱼都咬了。"
+    hidden: false
+
+  first_restaurant:
+    id: "first_restaurant"
+    title: "掌勺人"
+    description: "开设自己的餐厅，当上老板"
+    icon: "🍳"
+    condition_type: "has_restaurant"
+    condition_target: "restaurant"
+    condition_value: 1
+    rewards:
+      gold: 3000
+      exp: 800
+    flavor_text: "修仙修到最后，还是开饭馆最靠谱。"
+    hidden: false
+
 # 成就分类
 categories:
   cultivation: ["first_cultivation", "cultivation_adept", "cultivation_master", "ascetic_monk"]
@@ -440,4 +560,8 @@ categories:
   wealth: ["small_fortune", "wealthy_magnate", "financial_freedom"]
   exploration: ["world_explorer", "seasoned_explorer", "master_explorer"]
   loyalty: ["loyal_believer", "weekly_devotee", "monthly_devotee", "lifetime_achievement"]
+  social: ["npc_gift_beggar", "tied_the_knot", "joined_guild"]
+  adventure: ["first_reincarnation", "abyss_walker"]
+  economy: ["first_trade"]
+  lifestyle: ["fishing_enthusiast", "first_restaurant"]
   anniversary: ["first_anniversary"]
