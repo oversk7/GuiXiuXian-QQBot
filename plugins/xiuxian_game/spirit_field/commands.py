@@ -235,61 +235,35 @@ async def handle_steal(event: MessageEvent, args: Message = CommandArg()):
             await steal_cmd.finish(msg)
 
 
-# ==================== 放置诡兽 ====================
+# ==================== 旧诡兽命令（引导到宠物伴侣系统） ====================
 
-place_guardian_cmd = on_command("放置诡兽", aliases={"守田"}, priority=5, block=True)
+place_guardian_cmd = on_command("放置诡兽", priority=5, block=True)
 
 
 @place_guardian_cmd.handle()
-async def handle_place_guardian(event: MessageEvent, args: Message = CommandArg()):
-    """【放置诡兽 诡兽名】- 放置诡兽守田"""
-    args_text = args.extract_plain_text().strip()
-    if not args_text:
-        await place_guardian_cmd.finish("用法: 放置诡兽 <诡兽名>\n例如: 放置诡兽 看田犬")
+async def handle_place_guardian_redirect(event: MessageEvent):
+    await place_guardian_cmd.finish(
+        "诡兽系统已升级为宠物伴侣系统!\n"
+        "- 驯化: 【驯化诡兽 名称 昵称】\n"
+        "- 守田: 【派遣守田】\n"
+        "- 查看: 【宠物】"
+    )
 
-    beast_name = args_text.split()[0]
-
-    async with UnitOfWork(AsyncSessionLocal) as uow:
-        player = await get_unified_player(uow.session, event)
-        if not player:
-            await place_guardian_cmd.finish("请先创建角色")
-
-        success, msg = await guardian_service.place_guardian(uow, player.id, beast_name)
-        await place_guardian_cmd.finish(msg)
-
-
-# ==================== 收回诡兽 ====================
 
 remove_guardian_cmd = on_command("收回诡兽", aliases={"撤回诡兽"}, priority=5, block=True)
 
 
 @remove_guardian_cmd.handle()
-async def handle_remove_guardian(event: MessageEvent):
-    """【收回诡兽】- 收回守田诡兽"""
-    async with UnitOfWork(AsyncSessionLocal) as uow:
-        player = await get_unified_player(uow.session, event)
-        if not player:
-            await remove_guardian_cmd.finish("请先创建角色")
+async def handle_remove_guardian_redirect(event: MessageEvent):
+    await remove_guardian_cmd.finish("诡兽系统已升级! 使用【召回宠物】召回守田中的宠物")
 
-        success, msg = await guardian_service.remove_guardian(uow, player.id)
-        await remove_guardian_cmd.finish(msg)
-
-
-# ==================== 喂养诡兽 ====================
 
 feed_guardian_cmd = on_command("喂养诡兽", aliases={"喂诡兽"}, priority=5, block=True)
 
 
 @feed_guardian_cmd.handle()
-async def handle_feed_guardian(event: MessageEvent):
-    """【喂养诡兽】- 喂食诡兽"""
-    async with UnitOfWork(AsyncSessionLocal) as uow:
-        player = await get_unified_player(uow.session, event)
-        if not player:
-            await feed_guardian_cmd.finish("请先创建角色")
-
-        success, msg = await guardian_service.feed_guardian(uow, player.id)
-        await feed_guardian_cmd.finish(msg)
+async def handle_feed_guardian_redirect(event: MessageEvent):
+    await feed_guardian_cmd.finish("诡兽系统已升级! 使用【喂食】喂养你的宠物伴侣")
 
 
 # ==================== 灵种商店 ====================
