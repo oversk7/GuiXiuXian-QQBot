@@ -2410,6 +2410,13 @@ async def handle_region_overview(event: MessageEvent, args: Message = CommandArg
 
                 # 检查当前区域是否为诡域（层级制诡域）
                 if current_region.endswith("层诡域"):
+                    # 全视之眼赞助特权：预生成所有格子
+                    from ..sponsor.service import SponsorShopService
+                    if SponsorShopService.is_privilege_active(player, "premium_vision_until"):
+                        for tx in range(-5, 6):
+                            for ty in range(-5, 6):
+                                await get_or_create_tile(session, current_region, tx, ty)
+                        await session.flush()
                     # 诡域内：生成固定的10x10地图（-5到5的范围），以(0,0)为中心但显示玩家实际位置
                     img_data, (min_x, max_x, min_y, max_y) = await generate_player_centered_overview_image(
                         current_region, session, 0, 0, 11, 11, current_x, current_y  # 以(0,0)为中心的11x11地图，但显示玩家在(current_x,current_y)的位置
@@ -2492,6 +2499,13 @@ async def handle_region_overview(event: MessageEvent, args: Message = CommandArg
 
                 # 检查是否为诡域，如果是则使用固定范围
                 if region.endswith("层诡域"):
+                    # 全视之眼赞助特权：预生成所有格子
+                    from ..sponsor.service import SponsorShopService
+                    if SponsorShopService.is_privilege_active(player, "premium_vision_until"):
+                        for tx in range(-5, 6):
+                            for ty in range(-5, 6):
+                                await get_or_create_tile(session, region, tx, ty)
+                        await session.flush()
                     # 诡域使用固定的10x10范围（-5到5），如果玩家在当前诡域则以玩家为中心
                     center_x, center_y = 0, 0  # 默认以(0,0)为中心
                     if current_region == region and player_x is not None and player_y is not None:
