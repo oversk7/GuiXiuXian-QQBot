@@ -137,7 +137,7 @@ async def handle_attribute_breakdown(event: MessageEvent):
             if elixir > 0:
                 parts.append(f"丹药+{elixir}")
             if vip_equipment > 0:
-                parts.append(f"特殊装备+{vip_equipment}")
+                parts.append(f"特殊+{vip_equipment}")
             if reforge < 0:
                 parts.append(f"洗髓{reforge}")
             if temporary > 0:
