@@ -649,7 +649,7 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
         item_cfg = config.items_config["by_id"].get(order.item_id)
         item_name = item_cfg.name if item_cfg else order.item_id
         side_text = "📤 出售" if order.side == OrderSide.SELL else "📥 求购"
-        player_name = order.player.name if order.player else "未知"
+        player_name = order.player.nickname if order.player else "未知"
         player_uid = order.player.uid if order.player else "?"
 
         lines = [
