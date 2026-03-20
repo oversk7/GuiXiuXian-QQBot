@@ -22,7 +22,6 @@ from ..infrastructure.uow.unit_of_work import UnitOfWork
 from ..platform_utils import get_unified_player
 from .spirit_field_service import SpiritFieldService
 from .steal_service import StealService
-from .guardian_service import GuardianService
 from .config import (
     CropManager, GuardianBeastManager,
     FIELD_LEVEL_PLOTS, FIELD_UPGRADE_COST, FIELD_LEVEL_UNLOCK_RARITY,
@@ -32,7 +31,6 @@ from .config import (
 
 field_service = SpiritFieldService()
 steal_service = StealService()
-guardian_service = GuardianService()
 crop_manager = CropManager()
 beast_manager = GuardianBeastManager()
 

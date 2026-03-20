@@ -7,6 +7,7 @@ from sqlalchemy.orm.attributes import flag_modified
 from ..infrastructure.uow.unit_of_work import UnitOfWork
 from ..models.pet_instance import PetInstance
 from ..models.inventory import ItemInstance
+from ..domain.attributes.attribute_calculator_factory import AttributeCalculatorFactory
 from .config import PetConfigManager
 
 
@@ -84,6 +85,7 @@ class PetService:
 
         pet.is_active = True
         await uow.pets.update(pet)
+        AttributeCalculatorFactory.invalidate_pet_cache(player_id)
         return True, f"【{pet.nickname}】现在是你的伴侣了"
 
     # ==================== 喂食 ====================
@@ -111,6 +113,7 @@ class PetService:
         exp_gain = 5
         level_up_msg = self._add_experience(pet, exp_gain)
         await uow.pets.update(pet)
+        AttributeCalculatorFactory.invalidate_pet_cache(player_id)
 
         msg = (
             f"已喂养【{pet.nickname}】\n"
@@ -156,6 +159,7 @@ class PetService:
         pet.last_fed_at = datetime.now()
         level_up_msg = self._add_experience(pet, exp_gain)
         await uow.pets.update(pet)
+        AttributeCalculatorFactory.invalidate_pet_cache(player_id)
 
         msg = (
             f"用【{dish_name}】喂养了【{pet.nickname}】\n"
@@ -193,6 +197,7 @@ class PetService:
         pet.last_interact_at = datetime.now()
         level_up_msg = self._add_experience(pet, exp_gain)
         await uow.pets.update(pet)
+        AttributeCalculatorFactory.invalidate_pet_cache(player_id)
 
         level_name = self.config.get_affection_level_name(pet.affection)
         msg = (
@@ -267,6 +272,7 @@ class PetService:
         pet.accessories = accessories
         flag_modified(pet, "accessories")
         await uow.pets.update(pet)
+        AttributeCalculatorFactory.invalidate_pet_cache(player_id)
 
         bonus_text = ", ".join(f"{k}+{v}" for k, v in acc.bonus.items())
         return True, (

@@ -2,6 +2,7 @@
 from typing import Tuple
 from nonebot import logger
 
+from nonebot.exception import FinishedException, PausedException, RejectedException
 from ..dialogue.ai_dialogue_service import AIDialogueService
 from ..dialogue.npc_personality import PersonalityTemplate
 from ..infrastructure.uow.unit_of_work import UnitOfWork
@@ -83,6 +84,8 @@ class PetDialogueService:
                 favorability=pet.affection,
                 context=context,
             )
+        except (FinishedException, PausedException, RejectedException):
+            raise
         except Exception as e:
             logger.error(f"宠物AI对话失败: {e}", exc_info=True)
             response = self._get_fallback_response(pet)

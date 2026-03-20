@@ -254,7 +254,7 @@ async def handle_buy_accessory(event: MessageEvent, args: Message = CommandArg()
 
 
 # ==================== 派遣守田 ====================
-guard_cmd = on_command("派遣守田", priority=5, block=True)
+guard_cmd = on_command("派遣守田", aliases={"守田"}, priority=5, block=True)
 
 
 @guard_cmd.handle()
