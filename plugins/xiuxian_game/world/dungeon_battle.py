@@ -82,7 +82,7 @@ INSCRIPTION_TYPE_WEIGHTS = {"basic": 60, "advanced": 40}
 ADVANCED_RARITY_WEIGHTS = {"purple": 80, "orange": 20}
 ADVANCED_ORANGE_MIN_LEVEL = 150
 CELESTIAL_GRADE_MIN_LEVEL = 3000
-FRAGMENT_DROP_RATE = 0.20
+FRAGMENT_DROP_RATE = 0.08
 FRAGMENT_ITEM_ID = "inscription_fragment"
 
 # -------- 怪物原型配置 --------
@@ -672,7 +672,7 @@ async def handle_monster_drops(session, player: Player, monster_level: int, regi
 
         # 铭文碎片掉落（独立于铭文判定）
         if rng.random() < FRAGMENT_DROP_RATE * (1 + luck_prob(player.luck)):
-            frag_qty = rng.randint(1, 2)
+            frag_qty = 1
             try:
                 await ItemInstance.add_item(session, player.id, FRAGMENT_ITEM_ID, frag_qty)
                 drops[f"📜铭文碎片"] = drops.get("📜铭文碎片", 0) + frag_qty

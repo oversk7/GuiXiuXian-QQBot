@@ -64,7 +64,7 @@ def calculate_decompose_yields(equipment, rng: random.Random = None) -> Decompos
     if has_affixes:
         total_stones += rng.randint(extra_min, extra_max)
 
-    # T2 词缀 -> 铭文碎片（每个T2词缀必出1个碎片）
-    t2_count = sum(1 for a in affixes if a.get("tier") == "T2")
+    # T2 词缀 -> 铭文碎片（每个T2词缀50%概率出1个碎片）
+    t2_count = sum(1 for a in affixes if a.get("tier") == "T2" and rng.random() < 0.50)
 
     return DecomposeResult(reroll_stones=total_stones, fragment_count=t2_count)
