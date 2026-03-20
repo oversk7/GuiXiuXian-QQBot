@@ -4498,3 +4498,21 @@ items:
       rarity: "purple"
       price: 30000
       description: "宠物服饰，攻击+15 暴击+1.5%"
+    - item_id: "pet_acc_star_crown"
+      name: "星辰发冠"
+      type: "PET_ACCESSORY"
+      rarity: "orange"
+      price: 300
+      description: "宠物头饰，暴击率+3% 暴击伤害+10%（诡烛专属）"
+    - item_id: "pet_acc_silver_bell_necklace"
+      name: "银铃璎珞"
+      type: "PET_ACCESSORY"
+      rarity: "orange"
+      price: 300
+      description: "宠物颈饰，连击率+3% 穿透率+3%（诡烛专属）"
+    - item_id: "pet_acc_aurora_cloak"
+      name: "流光羽衣"
+      type: "PET_ACCESSORY"
+      rarity: "orange"
+      price: 300
+      description: "宠物服饰，闪避率+3% 反击率+3%（诡烛专属）"

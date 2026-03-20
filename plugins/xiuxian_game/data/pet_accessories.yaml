@@ -68,7 +68,7 @@ accessories:
     name: "虚空锁链"
     slot: "neck"
     rarity: "purple"
-    price: 30000
+    price: 150
     description_prefix: ""
     bonus:
       attack: 20
@@ -101,9 +101,43 @@ accessories:
     name: "诡纹和服"
     slot: "body"
     rarity: "purple"
-    price: 30000
+    price: 150
     description_prefix: "身穿诡纹和服的"
     bonus:
       attack: 15
       crit_rate: 0.015
     description: "绣有诡域纹章的华丽和服，散发着神秘气息"
+
+  # ==================== 诡烛专属饰品（橙色） ====================
+  - accessory_id: "star_crown"
+    name: "星辰发冠"
+    slot: "head"
+    rarity: "orange"
+    price: 300
+    description_prefix: "头戴星辰发冠的"
+    bonus:
+      crit_rate: 0.03
+      critical_damage: 0.10
+    description: "以凝固的星光编织而成的精致发冠，佩戴者仿佛自带柔和光晕"
+
+  - accessory_id: "silver_bell_necklace"
+    name: "银铃璎珞"
+    slot: "neck"
+    rarity: "orange"
+    price: 300
+    description_prefix: "佩戴银铃璎珞的"
+    bonus:
+      combo_rate: 0.03
+      penetration_rate: 0.03
+    description: "银色铃铛串成的精美项饰，走动时发出悦耳清音"
+
+  - accessory_id: "aurora_cloak"
+    name: "流光羽衣"
+    slot: "body"
+    rarity: "orange"
+    price: 300
+    description_prefix: "身着流光羽衣的"
+    bonus:
+      dodge_rate: 0.03
+      counter_rate: 0.03
+    description: "以流光羽毛缝制的华丽外衣，随动作泛起七彩微光"
