@@ -967,6 +967,18 @@ class EnhancedBattleEngine:
                     self.effect_manager.add_effect(attacker_id, rigid_effect)
                     status_lines.append(f"💪 刚气-心触发！受到伤害降低60%(持续3回合)")
 
+        # 检查攻击者是否有持续性DAMAGE_BOOST效果（如闪避触发的"风刃反击"）
+        active_boosts = self.effect_manager.get_active_effects(attacker_id, EffectType.DAMAGE_BOOST)
+        if active_boosts and damage > 0:
+            total_boost_pct = sum(float(getattr(b, 'value', 0)) for b in active_boosts)
+            if total_boost_pct > 0:
+                total_current = guaranteed_damage + damage
+                boost_damage = int(total_current * total_boost_pct / 100)
+                damage += boost_damage
+                # 取第一个效果的装备标签用于显示
+                boost_tag = active_boosts[0].equip_tag()
+                sub_lines.append(f"  └ 💥 {boost_tag}伤害提升 +{total_boost_pct:.0f}% (+{boost_damage})")
+
         # 检查刚气-心状态，降低造成的伤害
         rigid_qi_effects = self.effect_manager.get_active_effects(attacker_id, EffectType.RIGID_QI_HEART)
         if rigid_qi_effects:
@@ -1008,7 +1020,7 @@ class EnhancedBattleEngine:
             damage += fear_bonus
             sub_lines.append(f"  └ 😱 恐惧增伤 +20% (+{fear_bonus})")
 
-        # 伞下：受到伤害减少（归雨DAMAGE_REDUCTION效果）
+        # 受到伤害减少（DAMAGE_REDUCTION效果，如归雨·伞下、龙刃鞋·龙鳞护足等）
         dmg_reduction_effects = self.effect_manager.get_active_effects(defender_id, EffectType.DAMAGE_REDUCTION)
         total_reduction_pct = 0.0
         for dr_eff in dmg_reduction_effects:
@@ -1018,7 +1030,9 @@ class EnhancedBattleEngine:
             reduction_amount = int(damage * total_reduction_pct / 100)
             damage -= reduction_amount
             damage = max(1, damage)  # 至少造成1点伤害
-            sub_lines.append(f"  └ ☂️ 伞下减伤 -{total_reduction_pct:.0f}% (-{reduction_amount})")
+            # 动态显示来源装备名
+            dr_tag = dmg_reduction_effects[0].equip_tag() if dmg_reduction_effects else ""
+            sub_lines.append(f"  └ ☂️ {dr_tag}减伤 -{total_reduction_pct:.0f}% (-{reduction_amount})")
 
         # 猛虎标弹：防御者受到伤害降低30%（天退星刀专属）
         fierce_tiger_def_effects = self.effect_manager.get_active_effects(defender_id, EffectType.FIERCE_TIGER_BULLET)

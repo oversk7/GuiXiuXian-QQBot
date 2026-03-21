@@ -134,7 +134,7 @@ class BattleIntegrationHelper:
         player1._cached_attack = player1_base_attrs.get('attack', player1.attack)
         player1._cached_defense = player1_base_attrs.get('defense', player1.defense)
         player1._cached_hp = player1.hp  # 当前HP,不使用buff加成
-        player1._cached_max_hp = player1_base_attrs.get('max_hp', player1.max_hp)  # 最大HP,包含buff
+        player1._cached_max_hp = player1_base_attrs.get('max_hp', _get_cached_max_hp(player1))  # 最大HP,包含buff
         player1._cached_mp = player1.mp  # 当前MP,不使用buff加成
         player1._cached_max_mp = player1_base_attrs.get('max_mp', getattr(player1, 'max_mp', 0))  # 最大MP,包含buff
         player1._cached_agility = player1_base_attrs.get('agility', player1.agility)
@@ -142,7 +142,7 @@ class BattleIntegrationHelper:
         player2._cached_attack = player2_base_attrs.get('attack', player2.attack)
         player2._cached_defense = player2_base_attrs.get('defense', player2.defense)
         player2._cached_hp = player2.hp  # 当前HP,不使用buff加成
-        player2._cached_max_hp = player2_base_attrs.get('max_hp', player2.max_hp)  # 最大HP,包含buff
+        player2._cached_max_hp = player2_base_attrs.get('max_hp', _get_cached_max_hp(player2))  # 最大HP,包含buff
         player2._cached_mp = player2.mp  # 当前MP,不使用buff加成
         player2._cached_max_mp = player2_base_attrs.get('max_mp', getattr(player2, 'max_mp', 0))  # 最大MP,包含buff
         player2._cached_agility = player2_base_attrs.get('agility', player2.agility)
@@ -185,7 +185,7 @@ class BattleIntegrationHelper:
             _theme2 = ""
         _p2_region = player2.get_current_region() if hasattr(player2, 'get_current_region') else getattr(player2, 'region', "")
         _p2_ctx = {
-            "source": "战斗开始", "current_hp": player2.hp, "max_hp": player2.max_hp,
+            "source": "战斗开始", "current_hp": player2.hp, "max_hp": _get_cached_max_hp(player2),
             "current_mp": getattr(player2, 'mp', 0), "max_mp": getattr(player2, 'max_mp', 0),
             "region": _p2_region, "theme": _theme2,
         }
@@ -196,8 +196,9 @@ class BattleIntegrationHelper:
         # player2的绝魔体质削弱player1特殊属性
         engine.apply_ignore_special_debuff(player2.id, player1, player1.id)
         # 同步首回合临时增益导致的即时生命值变化（如"灵影体质"）
-        player1_hp = player1.hp
-        player2_hp = player2.hp
+        # 将当前HP cap到有效max_hp（含宠物加成），防止DB中膨胀的HP导致百分比异常
+        player1_hp = min(player1.hp, _get_cached_max_hp(player1))
+        player2_hp = min(player2.hp, _get_cached_max_hp(player2))
         initial_player1_hp = player1_hp
         initial_player2_hp = player2_hp
 
@@ -217,13 +218,13 @@ class BattleIntegrationHelper:
             # 玩家1 回合开始
             p1_turn_msgs, player1_hp_restored = engine._process_turn_start(player1.id, player1)
             if player1_hp_restored > 0:
-                player1_hp = min(player1.max_hp, player1_hp + player1_hp_restored)
+                player1_hp = min(_get_cached_max_hp(player1), player1_hp + player1_hp_restored)
             battle_log.extend(p1_turn_msgs)
 
             # 玩家2 回合开始
             p2_turn_msgs, player2_hp_restored = engine._process_turn_start(player2.id, player2)
             if player2_hp_restored > 0:
-                player2_hp = min(player2.max_hp, player2_hp + player2_hp_restored)
+                player2_hp = min(_get_cached_max_hp(player2), player2_hp + player2_hp_restored)
             battle_log.extend(p2_turn_msgs)
 
             # 确定回合顺序
@@ -249,7 +250,7 @@ class BattleIntegrationHelper:
                     # 只有在防守方还活着时才能回血，避免死人复活
                     heal_def = attack_result.get("defender_hp_restored", 0)
                     if heal_def > 0 and second_hp_ref[0] > 0:
-                        second_hp_ref[0] = min(second_player.max_hp, second_hp_ref[0] + heal_def)
+                        second_hp_ref[0] = min(_get_cached_max_hp(second_player), second_hp_ref[0] + heal_def)
                         battle_log.append(f"💚 {second_player.nickname}回复{heal_def}HP")
 
                     # 反弹伤害（对攻击方造成伤害）
@@ -269,7 +270,7 @@ class BattleIntegrationHelper:
                     # 命中后检查处决（忽略无敌等，直接强制死亡）
                     exec_thr = _get_execute_threshold(first_player.id)
                     if exec_thr > 0 and second_hp_ref[0] > 0:
-                        if second_hp_ref[0] < int(second_player.max_hp * exec_thr / 100):
+                        if second_hp_ref[0] < int(_get_cached_max_hp(second_player) * exec_thr / 100):
                             battle_log.append(f"⚰️ {first_player.nickname}发动处决，{second_player.nickname}被弑灭！")
                             second_hp_ref[0] = 0
 
@@ -297,10 +298,10 @@ class BattleIntegrationHelper:
                         # 击杀回血（更新first_hp_ref）
                         if kill_result.get("hp_restored", 0) > 0:
                             if player1_first:
-                                player1_hp = min(first_player.max_hp, first_hp_ref[0] + kill_result["hp_restored"])
+                                player1_hp = min(_get_cached_max_hp(first_player), first_hp_ref[0] + kill_result["hp_restored"])
                                 first_hp_ref[0] = player1_hp
                             else:
-                                player2_hp = min(first_player.max_hp, first_hp_ref[0] + kill_result["hp_restored"])
+                                player2_hp = min(_get_cached_max_hp(first_player), first_hp_ref[0] + kill_result["hp_restored"])
                                 first_hp_ref[0] = player2_hp
 
                     # 检查反击
@@ -333,7 +334,7 @@ class BattleIntegrationHelper:
                     # 命中后检查处决（忽略无敌等，直接强制死亡）
                     exec_thr = _get_execute_threshold(second_player.id)
                     if exec_thr > 0 and first_hp_ref[0] > 0:
-                        if first_hp_ref[0] < int(first_player.max_hp * exec_thr / 100):
+                        if first_hp_ref[0] < int(_get_cached_max_hp(first_player) * exec_thr / 100):
                             battle_log.append(f"⚰️ {second_player.nickname}发动处决，{first_player.nickname}被弑灭！")
                             first_hp_ref[0] = 0
 
@@ -341,7 +342,7 @@ class BattleIntegrationHelper:
                     # 只有在防守方还活着时才能回血，避免死人复活
                     heal_def = attack_result.get("defender_hp_restored", 0)
                     if heal_def > 0 and first_hp_ref[0] > 0:
-                        first_hp_ref[0] = min(first_player.max_hp, first_hp_ref[0] + heal_def)
+                        first_hp_ref[0] = min(_get_cached_max_hp(first_player), first_hp_ref[0] + heal_def)
                         battle_log.append(f"💚 {first_player.nickname}回复{heal_def}HP")
 
                     # 反弹伤害（对攻击方造成伤害）
@@ -381,10 +382,10 @@ class BattleIntegrationHelper:
                         # 击杀回血（更新second_hp_ref）
                         if kill_result.get("hp_restored", 0) > 0:
                             if player1_first:
-                                player2_hp = min(second_player.max_hp, second_hp_ref[0] + kill_result["hp_restored"])
+                                player2_hp = min(_get_cached_max_hp(second_player), second_hp_ref[0] + kill_result["hp_restored"])
                                 second_hp_ref[0] = player2_hp
                             else:
-                                player1_hp = min(second_player.max_hp, second_hp_ref[0] + kill_result["hp_restored"])
+                                player1_hp = min(_get_cached_max_hp(second_player), second_hp_ref[0] + kill_result["hp_restored"])
                                 second_hp_ref[0] = player1_hp
 
                     # 检查反击
@@ -409,8 +410,8 @@ class BattleIntegrationHelper:
                 player2_hp, player1_hp = first_hp_ref[0], second_hp_ref[0]
 
             # 回合结束后显示双方血量（只显示百分比）
-            player1_hp_bar = create_hp_bar(player1_hp, player1.max_hp, show_full=False)
-            player2_hp_bar = create_hp_bar(player2_hp, player2.max_hp, show_full=False)
+            player1_hp_bar = create_hp_bar(player1_hp, _get_cached_max_hp(player1), show_full=False)
+            player2_hp_bar = create_hp_bar(player2_hp, _get_cached_max_hp(player2), show_full=False)
             battle_log.append(f"  {player1.nickname}:")
             battle_log.append(f"    {player1_hp_bar}")
             battle_log.append(f"  {player2.nickname}:")
@@ -426,20 +427,20 @@ class BattleIntegrationHelper:
         if player1_victory:
             battle_log.append(f"🎉 {player1.nickname}获得胜利！用时{round_num}回合")
             # 只显示存活方的血条（完整信息）
-            player1_hp_bar = create_hp_bar(player1_hp, player1.max_hp, show_full=True)
+            player1_hp_bar = create_hp_bar(player1_hp, _get_cached_max_hp(player1), show_full=True)
             battle_log.append(f"  {player1.nickname}:")
             battle_log.append(f"    {player1_hp_bar}")
         elif player1_hp <= 0:
             battle_log.append(f"🎉 {player2.nickname}获得胜利！用时{round_num}回合")
             # 只显示存活方的血条（完整信息）
-            player2_hp_bar = create_hp_bar(player2_hp, player2.max_hp, show_full=True)
+            player2_hp_bar = create_hp_bar(player2_hp, _get_cached_max_hp(player2), show_full=True)
             battle_log.append(f"  {player2.nickname}:")
             battle_log.append(f"    {player2_hp_bar}")
         else:
             # 平局或超时 - 显示双方血条（完整信息）
             battle_log.append(f"⏰ 战斗超时，平局！用时{round_num}回合")
-            player1_hp_bar = create_hp_bar(player1_hp, player1.max_hp, show_full=True)
-            player2_hp_bar = create_hp_bar(player2_hp, player2.max_hp, show_full=True)
+            player1_hp_bar = create_hp_bar(player1_hp, _get_cached_max_hp(player1), show_full=True)
+            player2_hp_bar = create_hp_bar(player2_hp, _get_cached_max_hp(player2), show_full=True)
             battle_log.append(f"  {player1.nickname}:")
             battle_log.append(f"    {player1_hp_bar}")
             battle_log.append(f"  {player2.nickname}:")
@@ -554,8 +555,9 @@ class BattleIntegrationHelper:
 
         # 初始化战斗
         engine.start_battle(player, monster_stats, equipped_items)
-        # 同步首回合临时增益导致的即时生命值变化（如“灵影体质”）
-        player_hp = player.hp
+        # 同步首回合临时增益导致的即时生命值变化（如”灵影体质”）
+        # 将当前HP cap到有效max_hp（含宠物加成），防止DB中膨胀的HP导致百分比异常
+        player_hp = min(player.hp, _get_cached_max_hp(player))
         initial_player_hp = player_hp
 
         # 判定先后手（基于敏捷）
@@ -580,7 +582,7 @@ class BattleIntegrationHelper:
 
                 # 恢复玩家HP（吸血、回血等效果）
                 if turn_result.get("hp_restored", 0) > 0:
-                    player_hp = min(player.max_hp, player_hp + turn_result["hp_restored"])
+                    player_hp = min(_get_cached_max_hp(player), player_hp + turn_result["hp_restored"])
 
                 # 应用反弹伤害（怪物反弹给玩家）
                 reflect_damage = turn_result.get("reflect_damage", 0)
@@ -606,7 +608,7 @@ class BattleIntegrationHelper:
 
                     # 应用击杀回血
                     if kill_result.get("hp_restored", 0) > 0:
-                        player_hp = min(player.max_hp, player_hp + kill_result["hp_restored"])
+                        player_hp = min(_get_cached_max_hp(player), player_hp + kill_result["hp_restored"])
 
                     break
 
@@ -758,7 +760,7 @@ class BattleIntegrationHelper:
                                 "source": monster_name,
                                 "attacker": monster_name,
                                 "current_hp": player_hp,
-                                "max_hp": player.max_hp,
+                                "max_hp": _get_cached_max_hp(player),
                                 "region": region,
                                 "theme": theme_name,
                             }
@@ -767,8 +769,8 @@ class BattleIntegrationHelper:
                             defense_effects.extend(attacked_effects)
                             for eff in defense_effects:
                                 if eff.effect_type == EffectType.HEAL:
-                                    heal_amount = int(player.max_hp * eff.value / 100) if eff.is_percentage else int(eff.value)
-                                    player_hp = min(player.max_hp, player_hp + heal_amount)
+                                    heal_amount = int(_get_cached_max_hp(player) * eff.value / 100) if eff.is_percentage else int(eff.value)
+                                    player_hp = min(_get_cached_max_hp(player), player_hp + heal_amount)
                                     battle_log.append(f"💚 {player.nickname}回复{heal_amount}HP")
                         except Exception:
                             # 防御触发失败不影响主流程
@@ -794,7 +796,7 @@ class BattleIntegrationHelper:
 
                             # 恢复玩家HP（反击也可以吸血）
                             if counter_result.get("hp_restored", 0) > 0:
-                                player_hp = min(player.max_hp, player_hp + counter_result["hp_restored"])
+                                player_hp = min(_get_cached_max_hp(player), player_hp + counter_result["hp_restored"])
 
                             # 应用反弹伤害（怪物反弹给玩家）
                             reflect_damage = counter_result.get("reflect_damage", 0)
@@ -821,7 +823,7 @@ class BattleIntegrationHelper:
 
                                 # 应用击杀回血
                                 if kill_result.get("hp_restored", 0) > 0:
-                                    player_hp = min(player.max_hp, player_hp + kill_result["hp_restored"])
+                                    player_hp = min(_get_cached_max_hp(player), player_hp + kill_result["hp_restored"])
 
                                 break
 
@@ -835,7 +837,7 @@ class BattleIntegrationHelper:
 
                 # 恢复玩家HP（吸血、回血等效果）
                 if turn_result.get("hp_restored", 0) > 0:
-                    player_hp = min(player.max_hp, player_hp + turn_result["hp_restored"])
+                    player_hp = min(_get_cached_max_hp(player), player_hp + turn_result["hp_restored"])
 
                 # 应用反弹伤害（怪物反弹给玩家）
                 reflect_damage = turn_result.get("reflect_damage", 0)
@@ -860,7 +862,7 @@ class BattleIntegrationHelper:
 
                     # 应用击杀回血
                     if kill_result.get("hp_restored", 0) > 0:
-                        player_hp = min(player.max_hp, player_hp + kill_result["hp_restored"])
+                        player_hp = min(_get_cached_max_hp(player), player_hp + kill_result["hp_restored"])
 
                     break
 
@@ -907,7 +909,7 @@ class BattleIntegrationHelper:
 
             # 回合结束后显示双方血量（只显示百分比）
             if player_hp > 0 and monster_hp > 0:
-                player_hp_bar = create_hp_bar(player_hp, player.max_hp, show_full=False)
+                player_hp_bar = create_hp_bar(player_hp, _get_cached_max_hp(player), show_full=False)
                 monster_hp_bar = create_hp_bar(monster_hp, monster_stats["hp"], show_full=False)
                 battle_log.append(f"  {player.nickname}:")
                 battle_log.append(f"    {player_hp_bar}")
@@ -922,7 +924,7 @@ class BattleIntegrationHelper:
         if victory:
             battle_log.append(f"🎉 {player.nickname}获胜！用时{round_num}回合")
             # 只显示存活方的血条（完整信息）
-            player_hp_bar = create_hp_bar(player_hp, player.max_hp, show_full=True)
+            player_hp_bar = create_hp_bar(player_hp, _get_cached_max_hp(player), show_full=True)
             battle_log.append(f"  {player.nickname}:")
             battle_log.append(f"    {player_hp_bar}")
         else:
@@ -1014,7 +1016,7 @@ class BattleIntegrationHelper:
         player1._cached_attack = player1_base_attrs.get('attack', player1.attack)
         player1._cached_defense = player1_base_attrs.get('defense', player1.defense)
         player1._cached_hp = player1.hp  # 当前HP,不使用buff加成
-        player1._cached_max_hp = player1_base_attrs.get('max_hp', player1.max_hp)  # 最大HP,包含buff
+        player1._cached_max_hp = player1_base_attrs.get('max_hp', _get_cached_max_hp(player1))  # 最大HP,包含buff
         player1._cached_mp = player1.mp  # 当前MP,不使用buff加成
         player1._cached_max_mp = player1_base_attrs.get('max_mp', getattr(player1, 'max_mp', 0))  # 最大MP,包含buff
         player1._cached_agility = player1_base_attrs.get('agility', player1.agility)
@@ -1022,7 +1024,7 @@ class BattleIntegrationHelper:
         player2._cached_attack = player2_base_attrs.get('attack', player2.attack)
         player2._cached_defense = player2_base_attrs.get('defense', player2.defense)
         player2._cached_hp = player2.hp  # 当前HP,不使用buff加成
-        player2._cached_max_hp = player2_base_attrs.get('max_hp', player2.max_hp)  # 最大HP,包含buff
+        player2._cached_max_hp = player2_base_attrs.get('max_hp', _get_cached_max_hp(player2))  # 最大HP,包含buff
         player2._cached_mp = player2.mp  # 当前MP,不使用buff加成
         player2._cached_max_mp = player2_base_attrs.get('max_mp', getattr(player2, 'max_mp', 0))  # 最大MP,包含buff
         player2._cached_agility = player2_base_attrs.get('agility', player2.agility)
@@ -1053,7 +1055,7 @@ class BattleIntegrationHelper:
             _theme2b = ""
         _p2r2 = player2.get_current_region() if hasattr(player2, 'get_current_region') else getattr(player2, 'region', "")
         _p2c2 = {
-            "source": "战斗开始", "current_hp": player2.hp, "max_hp": player2.max_hp,
+            "source": "战斗开始", "current_hp": player2.hp, "max_hp": _get_cached_max_hp(player2),
             "current_mp": getattr(player2, 'mp', 0), "max_mp": getattr(player2, 'max_mp', 0),
             "region": _p2r2, "theme": _theme2b,
         }
@@ -1063,9 +1065,10 @@ class BattleIntegrationHelper:
             engine.effect_manager.add_effect(player2.id, _e2)
         # player2的绝魔体质削弱player1特殊属性
         engine.apply_ignore_special_debuff(player2.id, player1, player1.id)
-        # 同步首回合临时增益导致的即时生命值变化（如“灵影体质”）
-        player1_hp = player1.hp
-        player2_hp = player2.hp
+        # 同步首回合临时增益导致的即时生命值变化（如”灵影体质”）
+        # 将当前HP cap到有效max_hp（含宠物加成），防止DB中膨胀的HP导致百分比异常
+        player1_hp = min(player1.hp, _get_cached_max_hp(player1))
+        player2_hp = min(player2.hp, _get_cached_max_hp(player2))
         initial_player1_hp = player1_hp
         initial_player2_hp = player2_hp
 
@@ -1098,13 +1101,13 @@ class BattleIntegrationHelper:
             # 玩家1 回合开始
             p1_turn_msgs, player1_hp_restored = engine._process_turn_start(player1.id, player1)
             if player1_hp_restored > 0:
-                player1_hp = min(player1.max_hp, player1_hp + player1_hp_restored)
+                player1_hp = min(_get_cached_max_hp(player1), player1_hp + player1_hp_restored)
             battle_log.extend(p1_turn_msgs)
 
             # 玩家2 回合开始
             p2_turn_msgs, player2_hp_restored = engine._process_turn_start(player2.id, player2)
             if player2_hp_restored > 0:
-                player2_hp = min(player2.max_hp, player2_hp + player2_hp_restored)
+                player2_hp = min(_get_cached_max_hp(player2), player2_hp + player2_hp_restored)
             battle_log.extend(p2_turn_msgs)
 
             # 根据先后手判定执行攻击顺序（日志格式与 PvE 一致：直接 extend 引擎消息）
@@ -1120,7 +1123,7 @@ class BattleIntegrationHelper:
                         player2_hp = max(0, player2_hp - damage)
                         # 攻击方回血（吸血等效果）
                         if attack_result.get("hp_restored", 0) > 0:
-                            player1_hp = min(player1.max_hp, player1_hp + attack_result["hp_restored"])
+                            player1_hp = min(_get_cached_max_hp(player1), player1_hp + attack_result["hp_restored"])
                         # 反弹伤害（对攻击方造成伤害）
                         _reflect = attack_result.get("reflect_damage", 0)
                         if _reflect > 0:
@@ -1131,20 +1134,20 @@ class BattleIntegrationHelper:
                         # 斩杀判定
                         exec_thr = _get_exec_thr(player1.id)
                         if exec_thr > 0 and player2_hp > 0:
-                            if player2_hp < int(player2.max_hp * exec_thr / 100):
+                            if player2_hp < int(_get_cached_max_hp(player2) * exec_thr / 100):
                                 player2_hp = 0
                                 battle_log.append(f"⚰️ {player1.nickname}发动处决，{player2.nickname}被弑灭！")
                         # 防守方受击触发
                         heal_def = attack_result.get("defender_hp_restored", 0)
                         if heal_def > 0 and player2_hp > 0:
-                            player2_hp = min(player2.max_hp, player2_hp + heal_def)
+                            player2_hp = min(_get_cached_max_hp(player2), player2_hp + heal_def)
                             battle_log.append(f"💚 {player2.nickname}回复{heal_def}HP")
                         # 检查击杀并触发击杀效果
                         if player2_hp <= 0:
                             kill_result = engine.trigger_on_kill(player1, player2)
                             battle_log.extend(kill_result.get("messages", []))
                             if kill_result.get("hp_restored", 0) > 0:
-                                player1_hp = min(player1.max_hp, player1_hp + kill_result["hp_restored"])
+                                player1_hp = min(_get_cached_max_hp(player1), player1_hp + kill_result["hp_restored"])
                                 battle_log.append(f"💚 {player1.nickname}击杀回血+{kill_result['hp_restored']}HP")
 
                 # 玩家2反击（如果存活）
@@ -1158,7 +1161,7 @@ class BattleIntegrationHelper:
                         player1_hp = max(0, player1_hp - damage)
                         # 攻击方回血（吸血等效果）
                         if attack_result.get("hp_restored", 0) > 0:
-                            player2_hp = min(player2.max_hp, player2_hp + attack_result["hp_restored"])
+                            player2_hp = min(_get_cached_max_hp(player2), player2_hp + attack_result["hp_restored"])
                         # 反弹伤害（对攻击方造成伤害）
                         _reflect = attack_result.get("reflect_damage", 0)
                         if _reflect > 0:
@@ -1169,20 +1172,20 @@ class BattleIntegrationHelper:
                         # 处决判定（玩家2对玩家1）
                         _thr = _get_exec_thr(player2.id)
                         if _thr > 0 and player1_hp > 0:
-                            if player1_hp < int(player1.max_hp * _thr / 100):
+                            if player1_hp < int(_get_cached_max_hp(player1) * _thr / 100):
                                 player1_hp = 0
                                 battle_log.append(f"⚰️ {player2.nickname}发动处决，{player1.nickname}被弑灭！")
                         # 防守方受击触发
                         heal_def = attack_result.get("defender_hp_restored", 0)
                         if heal_def > 0 and player1_hp > 0:
-                            player1_hp = min(player1.max_hp, player1_hp + heal_def)
+                            player1_hp = min(_get_cached_max_hp(player1), player1_hp + heal_def)
                             battle_log.append(f"💚 {player1.nickname}回复{heal_def}HP")
                         # 检查击杀并触发击杀效果
                         if player1_hp <= 0:
                             kill_result = engine.trigger_on_kill(player2, player1)
                             battle_log.extend(kill_result.get("messages", []))
                             if kill_result.get("hp_restored", 0) > 0:
-                                player2_hp = min(player2.max_hp, player2_hp + kill_result["hp_restored"])
+                                player2_hp = min(_get_cached_max_hp(player2), player2_hp + kill_result["hp_restored"])
                                 battle_log.append(f"💚 {player2.nickname}击杀回血+{kill_result['hp_restored']}HP")
             else:
                 # 玩家2先手
@@ -1196,7 +1199,7 @@ class BattleIntegrationHelper:
                         player1_hp = max(0, player1_hp - damage)
                         # 攻击方回血（吸血等效果）
                         if attack_result.get("hp_restored", 0) > 0:
-                            player2_hp = min(player2.max_hp, player2_hp + attack_result["hp_restored"])
+                            player2_hp = min(_get_cached_max_hp(player2), player2_hp + attack_result["hp_restored"])
                         # 反弹伤害（对攻击方造成伤害）
                         _reflect = attack_result.get("reflect_damage", 0)
                         if _reflect > 0:
@@ -1207,20 +1210,20 @@ class BattleIntegrationHelper:
                         # 处决判定（玩家2对玩家1）
                         _thr = _get_exec_thr(player2.id)
                         if _thr > 0 and player1_hp > 0:
-                            if player1_hp < int(player1.max_hp * _thr / 100):
+                            if player1_hp < int(_get_cached_max_hp(player1) * _thr / 100):
                                 player1_hp = 0
                                 battle_log.append(f"⚰️ {player2.nickname}发动处决，{player1.nickname}被弑灭！")
                         # 防守方受击触发
                         heal_def = attack_result.get("defender_hp_restored", 0)
                         if heal_def > 0 and player1_hp > 0:
-                            player1_hp = min(player1.max_hp, player1_hp + heal_def)
+                            player1_hp = min(_get_cached_max_hp(player1), player1_hp + heal_def)
                             battle_log.append(f"💚 {player1.nickname}回复{heal_def}HP")
                         # 检查击杀并触发击杀效果
                         if player1_hp <= 0:
                             kill_result = engine.trigger_on_kill(player2, player1)
                             battle_log.extend(kill_result.get("messages", []))
                             if kill_result.get("hp_restored", 0) > 0:
-                                player2_hp = min(player2.max_hp, player2_hp + kill_result["hp_restored"])
+                                player2_hp = min(_get_cached_max_hp(player2), player2_hp + kill_result["hp_restored"])
                                 battle_log.append(f"💚 {player2.nickname}击杀回血+{kill_result['hp_restored']}HP")
 
                 # 玩家1反击（如果存活）
@@ -1234,7 +1237,7 @@ class BattleIntegrationHelper:
                         player2_hp = max(0, player2_hp - damage)
                         # 攻击方回血（吸血等效果）
                         if attack_result.get("hp_restored", 0) > 0:
-                            player1_hp = min(player1.max_hp, player1_hp + attack_result["hp_restored"])
+                            player1_hp = min(_get_cached_max_hp(player1), player1_hp + attack_result["hp_restored"])
                         # 反弹伤害（对攻击方造成伤害）
                         _reflect = attack_result.get("reflect_damage", 0)
                         if _reflect > 0:
@@ -1245,25 +1248,25 @@ class BattleIntegrationHelper:
                         # 处决判定（玩家1对玩家2）
                         _thr2 = _get_exec_thr(player1.id)
                         if _thr2 > 0 and player2_hp > 0:
-                            if player2_hp < int(player2.max_hp * _thr2 / 100):
+                            if player2_hp < int(_get_cached_max_hp(player2) * _thr2 / 100):
                                 player2_hp = 0
                                 battle_log.append(f"⚰️ {player1.nickname}发动处决，{player2.nickname}被弑灭！")
                         # 防守方受击触发
                         heal_def = attack_result.get("defender_hp_restored", 0)
                         if heal_def > 0 and player2_hp > 0:
-                            player2_hp = min(player2.max_hp, player2_hp + heal_def)
+                            player2_hp = min(_get_cached_max_hp(player2), player2_hp + heal_def)
                             battle_log.append(f"💚 {player2.nickname}回复{heal_def}HP")
                         # 检查击杀并触发击杀效果
                         if player2_hp <= 0:
                             kill_result = engine.trigger_on_kill(player1, player2)
                             battle_log.extend(kill_result.get("messages", []))
                             if kill_result.get("hp_restored", 0) > 0:
-                                player1_hp = min(player1.max_hp, player1_hp + kill_result["hp_restored"])
+                                player1_hp = min(_get_cached_max_hp(player1), player1_hp + kill_result["hp_restored"])
                                 battle_log.append(f"💚 {player1.nickname}击杀回血+{kill_result['hp_restored']}HP")
 
             # 每回合结束后显示双方血量（只显示百分比）
-            player1_hp_bar = create_hp_bar(player1_hp, player1.max_hp, show_full=False)
-            player2_hp_bar = create_hp_bar(player2_hp, player2.max_hp, show_full=False)
+            player1_hp_bar = create_hp_bar(player1_hp, _get_cached_max_hp(player1), show_full=False)
+            player2_hp_bar = create_hp_bar(player2_hp, _get_cached_max_hp(player2), show_full=False)
             battle_log.append(f"  {player1.nickname}:")
             battle_log.append(f"    {player1_hp_bar}")
             battle_log.append(f"  {player2.nickname}:")
@@ -1280,20 +1283,20 @@ class BattleIntegrationHelper:
         if player1_victory:
             battle_log.append(f"🎉 {player1.nickname}胜利！用时{round_num}回合")
             # 只显示存活方的血条（完整信息）
-            player1_hp_bar = create_hp_bar(player1_hp, player1.max_hp, show_full=True)
+            player1_hp_bar = create_hp_bar(player1_hp, _get_cached_max_hp(player1), show_full=True)
             battle_log.append(f"  {player1.nickname}:")
             battle_log.append(f"    {player1_hp_bar}")
         elif player1_hp <= 0:
             battle_log.append(f"🎉 {player2.nickname}胜利！用时{round_num}回合")
             # 只显示存活方的血条（完整信息）
-            player2_hp_bar = create_hp_bar(player2_hp, player2.max_hp, show_full=True)
+            player2_hp_bar = create_hp_bar(player2_hp, _get_cached_max_hp(player2), show_full=True)
             battle_log.append(f"  {player2.nickname}:")
             battle_log.append(f"    {player2_hp_bar}")
         else:
             # 平局或超时 - 显示双方血条（完整信息）
             battle_log.append(f"⏰ 战斗超时，平局！用时{round_num}回合")
-            player1_hp_bar = create_hp_bar(player1_hp, player1.max_hp, show_full=True)
-            player2_hp_bar = create_hp_bar(player2_hp, player2.max_hp, show_full=True)
+            player1_hp_bar = create_hp_bar(player1_hp, _get_cached_max_hp(player1), show_full=True)
+            player2_hp_bar = create_hp_bar(player2_hp, _get_cached_max_hp(player2), show_full=True)
             battle_log.append(f"  {player1.nickname}:")
             battle_log.append(f"    {player1_hp_bar}")
             battle_log.append(f"  {player2.nickname}:")
@@ -1461,7 +1464,7 @@ class BattleIntegrationHelper:
         # 战斗统计
         summary_lines.append("")
         summary_lines.append("📊 战斗统计:")
-        summary_lines.append(f"剩余血量: {player.hp}/{player.max_hp}")
+        summary_lines.append(f"剩余血量: {player.hp}/{_get_cached_max_hp(player)}")
         summary_lines.append(f"受到伤害: {damage_taken}")
 
         if exp_gain > 0:

@@ -129,7 +129,7 @@ async def handle_feed(event: MessageEvent, args: Message = CommandArg()):
                 f"🐾 {pet.nickname}\n"
                 f"饱食度: {pet.hunger}/100 | 心情: {pet.mood}/100\n"
                 f"━━━━━━━━━━━━━\n"
-                f"喂食 怨念 [数量] - 消耗怨念喂养\n"
+                f"喂食 怨念 [次数] - 消耗怨念喂养\n"
                 f"喂食 <菜肴名> [数量] - 用菜肴喂养"
             )
             await feed_cmd.finish(msg)
