@@ -44,6 +44,14 @@ class PetInstance(Base):
     is_active: Mapped[bool] = mapped_column(Boolean, default=False, server_default="0", comment="是否为当前伴侣")
     is_guarding: Mapped[bool] = mapped_column(Boolean, default=False, server_default="0", comment="是否正在守田")
     is_transformed: Mapped[bool] = mapped_column(Boolean, default=False, server_default="0", comment="是否已化形")
+    evolved_rarity: Mapped[str] = mapped_column(
+        String(16), default="", server_default="",
+        comment="进化后的稀有度(空=使用种族默认)"
+    )
+    transform_gender: Mapped[str] = mapped_column(
+        String(8), default="", server_default="",
+        comment="化形性别(male/female, 空=未选择)"
+    )
 
     # 饰品（JSON存储已装备饰品ID列表）
     accessories: Mapped[dict | None] = mapped_column(JSON, nullable=True, comment="已装备饰品 {slot: accessory_id}")

@@ -119,6 +119,11 @@ REQUIRED_FIELDS: Dict[str, Dict[str, str]] = {
     "world_boss_damage": {
         "reincarnation_snapshot": "INT DEFAULT -1 COMMENT '首次攻击时的转数快照(-1表示未攻击)'"
     },
+    # 宠物实例
+    "pet_instance": {
+        "evolved_rarity": "VARCHAR(16) DEFAULT '' COMMENT '进化后的稀有度'",
+        "transform_gender": "VARCHAR(8) DEFAULT '' COMMENT '化形性别'"
+    },
     # 拍卖行 - 缓存当前出价人昵称，避免列表页额外查询；卖家昵称快照
     "auction_item": {
         "current_bidder_name": "VARCHAR(64) NULL COMMENT '当前最高出价人昵称（快照）'",
