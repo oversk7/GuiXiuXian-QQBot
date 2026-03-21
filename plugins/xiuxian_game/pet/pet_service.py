@@ -591,13 +591,18 @@ class PetService:
         else:
             display_name = beast.name
 
-        # 饰品描述前缀
-        acc_desc = ""
+        # 饰品展示行（分行显示，带slot emoji）
+        SLOT_EMOJI = {"head": "👑", "neck": "📿", "body": "👗"}
+        acc_line = ""
         if pet.accessories:
+            acc_parts = []
             for slot, acc_id in pet.accessories.items():
                 acc = self.config.get_accessory(acc_id)
-                if acc and acc.description_prefix:
-                    acc_desc += acc.description_prefix
+                if acc:
+                    emoji = SLOT_EMOJI.get(slot, "✨")
+                    acc_parts.append(f"{emoji}{acc.name}")
+            if acc_parts:
+                acc_line = f"  {' · '.join(acc_parts)}\n"
 
         total_bonus = self._calculate_total_bonus(pet)
 
@@ -635,7 +640,8 @@ class PetService:
             rate_parts.append(f"👟闪避+{total_bonus['dodge_rate']:.1%}")
 
         msg = (
-            f"🐾 {acc_desc}{pet.nickname}\n"
+            f"🐾 {pet.nickname}\n"
+            f"{acc_line}"
             f"{rarity_emoji}{display_name} · Lv.{pet.level}\n"
             f"━━━━━━━━━━━━━\n"
             f"⭐ 经验 {exp_bar} {current_exp}/{next_level_exp}\n"
