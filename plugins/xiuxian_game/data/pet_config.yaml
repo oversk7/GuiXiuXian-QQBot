@@ -19,6 +19,11 @@ settings:
   interact_cooldown_minutes: 5   # 互动冷却时间（分钟）
   interact_affection_gain: 3     # 每次互动好感度增加
   interact_mood_gain: 5          # 每次互动心情增加
+  # 怨念喂食递减收益（每日）
+  feed_diminish_tier1: 99        # 前99次：正常收益(5经验/次)
+  feed_diminish_tier2: 300       # 100-300次：经验减半(2经验/次)，心情+1
+  feed_diminish_tier3_exp: 1     # 300次以上：最低经验
+  feed_diminish_tier3_mood: 0    # 300次以上：心情不再增加
 
 # 等级经验表（到达该等级所需的累计经验）
 level_exp_table:

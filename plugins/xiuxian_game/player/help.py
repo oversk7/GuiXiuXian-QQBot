@@ -1584,28 +1584,6 @@ async def handle_daily_task_help(event: MessageEvent, args: Message = CommandArg
     )
     await daily_task_help_cmd.finish(Message(msg))
 
-# 备份系统
-backup_help_cmd = on_command("备份系统", aliases={"备份帮助"}, priority=4, block=True)
-
-@backup_help_cmd.handle()
-async def handle_backup_help(event: MessageEvent, args: Message = CommandArg()):
-    msg = (
-        "✨ 数据库备份系统帮助 ✨\n"
-        "自动备份游戏数据，确保数据安全（仅限超级用户）\n"
-        "━━━━━━━━━━━━━\n"
-        "🔄 自动备份：每小时自动执行一次\n"
-        "📦 保留策略：只保留最近3个备份文件\n"
-        "📁 备份位置：项目根目录\n"
-        "\n"
-        "🛠️ 管理命令（超级用户专用）：\n"
-        "【手动备份】 立即创建数据库备份\n"
-        "【备份状态】 查看备份文件列表和状态\n"
-        "【恢复备份 <文件名>】 从指定备份恢复数据库\n"
-        "━━━━━━━━━━━━━\n"
-        "⚠️ 恢复操作具有破坏性，请谨慎使用！\n"
-        "💡 备份文件命名格式：game_backup_YYYYMMDD_HHMMSS.db"
-    )
-    await backup_help_cmd.finish(Message(msg))
 
 # 抽奖系统
 lottery_help_cmd = on_command("抽奖系统", aliases={"抽奖帮助"}, priority=4, block=True)
@@ -1676,9 +1654,8 @@ async def handle_admin_help(event: MessageEvent, args: Message = CommandArg()):
         "【最近活动 [数量]】 查看全服最近活动（默认10条，最多50条）\n"
         "━━━━━━━━━━━━━\n"
         "💾 备份管理：\n"
-        "【手动备份】 立即创建数据库备份\n"
+        "【手动备份】 立即创建MySQL数据库备份\n"
         "【备份状态】 查看备份文件列表\n"
-        "【恢复备份 <文件名>】 从备份恢复数据库\n"
         "━━━━━━━━━━━━━\n"
         "🖼️ 物品图片管理：\n"
         "【设置物品图片 <物品名> <图片URL>】 设置/覆盖物品图片\n"
@@ -2652,6 +2629,7 @@ async def handle_pet_help(event: MessageEvent, args: Message = CommandArg()):
         "【喂食 怨念 [次数]】 消耗怨念喂养（每次50-200怨念）\n"
         "【喂食 菜肴名 [数量]】 用菜肴喂养（更好效果）\n"
         "  • 菜肴品质越高，经验和心情加成越多\n"
+        "  • 每日递减收益：前99次正常(5经验)→100-300次减半(2经验)→300次后(1经验)\n"
         "━━━━━━━━━━━━━\n"
         "👗 装扮：\n"
         "【宠物装扮】 查看饰品商店\n"

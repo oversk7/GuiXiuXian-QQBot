@@ -122,7 +122,9 @@ REQUIRED_FIELDS: Dict[str, Dict[str, str]] = {
     # 宠物实例
     "pet_instance": {
         "evolved_rarity": "VARCHAR(16) DEFAULT '' COMMENT '进化后的稀有度'",
-        "transform_gender": "VARCHAR(8) DEFAULT '' COMMENT '化形性别'"
+        "transform_gender": "VARCHAR(8) DEFAULT '' COMMENT '化形性别'",
+        "daily_feed_count": "INT DEFAULT 0 COMMENT '当日怨念喂食次数'",
+        "daily_feed_date": "VARCHAR(10) NULL COMMENT '喂食计数日期(YYYY-MM-DD)'"
     },
     # 拍卖行 - 缓存当前出价人昵称，避免列表页额外查询；卖家昵称快照
     "auction_item": {

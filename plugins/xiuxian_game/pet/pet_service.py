@@ -105,10 +105,44 @@ class PetService:
 
     # ==================== 喂食 ====================
 
+    def _calc_diminished_rewards(self, already_fed: int, quantity: int) -> Tuple[int, int, str]:
+        """根据当日已喂次数计算递减后的经验和心情总收益
+
+        Returns: (total_exp, total_mood, 收益提示文本)
+        """
+        tier1 = self.config.settings["feed_diminish_tier1"]       # 50
+        tier2 = self.config.settings["feed_diminish_tier2"]       # 150
+        t3_exp = self.config.settings["feed_diminish_tier3_exp"]  # 1
+        t3_mood = self.config.settings["feed_diminish_tier3_mood"]  # 0
+
+        total_exp = 0
+        total_mood = 0
+        for i in range(quantity):
+            count = already_fed + i + 1
+            if count <= tier1:
+                total_exp += 5
+                total_mood += 3
+            elif count <= tier2:
+                total_exp += 2
+                total_mood += 1
+            else:
+                total_exp += t3_exp
+                total_mood += t3_mood
+
+        # 生成收益提示
+        final_count = already_fed + quantity
+        hint = ""
+        if final_count > tier2:
+            hint = f"（已超{tier2}次，经验大幅递减）"
+        elif final_count > tier1:
+            hint = f"（已超{tier1}次，经验减半）"
+
+        return total_exp, total_mood, hint
+
     async def feed_with_resentment(
         self, uow: UnitOfWork, player_id: str, quantity: int = 1
     ) -> Tuple[bool, str]:
-        """用怨念喂食当前伙伴（支持批量，每次随机消耗50-200怨念）"""
+        """用怨念喂食当前伙伴（支持批量，每次随机消耗50-200怨念，每日递减收益）"""
         import random
 
         pet = await uow.pets.get_active_pet(player_id)
@@ -128,11 +162,20 @@ class PetService:
         player.resentment -= total_cost
         await uow.players.update(player)
 
+        # 每日喂食计数（跨日自动重置）
+        today = datetime.now().strftime("%Y-%m-%d")
+        if pet.daily_feed_date != today:
+            pet.daily_feed_count = 0
+            pet.daily_feed_date = today
+        already_fed = pet.daily_feed_count
+
+        # 递减收益计算
+        total_exp, total_mood, diminish_hint = self._calc_diminished_rewards(already_fed, quantity)
+
         restore = self.config.settings["feed_hunger_restore"]
-        exp_per = 5
-        total_exp = exp_per * quantity
         pet.hunger = min(100, pet.hunger + restore * quantity)
-        pet.mood = min(100, pet.mood + 3 * quantity)
+        pet.mood = min(100, pet.mood + total_mood)
+        pet.daily_feed_count = already_fed + quantity
         pet.last_fed_at = datetime.now()
         level_up_msg = self._add_experience(pet, total_exp)
         await uow.pets.update(pet)
@@ -144,7 +187,8 @@ class PetService:
             f"消耗: {total_cost}点怨念\n"
             f"饱食度: {pet.hunger}/100\n"
             f"心情: {pet.mood}/100\n"
-            f"经验+{total_exp}"
+            f"经验+{total_exp}{diminish_hint}\n"
+            f"今日已喂: {pet.daily_feed_count}次"
         )
         if level_up_msg:
             msg += f"\n{level_up_msg}"
