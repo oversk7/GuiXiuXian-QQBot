@@ -840,6 +840,7 @@ items:
       type: "MATERIAL"
       rarity: "blue"
       price: 3000
+      tags: ["no_drop"]
 
     # ========== 高级铭文（多效果模板，仅精英怪掉落） ==========
 
