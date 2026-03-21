@@ -226,14 +226,30 @@ class PetService:
     # ==================== 化形 ====================
 
     async def transform(
-        self, uow: UnitOfWork, player_id: str
+        self, uow: UnitOfWork, player_id: str, gender: str = "female"
     ) -> Tuple[bool, str]:
         """宠物化形"""
         pet = await uow.pets.get_active_pet(player_id)
         if not pet:
             return False, "你还没有伴侣诡兽"
+
+        beast = self.config.get_beast(pet.beast_id)
+
+        # 已化形：允许切换性别
         if pet.is_transformed:
-            return False, f"【{pet.nickname}】已经化形了"
+            if pet.transform_gender == gender:
+                gender_cn = "男" if gender == "male" else "女"
+                return False, f"【{pet.nickname}】当前已是{gender_cn}性化形"
+            pet.transform_gender = gender
+            await uow.pets.update(pet)
+            transform_name = self.config.get_transform_name(pet.beast_id, gender)
+            transform_desc = self.config.get_transform_description(pet.beast_id, gender)
+            gender_cn = "男" if gender == "male" else "女"
+            return True, (
+                f"【{pet.nickname}】切换化形！\n"
+                f"化形为: {transform_name}（{gender_cn}）\n"
+                f"{transform_desc}"
+            )
 
         req_level = self.config.settings["transform_level"]
         req_affection = self.config.settings["transform_affection"]
@@ -243,13 +259,16 @@ class PetService:
             return False, f"化形需要好感度{req_affection}（当前{pet.affection}）"
 
         pet.is_transformed = True
+        pet.transform_gender = gender
         await uow.pets.update(pet)
 
-        beast = self.config.get_beast(pet.beast_id)
+        transform_name = self.config.get_transform_name(pet.beast_id, gender)
+        transform_desc = self.config.get_transform_description(pet.beast_id, gender)
+        gender_cn = "男" if gender == "male" else "女"
         return True, (
             f"【{pet.nickname}】化形成功!\n"
-            f"化形为: {beast.transform_name}\n"
-            f"{beast.transform_description}"
+            f"化形为: {transform_name}（{gender_cn}）\n"
+            f"{transform_desc}"
         )
 
     # ==================== 饰品 ====================
@@ -374,6 +393,141 @@ class PetService:
 
         return False, "没有宠物在守田"
 
+    # ==================== 宠物进化 ====================
+
+    RARITY_CN = {"white": "普通", "green": "优秀", "blue": "稀有", "purple": "史诗", "orange": "传说"}
+    RARITY_EMOJI = {"white": "⚪", "green": "🟢", "blue": "🔵", "purple": "🟣", "orange": "🟠"}
+
+    async def evolve_pet(
+        self, uow: UnitOfWork, player_id: str, confirm: bool = False
+    ) -> Tuple[bool, str]:
+        """宠物进化 — 提升稀有度"""
+        pet = await uow.pets.get_active_pet(player_id)
+        if not pet:
+            return False, "你还没有伴侣诡兽"
+
+        beast = self.config.get_beast(pet.beast_id)
+        current_rarity = pet.evolved_rarity or beast.rarity
+        next_rarity = self.config.get_next_rarity(current_rarity)
+
+        if not next_rarity:
+            return False, f"【{pet.nickname}】已是{self.RARITY_EMOJI.get(current_rarity, '')}最高稀有度，无法继续进化"
+
+        evo_cfg = self.config.get_evolution_config(current_rarity, next_rarity)
+        if not evo_cfg:
+            return False, "⛔ 进化配置缺失，请联系管理员"
+
+        min_level = evo_cfg["min_level"]
+        cost_item = evo_cfg["cost_item"]
+        cost_qty = evo_cfg["cost_quantity"]
+        cost_resentment = evo_cfg["cost_resentment"]
+
+        from ..config import config as gcfg
+        item_cfg = gcfg.items_config["by_id"].get(cost_item)
+        item_name = item_cfg.name if item_cfg else cost_item
+
+        cur_emoji = self.RARITY_EMOJI.get(current_rarity, "")
+        next_emoji = self.RARITY_EMOJI.get(next_rarity, "")
+        cur_cn = self.RARITY_CN.get(current_rarity, current_rarity)
+        next_cn = self.RARITY_CN.get(next_rarity, next_rarity)
+
+        # 不确认时：显示进化条件
+        if not confirm:
+            from ..models.inventory import ItemInstance
+            from sqlalchemy import func, select
+            stmt = select(func.coalesce(func.sum(ItemInstance.quantity), 0)).where(
+                ItemInstance.player_id == player_id,
+                ItemInstance.item_id == cost_item
+            )
+            result = await uow.session.execute(stmt)
+            have_qty = result.scalar() or 0
+
+            from ..models.player import Player
+            player = await uow.session.get(Player, player_id)
+            have_resentment = player.resentment if player else 0
+
+            level_ok = "✅" if pet.level >= min_level else "❌"
+            item_ok = "✅" if have_qty >= cost_qty else "❌"
+            resentment_ok = "✅" if have_resentment >= cost_resentment else "❌"
+
+            old_growth = self.config.get_growth(current_rarity)
+            new_growth = self.config.get_growth(next_rarity)
+
+            msg = (
+                f"🔮 宠物进化 — {pet.nickname}\n"
+                f"━━━━━━━━━━━━━\n"
+                f"{cur_emoji}{cur_cn} → {next_emoji}{next_cn}\n"
+                f"━━━ 进化条件 ━━━\n"
+                f"{level_ok} 等级 ≥ {min_level}（当前 Lv.{pet.level}）\n"
+                f"{item_ok} {item_name} ×{cost_qty}（拥有 {have_qty}）\n"
+                f"{resentment_ok} 怨念 ≥ {cost_resentment:,}（拥有 {have_resentment:,}）\n"
+                f"━━━ 成长变化 ━━━\n"
+                f"⚔攻击 {old_growth.attack}→{new_growth.attack}/级\n"
+                f"🛡防御 {old_growth.defense}→{new_growth.defense}/级\n"
+                f"❤生命 {old_growth.hp}→{new_growth.hp}/级\n"
+                f"━━━━━━━━━━━━━\n"
+                f"💡 输入【进化宠物 确认】执行进化"
+            )
+            return True, msg
+
+        # 确认进化：校验条件
+        if pet.level < min_level:
+            return False, f"⛔ 等级不足，需要 Lv.{min_level}（当前 Lv.{pet.level}）"
+
+        from ..models.inventory import ItemInstance
+        from sqlalchemy import func, select
+        stmt = select(func.coalesce(func.sum(ItemInstance.quantity), 0)).where(
+            ItemInstance.player_id == player_id,
+            ItemInstance.item_id == cost_item
+        )
+        result = await uow.session.execute(stmt)
+        have_qty = result.scalar() or 0
+        if have_qty < cost_qty:
+            return False, f"⛔ {item_name}不足，需要 {cost_qty} 个（拥有 {have_qty}）"
+
+        from ..models.player import Player
+        player = await uow.session.get(Player, player_id)
+        if not player or player.resentment < cost_resentment:
+            return False, f"⛔ 怨念不足，需要 {cost_resentment:,}"
+
+        # 扣除材料
+        await ItemInstance.consume_item(uow.session, player_id, cost_item, cost_qty)
+        player.resentment -= cost_resentment
+
+        # 执行进化：重算属性
+        new_growth = self.config.get_growth(next_rarity)
+        levels_gained = pet.level - 1  # 从Lv.1到当前等级的升级次数
+
+        pet.bonus_attack = int(new_growth.attack * levels_gained)
+        pet.bonus_defense = int(new_growth.defense * levels_gained)
+        pet.bonus_hp = int(new_growth.hp * levels_gained)
+        pet.bonus_crit_rate = new_growth.crit_rate * levels_gained
+        pet.bonus_dodge_rate = new_growth.dodge_rate * levels_gained
+        pet.evolved_rarity = next_rarity
+
+        await uow.pets.update(pet)
+
+        # 使宠物属性缓存失效
+        from ..domain.attributes.attribute_calculator_factory import AttributeCalculatorFactory
+        AttributeCalculatorFactory.invalidate_pet_cache(player_id)
+
+        # 计算属性变化展示
+        total_bonus = self._calculate_total_bonus(pet)
+
+        msg = (
+            f"🎉 进化成功！\n"
+            f"━━━━━━━━━━━━━\n"
+            f"{cur_emoji}{cur_cn} → {next_emoji}{next_cn}\n"
+            f"🐾 {pet.nickname} 的力量觉醒了！\n"
+            f"━━━ 当前属性 ━━━\n"
+            f"⚔攻击+{total_bonus['attack']} 🛡防御+{total_bonus['defense']}\n"
+            f"❤生命+{total_bonus['hp']}\n"
+            f"💥暴击+{total_bonus['crit_rate']:.1%} 👟闪避+{total_bonus['dodge_rate']:.1%}\n"
+            f"━━━━━━━━━━━━━\n"
+            f"📈 成长值已按{next_cn}标准重算"
+        )
+        return True, msg
+
     # ==================== 查看宠物 ====================
 
     @staticmethod
@@ -417,7 +571,10 @@ class PetService:
         level_name = self.config.get_affection_level_name(pet.affection)
         mood_mult = self.config.get_mood_multiplier(pet.mood)
 
-        display_name = beast.transform_name if pet.is_transformed else beast.name
+        if pet.is_transformed:
+            display_name = self.config.get_transform_name(pet.beast_id, pet.transform_gender)
+        else:
+            display_name = beast.name
 
         # 饰品描述前缀
         acc_desc = ""
@@ -432,8 +589,10 @@ class PetService:
         current_exp = pet.experience
         next_level_exp = self.config.get_exp_for_level(pet.level + 1)
 
+        # 使用进化后稀有度（如有）
+        current_rarity = pet.evolved_rarity or beast.rarity
         rarity_emoji, rarity_name = self.RARITY_DISPLAY.get(
-            beast.rarity, ("⚪", "普通")
+            current_rarity, ("⚪", "普通")
         )
         status_icon = "🌾" if pet.is_guarding else "🐾"
         status_text = "守田中" if pet.is_guarding else "跟随中"
@@ -530,7 +689,9 @@ class PetService:
     def _apply_level_up(self, pet: PetInstance):
         """应用升级属性"""
         beast = self.config.get_beast(pet.beast_id)
-        growth = self.config.get_growth(beast.rarity)
+        # 优先使用进化后的稀有度
+        current_rarity = pet.evolved_rarity or beast.rarity
+        growth = self.config.get_growth(current_rarity)
         if growth:
             pet.bonus_attack += int(growth.attack)
             pet.bonus_defense += int(growth.defense)
