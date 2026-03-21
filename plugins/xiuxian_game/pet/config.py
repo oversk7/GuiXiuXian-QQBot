@@ -16,6 +16,8 @@ class BeastConfig:
     description: str
     transform_name: str
     transform_description: str
+    transform_name_male: str = ""
+    transform_description_male: str = ""
 
 
 @dataclass
@@ -126,16 +128,23 @@ class PetConfigManager:
             self._accessories_by_name[acc.name] = acc
         self.accessory_slots: List[str] = acc_config["slots"]
 
+        # 加载进化配置
+        self.rarity_order: List[str] = config.get("rarity_order", ["white", "green", "blue", "purple", "orange"])
+        self._evolution: Dict[str, dict] = config.get("evolution", {})
+
         # 加载人设配置
         with open(data_dir / "pet_personalities.yaml", "r", encoding="utf-8") as f:
             pers_config = yaml.safe_load(f)
 
         self._personalities: Dict[str, Dict[str, PetPersonality]] = {}
         for beast_id, forms in pers_config["personalities"].items():
-            self._personalities[beast_id] = {
+            parsed = {
                 "beast": PetPersonality(**forms["beast_form"]),
                 "human": PetPersonality(**forms["human_form"]),
             }
+            if "human_form_male" in forms:
+                parsed["human_male"] = PetPersonality(**forms["human_form_male"])
+            self._personalities[beast_id] = parsed
 
         logger.info(
             f"宠物配置加载完成: {len(self._beasts)}种族, "
@@ -169,11 +178,16 @@ class PetConfigManager:
     def get_all_accessories(self) -> List[AccessoryConfig]:
         return list(self._accessories.values())
 
-    def get_personality(self, beast_id: str, is_transformed: bool) -> Optional[PetPersonality]:
+    def get_personality(self, beast_id: str, is_transformed: bool, gender: str = "") -> Optional[PetPersonality]:
         forms = self._personalities.get(beast_id)
         if not forms:
             return None
-        return forms["human"] if is_transformed else forms["beast"]
+        if not is_transformed:
+            return forms["beast"]
+        # 化形后优先使用对应性别人设
+        if gender == "male" and "human_male" in forms:
+            return forms["human_male"]
+        return forms["human"]  # 默认女性或无性别指定
 
     def get_exp_for_level(self, level: int) -> int:
         """获取到达某等级所需经验（线性插值）"""
@@ -208,3 +222,36 @@ class PetConfigManager:
             if affection >= threshold:
                 return self.affection_levels[threshold]
         return "陌生"
+
+    def get_next_rarity(self, current_rarity: str) -> Optional[str]:
+        """获取下一个稀有度，已是最高则返回 None"""
+        try:
+            idx = self.rarity_order.index(current_rarity)
+            if idx + 1 < len(self.rarity_order):
+                return self.rarity_order[idx + 1]
+        except ValueError:
+            pass
+        return None
+
+    def get_evolution_config(self, from_rarity: str, to_rarity: str) -> Optional[dict]:
+        """获取进化配置"""
+        key = f"{from_rarity}_to_{to_rarity}"
+        return self._evolution.get(key)
+
+    def get_transform_name(self, beast_id: str, gender: str = "") -> str:
+        """根据性别获取化形名"""
+        beast = self.get_beast(beast_id)
+        if not beast:
+            return "未知"
+        if gender == "male" and beast.transform_name_male:
+            return beast.transform_name_male
+        return beast.transform_name
+
+    def get_transform_description(self, beast_id: str, gender: str = "") -> str:
+        """根据性别获取化形描述"""
+        beast = self.get_beast(beast_id)
+        if not beast:
+            return ""
+        if gender == "male" and beast.transform_description_male:
+            return beast.transform_description_male
+        return beast.transform_description
