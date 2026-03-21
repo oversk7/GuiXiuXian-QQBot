@@ -21,7 +21,7 @@ from .npc_service import NPCService
 
 
 # ==================== NPC交互命令 ====================
-interact_cmd = on_command("交互", aliases={"对话", "找"}, block=True, priority=5)
+interact_cmd = on_command("交互", aliases={"找"}, block=True, priority=5)
 
 
 @interact_cmd.handle()
