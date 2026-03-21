@@ -130,7 +130,11 @@ def is_sub_admin(user_id: str) -> bool:
 
 async def call_zhipu_api(messages, model="GLM-4.5-Flash", timeout=30, temperature=0.75):
     """调用智谱AI API（异步版本）"""
+    import time as _time
     from .config import config
+
+    logger.info(f"[AI调用] provider=zhipu | model={model} | timeout={timeout}s")
+    _start = _time.time()
 
     # 从配置文件读取API密钥
     ai_config = config.game_config.get("ai_dialogue", {})
@@ -157,10 +161,15 @@ async def call_zhipu_api(messages, model="GLM-4.5-Flash", timeout=30, temperatur
     try:
         async with aiohttp.ClientSession(timeout=aiohttp.ClientTimeout(total=timeout)) as session:
             async with session.post(url, headers=headers, json=data) as response:
+                elapsed = _time.time() - _start
                 if response.status == 200:
-                    return _strip_think_tags(await response.json())
+                    result = _strip_think_tags(await response.json())
+                    tokens = result.get('usage', {}).get('total_tokens', '?')
+                    logger.info(f"[AI调用] provider=zhipu | 成功 | {elapsed:.1f}秒 | tokens={tokens}")
+                    return result
                 else:
                     response_text = await response.text()
+                    logger.warning(f"[AI调用] provider=zhipu | 失败 | {elapsed:.1f}秒 | status={response.status}")
                     raise aiohttp.ClientResponseError(
                         request_info=response.request_info,
                         history=response.history,
@@ -168,6 +177,8 @@ async def call_zhipu_api(messages, model="GLM-4.5-Flash", timeout=30, temperatur
                         message=f"API调用失败: {response.status}, {response_text}"
                     )
     except asyncio.TimeoutError:
+        elapsed = _time.time() - _start
+        logger.warning(f"[AI调用] provider=zhipu | 超时 | {elapsed:.1f}秒")
         raise TimeoutError(f"AI API调用超时（{timeout}秒）")
     except aiohttp.ClientError as e:
         raise aiohttp.ClientError(f"网络请求失败: {str(e)}")
@@ -175,7 +186,11 @@ async def call_zhipu_api(messages, model="GLM-4.5-Flash", timeout=30, temperatur
 
 async def call_volcengine_api(messages, model="ep-20260321201048-h78tm", timeout=30, temperature=0.75):
     """调用火山引擎ARK API（异步版本，OpenAI兼容接口）"""
+    import time as _time
     from .config import config
+
+    logger.info(f"[AI调用] provider=volcengine | model={model} | timeout={timeout}s")
+    _start = _time.time()
 
     ai_config = config.game_config.get("ai_dialogue", {})
     volc_config = ai_config.get("volcengine", {})
@@ -207,10 +222,15 @@ async def call_volcengine_api(messages, model="ep-20260321201048-h78tm", timeout
     try:
         async with aiohttp.ClientSession(timeout=aiohttp.ClientTimeout(total=timeout)) as session:
             async with session.post(url, headers=headers, json=data) as response:
+                elapsed = _time.time() - _start
                 if response.status == 200:
-                    return _strip_think_tags(await response.json())
+                    result = _strip_think_tags(await response.json())
+                    tokens = result.get('usage', {}).get('total_tokens', '?')
+                    logger.info(f"[AI调用] provider=volcengine | 成功 | {elapsed:.1f}秒 | tokens={tokens}")
+                    return result
                 else:
                     response_text = await response.text()
+                    logger.warning(f"[AI调用] provider=volcengine | 失败 | {elapsed:.1f}秒 | status={response.status}")
                     raise aiohttp.ClientResponseError(
                         request_info=response.request_info,
                         history=response.history,
@@ -218,6 +238,8 @@ async def call_volcengine_api(messages, model="ep-20260321201048-h78tm", timeout
                         message=f"火山引擎API调用失败: {response.status}, {response_text}"
                     )
     except asyncio.TimeoutError:
+        elapsed = _time.time() - _start
+        logger.warning(f"[AI调用] provider=volcengine | 超时 | {elapsed:.1f}秒")
         raise TimeoutError(f"火山引擎API调用超时（{timeout}秒）")
     except aiohttp.ClientError as e:
         raise aiohttp.ClientError(f"火山引擎网络请求失败: {str(e)}")
@@ -225,7 +247,11 @@ async def call_volcengine_api(messages, model="ep-20260321201048-h78tm", timeout
 
 async def call_scnet_api(messages, model="DeepSeek-R1-Distill-Qwen-7B", timeout=30, temperature=0.75):
     """调用scnet API（异步版本，OpenAI兼容接口）"""
+    import time as _time
     from .config import config
+
+    logger.info(f"[AI调用] provider=scnet | model={model} | timeout={timeout}s")
+    _start = _time.time()
 
     ai_config = config.game_config.get("ai_dialogue", {})
     scnet_config = ai_config.get("scnet", {})
@@ -258,10 +284,15 @@ async def call_scnet_api(messages, model="DeepSeek-R1-Distill-Qwen-7B", timeout=
     try:
         async with aiohttp.ClientSession(timeout=aiohttp.ClientTimeout(total=timeout)) as session:
             async with session.post(url, headers=headers, json=data) as response:
+                elapsed = _time.time() - _start
                 if response.status == 200:
-                    return _strip_think_tags(await response.json())
+                    result = _strip_think_tags(await response.json())
+                    tokens = result.get('usage', {}).get('total_tokens', '?')
+                    logger.info(f"[AI调用] provider=scnet | 成功 | {elapsed:.1f}秒 | tokens={tokens}")
+                    return result
                 else:
                     response_text = await response.text()
+                    logger.warning(f"[AI调用] provider=scnet | 失败 | {elapsed:.1f}秒 | status={response.status}")
                     raise aiohttp.ClientResponseError(
                         request_info=response.request_info,
                         history=response.history,
@@ -269,6 +300,8 @@ async def call_scnet_api(messages, model="DeepSeek-R1-Distill-Qwen-7B", timeout=
                         message=f"scnet API调用失败: {response.status}, {response_text}"
                     )
     except asyncio.TimeoutError:
+        elapsed = _time.time() - _start
+        logger.warning(f"[AI调用] provider=scnet | 超时 | {elapsed:.1f}秒")
         raise TimeoutError(f"scnet API调用超时（{timeout}秒）")
     except aiohttp.ClientError as e:
         raise aiohttp.ClientError(f"scnet 网络请求失败: {str(e)}")
@@ -276,7 +309,11 @@ async def call_scnet_api(messages, model="DeepSeek-R1-Distill-Qwen-7B", timeout=
 
 async def call_302ai_api(messages, model="gpt-3.5-turbo", timeout=30, temperature=0.75):
     """调用302.ai API（异步版本，OpenAI兼容接口）"""
+    import time as _time
     from .config import config
+
+    logger.info(f"[AI调用] provider=ai302 | model={model} | timeout={timeout}s")
+    _start = _time.time()
 
     # 从配置文件读取API密钥
     ai_config = config.game_config.get("ai_dialogue", {})
@@ -312,10 +349,15 @@ async def call_302ai_api(messages, model="gpt-3.5-turbo", timeout=30, temperatur
     try:
         async with aiohttp.ClientSession(timeout=aiohttp.ClientTimeout(total=timeout)) as session:
             async with session.post(url, headers=headers, json=data) as response:
+                elapsed = _time.time() - _start
                 if response.status == 200:
-                    return _strip_think_tags(await response.json())
+                    result = _strip_think_tags(await response.json())
+                    tokens = result.get('usage', {}).get('total_tokens', '?')
+                    logger.info(f"[AI调用] provider=ai302 | 成功 | {elapsed:.1f}秒 | tokens={tokens}")
+                    return result
                 else:
                     response_text = await response.text()
+                    logger.warning(f"[AI调用] provider=ai302 | 失败 | {elapsed:.1f}秒 | status={response.status}")
                     raise aiohttp.ClientResponseError(
                         request_info=response.request_info,
                         history=response.history,
@@ -323,6 +365,8 @@ async def call_302ai_api(messages, model="gpt-3.5-turbo", timeout=30, temperatur
                         message=f"302.ai API调用失败: {response.status}, {response_text}"
                     )
     except asyncio.TimeoutError:
+        elapsed = _time.time() - _start
+        logger.warning(f"[AI调用] provider=ai302 | 超时 | {elapsed:.1f}秒")
         raise TimeoutError(f"302.ai API调用超时（{timeout}秒）")
     except aiohttp.ClientError as e:
         raise aiohttp.ClientError(f"302.ai 网络请求失败: {str(e)}")
