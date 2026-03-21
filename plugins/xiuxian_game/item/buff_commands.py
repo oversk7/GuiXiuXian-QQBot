@@ -165,11 +165,14 @@ async def handle_attribute_breakdown(event: MessageEvent):
                 has_battle_attrs = True
                 attr_name = attr_names.get(attr, attr)
                 pet_val = breakdown.get("pet", {}).get(attr, 0)
+                # 格式化数值：整数显示整数，浮点显示1位小数
+                def _fmt(v):
+                    return str(int(v)) if v == int(v) else f"{v:.1f}"
                 if pet_val > 0:
                     base_val = total - pet_val
-                    battle_lines.append(f"🔸 {attr_name}: {total} (基础{base_val} + 伙伴+{pet_val})")
+                    battle_lines.append(f"🔸 {attr_name}: {_fmt(total)} (基础{_fmt(base_val)} + 伙伴+{_fmt(pet_val)})")
                 else:
-                    battle_lines.append(f"🔸 {attr_name}: {total}")
+                    battle_lines.append(f"🔸 {attr_name}: {_fmt(total)}")
 
         if has_battle_attrs:
             lines.append("")
