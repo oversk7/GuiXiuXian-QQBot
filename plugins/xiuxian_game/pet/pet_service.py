@@ -398,9 +398,9 @@ class PetService:
         status = "守田中" if pet.is_guarding else "跟随中"
 
         msg = (
-            f"{'═' * 16}\n"
+            f"━━━━━━━━━━━━━\n"
             f"  {acc_desc}{pet.nickname} ({display_name})\n"
-            f"{'═' * 16}\n"
+            f"━━━━━━━━━━━━━\n"
             f"等级: {pet.level} | 经验: {exp_progress}\n"
             f"好感: {pet.affection}({level_name})\n"
             f"心情: {pet.mood}/100 (倍率×{mood_mult:.1f})\n"
@@ -412,7 +412,7 @@ class PetService:
             msg += " | 已化形"
 
         msg += (
-            f"\n{'─' * 16}\n"
+            f"\n━━━━━━━━━━━━━\n"
             f"战斗加成:\n"
             f"  攻击+{total_bonus['attack']} 防御+{total_bonus['defense']}\n"
             f"  生命+{total_bonus['hp']}\n"
@@ -429,7 +429,7 @@ class PetService:
         if not pets:
             return False, "你还没有宠物，使用【驯化诡兽 名称 昵称】获取"
 
-        msg = f"宠物列表 ({len(pets)}只)\n{'━' * 16}\n"
+        msg = f"宠物列表 ({len(pets)}只)\n━━━━━━━━━━━━━\n"
         for pet in pets:
             beast = self.config.get_beast(pet.beast_id)
             display_name = beast.transform_name if pet.is_transformed else beast.name
