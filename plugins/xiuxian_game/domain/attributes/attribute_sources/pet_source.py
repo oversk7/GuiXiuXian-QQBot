@@ -75,13 +75,15 @@ class PetAttributeSource(IAttributeSource):
                     crit_rate += acc.bonus.get("crit_rate", 0)
                     dodge_rate += acc.bonus.get("dodge_rate", 0)
 
+        # crit_rate/dodge_rate 在 pet_config 中是小数(0.014=1.4%)
+        # 转为百分比整数以匹配 Player 模型的 critical_rate/dodge_rate 单位
         return AttributeBonus(
             attack=attack,
             defense=defense,
             hp=hp,
             max_hp=hp,
-            crit_rate=crit_rate,
-            dodge_rate=dodge_rate,
+            crit_rate=round(crit_rate * 100, 1),
+            dodge_rate=round(dodge_rate * 100, 1),
         )
 
     def invalidate_cache(self, player_id: str):

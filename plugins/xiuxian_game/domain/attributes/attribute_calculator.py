@@ -120,10 +120,15 @@ class AttributeCalculator:
             max_mp=getattr(player, 'max_mp', 0),
             cultivation=getattr(player, 'cultivation', 0),
             realm=getattr(player, 'realm', 0),
-            crit_rate=getattr(player, 'crit_rate', 0.0),
-            crit_damage=getattr(player, 'crit_damage', 0.0),
+            # Player模型字段名与AttributeBonus字段名的映射：
+            # Player.critical_rate (int, 百分比) → AttributeBonus.crit_rate
+            # Player.critical_power (int) → AttributeBonus.crit_damage
+            # Player.dodge_rate (int, 百分比) → AttributeBonus.dodge_rate
+            # Player.accuracy_rate (int, 百分比) → AttributeBonus.accuracy
+            crit_rate=getattr(player, 'critical_rate', 0.0),
+            crit_damage=getattr(player, 'critical_power', 0.0),
             dodge_rate=getattr(player, 'dodge_rate', 0.0),
-            accuracy=getattr(player, 'accuracy', 0.0),
+            accuracy=getattr(player, 'accuracy_rate', 0.0),
             agility=getattr(player, 'agility', 0),
             luck=getattr(player, 'luck', 0),
             gold_multiplier=getattr(player, 'gold_multiplier', 1.0),
