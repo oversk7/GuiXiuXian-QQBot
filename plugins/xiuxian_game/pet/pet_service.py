@@ -721,18 +721,19 @@ class PetService:
             pet.bonus_dodge_rate += growth.dodge_rate
 
     def _calculate_total_bonus(self, pet: PetInstance) -> dict:
-        """计算总属性加成（等级+饰品+心情倍率）"""
+        """计算总属性加成（等级×心情倍率 + 饰品固定值）"""
         mood_mult = self.config.get_mood_multiplier(pet.mood)
 
+        # 等级基础加成 × 心情倍率
         bonus = {
-            "attack": pet.bonus_attack,
-            "defense": pet.bonus_defense,
-            "hp": pet.bonus_hp,
-            "crit_rate": pet.bonus_crit_rate,
-            "dodge_rate": pet.bonus_dodge_rate,
+            "attack": int(pet.bonus_attack * mood_mult),
+            "defense": int(pet.bonus_defense * mood_mult),
+            "hp": int(pet.bonus_hp * mood_mult),
+            "crit_rate": round(pet.bonus_crit_rate * mood_mult, 4),
+            "dodge_rate": round(pet.bonus_dodge_rate * mood_mult, 4),
         }
 
-        # 叠加饰品加成
+        # 饰品加成（固定值，不受心情倍率影响）
         if pet.accessories:
             for acc_id in pet.accessories.values():
                 acc = self.config.get_accessory(acc_id)
@@ -740,12 +741,5 @@ class PetService:
                     for attr, value in acc.bonus.items():
                         if attr in bonus:
                             bonus[attr] += value
-
-        # 应用心情倍率
-        bonus["attack"] = int(bonus["attack"] * mood_mult)
-        bonus["defense"] = int(bonus["defense"] * mood_mult)
-        bonus["hp"] = int(bonus["hp"] * mood_mult)
-        bonus["crit_rate"] = round(bonus["crit_rate"] * mood_mult, 4)
-        bonus["dodge_rate"] = round(bonus["dodge_rate"] * mood_mult, 4)
 
         return bonus
