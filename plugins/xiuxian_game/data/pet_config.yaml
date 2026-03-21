@@ -7,7 +7,7 @@ settings:
   max_pets_per_player: 10        # 每个玩家最多拥有宠物数
   max_level: 100                 # 宠物最高等级
   transform_level: 50            # 化形所需等级
-  transform_affection: 500       # 化形所需好感度
+  transform_affection: 100       # 化形所需好感度
   hunger_decay_per_hour: 2       # 每小时饱食度下降
   mood_decay_per_hour: 1         # 每小时心情下降
   hungry_threshold: 20           # 饥饿阈值（低于此值心情加速下降）

@@ -88,7 +88,7 @@ class PetDialogueService:
                 personality=personality,
                 question=message,
                 dialogue_history=adapted_history,
-                favorability=pet.affection,
+                favorability=self._map_affection_to_favorability(pet.affection),
                 context=context,
             )
         except (FinishedException, PausedException, RejectedException):
@@ -120,17 +120,51 @@ class PetDialogueService:
         display_name = beast.transform_name if pet.is_transformed else beast.name
         return True, f"{pet.nickname}({display_name})\n━━━━━━━━━━━━━\n{response}"
 
+    @staticmethod
+    def _map_affection_to_favorability(affection: int) -> int:
+        """将宠物好感度(0-1000)映射到NPC亲密度(0-100)，让AI对话语气匹配关系阶段"""
+        if affection >= 800:
+            return 95
+        elif affection >= 500:
+            return 80
+        elif affection >= 300:
+            return 65
+        elif affection >= 150:
+            return 50
+        elif affection >= 50:
+            return 30
+        else:
+            return 15
+
+    @staticmethod
+    def _get_affection_behavior_hint(affection: int) -> str:
+        """根据好感度返回AI行为引导，让对话风格与关系深度匹配"""
+        if affection >= 800:
+            return "你和主人心意相通，彼此之间毫无隔阂，会撒娇、吃醋、主动关心，像家人一样自然。"
+        elif affection >= 500:
+            return "你和主人关系非常亲密，说话亲昵不见外，会开玩笑、偶尔撒娇，非常信赖对方。"
+        elif affection >= 300:
+            return "你和主人关系亲密，说话比较随意自然，愿意分享心事，会主动关心主人。"
+        elif affection >= 150:
+            return "你信赖主人，说话友好但还有些矜持，偶尔会害羞，愿意配合主人的要求。"
+        elif affection >= 50:
+            return "你和主人刚刚熟悉，说话礼貌客气，有些拘谨，偶尔会好奇地观察主人。"
+        else:
+            return "你刚被驯化不久，对主人还很陌生，话不多，警惕而谨慎，需要时间建立信任。"
+
     def _build_pet_background(self, pet, beast, personality_data, player) -> str:
         """构建宠物背景上下文"""
         affection_name = self.config.get_affection_level_name(pet.affection)
         mood_desc = self._get_mood_desc(pet.mood)
         hunger_desc = "饥饿" if pet.hunger < 20 else ("微饿" if pet.hunger < 50 else "饱足")
         form = "人形" if pet.is_transformed else "兽形"
+        affection_hint = self._get_affection_behavior_hint(pet.affection)
 
         bg = (
             f"{personality_data.background}\n\n"
             f"你的主人叫{player.nickname}，是一位{player.level}级的修仙者。"
-            f"你和主人的关系是【{affection_name}】。"
+            f"你和主人的关系是【{affection_name}】（好感度{pet.affection}）。"
+            f"{affection_hint}"
             f"你现在的心情{mood_desc}，{hunger_desc}状态。"
             f"你目前是{form}态。"
         )
