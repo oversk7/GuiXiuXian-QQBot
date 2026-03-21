@@ -57,6 +57,7 @@ async def _(event: MessageEvent):
             from ..sponsor.service import SponsorShopService
             extra_catches = []
             if SponsorShopService.is_privilege_active(player, "premium_fishing_until"):
+                current_x, current_y = player.get_current_coordinates()
                 for _ in range(2):
                     extra_rarity = FishingService.calculate_fish_rarity(player)
                     extra_fish_id = FishingService.get_random_fish(extra_rarity)
@@ -64,13 +65,38 @@ async def _(event: MessageEvent):
                     if extra_fish_cfg:
                         try:
                             await service._item_repo.add_item(player.id, extra_fish_id, 1)
+                            # 记录钓鱼活动到钓鱼记录
+                            await service._fishing_record_repo.record_fishing(
+                                player.id, extra_fish_id, 1, current_x, current_y
+                            )
                             fishing_stats_obj = await service._fishing_stats_repo.get_or_create(player.id)
                             await service._fishing_stats_repo.update_stats(
                                 fishing_stats_obj, extra_fish_cfg.price, extra_rarity, 1
                             )
                             rarity_emoji_map = {"white": "⚪", "green": "🟢", "blue": "🔵", "purple": "🟣", "orange": "🟠"}
                             extra_catches.append(
-                                f"{rarity_emoji_map.get(extra_rarity, '⚪')}{extra_fish_cfg.name}"
+                                f"{rarity_emoji_map.get(extra_rarity, '⚪')}{extra_fish_cfg.name}×1"
+                            )
+                        except ValueError:
+                            pass
+
+                # 保底机制：今日钓满50次后额外赠送1条传说鱼
+                stats_check = await service._fishing_record_repo.get_player_fishing_stats(player.id)
+                if stats_check["today_fishing_count"] >= FishingService.DAILY_FISHING_LIMIT:
+                    legend_fish_id = FishingService.get_random_fish("orange")
+                    legend_fish_cfg = config.items_config["by_id"].get(legend_fish_id)
+                    if legend_fish_cfg:
+                        try:
+                            await service._item_repo.add_item(player.id, legend_fish_id, 1)
+                            await service._fishing_record_repo.record_fishing(
+                                player.id, legend_fish_id, 1, current_x, current_y
+                            )
+                            fishing_stats_obj = await service._fishing_stats_repo.get_or_create(player.id)
+                            await service._fishing_stats_repo.update_stats(
+                                fishing_stats_obj, legend_fish_cfg.price, "orange", 1
+                            )
+                            extra_catches.append(
+                                f"🟠{legend_fish_cfg.name}×1（每日保底）"
                             )
                         except ValueError:
                             pass

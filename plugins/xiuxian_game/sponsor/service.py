@@ -644,7 +644,7 @@ class SponsorShopService:
             "  随时随地存取阴宅仓库",
             "",
             f"🎣 鱼竿特权    [{PREMIUM_FISHING_PRICE} 诡烛/月]",
-            "  每次钓鱼额外多钓2条",
+            "  每次钓鱼额外多钓2条，每天钓满50次保底一条传说鱼",
             "",
             f"👁️ 全视之眼    [{PREMIUM_VISION_PRICE} 诡烛/月]",
             "  俯瞰直接显示诡域全部方块",
