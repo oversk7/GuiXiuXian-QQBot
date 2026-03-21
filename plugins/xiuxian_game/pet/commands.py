@@ -210,15 +210,43 @@ transform_cmd = on_command("化形", priority=5, block=True)
 
 
 @transform_cmd.handle()
-async def handle_transform(event: MessageEvent):
-    """【化形】- 让当前伴侣化形为人形"""
+async def handle_transform(event: MessageEvent, args: Message = CommandArg()):
+    """【化形 男/女】- 宠物化形（可选性别）"""
+    args_text = args.extract_plain_text().strip()
+
+    # 解析性别参数
+    gender = "female"  # 默认女性
+    if args_text in ("男", "male", "男性"):
+        gender = "male"
+    elif args_text in ("女", "female", "女性"):
+        gender = "female"
+
     async with UnitOfWork(AsyncSessionLocal) as uow:
         player = await get_unified_player(uow.session, event)
         if not player:
             await transform_cmd.finish("请先创建角色")
 
-        success, msg = await pet_service.transform(uow, player.id)
+        success, msg = await pet_service.transform(uow, player.id, gender)
         await transform_cmd.finish(msg)
+
+
+# ==================== 宠物进化 ====================
+evolve_cmd = on_command("进化宠物", aliases={"宠物进化", "进化"}, priority=5, block=True)
+
+
+@evolve_cmd.handle()
+async def handle_evolve(event: MessageEvent, args: Message = CommandArg()):
+    """【进化宠物】- 提升宠物稀有度"""
+    args_text = args.extract_plain_text().strip()
+    confirm = args_text == "确认"
+
+    async with UnitOfWork(AsyncSessionLocal) as uow:
+        player = await get_unified_player(uow.session, event)
+        if not player:
+            await evolve_cmd.finish("请先创建角色")
+
+        success, msg = await pet_service.evolve_pet(uow, player.id, confirm)
+        await evolve_cmd.finish(msg)
 
 
 # ==================== 饰品 ====================
