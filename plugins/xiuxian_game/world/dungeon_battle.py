@@ -1661,7 +1661,9 @@ async def _handle_personal_monster(session, tile: WorldTile, player: Player) -> 
     return log
 
 async def _handle_rest(session, tile: WorldTile, player: Player) -> str:
-    player.hp = player.max_hp
+    effective_attrs = await player.get_effective_attributes(session)
+    effective_max_hp = effective_attrs.get('max_hp', player.max_hp)
+    player.hp = effective_max_hp
     session.add(player)
     await session.flush()
     return "🌫️ 你在这里休息了一晚，恢复了体力，生命++。"
