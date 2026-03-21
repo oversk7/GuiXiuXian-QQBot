@@ -376,6 +376,35 @@ class PetService:
 
     # ==================== 查看宠物 ====================
 
+    @staticmethod
+    def _progress_bar(value: int, max_val: int = 100, length: int = 10) -> str:
+        """生成进度条"""
+        filled = round(value / max_val * length) if max_val > 0 else 0
+        filled = max(0, min(length, filled))
+        return "▰" * filled + "▱" * (length - filled)
+
+    @staticmethod
+    def _mood_emoji(mood: int) -> str:
+        """根据心情值返回表情"""
+        if mood >= 80:
+            return "😆"
+        if mood >= 60:
+            return "😊"
+        if mood >= 40:
+            return "😐"
+        if mood >= 20:
+            return "😟"
+        return "😢"
+
+    RARITY_DISPLAY = {
+        "white": ("⚪", "普通"),
+        "green": ("🟢", "优秀"),
+        "blue": ("🔵", "稀有"),
+        "purple": ("🟣", "史诗"),
+        "orange": ("🟠", "传说"),
+        "red": ("🔴", "神话"),
+    }
+
     async def get_pet_info(
         self, uow: UnitOfWork, player_id: str
     ) -> Tuple[bool, str]:
@@ -402,30 +431,47 @@ class PetService:
 
         current_exp = pet.experience
         next_level_exp = self.config.get_exp_for_level(pet.level + 1)
-        exp_progress = f"{current_exp}/{next_level_exp}"
 
-        status = "守田中" if pet.is_guarding else "跟随中"
+        rarity_emoji, rarity_name = self.RARITY_DISPLAY.get(
+            beast.rarity, ("⚪", "普通")
+        )
+        status_icon = "🌾" if pet.is_guarding else "🐾"
+        status_text = "守田中" if pet.is_guarding else "跟随中"
+        if pet.is_transformed:
+            status_text += " · ✨已化形"
+
+        mood_emoji = self._mood_emoji(pet.mood)
+        mood_bar = self._progress_bar(pet.mood)
+        hunger_bar = self._progress_bar(pet.hunger)
+        exp_bar = self._progress_bar(current_exp, next_level_exp)
+
+        # 构建属性加成行
+        bonus_parts = []
+        if total_bonus['attack'] > 0:
+            bonus_parts.append(f"⚔攻击+{total_bonus['attack']}")
+        if total_bonus['defense'] > 0:
+            bonus_parts.append(f"🛡防御+{total_bonus['defense']}")
+        if total_bonus['hp'] > 0:
+            bonus_parts.append(f"❤生命+{total_bonus['hp']}")
+
+        rate_parts = []
+        if total_bonus['crit_rate'] > 0:
+            rate_parts.append(f"💥暴击+{total_bonus['crit_rate']:.1%}")
+        if total_bonus['dodge_rate'] > 0:
+            rate_parts.append(f"👟闪避+{total_bonus['dodge_rate']:.1%}")
 
         msg = (
+            f"🐾 {acc_desc}{pet.nickname}\n"
+            f"{rarity_emoji}{display_name} · Lv.{pet.level}\n"
             f"━━━━━━━━━━━━━\n"
-            f"  {acc_desc}{pet.nickname} ({display_name})\n"
-            f"━━━━━━━━━━━━━\n"
-            f"等级: {pet.level} | 经验: {exp_progress}\n"
-            f"好感: {pet.affection}({level_name})\n"
-            f"心情: {pet.mood}/100 (倍率×{mood_mult:.1f})\n"
-            f"饱食: {pet.hunger}/100\n"
-            f"状态: {status}"
-        )
-
-        if pet.is_transformed:
-            msg += " | 已化形"
-
-        msg += (
-            f"\n━━━━━━━━━━━━━\n"
-            f"战斗加成:\n"
-            f"  攻击+{total_bonus['attack']} 防御+{total_bonus['defense']}\n"
-            f"  生命+{total_bonus['hp']}\n"
-            f"  暴击+{total_bonus['crit_rate']:.1%} 闪避+{total_bonus['dodge_rate']:.1%}"
+            f"⭐ 经验 {exp_bar} {current_exp}/{next_level_exp}\n"
+            f"{mood_emoji} 心情 {mood_bar} {pet.mood} (×{mood_mult:.1f})\n"
+            f"🍖 饱食 {hunger_bar} {pet.hunger}\n"
+            f"❤️ 好感 {pet.affection} · {level_name}\n"
+            f"{status_icon} {status_text}\n"
+            f"━━━ 战斗加成 ━━━\n"
+            f"  {' '.join(bonus_parts)}\n"
+            f"  {' '.join(rate_parts)}"
         )
 
         return True, msg
@@ -438,16 +484,24 @@ class PetService:
         if not pets:
             return False, "你还没有宠物，使用【驯化诡兽 名称 昵称】获取"
 
-        msg = f"宠物列表 ({len(pets)}只)\n━━━━━━━━━━━━━\n"
+        msg = f"🐾 诡兽巢穴 ({len(pets)}只)\n━━━━━━━━━━━━━"
         for pet in pets:
             beast = self.config.get_beast(pet.beast_id)
             display_name = beast.transform_name if pet.is_transformed else beast.name
-            status = ""
+            rarity_emoji = self.RARITY_DISPLAY.get(beast.rarity, ("⚪",))[0]
+            tags = []
             if pet.is_active:
-                status = "[伴侣]"
+                tags.append("💖伴侣")
             if pet.is_guarding:
-                status += "[守田]"
-            msg += f"  #{pet.id} {pet.nickname}({display_name}) Lv.{pet.level} {status}\n"
+                tags.append("🌾守田")
+            tag_str = " ".join(tags)
+            mood_emoji = self._mood_emoji(pet.mood)
+            msg += (
+                f"\n{rarity_emoji} {pet.nickname}({display_name})"
+                f" Lv.{pet.level} {mood_emoji}"
+            )
+            if tag_str:
+                msg += f" {tag_str}"
 
         return True, msg
 

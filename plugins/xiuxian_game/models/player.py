@@ -301,7 +301,7 @@ class Player(Base):
         return self.inventory_capacity + bonus
 
     async def get_effective_attributes(self, session=None) -> dict:
-        """获取有效属性（包含装备加成、丹药加成和临时buff加成）
+        """获取有效属性（包含装备加成、丹药加成、临时buff加成和宠物加成）
 
         返回包含所有属性的字典，这是玩家的最终有效属性
         注意：装备加成已经通过_persist_bonus机制直接应用到玩家属性上
@@ -330,13 +330,26 @@ class Player(Base):
             "regen_rate": self.regen_rate,
         }
 
-        # 添加临时buff加成
         if session:
+            # 添加临时buff加成
             from .temporary_buff import TemporaryBuff
             buff_bonuses = await TemporaryBuff.get_total_attribute_bonuses(session, self.id)
             for attr, bonus in buff_bonuses.items():
                 if attr in base_attrs:
                     base_attrs[attr] += bonus
+
+            # 添加宠物属性加成（宠物加成未持久化，需动态计算）
+            from ..domain.attributes.attribute_calculator_factory import AttributeCalculatorFactory
+            pet_source = AttributeCalculatorFactory._pet_source
+            if pet_source:
+                pet_bonus = await pet_source.calculate_bonus(self, session)
+                base_attrs["max_hp"] += pet_bonus.max_hp
+                base_attrs["max_mp"] += pet_bonus.max_mp
+                base_attrs["attack"] += pet_bonus.attack
+                base_attrs["defense"] += pet_bonus.defense
+                base_attrs["agility"] += pet_bonus.agility
+                base_attrs["dodge_rate"] += pet_bonus.dodge_rate
+                base_attrs["critical_rate"] += pet_bonus.crit_rate
 
         return base_attrs
 
