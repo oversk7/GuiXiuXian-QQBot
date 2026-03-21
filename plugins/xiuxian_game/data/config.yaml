@@ -94,7 +94,7 @@ admin:
 # AI对话配置
 ai_dialogue:
   # LLM服务商配置
-  provider: "ai302"  # zhipu | ai302 | openai | claude | local
+  provider: "scnet"  # zhipu | ai302 | openai | claude | local
 
   # 智谱AI配置（付费，备用）
   zhipu:
