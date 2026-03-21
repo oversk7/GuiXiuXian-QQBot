@@ -84,9 +84,9 @@ BASE_INVITER_REWARD = 10_000
 INVITER_REWARD_STEP = 5_000
 INVITER_REWARD_MAX = 30_000
 
-# 初始绑定奖励（立即发放）
-INITIAL_INVITEE_REWARD = 2000
-INITIAL_INVITER_REWARD = 5000
+# 初始绑定奖励（立即发放，香火）
+INITIAL_INVITEE_REWARD = 200
+INITIAL_INVITER_REWARD = 500
 
 
 @invite_cmd.handle()
@@ -122,16 +122,16 @@ async def _(event: MessageEvent):
         f"🎉 已成功邀请：{invite_count} 人\n"
         "━━━━━━━━━━━━━\n"
         "🎁 分级奖励说明：\n"
-        "• 绑定时：邀请者+5000金币，被邀请者+2000金币\n"
-        "• 1级时：邀请者+3000金币，被邀请者+1000金币\n"
-        "• 10级时：邀请者+8000金币，被邀请者+3000金币\n"
-        "• 50级时：邀请者+20000金币，被邀请者+8000金币\n"
+        "• 绑定时：邀请者+500香火，被邀请者+200香火\n"
+        "• 1级时：邀请者+300香火，被邀请者+100香火\n"
+        "• 10级时：邀请者+800香火，被邀请者+300香火\n"
+        "• 50级时：邀请者+2000香火，被邀请者+800香火\n"
     )
 
     if pending_rewards:
         msg += "━━━━━━━━━━━━━\n🎁 待发放奖励：\n"
         for reward in pending_rewards:
-            msg += f"• {reward['invitee_name']}({reward['invitee_level']}级) - {reward['reward_level']}级奖励：+{reward['inviter_gold']}金币\n"
+            msg += f"• {reward['invitee_name']}({reward['invitee_level']}级) - {reward['reward_level']}级奖励：+{reward['inviter_incense']}香火\n"
 
     msg += f"\n将该码发送给好友，让 TA 发送 '/绑定邀请码 {code}' 双方均可获得奖励！"
 
@@ -191,19 +191,19 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
         # 创建新的邀请记录 (使用新版本)
         invite_record = await invite_reward_service.create_invite_record(player.uid, inviter_uid)
 
-        # 发放初始绑定奖励
-        player.gold += INITIAL_INVITEE_REWARD
-        inviter.gold += INITIAL_INVITER_REWARD
+        # 发放初始绑定奖励（香火）
+        player.incense += INITIAL_INVITEE_REWARD
+        inviter.incense += INITIAL_INVITER_REWARD
 
         # 如果玩家已经达到1级，立即发放1级奖励
         level_1_reward_msg = ""
         if player.level >= 1:
             level_1_reward = InviteRewardService.LEVEL_REWARDS[1]
-            player.gold += level_1_reward["invitee_gold"]
-            inviter.gold += level_1_reward["inviter_gold"]
+            player.incense += level_1_reward["invitee_incense"]
+            inviter.incense += level_1_reward["inviter_incense"]
             invite_record.level_1_rewarded = True
             invite_record.level_1_rewarded_at = datetime.now()
-            level_1_reward_msg = f"\n🎉 1级奖励同时发放：邀请者+{level_1_reward['inviter_gold']}，被邀请者+{level_1_reward['invitee_gold']}"
+            level_1_reward_msg = f"\n🎉 1级奖励同时发放：邀请者+{level_1_reward['inviter_incense']}香火，被邀请者+{level_1_reward['invitee_incense']}香火"
 
         # UoW会在__aexit__中自动commit
 
@@ -215,8 +215,8 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
         await bind_cmd.finish(
             message_add_head(
                 f"✅ 绑定成功！\n"
-                f"🎁 被邀请者 {player.nickname} 获得 💰{INITIAL_INVITEE_REWARD} 金币\n"
-                f"🎁 邀请者 {inviter.nickname} 获得 💰{INITIAL_INVITER_REWARD} 金币"
+                f"🎁 被邀请者 {player.nickname} 获得 🪔{INITIAL_INVITEE_REWARD} 香火\n"
+                f"🎁 邀请者 {inviter.nickname} 获得 🪔{INITIAL_INVITER_REWARD} 香火"
                 + level_1_reward_msg +
                 f"\n━━━━━━━━━━━━━\n"
                 f"📈 后续奖励将在达到10级、50级时自动发放！",

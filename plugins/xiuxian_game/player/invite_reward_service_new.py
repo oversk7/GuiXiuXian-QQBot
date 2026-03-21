@@ -15,26 +15,26 @@ from ..infrastructure.repositories.invite_reward_repository import InviteRewardR
 class InviteRewardService:
     """邀请奖励服务类 - DI版本"""
 
-    # 分级奖励配置
+    # 分级奖励配置（香火）
     LEVEL_REWARDS = {
         1: {
-            "inviter_gold": 3000,
+            "inviter_incense": 300,
             "inviter_items": [],  # 可以添加道具奖励
-            "invitee_gold": 1000,
+            "invitee_incense": 100,
             "invitee_items": [],
             "description": "1级奖励"
         },
         10: {
-            "inviter_gold": 8000,
+            "inviter_incense": 800,
             "inviter_items": [],
-            "invitee_gold": 3000,
+            "invitee_incense": 300,
             "invitee_items": [],
             "description": "10级奖励"
         },
         50: {
-            "inviter_gold": 20000,
+            "inviter_incense": 2000,
             "inviter_items": [],
-            "invitee_gold": 8000,
+            "invitee_incense": 800,
             "invitee_items": [],
             "description": "50级奖励"
         }
@@ -146,9 +146,9 @@ class InviteRewardService:
         if not reward_config:
             return ""
 
-        # 发放奖励
-        inviter.gold += reward_config["inviter_gold"]
-        invitee.gold += reward_config["invitee_gold"]
+        # 发放香火奖励
+        inviter.incense += reward_config["inviter_incense"]
+        invitee.incense += reward_config["invitee_incense"]
 
         # 更新玩家信息
         await self._player_repo.update(inviter)
@@ -160,8 +160,8 @@ class InviteRewardService:
         return (
             f"🎉 邀请奖励发放！\n"
             f"📈 {invitee.nickname} 达到{level}级\n"
-            f"🎁 邀请者 {inviter.nickname} 获得 💰{reward_config['inviter_gold']} 金币\n"
-            f"🎁 被邀请者 {invitee.nickname} 获得 💰{reward_config['invitee_gold']} 金币"
+            f"🎁 邀请者 {inviter.nickname} 获得 🪔{reward_config['inviter_incense']} 香火\n"
+            f"🎁 被邀请者 {invitee.nickname} 获得 🪔{reward_config['invitee_incense']} 香火"
         )
 
     async def get_invite_status(self, player_uid: int) -> Dict:
@@ -219,8 +219,8 @@ class InviteRewardService:
                             "invitee_name": invitee.nickname,
                             "invitee_level": invitee.level,
                             "reward_level": level,
-                            "inviter_gold": reward_config["inviter_gold"],
-                            "invitee_gold": reward_config["invitee_gold"]
+                            "inviter_incense": reward_config["inviter_incense"],
+                            "invitee_incense": reward_config["invitee_incense"]
                         })
 
         return pending_rewards
