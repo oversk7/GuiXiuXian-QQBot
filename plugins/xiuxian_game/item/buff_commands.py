@@ -164,7 +164,12 @@ async def handle_attribute_breakdown(event: MessageEvent):
             if total != 0:
                 has_battle_attrs = True
                 attr_name = attr_names.get(attr, attr)
-                battle_lines.append(f"🔸 {attr_name}: {total}")
+                pet_val = breakdown.get("pet", {}).get(attr, 0)
+                if pet_val > 0:
+                    base_val = total - pet_val
+                    battle_lines.append(f"🔸 {attr_name}: {total} (基础{base_val} + 伙伴+{pet_val})")
+                else:
+                    battle_lines.append(f"🔸 {attr_name}: {total}")
 
         if has_battle_attrs:
             lines.append("")

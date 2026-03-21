@@ -501,6 +501,8 @@ class Player(Base):
                 pet_bonus_dict["attack"] = pet_bonus.attack
                 pet_bonus_dict["defense"] = pet_bonus.defense
                 pet_bonus_dict["agility"] = pet_bonus.agility
+                pet_bonus_dict["critical_rate"] = pet_bonus.crit_rate
+                pet_bonus_dict["dodge_rate"] = pet_bonus.dodge_rate
 
         # 计算基础属性（初始值 + 加点，不含丹药和VIP装备永久加成）
         # 注意：Player表存储的属性值 = 基础 + 装备 + 永久丹药 + VIP装备 - 洗髓减成
