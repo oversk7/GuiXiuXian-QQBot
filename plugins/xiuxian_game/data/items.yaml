@@ -4457,55 +4457,55 @@ items:
       name: "红色蝴蝶结"
       type: "PET_ACCESSORY"
       rarity: "white"
-      price: 500
+      price: 100000
       description: "宠物头饰，攻击+5"
     - item_id: "pet_acc_ghost_crown"
       name: "幽冥小冠"
       type: "PET_ACCESSORY"
       rarity: "green"
-      price: 3000
+      price: 300000
       description: "宠物头饰，防御+10 生命+50"
     - item_id: "pet_acc_flower_hairpin"
       name: "灵花簪"
       type: "PET_ACCESSORY"
       rarity: "blue"
-      price: 10000
+      price: 800000
       description: "宠物头饰，攻击+15 暴击+1%"
     - item_id: "pet_acc_bell_collar"
       name: "铃铛项圈"
       type: "PET_ACCESSORY"
       rarity: "white"
-      price: 500
+      price: 100000
       description: "宠物颈饰，闪避+0.5%"
     - item_id: "pet_acc_soul_pendant"
       name: "魂玉坠"
       type: "PET_ACCESSORY"
       rarity: "green"
-      price: 3000
+      price: 300000
       description: "宠物颈饰，生命+100 防御+8"
     - item_id: "pet_acc_void_choker"
       name: "虚空锁链"
       type: "PET_ACCESSORY"
       rarity: "purple"
-      price: 30000
+      price: 150
       description: "宠物颈饰，攻击+20 防御+15"
     - item_id: "pet_acc_maid_outfit"
       name: "女仆装"
       type: "PET_ACCESSORY"
       rarity: "green"
-      price: 5000
+      price: 500000
       description: "宠物服饰，生命+80"
     - item_id: "pet_acc_battle_armor"
       name: "灵甲轻铠"
       type: "PET_ACCESSORY"
       rarity: "blue"
-      price: 15000
+      price: 1000000
       description: "宠物服饰，防御+20 生命+150"
     - item_id: "pet_acc_kimono"
       name: "诡纹和服"
       type: "PET_ACCESSORY"
       rarity: "purple"
-      price: 30000
+      price: 150
       description: "宠物服饰，攻击+15 暴击+1.5%"
     - item_id: "pet_acc_star_crown"
       name: "星辰发冠"
