@@ -130,3 +130,29 @@ affection_levels:
   300: "亲密"
   500: "羁绊"
   800: "心意相通"
+
+# 稀有度升级路径
+rarity_order: ["white", "green", "blue", "purple", "orange"]
+
+# 宠物进化配置
+evolution:
+  white_to_green:
+    min_level: 10
+    cost_item: "pet_evolution_stone"
+    cost_quantity: 3
+    cost_resentment: 200000
+  green_to_blue:
+    min_level: 20
+    cost_item: "pet_evolution_stone"
+    cost_quantity: 5
+    cost_resentment: 500000
+  blue_to_purple:
+    min_level: 35
+    cost_item: "pet_evolution_stone"
+    cost_quantity: 8
+    cost_resentment: 1200000
+  purple_to_orange:
+    min_level: 50
+    cost_item: "pet_evolution_stone"
+    cost_quantity: 12
+    cost_resentment: 3000000
