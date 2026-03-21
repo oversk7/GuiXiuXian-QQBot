@@ -91,36 +91,45 @@ class PetService:
     # ==================== 喂食 ====================
 
     async def feed_with_resentment(
-        self, uow: UnitOfWork, player_id: str
+        self, uow: UnitOfWork, player_id: str, quantity: int = 1
     ) -> Tuple[bool, str]:
-        """用怨念喂食当前伴侣"""
+        """用怨念喂食当前伴侣（支持批量，每次随机消耗50-200怨念）"""
+        import random
+
         pet = await uow.pets.get_active_pet(player_id)
         if not pet:
             return False, "你还没有伴侣诡兽"
 
-        cost = self.config.settings["base_feed_resentment"]
         player = await uow.players.get_by_id(player_id)
-        if player.resentment < cost:
-            return False, f"怨念不足，喂食需要{cost}点怨念（当前{player.resentment}）"
 
-        player.resentment -= cost
+        # 每次喂食随机消耗怨念
+        r_min = self.config.settings["feed_resentment_min"]
+        r_max = self.config.settings["feed_resentment_max"]
+        costs = [random.randint(r_min, r_max) for _ in range(quantity)]
+        total_cost = sum(costs)
+        if player.resentment < total_cost:
+            return False, f"怨念不足，喂食{quantity}次预计需要{r_min * quantity}~{r_max * quantity}点怨念（当前{player.resentment}）"
+
+        player.resentment -= total_cost
         await uow.players.update(player)
 
         restore = self.config.settings["feed_hunger_restore"]
-        pet.hunger = min(100, pet.hunger + restore)
-        pet.mood = min(100, pet.mood + 3)
+        exp_per = 5
+        total_exp = exp_per * quantity
+        pet.hunger = min(100, pet.hunger + restore * quantity)
+        pet.mood = min(100, pet.mood + 3 * quantity)
         pet.last_fed_at = datetime.now()
-        exp_gain = 5
-        level_up_msg = self._add_experience(pet, exp_gain)
+        level_up_msg = self._add_experience(pet, total_exp)
         await uow.pets.update(pet)
         AttributeCalculatorFactory.invalidate_pet_cache(player_id)
 
+        qty_text = f"×{quantity}" if quantity > 1 else ""
         msg = (
-            f"已喂养【{pet.nickname}】\n"
-            f"消耗: {cost}点怨念\n"
+            f"已喂养【{pet.nickname}】{qty_text}\n"
+            f"消耗: {total_cost}点怨念\n"
             f"饱食度: {pet.hunger}/100\n"
             f"心情: {pet.mood}/100\n"
-            f"经验+{exp_gain}"
+            f"经验+{total_exp}"
         )
         if level_up_msg:
             msg += f"\n{level_up_msg}"

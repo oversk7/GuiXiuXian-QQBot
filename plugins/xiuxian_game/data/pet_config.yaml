@@ -11,7 +11,8 @@ settings:
   hunger_decay_per_hour: 2       # 每小时饱食度下降
   mood_decay_per_hour: 1         # 每小时心情下降
   hungry_threshold: 20           # 饥饿阈值（低于此值心情加速下降）
-  base_feed_resentment: 10       # 基础怨念喂食消耗
+  feed_resentment_min: 50        # 怨念喂食最小消耗
+  feed_resentment_max: 200       # 怨念喂食最大消耗
   feed_hunger_restore: 30        # 怨念喂食恢复饱食度
   dish_hunger_restore: 50        # 菜肴喂食恢复饱食度
   dish_mood_bonus: 10            # 菜肴喂食额外心情加成

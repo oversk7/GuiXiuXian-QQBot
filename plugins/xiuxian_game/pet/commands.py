@@ -118,27 +118,46 @@ feed_cmd = on_command("喂食", aliases={"喂宠物"}, priority=5, block=True)
 
 @feed_cmd.handle()
 async def handle_feed(event: MessageEvent, args: Message = CommandArg()):
-    """【喂食】怨念喂食 / 【喂食 菜肴名 [数量]】用菜肴喂食"""
+    """【喂食 怨念/菜肴名 [数量]】- 统一喂食指令"""
     args_text = args.extract_plain_text().strip()
+
+    if not args_text:
+        # 无参数：显示宠物状态 + 用法提示
+        async with UnitOfWork(AsyncSessionLocal) as uow:
+            player = await get_unified_player(uow.session, event)
+            if not player:
+                await feed_cmd.finish("请先创建角色")
+            pet = await uow.pets.get_active_pet(player.id)
+            if not pet:
+                await feed_cmd.finish("你还没有伴侣诡兽\n💡 使用【驯化诡兽 诡兽名 昵称】驯化一只")
+            msg = (
+                f"🐾 {pet.nickname}\n"
+                f"饱食度: {pet.hunger}/100 | 心情: {pet.mood}/100\n"
+                f"━━━━━━━━━━━━━\n"
+                f"喂食 怨念 [数量] - 消耗怨念喂养\n"
+                f"喂食 <菜肴名> [数量] - 用菜肴喂养"
+            )
+            await feed_cmd.finish(msg)
+
+    # 解析参数：名称 [数量]
+    parts = args_text.rsplit(maxsplit=1)
+    name = args_text
+    quantity = 1
+    if len(parts) == 2 and parts[1].isdigit():
+        name = parts[0]
+        quantity = int(parts[1])
+        if quantity <= 0 or quantity > 99:
+            await feed_cmd.finish("数量必须在1-99之间")
 
     async with UnitOfWork(AsyncSessionLocal) as uow:
         player = await get_unified_player(uow.session, event)
         if not player:
             await feed_cmd.finish("请先创建角色")
 
-        if not args_text:
-            success, msg = await pet_service.feed_with_resentment(uow, player.id)
+        if name == "怨念":
+            success, msg = await pet_service.feed_with_resentment(uow, player.id, quantity)
         else:
-            # 解析菜肴名和可选数量
-            parts = args_text.rsplit(maxsplit=1)
-            dish_name = args_text
-            quantity = 1
-            if len(parts) == 2 and parts[1].isdigit():
-                dish_name = parts[0]
-                quantity = int(parts[1])
-                if quantity <= 0 or quantity > 99:
-                    await feed_cmd.finish("数量必须在1-99之间")
-            success, msg = await pet_service.feed_with_dish(uow, player.id, dish_name, quantity)
+            success, msg = await pet_service.feed_with_dish(uow, player.id, name, quantity)
         await feed_cmd.finish(msg)
 
 
