@@ -340,6 +340,7 @@ class Player(Base):
 
             # 添加宠物属性加成（宠物加成未持久化，需动态计算）
             from ..domain.attributes.attribute_calculator_factory import AttributeCalculatorFactory
+            AttributeCalculatorFactory.get_instance()  # 确保工厂已初始化
             pet_source = AttributeCalculatorFactory._pet_source
             if pet_source:
                 pet_bonus = await pet_source.calculate_bonus(self, session)
@@ -492,6 +493,7 @@ class Player(Base):
         pet_bonus_dict = {k: 0 for k in INIT_ATTRS}
         if session:
             from ..domain.attributes.attribute_calculator_factory import AttributeCalculatorFactory
+            AttributeCalculatorFactory.get_instance()  # 确保工厂已初始化
             pet_source = AttributeCalculatorFactory._pet_source
             if pet_source:
                 pet_bonus = await pet_source.calculate_bonus(self, session)
