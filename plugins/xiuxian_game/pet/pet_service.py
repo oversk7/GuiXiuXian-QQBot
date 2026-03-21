@@ -69,12 +69,27 @@ class PetService:
     # ==================== 切换伴侣 ====================
 
     async def set_active_pet(
-        self, uow: UnitOfWork, player_id: str, pet_id: int
+        self, uow: UnitOfWork, player_id: str, pet_id_or_name: str
     ) -> Tuple[bool, str]:
-        """切换当前伴侣"""
-        pet = await uow.pets.get_by_id(pet_id)
-        if not pet or pet.player_id != player_id:
-            return False, "未找到该宠物"
+        """切换当前伴侣（支持ID或昵称）"""
+        pet = None
+        # 尝试按数字ID查找
+        try:
+            pet_id = int(pet_id_or_name)
+            pet = await uow.pets.get_by_id(pet_id)
+            if pet and pet.player_id != player_id:
+                pet = None
+        except ValueError:
+            pass
+        # 按昵称查找
+        if not pet:
+            all_pets = await uow.pets.get_all_by_player(player_id)
+            for p in all_pets:
+                if p.nickname == pet_id_or_name:
+                    pet = p
+                    break
+        if not pet:
+            return False, "未找到该宠物，请使用【宠物列表】查看"
         if pet.is_active:
             return False, f"【{pet.nickname}】已经是当前伴侣了"
 
@@ -656,7 +671,7 @@ class PetService:
             tag_str = " ".join(tags)
             mood_emoji = self._mood_emoji(pet.mood)
             msg += (
-                f"\n{rarity_emoji} {pet.nickname}({display_name})"
+                f"\n{rarity_emoji}#{pet.id} {pet.nickname}({display_name})"
                 f" Lv.{pet.level} {mood_emoji}"
             )
             if tag_str:
