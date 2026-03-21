@@ -17,6 +17,7 @@ from ..models.inventory import ItemType
 from ..utils import message_add_head
 from ..config import config
 from ..platform_utils import get_unified_player
+from ..economy.market import get_shop_adjusted_price
 
 # 创建命令
 gift_shop_cmd = on_command("礼物商店", aliases={"礼物店", "礼品店"}, priority=5, block=True)
@@ -103,44 +104,45 @@ async def get_gift_shop_menu(player_id: str = None) -> str:
         "💝 礼物列表:"
     ]
 
-    # 如果提供了玩家ID,获取玩家购买记录
+    # 获取玩家购买记录和动态价格
     player_purchases = {}
-    if player_id:
-        async with UnitOfWork(AsyncSessionLocal) as uow:
+    async with UnitOfWork(AsyncSessionLocal) as uow:
+        if player_id:
             player = await uow.players.get_by_id(player_id)
             if player:
                 player_purchases = get_daily_gift_purchases(player)
 
-    for rarity in rarity_order:
-        if rarity not in rarity_groups:
-            continue
+        for rarity in rarity_order:
+            if rarity not in rarity_groups:
+                continue
 
-        lines.append(f"\n{rarity_names[rarity]}")
+            lines.append(f"\n{rarity_names[rarity]}")
 
-        # 按价格排序
-        items = sorted(rarity_groups[rarity], key=lambda x: x.price)
+            # 按价格排序
+            items = sorted(rarity_groups[rarity], key=lambda x: x.price)
 
-        for item in items:
-            # 获取每日限制
-            daily_limit = getattr(item, 'daily_limit', 0)
+            for item in items:
+                adj_price = await get_shop_adjusted_price(uow.session, item.price)
+                # 获取每日限制
+                daily_limit = getattr(item, 'daily_limit', 0)
 
-            # 构建显示文本
-            if daily_limit > 0:
-                # 获取今日已购买数量
-                purchased = 0
-                if item.item_id in player_purchases:
-                    purchase_info = player_purchases[item.item_id]
-                    if purchase_info["date"] == date.today().isoformat():
-                        purchased = purchase_info["count"]
+                # 构建显示文本
+                if daily_limit > 0:
+                    # 获取今日已购买数量
+                    purchased = 0
+                    if item.item_id in player_purchases:
+                        purchase_info = player_purchases[item.item_id]
+                        if purchase_info["date"] == date.today().isoformat():
+                            purchased = purchase_info["count"]
 
-                remaining = daily_limit - purchased
-                lines.append(
-                    f"  • {item.name} - {item.price}金币 (好感+{item.favorability}) [今日剩余:{remaining}]"
-                )
-            else:
-                lines.append(
-                    f"  • {item.name} - {item.price}金币 (好感+{item.favorability})"
-                )
+                    remaining = daily_limit - purchased
+                    lines.append(
+                        f"  • {item.name} - {adj_price}金币 (好感+{item.favorability}) [今日剩余:{remaining}]"
+                    )
+                else:
+                    lines.append(
+                        f"  • {item.name} - {adj_price}金币 (好感+{item.favorability})"
+                    )
 
     lines.extend([
         "",
@@ -238,9 +240,7 @@ async def handle_buy_gift(event: MessageEvent, args: Message = CommandArg()):
                         )
                     )
 
-        # 6. 计算总价
-        total_price = item_config.price * quantity
-
+        # 6. 计算总价（动态定价）
         # 7. 执行购买
         async with UnitOfWork(AsyncSessionLocal) as uow:
             # 获取玩家（通过ownership系统）
@@ -248,6 +248,9 @@ async def handle_buy_gift(event: MessageEvent, args: Message = CommandArg()):
             if not player:
                 await buy_gift_cmd.finish(message_add_head("⛔ 请先创建角色", event))
             player_id = player.id
+
+            adj_price = await get_shop_adjusted_price(uow.session, item_config.price)
+            total_price = adj_price * quantity
 
             # 检查金币
             if player.gold < total_price:

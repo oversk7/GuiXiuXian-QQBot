@@ -26,6 +26,7 @@ from sqlalchemy import select
 
 from ..models.db import safe_session
 from ..models.player import Player
+from .market import get_shop_adjusted_price
 from ..models.inventory import ItemInstance
 from ..models.market_state import MarketState
 from ..models.trade_record import TradeRecord, TradeType
@@ -604,8 +605,9 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
             # 今日黑市上架（非基础物品）
             today_items = await _pick_black_market_today_items(session)
             if item_cfg.item_id in SHOP_ITEMS:
-                # 基础物品原价
-                total_cost = item_cfg.price * qty
+                # 基础物品：基础倍率 × 财富指数
+                adjusted_price = await get_shop_adjusted_price(session, item_cfg.price)
+                total_cost = adjusted_price * qty
                 if player.gold < total_cost:
                     await buy_cmd.finish(f"💰 金币不足，需要 {total_cost} (当前 {player.gold})")
                 try:
@@ -633,7 +635,8 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
                     await buy_cmd.finish(
                         f"⛔ 超出今日限购！已购 {bought}/{BLACK_MARKET_DAILY_LIMIT_PER_PLAYER}，还可购买 {remaining} 件")
 
-                unit_price = max(1, int((item_cfg.price or 1) * BLACK_MARKET_OVERPRICE))
+                base_adjusted = await get_shop_adjusted_price(session, item_cfg.price or 1)
+                unit_price = max(1, int(base_adjusted * BLACK_MARKET_OVERPRICE))
                 total_cost = unit_price * qty
                 if player.gold < total_cost:
                     await buy_cmd.finish(f"💰 金币不足，需要 {total_cost} (当前 {player.gold})")
@@ -1241,7 +1244,7 @@ async def _(event: MessageEvent):
 
         await trade_advise_cmd.finish(message_add_head("\n".join(lines), event))
 
-# 系统商店基础物品（保留原价）
+# 系统商店基础物品（价格 = 基础价 × SHOP_BASE_MULT × 财富指数）
 SHOP_ITEMS = [
     "revive_potion", "president_letter", "territory_expansion_scroll", "heal_potion", "spirit_herb",
     # 基础调料（烹饪系统）
@@ -1385,16 +1388,18 @@ async def _(event: MessageEvent):
                 if not cfg:
                     continue
                 mstate = await MarketState.get_or_create(session, BLACK_MARKET_ID, iid)
-                unit_price = max(1, int((cfg.price or 1) * BLACK_MARKET_OVERPRICE))
+                base_adjusted = await get_shop_adjusted_price(session, cfg.price or 1)
+                unit_price = max(1, int(base_adjusted * BLACK_MARKET_OVERPRICE))
                 lines.append(f"• {cfg.name}│{unit_price} 金币│库存({mstate.current_stock})")
             lines.append("━━━━━━━━━━━━━")
 
-        # 基础物品·原价
-        lines.append("📦 基础物品（原价）:")
+        # 基础物品（动态定价）
+        lines.append("📦 基础物品:")
         for item_id in SHOP_ITEMS:
             cfg = config.items_config["by_id"].get(item_id)
             if cfg:
-                lines.append(f"• {cfg.name}│{cfg.price} 金币")
+                adj_price = await get_shop_adjusted_price(session, cfg.price)
+                lines.append(f"• {cfg.name}│{adj_price} 金币")
 
         # 限购说明
         bought = await _black_market_daily_purchased_qty(session, player.id)

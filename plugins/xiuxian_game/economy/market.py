@@ -87,6 +87,17 @@ def calculate_transaction_tax(amount: int) -> int:
         remaining -= taxable
 
     return tax
+
+# ====== 商店基础倍率（抗通胀） ======
+SHOP_BASE_MULT = 3  # 系统商店/黑市/礼物商店的固定基础倍率
+
+
+async def get_shop_adjusted_price(session, base_price: int) -> int:
+    """计算商店调整后价格：基础价 × 固定倍率 × 财富指数。
+    用于系统商店、黑市、礼物商店等所有金币定价的NPC商店。"""
+    scale = await _get_wealth_scale(session)
+    return max(1, int(base_price * SHOP_BASE_MULT * scale))
+
 # ====== 价格基础与底价吸附（调低整体物价与门槛） ======
 PRICE_FLOOR_ALPHA = 0.6   # 参考价折扣系数（底价≈参考价*alpha 与 经济基础价 取最大）
 MIN_UNIT_PRICE = 10       # 系统绝对最小单价下限（如需进一步降低门槛可改为 5）
