@@ -127,9 +127,9 @@ class PetService:
         return True, msg
 
     async def feed_with_dish(
-        self, uow: UnitOfWork, player_id: str, dish_name: str
+        self, uow: UnitOfWork, player_id: str, dish_name: str, quantity: int = 1
     ) -> Tuple[bool, str]:
-        """用菜肴喂食当前伴侣"""
+        """用菜肴喂食当前伴侣（支持批量）"""
         pet = await uow.pets.get_active_pet(player_id)
         if not pet:
             return False, "你还没有伴侣诡兽"
@@ -141,31 +141,35 @@ class PetService:
 
         dish_item_id = dish_config.item_id
         dish_count = await uow.items.get_material_total_quantity(player_id, dish_item_id)
-        if dish_count < 1:
-            return False, f"背包中没有【{dish_name}】"
+        if dish_count < quantity:
+            return False, f"背包中【{dish_name}】不足（需要{quantity}，拥有{dish_count}）"
 
-        await ItemInstance.consume_item(uow.session, player_id, dish_item_id, 1)
+        await ItemInstance.consume_item(uow.session, player_id, dish_item_id, quantity)
 
         rarity = getattr(dish_config, "rarity", "white")
         rarity_bonus = {"white": 1, "green": 2, "blue": 3, "purple": 4, "orange": 5}
         multiplier = rarity_bonus.get(rarity, 1)
 
         restore = self.config.settings["dish_hunger_restore"]
-        mood_bonus = self.config.settings["dish_mood_bonus"] * multiplier
-        exp_gain = 10 * multiplier
+        mood_bonus_per = self.config.settings["dish_mood_bonus"] * multiplier
+        exp_per = 10 * multiplier
 
-        pet.hunger = min(100, pet.hunger + restore)
-        pet.mood = min(100, pet.mood + mood_bonus)
+        total_mood_bonus = mood_bonus_per * quantity
+        total_exp = exp_per * quantity
+
+        pet.hunger = min(100, pet.hunger + restore * quantity)
+        pet.mood = min(100, pet.mood + total_mood_bonus)
         pet.last_fed_at = datetime.now()
-        level_up_msg = self._add_experience(pet, exp_gain)
+        level_up_msg = self._add_experience(pet, total_exp)
         await uow.pets.update(pet)
         AttributeCalculatorFactory.invalidate_pet_cache(player_id)
 
+        qty_text = f"×{quantity}" if quantity > 1 else ""
         msg = (
-            f"用【{dish_name}】喂养了【{pet.nickname}】\n"
+            f"用【{dish_name}】{qty_text}喂养了【{pet.nickname}】\n"
             f"饱食度: {pet.hunger}/100\n"
-            f"心情+{mood_bonus} → {pet.mood}/100\n"
-            f"经验+{exp_gain}"
+            f"心情+{total_mood_bonus} → {pet.mood}/100\n"
+            f"经验+{total_exp}"
         )
         if level_up_msg:
             msg += f"\n{level_up_msg}"

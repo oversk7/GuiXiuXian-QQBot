@@ -118,7 +118,7 @@ feed_cmd = on_command("喂食", aliases={"喂宠物"}, priority=5, block=True)
 
 @feed_cmd.handle()
 async def handle_feed(event: MessageEvent, args: Message = CommandArg()):
-    """【喂食】怨念喂食 / 【喂食 菜肴名】用菜肴喂食"""
+    """【喂食】怨念喂食 / 【喂食 菜肴名 [数量]】用菜肴喂食"""
     args_text = args.extract_plain_text().strip()
 
     async with UnitOfWork(AsyncSessionLocal) as uow:
@@ -129,7 +129,16 @@ async def handle_feed(event: MessageEvent, args: Message = CommandArg()):
         if not args_text:
             success, msg = await pet_service.feed_with_resentment(uow, player.id)
         else:
-            success, msg = await pet_service.feed_with_dish(uow, player.id, args_text)
+            # 解析菜肴名和可选数量
+            parts = args_text.rsplit(maxsplit=1)
+            dish_name = args_text
+            quantity = 1
+            if len(parts) == 2 and parts[1].isdigit():
+                dish_name = parts[0]
+                quantity = int(parts[1])
+                if quantity <= 0 or quantity > 99:
+                    await feed_cmd.finish("数量必须在1-99之间")
+            success, msg = await pet_service.feed_with_dish(uow, player.id, dish_name, quantity)
         await feed_cmd.finish(msg)
 
 
