@@ -343,14 +343,10 @@ class Player(Base):
             AttributeCalculatorFactory.get_instance()  # 确保工厂已初始化
             pet_source = AttributeCalculatorFactory._pet_source
             if pet_source:
-                pet_bonus = await pet_source.calculate_bonus(self, session)
-                base_attrs["max_hp"] += pet_bonus.max_hp
-                base_attrs["max_mp"] += pet_bonus.max_mp
-                base_attrs["attack"] += pet_bonus.attack
-                base_attrs["defense"] += pet_bonus.defense
-                base_attrs["agility"] += pet_bonus.agility
-                base_attrs["dodge_rate"] += pet_bonus.dodge_rate
-                base_attrs["critical_rate"] += pet_bonus.crit_rate
+                pet_full = await pet_source.calculate_full_bonus(self, session)
+                for attr_key, val in pet_full.items():
+                    if attr_key in base_attrs:
+                        base_attrs[attr_key] += val
 
         return base_attrs
 
@@ -496,13 +492,10 @@ class Player(Base):
             AttributeCalculatorFactory.get_instance()  # 确保工厂已初始化
             pet_source = AttributeCalculatorFactory._pet_source
             if pet_source:
-                pet_bonus = await pet_source.calculate_bonus(self, session)
-                pet_bonus_dict["max_hp"] = pet_bonus.max_hp
-                pet_bonus_dict["attack"] = pet_bonus.attack
-                pet_bonus_dict["defense"] = pet_bonus.defense
-                pet_bonus_dict["agility"] = pet_bonus.agility
-                pet_bonus_dict["critical_rate"] = pet_bonus.crit_rate
-                pet_bonus_dict["dodge_rate"] = pet_bonus.dodge_rate
+                pet_full = await pet_source.calculate_full_bonus(self, session)
+                for attr_key, val in pet_full.items():
+                    if attr_key in pet_bonus_dict:
+                        pet_bonus_dict[attr_key] = val
 
         # 计算基础属性（初始值 + 加点，不含丹药和VIP装备永久加成）
         # 注意：Player表存储的属性值 = 基础 + 装备 + 永久丹药 + VIP装备 - 洗髓减成

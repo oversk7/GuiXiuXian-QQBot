@@ -8,6 +8,29 @@ from nonebot import logger
 from ..interfaces import IAttributeSource, AttributeBonus
 
 
+# 饰品bonus key → Player模型属性名的映射
+# 小数类属性(crit_rate等)在pet_config中是0.03格式，需乘100转为百分比整数
+_ACC_DECIMAL_KEYS = {"crit_rate", "dodge_rate", "combo_rate", "penetration_rate",
+                     "counter_rate", "critical_damage", "lifesteal_rate",
+                     "accuracy_rate", "skill_crit_rate", "anti_crit_rate"}
+
+_ACC_TO_PLAYER = {
+    "attack": "attack",
+    "defense": "defense",
+    "hp": "max_hp",
+    "crit_rate": "critical_rate",
+    "dodge_rate": "dodge_rate",
+    "combo_rate": "combo_rate",
+    "penetration_rate": "penetration_rate",
+    "counter_rate": "counter_rate",
+    "critical_damage": "critical_power",
+    "lifesteal_rate": "lifesteal_rate",
+    "accuracy_rate": "accuracy_rate",
+    "skill_crit_rate": "skill_crit_rate",
+    "anti_crit_rate": "anti_crit_rate",
+}
+
+
 class PetAttributeSource(IAttributeSource):
     """
     宠物属性来源
@@ -19,6 +42,8 @@ class PetAttributeSource(IAttributeSource):
     def __init__(self, cache_ttl: float = 60.0):
         self._cache_ttl = cache_ttl
         self._cache: Dict[str, Tuple[AttributeBonus, float]] = {}
+        # 完整加成缓存（包含AttributeBonus不支持的字段）
+        self._full_cache: Dict[str, Tuple[dict, float]] = {}
 
     @property
     def source_name(self) -> str:
@@ -37,11 +62,40 @@ class PetAttributeSource(IAttributeSource):
             if time.time() - timestamp < self._cache_ttl:
                 return bonus
 
-        bonus = await self._query_pet_bonus(player_id, session)
-        self._cache[player_id] = (bonus, time.time())
+        full_dict = await self._query_pet_full_bonus(player_id, session)
+        bonus = AttributeBonus(
+            attack=full_dict.get("attack", 0),
+            defense=full_dict.get("defense", 0),
+            hp=full_dict.get("max_hp", 0),
+            max_hp=full_dict.get("max_hp", 0),
+            crit_rate=full_dict.get("critical_rate", 0),
+            crit_damage=full_dict.get("critical_power", 0),
+            dodge_rate=full_dict.get("dodge_rate", 0),
+        )
+        now = time.time()
+        self._cache[player_id] = (bonus, now)
+        self._full_cache[player_id] = (full_dict, now)
         return bonus
 
-    async def _query_pet_bonus(self, player_id: str, session: AsyncSession) -> AttributeBonus:
+    async def calculate_full_bonus(self, player, session: AsyncSession) -> dict:
+        """返回完整加成dict（使用Player模型属性名，百分比已转为整数）
+
+        包含AttributeBonus不支持的字段如combo_rate, penetration_rate, counter_rate等。
+        """
+        player_id = player.id
+
+        if player_id in self._full_cache:
+            full_dict, timestamp = self._full_cache[player_id]
+            if time.time() - timestamp < self._cache_ttl:
+                return full_dict
+
+        full_dict = await self._query_pet_full_bonus(player_id, session)
+        now = time.time()
+        self._full_cache[player_id] = (full_dict, now)
+        return full_dict
+
+    async def _query_pet_full_bonus(self, player_id: str, session: AsyncSession) -> dict:
+        """查询宠物完整加成，返回使用Player模型属性名的dict"""
         from ....models.pet_instance import PetInstance
 
         stmt = select(PetInstance).where(
@@ -52,43 +106,53 @@ class PetAttributeSource(IAttributeSource):
         pet = result.scalar_one_or_none()
 
         if not pet:
-            return AttributeBonus()
+            return {}
 
         from ....pet.config import PetConfigManager
         config = PetConfigManager()
         mood_mult = config.get_mood_multiplier(pet.mood)
 
-        attack = int(pet.bonus_attack * mood_mult)
-        defense = int(pet.bonus_defense * mood_mult)
-        hp = int(pet.bonus_hp * mood_mult)
-        crit_rate = round(pet.bonus_crit_rate * mood_mult, 4)
-        dodge_rate = round(pet.bonus_dodge_rate * mood_mult, 4)
+        # 宠物等级基础加成（整数属性）
+        raw = {
+            "attack": int(pet.bonus_attack * mood_mult),
+            "defense": int(pet.bonus_defense * mood_mult),
+            "hp": int(pet.bonus_hp * mood_mult),
+            "crit_rate": round(pet.bonus_crit_rate * mood_mult, 4),
+            "dodge_rate": round(pet.bonus_dodge_rate * mood_mult, 4),
+        }
 
-        # 饰品加成
+        # 饰品加成（累加所有饰品的所有bonus key）
         if pet.accessories:
             for acc_id in pet.accessories.values():
                 acc = config.get_accessory(acc_id)
                 if acc:
-                    attack += int(acc.bonus.get("attack", 0))
-                    defense += int(acc.bonus.get("defense", 0))
-                    hp += int(acc.bonus.get("hp", 0))
-                    crit_rate += acc.bonus.get("crit_rate", 0)
-                    dodge_rate += acc.bonus.get("dodge_rate", 0)
+                    for key, val in acc.bonus.items():
+                        raw[key] = raw.get(key, 0) + val
 
-        # crit_rate/dodge_rate 在 pet_config 中是小数(0.014=1.4%)
-        # 转为百分比整数以匹配 Player 模型的 critical_rate/dodge_rate 单位
-        return AttributeBonus(
-            attack=attack,
-            defense=defense,
-            hp=hp,
-            max_hp=hp,
-            crit_rate=round(crit_rate * 100, 1),
-            dodge_rate=round(dodge_rate * 100, 1),
-        )
+        # 转换为Player模型属性名，小数类乘100
+        out = {}
+        for raw_key, val in raw.items():
+            player_key = _ACC_TO_PLAYER.get(raw_key)
+            if not player_key:
+                continue
+            if raw_key in _ACC_DECIMAL_KEYS:
+                val = round(val * 100, 1)
+            else:
+                val = int(val)
+            out[player_key] = out.get(player_key, 0) + val
+
+        # hp → max_hp（等级基础hp也映射到max_hp）
+        if "hp" in raw and "max_hp" not in _ACC_TO_PLAYER.get("hp", ""):
+            pass  # 已在_ACC_TO_PLAYER中映射
+
+        return out
 
     def invalidate_cache(self, player_id: str):
         if player_id in self._cache:
             del self._cache[player_id]
+        if player_id in self._full_cache:
+            del self._full_cache[player_id]
 
     def clear_cache(self):
         self._cache.clear()
+        self._full_cache.clear()
