@@ -1,4 +1,5 @@
 """宠物AI对话服务 - 复用现有AIDialogueService"""
+import random
 from typing import Tuple
 from nonebot import logger
 
@@ -26,8 +27,13 @@ class PetDialogueService:
         if not pet:
             return False, "你还没有伙伴诡兽"
 
-        player = await uow.players.get_by_id(player_id)
         beast = self.config.get_beast(pet.beast_id)
+
+        # 未化形：使用固定语录回复，不调用AI
+        if not pet.is_transformed:
+            return await self._beast_form_reply(uow, pet, beast)
+
+        player = await uow.players.get_by_id(player_id)
 
         # 获取人设
         personality_data = self.config.get_personality(pet.beast_id, pet.is_transformed, pet.transform_gender or "")
@@ -153,6 +159,47 @@ class PetDialogueService:
             return "有点低落"
         else:
             return "很糟糕"
+
+    async def _beast_form_reply(self, uow: UnitOfWork, pet: PetInstance, beast) -> Tuple[bool, str]:
+        """未化形时使用固定动物叫声语录回复"""
+        personality_data = self.config.get_personality(pet.beast_id, False, "")
+        key_words = personality_data.key_words if personality_data else ["..."]
+
+        # 根据心情选择不同的动作描述
+        if pet.mood >= 60:
+            actions = [
+                "蹭了蹭你的手",
+                "朝你摇了摇尾巴",
+                "发出了愉快的声音",
+                "亲昵地靠近了你",
+            ]
+        elif pet.mood >= 30:
+            actions = [
+                "看了你一眼",
+                "懒洋洋地抬了抬头",
+                "动了动耳朵",
+            ]
+        else:
+            actions = [
+                "无精打采地趴着",
+                "转过头不想理你",
+                "发出了低沉的声音",
+            ]
+
+        sound = random.choice(key_words)
+        action = random.choice(actions)
+        response = f"{sound}\n（{pet.nickname}{action}）"
+
+        # 仍然给好感和心情
+        affection_gain = 1
+        mood_gain = 2
+        pet.affection = min(1000, pet.affection + affection_gain)
+        pet.mood = min(100, pet.mood + mood_gain)
+        await uow.pets.update(pet)
+
+        display_name = beast.name
+        hint = f"\n💡 它似乎还无法用言语交流...化形后或许能听懂你的话（需要{self.config.settings['transform_level']}级 + {self.config.settings['transform_affection']}好感度）"
+        return True, f"{pet.nickname}({display_name})\n━━━━━━━━━━━━━\n{response}{hint}"
 
     def _get_fallback_response(self, pet: PetInstance) -> str:
         """AI降级时的预设回复"""

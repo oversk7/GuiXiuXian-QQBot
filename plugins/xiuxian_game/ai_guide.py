@@ -186,6 +186,57 @@ async def call_zhipu_api(messages, model="GLM-4.5-Flash", timeout=30, temperatur
         raise aiohttp.ClientError(f"网络请求失败: {str(e)}")
 
 
+async def call_scnet_api(messages, model="DeepSeek-R1-Distill-Qwen-7B", timeout=30, temperature=0.75):
+    """调用scnet API（异步版本，OpenAI兼容接口）"""
+    from .config import config
+
+    ai_config = config.game_config.get("ai_dialogue", {})
+    scnet_config = ai_config.get("scnet", {})
+    api_key = scnet_config.get("api_key", "")
+
+    if not api_key:
+        raise ValueError("scnet API密钥未配置，请在config.yaml中配置 ai_dialogue.scnet.api_key")
+
+    url = "https://api.scnet.cn/api/llm/v1/chat/completions"
+
+    headers = {
+        "Authorization": f"Bearer {api_key}",
+        "Content-Type": "application/json"
+    }
+
+    formatted_messages = []
+    for msg in messages:
+        formatted_messages.append({
+            "role": msg.get("role", "user"),
+            "content": msg.get("content", "")
+        })
+
+    data = {
+        "model": model,
+        "messages": formatted_messages,
+        "temperature": temperature,
+        "enable_thinking": False,
+    }
+
+    try:
+        async with aiohttp.ClientSession(timeout=aiohttp.ClientTimeout(total=timeout)) as session:
+            async with session.post(url, headers=headers, json=data) as response:
+                if response.status == 200:
+                    return _strip_think_tags(await response.json())
+                else:
+                    response_text = await response.text()
+                    raise aiohttp.ClientResponseError(
+                        request_info=response.request_info,
+                        history=response.history,
+                        status=response.status,
+                        message=f"scnet API调用失败: {response.status}, {response_text}"
+                    )
+    except asyncio.TimeoutError:
+        raise TimeoutError(f"scnet API调用超时（{timeout}秒）")
+    except aiohttp.ClientError as e:
+        raise aiohttp.ClientError(f"scnet 网络请求失败: {str(e)}")
+
+
 async def call_302ai_api(messages, model="gpt-3.5-turbo", timeout=30, temperature=0.75):
     """调用302.ai API（异步版本，OpenAI兼容接口）"""
     from .config import config

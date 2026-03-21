@@ -104,6 +104,14 @@ ai_dialogue:
     temperature: 0.1  # 温度参数（0-1）
     timeout: 30  # API调用超时时间（秒）
 
+  # scnet配置（算力网）
+  scnet:
+    api_key: "***REMOVED***="
+    model: "DeepSeek-V3.2"
+    max_tokens: 10240
+    temperature: 0.6
+    timeout: 30
+
   # 302.ai配置（免费，主用）
   ai302:
     api_key: "***REMOVED***"  # 302.ai API密钥（需填写）
