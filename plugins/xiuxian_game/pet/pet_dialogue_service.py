@@ -30,7 +30,7 @@ class PetDialogueService:
         beast = self.config.get_beast(pet.beast_id)
 
         # 获取人设
-        personality_data = self.config.get_personality(pet.beast_id, pet.is_transformed)
+        personality_data = self.config.get_personality(pet.beast_id, pet.is_transformed, pet.transform_gender or "")
         if not personality_data:
             return False, "宠物人设配置异常"
 
@@ -156,7 +156,7 @@ class PetDialogueService:
 
     def _get_fallback_response(self, pet: PetInstance) -> str:
         """AI降级时的预设回复"""
-        personality = self.config.get_personality(pet.beast_id, pet.is_transformed)
+        personality = self.config.get_personality(pet.beast_id, pet.is_transformed, pet.transform_gender or "")
         if personality and personality.key_words:
             return personality.key_words[0]
         if pet.is_transformed:
