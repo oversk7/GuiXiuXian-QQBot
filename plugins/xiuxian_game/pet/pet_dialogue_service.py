@@ -160,8 +160,16 @@ class PetDialogueService:
         form = "人形" if pet.is_transformed else "兽形"
         affection_hint = self._get_affection_behavior_hint(pet.affection)
 
+        # 性别与化形名称
+        gender_desc = ""
+        if pet.is_transformed and pet.transform_gender:
+            transform_name = self.config.get_transform_name(pet.beast_id, pet.transform_gender)
+            gender_cn = "男性" if pet.transform_gender == "male" else "女性"
+            gender_desc = f"你的化形是{gender_cn}形态——{transform_name}。你必须严格按照{gender_cn}的身份说话和自称，不要使用其他性别的自称或语气。"
+
         bg = (
             f"{personality_data.background}\n\n"
+            f"{gender_desc}"
             f"你的主人叫{player.nickname}，是一位{player.level}级的修仙者。"
             f"你和主人的关系是【{affection_name}】（好感度{pet.affection}）。"
             f"{affection_hint}"
