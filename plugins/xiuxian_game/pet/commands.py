@@ -1,4 +1,4 @@
-"""宠物伴侣系统 - 命令处理器"""
+"""宠物伙伴系统 - 命令处理器"""
 from nonebot import on_command
 from nonebot.params import CommandArg
 from nonebot.adapters.qq import MessageEvent, Message
@@ -56,12 +56,12 @@ async def handle_tame(event: MessageEvent, args: Message = CommandArg()):
 
 
 # ==================== 宠物信息 ====================
-pet_info_cmd = on_command("宠物", aliases={"我的宠物", "诡兽伴侣"}, priority=5, block=True)
+pet_info_cmd = on_command("宠物", aliases={"我的宠物", "诡兽伙伴"}, priority=5, block=True)
 
 
 @pet_info_cmd.handle()
 async def handle_pet_info(event: MessageEvent):
-    """【宠物】- 查看当前伴侣状态"""
+    """【宠物】- 查看当前伙伴状态"""
     async with UnitOfWork(AsyncSessionLocal) as uow:
         player = await get_unified_player(uow.session, event)
         if not player:
@@ -87,16 +87,16 @@ async def handle_nest(event: MessageEvent):
         await nest_cmd.finish(msg)
 
 
-# ==================== 切换伴侣 ====================
-switch_cmd = on_command("切换伴侣", aliases={"切换宠物"}, priority=5, block=True)
+# ==================== 切换伙伴 ====================
+switch_cmd = on_command("切换伙伴", aliases={"切换宠物"}, priority=5, block=True)
 
 
 @switch_cmd.handle()
 async def handle_switch(event: MessageEvent, args: Message = CommandArg()):
-    """【切换伴侣 ID或昵称】- 切换当前伴侣"""
+    """【切换伙伴 ID或昵称】- 切换当前伙伴"""
     args_text = args.extract_plain_text().strip()
     if not args_text:
-        await switch_cmd.finish("用法: 切换伴侣 <ID或昵称>\n使用【宠物列表】查看")
+        await switch_cmd.finish("用法: 切换伙伴 <ID或昵称>\n使用【宠物列表】查看")
 
     async with UnitOfWork(AsyncSessionLocal) as uow:
         player = await get_unified_player(uow.session, event)
@@ -124,7 +124,7 @@ async def handle_feed(event: MessageEvent, args: Message = CommandArg()):
                 await feed_cmd.finish("请先创建角色")
             pet = await uow.pets.get_active_pet(player.id)
             if not pet:
-                await feed_cmd.finish("你还没有伴侣诡兽\n💡 使用【驯化诡兽 诡兽名 昵称】驯化一只")
+                await feed_cmd.finish("你还没有伙伴诡兽\n💡 使用【驯化诡兽 诡兽名 昵称】驯化一只")
             msg = (
                 f"🐾 {pet.nickname}\n"
                 f"饱食度: {pet.hunger}/100 | 心情: {pet.mood}/100\n"
@@ -331,7 +331,7 @@ guard_cmd = on_command("派遣守田", aliases={"守田"}, priority=5, block=Tru
 
 @guard_cmd.handle()
 async def handle_guard(event: MessageEvent):
-    """【派遣守田】- 派遣当前伴侣去灵田守田"""
+    """【派遣守田】- 派遣当前伙伴去灵田守田"""
     async with UnitOfWork(AsyncSessionLocal) as uow:
         player = await get_unified_player(uow.session, event)
         if not player:

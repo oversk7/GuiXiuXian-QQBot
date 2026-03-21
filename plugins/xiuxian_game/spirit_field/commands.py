@@ -233,7 +233,7 @@ async def handle_steal(event: MessageEvent, args: Message = CommandArg()):
             await steal_cmd.finish(msg)
 
 
-# ==================== 旧诡兽命令（引导到宠物伴侣系统） ====================
+# ==================== 旧诡兽命令（引导到宠物伙伴系统） ====================
 
 place_guardian_cmd = on_command("放置诡兽", priority=5, block=True)
 
@@ -241,7 +241,7 @@ place_guardian_cmd = on_command("放置诡兽", priority=5, block=True)
 @place_guardian_cmd.handle()
 async def handle_place_guardian_redirect(event: MessageEvent):
     await place_guardian_cmd.finish(
-        "诡兽系统已升级为宠物伴侣系统!\n"
+        "诡兽系统已升级为宠物伙伴系统!\n"
         "- 驯化: 【驯化诡兽 名称 昵称】\n"
         "- 守田: 【派遣守田】\n"
         "- 查看: 【宠物】"
@@ -261,7 +261,7 @@ feed_guardian_cmd = on_command("喂养诡兽", aliases={"喂诡兽"}, priority=5
 
 @feed_guardian_cmd.handle()
 async def handle_feed_guardian_redirect(event: MessageEvent):
-    await feed_guardian_cmd.finish("诡兽系统已升级! 使用【喂食】喂养你的宠物伴侣")
+    await feed_guardian_cmd.finish("诡兽系统已升级! 使用【喂食】喂养你的宠物伙伴")
 
 
 # ==================== 灵种商店 ====================

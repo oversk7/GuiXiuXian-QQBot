@@ -21,10 +21,10 @@ class PetDialogueService:
     async def chat(
         self, uow: UnitOfWork, player_id: str, message: str
     ) -> Tuple[bool, str]:
-        """与当前伴侣对话"""
+        """与当前伙伴对话"""
         pet = await uow.pets.get_active_pet(player_id)
         if not pet:
-            return False, "你还没有伴侣诡兽"
+            return False, "你还没有伙伴诡兽"
 
         player = await uow.players.get_by_id(player_id)
         beast = self.config.get_beast(pet.beast_id)

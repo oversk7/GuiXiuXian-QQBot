@@ -2555,8 +2555,8 @@ async def handle_spirit_field_help(event: MessageEvent, args: Message = CommandA
         "  • 每次最多偷20%成熟作物\n"
         "  • 15分钟冷却\n"
         "━━━━━━━━━━━━━\n"
-        "🐾 诡兽守田（已升级为宠物伴侣系统）：\n"
-        "【派遣守田】 派遣宠物伴侣守田\n"
+        "🐾 诡兽守田（已升级为宠物伙伴系统）：\n"
+        "【派遣守田】 派遣宠物伙伴守田\n"
         "【召回宠物】 召回守田中的宠物\n"
         "  • 详细功能见【宠物系统】\n"
         "━━━━━━━━━━━━━\n"
@@ -2629,20 +2629,20 @@ async def handle_lower_world_help(event: MessageEvent, args: Message = CommandAr
     await lower_world_help_cmd.finish(Message(msg))
 
 
-# 宠物伴侣系统
+# 宠物伙伴系统
 pet_help_cmd = on_command("宠物系统", aliases={"宠物帮助"}, priority=4, block=True)
 
 @pet_help_cmd.handle()
 async def handle_pet_help(event: MessageEvent, args: Message = CommandArg()):
     msg = (
-        "✨ 宠物伴侣系统 ✨\n"
-        "驯化诡兽为宠物伴侣，聊天、养成、打扮、战斗!\n"
+        "✨ 宠物伙伴系统 ✨\n"
+        "驯化诡兽为宠物伙伴，聊天、养成、打扮、战斗!\n"
         "━━━━━━━━━━━━━\n"
         "🐾 获取与管理：\n"
         "【驯化诡兽 名称 昵称】 驯化背包中的诡兽\n"
-        "【宠物】 查看当前伴侣状态\n"
+        "【宠物】 查看当前伙伴状态\n"
         "【宠物列表】 查看所有宠物\n"
-        "【切换伴侣 宠物ID】 切换当前伴侣\n"
+        "【切换伙伴 宠物ID】 切换当前伙伴\n"
         "━━━━━━━━━━━━━\n"
         "💬 互动与对话：\n"
         "【摸摸】/【摸头】/【玩耍】/【抱抱】 互动（+好感/心情）\n"

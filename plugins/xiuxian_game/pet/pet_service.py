@@ -63,15 +63,15 @@ class PetService:
             f"稀有度: {beast_config.rarity}"
         )
         if count == 0:
-            msg += "\n已自动设为当前伴侣"
+            msg += "\n已自动设为当前伙伴"
         return True, msg
 
-    # ==================== 切换伴侣 ====================
+    # ==================== 切换伙伴 ====================
 
     async def set_active_pet(
         self, uow: UnitOfWork, player_id: str, pet_id_or_name: str
     ) -> Tuple[bool, str]:
-        """切换当前伴侣（支持ID或昵称）"""
+        """切换当前伙伴（支持ID或昵称）"""
         pet = None
         # 尝试按数字ID查找
         try:
@@ -91,7 +91,7 @@ class PetService:
         if not pet:
             return False, "未找到该宠物，请使用【宠物列表】查看"
         if pet.is_active:
-            return False, f"【{pet.nickname}】已经是当前伴侣了"
+            return False, f"【{pet.nickname}】已经是当前伙伴了"
 
         current = await uow.pets.get_active_pet(player_id)
         if current:
@@ -101,19 +101,19 @@ class PetService:
         pet.is_active = True
         await uow.pets.update(pet)
         AttributeCalculatorFactory.invalidate_pet_cache(player_id)
-        return True, f"【{pet.nickname}】现在是你的伴侣了"
+        return True, f"【{pet.nickname}】现在是你的伙伴了"
 
     # ==================== 喂食 ====================
 
     async def feed_with_resentment(
         self, uow: UnitOfWork, player_id: str, quantity: int = 1
     ) -> Tuple[bool, str]:
-        """用怨念喂食当前伴侣（支持批量，每次随机消耗50-200怨念）"""
+        """用怨念喂食当前伙伴（支持批量，每次随机消耗50-200怨念）"""
         import random
 
         pet = await uow.pets.get_active_pet(player_id)
         if not pet:
-            return False, "你还没有伴侣诡兽"
+            return False, "你还没有伙伴诡兽"
 
         player = await uow.players.get_by_id(player_id)
 
@@ -153,10 +153,10 @@ class PetService:
     async def feed_with_dish(
         self, uow: UnitOfWork, player_id: str, dish_name: str, quantity: int = 1
     ) -> Tuple[bool, str]:
-        """用菜肴喂食当前伴侣（支持批量）"""
+        """用菜肴喂食当前伙伴（支持批量）"""
         pet = await uow.pets.get_active_pet(player_id)
         if not pet:
-            return False, "你还没有伴侣诡兽"
+            return False, "你还没有伙伴诡兽"
 
         from ..config import config as game_config
         dish_config = game_config.items_config.get("by_name", {}).get(dish_name)
@@ -207,7 +207,7 @@ class PetService:
         """与宠物互动（摸头、玩耍等）"""
         pet = await uow.pets.get_active_pet(player_id)
         if not pet:
-            return False, "你还没有伴侣诡兽"
+            return False, "你还没有伙伴诡兽"
 
         cd_minutes = self.config.settings["interact_cooldown_minutes"]
         if pet.last_interact_at:
@@ -246,7 +246,7 @@ class PetService:
         """宠物化形"""
         pet = await uow.pets.get_active_pet(player_id)
         if not pet:
-            return False, "你还没有伴侣诡兽"
+            return False, "你还没有伙伴诡兽"
 
         beast = self.config.get_beast(pet.beast_id)
 
@@ -294,7 +294,7 @@ class PetService:
         """给宠物装备饰品"""
         pet = await uow.pets.get_active_pet(player_id)
         if not pet:
-            return False, "你还没有伴侣诡兽"
+            return False, "你还没有伙伴诡兽"
 
         acc = self.config.get_accessory_by_name(accessory_name)
         if not acc:
@@ -333,10 +333,10 @@ class PetService:
     async def dispatch_to_guard(
         self, uow: UnitOfWork, player_id: str
     ) -> Tuple[bool, str]:
-        """派遣当前伴侣去守田"""
+        """派遣当前伙伴去守田"""
         pet = await uow.pets.get_active_pet(player_id)
         if not pet:
-            return False, "你还没有伴侣诡兽"
+            return False, "你还没有伙伴诡兽"
 
         guarding = await uow.pets.get_guarding_pet(player_id)
         if guarding:
@@ -403,7 +403,7 @@ class PetService:
 
             return True, (
                 f"已召回旧系统的【{beast_name}】到背包\n"
-                f"提示: 使用【驯化诡兽 {beast_name} 昵称】将其升级为宠物伴侣"
+                f"提示: 使用【驯化诡兽 {beast_name} 昵称】将其升级为宠物伙伴"
             )
 
         return False, "没有宠物在守田"
@@ -419,7 +419,7 @@ class PetService:
         """宠物进化 — 提升稀有度"""
         pet = await uow.pets.get_active_pet(player_id)
         if not pet:
-            return False, "你还没有伴侣诡兽"
+            return False, "你还没有伙伴诡兽"
 
         beast = self.config.get_beast(pet.beast_id)
         current_rarity = pet.evolved_rarity or beast.rarity
@@ -577,10 +577,10 @@ class PetService:
     async def get_pet_info(
         self, uow: UnitOfWork, player_id: str
     ) -> Tuple[bool, str]:
-        """查看当前伴侣信息"""
+        """查看当前伙伴信息"""
         pet = await uow.pets.get_active_pet(player_id)
         if not pet:
-            return False, "你还没有伴侣诡兽，使用【驯化诡兽 名称 昵称】获取"
+            return False, "你还没有伙伴诡兽，使用【驯化诡兽 名称 昵称】获取"
 
         beast = self.config.get_beast(pet.beast_id)
         level_name = self.config.get_affection_level_name(pet.affection)
@@ -665,7 +665,7 @@ class PetService:
             rarity_emoji = self.RARITY_DISPLAY.get(beast.rarity, ("⚪",))[0]
             tags = []
             if pet.is_active:
-                tags.append("💖伴侣")
+                tags.append("💖伙伴")
             if pet.is_guarding:
                 tags.append("🌾守田")
             tag_str = " ".join(tags)
