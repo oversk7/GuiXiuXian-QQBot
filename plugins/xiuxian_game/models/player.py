@@ -383,7 +383,7 @@ class Player(Base):
         return battle_attrs
 
     async def get_attribute_breakdown(self, session=None) -> dict:
-        """获取属性来源分解（基础、装备、丹药、VIP装备永久加成、临时buff）
+        """获取属性来源分解（基础、装备、丹药、VIP装备永久加成、宠物加成、临时buff）
 
         返回格式：
         {
@@ -391,6 +391,7 @@ class Player(Base):
             "equipment": {...},    # 装备加成
             "elixir": {...},       # 永久丹药加成
             "vip_equipment": {...},# VIP装备永久加成
+            "pet": {...},          # 宠物伙伴加成
             "temporary": {...},    # 临时buff加成
             "total": {...}         # 最终有效属性
         }
@@ -487,6 +488,18 @@ class Player(Base):
                 if attr in temporary_bonus:
                     temporary_bonus[attr] = bonus
 
+        # 获取宠物加成（动态计算，不持久化）
+        pet_bonus_dict = {k: 0 for k in INIT_ATTRS}
+        if session:
+            from ..domain.attributes.attribute_calculator_factory import AttributeCalculatorFactory
+            pet_source = AttributeCalculatorFactory._pet_source
+            if pet_source:
+                pet_bonus = await pet_source.calculate_bonus(self, session)
+                pet_bonus_dict["max_hp"] = pet_bonus.max_hp
+                pet_bonus_dict["attack"] = pet_bonus.attack
+                pet_bonus_dict["defense"] = pet_bonus.defense
+                pet_bonus_dict["agility"] = pet_bonus.agility
+
         # 计算基础属性（初始值 + 加点，不含丹药和VIP装备永久加成）
         # 注意：Player表存储的属性值 = 基础 + 装备 + 永久丹药 + VIP装备 - 洗髓减成
         # 临时buff不会写入Player表，只在get_effective_attributes查询时动态合并
@@ -503,7 +516,7 @@ class Player(Base):
             else:
                 base_attrs[attr] = raw_base
 
-        # 计算最终属性（应该等于当前属性值 + 临时buff）
+        # 计算最终属性（应该等于当前属性值 + 临时buff + 宠物加成）
         total_attrs = {}
         for attr in INIT_ATTRS:
             total_attrs[attr] = (
@@ -512,7 +525,8 @@ class Player(Base):
                 vip_equipment_bonus[attr] +
                 equipment_bonus[attr] +
                 reforge_reduction[attr] +
-                temporary_bonus[attr]
+                temporary_bonus[attr] +
+                pet_bonus_dict[attr]
             )
 
         return {
@@ -522,6 +536,7 @@ class Player(Base):
             "vip_equipment": vip_equipment_bonus,
             "reforge": reforge_reduction,
             "temporary": temporary_bonus,
+            "pet": pet_bonus_dict,
             "total": total_attrs
         }
 

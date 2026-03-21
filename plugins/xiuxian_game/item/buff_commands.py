@@ -128,6 +128,7 @@ async def handle_attribute_breakdown(event: MessageEvent):
             vip_equipment = breakdown["vip_equipment"][attr]
             reforge = breakdown["reforge"][attr]
             temporary = breakdown["temporary"][attr]
+            pet = breakdown.get("pet", {}).get(attr, 0)
             total = breakdown["total"][attr]
 
             # 构建显示字符串
@@ -138,6 +139,8 @@ async def handle_attribute_breakdown(event: MessageEvent):
                 parts.append(f"丹药+{elixir}")
             if vip_equipment > 0:
                 parts.append(f"特殊+{vip_equipment}")
+            if pet > 0:
+                parts.append(f"伙伴+{pet}")
             if reforge < 0:
                 parts.append(f"洗髓{reforge}")
             if temporary > 0:
@@ -180,7 +183,7 @@ async def handle_attribute_breakdown(event: MessageEvent):
 
         lines.append("")
         lines.append("💡 提示：使用【增益状态】查看临时增益详情")
-        lines.append("💡 总属性 = 基础 + 装备 + 丹药 + VIP装备 + 临时增益")
+        lines.append("💡 总属性 = 基础 + 装备 + 丹药 + 特殊 + 伙伴 + 临时增益")
 
         # 检查是否有严重异常的基础属性（负值且没有临时buff）
         has_abnormal_base = False
