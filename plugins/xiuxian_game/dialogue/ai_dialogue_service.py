@@ -24,9 +24,10 @@ class AIDialogueService:
         self.zhipu_config = ai_config.get("zhipu", {})
         self.ai302_config = ai_config.get("ai302", {})
         self.scnet_config = ai_config.get("scnet", {})
+        self.volcengine_config = ai_config.get("volcengine", {})
         self.max_tokens = self.zhipu_config.get("max_tokens", 300)
         self.temperature = self.zhipu_config.get("temperature", 0.75)
-        provider_configs = {"zhipu": self.zhipu_config, "ai302": self.ai302_config, "scnet": self.scnet_config}
+        provider_configs = {"zhipu": self.zhipu_config, "ai302": self.ai302_config, "scnet": self.scnet_config, "volcengine": self.volcengine_config}
         provider_config = provider_configs.get(self.provider, self.zhipu_config)
         self.timeout = provider_config.get("timeout", 30)
 
@@ -264,7 +265,7 @@ class AIDialogueService:
         Raises:
             Exception: 所有provider均失败时抛出异常
         """
-        from ..ai_guide import call_zhipu_api, call_302ai_api, call_scnet_api
+        from ..ai_guide import call_zhipu_api, call_302ai_api, call_scnet_api, call_volcengine_api
 
         # 确定主provider
         primary_provider = provider or self.provider
@@ -301,6 +302,16 @@ class AIDialogueService:
                     temperature=self.temperature
                 )
                 logger.info(f"[AIDialogue] scnet调用成功")
+                return result
+            elif primary_provider == "volcengine":
+                logger.info(f"[AIDialogue] 使用火山引擎调用...")
+                result = await call_volcengine_api(
+                    messages,
+                    model=self.volcengine_config.get("model", "ep-20260321201048-h78tm"),
+                    timeout=self.timeout,
+                    temperature=self.temperature
+                )
+                logger.info(f"[AIDialogue] 火山引擎调用成功")
                 return result
             else:
                 raise ValueError(f"不支持的provider: {primary_provider}")
@@ -345,6 +356,15 @@ class AIDialogueService:
                     result = await call_scnet_api(
                         messages,
                         model=self.scnet_config.get("model", "DeepSeek-R1-Distill-Qwen-7B"),
+                        timeout=self.timeout,
+                        temperature=self.temperature
+                    )
+                    logger.info(f"[AIDialogue] 备用provider {fallback} 调用成功")
+                    return result
+                elif fallback == "volcengine":
+                    result = await call_volcengine_api(
+                        messages,
+                        model=self.volcengine_config.get("model", "ep-20260321201048-h78tm"),
                         timeout=self.timeout,
                         temperature=self.temperature
                     )

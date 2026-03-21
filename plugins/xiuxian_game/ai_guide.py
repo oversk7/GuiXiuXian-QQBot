@@ -49,7 +49,10 @@ async def call_ai_with_fallback(messages: list) -> dict:
     provider = ai_config.get("provider", "zhipu")
     zhipu_config = ai_config.get("zhipu", {})
     ai302_config = ai_config.get("ai302", {})
-    provider_config = zhipu_config if provider == "zhipu" else ai302_config
+    scnet_config = ai_config.get("scnet", {})
+    volcengine_config = ai_config.get("volcengine", {})
+    provider_configs = {"zhipu": zhipu_config, "ai302": ai302_config, "scnet": scnet_config, "volcengine": volcengine_config}
+    provider_config = provider_configs.get(provider, zhipu_config)
     timeout = provider_config.get("timeout", 30)
 
     # 降级策略配置
@@ -57,30 +60,31 @@ async def call_ai_with_fallback(messages: list) -> dict:
     fallback_enabled = fallback_config.get("enabled", True)
     fallback_provider = fallback_config.get("fallback_provider", "ai302")
 
+    async def _call_provider(name: str) -> dict:
+        """调用指定provider"""
+        cfg = provider_configs.get(name)
+        if cfg is None:
+            raise ValueError(f"不支持的provider: {name}")
+
+        if name == "zhipu":
+            return await call_zhipu_api(messages, model=cfg.get("model", "GLM-4-Flash-250414"), timeout=timeout)
+        elif name == "ai302":
+            return await call_302ai_api(messages, model=cfg.get("model", "gpt-3.5-turbo"), timeout=timeout)
+        elif name == "scnet":
+            return await call_scnet_api(messages, model=cfg.get("model", "DeepSeek-V3.2"), timeout=timeout)
+        elif name == "volcengine":
+            return await call_volcengine_api(messages, model=cfg.get("model", "ep-20260321201048-h78tm"), timeout=timeout)
+        else:
+            raise ValueError(f"不支持的provider: {name}")
+
     errors = []
 
     # 尝试主provider
     try:
-        if provider == "zhipu":
-            logger.info(f"[AI引导] 使用智谱AI调用...")
-            result = await call_zhipu_api(
-                messages,
-                model=zhipu_config.get("model", "GLM-4-Flash-250414"),
-                timeout=timeout
-            )
-            logger.info(f"[AI引导] 智谱AI调用成功")
-            return result
-        elif provider == "ai302":
-            logger.info(f"[AI引导] 使用302.ai调用...")
-            result = await call_302ai_api(
-                messages,
-                model=ai302_config.get("model", "gpt-3.5-turbo"),
-                timeout=timeout
-            )
-            logger.info(f"[AI引导] 302.ai调用成功")
-            return result
-        else:
-            raise ValueError(f"不支持的provider: {provider}")
+        logger.info(f"[AI引导] 使用{provider}调用...")
+        result = await _call_provider(provider)
+        logger.info(f"[AI引导] {provider}调用成功")
+        return result
 
     except Exception as e:
         error_msg = f"{provider} 调用失败: {type(e).__name__}: {str(e)}"
@@ -95,29 +99,12 @@ async def call_ai_with_fallback(messages: list) -> dict:
         try:
             fallback = fallback_provider
             if fallback == provider:
-                # fallback provider与主provider相同，直接抛出异常
                 raise Exception(f"主provider和fallback provider相同，无法降级")
 
             logger.warning(f"[AI引导] 尝试降级到备用provider: {fallback}")
-
-            if fallback == "zhipu":
-                result = await call_zhipu_api(
-                    messages,
-                    model=zhipu_config.get("model", "GLM-4-Flash-250414"),
-                    timeout=timeout
-                )
-                logger.info(f"[AI引导] 备用provider {fallback} 调用成功")
-                return result
-            elif fallback == "ai302":
-                result = await call_302ai_api(
-                    messages,
-                    model=ai302_config.get("model", "gpt-3.5-turbo"),
-                    timeout=timeout
-                )
-                logger.info(f"[AI引导] 备用provider {fallback} 调用成功")
-                return result
-            else:
-                raise ValueError(f"不支持的fallback provider: {fallback}")
+            result = await _call_provider(fallback)
+            logger.info(f"[AI引导] 备用provider {fallback} 调用成功")
+            return result
 
         except Exception as fallback_error:
             fallback_error_msg = f"{fallback} 调用失败: {type(fallback_error).__name__}: {str(fallback_error)}"
@@ -184,6 +171,56 @@ async def call_zhipu_api(messages, model="GLM-4.5-Flash", timeout=30, temperatur
         raise TimeoutError(f"AI API调用超时（{timeout}秒）")
     except aiohttp.ClientError as e:
         raise aiohttp.ClientError(f"网络请求失败: {str(e)}")
+
+
+async def call_volcengine_api(messages, model="ep-20260321201048-h78tm", timeout=30, temperature=0.75):
+    """调用火山引擎ARK API（异步版本，OpenAI兼容接口）"""
+    from .config import config
+
+    ai_config = config.game_config.get("ai_dialogue", {})
+    volc_config = ai_config.get("volcengine", {})
+    api_key = volc_config.get("api_key", "")
+
+    if not api_key:
+        raise ValueError("火山引擎API密钥未配置，请在config.yaml中配置 ai_dialogue.volcengine.api_key")
+
+    url = "https://ark.cn-beijing.volces.com/api/v3/chat/completions"
+
+    headers = {
+        "Authorization": f"Bearer {api_key}",
+        "Content-Type": "application/json"
+    }
+
+    formatted_messages = []
+    for msg in messages:
+        formatted_messages.append({
+            "role": msg.get("role", "user"),
+            "content": msg.get("content", "")
+        })
+
+    data = {
+        "model": model,
+        "messages": formatted_messages,
+        "temperature": temperature,
+    }
+
+    try:
+        async with aiohttp.ClientSession(timeout=aiohttp.ClientTimeout(total=timeout)) as session:
+            async with session.post(url, headers=headers, json=data) as response:
+                if response.status == 200:
+                    return _strip_think_tags(await response.json())
+                else:
+                    response_text = await response.text()
+                    raise aiohttp.ClientResponseError(
+                        request_info=response.request_info,
+                        history=response.history,
+                        status=response.status,
+                        message=f"火山引擎API调用失败: {response.status}, {response_text}"
+                    )
+    except asyncio.TimeoutError:
+        raise TimeoutError(f"火山引擎API调用超时（{timeout}秒）")
+    except aiohttp.ClientError as e:
+        raise aiohttp.ClientError(f"火山引擎网络请求失败: {str(e)}")
 
 
 async def call_scnet_api(messages, model="DeepSeek-R1-Distill-Qwen-7B", timeout=30, temperature=0.75):

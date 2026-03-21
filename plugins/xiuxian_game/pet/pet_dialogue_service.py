@@ -51,9 +51,10 @@ class PetDialogueService:
             behavioral_rules=personality_data.behavioral_rules,
         )
 
-        # 获取最近对话历史
+        # 获取最近对话历史（宠物需要更多记忆来维持感情连贯性）
+        history_limit = self.config.settings.get("dialogue_history_rounds", 20)
         history_records = await uow.pet_dialogue_histories.get_recent(
-            pet_id=pet.id, player_id=player_id, limit=10
+            pet_id=pet.id, player_id=player_id, limit=history_limit
         )
 
         # 适配对话历史格式（AIDialogueService通过duck typing读取player_input/npc_response）

@@ -9,7 +9,7 @@ import logging
 from typing import List, Dict, Optional, Tuple
 from datetime import datetime
 
-from ..ai_guide import call_zhipu_api
+from ..ai_guide import call_ai_with_fallback
 from ..models.npc_dialogue_history import NPCDialogueHistory
 from ..infrastructure.repositories.npc_long_term_memory_repository import NPCLongTermMemoryRepository
 from ..infrastructure.repositories.npc_dialogue_history_repository import NPCDialogueHistoryRepository
@@ -202,15 +202,14 @@ class DialogueSummarizationService:
 - 如果没有关键事件，key_events 可以为空数组
 - 只输出JSON，不要其他内容"""
 
-            # 调用智谱AI
-            response = await call_zhipu_api(
+            # 调用AI（走统一provider配置）
+            result = await call_ai_with_fallback(
                 messages=[
                     {"role": "system", "content": system_prompt},
                     {"role": "user", "content": dialogue_text}
-                ],
-                temperature=0.1,  # 低温度确保输出稳定
-                max_tokens=600  # 总结+事件提取约需400-500 tokens
+                ]
             )
+            response = result['choices'][0]['message']['content']
 
             if not response:
                 logger.error("AI总结调用失败 - 未返回响应")

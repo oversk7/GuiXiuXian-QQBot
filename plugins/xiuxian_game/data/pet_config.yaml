@@ -16,6 +16,7 @@ settings:
   feed_hunger_restore: 30        # 怨念喂食恢复饱食度
   dish_hunger_restore: 50        # 菜肴喂食恢复饱食度
   dish_mood_bonus: 10            # 菜肴喂食额外心情加成
+  dialogue_history_rounds: 20    # 对话历史轮数（宠物需要记忆和感情）
   interact_cooldown_minutes: 5   # 互动冷却时间（分钟）
   interact_affection_gain: 3     # 每次互动好感度增加
   interact_mood_gain: 5          # 每次互动心情增加

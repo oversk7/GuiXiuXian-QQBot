@@ -94,7 +94,7 @@ admin:
 # AI对话配置
 ai_dialogue:
   # LLM服务商配置
-  provider: "scnet"  # zhipu | ai302 | openai | claude | local
+  provider: "volcengine"  # zhipu | ai302 | openai | claude | local
 
   # 智谱AI配置（付费，备用）
   zhipu:
@@ -103,6 +103,14 @@ ai_dialogue:
     max_tokens: 300  # 单次对话最大token数
     temperature: 0.1  # 温度参数（0-1）
     timeout: 30  # API调用超时时间（秒）
+
+  # 火山引擎配置（豆包，DeepSeek-V3.2）
+  volcengine:
+    api_key: "***REMOVED***"
+    model: "ep-20260321201048-h78tm"  # endpoint ID 对应 DeepSeek-V3.2
+    max_tokens: 300
+    temperature: 0.6
+    timeout: 30
 
   # scnet配置（算力网）
   scnet:
@@ -128,7 +136,7 @@ ai_dialogue:
 
   # 对话历史管理
   history:
-    max_rounds: 5  # 保留最近多少轮对话（用于AI上下文）
+    max_rounds: 10  # 保留最近多少轮对话（用于AI上下文）
     ttl_days: 30  # 对话历史保留天数
 
   # 限速控制（GLM-4.5-Flash为免费模型，仅需控制调用频率）
