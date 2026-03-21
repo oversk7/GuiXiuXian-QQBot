@@ -638,14 +638,16 @@ async def _handle_dungeon_rest(session, player: Player, event: MessageEvent, cmd
         msg = "\n".join(msg_lines)
         await cmd_handler.finish(message_add_head(msg, event))
 
-    player.hp = player.max_hp
+    effective_attrs = await player.get_effective_attributes(session)
+    effective_max_hp = effective_attrs.get('max_hp', player.max_hp)
+    player.hp = effective_max_hp
     session.add(player)
     await session.commit()
 
     msg_lines = [
         "🌫️ 你在驿站休息了一晚，恢复了体力，生命值已满。",
         "━━━━━━━━━━━━━",
-        f"✧ 生命值：{player.hp}/{player.max_hp}",
+        f"✧ 生命值：{player.hp}/{effective_max_hp}",
         "🧭 继续探索诡域吧！",
     ]
     msg = "\n".join(msg_lines)
@@ -654,8 +656,10 @@ async def _handle_dungeon_rest(session, player: Player, event: MessageEvent, cmd
 
 async def _handle_reality_rest(session, player: Player, event: MessageEvent, cmd_handler):
     effective_attrs = await player.get_effective_attributes(session)
-    player.hp = effective_attrs.get('max_hp', player.max_hp)
-    player.mp = effective_attrs.get('max_mp', player.max_mp)
+    effective_max_hp = effective_attrs.get('max_hp', player.max_hp)
+    effective_max_mp = effective_attrs.get('max_mp', player.max_mp)
+    player.hp = effective_max_hp
+    player.mp = effective_max_mp
     # stamina 是固定属性（咒抗），不需要恢复
 
     session.add(player)
@@ -664,8 +668,8 @@ async def _handle_reality_rest(session, player: Player, event: MessageEvent, cmd
     msg_lines = [
         "💤 你在现实世界好好休息了一觉，精力充沛。",
         "━━━━━━━━━━━━━",
-        f"✧ 生命值：{player.hp}/{player.max_hp}",
-        f"✧ 法力值：{player.mp}/{player.max_mp}",
+        f"✧ 生命值：{player.hp}/{effective_max_hp}",
+        f"✧ 法力值：{player.mp}/{effective_max_mp}",
         f"✧ 咒抗：{player.stamina}",
         "━━━━━━━━━━━━━",
         "🧭 使用【导航 <x> <y>】开始经商",
