@@ -64,6 +64,12 @@ ATTR_NAME_CN = {
     "dodge_rate": "闪避率",
     "accuracy": "命中率",
     "agility": "敏捷",
+    "critical_damage": "暴击伤害",
+    "combo_rate": "连击率",
+    "penetration_rate": "穿透率",
+    "counter_rate": "反击率",
+    "lifesteal_rate": "吸血率",
+    "accuracy_rate": "命中率",
 }
 
 

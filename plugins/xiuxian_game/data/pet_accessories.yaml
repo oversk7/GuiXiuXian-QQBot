@@ -14,7 +14,7 @@ accessories:
     name: "红色蝴蝶结"
     slot: "head"
     rarity: "white"
-    price: 500
+    price: 100000
     description_prefix: "戴着红色蝴蝶结的"
     bonus:
       attack: 5
@@ -24,7 +24,7 @@ accessories:
     name: "幽冥小冠"
     slot: "head"
     rarity: "green"
-    price: 3000
+    price: 300000
     description_prefix: "头戴幽冥小冠的"
     bonus:
       defense: 10
@@ -35,7 +35,7 @@ accessories:
     name: "灵花簪"
     slot: "head"
     rarity: "blue"
-    price: 10000
+    price: 800000
     description_prefix: "簪着灵花的"
     bonus:
       attack: 15
@@ -47,7 +47,7 @@ accessories:
     name: "铃铛项圈"
     slot: "neck"
     rarity: "white"
-    price: 500
+    price: 100000
     description_prefix: ""
     bonus:
       dodge_rate: 0.005
@@ -57,7 +57,7 @@ accessories:
     name: "魂玉坠"
     slot: "neck"
     rarity: "green"
-    price: 3000
+    price: 300000
     description_prefix: ""
     bonus:
       hp: 100
@@ -80,7 +80,7 @@ accessories:
     name: "女仆装"
     slot: "body"
     rarity: "green"
-    price: 5000
+    price: 500000
     description_prefix: "穿着女仆装的"
     bonus:
       hp: 80
@@ -90,7 +90,7 @@ accessories:
     name: "灵甲轻铠"
     slot: "body"
     rarity: "blue"
-    price: 15000
+    price: 1000000
     description_prefix: "身着灵甲的"
     bonus:
       defense: 20
