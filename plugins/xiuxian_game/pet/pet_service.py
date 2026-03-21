@@ -294,21 +294,9 @@ class PetService:
 
         beast = self.config.get_beast(pet.beast_id)
 
-        # 已化形：允许切换性别
+        # 已化形：不可再次化形
         if pet.is_transformed:
-            if pet.transform_gender == gender:
-                gender_cn = "男" if gender == "male" else "女"
-                return False, f"【{pet.nickname}】当前已是{gender_cn}性化形"
-            pet.transform_gender = gender
-            await uow.pets.update(pet)
-            transform_name = self.config.get_transform_name(pet.beast_id, gender)
-            transform_desc = self.config.get_transform_description(pet.beast_id, gender)
-            gender_cn = "男" if gender == "male" else "女"
-            return True, (
-                f"【{pet.nickname}】切换化形！\n"
-                f"化形为: {transform_name}（{gender_cn}）\n"
-                f"{transform_desc}"
-            )
+            return False, f"【{pet.nickname}】已经化形了，无法再次变更"
 
         req_level = self.config.settings["transform_level"]
         req_affection = self.config.settings["transform_affection"]
