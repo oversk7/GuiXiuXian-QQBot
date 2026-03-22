@@ -333,15 +333,25 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
     # 搜索物品
     item_matches = []
     by_id = config.items_config["by_id"]
-    # 1. 先尝试精确匹配物品名称
-    exact_cfg = config.items_config["by_name"].get(keyword)
-    if exact_cfg:
-        item_matches.append(exact_cfg)
-    else:
-        # 2. 子串模糊匹配物品名称或描述
+
+    # 铭文类型专项筛选：支持"进阶铭文"/"基础铭文"关键词
+    if keyword in ("进阶铭文", "基础铭文"):
+        want_advanced = keyword == "进阶铭文"
         for cfg in by_id.values():
-            if keyword in cfg.name or keyword in cfg.description:
-                item_matches.append(cfg)
+            if cfg.type.value == "INSCRIPTION":
+                is_advanced = getattr(cfg, 'inscription_type', None) == "advanced"
+                if want_advanced == is_advanced:
+                    item_matches.append(cfg)
+    else:
+        # 1. 先尝试精确匹配物品名称
+        exact_cfg = config.items_config["by_name"].get(keyword)
+        if exact_cfg:
+            item_matches.append(exact_cfg)
+        else:
+            # 2. 子串模糊匹配物品名称或描述
+            for cfg in by_id.values():
+                if keyword in cfg.name or keyword in cfg.description:
+                    item_matches.append(cfg)
 
     # 鬼怪系统已移除，不再搜索鬼怪
     ghost_matches = []
@@ -368,6 +378,7 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
         "HERB": "诡药",
         "SEED": "灵种",
         "GUARDIAN_BEAST": "守护兽",
+        "INSCRIPTION": "铭文",
     }
 
     TYPE_ICON_MAP = {
@@ -386,21 +397,31 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
         "HERB": "🌱",
         "SEED": "🫘",
         "GUARDIAN_BEAST": "🐾",
+        "INSCRIPTION": "🔮",
     }
 
     # 若匹配过多（>6），展示按类型分组的紧凑名称列表
     if total_matches > 6:
-        # 按物品类型分组
+        # 按物品类型分组（铭文按进阶/基础细分）
         from collections import defaultdict
         grouped: dict[str, list] = defaultdict(list)
         for cfg in item_matches:
-            grouped[cfg.type.value].append(cfg.name)
+            if cfg.type.value == "INSCRIPTION":
+                is_adv = getattr(cfg, 'inscription_type', None) == "advanced"
+                group_key = "进阶铭文" if is_adv else "基础铭文"
+            else:
+                group_key = cfg.type.value
+            grouped[group_key].append(cfg.name)
 
         summary_lines = [f"📖 匹配到 {total_matches} 条【{keyword}】相关记录", "━━━━━━━━━━"]
 
         for type_val, names in grouped.items():
-            type_cn = TYPE_NAME_MAP.get(type_val, type_val)
-            icon = TYPE_ICON_MAP.get(type_val, "📌")
+            if type_val in ("基础铭文", "进阶铭文"):
+                type_cn = type_val
+                icon = "🔮"
+            else:
+                type_cn = TYPE_NAME_MAP.get(type_val, type_val)
+                icon = TYPE_ICON_MAP.get(type_val, "📌")
 
             # 尝试提取公共前缀以简化显示（如 "铭文·恐惧之力" → "恐惧之力"）
             # 找到所有名称的最长公共前缀（至少含分隔符·才去除）
@@ -437,11 +458,21 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
 
     # 显示物品匹配结果
     for cfg in item_matches:
-        type_cn = TYPE_NAME_MAP.get(cfg.type.value, cfg.type.value)
+        if cfg.type.value == "INSCRIPTION":
+            is_adv = getattr(cfg, 'inscription_type', None) == "advanced"
+            type_cn = "进阶铭文" if is_adv else "基础铭文"
+        else:
+            type_cn = TYPE_NAME_MAP.get(cfg.type.value, cfg.type.value)
 
         extra_info = ""
+        # 若为铭文，展示铭文类型
+        if cfg.type.value == "INSCRIPTION":
+            is_adv = getattr(cfg, 'inscription_type', None) == "advanced"
+            ins_type_cn = "进阶铭文" if is_adv else "基础铭文"
+            extra_info = f"\n🔮 铭文类型：{ins_type_cn}"
+
         # 若为装备，附加等级要求、属性加成、稀有度等信息
-        if cfg.type.value == "EQUIPMENT":
+        elif cfg.type.value == "EQUIPMENT":
             ATTR_CN = {
                 "attack": "力",
                 "defense": "防",
@@ -729,6 +760,11 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
                             # 计算解锁所需的升阶等级
                             required_level = idx * 2
                             desc_parts.append(f"  • [{idx}] {effect_desc} (+{required_level}阶解锁)")
+        elif cfg.type.value == "INSCRIPTION":
+            is_adv = getattr(cfg, 'inscription_type', None) == "advanced"
+            ins_type_cn = "进阶铭文" if is_adv else "基础铭文"
+            desc_parts.append(f"🔮 铭文类型：{ins_type_cn}")
+            desc_parts.append(f"📍 获取方式：{'诡域精英怪掉落' if is_adv else '合成铭文 / 诡域掉落'}")
         elif cfg.type.value == "CONSUMABLE":
             desc_parts.append(f"💊 类型：消耗品")
         elif cfg.type.value == "GEM":
@@ -769,7 +805,8 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
             "GOODS": ["背包", "市集", "帮助", "图鉴"],
             "SEASONING": ["背包", "餐厅", "菜单", "食谱"],
             "DISH": ["背包", "餐厅", "吃", "帮助"],
-            "RECIPE": ["背包", "食谱", "餐厅", "帮助"]
+            "RECIPE": ["背包", "食谱", "餐厅", "帮助"],
+            "INSCRIPTION": ["背包", "铭文", "铭文列表", "帮助"],
         }
         buttons = type_buttons.get(cfg.type.value, ["背包", "图鉴", "帮助", "面板"])
 
@@ -787,7 +824,8 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
             "GOODS": "🏪",
             "SEASONING": "🧂",
             "DISH": "🍽️",
-            "RECIPE": "📜"
+            "RECIPE": "📜",
+            "INSCRIPTION": "🔮",
         }
         icon = type_icons.get(cfg.type.value, "📖")
 

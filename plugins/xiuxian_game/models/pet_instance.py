@@ -60,6 +60,9 @@ class PetInstance(Base):
     daily_feed_count: Mapped[int] = mapped_column(Integer, default=0, server_default="0", comment="当日怨念喂食次数")
     daily_feed_date: Mapped[str | None] = mapped_column(String(10), nullable=True, comment="喂食计数日期(YYYY-MM-DD)")
 
+    # 赠礼冷却（每日一次）
+    gift_last_date: Mapped[str | None] = mapped_column(String(10), nullable=True, comment="上次赠礼日期(YYYY-MM-DD)")
+
     # 时间戳
     last_fed_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True, comment="上次喂食时间")
     last_interact_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True, comment="上次互动时间")

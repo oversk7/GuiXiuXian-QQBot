@@ -1,15 +1,20 @@
 """宠物AI对话服务 - 复用现有AIDialogueService"""
 import random
+import re
+from datetime import date
 from typing import Tuple
 from nonebot import logger
 
 from nonebot.exception import FinishedException, PausedException, RejectedException
 from ..dialogue.ai_dialogue_service import AIDialogueService
 from ..dialogue.npc_personality import PersonalityTemplate
+from ..dialogue.npc_gift_service import GIFT_WHITELIST
 from ..infrastructure.uow.unit_of_work import UnitOfWork
 from ..models.pet_instance import PetInstance
 from ..models.pet_dialogue_history import PetDialogueHistory
 from .config import PetConfigManager
+
+_GIFT_PATTERN = re.compile(r'[\[（(]赠[:：](.+?)[:：](\d+)[\]）)]')
 
 
 class PetDialogueService:
@@ -98,6 +103,36 @@ class PetDialogueService:
             response = self._get_fallback_response(pet)
             tokens_used = 0
 
+        # 解析并处理宠物赠礼
+        gift_notice = ""
+        match = _GIFT_PATTERN.search(response)
+        response = _GIFT_PATTERN.sub("", response).strip()
+        if match:
+            item_name = match.group(1).strip()
+            qty = int(match.group(2))
+            today = str(date.today())
+
+            if item_name not in GIFT_WHITELIST:
+                logger.warning(f"宠物 {pet.nickname} 尝试赠送非白名单物品: {item_name!r}，已忽略")
+            elif pet.gift_last_date == today:
+                logger.info(f"宠物 {pet.nickname} 今日已赠过礼，冷却中")
+            else:
+                item_id, max_qty = GIFT_WHITELIST[item_name]
+                qty = max(1, min(qty, max_qty))
+                if item_id == "_gold":
+                    player.gold += qty
+                    gift_ok = True
+                else:
+                    from ..models.inventory import ItemInstance
+                    gift_ok = await ItemInstance.add_item(uow.session, player_id, item_id, qty)
+
+                if gift_ok:
+                    pet.gift_last_date = today
+                    gift_notice = f"\n━━━━━━━━━━━━━\n🎁 【系统】{pet.nickname} 赠予了你 {item_name}×{qty}，已存入背包"
+                    logger.info(f"宠物 {pet.nickname} 赠送 {item_name}×{qty} 给玩家 {player_id}")
+                else:
+                    logger.warning(f"宠物 {pet.nickname} 赠送 {item_name}×{qty} 失败（背包已满？）")
+
         # 互动增加好感和心情
         affection_gain = 1
         mood_gain = 2
@@ -117,8 +152,8 @@ class PetDialogueService:
         )
         await uow.pet_dialogue_histories.add(history)
 
-        display_name = beast.transform_name if pet.is_transformed else beast.name
-        return True, f"{pet.nickname}({display_name})\n━━━━━━━━━━━━━\n{response}"
+        display_name = self.config.get_transform_name(pet.beast_id, pet.transform_gender) if pet.is_transformed else beast.name
+        return True, f"{pet.nickname}({display_name})\n━━━━━━━━━━━━━\n{response}{gift_notice}"
 
     @staticmethod
     def _map_affection_to_favorability(affection: int) -> int:

@@ -699,7 +699,7 @@ class PetService:
         msg = f"🐾 诡兽巢穴 ({len(pets)}只)\n━━━━━━━━━━━━━"
         for pet in pets:
             beast = self.config.get_beast(pet.beast_id)
-            display_name = beast.transform_name if pet.is_transformed else beast.name
+            display_name = self.config.get_transform_name(pet.beast_id, pet.transform_gender) if pet.is_transformed else beast.name
             rarity_emoji = self.RARITY_DISPLAY.get(beast.rarity, ("⚪",))[0]
             tags = []
             if pet.is_active:
