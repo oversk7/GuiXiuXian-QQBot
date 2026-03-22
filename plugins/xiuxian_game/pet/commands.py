@@ -10,6 +10,7 @@ from ..platform_utils import get_unified_player
 from .pet_service import PetService
 from .pet_dialogue_service import PetDialogueService
 from .config import PetConfigManager, format_bonus
+from .personality_customization_service import customize_pet_personality, reset_pet_personality
 
 pet_service = PetService()
 dialogue_service = PetDialogueService()
@@ -355,3 +356,43 @@ async def handle_recall(event: MessageEvent):
 
         success, msg = await pet_service.recall_from_guard(uow, player.id)
         await recall_cmd.finish(msg)
+
+
+# ==================== 定制人设 ====================
+customize_personality_cmd = on_command("定制人设", priority=5, block=True)
+
+
+@customize_personality_cmd.handle()
+async def handle_customize_personality(event: MessageEvent, args: Message = CommandArg()):
+    """【定制人设 描述】- 花费50诡烛定制宠物人设（需已化形）"""
+    description = args.extract_plain_text().strip()
+    if not description:
+        await customize_personality_cmd.finish(
+            "用法：定制人设 <你想要的人设描述>\n"
+            "例如：定制人设 傲娇毒舌，表面嫌弃主人实则超在意\n"
+            "💰 费用：50诡烛/次（可免费重置）"
+        )
+
+    async with UnitOfWork(AsyncSessionLocal) as uow:
+        player = await get_unified_player(uow.session, event)
+        if not player:
+            await customize_personality_cmd.finish("请先创建角色")
+
+        success, msg = await customize_pet_personality(uow, player.id, description)
+        await customize_personality_cmd.finish(msg)
+
+
+# ==================== 重置人设 ====================
+reset_personality_cmd = on_command("重置人设", priority=5, block=True)
+
+
+@reset_personality_cmd.handle()
+async def handle_reset_personality(event: MessageEvent):
+    """【重置人设】- 免费恢复宠物默认人设"""
+    async with UnitOfWork(AsyncSessionLocal) as uow:
+        player = await get_unified_player(uow.session, event)
+        if not player:
+            await reset_personality_cmd.finish("请先创建角色")
+
+        success, msg = await reset_pet_personality(uow, player.id)
+        await reset_personality_cmd.finish(msg)

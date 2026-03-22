@@ -45,16 +45,29 @@ class PetDialogueService:
         if not personality_data:
             return False, "宠物人设配置异常"
 
-        # 转换为 PersonalityTemplate（复用现有AI对话系统）
-        personality = PersonalityTemplate(
-            name=pet.nickname,
-            role=personality_data.role,
-            pronouns=personality_data.pronouns,
-            speech_patterns=personality_data.speech_patterns,
-            key_words=personality_data.key_words,
-            background=self._build_pet_background(pet, beast, personality_data, player),
-            behavioral_rules=personality_data.behavioral_rules,
-        )
+        # 根据是否有定制人设选择不同的PersonalityTemplate构建路径
+        if pet.custom_personality:
+            # 自定义人设：用玩家定制内容替换background+role，保留状态上下文
+            personality = PersonalityTemplate(
+                name=pet.nickname,
+                role="",
+                pronouns=[],
+                speech_patterns=[],
+                key_words=personality_data.key_words,
+                background=pet.custom_personality + "\n\n" + self._build_state_context(pet, player),
+                behavioral_rules=[],
+            )
+        else:
+            # 默认人设：使用种族配置
+            personality = PersonalityTemplate(
+                name=pet.nickname,
+                role=personality_data.role,
+                pronouns=personality_data.pronouns,
+                speech_patterns=personality_data.speech_patterns,
+                key_words=personality_data.key_words,
+                background=self._build_pet_background(pet, beast, personality_data, player),
+                behavioral_rules=personality_data.behavioral_rules,
+            )
 
         # 获取最近对话历史（宠物需要更多记忆来维持感情连贯性）
         history_limit = self.config.settings.get("dialogue_history_rounds", 20)
@@ -187,23 +200,21 @@ class PetDialogueService:
         else:
             return "你刚被驯化不久，对主人还很陌生，话不多，警惕而谨慎，需要时间建立信任。"
 
-    def _build_pet_background(self, pet, beast, personality_data, player) -> str:
-        """构建宠物背景上下文"""
+    def _build_state_context(self, pet, player) -> str:
+        """构建宠物当前状态上下文（好感、心情、饥饿、形态、饰品等）"""
         affection_name = self.config.get_affection_level_name(pet.affection)
         mood_desc = self._get_mood_desc(pet.mood)
         hunger_desc = "饥饿" if pet.hunger < 20 else ("微饿" if pet.hunger < 50 else "饱足")
         form = "人形" if pet.is_transformed else "兽形"
         affection_hint = self._get_affection_behavior_hint(pet.affection)
 
-        # 性别与化形名称
         gender_desc = ""
         if pet.is_transformed and pet.transform_gender:
             transform_name = self.config.get_transform_name(pet.beast_id, pet.transform_gender)
             gender_cn = "男性" if pet.transform_gender == "male" else "女性"
             gender_desc = f"你的化形是{gender_cn}形态——{transform_name}。你必须严格按照{gender_cn}的身份说话和自称，不要使用其他性别的自称或语气。"
 
-        bg = (
-            f"{personality_data.background}\n\n"
+        ctx = (
             f"{gender_desc}"
             f"你的主人叫{player.nickname}，是一位{player.level}级的修仙者。"
             f"你和主人的关系是【{affection_name}】（好感度{pet.affection}）。"
@@ -213,7 +224,7 @@ class PetDialogueService:
         )
 
         if pet.is_guarding:
-            bg += "你正在灵田守田值班。"
+            ctx += "你正在灵田守田值班。"
 
         if pet.accessories:
             acc_names = []
@@ -222,9 +233,13 @@ class PetDialogueService:
                 if acc:
                     acc_names.append(acc.name)
             if acc_names:
-                bg += f"你身上穿戴着{'、'.join(acc_names)}。"
+                ctx += f"你身上穿戴着{'、'.join(acc_names)}。"
 
-        return bg
+        return ctx
+
+    def _build_pet_background(self, pet, beast, personality_data, player) -> str:
+        """构建宠物背景上下文（默认人设路径）"""
+        return f"{personality_data.background}\n\n{self._build_state_context(pet, player)}"
 
     def _get_mood_desc(self, mood: int) -> str:
         if mood >= 80:
