@@ -3957,7 +3957,7 @@ items:
       rarity: "purple"
       price: 0
       description: "蕴含诡兽本源之力的结晶，可用于宠物进化突破"
-      tags: ["pet", "evolution"]
+      tags: ["pet", "evolution", "no_drop"]
 
     # --- 食谱解锁 ---
     - item_id: "recipe_sweet_sour_bass"
