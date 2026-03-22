@@ -107,6 +107,8 @@ class EnhancedBattleEngine:
         })
 
         for effect in triggered:
+            if effect.effect_type == EffectType.SHIELD:
+                effect.shield_value = int(player.max_hp * effect.value / 100) if effect.is_percentage else int(effect.value)
             self.effect_manager.add_effect(player.id, effect)
 
         # 首回合：将灵影护盾转换为实际护盾值（按最大理智）
@@ -542,6 +544,8 @@ class EnhancedBattleEngine:
         })
 
         for effect in triggered:
+            if effect.effect_type == EffectType.SHIELD:
+                effect.shield_value = int(getattr(unit, 'max_hp', 0) * effect.value / 100) if effect.is_percentage else int(effect.value)
             self.effect_manager.add_effect(unit_id, effect)
             messages.append(format_effect_message(effect, unit.nickname if hasattr(unit, 'nickname') else "敌人"))
 
@@ -755,8 +759,8 @@ class EnhancedBattleEngine:
                     'description': effect.description or ""
                 })
 
-            elif effect.duration > 0:
-                # 持续性效果
+            elif effect.duration > 0 or effect.duration == -1:
+                # 持续性效果（duration=-1 为永久效果）
                 self.effect_manager.add_effect(killer_id, effect)
                 result["messages"].append(format_effect_message(effect, killer_name))
                 result["effects_triggered"].append(effect.effect_type.value)
@@ -1161,6 +1165,10 @@ class EnhancedBattleEngine:
             crit_effects = self.effect_manager.check_triggers(attacker_id, TriggerType.ON_CRITICAL, context)
             attack_effects.extend(crit_effects)
 
+        # 低血量触发效果（每次攻击时检查自身血量）
+        low_hp_effects = self.effect_manager.check_triggers(attacker_id, TriggerType.LOW_HP, context)
+        attack_effects.extend(low_hp_effects)
+
         # 处理触发的效果
         for effect in attack_effects:
             _tag = effect.equip_tag()  # 装备来源标签
@@ -1208,11 +1216,25 @@ class EnhancedBattleEngine:
                 result["messages"].append(f"☂️ {_tag}无视敌人{effect.value:.0f}%防御(持续{effect.duration}回合)")
                 result["effects_triggered"].append("defense_penetration")
 
-            elif effect.duration > 0:
-                # 其他持续性效果
+            elif effect.duration > 0 or effect.duration == -1:
+                # 其他持续性效果（duration=-1 为永久效果）
                 self.effect_manager.add_effect(attacker_id, effect)
                 result["messages"].append(format_effect_message(effect, attacker_name))
                 result["effects_triggered"].append(effect.effect_type.value)
+
+        # 定身率：命中后有概率触发恐惧（无法行动1回合）
+        immobilize_rate = getattr(attacker, 'immobilize_rate', 0)
+        if immobilize_rate > 0 and self.rng.random() * 100 < immobilize_rate:
+            imm_effect = BattleEffect(
+                effect_type=EffectType.FEAR,
+                value=0,
+                duration=1,
+                source="定身率",
+                source_equipment="定身率",
+            )
+            self.effect_manager.add_effect(defender_id, imm_effect)
+            result["messages"].append(format_effect_message(imm_effect, defender_name))
+            result["effects_triggered"].append("fear")
 
         # 触发防御时效果(被攻击方) - 同时触发ON_DEFENSE和ON_ATTACKED
         defender_region = defender.get_current_region() if hasattr(defender, 'get_current_region') else getattr(defender, 'region', "")
@@ -1308,6 +1330,12 @@ class EnhancedBattleEngine:
                 result["defender_hp_restored"] = result.get("defender_hp_restored", 0) + heal_amount
                 result["messages"].append(f"💚 {_dtag}{defender_name}回复{heal_amount}HP")
                 result["effects_triggered"].append("heal")
+
+            elif effect.effect_type == EffectType.FEAR:
+                # on_attacked 触发的恐惧应施加给攻击者（"使敌人恐惧"），而非自己
+                self.effect_manager.add_effect(attacker_id, effect)
+                result["messages"].append(format_effect_message(effect, attacker_name))
+                result["effects_triggered"].append("fear")
 
             else:
                 self.effect_manager.add_effect(defender_id, effect)

@@ -124,7 +124,7 @@ affixes:
 
     - affix_id: "immobilize_rate"
       name: "禁锢"
-      description: "定身率+{value}%"
+      description: "命中时+{value}%概率使敌人恐惧1回合"
       attribute: "immobilize_rate"
       ranges:
         white: [0.3, 0.8]

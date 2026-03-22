@@ -370,6 +370,7 @@ def _build_trigger_config(effect_cfg: dict, values: dict, insc_name: str,
     value = values.get("value", 0)
     duration = effect_cfg.get("duration", 0)
     threshold = effect_cfg.get("threshold", 0)
+    max_stacks = effect_cfg.get("max_stacks", 1)
     return TriggerConfig(
         trigger=trigger_type,
         chance=chance,
@@ -377,6 +378,7 @@ def _build_trigger_config(effect_cfg: dict, values: dict, insc_name: str,
         value=value,
         duration=duration,
         threshold=float(threshold),
+        max_stacks=max_stacks,
         description=f"铭文·{insc_name}",
         source_equipment=source_name,
     )

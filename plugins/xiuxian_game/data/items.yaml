@@ -699,15 +699,16 @@ items:
 
     - item_id: "inscription_kill_attack"
       name: "铭文·弑神"
-      description: "击杀敌人时{chance}%概率攻击力+{value}%(3回合)"
+      description: "攻击时{chance}%概率激发弑神之力，攻击力+{value}%(整场战斗，仅触发一次)"
       type: "INSCRIPTION"
       rarity: "purple"
       price: 25000
       inscription_effect:
-        trigger: "on_kill"
+        trigger: "on_attack"
         effect: "buff_attack"
-        duration: 3
-        chance_range: [30, 60]
+        duration: -1
+        max_stacks: 1
+        chance_range: [20, 40]
         value_range: [15, 30]
 
     - item_id: "inscription_kill_heal"
@@ -744,6 +745,7 @@ items:
       inscription_effect:
         trigger: "passive"
         effect: "buff_dodge"
+        duration: -1
         value_range: [3, 8]
 
     - item_id: "inscription_passive_accuracy"
@@ -755,6 +757,7 @@ items:
       inscription_effect:
         trigger: "passive"
         effect: "buff_accuracy"
+        duration: -1
         value_range: [3, 8]
 
     - item_id: "inscription_turn_shield"
