@@ -1,6 +1,6 @@
 """宠物实例模型"""
 from datetime import datetime
-from sqlalchemy import String, Integer, Float, DateTime, Boolean, ForeignKey, Index, JSON
+from sqlalchemy import String, Integer, Float, DateTime, Boolean, ForeignKey, Index, JSON, Text
 from sqlalchemy.orm import Mapped, mapped_column
 from .db import Base
 
@@ -62,6 +62,11 @@ class PetInstance(Base):
 
     # 赠礼冷却（每日一次）
     gift_last_date: Mapped[str | None] = mapped_column(String(10), nullable=True, comment="上次赠礼日期(YYYY-MM-DD)")
+
+    # 定制人设（AI生成的完整人设描述文本，None表示使用默认）
+    custom_personality: Mapped[str | None] = mapped_column(
+        Text, nullable=True, comment="玩家定制的AI人设描述文本"
+    )
 
     # 时间戳
     last_fed_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True, comment="上次喂食时间")
