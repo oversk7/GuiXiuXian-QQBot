@@ -15,6 +15,7 @@ from ..models.pet_dialogue_history import PetDialogueHistory
 from .config import PetConfigManager
 
 _GIFT_PATTERN = re.compile(r'[\[（(]赠[:：](.+?)[:：](\d+)[\]）)]')
+_MOOD_PATTERN = re.compile(r'\[情绪:([+-]\d+)\]')
 
 
 class PetDialogueService:
@@ -116,6 +117,28 @@ class PetDialogueService:
             response = self._get_fallback_response(pet)
             tokens_used = 0
 
+        # 解析情绪标记（在其他处理前先提取，避免影响赠礼解析）
+        mood_tag_match = _MOOD_PATTERN.search(response)
+        response = _MOOD_PATTERN.sub("", response).strip()
+        if mood_tag_match:
+            sentiment = int(mood_tag_match.group(1))
+        else:
+            sentiment = 0
+
+        # 根据情绪标记计算本次好感/心情变化
+        if sentiment > 0:
+            affection_gain = 2
+            mood_gain = 4
+        elif sentiment == -1:
+            affection_gain = 0
+            mood_gain = -3
+        elif sentiment <= -2:
+            affection_gain = -1
+            mood_gain = -6
+        else:
+            affection_gain = 1
+            mood_gain = 2
+
         # 解析并处理宠物赠礼
         gift_notice = ""
         match = _GIFT_PATTERN.search(response)
@@ -146,11 +169,9 @@ class PetDialogueService:
                 else:
                     logger.warning(f"宠物 {pet.nickname} 赠送 {item_name}×{qty} 失败（背包已满？）")
 
-        # 互动增加好感和心情
-        affection_gain = 1
-        mood_gain = 2
-        pet.affection = min(1000, pet.affection + affection_gain)
-        pet.mood = min(100, pet.mood + mood_gain)
+        # 应用好感/心情变化（情绪标记已在上方解析）
+        pet.affection = max(0, min(1000, pet.affection + affection_gain))
+        pet.mood = max(0, min(100, pet.mood + mood_gain))
         await uow.pets.update(pet)
 
         # 保存对话历史
@@ -234,6 +255,14 @@ class PetDialogueService:
                     acc_names.append(acc.name)
             if acc_names:
                 ctx += f"你身上穿戴着{'、'.join(acc_names)}。"
+
+        ctx += (
+            "\n【情绪表达规则】对话结束时，根据这轮互动的感受，在回复末尾附加情绪标记："
+            "被关心/称赞/温柔对待时加 [情绪:+1]；"
+            "被冷漠/嫌弃/轻微冒犯时加 [情绪:-1]；"
+            "被辱骂/严重伤害时加 [情绪:-2]；"
+            "普通寒暄不加任何标记。标记仅供系统识别，不要对主人解释。"
+        )
 
         return ctx
 

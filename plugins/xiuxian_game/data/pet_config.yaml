@@ -25,6 +25,10 @@ settings:
   feed_diminish_tier2: 300       # 100-300次：经验减半(2经验/次)，心情+1
   feed_diminish_tier3_exp: 1     # 300次以上：最低经验
   feed_diminish_tier3_mood: 0    # 300次以上：心情不再增加
+  # 好感度衰减（每小时定时任务）
+  affection_decay_when_starving: 2   # hunger=0时每小时好感度下降
+  affection_decay_when_sad: 1        # mood<20时每小时好感度下降（可与饥饿叠加）
+  affection_sad_threshold: 20        # 触发情绪衰减的心情阈值
 
 # 等级经验表（到达该等级所需的累计经验）
 level_exp_table:

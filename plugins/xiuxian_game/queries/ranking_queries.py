@@ -8,7 +8,7 @@
 from dataclasses import dataclass, field
 from typing import Any, Callable, Sequence
 
-from sqlalchemy import select, func, case, literal_column
+from sqlalchemy import select, func, case
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from . import readonly_session, cached

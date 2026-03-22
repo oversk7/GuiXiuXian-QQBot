@@ -158,7 +158,6 @@ Base = declarative_base()
 
 def get_base():
     """获取 Base（兼容旧代码）"""
-    import models
     return Base
 
 

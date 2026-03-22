@@ -11,7 +11,6 @@ from ..models import Player
 from ..models.inventory import ItemInstance, ItemType
 from ..models.db import safe_session
 from ..config import config
-from ..utils import bypass_urls
 
 # 生成经验表
 generate_exp_table_cmd = on_command("生成经验表", priority=4, block=True, permission=SUPERUSER)

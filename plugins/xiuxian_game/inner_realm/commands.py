@@ -6,7 +6,6 @@
 from nonebot import on_command
 from nonebot.adapters.qq import MessageEvent, Message
 from nonebot.params import CommandArg
-from nonebot.rule import Rule
 from nonebot.permission import SUPERUSER
 
 from ..platform_utils import get_unified_player
