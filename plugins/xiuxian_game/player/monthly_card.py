@@ -90,13 +90,34 @@ async def handle_check_monthly_card(event: MessageEvent):
         active_cards = await MonthlyCard.get_all_active_cards(session, player.id)
 
         if not active_cards:
-            await check_monthly_card_cmd.finish(message_add_head(
-                "💳 月卡状态\n"
-                "━━━━━━━━━━━━━\n"
-                "🚫 暂无有效月卡\n"
-                "━━━━━━━━━━━━━",
-                event
-            ))
+            # 没有月卡，但可能有诡烛特权
+            from ..sponsor.service import SponsorShopService
+            from datetime import datetime
+            privilege_list = [
+                ("premium_seclusion_until", "闭关无上限"),
+                ("premium_warehouse_until", "远程仓库"),
+                ("premium_fishing_until", "鱼竿特权"),
+                ("premium_vision_until", "全视之眼"),
+            ]
+            no_card_lines = ["💳 月卡状态", "━━━━━━━━━━━━━", "🚫 暂无有效月卡"]
+            active_privs = []
+            for key, name in privilege_list:
+                extra = player.extra_attrs or {}
+                until_str = extra.get(key)
+                if until_str:
+                    try:
+                        end_time = datetime.fromisoformat(until_str)
+                        if end_time > datetime.now():
+                            remaining = (end_time - datetime.now()).days
+                            active_privs.append(f"🔮 {name} - 剩余{remaining}天（{end_time.strftime('%m-%d')}到期）")
+                    except (ValueError, TypeError):
+                        pass
+            if active_privs:
+                no_card_lines.append("━━━━━━━━━━━━━")
+                no_card_lines.append("🏷️ 诡烛特权：")
+                no_card_lines.extend(active_privs)
+            no_card_lines.append("━━━━━━━━━━━━━")
+            await check_monthly_card_cmd.finish(message_add_head("\n".join(no_card_lines), event))
         
         # 获取月卡权益
         benefits = await get_player_card_benefits(session, player.id)
@@ -143,8 +164,35 @@ async def handle_check_monthly_card(event: MessageEvent):
             protection_percent = int(benefits["breakthrough_protection"] * 100)
             msg_lines.append(f"🛡️ 突破失败修为保留{protection_percent}%")
 
+        # 显示诡烛特权到期时间
+        from ..sponsor.service import SponsorShopService
+        from datetime import datetime
+        privilege_list = [
+            ("premium_seclusion_until", "闭关无上限"),
+            ("premium_warehouse_until", "远程仓库"),
+            ("premium_fishing_until", "鱼竿特权"),
+            ("premium_vision_until", "全视之眼"),
+        ]
+        active_privileges = []
+        for key, name in privilege_list:
+            extra = player.extra_attrs or {}
+            until_str = extra.get(key)
+            if until_str:
+                try:
+                    end_time = datetime.fromisoformat(until_str)
+                    if end_time > datetime.now():
+                        remaining = (end_time - datetime.now()).days
+                        active_privileges.append(f"🔮 {name} - 剩余{remaining}天（{end_time.strftime('%m-%d')}到期）")
+                except (ValueError, TypeError):
+                    pass
+
+        if active_privileges:
+            msg_lines.append("━━━━━━━━━━━━━")
+            msg_lines.append("🏷️ 诡烛特权：")
+            msg_lines.extend(active_privileges)
+
         msg_lines.append("━━━━━━━━━━━━━")
-        
+
         await check_monthly_card_cmd.finish(message_add_head("\n".join(msg_lines), event))
 
 
