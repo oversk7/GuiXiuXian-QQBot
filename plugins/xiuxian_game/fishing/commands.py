@@ -65,10 +65,7 @@ async def _(event: MessageEvent):
                     if extra_fish_cfg:
                         try:
                             await service._item_repo.add_item(player.id, extra_fish_id, 1)
-                            # 记录钓鱼活动到钓鱼记录
-                            await service._fishing_record_repo.record_fishing(
-                                player.id, extra_fish_id, 1, current_x, current_y
-                            )
+                            # 特权额外鱼不记录record_fishing，避免占用每日钓鱼次数
                             fishing_stats_obj = await service._fishing_stats_repo.get_or_create(player.id)
                             await service._fishing_stats_repo.update_stats(
                                 fishing_stats_obj, extra_fish_cfg.price, extra_rarity, 1
@@ -88,9 +85,7 @@ async def _(event: MessageEvent):
                     if legend_fish_cfg:
                         try:
                             await service._item_repo.add_item(player.id, legend_fish_id, 1)
-                            await service._fishing_record_repo.record_fishing(
-                                player.id, legend_fish_id, 1, current_x, current_y
-                            )
+                            # 保底鱼不记录record_fishing，避免占用每日钓鱼次数
                             fishing_stats_obj = await service._fishing_stats_repo.get_or_create(player.id)
                             await service._fishing_stats_repo.update_stats(
                                 fishing_stats_obj, legend_fish_cfg.price, "orange", 1
