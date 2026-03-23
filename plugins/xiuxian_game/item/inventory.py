@@ -681,7 +681,7 @@ async def handle_rename(event: MessageEvent, args: Message = CommandArg()):
         rename_item = config.items_config["by_name"]["改名卡"]
         inv_result = await session.execute(
             select(ItemInstance)
-            .where(ItemInstance.player_id == event.get_user_id())
+            .where(ItemInstance.player_id == player.id)
             .where(ItemInstance.item_id == rename_item.item_id)
         )
         inventory: ItemInstance = inv_result.scalars().first()
@@ -691,6 +691,7 @@ async def handle_rename(event: MessageEvent, args: Message = CommandArg()):
 
         # 执行改名操作
         inventory.quantity -= 1
+        remaining = inventory.quantity
         if inventory.quantity <= 0:
             await session.delete(inventory)
 
@@ -699,7 +700,7 @@ async def handle_rename(event: MessageEvent, args: Message = CommandArg()):
         await session.commit()
 
         await rename_cmd.finish(f"🎉 成功修改角色名为：{new_name}\n"
-                               f"剩余改名卡：{inventory.quantity-1 if inventory else 0}张")
+                               f"剩余改名卡：{remaining}张")
 
 
 
