@@ -57,18 +57,20 @@ class EquipmentTradeService:
 
     @staticmethod
     def generate_equipment_summary(equipment: ItemInstance) -> str:
-        """生成装备摘要信息用于显示（纯函数）
+        """生成装备摘要信息用于显示（含稀有度、词缀、铭文）
 
         Args:
             equipment: 装备实例
 
         Returns:
-            装备摘要字符串（包含名称、升阶、宝石、耐久度等信息）
+            装备摘要字符串（包含稀有度、名称、升阶、宝石、词缀、铭文、耐久度等信息）
         """
         if not equipment.is_equipment:
             return equipment.config.name
 
-        parts = [equipment.config.name]
+        tpl = equipment.config
+        # 稀有度图标 + 名称
+        parts = [tpl.get_display_name()]
 
         # 升阶等级
         if equipment.upgrade_level > 0:
@@ -83,11 +85,23 @@ class EquipmentTradeService:
             else:
                 parts.append(f"[🔘{total_slots}]")
 
-        # 耐久度
-        if equipment.config:
-            durability_ratio = equipment.durability / equipment.config.durability
-            if durability_ratio < 0.8:  # 耐久度低于80%时显示
-                parts.append(f"耐久{equipment.durability}/{equipment.config.durability}")
+        # 词缀数量
+        from ..item.affix_service import get_affixes_from_equipment
+        affixes = get_affixes_from_equipment(equipment.extra_attrs)
+        if affixes:
+            parts.append(f"🔮{len(affixes)}词缀")
+
+        # 铭文数量
+        from ..item.inscription_service import get_inscriptions_from_equipment
+        inscriptions = get_inscriptions_from_equipment(equipment.gem_slots_data)
+        if inscriptions:
+            parts.append(f"📜{len(inscriptions)}铭文")
+
+        # 耐久度（低于80%时显示）
+        if tpl:
+            durability_ratio = equipment.durability / tpl.durability
+            if durability_ratio < 0.8:
+                parts.append(f"🛠️{equipment.durability}/{tpl.durability}")
 
         return " ".join(parts)
 
