@@ -640,13 +640,13 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
     await cancel_cmd.finish(message_add_head(f"🗑️ 已撤回牌子 #{oid}", event))
 
 # ---------------- 指令：查牌主（查看订单归属） ----------------
-order_owner_cmd = on_command("查牌主", aliases={"牌主"}, block=True, priority=5)
+order_owner_cmd = on_command("挂牌详情", aliases={"查牌主", "牌主", "牌子详情"}, block=True, priority=5)
 
 @order_owner_cmd.handle()
 async def _(event: MessageEvent, args: Message = CommandArg()):
     oid_str = args.extract_plain_text().strip()
     if not oid_str.isdigit():
-        await order_owner_cmd.finish("⛔ 格式：查牌主 订单ID")
+        await order_owner_cmd.finish("⛔ 格式：挂牌详情 订单ID")
     oid = int(oid_str)
 
     async with safe_session() as session:
@@ -658,7 +658,7 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
             await order_owner_cmd.finish("⛔ 未找到该订单，可能已撤牌或成交")
 
         item_cfg = config.items_config["by_id"].get(order.item_id)
-        item_name = item_cfg.name if item_cfg else order.item_id
+        item_name = item_cfg.get_display_name() if item_cfg else order.item_id
         side_text = "📤 出售" if order.side == OrderSide.SELL else "📥 求购"
         player_name = order.player.nickname if order.player else "未知"
         player_uid = order.player.uid if order.player else "?"
@@ -669,10 +669,92 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
             f"{side_text} {item_name}",
             f"💰 单价: {order.price:,}",
         ]
-        if order.is_equipment_trade:
-            lines.append(f"⭐ {order.equipment_summary}")
+
+        if order.is_equipment_trade and order.item_instance_id:
+            # 装备交易：实时读取装备实例展示完整详情
+            equip = await session.get(ItemInstance, order.item_instance_id)
+            if equip and equip.is_equipment:
+                tpl = equip.config
+                rarity_map = {
+                    "white": "白色", "green": "绿色", "blue": "蓝色",
+                    "purple": "紫色", "orange": "橙色", "red": "红色"
+                }
+                rarity_name = rarity_map.get(tpl.rarity, tpl.rarity)
+
+                lines.append(f"🎨 品质：{tpl.get_rarity_display()}{rarity_name}")
+                lines.append(f"⭐ 升阶：+{equip.upgrade_level}阶")
+                lines.append(f"🛠️ 耐久：{equip.durability}/{tpl.durability}")
+                lines.append("")
+
+                # 基础属性
+                upgrade_multiplier = equip.get_upgrade_bonus_multiplier()
+                if tpl.attr_bonus or tpl.attr_ratio:
+                    lines.append("📈 基础属性：")
+                    attr_name_map = {
+                        "attack": "攻击力", "defense": "防御力", "agility": "敏捷",
+                        "luck": "运气", "hp": "生命值", "mp": "理智值",
+                        "max_hp": "最大生命值", "max_mp": "最大理智值"
+                    }
+                    if tpl.attr_bonus:
+                        for k, v in tpl.attr_bonus.items():
+                            current_value = int(v * upgrade_multiplier)
+                            lines.append(f"  • {attr_name_map.get(k, k)}+{current_value}")
+                    if tpl.attr_ratio:
+                        for k, r in tpl.attr_ratio.items():
+                            current_ratio = float(r) * upgrade_multiplier * 100
+                            lines.append(f"  • {attr_name_map.get(k, k)}+{current_ratio:.1f}%")
+                    lines.append("")
+
+                # 词缀详情
+                from ..item.affix_service import get_affixes_from_equipment, format_affixes_display
+                affixes = get_affixes_from_equipment(equip.extra_attrs)
+                if affixes:
+                    lines.append("🔮 词缀：")
+                    lines.extend(format_affixes_display(affixes))
+                    lines.append("")
+
+                # 宝石/铭文镶嵌详情
+                if equip.available_gem_slots > 0:
+                    lines.append("💎 镶嵌孔位：")
+                    lines.append(f"  • 孔位：{equip.used_gem_slots}/{equip.available_gem_slots}")
+                    if equip.used_gem_slots > 0:
+                        from ..item.gem_socket_service_new import GemSocketService
+                        from ..item.inscription_service import get_inscription_display
+                        gem_info = GemSocketService.get_equipment_gem_info(equip)
+                        for slot_info in gem_info:
+                            if not slot_info["is_empty"]:
+                                slot_num = slot_info["slot_number"]
+                                if slot_info.get("is_inscription"):
+                                    display = get_inscription_display(slot_info["inscription_data"])
+                                    lines.append(f"  • 孔位{slot_num}：📜 {display}")
+                                else:
+                                    gem_name = slot_info["gem_name"]
+                                    gem_type = slot_info["gem_type"]
+                                    lines.append(f"  • 孔位{slot_num}：{gem_type} - {gem_name}")
+                    lines.append("")
+
+                # 特殊效果
+                if hasattr(tpl, 'special_effects') and tpl.special_effects:
+                    lines.append("✨ 特殊效果：")
+                    VIP_EQUIPMENT_IDS = {"vip_blade_zhanlongshan", "vip_robe_jingyuanzhiyi", "heaven_retreat_star_blade", "vip_gui_yu", "vip_chrono_watch", "vip_longying_flash", "vip_ghost_dice", "vip_shoes_longren"}
+                    is_vip = equip.item_id in VIP_EQUIPMENT_IDS
+                    unlocked_count = equip.upgrade_level // 2
+
+                    for idx, effect in enumerate(tpl.special_effects, start=1):
+                        desc = effect.get('description', '')
+                        if not desc:
+                            continue
+                        if is_vip or idx <= unlocked_count:
+                            lines.append(f"  ✅ [{idx}] {desc}")
+                        else:
+                            lines.append(f"  🔒 [{idx}] {desc} (需+{idx * 2}阶)")
+                    lines.append("")
+            else:
+                # 装备实例不存在，回退到摘要
+                lines.append(f"⭐ {order.equipment_summary}")
         else:
             lines.append(f"📦 数量: {order.quantity}")
+
         lines.append(f"👤 挂牌人: {player_name} (UID: {player_uid})")
         lines.append(f"🕐 挂牌时间: {order.created_at.strftime('%Y-%m-%d %H:%M')}")
 
