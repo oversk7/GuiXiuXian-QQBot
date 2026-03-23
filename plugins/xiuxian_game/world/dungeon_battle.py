@@ -955,6 +955,12 @@ async def _(event: MessageEvent):
         # 获取当前位置事件格
         tile = await get_or_create_tile(session, player.get_current_region(), new_x, new_y)
 
+        # 清除全视之眼预览标记（玩家已实际到达此格子）
+        if (tile.state or {}).get("preview"):
+            state = tile.state or {}
+            state.pop("preview", None)
+            tile.state = state
+
         # 检查月卡权限是否支持自动采集
         benefits = await get_player_card_benefits(session, player.id)
         auto_collect = benefits.get("auto_collect", False)
@@ -1745,6 +1751,13 @@ async def _(event: MessageEvent):
         current_x, current_y = player.get_current_coordinates()
         current_region = player.get_current_region()
         tile = await get_or_create_tile(session, current_region, current_x, current_y)
+
+        # 清除全视之眼预览标记（玩家已实际探索此格子）
+        if (tile.state or {}).get("preview"):
+            state = tile.state or {}
+            state.pop("preview", None)
+            tile.state = state
+
         log = await EVENT_HANDLERS[tile.event_type](session, tile, player)
 
         # 更新探索统计（用于公会任务）
