@@ -2,35 +2,35 @@ items:
   consumables:  # 消耗品类
     - item_id: "heal_potion"
       name: "回春散"
-      description: "恢复少量生命值（+40HP）"
+      description: "恢复少量生命值（+50HP）"
       type: "CONSUMABLE"
       effect_type: "RESTORE_HP"
-      effect_params: {"value": 40}
+      effect_params: {"value": 50}
       price: 100
 
     - item_id: "spirit_herb"
       name: "凝神草"
-      description: "恢复少量理智值（+40MP）"
+      description: "恢复少量理智值（+50MP）"
       type: "CONSUMABLE"
       effect_type: "RESTORE_MP"
-      effect_params: {"value": 40}
+      effect_params: {"value": 50}
       price: 100
 
     - item_id: "blood_pact"
       name: "血契丹"
-      description: "以精血为引的丹药，恢复生命值（+120HP）"
+      description: "以精血为引的丹药，恢复15%生命值"
       type: "CONSUMABLE"
-      effect_type: "RESTORE_HP"
-      effect_params: {"value": 120}
-      price: 1000
+      effect_type: "RESTORE_HP_PERCENT"
+      effect_params: {"percent": 0.15}
+      price: 5000
 
     - item_id: "yin_grass"
       name: "阴冥草"
-      description: "生长在极阴之地的药草，服用后恢复理智值（+120MP）"
+      description: "生长在极阴之地的药草，服用后恢复15%理智值"
       type: "CONSUMABLE"
-      effect_type: "RESTORE_MP"
-      effect_params: {"value": 120}
-      price: 500
+      effect_type: "RESTORE_MP_PERCENT"
+      effect_params: {"percent": 0.15}
+      price: 5000
 
     - item_id: "revive_potion"
       name: "仿制还魂丹"
