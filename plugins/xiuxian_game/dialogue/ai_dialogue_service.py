@@ -1,15 +1,14 @@
 """AI对话生成服务"""
-import logging
 from typing import Optional, List
 from datetime import datetime
+
+from nonebot import logger
 
 from ..models.npc import NPC
 from ..models.npc_dialogue_history import NPCDialogueHistory
 from ..dialogue.npc_personality import PersonalityTemplate
 from ..ai_guide import call_zhipu_api
 from ..config import config
-
-logger = logging.getLogger(__name__)
 
 
 class AIDialogueService:
@@ -274,40 +273,44 @@ class AIDialogueService:
         # 尝试主provider
         try:
             if primary_provider == "zhipu":
-                logger.info(f"[AIDialogue] 使用智谱AI调用...")
+                zhipu_model = self.zhipu_config.get("model", "GLM-4-Flash-250414")
+                logger.info(f"[AIDialogue] 使用智谱AI调用, model={zhipu_model}")
                 result = await call_zhipu_api(
                     messages,
-                    model=self.zhipu_config.get("model", "GLM-4-Flash-250414"),
+                    model=zhipu_model,
                     timeout=self.timeout,
                     temperature=self.temperature
                 )
                 logger.info(f"[AIDialogue] 智谱AI调用成功")
                 return result
             elif primary_provider == "ai302":
-                logger.info(f"[AIDialogue] 使用302.ai调用...")
+                ai302_model = self.ai302_config.get("model", "gpt-3.5-turbo")
+                logger.info(f"[AIDialogue] 使用302.ai调用, model={ai302_model}")
                 result = await call_302ai_api(
                     messages,
-                    model=self.ai302_config.get("model", "gpt-3.5-turbo"),
+                    model=ai302_model,
                     timeout=self.timeout,
                     temperature=self.temperature
                 )
                 logger.info(f"[AIDialogue] 302.ai调用成功")
                 return result
             elif primary_provider == "scnet":
-                logger.info(f"[AIDialogue] 使用scnet调用...")
+                scnet_model = self.scnet_config.get("model", "DeepSeek-R1-Distill-Qwen-7B")
+                logger.info(f"[AIDialogue] 使用scnet调用, model={scnet_model}")
                 result = await call_scnet_api(
                     messages,
-                    model=self.scnet_config.get("model", "DeepSeek-R1-Distill-Qwen-7B"),
+                    model=scnet_model,
                     timeout=self.timeout,
                     temperature=self.temperature
                 )
                 logger.info(f"[AIDialogue] scnet调用成功")
                 return result
             elif primary_provider == "volcengine":
-                logger.info(f"[AIDialogue] 使用火山引擎调用...")
+                volc_model = self.volcengine_config.get("model", "ep-20260321201048-h78tm")
+                logger.info(f"[AIDialogue] 使用火山引擎调用, model={volc_model}")
                 result = await call_volcengine_api(
                     messages,
-                    model=self.volcengine_config.get("model", "ep-20260321201048-h78tm"),
+                    model=volc_model,
                     timeout=self.timeout,
                     temperature=self.temperature
                 )

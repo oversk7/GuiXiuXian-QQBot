@@ -5,16 +5,15 @@
 """
 
 import json
-import logging
 from typing import List, Dict, Optional, Tuple
 from datetime import datetime
+
+from nonebot import logger
 
 from ..ai_guide import call_ai_with_fallback
 from ..models.npc_dialogue_history import NPCDialogueHistory
 from ..infrastructure.repositories.npc_long_term_memory_repository import NPCLongTermMemoryRepository
 from ..infrastructure.repositories.npc_dialogue_history_repository import NPCDialogueHistoryRepository
-
-logger = logging.getLogger(__name__)
 
 
 class DialogueSummarizationService:

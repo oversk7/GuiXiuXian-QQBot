@@ -4,9 +4,8 @@ AI引导系统 - 为玩家提供游戏帮助和指令推荐
 import aiohttp
 import asyncio
 import re
-import logging
 from typing import List, Dict, Any
-from nonebot import on_message, on_command
+from nonebot import on_message, on_command, logger
 from nonebot.adapters.qq import MessageEvent, Message
 from nonebot.params import CommandArg
 from sqlalchemy import text
@@ -16,7 +15,6 @@ from .models.story_session import StorySession
 from .utils import message_add_head
 from .config import Config
 
-logger = logging.getLogger(__name__)
 
 def _strip_think_tags(response: dict) -> dict:
     """清除AI回复中的<think>...</think>思考内容"""
