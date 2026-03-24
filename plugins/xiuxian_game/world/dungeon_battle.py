@@ -551,18 +551,31 @@ async def handle_monster_drops(session, player: Player, monster_level: int, regi
     # ===== 装备掉落（词缀系统 Phase 1）=====
     from ..item.affix_service import generate_affixes, VIP_EQUIPMENT_IDS
 
-    # 装备掉落率配置
+    # 装备掉落率配置（按怪物等级匹配装备品阶，精英怪是核心装备来源）
     if is_elite:
-        equip_drop_rate = 0.07  # 精英怪 7%
+        if monster_level > 200:
+            equip_drop_rate = 0.09   # 200+精英 9%
+            equip_rarities = ["blue", "purple", "purple", "orange"]  # 紫色权重高
+        elif monster_level > 100:
+            equip_drop_rate = 0.08   # 101-200精英 8%
+            equip_rarities = ["green", "blue", "blue", "purple"]     # 蓝色权重高
+        elif monster_level > 60:
+            equip_drop_rate = 0.07   # 61-100精英 7%
+            equip_rarities = ["green", "blue"]
+        else:
+            equip_drop_rate = 0.06   # ≤60精英 6%
+            equip_rarities = ["green"]
+    elif monster_level > 200:
+        equip_drop_rate = 0.025  # 200+普通怪 2.5%
         equip_rarities = ["green", "blue"]
     elif monster_level > 100:
-        equip_drop_rate = 0.02  # 高级普通怪 2%
-        equip_rarities = ["white", "green"]
+        equip_drop_rate = 0.02   # 101-200普通怪 2%
+        equip_rarities = ["white", "green", "blue"]
     elif monster_level > 60:
-        equip_drop_rate = 0.015
+        equip_drop_rate = 0.015  # 61-100普通怪 1.5%
         equip_rarities = ["white", "green"]
     else:
-        equip_drop_rate = 0.01  # 低级普通怪 1%
+        equip_drop_rate = 0.01   # ≤60普通怪 1%
         equip_rarities = ["white"]
 
     # 幸运值加成
