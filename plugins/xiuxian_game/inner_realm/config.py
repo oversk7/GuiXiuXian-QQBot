@@ -115,3 +115,59 @@ class InnerRealmConfig:
         cls._config = None
         cls.load_config()
         logger.info("🔄 里界配置已重新加载")
+
+    @classmethod
+    def get_scenes_config(cls, realm_name: str) -> Dict[str, Any]:
+        """获取指定里界的场景节点配置"""
+        realm = cls.get_realm_config(realm_name)
+        if not realm:
+            return {}
+        return realm.get("scenes", {})
+
+    @classmethod
+    def get_npcs_config(cls, realm_name: str) -> list:
+        """获取指定里界的NPC配置列表"""
+        realm = cls.get_realm_config(realm_name)
+        if not realm:
+            return []
+        return realm.get("npcs", [])
+
+    @classmethod
+    def get_clues_config(cls, realm_name: str) -> list:
+        """获取指定里界的线索配置列表"""
+        realm = cls.get_realm_config(realm_name)
+        if not realm:
+            return []
+        return realm.get("clues", [])
+
+    @classmethod
+    def get_endings_config(cls, realm_name: str) -> Dict[str, Any]:
+        """获取指定里界的结局配置"""
+        realm = cls.get_realm_config(realm_name)
+        if not realm:
+            return {}
+        return realm.get("endings", {})
+
+    @classmethod
+    def get_phases_config(cls, realm_name: str) -> Dict[str, Any]:
+        """获取指定里界的阶段配置（黄昏/入夜）"""
+        realm = cls.get_realm_config(realm_name)
+        if not realm:
+            return {}
+        return realm.get("phases", {})
+
+    @classmethod
+    def get_key_items_config(cls, realm_name: str) -> Dict[str, Any]:
+        """获取指定里界的关键道具配置"""
+        realm = cls.get_realm_config(realm_name)
+        if not realm:
+            return {}
+        return realm.get("key_items", {})
+
+    @classmethod
+    def is_realm_suppress_cultivation(cls, realm_name: str) -> bool:
+        """检查里界是否压制修为"""
+        realm = cls.get_realm_config(realm_name)
+        if not realm:
+            return False
+        return realm.get("suppress_cultivation", False)
