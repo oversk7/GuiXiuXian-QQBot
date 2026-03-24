@@ -1544,7 +1544,7 @@ async def handle_social_help(event: MessageEvent, args: Message = CommandArg()):
         "  • 不能抢自己的红包\n"
         "  • 红包10分钟过期自动退还\n"
         "  • 大额红包收取散财税（累进税率）\n"
-        "  • 天道意志：金币少的玩家抢到更多"
+        "  • 金额随机分配，手气决定一切"
     )
     await social_help_cmd.finish(Message(msg))
 

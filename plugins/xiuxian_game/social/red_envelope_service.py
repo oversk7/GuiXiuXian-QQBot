@@ -3,12 +3,13 @@
 
 核心功能：
 1. 发红包（含阶梯散财税）
-2. 抢红包（含诡运加持机制）
+2. 抢红包（含隐性天道偏移）
 3. 过期红包清理
 4. 红包记录查询
 """
 
 import json
+import math
 import random
 import time
 from typing import Optional, Tuple, List, Dict, Any
@@ -181,7 +182,7 @@ class RedEnvelopeService:
         if not player:
             return False, "玩家不存在", None
 
-        # 计算份额（含诡运加持）
+        # 计算份额
         avg_gold = await self._get_avg_player_gold()
         amount = self._calculate_share(
             envelope.remaining_gold,
@@ -314,7 +315,10 @@ class RedEnvelopeService:
         grabber_gold: int,
         avg_gold: int
     ) -> int:
-        """计算抢红包份额（双倍均值 + 诡运加持）
+        """计算抢红包份额（双倍均值 + 隐性天道偏移）
+
+        使用概率触发制：60%概率触发微弱的财富偏向（对数曲线，最高+25%），
+        40%概率完全随机。单次抢红包看不出规律，但长期统计下穷玩家平均多~10%。
 
         Args:
             remaining_gold: 剩余金额
@@ -335,11 +339,14 @@ class RedEnvelopeService:
         upper = max(upper, 1)  # 至少1
         base_share = random.randint(1, upper)
 
-        # 诡运加持：金币少的玩家获得加成
-        if avg_gold > 0 and grabber_gold < avg_gold:
-            # 金币越少，加成越高，最高1.5倍
-            ratio = grabber_gold / avg_gold  # 0~1
-            luck_multiplier = 1.0 + (1.0 - ratio) * 0.5  # 1.0~1.5
+        # 隐性天道偏移：60%概率触发，使用对数曲线柔化
+        if avg_gold > 0 and random.random() < 0.6:
+            # 对数曲线：财富越多 ratio 越接近1，加成越小
+            # log(1+x)/log(2) 在 x=0 时为0，x=1 时为1，增长逐渐放缓
+            wealth_ratio = min(grabber_gold / avg_gold, 2.0)
+            ratio = math.log(1 + wealth_ratio) / math.log(3)  # 0~1 柔化映射
+            ratio = min(ratio, 1.0)
+            luck_multiplier = 1.0 + (1.0 - ratio) * 0.25  # 1.0~1.25
             base_share = int(base_share * luck_multiplier)
 
         # 确保不超过剩余金额，且至少给后面的人留够每人1金币
