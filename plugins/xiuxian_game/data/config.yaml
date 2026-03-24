@@ -94,14 +94,14 @@ admin:
 # AI对话配置
 ai_dialogue:
   # LLM服务商配置
-  provider: "volcengine"  # zhipu | ai302 | openai | claude | local
+  provider: "zhipu"  # zhipu | ai302 | openai | claude | local
 
   # 智谱AI配置（付费，备用）
   zhipu:
     api_key: "***REMOVED***"  # 智谱AI API密钥
-    model: "GLM-4-Flash-250414"  # 默认模型
+    model: "GLM-4.7"  # 默认模型
     max_tokens: 300  # 单次对话最大token数
-    temperature: 0.1  # 温度参数（0-1）
+    temperature: 0.7  # 温度参数（0-1）
     timeout: 30  # API调用超时时间（秒）
 
   # 火山引擎配置（豆包，DeepSeek-V3.2）
