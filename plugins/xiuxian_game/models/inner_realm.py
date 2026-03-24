@@ -106,6 +106,23 @@ class InnerRealmSession(Base):
         comment="是否已结算（0=未结算，1=已结算）"
     )
 
+    # 场景节点系统字段
+    current_scene: Mapped[str] = mapped_column(
+        String(50), nullable=True, comment="当前场景节点ID"
+    )
+    visited_scenes: Mapped[str] = mapped_column(
+        Text, default='[]', comment="已访问场景列表(JSON)"
+    )
+    inventory: Mapped[str] = mapped_column(
+        Text, default='{}', comment="里界内道具(JSON)"
+    )
+    is_first_clear: Mapped[bool] = mapped_column(
+        Integer, default=0, server_default='0', comment="是否首次通关(0/1)"
+    )
+    move_count: Mapped[int] = mapped_column(
+        Integer, default=0, server_default='0', comment="移动次数"
+    )
+
     # 关联地块
     tiles: Mapped[list["InnerRealmTile"]] = relationship(
         "InnerRealmTile",

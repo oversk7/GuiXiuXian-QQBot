@@ -1168,6 +1168,61 @@ items:
       price: 0
       rarity: "white"
 
+    # ========== 里界专属材料（荔湾鬼镇）==========
+    - item_id: "bloodstained_room_card"
+      name: "血迹房卡"
+      description: "旅馆的房卡，背面有指甲刮出的痕迹。每一张都属于一个再也没有退房的客人"
+      type: "MATERIAL"
+      rarity: "white"
+      price: 100
+      grudge_value: 10
+      tags: ["inner_realm_exclusive"]
+
+    - item_id: "faceless_skin"
+      name: "无脸人皮"
+      description: "一张完整的人脸皮肤，五官处光滑如蛋壳。不知道它原来的主人是谁——也许它就是主人"
+      type: "MATERIAL"
+      rarity: "green"
+      price: 200
+      grudge_value: 20
+      tags: ["inner_realm_exclusive"]
+
+    - item_id: "human_tooth_collection"
+      name: "拔下的牙齿"
+      description: "用红绳串在一起的十几颗人类牙齿，根部带着干涸血肉，说明是活着时被拔下的"
+      type: "MATERIAL"
+      rarity: "blue"
+      price: 450
+      grudge_value: 35
+      tags: ["inner_realm_exclusive"]
+
+    - item_id: "headless_ghost_nail"
+      name: "提头女鬼的指甲"
+      description: "漆黑如墨的指甲，边缘锋利如刀片。断面还嵌着一小片人类衣物的纤维"
+      type: "MATERIAL"
+      rarity: "blue"
+      price: 450
+      grudge_value: 40
+      tags: ["inner_realm_exclusive"]
+
+    - item_id: "freezer_woman_flesh"
+      name: "冰箱怪物的腐肉"
+      description: "蠕动的灰白色肉块，低温也无法阻止它的生长。切开后内部纹理像人类胃壁组织"
+      type: "MATERIAL"
+      rarity: "purple"
+      price: 1600
+      grudge_value: 80
+      tags: ["inner_realm_exclusive"]
+
+    - item_id: "liwan_time_fragment"
+      name: "荔湾时间碎片"
+      description: "凝固时空裂隙坍缩时剥落的碎片，里面封存着三十年前的某一秒"
+      type: "MATERIAL"
+      rarity: "orange"
+      price: 5000
+      grudge_value: 200
+      tags: ["inner_realm_exclusive"]
+
   equipment:
     # ========== 初级装备 (1-20级) - 主要数值加成，使用白色材料 ==========
 
@@ -3718,33 +3773,6 @@ items:
       tags: ["inner_realm_only"]
 
     # ========== 里界材料（战利品） ==========
-    - item_id: "stained_infusion_bag"
-      name: "发黄的输液袋"
-      description: "塑料已经发黄发脆，里面残留的液体呈现不正常的暗红色。标签上写着一个从未听说过的药品名"
-      type: "MATERIAL"
-      rarity: "green"
-      price: 200
-      grudge_value: 50
-      tags: ["inner_realm_only"]
-
-    - item_id: "discolored_meal_tray"
-      name: "变色的病号餐"
-      description: "铝制餐盘上的食物早已辨认不出原样。米饭变成了灰紫色，最诡异的是这份餐食似乎还在微微冒着热气"
-      type: "MATERIAL"
-      rarity: "blue"
-      price: 450
-      grudge_value: 150
-      tags: ["inner_realm_only"]
-
-    - item_id: "cracked_specimen_jar"
-      name: "碎裂的标本瓶"
-      description: "玻璃瓶身布满蛛网状裂纹，福尔马林早已蒸发殆尽。标签上隐约看到'正常'两个字"
-      type: "MATERIAL"
-      rarity: "purple"
-      price: 1600
-      grudge_value: 500
-      tags: ["inner_realm_only"]
-
     - item_id: "flickering_night_light"
       name: "忽明忽暗的夜灯"
       description: "床头小夜灯，插头早已不在插座上却仍在一闪一闪地发着光。灯罩内壁凝结着一层白色的雾气"

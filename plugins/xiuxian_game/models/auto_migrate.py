@@ -50,7 +50,8 @@ REQUIRED_FIELDS: Dict[str, Dict[str, str]] = {
         "demon_coins": "BIGINT DEFAULT 0 COMMENT '恶魔币(恶魔轮盘排行积分)'",
         # 消息系统字段
         "last_system_check": "DATETIME NULL COMMENT '最后查看系统公告时间'",
-        "last_guild_check": "DATETIME NULL COMMENT '最后查看公会消息时间'"
+        "last_guild_check": "DATETIME NULL COMMENT '最后查看公会消息时间'",
+        "inner_realm_clears": "TEXT NULL COMMENT '里界通关记录(JSON)'",
     },
     "player_relationship": {
         "master_id": "VARCHAR(32) NULL COMMENT '师父ID(师徒关系专用)'",
@@ -75,7 +76,12 @@ REQUIRED_FIELDS: Dict[str, Dict[str, str]] = {
     "inner_realm_session": {
         "sanity": "INT DEFAULT 100 COMMENT '当前理智值(0-100)'",
         "clue_collected": "TEXT COMMENT '已收集的线索ID列表(JSON数组)'",
-        "state": "TEXT COMMENT '探索状态(JSON对象,存储自定义数据)'"
+        "state": "TEXT COMMENT '探索状态(JSON对象,存储自定义数据)'",
+        "current_scene": "VARCHAR(50) NULL COMMENT '当前场景节点ID'",
+        "visited_scenes": "TEXT DEFAULT '[]' COMMENT '已访问场景列表(JSON)'",
+        "inventory": "TEXT DEFAULT '{}' COMMENT '里界内道具(JSON)'",
+        "is_first_clear": "INT DEFAULT 0 COMMENT '是否首次通关(0/1)'",
+        "move_count": "INT DEFAULT 0 COMMENT '移动次数(控制黄昏到入夜)'",
     },
     # 烹饪系统 - 餐厅招募冷却 & 仓库等级
     "restaurant": {
