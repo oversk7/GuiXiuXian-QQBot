@@ -400,17 +400,6 @@ elixirs:
 
   # ========== 灵田联动 - 诡药炼丹系列 ==========
 
-  # 初级防御运气丹 - 幽草培元丹（鬼草×15）
-  herb_weed_heal:
-    produce_item_id: "weed_heal_elixir"
-    materials:
-      ghost_weed: 15      # 白色诡药（灵田）
-      rotten_core: 8      # 白色材料
-      ghost_tears: 5      # 白色材料
-      common_carp: 2      # 白色鱼类
-    quantity: 1
-    base_success: 0.85
-
   # 初级防御丹 - 阴莓护体丹（阴莓×12）
   herb_berry_shield:
     produce_item_id: "berry_shield_elixir"
