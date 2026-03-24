@@ -13,6 +13,13 @@ from ..infrastructure.uow.unit_of_work import UnitOfWork
 from ..models.db import AsyncSessionLocal
 from .service import InnerRealmService
 from .config import InnerRealmConfig
+from .markdown_helper import (
+    build_scene_markdown,
+    build_result_markdown,
+    build_choices_markdown,
+    build_destination_buttons,
+    build_event_choices,
+)
 import json
 
 
@@ -159,12 +166,13 @@ async def handle_enter_realm(event: MessageEvent, args: Message = CommandArg()):
         success, message, session = await service.enter_realm(player, realm_key)
 
         if success:
-            result_msg = (
-                f"{message}\n"
-                f"━━━━━━━━━━━━━\n"
-                f"💡 使用【里界信息】查看探索进度\n"
-                f"💡 使用【前往 场景名】移动\n"
-                f"💡 使用【返回】离开并结算"
+            result_msg = build_scene_markdown(
+                title="进入里界",
+                desc=message,
+                hint="探索荔湾鬼镇",
+                btn1="观察",
+                btn2="前往",
+                btn3="里界信息",
             )
         else:
             result_msg = message
@@ -233,13 +241,14 @@ async def handle_realm_info(event: MessageEvent):
                         f"🗺️ 已访问: {len(visited)} 个场景",
                     ]
 
-                    lines.extend([
-                        "━━━━━━━━━━━━━",
-                        "💡 使用【前往 场景名】移动",
-                        "💡 使用【返回】结算并离开里界"
-                    ])
-
-                    result_msg = "\n".join(lines)
+                    result_msg = build_result_markdown(
+                        title=f"{realm_config['display_name']}",
+                        desc="\r".join(lines),
+                        btn1="前往",
+                        btn2="观察",
+                        btn3="道具",
+                        btn4="返回",
+                    )
 
     await realm_info_cmd.finish(result_msg)
 
@@ -292,7 +301,14 @@ async def handle_exit_realm(event: MessageEvent):
                         lines.append("🎁 获得奖励:")
                         lines.append(reward_desc)
 
-                    result_msg = "\n".join(lines)
+                    result_msg = build_scene_markdown(
+                        title="试炼结算",
+                        desc="\r".join(lines),
+                        hint="",
+                        btn1="里界",
+                        btn2="背包",
+                        btn3="面板",
+                    )
 
     await exit_realm_cmd.finish(result_msg)
 
@@ -327,27 +343,29 @@ async def handle_goto(event: MessageEvent, args: Message = CommandArg()):
                     if not arg_text:
                         # 无参数 -- 显示可前往地点列表
                         engine = service._get_scene_engine(active_session.realm_name)
+                        scene = engine.get_current_scene(active_session)
                         dests = engine.get_available_destinations(active_session)
                         if not dests:
                             result_msg = "⛔ 当前没有可前往的地点"
                         else:
-                            lines = [
-                                "🚪 可前往地点",
-                                "━━━━━━━━━━━━━",
-                            ]
-                            for dest in dests:
-                                lines.append(f"  📍 {dest.display_name}")
-                            lines.extend([
-                                "━━━━━━━━━━━━━",
-                                "💡 使用【前往 场景名】移动",
-                            ])
-                            result_msg = "\n".join(lines)
+                            current_name = scene.display_name if scene else ""
+                            result_msg = build_destination_buttons(dests, current_name)
                     else:
                         # 有参数 -- 移动到目标场景
                         success, message = await service.move_to_scene(
                             player, active_session, arg_text
                         )
-                        result_msg = message
+                        if success:
+                            result_msg = build_scene_markdown(
+                                title="场景移动",
+                                desc=message,
+                                hint="快捷操作",
+                                btn1="观察",
+                                btn2="搜刮",
+                                btn3="前往",
+                            )
+                        else:
+                            result_msg = message
 
     await goto_cmd.finish(result_msg)
 
@@ -377,7 +395,17 @@ async def handle_search(event: MessageEvent):
                     result_msg = service._sanity_collapse_text()
                 else:
                     success, message = await service.perform_search(player, active_session)
-                    result_msg = message
+                    if success:
+                        result_msg = build_result_markdown(
+                            title="搜刮",
+                            desc=message,
+                            btn1="前往",
+                            btn2="观察",
+                            btn3="道具",
+                            btn4="里界信息",
+                        )
+                    else:
+                        result_msg = message
 
     await search_cmd.finish(result_msg)
 
@@ -411,7 +439,17 @@ async def handle_intimidate(event: MessageEvent, args: Message = CommandArg()):
                     success, message = await service.perform_intimidation(
                         player, active_session, arg_text if arg_text else None
                     )
-                    result_msg = message
+                    if success:
+                        result_msg = build_result_markdown(
+                            title="威吓",
+                            desc=message,
+                            btn1="前往",
+                            btn2="搜刮",
+                            btn3="处决",
+                            btn4="里界信息",
+                        )
+                    else:
+                        result_msg = message
 
     await intimidate_cmd.finish(result_msg)
 
@@ -445,7 +483,17 @@ async def handle_assassination(event: MessageEvent, args: Message = CommandArg()
                     success, message = await service.perform_assassination(
                         player, active_session, arg_text if arg_text else None
                     )
-                    result_msg = message
+                    if success:
+                        result_msg = build_result_markdown(
+                            title="处决",
+                            desc=message,
+                            btn1="前往",
+                            btn2="搜刮",
+                            btn3="道具",
+                            btn4="里界信息",
+                        )
+                    else:
+                        result_msg = message
 
     await assassination_cmd.finish(result_msg)
 
@@ -479,7 +527,17 @@ async def handle_talk(event: MessageEvent, args: Message = CommandArg()):
                     success, message = await service.talk_to_npc(
                         player, active_session, arg_text if arg_text else None
                     )
-                    result_msg = message
+                    if success:
+                        result_msg = build_result_markdown(
+                            title="交谈",
+                            desc=message,
+                            btn1="交谈",
+                            btn2="威吓",
+                            btn3="前往",
+                            btn4="里界信息",
+                        )
+                    else:
+                        result_msg = message
 
     await talk_cmd.finish(result_msg)
 
@@ -508,7 +566,15 @@ async def handle_observe(event: MessageEvent):
                 if await service.check_sanity_zero(player, active_session):
                     result_msg = service._sanity_collapse_text()
                 else:
-                    result_msg = await service.observe_scene(player, active_session)
+                    result_msg_text = await service.observe_scene(player, active_session)
+                    result_msg = build_scene_markdown(
+                        title="仔细观察",
+                        desc=result_msg_text,
+                        hint="快捷操作",
+                        btn1="搜刮",
+                        btn2="前往",
+                        btn3="里界信息",
+                    )
 
     await observe_cmd.finish(result_msg)
 
@@ -565,10 +631,14 @@ async def handle_view_clues(event: MessageEvent):
                             lines.append(f"   💡 {clue.get('reveal')}")
                         lines.append("")
 
-                    lines.append("━━━━━━━━━━━━━")
-                    lines.append("💡 收集全部线索可以触发【真相】结局")
-
-                    result_msg = "\n".join(lines)
+                    result_msg = build_scene_markdown(
+                        title="已收集线索",
+                        desc="\r".join(lines),
+                        hint=f"已收集 {len(clue_ids)}/{len(all_clues)}",
+                        btn1="前往",
+                        btn2="观察",
+                        btn3="里界信息",
+                    )
 
     await view_clues_cmd.finish(result_msg)
 
@@ -630,7 +700,15 @@ async def handle_inventory(event: MessageEvent):
             if not active_session:
                 result_msg = "⛔ 会话数据错误"
             else:
-                result_msg = await service.get_inventory_display(active_session)
+                result_msg_text = await service.get_inventory_display(active_session)
+                result_msg = build_result_markdown(
+                    title="里界道具",
+                    desc=result_msg_text,
+                    btn1="前往",
+                    btn2="搜刮",
+                    btn3="观察",
+                    btn4="里界信息",
+                )
 
     await inventory_cmd.finish(result_msg)
 
