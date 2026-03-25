@@ -1176,7 +1176,7 @@ items:
       rarity: "white"
       price: 100
       grudge_value: 10
-      tags: ["inner_realm_exclusive"]
+      tags: ["inner_realm_only"]
 
     - item_id: "faceless_skin"
       name: "无脸人皮"
@@ -1185,7 +1185,7 @@ items:
       rarity: "green"
       price: 200
       grudge_value: 20
-      tags: ["inner_realm_exclusive"]
+      tags: ["inner_realm_only"]
 
     - item_id: "human_tooth_collection"
       name: "拔下的牙齿"
@@ -1194,7 +1194,7 @@ items:
       rarity: "blue"
       price: 450
       grudge_value: 35
-      tags: ["inner_realm_exclusive"]
+      tags: ["inner_realm_only"]
 
     - item_id: "headless_ghost_nail"
       name: "提头女鬼的指甲"
@@ -1203,7 +1203,7 @@ items:
       rarity: "blue"
       price: 450
       grudge_value: 40
-      tags: ["inner_realm_exclusive"]
+      tags: ["inner_realm_only"]
 
     - item_id: "freezer_woman_flesh"
       name: "冰箱怪物的腐肉"
@@ -1212,7 +1212,7 @@ items:
       rarity: "purple"
       price: 1600
       grudge_value: 80
-      tags: ["inner_realm_exclusive"]
+      tags: ["inner_realm_only"]
 
     - item_id: "liwan_time_fragment"
       name: "荔湾时间碎片"
@@ -1221,7 +1221,7 @@ items:
       rarity: "orange"
       price: 5000
       grudge_value: 200
-      tags: ["inner_realm_exclusive"]
+      tags: ["inner_realm_only"]
 
   equipment:
     # ========== 初级装备 (1-20级) - 主要数值加成，使用白色材料 ==========
