@@ -12,6 +12,7 @@ from sqlalchemy.orm import selectinload
 from ..models.location import Location
 from ..models.npc import NPC, NPCType, NPCStatus
 from ..models.player import Player
+from ..utils_markdown import cmd
 
 
 class LocationService:
@@ -188,11 +189,11 @@ class LocationService:
         """格式化地点信息显示"""
         location = location_summary["location"]
         npcs_by_type = location_summary["npcs_by_type"]
-        
+
         coord_str = f"({location.x},{location.y})"
         name_display = location.name if coord_str in location.name else f"{location.name}{coord_str}"
         lines = [
-            f"所在地 ※ {name_display}",
+            f"# 所在地 · {name_display}",
             location.description,
             ""
         ]
@@ -205,43 +206,45 @@ class LocationService:
                 display_players = nearby_players[:20]
                 player_names = []
                 for p in display_players:
-                    distance = abs(p.x - player_x) + abs(p.y - player_y)
-                    player_names.append(f"{p.nickname}[{p.uid}]")
-                
-                lines.append(f"⛹️附近玩家({player_count}): {' '.join(player_names)}")
+                    player_names.append(cmd(f'{p.nickname}[{p.uid}]', f'切磋 {p.uid}'))
+
+                lines.append(f"附近玩家({player_count}): {' '.join(player_names)}")
                 if player_count > 20:
                     lines.append(f"...等{player_count}个玩家")
-                lines.append("⬇️ 攻击 <玩家|NPC>")
                 lines.append("")
-        
+
         # 显示NPC
         total_npcs = location_summary["total_npcs"]
         if total_npcs > 0:
-            lines.append(f"🤖NPC({total_npcs}): ")
-            
+            lines.append(f"**NPC({total_npcs}):**")
+
             # 按类型显示NPC
             for npc_type, npcs in npcs_by_type.items():
                 for npc in npcs:
-                    hint = npc.get_interaction_hint()
-                    lines.append(f"{npc.get_display_name()}{hint}")
-            
-            lines.append("⬇️ 交互 <NPC>")
-            lines.append("⬇️ 死斗 <NPC>")
-        
+                    if npc.is_dead() or npc.is_respawning():
+                        # 死亡/复活中的NPC不做蓝字
+                        hint = npc.get_interaction_hint()
+                        lines.append(f"{npc.get_display_name()}{hint}")
+                    else:
+                        hint = npc.get_interaction_hint()
+                        lines.append(f"{cmd(npc.name, f'交互 {npc.name}')}{hint}")
+
+            lines.append("")
+
         # 显示地点功能
         functions = location_summary["functions"]
         if "part_time_job" in functions:
-            lines.append(f"💼工作地点: {location.name}")
-        
+            lines.append(f"💼工作地点: {cmd('打工')}")
+
         if "market" in functions:
-            lines.append(f"🏬 市集：{location.name}")
-        
+            lines.append(f"🏬 市集: {cmd('市集')}")
+
         if "forge" in functions:
-            lines.append(f"⚒️ 工坊：{location.name}")
-        
+            lines.append(f"⚒️ 工坊: {cmd('锻造列表')}")
+
         if "special_shop" in functions:
-            lines.append(f"🏛️ 特殊商店：{location.name}")
-        
+            lines.append(f"🏛️ 特殊商店: {location.name}")
+
         return "\n".join(lines)
     
     @staticmethod

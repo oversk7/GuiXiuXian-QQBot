@@ -10,7 +10,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from ..models.db import safe_session
 from ..models.player import Player
-from ..utils import message_add_head
+from ..utils_markdown import cmd, build_markdown
 from .location_service import LocationService
 from .npc_service import NPCService
 from ..cultivate.mansion_service_new import MansionService
@@ -106,7 +106,7 @@ async def show_location_info(session: AsyncSession, player: Player, location, cu
     if achievement_messages:
         info_text += "\n\n" + "\n\n".join(achievement_messages)
 
-    await real_explore_cmd.finish(message_add_head(info_text, event))
+    await real_explore_cmd.finish(build_markdown(info_text))
 
 
 async def show_basic_location_info(session: AsyncSession, player: Player, x: int, y: int,
@@ -150,25 +150,24 @@ async def show_basic_location_info(session: AsyncSession, player: Player, x: int
         })
     
     lines = [
-        f"所在地 ※ 荒野({x},{y})",
+        f"# 所在地 · 荒野({x},{y})",
         "这里是一片普通的区域，没有特殊的建筑或服务。",
         ""
     ]
-    
+
     # 显示附近玩家
     if nearby_players:
         player_count = len(nearby_players)
         display_players = nearby_players[:20]
         player_names = []
         for p in display_players:
-            player_names.append(f"{p.nickname}[{p.uid}]")
-        
-        lines.append(f"⛹️附近玩家({player_count}): {'、'.join(player_names)}")
+            player_names.append(cmd(f'{p.nickname}[{p.uid}]', f'切磋 {p.uid}'))
+
+        lines.append(f"附近玩家({player_count}): {' '.join(player_names)}")
         if player_count > 20:
             lines.append(f"...等{player_count}个玩家")
-        lines.append("👉攻击 <玩家>")
         lines.append("")
-    
+
     # 显示附近地点（包括阴宅）
     all_nearby_places = []
 
@@ -196,47 +195,29 @@ async def show_basic_location_info(session: AsyncSession, player: Player, x: int
         # 按距离排序
         all_nearby_places.sort(key=lambda p: p["distance"])
 
-        # 获取地点类型图标
-        def get_location_icon(place):
-            """根据地点类型返回图标"""
-            if place["type"] == "mansion":
-                return "🏚️"
-            # 尝试从地点名称推断类型
-            name = place["name"]
-            if any(keyword in name for keyword in ["市集", "市", "商"]):
-                return "🏪"
-            elif any(keyword in name for keyword in ["工坊", "锻造", "炼"]):
-                return "⚒️"
-            elif any(keyword in name for keyword in ["总部", "司", "缉邪"]):
-                return "🏛️"
-            elif any(keyword in name for keyword in ["郊", "镇", "城", "岭", "山"]):
-                return "📍"
-            else:
-                return "📌"
-
-        lines.append(f"🗺️ 附近地点（{len(all_nearby_places)}个）：")
+        lines.append(f"**附近地点({len(all_nearby_places)}个):**")
 
         # 显示前10个最近的地点
         display_count = min(10, len(all_nearby_places))
         for place in all_nearby_places[:display_count]:
-            icon = get_location_icon(place)
+            pname = place['name']
+            nav_cmd = cmd(pname, f'导航 {pname}')
             # 检查地点名称是否已包含坐标，避免重复显示
-            if f"({place['x']},{place['y']})" in place["name"]:
-                lines.append(f"{icon} {place['name']} - {place['distance']}格")
+            if f"({place['x']},{place['y']})" in pname:
+                lines.append(f"{nav_cmd} - {place['distance']}格")
             else:
-                lines.append(f"{icon} {place['name']} ({place['x']},{place['y']}) - {place['distance']}格")
+                lines.append(f"{nav_cmd}({place['x']},{place['y']}) - {place['distance']}格")
 
         # 如果还有更多地点，显示提示
         if len(all_nearby_places) > display_count:
             lines.append(f"...还有{len(all_nearby_places) - display_count}个地点")
 
-        lines.append("━━━━━━━━━━━━━")
-        lines.append("💡 【前往 地点名】快速导航")
-        lines.append("💡 【查找 NPC】搜索NPC位置")
+        lines.append("")
+        lines.append(f"{cmd('地图')} | {cmd('查找 NPC', '查找 ')}")
     else:
-        lines.append("🔍 附近50格内没有特殊地点")
-        lines.append("💡 使用【地图】查看所有地点坐标")
-    
+        lines.append("附近50格内没有特殊地点")
+        lines.append(f"{cmd('地图')}")
+
     info_text = "\n".join(lines)
 
     # 添加阴宅信息
@@ -248,7 +229,7 @@ async def show_basic_location_info(session: AsyncSession, player: Player, x: int
     if quest_msg:
         info_text += "\n\n" + quest_msg
 
-    await real_explore_cmd.finish(message_add_head(info_text, event))
+    await real_explore_cmd.finish(build_markdown(info_text))
 
 
 async def get_mansion_info_for_location(session: AsyncSession, player: Player, x: int, y: int) -> str | None:
@@ -284,8 +265,7 @@ async def get_mansion_info_for_location(session: AsyncSession, player: Player, x
             usage_info = f"❌ {use_msg}"
 
     lines = [
-        f"🏚️ 阴宅信息",
-        f"━━━━━━━━━━━━━",
+        f"**阴宅信息**",
         f"✧ {status_info} (Lv.{mansion_info['level']})",
         f"✧ 修炼效率：+{mansion_info['efficiency_percent']:.1f}%"
     ]
@@ -330,65 +310,55 @@ async def handle_location_detail(event: MessageEvent):
         functions = location_summary["functions"]
         
         lines = [
-            f"🏛️ {location.name} 详细信息",
-            "━━━━━━━━━━━━━",
-            f"📍 坐标：({location.x},{location.y})",
-            f"🌍 区域：{location.region}",
-            f"📝 描述：{location.description}",
+            f"# {location.name} 详细信息",
+            f"坐标：({location.x},{location.y}) | 区域：{location.region}",
+            f"{location.description}",
             ""
         ]
-        
+
         # 显示地点功能
         if functions:
-            lines.append("⚙️ 地点功能：")
-            function_names = {
-                "market": "🏬 市集交易",
-                "part_time_job": "💼 打工服务", 
-                "forge": "⚒️ 装备锻造",
-                "special_shop": "🏛️ 特殊商店"
+            lines.append("**地点功能:**")
+            function_cmds = {
+                "market": ("市集交易", cmd('市集')),
+                "part_time_job": ("打工服务", cmd('打工')),
+                "forge": ("装备锻造", cmd('锻造列表')),
+                "special_shop": ("特殊商店", "特殊商店")
             }
             for func in functions:
-                func_name = function_names.get(func, f"🔧 {func}")
-                lines.append(f"• {func_name}")
+                if func in function_cmds:
+                    label, action = function_cmds[func]
+                    lines.append(f"- {action}")
+                else:
+                    lines.append(f"- {func}")
             lines.append("")
-        
+
         # 显示NPC详情
         if npcs_by_type:
-            lines.append("🤖 驻守NPC：")
+            lines.append("**驻守NPC:**")
             for npc_type, npcs in npcs_by_type.items():
                 type_names = {
                     "merchant": "商人",
-                    "craftsman": "工匠", 
+                    "craftsman": "工匠",
                     "employer": "雇主",
                     "ghost": "鬼怪",
                     "special_vendor": "特殊商贩",
                     "guard": "守卫"
                 }
                 type_name = type_names.get(npc_type, npc_type)
-                lines.append(f"• {type_name}：")
+                lines.append(f"「{type_name}」")
                 for npc in npcs:
-                    status = ""
                     if npc.is_dead():
-                        status = " [已死亡]"
+                        lines.append(f"  - {npc.name} [已死亡]")
                     elif npc.is_respawning():
                         remaining = npc.respawn_time - npc.death_time
                         minutes = int(remaining.total_seconds() / 60)
-                        status = f" [复活中:{minutes}分钟]"
-                    
-                    lines.append(f"  - {npc.name}{status}")
-                    if npc.description:
-                        lines.append(f"    {npc.description}")
+                        lines.append(f"  - {npc.name} [复活中:{minutes}分钟]")
+                    else:
+                        lines.append(f"  - {cmd(npc.name, f'交互 {npc.name}')}")
+                        if npc.description:
+                            lines.append(f"    {npc.description}")
             lines.append("")
-        
-        # 显示使用提示
-        lines.extend([
-            "━━━━━━━━━━━━━",
-            "💡 使用方法：",
-            "• 【交互 <NPC名称>】与NPC交互",
-            "• 【攻击 <目标>】攻击玩家或NPC",
-            "• 【市集】查看市场（如果有）",
-            "• 【打工】查看工作（如果有）"
-        ])
-        
+
         info_text = "\n".join(lines)
-        await location_detail_cmd.finish(message_add_head(info_text, event))
+        await location_detail_cmd.finish(build_markdown(info_text))
