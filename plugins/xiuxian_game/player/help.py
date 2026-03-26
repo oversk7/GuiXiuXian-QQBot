@@ -52,7 +52,8 @@ async def handle_help(event: MessageEvent, args: Message = CommandArg()):
         f"💡 新手？点 {cmd('新手指引')} 看成长路线\n"
         f"💡 有疑问？点 {cmd('问 你的问题', '问 ')} 询问AI\n"
         f"💡 {cmd('完整帮助')} 查看所有功能\n"
-        f"💡 [加入官群【꧁༺诡修仙༻꧂】]({GROUP_LINK})"
+        f"💡 [加入官群【꧁༺诡修仙༻꧂】]({GROUP_LINK})\n"
+        "💡 [游戏资料教程](HTTPS://GITEE.COM/ling-gtq/TheWestTutorial)"
     )
     await help_cmd.finish(build_markdown(content))
 
