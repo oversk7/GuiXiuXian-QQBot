@@ -17,7 +17,7 @@ from nonebot.permission import SUPERUSER
 from ..models.db import safe_session
 from ..models.player import Player
 from ..models.stock import Stock, StockType, StockPriceHistory
-from ..utils import message_add_head
+from ..utils_markdown import cmd, build_markdown
 from ..platform_utils import get_unified_player
 from .stock_service_new import StockService
 from .stock_price_engine import StockPriceEngine
@@ -92,7 +92,7 @@ async def handle_stock_list(event: MessageEvent):
         type_groups[stock.stock_type].append(stock)
 
     # 构建消息
-    lines = ["💎 气运投资行情", "▃▃▃▃▃▃▃▃▃▃"]
+    lines = ["# 气运投资行情", "***"]
 
     # 计算下次刷新时间（整点刷新）
     now = datetime.now()
@@ -102,23 +102,23 @@ async def handle_stock_list(event: MessageEvent):
 
     # 显示刷新时间信息
     if price_updated:
-        lines.append("🔄 价格已更新")
+        lines.append("价格已更新")
     else:
         minutes = int(time_until_update.total_seconds() // 60)
         seconds = int(time_until_update.total_seconds() % 60)
         if minutes > 0:
-            lines.append(f"⏰ 下次刷新：{minutes}分{seconds}秒后 ({next_hour.strftime('%H:%M')}整点)")
+            lines.append(f"下次刷新：**{minutes}分{seconds}秒**后 ({next_hour.strftime('%H:%M')}整点)")
         else:
-            lines.append(f"⏰ 下次刷新：{seconds}秒后")
+            lines.append(f"下次刷新：**{seconds}秒**后")
     lines.append("")
 
     type_names = {
-        StockType.TECH: "🔬 法宝气运",
-        StockType.FINANCE: "🏦 金融气运",
-        StockType.ENERGY: "⚡ 灵气气运",
-        StockType.CONSUMER: "🛒 丹药气运",
-        StockType.HEALTHCARE: "🏥 医道气运",
-        StockType.MATERIALS: "🏗️ 材料气运"
+        StockType.TECH: "## 法宝气运",
+        StockType.FINANCE: "## 金融气运",
+        StockType.ENERGY: "## 灵气气运",
+        StockType.CONSUMER: "## 丹药气运",
+        StockType.HEALTHCARE: "## 医道气运",
+        StockType.MATERIALS: "## 材料气运"
     }
 
     for stock_type, stocks_in_type in type_groups.items():
@@ -140,15 +140,18 @@ async def handle_stock_list(event: MessageEvent):
                 health_emoji = "🔴"
                 health_text = "危险"
 
+            stock_link = cmd(stock.name, f'投资气运 {stock.symbol} ')
+            history_link = cmd("历史", f'气运历史 {stock.symbol}')
+
             lines.append(
-                f"{stock.symbol} {stock.name}\n"
-                f"  💰 {stock.current_price} 金币 {change_symbol} {health_emoji} {health_text}"
+                f"{stock.symbol} {stock_link} {history_link}\n"
+                f"  **{stock.current_price}** 金币 {change_symbol} {health_emoji} {health_text}"
             )
 
-    lines.append("\n💡 使用「投资气运 代码 数量」进行投资")
-    lines.append("💡 使用「投资气运 代码 数量 银行」从银行账户扣款")
+    lines.append("***")
+    lines.append(f"{cmd('我的投资')} | {cmd('气运刷新时间')} | {cmd('气运事件')}")
 
-    await stock_list_cmd.finish(message_add_head("\n".join(lines), event))
+    await stock_list_cmd.finish(build_markdown("\n".join(lines)))
 
 
 @stock_buy_cmd.handle()
@@ -202,9 +205,15 @@ async def handle_stock_buy(event: MessageEvent, args: Message = CommandArg()):
             player.id, symbol, shares, use_bank
         )
     if success:
-        await stock_buy_cmd.finish(message_add_head(f"✅ {message}", event))
+        content = (
+            f"# 投资成功\n***\n"
+            f"{message}\n"
+            f"***\n"
+            f"{cmd('我的投资')} | {cmd('投资行情')}"
+        )
+        await stock_buy_cmd.finish(build_markdown(content))
     else:
-        await stock_buy_cmd.finish(message_add_head(f"⛔ {message}", event))
+        await stock_buy_cmd.finish(f"⛔ {message}")
 
 
 @stock_sell_cmd.handle()
@@ -258,9 +267,15 @@ async def handle_stock_sell(event: MessageEvent, args: Message = CommandArg()):
             player.id, symbol, shares, to_bank
         )
     if success:
-        await stock_sell_cmd.finish(message_add_head(f"✅ {message}", event))
+        content = (
+            f"# 出售成功\n***\n"
+            f"{message}\n"
+            f"***\n"
+            f"{cmd('我的投资')} | {cmd('投资行情')}"
+        )
+        await stock_sell_cmd.finish(build_markdown(content))
     else:
-        await stock_sell_cmd.finish(message_add_head(f"⛔ {message}", event))
+        await stock_sell_cmd.finish(f"⛔ {message}")
 
 
 @stock_holdings_cmd.handle()
@@ -294,9 +309,15 @@ async def handle_stock_holdings(event: MessageEvent):
         price_updated = await stock_service.check_and_update_prices()
         holdings = await stock_service.get_player_holdings(player.id)
     if not holdings:
-        await stock_holdings_cmd.finish(message_add_head("� 您当前没有投资", event))
+        content = (
+            "# 我的气运投资\n***\n"
+            "您当前没有投资\n"
+            "***\n"
+            f"{cmd('投资行情')}"
+        )
+        await stock_holdings_cmd.finish(build_markdown(content))
 
-    lines = ["🗠 我的气运投资", "▃▃▃▃▃▃▃▃▃▃"]
+    lines = ["# 我的气运投资", "***"]
 
     # 获取刷新时间信息
     from ..infrastructure.uow.unit_of_work import UnitOfWork
@@ -315,17 +336,17 @@ async def handle_stock_holdings(event: MessageEvent):
             time_until_update = next_update_time - now
 
             if price_updated:
-                lines.append("🔄 价格已更新")
+                lines.append("价格已更新")
             else:
                 if time_until_update.total_seconds() > 0:
                     hours = int(time_until_update.total_seconds() // 3600)
                     minutes = int((time_until_update.total_seconds() % 3600) // 60)
                     if hours > 0:
-                        lines.append(f"⏰ 下次刷新：{hours}小时{minutes}分钟后")
+                        lines.append(f"下次刷新：**{hours}小时{minutes}分钟**后")
                     else:
-                        lines.append(f"⏰ 下次刷新：{minutes}分钟后")
+                        lines.append(f"下次刷新：**{minutes}分钟**后")
                 else:
-                    lines.append("⏰ 即将刷新价格...")
+                    lines.append("即将刷新价格...")
             lines.append("")
     total_value = 0
     total_cost = 0
@@ -345,19 +366,22 @@ async def handle_stock_holdings(event: MessageEvent):
         elif health >= 30:
             health_emoji = "🟡"
             health_text = "偏低"
-            risk_warning = "\n  ⚠️ 建议关注，考虑止损"
+            risk_warning = "\n  建议关注，考虑止损"
         else:
             health_emoji = "🔴"
             health_text = "危险"
-            risk_warning = "\n  🚨 高风险！建议立即止损"
+            risk_warning = "\n  高风险！建议立即止损"
+
+        stock_link = cmd(holding['name'], f'出售气运 {holding["symbol"]} ')
+        history_link = cmd("历史", f'气运历史 {holding["symbol"]}')
 
         lines.append(
-            f"\n{holding['symbol']} {holding['name']}\n"
-            f"  🗠 持有：{holding['shares']} 份\n"
-            f"  💰 成本：{holding['avg_cost']} 金币/份\n"
-            f"  ✨ 现价：{holding['current_price']} 金币/份\n"
-            f"  💵 价值：{holding['current_value']} 金币\n"
-            f"  {profit_symbol} 盈亏：{holding['profit_loss']:+} 金币 ({holding['profit_loss_rate']:+.2f}%)\n"
+            f"\n{holding['symbol']} {stock_link} {history_link}\n"
+            f"  持有：**{holding['shares']}** 份\n"
+            f"  成本：**{holding['avg_cost']}** 金币/份\n"
+            f"  现价：**{holding['current_price']}** 金币/份\n"
+            f"  价值：**{holding['current_value']}** 金币\n"
+            f"  {profit_symbol} 盈亏：**{holding['profit_loss']:+}** 金币 ({holding['profit_loss_rate']:+.2f}%)\n"
             f"  {health_emoji} 健康度：{health_text} ({health}/100){risk_warning}"
         )
 
@@ -365,11 +389,13 @@ async def handle_stock_holdings(event: MessageEvent):
     total_profit_rate = (total_profit / total_cost * 100) if total_cost > 0 else 0
     profit_symbol = "📈" if total_profit > 0 else "📉" if total_profit < 0 else "➡️"
 
-    lines.append(f"\n💰 总价值：{total_value} 金币")
-    lines.append(f"💰 总成本：{total_cost} 金币")
-    lines.append(f"{profit_symbol} 总盈亏：{total_profit:+} 金币 ({total_profit_rate:+.2f}%)")
+    lines.append(f"\n总价值：**{total_value}** 金币")
+    lines.append(f"总成本：**{total_cost}** 金币")
+    lines.append(f"{profit_symbol} 总盈亏：**{total_profit:+}** 金币 ({total_profit_rate:+.2f}%)")
+    lines.append("***")
+    lines.append(f"{cmd('投资行情')} | {cmd('投资记录')}")
 
-    await stock_holdings_cmd.finish(message_add_head("\n".join(lines), event))
+    await stock_holdings_cmd.finish(build_markdown("\n".join(lines)))
 
 
 @stock_transactions_cmd.handle()
@@ -402,9 +428,15 @@ async def handle_stock_transactions(event: MessageEvent):
         # 使用新版本
         transactions = await stock_service.get_player_transactions(player.id, 10)
     if not transactions:
-        await stock_transactions_cmd.finish(message_add_head("📋 您还没有投资记录", event))
+        content = (
+            "# 投资记录\n***\n"
+            "您还没有投资记录\n"
+            "***\n"
+            f"{cmd('投资行情')}"
+        )
+        await stock_transactions_cmd.finish(build_markdown(content))
 
-    lines = ["📋 最近投资记录", "▃▃▃▃▃▃▃▃▃▃"]
+    lines = ["# 最近投资记录", "***"]
 
     for trans in transactions:
         type_symbol = "🟢" if trans["type"] == "BUY" else "🔴"
@@ -412,14 +444,17 @@ async def handle_stock_transactions(event: MessageEvent):
 
         lines.append(
             f"\n{type_symbol} {type_text} {trans['symbol']} {trans['name']}\n"
-            f"  � 数量：{trans['shares']} 份\n"
-            f"  💰 价格：{trans['price']} 金币/份\n"
-            f"  💵 金额：{trans['total_amount']} 金币\n"
-            f"  💸 手续费：{trans['commission']} 金币\n"
-            f"  🕐 时间：{trans['created_at'].strftime('%m-%d %H:%M')}"
+            f"  数量：**{trans['shares']}** 份\n"
+            f"  价格：**{trans['price']}** 金币/份\n"
+            f"  金额：**{trans['total_amount']}** 金币\n"
+            f"  手续费：**{trans['commission']}** 金币\n"
+            f"  时间：{trans['created_at'].strftime('%m-%d %H:%M')}"
         )
 
-    await stock_transactions_cmd.finish(message_add_head("\n".join(lines), event))
+    lines.append("***")
+    lines.append(f"{cmd('我的投资')} | {cmd('投资行情')}")
+
+    await stock_transactions_cmd.finish(build_markdown("\n".join(lines)))
 
 
 @stock_init_cmd.handle()
@@ -500,12 +535,18 @@ async def handle_stock_update(event: MessageEvent):
             # 使用新版本强制更新
             updated = await stock_service.check_and_update_prices(force_update=True)
         if updated:
-            await stock_update_cmd.finish(message_add_head("✅ 气运价格已强制更新", event))
+            content = (
+                "# 气运价格更新\n***\n"
+                "气运价格已强制更新\n"
+                "***\n"
+                f"{cmd('投资行情')}"
+            )
+            await stock_update_cmd.finish(build_markdown(content))
         else:
-            await stock_update_cmd.finish(message_add_head("⚠️ 价格更新失败或无需更新", event))
+            await stock_update_cmd.finish("⛔ 价格更新失败或无需更新")
 
     except Exception as e:
-        await stock_update_cmd.finish(message_add_head(f"❌ 更新气运价格失败：{e}", event))
+        await stock_update_cmd.finish(f"⛔ 更新气运价格失败：{e}")
 
 
 @stock_refresh_time_cmd.handle()
@@ -534,38 +575,40 @@ async def handle_stock_refresh_time(event: MessageEvent):
         time_until_update = next_update_time - now
         time_since_update = now - last_update_time
 
-        lines = ["⏰ 气运价格刷新时间", "▃▃▃▃▃▃▃▃▃▃"]
+        lines = ["# 气运价格刷新时间", "***"]
 
         # 上次更新时间
         hours_since = int(time_since_update.total_seconds() // 3600)
         minutes_since = int((time_since_update.total_seconds() % 3600) // 60)
         if hours_since > 0:
-            lines.append(f"📅 上次更新：{hours_since}小时{minutes_since}分钟前")
+            lines.append(f"上次更新：**{hours_since}小时{minutes_since}分钟**前")
         else:
-            lines.append(f"📅 上次更新：{minutes_since}分钟前")
+            lines.append(f"上次更新：**{minutes_since}分钟**前")
 
-        lines.append(f"🕐 更新时间：{last_update_time.strftime('%m-%d %H:%M:%S')}")
+        lines.append(f"更新时间：{last_update_time.strftime('%m-%d %H:%M:%S')}")
 
         # 下次更新时间
         if time_until_update.total_seconds() > 0:
             hours_until = int(time_until_update.total_seconds() // 3600)
             minutes_until = int((time_until_update.total_seconds() % 3600) // 60)
             if hours_until > 0:
-                lines.append(f"⏳ 下次更新：{hours_until}小时{minutes_until}分钟后")
+                lines.append(f"下次更新：**{hours_until}小时{minutes_until}分钟**后")
             else:
-                lines.append(f"⏳ 下次更新：{minutes_until}分钟后")
-            lines.append(f"🎯 预计时间：{next_update_time.strftime('%m-%d %H:%M:%S')}")
+                lines.append(f"下次更新：**{minutes_until}分钟**后")
+            lines.append(f"预计时间：{next_update_time.strftime('%m-%d %H:%M:%S')}")
         else:
-            lines.append("⏳ 下次更新：即将刷新...")
+            lines.append("下次更新：即将刷新...")
 
         lines.append("")
-        lines.append("💡 刷新规则说明：")
-        lines.append("• 🔄 被动刷新：查看行情时自动检查")
-        lines.append("• ⏰ 刷新间隔：每1小时更新一次")
-        lines.append("• 🌅 每日更新：每天9点市场开盘")
-        lines.append("• 🔧 备用机制：每12小时自动更新")
+        lines.append("## 刷新规则说明")
+        lines.append("- 被动刷新：查看行情时自动检查")
+        lines.append("- 刷新间隔：每1小时更新一次")
+        lines.append("- 每日更新：每天9点市场开盘")
+        lines.append("- 备用机制：每12小时自动更新")
+        lines.append("***")
+        lines.append(f"{cmd('投资行情')}")
 
-        await stock_refresh_time_cmd.finish(message_add_head("\n".join(lines), event))
+        await stock_refresh_time_cmd.finish(build_markdown("\n".join(lines)))
 
 
 @stock_history_cmd.handle()
@@ -616,10 +659,10 @@ async def handle_stock_history(event: MessageEvent, args: Message = CommandArg()
         if not price_history:
             await stock_history_cmd.finish(f"📊 {stock.name}({symbol}) 暂无历史数据")
 
-        lines = [f"📊 {stock.name}({symbol}) 价格历史", "▃▃▃▃▃▃▃▃▃▃"]
-        lines.append(f"📅 查询范围：最近{days}天")
-        lines.append(f"💰 基础价格：{stock.base_price} 金币")
-        lines.append(f"💎 当前价格：{stock.current_price} 金币")
+        lines = [f"# {stock.name}({symbol}) 价格历史", "***"]
+        lines.append(f"查询范围：最近**{days}**天")
+        lines.append(f"基础价格：**{stock.base_price}** 金币")
+        lines.append(f"当前价格：**{stock.current_price}** 金币")
 
         # 计算总体统计
         prices = [h.price for h in price_history]
@@ -628,25 +671,26 @@ async def handle_stock_history(event: MessageEvent, args: Message = CommandArg()
             min_price = min(prices)
             avg_price = sum(prices) // len(prices)
 
-            lines.append(f"📈 最高价格：{max_price} 金币")
-            lines.append(f"📉 最低价格：{min_price} 金币")
-            lines.append(f"📊 平均价格：{avg_price} 金币")
+            lines.append(f"📈 最高：**{max_price}** 金币")
+            lines.append(f"📉 最低：**{min_price}** 金币")
+            lines.append(f"平均：**{avg_price}** 金币")
             lines.append("")
 
         # 显示最近的价格变化（最多10条）
-        lines.append("🕐 最近价格变化：")
+        lines.append("## 最近价格变化")
         recent_history = list(reversed(price_history))[:10]
 
         for record in recent_history:
             change_symbol = "📈" if record.change_rate > 0 else "📉" if record.change_rate < 0 else "➡️"
             time_str = record.recorded_at.strftime("%m-%d %H:%M")
             lines.append(
-                f"  {time_str} {change_symbol} {record.price} 金币 "
+                f"  {time_str} {change_symbol} **{record.price}** 金币 "
                 f"({record.change_rate:+.2f}%)"
             )
 
-        lines.append("\n💡 使用「气运分析」查看随机性说明")
-        await stock_history_cmd.finish(message_add_head("\n".join(lines), event))
+        lines.append("***")
+        lines.append(f"{cmd('气运分析')} | {cmd('投资行情')} | {cmd(stock.name, f'投资气运 {symbol} ')}")
+        await stock_history_cmd.finish(build_markdown("\n".join(lines)))
 
 
 @stock_analysis_cmd.handle()
@@ -664,49 +708,49 @@ async def handle_stock_analysis(event: MessageEvent):
         if not stocks:
             await stock_analysis_cmd.finish("💎 当前没有可投资的气运")
 
-        lines = ["🔬 气运价格波动原理分析", "▃▃▃▃▃▃▃▃▃▃▃▃▃▃"]
+        lines = ["# 气运价格波动原理分析", "***"]
 
-        lines.append("📊 **为什么有些股票一直涨/跌？**")
+        lines.append("## 为什么有些股票一直涨/跌？")
         lines.append("")
-        lines.append("🎲 **这是正常的随机现象！**")
+        lines.append("**这是正常的随机现象！**")
         lines.append("就像抛硬币，连续出现正面或反面都是可能的")
         lines.append("")
 
-        lines.append("🧮 **价格计算公式：**")
-        lines.append("新价格 = 当前价格 × (1 + 综合变化率)")
-        lines.append("")
+        lines.append("## 价格计算公式")
+        lines.append("新价格 = 当前价格 x (1 + 综合变化率)")
         lines.append("综合变化率 = 随机因子 + 市场情绪 + 回归因子")
         lines.append("")
 
-        lines.append("🔍 **各因子说明：**")
-        lines.append("• 🎯 随机因子：正态分布随机数（-20%~+20%）")
-        lines.append("• 🌊 市场情绪：全局影响（牛市+2%，熊市-2%）")
-        lines.append("• 🔄 回归因子：防止偏离基础价格太远")
+        lines.append("## 各因子说明")
+        lines.append("- 随机因子：正态分布随机数（-20%~+20%）")
+        lines.append("- 市场情绪：全局影响（牛市+2%，熊市-2%）")
+        lines.append("- 回归因子：防止偏离基础价格太远")
         lines.append("")
 
-        lines.append("📈 **为什么会出现连续涨跌？**")
+        lines.append("## 为什么会出现连续涨跌？")
         lines.append("1. 随机数的聚集效应（正常统计现象）")
         lines.append("2. 市场情绪的短期持续影响")
         lines.append("3. 但回归因子会逐渐拉回基础价格")
         lines.append("")
 
         # 显示当前各股票相对基础价格的偏离情况
-        lines.append("📊 **当前价格偏离情况：**")
+        lines.append("## 当前价格偏离情况")
         for stock in stocks:
             deviation = ((stock.current_price - stock.base_price) / stock.base_price) * 100
             if abs(deviation) > 10:  # 只显示偏离超过10%的
                 direction = "高于" if deviation > 0 else "低于"
-                lines.append(f"• {stock.symbol} {direction}基础价格 {abs(deviation):.1f}%")
+                lines.append(f"- {stock.symbol} {direction}基础价格 **{abs(deviation):.1f}%**")
 
         lines.append("")
-        lines.append("🔒 **系统保证：**")
-        lines.append("• ✅ 完全随机算法，无人工干预")
-        lines.append("• ✅ 价格有下限保护（基础价格20%）")
-        lines.append("• ✅ 单次变化限制（±20%）")
-        lines.append("• ✅ 长期会回归基础价格")
-        lines.append("")
+        lines.append("## 系统保证")
+        lines.append("- 完全随机算法，无人工干预")
+        lines.append("- 价格有下限保护（基础价格20%）")
+        lines.append("- 单次变化限制（+/-20%）")
+        lines.append("- 长期会回归基础价格")
+        lines.append("***")
+        lines.append(f"{cmd('投资行情')} | {cmd('我的投资')}")
 
-    await stock_analysis_cmd.finish("\n".join(lines))
+    await stock_analysis_cmd.finish(build_markdown("\n".join(lines)))
 
 
 @stock_events_cmd.handle()
@@ -799,16 +843,18 @@ async def handle_stock_events(event: MessageEvent):
             all_events = all_events[:15]
 
             if not all_events:
-                result_msg = (
-                    "💎 气运市场事件\n"
-                    "▃▃▃▃▃▃▃▃▃▃\n"
-                    "🌤 近期市场风平浪静\n"
-                    "暂无重大事件发生\n\n"
-                    "💡 气运投资有风险，请谨慎决策"
-                )
+                result_lines = [
+                    "# 气运市场事件",
+                    "***",
+                    "近期市场风平浪静",
+                    "暂无重大事件发生",
+                    "***",
+                    f"{cmd('投资行情')} | {cmd('我的投资')}"
+                ]
+                result_msg = "\n".join(result_lines)
             else:
-                lines = ["🌪 气运市场事件", "▃▃▃▃▃▃▃▃▃▃"]
-                lines.append(f"📋 最近 {len(all_events)} 条重大事件\n")
+                lines = ["# 气运市场事件", "***"]
+                lines.append(f"最近 **{len(all_events)}** 条重大事件\n")
 
                 for evt in all_events:
                     # 时间格式化
@@ -817,7 +863,9 @@ async def handle_stock_events(event: MessageEvent):
                     # 事件主标题
                     lines.append(f"{evt['icon']} {evt['title']}")
                     lines.append(f"   时间: {time_str}")
-                    lines.append(f"   气运: {evt['stock_symbol']} {evt['stock_name']}")
+
+                    stock_link = cmd(evt['stock_name'], f'气运历史 {evt["stock_symbol"]}')
+                    lines.append(f"   气运: {evt['stock_symbol']} {stock_link}")
 
                     # 事件详情
                     for detail in evt['details']:
@@ -825,12 +873,12 @@ async def handle_stock_events(event: MessageEvent):
 
                     # 退市提示
                     if evt['delisted'] and evt['type'] != 'delist':
-                        lines.append(f"   ⚠️ {evt['stock_symbol']} 已退市")
+                        lines.append(f"   {evt['stock_symbol']} 已退市")
 
                     lines.append("")
 
-                lines.append("💡 提示: 气运投资有风险")
-                lines.append("建议分散投资，控制仓位")
+                lines.append("***")
+                lines.append(f"{cmd('投资行情')} | {cmd('我的投资')}")
 
                 result_msg = "\n".join(lines)
 
@@ -838,7 +886,7 @@ async def handle_stock_events(event: MessageEvent):
     if error_msg:
         await stock_events_cmd.finish(error_msg)
     else:
-        await stock_events_cmd.finish(result_msg)
+        await stock_events_cmd.finish(build_markdown(result_msg))
 
 
 # 管理员命令: 重置所有退市股票
@@ -978,8 +1026,7 @@ async def handle_trigger_black_swan(event: MessageEvent):
             lines.append("   可在 data/black_swan_events.yaml 中调整")
 
         result_msg = "\n".join(lines)
-        result_msg = message_add_head(result_msg, event)  # 修正参数顺序
-        await stock_trigger_black_swan_cmd.finish(result_msg)
+        await stock_trigger_black_swan_cmd.finish(build_markdown(result_msg))
 
     except Exception as e:
         import traceback

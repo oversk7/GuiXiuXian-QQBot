@@ -20,6 +20,7 @@ from datetime import datetime, timedelta
 from ..models.db import safe_session
 from ..models.player import Player
 from ..utils import message_add_head, check_action_limit, record_action
+from ..utils_markdown import cmd, build_markdown
 from .part_time_job_service import PartTimeJobService
 from ..platform_utils import get_unified_player
 
@@ -101,10 +102,15 @@ async def handle_work(event: MessageEvent, args: Message = CommandArg()):
             await work_cmd.finish(message_add_head(f"❌ {msg}", event))
 
         if not jobs:
-            await work_cmd.finish(message_add_head("📍 当前位置没有工作机会\n💡 使用【工作地点】查看所有工作地点", event))
+            content = (
+                f"📍 当前位置没有工作机会\n"
+                f"***\n"
+                f"{cmd('工作地点')}"
+            )
+            await work_cmd.finish(build_markdown(content))
 
         # 构建工作列表消息
-        lines = [f"💼 {msg}", "━━━━━━━━━━━━━"]
+        lines = [f"# 💼 {msg}", "***"]
         for i, job in enumerate(jobs, 1):
             # 格式化时间显示
             duration = job['duration_hours']
@@ -117,20 +123,16 @@ async def handle_work(event: MessageEvent, args: Message = CommandArg()):
             else:
                 time_str = f"{duration}小时"
 
-            lines.append(f"{job['emoji']} {i}. {job['name']}")
-            lines.append(f"   💰 基础收入：{job['base_reward']}金币")
-            lines.append(f"   ⏰ 工作时长：{time_str}")
-            lines.append(f"   📝 {job['description']}")
+            lines.append(f"{job['emoji']} {i}. {cmd(job['name'], '打工 ' + job['name'])}")
+            lines.append(f"💰 基础收入：**{job['base_reward']}** 金币 | ⏰ 时长：**{time_str}**")
+            lines.append(f"📝 {job['description']}")
             if i < len(jobs):
                 lines.append("")
 
-        lines.extend([
-            "━━━━━━━━━━━━━",
-            "💡 使用【打工 工作名称】开始工作",
-            "💡 例如：打工 便利店收银员"
-        ])
+        lines.append("***")
+        lines.append(f"{cmd('工作地点')} | {cmd('工作状态')} | {cmd('打工统计')}")
 
-        await work_cmd.finish(message_add_head("\n".join(lines), event))
+        await work_cmd.finish(build_markdown("\n".join(lines)))
     else:
         # 开始工作的消息
         if not success:
@@ -155,22 +157,22 @@ async def handle_work(event: MessageEvent, args: Message = CommandArg()):
         else:
             duration_str = f"{duration}小时"
 
-        result_msg = (
-            f"✅ {msg}\n"
-            f"━━━━━━━━━━━━━\n"
-            f"{job_config['emoji']} 工作：{job_config['name']}\n"
-            f"💰 预期收入：{job_config['base_reward']}+ 金币\n"
-            f"⏰ 工作时长：{duration_str}\n"
-            f"🕐 完成时间：{end_time_str}\n"
-            f"━━━━━━━━━━━━━\n"
-            f"💡 使用【收工】完成工作并获得奖励"
+        content = (
+            f"# ✅ {msg}\n"
+            f"***\n"
+            f"{job_config['emoji']} 工作：**{job_config['name']}**\n"
+            f"💰 预期收入：**{job_config['base_reward']}+** 金币\n"
+            f"⏰ 工作时长：**{duration_str}**\n"
+            f"🕐 完成时间：**{end_time_str}**\n"
+            f"***\n"
+            f"{cmd('收工')} | {cmd('工作状态')}"
         )
 
         # 附加新手任务消息
         if quest_completed and quest_msg:
-            result_msg += "\n\n" + quest_msg
+            content += "\n\n" + quest_msg
 
-        await work_cmd.finish(message_add_head(result_msg, event))
+        await work_cmd.finish(build_markdown(content))
 
 
 @finish_work_cmd.handle()
@@ -201,27 +203,29 @@ async def handle_finish_work(event: MessageEvent):
 
     # 构建奖励消息
     lines = [
-        f"🎉 {result['job_name']} 工作完成！",
-        "━━━━━━━━━━━━━",
-        f"💰 基础收入：{result['base_reward']} 金币"
+        f"# 🎉 {result['job_name']} 工作完成",
+        "***",
+        f"💰 基础收入：**{result['base_reward']}** 金币"
     ]
 
     if result['bonus_reward'] != 0:
         if result['special_event']:
             lines.append(f"🎁 特殊事件：{result['special_event']['description']}")
             if result['bonus_reward'] > 0:
-                lines.append(f"✨ 额外奖励：+{result['bonus_reward']} 金币")
+                lines.append(f"✨ 额外奖励：**+{result['bonus_reward']}** 金币")
             else:
-                lines.append(f"💔 收入减少：{result['bonus_reward']} 金币")
+                lines.append(f"💔 收入减少：**{result['bonus_reward']}** 金币")
 
     lines.extend([
-        f"💎 总收入：{result['total_reward']} 金币",
-        f"🔥 连续工作：{result['current_streak']} 天",
-        "━━━━━━━━━━━━━",
-        f"💰 当前金币：{player.gold}"
+        f"💎 总收入：**{result['total_reward']}** 金币",
+        f"🔥 连续工作：**{result['current_streak']}** 天",
+        "***",
+        f"💰 当前金币：**{player.gold}**",
+        "",
+        f"{cmd('打工')} | {cmd('打工统计')} | {cmd('工作状态')}"
     ])
 
-    await finish_work_cmd.finish(message_add_head("\n".join(lines), event))
+    await finish_work_cmd.finish(build_markdown("\n".join(lines)))
 
 
 @work_status_cmd.handle()
@@ -252,34 +256,39 @@ async def handle_work_status(event: MessageEvent):
 
         success, msg, status = await part_time_job_service.get_current_job_status(player)
     if not success:
-        await work_status_cmd.finish(message_add_head(f"ℹ️ {msg}", event))
+        content = (
+            f"ℹ️ {msg}\n"
+            f"***\n"
+            f"{cmd('打工')} | {cmd('工作地点')}"
+        )
+        await work_status_cmd.finish(build_markdown(content))
 
     if status['is_completed']:
-        result_msg = (
-            f"✅ 工作已完成！\n"
-            f"━━━━━━━━━━━━━\n"
-            f"{status['job_emoji']} {status['job_name']}\n"
-            f"⏰ 完成时间：{status['end_time'].strftime('%H:%M')}\n"
-            f"━━━━━━━━━━━━━\n"
-            f"💡 使用【收工】获得奖励"
+        content = (
+            f"# ✅ 工作已完成\n"
+            f"***\n"
+            f"{status['job_emoji']} **{status['job_name']}**\n"
+            f"⏰ 完成时间：**{status['end_time'].strftime('%H:%M')}**\n"
+            f"***\n"
+            f"{cmd('收工')}"
         )
     else:
         remaining = status['remaining_time']
         hours = int(remaining.total_seconds() // 3600)
         minutes = int((remaining.total_seconds() % 3600) // 60)
 
-        result_msg = (
-            f"⏳ 工作进行中...\n"
-            f"━━━━━━━━━━━━━\n"
-            f"{status['job_emoji']} {status['job_name']}\n"
-            f"⏰ 开始时间：{status['start_time'].strftime('%H:%M')}\n"
-            f"🕐 完成时间：{status['end_time'].strftime('%H:%M')}\n"
-            f"⏱️ 剩余时间：{hours}小时{minutes}分钟\n"
-            f"━━━━━━━━━━━━━\n"
-            f"💡 完成后使用【收工】获得奖励"
+        content = (
+            f"# ⏳ 工作进行中\n"
+            f"***\n"
+            f"{status['job_emoji']} **{status['job_name']}**\n"
+            f"⏰ 开始时间：**{status['start_time'].strftime('%H:%M')}**\n"
+            f"🕐 完成时间：**{status['end_time'].strftime('%H:%M')}**\n"
+            f"⏱️ 剩余时间：**{hours}小时{minutes}分钟**\n"
+            f"***\n"
+            f"{cmd('收工')} | {cmd('工作状态')}"
         )
 
-    await work_status_cmd.finish(message_add_head(result_msg, event))
+    await work_status_cmd.finish(build_markdown(content))
 
 
 @work_locations_cmd.handle()
@@ -308,22 +317,18 @@ async def handle_work_locations(event: MessageEvent):
     if not locations:
         await work_locations_cmd.finish(message_add_head("❌ 暂无工作地点", event))
 
-    lines = ["🏢 工作地点一览", "━━━━━━━━━━━━━"]
+    lines = ["# 🏢 工作地点一览", "***"]
 
     for location in locations:
-        lines.append(f"📍 {location['name']} ({location['x']}, {location['y']})")
-        lines.append(f"   💼 工作数量：{location['job_count']}个")
-        lines.append(f"   🎯 等级要求：{location['required_level']}级")
-        lines.append(f"   📝 {location['description']}")
+        lines.append(f"📍 {cmd(location['name'], '导航 ' + location['name'])} ({location['x']}, {location['y']})")
+        lines.append(f"💼 工作数量：**{location['job_count']}** 个 | 🎯 等级要求：**{location['required_level']}** 级")
+        lines.append(f"📝 {location['description']}")
         lines.append("")
 
-    lines.extend([
-        "━━━━━━━━━━━━━",
-        "💡 前往对应坐标后使用【打工】查看工作",
-        "💡 使用【导航 x y】快速前往"
-    ])
+    lines.append("***")
+    lines.append(f"{cmd('打工')} | {cmd('工作状态')}")
 
-    await work_locations_cmd.finish(message_add_head("\n".join(lines), event))
+    await work_locations_cmd.finish(build_markdown("\n".join(lines)))
 
 
 @work_history_cmd.handle()
@@ -350,23 +355,30 @@ async def handle_work_history(event: MessageEvent):
 
         history = await part_time_job_service.get_player_job_history(player.id, 5)
     if not history:
-        await work_history_cmd.finish(message_add_head("📝 暂无打工记录", event))
+        content = (
+            f"📝 暂无打工记录\n"
+            f"***\n"
+            f"{cmd('打工')} | {cmd('工作地点')}"
+        )
+        await work_history_cmd.finish(build_markdown(content))
 
-    lines = ["📋 最近打工记录", "━━━━━━━━━━━━━"]
+    lines = ["# 📋 最近打工记录", "***"]
 
     for i, job in enumerate(history, 1):
         completed_time = job['completed_time'].strftime("%m-%d %H:%M")
-        lines.append(f"{job['job_emoji']} {i}. {job['job_name']}")
-        lines.append(f"   💰 收入：{job['total_reward']} 金币")
-        lines.append(f"   ⏰ 完成：{completed_time}")
+        lines.append(f"{job['job_emoji']} {i}. **{job['job_name']}**")
+        lines.append(f"💰 收入：**{job['total_reward']}** 金币 | ⏰ 完成：{completed_time}")
 
         if job['special_event']:
-            lines.append(f"   🎁 {job['special_event']}")
+            lines.append(f"🎁 {job['special_event']}")
 
         if i < len(history):
             lines.append("")
 
-    await work_history_cmd.finish(message_add_head("\n".join(lines), event))
+    lines.append("***")
+    lines.append(f"{cmd('打工')} | {cmd('打工统计')}")
+
+    await work_history_cmd.finish(build_markdown("\n".join(lines)))
 
 
 @work_stats_cmd.handle()
@@ -396,14 +408,14 @@ async def handle_work_stats(event: MessageEvent):
     avg_income = stats.total_earnings // max(stats.total_jobs_completed, 1)
 
     lines = [
-        f"📊 {player.nickname} 的打工统计",
-        "━━━━━━━━━━━━━",
-        f"💼 完成工作：{stats.total_jobs_completed} 次",
-        f"💰 总收入：{stats.total_earnings} 金币",
-        f"📈 平均收入：{avg_income} 金币/次",
-        f"⏰ 总工时：{stats.total_work_hours} 小时",
-        f"🔥 当前连击：{stats.current_streak} 天",
-        f"🏆 最高连击：{stats.max_streak} 天"
+        f"# 📊 {player.nickname} 的打工统计",
+        "***",
+        f"💼 完成工作：**{stats.total_jobs_completed}** 次",
+        f"💰 总收入：**{stats.total_earnings}** 金币",
+        f"📈 平均收入：**{avg_income}** 金币/次",
+        f"⏰ 总工时：**{stats.total_work_hours}** 小时",
+        f"🔥 当前连击：**{stats.current_streak}** 天",
+        f"🏆 最高连击：**{stats.max_streak}** 天"
     ]
 
     # 获取JOB_TYPES（新旧版本都有）
@@ -411,9 +423,12 @@ async def handle_work_stats(event: MessageEvent):
     job_types = PartTimeJobServiceNew.JOB_TYPES
     if stats.favorite_job_type and stats.favorite_job_type in job_types:
         fav_job = job_types[stats.favorite_job_type]
-        lines.append(f"❤️ 偏好工作：{fav_job['name']}")
+        lines.append(f"❤️ 偏好工作：**{fav_job['name']}**")
 
-    await work_stats_cmd.finish(message_add_head("\n".join(lines), event))
+    lines.append("***")
+    lines.append(f"{cmd('打工')} | {cmd('打工记录')} | {cmd('工作地点')}")
+
+    await work_stats_cmd.finish(build_markdown("\n".join(lines)))
 
 
 # 帮助命令
@@ -423,45 +438,26 @@ work_help_cmd = on_command("打工帮助", aliases={"工作帮助"}, block=True,
 @work_help_cmd.handle()
 async def handle_work_help(event: MessageEvent):
     """处理打工帮助命令"""
-    help_msg = (
-        "💼 打工系统使用指南 (年轻玩家专属优化)\n"
-        "━━━━━━━━━━━━━\n"
-        "📍 基本流程：\n"
-        "1. 前往工作地点坐标\n"
-        "2. 使用【打工】查看可用工作\n"
-        "3. 使用【打工 工作名称】开始工作\n"
-        "4. 等待工作完成后使用【收工】获得奖励\n"
-        "\n"
-        "🏢 工作地点：\n"
-        "• 上京商业中心 (0,0) - 服务业工作\n"
-        "• 荔湾镇工业区 (120,200) - 体力工作\n"
-        "• 郸城娱乐街区 (120,120) - 轻松工作\n"
-        "• 东郊物流中心 (390,50) - 物流工作\n"
-        "\n"
-        "⚡ 超快节奏体验：\n"
-        "• 工作时长：2-3分钟 (极速完成!)\n"
-        "• 高工资：60-180金币/次 + 特殊事件奖励\n"
-        "• 特殊事件奖励丰厚，最高300金币!\n"
-        "• 频率限制：每小时最多10次，每次间隔1分钟\n"
-        "\n"
-        "💰 收入计算：\n"
-        "基础收入 + 等级加成 + 运气加成 + 连续奖励 + 特殊事件\n"
-        "\n"
-        "📋 相关命令：\n"
-        "• 打工 - 查看当前位置工作\n"
-        "• 打工 [工作名] - 开始工作\n"
-        "• 收工 - 完成工作获得奖励\n"
-        "• 工作状态 - 查看当前工作状态\n"
-        "• 工作地点 - 查看所有工作地点\n"
-        "• 打工记录 - 查看打工历史\n"
-        "• 打工统计 - 查看打工数据\n"
-        "\n"
-        "💡 小贴士：\n"
-        "• 连续打工可获得额外奖励\n"
-        "• 运气值影响收入和特殊事件\n"
-        "• 不同工作有不同的等级要求\n"
-        "• 特殊事件可能带来额外收入\n"
-        "• 适合碎片化时间，随时开始!"
+    content = (
+        f"# 💼 打工系统使用指南\n"
+        f"***\n"
+        f"📍 基本流程\n"
+        f"1. 前往工作地点坐标\n"
+        f"2. 使用 {cmd('打工')} 查看可用工作\n"
+        f"3. 使用 {cmd('打工 工作名称', '打工 ')} 开始工作\n"
+        f"4. 等待完成后使用 {cmd('收工')} 获得奖励\n\n"
+        f"🏢 工作地点\n"
+        f"▫️ {cmd('上京商业中心', '导航 上京商业中心')} (0,0) - 服务业\n"
+        f"▫️ {cmd('荔湾镇工业区', '导航 荔湾镇工业区')} (120,200) - 体力\n"
+        f"▫️ {cmd('郸城娱乐街区', '导航 郸城娱乐街区')} (120,120) - 轻松\n"
+        f"▫️ {cmd('东郊物流中心', '导航 东郊物流中心')} (390,50) - 物流\n\n"
+        f"⚡ 超快节奏体验\n"
+        f"▫️ 工作时长：**2-3**分钟 | 工资：**60-180**金币/次\n"
+        f"▫️ 特殊事件最高**300**金币 | 每小时最多**10**次\n\n"
+        f"💰 收入 = 基础 + 等级加成 + 运气加成 + 连续奖励 + 特殊事件\n"
+        f"***\n"
+        f"{cmd('打工')} | {cmd('收工')} | {cmd('工作状态')}\n"
+        f"{cmd('工作地点')} | {cmd('打工记录')} | {cmd('打工统计')}"
     )
 
-    await work_help_cmd.finish(message_add_head(help_msg, event))
+    await work_help_cmd.finish(build_markdown(content))

@@ -8,7 +8,7 @@ from sqlalchemy.orm import joinedload
 from ..models.db import safe_session
 from ..models.player import Player
 from ..models.bank_account import BankAccount
-from ..utils import message_add_head
+from ..utils_markdown import cmd, build_markdown
 from ..platform_utils import get_unified_player
 
 # ==================== 银行系统改革说明 ====================
@@ -51,17 +51,18 @@ async def handle_balance(event: MessageEvent):
             await session.commit()
 
         # 已取消利息计算
-        msg = (
-            f"🏦 冥界银行账单\n"
-            f"━━━━━━━━━━━━━\n"
-            f"💰 当前存款：{acc.balance:,} 金币\n"
-            f"━━━━━━━━━━━━━\n"
+        content = (
+            f"# 🏦 冥界银行\n"
+            f"***\n"
+            f"💰 当前存款：**{acc.balance:,}** 金币\n"
+            f"***\n"
             f"📢 银行改革公告\n"
             f"▫️ 已取消存款利息\n"
             f"▫️ 新增理财产品\n\n"
-            f"💡 使用「理财产品」查看投资选项"
+            f"{cmd('存 金额', '存 ')} | {cmd('取 金额', '取 ')} | {cmd('转账 UID 金额', '转账 ')}\n"
+            f"{cmd('理财产品')} | {cmd('投资理财')}"
         )
-        await bank_balance_cmd.finish(message_add_head(msg, event))
+        await bank_balance_cmd.finish(build_markdown(content))
 
 
 @bank_deposit_cmd.handle()
@@ -97,7 +98,15 @@ async def handle_deposit(event: MessageEvent, args: Message = CommandArg()):
         acc.balance += amt
         session.add_all([player, acc])
         await session.commit()
-        await bank_deposit_cmd.finish(message_add_head(f"✅ 存入 {amt} 金币，当前存款 {acc.balance}", event))
+        content = (
+            f"# ✅ 存款成功\n"
+            f"***\n"
+            f"💰 存入：**{amt:,}** 金币\n"
+            f"🏦 当前存款：**{acc.balance:,}** 金币\n"
+            f"***\n"
+            f"{cmd('余额')} | {cmd('取 金额', '取 ')} | {cmd('转账 UID 金额', '转账 ')}"
+        )
+        await bank_deposit_cmd.finish(build_markdown(content))
 
 
 @bank_withdraw_cmd.handle()
@@ -131,7 +140,15 @@ async def handle_withdraw(event: MessageEvent, args: Message = CommandArg()):
         player.gold += amt
         session.add_all([player, acc])
         await session.commit()
-        await bank_withdraw_cmd.finish(message_add_head(f"💰 取出 {amt} 金币，剩余存款 {acc.balance}", event))
+        content = (
+            f"# ✅ 取款成功\n"
+            f"***\n"
+            f"💰 取出：**{amt:,}** 金币\n"
+            f"🏦 剩余存款：**{acc.balance:,}** 金币\n"
+            f"***\n"
+            f"{cmd('余额')} | {cmd('存 金额', '存 ')} | {cmd('转账 UID 金额', '转账 ')}"
+        )
+        await bank_withdraw_cmd.finish(build_markdown(content))
 
 
 @bank_transfer_cmd.handle()
@@ -205,16 +222,18 @@ async def handle_transfer(event: MessageEvent, args: Message = CommandArg()):
         session.add_all([sender_acc, receiver_acc])
         await session.commit()
 
-        msg = (
-            f"💸 转账成功\n"
-            f"━━━━━━━━━━━━━\n"
-            f"💰 转账金额：{amt} 金币\n"
-            f"💸 手续费：{tax} 金币 (3%)\n"
-            f"💎 实际到账：{actual_amount} 金币\n"
+        content = (
+            f"# 💸 转账成功\n"
+            f"***\n"
+            f"💰 转账金额：**{amt:,}** 金币\n"
+            f"💸 手续费：**{tax:,}** 金币 (3%)\n"
+            f"💎 实际到账：**{actual_amount:,}** 金币\n"
             f"👤 收款人：{receiver.nickname}[UID:{receiver.uid}]\n"
-            f"💳 剩余存款：{sender_acc.balance} 金币"
+            f"💳 剩余存款：**{sender_acc.balance:,}** 金币\n"
+            f"***\n"
+            f"{cmd('余额')} | {cmd('存 金额', '存 ')} | {cmd('帮助')}"
         )
-        await bank_transfer_cmd.finish(message_add_head(msg, event))
+        await bank_transfer_cmd.finish(build_markdown(content))
 
 
 @deposit_rank_cmd.handle()
@@ -276,11 +295,11 @@ async def handle_deposit_rank(event: MessageEvent, args: Message = CommandArg())
             await deposit_rank_cmd.finish("暂无存款数据")
 
         if player_rank is not None:
-            lines = [f"🏦 存款排行榜 (你的排名: 第{player_rank}名)", "━━━━━━━━━━━━━"]
+            lines = [f"# 🏦 存款排行榜", f"你的排名: 第**{player_rank}**名", "***"]
         elif page is not None:
-            lines = [f"🏦 存款排行榜 (第{page}/3页)", "━━━━━━━━━━━━━"]
+            lines = [f"# 🏦 存款排行榜", f"第**{page}**/3页", "***"]
         else:
-            lines = ["🏦 存款排行榜", "━━━━━━━━━━━━━"]
+            lines = ["# 🏦 存款排行榜", "***"]
 
         for idx, acc in enumerate(accounts, start=offset + 1):
             p = acc.player
@@ -288,12 +307,12 @@ async def handle_deposit_rank(event: MessageEvent, args: Message = CommandArg())
                 continue
             rank_emoji = "🥇" if idx == 1 else "🥈" if idx == 2 else "🥉" if idx == 3 else f"{idx}."
             marker = " ◀" if player and p.id == player.id else ""
-            lines.append(f"{rank_emoji} {p.nickname}[UID:{p.uid}] - {acc.balance}💰{marker}")
+            lines.append(f"{rank_emoji} {p.nickname}[UID:{p.uid}] - **{acc.balance:,}**💰{marker}")
 
-        lines.append("━━━━━━━━━━━━━")
-        lines.append("💡 使用【存款榜 页码】查看指定页(1-3)")
+        lines.append("***")
+        lines.append(f"{cmd('存款榜 1', '存款榜 1')} | {cmd('存款榜 2', '存款榜 2')} | {cmd('存款榜 3', '存款榜 3')} | {cmd('余额')}")
 
-    await deposit_rank_cmd.finish(message_add_head("\n".join(lines), event))
+    await deposit_rank_cmd.finish(build_markdown("\n".join(lines)))
 
 
 @bank_invest_cmd.handle()
@@ -317,25 +336,26 @@ async def handle_bank_invest(event: MessageEvent):
 
         # 已取消利息计算
 
-        msg = (
-            "🏦 冥界银行投资理财中心\n"
-            "▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃\n"
-            f"💰 当前存款：{acc.balance:,} 金币\n\n"
-            "💎 投资产品：\n"
-            "1️⃣ 气运投资 - 高风险高收益\n"
-            "   • 使用「气运行情」查看可投资项目\n"
-            "   • 使用「投资气运 代码 数量 银行」从银行账户投资\n"
-            "   • 使用「出售气运 代码 数量 银行」出售后存入银行\n\n"
-            "2️⃣ 活期理财 - 随存随取（零和博弈）\n"
-            "   • 每日结算，日收益±5%，管理费0.1%/天\n"
-            "   • 使用「理财产品」查看详情\n\n"
-            "3️⃣ 七日定存 - 锁定7天，固定周利率5%\n"
-            "   • 到期净收益约4.5%，期间不可提前取出\n"
-            "   • 使用「定期理财」查看详情\n"
-            "   • 使用「购买定期 金额」开始定存\n\n"
-            "📢 银行改革公告:\n"
-            "   已取消存款利息，控制通货膨胀\n\n"
-            "💡 风险提示：投资有风险，需谨慎！"
+        content = (
+            f"# 🏦 投资理财中心\n"
+            f"***\n"
+            f"💰 当前存款：**{acc.balance:,}** 金币\n\n"
+            f"💎 投资产品：\n"
+            f"1️⃣ 气运投资 - 高风险高收益\n"
+            f"   • {cmd('气运行情')} 查看可投资项目\n"
+            f"   • {cmd('投资气运 代码 数量 银行', '投资气运 ')} 从银行账户投资\n"
+            f"   • {cmd('出售气运 代码 数量 银行', '出售气运 ')} 出售后存入银行\n\n"
+            f"2️⃣ 活期理财 - 随存随取（零和博弈）\n"
+            f"   • 每日结算，日收益±5%，管理费0.1%/天\n"
+            f"   • {cmd('理财产品')} 查看详情\n\n"
+            f"3️⃣ 七日定存 - 锁定7天，固定周利率5%\n"
+            f"   • 到期净收益约4.5%，期间不可提前取出\n"
+            f"   • {cmd('定期理财')} 查看详情\n"
+            f"   • {cmd('购买定期 金额', '购买定期 ')} 开始定存\n"
+            f"***\n"
+            f"📢 已取消存款利息，控制通货膨胀\n"
+            f"💡 风险提示：投资有风险，需谨慎！\n\n"
+            f"{cmd('余额')} | {cmd('存款榜')} | {cmd('帮助')}"
         )
 
-        await bank_invest_cmd.finish(message_add_head(msg, event))
+        await bank_invest_cmd.finish(build_markdown(content))

@@ -11,6 +11,7 @@ from ..models.player import Player
 from ..models.inventory import ItemInstance
 from ..config import config
 from ..utils import message_add_head
+from ..utils_markdown import cmd, build_markdown
 from .equipment_trade_service import EquipmentTradeService
 from ..item.equipment_commands import find_equipment_by_input
 from ..platform_utils import get_unified_player
@@ -401,16 +402,20 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
 
         await session.commit()
 
-    result_msg = (
-        f"📈 成功挂牌 🆔{new_order.id}┃{mode_str}{item_cfg.name}┃💰{price}┃📦{quantity}"
-    )
+    lines = [
+        f"# 📈 成功挂牌",
+        f"***",
+        f"🆔 **{new_order.id}** | {mode_str} {cmd(item_cfg.name, '查牌 ' + item_cfg.name)} | 💰 **{price}** | 📦 **{quantity}**",
+    ]
     if snap_hint:
-        result_msg += f"\n{snap_hint}"
+        lines.append(snap_hint)
     if cap_hint:
-        result_msg += f"\n{cap_hint}"
+        lines.append(cap_hint)
     if fill_msg:
-        result_msg += "\n" + fill_msg
-    await list_cmd.finish(message_add_head(result_msg, event))
+        lines.append(fill_msg)
+    lines.append("***")
+    lines.append(f"{cmd('我的挂牌')} | {cmd('撤牌 ' + str(new_order.id), '撤牌 ' + str(new_order.id))} | {cmd('查牌 ' + item_cfg.name, '查牌 ' + item_cfg.name)}")
+    await list_cmd.finish(build_markdown("\n".join(lines)))
 
 
 async def _handle_equipment_listing(event: MessageEvent, item_cfg, price: int):
@@ -451,21 +456,21 @@ async def _handle_equipment_listing(event: MessageEvent, item_cfg, price: int):
         }
 
         lines = [
-            f"📋 选择要挂牌的 {item_cfg.name}：",
-            "━━━━━━━━━━━━━",
-            f"💡 提醒：挂牌价格需在建议底价的 {PRICE_CAP_MULT} 倍以内"
+            f"# 📋 选择要挂牌的 {item_cfg.name}",
+            "***",
+            f"💡 挂牌价格需在建议底价的 **{PRICE_CAP_MULT}** 倍以内"
         ]
 
         # 使用保存的摘要信息显示装备列表
         for i, (eq_id, summary) in enumerate(zip(equipment_ids, equipment_summaries), 1):
-            lines.append(f"{i}. 🆔{eq_id} {summary}")
+            lines.append(f"{i}. 🆔**{eq_id}** {summary}")
 
         lines.extend([
             "",
             "💡 请直接回复序号选择装备（如：1），或回复 取消"
         ])
 
-        await list_cmd.finish(message_add_head("\n".join(lines), event))
+        await list_cmd.finish(build_markdown("\n".join(lines)))
 
 
 async def _create_equipment_order(session, player, equipment: ItemInstance, price: int, event: MessageEvent):
@@ -518,13 +523,18 @@ async def _create_equipment_order(session, player, equipment: ItemInstance, pric
 
     await session.commit()
 
-    result_msg = f"📈 成功挂牌装备 🆔{new_order.id}┃{summary}┃💰{price:,}"
+    lines = [
+        f"# 📈 成功挂牌装备",
+        "***",
+        f"🆔 **{new_order.id}** | {summary} | 💰 **{price:,}**",
+    ]
     if snap_hint:
-        result_msg += "\n" + snap_hint
+        lines.append(snap_hint)
     if fill_msg:
-        result_msg += "\n" + fill_msg
-
-    await list_cmd.finish(message_add_head(result_msg, event))
+        lines.append(fill_msg)
+    lines.append("***")
+    lines.append(f"{cmd('我的挂牌')} | {cmd('撤牌 ' + str(new_order.id), '撤牌 ' + str(new_order.id))}")
+    await list_cmd.finish(build_markdown("\n".join(lines)))
 
 # ---------------- 装备选择消息处理器 ----------------
 equipment_selection_handler = on_message(priority=10, block=False)
@@ -637,7 +647,12 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
         await session.delete(order)
         await session.commit()
 
-    await cancel_cmd.finish(message_add_head(f"🗑️ 已撤回牌子 #{oid}", event))
+    content = (
+        f"🗑️ 已撤回牌子 #**{oid}**\n"
+        f"***\n"
+        f"{cmd('我的挂牌')} | {cmd('交易清单')}"
+    )
+    await cancel_cmd.finish(build_markdown(content))
 
 # ---------------- 指令：查牌主（查看订单归属） ----------------
 order_owner_cmd = on_command("挂牌详情", aliases={"查牌主", "牌主", "牌子详情"}, block=True, priority=5)
@@ -664,10 +679,10 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
         player_uid = order.player.uid if order.player else "?"
 
         lines = [
-            f"📋 订单 #{order.id} 详情",
-            "━━━━━━━━━━━━━",
-            f"{side_text} {item_name}",
-            f"💰 单价: {order.price:,}",
+            f"# 📋 订单 #{order.id} 详情",
+            "***",
+            f"{side_text} {cmd(item_name, '查牌 ' + item_name)}",
+            f"💰 单价: **{order.price:,}**",
         ]
 
         if order.is_equipment_trade and order.item_instance_id:
@@ -757,8 +772,10 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
 
         lines.append(f"👤 挂牌人: {player_name} (UID: {player_uid})")
         lines.append(f"🕐 挂牌时间: {order.created_at.strftime('%Y-%m-%d %H:%M')}")
+        lines.append("***")
+        lines.append(f"{cmd('查牌 ' + item_name, '查牌 ' + item_name)} | {cmd('交易清单')}")
 
-        await order_owner_cmd.finish(message_add_head("\n".join(lines), event))
+        await order_owner_cmd.finish(build_markdown("\n".join(lines)))
 
 # ---------------- 指令：查看牌子 ----------------
 view_cmd = on_command("查牌",aliases={"比价"}, block=True, priority=5)
@@ -799,12 +816,11 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
         ref_info = await _get_market_reference(session, item_cfg)
 
         def _fmt(order: MarketOrder):
+            oid_cmd = cmd(f"#{order.id}", f"挂牌详情 {order.id}")
             if order.is_equipment_trade:
-                # 装备显示格式：🆔001┃💰50,000┃⭐+5阶 [💎2/3] 耐久160/160
-                return f"🆔{str(order.id).rjust(3)}┃💰{str(order.price).rjust(8)}┃{order.equipment_summary}"
+                return f"{oid_cmd} 💰**{order.price:,}** | {order.equipment_summary}"
             else:
-                # 普通物品显示格式
-                return format_order_line(order.id, order.price, order.quantity, order.player.uid)
+                return f"{oid_cmd} 💰**{order.price:,}** 📦**{order.quantity}**"
 
         PAGE_SIZE = 10
         def _paginate(lst: list[MarketOrder]):
@@ -817,22 +833,26 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
         sell_page, sell_total, cur_page = _paginate(sells)
         buy_page, _, _ = _paginate(buys)
 
-        lines = [f"📋 {item_cfg.name} 市场牌子 · 第{cur_page}/{sell_total}页"]
+        lines = [f"# 📋 {cmd(item_cfg.name, '查牌 ' + item_cfg.name)} 市场牌子 第{cur_page}/{sell_total}页"]
         # 插入市场参考信息行
         if ref_info:
             lines.append(ref_info)
-        lines.append(heavy_divider(f"{EMOJI_SELL} 出售"))
+        lines.append(f"***")
+        lines.append(f"{EMOJI_SELL} **出售**")
         if sell_page:
             lines.extend(_fmt(o) for o in sell_page)
         else:
             lines.append("(空)")
-        lines.append(heavy_divider(f"{EMOJI_BUY} 求购"))
+        lines.append(f"***")
+        lines.append(f"{EMOJI_BUY} **求购**")
         if buy_page:
             lines.extend(_fmt(o) for o in buy_page)
         else:
             lines.append("(空)")
+        lines.append("***")
+        lines.append(f"{cmd('挂牌 出售 ' + item_cfg.name, '挂牌 出售 ' + item_cfg.name + ' ')} | {cmd('挂牌 收购 ' + item_cfg.name, '挂牌 收购 ' + item_cfg.name + ' ')} | {cmd('交易清单')}")
 
-        await view_cmd.finish(message_add_head("\n".join(lines), event))
+        await view_cmd.finish(build_markdown("\n".join(lines)))
 
 overview_cmd = on_command("交易清单", aliases={"交易市场"}, block=True, priority=5)
 
@@ -878,13 +898,13 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
             item_cfg = config.items_config["by_id"].get(row.item_id)
             if not item_cfg:
                 return None
-            return f"{EMOJI_SELL} {item_cfg.name} 💰{row.min_price} 📦{row.qty}"
+            return f"{EMOJI_SELL} {cmd(item_cfg.name, '查牌 ' + item_cfg.name)} 💰**{row.min_price}** 📦**{row.qty}**"
 
         def _fmt_buy(row):
             item_cfg = config.items_config["by_id"].get(row.item_id)
             if not item_cfg:
                 return None
-            return f"{EMOJI_BUY} {item_cfg.name} 💰{row.max_price} 📦{row.qty}"
+            return f"{EMOJI_BUY} {cmd(item_cfg.name, '查牌 ' + item_cfg.name)} 💰**{row.max_price}** 📦**{row.qty}**"
 
         sell_lines_raw: list[str] = list(filter(None, (_fmt_sell(r) for r in sells)))
         buy_lines_raw: list[str] = list(filter(None, (_fmt_buy(r) for r in buys)))
@@ -901,19 +921,22 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
         sell_page = sell_lines_raw[start:end]
         buy_page = buy_lines_raw[start:end]
 
-        lines: list[str] = [f"📊 市场总览 第{cur_page}/{total_pages}页"]
-        lines.append(heavy_divider(f"{EMOJI_SELL} 在售"))
+        lines: list[str] = [f"# 📊 市场总览 第{cur_page}/{total_pages}页"]
+        lines.append("***")
+        lines.append(f"{EMOJI_SELL} **在售**")
         if sell_page:
             lines.extend(sell_page)
         else:
             lines.append("(空)")
-        lines.append(heavy_divider(f"{EMOJI_BUY} 收购"))
+        lines.append("***")
+        lines.append(f"{EMOJI_BUY} **收购**")
         if buy_page:
             lines.extend(buy_page)
         else:
             lines.append("(空)")
-        lines.append("⬇️ 【查牌 <物品名> [页数]】 查看物品买卖行情")
-        await overview_cmd.finish(message_add_head("\n".join(lines), event))
+        lines.append("***")
+        lines.append(f"{cmd('我的挂牌')} | {cmd('税率')} | {cmd('估价', '估价 ')}")
+        await overview_cmd.finish(build_markdown("\n".join(lines)))
 
 # ---------------- 指令：我的挂牌 ----------------
 my_orders_cmd = on_command("我的挂牌", aliases={"查看我的挂牌", "我的牌子"}, block=True, priority=5)
@@ -944,7 +967,12 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
         orders = (await session.execute(stmt)).scalars().all()
 
         if not orders:
-            await my_orders_cmd.finish(message_add_head("📋 你还没有挂牌任何物品", event))
+            content = (
+                f"📋 你还没有挂牌任何物品\n"
+                f"***\n"
+                f"{cmd('交易清单')} | {cmd('挂牌', '挂牌 ')}"
+            )
+            await my_orders_cmd.finish(build_markdown(content))
 
         PAGE_SIZE = 8
         total_pages = (len(orders) - 1) // PAGE_SIZE + 1 if orders else 1
@@ -953,31 +981,34 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
         end = start + PAGE_SIZE
         page_orders = orders[start:end]
 
-        lines = [f"📋 我的挂牌 · 第{page}/{total_pages}页 ({len(orders)}个)"]
-        lines.append(heavy_divider("📤 出售订单"))
+        lines = [f"# 📋 我的挂牌 第{page}/{total_pages}页 ({len(orders)}个)"]
+        lines.append("***")
+        lines.append(f"📤 **出售订单**")
 
         sell_orders = [o for o in page_orders if o.side == OrderSide.SELL]
         if sell_orders:
             for order in sell_orders:
                 item_cfg = config.items_config["by_id"].get(order.item_id)
                 if item_cfg:
-                    lines.append(f"🆔{str(order.id).rjust(3)}┃{item_cfg.name}┃💰{order.price}┃📦{order.quantity}")
+                    lines.append(f"🆔**{order.id}** | {cmd(item_cfg.name, '查牌 ' + item_cfg.name)} | 💰**{order.price}** 📦**{order.quantity}** | {cmd('撤牌', '撤牌 ' + str(order.id))}")
         else:
             lines.append("(空)")
 
-        lines.append(heavy_divider("📥 求购订单"))
+        lines.append("***")
+        lines.append(f"📥 **求购订单**")
 
         buy_orders = [o for o in page_orders if o.side == OrderSide.BUY]
         if buy_orders:
             for order in buy_orders:
                 item_cfg = config.items_config["by_id"].get(order.item_id)
                 if item_cfg:
-                    lines.append(f"🆔{str(order.id).rjust(3)}┃{item_cfg.name}┃💰{order.price}┃📦{order.quantity}")
+                    lines.append(f"🆔**{order.id}** | {cmd(item_cfg.name, '查牌 ' + item_cfg.name)} | 💰**{order.price}** 📦**{order.quantity}** | {cmd('撤牌', '撤牌 ' + str(order.id))}")
         else:
             lines.append("(空)")
 
-        lines.append("⬇️ 【撤牌 <牌子ID>】 撤回指定牌子")
-        await my_orders_cmd.finish(message_add_head("\n".join(lines), event))
+        lines.append("***")
+        lines.append(f"{cmd('交易清单')} | {cmd('挂牌', '挂牌 ')}")
+        await my_orders_cmd.finish(build_markdown("\n".join(lines)))
 
 # ---------------- 指令：查看税率 ----------------
 tax_info_cmd = on_command("税率", aliases={"交易税率", "查看税率"}, block=True, priority=5)
@@ -985,20 +1016,21 @@ tax_info_cmd = on_command("税率", aliases={"交易税率", "查看税率"}, bl
 @tax_info_cmd.handle()
 async def _(event: MessageEvent):
     """查看当前的分段累进交易税率"""
-    lines = [
-        "💰 交易税率表（分段累进）",
-        heavy_divider("税率区间"),
-        "💚 ≤5,000金币：免税 (0%)",
-        "💛 5,001~20,000金币：超出部分 5%",
-        "🧡 20,001~50,000金币：超出部分 10%",
-        "❤️ 50,001~100,000金币：超出部分 15%",
-        "💜 >100,000金币：超出部分 20%",
-        "",
-        "📝 仅对超出部分征税，不会因多挂1金币多交一大笔",
-        f"💡 举例：交易额 25,000 → 税收 {calculate_transaction_tax(25000):,}（而非2,500）",
-        "⚠️ 税收从卖家收入中扣除，直接销毁"
-    ]
-    await tax_info_cmd.finish(message_add_head("\n".join(lines), event))
+    content = (
+        f"# 💰 交易税率表（分段累进）\n"
+        f"***\n"
+        f"💚 ≤**5,000**金币：免税 (**0%**)\n"
+        f"💛 **5,001**~**20,000**金币：超出部分 **5%**\n"
+        f"🧡 **20,001**~**50,000**金币：超出部分 **10%**\n"
+        f"❤️ **50,001**~**100,000**金币：超出部分 **15%**\n"
+        f"💜 >**100,000**金币：超出部分 **20%**\n\n"
+        f"📝 仅对超出部分征税，不会因多挂1金币多交一大笔\n"
+        f"💡 举例：交易额 25,000 → 税收 **{calculate_transaction_tax(25000):,}**（而非2,500）\n"
+        f"⚠️ 税收从卖家收入中扣除，直接销毁\n"
+        f"***\n"
+        f"{cmd('交易清单')} | {cmd('我的挂牌')} | {cmd('挂牌', '挂牌 ')}"
+    )
+    await tax_info_cmd.finish(build_markdown(content))
 
 
 # ---------------- 指令：装备估价 ----------------
@@ -1037,18 +1069,18 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
         market_orders = (await session.execute(stmt)).scalars().all()
 
         lines = [
-            f"💰 装备估价报告",
-            f"━━━━━━━━━━━━━",
+            f"# 💰 装备估价报告",
+            f"***",
             f"🎯 装备：{summary}",
-            f"🆔 ID：{equipment.id}",
+            f"🆔 ID：**{equipment.id}**",
             "",
-            f"📊 估价分析：",
-            f"• 基础价值：{equipment.config.price:,} 金币",
+            f"📊 估价分析",
+            f"▫️ 基础价值：**{equipment.config.price:,}** 金币",
         ]
 
         if equipment.upgrade_level > 0:
             upgrade_bonus = (equipment.get_upgrade_bonus_multiplier() - 1) * 100
-            lines.append(f"• 升阶加成：+{upgrade_bonus:.0f}% ({equipment.upgrade_level}阶)")
+            lines.append(f"▫️ 升阶加成：**+{upgrade_bonus:.0f}%** ({equipment.upgrade_level}阶)")
 
         if equipment.used_gem_slots > 0:
             gem_value = 0
@@ -1056,26 +1088,30 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
                 gem_config = config.items_config["by_id"].get(gem_item_id)
                 if gem_config:
                     gem_value += gem_config.price
-            lines.append(f"• 宝石价值：{gem_value:,} 金币")
+            lines.append(f"▫️ 宝石价值：**{gem_value:,}** 金币")
 
         durability_ratio = equipment.durability / equipment.config.durability if equipment.config.durability > 0 else 1.0
         if durability_ratio < 1.0:
-            lines.append(f"• 耐久影响：{durability_ratio:.1%}")
+            lines.append(f"▫️ 耐久影响：**{durability_ratio:.1%}**")
 
         lines.extend([
             "",
-            f"💎 建议售价：{min_price:,} - {max_price:,} 金币",
+            f"💎 建议售价：**{min_price:,}** - **{max_price:,}** 金币",
             ""
         ])
 
         if market_orders:
-            lines.append("📈 市场参考：")
+            lines.append("📈 市场参考")
             for order in market_orders:
-                lines.append(f"• {order.equipment_summary} - {order.price:,} 金币")
+                lines.append(f"▫️ {order.equipment_summary} - **{order.price:,}** 金币")
         else:
             lines.append("📈 市场参考：暂无同类装备在售")
 
-        await equipment_appraise_cmd.finish(message_add_head("\n".join(lines), event))
+        eq_name = equipment.config.name if equipment.config else equipment.item_id
+        lines.append("***")
+        lines.append(f"{cmd('挂牌 出售 ' + eq_name, '挂牌 出售 ' + eq_name + ' ')} | {cmd('查牌 ' + eq_name, '查牌 ' + eq_name)} | {cmd('交易清单')}")
+
+        await equipment_appraise_cmd.finish(build_markdown("\n".join(lines)))
 
 # ======= 辅助函数 =======
 async def _try_auto_match(session, new_order: MarketOrder, player: Player, same_price_only: bool = False) -> str:

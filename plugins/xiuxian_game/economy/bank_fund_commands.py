@@ -12,7 +12,7 @@ from nonebot.adapters.qq import MessageEvent, Message
 from nonebot.params import CommandArg
 from datetime import datetime
 
-from ..utils import message_add_head
+from ..utils_markdown import cmd, build_markdown
 from ..platform_utils import get_unified_player
 from .bank_fund_service import BankFundService
 from ..infrastructure.uow.unit_of_work import UnitOfWork
@@ -57,33 +57,30 @@ async def handle_fund_list(event: MessageEvent):
         await fund_list_cmd.finish(error_msg)
 
     # 构建消息
-    lines = ["💎 理财产品列表", "▃▃▃▃▃▃▃▃▃▃"]
-    lines.append("")
-
-    # 显示活期理财
     daily_return_pct = fund.daily_return * 100
     return_emoji = "📈" if fund.daily_return > 0 else "📉" if fund.daily_return < 0 else "➡️"
 
-    lines.append(f"📊 {fund.fund_name}")
-    lines.append(f"  💰 基金规模：{fund.total_scale:,} 金币")
-    lines.append(f"  👥 参与人数：{fund.participant_count} 人")
-    lines.append(f"  {return_emoji} 昨日收益率：{daily_return_pct:+.2f}%")
-    lines.append("")
+    fund_config = BankFundService.LIVELY_FUND_CONFIG
 
-    # 配置信息
-    config = BankFundService.LIVELY_FUND_CONFIG
-    lines.append("📝 投资说明")
-    lines.append(f"  ▫️ 最低投资：{config['min_investment']:,} 金币")
-    lines.append(f"  ▫️ 最高投资：{config['max_investment']:,} 金币")
-    lines.append(f"  ▫️ 管理费：{config['management_fee_rate']*100:.1f}%/天")
-    lines.append(f"  ▫️ 收益波动：±{config['max_daily_change']*100:.0f}%/天")
-    lines.append("")
+    content = (
+        f"# 💎 理财产品列表\n"
+        f"***\n"
+        f"📊 {fund.fund_name}\n"
+        f"💰 基金规模：**{fund.total_scale:,}** 金币\n"
+        f"👥 参与人数：**{fund.participant_count}** 人\n"
+        f"{return_emoji} 昨日收益率：**{daily_return_pct:+.2f}%**\n"
+        f"***\n"
+        f"📝 投资说明\n"
+        f"▫️ 最低投资：**{fund_config['min_investment']:,}** 金币\n"
+        f"▫️ 最高投资：**{fund_config['max_investment']:,}** 金币\n"
+        f"▫️ 管理费：**{fund_config['management_fee_rate']*100:.1f}%**/天\n"
+        f"▫️ 收益波动：**±{fund_config['max_daily_change']*100:.0f}%**/天\n"
+        f"***\n"
+        f"{cmd('购买理财 金额', '购买理财 ')} | {cmd('购买理财 金额 银行', '购买理财 ')}\n"
+        f"{cmd('我的理财')} | {cmd('定期理财')}"
+    )
 
-    lines.append("💡 使用「购买理财 金额」进行投资")
-    lines.append("💡 使用「购买理财 金额 银行」从银行账户扣款")
-    lines.append("💡 使用「我的理财」查看持仓")
-
-    await fund_list_cmd.finish(message_add_head("\n".join(lines), event))
+    await fund_list_cmd.finish(build_markdown(content))
 
 
 @fund_buy_cmd.handle()
@@ -133,7 +130,12 @@ async def handle_fund_buy(event: MessageEvent, args: Message = CommandArg()):
     if error_msg:
         await fund_buy_cmd.finish(error_msg)
 
-    await fund_buy_cmd.finish(message_add_head(message, event))
+    content = (
+        f"{message}\n"
+        f"***\n"
+        f"{cmd('我的理财')} | {cmd('理财产品')}"
+    )
+    await fund_buy_cmd.finish(build_markdown(content))
 
 
 @fund_sell_cmd.handle()
@@ -183,7 +185,12 @@ async def handle_fund_sell(event: MessageEvent, args: Message = CommandArg()):
     if error_msg:
         await fund_sell_cmd.finish(error_msg)
 
-    await fund_sell_cmd.finish(message_add_head(message, event))
+    content = (
+        f"{message}\n"
+        f"***\n"
+        f"{cmd('我的理财')} | {cmd('理财产品')} | {cmd('购买理财 金额', '购买理财 ')}"
+    )
+    await fund_sell_cmd.finish(build_markdown(content))
 
 
 @fund_holdings_cmd.handle()
@@ -211,11 +218,15 @@ async def handle_fund_holdings(event: MessageEvent):
         await fund_holdings_cmd.finish(error_msg)
 
     if not holdings:
-        await fund_holdings_cmd.finish(message_add_head("💼 你还没有任何理财产品", event))
+        content = (
+            f"💼 你还没有任何理财产品\n"
+            f"***\n"
+            f"{cmd('理财产品')} | {cmd('购买理财 金额', '购买理财 ')}"
+        )
+        await fund_holdings_cmd.finish(build_markdown(content))
 
     # 构建消息
-    lines = ["💼 我的理财持仓", "▃▃▃▃▃▃▃▃▃▃"]
-    lines.append("")
+    lines = ["# 💼 我的理财持仓", "***"]
 
     total_principal = 0
     total_value = 0
@@ -228,12 +239,13 @@ async def handle_fund_holdings(event: MessageEvent):
         # 计算持有天数
         days_held = (datetime.now() - holding.buy_date).days
 
-        lines.append(f"【{idx}】 持仓编号：{holding.id}")
-        lines.append(f"  💰 本金：{holding.principal:,} 金币")
-        lines.append(f"  📊 当前市值：{holding.current_value:,} 金币")
-        lines.append(f"  {profit_emoji} 累计盈亏：{profit_str} 金币")
-        lines.append(f"  📅 持有天数：{days_held} 天")
-        lines.append(f"  🕐 上次结算：{holding.last_settlement.strftime('%Y-%m-%d %H:%M')}")
+        lines.append(f"【{idx}】 持仓编号：**{holding.id}**")
+        lines.append(f"💰 本金：**{holding.principal:,}** 金币")
+        lines.append(f"📊 当前市值：**{holding.current_value:,}** 金币")
+        lines.append(f"{profit_emoji} 累计盈亏：**{profit_str}** 金币")
+        lines.append(f"📅 持有天数：**{days_held}** 天")
+        lines.append(f"🕐 上次结算：{holding.last_settlement.strftime('%Y-%m-%d %H:%M')}")
+        lines.append(f"{cmd('赎回理财 ' + str(holding.id), '赎回理财 ' + str(holding.id))} | {cmd('赎回到银行', '赎回理财 ' + str(holding.id) + ' 银行')}")
         lines.append("")
 
         total_principal += holding.principal
@@ -241,20 +253,18 @@ async def handle_fund_holdings(event: MessageEvent):
         total_profit += holding.accumulated_profit
 
     # 总计
-    lines.append("━━━━━━━━━━━━━")
+    lines.append("***")
     total_profit_str = f"+{total_profit:,}" if total_profit >= 0 else f"{total_profit:,}"
     total_return_pct = (total_profit / total_principal * 100) if total_principal > 0 else 0
 
-    lines.append(f"📝 汇总")
-    lines.append(f"  💰 总本金：{total_principal:,} 金币")
-    lines.append(f"  📊 总市值：{total_value:,} 金币")
-    lines.append(f"  📈 总盈亏：{total_profit_str} 金币 ({total_return_pct:+.2f}%)")
-    lines.append("")
+    lines.append("📝 汇总")
+    lines.append(f"💰 总本金：**{total_principal:,}** 金币")
+    lines.append(f"📊 总市值：**{total_value:,}** 金币")
+    lines.append(f"📈 总盈亏：**{total_profit_str}** 金币 (**{total_return_pct:+.2f}%**)")
+    lines.append("***")
+    lines.append(f"{cmd('理财产品')} | {cmd('购买理财 金额', '购买理财 ')}")
 
-    lines.append("💡 使用「赎回理财 编号」赎回到现金")
-    lines.append("💡 使用「赎回理财 编号 银行」赎回到银行")
-
-    await fund_holdings_cmd.finish(message_add_head("\n".join(lines), event))
+    await fund_holdings_cmd.finish(build_markdown("\n".join(lines)))
 
 
 # ==================== 定期理财（七日定存）命令 ====================
@@ -291,27 +301,24 @@ async def handle_fixed_list(event: MessageEvent):
     fee = cfg["interest_rate"] * cfg["fee_rate"] * 100
     net = gross - fee
 
-    lines = [
-        "🏦 冥界七日定存",
-        "▃▃▃▃▃▃▃▃▃▃",
-        "",
-        f"📊 基金规模：{fund.total_scale:,} 金币",
-        f"👥 参与人数：{fund.participant_count} 人",
-        "",
-        "📝 产品说明",
-        f"  ▫️ 锁定期：7天（到期方可赎回）",
-        f"  ▫️ 周利率：{gross:.0f}%（毛）/ {net:.0f}%（净）",
-        f"  ▫️ 管理费：利息的 {cfg['fee_rate']*100:.0f}%",
-        f"  ▫️ 最低投资：{cfg['min_investment']:,} 金币",
-        f"  ▫️ 最高投资：{cfg['max_investment']:,} 金币",
-        "",
-        "⚠️ 注意：锁定期间不可提前赎回，请确保资金不急用",
-        "",
-        "💡 使用「购买定期 金额」从现金投资",
-        "💡 使用「购买定期 金额 银行」从银行账户投资",
-        "💡 使用「我的定期」查看持有中的定存",
-    ]
-    await fixed_list_cmd.finish(message_add_head("\n".join(lines), event))
+    content = (
+        f"# 🏦 冥界七日定存\n"
+        f"***\n"
+        f"📊 基金规模：**{fund.total_scale:,}** 金币\n"
+        f"👥 参与人数：**{fund.participant_count}** 人\n"
+        f"***\n"
+        f"📝 产品说明\n"
+        f"▫️ 锁定期：**7**天（到期方可赎回）\n"
+        f"▫️ 周利率：**{gross:.0f}%**（毛）/ **{net:.0f}%**（净）\n"
+        f"▫️ 管理费：利息的 **{cfg['fee_rate']*100:.0f}%**\n"
+        f"▫️ 最低投资：**{cfg['min_investment']:,}** 金币\n"
+        f"▫️ 最高投资：**{cfg['max_investment']:,}** 金币\n\n"
+        f"⚠️ 锁定期间不可提前赎回，请确保资金不急用\n"
+        f"***\n"
+        f"{cmd('购买定期 金额', '购买定期 ')} | {cmd('购买定期 金额 银行', '购买定期 ')}\n"
+        f"{cmd('我的定期')} | {cmd('理财产品')}"
+    )
+    await fixed_list_cmd.finish(build_markdown(content))
 
 
 @fixed_buy_cmd.handle()
@@ -352,7 +359,12 @@ async def handle_fixed_buy(event: MessageEvent, args: Message = CommandArg()):
     if error_msg:
         await fixed_buy_cmd.finish(error_msg)
 
-    await fixed_buy_cmd.finish(message_add_head(message, event))
+    content = (
+        f"{message}\n"
+        f"***\n"
+        f"{cmd('我的定期')} | {cmd('定期理财')}"
+    )
+    await fixed_buy_cmd.finish(build_markdown(content))
 
 
 @fixed_holdings_cmd.handle()
@@ -376,12 +388,17 @@ async def handle_fixed_holdings(event: MessageEvent):
         await fixed_holdings_cmd.finish(error_msg)
 
     if not holdings:
-        await fixed_holdings_cmd.finish(message_add_head("📋 你目前没有持有七日定存", event))
+        content = (
+            f"📋 你目前没有持有七日定存\n"
+            f"***\n"
+            f"{cmd('定期理财')} | {cmd('购买定期 金额', '购买定期 ')}"
+        )
+        await fixed_holdings_cmd.finish(build_markdown(content))
 
     cfg = BankFundService.FIXED_WEEKLY_CONFIG
     now = datetime.now()
 
-    lines = ["📋 我的七日定存", "▃▃▃▃▃▃▃▃▃▃", ""]
+    lines = ["# 📋 我的七日定存", "***"]
     total_principal = 0
 
     for idx, h in enumerate(holdings, 1):
@@ -396,24 +413,25 @@ async def handle_fixed_holdings(event: MessageEvent):
             remaining = h.maturity_date - now
             hours = int(remaining.total_seconds() // 3600)
             mins = int((remaining.total_seconds() % 3600) // 60)
-            status = f"⏳ 锁定中"
+            status = "⏳ 锁定中"
             countdown = f"（剩余 {hours}小时{mins}分）"
 
-        lines.append(f"【{idx}】编号 {h.id}")
-        lines.append(f"  💰 本金：{h.principal:,} 金币")
-        lines.append(f"  📈 预期净收益：+{net_interest:,} 金币")
-        lines.append(f"  📅 到期时间：{h.maturity_date.strftime('%Y-%m-%d %H:%M')}")
-        lines.append(f"  🔒 状态：{status}{countdown}")
+        lines.append(f"【{idx}】编号 **{h.id}**")
+        lines.append(f"💰 本金：**{h.principal:,}** 金币")
+        lines.append(f"📈 预期净收益：**+{net_interest:,}** 金币")
+        lines.append(f"📅 到期时间：{h.maturity_date.strftime('%Y-%m-%d %H:%M')}")
+        lines.append(f"🔒 状态：{status}{countdown}")
+        if now >= h.maturity_date:
+            lines.append(f"{cmd('赎回定期 ' + str(h.id), '赎回定期 ' + str(h.id))} | {cmd('赎回到银行', '赎回定期 ' + str(h.id) + ' 银行')}")
         lines.append("")
         total_principal += h.principal
 
-    lines.append("━━━━━━━━━━━━━")
-    lines.append(f"💰 定存总额：{total_principal:,} 金币")
-    lines.append("")
-    lines.append("💡 使用「赎回定期 编号」赎回到现金")
-    lines.append("💡 使用「赎回定期 编号 银行」赎回到银行")
+    lines.append("***")
+    lines.append(f"💰 定存总额：**{total_principal:,}** 金币")
+    lines.append("***")
+    lines.append(f"{cmd('定期理财')} | {cmd('购买定期 金额', '购买定期 ')}")
 
-    await fixed_holdings_cmd.finish(message_add_head("\n".join(lines), event))
+    await fixed_holdings_cmd.finish(build_markdown("\n".join(lines)))
 
 
 @fixed_redeem_cmd.handle()
@@ -454,4 +472,9 @@ async def handle_fixed_redeem(event: MessageEvent, args: Message = CommandArg())
     if error_msg:
         await fixed_redeem_cmd.finish(error_msg)
 
-    await fixed_redeem_cmd.finish(message_add_head(message, event))
+    content = (
+        f"{message}\n"
+        f"***\n"
+        f"{cmd('我的定期')} | {cmd('定期理财')} | {cmd('购买定期 金额', '购买定期 ')}"
+    )
+    await fixed_redeem_cmd.finish(build_markdown(content))

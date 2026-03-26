@@ -13,7 +13,7 @@ from ..models.db import safe_session
 from ..models.player import Player
 from ..models.inventory import ItemInstance
 from ..config import config
-from ..utils import message_add_head
+from ..utils_markdown import cmd, build_markdown
 from ..platform_utils import get_unified_player
 
 __all__ = [
@@ -77,24 +77,20 @@ async def handle_token_exchange(event: MessageEvent):
         elixir_item = result.scalar_one_or_none()
         elixir_count = elixir_item.quantity if elixir_item else 0
 
-        lines = [
-            "💎 月卡宝箱兑换商店",
-            "━━━━━━━━━━━━━",
-            f"💰 你的月卡宝箱：{monthly_card_box_count}",
-            f"💊 你的真还魂丹：{elixir_count}",
-            "",
-            "🛒 可兑换物品：",
-            "1. 真还魂丹 - 2月卡宝箱/个",
-            "",
-            "💡 兑换说明：",
-            "• 月卡用户可以将宝箱兑换成真还魂丹",
-            "",
-            "📝 操作指南：",
-            "【兑换真还魂丹 数量】 - 兑换真还魂丹",
-            "例如：兑换真还魂丹 1"
-        ]
+        content = (
+            f"# 💎 月卡宝箱兑换商店\n"
+            f"***\n"
+            f"💰 你的月卡宝箱：**{monthly_card_box_count}**\n"
+            f"💊 你的真还魂丹：**{elixir_count}**\n"
+            f"***\n"
+            f"🛒 可兑换物品\n"
+            f"▫️ {cmd('真还魂丹', '兑换真还魂丹 1')} - **2**月卡宝箱/个\n\n"
+            f"💡 月卡用户可以将宝箱兑换成真还魂丹\n"
+            f"***\n"
+            f"{cmd('兑换真还魂丹 数量', '兑换真还魂丹 ')} | {cmd('月卡宝箱兑换')}"
+        )
 
-        await token_exchange_cmd.finish(message_add_head("\n".join(lines), event))
+        await token_exchange_cmd.finish(build_markdown(content))
 
 
 @exchange_elixir_cmd.handle()
@@ -152,9 +148,12 @@ async def handle_exchange_elixir(event: MessageEvent, args: Message = CommandArg
 
         await session.commit()
 
-        await exchange_elixir_cmd.finish(message_add_head(
-            f"✅ 兑换成功！\n"
-            f"💸 消耗：月卡宝箱×{required_boxes}\n"
-            f"💊 获得：真还魂丹×{quantity}",
-            event
-        ))
+        content = (
+            f"# ✅ 兑换成功\n"
+            f"***\n"
+            f"💸 消耗：月卡宝箱 x**{required_boxes}**\n"
+            f"💊 获得：真还魂丹 x**{quantity}**\n"
+            f"***\n"
+            f"{cmd('月卡宝箱兑换')} | {cmd('背包')}"
+        )
+        await exchange_elixir_cmd.finish(build_markdown(content))
