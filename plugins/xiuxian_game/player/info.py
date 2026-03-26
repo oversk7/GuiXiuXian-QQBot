@@ -708,8 +708,7 @@ async def _(event: MessageEvent):
         f"刷材料 = {cmd('进入 1层诡域', '进入 ')} + {cmd('每日委托')}\n"
         f"赚钱 = {cmd('打工')}(稳) + {cmd('跑商推荐', '跑商推荐')}(中) + {cmd('投资行情', '投资行情')}(险)\n"
         "***\n"
-        f"> {cmd('帮助')} 查看所有系统 | [加入官群]({GROUP_LINK})\n"
-        "> [游戏资料教程](https://Tutorials.Bossjlb.Top)"
+        f"> {cmd('帮助')} 查看所有系统"
     )
 
     await newbie_guide.finish(build_markdown(content))
