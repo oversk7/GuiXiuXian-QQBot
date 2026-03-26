@@ -8,6 +8,7 @@ from ..models.db import AsyncSessionLocal
 from ..models.player import Player
 from ..models.daily_task import DailyTask, TaskStatus
 from ..utils import message_add_head
+from ..utils_markdown import cmd, build_markdown
 from ..platform_utils import get_unified_player
 from .service_new import DailyTaskService
 from ..battle.integration_helper import BattleIntegrationHelper
@@ -67,12 +68,11 @@ async def handle_daily_task(event: MessageEvent):
         summary = await task_service.get_task_summary(player.id)
 
         # 构建消息
-        lines = ["🏛️ 大都会缉邪司 - 每日委托", "━━━━━━━━━━━━━"]
+        lines = ["# 🏛️ 缉邪司 · 每日委托", "***"]
 
         if not tasks:
             lines.append("⚠️ 今日暂无委托任务")
         else:
-            # 显示所有任务
             for i, task in enumerate(tasks, 1):
                 if task.is_available():
                     status_emoji = "📋"
@@ -87,42 +87,36 @@ async def handle_daily_task(event: MessageEvent):
                     status_emoji = "❌"
                     status_text = "已过期"
 
-                lines.append(f"{status_emoji} 【委托{i}】{task.title}")
-                lines.append(f"🔳 任务描述：{task.description}")
-                lines.append(f"📍 目标位置：{task.location_str}")
-                lines.append(f"👹 目标敌人：{task.enemy_name} Lv.{task.enemy_level}")
-                lines.append(f"💰 任务奖励：{task.get_reward_summary(bool(player.guild_id))}")
-                lines.append(f"📊 任务状态：{status_text}")
+                lines.append(f"**{status_emoji} 委托{i} · {task.title}**")
+                lines.append(f"📝 {task.description}")
+                lines.append(f"📍 {cmd(task.location_str, f'导航 {task.target_x} {task.target_y}')} | 👹 {task.enemy_name} Lv.**{task.enemy_level}**")
+                lines.append(f"💰 {task.get_reward_summary(bool(player.guild_id))} | 状态：{status_text}")
 
-                # 添加导航快捷方式提示
-                if task.is_available() or task.is_accepted():
-                    lines.append(f"🧭 快捷导航：【导航 {task.target_x} {task.target_y}】")
+                if task.is_available():
+                    lines.append(f"→ {cmd(f'接取委托 {i}')} | {cmd(f'接取并导航', f'接取委托 {i} 导航')}")
+                elif task.is_accepted():
+                    lines.append(f"→ {cmd(task.location_str, f'导航 {task.target_x} {task.target_y}')} 前往 | {cmd('完成任务')} 到达后提交")
 
-                lines.append("")
+                lines.append("***")
 
-        lines.append("━━━━━━━━━━━━━")
-        
         # 统计信息
-        lines.append("📈 完成统计：")
-        lines.append(f"本周完成：{summary['weekly_completed']} 次")
-        lines.append(f"总计完成：{summary['total_completed']} 次")
-        lines.append("")
-        
+        lines.append(f"📈 本周完成：**{summary['weekly_completed']}**次 | 总计：**{summary['total_completed']}**次")
+
         # 操作提示
         available_count = sum(1 for task in tasks if task.is_available())
         accepted_count = sum(1 for task in tasks if task.is_accepted())
         completed_count = sum(1 for task in tasks if task.is_completed())
 
-        if available_count > 0:
-            lines.append(f"💡 使用【接取任务 <委托编号>】接取委托（如：接取任务 1）")
-        if accepted_count > 0:
-            lines.append("💡 前往目标位置，使用【观察】查看鬼怪，击杀后使用【完成任务】")
+        nav_cmds = []
         if completed_count == len(tasks) and len(tasks) >= 3:
             lines.append("🎉 今日所有委托已完成，明日再来！")
-        elif len(tasks) < 3:
-            lines.append("💡 使用【刷新委托】获取更多委托任务")
+        if len(tasks) < 3:
+            nav_cmds.append(cmd('刷新委托'))
+        nav_cmds.append(cmd('任务统计'))
+        nav_cmds.append(cmd('帮助'))
+        lines.append(" | ".join(nav_cmds))
 
-        # 检查新手任务（在最后）
+        # 检查新手任务
         from ..quest.novice_quest_service import NoviceQuestService
         quest_completed, quest_msg = await NoviceQuestService.check_and_advance_quest(
             uow.session, player, "command", {"command": "任务"}
@@ -132,7 +126,7 @@ async def handle_daily_task(event: MessageEvent):
             lines.append("")
             lines.append(quest_msg)
 
-        await daily_task_cmd.finish(message_add_head("\n".join(lines), event))
+        await daily_task_cmd.finish(build_markdown("\n".join(lines)))
 
 
 # ==================== 接取任务 ====================
@@ -245,26 +239,24 @@ async def handle_accept_task(event: MessageEvent, args: Message = CommandArg()):
             await uow.commit()
 
             msg = (
-                f"🏛️ 缉邪司委托接取成功！\n"
-                f"━━━━━━━━━━━━━\n"
-                f"📋 委托{task_index}：{task.title}\n"
-                f"🔳 任务描述：{task.description}\n"
-                f"📍 目标：{task.location_str}\n"
-                f"👹 敌人：{task.enemy_name} Lv.{task.enemy_level}\n"
-                f"💰 奖励：{task.get_reward_summary(bool(player.guild_id))}\n"
-                f"━━━━━━━━━━━━━\n"
-                f"💡 请前往目标位置，使用【观察】查看鬼怪，击杀后使用【完成任务】\n"
+                f"# ✅ 委托接取成功\n"
+                f"***\n"
+                f"**📋 委托{task_index} · {task.title}**\n"
+                f"📝 {task.description}\n"
+                f"📍 {cmd(task.location_str, f'导航 {task.target_x} {task.target_y}')} | 👹 {task.enemy_name} Lv.**{task.enemy_level}**\n"
+                f"💰 {task.get_reward_summary(bool(player.guild_id))}\n"
+                f"***\n"
             )
 
             if auto_nav:
-                msg += f"🧭 已自动设置导航至任务位置\n"
-                msg += f"💡 使用【导航】查看进度 | 【中断导航】停止前进"
+                msg += f"🧭 已自动导航至任务位置\n"
+                msg += f"{cmd('导航')} 查看进度 | {cmd('中断导航')} 停止"
             else:
-                msg += f"🧭 快捷导航：【导航 {task.target_x} {task.target_y}】或【接取任务 {task_index} 导航】"
+                msg += f"🧭 {cmd('前往任务点', f'导航 {task.target_x} {task.target_y}')} | {cmd('观察')} 到达后查看鬼怪 | {cmd('完成任务')}"
         else:
             msg = f"⛔ {message}"
 
-    await accept_task_cmd.finish(message_add_head(msg, event))
+    await accept_task_cmd.finish(build_markdown(msg))
 
 
 # ==================== 完成任务 ====================
@@ -367,16 +359,18 @@ async def handle_complete_task(event: MessageEvent):
             completion_desc = random.choice(completion_descriptions)
 
             msg = (
-                f"🎉 任务完成！\n"
-                f"━━━━━━━━━━━━━\n"
+                f"# 🎉 任务完成！\n"
+                f"***\n"
                 f"👻 {completion_desc}\n"
-                f"💰 获得奖励：{reward_text}\n"
-                f"🏛️ 缉邪司对你的英勇表示赞赏！"
+                f"💰 获得奖励：**{reward_text}**\n"
+                f"🏛️ 缉邪司对你的英勇表示赞赏！\n"
+                f"***\n"
+                f"{cmd('每日委托')} | {cmd('刷新委托')} | {cmd('任务统计')} | {cmd('帮助')}"
             )
         else:
             msg = f"⛔ {message}"
 
-    await complete_task_cmd.finish(message_add_head(msg, event))
+    await complete_task_cmd.finish(build_markdown(msg))
 
 
 # ==================== 任务统计 ====================
@@ -412,26 +406,25 @@ async def handle_task_stats(event: MessageEvent):
 
         summary = await task_service.get_task_summary(player.id)
 
-        lines = ["📊 缉邪司委托统计", "━━━━━━━━━━━━━"]
-        lines.append(f"📅 本周完成：{summary['weekly_completed']} 次")
-        lines.append(f"🏆 总计完成：{summary['total_completed']} 次")
+        lines = ["# 📊 缉邪司委托统计", "***"]
+        lines.append(f"📅 本周完成：**{summary['weekly_completed']}** 次")
+        lines.append(f"🏆 总计完成：**{summary['total_completed']}** 次")
 
-        # 今日任务状态
         today_task = summary['today_task']
         if today_task:
             if today_task.is_completed():
                 lines.append("✅ 今日任务：已完成")
             elif today_task.is_accepted():
-                lines.append("⚔️ 今日任务：进行中")
+                lines.append(f"⚔️ 今日任务：进行中 → {cmd('完成任务')}")
             else:
-                lines.append("📋 今日任务：可接取")
+                lines.append(f"📋 今日任务：可接取 → {cmd('接取委托 1')}")
         else:
-            lines.append("📋 今日任务：尚未生成")
+            lines.append(f"📋 今日任务：尚未生成 → {cmd('每日委托')} 查看")
 
-        lines.append("")
-        lines.append("💡 每日完成委托可获得经验、金币和积分奖励，有公会还可获得公会经验")
+        lines.append("***")
+        lines.append(f"{cmd('每日委托')} | {cmd('刷新委托')} | {cmd('帮助')}")
 
-    await task_stats_cmd.finish(message_add_head("\n".join(lines), event))
+    await task_stats_cmd.finish(build_markdown("\n".join(lines)))
 
 
 # ==================== 刷新委托 ====================
@@ -481,16 +474,16 @@ async def handle_refresh_task(event: MessageEvent):
 
         await uow.commit()
 
+        task_num = len(tasks) + 1
         msg = (
-            f"🏛️ 缉邪司新委托生成！\n"
-            f"━━━━━━━━━━━━━\n"
-            f"📋 委托{len(tasks) + 1}：{new_task.title}\n"
-            f"🔳 任务描述：{new_task.description}\n"
-            f"📍 目标：{new_task.location_str}\n"
-            f"👹 敌人：{new_task.enemy_name} Lv.{new_task.enemy_level}\n"
-            f"💰 奖励：{new_task.get_reward_summary(bool(player.guild_id))}\n"
-            f"━━━━━━━━━━━━━\n"
-            f"💡 使用【接取任务 {len(tasks) + 1}】接取此委托"
+            f"# 🏛️ 新委托生成！\n"
+            f"***\n"
+            f"**📋 委托{task_num} · {new_task.title}**\n"
+            f"📝 {new_task.description}\n"
+            f"📍 {cmd(new_task.location_str, f'导航 {new_task.target_x} {new_task.target_y}')} | 👹 {new_task.enemy_name} Lv.**{new_task.enemy_level}**\n"
+            f"💰 {new_task.get_reward_summary(bool(player.guild_id))}\n"
+            f"***\n"
+            f"{cmd(f'接取委托 {task_num}')} | {cmd(f'接取并导航', f'接取委托 {task_num} 导航')} | {cmd('每日委托')}"
         )
 
-    await refresh_task_cmd.finish(message_add_head(msg, event))
+    await refresh_task_cmd.finish(build_markdown(msg))
