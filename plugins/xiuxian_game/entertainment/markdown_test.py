@@ -1,6 +1,6 @@
 """
 QQ原生Markdown语法测试指令
-测试官方开放的原生markdown能力，包括链接、标题、加粗等语法
+测试官方开放的原生markdown能力，包括链接、标题、加粗、交互蓝字等语法
 """
 from nonebot import on_command
 from nonebot.adapters.qq import MessageEvent, MessageSegment
@@ -34,3 +34,36 @@ async def handle_md_native_test(event: MessageEvent):
     )
     markdown = MessageMarkdown(content=content)
     await md_native_test.finish(MessageSegment.markdown(markdown))
+
+
+# ==================== 蓝字交互测试 ====================
+
+md_btn_test = on_command("蓝字测试", aliases={"交互文本测试"}, priority=4, block=True)
+
+
+@md_btn_test.handle()
+async def handle_md_btn_test(event: MessageEvent):
+    """测试原生Markdown中的<qqbot-cmd-input>交互蓝字"""
+    content = (
+        "# 蓝字交互测试\r"
+        "***\r"
+        "**测试1：基本蓝字（show=text）**\r"
+        '点击签到：<qqbot-cmd-input text="签到" show="签到" reference="false"/>\r'
+        "***\r"
+        "**测试2：show与text不一致**\r"
+        '点击购买：<qqbot-cmd-input text="购买 金表 " show="金表" reference="false"/>\r'
+        "***\r"
+        "**测试3：同一行多个蓝字**\r"
+        '<qqbot-cmd-input text="修炼" show="修炼" reference="false"/>'
+        " | "
+        '<qqbot-cmd-input text="闭关" show="闭关" reference="false"/>'
+        " | "
+        '<qqbot-cmd-input text="突破" show="突破" reference="false"/>\r'
+        "***\r"
+        "**测试4：引用蓝字（reference=true）**\r"
+        '引用模式：<qqbot-cmd-input text="面板" show="查看面板" reference="true"/>\r'
+        "***\r"
+        "> 请逐个点击蓝字，确认输入框中出现的命令是否正确"
+    )
+    markdown = MessageMarkdown(content=content)
+    await md_btn_test.finish(MessageSegment.markdown(markdown))
