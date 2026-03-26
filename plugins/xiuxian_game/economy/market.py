@@ -850,6 +850,13 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
         else:
             lines.append("(空)")
         lines.append("***")
+        if sell_total > 1:
+            nav = []
+            if cur_page > 1:
+                nav.append(cmd(f'上一页', f'查牌 {item_cfg.name} {cur_page - 1}'))
+            if cur_page < sell_total:
+                nav.append(cmd(f'下一页', f'查牌 {item_cfg.name} {cur_page + 1}'))
+            lines.append(" | ".join(nav))
         lines.append(f"{cmd('挂牌 出售 ' + item_cfg.name, '挂牌 出售 ' + item_cfg.name + ' ')} | {cmd('挂牌 收购 ' + item_cfg.name, '挂牌 收购 ' + item_cfg.name + ' ')} | {cmd('交易清单')}")
 
         await view_cmd.finish(build_markdown("\n".join(lines)))
@@ -935,6 +942,13 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
         else:
             lines.append("(空)")
         lines.append("***")
+        if total_pages > 1:
+            nav = []
+            if cur_page > 1:
+                nav.append(cmd(f'上一页', f'交易清单 {cur_page - 1}'))
+            if cur_page < total_pages:
+                nav.append(cmd(f'下一页', f'交易清单 {cur_page + 1}'))
+            lines.append(" | ".join(nav))
         lines.append(f"{cmd('我的挂牌')} | {cmd('税率')} | {cmd('估价', '估价 ')}")
         await overview_cmd.finish(build_markdown("\n".join(lines)))
 
@@ -1007,6 +1021,13 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
             lines.append("(空)")
 
         lines.append("***")
+        if total_pages > 1:
+            nav = []
+            if page > 1:
+                nav.append(cmd(f'上一页', f'我的挂牌 {page - 1}'))
+            if page < total_pages:
+                nav.append(cmd(f'下一页', f'我的挂牌 {page + 1}'))
+            lines.append(" | ".join(nav))
         lines.append(f"{cmd('交易清单')} | {cmd('挂牌', '挂牌 ')}")
         await my_orders_cmd.finish(build_markdown("\n".join(lines)))
 
