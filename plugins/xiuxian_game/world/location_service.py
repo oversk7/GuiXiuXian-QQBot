@@ -225,6 +225,10 @@ class LocationService:
                         # 死亡/复活中的NPC不做蓝字
                         hint = npc.get_interaction_hint()
                         lines.append(f"{npc.get_display_name()}{hint}")
+                    elif npc_type == "ghost":
+                        # 鬼怪NPC：点击直接死斗
+                        hint = npc.get_interaction_hint()
+                        lines.append(f"{cmd(npc.name, f'攻击 {npc.name}')}⚔️{hint}")
                     else:
                         hint = npc.get_interaction_hint()
                         lines.append(f"{cmd(npc.name, f'交互 {npc.name}')}{hint}")
