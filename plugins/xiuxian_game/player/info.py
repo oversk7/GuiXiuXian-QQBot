@@ -185,22 +185,28 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
     if has_world_unread:
         notice_parts.append(f"🌐 {cmd('查看世界消息', '消息')}")
 
-    # 组装原生 Markdown 面板
+    # 组装原生 Markdown 面板（保持原版逐行排版）
     lines = [
         f"# 👤 {display_name}",
-        f"UID:{player.uid}　{player.sex}　Lv.**{player.level}** · {realm_name}",
+        f"UID:{player.uid}　「{player.sex}」",
+        f"Lv.**{player.level}** · {realm_name}",
     ]
     if title_line:
         lines.append(title_line)
     lines.extend([
-        f"☯ {guild_name}　Exp {player.exp}/{exp_max}",
+        f"☯ {guild_name}",
+        f"Exp {player.exp}/{exp_max}",
         "***",
-        f"❤️生命 **{cur_hp}**/{hp_max_str}　🧠理智 **{cur_mp}**/{mp_max_str}",
-        f"⚔️力 **{atk_str}**　🛡️防 **{def_str}**　👟敏 **{agi_str}**　🍀运 **{luk_str}**",
+        f"❤️生命 **{cur_hp}**/{hp_max_str}",
+        f"🧠理智 **{cur_mp}**/{mp_max_str}",
+        f"⚔️力 **{atk_str}**　🛡️防 **{def_str}**",
+        f"👟敏 **{agi_str}**　🍀运 **{luk_str}**",
         f"🔮咒抗 **{player.stamina}**",
         "***",
-        f"🪙金币 **{player.gold}**　💎积分 **{player.gold2}**　🕯️诡烛 **{player.gui_zhu}**",
-        f"💀怨念 **{player.resentment}**　✨点数 **{player.attribute_points}**　🙏香火 **{player.incense}**",
+        f"🪙金币 **{player.gold}**",
+        f"💎积分 **{player.gold2}**",
+        f"💀怨念 **{player.resentment}**　✨点数 **{player.attribute_points}**",
+        f"🕯️诡烛 **{player.gui_zhu}**　🙏香火 **{player.incense}**",
         f"📍{_format_player_location(player)}",
         "***",
     ])
@@ -759,18 +765,23 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
     if has_world_unread:
         notice_parts_full.append(f"🌐 {cmd('查看世界消息', '消息')}")
 
-    # 11. 组装完整面板（原生 Markdown）
+    # 11. 组装完整面板（原生 Markdown，保持原版逐行排版）
     lines = [
         f"# 👤 {display_name_full}",
-        f"UID:{player.uid}　{player.sex}　Lv.**{player.level}** · {realm_name}",
+        f"UID:{player.uid}　「{player.sex}」",
+        f"Lv.**{player.level}** · {realm_name}",
     ]
     if title_line_full.strip():
-        lines.append(title_line_full.replace("┃ ", "").replace("\n", "").strip())
+        lines.append("🏅称号 「" + player_title + "」")
     lines.extend([
-        f"☯ {guild_name}　Exp {player.exp}/{exp_max}　📅注册 {created_info}",
+        f"☯ {guild_name}",
+        f"Exp {player.exp}/{exp_max}",
+        f"📅注册 {created_info}",
         "***",
-        f"❤️生命 **{cur_hp}**/{hp_max_str}　🧠理智 **{cur_mp}**/{mp_max_str}",
-        f"⚔️力 **{atk_str}**　🛡️防 **{def_str}**　👟敏 **{agi_str}**　🍀运 **{luk_str}**",
+        f"❤️生命 **{cur_hp}**/{hp_max_str}",
+        f"🧠理智 **{cur_mp}**/{mp_max_str}",
+        f"⚔️力 **{atk_str}**　🛡️防 **{def_str}**",
+        f"👟敏 **{agi_str}**　🍀运 **{luk_str}**",
         f"🔮咒抗 **{player.stamina}**",
         "***",
         "**⚔️ 战斗属性**",
@@ -784,8 +795,10 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
 
     lines.extend([
         "***",
-        f"🪙金币 **{player.gold}**　💎积分 **{player.gold2}**　🕯️诡烛 **{player.gui_zhu}**",
-        f"💀怨念 **{player.resentment}**　✨点数 **{player.attribute_points}**　🙏香火 **{player.incense}**",
+        f"🪙金币 **{player.gold}**",
+        f"💎积分 **{player.gold2}**",
+        f"💀怨念 **{player.resentment}**　✨点数 **{player.attribute_points}**",
+        f"🕯️诡烛 **{player.gui_zhu}**　🙏香火 **{player.incense}**",
         f"📍{_format_player_location(player)}",
     ])
 
