@@ -199,6 +199,64 @@ async def handle_recipe_guide(event: MessageEvent):
         await recipe_guide_cmd.finish(msg)
 
 
+# ==================== 菜品利润分析 ====================
+
+dish_profit_cmd = on_command("菜品利润", aliases={"利润分析"}, priority=5, block=True)
+
+
+@dish_profit_cmd.handle()
+async def handle_dish_profit(event: MessageEvent):
+    """【菜品利润】- 查看菜品利润分析"""
+
+    async with UnitOfWork(AsyncSessionLocal) as uow:
+        player = await get_unified_player(uow.session, event)
+        if not player:
+            await dish_profit_cmd.finish("⛔ 请先创建角色")
+
+        recipes = await cooking_service.get_player_recipes(uow, player.id)
+
+        if not recipes:
+            await dish_profit_cmd.finish("⛔ 你还没有学会任何食谱\n使用【食谱图鉴】查看所有食谱")
+
+        # 客群映射
+        tier_customer_map = {
+            "white": "普通食客",
+            "green": "普通/富商",
+            "blue": "富商",
+            "purple": "富商/贵宾",
+            "orange": "贵宾"
+        }
+
+        tier_names = {
+            "white": "白", "green": "绿", "blue": "蓝",
+            "purple": "紫", "orange": "橙"
+        }
+
+        msg = "📋 菜品利润分析\n━━━━━━━━━━━━━\n"
+
+        for tier in ["white", "green", "blue", "purple", "orange"]:
+            tier_recipes = [r for r in recipes if r.tier == tier]
+            if not tier_recipes:
+                continue
+
+            for recipe in tier_recipes:
+                cost = cooking_service.calculate_recipe_cost(recipe.recipe_id)
+                profit = recipe.base_price - cost
+                profit_rate = int(profit / cost * 100) if cost > 0 else 0
+                customer = tier_customer_map.get(recipe.tier, "")
+
+                msg += (
+                    f"  {recipe.name}({tier_names[tier]}) | "
+                    f"售{recipe.base_price} 本{cost} "
+                    f"利{profit}({profit_rate}%) | "
+                    f"{customer}\n"
+                )
+
+        msg += "\n💡 菜单应覆盖各层客群，避免客人吃不到合适的菜"
+
+        await dish_profit_cmd.finish(msg)
+
+
 # ==================== 餐厅相关指令 ====================
 
 create_restaurant_cmd = on_command("创建餐厅", aliases={"开餐厅"}, priority=5, block=True)
