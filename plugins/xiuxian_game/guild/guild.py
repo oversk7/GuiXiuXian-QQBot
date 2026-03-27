@@ -11,6 +11,7 @@ from ..models.guild import Guild, GuildMember, GuildPosition, BuildingType, Guil
 from ..models.guild_task_record import GuildTaskRecord
 from ..config import config
 from ..utils import message_add_head
+from ..utils_markdown import cmd, build_markdown
 from ..models.social_application import SocialApplication, ApplicationType, ApplicationStatus
 from ..models.donation_log import PlayerDonationLog
 from ..models.navigation_task import NavigationTask
@@ -718,38 +719,53 @@ async def handle_list_guilds(event: MessageEvent, args: Message = CommandArg()):
 
         # 分页
         total_guilds = len(guilds)
+        total_pages = (total_guilds + page_size - 1) // page_size
+        page = min(page, total_pages)
         start_idx = (page - 1) * page_size
         end_idx = start_idx + page_size
         guilds_page = guilds[start_idx:end_idx]
 
-        # 构建消息 - 优化版，信息密度最大化
-        lines = [f"📋 公会列表 (第{page}/{(total_guilds + page_size - 1) // page_size}页 | 共{total_guilds}个)"]
-        lines.append("━━━━━━━━━━━━━")
+        # 构建Markdown格式消息
+        lines = [
+            f"# 📋 公会列表",
+            f"第**{page}**/{total_pages}页 | 共**{total_guilds}**个公会",
+            "***",
+        ]
 
         for guild in guilds_page:
             # 获取会长信息
             president = await uow.session.get(Player, guild.president_id)
             president_name = president.nickname if president else "未知"
-            president_uid = president.uid if president else "N/A"
 
             # 获取成员数量
             member_count = await uow.guilds.get_member_count(guild.id)
             max_members = 10 + (guild.level - 1) * 5
 
-            # 紧凑格式，所有信息在一行显示
             lines.append(
-                f"🏰{guild.name} [ID:{guild.id}] | Lv{guild.level} | {member_count}/{max_members}人 | "
-                f"💰{guild.treasury:,} | ⭐{guild.exp:,}\n"
-                f"   会长: {president_name}[UID:{president_uid}]"
+                f"🏰 **{guild.name}** Lv.{guild.level}│"
+                f"{member_count}/{max_members}人│"
+                f"💰{guild.treasury:,}"
             )
+            lines.append(
+                f"会长：{president_name}　"
+                f"{cmd('加入', f'加入公会 {guild.id}')}"
+            )
+            lines.append("")
 
-        lines.append("━━━━━━━━━━━━━")
-        lines.append("💡 使用【加入公会 公会ID】申请加入")
-        lines.append("💡 或通过UID联系会长了解详情")
-        if total_guilds > page_size:
-            lines.append(f"💡 查看更多: 【公会列表 {page + 1}】")
+        lines.append("***")
 
-    await list_guilds_cmd.finish(message_add_head("\n".join(lines), event))
+        # 分页导航
+        nav_parts = []
+        if page > 1:
+            nav_parts.append(cmd(f"上一页", f"公会列表 {page - 1}"))
+        if page < total_pages:
+            nav_parts.append(cmd(f"下一页", f"公会列表 {page + 1}"))
+        if nav_parts:
+            lines.append(" | ".join(nav_parts))
+
+        lines.append(cmd("公会列表") + " | " + cmd("帮助"))
+
+    await list_guilds_cmd.finish(build_markdown("\n".join(lines)))
 
 # ==================== 申请列表 ====================
 application_list_cmd = on_command("申请列表", block=True, priority=5)
