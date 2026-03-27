@@ -388,6 +388,31 @@ class CookingService:
         """
         return f"dish_{recipe_id}_{quality}"
 
+    def calculate_recipe_cost(self, recipe_id: str) -> int:
+        """
+        计算食谱的食材成本
+
+        遍历recipe.ingredients, 查items_config获取每个食材的price, 累加
+
+        Args:
+            recipe_id: 食谱ID
+
+        Returns:
+            总食材成本(金币), 找不到返回0
+        """
+        recipe = self.recipe_manager.get_recipe(recipe_id)
+        if not recipe:
+            return 0
+
+        from ..config import config
+        total_cost = 0
+        for item_id, qty in recipe.ingredients.items():
+            item_cfg = config.items_config["by_id"].get(item_id)
+            if item_cfg:
+                total_cost += item_cfg.price * qty
+
+        return total_cost
+
     async def learn_recipe(
         self,
         uow: UnitOfWork,
