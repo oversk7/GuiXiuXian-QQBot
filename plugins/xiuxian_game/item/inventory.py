@@ -8,7 +8,7 @@ from ..models.db import safe_session
 from ..models.player import Player
 from ..models.inventory import ItemInstance
 from ..models.inventory import ItemType, ItemEffectType
-from ..utils import message_add_head, paginate_items
+from ..utils import message_add_head
 from ..utils_markdown import cmd, build_markdown
 from sqlalchemy import select, func
 from ..config import config
@@ -126,6 +126,23 @@ TYPE_NAME_MAP = {
     "GUARDIAN_BEAST": "守护兽",
 }
 
+# 分类键名对应的中文（用于翻页导航指令）
+CATEGORY_CN_DISPLAY = {
+    "CONSUMABLE": "消耗品",
+    "MATERIAL": "材料",
+    "GOODS": "商品",
+    "ELIXIR": "丹药",
+    "GEM": "宝石",
+    "GIFT": "礼物",
+    "SEASONING": "调味品",
+    "DISH": "菜肴",
+    "RECIPE": "食谱",
+    "VEGETABLE": "灵蔬",
+    "HERB": "诡药",
+    "SEED": "灵种",
+    "GUARDIAN_BEAST": "守护兽",
+}
+
 # 默认展示顺序（决定排序权重）
 CATEGORY_ORDER = [
     "CONSUMABLE_NON_ELIXIR",  # 普通消耗品（不含丹药）
@@ -143,6 +160,72 @@ CATEGORY_ORDER = [
     "GEM",                   # 宝石
     "EQUIPMENT"
 ]
+
+def _get_item_action_cmd(inst) -> str:
+    """根据物品类型返回可点击的蓝字名称，点击后在输入框填入对应指令"""
+    cfg = inst.config
+    name = cfg.name
+    item_type = cfg.type.value
+    is_elixir = cfg.item_id.endswith("_elixir")
+
+    if item_type in ("CONSUMABLE", "GOODS", "DISH", "SEASONING", "VEGETABLE", "RECIPE") or is_elixir:
+        return cmd(name, f"使用 {name}")
+    elif item_type in ("MATERIAL", "HERB", "GHOST_FRAGMENT"):
+        return cmd(name, f"献祭 {name}")
+    elif item_type in ("GEM", "INSCRIPTION"):
+        return cmd(name, f"镶嵌 {name}")
+    elif item_type == "SEED":
+        return cmd(name, f"种植 {name}")
+    elif item_type == "GIFT":
+        return cmd(name, f"送礼 {name} ")
+    else:
+        return name
+
+
+def _format_inventory_md(
+    items: list,
+    page: int,
+    page_size: int,
+    capacity_info: str,
+    total_items: int | None = None,
+    category_cn: str = "",
+) -> str:
+    """格式化背包为原生Markdown，物品名称为可点击蓝字"""
+    if total_items is not None:
+        current_page_items = items
+        start = (page - 1) * page_size
+        count = total_items
+    else:
+        start = (page - 1) * page_size
+        current_page_items = items[start:start + page_size]
+        count = len(items)
+
+    total_pages = max(1, (count - 1) // page_size + 1)
+
+    title = f"# 🎒 背包{'·' + category_cn if category_cn else ''}"
+    lines = [title, capacity_info, "***"]
+
+    for offset, inst in enumerate(current_page_items, start=1):
+        global_idx = start + offset
+        item_link = _get_item_action_cmd(inst)
+        lines.append(f"{global_idx}. {item_link} ✖️{inst.quantity}")
+
+    lines.append("***")
+
+    # 翻页导航
+    nav_cmd_base = f"背包 {category_cn}" if category_cn else "背包"
+    page_nav = []
+    if page > 1:
+        page_nav.append(cmd("◀上一页", f"{nav_cmd_base} {page - 1}"))
+    page_nav.append(f"第**{page}**/{total_pages}页")
+    if page < total_pages:
+        page_nav.append(cmd("下一页▶", f"{nav_cmd_base} {page + 1}"))
+    lines.append("　".join(page_nav))
+
+    lines.append(cmd("背包") + " | " + cmd("整理背包") + " | " + cmd("帮助"))
+
+    return build_markdown("\n".join(lines))
+
 
 @use_item.handle()
 async def handle_use_item(event: MessageEvent, args: Message = CommandArg()):
@@ -539,9 +622,9 @@ async def handle_inventory(event: MessageEvent, args: Message = CommandArg()):
         if effective_capacity > inventory_capacity:
             capacity_info += f" (💳+{effective_capacity - inventory_capacity})"
 
-        # query_inventory_page 已完成 DB 层分页，传入 page 和 total_items 以正确显示页码
-        formatted = await paginate_items(items, page, page_size=page_size, capacity_info=capacity_info, total_items=total)
-        await inventory_cmd.finish(message_add_head(formatted, event))
+        # query_inventory_page 已完成 DB 层分页，使用原生Markdown渲染
+        cat_cn = CATEGORY_CN_DISPLAY.get(category_key, "")
+        await inventory_cmd.finish(_format_inventory_md(items, page, page_size, capacity_info, total_items=total, category_cn=cat_cn))
 
     # --- 全背包视图：Python 端跨分类排序 ---
     from ..queries import readonly_session as _readonly_session
@@ -575,8 +658,7 @@ async def handle_inventory(event: MessageEvent, args: Message = CommandArg()):
     if effective_capacity > inventory_capacity:
         capacity_info += f" (💳+{effective_capacity - inventory_capacity})"
 
-    formatted = await paginate_items(inventory_items, page, page_size=page_size, capacity_info=capacity_info)
-    await inventory_cmd.finish(message_add_head(formatted, event))
+    await inventory_cmd.finish(_format_inventory_md(inventory_items, page, page_size, capacity_info))
 
 
 @fish_inventory_cmd.handle()
