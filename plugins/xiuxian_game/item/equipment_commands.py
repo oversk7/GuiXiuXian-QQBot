@@ -138,8 +138,8 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
             # 构建装备信息
             info_parts = []
 
-            # 基础信息 - 编号可点击（填入"装备 N"到输入框），装备名可点击查看详情
-            info_parts.append(f"🆔{cmd(str(i), f'装备 {i}')}│{cmd(tpl.name, f'装备详情 {i}')}")
+            # 基础信息 - 编号只追加纯数字（配合底部"装备"按钮组合），装备名可点击查看详情
+            info_parts.append(f"🆔{cmd(str(i), str(i))}│{cmd(tpl.name, f'装备详情 {i}')}")
 
             # 升阶等级
             if eq.upgrade_level > 0:
@@ -164,7 +164,7 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
             lines.append(" ".join(info_parts))
 
         lines.append("***")
-        lines.append("💡 点编号→填入输入框→可改为`装备 1 2 3`批量穿戴　点名称→查看详情")
+        lines.append("💡 先点「🗡️装备」再连点编号，拼出「装备 1 2」批量穿戴　点名称查看详情")
         if total_pages > 1:
             lines.append(f"第**{page}**/{total_pages}页")
             nav = []
@@ -174,7 +174,7 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
                 nav.append(cmd("下一页", f"装备栏 {page + 1}"))
             if nav:
                 lines.append(" | ".join(nav))
-        lines.append(cmd("装备栏") + " | " + cmd("装备菜单") + " | " + cmd("铭文列表") + " | " + cmd("帮助"))
+        lines.append(cmd("🗡️装备", "装备") + " | " + cmd("装备栏") + " | " + cmd("装备菜单") + " | " + cmd("铭文列表") + " | " + cmd("帮助"))
 
         await list_equipment.finish(build_markdown("\n".join(lines)))
 
