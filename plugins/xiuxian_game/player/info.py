@@ -29,15 +29,27 @@ from ..queries.player_queries import query_player_profile
 def _format_player_location(player: Player) -> str:
     """格式化玩家位置信息，区分现实世界和诡域坐标"""
     if player.is_in_dungeon():
-        # 在诡域中：显示诡域坐标和现实世界坐标
         dungeon_x, dungeon_y = player.get_current_coordinates()
         real_x = player.real_world_x or 0
         real_y = player.real_world_y or 0
         return f"{player.get_current_region()} ({dungeon_x},{dungeon_y}) | 现实 ({real_x},{real_y})"
     else:
-        # 在现实世界：只显示现实世界坐标
         real_x, real_y = player.get_current_coordinates()
         return f"{player.get_current_region()} ({real_x},{real_y})"
+
+
+def _format_player_location_cmd(player: Player) -> str:
+    """格式化玩家位置信息，返回可点击蓝字（点击导航到该坐标）"""
+    if player.is_in_dungeon():
+        dungeon_x, dungeon_y = player.get_current_coordinates()
+        real_x = player.real_world_x or 0
+        real_y = player.real_world_y or 0
+        location_text = f"{player.get_current_region()} ({dungeon_x},{dungeon_y}) | 现实 ({real_x},{real_y})"
+        return cmd(location_text, f"导航 {real_x} {real_y}")
+    else:
+        real_x, real_y = player.get_current_coordinates()
+        location_text = f"{player.get_current_region()} ({real_x},{real_y})"
+        return cmd(location_text, f"导航 {real_x} {real_y}")
 from ..config import config
 from ..world.message_board import get_unread_message_status
 
@@ -177,11 +189,11 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
     has_world_unread, has_private_unread, has_system_unread, has_guild_unread = await get_unread_message_status(player.id)
     notice_parts = []
     if has_private_unread:
-        notice_parts.append(f"📬 {cmd('查看私信', '消息 私信')}")
+        notice_parts.append(f"📬 {cmd('有新的私信！点击查看', '消息 私信')}")
     if has_system_unread:
-        notice_parts.append(f"📢 {cmd('查看公告', '消息 系统')}")
+        notice_parts.append(f"📢 {cmd('有新的系统公告！点击查看', '消息 系统')}")
     if has_guild_unread:
-        notice_parts.append(f"🏯 {cmd('查看公会消息', '消息 公会')}")
+        notice_parts.append(f"🏯 {cmd('公会频道有新消息！点击查看', '消息 公会')}")
     if has_world_unread:
         notice_parts.append(f"🌐 {cmd('有新的世界消息！点击查看', '消息')}")
 
@@ -207,7 +219,7 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
         f"💎积分 **{player.gold2}**",
         f"💀怨念 **{player.resentment}**　✨点数 **{player.attribute_points}**",
         f"🕯️诡烛 **{player.gui_zhu}**　🙏香火 **{player.incense}**",
-        f"📍{_format_player_location(player)}",
+        f"📍{_format_player_location_cmd(player)}",
         "***",
     ])
 
@@ -799,7 +811,7 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
         f"💎积分 **{player.gold2}**",
         f"💀怨念 **{player.resentment}**　✨点数 **{player.attribute_points}**",
         f"🕯️诡烛 **{player.gui_zhu}**　🙏香火 **{player.incense}**",
-        f"📍{_format_player_location(player)}",
+        f"📍{_format_player_location_cmd(player)}",
     ])
 
     # 13. Buff状态
