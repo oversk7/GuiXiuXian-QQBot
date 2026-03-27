@@ -550,6 +550,36 @@ class SettlementService:
     # 事件触发概率 (每次结算有此概率触发事件)
     EVENT_TRIGGER_CHANCE = 0.25  # 25%
 
+    # 客人类型与接受的菜品等级映射
+    CUSTOMER_TIER_RECIPE_MAP = {
+        "common":  ["white", "green"],
+        "wealthy": ["green", "blue", "purple"],
+        "vip":     ["purple", "orange"]
+    }
+
+    # 声望区间对应的客流比例
+    REPUTATION_CUSTOMER_RATIO = [
+        (0,     {"common": 0.65, "wealthy": 0.28, "vip": 0.07}),
+        (1000,  {"common": 0.60, "wealthy": 0.30, "vip": 0.10}),
+        (3000,  {"common": 0.52, "wealthy": 0.35, "vip": 0.13}),
+        (5000,  {"common": 0.45, "wealthy": 0.38, "vip": 0.17}),
+        (8000,  {"common": 0.40, "wealthy": 0.40, "vip": 0.20}),
+    ]
+
+    # 声望满意奖励 (固定值，可预测)
+    SATISFACTION_BONUS = {
+        "common": 1,
+        "wealthy": 3,
+        "vip": 8
+    }
+
+    # 声望不满惩罚 (固定值)
+    DISSATISFACTION_PENALTY = {
+        "common": 3,
+        "wealthy": 5,
+        "vip": 2
+    }
+
     def _roll_random_event(self, restaurant_level: int) -> Optional[Dict]:
         """
         随机roll经营事件
@@ -575,6 +605,38 @@ class SettlementService:
 
         weights = [e["weight"] for e in eligible]
         return random.choices(eligible, weights=weights, k=1)[0]
+
+    def _get_customer_ratio(self, reputation: int) -> Dict[str, float]:
+        """
+        根据声望获取客流比例
+        查表逻辑：取不超过当前声望的最大阈值对应的比例
+        """
+        result = self.REPUTATION_CUSTOMER_RATIO[0][1]
+        for threshold, ratio in self.REPUTATION_CUSTOMER_RATIO:
+            if reputation >= threshold:
+                result = ratio
+            else:
+                break
+        return result
+
+    def _split_customers_by_tier(
+        self,
+        total_customers: int,
+        reputation: int
+    ) -> Dict[str, int]:
+        """
+        将总客流按声望比例拆分为3组
+        取整后剩余人数归入common层
+        """
+        ratio = self._get_customer_ratio(reputation)
+        wealthy_count = int(total_customers * ratio["wealthy"])
+        vip_count = int(total_customers * ratio["vip"])
+        common_count = total_customers - wealthy_count - vip_count
+        return {
+            "common": max(0, common_count),
+            "wealthy": max(0, wealthy_count),
+            "vip": max(0, vip_count)
+        }
 
     async def get_settlement_report(
         self,
