@@ -657,9 +657,9 @@ async def handle_liuyao(event: MessageEvent, args: Message = CommandArg()):
         template_params = [
             MessageMarkdownParams(key="title", values=[title]),
             MessageMarkdownParams(key="desc", values=[desc]),
-            MessageMarkdownParams(key="imgurl", values=["https://www.xxhzm.cn/api/guanyin/default.gif"]),
-            MessageMarkdownParams(key="width", values=["100"]),
-            MessageMarkdownParams(key="height", values=["100"]),
+            MessageMarkdownParams(key="imgurl", values=[f"https://thirdqq.qlogo.cn/qqapp/102499345/{user_id}/0"]),
+            MessageMarkdownParams(key="width", values=["32"]),
+            MessageMarkdownParams(key="height", values=["32"]),
             MessageMarkdownParams(key="hint", values=[hint]),
             MessageMarkdownParams(key="t1", values=[btn1]),
             MessageMarkdownParams(key="t2", values=[btn2]),
