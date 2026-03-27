@@ -3826,28 +3826,28 @@ items:
       type: "SEASONING"
       rarity: "white"
       price: 5
-      description: "基础调味料,百味之首。获取：任意商店【购买 盐】"
+      description: "基础调味料,百味之首。获取：食材铺【购买盐】"
 
     - item_id: "soy_sauce"
       name: "酱油"
       type: "SEASONING"
       rarity: "white"
       price: 8
-      description: "酿造酱油,增色提鲜。获取：任意商店【购买 酱油】"
+      description: "酿造酱油,增色提鲜。获取：食材铺【购买酱油】"
 
     - item_id: "vinegar"
       name: "醋"
       type: "SEASONING"
       rarity: "white"
       price: 8
-      description: "陈年老醋,酸香醇厚。获取：任意商店【购买 醋】"
+      description: "陈年老醋,酸香醇厚。获取：食材铺【购买醋】"
 
     - item_id: "sugar"
       name: "糖"
       type: "SEASONING"
       rarity: "white"
       price: 6
-      description: "甜蜜调味,中和苦涩。获取：任意商店【购买 糖】"
+      description: "甜蜜调味,中和苦涩。获取：食材铺【购买糖】"
 
     # ========== 绿色（进阶调料,NPC商店/跑商市集） ==========
     - item_id: "spice"

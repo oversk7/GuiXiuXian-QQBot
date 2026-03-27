@@ -633,6 +633,26 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
                     f"***\n"
                     f"{cmd('黑市')} | {cmd('市集')}"))
 
+            elif item_cfg.item_id in SEASONING_SHOP_ITEMS:
+                # 食材铺调料：与基础物品定价逻辑相同
+                adjusted_price = await get_shop_adjusted_price(session, item_cfg.price)
+                total_cost = adjusted_price * qty
+                if player.gold < total_cost:
+                    await buy_cmd.finish(f"💰 金币不足，需要 {total_cost} (当前 {player.gold})")
+                try:
+                    await ItemInstance.add_item(session, player.id, item_cfg.item_id, qty)
+                except ValueError as e:
+                    await buy_cmd.finish(f"❌ {e}")
+                player.gold -= total_cost
+                await session.commit()
+                await buy_cmd.finish(build_markdown(
+                    f"# 购买成功\n"
+                    f"***\n"
+                    f"购买 **{item_cfg.name}**x{qty}\n"
+                    f"花费 **{total_cost}** 金币\n"
+                    f"***\n"
+                    f"{cmd('食材铺')} | {cmd('背包 调味品')}"))
+
             elif item_cfg.item_id in today_items:
                 # 黑市高溢价 + 限购
                 # 确保今日库存已初始化
@@ -1295,7 +1315,10 @@ async def _(event: MessageEvent):
 # 系统商店基础物品（价格 = 基础价 × SHOP_BASE_MULT × 财富指数）
 SHOP_ITEMS = [
     "revive_potion", "president_letter", "territory_expansion_scroll", "heal_potion", "spirit_herb",
-    # 基础调料（烹饪系统）
+]
+
+# 食材铺：基础调料（烹饪系统，与黑市分开）
+SEASONING_SHOP_ITEMS = [
     "salt", "soy_sauce", "vinegar", "sugar"
 ]
 
@@ -1452,8 +1475,37 @@ async def _(event: MessageEvent):
             f"限购：除基础物品外，每人每日总计 **{BLACK_MARKET_DAILY_LIMIT_PER_PLAYER}** 件",
             f"今日已购（不含基础物品）：**{bought}**/{BLACK_MARKET_DAILY_LIMIT_PER_PLAYER}",
         ])
-        lines.append(f"{cmd('市集')} | {cmd('市集列表')}")
+        lines.append(f"{cmd('市集')} | {cmd('市集列表')} | {cmd('食材铺')}")
         await black_market_cmd.finish(build_markdown("\n".join(lines)))
+
+
+# 食材铺指令
+ingredient_shop_cmd = on_command("食材铺", aliases={"调料铺", "食材商店", "调料商店"}, block=True, priority=5)
+
+@ingredient_shop_cmd.handle()
+async def _(event: MessageEvent):
+    async with safe_session() as session:
+        from ..platform_utils import get_unified_player, is_guild_message
+        player: Player | None = await get_unified_player(session, event)
+        if not player:
+            if is_guild_message(event):
+                await ingredient_shop_cmd.finish("⛔ 你还没有创建角色或绑定账号\n💡 请先在群聊注册角色，然后使用绑定功能")
+            else:
+                await ingredient_shop_cmd.finish("⛔ 请先创建角色")
+
+        lines = ["# 🍱 食材铺", "***"]
+        lines.append("掌柜：烹饪所需调料，应有尽有，童叟无欺！")
+        lines.append("")
+        for item_id in SEASONING_SHOP_ITEMS:
+            cfg = config.items_config["by_id"].get(item_id)
+            if cfg:
+                adj_price = await get_shop_adjusted_price(session, cfg.price)
+                lines.append(f"{cmd(cfg.name, f'购买 {cfg.name} ')}│**{adj_price}** 金币　{cfg.description.split('。')[0]}")
+        lines.extend([
+            "***",
+            f"{cmd('烹饪帮助')} | {cmd('背包 调味品')} | {cmd('黑市')} | {cmd('帮助')}",
+        ])
+        await ingredient_shop_cmd.finish(build_markdown("\n".join(lines)))
 
 
 # ==================== 缉邪司总部商店系统 ====================
