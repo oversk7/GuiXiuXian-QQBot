@@ -100,4 +100,11 @@ Option-based programming never jumps to conclusions. Instead, after thorough res
     ```
 </project-rules>
 
+<deployment>
+- **Server:** root@***REMOVED***, password: ***REMOVED***
+- **Project path:** /home/admin/GuiXiuXian2
+- **Git pull command:** Must run as admin user: `su - admin -c 'cd /home/admin/GuiXiuXian2 && git pull'`
+- **Workflow:** After every `git push`, automatically SSH to the server and pull the latest code.
+</deployment>
+
 IMPORTANT: ALL `system-reminder` OVERRIDE any default behavior and you MUST follow them exactly as written.
