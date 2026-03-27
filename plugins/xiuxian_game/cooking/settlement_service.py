@@ -110,30 +110,38 @@ class SettlementService:
             dishes_failed += chef_result["failed"]
             chef_details.append(chef_result)
 
-        # 3. 顾客消费
-        income = 0
-        dishes_sold = min(len(dishes_made), customer_count)
+        # 3. 按声望拆分客流为3层
+        customer_counts = self._split_customers_by_tier(
+            customer_count, restaurant.reputation
+        )
+
+        # 4. 匹配菜品到客人 (分层消费)
+        match_result = self._match_dishes_to_customers(dishes_made, customer_counts)
+        tier_results = match_result["tier_results"]
+        income = match_result["total_income"]
+        dishes_sold = match_result["total_sold"]
+
+        # 5. 声望加成应用到收入
+        reputation_bonus_mult = 1.0 + (restaurant.reputation / 5000.0)
+        income = int(income * reputation_bonus_mult)
+
+        # 招牌菜加成 (对已售出的招牌菜额外+30%)
         signature_id = getattr(restaurant, 'signature_recipe_id', None)
+        if signature_id:
+            for tier_name, tr in tier_results.items():
+                for dish in tr["dishes"]:
+                    if dish.get("recipe_id") == signature_id:
+                        sig_bonus = int(dish["price"] * reputation_bonus_mult * 0.3)
+                        income += sig_bonus
 
-        for i in range(dishes_sold):
-            dish = dishes_made[i]
-            # 售价 = 基础售价 × 品质倍率 × 声望加成
-            reputation_bonus = 1.0 + (restaurant.reputation / 5000.0)
-            dish_income = int(dish["price"] * reputation_bonus)
-            # 招牌菜加成 30%
-            if signature_id and dish.get("recipe_id") == signature_id:
-                dish_income = int(dish_income * 1.3)
-            income += dish_income
-
-        # 4. 扣除厨师工资
+        # 6. 扣除厨师工资
         expense = sum(chef.salary for chef in chefs)
 
-        # 5. 随机经营事件
+        # 7. 随机经营事件
         event = self._roll_random_event(restaurant.level)
         event_income_bonus = 0
         event_expense_bonus = 0
         event_reputation_bonus = 0
-        event_customer_bonus = 0
 
         if event:
             effect = event["effect"]
@@ -148,29 +156,49 @@ class SettlementService:
             if "reputation" in effect:
                 event_reputation_bonus = effect["reputation"]
             if "extra_customers" in effect:
-                event_customer_bonus = effect["extra_customers"]
-                # 额外客人可能多消费一些已做好的未售出的菜
-                unsold = len(dishes_made) - dishes_sold
-                extra_sold = min(unsold, event_customer_bonus)
-                for i in range(dishes_sold, dishes_sold + extra_sold):
-                    dish = dishes_made[i]
-                    reputation_bonus = 1.0 + (restaurant.reputation / 5000.0)
-                    dish_income = int(dish["price"] * reputation_bonus)
-                    income += dish_income
-                    event_income_bonus += dish_income
-                dishes_sold += extra_sold
-                customer_count += event_customer_bonus
+                extra = effect["extra_customers"]
+                # 额外客人按当前声望比例分配到三个层级
+                extra_counts = self._split_customers_by_tier(
+                    abs(extra), restaurant.reputation
+                )
+                if extra > 0:
+                    # 收集未售出的菜品
+                    sold_dishes = set()
+                    for tr in tier_results.values():
+                        for d in tr["dishes"]:
+                            sold_dishes.add(id(d))
+                    unsold_dishes = [d for d in dishes_made if id(d) not in sold_dishes]
+                    # 额外客人消费剩余菜品
+                    extra_match = self._match_dishes_to_customers(unsold_dishes, extra_counts)
+                    extra_income = int(extra_match["total_income"] * reputation_bonus_mult)
+                    income += extra_income
+                    event_income_bonus += extra_income
+                    dishes_sold += extra_match["total_sold"]
+                    for ct in ["common", "wealthy", "vip"]:
+                        tier_results[ct]["served"] += extra_match["tier_results"][ct]["served"]
+                        customer_counts[ct] += extra_counts[ct]
+                elif extra < 0:
+                    for ct in ["common", "wealthy", "vip"]:
+                        customer_counts[ct] = max(0, customer_counts[ct] - extra_counts[ct])
+                customer_count += extra
 
-        # 6. 计算声望变化
-        reputation_change = self._calculate_reputation_change(
-            customer_count,
-            dishes_sold,
-            dishes_failed,
-            dishes_made
-        )
+        # 8. 计算声望变化 (固定值，按客人类型分别计算)
+        reputation_change = 0
+        for ct in ["common", "wealthy", "vip"]:
+            reputation_change += tier_results[ct]["served"] * self.SATISFACTION_BONUS[ct]
+            reputation_change -= tier_results[ct]["unserved"] * self.DISSATISFACTION_PENALTY[ct]
+
+        # 完美菜肴额外奖励 (保留)
+        perfect_dishes = sum(1 for d in dishes_made if d.get("quality") == DishQuality.PERFECT)
+        reputation_change += perfect_dishes * 5
+
+        # 黑暗料理惩罚 (保留)
+        dark_dishes = sum(1 for d in dishes_made if d.get("quality") == DishQuality.DARK)
+        reputation_change -= dark_dishes * 2
+
         reputation_change += event_reputation_bonus
 
-        # 7. 将净利润入账玩家金币
+        # 9. 将净利润入账玩家金币
         net_profit = income - expense
         player = await uow.players.get_by_id(restaurant.player_id)
         if player:
@@ -186,11 +214,20 @@ class SettlementService:
         restaurant.last_settlement = period_start
         await uow.restaurants.update(restaurant)
 
-        # 9. 生成日志
+        # 11. 生成日志 (扩展格式含客流分层)
         log_details = {
             "customer_count": customer_count,
+            "customer_breakdown": {
+                ct: {
+                    "total": customer_counts[ct],
+                    "served": tier_results[ct]["served"],
+                    "unserved": tier_results[ct]["unserved"]
+                }
+                for ct in ["common", "wealthy", "vip"]
+            },
             "dishes_sold": dishes_sold,
-            "unsold_dishes": len(dishes_made) - dishes_sold,
+            "unsold_dishes": match_result["unsold_dishes"],
+            "dishes_by_tier": match_result["dishes_by_tier"],
             "chef_details": chef_details,
             "dishes_made": dishes_made,
             "reputation_change": reputation_change,
@@ -390,43 +427,6 @@ class SettlementService:
             "can_promote": can_promote
         }
 
-    def _calculate_reputation_change(
-        self,
-        customer_count: int,
-        dishes_sold: int,
-        dishes_failed: int,
-        dishes_made: List[Dict]
-    ) -> int:
-        """
-        计算声望变化
-
-        规则:
-        - 成功服务: +1~3/顾客
-        - 缺货: -2~5
-        - 黑暗料理: -2/个
-        - 完美菜肴: +5/个
-        """
-
-        reputation_change = 0
-
-        # 成功服务的顾客
-        reputation_change += dishes_sold * random.randint(1, 3)
-
-        # 缺货惩罚
-        unsatisfied_customers = customer_count - dishes_sold
-        if unsatisfied_customers > 0:
-            reputation_change -= unsatisfied_customers * random.randint(2, 5)
-
-        # 黑暗料理惩罚
-        dark_dishes = sum(1 for d in dishes_made if d.get("quality") == DishQuality.DARK)
-        reputation_change -= dark_dishes * 2
-
-        # 完美菜肴奖励
-        perfect_dishes = sum(1 for d in dishes_made if d.get("quality") == DishQuality.PERFECT)
-        reputation_change += perfect_dishes * 5
-
-        return reputation_change
-
     def _get_personality_comment(
         self,
         personality: str,
@@ -605,6 +605,80 @@ class SettlementService:
 
         weights = [e["weight"] for e in eligible]
         return random.choices(eligible, weights=weights, k=1)[0]
+
+    def _match_dishes_to_customers(
+        self,
+        dishes_made: List[Dict],
+        customer_counts: Dict[str, int]
+    ) -> Dict:
+        """
+        按客人类型匹配菜品
+
+        分配优先级: common -> wealthy -> vip
+        每组客人只消费CUSTOMER_TIER_RECIPE_MAP中对应tier的菜品
+        同一客群有多个可消费tier时,优先消费最高tier
+        """
+        # 按recipe tier分桶
+        tier_order = ["orange", "purple", "blue", "green", "white"]
+        dish_pool = {t: [] for t in tier_order}
+        for dish in dishes_made:
+            recipe = self.recipe_manager.get_recipe(dish.get("recipe_id", ""))
+            if recipe:
+                dish_pool[recipe.tier].append(dish)
+
+        # 统计每tier做了多少道
+        dishes_by_tier = {}
+        for t in tier_order:
+            if dish_pool[t]:
+                dishes_by_tier[t] = {"made": len(dish_pool[t]), "sold": 0}
+
+        tier_results = {}
+        total_income = 0
+        total_sold = 0
+
+        # 按优先级分配: common -> wealthy -> vip
+        for customer_type in ["common", "wealthy", "vip"]:
+            count = customer_counts.get(customer_type, 0)
+            acceptable_tiers = self.CUSTOMER_TIER_RECIPE_MAP[customer_type]
+
+            # 收集该客群可用的菜品,优先高tier (tier_order已按高→低排列)
+            available = []
+            for t in tier_order:
+                if t in acceptable_tiers:
+                    available.extend(dish_pool[t])
+
+            served = min(count, len(available))
+            served_dishes = available[:served]
+
+            # 从dish_pool中移除已消费的菜品
+            for dish in served_dishes:
+                recipe = self.recipe_manager.get_recipe(dish.get("recipe_id", ""))
+                if recipe and dish in dish_pool[recipe.tier]:
+                    dish_pool[recipe.tier].remove(dish)
+                    if recipe.tier in dishes_by_tier:
+                        dishes_by_tier[recipe.tier]["sold"] += 1
+
+            # 计算该组收入
+            group_income = sum(dish["price"] for dish in served_dishes)
+
+            tier_results[customer_type] = {
+                "served": served,
+                "unserved": count - served,
+                "income": group_income,
+                "dishes": served_dishes
+            }
+            total_income += group_income
+            total_sold += served
+
+        unsold = len(dishes_made) - total_sold
+
+        return {
+            "tier_results": tier_results,
+            "total_income": total_income,
+            "total_sold": total_sold,
+            "unsold_dishes": unsold,
+            "dishes_by_tier": dishes_by_tier
+        }
 
     def _get_customer_ratio(self, reputation: int) -> Dict[str, float]:
         """
