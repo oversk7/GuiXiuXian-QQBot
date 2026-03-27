@@ -1263,11 +1263,11 @@ async def _(event: MessageEvent):
         top_opportunities = opportunities[:10]  # 取前10条
         sample = _rnd.sample(top_opportunities, min(5, len(top_opportunities)))
 
-        lines = ["# 跑商盈利机会 (个性化推荐)", "***"]
+        lines = ["# 💹 跑商盈利机会 (个性化推荐)", "***"]
 
         # 添加个人情况说明
         if filtered_count > 0:
-            lines.append(f"已为您过滤 **{filtered_count}** 个受交易限制的机会")
+            lines.append(f"🔍 已为您过滤 **{filtered_count}** 个受交易限制的机会")
             lines.append("***")
 
         for op in sample:
@@ -1276,17 +1276,18 @@ async def _(event: MessageEvent):
             op_from = op['from']
             op_to = op['to']
             lines.append(
-                f"{cmd(op_item, f'购买 {op_item} ')} (库存:**{op['src_stock']}**){tiered_tag}\n"
-                f"{cmd(op_from, f'导航 {op_from}')} -> {cmd(op_to, f'导航 {op_to}')} "
-                f"**{op['buy']}** -> **{op['sell']}** "
-                f"+**{op['profit']}** ({op['margin']*100:.0f}%)"
+                f"📦 {cmd(op_item, f'购买 {op_item} ')} (库存:**{op['src_stock']}**){tiered_tag}\n"
+                f"🛒 {cmd(op_from, f'导航 {op_from}')} → {cmd(op_to, f'导航 {op_to}')}\n"
+                f"💸 买入 **{op['buy']}** → 💰 卖出 **{op['sell']}**　"
+                f"📈 +**{op['profit']}** ({op['margin']*100:.0f}%)"
             )
+            lines.append("──────────")
 
         # 添加提示信息
         lines.append("***")
-        lines.append("推荐已考虑您的交易记录，避免原地交易限制")
+        lines.append("💡 推荐已考虑您的交易记录，避免原地交易限制")
         if filtered_count > 0:
-            lines.append("4小时后可能有更多机会解锁")
+            lines.append("💡 4小时后可能有更多机会解锁")
 
         lines.append(f"{cmd('市集')} | {cmd('市集列表')} | {cmd('交易限制')}")
         await trade_advise_cmd.finish(build_markdown("\n".join(lines)))
