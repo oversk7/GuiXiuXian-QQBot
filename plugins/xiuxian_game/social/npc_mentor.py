@@ -14,6 +14,7 @@ from ..models.db import AsyncSessionLocal
 from ..infrastructure.uow.unit_of_work import UnitOfWork
 from .mentorship_system_service import MentorshipSystemService
 from ..utils import message_add_head
+from ..utils_markdown import cmd, build_markdown
 from ..platform_utils import get_unified_player
 
 
@@ -280,7 +281,7 @@ def get_mentor_menu(player: Player) -> str:
 
 
 def get_incense_shop_menu(player: Player) -> str:
-    """获取香火商店菜单"""
+    """获取香火商店菜单（Markdown格式）"""
     incense = player.incense or 0
 
     white_recipes = [
@@ -306,51 +307,42 @@ def get_incense_shop_menu(player: Player) -> str:
     ]
 
     lines = [
-        "香火商店",
-        "━━━━━━━━━━━━━",
-        "香火是师徒传承的见证，可兑换珍稀物品。",
+        "# 🕯️ 香火商店",
+        "***",
+        f"当前香火：**{incense}**",
+        "***",
+        "**兑换列表**",
+        f"{cmd('购买徒弟位')} — **500**香火 · 永久+1徒弟位",
+        "***",
+        "**📖 烹饪食谱**",
         "",
-        f"【你的香火】{incense}",
-        "",
-        "【兑换列表】",
-        "购买徒弟位 - 500香火",
-        "  • 永久增加1个徒弟位",
-        "",
-        "📖 烹饪食谱（使用【买食谱 食谱名】购买）",
-        "━━━━━━━━━━━━━",
-        "⚪ 白色食谱（80-110香火/个）：",
+        "⚪ **白色**（80-110香火）",
     ]
     for name, cost in white_recipes:
-        lines.append(f"  {name}（{cost}香火）")
+        lines.append(f"{cmd(name, f'买食谱 {name}')}│**{cost}**香火")
 
-    lines.extend([
-        "🟢 绿色食谱（80香火/个）：",
-    ])
-    for name, _ in green_recipes:
-        lines.append(f"  {name}")
+    lines.append("")
+    lines.append("🟢 **绿色**（80香火）")
+    for name, cost in green_recipes:
+        lines.append(f"{cmd(name, f'买食谱 {name}')}│**{cost}**香火")
 
-    lines.extend([
-        "🔵 蓝色食谱（250-300香火/个）：",
-    ])
+    lines.append("")
+    lines.append("🔵 **蓝色**（250-300香火）")
     for name, cost in blue_recipes:
-        lines.append(f"  {name}（{cost}香火）")
+        lines.append(f"{cmd(name, f'买食谱 {name}')}│**{cost}**香火")
 
-    lines.extend([
-        "🟣 紫色食谱（800-1000香火/个）：",
-    ])
+    lines.append("")
+    lines.append("🟣 **紫色**（800-1000香火）")
     for name, cost in purple_recipes:
-        lines.append(f"  {name}（{cost}香火）")
+        lines.append(f"{cmd(name, f'买食谱 {name}')}│**{cost}**香火")
 
-    lines.extend([
-        "🟠 橙色食谱（3000-4000香火/个）：",
-    ])
+    lines.append("")
+    lines.append("🟠 **橙色**（3000-4000香火）")
     for name, cost in orange_recipes:
-        lines.append(f"  {name}（{cost}香火）")
+        lines.append(f"{cmd(name, f'买食谱 {name}')}│**{cost}**香火")
 
-    lines.extend([
-        "━━━━━━━━━━━━━",
-        "积善成德，香火绵延！",
-    ])
+    lines.append("***")
+    lines.append(f"{cmd('香火商店')} | {cmd('帮助')}")
 
     return "\n".join(lines)
 
@@ -447,7 +439,7 @@ async def handle_incense_shop(event: MessageEvent):
             await incense_shop_cmd.finish("⛔ 请先创建角色")
 
         menu = get_incense_shop_menu(player)
-        await incense_shop_cmd.finish(message_add_head(menu, event))
+        await incense_shop_cmd.finish(build_markdown(menu))
 
 
 buy_recipe_cmd = on_command("买食谱", aliases={"购买食谱"}, priority=5, block=True)
