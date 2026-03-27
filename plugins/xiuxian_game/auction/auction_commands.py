@@ -25,6 +25,7 @@ from ..models.inventory import ItemInstance, ItemType
 from ..economy.equipment_trade_service import EquipmentTradeService
 from ..platform_utils import get_unified_player, is_guild_message
 from ..utils import message_add_head
+from ..utils_markdown import cmd, build_markdown
 from ..config import config
 from . import auction_service
 
@@ -365,8 +366,9 @@ async def handle_auction_hall(event: MessageEvent, args: Message = CommandArg())
             auctions = await uow.auction_items.find_active_auctions(page, page_size)
 
             lines = [
-                f"🏛️ 拍卖行（第{page}/{total_pages}页，共{total}件）",
-                "━━━━━━━━━━━━━",
+                "# 🏛️ 拍卖行",
+                f"第**{page}**/{total_pages}页　共**{total}**件",
+                "***",
             ]
             now = datetime.now()
             for a in auctions:
@@ -386,20 +388,27 @@ async def handle_auction_hall(event: MessageEvent, args: Message = CommandArg())
                 buyout_str = f"\n   🎯 一口价：{a.buyout_price:,}💰" if a.buyout_price else ""
                 seller_str = f"{a.seller_name or '未知'} [UID:{a.seller_uid}]"
 
+                aid = a.id
                 lines.append(
-                    f"#{a.id} {item_name}\n"
-                    f"   👤 卖家：{seller_str}\n"
-                    f"   💰 {bid_info}{buyout_str}\n"
-                    f"   ⏰ {remain_str}剩余 | 📊{a.bid_count}次出价"
+                    f"**#{aid}** {item_name}\n"
+                    f"👤 {seller_str}　💰 {bid_info}{buyout_str}\n"
+                    f"⏰ {remain_str}　📊{a.bid_count}次　"
+                    f"{cmd('详情', f'拍卖详情 {aid}')}"
                 )
+                lines.append("")
 
-            lines.append("━━━━━━━━━━━━━")
-            lines.append("💡【出价 编号 金额】参与竞价")
-            if total_pages > 1:
-                lines.append(f"💡【拍卖行 页码】查看更多")
+            lines.append("***")
+            nav = []
+            if page > 1:
+                nav.append(cmd("上一页", f"拍卖行 {page - 1}"))
+            if page < total_pages:
+                nav.append(cmd("下一页", f"拍卖行 {page + 1}"))
+            if nav:
+                lines.append(" | ".join(nav))
+            lines.append(cmd("拍卖行") + " | " + cmd("我的拍卖") + " | " + cmd("帮助"))
             result_msg = "\n".join(lines)
 
-    await auction_hall_cmd.finish(message_add_head(result_msg, event))
+    await auction_hall_cmd.finish(build_markdown(result_msg))
 
 
 # ==================== 我的拍卖 ====================
@@ -421,7 +430,11 @@ async def handle_my_auction(event: MessageEvent):
             if not auctions:
                 result_msg = "📋 你当前没有进行中的拍卖\n💡 使用【上架拍卖 物品名 起拍价 时长】发起拍卖"
             else:
-                lines = [f"📋 我的拍卖（进行中，共{len(auctions)}件）", "━━━━━━━━━━━━━"]
+                lines = [
+                    "# 📋 我的拍卖",
+                    f"进行中　共**{len(auctions)}**件",
+                    "***",
+                ]
                 now = datetime.now()
                 for a in auctions:
                     item_cfg = config.items_config["by_id"].get(a.item_id)
@@ -439,16 +452,18 @@ async def handle_my_auction(event: MessageEvent):
                     else:
                         bid_info = "暂无人出价"
 
+                    cancel_btn = cmd("撤拍", f"撤拍 {a.id}") if not a.has_bidder else ""
                     lines.append(
-                        f"#{a.id} {item_name}\n"
-                        f"   💰{bid_info}\n"
-                        f"   ⏰剩余：{remain_str}"
+                        f"**#{a.id}** {item_name}\n"
+                        f"💰 {bid_info}\n"
+                        f"⏰ 剩余：{remain_str}　{cancel_btn}"
                     )
-                lines.append("━━━━━━━━━━━━━")
-                lines.append("💡 无人出价时可使用【撤拍 编号】撤回")
+                    lines.append("")
+                lines.append("***")
+                lines.append(cmd("拍卖行") + " | " + cmd("我的拍卖") + " | " + cmd("帮助"))
                 result_msg = "\n".join(lines)
 
-    await my_auction_cmd.finish(message_add_head(result_msg, event))
+    await my_auction_cmd.finish(build_markdown(result_msg))
 
 
 # ==================== 撤拍 ====================
@@ -533,9 +548,8 @@ async def handle_auction_detail(event: MessageEvent, args: Message = CommandArg(
             status_str = status_map.get(auction.status, auction.status)
 
             lines = [
-                f"🏛️ 拍卖详情 #{auction.id}",
-                "━━━━━━━━━━━━━",
-                f"📦 {item_name}",
+                f"# 🏛️ 拍卖详情 #{auction.id}",
+                f"📦 **{item_name}**",
                 f"👤 卖家：{auction.seller_name or '未知'} [UID:{auction.seller_uid}]",
                 f"💰 起拍价：{auction.start_price:,}💰",
             ]
@@ -569,10 +583,12 @@ async def handle_auction_detail(event: MessageEvent, args: Message = CommandArg(
                     crown = "🥇" if i == 1 else f"{i}."
                     lines.append(f"  {crown} {bid.bidder_name} [UID:{bid.bidder_uid}]  {bid.amount:,}💰  {bid_time}")
 
+            lines.append("***")
             if auction.status == "active":
-                lines.append("━━━━━━━━━━━━━")
-                lines.append(f"💡【出价 {auction.id} 金额】参与竞价")
+                lines.append(cmd("拍卖行") + " | " + cmd("我的拍卖") + " | " + cmd("帮助"))
+            else:
+                lines.append(cmd("拍卖行") + " | " + cmd("帮助"))
 
             result_msg = "\n".join(lines)
 
-    await auction_detail_cmd.finish(message_add_head(result_msg, event))
+    await auction_detail_cmd.finish(build_markdown(result_msg))

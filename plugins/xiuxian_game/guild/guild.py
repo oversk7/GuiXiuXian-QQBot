@@ -190,35 +190,42 @@ async def handle_guild_info(event: MessageEvent):
         exp_multiplier = bonuses.get("exp_multiplier", 1.0)
         cultivation_bonus = bonuses.get("cultivation_bonus", 0.0)
 
-    # 基地信息
-    base_info = ""
-    if guild_obj.base_x is not None and guild_obj.base_y is not None:
-        base_info = (
-            f"▫️ 基地坐标：({guild_obj.base_x}, {guild_obj.base_y})\n"
-            f"▫️ 势力范围：{guild_obj.territory_range}×{guild_obj.territory_range}\n"
-        )
-    elif guild_obj.level >= 2:
-        base_info = f"▫️ 基地坐标：未设置（可使用【设置基地】命令）\n"
-
-    # 加成信息
-    bonus_info = f"▫️ 经验倍率：{exp_multiplier:.1f}x\n"
+    # 构建Markdown格式公会面板
+    lines = [
+        f"# 🏰 {guild_obj.name}",
+        f"ID:{guild_obj.id}　Lv.**{guild_obj.level}**　创建于 {guild_obj.created_at.strftime('%Y-%m-%d')}",
+        "***",
+        f"👑 会长：**{president.nickname if president else '未知'}**",
+        f"📛 你的职位：**{position_name}**",
+        f"👥 人数：**{member_count}**/{capacity}",
+        f"📊 经验：**{exp_current}**/{exp_need}",
+        f"💰 资金库：**{treasury}**",
+        f"✨ 经验倍率：**{exp_multiplier:.1f}x**",
+    ]
     if cultivation_bonus > 0:
-        bonus_info += f"▫️ 修为加成：+{cultivation_bonus*100:.1f}%\n"
+        lines.append(f"🏋️ 修为加成：**+{cultivation_bonus*100:.1f}%**")
 
-    msg = (
-        f"🏰 公会面板\n"
-        f"▫️『{guild_obj.name}』[ID:{guild_obj.id}] Lv.{guild_obj.level}\n"
-        f"▫️ 会长：{president.nickname if president else '未知'}\n"
-        f"▫️ 你的职位：{position_name}\n"
-        f"▫️ 人数：{member_count}/{capacity}\n"
-        f"▫️ 经验：{exp_current}/{exp_need}\n"
-        f"▫️ 资金库：{treasury}\n"
-        f"{bonus_info}"
-        f"▫️ 创建时间：{guild_obj.created_at.strftime('%Y-%m-%d')}\n"
-        f"{base_info}"
-        f"▫️ 公告：{guild_obj.notice or '暂无公告'}"
+    # 基地信息
+    if guild_obj.base_x is not None and guild_obj.base_y is not None:
+        lines.append(f"📍 基地：({guild_obj.base_x}, {guild_obj.base_y})　范围 {guild_obj.territory_range}×{guild_obj.territory_range}")
+    elif guild_obj.level >= 2:
+        lines.append(f"📍 基地：未设置　{cmd('设置基地')}")
+
+    lines.append(f"📰 公告：{guild_obj.notice or '暂无公告'}")
+    lines.append("***")
+
+    # 快捷操作按钮
+    lines.append(
+        f"{cmd('公会成员')} | {cmd('公会建筑')} | {cmd('公会加成')}"
     )
-    await guild_info_cmd.finish(message_add_head(msg, event))
+    lines.append(
+        f"{cmd('捐献金币')} | {cmd('公会丹房')} | {cmd('公会仓库')}"
+    )
+    lines.append(
+        f"{cmd('公会传送')} | {cmd('公会列表')} | {cmd('帮助')}"
+    )
+
+    await guild_info_cmd.finish(build_markdown("\n".join(lines)))
 
 # ==================== 公会加成 ====================
 guild_bonuses_cmd = on_command("公会加成", aliases={"加成效果"}, block=True, priority=5)
@@ -485,30 +492,41 @@ async def handle_member_list(event: MessageEvent, args: Message = CommandArg()):
     end_idx = start_idx + page_size
     members = all_members[start_idx:end_idx]
 
-    lines = [f"👥 公会成员『{guild_obj.name}』({total_members}人) 第{page}/{total_pages}页", "━━━━━━━━━━━━━"]
-    for idx, member in enumerate(members, start_idx + 1):
-        # 职位图标
-        position_icons = {
-            GuildPosition.PRESIDENT: "👑",
-            GuildPosition.VICE_PRESIDENT: "⭐",
-            GuildPosition.CORE_MEMBER: "🔸",
-            GuildPosition.MEMBER: ""
-        }
-        icon = position_icons.get(member["position"], "")
+    # 职位图标
+    position_icons = {
+        GuildPosition.PRESIDENT: "👑",
+        GuildPosition.VICE_PRESIDENT: "⭐",
+        GuildPosition.CORE_MEMBER: "🔸",
+        GuildPosition.MEMBER: ""
+    }
 
+    lines = [
+        f"# 👥 {guild_obj.name}",
+        f"共**{total_members}**人　第**{page}**/{total_pages}页",
+        "***",
+    ]
+    for idx, member in enumerate(members, start_idx + 1):
+        icon = position_icons.get(member["position"], "")
         lines.append(
-            f"{idx}. {member['nickname']}[{member['uid']}]{icon} "
-            f"Lv.{member['level']} "
-            f"{member['position_name']} "
-            f"贡:{GuildEconomyService.format_large_number(member['contribution'])}"
+            f"{idx}. {icon}**{member['nickname']}** Lv.{member['level']}　"
+            f"{member['position_name']}　"
+            f"贡献:{GuildEconomyService.format_large_number(member['contribution'])}"
         )
 
-    # 添加分页提示
-    if total_pages > 1:
-        lines.append("━━━━━━━━━━━━━")
-        lines.append(f"💡 使用「公会成员 页码」查看其他页面")
+    lines.append("***")
 
-    await member_list_cmd.finish(message_add_head("\n".join(lines), event))
+    # 分页导航
+    nav_parts = []
+    if page > 1:
+        nav_parts.append(cmd("上一页", f"公会成员 {page - 1}"))
+    if page < total_pages:
+        nav_parts.append(cmd("下一页", f"公会成员 {page + 1}"))
+    if nav_parts:
+        lines.append(" | ".join(nav_parts))
+
+    lines.append(cmd("公会") + " | " + cmd("公会成员") + " | " + cmd("帮助"))
+
+    await member_list_cmd.finish(build_markdown("\n".join(lines)))
 
 # ==================== 捐献金币 ====================
 donate_cmd = on_command("捐献金币", aliases={"贡献", "捐献","上供"}, block=True, priority=5)
@@ -796,14 +814,22 @@ async def handle_app_list(event: MessageEvent):
         if not apps:
             await application_list_cmd.finish("暂无待处理申请")
 
-        lines = ["📑 待处理入会申请", "━━━━━━━━━━"]
+        lines = [
+            "# 📑 待处理入会申请",
+            f"共**{len(apps)}**条",
+            "***",
+        ]
         for a in apps:
             applicant = await session.get(Player, a.applicant_id)
-            lines.append(f"UID:{applicant.uid} {applicant.nickname} Lv.{applicant.level}")
-        lines.append("━━━━━━━━━━━━━\n"
-            "⬇️ 【同意入会 <UID>】\n"
-            "❌ 【拒绝入会 <UID>】")
-        await application_list_cmd.finish(message_add_head("\n".join(lines), event))
+            lines.append(
+                f"**{applicant.nickname}** Lv.{applicant.level}　"
+                f"{cmd('同意', f'同意入会 {applicant.uid}')} | "
+                f"{cmd('拒绝', f'拒绝入会 {applicant.uid}')}"
+            )
+
+        lines.append("***")
+        lines.append(cmd("申请列表") + " | " + cmd("公会") + " | " + cmd("帮助"))
+        await application_list_cmd.finish(build_markdown("\n".join(lines)))
 
 # ==================== 同意/拒绝申请 ====================
 approve_cmd = on_command("同意入会", block=True, priority=5)
@@ -1125,18 +1151,33 @@ async def handle_guild_buildings(event: MessageEvent):
             item_repo=None  # get_guild_buildings不需要item_repo
         )
         buildings = await building_service.get_guild_buildings(player.guild_id)
-        if not buildings:
-            msg = f"🏗️ 公会『{guild.name}』建筑列表\n━━━━━━━━━━\n暂无建筑"
-        else:
-            lines = [f"🏗️ 公会『{guild.name}』建筑列表", "━━━━━━━━━━"]
-            for building in buildings:
-                # 使用建筑服务的格式化方法（静态方法，新旧版本都可用）
-                effects_str = GuildBuildingServiceNew.format_building_effects(building["effects"])
-                lines.append(f"▫️ {building['name']} Lv.{building['level']}/{building['max_level']}")
-                lines.append(f"   效果：{effects_str}")
-            msg = "\n".join(lines)
 
-        await guild_buildings_cmd.finish(message_add_head(msg, event))
+        lines = [
+            f"# 🏗️ {guild.name}·建筑",
+            "***",
+        ]
+
+        if not buildings:
+            lines.append("暂无建筑，快去建造吧！")
+        else:
+            for building in buildings:
+                effects_str = GuildBuildingServiceNew.format_building_effects(building["effects"])
+                lines.append(
+                    f"**{building['name']}** Lv.{building['level']}/{building['max_level']}　{effects_str}"
+                )
+                if building['level'] < building['max_level']:
+                    bname = building['name']
+                    lines.append(f"　{cmd('升级', f'建造 {bname}')}")
+                lines.append("")
+
+        lines.append("***")
+        lines.append("**可建造建筑：**")
+        building_names = ["经验神龛", "资金金库", "训练场", "传送阵", "丹房", "公会仓库"]
+        lines.append(" | ".join([cmd(n, f"建造 {n}") for n in building_names]))
+        lines.append("***")
+        lines.append(cmd("公会") + " | " + cmd("公会建筑") + " | " + cmd("帮助"))
+
+        await guild_buildings_cmd.finish(build_markdown("\n".join(lines)))
 
 build_cmd = on_command("建造", aliases={"升级建筑"}, block=True, priority=5)
 
@@ -1183,11 +1224,19 @@ async def handle_build(event: MessageEvent, args: Message = CommandArg()):
         if not cost:
             await build_cmd.finish("⛔ 该建筑已达到最高等级")
 
-        # 显示成本信息
-        materials_str = ", ".join([f"{k}×{v}" for k, v in cost["materials"].items()])
-        cost_msg = f"建造{building_name}需要：\n▫️ 金币：{cost['gold']}\n▫️ 材料：{materials_str}\n\n确认建造请使用命令：确认建造 {building_name}"
+        # 显示成本信息（Markdown格式）
+        materials_str = "、".join([f"{k}×{v}" for k, v in cost["materials"].items()])
+        cost_lines = [
+            f"# 🏗️ 建造确认",
+            f"建筑：**{building_name}**",
+            "***",
+            f"💰 金币：**{cost['gold']:,}**",
+            f"📦 材料：{materials_str}",
+            "***",
+            cmd("确认建造 " + building_name, f"确认建造 {building_name}") + " | " + cmd("取消", "公会建筑"),
+        ]
 
-        await build_cmd.send(message_add_head(cost_msg, event))
+        await build_cmd.send(build_markdown("\n".join(cost_lines)))
 
 # ==================== 确认建造 ====================
 confirm_build_cmd = on_command("确认", block=True, priority=5)
@@ -1393,35 +1442,34 @@ async def handle_guild_alchemy(event: MessageEvent):
         # 提交丹房产出的更改
         await session.commit()
 
+        lines = [
+            f"# 🧪 {guild.name}·丹房",
+            f"💰 你的积分：**{player.gold2}**",
+        ]
+
+        # 如果有新产出或存储已满，显示提示
+        if refresh_result["alchemy_generated"] > 0:
+            lines.append(f"✨ {refresh_result['message']}")
+        elif refresh_result["alchemy_generated"] == -1:
+            lines.append(f"{refresh_result['message']}")
+
+        lines.append("***")
+
         if not productions:
-            msg = f"🧪 公会『{guild.name}』丹房\n━━━━━━━━━━\n暂无可兑换的丹药"
-            # 如果有新产出或存储已满，显示提示
-            if refresh_result["alchemy_generated"] > 0:
-                msg += f"\n✨ {refresh_result['message']}"
-            elif refresh_result["alchemy_generated"] == -1:
-                msg += f"\n{refresh_result['message']}"
+            lines.append("暂无可兑换的丹药")
         else:
-            lines = [f"🧪 公会『{guild.name}』丹房", "━━━━━━━━━━"]
-            lines.append(f"💰 你的积分：{player.gold2}")
-
-            # 如果有新产出或存储已满，显示提示
-            if refresh_result["alchemy_generated"] > 0:
-                lines.append(f"✨ {refresh_result['message']}")
-            elif refresh_result["alchemy_generated"] == -1:
-                lines.append(f"{refresh_result['message']}")
-
-            lines.append("━━━━━━━━━━")
-
             for idx, prod in enumerate(productions, 1):
-                # 显示丹药名称、总数量和单价
-                lines.append(f"{idx}. {prod['item_name']}×{prod['total_quantity']} - {prod['points_cost']}积分/个")
+                pname = prod['item_name']
+                lines.append(
+                    f"{idx}. **{pname}**×{prod['total_quantity']}　"
+                    f"{prod['points_cost']}积分/个　"
+                    f"{cmd('兑换', f'兑换丹药 {pname} 1')}"
+                )
 
-            lines.append("━━━━━━━━━━")
-            lines.append("💡 使用【兑换丹药 丹药名称 数量】来兑换")
-            lines.append("💡 例如：兑换丹药 仿制还魂丹 5")
-            msg = "\n".join(lines)
+        lines.append("***")
+        lines.append(cmd("公会") + " | " + cmd("公会丹房") + " | " + cmd("帮助"))
 
-        await guild_alchemy_cmd.finish(message_add_head(msg, event))
+        await guild_alchemy_cmd.finish(build_markdown("\n".join(lines)))
 
 # ==================== 兑换丹药 ====================
 exchange_pill_cmd = on_command("兑换丹药", block=True, priority=5)
@@ -1558,22 +1606,27 @@ async def handle_guild_warehouse(event: MessageEvent):
         stmt = select(_func.count(GuildWarehouseItem.id)).where(GuildWarehouseItem.guild_id == player.guild_id)
         current_slots_used = (await session.execute(stmt)).scalar_one() or 0
 
+        lines = [
+            f"# 📦 {guild.name}·仓库",
+            f"格子：**{current_slots_used}**/{capacity}",
+            "***",
+        ]
+
         if not items:
-            msg = f"📦 公会『{guild.name}』仓库\n━━━━━━━━━━\n格子：{current_slots_used}/{capacity}\n暂无物品\n━━━━━━━━━━\n使用【存入仓库 <物品名> <数量>】存入物品"
+            lines.append("暂无物品")
         else:
-            lines = [f"📦 公会『{guild.name}』仓库", "━━━━━━━━━━"]
-            lines.append(f"格子：{current_slots_used}/{capacity}")
-            lines.append("━━━━━━━━━━")
-
             for idx, item in enumerate(items, 1):
-                lines.append(f"{idx}. {item['item_name']}×{item['quantity']} (存入者:{item['deposited_by']})")
+                iname = item['item_name']
+                lines.append(
+                    f"{idx}. **{iname}**×{item['quantity']}　"
+                    f"存入者:{item['deposited_by']}　"
+                    f"{cmd('取出', f'取出仓库 {iname} 1')}"
+                )
 
-            lines.append("━━━━━━━━━━")
-            lines.append("💡 使用【存入仓库 <物品名> <数量>】存入物品")
-            lines.append("💡 使用【取出仓库 <物品名> <数量>】取出物品")
-            msg = "\n".join(lines)
+        lines.append("***")
+        lines.append(cmd("仓库记录") + " | " + cmd("公会") + " | " + cmd("帮助"))
 
-        await guild_warehouse_cmd.finish(message_add_head(msg, event))
+        await guild_warehouse_cmd.finish(build_markdown("\n".join(lines)))
 
 # ==================== 存入仓库 ====================
 deposit_warehouse_cmd = on_command("存入仓库", block=True, priority=5)

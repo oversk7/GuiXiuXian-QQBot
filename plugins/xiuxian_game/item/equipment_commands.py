@@ -17,6 +17,7 @@ from ..models.db import safe_session
 from ..models import Player, ItemInstance
 from ..config import config
 from ..utils import message_add_head
+from ..utils_markdown import cmd, build_markdown
 from ..platform_utils import get_unified_player
 # 导入装备服务模块（业务逻辑已移至此处，解决模块耦合）
 from .equipment_service import recalc_equipment_attributes, EQUIP_ITEM_IDS
@@ -123,7 +124,11 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
         end_idx = start_idx + page_size
         current_page_equips = equips[start_idx:end_idx]
 
-        lines = [f"🎽 装备栏 ({equipped_count}/5)", "━━━━━━━━━━━━━"]
+        lines = [
+            "# 🎽 装备栏",
+            f"已装备 **{equipped_count}**/5",
+            "***",
+        ]
 
         # 为装备分配简短编号（全局编号）
         for i, eq in enumerate(current_page_equips, start=start_idx + 1):
@@ -158,14 +163,19 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
 
             lines.append(" ".join(info_parts))
 
-        # 添加分页信息
+        lines.append("***")
         if total_pages > 1:
-            lines.append("━━━━━━━━━━━━━")
-            lines.append(f"📖 第 {page} 页（共 {total_pages} 页）")
+            lines.append(f"第**{page}**/{total_pages}页")
+            nav = []
+            if page > 1:
+                nav.append(cmd("上一页", f"装备栏 {page - 1}"))
             if page < total_pages:
-                lines.append("💡 使用【装备栏 页码】查看其他页")
+                nav.append(cmd("下一页", f"装备栏 {page + 1}"))
+            if nav:
+                lines.append(" | ".join(nav))
+        lines.append(cmd("装备栏") + " | " + cmd("装备菜单") + " | " + cmd("铭文列表") + " | " + cmd("帮助"))
 
-        await list_equipment.finish(message_add_head("\n".join(lines), event))
+        await list_equipment.finish(build_markdown("\n".join(lines)))
 
 
 # ---------------- 指令：装备详情 ----------------
@@ -213,16 +223,11 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
 
         # 构建详细信息
         lines = [
-            f"⚔️ 装备详情",
-            f"━━━━━━━━━━━━━",
-            f"🎯 名称：{tpl.name}",
-            f"🆔 ID：{equip.id}",
-            f"📊 等级要求：Lv.{tpl.required_level}",
-            f"⭐ 升阶等级：+{equip.upgrade_level}阶",
-            f"🛠️ 耐久度：{equip.durability}/{tpl.durability}",
-            f"💰 价值：{tpl.price:,} 金币",
-            f"🎨 品质：{rarity_display}{rarity_name}",
-            f"👕 状态：{'🟢已装备' if equip.equipped else '🔘未装备'}",
+            f"# ⚔️ {tpl.name}",
+            f"ID:{equip.id}　{rarity_display}**{rarity_name}**　{'🟢已装备' if equip.equipped else '🔘未装备'}",
+            "***",
+            f"📊 等级要求：Lv.{tpl.required_level}　⭐ 升阶：+{equip.upgrade_level}",
+            f"🛠️ 耐久：{equip.durability}/{tpl.durability}　💰 价值：{tpl.price:,}",
             ""
         ]
 
@@ -373,7 +378,13 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
         lines.append("📝 描述：")
         lines.append(f"  {tpl.description}")
 
-        await equipment_detail.finish(message_add_head("\n".join(lines), event))
+        lines.append("***")
+        eid = str(equip.id)
+        if not equip.equipped:
+            lines.append(cmd("穿戴", f"装备 {eid}") + " | " + cmd("装备栏") + " | " + cmd("帮助"))
+        else:
+            lines.append(cmd("卸下 " + tpl.name, f"卸下 {eid}") + " | " + cmd("装备栏") + " | " + cmd("帮助"))
+        await equipment_detail.finish(build_markdown("\n".join(lines)))
 
 
 # ---------------- 指令：穿戴装备 ----------------
@@ -927,7 +938,7 @@ async def handle_equip_menu(event: MessageEvent):
             )
 
         # 按装备构建帮助信息
-        lines = ["✨ 你的VIP定制装备技能菜单 ✨", "━━━━━━━━━━━━━"]
+        lines = ["# ✨ VIP装备技能菜单", "***"]
 
         for eq in equipped_vip:
             menu = _VIP_EQUIPMENT_SKILL_MENUS.get(eq.item_id)
@@ -935,11 +946,10 @@ async def handle_equip_menu(event: MessageEvent):
                 lines.append("")
                 lines.append(menu["skills"])
 
-        lines.append("")
-        lines.append("━━━━━━━━━━━━━")
-        lines.append(f"📌 当前装备了 {len(equipped_vip)} 件VIP定制装备")
-
-        await equip_menu_cmd.finish(message_add_head("\n".join(lines), event))
+        lines.append("***")
+        lines.append(f"当前装备了 **{len(equipped_vip)}** 件VIP定制装备")
+        lines.append(cmd("装备栏") + " | " + cmd("装备菜单") + " | " + cmd("帮助"))
+        await equip_menu_cmd.finish(build_markdown("\n".join(lines)))
 
 
 # ==================== 铭文列表命令 ====================
@@ -967,10 +977,13 @@ async def handle_inscription_list(event: MessageEvent, args: Message = CommandAr
         )
         inscriptions = (await session.execute(stmt)).scalars().all()
 
+        synth_cmd = cmd("合成铭文")
+        equip_bar_cmd = cmd("装备栏")
+        help_cmd = cmd("帮助")
         if not inscriptions:
-            msg = "📜 你还没有铭文物品\n💡 击杀精英怪可掉落铭文，或用铭文碎片合成\n💡 发送【合成铭文】消耗5个碎片合成基础铭文"
+            msg = f"# 📜 铭文列表\n***\n你还没有铭文物品\n击杀精英怪可掉落铭文，或用铭文碎片合成\n***\n{synth_cmd} | {equip_bar_cmd} | {help_cmd}"
         else:
-            lines = ["📜 铭文列表："]
+            lines = ["# 📜 铭文列表", "***"]
             rarity_map = {"white": "⚪", "green": "🟢", "blue": "🔵", "purple": "🟣", "orange": "🟠"}
             rarity_order = {"orange": 0, "purple": 1, "blue": 2, "green": 3, "white": 4}
 
@@ -1002,7 +1015,8 @@ async def handle_inscription_list(event: MessageEvent, args: Message = CommandAr
             if fragment_count > 0:
                 lines.append(f"  [{idx}] 🔵 铭文碎片 ×{fragment_count}（收集5个可【合成铭文】）")
 
-            lines.append(f"\n💡 使用【镶嵌 装备编号 孔位 铭文名】将铭文插入装备")
+            lines.append("***")
+            lines.append(cmd("合成铭文") + " | " + cmd("装备栏") + " | " + cmd("帮助"))
             msg = "\n".join(lines)
 
-    await inscription_list_cmd.finish(Message(msg))
+    await inscription_list_cmd.finish(build_markdown(msg))

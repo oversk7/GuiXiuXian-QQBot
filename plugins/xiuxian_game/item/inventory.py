@@ -9,6 +9,7 @@ from ..models.player import Player
 from ..models.inventory import ItemInstance
 from ..models.inventory import ItemType, ItemEffectType
 from ..utils import message_add_head, paginate_items
+from ..utils_markdown import cmd, build_markdown
 from sqlalchemy import select, func
 from ..config import config
 from ..queries.inventory_queries import query_inventory_page, query_inventory_usage
@@ -299,7 +300,7 @@ async def handle_elixir_tolerance(event: MessageEvent, args: Message = CommandAr
             await elixir_tolerance_cmd.finish("📊 今日尚未服用任何丹药")
 
         # 构建使用状态报告
-        lines = ["📊 今日丹药使用状态", "=" * 15]
+        lines = ["# 📊 今日丹药使用状态", "***"]
 
         for log in logs:
             item_config = config.items_config["by_id"].get(log.item_id)
@@ -320,8 +321,9 @@ async def handle_elixir_tolerance(event: MessageEvent, args: Message = CommandAr
             lines.append(f"  状态：{status}")
             lines.append("")
 
-        result = "\n".join(lines)
-        await elixir_tolerance_cmd.finish(result)
+        lines.append("***")
+        lines.append(cmd("丹药加成") + " | " + cmd("背包") + " | " + cmd("帮助"))
+        await elixir_tolerance_cmd.finish(build_markdown("\n".join(lines)))
 
 
 @elixir_bonus_cmd.handle()
@@ -359,7 +361,7 @@ async def handle_elixir_bonus(event: MessageEvent):
         }
 
         # 构建详细报告
-        lines = ["💊 丹药总加成统计", "━━━━━━━━━━━━━"]
+        lines = ["# 💊 丹药总加成统计", "***"]
 
         # 按丹药分类显示
         for item_id, total_qty in elixir_usage_total.items():
@@ -398,8 +400,8 @@ async def handle_elixir_bonus(event: MessageEvent):
             lines.append("")
 
         # 显示总计
-        lines.append("🌟 总计加成")
-        lines.append("-" * 20)
+        lines.append("***")
+        lines.append("**🌟 总计加成**")
 
         total_display = []
         attr_names = {
@@ -421,8 +423,9 @@ async def handle_elixir_bonus(event: MessageEvent):
         else:
             lines.append("暂无属性加成")
 
-        result = "\n".join(lines)
-        await elixir_bonus_cmd.finish(message_add_head(result, event))
+        lines.append("***")
+        lines.append(cmd("耐药性") + " | " + cmd("背包") + " | " + cmd("帮助"))
+        await elixir_bonus_cmd.finish(build_markdown("\n".join(lines)))
 
 
 @inventory_cmd.handle()
@@ -640,22 +643,29 @@ async def handle_fish_inventory(event: MessageEvent, args: Message = CommandArg(
         current_entries = entries[start:start + page_size]
 
         lines = [
-            "🐟 鱼栏存量",
-            "━━━━━━━━━━━━━",
-            f"📊 总数量：{total_quantity} 条",
-            f"💰 总估值：{total_value} 金币",
-            ""
+            "# 🐟 鱼栏存量",
+            f"📊 总数量：**{total_quantity}**条　💰 总估值：**{total_value}**金币",
+            "***",
         ]
 
         for idx, (tpl, qty) in enumerate(current_entries, start=start + 1):
             value = (tpl.price or 0) * qty
             lines.append(f"{idx}. {tpl.get_rarity_display()}{tpl.name} ✖️{qty}（估值 {value} 金币）")
 
-        lines.append("")
-        lines.append(f"📖 第 {page} 页（共 {total_pages} 页)")
+        lines.append("***")
+        if total_pages > 1:
+            lines.append(f"第**{page}**/{total_pages}页")
+            nav = []
+            if page > 1:
+                nav.append(cmd("上一页", f"鱼栏 {page - 1}"))
+            if page < total_pages:
+                nav.append(cmd("下一页", f"鱼栏 {page + 1}"))
+            if nav:
+                lines.append(" | ".join(nav))
+        lines.append(cmd("鱼栏") + " | " + cmd("背包") + " | " + cmd("帮助"))
 
         message = "\n".join(lines)
-        await fish_inventory_cmd.finish(message_add_head(message, event))
+        await fish_inventory_cmd.finish(build_markdown(message))
 
 
 

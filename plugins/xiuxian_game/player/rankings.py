@@ -7,6 +7,7 @@ from typing import Callable, Awaitable
 from ..models.db import safe_session
 from ..utils import message_add_head
 from ..platform_utils import get_unified_player
+from ..utils_markdown import cmd, build_markdown
 from .realm_utils import realm_by_level_and_reincarnation
 from ..queries.ranking_queries import (
     RankedPlayer,
@@ -133,17 +134,14 @@ def _build_header(
     quote: str | None = None,
 ) -> list[str]:
     """构建排行榜头部"""
+    lines = [f"# {emoji} {title}"]
     if player_rank is not None:
-        header = f"{emoji} {title} (你的排名: 第{player_rank}名)"
+        lines.append(f"你的排名：第**{player_rank}**名")
     elif page is not None:
-        header = f"{emoji} {title} (第{page}/3页)"
-    else:
-        header = f"{emoji} {title}"
-
-    lines = [header]
+        lines.append(f"第**{page}**/3页")
     if quote:
-        lines.append(quote)
-    lines.append("━━━━━━━━━━━━━")
+        lines.append(f"*{quote}*")
+    lines.append("***")
     return lines
 
 
@@ -269,15 +267,23 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
         realm_name = realm_by_level_and_reincarnation(
             entry.value, entry.extra.get("reincarnation_level", 0)
         )
-        marker = " ◀" if player_id and entry.player_id == player_id else ""
+        marker = " **◀你**" if player_id and entry.player_id == player_id else ""
+        exp_val = entry.extra.get("exp", 0)
         lines.append(
             f"{_rank_emoji(entry.rank)} {entry.nickname}[UID:{entry.uid}] "
-            f"- Lv.{entry.value}『{realm_name}』 ({entry.extra.get('exp', 0)} EXP){marker}"
+            f"- Lv.{entry.value}『{realm_name}』 ({exp_val} EXP){marker}"
         )
 
-    lines.append("━━━━━━━━━━━━━")
-    lines.append("💡 使用【修为榜 页码】查看指定页(1-3)")
-    await level_rank_cmd.finish(message_add_head("\n".join(lines), event))
+    lines.append("***")
+    nav = []
+    if (page or 1) > 1:
+        nav.append(cmd("上一页", f"修为榜 {(page or 1) - 1}"))
+    if (page or 1) < 3:
+        nav.append(cmd("下一页", f"修为榜 {(page or 1) + 1}"))
+    if nav:
+        lines.append(" | ".join(nav))
+    lines.append(cmd("修为榜") + " | " + cmd("帮助"))
+    await level_rank_cmd.finish(build_markdown("\n".join(lines)))
 
 
 # ==================== 幸运榜 ====================
@@ -307,12 +313,19 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
 
     for entry in page_data:
         title = _luck_title(entry.value)
-        marker = " ◀" if player_id and entry.player_id == player_id else ""
+        marker = " **◀你**" if player_id and entry.player_id == player_id else ""
         lines.append(f"{_rank_emoji(entry.rank)} {entry.nickname}[UID:{entry.uid}] - {title} 🍀{entry.value}{marker}")
 
-    lines.append("━━━━━━━━━━━━━")
-    lines.append("💡 使用【幸运榜 页码】查看指定页")
-    await luck_rank_cmd.finish(message_add_head("\n".join(lines), event))
+    lines.append("***")
+    nav = []
+    if (page or 1) > 1:
+        nav.append(cmd("上一页", f"幸运榜 {(page or 1) - 1}"))
+    if (page or 1) < 3:
+        nav.append(cmd("下一页", f"幸运榜 {(page or 1) + 1}"))
+    if nav:
+        lines.append(" | ".join(nav))
+    lines.append(cmd("幸运榜") + " | " + cmd("帮助"))
+    await luck_rank_cmd.finish(build_markdown("\n".join(lines)))
 
 
 # ==================== 财富榜 ====================
@@ -337,13 +350,20 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
 
     for entry in page_data:
         formatted_wealth = _format_wealth(entry.value)
-        marker = " ◀" if player_id and entry.player_id == player_id else ""
+        marker = " **◀你**" if player_id and entry.player_id == player_id else ""
         lines.append(f"{_rank_emoji(entry.rank)} {entry.nickname}[UID:{entry.uid}] - {formatted_wealth}{marker}")
 
-    lines.append("━━━━━━━━━━━━━")
-    lines.append("💡 使用【财富榜 页码】查看指定页(1-3)")
-    lines.append("💡 总财富 = 面板金币 + 银行余额 + 投资价值")
-    await wealth_rank_cmd.finish(message_add_head("\n".join(lines), event))
+    lines.append("***")
+    lines.append("*总财富 = 面板金币 + 银行余额 + 投资价值*")
+    nav = []
+    if (page or 1) > 1:
+        nav.append(cmd("上一页", f"财富榜 {(page or 1) - 1}"))
+    if (page or 1) < 3:
+        nav.append(cmd("下一页", f"财富榜 {(page or 1) + 1}"))
+    if nav:
+        lines.append(" | ".join(nav))
+    lines.append(cmd("财富榜") + " | " + cmd("帮助"))
+    await wealth_rank_cmd.finish(build_markdown("\n".join(lines)))
 
 
 # ==================== 探索榜 ====================
@@ -375,12 +395,19 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
 
     for entry in page_data:
         title = _exploration_title(entry.value)
-        marker = " ◀" if player_id and entry.player_id == player_id else ""
+        marker = " **◀你**" if player_id and entry.player_id == player_id else ""
         lines.append(f"{_rank_emoji(entry.rank)} {entry.nickname}[UID:{entry.uid}] - {title} 第{entry.value}层{marker}")
 
-    lines.append("━━━━━━━━━━━━━")
-    lines.append("💡 使用【探索榜 页码】查看指定页(1-3)")
-    await exploration_rank_cmd.finish(message_add_head("\n".join(lines), event))
+    lines.append("***")
+    nav = []
+    if (page or 1) > 1:
+        nav.append(cmd("上一页", f"探索榜 {(page or 1) - 1}"))
+    if (page or 1) < 3:
+        nav.append(cmd("下一页", f"探索榜 {(page or 1) + 1}"))
+    if nav:
+        lines.append(" | ".join(nav))
+    lines.append(cmd("探索榜") + " | " + cmd("帮助"))
+    await exploration_rank_cmd.finish(build_markdown("\n".join(lines)))
 
 
 # ==================== 敏捷榜 ====================
@@ -412,12 +439,19 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
 
     for entry in page_data:
         title = _agility_title(entry.value)
-        marker = " ◀" if player_id and entry.player_id == player_id else ""
+        marker = " **◀你**" if player_id and entry.player_id == player_id else ""
         lines.append(f"{_rank_emoji(entry.rank)} {entry.nickname}[UID:{entry.uid}] - {title} ⚡{entry.value}{marker}")
 
-    lines.append("━━━━━━━━━━━━━")
-    lines.append("💡 使用【敏捷榜 页码】查看指定页(1-3)")
-    await agility_rank_cmd.finish(message_add_head("\n".join(lines), event))
+    lines.append("***")
+    nav = []
+    if (page or 1) > 1:
+        nav.append(cmd("上一页", f"敏捷榜 {(page or 1) - 1}"))
+    if (page or 1) < 3:
+        nav.append(cmd("下一页", f"敏捷榜 {(page or 1) + 1}"))
+    if nav:
+        lines.append(" | ".join(nav))
+    lines.append(cmd("敏捷榜") + " | " + cmd("帮助"))
+    await agility_rank_cmd.finish(build_markdown("\n".join(lines)))
 
 
 # ==================== 小游戏榜 ====================
@@ -449,12 +483,19 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
 
     for entry in page_data:
         title = _mini_game_title(entry.value)
-        marker = " ◀" if player_id and entry.player_id == player_id else ""
+        marker = " **◀你**" if player_id and entry.player_id == player_id else ""
         lines.append(f"{_rank_emoji(entry.rank)} {entry.nickname}[UID:{entry.uid}] - {title} 🎮{entry.value}分{marker}")
 
-    lines.append("━━━━━━━━━━━━━")
-    lines.append("💡 使用【小游戏榜 页码】查看指定页(1-3)")
-    await mini_game_rank_cmd.finish(message_add_head("\n".join(lines), event))
+    lines.append("***")
+    nav = []
+    if (page or 1) > 1:
+        nav.append(cmd("上一页", f"小游戏榜 {(page or 1) - 1}"))
+    if (page or 1) < 3:
+        nav.append(cmd("下一页", f"小游戏榜 {(page or 1) + 1}"))
+    if nav:
+        lines.append(" | ".join(nav))
+    lines.append(cmd("小游戏榜") + " | " + cmd("帮助"))
+    await mini_game_rank_cmd.finish(build_markdown("\n".join(lines)))
 
 
 # ==================== 恶魔币榜 ====================
@@ -511,13 +552,20 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
 
     for entry in page_data:
         title = _demon_coins_title(entry.value)
-        marker = " ◀" if player_id and entry.player_id == player_id else ""
+        marker = " **◀你**" if player_id and entry.player_id == player_id else ""
         lines.append(f"{_rank_emoji(entry.rank)} {entry.nickname}[UID:{entry.uid}] - {title} 🎰{entry.value}{marker}")
 
-    lines.append("━━━━━━━━━━━━━")
-    lines.append("💡 使用【恶魔币榜 页码】查看指定页(1-3)")
-    lines.append("💡 通过【人机轮盘】赢取恶魔币上榜")
-    await demon_coins_rank_cmd.finish(message_add_head("\n".join(lines), event))
+    lines.append("***")
+    lines.append(f"*通过 {cmd('人机轮盘')} 赢取恶魔币上榜*")
+    nav = []
+    if (page or 1) > 1:
+        nav.append(cmd("上一页", f"恶魔币榜 {(page or 1) - 1}"))
+    if (page or 1) < 3:
+        nav.append(cmd("下一页", f"恶魔币榜 {(page or 1) + 1}"))
+    if nav:
+        lines.append(" | ".join(nav))
+    lines.append(cmd("恶魔币榜") + " | " + cmd("帮助"))
+    await demon_coins_rank_cmd.finish(build_markdown("\n".join(lines)))
 
 
 # ==================== 排行榜总览 ====================
@@ -527,22 +575,22 @@ all_rankings_cmd = on_command("排行榜", aliases={"榜单", "排行榜总览"}
 async def _(event: MessageEvent, args: Message = CommandArg()):
     """显示所有排行榜的入口"""
     lines = [
-        "🏆 排行榜总览",
-        "━━━━━━━━━━━━━",
-        "📈 【修为榜】 - 查看修为排行",
-        "🍀 【幸运榜】 - 查看幸运排行",
-        "💰 【财富榜】 - 查看财富排行（含现金+存款+投资）",
-        "🌀 【探索榜】 - 查看探索排行",
-        "⚡ 【敏捷榜】 - 查看敏捷排行",
-        "🎮 【小游戏榜】 - 查看小游戏排行",
-        "🎰 【恶魔币榜】 - 查看恶魔轮盘排行",
-        "🎣 【钓鱼排行】 - 查看钓鱼排行",
-        "🏦 【存款榜】 - 查看存款排行",
-        "💕 【魅力榜】 - 查看谁最受欢迎的排行",
-        "👹 【BOSS排行】 - 查看世界BOSS伤害排行",
-        "🏰 【公会列表】 - 查看公会排行",
-        "━━━━━━━━━━━━━",
-        "💡 发送对应指令查看详细排行榜"
+        "# 🏆 排行榜总览",
+        "***",
+        f"📈 {cmd('修为榜')} — 修为排行",
+        f"🍀 {cmd('幸运榜')} — 幸运排行",
+        f"💰 {cmd('财富榜')} — 财富排行（含现金+存款+投资）",
+        f"🌀 {cmd('探索榜')} — 探索排行",
+        f"⚡ {cmd('敏捷榜')} — 敏捷排行",
+        f"🎮 {cmd('小游戏榜')} — 小游戏排行",
+        f"🎰 {cmd('恶魔币榜')} — 恶魔轮盘排行",
+        f"🎣 {cmd('钓鱼排行')} — 钓鱼排行",
+        f"🏦 {cmd('存款榜')} — 存款排行",
+        f"💕 {cmd('魅力榜')} — 谁最受欢迎",
+        f"👹 {cmd('BOSS排行')} — 世界BOSS伤害排行",
+        f"🏰 {cmd('公会列表')} — 公会排行",
+        "***",
+        cmd("排行榜") + " | " + cmd("帮助"),
     ]
 
-    await all_rankings_cmd.finish(message_add_head("\n".join(lines), event))
+    await all_rankings_cmd.finish(build_markdown("\n".join(lines)))

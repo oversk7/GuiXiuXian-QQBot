@@ -15,6 +15,7 @@ from ..infrastructure.uow.unit_of_work import UnitOfWork
 from ..models.db import AsyncSessionLocal
 from ..models.inventory import ItemType
 from ..utils import message_add_head
+from ..utils_markdown import cmd, build_markdown
 from ..config import config
 from ..platform_utils import get_unified_player
 from ..economy.market import get_shop_adjusted_price
@@ -93,15 +94,8 @@ async def get_gift_shop_menu(player_id: str = None) -> str:
     }
 
     lines = [
-        "🎁 礼物商店 🎁",
-        "━━━━━━━━━━━━━",
-        "这里是购买好感度礼物的地方",
-        "",
-        "📜 使用方法:",
-        "【买礼物 <礼物名> [数量]】",
-        "示例: 买礼物 红玫瑰 10",
-        "",
-        "💝 礼物列表:"
+        "# 🎁 礼物商店",
+        "***",
     ]
 
     # 获取玩家购买记录和动态价格
@@ -116,7 +110,8 @@ async def get_gift_shop_menu(player_id: str = None) -> str:
             if rarity not in rarity_groups:
                 continue
 
-            lines.append(f"\n{rarity_names[rarity]}")
+            lines.append("")
+            lines.append(f"**{rarity_names[rarity]}**")
 
             # 按价格排序
             items = sorted(rarity_groups[rarity], key=lambda x: x.price)
@@ -136,21 +131,19 @@ async def get_gift_shop_menu(player_id: str = None) -> str:
                             purchased = purchase_info["count"]
 
                     remaining = daily_limit - purchased
+                    iname = item.name
                     lines.append(
-                        f"  • {item.name} - {adj_price}金币 (好感+{item.favorability}) [今日剩余:{remaining}]"
+                        f"{cmd(iname, f'买礼物 {iname}')}　{adj_price}金币　好感+{item.favorability}　剩余:{remaining}"
                     )
                 else:
+                    iname = item.name
                     lines.append(
-                        f"  • {item.name} - {adj_price}金币 (好感+{item.favorability})"
+                        f"{cmd(iname, f'买礼物 {iname}')}　{adj_price}金币　好感+{item.favorability}"
                     )
 
     lines.extend([
-        "",
-        "━━━━━━━━━━━━━",
-        "💡 提示:",
-        "• 使用【赠礼 UID 礼物名】赠送礼物增加好感度",
-        "• 每种礼物每日有购买数量限制",
-        "• 每日好感度上限500"
+        "***",
+        cmd("礼物商店") + " | " + cmd("帮助"),
     ])
 
     return "\n".join(lines)
@@ -164,7 +157,7 @@ async def handle_gift_shop(event: MessageEvent, args: Message = CommandArg()):
         player = await get_unified_player(session, event)
     player_id = player.id if player else None
     menu = await get_gift_shop_menu(player_id)
-    await gift_shop_cmd.finish(message_add_head(menu, event))
+    await gift_shop_cmd.finish(build_markdown(menu))
 
 
 @buy_gift_cmd.handle()
