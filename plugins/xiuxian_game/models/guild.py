@@ -116,6 +116,31 @@ class GuildAlchemyProduction(Base):
     )
 
 
+class WarehouseLogType(str, PyEnum):
+    """仓库操作类型枚举"""
+    DEPOSIT = "DEPOSIT"      # 存入
+    WITHDRAW = "WITHDRAW"    # 取出
+
+
+class GuildWarehouseLog(Base):
+    """公会仓库操作日志表"""
+    __tablename__ = "guild_warehouse_log"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    guild_id: Mapped[int] = mapped_column(Integer, ForeignKey("guild.id"), comment="公会ID")
+    player_id: Mapped[str] = mapped_column(String(32), comment="操作者玩家ID")
+    player_name: Mapped[str] = mapped_column(String(32), default="", server_default="", comment="操作者昵称（冗余存储，避免查询）")
+    operation: Mapped[WarehouseLogType] = mapped_column(SQLEnum(WarehouseLogType), comment="操作类型")
+    item_id: Mapped[str] = mapped_column(String(32), comment="物品ID")
+    item_name: Mapped[str] = mapped_column(String(64), default="", server_default="", comment="物品名称（冗余存储）")
+    quantity: Mapped[int] = mapped_column(Integer, comment="数量")
+    operated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.now, server_default=func.now(), comment="操作时间")
+
+    __table_args__ = (
+        {"comment": "公会仓库操作日志表"}
+    )
+
+
 class GuildTeleportLog(Base):
     """公会传送记录表"""
     __tablename__ = "guild_teleport_log"

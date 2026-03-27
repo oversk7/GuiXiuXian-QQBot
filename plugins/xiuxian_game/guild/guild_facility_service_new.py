@@ -9,7 +9,7 @@ from datetime import datetime, date, timedelta
 import random
 import math
 
-from ..models.guild import Guild, GuildBuilding, BuildingType, GuildWarehouseItem, GuildAlchemyProduction, GuildTeleportLog
+from ..models.guild import Guild, GuildBuilding, BuildingType, GuildWarehouseItem, GuildAlchemyProduction, GuildTeleportLog, GuildWarehouseLog, WarehouseLogType
 from ..models.player import Player
 from ..models.inventory import ItemInstance, STACK_SIZE
 from ..config import config
@@ -20,6 +20,7 @@ from ..infrastructure.repositories.item_repository import ItemRepository
 from ..infrastructure.repositories.guild_teleport_log_repository import GuildTeleportLogRepository
 from ..infrastructure.repositories.guild_alchemy_production_repository import GuildAlchemyProductionRepository
 from ..infrastructure.repositories.guild_warehouse_item_repository import GuildWarehouseItemRepository
+from ..infrastructure.repositories.guild_warehouse_log_repository import GuildWarehouseLogRepository
 from .guild_building_service_new import GuildBuildingService as GuildBuildingServiceNew
 
 
@@ -102,19 +103,8 @@ class GuildFacilityService:
         teleport_log_repo: GuildTeleportLogRepository,
         alchemy_production_repo: GuildAlchemyProductionRepository,
         warehouse_item_repo: GuildWarehouseItemRepository,
+        warehouse_log_repo: GuildWarehouseLogRepository = None,
     ):
-        """
-        初始化公会设施服务
-
-        Args:
-            guild_repo: 公会仓储
-            building_repo: 公会建筑仓储
-            player_repo: 玩家仓储
-            item_repo: 物品仓储
-            teleport_log_repo: 公会传送日志仓储
-            alchemy_production_repo: 公会丹房产出仓储
-            warehouse_item_repo: 公会仓库物品仓储
-        """
         self._guild_repo = guild_repo
         self._building_repo = building_repo
         self._player_repo = player_repo
@@ -122,6 +112,7 @@ class GuildFacilityService:
         self._teleport_log_repo = teleport_log_repo
         self._alchemy_production_repo = alchemy_production_repo
         self._warehouse_item_repo = warehouse_item_repo
+        self._warehouse_log_repo = warehouse_log_repo
 
     @staticmethod
     def get_pill_quality_chinese(quality: str) -> str:
@@ -672,6 +663,12 @@ class GuildFacilityService:
             await self._warehouse_item_repo.add(warehouse_item)
             remaining_quantity -= stack_quantity
 
+        # 写入仓库操作日志
+        await self._write_warehouse_log(
+            guild_id, player_id, WarehouseLogType.DEPOSIT,
+            item_id, item_config.name, quantity
+        )
+
         return True, f"成功存入{item_config.name}×{quantity}"
 
     async def _do_withdraw(self, player_id: str, guild_id: int, item_id: str, item_name: str, quantity: int) -> Tuple[bool, str]:
@@ -700,6 +697,12 @@ class GuildFacilityService:
                 await self._warehouse_item_repo.delete(stack.id)
             else:
                 await self._warehouse_item_repo.update(stack)
+
+        # 写入仓库操作日志
+        await self._write_warehouse_log(
+            guild_id, player_id, WarehouseLogType.WITHDRAW,
+            item_id, item_name, quantity
+        )
 
         return True, f"成功取出{item_name}×{quantity}"
 
@@ -739,3 +742,56 @@ class GuildFacilityService:
             return False, f"仓库中该物品数量不足（仅有{total_quantity}个）"
 
         return await self._do_withdraw(player_id, guild_id, item_config.item_id, item_name, quantity)
+
+    async def _write_warehouse_log(
+        self, guild_id: int, player_id: str,
+        operation: WarehouseLogType, item_id: str, item_name: str, quantity: int
+    ):
+        """写入仓库操作日志，并自动清理超出上限的旧记录"""
+        if not self._warehouse_log_repo:
+            return
+
+        # 获取玩家昵称
+        player = await self._player_repo.get_by_id(player_id)
+        player_name = player.nickname if player else "未知"
+
+        log = GuildWarehouseLog(
+            guild_id=guild_id,
+            player_id=player_id,
+            player_name=player_name,
+            operation=operation,
+            item_id=item_id,
+            item_name=item_name,
+            quantity=quantity,
+        )
+        await self._warehouse_log_repo.add(log)
+
+        # 自动清理超出上限的旧日志
+        await self._warehouse_log_repo.cleanup_old_logs(guild_id)
+
+    async def get_warehouse_logs(self, guild_id: int, limit: int = 20) -> List[Dict]:
+        """
+        获取公会仓库操作日志
+
+        Args:
+            guild_id: 公会ID
+            limit: 返回条数
+
+        Returns:
+            日志列表
+        """
+        if not self._warehouse_log_repo:
+            return []
+
+        logs = await self._warehouse_log_repo.get_recent_by_guild(guild_id, limit)
+
+        result = []
+        for log in logs:
+            result.append({
+                "player_name": log.player_name,
+                "operation": "存入" if log.operation == WarehouseLogType.DEPOSIT else "取出",
+                "item_name": log.item_name,
+                "quantity": log.quantity,
+                "operated_at": log.operated_at,
+            })
+        return result

@@ -1606,6 +1606,7 @@ async def handle_deposit_warehouse(event: MessageEvent, args: Message = CommandA
         from ..infrastructure.repositories.guild_teleport_log_repository import GuildTeleportLogRepository
         from ..infrastructure.repositories.guild_alchemy_production_repository import GuildAlchemyProductionRepository
         from ..infrastructure.repositories.guild_warehouse_item_repository import GuildWarehouseItemRepository
+        from ..infrastructure.repositories.guild_warehouse_log_repository import GuildWarehouseLogRepository
 
         facility_service = GuildFacilityServiceNew(
             guild_repo=GuildRepository(session),
@@ -1615,6 +1616,7 @@ async def handle_deposit_warehouse(event: MessageEvent, args: Message = CommandA
             teleport_log_repo=GuildTeleportLogRepository(session),
             alchemy_production_repo=GuildAlchemyProductionRepository(session),
             warehouse_item_repo=GuildWarehouseItemRepository(session),
+            warehouse_log_repo=GuildWarehouseLogRepository(session),
         )
         success, message = await facility_service.deposit_to_warehouse(
             player.id, player.guild_id, item_config.item_id, quantity
@@ -1678,6 +1680,7 @@ async def handle_withdraw_warehouse(event: MessageEvent, args: Message = Command
         from ..infrastructure.repositories.guild_teleport_log_repository import GuildTeleportLogRepository
         from ..infrastructure.repositories.guild_alchemy_production_repository import GuildAlchemyProductionRepository
         from ..infrastructure.repositories.guild_warehouse_item_repository import GuildWarehouseItemRepository
+        from ..infrastructure.repositories.guild_warehouse_log_repository import GuildWarehouseLogRepository
 
         facility_service = GuildFacilityServiceNew(
             guild_repo=GuildRepository(session),
@@ -1687,6 +1690,7 @@ async def handle_withdraw_warehouse(event: MessageEvent, args: Message = Command
             teleport_log_repo=GuildTeleportLogRepository(session),
             alchemy_production_repo=GuildAlchemyProductionRepository(session),
             warehouse_item_repo=GuildWarehouseItemRepository(session),
+            warehouse_log_repo=GuildWarehouseLogRepository(session),
         )
 
         if item_name:
@@ -1705,5 +1709,55 @@ async def handle_withdraw_warehouse(event: MessageEvent, args: Message = Command
         else:
             await withdraw_warehouse_cmd.finish(message_add_head(f"⛔ {message}", event))
 
+# ==================== 仓库记录 ====================
+warehouse_log_cmd = on_command("仓库记录", block=True, priority=5)
 
+@warehouse_log_cmd.handle()
+async def handle_warehouse_log(event: MessageEvent, args: Message = CommandArg()):
+    """查看公会仓库的存取操作记录"""
+    async with safe_session() as session:
+        player = await get_unified_player(session, event)
+        if not player or not player.guild_id:
+            await warehouse_log_cmd.finish("⛔ 你未加入任何公会")
 
+        guild = await session.get(Guild, player.guild_id)
+
+        from ..infrastructure.repositories.guild_repository import GuildRepository
+        from ..infrastructure.repositories.guild_building_repository import GuildBuildingRepository
+        from ..infrastructure.repositories.player_repository import PlayerRepository
+        from ..infrastructure.repositories.item_repository import ItemRepository
+        from ..infrastructure.repositories.guild_teleport_log_repository import GuildTeleportLogRepository
+        from ..infrastructure.repositories.guild_alchemy_production_repository import GuildAlchemyProductionRepository
+        from ..infrastructure.repositories.guild_warehouse_item_repository import GuildWarehouseItemRepository
+        from ..infrastructure.repositories.guild_warehouse_log_repository import GuildWarehouseLogRepository
+
+        facility_service = GuildFacilityServiceNew(
+            guild_repo=GuildRepository(session),
+            building_repo=GuildBuildingRepository(session),
+            player_repo=PlayerRepository(session),
+            item_repo=ItemRepository(session),
+            teleport_log_repo=GuildTeleportLogRepository(session),
+            alchemy_production_repo=GuildAlchemyProductionRepository(session),
+            warehouse_item_repo=GuildWarehouseItemRepository(session),
+            warehouse_log_repo=GuildWarehouseLogRepository(session),
+        )
+
+        logs = await facility_service.get_warehouse_logs(player.guild_id, limit=20)
+
+        if not logs:
+            await warehouse_log_cmd.finish(message_add_head(
+                f"📋 公会『{guild.name}』仓库记录\n━━━━━━━━━━\n暂无操作记录", event
+            ))
+
+        lines = [f"📋 公会『{guild.name}』仓库记录", "━━━━━━━━━━"]
+        for log in logs:
+            time_str = log["operated_at"].strftime("%m-%d %H:%M")
+            op_icon = "📥" if log["operation"] == "存入" else "📤"
+            lines.append(
+                f"{op_icon} {time_str} {log['player_name']} "
+                f"{log['operation']} {log['item_name']}×{log['quantity']}"
+            )
+        lines.append("━━━━━━━━━━")
+        lines.append("💡 显示最近20条记录")
+
+        await warehouse_log_cmd.finish(message_add_head("\n".join(lines), event))
