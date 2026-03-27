@@ -108,6 +108,9 @@ class RestaurantService:
         default_recipe_ids = self.recipe_manager.get_default_recipes()
 
         for recipe_id in default_recipe_ids:
+            already_learned = await uow.player_recipes.has_recipe(player_id, recipe_id)
+            if already_learned:
+                continue
             player_recipe = PlayerRecipe(
                 player_id=player_id,
                 recipe_id=recipe_id,
