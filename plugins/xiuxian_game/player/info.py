@@ -173,196 +173,59 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
     display_name = player.nickname  # 称号不再拼接到昵称，单独展示
     title_line = f"🏅称号 「{player_title}」" if player_title else ""
 
-    # 检查各频道未读状态
+    # 构建未读消息通知（蓝字可点击）
     has_world_unread, has_private_unread, has_system_unread, has_guild_unread = await get_unread_message_status(player.id)
-    unread_notice = ""
-    notice_lines: list[str] = []
+    notice_parts = []
     if has_private_unread:
-        notice_lines.append("📬 有新私信！【消息 私信】查看")
+        notice_parts.append(f"📬 {cmd('查看私信', '消息 私信')}")
     if has_system_unread:
-        notice_lines.append("📢 有新系统公告！【消息 系统】查看")
+        notice_parts.append(f"📢 {cmd('查看公告', '消息 系统')}")
     if has_guild_unread:
-        notice_lines.append("🏯 公会频道有新消息！【消息 公会】查看")
+        notice_parts.append(f"🏯 {cmd('查看公会消息', '消息 公会')}")
     if has_world_unread:
-        notice_lines.append("🌐 世界频道有新内容！【消息】查看")
-    if notice_lines:
-        unread_notice = "".join(f"\n┃{line}" for line in notice_lines)
+        notice_parts.append(f"🌐 {cmd('查看世界消息', '消息')}")
 
-    content = (
-        f"┏━━ 信息 ━━━━\n"
-        f"┃{display_name}[UID:{player.uid}]「{player.sex}」\n"
-        f"┃ Lv.{player.level} · {realm_name}\n"
-        f"┃ Exp {player.exp}/{exp_max}\n"
-        "┣━━ 状态 ━━━━\n"
-        f"┃ ❤️生命 {cur_hp}/{hp_max_str}\n"
-        f"┃ 🧠理智 {cur_mp}/{mp_max_str}\n"
-        f"┃ ⚔力 {atk_str}   🛡防 {def_str}\n"
-        f"┃ 👟敏 {agi_str}   🍀运 {luk_str}\n"
-        f"┃ 🔮咒抗 {player.stamina}\n"
-        "┣━━ 其他 ━━━━\n"
-        f"┃ 🪙金币 {player.gold}  💎积分 {player.gold2}\n"
-        f"┃ 🕯️诡烛 {player.gui_zhu}\n"
-        f"┃ 💀怨念 {player.resentment} ✨点数 {player.attribute_points}\n"
-        f"┃ ☯公会 {guild_name}\n"
-        f"┃ 📍位置 {_format_player_location(player)}\n"
-        "┣━━━━━━━━━\n"
-        f"┃☞【装备栏】【社交系统】{unread_notice}"
-    )
+    # 组装原生 Markdown 面板
+    lines = [
+        f"# 👤 {display_name}",
+        f"UID:{player.uid}　{player.sex}　Lv.**{player.level}** · {realm_name}",
+    ]
+    if title_line:
+        lines.append(title_line)
+    lines.extend([
+        f"☯ {guild_name}　Exp {player.exp}/{exp_max}",
+        "***",
+        f"❤️生命 **{cur_hp}**/{hp_max_str}　🧠理智 **{cur_mp}**/{mp_max_str}",
+        f"⚔️力 **{atk_str}**　🛡️防 **{def_str}**　👟敏 **{agi_str}**　🍀运 **{luk_str}**",
+        f"🔮咒抗 **{player.stamina}**",
+        "***",
+        f"🪙金币 **{player.gold}**　💎积分 **{player.gold2}**　🕯️诡烛 **{player.gui_zhu}**",
+        f"💀怨念 **{player.resentment}**　✨点数 **{player.attribute_points}**　🙏香火 **{player.incense}**",
+        f"📍{_format_player_location(player)}",
+        "***",
+    ])
 
-    # 附加任务/成就检查结果（仅查看自己面板时有值）
-    content += quest_extra
+    if notice_parts:
+        lines.extend(notice_parts)
+        lines.append("***")
 
-    # 使用图鉴类模板美化显示（仅在QQ平台且查看自己面板时使用）
-    if target_uid is None and hasattr(event, 'get_user_id'):
-        try:
-            # 获取玩家QQ官方ID（用于头像）
-            qq_openid = event.get_user_id()
-
-            # 调试日志
-            import logging
-            logger = logging.getLogger(__name__)
-            logger.info(f"[面板MD] 尝试发送MD模板，qq_openid={qq_openid}")
-
-            # 构建图鉴模板参数
-            title = f"{display_name} [UID:{player.uid}]"
-
-            # 描述信息（所有玩家信息，使用\r换行）
-            desc_lines = [
-                f"Lv.{player.level} · {realm_name} | {player.sex}",
-            ]
-            if title_line:
-                desc_lines.append(title_line)
-            desc_lines.extend([
-                f"☯公会 {guild_name}",
-                f"Exp {player.exp}/{exp_max}",
-                f"━━━ 状态 ━━━",
-                f"❤️生命 {cur_hp}/{hp_max_str}",
-                f"🧠理智 {cur_mp}/{mp_max_str}",
-                f"⚔力 {atk_str}  🛡防 {def_str}",
-                f"👟敏 {agi_str}  🍀运 {luk_str}",
-                f"🔮咒抗 {player.stamina}",
-                f"━━━ 资产 ━━━",
-                f"🪙金币 {player.gold}",
-                f"💎积分 {player.gold2}",
-                f"💀怨念 {player.resentment} ✨点数 {player.attribute_points}",
-                f"🕯️诡烛 {player.gui_zhu} 🙏香火 {player.incense}",
-                f"━━━ 位置 ━━━",
-                f"📍{_format_player_location(player)}",
-            ])
-            desc = "\r".join(desc_lines)
-
-            # 玩家头像URL
-            avatar_url = f"https://thirdqq.qlogo.cn/qqapp/102499345/{qq_openid}/0"
-
-            # 提示信息（留言板状态，使用\r换行）
-            hint = "☞【装备栏】【社交系统】"
-
-            # 添加未读消息提示
-            if unread_notice:
-                clean_notice = unread_notice.replace('\n', '\r')
-                hint += f"\r{clean_notice}"
-
-            # 清理所有参数中的\n换行符，确保只使用\r
-            title = title.replace('\n', '\r')
-            desc = desc.replace('\n', '\r')
-            hint = hint.replace('\n', '\r')
-
-            # 构建模板参数
-            template_params = [
-                MessageMarkdownParams(key="title", values=[title]),
-                MessageMarkdownParams(key="desc", values=[desc]),
-                MessageMarkdownParams(key="width", values=["32"]),
-                MessageMarkdownParams(key="height", values=["32"]),
-                MessageMarkdownParams(key="imgurl", values=[avatar_url]),
-                MessageMarkdownParams(key="hint", values=[hint])
-            ]
-
-            # 使用图鉴类Markdown模版
-            markdown_msg = MessageMarkdown(
-                custom_template_id="102499345_1769178984",
-                params=template_params
-            )
-            await profile.finish(MessageSegment.markdown(markdown_msg))
-        except Exception as e:
-            # 如果模板发送失败，回退到文字版本
-            # formatted_content = format_platform_message(content, event)
-            # await profile.finish(message_add_head(formatted_content, event))
-            raise  # 重新抛出异常，让用户看到错误
+    # 底部快捷按钮
+    if target_uid is None:
+        lines.append(
+            cmd("装备栏") + " | " + cmd("修炼") + " | " + cmd("突破") + " | " +
+            cmd("签到") + " | " + cmd("加点帮助")
+        )
+        lines.append(
+            cmd("社交系统") + " | " + cmd("完整面板") + " | " + cmd("帮助")
+        )
     else:
-        # 查看他人面板时也使用MD版本
-        # 注释掉文字版，保留代码
-        # formatted_content = format_platform_message(content, event)
-        # await profile.finish(message_add_head(formatted_content, event))
+        lines.append(cmd("面板") + " | " + cmd("社交系统") + " | " + cmd("帮助"))
 
-        # 查看他人面板时，使用对方的UID获取头像
-        try:
-            # 如果是查看他人，使用目标玩家的ID（openid）
-            if target_uid:
-                qq_openid = player.id
-            else:
-                qq_openid = event.get_user_id() if hasattr(event, 'get_user_id') else "default"
+    if quest_extra:
+        lines.append("***")
+        lines.append(quest_extra.strip())
 
-            # 构建图鉴模板参数
-            title = f"{display_name} [UID:{player.uid}]"
-
-            # 描述信息（所有玩家信息，使用\r换行）
-            desc_lines = [
-                f"Lv.{player.level} · {realm_name} | {player.sex}",
-            ]
-            if title_line:
-                desc_lines.append(title_line)
-            desc_lines.extend([
-                f"☯公会 {guild_name}",
-                f"Exp {player.exp}/{exp_max}",
-                f"━━━ 状态 ━━━",
-                f"❤️生命 {cur_hp}/{hp_max_str}",
-                f"🧠理智 {cur_mp}/{mp_max_str}",
-                f"⚔力 {atk_str}  🛡防 {def_str}",
-                f"👟敏 {agi_str}  🍀运 {luk_str}",
-                f"🔮咒抗 {player.stamina}",
-                f"━━━ 资产 ━━━",
-                f"🪙金币 {player.gold}",
-                f"💎积分 {player.gold2}",
-                f"💀怨念 {player.resentment} ✨点数 {player.attribute_points}",
-                f"🕯️诡烛 {player.gui_zhu} 🙏香火 {player.incense}",
-                f"━━━ 位置 ━━━",
-                f"📍{_format_player_location(player)}",
-            ])
-            desc = "\r".join(desc_lines)
-
-            # 玩家头像URL
-            avatar_url = f"https://thirdqq.qlogo.cn/qqapp/102499345/{qq_openid}/0"
-
-            # 提示信息（留言板状态，使用\r换行）
-            hint = "☞【装备栏】【社交系统】"
-
-            # 清理所有参数中的\n换行符，确保只使用\r
-            title = title.replace('\n', '\r')
-            desc = desc.replace('\n', '\r')
-            hint = hint.replace('\n', '\r')
-
-            # 构建模板参数
-            template_params = [
-                MessageMarkdownParams(key="title", values=[title]),
-                MessageMarkdownParams(key="desc", values=[desc]),
-                MessageMarkdownParams(key="width", values=["32"]),
-                MessageMarkdownParams(key="height", values=["32"]),
-                MessageMarkdownParams(key="imgurl", values=[avatar_url]),
-                MessageMarkdownParams(key="hint", values=[hint])
-            ]
-
-            # 使用图鉴类Markdown模版
-            markdown_msg = MessageMarkdown(
-                custom_template_id="102499345_1769178984",
-                params=template_params
-            )
-
-            await profile.finish(MessageSegment.markdown(markdown_msg))
-        except Exception as e:
-            import logging
-            logger = logging.getLogger(__name__)
-            logger.error(f"[面板MD] 查看他人面板MD发送失败: {e}", exc_info=True)
-            raise  # 重新抛出异常
+    await profile.finish(build_markdown("\n".join(lines)))
 
 @register.handle()
 async def _(event: MessageEvent, state: T_State, args: Message = CommandArg()):
@@ -886,70 +749,71 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
 
     # 10. 检查各频道未读状态
     has_world_unread, has_private_unread, has_system_unread, has_guild_unread = await get_unread_message_status(player.id)
-    unread_notice = ""
-    notice_lines: list[str] = []
+    notice_parts_full = []
     if has_private_unread:
-        notice_lines.append("📬 有新私信！【消息 私信】查看")
+        notice_parts_full.append(f"📬 {cmd('查看私信', '消息 私信')}")
     if has_system_unread:
-        notice_lines.append("📢 有新系统公告！【消息 系统】查看")
+        notice_parts_full.append(f"📢 {cmd('查看公告', '消息 系统')}")
     if has_guild_unread:
-        notice_lines.append("🏯 公会频道有新消息！【消息 公会】查看")
+        notice_parts_full.append(f"🏯 {cmd('查看公会消息', '消息 公会')}")
     if has_world_unread:
-        notice_lines.append("🌐 世界频道有新内容！【消息】查看")
-    if notice_lines:
-        unread_notice = "".join(f"\n┃{line}" for line in notice_lines)
+        notice_parts_full.append(f"🌐 {cmd('查看世界消息', '消息')}")
 
-    # 11. 组装完整面板内容
-    content = (
-        f"┏━━ 信息 ━━━━\n"
-        f"┃{display_name_full}[UID:{player.uid}]「{player.sex}」\n"
-        f"┃ Lv.{player.level} · {realm_name}\n"
-        f"{title_line_full}"
-        f"┃ Exp {player.exp}/{exp_max}\n"
-        f"┃ 📅注册 {created_info}\n"
-        "┣━━ 状态 ━━━━\n"
-        f"┃ ❤️生命 {cur_hp}/{hp_max_str}\n"
-        f"┃ 🧠理智 {cur_mp}/{mp_max_str}\n"
-        f"┃ ⚔力 {atk_str}   🛡防 {def_str}\n"
-        f"┃ 👟敏 {agi_str}   🍀运 {luk_str}\n"
-        f"┃ 🔮咒抗 {player.stamina}\n"
-        "┣━━ 战斗属性 ━━\n"
-    )
+    # 11. 组装完整面板（原生 Markdown）
+    lines = [
+        f"# 👤 {display_name_full}",
+        f"UID:{player.uid}　{player.sex}　Lv.**{player.level}** · {realm_name}",
+    ]
+    if title_line_full.strip():
+        lines.append(title_line_full.replace("┃ ", "").replace("\n", "").strip())
+    lines.extend([
+        f"☯ {guild_name}　Exp {player.exp}/{exp_max}　📅注册 {created_info}",
+        "***",
+        f"❤️生命 **{cur_hp}**/{hp_max_str}　🧠理智 **{cur_mp}**/{mp_max_str}",
+        f"⚔️力 **{atk_str}**　🛡️防 **{def_str}**　👟敏 **{agi_str}**　🍀运 **{luk_str}**",
+        f"🔮咒抗 **{player.stamina}**",
+        "***",
+        "**⚔️ 战斗属性**",
+    ])
 
-    # 12. 添加战斗属性（去除第一行的"战斗属性："标题，因为已在面板中显示）
+    # 12. 添加战斗属性（跳过标题行）
     battle_lines = battle_attr_display.strip().split('\n')
-    # 跳过战斗属性的标题行，只保留具体属性行
-    for line in battle_lines[1:]:  # 跳过第一行"战斗属性："
+    for line in battle_lines[1:]:
         if line.strip():
-            content += f"┃ {line.strip()}\n"
+            lines.append(line.strip())
 
-    # 13. 添加其他信息
-    content += (
-        "┣━━ 其他 ━━━━\n"
-        f"┃ 🪙金币 {player.gold}  💎积分 {player.gold2}\n"
-        f"┃ 🕯️诡烛 {player.gui_zhu}\n"
-        f"┃ 💀怨念 {player.resentment} ✨点数 {player.attribute_points}\n"
-        f"┃ ☯公会 {guild_name}\n"
-        f"┃ 📍位置 {_format_player_location(player)}\n"
+    lines.extend([
+        "***",
+        f"🪙金币 **{player.gold}**　💎积分 **{player.gold2}**　🕯️诡烛 **{player.gui_zhu}**",
+        f"💀怨念 **{player.resentment}**　✨点数 **{player.attribute_points}**　🙏香火 **{player.incense}**",
+        f"📍{_format_player_location(player)}",
+    ])
+
+    # 13. Buff状态
+    if active_buffs:
+        lines.append(f"✨增益 **{len(active_buffs)}**个　{cmd('增益状态')}")
+
+    lines.append("***")
+    if notice_parts_full:
+        lines.extend(notice_parts_full)
+        lines.append("***")
+
+    lines.append(
+        cmd("装备栏") + " | " + cmd("修炼") + " | " + cmd("突破") + " | " +
+        cmd("签到") + " | " + cmd("加点帮助")
+    )
+    lines.append(
+        cmd("社交系统") + " | " + cmd("面板") + " | " + cmd("帮助")
     )
 
-    # 14. 添加Buff状态提示
-    if active_buffs:
-        content += f"┃ ✨增益 {len(active_buffs)}个 (输入【增益状态】查看)\n"
-
-    content += f"┣━━━━━━━━━\n"
-    content += f"┃☞【装备栏】【社交系统】{unread_notice}"
-
-    # 15. 检查新手任务（仅检查自己的面板，不检查查询他人）
+    # 14. 检查新手任务
     if target_uid is None:
         from ..quest.novice_quest_service import NoviceQuestService
         quest_completed, quest_msg = await NoviceQuestService.check_and_advance_quest(
             uow.session, player, "command", {"command": "完整面板"}
         )
-
         if quest_completed and quest_msg:
-            content += f"\n\n{quest_msg}"
+            lines.append("***")
+            lines.append(quest_msg.strip())
 
-    # 16. 使用平台格式化工具
-    formatted_content = format_platform_message(content, event)
-    await complete_profile.finish(message_add_head(formatted_content, event))
+    await complete_profile.finish(build_markdown("\n".join(lines)))
