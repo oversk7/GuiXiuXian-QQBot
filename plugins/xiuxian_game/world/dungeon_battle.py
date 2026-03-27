@@ -1509,9 +1509,9 @@ async def _handle_personal_monster(session, tile: WorldTile, player: Player) -> 
                     existing_record = (await session.execute(stmt)).scalar_one_or_none()
 
                     if not existing_record:
-                        battle_summary.append("━━━━━━━━━━━━━")
+                        battle_summary.append("***")
                         battle_summary.append("🎁 恭喜！你可以领取深渊探索者宝箱了！")
-                        battle_summary.append("💎 【领取宝箱】一键领取所有可领取的宝箱")
+                        battle_summary.append(f"💎 {cmd('领取宝箱')} 一键领取所有可领取的宝箱")
 
     else:
         # PVE失败（玩家死亡）：应用镜怨自噬与每日随机属性
@@ -1637,9 +1637,9 @@ async def _handle_personal_monster(session, tile: WorldTile, player: Player) -> 
                 eq.extra_attrs = {k: v for k, v in eq.extra_attrs.items() if k != "_persist_bonus"}
             eq.equipped = False
             broken_msgs.append(
-                f"━━━━━━━━━━━━━\n"
-                f"💔 {eq.config.name} 耐久耗尽已自动卸下\n"
-                f"   ⚠️ 需修理后才能再次穿戴"
+                f"***\n"
+                f"💔 **{eq.config.name}** 耐久耗尽已自动卸下\n"
+                f"⚠️ 需修理后才能再次穿戴"
             )
             # 不再删除装备实例，遵循“耐久归零自动卸下且无法穿戴”的规则
 
@@ -1709,14 +1709,19 @@ async def _handle_merchant(session, tile: WorldTile, player: Player) -> str:
     if not goods_display:
         return "🏪 卖货郎的货物已经售罄。"
 
+    goods_display_md = []
+    for i, good in enumerate(goods, 1):
+        item_config_md = config.items_config["by_id"].get(good["item_id"])
+        if item_config_md:
+            goods_display_md.append(
+                f"{i}. {cmd(item_config_md.get_display_name(), f'购买 {i}')} ×{good['quantity']}　💰{good['price']}"
+            )
+
     msg = (
-        "🏪 神秘卖货郎：\n"
-        "━━━━━━━━━━━━━\n"
+        "🏪 **神秘卖货郎**\n"
         "「旅者，需要些稀有材料吗？」\n"
-        + "\n".join(goods_display) +
-        "\n━━━━━━━━━━━━━\n"
-        "💡 使用【购买 序号】购买商品\n"
-        "⚠️ 每人只能访问一次"
+        + "\n".join(goods_display_md if goods_display_md else goods_display) +
+        "\n💡 点击物品名直接购买　⚠️ 每人只能访问一次"
     )
 
     # 标记玩家已访问
@@ -1800,42 +1805,23 @@ async def _(event: MessageEvent):
                 log += "\n\n🎉 公会任务完成：\n" + "\n".join(completed_tasks)
         await session.commit()
 
-    header = f"🧭位置 {current_region} ({current_x},{current_y})"
-
-    # 使用反馈类模板（102499345_1769177016）同时显示文字和按钮
-    # 注意：模版参数不能包含markdown语法，换行符使用\r
-    title = f"诡域探索 - {current_region}"
-    result_text = f"{header}\r{log}".replace("\n", "\r")
-
-    # 构建8个按钮（反馈类模板支持8个按钮）
-    buttons = [
-        "上",
-        "下",
-        "左",
-        "右",
-        "探索",
-        "上一层",
-        "下一层",
-        "一键嗑药"
-    ]
-
-    # 构建模版参数
-    template_params = [
-        MessageMarkdownParams(key="title", values=[title]),
-        MessageMarkdownParams(key="result", values=[result_text])
-    ]
-    template_params.extend([
-        MessageMarkdownParams(key=f"btn{i+1}", values=[btn])
-        for i, btn in enumerate(buttons)
-    ])
-
-    # 使用反馈类Markdown模版发送消息
-    markdown_msg = MessageMarkdown(
-        custom_template_id="102499345_1769177016",
-        params=template_params
+    status_line = (
+        f"🧭 **{current_region}** ({current_x},{current_y})　"
+        f"❤️ **{player.hp}**/{player.max_hp}　"
+        f"🧠 **{player.mp}**/{player.max_mp}"
     )
 
-    await explore_cmd.finish(MessageSegment.markdown(markdown_msg))
+    lines = [
+        "# 🌀 诡域探索",
+        status_line,
+        "***",
+        log,
+        "***",
+        f"{cmd('↑上', '上')} | {cmd('↓下', '下')} | {cmd('←左', '左')} | {cmd('→右', '右')} | {cmd('🗡️探索', '探索')}",
+        f"{cmd('上一层')} | {cmd('下一层')} | {cmd('一键嗑药')} | {cmd('俯瞰')}",
+    ]
+
+    await explore_cmd.finish(build_markdown("\n".join(lines)))
 
 # ==================== 购买指令 ====================
 buy_cmd = on_command("购买", block=True, priority=5)
