@@ -718,33 +718,17 @@ class SettlementService:
         restaurant_id: int,
         hours: int = 24
     ) -> str:
-        """
-        获取经营报表(最近N小时)
-
-        Args:
-            uow: 工作单元
-            restaurant_id: 餐厅ID
-            hours: 统计小时数
-
-        Returns:
-            报表文本
-        """
-
         stats = await uow.restaurant_logs.get_recent_stats(restaurant_id, hours)
         logs = await uow.restaurant_logs.get_by_restaurant_id(restaurant_id, limit=hours)
 
         msg = f"📊 经营报表(最近{hours}小时)\n\n"
-        msg += f"💰 总收入: {stats['total_income']}金\n"
-        msg += f"💸 总支出: {stats['total_expense']}金\n"
-        msg += f"📈 净利润: {stats['net_profit']}金\n\n"
-        msg += f"👥 总顾客: {stats['total_customers']}人\n"
-        msg += f"🍽️ 制作: {stats['total_dishes_made']}道\n"
-        msg += f"💀 失败: {stats['total_dishes_failed']}道\n"
-        msg += f"⭐ 声望变化: {int(stats['total_reputation_change']):+d}\n"
+        msg += f"💰 收入: {stats['total_income']}金 | 支出: {stats['total_expense']}金\n"
+        msg += f"📈 净利润: {stats['net_profit']}金\n"
 
-        # 从日志详情中提取菜品销量和厨师绩效
-        dish_sales = {}   # {菜名: 售出数量}
-        chef_stats = {}   # {厨师名: {"made": int, "failed": int}}
+        # 客流分析 (聚合所有日志的customer_breakdown)
+        tier_totals = {ct: {"total": 0, "served": 0} for ct in ["common", "wealthy", "vip"]}
+        dish_sales = {}
+        chef_stats = {}
 
         for log in logs:
             try:
@@ -752,11 +736,21 @@ class SettlementService:
             except (json.JSONDecodeError, TypeError):
                 continue
 
+            # 聚合客流分层数据
+            breakdown = details.get("customer_breakdown")
+            if breakdown:
+                for ct in ["common", "wealthy", "vip"]:
+                    if ct in breakdown:
+                        tier_totals[ct]["total"] += breakdown[ct].get("total", 0)
+                        tier_totals[ct]["served"] += breakdown[ct].get("served", 0)
+
             # 统计菜品销量
             for dish in details.get("dishes_made", []):
                 name = dish.get("name", "")
                 if name and dish.get("quality") != DishQuality.DARK:
-                    dish_sales[name] = dish_sales.get(name, 0) + 1
+                    if name not in dish_sales:
+                        dish_sales[name] = {"count": 0, "recipe_id": dish.get("recipe_id", "")}
+                    dish_sales[name]["count"] += 1
 
             # 统计厨师绩效
             for chef_detail in details.get("chef_details", []):
@@ -768,12 +762,43 @@ class SettlementService:
                 chef_stats[cname]["made"] += len(chef_detail.get("dishes", []))
                 chef_stats[cname]["failed"] += chef_detail.get("failed", 0)
 
-        # TOP3 热门菜品
+        # 客流分析显示 (向后兼容: 旧日志无breakdown时不显示)
+        has_breakdown = any(tier_totals[ct]["total"] > 0 for ct in tier_totals)
+        if has_breakdown:
+            tier_names = {"common": "普通食客", "wealthy": "富商", "vip": "贵宾"}
+            msg += "\n👥 客流分析\n"
+            for ct in ["common", "wealthy", "vip"]:
+                total = tier_totals[ct]["total"]
+                served = tier_totals[ct]["served"]
+                if total > 0:
+                    rate = served / total * 100
+                    warn = ""
+                    if rate < 50:
+                        acceptable = self.CUSTOMER_TIER_RECIPE_MAP[ct]
+                        tier_cn = {"white": "白", "green": "绿", "blue": "蓝", "purple": "紫", "orange": "橙"}
+                        need_tiers = "/".join(tier_cn.get(t, t) for t in acceptable)
+                        warn = f" ⚠️ 缺少{need_tiers}色菜品!"
+                    msg += f"  {tier_names[ct]}: {total}人 → 满足{served}人({rate:.0f}%){warn}\n"
+
+        msg += f"\n👥 总顾客: {stats['total_customers']}人\n"
+        msg += f"🍽️ 制作: {stats['total_dishes_made']}道 | 失败: {stats['total_dishes_failed']}道\n"
+        msg += f"⭐ 声望变化: {int(stats['total_reputation_change']):+d}\n"
+
+        # TOP3 热门菜品 (含利润)
         if dish_sales:
             msg += "\n🔥 热门菜品 TOP3:\n"
-            sorted_dishes = sorted(dish_sales.items(), key=lambda x: x[1], reverse=True)[:3]
-            for i, (name, count) in enumerate(sorted_dishes, 1):
-                msg += f"  {i}. {name} ({count}份)\n"
+            sorted_dishes = sorted(dish_sales.items(), key=lambda x: x[1]["count"], reverse=True)[:3]
+            for i, (name, data) in enumerate(sorted_dishes, 1):
+                profit_text = ""
+                recipe_id = data.get("recipe_id", "")
+                if recipe_id:
+                    cost = self.cooking_service.calculate_recipe_cost(recipe_id)
+                    recipe = self.recipe_manager.get_recipe(recipe_id)
+                    if recipe and cost > 0:
+                        profit_per = recipe.base_price - cost
+                        total_profit = profit_per * data["count"]
+                        profit_text = f" 利润{total_profit}金"
+                msg += f"  {i}. {name} ({data['count']}份){profit_text}\n"
 
         # 厨师绩效
         if chef_stats:
