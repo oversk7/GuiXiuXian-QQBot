@@ -66,6 +66,30 @@ HEXAGRAM_NAMES = {
     (8, 5): "地风升",  (8, 6): "地水师", (8, 7): "地山谦", (8, 8): "坤为地",
 }
 
+# 六十四卦 Unicode 符号映射（卦名简称 -> 卦象符号）
+HEXAGRAM_UNICODE = {
+    "乾": "䷀", "坤": "䷁", "屯": "䷂", "蒙": "䷃", "需": "䷄", "讼": "䷅",
+    "师": "䷆", "比": "䷇", "小畜": "䷈", "履": "䷉", "泰": "䷊", "否": "䷋",
+    "同人": "䷌", "大有": "䷍", "谦": "䷎", "豫": "䷏", "随": "䷐", "蛊": "䷑",
+    "临": "䷒", "观": "䷓", "噬嗑": "䷔", "贲": "䷕", "剥": "䷖", "复": "䷗",
+    "无妄": "䷘", "大畜": "䷙", "颐": "䷚", "大过": "䷛", "坎": "䷜", "离": "䷝",
+    "咸": "䷞", "恒": "䷟", "遁": "䷠", "大壮": "䷡", "晋": "䷢", "明夷": "䷣",
+    "家人": "䷤", "睽": "䷥", "蹇": "䷦", "解": "䷧", "损": "䷨", "益": "䷩",
+    "夬": "䷪", "姤": "䷫", "萃": "䷬", "升": "䷭", "困": "䷮", "井": "䷯",
+    "革": "䷰", "鼎": "䷱", "震": "䷲", "艮": "䷳", "渐": "䷴", "归妹": "䷵",
+    "丰": "䷶", "旅": "䷷", "巽": "䷸", "兑": "䷹", "涣": "䷺", "节": "䷻",
+    "中孚": "䷼", "小过": "䷽", "既济": "䷾", "未济": "䷿",
+}
+
+
+def get_hexagram_symbol(hexagram_name: str) -> str:
+    """从卦名中提取对应的Unicode卦象符号"""
+    # 先尝试完整匹配"X为Y"格式，如"乾为天"→取"乾"
+    for key in sorted(HEXAGRAM_UNICODE.keys(), key=len, reverse=True):
+        if key in hexagram_name:
+            return HEXAGRAM_UNICODE[key]
+    return "☯"
+
 # ===== 纳甲系统 =====
 # 八卦纳甲：每卦6爻对应的天干地支（从初爻到上爻）
 # 阳卦(乾震坎艮)纳阳干，阴卦(坤巽离兑)纳阴干
@@ -610,8 +634,10 @@ async def handle_liuyao(event: MessageEvent, args: Message = CommandArg()):
         desc_parts.append(f"🤔 所问：{question}")
         desc_parts.append("━━━━━━━━━━━━━")
 
-        # 本卦 → 变卦
-        desc_parts.append(f"📖 {hex_data['hexagram_name']}({hex_data['palace_name']}) → {hex_data['changed_name']}")
+        # 本卦 → 变卦（带Unicode卦象）
+        main_symbol = get_hexagram_symbol(hex_data['hexagram_name'])
+        changed_symbol = get_hexagram_symbol(hex_data['changed_name'])
+        desc_parts.append(f"{main_symbol} {hex_data['hexagram_name']}({hex_data['palace_name']}) → {changed_symbol} {hex_data['changed_name']}")
         desc_parts.append("")
 
         # 排盘（简化显示）
@@ -642,7 +668,7 @@ async def handle_liuyao(event: MessageEvent, args: Message = CommandArg()):
         desc_parts.append("💡 卦象仅供娱乐参考，切勿过分迷信")
 
         desc = "\r".join(desc_parts)
-        title = f"☯ 六爻 · {hex_data['hexagram_name']}"
+        title = f"{main_symbol} 六爻 · {hex_data['hexagram_name']}"
         hint = "💡 点击下方按钮快速操作"
 
         btn1 = "起卦 今日运势"
