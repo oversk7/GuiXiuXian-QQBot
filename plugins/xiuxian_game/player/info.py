@@ -183,7 +183,7 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
     if has_guild_unread:
         notice_parts.append(f"🏯 {cmd('查看公会消息', '消息 公会')}")
     if has_world_unread:
-        notice_parts.append(f"🌐 {cmd('查看世界消息', '消息')}")
+        notice_parts.append(f"🌐 {cmd('有新的世界消息！点击查看', '消息')}")
 
     # 组装原生 Markdown 面板（保持原版逐行排版）
     lines = [
@@ -763,7 +763,7 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
     if has_guild_unread:
         notice_parts_full.append(f"🏯 {cmd('查看公会消息', '消息 公会')}")
     if has_world_unread:
-        notice_parts_full.append(f"🌐 {cmd('查看世界消息', '消息')}")
+        notice_parts_full.append(f"🌐 {cmd('有新的世界消息！点击查看', '消息')}")
 
     # 11. 组装完整面板（原生 Markdown，保持原版逐行排版）
     lines = [
