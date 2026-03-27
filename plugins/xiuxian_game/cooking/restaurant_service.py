@@ -643,6 +643,38 @@ class RestaurantService:
         recipe_names = [self.recipe_manager.get_recipe(rid).name for rid in recipe_ids]
         return True, f"✅ 成功设置菜单 ({len(recipe_ids)}道菜)\n当前菜品: {', '.join(recipe_names)}"
 
+    def estimate_customer_flow(
+        self,
+        area: int,
+        reputation: int,
+        level: int
+    ) -> Dict:
+        """
+        预估客流量和分层(供【餐厅】命令显示)
+        """
+        from .settlement_service import SettlementService
+        ss = SettlementService()
+
+        base_customer = 5 + level * 2
+        reputation_multiplier = 1.0 + (reputation / 2000.0)
+        potential = int(base_customer * reputation_multiplier)
+        total = min(area, potential)
+
+        ratio = ss._get_customer_ratio(reputation)
+        wealthy_count = int(total * ratio["wealthy"])
+        vip_count = int(total * ratio["vip"])
+        common_count = total - wealthy_count - vip_count
+
+        return {
+            "total": total,
+            "common": common_count,
+            "wealthy": wealthy_count,
+            "vip": vip_count,
+            "common_pct": ratio["common"] * 100,
+            "wealthy_pct": ratio["wealthy"] * 100,
+            "vip_pct": ratio["vip"] * 100,
+        }
+
     async def get_restaurant_status(
         self,
         uow: UnitOfWork,
@@ -673,16 +705,51 @@ class RestaurantService:
         status_emoji = "🟢" if restaurant.is_open else "🔴"
         status_text = "营业中" if restaurant.is_open else "打烊"
 
+        # 客流预估
+        flow = self.estimate_customer_flow(
+            restaurant.area, restaurant.reputation, restaurant.level
+        )
+
+        # 获取厨师产能
+        chefs = await uow.chefs.get_by_restaurant_id(restaurant.id)
+        total_speed = sum(c.speed for c in chefs) if chefs else 0
+
+        # 最近一次结算的产能利用率
+        logs = await uow.restaurant_logs.get_by_restaurant_id(restaurant.id, limit=1)
+        capacity_text = ""
+        if logs and total_speed > 0:
+            import json
+            try:
+                details = json.loads(logs[0].details_json)
+                sold = details.get("dishes_sold", 0)
+                made = logs[0].dishes_made
+                if made > 0:
+                    util_rate = int(sold / made * 100)
+                    capacity_text = f"\n  产能利用率: {util_rate}% (上小时售出{sold}/{made}道)"
+            except (json.JSONDecodeError, TypeError):
+                pass
+
+        # 24h收支摘要
+        stats = await uow.restaurant_logs.get_recent_stats(restaurant.id, 24)
+
         msg = (
-            f"🏪 餐厅状态\n\n"
-            f"📊 等级: Lv.{restaurant.level} | 厨房: Lv.{restaurant.kitchen_level}\n"
-            f"🪑 面积: {restaurant.area}席 | {status_emoji} {status_text}\n"
-            f"👨‍🍳 厨师: {chef_count}/{restaurant.max_chefs}人\n"
-            f"⭐ 声望: {restaurant.reputation}\n"
-            f"📦 仓库: Lv.{restaurant.storage_level} | {used_storage}/{restaurant.storage_capacity}\n\n"
-            f"💰 累计收入: {restaurant.total_income}金\n"
-            f"💸 累计支出: {restaurant.total_expense}金\n"
-            f"📈 净利润: {restaurant.total_income - restaurant.total_expense}金"
+            f"🏪 餐厅状态 Lv.{restaurant.level}\n"
+            f"━━━━━━━━━━━━━\n"
+            f"📊 基础信息\n"
+            f"  席位: {restaurant.area} | 厨房: Lv.{restaurant.kitchen_level} | "
+            f"仓库: Lv.{restaurant.storage_level} ({used_storage}/{restaurant.storage_capacity})\n"
+            f"  声望: {restaurant.reputation} | {status_emoji} {status_text}\n"
+            f"\n👥 客流概况 (当前声望下)\n"
+            f"  预计客流: ~{flow['total']}人/时\n"
+            f"  ├ 普通食客: ~{flow['common']}人 ({flow['common_pct']:.0f}%) → 消费白/绿菜\n"
+            f"  ├ 富商: ~{flow['wealthy']}人 ({flow['wealthy_pct']:.0f}%) → 消费绿/蓝/紫菜\n"
+            f"  └ 贵宾: ~{flow['vip']}人 ({flow['vip_pct']:.0f}%) → 消费紫/橙菜\n"
+            f"\n⚙️ 产能\n"
+            f"  厨师: {chef_count}/{restaurant.max_chefs}人 | "
+            f"总产能: {total_speed}道/时{capacity_text}\n"
+            f"\n💰 近24h摘要\n"
+            f"  收入: {stats['total_income']}金 | 支出: {stats['total_expense']}金\n"
+            f"  净利润: {stats['net_profit']}金"
         )
 
         return True, msg, restaurant
