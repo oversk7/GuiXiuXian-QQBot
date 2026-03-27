@@ -27,6 +27,7 @@ from ..models.world_tile import WorldTile
 from ..models.monthly_card import get_player_card_benefits
 from ..config import config
 from ..utils import message_add_head, luck_prob
+from ..utils_markdown import cmd, build_markdown
 from ..platform_utils import get_unified_player
 from ..item.equipment_service import recalc_equipment_attributes
 from ..battle.battle_log_filter import filter_battle_log, get_player_log_mode
@@ -1949,44 +1950,52 @@ async def handle_teleport_list(event: MessageEvent):
                 status = "🔒"  # 未解锁
 
             # 当前所在层级
-            current_marker = " 📍当前" if level == current_level else ""
+            current_marker = " 📍**当前**" if level == current_level else ""
+            level_name = f"{level}层诡域"
 
-            locations.append(f"{status} {level}层诡域 (理智-{mp_cost} 诡异Lv.{level_range[0]}-{level_range[1]}){current_marker}")
+            if level <= max_level + 1:
+                # 可进入的层：点击直接传送
+                locations.append(
+                    f"{status} {cmd(level_name, f'传送 {level_name}')}　"
+                    f"⚡理智-{mp_cost}　👹诡异Lv.{level_range[0]}-{level_range[1]}{current_marker}"
+                )
+            else:
+                locations.append(
+                    f"{status} **{level_name}**　"
+                    f"⚡理智-{mp_cost}　👹诡异Lv.{level_range[0]}-{level_range[1]}"
+                )
 
         # 格式化消息
         msg_lines = [
-            "🌀 无限重诡域探索系统",
-            "━━━━━━━━━━━━━",
-            f"🏆 当前最深探索：第{max_level}重诡域",
-            f"🎯 下一个目标：第{max_level + 1}重诡域",
-            f"📊 总可访问深度：{len(accessible_levels)}重",
+            "# 🌀 无限重诡域探索系统",
+            "***",
+            f"🏆 最深探索：**第{max_level}重**诡域",
+            f"🎯 下一目标：**第{max_level + 1}重**诡域",
+            f"📊 总可访问：**{len(accessible_levels)}重**",
         ]
 
         if current_level > 0:
-            msg_lines.append(f"📍 当前位置：第{current_level}重诡域")
+            msg_lines.append(f"📍 当前位置：**第{current_level}重**诡域")
 
         msg_lines.extend([
-            "━━━━━━━━━━━━━",
-            "🌀 每重诡域都是独立的10x10空间",
+            "***",
+            "💡 每重诡域都是独立的10x10空间",
             "⚔️ 诡异等级 = 诡域深度 × 5（±2波动）",
             "🔓 击败诡异解锁更深的诡域",
-            "━━━━━━━━━━━━━"
+            "***",
         ])
 
         if locations:
-            msg_lines.append("📋 可访问深度（最近10重）：")
+            msg_lines.append("**📋 可访问深度（最近10重）：**")
             msg_lines.extend(locations)
 
         msg_lines.extend([
-            "━━━━━━━━━━━━━",
-            "📌 使用方式：【传送 N层诡域】",
-            "📦 需要消耗咒抗1点",
-            "✅已探索 🎯下一目标 🔒未解锁",
-            "🏠 使用【返回】穿越回表世界"
+            "***",
+            "✅已探索　🎯下一目标　🔒未解锁",
+            f"{cmd('俯瞰')} | {cmd('返回')} | {cmd('帮助')}",
         ])
 
-        msg = "\n".join(msg_lines)
-        await teleport_list.finish(message_add_head(msg, event))
+        await teleport_list.finish(build_markdown("\n".join(msg_lines)))
 
 
 # ==================== 诡域探索概览图片生成 ====================
