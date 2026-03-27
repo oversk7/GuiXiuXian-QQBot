@@ -4,6 +4,7 @@
 再调用大模型进行专业解析。
 """
 import logging
+import aiohttp
 from datetime import datetime
 from nonebot import on_command
 from nonebot.adapters.qq import MessageEvent, Message, MessageSegment
@@ -476,67 +477,21 @@ def generate_hexagram(now: datetime, question: str) -> dict:
 #  排盘格式化
 # =====================================================================
 
-def format_hexagram_text(hex_data: dict, question: str) -> str:
-    """格式化完整排盘为文本（类似传统排盘格式）"""
-    lines = []
-    lines.append("☯ 六爻起卦 ☯")
-    lines.append("━━━━━━━━━━━━━")
-
-    # 四柱信息
-    sz = hex_data["sizhu"]
-    lines.append(f"📅 {hex_data['time_str']}")
-    lines.append(f"四柱：{sz['year']}年 {sz['month']}月 {sz['day']}日 {sz['hour']}时")
-    lines.append(f"旬空：{sz['xunkong']}")
-    if question:
-        lines.append(f"🤔 所问：{question}")
-    lines.append("━━━━━━━━━━━━━")
-
-    # 本卦与变卦标题
-    lines.append(f"📖 {hex_data['hexagram_name']}({hex_data['palace_name']}宫) → {hex_data['changed_name']}")
-    lines.append("")
-
-    # 排盘表格（从上爻到初爻）
-    lines.append("六神  本卦              变卦")
-    lines.append("─── ─────────── ───────────")
-    for i in range(5, -1, -1):
-        yao = hex_data["yaos"][i]
-        cy = hex_data["changed_yaos"][i]
-
-        # 本卦部分
-        shi_ying = f" {yao['shi_ying']}" if yao["shi_ying"] else "  "
-        dong_mark = f" {yao['dong_mark']}" if yao["dong_mark"] else "  "
-        main_part = f"{yao['liuqin']}{yao['dizhi']}{yao['wuxing']} {yao['symbol']}{dong_mark}{shi_ying}"
-
-        # 变卦部分（仅动爻才显示变化）
-        if yao["is_dong"]:
-            c_shi_ying = f" {cy['shi_ying']}" if cy["shi_ying"] else "  "
-            change_part = f"{cy['liuqin']}{cy['dizhi']}{cy['wuxing']} {cy['symbol']}{c_shi_ying}"
-        else:
-            change_part = ""
-
-        lines.append(f"{yao['liushen']}  {main_part}  {change_part}")
-
-    lines.append("━━━━━━━━━━━━━")
-    lines.append(f"⚡ 动爻：第{hex_data['dong_yao']}爻")
-
-    return "\n".join(lines)
-
-
 def build_ai_prompt(hex_data: dict, question: str) -> list:
     """构建发送给大模型的消息，包含完整排盘信息"""
-    system_prompt = """你是一位精通《易经》六爻占卜的国学大师，擅长以传统易学理论解读卦象。
+    system_prompt = """你是一位精通《易经》六爻占卜的国学大师，擅长用通俗易懂的方式为普通人解读卦象。
 
 你将收到一个完整的六爻排盘，包含四柱、六亲、六神、世应、纳甲、动爻和变卦信息。
 
-解卦要求：
-1. 先说明本卦的基本含义
-2. 找出用神（根据所问之事确定用神六亲），分析用神旺衰
-3. 分析动爻与用神的生克关系
-4. 结合世应、六神、日建（日柱地支）进行综合判断
-5. 给出对所问之事的明确判断和建议
-6. 最后给出一句忠告
+解卦格式要求（严格遵守）：
+1.【卦意】一句话说明本卦核心含义，然后用大白话解释"简单说就是……"
+2.【用神分析】找出用神，分析旺衰生克，然后加一句"也就是说……"的通俗翻译
+3.【动爻变化】分析动爻影响，然后加"换句话说……"的白话解释
+4.【综合判断】结合世应、六神给出明确结论，用"对你来说……"开头说人话
+5.【行动建议】针对所问之事给出具体可操作的建议，说清楚该做什么、不该做什么
+6.【忠告】一句简短有力的忠告
 
-语言风格：古雅而不晦涩，引经据典但通俗易懂。
+重要：每一段专业分析后面都必须跟一句通俗易懂的大白话翻译，让完全不懂易经的人也能看明白。
 字数控制在400-600字。
 不要使用markdown格式，用纯文本。"""
 
@@ -641,14 +596,11 @@ async def handle_liuyao(event: MessageEvent, args: Message = CommandArg()):
         ai_analysis = "（天机不可泄露，解卦暂时无法获取）"
     except TimeoutError:
         ai_analysis = "（天机运算超时，请稍后再试）"
-    except Exception as e:
+    except (aiohttp.ClientError, ValueError, ConnectionError) as e:
         logger.error(f"[六爻] AI解卦失败: {type(e).__name__}: {e}", exc_info=True)
         ai_analysis = "（天机晦涩，解卦暂时无法获取）"
 
-    # 格式化排盘文本
-    hex_text = format_hexagram_text(hex_data, question)
-
-    # 尝试使用Markdown模板展示
+    # 使用Markdown模板展示
     try:
         desc_parts = []
         sz = hex_data["sizhu"]
@@ -720,22 +672,12 @@ async def handle_liuyao(event: MessageEvent, args: Message = CommandArg()):
             params=template_params
         )
 
-        await liuyao_cmd.finish(MessageSegment.markdown(markdown_msg))
+        msg = MessageSegment.markdown(markdown_msg)
+    except (KeyError, ValueError, TypeError) as e:
+        logger.error(f"[六爻] Markdown构建失败: {e}", exc_info=True)
+        await liuyao_cmd.finish(message_add_head("⚠️ 卦象展示失败，请稍后重试", event))
 
-    except Exception as e:
-        logger.error(f"[六爻] Markdown发送失败，回退到文本: {e}", exc_info=True)
-
-        # 纯文本回退
-        text_msg = (
-            f"{hex_text}\n"
-            f"━━━━━━━━━━━━━\n"
-            f"🔮 卦象解析：\n"
-            f"{ai_analysis}\n"
-            f"━━━━━━━━━━━━━\n"
-            f"💰 消耗 {DIVINATION_COST} 金币\n"
-            f"💡 卦象仅供娱乐参考，切勿过分迷信"
-        )
-        await liuyao_cmd.finish(message_add_head(text_msg, event))
+    await liuyao_cmd.finish(msg)
 
 
 # 注册频率限制配置
