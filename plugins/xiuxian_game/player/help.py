@@ -53,7 +53,7 @@ async def handle_help(event: MessageEvent, args: Message = CommandArg()):
         f"💡 有疑问？点 {cmd('问 你的问题', '问 ')} 询问AI\n"
         f"💡 {cmd('完整帮助')} 查看所有功能\n"
         f"💡 [加入官群【꧁༺诡修仙༻꧂】]({GROUP_LINK})\n"
-        "💡 [游戏资料教程](HTTPS://GITEE.COM/ling-gtq/TheWestTutorial)"
+        "💡 游戏资料教程👉<HTTPS://GITEE.COM/ling-gtq/TheWestTutorial>"
     )
     await help_cmd.finish(build_markdown(content))
 
@@ -294,7 +294,8 @@ async def handle_fun_module(event: MessageEvent, args: Message = CommandArg()):
         "***\n"
         "**🎮 小游戏**\n"
         f"{cmd('抽签 你的问题', '抽签 ')} 观音灵签 | {cmd('答案之书 你的问题', '答案之书 ')} 宇宙智慧\n"
-        f"{cmd('驾考题目')} 随机驾考题 | {cmd('恶魔轮盘帮助')} PVP博弈\n"
+        f"{cmd('起卦 你的问题', '起卦 ')} 六爻占卜(500金币) | {cmd('驾考题目')} 随机驾考题\n"
+        f"{cmd('恶魔轮盘帮助')} PVP博弈\n"
         f"{cmd('猜拳 石头 金额', '猜拳 ')} 猜拳鬼(仅周六) | {cmd('试炼列表')} 互动剧情\n"
         "***\n"
         "**🎉 休闲功能**\n"
@@ -876,6 +877,7 @@ async def handle_entertainment(event: MessageEvent, args: Message = CommandArg()
         f"{cmd('签到')} 每日签到，获取奖励\n"
         f"{cmd('月卡')} 查看月卡状态和权益\n"
         f"{cmd('抽签 你的问题', '抽签 ')} 观音灵签占卜\n"
+        f"{cmd('起卦 你的问题', '起卦 ')} 六爻占卜，AI解卦(500金币)\n"
         f"{cmd('答案之书 你的问题', '答案之书 ')} 向宇宙提问，获得智慧指引\n"
         f"{cmd('驾考题目', '驾考题目 ')} 随机驾考题目(支持科目一~四)\n"
         f"{cmd('每日一言')} 获取励志名言警句\n"
