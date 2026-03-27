@@ -316,9 +316,9 @@ async def handle_elixir_tolerance(event: MessageEvent, args: Message = CommandAr
             else:
                 status = "🔴 已达上限"
 
-            lines.append(f"{item_config.name}")
-            lines.append(f"  今日使用：{log.quantity}/{item_config.daily_limit}")
-            lines.append(f"  状态：{status}")
+            lines.append(f"💊 **{item_config.name}**")
+            lines.append(f"  📈 今日使用：{log.quantity}/{item_config.daily_limit}")
+            lines.append(f"  {status}")
             lines.append("")
 
         lines.append("***")

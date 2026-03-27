@@ -133,12 +133,12 @@ async def get_gift_shop_menu(player_id: str = None) -> str:
                     remaining = daily_limit - purchased
                     iname = item.name
                     lines.append(
-                        f"{cmd(iname, f'买礼物 {iname}')}　{adj_price}金币　好感+{item.favorability}　剩余:{remaining}"
+                        f"🎁 {cmd(iname, f'买礼物 {iname}')}　💰{adj_price}金币　💕好感+{item.favorability}　⏳剩余:{remaining}"
                     )
                 else:
                     iname = item.name
                     lines.append(
-                        f"{cmd(iname, f'买礼物 {iname}')}　{adj_price}金币　好感+{item.favorability}"
+                        f"🎁 {cmd(iname, f'买礼物 {iname}')}　💰{adj_price}金币　💕好感+{item.favorability}"
                     )
 
     lines.extend([

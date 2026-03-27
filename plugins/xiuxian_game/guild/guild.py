@@ -765,8 +765,8 @@ async def handle_list_guilds(event: MessageEvent, args: Message = CommandArg()):
                 f"💰{guild.treasury:,}"
             )
             lines.append(
-                f"会长：{president_name}　"
-                f"{cmd('加入', f'加入公会 {guild.id}')}"
+                f"👑 会长：{president_name}　"
+                f"{cmd('⚔️加入', f'加入公会 {guild.id}')}"
             )
             lines.append("")
 
@@ -822,9 +822,9 @@ async def handle_app_list(event: MessageEvent):
         for a in apps:
             applicant = await session.get(Player, a.applicant_id)
             lines.append(
-                f"**{applicant.nickname}** Lv.{applicant.level}　"
-                f"{cmd('同意', f'同意入会 {applicant.uid}')} | "
-                f"{cmd('拒绝', f'拒绝入会 {applicant.uid}')}"
+                f"👤 **{applicant.nickname}** Lv.{applicant.level}　"
+                f"{cmd('✅同意', f'同意入会 {applicant.uid}')} | "
+                f"{cmd('❌拒绝', f'拒绝入会 {applicant.uid}')}"
             )
 
         lines.append("***")
@@ -1157,23 +1157,25 @@ async def handle_guild_buildings(event: MessageEvent):
             "***",
         ]
 
+        building_emojis = {"经验神龛": "✨", "资金金库": "💰", "训练场": "🏋️", "传送阵": "🔮", "丹房": "🧪", "公会仓库": "📦"}
         if not buildings:
             lines.append("暂无建筑，快去建造吧！")
         else:
             for building in buildings:
                 effects_str = GuildBuildingServiceNew.format_building_effects(building["effects"])
+                bicon = building_emojis.get(building['name'], "🏛️")
                 lines.append(
-                    f"**{building['name']}** Lv.{building['level']}/{building['max_level']}　{effects_str}"
+                    f"{bicon} **{building['name']}** Lv.{building['level']}/{building['max_level']}　{effects_str}"
                 )
                 if building['level'] < building['max_level']:
                     bname = building['name']
-                    lines.append(f"　{cmd('升级', f'建造 {bname}')}")
+                    lines.append(f"　{cmd('⬆️升级', f'建造 {bname}')}")
                 lines.append("")
 
         lines.append("***")
         lines.append("**可建造建筑：**")
         building_names = ["经验神龛", "资金金库", "训练场", "传送阵", "丹房", "公会仓库"]
-        lines.append(" | ".join([cmd(n, f"建造 {n}") for n in building_names]))
+        lines.append(" | ".join([f"{building_emojis.get(n, '🏛️')}{cmd(n, f'建造 {n}')}" for n in building_names]))
         lines.append("***")
         lines.append(cmd("公会") + " | " + cmd("公会建筑") + " | " + cmd("帮助"))
 
@@ -1461,9 +1463,9 @@ async def handle_guild_alchemy(event: MessageEvent):
             for idx, prod in enumerate(productions, 1):
                 pname = prod['item_name']
                 lines.append(
-                    f"{idx}. **{pname}**×{prod['total_quantity']}　"
-                    f"{prod['points_cost']}积分/个　"
-                    f"{cmd('兑换', f'兑换丹药 {pname} 1')}"
+                    f"💊 **{pname}**×{prod['total_quantity']}　"
+                    f"💎{prod['points_cost']}积分/个　"
+                    f"{cmd('🔄兑换', f'兑换丹药 {pname} 1')}"
                 )
 
         lines.append("***")
@@ -1618,9 +1620,9 @@ async def handle_guild_warehouse(event: MessageEvent):
             for idx, item in enumerate(items, 1):
                 iname = item['item_name']
                 lines.append(
-                    f"{idx}. **{iname}**×{item['quantity']}　"
-                    f"存入者:{item['deposited_by']}　"
-                    f"{cmd('取出', f'取出仓库 {iname} 1')}"
+                    f"📦 **{iname}**×{item['quantity']}　"
+                    f"👤存入者:{item['deposited_by']}　"
+                    f"{cmd('⬆️取出', f'取出仓库 {iname} 1')}"
                 )
 
         lines.append("***")
