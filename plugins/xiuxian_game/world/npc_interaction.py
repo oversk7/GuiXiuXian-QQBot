@@ -351,10 +351,20 @@ async def handle_sworn_envoy_interaction(session, player: Player, npc, event: Me
 async def handle_mentor_envoy_interaction(session, player: Player, npc, event: MessageEvent, dialogue_content: str = None):
     """处理师徒使者NPC交互"""
     from ..social.npc_mentor import handle_mentor_interaction
+    from ..utils_markdown import build_markdown
 
     # 调用师徒使者处理器,传递所有参数
-    message = await handle_mentor_interaction(session, player, npc, event, dialogue_content or "")
-    await interact_cmd.finish(message_add_head(message, event))
+    result = await handle_mentor_interaction(session, player, npc, event, dialogue_content or "")
+
+    # 支持返回 (message, is_markdown) 元组
+    if isinstance(result, tuple):
+        message, is_markdown = result
+        if is_markdown:
+            await interact_cmd.finish(build_markdown(message))
+        else:
+            await interact_cmd.finish(message_add_head(message, event))
+    else:
+        await interact_cmd.finish(message_add_head(result, event))
 
 
 async def handle_generic_interaction(session, player: Player, npc, event: MessageEvent, dialogue_content: str = None):

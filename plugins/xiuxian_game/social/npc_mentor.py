@@ -200,9 +200,9 @@ async def handle_mentor_interaction(
 
         return message
 
-    # 香火商店
+    # 香火商店（返回markdown标记）
     elif dialogue_content in ["香火商店", "商店"]:
-        return get_incense_shop_menu(player)
+        return get_incense_shop_menu(player), True
 
     # 买食谱
     elif dialogue_content.startswith("买食谱 ") or dialogue_content.startswith("购买食谱 "):
