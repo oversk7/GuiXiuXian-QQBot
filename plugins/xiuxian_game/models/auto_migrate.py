@@ -53,6 +53,9 @@ REQUIRED_FIELDS: Dict[str, Dict[str, str]] = {
         "last_guild_check": "DATETIME NULL COMMENT '最后查看公会消息时间'",
         "inner_realm_clears": "TEXT NULL COMMENT '里界通关记录(JSON)'",
     },
+    "trade_record": {
+        "is_cross_market": "INT DEFAULT 0 COMMENT '是否为跨市场出售(跑商)'",
+    },
     "player_relationship": {
         "master_id": "VARCHAR(32) NULL COMMENT '师父ID(师徒关系专用)'",
         "apprentice_level_at_start": "INT DEFAULT 0 COMMENT '拜师时徒弟等级'",

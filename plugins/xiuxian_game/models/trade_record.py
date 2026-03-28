@@ -14,7 +14,7 @@ class TradeType(Enum):
 class TradeRecord(Base):
     """交易记录表 - 记录玩家在跑商系统中的所有交易"""
     __tablename__ = "trade_record"
-    
+
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
     player_id: Mapped[str] = mapped_column(String(32), index=True, comment="玩家ID")
     trade_type: Mapped[TradeType] = mapped_column(SAEnum(TradeType), comment="交易类型")
@@ -24,6 +24,7 @@ class TradeRecord(Base):
     unit_price: Mapped[int] = mapped_column(Integer, comment="单价")
     total_amount: Mapped[int] = mapped_column(Integer, comment="总金额")
     trade_time: Mapped[datetime] = mapped_column(DateTime, default=datetime.now, server_default=func.now(), comment="交易时间")
+    is_cross_market: Mapped[bool] = mapped_column(Integer, default=False, server_default="0", comment="是否为跨市场出售(跑商)")
     
     @classmethod
     async def can_sell_at_market(cls, session, player_id: str, market_id: str, item_id: str, hours: int = 8) -> bool:
@@ -205,7 +206,8 @@ class TradeRecord(Base):
                 cls.player_id == player_id,
                 cls.trade_type == TradeType.SELL,
                 cls.trade_time >= day_start,
-                cls.market_id != 'black_market'
+                cls.market_id != 'black_market',
+                cls.is_cross_market == True
             )
         )
 
@@ -214,7 +216,8 @@ class TradeRecord(Base):
 
     @classmethod
     async def record_trade(cls, session, player_id: str, trade_type: TradeType, market_id: str,
-                          item_id: str, quantity: int, unit_price: int, total_amount: int):
+                          item_id: str, quantity: int, unit_price: int, total_amount: int,
+                          is_cross_market: bool = False):
         """
         记录一笔交易
 
@@ -227,6 +230,7 @@ class TradeRecord(Base):
             quantity: 交易数量
             unit_price: 单价
             total_amount: 总金额
+            is_cross_market: 是否为跨市场出售(跑商)
         """
         trade_record = cls(
             player_id=player_id,
@@ -236,7 +240,8 @@ class TradeRecord(Base):
             quantity=quantity,
             unit_price=unit_price,
             total_amount=total_amount,
-            trade_time=datetime.now()
+            trade_time=datetime.now(),
+            is_cross_market=is_cross_market
         )
         session.add(trade_record)
         return trade_record

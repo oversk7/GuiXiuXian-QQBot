@@ -800,9 +800,11 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
         # 计算跑商奖励（异地出售奖励，递减机制）
         bonus = 0
         bonus_msg = ""
+        is_cross_market = False
         # 检查是否为跨市场交易（在不同市场出售）
         recent_purchases = await TradeRecord.get_recent_purchases_at_market(session, player.id, market.id, item_cfg.item_id, hours=24)
         if not recent_purchases:  # 没有在本地购买记录，说明是从其他地方运来的
+            is_cross_market = True
             # 查询今日已完成的跨市场出售笔数，获取递减奖励比例
             daily_sell_count = await TradeRecord.get_daily_cross_market_sell_count(session, player.id)
             bonus_rate = _get_cross_market_bonus_rate(daily_sell_count)
@@ -829,7 +831,8 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
             item_id=item_cfg.item_id,
             quantity=qty,
             unit_price=buy_price,
-            total_amount=total_gain
+            total_amount=total_gain,
+            is_cross_market=is_cross_market
         )
 
         session.add_all([player, market_state])
@@ -934,10 +937,12 @@ async def _(event: MessageEvent):
             # 计算跑商奖励（递减机制）
             bonus = 0
             bonus_rate = 0.0
+            is_cross_market = False
             recent_purchases = await TradeRecord.get_recent_purchases_at_market(
                 session, player.id, market.id, item_id, hours=24
             )
             if not recent_purchases:
+                is_cross_market = True
                 # 查询今日已完成的跨市场出售笔数
                 daily_sell_count = await TradeRecord.get_daily_cross_market_sell_count(session, player.id)
                 bonus_rate = _get_cross_market_bonus_rate(daily_sell_count)
@@ -967,7 +972,8 @@ async def _(event: MessageEvent):
                 item_id=item_id,
                 quantity=quantity,
                 unit_price=buy_price,
-                total_amount=item_gain
+                total_amount=item_gain,
+                is_cross_market=is_cross_market
             )
             # flush 确保下一轮循环能查到本次记录（递减笔数统计）
             await session.flush()
