@@ -115,8 +115,8 @@ async def list_auction(
     if len(active_auctions) >= MAX_AUCTION_LISTINGS:
         return False, f"⛔ 你已有 {MAX_AUCTION_LISTINGS} 件物品正在拍卖，无法继续上架"
 
-    # 5. 根据物品类型分支处理
-    if item_cfg.type == ItemType.EQUIPMENT:
+    # 5. 根据物品类型分支处理（装备和铭文走实例交易路径）
+    if item_cfg.type in (ItemType.EQUIPMENT, ItemType.INSCRIPTION):
         return await _list_equipment_auction(
             uow, seller, item_cfg, start_price, duration_hours, buyout_price,
             equipment_instance_id=equipment_instance_id,
@@ -131,26 +131,29 @@ async def _list_equipment_auction(
     uow, seller, item_cfg, start_price, duration_hours, buyout_price,
     equipment_instance_id: Optional[int] = None,
 ) -> Tuple[bool, str]:
-    """上架装备拍卖"""
+    """上架装备/铭文实例拍卖"""
     session = uow.session
+    is_inscription = item_cfg.type == ItemType.INSCRIPTION
 
     if equipment_instance_id is not None:
         # 命令层已选好具体实例，直接使用
         equipment = await session.get(ItemInstance, equipment_instance_id)
         if not equipment or equipment.player_id != seller.id:
-            return False, "⛔ 装备实例不存在或不属于你"
-        if equipment.equipped:
+            return False, "⛔ 物品实例不存在或不属于你"
+        if not is_inscription and equipment.equipped:
             return False, "⛔ 该装备正在装备中，无法上架"
         extra = equipment.extra_attrs or {}
         if extra.get("_frozen_for_trade") or extra.get("_frozen_for_auction"):
-            return False, "⛔ 该装备已在交易中，无法上架"
+            return False, "⛔ 该物品已在交易中，无法上架"
     else:
-        # 兜底：自动选择第一件可用装备（背包只有一件时命令层也会走这里）
-        stmt = select(ItemInstance).where(
+        # 兜底：自动选择第一件可用实例
+        conditions = [
             ItemInstance.player_id == seller.id,
             ItemInstance.item_id == item_cfg.item_id,
-            ItemInstance.equipped == False,
-        )
+        ]
+        if not is_inscription:
+            conditions.append(ItemInstance.equipped == False)
+        stmt = select(ItemInstance).where(*conditions)
         result = await session.execute(stmt)
         candidates = result.scalars().all()
         available = [
@@ -159,28 +162,33 @@ async def _list_equipment_auction(
             and not (e.extra_attrs or {}).get("_frozen_for_auction")
         ]
         if not available:
-            return False, f"⛔ 背包中没有可拍卖的「{item_cfg.name}」（请确认未装备且未在市场挂牌）"
+            type_name = "铭文" if is_inscription else "装备"
+            return False, f"⛔ 背包中没有可拍卖的「{item_cfg.name}」（请确认未在市场挂牌）"
         equipment = available[0]
 
-    # 检查起拍价不低于系统估价下界
-    min_price, _ = EquipmentTradeService.calculate_equipment_value_range(equipment)
+    # 检查起拍价不低于系统估价下界（铭文使用基础价格）
+    if is_inscription:
+        min_price = item_cfg.price if item_cfg else 1000
+    else:
+        min_price, _ = EquipmentTradeService.calculate_equipment_value_range(equipment)
     if min_price > 0 and start_price < min_price:
-        return False, f"⛔ 起拍价不能低于系统估价 {min_price:,}💰\n💡 使用【估价 装备名/编号】查看详细估价"
+        return False, f"⛔ 起拍价不能低于系统估价 {min_price:,}💰"
 
-    # 检查是否已在市场挂牌
+    # 检查是否已在拍卖行
     existing_order = await uow.auction_items.find_by_equipment_instance(equipment.id)
     if existing_order:
-        return False, "⛔ 该装备已在拍卖行中"
+        return False, "⛔ 该物品已在拍卖行中"
 
-    # 冻结装备（拍卖专用标记）
+    # 冻结实例（拍卖专用标记）
     extra_attrs = equipment.extra_attrs or {}
     extra_attrs["_frozen_for_auction"] = True
     equipment.extra_attrs = extra_attrs
     session.add(equipment)
     await session.flush()
 
-    # 生成装备摘要
-    summary = EquipmentTradeService.generate_equipment_summary(equipment)
+    # 生成摘要
+    from ..economy.equipment_trade_service_new import EquipmentTradeService as ETS_New
+    summary = ETS_New.generate_instance_summary(equipment)
 
     # 创建拍卖条目
     end_at = datetime.now() + timedelta(hours=duration_hours)

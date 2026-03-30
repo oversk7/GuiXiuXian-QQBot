@@ -56,6 +56,36 @@ class EquipmentTradeService:
         return item_config and item_config.type.value == "EQUIPMENT"
 
     @staticmethod
+    def is_instance_trade(item_id: str) -> bool:
+        """判断是否需要实例交易（装备或铭文，每个实例独立）
+
+        Args:
+            item_id: 物品ID
+
+        Returns:
+            True表示是装备或铭文类型（需要按实例交易），False表示普通物品
+        """
+        item_config = config.items_config["by_id"].get(item_id)
+        if not item_config:
+            return False
+        return item_config.type.value in ("EQUIPMENT", "INSCRIPTION")
+
+    @staticmethod
+    def generate_instance_summary(item: ItemInstance) -> str:
+        """生成实例摘要（装备或铭文通用入口）"""
+        if item.is_equipment:
+            return EquipmentTradeService.generate_equipment_summary(item)
+        if item.is_inscription:
+            return EquipmentTradeService.generate_inscription_summary(item)
+        return item.config.name if item.config else str(item.item_id)
+
+    @staticmethod
+    def generate_inscription_summary(inscription: ItemInstance) -> str:
+        """生成铭文摘要信息（含品阶和效果数值）"""
+        from ..item.inscription_service import get_inscription_display_from_item
+        return get_inscription_display_from_item(inscription)
+
+    @staticmethod
     def generate_equipment_summary(equipment: ItemInstance) -> str:
         """生成装备摘要信息用于显示（含稀有度、词缀、铭文）
 

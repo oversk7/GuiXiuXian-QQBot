@@ -713,15 +713,15 @@ items:
 
     - item_id: "inscription_kill_heal"
       name: "铭文·噬魂"
-      description: "击杀敌人时{chance}%概率回复{value}%最大生命"
+      description: "攻击时{chance}%概率吸取{value}%伤害为生命"
       type: "INSCRIPTION"
       rarity: "blue"
       price: 18000
       inscription_effect:
-        trigger: "on_kill"
-        effect: "heal"
-        chance_range: [30, 60]
-        value_range: [10, 25]
+        trigger: "on_attack"
+        effect: "lifesteal"
+        chance_range: [8, 20]
+        value_range: [6, 16]
 
     - item_id: "inscription_hit_debuff_def"
       name: "铭文·蚀甲"

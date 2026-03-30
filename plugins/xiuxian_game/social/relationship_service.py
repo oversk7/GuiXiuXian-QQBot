@@ -231,20 +231,20 @@ class RelationshipService:
         if item_config.item_id in VIP_EQUIPMENT_IDS:
             return False, "VIP定制装备为专属装备，不可转移"
 
-        # 6. 特殊处理: 装备类型需要返回信息供Command处理
-        if item_config.type == ItemType.EQUIPMENT:
-            # 获取玩家装备列表
-            equipment_list = await self._item_repo.get_player_equipment_list(
+        # 6. 特殊处理: 装备/铭文类型需要返回信息供Command处理（实例交易）
+        if item_config.type in (ItemType.EQUIPMENT, ItemType.INSCRIPTION):
+            # 获取玩家实例列表
+            instance_list = await self._item_repo.get_player_equipment_list(
                 sender_id, item_config.item_id, equipped=False
             )
 
-            if not equipment_list:
+            if not instance_list:
                 return False, f"你没有可转移的「{item_name}」"
 
-            # 返回特殊标记,通知Command需要处理装备选择
+            # 返回特殊标记,通知Command需要处理实例选择
             return (
                 False,
-                f"__EQUIPMENT_SELECTION__:{item_config.item_id}:{item_config.name}:{len(equipment_list)}"
+                f"__EQUIPMENT_SELECTION__:{item_config.item_id}:{item_config.name}:{len(instance_list)}"
             )
 
         # 7. 普通物品处理流程
@@ -307,42 +307,42 @@ class RelationshipService:
         if not receiver:
             return False, f"未找到UID为{receiver_uid}的玩家"
 
-        # 2. 获取装备实例
+        # 2. 获取物品实例（装备或铭文）
         equipment = await self._item_repo.get_by_id(equipment_instance_id)
         if not equipment:
-            return False, "装备不存在"
+            return False, "物品不存在"
 
         if equipment.player_id != sender_id:
-            return False, "该装备不属于你"
+            return False, "该物品不属于你"
 
-        if equipment.equipped:
+        if equipment.is_equipment and equipment.equipped:
             return False, "不能转移已装备的装备,请先卸下"
 
         # 3. 检查地理约束(同一坐标)
-        # 使用精确坐标判断
         sender_x, sender_y = sender.get_current_coordinates()
         receiver_x, receiver_y = receiver.get_current_coordinates()
 
-        # 检查是否在同一坐标
         if sender_x != receiver_x or sender_y != receiver_y:
             sender_region = sender.get_current_region()
             receiver_region = receiver.get_current_region()
-            return False, f"必须和{receiver.nickname}在同一坐标才能当面转移装备\n你的位置: {sender_region}({sender_x},{sender_y})\n对方位置: {receiver_region}({receiver_x},{receiver_y})"
+            type_name = "装备" if equipment.is_equipment else "铭文"
+            return False, f"必须和{receiver.nickname}在同一坐标才能当面转移{type_name}\n你的位置: {sender_region}({sender_x},{sender_y})\n对方位置: {receiver_region}({receiver_x},{receiver_y})"
 
-        # 4. 转移装备
-        # 使用EquipmentTradeService的transfer_equipment方法
+        # 4. 转移实例
         success = await EquipmentTradeService.transfer_equipment(
             self._uow.session, equipment, receiver.id
         )
 
         if not success:
-            return False, "转移装备失败"
+            return False, "转移物品失败"
 
         # 5. 返回成功消息
-        summary = EquipmentTradeService.generate_equipment_summary(equipment)
+        from ..economy.equipment_trade_service_new import EquipmentTradeService as ETSNew
+        summary = ETSNew.generate_instance_summary(equipment)
+        type_name = "装备" if equipment.is_equipment else "铭文"
         return (
             True,
-            f"成功向{receiver.nickname}转移装备: {summary}"
+            f"成功向{receiver.nickname}转移{type_name}: {summary}"
         )
 
     async def get_favorability(

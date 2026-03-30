@@ -244,7 +244,7 @@ async def _compute_equipment_floor_price(session, equipment) -> int:
 
 async def _get_market_reference(session, item_cfg) -> str | None:
     """查询近7日市场参考数据，返回格式化的信息行。无数据时返回 None。"""
-    is_equipment = EquipmentTradeService.is_equipment_trade(item_cfg.item_id)
+    is_equipment = EquipmentTradeServiceNew.is_instance_trade(item_cfg.item_id)
     lookback_since = datetime.now() - timedelta(days=TRADE_REF_LOOKBACK_DAYS)
 
     # 查询近7日成交记录（跑商系统的交易数据）
@@ -319,13 +319,14 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
     if item_cfg.item_id in VIP_EQUIPMENT_IDS:
         await list_cmd.finish("⛔ VIP定制装备为专属装备，不可交易")
 
-    # 装备交易特殊处理
-    is_equipment = EquipmentTradeService.is_equipment_trade(item_cfg.item_id)
-    if is_equipment and side == OrderSide.SELL:
+    # 装备/铭文实例交易特殊处理
+    is_instance = EquipmentTradeServiceNew.is_instance_trade(item_cfg.item_id)
+    if is_instance and side == OrderSide.SELL:
         if quantity != 1:
-            await list_cmd.finish("⛔ 装备只能单件出售")
-        # 装备出售需要选择具体实例，转到装备选择流程
-        await _handle_equipment_listing(event, item_cfg, price)
+            type_name = "装备" if item_cfg.type.value == "EQUIPMENT" else "铭文"
+            await list_cmd.finish(f"⛔ {type_name}只能单件出售")
+        # 实例出售需要选择具体实例，转到实例选择流程
+        await _handle_instance_listing(event, item_cfg, price)
         return
 
     async with safe_session() as session:
@@ -346,7 +347,7 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
         # 底价吸附与价格上限（普通物品）
         snap_hint = ""
         cap_hint = ""
-        if not is_equipment:
+        if not is_instance:
             floor_price = await _compute_item_floor_price(session, item_cfg)
             price_cap = max(int(floor_price * PRICE_CAP_MULT), floor_price)
             if price > price_cap:
@@ -418,41 +419,48 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
     await list_cmd.finish(build_markdown("\n".join(lines)))
 
 
-async def _handle_equipment_listing(event: MessageEvent, item_cfg, price: int):
-    """处理装备挂牌选择"""
+async def _handle_instance_listing(event: MessageEvent, item_cfg, price: int):
+    """处理装备/铭文实例挂牌选择"""
     async with safe_session() as session:
         player = await get_unified_player(session, event)
         if not player:
             await list_cmd.finish("⛔ 请先创建角色")
 
-        # 获取玩家的装备列表
+        # 获取玩家的实例列表（装备和铭文共用同一查询）
         item_repo = ItemRepository(session)
         market_order_repo = MarketOrderRepository(session)
         service = EquipmentTradeServiceNew(item_repo, market_order_repo)
-        equipment_list = await service.get_player_equipment_list(player.id, item_cfg.item_id)
+        instance_list = await service.get_player_equipment_list(player.id, item_cfg.item_id)
 
-        if not equipment_list:
+        # 过滤掉已冻结的实例
+        instance_list = [
+            inst for inst in instance_list
+            if not (inst.extra_attrs or {}).get("_frozen_for_trade")
+            and not (inst.extra_attrs or {}).get("_frozen_for_auction")
+        ]
+
+        type_name = "装备" if item_cfg.type.value == "EQUIPMENT" else "铭文"
+        if not instance_list:
             await list_cmd.finish(f"⛔ 你没有可挂牌的 {item_cfg.name}")
 
-        if len(equipment_list) == 1:
-            # 只有一件装备，直接挂牌
-            await _create_equipment_order(session, player, equipment_list[0], price, event)
+        if len(instance_list) == 1:
+            # 只有一件，直接挂牌
+            await _create_instance_order(session, player, instance_list[0], price, event)
             return
 
-        # 多件装备，保存状态并让玩家选择
+        # 多件，保存状态并让玩家选择
         import time
 
-        # 只保存装备ID列表和基本信息，避免数据库会话问题
-        equipment_ids = [eq.id for eq in equipment_list]
-        equipment_summaries = [EquipmentTradeService.generate_equipment_summary(eq) for eq in equipment_list]
+        instance_ids = [inst.id for inst in instance_list]
+        instance_summaries = [EquipmentTradeServiceNew.generate_instance_summary(inst) for inst in instance_list]
 
         equipment_selection_state[player.id] = {
-            "equipment_ids": equipment_ids,
-            "equipment_summaries": equipment_summaries,
+            "equipment_ids": instance_ids,
+            "equipment_summaries": instance_summaries,
             "item_id": item_cfg.item_id,
             "item_name": item_cfg.name,
             "price": price,
-            "timestamp": time.time()  # 添加时间戳，用于状态过期
+            "timestamp": time.time()
         }
 
         lines = [
@@ -461,40 +469,46 @@ async def _handle_equipment_listing(event: MessageEvent, item_cfg, price: int):
             f"💡 挂牌价格需在建议底价的 **{PRICE_CAP_MULT}** 倍以内"
         ]
 
-        # 使用保存的摘要信息显示装备列表
-        for i, (eq_id, summary) in enumerate(zip(equipment_ids, equipment_summaries), 1):
-            lines.append(f"{i}. 🆔**{eq_id}** {summary}")
+        for i, (inst_id, summary) in enumerate(zip(instance_ids, instance_summaries), 1):
+            lines.append(f"{i}. 🆔**{inst_id}** {summary}")
 
         lines.extend([
             "",
-            "💡 请直接回复序号选择装备（如：1），或回复 取消"
+            f"💡 请直接回复序号选择{type_name}（如：1），或回复 取消"
         ])
 
         await list_cmd.finish(build_markdown("\n".join(lines)))
 
 
-async def _create_equipment_order(session, player, equipment: ItemInstance, price: int, event: MessageEvent):
-    """创建装备订单"""
-    # 冻结装备
+async def _create_instance_order(session, player, instance: ItemInstance, price: int, event: MessageEvent):
+    """创建装备/铭文实例订单"""
+    # 冻结实例
     item_repo = ItemRepository(session)
     market_order_repo = MarketOrderRepository(session)
     service = EquipmentTradeServiceNew(item_repo, market_order_repo)
-    if not await service.freeze_equipment(equipment):
-        await list_cmd.finish("⛔ 该装备无法挂牌（可能已在交易中或已装备）")
+    if not await service.freeze_equipment(instance):
+        await list_cmd.finish("⛔ 该物品无法挂牌（可能已在交易中或已装备）")
 
-    # 生成装备摘要
-    summary = EquipmentTradeService.generate_equipment_summary(equipment)
+    # 生成摘要
+    summary = EquipmentTradeServiceNew.generate_instance_summary(instance)
 
-    # 底价吸附（装备）
+    # 底价吸附
     snap_hint = ""
-    floor_price = await _compute_equipment_floor_price(session, equipment)
+    if instance.is_equipment:
+        floor_price = await _compute_equipment_floor_price(session, instance)
+    else:
+        # 铭文：使用基础价格 × 财富指数
+        base_price = instance.config.price if instance.config else 1000
+        scale = await _get_wealth_scale(session)
+        floor_price = max(int(base_price * scale), MIN_UNIT_PRICE)
     price_cap = max(int(floor_price * PRICE_CAP_MULT), floor_price)
+    type_name = "装备" if instance.is_equipment else "铭文"
     if price > price_cap:
         await list_cmd.finish(
             message_add_head(
                 (
-                    f"⛔ 装备挂牌价格不得超过建议底价 {floor_price}💰 的 {PRICE_CAP_MULT} 倍\n"
-                    f"💡 该装备当前上限为 {price_cap}💰，请调整价格后再试"
+                    f"⛔ {type_name}挂牌价格不得超过建议底价 {floor_price}💰 的 {PRICE_CAP_MULT} 倍\n"
+                    f"💡 当前上限为 {price_cap}💰，请调整价格后再试"
                 ),
                 event,
             )
@@ -503,15 +517,15 @@ async def _create_equipment_order(session, player, equipment: ItemInstance, pric
         price = floor_price
         snap_hint = f"（已自动吸附到底价{floor_price}💰）"
 
-    # 创建装备订单
+    # 创建实例订单
     new_order = MarketOrder(
         player_id=player.id,
         side=OrderSide.SELL,
-        item_id=equipment.item_id,
+        item_id=instance.item_id,
         price=price,
         quantity=1,
         is_instance_trade=True,
-        item_instance_id=equipment.id,
+        item_instance_id=instance.id,
         equipment_summary=summary
     )
     session.add(new_order)
@@ -524,7 +538,7 @@ async def _create_equipment_order(session, player, equipment: ItemInstance, pric
     await session.commit()
 
     lines = [
-        f"# 📈 成功挂牌装备",
+        f"# 📈 成功挂牌{type_name}",
         "***",
         f"🆔 **{new_order.id}** | {summary} | 💰 **{price:,}**",
     ]
@@ -600,7 +614,7 @@ async def _(event: MessageEvent):
         if not equipment or equipment.player_id != player_id:
             await equipment_selection_handler.finish("⛔ 装备不存在或不属于你")
 
-        await _create_equipment_order(session, player, equipment, price, event)
+        await _create_instance_order(session, player, equipment, price, event)
 
 
 # ---------------- 指令：撤牌 ----------------
