@@ -1075,8 +1075,28 @@ async def _(event: MessageEvent):
             return "⁉️ 未知事件。"
 
         event_desc = describe_tile(tile)
-        header = f"🚶 已移动至 {player.get_current_region()} ({new_x},{new_y})"
-        await move_cmd.finish(message_add_head(f"{header}\n{event_desc}{auto_collect_msg}", event))
+
+        status_line = (
+            f"🧭 **{player.get_current_region()}** ({new_x},{new_y})　"
+            f"❤️ **{player.hp}**/{player.max_hp}　"
+            f"🧠 **{player.mp}**/{player.max_mp}"
+        )
+
+        lines = [
+            "# 🚶 诡域移动",
+            status_line,
+            "***",
+            event_desc,
+        ]
+        if auto_collect_msg:
+            lines.append(auto_collect_msg)
+        lines += [
+            "***",
+            f"{cmd('↑上', '上')} | {cmd('↓下', '下')} | {cmd('←左', '左')} | {cmd('→右', '右')} | {cmd('🗡️探索', '探索')}",
+            f"{cmd('上一层')} | {cmd('下一层')} | {cmd('一键嗑药')} | {cmd('俯瞰')}",
+        ]
+
+        await move_cmd.finish(build_markdown("\n".join(lines)))
 
 # ----------------- 指令：战斗 -----------------
 explore_cmd = on_command("探索", aliases={"战斗", "收集"}, block=True, priority=5)
