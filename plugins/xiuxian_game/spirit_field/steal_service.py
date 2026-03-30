@@ -4,7 +4,7 @@
 import random
 import math
 import json
-from datetime import datetime
+from datetime import datetime, timedelta
 from typing import Tuple, List, Optional
 from nonebot import logger
 from sqlalchemy import select
@@ -15,7 +15,7 @@ from ..models.player import Player
 from ..models.inventory import ItemInstance
 from .config import (
     STEAL_MAX_PER_DAY, STEAL_COOLDOWN_MINUTES, STEAL_PROTECT_PERCENT,
-    STEAL_TARGET_LIST_LIMIT,
+    STEAL_TARGET_LIST_LIMIT, STEAL_TARGET_ACTIVE_HOURS,
     GUARDIAN_HUNGRY_HOURS, GUARDIAN_HUNGRY_RATE_PENALTY,
     CropManager, GuardianBeastManager,
 )
@@ -83,6 +83,11 @@ class StealService:
 
             victim = await uow.players.get_by_id(field.player_id)
             if not victim:
+                continue
+
+            # 跳过不活跃玩家（48小时内无操作）
+            active_cutoff = now - timedelta(hours=STEAL_TARGET_ACTIVE_HOURS)
+            if not getattr(victim, 'last_active_at', None) or victim.last_active_at < active_cutoff:
                 continue
 
             if mature_plots and not already_stolen and stealable_plots > 0:
@@ -196,6 +201,11 @@ class StealService:
 
         if victim.id == thief_id:
             return False, "不能偷自己的作物"
+
+        # 检查目标是否活跃（48小时内有操作）
+        active_cutoff = now - timedelta(hours=STEAL_TARGET_ACTIVE_HOURS)
+        if not getattr(victim, 'last_active_at', None) or victim.last_active_at < active_cutoff:
+            return False, f"{victim.nickname}已长期不活跃，无法偷取"
 
         # 检查今日是否已偷过
         already_stolen = await uow.spirit_field_steal_logs.has_stolen_from_today(
