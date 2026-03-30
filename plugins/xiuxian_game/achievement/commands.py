@@ -8,7 +8,7 @@ from nonebot.adapters.qq import Message
 from ..models.db import safe_session
 from ..models.player import Player
 from ..platform_utils import get_unified_player
-from ..utils import message_add_head
+from ..utils_markdown import cmd, build_markdown
 from .achievement_service import AchievementService
 
 achievement_cmd = on_command("成就", aliases={"成就列表", "我的成就"}, block=True, priority=5)
@@ -22,7 +22,8 @@ async def handle_achievement(event: MessageEvent, args: Message = CommandArg()):
     async with safe_session() as session:
         player = await get_unified_player(session, event)
         if not player:
-            result_msg = "⛔ 请先创建角色"
+            await achievement_cmd.finish("请先创建角色")
+            return
         else:
             # 解析参数
             arg_text = args.extract_plain_text().strip()
@@ -42,7 +43,7 @@ async def handle_achievement(event: MessageEvent, args: Message = CommandArg()):
                 result_msg = await get_achievement_list(session, player, page)
 
     # 在上下文外部调用finish，避免连接泄漏
-    await achievement_cmd.finish(message_add_head(result_msg, event))
+    await achievement_cmd.finish(build_markdown(result_msg))
 
 
 async def get_achievement_list(session, player: Player, page: int) -> str:
@@ -87,9 +88,9 @@ async def get_achievement_list(session, player: Player, page: int) -> str:
 
     # 构建显示消息
     lines = [
-        "🏆 成就系统",
-        f"第 {page}/{total_pages} 页 | 总计 {len(data['unlocked'])}/{total_count} 已解锁",
-        "━━━━━━━━━━━━━"
+        "# 成就系统",
+        f"第 **{page}**/**{total_pages}** 页 | 总计 **{len(data['unlocked'])}**/**{total_count}** 已解锁",
+        "***"
     ]
 
     # 显示当前页的成就
@@ -104,23 +105,26 @@ async def get_achievement_list(session, player: Player, page: int) -> str:
             # 对于 account_age 类型的成就，使用特殊显示格式
             if condition_type == "account_age":
                 if progress == 1:
-                    status_text = f"✅ 符合条件（{target}前创建）"
+                    status_text = f"✅ 符合条件({target}前创建)"
                 else:
-                    status_text = f"❌ 限定成就（需{target}前创建）"
+                    status_text = f"❌ 限定成就(需{target}前创建)"
                 lines.append(f"🔒 {ach['icon']} {ach['title']} - {status_text}")
             else:
                 # 其他类型显示数值进度
-                lines.append(f"🔒 {ach['icon']} {ach['title']} - 进度: {progress}/{target}")
+                lines.append(f"🔒 {ach['icon']} {ach['title']} - 进度: **{progress}**/{target}")
 
     lines.append("")
-    lines.append("━━━━━━━━━━━━━")
-    lines.append("💡 使用【成就 页码】查看其他页")
-    lines.append("💡 使用【成就 成就名】查看详情")
+    lines.append("***")
+    lines.append(f"使用{cmd('成就 页码', '成就 ')}查看其他页")
+    lines.append(f"使用{cmd('成就 成就名', '成就 ')}查看详情")
 
     # 附加成就解锁消息（如果有）
     if achievement_msgs:
         lines.append("")
         lines.extend(achievement_msgs)
+
+    lines.append("***")
+    lines.append(f"{cmd('成就 页码', '成就 ')} | {cmd('面板')}")
 
     return "\n".join(lines)
 
@@ -130,7 +134,7 @@ async def get_achievement_detail(session, player, achievement_name: str) -> str:
     # 加载成就配置
     config = AchievementService._load_achievement_config()
     if not config:
-        return "⛔ 成就配置加载失败"
+        return "成就配置加载失败"
 
     # 查找成就（合并基础成就和高难度成就）
     achievement_data = None
@@ -152,7 +156,7 @@ async def get_achievement_detail(session, player, achievement_name: str) -> str:
                 break
 
     if not achievement_data:
-        return f"❌ 未找到成就: {achievement_name}"
+        return f"未找到成就: {achievement_name}"
 
     # 获取玩家成就和统计数据
     data = await AchievementService.get_player_achievements(session, player.id)
@@ -166,12 +170,12 @@ async def get_achievement_detail(session, player, achievement_name: str) -> str:
 
     # 构建详情消息
     lines = [
-        f"{achievement_data['icon']} {achievement_data['title']}",
-        "━━━━━━━━━━━━━",
-        f"📝 描述：{achievement_data['description']}",
-        f"✨ 寄语：{achievement_data.get('flavor_text', '无')}",
+        f"# {achievement_data['icon']} {achievement_data['title']}",
+        "***",
+        f"描述: {achievement_data['description']}",
+        f"寄语: {achievement_data.get('flavor_text', '无')}",
         "",
-        "📊 完成条件：",
+        "**完成条件:**",
     ]
 
     # 显示条件类型
@@ -190,41 +194,42 @@ async def get_achievement_detail(session, player, achievement_name: str) -> str:
         "total_login_days": "累计登录天数",
         "account_age": "账号创建时间"
     }
-    lines.append(f"  类型：{condition_map.get(condition_type, condition_type)}")
-    lines.append(f"  目标：{target}")
+    lines.append(f"  类型: {condition_map.get(condition_type, condition_type)}")
+    lines.append(f"  目标: **{target}**")
 
     # 显示进度
     if unlocked:
-        lines.append(f"  状态：✅ 已解锁")
+        lines.append(f"  状态: ✅ 已解锁")
         # 查找解锁时间
         for ach in data["unlocked"]:
             if ach["id"] == achievement_id:
-                lines.append(f"  解锁时间：{ach.get('unlocked_at', '未知')}")
+                lines.append(f"  解锁时间: {ach.get('unlocked_at', '未知')}")
                 break
     else:
-        lines.append(f"  状态：🔒 未解锁")
+        lines.append(f"  状态: 🔒 未解锁")
 
         # 对于 account_age 类型，使用特殊显示方式
         if condition_type == "account_age":
             if progress == 1:
-                lines.append(f"  条件：✅ 符合（账号创建于 {target} 之前）")
+                lines.append(f"  条件: ✅ 符合(账号创建于 {target} 之前)")
             else:
-                lines.append(f"  条件：❌ 不符合（需要在 {target} 之前创建账号）")
+                lines.append(f"  条件: ❌ 不符合(需要在 {target} 之前创建账号)")
         else:
             # 其他类型显示数值进度和百分比
             progress_pct = int(progress / target * 100) if target > 0 else 0
-            lines.append(f"  进度：{progress}/{target} ({progress_pct}%)")
+            lines.append(f"  进度: **{progress}**/{target} (**{progress_pct}**%)")
 
     lines.append("")
-    lines.append("🎁 奖励：")
+    lines.append("**奖励:**")
     rewards = achievement_data.get("rewards", {})
     if rewards.get("exp"):
-        lines.append(f"  怨炁 +{rewards['exp']}")
+        lines.append(f"  怨炁 +**{rewards['exp']}**")
     if rewards.get("gold"):
-        lines.append(f"  金币 +{rewards['gold']}")
+        lines.append(f"  金币 +**{rewards['gold']}**")
     if rewards.get("attribute_points"):
-        lines.append(f"  属性点 +{rewards['attribute_points']}")
+        lines.append(f"  属性点 +**{rewards['attribute_points']}**")
 
-    lines.append("━━━━━━━━━━━━━")
+    lines.append("***")
+    lines.append(f"{cmd('成就')} | {cmd('面板')}")
 
     return "\n".join(lines)

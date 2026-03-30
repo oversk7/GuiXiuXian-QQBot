@@ -16,6 +16,7 @@ from ..models.db import safe_session
 from ..models import Player, ItemInstance
 from ..config import config
 from ..utils import message_add_head
+from ..utils_markdown import cmd, build_markdown
 from .gem_socket_service_new import GemSocketService
 from .equipment_commands import find_equipment_by_input
 from ..platform_utils import get_unified_player
@@ -76,12 +77,13 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
         lines.extend([
             "",
             "💡 使用方法：",
-            f"• 镶嵌 {arg} 孔位号 宝石名称（消耗：镶嵌锤×1 + 1000金币）",
-            f"• 拆卸 {arg} 孔位号（消耗：拆卸凿×1 + 500金币，15%宝石损坏风险）",
-            f"• 拆卸 {arg} 孔位号 稳定水晶（额外消耗稳定水晶×1，消除所有风险）"
+            f"▫️ {cmd(f'镶嵌 {arg} 孔位 宝石名', f'镶嵌 {arg} ')} 镶嵌",
+            f"▫️ {cmd(f'拆卸 {arg} 孔位', f'拆卸 {arg} ')} 拆卸",
+            f"***",
+            f"{cmd('镶嵌物品')} | {cmd('装备栏')}"
         ])
 
-        await gem_slots_cmd.finish(message_add_head("\n".join(lines), event))
+        await gem_slots_cmd.finish(build_markdown("\n".join(lines)))
 
 
 # ---------------- 指令：镶嵌宝石 ----------------
@@ -155,7 +157,8 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
         await session.commit()
 
         if success:
-            await socket_gem_cmd.finish(message_add_head(message, event))
+            buttons = f"\n***\n{cmd('孔位 ' + equipment_arg, '孔位 ' + equipment_arg)} | {cmd('装备栏')}"
+            await socket_gem_cmd.finish(build_markdown(message + buttons))
         else:
             await socket_gem_cmd.finish(f"⛔ {message}")
 
@@ -211,7 +214,8 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
         await session.commit()
 
         if success:
-            await remove_gem_cmd.finish(message_add_head(message, event))
+            buttons = f"\n***\n{cmd('孔位 ' + equipment_arg, '孔位 ' + equipment_arg)} | {cmd('装备栏')}"
+            await remove_gem_cmd.finish(build_markdown(message + buttons))
         else:
             await remove_gem_cmd.finish(f"⛔ {message}")
 
@@ -270,9 +274,10 @@ async def _(event: MessageEvent):
             lines.extend(runes)
             lines.append("")
 
-        lines.append("💡 使用 /镶嵌 装备名 孔位号 物品名 进行镶嵌")
+        lines.append(f"***")
+        lines.append(f"{cmd('装备栏')} | {cmd('可升级镶嵌物')}")
 
-        await gem_list_cmd.finish(message_add_head("\n".join(lines), event))
+        await gem_list_cmd.finish(build_markdown("\n".join(lines)))
 
 
 

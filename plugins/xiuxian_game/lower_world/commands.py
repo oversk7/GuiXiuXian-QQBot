@@ -30,6 +30,7 @@ from .hero_generator import hero_from_json
 from ..battle.integration_helper import BattleIntegrationHelper
 from ..battle.battle_markdown import build_battle_markdown
 from ..battle.battle_log_filter import filter_battle_log, get_player_log_mode
+from ..utils_markdown import cmd, build_markdown
 
 
 # ==================== 命令注册 ====================
@@ -62,45 +63,46 @@ async def handle_descend(event: MessageEvent):
             await schedule_next_wave(uow, stronghold, player.level)
             await uow.commit()
 
-            msg = (
-                "📋 大都会第七分部紧急会议记录\n"
-                "\n"
-                "敲门诡在第十七区扩散，鬼域裂缝停不下来了。\n"
-                "再不处理，七十二小时内整个分部都会被吞掉。\n"
-                "\n"
-                "会长看了一眼数据，说：\n"
-                "「导流。补偿打账户里。」\n"
-                "\n"
-                "就这一句话。会议结束了。\n"
-                "\n"
-                "你收到一条消息——\n"
-                "「你已被选为第四天灾导流节点，请配合传送。」\n"
-                "\n"
-                "你还没看完，那些诡异的气息就扑过来了。\n"
-                "不是来打你的——它们要钻进你身体里。\n"
-                "它们把你当成了一扇门。\n"
-                "\n"
-                "然后你就掉下去了。\n"
-                "\n"
-                "睁开眼，天是另一种颜色。\n"
-                "有个小孩看见你，大叫一声\"天灾来了\"，\n"
-                "撒腿就跑，摔了一跤，爬起来继续跑。\n"
-                "\n"
-                "你低头看自己落脚的地方——\n"
-                "地面正在龟裂，裂缝里渗出灰色的雾。\n"
-                "你身后，鬼域已经张开了。\n"
-                "叩门声从你的影子里传出来，一下一下，\n"
-                "敲进这片土地。\n"
-                "\n"
-                "这里的人还不知道，\n"
-                "大都会把什么东西送过来了。\n"
+            content = (
+                "# 📋 大都会第七分部紧急会议记录\n"
+                "***\n"
+                "> 敲门诡在第十七区扩散，鬼域裂缝停不下来了。\n"
+                "> 再不处理，七十二小时内整个分部都会被吞掉。\n"
+                "> \n"
+                "> 会长看了一眼数据，说：\n"
+                "> 「导流。补偿打账户里。」\n"
+                "> \n"
+                "> 就这一句话。会议结束了。\n"
+                "> \n"
+                "> 你收到一条消息——\n"
+                "> 「你已被选为第四天灾导流节点，请配合传送。」\n"
+                "> \n"
+                "> 你还没看完，那些诡异的气息就扑过来了。\n"
+                "> 不是来打你的——它们要钻进你身体里。\n"
+                "> 它们把你当成了一扇门。\n"
+                "> \n"
+                "> 然后你就掉下去了。\n"
+                "> \n"
+                "> 睁开眼，天是另一种颜色。\n"
+                "> 有个小孩看见你，大叫一声\"天灾来了\"，\n"
+                "> 撒腿就跑，摔了一跤，爬起来继续跑。\n"
+                "> \n"
+                "> 你低头看自己落脚的地方——\n"
+                "> 地面正在龟裂，裂缝里渗出灰色的雾。\n"
+                "> 你身后，鬼域已经张开了。\n"
+                "> 叩门声从你的影子里传出来，一下一下，\n"
+                "> 敲进这片土地。\n"
+                "> \n"
+                "> 这里的人还不知道，\n"
+                "> 大都会把什么东西送过来了。\n"
                 "\n"
                 "⚠️ 你已降临下位世界，成为「第四天灾」\n"
-                "   大都会的诡异正通过你持续涌入这个世界\n"
-                f"  {WAVE_INTERVAL_HOURS}小时后，这里的英雄会来找你\n"
-                "   ——大都会那边已经收到你的报酬了"
+                "大都会的诡异正通过你持续涌入这个世界\n"
+                f"**{WAVE_INTERVAL_HOURS}**小时后，这里的英雄会来找你\n"
+                "——大都会那边已经收到你的报酬了\n"
+                f"***\n{cmd('镇守')} | {cmd('天灾商店')}"
             )
-            await descend_cmd.finish(msg)
+            await descend_cmd.finish(build_markdown(content))
 
         # 已建立山寨，显示当前状态
         await _show_stronghold_status(stronghold, player.level)

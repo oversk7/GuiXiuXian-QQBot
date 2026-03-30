@@ -12,6 +12,7 @@ from sqlalchemy import select
 from ..models.db import safe_session
 from ..models import Player
 from ..utils import message_add_head
+from ..utils_markdown import cmd, build_markdown
 from .item_effects import get_player_buff_status
 
 # ---------------- 指令：查看临时buff状态 ----------------
@@ -33,7 +34,8 @@ async def handle_buff_status(event: MessageEvent):
         status_msg = await get_player_buff_status(session, player)
         await session.commit()  # 提交清理过期buff的操作
         
-        await buff_status_cmd.finish(message_add_head(status_msg, event))
+        buttons = f"\n***\n{cmd('清理增益')} | {cmd('面板')} | {cmd('属性分解')}"
+        await buff_status_cmd.finish(build_markdown(status_msg + buttons))
 
 
 # ---------------- 指令：清理过期buff ----------------
@@ -72,7 +74,8 @@ async def handle_clear_buffs(event: MessageEvent):
         else:
             msg = "✅ 没有发现过期的临时增益效果"
         
-        await clear_buffs_cmd.finish(message_add_head(msg, event))
+        buttons = f"\n***\n{cmd('增益状态')} | {cmd('面板')}"
+        await clear_buffs_cmd.finish(build_markdown(msg + buttons))
 
 
 # ---------------- 指令：详细属性分解 ----------------
@@ -214,7 +217,9 @@ async def handle_attribute_breakdown(event: MessageEvent):
         if not is_tracked:
             lines.append("💡 使用【洗点】后重新加点可获得更精确的分解")
 
-        await attribute_breakdown_cmd.finish(message_add_head("\n".join(lines), event))
+        lines.append(f"***")
+        lines.append(f"{cmd('面板')} | {cmd('增益状态')} | {cmd('战力')}")
+        await attribute_breakdown_cmd.finish(build_markdown("\n".join(lines)))
 
 
 # ---------------- 指令：一键嗑药 ----------------
@@ -309,4 +314,5 @@ async def handle_auto_use_medicine(event: MessageEvent):
             f"📊 当前状态：{min(player.hp, effective_max_hp)}/{effective_max_hp} HP | {min(player.mp, effective_max_mp)}/{effective_max_mp} MP",
             "━━━━━━━━━━━━━"
         ])
-        await auto_use_medicine_cmd.finish(message_add_head("\n".join(result_msg), event))
+        result_msg.append(f"{cmd('面板')} | {cmd('背包')}")
+        await auto_use_medicine_cmd.finish(build_markdown("\n".join(result_msg)))

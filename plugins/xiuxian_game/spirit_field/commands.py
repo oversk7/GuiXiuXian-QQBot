@@ -20,6 +20,7 @@ from nonebot.adapters.qq import Message
 from ..models.db import AsyncSessionLocal
 from ..infrastructure.uow.unit_of_work import UnitOfWork
 from ..platform_utils import get_unified_player
+from ..utils_markdown import cmd, build_markdown
 from .spirit_field_service import SpiritFieldService
 from .steal_service import StealService
 from .config import (
@@ -48,7 +49,7 @@ async def handle_create_field(event: MessageEvent):
             await create_field_cmd.finish("请先创建角色")
 
         success, msg = await field_service.create_field(uow, player.id)
-        await create_field_cmd.finish(msg)
+        await create_field_cmd.finish(build_markdown(msg + f"\n***\n{cmd('灵田')} | {cmd('种子商店')}"))
 
 
 # ==================== 查看灵田 ====================
@@ -65,7 +66,7 @@ async def handle_view_field(event: MessageEvent):
             await view_field_cmd.finish("请先创建角色")
 
         success, msg = await field_service.get_field_status(uow, player.id)
-        await view_field_cmd.finish(msg)
+        await view_field_cmd.finish(build_markdown(msg + f"\n***\n{cmd('收菜')} | {cmd('一键浇水')} | {cmd('种子商店')} | {cmd('偷菜')}"))
 
 
 # ==================== 升级灵田 ====================
@@ -82,7 +83,7 @@ async def handle_upgrade_field(event: MessageEvent):
             await upgrade_field_cmd.finish("请先创建角色")
 
         success, msg = await field_service.upgrade_field(uow, player.id)
-        await upgrade_field_cmd.finish(msg)
+        await upgrade_field_cmd.finish(build_markdown(msg + f"\n***\n{cmd('灵田')} | {cmd('种子商店')}"))
 
 
 # ==================== 种植 ====================
@@ -115,7 +116,7 @@ async def handle_plant(event: MessageEvent, args: Message = CommandArg()):
             await plant_cmd.finish("请先创建角色")
 
         success, msg = await field_service.plant(uow, player.id, crop_name, plot_index)
-        await plant_cmd.finish(msg)
+        await plant_cmd.finish(build_markdown(msg + f"\n***\n{cmd('灵田')} | {cmd('一键浇水')} | {cmd('收菜')}"))
 
 
 # ==================== 一键种植 ====================
@@ -138,7 +139,7 @@ async def handle_plant_all(event: MessageEvent, args: Message = CommandArg()):
             await plant_all_cmd.finish("请先创建角色")
 
         success, msg = await field_service.plant_all(uow, player.id, crop_name)
-        await plant_all_cmd.finish(msg)
+        await plant_all_cmd.finish(build_markdown(msg + f"\n***\n{cmd('灵田')} | {cmd('一键浇水')} | {cmd('收菜')}"))
 
 
 # ==================== 灌溉 ====================
@@ -166,7 +167,7 @@ async def handle_water(event: MessageEvent, args: Message = CommandArg()):
             await water_cmd.finish("请先创建角色")
 
         success, msg = await field_service.water_plot(uow, player.id, plot_index)
-        await water_cmd.finish(msg)
+        await water_cmd.finish(build_markdown(msg + f"\n***\n{cmd('灵田')} | {cmd('收菜')}"))
 
 
 # ==================== 一键灌溉 ====================
@@ -183,7 +184,7 @@ async def handle_water_all(event: MessageEvent):
             await water_all_cmd.finish("请先创建角色")
 
         success, msg = await field_service.water_all(uow, player.id)
-        await water_all_cmd.finish(msg)
+        await water_all_cmd.finish(build_markdown(msg + f"\n***\n{cmd('灵田')} | {cmd('收菜')}"))
 
 
 # ==================== 收菜 ====================
@@ -200,7 +201,7 @@ async def handle_harvest(event: MessageEvent):
             await harvest_cmd.finish("请先创建角色")
 
         success, msg = await field_service.harvest(uow, player.id)
-        await harvest_cmd.finish(msg)
+        await harvest_cmd.finish(build_markdown(msg + f"\n***\n{cmd('灵田')} | {cmd('一键种植 作物', '一键种植 ')} | {cmd('种子商店')}"))
 
 
 # ==================== 偷菜(偷菜) ====================
@@ -221,7 +222,7 @@ async def handle_steal(event: MessageEvent, args: Message = CommandArg()):
         if not args_text:
             # 查看可偷目标
             success, msg = await steal_service.get_steal_targets(uow, player.id)
-            await steal_cmd.finish(msg)
+            await steal_cmd.finish(build_markdown(msg + f"\n***\n{cmd('偷菜 UID', '偷菜 ')} | {cmd('灵田')} | {cmd('偷菜记录')}"))
         else:
             # 执行偷菜
             try:
@@ -230,7 +231,7 @@ async def handle_steal(event: MessageEvent, args: Message = CommandArg()):
                 await steal_cmd.finish("用法: 偷菜 <UID>\n使用【偷菜】查看可偷目标")
 
             success, msg = await steal_service.steal_from(uow, player.id, victim_uid)
-            await steal_cmd.finish(msg)
+            await steal_cmd.finish(build_markdown(msg + f"\n***\n{cmd('偷菜 UID', '偷菜 ')} | {cmd('灵田')} | {cmd('偷菜记录')}"))
 
 
 # ==================== 旧诡兽命令（引导到宠物伙伴系统） ====================
@@ -240,12 +241,14 @@ place_guardian_cmd = on_command("放置诡兽", priority=5, block=True)
 
 @place_guardian_cmd.handle()
 async def handle_place_guardian_redirect(event: MessageEvent):
-    await place_guardian_cmd.finish(
+    msg = (
+        "# 诡兽系统已升级\n***\n"
         "诡兽系统已升级为宠物伙伴系统!\n"
-        "- 驯化: 【驯化诡兽 名称 昵称】\n"
-        "- 守田: 【派遣守田】\n"
-        "- 查看: 【宠物】"
+        f"{cmd('驯化诡兽 名称 昵称', '驯化诡兽 ')} 驯化\n"
+        f"{cmd('派遣守田')} 守田\n"
+        f"{cmd('宠物')} 查看"
     )
+    await place_guardian_cmd.finish(build_markdown(msg))
 
 
 remove_guardian_cmd = on_command("收回诡兽", aliases={"撤回诡兽"}, priority=5, block=True)
@@ -253,7 +256,12 @@ remove_guardian_cmd = on_command("收回诡兽", aliases={"撤回诡兽"}, prior
 
 @remove_guardian_cmd.handle()
 async def handle_remove_guardian_redirect(event: MessageEvent):
-    await remove_guardian_cmd.finish("诡兽系统已升级! 使用【召回宠物】召回守田中的宠物")
+    msg = (
+        "# 诡兽系统已升级\n***\n"
+        f"使用 {cmd('召回宠物')} 召回守田中的宠物\n"
+        f"{cmd('宠物')} | {cmd('灵田')}"
+    )
+    await remove_guardian_cmd.finish(build_markdown(msg))
 
 
 feed_guardian_cmd = on_command("喂养诡兽", aliases={"喂诡兽"}, priority=5, block=True)
@@ -261,7 +269,12 @@ feed_guardian_cmd = on_command("喂养诡兽", aliases={"喂诡兽"}, priority=5
 
 @feed_guardian_cmd.handle()
 async def handle_feed_guardian_redirect(event: MessageEvent):
-    await feed_guardian_cmd.finish("诡兽系统已升级! 使用【喂食】喂养你的宠物伙伴")
+    msg = (
+        "# 诡兽系统已升级\n***\n"
+        f"使用 {cmd('喂食')} 喂养你的宠物伙伴\n"
+        f"{cmd('宠物')} | {cmd('灵田')}"
+    )
+    await feed_guardian_cmd.finish(build_markdown(msg))
 
 
 # ==================== 灵种商店 ====================
@@ -288,7 +301,7 @@ async def handle_seed_shop(event: MessageEvent):
         rarity_names = {"white": "白色", "green": "绿色", "blue": "蓝色", "purple": "紫色", "orange": "橙色"}
         rarity_icons = {"white": "⚪", "green": "🟢", "blue": "🔵", "purple": "🟣", "orange": "🟠"}
 
-        msg = f"灵种商店 (灵田{field.level}级)\n━━━━━━━━━━━━━\n"
+        msg = f"# 🌱 灵种商店 (灵田{field.level}级)\n***\n"
 
         # 按稀有度分组显示
         for rarity in ["white", "green", "blue", "purple", "orange"]:
@@ -301,28 +314,25 @@ async def handle_seed_shop(event: MessageEvent):
             label = rarity_names.get(rarity, rarity)
 
             if is_locked:
-                msg += f"\n{icon} {label}灵种 (未解锁)\n"
-                for crop in crops:
-                    msg += f"  {crop.name} - 需升级灵田\n"
+                msg += f"\n**{icon} {label}灵种** (未解锁)\n"
             else:
-                msg += f"\n{icon} {label}灵种\n"
+                msg += f"\n**{icon} {label}灵种**\n"
                 for crop in crops:
                     type_tag = "蔬" if crop.type == "VEGETABLE" else "药"
-                    msg += f"  {crop.name}[{type_tag}] {crop.seed_price}金 ({crop.grow_hours}h)\n"
-
-        msg += f"\n━━━━━━━━━━━━━\n"
-        msg += f"购买: 【买种子 名称 数量】\n"
-        msg += f"金币: {player.gold:,}"
+                    msg += f"▫️ {cmd(crop.name, f'买种子 {crop.name} ')} [{type_tag}] **{crop.seed_price}**金 ({crop.grow_hours}h)\n"
 
         # 诡兽商店
         shop_beasts = beast_manager.get_shop_beasts()
         if shop_beasts:
-            msg += f"\n诡兽（【买诡兽 名称】购买）:\n"
+            msg += f"\n**🐾 守田诡兽**\n"
             for beast in shop_beasts:
                 icon = rarity_icons.get(beast.rarity, "⚪")
-                msg += f"  {icon}{beast.name} {beast.shop_price:,}金 (拦截{beast.intercept_rate}%)\n"
+                msg += f"▫️ {icon} {cmd(beast.name, f'买诡兽 {beast.name} ')} **{beast.shop_price:,}**金 (拦截{beast.intercept_rate}%)\n"
 
-        await seed_shop_cmd.finish(msg)
+        msg += f"\n***\n💰 金币: **{player.gold:,}**\n"
+        msg += f"{cmd('灵田')} | {cmd('收菜')} | {cmd('一键种植 作物', '一键种植 ')}"
+
+        await seed_shop_cmd.finish(build_markdown(msg))
 
 
 # ==================== 购买灵种 ====================
@@ -377,11 +387,12 @@ async def handle_buy_seed(event: MessageEvent, args: Message = CommandArg()):
         from ..models.inventory import ItemInstance
         await ItemInstance.add_item(uow.session, player.id, crop.seed_id, quantity)
 
-        await buy_seed_cmd.finish(
+        await buy_seed_cmd.finish(build_markdown(
             f"购买成功!\n"
             f"{crop.name}种子 x{quantity}\n"
             f"消耗: {total_cost:,}金币"
-        )
+            f"\n***\n{cmd('灵田')} | {cmd('种子商店')}"
+        ))
 
 
 # ==================== 买诡兽 ====================
@@ -434,12 +445,12 @@ async def handle_buy_beast(event: MessageEvent, args: Message = CommandArg()):
         from ..models.inventory import ItemInstance
         await ItemInstance.add_item(uow.session, player.id, beast.item_id, quantity)
 
-        await buy_beast_cmd.finish(
+        await buy_beast_cmd.finish(build_markdown(
             f"购买成功!\n"
             f"{beast.name} x{quantity}\n"
-            f"消耗: {total_cost:,}金币\n"
-            f"使用【放置诡兽 {beast.name}】守田"
-        )
+            f"消耗: {total_cost:,}金币"
+            f"\n***\n{cmd('灵田')} | {cmd('种子商店')}"
+        ))
 
 
 # ==================== 拜访灵田 ====================
@@ -465,7 +476,7 @@ async def handle_visit_other_field(event: MessageEvent, args: Message = CommandA
             await visit_other_field_cmd.finish("请先创建角色")
 
         success, msg = await field_service.visit_field(uow, player.id, target_uid)
-        await visit_other_field_cmd.finish(msg)
+        await visit_other_field_cmd.finish(build_markdown(msg + f"\n***\n{cmd('偷菜 UID', '偷菜 ')} | {cmd('灵田')}"))
 
 
 # ==================== 灵田记录 ====================
@@ -492,4 +503,4 @@ async def handle_field_log(event: MessageEvent, args: Message = CommandArg()):
             await field_log_cmd.finish("请先创建角色")
 
         success, msg = await steal_service.get_steal_logs(uow, player.id, page)
-        await field_log_cmd.finish(msg)
+        await field_log_cmd.finish(build_markdown(msg + f"\n***\n{cmd('灵田')} | {cmd('偷菜')}"))

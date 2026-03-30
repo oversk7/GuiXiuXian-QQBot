@@ -14,7 +14,7 @@ from sqlalchemy import select
 from ..models.db import safe_session
 from ..models import Player, ItemInstance
 from ..config import config
-from ..utils import message_add_head
+from ..utils_markdown import cmd, build_markdown
 from .equipment_upgrade_service_new import EquipmentUpgradeService
 from .equipment_commands import (
     find_equipment_by_input,
@@ -87,14 +87,14 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
         base_success_rate = upgrade_service.get_success_rate(current_level, False, 0)
         # 构建信息显示
         lines = [
-            f"⚔️ 装备升阶信息（装备合成模式）",
-            f"━━━━━━━━━━━━━",
+            f"# ⚔️ 装备升阶信息",
+            f"***",
             f"🎯 装备：{equip.config.name} (ID:{equip.id})",
-            f"📊 当前等级：+{current_level}阶 → +{target_level}阶",
-            f"💰 金币消耗：{required_gold:,}",
-            f"📈 基础成功率：{base_success_rate:.1%}",
-            f"🍀 运气加成后：{success_rate:.1%}",
-            f"💎 稳定水晶加成：{success_rate_with_protection:.1%}",
+            f"📊 当前等级：+**{current_level}**阶 → +**{target_level}**阶",
+            f"💰 金币消耗：**{required_gold:,}**",
+            f"📈 基础成功率：**{base_success_rate:.1%}**",
+            f"🍀 运气加成后：**{success_rate:.1%}**",
+            f"💎 稳定水晶加成：**{success_rate_with_protection:.1%}**",
             "",
             "🔧 装备合成需求："
         ]
@@ -125,8 +125,8 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
         lines.extend([
             "",
             "💡 使用方法：",
-            f"• 升阶 {arg}",
-            f"• 升阶 {arg} 稳定水晶",
+            f"• {cmd(f'升阶 {arg}', f'升阶 {arg}')}",
+            f"• {cmd(f'升阶 {arg} 稳定水晶', f'升阶 {arg} 稳定水晶')}",
             "",
             "📝 说明：",
             f"• 需要消耗 {required_equipment_count-1} 个相同装备作为材料",
@@ -158,7 +158,8 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
 
         lines.extend(gem_warn_lines)
 
-        await upgrade_info_cmd.finish(message_add_head("\n".join(lines), event))
+        buttons = f"\n{cmd('升阶列表')} | {cmd('装备栏')} | {cmd('升阶信息 编号', '升阶信息 ')}"
+        await upgrade_info_cmd.finish(build_markdown("\n".join(lines) + buttons))
 
 
 # ---------------- 指令：装备升阶 ----------------
@@ -224,7 +225,8 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
             if consumed_gold > 0:
                 result_lines.append(f"💰 消耗金币：{consumed_gold:,}")
 
-        await upgrade_equipment_cmd.finish(message_add_head("\n".join(result_lines), event))
+        buttons = f"\n{cmd('升阶列表')} | {cmd('装备栏')} | {cmd('升阶信息 编号', '升阶信息 ')}"
+        await upgrade_equipment_cmd.finish(build_markdown("\n".join(result_lines) + buttons))
 
 
 # ---------------- 指令：升阶列表 ----------------
@@ -255,7 +257,7 @@ async def _(event: MessageEvent):
         )
         all_equips = (await session.execute(stmt_all)).scalars().all()
 
-        lines = ["⚔️ 可升阶装备列表", "━━━━━━━━━━━━━"]
+        lines = ["# ⚔️ 可升阶装备列表", "***"]
 
         # 新版本: 使用DI架构的EquipmentUpgradeService
         from ..infrastructure.repositories.item_repository import ItemRepository
@@ -291,7 +293,8 @@ async def _(event: MessageEvent):
         lines.append("")
         lines.append("💡 使用 /升阶信息 装备ID 查看详细信息")
 
-        await upgrade_list_cmd.finish(message_add_head("\n".join(lines), event))
+        buttons = f"\n{cmd('升阶列表')} | {cmd('装备栏')} | {cmd('升阶信息 编号', '升阶信息 ')}"
+        await upgrade_list_cmd.finish(build_markdown("\n".join(lines) + buttons))
 
 # ---------------- 指令：一键升阶 ----------------
 auto_upgrade_cmd = on_command("一键升阶", block=True, priority=5, force_whitespace=True)
@@ -342,10 +345,7 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
         from ..models.monthly_card import MonthlyCard as MonthlyCardModel
         active_cards = await MonthlyCardModel.get_all_active_cards(session, player.id)
         if not active_cards:
-            await auto_upgrade_cmd.finish(message_add_head(
-                "⛔ 一键升阶是月卡专属功能，请先购买月卡\n💡 发送【赞助】了解月卡权益",
-                event
-            ))
+            await auto_upgrade_cmd.finish("⛔ 一键升阶是月卡专属功能，请先购买月卡\n💡 发送【赞助】了解月卡权益")
 
         from ..infrastructure.repositories.item_repository import ItemRepository
         from ..infrastructure.repositories.player_repository import PlayerRepository

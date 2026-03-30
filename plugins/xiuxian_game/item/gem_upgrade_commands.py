@@ -13,7 +13,7 @@ from sqlalchemy import select
 from ..models.db import safe_session
 from ..models import Player, ItemInstance
 from ..config import config
-from ..utils import message_add_head
+from ..utils_markdown import cmd, build_markdown
 from .gem_upgrade_service_new import GemUpgradeService
 from ..platform_utils import get_unified_player
 
@@ -60,9 +60,9 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
         owned_qty = sum(result.scalars().all())
 
         lines = [
-            f"🔮 {upgrade_info['current_name']} 升级信息",
-            f"📊 当前等级: {upgrade_info['current_level']}/10",
-            f"💎 拥有数量: {owned_qty}",
+            f"# 🔮 {upgrade_info['current_name']} 升级信息",
+            f"📊 当前等级: **{upgrade_info['current_level']}**/10",
+            f"💎 拥有数量: **{owned_qty}**",
             ""
         ]
 
@@ -71,8 +71,8 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
         else:
             lines.extend([
                 f"⬆️ 升级目标: {upgrade_info['next_name']}",
-                f"🔢 需要数量: {upgrade_info['required_gem_count']} 个",
-                f"💰 消耗金币: {upgrade_info['required_gold']}",
+                f"🔢 需要数量: **{upgrade_info['required_gem_count']}** 个",
+                f"💰 消耗金币: **{upgrade_info['required_gold']}**",
                 ""
             ])
 
@@ -103,8 +103,8 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
                 f"🛡️ 稳定水晶加成: {upgrade_info['success_rate_with_protection']:.1%}",
                 "",
                 "💡 使用方法：",
-                f"• 合成镶嵌物 {arg}",
-                f"• 合成镶嵌物 {arg} 稳定水晶",
+                f"• {cmd(f'合成镶嵌物 {arg}', f'合成镶嵌物 {arg}')}",
+                f"• {cmd(f'合成镶嵌物 {arg} 稳定水晶', f'合成镶嵌物 {arg} 稳定水晶')}",
                 "",
                 "📝 说明：",
                 f"• 需要消耗 {upgrade_info['required_gem_count']} 个相同镶嵌物进行合成",
@@ -113,7 +113,8 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
                 f"• 运气值 {player.luck} 提供额外成功率加成"
             ])
 
-        await gem_upgrade_info_cmd.finish(message_add_head("\n".join(lines), event))
+        buttons = f"\n{cmd('可升级镶嵌物')} | {cmd('装备栏')} | {cmd('镶嵌物品')}"
+        await gem_upgrade_info_cmd.finish(build_markdown("\n".join(lines) + buttons))
 
 
 # ---------------- 指令：升级镶嵌物 ----------------
@@ -167,7 +168,8 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
         final_message = "\n".join(result_lines)
         
         if success:
-            await gem_upgrade_cmd.finish(message_add_head(final_message, event))
+            buttons = f"\n{cmd('可升级镶嵌物')} | {cmd('装备栏')} | {cmd('镶嵌物品')}"
+            await gem_upgrade_cmd.finish(build_markdown(final_message + buttons))
         else:
             await gem_upgrade_cmd.finish(f"⛔ {final_message}")
 
@@ -210,12 +212,12 @@ async def _(event: MessageEvent):
         # 按等级和名称排序
         upgradeable_gems.sort(key=lambda x: (x["level"], x["name"]))
 
-        lines = ["🔮 你的可升级镶嵌物：", ""]
+        lines = ["# 🔮 你的可升级镶嵌物", ""]
         
         for gem in upgradeable_gems:
             status = "⬆️" if gem["can_upgrade"] else "✨"
             max_level_text = " (满级)" if not gem["can_upgrade"] else ""
-            lines.append(f"{status} {gem['name']} x{gem['quantity']}{max_level_text}")
+            lines.append(f"{status} {gem['name']} x**{gem['quantity']}**{max_level_text}")
 
         lines.extend([
             "",
@@ -224,4 +226,5 @@ async def _(event: MessageEvent):
             "• 合成镶嵌物 镶嵌物名称 - 进行升级合成"
         ])
 
-        await upgradeable_gems_cmd.finish(message_add_head("\n".join(lines), event))
+        buttons = f"\n{cmd('可升级镶嵌物')} | {cmd('装备栏')} | {cmd('镶嵌物品')}"
+        await upgradeable_gems_cmd.finish(build_markdown("\n".join(lines) + buttons))

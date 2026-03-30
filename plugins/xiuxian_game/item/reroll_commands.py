@@ -17,6 +17,7 @@ from ..models.db import safe_session
 from ..models.player import Player
 from ..models.inventory import ItemInstance
 from ..platform_utils import get_unified_player
+from ..utils_markdown import cmd, build_markdown
 from .affix_service import (
     get_affixes_from_equipment, get_affix_display_name,
     get_affix_value_range_display, reroll_single_affix,
@@ -97,9 +98,11 @@ async def handle_reroll(event: MessageEvent, args: Message = CommandArg()):
             "⚠️ 洗炼后数值直接覆盖，不可保留旧值",
             "发送【确认洗炼】执行",
         ]
+        lines.append("")
+        lines.append(f"{cmd('确认洗炼')} | {cmd('装备栏')}")
         msg = "\n".join(lines)
 
-    await reroll_cmd.finish(Message(msg))
+    await reroll_cmd.finish(build_markdown(msg))
 
 
 confirm_reroll_cmd = on_command("确认洗炼", priority=5, block=True)
@@ -173,11 +176,13 @@ async def handle_confirm_reroll(event: MessageEvent):
 
         equip_name = equipment.config.name if equipment.config else equipment.item_id
         lines = [
-            f"🔄 洗炼完成 — {equip_name}",
-            f"  旧词缀：{old_display}",
-            f"  新词缀：{new_display}",
-            f"  变化：{trend}",
+            f"# 🔄 洗炼完成 — {equip_name}",
+            f"旧词缀：{old_display}",
+            f"新词缀：**{new_display}**",
+            f"变化：{trend}",
+            f"***",
+            f"{cmd('装备栏')} | {cmd(f'装备详情 {equip_name}', f'装备详情 {equip_name}')}",
         ]
         msg = "\n".join(lines)
 
-    await confirm_reroll_cmd.finish(Message(msg))
+    await confirm_reroll_cmd.finish(build_markdown(msg))

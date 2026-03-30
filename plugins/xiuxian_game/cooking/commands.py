@@ -18,6 +18,7 @@ from nonebot.adapters.qq import Message
 from ..models.db import AsyncSessionLocal
 from ..infrastructure.uow.unit_of_work import UnitOfWork
 from ..platform_utils import get_unified_player
+from ..utils_markdown import cmd, build_markdown
 from .cooking_service import CookingService, RecipeManager
 from .chef_service import ChefService
 from .restaurant_service import RestaurantService
@@ -74,7 +75,7 @@ async def handle_cook(event: MessageEvent, args: Message = CommandArg()):
             uow, player.id, recipe.recipe_id, quantity
         )
 
-        await cook_cmd.finish(msg)
+        await cook_cmd.finish(build_markdown(msg + f"\n***\n{cmd('食谱')} | {cmd('烹饪 菜名', '烹饪 ')} | {cmd('菜品利润')} | {cmd('食谱图鉴')}"))
 
 
 recipes_cmd = on_command("食谱", aliases={"我的食谱", "已学食谱"}, priority=5, block=True)
@@ -107,7 +108,7 @@ async def handle_recipes(event: MessageEvent):
             recipes_by_tier[recipe.tier].append(recipe)
 
         # 生成消息
-        msg = "📖 已学会的食谱\n\n"
+        msg = "# 📖 已学会的食谱\n***\n"
 
         tier_names = {
             "white": "⚪ 家常菜",
@@ -120,7 +121,7 @@ async def handle_recipes(event: MessageEvent):
         for tier, tier_name in tier_names.items():
             tier_recipes = recipes_by_tier[tier]
             if tier_recipes:
-                msg += f"{tier_name}\n"
+                msg += f"**{tier_name}**\n"
                 for recipe in tier_recipes:
                     # 将食材ID转换为中文名称
                     from ..config import config
@@ -131,13 +132,13 @@ async def handle_recipes(event: MessageEvent):
                         ingredients_parts.append(f"{item_name}×{qty}")
                     ingredients_text = " + ".join(ingredients_parts)
 
-                    msg += f"  • {recipe.name} ({recipe.base_price}金)\n"
+                    msg += f"  - {recipe.name} (**{recipe.base_price}**金)\n"
                     msg += f"    {ingredients_text}\n"
                 msg += "\n"
 
-        msg += "使用【烹饪 菜名 数量】开始制作"
+        msg += f"***\n{cmd('烹饪 菜名', '烹饪 ')} | {cmd('菜品利润')} | {cmd('食谱图鉴')}"
 
-        await recipes_cmd.finish(msg)
+        await recipes_cmd.finish(build_markdown(msg))
 
 
 recipe_guide_cmd = on_command("食谱图鉴", aliases={"所有食谱", "全部食谱"}, priority=5, block=True)
@@ -176,7 +177,7 @@ async def handle_recipe_guide(event: MessageEvent):
         learned_count = len(learned_ids)
         total_count = len(all_recipes)
 
-        msg = f"📖 食谱图鉴 ({learned_count}/{total_count})\n\n"
+        msg = f"# 📖 食谱图鉴 ({learned_count}/{total_count})\n***\n"
 
         for tier in tier_order:
             tier_recipes = recipes_by_tier[tier]
@@ -184,19 +185,19 @@ async def handle_recipe_guide(event: MessageEvent):
                 continue
 
             tier_learned = sum(1 for r in tier_recipes if r.recipe_id in learned_ids)
-            msg += f"{tier_names[tier]} ({tier_learned}/{len(tier_recipes)})\n"
+            msg += f"**{tier_names[tier]}** ({tier_learned}/{len(tier_recipes)})\n"
 
             for recipe in tier_recipes:
                 learned = recipe.recipe_id in learned_ids
                 status = "✅" if learned else "🔒"
-                msg += f"  {status} {recipe.name} ({recipe.base_price}金)\n"
+                msg += f"  {status} {recipe.name} (**{recipe.base_price}**金)\n"
 
             msg += "\n"
 
         msg += "✅ 已学会 | 🔒 未解锁\n"
-        msg += "使用【食谱】查看已学食谱的详细食材"
+        msg += f"***\n{cmd('食谱')} | {cmd('烹饪 菜名', '烹饪 ')} | {cmd('菜品利润')}"
 
-        await recipe_guide_cmd.finish(msg)
+        await recipe_guide_cmd.finish(build_markdown(msg))
 
 
 # ==================== 菜品利润分析 ====================
@@ -232,7 +233,7 @@ async def handle_dish_profit(event: MessageEvent):
             "purple": "紫", "orange": "橙"
         }
 
-        msg = "📋 菜品利润分析\n━━━━━━━━━━━━━\n"
+        msg = "# 📋 菜品利润分析\n***\n"
 
         for tier in ["white", "green", "blue", "purple", "orange"]:
             tier_recipes = [r for r in recipes if r.tier == tier]
@@ -247,14 +248,15 @@ async def handle_dish_profit(event: MessageEvent):
 
                 msg += (
                     f"  {recipe.name}({tier_names[tier]}) | "
-                    f"售{recipe.base_price} 本{cost} "
-                    f"利{profit}({profit_rate}%) | "
+                    f"售**{recipe.base_price}** 本**{cost}** "
+                    f"利**{profit}**({profit_rate}%) | "
                     f"{customer}\n"
                 )
 
         msg += "\n💡 菜单应覆盖各层客群，避免客人吃不到合适的菜"
+        msg += f"\n***\n{cmd('食谱')} | {cmd('烹饪 菜名', '烹饪 ')} | {cmd('食谱图鉴')} | {cmd('查菜单')}"
 
-        await dish_profit_cmd.finish(msg)
+        await dish_profit_cmd.finish(build_markdown(msg))
 
 
 # ==================== 餐厅相关指令 ====================
@@ -272,7 +274,7 @@ async def handle_create_restaurant(event: MessageEvent):
             await create_restaurant_cmd.finish("⛔ 请先创建角色")
 
         success, msg = await restaurant_service.create_restaurant(uow, player.id)
-        await create_restaurant_cmd.finish(msg)
+        await create_restaurant_cmd.finish(build_markdown(msg + f"\n***\n{cmd('餐厅')} | {cmd('开店')} | {cmd('经营报表')} | {cmd('我的厨师')}"))
 
 
 restaurant_cmd = on_command("餐厅", aliases={"我的餐厅", "餐厅状态"}, priority=5, block=True)
@@ -288,7 +290,7 @@ async def handle_restaurant(event: MessageEvent):
             await restaurant_cmd.finish("⛔ 请先创建角色")
 
         success, msg, restaurant = await restaurant_service.get_restaurant_status(uow, player.id)
-        await restaurant_cmd.finish(msg)
+        await restaurant_cmd.finish(build_markdown(msg + f"\n***\n{cmd('餐厅')} | {cmd('开店')} | {cmd('经营报表')} | {cmd('我的厨师')}"))
 
 
 upgrade_restaurant_cmd = on_command("餐厅升级", aliases={"升级餐厅"}, priority=5, block=True)
@@ -304,7 +306,7 @@ async def handle_upgrade_restaurant(event: MessageEvent):
             await upgrade_restaurant_cmd.finish("⛔ 请先创建角色")
 
         success, msg = await restaurant_service.upgrade_restaurant(uow, player.id)
-        await upgrade_restaurant_cmd.finish(msg)
+        await upgrade_restaurant_cmd.finish(build_markdown(msg + f"\n***\n{cmd('餐厅')} | {cmd('开店')} | {cmd('经营报表')} | {cmd('我的厨师')}"))
 
 
 expand_restaurant_cmd = on_command("扩张餐厅", aliases={"餐厅扩张", "扩大面积"}, priority=5, block=True)
@@ -320,7 +322,7 @@ async def handle_expand_restaurant(event: MessageEvent):
             await expand_restaurant_cmd.finish("⛔ 请先创建角色")
 
         success, msg = await restaurant_service.expand_area(uow, player.id)
-        await expand_restaurant_cmd.finish(msg)
+        await expand_restaurant_cmd.finish(build_markdown(msg + f"\n***\n{cmd('餐厅')} | {cmd('开店')} | {cmd('经营报表')} | {cmd('我的厨师')}"))
 
 
 upgrade_kitchen_cmd = on_command("升级厨房", aliases={"厨房升级"}, priority=5, block=True)
@@ -336,7 +338,7 @@ async def handle_upgrade_kitchen(event: MessageEvent):
             await upgrade_kitchen_cmd.finish("⛔ 请先创建角色")
 
         success, msg = await restaurant_service.upgrade_kitchen(uow, player.id)
-        await upgrade_kitchen_cmd.finish(msg)
+        await upgrade_kitchen_cmd.finish(build_markdown(msg + f"\n***\n{cmd('餐厅')} | {cmd('开店')} | {cmd('经营报表')} | {cmd('我的厨师')}"))
 
 
 open_restaurant_cmd = on_command("开店", aliases={"营业", "开始营业"}, priority=5, block=True)
@@ -352,7 +354,7 @@ async def handle_open_restaurant(event: MessageEvent):
             await open_restaurant_cmd.finish("⛔ 请先创建角色")
 
         success, msg = await restaurant_service.toggle_open(uow, player.id, True)
-        await open_restaurant_cmd.finish(msg)
+        await open_restaurant_cmd.finish(build_markdown(msg + f"\n***\n{cmd('餐厅')} | {cmd('经营报表')} | {cmd('查菜单')}"))
 
 
 close_restaurant_cmd = on_command("打烊", aliases={"关店", "停止营业"}, priority=5, block=True)
@@ -368,7 +370,7 @@ async def handle_close_restaurant(event: MessageEvent):
             await close_restaurant_cmd.finish("⛔ 请先创建角色")
 
         success, msg = await restaurant_service.toggle_open(uow, player.id, False)
-        await close_restaurant_cmd.finish(msg)
+        await close_restaurant_cmd.finish(build_markdown(msg + f"\n***\n{cmd('餐厅')} | {cmd('经营报表')} | {cmd('查菜单')}"))
 
 
 # ==================== 厨师相关指令 ====================
@@ -433,7 +435,7 @@ async def handle_recruit_chef(event: MessageEvent):
             f"{msg}"
         )
 
-        await recruit_chef_cmd.finish(final_msg)
+        await recruit_chef_cmd.finish(build_markdown(final_msg + f"\n***\n{cmd('我的厨师')} | {cmd('招募厨师')} | {cmd('餐厅')}"))
 
 
 hire_chef_cmd = on_command("雇佣", aliases={"雇佣厨师"}, priority=5, block=True)
@@ -464,7 +466,7 @@ async def handle_hire_chef(event: MessageEvent, args: Message = CommandArg()):
             await hire_chef_cmd.finish("⛔ 你还没有餐厅")
 
         success, msg = await chef_service.hire_chef(uow, player.id, candidate_index, restaurant.id)
-        await hire_chef_cmd.finish(msg)
+        await hire_chef_cmd.finish(build_markdown(msg + f"\n***\n{cmd('我的厨师')} | {cmd('招募厨师')} | {cmd('餐厅')}"))
 
 
 fire_chef_cmd = on_command("解雇", aliases={"解雇厨师", "开除"}, priority=5, block=True)
@@ -490,7 +492,7 @@ async def handle_fire_chef(event: MessageEvent, args: Message = CommandArg()):
             await fire_chef_cmd.finish("⛔ 你还没有餐厅")
 
         success, msg = await chef_service.fire_chef(uow, restaurant.id, chef_name)
-        await fire_chef_cmd.finish(msg)
+        await fire_chef_cmd.finish(build_markdown(msg + f"\n***\n{cmd('我的厨师')} | {cmd('招募厨师')} | {cmd('餐厅')}"))
 
 
 my_chefs_cmd = on_command("我的厨师", aliases={"厨师", "厨师列表"}, priority=5, block=True)
@@ -516,7 +518,7 @@ async def handle_my_chefs(event: MessageEvent):
             await my_chefs_cmd.finish("⛔ 还没有雇佣厨师\n使用【招募厨师】开始招募")
 
         # 生成消息
-        msg = f"👨‍🍳 我的厨师 ({len(chefs)}/{restaurant.max_chefs})\n\n"
+        msg = f"# 👨‍🍳 我的厨师 ({len(chefs)}/{restaurant.max_chefs})\n***\n"
 
         tier_names = {
             "apprentice": "学徒厨师",
@@ -538,9 +540,9 @@ async def handle_my_chefs(event: MessageEvent):
             tier_name = tier_names.get(chef.tier, chef.tier)
             specialty_name = category_names.get(chef.specialty, chef.specialty)
 
-            msg += f"• {chef.name} ({tier_name})\n"
-            msg += f"  厨艺: {chef.skill} | 速度: {chef.speed}道/时\n"
-            msg += f"  擅长: {specialty_name} | 时薪: {chef.salary}金\n"
+            msg += f"**{chef.name}** ({tier_name})\n"
+            msg += f"  厨艺: **{chef.skill}** | 速度: **{chef.speed}**道/时\n"
+            msg += f"  擅长: {specialty_name} | 时薪: **{chef.salary}**金\n"
 
             # 显示经验进度
             from ..models.chef import ChefTier
@@ -552,15 +554,15 @@ async def handle_my_chefs(event: MessageEvent):
                 bar_filled = progress // 10
                 bar_empty = 10 - bar_filled
                 bar = "█" * bar_filled + "░" * bar_empty
-                msg += f"  经验: {exp}/{required_exp} [{bar}] {progress}%\n"
+                msg += f"  经验: **{exp}**/{required_exp} [{bar}] {progress}%\n"
             else:
                 msg += f"  经验: MAX (已满级)\n"
 
             msg += "\n"
 
-        msg += "💡 经验满后使用【培训厨师 厨师名】升级"
+        msg += f"***\n{cmd('我的厨师')} | {cmd('招募厨师')} | {cmd('餐厅')}"
 
-        await my_chefs_cmd.finish(msg)
+        await my_chefs_cmd.finish(build_markdown(msg))
 
 
 promote_chef_cmd = on_command("培训厨师", aliases={"厨师培训", "升级厨师"}, priority=5, block=True)
@@ -591,7 +593,7 @@ async def handle_promote_chef(event: MessageEvent, args: Message = CommandArg())
         success, msg = await chef_service.promote_chef(
             uow, player.id, restaurant.id, chef_name
         )
-        await promote_chef_cmd.finish(msg)
+        await promote_chef_cmd.finish(build_markdown(msg + f"\n***\n{cmd('我的厨师')} | {cmd('招募厨师')} | {cmd('餐厅')}"))
 
 
 # ==================== 经营报表 ====================
@@ -614,7 +616,7 @@ async def handle_report(event: MessageEvent):
             await report_cmd.finish("⛔ 你还没有餐厅")
 
         msg = await settlement_service.get_settlement_report(uow, restaurant.id, hours=24)
-        await report_cmd.finish(msg)
+        await report_cmd.finish(build_markdown(msg + f"\n***\n{cmd('餐厅')} | {cmd('经营日志')} | {cmd('菜品利润')}"))
 
 
 log_cmd = on_command("经营日志", aliases={"日志", "餐厅日志"}, priority=5, block=True)
@@ -644,17 +646,17 @@ async def handle_log(event: MessageEvent):
         details = json.loads(log.details_json)
 
         msg_lines = [
-            "📜 餐厅经营日志",
-            "━━━━━━━━━━━━━",
+            "# 📜 餐厅经营日志",
+            "***",
             f"⏰ 时段: {log.period_start.strftime('%m-%d %H:%M')}",
-            f"💰 收入: {log.income}金 | 支出: {log.expense}金",
-            f"📈 净利润: {log.income - log.expense}金",
-            f"👥 顾客数: {log.customers}人",
-            f"🍽️ 制作菜品: {log.dishes_made}道 | 失败: {log.dishes_failed}道",
-            f"⭐ 声望变化: {log.reputation_change:+d}",
+            f"💰 收入: **{log.income}**金 | 支出: **{log.expense}**金",
+            f"📈 净利润: **{log.income - log.expense}**金",
+            f"👥 顾客数: **{log.customers}**人",
+            f"🍽️ 制作菜品: **{log.dishes_made}**道 | 失败: **{log.dishes_failed}**道",
+            f"⭐ 声望变化: **{log.reputation_change:+d}**",
             "",
-            "👨‍🍳 厨师工作详情:",
-            "━━━━━━━━━━━━━"
+            "**👨‍🍳 厨师工作详情:**",
+            "***"
         ]
 
         # 展示每个厨师的详细情况
@@ -681,24 +683,25 @@ async def handle_log(event: MessageEvent):
         event_data = details.get("event")
         if event_data and event_data.get("name"):
             msg_lines.append("")
-            msg_lines.append("━━━━━━━━━━━━━")
+            msg_lines.append("***")
             event_type_icon = "🎉" if event_data.get("income_bonus", 0) >= 0 and event_data.get("reputation_bonus", 0) >= 0 else "⚠️"
-            msg_lines.append(f"{event_type_icon} 经营事件: {event_data['name']}")
+            msg_lines.append(f"{event_type_icon} 经营事件: **{event_data['name']}**")
             msg_lines.append(f"  {event_data.get('description', '')}")
             if event_data.get("income_bonus", 0) != 0:
                 sign = "+" if event_data["income_bonus"] > 0 else ""
-                msg_lines.append(f"  💰 收入影响: {sign}{event_data['income_bonus']}金")
+                msg_lines.append(f"  💰 收入影响: **{sign}{event_data['income_bonus']}**金")
             if event_data.get("expense_bonus", 0) != 0:
                 sign = "+" if event_data["expense_bonus"] > 0 else ""
-                msg_lines.append(f"  💸 支出影响: {sign}{event_data['expense_bonus']}金")
+                msg_lines.append(f"  💸 支出影响: **{sign}{event_data['expense_bonus']}**金")
             if event_data.get("reputation_bonus", 0) != 0:
                 sign = "+" if event_data["reputation_bonus"] > 0 else ""
-                msg_lines.append(f"  ⭐ 声望影响: {sign}{event_data['reputation_bonus']}")
+                msg_lines.append(f"  ⭐ 声望影响: **{sign}{event_data['reputation_bonus']}**")
 
         msg_lines.append("")
-        msg_lines.append("💡 使用【经营报表】查看汇总数据")
+        msg_lines.append("***")
+        msg_lines.append(f"{cmd('餐厅')} | {cmd('经营日志')} | {cmd('菜品利润')}")
 
-        await log_cmd.finish("\n".join(msg_lines))
+        await log_cmd.finish(build_markdown("\n".join(msg_lines)))
 
 
 # ==================== 仓库管理 ====================
@@ -745,7 +748,7 @@ async def handle_restock(event: MessageEvent, args: Message = CommandArg()):
             await restock_cmd.finish(f"⛔ 未找到食材: {item_name}")
 
         success, msg = await restaurant_service.restock_ingredient(uow, player.id, item_id, quantity)
-        await restock_cmd.finish(msg)
+        await restock_cmd.finish(build_markdown(msg + f"\n***\n{cmd('餐厅仓库')} | {cmd('补货 菜名 数量', '补货 ')} | {cmd('餐厅')}"))
 
 
 withdraw_cmd = on_command("取货", aliases={"餐厅取货", "取出食材"}, priority=5, block=True)
@@ -790,7 +793,7 @@ async def handle_withdraw(event: MessageEvent, args: Message = CommandArg()):
             await withdraw_cmd.finish(f"⛔ 未找到食材: {item_name}")
 
         success, msg = await restaurant_service.withdraw_ingredient(uow, player.id, item_id, quantity)
-        await withdraw_cmd.finish(msg)
+        await withdraw_cmd.finish(build_markdown(msg + f"\n***\n{cmd('餐厅仓库')} | {cmd('补货 菜名 数量', '补货 ')} | {cmd('餐厅')}"))
 
 
 storage_cmd = on_command("餐厅仓库", aliases={"仓库", "查看仓库"}, priority=5, block=True)
@@ -813,12 +816,12 @@ async def handle_storage(event: MessageEvent):
         storage_items = await uow.restaurant_storage.get_by_restaurant(restaurant.id)
 
         if not storage_items:
-            await storage_cmd.finish(
-                f"📦 餐厅仓库 (0/{restaurant.storage_capacity})\n\n"
+            empty_msg = (
+                f"# 📦 餐厅仓库 (0/{restaurant.storage_capacity})\n***\n"
                 f"⚠️ 仓库空空如也\n"
-                f"💡 使用【补货 食材名 数量】补充食材\n"
-                f"💡 使用【取货 食材名 数量】取出食材"
+                f"\n***\n{cmd('补货 菜名 数量', '补货 ')} | {cmd('餐厅')}"
             )
+            await storage_cmd.finish(build_markdown(empty_msg))
 
         # 计算总量
         total_quantity = sum(item.quantity for item in storage_items)
@@ -840,21 +843,20 @@ async def handle_storage(event: MessageEvent):
                 else:
                     other_items.append(item_info)
 
-        msg = f"📦 餐厅仓库 ({total_quantity}/{restaurant.storage_capacity})\n\n"
+        msg = f"# 📦 餐厅仓库 ({total_quantity}/{restaurant.storage_capacity})\n***\n"
 
         if fish_items:
-            msg += "🐟 鱼类食材:\n" + "\n".join(fish_items) + "\n\n"
+            msg += "**🐟 鱼类食材:**\n" + "\n".join(fish_items) + "\n\n"
 
         if seasoning_items:
-            msg += "🧂 调料:\n" + "\n".join(seasoning_items) + "\n\n"
+            msg += "**🧂 调料:**\n" + "\n".join(seasoning_items) + "\n\n"
 
         if other_items:
-            msg += "📦 其他:\n" + "\n".join(other_items) + "\n\n"
+            msg += "**📦 其他:**\n" + "\n".join(other_items) + "\n\n"
 
-        msg += "💡 使用【补货 食材名 数量】补充食材\n"
-        msg += "💡 使用【取货 食材名 数量】取出食材"
+        msg += f"***\n{cmd('补货 菜名 数量', '补货 ')} | {cmd('餐厅仓库')} | {cmd('餐厅')}"
 
-        await storage_cmd.finish(msg)
+        await storage_cmd.finish(build_markdown(msg))
 
 
 # ==================== 菜单管理 ====================
@@ -897,7 +899,7 @@ async def handle_set_menu(event: MessageEvent, args: Message = CommandArg()):
                 await set_menu_cmd.finish(f"⛔ 未找到菜谱: {dish_name}")
 
         success, msg = await restaurant_service.set_menu(uow, player.id, recipe_ids)
-        await set_menu_cmd.finish(msg)
+        await set_menu_cmd.finish(build_markdown(msg + f"\n***\n{cmd('查菜单')} | {cmd('设置菜单 菜名', '设置菜单 ')} | {cmd('平衡菜单')} | {cmd('餐厅')}"))
 
 
 view_menu_cmd = on_command("菜单", aliases={"查看菜单", "营业菜单"}, priority=5, block=True)
@@ -920,14 +922,14 @@ async def handle_view_menu(event: MessageEvent):
         menu_items = await uow.restaurant_menus.get_active_menu(restaurant.id)
 
         if not menu_items:
-            await view_menu_cmd.finish(
-                "📋 营业菜单\n\n"
+            empty_menu_msg = (
+                "# 📋 营业菜单\n***\n"
                 "⚠️ 还未设置菜单\n"
-                "使用【设置菜单 菜名1 菜名2】设置营业菜品\n"
-                "使用【食谱】查看已学会的菜谱"
+                f"\n***\n{cmd('设置菜单 菜名', '设置菜单 ')} | {cmd('食谱')} | {cmd('餐厅')}"
             )
+            await view_menu_cmd.finish(build_markdown(empty_menu_msg))
 
-        msg = "📋 营业菜单\n\n"
+        msg = "# 📋 营业菜单\n***\n"
 
         from ..config import config
 
@@ -954,14 +956,14 @@ async def handle_view_menu(event: MessageEvent):
                 sig_tag = " ⭐招牌" if is_signature else ""
 
                 msg += (
-                    f"{rarity_emoji.get(recipe.tier, '⚪')} {recipe.name}{sig_tag}\n"
-                    f"  售价: {recipe.base_price}金{' (+30%)' if is_signature else ''}\n"
+                    f"{rarity_emoji.get(recipe.tier, '⚪')} **{recipe.name}**{sig_tag}\n"
+                    f"  售价: **{recipe.base_price}**金{' (+30%)' if is_signature else ''}\n"
                     f"  食材: {ingredients_str}\n\n"
                 )
 
-        msg += "💡 使用【设置菜单 菜名1 菜名2】更新菜单"
+        msg += f"***\n{cmd('查菜单')} | {cmd('设置菜单 菜名', '设置菜单 ')} | {cmd('平衡菜单')} | {cmd('餐厅')}"
 
-        await view_menu_cmd.finish(msg)
+        await view_menu_cmd.finish(build_markdown(msg))
 
 
 # ==================== 仓库升级 ====================
@@ -995,16 +997,15 @@ async def handle_upgrade_storage(event: MessageEvent):
         new_capacity, req_restaurant_level, cost = config[next_level]
 
         info = (
-            f"📦 仓库升级\n"
-            f"━━━━━━━━━━━━━\n"
-            f"当前: Lv.{restaurant.storage_level} | 容量{restaurant.storage_capacity}\n"
-            f"升级: Lv.{next_level} | 容量{new_capacity}\n"
-            f"需要: 餐厅Lv.{req_restaurant_level} | {cost}金币\n"
-            f"━━━━━━━━━━━━━\n"
+            f"# 📦 仓库升级\n***\n"
+            f"当前: Lv.**{restaurant.storage_level}** | 容量**{restaurant.storage_capacity}**\n"
+            f"升级: Lv.**{next_level}** | 容量**{new_capacity}**\n"
+            f"需要: 餐厅Lv.**{req_restaurant_level}** | **{cost}**金币\n"
+            f"***\n"
         )
 
         success, msg = await restaurant_service.upgrade_storage(uow, player.id)
-        await upgrade_storage_cmd.finish(info + msg)
+        await upgrade_storage_cmd.finish(build_markdown(info + msg + f"\n***\n{cmd('餐厅仓库')} | {cmd('补货 菜名 数量', '补货 ')} | {cmd('餐厅')}"))
 
 
 # ==================== 招牌菜 ====================

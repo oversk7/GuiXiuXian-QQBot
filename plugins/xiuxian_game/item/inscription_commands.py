@@ -18,6 +18,7 @@ from ..models.player import Player
 from ..models.inventory import ItemInstance
 from ..config import config
 from ..platform_utils import get_unified_player
+from ..utils_markdown import cmd, build_markdown
 from .inscription_service import (
     generate_synthesis_inscription,
     get_inscription_display_from_item,
@@ -109,6 +110,12 @@ async def handle_synthesize(event: MessageEvent, args: Message = CommandArg()):
         # 显示结果
         display = get_inscription_display_from_item(inst)
         protection_hint = "（稳定水晶保护）" if use_protection else ""
-        msg = f"合成成功！{protection_hint}消耗铭文碎片 x{FRAGMENT_COST}\n  获得：{display}"
+        msg = (
+            f"# ✅ 合成成功！{protection_hint}\n"
+            f"消耗铭文碎片 x{FRAGMENT_COST}\n"
+            f"获得：**{display}**\n"
+            f"***\n"
+            f"{cmd('铭文列表')} | {cmd('装备栏')}"
+        )
 
-    await synthesize_cmd.finish(Message(msg))
+    await synthesize_cmd.finish(build_markdown(msg))

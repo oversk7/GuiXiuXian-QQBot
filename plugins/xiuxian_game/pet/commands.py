@@ -11,6 +11,7 @@ from .pet_service import PetService
 from .pet_dialogue_service import PetDialogueService
 from .config import PetConfigManager, format_bonus
 from .personality_customization_service import customize_pet_personality, reset_pet_personality
+from ..utils_markdown import cmd, build_markdown
 
 pet_service = PetService()
 dialogue_service = PetDialogueService()
@@ -27,7 +28,11 @@ async def handle_tame(event: MessageEvent, args: Message = CommandArg()):
     args_text = args.extract_plain_text().strip()
     parts = args_text.split(maxsplit=1)
     if len(parts) < 2:
-        await tame_cmd.finish("用法: 驯化诡兽 <诡兽名> <昵称>\n例如: 驯化诡兽 冥犬 小黑")
+        content = (
+            f"用法: {cmd('驯化诡兽 诡兽名 昵称', '驯化诡兽 ')}\n"
+            f"例如: 驯化诡兽 冥犬 小黑"
+        )
+        await tame_cmd.finish(build_markdown(content))
 
     beast_name, nickname = parts[0], parts[1]
 
@@ -53,6 +58,9 @@ async def handle_tame(event: MessageEvent, args: Message = CommandArg()):
             await tame_cmd.finish("请先创建角色")
 
         success, msg = await pet_service.acquire_pet(uow, player.id, beast_item_id, nickname)
+        if success and msg:
+            content = f"{msg}\n***\n{cmd('宠物')} | {cmd('喂食')} | {cmd('摸摸')}"
+            await tame_cmd.finish(build_markdown(content))
         await tame_cmd.finish(msg)
 
 
@@ -69,6 +77,9 @@ async def handle_pet_info(event: MessageEvent):
             await pet_info_cmd.finish("请先创建角色")
 
         success, msg = await pet_service.get_pet_info(uow, player.id)
+        if success and msg:
+            content = f"{msg}\n***\n{cmd('喂食')} | {cmd('摸摸')} | {cmd('宠物列表')} | {cmd('宠物装扮')}"
+            await pet_info_cmd.finish(build_markdown(content))
         await pet_info_cmd.finish(msg)
 
 
@@ -85,6 +96,9 @@ async def handle_nest(event: MessageEvent):
             await nest_cmd.finish("请先创建角色")
 
         success, msg = await pet_service.get_pet_list(uow, player.id)
+        if success and msg:
+            content = f"{msg}\n***\n{cmd('切换伙伴 ID', '切换伙伴 ')} | {cmd('宠物')}"
+            await nest_cmd.finish(build_markdown(content))
         await nest_cmd.finish(msg)
 
 
@@ -98,13 +112,15 @@ async def handle_switch(event: MessageEvent, args: Message = CommandArg()):
     args_text = args.extract_plain_text().strip()
     if not args_text:
         await switch_cmd.finish("用法: 切换伙伴 <ID或昵称>\n使用【宠物列表】查看")
-
     async with UnitOfWork(AsyncSessionLocal) as uow:
         player = await get_unified_player(uow.session, event)
         if not player:
             await switch_cmd.finish("请先创建角色")
 
         success, msg = await pet_service.set_active_pet(uow, player.id, args_text)
+        if success and msg:
+            content = f"{msg}\n***\n{cmd('宠物')} | {cmd('喂食')} | {cmd('摸摸')}"
+            await switch_cmd.finish(build_markdown(content))
         await switch_cmd.finish(msg)
 
 
@@ -126,14 +142,16 @@ async def handle_feed(event: MessageEvent, args: Message = CommandArg()):
             pet = await uow.pets.get_active_pet(player.id)
             if not pet:
                 await feed_cmd.finish("你还没有伙伴诡兽\n💡 使用【驯化诡兽 诡兽名 昵称】驯化一只")
-            msg = (
-                f"🐾 {pet.nickname}\n"
-                f"饱食度: {pet.hunger}/100 | 心情: {pet.mood}/100\n"
-                f"━━━━━━━━━━━━━\n"
-                f"喂食 怨念 [次数] - 消耗怨念喂养\n"
-                f"喂食 <菜肴名> [数量] - 用菜肴喂养"
+            content = (
+                f"# 🐾 {pet.nickname}\n"
+                f"饱食度: **{pet.hunger}**/100 | 心情: **{pet.mood}**/100\n"
+                f"***\n"
+                f"{cmd('喂食 怨念', '喂食 怨念 ')} 消耗怨念喂养\n"
+                f"{cmd('喂食 菜肴名', '喂食 ')} 用菜肴喂养\n"
+                f"***\n"
+                f"{cmd('宠物')} | {cmd('摸摸')} | {cmd('食谱')}"
             )
-            await feed_cmd.finish(msg)
+            await feed_cmd.finish(build_markdown(content))
 
     # 解析参数：名称 [数量]
     parts = args_text.rsplit(maxsplit=1)
@@ -154,6 +172,9 @@ async def handle_feed(event: MessageEvent, args: Message = CommandArg()):
             success, msg = await pet_service.feed_with_resentment(uow, player.id, quantity)
         else:
             success, msg = await pet_service.feed_with_dish(uow, player.id, name, quantity)
+        if success and msg:
+            content = f"{msg}\n***\n{cmd('宠物')} | {cmd('摸摸')}"
+            await feed_cmd.finish(build_markdown(content))
         await feed_cmd.finish(msg)
 
 
@@ -178,6 +199,9 @@ async def handle_interact(event: MessageEvent):
             await interact_cmd.finish("请先创建角色")
 
         success, msg = await pet_service.interact(uow, player.id, action)
+        if success and msg:
+            content = f"{msg}\n***\n{cmd('宠物')} | {cmd('喂食')} | {cmd('对话 内容', '对话 ')}"
+            await interact_cmd.finish(build_markdown(content))
         await interact_cmd.finish(msg)
 
 
@@ -198,6 +222,9 @@ async def handle_chat(event: MessageEvent, args: Message = CommandArg()):
             await chat_cmd.finish("请先创建角色")
 
         success, msg = await dialogue_service.chat(uow, player.id, args_text)
+        if success and msg:
+            content = f"{msg}\n***\n{cmd('宠物')} | {cmd('摸摸')} | {cmd('喂食')}"
+            await chat_cmd.finish(build_markdown(content))
         await chat_cmd.finish(msg)
 
 
@@ -223,6 +250,9 @@ async def handle_transform(event: MessageEvent, args: Message = CommandArg()):
             await transform_cmd.finish("请先创建角色")
 
         success, msg = await pet_service.transform(uow, player.id, gender)
+        if success and msg:
+            content = f"{msg}\n***\n{cmd('宠物')} | {cmd('定制人设 描述', '定制人设 ')}"
+            await transform_cmd.finish(build_markdown(content))
         await transform_cmd.finish(msg)
 
 
@@ -242,6 +272,9 @@ async def handle_evolve(event: MessageEvent, args: Message = CommandArg()):
             await evolve_cmd.finish("请先创建角色")
 
         success, msg = await pet_service.evolve_pet(uow, player.id, confirm)
+        if success and msg:
+            content = f"{msg}\n***\n{cmd('宠物')} | {cmd('宠物列表')}"
+            await evolve_cmd.finish(build_markdown(content))
         await evolve_cmd.finish(msg)
 
 
@@ -255,19 +288,18 @@ async def handle_equip_accessory(event: MessageEvent, args: Message = CommandArg
     args_text = args.extract_plain_text().strip()
     if not args_text:
         # 显示饰品商店
-        all_acc = pet_config.get_all_accessories()
         rarity_names = {"white": "⚪", "green": "🟢", "blue": "🔵", "purple": "🟣", "orange": "🟠"}
-        msg = "宠物饰品商店\n━━━━━━━━━━━━━\n"
+        msg = "# 🎀 宠物饰品商店\n***\n"
         for slot in pet_config.accessory_slots:
             slot_names = {"head": "头饰", "neck": "颈饰", "body": "服饰"}
-            msg += f"\n{slot_names.get(slot, slot)}:\n"
+            msg += f"\n**{slot_names.get(slot, slot)}**\n"
             for acc in pet_config.get_accessories_by_slot(slot):
                 icon = rarity_names.get(acc.rarity, "⚪")
                 bonus_text = format_bonus(acc.bonus)
                 currency = "诡烛" if acc.rarity in ("purple", "orange") else "金"
-                msg += f"  {icon} {acc.name} {acc.price}{currency} ({bonus_text})\n"
-        msg += "\n购买: 【买饰品 名称】\n装备: 【宠物装扮 名称】"
-        await equip_acc_cmd.finish(msg)
+                msg += f"▫️ {icon} {cmd(acc.name, f'买饰品 {acc.name}')} **{acc.price}**{currency} ({bonus_text})\n"
+        msg += f"\n***\n{cmd('宠物')} | {cmd('宠物装扮 名称', '宠物装扮 ')}"
+        await equip_acc_cmd.finish(build_markdown(msg))
 
     async with UnitOfWork(AsyncSessionLocal) as uow:
         player = await get_unified_player(uow.session, event)
@@ -275,6 +307,9 @@ async def handle_equip_accessory(event: MessageEvent, args: Message = CommandArg
             await equip_acc_cmd.finish("请先创建角色")
 
         success, msg = await pet_service.equip_accessory(uow, player.id, args_text)
+        if success and msg:
+            content = f"{msg}\n***\n{cmd(f'宠物装扮 {args_text}', f'宠物装扮 ')} | {cmd('宠物')}"
+            await equip_acc_cmd.finish(build_markdown(content))
         await equip_acc_cmd.finish(msg)
 
 
@@ -319,11 +354,14 @@ async def handle_buy_accessory(event: MessageEvent, args: Message = CommandArg()
             await buy_acc_cmd.finish(f"购买失败: {e}")
 
         currency = "诡烛" if use_gui_zhu else "金"
-        await buy_acc_cmd.finish(
-            f"成功购买【{acc.name}】!\n"
-            f"消耗: {acc.price}{currency}\n"
-            f"使用【宠物装扮 {acc.name}】装备"
+        content = (
+            f"# ✅ 成功购买【{acc.name}】\n"
+            f"***\n"
+            f"消耗: **{acc.price}**{currency}\n"
+            f"***\n"
+            f"{cmd(f'宠物装扮 {acc.name}')} 装备 | {cmd('宠物')}"
         )
+        await buy_acc_cmd.finish(build_markdown(content))
 
 
 # ==================== 派遣守田 ====================
@@ -339,6 +377,9 @@ async def handle_guard(event: MessageEvent):
             await guard_cmd.finish("请先创建角色")
 
         success, msg = await pet_service.dispatch_to_guard(uow, player.id)
+        if success and msg:
+            content = f"{msg}\n***\n{cmd('宠物')} | {cmd('灵田')}"
+            await guard_cmd.finish(build_markdown(content))
         await guard_cmd.finish(msg)
 
 
@@ -355,6 +396,9 @@ async def handle_recall(event: MessageEvent):
             await recall_cmd.finish("请先创建角色")
 
         success, msg = await pet_service.recall_from_guard(uow, player.id)
+        if success and msg:
+            content = f"{msg}\n***\n{cmd('宠物')} | {cmd('灵田')}"
+            await recall_cmd.finish(build_markdown(content))
         await recall_cmd.finish(msg)
 
 
@@ -370,7 +414,7 @@ async def handle_customize_personality(event: MessageEvent, args: Message = Comm
         await customize_personality_cmd.finish(
             "用法：定制人设 <你想要的人设描述>\n"
             "例如：定制人设 傲娇毒舌，表面嫌弃主人实则超在意\n"
-            "💰 费用：50诡烛/次（可免费重置）"
+            "费用：50诡烛/次（可免费重置）"
         )
 
     async with UnitOfWork(AsyncSessionLocal) as uow:
@@ -379,6 +423,9 @@ async def handle_customize_personality(event: MessageEvent, args: Message = Comm
             await customize_personality_cmd.finish("请先创建角色")
 
         success, msg = await customize_pet_personality(uow, player.id, description)
+        if success and msg:
+            content = f"{msg}\n***\n{cmd('宠物')} | {cmd('对话 内容', '对话 ')}"
+            await customize_personality_cmd.finish(build_markdown(content))
         await customize_personality_cmd.finish(msg)
 
 
@@ -395,4 +442,7 @@ async def handle_reset_personality(event: MessageEvent):
             await reset_personality_cmd.finish("请先创建角色")
 
         success, msg = await reset_pet_personality(uow, player.id)
+        if success and msg:
+            content = f"{msg}\n***\n{cmd('宠物')} | {cmd('对话 内容', '对话 ')}"
+            await reset_personality_cmd.finish(build_markdown(content))
         await reset_personality_cmd.finish(msg)

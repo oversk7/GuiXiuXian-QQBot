@@ -12,7 +12,7 @@ from datetime import datetime, timedelta
 from ..models.db import safe_session
 from ..models.fishing_record import FishingRecord, FishingStats
 from ..models.inventory import ItemInstance
-from ..utils import message_add_head
+from ..utils_markdown import cmd, build_markdown
 from ..config import config
 from .service_new import FishingService
 
@@ -51,7 +51,7 @@ async def _(event: MessageEvent):
             )
             result = await service.do_fishing(player)
             if not result["success"]:
-                await fishing_cmd.finish(message_add_head(result["message"], event))
+                await fishing_cmd.finish(build_markdown(result["message"]))
 
             # 鱼竿特权：额外多钓2条（独立计算品质）
             from ..sponsor.service import SponsorShopService
@@ -97,10 +97,10 @@ async def _(event: MessageEvent):
                             pass
         except TypeError as e:
             if "unsupported operand type(s) for +=: 'NoneType' and 'int'" in str(e):
-                await fishing_cmd.finish(message_add_head("⛔ 钓鱼数据异常，请联系管理员处理", event))
+                await fishing_cmd.finish(build_markdown("⛔ 钓鱼数据异常，请联系管理员处理"))
             else:
                 # 其他TypeError也正常finish，不要raise
-                await fishing_cmd.finish(message_add_head(f"⛔ 钓鱼发生错误：{str(e)}", event))
+                await fishing_cmd.finish(build_markdown(f"⛔ 钓鱼发生错误：{str(e)}"))
 
         # ⚠️ 关键修复：必须在finish()之前commit，否则finish()抛出的异常会导致rollback
         await session.commit()
@@ -137,19 +137,20 @@ async def _(event: MessageEvent):
         fish_config = config.items_config["by_id"].get(result["fish_id"])
         if not fish_config:
             # 如果没有配置，使用文字版本
-            message = (
-                f"{celebration}\n"
-                f"━━━━━━━━━━━━━\n"
+            content = (
+                f"# {celebration}\n"
+                f"***\n"
                 f"🐟 {emoji}{result['fish_name']}{quantity_text}\n"
-                f"💰 价值：{result['value']} 金币\n"
-                f"━━━━━━━━━━━━━\n"
+                f"💰 价值：**{result['value']}** 金币\n"
+                f"***\n"
                 f"🎣 继续钓鱼需等待 {FishingService.FISHING_COOLDOWN} 分钟"
             )
             if quest_completed and quest_msg:
-                message += "\n\n" + quest_msg
+                content += "\n\n" + quest_msg
             if extra_catches:
-                message += "\n🎣 鱼竿特权额外收获：" + "、".join(extra_catches)
-            await fishing_cmd.finish(message_add_head(message, event))
+                content += "\n🎣 鱼竿特权额外收获：" + "、".join(extra_catches)
+            buttons = f"\n{cmd('钓鱼')} | {cmd('鱼栏')} | {cmd('钓鱼记录')} | {cmd('钓鱼图鉴')}"
+            await fishing_cmd.finish(build_markdown(content + buttons))
 
         # 标题
         title = celebration
@@ -248,14 +249,14 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
         recent_records = await FishingRecord.get_recent_fishing_records(session, player.id, 5)
         
         lines = [
-            "🎣 钓鱼记录",
-            "━━━━━━━━━━━━━",
-            f"📊 总钓鱼次数：{stats['total_fishing_count']}",
-            f"🐟 总钓鱼数量：{stats['total_fish_caught']}",
-            f"📅 今日钓鱼：{stats['today_fishing_count']}/{FishingService.DAILY_FISHING_LIMIT}",
-            "━━━━━━━━━━━━━"
+            "# 🎣 钓鱼记录",
+            "***",
+            f"📊 总钓鱼次数：**{stats['total_fishing_count']}**",
+            f"🐟 总钓鱼数量：**{stats['total_fish_caught']}**",
+            f"📅 今日钓鱼：**{stats['today_fishing_count']}**/{FishingService.DAILY_FISHING_LIMIT}",
+            "***"
         ]
-        
+
         if recent_records:
             lines.append("🕐 最近记录：")
             for record in recent_records:
@@ -267,11 +268,10 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
                     lines.append(f"  {rarity_display}{fish_config.name}{quantity_text} ({time_str})")
         else:
             lines.append("📝 暂无钓鱼记录")
-        
-        lines.append("━━━━━━━━━━━━━")
-        lines.append("💡 使用【钓鱼】开始钓鱼")
-        
-        await fishing_record_cmd.finish(message_add_head("\n".join(lines), event))
+
+        buttons = f"\n{cmd('钓鱼')} | {cmd('钓鱼状态')} | {cmd('钓鱼排行')} | {cmd('钓鱼图鉴')}"
+
+        await fishing_record_cmd.finish(build_markdown("\n".join(lines) + buttons))
 
 
 # 钓鱼排行榜指令
@@ -293,33 +293,33 @@ async def _(event: MessageEvent):
         )
         leaderboard = await service.get_fishing_leaderboard(10)
         if not leaderboard:
-            await fishing_leaderboard_cmd.finish(message_add_head("📊 暂无钓鱼排行数据", event))
+            await fishing_leaderboard_cmd.finish(build_markdown("📊 暂无钓鱼排行数据"))
         
         lines = [
-            "🏆 钓鱼排行榜（按总价值）",
-            "━━━━━━━━━━━━━"
+            "# 🏆 钓鱼排行榜（按总价值）",
+            "***"
         ]
-        
+
         for i, player_data in enumerate(leaderboard, 1):
             medal = "🥇" if i == 1 else "🥈" if i == 2 else "🥉" if i == 3 else f"{i}."
 
             lines.append(
                 f"{medal} {player_data['nickname']}(UID:{player_data['uid']})\n"
-                f"   💰 总价值：{player_data['total_fish_value']}\n"
-                f"   🎣 钓鱼次数：{player_data['total_fishing_count']}\n"
-                f"   🐟 鱼类数量：{player_data['total_fish_caught']}"
+                f"   💰 总价值：**{player_data['total_fish_value']}**\n"
+                f"   🎣 钓鱼次数：**{player_data['total_fishing_count']}**\n"
+                f"   🐟 鱼类数量：**{player_data['total_fish_caught']}**"
             )
-            
+
             if player_data['legendary_fish_caught'] > 0:
-                lines.append(f"   🟠 传说鱼类：{player_data['legendary_fish_caught']}")
+                lines.append(f"   🟠 传说鱼类：**{player_data['legendary_fish_caught']}**")
             if player_data['rare_fish_caught'] > 0:
-                lines.append(f"   🟣 稀有鱼类：{player_data['rare_fish_caught']}")
-            
-            lines.append("──────────")
-        
-        lines.append("💡 使用【钓鱼】参与排行")
-        
-        await fishing_leaderboard_cmd.finish(message_add_head("\n".join(lines), event))
+                lines.append(f"   🟣 稀有鱼类：**{player_data['rare_fish_caught']}**")
+
+            lines.append("***")
+
+        buttons = f"\n{cmd('钓鱼')} | {cmd('钓鱼记录')} | {cmd('钓鱼图鉴')}"
+
+        await fishing_leaderboard_cmd.finish(build_markdown("\n".join(lines) + buttons))
 
 
 # 钓鱼状态指令
@@ -357,37 +357,39 @@ async def _(event: MessageEvent):
         fishing_stats = await FishingStats.get_or_create(session, player.id)
         
         lines = [
-            "🎣 钓鱼状态",
-            "━━━━━━━━━━━━━"
+            "# 🎣 钓鱼状态",
+            "***"
         ]
-        
+
         if can_fish:
             lines.append("✅ 可以钓鱼")
         else:
             lines.append(f"⏰ {reason}")
-        
+
         lines.extend([
-            f"📅 今日钓鱼：{stats['today_fishing_count']}/{FishingService.DAILY_FISHING_LIMIT}",
-            f"🎣 总钓鱼次数：{stats['total_fishing_count']}",
-            f"🐟 总鱼类数量：{stats['total_fish_caught']}",
-            f"💰 总鱼类价值：{fishing_stats.total_fish_value}",
-            "━━━━━━━━━━━━━"
+            f"📅 今日钓鱼：**{stats['today_fishing_count']}**/{FishingService.DAILY_FISHING_LIMIT}",
+            f"🎣 总钓鱼次数：**{stats['total_fishing_count']}**",
+            f"🐟 总鱼类数量：**{stats['total_fish_caught']}**",
+            f"💰 总鱼类价值：**{fishing_stats.total_fish_value}**",
+            "***"
         ])
-        
+
         if fishing_stats.rare_fish_caught > 0:
-            lines.append(f"🟣 稀有鱼类：{fishing_stats.rare_fish_caught}")
+            lines.append(f"🟣 稀有鱼类：**{fishing_stats.rare_fish_caught}**")
         if fishing_stats.legendary_fish_caught > 0:
-            lines.append(f"🟠 传说鱼类：{fishing_stats.legendary_fish_caught}")
+            lines.append(f"🟠 传说鱼类：**{fishing_stats.legendary_fish_caught}**")
         if fishing_stats.best_fish_value > 0:
-            lines.append(f"🏆 最贵单鱼：{fishing_stats.best_fish_value} 金币")
-        
+            lines.append(f"🏆 最贵单鱼：**{fishing_stats.best_fish_value}** 金币")
+
         lines.extend([
-            "━━━━━━━━━━━━━",
-            f"🍀 运气值：{player.luck}（影响稀有鱼概率）",
+            "***",
+            f"🍀 运气值：**{player.luck}**（影响稀有鱼概率）",
             "💡 运气值越高，钓到稀有鱼的概率越大"
         ])
-        
-        await fishing_status_cmd.finish(message_add_head("\n".join(lines), event))
+
+        buttons = f"\n{cmd('钓鱼')} | {cmd('钓鱼记录')} | {cmd('钓鱼排行')}"
+
+        await fishing_status_cmd.finish(build_markdown("\n".join(lines) + buttons))
 
 
 # 钓鱼图鉴指令
@@ -397,51 +399,53 @@ fishing_guide_cmd = on_command("钓鱼图鉴", aliases={"鱼类图鉴"}, block=T
 async def _(event: MessageEvent):
     """查看钓鱼图鉴"""
     lines = [
-        "📖 钓鱼图鉴",
-        "━━━━━━━━━━━━━",
-        "🎣 钓鱼系统说明：",
-        "• 随时随地可以钓鱼，方便新手",
-        f"• 每次钓鱼冷却时间：{FishingService.FISHING_COOLDOWN}分钟",
-        f"• 每日钓鱼次数限制：{FishingService.DAILY_FISHING_LIMIT}次",
+        "# 📖 钓鱼图鉴",
+        "***",
+        "🎣 **钓鱼系统说明：**",
+        f"• 随时随地可以{cmd('钓鱼')}，方便新手",
+        f"• 每次钓鱼冷却时间：**{FishingService.FISHING_COOLDOWN}**分钟",
+        f"• 每日钓鱼次数限制：**{FishingService.DAILY_FISHING_LIMIT}**次",
         "• 运气值大幅影响稀有鱼概率和数量",
         "• 高运气玩家将获得显著的钓鱼加成",
-        "━━━━━━━━━━━━━",
-        "🐟 鱼类稀有度（基础概率）：",
+        "***",
+        "🐟 **鱼类稀有度（基础概率）：**",
         "⚪ 普通（55%）- 鲤鱼、鲫鱼、草鱼等",
         "🟢 优良（28%）- 鲈鱼、桂鱼、黄花鱼等",
         "🔵 精品（14%）- 三文鱼、金枪鱼、石斑鱼等",
         "🟣 稀有（2.5%）- 中华鲟、龙鱼等",
         "🟠 传说（0.5%）- 金龙鱼、凤凰鱼等",
         "",
-        "🍀 运气加成效果：",
+        "🍀 **运气加成效果：**",
         "• 🟠传说鱼：运气加成最高（最多+300%）",
         "• 🟣稀有鱼：运气加成很高（最多+200%）",
         "• 🔵精品鱼：运气加成中等（最多+100%）",
         "• 🟢优良鱼：运气加成较小（最多+50%）",
         "• ⚪普通鱼：不受运气影响，但数量有加成",
-        "━━━━━━━━━━━━━",
-        "🎒 鱼栏系统：",
+        "***",
+        "🎒 **鱼栏系统：**",
         "• 鱼类存入专属鱼栏，不占背包空间",
-        "• 使用【鱼栏】查看所有鱼类存量和总估值",
+        f"• 使用{cmd('鱼栏')}查看所有鱼类存量和总估值",
         "• 鱼栏容量无限制，可以尽情钓鱼",
-        "━━━━━━━━━━━━━",
-        "💰 鱼类用途：",
+        "***",
+        "💰 **鱼类用途：**",
         "• 可在海洋城市舟山(200,-200)出售给商人",
         "• 稀有鱼类价值更高",
-        "• 参与钓鱼排行榜竞争",
-        "• 使用【丢弃】指令放生鱼类，获得功德（娱乐效果）",
-        "━━━━━━━━━━━━━",
-        "📋 相关指令：",
-        "【钓鱼】- 开始钓鱼",
-        "【钓鱼记录】- 查看钓鱼记录",
-        "【钓鱼状态】- 查看当前状态",
-        "【钓鱼排行】- 查看排行榜",
-        "【鱼栏】- 查看鱼类存量",
-        "【吃鱼】- 品尝鱼类美味（娱乐功能）",
-        "【丢弃】- 放生鱼类，获得功德"
+        f"• 参与{cmd('钓鱼排行')}榜竞争",
+        f"• 使用{cmd('丢弃')}指令放生鱼类，获得功德",
+        "***",
+        "📋 **相关指令：**",
+        f"{cmd('钓鱼')} - 开始钓鱼",
+        f"{cmd('钓鱼记录')} - 查看钓鱼记录",
+        f"{cmd('钓鱼状态')} - 查看当前状态",
+        f"{cmd('钓鱼排行')} - 查看排行榜",
+        f"{cmd('鱼栏')} - 查看鱼类存量",
+        f"{cmd('吃鱼 鱼名 数量', '吃鱼 ')} - 品尝鱼类美味",
+        f"{cmd('丢弃')} - 放生鱼类，获得功德"
     ]
-    
-    await fishing_guide_cmd.finish(message_add_head("\n".join(lines), event))
+
+    buttons = f"\n{cmd('钓鱼')} | {cmd('钓鱼状态')} | {cmd('钓鱼概率')}"
+
+    await fishing_guide_cmd.finish(build_markdown("\n".join(lines) + buttons))
 
 
 # 钓鱼概率查询指令
@@ -478,10 +482,10 @@ async def _(event: MessageEvent):
         }
 
         lines = [
-            "📊 我的钓鱼概率",
-            "━━━━━━━━━━━━━",
-            f"🍀 当前幸运值：{player.luck}",
-            "━━━━━━━━━━━━━",
+            "# 📊 我的钓鱼概率",
+            "***",
+            f"🍀 当前幸运值：**{player.luck}**",
+            "***",
             "🐟 各品阶鱼类概率：",
             ""
         ]
@@ -499,25 +503,25 @@ async def _(event: MessageEvent):
 
             # 显示格式
             if rarity == "white":
-                lines.append(f"{rarity_name} {actual_rate:.2f}%")
+                lines.append(f"{rarity_name} **{actual_rate:.2f}%**")
             else:
                 if improvement > 0:
-                    lines.append(f"{rarity_name} {actual_rate:.2f}% (基础{base_rate}% × {multiplier:.2f}倍, +{improvement:.1f}%)")
+                    lines.append(f"{rarity_name} **{actual_rate:.2f}%** (基础{base_rate}% x {multiplier:.2f}倍, +{improvement:.1f}%)")
                 else:
-                    lines.append(f"{rarity_name} {actual_rate:.2f}% (基础{base_rate}%)")
+                    lines.append(f"{rarity_name} **{actual_rate:.2f}%** (基础{base_rate}%)")
 
         lines.extend([
             "",
-            "━━━━━━━━━━━━━",
+            "***",
             "💡 说明：",
             "• 幸运值影响稀有鱼概率和数量",
             "• 幸运值越高，钓到稀有鱼概率越大",
             "• 概率已自动归一化处理",
-            "━━━━━━━━━━━━━",
-            "🎣 使用【钓鱼】开始钓鱼"
         ])
 
-        await fishing_prob_cmd.finish(message_add_head("\n".join(lines), event))
+        buttons = f"\n{cmd('钓鱼')} | {cmd('钓鱼状态')} | {cmd('钓鱼图鉴')}"
+
+        await fishing_prob_cmd.finish(build_markdown("\n".join(lines) + buttons))
 
 
 # 吃鱼指令（娱乐功能，实际为丢弃）
@@ -617,15 +621,17 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
             taste_desc = "🐟 普通的鱼肉，但也算是不错的一餐！"
             effect_desc = "😊 你填饱了肚子，感觉还不错！"
 
-        message = (
-            f"🍽️ 美食品尝\n"
-            f"━━━━━━━━━━━━━\n"
-            f"🐟 品尝了 {emoji}{fish_name} ×{quantity_text}\n"
-            f"━━━━━━━━━━━━━\n"
+        content = (
+            f"# 🍽️ 美食品尝\n"
+            f"***\n"
+            f"🐟 品尝了 {emoji}{fish_name} x**{quantity_text}**\n"
+            f"***\n"
             f"{taste_desc}\n"
             f"{effect_desc}\n"
-            f"━━━━━━━━━━━━━\n"
+            f"***\n"
             f"💡 虽然只是品尝，但这份美味永远留在了记忆中！"
         )
 
-        await eat_fish_cmd.finish(message_add_head(message, event))
+        buttons = f"\n{cmd('钓鱼')} | {cmd('鱼栏')} | {cmd('钓鱼记录')}"
+
+        await eat_fish_cmd.finish(build_markdown(content + buttons))
