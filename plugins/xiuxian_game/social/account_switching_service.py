@@ -22,6 +22,7 @@ from ..infrastructure.repositories.account_transfer_log_repository import Accoun
 from ..infrastructure.repositories.player_repository import PlayerRepository
 from ..models.account_ownership import AccountOwnership
 from ..models.player import Player
+from ..infrastructure.cache import player_identity_cache
 
 
 class AccountSwitchingService:
@@ -153,6 +154,7 @@ class AccountSwitchingService:
         )
 
         if success:
+            player_identity_cache.invalidate(owner_platform_id)
             return True, "切换成功"
         else:
             return False, "切换失败"
@@ -273,6 +275,10 @@ class AccountSwitchingService:
             transfer_key_used=transfer_key,
             notes=f"使用转让密钥{transfer_key}完成转让"
         )
+
+        # 6. 失效双方缓存
+        player_identity_cache.invalidate(original_owner)
+        player_identity_cache.invalidate(recipient_platform_id)
 
         return True, f"成功接收账号 {player_id}"
 

@@ -10,6 +10,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from .models.player import Player
 from .models.account_ownership import AccountOwnership
 from .infrastructure.repositories.player_repository import PlayerRepository
+from .infrastructure.cache import player_identity_cache
 
 
 # ==================== 管理员临时切换功能 ====================
@@ -84,35 +85,46 @@ async def get_unified_player(session: AsyncSession, event: MessageEvent) -> Opti
     """
     _, user_id = get_platform_info(event)
 
-    # 1. 优先检查管理员临时切换
+    # 1. 优先检查管理员临时切换（绕过缓存）
     if user_id in _admin_temp_switch:
         temp_player_id = _admin_temp_switch[user_id]
         temp_player = await session.get(Player, temp_player_id)
         if temp_player:
-            # 刷新对象以获取最新数据库状态，避免session缓存问题
             await session.refresh(temp_player)
             return temp_player
 
-    # 2. 使用 PlayerRepository 查询激活的账号
+    # 2. 查缓存：platform_id → player_id
+    if player_identity_cache.has(user_id):
+        cached_player_id = player_identity_cache.get(user_id)
+        if cached_player_id is None:
+            return None  # 缓存记录该用户无角色
+        player = await session.get(Player, cached_player_id)
+        if player is not None:
+            player.last_active_at = datetime.now()
+            return player
+        # player 被删除了，缓存失效，走下面的完整查询
+        player_identity_cache.invalidate(user_id)
+
+    # 3. 缓存未命中：完整查询并回填缓存
     player_repo = PlayerRepository(session)
     player = await player_repo.get_active_by_platform_id(user_id)
 
-    # 3. 如果没有激活账号记录，回退到直接查询（仅限没有ownership记录的老玩家）
     if player is None:
+        # 回退：直接用 platform_id 查 Player（无 ownership 记录的老玩家）
         player = await session.get(Player, user_id)
         if player is not None:
-            # 检查该玩家是否有ownership记录（已被转让给他人）
             stmt = select(AccountOwnership).where(
                 AccountOwnership.player_id == player.id
             )
             result = await session.execute(stmt)
             ownership = result.scalars().first()
             if ownership and ownership.owner_platform_id != user_id:
-                # 账号已转让给别人，当前用户无权操作
                 player = None
 
+    # 回填缓存
+    player_identity_cache.put(user_id, player.id if player else None)
+
     if player is not None:
-        # 更新最后活跃时间（灵田偷菜判定用）
         player.last_active_at = datetime.now()
 
     return player
