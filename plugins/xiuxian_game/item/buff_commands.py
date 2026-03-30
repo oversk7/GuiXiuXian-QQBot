@@ -8,6 +8,7 @@
 
 from nonebot import on_command
 from nonebot.adapters.qq import MessageEvent
+from sqlalchemy import select
 from ..models.db import safe_session
 from ..models import Player
 from ..utils import message_add_head
@@ -177,6 +178,24 @@ async def handle_attribute_breakdown(event: MessageEvent):
             lines.append("⚔️ 战斗属性:")
             lines.extend(battle_lines)
 
+        # 显示宠物心情对属性的影响
+        has_pet = any(breakdown.get("pet", {}).values())
+        if has_pet:
+            from ..models.pet_instance import PetInstance
+            from ..pet.config import PetConfigManager
+            stmt = select(PetInstance).where(PetInstance.player_id == player.id)
+            pet = (await session.execute(stmt)).scalars().first()
+            if pet:
+                pet_cfg = PetConfigManager()
+                mood_mult = pet_cfg.get_mood_multiplier(pet.mood)
+                mood_icon = "😊" if pet.mood >= 80 else "😐" if pet.mood >= 40 else "😢"
+                lines.append("")
+                lines.append(f"🐾 伙伴状态: {pet.nickname or '宠物'}")
+                lines.append(f"  {mood_icon} 心情 {pet.mood}/100 → 属性倍率 {mood_mult:.1f}x")
+                lines.append(f"  🍖 饱食 {pet.hunger}/100")
+                if mood_mult < 1.0:
+                    lines.append(f"  ⚠️ 心情低导致伙伴加成打折！【喂食】【摸摸】可恢复")
+
         # 显示临时buff状态
         if any(breakdown["temporary"].values()):
             lines.append("")
@@ -190,6 +209,8 @@ async def handle_attribute_breakdown(event: MessageEvent):
         lines.append("")
         lines.append("💡 永久 = 丹药/洗髓的合计加成")
         lines.append("💡 总属性 = 基础 + 装备 + 永久 + 特殊 + 伙伴 + 临时")
+        if has_pet:
+            lines.append("💡 伙伴加成随心情波动，喂食/互动可提升心情")
         if not is_tracked:
             lines.append("💡 使用【洗点】后重新加点可获得更精确的分解")
 
