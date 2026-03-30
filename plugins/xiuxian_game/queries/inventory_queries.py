@@ -50,6 +50,11 @@ def _get_fish_item_ids() -> list[str]:
     return [iid for iid, cfg in items_by_id.items() if getattr(cfg, "is_fish", False)]
 
 
+def _get_inscription_item_ids() -> list[str]:
+    """获取所有铭文类 item_id（铭文为独立实例，不在背包中显示）"""
+    return config.items_config.get("by_type", {}).get("INSCRIPTION", [])
+
+
 @dataclass
 class InventoryPage:
     """背包分页结果"""
@@ -72,6 +77,7 @@ async def query_inventory_page(
     page_size: int = 15,
     exclude_equipment: bool = True,
     exclude_fish: bool = True,
+    exclude_inscription: bool = True,
 ) -> tuple[list[ItemInstance], int]:
     """在 DB 层完成过滤和分页
 
@@ -82,6 +88,7 @@ async def query_inventory_page(
         page_size: 每页大小
         exclude_equipment: 是否排除装备
         exclude_fish: 是否排除鱼类
+        exclude_inscription: 是否排除铭文（铭文为独立实例，通过铭文列表查看）
 
     Returns:
         (当前页的 ItemInstance 列表, 过滤后的总数)
@@ -93,12 +100,14 @@ async def query_inventory_page(
             ItemInstance.quantity > 0,
         ]
 
-        # 排除装备和鱼类
+        # 排除装备、鱼类和铭文
         exclude_ids: set[str] = set()
         if exclude_equipment:
             exclude_ids.update(_get_equipment_item_ids())
         if exclude_fish:
             exclude_ids.update(_get_fish_item_ids())
+        if exclude_inscription:
+            exclude_ids.update(_get_inscription_item_ids())
 
         if exclude_ids:
             conditions.append(ItemInstance.item_id.notin_(list(exclude_ids)))
@@ -134,11 +143,12 @@ async def query_inventory_usage(player_id: str) -> tuple[int, int]:
     """查询背包容量使用情况
 
     Returns:
-        (已用格数, 总物品行数含装备鱼)  —— 不含装备和鱼的格数
+        (已用格数, 总物品行数含装备鱼)  —— 不含装备、鱼和铭文的格数
     """
     exclude_ids: set[str] = set()
     exclude_ids.update(_get_equipment_item_ids())
     exclude_ids.update(_get_fish_item_ids())
+    exclude_ids.update(_get_inscription_item_ids())
 
     async with readonly_session() as session:
         conditions = [

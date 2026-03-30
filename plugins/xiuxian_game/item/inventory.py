@@ -635,7 +635,7 @@ async def handle_inventory(event: MessageEvent, args: Message = CommandArg()):
         )
         all_items: list[ItemInstance] = list(result.scalars().all())
 
-    inventory_items = [item for item in all_items if not item.is_equipment and not item.is_fish]
+    inventory_items = [item for item in all_items if not item.is_equipment and not item.is_fish and not item.is_inscription]
     if not inventory_items:
         await inventory_cmd.finish("🎒 你的背包空无一物")
 
@@ -888,8 +888,9 @@ async def handle_organize_inventory(event: MessageEvent):
             )
             all_items: list[ItemInstance] = result.scalars().all()
 
-            # 过滤掉装备和鱼类，只整理背包物品
-            items: list[ItemInstance] = [item for item in all_items if not item.is_equipment and not item.is_fish]
+            # 过滤掉装备、鱼类和铭文，只整理背包物品
+            # 铭文每个实例有独立的随机数值(extra_attrs)，不可合并
+            items: list[ItemInstance] = [item for item in all_items if not item.is_equipment and not item.is_fish and not item.is_inscription]
             equipment_count = sum(1 for item in all_items if item.is_equipment)
             fish_count = sum(1 for item in all_items if item.is_fish)
 

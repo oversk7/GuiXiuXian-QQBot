@@ -263,8 +263,12 @@ class GemSocketService:
             # 铭文镶嵌：读取随机数值，写入孔位为字典格式
             insc_values = (inscription_instance.extra_attrs or {}).get("_inscription_values", {})
             slot_data = {"item_id": gem_item_id, "values": insc_values}
-            # 删除铭文物品实例
-            await self._item_repo.delete_item_instance(inscription_instance)
+            # 消耗一个铭文实例（防御性处理：若被整理背包误合并导致quantity>1，只减1）
+            if inscription_instance.quantity > 1:
+                inscription_instance.quantity -= 1
+                self._item_repo._session.add(inscription_instance)
+            else:
+                await self._item_repo.delete_item_instance(inscription_instance)
             # 消耗镶嵌锤
             hammer_success = await self._item_repo.consume_item(player.id, "gem_hammer", 1)
             if not hammer_success:
