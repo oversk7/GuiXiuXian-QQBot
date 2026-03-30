@@ -2,7 +2,7 @@
 今天吃什么功能模块
 使用TheMealDB API获取随机食谱推荐
 """
-import requests
+import aiohttp
 import json
 import logging
 from nonebot import on_command
@@ -58,21 +58,21 @@ async def _get_random_meal() -> tuple[bool, dict, str]:
         api_url = "https://www.themealdb.com/api/json/v1/1/random.php"
 
         logger.info(f"请求随机食谱API: {api_url}")
-        response = requests.get(api_url, timeout=15)
+        async with aiohttp.ClientSession(timeout=aiohttp.ClientTimeout(total=15)) as http_session:
+            async with http_session.get(api_url) as response:
+                if response.status == 200:
+                    data = await response.json()
 
-        if response.status_code == 200:
-            data = response.json()
+                    if data.get("meals") and len(data["meals"]) > 0:
+                        meal_data = data["meals"][0]
+                        logger.info(f"成功获取食谱: {meal_data.get('strMeal', 'Unknown')}")
+                        return True, meal_data, ""
+                    else:
+                        return False, {}, "API未返回食谱数据"
+                else:
+                    return False, {}, f"API请求失败: HTTP {response.status}"
 
-            if data.get("meals") and len(data["meals"]) > 0:
-                meal_data = data["meals"][0]
-                logger.info(f"成功获取食谱: {meal_data.get('strMeal', 'Unknown')}")
-                return True, meal_data, ""
-            else:
-                return False, {}, "API未返回食谱数据"
-        else:
-            return False, {}, f"API请求失败: HTTP {response.status_code}"
-
-    except requests.RequestException as e:
+    except aiohttp.ClientError as e:
         logger.error(f"网络请求异常: {e}")
         return False, {}, f"网络请求失败: {str(e)}"
     except json.JSONDecodeError as e:

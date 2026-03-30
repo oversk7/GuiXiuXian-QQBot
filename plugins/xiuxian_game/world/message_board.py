@@ -3,7 +3,8 @@ import re
 from datetime import datetime, timedelta
 
 from nonebot import on_command, logger
-import requests
+import aiohttp
+from urllib.parse import quote as url_quote
 from nonebot.adapters.qq import MessageEvent, Message
 from nonebot.params import CommandArg
 from sqlalchemy import and_, or_, select
@@ -73,12 +74,12 @@ async def check_prohibited_content(text: str) -> tuple[bool, list, str, str]:
         return False, [], "", ""
 
     try:
-        url = f"https://api.lolimi.cn/API/wjc/api.php?msg={requests.utils.quote(text)}"
+        url = f"https://api.lolimi.cn/API/wjc/api.php?msg={url_quote(text)}"
 
-        response = requests.get(url, timeout=5)
-        response.raise_for_status()
-
-        data = response.json()
+        async with aiohttp.ClientSession(timeout=aiohttp.ClientTimeout(total=5)) as http_session:
+            async with http_session.get(url) as response:
+                response.raise_for_status()
+                data = await response.json()
 
         # API响应格式:
         # 正常: {"code": 200, "message": "合规", "words": [], ...}
@@ -99,7 +100,7 @@ async def check_prohibited_content(text: str) -> tuple[bool, list, str, str]:
             logger.warning(f"违禁词API返回未知状态码: {code}, 数据: {data}")
             return False, [], "", ""
 
-    except requests.RequestException as e:
+    except aiohttp.ClientError as e:
         logger.error(f"违禁词检测API请求失败: {e}")
         # API失败时返回False,不阻止用户发言
         return False, [], "", ""

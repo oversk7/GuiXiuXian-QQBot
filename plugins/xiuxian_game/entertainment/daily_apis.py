@@ -2,7 +2,7 @@
 日常API娱乐功能模块
 包含抽签、每日一言、吃掉头像、答案之书、驾考题目、微博热搜等功能
 """
-import requests
+import aiohttp
 from nonebot import on_command
 from nonebot.adapters.qq import MessageEvent, MessageSegment, Message
 from nonebot.params import CommandArg
@@ -54,14 +54,14 @@ async def handle_draw_fortune(event: MessageEvent, args: Message = CommandArg())
             'User-Agent': 'xiaoxiaoapi/1.0.0'
         }
 
-        response = requests.get(api_url, headers=headers, timeout=15)
+        async with aiohttp.ClientSession(timeout=aiohttp.ClientTimeout(total=15)) as http_session:
+            async with http_session.get(api_url, headers=headers) as response:
+                if response.status != 200:
+                    await draw_fortune.finish(message_add_head(f"❌ API请求失败,状态码: {response.status}", event))
 
-        if response.status_code != 200:
-            await draw_fortune.finish(message_add_head(f"❌ API请求失败,状态码: {response.status_code}", event))
-
-        # 解析JSON响应
-        data = response.json()
-        logger.info(f"观音灵签API响应: {data}")
+                # 解析JSON响应
+                data = await response.json()
+                logger.info(f"观音灵签API响应: {data}")
 
         if data.get("code") != 200:
             error_msg = data.get("msg", "未知错误")
@@ -172,7 +172,7 @@ async def handle_draw_fortune(event: MessageEvent, args: Message = CommandArg())
 
         await draw_fortune.finish(MessageSegment.markdown(markdown_msg))
 
-    except requests.RequestException as e:
+    except aiohttp.ClientError as e:
         logger.error(f"观音灵签API请求失败: {e}")
         await draw_fortune.finish(message_add_head("❌ 网络请求失败,请稍后再试", event))
     except json.JSONDecodeError as e:
@@ -201,36 +201,36 @@ async def handle_daily_quote(event: MessageEvent):
                 await daily_quote.finish("您还没有创建角色,请先注册。")
 
         # 请求一言API
-        response = requests.get("https://v1.hitokoto.cn/", timeout=10)
+        async with aiohttp.ClientSession(timeout=aiohttp.ClientTimeout(total=10)) as http_session:
+            async with http_session.get("https://v1.hitokoto.cn/") as response:
+                if response.status != 200:
+                    await daily_quote.finish("❌ 每日一言获取失败,请稍后再试")
 
-        if response.status_code == 200:
-            data = response.json()
+                data = await response.json(content_type=None)
 
-            # 记录操作
-            record_action(user_id, "daily_api")
+        # 记录操作
+        record_action(user_id, "daily_api")
 
-            # 解析数据
-            content = data.get("hitokoto", "获取失败")
-            author = data.get("from_who", "")
-            source = data.get("from", "")
+        # 解析数据
+        content = data.get("hitokoto", "获取失败")
+        author = data.get("from_who", "")
+        source = data.get("from", "")
 
-            # 构建回复消息
-            msg_content = "✨ 每日一言\n"
-            msg_content += "=" * 15 + "\n"
-            msg_content += f"💭 {content}\n\n"
+        # 构建回复消息
+        msg_content = "✨ 每日一言\n"
+        msg_content += "=" * 15 + "\n"
+        msg_content += f"💭 {content}\n\n"
 
-            if author and source:
-                msg_content += f"📖 —— {author}《{source}》"
-            elif source:
-                msg_content += f"📖 —— 《{source}》"
-            elif author:
-                msg_content += f"📖 —— {author}"
+        if author and source:
+            msg_content += f"📖 —— {author}《{source}》"
+        elif source:
+            msg_content += f"📖 —— 《{source}》"
+        elif author:
+            msg_content += f"📖 —— {author}"
 
-            await daily_quote.finish(message_add_head(msg_content, event))
-        else:
-            await daily_quote.finish("❌ 每日一言获取失败,请稍后再试")
+        await daily_quote.finish(message_add_head(msg_content, event))
 
-    except requests.RequestException as e:
+    except aiohttp.ClientError as e:
         logger.error(f"每日一言API请求失败: {e}")
         await daily_quote.finish("❌ 网络请求失败,请检查网络连接")
     except json.JSONDecodeError as e:
@@ -277,14 +277,14 @@ async def handle_bite_avatar(event: MessageEvent, args: Message = CommandArg()):
             'User-Agent': 'xiaoxiaoapi/1.0.0'
         }
 
-        response = requests.get(api_url, headers=headers, timeout=15)
+        async with aiohttp.ClientSession(timeout=aiohttp.ClientTimeout(total=15)) as http_session:
+            async with http_session.get(api_url, headers=headers) as response:
+                if response.status != 200:
+                    await bite_avatar.finish(message_add_head(f"❌ API请求失败,状态码: {response.status}", event))
 
-        if response.status_code != 200:
-            await bite_avatar.finish(message_add_head(f"❌ API请求失败,状态码: {response.status_code}", event))
-
-        # 解析JSON响应
-        data = response.json()
-        logger.info(f"吃掉头像API响应: {data}")
+                # 解析JSON响应
+                data = await response.json()
+                logger.info(f"吃掉头像API响应: {data}")
 
         if data.get("code") != 200:
             error_msg = data.get("msg", "未知错误")
@@ -334,7 +334,7 @@ async def handle_bite_avatar(event: MessageEvent, args: Message = CommandArg()):
 
         await bite_avatar.finish(MessageSegment.markdown(markdown_msg))
 
-    except requests.RequestException as e:
+    except aiohttp.ClientError as e:
         logger.error(f"吃掉头像API请求失败: {e}")
         await bite_avatar.finish(message_add_head("❌ 网络请求失败,请稍后再试", event))
     except json.JSONDecodeError as e:
@@ -380,14 +380,14 @@ async def handle_answer_book(event: MessageEvent, args: Message = CommandArg()):
             'question': question
         }
 
-        response = requests.get(api_url, headers=headers, params=params, timeout=15)
+        async with aiohttp.ClientSession(timeout=aiohttp.ClientTimeout(total=15)) as http_session:
+            async with http_session.get(api_url, headers=headers, params=params) as response:
+                if response.status != 200:
+                    await answer_book.finish(message_add_head(f"❌ API请求失败,状态码: {response.status}", event))
 
-        if response.status_code != 200:
-            await answer_book.finish(message_add_head(f"❌ API请求失败,状态码: {response.status_code}", event))
-
-        # 解析JSON响应
-        data = response.json()
-        logger.info(f"答案之书API响应: {data}")
+                # 解析JSON响应
+                data = await response.json()
+                logger.info(f"答案之书API响应: {data}")
 
         if data.get("code") != 200:
             error_msg = data.get("msg", "未知错误")
@@ -461,7 +461,7 @@ async def handle_answer_book(event: MessageEvent, args: Message = CommandArg()):
 
         await answer_book.finish(message_add_head(msg_content, event))
 
-    except requests.RequestException as e:
+    except aiohttp.ClientError as e:
         logger.error(f"答案之书API请求失败: {e}")
         await answer_book.finish(message_add_head("❌ 网络请求失败,请稍后再试", event))
     except json.JSONDecodeError as e:
@@ -520,14 +520,14 @@ async def handle_driving_test(event: MessageEvent, args: Message = CommandArg())
             'User-Agent': 'xiaoxiaoapi/1.0.0'
         }
 
-        response = requests.get(api_url, headers=headers, timeout=15)
+        async with aiohttp.ClientSession(timeout=aiohttp.ClientTimeout(total=15)) as http_session:
+            async with http_session.get(api_url, headers=headers) as response:
+                if response.status != 200:
+                    await driving_test.finish(message_add_head(f"❌ API请求失败,状态码: {response.status}", event))
 
-        if response.status_code != 200:
-            await driving_test.finish(message_add_head(f"❌ API请求失败,状态码: {response.status_code}", event))
-
-        # 解析JSON响应
-        data = response.json()
-        logger.info(f"驾考题目API响应: {data}")
+                # 解析JSON响应
+                data = await response.json()
+                logger.info(f"驾考题目API响应: {data}")
 
         if data.get("code") != 200:
             error_msg = data.get("msg", "未知错误")
@@ -589,7 +589,7 @@ async def handle_driving_test(event: MessageEvent, args: Message = CommandArg())
 
         await driving_test.finish(message_add_head(msg_content, event))
 
-    except requests.RequestException as e:
+    except aiohttp.ClientError as e:
         logger.error(f"驾考题目API请求失败: {e}")
         await driving_test.finish(message_add_head("❌ 网络请求失败,请稍后再试", event))
     except json.JSONDecodeError as e:
@@ -626,14 +626,14 @@ async def handle_weibo_hot(event: MessageEvent):
             'User-Agent': 'xiaoxiaoapi/1.0.0'
         }
 
-        response = requests.get(api_url, headers=headers, timeout=15)
+        async with aiohttp.ClientSession(timeout=aiohttp.ClientTimeout(total=15)) as http_session:
+            async with http_session.get(api_url, headers=headers) as response:
+                if response.status != 200:
+                    await weibo_hot.finish(message_add_head(f"❌ API请求失败,状态码: {response.status}", event))
 
-        if response.status_code != 200:
-            await weibo_hot.finish(message_add_head(f"❌ API请求失败,状态码: {response.status_code}", event))
-
-        # 解析JSON响应
-        data = response.json()
-        logger.info(f"微博热搜API响应数据条数: {len(data.get('data', []))}")
+                # 解析JSON响应
+                data = await response.json()
+                logger.info(f"微博热搜API响应数据条数: {len(data.get('data', []))}")
 
         if data.get("code") != 200:
             error_msg = data.get("msg", "未知错误")
@@ -683,7 +683,7 @@ async def handle_weibo_hot(event: MessageEvent):
 
         await weibo_hot.finish(message_add_head(msg_content, event))
 
-    except requests.RequestException as e:
+    except aiohttp.ClientError as e:
         logger.error(f"微博热搜API请求失败: {e}")
         await weibo_hot.finish(message_add_head("❌ 网络请求失败,请稍后再试", event))
     except json.JSONDecodeError as e:
