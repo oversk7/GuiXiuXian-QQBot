@@ -111,6 +111,7 @@ async def handle_attribute_breakdown(event: MessageEvent):
             "anti_crit_rate": "抗暴率"
         }
 
+        is_tracked = player.allocated_attrs is not None
         lines = [
             f"📊 {player.nickname} 的属性分解",
             "━━━━━━━━━━━━━",
@@ -124,9 +125,8 @@ async def handle_attribute_breakdown(event: MessageEvent):
             attr_name = attr_names.get(attr, attr)
             base = breakdown["base"][attr]
             equipment = breakdown["equipment"][attr]
-            elixir = breakdown["elixir"][attr]
+            permanent = breakdown["permanent"][attr]
             vip_equipment = breakdown["vip_equipment"][attr]
-            reforge = breakdown["reforge"][attr]
             temporary = breakdown["temporary"][attr]
             pet = breakdown.get("pet", {}).get(attr, 0)
             total = breakdown["total"][attr]
@@ -135,14 +135,14 @@ async def handle_attribute_breakdown(event: MessageEvent):
             parts = [f"基础{base}"]
             if equipment > 0:
                 parts.append(f"装备+{equipment}")
-            if elixir > 0:
-                parts.append(f"丹药+{elixir}")
+            if permanent > 0:
+                parts.append(f"永久+{permanent}")
+            elif permanent < 0:
+                parts.append(f"永久{permanent}")
             if vip_equipment > 0:
                 parts.append(f"特殊+{vip_equipment}")
             if pet > 0:
                 parts.append(f"伙伴+{pet}")
-            if reforge < 0:
-                parts.append(f"洗髓{reforge}")
             if temporary > 0:
                 parts.append(f"临时+{temporary}")
             elif temporary < 0:
@@ -160,12 +160,10 @@ async def handle_attribute_breakdown(event: MessageEvent):
 
         for attr in battle_attrs:
             total = breakdown["total"][attr]
-            # 只显示非零的战斗属性
             if total != 0:
                 has_battle_attrs = True
                 attr_name = attr_names.get(attr, attr)
                 pet_val = breakdown.get("pet", {}).get(attr, 0)
-                # 格式化数值：整数显示整数，浮点显示1位小数
                 def _fmt(v):
                     return str(int(v)) if v == int(v) else f"{v:.1f}"
                 if pet_val > 0:
@@ -190,19 +188,10 @@ async def handle_attribute_breakdown(event: MessageEvent):
                 lines.append(f"  • {buff.buff_name} (剩余{remaining}分钟)")
 
         lines.append("")
-        lines.append("💡 提示：使用【增益状态】查看临时增益详情")
-        lines.append("💡 总属性 = 基础 + 装备 + 丹药 + 特殊 + 伙伴 + 临时增益")
-
-        # 检查是否有严重异常的基础属性（负值且没有临时buff）
-        has_abnormal_base = False
-        for attr in main_attrs:
-            if breakdown["base"][attr] < 0 and breakdown["temporary"][attr] == 0:
-                has_abnormal_base = True
-                break
-
-        if has_abnormal_base:
-            lines.append("")
-            lines.append("⚠️ 检测到基础属性异常，建议联系管理员处理")
+        lines.append("💡 永久 = 丹药/洗髓的合计加成")
+        lines.append("💡 总属性 = 基础 + 装备 + 永久 + 特殊 + 伙伴 + 临时")
+        if not is_tracked:
+            lines.append("💡 使用【洗点】后重新加点可获得更精确的分解")
 
         await attribute_breakdown_cmd.finish(message_add_head("\n".join(lines), event))
 

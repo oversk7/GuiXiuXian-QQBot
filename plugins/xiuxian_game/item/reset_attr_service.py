@@ -126,6 +126,9 @@ class ResetAttrService:
         pts_per_lvl = ReincarnationService.get_attribute_points_per_level(player.reincarnation_level)
         player.attribute_points = (player.level - 1) * pts_per_lvl
 
+        # 清零加点追踪（洗点后重新分配时从零开始精确追踪）
+        player.allocated_attrs = {}
+
         # 重新计算装备加成（基于新的基础属性）
         # 获取所有已装备的装备
         equipped_items = await self._item_repo.get_equipped_equipment(

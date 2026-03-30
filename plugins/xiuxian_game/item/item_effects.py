@@ -569,6 +569,7 @@ async def _reforge_attr(player: Player, cfg: ItemConfig, qty: int, ctx: str, ses
         else {}
     )
 
+    equip_bonus_val = 0
     if session:
         from sqlalchemy import select
 
@@ -584,6 +585,7 @@ async def _reforge_attr(player: Player, cfg: ItemConfig, qty: int, ctx: str, ses
             bonus = delta.get(source_attr)
             if isinstance(bonus, (int, float, Decimal)):
                 base_value -= Decimal(str(bonus))
+                equip_bonus_val += int(bonus)
 
     base_value = base_value.to_integral_value(rounding=ROUND_HALF_UP)
     base_value_int = int(base_value)
@@ -591,9 +593,34 @@ async def _reforge_attr(player: Player, cfg: ItemConfig, qty: int, ctx: str, ses
     if base_value_int <= 0:
         return False, f"⛔ {attr_name}基础值不足，无法洗髓"
 
-    # 计算转换量（每次使用转换一次，仅针对基础属性值）
+    # ---- 保护加点投入：洗髓只允许在永久丹药加成范围内 ----
+    if player.allocated_attrs is None and session:
+        await player.get_attribute_breakdown(session)
+
+    INIT = Player.INIT_ATTRS
+    init_val = INIT.get(source_attr, 0)
+    alloc_val = (player.allocated_attrs or {}).get(source_attr, 0)
+
+    # 获取VIP加成
+    vip_val = 0
+    if session:
+        from ..models.vip_equipment_bonus import VIPEquipmentBonus
+        stmt_vip = select(VIPEquipmentBonus).where(VIPEquipmentBonus.player_id == player.id)
+        vip_record = (await session.execute(stmt_vip)).scalars().first()
+        if vip_record:
+            vip_val = int(vip_record.get_total_bonus().get(source_attr, 0))
+
+    # 可洗部分 = 不含装备的值 - 初始值 - 加点分配 - VIP加成
+    washable = base_value_int - init_val - alloc_val - vip_val
+    if washable <= 0:
+        return False, (
+            f"⛔ {attr_name}的永久加成已用尽，无法继续洗髓\n"
+            f"💡 洗髓只能转换丹药加成，不会减少加点分配的属性"
+        )
+
+    # 计算转换量（仅针对可洗部分）
     percent_ratio = Decimal(str(percent)) / Decimal("100")
-    convert_amount_decimal = Decimal(base_value_int) * percent_ratio * Decimal(qty)
+    convert_amount_decimal = Decimal(washable) * percent_ratio * Decimal(qty)
     convert_amount = int(convert_amount_decimal.to_integral_value(rounding=ROUND_DOWN))
 
     # 检查是否会导致属性过低
@@ -601,7 +628,7 @@ async def _reforge_attr(player: Player, cfg: ItemConfig, qty: int, ctx: str, ses
     if source_attr in ["max_hp", "max_mp"]:
         min_value = 10  # 生命和理智至少保留10点
 
-    max_convertible = base_value_int - min_value
+    max_convertible = min(washable, base_value_int - min_value)
     if max_convertible <= 0:
         return False, f"⛔ {attr_name}过低，无法继续洗髓（至少需保留{min_value}点）"
 
@@ -708,6 +735,19 @@ async def _reforge_multi_attr(player: Player, cfg: ItemConfig, qty: int, ctx: st
         else {}
     )
 
+    # 确保 allocated_attrs 已初始化（保护加点投入）
+    if player.allocated_attrs is None:
+        await player.get_attribute_breakdown(session)
+    INIT = Player.INIT_ATTRS
+
+    # 获取VIP加成
+    vip_bonus_map = {}
+    from ..models.vip_equipment_bonus import VIPEquipmentBonus
+    stmt_vip = select(VIPEquipmentBonus).where(VIPEquipmentBonus.player_id == player.id)
+    vip_record = (await session.execute(stmt_vip)).scalars().first()
+    if vip_record:
+        vip_bonus_map = {k: int(v) for k, v in vip_record.get_total_bonus().items()}
+
     total_points = 0
     result_lines = []
 
@@ -738,14 +778,23 @@ async def _reforge_multi_attr(player: Player, cfg: ItemConfig, qty: int, ctx: st
             result_lines.append(f"⚠️ {attr_name}基础值不足，跳过")
             continue
 
+        # 保护加点投入：只能洗永久丹药加成部分
+        init_val = INIT.get(source_attr, 0)
+        alloc_val = (player.allocated_attrs or {}).get(source_attr, 0)
+        vip_val = vip_bonus_map.get(source_attr, 0)
+        washable = base_value_int - init_val - alloc_val - vip_val
+        if washable <= 0:
+            result_lines.append(f"⚠️ {attr_name}永久加成已用尽，跳过")
+            continue
+
         min_value = 10 if source_attr in ["max_hp", "max_mp"] else 1
-        max_convertible = base_value_int - min_value
+        max_convertible = min(washable, base_value_int - min_value)
         if max_convertible <= 0:
             result_lines.append(f"⚠️ {attr_name}过低（至少需保留{min_value}点），跳过")
             continue
 
         percent_ratio = Decimal(str(percent)) / Decimal("100")
-        convert_amount_decimal = Decimal(base_value_int) * percent_ratio * Decimal(qty)
+        convert_amount_decimal = Decimal(washable) * percent_ratio * Decimal(qty)
         convert_amount = int(convert_amount_decimal.to_integral_value(rounding=ROUND_DOWN))
 
         ratio_raw = attributes_base.get(source_attr, 1)

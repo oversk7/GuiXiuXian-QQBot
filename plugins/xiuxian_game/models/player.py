@@ -244,6 +244,15 @@ class Player(Base):
     max_apprentice_slots: Mapped[int] = mapped_column(Integer, default=3, server_default='3', comment="最大徒弟位")
     mentor_cooldown_until: Mapped[datetime | None] = mapped_column(DateTime, nullable=True, comment="师徒操作冷却结束时间")
 
+    # 加点分配追踪: {"max_hp": 30, "attack": 15, ...} 记录每个属性从加点获得的增量
+    # None = 未初始化（需要迁移）；{} = 已初始化但无分配（洗点后）
+    allocated_attrs: Mapped[dict | None] = mapped_column(
+        MutableDict.as_mutable(JSON),
+        nullable=True,
+        default=None,
+        comment="加点分配追踪JSON(各属性从加点获得的增量)"
+    )
+
     # 扩展数据(活动、特殊系统等)
     extra_attrs: Mapped[dict] = mapped_column(
         MutableDict.as_mutable(JSON),
@@ -379,94 +388,54 @@ class Player(Base):
 
         return battle_attrs
 
+    # 角色创建时的初始属性值（与Player模型default一致）
+    INIT_ATTRS = {
+        "max_hp": 20, "max_mp": 20, "attack": 1, "defense": 0,
+        "agility": 5, "luck": 1,
+        "critical_rate": 5, "critical_power": 0, "combo_rate": 0,
+        "counter_rate": 0, "dodge_rate": 0, "accuracy_rate": 80,
+        "skill_crit_rate": 0, "penetration_rate": 0, "anti_crit_rate": 0,
+        "lifesteal_rate": 0, "immobilize_rate": 0, "true_damage_rate": 0, "regen_rate": 0,
+    }
+
     async def get_attribute_breakdown(self, session=None) -> dict:
-        """获取属性来源分解（基础、装备、丹药、VIP装备永久加成、宠物加成、临时buff）
+        """获取属性来源分解
 
         返回格式：
         {
-            "base": {...},         # 基础属性（初始值 + 加点，不含丹药）
+            "base": {...},         # 基础属性（初始值 + 加点）
             "equipment": {...},    # 装备加成
-            "elixir": {...},       # 永久丹药加成
+            "permanent": {...},    # 永久加成（丹药+洗髓合计）
             "vip_equipment": {...},# VIP装备永久加成
             "pet": {...},          # 宠物伙伴加成
             "temporary": {...},    # 临时buff加成
             "total": {...}         # 最终有效属性
         }
+
+        当 allocated_attrs 已追踪时，base = 初始值 + allocated_attrs（精确）。
+        当 allocated_attrs 为 None（未迁移）时，使用旧版反推计算并进行一次性初始化。
         """
-        # 获取基础属性（从初始值和加点计算）
         from ..config import config as gcfg
-        from ..models.elixir_usage import ElixirUsageLog
         from sqlalchemy import select
 
-        # 初始基础属性
-        INIT_ATTRS = {
-            "max_hp": 20,
-            "max_mp": 20,
-            "attack": 1,
-            "defense": 0,
-            "agility": 5,
-            "luck": 1,
-            "critical_rate": 5,
-            "critical_power": 0,
-            "combo_rate": 0,
-            "counter_rate": 0,
-            "dodge_rate": 0,
-            "accuracy_rate": 80,
-            "skill_crit_rate": 0,
-            "penetration_rate": 0,
-            "anti_crit_rate": 0,
-            # 增强战斗属性
-            "lifesteal_rate": 0,
-            "immobilize_rate": 0,
-            "true_damage_rate": 0,
-            "regen_rate": 0,
-        }
+        INIT = self.INIT_ATTRS
 
-        # 计算丹药加成和洗髓减成
-        elixir_bonus = {k: 0 for k in INIT_ATTRS}
-        reforge_reduction = {k: 0 for k in INIT_ATTRS}
+        # ---- 装备加成（始终精确：直接读取 _persist_bonus）----
+        equipment_bonus = {k: 0 for k in INIT}
         if session:
-            stmt = select(ElixirUsageLog).where(ElixirUsageLog.player_id == self.id)
-            logs = (await session.execute(stmt)).scalars().all()
-
-            elixir_usage_total = {}
-            for log in logs:
-                if log.item_id not in elixir_usage_total:
-                    elixir_usage_total[log.item_id] = 0
-                elixir_usage_total[log.item_id] += log.quantity
-
-            for item_id, total_qty in elixir_usage_total.items():
-                item_cfg = gcfg.items_config["by_id"].get(item_id)
-                if not item_cfg:
-                    continue
-                effect_type = item_cfg.effect_type.value
-                if effect_type == "BUFF":
-                    effect_params = item_cfg.effect_params or {}
-                    for attr, value in effect_params.items():
-                        if attr in elixir_bonus:
-                            elixir_bonus[attr] += int(value) * total_qty
-
-        # 获取装备加成
-        equipment_bonus = {k: 0 for k in INIT_ATTRS}
-        if session:
-            from sqlalchemy import select
             from ..models.inventory import ItemInstance
-
             stmt = select(ItemInstance).where(
                 ItemInstance.player_id == self.id,
                 ItemInstance.equipped == True,
                 ItemInstance.item_id.in_(gcfg.items_config["by_type"]["EQUIPMENT"])
             )
-            equipped_items = (await session.execute(stmt)).scalars().all()
-
-            for eq in equipped_items:
-                delta = (eq.extra_attrs or {}).get("_persist_bonus", {})
-                for k, v in delta.items():
+            for eq in (await session.execute(stmt)).scalars().all():
+                for k, v in ((eq.extra_attrs or {}).get("_persist_bonus", {})).items():
                     if k in equipment_bonus:
                         equipment_bonus[k] += int(v)
 
-        # 获取VIP装备永久加成
-        vip_equipment_bonus = {k: 0 for k in INIT_ATTRS}
+        # ---- VIP装备永久加成（始终精确）----
+        vip_equipment_bonus = {k: 0 for k in INIT}
         if session:
             from .vip_equipment_bonus import VIPEquipmentBonus
             stmt = select(VIPEquipmentBonus).where(VIPEquipmentBonus.player_id == self.id)
@@ -476,8 +445,8 @@ class Player(Base):
                     if attr in vip_equipment_bonus:
                         vip_equipment_bonus[attr] = int(value)
 
-        # 获取临时buff加成
-        temporary_bonus = {k: 0 for k in INIT_ATTRS}
+        # ---- 临时buff加成（始终精确）----
+        temporary_bonus = {k: 0 for k in INIT}
         if session:
             from .temporary_buff import TemporaryBuff
             buff_bonuses = await TemporaryBuff.get_total_attribute_bonuses(session, self.id)
@@ -485,11 +454,11 @@ class Player(Base):
                 if attr in temporary_bonus:
                     temporary_bonus[attr] = bonus
 
-        # 获取宠物加成（动态计算，不持久化）
-        pet_bonus_dict = {k: 0 for k in INIT_ATTRS}
+        # ---- 宠物加成（始终精确）----
+        pet_bonus_dict = {k: 0 for k in INIT}
         if session:
             from ..domain.attributes.attribute_calculator_factory import AttributeCalculatorFactory
-            AttributeCalculatorFactory.get_instance()  # 确保工厂已初始化
+            AttributeCalculatorFactory.get_instance()
             pet_source = AttributeCalculatorFactory._pet_source
             if pet_source:
                 pet_full = await pet_source.calculate_full_bonus(self, session)
@@ -497,31 +466,64 @@ class Player(Base):
                     if attr_key in pet_bonus_dict:
                         pet_bonus_dict[attr_key] = val
 
-        # 计算基础属性（初始值 + 加点，不含丹药和VIP装备永久加成）
-        # 注意：Player表存储的属性值 = 基础 + 装备 + 永久丹药 + VIP装备 - 洗髓减成
-        # 临时buff不会写入Player表，只在get_effective_attributes查询时动态合并
-        # 所以：raw_base = 当前存储值 - 装备 - 丹药 - VIP装备
-        # 如果 raw_base < 初始值，说明有洗髓减成，差值归入 reforge_reduction
-        base_attrs = {}
-        for attr in INIT_ATTRS:
-            current_value = getattr(self, attr, INIT_ATTRS[attr])
-            raw_base = current_value - equipment_bonus[attr] - elixir_bonus[attr] - vip_equipment_bonus[attr]
-            if raw_base < INIT_ATTRS[attr]:
-                # 洗髓导致基础值低于初始值，差值记为洗髓减成
-                reforge_reduction[attr] = raw_base - INIT_ATTRS[attr]  # 负值
-                base_attrs[attr] = INIT_ATTRS[attr]
-            else:
-                base_attrs[attr] = raw_base
+        # ---- 基础属性 & 永久加成 ----
+        allocated = self.allocated_attrs
 
-        # 计算最终属性（应该等于当前属性值 + 临时buff + 宠物加成）
+        if allocated is not None:
+            # ★ 已追踪：base 从 allocated_attrs 正向计算（精确）
+            base_attrs = {attr: INIT[attr] + allocated.get(attr, 0) for attr in INIT}
+            # 永久加成 = 残差（自动包含 BUFF + BUFF_PERCENT - REFORGE）
+            permanent_bonus = {}
+            for attr in INIT:
+                current = getattr(self, attr, INIT[attr])
+                permanent_bonus[attr] = current - base_attrs[attr] - equipment_bonus[attr] - vip_equipment_bonus[attr]
+        else:
+            # ★ 未追踪（旧玩家一次性迁移）：用旧方法反推 + 惰性初始化
+            from ..models.elixir_usage import ElixirUsageLog
+
+            # 从 ElixirUsageLog 重建已知的 BUFF 类丹药加成
+            elixir_known = {k: 0 for k in INIT}
+            if session:
+                stmt = select(ElixirUsageLog).where(ElixirUsageLog.player_id == self.id)
+                logs = (await session.execute(stmt)).scalars().all()
+                usage_total = {}
+                for log in logs:
+                    usage_total[log.item_id] = usage_total.get(log.item_id, 0) + log.quantity
+                for item_id, total_qty in usage_total.items():
+                    item_cfg = gcfg.items_config["by_id"].get(item_id)
+                    if not item_cfg:
+                        continue
+                    if item_cfg.effect_type.value == "BUFF":
+                        for attr, value in (item_cfg.effect_params or {}).items():
+                            if attr in elixir_known:
+                                elixir_known[attr] += int(value) * total_qty
+
+            # 反推基础 = 存储值 - 装备 - 已知丹药 - VIP
+            base_attrs = {}
+            permanent_bonus = {}
+            init_alloc = {}
+            for attr in INIT:
+                current = getattr(self, attr, INIT[attr])
+                raw_base = current - equipment_bonus[attr] - elixir_known[attr] - vip_equipment_bonus[attr]
+                alloc_est = max(0, raw_base - INIT[attr])
+                base_attrs[attr] = INIT[attr] + alloc_est
+                # 永久加成 = 存储值 - base - 装备 - VIP（自动包含 BUFF + BUFF_PERCENT - REFORGE）
+                permanent_bonus[attr] = current - base_attrs[attr] - equipment_bonus[attr] - vip_equipment_bonus[attr]
+                if alloc_est > 0:
+                    init_alloc[attr] = alloc_est
+
+            # 惰性初始化：保存估算的加点分配，后续使用精确追踪路径
+            if session:
+                self.allocated_attrs = init_alloc if init_alloc else {}
+
+        # ---- 计算最终属性 ----
         total_attrs = {}
-        for attr in INIT_ATTRS:
+        for attr in INIT:
             total_attrs[attr] = (
                 base_attrs[attr] +
-                elixir_bonus[attr] +
-                vip_equipment_bonus[attr] +
+                permanent_bonus[attr] +
                 equipment_bonus[attr] +
-                reforge_reduction[attr] +
+                vip_equipment_bonus[attr] +
                 temporary_bonus[attr] +
                 pet_bonus_dict[attr]
             )
@@ -529,9 +531,8 @@ class Player(Base):
         return {
             "base": base_attrs,
             "equipment": equipment_bonus,
-            "elixir": elixir_bonus,
+            "permanent": permanent_bonus,
             "vip_equipment": vip_equipment_bonus,
-            "reforge": reforge_reduction,
             "temporary": temporary_bonus,
             "pet": pet_bonus_dict,
             "total": total_attrs

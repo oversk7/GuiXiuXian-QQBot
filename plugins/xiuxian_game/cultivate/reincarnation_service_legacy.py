@@ -54,7 +54,10 @@ class ReincarnationService:
         player.level = 1
         player.exp = 0
         player.attribute_points = 0
-        
+
+        # 清零加点追踪
+        player.allocated_attrs = {}
+
         # 增加转数
         player.reincarnation_level += 1
         
