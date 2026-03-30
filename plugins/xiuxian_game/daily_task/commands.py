@@ -2,21 +2,17 @@
 from nonebot import on_command
 from nonebot.adapters.qq import MessageEvent, Message
 from nonebot.params import CommandArg
-from sqlalchemy import select, and_
 
 from ..models.db import AsyncSessionLocal
 from ..models.player import Player
 from ..models.daily_task import DailyTask, TaskStatus
-from ..utils import message_add_head
 from ..utils_markdown import cmd, build_markdown
 from ..platform_utils import get_unified_player
 from .service_new import DailyTaskService
-from ..battle.integration_helper import BattleIntegrationHelper
 from ..infrastructure.uow.unit_of_work import UnitOfWork
 from ..world.location_service_new import LocationService
 from ..world.npc_service_new import NPCService
 from ..guild.guild_economy_service_new import GuildEconomyService
-import time
 import random
 from datetime import date
 

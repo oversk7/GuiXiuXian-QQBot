@@ -176,39 +176,6 @@ def register_all_battle_effect_bridges() -> Dict[str, Type[BattleEffectBridge]]:
     return _registered_bridges
 
 
-def get_registered_bridges() -> Dict[str, Type[BattleEffectBridge]]:
-    """
-    获取已注册的桥接器列表
-
-    Returns:
-        Dict[effect_id, BattleEffectBridge类型]: 已注册的桥接器映射
-    """
-    return _registered_bridges.copy()
-
-
-def is_bridge_registered(effect_id: str) -> bool:
-    """
-    检查指定的桥接器是否已注册
-
-    Args:
-        effect_id: 效果ID
-
-    Returns:
-        bool: 是否已注册
-    """
-    return effect_id in _registered_bridges
-
-
-def get_bridge_count() -> int:
-    """
-    获取已注册的桥接器数量
-
-    Returns:
-        int: 桥接器数量
-    """
-    return len(_registered_bridges)
-
-
 def get_equipment_bridge_mapping() -> Dict[str, List[str]]:
     """
     获取装备到桥接器的映射关系
@@ -242,28 +209,3 @@ def get_equipment_bridge_mapping() -> Dict[str, List[str]]:
             mapping[item_id].append(effect_id)
 
     return mapping
-
-
-def get_bridge_statistics() -> Dict[str, int]:
-    """
-    获取桥接器统计信息
-
-    Returns:
-        Dict: 统计信息
-        {
-            "total_bridges": int,  # 总桥接器数
-            "total_equipment": int,  # 有效果的装备数
-            "avg_effects_per_equipment": float  # 平均每个装备的效果数
-        }
-    """
-    mapping = get_equipment_bridge_mapping()
-
-    total_bridges = len(_registered_bridges)
-    total_equipment = len(mapping)
-    avg_effects = total_bridges / total_equipment if total_equipment > 0 else 0
-
-    return {
-        "total_bridges": total_bridges,
-        "total_equipment": total_equipment,
-        "avg_effects_per_equipment": round(avg_effects, 2)
-    }

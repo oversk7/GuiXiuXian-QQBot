@@ -148,20 +148,3 @@ class BuffAttributeSource(IAttributeSource):
             "expired": expired_count,
         }
 
-    def cleanup_expired_cache(self):
-        """
-        清理过期缓存（可由定时任务调用）
-
-        建议每5分钟运行一次
-        """
-        current_time = time.time()
-        expired_keys = [
-            player_id
-            for player_id, (bonus, timestamp) in self._cache.items()
-            if current_time - timestamp >= self._cache_ttl
-        ]
-
-        for key in expired_keys:
-            del self._cache[key]
-
-        return len(expired_keys)

@@ -27,11 +27,6 @@ bank_invest_cmd = on_command("银行投资", aliases={"投资理财"}, block=Tru
 # ==================== 存款排行榜 ====================
 deposit_rank_cmd = on_command("存款榜", aliases={"冥行榜"}, block=True, priority=5)
 
-# 旧利息计算函数已废弃
-# def _apply_interest(acc: BankAccount):
-#     """已于2025-12-03废弃，不再计算利息"""
-#     pass
-
 
 @bank_balance_cmd.handle()
 async def handle_balance(event: MessageEvent):

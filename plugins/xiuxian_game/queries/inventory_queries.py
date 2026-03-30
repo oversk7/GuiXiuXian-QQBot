@@ -65,9 +65,6 @@ class InventoryPage:
     used_slots: int  # 已使用的背包格数（不含装备和鱼）
     effective_capacity: int  # 有效容量
 
-    @property
-    def total_pages(self) -> int:
-        return max(1, (self.total_items - 1) // self.page_size + 1)
 
 
 async def query_inventory_page(

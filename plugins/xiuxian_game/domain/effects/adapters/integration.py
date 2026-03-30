@@ -6,7 +6,7 @@
 """
 
 import os
-from typing import Tuple, Any, Dict
+from typing import Tuple, Any
 from nonebot import logger, get_driver
 
 from ..registry import get_effect_registry
@@ -158,30 +158,3 @@ async def apply_effect_with_fallback(
         logger.debug("[EffectSystem] Feature Flag: 使用旧效果系统")
         from plugins.xiuxian_game.item.item_effects import apply_effect as apply_effect_legacy
         return await apply_effect_legacy(player, item_config, quantity, ctx, session)
-
-
-def get_effect_system_status() -> Dict[str, Any]:
-    """
-    获取效果系统状态信息（用于监控和调试）
-
-    Returns:
-        Dict: 状态信息
-        {
-            "use_new_system": bool,
-            "registered_effects": int,
-            "registry_status": str
-        }
-    """
-    from .register_all import get_registered_adapters
-
-    adapters = get_registered_adapters()
-    registry = get_effect_registry()
-    all_effects = registry.list_all()
-
-    return {
-        "use_new_system": USE_NEW_EFFECT_SYSTEM,
-        "registered_adapters": len(adapters),
-        "total_effects": len(all_effects),
-        "adapter_ids": list(adapters.keys()) if adapters else [],
-        "feature_flag_env": os.getenv("USE_NEW_EFFECT_SYSTEM", "not set")
-    }

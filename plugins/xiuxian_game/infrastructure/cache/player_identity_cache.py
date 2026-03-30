@@ -45,11 +45,6 @@ class PlayerIdentityCache:
         """使指定用户的缓存失效。账号切换/转让时调用。"""
         self._map.pop(platform_id, None)
 
-    def invalidate_all(self) -> None:
-        """清空全部缓存。一般用于调试或热重载。"""
-        self._map.clear()
-        logger.info("[PlayerIdentityCache] 全部缓存已清空")
-
     @property
     def stats(self) -> dict:
         """缓存命中统计，用于监控。"""

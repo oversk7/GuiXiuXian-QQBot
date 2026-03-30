@@ -18,10 +18,7 @@ from nonebot import logger
 from sqlalchemy import select
 
 from ..economy.market import calculate_transaction_tax
-from ..economy.equipment_trade_service_new import EquipmentTradeService as EquipmentTradeServiceNew
 from ..economy.equipment_trade_service import EquipmentTradeService
-from ..infrastructure.repositories.item_repository import ItemRepository
-from ..infrastructure.repositories.market_order_repository import MarketOrderRepository
 from ..infrastructure.uow.unit_of_work import UnitOfWork
 from ..models.auction import AuctionItem, AuctionBidHistory
 from ..models.inventory import ItemInstance, ItemType

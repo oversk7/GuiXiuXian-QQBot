@@ -9,9 +9,8 @@
 """
 
 from typing import Optional, List
-from sqlalchemy import select, and_, desc
+from sqlalchemy import select, desc
 from sqlalchemy.ext.asyncio import AsyncSession
-from datetime import datetime
 
 from ...domain.repositories.base import IRepository
 from ...models.account_transfer_log import AccountTransferLog
@@ -298,62 +297,3 @@ class AccountTransferLogRepository(IRepository[AccountTransferLog]):
         result = await self._session.execute(stmt)
         return result.scalar()
 
-    # ==================== 高级查询 ====================
-
-    async def find_recent_transfers(
-        self,
-        days: int = 7,
-        limit: Optional[int] = 50
-    ) -> List[AccountTransferLog]:
-        """
-        查询最近N天的所有转让记录（用于管理员监控）
-
-        Args:
-            days: 最近天数
-            limit: 限制返回数量
-
-        Returns:
-            转让记录列表（按时间倒序）
-        """
-        from datetime import timedelta
-        cutoff_time = datetime.now() - timedelta(days=days)
-
-        stmt = (
-            select(AccountTransferLog)
-            .where(AccountTransferLog.transfer_time >= cutoff_time)
-            .order_by(desc(AccountTransferLog.transfer_time))
-        )
-
-        if limit:
-            stmt = stmt.limit(limit)
-
-        result = await self._session.execute(stmt)
-        return list(result.scalars().all())
-
-    async def find_transfers_between_users(
-        self,
-        platform_id_1: str,
-        platform_id_2: str
-    ) -> List[AccountTransferLog]:
-        """
-        查询两个用户之间的所有转让记录（双向）
-
-        Args:
-            platform_id_1: 用户1的平台ID
-            platform_id_2: 用户2的平台ID
-
-        Returns:
-            转让记录列表（按时间倒序）
-        """
-        stmt = (
-            select(AccountTransferLog)
-            .where(
-                and_(
-                    AccountTransferLog.from_platform_id.in_([platform_id_1, platform_id_2]),
-                    AccountTransferLog.to_platform_id.in_([platform_id_1, platform_id_2])
-                )
-            )
-            .order_by(desc(AccountTransferLog.transfer_time))
-        )
-        result = await self._session.execute(stmt)
-        return list(result.scalars().all())

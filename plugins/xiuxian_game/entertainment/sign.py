@@ -4,7 +4,6 @@ from nonebot.adapters.qq.models import MessageMarkdown, MessageMarkdownParams
 from datetime import datetime, timedelta
 from sqlalchemy import select
 from ..models import Player, ItemInstance
-from ..models.db import get_session
 import random
 from ..utils import luck_prob
 

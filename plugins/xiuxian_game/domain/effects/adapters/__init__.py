@@ -14,7 +14,6 @@ from .register_all import (
 from .integration import (
     apply_effect_v2,
     apply_effect_with_fallback,
-    get_effect_system_status,
     USE_NEW_EFFECT_SYSTEM
 )
 
@@ -22,11 +21,7 @@ from .integration import (
 from .battle_effect_bridge import BattleEffectBridge, create_bridge_for_trigger_config
 from .battle_effect_register import (
     register_all_battle_effect_bridges,
-    get_registered_bridges,
-    is_bridge_registered,
-    get_bridge_count,
     get_equipment_bridge_mapping,
-    get_bridge_statistics,
 )
 
 __all__ = [
@@ -38,16 +33,11 @@ __all__ = [
     "is_effect_registered",
     "apply_effect_v2",
     "apply_effect_with_fallback",
-    "get_effect_system_status",
     "USE_NEW_EFFECT_SYSTEM",
 
     # 战斗效果桥接器
     "BattleEffectBridge",
     "create_bridge_for_trigger_config",
     "register_all_battle_effect_bridges",
-    "get_registered_bridges",
-    "is_bridge_registered",
-    "get_bridge_count",
     "get_equipment_bridge_mapping",
-    "get_bridge_statistics",
 ]

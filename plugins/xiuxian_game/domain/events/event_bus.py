@@ -65,18 +65,6 @@ class EventBus:
             self._function_subscribers[event_type].append(handler_func)
             logger.info(f"订阅事件: {event_type.__name__} -> {handler_func.__name__}")
 
-    def unsubscribe(self, event_type: Type[IEvent], handler: IEventHandler) -> None:
-        """
-        取消订阅事件
-
-        Args:
-            event_type: 事件类型
-            handler: 要移除的处理器
-        """
-        if handler in self._subscribers[event_type]:
-            self._subscribers[event_type].remove(handler)
-            logger.info(f"取消订阅: {event_type.__name__} -> {handler.__class__.__name__}")
-
     async def publish(self, event: IEvent) -> None:
         """
         发布事件
@@ -125,22 +113,3 @@ class EventBus:
                     exc_info=True
                 )
 
-    def clear_all(self) -> None:
-        """
-        清除所有订阅（主要用于测试）
-        """
-        self._subscribers.clear()
-        self._function_subscribers.clear()
-        logger.warning("已清除所有事件订阅")
-
-    def get_subscriber_count(self, event_type: Type[IEvent]) -> int:
-        """
-        获取某个事件类型的订阅者数量
-
-        Args:
-            event_type: 事件类型
-
-        Returns:
-            订阅者数量
-        """
-        return len(self._subscribers.get(event_type, [])) + len(self._function_subscribers.get(event_type, []))

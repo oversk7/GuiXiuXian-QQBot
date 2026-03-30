@@ -58,13 +58,3 @@ def invalidate_player_buff_cache(player_id: str):
         player_id: 玩家ID
     """
     AttributeCalculatorFactory.invalidate_buff_cache(player_id)
-
-
-def get_attribute_calculator_stats() -> dict:
-    """
-    获取AttributeCalculator统计信息（用于监控）
-
-    Returns:
-        Dict: 缓存统计信息
-    """
-    return AttributeCalculatorFactory.get_cache_stats()

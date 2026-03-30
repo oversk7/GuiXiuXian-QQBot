@@ -10,7 +10,6 @@ from .attribute_calculator_factory import AttributeCalculatorFactory
 from .player_attributes_integration import (
     get_effective_attributes_v2,
     invalidate_player_buff_cache,
-    get_attribute_calculator_stats,
 )
 
 __all__ = [
@@ -23,5 +22,4 @@ __all__ = [
     "AttributeCalculatorFactory",
     "get_effective_attributes_v2",
     "invalidate_player_buff_cache",
-    "get_attribute_calculator_stats",
 ]

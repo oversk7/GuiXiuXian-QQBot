@@ -55,11 +55,6 @@ def is_guild_message(event: MessageEvent) -> bool:
     return platform_type == PlatformType.GUILD
 
 
-def is_group_message(event: MessageEvent) -> bool:
-    """判断是否为群聊消息"""
-    platform_type, _ = get_platform_info(event)
-    return platform_type == PlatformType.GROUP
-
 
 def is_private_message(event: MessageEvent) -> bool:
     """判断是否为私聊消息"""
@@ -185,25 +180,3 @@ def get_admin_temp_switch_target(admin_platform_id: str) -> Optional[str]:
     return _admin_temp_switch.get(admin_platform_id)
 
 
-def format_platform_message(content: str, event: MessageEvent) -> str:
-    """
-    根据平台类型格式化消息
-    
-    Args:
-        content: 消息内容
-        event: 消息事件
-        
-    Returns:
-        格式化后的消息
-    """
-    platform_type, _ = get_platform_info(event)
-    
-    if platform_type == PlatformType.GUILD:
-        # 频道消息添加特殊标识
-        return f"🏛️ 频道模式\n{content}"
-    elif platform_type == PlatformType.GROUP:
-        # 群聊消息保持原样
-        return content
-    else:
-        # 私聊消息添加标识
-        return f"💬 私聊模式\n{content}"

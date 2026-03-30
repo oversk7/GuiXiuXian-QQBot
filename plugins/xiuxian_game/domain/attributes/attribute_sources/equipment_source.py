@@ -85,35 +85,3 @@ class EquipmentAttributeSource(IAttributeSource):
 
         return total_bonus
 
-    async def get_equipment_detail(
-        self,
-        player,
-        session: AsyncSession
-    ) -> list[dict]:
-        """
-        获取装备详细信息（用于UI展示）
-
-        Returns:
-            List[Dict]: 每件装备的名称和加成
-        """
-        from ....models.inventory import ItemInstance
-
-        stmt = select(ItemInstance).where(
-            ItemInstance.player_id == player.id,
-            ItemInstance.equipped == True
-        )
-        result = await session.execute(stmt)
-        equipped_items = result.scalars().all()
-
-        details = []
-        for item in equipped_items:
-            persist_bonus = item.extra_attrs.get('_persist_bonus', {})
-            if persist_bonus:
-                details.append({
-                    'item_id': item.id,
-                    'item_name': item.item_id,  # 需要从ItemConfig获取实际名称
-                    'slot': item.extra_attrs.get('slot', 'unknown'),
-                    'bonus': persist_bonus,
-                })
-
-        return details

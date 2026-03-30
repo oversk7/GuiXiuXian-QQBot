@@ -34,10 +34,6 @@ class AttributeCalculator:
         """
         self._sources.append(source)
 
-    def clear_sources(self):
-        """清空所有属性来源（用于测试）"""
-        self._sources.clear()
-
     async def calculate_final_attributes(
         self,
         player,
@@ -147,18 +143,3 @@ class AttributeCalculator:
             include_breakdown=False
         )
 
-    async def calculate_with_breakdown(
-        self,
-        player,
-        session
-    ) -> AttributeBreakdown:
-        """
-        计算属性并返回详细分解
-
-        用于查看面板、调试等场景
-        """
-        return await self.calculate_final_attributes(
-            player,
-            session,
-            include_breakdown=True
-        )

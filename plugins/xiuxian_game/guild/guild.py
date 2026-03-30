@@ -15,9 +15,7 @@ from ..utils_markdown import cmd, build_markdown
 from ..models.social_application import SocialApplication, ApplicationType, ApplicationStatus
 from ..models.donation_log import PlayerDonationLog
 from ..models.navigation_task import NavigationTask
-from .guild_application_service import GuildApplicationService
 from .guild_application_service_new import GuildApplicationService as GuildApplicationServiceNew  # DI版本
-from .guild_service import GuildService
 from .guild_service_new import GuildService as GuildServiceNew  # DI版本
 from .guild_permission import GuildPermission
 from .guild_economy_service import GuildEconomyService

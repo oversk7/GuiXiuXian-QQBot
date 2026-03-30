@@ -13,7 +13,6 @@ from nonebot.adapters.qq import MessageEvent, Message
 from nonebot.params import CommandArg
 from nonebot.exception import FinishedException
 
-from ..infrastructure.di.container import DIContainer
 from ..infrastructure.uow.unit_of_work import UnitOfWork
 from ..models.db import AsyncSessionLocal, safe_session
 from .relationship_service import RelationshipService

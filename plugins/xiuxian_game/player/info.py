@@ -17,7 +17,7 @@ import random
 import uuid
 from ..models.navigation_task import NavigationTask
 from ..world.navigation import _update_nav_position
-from ..platform_utils import get_unified_player, format_platform_message, is_guild_message
+from ..platform_utils import get_unified_player, is_guild_message
 from ..config import config
 from ..infrastructure.uow import UnitOfWork
 from ..domain.attributes import get_effective_attributes_v2

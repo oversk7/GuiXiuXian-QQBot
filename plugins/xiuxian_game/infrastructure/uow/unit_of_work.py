@@ -9,12 +9,9 @@
 - 在 UnitOfWork 外部调用 finish()
 """
 
-from typing import Callable, Optional, TypeVar, Awaitable
+from typing import Callable, Optional
 from sqlalchemy.ext.asyncio import AsyncSession
 from nonebot import logger
-from functools import wraps
-
-T = TypeVar('T')
 
 
 class UnitOfWork:
@@ -532,46 +529,3 @@ class UnitOfWork:
     def session(self) -> AsyncSession:
         """获取当前会话（用于需要直接访问会话的特殊情况）"""
         return self._session
-
-
-# ==================== 工具函数 ====================
-
-def with_uow(session_factory: Callable):
-    """
-    装饰器：自动处理 UnitOfWork 和 finish() 的交互
-
-    使用这个装饰器可以避免连接泄漏问题，无需手动管理消息返回逻辑。
-
-    使用示例：
-    ```python
-    @with_uow(lambda: AsyncSessionLocal())
-    async def handle_command(event, uow):
-        player = await get_unified_player(uow.session, event)
-        if not player:
-            return "⛔ 请先创建角色"  # 直接 return，不用 finish
-
-        # 业务逻辑...
-        return "✅ 执行成功"
-
-    @some_cmd.handle()
-    async def _(event: MessageEvent):
-        result = await handle_command(event)
-        await some_cmd.finish(result)  # 在外部 finish
-    ```
-
-    Args:
-        session_factory: 创建 AsyncSession 的工厂函数
-
-    Returns:
-        装饰器函数
-    """
-    def decorator(func: Callable[..., Awaitable[T]]) -> Callable[..., Awaitable[T]]:
-        @wraps(func)
-        async def wrapper(*args, **kwargs) -> T:
-            async with UnitOfWork(session_factory) as uow:
-                # 将 uow 注入到函数参数中
-                return await func(*args, uow=uow, **kwargs)
-            # UnitOfWork 自动关闭，然后返回结果
-            # 调用者可以拿到结果后再 finish()
-        return wrapper
-    return decorator

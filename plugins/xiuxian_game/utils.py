@@ -1,8 +1,8 @@
-from nonebot.adapters.qq import Message, MessageSegment, MessageEvent
+from nonebot.adapters.qq import Message, MessageEvent
 from typing import Optional, Dict
 from .config import config
 import math
-import re  # 用于正则匹配域名
+
 import time
 from collections import defaultdict, deque
 from dataclasses import dataclass
@@ -100,55 +100,6 @@ async def generate_exp_table(max_level: int = 100) -> str:
 
     return str(output_path)
 
-
-async def paginate_items(items: list, page: int, page_size: Optional[int] = None, capacity_info: str = None, total_items: Optional[int] = None) -> str:
-    """分页格式化背包物品
-
-    • 普通物品显示数量：✖️{qty}
-    • 装备显示耐久：🛠️ {cur}/{max}
-
-    Args:
-        total_items: 当调用方已在 DB 层完成分页时，传入过滤后的真实总条目数。
-                     此时 items 被视为"当前页"，不再做 Python 切片。
-                     未提供时退化为 len(items) 并在 Python 端切片。
-    """
-    # 从配置获取分页大小
-    cfg_page_size = config.game_config["game"]["inventory_page_size"]
-    page_size = page_size or cfg_page_size
-
-    if total_items is not None:
-        # DB 层已分页：items 就是当前页，不再切片
-        current_page_items = items
-        start = (page - 1) * page_size
-        count = total_items
-    else:
-        # Python 端切片
-        start = (page - 1) * page_size
-        end = start + page_size
-        current_page_items = items[start:end]
-        count = len(items)
-
-    total_pages = max(1, (count - 1) // page_size + 1)
-    page_info = f"\n📖 第 {page} 页（共 {total_pages} 页)"
-
-    # 添加容量信息
-    if capacity_info:
-        page_info = f"\n{capacity_info}" + page_info
-
-    lines: list[str] = []
-    for offset, inst in enumerate(current_page_items, start=1):
-        global_idx = start + offset  # 背包全局序号 (从1开始)
-        if getattr(inst, "is_equipment", False):
-            tpl = inst.config
-            lines.append(
-                f"{global_idx}. {tpl.name} 🛠️ {inst.durability}/{tpl.durability}\n"
-            )
-        else:
-            lines.append(
-                f"{global_idx}. {inst.config.name} ✖️{inst.quantity}\n"
-            )
-
-    return "🎒 你的背包\n" + "".join(lines) + page_info
 
 
 # ---------------- Luck 概率曲线 ----------------
@@ -373,78 +324,6 @@ def apply_defense_mitigation(
     }
 
 
-# ---------------- URL 转义工具 ----------------
-
-def bypass_urls(
-    text: str,
-    mode: str = "unicode",
-    whitelist: list[str] | None = None,
-) -> str:
-    """在文本中查找英文域名并根据不同 *mode* 进行转义。
-
-    参数说明
-    ----------
-    text: str
-        待处理文本。
-    mode: str
-        转义模式，可选值
-        ``unicode``      : 在点号前插入不可见字符 ``\u200E``（默认）
-        ``space``        : 在点号前插入空格
-        ``fullStop``     : 将半角点号替换为中文句号 ``。``
-        ``remove``       : 直接删除匹配到的域名
-        ``uppercase``    : 整个域名转为大写
-        ``tldUppercase`` : 仅将顶级域名 TLD 转为大写
-    whitelist: list[str] | None
-        白名单域名列表，命中后将保持原样，不做任何处理。
-
-    返回值
-    -------
-    str
-        处理后的文本。
-
-    Notes
-    -----
-    1. 为了保持依赖最小化，这里并未引入第三方库获取 "全部" 顶级域名列表，而是使用
-       一个正则 ``([A-Za-z0-9-]+\.)+[A-Za-z]{2,63}`` 来粗略匹配"看起来像"域名的串。
-       在大多数常见场景下已足够；如需严格匹配，可替换为公开的 TLD 列表。
-    2. 该函数 **不会** 主动发送消息，也不包含任何异步操作，可安全在任何上下文中调用。
-    """
-
-    whitelist = whitelist or []
-
-    # 点号替换映射
-    dot_replacer_map: dict[str, str] = {
-        "unicode": "\u200E.",  # U+200E (LRM) + '.'
-        "space": " .",
-        "fullStop": "。",
-    }
-
-    # 用于匹配英文域名的正则表达式：<sub>.<domain>.<tld>
-    domain_pattern = re.compile(r"((?:[A-Za-z0-9-]+\.)+[A-Za-z]{2,63})(?=[^A-Za-z0-9-]|$)")
-
-    def _replace(match: re.Match[str]) -> str:
-        domain = match.group(1)
-
-        # 白名单直接放行
-        if domain in whitelist:
-            return domain
-
-        # 各模式处理
-        if mode == "remove":
-            return ""
-        if mode == "uppercase":
-            return domain.upper()
-        if mode == "tldUppercase":
-            parts = domain.split(".")
-            if len(parts) > 1:
-                parts[-1] = parts[-1].upper()
-            return ".".join(parts)
-        # 默认走点号替换类模式（unicode / space / fullStop）
-        replacer = dot_replacer_map.get(mode, "\u200E.")
-        return domain.replace(".", replacer)
-
-    return domain_pattern.sub(_replace, text)
-
 
 # ============== 频率限制系统 ==============
 
@@ -549,23 +428,6 @@ def record_action(user_id: str, action: str):
     rate_limiter.record_request(user_id, action)
 
 
-def get_weekly_theme() -> dict:
-    """获取当前周主题信息（便捷函数）"""
-    try:
-        from .world.weekly_theme import WeeklyThemeManager
-        theme = WeeklyThemeManager.get_current_theme()
-        config = WeeklyThemeManager.get_theme_config(theme)
-        return {
-            "theme": theme,
-            "name": config.get("name", ""),
-            "emoji": config.get("emoji", ""),
-            "description": config.get("description", "")
-        }
-    except ImportError:
-        return {"theme": None, "name": "", "emoji": "", "description": ""}
-
-
-# ---------------- 周主题氛围 ----------------
 from datetime import datetime
 
 _WEEKLY_THEMES: list[dict] = [
@@ -591,9 +453,5 @@ def get_weekly_theme() -> dict:
     idx = (iso_week - 1) % len(_WEEKLY_THEMES)
     return _WEEKLY_THEMES[idx]
 
-
-def format_theme_banner(prefix: str = "本周主题") -> str:
-    t = get_weekly_theme()
-    return f"{t['emoji']} {prefix}：{t['name']}\n{t['hint']}"
 
 

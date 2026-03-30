@@ -638,45 +638,6 @@ def _get_employer_name(location_name: str) -> str:
         return "负责人"
 
 
-# ==================== 中立NPC初始化命令 ====================
-# 已禁用 - 2025-12-07: 不再生成装饰性中立NPC
-# init_neutral_cmd = on_command("初始化中立NPC", block=True, priority=1, permission=SUPERUSER)
-#
-#
-# @init_neutral_cmd.handle()
-# async def handle_init_neutral_npcs(event: MessageEvent):
-#     """单独初始化中立NPC"""
-#     try:
-#         async with safe_session() as session:
-#             # 初始化中立NPC
-#             neutral_count = await init_neutral_npcs(session)
-#
-#             await session.commit()
-#
-#             result_msg = (
-#                 "✅ 中立NPC初始化完成！\n"
-#                 "━━━━━━━━━━━━━\n"
-#                 f"👤 新增中立NPC：{neutral_count}个\n"
-#                 "━━━━━━━━━━━━━\n"
-#                 "🌟 特色功能：\n"
-#                 "• 丰富的怪谈风格对话\n"
-#                 "• 随机/循环对话系统\n"
-#                 "• 神秘的世界观背景\n"
-#                 "• 诡异的氛围描述\n"
-#                 "━━━━━━━━━━━━━\n"
-#                 "🎯 使用【交互 <NPC名称>】与他们对话\n"
-#                 "👻 每次交互都可能听到不同的故事！"
-#             )
-#
-#             await init_neutral_cmd.finish(message_add_head(result_msg, event))
-#
-#     except SQLAlchemyError as e:
-#         error_msg = f"❌ 中立NPC初始化失败（数据库）：{str(e)}"
-#         await init_neutral_cmd.finish(message_add_head(error_msg, event))
-#     except ValueError as e:
-#         error_msg = f"❌ 中立NPC初始化失败：{str(e)}"
-#         await init_neutral_cmd.finish(message_add_head(error_msg, event))
-
 
 # ==================== 迁移命令 ====================
 migrate_data_cmd = on_command("迁移数据", block=True, priority=1, permission=SUPERUSER)
