@@ -111,9 +111,7 @@ async def get_unified_player(session: AsyncSession, event: MessageEvent) -> Opti
                 # 账号已转让给别人，当前用户无权操作
                 player = None
 
-    # 刷新对象以获取最新数据库状态，避免session缓存导致的闭关状态不同步问题
     if player is not None:
-        await session.refresh(player)
         # 更新最后活跃时间（灵田偷菜判定用）
         player.last_active_at = datetime.now()
 
