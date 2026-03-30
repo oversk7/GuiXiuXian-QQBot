@@ -18,7 +18,7 @@ from ..models.player import Player
 from ..models.inventory import ItemInstance
 from ..config import config
 from ..platform_utils import get_unified_player
-from ..markdown_utils import build_markdown, cmd
+from ..utils_markdown import build_markdown, cmd
 from .decompose_service import validate_decompose, calculate_decompose_yields, FRAGMENT_ITEM_ID
 
 # 分解选择状态：{player_id: {"ids": [...], "summaries": [...], "timestamp": float}}
