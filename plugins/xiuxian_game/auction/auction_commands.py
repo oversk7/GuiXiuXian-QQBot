@@ -130,8 +130,8 @@ async def handle_list_auction(event: MessageEvent, args: Message = CommandArg())
     if not item_cfg:
         await list_auction_cmd.finish(message_add_head(f"⛔ 未找到物品「{item_name}」", event))
 
-    if item_cfg.type == ItemType.EQUIPMENT:
-        await _handle_equipment_auction_listing(event, item_cfg, start_price, duration_hours, buyout_price)
+    if item_cfg.type in (ItemType.EQUIPMENT, ItemType.INSCRIPTION):
+        await _handle_instance_auction_listing(event, item_cfg, start_price, duration_hours, buyout_price)
         return  # finish() 已在内部调用，此行不会执行
 
     # 普通物品：直接上架
@@ -154,14 +154,17 @@ async def handle_list_auction(event: MessageEvent, args: Message = CommandArg())
     await list_auction_cmd.finish(message_add_head(result_msg, event))
 
 
-async def _handle_equipment_auction_listing(
+async def _handle_instance_auction_listing(
     event: MessageEvent,
     item_cfg,
     start_price: int,
     duration_hours: int,
     buyout_price: Optional[int],
 ):
-    """装备拍卖：查询可用实例，单件直接上架，多件让玩家选择"""
+    """装备/铭文拍卖：查询可用实例，单件直接上架，多件让玩家选择"""
+    is_inscription = item_cfg.type == ItemType.INSCRIPTION
+    type_name = "铭文" if is_inscription else "装备"
+
     async with UnitOfWork(AsyncSessionLocal) as uow:
         player = await get_unified_player(uow.session, event)
         if not player:
@@ -170,19 +173,21 @@ async def _handle_equipment_auction_listing(
             else:
                 await list_auction_cmd.finish(message_add_head("⛔ 请先创建角色", event))
 
-        # 提前检查上架数量限制，避免展示选择菜单后再失败
+        # 提前检查上架数量限制
         active_auctions = await uow.auction_items.find_seller_active_auctions(player.id)
         if len(active_auctions) >= auction_service.MAX_AUCTION_LISTINGS:
             await list_auction_cmd.finish(message_add_head(
                 f"⛔ 你已有 {auction_service.MAX_AUCTION_LISTINGS} 件物品正在拍卖，无法继续上架", event
             ))
 
-        # 查询背包中所有该装备的可用实例
-        stmt = select(ItemInstance).where(
+        # 查询背包中所有该物品的可用实例
+        conditions = [
             ItemInstance.player_id == player.id,
             ItemInstance.item_id == item_cfg.item_id,
-            ItemInstance.equipped == False,
-        )
+        ]
+        if not is_inscription:
+            conditions.append(ItemInstance.equipped == False)
+        stmt = select(ItemInstance).where(*conditions)
         res = await uow.session.execute(stmt)
         candidates = res.scalars().all()
         available = [
@@ -193,7 +198,7 @@ async def _handle_equipment_auction_listing(
 
         if not available:
             await list_auction_cmd.finish(message_add_head(
-                f"⛔ 背包中没有可拍卖的「{item_cfg.name}」（请确认未装备且未在市场挂牌）", event
+                f"⛔ 背包中没有可拍卖的「{item_cfg.name}」", event
             ))
 
         if len(available) == 1:
@@ -206,8 +211,9 @@ async def _handle_equipment_auction_listing(
                 await uow.commit()
             await list_auction_cmd.finish(message_add_head(msg, event))
 
-        # 多件装备：生成摘要，保存选择状态，展示列表
-        summaries = [EquipmentTradeService.generate_equipment_summary(e) for e in available]
+        # 多件：生成摘要，保存选择状态，展示列表
+        from ..economy.equipment_trade_service_new import EquipmentTradeService as ETSNew
+        summaries = [ETSNew.generate_instance_summary(e) for e in available]
         equipment_ids = [e.id for e in available]
 
         _cleanup_expired_auction_states()

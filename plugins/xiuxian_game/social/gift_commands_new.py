@@ -261,10 +261,11 @@ async def _handle_equipment_transfer_selection(
             )
             return
 
-        # 多件装备,保存状态并让玩家选择
+        # 多件实例,保存状态并让玩家选择
+        from ..economy.equipment_trade_service_new import EquipmentTradeService as ETSNew
         equipment_ids = [eq.id for eq in equipment_list]
         equipment_summaries = [
-            EquipmentTradeService.generate_equipment_summary(eq) for eq in equipment_list
+            ETSNew.generate_instance_summary(eq) for eq in equipment_list
         ]
 
         equipment_transfer_selection_state[player_id] = {
