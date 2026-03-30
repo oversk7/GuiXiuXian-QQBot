@@ -1076,10 +1076,15 @@ async def _(event: MessageEvent):
 
         event_desc = describe_tile(tile)
 
+        # 获取含buff/宠物的有效属性，保持与面板一致
+        effective_attrs = await player.get_effective_attributes(session)
+        eff_max_hp = effective_attrs.get("max_hp", player.max_hp)
+        eff_max_mp = effective_attrs.get("max_mp", player.max_mp)
+
         status_line = (
             f"🧭 **{player.get_current_region()}** ({new_x},{new_y})　"
-            f"❤️ **{player.hp}**/{player.max_hp}　"
-            f"🧠 **{player.mp}**/{player.max_mp}"
+            f"❤️ **{player.hp}**/{eff_max_hp}　"
+            f"🧠 **{player.mp}**/{eff_max_mp}"
         )
 
         lines = [
@@ -1823,12 +1828,16 @@ async def _(event: MessageEvent):
             completed_tasks = await task_service.try_auto_complete_tasks(player.id)
             if completed_tasks:
                 log += "\n\n🎉 公会任务完成：\n" + "\n".join(completed_tasks)
+        # 获取含buff/宠物的有效属性，保持与面板一致
+        effective_attrs = await player.get_effective_attributes(session)
+        eff_max_hp = effective_attrs.get("max_hp", player.max_hp)
+        eff_max_mp = effective_attrs.get("max_mp", player.max_mp)
         await session.commit()
 
     status_line = (
         f"🧭 **{current_region}** ({current_x},{current_y})　"
-        f"❤️ **{player.hp}**/{player.max_hp}　"
-        f"🧠 **{player.mp}**/{player.max_mp}"
+        f"❤️ **{player.hp}**/{eff_max_hp}　"
+        f"🧠 **{player.mp}**/{eff_max_mp}"
     )
 
     lines = [
