@@ -53,8 +53,12 @@ async def handle_reroll(event: MessageEvent, args: Message = CommandArg()):
         if not player:
             await reroll_cmd.finish("你还没有创建角色")
 
-        from .decompose_commands import _find_equipment
-        equipment = await _find_equipment(session, player.id, equip_keyword)
+        from .decompose_commands import _find_equipment_by_index, _find_equipments_by_name
+        if equip_keyword.isdigit():
+            equipment = await _find_equipment_by_index(session, player.id, int(equip_keyword))
+        else:
+            matches = await _find_equipments_by_name(session, player.id, equip_keyword)
+            equipment = matches[0] if matches else None
         if not equipment:
             await reroll_cmd.finish(f"未找到装备：{equip_keyword}")
 
