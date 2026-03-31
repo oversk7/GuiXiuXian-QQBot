@@ -18,6 +18,7 @@ import uuid
 from ..models.navigation_task import NavigationTask
 from ..world.navigation import _update_nav_position
 from ..platform_utils import get_unified_player, is_guild_message
+from ..infrastructure.cache import player_identity_cache
 from ..config import config
 from ..infrastructure.uow import UnitOfWork
 from ..domain.attributes import get_effective_attributes_v2
@@ -421,6 +422,9 @@ async def create_player(event: MessageEvent, nickname: str, gender: Gender) -> M
         )
         session.add(ownership)
         await session.commit()
+
+        # 清除身份缓存，防止注册前的"无角色"缓存导致后续指令失败
+        player_identity_cache.put(user_id, new_player.id)
 
         # 💡 改名卡由首次签到时赠送，见 entertainment/sign.py
 
