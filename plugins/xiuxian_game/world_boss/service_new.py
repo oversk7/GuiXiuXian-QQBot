@@ -98,15 +98,21 @@ class WorldBossService:
         """获取转数对应的段位编号（0=凡尘/0转，1=轮回/1-2转，2=超脱/3-4转，...）"""
         if reincarnation_level <= 0:
             return 0
-        return (reincarnation_level - 1) // 2 + 1
+        tier = (reincarnation_level - 1) // 2 + 1
+        max_tier = len(WorldBossService.TIER_NAMES) - 1
+        return min(tier, max_tier)
 
     @staticmethod
     def get_tier_label(tier: int) -> str:
         """获取段位展示名称，如'轮回段（1-2转）'"""
         names = WorldBossService.TIER_NAMES
-        name = names[tier] if tier < len(names) else f"第{tier+1}段"
+        name = names[tier] if tier < len(names) else names[-1]
         if tier == 0:
             return f"{name}（0转）"
+        max_tier = len(names) - 1
+        if tier >= max_tier:
+            low = (max_tier - 1) * 2 + 1
+            return f"{name}（{low}+转）"
         low = (tier - 1) * 2 + 1
         high = tier * 2
         return f"{name}（{low}-{high}转）"
@@ -372,7 +378,7 @@ class WorldBossService:
             "  · 存活至战斗结束：总伤害 ×1.2",
             "  · 理智防护：闪避可完全躲避，防御15%效益",
             "",
-            "📊 段位划分：凡尘(0转) / 轮回(1-2转) / 超脱(3-4转) / 传说(5-6转)..."
+            "📊 段位划分：凡尘(0转) / 轮回(1-2转) / 超脱(3-4转) / 传说(5-6转) / 永恒(7-8转) / 无上(9+转)"
         ])
 
         return "\n".join(lines)
@@ -751,7 +757,7 @@ class WorldBossService:
             f"⏳ 结算时间：{cycle.next_refresh_at.strftime('%m-%d %H:%M')}",
             "",
             "💎 各段位独立排名，同等奖励",
-            "📊 段位：凡尘(0转) / 轮回(1-2转) / 超脱(3-4转) / 传说(5-6转)..."
+            "📊 段位：凡尘(0转) / 轮回(1-2转) / 超脱(3-4转) / 传说(5-6转) / 永恒(7-8转) / 无上(9+转)"
         ])
 
         return "\n".join(lines)
