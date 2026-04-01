@@ -104,6 +104,12 @@ async def handle_favorability(event: MessageEvent, args: Message = CommandArg())
                 await favorability_cmd.finish("UID格式错误,请输入数字")
                 return
 
+            # 先查目标玩家，将UID转为player.id
+            target = await uow.players.get_by_uid(target_uid)
+            if not target:
+                await favorability_cmd.finish(f"未找到UID为{target_uid}的玩家")
+                return
+
             service = RelationshipService(
                 player_repo=uow.players,
                 relationship_repo=uow.player_relationships,
@@ -111,13 +117,7 @@ async def handle_favorability(event: MessageEvent, args: Message = CommandArg())
                 uow=uow
             )
 
-            favorability, relation_desc = await service.get_favorability(player.id, target_uid)
-
-            # 获取目标玩家
-            target = await uow.players.get_by_uid(target_uid)
-            if not target:
-                await favorability_cmd.finish(f"未找到UID为{target_uid}的玩家")
-                return
+            favorability, relation_desc = await service.get_favorability(player.id, target.id)
 
             lines = [
                 f"# 好感度查询",
