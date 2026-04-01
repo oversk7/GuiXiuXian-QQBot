@@ -144,7 +144,7 @@ def _load_item_images() -> dict:
     Returns:
         物品ID到图片URL的映射字典
     """
-    config_path = Path(__file__).parent.parent.parent.parent / "data" / "item_images.yaml"
+    config_path = Path(__file__).parent.parent / "data" / "item_images.yaml"
 
     if not config_path.exists():
         return {}

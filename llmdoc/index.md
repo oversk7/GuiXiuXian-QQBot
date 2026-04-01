@@ -8,9 +8,11 @@
 
 - **[项目概览](#项目概览)** - 了解这是什么项目
 - **[核心系统](#核心系统)** - 理解主要功能模块
-- **[架构设计](#架构设计)** - 系统如何构建(LLM检索地图)
+- **[架构设计](#架构设计)** - 系统如何构建
 - **[使用指南](#使用指南)** - 操作指南和最佳实践
 - **[参考手册](#参考手册)** - API规范和配置
+- **[设计文档](#设计文档)** - 功能设计规格和实现计划
+- **[调查报告](#调查报告)** - Agent调查报告
 - **[快速开始](#快速开始)** - 新手入门路径
 
 ---
@@ -61,14 +63,9 @@
   - 装备效果解锁(普通装备+2阶解锁,VIP装备0阶全解锁)
 
 - **[战斗系统指南](/llmdoc/guides/battle-system-guide.md)** - 发起PvP/PvE战斗、查询战斗属性、理解伤害计算
-  - 使用BattleIntegrationHelper.compact_player_vs_player_battle发起切磋
-  - 斩龙闪20%必中伤害拆分机制
   - 防御减伤公式: max(1, damage - min(defense, damage*defense/(defense+100)))
 
 - **[添加战斗效果指南](/llmdoc/guides/how-to-add-battle-effect.md)** - 通过YAML配置添加新效果,无需修改代码
-  - 添加新EffectType/TriggerType的步骤
-  - 配置参数说明(trigger, chance, effect, value, duration等)
-  - 环境条件效果(理智上限、区域白名单、周主题白名单)
 
 ### 经济系统
 - **[经济系统架构](/llmdoc/architecture/economy-system-architecture.md)** - 货币管理、价格计算、交易撮合、税收控制
@@ -77,47 +74,15 @@
   - 财富指数联动(1.0-3.0倍)响应全服财富水平
 
 - **[市场交易架构](/llmdoc/architecture/market-trading-architecture.md)** - 跑商系统、动态定价、供需因子
-  - 13个市集配置,4小时同地点限制
-  - 供需因子(0.6-1.6)影响价格,每日20%回归
-  - 跨市场交易5%奖励
 
 - **[市场交易指南](/llmdoc/guides/market-trading-guide.md)** - 挂牌买卖、撤牌、查牌、税率
-  - 挂牌命令: 【挂牌 出售/收购 物品名 单价 数量】
-  - 每人最多6个订单,装备交易冻结状态
-  - 底价自动吸附,8倍底价上限
 
 - **[经济平衡指南](/llmdoc/guides/economy-balance-guide.md)** - 通胀控制、财富分配、价格调控
-  - 财富指数公式: scale = 1.0 + (median_wealth/5B)^0.3 * 0.3
-  - EMA平滑处理: current = prev*0.85 + new*0.15
-
-### 物品与装备
-- **[物品装备架构](/llmdoc/agent/scout_item_equipment.md)** - 物品类型、稀有度分级、材料系统
-  - 7大类型: 消耗品、材料、装备、商品、鬼魂碎片、宝石、鱼类
-  - 稀有度: 白/绿/蓝/紫/橙/红
-  - 材料按诡域深度分层掉落(1-20重白色,21-50重绿色...)
-
-### 公会系统
-- **[公会系统架构](/llmdoc/agent/scout_guild_system.md)** - 宗门管理、建筑系统、职位权限
-  - 8种功能建筑(经验神龛、资金金库、训练场等)
-  - 职位: 会长/副会长/核心成员/普通成员
-  - 容量计算: 10 + (level-1)*5
 
 ### 烹饪与餐厅经营
 - **[烹饪与餐厅经营系统设计](/llmdoc/architecture/cooking-restaurant-system-design.md)** - 烹饪系统、餐厅经营、厨师雇佣、食谱配方
-  - 核心定位: 娱乐+经济循环,玩家当老板开餐厅
   - 联动钓鱼系统: 鱼类食材 → 烹饪 → 菜肴 → 餐厅售卖/食用
-  - 厨师NPC: 5级(学徒→特级厨师),随机招募,影响品质和速度
-  - 食谱系统: 白/绿/蓝/紫/橙5级,默认+购买+掉落(共22个食谱)
-  - 新增调料物品: 盐/酱油/醋/糖/香料/芥末/灵芝粉/秘制酱料/仙厨秘油
-  - 按小时自动经营结算,厨师日志,经营报表
   - **实现状态**: ✅ 已完成(2026-02-08)
-  - 文件位置: `plugins/xiuxian_game/cooking/`
-
-### NPC与对话
-- **[故事对话系统](/llmdoc/agent/scout_story_dialogue_investigation_2025_01_10.md)** - AI对话引擎、NPC人设、长期记忆
-   - AI NPC支持自然对话和游戏指令角色扮演
-   - 每20轮对话自动总结,提取关键事件
-   - 好感度递减防止刷好感度
 
 ---
 
@@ -125,22 +90,8 @@
 
 ### 数据访问层
 - **[Repository模式实现](/llmdoc/architecture/repository-pattern-implementation.md)** - 42个Repository,泛型接口,领域查询
-  - IRepository[T]泛型抽象基类
-  - 标准CRUD + 领域查询方法(如get_by_uid)
-  - joinedload()预加载优化N+1问题
-
 - **[Unit of Work和DI](/llmdoc/architecture/unit-of-work-and-di.md)** - 事务边界管理、依赖注入容器、生命周期
-  - UnitOfWork统一事务管理,自动commit/rollback
-  - DIContainer支持Singleton/Scoped/Transient三种生命周期
-  - 延迟初始化Repository,所有Repository共享同一Session
-
-- **[数据访问迁移指南](/llmdoc/guides/data-access-migration-guide.md)** - 从Legacy架构迁移到新架构
-  - 步骤1: 创建Repository实现
-  - 步骤2: 添加到UnitOfWork
-  - 步骤3: 创建新Service类(移除内部commit)
-  - 步骤4: 更新CommandHandler(使用async with UnitOfWork)
-  - 步骤5: 测试和验证
-  - 步骤6: 清理旧代码
+- **[数据访问迁移指南](/llmdoc/guides/data-access-migration-guide.md)** - 从Legacy架构迁移到新架构(✅ 已全部完成)
 
 ### 设计模式
 - **Repository模式** - 数据访问抽象,可测试性,查询集中化
@@ -148,16 +99,12 @@
 - **依赖注入(DI)** - 解耦合,可测试性,生命周期管理
 - **策略模式** - 属性来源系统(IAttributeSource)
 - **桥接模式** - 战斗效果桥接(BattleEffectBridge)
-- **工厂模式** - AttributeCalculatorFactory单例
-- **适配器模式** - 旧代码适配新接口(IEffect)
 
 ### 架构特点
-- **双轨架构并存** - Legacy静态方法服务与DI架构服务平滑共存
 - **自动数据库迁移** - 启动时自动检测并升级数据库结构,零停机部署
 - **缓存优化** - 60秒TTL缓存减少90%临时buff查询
 - **属性持久化** - 装备加成预计算并持久化到player表
-
-
+- **架构迁移完成** - 26/26服务全部迁移到DI架构(2026-01-10)
 
 ---
 
@@ -165,48 +112,27 @@
 
 ### 属性系统
 - **[玩家属性指南](/llmdoc/guides/player-attribute-guide.md)** - 获取有效属性、添加属性来源、修改玩家属性
-  - 使用get_effective_attributes_v2()获取含所有加成的属性
-  - 实现IAttributeSource接口添加新属性来源
-  - 装备加成持久化 vs 临时buff动态计算
 
 ### 数据库操作
 - **[自动迁移系统](/llmdoc/overview/project-overview.md#64-自动数据库迁移-auto-migrate)** - 添加新字段、添加ENUM值
-  - 在REQUIRED_FIELDS字典中添加字段定义
-  - 重启Bot自动执行迁移
-  - 安全ENUM重建6步流程
 
 ### 开发规范
 - **[编码规范](/llmdoc/reference/coding-conventions.md)** - Python代码风格、命名约定、文件组织、设计模式
-   - 强制类型注解,ORM字段使用Mapped[T]语法
-   - 类命名PascalCase,函数命名snake_case
-   - Repository实现IRepository[T]接口
-   - UoW外部调用finish()防止连接泄漏
 
 ### 装备设计
 - **[VIP装备设计模板](/llmdoc/guides/vip-equipment-design-templates.md)** - VIP定制装备设计方案集，带专属主动技能
-  - 4套完整方案: 雨钉锚点流、时间回溯流、诡域速通流、生命锚点流
-  - 定价原则(1000元档位)、平衡性要求、技术实现框架
-  - 通用技能代码框架、数据库表扩展、定制流程建议
 
-### 帮助信息更新
-- **[帮助系统](/llmdoc/overview/project-overview.md#104-帮助信息更新)** - 添加/修改命令时更新help.py
-  - 位置: plugins/xiuxian_game/player/help.py
-  - 格式: {"命令名": {"usage": "...", "description": "...", "examples": [...]}}
-
-
+### 玩家攻略
+- **[攻略合集](/llmdoc/guides/攻略合集.md)** - 跑商、战斗、经济等玩家攻略(面向玩家)
 
 ---
 
 ## 参考手册
 
-### 系统参考
 - **[经济系统参考](/llmdoc/reference/economy-system-reference.md)** - 配置参数、计算公式、常量定义
-  - 修炼配置: cool_down: 300, base_exp: 50
-  - 突破配置: change_level: 30, fail_keep_ratio: 0.7
-  - 掉落率: 白色30%,绿色15%,蓝色8%,紫色3%,橙色1%
-  - 经济倍率: MATERIAL 0.7x, GEM 2.0x, EQUIPMENT 4.0x
-
-
+- **[编码规范](/llmdoc/reference/coding-conventions.md)** - Python代码风格、命名约定
+- **[Git规范](/llmdoc/reference/git-conventions.md)** - Git提交规范
+- **[QQ Bot Markdown模板](/llmdoc/reference/markdown-templates.md)** - QQ Bot模板ID和模板语法参考
 
 ### 配置文件
 - **NoneBot配置** (`.env`) - ENVIRONMENT, LOG_LEVEL, COMMAND_START, SUPERUSERS
@@ -223,6 +149,55 @@
 | 背包格子 | +5 | +20 |
 | 突破保护 | 75% | 80% |
 | 自动采集 | 无 | 有 |
+
+---
+
+## 设计文档
+
+功能设计规格和实现计划,由 brainstorming 会话产出。
+
+### 设计规格 (specs)
+- **[战斗UI Markdown设计](/llmdoc/design/specs/2026-03-13-battle-ui-markdown-design.md)** (2026-03-13)
+- **[龙斩鞋设计](/llmdoc/design/specs/2026-03-13-dragon-blade-shoes-design.md)** (2026-03-13)
+- **[奋进系统设计](/llmdoc/design/specs/2026-03-15-fenjin-design.md)** (2026-03-15)
+- **[装备词缀铭文设计](/llmdoc/design/specs/2026-03-18-equipment-affix-inscription-design.md)** (2026-03-18)
+- **[铭文掉落Phase3设计](/llmdoc/design/specs/2026-03-19-inscription-drop-phase3-design.md)** (2026-03-19)
+- **[新手任务扩展设计](/llmdoc/design/specs/2026-03-20-novice-quest-expansion-design.md)** (2026-03-20)
+- **[导航随机事件设计](/llmdoc/design/specs/2026-03-20-navigation-random-events-design.md)** (2026-03-20)
+- **[荔湾鬼城内界设计](/llmdoc/design/specs/2026-03-24-liwan-ghost-town-inner-realm-design.md)** (2026-03-24)
+- **[餐厅经济平衡重设计](/llmdoc/design/specs/2026-03-27-restaurant-economy-balance-design.md)** (2026-03-27)
+
+### 实现计划 (plans)
+- **[奋进系统实现](/llmdoc/design/plans/2026-03-15-fenjin-impl.md)** (2026-03-15)
+- **[装备词缀Phase1](/llmdoc/design/plans/2026-03-18-equipment-affix-phase1-impl.md)** (2026-03-18)
+- **[装备词缀Phase2](/llmdoc/design/plans/2026-03-18-equipment-affix-phase2-impl.md)** (2026-03-18)
+- **[铭文掉落Phase3](/llmdoc/design/plans/2026-03-19-inscription-drop-phase3-impl.md)** (2026-03-19)
+- **[宠物伴侣系统](/llmdoc/design/plans/2026-03-20-pet-companion-system.md)** (2026-03-20)
+- **[宠物进化系统](/llmdoc/design/plans/2026-03-21-pet-evolution-system.md)** (2026-03-21)
+- **[宠物自定义性格](/llmdoc/design/plans/2026-03-22-pet-custom-personality.md)** (2026-03-22)
+- **[荔湾鬼城实现](/llmdoc/design/plans/2026-03-24-liwan-ghost-town-impl.md)** (2026-03-24)
+- **[原生Markdown帮助经济](/llmdoc/design/plans/2026-03-26-native-markdown-help-economy.md)** (2026-03-26)
+- **[餐厅经济平衡](/llmdoc/design/plans/2026-03-27-restaurant-economy-balance.md)** (2026-03-27)
+
+---
+
+## 调查报告
+
+Agent调查报告,记录系统分析和设计决策。
+
+- **[Repository/Service/UoW模式](/llmdoc/agent/scout_repository_service_uow_patterns_2026_01_11.md)** (2026-01-11)
+- **[周主题调查](/llmdoc/agent/scout_weekly_theme_investigation_2026_01_11.md)** (2026-01-11)
+- **[修炼系统调查](/llmdoc/agent/scout_cultivation_system_investigation_2025_01_23.md)** (2025-01-23)
+- **[经济社交菜单结构](/llmdoc/agent/economy_social_systems_menu_structure_2026_01_23.md)** (2026-01-23)
+- **[战斗装备背包UI](/llmdoc/agent/scout_battle_equipment_inventory_ui_2026_01_23.md)** (2026-01-23)
+- **[帮助系统调查](/llmdoc/agent/help_system_investigation_2026_01_31.md)** (2026-01-31)
+- **[内界设计](/llmdoc/agent/inner_realms_design_2026_02_07.md)** (2026-02-07)
+- **[世界Boss调查](/llmdoc/agent/scout_world_boss_system_investigation_2026_02_11.md)** (2026-02-11)
+- **[技术架构调查](/llmdoc/agent/tech_architecture_investigation_2026_02_18.md)** (2026-02-18)
+- **[阴宅公会仓库调查](/llmdoc/agent/scout_mansion_guild_warehouse_investigation_2026_02_22.md)** (2026-02-22)
+- **[战斗日志调查](/llmdoc/agent/battle_log_scout.md)**
+- **[NPC对话与物品管理](/llmdoc/agent/scout_npc_ai_dialogue_and_item_management_2026_03_04.md)** (2026-03-04)
+- **[下界系统](/llmdoc/agent/scout_lower_world_system_2026_03_15.md)** (2026-03-15)
 
 ---
 
@@ -247,116 +222,29 @@
 - **修改玩家属性**: 参考 [玩家属性指南](/llmdoc/guides/player-attribute-guide.md)
 - **数据库迁移**: 参考 [自动迁移系统](/llmdoc/overview/project-overview.md#64-自动数据库迁移-auto-migrate)
 
-#### 4. 更新文档
-- 架构文档更新: `/llmdoc/architecture/`
-- 操作指南更新: `/llmdoc/guides/`
-- 参考文档更新: `/llmdoc/reference/`
-- **必须同步更新本索引文件**
+### 常见任务速查
 
----
-
-## 常见任务速查
-
-### 添加新功能
-1. 创建数据模型 (models/)
-2. 创建Repository (infrastructure/repositories/)
-3. 添加到UnitOfWork (infrastructure/uow/unit_of_work.py)
-4. 创建Service (domain/ 或 功能目录/*_service_new.py)
-5. 更新帮助信息 (player/help.py)
-
-### 修复Bug
-1. 定位代码位置 (使用本索引找到相关模块)
-2. 阅读[架构文档](#架构设计)理解数据流
-3. 阅读[指南文档](#使用指南)了解使用方式
-4. 遵循[编码规范](#编码规范)修改代码
-
-### 性能优化
-1. 检查是否使用Repository而非直接Session
-2. 检查是否使用joinedload()避免N+1查询
-3. 检查是否使用60秒TTL缓存(buff_source.py)
-4. 检查是否预计算并持久化属性(装备加成)
-
-### 数据库迁移
-1. 在models/auto_migrate.py的REQUIRED_FIELDS添加字段定义
-2. 重启Bot,自动执行迁移
-3. 验证字段是否正确添加
-4. 更新相关代码使用新字段
-
----
-
-## 技术债务与改进方向
-
-### 已知问题
-1. **属性计算复杂** - 多层叠加可能导致性能问题
-2. **经济平衡** - 长期通胀压力,高玩财富集中
-3. **新手门槛** - 300级才能转生,前期体验较长
-
-### 改进方向
-1. ~~**完成架构迁移**~~ - ✅ **已完成** (2026-01-10: 26/26服务全部迁移到DI架构)
-2. **引入缓存** - Redis缓存热点数据(如玩家属性)
-3. **CQRS** - 读写分离,查询用轻量级Query
-4. **事件溯源** - 关键操作记录事件日志
-5. **微服务拆分** - 经济服务、社交服务独立部署
-
-### 代码清理记录
-- **2026-01-10**: 完成完整legacy代码清理(删除21个文件,约6,624行)
-  - 第一阶段: 删除13个低风险legacy文件 (~3,800行)
-  - 第二阶段: 删除5个中风险legacy文件 (~1,693行)
-  - 第三阶段: 迁移并删除3个文件 (~1,131行)
-  - **架构迁移完成度: 100%** (26/26个服务全部完成)
-  - 详细报告: `/llmdoc/agent/legacy_code_complete_cleanup_2026_01_10.md`
-  - 调查报告: `/llmdoc/agent/legacy_files_investigation_2026_01_10.md`
+| 任务 | 步骤 |
+|------|------|
+| 添加新功能 | 创建Model → Repository → 添加到UoW → 创建Service → 更新help.py |
+| 数据库迁移 | 在auto_migrate.py的REQUIRED_FIELDS添加字段 → 重启Bot |
+| 添加战斗效果 | 参考 [how-to-add-battle-effect](/llmdoc/guides/how-to-add-battle-effect.md) |
 
 ---
 
 ## 文档分类说明
 
-### /llmdoc/overview/ (概览)
-回答"这是什么?" - 高层次项目上下文、系统概览、核心概念
-
-### /llmdoc/architecture/ (架构)
-回答"如何构建?" - LLM检索地图,核心组件、执行流程、设计原理
-
-### /llmdoc/guides/ (指南)
-回答"如何操作?" - 步骤化操作指南、最佳实践、调试技巧
-
-### /llmdoc/reference/ (参考)
-回答"具体细节?" - API规范、配置参数、数据模型、常量定义
-
-### /llmdoc/agent/ (Agent报告)
-调查报告、问题分析、实现状态 - LLM Agent工作成果
+| 目录 | 用途 | 回答的问题 |
+|------|------|-----------|
+| `/llmdoc/overview/` | 高层次项目上下文、系统概览 | "这是什么?" |
+| `/llmdoc/architecture/` | 核心组件、执行流程、设计原理 | "如何构建?" |
+| `/llmdoc/guides/` | 步骤化操作指南、最佳实践 | "如何操作?" |
+| `/llmdoc/reference/` | API规范、配置参数、模板 | "具体细节?" |
+| `/llmdoc/design/` | 功能设计规格和实现计划 | "为什么这样设计?" |
+| `/llmdoc/agent/` | Agent调查报告和分析 | "调查了什么?" |
 
 ---
 
-## 文档维护
-
-### 文档质量标准
-- **Brevity**: 每个文档少于150行,简洁明了
-- **Clarity**: 目的清晰,标题直观
-- **Accuracy**: 基于验证的代码,可追溯源文件
-- **Categorization**: 放入正确的分类(overview/architecture/guides/reference)
-- **Formatting**: 严格遵循ContentFormat_*/格式规范
-
-### 代码引用规范
-- **优先引用**: 使用`path/to/file.ext:line_start-line_end`格式
-- **避免大段代码**: 不粘贴超过15行的代码块
-- **说明意图**: 简要描述引用代码的作用
-
-### 更新检查清单
-- [ ] 文档内容准确(基于最新代码)
-- [ ] 引用路径正确(行号准确)
-- [ ] 遵循格式规范(ContentFormat_*)
-- [ ] 文件路径使用绝对路径
-- [ ] 同步更新本索引文件
-
----
-
-**版本**: 3.5
-**最后更新**: 2026-02-12
-**维护者**: 项目架构组
-**文档生成器**: recorder (Claude Code Agent)
-**最近更新**: 新增VIP装备设计模板文档，包含4套带专属主动技能的装备方案 (2026-02-12)
-
----
-
-> **提示**: 本索引是LLM的检索地图,按照从高到低的层次组织。使用Ctrl+F快速查找关键词,或跟随"快速开始"路径逐步了解项目。
+**版本**: 4.0
+**最后更新**: 2026-04-01
+**最近更新**: 整合docs/到llmdoc/,新增design/分类,修复死链,清理过时内容

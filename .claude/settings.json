@@ -1,6 +1,19 @@
 {
   "enabledPlugins": {
-    "superpowers@superpowers-marketplace": true,
-    "tr@tokenroll-cc-plugin": true
+    "superpowers@superpowers-marketplace": true
+  },
+  "hooks": {
+    "PostToolUse": [
+      {
+        "matcher": "Write",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash .claude/hooks/move-superpowers-docs.sh",
+            "async": true
+          }
+        ]
+      }
+    ]
   }
 }

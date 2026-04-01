@@ -23,7 +23,7 @@ from ..ai_guide import is_admin
 
 
 # 配置文件路径
-ITEM_IMAGES_CONFIG = Path(__file__).parent.parent.parent.parent / "data" / "item_images.yaml"
+ITEM_IMAGES_CONFIG = Path(__file__).parent.parent / "data" / "item_images.yaml"
 
 # 允许的图床URL前缀（不再限制特定图床，只要求HTTPS）
 ALLOWED_IMAGE_PREFIXES = [
