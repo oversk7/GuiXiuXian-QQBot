@@ -6,6 +6,7 @@ from sqlalchemy import select, func
 from ..models.db import safe_session
 from ..models.player import Player
 from ..utils import message_add_head
+from ..utils_markdown import cmd, build_markdown
 from ..platform_utils import get_unified_player
 
 
@@ -87,22 +88,21 @@ async def handle_charm_ranking(event: MessageEvent, args: Message = CommandArg()
         players = (await session.execute(stmt)).scalars().all()
 
     if not players:
-        await charm_ranking_cmd.finish(message_add_head("💖 魅力排行榜\n━━━━━━━━━━━━━\n暂无数据", event))
+        await charm_ranking_cmd.finish(build_markdown("💖 魅力排行榜\n***\n暂无数据"))
 
     if player_rank is not None:
-        lines = [f"💖 魅力排行榜 (你的排名: 第{player_rank}名)", "━━━━━━━━━━━━━"]
+        lines = [f"# 💖 魅力排行榜", f"你的排名: 第**{player_rank}**名", "***"]
     elif page is not None:
-        lines = [f"💖 魅力排行榜 (第{page}/3页)", "━━━━━━━━━━━━━"]
+        lines = [f"# 💖 魅力排行榜 (第{page}/3页)", "***"]
     else:
-        lines = ["💖 魅力排行榜", "━━━━━━━━━━━━━"]
+        lines = ["# 💖 魅力排行榜", "***"]
 
     for idx, p in enumerate(players, start=offset + 1):
         rank_emoji = "🥇" if idx == 1 else "🥈" if idx == 2 else "🥉" if idx == 3 else f"{idx}."
-        marker = " ◀" if player and p.id == player.id else ""
-        lines.append(f"{rank_emoji} {p.nickname}[UID:{p.uid}] - {p.charm} 🍫{marker}")
+        marker = " **◀你**" if player and p.id == player.id else ""
+        lines.append(f"{rank_emoji} {cmd(p.nickname, f'面板 {p.uid}')} - {p.charm} 🍫{marker}")
 
-    lines.append("━━━━━━━━━━━━━")
-    lines.append("💡 使用【魅力榜 页码】查看指定页(1-3)")
+    lines.append("***")
     lines.append("💡 收到好感度礼物可增加魅力值")
 
-    await charm_ranking_cmd.finish(message_add_head("\n".join(lines), event))
+    await charm_ranking_cmd.finish(build_markdown("\n".join(lines)))

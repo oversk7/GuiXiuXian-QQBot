@@ -301,8 +301,8 @@ async def handle_deposit_rank(event: MessageEvent, args: Message = CommandArg())
             if not p:
                 continue
             rank_emoji = "🥇" if idx == 1 else "🥈" if idx == 2 else "🥉" if idx == 3 else f"{idx}."
-            marker = " ◀" if player and p.id == player.id else ""
-            lines.append(f"{rank_emoji} {p.nickname}[UID:{p.uid}] - **{acc.balance:,}**💰{marker}")
+            marker = " **◀你**" if player and p.id == player.id else ""
+            lines.append(f"{rank_emoji} {cmd(p.nickname, f'面板 {p.uid}')} - **{acc.balance:,}**💰{marker}")
 
         lines.append("***")
         lines.append(f"{cmd('存款榜 1', '存款榜 1')} | {cmd('存款榜 2', '存款榜 2')} | {cmd('存款榜 3', '存款榜 3')} | {cmd('余额')}")

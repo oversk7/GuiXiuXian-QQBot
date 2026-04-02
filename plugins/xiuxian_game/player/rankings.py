@@ -270,7 +270,7 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
         marker = " **◀你**" if player_id and entry.player_id == player_id else ""
         exp_val = entry.extra.get("exp", 0)
         lines.append(
-            f"{_rank_emoji(entry.rank)} {entry.nickname}[UID:{entry.uid}] "
+            f"{_rank_emoji(entry.rank)} {cmd(entry.nickname, f'面板 {entry.uid}')} "
             f"- Lv.{entry.value}『{realm_name}』 ({exp_val} EXP){marker}"
         )
 
@@ -314,7 +314,7 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
     for entry in page_data:
         title = _luck_title(entry.value)
         marker = " **◀你**" if player_id and entry.player_id == player_id else ""
-        lines.append(f"{_rank_emoji(entry.rank)} {entry.nickname}[UID:{entry.uid}] - {title} 🍀{entry.value}{marker}")
+        lines.append(f"{_rank_emoji(entry.rank)} {cmd(entry.nickname, f'面板 {entry.uid}')} - {title} 🍀{entry.value}{marker}")
 
     lines.append("***")
     nav = []
@@ -351,7 +351,7 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
     for entry in page_data:
         formatted_wealth = _format_wealth(entry.value)
         marker = " **◀你**" if player_id and entry.player_id == player_id else ""
-        lines.append(f"{_rank_emoji(entry.rank)} {entry.nickname}[UID:{entry.uid}] - {formatted_wealth}{marker}")
+        lines.append(f"{_rank_emoji(entry.rank)} {cmd(entry.nickname, f'面板 {entry.uid}')} - {formatted_wealth}{marker}")
 
     lines.append("***")
     lines.append("*总财富 = 面板金币 + 银行余额 + 投资价值*")
@@ -396,7 +396,7 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
     for entry in page_data:
         title = _exploration_title(entry.value)
         marker = " **◀你**" if player_id and entry.player_id == player_id else ""
-        lines.append(f"{_rank_emoji(entry.rank)} {entry.nickname}[UID:{entry.uid}] - {title} 第{entry.value}层{marker}")
+        lines.append(f"{_rank_emoji(entry.rank)} {cmd(entry.nickname, f'面板 {entry.uid}')} - {title} 第{entry.value}层{marker}")
 
     lines.append("***")
     nav = []
@@ -440,7 +440,7 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
     for entry in page_data:
         title = _agility_title(entry.value)
         marker = " **◀你**" if player_id and entry.player_id == player_id else ""
-        lines.append(f"{_rank_emoji(entry.rank)} {entry.nickname}[UID:{entry.uid}] - {title} ⚡{entry.value}{marker}")
+        lines.append(f"{_rank_emoji(entry.rank)} {cmd(entry.nickname, f'面板 {entry.uid}')} - {title} ⚡{entry.value}{marker}")
 
     lines.append("***")
     nav = []
@@ -484,7 +484,7 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
     for entry in page_data:
         title = _mini_game_title(entry.value)
         marker = " **◀你**" if player_id and entry.player_id == player_id else ""
-        lines.append(f"{_rank_emoji(entry.rank)} {entry.nickname}[UID:{entry.uid}] - {title} 🎮{entry.value}分{marker}")
+        lines.append(f"{_rank_emoji(entry.rank)} {cmd(entry.nickname, f'面板 {entry.uid}')} - {title} 🎮{entry.value}分{marker}")
 
     lines.append("***")
     nav = []
@@ -553,7 +553,7 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
     for entry in page_data:
         title = _demon_coins_title(entry.value)
         marker = " **◀你**" if player_id and entry.player_id == player_id else ""
-        lines.append(f"{_rank_emoji(entry.rank)} {entry.nickname}[UID:{entry.uid}] - {title} 🎰{entry.value}{marker}")
+        lines.append(f"{_rank_emoji(entry.rank)} {cmd(entry.nickname, f'面板 {entry.uid}')} - {title} 🎰{entry.value}{marker}")
 
     lines.append("***")
     lines.append(f"*通过 {cmd('人机轮盘')} 赢取恶魔币上榜*")

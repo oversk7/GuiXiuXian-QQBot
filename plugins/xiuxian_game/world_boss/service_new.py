@@ -34,6 +34,7 @@ from ..infrastructure.repositories.player_repository import PlayerRepository
 from ..infrastructure.repositories.item_repository import ItemRepository
 # 事件系统
 from ..domain.events import event_bus, WorldBossDamageEvent
+from ..utils_markdown import cmd
 
 
 class WorldBossService:
@@ -743,7 +744,7 @@ class WorldBossService:
                 else:
                     icon = "🎖️"
 
-                lines.append(f"{icon} {rank}. {nickname}({uid}) - {damage_record.total_damage:,}")
+                lines.append(f"{icon} {rank}. {cmd(nickname, f'面板 {uid}')} - {damage_record.total_damage:,}")
 
             if len(group) > 10:
                 lines.append(f"   ... 还有 {len(group) - 10} 名勇士参与")

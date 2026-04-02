@@ -303,8 +303,9 @@ async def _(event: MessageEvent):
         for i, player_data in enumerate(leaderboard, 1):
             medal = "🥇" if i == 1 else "🥈" if i == 2 else "🥉" if i == 3 else f"{i}."
 
+            nick_cmd = cmd(player_data['nickname'], f"面板 {player_data['uid']}")
             lines.append(
-                f"{medal} {player_data['nickname']}(UID:{player_data['uid']})\n"
+                f"{medal} {nick_cmd}\n"
                 f"   💰 总价值：**{player_data['total_fish_value']}**\n"
                 f"   🎣 钓鱼次数：**{player_data['total_fishing_count']}**\n"
                 f"   🐟 鱼类数量：**{player_data['total_fish_caught']}**"

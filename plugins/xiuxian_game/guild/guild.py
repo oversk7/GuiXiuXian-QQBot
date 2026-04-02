@@ -762,8 +762,9 @@ async def handle_list_guilds(event: MessageEvent, args: Message = CommandArg()):
                 f"{member_count}/{max_members}人│"
                 f"💰{guild.treasury:,}"
             )
+            president_uid = president.uid if president else 0
             lines.append(
-                f"👑 会长：{president_name}　"
+                f"👑 会长：{cmd(president_name, f'面板 {president_uid}')}　"
                 f"{cmd('⚔️加入', f'加入公会 {guild.id}')}"
             )
             lines.append("")
