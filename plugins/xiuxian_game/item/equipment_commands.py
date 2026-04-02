@@ -984,7 +984,7 @@ async def handle_inscription_list(event: MessageEvent, args: Message = CommandAr
         if not inscriptions:
             msg = f"# 📜 铭文列表\n***\n你还没有铭文物品\n击杀精英怪可掉落铭文，或用铭文碎片合成\n***\n{synth_cmd} | {equip_bar_cmd} | {help_cmd}"
         else:
-            lines = ["# 📜 铭文列表", "***"]
+            lines = ["# 📜 铭文列表", "***", "```bash"]
             rarity_map = {"white": "⚪", "green": "🟢", "blue": "🔵", "purple": "🟣", "orange": "🟠"}
             rarity_order = {"orange": 0, "purple": 1, "blue": 2, "green": 3, "white": 4}
 
@@ -1009,13 +1009,14 @@ async def handle_inscription_list(event: MessageEvent, args: Message = CommandAr
                 display = get_inscription_display_from_item(insc)
                 rarity = insc.config.rarity if insc.config else "unknown"
                 icon = rarity_map.get(rarity, "⚪")
-                lines.append(f"> [{idx}] {icon} {display}")
+                lines.append(f"[{idx}] {icon} {display}")
                 idx += 1
 
             # 铭文碎片合并为一行
             if fragment_count > 0:
-                lines.append(f"> [{idx}] 🔵 铭文碎片 ×{fragment_count}（收集5个可【合成铭文】）")
+                lines.append(f"[{idx}] 🔵 铭文碎片 ×{fragment_count}（收集5个可【合成铭文】）")
 
+            lines.append("```")
             lines.append("***")
             lines.append(cmd("合成铭文") + " | " + cmd("装备栏") + " | " + cmd("帮助"))
             msg = "\n".join(lines)
