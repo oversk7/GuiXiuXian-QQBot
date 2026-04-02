@@ -246,6 +246,18 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
 
     await profile.finish(build_markdown("\n".join(lines)))
 
+
+def _get_qq_username(event: MessageEvent) -> str | None:
+    """尝试从 QQ 事件中获取用户昵称（username 字段）"""
+    author = getattr(event, "author", None)
+    if author is None:
+        return None
+    username = getattr(author, "username", None)
+    if username and isinstance(username, str) and username.strip():
+        return username.strip()[:24]  # 昵称最长24字符
+    return None
+
+
 @register.handle()
 async def _(event: MessageEvent, state: T_State, args: Message = CommandArg()):
     # 检查是否已有角色（通过ownership系统判断，支持转让后重新注册）
@@ -272,8 +284,10 @@ async def _(event: MessageEvent, state: T_State, args: Message = CommandArg()):
     arg_text = args.extract_plain_text().strip()
     if arg_text in ["男", "女"]:
         gender = Gender.MALE if arg_text == "男" else Gender.FEMALE
-        async with safe_session() as session:
-            nickname = await generate_random_nickname(session)
+        nickname = _get_qq_username(event)
+        if not nickname:
+            async with safe_session() as session:
+                nickname = await generate_random_nickname(session)
         result = await create_player(event, nickname, gender)
         await register.finish(result)
 
@@ -295,8 +309,10 @@ async def _(event: MessageEvent, gender_input: str = ArgPlainText("gender")):
     if gender_input not in ["男", "女"]:
         await register.reject("⛔ 请回复「男」或「女」")
     gender = Gender.MALE if gender_input == "男" else Gender.FEMALE
-    async with safe_session() as session:
-        nickname = await generate_random_nickname(session)
+    nickname = _get_qq_username(event)
+    if not nickname:
+        async with safe_session() as session:
+            nickname = await generate_random_nickname(session)
     result = await create_player(event, nickname, gender)
     await register.finish(result)
 
