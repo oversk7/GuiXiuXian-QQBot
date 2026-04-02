@@ -77,10 +77,11 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
         lines.extend([
             "",
             "💡 使用方法：",
-            f"▫️ {cmd(f'镶嵌 {arg} 孔位 宝石名', f'镶嵌 {arg} ')} 镶嵌",
+            f"▫️ {cmd(f'镶嵌 {arg} 孔位 宝石名', f'镶嵌 {arg} ')} 镶嵌宝石",
+            f"▫️ {cmd(f'镶嵌 {arg} 孔位 铭文编号', f'镶嵌 {arg} ')} 镶嵌铭文(编号见【铭文列表】)",
             f"▫️ {cmd(f'拆卸 {arg} 孔位', f'拆卸 {arg} ')} 拆卸",
             f"***",
-            f"{cmd('镶嵌物品')} | {cmd('装备栏')}"
+            f"{cmd('镶嵌物品')} | {cmd('铭文列表')} | {cmd('装备栏')}"
         ])
 
         await gem_slots_cmd.finish(build_markdown("\n".join(lines)))
@@ -93,12 +94,12 @@ socket_gem_cmd = on_command("镶嵌", aliases={"宝石镶嵌"}, block=True, prio
 async def _(event: MessageEvent, args: Message = CommandArg()):
     arg_text = args.extract_plain_text().strip()
     if not arg_text:
-        await socket_gem_cmd.finish("⛔ 格式：镶嵌 装备编号/名称 孔位号 宝石名称")
+        await socket_gem_cmd.finish("⛔ 格式：\n镶嵌 装备编号 孔位 宝石名称\n镶嵌 装备编号 孔位 铭文编号（铭文列表中的序号）")
 
     # 解析参数
     parts = arg_text.split()
     if len(parts) < 3:
-        await socket_gem_cmd.finish("⛔ 格式：镶嵌 装备编号/名称 孔位号 宝石名称")
+        await socket_gem_cmd.finish("⛔ 格式：\n镶嵌 装备编号 孔位 宝石名称\n镶嵌 装备编号 孔位 铭文编号")
 
     equipment_arg = parts[0]
     try:
@@ -107,7 +108,7 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
     except ValueError:
         await socket_gem_cmd.finish("⛔ 孔位号必须是数字")
 
-    gem_name = " ".join(parts[2:])
+    gem_arg = " ".join(parts[2:]).strip().lstrip("#")  # 支持 #1 或 1 格式
 
     async with safe_session() as session:
         # 使用跨平台工具获取玩家数据
@@ -124,24 +125,64 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
         if not equip:
             await socket_gem_cmd.finish("⛔ 未找到指定装备，请使用装备栏中显示的编号或装备名称")
 
-        # 查找宝石/铭文
-        gem_config = config.items_config["by_name"].get(gem_name)
-        if not gem_config:
-            await socket_gem_cmd.finish("⛔ 未找到指定宝石或铭文")
-
-        gem_item_id = gem_config.item_id
-
-        # 如果是铭文，需要查找背包中的铭文实例（带随机数值）
+        gem_item_id = None
         inscription_instance = None
-        if gem_config.type.value == "INSCRIPTION":
+
+        # 判断是铭文编号还是宝石名称
+        is_inscription_index = gem_arg.isdigit()
+
+        if is_inscription_index:
+            # 按铭文列表编号查找
+            insc_index = int(gem_arg)
+            from sqlalchemy import or_ as sa_or
             from sqlalchemy import select as sa_select
             stmt = sa_select(ItemInstance).where(
                 ItemInstance.player_id == player.id,
-                ItemInstance.item_id == gem_item_id,
-            ).limit(1)
-            inscription_instance = (await session.execute(stmt)).scalars().first()
-            if not inscription_instance:
-                await socket_gem_cmd.finish(f"⛔ 背包中没有铭文：{gem_name}")
+                sa_or(
+                    ItemInstance.item_id.like("inscription_%"),
+                    ItemInstance.item_id.like("adv_inscription_%"),
+                ),
+                ItemInstance.item_id != "inscription_fragment",
+            )
+            all_inscriptions = (await session.execute(stmt)).scalars().all()
+
+            # 按品阶排序（与铭文列表一致）
+            rarity_order = {"orange": 0, "purple": 1, "blue": 2, "green": 3, "white": 4}
+            all_inscriptions.sort(
+                key=lambda x: rarity_order.get(
+                    x.config.rarity if x.config else "white", 99
+                )
+            )
+
+            if insc_index < 1 or insc_index > len(all_inscriptions):
+                await socket_gem_cmd.finish(
+                    f"⛔ 铭文编号无效，你有 {len(all_inscriptions)} 个铭文\n"
+                    f"💡 使用【铭文列表】查看编号"
+                )
+
+            inscription_instance = all_inscriptions[insc_index - 1]
+            gem_item_id = inscription_instance.item_id
+        else:
+            # 按宝石/铭文名称查找（原逻辑）
+            gem_config = config.items_config["by_name"].get(gem_arg)
+            if not gem_config:
+                await socket_gem_cmd.finish(
+                    f"⛔ 未找到：{gem_arg}\n"
+                    f"💡 宝石用名称，铭文用编号（见【铭文列表】）"
+                )
+
+            gem_item_id = gem_config.item_id
+
+            # 如果是铭文类型，用名称查找第一个实例
+            if gem_config.type.value == "INSCRIPTION":
+                from sqlalchemy import select as sa_select
+                stmt = sa_select(ItemInstance).where(
+                    ItemInstance.player_id == player.id,
+                    ItemInstance.item_id == gem_item_id,
+                ).limit(1)
+                inscription_instance = (await session.execute(stmt)).scalars().first()
+                if not inscription_instance:
+                    await socket_gem_cmd.finish(f"⛔ 背包中没有铭文：{gem_arg}")
 
         # 执行镶嵌
         from ..infrastructure.repositories.item_repository import ItemRepository
