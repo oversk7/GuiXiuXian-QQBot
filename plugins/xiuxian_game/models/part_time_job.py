@@ -112,6 +112,13 @@ class PlayerJobStats(Base):
     favorite_job_type: Mapped[str] = mapped_column(String(32), nullable=True, comment="最喜欢的工作类型")
     favorite_location: Mapped[str] = mapped_column(String(32), nullable=True, comment="最喜欢的工作地点")
 
+    # 熟练度数据 {job_type: {"count": N, "level": N}}
+    job_proficiency: Mapped[dict] = mapped_column(
+        MutableDict.as_mutable(JSON),
+        default=dict,
+        comment="各工作熟练度数据JSON"
+    )
+
     # 成就数据
     achievements: Mapped[dict] = mapped_column(
         MutableDict.as_mutable(JSON),

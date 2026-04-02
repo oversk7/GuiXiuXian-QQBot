@@ -123,9 +123,19 @@ async def handle_work(event: MessageEvent, args: Message = CommandArg()):
             else:
                 time_str = f"{duration}小时"
 
+            # 熟练度信息
+            prof = job.get('proficiency', {})
+            prof_icon = prof.get('icon', '🔰')
+            prof_name = prof.get('name', '学徒')
+            prof_count = job.get('proficiency_count', 0)
+            prof_str = f"{prof_icon}{prof_name}({prof_count}次)"
+            next_lvl = job.get('next_level')
+            if next_lvl:
+                remaining = next_lvl['threshold'] - prof_count
+                prof_str += f" → 还需{remaining}次升{next_lvl['icon']}{next_lvl['name']}"
+
             lines.append(f"{job['emoji']} {i}. {cmd(job['name'], '打工 ' + job['name'])}")
-            lines.append(f"💰 基础收入：**{job['base_reward']}** 金币 | ⏰ 时长：**{time_str}**")
-            lines.append(f"📝 {job['description']}")
+            lines.append(f"💰 **{job['base_reward']}**金币 | ⏰ **{time_str}** | {prof_str}")
             if i < len(jobs):
                 lines.append("")
 
@@ -201,25 +211,46 @@ async def handle_finish_work(event: MessageEvent):
     if not success:
         await finish_work_cmd.finish(message_add_head(f"❌ {msg}", event))
 
-    # 构建奖励消息
+    # 构建奖励消息 - 包含评级、熟练度、掉落
+    rating_icon = result.get('rating_icon', '📋C')
+    rating_mult = result.get('rating_multiplier', 1.0)
+    prof = result.get('proficiency', {})
+    prof_icon = prof.get('icon', '🔰')
+    prof_name = prof.get('name', '学徒')
+
     lines = [
         f"# 🎉 {result['job_name']} 工作完成",
         "***",
-        f"💰 基础收入：**{result['base_reward']}** 金币"
+        f"📊 评级：**{rating_icon}** (×{rating_mult})",
+        f"💰 基础收入：**{result['base_reward']}** → 评级后：**{int(result['base_reward'] * rating_mult)}** 金币",
     ]
 
     if result['bonus_reward'] != 0:
         if result['special_event']:
-            lines.append(f"🎁 特殊事件：{result['special_event']['description']}")
             if result['bonus_reward'] > 0:
-                lines.append(f"✨ 额外奖励：**+{result['bonus_reward']}** 金币")
+                lines.append(f"🎁 {result['special_event']['description']}：**+{result['bonus_reward']}** 金币")
             else:
-                lines.append(f"💔 收入减少：**{result['bonus_reward']}** 金币")
+                lines.append(f"💔 {result['special_event']['description']}：**{result['bonus_reward']}** 金币")
+
+    lines.append(f"💎 总收入：**{result['total_reward']}** 金币")
+
+    # 道具掉落
+    dropped = result.get('dropped_item')
+    if dropped:
+        lines.append(f"🎒 捡到：**{dropped['name']}** ×{dropped['quantity']}")
+
+    lines.append("***")
+
+    # 熟练度信息
+    prof_count = result.get('proficiency_count', 0)
+    leveled_up = result.get('leveled_up', False)
+    if leveled_up:
+        lines.append(f"🎊 熟练度提升！→ {prof_icon}**{prof_name}** (收益+{int(prof.get('bonus', 0)*100)}%)")
+    else:
+        lines.append(f"{prof_icon} 熟练度：**{prof_name}** ({prof_count}次)")
 
     lines.extend([
-        f"💎 总收入：**{result['total_reward']}** 金币",
         f"🔥 连续工作：**{result['current_streak']}** 天",
-        "***",
         f"💰 当前金币：**{player.gold}**",
         "",
         f"{cmd('打工')} | {cmd('打工统计')} | {cmd('工作状态')}"
@@ -425,6 +456,21 @@ async def handle_work_stats(event: MessageEvent):
         fav_job = job_types[stats.favorite_job_type]
         lines.append(f"❤️ 偏好工作：**{fav_job['name']}**")
 
+    # 熟练度概览
+    proficiency = getattr(stats, 'job_proficiency', None) or {}
+    if proficiency:
+        lines.append("")
+        lines.append("📈 **熟练度一览**")
+        # 按完成次数排序
+        sorted_profs = sorted(proficiency.items(), key=lambda x: x[1].get("count", 0), reverse=True)
+        for job_type, prof_data in sorted_profs[:5]:  # 最多显示5个
+            if job_type in job_types:
+                count = prof_data.get("count", 0)
+                prof_info = PartTimeJobServiceNew.get_proficiency_level(count)
+                job_name = job_types[job_type]["name"]
+                job_emoji = job_types[job_type]["emoji"]
+                lines.append(f"  {job_emoji} {job_name}：{prof_info['icon']}{prof_info['name']}({count}次)")
+
     lines.append("***")
     lines.append(f"{cmd('打工')} | {cmd('打工记录')} | {cmd('工作地点')}")
 
@@ -451,10 +497,16 @@ async def handle_work_help(event: MessageEvent):
         f"▫️ {cmd('荔湾镇工业区', '导航 荔湾镇工业区')} (120,200) - 体力\n"
         f"▫️ {cmd('郸城娱乐街区', '导航 郸城娱乐街区')} (120,120) - 轻松\n"
         f"▫️ {cmd('东郊物流中心', '导航 东郊物流中心')} (390,50) - 物流\n\n"
-        f"⚡ 超快节奏体验\n"
-        f"▫️ 工作时长：**2-3**分钟 | 工资：**60-180**金币/次\n"
-        f"▫️ 特殊事件最高**300**金币 | 每小时最多**10**次\n\n"
-        f"💰 收入 = 基础 + 等级加成 + 运气加成 + 连续奖励 + 特殊事件\n"
+        f"📊 评级系统\n"
+        f"▫️ 收工时随机评级：🏆S(×3) ⭐A(×2) ✅B(×1.5) 📋C(×1) 💤D(×0.7)\n"
+        f"▫️ 熟练度和运气越高，高评级概率越大\n\n"
+        f"🔰 熟练度系统\n"
+        f"▫️ 🔰学徒(0次) → ⭐熟手(5次,+15%) → 🌟专家(15次,+35%) → 👑大师(30次,+60%)\n"
+        f"▫️ 同一工作做得越多，收入和掉落越好\n\n"
+        f"🎒 道具掉落\n"
+        f"▫️ 收工时有概率获得材料、丹药、铭文碎片等\n"
+        f"▫️ 熟练度越高，掉落率越高、稀有物品越多\n\n"
+        f"💰 收入 = (基础+等级+熟练度)×运气×评级 + 连续奖励 + 特殊事件\n"
         f"***\n"
         f"{cmd('打工')} | {cmd('收工')} | {cmd('工作状态')}\n"
         f"{cmd('工作地点')} | {cmd('打工记录')} | {cmd('打工统计')}"

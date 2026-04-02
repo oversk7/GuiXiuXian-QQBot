@@ -168,6 +168,10 @@ REQUIRED_FIELDS: Dict[str, Dict[str, str]] = {
     "player_stats": {
         "npc_gifts_received": "INT DEFAULT 0 COMMENT '累计收到NPC赠礼次数'",
     },
+    # 打工系统 - 熟练度
+    "player_job_stats": {
+        "job_proficiency": "JSON NULL COMMENT '各工作熟练度数据JSON({job_type: {count, level}})'",
+    },
     # 注释: 以下字段已通过多次重启完成迁移:
     # - daily_task: quest_chain_id, quest_step, is_tutorial, auto_accept
     # - stocks: health, health_decay_rate, is_active, delisted_at, delist_reason
