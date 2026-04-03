@@ -15,6 +15,7 @@ from . import readonly_session, cached
 from ..models.player import Player
 from ..models.bank_account import BankAccount
 from ..models.stock import StockHolding, Stock
+from ..models.guild import Guild
 
 
 @dataclass
@@ -42,7 +43,9 @@ async def query_level_ranking(limit: int = 30) -> list[RankedPlayer]:
                 Player.level,
                 Player.exp,
                 Player.reincarnation_level,
+                Guild.name.label("guild_name"),
             )
+            .outerjoin(Guild, Player.guild_id == Guild.id)
             .order_by(
                 Player.reincarnation_level.desc(),
                 Player.level.desc(),
@@ -61,8 +64,8 @@ async def query_level_ranking(limit: int = 30) -> list[RankedPlayer]:
             nickname=row.nickname,
             value=row.level,
             extra={
-                "exp": row.exp,
                 "reincarnation_level": row.reincarnation_level,
+                "guild_name": row.guild_name,
             },
         ))
     return result

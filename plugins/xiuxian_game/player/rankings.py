@@ -268,10 +268,11 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
             entry.value, entry.extra.get("reincarnation_level", 0)
         )
         marker = " **◀你**" if player_id and entry.player_id == player_id else ""
-        exp_val = entry.extra.get("exp", 0)
+        guild_name = entry.extra.get("guild_name")
+        guild_tag = f" 【{guild_name}】" if guild_name else ""
         lines.append(
             f"{_rank_emoji(entry.rank)} {cmd(entry.nickname, f'面板 {entry.uid}')} "
-            f"- Lv.{entry.value}『{realm_name}』 ({exp_val} EXP){marker}"
+            f"- Lv.{entry.value}『{realm_name}』{guild_tag}{marker}"
         )
 
     lines.append("***")
