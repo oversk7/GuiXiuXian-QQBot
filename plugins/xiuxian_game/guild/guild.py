@@ -505,8 +505,9 @@ async def handle_member_list(event: MessageEvent, args: Message = CommandArg()):
     ]
     for idx, member in enumerate(members, start_idx + 1):
         icon = position_icons.get(member["position"], "")
+        nick_display = cmd(member['nickname'], f"面板 {member['uid']}")
         lines.append(
-            f"{idx}. {icon}**{member['nickname']}** Lv.{member['level']}　"
+            f"{idx}. {icon}{nick_display} Lv.{member['level']}　"
             f"{member['position_name']}　"
             f"贡献:{GuildEconomyService.format_large_number(member['contribution'])}"
         )

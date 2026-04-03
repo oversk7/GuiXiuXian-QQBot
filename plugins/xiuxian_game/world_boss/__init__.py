@@ -26,6 +26,7 @@ from nonebot.params import CommandArg
 from ..models.db import safe_session
 from ..models.player import Player
 from ..utils import message_add_head
+from ..utils_markdown import build_markdown
 from ..battle.battle_markdown import build_battle_markdown
 from ..battle.battle_log_filter import filter_battle_log, get_player_log_mode
 from .service_new import WorldBossService
@@ -133,7 +134,7 @@ async def handle_rank(event: MessageEvent):
         msg = await service.build_ranking_view(cycle)
         if tip:
             msg = tip + "\n" + msg
-        await rank_cmd.finish(message_add_head(msg, event))
+        await rank_cmd.finish(build_markdown(msg))
 
 
 @open_chest_cmd.handle()
