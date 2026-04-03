@@ -1,0 +1,812 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>大都会 · 修仙者态势图</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+html,body{width:100%;height:100%;overflow:hidden;background:#080c18;color:#a0c4e8;font-family:'Courier New',monospace}
+
+/* ======== Header ======== */
+#hdr{position:fixed;top:0;left:0;right:0;height:52px;background:rgba(8,12,24,.92);border-bottom:1px solid rgba(0,200,255,.15);display:flex;align-items:center;padding:0 20px;z-index:100;backdrop-filter:blur(8px)}
+#hdr .logo{font-size:16px;color:#00f0ff;letter-spacing:2px;white-space:nowrap;text-shadow:0 0 10px rgba(0,240,255,.4)}
+#hdr .logo span{color:#00ff88;margin-right:4px}
+#search-box{margin-left:24px;position:relative;flex:0 1 260px}
+#search{width:100%;padding:7px 12px 7px 32px;background:rgba(0,180,255,.08);border:1px solid rgba(0,200,255,.25);border-radius:4px;color:#d0e8ff;font-family:inherit;font-size:13px;outline:none;transition:border-color .2s}
+#search:focus{border-color:#00f0ff;box-shadow:0 0 12px rgba(0,240,255,.15)}
+#search::placeholder{color:rgba(160,196,232,.4)}
+#search-icon{position:absolute;left:10px;top:50%;transform:translateY(-50%);color:rgba(0,240,255,.5);font-size:14px;pointer-events:none}
+#stats{margin-left:auto;font-size:12px;color:rgba(160,196,232,.6);display:flex;gap:16px;white-space:nowrap}
+#stats .val{color:#00f0ff}
+#conn{width:8px;height:8px;border-radius:50%;margin-left:12px;background:#00ff88;box-shadow:0 0 6px #00ff88;align-self:center;transition:background .3s}
+#conn.err{background:#ff3366;box-shadow:0 0 6px #ff3366}
+
+/* ======== Canvas ======== */
+#map-canvas{position:fixed;top:52px;left:0;right:0;bottom:32px;cursor:grab}
+#map-canvas:active{cursor:grabbing}
+
+/* ======== Footer ======== */
+#ftr{position:fixed;bottom:0;left:0;right:0;height:32px;background:rgba(8,12,24,.92);border-top:1px solid rgba(0,200,255,.1);display:flex;align-items:center;padding:0 20px;font-size:11px;color:rgba(160,196,232,.45);z-index:100;gap:20px}
+#ftr .hl{color:rgba(0,240,255,.6)}
+
+/* ======== Tooltip ======== */
+#tip{position:fixed;pointer-events:none;z-index:200;background:rgba(8,16,32,.95);border:1px solid rgba(0,200,255,.3);border-radius:6px;padding:10px 14px;font-size:12px;line-height:1.6;display:none;max-width:220px;box-shadow:0 4px 20px rgba(0,0,0,.5)}
+#tip .tn{color:#00f0ff;font-size:14px;font-weight:bold;margin-bottom:4px}
+#tip .td{color:rgba(160,196,232,.7)}
+#tip .td b{color:#00ff88}
+
+/* ======== Info Panel (selected player) ======== */
+#panel{position:fixed;top:64px;right:12px;width:220px;background:rgba(8,16,32,.92);border:1px solid rgba(0,200,255,.2);border-radius:8px;padding:16px;z-index:150;display:none;backdrop-filter:blur(6px)}
+#panel .close{position:absolute;top:8px;right:10px;cursor:pointer;color:rgba(160,196,232,.5);font-size:16px}
+#panel .close:hover{color:#ff3366}
+#panel .pname{color:#00f0ff;font-size:16px;font-weight:bold;margin-bottom:8px;text-shadow:0 0 8px rgba(0,240,255,.3)}
+#panel .prow{font-size:12px;color:rgba(160,196,232,.7);margin-bottom:4px}
+#panel .prow b{color:#00ff88}
+#panel .pstatus{margin-top:8px;padding:6px 10px;border-radius:4px;font-size:12px;text-align:center}
+#panel .pstatus.nav{background:rgba(255,102,0,.12);color:#ff9944;border:1px solid rgba(255,102,0,.25)}
+#panel .pstatus.idle{background:rgba(0,255,136,.08);color:#00ff88;border:1px solid rgba(0,255,136,.2)}
+#panel .pstatus.dg{background:rgba(180,80,255,.1);color:#bb66ff;border:1px solid rgba(180,80,255,.2)}
+
+/* ======== Legend ======== */
+#legend{position:fixed;bottom:44px;left:12px;background:rgba(8,16,32,.85);border:1px solid rgba(0,200,255,.15);border-radius:6px;padding:10px 14px;font-size:11px;z-index:150;backdrop-filter:blur(4px)}
+#legend .lr{display:flex;align-items:center;gap:8px;margin-bottom:4px}
+#legend .lr:last-child{margin-bottom:0}
+#legend .dot{width:10px;height:10px;border-radius:50%;flex-shrink:0}
+
+/* ======== Keyboard hint ======== */
+#kbd-hint{position:fixed;bottom:44px;right:12px;background:rgba(8,16,32,.85);border:1px solid rgba(0,200,255,.15);border-radius:6px;padding:8px 12px;font-size:10px;color:rgba(160,196,232,.4);z-index:150;line-height:1.7}
+#kbd-hint kbd{background:rgba(0,180,255,.1);border:1px solid rgba(0,200,255,.2);border-radius:3px;padding:1px 5px;color:rgba(160,196,232,.6)}
+</style>
+</head>
+<body>
+
+<!-- Header -->
+<div id="hdr">
+  <div class="logo"><span>&#9678;</span> 大都会 · 修仙者态势图</div>
+  <div id="search-box">
+    <span id="search-icon">&#9906;</span>
+    <input id="search" type="text" placeholder="搜索玩家昵称或UID..." maxlength="24" autocomplete="off">
+  </div>
+  <div id="stats">
+    <span>在线 <span class="val" id="s-total">-</span></span>
+    <span>导航 <span class="val" id="s-nav">-</span></span>
+    <span>诡域 <span class="val" id="s-dg">-</span></span>
+    <span id="s-refresh">--</span>
+  </div>
+  <div id="conn"></div>
+</div>
+
+<!-- Canvas -->
+<canvas id="map-canvas"></canvas>
+
+<!-- Tooltip -->
+<div id="tip"></div>
+
+<!-- Info Panel -->
+<div id="panel">
+  <span class="close" id="panel-close">&times;</span>
+  <div class="pname" id="p-name"></div>
+  <div class="prow">UID: <b id="p-uid"></b></div>
+  <div class="prow">等级: <b id="p-lv"></b></div>
+  <div class="prow">坐标: <b id="p-coord"></b></div>
+  <div class="pstatus" id="p-status"></div>
+</div>
+
+<!-- Legend -->
+<div id="legend">
+  <div class="lr"><div class="dot" style="background:#00ff88;box-shadow:0 0 4px #00ff88"></div> 驻留</div>
+  <div class="lr"><div class="dot" style="background:#00ccff;box-shadow:0 0 4px #00ccff"></div> 导航中</div>
+  <div class="lr"><div class="dot" style="background:#bb66ff;box-shadow:0 0 4px #bb66ff"></div> 诡域中</div>
+  <div class="lr"><div class="dot" style="background:#ff0066;box-shadow:0 0 6px #ff0066"></div> 搜索目标</div>
+  <div class="lr"><div class="dot" style="background:#00ffcc;box-shadow:0 0 4px #00ffcc;width:12px;height:12px;border-radius:2px"></div> 城镇</div>
+</div>
+
+<!-- Keyboard hints -->
+<div id="kbd-hint">
+  <kbd>/</kbd> 搜索 &nbsp; <kbd>Esc</kbd> 清除 &nbsp; <kbd>R</kbd> 复位<br>
+  滚轮缩放 &nbsp; 拖拽平移 &nbsp; 点击选中
+</div>
+
+<!-- Footer -->
+<div id="ftr">
+  <span>坐标: <span class="hl" id="f-coord">(-,-)</span></span>
+  <span>缩放: <span class="hl" id="f-zoom">100%</span></span>
+  <span>范围: <span class="hl">-500 ~ 500</span></span>
+  <span style="margin-left:auto">数据每 5 秒刷新</span>
+</div>
+
+<script nonce="%%CSP_NONCE%%">
+// ============================================================
+//  CONFIG
+// ============================================================
+const API_URL  = '/api/map/data';
+const REFRESH  = 5000;      // ms
+const MAX_COORD= 500;
+const BG_COLOR = '#080c18';
+
+// Colors
+const C = {
+  grid:     'rgba(0,180,255,0.06)',
+  gridMaj:  'rgba(0,180,255,0.12)',
+  axis:     'rgba(0,240,255,0.18)',
+  city:     '#00ffcc',
+  cityGlow: 'rgba(0,255,204,0.25)',
+  player:   '#00ff88',
+  navPlayer:'#00ccff',
+  dgPlayer: '#bb66ff',
+  navLine:  '#ff8833',
+  highlight:'#ff0066',
+  hlGlow:   'rgba(255,0,102,0.3)',
+  sweep:    'rgba(0,240,255,0.04)',
+  text:     '#a0c4e8',
+};
+
+// ============================================================
+//  STATE
+// ============================================================
+const canvas = document.getElementById('map-canvas');
+const ctx    = canvas.getContext('2d');
+
+let W = 0, H = 0;        // canvas size
+let zoom  = 1;            // pixels per game-unit
+let panX  = 0, panY = 0;  // game-coord center offset
+
+let mapData    = {cities:[], players:[]};
+let lastFetch  = 0;
+let fetchOK    = true;
+
+// Interaction
+let dragging   = false;
+let dragStartX = 0, dragStartY = 0;
+let dragPanX   = 0, dragPanY   = 0;
+
+let hoverPlayer = null;   // player under mouse
+let selectedUID = null;    // clicked player UID
+let searchQuery = '';      // current search text
+let highlightUIDs = new Set();
+
+let mouseGX = 0, mouseGY = 0; // mouse in game coords
+
+// ============================================================
+//  COORDINATE TRANSFORMS
+// ============================================================
+function g2c(gx, gy) {
+  // game → canvas
+  return [
+    (gx - panX) * zoom + W / 2,
+    -(gy - panY) * zoom + H / 2,
+  ];
+}
+function c2g(cx, cy) {
+  // canvas → game
+  return [
+    (cx - W / 2) / zoom + panX,
+    -(cy - H / 2) / zoom + panY,
+  ];
+}
+
+// ============================================================
+//  RESIZE
+// ============================================================
+function resize() {
+  const rect = canvas.getBoundingClientRect();
+  const dpr = window.devicePixelRatio || 1;
+  W = rect.width;
+  H = rect.height;
+  canvas.width  = W * dpr;
+  canvas.height = H * dpr;
+  canvas.style.width  = W + 'px';
+  canvas.style.height = H + 'px';
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+}
+
+function resetView() {
+  panX = 0; panY = 0;
+  zoom = Math.min(W, H) / 1150;
+}
+
+// ============================================================
+//  DRAWING — GRID
+// ============================================================
+function drawGrid() {
+  const step = 50;  // grid every 50 game-units
+  const [lx, ly] = c2g(0, H);
+  const [rx, ry] = c2g(W, 0);
+  const gLeft  = Math.floor(lx / step) * step;
+  const gRight = Math.ceil(rx / step) * step;
+  const gBot   = Math.floor(ly / step) * step;  // note: ly < ry because Y flipped
+  const gTop   = Math.ceil(ry / step) * step;
+
+  ctx.lineWidth = 0.5;
+
+  for (let gx = gLeft; gx <= gRight; gx += step) {
+    const isMaj = gx % 100 === 0;
+    const isAxis = gx === 0;
+    ctx.strokeStyle = isAxis ? C.axis : isMaj ? C.gridMaj : C.grid;
+    const [cx] = g2c(gx, 0);
+    ctx.beginPath(); ctx.moveTo(cx, 0); ctx.lineTo(cx, H); ctx.stroke();
+
+    // labels on major grid lines
+    if (isMaj && zoom > 0.3) {
+      ctx.fillStyle = 'rgba(160,196,232,0.2)';
+      ctx.font = '9px monospace';
+      ctx.textAlign = 'center';
+      const [, cy0] = g2c(gx, 0);
+      ctx.fillText(gx, cx, Math.min(Math.max(cy0 + 12, 10), H - 4));
+    }
+  }
+  for (let gy = gBot; gy <= gTop; gy += step) {
+    const isMaj = gy % 100 === 0;
+    const isAxis = gy === 0;
+    ctx.strokeStyle = isAxis ? C.axis : isMaj ? C.gridMaj : C.grid;
+    const [, cy] = g2c(0, gy);
+    ctx.beginPath(); ctx.moveTo(0, cy); ctx.lineTo(W, cy); ctx.stroke();
+
+    if (isMaj && zoom > 0.3 && gy !== 0) {
+      ctx.fillStyle = 'rgba(160,196,232,0.2)';
+      ctx.font = '9px monospace';
+      ctx.textAlign = 'left';
+      const [cx0] = g2c(0, gy);
+      ctx.fillText(gy, Math.min(Math.max(cx0 + 4, 4), W - 30), cy - 3);
+    }
+  }
+}
+
+// ============================================================
+//  DRAWING — BOUNDARY
+// ============================================================
+function drawBoundary() {
+  const [x1, y1] = g2c(-MAX_COORD, MAX_COORD);
+  const [x2, y2] = g2c(MAX_COORD, -MAX_COORD);
+  ctx.strokeStyle = 'rgba(0,240,255,0.15)';
+  ctx.lineWidth = 1.5;
+  ctx.setLineDash([8, 4]);
+  ctx.strokeRect(x1, y1, x2 - x1, y2 - y1);
+  ctx.setLineDash([]);
+}
+
+// ============================================================
+//  DRAWING — RADAR SWEEP
+// ============================================================
+function drawSweep(t) {
+  const [cx, cy] = g2c(0, 0);
+  const r = Math.max(W, H);
+  const angle = (t / 6000) * Math.PI * 2;
+
+  const grad = ctx.createConicalGradient
+    ? null  // not widely supported
+    : null;
+
+  // Simple sweep line
+  ctx.save();
+  ctx.globalAlpha = 0.12;
+  ctx.strokeStyle = '#00f0ff';
+  ctx.lineWidth = 1;
+  ctx.beginPath();
+  ctx.moveTo(cx, cy);
+  ctx.lineTo(cx + Math.cos(angle) * r, cy + Math.sin(angle) * r);
+  ctx.stroke();
+
+  // Fading wedge
+  ctx.globalAlpha = 0.015;
+  ctx.fillStyle = '#00f0ff';
+  ctx.beginPath();
+  ctx.moveTo(cx, cy);
+  ctx.arc(cx, cy, r, angle - 0.3, angle);
+  ctx.closePath();
+  ctx.fill();
+  ctx.restore();
+}
+
+// ============================================================
+//  DRAWING — CITIES
+// ============================================================
+function drawCities(t) {
+  const pulse = 0.8 + 0.2 * Math.sin(t / 800);
+
+  for (const city of mapData.cities) {
+    const [cx, cy] = g2c(city.x, city.y);
+    if (cx < -60 || cx > W+60 || cy < -60 || cy > H+60) continue;
+
+    const r = 6 * pulse;
+
+    // Outer glow
+    ctx.shadowBlur = 18;
+    ctx.shadowColor = C.cityGlow;
+    ctx.fillStyle = C.cityGlow;
+    ctx.beginPath(); ctx.arc(cx, cy, r + 4, 0, Math.PI * 2); ctx.fill();
+
+    // Inner dot
+    ctx.shadowBlur = 12;
+    ctx.shadowColor = C.city;
+    ctx.fillStyle = C.city;
+    ctx.beginPath(); ctx.arc(cx, cy, r, 0, Math.PI * 2); ctx.fill();
+    ctx.shadowBlur = 0;
+
+    // Diamond marker
+    ctx.strokeStyle = C.city;
+    ctx.lineWidth = 1.2;
+    ctx.beginPath();
+    ctx.moveTo(cx, cy - r - 4);
+    ctx.lineTo(cx + r + 4, cy);
+    ctx.lineTo(cx, cy + r + 4);
+    ctx.lineTo(cx - r - 4, cy);
+    ctx.closePath();
+    ctx.stroke();
+
+    // Label
+    if (zoom > 0.25) {
+      ctx.font = 'bold 12px monospace';
+      ctx.textAlign = 'center';
+      ctx.fillStyle = '#d0f0ff';
+      ctx.shadowBlur = 6;
+      ctx.shadowColor = 'rgba(0,240,255,0.5)';
+      ctx.fillText(city.name, cx, cy - r - 10);
+      ctx.shadowBlur = 0;
+
+      if (zoom > 0.5) {
+        ctx.font = '9px monospace';
+        ctx.fillStyle = 'rgba(160,196,232,0.45)';
+        ctx.fillText(city.desc, cx, cy + r + 14);
+      }
+    }
+  }
+}
+
+// ============================================================
+//  DRAWING — NAVIGATION ROUTES
+// ============================================================
+function drawNavRoutes(t) {
+  const dashOffset = (t / 80) % 20;
+
+  for (const p of mapData.players) {
+    if (!p.nav) continue;
+
+    const [x1, y1] = g2c(p.x, p.y);
+    const [x2, y2] = g2c(p.nav.tx, p.nav.ty);
+
+    // Route line
+    ctx.strokeStyle = C.navLine;
+    ctx.lineWidth = 1.5;
+    ctx.globalAlpha = 0.6;
+    ctx.setLineDash([8, 6]);
+    ctx.lineDashOffset = -dashOffset;
+    ctx.beginPath();
+    ctx.moveTo(x1, y1);
+    ctx.lineTo(x2, y2);
+    ctx.stroke();
+    ctx.setLineDash([]);
+    ctx.globalAlpha = 1;
+
+    // Target marker (crosshair)
+    ctx.strokeStyle = 'rgba(255,136,51,0.4)';
+    ctx.lineWidth = 1;
+    const cr = 8;
+    ctx.beginPath();
+    ctx.moveTo(x2 - cr, y2); ctx.lineTo(x2 + cr, y2);
+    ctx.moveTo(x2, y2 - cr); ctx.lineTo(x2, y2 + cr);
+    ctx.stroke();
+    ctx.beginPath(); ctx.arc(x2, y2, cr, 0, Math.PI*2); ctx.stroke();
+  }
+}
+
+// ============================================================
+//  DRAWING — PLAYERS
+// ============================================================
+function drawPlayers(t) {
+  const breathe = 0.85 + 0.15 * Math.sin(t / 600);
+
+  for (const p of mapData.players) {
+    const [cx, cy] = g2c(p.x, p.y);
+    if (cx < -20 || cx > W+20 || cy < -20 || cy > H+20) continue;
+
+    const isHL = highlightUIDs.has(p.uid);
+    const isDg = !!p.dg;
+    const isNav = !!p.nav;
+    const isSel = p.uid === selectedUID;
+
+    let color = isDg ? C.dgPlayer : isNav ? C.navPlayer : C.player;
+    let r = Math.max(2.5, Math.min(1.5 + p.lv * 0.08, 6)) * breathe;
+    let alpha = isDg ? 0.45 : 1;
+
+    if (isHL) {
+      color = C.highlight;
+      r = Math.max(r, 5) + 2 * Math.sin(t / 200);
+      alpha = 1;
+    }
+
+    // Glow
+    ctx.globalAlpha = alpha;
+    ctx.shadowBlur = isHL ? 20 : 8;
+    ctx.shadowColor = color;
+    ctx.fillStyle = color;
+    ctx.beginPath();
+    ctx.arc(cx, cy, r, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.shadowBlur = 0;
+
+    // Highlight ring
+    if (isHL) {
+      const ringR = r + 6 + 3 * Math.sin(t / 300);
+      ctx.strokeStyle = C.hlGlow;
+      ctx.lineWidth = 1.5;
+      ctx.beginPath(); ctx.arc(cx, cy, ringR, 0, Math.PI*2); ctx.stroke();
+
+      // Name label for highlighted
+      ctx.font = 'bold 11px monospace';
+      ctx.textAlign = 'center';
+      ctx.fillStyle = '#ff6699';
+      ctx.fillText(p.name, cx, cy - r - 10);
+    }
+
+    // Selection ring
+    if (isSel && !isHL) {
+      ctx.strokeStyle = 'rgba(0,240,255,0.5)';
+      ctx.lineWidth = 1.2;
+      ctx.beginPath(); ctx.arc(cx, cy, r + 5, 0, Math.PI*2); ctx.stroke();
+    }
+
+    // Name for zoom-in
+    if (zoom > 1.2 && !isHL) {
+      ctx.font = '9px monospace';
+      ctx.textAlign = 'center';
+      ctx.fillStyle = 'rgba(160,196,232,0.5)';
+      ctx.fillText(p.name, cx, cy - r - 4);
+    }
+
+    ctx.globalAlpha = 1;
+  }
+}
+
+// ============================================================
+//  DRAWING — HUD OVERLAY
+// ============================================================
+function drawHUD() {
+  // Origin crosshair
+  const [ox, oy] = g2c(0, 0);
+  ctx.strokeStyle = 'rgba(0,240,255,0.1)';
+  ctx.lineWidth = 0.5;
+  ctx.beginPath();
+  ctx.moveTo(ox - 15, oy); ctx.lineTo(ox + 15, oy);
+  ctx.moveTo(ox, oy - 15); ctx.lineTo(ox, oy + 15);
+  ctx.stroke();
+}
+
+// ============================================================
+//  MAIN RENDER LOOP
+// ============================================================
+function render() {
+  const t = performance.now();
+
+  // Clear
+  ctx.fillStyle = BG_COLOR;
+  ctx.fillRect(0, 0, W, H);
+
+  drawGrid();
+  drawBoundary();
+  drawSweep(t);
+  drawCities(t);
+  drawNavRoutes(t);
+  drawPlayers(t);
+  drawHUD();
+
+  requestAnimationFrame(render);
+}
+
+// ============================================================
+//  TOOLTIP
+// ============================================================
+const tipEl = document.getElementById('tip');
+
+function updateTooltip(mx, my) {
+  if (dragging) { tipEl.style.display = 'none'; return; }
+
+  // Find closest player within 15px
+  let closest = null;
+  let minDist = 16;
+  for (const p of mapData.players) {
+    const [cx, cy] = g2c(p.x, p.y);
+    const d = Math.hypot(cx - mx, cy - my);
+    if (d < minDist) { minDist = d; closest = p; }
+  }
+
+  // Also check cities
+  let closestCity = null;
+  let minCityDist = 20;
+  for (const c of mapData.cities) {
+    const [cx, cy] = g2c(c.x, c.y);
+    const d = Math.hypot(cx - mx, cy - my);
+    if (d < minCityDist) { minCityDist = d; closestCity = c; }
+  }
+
+  hoverPlayer = closest;
+
+  if (closest) {
+    const status = closest.dg ? `诡域 ${Number(closest.dg)}层` : closest.nav ? '导航中' : '驻留';
+    let html = `<div class="tn">${esc(closest.name)}</div>`;
+    html += `<div class="td">UID: <b>${Number(closest.uid)}</b></div>`;
+    html += `<div class="td">等级: <b>Lv.${Number(closest.lv)}</b></div>`;
+    html += `<div class="td">坐标: <b>(${Number(closest.x)}, ${Number(closest.y)})</b></div>`;
+    html += `<div class="td">状态: <b>${esc(status)}</b></div>`;
+    if (closest.nav) {
+      html += `<div class="td">目的地: <b>(${Number(closest.nav.tx)}, ${Number(closest.nav.ty)})</b></div>`;
+    }
+    tipEl.innerHTML = html;
+    tipEl.style.display = 'block';
+    positionTip(mx, my);
+  } else if (closestCity) {
+    let html = `<div class="tn">${esc(closestCity.name)}</div>`;
+    html += `<div class="td">${esc(closestCity.desc)}</div>`;
+    html += `<div class="td">坐标: <b>(${Number(closestCity.x)}, ${Number(closestCity.y)})</b></div>`;
+    tipEl.innerHTML = html;
+    tipEl.style.display = 'block';
+    positionTip(mx, my);
+  } else {
+    tipEl.style.display = 'none';
+  }
+}
+
+function positionTip(mx, my) {
+  const tw = tipEl.offsetWidth;
+  const th = tipEl.offsetHeight;
+  let tx = mx + 16, ty = my - 10;
+  if (tx + tw > window.innerWidth - 8) tx = mx - tw - 10;
+  if (ty + th > window.innerHeight - 40) ty = my - th - 10;
+  if (ty < 56) ty = 56;
+  tipEl.style.left = tx + 'px';
+  tipEl.style.top  = ty + 'px';
+}
+
+function esc(s) {
+  const d = document.createElement('div');
+  d.textContent = s;
+  return d.innerHTML;
+}
+
+// ============================================================
+//  INFO PANEL
+// ============================================================
+const panelEl   = document.getElementById('panel');
+const pNameEl   = document.getElementById('p-name');
+const pUidEl    = document.getElementById('p-uid');
+const pLvEl     = document.getElementById('p-lv');
+const pCoordEl  = document.getElementById('p-coord');
+const pStatusEl = document.getElementById('p-status');
+
+function showPanel(p) {
+  selectedUID = p.uid;
+  pNameEl.textContent = p.name;
+  pUidEl.textContent  = p.uid;
+  pLvEl.textContent   = 'Lv.' + p.lv;
+  pCoordEl.textContent= `(${p.x}, ${p.y})`;
+
+  if (p.dg) {
+    pStatusEl.textContent = `诡域探索中 · ${p.dg}层`;
+    pStatusEl.className = 'pstatus dg';
+  } else if (p.nav) {
+    pStatusEl.textContent = `导航至 (${p.nav.tx}, ${p.nav.ty})`;
+    pStatusEl.className = 'pstatus nav';
+  } else {
+    pStatusEl.textContent = '驻留中';
+    pStatusEl.className = 'pstatus idle';
+  }
+  panelEl.style.display = 'block';
+}
+
+document.getElementById('panel-close').onclick = () => {
+  panelEl.style.display = 'none';
+  selectedUID = null;
+};
+
+// ============================================================
+//  SEARCH
+// ============================================================
+const searchEl = document.getElementById('search');
+
+function updateSearch() {
+  const q = searchEl.value.trim().toLowerCase();
+  searchQuery = q;
+  highlightUIDs.clear();
+
+  if (!q) return;
+
+  for (const p of mapData.players) {
+    const nameMatch = p.name.toLowerCase().includes(q);
+    const uidMatch  = String(p.uid) === q;
+    if (nameMatch || uidMatch) {
+      highlightUIDs.add(p.uid);
+    }
+  }
+
+  // Auto-center on single result
+  if (highlightUIDs.size === 1) {
+    const uid = [...highlightUIDs][0];
+    const p = mapData.players.find(x => x.uid === uid);
+    if (p) {
+      panX = p.x;
+      panY = p.y;
+      zoom = Math.max(zoom, 1.5);
+    }
+  }
+}
+
+searchEl.addEventListener('input', updateSearch);
+
+// ============================================================
+//  MOUSE / TOUCH EVENTS
+// ============================================================
+
+// Mouse
+canvas.addEventListener('mousedown', e => {
+  dragging = true;
+  dragStartX = e.clientX;
+  dragStartY = e.clientY;
+  dragPanX = panX;
+  dragPanY = panY;
+});
+
+window.addEventListener('mousemove', e => {
+  const rect = canvas.getBoundingClientRect();
+  const mx = e.clientX - rect.left;
+  const my = e.clientY - rect.top;
+  [mouseGX, mouseGY] = c2g(mx, my);
+  document.getElementById('f-coord').textContent = `(${Math.round(mouseGX)}, ${Math.round(mouseGY)})`;
+
+  if (dragging) {
+    const dx = e.clientX - dragStartX;
+    const dy = e.clientY - dragStartY;
+    panX = dragPanX - dx / zoom;
+    panY = dragPanY + dy / zoom; // Y is flipped
+  } else {
+    updateTooltip(e.clientX, e.clientY);
+  }
+});
+
+window.addEventListener('mouseup', () => { dragging = false; });
+
+canvas.addEventListener('click', e => {
+  if (hoverPlayer) {
+    showPanel(hoverPlayer);
+  }
+});
+
+canvas.addEventListener('wheel', e => {
+  e.preventDefault();
+  const factor = e.deltaY < 0 ? 1.12 : 1 / 1.12;
+  const newZoom = Math.max(0.1, Math.min(zoom * factor, 10));
+
+  // Zoom toward mouse position
+  const rect = canvas.getBoundingClientRect();
+  const mx = e.clientX - rect.left;
+  const my = e.clientY - rect.top;
+  const [gx, gy] = c2g(mx, my);
+
+  zoom = newZoom;
+
+  // Adjust pan so mouse stays on same game point
+  panX = gx - (mx - W/2) / zoom;
+  panY = gy + (my - H/2) / zoom;
+
+  document.getElementById('f-zoom').textContent = Math.round(zoom * 100 / (Math.min(W,H)/1150)) + '%';
+}, {passive: false});
+
+// Touch (mobile)
+let lastTouchDist = 0;
+let lastTouchMid  = [0,0];
+
+canvas.addEventListener('touchstart', e => {
+  if (e.touches.length === 1) {
+    dragging = true;
+    dragStartX = e.touches[0].clientX;
+    dragStartY = e.touches[0].clientY;
+    dragPanX = panX;
+    dragPanY = panY;
+  } else if (e.touches.length === 2) {
+    dragging = false;
+    const t = e.touches;
+    lastTouchDist = Math.hypot(t[1].clientX-t[0].clientX, t[1].clientY-t[0].clientY);
+    lastTouchMid = [(t[0].clientX+t[1].clientX)/2, (t[0].clientY+t[1].clientY)/2];
+  }
+  e.preventDefault();
+}, {passive:false});
+
+canvas.addEventListener('touchmove', e => {
+  if (e.touches.length === 1 && dragging) {
+    const dx = e.touches[0].clientX - dragStartX;
+    const dy = e.touches[0].clientY - dragStartY;
+    panX = dragPanX - dx / zoom;
+    panY = dragPanY + dy / zoom;
+  } else if (e.touches.length === 2) {
+    const t = e.touches;
+    const dist = Math.hypot(t[1].clientX-t[0].clientX, t[1].clientY-t[0].clientY);
+    const factor = dist / lastTouchDist;
+    zoom = Math.max(0.1, Math.min(zoom * factor, 10));
+    lastTouchDist = dist;
+  }
+  e.preventDefault();
+}, {passive:false});
+
+canvas.addEventListener('touchend', () => { dragging = false; });
+
+// ============================================================
+//  KEYBOARD
+// ============================================================
+window.addEventListener('keydown', e => {
+  if (e.key === '/' && document.activeElement !== searchEl) {
+    e.preventDefault();
+    searchEl.focus();
+  }
+  if (e.key === 'Escape') {
+    searchEl.value = '';
+    searchEl.blur();
+    searchQuery = '';
+    highlightUIDs.clear();
+  }
+  if ((e.key === 'r' || e.key === 'R') && document.activeElement !== searchEl) {
+    resetView();
+    document.getElementById('f-zoom').textContent = '100%';
+  }
+});
+
+// ============================================================
+//  DATA FETCHING
+// ============================================================
+const connEl = document.getElementById('conn');
+
+async function fetchData() {
+  try {
+    const resp = await fetch(API_URL);
+    if (!resp.ok) {
+      if (resp.status === 429) console.warn('Rate limited');
+      throw new Error(`HTTP ${resp.status}`);
+    }
+    const data = await resp.json();
+    if (!Array.isArray(data.players) || !Array.isArray(data.cities)) {
+      throw new Error('Invalid data structure');
+    }
+    mapData = data;
+    lastFetch = Date.now();
+    fetchOK = true;
+    connEl.classList.remove('err');
+    updateStats();
+    if (searchQuery) updateSearch(); // re-apply highlight
+  } catch (err) {
+    console.error('Fetch error:', err);
+    fetchOK = false;
+    connEl.classList.add('err');
+  }
+}
+
+function updateStats() {
+  const total = mapData.players.length;
+  const nav   = mapData.players.filter(p => p.nav).length;
+  const dg    = mapData.players.filter(p => p.dg).length;
+  document.getElementById('s-total').textContent = total;
+  document.getElementById('s-nav').textContent   = nav;
+  document.getElementById('s-dg').textContent    = dg;
+}
+
+// Refresh timer display
+setInterval(() => {
+  if (!lastFetch) return;
+  const ago = Math.round((Date.now() - lastFetch) / 1000);
+  document.getElementById('s-refresh').textContent = ago + 's前';
+}, 1000);
+
+// ============================================================
+//  INIT
+// ============================================================
+(async function init() {
+  resize();
+  resetView();
+  window.addEventListener('resize', () => { resize(); });
+
+  await fetchData();
+  setInterval(fetchData, REFRESH);
+
+  requestAnimationFrame(render);
+})();
+</script>
+</body>
+</html>

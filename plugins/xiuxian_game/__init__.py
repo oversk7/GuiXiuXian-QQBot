@@ -42,6 +42,7 @@ from . import (
     sponsor,  # 赞助商店系统（诡烛氪金货币）
     auction,  # 拍卖行系统（稀有物品限时竞价）
     pet,  # 宠物伴侣系统
+    web,  # Web 地图可视化
 )
 
 driver = get_driver()
