@@ -419,7 +419,7 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
 
         # 根据是否有地点名显示不同的标题
         if target_name.startswith("("):  # 坐标模式
-            nav_msg = f"📍 已设置导航至 **{target_name}**\n\n"
+            nav_msg = f"⚙️ 指针静默旋转，已开始导航至 **{target_name}**\n\n"
         else:  # 地点模式
             nav_msg = f"📍 已设置导航至 **【{target_name}】**\n\n"
 
