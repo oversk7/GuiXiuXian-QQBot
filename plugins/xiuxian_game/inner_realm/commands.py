@@ -73,6 +73,9 @@ observe_cmd = on_command("观察", aliases={"环顾", "查看环境"},
 use_item_cmd = on_command("使用", rule=in_inner_realm_rule, block=True, priority=4, permission=SUPERUSER)
 inventory_cmd = on_command("道具", rule=in_inner_realm_rule, block=True, priority=4, permission=SUPERUSER)
 
+# 休息
+rest_cmd = on_command("休息", rule=in_inner_realm_rule, block=True, priority=4, permission=SUPERUSER)
+
 # 线索 & 事件
 view_clues_cmd = on_command("查看线索", aliases={"线索列表", "已收集线索"}, block=True, priority=4, permission=SUPERUSER)
 choose_cmd = on_command("选择", rule=in_inner_realm_rule, block=True, priority=4, permission=SUPERUSER)
@@ -748,3 +751,45 @@ async def handle_choose(event: MessageEvent, args: Message = CommandArg()):
                     result_msg = result
 
     await choose_cmd.finish(result_msg)
+
+
+# ==================== 【休息】 ====================
+
+@rest_cmd.handle()
+async def handle_rest(event: MessageEvent):
+    """在安全场景休息恢复理智"""
+    def session_factory():
+        return AsyncSessionLocal()
+
+    result_msg = None
+    async with UnitOfWork(session_factory) as uow:
+        player = await get_unified_player(uow.session, event)
+        if not player:
+            result_msg = "⛔ 请先创建角色"
+        elif not player.inner_realm:
+            result_msg = "⛔ 你不在任何里界中"
+        else:
+            service = InnerRealmService(uow)
+            active_session = await service.get_active_session(player.id, player.inner_realm)
+            if not active_session:
+                result_msg = "⛔ 会话数据错误"
+            else:
+                if await service.check_sanity_zero(player, active_session):
+                    result_msg = service._sanity_collapse_text()
+                else:
+                    success, message = await service.perform_rest(
+                        player, active_session
+                    )
+                    if success:
+                        result_msg = build_result_markdown(
+                            title="休息",
+                            desc=message,
+                            btn1="前往",
+                            btn2="观察",
+                            btn3="道具",
+                            btn4="里界信息",
+                        )
+                    else:
+                        result_msg = message
+
+    await rest_cmd.finish(result_msg)

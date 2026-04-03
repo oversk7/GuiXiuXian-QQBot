@@ -464,7 +464,7 @@ class InnerRealmService:
         target_display_name: str
     ) -> Tuple[bool, str]:
         """
-        前往指定场景
+        前往指定场景（含事件触发）
 
         Returns:
             (success, message)
@@ -474,6 +474,11 @@ class InnerRealmService:
         # 先检查理智
         if session.sanity <= 0:
             return False, self._sanity_collapse_text()
+
+        # 检查移动冷却
+        can_act, remaining = self.check_action_cooldown(session, "move")
+        if not can_act:
+            return False, f"⏳ 移动冷却中，还需等待 {remaining} 秒"
 
         # 通过显示名查找场景
         target = engine.get_scene_by_display_name(target_display_name)
@@ -487,22 +492,69 @@ class InnerRealmService:
         if not target:
             return False, f"⛔ 找不到「{target_display_name}」\n💡 使用【前往】查看可前往地点"
 
-        # 检查是否可以进入
+        state = json.loads(session.state) if session.state else {}
+        is_first = state.get("is_first_playthrough", False)
+
+        # 特殊处理：缺道具进入 → 触发 on_enter_without_item 事件（如旅馆大厅无房卡死亡）
+        if target.required_items:
+            inventory = engine.get_session_inventory(session)
+            missing = [i for i in target.required_items if inventory.get(i, 0) <= 0]
+            if missing:
+                for evt in target.events:
+                    if evt.get("trigger") == "on_enter_without_item":
+                        # 强制进入场景并触发死亡事件
+                        scene_text = engine.enter_scene(session, target.id, is_first)
+                        await self.update_action_cooldown(session, "move")
+                        evt_text, died = await self._process_scene_event(
+                            player, session, evt, engine
+                        )
+                        return True, scene_text + "\n\n" + evt_text
+                # 无事件则返回普通缺道具提示（由 can_enter_scene 处理）
+
+        # 正常入场检查
         can_enter, reason = engine.can_enter_scene(session, target.id)
         if not can_enter:
-            # 入夜户外=死亡
             if "试炼失败" in reason:
                 await self._handle_death(player, session, "outdoor_night")
             return False, reason
 
         # 执行移动
-        state = json.loads(session.state) if session.state else {}
-        is_first = state.get("is_first_playthrough", False)
-
         scene_text = engine.enter_scene(session, target.id, is_first)
+        await self.update_action_cooldown(session, "move")
+
+        # 记录进入次数（用于 on_enter_repeat）
+        scene_states = state.get("scene_states", {})
+        if target.id not in scene_states:
+            scene_states[target.id] = {}
+        enter_count = scene_states[target.id].get("enter_count", 0) + 1
+        scene_states[target.id]["enter_count"] = enter_count
+        state["scene_states"] = scene_states
+        session.state = json.dumps(state, ensure_ascii=False)
         await self.uow.commit()
 
-        return True, scene_text
+        lines = [scene_text]
+        died = False
+
+        # 处理 auto_on_enter 事件（如十字路口死神、隔壁房间红衣女鬼）
+        auto_text, auto_died = await self._process_auto_enter_events(
+            player, session, engine
+        )
+        if auto_text:
+            lines.append("")
+            lines.append(auto_text)
+        died = died or auto_died
+
+        # 处理 on_enter_repeat 事件（如旅馆走廊电梯幽灵）
+        if not died:
+            repeat_text, repeat_died = await self._process_enter_repeat_events(
+                player, session, engine, enter_count
+            )
+            if repeat_text:
+                lines.append("")
+                lines.append(repeat_text)
+            died = died or repeat_died
+
+        return True, "\n".join(lines)
 
     # ==================== 观察 ====================
 
@@ -560,6 +612,26 @@ class InnerRealmService:
                     lines.append(f"💡 {clue_config.get('reveal', '')}")
 
                     await self.uow.commit()
+
+        # 检查 on_observe_or_wait 事件（如四号房的宵夜触发）
+        state = json.loads(session.state) if session.state else {}
+        triggered = state.get("events_triggered", [])
+        for event in scene.events:
+            if event.get("trigger") != "on_observe_or_wait":
+                continue
+            event_id = event.get("id", "")
+            if event_id in triggered:
+                continue
+
+            event_text, died = await self._process_scene_event(
+                player, session, event, engine
+            )
+            if event_text:
+                lines.append("")
+                lines.append(event_text)
+            # 如果事件导致了移动（如自动传送到宵夜大厅），不再显示旧场景的可前往地点
+            if died or event.get("auto_move_to"):
+                return "\n".join(lines)
 
         # 显示可前往地点
         lines.append("━━━━━━━━━━━━━")
@@ -705,6 +777,24 @@ class InnerRealmService:
         if death_result == "death":
             await self._handle_death(player, session, "search_trap")
             msg += "\n\n💀 试炼失败"
+
+        # 搜刮失败时触发 on_search_failure 事件（如卧室镜中人）
+        if result.result_level in ("critical_failure", "failure"):
+            state = json.loads(session.state) if session.state else {}
+            triggered = state.get("events_triggered", [])
+            for evt in scene.events:
+                if evt.get("trigger") != "on_search_failure":
+                    continue
+                evt_id = evt.get("id", "")
+                if evt_id in triggered:
+                    continue
+                evt_text, evt_died = await self._process_scene_event(
+                    player, session, evt, engine
+                )
+                if evt_text:
+                    msg += "\n\n" + evt_text
+                if evt_died:
+                    break
 
         return True, msg
 
@@ -881,15 +971,30 @@ class InnerRealmService:
         session: InnerRealmSession,
         npc_name: str = None
     ) -> Tuple[bool, str]:
-        """与NPC交谈"""
+        """与NPC交谈（含 on_talk 事件触发）"""
         engine = self._get_scene_engine(session.realm_name)
         scene = engine.get_current_scene(session)
         if not scene:
             return False, "⛔ 当前位置异常"
 
+        state = json.loads(session.state) if session.state else {}
+        triggered = state.get("events_triggered", [])
+
+        # ---- 无NPC场景：直接触发 on_talk 事件（如诊所幽灵儿童、二号房无脸女人）----
         if not scene.npcs:
+            on_talk_events = [
+                e for e in scene.events
+                if e.get("trigger") == "on_talk" and e.get("id", "") not in triggered
+            ]
+            if on_talk_events:
+                evt = on_talk_events[0]
+                evt_text, died = await self._process_scene_event(
+                    player, session, evt, engine
+                )
+                return True, evt_text
             return False, "⛔ 这里没有可以交谈的对象"
 
+        # ---- 有NPC场景 ----
         npc = self._find_npc_in_scene(session, scene, npc_name)
         if not npc:
             return False, "⛔ 找不到目标NPC"
@@ -897,7 +1002,6 @@ class InnerRealmService:
         if not npc.get("can_talk", False):
             return False, f"⛔ {npc['name']} 不想和你说话"
 
-        state = json.loads(session.state) if session.state else {}
         npc_states = state.get("npc_states", {})
         if not npc_states.get(npc["id"], {}).get("alive", True):
             return False, f"⛔ {npc['name']} 已经死了，无法交谈"
@@ -907,14 +1011,31 @@ class InnerRealmService:
         talk_count = state.get(talk_key, 0)
 
         dialogues = npc.get("dialogue", [])
-        if not dialogues:
-            return False, f"⛔ {npc['name']} 沉默不语"
 
-        # 选择对应的对话
-        if talk_count < len(dialogues):
-            dialogue = dialogues[talk_count]
+        # 对话耗尽后触发 on_talk 事件（如三号房学生的选择）
+        if talk_count >= len(dialogues):
+            on_talk_events = [
+                e for e in scene.events
+                if e.get("trigger") == "on_talk" and e.get("id", "") not in triggered
+            ]
+            if on_talk_events:
+                evt = on_talk_events[0]
+                state[talk_key] = talk_count + 1
+                session.state = json.dumps(state, ensure_ascii=False)
+                await self.uow.commit()
+                evt_text, died = await self._process_scene_event(
+                    player, session, evt, engine
+                )
+                header = f"💬 与「{npc['name']}」交谈\n━━━━━━━━━━━━━\n"
+                return True, header + evt_text
+            # 无事件则重复最后一句对话
+            if not dialogues:
+                return False, f"⛔ {npc['name']} 沉默不语"
+            dialogue = dialogues[-1]
         else:
-            dialogue = dialogues[-1]  # 重复最后一句
+            if not dialogues:
+                return False, f"⛔ {npc['name']} 沉默不语"
+            dialogue = dialogues[talk_count]
 
         state[talk_key] = talk_count + 1
         session.state = json.dumps(state, ensure_ascii=False)
@@ -1212,11 +1333,25 @@ class InnerRealmService:
             await self._handle_death(player, session, "event_choice")
             lines.append("\n💀 试炼失败")
 
-        # 自动移动
+        # 自动移动（并处理新场景的 auto_on_enter 事件）
         auto_move = chosen.get("auto_move_to")
         if auto_move:
             scene_text = engine.enter_scene(session, auto_move, state.get("is_first_playthrough", False))
             lines.append(f"\n{scene_text}")
+
+            # 保存状态后处理新场景的自动事件
+            state.pop("pending_event", None)
+            session.state = json.dumps(state, ensure_ascii=False)
+            await self.uow.commit()
+
+            auto_text, auto_died = await self._process_auto_enter_events(
+                player, session, engine
+            )
+            if auto_text:
+                lines.append(f"\n{auto_text}")
+            if auto_died:
+                # 发放道具逻辑跳过，直接返回
+                return True, "\n".join(lines)
 
         # 发放道具
         grant_item = chosen.get("grant_item")
@@ -1229,9 +1364,10 @@ class InnerRealmService:
             item_name = item_config.name if item_config else item_id
             lines.append(f"\n📦 获得：{item_name} x{qty}")
 
-        # 清除待处理事件
-        state.pop("pending_event", None)
-        session.state = json.dumps(state, ensure_ascii=False)
+        # 清除待处理事件（auto_move 路径可能已经清除过，重新读取 state）
+        final_state = json.loads(session.state) if session.state else {}
+        final_state.pop("pending_event", None)
+        session.state = json.dumps(final_state, ensure_ascii=False)
         await self.uow.commit()
 
         return True, "\n".join(lines)
@@ -1359,3 +1495,238 @@ class InnerRealmService:
             await self._handle_death(player, session, "sanity_zero")
             return True
         return False
+
+    # ==================== 事件处理系统 ====================
+
+    async def _process_scene_event(
+        self,
+        player: Player,
+        session: InnerRealmSession,
+        event: Dict[str, Any],
+        engine: SceneEngine,
+        mark_triggered: bool = True
+    ) -> Tuple[str, bool]:
+        """
+        通用场景事件处理器
+
+        处理所有类型的事件：骰子检定、选择分支、即死事件、自动移动等。
+
+        Returns:
+            (叙事文本, 是否死亡)
+        """
+        lines = []
+        died = False
+        state = json.loads(session.state) if session.state else {}
+
+        # 标记事件已触发（on_enter_repeat 不标记）
+        event_id = event.get("id", "")
+        if mark_triggered and event_id:
+            triggered = state.get("events_triggered", [])
+            if event_id not in triggered:
+                triggered.append(event_id)
+                state["events_triggered"] = triggered
+
+        # 显示事件描述
+        if event.get("description"):
+            lines.append(event["description"])
+
+        # ---- 骰子检定事件 ----
+        if "dice_check" in event:
+            dice_cfg = event["dice_check"]
+            modifier = self.calculate_mortal_modifier(player)
+            time_bonus = self.get_time_bonus(dice_cfg.get("attribute", "luck"), session)
+            result = self.roll_2d6(modifier, time_bonus)
+            difficulty = dice_cfg.get("difficulty", 8)
+
+            if result.final_total >= difficulty:
+                dice_text = self.format_dice_roll_message(
+                    event.get("name", "检定"), result,
+                    event.get("success_text", "检定成功。")
+                )
+                lines.append(dice_text)
+            else:
+                dice_text = self.format_dice_roll_message(
+                    event.get("name", "检定"), result,
+                    event.get("failure_text", "检定失败。")
+                )
+                lines.append(dice_text)
+
+                failure_sanity = event.get("failure_sanity", 0)
+                if failure_sanity:
+                    await self.modify_sanity(session, failure_sanity, event.get("name", "事件"))
+                    lines.append(f"🧠 理智 {failure_sanity}")
+
+                if event.get("failure_result") == "death":
+                    await self._handle_death(player, session, f"event_{event_id}")
+                    died = True
+                    lines.append("\n💀 试炼失败")
+
+        # ---- 选择分支事件 ----
+        elif "choices" in event:
+            if event.get("text"):
+                lines.append(event["text"])
+
+            # 显示对话树（如三号房学生的多段独白）
+            if event.get("dialogue_tree"):
+                for dt_entry in event["dialogue_tree"]:
+                    dt_text = dt_entry.get("text", "") if isinstance(dt_entry, dict) else str(dt_entry)
+                    lines.append(dt_text)
+                    lines.append("")
+
+            # 存储待选择事件
+            state["pending_event"] = {
+                "event_id": event_id,
+                "choices": event["choices"]
+            }
+            lines.append("━━━━━━━━━━━━━")
+            for c in event["choices"]:
+                lines.append(f"▸ 【选择 {c['label']}】")
+
+        # ---- 纯文本事件（可能附带即死/理智变化）----
+        elif event.get("text"):
+            lines.append(event["text"])
+
+            sanity_change = event.get("sanity_change", 0)
+            if sanity_change:
+                await self.modify_sanity(session, sanity_change, event.get("name", "事件"))
+                lines.append(f"🧠 理智 {sanity_change:+d}")
+
+            if event.get("result") == "death":
+                await self._handle_death(player, session, f"event_{event_id}")
+                died = True
+                lines.append("\n💀 试炼失败")
+
+        # ---- 自动移动（仅在存活且无待选择时执行）----
+        if event.get("auto_move_to") and not died and "choices" not in event:
+            is_first = state.get("is_first_playthrough", False)
+            target_scene = event["auto_move_to"]
+            scene_text = engine.enter_scene(session, target_scene, is_first)
+            lines.append("")
+            lines.append(scene_text)
+
+            # 先保存当前状态，再处理新场景的自动事件
+            session.state = json.dumps(state, ensure_ascii=False)
+            await self.uow.commit()
+
+            auto_text, auto_died = await self._process_auto_enter_events(
+                player, session, engine
+            )
+            if auto_text:
+                lines.append("")
+                lines.append(auto_text)
+            died = died or auto_died
+        else:
+            session.state = json.dumps(state, ensure_ascii=False)
+            await self.uow.commit()
+
+        return "\n".join(lines), died
+
+    async def _process_auto_enter_events(
+        self,
+        player: Player,
+        session: InnerRealmSession,
+        engine: SceneEngine
+    ) -> Tuple[str, bool]:
+        """处理当前场景的 auto_on_enter 事件"""
+        scene = engine.get_current_scene(session)
+        if not scene:
+            return "", False
+
+        state = json.loads(session.state) if session.state else {}
+        triggered = state.get("events_triggered", [])
+
+        lines = []
+        died = False
+
+        for event in scene.events:
+            if event.get("trigger") != "auto_on_enter":
+                continue
+            event_id = event.get("id", "")
+            if event_id in triggered:
+                continue
+
+            event_text, event_died = await self._process_scene_event(
+                player, session, event, engine
+            )
+            if event_text:
+                lines.append(event_text)
+            if event_died:
+                died = True
+                break
+
+        return "\n".join(lines), died
+
+    async def _process_enter_repeat_events(
+        self,
+        player: Player,
+        session: InnerRealmSession,
+        engine: SceneEngine,
+        enter_count: int
+    ) -> Tuple[str, bool]:
+        """处理 on_enter_repeat 事件（如旅馆走廊电梯幽灵）"""
+        scene = engine.get_current_scene(session)
+        if not scene:
+            return "", False
+
+        lines = []
+        died = False
+
+        for event in scene.events:
+            if event.get("trigger") != "on_enter_repeat":
+                continue
+            threshold = event.get("repeat_threshold", 3)
+            if enter_count < threshold:
+                continue
+
+            # repeat 事件不标记为已触发，每次满足条件都触发
+            event_text, event_died = await self._process_scene_event(
+                player, session, event, engine, mark_triggered=False
+            )
+            if event_text:
+                lines.append(event_text)
+            if event_died:
+                died = True
+                break
+
+        return "\n".join(lines), died
+
+    # ==================== 休息 ====================
+
+    async def perform_rest(
+        self,
+        player: Player,
+        session: InnerRealmSession
+    ) -> Tuple[bool, str]:
+        """在安全场景休息恢复理智"""
+        engine = self._get_scene_engine(session.realm_name)
+        scene = engine.get_current_scene(session)
+        if not scene:
+            return False, "⛔ 当前位置异常"
+
+        if scene.rest_sanity <= 0:
+            return False, "⛔ 这里不适合休息"
+
+        state = json.loads(session.state) if session.state else {}
+        scene_states = state.get("scene_states", {})
+        scene_state = scene_states.get(scene.id, {})
+        rest_count = scene_state.get("rest_count", 0)
+
+        if rest_count >= scene.max_rest_count:
+            return False, "⛔ 你已经在这里休息过了，无法继续休息"
+
+        # 执行休息
+        scene_state["rest_count"] = rest_count + 1
+        scene_states[scene.id] = scene_state
+        state["scene_states"] = scene_states
+        session.state = json.dumps(state, ensure_ascii=False)
+
+        await self.modify_sanity(session, scene.rest_sanity, "休息")
+        await self.uow.commit()
+
+        lines = [
+            f"💤 在「{scene.display_name}」休息",
+            "━━━━━━━━━━━━━",
+            f"🧠 理智 +{scene.rest_sanity} (当前: {session.sanity}/100)",
+            f"剩余休息次数: {scene.max_rest_count - rest_count - 1}",
+        ]
+        return True, "\n".join(lines)

@@ -2112,6 +2112,7 @@ async def handle_inner_realm_help(event: MessageEvent, args: Message = CommandAr
         f"{cmd('处决')} 静默击杀NPC（2D6+属性判定）\n"
         f"{cmd('交谈')} 与NPC对话，获取信息\n"
         f"{cmd('选择 选项名', '选择 ')} 在特殊事件中做出选择\n"
+        f"{cmd('休息')} 在安全场景休息恢复理智\n"
         "***\n"
         "**🎒 道具命令**\n"
         f"{cmd('道具')} 查看里界内持有的道具\n"

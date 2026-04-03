@@ -581,7 +581,7 @@ realms:
         loot_table:
           critical_success: {items: [{id: "human_tooth_collection", qty: 2}, {id: "old_diary", qty: 1, is_key_item: true}, {id: "teeth_key_item", qty: 1, is_key_item: true}]}
           success: {items: [{id: "human_tooth_collection", qty: 1}, {id: "old_diary", qty: 1, is_key_item: true}, {id: "teeth_key_item", qty: 1, is_key_item: true}]}
-          normal: {items: [{id: "old_diary", qty: 1, is_key_item: true}]}
+          normal: {items: [{id: "old_diary", qty: 1, is_key_item: true}, {id: "teeth_key_item", qty: 1, is_key_item: true}]}
           failure: {text: "门外传来沉重的脚步声。满身是血的老人出现在门口——他还活着。", sanity: -10}
         search_attribute: "luck"
         clue_on_observe: "clue_6"
