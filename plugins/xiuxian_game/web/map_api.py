@@ -12,6 +12,7 @@ from __future__ import annotations
 
 import secrets
 import time
+from datetime import datetime, timedelta
 from pathlib import Path
 
 from fastapi import APIRouter, Request
@@ -158,7 +159,8 @@ async def get_map_data(request: Request) -> JSONResponse:
 
     try:
         async with AsyncSessionLocal() as session:
-            # 一次查询：玩家 LEFT JOIN 导航任务（不查 Player.id 即 QQ 号）
+            # 只查 7 天内签到过的活跃玩家，避免全表 2900+ 行拖慢前端
+            cutoff = datetime.now() - timedelta(days=7)
             stmt = (
                 select(
                     Player.uid,
@@ -171,6 +173,7 @@ async def get_map_data(request: Request) -> JSONResponse:
                     NavigationTask.target_y,
                 )
                 .outerjoin(NavigationTask, Player.id == NavigationTask.player_id)
+                .where(Player.last_sign >= cutoff)
             )
             rows = (await session.execute(stmt)).all()
     except SQLAlchemyError as e:
