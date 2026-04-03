@@ -876,6 +876,9 @@ async def _sweep_dungeon(player: Player, cfg: ItemConfig, qty: int, ctx: str, se
         )
     )
     result = await sweep_service.execute(player, cfg, qty, str(ctx))
+    # 透传 use_markdown 标记到 player 临时属性，供 inventory.py 判断发送方式
+    if result.extra_data.get("use_markdown"):
+        player._sweep_use_markdown = True
     return result.success, result.message
 # ---------------- 重置属性 ----------------
 

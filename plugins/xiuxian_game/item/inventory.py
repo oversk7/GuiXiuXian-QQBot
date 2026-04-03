@@ -327,6 +327,10 @@ async def handle_use_item(event: MessageEvent, args: Message = CommandArg()):
         if not success:
             # 未生效，不扣除物品
             await session.rollback()
+            # 支持 Markdown 格式的错误消息（如扫荡令装备预检）
+            if hasattr(player, '_sweep_use_markdown'):
+                delattr(player, '_sweep_use_markdown')
+                await use_item.finish(build_markdown(msg))
             await use_item.finish(msg)
 
         # 扣除物品数量，优先消耗未满堆叠
@@ -354,6 +358,14 @@ async def handle_use_item(event: MessageEvent, args: Message = CommandArg()):
         quest_completed, quest_msg = await NoviceQuestService.check_and_advance_quest(
             session, player, "command", {"command": "使用"}
         )
+
+        # 扫荡令使用 Markdown 富文本发送
+        if hasattr(player, '_sweep_use_markdown'):
+            delattr(player, '_sweep_use_markdown')
+            md_msg = f"✅ 成功使用 **{item_name}** ✖️{quantity}\n\n{msg}"
+            if quest_completed and quest_msg:
+                md_msg += f"\n\n{quest_msg}"
+            await use_item.finish(build_markdown(md_msg))
 
         result_msg = f"✅ 成功使用 {item_name} ✖️{quantity}\n" + msg
         if quest_completed and quest_msg:
