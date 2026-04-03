@@ -30,13 +30,8 @@ async def handle_init_part_time_job(event: MessageEvent):
             result_msg = (
                 "✅ 打工系统初始化完成！\n"
                 "━━━━━━━━━━━━━\n"
-                "📍 已创建工作地点：\n"
-                "• 上京商业中心 (0, 0)\n"
-                "• 荔湾镇工业区 (120, 200)\n"
-                "• 郸城娱乐街区 (120, 120)\n"
-                "• 东郊物流中心 (390, 50)\n"
-                "━━━━━━━━━━━━━\n"
-                "💼 共配置 9 种工作类型\n"
+                f"📍 已创建 {len(PartTimeJobService.JOB_LOCATIONS)} 个工作地点\n"
+                f"💼 共配置 {len(PartTimeJobService.JOB_TYPES)} 种工作类型\n"
                 "🎯 玩家可前往对应坐标开始打工\n"
                 "🏘️ 所有打工地点已整合到相应城镇中"
             )

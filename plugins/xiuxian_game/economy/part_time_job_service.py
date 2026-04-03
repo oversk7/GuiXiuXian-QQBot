@@ -160,7 +160,139 @@ class PartTimeJobService:
                 {"name": "发现问题", "probability": 0.12, "bonus": 80, "description": "发现库存问题并及时处理"},
                 {"name": "效率提升", "probability": 0.15, "bonus": 45, "description": "工作效率高获得效率奖金"},
             ]
-        }
+        },
+        "farm_worker": {
+            "name": "农场帮工",
+            "description": "在农贸集散地帮忙搬运、分拣农产品",
+            "base_reward": 130,
+            "duration_hours": 0.033,  # 2分钟
+            "required_level": 1,
+            "emoji": "🌾",
+            "special_events": [
+                {"name": "丰收季", "probability": 0.15, "bonus": 70, "description": "赶上丰收季，老板多给了工钱"},
+                {"name": "挑到好货", "probability": 0.10, "bonus": 100, "description": "帮老板挑到了品相极好的货，获得额外奖励"},
+            ]
+        },
+        "night_market_vendor": {
+            "name": "夜市摊贩",
+            "description": "在热闹的夜市摆摊，吆喝叫卖各种小吃",
+            "base_reward": 145,
+            "duration_hours": 0.042,  # 2.5分钟
+            "required_level": 1,
+            "emoji": "🏮",
+            "special_events": [
+                {"name": "爆单时刻", "probability": 0.15, "bonus": 90, "description": "排队排到马路上，赚翻了"},
+                {"name": "美食博主", "probability": 0.05, "bonus": 200, "description": "被美食博主拍了视频，老板发了大红包"},
+            ]
+        },
+        "fisherman_helper": {
+            "name": "渔船帮工",
+            "description": "跟着老渔民出海捕鱼，负责撒网收网",
+            "base_reward": 200,
+            "duration_hours": 0.05,  # 3分钟
+            "required_level": 3,
+            "emoji": "🎣",
+            "special_events": [
+                {"name": "大丰收", "probability": 0.12, "bonus": 120, "description": "捞上来满满一网鱼，老船长乐开了花"},
+                {"name": "稀有海鲜", "probability": 0.05, "bonus": 250, "description": "网到一只罕见的大龙虾，卖了大价钱"},
+            ]
+        },
+        "miner": {
+            "name": "矿场矿工",
+            "description": "在幽暗的矿洞中开采矿石",
+            "base_reward": 260,
+            "duration_hours": 0.05,  # 3分钟
+            "required_level": 5,
+            "emoji": "⛏️",
+            "special_events": [
+                {"name": "挖到矿脉", "probability": 0.08, "bonus": 180, "description": "运气爆棚挖到了富矿脉"},
+                {"name": "稀有矿石", "probability": 0.04, "bonus": 300, "description": "发现了一块稀有矿石"},
+            ]
+        },
+        "mechanic": {
+            "name": "修车技师",
+            "description": "在修配街的车行里给各种车辆做保养维修",
+            "base_reward": 230,
+            "duration_hours": 0.042,  # 2.5分钟
+            "required_level": 5,
+            "emoji": "🔩",
+            "special_events": [
+                {"name": "疑难杂症", "probability": 0.10, "bonus": 150, "description": "修好了别人搞不定的故障"},
+                {"name": "豪车客户", "probability": 0.05, "bonus": 200, "description": "来了辆豪车，维修费翻倍还给了小费"},
+            ]
+        },
+        "tour_guide": {
+            "name": "景区导游",
+            "description": "带领游客参观金陵古城，讲解历史文化",
+            "base_reward": 170,
+            "duration_hours": 0.042,  # 2.5分钟
+            "required_level": 3,
+            "emoji": "🗺️",
+            "special_events": [
+                {"name": "好评如潮", "probability": 0.18, "bonus": 80, "description": "讲解生动有趣，游客全五星好评"},
+                {"name": "土豪团", "probability": 0.05, "bonus": 250, "description": "带了个土豪旅游团，小费给得大方"},
+            ]
+        },
+        "escort_guard": {
+            "name": "镖局护卫",
+            "description": "护送货物安全抵达目的地",
+            "base_reward": 300,
+            "duration_hours": 0.05,  # 3分钟
+            "required_level": 8,
+            "emoji": "⚔️",
+            "special_events": [
+                {"name": "一路平安", "probability": 0.20, "bonus": 100, "description": "轻松完成护送任务"},
+                {"name": "击退劫匪", "probability": 0.10, "bonus": 200, "description": "成功击退了路上的劫匪"},
+            ]
+        },
+        "snow_patrol": {
+            "name": "雪山巡逻员",
+            "description": "在风雪镇外围巡逻，排查异常和救助旅人",
+            "base_reward": 350,
+            "duration_hours": 0.05,  # 3分钟
+            "required_level": 10,
+            "emoji": "🏔️",
+            "special_events": [
+                {"name": "救助旅人", "probability": 0.12, "bonus": 150, "description": "救了个迷路的旅人"},
+                {"name": "发现异常", "probability": 0.08, "bonus": 200, "description": "发现并上报了可疑活动"},
+            ]
+        },
+        "dock_worker": {
+            "name": "码头搬运工",
+            "description": "在舟山渔港码头搬运卸货",
+            "base_reward": 190,
+            "duration_hours": 0.05,  # 3分钟
+            "required_level": 1,
+            "emoji": "⚓",
+            "special_events": [
+                {"name": "加急货", "probability": 0.15, "bonus": 80, "description": "帮忙搬了批加急货，拿了加急费"},
+                {"name": "力大无穷", "probability": 0.10, "bonus": 100, "description": "一人干了两人的活"},
+            ]
+        },
+        "herb_gatherer": {
+            "name": "药材采集员",
+            "description": "在云岭山区采集各种珍贵药材",
+            "base_reward": 210,
+            "duration_hours": 0.042,  # 2.5分钟
+            "required_level": 5,
+            "emoji": "🌿",
+            "special_events": [
+                {"name": "珍稀草药", "probability": 0.08, "bonus": 180, "description": "找到了一株年份很老的药材"},
+                {"name": "满载而归", "probability": 0.15, "bonus": 90, "description": "今天运气好，采了满满一筐好药材"},
+            ]
+        },
+        "tavern_waiter": {
+            "name": "酒馆跑堂",
+            "description": "在大昌市的热闹酒馆里端盘子、招待客人",
+            "base_reward": 110,
+            "duration_hours": 0.033,  # 2分钟
+            "required_level": 1,
+            "emoji": "🍺",
+            "special_events": [
+                {"name": "豪客打赏", "probability": 0.12, "bonus": 100, "description": "来了桌豪客，喝高兴了赏了一大笔"},
+                {"name": "听到情报", "probability": 0.08, "bonus": 80, "description": "无意间听到有用情报，老板给了信息费"},
+            ]
+        },
     }
 
     # 工作地点配置 - 整合到相应城镇中
@@ -200,7 +332,70 @@ class PartTimeJobService:
             "y": 50,
             "available_jobs": ["delivery_driver", "warehouse_keeper", "cargo_handler"],
             "required_level": 1
-        }
+        },
+        "farm_market": {
+            "location_id": "farm_market",
+            "name": "北郊农贸集散地",
+            "description": "北郊最大的农产品集散中心",
+            "x": 100,
+            "y": 460,
+            "available_jobs": ["farm_worker", "delivery_sorter", "warehouse_keeper"],
+            "required_level": 1
+        },
+        "culture_street": {
+            "location_id": "culture_street",
+            "name": "金陵文化商街",
+            "description": "古色古香的文化街区",
+            "x": 220,
+            "y": -350,
+            "available_jobs": ["tour_guide", "night_market_vendor", "coffee_server"],
+            "required_level": 1
+        },
+        "mining_area": {
+            "location_id": "mining_area",
+            "name": "云岭采矿区",
+            "description": "云岭深处的矿区，报酬不菲",
+            "x": -250,
+            "y": 490,
+            "available_jobs": ["miner", "herb_gatherer", "cargo_handler"],
+            "required_level": 3
+        },
+        "repair_street": {
+            "location_id": "repair_street",
+            "name": "摩配镇修配街",
+            "description": "摩配镇最热闹的修配一条街",
+            "x": 80,
+            "y": 140,
+            "available_jobs": ["mechanic", "factory_worker", "night_market_vendor"],
+            "required_level": 1
+        },
+        "snow_outpost": {
+            "location_id": "snow_outpost",
+            "name": "风雪镇哨站",
+            "description": "风雪镇外围的巡逻哨站",
+            "x": -5,
+            "y": 390,
+            "available_jobs": ["snow_patrol", "escort_guard", "herb_gatherer"],
+            "required_level": 5
+        },
+        "fishing_dock": {
+            "location_id": "fishing_dock",
+            "name": "舟山渔业码头",
+            "description": "舟山最繁忙的渔港码头",
+            "x": 200,
+            "y": -200,
+            "available_jobs": ["fisherman_helper", "dock_worker", "delivery_driver"],
+            "required_level": 1
+        },
+        "trade_district": {
+            "location_id": "trade_district",
+            "name": "大昌市商贸区",
+            "description": "大昌市的核心商贸区",
+            "x": -400,
+            "y": -240,
+            "available_jobs": ["escort_guard", "tavern_waiter", "warehouse_keeper"],
+            "required_level": 1
+        },
     }
 
     @classmethod

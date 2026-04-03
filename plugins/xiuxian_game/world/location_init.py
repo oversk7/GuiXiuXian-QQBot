@@ -626,16 +626,23 @@ def _get_merchant_name(market_name: str) -> str:
 
 def _get_employer_name(location_name: str) -> str:
     """根据地点名称生成雇主名称"""
-    if "商业" in location_name:
-        return "刘经理"
-    elif "工业" in location_name:
-        return "厂长老张"
-    elif "娱乐" in location_name:
-        return "店长小李"
-    elif "配送" in location_name:
-        return "主管老陈"
-    else:
-        return "负责人"
+    name_map = {
+        "商业": "刘经理",
+        "工业": "厂长老张",
+        "娱乐": "店长小李",
+        "物流": "主管老陈",
+        "农贸": "老农郭叔",
+        "文化": "馆长方先生",
+        "采矿": "矿头赵铁柱",
+        "修配": "车行老王",
+        "哨站": "哨长孙大壮",
+        "渔业": "船老大黄三",
+        "商贸": "掌柜钱婆婆",
+    }
+    for keyword, name in name_map.items():
+        if keyword in location_name:
+            return name
+    return "负责人"
 
 
 
