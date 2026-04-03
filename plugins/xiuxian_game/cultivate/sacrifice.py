@@ -12,6 +12,7 @@ from ..models.monthly_card import MonthlyCard
 from ..utils import message_add_head
 from ..config import config
 from ..platform_utils import get_unified_player
+from ..utils_markdown import cmd, build_markdown
 
 sacrifice_cmd = on_command("献祭", block=True, priority=5)
 batch_sacrifice_cmd = on_command("一键献祭", block=True, priority=5)
@@ -71,15 +72,15 @@ async def handle_sacrifice(event: MessageEvent, args: Message = CommandArg()):
         await session.commit()
 
         msg = (
-            f"⚙️ 祭品坠入幽冥，磷火噬啮骨肉。\n"
-            "━━━━━━━━━━━━━\n"
-            f"✧ 怨念值 + {gained}↑\n"
-            f"✧ 当前怨念值 {player.resentment}\n"
-            "━━━━━━━━━━━━━\n"
-            "⬇️ 【献祭】继续投喂祭坛\n"
-            "⬇️ 【突破 [镇厄]】以怨念护体突破"
+            f"⚙️ 祭品坠入幽冥，磷火噬啮骨肉。\n\n"
+            f"**━━ 献祭结果 ━━**\n"
+            f"✧ 怨念值 **+{gained}**↑\n"
+            f"✧ 当前怨念值 **{player.resentment}**\n\n"
+            + cmd("继续献祭", "献祭 ") + " | "
+            + cmd("突破", "突破 ") + " | "
+            + cmd("突破 镇厄")
         )
-        await sacrifice_cmd.finish(message_add_head(msg, event))
+        await sacrifice_cmd.finish(build_markdown(msg))
 
 
 @batch_sacrifice_cmd.handle()
@@ -202,11 +203,9 @@ async def handle_batch_sacrifice(event: MessageEvent, args: Message = CommandArg
 
         # 构建消息
         msg_lines = [
-            f"💳 月卡特权：一键献祭",
-            "━━━━━━━━━━━━━",
-            f"📦 献祭种类：{len(sacrifice_details)}",
-            "━━━━━━━━━━━━━",
-            "📋 献祭明细："
+            f"💳 **月卡特权：一键献祭**",
+            "",
+            f"**━━ 献祭明细 ━━**",
         ]
 
         # 限制显示前10条，避免消息过长
@@ -218,17 +217,19 @@ async def handle_batch_sacrifice(event: MessageEvent, args: Message = CommandArg
 
         if missing_items:
             msg_lines.extend([
-                "━━━━━━━━━━━━━",
+                "",
                 "⚠️ 未献祭：" + "、".join(missing_items)
             ])
 
         msg_lines.extend([
-            "━━━━━━━━━━━━━",
-            f"✧ 怨念值 + {total_gained}↑",
-            f"✧ 当前怨念值 {player.resentment}",
-            "━━━━━━━━━━━━━",
-            "⬇️ 【一键献祭 材料1 材料2】继续献祭",
-            "⬇️ 【突破 [镇厄]】以怨念护体突破"
+            "",
+            f"**━━ 结果 ━━**",
+            f"✧ 怨念值 **+{total_gained}**↑",
+            f"✧ 当前怨念值 **{player.resentment}**",
+            "",
+            cmd("继续献祭", "一键献祭 ") + " | "
+            + cmd("突破", "突破 ") + " | "
+            + cmd("突破 镇厄")
         ])
 
-        await batch_sacrifice_cmd.finish(message_add_head("\n".join(msg_lines), event))
+        await batch_sacrifice_cmd.finish(build_markdown("\n".join(msg_lines)))

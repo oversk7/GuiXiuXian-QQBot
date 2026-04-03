@@ -20,6 +20,7 @@ from typing import Tuple
 from ..models.db import safe_session, AsyncSessionLocal
 from ..models.player import Player
 from ..utils import message_add_head
+from ..utils_markdown import cmd, build_markdown
 from ..models.navigation_task import NavigationTask
 from ..platform_utils import get_unified_player
 from ..infrastructure.uow.unit_of_work import UnitOfWork
@@ -200,17 +201,16 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
             await session.commit()
 
             rx, ry = (player.real_world_x or 0), (player.real_world_y or 0)
-            arrival_msg = f"🎯 已到达目标位置 ({target_x},{target_y})\n"
-            arrival_msg += "━━━━━━━━━━━━━\n"
+            arrival_msg = f"🎯 已到达目标位置 **({target_x},{target_y})**\n\n"
 
             # 展示途中见闻
             events_text = format_navigation_events(nav_events)
             if events_text:
-                arrival_msg += events_text + "\n"
-                arrival_msg += "━━━━━━━━━━━━━\n"
+                arrival_msg += events_text + "\n\n"
 
             arrival_msg += f"📍 当前坐标: ({rx},{ry})\n"
-            arrival_msg += "✅ 导航任务已完成"
+            arrival_msg += "✅ 导航任务已完成\n\n"
+            arrival_msg += cmd("导航", "导航 ") + " | " + cmd("背包") + " | " + cmd("面板")
 
             # 检查到达位置是否有地点，记录访问并检查成就
             from .location_service import LocationService
@@ -230,7 +230,7 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
                 if achievement_messages:
                     arrival_msg += "\n\n" + "\n\n".join(achievement_messages)
 
-            await nav_cmd.finish(message_add_head(arrival_msg, event))
+            await nav_cmd.finish(build_markdown(arrival_msg))
 
         # 若未提供坐标 && 有导航，则只是查看进度（在诡域时展示现实坐标）
         if not parts:
@@ -241,8 +241,9 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
 
             if not task:
                 rx, ry = _real_coords(player)
-                await nav_cmd.finish(message_add_head(
-                    f"🧭 现实导航未设置\n当前现实坐标 ({rx:.1f},{ry:.1f})", event))
+                nav_empty_msg = f"🧭 现实导航未设置\n当前现实坐标 ({rx:.1f},{ry:.1f})\n\n"
+                nav_empty_msg += cmd("导航", "导航 ")
+                await nav_cmd.finish(build_markdown(nav_empty_msg))
 
             target_x, target_y = task.target_x, task.target_y
 
@@ -299,8 +300,7 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
             await session.commit()
 
             # 构建导航状态显示
-            nav_status = f"🧭 导航中 → 目标 ({target_x},{target_y})\n"
-            nav_status += "━━━━━━━━━━━━━\n"
+            nav_status = f"🧭 **导航中** → 目标 ({target_x},{target_y})\n\n"
             nav_status += f"📍 当前位置: ({disp_x},{disp_y})\n"
 
             # 如果在诡域中，额外显示诡域位置
@@ -308,15 +308,14 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
                 dungeon_x, dungeon_y = player.get_current_coordinates()
                 nav_status += f"🌏 诡域位置: {player.get_current_region()} ({dungeon_x},{dungeon_y})\n"
 
-            nav_status += f"📏 剩余距离: {rem_distance:.1f} 格\n"
+            nav_status += f"📏 剩余距离: **{rem_distance:.1f}** 格\n"
             if progress_info:
                 nav_status += progress_info
             nav_status += f"🚀 速度: {speed_now:.2f} 格/秒\n"
-            nav_status += f"⏱️ 预计: {_format_eta(eta_td)}\n"
-            nav_status += "━━━━━━━━━━━━━\n"
-            nav_status += "💡 【中断导航】停止前进"
+            nav_status += f"⏱️ 预计: **{_format_eta(eta_td)}**\n\n"
+            nav_status += cmd("刷新", "导航") + " | " + cmd("中断导航")
 
-            await nav_cmd.finish(message_add_head(nav_status, event))
+            await nav_cmd.finish(build_markdown(nav_status))
 
         # 智能判断：坐标导航 vs 地点导航
         is_coordinate_input = (len(parts) == 2 and all(p.lstrip("-+").isdigit() for p in parts))
@@ -420,11 +419,10 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
 
         # 根据是否有地点名显示不同的标题
         if target_name.startswith("("):  # 坐标模式
-            nav_msg = f"⚙️ 指针静默旋转，已开始导航至 {target_name}\n"
+            nav_msg = f"📍 已设置导航至 **{target_name}**\n\n"
         else:  # 地点模式
-            nav_msg = f"📍 已设置导航至【{target_name}】\n"
+            nav_msg = f"📍 已设置导航至 **【{target_name}】**\n\n"
 
-        nav_msg += "━━━━━━━━━━━━━\n"
         nav_msg += f"📍 起点: ({rx},{ry})\n"
         nav_msg += f"🎯 终点: ({tx},{ty})\n"
 
@@ -433,11 +431,10 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
             dungeon_x, dungeon_y = player.get_current_coordinates()
             nav_msg += f"🌏 诡域位置: {player.get_current_region()} ({dungeon_x},{dungeon_y})\n"
 
-        nav_msg += f"📏 总距离: {initial_distance:.1f} 格\n"
+        nav_msg += f"📏 总距离: **{initial_distance:.1f}** 格\n"
         nav_msg += f"🚀 速度: {speed_now:.2f} 格/秒\n"
-        nav_msg += f"⏱️ 预计: {_format_eta(eta_td)}\n"
-        nav_msg += "━━━━━━━━━━━━━\n"
-        nav_msg += "💡 【导航】查看进度 | 【中断导航】停止前进"
+        nav_msg += f"⏱️ 预计: **{_format_eta(eta_td)}**\n\n"
+        nav_msg += cmd("查看进度", "导航") + " | " + cmd("中断导航")
 
         # 检查新手任务（兼容旧的"前往"命令和新的"导航"命令）
         from ..quest.novice_quest_service import NoviceQuestService
@@ -448,7 +445,7 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
         if quest_completed and quest_msg:
             nav_msg += f"\n\n{quest_msg}"
 
-        await nav_cmd.finish(message_add_head(nav_msg, event))
+        await nav_cmd.finish(build_markdown(nav_msg))
 
 
 @stop_nav_cmd.handle()
@@ -473,8 +470,9 @@ async def _(event: MessageEvent):
         await session.commit()
         # 展示现实坐标
         rx, ry = (player.real_world_x or 0), (player.real_world_y or 0)
-        await stop_nav_cmd.finish(message_add_head(
-            f"🛑 指针折断，你停在现实坐标 ({rx},{ry})", event))
+        stop_msg = f"🛑 指针折断，你停在现实坐标 ({rx},{ry})\n\n"
+        stop_msg += cmd("导航", "导航 ")
+        await stop_nav_cmd.finish(build_markdown(stop_msg))
 
 
 @find_npc_cmd.handle()

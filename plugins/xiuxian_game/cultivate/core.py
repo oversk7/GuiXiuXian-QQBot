@@ -11,6 +11,7 @@ import random
 from sqlalchemy import select as _sel
 from ..models.inventory import ItemInstance as _Equip, ItemType
 from ..models.monthly_card import get_player_card_benefits
+from ..utils_markdown import cmd, build_markdown
 
 # Feature Flag: 控制是否使用新版MansionService (DI架构)
 cfg = config.game_config["cultivate"]
@@ -797,22 +798,20 @@ async def handle_breakthrough(event: MessageEvent, args: Message = CommandArg())
         required_level = ReincarnationService.get_required_level_for_reincarnation(player.reincarnation_level)
         if player.level >= required_level:
             reincarnation_count = player.reincarnation_level + 1
-            await breakthrough.finish(
-                f"🌟 你已达到冥返要求 Lv.{required_level}！\n"
-                "━━━━━━━━━━━━━\n"
+            await breakthrough.finish(build_markdown(
+                f"🌟 你已达到冥返要求 **Lv.{required_level}**！\n\n"
                 f"✧ 可进行第{reincarnation_count}次冥返轮回\n"
-                "✧ 冥返将重塑根基，获得更强潜力\n"
-                "━━━━━━━━━━━━━\n"
-                "⬇️ 【冥返】踏入轮回，重铸道基\n"
-                "⬇️ 【冥返信息】查看详细信息"
-            )
+                "✧ 冥返将重塑根基，获得更强潜力\n\n"
+                + cmd("冥返") + " | " + cmd("冥返信息")
+            ))
 
         # 检查经验是否足够
         if player.exp < required_exp:
-            await breakthrough.finish(
+            await breakthrough.finish(build_markdown(
                 f"💢 修为不足！\n"
-                f"▫️ 需要修为：{player.exp}/{required_exp}"
-            )
+                f"▫️ 需要修为：**{player.exp}**/{required_exp}\n\n"
+                + cmd("修炼") + " | " + cmd("闭关")
+            ))
 
         # 如果启用护航，检查怨念值是否足够
         if use_guardian and player.resentment < guardian_cost:
@@ -871,15 +870,13 @@ async def handle_breakthrough(event: MessageEvent, args: Message = CommandArg())
                 reward_msg = "\n" + "\n".join(reward_messages) + "\n"
 
             msg = (
-                f"⛓️‍💥骨裂声回荡，已突破至Lv.{player.level}↑\n"
-                "━━━━━━━━━━━━━\n"
-                f"✧ 获得属性点 + {points_gained}" + (f" (冥返加成)" if player.reincarnation_level > 0 else "") + "\n"
+                f"⛓️‍💥骨裂声回荡，已突破至 **Lv.{player.level}**↑\n\n"
+                "**━━ 突破结果 ━━**\n"
+                f"✧ 获得属性点 **+{points_gained}**" + (f" (冥返加成)" if player.reincarnation_level > 0 else "") + "\n"
                 f"✧ 剩余修为 {player.exp}\n"
                 + cost_msg +
-                reward_msg +
-                "━━━━━━━━━━━━━\n"
-                "⬇️ 【加点】缝合裂隙\n"
-                "⬇️ 【修炼】继续喂养怨炁"
+                reward_msg + "\n"
+                + cmd("加点", "加点 ") + " | " + cmd("修炼") + " | " + cmd("继续突破", "突破")
             )
 
             # 检查新手任务（等级提升）
@@ -926,15 +923,13 @@ async def handle_breakthrough(event: MessageEvent, args: Message = CommandArg())
                     reward_msg = "\n" + "\n".join(reward_messages) + "\n"
 
                 msg = (
-                    f"⛓️‍💥骨裂声回荡，已突破至Lv.{player.level}↑\n"
-                    "━━━━━━━━━━━━━\n"
-                    f"✧ 获得属性点 + {points_gained}" + (f" (冥返加成)" if player.reincarnation_level > 0 else "") + "\n"
+                    f"⛓️‍💥骨裂声回荡，已突破至 **Lv.{player.level}**↑\n\n"
+                    "**━━ 突破结果 ━━**\n"
+                    f"✧ 获得属性点 **+{points_gained}**" + (f" (冥返加成)" if player.reincarnation_level > 0 else "") + "\n"
                     f"✧ 剩余修为 {player.exp}\n"
                     + cost_msg +
-                    reward_msg +
-                    "━━━━━━━━━━━━━\n"
-                    "⬇️ 【加点】缝合裂隙\n"
-                    "⬇️ 【修炼】继续喂养怨炁"
+                    reward_msg + "\n"
+                    + cmd("加点", "加点 ") + " | " + cmd("修炼") + " | " + cmd("继续突破", "突破")
                 )
 
                 # 检查新手任务（等级提升）
@@ -982,25 +977,24 @@ async def handle_breakthrough(event: MessageEvent, args: Message = CommandArg())
                 pity_threshold = cfg_break.get("pity_threshold", 10)
                 pity_reached = player.breakthrough_fail_count >= pity_threshold
 
-                msg_lines = ["💥 镇厄崩散，修为反噬席卷脏腑。", "━━━━━━━━━━━━━"]
+                msg_lines = ["💥 镇厄崩散，修为反噬席卷脏腑。", "", "**━━ 失败详情 ━━**"]
                 if protection_msg:
                     msg_lines.append(protection_msg)
                 msg_lines.extend([
                     f"✧ 剩余修为 {player.exp}",
                     f"✧ 修为保留 {int(keep_ratio*100)}%",
                     f"✧ 本次理论成功率 {int(success_chance*100)}%（含运气+{int(luck_break_bonus*100)}%）",
-                    f"✧ 连续失败 {player.breakthrough_fail_count} 次",
+                    f"✧ 连续失败 **{player.breakthrough_fail_count}** 次",
                     f"✧ 下次成功率加成 +{int(next_bonus*100)}%",
-                    f"✧ 保底进度 {player.breakthrough_fail_count}/{pity_threshold}{'【下次必定成功！】' if pity_reached else ''}",
-                    "━━━━━━━━━━━━━",
-                    "⬇️ 建议【突破 镇厄】以怨念护体",
-                    "⬇️ 或者【突破 棺材钉】消耗棺材钉"
+                    f"✧ 保底进度 {player.breakthrough_fail_count}/{pity_threshold}" + (" **【下次必定成功！】**" if pity_reached else ""),
+                    "",
+                    cmd("突破 镇厄") + " | " + cmd("突破 棺材钉") + " | " + cmd("献祭", "献祭 ")
                 ])
                 msg = "\n".join(msg_lines)
 
         session.add(player)
         await session.commit()
-        await breakthrough.finish(message_add_head(msg, event))
+        await breakthrough.finish(build_markdown(msg))
 
 @continuous_breakthrough.handle()
 async def handle_continuous_breakthrough(event: MessageEvent, args: Message = CommandArg()):
@@ -1027,15 +1021,12 @@ async def handle_continuous_breakthrough(event: MessageEvent, args: Message = Co
         required_level = ReincarnationService.get_required_level_for_reincarnation(player.reincarnation_level)
         if player.level >= required_level:
             reincarnation_count = player.reincarnation_level + 1
-            await continuous_breakthrough.finish(
-                f"🌟 你已达到冥返要求 Lv.{required_level}！\n"
-                "━━━━━━━━━━━━━\n"
+            await continuous_breakthrough.finish(build_markdown(
+                f"🌟 你已达到冥返要求 **Lv.{required_level}**！\n\n"
                 f"✧ 可进行第{reincarnation_count}次冥返轮回\n"
-                "✧ 冥返将重塑根基，获得更强潜力\n"
-                "━━━━━━━━━━━━━\n"
-                "⬇️ 【冥返】踏入轮回，重铸道基\n"
-                "⬇️ 【冥返信息】查看详细信息"
-            )
+                "✧ 冥返将重塑根基，获得更强潜力\n\n"
+                + cmd("冥返") + " | " + cmd("冥返信息")
+            ))
 
         # 统计信息
         breakthrough_count = 0
@@ -1161,33 +1152,27 @@ async def handle_continuous_breakthrough(event: MessageEvent, args: Message = Co
                     next_bonus = min(next_bonus, max_rate)
 
                 msg = (
-                    "💥 连续突破失败，修为不足以继续！\n"
-                    "━━━━━━━━━━━━━\n"
+                    "💥 连续突破失败，修为不足以继续！\n\n"
+                    "**━━ 失败详情 ━━**\n"
                     f"✧ 本轮失败 {failed_attempts} 次\n"
                     f"✧ 当前等级 Lv.{player.level}\n"
                     f"✧ 剩余修为 {player.exp}/{calculate_level_up_exp(player.level)}\n"
-                    f"✧ 连续失败 {player.breakthrough_fail_count} 次\n"
-                    f"✧ 下次成功率加成 +{int(next_bonus*100)}%\n"
-                    "━━━━━━━━━━━━━\n"
-                    "⬇️ 建议【突破 镇厄】以怨念护体"
+                    f"✧ 连续失败 **{player.breakthrough_fail_count}** 次\n"
+                    f"✧ 下次成功率加成 +{int(next_bonus*100)}%\n\n"
+                    + cmd("突破 镇厄") + " | " + cmd("修炼") + " | " + cmd("献祭", "献祭 ")
                 )
             elif player.exp < calculate_level_up_exp(player.level):
                 msg = (
                     "💢 修为不足，无法进行突破！\n"
-                    "━━━━━━━━━━━━━\n"
-                    f"✧ 当前修为 {player.exp}/{calculate_level_up_exp(player.level)}\n"
-                    "━━━━━━━━━━━━━\n"
-                    "⬇️ 【修炼】继续喂养怨炁"
+                    f"✧ 当前修为 **{player.exp}**/{calculate_level_up_exp(player.level)}\n\n"
+                    + cmd("修炼") + " | " + cmd("闭关")
                 )
             elif use_guardian and start_resentment < (cfg_break.get("guardian_cost_base", 50) + player.level * cfg_break.get("guardian_cost_per_level", 15)):
                 msg = (
                     "💢 怨念值不足，无法使用镇厄！\n"
-                    "━━━━━━━━━━━━━\n"
-                    f"✧ 当前怨念值 {player.resentment}\n"
-                    f"✧ 镇厄需要 {cfg_break.get('guardian_cost_base', 50) + player.level * cfg_break.get('guardian_cost_per_level', 15)}\n"
-                    "━━━━━━━━━━━━━\n"
-                    "⬇️ 【献祭】获取怨念值\n"
-                    "⬇️ 【连续突破】不使用镇厄"
+                    f"✧ 当前怨念值 **{player.resentment}**\n"
+                    f"✧ 镇厄需要 **{cfg_break.get('guardian_cost_base', 50) + player.level * cfg_break.get('guardian_cost_per_level', 15)}**\n\n"
+                    + cmd("献祭", "献祭 ") + " | " + cmd("连续突破")
                 )
             else:
                 # 计算下次成功率加成
@@ -1199,15 +1184,14 @@ async def handle_continuous_breakthrough(event: MessageEvent, args: Message = Co
                     next_bonus = min(next_bonus, max_rate)
 
                 msg = (
-                    "💥 连续突破失败，修为耗尽！\n"
-                    "━━━━━━━━━━━━━\n"
+                    "💥 连续突破失败，修为耗尽！\n\n"
+                    "**━━ 失败详情 ━━**\n"
                     f"✧ 当前等级 Lv.{player.level}\n"
                     f"✧ 失败次数 {failed_attempts} 次\n"
                     f"✧ 剩余修为 {player.exp}\n"
-                    f"✧ 连续失败 {player.breakthrough_fail_count} 次\n"
-                    f"✧ 下次成功率加成 +{int(next_bonus*100)}%\n"
-                    "━━━━━━━━━━━━━\n"
-                    "⬇️ 建议【突破 镇厄】以怨念护体"
+                    f"✧ 连续失败 **{player.breakthrough_fail_count}** 次\n"
+                    f"✧ 下次成功率加成 +{int(next_bonus*100)}%\n\n"
+                    + cmd("突破 镇厄") + " | " + cmd("修炼") + " | " + cmd("献祭", "献祭 ")
                 )
         else:
             # 计算消耗的修为
@@ -1223,22 +1207,20 @@ async def handle_continuous_breakthrough(event: MessageEvent, args: Message = Co
                 fail_msg = f"✧ 失败次数 {failed_attempts} 次\n"
 
             msg = (
-                f"⛓️‍💥连续突破完成！骨裂声不绝于耳！\n"
-                "━━━━━━━━━━━━━\n"
+                f"⛓️‍💥连续突破完成！骨裂声不绝于耳！\n\n"
+                "**━━ 突破结果 ━━**\n"
                 f"✧ 突破次数 {breakthrough_count} 次\n"
                 + fail_msg +
-                f"✧ 等级提升 Lv.{start_level} → Lv.{player.level}\n"
+                f"✧ 等级提升 Lv.{start_level} → **Lv.{player.level}**\n"
                 f"✧ 消耗修为 {consumed_exp}\n"
-                f"✧ 获得属性点 + {total_attribute_points}" + (f" (冥返加成)" if player.reincarnation_level > 0 else "") + "\n"
+                f"✧ 获得属性点 **+{total_attribute_points}**" + (f" (冥返加成)" if player.reincarnation_level > 0 else "") + "\n"
                 f"✧ 剩余修为 {player.exp}\n"
                 + cost_msg +
-                (f"✧ 当前已达 Lv.{required_level}，需先进行冥返才能继续突破\n" if reached_level_cap else "") +
-                "━━━━━━━━━━━━━\n"
-                "⬇️ 【加点】缝合裂隙\n"
-                "⬇️ 【修炼】继续喂养怨炁"
+                (f"✧ 当前已达 Lv.{required_level}，需先进行冥返才能继续突破\n" if reached_level_cap else "") + "\n"
+                + cmd("加点", "加点 ") + " | " + cmd("修炼") + " | " + cmd("面板")
             )
 
-        await continuous_breakthrough.finish(message_add_head(msg, event))
+        await continuous_breakthrough.finish(build_markdown(msg))
 
 # 基础属性映射表
 ATTRIBUTE_MAP = {
