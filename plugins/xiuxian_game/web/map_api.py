@@ -46,19 +46,15 @@ CITIES = [
 
 # ==================== HTML 缓存（启动时加载，避免阻塞事件循环） ====================
 
-_html_cache: str | None = None
 _NONCE_PLACEHOLDER = "%%CSP_NONCE%%"
 
 
 def _load_html() -> str:
-    global _html_cache
-    if _html_cache is None:
-        html_path = Path(__file__).parent / "static" / "map.html"
-        if html_path.exists():
-            _html_cache = html_path.read_text(encoding="utf-8")
-        else:
-            _html_cache = ""
-    return _html_cache
+    """读取地图 HTML（每次读磁盘，方便热更新调试）"""
+    html_path = Path(__file__).parent / "static" / "map.html"
+    if html_path.exists():
+        return html_path.read_text(encoding="utf-8")
+    return ""
 
 
 # ==================== 速率限制器 ====================

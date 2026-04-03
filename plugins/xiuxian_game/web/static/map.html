@@ -23,7 +23,7 @@ html,body{width:100%;height:100%;overflow:hidden;background:#080c18;color:#a0c4e
 #conn.err{background:#ff3366;box-shadow:0 0 6px #ff3366}
 
 /* ======== Canvas ======== */
-#map-canvas{position:fixed;top:52px;left:0;right:0;bottom:32px;cursor:grab}
+#map-canvas{display:block;position:fixed;top:52px;left:0;width:100vw;height:calc(100vh - 84px);cursor:grab}
 #map-canvas:active{cursor:grabbing}
 
 /* ======== Footer ======== */
@@ -190,12 +190,13 @@ function c2g(cx, cy) {
 //  RESIZE
 // ============================================================
 function resize() {
-  const rect = canvas.getBoundingClientRect();
   const dpr = window.devicePixelRatio || 1;
-  W = rect.width;
-  H = rect.height;
-  canvas.width  = W * dpr;
-  canvas.height = H * dpr;
+  // 用 innerWidth/innerHeight 确保拿到正确尺寸，不依赖 getBoundingClientRect 时序
+  W = window.innerWidth;
+  H = window.innerHeight - 84; // header 52 + footer 32
+  if (H < 100) H = window.innerHeight;
+  canvas.width  = Math.round(W * dpr);
+  canvas.height = Math.round(H * dpr);
   canvas.style.width  = W + 'px';
   canvas.style.height = H + 'px';
   ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
@@ -801,6 +802,9 @@ setInterval(() => {
   resize();
   resetView();
   window.addEventListener('resize', () => { resize(); });
+
+  // 确保布局完成后再校正一次尺寸
+  window.addEventListener('load', () => { resize(); resetView(); });
 
   await fetchData();
   setInterval(fetchData, REFRESH);
