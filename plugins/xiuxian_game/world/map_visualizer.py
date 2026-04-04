@@ -32,8 +32,8 @@ class MapVisualizer:
 
     def __init__(self):
         # 地图配置 - 扩大纵向范围以显示所有地点
-        self.map_width = 1200
-        self.map_height = 1000  # 增加高度以容纳Y轴范围-500到500
+        self.map_width = 1600
+        self.map_height = 1400  # 增加高度以容纳Y轴范围-2000到2000
         self.grid_size = 20  # 每个网格的像素大小
         self.coordinate_scale = 50  # 坐标缩放比例，50像素 = 1游戏坐标
 
@@ -318,8 +318,8 @@ class MapVisualizer:
         center_y = self.map_height // 2
 
         # 扩大坐标范围以适应实际地点分布：X轴-500到500，Y轴-500到500
-        pixel_x = center_x + (x * self.map_width // 1000)  # X轴范围-500到500
-        pixel_y = center_y - (y * self.map_height // 1000)  # Y轴范围-500到500，Y轴翻转，向上为正
+        pixel_x = center_x + (x * self.map_width // 4000)  # X轴范围-2000到2000
+        pixel_y = center_y - (y * self.map_height // 4000)  # Y轴范围-2000到2000，Y轴翻转，向上为正
 
         return pixel_x, pixel_y
     
@@ -359,7 +359,7 @@ class MapVisualizer:
         draw.line([center_x, 0, center_x, self.map_height], fill=self.colors['border'], width=2)
         
         # 绘制坐标刻度 - 扩大范围以显示所有地点
-        for i in range(-500, 501, 100):
+        for i in range(-2000, 2001, 500):
             if i == 0:
                 continue
 
@@ -749,10 +749,10 @@ class MapVisualizer:
         except ImportError:
             # 如果导入失败，使用默认配置（已整合到城镇中）
             default_jobs = [
-                (0, 0, "上京商业心"),
-                (120, 200, "荔湾镇工业区"),
-                (120, 120, "郸城娱乐街区"),
-                (390, 50, "东郊物流中心"),
+                (0, 0, "上京商业中心"),
+                (250, -1350, "荔湾镇工业区"),
+                (150, -130, "郸城娱乐街区"),
+                (250, -50, "天海卫物流中心"),
             ]
             for x, y, name in default_jobs:
                 coords = self._draw_location(draw, x, y, name, 'job')
