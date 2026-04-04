@@ -442,9 +442,7 @@ T2_AFFIX_TO_INSCRIPTION = {
     "weaken": "inscription_debuff_defense",
     "counter_stun": "inscription_counter_fear",
     "dodge_crit": "inscription_buff_crit",
-    "kill_boost": "inscription_kill_attack",
     "desperation_crit": "inscription_lowhp_damage",
-    "soul_burn": "inscription_hit_debuff_def",
     "combo_stack": "inscription_crit_boost",
     "doom_judgment": "inscription_execute",
 }

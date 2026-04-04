@@ -314,24 +314,6 @@ affixes:
         purple: [8, 12]
         orange: [12, 18]
 
-    - affix_id: "kill_boost"
-      name: "击杀加伤"
-      description: "击杀后{value}%概率下次伤害+{value2}%"
-      trigger: "on_kill"
-      effect: "damage_boost"
-      chance_ranges:
-        blue: [30, 40]
-        purple: [40, 55]
-        orange: [55, 70]
-      value_ranges:
-        blue: [10, 15]
-        purple: [15, 22]
-        orange: [22, 30]
-      duration_ranges:
-        blue: [1, 1]
-        purple: [1, 1]
-        orange: [1, 2]
-
     - affix_id: "dodge_crit"
       name: "闪避必暴"
       description: "闪避成功后{value}%概率下次暴击+{value2}%"
@@ -367,24 +349,6 @@ affixes:
         blue: [2, 2]
         purple: [2, 3]
         orange: [3, 3]
-
-    - affix_id: "soul_burn"
-      name: "灵魂灼烧"
-      description: "攻击时{value}%概率灼烧敌人{value2}%理智(2回合)"
-      trigger: "on_attack"
-      effect: "debuff_defense"
-      chance_ranges:
-        blue: [8, 12]
-        purple: [12, 18]
-        orange: [18, 25]
-      value_ranges:
-        blue: [5, 8]
-        purple: [8, 12]
-        orange: [12, 18]
-      duration_ranges:
-        blue: [2, 2]
-        purple: [2, 2]
-        orange: [2, 3]
 
     - affix_id: "periodic_regen"
       name: "周期回复"

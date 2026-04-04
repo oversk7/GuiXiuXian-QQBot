@@ -12,6 +12,7 @@
 from sqlalchemy import text, inspect
 from sqlalchemy.ext.asyncio import AsyncEngine
 from typing import Dict, List, Tuple, Set
+import json
 import logging
 import re
 
@@ -261,11 +262,15 @@ async def auto_migrate(engine: AsyncEngine, verbose: bool = True):
         # 4. 检测并修复 ENUM 列
         enums_fixed = await _fix_enum_columns(conn, verbose)
 
+        # 5. 数据清理：移除已废弃的装备词缀
+        affixes_cleaned = await _cleanup_deprecated_affixes(conn, verbose)
+
         if verbose:
-            if tables_created > 0 or fields_added > 0 or indexes_added > 0 or enums_fixed > 0:
+            if tables_created > 0 or fields_added > 0 or indexes_added > 0 or enums_fixed > 0 or affixes_cleaned > 0:
                 print(f"[√] [自动迁移] 完成！创建了 {tables_created} 个表，"
                       f"添加了 {fields_added} 个字段，{indexes_added} 个索引，"
-                      f"修复了 {enums_fixed} 个 ENUM 列")
+                      f"修复了 {enums_fixed} 个 ENUM 列"
+                      f"{f'，清理了 {affixes_cleaned} 件装备的废弃词缀' if affixes_cleaned > 0 else ''}")
             else:
                 print("[√] [自动迁移] 数据库结构已是最新")
 
@@ -390,6 +395,69 @@ async def _add_missing_indexes(conn, verbose: bool) -> int:
                 logger.error(f"[X] [自动迁移] 创建索引 {idx_name} 失败: {e}")
 
     return added_count
+
+
+# ==================== 数据清理函数 ====================
+
+# 已废弃的词缀ID列表（与战斗机制不符，不再生成）
+DEPRECATED_AFFIX_IDS = {"kill_boost", "soul_burn"}
+
+
+async def _cleanup_deprecated_affixes(conn, verbose: bool) -> int:
+    """清理已有装备上的废弃词缀（仅删词缀，保留装备和其他效果）"""
+    cleaned_count = 0
+
+    try:
+        # 查找包含废弃词缀的装备行
+        conditions = " OR ".join(
+            f"extra_attrs LIKE '%{affix_id}%'" for affix_id in DEPRECATED_AFFIX_IDS
+        )
+        result = await conn.execute(
+            text(f"SELECT id, extra_attrs FROM inventory WHERE {conditions}")
+        )
+        rows = result.fetchall()
+
+        if not rows:
+            if verbose:
+                logger.debug("  [√] 无需清理废弃词缀")
+            return 0
+
+        for row in rows:
+            row_id, extra_attrs_raw = row[0], row[1]
+
+            # extra_attrs 可能是 str 或 dict
+            if isinstance(extra_attrs_raw, str):
+                extra_attrs = json.loads(extra_attrs_raw)
+            elif isinstance(extra_attrs_raw, dict):
+                extra_attrs = extra_attrs_raw
+            else:
+                continue
+
+            affixes = extra_attrs.get("_affixes", [])
+            if not affixes:
+                continue
+
+            original_count = len(affixes)
+            filtered = [a for a in affixes if a.get("affix_id") not in DEPRECATED_AFFIX_IDS]
+
+            if len(filtered) == original_count:
+                continue  # 无变化
+
+            extra_attrs["_affixes"] = filtered
+            new_json = json.dumps(extra_attrs, ensure_ascii=False)
+            await conn.execute(
+                text("UPDATE inventory SET extra_attrs = :data WHERE id = :id"),
+                {"data": new_json, "id": row_id}
+            )
+            cleaned_count += 1
+
+        if verbose and cleaned_count > 0:
+            print(f"  [清理] 已从 {cleaned_count} 件装备中移除废弃词缀 {DEPRECATED_AFFIX_IDS}")
+
+    except Exception as e:
+        logger.error(f"[X] [自动迁移] 清理废弃词缀失败: {e}")
+
+    return cleaned_count
 
 
 # ==================== 验证函数 ====================
