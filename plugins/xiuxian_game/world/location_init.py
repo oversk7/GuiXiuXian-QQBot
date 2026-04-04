@@ -598,90 +598,135 @@ async def init_special_locations(session) -> int:
 
 async def init_social_npcs(session) -> int:
     """
-    初始化社交NPC(月老、结义使者)
+    初始化社交NPC和社交代理
 
-    在上京(0,0)添加月老和结义使者
+    - 月老 → 临安（姻缘圣地）
+    - 结义使者 → 长安（武道义气）
+    - 师徒使者 → 金陵（文教传承）
+    - 8个集群主城各放一个社交代理（提供全部三种社交功能）
     """
     from ..models.npc import NPC, NPCType
     from ..economy.merchants import MARKETS
 
     created_count = 0
 
-    # 找到上京市集地点
-    shangjing_market = None
-    for market in MARKETS:
-        if market.name == "上京":
-            # 查找上京市集对应的地点
-            shangjing_market = await LocationService.get_location_by_coordinates(
-                session, market.x, market.y, "大都会"
+    # 清理旧版社交NPC（从上京迁出）
+    old_npc_ids = ["matchmaker_shangjing", "sworn_envoy_shangjing", "mentor_envoy_shangjing"]
+    for old_id in old_npc_ids:
+        old_npc = await NPCService.get_npc_by_id(session, old_id)
+        if old_npc:
+            await session.delete(old_npc)
+
+    # 辅助函数：按城市名找到Location
+    async def find_city_location(city_name: str):
+        for market in MARKETS:
+            if market.name == city_name:
+                loc = await LocationService.get_location_by_coordinates(
+                    session, market.x, market.y, "大都会"
+                )
+                return loc
+        return None
+
+    # ===== 1. 月老 → 临安 =====
+    linan_loc = await find_city_location("临安")
+    if linan_loc:
+        if not linan_loc.has_function("social"):
+            linan_loc.add_function("social", {"enabled": True})
+        matchmaker_id = "matchmaker_linan"
+        existing = await NPCService.get_npc_by_id(session, matchmaker_id)
+        if not existing:
+            npc = NPC(
+                npc_id=matchmaker_id,
+                name="月老",
+                description="掌管天下姻缘的老人，手持红绳，据说能牵起千里良缘",
+                npc_type=NPCType.NORMAL,
+                location_id=linan_loc.id,
+                is_killable=False,
+                is_active=True
             )
-            break
+            npc.add_function("matchmaker", {"enabled": True})
+            session.add(npc)
+            created_count += 1
 
-    if not shangjing_market:
-        # 如果找不到上京，就不创建
-        return 0
+    # ===== 2. 结义使者 → 长安 =====
+    changan_loc = await find_city_location("长安")
+    if changan_loc:
+        if not changan_loc.has_function("social"):
+            changan_loc.add_function("social", {"enabled": True})
+        sworn_id = "sworn_envoy_changan"
+        existing = await NPCService.get_npc_by_id(session, sworn_id)
+        if not existing:
+            npc = NPC(
+                npc_id=sworn_id,
+                name="结义使者",
+                description="负责见证江湖义气的使者，曾为无数英雄豪杰主持结义仪式",
+                npc_type=NPCType.NORMAL,
+                location_id=changan_loc.id,
+                is_killable=False,
+                is_active=True
+            )
+            npc.add_function("sworn_ceremony", {"enabled": True})
+            session.add(npc)
+            created_count += 1
 
-    # 确保functions字段不为None
-    if shangjing_market.functions is None:
-        shangjing_market.functions = {}
+    # ===== 3. 师徒使者 → 金陵 =====
+    jinling_loc = await find_city_location("金陵")
+    if jinling_loc:
+        if not jinling_loc.has_function("social"):
+            jinling_loc.add_function("social", {"enabled": True})
+        mentor_id = "mentor_envoy_jinling"
+        existing = await NPCService.get_npc_by_id(session, mentor_id)
+        if not existing:
+            npc = NPC(
+                npc_id=mentor_id,
+                name="师徒使者",
+                description="传承之道的见证者，师徒关系的缔结者",
+                npc_type=NPCType.NORMAL,
+                location_id=jinling_loc.id,
+                is_killable=False,
+                is_active=True
+            )
+            npc.add_function("mentorship", {"enabled": True})
+            session.add(npc)
+            created_count += 1
 
-    # 添加社交功能
-    if not shangjing_market.has_function("social"):
-        shangjing_market.add_function("social", {"enabled": True})
+    # ===== 4. 8个集群主城的社交代理 =====
+    social_agent_cities = {
+        "上京": "社交代理·京畿",
+        "姑苏": "社交代理·江南",
+        "荔湾镇": "社交代理·南海",
+        "锦官城": "社交代理·蜀地",
+        "神都": "社交代理·关中",
+        "汴梁": "社交代理·中原",
+        "辽阳": "社交代理·北境",
+        "楼兰": "社交代理·西域",
+    }
 
-    # 1. 创建月老NPC
-    matchmaker_npc_id = "matchmaker_shangjing"
-    existing_matchmaker = await NPCService.get_npc_by_id(session, matchmaker_npc_id)
+    for city_name, agent_name in social_agent_cities.items():
+        loc = await find_city_location(city_name)
+        if not loc:
+            continue
+        if not loc.has_function("social"):
+            loc.add_function("social", {"enabled": True})
 
-    if not existing_matchmaker:
-        matchmaker_npc = NPC(
-            npc_id=matchmaker_npc_id,
-            name="月老",
-            description="掌管天下姻缘的老人，手持红绳，据说能牵起千里良缘",
-            npc_type=NPCType.NORMAL,
-            location_id=shangjing_market.id,
-            is_killable=False,
-            is_active=True
-        )
-        matchmaker_npc.add_function("matchmaker", {"enabled": True})
-        session.add(matchmaker_npc)
-        created_count += 1
-
-    # 2. 创建结义使者NPC
-    sworn_npc_id = "sworn_envoy_shangjing"
-    existing_sworn = await NPCService.get_npc_by_id(session, sworn_npc_id)
-
-    if not existing_sworn:
-        sworn_npc = NPC(
-            npc_id=sworn_npc_id,
-            name="结义使者",
-            description="负责见证江湖义气的使者，曾为无数英雄豪杰主持结义仪式",
-            npc_type=NPCType.NORMAL,
-            location_id=shangjing_market.id,
-            is_killable=False,
-            is_active=True
-        )
-        sworn_npc.add_function("sworn_ceremony", {"enabled": True})
-        session.add(sworn_npc)
-        created_count += 1
-
-    # 3. 创建师徒使者NPC
-    mentor_npc_id = "mentor_envoy_shangjing"
-    existing_mentor = await NPCService.get_npc_by_id(session, mentor_npc_id)
-
-    if not existing_mentor:
-        mentor_npc = NPC(
-            npc_id=mentor_npc_id,
-            name="师徒使者",
-            description="传承之道的见证者，师徒关系的缔结者",
-            npc_type=NPCType.NORMAL,
-            location_id=shangjing_market.id,
-            is_killable=False,
-            is_active=True
-        )
-        mentor_npc.add_function("mentorship", {"enabled": True})
-        session.add(mentor_npc)
-        created_count += 1
+        agent_npc_id = f"social_agent_{city_name}"
+        existing = await NPCService.get_npc_by_id(session, agent_npc_id)
+        if not existing:
+            npc = NPC(
+                npc_id=agent_npc_id,
+                name=agent_name,
+                description="可代办姻缘、结义、师徒等社交事务的官方代理",
+                npc_type=NPCType.NORMAL,
+                location_id=loc.id,
+                is_killable=False,
+                is_active=True
+            )
+            npc.add_function("social_agent", {"enabled": True})
+            npc.add_function("matchmaker", {"enabled": True})
+            npc.add_function("sworn_ceremony", {"enabled": True})
+            npc.add_function("mentorship", {"enabled": True})
+            session.add(npc)
+            created_count += 1
 
     return created_count
 

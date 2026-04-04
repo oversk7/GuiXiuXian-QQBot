@@ -207,14 +207,14 @@ async def handle_npc_type_interaction(session, player: Player, npc, interaction_
         await handle_ghost_interaction(session, player, npc, event)
     elif npc_type == NPCType.SPECIAL_VENDOR:
         await handle_special_vendor_interaction(session, player, npc, event)
-    elif npc.npc_id == "matchmaker_shangjing":
-        # 月老NPC - 通过npc_id判断
+    elif npc.has_function("social_agent"):
+        # 社交代理优先匹配（同时拥有matchmaker/sworn_ceremony/mentorship，走统一菜单）
+        await handle_social_agent_interaction(session, player, npc, event, dialogue_content)
+    elif npc.has_function("matchmaker"):
         await handle_matchmaker_interaction(session, player, npc, event, dialogue_content)
-    elif npc.npc_id == "sworn_envoy_shangjing":
-        # 结义使者NPC - 通过npc_id判断
+    elif npc.has_function("sworn_ceremony"):
         await handle_sworn_envoy_interaction(session, player, npc, event, dialogue_content)
-    elif npc.npc_id == "mentor_envoy_shangjing":
-        # 师徒使者NPC - 通过npc_id判断
+    elif npc.has_function("mentorship"):
         await handle_mentor_envoy_interaction(session, player, npc, event, dialogue_content)
     else:
         await handle_generic_interaction(session, player, npc, event, dialogue_content)
@@ -365,6 +365,38 @@ async def handle_mentor_envoy_interaction(session, player: Player, npc, event: M
             await interact_cmd.finish(message_add_head(message, event))
     else:
         await interact_cmd.finish(message_add_head(result, event))
+
+
+async def handle_social_agent_interaction(session, player: Player, npc, event: MessageEvent, dialogue_content: str = None):
+    """处理社交代理NPC交互 - 提供求婚/结义/拜师三合一服务"""
+    from ..utils_markdown import cmd
+
+    # 如果玩家指定了具体功能，直接路由
+    if dialogue_content:
+        content = dialogue_content.strip()
+        if "婚" in content or "姻缘" in content or "求婚" in content:
+            await handle_matchmaker_interaction(session, player, npc, event, dialogue_content)
+            return
+        elif "结义" in content or "义" in content or "兄弟" in content:
+            await handle_sworn_envoy_interaction(session, player, npc, event, dialogue_content)
+            return
+        elif "师" in content or "拜师" in content or "收徒" in content or "香火" in content or "食谱" in content:
+            await handle_mentor_envoy_interaction(session, player, npc, event, dialogue_content)
+            return
+
+    # 未指定功能，显示菜单
+    lines = [
+        f"🏛️ {npc.name}",
+        "━━━━━━━━━━━━━",
+        f"💬 「需要什么帮助？我可以代办以下事务。」",
+        "",
+        f"💕 {cmd('姻缘', f'交互 {npc.name} 姻缘')} — 求婚·结婚·离婚",
+        f"🤝 {cmd('结义', f'交互 {npc.name} 结义')} — 结拜·断义",
+        f"📖 {cmd('师徒', f'交互 {npc.name} 拜师')} — 拜师·收徒·香火商店·食谱",
+        "━━━━━━━━━━━━━",
+        "💡 点击上方按钮或输入【交互 " + npc.name + " 姻缘/结义/拜师】",
+    ]
+    await interact_cmd.finish(message_add_head("\n".join(lines), event))
 
 
 async def handle_generic_interaction(session, player: Player, npc, event: MessageEvent, dialogue_content: str = None):
