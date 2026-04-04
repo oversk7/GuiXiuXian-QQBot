@@ -38,7 +38,6 @@ def _build_service(session):
 @mansion_warehouse_cmd.handle()
 async def handle_mansion_warehouse(event: MessageEvent):
     """查看阴宅仓库"""
-    user_id = event.get_user_id()
     async with safe_session() as session:
         player = await get_unified_player(session, event)
         if not player:
@@ -64,14 +63,13 @@ async def handle_mansion_warehouse(event: MessageEvent):
             ))
 
         service = _build_service(session)
-        display = await service.format_warehouse_display(user_id, player.mansion_level)
+        display = await service.format_warehouse_display(player.id, player.mansion_level)
         await mansion_warehouse_cmd.finish(message_add_head(display, event))
 
 
 @deposit_mansion_cmd.handle()
 async def handle_deposit_mansion(event: MessageEvent, args: Message = CommandArg()):
     """存入物品到阴宅仓库"""
-    user_id = event.get_user_id()
     arg_text = args.extract_plain_text().strip()
 
     if not arg_text:
@@ -133,7 +131,7 @@ async def handle_deposit_mansion(event: MessageEvent, args: Message = CommandArg
             ))
 
         service = _build_service(session)
-        success, msg = await service.deposit_item(user_id, player.mansion_level, item_id, quantity)
+        success, msg = await service.deposit_item(player.id, player.mansion_level, item_id, quantity)
         if success:
             await session.commit()
             await deposit_mansion_cmd.finish(message_add_head(f"✅ {msg}", event))
@@ -144,7 +142,6 @@ async def handle_deposit_mansion(event: MessageEvent, args: Message = CommandArg
 @withdraw_mansion_cmd.handle()
 async def handle_withdraw_mansion(event: MessageEvent, args: Message = CommandArg()):
     """从阴宅仓库取出物品"""
-    user_id = event.get_user_id()
     arg_text = args.extract_plain_text().strip()
 
     if not arg_text:
@@ -194,7 +191,7 @@ async def handle_withdraw_mansion(event: MessageEvent, args: Message = CommandAr
             ))
 
         service = _build_service(session)
-        success, msg = await service.withdraw_item(user_id, player.mansion_level, item_index, quantity)
+        success, msg = await service.withdraw_item(player.id, player.mansion_level, item_index, quantity)
         if success:
             await session.commit()
             await withdraw_mansion_cmd.finish(message_add_head(f"✅ {msg}", event))
