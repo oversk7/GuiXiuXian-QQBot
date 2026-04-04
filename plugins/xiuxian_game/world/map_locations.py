@@ -162,6 +162,8 @@ async def _(event: MessageEvent):
 
             coord_info.append("━━━━━━━━━━━━━")
             coord_info.append("💡 使用【导航 x y】可前往指定坐标")
+            coord_info.append("🌐 网页版大地图（复制链接到浏览器打开）：")
+            coord_info.append("https://oversky.online/map")
 
             # 创建图片消息
             img = MessageSegment.file_image(base64_img)
