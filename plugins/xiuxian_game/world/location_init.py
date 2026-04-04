@@ -625,15 +625,15 @@ async def init_social_npcs(session) -> int:
         if old_npc:
             await session.delete(old_npc)
 
-    # 辅助函数：按城市名找到Location
+    # 辅助函数：按城市名找到Location（按名称查找，避免同坐标多地点冲突）
     async def find_city_location(city_name: str):
-        for market in MARKETS:
-            if market.name == city_name:
-                loc = await LocationService.get_location_by_coordinates(
-                    session, market.x, market.y, "大都会"
-                )
-                return loc
-        return None
+        stmt = select(Location).where(
+            Location.name == city_name,
+            Location.region == "大都会",
+            Location.is_active == True
+        )
+        result = await session.execute(stmt)
+        return result.scalars().first()
 
     # ===== 1. 月老 → 临安 =====
     linan_loc = await find_city_location("临安")
@@ -770,9 +770,14 @@ async def init_station_masters(session) -> int:
     }
 
     for market in MARKETS:
-        loc = await LocationService.get_location_by_coordinates(
-            session, market.x, market.y, "大都会"
+        # 按名称查找，避免同坐标多地点冲突
+        stmt = select(Location).where(
+            Location.name == market.name,
+            Location.region == "大都会",
+            Location.is_active == True
         )
+        result = await session.execute(stmt)
+        loc = result.scalars().first()
         if not loc:
             continue
 
@@ -823,9 +828,14 @@ async def init_intelligence_dealers(session) -> int:
         if market.name not in dealer_cities:
             continue
 
-        loc = await LocationService.get_location_by_coordinates(
-            session, market.x, market.y, "大都会"
+        # 按名称查找，避免同坐标多地点冲突
+        stmt = select(Location).where(
+            Location.name == market.name,
+            Location.region == "大都会",
+            Location.is_active == True
         )
+        result = await session.execute(stmt)
+        loc = result.scalars().first()
         if not loc:
             continue
 
