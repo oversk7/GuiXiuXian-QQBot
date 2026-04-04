@@ -654,7 +654,25 @@ async def _handle_dungeon_rest(session, player: Player, event: MessageEvent, cmd
     await cmd_handler.finish(message_add_head(msg, event))
 
 
+_reality_rest_history: dict = {}  # {user_id: deque[timestamp]}
+
 async def _handle_reality_rest(session, player: Player, event: MessageEvent, cmd_handler):
+    import time
+    from collections import deque
+
+    # 现实世界休息限频：3600秒内最多10次
+    user_id = event.get_user_id()
+    now = time.monotonic()
+    if user_id not in _reality_rest_history:
+        _reality_rest_history[user_id] = deque()
+    history = _reality_rest_history[user_id]
+    # 清理过期记录
+    while history and history[0] < now - 3600:
+        history.popleft()
+    if len(history) >= 10:
+        await cmd_handler.finish("⚠️ 现实世界休息过于频繁，请在1小时内最多休息10次")
+    history.append(now)
+
     effective_attrs = await player.get_effective_attributes(session)
     effective_max_hp = effective_attrs.get('max_hp', player.max_hp)
     effective_max_mp = effective_attrs.get('max_mp', player.max_mp)

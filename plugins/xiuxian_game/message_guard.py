@@ -47,7 +47,7 @@ _COMMAND_RATE_LIMITS: Dict[str, RateLimitConfig] = {
     "左": RateLimitConfig(max_requests=25, time_window=30.0, cooldown=0.9),
     "右": RateLimitConfig(max_requests=25, time_window=30.0, cooldown=0.9),
     "下一层": RateLimitConfig(max_requests=25, time_window=30.0, cooldown=0.9),
-    "休息": RateLimitConfig(max_requests=10, time_window=3600.0),
+    # "休息"限制已移到 teleport.py 内部，仅对现实世界休息计数
 }
 
 # 用户指令请求历史 {user_id: {command: deque[timestamp]}}
