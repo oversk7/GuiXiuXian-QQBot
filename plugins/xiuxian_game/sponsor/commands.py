@@ -38,6 +38,7 @@ buy_title_cmd = on_command("购买称号", priority=5, block=True)
 buy_coffin_nail_cmd = on_command("购买棺材钉", priority=5, block=True)
 buy_crying_tomb_hat_cmd = on_command("购买哭坟帽", priority=5, block=True)
 buy_reset_talisman_cmd = on_command("购买重启符", aliases={"兑换重启符"}, priority=5, block=True)
+buy_santa_rift_cmd = on_command("购买圣诞裂隙", aliases={"购买裂隙"}, priority=5, block=True)
 expand_inventory_cmd = on_command("背包扩容", aliases={"扩容背包"}, priority=5, block=True)
 buy_basic_monthly_card_cmd = on_command("购买初级月卡", aliases={"兑换初级月卡"}, priority=5, block=True)
 buy_premium_monthly_card_cmd = on_command("购买高级月卡", aliases={"兑换高级月卡"}, priority=5, block=True)
@@ -197,6 +198,35 @@ async def handle_buy_reset_talisman(event: MessageEvent, args: Message = Command
 
     buttons = f"\n***\n{cmd('赞助商店')} | {cmd('洗点')}"
     await buy_reset_talisman_cmd.finish(build_markdown(msg + buttons))
+
+
+# ==================== 购买圣诞裂隙 ====================
+
+@buy_santa_rift_cmd.handle()
+async def handle_buy_santa_rift(event: MessageEvent, args: Message = CommandArg()):
+    """购买圣诞裂隙（30诡烛/个）"""
+    arg_text = args.extract_plain_text().strip()
+
+    quantity = 1
+    if arg_text:
+        if not arg_text.isdigit() or int(arg_text) <= 0:
+            content = (
+                "# 🌀 购买圣诞裂隙\n"
+                "***\n"
+                f"用法：{cmd('购买圣诞裂隙')} {cmd('购买圣诞裂隙 3', '购买圣诞裂隙 ')}\n"
+                "价格：**30** 诡烛/个\n"
+                "效果：瞬移到任意坐标或诡域层级\n"
+                f"***\n{cmd('赞助商店')}"
+            )
+            await buy_santa_rift_cmd.finish(build_markdown(content))
+        quantity = int(arg_text)
+
+    async with safe_session() as session:
+        player = await _get_player_or_finish(session, event, buy_santa_rift_cmd)
+        success, msg = await SponsorShopService.buy_santa_rift(player, quantity, session)
+
+    buttons = f"\n***\n{cmd('赞助商店')} | {cmd('背包')}"
+    await buy_santa_rift_cmd.finish(build_markdown(msg + buttons))
 
 
 # ==================== 背包扩容 ====================

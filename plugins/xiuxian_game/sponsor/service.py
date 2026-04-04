@@ -28,6 +28,7 @@ PREMIUM_MONTHLY_CARD_PRICE = 288 # 高级月卡（诡烛/月）
 INVENTORY_EXPAND_PRICE = 10      # 背包扩容（诡烛/格）
 INVENTORY_EXPAND_MAX = 1000      # 背包容量上限
 RESET_TALISMAN_PRICE = 1000      # 重启符（诡烛/张）
+SANTA_RIFT_PRICE = 30            # 圣诞裂隙（诡烛/个）
 
 # ==================== 月卡特权价格 ====================
 PREMIUM_SECLUSION_PRICE = 180     # 闭关无上限特权（诡烛/月）
@@ -443,6 +444,44 @@ class SponsorShopService:
             f"🔮 剩余诡烛: {player.gui_zhu}"
         )
 
+    # ==================== 圣诞裂隙购买 ====================
+
+    @classmethod
+    async def buy_santa_rift(cls, player: Player, quantity: int, session: AsyncSession) -> Tuple[bool, str]:
+        """
+        购买圣诞裂隙（30诡烛/个，瞬移到任意坐标）
+        """
+        if quantity <= 0:
+            return False, "⛔ 购买数量必须大于0"
+
+        total_cost = SANTA_RIFT_PRICE * quantity
+
+        if player.gui_zhu < total_cost:
+            return False, (
+                f"⛔ 诡烛不足\n"
+                f"需要: {total_cost} 诡烛（{quantity}个 × {SANTA_RIFT_PRICE}诡烛）\n"
+                f"当前: {player.gui_zhu} 诡烛"
+            )
+
+        from ..models.inventory import ItemInstance
+        try:
+            await ItemInstance.add_item(session, player.id, "santa_ride_ticket", quantity)
+        except ValueError:
+            return False, "⛔ 背包已满，无法添加圣诞裂隙"
+
+        balance_before = player.gui_zhu
+        player.gui_zhu -= total_cost
+
+        from ..models.sponsor_shop_log import SponsorShopLog
+        await SponsorShopLog.add_log(session, player, "圣诞裂隙", f"×{quantity}", total_cost, balance_before)
+
+        return True, (
+            f"✅ 购买成功！获得圣诞裂隙 ×{quantity}\n"
+            f"💡 使用【使用 圣诞裂隙 x y】瞬移到任意坐标\n"
+            f"💡 使用【使用 圣诞裂隙 N层诡域】传送到诡域\n"
+            f"🔮 剩余诡烛: {player.gui_zhu}"
+        )
+
     # ==================== 月卡购买 ====================
 
     @classmethod
@@ -582,6 +621,9 @@ class SponsorShopService:
             f"🔄 重启符  [{RESET_TALISMAN_PRICE} 诡烛/张]",
             f"  重置所有属性点，装备/丹药/VIP加成保留",
             "",
+            f"🌀 圣诞裂隙  [{SANTA_RIFT_PRICE} 诡烛/个]",
+            f"  瞬移到任意坐标或诡域层级",
+            "",
             "━━━━━━━━━━━━━",
             "💳 月卡特权",
             "─────────────",
@@ -658,6 +700,7 @@ class SponsorShopService:
             "【购买棺材钉】       获得1根棺材钉",
             "【购买哭坟帽】       获得1顶哭坟帽",
             "【购买重启符 N】     购买N张重启符（默认1张）",
+            "【购买圣诞裂隙 N】   购买N个圣诞裂隙（默认1个）",
             "【背包扩容 N】       永久扩容N格（10诡烛/格）",
             "【购买初级月卡】     购买30天初级月卡",
             "【购买高级月卡】     购买30天高级月卡",
