@@ -16,6 +16,7 @@ from ..models.world_message import WorldMessage
 from ..models.message_blacklist import MessageBoardBlacklist
 from ..models.guild import Guild
 from ..utils import message_add_head
+from ..utils_markdown import cmd, build_markdown
 from ..platform_utils import get_unified_player
 from ..ai_guide import is_admin
 from ..config import Config
@@ -311,6 +312,14 @@ async def _get_message_page(
         return total, total_pages, page, records, players
 
 
+_SCOPE_NAMES = {
+    MessageScope.WORLD: "世界",
+    MessageScope.PRIVATE: "私信",
+    MessageScope.SYSTEM: "系统",
+    MessageScope.GUILD: "公会",
+}
+
+
 def _format_message_lines(
     scope: MessageScope,
     page: int,
@@ -321,63 +330,105 @@ def _format_message_lines(
     last_check: datetime | None = None,
     guild_name: str | None = None,
 ) -> str:
+    """格式化消息列表为 Markdown，用分隔线清晰区分每条消息"""
 
     titles = {
         MessageScope.WORLD: "🌐 世界频道",
         MessageScope.PRIVATE: "📬 私信",
         MessageScope.SYSTEM: "📢 系统公告",
-        MessageScope.GUILD: f"🏯 {guild_name} 公会频道" if guild_name else "🏯 公会频道",
+        MessageScope.GUILD: f"🏯 {guild_name}·公会频道" if guild_name else "🏯 公会频道",
     }
     title = titles.get(scope, "📋 消息")
 
-    lines = [f"{title} (第{page}/{total_pages}页)", "━━━━━━━━━━"]
+    lines = [f"# {title}"]
+    if total_pages > 0:
+        lines.append(f"第{page}/{total_pages}页")
 
+    msg_count = 0
     for rec in records:
         time_str = rec.created_at.strftime("%m-%d %H:%M")
         new_flag = "🆕 " if (last_check and rec.created_at > last_check) else ""
 
+        lines.append("***")
+
         if scope is MessageScope.SYSTEM or rec.player_id == "SYSTEM":
-            lines.append(f"〓📢 ({time_str})\n{rec.content}")
+            lines.append(f"📢 **系统公告**　{time_str}")
+            lines.append(rec.content)
+            msg_count += 1
             continue
 
         if scope is MessageScope.GUILD:
             sender = players.get(rec.player_id)
             if sender:
-                lines.append(
-                    f"〓{new_flag}{sender.nickname}[UID:{sender.uid}] ({time_str})\n{rec.content}"
-                )
+                lines.append(f"{new_flag}**{sender.nickname}** [UID:{sender.uid}]　{time_str}")
+                lines.append(rec.content)
+                msg_count += 1
             continue
 
         if scope is MessageScope.WORLD:
             sender = players.get(rec.player_id)
             if sender:
-                lines.append(
-                    f"〓{new_flag}{sender.nickname}[UID:{sender.uid}] ({time_str})\n{rec.content}"
-                )
+                lines.append(f"{new_flag}**{sender.nickname}** [UID:{sender.uid}]　{time_str}")
+                lines.append(rec.content)
+                msg_count += 1
             continue
 
+        # 私信
         sender = players.get(rec.player_id)
         recipient = players.get(rec.recipient_id) if rec.recipient_id else None
         if not sender or not recipient:
             continue
 
         if rec.recipient_id == viewer_id:
-            lines.append(
-                f"〓{new_flag}📥 来自 {sender.nickname}[UID:{sender.uid}] ({time_str})\n{rec.content}"
-            )
+            lines.append(f"{new_flag}📥 来自 **{sender.nickname}** [UID:{sender.uid}]　{time_str}")
+            lines.append(rec.content)
         elif rec.player_id == viewer_id:
-            lines.append(
-                f"〓📤 发给 {recipient.nickname}[UID:{recipient.uid}] ({time_str})\n{rec.content}"
-            )
+            lines.append(f"📤 发给 **{recipient.nickname}** [UID:{recipient.uid}]　{time_str}")
+            lines.append(rec.content)
+        msg_count += 1
 
-    if len(lines) == 2:
+    if msg_count == 0:
         empty_msgs = {
-            MessageScope.WORLD: "🌐 世界频道空空如也，快来留下第一条消息吧！",
-            MessageScope.PRIVATE: "📭 暂无私信。发送【私信 UID 内容】与他人沟通吧！",
-            MessageScope.SYSTEM: "📭 暂无系统公告",
-            MessageScope.GUILD: "📭 暂无公会消息",
+            MessageScope.WORLD: "世界频道空空如也，快来留下第一条消息吧！",
+            MessageScope.PRIVATE: "暂无私信",
+            MessageScope.SYSTEM: "暂无系统公告",
+            MessageScope.GUILD: "暂无公会消息",
         }
-        return empty_msgs.get(scope, "📭 暂无消息")
+        lines.append("***")
+        lines.append(empty_msgs.get(scope, "暂无消息"))
+
+    # ── 底部导航 ──
+    lines.append("***")
+
+    # 翻页
+    nav = []
+    scope_name = _SCOPE_NAMES.get(scope, "世界")
+    if page > 1:
+        nav.append(cmd(f"⬅️第{page - 1}页", f"消息 {scope_name} {page - 1}"))
+    if page < total_pages:
+        nav.append(cmd(f"➡️第{page + 1}页", f"消息 {scope_name} {page + 1}"))
+    if nav:
+        lines.append(" | ".join(nav))
+
+    # 频道切换
+    channels = []
+    for s, label in [
+        (MessageScope.WORLD, "🌐世界"),
+        (MessageScope.PRIVATE, "📬私信"),
+        (MessageScope.GUILD, "🏯公会"),
+        (MessageScope.SYSTEM, "📢系统"),
+    ]:
+        if s != scope:
+            channels.append(cmd(label, f"消息 {_SCOPE_NAMES[s]}"))
+    lines.append(" | ".join(channels))
+
+    # 快捷操作
+    if scope is MessageScope.WORLD:
+        lines.append(cmd("📝发消息", "发消息 ") + " | " + cmd("💬私信", "私信 "))
+    elif scope is MessageScope.GUILD:
+        lines.append(cmd("📝发公会消息", "发消息 公会 "))
+    elif scope is MessageScope.PRIVATE:
+        lines.append(cmd("💬发私信", "私信 "))
 
     return "\n".join(lines)
 
@@ -546,7 +597,7 @@ async def handle_send_msg(event: MessageEvent, args: Message = CommandArg()):
         None,
         player_guild_name,
     )
-    await send_msg_cmd.finish(message_add_head(lines, event))
+    await send_msg_cmd.finish(build_markdown(lines))
 
 
 @private_msg_cmd.handle()
@@ -638,7 +689,7 @@ async def handle_private_message(event: MessageEvent, args: Message = CommandArg
         sender.id,
         sender_last_check,
     )
-    await private_msg_cmd.finish(message_add_head(lines, event))
+    await private_msg_cmd.finish(build_markdown(lines))
 
 
 @view_board_cmd.handle()
@@ -679,7 +730,7 @@ async def handle_view_board(event: MessageEvent, args: Message = CommandArg()):
         last_check,
         guild_name,
     )
-    await view_board_cmd.finish(message_add_head(lines, event))
+    await view_board_cmd.finish(build_markdown(lines))
 
 
 # ==================== 管理员命令处理器 ====================
