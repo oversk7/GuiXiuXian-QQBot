@@ -88,7 +88,7 @@ class LocationRepository(IRepository[Location]):
             )
         )
         result = await self._session.execute(stmt)
-        return result.scalar_one_or_none()
+        return result.scalars().first()
 
     async def find_nearby(
         self,

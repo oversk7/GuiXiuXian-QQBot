@@ -26,9 +26,9 @@ class LocationService:
         return result.scalar_one_or_none()
     
     @staticmethod
-    async def get_location_by_coordinates(session: AsyncSession, x: int, y: int, 
+    async def get_location_by_coordinates(session: AsyncSession, x: int, y: int,
                                         region: str = "大都会") -> Optional[Location]:
-        """根据坐标获取地点"""
+        """根据坐标获取地点（同坐标多地点时返回第一个）"""
         stmt = select(Location).where(
             and_(
                 Location.x == x,
@@ -38,7 +38,7 @@ class LocationService:
             )
         ).options(selectinload(Location.npcs))
         result = await session.execute(stmt)
-        return result.scalar_one_or_none()
+        return result.scalars().first()
     
     @staticmethod
     async def get_nearby_locations(session: AsyncSession, x: int, y: int, 
