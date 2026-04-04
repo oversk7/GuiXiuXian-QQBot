@@ -183,45 +183,64 @@ async def init_market_locations(session) -> int:
 
 
 async def init_job_locations(session) -> int:
-    """在现有打工地点添加雇主NPC"""
-    # 从打工系统获取地点配置
+    """初始化/同步打工地点和雇主NPC（支持坐标更新和新地点创建）"""
     from ..economy.part_time_job_service import PartTimeJobService
 
     created_count = 0
 
     for location_id, location_data in PartTimeJobService.JOB_LOCATIONS.items():
-        # 查找或创建地点
-        existing_location = await LocationService.get_location_by_coordinates(
-            session, location_data['x'], location_data['y'], "大都会"
+        # 优先按名称查找（支持坐标变更后的匹配）
+        stmt = select(Location).where(
+            Location.name == location_data['name'],
+            Location.region == "大都会"
         )
+        result = await session.execute(stmt)
+        existing_by_name = result.scalars().first()
 
-        if not existing_location:
-            # 创建打工地点，保持原有名称
-            location = Location.create_job_location(
-                location_id=f"job_{location_id}",
-                name=location_data['name'],
-                x=location_data['x'],
-                y=location_data['y'],
-                description=location_data['description'],
-                available_jobs=location_data.get('available_jobs', {})
-            )
-            session.add(location)
-            await session.flush()
-        else:
-            location = existing_location
-            # 确保functions字段不为None
+        if existing_by_name:
+            location = existing_by_name
+            # 同步坐标
+            if location.x != location_data['x'] or location.y != location_data['y']:
+                location.x = location_data['x']
+                location.y = location_data['y']
             if location.functions is None:
                 location.functions = {}
-            # 为现有地点添加打工功能
-            if not location.has_function("part_time_job"):
-                job_config = {
-                    "enabled": True,
-                    "available_jobs": location_data.get('available_jobs', {}),
-                    "max_workers": 10
-                }
-                location.add_function("part_time_job", job_config)
+            job_config = {
+                "enabled": True,
+                "available_jobs": location_data.get('available_jobs', {}),
+                "max_workers": 10
+            }
+            location.add_function("part_time_job", job_config)
+        else:
+            # 再按坐标查找（兜底）
+            existing_by_coord = await LocationService.get_location_by_coordinates(
+                session, location_data['x'], location_data['y'], "大都会"
+            )
+            if existing_by_coord:
+                location = existing_by_coord
+                if location.functions is None:
+                    location.functions = {}
+                if not location.has_function("part_time_job"):
+                    job_config = {
+                        "enabled": True,
+                        "available_jobs": location_data.get('available_jobs', {}),
+                        "max_workers": 10
+                    }
+                    location.add_function("part_time_job", job_config)
+            else:
+                # 全新打工地点
+                location = Location.create_job_location(
+                    location_id=f"job_{location_id}",
+                    name=location_data['name'],
+                    x=location_data['x'],
+                    y=location_data['y'],
+                    description=location_data['description'],
+                    available_jobs=location_data.get('available_jobs', {})
+                )
+                session.add(location)
+                await session.flush()
 
-        # 检查是否已有雇主NPC（按名称和npc_id双重检查）
+        # 检查是否已有雇主NPC
         employer_name = f"雇主{_get_employer_name(location_data['name'])}"
         employer_npc_id = f"employer_{location_id}"
 
@@ -233,7 +252,6 @@ async def init_job_locations(session) -> int:
         )
 
         if not existing_employer_by_name and not existing_employer_by_id:
-            # 创建雇主NPC
             employer_npc = NPC.create_employer(
                 npc_id=employer_npc_id,
                 name=employer_name,
@@ -507,12 +525,21 @@ async def init_special_locations(session) -> int:
 
     created_count = 0
 
-    # 查找缉邪司总部地点
-    existing_location = await LocationService.get_location_by_coordinates(
-        session, HEADQUARTERS_COORD[0], HEADQUARTERS_COORD[1], "大都会"
+    # 查找缉邪司总部地点（优先按名称匹配）
+    stmt = select(Location).where(
+        Location.name == "缉邪司总部",
+        Location.region == "大都会"
     )
+    result = await session.execute(stmt)
+    existing_by_name = result.scalars().first()
 
-    if not existing_location:
+    if not existing_by_name:
+        # 再按坐标查找
+        existing_by_name = await LocationService.get_location_by_coordinates(
+            session, HEADQUARTERS_COORD[0], HEADQUARTERS_COORD[1], "大都会"
+        )
+
+    if not existing_by_name:
         # 创建缉邪司总部地点
         location = Location.create_special_shop_location(
             location_id="headquarters",
@@ -525,7 +552,11 @@ async def init_special_locations(session) -> int:
         session.add(location)
         await session.flush()
     else:
-        location = existing_location
+        location = existing_by_name
+        # 同步坐标
+        if location.x != HEADQUARTERS_COORD[0] or location.y != HEADQUARTERS_COORD[1]:
+            location.x = HEADQUARTERS_COORD[0]
+            location.y = HEADQUARTERS_COORD[1]
         # 确保functions字段不为None
         if location.functions is None:
             location.functions = {}

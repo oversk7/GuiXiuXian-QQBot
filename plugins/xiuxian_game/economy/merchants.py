@@ -1715,7 +1715,7 @@ async def _(event: MessageEvent):
 # ==================== 缉邪司总部商店系统 ====================
 
 # 缉邪司总部坐标
-HEADQUARTERS_COORD = (-5, 390)
+HEADQUARTERS_COORD = (150, 1200)  # 风雪镇
 
 # 缉邪司总部商品配置（物品ID: 积分价格）
 HEADQUARTERS_ITEMS = {
