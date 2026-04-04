@@ -54,6 +54,10 @@ REQUIRED_FIELDS: Dict[str, Dict[str, str]] = {
         "last_system_check": "DATETIME NULL COMMENT '最后查看系统公告时间'",
         "last_guild_check": "DATETIME NULL COMMENT '最后查看公会消息时间'",
         "inner_realm_clears": "TEXT NULL COMMENT '里界通关记录(JSON)'",
+        # 焚金充能系统
+        "fenjin_charge": "FLOAT DEFAULT 0 COMMENT '焚金充能百分比(0-100)'",
+        "fenjin_last_update": "DATETIME NULL COMMENT '焚金充能最后更新时间(衰减计算基准)'",
+        "fenjin_last_charge": "DATETIME NULL COMMENT '焚金最后一次充值时间(衰减速率计算)'",
     },
     "trade_record": {
         "is_cross_market": "INT DEFAULT 0 COMMENT '是否为跨市场出售(跑商)'",

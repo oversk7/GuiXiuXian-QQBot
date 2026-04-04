@@ -195,8 +195,23 @@ async def handle_cultivate(event: MessageEvent):
         luck_cultivation_rate = luck_prob(player.luck, midpoint=800, steepness=400) * 0.10
         luck_cultivation_bonus = int(base_exp_gain_after_penalty * luck_cultivation_rate)
 
+        # 焚金充能加成
+        _now = datetime.now()
+        fenjin_charge_now = calc_fenjin_decay(
+            player.fenjin_charge or 0,
+            player.fenjin_last_update,
+            player.fenjin_last_charge,
+            _now
+        )
+        fenjin_rate = fenjin_charge_now / 100.0  # 100%充能 = +100%效率
+        fenjin_bonus = int(base_exp_gain_after_penalty * fenjin_rate)
+        # 更新衰减后的充能值
+        if fenjin_charge_now != (player.fenjin_charge or 0):
+            player.fenjin_charge = fenjin_charge_now
+            player.fenjin_last_update = _now
+
         # 总经验 = 惩罚后的基础经验 + 各种加成
-        exp_gain = base_exp_gain_after_penalty + card_bonus + reincarnation_bonus + guild_bonus + mansion_bonus + calamity_bonus + luck_cultivation_bonus
+        exp_gain = base_exp_gain_after_penalty + card_bonus + reincarnation_bonus + guild_bonus + mansion_bonus + calamity_bonus + luck_cultivation_bonus + fenjin_bonus
 
         # 更新数据
         player.last_cultivation = datetime.now()
@@ -214,10 +229,9 @@ async def handle_cultivate(event: MessageEvent):
         progress_bar = generate_progress_bar(player.exp, exp_max)
 
         # 构建加成明细行（折叠式）
-        total_bonus = card_bonus + reincarnation_bonus + guild_bonus + mansion_bonus + calamity_bonus + luck_cultivation_bonus
+        total_bonus = card_bonus + reincarnation_bonus + guild_bonus + mansion_bonus + calamity_bonus + luck_cultivation_bonus + fenjin_bonus
         bonus_detail_line = ""
         if total_bonus > 0 or mentorship_penalty > 0:
-            bonus_percent = (total_bonus / base_exp_gain) * 100 if base_exp_gain > 0 else 0
             bonus_parts = []
 
             # 按顺序显示有效加成
@@ -233,6 +247,8 @@ async def handle_cultivate(event: MessageEvent):
                 bonus_parts.append(f"天灾+{calamity_bonus}")
             if luck_cultivation_bonus > 0:
                 bonus_parts.append(f"运气+{luck_cultivation_bonus}")
+            if fenjin_bonus > 0:
+                bonus_parts.append(f"焚金+{fenjin_bonus}")
             if mentorship_penalty > 0:
                 apprentice_count = await mentorship_service.get_apprentice_count(player.id)
                 bonus_parts.append(f"徒弟-{mentorship_penalty}({apprentice_count}人)")
@@ -256,11 +272,15 @@ async def handle_cultivate(event: MessageEvent):
         # 冷却提示（诡异化）
         cooldown_text = f"⏰ 深渊的低语将在{cfg['cool_down']//60}分钟后再次响起"
 
+        # 焚金充能条
+        fenjin_line = generate_fenjin_line(player, _now)
+
         msg = (
             f"{flavor_text}\n"
             "━━━━━━━━━━━━━\n"
             f"🔥 汲取怨炁(经验) +{exp_gain} | 怨炁进度 {progress_bar}"
             f"{bonus_detail_line}\n"
+            f"{fenjin_line}\n"
             f"{hint_text}\n"
             f"{cooldown_text}"
         )
@@ -401,6 +421,16 @@ async def handle_seclusion(event: MessageEvent):
         )
 
         # 构建简洁版闭关消息（折叠式）
+        # 焚金充能（闭关开始时的快照）
+        _now_secl = datetime.now()
+        fenjin_charge_secl = calc_fenjin_decay(
+            player.fenjin_charge or 0,
+            player.fenjin_last_update,
+            player.fenjin_last_charge,
+            _now_secl
+        )
+        fenjin_efficiency = fenjin_charge_secl  # 充能% = 效率加成%
+
         # 计算总效率
         total_efficiency = efficiency_bonus
         efficiency_parts = []
@@ -432,6 +462,10 @@ async def handle_seclusion(event: MessageEvent):
             total_efficiency += mansion_efficiency
             efficiency_parts.append("阴宅")
 
+        if fenjin_efficiency > 0:
+            total_efficiency += fenjin_efficiency
+            efficiency_parts.append(f"焚金+{fenjin_efficiency:.0f}%")
+
         if mentorship_penalty_percent > 0:
             apprentice_count = await mentorship_service.get_apprentice_count(player.id)
             total_efficiency -= mentorship_penalty_percent
@@ -453,11 +487,15 @@ async def handle_seclusion(event: MessageEvent):
         if efficiency_parts:
             efficiency_detail = f"\n   ↳ 效率加成来源: {' + '.join(efficiency_parts)}"
 
+        # 焚金充能条
+        fenjin_line_secl = generate_fenjin_line(player, _now_secl)
+
         msg_secl = (
             f"⚰️ {seclusion_flavor_text}\n"
             "━━━━━━━━━━━━━\n"
             f"🔥 离线修炼已开始 | 总效率加成 {total_efficiency:+.1f}%"
             f"{efficiency_detail}\n"
+            f"{fenjin_line_secl}\n"
             f"⏰ 时长上限 {time_limit_str} | 期间无法普通修炼\n"
             "━━━━━━━━━━━━━\n"
             "💡 出关 推开棺盖并结算怨炁"
@@ -626,8 +664,23 @@ async def handle_out_seclusion(event: MessageEvent):
         luck_seclusion_rate = luck_prob(player.luck, midpoint=800, steepness=400) * 0.10
         luck_seclusion_bonus = int(base_exp_gain_after_penalty * luck_seclusion_rate)
 
+        # 焚金充能加成（出关时计算实时衰减值）
+        _now_out = datetime.now()
+        fenjin_charge_out = calc_fenjin_decay(
+            player.fenjin_charge or 0,
+            player.fenjin_last_update,
+            player.fenjin_last_charge,
+            _now_out
+        )
+        fenjin_rate_out = fenjin_charge_out / 100.0
+        fenjin_bonus = int(base_exp_gain_after_penalty * fenjin_rate_out)
+        # 更新衰减后的充能值
+        if fenjin_charge_out != (player.fenjin_charge or 0):
+            player.fenjin_charge = fenjin_charge_out
+            player.fenjin_last_update = _now_out
+
         # 总经验 = 惩罚后的基础经验 + 各种加成
-        exp_gain = base_exp_gain_after_penalty + coffin_nail_bonus + card_bonus + reincarnation_exp_bonus + guild_bonus + mansion_bonus + luck_seclusion_bonus
+        exp_gain = base_exp_gain_after_penalty + coffin_nail_bonus + card_bonus + reincarnation_exp_bonus + guild_bonus + mansion_bonus + luck_seclusion_bonus + fenjin_bonus
 
         player.exp += exp_gain
 
@@ -656,13 +709,15 @@ async def handle_out_seclusion(event: MessageEvent):
             bonus_parts.append(f"阴宅+{mansion_bonus}")
         if luck_seclusion_bonus > 0:
             bonus_parts.append(f"运气+{luck_seclusion_bonus}")
+        if fenjin_bonus > 0:
+            bonus_parts.append(f"焚金+{fenjin_bonus}")
         if mentorship_penalty > 0:
             apprentice_count = await mentorship_service.get_apprentice_count(player.id)
             bonus_parts.append(f"徒弟-{mentorship_penalty}({apprentice_count}人)")
 
         bonus_detail_line = ""
         if bonus_parts:
-            total_bonus = coffin_nail_bonus + card_bonus + reincarnation_exp_bonus + guild_bonus + mansion_bonus + luck_seclusion_bonus
+            total_bonus = coffin_nail_bonus + card_bonus + reincarnation_exp_bonus + guild_bonus + mansion_bonus + luck_seclusion_bonus + fenjin_bonus
             total_effect = total_bonus - mentorship_penalty
             bonus_detail = " ".join(bonus_parts)
             bonus_detail_line = f"\n   ↳ 基础+{base_exp_gain} {bonus_detail} (总加成{total_effect:+d})"
@@ -686,11 +741,15 @@ async def handle_out_seclusion(event: MessageEvent):
         else:
             hint_text = "💡 修炼 继续积累怨炁"
 
+        # 焚金充能条
+        fenjin_line_out = generate_fenjin_line(player, _now_out)
+
         msg_out = (
             f"🔓 {out_seclusion_flavor_text}\n"
             "━━━━━━━━━━━━━\n"
             f"🔥 累积怨炁 +{exp_gain} | 怨炁进度 {progress_bar}"
             f"{bonus_detail_line}\n"
+            f"{fenjin_line_out}\n"
             f"⏰ 闭关时长 {duration_str}\n"
             f"{hint_text}"
         )
@@ -1658,58 +1717,269 @@ async def handle_free_reset_points(event: MessageEvent):
         await free_reset_points.finish(message_add_head(msg, event))
 
 
-# ==================== 焚金 ====================
+# ==================== 焚金充能系统 ====================
 import math as _math
 
-_FENJIN_MAX_AMOUNT = 10_000_000_000   # 单次上限100亿，防止 math.floor(inf) OverflowError
-
-# 焚金氛围文案池 - 黄金隔绝灵异，焚烧后释放压缩的力量
+# 焚金氛围文案池
 FENJIN_FLAVOR_TEXTS = [
-    "黄金在黑焰中融化，其中封印的灵异力量涌入你的经脉。",
-    "金币化作灰烬，曾被压制的怨炁如潮水般释放。",
-    "黄金的隔绝之力消散，无数被封印的灵异碎片融入你的身体。",
-    "金属熔化的瞬间，你感受到被黄金囚禁的力量终于获得自由。",
-    "每一枚金币都是一座牢笼，焚烧它们就是释放其中的囚徒。",
-    "黄金燃尽，曾被隔绝的灵异力量凝聚成纯粹的修为。",
-    "你将黄金投入虚空，封印破碎，力量回归本源。",
-    "金币在黑暗中消失，被压缩的怨炁结晶涌入你的灵魂。",
-    "黄金的光泽褪去，其中蕴藏的灵异本质显露无遗。",
-    "焚金的瞬间，你听见无数被封印之物的低语。",
+    "黄金在黑焰中融化，炉火愈发旺盛。",
+    "金币化作灰烬，炉膛中的灵异之焰越烧越烈。",
+    "黄金的隔绝之力消散，焚金炉发出低沉的嗡鸣。",
+    "每一枚金币都是燃料，焚金炉的温度持续攀升。",
+    "黄金燃尽，炉火跳动，灵异共鸣愈发强烈。",
+    "你将黄金投入焚金炉，封印之力化作灼热的光芒。",
+    "金币在炉中消融，被压缩的怨炁开始加速流转。",
+    "黄金的光泽褪去，焚金炉壁上的符文亮起幽光。",
+    "焚金的瞬间，炉火猛地窜高，你感到周身灵力涌动。",
+    "金属熔化，炉膛轰鸣，灵异之力在体内加速运转。",
 ]
+
+# 三档衰减常量
+_DECAY_PHASE_1_HOURS = 6    # 炉火旺盛阶段时长
+_DECAY_PHASE_2_HOURS = 12   # 炉火渐弱阶段结束时间
+_DECAY_RATE_1 = 2.0         # 炉火旺盛: 2%/小时
+_DECAY_RATE_2 = 5.0         # 炉火渐弱: 5%/小时
+_DECAY_RATE_3 = 10.0        # 炉火熄灭: 10%/小时
+
+# 充值成本常量
+_COST_BASE = 2500           # 基础价格: 2500金/1%
+_COST_SCALE = 50            # 缩放因子: cost = base × (1 + charge/scale)
+_FENJIN_MIN_AMOUNT = 1000   # 最低充值金额
+_FENJIN_MAX_AMOUNT = 5_000_000  # 单次上限500万
+
+
+def calc_fenjin_decay(charge: float, last_update: datetime, last_charge: datetime, now: datetime = None) -> float:
+    """计算焚金充能衰减后的实际值（惰性计算，分段积分）
+
+    三档衰减：
+    - 距上次充值 0~6h:  2%/h（炉火旺盛）
+    - 距上次充值 6~12h: 5%/h（炉火渐弱）
+    - 距上次充值 12h+:  10%/h（炉火熄灭）
+
+    Args:
+        charge: 上次记录的充能值
+        last_update: 上次更新时间（衰减起算点）
+        last_charge: 上次充值时间（决定衰减速率）
+        now: 当前时间（默认 datetime.now()）
+
+    Returns:
+        衰减后的充能值，最低0
+    """
+    if charge <= 0 or not last_update:
+        return 0.0
+    if now is None:
+        now = datetime.now()
+
+    elapsed_hours = (now - last_update).total_seconds() / 3600
+    if elapsed_hours <= 0:
+        return charge
+
+    if not last_charge:
+        last_charge = last_update  # 兼容旧数据
+
+    # 计算衰减起算时刻相对于上次充值的时间偏移
+    charge_offset_hours = (last_update - last_charge).total_seconds() / 3600
+    if charge_offset_hours < 0:
+        charge_offset_hours = 0
+
+    # 分段积分衰减
+    remaining = charge
+    time_left = elapsed_hours
+
+    while time_left > 0 and remaining > 0:
+        # 当前时刻距上次充值的小时数
+        current_offset = charge_offset_hours + (elapsed_hours - time_left)
+
+        # 确定当前衰减速率和本段可持续时长
+        if current_offset < _DECAY_PHASE_1_HOURS:
+            rate = _DECAY_RATE_1
+            phase_remaining = _DECAY_PHASE_1_HOURS - current_offset
+        elif current_offset < _DECAY_PHASE_2_HOURS:
+            rate = _DECAY_RATE_2
+            phase_remaining = _DECAY_PHASE_2_HOURS - current_offset
+        else:
+            rate = _DECAY_RATE_3
+            phase_remaining = time_left  # 最后一档，无限持续
+
+        # 本段实际持续时间
+        dt = min(time_left, phase_remaining)
+        remaining -= rate * dt
+        time_left -= dt
+
+    return max(0.0, remaining)
+
+
+def calc_fenjin_charge_gain(current_charge: float, gold_amount: int) -> tuple[float, int]:
+    """计算投入金币能获得多少充能（非线性成本）
+
+    每1%的价格 = _COST_BASE × (1 + 当前充能 / _COST_SCALE)
+
+    Args:
+        current_charge: 当前充能百分比
+        gold_amount: 投入的金币数量
+
+    Returns:
+        (新充能值, 实际消耗金币)
+    """
+    charge = current_charge
+    gold_left = gold_amount
+    total_spent = 0
+
+    while gold_left > 0 and charge < 100.0:
+        # 当前1%的价格
+        cost_per_percent = _COST_BASE * (1 + charge / _COST_SCALE)
+
+        if gold_left >= cost_per_percent:
+            # 能买满1%
+            charge += 1.0
+            gold_left -= int(cost_per_percent)
+            total_spent += int(cost_per_percent)
+        else:
+            # 买不满1%，按比例算
+            partial = gold_left / cost_per_percent
+            charge += partial
+            total_spent += gold_left
+            gold_left = 0
+
+    charge = min(100.0, charge)
+    return charge, total_spent
+
+
+def get_fenjin_status_text(charge: float, last_charge: datetime, now: datetime = None) -> str:
+    """获取炉火状态文字"""
+    if charge <= 0:
+        return "💀 炉火熄灭"
+    if now is None:
+        now = datetime.now()
+    if not last_charge:
+        return "💀 炉火熄灭"
+
+    hours_since = (now - last_charge).total_seconds() / 3600
+    if hours_since < _DECAY_PHASE_1_HOURS:
+        return "🔥 炉火旺盛"
+    elif hours_since < _DECAY_PHASE_2_HOURS:
+        return "🕯️ 炉火渐弱"
+    else:
+        return "💀 炉火熄灭"
+
+
+def generate_fenjin_bar(charge: float, length: int = 10) -> str:
+    """生成焚金充能条可视化
+
+    Args:
+        charge: 充能百分比 0-100
+        length: 进度条长度
+    Returns:
+        例如: "🔥 ██████░░░░ 60% (+60%修炼)"
+    """
+    filled = int(charge / 100 * length)
+    empty = length - filled
+    bar = "█" * filled + "░" * empty
+    bonus = f"+{charge:.0f}%修炼" if charge > 0 else "无加成"
+    return f"{bar} {charge:.0f}% ({bonus})"
+
+
+def generate_fenjin_line(player, now: datetime = None) -> str:
+    """生成用于修炼/闭关消息中的焚金充能条行
+
+    Returns:
+        一行带图标的充能条文字，如:
+        "🔥 焚金炉 ██████░░░░ 60% (+60%修炼) | 炉火旺盛"
+        如果充能为0则返回:
+        "💀 焚金炉 ░░░░░░░░░░ 0% (无加成) | 【焚金】点燃"
+    """
+    if now is None:
+        now = datetime.now()
+
+    charge = calc_fenjin_decay(
+        player.fenjin_charge or 0,
+        player.fenjin_last_update,
+        player.fenjin_last_charge,
+        now
+    )
+    bar = generate_fenjin_bar(charge)
+    status = get_fenjin_status_text(charge, player.fenjin_last_charge, now)
+
+    if charge <= 0:
+        return f"💀 焚金炉 {bar} | 【焚金】点燃"
+    return f"{status[:2]} 焚金炉 {bar} | {status[2:]}"
+
 
 fenjin = on_command("焚金", block=True, priority=5)
 
 @fenjin.handle()
 async def handle_fenjin(event: MessageEvent, args: Message = CommandArg()):
-    """焚金 — 消耗金币换取修为（平方根递减 + 等级联动）"""
+    """焚金 — 金币充能系统，提升修炼效率"""
     from ..platform_utils import get_unified_player
-    from ..player.realm_utils import realm_by_level_and_reincarnation
 
     arg_text = args.extract_plain_text().strip()
+    now = datetime.now()
 
-    # 参数校验在 session 外部
-    if not arg_text or not arg_text.isdigit():
-        await fenjin.finish(
-            "🔥 焚金仪式\n"
-            "━━━━━━━━━━━━━\n"
-            "黄金隔绝灵异，焚烧释放封印之力。\n"
-            "将金币投入黑焰，压缩的怨炁化作修为。\n"
-            "━━━━━━━━━━━━━\n"
-            "用法：【焚金 <金额>】\n"
-            "示例：【焚金 100000】【焚金 1000000】\n"
-            "  • 消耗金币，直接获得修为\n"
-            "  • 边际递减：投入越多，每金所得越少\n"
-            "  • 等级联动：境界越高，转化效率越强\n"
-            "  • 无每日限制，最低消耗 1,000 金币"
-        )
+    # 无参数：查看充能状态
+    if not arg_text:
+        status_msg = None
+        async with safe_session() as session:
+            player = await get_unified_player(session, event)
+            if not player:
+                status_msg = "⛔ 请先使用【注册】命令创建角色"
+            else:
+                charge = calc_fenjin_decay(
+                    player.fenjin_charge or 0,
+                    player.fenjin_last_update,
+                    player.fenjin_last_charge,
+                    now
+                )
+                # 更新衰减后的值
+                if charge != (player.fenjin_charge or 0):
+                    player.fenjin_charge = charge
+                    player.fenjin_last_update = now
+                    session.add(player)
+
+                bar = generate_fenjin_bar(charge)
+                fire_status = get_fenjin_status_text(charge, player.fenjin_last_charge, now)
+
+                # 计算当前每1%的价格
+                cost_now = int(_COST_BASE * (1 + charge / _COST_SCALE))
+                # 估算充满所需金币
+                est_full = 0
+                tmp_c = charge
+                while tmp_c < 100.0:
+                    c = int(_COST_BASE * (1 + tmp_c / _COST_SCALE))
+                    est_full += c
+                    tmp_c += 1.0
+
+                status_msg = (
+                    f"🔥 焚金炉\n"
+                    f"━━━━━━━━━━━━━\n"
+                    f"{fire_status}\n"
+                    f"充能: {bar}\n"
+                    f"效果: 修炼/闭关效率 +{charge:.0f}%\n"
+                    f"━━━━━━━━━━━━━\n"
+                    f"当前价格: {cost_now:,} 金/1%\n"
+                    f"充满还需: 约{est_full:,} 金币\n"
+                    f"持有金币: {player.gold:,}\n"
+                    f"━━━━━━━━━━━━━\n"
+                    f"衰减规则:\n"
+                    f"  0~6h  续费后: 2%/时 (炉火旺盛)\n"
+                    f"  6~12h 未续费: 5%/时 (炉火渐弱)\n"
+                    f"  12h+  长期未续: 10%/时 (炉火熄灭)\n"
+                    f"━━━━━━━━━━━━━\n"
+                    f"用法：【焚金 金额】投入金币充能\n"
+                    f"示例：【焚金 50000】【焚金 100000】"
+                )
+
+        await fenjin.finish(message_add_head(status_msg, event))
+
+    # 有参数：充值金币
+    if not arg_text.isdigit():
+        await fenjin.finish(message_add_head("⛔ 请输入正确的金额，例如：焚金 50000", event))
 
     amount = int(arg_text)
-    if amount < 1000:
-        await fenjin.finish("⛔ 焚金最低消耗 1,000 金币")
+    if amount < _FENJIN_MIN_AMOUNT:
+        await fenjin.finish(message_add_head(f"⛔ 焚金最低投入 {_FENJIN_MIN_AMOUNT:,} 金币", event))
     if amount > _FENJIN_MAX_AMOUNT:
-        await fenjin.finish(f"⛔ 单次焚金上限为 {_FENJIN_MAX_AMOUNT:,} 金币")
+        await fenjin.finish(message_add_head(f"⛔ 单次焚金上限 {_FENJIN_MAX_AMOUNT:,} 金币", event))
 
-    # 在 session 内收集结果，不调用 finish()
     error_msg = None
     result_msg = None
 
@@ -1724,41 +1994,50 @@ async def handle_fenjin(event: MessageEvent, args: Message = CommandArg()):
                 f"需要: {amount:,} 金币"
             )
         else:
-            # 计算修为
-            # player.exp = 已积累修为（绝对值），exp_cap = 升级所需总修为（绝对值），同一量纲
-            level_factor = 1.0 + (player.level / 100.0)
-            exp_gain = _math.floor(
-                _math.sqrt(amount / 1000) * 100 * level_factor
+            # 先计算衰减后的当前充能
+            old_charge = calc_fenjin_decay(
+                player.fenjin_charge or 0,
+                player.fenjin_last_update,
+                player.fenjin_last_charge,
+                now
             )
 
-            exp_cap = calculate_level_up_exp(player.level)
-            exp_gain = min(exp_gain, max(0, exp_cap - player.exp))
-
-            if exp_gain <= 0:
-                error_msg = "⛔ 修为已满，请先使用【突破】提升境界"
+            if old_charge >= 100.0:
+                error_msg = "⛔ 充能已满，无需继续投入"
             else:
-                player.gold -= amount
-                player.exp += exp_gain
+                # 计算充能增量
+                new_charge, actual_spent = calc_fenjin_charge_gain(old_charge, amount)
+                charge_gained = new_charge - old_charge
+
+                # 扣金币，更新充能
+                player.gold -= actual_spent
+                player.fenjin_charge = new_charge
+                player.fenjin_last_update = now
+                player.fenjin_last_charge = now  # 刷新充值时间 → 重置衰减档位
                 session.add(player)
 
-                realm_name = realm_by_level_and_reincarnation(
-                    player.level, player.reincarnation_level
-                )
+                bar = generate_fenjin_bar(new_charge)
                 flavor = random.choice(FENJIN_FLAVOR_TEXTS)
+
+                # 退还未使用的金币提示
+                refund_line = ""
+                refund = amount - actual_spent
+                if refund > 0:
+                    refund_line = f"\n💰 充能已满，退还 {refund:,} 金币"
+
                 result_msg = (
-                    f"🔥 焚金仪式\n"
+                    f"🔥 焚金炉充能\n"
                     f"━━━━━━━━━━━━━\n"
                     f"{flavor}\n"
                     f"━━━━━━━━━━━━━\n"
-                    f"消耗: {amount:,} 金币\n"
-                    f"境界: {realm_name} Lv.{player.level}（等级加成 ×{level_factor:.1f}）\n"
-                    f"获得修为: +{exp_gain:,}\n"
-                    f"当前修为: {player.exp:,} / {exp_cap:,}\n"
-                    f"━━━━━━━━━━━━━\n"
-                    f"⚠️ 修为已积累，使用【突破】继续成长"
+                    f"消耗: {actual_spent:,} 金币\n"
+                    f"充能: {old_charge:.0f}% → {new_charge:.0f}% (+{charge_gained:.0f}%)\n"
+                    f"{bar}\n"
+                    f"效果: 修炼/闭关效率 +{new_charge:.0f}%\n"
+                    f"🔥 炉火旺盛 衰减已重置"
+                    f"{refund_line}"
                 )
 
-    # session 关闭后再调用 finish()，避免连接泄漏
     if error_msg:
         await fenjin.finish(message_add_head(error_msg, event))
     await fenjin.finish(message_add_head(result_msg, event))

@@ -1,4 +1,4 @@
-from sqlalchemy import Integer, BigInteger, String, DateTime, func, Boolean, Index, text, Text, JSON
+from sqlalchemy import Integer, BigInteger, String, DateTime, Float, func, Boolean, Index, text, Text, JSON
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from sqlalchemy.ext.mutable import MutableDict
 from datetime import datetime
@@ -86,6 +86,11 @@ class Player(Base):
     completed_trials: Mapped[str | None] = mapped_column(Text, nullable=True, comment="已通关的试炼列表(JSON数组)")
     created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now(), comment="创建时间")
     last_cultivation: Mapped[datetime] = mapped_column(DateTime, nullable=True, comment="上次修炼时间")
+
+    # 焚金充能系统
+    fenjin_charge: Mapped[float] = mapped_column(Float, default=0, server_default='0', comment="焚金充能百分比(0-100)")
+    fenjin_last_update: Mapped[datetime | None] = mapped_column(DateTime, nullable=True, comment="焚金充能最后更新时间")
+    fenjin_last_charge: Mapped[datetime | None] = mapped_column(DateTime, nullable=True, comment="焚金最后充值时间(衰减速率)")
 
     # 双层坐标系统辅助方法
     def is_in_dungeon(self) -> bool:
