@@ -11,6 +11,7 @@ from nonebot.params import CommandArg
 
 from nonebot.permission import SUPERUSER
 
+from sqlalchemy import select
 from sqlalchemy.exc import SQLAlchemyError
 
 from ..models.db import safe_session
@@ -80,44 +81,67 @@ async def handle_init_locations(event: MessageEvent):
 
 
 async def init_market_locations(session) -> int:
-    """在现有市集地点添加商人NPC"""
-    # 从现有的merchants.py获取市集配置
+    """初始化/同步市集地点和商人NPC（支持坐标更新和新城市创建）"""
     from ..economy.merchants import MARKETS
 
     created_count = 0
 
-    for market in MARKETS:
-        # 查找或创建地点（使用现有坐标，不改变地点名称）
-        existing_location = await LocationService.get_location_by_coordinates(
-            session, market.x, market.y, "大都会"
-        )
+    # 收集当前配置的所有城市名
+    current_city_names = {market.name for market in MARKETS}
 
-        if not existing_location:
-            # 创建地点，但使用原有的市集名称（不加"市集"后缀）
-            location = Location.create_market_location(
-                location_id=f"market_{market.id}",
-                name=market.name,  # 保持原有名称：上京、天海卫等
-                x=market.x,
-                y=market.y,
-                market_items=market.items
-            )
-            session.add(location)
-            await session.flush()
-        else:
-            location = existing_location
-            # 确保functions字段不为None
+    for market in MARKETS:
+        # 优先按名称查找（支持坐标变更后的城市匹配）
+        stmt = select(Location).where(
+            Location.name == market.name,
+            Location.region == "大都会"
+        )
+        result = await session.execute(stmt)
+        existing_by_name = result.scalars().first()
+
+        if existing_by_name:
+            location = existing_by_name
+            # 同步坐标（城市可能搬迁了）
+            if location.x != market.x or location.y != market.y:
+                location.x = market.x
+                location.y = market.y
+            # 确保有市集功能
             if location.functions is None:
                 location.functions = {}
-            # 为现有地点添加市集功能
-            if not location.has_function("market"):
-                market_config = {
-                    "enabled": True,
-                    "items": market.items,
-                    "market_id": market.id
-                }
-                location.add_function("market", market_config)
+            market_config = {
+                "enabled": True,
+                "items": market.items,
+                "market_id": market.id
+            }
+            location.add_function("market", market_config)
+        else:
+            # 再按坐标查找（兜底）
+            existing_by_coord = await LocationService.get_location_by_coordinates(
+                session, market.x, market.y, "大都会"
+            )
+            if existing_by_coord:
+                location = existing_by_coord
+                if location.functions is None:
+                    location.functions = {}
+                if not location.has_function("market"):
+                    market_config = {
+                        "enabled": True,
+                        "items": market.items,
+                        "market_id": market.id
+                    }
+                    location.add_function("market", market_config)
+            else:
+                # 全新城市，创建 Location
+                location = Location.create_market_location(
+                    location_id=f"market_{market.id}",
+                    name=market.name,
+                    x=market.x,
+                    y=market.y,
+                    market_items=market.items
+                )
+                session.add(location)
+                await session.flush()
 
-        # 检查是否已有商人NPC（按名称和npc_id双重检查）
+        # 检查是否已有商人NPC
         merchant_name = f"商人{_get_merchant_name(market.name)}"
         merchant_npc_id = f"merchant_{market.id}"
 
@@ -129,7 +153,6 @@ async def init_market_locations(session) -> int:
         )
 
         if not existing_merchant_by_name and not existing_merchant_by_id:
-            # 创建商人NPC
             merchant_npc = NPC.create_merchant(
                 npc_id=merchant_npc_id,
                 name=merchant_name,
@@ -138,6 +161,23 @@ async def init_market_locations(session) -> int:
             )
             session.add(merchant_npc)
             created_count += 1
+
+    # 清理已移除城市的 Location 记录（四郊）
+    removed_cities = {"北郊", "东郊", "西郊", "南郊"}
+    for city_name in removed_cities:
+        stmt = select(Location).where(
+            Location.name == city_name,
+            Location.region == "大都会"
+        )
+        result = await session.execute(stmt)
+        old_location = result.scalars().first()
+        if old_location:
+            # 删除关联的NPC
+            npc_stmt = select(NPC).where(NPC.location_id == old_location.id)
+            npc_result = await session.execute(npc_stmt)
+            for npc in npc_result.scalars().all():
+                await session.delete(npc)
+            await session.delete(old_location)
 
     return created_count
 
