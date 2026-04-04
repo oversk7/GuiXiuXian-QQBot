@@ -963,12 +963,14 @@ document.getElementById('panel-close').onclick = () => {
 // ============================================================
 const searchEl = document.getElementById('search');
 
+let _lastSearchFocusUID = null;  // 上次搜索聚焦的玩家UID，避免重复拉近
+
 function updateSearch() {
   const q = searchEl.value.trim().toLowerCase();
   searchQuery = q;
   highlightUIDs.clear();
 
-  if (!q) return;
+  if (!q) { _lastSearchFocusUID = null; return; }
 
   for (const p of mapData.players) {
     const nameMatch = p.name.toLowerCase().includes(q);
@@ -978,15 +980,21 @@ function updateSearch() {
     }
   }
 
-  // Auto-center on single result
+  // Auto-center on single result (only on first focus, don't force zoom afterwards)
   if (highlightUIDs.size === 1) {
     const uid = [...highlightUIDs][0];
     const p = mapData.players.find(x => x.uid === uid);
     if (p) {
       panX = p.x;
       panY = p.y;
-      zoom = Math.max(zoom, 1.5);
+      // 只在首次定位时拉近，之后用户可以自由缩放
+      if (_lastSearchFocusUID !== uid) {
+        zoom = Math.max(zoom, 1.5);
+        _lastSearchFocusUID = uid;
+      }
     }
+  } else {
+    _lastSearchFocusUID = null;
   }
 }
 
