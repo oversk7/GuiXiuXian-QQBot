@@ -418,9 +418,12 @@ function drawCities(t) {
       ctx.shadowBlur = 0;
 
       if (zoom > 0.5) {
+        // 显示城市描述和驻留人数
+        const inCity = mapData.players.filter(p => Math.abs(p.x-city.x)+Math.abs(p.y-city.y)<=5 && !p.dg).length;
+        const desc = inCity > 0 ? `${city.desc} · ${inCity}人` : city.desc;
         ctx.font = '9px monospace';
         ctx.fillStyle = 'rgba(160,196,232,0.45)';
-        ctx.fillText(city.desc, cx, cy + r + 14);
+        ctx.fillText(desc, cx, cy + r + 14);
       }
     }
   }
@@ -466,6 +469,14 @@ function drawNavRoutes(t) {
 // ============================================================
 //  DRAWING — PLAYERS
 // ============================================================
+// 判断玩家是否在某个城市内（曼哈顿距离≤5）
+function isInCity(p) {
+  for (const c of mapData.cities) {
+    if (Math.abs(p.x - c.x) + Math.abs(p.y - c.y) <= 5) return true;
+  }
+  return false;
+}
+
 function drawPlayers(t) {
   const breathe = 0.85 + 0.15 * Math.sin(t / 600);
 
@@ -477,6 +488,9 @@ function drawPlayers(t) {
     const isDg = !!p.dg;
     const isNav = !!p.nav;
     const isSel = p.uid === selectedUID;
+
+    // 在城市内的非特殊玩家隐藏，避免重叠
+    if (!isHL && !isSel && !isNav && !isDg && isInCity(p)) continue;
 
     let color = isDg ? C.dgPlayer : isNav ? C.navPlayer : C.player;
     let r = Math.max(2.5, Math.min(1.5 + p.lv * 0.08, 6)) * breathe;
@@ -609,9 +623,11 @@ function updateTooltip(mx, my) {
     tipEl.style.display = 'block';
     positionTip(mx, my);
   } else if (closestCity) {
+    const inCity = mapData.players.filter(p => Math.abs(p.x-closestCity.x)+Math.abs(p.y-closestCity.y)<=5 && !p.dg).length;
     let html = `<div class="tn">${esc(closestCity.name)}</div>`;
     html += `<div class="td">${esc(closestCity.desc)}</div>`;
     html += `<div class="td">坐标: <b>(${Number(closestCity.x)}, ${Number(closestCity.y)})</b></div>`;
+    if (inCity > 0) html += `<div class="td">驻留: <b>${inCity}人</b></div>`;
     tipEl.innerHTML = html;
     tipEl.style.display = 'block';
     positionTip(mx, my);
