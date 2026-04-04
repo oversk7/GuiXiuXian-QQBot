@@ -112,7 +112,7 @@ html,body{width:100%;height:100%;overflow:hidden;background:#080c18;color:#a0c4e
 <div id="ftr">
   <span>坐标: <span class="hl" id="f-coord">(-,-)</span></span>
   <span>缩放: <span class="hl" id="f-zoom">100%</span></span>
-  <span>范围: <span class="hl">-500 ~ 500</span></span>
+  <span>范围: <span class="hl">-2000 ~ 2000</span></span>
   <span style="margin-left:auto">数据每 5 秒刷新</span>
 </div>
 
@@ -122,7 +122,7 @@ html,body{width:100%;height:100%;overflow:hidden;background:#080c18;color:#a0c4e
 // ============================================================
 const API_URL  = '/api/map/data';
 const REFRESH  = 5000;      // ms
-const MAX_COORD= 500;
+const MAX_COORD= 2000;
 const BG_COLOR = '#080c18';
 
 // Colors
@@ -204,7 +204,7 @@ function resize() {
 
 function resetView() {
   panX = 0; panY = 0;
-  zoom = Math.min(W, H) / 1150;
+  zoom = Math.min(W, H) / 4600;
 }
 
 // ============================================================

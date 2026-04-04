@@ -3855,7 +3855,7 @@ items:
       type: "SEASONING"
       rarity: "green"
       price: 30
-      description: "混合香辛料,增添风味层次。获取：上京/荔湾镇/大昌市市集购买"
+      description: "混合香辛料,增添风味层次。获取：上京/金陵/大昌市/荔湾镇市集购买"
 
     - item_id: "wasabi"
       name: "芥末"

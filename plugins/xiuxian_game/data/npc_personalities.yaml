@@ -116,7 +116,7 @@ personalities:
   # 商人模板2: 朴实型商人（适用于小镇商人）
   商人王五:
     name: "商人王五"
-    role: "北郊市集商人"
+    role: "石关市集商人"
     pronouns: ["俺", "小店", "我"]
     speech_patterns: ["朴实", "实在", "憨厚"]
     key_words: ["道友", "实惠", "不骗人", "您看"]
@@ -124,7 +124,7 @@ personalities:
       loyalty: 70
       cheerfulness: 65
       aggressiveness: 15
-    background: "北郊土生土长的商人，从小跟着父亲做生意。为人朴实憨厚，不会花言巧语，但货真价实。对老乡和新手特别照顾。"
+    background: "石关土生土长的商人，从小跟着父亲做生意。为人朴实憨厚，不会花言巧语，但货真价实。对老乡和新手特别照顾。"
     relationships: {}
     behavioral_rules:
       - "说话直来直去，不会过分推销"
