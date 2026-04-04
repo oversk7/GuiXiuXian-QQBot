@@ -24,6 +24,7 @@ from sqlalchemy.exc import SQLAlchemyError
 from ..models.db import AsyncSessionLocal
 from ..models.player import Player
 from ..models.navigation_task import NavigationTask
+from ..models.guild import Guild
 
 router = APIRouter()
 
@@ -206,6 +207,33 @@ async def get_map_data(request: Request) -> JSONResponse:
                 .where(Player.last_sign >= cutoff)
             )
             rows = (await session.execute(stmt)).all()
+
+            # 阴宅: 所有拥有阴宅的玩家
+            mansion_stmt = (
+                select(
+                    Player.nickname,
+                    Player.mansion_x,
+                    Player.mansion_y,
+                    Player.mansion_level,
+                )
+                .where(Player.mansion_level > 0)
+                .where(Player.mansion_x.is_not(None))
+                .where(Player.mansion_y.is_not(None))
+            )
+            mansion_rows = (await session.execute(mansion_stmt)).all()
+
+            # 公会基地: 所有有坐标的公会
+            guild_stmt = (
+                select(
+                    Guild.name,
+                    Guild.base_x,
+                    Guild.base_y,
+                    Guild.level,
+                )
+                .where(Guild.base_x.is_not(None))
+                .where(Guild.base_y.is_not(None))
+            )
+            guild_rows = (await session.execute(guild_stmt)).all()
     except SQLAlchemyError as e:
         logger.error(f"[MapAPI] 数据库查询失败: {e}")
         return _secure(JSONResponse(
@@ -229,8 +257,20 @@ async def get_map_data(request: Request) -> JSONResponse:
             p["nav"] = {"tx": ntx, "ty": nty}
         players.append(p)
 
+    mansions = [
+        {"owner": name or "无名", "x": mx, "y": my, "lv": mlv}
+        for name, mx, my, mlv in mansion_rows
+    ]
+
+    guilds = [
+        {"name": gname, "x": gx, "y": gy, "lv": glv}
+        for gname, gx, gy, glv in guild_rows
+    ]
+
     return _secure(JSONResponse(content={
         "ts": int(time.time()),
         "cities": CITIES,
         "players": players,
+        "mansions": mansions,
+        "guilds": guilds,
     }))

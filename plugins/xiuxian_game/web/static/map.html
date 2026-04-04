@@ -125,6 +125,8 @@ html,body{width:100%;height:100%;overflow:hidden;background:#080c18;color:#a0c4e
   <label><input type="checkbox" class="tog" id="f-nav" checked> 导航玩家</label>
   <label><input type="checkbox" class="tog" id="f-dg" checked> 诡域玩家</label>
   <label><input type="checkbox" class="tog" id="f-route" checked> 导航路线</label>
+  <label><input type="checkbox" class="tog" id="f-mansion" checked> 阴宅</label>
+  <label><input type="checkbox" class="tog" id="f-guild" checked> 公会基地</label>
   <label><input type="checkbox" class="tog" id="f-zone" checked> 区域标注</label>
 </div>
 
@@ -151,6 +153,8 @@ html,body{width:100%;height:100%;overflow:hidden;background:#080c18;color:#a0c4e
   <div class="lr"><div class="dot" style="background:#bb66ff;box-shadow:0 0 4px #bb66ff"></div> 诡域中</div>
   <div class="lr"><div class="dot" style="background:#ff0066;box-shadow:0 0 6px #ff0066"></div> 搜索目标</div>
   <div class="lr"><div class="dot" style="background:#00ffcc;box-shadow:0 0 4px #00ffcc;width:12px;height:12px;border-radius:2px"></div> 城镇</div>
+  <div class="lr"><div class="dot" style="background:#7799bb;box-shadow:0 0 4px #7799bb;border-radius:2px"></div> 阴宅</div>
+  <div class="lr"><div class="dot" style="background:#ffaa33;box-shadow:0 0 4px #ffaa33;border-radius:2px"></div> 公会基地</div>
 </div>
 
 <!-- Keyboard hints -->
@@ -191,6 +195,10 @@ const C = {
   hlGlow:   'rgba(255,0,102,0.3)',
   sweep:    'rgba(0,240,255,0.04)',
   text:     '#a0c4e8',
+  mansion:  '#7799bb',
+  manGlow:  'rgba(119,153,187,0.2)',
+  guild:    '#ffaa33',
+  gldGlow:  'rgba(255,170,51,0.25)',
 };
 
 // ============================================================
@@ -203,7 +211,7 @@ let W = 0, H = 0;        // canvas size
 let zoom  = 1;            // pixels per game-unit
 let panX  = 0, panY = 0;  // game-coord center offset
 
-let mapData    = {cities:[], players:[]};
+let mapData    = {cities:[], players:[], mansions:[], guilds:[]};
 let lastFetch  = 0;
 let fetchOK    = true;
 
@@ -220,7 +228,7 @@ let highlightUIDs = new Set();
 let mouseGX = 0, mouseGY = 0; // mouse in game coords
 
 // Filters
-const filters = {city:true, idle:true, nav:true, dg:true, route:true, zone:true};
+const filters = {city:true, idle:true, nav:true, dg:true, route:true, zone:true, mansion:true, guild:true};
 
 // ============================================================
 //  COORDINATE TRANSFORMS
@@ -610,6 +618,111 @@ function drawPlayers(t) {
 }
 
 // ============================================================
+//  DRAWING — MANSIONS (阴宅)
+// ============================================================
+function drawMansions(t) {
+  if (!filters.mansion) return;
+  const ms = mapData.mansions || [];
+  if (!ms.length) return;
+
+  for (const m of ms) {
+    const [cx, cy] = g2c(m.x, m.y);
+    if (cx < -30 || cx > W+30 || cy < -30 || cy > H+30) continue;
+
+    const s = Math.max(4, Math.min(3 + m.lv * 0.3, 8));
+
+    // Glow
+    ctx.shadowBlur = 8;
+    ctx.shadowColor = C.manGlow;
+    ctx.fillStyle = C.manGlow;
+    ctx.beginPath(); ctx.arc(cx, cy, s + 2, 0, Math.PI*2); ctx.fill();
+    ctx.shadowBlur = 0;
+
+    // House shape: triangle roof + square body
+    ctx.fillStyle = C.mansion;
+    ctx.globalAlpha = 0.7;
+    // Body (square)
+    ctx.fillRect(cx - s*0.6, cy - s*0.2, s*1.2, s*0.9);
+    // Roof (triangle)
+    ctx.beginPath();
+    ctx.moveTo(cx, cy - s);
+    ctx.lineTo(cx + s*0.8, cy - s*0.2);
+    ctx.lineTo(cx - s*0.8, cy - s*0.2);
+    ctx.closePath();
+    ctx.fill();
+    ctx.globalAlpha = 1;
+
+    // Label at zoom
+    if (zoom > 0.5) {
+      ctx.font = '9px monospace';
+      ctx.textAlign = 'center';
+      ctx.fillStyle = 'rgba(119,153,187,0.6)';
+      ctx.fillText(m.owner + '宅', cx, cy + s + 10);
+    }
+  }
+}
+
+// ============================================================
+//  DRAWING — GUILDS (公会基地)
+// ============================================================
+function drawGuilds(t) {
+  if (!filters.guild) return;
+  const gs = mapData.guilds || [];
+  if (!gs.length) return;
+  const pulse = 0.85 + 0.15 * Math.sin(t / 1000);
+
+  for (const g of gs) {
+    const [cx, cy] = g2c(g.x, g.y);
+    if (cx < -40 || cx > W+40 || cy < -40 || cy > H+40) continue;
+
+    const s = Math.max(6, Math.min(5 + g.lv * 0.5, 12)) * pulse;
+
+    // Glow
+    ctx.shadowBlur = 14;
+    ctx.shadowColor = C.gldGlow;
+    ctx.fillStyle = C.gldGlow;
+    ctx.beginPath(); ctx.arc(cx, cy, s + 4, 0, Math.PI*2); ctx.fill();
+    ctx.shadowBlur = 0;
+
+    // Shield shape (pentagon)
+    ctx.fillStyle = C.guild;
+    ctx.globalAlpha = 0.8;
+    ctx.beginPath();
+    ctx.moveTo(cx, cy - s);           // top
+    ctx.lineTo(cx + s*0.8, cy - s*0.3); // top-right
+    ctx.lineTo(cx + s*0.6, cy + s*0.6); // bottom-right
+    ctx.lineTo(cx, cy + s);             // bottom center
+    ctx.lineTo(cx - s*0.6, cy + s*0.6); // bottom-left
+    ctx.lineTo(cx - s*0.8, cy - s*0.3); // top-left
+    ctx.closePath();
+    ctx.fill();
+
+    // Border
+    ctx.strokeStyle = '#ffcc66';
+    ctx.lineWidth = 1.2;
+    ctx.stroke();
+    ctx.globalAlpha = 1;
+
+    // Label
+    if (zoom > 0.25) {
+      ctx.font = 'bold 11px monospace';
+      ctx.textAlign = 'center';
+      ctx.fillStyle = '#ffe088';
+      ctx.shadowBlur = 4;
+      ctx.shadowColor = 'rgba(255,170,51,0.4)';
+      ctx.fillText(g.name, cx, cy - s - 8);
+      ctx.shadowBlur = 0;
+
+      if (zoom > 0.5) {
+        ctx.font = '9px monospace';
+        ctx.fillStyle = 'rgba(255,200,100,0.5)';
+        ctx.fillText('Lv.' + g.lv, cx, cy + s + 12);
+      }
+    }
+  }
+}
+
+// ============================================================
 //  DRAWING — HUD OVERLAY
 // ============================================================
 function drawHUD() {
@@ -637,6 +750,8 @@ function render() {
   drawTerrain();
   drawBoundary();
   drawSweep(t);
+  drawMansions(t);
+  drawGuilds(t);
   drawCities(t);
   drawNavRoutes(t);
   drawPlayers(t);
@@ -687,6 +802,24 @@ function updateTooltip(mx, my) {
     if (d < minCityDist) { minCityDist = d; closestCity = c; }
   }
 
+  // Check mansions
+  let closestMansion = null;
+  let minManDist = 18;
+  if (filters.mansion) for (const m of (mapData.mansions||[])) {
+    const [cx, cy] = g2c(m.x, m.y);
+    const d = Math.hypot(cx - cmx, cy - cmy);
+    if (d < minManDist) { minManDist = d; closestMansion = m; }
+  }
+
+  // Check guilds
+  let closestGuild = null;
+  let minGldDist = 22;
+  if (filters.guild) for (const g of (mapData.guilds||[])) {
+    const [cx, cy] = g2c(g.x, g.y);
+    const d = Math.hypot(cx - cmx, cy - cmy);
+    if (d < minGldDist) { minGldDist = d; closestGuild = g; }
+  }
+
   hoverPlayer = closest;
 
   if (closest) {
@@ -699,6 +832,21 @@ function updateTooltip(mx, my) {
     if (closest.nav) {
       html += `<div class="td">目的地: <b>(${Number(closest.nav.tx)}, ${Number(closest.nav.ty)})</b></div>`;
     }
+    tipEl.innerHTML = html;
+    tipEl.style.display = 'block';
+    positionTip(mx, my);
+  } else if (closestGuild) {
+    let html = `<div class="tn" style="color:#ffaa33">${esc(closestGuild.name)}</div>`;
+    html += `<div class="td">类型: <b style="color:#ffcc66">公会基地</b></div>`;
+    html += `<div class="td">等级: <b>Lv.${Number(closestGuild.lv)}</b></div>`;
+    html += `<div class="td">坐标: <b>(${Number(closestGuild.x)}, ${Number(closestGuild.y)})</b></div>`;
+    tipEl.innerHTML = html;
+    tipEl.style.display = 'block';
+    positionTip(mx, my);
+  } else if (closestMansion) {
+    let html = `<div class="tn" style="color:#7799bb">${esc(closestMansion.owner)}的阴宅</div>`;
+    html += `<div class="td">等级: <b>Lv.${Number(closestMansion.lv)}</b></div>`;
+    html += `<div class="td">坐标: <b>(${Number(closestMansion.x)}, ${Number(closestMansion.y)})</b></div>`;
     tipEl.innerHTML = html;
     tipEl.style.display = 'block';
     positionTip(mx, my);
@@ -938,9 +1086,46 @@ canvas.addEventListener('touchend', e => {
       if (d < minCD) { minCD = d; tapCity = c; }
     }
 
+    // 查找最近的公会基地
+    let tapGuild = null;
+    let minGD = 30;
+    if (filters.guild) for (const g of (mapData.guilds||[])) {
+      const [cx, cy] = g2c(g.x, g.y);
+      const d = Math.hypot(cx - cmx, cy - cmy);
+      if (d < minGD) { minGD = d; tapGuild = g; }
+    }
+
+    // 查找最近的阴宅
+    let tapMansion = null;
+    let minMD = 25;
+    if (filters.mansion) for (const m of (mapData.mansions||[])) {
+      const [cx, cy] = g2c(m.x, m.y);
+      const d = Math.hypot(cx - cmx, cy - cmy);
+      if (d < minMD) { minMD = d; tapMansion = m; }
+    }
+
     if (tapPlayer) {
       showPanel(tapPlayer);
       selectedUID = tapPlayer.uid;
+    } else if (tapGuild) {
+      let html = `<div class="tn" style="color:#ffaa33">${esc(tapGuild.name)}</div>`;
+      html += `<div class="td">类型: <b style="color:#ffcc66">公会基地</b></div>`;
+      html += `<div class="td">等级: <b>Lv.${tapGuild.lv}</b></div>`;
+      html += `<div class="td">坐标: <b>(${tapGuild.x}, ${tapGuild.y})</b></div>`;
+      tipEl.innerHTML = html;
+      tipEl.style.display = 'block';
+      positionTip(mx, my);
+      clearTimeout(tipEl._hideTimer);
+      tipEl._hideTimer = setTimeout(() => { tipEl.style.display = 'none'; }, 3000);
+    } else if (tapMansion) {
+      let html = `<div class="tn" style="color:#7799bb">${esc(tapMansion.owner)}的阴宅</div>`;
+      html += `<div class="td">等级: <b>Lv.${tapMansion.lv}</b></div>`;
+      html += `<div class="td">坐标: <b>(${tapMansion.x}, ${tapMansion.y})</b></div>`;
+      tipEl.innerHTML = html;
+      tipEl.style.display = 'block';
+      positionTip(mx, my);
+      clearTimeout(tipEl._hideTimer);
+      tipEl._hideTimer = setTimeout(() => { tipEl.style.display = 'none'; }, 3000);
     } else if (tapCity) {
       // 城市信息弹窗
       const inCity = mapData.players.filter(p => Math.abs(p.x-tapCity.x)+Math.abs(p.y-tapCity.y)<=5 && !p.dg).length;
@@ -951,7 +1136,6 @@ canvas.addEventListener('touchend', e => {
       tipEl.innerHTML = html;
       tipEl.style.display = 'block';
       positionTip(mx, my);
-      // 3秒后自动隐藏
       clearTimeout(tipEl._hideTimer);
       tipEl._hideTimer = setTimeout(() => { tipEl.style.display = 'none'; }, 3000);
     } else {
@@ -1000,6 +1184,8 @@ async function fetchData() {
     if (!Array.isArray(data.players) || !Array.isArray(data.cities)) {
       throw new Error('Invalid data structure');
     }
+    if (!data.mansions) data.mansions = [];
+    if (!data.guilds) data.guilds = [];
     mapData = data;
     lastFetch = Date.now();
     fetchOK = true;
@@ -1050,7 +1236,7 @@ document.addEventListener('click', e => {
 });
 
 // Bind filter checkboxes
-['city','idle','nav','dg','route','zone'].forEach(k => {
+['city','idle','nav','dg','route','mansion','guild','zone'].forEach(k => {
   const el = document.getElementById('f-' + k);
   if (el) el.addEventListener('change', () => { filters[k] = el.checked; });
 });
