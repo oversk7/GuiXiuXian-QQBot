@@ -712,7 +712,7 @@ class MapVisualizer:
         # 图例项目 - 使用纯文字，避免emoji乱码
         if font_supports_chinese:
             legend_items = [
-                ("玩家位置", self.colors['player']),
+                ("你的位置", self.colors['player']),
                 ("市集交易", self.colors['market']),
                 ("打工地点", self.colors['job']),
                 ("特殊地点", self.colors['special']),
@@ -722,7 +722,7 @@ class MapVisualizer:
             ]
         else:
             legend_items = [
-                ("Players", self.colors['player']),
+                ("You", self.colors['player']),
                 ("Markets", self.colors['market']),
                 ("Jobs", self.colors['job']),
                 ("Special", self.colors['special']),
@@ -776,21 +776,18 @@ class MapVisualizer:
         self._load_fonts()
 
         # ── 阶段1：异步预取所有DB数据 ──
-        # 玩家位置
-        stmt = select(Player).where(Player.region == "大都会")
-        result = await session.execute(stmt)
-        players = result.scalars().all()
-
-        # 提取玩家渲染所需的纯数据（脱离ORM session）
-        players_data = []
+        # 只查当前玩家（不再渲染其他玩家，减少查询量）
         current_player_data = None
-        for p in players:
-            px, py = p.get_current_coordinates()
-            pd = {'id': p.id, 'nickname': p.nickname, 'x': px, 'y': py,
-                  'real_world_x': p.real_world_x or 0, 'real_world_y': p.real_world_y or 0}
-            players_data.append(pd)
-            if current_player_id and p.id == current_player_id:
-                current_player_data = pd
+        if current_player_id:
+            stmt = select(Player).where(Player.id == current_player_id)
+            result = await session.execute(stmt)
+            p = result.scalar_one_or_none()
+            if p:
+                px, py = p.get_current_coordinates()
+                current_player_data = {
+                    'id': p.id, 'nickname': p.nickname, 'x': px, 'y': py,
+                    'real_world_x': p.real_world_x or 0, 'real_world_y': p.real_world_y or 0,
+                }
 
         # 阴宅数据
         mansion_stmt = select(Player).where(
@@ -825,11 +822,11 @@ class MapVisualizer:
 
         # ── 阶段2：线程池中执行纯CPU渲染 ──
         return await asyncio.to_thread(
-            self._render_map, players_data, mansion_data, nav_data,
+            self._render_map, mansion_data, nav_data,
             current_player_id, current_player_data, job_locations
         )
 
-    def _render_map(self, players_data: List[Dict], mansion_data: List[Tuple],
+    def _render_map(self, mansion_data: List[Tuple],
                     nav_data: Optional[Dict], current_player_id: str,
                     current_player_data: Optional[Dict],
                     job_locations: List[Tuple[int, int, str]]) -> bytes:
@@ -861,16 +858,6 @@ class MapVisualizer:
 
         # 绘制阴宅
         self._draw_mansions_from_data(draw, mansion_data, occupancy_map)
-
-        # 绘制玩家（使用纯数据字典）
-        # 先绘制其他玩家（小红点）
-        for pd in players_data:
-            if current_player_id and pd['id'] == current_player_id:
-                continue
-            pixel_x, pixel_y = self._game_to_pixel(pd['x'], pd['y'])
-            if 0 <= pixel_x <= self.map_width and 0 <= pixel_y <= self.map_height:
-                draw.ellipse([pixel_x - 1, pixel_y - 1, pixel_x + 1, pixel_y + 1],
-                            fill=self.colors['player'], outline=None, width=0)
 
         # 当前玩家（粗红点 + 高亮 + 昵称）
         if current_player_data:
