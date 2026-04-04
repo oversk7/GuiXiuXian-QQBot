@@ -214,10 +214,9 @@ async def init_workshop_locations(session) -> int:
     # 城市专属锻造白名单（按世界观/难度系统细分）
     CITY_FORGE_WHITELIST: dict[str, list[str]] = {
         # === 新手区域 (1-30级) - 基础装备，白色/绿色品质 ===
-        "北郊": ["bone_armor", "rusty_blade", "broken_glasses"],  # 新手村，基础三件套
-        "东郊": ["bone_armor", "ghost_tear_pendant", "rusty_blade"],  # 东部新手区
-        "西郊": ["ghost_tear_pendant", "broken_glasses", "bone_armor"],  # 西部新手区
-        "南郊": ["rusty_blade", "broken_glasses", "ghost_tear_pendant"],  # 南部新手区
+        "天海卫": ["bone_armor", "rusty_blade", "broken_glasses"],  # 新手区
+        "石关": ["bone_armor", "ghost_tear_pendant", "rusty_blade"],  # 新手区
+        "郸城": ["ghost_tear_pendant", "broken_glasses", "bone_armor"],  # 新手区
 
         # === 中级区域 (30-80级) - 进阶装备，蓝色品质为主 ===
         "荔湾镇": ["swim_coat", "self_awareness_key", "corrupted_bandage_wrap", "wedding_photo"],  # 水域主题
@@ -248,26 +247,49 @@ async def init_workshop_locations(session) -> int:
     def _get_craftsman_name_by_city(city_name: str) -> str:
         """获取城市对应的工匠名称，按主题风格命名"""
         name_map = {
-            # 新手区域工匠 - 朴实名字
-            "北郊": "打铁张",
-            "东郊": "匠人许",
-            "西郊": "工匠周",
-            "南郊": "匠师南宫",
-
-            # 中级区域工匠 - 主题化名字
-            "荔湾镇": "水鬼匠师",  # 水域主题
-            "摩配镇": "疯狂技师",  # 都市恐怖主题
-            "郸城": "送葬匠人",  # 死亡主题
-            "舟山": "时光工匠",  # 时间/记忆主题
-            "大昌市": "大昌匠人",  # 综合商埠主题
-
-            # 高级区域工匠 - 神秘名字
-            "云岭": "幽魂锻师",  # 幽灵主题
-            "金陵": "心魔巧匠",  # 心理恐怖主题
-
-            # 终极区域工匠 - 传说级名字
-            "上京": "百工坊宗师",  # 首都最高级
-            "风雪镇": "炼魂大师",  # 特殊地区
+            # 京畿
+            "上京": "百工坊宗师",
+            "郸城": "送葬匠人",
+            "摩配镇": "疯狂技师",
+            "天海卫": "打铁张",
+            "石关": "匠人许",
+            # 江南
+            "金陵": "心魔巧匠",
+            "姑苏": "织锦匠师",
+            "临安": "碧水工匠",
+            "海门": "远洋匠人",
+            "舟山": "时光工匠",
+            # 南海
+            "荔湾镇": "水鬼匠师",
+            "鹏城": "南洋锻师",
+            "鹭岛": "海风匠人",
+            "琼崖": "椰林工匠",
+            # 蜀地
+            "锦官城": "蜀山锻师",
+            "大昌市": "大昌匠人",
+            "剑阁": "剑门匠人",
+            "夜郎": "蛮荒铸师",
+            "云岭": "幽魂锻师",
+            # 关中
+            "长安": "古都宗匠",
+            "神都": "洛神锻师",
+            "陈仓": "暗仓匠人",
+            "金城": "丝路铸师",
+            # 中原
+            "汴梁": "中原匠人",
+            "颍川": "颍水工匠",
+            "江夏": "江汉锻师",
+            "潭州": "湘楚匠人",
+            # 北境
+            "辽阳": "北铁匠师",
+            "龙城": "寒霜锻师",
+            "风雪镇": "炼魂大师",
+            "冰原堡": "极寒铸师",
+            # 西域
+            "玉门": "关外匠人",
+            "楼兰": "沙海锻师",
+            "龟兹": "异域工匠",
+            "轮台": "戍边铸师",
         }
         return name_map.get(city_name, f"工匠{city_name}")
 
@@ -342,10 +364,9 @@ async def handle_refresh_workshops(event: MessageEvent, args: Message = CommandA
             # 与 init_workshop_locations 规则保持一致（含新手村/风雪镇改动）
             CITY_FORGE_WHITELIST: dict[str, list[str]] = {
                 # === 新手区域 (1-30级) - 基础装备，白色/绿色品质 ===
-                "北郊": ["bone_armor", "rusty_blade", "broken_glasses"],
-                "东郊": ["bone_armor", "ghost_tear_pendant", "rusty_blade"],
-                "西郊": ["ghost_tear_pendant", "broken_glasses", "bone_armor"],
-                "南郊": ["rusty_blade", "broken_glasses", "ghost_tear_pendant"],
+                "天海卫": ["bone_armor", "rusty_blade", "broken_glasses"],
+                "石关": ["bone_armor", "ghost_tear_pendant", "rusty_blade"],
+                "郸城": ["ghost_tear_pendant", "broken_glasses", "bone_armor"],
 
                 # === 中级区域 (30-80级) - 进阶装备，蓝色品质为主 ===
                 "荔湾镇": ["swim_coat", "self_awareness_key", "corrupted_bandage_wrap", "wedding_photo"],
@@ -610,16 +631,40 @@ def _get_merchant_name(market_name: str) -> str:
     """根据市集名称生成商人名称"""
     name_map = {
         "上京": "李掌柜",
-        "北郊": "王五",
-        "东郊": "赵六",
-        "西郊": "钱七",
-        "南郊": "孙八",
-        "金陵": "周九",
-        "云岭": "吴十",
-        "郸城": "郑一",
-        "荔湾镇": "冯二",
-        "摩配镇": "陈三",
-        "风雪镇": "褚四"
+        "郸城": "郸城商客",
+        "摩配镇": "孙三",
+        "天海卫": "马九",
+        "石关": "卫十一",
+        "金陵": "金陵商客",
+        "姑苏": "范掌柜",
+        "临安": "沈掌柜",
+        "海门": "顾掌柜",
+        "舟山": "舟山鱼商",
+        "荔湾镇": "荔湾商客",
+        "鹏城": "陈掌柜",
+        "鹭岛": "林掌柜",
+        "琼崖": "黎掌柜",
+        "锦官城": "蜀商张",
+        "大昌市": "大昌商客",
+        "剑阁": "关商刘",
+        "夜郎": "蛮商阿布",
+        "云岭": "云岭药商",
+        "长安": "秦商白",
+        "神都": "洛商周",
+        "陈仓": "仓商吕",
+        "金城": "河西商客",
+        "汴梁": "宋商赵",
+        "颍川": "豫商曹",
+        "江夏": "楚商黄",
+        "潭州": "湘商谭",
+        "辽阳": "辽商耶律",
+        "龙城": "边商完颜",
+        "风雪镇": "褚四",
+        "冰原堡": "北商哈达",
+        "玉门": "关商李",
+        "楼兰": "胡商阿里",
+        "龟兹": "龟兹商客",
+        "轮台": "轮台戍商"
     }
     return name_map.get(market_name, "老板")
 
