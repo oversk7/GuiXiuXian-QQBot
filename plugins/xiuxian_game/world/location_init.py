@@ -96,7 +96,7 @@ async def init_market_locations(session) -> int:
             # 创建地点，但使用原有的市集名称（不加"市集"后缀）
             location = Location.create_market_location(
                 location_id=f"market_{market.id}",
-                name=market.name,  # 保持原有名称：上京、北郊等
+                name=market.name,  # 保持原有名称：上京、天海卫等
                 x=market.x,
                 y=market.y,
                 market_items=market.items
