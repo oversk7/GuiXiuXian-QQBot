@@ -210,6 +210,8 @@ async def handle_npc_type_interaction(session, player: Player, npc, interaction_
     elif npc.has_function("social_agent"):
         # 社交代理优先匹配（同时拥有matchmaker/sworn_ceremony/mentorship，走统一菜单）
         await handle_social_agent_interaction(session, player, npc, event, dialogue_content)
+    elif npc.has_function("intelligence_dealer"):
+        await handle_intelligence_dealer_interaction(session, player, npc, event)
     elif npc.has_function("station_master"):
         await handle_station_master_interaction(session, player, npc, event)
     elif npc.has_function("matchmaker"):
@@ -401,6 +403,99 @@ async def handle_social_agent_interaction(session, player: Player, npc, event: M
     await interact_cmd.finish(message_add_head("\n".join(lines), event))
 
 
+async def handle_intelligence_dealer_interaction(session, player: Player, npc, event: MessageEvent):
+    """处理情报贩子NPC交互 - 显示本集群物价对比和跑商建议"""
+    from ..economy.merchants import MARKETS, CITY_CLUSTERS, CITY_TO_CLUSTER
+    from ..economy.merchants import _price_for, LIMITED_GOODS
+    from ..config import config as game_config
+
+    location = npc.location
+    if not location:
+        await interact_cmd.finish("⛔ 情报贩子所在地点异常")
+
+    city_name = location.name
+    cluster_name = CITY_TO_CLUSTER.get(city_name, "未知")
+    cluster_cities = CITY_CLUSTERS.get(cluster_name, [])
+
+    # 收集本集群各城市的物价信息
+    price_data = {}  # {city_name: {item_id: (sell_price, buy_price)}}
+
+    for market in MARKETS:
+        if market.name not in cluster_cities:
+            continue
+        city_prices = {}
+        for item_id in market.sellable_items:
+            if item_id not in LIMITED_GOODS:
+                continue  # 只显示跑商商品
+            try:
+                sell_price, buy_price = await _price_for(session, market, item_id)
+                city_prices[item_id] = (sell_price, buy_price)
+            except ValueError:
+                continue
+        price_data[market.name] = city_prices
+
+    # 寻找最佳跑商路线（本集群内）
+    best_routes = []
+    for src_name, src_prices in price_data.items():
+        for dst_name, dst_prices in price_data.items():
+            if src_name == dst_name:
+                continue
+            # 在src买、在dst卖
+            for item_id, (sell_price, _) in src_prices.items():
+                # 检查dst是否收购此商品
+                dst_market = None
+                for m in MARKETS:
+                    if m.name == dst_name:
+                        dst_market = m
+                        break
+                if not dst_market or not dst_market.can_buy_from_player(item_id):
+                    continue
+                try:
+                    _, dst_buy_price = await _price_for(session, dst_market, item_id)
+                except ValueError:
+                    continue
+                profit = dst_buy_price - sell_price
+                if profit > 0:
+                    item_cfg = game_config.items_config["by_id"].get(item_id)
+                    item_name = item_cfg.name if item_cfg else item_id
+                    profit_rate = round(profit / sell_price * 100)
+                    best_routes.append((item_name, src_name, dst_name, sell_price, dst_buy_price, profit, profit_rate))
+
+    # 按利润率排序，取前5
+    best_routes.sort(key=lambda x: x[6], reverse=True)
+
+    lines = [
+        f"🕵️ {npc.name}",
+        "━━━━━━━━━━━━━",
+        f"💬 「嘘...{cluster_name}的行情，都在这了。」",
+        "",
+    ]
+
+    if best_routes:
+        lines.append(f"**📊 {cluster_name}今日跑商推荐：**")
+        for item_name, src, dst, buy_p, sell_p, profit, rate in best_routes[:5]:
+            lines.append(
+                f"  💰 {item_name}: {src}买({buy_p}💎)→{dst}卖({sell_p}💎) 利润{profit}💎({rate}%)"
+            )
+    else:
+        lines.append("💬 「今天行情不好，没什么赚头...」")
+
+    # 本城物价概览
+    if city_name in price_data and price_data[city_name]:
+        lines.append("")
+        lines.append(f"**🏪 {city_name}今日出售价：**")
+        city_prices = price_data[city_name]
+        for item_id, (sell_price, _) in sorted(city_prices.items(), key=lambda x: x[1][0], reverse=True)[:8]:
+            item_cfg = game_config.items_config["by_id"].get(item_id)
+            item_name = item_cfg.name if item_cfg else item_id
+            lines.append(f"  {item_name}: {sell_price}💎")
+
+    lines.append("━━━━━━━━━━━━━")
+    lines.append("💡 价格每日09:00刷新")
+
+    await interact_cmd.finish(message_add_head("\n".join(lines), event))
+
+
 async def handle_station_master_interaction(session, player: Player, npc, event: MessageEvent):
     """处理驿丞NPC交互 - 显示本城信息、NPC列表、集群导航"""
     from ..economy.merchants import MARKETS, MARKET_BY_COORD, CITY_CLUSTERS, CITY_TO_CLUSTER
@@ -444,6 +539,8 @@ async def handle_station_master_interaction(session, player: Player, npc, event:
             icon = "📖"
         elif local_npc.has_function("social_agent"):
             icon = "🏛️"
+        elif local_npc.has_function("intelligence_dealer"):
+            icon = "🕵️"
         npc_lines.append(f"  {icon} {cmd(local_npc.name, f'交互 {local_npc.name}')}")
 
     # 2. 集群内其他城市

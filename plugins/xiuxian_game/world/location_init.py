@@ -49,6 +49,9 @@ async def handle_init_locations(event: MessageEvent):
             # 初始化驿丞NPC（每城1个）
             station_master_count = await init_station_masters(session)
 
+            # 初始化情报贩子NPC（18城）
+            intel_dealer_count = await init_intelligence_dealers(session)
+
             # 初始化中立NPC（已禁用 - 2025-12-07）
             # neutral_count = await init_neutral_npcs(session)
             neutral_count = 0  # 不再生成中立NPC
@@ -64,6 +67,7 @@ async def handle_init_locations(event: MessageEvent):
                 f"🏛️ 特殊NPC：{special_count}个\n"
                 f"💕 社交NPC：{social_count}个\n"
                 f"🏛️ 驿丞NPC：{station_master_count}个\n"
+                f"🕵️ 情报贩子：{intel_dealer_count}个\n"
                 f"👤 中立NPC：{neutral_count}个\n"
                 "━━━━━━━━━━━━━\n"
                 "📍 所有NPC已添加到现有地点中\n"
@@ -786,6 +790,58 @@ async def init_station_masters(session) -> int:
                 is_active=True
             )
             npc.add_function("station_master", {"enabled": True})
+            session.add(npc)
+            created_count += 1
+
+    return created_count
+
+
+async def init_intelligence_dealers(session) -> int:
+    """
+    初始化情报贩子NPC — 分布在约18座主要城市
+
+    情报贩子提供：当天本集群及临近城市物价对比、跑商利润建议
+    """
+    from ..models.npc import NPC, NPCType
+    from ..economy.merchants import MARKETS
+
+    created_count = 0
+
+    # 有情报贩子的城市及其名称
+    dealer_cities = {
+        "上京": "情报贩子·暗线", "郸城": "情报贩子·耳目", "天海卫": "情报贩子·港风",
+        "金陵": "情报贩子·风声", "海门": "情报贩子·潮讯", "舟山": "情报贩子·渔信",
+        "荔湾镇": "情报贩子·南讯", "鹏城": "情报贩子·鹏讯",
+        "锦官城": "情报贩子·蜀讯", "大昌市": "情报贩子·昌讯",
+        "长安": "情报贩子·关讯", "神都": "情报贩子·洛讯",
+        "汴梁": "情报贩子·中讯", "江夏": "情报贩子·楚讯",
+        "辽阳": "情报贩子·辽讯", "风雪镇": "情报贩子·寒讯",
+        "玉门": "情报贩子·关外讯", "楼兰": "情报贩子·丝路讯",
+    }
+
+    for market in MARKETS:
+        if market.name not in dealer_cities:
+            continue
+
+        loc = await LocationService.get_location_by_coordinates(
+            session, market.x, market.y, "大都会"
+        )
+        if not loc:
+            continue
+
+        npc_id = f"intel_dealer_{market.name}"
+        existing = await NPCService.get_npc_by_id(session, npc_id)
+        if not existing:
+            npc = NPC(
+                npc_id=npc_id,
+                name=dealer_cities[market.name],
+                description="神秘的情报贩子，掌握着各地商品行情",
+                npc_type=NPCType.NORMAL,
+                location_id=loc.id,
+                is_killable=False,
+                is_active=True
+            )
+            npc.add_function("intelligence_dealer", {"enabled": True})
             session.add(npc)
             created_count += 1
 
