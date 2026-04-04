@@ -984,14 +984,11 @@ function updateSearch() {
   if (highlightUIDs.size === 1) {
     const uid = [...highlightUIDs][0];
     const p = mapData.players.find(x => x.uid === uid);
-    if (p) {
+    if (p && _lastSearchFocusUID !== uid) {
       panX = p.x;
       panY = p.y;
-      // 只在首次定位时拉近，之后用户可以自由缩放
-      if (_lastSearchFocusUID !== uid) {
-        zoom = Math.max(zoom, 1.5);
-        _lastSearchFocusUID = uid;
-      }
+      zoom = Math.max(zoom, 1.5);
+      _lastSearchFocusUID = uid;
     }
   } else {
     _lastSearchFocusUID = null;
