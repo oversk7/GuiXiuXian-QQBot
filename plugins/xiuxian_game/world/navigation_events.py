@@ -229,11 +229,12 @@ def generate_navigation_events(
     rng = random.Random(seed)
     events: List[NavigationEvent] = []
 
-    # 路程事件：每30-80格触发一次
+    # 路程事件：每30-80格触发一次，上限5个（防止长途刷屏）
+    MAX_ROUTE_EVENTS = 5
     if distance >= 30:
         traveled = 0.0
         next_trigger = rng.randint(30, 80)
-        while traveled + next_trigger <= distance:
+        while traveled + next_trigger <= distance and len(events) < MAX_ROUTE_EVENTS:
             traveled += next_trigger
             events.append(_pick_event(player, rng))
             next_trigger = rng.randint(30, 80)
