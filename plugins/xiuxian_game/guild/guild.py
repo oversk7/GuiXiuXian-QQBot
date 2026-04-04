@@ -822,7 +822,7 @@ async def handle_app_list(event: MessageEvent):
         for a in apps:
             applicant = await session.get(Player, a.applicant_id)
             lines.append(
-                f"👤 **{applicant.nickname}** Lv.{applicant.level}　"
+                f"👤 {cmd(applicant.nickname, f'面板 {applicant.uid}')} Lv.{applicant.level}　"
                 f"{cmd('✅同意', f'同意入会 {applicant.uid}')} | "
                 f"{cmd('❌拒绝', f'拒绝入会 {applicant.uid}')}"
             )
