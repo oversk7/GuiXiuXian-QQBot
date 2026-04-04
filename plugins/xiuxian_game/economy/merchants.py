@@ -1400,9 +1400,8 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
 
 @trade_advise_cmd.handle()
 async def _(event: MessageEvent):
-    """遍历市集与商品，列出正利润路线（购买→售出），考虑玩家个人交易限制。"""
+    """快速跑商推荐：只看玩家附近市集的路线，避免全图遍历。"""
     async with safe_session() as session:
-        # 使用跨平台工具获取玩家数据
         from ..platform_utils import get_unified_player, is_guild_message
         player: Player | None = await get_unified_player(session, event)
         if not player:
@@ -1411,130 +1410,86 @@ async def _(event: MessageEvent):
             else:
                 await trade_advise_cmd.finish("⛔ 请先创建角色")
 
-        opportunities = []
-        filtered_count = 0  # 被过滤掉的机会数量
+        px, py = player.get_current_coordinates()
 
-        for src in MARKETS:
-            for iid in src.sellable_items:  # 只考虑源市场出售的商品
-                # 检查源市场库存
-                src_state = await MarketState.get_or_create(session, src.id, iid)
-                if not src_state.can_purchase(1):  # 至少要有1个库存
+        # ---- 第1步：找最近的源市集（当前位置或最近3个）----
+        sorted_markets = sorted(MARKETS, key=lambda m: abs(m.x - px) + abs(m.y - py))
+        source_markets = sorted_markets[:3]  # 最近3个市集作为进货来源
+
+        # ---- 第2步：确定搜索范围（源市集所在集群 + 邻接集群）----
+        search_clusters = set()
+        for src in source_markets:
+            cl = CITY_TO_CLUSTER.get(src.name)
+            if cl:
+                search_clusters.add(cl)
+                search_clusters.update(CLUSTER_NEIGHBORS.get(cl, []))
+
+        dest_markets = [m for m in MARKETS if CITY_TO_CLUSTER.get(m.name) in search_clusters]
+
+        # ---- 第3步：快速计算路线（只查必要的价格）----
+        opportunities = []
+
+        for src in source_markets:
+            for iid in src.sellable_items:
+                # 跳过调料和特殊物品（利润低且玩法不同）
+                if iid in ("spice", "wasabi", "lingzhi_powder", "secret_sauce", "immortal_oil"):
                     continue
 
                 sell_p_src, _ = await _price_for(session, src, iid)
 
-                # 查询玩家在源市场的当日已购量，计算阶梯加价后的实际买入价（按50个估算）
-                already_bought_src = await TradeRecord.get_daily_purchase_quantity(
-                    session, player.id, src.id, iid)
-                recommend_qty = 50
-                tiered_mult_src = _calculate_tiered_multiplier(already_bought_src, recommend_qty)
-                effective_buy_price = max(1, int(sell_p_src * tiered_mult_src))
-
-                for dst in MARKETS:
-                    if dst is src or not dst.can_buy_from_player(iid):  # 检查目标市场是否收购此商品
+                for dst in dest_markets:
+                    if dst is src or not dst.can_buy_from_player(iid):
                         continue
                     _, buy_p_dst = await _price_for(session, dst, iid)
-                    profit = buy_p_dst - effective_buy_price
-                    if profit > 0:
-                        item_cfg = config.items_config["by_id"].get(iid)
-                        margin = profit / effective_buy_price if effective_buy_price else 0
+                    profit = buy_p_dst - sell_p_src
+                    if profit <= 0:
+                        continue
 
-                        # 限制利润率上限（跨集群远途允许更高利润）
-                        src_cl = CITY_TO_CLUSTER.get(src.name, "")
-                        dst_cl = CITY_TO_CLUSTER.get(dst.name, "")
-                        cd = _cluster_distance(src_cl, dst_cl)
-                        max_margin = {0: 0.30, 1: 0.60, 2: 1.00, 3: 1.50}.get(min(cd, 3), 1.50)
-                        if margin > max_margin:
-                            buy_p_dst = int(effective_buy_price * (1 + max_margin))
-                            profit = buy_p_dst - effective_buy_price
-                            margin = max_margin
+                    margin = profit / sell_p_src if sell_p_src else 0
+                    item_cfg = config.items_config["by_id"].get(iid)
 
-                        # 检查玩家是否可以在目标市场出售该商品（考虑原地交易限制）
-                        can_sell_at_dst = await TradeRecord.can_sell_at_market(
-                            session, player.id, dst.id, iid, hours=4
-                        )
+                    src_cluster = CITY_TO_CLUSTER.get(src.name, "?")
+                    dst_cluster = CITY_TO_CLUSTER.get(dst.name, "?")
+                    cdist = _cluster_distance(src_cluster, dst_cluster)
+                    tile_dist = int(((src.x - dst.x)**2 + (src.y - dst.y)**2)**0.5)
 
-                        if not can_sell_at_dst:
-                            filtered_count += 1
-                            continue  # 跳过这个机会，因为玩家在目标市场有交易限制
-
-                        tiered_note = ""
-                        if tiered_mult_src > 1.001:
-                            tiered_note = f" [加价×{tiered_mult_src:.2f}]"
-
-                        # 计算集群距离和路程信息
-                        src_cluster = CITY_TO_CLUSTER.get(src.name, "?")
-                        dst_cluster = CITY_TO_CLUSTER.get(dst.name, "?")
-                        cdist = _cluster_distance(src_cluster, dst_cluster)
-                        tile_dist = int(((src.x - dst.x)**2 + (src.y - dst.y)**2)**0.5)
-
-                        opportunities.append({
-                            "item": item_cfg.name,
-                            "from": src.name,
-                            "to": dst.name,
-                            "buy": effective_buy_price,
-                            "sell": buy_p_dst,
-                            "profit": profit,
-                            "margin": margin,
-                            "src_stock": src_state.current_stock,
-                            "src_id": src.id,
-                            "dst_id": dst.id,
-                            "item_id": iid,
-                            "tiered_note": tiered_note,
-                            "src_cluster": src_cluster,
-                            "dst_cluster": dst_cluster,
-                            "cluster_dist": cdist,
-                            "tile_dist": tile_dist,
-                        })
+                    opportunities.append({
+                        "item": item_cfg.name if item_cfg else iid,
+                        "from": src.name, "to": dst.name,
+                        "buy": sell_p_src, "sell": buy_p_dst,
+                        "profit": profit, "margin": margin,
+                        "src_cluster": src_cluster, "dst_cluster": dst_cluster,
+                        "cluster_dist": cdist, "tile_dist": tile_dist,
+                    })
 
         if not opportunities:
-            filter_msg = ""
-            if filtered_count > 0:
-                filter_msg = f"\n已过滤 **{filtered_count}** 个受交易限制影响的机会"
             await trade_advise_cmd.finish(build_markdown(
-                f"# 跑商推荐\n***\n今日暂无可用的盈利机会，明天再来看看吧！{filter_msg}\n***\n{cmd('市集')} | {cmd('交易限制')}"))
+                f"# 跑商推荐\n***\n附近暂无盈利机会，换个地方试试？\n***\n{cmd('市集列表')}"))
 
-        # ---- 智能排序：按利润效率（利润/距离）+ 绝对利润综合排序 ----
-        # 长途高利润排在前面，同时兼顾短途快钱
+        # ---- 第4步：排序展示 ----
+        opportunities.sort(key=lambda d: d["profit"], reverse=True)
+
+        # 取前8条，去重同商品路线
+        seen = set()
+        sample = []
         for op in opportunities:
-            # 效率分 = 利润 × (1 + 集群距离加权)，鼓励跨集群
-            op["score"] = op["profit"] * (1 + op["cluster_dist"] * 0.3)
-
-        opportunities.sort(key=lambda d: d["score"], reverse=True)
-
-        # 分层抽样：跨集群2条 + 近距离2条 + 随机2条，共6条（去重）
-        import random as _rnd
-        cross = [o for o in opportunities if o["cluster_dist"] >= 2][:4]
-        nearby = [o for o in opportunities if o["cluster_dist"] <= 1][:4]
-        sample_set = []
-        if cross:
-            sample_set += _rnd.sample(cross, min(2, len(cross)))
-        if nearby:
-            sample_set += _rnd.sample(nearby, min(2, len(nearby)))
-        # 补充到6条
-        seen = {(o["item"], o["from"], o["to"]) for o in sample_set}
-        rest = [o for o in opportunities if (o["item"], o["from"], o["to"]) not in seen]
-        if rest and len(sample_set) < 6:
-            sample_set += _rnd.sample(rest, min(6 - len(sample_set), len(rest)))
-
-        # 按集群距离降序展示（远途在前）
-        sample_set.sort(key=lambda d: (-d["cluster_dist"], -d["profit"]))
-
-        lines = ["# 💹 跑商推荐", "***"]
-
-        if filtered_count > 0:
-            lines.append(f"🔍 已过滤 **{filtered_count}** 个受限机会")
-            lines.append("***")
+            key = (op["item"], op["to"])
+            if key in seen:
+                continue
+            seen.add(key)
+            sample.append(op)
+            if len(sample) >= 6:
+                break
 
         DIST_LABELS = {0: "同城", 1: "邻近", 2: "中途", 3: "远途", 4: "远途"}
         DIST_EMOJIS = {0: "🏠", 1: "🚶", 2: "🐎", 3: "🚀", 4: "🚀"}
 
-        for op in sample_set:
-            tiered_tag = op.get('tiered_note', '')
+        lines = ["# 💹 跑商推荐", "***"]
+
+        for op in sample:
             cdist = op['cluster_dist']
             dist_label = DIST_LABELS.get(cdist, "远途")
             dist_emoji = DIST_EMOJIS.get(cdist, "🚀")
-            # 估算旅行时间（敏捷100基准：0.5格/秒）
             eta_sec = op['tile_dist'] / 0.5
             if eta_sec < 60:
                 eta_str = f"{int(eta_sec)}秒"
@@ -1549,7 +1504,7 @@ async def _(event: MessageEvent):
             lines.append(
                 f"{dist_emoji} **{dist_label}** {op['src_cluster']}→{op['dst_cluster']}　"
                 f"📈 +**{op['profit']}** ({op['margin']*100:.0f}%)\n"
-                f"📦 {cmd(op_item, f'购买 {op_item} ')} (库存:{op['src_stock']}){tiered_tag}\n"
+                f"📦 {cmd(op_item, f'购买 {op_item} ')} \n"
                 f"🛒 {cmd(op_from, f'导航 {op_from}')} → "
                 f"{cmd(op_to, f'导航 {op_to}')}　"
                 f"🗺️{op['tile_dist']}格 ⏱️{eta_str}"
@@ -1558,8 +1513,6 @@ async def _(event: MessageEvent):
 
         lines.append("***")
         lines.append("💡 跨集群利润更高，产地购买更便宜")
-        if filtered_count > 0:
-            lines.append("💡 4小时后可能有更多机会解锁")
         lines.append(f"{cmd('市集')} | {cmd('市集列表')} | {cmd('交易限制')}")
         await trade_advise_cmd.finish(build_markdown("\n".join(lines)))
 
