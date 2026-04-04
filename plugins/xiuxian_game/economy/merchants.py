@@ -1543,12 +1543,15 @@ async def _(event: MessageEvent):
             else:
                 eta_str = f"{eta_sec/3600:.1f}小时"
 
+            op_item = op['item']
+            op_from = op['from']
+            op_to = op['to']
             lines.append(
                 f"{dist_emoji} **{dist_label}** {op['src_cluster']}→{op['dst_cluster']}　"
                 f"📈 +**{op['profit']}** ({op['margin']*100:.0f}%)\n"
-                f"📦 {cmd(op['item'], f'购买 {op[\"item\"]} ')} (库存:{op['src_stock']}){tiered_tag}\n"
-                f"🛒 {cmd(op['from'], f'导航 {op[\"from\"]}')} → "
-                f"{cmd(op['to'], f'导航 {op[\"to\"]}')}　"
+                f"📦 {cmd(op_item, f'购买 {op_item} ')} (库存:{op['src_stock']}){tiered_tag}\n"
+                f"🛒 {cmd(op_from, f'导航 {op_from}')} → "
+                f"{cmd(op_to, f'导航 {op_to}')}　"
                 f"🗺️{op['tile_dist']}格 ⏱️{eta_str}"
             )
             lines.append("──────────")
