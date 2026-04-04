@@ -380,8 +380,8 @@ class PartTimeJobService:
             "location_id": "industrial_zone",
             "name": "荔湾镇工业区",
             "description": "工厂集中的工业区，体力劳动较多",
-            "x": 120,  # 荔湾镇
-            "y": 200,
+            "x": 250,  # 荔湾镇
+            "y": -1350,
             "available_jobs": ["factory_worker", "cargo_handler", "quality_inspector"],
             "required_level": 1
         },
@@ -389,26 +389,26 @@ class PartTimeJobService:
             "location_id": "entertainment_district",
             "name": "郸城娱乐街区",
             "description": "充满活力的娱乐区，工作轻松有趣",
-            "x": 120,  # 郸城
-            "y": 120,
+            "x": 150,  # 郸城
+            "y": -130,
             "available_jobs": ["internet_cafe_manager", "cinema_usher", "street_performer_assistant"],
             "required_level": 1
         },
         "logistics_center": {
             "location_id": "logistics_center",
-            "name": "东郊物流中心",
-            "description": "物流配送中心，负责货物运输和仓储",
-            "x": 390,  # 东郊
-            "y": 50,
+            "name": "天海卫物流中心",
+            "description": "天海卫港口的物流配送中心",
+            "x": 250,  # 天海卫
+            "y": -50,
             "available_jobs": ["delivery_driver", "warehouse_keeper", "cargo_handler"],
             "required_level": 1
         },
         "farm_market": {
             "location_id": "farm_market",
-            "name": "北郊农贸集散地",
-            "description": "北郊最大的农产品集散中心，每天人来人往热闹非凡",
-            "x": 100,  # 北郊
-            "y": 460,
+            "name": "石关农贸集散地",
+            "description": "石关最大的农产品集散中心",
+            "x": -200,  # 石关
+            "y": -150,
             "available_jobs": ["farm_worker", "delivery_sorter", "warehouse_keeper"],
             "required_level": 1
         },
@@ -416,8 +416,8 @@ class PartTimeJobService:
             "location_id": "culture_street",
             "name": "金陵文化商街",
             "description": "古色古香的文化街区，聚集了各种文艺和旅游相关的工作",
-            "x": 220,  # 金陵
-            "y": -350,
+            "x": 450,  # 金陵
+            "y": -480,
             "available_jobs": ["tour_guide", "night_market_vendor", "coffee_server"],
             "required_level": 1
         },
@@ -425,8 +425,8 @@ class PartTimeJobService:
             "location_id": "mining_area",
             "name": "云岭采矿区",
             "description": "云岭深处的矿区，矿脉丰富但环境恶劣，报酬不菲",
-            "x": -250,  # 云岭
-            "y": 490,
+            "x": -850,  # 云岭
+            "y": -1150,
             "available_jobs": ["miner", "herb_gatherer", "cargo_handler"],
             "required_level": 3
         },
@@ -443,8 +443,8 @@ class PartTimeJobService:
             "location_id": "snow_outpost",
             "name": "风雪镇哨站",
             "description": "风雪镇外围的巡逻哨站，只有胆子大的人才敢来这里打工",
-            "x": -5,  # 风雪镇
-            "y": 390,
+            "x": 150,  # 风雪镇
+            "y": 1200,
             "available_jobs": ["snow_patrol", "escort_guard", "herb_gatherer"],
             "required_level": 5
         },
@@ -452,8 +452,8 @@ class PartTimeJobService:
             "location_id": "fishing_dock",
             "name": "舟山渔业码头",
             "description": "舟山最繁忙的渔港码头，渔船进进出出好不热闹",
-            "x": 200,  # 舟山
-            "y": -200,
+            "x": 700,  # 舟山
+            "y": -600,
             "available_jobs": ["fisherman_helper", "dock_worker", "delivery_driver"],
             "required_level": 1
         },
@@ -461,9 +461,45 @@ class PartTimeJobService:
             "location_id": "trade_district",
             "name": "大昌市商贸区",
             "description": "大昌市的核心商贸区，南来北往的商队都在这里中转",
-            "x": -400,  # 大昌市
-            "y": -240,
+            "x": -600,  # 大昌市
+            "y": -800,
             "available_jobs": ["escort_guard", "tavern_waiter", "warehouse_keeper"],
+            "required_level": 1
+        },
+        "guanzhong_arena": {
+            "location_id": "guanzhong_arena",
+            "name": "长安武馆",
+            "description": "古都长安最大的武馆，常年招收杂役",
+            "x": -500,
+            "y": -280,
+            "available_jobs": ["escort_guard", "snow_patrol", "cargo_handler"],
+            "required_level": 3
+        },
+        "bianliang_market": {
+            "location_id": "bianliang_market",
+            "name": "汴梁集市",
+            "description": "中原最繁忙的集市，需要大量帮工",
+            "x": -100,
+            "y": -450,
+            "available_jobs": ["cashier", "delivery_driver", "night_market_vendor"],
+            "required_level": 1
+        },
+        "yumen_outpost": {
+            "location_id": "yumen_outpost",
+            "name": "玉门驿站",
+            "description": "丝路重要驿站，为往来商旅提供服务",
+            "x": -1200,
+            "y": 100,
+            "available_jobs": ["escort_guard", "cargo_handler", "delivery_driver"],
+            "required_level": 5
+        },
+        "pengcheng_dock": {
+            "location_id": "pengcheng_dock",
+            "name": "鹏城码头",
+            "description": "南海最繁忙的商港码头",
+            "x": 350,
+            "y": -1450,
+            "available_jobs": ["dock_worker", "fisherman_helper", "cargo_handler"],
             "required_level": 1
         },
     }
