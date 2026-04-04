@@ -92,7 +92,8 @@ html,body{width:100%;height:100%;overflow:hidden;background:#080c18;color:#a0c4e
   #legend .lr{gap:6px;margin-bottom:3px}
   #legend .dot{width:8px;height:8px}
   #kbd-hint{display:none}
-  #panel{top:auto;bottom:26px;right:0;left:0;width:100%;border-radius:12px 12px 0 0;padding:14px 16px 10px;max-width:100%}
+  #panel{top:auto;bottom:26px;right:0;left:0;width:100%;border-radius:12px 12px 0 0;padding:14px 16px 10px;max-width:100%;z-index:160}
+  #legend.hide-mobile{display:none}
   #ftr{height:26px;padding:0 10px;font-size:10px;gap:10px}
 }
 </style>
@@ -948,11 +949,13 @@ function showPanel(p) {
     pStatusEl.className = 'pstatus idle';
   }
   panelEl.style.display = 'block';
+  document.getElementById('legend').classList.add('hide-mobile');
 }
 
 document.getElementById('panel-close').onclick = () => {
   panelEl.style.display = 'none';
   selectedUID = null;
+  document.getElementById('legend').classList.remove('hide-mobile');
 };
 
 // ============================================================
@@ -1182,6 +1185,7 @@ canvas.addEventListener('touchend', e => {
       panelEl.style.display = 'none';
       selectedUID = null;
       tipEl.style.display = 'none';
+      document.getElementById('legend').classList.remove('hide-mobile');
     }
   }
   dragging = false;
