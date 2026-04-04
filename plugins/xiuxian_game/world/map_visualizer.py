@@ -323,10 +323,89 @@ class MapVisualizer:
 
         return pixel_x, pixel_y
     
+    def _draw_terrain(self, image: Image.Image):
+        """绘制地形层：海域（蓝）+ 八大集群区域（彩色半透明）"""
+        overlay = Image.new('RGBA', (self.map_width, self.map_height), (0, 0, 0, 0))
+        od = ImageDraw.Draw(overlay)
+
+        # ── 海域（东海+南海，沿海岸线的不规则多边形）──
+        # 用游戏坐标描述海岸线，然后转像素
+        # 从地图顶部右侧 → 沿东海岸 → 绕南海 → 地图底部右侧
+        coastline_game = [
+            (2000, 2000),     # 右上角
+            (500, 1500),      # 北境东侧海面
+            (450, 700),       # 辽阳以东
+            (800, 0),         # 天海卫以东
+            (850, -400),      # 海门以东
+            (800, -700),      # 舟山以东
+            (700, -1100),     # 鹭岛以东
+            (500, -1500),     # 鹏城以东
+            (350, -1750),     # 琼崖以南
+            (-200, -2000),    # 向西南延伸
+            (2000, -2000),    # 右下角
+        ]
+        coastline_px = [self._game_to_pixel(gx, gy) for gx, gy in coastline_game]
+        od.polygon(coastline_px, fill=(70, 130, 180, 45))  # 钢蓝色半透明
+
+        # 在深海区域加深颜色（离海岸更远的部分）
+        deep_sea_game = [
+            (2000, 2000), (900, 1500), (1000, 0), (1100, -500),
+            (1000, -1100), (800, -1700), (500, -2000), (2000, -2000),
+        ]
+        deep_sea_px = [self._game_to_pixel(gx, gy) for gx, gy in deep_sea_game]
+        od.polygon(deep_sea_px, fill=(50, 100, 160, 30))  # 更深的蓝
+
+        # ── 八大集群区域（柔和椭圆色块 + 标签）──
+        clusters = [
+            # (名称, 中心game坐标, 椭圆半径game坐标, RGBA颜色)
+            ("京  畿", (25, 0), (300, 250), (200, 160, 60, 30)),     # 暖金
+            ("江  南", (590, -560), (200, 150), (60, 160, 60, 28)),   # 翠绿
+            ("南  海", (350, -1380), (250, 250), (40, 140, 180, 25)), # 海蓝
+            ("蜀  地", (-750, -870), (220, 320), (140, 90, 40, 28)),  # 赭棕
+            ("关  中", (-580, -300), (280, 130), (170, 50, 50, 28)),  # 暗红
+            ("中  原", (-100, -600), (170, 300), (170, 140, 40, 25)), # 暗金
+            ("北  境", (250, 1020), (180, 480), (130, 180, 210, 30)), # 冰蓝
+            ("西  域", (-1450, 225), (350, 200), (190, 170, 130, 28)),# 沙黄
+        ]
+
+        for name, (cx, cy), (rx, ry), color in clusters:
+            px, py = self._game_to_pixel(cx, cy)
+            # 游戏坐标半径 → 像素半径
+            rx_px = rx * self.map_width // 4000
+            ry_px = ry * self.map_height // 4000
+            od.ellipse([px - rx_px, py - ry_px, px + rx_px, py + ry_px], fill=color)
+
+        # 合成到主图
+        base = image.convert('RGBA')
+        composited = Image.alpha_composite(base, overlay)
+        image.paste(composited.convert('RGB'))
+
+        # ── 集群标签（直接画在主图上，不需要透明）──
+        label_draw = ImageDraw.Draw(image)
+        label_font = self.fonts.get('medium', self.fonts.get('small'))
+        for name, (cx, cy), _, _ in clusters:
+            px, py = self._game_to_pixel(cx, cy)
+            # 计算文字宽度以居中
+            try:
+                bbox = label_draw.textbbox((0, 0), name, font=label_font)
+                tw = bbox[2] - bbox[0]
+                th = bbox[3] - bbox[1]
+            except Exception:
+                tw, th = 40, 14
+            label_draw.text(
+                (px - tw // 2, py - th // 2),
+                name,
+                fill='#8B7355',  # 柔和棕色，不抢眼
+                font=label_font,
+            )
+
     def _draw_background_and_grid(self, draw: ImageDraw.Draw, image: Image.Image):
         """绘制背景和网格（古地图版：羊皮纸纹理 + 装饰边框 + 标题）"""
         # 绘制羊皮纸渐变背景和纹理
         self._draw_gradient_background(image)
+
+        # 绘制地形层：海域 + 集群区域
+        self._draw_terrain(image)
 
         # 绘制装饰性边框（多层边框效果）
         self._draw_decorative_border(draw)
