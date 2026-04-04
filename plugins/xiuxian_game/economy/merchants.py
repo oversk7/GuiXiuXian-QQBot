@@ -85,112 +85,234 @@ ALL_FISH = [
 ]
 
 # ================= 硬编码市集配置 =================
-# 基于地理位置和经济特色进行商品分配，确保跑商路线的多样性和盈利性
+# 八大集群 · 35城 — 参见 llmdoc/design/specs/2026-04-04-world-map-expansion-design.md
 
 MARKET_CONFIGS = {
-    # 上京 (0,0) - 政治中心，奢侈品集散地
-    "merchant1": {
+    # ==================== 集群一：京畿（5城）====================
+    "merchant_shangjing": {
         "name": "上京",
         "coord": (0, 0),
         "sellable": ["gold_watch", "jade_bracelet", "lux_perfume", "designer_bag", "red_wine", "spice", "secret_sauce", "immortal_oil"],
         "buyable": ["gold_watch", "jade_bracelet", "lux_perfume", "designer_bag", "red_wine", "art_book"]
     },
-
-    # 北郊 (100,460) - 工业区，电子产品集中
-    "merchant2": {
-        "name": "北郊",
-        "coord": (100, 460),
-        "sellable": ["smartphone", "gaming_console", "noise_headphones", "dslr_camera", "lux_perfume"],
-        "buyable": ["smartphone", "gaming_console", "noise_headphones", "dslr_camera", "fountain_pen"]
-    },
-
-    # 东郊 (390,50) - 制造业基地，日用品丰富
-    "merchant3": {
-        "name": "东郊",
-        "coord": (390, 50),
-        "sellable": ["sneakers", "silk_scarf", "fountain_pen", "concert_ticket", "luxury_chocolate"],
-        "buyable": ["sneakers", "silk_scarf", "fountain_pen", "concert_ticket", "smartphone", "gaming_console"]
-    },
-
-    # 西郊 (-420,140) - 文化区，艺术品交易
-    "merchant4": {
-        "name": "西郊",
-        "coord": (-420, 140),
-        "sellable": ["art_book", "concert_ticket", "fountain_pen", "luxury_chocolate", "blood_pact"],
-        "buyable": ["art_book", "concert_ticket", "fountain_pen", "luxury_chocolate", "lux_perfume", "designer_bag"]
-    },
-
-    # 南郊 (-100,-480) - 港口，进口商品多
-    "merchant5": {
-        "name": "南郊",
-        "coord": (-100, -480),
-        "sellable": ["red_wine", "luxury_chocolate", "designer_bag", "dslr_camera", "gold_watch"],
-        "buyable": ["red_wine", "luxury_chocolate", "dslr_camera", "gold_watch", "jade_bracelet", "gaming_console"]
-    },
-
-    # 金陵 (220,-350) - 古都，传统与现代结合
-    "merchant6": {
-        "name": "金陵",
-        "coord": (220, -350),
-        "sellable": ["gold_watch", "art_book", "fountain_pen", "silk_scarf", "yin_grass"],
-        "buyable": ["gold_watch", "art_book", "silk_scarf", "yin_grass", "sneakers", "concert_ticket", "jade_bracelet"]
-    },
-
-    # 云岭 (-250,490) - 山区，药材丰富
-    "merchant7": {
-        "name": "云岭",
-        "coord": (-250, 490),
-        "sellable": ["yin_grass", "blood_pact", "luxury_chocolate", "art_book", "gaming_console", "lingzhi_powder"],
-        "buyable": ["yin_grass", "blood_pact", "luxury_chocolate", "silk_scarf", "fountain_pen"]
-    },
-
-    # 郸城 (120,120) - 商业重镇，各类商品齐全
-    "merchant8": {
+    "merchant_dancheng": {
         "name": "郸城",
-        "coord": (120, 120),
-        "sellable": ["smartphone", "sneakers", "noise_headphones", "designer_bag", "concert_ticket"],
-        "buyable": ["smartphone", "sneakers", "noise_headphones", "designer_bag", "gaming_console", "lux_perfume"]
+        "coord": (150, -130),
+        "sellable": ["gold_watch", "designer_bag", "lux_perfume", "smartphone", "concert_ticket"],
+        "buyable": ["gold_watch", "designer_bag", "lux_perfume", "smartphone", "sneakers", "art_book"]
     },
-
-    # 荔湾镇 (120,200) - 小镇，特色商品
-    "merchant9": {
-        "name": "荔湾镇",
-        "coord": (120, 200),
-        "sellable": ["silk_scarf", "luxury_chocolate", "fountain_pen", "sneakers", "spice"],
-        "buyable": ["silk_scarf", "luxury_chocolate", "fountain_pen", "sneakers", "art_book", "noise_headphones"]
-    },
-
-    # 摩配镇 (80,140) - 机械城，电子设备专业
-    "merchant10": {
+    "merchant_mopeizhen": {
         "name": "摩配镇",
-        "coord": (80, 140),
+        "coord": (80, 160),
         "sellable": ["gaming_console", "dslr_camera", "noise_headphones", "smartphone"],
         "buyable": ["gaming_console", "dslr_camera", "noise_headphones", "red_wine", "lux_perfume"]
     },
-
-    # 风雪镇 (-5,390) - 边境小镇，药材和特殊商品
-    "merchant11": {
-        "name": "风雪镇",
-        "coord": (-5, 390),
-        "sellable": ["blood_pact", "yin_grass", "concert_ticket", "art_book", "lingzhi_powder"],
-        "buyable": ["blood_pact", "yin_grass", "concert_ticket", "jade_bracelet", "gold_watch"]
+    "merchant_tianhaiwei": {
+        "name": "天海卫",
+        "coord": (250, -50),
+        "sellable": ["jade_bracelet", "designer_bag", "red_wine", "gold_watch", "noise_headphones"],
+        "buyable": ["jade_bracelet", "designer_bag", "red_wine", "sneakers", "art_book", "fountain_pen"]
+    },
+    "merchant_shiguan": {
+        "name": "石关",
+        "coord": (-200, -150),
+        "sellable": ["lux_perfume", "gold_watch", "concert_ticket", "noise_headphones"],
+        "buyable": ["lux_perfume", "gold_watch", "sneakers", "art_book", "silk_scarf"]
     },
 
-    # 舟山 (200,-200) - 海岛城市，海外商品 + 鱼类收购
-    "merchant12": {
+    # ==================== 集群二：江南（5城）====================
+    "merchant_jinling": {
+        "name": "金陵",
+        "coord": (450, -480),
+        "sellable": ["silk_scarf", "art_book", "fountain_pen", "luxury_chocolate", "yin_grass", "spice"],
+        "buyable": ["silk_scarf", "art_book", "yin_grass", "sneakers", "concert_ticket", "jade_bracelet"]
+    },
+    "merchant_gusu": {
+        "name": "姑苏",
+        "coord": (600, -520),
+        "sellable": ["silk_scarf", "art_book", "luxury_chocolate", "fountain_pen"],
+        "buyable": ["silk_scarf", "art_book", "smartphone", "gaming_console", "dslr_camera"]
+    },
+    "merchant_linan": {
+        "name": "临安",
+        "coord": (580, -650),
+        "sellable": ["luxury_chocolate", "fountain_pen", "art_book", "silk_scarf"],
+        "buyable": ["luxury_chocolate", "fountain_pen", "gaming_console", "smartphone", "noise_headphones"]
+    },
+    "merchant_haimen": {
+        "name": "海门",
+        "coord": (720, -480),
+        "sellable": ["silk_scarf", "designer_bag", "dslr_camera", "red_wine"],
+        "buyable": ["silk_scarf", "designer_bag", "dslr_camera", "smartphone", "gaming_console"] + ALL_FISH
+    },
+    "merchant_zhoushan": {
         "name": "舟山",
-        "coord": (200, -200),
+        "coord": (700, -600),
         "sellable": ["jade_bracelet", "red_wine", "dslr_camera", "designer_bag", "wasabi"],
         "buyable": ["jade_bracelet", "red_wine", "dslr_camera", "designer_bag", "gaming_console", "smartphone"] + ALL_FISH
     },
 
-    # 大昌市 (-400,-240) - 西南商埠，综合贸易
-    "merchant13": {
+    # ==================== 集群三：南海（4城）====================
+    "merchant_liwanzhen": {
+        "name": "荔湾镇",
+        "coord": (250, -1350),
+        "sellable": ["red_wine", "dslr_camera", "designer_bag", "luxury_chocolate", "spice"],
+        "buyable": ["red_wine", "dslr_camera", "silk_scarf", "fountain_pen", "art_book"] + ALL_FISH
+    },
+    "merchant_pengcheng": {
+        "name": "鹏城",
+        "coord": (350, -1450),
+        "sellable": ["red_wine", "dslr_camera", "designer_bag", "noise_headphones"],
+        "buyable": ["red_wine", "dslr_camera", "silk_scarf", "art_book", "fountain_pen"] + ALL_FISH
+    },
+    "merchant_ludao": {
+        "name": "鹭岛",
+        "coord": (550, -1200),
+        "sellable": ["red_wine", "designer_bag", "dslr_camera", "luxury_chocolate"],
+        "buyable": ["red_wine", "designer_bag", "silk_scarf", "fountain_pen", "art_book", "sneakers"] + ALL_FISH
+    },
+    "merchant_qiongya": {
+        "name": "琼崖",
+        "coord": (200, -1650),
+        "sellable": ["red_wine", "luxury_chocolate", "dslr_camera", "lux_perfume"],
+        "buyable": ["red_wine", "luxury_chocolate", "silk_scarf", "fountain_pen", "art_book"] + ALL_FISH
+    },
+
+    # ==================== 集群四：蜀地（5城）====================
+    "merchant_jinguancheng": {
+        "name": "锦官城",
+        "coord": (-780, -750),
+        "sellable": ["yin_grass", "blood_pact", "luxury_chocolate", "art_book", "spice"],
+        "buyable": ["yin_grass", "blood_pact", "smartphone", "noise_headphones", "designer_bag"]
+    },
+    "merchant_dachangshi": {
         "name": "大昌市",
-        "coord": (-400, -240),
-        "sellable": ["smartphone", "sneakers", "noise_headphones", "designer_bag", "concert_ticket", "spice"],
-        "buyable": ["smartphone", "sneakers", "noise_headphones", "designer_bag", "gaming_console", "lux_perfume"]
-    }
+        "coord": (-600, -800),
+        "sellable": ["yin_grass", "luxury_chocolate", "concert_ticket", "sneakers", "spice"],
+        "buyable": ["yin_grass", "smartphone", "noise_headphones", "designer_bag", "gaming_console", "lux_perfume"]
+    },
+    "merchant_jiange": {
+        "name": "剑阁",
+        "coord": (-650, -650),
+        "sellable": ["blood_pact", "concert_ticket", "luxury_chocolate", "art_book"],
+        "buyable": ["blood_pact", "smartphone", "noise_headphones", "designer_bag"]
+    },
+    "merchant_yelang": {
+        "name": "夜郎",
+        "coord": (-900, -950),
+        "sellable": ["yin_grass", "blood_pact", "luxury_chocolate"],
+        "buyable": ["yin_grass", "blood_pact", "smartphone", "noise_headphones", "designer_bag"]
+    },
+    "merchant_yunling": {
+        "name": "云岭",
+        "coord": (-850, -1150),
+        "sellable": ["yin_grass", "blood_pact", "luxury_chocolate", "art_book", "gaming_console", "lingzhi_powder"],
+        "buyable": ["yin_grass", "blood_pact", "luxury_chocolate", "silk_scarf", "fountain_pen"]
+    },
+
+    # ==================== 集群五：关中（4城）====================
+    "merchant_changan": {
+        "name": "长安",
+        "coord": (-500, -280),
+        "sellable": ["concert_ticket", "art_book", "fountain_pen", "luxury_chocolate"],
+        "buyable": ["concert_ticket", "gold_watch", "jade_bracelet", "red_wine", "designer_bag"]
+    },
+    "merchant_shendu": {
+        "name": "神都",
+        "coord": (-350, -320),
+        "sellable": ["art_book", "fountain_pen", "concert_ticket", "luxury_chocolate"],
+        "buyable": ["art_book", "gold_watch", "jade_bracelet", "red_wine"]
+    },
+    "merchant_chencang": {
+        "name": "陈仓",
+        "coord": (-650, -350),
+        "sellable": ["concert_ticket", "fountain_pen", "art_book"],
+        "buyable": ["concert_ticket", "gold_watch", "jade_bracelet", "red_wine", "designer_bag"]
+    },
+    "merchant_jincheng": {
+        "name": "金城",
+        "coord": (-900, -180),
+        "sellable": ["jade_bracelet", "concert_ticket", "art_book", "fountain_pen"],
+        "buyable": ["jade_bracelet", "smartphone", "gaming_console", "sneakers", "noise_headphones"]
+    },
+
+    # ==================== 集群六：中原（4城）====================
+    "merchant_bianliang": {
+        "name": "汴梁",
+        "coord": (-100, -450),
+        "sellable": ["sneakers", "smartphone", "noise_headphones", "gaming_console", "concert_ticket"],
+        "buyable": ["sneakers", "smartphone", "lux_perfume", "jade_bracelet", "designer_bag"]
+    },
+    "merchant_yingchuan": {
+        "name": "颍川",
+        "coord": (-200, -380),
+        "sellable": ["sneakers", "smartphone", "gaming_console", "fountain_pen"],
+        "buyable": ["sneakers", "smartphone", "lux_perfume", "jade_bracelet"]
+    },
+    "merchant_jiangxia": {
+        "name": "江夏",
+        "coord": (-30, -680),
+        "sellable": ["smartphone", "gaming_console", "noise_headphones", "sneakers", "dslr_camera"],
+        "buyable": ["smartphone", "gaming_console", "lux_perfume", "jade_bracelet", "silk_scarf"]
+    },
+    "merchant_tanzhou": {
+        "name": "潭州",
+        "coord": (-80, -900),
+        "sellable": ["sneakers", "noise_headphones", "gaming_console", "luxury_chocolate"],
+        "buyable": ["sneakers", "noise_headphones", "lux_perfume", "jade_bracelet", "silk_scarf"]
+    },
+
+    # ==================== 集群七：北境（4城）====================
+    "merchant_liaoyang": {
+        "name": "辽阳",
+        "coord": (350, 650),
+        "sellable": ["blood_pact", "yin_grass", "concert_ticket", "noise_headphones"],
+        "buyable": ["blood_pact", "yin_grass", "luxury_chocolate", "red_wine", "silk_scarf"]
+    },
+    "merchant_longcheng": {
+        "name": "龙城",
+        "coord": (280, 900),
+        "sellable": ["blood_pact", "yin_grass", "concert_ticket", "art_book"],
+        "buyable": ["blood_pact", "yin_grass", "luxury_chocolate", "red_wine", "silk_scarf", "designer_bag"]
+    },
+    "merchant_fengxuezhen": {
+        "name": "风雪镇",
+        "coord": (150, 1200),
+        "sellable": ["blood_pact", "yin_grass", "concert_ticket", "art_book", "lingzhi_powder"],
+        "buyable": ["blood_pact", "yin_grass", "concert_ticket", "jade_bracelet", "gold_watch"]
+    },
+    "merchant_bingyuanbao": {
+        "name": "冰原堡",
+        "coord": (200, 1400),
+        "sellable": ["blood_pact", "yin_grass", "concert_ticket"],
+        "buyable": ["blood_pact", "yin_grass", "luxury_chocolate", "red_wine", "silk_scarf"]
+    },
+
+    # ==================== 集群八：西域（4城）====================
+    "merchant_yumen": {
+        "name": "玉门",
+        "coord": (-1200, 100),
+        "sellable": ["jade_bracelet", "lux_perfume", "concert_ticket", "art_book"],
+        "buyable": ["jade_bracelet", "lux_perfume", "smartphone", "gaming_console", "sneakers"]
+    },
+    "merchant_loulan": {
+        "name": "楼兰",
+        "coord": (-1400, 250),
+        "sellable": ["jade_bracelet", "lux_perfume", "gold_watch"],
+        "buyable": ["jade_bracelet", "lux_perfume", "smartphone", "gaming_console", "sneakers", "noise_headphones"]
+    },
+    "merchant_qiuci": {
+        "name": "龟兹",
+        "coord": (-1550, 300),
+        "sellable": ["lux_perfume", "jade_bracelet", "luxury_chocolate"],
+        "buyable": ["lux_perfume", "jade_bracelet", "smartphone", "gaming_console", "sneakers"]
+    },
+    "merchant_luntai": {
+        "name": "轮台",
+        "coord": (-1700, 350),
+        "sellable": ["lux_perfume", "jade_bracelet", "concert_ticket"],
+        "buyable": ["lux_perfume", "jade_bracelet", "smartphone", "gaming_console", "sneakers", "noise_headphones"]
+    },
 }
 
 # 创建市场实例
