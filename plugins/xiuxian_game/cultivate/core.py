@@ -1949,26 +1949,29 @@ async def handle_fenjin(event: MessageEvent, args: Message = CommandArg()):
                     tmp_c += 1.0
 
                 status_msg = (
-                    f"🔥 焚金炉\n"
-                    f"━━━━━━━━━━━━━\n"
+                    f"**🔥 焚金炉**\n"
+                    f"***\n"
                     f"{fire_status}\n"
                     f"充能: {bar}\n"
-                    f"效果: 修炼/闭关效率 +{charge:.0f}%\n"
-                    f"━━━━━━━━━━━━━\n"
+                    f"效果: 修炼/闭关效率 **+{charge:.0f}%**\n"
+                    f"***\n"
                     f"当前价格: {cost_now:,} 金/1%\n"
                     f"充满还需: 约{est_full:,} 金币\n"
                     f"持有金币: {player.gold:,}\n"
-                    f"━━━━━━━━━━━━━\n"
+                    f"***\n"
                     f"衰减规则:\n"
-                    f"  0~6h  续费后: 2%/时 (炉火旺盛)\n"
+                    f"  0~6h 续费后: 2%/时 (炉火旺盛)\n"
                     f"  6~12h 未续费: 5%/时 (炉火渐弱)\n"
-                    f"  12h+  长期未续: 10%/时 (炉火熄灭)\n"
-                    f"━━━━━━━━━━━━━\n"
-                    f"用法：【焚金 金额】投入金币充能\n"
-                    f"示例：【焚金 50000】【焚金 100000】"
+                    f"  12h+ 长期未续: 10%/时 (炉火熄灭)\n"
+                    f"***\n"
+                    f"快捷充能: "
+                    f"{cmd('焚金 10000', '焚金 10000')} "
+                    f"{cmd('焚金 50000', '焚金 50000')} "
+                    f"{cmd('焚金 100000', '焚金 100000')}\n"
+                    f"> {cmd('修炼')} | {cmd('闭关')} | {cmd('帮助', '帮助')}"
                 )
 
-        await fenjin.finish(message_add_head(status_msg, event))
+        await fenjin.finish(build_markdown(status_msg))
 
     # 有参数：充值金币
     if not arg_text.isdigit():
@@ -2026,18 +2029,20 @@ async def handle_fenjin(event: MessageEvent, args: Message = CommandArg()):
                     refund_line = f"\n💰 充能已满，退还 {refund:,} 金币"
 
                 result_msg = (
-                    f"🔥 焚金炉充能\n"
-                    f"━━━━━━━━━━━━━\n"
+                    f"**🔥 焚金炉充能**\n"
+                    f"***\n"
                     f"{flavor}\n"
-                    f"━━━━━━━━━━━━━\n"
+                    f"***\n"
                     f"消耗: {actual_spent:,} 金币\n"
-                    f"充能: {old_charge:.0f}% → {new_charge:.0f}% (+{charge_gained:.0f}%)\n"
+                    f"充能: **{old_charge:.0f}% → {new_charge:.0f}%** (+{charge_gained:.0f}%)\n"
                     f"{bar}\n"
-                    f"效果: 修炼/闭关效率 +{new_charge:.0f}%\n"
-                    f"🔥 炉火旺盛 衰减已重置"
-                    f"{refund_line}"
+                    f"效果: 修炼/闭关效率 **+{new_charge:.0f}%**\n"
+                    f"🔥 **炉火旺盛** 衰减已重置"
+                    f"{refund_line}\n"
+                    f"***\n"
+                    f"> {cmd('焚金')} 查看状态 | {cmd('修炼')} | {cmd('闭关')}"
                 )
 
     if error_msg:
         await fenjin.finish(message_add_head(error_msg, event))
-    await fenjin.finish(message_add_head(result_msg, event))
+    await fenjin.finish(build_markdown(result_msg))
