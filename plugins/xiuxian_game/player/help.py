@@ -241,7 +241,7 @@ async def handle_social_module(event: MessageEvent, args: Message = CommandArg()
         f"{cmd('礼物商店')} 查看 → {cmd('买礼物 礼物名 数量', '买礼物 ')} 购买 → {cmd('赠礼 UID 礼物名 数量', '赠礼 ')} 赠送\n"
         f"{cmd('好感度 UID', '好感度 ')} 查看好感度\n"
         "***\n"
-        "**💒 结婚/结义/师徒**(需前往上京(0,0)找NPC)\n"
+        "**💒 结婚/结义/师徒**(找月老/结义使者/师徒使者或各集群社交代理)\n"
         f"{cmd('交互 月老 求婚 UID', '交互 月老 求婚 ')} 求婚\n"
         f"{cmd('交互 结义使者 结义 UID', '交互 结义使者 结义 ')} 结义\n"
         f"{cmd('交互 师徒使者 拜师 UID', '交互 师徒使者 拜师 ')} 拜师\n"
