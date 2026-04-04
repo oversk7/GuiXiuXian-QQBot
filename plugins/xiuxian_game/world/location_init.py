@@ -46,6 +46,9 @@ async def handle_init_locations(event: MessageEvent):
             # 初始化社交NPC(月老、结义使者)
             social_count = await init_social_npcs(session)
 
+            # 初始化驿丞NPC（每城1个）
+            station_master_count = await init_station_masters(session)
+
             # 初始化中立NPC（已禁用 - 2025-12-07）
             # neutral_count = await init_neutral_npcs(session)
             neutral_count = 0  # 不再生成中立NPC
@@ -60,6 +63,7 @@ async def handle_init_locations(event: MessageEvent):
                 f"⚒️ 工匠NPC：{workshop_count}个\n"
                 f"🏛️ 特殊NPC：{special_count}个\n"
                 f"💕 社交NPC：{social_count}个\n"
+                f"🏛️ 驿丞NPC：{station_master_count}个\n"
                 f"👤 中立NPC：{neutral_count}个\n"
                 "━━━━━━━━━━━━━\n"
                 "📍 所有NPC已添加到现有地点中\n"
@@ -725,6 +729,63 @@ async def init_social_npcs(session) -> int:
             npc.add_function("matchmaker", {"enabled": True})
             npc.add_function("sworn_ceremony", {"enabled": True})
             npc.add_function("mentorship", {"enabled": True})
+            session.add(npc)
+            created_count += 1
+
+    return created_count
+
+
+async def init_station_masters(session) -> int:
+    """
+    初始化驿丞NPC — 每座城市1个
+
+    驿丞提供：本城NPC列表、集群城市导航、附近城市距离
+    """
+    from ..models.npc import NPC, NPCType
+    from ..economy.merchants import MARKETS
+
+    created_count = 0
+
+    station_master_names = {
+        "上京": "驿丞·京畿总驿", "郸城": "驿丞·郸城驿", "摩配镇": "驿丞·摩配驿",
+        "天海卫": "驿丞·天海驿", "石关": "驿丞·石关驿",
+        "金陵": "驿丞·金陵驿", "姑苏": "驿丞·姑苏驿", "临安": "驿丞·临安驿",
+        "海门": "驿丞·海门驿", "舟山": "驿丞·舟山驿",
+        "荔湾镇": "驿丞·荔湾驿", "鹏城": "驿丞·鹏城驿", "鹭岛": "驿丞·鹭岛驿",
+        "琼崖": "驿丞·琼崖驿",
+        "锦官城": "驿丞·锦官驿", "大昌市": "驿丞·大昌驿", "剑阁": "驿丞·剑阁驿",
+        "夜郎": "驿丞·夜郎驿", "云岭": "驿丞·云岭驿",
+        "长安": "驿丞·长安驿", "神都": "驿丞·神都驿", "陈仓": "驿丞·陈仓驿",
+        "金城": "驿丞·金城驿",
+        "汴梁": "驿丞·汴梁驿", "颍川": "驿丞·颍川驿", "江夏": "驿丞·江夏驿",
+        "潭州": "驿丞·潭州驿",
+        "辽阳": "驿丞·辽阳驿", "龙城": "驿丞·龙城驿", "风雪镇": "驿丞·风雪驿",
+        "冰原堡": "驿丞·冰原驿",
+        "玉门": "驿丞·玉门驿", "楼兰": "驿丞·楼兰驿", "龟兹": "驿丞·龟兹驿",
+        "轮台": "驿丞·轮台驿",
+    }
+
+    for market in MARKETS:
+        loc = await LocationService.get_location_by_coordinates(
+            session, market.x, market.y, "大都会"
+        )
+        if not loc:
+            continue
+
+        npc_id = f"station_master_{market.name}"
+        existing = await NPCService.get_npc_by_id(session, npc_id)
+        if not existing:
+            npc_name = station_master_names.get(market.name, f"驿丞·{market.name}驿")
+            npc = NPC(
+                npc_id=npc_id,
+                name=npc_name,
+                description="负责驿站事务的官员，熟知各地风土人情和路线",
+                npc_type=NPCType.NORMAL,
+                location_id=loc.id,
+                is_killable=False,
+                is_active=True
+            )
+            npc.add_function("station_master", {"enabled": True})
             session.add(npc)
             created_count += 1
 

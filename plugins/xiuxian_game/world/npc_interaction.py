@@ -210,6 +210,8 @@ async def handle_npc_type_interaction(session, player: Player, npc, interaction_
     elif npc.has_function("social_agent"):
         # 社交代理优先匹配（同时拥有matchmaker/sworn_ceremony/mentorship，走统一菜单）
         await handle_social_agent_interaction(session, player, npc, event, dialogue_content)
+    elif npc.has_function("station_master"):
+        await handle_station_master_interaction(session, player, npc, event)
     elif npc.has_function("matchmaker"):
         await handle_matchmaker_interaction(session, player, npc, event, dialogue_content)
     elif npc.has_function("sworn_ceremony"):
@@ -396,6 +398,111 @@ async def handle_social_agent_interaction(session, player: Player, npc, event: M
         "━━━━━━━━━━━━━",
         "💡 点击上方按钮或输入【交互 " + npc.name + " 姻缘/结义/拜师】",
     ]
+    await interact_cmd.finish(message_add_head("\n".join(lines), event))
+
+
+async def handle_station_master_interaction(session, player: Player, npc, event: MessageEvent):
+    """处理驿丞NPC交互 - 显示本城信息、NPC列表、集群导航"""
+    from ..economy.merchants import MARKETS, MARKET_BY_COORD, CITY_CLUSTERS, CITY_TO_CLUSTER
+    from ..utils_markdown import cmd
+    from sqlalchemy import select as sa_select
+
+    # 获取NPC所在地点
+    location = npc.location
+    if not location:
+        await interact_cmd.finish("⛔ 驿丞所在地点异常")
+
+    city_name = location.name
+    cluster_name = CITY_TO_CLUSTER.get(city_name, "未知")
+
+    # 1. 本城NPC列表（直接查询）
+    stmt = sa_select(NPC).where(NPC.location_id == location.id, NPC.is_active == True)
+    result = await session.execute(stmt)
+    local_npcs = result.scalars().all()
+
+    npc_lines = []
+    for local_npc in local_npcs:
+        if local_npc.npc_id == npc.npc_id:
+            continue  # 不显示驿丞自己
+        if not local_npc.is_active:
+            continue
+        # 根据NPC类型显示图标
+        icon = "👤"
+        if local_npc.npc_type == NPCType.MERCHANT:
+            icon = "🏪"
+        elif local_npc.npc_type == NPCType.CRAFTSMAN:
+            icon = "🔨"
+        elif local_npc.npc_type == NPCType.EMPLOYER:
+            icon = "💼"
+        elif local_npc.npc_type == NPCType.SPECIAL_VENDOR:
+            icon = "🎖️"
+        elif local_npc.has_function("matchmaker"):
+            icon = "💕"
+        elif local_npc.has_function("sworn_ceremony"):
+            icon = "🤝"
+        elif local_npc.has_function("mentorship"):
+            icon = "📖"
+        elif local_npc.has_function("social_agent"):
+            icon = "🏛️"
+        npc_lines.append(f"  {icon} {cmd(local_npc.name, f'交互 {local_npc.name}')}")
+
+    # 2. 集群内其他城市
+    cluster_cities = CITY_CLUSTERS.get(cluster_name, [])
+    player_x = player.real_world_x or 0
+    player_y = player.real_world_y or 0
+
+    cluster_lines = []
+    for market in MARKETS:
+        if market.name in cluster_cities and market.name != city_name:
+            dist = abs(market.x - player_x) + abs(market.y - player_y)
+            cluster_lines.append(
+                f"  📍 {cmd(market.name, f'导航 {market.name}')} ({market.x},{market.y}) — {dist}格"
+            )
+
+    # 3. 最近的其他集群城市（取每个外集群最近的1个）
+    other_cluster_lines = []
+    cluster_nearest = {}
+    for market in MARKETS:
+        m_cluster = CITY_TO_CLUSTER.get(market.name, "")
+        if m_cluster == cluster_name or m_cluster == "":
+            continue
+        dist = abs(market.x - player_x) + abs(market.y - player_y)
+        if m_cluster not in cluster_nearest or dist < cluster_nearest[m_cluster][1]:
+            cluster_nearest[m_cluster] = (market, dist)
+
+    for c_name, (market, dist) in sorted(cluster_nearest.items(), key=lambda x: x[1]):
+        other_cluster_lines.append(
+            f"  🗺️ {c_name} → {cmd(market.name, f'导航 {market.name}')} ({dist}格)"
+        )
+
+    # 组装输出
+    lines = [
+        f"🏛️ {npc.name}",
+        "━━━━━━━━━━━━━",
+        f"📍 {city_name}（{cluster_name}）({location.x},{location.y})",
+        "",
+        f"**本城NPC：**",
+    ]
+    if npc_lines:
+        lines.extend(npc_lines)
+    else:
+        lines.append("  （暂无其他NPC）")
+
+    lines.append("")
+    lines.append(f"**{cluster_name}集群城市：**")
+    if cluster_lines:
+        lines.extend(cluster_lines)
+    else:
+        lines.append("  （无其他城市）")
+
+    if other_cluster_lines:
+        lines.append("")
+        lines.append("**最近的其他集群：**")
+        lines.extend(other_cluster_lines)
+
+    lines.append("━━━━━━━━━━━━━")
+    lines.append(f"💡 输入【查找 NPC名】搜索全地图NPC")
+
     await interact_cmd.finish(message_add_head("\n".join(lines), event))
 
 

@@ -330,6 +330,18 @@ for mid, config_data in MARKET_CONFIGS.items():
 MARKET_BY_COORD: Dict[Tuple[int, int], MarketConfig] = {(m.x, m.y): m for m in MARKETS}
 MARKET_BY_NAME: Dict[str, MarketConfig] = {m.name: m for m in MARKETS}
 
+# ================= 集群配置 =================
+CITY_CLUSTERS: Dict[str, List[str]] = {
+    "京畿": ["上京", "郸城", "摩配镇", "天海卫", "石关"],
+    "江南": ["金陵", "姑苏", "临安", "海门", "舟山"],
+    "南海": ["荔湾镇", "鹏城", "鹭岛", "琼崖"],
+    "蜀地": ["锦官城", "大昌市", "剑阁", "夜郎", "云岭"],
+    "关中": ["长安", "神都", "陈仓", "金城"],
+    "中原": ["汴梁", "颍川", "江夏", "潭州"],
+    "北境": ["辽阳", "龙城", "风雪镇", "冰原堡"],
+    "西域": ["玉门", "楼兰", "龟兹", "轮台"],
+}
+
 # ================= 集群与地理定价 =================
 # 城市 → 集群
 CITY_TO_CLUSTER: Dict[str, str] = {
