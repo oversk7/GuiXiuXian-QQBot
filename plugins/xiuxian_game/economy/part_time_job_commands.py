@@ -211,19 +211,48 @@ async def handle_finish_work(event: MessageEvent):
     if not success:
         await finish_work_cmd.finish(message_add_head(f"❌ {msg}", event))
 
-    # 构建奖励消息 - 包含评级、熟练度、掉落
+    # 构建奖励消息 - 完整收入明细
     rating_icon = result.get('rating_icon', '📋C')
     rating_mult = result.get('rating_multiplier', 1.0)
     prof = result.get('proficiency', {})
     prof_icon = prof.get('icon', '🔰')
     prof_name = prof.get('name', '学徒')
 
+    # 从 service 中获取工作配置的原始 base_reward
+    from .part_time_job_service_new import PartTimeJobService as _PTJS
+    _job_type_key = None
+    for k, v in _PTJS.JOB_TYPES.items():
+        if v["name"] == result['job_name']:
+            _job_type_key = k
+            break
+    raw_base = _PTJS.JOB_TYPES[_job_type_key]["base_reward"] if _job_type_key else 0
+
+    level_bonus = result.get('level_bonus', 0)
+    luck_mult = result.get('luck_multiplier', 1.0)
+    consecutive_bonus = result.get('consecutive_bonus', 0)
+    prof_bonus_rate = result.get('proficiency_bonus', 0)
+    prof_reward_bonus = int(raw_base * prof_bonus_rate)
+
     lines = [
         f"# 🎉 {result['job_name']} 工作完成",
         "***",
-        f"📊 评级：**{rating_icon}** (×{rating_mult})",
-        f"💰 基础收入：**{result['base_reward']}** → 评级后：**{int(result['base_reward'] * rating_mult)}** 金币",
+        "**📋 收入明细：**",
+        f"  基础工资：**{raw_base}** 金币",
     ]
+    if level_bonus > 0:
+        lines.append(f"  等级加成(Lv.{player.level} ×3%/级)：**+{level_bonus}**")
+    if prof_reward_bonus > 0:
+        lines.append(f"  熟练度加成({prof_name} +{int(prof_bonus_rate*100)}%)：**+{prof_reward_bonus}**")
+    if luck_mult > 1.001:
+        luck_pct = int((luck_mult - 1) * 100)
+        lines.append(f"  运气加成(+{luck_pct}%)：**×{luck_mult:.2f}**")
+    if consecutive_bonus > 0:
+        lines.append(f"  连续工作({result['current_streak']}天)：**+{consecutive_bonus}**")
+
+    lines.append(f"  评级前小计：**{result['base_reward']}** 金币")
+    lines.append("***")
+    lines.append(f"📊 评级：**{rating_icon}** (×{rating_mult})")
+    lines.append(f"  评级后：**{int(result['base_reward'] * rating_mult)}** 金币")
 
     if result['bonus_reward'] != 0:
         if result['special_event']:
@@ -232,6 +261,7 @@ async def handle_finish_work(event: MessageEvent):
             else:
                 lines.append(f"💔 {result['special_event']['description']}：**{result['bonus_reward']}** 金币")
 
+    lines.append("***")
     lines.append(f"💎 总收入：**{result['total_reward']}** 金币")
 
     # 道具掉落
