@@ -57,6 +57,44 @@ html,body{width:100%;height:100%;overflow:hidden;background:#080c18;color:#a0c4e
 /* ======== Keyboard hint ======== */
 #kbd-hint{position:fixed;bottom:44px;right:12px;background:rgba(8,16,32,.85);border:1px solid rgba(0,200,255,.15);border-radius:6px;padding:8px 12px;font-size:10px;color:rgba(160,196,232,.4);z-index:150;line-height:1.7}
 #kbd-hint kbd{background:rgba(0,180,255,.1);border:1px solid rgba(0,200,255,.2);border-radius:3px;padding:1px 5px;color:rgba(160,196,232,.6)}
+
+/* ======== Filter ======== */
+#filter-btn{position:fixed;top:58px;left:12px;z-index:150;width:36px;height:36px;border-radius:8px;background:rgba(8,16,32,.85);border:1px solid rgba(0,200,255,.2);color:#00f0ff;font-size:16px;cursor:pointer;display:flex;align-items:center;justify-content:center;backdrop-filter:blur(4px);transition:border-color .2s,background .2s}
+#filter-btn:hover,#filter-btn.active{border-color:#00f0ff;background:rgba(0,200,255,.12)}
+#filter-panel{position:fixed;top:58px;left:56px;background:rgba(8,16,32,.92);border:1px solid rgba(0,200,255,.2);border-radius:8px;padding:12px 14px;z-index:150;display:none;backdrop-filter:blur(6px);min-width:140px}
+#filter-panel.show{display:block}
+#filter-panel .ft{font-size:11px;color:rgba(160,196,232,.5);margin-bottom:8px;letter-spacing:1px}
+#filter-panel label{display:flex;align-items:center;gap:8px;font-size:12px;color:rgba(160,196,232,.7);margin-bottom:6px;cursor:pointer;white-space:nowrap}
+#filter-panel label:last-child{margin-bottom:0}
+.tog{appearance:none;-webkit-appearance:none;width:28px;height:16px;border-radius:8px;background:rgba(100,130,160,.2);border:1px solid rgba(0,200,255,.15);position:relative;cursor:pointer;transition:background .2s,border-color .2s;flex-shrink:0}
+.tog::after{content:'';position:absolute;top:2px;left:2px;width:10px;height:10px;border-radius:50%;background:rgba(160,196,232,.4);transition:transform .2s,background .2s}
+.tog:checked{background:rgba(0,200,255,.15);border-color:rgba(0,240,255,.4)}
+.tog:checked::after{transform:translateX(12px);background:#00f0ff}
+
+/* ======== Stats toggle (mobile) ======== */
+#stats-btn{display:none;align-items:center;justify-content:center;width:28px;height:28px;background:none;border:1px solid rgba(0,200,255,.2);border-radius:6px;color:rgba(160,196,232,.6);font-size:13px;cursor:pointer;margin-left:8px;flex-shrink:0}
+
+/* ======== Mobile ======== */
+@media(max-width:640px){
+  #hdr{height:44px;padding:0 10px}
+  #hdr .logo{font-size:13px;letter-spacing:1px}
+  #search-box{margin-left:10px;flex:1 1 100px}
+  #search{padding:5px 8px 5px 26px;font-size:12px}
+  #search-icon{left:7px;font-size:12px}
+  #stats{display:none}
+  #stats.show{display:flex;position:fixed;top:44px;left:0;right:0;background:rgba(8,12,24,.95);padding:8px 16px;gap:12px;justify-content:center;border-bottom:1px solid rgba(0,200,255,.1);z-index:99}
+  #stats-btn{display:flex}
+  #conn{margin-left:4px}
+  #map-canvas{top:44px;height:calc(100vh - 70px)}
+  #filter-btn{top:50px;left:8px;width:32px;height:32px;font-size:14px}
+  #filter-panel{top:50px;left:46px;padding:10px 12px}
+  #legend{bottom:34px;left:8px;padding:6px 10px;font-size:10px}
+  #legend .lr{gap:6px;margin-bottom:3px}
+  #legend .dot{width:8px;height:8px}
+  #kbd-hint{display:none}
+  #panel{top:auto;bottom:26px;right:0;left:0;width:100%;border-radius:12px 12px 0 0;padding:14px 16px 10px;max-width:100%}
+  #ftr{height:26px;padding:0 10px;font-size:10px;gap:10px}
+}
 </style>
 </head>
 <body>
@@ -74,7 +112,20 @@ html,body{width:100%;height:100%;overflow:hidden;background:#080c18;color:#a0c4e
     <span>诡域 <span class="val" id="s-dg">-</span></span>
     <span id="s-refresh">--</span>
   </div>
+  <button id="stats-btn" title="统计">&#9776;</button>
   <div id="conn"></div>
+</div>
+
+<!-- Filter -->
+<button id="filter-btn" title="图层过滤">&#9881;</button>
+<div id="filter-panel">
+  <div class="ft">图层过滤</div>
+  <label><input type="checkbox" class="tog" id="f-city" checked> 城镇</label>
+  <label><input type="checkbox" class="tog" id="f-idle" checked> 驻留玩家</label>
+  <label><input type="checkbox" class="tog" id="f-nav" checked> 导航玩家</label>
+  <label><input type="checkbox" class="tog" id="f-dg" checked> 诡域玩家</label>
+  <label><input type="checkbox" class="tog" id="f-route" checked> 导航路线</label>
+  <label><input type="checkbox" class="tog" id="f-zone" checked> 区域标注</label>
 </div>
 
 <!-- Canvas -->
@@ -168,6 +219,9 @@ let highlightUIDs = new Set();
 
 let mouseGX = 0, mouseGY = 0; // mouse in game coords
 
+// Filters
+const filters = {city:true, idle:true, nav:true, dg:true, route:true, zone:true};
+
 // ============================================================
 //  COORDINATE TRANSFORMS
 // ============================================================
@@ -191,9 +245,9 @@ function c2g(cx, cy) {
 // ============================================================
 function resize() {
   const dpr = window.devicePixelRatio || 1;
-  // 用 innerWidth/innerHeight 确保拿到正确尺寸，不依赖 getBoundingClientRect 时序
+  const isMobile = window.innerWidth <= 640;
   W = window.innerWidth;
-  H = window.innerHeight - 84; // header 52 + footer 32
+  H = window.innerHeight - (isMobile ? 70 : 84); // mobile: header 44 + footer 26; desktop: 52 + 32
   if (H < 100) H = window.innerHeight;
   canvas.width  = Math.round(W * dpr);
   canvas.height = Math.round(H * dpr);
@@ -258,6 +312,7 @@ function drawGrid() {
 //  DRAWING — TERRAIN (sea + cluster zones)
 // ============================================================
 function drawTerrain() {
+  if (!filters.zone) return;
   // ── Sea (coastline polygon) ──
   const coastline = [
     [2000,2000],[500,1500],[450,700],[800,0],[850,-400],
@@ -375,6 +430,7 @@ function drawSweep(t) {
 //  DRAWING — CITIES
 // ============================================================
 function drawCities(t) {
+  if (!filters.city) return;
   const pulse = 0.8 + 0.2 * Math.sin(t / 800);
 
   for (const city of mapData.cities) {
@@ -433,6 +489,7 @@ function drawCities(t) {
 //  DRAWING — NAVIGATION ROUTES
 // ============================================================
 function drawNavRoutes(t) {
+  if (!filters.route) return;
   const dashOffset = (t / 80) % 20;
 
   for (const p of mapData.players) {
@@ -488,6 +545,13 @@ function drawPlayers(t) {
     const isDg = !!p.dg;
     const isNav = !!p.nav;
     const isSel = p.uid === selectedUID;
+
+    // 按过滤状态隐藏（搜索高亮和选中的不受过滤影响）
+    if (!isHL && !isSel) {
+      if (isDg && !filters.dg) continue;
+      if (isNav && !filters.nav) continue;
+      if (!isDg && !isNav && !filters.idle) continue;
+    }
 
     // 在城市内的非特殊玩家隐藏，避免重叠
     if (!isHL && !isSel && !isNav && !isDg && isInCity(p)) continue;
@@ -594,7 +658,7 @@ function updateTooltip(mx, my) {
   const cmx = mx - rect.left;
   const cmy = my - rect.top;
 
-  // Find closest VISIBLE player within 15px (skip hidden in-city idle players)
+  // Find closest VISIBLE player within 15px (skip hidden/filtered players)
   let closest = null;
   let minDist = 16;
   for (const p of mapData.players) {
@@ -602,16 +666,22 @@ function updateTooltip(mx, my) {
     const isSel = p.uid === selectedUID;
     const isNav = !!p.nav;
     const isDg = !!p.dg;
+    if (!isHL && !isSel) {
+      if (isDg && !filters.dg) continue;
+      if (isNav && !filters.nav) continue;
+      if (!isDg && !isNav && !filters.idle) continue;
+    }
     if (!isHL && !isSel && !isNav && !isDg && isInCity(p)) continue;
     const [cx, cy] = g2c(p.x, p.y);
     const d = Math.hypot(cx - cmx, cy - cmy);
     if (d < minDist) { minDist = d; closest = p; }
   }
 
-  // Also check cities
+  // Also check cities (respect filter)
   let closestCity = null;
   let minCityDist = 20;
-  for (const c of mapData.cities) {
+  if (!filters.city) { closestCity = null; }
+  else for (const c of mapData.cities) {
     const [cx, cy] = g2c(c.x, c.y);
     const d = Math.hypot(cx - cmx, cy - cmy);
     if (d < minCityDist) { minCityDist = d; closestCity = c; }
@@ -839,7 +909,7 @@ canvas.addEventListener('touchend', e => {
     const rect = canvas.getBoundingClientRect();
     const cmx = mx - rect.left, cmy = my - rect.top;
 
-    // 查找最近的可见玩家
+    // 查找最近的可见玩家（尊重过滤）
     let tapPlayer = null;
     let minD = 25; // 手指比鼠标大，放宽到25px
     for (const p of mapData.players) {
@@ -847,15 +917,21 @@ canvas.addEventListener('touchend', e => {
       const isSel = p.uid === selectedUID;
       const isNav = !!p.nav;
       const isDg = !!p.dg;
+      if (!isHL && !isSel) {
+        if (isDg && !filters.dg) continue;
+        if (isNav && !filters.nav) continue;
+        if (!isDg && !isNav && !filters.idle) continue;
+      }
       if (!isHL && !isSel && !isNav && !isDg && isInCity(p)) continue;
       const [cx, cy] = g2c(p.x, p.y);
       const d = Math.hypot(cx - cmx, cy - cmy);
       if (d < minD) { minD = d; tapPlayer = p; }
     }
 
-    // 查找最近的城市
+    // 查找最近的城市（尊重过滤）
     let tapCity = null;
     let minCD = 30;
+    if (!filters.city) { tapCity = null; } else
     for (const c of mapData.cities) {
       const [cx, cy] = g2c(c.x, c.y);
       const d = Math.hypot(cx - cmx, cy - cmy);
@@ -952,6 +1028,47 @@ setInterval(() => {
   const ago = Math.round((Date.now() - lastFetch) / 1000);
   document.getElementById('s-refresh').textContent = ago + 's前';
 }, 1000);
+
+// ============================================================
+//  FILTER PANEL + STATS TOGGLE
+// ============================================================
+const filterBtn = document.getElementById('filter-btn');
+const filterPanel = document.getElementById('filter-panel');
+
+filterBtn.addEventListener('click', e => {
+  e.stopPropagation();
+  filterPanel.classList.toggle('show');
+  filterBtn.classList.toggle('active');
+});
+
+// Close filter panel on outside click
+document.addEventListener('click', e => {
+  if (!filterPanel.contains(e.target) && e.target !== filterBtn) {
+    filterPanel.classList.remove('show');
+    filterBtn.classList.remove('active');
+  }
+});
+
+// Bind filter checkboxes
+['city','idle','nav','dg','route','zone'].forEach(k => {
+  const el = document.getElementById('f-' + k);
+  if (el) el.addEventListener('change', () => { filters[k] = el.checked; });
+});
+
+// Mobile stats toggle
+const statsBtn = document.getElementById('stats-btn');
+const statsEl = document.getElementById('stats');
+if (statsBtn) {
+  statsBtn.addEventListener('click', e => {
+    e.stopPropagation();
+    statsEl.classList.toggle('show');
+  });
+  document.addEventListener('click', e => {
+    if (!statsEl.contains(e.target) && e.target !== statsBtn) {
+      statsEl.classList.remove('show');
+    }
+  });
+}
 
 // ============================================================
 //  INIT
