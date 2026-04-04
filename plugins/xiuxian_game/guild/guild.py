@@ -981,7 +981,7 @@ async def handle_set_base(event: MessageEvent):
 
         # 检查坐标范围（使用导航系统的坐标限制） - 使用正确的当前坐标
         current_x, current_y = player.get_current_coordinates()
-        MAX_COORD = 1000
+        MAX_COORD = 2000
         if not (-MAX_COORD <= current_x <= MAX_COORD and -MAX_COORD <= current_y <= MAX_COORD):
             await set_base_cmd.finish(f"⛔ 当前坐标超出有效范围（{-MAX_COORD}~{MAX_COORD}）")
 
