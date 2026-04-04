@@ -1943,8 +1943,8 @@ async def handle_teleport_list(event: MessageEvent):
         accessible_levels = player.get_accessible_dungeon_levels()
         current_level = player.dungeon_level if player.is_in_dungeon() else 0
 
-        # 显示当前可访问的层级（最多显示10层）
-        display_levels = accessible_levels[-10:] if len(accessible_levels) > 10 else accessible_levels
+        # 显示当前可访问的层级（最多显示5层）
+        display_levels = accessible_levels[-5:] if len(accessible_levels) > 5 else accessible_levels
 
         locations = []
         for level in display_levels:
@@ -2001,7 +2001,7 @@ async def handle_teleport_list(event: MessageEvent):
         ])
 
         if locations:
-            msg_lines.append("**📋 可访问深度（最近10重）：**")
+            msg_lines.append("**📋 可访问深度（最近5重）：**")
             msg_lines.extend(locations)
 
         msg_lines.extend([
