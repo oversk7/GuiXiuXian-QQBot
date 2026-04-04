@@ -12,6 +12,7 @@ from nonebot.adapters.qq.models.common import MessageMarkdown, MessageMarkdownPa
 from nonebot.params import CommandArg
 from typing import Tuple, Dict
 from datetime import datetime, date, timedelta
+import asyncio
 import random
 import base64
 import io
@@ -2017,9 +2018,120 @@ async def handle_teleport_list(event: MessageEvent):
 region_overview_cmd = on_command("俯瞰", aliases={"感知"}, block=True, priority=5)
 
 
+def _render_dungeon_overview(tile_data: list[tuple[int, int, str, bool]],
+                            min_x: int, max_x: int, min_y: int, max_y: int,
+                            player_x: int | None, player_y: int | None) -> bytes:
+    """纯CPU渲染诡域俯瞰图（在线程池中执行，不阻塞事件循环）
+    tile_data: [(x, y, event_type, is_preview), ...]
+    """
+    margin = 40
+    img_width = 1000
+    img_height = 1000
+    img = Image.new('RGB', (img_width, img_height), color='#1a1a1a')
+    draw = ImageDraw.Draw(img)
+
+    try:
+        font = ImageFont.load_default()
+    except Exception:
+        font = None
+
+    grid_width = max(max_x - min_x + 1, 1)
+    grid_height = max(max_y - min_y + 1, 1)
+    available_width = img_width - 2 * margin
+    available_height = img_height - 2 * margin
+
+    cell_width = max(available_width // grid_width, 2)
+    cell_height = max(available_height // grid_height, 2)
+
+    event_colors = {
+        'MATERIAL': (76, 175, 80),
+        'TREASURE': (255, 215, 0),
+        'EMPTY': (244, 67, 54),
+        'REST': (33, 150, 243),
+        'MERCHANT': (156, 39, 176),
+        'ELITE': (255, 87, 34),
+    }
+
+    tile_map = {(x, y): (evt, preview) for x, y, evt, preview in tile_data}
+
+    # 绘制格子
+    for grid_x in range(grid_width):
+        for grid_y in range(grid_height):
+            world_x = min_x + grid_x
+            world_y = max_y - grid_y
+
+            pixel_x = margin + grid_x * cell_width
+            pixel_y = margin + grid_y * cell_height
+
+            tile_info = tile_map.get((world_x, world_y))
+            if tile_info:
+                evt_type, is_preview = tile_info
+                base_color = event_colors.get(evt_type, (102, 102, 102))
+                if is_preview:
+                    color = (base_color[0] // 3, base_color[1] // 3, base_color[2] // 3)
+                else:
+                    color = base_color
+            else:
+                color = (51, 51, 51)
+
+            x1, y1 = pixel_x, pixel_y
+            x2, y2 = pixel_x + cell_width, pixel_y + cell_height
+            if x2 > x1 and y2 > y1:
+                draw.rectangle([x1, y1, x2, y2], fill=color, outline=(85, 85, 85))
+
+    # 绘制玩家位置标记
+    if player_x is not None and player_y is not None:
+        if min_x <= player_x <= max_x and min_y <= player_y <= max_y:
+            pg_x = player_x - min_x
+            pg_y = max_y - player_y
+            pp_x = margin + pg_x * cell_width
+            pp_y = margin + pg_y * cell_height
+
+            cx = pp_x + cell_width // 2
+            cy = pp_y + cell_height // 2
+            radius = min(cell_width, cell_height) // 3
+
+            draw.ellipse([cx - radius - 2, cy - radius - 2,
+                         cx + radius + 2, cy + radius + 2],
+                        fill=(255, 255, 255), outline=(255, 255, 255))
+            draw.ellipse([cx - radius, cy - radius, cx + radius, cy + radius],
+                        fill=(255, 255, 0), outline=(255, 215, 0))
+
+    # 绘制坐标轴十字线
+    if min_x <= 0 <= max_x and min_y <= 0 <= max_y:
+        og_x = 0 - min_x
+        og_y = max_y - 0
+        op_x = margin + og_x * cell_width
+        op_y = margin + og_y * cell_height
+        draw.line([(op_x + cell_width // 2, margin),
+                   (op_x + cell_width // 2, img_height - margin)], fill=(128, 128, 128), width=1)
+        draw.line([(margin, op_y + cell_height // 2),
+                   (img_width - margin, op_y + cell_height // 2)], fill=(128, 128, 128), width=1)
+
+    # 绘制坐标轴数字
+    if font:
+        step_x = max(1, grid_width // 10)
+        for i in range(0, grid_width, step_x):
+            wx = min_x + i
+            px = margin + i * cell_width + cell_width // 2
+            draw.text((px, 5), str(wx), fill=(255, 255, 255), font=font, anchor='mt')
+            draw.text((px, img_height - 20), str(wx), fill=(255, 255, 255), font=font, anchor='mb')
+
+        step_y = max(1, grid_height // 10)
+        for i in range(0, grid_height, step_y):
+            wy = max_y - i
+            py = margin + i * cell_height + cell_height // 2
+            draw.text((5, py), str(wy), fill=(255, 255, 255), font=font, anchor='lm')
+            draw.text((img_width - 5, py), str(wy), fill=(255, 255, 255), font=font, anchor='rm')
+
+    img_buffer = io.BytesIO()
+    img.save(img_buffer, format='PNG')
+    img_buffer.seek(0)
+    return img_buffer.getvalue()
+
+
 async def generate_player_centered_overview_image(region: str, session, center_x: int, center_y: int, width: int, height: int, player_x: int = None, player_y: int = None) -> tuple[bytes, tuple[int, int, int, int]]:
     """生成以玩家为中心的固定大小俯瞰图片，只显示今日刷新的格子"""
-    # 计算坐标范围
     half_width = width // 2
     half_height = height // 2
     min_x = center_x - half_width
@@ -2027,21 +2139,16 @@ async def generate_player_centered_overview_image(region: str, session, center_x
     min_y = center_y - half_height
     max_y = center_y + half_height
 
-    # 获取该区域内今日刷新的格子数据
     from sqlalchemy import and_
     today = date.today()
-
-    # 计算今日的开始和结束时间
     today_start = datetime.combine(today, datetime.min.time())
     tomorrow_start = today_start + timedelta(days=1)
 
     stmt = select(WorldTile).where(
         and_(
             WorldTile.region == region,
-            WorldTile.x >= min_x,
-            WorldTile.x <= max_x,
-            WorldTile.y >= min_y,
-            WorldTile.y <= max_y,
+            WorldTile.x >= min_x, WorldTile.x <= max_x,
+            WorldTile.y >= min_y, WorldTile.y <= max_y,
             WorldTile.refreshed_at >= today_start,
             WorldTile.refreshed_at < tomorrow_start
         )
@@ -2049,183 +2156,24 @@ async def generate_player_centered_overview_image(region: str, session, center_x
     result = await session.execute(stmt)
     tiles = result.scalars().all()
 
-    # 创建图片 - 为坐标轴预留空间（完全按照原有方式）
-    margin = 40  # 边缘留白用于显示坐标
-    img_width = 1000
-    img_height = 1000
-    img = Image.new('RGB', (img_width, img_height), color='#1a1a1a')  # 深色背景
-    draw = ImageDraw.Draw(img)
+    # 提取纯数据，脱离ORM session
+    tile_data = [(t.x, t.y, t.event_type, bool((t.state or {}).get("preview"))) for t in tiles]
 
-    # 尝试加载字体，如果失败则使用默认字体
-    try:
-        # 使用系统默认字体
-        font = ImageFont.load_default()
-    except Exception:
-        font = None
-
-    # 计算格子大小 - 减去边缘空间（完全按照原有方式）
-    grid_width = max_x - min_x + 1
-    grid_height = max_y - min_y + 1
-    available_width = img_width - 2 * margin
-    available_height = img_height - 2 * margin
-
-    # 防止除零错误
-    if grid_width <= 0:
-        grid_width = 1
-    if grid_height <= 0:
-        grid_height = 1
-
-    cell_width = available_width // grid_width
-    cell_height = available_height // grid_height
-
-    # 确保格子大小至少为2像素，避免太小无法显示
-    if cell_width <= 1:
-        cell_width = 2
-    if cell_height <= 1:
-        cell_height = 2
-
-    # 事件类型颜色映射 - 使用RGB元组确保兼容性（完全按照原有方式）
-    event_colors = {
-        'MATERIAL': (76, 175, 80),     # 绿色 - 材料
-        'TREASURE': (255, 215, 0),     # 金色 - 宝藏
-        'EMPTY': (244, 67, 54),        # 红色 - 诡异
-        'REST': (33, 150, 243),        # 蓝色 - 休息点
-        'MERCHANT': (156, 39, 176),    # 紫色 - 商人
-        'ELITE': (255, 87, 34),        # 深橙色 - 精英怪
-    }
-
-    # 创建格子坐标到tile的映射
-    tile_map = {(tile.x, tile.y): tile for tile in tiles}
-
-    # 绘制格子（完全按照原有方式）
-    colored_tiles_count = 0
-    for grid_x in range(grid_width):
-        for grid_y in range(grid_height):
-            world_x = min_x + grid_x
-            # 修复Y轴坐标：从下到上递增（数学坐标系）
-            world_y = max_y - grid_y
-
-            # 计算像素坐标 - 加上边距偏移
-            pixel_x = margin + grid_x * cell_width
-            pixel_y = margin + grid_y * cell_height
-
-            tile = tile_map.get((world_x, world_y))
-
-            if tile:
-                base_color = event_colors.get(tile.event_type, (102, 102, 102))  # 默认灰色
-                # 全视之眼预览格子用暗色显示（颜色减为1/3亮度）
-                if (tile.state or {}).get("preview"):
-                    color = (base_color[0] // 3, base_color[1] // 3, base_color[2] // 3)
-                else:
-                    color = base_color
-                colored_tiles_count += 1
-            else:
-                # 未探索的区域使用深灰色
-                color = (51, 51, 51)  # 深灰色
-
-            # 绘制格子 - 使用更简单的坐标计算
-            x1 = pixel_x
-            y1 = pixel_y
-            x2 = pixel_x + cell_width
-            y2 = pixel_y + cell_height
-
-            # 确保坐标有效并绘制格子
-            if x2 > x1 and y2 > y1:
-                draw.rectangle([x1, y1, x2, y2], fill=color, outline=(85, 85, 85))  # 使用RGB格式的边框色
-
-    # 绘制玩家位置标记（使用传入的玩家坐标，如果没有则使用中心坐标）
     if player_x is None or player_y is None:
-        player_x = center_x
-        player_y = center_y
-    if player_x is not None and player_y is not None:
-        # 检查玩家位置是否在当前显示范围内
-        if min_x <= player_x <= max_x and min_y <= player_y <= max_y:
-            # 计算玩家位置的像素坐标
-            player_grid_x = player_x - min_x
-            # 修复Y轴玩家位置计算：从下到上递增（数学坐标系）
-            player_grid_y = max_y - player_y
-            player_pixel_x = margin + player_grid_x * cell_width
-            player_pixel_y = margin + player_grid_y * cell_height
+        player_x, player_y = center_x, center_y
 
-            # 绘制玩家位置标记 - 使用亮黄色圆形
-            center_x_pixel = player_pixel_x + cell_width // 2
-            center_y_pixel = player_pixel_y + cell_height // 2
-            radius = min(cell_width, cell_height) // 3
-
-            # 绘制外圈（白色边框）
-            draw.ellipse([
-                center_x_pixel - radius - 2, center_y_pixel - radius - 2,
-                center_x_pixel + radius + 2, center_y_pixel + radius + 2
-            ], fill=(255, 255, 255), outline=(255, 255, 255))
-
-            # 绘制内圈（亮黄色）
-            draw.ellipse([
-                center_x_pixel - radius, center_y_pixel - radius,
-                center_x_pixel + radius, center_y_pixel + radius
-            ], fill=(255, 255, 0), outline=(255, 215, 0))
-
-    # 绘制坐标轴十字细线（完全按照原有方式）
-    # 绘制中心十字线（如果坐标范围包含原点）
-    if min_x <= 0 <= max_x and min_y <= 0 <= max_y:
-        # 计算原点(0,0)的像素坐标
-        origin_grid_x = 0 - min_x
-        # 修复Y轴原点计算：从下到上递增（数学坐标系）
-        origin_grid_y = max_y - 0
-        origin_pixel_x = margin + origin_grid_x * cell_width
-        origin_pixel_y = margin + origin_grid_y * cell_height
-
-        # 绘制垂直线（Y轴）
-        draw.line([
-            (origin_pixel_x + cell_width // 2, margin),
-            (origin_pixel_x + cell_width // 2, img_height - margin)
-        ], fill=(128, 128, 128), width=1)
-
-        # 绘制水平线（X轴）
-        draw.line([
-            (margin, origin_pixel_y + cell_height // 2),
-            (img_width - margin, origin_pixel_y + cell_height // 2)
-        ], fill=(128, 128, 128), width=1)
-
-    # 绘制坐标轴数字（完全按照原有方式）
-    if font:
-        # 绘制X轴坐标（顶部和底部）
-        step_x = max(1, grid_width // 10)  # 最多显示10个X坐标
-        for i in range(0, grid_width, step_x):
-            world_x = min_x + i
-            pixel_x = margin + i * cell_width + cell_width // 2
-
-            # 顶部X坐标
-            draw.text((pixel_x, 5), str(world_x), fill=(255, 255, 255), font=font, anchor='mt')
-            # 底部X坐标
-            draw.text((pixel_x, img_height - 20), str(world_x), fill=(255, 255, 255), font=font, anchor='mb')
-
-        # 绘制Y轴坐标（左侧和右侧）
-        step_y = max(1, grid_height // 10)  # 最多显示10个Y坐标
-        for i in range(0, grid_height, step_y):
-            # 修复Y轴坐标标签：从下到上递增（数学坐标系）
-            world_y = max_y - i
-            pixel_y = margin + i * cell_height + cell_height // 2
-
-            # 左侧Y坐标
-            draw.text((5, pixel_y), str(world_y), fill=(255, 255, 255), font=font, anchor='lm')
-            # 右侧Y坐标
-            draw.text((img_width - 5, pixel_y), str(world_y), fill=(255, 255, 255), font=font, anchor='rm')
-
-    # 将图片转换为字节流
-    img_buffer = io.BytesIO()
-    img.save(img_buffer, format='PNG')
-    img_buffer.seek(0)
-    return img_buffer.getvalue(), (min_x, max_x, min_y, max_y)
+    # 线程池渲染
+    img_bytes = await asyncio.to_thread(
+        _render_dungeon_overview, tile_data, min_x, max_x, min_y, max_y, player_x, player_y
+    )
+    return img_bytes, (min_x, max_x, min_y, max_y)
 
 
 async def generate_region_overview_image(region: str, session, player_x: int = None, player_y: int = None) -> tuple[bytes, tuple[int, int, int, int]]:
     """生成指定诡域的今日探索概览图片"""
     today = date.today()
-
-    # 获取今日该诡域的所有格子数据
     from sqlalchemy import and_
 
-    # 计算今日的开始和结束时间
     today_start = datetime.combine(today, datetime.min.time())
     tomorrow_start = today_start + timedelta(days=1)
 
@@ -2239,223 +2187,47 @@ async def generate_region_overview_image(region: str, session, player_x: int = N
     result = await session.execute(stmt)
     today_tiles = result.scalars().all()
 
-    # 过滤掉x或y绝对值大于600的格子，避免图片上格子太小
+    # 过滤掉x或y绝对值大于500的格子
     today_tiles = [tile for tile in today_tiles if abs(tile.x) <= 500 and abs(tile.y) <= 500]
 
-    # 如果今天没有格子数据，使用玩家位置作为中心生成小范围
     if not today_tiles:
-        # 使用玩家位置作为中心生成小范围
-        center_x, center_y = 0, 0  # 默认中心点
+        center_x, center_y = 0, 0
         if player_x is not None and player_y is not None:
             center_x, center_y = player_x, player_y
-
-        # 设置一个小范围的坐标
         min_x, max_x = center_x - 2, center_x + 2
         min_y, max_y = center_y - 2, center_y + 2
-        tiles = []  # 空列表，所有格子都显示为未探索
+        tile_data = []
     else:
-        tiles = today_tiles
-        # 计算坐标范围
-        min_x = min(tile.x for tile in tiles)
-        max_x = max(tile.x for tile in tiles)
-        min_y = min(tile.y for tile in tiles)
-        max_y = max(tile.y for tile in tiles)
+        # 提取纯数据
+        tile_data = [(t.x, t.y, t.event_type, bool((t.state or {}).get("preview"))) for t in today_tiles]
+        min_x = min(t[0] for t in tile_data)
+        max_x = max(t[0] for t in tile_data)
+        min_y = min(t[1] for t in tile_data)
+        max_y = max(t[1] for t in tile_data)
 
-    # 验证和修正坐标范围
     if min_x > max_x:
         min_x, max_x = max_x, min_x
     if min_y > max_y:
         min_y, max_y = max_y, min_y
 
-    # 扩展范围以显示更多区域（如果有格子的话）
-    if tiles:
-        range_x = max_x - min_x + 1
-        range_y = max_y - min_y + 1
+    if tile_data:
+        if max_x - min_x + 1 < 20:
+            cx = (min_x + max_x) // 2
+            min_x, max_x = cx - 10, cx + 10
+        if max_y - min_y + 1 < 20:
+            cy = (min_y + max_y) // 2
+            min_y, max_y = cy - 10, cy + 10
 
-        # 确保最小显示范围
-        if range_x < 20:
-            center_x = (min_x + max_x) // 2
-            min_x = center_x - 10
-            max_x = center_x + 10
-        if range_y < 20:
-            center_y = (min_y + max_y) // 2
-            min_y = center_y - 10
-            max_y = center_y + 10
-
-    # 最终验证坐标范围的有效性
     if min_x >= max_x:
         max_x = min_x + 20
     if min_y >= max_y:
         max_y = min_y + 20
 
-    # 创建图片 - 为坐标轴预留空间
-    margin = 40  # 边缘留白用于显示坐标
-    img_width = 1000
-    img_height = 1000
-    img = Image.new('RGB', (img_width, img_height), color='#1a1a1a')  # 深色背景
-    draw = ImageDraw.Draw(img)
-
-    # 尝试加载字体，如果失败则使用默认字体
-    try:
-        # 使用系统默认字体
-        font = ImageFont.load_default()
-    except Exception:
-        font = None
-
-    # 计算格子大小 - 减去边缘空间
-    grid_width = max_x - min_x + 1
-    grid_height = max_y - min_y + 1
-    available_width = img_width - 2 * margin
-    available_height = img_height - 2 * margin
-
-    # 防止除零错误
-    if grid_width <= 0:
-        grid_width = 1
-    if grid_height <= 0:
-        grid_height = 1
-
-    cell_width = available_width // grid_width
-    cell_height = available_height // grid_height
-
-    # 确保格子大小至少为2像素，避免太小无法显示
-    if cell_width <= 1:
-        cell_width = 2
-    if cell_height <= 1:
-        cell_height = 2
-
-
-
-    # 事件类型颜色映射 - 使用RGB元组确保兼容性
-    event_colors = {
-        'MATERIAL': (76, 175, 80),     # 绿色 - 材料
-        'TREASURE': (255, 215, 0),     # 金色 - 宝藏
-        'EMPTY': (244, 67, 54),        # 红色 - 诡异
-        'REST': (33, 150, 243),        # 蓝色 - 休息点
-        'MERCHANT': (156, 39, 176),    # 紫色 - 商人
-        'ELITE': (255, 87, 34),        # 深橙色 - 精英怪
-    }
-
-    # 创建格子坐标到tile的映射
-    tile_map = {(tile.x, tile.y): tile for tile in tiles}
-
-
-
-    # 绘制格子
-    colored_tiles_count = 0
-    for grid_x in range(grid_width):
-        for grid_y in range(grid_height):
-            world_x = min_x + grid_x
-            # 修复Y轴坐标：从下到上递增（数学坐标系）
-            world_y = max_y - grid_y
-
-            # 计算像素坐标 - 加上边距偏移
-            pixel_x = margin + grid_x * cell_width
-            pixel_y = margin + grid_y * cell_height
-
-            tile = tile_map.get((world_x, world_y))
-
-            if tile:
-                base_color = event_colors.get(tile.event_type, (102, 102, 102))  # 默认灰色
-                # 全视之眼预览格子用暗色显示（颜色减为1/3亮度）
-                if (tile.state or {}).get("preview"):
-                    color = (base_color[0] // 3, base_color[1] // 3, base_color[2] // 3)
-                else:
-                    color = base_color
-                colored_tiles_count += 1
-            else:
-                # 未探索的区域使用深灰色
-                color = (51, 51, 51)  # 深灰色
-
-            # 绘制格子 - 使用更简单的坐标计算
-            x1 = pixel_x
-            y1 = pixel_y
-            x2 = pixel_x + cell_width
-            y2 = pixel_y + cell_height
-
-            # 确保坐标有效并绘制格子
-            if x2 > x1 and y2 > y1:
-                draw.rectangle([x1, y1, x2, y2], fill=color, outline=(85, 85, 85))  # 使用RGB格式的边框色
-
-    # 绘制玩家位置标记
-    if player_x is not None and player_y is not None:
-        # 检查玩家位置是否在当前显示范围内
-        if min_x <= player_x <= max_x and min_y <= player_y <= max_y:
-            # 计算玩家位置的像素坐标
-            player_grid_x = player_x - min_x
-            # 修复Y轴玩家位置计算：从下到上递增（数学坐标系）
-            player_grid_y = max_y - player_y
-            player_pixel_x = margin + player_grid_x * cell_width
-            player_pixel_y = margin + player_grid_y * cell_height
-
-            # 绘制玩家位置标记 - 使用亮黄色圆形
-            center_x = player_pixel_x + cell_width // 2
-            center_y = player_pixel_y + cell_height // 2
-            radius = min(cell_width, cell_height) // 3
-
-            # 绘制外圈（白色边框）
-            draw.ellipse([
-                center_x - radius - 2, center_y - radius - 2,
-                center_x + radius + 2, center_y + radius + 2
-            ], fill=(255, 255, 255), outline=(255, 255, 255))
-
-            # 绘制内圈（亮黄色）
-            draw.ellipse([
-                center_x - radius, center_y - radius,
-                center_x + radius, center_y + radius
-            ], fill=(255, 255, 0), outline=(255, 215, 0))
-
-    # 绘制坐标轴十字细线
-    # 绘制中心十字线（如果坐标范围包含原点）
-    if min_x <= 0 <= max_x and min_y <= 0 <= max_y:
-        # 计算原点(0,0)的像素坐标
-        origin_grid_x = 0 - min_x
-        # 修复Y轴原点计算：从下到上递增（数学坐标系）
-        origin_grid_y = max_y - 0
-        origin_pixel_x = margin + origin_grid_x * cell_width
-        origin_pixel_y = margin + origin_grid_y * cell_height
-
-        # 绘制垂直线（Y轴）
-        draw.line([
-            (origin_pixel_x + cell_width // 2, margin),
-            (origin_pixel_x + cell_width // 2, img_height - margin)
-        ], fill=(128, 128, 128), width=1)
-
-        # 绘制水平线（X轴）
-        draw.line([
-            (margin, origin_pixel_y + cell_height // 2),
-            (img_width - margin, origin_pixel_y + cell_height // 2)
-        ], fill=(128, 128, 128), width=1)
-
-    # 绘制坐标轴数字
-    if font:
-        # 绘制X轴坐标（顶部和底部）
-        step_x = max(1, grid_width // 10)  # 最多显示10个X坐标
-        for i in range(0, grid_width, step_x):
-            world_x = min_x + i
-            pixel_x = margin + i * cell_width + cell_width // 2
-
-            # 顶部X坐标
-            draw.text((pixel_x, 5), str(world_x), fill=(255, 255, 255), font=font, anchor='mt')
-            # 底部X坐标
-            draw.text((pixel_x, img_height - 20), str(world_x), fill=(255, 255, 255), font=font, anchor='mb')
-
-        # 绘制Y轴坐标（左侧和右侧）
-        step_y = max(1, grid_height // 10)  # 最多显示10个Y坐标
-        for i in range(0, grid_height, step_y):
-            # 修复Y轴坐标标签：从下到上递增（数学坐标系）
-            world_y = max_y - i
-            pixel_y = margin + i * cell_height + cell_height // 2
-
-            # 左侧Y坐标
-            draw.text((5, pixel_y), str(world_y), fill=(255, 255, 255), font=font, anchor='lm')
-            # 右侧Y坐标
-            draw.text((img_width - 5, pixel_y), str(world_y), fill=(255, 255, 255), font=font, anchor='rm')
-
-    # 将图片转换为字节流
-    img_buffer = io.BytesIO()
-    img.save(img_buffer, format='PNG')
-    img_buffer.seek(0)
-    return img_buffer.getvalue(), (min_x, max_x, min_y, max_y)
+    # 线程池渲染（复用共享渲染函数）
+    img_bytes = await asyncio.to_thread(
+        _render_dungeon_overview, tile_data, min_x, max_x, min_y, max_y, player_x, player_y
+    )
+    return img_bytes, (min_x, max_x, min_y, max_y)
 
 
 @region_overview_cmd.handle()

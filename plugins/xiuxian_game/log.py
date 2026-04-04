@@ -1,10 +1,11 @@
-from nonebot import on_message, on_command, logger
+from nonebot import on_message, on_command, logger, get_driver
 from nonebot.adapters.qq import MessageEvent, Message
 from nonebot.params import CommandArg
 from nonebot.permission import SUPERUSER
 from pathlib import Path
 from sqlalchemy.exc import SQLAlchemyError
 from datetime import datetime
+import asyncio
 import json
 from .models.db import safe_session
 from .models.player import Player
@@ -12,62 +13,94 @@ from .utils import message_add_head
 from .platform_utils import get_unified_player
 from .ai_guide import is_admin
 
+# ==================== 活跃记录内存缓存 ====================
+# 性能优化：内存缓存 + 定时写盘，避免每条指令都做文件 I/O
+_active_cache: dict = {}
+_cache_dirty: bool = False
+_FLUSH_INTERVAL = 60  # 秒
+_LAST_ACTIVE_PATH = Path(__file__).parent.parent.parent / "logs" / "last_active.json"
+
+
+def _load_active_cache() -> None:
+    """启动时从磁盘加载活跃记录到内存"""
+    global _active_cache
+    try:
+        if _LAST_ACTIVE_PATH.exists():
+            with open(_LAST_ACTIVE_PATH, "r", encoding="utf-8") as f:
+                loaded = json.load(f)
+                if isinstance(loaded, dict):
+                    _active_cache = loaded
+                    return
+    except (json.JSONDecodeError, OSError):
+        pass
+    _active_cache = {}
+
+
+def _flush_active_cache() -> None:
+    """将内存缓存写入磁盘（同步，供 to_thread 调用）"""
+    global _cache_dirty
+    if not _cache_dirty:
+        return
+    try:
+        _LAST_ACTIVE_PATH.parent.mkdir(parents=True, exist_ok=True)
+        with open(_LAST_ACTIVE_PATH, "w", encoding="utf-8") as f:
+            json.dump(_active_cache, f, ensure_ascii=False, indent=2)
+        _cache_dirty = False
+    except OSError:
+        pass
+
+
+async def _periodic_flush() -> None:
+    """后台定时刷盘任务"""
+    while True:
+        await asyncio.sleep(_FLUSH_INTERVAL)
+        if _cache_dirty:
+            await asyncio.to_thread(_flush_active_cache)
+
+
+# 启动时加载缓存并启动定时刷盘
+driver = get_driver()
+
+@driver.on_startup
+async def _on_startup():
+    _load_active_cache()
+    asyncio.create_task(_periodic_flush())
+
+@driver.on_shutdown
+async def _on_shutdown():
+    _flush_active_cache()
+
+
 # 不阻拦也不回复，仅后台记录
 log_uid_matcher = on_message(priority=1, block=False)
 
 @log_uid_matcher.handle()
 async def _(event: MessageEvent):
     """记录触发指令的玩家信息，并同步最近活跃时间"""
+    global _cache_dirty
+    cmd_text_raw = event.get_plaintext().strip()
+    if not cmd_text_raw:
+        return
     try:
         async with safe_session() as session:
             player = await get_unified_player(session, event)
         uid = player.uid if player else "未注册"
         nickname = player.nickname if player else "未注册"
-        cmd_text_raw = event.get_plaintext().strip()
-        command = cmd_text_raw if cmd_text_raw else "未知指令"
+        command = cmd_text_raw
         logger.info(f"UID:{uid} 昵称:{nickname} 指令:{command}")
-        # 仅在文本非空时记录活跃时间
-        if cmd_text_raw:
-            _update_last_active(player, event.get_user_id(), command)
+        # 直接更新内存缓存，无文件 I/O
+        user_id = str(event.get_user_id())
+        old = _active_cache.get(user_id, {})
+        _active_cache[user_id] = {
+            **old,
+            "uid": (player.uid if player else None),
+            "nickname": (player.nickname if player else None),
+            "last_active": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+            "last_command": command,
+        }
+        _cache_dirty = True
     except SQLAlchemyError as e:
         logger.error(f"UID:未知 昵称:未知 指令:未知 状态:失败 错误:{str(e)}")
-
-
-
-def _update_last_active(player: Player | None, user_id: str, command: str) -> None:
-    """将玩家最近活跃时间写入日志目录下的last_active.json
-    不改动数据库，避免迁移；后续有需要可读取此文件做活跃统计/展示
-    """
-    log_dir = Path(__file__).parent.parent.parent / "logs"
-    log_dir.mkdir(parents=True, exist_ok=True)
-    path = log_dir / "last_active.json"
-
-    data = {}
-    try:
-        if path.exists():
-            with open(path, "r", encoding="utf-8") as f:
-                loaded = json.load(f)
-                if isinstance(loaded, dict):
-                    data = loaded
-    except (json.JSONDecodeError, OSError):
-        data = {}
-
-    record = {
-        "uid": (player.uid if player else None),
-        "nickname": (player.nickname if player else None),
-        "last_active": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
-        "last_command": command,
-    }
-
-    # 使用平台ID作为键，便于通过event.get_user_id()直接读取
-    data[str(user_id)] = record
-
-    try:
-        with open(path, "w", encoding="utf-8") as f:
-            json.dump(data, f, ensure_ascii=False, indent=2)
-    except OSError:
-        # 写入失败不影响主流程
-        pass
 
 
 # ==================== 活动隐私设置 ====================
@@ -76,49 +109,22 @@ show_activity_cmd = on_command("显示活动", aliases={"显示动态"}, block=T
 
 
 def _get_hidden_uids() -> set:
-    """从 last_active.json 中获取所有设置了隐藏活动的玩家UID集合"""
-    log_dir = Path(__file__).parent.parent.parent / "logs"
-    path = log_dir / "last_active.json"
+    """从内存缓存中获取所有设置了隐藏活动的玩家UID集合"""
     hidden = set()
-    try:
-        if path.exists():
-            with open(path, "r", encoding="utf-8") as f:
-                data = json.load(f)
-            if isinstance(data, dict):
-                for user_id, record in data.items():
-                    if record.get("hide_activity") and record.get("uid"):
-                        hidden.add(record["uid"])
-    except (json.JSONDecodeError, OSError):
-        pass
+    for user_id, record in _active_cache.items():
+        if record.get("hide_activity") and record.get("uid"):
+            hidden.add(record["uid"])
     return hidden
 
 
 def _set_hide_activity(user_id: str, hide: bool) -> None:
-    """设置指定玩家的活动隐藏状态"""
-    log_dir = Path(__file__).parent.parent.parent / "logs"
-    log_dir.mkdir(parents=True, exist_ok=True)
-    path = log_dir / "last_active.json"
-
-    data = {}
-    try:
-        if path.exists():
-            with open(path, "r", encoding="utf-8") as f:
-                loaded = json.load(f)
-                if isinstance(loaded, dict):
-                    data = loaded
-    except (json.JSONDecodeError, OSError):
-        data = {}
-
-    if user_id in data:
-        data[user_id]["hide_activity"] = hide
+    """设置指定玩家的活动隐藏状态（内存操作，定时刷盘）"""
+    global _cache_dirty
+    if user_id in _active_cache:
+        _active_cache[user_id]["hide_activity"] = hide
     else:
-        data[user_id] = {"hide_activity": hide}
-
-    try:
-        with open(path, "w", encoding="utf-8") as f:
-            json.dump(data, f, ensure_ascii=False, indent=2)
-    except OSError:
-        pass
+        _active_cache[user_id] = {"hide_activity": hide}
+    _cache_dirty = True
 
 
 @hide_activity_cmd.handle()
@@ -185,17 +191,10 @@ async def handle_recent_activity(event: MessageEvent, args: Message = CommandArg
         except ValueError:
             await recent_activity_cmd.finish("⛔ 请输入有效的数字（数量1-50或玩家UID）")
 
-    log_dir = Path(__file__).parent.parent.parent / "logs"
-    path = log_dir / "last_active.json"
-
-    if not path.exists():
-        await recent_activity_cmd.finish(message_add_head("❌ 暂无活动记录", event))
-
     try:
-        with open(path, "r", encoding="utf-8") as f:
-            data = json.load(f)
+        data = _active_cache
 
-        if not isinstance(data, dict) or not data:
+        if not data:
             await recent_activity_cmd.finish(message_add_head("❌ 暂无活动记录", event))
 
         # 获取当前查询者的UID，用于判断是否查看自己
@@ -314,9 +313,7 @@ async def handle_recent_activity(event: MessageEvent, args: Message = CommandArg
         message = "\n".join(msg_lines)
         await recent_activity_cmd.finish(message_add_head(message, event))
 
-    except json.JSONDecodeError:
-        await recent_activity_cmd.finish(message_add_head("❌ 活动记录文件格式错误", event))
-    except OSError as e:
+    except (ValueError, KeyError) as e:
         await recent_activity_cmd.finish(message_add_head(f"❌ 读取活动记录失败: {str(e)}", event))
 
 

@@ -7,6 +7,7 @@ from nonebot.adapters.qq.models.common import MessageMarkdown, MessageMarkdownPa
 from nonebot.params import CommandArg
 from nonebot.rule import to_me
 import os
+import asyncio
 from ..models import Player
 from ..models.inventory import ItemInstance, ItemType
 from ..models.db import safe_session
@@ -2063,6 +2064,8 @@ def _generate_full_help_image():
 
 
 # ==================== 完整帮助系统 ====================
+_cached_full_help_image: str | None = None  # 帮助图片缓存，内容固定无需重复生成
+
 full_help_cmd = on_command("完整帮助", aliases={"全部帮助", "帮助大全"}, priority=5, block=True)
 
 @full_help_cmd.handle()
@@ -2070,7 +2073,10 @@ async def handle_full_help(event: MessageEvent, args: Message = CommandArg()):
     """
     完整帮助 - 优先发送图片版，生成失败时降级为文字版
     """
-    img_b64 = _generate_full_help_image()
+    global _cached_full_help_image
+    if _cached_full_help_image is None:
+        _cached_full_help_image = await asyncio.to_thread(_generate_full_help_image)
+    img_b64 = _cached_full_help_image
     if img_b64:
         await full_help_cmd.finish(Message([MessageSegment.file_image(img_b64)]))
 

@@ -9,6 +9,7 @@ from __future__ import annotations
 4. 美观的背景和样式
 """
 
+import asyncio
 import io
 import math
 import os
@@ -564,30 +565,11 @@ class MapVisualizer:
             text_y = house_center_y - text_height // 2
             draw.text((text_x, text_y), level_text, fill='#FFFFFF', font=self.fonts['small'])
 
-    async def _draw_mansions(self, draw: ImageDraw.Draw, session: AsyncSession,
-                             occupancy_map: Optional[Dict[Tuple[int, int], Dict[str, Any]]] = None):
-        """查询并绘制所有阴宅"""
-        # 查询所有拥有阴宅的玩家
-        stmt = select(Player).where(
-            Player.mansion_level > 0,
-            Player.mansion_x.isnot(None),
-            Player.mansion_y.isnot(None),
-            Player.region == "大都会"  # 只显示大都会区域的阴宅
-        )
-        result = await session.execute(stmt)
-        mansion_owners = result.scalars().all()
-
-        # 绘制每个阴宅
-        for owner in mansion_owners:
-            if owner.mansion_x is not None and owner.mansion_y is not None:
-                self._draw_mansion(
-                    draw,
-                    owner.mansion_x,
-                    owner.mansion_y,
-                    owner.mansion_level,
-                    owner.nickname,
-                    occupancy_map
-                )
+    def _draw_mansions_from_data(self, draw: ImageDraw.Draw, mansion_data: List[Tuple[int, int, int, str]],
+                                occupancy_map: Optional[Dict[Tuple[int, int], Dict[str, Any]]] = None):
+        """从预取数据绘制所有阴宅（纯渲染，无DB访问）"""
+        for mx, my, mlevel, mnick in mansion_data:
+            self._draw_mansion(draw, mx, my, mlevel, mnick, occupancy_map)
     
     def _draw_players(self, draw: ImageDraw.Draw, players: List[Player], current_player_id: str = None):
         """绘制玩家位置"""
@@ -789,15 +771,72 @@ class MapVisualizer:
             draw.text((legend_x + 35, item_y - 2), text, fill=self.colors['location_text'], font=self.fonts['small'])
     
     async def generate_map(self, session: AsyncSession, current_player_id: str = None) -> bytes:
-        """生成地图图片（优化版：字体缓存 + 渐变背景 + 阴影效果）"""
+        """生成地图图片（优化版：DB预取 + 线程池渲染）"""
         # 加载字体（带缓存，首次后~300ms性能提升）
         self._load_fonts()
 
-        # 创建图片
+        # ── 阶段1：异步预取所有DB数据 ──
+        # 玩家位置
+        stmt = select(Player).where(Player.region == "大都会")
+        result = await session.execute(stmt)
+        players = result.scalars().all()
+
+        # 提取玩家渲染所需的纯数据（脱离ORM session）
+        players_data = []
+        current_player_data = None
+        for p in players:
+            px, py = p.get_current_coordinates()
+            pd = {'id': p.id, 'nickname': p.nickname, 'x': px, 'y': py,
+                  'real_world_x': p.real_world_x or 0, 'real_world_y': p.real_world_y or 0}
+            players_data.append(pd)
+            if current_player_id and p.id == current_player_id:
+                current_player_data = pd
+
+        # 阴宅数据
+        mansion_stmt = select(Player).where(
+            Player.mansion_level > 0,
+            Player.mansion_x.isnot(None),
+            Player.mansion_y.isnot(None),
+            Player.region == "大都会"
+        )
+        mansion_result = await session.execute(mansion_stmt)
+        mansion_data = [
+            (o.mansion_x, o.mansion_y, o.mansion_level, o.nickname)
+            for o in mansion_result.scalars().all()
+            if o.mansion_x is not None and o.mansion_y is not None
+        ]
+
+        # 导航任务
+        nav_data = None
+        if current_player_id:
+            nav_task = await session.get(NavigationTask, current_player_id)
+            if nav_task:
+                nav_data = {'target_x': nav_task.target_x, 'target_y': nav_task.target_y}
+
+        # 打工地点（静态数据，无DB）
+        try:
+            from ..economy.part_time_job_service import PartTimeJobService
+            job_locations = [(d['x'], d['y'], d['name']) for d in PartTimeJobService.JOB_LOCATIONS.values()]
+        except ImportError:
+            job_locations = [
+                (0, 0, "上京商业中心"), (250, -1350, "荔湾镇工业区"),
+                (150, -130, "郸城娱乐街区"), (250, -50, "天海卫物流中心"),
+            ]
+
+        # ── 阶段2：线程池中执行纯CPU渲染 ──
+        return await asyncio.to_thread(
+            self._render_map, players_data, mansion_data, nav_data,
+            current_player_id, current_player_data, job_locations
+        )
+
+    def _render_map(self, players_data: List[Dict], mansion_data: List[Tuple],
+                    nav_data: Optional[Dict], current_player_id: str,
+                    current_player_data: Optional[Dict],
+                    job_locations: List[Tuple[int, int, str]]) -> bytes:
+        """纯CPU渲染地图（在线程池中执行，不阻塞事件循环）"""
         image = Image.new('RGB', (self.map_width, self.map_height), self.colors['background'])
         draw = ImageDraw.Draw(image)
 
-        # 绘制背景和网格（优化版：渐变 + 高性能网格）
         self._draw_background_and_grid(draw, image)
 
         occupancy_map: Dict[Tuple[int, int], Dict[str, Any]] = {}
@@ -815,80 +854,55 @@ class MapVisualizer:
             occupancy_map[hq_coords] = {'type': 'special', 'name': '缉邪司总部'}
 
         # 绘制打工地点
-        try:
-            from ..economy.part_time_job_service import PartTimeJobService
-            for location_data in PartTimeJobService.JOB_LOCATIONS.values():
-                coords = self._draw_location(draw, location_data['x'], location_data['y'],
-                                             location_data['name'], 'job')
-                if coords:
-                    occupancy_map[coords] = {
-                        'type': 'job',
-                        'name': location_data['name']
-                    }
-        except ImportError:
-            # 如果导入失败，使用默认配置（已整合到城镇中）
-            default_jobs = [
-                (0, 0, "上京商业中心"),
-                (250, -1350, "荔湾镇工业区"),
-                (150, -130, "郸城娱乐街区"),
-                (250, -50, "天海卫物流中心"),
-            ]
-            for x, y, name in default_jobs:
-                coords = self._draw_location(draw, x, y, name, 'job')
-                if coords:
-                    occupancy_map[coords] = {'type': 'job', 'name': name}
-        
-        # 查询并绘制玩家位置
-        stmt = select(Player).where(Player.region == "大都会")
-        result = await session.execute(stmt)
-        players = result.scalars().all()
+        for x, y, name in job_locations:
+            coords = self._draw_location(draw, x, y, name, 'job')
+            if coords:
+                occupancy_map[coords] = {'type': 'job', 'name': name}
 
-        # 查询并绘制阴宅
-        await self._draw_mansions(draw, session, occupancy_map)
+        # 绘制阴宅
+        self._draw_mansions_from_data(draw, mansion_data, occupancy_map)
 
-        # 绘制所有玩家，当前玩家会显示为粗红点，其他玩家显示为小红点
-        self._draw_players(draw, players, current_player_id)
-
-        # 如果指定了当前玩家，检查是否有导航任务并绘制导航连线
-        current_player = None
-        nav_task = None
-        if current_player_id:
-            # 查询当前玩家的导航任务
-            nav_task = await session.get(NavigationTask, current_player_id)
-
-            # 找到当前玩家对象
-            for player in players:
-                if player.id == current_player_id:
-                    current_player = player
-                    break
-
-            # 如果有导航任务，绘制导航连线
-            if nav_task and current_player:
-                self._draw_navigation_line(draw, current_player, nav_task)
-
-        # 如果指定了当前玩家，额外绘制高亮效果和昵称
-        if current_player_id and current_player:
-            # 使用正确的当前坐标
-            player_x, player_y = current_player.get_current_coordinates()
-            pixel_x, pixel_y = self._game_to_pixel(player_x, player_y)
+        # 绘制玩家（使用纯数据字典）
+        # 先绘制其他玩家（小红点）
+        for pd in players_data:
+            if current_player_id and pd['id'] == current_player_id:
+                continue
+            pixel_x, pixel_y = self._game_to_pixel(pd['x'], pd['y'])
             if 0 <= pixel_x <= self.map_width and 0 <= pixel_y <= self.map_height:
-                # 绘制高亮圆圈（只有边框，不填充）
-                highlight_size = 10
-                draw.ellipse([pixel_x - highlight_size, pixel_y - highlight_size,
-                             pixel_x + highlight_size, pixel_y + highlight_size],
+                draw.ellipse([pixel_x - 1, pixel_y - 1, pixel_x + 1, pixel_y + 1],
+                            fill=self.colors['player'], outline=None, width=0)
+
+        # 当前玩家（粗红点 + 高亮 + 昵称）
+        if current_player_data:
+            pixel_x, pixel_y = self._game_to_pixel(current_player_data['x'], current_player_data['y'])
+            if 0 <= pixel_x <= self.map_width and 0 <= pixel_y <= self.map_height:
+                draw.ellipse([pixel_x - 6, pixel_y - 6, pixel_x + 6, pixel_y + 6],
+                            fill=self.colors['player'], outline='#FFFFFF', width=2)
+                draw.ellipse([pixel_x - 10, pixel_y - 10, pixel_x + 10, pixel_y + 10],
                             outline='#FFFF00', width=2)
-                # 绘制玩家昵称（放在标点下方）
-                text_x = pixel_x - 20  # 向左偏移一些，让文字居中
-                text_y = pixel_y + 12  # 放在标点下方
-                draw.text((text_x, text_y), f"{current_player.nickname}(你)",
+                draw.text((pixel_x - 20, pixel_y + 12), f"{current_player_data['nickname']}(你)",
                          fill=self.colors['player'], font=self.fonts['medium'])
-        
-        # 绘制图例
+
+            # 导航连线
+            if nav_data:
+                rwx, rwy = current_player_data['real_world_x'], current_player_data['real_world_y']
+                pp_x, pp_y = self._game_to_pixel(rwx, rwy)
+                tp_x, tp_y = self._game_to_pixel(nav_data['target_x'], nav_data['target_y'])
+                p_in = 0 <= pp_x <= self.map_width and 0 <= pp_y <= self.map_height
+                t_in = 0 <= tp_x <= self.map_width and 0 <= tp_y <= self.map_height
+                if p_in or t_in:
+                    self._draw_dashed_line(draw, pp_x, pp_y, tp_x, tp_y,
+                                          self.colors['navigation_line'], width=2)
+                if t_in:
+                    draw.ellipse([tp_x - 8, tp_y - 8, tp_x + 8, tp_y + 8],
+                                fill=self.colors['navigation_target'], outline='#000000', width=2)
+                    draw.text((tp_x - 30, tp_y + 12),
+                             f"目标({nav_data['target_x']},{nav_data['target_y']})",
+                             fill='#000000', font=self.fonts['small'])
+
         self._draw_legend(draw)
-        
-        # 将图片转换为字节流
+
         img_buffer = io.BytesIO()
         image.save(img_buffer, format='PNG', quality=95)
         img_buffer.seek(0)
-        
         return img_buffer.getvalue()

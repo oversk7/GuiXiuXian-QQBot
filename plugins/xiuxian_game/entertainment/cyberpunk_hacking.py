@@ -7,6 +7,7 @@ from ..models.player import Player
 from ..utils import message_add_head
 from ..platform_utils import get_unified_player
 import random
+import asyncio
 from typing import List, Tuple, Dict
 from dataclasses import dataclass
 import base64
@@ -418,8 +419,8 @@ async def handle_array_breaking(event: MessageEvent, args: Message = CommandArg(
 
         difficulty_text = "标准(5x5/6步)" if size == 5 else "困难(7x7/8步)"
 
-        # 生成游戏图片
-        image_bytes = game.get_status_image()
+        # 生成游戏图片（线程池，避免阻塞事件循环）
+        image_bytes = await asyncio.to_thread(game.get_status_image)
         image_b64 = base64.b64encode(image_bytes).decode()
 
         # 发送图片和说明
@@ -499,8 +500,8 @@ async def handle_array_breaking(event: MessageEvent, args: Message = CommandArg(
         result_msg = "\n".join(result_lines)
         await array_breaking.finish(message_add_head(result_msg, event))
 
-    # 游戏继续，显示当前状态（图片形式）
-    image_bytes = game.get_status_image()
+    # 游戏继续，显示当前状态（图片形式，线程池）
+    image_bytes = await asyncio.to_thread(game.get_status_image)
     image_b64 = base64.b64encode(image_bytes).decode()
     img = MessageSegment.file_image(image_b64)
     text_msg = message_add_head("", event)
