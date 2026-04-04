@@ -397,7 +397,7 @@ def _geo_modifiers(market_name: str, item_id: str) -> Tuple[float, float]:
         return 1.0, 1.0
     dist = _cluster_distance(item_home, market_cluster)
     # 产地折扣：在产地集群购买更便宜
-    sell_mod = 0.82 if dist == 0 else 1.0 + dist * 0.03  # 0.82 / 1.03 / 1.06 / 1.09
+    sell_mod = 0.85 if dist == 0 else 1.0 + dist * 0.03  # 0.85 / 1.03 / 1.06 / 1.09
     # 收购加成：远离产地时市集愿意出更高价
     buy_mod = DISTANCE_BUY_BONUS.get(min(dist, 3), 1.60)
     return sell_mod, buy_mod
@@ -513,7 +513,7 @@ async def _price_for(session, market: MarketConfig, item_id: str) -> Tuple[int, 
     sell_price = max(1, int(base_price * final_factor))
 
     # 收购价基础比率
-    buy_price_ratio = rng_local.uniform(0.75, 0.85)  # 75%-85%
+    buy_price_ratio = rng_local.uniform(0.72, 0.82)  # 72%-82%
 
     # -------- 地理定价修正（集群特产/距离加成）--------
     sell_mod, buy_mod = _geo_modifiers(market.name, item_id)
@@ -525,10 +525,10 @@ async def _price_for(session, market: MarketConfig, item_id: str) -> Tuple[int, 
 
 # ------------------- 阶梯加价系统 -------------------
 TIERED_PRICE_BRACKETS = [
-    (50,     1.00),   # 1-50: 原价
-    (100,    1.15),   # 51-100: 1.15x
-    (200,    1.30),   # 101-200: 1.30x
-    (999999, 1.50),   # 200+: 1.50x
+    (30,     1.00),   # 1-30: 原价
+    (80,     1.12),   # 31-80: 1.12x
+    (150,    1.28),   # 81-150: 1.28x
+    (999999, 1.48),   # 150+: 1.48x
 ]
 
 
