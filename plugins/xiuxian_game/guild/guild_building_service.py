@@ -136,21 +136,62 @@ class GuildBuildingService:
     }
     
     @staticmethod
+    def get_effects_for_level(building_type: BuildingType, level: int) -> Dict:
+        """获取指定等级的建筑效果，超出预定义等级时自动外推"""
+        config = GuildBuildingService.BUILDING_CONFIGS[building_type]
+        effects_dict = config["effects"]
+
+        if level in effects_dict:
+            return effects_dict[level]
+
+        # 超出预定义等级，基于公式外推
+        max_defined = max(effects_dict.keys())
+        last_effects = effects_dict[max_defined]
+        extra = level - max_defined
+
+        extrapolated = {}
+        for key, value in last_effects.items():
+            if key == "exp_multiplier":
+                extrapolated[key] = round(1.0 + level * 0.1, 1)
+            elif key == "treasury_limit":
+                extrapolated[key] = int(value * (2 ** extra))
+            elif key == "cultivation_bonus":
+                extrapolated[key] = round(value + extra * 0.05, 2)
+            elif key == "teleport_range":
+                extrapolated[key] = value + extra * 100
+            elif key == "daily_uses":
+                extrapolated[key] = value + max(0, extra // 3)
+            elif key == "daily_production":
+                extrapolated[key] = value + extra * 2
+            elif key == "pill_quality":
+                extrapolated[key] = "legendary"
+            elif key == "storage_slots":
+                extrapolated[key] = value + extra * 100
+            else:
+                extrapolated[key] = value
+
+        return extrapolated
+
+    @staticmethod
     async def can_build(session: AsyncSession, guild_id: int, building_type: BuildingType) -> Tuple[bool, str]:
-        """检查是否可以建造指定建筑"""
+        """检查是否可以建造指定建筑（等级上限=公会等级）"""
+        # 获取公会等级作为建筑等级上限
+        guild = await session.get(Guild, guild_id)
+        max_level = guild.level if guild else 1
+
         # 检查是否已存在该类型建筑
         stmt = select(GuildBuilding).where(
             and_(GuildBuilding.guild_id == guild_id, GuildBuilding.building_type == building_type)
         )
         existing = (await session.execute(stmt)).scalars().first()
-        
+
         if existing:
             config = GuildBuildingService.BUILDING_CONFIGS[building_type]
-            if existing.level >= config["max_level"]:
-                return False, f"{config['name']}已达到最高等级"
+            if existing.level >= max_level:
+                return False, f"{config['name']}已达到最高等级（公会等级{max_level}级）"
             else:
                 return True, f"可以升级{config['name']}"
-        
+
         return True, "可以建造"
     
     @staticmethod
@@ -166,8 +207,11 @@ class GuildBuildingService:
         
         current_level = existing.level if existing else 0
         target_level = current_level + 1
-        
-        if target_level > config["max_level"]:
+
+        # 建筑等级上限=公会等级
+        guild = await session.get(Guild, guild_id)
+        max_level = guild.level if guild else 1
+        if target_level > max_level:
             return {}
         
         # 计算成本（等级越高成本越高）
@@ -270,16 +314,20 @@ class GuildBuildingService:
         stmt = select(GuildBuilding).where(GuildBuilding.guild_id == guild_id)
         buildings = (await session.execute(stmt)).scalars().all()
         
+        # 建筑等级上限=公会等级
+        guild = await session.get(Guild, guild_id)
+        max_level = guild.level if guild else 1
+
         result = []
         for building in buildings:
             config = GuildBuildingService.BUILDING_CONFIGS[building.building_type]
-            effects = config["effects"].get(building.level, {})
-            
+            effects = GuildBuildingService.get_effects_for_level(building.building_type, building.level)
+
             result.append({
                 "type": building.building_type,
                 "name": config["name"],
                 "level": building.level,
-                "max_level": config["max_level"],
+                "max_level": max_level,
                 "description": config["description"],
                 "effects": effects,
                 "built_at": building.built_at
