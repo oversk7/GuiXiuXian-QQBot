@@ -335,16 +335,25 @@ async def handle_work_status(event: MessageEvent):
         )
     else:
         remaining = status['remaining_time']
-        hours = int(remaining.total_seconds() // 3600)
-        minutes = int((remaining.total_seconds() % 3600) // 60)
+        total_secs = int(remaining.total_seconds())
+        hours = total_secs // 3600
+        minutes = (total_secs % 3600) // 60
+        seconds = total_secs % 60
+
+        if hours > 0:
+            remain_str = f"{hours}小时{minutes}分{seconds}秒"
+        elif minutes > 0:
+            remain_str = f"{minutes}分{seconds}秒"
+        else:
+            remain_str = f"{seconds}秒"
 
         content = (
             f"# ⏳ 工作进行中\n"
             f"***\n"
             f"{status['job_emoji']} **{status['job_name']}**\n"
-            f"⏰ 开始时间：**{status['start_time'].strftime('%H:%M')}**\n"
-            f"🕐 完成时间：**{status['end_time'].strftime('%H:%M')}**\n"
-            f"⏱️ 剩余时间：**{hours}小时{minutes}分钟**\n"
+            f"⏰ 开始时间：**{status['start_time'].strftime('%H:%M:%S')}**\n"
+            f"🕐 完成时间：**{status['end_time'].strftime('%H:%M:%S')}**\n"
+            f"⏱️ 剩余时间：**{remain_str}**\n"
             f"***\n"
             f"{cmd('收工')} | {cmd('工作状态')}"
         )
