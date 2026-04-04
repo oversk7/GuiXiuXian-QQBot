@@ -31,7 +31,7 @@ from .npc_service_new import NPCService
 
 # ----------------- 常量 -----------------
 # 坐标正负范围
-MAX_COORD = 500
+MAX_COORD = 2000
 REAL_WORLD = "大都会"
 
 # ----------------- 指令：导航 -----------------

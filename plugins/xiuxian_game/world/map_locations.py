@@ -43,7 +43,7 @@ async def _(event: MessageEvent):
         from ..economy.merchants import MARKETS
         for market in MARKETS:
             distance = calculate_distance(current_x, current_y, market.x, market.y)
-            if distance <= 100:  # 100格内
+            if distance <= 300:  # 300格内（适配大地图）
                 nearby_places.append({
                     "name": f"🏪 {market.name}",
                     "coord": f"({market.x},{market.y})",
@@ -54,7 +54,7 @@ async def _(event: MessageEvent):
         # 2. 检查缉邪司总部
         from ..economy.merchants import HEADQUARTERS_COORD
         hq_distance = calculate_distance(current_x, current_y, HEADQUARTERS_COORD[0], HEADQUARTERS_COORD[1])
-        if hq_distance <= 100:
+        if hq_distance <= 300:
             nearby_places.append({
                 "name": "🏛️ 缉邪司总部",
                 "coord": f"{HEADQUARTERS_COORD}",
@@ -72,7 +72,7 @@ async def _(event: MessageEvent):
                 Player.mansion_x.isnot(None),
                 Player.mansion_y.isnot(None),
                 Player.region == player.region,
-                func.abs(Player.mansion_x - current_x) + func.abs(Player.mansion_y - current_y) <= 100
+                func.abs(Player.mansion_x - current_x) + func.abs(Player.mansion_y - current_y) <= 300
             )
         )
         mansion_result = await session.execute(mansion_stmt)
