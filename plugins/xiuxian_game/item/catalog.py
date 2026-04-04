@@ -793,6 +793,9 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
         desc = "\r".join(desc_parts)
         # 清理所有参数中的\n换行符，确保只使用\r（因为配置文件中的描述可能包含\n）
         desc = desc.replace('\n', '\r')
+        # 清理markdown语法字符，QQ模板参数不允许包含markdown语法（错误码40034010）
+        import re
+        desc = re.sub(r'[*#\[\]>`~|]', '', desc)
 
         # 根据物品类型定制快捷操作按钮（4个）
         type_buttons = {
