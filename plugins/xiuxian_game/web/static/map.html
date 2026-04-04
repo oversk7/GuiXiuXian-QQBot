@@ -589,10 +589,16 @@ const tipEl = document.getElementById('tip');
 function updateTooltip(mx, my) {
   if (dragging) { tipEl.style.display = 'none'; return; }
 
-  // Find closest player within 15px
+  // Find closest VISIBLE player within 15px (skip hidden in-city idle players)
   let closest = null;
   let minDist = 16;
   for (const p of mapData.players) {
+    const isHL = highlightUIDs.has(p.uid);
+    const isSel = p.uid === selectedUID;
+    const isNav = !!p.nav;
+    const isDg = !!p.dg;
+    // 与 drawPlayers 保持一致：城市内普通驻留玩家已隐藏
+    if (!isHL && !isSel && !isNav && !isDg && isInCity(p)) continue;
     const [cx, cy] = g2c(p.x, p.y);
     const d = Math.hypot(cx - mx, cy - my);
     if (d < minDist) { minDist = d; closest = p; }
