@@ -1252,9 +1252,7 @@ async def _learn_recipe(player: Player, cfg: ItemConfig, qty: int, ctx: object, 
     if not recipe_id:
         return False, "⛔ 该食谱物品配置错误（缺少recipe_id）"
 
-    from ..cooking.cooking_service import CookingService, RecipeManager
-    from ..infrastructure.uow.unit_of_work import UnitOfWork
-    from ..models.db import AsyncSessionLocal
+    from ..cooking.cooking_service import RecipeManager
 
     # 验证食谱存在
     recipe_manager = RecipeManager()
@@ -1262,12 +1260,30 @@ async def _learn_recipe(player: Player, cfg: ItemConfig, qty: int, ctx: object, 
     if not recipe:
         return False, f"⛔ 未找到对应食谱: {recipe_id}"
 
-    # 使用独立UoW来学习食谱（避免与外层session冲突）
-    cooking_service = CookingService()
-    async with UnitOfWork(AsyncSessionLocal) as uow:
-        success, msg = await cooking_service.learn_recipe(uow, player.id, recipe_id)
+    # 直接使用外层session操作（避免嵌套事务死锁）
+    from ..models.player_recipe import PlayerRecipe
+    from sqlalchemy import select as sa_select
 
-    return success, msg
+    # 检查是否已学会
+    check_stmt = sa_select(PlayerRecipe).where(
+        PlayerRecipe.player_id == player.id,
+        PlayerRecipe.recipe_id == recipe_id
+    )
+    existing = (await session.execute(check_stmt)).scalars().first()
+    if existing:
+        return False, f"⛔ 你已经学会了【{recipe.name}】"
+
+    # 直接用外层session插入
+    from datetime import datetime
+    player_recipe = PlayerRecipe(
+        player_id=player.id,
+        recipe_id=recipe_id,
+        learned_at=datetime.now()
+    )
+    session.add(player_recipe)
+    await session.flush()
+
+    return True, f"✅ 成功学会食谱【{recipe.name}】!"
 
 
 # ============== 活动道具专用效果 ==============
