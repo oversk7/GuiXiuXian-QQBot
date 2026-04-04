@@ -255,6 +255,77 @@ function drawGrid() {
 }
 
 // ============================================================
+//  DRAWING — TERRAIN (sea + cluster zones)
+// ============================================================
+function drawTerrain() {
+  // ── Sea (coastline polygon) ──
+  const coastline = [
+    [2000,2000],[500,1500],[450,700],[800,0],[850,-400],
+    [800,-700],[700,-1100],[500,-1500],[350,-1750],[-200,-2000],[2000,-2000]
+  ];
+  const deepSea = [
+    [2000,2000],[900,1500],[1000,0],[1100,-500],
+    [1000,-1100],[800,-1700],[500,-2000],[2000,-2000]
+  ];
+
+  ctx.save();
+  // Shallow sea
+  ctx.globalAlpha = 0.07;
+  ctx.fillStyle = '#4682B4';
+  ctx.beginPath();
+  coastline.forEach(([gx,gy],i)=>{const[cx,cy]=g2c(gx,gy);i?ctx.lineTo(cx,cy):ctx.moveTo(cx,cy)});
+  ctx.closePath(); ctx.fill();
+  // Deep sea
+  ctx.globalAlpha = 0.05;
+  ctx.beginPath();
+  deepSea.forEach(([gx,gy],i)=>{const[cx,cy]=g2c(gx,gy);i?ctx.lineTo(cx,cy):ctx.moveTo(cx,cy)});
+  ctx.closePath(); ctx.fill();
+  ctx.restore();
+
+  // ── Cluster zones (ellipses + labels) ──
+  const clusters = [
+    ['京畿',0,0,300,250,'200,160,60'],
+    ['江南',590,-560,200,150,'60,180,60'],
+    ['南海',350,-1380,250,250,'40,160,200'],
+    ['蜀地',-750,-870,220,320,'160,100,40'],
+    ['关中',-580,-300,280,130,'180,60,60'],
+    ['中原',-100,-600,170,300,'180,150,40'],
+    ['北境',250,1020,180,480,'100,180,220'],
+    ['西域',-1450,225,350,200,'200,180,140'],
+  ];
+
+  for (const [name,gx,gy,rx,ry,rgb] of clusters) {
+    const [px,py] = g2c(gx,gy);
+    const rxPx = rx*zoom, ryPx = ry*zoom;
+
+    // Zone fill
+    ctx.save();
+    ctx.fillStyle = `rgba(${rgb},0.06)`;
+    ctx.beginPath();
+    ctx.ellipse(px, py, Math.max(rxPx,1), Math.max(ryPx,1), 0, 0, Math.PI*2);
+    ctx.fill();
+
+    // Zone border (dashed)
+    ctx.strokeStyle = `rgba(${rgb},0.12)`;
+    ctx.lineWidth = 1;
+    ctx.setLineDash([6,4]);
+    ctx.stroke();
+    ctx.setLineDash([]);
+    ctx.restore();
+
+    // Label (visible at most zoom levels)
+    if (zoom > 0.12) {
+      ctx.save();
+      ctx.font = `${Math.max(10, Math.min(14, 11*zoom/0.3))}px monospace`;
+      ctx.textAlign = 'center';
+      ctx.fillStyle = `rgba(${rgb},0.25)`;
+      ctx.fillText(name, px, py + 4);
+      ctx.restore();
+    }
+  }
+}
+
+// ============================================================
 //  DRAWING — BOUNDARY
 // ============================================================
 function drawBoundary() {
@@ -485,6 +556,7 @@ function render() {
   ctx.fillRect(0, 0, W, H);
 
   drawGrid();
+  drawTerrain();
   drawBoundary();
   drawSweep(t);
   drawCities(t);
