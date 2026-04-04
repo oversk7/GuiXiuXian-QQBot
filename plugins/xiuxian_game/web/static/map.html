@@ -589,6 +589,11 @@ const tipEl = document.getElementById('tip');
 function updateTooltip(mx, my) {
   if (dragging) { tipEl.style.display = 'none'; return; }
 
+  // mx/my 是视口坐标(clientX/Y)，g2c 返回 canvas 相对坐标，需要转换
+  const rect = canvas.getBoundingClientRect();
+  const cmx = mx - rect.left;
+  const cmy = my - rect.top;
+
   // Find closest VISIBLE player within 15px (skip hidden in-city idle players)
   let closest = null;
   let minDist = 16;
@@ -597,10 +602,9 @@ function updateTooltip(mx, my) {
     const isSel = p.uid === selectedUID;
     const isNav = !!p.nav;
     const isDg = !!p.dg;
-    // 与 drawPlayers 保持一致：城市内普通驻留玩家已隐藏
     if (!isHL && !isSel && !isNav && !isDg && isInCity(p)) continue;
     const [cx, cy] = g2c(p.x, p.y);
-    const d = Math.hypot(cx - mx, cy - my);
+    const d = Math.hypot(cx - cmx, cy - cmy);
     if (d < minDist) { minDist = d; closest = p; }
   }
 
@@ -609,7 +613,7 @@ function updateTooltip(mx, my) {
   let minCityDist = 20;
   for (const c of mapData.cities) {
     const [cx, cy] = g2c(c.x, c.y);
-    const d = Math.hypot(cx - mx, cy - my);
+    const d = Math.hypot(cx - cmx, cy - cmy);
     if (d < minCityDist) { minCityDist = d; closestCity = c; }
   }
 
