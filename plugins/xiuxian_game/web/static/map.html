@@ -339,33 +339,46 @@ function drawTerrain(t) {
 
   ctx.save();
 
-  // Shallow sea — base fill
-  ctx.globalAlpha = 0.18;
-  ctx.fillStyle = '#143050';
+  // Shallow sea — base fill (vivid enough to distinguish from land)
+  ctx.globalAlpha = 0.35;
+  ctx.fillStyle = '#122e4d';
   buildPath(coastline); ctx.fill();
 
-  // Deep sea — darker overlay
-  ctx.globalAlpha = 0.15;
-  ctx.fillStyle = '#0a1e3a';
+  // Deep sea — extra dark blue
+  ctx.globalAlpha = 0.25;
+  ctx.fillStyle = '#091a35';
   buildPath(deepSea); ctx.fill();
 
-  // Animated light band sweeping across water (screen-space, very cheap)
+  // Animated light bands — 2 bands at different speeds (3 cheap fillRects)
   ctx.save();
   buildPath(coastline); ctx.clip();
-  const cycle = ((t || 0) / 8000) % 1;          // 8s per sweep
-  const bx = W * (cycle * 1.6 - 0.3);            // overshoot edges
-  const bw = W * 0.35;
-  const grad = ctx.createLinearGradient(bx, 0, bx + bw, 0);
-  grad.addColorStop(0,   'rgba(50,130,180,0)');
-  grad.addColorStop(0.5, 'rgba(50,130,180,0.07)');
-  grad.addColorStop(1,   'rgba(50,130,180,0)');
-  ctx.fillStyle = grad;
+  const T = t || 0;
+
+  // Band A — wide slow sweep
+  const cA = (T / 7000) % 1;
+  const xA = W * (cA * 1.6 - 0.3), wA = W * 0.45;
+  const gA = ctx.createLinearGradient(xA, 0, xA + wA, 0);
+  gA.addColorStop(0, 'rgba(80,170,220,0)');
+  gA.addColorStop(0.5, 'rgba(80,170,220,0.18)');
+  gA.addColorStop(1, 'rgba(80,170,220,0)');
+  ctx.fillStyle = gA;
   ctx.fillRect(0, 0, W, H);
+
+  // Band B — narrower, faster, offset direction (right→left via reverse cycle)
+  const cB = (1 - (T / 5000) % 1);
+  const xB = W * (cB * 1.6 - 0.3), wB = W * 0.3;
+  const gB = ctx.createLinearGradient(xB, 0, xB + wB, 0);
+  gB.addColorStop(0, 'rgba(60,140,200,0)');
+  gB.addColorStop(0.5, 'rgba(60,140,200,0.12)');
+  gB.addColorStop(1, 'rgba(60,140,200,0)');
+  ctx.fillStyle = gB;
+  ctx.fillRect(0, 0, W, H);
+
   ctx.restore();
 
   // Coastline border
-  ctx.globalAlpha = 0.3;
-  ctx.strokeStyle = '#5599bb';
+  ctx.globalAlpha = 0.4;
+  ctx.strokeStyle = '#4499bb';
   ctx.lineWidth = 1.5;
   buildPath(coastline); ctx.stroke();
 
