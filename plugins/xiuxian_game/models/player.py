@@ -86,6 +86,7 @@ class Player(Base):
     completed_trials: Mapped[str | None] = mapped_column(Text, nullable=True, comment="已通关的试炼列表(JSON数组)")
     created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now(), comment="创建时间")
     last_cultivation: Mapped[datetime] = mapped_column(DateTime, nullable=True, comment="上次修炼时间")
+    last_active_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True, comment="最后活跃时间(灵田偷菜判定用)")
 
     # 焚金充能系统
     fenjin_charge: Mapped[float] = mapped_column(Float, default=0, server_default='0', comment="焚金充能百分比(0-100)")
