@@ -583,6 +583,87 @@ async def handle_auction_detail(event: MessageEvent, args: Message = CommandArg(
             ]
             if auction.description:
                 lines.append(f"💬 {auction.description}")
+
+            # 装备实例：展示完整属性详情
+            if auction.is_instance_trade and auction.item_instance_id:
+                equip = await uow.session.get(ItemInstance, auction.item_instance_id)
+                if equip and equip.is_equipment:
+                    tpl = equip.config
+                    rarity_map = {
+                        "white": "白色", "green": "绿色", "blue": "蓝色",
+                        "purple": "紫色", "orange": "橙色", "red": "红色"
+                    }
+                    rarity_name = rarity_map.get(tpl.rarity, tpl.rarity)
+
+                    lines.append(f"🎨 品质：{tpl.get_rarity_display()}{rarity_name}")
+                    lines.append(f"⭐ 升阶：+{equip.upgrade_level}阶")
+                    lines.append(f"🛠️ 耐久：{equip.durability}/{tpl.durability}")
+                    lines.append("")
+
+                    # 基础属性
+                    upgrade_multiplier = equip.get_upgrade_bonus_multiplier()
+                    if tpl.attr_bonus or tpl.attr_ratio:
+                        lines.append("📈 基础属性：")
+                        attr_name_map = {
+                            "attack": "攻击力", "defense": "防御力", "agility": "敏捷",
+                            "luck": "运气", "hp": "生命值", "mp": "理智值",
+                            "max_hp": "最大生命值", "max_mp": "最大理智值"
+                        }
+                        if tpl.attr_bonus:
+                            for k, v in tpl.attr_bonus.items():
+                                current_value = int(v * upgrade_multiplier)
+                                lines.append(f"  • {attr_name_map.get(k, k)}+{current_value}")
+                        if tpl.attr_ratio:
+                            for k, r in tpl.attr_ratio.items():
+                                current_ratio = float(r) * upgrade_multiplier * 100
+                                lines.append(f"  • {attr_name_map.get(k, k)}+{current_ratio:.1f}%")
+                        lines.append("")
+
+                    # 词缀详情
+                    from ..item.affix_service import get_affixes_from_equipment, format_affixes_display
+                    affixes = get_affixes_from_equipment(equip.extra_attrs)
+                    if affixes:
+                        lines.append("🔮 词缀：")
+                        lines.extend(format_affixes_display(affixes))
+                        lines.append("")
+
+                    # 宝石/铭文镶嵌详情
+                    if equip.available_gem_slots > 0:
+                        lines.append("💎 镶嵌孔位：")
+                        lines.append(f"  • 孔位：{equip.used_gem_slots}/{equip.available_gem_slots}")
+                        if equip.used_gem_slots > 0:
+                            from ..item.gem_socket_service_new import GemSocketService
+                            from ..item.inscription_service import get_inscription_display
+                            gem_info = GemSocketService.get_equipment_gem_info(equip)
+                            for slot_info in gem_info:
+                                if not slot_info["is_empty"]:
+                                    slot_num = slot_info["slot_number"]
+                                    if slot_info.get("is_inscription"):
+                                        display = get_inscription_display(slot_info["inscription_data"])
+                                        lines.append(f"  • 孔位{slot_num}：📜 {display}")
+                                    else:
+                                        gem_name = slot_info["gem_name"]
+                                        gem_type = slot_info["gem_type"]
+                                        lines.append(f"  • 孔位{slot_num}：{gem_type} - {gem_name}")
+                        lines.append("")
+
+                    # 特殊效果
+                    if hasattr(tpl, 'special_effects') and tpl.special_effects:
+                        lines.append("✨ 特殊效果：")
+                        VIP_EQUIPMENT_IDS = {"vip_blade_zhanlongshan", "vip_robe_jingyuanzhiyi", "heaven_retreat_star_blade", "vip_gui_yu", "vip_chrono_watch", "vip_longying_flash", "vip_ghost_dice", "vip_shoes_longren"}
+                        is_vip = equip.item_id in VIP_EQUIPMENT_IDS
+                        unlocked_count = equip.upgrade_level // 2
+
+                        for idx, effect in enumerate(tpl.special_effects, start=1):
+                            desc = effect.get('description', '')
+                            if not desc:
+                                continue
+                            if is_vip or idx <= unlocked_count:
+                                lines.append(f"  ✅ [{idx}] {desc}")
+                            else:
+                                lines.append(f"  🔒 [{idx}] {desc} (需+{idx * 2}阶)")
+                        lines.append("")
+
             lines.append(f"💰 起拍价：{auction.start_price:,}💰")
             if auction.buyout_price:
                 lines.append(f"🎯 一口价：{auction.buyout_price:,}💰")
