@@ -89,7 +89,7 @@ def _generate_life_image(
 
 
 async def _send_life_result(matcher, selected, init_prop, results, summary):
-    """生成图片并发送结果（图片 + markdown 按钮分两条消息）"""
+    """生成图片并发送结果"""
     try:
         img_bytes: BytesIO = await asyncio.to_thread(
             _generate_life_image, selected, init_prop, results, summary
@@ -98,20 +98,8 @@ async def _send_life_result(matcher, selected, init_prop, results, summary):
         logger.error(f"人生重开图片生成失败: {e}")
         await matcher.finish("❌ 人生重开失败，请稍后再试")
 
-    # 第一条：图片
     img_b64 = base64.b64encode(img_bytes.getvalue()).decode()
-    await matcher.send(MessageSegment.file_image(img_b64))
-
-    # 第二条：摘要 + 操作按钮（markdown）
-    age = summary.AGE
-    sum_s = summary.SUM
-    content = (
-        f"# 🎴 人生重开模拟器\n"
-        f"享年 **{age.value}岁**（{age.judge}）| 总评 **{sum_s.value}**（{sum_s.judge}）\n"
-        "***\n"
-        f"> {cmd('随机人生')} 再来一次 | {cmd('人生选择')} 自选天赋 | {cmd('福利娱乐')} 返回"
-    )
-    await matcher.finish(build_markdown(content))
+    await matcher.finish(MessageSegment.file_image(img_b64))
 
 
 # ─── 随机人生（一键随机） ────────────────────────────────
