@@ -758,7 +758,7 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
     arg_text = args.extract_plain_text().strip()
     parts = arg_text.split()
     if len(parts) != 2:
-        return
+        await buy_cmd.finish("📦 格式：购买 物品名 数量")
     item_name, qty_str = parts
     if not qty_str.isdigit():
         await buy_cmd.finish("❌ 数量需为正整数")

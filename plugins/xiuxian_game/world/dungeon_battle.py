@@ -1854,51 +1854,53 @@ async def _(event: MessageEvent):
     await explore_cmd.finish(build_markdown("\n".join(lines)))
 
 # ==================== 购买指令 ====================
-buy_cmd = on_command("购买", block=True, priority=5)
+dungeon_buy_cmd = on_command("购买", block=False, priority=5)
 
-@buy_cmd.handle()
+@dungeon_buy_cmd.handle()
 async def handle_buy(event: MessageEvent, args: Message = CommandArg()):
-    """从卖货郎处购买商品"""
-    try:
-        item_index = int(args.extract_plain_text().strip())
-    except ValueError:
+    """从卖货郎处购买商品（仅副本内生效，参数为纯数字序号）"""
+    arg_text = args.extract_plain_text().strip()
+    # 仅处理纯数字参数（副本卖货郎用序号），其他格式放行给跑商购买
+    if not arg_text or not arg_text.isdigit():
         return
+    item_index = int(arg_text)
 
     async with safe_session() as session:
         player = await get_unified_player(session, event)
         if not player:
-            await buy_cmd.finish("⛔ 请先创建角色")
+            await dungeon_buy_cmd.finish("⛔ 请先创建角色")
 
+        # 大都会玩家不处理，放行给跑商购买命令
         if player.region == "大都会":
-            await buy_cmd.finish("⛔ 现实世界没有卖货郎")
+            return
 
         # 获取当前位置的格子 - 使用正确的当前坐标
         current_x, current_y = player.get_current_coordinates()
         tile = await get_or_create_tile(session, player.region, current_x, current_y)
 
         if tile.event_type != "MERCHANT":
-            await buy_cmd.finish("⛔ 这里没有卖货郎")
+            await dungeon_buy_cmd.finish("⛔ 这里没有卖货郎")
 
         if player.id not in tile.state.get("visited_by", []):
-            await buy_cmd.finish("⛔ 你还没有与卖货郎交谈，请先【探索】")
+            await dungeon_buy_cmd.finish("⛔ 你还没有与卖货郎交谈，请先【探索】")
 
         # 检查玩家是否已经购买过商品
         purchased_by = tile.state.get("purchased_by", [])
         if player.id in purchased_by:
-            await buy_cmd.finish("⛔ 你已经从这个卖货郎处购买过商品了，每人只能购买一次")
+            await dungeon_buy_cmd.finish("⛔ 你已经从这个卖货郎处购买过商品了，每人只能购买一次")
 
         goods = tile.state.get("goods", [])
         if not goods or item_index < 1 or item_index > len(goods):
-            await buy_cmd.finish("⛔ 商品序号无效")
+            await dungeon_buy_cmd.finish("⛔ 商品序号无效")
 
         good = goods[item_index - 1]
         item_config = config.items_config["by_id"].get(good["item_id"])
         if not item_config:
-            await buy_cmd.finish("⛔ 商品不存在")
+            await dungeon_buy_cmd.finish("⛔ 商品不存在")
 
         # 检查金币是否足够
         if player.gold < good["price"]:
-            await buy_cmd.finish(f"⛔ 金币不足，需要 {good['price']}💰，当前 {player.gold}💰")
+            await dungeon_buy_cmd.finish(f"⛔ 金币不足，需要 {good['price']}💰，当前 {player.gold}💰")
 
         # 购买商品
         try:
@@ -1923,10 +1925,10 @@ async def handle_buy(event: MessageEvent, args: Message = CommandArg()):
                 f"▫️ 剩余金币：{player.gold}💰\n"
                 f"⚠️ 你已经从这个卖货郎处购买过商品，无法再次购买"
             )
-            await buy_cmd.finish(message_add_head(msg, event))
+            await dungeon_buy_cmd.finish(message_add_head(msg, event))
 
         except ValueError as e:
-            await buy_cmd.finish(f"⛔ 购买失败：{e}")
+            await dungeon_buy_cmd.finish(f"⛔ 购买失败：{e}")
 
 
 teleport_list = on_command("诡域", aliases={"副本列表"}, block=True, priority=5)

@@ -1400,6 +1400,8 @@ async def handle_admin_help(event: MessageEvent, args: Message = CommandArg()):
         "**💾 备份管理**\n"
         f"{cmd('手动备份')} 立即创建MySQL数据库备份\n"
         f"{cmd('备份状态')} 查看备份文件列表\n"
+        f"{cmd('恢复备份 序号/文件名', '恢复备份 ')} 从备份恢复数据库\n"
+        "  • 每天凌晨4:00自动备份\n"
         "***\n"
         "**🖼️ 物品图片管理**\n"
         f"{cmd('设置物品图片 物品名 图片URL', '设置物品图片 ')} 设置/覆盖物品图片\n"
