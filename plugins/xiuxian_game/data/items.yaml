@@ -117,7 +117,7 @@ items:
     # ========== 白色（普通）材料 ==========
     - item_id: "rotten_core"
       name: "腐坏的内丹"
-      description: "从腐尸体内取出的浑浊内丹，散发着腐臭气息 🦠"
+      description: "从腐朽躯壳中取出的浑浊内丹，散发着腐臭气息 🦠"
       type: "MATERIAL"
       rarity: "white"
       price: 100
@@ -208,7 +208,7 @@ items:
     # ========== 紫色（史诗）材料 ==========
     - item_id: "wanted_poster"
       name: "寻人启事"
-      description: "我每天都在寻找那个被自己杀死的人，我将她杀死了一遍又一遍，可她似乎总能找到我。每当天亮，我睁开双眼的时候，她的东西总会出现在我的床上。我明明把她砌进了墙里，可她却好像钻进了我的心里……"
+      description: "我每天都在寻找那个被自己亲手了结的人，我将她埋葬了一遍又一遍，可她似乎总能找到我。每当天亮，我睁开双眼的时候，她的东西总会出现在我的床上。我明明把她砌进了墙里，可她却好像钻进了我的心里……"
       type: "MATERIAL"
       rarity: "purple"
       price: 1500
@@ -224,7 +224,7 @@ items:
 
     - item_id: "kissed_phone_number"
       name: "被死者亲吻的号码"
-      description: "警察发现，每一位死者在生前的最后一段时间，都拨打了这个电话。"
+      description: "警方发现，每一位遇难者在最后的时间里，都拨打了这个号码。"
       type: "MATERIAL"
       rarity: "purple"
       price: 1800
@@ -257,7 +257,7 @@ items:
 
     - item_id: "withered_flower"
       name: "枯萎花束"
-      description: "永远不会凋零的黑色花朵，据说是用死者的眼泪浇灌而成 🥀"
+      description: "永远不会凋零的黑色花朵，据说是用亡者的眼泪浇灌而成 🥀"
       type: "MATERIAL"
       rarity: "green"
       price: 280
@@ -1435,7 +1435,7 @@ items:
 
     - item_id: "old_coat"
       name: "旧大衣"
-      description: "这件大衣是我从死人身上扒下来的，当时他已经在雪地里躺了很久。穿上它后，我总是感觉很冷，即使在夏天也是如此。有时候我觉得，那个死人还在里面。"
+      description: "这件大衣是我从一具冰冷的躯体上扒下来的，当时他已经在雪地里躺了很久。穿上它后，我总是感觉很冷，即使在夏天也是如此。有时候我觉得，那个人还在里面。"
       type: "EQUIPMENT"
       price: 8500
       durability: 110
@@ -1493,7 +1493,7 @@ items:
 
     - item_id: "crying_tape"
       name: "哭泣的磁带"
-      description: "他第一次听这盘磁带时就发现了问题，空白的磁带里有一段无法消除的杂音，他尝试各种办法最终还原出了杂音的内容。原来，那是他临死时挣扎求救的声音。"
+      description: "他第一次听这盘磁带时就发现了问题，空白的磁带里有一段无法消除的杂音，他尝试各种办法最终还原出了杂音的内容。原来，那是他弥留之际挣扎求救的声音。"
       type: "EQUIPMENT"
       price: 11880
       durability: 120
@@ -1569,7 +1569,7 @@ items:
 
     - item_id: "fog_coat"
       name: "雾都风衣"
-      description: "这件风衣可以遮住你的面容，隐藏你的体型，掩盖你犯下的所有罪行。（开膛手套装）"
+      description: "这件风衣可以遮住你的面容，隐藏你的体型，掩盖你犯下的所有罪行。（雾都猎手套装）"
       type: "EQUIPMENT"
       price: 16560
       durability: 100
@@ -1752,7 +1752,7 @@ items:
 
     - item_id: "shroud_of_eternity"
       name: "寿衣"
-      description: "用死者的怨念与神明之泪编织而成的诡异寿衣，每一根丝线都浸透着亡魂的哀嚎。穿戴者的血肉将与布料融为一体，获得不死不灭的诅咒庇护，但代价是永远无法安息... 👻"
+      description: "用亡者的怨念与神明之泪编织而成的诡异寿衣，每一根丝线都浸透着亡魂的哀嚎。穿戴者的血肉将与布料融为一体，获得永世不灭的诅咒庇护，但代价是永远无法安息... 👻"
       type: "EQUIPMENT"
       price: 130800
       durability: 240
@@ -1773,7 +1773,7 @@ items:
 
     - item_id: "lucky_scissors"
       name: "幸运剪刀"
-      description: "这把血迹斑斑的剪刀和幸运完全沾不上边，可它就是被命名为幸运。（开膛手套装）"
+      description: "这把血迹斑斑的剪刀和幸运完全沾不上边，可它就是被命名为幸运。（雾都猎手套装）"
       type: "EQUIPMENT"
       price: 80000
       durability: 100
@@ -1786,7 +1786,7 @@ items:
 
     - item_id: "black_envelope"
       name: "黑色信封"
-      description: "开膛手曾留下署名，将死者的器官装入信封，寄送给当地的报社。（开膛手套装）"
+      description: "雾都猎手曾留下署名，将不可言说之物封入信笺，寄送给当地的报社。（雾都猎手套装）"
       type: "EQUIPMENT"
       price: 100000
       durability: 100
@@ -3726,7 +3726,7 @@ items:
 
     - item_id: "surgery_notes"
       name: "手术笔记"
-      description: "沾满血污的笔记本，记录着一场场非人道的器官摘取手术 📖"
+      description: "沾满血污的笔记本，记录着一场场骇人听闻的禁忌实验 📖"
       type: "MATERIAL"
       rarity: "blue"
       price: 0
@@ -3742,7 +3742,7 @@ items:
 
     - item_id: "organ_trafficking_ledger"
       name: "器官交易账本"
-      description: "详细记录了黑市器官交易的账本，每一页都浸满了罪恶 📕"
+      description: "详细记录了黑市禁品交易的账本，每一页都浸满了罪恶 📕"
       type: "MATERIAL"
       rarity: "purple"
       price: 0
