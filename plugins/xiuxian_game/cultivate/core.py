@@ -1901,7 +1901,7 @@ def generate_fenjin_line(player, now: datetime = None) -> str:
     status = get_fenjin_status_text(charge, player.fenjin_last_charge, now)
 
     if charge <= 0:
-        return f"💀 焚金炉 {bar} | 【焚金】点燃"
+        return f"💀 焚金炉 {bar} | {cmd('焚金', '焚金')}点燃"
     return f"{status[:2]} 焚金炉 {bar} | {status[2:]}"
 
 
