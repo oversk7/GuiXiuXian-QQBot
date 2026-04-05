@@ -675,40 +675,27 @@ class GuildTaskService:
         return completed_tasks
 
     async def get_guild_task_summary(self, guild_id: int) -> Dict:
-        """
-        获取公会任务完成情况汇总
+        """获取公会任务完成情况汇总"""
+        from sqlalchemy import select, func, and_
+        from ..models.player import Player
 
-        Args:
-            guild_id: 公会ID
-
-        Returns:
-            汇总信息字典
-
-        对应原代码:
-            guild_task_service.py Line 523-544
-
-        Note:
-            由于需要复杂查询（func.date等），暂时保留原有逻辑
-            未来可以在GuildRepository中添加专门的查询方法
-        """
-        # 获取公会成员数量
         member_count = await self._guild_repo.get_member_count(guild_id)
 
-        # 今日签到人数
-        # 这里需要查询Player.last_sign字段，由于涉及func.date，需要直接使用Repository的底层session
-        # 由于PlayerRepository没有此特定查询方法，我们使用简化版本
-        # TODO: 未来可以在PlayerRepository中添加get_signed_today_count方法
-
-        # 暂时返回简化版本的汇总信息
+        # 今日签到人数（直接查 Player 表，与旧版逻辑一致）
         today = date.today()
+        session = self._guild_repo._session
+        stmt = select(func.count(Player.id)).where(
+            and_(
+                Player.guild_id == guild_id,
+                func.date(Player.last_sign) == today,
+            )
+        )
+        signed_today = (await session.execute(stmt)).scalar_one()
 
-        # 使用PlayerRepository获取所有公会成员并手动过滤（性能较低，但保持业务逻辑一致）
-        # 由于没有直接的查询方法，这里返回基础信息
-        signed_today = 0  # TODO: 实现精确的签到统计
-
+        sign_rate = signed_today / member_count if member_count > 0 else 0
         return {
             "member_count": member_count,
             "signed_today": signed_today,
-            "sign_rate": signed_today / member_count if member_count > 0 else 0,
-            "active_level": "高" if member_count > 0 and signed_today / member_count > 0.8 else "中" if member_count > 0 and signed_today / member_count > 0.5 else "低"
+            "sign_rate": sign_rate,
+            "active_level": "高" if sign_rate > 0.8 else "中" if sign_rate > 0.5 else "低",
         }

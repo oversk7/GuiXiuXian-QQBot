@@ -172,15 +172,22 @@ class GuildBuildingService:
 
         return extrapolated
 
+    def _get_building_max_level(self, guild_level: int, building_type: BuildingType) -> int:
+        """建筑等级上限：公会10级以下不限（取建筑配置上限），10级及以上=公会等级"""
+        config_max = self.BUILDING_CONFIGS[building_type].get("max_level", 10)
+        if guild_level < 10:
+            return config_max
+        return min(guild_level, config_max)
+
     async def can_build(
         self, guild_id: int, building_type: BuildingType
     ) -> Tuple[bool, str]:
         """
-        检查是否可以建造指定建筑（等级上限=公会等级）
+        检查是否可以建造指定建筑
         """
-        # 获取公会等级作为建筑等级上限
         guild = await self._guild_repo.get_by_id(guild_id)
-        max_level = guild.level if guild else 1
+        guild_level = guild.level if guild else 1
+        max_level = self._get_building_max_level(guild_level, building_type)
 
         # 检查是否已存在该类型建筑
         existing = await self._building_repo.get_by_guild_and_type(
@@ -190,7 +197,7 @@ class GuildBuildingService:
         if existing:
             config = self.BUILDING_CONFIGS[building_type]
             if existing.level >= max_level:
-                return False, f"{config['name']}已达到最高等级（公会等级{max_level}级）"
+                return False, f"{config['name']}已达到最高等级（{max_level}级）"
             else:
                 return True, f"可以升级{config['name']}"
 
@@ -222,9 +229,9 @@ class GuildBuildingService:
         current_level = existing.level if existing else 0
         target_level = current_level + 1
 
-        # 建筑等级上限=公会等级
         guild = await self._guild_repo.get_by_id(guild_id)
-        max_level = guild.level if guild else 1
+        guild_level = guild.level if guild else 1
+        max_level = self._get_building_max_level(guild_level, building_type)
         if target_level > max_level:
             return {}
 
@@ -362,14 +369,14 @@ class GuildBuildingService:
         """
         buildings = await self._building_repo.get_all_by_guild_id(guild_id)
 
-        # 建筑等级上限=公会等级
         guild = await self._guild_repo.get_by_id(guild_id)
-        max_level = guild.level if guild else 1
+        guild_level = guild.level if guild else 1
 
         result = []
         for building in buildings:
             config = self.BUILDING_CONFIGS[building.building_type]
             effects = self.get_effects_for_level(building.building_type, building.level)
+            max_level = self._get_building_max_level(guild_level, building.building_type)
 
             result.append({
                 "type": building.building_type,

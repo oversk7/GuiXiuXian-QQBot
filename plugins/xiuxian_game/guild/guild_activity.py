@@ -176,12 +176,15 @@ async def get_guilds_sorted_by_activity(session: AsyncSession):
     - 主排序: 公会最近活跃成员的登录时间降序
     - 次排序: 公会等级降序
     """
-    # 子查询：每个公会最近成员活跃时间
+    # 子查询：每个公会最近成员活跃时间（取 last_active_at 和 last_sign 中较新者）
     activity_subq = (
         select(
             GuildMember.guild_id,
             func.max(
-                func.coalesce(Player.last_sign, Player.created_at)
+                func.greatest(
+                    func.coalesce(Player.last_active_at, Player.created_at),
+                    func.coalesce(Player.last_sign, Player.created_at),
+                )
             ).label("latest_active"),
         )
         .join(Player, GuildMember.player_id == Player.id)
