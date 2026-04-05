@@ -293,6 +293,53 @@ class TradeRecord(Base):
         return streak
 
     @classmethod
+    async def get_fifo_cost(cls, session, player_id: str, item_id: str, sell_qty: int) -> int | None:
+        """用FIFO（先买先卖）计算卖出 sell_qty 个物品的买入成本。
+
+        遍历所有BUY记录（时间升序），扣除已被历史SELL消耗的数量，
+        再从剩余库存中匹配本次卖出量，累加成本。
+
+        Returns:
+            总买入成本，若无足够购买记录则返回 None
+        """
+        from sqlalchemy import select, and_
+
+        buys = (await session.execute(
+            select(cls).where(
+                and_(cls.player_id == player_id, cls.item_id == item_id, cls.trade_type == TradeType.BUY)
+            ).order_by(cls.trade_time.asc())
+        )).scalars().all()
+
+        if not buys:
+            return None
+
+        # 历史已卖出总量（不含本次，因为本次还没 record_trade）
+        from sqlalchemy import func as sa_func
+        total_sold = (await session.execute(
+            select(sa_func.coalesce(sa_func.sum(cls.quantity), 0)).where(
+                and_(cls.player_id == player_id, cls.item_id == item_id, cls.trade_type == TradeType.SELL)
+            )
+        )).scalar() or 0
+
+        consumed = total_sold  # 已被历史卖出消耗的买入量
+        total_cost = 0
+        remaining = sell_qty
+
+        for buy in buys:
+            if consumed >= buy.quantity:
+                consumed -= buy.quantity
+                continue
+            available = buy.quantity - consumed
+            consumed = 0
+            take = min(available, remaining)
+            total_cost += take * buy.unit_price
+            remaining -= take
+            if remaining <= 0:
+                break
+
+        return total_cost if remaining <= 0 else None
+
+    @classmethod
     async def record_trade(cls, session, player_id: str, trade_type: TradeType, market_id: str,
                           item_id: str, quantity: int, unit_price: int, total_amount: int,
                           is_cross_market: bool = False):

@@ -1095,6 +1095,10 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
                 bonus_lines.append(f"💸跑商税({tax_rate*100:.0f}%)：-{tax_amount}")
 
         net_gain = total_gain + bonus_total - tax_amount
+
+        # FIFO 计算买入成本（在 record_trade 之前，才不会把本次卖出算进已消耗）
+        purchase_cost = await TradeRecord.get_fifo_cost(session, player.id, item_cfg.item_id, qty)
+
         # 更新玩家金币和市场状态
         player.gold += net_gain
         # 更新财富成就统计
@@ -1128,10 +1132,20 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
         if bonus_lines:
             sell_lines.append("")
             sell_lines.extend(bonus_lines)
-            if bonus_total > 0:
-                sell_lines.append(f"🎁奖励合计：+**{bonus_total}**")
             sell_lines.append("")
             sell_lines.append(f"实得 **{net_gain}** 金币")
+
+        # 利润计算
+        final_income = net_gain if bonus_lines else total_gain
+        if purchase_cost is not None:
+            profit = final_income - purchase_cost
+            if profit >= 0:
+                pct = profit / purchase_cost * 100 if purchase_cost > 0 else 0
+                sell_lines.append(f"💰净赚 **{profit}** 金币(+{pct:.1f}%)")
+            else:
+                pct = abs(profit) / purchase_cost * 100 if purchase_cost > 0 else 0
+                sell_lines.append(f"💸亏损 **{abs(profit)}** 金币(-{pct:.1f}%)")
+
         sell_lines.extend([
             f"市场库存：**{market_state.current_stock}**",
             f"***",
@@ -1241,6 +1255,9 @@ async def _(event: MessageEvent):
                         item_bonus += amount
                         item_bonus_names.append(name)
 
+            # FIFO 计算买入成本（在 record_trade 之前）
+            item_cost = await TradeRecord.get_fifo_cost(session, player.id, item_id, quantity)
+
             # 扣除物品
             try:
                 success_consume = await ItemInstance.consume_item(
@@ -1278,7 +1295,8 @@ async def _(event: MessageEvent):
                 "unit_price": buy_price,
                 "total": item_gain,
                 "bonus": item_bonus,
-                "bonus_names": item_bonus_names
+                "bonus_names": item_bonus_names,
+                "cost": item_cost,
             })
 
             session.add(market_state)
@@ -1315,13 +1333,24 @@ async def _(event: MessageEvent):
 
         lines.extend(["***"])
 
-        if total_bonus > 0:
-            lines.append(f"🎁奖励合计：+**{total_bonus}** 金币")
         if tax_amount > 0:
             lines.append(f"💸跑商税({tax_rate*100:.0f}%)：-**{tax_amount}** 金币")
 
+        lines.append(f"实得：**{net_gain}** 金币")
+
+        # 利润汇总
+        total_cost = sum(item['cost'] for item in sold_items if item['cost'] is not None)
+        has_cost = any(item['cost'] is not None for item in sold_items)
+        if has_cost and total_cost > 0:
+            profit = net_gain - total_cost
+            if profit >= 0:
+                pct = profit / total_cost * 100
+                lines.append(f"💰净赚 **{profit}** 金币(+{pct:.1f}%)")
+            else:
+                pct = abs(profit) / total_cost * 100
+                lines.append(f"💸亏损 **{abs(profit)}** 金币(-{pct:.1f}%)")
+
         lines.extend([
-            f"实得：**{net_gain}** 金币",
             f"当前金币：**{player.gold}**",
             f"***\n{cmd('市集')} | {cmd('跑商推荐')} | {cmd('交易限制')}"
         ])
