@@ -315,7 +315,8 @@ class GuildService:
                 "position": member.position,
                 "position_name": GuildPermission.get_position_display_name(member.position),
                 "contribution": player.guild_contribution,
-                "joined_at": member.joined_at
+                "joined_at": member.joined_at,
+                "last_sign": player.last_sign,
             })
 
         return members

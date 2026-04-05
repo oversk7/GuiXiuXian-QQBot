@@ -503,11 +503,13 @@ async def handle_member_list(event: MessageEvent, args: Message = CommandArg()):
         f"共**{total_members}**人　第**{page}**/{total_pages}页",
         "***",
     ]
+    today = date.today()
     for idx, member in enumerate(members, start_idx + 1):
         icon = position_icons.get(member["position"], "")
+        sign_mark = "✅" if (member.get("last_sign") and member["last_sign"].date() == today) else "⬜"
         nick_display = cmd(member['nickname'], f"面板 {member['uid']}")
         lines.append(
-            f"{idx}. {icon}{nick_display} Lv.{member['level']}　"
+            f"{idx}. {sign_mark}{icon}{nick_display} Lv.{member['level']}　"
             f"{member['position_name']}　"
             f"贡献:{GuildEconomyService.format_large_number(member['contribution'])}"
         )
