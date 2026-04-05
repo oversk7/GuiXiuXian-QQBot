@@ -12,7 +12,6 @@
 from sqlalchemy import text, inspect
 from sqlalchemy.ext.asyncio import AsyncEngine
 from typing import Dict, List, Tuple, Set
-import json
 import logging
 import re
 
@@ -24,192 +23,56 @@ logger = logging.getLogger(__name__)
 # 定义需要自动添加的字段
 # 格式: {表名: {字段名: 字段定义}}
 REQUIRED_FIELDS: Dict[str, Dict[str, str]] = {
-    "stocks": {
-        "relisted_at": "DATETIME NULL COMMENT '重新上市时间'",
-        "relist_reason": "VARCHAR(100) NULL COMMENT '重新上市原因'"
-    },
-    "lottery": {
-        "description": "VARCHAR(200) NULL COMMENT '抽奖描述'"
-    },
-    # 师徒系统字段
-    "player": {
-        "incense": "INT DEFAULT 0 COMMENT '香火点数'",
-        "max_apprentice_slots": "INT DEFAULT 3 COMMENT '最大徒弟位'",
-        "mentor_cooldown_until": "DATETIME NULL COMMENT '师徒操作冷却结束时间'",
-        # 里界系统字段
-        "inner_realm": "VARCHAR(64) NULL COMMENT '当前所在里界(None=不在里界)'",
-        # 诡烛氪金货币
-        "gui_zhu": "BIGINT DEFAULT 0 COMMENT '诡烛(氪金专属货币)'",
-        # 加点分配追踪
-        "allocated_attrs": "JSON NULL COMMENT '加点分配追踪JSON(各属性从加点获得的增量)'",
-        # 扩展数据字段(活动数据等)
-        "extra_attrs": "JSON NULL COMMENT '扩展数据JSON(活动数据、特殊系统数据等)'",
-        # VIP装备专属数据字段
-        "vip_equipment_data": "JSON NULL COMMENT 'VIP装备专属数据(锚点坐标、快照等)'",
-        "vip_skill_cooldown": "JSON NULL COMMENT 'VIP技能冷却时间戳'",
-        # 灵田系统 - 玩家活跃时间
-        "last_active_at": "DATETIME NULL COMMENT '最后活跃时间(灵田偷菜判定用)'",
-        # 恶魔轮盘排行积分
-        "demon_coins": "BIGINT DEFAULT 0 COMMENT '恶魔币(恶魔轮盘排行积分)'",
-        # 消息系统字段
-        "last_system_check": "DATETIME NULL COMMENT '最后查看系统公告时间'",
-        "last_guild_check": "DATETIME NULL COMMENT '最后查看公会消息时间'",
-        "inner_realm_clears": "TEXT NULL COMMENT '里界通关记录(JSON)'",
-        # 焚金充能系统
-        "fenjin_charge": "FLOAT DEFAULT 0 COMMENT '焚金充能百分比(0-100)'",
-        "fenjin_last_update": "DATETIME NULL COMMENT '焚金充能最后更新时间(衰减计算基准)'",
-        "fenjin_last_charge": "DATETIME NULL COMMENT '焚金最后一次充值时间(衰减速率计算)'",
-    },
-    "trade_record": {
-        "is_cross_market": "INT DEFAULT 0 COMMENT '是否为跨市场出售(跑商)'",
-    },
-    "player_relationship": {
-        "master_id": "VARCHAR(32) NULL COMMENT '师父ID(师徒关系专用)'",
-        "apprentice_level_at_start": "INT DEFAULT 0 COMMENT '拜师时徒弟等级'",
-        "total_incense_contributed": "INT DEFAULT 0 COMMENT '累计贡献香火'",
-        "established_at": "DATETIME NULL COMMENT '关系建立时间'",
-        "mentorship_request_status": "VARCHAR(20) NULL COMMENT '拜师申请状态(pending/rejected)'",
-        "mentorship_request_time": "DATETIME NULL COMMENT '拜师申请发起时间'",
-        "mentorship_reject_time": "DATETIME NULL COMMENT '拜师申请被拒绝时间'",
-        # 结婚申请相关字段
-        "marriage_request_status": "VARCHAR(20) NULL COMMENT '结婚申请状态(pending/rejected)'",
-        "marriage_request_time": "DATETIME NULL COMMENT '结婚申请发起时间'",
-        "marriage_reject_time": "DATETIME NULL COMMENT '结婚申请被拒绝时间'",
-        "marriage_proposer_id": "VARCHAR(32) NULL COMMENT '结婚申请发起者ID'",
-        # 结义申请相关字段
-        "sworn_request_status": "VARCHAR(20) NULL COMMENT '结义申请状态(pending/rejected)'",
-        "sworn_request_time": "DATETIME NULL COMMENT '结义申请发起时间'",
-        "sworn_reject_time": "DATETIME NULL COMMENT '结义申请被拒绝时间'",
-        "sworn_proposer_id": "VARCHAR(32) NULL COMMENT '结义申请发起者ID'"
-    },
-    # 里界系统表
-    "inner_realm_session": {
-        "sanity": "INT DEFAULT 100 COMMENT '当前理智值(0-100)'",
-        "clue_collected": "TEXT COMMENT '已收集的线索ID列表(JSON数组)'",
-        "state": "TEXT COMMENT '探索状态(JSON对象,存储自定义数据)'",
-        "current_scene": "VARCHAR(50) NULL COMMENT '当前场景节点ID'",
-        "visited_scenes": "TEXT NULL COMMENT '已访问场景列表(JSON)'",
-        "inventory": "TEXT NULL COMMENT '里界内道具(JSON)'",
-        "is_first_clear": "INT DEFAULT 0 COMMENT '是否首次通关(0/1)'",
-        "move_count": "INT DEFAULT 0 COMMENT '移动次数(控制黄昏到入夜)'",
-    },
-    # 烹饪系统 - 餐厅招募冷却 & 仓库等级
-    "restaurant": {
-        "last_recruit_time": "DATETIME NULL COMMENT '上次招募厨师时间'",
-        "daily_recruit_count": "INT DEFAULT 0 COMMENT '当日招募次数(用于递增费用计算)'",
-        "last_recruit_date": "VARCHAR(10) NULL COMMENT '上次招募日期(YYYY-MM-DD格式,用于每日重置)'",
-        "storage_level": "INT DEFAULT 1 COMMENT '仓库等级(1-5)'",
-        "signature_recipe_id": "VARCHAR(32) NULL COMMENT '招牌菜食谱ID'"
-    },
-    # 厨师成长系统 - 经验值
-    "chef": {
-        "experience": "INT DEFAULT 0 COMMENT '累计经验值(用于厨师成长升级)'"
-    },
-    # 背包表 - 扩展item_id长度以支持更长的食谱ID
-    "inventory": {
-        "item_id": "VARCHAR(64) NOT NULL COMMENT '物品模板ID'"
-    },
-    # 灵田偷菜记录 - 汇总字段
-    "spirit_field_steal_log": {
-        "stolen_summary": "TEXT NULL COMMENT '偷取作物汇总JSON，格式:{作物名:数量}'"
-    },
-    # 天灾山寨 - 战斗冷却字段
-    "lower_world_stronghold": {
-        "last_battle_at": "DATETIME NULL COMMENT '最后一次迎战时间（战斗冷却用）'",
-        "best_wave": "INT DEFAULT 1 COMMENT '历史最高波次'"
-    },
-    # 世界消息 - 新增scope和guild_id字段
-    "world_message": {
-        "scope": "VARCHAR(20) DEFAULT 'world' COMMENT '消息范围: world/private/system/guild'",
-        "guild_id": "INT NULL COMMENT '公会ID(公会频道专用)'"
-    },
-    # 市场状态 - 分时补货
-    "market_state": {
-        "last_restock_time": "DATETIME NULL COMMENT '上次分时补货时间'"
-    },
-    # 定期理财 - 到期时间字段
-    "fund_holding": {
-        "maturity_date": "DATETIME NULL COMMENT '到期时间(定期专用,活期为NULL)'"
-    },
-    # 世界BOSS - 分段排行快照
-    "world_boss_damage": {
-        "reincarnation_snapshot": "INT DEFAULT -1 COMMENT '首次攻击时的转数快照(-1表示未攻击)'"
-    },
-    # 宠物实例
-    "pet_instance": {
-        "evolved_rarity": "VARCHAR(16) DEFAULT '' COMMENT '进化后的稀有度'",
-        "transform_gender": "VARCHAR(8) DEFAULT '' COMMENT '化形性别'",
-        "daily_feed_count": "INT DEFAULT 0 COMMENT '当日怨念喂食次数'",
-        "daily_feed_date": "VARCHAR(10) NULL COMMENT '喂食计数日期(YYYY-MM-DD)'",
-        "gift_last_date": "VARCHAR(10) NULL COMMENT '上次赠礼日期(YYYY-MM-DD)'",
-        "custom_personality": "TEXT NULL COMMENT '玩家定制的AI人设描述文本'"
-    },
-    # 拍卖行 - 缓存当前出价人昵称，避免列表页额外查询；卖家昵称快照
-    "auction_item": {
-        "current_bidder_name": "VARCHAR(64) NULL COMMENT '当前最高出价人昵称（快照）'",
-        "seller_name": "VARCHAR(64) NULL COMMENT '卖家昵称快照（防止改名后丢失）'",
-        "seller_uid": "INT NULL COMMENT '卖家游戏UID（player.uid）'",
-        "current_bidder_uid": "INT NULL COMMENT '当前最高出价人游戏UID（player.uid）'",
-        "description": "VARCHAR(64) NULL COMMENT '卖家宣传语'",
-    },
-    "auction_bid_history": {
-        "bidder_uid": "INT NULL COMMENT '出价人游戏UID（player.uid）'"
-    },
-    # 恶魔轮盘PvE人机模式
-    "russian_roulette_pve_game": {
-        "player_id": "VARCHAR(32) NOT NULL COMMENT '玩家ID'",
-        "initial_bet": "INT NOT NULL COMMENT '初始赌注'",
-        "pot": "INT NOT NULL COMMENT '当前奖池'",
-        "double_count": "INT DEFAULT 0 COMMENT '加倍次数'",
-        "max_hp": "INT DEFAULT 3 COMMENT '血量上限'",
-        "game_state": "TEXT NOT NULL COMMENT '完整game_state字典(JSON)'",
-        "current_turn": "VARCHAR(16) NOT NULL COMMENT '当前回合: player / ai'",
-        "status": "VARCHAR(16) DEFAULT 'playing' COMMENT '游戏状态: playing / won'",
-        "ai_known_bullet": "BOOLEAN NULL COMMENT 'AI预知的当前弹药(True=实弹)'",
-        "ai_known_phone": "TEXT NULL COMMENT 'AI电话预知信息(JSON)'",
-        "bullet_counts": "TEXT NOT NULL COMMENT '弹药统计(JSON)'",
-        "created_at": "DATETIME NULL COMMENT '创建时间'",
-        "updated_at": "DATETIME NULL COMMENT '更新时间'"
-    },
-    "player_stats": {
-        "npc_gifts_received": "INT DEFAULT 0 COMMENT '累计收到NPC赠礼次数'",
-    },
-    # 打工系统 - 熟练度
-    "player_job_stats": {
-        "job_proficiency": "JSON NULL COMMENT '各工作熟练度数据JSON({job_type: {count, level}})'",
-    },
-    # 注释: 以下字段已通过多次重启完成迁移:
+    # 添加新字段时在此处定义，重启 bot 后自动迁移，迁移完成后移入下方注释
+    #
+    # 已完成迁移的字段（勿删除注释，留作记录）:
+    # - stocks: relisted_at, relist_reason, health, health_decay_rate, is_active, delisted_at, delist_reason
+    # - lottery: description
+    # - player: incense, max_apprentice_slots, mentor_cooldown_until, inner_realm, gui_zhu,
+    #           allocated_attrs, extra_attrs, vip_equipment_data, vip_skill_cooldown, last_active_at,
+    #           demon_coins, last_system_check, last_guild_check, inner_realm_clears,
+    #           fenjin_charge, fenjin_last_update, fenjin_last_charge,
+    #           completed_trials, charm, daily_gift_purchases
+    # - trade_record: is_cross_market
+    # - player_relationship: master_id, apprentice_level_at_start, total_incense_contributed,
+    #           established_at, mentorship_request_status/time, mentorship_reject_time,
+    #           marriage_request_status/time, marriage_reject_time, marriage_proposer_id,
+    #           sworn_request_status/time, sworn_reject_time, sworn_proposer_id
+    # - inner_realm_session: sanity, clue_collected, state, current_scene, visited_scenes,
+    #           inventory, is_first_clear, move_count
+    # - restaurant: last_recruit_time, daily_recruit_count, last_recruit_date, storage_level, signature_recipe_id
+    # - chef: experience
+    # - inventory: item_id (VARCHAR(64))
+    # - spirit_field_steal_log: stolen_summary
+    # - lower_world_stronghold: last_battle_at, best_wave
+    # - world_message: scope, guild_id, is_deleted, deleted_by, deleted_at
+    # - market_state: last_restock_time
+    # - fund_holding: maturity_date
+    # - world_boss_damage: reincarnation_snapshot
+    # - pet_instance: evolved_rarity, transform_gender, daily_feed_count, daily_feed_date, gift_last_date, custom_personality
+    # - auction_item: current_bidder_name, seller_name, seller_uid, current_bidder_uid, description
+    # - auction_bid_history: bidder_uid
+    # - russian_roulette_pve_game: (all fields)
+    # - player_stats: npc_gifts_received, gold_earned_total, gold_spent_total, locations_visited_list
+    # - player_job_stats: job_proficiency
     # - daily_task: quest_chain_id, quest_step, is_tutorial, auto_accept
-    # - stocks: health, health_decay_rate, is_active, delisted_at, delist_reason
-    # - player: completed_trials, charm, daily_gift_purchases
     # - navigation_task: initial_distance
-    # - player_stats: gold_earned_total, gold_spent_total, locations_visited_list
     # - location: expires_at
-    # - world_message: is_deleted, deleted_by, deleted_at
 }
 
 
 # 定义需要自动创建的表（仅用于新表创建，不修改已有表）
 # 注意：这会调用 CREATE TABLE IF NOT EXISTS
 REQUIRED_TABLES: Dict[str, str] = {
-    # 所有表均已通过多次重启创建完成,无需额外配置
-    # 注释: 以下表已创建完成:
-    # - stock_events, bank_fund, fund_holding, player_achievement, player_stats
-    # - npc_dialogue_history, npc_favorability, npc_long_term_memory, npc_dialogue_summary_checkpoint
-    # - message_board_blacklist, player_ban, player_relationship
-    # - invite_reward, dungeon_chest_record, russian_roulette_room, russian_roulette_game
-    # - guild_task_record, player_task_stats, part_time_job, job_location, player_job_stats
-    # - world_boss_cycle, world_boss_damage, alchemy_record
-    # - russian_roulette_bet（新增：旁观者下注记录，通过ORM Base.metadata.create_all自动建表）
+    # 添加新表时在此处定义 CREATE TABLE IF NOT EXISTS 语句
+    # 已创建的表通过 ORM Base.metadata.create_all 自动管理
 }
 
 
 # 定义需要自动创建的索引
 # 格式: [(表名, 索引名, 索引列)]
 REQUIRED_INDEXES: List[Tuple[str, str, str]] = [
-    # 所有索引均已创建完成,无需额外配置
-    # 注释: 以下索引已创建完成:
-    # - idx_daily_task_tutorial, idx_daily_task_quest_chain
+    # 添加新索引时在此处定义: (表名, 索引名, 索引列)
 ]
 
 
@@ -263,15 +126,11 @@ async def auto_migrate(engine: AsyncEngine, verbose: bool = True):
         # 4. 检测并修复 ENUM 列
         enums_fixed = await _fix_enum_columns(conn, verbose)
 
-        # 5. 数据清理：移除已废弃的装备词缀
-        affixes_cleaned = await _cleanup_deprecated_affixes(conn, verbose)
-
         if verbose:
-            if tables_created > 0 or fields_added > 0 or indexes_added > 0 or enums_fixed > 0 or affixes_cleaned > 0:
+            if tables_created > 0 or fields_added > 0 or indexes_added > 0 or enums_fixed > 0:
                 print(f"[√] [自动迁移] 完成！创建了 {tables_created} 个表，"
                       f"添加了 {fields_added} 个字段，{indexes_added} 个索引，"
-                      f"修复了 {enums_fixed} 个 ENUM 列"
-                      f"{f'，清理了 {affixes_cleaned} 件装备的废弃词缀' if affixes_cleaned > 0 else ''}")
+                      f"修复了 {enums_fixed} 个 ENUM 列")
             else:
                 print("[√] [自动迁移] 数据库结构已是最新")
 
@@ -396,69 +255,6 @@ async def _add_missing_indexes(conn, verbose: bool) -> int:
                 logger.error(f"[X] [自动迁移] 创建索引 {idx_name} 失败: {e}")
 
     return added_count
-
-
-# ==================== 数据清理函数 ====================
-
-# 已废弃的词缀ID列表（与战斗机制不符，不再生成）
-DEPRECATED_AFFIX_IDS = {"kill_boost", "soul_burn"}
-
-
-async def _cleanup_deprecated_affixes(conn, verbose: bool) -> int:
-    """清理已有装备上的废弃词缀（仅删词缀，保留装备和其他效果）"""
-    cleaned_count = 0
-
-    try:
-        # 查找包含废弃词缀的装备行
-        conditions = " OR ".join(
-            f"extra_attrs LIKE '%{affix_id}%'" for affix_id in DEPRECATED_AFFIX_IDS
-        )
-        result = await conn.execute(
-            text(f"SELECT id, extra_attrs FROM inventory WHERE {conditions}")
-        )
-        rows = result.fetchall()
-
-        if not rows:
-            if verbose:
-                logger.debug("  [√] 无需清理废弃词缀")
-            return 0
-
-        for row in rows:
-            row_id, extra_attrs_raw = row[0], row[1]
-
-            # extra_attrs 可能是 str 或 dict
-            if isinstance(extra_attrs_raw, str):
-                extra_attrs = json.loads(extra_attrs_raw)
-            elif isinstance(extra_attrs_raw, dict):
-                extra_attrs = extra_attrs_raw
-            else:
-                continue
-
-            affixes = extra_attrs.get("_affixes", [])
-            if not affixes:
-                continue
-
-            original_count = len(affixes)
-            filtered = [a for a in affixes if a.get("affix_id") not in DEPRECATED_AFFIX_IDS]
-
-            if len(filtered) == original_count:
-                continue  # 无变化
-
-            extra_attrs["_affixes"] = filtered
-            new_json = json.dumps(extra_attrs, ensure_ascii=False)
-            await conn.execute(
-                text("UPDATE inventory SET extra_attrs = :data WHERE id = :id"),
-                {"data": new_json, "id": row_id}
-            )
-            cleaned_count += 1
-
-        if verbose and cleaned_count > 0:
-            print(f"  [清理] 已从 {cleaned_count} 件装备中移除废弃词缀 {DEPRECATED_AFFIX_IDS}")
-
-    except Exception as e:
-        logger.error(f"[X] [自动迁移] 清理废弃词缀失败: {e}")
-
-    return cleaned_count
 
 
 # ==================== 验证函数 ====================
