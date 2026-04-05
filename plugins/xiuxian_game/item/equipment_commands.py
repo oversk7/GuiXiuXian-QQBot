@@ -185,8 +185,10 @@ equipment_detail = on_command("装备详情", aliases={"装备信息", "查看�
 @equipment_detail.handle()
 async def _(event: MessageEvent, args: Message = CommandArg()):
     from ..alchemy.service_new import AlchemyService
+    from nonebot import logger as _logger
 
     arg = args.extract_plain_text().strip()
+    _logger.info(f"[装备详情] arg={arg!r} user={event.get_user_id()}")
     if not arg:
         await equipment_detail.finish("⛔ 格式：装备详情 装备编号/名称")
 
@@ -202,11 +204,13 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
 
         # 查找装备
         equip = await find_equipment_by_input(session, player.id, arg)
+        _logger.info(f"[装备详情] player={player.id} equip={equip.id if equip else None} item={equip.item_id if equip else None}")
         if not equip:
             await equipment_detail.finish("⛔ 未找到指定装备，请使用装备栏中显示的编号或装备名称")
 
         # 获取装备配置
         tpl = equip.config
+        _logger.info(f"[装备详情] tpl={tpl.name if tpl else None} rarity={tpl.rarity if tpl else None}")
         if not tpl:
             await equipment_detail.finish("⛔ 装备配置错误")
 
@@ -385,7 +389,9 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
             lines.append(cmd("穿戴", f"装备 {eid}") + " | " + cmd("装备栏") + " | " + cmd("帮助"))
         else:
             lines.append(cmd("卸下 " + tpl.name, f"卸下 {eid}") + " | " + cmd("装备栏") + " | " + cmd("帮助"))
-        await equipment_detail.finish(build_markdown("\n".join(lines)))
+        result_text = "\n".join(lines)
+        _logger.info(f"[装备详情] 发送消息 len={len(result_text)} equip_id={equip.id} item={equip.item_id}")
+        await equipment_detail.finish(build_markdown(result_text))
 
 
 # ---------------- 指令：穿戴装备 ----------------
