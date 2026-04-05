@@ -10,6 +10,7 @@ from nonebot import on_command
 from nonebot.adapters.qq import Message, MessageEvent, MessageSegment
 from nonebot.params import CommandArg
 
+from ...utils import message_add_head
 from ...utils_markdown import cmd, build_markdown
 from .pig_data import PIG_POOL, Pigsonality
 
@@ -26,13 +27,23 @@ def _get_today_pig(user_id: str) -> Pigsonality:
 
 def _get_pig_image_b64(pig: Pigsonality) -> str | None:
     """读取猪格配图并返回 base64"""
-    # 尝试多种文件名格式（原始id可能有下划线或连字符）
     for pid in (pig.id, pig.id.replace("-", "_"), pig.id.replace("_", "-")):
         for ext in ("png", "jpg", "jpeg", "gif", "webp"):
             path = IMAGE_DIR / f"{pid}.{ext}"
             if path.exists():
                 return base64.b64encode(path.read_bytes()).decode()
     return None
+
+
+def _pig_text(pig: Pigsonality) -> str:
+    """构建猪格文字描述"""
+    return (
+        f"🐷 {pig.name}\n"
+        f"━━━━━━━━━━━━━\n"
+        f"{pig.description}\n"
+        f"━━━━━━━━━━━━━\n"
+        f"{pig.analysis}"
+    )
 
 
 # ─── 今日小猪 ──────────────────────────────────────────
@@ -48,23 +59,20 @@ async def handle_today_pig(event: MessageEvent):
     user_id = event.get_user_id()
     pig = _get_today_pig(user_id)
 
-    content = (
-        f"# 今天你是——{pig.name}！\n"
-        f"*{pig.description}*\n"
-        "***\n"
-        f"{pig.analysis}\n"
-        "***\n"
-        f"> {cmd('随机小猪')} 再抽一只 | {cmd('福利娱乐')} 返回"
-    )
-
+    # 先发图片+文字（base64方式）
+    text = message_add_head(f"今天你是——{pig.name}！\n{_pig_text(pig)}", event)
     img_b64 = _get_pig_image_b64(pig)
     if img_b64:
-        msg = Message(build_markdown(content)).append(
-            MessageSegment.file_image(img_b64)
-        )
-        await today_pig_cmd.finish(msg)
+        msg = Message(text).append(MessageSegment.file_image(img_b64))
+        await today_pig_cmd.send(msg)
     else:
-        await today_pig_cmd.finish(build_markdown(content))
+        await today_pig_cmd.send(text)
+
+    # 再发 markdown 按钮
+    buttons = (
+        f"> {cmd('今日小猪')} 再测一次 | {cmd('随机小猪')} 随机猪猪 | {cmd('福利娱乐')} 返回"
+    )
+    await today_pig_cmd.finish(build_markdown(buttons))
 
 
 # ─── 随机小猪 ──────────────────────────────────────────
@@ -88,31 +96,30 @@ async def handle_random_pig(event: MessageEvent, args: Message = CommandArg()):
 
     if count == 1:
         pig = pigs[0]
-        content = (
-            f"# {pig.name}\n"
-            f"*{pig.description}*\n"
-            "***\n"
-            f"{pig.analysis}\n"
-            "***\n"
-            f"> {cmd('随机小猪')} 再来一只 | {cmd('今日小猪')} 今日猪格 | {cmd('福利娱乐')} 返回"
-        )
+        text = message_add_head(_pig_text(pig), event)
         img_b64 = _get_pig_image_b64(pig)
         if img_b64:
-            msg = Message(build_markdown(content)).append(
-                MessageSegment.file_image(img_b64)
-            )
-            await random_pig_cmd.finish(msg)
+            msg = Message(text).append(MessageSegment.file_image(img_b64))
+            await random_pig_cmd.send(msg)
         else:
-            await random_pig_cmd.finish(build_markdown(content))
-    else:
-        # 多只猪，文字列表
-        lines = []
-        for i, pig in enumerate(pigs, 1):
-            lines.append(f"**{i}. {pig.name}** — {pig.description}")
-        content = (
-            f"# 随机 {len(pigs)} 只小猪\n"
-            + "\n".join(lines)
-            + "\n***\n"
-            + f"> {cmd('随机小猪')} 再来 | {cmd('今日小猪')} 今日猪格"
+            await random_pig_cmd.send(text)
+
+        buttons = (
+            f"> {cmd('随机小猪')} 再来一只 | {cmd('今日小猪')} 今日猪格 | {cmd('福利娱乐')} 返回"
         )
-        await random_pig_cmd.finish(build_markdown(content))
+        await random_pig_cmd.finish(build_markdown(buttons))
+    else:
+        # 多只猪：逐个发送图片+文字
+        for pig in pigs:
+            text = message_add_head(_pig_text(pig), event)
+            img_b64 = _get_pig_image_b64(pig)
+            if img_b64:
+                msg = Message(text).append(MessageSegment.file_image(img_b64))
+                await random_pig_cmd.send(msg)
+            else:
+                await random_pig_cmd.send(text)
+
+        buttons = (
+            f"> {cmd('随机小猪')} 再来 | {cmd('今日小猪')} 今日猪格 | {cmd('福利娱乐')} 返回"
+        )
+        await random_pig_cmd.finish(build_markdown(buttons))
