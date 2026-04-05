@@ -7,11 +7,10 @@ from datetime import datetime
 from nonebot.adapters.qq import MessageEvent
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy.orm import make_transient_to_detached
 from .models.player import Player
 from .models.account_ownership import AccountOwnership
 from .infrastructure.repositories.player_repository import PlayerRepository
-from .infrastructure.cache import player_identity_cache, player_data_cache
+from .infrastructure.cache import player_identity_cache
 
 
 # ==================== last_active_at 节流 ====================
@@ -108,24 +107,13 @@ async def get_unified_player(session: AsyncSession, event: MessageEvent) -> Opti
         if cached_player_id is None:
             return None  # 缓存记录该用户无角色
 
-        # 2a. 尝试 Player 数据缓存（LRU），命中则跳过 SELECT
-        cached_data = player_data_cache.get(cached_player_id)
-        if cached_data is not None:
-            player = Player(**cached_data)
-            make_transient_to_detached(player)
-            player = await session.merge(player, load=False)
-            _touch_last_active(player)
-            return player
-
-        # 2b. 数据缓存未命中，走 DB
+        # 用 player_id 直接查 DB
         player = await session.get(Player, cached_player_id)
         if player is not None:
-            player_data_cache.put_from_player(player)
             _touch_last_active(player)
             return player
         # player 被删除了，缓存失效，走下面的完整查询
         player_identity_cache.invalidate(user_id)
-        player_data_cache.invalidate(cached_player_id)
 
     # 3. 缓存未命中：完整查询并回填缓存
     player_repo = PlayerRepository(session)
@@ -143,10 +131,9 @@ async def get_unified_player(session: AsyncSession, event: MessageEvent) -> Opti
             if ownership and ownership.owner_platform_id != user_id:
                 player = None
 
-    # 回填缓存
+    # 回填身份缓存
     player_identity_cache.put(user_id, player.id if player else None)
     if player is not None:
-        player_data_cache.put_from_player(player)
         _touch_last_active(player)
 
     return player

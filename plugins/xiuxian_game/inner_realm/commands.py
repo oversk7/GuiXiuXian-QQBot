@@ -27,7 +27,7 @@ import json
 async def in_inner_realm_rule(event: MessageEvent) -> bool:
     """检查玩家是否在里界中（轻量版：优先走缓存，避免每条消息都查 DB）"""
     from ..platform_utils import get_platform_info
-    from ..infrastructure.cache import player_identity_cache, player_data_cache
+    from ..infrastructure.cache import player_identity_cache
 
     try:
         _, user_id = get_platform_info(event)
@@ -39,12 +39,7 @@ async def in_inner_realm_rule(event: MessageEvent) -> bool:
         if cached_player_id is None:
             return False
 
-        # 2. 再查数据缓存拿 inner_realm 字段
-        cached_data = player_data_cache.get(cached_player_id)
-        if cached_data is not None:
-            return cached_data.get("inner_realm") is not None
-
-        # 3. 缓存都未命中才查 DB（极少走到这里）
+        # 2. 查 DB 确认 inner_realm 字段
         def session_factory():
             return AsyncSessionLocal()
 

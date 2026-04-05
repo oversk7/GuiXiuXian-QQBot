@@ -23,7 +23,6 @@ from ..utils import message_add_head
 from ..utils_markdown import cmd, build_markdown
 from ..models.navigation_task import NavigationTask
 from ..platform_utils import get_unified_player
-from ..infrastructure.cache.player_data_cache import player_data_cache
 from ..infrastructure.uow.unit_of_work import UnitOfWork
 from .location_service_new import LocationService
 from .npc_service_new import NPCService
@@ -200,7 +199,6 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
 
             await session.delete(task)
             await session.commit()
-            player_data_cache.put_from_player(player)
 
             rx, ry = (player.real_world_x or 0), (player.real_world_y or 0)
             arrival_msg = f"🎯 已到达目标位置 **({target_x},{target_y})**\n\n"
@@ -300,7 +298,6 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
                 progress_info = f"📊 进度: {progress_bar}\n"
 
             await session.commit()
-            player_data_cache.put_from_player(player)
 
             # 构建导航状态显示
             nav_status = f"🧭 **导航中** → 目标 ({target_x},{target_y})\n\n"
@@ -475,7 +472,6 @@ async def _(event: MessageEvent):
         await _update_nav_position(player, task, session)
         await session.delete(task)
         await session.commit()
-        player_data_cache.put_from_player(player)
         # 展示现实坐标
         rx, ry = (player.real_world_x or 0), (player.real_world_y or 0)
         stop_msg = f"🛑 指针折断，你停在现实坐标 ({rx},{ry})\n\n"

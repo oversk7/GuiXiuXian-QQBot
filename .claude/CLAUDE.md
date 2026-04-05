@@ -60,4 +60,5 @@ After thorough research, use `AskUserQuestion` to present users with choices rat
 - **Server:** root@***REMOVED***, password: ***REMOVED***
 - **Project path:** /home/admin/GuiXiuXian2
 - **Git pull command:** `su - admin -c 'cd /home/admin/GuiXiuXian2 && git pull'`
-- **Workflow:** After every `git push`, SSH to the server and pull the latest code.
+- **Restart bot:** 已关闭 `--reload`，每次部署后需手动重启：`ssh root@***REMOVED***` → `screen -r qqbot` → Ctrl+C 停止 → `su - admin -c 'cd /home/admin/GuiXiuXian2 && nb run'`
+- **Workflow:** After every `git push`, SSH to the server, pull the latest code, then在 screen qqbot 中重启 bot。
