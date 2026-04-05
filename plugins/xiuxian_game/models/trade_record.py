@@ -215,6 +215,84 @@ class TradeRecord(Base):
         return result.scalar() or 0
 
     @classmethod
+    async def get_daily_cross_market_revenue(cls, session, player_id: str) -> int:
+        """获取玩家当日跨市场出售总收入（使用09:00日切，用于跑商税计算）"""
+        from sqlalchemy import select, and_, func as sa_func
+        from datetime import time, timedelta
+
+        now = datetime.now()
+        day = now.date()
+        if now.time() < time(hour=9):
+            day -= timedelta(days=1)
+        day_start = datetime.combine(day, time(hour=9))
+
+        stmt = select(sa_func.coalesce(sa_func.sum(cls.total_amount), 0)).where(
+            and_(
+                cls.player_id == player_id,
+                cls.trade_type == TradeType.SELL,
+                cls.is_cross_market == True,
+                cls.trade_time >= day_start,
+                cls.market_id != 'black_market'
+            )
+        )
+
+        result = await session.execute(stmt)
+        return result.scalar() or 0
+
+    @classmethod
+    async def get_trade_streak_days(cls, session, player_id: str) -> int:
+        """获取玩家连续跑商天数（不含今天，用于连续跑商奖励）
+
+        检查从昨天起往前连续有跨市场交易的天数，最多回溯7天。
+        """
+        from sqlalchemy import select, and_
+        from datetime import time, timedelta
+
+        now = datetime.now()
+        today = now.date()
+        if now.time() < time(hour=9):
+            today -= timedelta(days=1)
+
+        # 一次查询最近7天的跨市场出售记录
+        week_start = datetime.combine(today - timedelta(days=7), time(hour=9))
+        today_start = datetime.combine(today, time(hour=9))
+
+        stmt = select(cls.trade_time).where(
+            and_(
+                cls.player_id == player_id,
+                cls.trade_type == TradeType.SELL,
+                cls.is_cross_market == True,
+                cls.trade_time >= week_start,
+                cls.trade_time < today_start
+            )
+        )
+
+        result = await session.execute(stmt)
+        records = result.scalars().all()
+
+        if not records:
+            return 0
+
+        # 按seed day分组
+        traded_days = set()
+        for trade_time in records:
+            trade_day = trade_time.date()
+            if trade_time.time() < time(hour=9):
+                trade_day -= timedelta(days=1)
+            traded_days.add(trade_day)
+
+        # 从昨天起检查连续天数
+        streak = 0
+        for i in range(1, 8):
+            check_day = today - timedelta(days=i)
+            if check_day in traded_days:
+                streak += 1
+            else:
+                break
+
+        return streak
+
+    @classmethod
     async def record_trade(cls, session, player_id: str, trade_type: TradeType, market_id: str,
                           item_id: str, quantity: int, unit_price: int, total_amount: int,
                           is_cross_market: bool = False):

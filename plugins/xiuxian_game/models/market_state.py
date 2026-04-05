@@ -7,7 +7,7 @@ import random
 
 # 分时补货常量
 RESTOCK_INTERVAL_HOURS = 6   # 每6小时补货一次
-RESTOCK_RATIO = 0.20         # 每次补货最大库存的20%
+RESTOCK_RATIO = 0.10         # 每次补货最大库存的10%（控制跑商收益）
 
 
 class MarketState(Base):

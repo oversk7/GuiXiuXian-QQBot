@@ -378,7 +378,7 @@ ITEM_HOME_CLUSTER: Dict[str, str] = {
 }
 
 # 集群距离 → 收购价加成（卖出时远离产地越远，价格越高）
-DISTANCE_BUY_BONUS = {0: 1.00, 1: 1.15, 2: 1.35, 3: 1.60}
+DISTANCE_BUY_BONUS = {0: 1.00, 1: 1.08, 2: 1.18, 3: 1.30}
 
 
 def _cluster_distance(a: str, b: str) -> int:
@@ -577,28 +577,91 @@ def _calculate_tiered_multiplier(already_bought: int, qty: int) -> float:
     return total_cost_weight / qty
 
 
-# ------------------- 跑商奖励递减系统 -------------------
-TRADE_BONUS_BRACKETS = [
-    (3,  0.10),   # 第1-3笔: 10%
-    (6,  0.05),   # 第4-6笔: 5%
-    (10, 0.02),   # 第7-10笔: 2%
+# ------------------- 跑商多元奖励系统 -------------------
+# 多种小额奖励并存，看起来丰富但总额可控（最高约18%，日常约6-8%）
+
+async def _calculate_trade_bonuses(
+    session, player_id: str, market: MarketConfig, item_id: str, total_gain: int
+) -> list[tuple[str, float, int]]:
+    """计算跑商交易的各项奖励
+
+    Returns:
+        list of (奖励名称, 奖励比例, 奖励金额)
+    """
+    bonuses = []
+
+    market_cluster = CITY_TO_CLUSTER.get(market.name)
+    item_home = ITEM_HOME_CLUSTER.get(item_id)
+    dist = _cluster_distance(item_home, market_cluster) if item_home and market_cluster else 0
+
+    # 1. 跨域贸易 —— 在非产地集群出售即可获得
+    if dist > 0:
+        rate = 0.03
+        bonuses.append(("🌍跨域贸易", rate, int(total_gain * rate)))
+
+    # 2. 远途补贴 —— 距离越远补贴越高
+    if dist >= 2:
+        rate = 0.02 if dist == 2 else 0.04  # 中途2% / 远途4%
+        bonuses.append(("🚀远途补贴", rate, int(total_gain * rate)))
+
+    # 3. 稀缺供应 —— 目标市场该商品库存紧张时触发
+    ms = await MarketState.get_or_create(session, market.id, item_id)
+    stock_ratio = ms.current_stock / max(1, ms.max_stock)
+    if stock_ratio < 0.3:
+        rate = 0.02
+        bonuses.append(("📦稀缺供应", rate, int(total_gain * rate)))
+
+    # 4. 首单加成 —— 当日首笔跨市场交易
+    daily_sell_count = await TradeRecord.get_daily_cross_market_sell_count(session, player_id)
+    if daily_sell_count == 0:
+        rate = 0.05
+        bonuses.append(("⭐首单加成", rate, int(total_gain * rate)))
+
+    # 5. 行情红利 —— 市场需求旺盛时出售
+    if ms.demand_factor > 1.2:
+        rate = 0.02
+        bonuses.append(("📈行情红利", rate, int(total_gain * rate)))
+
+    # 6. 连续跑商 —— 连续多天进行跑商活动
+    streak = await TradeRecord.get_trade_streak_days(session, player_id)
+    if streak > 0:
+        rate = min(0.01 * streak, 0.03)  # 每天+1%，最高3%
+        bonuses.append((f"🔥连续跑商({streak}天)", rate, int(total_gain * rate)))
+
+    return bonuses
+
+
+# ------------------- 跑商税（累进制）-------------------
+TRADE_TAX_BRACKETS = [
+    (300_000,      0.00),   # 日收入 0-30万: 免税
+    (800_000,      0.05),   # 30万-80万: 5%
+    (1_500_000,    0.10),   # 80万-150万: 10%
+    (999_999_999,  0.15),   # 150万+: 15%
 ]
 
 
-def _get_cross_market_bonus_rate(sell_count: int) -> float:
-    """根据已完成跑商笔数获取奖励比例
+async def _calculate_trade_tax(session, player_id: str, revenue: int) -> tuple[float, int]:
+    """根据当日累计跑商收入计算本笔交易的税额
 
     Args:
-        sell_count: 今日已完成的跨市场出售笔数（本次为第 sell_count+1 笔）
+        session: 数据库会话
+        player_id: 玩家ID
+        revenue: 本次交易收入
 
     Returns:
-        float: 奖励比例 (0.0 - 0.10)
+        (适用税率, 税额)
     """
-    current_trade = sell_count + 1  # 本次是第几笔
-    for bracket_end, rate in TRADE_BONUS_BRACKETS:
-        if current_trade <= bracket_end:
-            return rate
-    return 0.0  # 超过所有档位，无奖励
+    daily_revenue = await TradeRecord.get_daily_cross_market_revenue(session, player_id)
+
+    # 根据累计日收入确定税率档位
+    tax_rate = 0.0
+    for bracket_limit, rate in TRADE_TAX_BRACKETS:
+        if daily_revenue < bracket_limit:
+            tax_rate = rate
+            break
+
+    tax_amount = int(revenue * tax_rate)
+    return tax_rate, tax_amount
 
 
 # ------------------- 指令 -------------------
@@ -1009,29 +1072,34 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
             await session.rollback()
             await sell_cmd.finish("❌ 扣除物品失败")
 
-        # 计算跑商奖励（异地出售奖励，递减机制）
-        bonus = 0
-        bonus_msg = ""
+        # 计算跑商多元奖励 + 跑商税
+        bonus_total = 0
+        tax_amount = 0
+        bonus_lines = []
         is_cross_market = False
         # 检查是否为跨市场交易（在不同市场出售）
         recent_purchases = await TradeRecord.get_recent_purchases_at_market(session, player.id, market.id, item_cfg.item_id, hours=24)
         if not recent_purchases:  # 没有在本地购买记录，说明是从其他地方运来的
             is_cross_market = True
-            # 查询今日已完成的跨市场出售笔数，获取递减奖励比例
-            daily_sell_count = await TradeRecord.get_daily_cross_market_sell_count(session, player.id)
-            bonus_rate = _get_cross_market_bonus_rate(daily_sell_count)
-            if bonus_rate > 0:
-                bonus = int(total_gain * bonus_rate)
-                if bonus > 0:
-                    bonus_msg = f"\n🎁 跑商奖励(第{daily_sell_count+1}笔,{bonus_rate*100:.0f}%)：+{bonus} 金币"
-            else:
-                bonus_msg = "\n💤 今日跑商奖励已用尽，明日刷新"
+            # 计算各项奖励
+            trade_bonuses = await _calculate_trade_bonuses(
+                session, player.id, market, item_cfg.item_id, total_gain)
+            for name, rate, amount in trade_bonuses:
+                if amount > 0:
+                    bonus_total += amount
+                    bonus_lines.append(f"{name}({rate*100:.0f}%)：+{amount}")
 
+            # 计算跑商税
+            tax_rate, tax_amount = await _calculate_trade_tax(session, player.id, total_gain)
+            if tax_amount > 0:
+                bonus_lines.append(f"💸跑商税({tax_rate*100:.0f}%)：-{tax_amount}")
+
+        net_gain = total_gain + bonus_total - tax_amount
         # 更新玩家金币和市场状态
-        player.gold += total_gain + bonus
+        player.gold += net_gain
         # 更新财富成就统计
         from ..achievement.achievement_service import AchievementService
-        await AchievementService.update_stat(session, player.id, "gold_earned_total", increment=total_gain + bonus, auto_commit=False)
+        await AchievementService.update_stat(session, player.id, "gold_earned_total", increment=net_gain, auto_commit=False)
         market_state.apply_sale(qty)
 
         # 记录交易
@@ -1050,15 +1118,26 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
         session.add_all([player, market_state])
         await session.commit()
 
-        sell_result = (
-            f"# 出售成功\n"
-            f"***\n"
-            f"卖出 **{item_cfg.name}**x{qty}\n"
-            f"获得 **{total_gain + bonus}** 金币{bonus_msg}\n"
-            f"市场库存：**{market_state.current_stock}**\n"
-            f"***\n"
-            f"{cmd('市集')} | {cmd('自动出售')} | {cmd('跑商推荐')}"
-        )
+        # 构建出售结果消息
+        sell_lines = [
+            f"# 出售成功",
+            f"***",
+            f"卖出 **{item_cfg.name}**x{qty}",
+            f"基础收入：**{total_gain}** 金币",
+        ]
+        if bonus_lines:
+            sell_lines.append("")
+            sell_lines.extend(bonus_lines)
+            if bonus_total > 0:
+                sell_lines.append(f"🎁奖励合计：+**{bonus_total}**")
+            sell_lines.append("")
+            sell_lines.append(f"实得 **{net_gain}** 金币")
+        sell_lines.extend([
+            f"市场库存：**{market_state.current_stock}**",
+            f"***",
+            f"{cmd('市集')} | {cmd('自动出售')} | {cmd('跑商推荐')}",
+        ])
+        sell_result = "\n".join(sell_lines)
         await sell_cmd.finish(build_markdown(sell_result))
 
 @auto_sell_cmd.handle()
@@ -1125,7 +1204,7 @@ async def _(event: MessageEvent):
                 "***\n"
                 f"{cmd('市集')} | {cmd('市集列表')} | {cmd('跑商推荐')}"))
 
-        # 计算总收益和详细信息
+        # 计算总收益、多元奖励和跑商税
         total_gain = 0
         total_bonus = 0
         sold_items = []
@@ -1146,20 +1225,21 @@ async def _(event: MessageEvent):
             _, buy_price = await _price_for(session, market, item_id)
             item_gain = buy_price * quantity
 
-            # 计算跑商奖励（递减机制）
-            bonus = 0
-            bonus_rate = 0.0
+            # 计算跑商多元奖励
+            item_bonus = 0
+            item_bonus_names = []
             is_cross_market = False
             recent_purchases = await TradeRecord.get_recent_purchases_at_market(
                 session, player.id, market.id, item_id, hours=24
             )
             if not recent_purchases:
                 is_cross_market = True
-                # 查询今日已完成的跨市场出售笔数
-                daily_sell_count = await TradeRecord.get_daily_cross_market_sell_count(session, player.id)
-                bonus_rate = _get_cross_market_bonus_rate(daily_sell_count)
-                if bonus_rate > 0:
-                    bonus = int(item_gain * bonus_rate)
+                trade_bonuses = await _calculate_trade_bonuses(
+                    session, player.id, market, item_id, item_gain)
+                for name, rate, amount in trade_bonuses:
+                    if amount > 0:
+                        item_bonus += amount
+                        item_bonus_names.append(name)
 
             # 扣除物品
             try:
@@ -1187,18 +1267,18 @@ async def _(event: MessageEvent):
                 total_amount=item_gain,
                 is_cross_market=is_cross_market
             )
-            # flush 确保下一轮循环能查到本次记录（递减笔数统计）
+            # flush 确保下一轮循环能查到本次记录
             await session.flush()
 
             total_gain += item_gain
-            total_bonus += bonus
+            total_bonus += item_bonus
             sold_items.append({
                 "name": item_cfg.name,
                 "quantity": quantity,
                 "unit_price": buy_price,
                 "total": item_gain,
-                "bonus": bonus,
-                "bonus_rate": bonus_rate
+                "bonus": item_bonus,
+                "bonus_names": item_bonus_names
             })
 
             session.add(market_state)
@@ -1207,11 +1287,15 @@ async def _(event: MessageEvent):
             await auto_sell_cmd.finish(build_markdown(
                 f"# 出售失败\n***\n没有成功出售任何商品\n***\n{cmd('市集')} | {cmd('跑商推荐')}"))
 
+        # 计算跑商税（基于总收入）
+        tax_rate, tax_amount = await _calculate_trade_tax(session, player.id, total_gain)
+
         # 更新玩家金币
-        player.gold += total_gain + total_bonus
+        net_gain = total_gain + total_bonus - tax_amount
+        player.gold += net_gain
         # 更新财富成就统计
         from ..achievement.achievement_service import AchievementService
-        await AchievementService.update_stat(session, player.id, "gold_earned_total", increment=total_gain + total_bonus, auto_commit=False)
+        await AchievementService.update_stat(session, player.id, "gold_earned_total", increment=net_gain, auto_commit=False)
         session.add(player)
         await session.commit()
 
@@ -1225,19 +1309,22 @@ async def _(event: MessageEvent):
         for item in sold_items:
             bonus_text = ""
             if item['bonus'] > 0:
-                bonus_text = f" (+{item['bonus']}奖励{item['bonus_rate']*100:.0f}%)"
+                names = "+".join(n.replace("🌍", "").replace("🚀", "").replace("📦", "").replace("⭐", "").replace("📈", "").replace("🔥", "") for n in item['bonus_names'])
+                bonus_text = f" (+{item['bonus']} {names})"
             lines.append(f"- {item['name']} x{item['quantity']} = **{item['total']}**金币{bonus_text}")
 
-        lines.extend([
-            "***",
-            f"总收益：**{total_gain + total_bonus}** 金币",
-            f"当前金币：**{player.gold}**"
-        ])
+        lines.extend(["***"])
 
         if total_bonus > 0:
-            lines.append(f"跑商奖励合计：**{total_bonus}** 金币")
+            lines.append(f"🎁奖励合计：+**{total_bonus}** 金币")
+        if tax_amount > 0:
+            lines.append(f"💸跑商税({tax_rate*100:.0f}%)：-**{tax_amount}** 金币")
 
-        lines.append(f"***\n{cmd('市集')} | {cmd('跑商推荐')} | {cmd('交易限制')}")
+        lines.extend([
+            f"实得：**{net_gain}** 金币",
+            f"当前金币：**{player.gold}**",
+            f"***\n{cmd('市集')} | {cmd('跑商推荐')} | {cmd('交易限制')}"
+        ])
         await auto_sell_cmd.finish(build_markdown("\n".join(lines)))
 
 # -------- 市集列表 --------
