@@ -699,13 +699,15 @@ list_guilds_cmd = on_command("公会列表", aliases={"查看公会", "所有公
 @list_guilds_cmd.handle()
 async def handle_list_guilds(event: MessageEvent, args: Message = CommandArg()):
     """
-    公会列表指令：查看所有公会
+    公会列表指令：查看所有公会（按活跃度排序）
 
     用法：【公会列表】或【查看公会】或【所有公会】
 
-    显示所有公会的名称、等级、成员数量、资金、经验以及会长信息
-    方便玩家选择并联系会长申请加入
+    - 每日首次查看时自动检查：会长30天未登录则自动继承，全员不活跃则解散
+    - 列表按成员活跃度排序，活跃公会排前面
     """
+    from .guild_activity import maybe_run_activity_check, get_guilds_sorted_by_activity
+
     # 分页参数
     arg = args.extract_plain_text().strip()
     try:
@@ -724,23 +726,22 @@ async def handle_list_guilds(event: MessageEvent, args: Message = CommandArg()):
         return AsyncSessionLocal()
 
     async with UnitOfWork(session_factory) as uow:
-        # 查询所有公会
-        from sqlalchemy import select, desc
+        # 每日自动检查：会长继承 / 僵尸公会解散
+        activity_logs = await maybe_run_activity_check(uow.session)
 
-        stmt = select(Guild).order_by(desc(Guild.level), Guild.id)
-        result = await uow.session.execute(stmt)
-        guilds = result.scalars().all()
+        # 按活跃度排序查询公会
+        guild_rows = await get_guilds_sorted_by_activity(uow.session)
 
-        if not guilds:
+        if not guild_rows:
             await list_guilds_cmd.finish(message_add_head("📋 当前没有任何公会", event))
 
         # 分页
-        total_guilds = len(guilds)
+        total_guilds = len(guild_rows)
         total_pages = (total_guilds + page_size - 1) // page_size
         page = min(page, total_pages)
         start_idx = (page - 1) * page_size
         end_idx = start_idx + page_size
-        guilds_page = guilds[start_idx:end_idx]
+        page_rows = guild_rows[start_idx:end_idx]
 
         # 构建Markdown格式消息
         lines = [
@@ -749,7 +750,13 @@ async def handle_list_guilds(event: MessageEvent, args: Message = CommandArg()):
             "***",
         ]
 
-        for guild in guilds_page:
+        # 如果本次触发了活跃度清理，显示摘要
+        if activity_logs:
+            for log in activity_logs:
+                lines.append(f"> {log}")
+            lines.append("***")
+
+        for guild, _latest_active in page_rows:
             # 获取会长信息
             president = await uow.session.get(Player, guild.president_id)
             president_name = president.nickname if president else "未知"
