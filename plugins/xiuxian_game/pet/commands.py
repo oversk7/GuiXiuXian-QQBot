@@ -429,6 +429,38 @@ async def handle_customize_personality(event: MessageEvent, args: Message = Comm
         await customize_personality_cmd.finish(msg)
 
 
+# ==================== 放生宠物 ====================
+release_pet_cmd = on_command("放生", aliases={"放生宠物"}, priority=5, block=True)
+
+
+@release_pet_cmd.handle()
+async def handle_release_pet(event: MessageEvent, args: Message = CommandArg()):
+    """【放生 宠物ID或昵称】- 永久放生一只宠物"""
+    args_text = args.extract_plain_text().strip()
+    if not args_text:
+        await release_pet_cmd.finish("用法：放生 宠物ID或昵称\n⚠️ 放生后宠物将永久消失，无法恢复！")
+
+    # 需要确认：参数末尾带"确认"才执行
+    if not args_text.endswith("确认"):
+        await release_pet_cmd.finish(
+            f"⚠️ 确定要放生【{args_text}】吗？此操作不可撤销！\n"
+            f"确认请输入：放生 {args_text} 确认"
+        )
+
+    pet_name = args_text.rsplit("确认", 1)[0].strip()
+    if not pet_name:
+        await release_pet_cmd.finish("请指定要放生的宠物ID或昵称")
+
+    async with UnitOfWork(AsyncSessionLocal) as uow:
+        player = await get_unified_player(uow.session, event)
+        if not player:
+            await release_pet_cmd.finish("请先创建角色")
+
+        success, msg = await pet_service.release_pet(uow, player.id, pet_name)
+        await uow.commit()
+        await release_pet_cmd.finish(msg)
+
+
 # ==================== 重置人设 ====================
 reset_personality_cmd = on_command("重置人设", priority=5, block=True)
 

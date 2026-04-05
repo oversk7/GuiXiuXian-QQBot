@@ -440,6 +440,51 @@ class PetService:
 
         return False, "没有宠物在守田"
 
+    # ==================== 放生宠物 ====================
+
+    async def release_pet(
+        self, uow: UnitOfWork, player_id: str, pet_id_or_name: str
+    ) -> Tuple[bool, str]:
+        """放生宠物（永久删除）"""
+        pet = None
+        # 按数字ID查找
+        try:
+            pet_id = int(pet_id_or_name)
+            pet = await uow.pets.get_by_id(pet_id)
+            if pet and pet.player_id != player_id:
+                pet = None
+        except ValueError:
+            pass
+        # 按昵称查找
+        if not pet:
+            all_pets = await uow.pets.get_all_by_player(player_id)
+            for p in all_pets:
+                if p.nickname == pet_id_or_name:
+                    pet = p
+                    break
+
+        if not pet:
+            return False, "找不到该宠物，请输入正确的宠物ID或昵称"
+
+        if pet.is_guarding:
+            return False, f"【{pet.nickname}】正在守田中，请先召回再放生"
+
+        nickname = pet.nickname
+        was_active = pet.is_active
+
+        # 删除宠物
+        await uow.pets.delete(pet)
+
+        # 如果放生的是当前伙伴，自动切换到下一只
+        if was_active:
+            remaining = await uow.pets.get_all_by_player(player_id)
+            if remaining:
+                remaining[0].is_active = True
+                await uow.pets.update(remaining[0])
+
+        AttributeCalculatorFactory.invalidate_pet_cache(player_id)
+        return True, f"【{nickname}】已被放生，消失在了荒野中..."
+
     # ==================== 宠物进化 ====================
 
     RARITY_CN = {"white": "普通", "green": "优秀", "blue": "稀有", "purple": "史诗", "orange": "传说"}
