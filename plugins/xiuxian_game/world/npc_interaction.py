@@ -400,7 +400,8 @@ async def handle_social_agent_interaction(session, player: Player, npc, event: M
         "━━━━━━━━━━━━━",
         "💡 点击上方按钮或输入【交互 " + npc.name + " 姻缘/结义/拜师】",
     ]
-    await interact_cmd.finish(message_add_head("\n".join(lines), event))
+    from ..utils_markdown import build_markdown
+    await interact_cmd.finish(build_markdown("\n".join(lines)))
 
 
 async def handle_intelligence_dealer_interaction(session, player: Player, npc, event: MessageEvent):
@@ -600,7 +601,8 @@ async def handle_station_master_interaction(session, player: Player, npc, event:
     lines.append("━━━━━━━━━━━━━")
     lines.append(f"💡 输入【查找 NPC名】搜索全地图NPC")
 
-    await interact_cmd.finish(message_add_head("\n".join(lines), event))
+    from ..utils_markdown import build_markdown
+    await interact_cmd.finish(build_markdown("\n".join(lines)))
 
 
 async def handle_generic_interaction(session, player: Player, npc, event: MessageEvent, dialogue_content: str = None):
