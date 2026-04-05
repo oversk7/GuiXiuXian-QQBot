@@ -5,7 +5,6 @@ import base64
 import itertools
 import random
 import re
-import traceback
 import logging
 from io import BytesIO
 
@@ -83,42 +82,41 @@ async def handle_random_life(event: MessageEvent, args: Message = CommandArg()):
 
     await random_life_cmd.send(message_add_head("🔄 你的人生正在重开...", event))
 
+    life = Life()
+    life.load()
+
+    # 随机选天赋
+    all_talents = life.rand_talents(10)
+    selected = _random_talents_no_conflict(all_talents, 3)
+    life.set_talents(selected)
+
+    # 随机分配属性
+    total = life.total_property()
+    nums = _random_attributes(total)
+    prop = {"CHR": nums[0], "INT": nums[1], "STR": nums[2], "MNY": nums[3]}
+    life.apply_property(prop)
+
+    # 模拟人生
+    init_prop = life.get_property()
+    results = list(life.run())
+    summary = life.gen_summary()
+
+    # 生成图片（线程池避免阻塞）
     try:
-        life = Life()
-        life.load()
-
-        # 随机选天赋
-        all_talents = life.rand_talents(10)
-        selected = _random_talents_no_conflict(all_talents, 3)
-        life.set_talents(selected)
-
-        # 随机分配属性
-        total = life.total_property()
-        nums = _random_attributes(total)
-        prop = {"CHR": nums[0], "INT": nums[1], "STR": nums[2], "MNY": nums[3]}
-        life.apply_property(prop)
-
-        # 模拟人生
-        init_prop = life.get_property()
-        results = list(life.run())
-        summary = life.gen_summary()
-
-        # 生成图片（线程池避免阻塞）
         img_bytes: BytesIO = await asyncio.to_thread(
             _generate_life_image, selected, init_prop, results, summary
         )
-        img_b64 = base64.b64encode(img_bytes.getvalue()).decode()
-
-        img_seg = MessageSegment.file_image(img_b64)
-        text_msg = message_add_head("🎴 人生重开模拟器", event)
-        msg = Message(text_msg).append(img_seg)
-        await random_life_cmd.finish(msg)
-
-    except Exception:
-        logger.error(f"人生重开失败:\n{traceback.format_exc()}")
+    except (OSError, ValueError) as e:
+        logger.error(f"人生重开图片生成失败: {e}")
         await random_life_cmd.finish(
             message_add_head("❌ 人生重开失败，请稍后再试", event)
         )
+    img_b64 = base64.b64encode(img_bytes.getvalue()).decode()
+
+    img_seg = MessageSegment.file_image(img_b64)
+    text_msg = message_add_head("🎴 人生重开模拟器", event)
+    msg = Message(text_msg).append(img_seg)
+    await random_life_cmd.finish(msg)
 
 
 # ─── 交互模式（手动选天赋+分属性） ──────────────────────
@@ -249,23 +247,22 @@ async def handle_attr_select(event: MessageEvent, state: T_State):
 
     await interactive_life_cmd.send(message_add_head("🔄 你的人生正在重开...", event))
 
-    try:
-        init_prop = life.get_property()
-        results = list(life.run())
-        summary = life.gen_summary()
+    init_prop = life.get_property()
+    results = list(life.run())
+    summary = life.gen_summary()
 
+    try:
         img_bytes: BytesIO = await asyncio.to_thread(
             _generate_life_image, selected, init_prop, results, summary
         )
-        img_b64 = base64.b64encode(img_bytes.getvalue()).decode()
-
-        img_seg = MessageSegment.file_image(img_b64)
-        text_msg = message_add_head("🎴 人生重开模拟器", event)
-        msg = Message(text_msg).append(img_seg)
-        await interactive_life_cmd.finish(msg)
-
-    except Exception:
-        logger.error(f"人生重开失败:\n{traceback.format_exc()}")
+    except (OSError, ValueError) as e:
+        logger.error(f"人生重开图片生成失败: {e}")
         await interactive_life_cmd.finish(
             message_add_head("❌ 人生重开失败，请稍后再试", event)
         )
+    img_b64 = base64.b64encode(img_bytes.getvalue()).decode()
+
+    img_seg = MessageSegment.file_image(img_b64)
+    text_msg = message_add_head("🎴 人生重开模拟器", event)
+    msg = Message(text_msg).append(img_seg)
+    await interactive_life_cmd.finish(msg)
