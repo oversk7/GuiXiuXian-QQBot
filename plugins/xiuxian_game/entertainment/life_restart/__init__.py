@@ -121,7 +121,7 @@ async def handle_random_life(event: MessageEvent, args: Message = CommandArg()):
         )
         await random_life_cmd.finish(build_markdown(content))
 
-    await random_life_cmd.send(build_markdown("# 🔄 你的人生正在重开..."))
+    await random_life_cmd.send("🔄 你的人生正在重开...")
 
     life = Life()
     life.load()
@@ -168,6 +168,32 @@ async def handle_random_life(event: MessageEvent, args: Message = CommandArg()):
 interactive_life_cmd = on_command("人生选择", priority=5, block=True)
 
 
+def _build_talent_list_md(all_talents: list[Talent], selected_indices: list[int], warning: str = "") -> MessageSegment:
+    """构建天赋选择列表 markdown，已选的显示 ✅，未选的序号为蓝字按钮"""
+    lines = []
+    for i, t in enumerate(all_talents):
+        tag = _GRADE_TAG.get(t.grade, "")
+        if i in selected_indices:
+            lines.append(f"✅ **{i}. {tag}{t.name}** {t.description}")
+        else:
+            lines.append(f"{cmd(str(i))} {tag}**{t.name}** {t.description}")
+    talent_text = "\n".join(lines)
+
+    count = len(selected_indices)
+    warn_line = f"**{warning}**\n" if warning else ""
+
+    content = (
+        f"# 🎲 人生重开 · 选择天赋（{count}/3）\n"
+        f"{warn_line}"
+        "点击序号选择，再点已选序号可取消\n"
+        "***\n"
+        f"{talent_text}\n"
+        "***\n"
+        f"> {cmd('随机')} 随机选择 | {cmd('取消')} 退出"
+    )
+    return build_markdown(content)
+
+
 @interactive_life_cmd.handle()
 async def handle_interactive_start(event: MessageEvent, state: T_State):
     life = Life()
@@ -176,35 +202,9 @@ async def handle_interactive_start(event: MessageEvent, state: T_State):
 
     state["life"] = life
     state["all_talents"] = all_talents
+    state["selected_indices"] = []
 
-    # 构建天赋列表 markdown
-    talent_lines = []
-    for i, t in enumerate(all_talents):
-        tag = _GRADE_TAG.get(t.grade, "")
-        talent_lines.append(f"{i}. {tag}**{t.name}** {t.description}")
-    talent_text = "\n".join(talent_lines)
-
-    # 生成几组随机推荐组合作为快捷按钮
-    suggestions = []
-    for _ in range(3):
-        combo = _random_talents_no_conflict(all_talents, 3)
-        idxs = sorted(all_talents.index(t) for t in combo)
-        suggestions.append(f"{idxs[0]} {idxs[1]} {idxs[2]}")
-    # 去重
-    suggestions = list(dict.fromkeys(suggestions))
-
-    btn_row = " | ".join(cmd(s) for s in suggestions)
-
-    content = (
-        "# 🎲 人生重开 · 选择天赋\n"
-        "选择 **3个** 天赋编号（如 0 1 2）\n"
-        "***\n"
-        f"{talent_text}\n"
-        "***\n"
-        f"> 推荐 {btn_row}\n"
-        f"> {cmd('随机')} 随机选择 | {cmd('取消')} 退出"
-    )
-    await interactive_life_cmd.send(build_markdown(content))
+    await interactive_life_cmd.send(_build_talent_list_md(all_talents, []))
 
 
 @interactive_life_cmd.got("talent_input")
@@ -212,6 +212,7 @@ async def handle_talent_select(event: MessageEvent, state: T_State):
     text = state["talent_input"].extract_plain_text().strip()
     all_talents: list[Talent] = state["all_talents"]
     life: Life = state["life"]
+    selected_indices: list[int] = state["selected_indices"]
 
     if text == "取消":
         await interactive_life_cmd.finish(
@@ -222,46 +223,84 @@ async def handle_talent_select(event: MessageEvent, state: T_State):
             )
         )
 
+    # ── 随机选天赋，直接进入属性分配 ──
     if text == "随机":
         selected = _random_talents_no_conflict(all_talents, 3)
-    else:
-        matched = re.fullmatch(r"\s*(\d)\s*(\d)\s*(\d)\s*", text)
-        if not matched:
-            await interactive_life_cmd.reject(
-                build_markdown(
-                    "**⚠️ 格式不对** — 请发送3个编号\n"
-                    f"> 例如 {cmd('0 1 2')} 或 {cmd('随机')}"
-                )
-            )
+        _proceed_to_attr(life, selected, state)
+        await interactive_life_cmd.send(_build_attr_prompt(selected, state))
+        return
 
+    # ── 一次性输入3个编号（如 "0 1 2"）──
+    matched = re.fullmatch(r"\s*(\d)\s+(\d)\s+(\d)\s*", text)
+    if matched:
         nums = sorted(set(int(n) for n in matched.groups()))
         if len(nums) != 3 or any(n >= len(all_talents) for n in nums):
             await interactive_life_cmd.reject(
-                build_markdown(
-                    "**⚠️ 编号不正确** — 请选择0~9之间的3个不同编号\n"
-                    f"> 例如 {cmd('0 1 2')} 或 {cmd('随机')}"
-                )
+                _build_talent_list_md(all_talents, selected_indices, "⚠️ 编号不正确，请选0~9之间的3个不同编号")
             )
-
         selected = [all_talents[n] for n in nums]
-
         for t1, t2 in itertools.combinations(selected, 2):
             if t1.exclusive_with(t2):
                 await interactive_life_cmd.reject(
-                    build_markdown(
-                        f"**⚠️ 天赋冲突** — 「{t1.name}」和「{t2.name}」不能同时选择\n"
-                        f"> {cmd('随机')} 随机选择 | 请重新发送编号"
-                    )
+                    _build_talent_list_md(all_talents, selected_indices, f"⚠️ 「{t1.name}」和「{t2.name}」冲突")
+                )
+        _proceed_to_attr(life, selected, state)
+        await interactive_life_cmd.send(_build_attr_prompt(selected, state))
+        return
+
+    # ── 单个序号点击：切换选中状态 ──
+    if text.isdigit() and 0 <= int(text) < len(all_talents):
+        idx = int(text)
+        if idx in selected_indices:
+            selected_indices.remove(idx)
+            await interactive_life_cmd.reject(
+                _build_talent_list_md(all_talents, selected_indices)
+            )
+        else:
+            if len(selected_indices) >= 3:
+                await interactive_life_cmd.reject(
+                    _build_talent_list_md(all_talents, selected_indices, "⚠️ 已选满3个，点已选序号可取消")
+                )
+            selected_indices.append(idx)
+
+            # 选满3个 → 检查冲突 → 自动进入属性分配
+            if len(selected_indices) == 3:
+                selected = [all_talents[n] for n in sorted(selected_indices)]
+                for t1, t2 in itertools.combinations(selected, 2):
+                    if t1.exclusive_with(t2):
+                        selected_indices.pop()  # 撤回最后一个
+                        await interactive_life_cmd.reject(
+                            _build_talent_list_md(
+                                all_talents, selected_indices,
+                                f"⚠️ 「{t1.name}」和「{t2.name}」冲突，已撤回"
+                            )
+                        )
+                _proceed_to_attr(life, selected, state)
+                await interactive_life_cmd.send(_build_attr_prompt(selected, state))
+                return
+            else:
+                await interactive_life_cmd.reject(
+                    _build_talent_list_md(all_talents, selected_indices)
                 )
 
+    # ── 无法识别 ──
+    await interactive_life_cmd.reject(
+        _build_talent_list_md(all_talents, selected_indices, "⚠️ 请点击序号或发送「随机」")
+    )
+
+
+def _proceed_to_attr(life: Life, selected: list[Talent], state: T_State):
+    """设置天赋并准备属性分配阶段"""
     life.set_talents(selected)
     state["selected_talents"] = selected
-    total = life.total_property()
-    state["total_prop"] = total
+    state["total_prop"] = life.total_property()
 
+
+def _build_attr_prompt(selected: list[Talent], state: T_State) -> MessageSegment:
+    """构建属性分配提示 markdown"""
+    total = state["total_prop"]
     talent_names = "、".join(f"**{t.name}**" for t in selected)
 
-    # 属性分配推荐按钮
     combos = _suggest_attr_combos(total)
     labels = ["均衡", "颜值", "智力", "体质"]
     combo_btns = []
@@ -279,7 +318,7 @@ async def handle_talent_select(event: MessageEvent, state: T_State):
         f"> {combo_row}\n"
         f"> {cmd('随机')} 随机分配"
     )
-    await interactive_life_cmd.send(build_markdown(content))
+    return build_markdown(content)
 
 
 @interactive_life_cmd.got("attr_input")
@@ -331,7 +370,7 @@ async def handle_attr_select(event: MessageEvent, state: T_State):
     prop = {"CHR": nums[0], "INT": nums[1], "STR": nums[2], "MNY": nums[3]}
     life.apply_property(prop)
 
-    await interactive_life_cmd.send(build_markdown("# 🔄 你的人生正在重开..."))
+    await interactive_life_cmd.send("🔄 你的人生正在重开...")
 
     init_prop = life.get_property()
     results = list(life.run())
