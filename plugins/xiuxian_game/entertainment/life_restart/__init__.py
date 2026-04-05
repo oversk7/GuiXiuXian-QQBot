@@ -1,38 +1,31 @@
 """人生重开模拟器 - 集成自 nonebot-plugin-remake"""
 
-import asyncio
-import base64
 import itertools
 import random
 import re
 import logging
-from io import BytesIO
 
 from nonebot import on_command
-from nonebot.adapters.qq import Message, MessageEvent, MessageSegment
+from nonebot.adapters.qq import Message, MessageEvent
 from nonebot.params import CommandArg
 from nonebot.typing import T_State
 
 from ...utils_markdown import cmd, build_markdown
-from .drawer import draw_life, save_jpg
 from .life import Life, PerAgeProperty, PerAgeResult
 from .property import Summary
 from .talent import Talent
 
 logger = logging.getLogger(__name__)
 
-# ─── 天赋稀有度标识 ───────────────────────────────────
+# ─── 天赋稀有度 emoji ────────────────────────────────
 
-_GRADE_TAG = {3: "【金】", 2: "【紫】", 1: "【蓝】", 0: ""}
+_GRADE_EMOJI = {3: "⭐", 2: "💜", 1: "💙", 0: ""}
 
 
-def _generate_life_image(
-    talents: list[Talent],
-    init_prop: PerAgeProperty,
-    results: list[PerAgeResult],
-    summary: Summary,
-) -> BytesIO:
-    return save_jpg(draw_life(talents, init_prop, results, summary))
+def _talent_display(t: Talent) -> str:
+    """天赋显示文本：emoji + 名称"""
+    e = _GRADE_EMOJI.get(t.grade, "")
+    return f"{e}{t.name}" if e else t.name
 
 
 def _random_talents_no_conflict(talents: list[Talent], count: int = 3) -> list[Talent]:
@@ -62,42 +55,83 @@ def _random_attributes(total: int) -> list[int]:
 def _suggest_attr_combos(total: int) -> list[list[int]]:
     """根据总点数生成几组推荐属性分配"""
     combos = []
-    # 均衡型
     base = total // 4
     remainder = total - base * 4
     balanced = [base] * 4
     for i in range(remainder):
         balanced[i] += 1
     combos.append(balanced)
-    # 颜值型
-    if total >= 10:
-        rest = total - 10
-        r = rest // 3
-        rem = rest - r * 3
-        c = [10, r, r, r]
-        for i in range(1, 1 + rem):
-            c[i] += 1
-        combos.append(c)
-    # 智力型
-    if total >= 10:
-        rest = total - 10
-        r = rest // 3
-        rem = rest - r * 3
-        c = [r, 10, r, r]
-        for i in [0, 2, 3][:rem]:
-            c[i] += 1
-        combos.append(c)
-    # 体质型
-    if total >= 10:
-        rest = total - 10
-        r = rest // 3
-        rem = rest - r * 3
-        c = [r, r, 10, r]
-        for i in [0, 1, 3][:rem]:
-            c[i] += 1
-        combos.append(c)
-    # 过滤掉超过10的
+    for focus_idx in range(4):
+        if total >= 10:
+            rest = total - 10
+            r = rest // 3
+            rem = rest - r * 3
+            c = [r] * 4
+            c[focus_idx] = 10
+            j = 0
+            for k in range(4):
+                if k != focus_idx and j < rem:
+                    c[k] += 1
+                    j += 1
+            combos.append(c)
     return [c for c in combos if max(c) <= 10]
+
+
+# ─── 文字版结果 ──────────────────────────────────────
+
+def _format_result_md(
+    selected: list[Talent],
+    init_prop: PerAgeProperty,
+    results: list[PerAgeResult],
+    summary: Summary,
+) -> str:
+    """将人生模拟结果格式化为 markdown 文本"""
+    # 天赋
+    talent_str = "、".join(f"**{_talent_display(t)}**" for t in selected)
+    # 初始属性
+    prop_str = (
+        f"颜值{init_prop.CHR} 智力{init_prop.INT} "
+        f"体质{init_prop.STR} 家境{init_prop.MNY} 快乐{init_prop.SPR}"
+    )
+    # 人生经历
+    event_lines = []
+    for r in results:
+        logs = r.event_log + r.talent_log
+        if logs:
+            log_text = "；".join(logs)
+            event_lines.append(f"**{r.property.AGE}岁** {log_text}")
+    events_str = "\n".join(event_lines)
+    # 总结
+    age = summary.AGE
+    sum_s = summary.SUM
+    prop_summaries = [
+        ("颜值", summary.CHR),
+        ("智力", summary.INT),
+        ("体质", summary.STR),
+        ("家境", summary.MNY),
+        ("快乐", summary.SPR),
+    ]
+    summary_lines = []
+    for name, ps in prop_summaries:
+        filled = min(max(ps.value, 0), 10)
+        bar = "▓" * filled + "░" * (10 - filled)
+        summary_lines.append(f"{name} {bar} **{ps.value}**（{ps.judge}）")
+    summary_str = "\n".join(summary_lines)
+
+    content = (
+        f"# 🎴 人生重开模拟器\n"
+        f"**天赋** {talent_str}\n"
+        f"**属性** {prop_str}\n"
+        "***\n"
+        f"{events_str}\n"
+        "***\n"
+        f"**享年** {age.value}岁（{age.judge}）\n"
+        f"{summary_str}\n"
+        f"**总评** {sum_s.value}（{sum_s.judge}）\n"
+        "***\n"
+        f"> {cmd('随机人生')} 再来一次 | {cmd('人生选择')} 自选天赋 | {cmd('福利娱乐')} 返回"
+    )
+    return content
 
 
 # ─── 随机人生（一键随机） ────────────────────────────────
@@ -121,8 +155,6 @@ async def handle_random_life(event: MessageEvent, args: Message = CommandArg()):
         )
         await random_life_cmd.finish(build_markdown(content))
 
-    await random_life_cmd.send("🔄 你的人生正在重开...")
-
     life = Life()
     life.load()
 
@@ -139,28 +171,8 @@ async def handle_random_life(event: MessageEvent, args: Message = CommandArg()):
     results = list(life.run())
     summary = life.gen_summary()
 
-    try:
-        img_bytes: BytesIO = await asyncio.to_thread(
-            _generate_life_image, selected, init_prop, results, summary
-        )
-    except (OSError, ValueError) as e:
-        logger.error(f"人生重开图片生成失败: {e}")
-        await random_life_cmd.finish(build_markdown("# ❌ 人生重开失败\n请稍后再试"))
-
-    img_b64 = base64.b64encode(img_bytes.getvalue()).decode()
-    img_seg = MessageSegment.file_image(img_b64)
-
-    # 结果文字摘要 + 操作按钮
-    age = summary.AGE
-    sum_s = summary.SUM
-    content = (
-        f"# 🎴 人生重开模拟器\n"
-        f"享年 **{age.value}岁**（{age.judge}）| 总评 **{sum_s.value}**（{sum_s.judge}）\n"
-        "***\n"
-        f"> {cmd('随机人生')} 再来一次 | {cmd('人生选择')} 自选天赋 | {cmd('福利娱乐')} 返回"
-    )
-    msg = Message(build_markdown(content)).append(img_seg)
-    await random_life_cmd.finish(msg)
+    content = _format_result_md(selected, init_prop, results, summary)
+    await random_life_cmd.finish(build_markdown(content))
 
 
 # ─── 交互模式（手动选天赋+分属性） ──────────────────────
@@ -168,15 +180,16 @@ async def handle_random_life(event: MessageEvent, args: Message = CommandArg()):
 interactive_life_cmd = on_command("人生选择", priority=5, block=True)
 
 
-def _build_talent_list_md(all_talents: list[Talent], selected_indices: list[int], warning: str = "") -> MessageSegment:
+def _build_talent_list_md(all_talents: list[Talent], selected_indices: list[int], warning: str = ""):
     """构建天赋选择列表 markdown，已选的显示 ✅，未选的序号为蓝字按钮"""
     lines = []
     for i, t in enumerate(all_talents):
-        tag = _GRADE_TAG.get(t.grade, "")
+        emoji = _GRADE_EMOJI.get(t.grade, "")
+        prefix = f"{emoji}" if emoji else ""
         if i in selected_indices:
-            lines.append(f"✅ **{i}. {tag}{t.name}** {t.description}")
+            lines.append(f"✅ **{i}. {prefix}{t.name}** {t.description}")
         else:
-            lines.append(f"{cmd(str(i))} {tag}**{t.name}** {t.description}")
+            lines.append(f"{cmd(str(i))} {prefix}**{t.name}** {t.description}")
     talent_text = "\n".join(lines)
 
     count = len(selected_indices)
@@ -268,7 +281,7 @@ async def handle_talent_select(event: MessageEvent, state: T_State):
                 selected = [all_talents[n] for n in sorted(selected_indices)]
                 for t1, t2 in itertools.combinations(selected, 2):
                     if t1.exclusive_with(t2):
-                        selected_indices.pop()  # 撤回最后一个
+                        selected_indices.pop()
                         await interactive_life_cmd.reject(
                             _build_talent_list_md(
                                 all_talents, selected_indices,
@@ -296,10 +309,10 @@ def _proceed_to_attr(life: Life, selected: list[Talent], state: T_State):
     state["total_prop"] = life.total_property()
 
 
-def _build_attr_prompt(selected: list[Talent], state: T_State) -> MessageSegment:
+def _build_attr_prompt(selected: list[Talent], state: T_State):
     """构建属性分配提示 markdown"""
     total = state["total_prop"]
-    talent_names = "、".join(f"**{t.name}**" for t in selected)
+    talent_names = "、".join(f"**{_talent_display(t)}**" for t in selected)
 
     combos = _suggest_attr_combos(total)
     labels = ["均衡", "颜值", "智力", "体质"]
@@ -370,32 +383,9 @@ async def handle_attr_select(event: MessageEvent, state: T_State):
     prop = {"CHR": nums[0], "INT": nums[1], "STR": nums[2], "MNY": nums[3]}
     life.apply_property(prop)
 
-    await interactive_life_cmd.send("🔄 你的人生正在重开...")
-
     init_prop = life.get_property()
     results = list(life.run())
     summary = life.gen_summary()
 
-    try:
-        img_bytes: BytesIO = await asyncio.to_thread(
-            _generate_life_image, selected, init_prop, results, summary
-        )
-    except (OSError, ValueError) as e:
-        logger.error(f"人生重开图片生成失败: {e}")
-        await interactive_life_cmd.finish(
-            build_markdown("# ❌ 人生重开失败\n请稍后再试")
-        )
-
-    img_b64 = base64.b64encode(img_bytes.getvalue()).decode()
-    img_seg = MessageSegment.file_image(img_b64)
-
-    age = summary.AGE
-    sum_s = summary.SUM
-    content = (
-        f"# 🎴 人生重开模拟器\n"
-        f"享年 **{age.value}岁**（{age.judge}）| 总评 **{sum_s.value}**（{sum_s.judge}）\n"
-        "***\n"
-        f"> {cmd('随机人生')} 再来一次 | {cmd('人生选择')} 自选天赋 | {cmd('福利娱乐')} 返回"
-    )
-    msg = Message(build_markdown(content)).append(img_seg)
-    await interactive_life_cmd.finish(msg)
+    content = _format_result_md(selected, init_prop, results, summary)
+    await interactive_life_cmd.finish(build_markdown(content))
