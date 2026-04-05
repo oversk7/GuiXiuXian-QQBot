@@ -1,7 +1,6 @@
 from nonebot import on_command
 from nonebot.params import CommandArg, ArgPlainText
 from nonebot.adapters.qq import MessageEvent, Message, MessageSegment
-from nonebot.adapters.qq.models import MessageMarkdown, MessageMarkdownParams
 from nonebot.typing import T_State
 from ..models.db import safe_session, AsyncSessionLocal
 from ..models.player import Player
@@ -457,58 +456,34 @@ async def create_player(event: MessageEvent, nickname: str, gender: Gender) -> M
 
         card_type = random.choice(('🎲','🀄️','🀃','🀅','🀆','🀀','🀁','🀂','🀒','🀚','🀣'))
 
-        # 使用反馈类模版 (102499345_1769177016)
-        title = f"⚰️ 棺盖移位，黑暗替你呼吸——欢迎回到人间"
-
-        result_text = (
-            f"┌── 🃏新牌出世🃏 ──┐\r"
-            f"🪬 道号  : {card_type}{nickname}\r"
-            f"🆔 UID   : {new_player.uid}\r"
-            f"⚧️ 性别  : {new_player.sex.value}\r"
-            f"━━━━━━━━━━━━━\r"
-            f"🌍 世界简介：\r"
-            f"本游戏有两个世界——【现实】与【诡域】\r"
-            f"・现实：安全地带，随时可以休息恢复\r"
-            f"・诡域：危险异界，传送过去需消耗「咒抗」\r"
-            f"  进入诡域后只有「驿站」才能休息\r"
-            f"  无驿站时只能靠嗑药维持状态\r"
-            f"  想回来？发送【返回】即可回到现实\r"
-            f"━━━━━━━━━━━━━\r"
-            f"📜 你的第一天路线：\r"
-            f"1. 【修炼】提升等级 → 攒够经验后【突破】\r"
-            f"2. 【打工】赚金币 → 用来买装备和药品\r"
-            f"3. 【签到】领每日奖励\r"
-            f"4. 【面板】查看自己的状态\r"
-            f"━━━━━━━━━━━━━\r"
-            f"💡 系统为你生成了道号，可签到后用改名卡修改\r"
-            f"💡 新手任务已开启，跟着做就能快速变强！\r"
-            f"💡 发送【新手指引】查看完整成长路线\r"
-            f"💡 指令不要带【】括号，空格不能少"
+        content = (
+            f"# ⚰️ 棺盖移位，你醒了\n"
+            f"黑暗替你呼吸——欢迎回到人间。\n"
+            f"***\n"
+            f"{card_type} **{nickname}**　UID:**{new_player.uid}**　{new_player.sex.value}\n"
+            f"📍 你在 **{spawn_market.name}**\n"
+            f"***\n"
+            f"**🌍 两个世界**\n"
+            f"・**现实** — 安全地带，休息恢复、买卖交易\n"
+            f"・**诡域** — 危险异界，探索刷怪、获取材料\n"
+            f"　进入需消耗「咒抗」，只有驿站能休息\n"
+            f"　发送 {cmd('返回')} 可随时回到现实\n"
+            f"***\n"
+            f"**👁️ 第一件事：睁开眼**\n"
+            f"点击 {cmd('观察')} 看看你身边有什么\n"
+            f"然后跟着 **新手任务** 的指引走，完成有奖励\n"
+            f"***\n"
+            f"**📜 每天记得做**\n"
+            f"{cmd('签到')} 领奖励（首次送改名卡）\n"
+            f"{cmd('修炼')} 攒经验 → {cmd('突破')} 升级\n"
+            f"{cmd('打工')} 赚金币 → 买装备和药品\n"
+            f"***\n"
+            f"⚠️ 指令不要带【】括号，空格不能少\n"
+            f"***\n"
+            f"{cmd('观察')} | {cmd('签到')} | {cmd('新手指引')} | {cmd('帮助')}"
         )
 
-        # 构建Markdown模板参数
-        template_params = [
-            MessageMarkdownParams(key="title", values=[title]),
-            MessageMarkdownParams(key="result", values=[result_text]),
-            MessageMarkdownParams(key="btn1", values=["修炼"]),
-            MessageMarkdownParams(key="btn2", values=["打工"]),
-            MessageMarkdownParams(key="btn3", values=["签到"]),
-            MessageMarkdownParams(key="btn4", values=["面板"]),
-            MessageMarkdownParams(key="btn5", values=["新手指引"]),
-            MessageMarkdownParams(key="btn6", values=["突破"]),
-            MessageMarkdownParams(key="btn7", values=["背包"]),
-            MessageMarkdownParams(key="btn8", values=["帮助"]),
-        ]
-
-        markdown = MessageMarkdown(
-            custom_template_id="102499345_1769177016",
-            params=template_params
-        )
-
-        # 构建消息
-        msg = Message("🎉 角色创建成功")
-        msg.append(MessageSegment.markdown(markdown))
-        return msg
+        return Message(build_markdown(content))
 
 
 @change_gender.handle()
