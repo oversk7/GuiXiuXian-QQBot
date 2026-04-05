@@ -78,13 +78,15 @@ html,body{width:100%;height:100%;overflow:hidden;background:#080c18;color:#a0c4e
 @media(max-width:640px){
   #hdr{height:44px;padding:0 10px}
   #hdr .logo{font-size:13px;letter-spacing:1px}
-  #search-box{margin-left:10px;flex:1 1 100px}
-  #search{padding:5px 8px 5px 26px;font-size:12px}
+  #search-box{margin-left:8px;flex:1 1 80px;min-width:0}
+  #search{padding:5px 8px 5px 26px;font-size:14px}
   #search-icon{left:7px;font-size:12px}
   #stats{display:none}
   #stats.show{display:flex;position:fixed;top:44px;left:0;right:0;background:rgba(8,12,24,.95);padding:8px 16px;gap:12px;justify-content:center;border-bottom:1px solid rgba(0,200,255,.1);z-index:99}
   #stats-btn{display:flex}
   #conn{margin-left:4px}
+  #tower-link{font-size:0!important;padding:3px 6px!important;margin-left:6px!important}
+  #tower-link::before{content:'▲';font-size:13px}
   #map-canvas{top:44px;height:calc(100vh - 70px)}
   #filter-btn{top:50px;left:8px;width:32px;height:32px;font-size:14px}
   #filter-panel{top:50px;left:46px;padding:10px 12px}
@@ -95,6 +97,14 @@ html,body{width:100%;height:100%;overflow:hidden;background:#080c18;color:#a0c4e
   #panel{top:auto;bottom:26px;right:0;left:0;width:100%;border-radius:12px 12px 0 0;padding:14px 16px 10px;max-width:100%;z-index:160}
   #legend.hide-mobile{display:none}
   #ftr{height:26px;padding:0 10px;font-size:10px;gap:10px}
+}
+/* 竖屏：搜索框聚焦时全宽展开 */
+@media(max-width:400px){
+  #hdr .logo{display:none}
+  #search-box{margin-left:0}
+}
+@media(max-width:640px){
+  #search:focus{position:absolute;left:10px;right:50px;width:auto;z-index:10;background:rgba(8,12,24,.98)}
 }
 </style>
 </head>
