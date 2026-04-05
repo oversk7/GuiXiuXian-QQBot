@@ -289,7 +289,7 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
                 # 对于旧任务，无法准确计算进度，使用剩余距离作为参考
                 # 但我们可以保存当前剩余距离，下次查看时就能显示进度了
                 task.initial_distance = rem_distance if rem_distance > 0 else 1.0
-                progress_info = "📊 进度: [更新中...] (旧任务重新计算)\n"
+                progress_info = "📊 进度: [更新中...] 首次查询，下次可显示\n"
             elif task.initial_distance > 0:
                 # 已完成距离 = 初始距离 - 剩余距离
                 completed_distance = max(0, task.initial_distance - rem_distance)

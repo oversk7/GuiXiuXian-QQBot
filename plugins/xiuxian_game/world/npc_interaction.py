@@ -567,7 +567,7 @@ async def handle_station_master_interaction(session, player: Player, npc, event:
         if m_cluster not in cluster_nearest or dist < cluster_nearest[m_cluster][1]:
             cluster_nearest[m_cluster] = (market, dist)
 
-    for c_name, (market, dist) in sorted(cluster_nearest.items(), key=lambda x: x[1]):
+    for c_name, (market, dist) in sorted(cluster_nearest.items(), key=lambda x: x[1][1]):
         other_cluster_lines.append(
             f"  🗺️ {c_name} → {cmd(market.name, f'导航 {market.name}')} ({dist}格)"
         )
