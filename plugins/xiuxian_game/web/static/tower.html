@@ -16,7 +16,7 @@ html,body{width:100%;height:100%;overflow:hidden;background:#06080f;color:#a0c4e
 #hdr .back{color:rgba(160,196,232,.5);text-decoration:none;font-size:12px;margin-right:14px;border:1px solid rgba(160,196,232,.15);border-radius:4px;padding:3px 8px;transition:all .2s}
 #hdr .back:hover{color:#00f0ff;border-color:rgba(0,240,255,.3)}
 
-#tower-canvas{display:block;position:fixed;top:48px;left:0;cursor:grab}
+#tower-canvas{display:block;position:fixed;top:48px;left:0;cursor:grab;touch-action:none}
 #tower-canvas:active{cursor:grabbing}
 
 /* Detail panel */
@@ -56,11 +56,15 @@ html,body{width:100%;height:100%;overflow:hidden;background:#06080f;color:#a0c4e
   #hdr{height:40px;padding:0 10px}
   #hdr .logo{font-size:13px}
   #hdr .stats{display:none}
-  #tower-canvas{top:40px}
-  #detail{width:100%;top:auto;bottom:26px;max-height:50vh;border-left:none;border-top:1px solid rgba(180,80,255,.15);border-radius:10px 10px 0 0}
+  #tower-canvas{top:40px;touch-action:none}
+  #detail{width:100%;top:auto;bottom:0;max-height:55vh;border-left:none;border-top:1px solid rgba(180,80,255,.15);border-radius:10px 10px 0 0;padding:14px 16px 20px;z-index:110}
+  #detail .grid-detail canvas{max-height:40vh}
   #hints{display:none}
-  #ftr{height:26px;font-size:9px;padding:0 8px}
-  #nav{bottom:34px}
+  #ftr{display:none}
+  #nav{bottom:10px}
+  #nav button{padding:10px 18px;font-size:14px;min-height:44px}
+  #nav .page-info{font-size:13px}
+  .mobile-hint{position:fixed;bottom:60px;left:0;right:0;text-align:center;font-size:10px;color:rgba(160,196,232,.2);z-index:99;pointer-events:none}
 }
 </style>
 </head>
@@ -106,6 +110,7 @@ html,body{width:100%;height:100%;overflow:hidden;background:#06080f;color:#a0c4e
   <button id="nav-next">&darr; 深层</button>
 </div>
 
+<div class="mobile-hint" id="mobile-hint">↕ 上下滑动浏览 &nbsp; ↔ 左右滑动旋转 &nbsp; 双指缩放</div>
 <div id="hints">
   <kbd>拖拽</kbd> 旋转 &nbsp; <kbd>滚轮</kbd> 上下移动<br>
   <kbd>&uarr;&darr;</kbd> 翻页 &nbsp; <kbd>点击</kbd> 查看层详情
@@ -149,10 +154,11 @@ const ctx = canvas.getContext('2d');
 let W = 0, H = 0;
 
 // Camera
+const isMobile = window.innerWidth <= 640;
 let azimuth = -0.6;       // horizontal rotation (radians)
 let elevation = 0.55;      // vertical tilt (radians), 0=side, PI/2=top
 let scrollY = 0;           // vertical scroll offset (world-units)
-let zoom = 3.5;
+let zoom = isMobile ? 2.2 : 3.5;
 
 // Data
 let currentPage = 1;
@@ -198,9 +204,9 @@ function project(x, y, z) {
 // ============================================================
 function resize() {
   const dpr = window.devicePixelRatio || 1;
-  const isMobile = window.innerWidth <= 640;
+  const mobile = window.innerWidth <= 640;
   W = window.innerWidth;
-  H = window.innerHeight - (isMobile ? 66 : 80);
+  H = window.innerHeight - (mobile ? 40 : 80); // mobile: header only, no footer
   canvas.width = Math.round(W * dpr);
   canvas.height = Math.round(H * dpr);
   canvas.style.width = W + 'px';
@@ -577,39 +583,75 @@ canvas.addEventListener('wheel', e => {
   scrollY = Math.max(-maxScroll - 100, Math.min(100, scrollY));
 }, {passive: false});
 
-// Touch
-let touchDragging = false;
+// ---- Touch: direction-locked gestures ----
+let touchMode = null;  // null | 'scroll' | 'rotate' | 'pinch'
+let touchStartX = 0, touchStartY = 0;
+let touchStartAz = 0, touchStartScroll = 0;
+let touchPinchDist = 0, touchPinchZoom = 0;
+const LOCK_THRESHOLD = 12; // px before locking direction
+
 canvas.addEventListener('touchstart', e => {
-  if (e.touches.length === 1) {
-    touchDragging = true;
-    dragX = e.touches[0].clientX;
-    dragY = e.touches[0].clientY;
-    dragAz = azimuth;
-    dragEl = elevation;
-  }
   e.preventDefault();
+  if (e.touches.length === 2) {
+    // Pinch zoom
+    touchMode = 'pinch';
+    const t = e.touches;
+    touchPinchDist = Math.hypot(t[1].clientX - t[0].clientX, t[1].clientY - t[0].clientY);
+    touchPinchZoom = zoom;
+  } else if (e.touches.length === 1) {
+    touchMode = null; // will be locked on first move
+    touchStartX = e.touches[0].clientX;
+    touchStartY = e.touches[0].clientY;
+    touchStartAz = azimuth;
+    touchStartScroll = scrollY;
+  }
 }, {passive: false});
 
 canvas.addEventListener('touchmove', e => {
-  if (touchDragging && e.touches.length === 1) {
-    azimuth = dragAz + (e.touches[0].clientX - dragX) * 0.006;
-    elevation = Math.max(0.15, Math.min(1.45, dragEl - (e.touches[0].clientY - dragY) * 0.006));
-  }
   e.preventDefault();
+  if (e.touches.length === 2 && touchMode === 'pinch') {
+    const t = e.touches;
+    const dist = Math.hypot(t[1].clientX - t[0].clientX, t[1].clientY - t[0].clientY);
+    const scale = dist / touchPinchDist;
+    zoom = Math.max(1, Math.min(8, touchPinchZoom * scale));
+    return;
+  }
+  if (e.touches.length !== 1) return;
+
+  const dx = e.touches[0].clientX - touchStartX;
+  const dy = e.touches[0].clientY - touchStartY;
+
+  // Lock direction on first significant movement
+  if (touchMode === null) {
+    if (Math.abs(dx) > LOCK_THRESHOLD || Math.abs(dy) > LOCK_THRESHOLD) {
+      touchMode = Math.abs(dx) > Math.abs(dy) ? 'rotate' : 'scroll';
+    } else {
+      return;
+    }
+  }
+
+  if (touchMode === 'scroll') {
+    // Vertical drag → scroll tower up/down
+    scrollY = touchStartScroll + dy * 0.8;
+    const maxScroll = Math.max(0, (layersData.length - 1) * LAYER_H);
+    scrollY = Math.max(-maxScroll - 100, Math.min(100, scrollY));
+  } else if (touchMode === 'rotate') {
+    // Horizontal drag → rotate azimuth
+    azimuth = touchStartAz + dx * 0.008;
+  }
 }, {passive: false});
 
 canvas.addEventListener('touchend', e => {
-  if (touchDragging && e.changedTouches.length === 1) {
+  // Tap detection: no mode lock means no significant movement
+  if (touchMode === null && e.changedTouches.length === 1) {
     const rect = canvas.getBoundingClientRect();
-    const dx = e.changedTouches[0].clientX - dragX;
-    const dy = e.changedTouches[0].clientY - dragY;
-    if (Math.abs(dx) < 10 && Math.abs(dy) < 10) {
-      const lv = hitTest(e.changedTouches[0].clientX - rect.left, e.changedTouches[0].clientY - rect.top);
-      if (lv !== null) selectFloor(lv);
-    }
+    const mx = e.changedTouches[0].clientX - rect.left;
+    const my = e.changedTouches[0].clientY - rect.top;
+    const lv = hitTest(mx, my);
+    if (lv !== null) selectFloor(lv);
   }
-  touchDragging = false;
-});
+  touchMode = null;
+}, {passive: false});
 
 // Keyboard
 window.addEventListener('keydown', e => {
