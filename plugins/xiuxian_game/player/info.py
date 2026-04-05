@@ -416,11 +416,18 @@ async def create_player(event: MessageEvent, nickname: str, gender: Gender) -> M
         # 使用UUID作为Player.id，支持转让后重新注册
         player_id = str(uuid.uuid4()).replace("-", "")[:32]
 
+        # 随机选择一个城市作为出生点
+        import random as _rng
+        from ..economy.merchants import MARKETS
+        spawn_market = _rng.choice(MARKETS)
+
         new_player = Player(
             id=player_id,
             uid=max_uid + 1,
             nickname=nickname,
             sex=gender,
+            real_world_x=spawn_market.x,
+            real_world_y=spawn_market.y,
             created_at=datetime.now()
         )
 
