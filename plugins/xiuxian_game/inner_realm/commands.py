@@ -25,11 +25,29 @@ import json
 
 # ==================== 规则定义 ====================
 async def in_inner_realm_rule(event: MessageEvent) -> bool:
-    """检查玩家是否在里界中"""
-    def session_factory():
-        return AsyncSessionLocal()
+    """检查玩家是否在里界中（轻量版：优先走缓存，避免每条消息都查 DB）"""
+    from ..platform_utils import get_platform_info
+    from ..infrastructure.cache import player_identity_cache, player_data_cache
 
     try:
+        _, user_id = get_platform_info(event)
+
+        # 1. 先查身份缓存拿 player_id
+        if not player_identity_cache.has(user_id):
+            return False  # 未缓存，说明该玩家从未发过指令，不可能在里界
+        cached_player_id = player_identity_cache.get(user_id)
+        if cached_player_id is None:
+            return False
+
+        # 2. 再查数据缓存拿 inner_realm 字段
+        cached_data = player_data_cache.get(cached_player_id)
+        if cached_data is not None:
+            return cached_data.get("inner_realm") is not None
+
+        # 3. 缓存都未命中才查 DB（极少走到这里）
+        def session_factory():
+            return AsyncSessionLocal()
+
         async with UnitOfWork(session_factory) as uow:
             player = await get_unified_player(uow.session, event)
             return player is not None and player.inner_realm is not None
