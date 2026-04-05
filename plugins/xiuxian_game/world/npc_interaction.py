@@ -21,7 +21,7 @@ from .npc_service import NPCService
 
 
 # ==================== NPC交互命令 ====================
-interact_cmd = on_command("交互", aliases={"找"}, block=True, priority=5)
+interact_cmd = on_command("交互", block=True, priority=5)
 
 
 @interact_cmd.handle()
@@ -384,7 +384,7 @@ async def handle_social_agent_interaction(session, player: Player, npc, event: M
         elif "结义" in content or "义" in content or "兄弟" in content:
             await handle_sworn_envoy_interaction(session, player, npc, event, dialogue_content)
             return
-        elif "师" in content or "拜师" in content or "收徒" in content or "香火" in content or "食谱" in content:
+        elif "师" in content or "拜师" in content or "收徒" in content or "香火" in content or "食谱" in content or "徒弟" in content or "逐出" in content or "叛" in content:
             await handle_mentor_envoy_interaction(session, player, npc, event, dialogue_content)
             return
 
@@ -408,6 +408,7 @@ async def handle_intelligence_dealer_interaction(session, player: Player, npc, e
     """处理情报贩子NPC交互 - 显示本集群物价对比和跑商建议"""
     from ..economy.merchants import MARKETS, CITY_CLUSTERS, CITY_TO_CLUSTER
     from ..economy.merchants import _price_for, LIMITED_GOODS
+    from ..models.market_state import MarketState
     from ..config import config as game_config
 
     location = npc.location
@@ -418,8 +419,10 @@ async def handle_intelligence_dealer_interaction(session, player: Player, npc, e
     cluster_name = CITY_TO_CLUSTER.get(city_name, "未知")
     cluster_cities = CITY_CLUSTERS.get(cluster_name, [])
 
-    # 收集本集群各城市的物价信息
-    price_data = {}  # {city_name: {item_id: (sell_price, buy_price)}}
+    # 收集本集群各城市的物价和库存信息
+    # {city_name: {item_id: (sell_price, buy_price, stock)}}
+    price_data = {}
+    market_by_name = {m.name: m for m in MARKETS}
 
     for market in MARKETS:
         if market.name not in cluster_cities:
@@ -427,10 +430,11 @@ async def handle_intelligence_dealer_interaction(session, player: Player, npc, e
         city_prices = {}
         for item_id in market.sellable_items:
             if item_id not in LIMITED_GOODS:
-                continue  # 只显示跑商商品
+                continue
             try:
                 sell_price, buy_price = await _price_for(session, market, item_id)
-                city_prices[item_id] = (sell_price, buy_price)
+                ms = await MarketState.get_or_create(session, market.id, item_id)
+                city_prices[item_id] = (sell_price, buy_price, ms.current_stock)
             except ValueError:
                 continue
         price_data[market.name] = city_prices
@@ -441,26 +445,19 @@ async def handle_intelligence_dealer_interaction(session, player: Player, npc, e
         for dst_name, dst_prices in price_data.items():
             if src_name == dst_name:
                 continue
-            # 在src买、在dst卖
-            for item_id, (sell_price, _) in src_prices.items():
-                # 检查dst是否收购此商品
-                dst_market = None
-                for m in MARKETS:
-                    if m.name == dst_name:
-                        dst_market = m
-                        break
+            for item_id, (sell_price, _, src_stock) in src_prices.items():
+                dst_market = market_by_name.get(dst_name)
                 if not dst_market or not dst_market.can_buy_from_player(item_id):
                     continue
-                try:
-                    _, dst_buy_price = await _price_for(session, dst_market, item_id)
-                except ValueError:
+                if item_id not in dst_prices:
                     continue
+                _, dst_buy_price, _ = dst_prices[item_id]
                 profit = dst_buy_price - sell_price
                 if profit > 0:
                     item_cfg = game_config.items_config["by_id"].get(item_id)
                     item_name = item_cfg.name if item_cfg else item_id
                     profit_rate = round(profit / sell_price * 100)
-                    best_routes.append((item_name, src_name, dst_name, sell_price, dst_buy_price, profit, profit_rate))
+                    best_routes.append((item_name, src_name, dst_name, sell_price, dst_buy_price, profit, profit_rate, src_stock))
 
     # 按利润率排序，取前5
     best_routes.sort(key=lambda x: x[6], reverse=True)
@@ -473,10 +470,10 @@ async def handle_intelligence_dealer_interaction(session, player: Player, npc, e
     ]
 
     if best_routes:
-        lines.append(f"**📊 {cluster_name}今日跑商推荐：**")
-        for item_name, src, dst, buy_p, sell_p, profit, rate in best_routes[:5]:
+        lines.append(f"📊 {cluster_name}今日跑商推荐：")
+        for item_name, src, dst, buy_p, sell_p, profit, rate, stock in best_routes[:5]:
             lines.append(
-                f"  💰 {item_name}: {src}买({buy_p}💎)→{dst}卖({sell_p}💎) 利润{profit}💎({rate}%)"
+                f"  💰 {item_name}: {src}({buy_p}金币)→{dst}({sell_p}金币) +{profit}({rate}%) 库存:{stock}"
             )
     else:
         lines.append("💬 「今天行情不好，没什么赚头...」")
@@ -484,15 +481,15 @@ async def handle_intelligence_dealer_interaction(session, player: Player, npc, e
     # 本城物价概览
     if city_name in price_data and price_data[city_name]:
         lines.append("")
-        lines.append(f"**🏪 {city_name}今日出售价：**")
+        lines.append(f"🏪 {city_name}今日物价：")
         city_prices = price_data[city_name]
-        for item_id, (sell_price, _) in sorted(city_prices.items(), key=lambda x: x[1][0], reverse=True)[:8]:
+        for item_id, (sell_price, _, stock) in sorted(city_prices.items(), key=lambda x: x[1][0], reverse=True)[:8]:
             item_cfg = game_config.items_config["by_id"].get(item_id)
             item_name = item_cfg.name if item_cfg else item_id
-            lines.append(f"  {item_name}: {sell_price}💎")
+            lines.append(f"  {item_name}: {sell_price}金币 (库存:{stock})")
 
     lines.append("━━━━━━━━━━━━━")
-    lines.append("💡 价格每日09:00刷新")
+    lines.append("💡 价格受供需实时浮动，库存有限先到先得")
 
     await interact_cmd.finish(message_add_head("\n".join(lines), event))
 
