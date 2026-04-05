@@ -1,16 +1,20 @@
 """人生重开模拟器 - 集成自 nonebot-plugin-remake"""
 
+import asyncio
+import base64
 import itertools
 import random
 import re
 import logging
+from io import BytesIO
 
 from nonebot import on_command
-from nonebot.adapters.qq import Message, MessageEvent
+from nonebot.adapters.qq import Message, MessageEvent, MessageSegment
 from nonebot.params import CommandArg
 from nonebot.typing import T_State
 
 from ...utils_markdown import cmd, build_markdown
+from .drawer import draw_life, save_jpg
 from .life import Life, PerAgeProperty, PerAgeResult
 from .property import Summary
 from .talent import Talent
@@ -23,7 +27,6 @@ _GRADE_EMOJI = {3: "⭐", 2: "💜", 1: "💙", 0: ""}
 
 
 def _talent_display(t: Talent) -> str:
-    """天赋显示文本：emoji + 名称"""
     e = _GRADE_EMOJI.get(t.grade, "")
     return f"{e}{t.name}" if e else t.name
 
@@ -53,7 +56,6 @@ def _random_attributes(total: int) -> list[int]:
 
 
 def _suggest_attr_combos(total: int) -> list[list[int]]:
-    """根据总点数生成几组推荐属性分配"""
     combos = []
     base = total // 4
     remainder = total - base * 4
@@ -77,61 +79,39 @@ def _suggest_attr_combos(total: int) -> list[list[int]]:
     return [c for c in combos if max(c) <= 10]
 
 
-# ─── 文字版结果 ──────────────────────────────────────
-
-def _format_result_md(
-    selected: list[Talent],
+def _generate_life_image(
+    talents: list[Talent],
     init_prop: PerAgeProperty,
     results: list[PerAgeResult],
     summary: Summary,
-) -> str:
-    """将人生模拟结果格式化为 markdown 文本"""
-    # 天赋
-    talent_str = "、".join(f"**{_talent_display(t)}**" for t in selected)
-    # 初始属性
-    prop_str = (
-        f"颜值{init_prop.CHR} 智力{init_prop.INT} "
-        f"体质{init_prop.STR} 家境{init_prop.MNY} 快乐{init_prop.SPR}"
-    )
-    # 人生经历
-    event_lines = []
-    for r in results:
-        logs = r.event_log + r.talent_log
-        if logs:
-            log_text = "；".join(logs)
-            event_lines.append(f"**{r.property.AGE}岁** {log_text}")
-    events_str = "\n".join(event_lines)
-    # 总结
+) -> BytesIO:
+    return save_jpg(draw_life(talents, init_prop, results, summary))
+
+
+async def _send_life_result(matcher, selected, init_prop, results, summary):
+    """生成图片并发送结果（图片 + markdown 按钮分两条消息）"""
+    try:
+        img_bytes: BytesIO = await asyncio.to_thread(
+            _generate_life_image, selected, init_prop, results, summary
+        )
+    except (OSError, ValueError) as e:
+        logger.error(f"人生重开图片生成失败: {e}")
+        await matcher.finish("❌ 人生重开失败，请稍后再试")
+
+    # 第一条：图片
+    img_b64 = base64.b64encode(img_bytes.getvalue()).decode()
+    await matcher.send(MessageSegment.file_image(img_b64))
+
+    # 第二条：摘要 + 操作按钮（markdown）
     age = summary.AGE
     sum_s = summary.SUM
-    prop_summaries = [
-        ("颜值", summary.CHR),
-        ("智力", summary.INT),
-        ("体质", summary.STR),
-        ("家境", summary.MNY),
-        ("快乐", summary.SPR),
-    ]
-    summary_lines = []
-    for name, ps in prop_summaries:
-        filled = min(max(ps.value, 0), 10)
-        bar = "▓" * filled + "░" * (10 - filled)
-        summary_lines.append(f"{name} {bar} **{ps.value}**（{ps.judge}）")
-    summary_str = "\n".join(summary_lines)
-
     content = (
         f"# 🎴 人生重开模拟器\n"
-        f"**天赋** {talent_str}\n"
-        f"**属性** {prop_str}\n"
-        "***\n"
-        f"{events_str}\n"
-        "***\n"
-        f"**享年** {age.value}岁（{age.judge}）\n"
-        f"{summary_str}\n"
-        f"**总评** {sum_s.value}（{sum_s.judge}）\n"
+        f"享年 **{age.value}岁**（{age.judge}）| 总评 **{sum_s.value}**（{sum_s.judge}）\n"
         "***\n"
         f"> {cmd('随机人生')} 再来一次 | {cmd('人生选择')} 自选天赋 | {cmd('福利娱乐')} 返回"
     )
-    return content
+    await matcher.finish(build_markdown(content))
 
 
 # ─── 随机人生（一键随机） ────────────────────────────────
@@ -171,8 +151,7 @@ async def handle_random_life(event: MessageEvent, args: Message = CommandArg()):
     results = list(life.run())
     summary = life.gen_summary()
 
-    content = _format_result_md(selected, init_prop, results, summary)
-    await random_life_cmd.finish(build_markdown(content))
+    await _send_life_result(random_life_cmd, selected, init_prop, results, summary)
 
 
 # ─── 交互模式（手动选天赋+分属性） ──────────────────────
@@ -181,7 +160,6 @@ interactive_life_cmd = on_command("人生选择", priority=5, block=True)
 
 
 def _build_talent_list_md(all_talents: list[Talent], selected_indices: list[int], warning: str = ""):
-    """构建天赋选择列表 markdown，已选的显示 ✅，未选的序号为蓝字按钮"""
     lines = []
     for i, t in enumerate(all_talents):
         emoji = _GRADE_EMOJI.get(t.grade, "")
@@ -236,14 +214,12 @@ async def handle_talent_select(event: MessageEvent, state: T_State):
             )
         )
 
-    # ── 随机选天赋，直接进入属性分配 ──
     if text == "随机":
         selected = _random_talents_no_conflict(all_talents, 3)
         _proceed_to_attr(life, selected, state)
         await interactive_life_cmd.send(_build_attr_prompt(selected, state))
         return
 
-    # ── 一次性输入3个编号（如 "0 1 2"）──
     matched = re.fullmatch(r"\s*(\d)\s+(\d)\s+(\d)\s*", text)
     if matched:
         nums = sorted(set(int(n) for n in matched.groups()))
@@ -261,7 +237,6 @@ async def handle_talent_select(event: MessageEvent, state: T_State):
         await interactive_life_cmd.send(_build_attr_prompt(selected, state))
         return
 
-    # ── 单个序号点击：切换选中状态 ──
     if text.isdigit() and 0 <= int(text) < len(all_talents):
         idx = int(text)
         if idx in selected_indices:
@@ -276,7 +251,6 @@ async def handle_talent_select(event: MessageEvent, state: T_State):
                 )
             selected_indices.append(idx)
 
-            # 选满3个 → 检查冲突 → 自动进入属性分配
             if len(selected_indices) == 3:
                 selected = [all_talents[n] for n in sorted(selected_indices)]
                 for t1, t2 in itertools.combinations(selected, 2):
@@ -296,21 +270,18 @@ async def handle_talent_select(event: MessageEvent, state: T_State):
                     _build_talent_list_md(all_talents, selected_indices)
                 )
 
-    # ── 无法识别 ──
     await interactive_life_cmd.reject(
         _build_talent_list_md(all_talents, selected_indices, "⚠️ 请点击序号或发送「随机」")
     )
 
 
 def _proceed_to_attr(life: Life, selected: list[Talent], state: T_State):
-    """设置天赋并准备属性分配阶段"""
     life.set_talents(selected)
     state["selected_talents"] = selected
     state["total_prop"] = life.total_property()
 
 
 def _build_attr_prompt(selected: list[Talent], state: T_State):
-    """构建属性分配提示 markdown"""
     total = state["total_prop"]
     talent_names = "、".join(f"**{_talent_display(t)}**" for t in selected)
 
@@ -387,5 +358,4 @@ async def handle_attr_select(event: MessageEvent, state: T_State):
     results = list(life.run())
     summary = life.gen_summary()
 
-    content = _format_result_md(selected, init_prop, results, summary)
-    await interactive_life_cmd.finish(build_markdown(content))
+    await _send_life_result(interactive_life_cmd, selected, init_prop, results, summary)
