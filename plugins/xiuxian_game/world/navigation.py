@@ -365,17 +365,21 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
                     "💡 或使用坐标导航：导航 x y"
                 )
 
-            # 如果找到多个地点，显示选项让用户确认
+            # 如果找到多个地点，优先精确匹配
             if len(locations) > 1:
-                location_list = "\n".join([
-                    f"{i+1}. {loc.name} ({loc.x},{loc.y}) [{loc.region}]"
-                    for i, loc in enumerate(locations)
-                ])
-                await nav_cmd.finish(
-                    f"🔍 找到多个匹配的地点：\n"
-                    f"{location_list}\n\n"
-                    f"💡 请使用【导航 x y】前往具体坐标"
-                )
+                exact_matches = [loc for loc in locations if loc.name == location_name]
+                if len(exact_matches) == 1:
+                    locations = exact_matches
+                else:
+                    location_list = "\n".join([
+                        f"{i+1}. {loc.name} ({loc.x},{loc.y}) [{loc.region}]"
+                        for i, loc in enumerate(locations)
+                    ])
+                    await nav_cmd.finish(
+                        f"🔍 找到多个匹配的地点：\n"
+                        f"{location_list}\n\n"
+                        f"💡 请使用【导航 x y】前往具体坐标"
+                    )
 
             # 找到唯一地点，获取坐标
             target_location = locations[0]
