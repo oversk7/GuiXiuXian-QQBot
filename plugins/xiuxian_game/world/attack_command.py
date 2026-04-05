@@ -163,7 +163,7 @@ async def handle_wilderness_drops(session, loser: Player, winner: Player) -> str
 
 
 # ==================== 攻击命令 ====================
-attack_cmd = on_command("攻击", aliases={"死斗"}, block=True, priority=5)
+attack_cmd = on_command("攻击", aliases={"死斗", "击杀"}, block=True, priority=5)
 
 
 @attack_cmd.handle()
