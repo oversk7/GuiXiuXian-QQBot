@@ -302,33 +302,9 @@ async def handle_cultivate(event: MessageEvent):
         if achievement_msgs:
             msg += "\n\n" + "\n\n".join(achievement_msgs)
 
-        # 使用图鉴模版发送修炼结果
-        title = "✨ 修炼完成"
-        desc = msg.replace("\n", "\r")
-
-        # 获取玩家头像链接
-        from ..platform_utils import get_platform_info
-        _, user_id = get_platform_info(event)
-        avatar_url = f"https://thirdqq.qlogo.cn/qqapp/102499345/{user_id}/0"
-
-        # 快捷操作提示
-        hint = "快捷操作: 修炼 | 闭关 | 突破 | 面板 | 背包 | 战力 | 签到 | 帮助"
-
-        template_params = [
-            MessageMarkdownParams(key="title", values=[title]),
-            MessageMarkdownParams(key="desc", values=[desc]),
-            MessageMarkdownParams(key="imgurl", values=[avatar_url]),
-            MessageMarkdownParams(key="width", values=["100"]),
-            MessageMarkdownParams(key="height", values=["100"]),
-            MessageMarkdownParams(key="hint", values=[hint])
-        ]
-
-        markdown = MessageMarkdown(
-            custom_template_id="102499345_1769178984",
-            params=template_params
-        )
-
-        await cultivate.finish(MessageSegment.markdown(markdown))
+        # 使用原生 Markdown 发送修炼结果
+        full_msg = f"**✨ 修炼完成**\n{msg}"
+        await cultivate.finish(build_markdown(full_msg))
 
 @seclusion.handle()
 async def handle_seclusion(event: MessageEvent):
@@ -504,43 +480,9 @@ async def handle_seclusion(event: MessageEvent):
         if quest_completed and quest_msg:
             msg_secl += f"\n\n{quest_msg}"
 
-        # 使用图鉴模版发送闭关开始消息
-        title = "⚰️ 闭关开始"
-        desc = msg_secl.replace("\n", "\r")
-
-        # 获取玩家头像链接
-        from ..platform_utils import get_platform_info
-        _, user_id = get_platform_info(event)
-        avatar_url = f"https://thirdqq.qlogo.cn/qqapp/102499345/{user_id}/0"
-
-        # 快捷操作提示
-        hint = "💡 点击下方按钮快速操作"
-
-        # 快捷操作按钮（4个）
-        btn1 = "出关"
-        btn2 = "面板"
-        btn3 = "背包"
-        btn4 = "战力"
-
-        template_params = [
-            MessageMarkdownParams(key="title", values=[title]),
-            MessageMarkdownParams(key="desc", values=[desc]),
-            MessageMarkdownParams(key="imgurl", values=[avatar_url]),
-            MessageMarkdownParams(key="width", values=["100"]),
-            MessageMarkdownParams(key="height", values=["100"]),
-            MessageMarkdownParams(key="hint", values=[hint]),
-            MessageMarkdownParams(key="t1", values=[btn1]),
-            MessageMarkdownParams(key="t2", values=[btn2]),
-            MessageMarkdownParams(key="t3", values=[btn3]),
-            MessageMarkdownParams(key="t4", values=[btn4])
-        ]
-
-        markdown = MessageMarkdown(
-            custom_template_id="102499345_1770445216",
-            params=template_params
-        )
-
-        await seclusion.finish(MessageSegment.markdown(markdown))
+        # 使用原生 Markdown 发送闭关开始消息
+        full_msg = f"**⚰️ 闭关开始**\n{msg_secl}"
+        await seclusion.finish(build_markdown(full_msg))
 
 @out_seclusion.handle()
 async def handle_out_seclusion(event: MessageEvent):
@@ -754,43 +696,9 @@ async def handle_out_seclusion(event: MessageEvent):
             f"{hint_text}"
         )
 
-        # 使用图鉴模版发送出关结果
-        title = "🔓 出关完成"
-        desc = msg_out.replace("\n", "\r")
-
-        # 获取玩家头像链接
-        from ..platform_utils import get_platform_info
-        _, user_id = get_platform_info(event)
-        avatar_url = f"https://thirdqq.qlogo.cn/qqapp/102499345/{user_id}/0"
-
-        # 快捷操作提示
-        hint = "💡 点击下方按钮快速操作"
-
-        # 快捷操作按钮（4个）
-        btn1 = "修炼"
-        btn2 = "突破"
-        btn3 = "面板"
-        btn4 = "闭关"
-
-        template_params = [
-            MessageMarkdownParams(key="title", values=[title]),
-            MessageMarkdownParams(key="desc", values=[desc]),
-            MessageMarkdownParams(key="imgurl", values=[avatar_url]),
-            MessageMarkdownParams(key="width", values=["100"]),
-            MessageMarkdownParams(key="height", values=["100"]),
-            MessageMarkdownParams(key="hint", values=[hint]),
-            MessageMarkdownParams(key="t1", values=[btn1]),
-            MessageMarkdownParams(key="t2", values=[btn2]),
-            MessageMarkdownParams(key="t3", values=[btn3]),
-            MessageMarkdownParams(key="t4", values=[btn4])
-        ]
-
-        markdown = MessageMarkdown(
-            custom_template_id="102499345_1770445216",
-            params=template_params
-        )
-
-        await out_seclusion.finish(MessageSegment.markdown(markdown))
+        # 使用原生 Markdown 发送出关结果
+        full_msg = f"**🔓 出关完成**\n{msg_out}"
+        await out_seclusion.finish(build_markdown(full_msg))
 
 @breakthrough.handle()
 async def handle_breakthrough(event: MessageEvent, args: Message = CommandArg()):
