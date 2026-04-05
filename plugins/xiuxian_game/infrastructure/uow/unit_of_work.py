@@ -12,6 +12,7 @@
 from typing import Callable, Optional
 from sqlalchemy.ext.asyncio import AsyncSession
 from nonebot import logger
+from ..cache.player_data_cache import player_data_cache
 
 
 class UnitOfWork:
@@ -490,6 +491,7 @@ class UnitOfWork:
                     from nonebot.exception import FinishedException, PausedException, RejectedException
                     if exc_type in (FinishedException, PausedException, RejectedException):
                         # 流程控制异常：静默提交事务（不记录日志）
+                        self._update_player_cache()
                         await self._session.commit()
                     else:
                         # 其他异常：回滚事务
@@ -502,6 +504,7 @@ class UnitOfWork:
             else:
                 # 没有异常，提交事务
                 logger.debug(f"✅ [UnitOfWork] 会话 {id(self._session)} 提交")
+                self._update_player_cache()
                 await self._session.commit()
         finally:
             # 无论如何都要关闭会话
@@ -512,9 +515,17 @@ class UnitOfWork:
         # 返回 False 或不返回值（默认 None），表示不处理异常
         return False
 
+    def _update_player_cache(self):
+        """提交前收集脏 Player 对象，提交后写回缓存。"""
+        from ...models.player import Player
+        for obj in self._session.dirty | self._session.new:
+            if isinstance(obj, Player):
+                player_data_cache.put_from_player(obj)
+
     async def commit(self):
         """手动提交事务"""
         logger.debug(f"💾 [UnitOfWork] 手动提交会话 {id(self._session)}")
+        self._update_player_cache()
         await self._session.commit()
 
     async def rollback(self):

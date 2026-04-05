@@ -7,10 +7,24 @@ from datetime import datetime
 from nonebot.adapters.qq import MessageEvent
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import make_transient_to_detached
 from .models.player import Player
 from .models.account_ownership import AccountOwnership
 from .infrastructure.repositories.player_repository import PlayerRepository
-from .infrastructure.cache import player_identity_cache
+from .infrastructure.cache import player_identity_cache, player_data_cache
+
+
+# ==================== last_active_at 节流 ====================
+# 60秒内不重复更新，减少不必要的 UPDATE
+_ACTIVE_THROTTLE_SECONDS = 60
+
+
+def _touch_last_active(player: Player) -> None:
+    """更新 last_active_at，60秒内跳过以减少 DB 写入。"""
+    now = datetime.now()
+    if (player.last_active_at is None
+            or (now - player.last_active_at).total_seconds() > _ACTIVE_THROTTLE_SECONDS):
+        player.last_active_at = now
 
 
 # ==================== 管理员临时切换功能 ====================
@@ -93,12 +107,25 @@ async def get_unified_player(session: AsyncSession, event: MessageEvent) -> Opti
         cached_player_id = player_identity_cache.get(user_id)
         if cached_player_id is None:
             return None  # 缓存记录该用户无角色
+
+        # 2a. 尝试 Player 数据缓存（LRU），命中则跳过 SELECT
+        cached_data = player_data_cache.get(cached_player_id)
+        if cached_data is not None:
+            player = Player(**cached_data)
+            make_transient_to_detached(player)
+            player = await session.merge(player, load=False)
+            _touch_last_active(player)
+            return player
+
+        # 2b. 数据缓存未命中，走 DB
         player = await session.get(Player, cached_player_id)
         if player is not None:
-            player.last_active_at = datetime.now()
+            player_data_cache.put_from_player(player)
+            _touch_last_active(player)
             return player
         # player 被删除了，缓存失效，走下面的完整查询
         player_identity_cache.invalidate(user_id)
+        player_data_cache.invalidate(cached_player_id)
 
     # 3. 缓存未命中：完整查询并回填缓存
     player_repo = PlayerRepository(session)
@@ -118,9 +145,9 @@ async def get_unified_player(session: AsyncSession, event: MessageEvent) -> Opti
 
     # 回填缓存
     player_identity_cache.put(user_id, player.id if player else None)
-
     if player is not None:
-        player.last_active_at = datetime.now()
+        player_data_cache.put_from_player(player)
+        _touch_last_active(player)
 
     return player
 
