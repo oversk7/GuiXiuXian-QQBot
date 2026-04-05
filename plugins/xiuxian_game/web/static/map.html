@@ -1075,6 +1075,9 @@ let lastTouchMid  = [0,0];
 let touchMoved = false; // 区分 tap 和 drag
 
 canvas.addEventListener('touchstart', e => {
+  // 收起搜索框（preventDefault 会阻止浏览器自动 blur）
+  if (document.activeElement === searchEl) searchEl.blur();
+
   if (e.touches.length === 1) {
     dragging = true;
     touchMoved = false;
