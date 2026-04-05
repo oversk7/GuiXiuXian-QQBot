@@ -1,1 +1,1 @@
-from . import sign, tic_tac_toe, russian_roulette, russian_roulette_cleanup, russian_roulette_pve, cyberpunk_hacking, daily_apis, finger_guessing, today_meal, markdown_test, liuyao_divination
+from . import sign, tic_tac_toe, russian_roulette, russian_roulette_cleanup, russian_roulette_pve, cyberpunk_hacking, daily_apis, finger_guessing, today_meal, markdown_test, liuyao_divination, life_restart
