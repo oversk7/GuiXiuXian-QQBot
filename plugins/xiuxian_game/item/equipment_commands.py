@@ -379,9 +379,10 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
 
             lines.append("")
 
-        # 描述
+        # 描述（临时脱敏测试）
+        _desc = tpl.description.replace("死者的器官", "死者的遗物").replace("开膛手", "猎手")
         lines.append("📝 描述：")
-        lines.append(f"  {tpl.description}")
+        lines.append(f"  {_desc}")
 
         lines.append("***")
         eid = str(equip.id)
