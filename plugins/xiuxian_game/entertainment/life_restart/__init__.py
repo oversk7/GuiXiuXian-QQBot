@@ -1,20 +1,16 @@
 """人生重开模拟器 - 集成自 nonebot-plugin-remake"""
 
-import asyncio
-import base64
 import itertools
 import random
 import re
 import logging
-from io import BytesIO
 
 from nonebot import on_command
-from nonebot.adapters.qq import Message, MessageEvent, MessageSegment
+from nonebot.adapters.qq import Message, MessageEvent
 from nonebot.params import CommandArg
 from nonebot.typing import T_State
 
 from ...utils_markdown import cmd, build_markdown
-from .drawer import draw_life, save_jpg
 from .life import Life, PerAgeProperty, PerAgeResult
 from .property import Summary
 from .talent import Talent
@@ -79,27 +75,49 @@ def _suggest_attr_combos(total: int) -> list[list[int]]:
     return [c for c in combos if max(c) <= 10]
 
 
-def _generate_life_image(
-    talents: list[Talent],
-    init_prop: PerAgeProperty,
-    results: list[PerAgeResult],
-    summary: Summary,
-) -> BytesIO:
-    return save_jpg(draw_life(talents, init_prop, results, summary))
+def _format_life_text(selected, init_prop, results, summary) -> str:
+    """纯文本格式化人生结果（用于代码块展示）"""
+    lines = []
+    # 天赋
+    talent_str = " / ".join(_talent_display(t) for t in selected)
+    lines.append(f"【天赋】{talent_str}")
+    lines.append(f"【属性】颜{init_prop.CHR} 智{init_prop.INT} 体{init_prop.STR} 家{init_prop.MNY} 乐{init_prop.SPR}")
+    lines.append("")
+    # 人生经历
+    for r in results:
+        logs = r.event_log + r.talent_log
+        if logs:
+            log_text = "；".join(logs)
+            lines.append(f"{r.property.AGE}岁: {log_text}")
+    lines.append("")
+    # 总结
+    age = summary.AGE
+    sum_s = summary.SUM
+    props = [
+        ("颜值", summary.CHR), ("智力", summary.INT),
+        ("体质", summary.STR), ("家境", summary.MNY),
+        ("快乐", summary.SPR),
+    ]
+    lines.append("═══ 人生总结 ═══")
+    lines.append(f"享年: {age.value}岁 ({age.judge})")
+    for name, ps in props:
+        filled = min(max(ps.value, 0), 10)
+        bar = "█" * filled + "░" * (10 - filled)
+        lines.append(f"{name}: {bar} {ps.value} ({ps.judge})")
+    lines.append(f"总评: {sum_s.value} ({sum_s.judge})")
+    return "\n".join(lines)
 
 
 async def _send_life_result(matcher, selected, init_prop, results, summary):
-    """生成图片并发送结果"""
-    try:
-        img_bytes: BytesIO = await asyncio.to_thread(
-            _generate_life_image, selected, init_prop, results, summary
-        )
-    except (OSError, ValueError) as e:
-        logger.error(f"人生重开图片生成失败: {e}")
-        await matcher.finish("❌ 人生重开失败，请稍后再试")
-
-    img_b64 = base64.b64encode(img_bytes.getvalue()).decode()
-    await matcher.finish(MessageSegment.file_image(img_b64))
+    """用 markdown 代码块发送人生结果"""
+    text = _format_life_text(selected, init_prop, results, summary)
+    content = (
+        "# 🎴 人生重开模拟器\n"
+        f"```bash\n{text}\n```\n"
+        "***\n"
+        f"> {cmd('随机人生')} 再来一次 | {cmd('人生选择')} 自选天赋 | {cmd('福利娱乐')} 返回"
+    )
+    await matcher.finish(build_markdown(content))
 
 
 # ─── 随机人生（一键随机） ────────────────────────────────
