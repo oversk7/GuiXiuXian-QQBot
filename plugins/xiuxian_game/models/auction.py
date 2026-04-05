@@ -58,6 +58,9 @@ class AuctionItem(Base):
     equipment_summary: Mapped[Optional[str]] = mapped_column(
         String(300), nullable=True, comment="装备摘要文本（如：⭐+5阶 [💎2/3] 耐久160/160）"
     )
+    description: Mapped[Optional[str]] = mapped_column(
+        String(64), nullable=True, comment="卖家宣传语"
+    )
 
     # ==================== 价格信息 ====================
     start_price: Mapped[int] = mapped_column(

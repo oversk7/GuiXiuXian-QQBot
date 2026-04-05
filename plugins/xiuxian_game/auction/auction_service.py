@@ -71,6 +71,7 @@ async def list_auction(
     duration_hours: int,
     buyout_price: Optional[int] = None,
     equipment_instance_id: Optional[int] = None,
+    description: Optional[str] = None,
 ) -> Tuple[bool, str]:
     """
     上架拍卖
@@ -117,16 +118,19 @@ async def list_auction(
         return await _list_equipment_auction(
             uow, seller, item_cfg, start_price, duration_hours, buyout_price,
             equipment_instance_id=equipment_instance_id,
+            description=description,
         )
     else:
         return await _list_normal_auction(
-            uow, seller, item_cfg, start_price, duration_hours, buyout_price
+            uow, seller, item_cfg, start_price, duration_hours, buyout_price,
+            description=description,
         )
 
 
 async def _list_equipment_auction(
     uow, seller, item_cfg, start_price, duration_hours, buyout_price,
     equipment_instance_id: Optional[int] = None,
+    description: Optional[str] = None,
 ) -> Tuple[bool, str]:
     """上架装备/铭文实例拍卖"""
     session = uow.session
@@ -198,6 +202,7 @@ async def _list_equipment_auction(
         is_instance_trade=True,
         item_instance_id=equipment.id,
         equipment_summary=summary,
+        description=description,
         start_price=start_price,
         current_price=start_price,
         buyout_price=buyout_price,
@@ -232,7 +237,8 @@ async def _list_equipment_auction(
 
 
 async def _list_normal_auction(
-    uow, seller, item_cfg, start_price, duration_hours, buyout_price
+    uow, seller, item_cfg, start_price, duration_hours, buyout_price,
+    description: Optional[str] = None,
 ) -> Tuple[bool, str]:
     """上架普通物品拍卖（固定1件）"""
     session = uow.session
@@ -271,6 +277,7 @@ async def _list_normal_auction(
         is_instance_trade=False,
         item_instance_id=None,
         equipment_summary=None,
+        description=description,
         start_price=start_price,
         current_price=start_price,
         buyout_price=buyout_price,

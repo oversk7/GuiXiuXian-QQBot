@@ -105,11 +105,12 @@ async def handle_list_auction(event: MessageEvent, args: Message = CommandArg())
     if len(parts) < 3:
         await list_auction_cmd.finish(message_add_head(
             "📋 上架拍卖格式：\n"
-            "【上架拍卖 物品名 起拍价 时长(小时) [一口价]】\n"
+            "【上架拍卖 物品名 起拍价 时长(小时) [一口价] [宣传语]】\n"
             "━━━━━━━━━━━━━\n"
             "示例：\n"
             "• 上架拍卖 棺材钉 50000 12\n"
             "• 上架拍卖 碎颅制服 50000 24 200000（带一口价）\n"
+            "• 上架拍卖 碎颅制服 50000 24 200000 全服最强武器\n"
             f"⏰ 时长范围：{auction_service.MIN_DURATION_HOURS}~{auction_service.MAX_DURATION_HOURS}小时\n"
             "💰 起拍价最低：物品系统估价\n"
             "⚠️ 跑商商品不可拍卖",
@@ -117,13 +118,28 @@ async def handle_list_auction(event: MessageEvent, args: Message = CommandArg())
         ))
 
     item_name = parts[0]
+    description = None
 
     try:
         start_price = int(parts[1])
         duration_hours = int(parts[2])
-        buyout_price = int(parts[3]) if len(parts) >= 4 else None
+        # parts[3] 如果是数字则为一口价，否则当作宣传语开头
+        if len(parts) >= 4:
+            try:
+                buyout_price = int(parts[3])
+                # 一口价后面的全部文字作为宣传语
+                if len(parts) >= 5:
+                    description = " ".join(parts[4:])
+            except ValueError:
+                buyout_price = None
+                description = " ".join(parts[3:])
+        else:
+            buyout_price = None
     except ValueError:
         await list_auction_cmd.finish(message_add_head("⛔ 价格和时长必须是整数", event))
+
+    if description and len(description) > 32:
+        await list_auction_cmd.finish(message_add_head("⛔ 宣传语最多32个字", event))
 
     # 提前识别物品配置，装备走选择流程
     item_cfg = config.items_config["by_name"].get(item_name)
@@ -131,7 +147,7 @@ async def handle_list_auction(event: MessageEvent, args: Message = CommandArg())
         await list_auction_cmd.finish(message_add_head(f"⛔ 未找到物品「{item_name}」", event))
 
     if item_cfg.type in (ItemType.EQUIPMENT, ItemType.INSCRIPTION):
-        await _handle_instance_auction_listing(event, item_cfg, start_price, duration_hours, buyout_price)
+        await _handle_instance_auction_listing(event, item_cfg, start_price, duration_hours, buyout_price, description)
         return  # finish() 已在内部调用，此行不会执行
 
     # 普通物品：直接上架
@@ -145,7 +161,8 @@ async def handle_list_auction(event: MessageEvent, args: Message = CommandArg())
                 result_msg = "⛔ 请先创建角色"
         else:
             success, msg = await auction_service.list_auction(
-                uow, player, item_name, start_price, duration_hours, buyout_price
+                uow, player, item_name, start_price, duration_hours, buyout_price,
+                description=description,
             )
             if success:
                 await uow.commit()
@@ -160,6 +177,7 @@ async def _handle_instance_auction_listing(
     start_price: int,
     duration_hours: int,
     buyout_price: Optional[int],
+    description: Optional[str] = None,
 ):
     """装备/铭文拍卖：查询可用实例，单件直接上架，多件让玩家选择"""
     is_inscription = item_cfg.type == ItemType.INSCRIPTION
@@ -206,6 +224,7 @@ async def _handle_instance_auction_listing(
             success, msg = await auction_service.list_auction(
                 uow, player, item_cfg.name, start_price, duration_hours, buyout_price,
                 equipment_instance_id=available[0].id,
+                description=description,
             )
             if success:
                 await uow.commit()
@@ -224,6 +243,7 @@ async def _handle_instance_auction_listing(
             "start_price": start_price,
             "duration_hours": duration_hours,
             "buyout_price": buyout_price,
+            "description": description,
             "timestamp": time.time(),
         }
 
@@ -283,12 +303,14 @@ async def handle_auction_equipment_selection(event: MessageEvent):
         start_price = state["start_price"]
         duration_hours = state["duration_hours"]
         buyout_price = state["buyout_price"]
+        sel_description = state.get("description")
 
         del _auction_equipment_selection_state[player.id]
 
         success, msg = await auction_service.list_auction(
             uow, player, item_name, start_price, duration_hours, buyout_price,
             equipment_instance_id=equipment_id,
+            description=sel_description,
         )
         if success:
             await uow.commit()
@@ -395,9 +417,10 @@ async def handle_auction_hall(event: MessageEvent, args: Message = CommandArg())
                 seller_str = f"{a.seller_name or '未知'} [UID:{a.seller_uid}]"
 
                 aid = a.id
+                desc_str = f"\n   💬 {a.description}" if a.description else ""
                 lines.append(
                     f"**#{aid}** {item_name}\n"
-                    f"👤 {seller_str}　💰 {bid_info}{buyout_str}\n"
+                    f"👤 {seller_str}　💰 {bid_info}{buyout_str}{desc_str}\n"
                     f"⏰ {remain_str}　📊{a.bid_count}次　"
                     f"{cmd('详情', f'拍卖详情 {aid}')}"
                 )
@@ -557,8 +580,10 @@ async def handle_auction_detail(event: MessageEvent, args: Message = CommandArg(
                 f"# 🏛️ 拍卖详情 #{auction.id}",
                 f"📦 **{item_name}**",
                 f"👤 卖家：{auction.seller_name or '未知'} [UID:{auction.seller_uid}]",
-                f"💰 起拍价：{auction.start_price:,}💰",
             ]
+            if auction.description:
+                lines.append(f"💬 {auction.description}")
+            lines.append(f"💰 起拍价：{auction.start_price:,}💰")
             if auction.buyout_price:
                 lines.append(f"🎯 一口价：{auction.buyout_price:,}💰")
             if auction.has_bidder:

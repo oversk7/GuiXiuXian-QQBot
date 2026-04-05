@@ -149,7 +149,8 @@ REQUIRED_FIELDS: Dict[str, Dict[str, str]] = {
         "current_bidder_name": "VARCHAR(64) NULL COMMENT '当前最高出价人昵称（快照）'",
         "seller_name": "VARCHAR(64) NULL COMMENT '卖家昵称快照（防止改名后丢失）'",
         "seller_uid": "INT NULL COMMENT '卖家游戏UID（player.uid）'",
-        "current_bidder_uid": "INT NULL COMMENT '当前最高出价人游戏UID（player.uid）'"
+        "current_bidder_uid": "INT NULL COMMENT '当前最高出价人游戏UID（player.uid）'",
+        "description": "VARCHAR(64) NULL COMMENT '卖家宣传语'",
     },
     "auction_bid_history": {
         "bidder_uid": "INT NULL COMMENT '出价人游戏UID（player.uid）'"
