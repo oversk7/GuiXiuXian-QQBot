@@ -98,13 +98,11 @@ html,body{width:100%;height:100%;overflow:hidden;background:#080c18;color:#a0c4e
   #legend.hide-mobile{display:none}
   #ftr{height:26px;padding:0 10px;font-size:10px;gap:10px}
 }
-/* 竖屏：搜索框聚焦时全宽展开 */
-@media(max-width:400px){
-  #hdr .logo{display:none}
-  #search-box{margin-left:0}
-}
+/* 手机端：搜索框聚焦时展开覆盖header */
 @media(max-width:640px){
-  #search:focus{position:absolute;left:10px;right:50px;width:auto;z-index:10;background:rgba(8,12,24,.98)}
+  #search-box{transition:all .25s ease}
+  #search-box.expanded{position:absolute;left:10px;right:10px;margin:0;z-index:10}
+  #search-box.expanded #search{background:rgba(8,12,24,.98);font-size:15px;padding:8px 12px 8px 30px}
 }
 </style>
 </head>
@@ -1007,6 +1005,11 @@ function updateSearch() {
 }
 
 searchEl.addEventListener('input', updateSearch);
+
+// 手机端：聚焦展开搜索框，失焦收回
+const searchBox = document.getElementById('search-box');
+searchEl.addEventListener('focus', () => { searchBox.classList.add('expanded'); });
+searchEl.addEventListener('blur', () => { searchBox.classList.remove('expanded'); });
 
 // ============================================================
 //  MOUSE / TOUCH EVENTS
