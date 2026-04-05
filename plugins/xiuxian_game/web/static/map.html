@@ -100,7 +100,7 @@ html,body{width:100%;height:100%;overflow:hidden;background:#080c18;color:#a0c4e
 }
 /* 手机端：搜索框聚焦时展开覆盖header */
 @media(max-width:640px){
-  #search-box{transition:all .25s ease}
+  #search-box{position:relative;z-index:1}
   #search-box.expanded{position:absolute;left:10px;right:10px;margin:0;z-index:10}
   #search-box.expanded #search{background:rgba(8,12,24,.98);font-size:15px;padding:8px 12px 8px 30px}
 }
