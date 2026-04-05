@@ -8,7 +8,6 @@
 *{margin:0;padding:0;box-sizing:border-box}
 html,body{width:100%;height:100%;overflow:hidden;background:#06080f;color:#a0c4e8;font-family:'Courier New',monospace}
 
-/* ======== Header ======== */
 #hdr{position:fixed;top:0;left:0;right:0;height:48px;background:rgba(6,8,15,.94);border-bottom:1px solid rgba(180,80,255,.2);display:flex;align-items:center;padding:0 16px;z-index:100;backdrop-filter:blur(8px)}
 #hdr .logo{font-size:15px;color:#bb66ff;letter-spacing:2px;white-space:nowrap;text-shadow:0 0 10px rgba(180,80,255,.4)}
 #hdr .logo span{color:#ff3366;margin-right:4px}
@@ -17,27 +16,10 @@ html,body{width:100%;height:100%;overflow:hidden;background:#06080f;color:#a0c4e
 #hdr .back{color:rgba(160,196,232,.5);text-decoration:none;font-size:12px;margin-right:14px;border:1px solid rgba(160,196,232,.15);border-radius:4px;padding:3px 8px;transition:all .2s}
 #hdr .back:hover{color:#00f0ff;border-color:rgba(0,240,255,.3)}
 
-/* ======== Main container ======== */
-#scene{position:fixed;top:48px;left:0;right:0;bottom:32px;perspective:1200px;perspective-origin:50% 40%;overflow:hidden;cursor:grab}
-#scene:active{cursor:grabbing}
+#tower-canvas{display:block;position:fixed;top:48px;left:0;cursor:grab}
+#tower-canvas:active{cursor:grabbing}
 
-#tower{transform-style:preserve-3d;position:absolute;left:50%;top:50%;transition:transform .1s linear}
-
-/* ======== Layer (each floor) ======== */
-.floor{position:absolute;transform-style:preserve-3d;left:-120px;top:0;width:240px;height:240px;cursor:pointer;transition:opacity .3s,filter .2s}
-.floor:hover{filter:brightness(1.3)}
-.floor.active{filter:brightness(1.4) drop-shadow(0 0 12px rgba(180,80,255,.5))}
-
-/* Grid canvas inside floor */
-.floor canvas{width:240px;height:240px;border:1px solid rgba(180,80,255,.15);border-radius:4px;background:rgba(12,8,24,.7)}
-
-/* Floor label */
-.floor .lbl{position:absolute;left:-60px;top:50%;transform:translateY(-50%);font-size:10px;color:rgba(180,80,255,.5);white-space:nowrap;text-align:right;width:52px;pointer-events:none}
-.floor .lbl b{color:#bb66ff;font-size:12px}
-.floor .info{position:absolute;right:-70px;top:50%;transform:translateY(-50%);font-size:9px;color:rgba(160,196,232,.35);white-space:nowrap;pointer-events:none;width:66px}
-.floor .info .active-dot{display:inline-block;width:6px;height:6px;border-radius:50%;background:#ff3366;box-shadow:0 0 4px #ff3366;vertical-align:middle;margin-right:2px}
-
-/* ======== Detail panel ======== */
+/* Detail panel */
 #detail{position:fixed;top:48px;right:0;width:280px;bottom:32px;background:rgba(6,8,15,.95);border-left:1px solid rgba(180,80,255,.15);z-index:90;display:none;overflow-y:auto;padding:16px;backdrop-filter:blur(6px)}
 #detail.show{display:block}
 #detail .title{color:#bb66ff;font-size:16px;font-weight:bold;margin-bottom:10px;text-shadow:0 0 8px rgba(180,80,255,.3)}
@@ -51,47 +33,41 @@ html,body{width:100%;height:100%;overflow:hidden;background:#06080f;color:#a0c4e
 #detail .legend .li{display:flex;align-items:center;gap:4px;font-size:10px;color:rgba(160,196,232,.5)}
 #detail .legend .dot{width:8px;height:8px;border-radius:2px;flex-shrink:0}
 
-/* ======== Nav controls ======== */
+/* Nav */
 #nav{position:fixed;bottom:44px;left:50%;transform:translateX(-50%);display:flex;gap:8px;z-index:100}
 #nav button{background:rgba(12,8,24,.85);border:1px solid rgba(180,80,255,.25);border-radius:6px;color:#bb66ff;padding:6px 14px;font-family:inherit;font-size:12px;cursor:pointer;transition:all .2s;backdrop-filter:blur(4px)}
 #nav button:hover{border-color:#bb66ff;background:rgba(180,80,255,.1)}
 #nav button:disabled{opacity:.3;cursor:default}
 #nav .page-info{color:rgba(160,196,232,.5);font-size:11px;align-self:center;min-width:80px;text-align:center}
 
-/* ======== Scroll hint ======== */
-#scroll-hint{position:fixed;bottom:44px;right:12px;font-size:10px;color:rgba(160,196,232,.3);z-index:100;text-align:right;line-height:1.7}
-#scroll-hint kbd{background:rgba(180,80,255,.08);border:1px solid rgba(180,80,255,.15);border-radius:3px;padding:1px 4px;color:rgba(180,80,255,.5)}
+#hints{position:fixed;bottom:44px;right:12px;font-size:10px;color:rgba(160,196,232,.3);z-index:100;text-align:right;line-height:1.7}
+#hints kbd{background:rgba(180,80,255,.08);border:1px solid rgba(180,80,255,.15);border-radius:3px;padding:1px 4px;color:rgba(180,80,255,.5)}
 
-/* ======== Footer ======== */
 #ftr{position:fixed;bottom:0;left:0;right:0;height:32px;background:rgba(6,8,15,.94);border-top:1px solid rgba(180,80,255,.1);display:flex;align-items:center;padding:0 16px;font-size:10px;color:rgba(160,196,232,.35);z-index:100;gap:16px}
 #ftr .hl{color:rgba(180,80,255,.6)}
 
-/* ======== Loading ======== */
-#loading{position:fixed;top:0;left:0;right:0;bottom:0;display:flex;align-items:center;justify-content:center;background:rgba(6,8,15,.97);z-index:500;transition:opacity .5s}
+#loading{position:fixed;top:0;left:0;right:0;bottom:0;display:flex;align-items:center;justify-content:center;flex-direction:column;background:rgba(6,8,15,.97);z-index:500;transition:opacity .5s}
 #loading.hide{opacity:0;pointer-events:none}
-#loading .spinner{width:40px;height:40px;border:3px solid rgba(180,80,255,.15);border-top-color:#bb66ff;border-radius:50%;animation:spin 1s linear infinite}
+.spinner{width:40px;height:40px;border:3px solid rgba(180,80,255,.15);border-top-color:#bb66ff;border-radius:50%;animation:spin 1s linear infinite}
 @keyframes spin{to{transform:rotate(360deg)}}
 #loading .text{margin-top:12px;color:rgba(180,80,255,.6);font-size:13px}
 
-/* ======== Mobile ======== */
 @media(max-width:640px){
   #hdr{height:40px;padding:0 10px}
   #hdr .logo{font-size:13px}
   #hdr .stats{display:none}
-  #scene{top:40px;bottom:26px}
+  #tower-canvas{top:40px}
   #detail{width:100%;top:auto;bottom:26px;max-height:50vh;border-left:none;border-top:1px solid rgba(180,80,255,.15);border-radius:10px 10px 0 0}
-  #scroll-hint{display:none}
+  #hints{display:none}
   #ftr{height:26px;font-size:9px;padding:0 8px}
   #nav{bottom:34px}
-  #nav button{padding:5px 10px;font-size:11px}
 }
 </style>
 </head>
 <body>
 
-<div id="loading"><div><div class="spinner"></div><div class="text">正在探查深渊...</div></div></div>
+<div id="loading"><div class="spinner"></div><div class="text">正在探查深渊...</div></div>
 
-<!-- Header -->
 <div id="hdr">
   <a class="back" href="/map">&larr; 态势图</a>
   <div class="logo"><span>&#9650;</span> 诡域深渊 · 塔览</div>
@@ -101,10 +77,7 @@ html,body{width:100%;height:100%;overflow:hidden;background:#06080f;color:#a0c4e
   </div>
 </div>
 
-<!-- 3D Scene -->
-<div id="scene">
-  <div id="tower"></div>
-</div>
+<canvas id="tower-canvas"></canvas>
 
 <!-- Detail panel -->
 <div id="detail">
@@ -127,23 +100,20 @@ html,body{width:100%;height:100%;overflow:hidden;background:#06080f;color:#a0c4e
   </div>
 </div>
 
-<!-- Page nav -->
 <div id="nav">
-  <button id="nav-prev" title="上层">&uarr; 浅层</button>
+  <button id="nav-prev">&uarr; 浅层</button>
   <div class="page-info" id="nav-info">-</div>
-  <button id="nav-next" title="下层">&darr; 深层</button>
+  <button id="nav-next">&darr; 深层</button>
 </div>
 
-<!-- Hints -->
-<div id="scroll-hint">
-  <kbd>滚轮</kbd> 旋转 &nbsp; <kbd>拖拽</kbd> 倾斜<br>
-  <kbd>&uarr;&darr;</kbd> 翻页 &nbsp; <kbd>点击</kbd> 查看层
+<div id="hints">
+  <kbd>拖拽</kbd> 旋转 &nbsp; <kbd>滚轮</kbd> 上下移动<br>
+  <kbd>&uarr;&darr;</kbd> 翻页 &nbsp; <kbd>点击</kbd> 查看层详情
 </div>
 
-<!-- Footer -->
 <div id="ftr">
   <span>诡域塔 · <span class="hl">无限重</span></span>
-  <span>格子类型：诡异 / 材料 / 宝箱 / 驿站 / 商人 / 精英</span>
+  <span id="ftr-angle"></span>
   <span style="margin-left:auto">数据延迟约 1 天</span>
 </div>
 
@@ -153,181 +123,304 @@ html,body{width:100%;height:100%;overflow:hidden;background:#06080f;color:#a0c4e
 // ============================================================
 const API = '/api/tower/data';
 const PAGE_SIZE = 20;
-const FLOOR_GAP = 56;       // px between floors in 3D
-const GRID_SIZE = 11;        // -5 to 5 = 11 cells
-const CELL_PX = 20;          // cell size on mini canvas
-const DETAIL_CELL = 40;      // cell size on detail canvas
+const BG = '#06080f';
 
-// Tile colors
 const TILE_COLORS = {
-  EMPTY:    '#cc3355',
-  MATERIAL: '#33cc66',
-  TREASURE: '#ffaa22',
-  REST:     '#33cccc',
-  MERCHANT: '#ff8833',
-  ELITE:    '#aa44ff',
+  EMPTY:    [204,51,85],
+  MATERIAL: [51,204,102],
+  TREASURE: [255,170,34],
+  REST:     [51,204,204],
+  MERCHANT: [255,136,51],
+  ELITE:    [170,68,255],
 };
-const UNKNOWN_COLOR = 'rgba(80,100,130,0.25)';
-const PLAYER_COLOR = '#ff3366';
+
+// 3D geometry
+const GRID = 11;           // -5..5
+const CELL = 8;            // world-units per cell
+const FLOOR_W = GRID * CELL;  // 88
+const LAYER_H = 30;        // vertical gap between layers (world-units)
 
 // ============================================================
 //  STATE
 // ============================================================
+const canvas = document.getElementById('tower-canvas');
+const ctx = canvas.getContext('2d');
+
+let W = 0, H = 0;
+
+// Camera
+let azimuth = -0.6;       // horizontal rotation (radians)
+let elevation = 0.55;      // vertical tilt (radians), 0=side, PI/2=top
+let scrollY = 0;           // vertical scroll offset (world-units)
+let zoom = 3.5;
+
+// Data
 let currentPage = 1;
 let totalLayers = 1;
 let globalMax = 0;
 let layersData = [];
 let playersData = [];
 let selectedLevel = null;
+let hoverLevel = null;
 
-// 3D rotation
-let rotX = 55;    // tilt angle (degrees)
-let rotZ = -30;   // spin angle (degrees)
-let translateY = 0;
+// Drag
 let dragging = false;
-let dragStartX = 0, dragStartY = 0;
-let dragRotX = 0, dragRotZ = 0;
+let dragX = 0, dragY = 0;
+let dragAz = 0, dragEl = 0;
 
-const scene = document.getElementById('scene');
-const tower = document.getElementById('tower');
+// Hit-test: store projected floor polygons for click detection
+let floorPolygons = [];  // [{lv, points:[[sx,sy],...]}, ...]
 
 // ============================================================
-//  FETCH DATA
+//  3D PROJECTION
+// ============================================================
+function project(x, y, z) {
+  // x,z = horizontal plane, y = vertical (up)
+  const ca = Math.cos(azimuth), sa = Math.sin(azimuth);
+  const ce = Math.cos(elevation), se = Math.sin(elevation);
+
+  // Rotate around Y axis (azimuth)
+  const rx = x * ca + z * sa;
+  const rz = -x * sa + z * ca;
+
+  // Rotate around X axis (elevation)
+  const ry = y * ce - rz * se;
+  const rz2 = y * se + rz * ce;
+
+  // Orthographic with zoom
+  const sx = rx * zoom + W / 2;
+  const sy = -ry * zoom + H / 2;
+  return [sx, sy, rz2]; // rz2 for depth sorting
+}
+
+// ============================================================
+//  RESIZE
+// ============================================================
+function resize() {
+  const dpr = window.devicePixelRatio || 1;
+  const isMobile = window.innerWidth <= 640;
+  W = window.innerWidth;
+  H = window.innerHeight - (isMobile ? 66 : 80);
+  canvas.width = Math.round(W * dpr);
+  canvas.height = Math.round(H * dpr);
+  canvas.style.width = W + 'px';
+  canvas.style.height = H + 'px';
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+}
+
+// ============================================================
+//  FETCH
 // ============================================================
 async function fetchData(page) {
   try {
-    const resp = await fetch(`${API}?page=${page}&size=${PAGE_SIZE}`);
-    if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
-    const data = await resp.json();
-    globalMax = data.global_max || 0;
-    totalLayers = data.total_layers || 1;
-    layersData = data.layers || [];
-    playersData = data.players || [];
-    currentPage = data.page || 1;
+    const r = await fetch(`${API}?page=${page}&size=${PAGE_SIZE}`);
+    if (!r.ok) throw new Error(r.status);
+    const d = await r.json();
+    globalMax = d.global_max || 0;
+    totalLayers = d.total_layers || 1;
+    layersData = d.layers || [];
+    playersData = d.players || [];
+    currentPage = d.page || 1;
     return true;
-  } catch (e) {
-    console.error('Fetch error:', e);
-    return false;
-  }
+  } catch (e) { console.error(e); return false; }
 }
 
 // ============================================================
-//  RENDER TOWER
+//  DRAW FLOOR
 // ============================================================
-function buildTower() {
-  tower.innerHTML = '';
+function drawFloor(layer, yWorld, t) {
+  const hw = FLOOR_W / 2;
+  const isSelected = layer.lv === selectedLevel;
+  const isHover = layer.lv === hoverLevel;
 
-  const totalFloors = layersData.length;
-  const halfH = (totalFloors - 1) * FLOOR_GAP / 2;
+  // 4 corners of the floor plane
+  const corners3D = [
+    [-hw, yWorld, -hw],
+    [ hw, yWorld, -hw],
+    [ hw, yWorld,  hw],
+    [-hw, yWorld,  hw],
+  ];
+  const corners = corners3D.map(p => project(p[0], p[1], p[2]));
 
-  layersData.forEach((layer, i) => {
-    const floor = document.createElement('div');
-    floor.className = 'floor';
-    if (layer.lv === selectedLevel) floor.classList.add('active');
+  // Save polygon for hit-test
+  floorPolygons.push({lv: layer.lv, points: corners.map(c => [c[0], c[1]])});
 
-    // Position: stack vertically in 3D (deeper layers at bottom)
-    const yOff = halfH - i * FLOOR_GAP;
-    floor.style.transform = `translateY(${-yOff}px) rotateX(90deg)`;
+  // Floor base plate
+  ctx.beginPath();
+  corners.forEach((c, i) => i === 0 ? ctx.moveTo(c[0], c[1]) : ctx.lineTo(c[0], c[1]));
+  ctx.closePath();
 
-    // Mini canvas (10x10 grid)
-    const cvs = document.createElement('canvas');
-    cvs.width = GRID_SIZE * CELL_PX;
-    cvs.height = GRID_SIZE * CELL_PX;
-    drawFloorGrid(cvs, layer);
-    floor.appendChild(cvs);
+  const alpha = isSelected ? 0.35 : isHover ? 0.25 : 0.15;
+  ctx.fillStyle = isSelected ? `rgba(180,80,255,${alpha})` : `rgba(20,15,40,${alpha + 0.3})`;
+  ctx.fill();
 
-    // Label (left)
-    const lbl = document.createElement('div');
-    lbl.className = 'lbl';
-    lbl.innerHTML = `<b>${layer.lv}</b>层`;
-    floor.appendChild(lbl);
+  // Border
+  ctx.strokeStyle = isSelected ? 'rgba(180,80,255,0.7)' : isHover ? 'rgba(180,80,255,0.4)' : 'rgba(180,80,255,0.12)';
+  ctx.lineWidth = isSelected ? 1.5 : 0.7;
+  ctx.stroke();
 
-    // Info (right)
-    const info = document.createElement('div');
-    info.className = 'info';
-    let infoHtml = '';
-    if (layer.active > 0) infoHtml += `<span class="active-dot"></span>${layer.active}人 `;
-    if (layer.cleared > 0) infoHtml += `✓${layer.cleared}`;
-    info.innerHTML = infoHtml || '—';
-    floor.appendChild(info);
-
-    floor.addEventListener('click', () => selectFloor(layer.lv));
-    tower.appendChild(floor);
-  });
-
-  updateTowerTransform();
-}
-
-function drawFloorGrid(canvas, layer) {
-  const ctx = canvas.getContext('2d');
-  const w = canvas.width, h = canvas.height;
-  ctx.clearRect(0, 0, w, h);
-
-  // Build tile map
+  // Draw cells
   const tileMap = {};
-  for (const t of layer.tiles) {
-    tileMap[`${t.x},${t.y}`] = t.t;
-  }
+  for (const tile of layer.tiles) tileMap[`${tile.x},${tile.y}`] = tile.t;
 
-  // Find players on this layer
-  const layerPlayers = playersData.filter(p => p.dl === layer.lv);
-  const playerPositions = new Set(layerPlayers.map(p => `${p.x},${p.y}`));
+  const playerSet = new Set(
+    playersData.filter(p => p.dl === layer.lv).map(p => `${p.x},${p.y}`)
+  );
 
   for (let gx = -5; gx <= 5; gx++) {
-    for (let gy = -5; gy <= 5; gy++) {
-      const px = (gx + 5) * CELL_PX;
-      const py = (5 - gy) * CELL_PX;  // flip Y so positive is up
-      const key = `${gx},${gy}`;
-      const tileType = tileMap[key];
+    for (let gz = -5; gz <= 5; gz++) {
+      const key = `${gx},${gz}`;
+      const ttype = tileMap[key];
+      const hasPlayer = playerSet.has(key);
 
-      // Cell background
-      ctx.fillStyle = tileType ? TILE_COLORS[tileType] || UNKNOWN_COLOR : UNKNOWN_COLOR;
-      ctx.globalAlpha = tileType ? 0.7 : 0.15;
-      ctx.fillRect(px + 1, py + 1, CELL_PX - 2, CELL_PX - 2);
+      // Cell center in world coords
+      const cx = (gx + 0.5) * CELL - hw + CELL / 2 - CELL;
+      const cz = (gz + 0.5) * CELL - hw + CELL / 2 - CELL;
 
-      // Player marker
-      if (playerPositions.has(key)) {
-        ctx.globalAlpha = 1;
-        ctx.fillStyle = PLAYER_COLOR;
+      // Project cell corners
+      const s = CELL * 0.42;
+      const p1 = project(cx - s, yWorld, cz - s);
+      const p2 = project(cx + s, yWorld, cz - s);
+      const p3 = project(cx + s, yWorld, cz + s);
+      const p4 = project(cx - s, yWorld, cz + s);
+
+      if (ttype) {
+        const rgb = TILE_COLORS[ttype] || [80, 100, 130];
         ctx.beginPath();
-        ctx.arc(px + CELL_PX / 2, py + CELL_PX / 2, 4, 0, Math.PI * 2);
+        ctx.moveTo(p1[0], p1[1]);
+        ctx.lineTo(p2[0], p2[1]);
+        ctx.lineTo(p3[0], p3[1]);
+        ctx.lineTo(p4[0], p4[1]);
+        ctx.closePath();
+        ctx.fillStyle = `rgba(${rgb[0]},${rgb[1]},${rgb[2]},0.65)`;
         ctx.fill();
+      }
+
+      if (hasPlayer) {
+        const pc = project(cx, yWorld, cz);
+        ctx.fillStyle = '#ff3366';
+        ctx.shadowBlur = 6;
+        ctx.shadowColor = '#ff3366';
+        ctx.beginPath();
+        ctx.arc(pc[0], pc[1], Math.max(2, zoom * 0.8), 0, Math.PI * 2);
+        ctx.fill();
+        ctx.shadowBlur = 0;
       }
     }
   }
-  ctx.globalAlpha = 1;
 
-  // Grid lines
-  ctx.strokeStyle = 'rgba(180,80,255,0.08)';
-  ctx.lineWidth = 0.5;
-  for (let i = 0; i <= GRID_SIZE; i++) {
-    ctx.beginPath();
-    ctx.moveTo(i * CELL_PX, 0);
-    ctx.lineTo(i * CELL_PX, h);
-    ctx.stroke();
-    ctx.beginPath();
-    ctx.moveTo(0, i * CELL_PX);
-    ctx.lineTo(w, i * CELL_PX);
-    ctx.stroke();
+  // Layer label — drawn in screen space, always readable
+  // Position: to the left of the floor
+  const labelPos = project(-hw - 16, yWorld, 0);
+  ctx.font = isSelected ? 'bold 13px monospace' : '11px monospace';
+  ctx.textAlign = 'right';
+  ctx.textBaseline = 'middle';
+  ctx.fillStyle = isSelected ? '#bb66ff' : isHover ? 'rgba(180,80,255,0.7)' : 'rgba(180,80,255,0.4)';
+  ctx.fillText(`${layer.lv}层`, labelPos[0], labelPos[1]);
+
+  // Right side: player count / cleared
+  const infoPos = project(hw + 16, yWorld, 0);
+  ctx.textAlign = 'left';
+  ctx.font = '9px monospace';
+  let info = '';
+  if (layer.active > 0) info += `●${layer.active}人 `;
+  if (layer.cleared > 0) info += `✓${layer.cleared}`;
+  if (info) {
+    ctx.fillStyle = layer.active > 0 ? 'rgba(255,51,102,0.6)' : 'rgba(160,196,232,0.3)';
+    ctx.fillText(info, infoPos[0], infoPos[1]);
   }
-
-  // Origin marker (0,0)
-  const ox = 5 * CELL_PX + CELL_PX / 2;
-  const oy = 5 * CELL_PX + CELL_PX / 2;
-  ctx.strokeStyle = 'rgba(255,255,255,0.15)';
-  ctx.lineWidth = 1;
-  ctx.beginPath();
-  ctx.moveTo(ox - 3, oy); ctx.lineTo(ox + 3, oy);
-  ctx.moveTo(ox, oy - 3); ctx.lineTo(ox, oy + 3);
-  ctx.stroke();
 }
 
 // ============================================================
-//  3D TRANSFORM
+//  DRAW CONNECTING PILLARS
 // ============================================================
-function updateTowerTransform() {
-  tower.style.transform =
-    `rotateX(${rotX}deg) rotateZ(${rotZ}deg) translateZ(${translateY}px)`;
+function drawPillars() {
+  if (layersData.length < 2) return;
+
+  const hw = FLOOR_W / 2;
+  const pillarCorners = [
+    [-hw, -hw], [hw, -hw], [hw, hw], [-hw, hw]
+  ];
+
+  const yTop = (layersData.length - 1) * LAYER_H + scrollY;
+  const yBot = scrollY;
+
+  ctx.strokeStyle = 'rgba(180,80,255,0.06)';
+  ctx.lineWidth = 1;
+
+  for (const [px, pz] of pillarCorners) {
+    const top = project(px, yTop, pz);
+    const bot = project(px, yBot, pz);
+    ctx.beginPath();
+    ctx.moveTo(bot[0], bot[1]);
+    ctx.lineTo(top[0], top[1]);
+    ctx.stroke();
+  }
+}
+
+// ============================================================
+//  MAIN RENDER
+// ============================================================
+function render() {
+  const t = performance.now();
+
+  ctx.fillStyle = BG;
+  ctx.fillRect(0, 0, W, H);
+
+  floorPolygons = [];
+
+  // Sort layers by depth (back-to-front) for painter's algorithm
+  const sorted = layersData.map((layer, i) => {
+    const yWorld = i * LAYER_H + scrollY;
+    // Depth = average z of corners after projection
+    const hw = FLOOR_W / 2;
+    const center = project(0, yWorld, 0);
+    return { layer, yWorld, depth: center[2], idx: i };
+  });
+  sorted.sort((a, b) => a.depth - b.depth); // far first
+
+  // Pillars behind floors
+  drawPillars();
+
+  // Draw floors back-to-front
+  for (const item of sorted) {
+    drawFloor(item.layer, item.yWorld, t);
+  }
+
+  // Title overlay at top
+  ctx.font = '10px monospace';
+  ctx.textAlign = 'center';
+  ctx.fillStyle = 'rgba(160,196,232,0.15)';
+  const topY = project(0, (layersData.length - 1) * LAYER_H + scrollY + 20, 0);
+  ctx.fillText('▲ 深层', topY[0], topY[1]);
+  const botY = project(0, scrollY - 20, 0);
+  ctx.fillText('▼ 浅层', botY[0], botY[1]);
+
+  requestAnimationFrame(render);
+}
+
+// ============================================================
+//  HIT TEST
+// ============================================================
+function pointInPolygon(px, py, poly) {
+  let inside = false;
+  for (let i = 0, j = poly.length - 1; i < poly.length; j = i++) {
+    const [xi, yi] = poly[i], [xj, yj] = poly[j];
+    if ((yi > py) !== (yj > py) && px < (xj - xi) * (py - yi) / (yj - yi) + xi) {
+      inside = !inside;
+    }
+  }
+  return inside;
+}
+
+function hitTest(mx, my) {
+  // Check from front to back (reverse order since floorPolygons is back-to-front)
+  for (let i = floorPolygons.length - 1; i >= 0; i--) {
+    if (pointInPolygon(mx, my, floorPolygons[i].points)) {
+      return floorPolygons[i].lv;
+    }
+  }
+  return null;
 }
 
 // ============================================================
@@ -338,42 +431,31 @@ function selectFloor(lv) {
   const layer = layersData.find(l => l.lv === lv);
   if (!layer) return;
 
-  // Update active highlight
-  document.querySelectorAll('.floor').forEach((f, i) => {
-    f.classList.toggle('active', layersData[i]?.lv === lv);
-  });
-
-  // Panel content
   document.getElementById('d-title').textContent = `第 ${lv} 层诡域`;
   document.getElementById('d-monster-lv').textContent = `Lv.${lv * 5}`;
   document.getElementById('d-cleared').textContent = layer.cleared || 0;
   document.getElementById('d-active').textContent = layer.active || 0;
   document.getElementById('d-explored').textContent = layer.tiles.length;
-
-  // Draw detailed grid
   drawDetailGrid(layer);
-
   document.getElementById('detail').classList.add('show');
 }
 
 function drawDetailGrid(layer) {
-  const canvas = document.getElementById('d-canvas');
-  const ctx = canvas.getContext('2d');
-  const S = DETAIL_CELL;
-  canvas.width = GRID_SIZE * S + 4;
-  canvas.height = GRID_SIZE * S + 4;
-  const w = canvas.width, h = canvas.height;
-  ctx.clearRect(0, 0, w, h);
+  const cvs = document.getElementById('d-canvas');
+  const S = 40;
+  cvs.width = GRID * S + 4;
+  cvs.height = GRID * S + 4;
+  const c = cvs.getContext('2d');
+  c.clearRect(0, 0, cvs.width, cvs.height);
 
   const tileMap = {};
   for (const t of layer.tiles) tileMap[`${t.x},${t.y}`] = t.t;
 
-  const layerPlayers = playersData.filter(p => p.dl === layer.lv);
   const playerMap = {};
-  for (const p of layerPlayers) {
-    const key = `${p.x},${p.y}`;
-    if (!playerMap[key]) playerMap[key] = [];
-    playerMap[key].push(p);
+  for (const p of playersData.filter(p => p.dl === layer.lv)) {
+    const k = `${p.x},${p.y}`;
+    if (!playerMap[k]) playerMap[k] = [];
+    playerMap[k].push(p);
   }
 
   for (let gx = -5; gx <= 5; gx++) {
@@ -381,146 +463,155 @@ function drawDetailGrid(layer) {
       const px = (gx + 5) * S + 2;
       const py = (5 - gy) * S + 2;
       const key = `${gx},${gy}`;
-      const tileType = tileMap[key];
+      const tt = tileMap[key];
 
-      // Cell fill
-      ctx.fillStyle = tileType ? TILE_COLORS[tileType] || UNKNOWN_COLOR : UNKNOWN_COLOR;
-      ctx.globalAlpha = tileType ? 0.6 : 0.1;
-      ctx.fillRect(px + 1, py + 1, S - 2, S - 2);
-      ctx.globalAlpha = 1;
+      // Fill
+      if (tt) {
+        const rgb = TILE_COLORS[tt];
+        c.fillStyle = `rgba(${rgb[0]},${rgb[1]},${rgb[2]},0.55)`;
+      } else {
+        c.fillStyle = 'rgba(80,100,130,0.1)';
+      }
+      c.fillRect(px + 1, py + 1, S - 2, S - 2);
 
-      // Cell border
-      ctx.strokeStyle = 'rgba(180,80,255,0.12)';
-      ctx.lineWidth = 0.5;
-      ctx.strokeRect(px + 1, py + 1, S - 2, S - 2);
+      // Border
+      c.strokeStyle = 'rgba(180,80,255,0.1)';
+      c.lineWidth = 0.5;
+      c.strokeRect(px + 1, py + 1, S - 2, S - 2);
 
-      // Type icon
-      if (tileType) {
-        ctx.font = `${Math.floor(S * 0.4)}px monospace`;
-        ctx.textAlign = 'center';
-        ctx.textBaseline = 'middle';
-        ctx.fillStyle = TILE_COLORS[tileType];
-        const icons = {
-          EMPTY: '👻', MATERIAL: '💎', TREASURE: '🎁',
-          REST: '🏨', MERCHANT: '🏪', ELITE: '💀'
-        };
-        ctx.fillText(icons[tileType] || '?', px + S / 2, py + S / 2);
+      // Icon
+      if (tt) {
+        const icons = {EMPTY:'👻',MATERIAL:'💎',TREASURE:'🎁',REST:'🏨',MERCHANT:'🏪',ELITE:'💀'};
+        c.font = `${S * 0.4}px monospace`;
+        c.textAlign = 'center';
+        c.textBaseline = 'middle';
+        c.fillText(icons[tt] || '?', px + S / 2, py + S / 2);
       }
 
-      // Coordinate label at edges
+      // Coord labels
       if (gy === -5) {
-        ctx.font = '8px monospace';
-        ctx.textAlign = 'center';
-        ctx.fillStyle = 'rgba(160,196,232,0.25)';
-        ctx.fillText(gx, px + S / 2, py + S + 10);
+        c.font = '8px monospace';
+        c.textAlign = 'center';
+        c.fillStyle = 'rgba(160,196,232,0.25)';
+        c.fillText(gx, px + S / 2, py + S + 10);
       }
       if (gx === -5) {
-        ctx.font = '8px monospace';
-        ctx.textAlign = 'right';
-        ctx.fillStyle = 'rgba(160,196,232,0.25)';
-        ctx.fillText(gy, px - 4, py + S / 2 + 3);
+        c.font = '8px monospace';
+        c.textAlign = 'right';
+        c.fillStyle = 'rgba(160,196,232,0.25)';
+        c.fillText(gy, px - 4, py + S / 2 + 3);
       }
 
-      // Player markers
+      // Players
       const ps = playerMap[key];
       if (ps) {
-        ctx.fillStyle = PLAYER_COLOR;
-        ctx.shadowBlur = 6;
-        ctx.shadowColor = PLAYER_COLOR;
-        ctx.beginPath();
-        ctx.arc(px + S - 8, py + 8, 5, 0, Math.PI * 2);
-        ctx.fill();
-        ctx.shadowBlur = 0;
-
+        c.fillStyle = '#ff3366';
+        c.shadowBlur = 6;
+        c.shadowColor = '#ff3366';
+        c.beginPath();
+        c.arc(px + S - 8, py + 8, 5, 0, Math.PI * 2);
+        c.fill();
+        c.shadowBlur = 0;
         if (ps.length > 1) {
-          ctx.font = 'bold 8px monospace';
-          ctx.textAlign = 'center';
-          ctx.fillStyle = '#fff';
-          ctx.fillText(ps.length, px + S - 8, py + 11);
+          c.font = 'bold 8px monospace';
+          c.textAlign = 'center';
+          c.fillStyle = '#fff';
+          c.fillText(ps.length, px + S - 8, py + 11);
         }
       }
     }
   }
 
-  // Origin crosshair
-  const ox = 5 * S + S / 2 + 2;
-  const oy = 5 * S + S / 2 + 2;
-  ctx.strokeStyle = 'rgba(255,255,255,0.2)';
-  ctx.lineWidth = 1;
-  ctx.setLineDash([3, 3]);
-  ctx.beginPath();
-  ctx.moveTo(ox, 2); ctx.lineTo(ox, h - 2);
-  ctx.moveTo(2, oy); ctx.lineTo(w - 2, oy);
-  ctx.stroke();
-  ctx.setLineDash([]);
+  // Origin cross
+  const ox = 5 * S + S / 2 + 2, oy = 5 * S + S / 2 + 2;
+  c.strokeStyle = 'rgba(255,255,255,0.15)';
+  c.lineWidth = 1;
+  c.setLineDash([3, 3]);
+  c.beginPath();
+  c.moveTo(ox, 2); c.lineTo(ox, cvs.height - 2);
+  c.moveTo(2, oy); c.lineTo(cvs.width - 2, oy);
+  c.stroke();
+  c.setLineDash([]);
 }
 
 // ============================================================
-//  EVENT HANDLERS
+//  EVENTS
 // ============================================================
 
 // Drag to rotate
-scene.addEventListener('mousedown', e => {
-  if (e.target.closest('#detail')) return;
+canvas.addEventListener('mousedown', e => {
   dragging = true;
-  dragStartX = e.clientX;
-  dragStartY = e.clientY;
-  dragRotX = rotX;
-  dragRotZ = rotZ;
+  dragX = e.clientX;
+  dragY = e.clientY;
+  dragAz = azimuth;
+  dragEl = elevation;
 });
 
 window.addEventListener('mousemove', e => {
-  if (!dragging) return;
-  const dx = e.clientX - dragStartX;
-  const dy = e.clientY - dragStartY;
-  rotZ = dragRotZ + dx * 0.3;
-  rotX = Math.max(20, Math.min(80, dragRotX - dy * 0.3));
-  updateTowerTransform();
+  const rect = canvas.getBoundingClientRect();
+  const mx = e.clientX - rect.left;
+  const my = e.clientY - rect.top;
+
+  if (dragging) {
+    azimuth = dragAz + (e.clientX - dragX) * 0.006;
+    elevation = Math.max(0.15, Math.min(1.45, dragEl - (e.clientY - dragY) * 0.006));
+  } else {
+    hoverLevel = hitTest(mx, my);
+  }
 });
 
 window.addEventListener('mouseup', () => { dragging = false; });
 
-// Scroll to shift tower vertically
-scene.addEventListener('wheel', e => {
+canvas.addEventListener('click', e => {
+  const rect = canvas.getBoundingClientRect();
+  const lv = hitTest(e.clientX - rect.left, e.clientY - rect.top);
+  if (lv !== null) selectFloor(lv);
+});
+
+// Scroll to move up/down
+canvas.addEventListener('wheel', e => {
   e.preventDefault();
-  translateY += e.deltaY > 0 ? -30 : 30;
-  translateY = Math.max(-800, Math.min(800, translateY));
-  updateTowerTransform();
+  scrollY += e.deltaY > 0 ? -18 : 18;
+  // Clamp
+  const maxScroll = Math.max(0, (layersData.length - 1) * LAYER_H);
+  scrollY = Math.max(-maxScroll - 100, Math.min(100, scrollY));
 }, {passive: false});
 
-// Touch support
-let lastTouchDist = 0;
+// Touch
 let touchDragging = false;
-
-scene.addEventListener('touchstart', e => {
-  if (e.target.closest('#detail')) return;
+canvas.addEventListener('touchstart', e => {
   if (e.touches.length === 1) {
     touchDragging = true;
-    dragStartX = e.touches[0].clientX;
-    dragStartY = e.touches[0].clientY;
-    dragRotX = rotX;
-    dragRotZ = rotZ;
+    dragX = e.touches[0].clientX;
+    dragY = e.touches[0].clientY;
+    dragAz = azimuth;
+    dragEl = elevation;
   }
   e.preventDefault();
 }, {passive: false});
 
-scene.addEventListener('touchmove', e => {
+canvas.addEventListener('touchmove', e => {
   if (touchDragging && e.touches.length === 1) {
-    const dx = e.touches[0].clientX - dragStartX;
-    const dy = e.touches[0].clientY - dragStartY;
-    rotZ = dragRotZ + dx * 0.3;
-    rotX = Math.max(20, Math.min(80, dragRotX - dy * 0.3));
-    updateTowerTransform();
+    azimuth = dragAz + (e.touches[0].clientX - dragX) * 0.006;
+    elevation = Math.max(0.15, Math.min(1.45, dragEl - (e.touches[0].clientY - dragY) * 0.006));
   }
   e.preventDefault();
 }, {passive: false});
 
-scene.addEventListener('touchend', () => { touchDragging = false; });
+canvas.addEventListener('touchend', e => {
+  if (touchDragging && e.changedTouches.length === 1) {
+    const rect = canvas.getBoundingClientRect();
+    const dx = e.changedTouches[0].clientX - dragX;
+    const dy = e.changedTouches[0].clientY - dragY;
+    if (Math.abs(dx) < 10 && Math.abs(dy) < 10) {
+      const lv = hitTest(e.changedTouches[0].clientX - rect.left, e.changedTouches[0].clientY - rect.top);
+      if (lv !== null) selectFloor(lv);
+    }
+  }
+  touchDragging = false;
+});
 
-// Page nav
-document.getElementById('nav-prev').addEventListener('click', () => changePage(-1));
-document.getElementById('nav-next').addEventListener('click', () => changePage(1));
-
+// Keyboard
 window.addEventListener('keydown', e => {
   if (e.key === 'ArrowUp' || e.key === 'ArrowLeft') { e.preventDefault(); changePage(-1); }
   if (e.key === 'ArrowDown' || e.key === 'ArrowRight') { e.preventDefault(); changePage(1); }
@@ -529,25 +620,29 @@ window.addEventListener('keydown', e => {
 document.getElementById('detail-close').addEventListener('click', () => {
   document.getElementById('detail').classList.remove('show');
   selectedLevel = null;
-  document.querySelectorAll('.floor').forEach(f => f.classList.remove('active'));
 });
 
+document.getElementById('nav-prev').addEventListener('click', () => changePage(-1));
+document.getElementById('nav-next').addEventListener('click', () => changePage(1));
+
+// ============================================================
+//  PAGE NAV
+// ============================================================
 async function changePage(delta) {
   const maxPage = Math.ceil(totalLayers / PAGE_SIZE);
-  const newPage = Math.max(1, Math.min(currentPage + delta, maxPage));
-  if (newPage === currentPage) return;
-
-  await fetchData(newPage);
-  translateY = 0;
-  buildTower();
+  const np = Math.max(1, Math.min(currentPage + delta, maxPage));
+  if (np === currentPage) return;
+  await fetchData(np);
+  scrollY = 0;
   updateNav();
+  updateStats();
 }
 
 function updateNav() {
   const maxPage = Math.ceil(totalLayers / PAGE_SIZE);
-  const start = (currentPage - 1) * PAGE_SIZE + 1;
-  const end = Math.min(currentPage * PAGE_SIZE, totalLayers);
-  document.getElementById('nav-info').textContent = `${start}-${end} / ${totalLayers}层`;
+  const s = (currentPage - 1) * PAGE_SIZE + 1;
+  const e = Math.min(currentPage * PAGE_SIZE, totalLayers);
+  document.getElementById('nav-info').textContent = `${s}-${e} / ${totalLayers}层`;
   document.getElementById('nav-prev').disabled = currentPage <= 1;
   document.getElementById('nav-next').disabled = currentPage >= maxPage;
 }
@@ -561,17 +656,17 @@ function updateStats() {
 //  INIT
 // ============================================================
 (async function init() {
+  resize();
+  window.addEventListener('resize', resize);
+
   const ok = await fetchData(1);
   document.getElementById('loading').classList.add('hide');
 
-  if (!ok) {
-    tower.innerHTML = '<div style="color:#ff3366;text-align:center;margin-top:200px">数据加载失败</div>';
-    return;
-  }
+  if (!ok) return;
 
-  buildTower();
   updateNav();
   updateStats();
+  requestAnimationFrame(render);
 })();
 </script>
 </body>
