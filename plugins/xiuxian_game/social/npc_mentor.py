@@ -427,7 +427,7 @@ async def _buy_recipe(uow, session, player: Player, recipe_name: str) -> str:
 
 # ==================== 独立香火商店指令 ====================
 
-incense_shop_cmd = on_command("香火商店", priority=5, block=True)
+incense_shop_cmd = on_command("香火商店", priority=11, block=True)
 
 
 @incense_shop_cmd.handle()
@@ -442,7 +442,7 @@ async def handle_incense_shop(event: MessageEvent):
         await incense_shop_cmd.finish(build_markdown(menu))
 
 
-buy_recipe_cmd = on_command("买食谱", aliases={"购买食谱"}, priority=5, block=True)
+buy_recipe_cmd = on_command("买食谱", aliases={"购买食谱"}, priority=11, block=True)
 
 
 @buy_recipe_cmd.handle()

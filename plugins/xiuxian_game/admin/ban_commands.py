@@ -17,10 +17,10 @@ from ..ai_guide import is_admin
 
 
 # 全局封禁管理命令
-global_ban_cmd = on_command("封禁", block=True, priority=5)
-global_unban_cmd = on_command("解封", block=True, priority=5)
-ban_list_cmd = on_command("封禁列表", aliases={"查看封禁"}, block=True, priority=5)
-ban_info_cmd = on_command("封禁信息", block=True, priority=5)
+global_ban_cmd = on_command("封禁", block=True, priority=15)
+global_unban_cmd = on_command("解封", block=True, priority=15)
+ban_list_cmd = on_command("封禁列表", aliases={"查看封禁"}, block=True, priority=15)
+ban_info_cmd = on_command("封禁信息", block=True, priority=15)
 
 
 @global_ban_cmd.handle()

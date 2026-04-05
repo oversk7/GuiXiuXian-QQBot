@@ -125,7 +125,7 @@ def _generate_loot() -> tuple[list[tuple[str, str, int]], int]:
 
 
 # ==================== 指令：怨灵拾荒 ====================
-scavenge_cmd = on_command("怨灵拾荒", block=True, priority=5)
+scavenge_cmd = on_command("怨灵拾荒", block=True, priority=9)
 
 
 @scavenge_cmd.handle()
@@ -255,7 +255,7 @@ async def handle_scavenge(event: MessageEvent):
 
 
 # ==================== 指令：镜怨披风（状态面板） ====================
-panel_cmd = on_command("镜怨披风", block=True, priority=5)
+panel_cmd = on_command("镜怨披风", block=True, priority=9)
 
 
 @panel_cmd.handle()

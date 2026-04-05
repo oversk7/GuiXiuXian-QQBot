@@ -129,7 +129,7 @@ def _set_dice_buff(player: Player, attribute: str, attribute_cn: str, icon: str)
 
 
 # ==================== 指令：掷骰 ====================
-roll_dice_cmd = on_command("掷骰", block=True, priority=5)
+roll_dice_cmd = on_command("掷骰", block=True, priority=9)
 
 
 @roll_dice_cmd.handle()
@@ -209,7 +209,7 @@ async def handle_roll_dice(event: MessageEvent):
 
 
 # ==================== 指令：诡面骰（状态面板） ====================
-dice_panel_cmd = on_command("诡面骰", block=True, priority=5)
+dice_panel_cmd = on_command("诡面骰", block=True, priority=9)
 
 
 @dice_panel_cmd.handle()

@@ -20,7 +20,7 @@ logger = logging.getLogger(__name__)
 
 
 # 观音灵签抽签功能
-draw_fortune = on_command("抽签", aliases={"求签", "占卜", "灵签"}, block=True, priority=5)
+draw_fortune = on_command("抽签", aliases={"求签", "占卜", "灵签"}, block=True, priority=13)
 
 @draw_fortune.handle()
 async def handle_draw_fortune(event: MessageEvent, args: Message = CommandArg()):
@@ -181,7 +181,7 @@ async def handle_draw_fortune(event: MessageEvent, args: Message = CommandArg())
 
 
 # 每日一言
-daily_quote = on_command("每日一言", aliases={"一言", "名言"}, block=True, priority=5)
+daily_quote = on_command("每日一言", aliases={"一言", "名言"}, block=True, priority=13)
 
 @daily_quote.handle()
 async def handle_daily_quote(event: MessageEvent):
@@ -239,7 +239,7 @@ async def handle_daily_quote(event: MessageEvent):
 
 
 # 吃掉头像功能
-bite_avatar = on_command("吃掉", block=True, priority=5)
+bite_avatar = on_command("吃掉", block=True, priority=13)
 
 @bite_avatar.handle()
 async def handle_bite_avatar(event: MessageEvent, args: Message = CommandArg()):
@@ -343,7 +343,7 @@ async def handle_bite_avatar(event: MessageEvent, args: Message = CommandArg()):
 
 
 # 答案之书功能
-answer_book = on_command("答案之书", aliases={"答案", "问答之书"}, block=True, priority=5)
+answer_book = on_command("答案之书", aliases={"答案", "问答之书"}, block=True, priority=13)
 
 @answer_book.handle()
 async def handle_answer_book(event: MessageEvent, args: Message = CommandArg()):
@@ -470,7 +470,7 @@ async def handle_answer_book(event: MessageEvent, args: Message = CommandArg()):
 
 
 # 驾考题目功能
-driving_test = on_command("驾考题目", aliases={"驾考", "科目一", "科目四"}, block=True, priority=5)
+driving_test = on_command("驾考题目", aliases={"驾考", "科目一", "科目四"}, block=True, priority=13)
 
 @driving_test.handle()
 async def handle_driving_test(event: MessageEvent, args: Message = CommandArg()):
@@ -598,7 +598,7 @@ async def handle_driving_test(event: MessageEvent, args: Message = CommandArg())
 
 
 # 微博热搜功能
-weibo_hot = on_command("微博热搜", aliases={"热搜", "微博", "热榜"}, block=True, priority=5)
+weibo_hot = on_command("微博热搜", aliases={"热搜", "微博", "热榜"}, block=True, priority=13)
 
 @weibo_hot.handle()
 async def handle_weibo_hot(event: MessageEvent):

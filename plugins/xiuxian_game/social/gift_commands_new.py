@@ -23,8 +23,8 @@ from ..utils import message_add_head
 from ..platform_utils import get_unified_player
 
 # 创建命令
-gift_command = on_command("赠礼", aliases={"送礼"}, priority=5, block=True)
-transfer_command = on_command("转移", priority=5, block=True)
+gift_command = on_command("赠礼", aliases={"送礼"}, priority=11, block=True)
+transfer_command = on_command("转移", priority=11, block=True)
 
 
 @gift_command.handle()

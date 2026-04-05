@@ -35,37 +35,37 @@ list_auction_cmd = on_command(
     "上架拍卖",
     aliases={"拍卖上架", "发起拍卖"},
     block=True,
-    priority=5,
+    priority=13,
 )
 bid_cmd = on_command(
     "出价",
     aliases={"竞价", "拍卖出价"},
     block=True,
-    priority=5,
+    priority=13,
 )
 auction_hall_cmd = on_command(
     "拍卖行",
     aliases={"查看拍卖", "拍卖列表", "拍卖大厅"},
     block=True,
-    priority=5,
+    priority=13,
 )
 my_auction_cmd = on_command(
     "我的拍卖",
     aliases={"我的拍卖品", "查看我的拍卖"},
     block=True,
-    priority=5,
+    priority=13,
 )
 cancel_auction_cmd = on_command(
     "撤拍",
     aliases={"取消拍卖", "拍卖撤回"},
     block=True,
-    priority=5,
+    priority=13,
 )
 auction_detail_cmd = on_command(
     "拍卖详情",
     aliases={"竞价记录", "拍卖记录"},
     block=True,
-    priority=5,
+    priority=13,
 )
 
 # ==================== 装备选择状态管理 ====================

@@ -18,7 +18,7 @@ from datetime import date
 
 
 # ==================== 查看每日任务 ====================
-daily_task_cmd = on_command("每日委托", aliases={"任务", "每日任务"}, block=True, priority=5)
+daily_task_cmd = on_command("每日委托", aliases={"任务", "每日任务"}, block=True, priority=7)
 
 @daily_task_cmd.handle()
 async def handle_daily_task(event: MessageEvent):
@@ -126,7 +126,7 @@ async def handle_daily_task(event: MessageEvent):
 
 
 # ==================== 接取任务 ====================
-accept_task_cmd = on_command("接取委托", aliases={"接取任务", "接收委托"}, block=True, priority=5)
+accept_task_cmd = on_command("接取委托", aliases={"接取任务", "接收委托"}, block=True, priority=7)
 
 @accept_task_cmd.handle()
 async def handle_accept_task(event: MessageEvent, args: Message = CommandArg()):
@@ -256,7 +256,7 @@ async def handle_accept_task(event: MessageEvent, args: Message = CommandArg()):
 
 
 # ==================== 完成任务 ====================
-complete_task_cmd = on_command("完成任务", aliases={"完成委托", "退邪"}, block=True, priority=5)
+complete_task_cmd = on_command("完成任务", aliases={"完成委托", "退邪"}, block=True, priority=7)
 
 @complete_task_cmd.handle()
 async def handle_complete_task(event: MessageEvent):
@@ -370,7 +370,7 @@ async def handle_complete_task(event: MessageEvent):
 
 
 # ==================== 任务统计 ====================
-task_stats_cmd = on_command("任务统计", aliases={"委托统计"}, block=True, priority=5)
+task_stats_cmd = on_command("任务统计", aliases={"委托统计"}, block=True, priority=7)
 
 @task_stats_cmd.handle()
 async def handle_task_stats(event: MessageEvent):
@@ -424,7 +424,7 @@ async def handle_task_stats(event: MessageEvent):
 
 
 # ==================== 刷新委托 ====================
-refresh_task_cmd = on_command("刷新委托", aliases={"刷新任务", "更多委托"}, block=True, priority=5)
+refresh_task_cmd = on_command("刷新委托", aliases={"刷新任务", "更多委托"}, block=True, priority=7)
 
 @refresh_task_cmd.handle()
 async def handle_refresh_task(event: MessageEvent):

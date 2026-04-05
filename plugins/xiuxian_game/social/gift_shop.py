@@ -21,8 +21,8 @@ from ..platform_utils import get_unified_player
 from ..economy.market import get_shop_adjusted_price
 
 # 创建命令
-gift_shop_cmd = on_command("礼物商店", aliases={"礼物店", "礼品店"}, priority=5, block=True)
-buy_gift_cmd = on_command("买礼物", aliases={"购买礼物"}, priority=5, block=True)
+gift_shop_cmd = on_command("礼物商店", aliases={"礼物店", "礼品店"}, priority=11, block=True)
+buy_gift_cmd = on_command("买礼物", aliases={"购买礼物"}, priority=11, block=True)
 
 
 def get_daily_gift_purchases(player) -> dict:

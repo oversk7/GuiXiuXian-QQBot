@@ -34,7 +34,7 @@ recipe_manager = RecipeManager()
 
 # ==================== 烹饪相关指令 ====================
 
-cook_cmd = on_command("烹饪", aliases={"做菜", "制作菜肴"}, priority=5, block=True)
+cook_cmd = on_command("烹饪", aliases={"做菜", "制作菜肴"}, priority=11, block=True)
 
 
 @cook_cmd.handle()
@@ -78,7 +78,7 @@ async def handle_cook(event: MessageEvent, args: Message = CommandArg()):
         await cook_cmd.finish(build_markdown(msg + f"\n***\n{cmd('食谱')} | {cmd('烹饪 菜名', '烹饪 ')} | {cmd('菜品利润')} | {cmd('食谱图鉴')}"))
 
 
-recipes_cmd = on_command("食谱", aliases={"我的食谱", "已学食谱"}, priority=5, block=True)
+recipes_cmd = on_command("食谱", aliases={"我的食谱", "已学食谱"}, priority=11, block=True)
 
 
 @recipes_cmd.handle()
@@ -141,7 +141,7 @@ async def handle_recipes(event: MessageEvent):
         await recipes_cmd.finish(build_markdown(msg))
 
 
-recipe_guide_cmd = on_command("食谱图鉴", aliases={"所有食谱", "全部食谱"}, priority=5, block=True)
+recipe_guide_cmd = on_command("食谱图鉴", aliases={"所有食谱", "全部食谱"}, priority=11, block=True)
 
 
 @recipe_guide_cmd.handle()
@@ -202,7 +202,7 @@ async def handle_recipe_guide(event: MessageEvent):
 
 # ==================== 菜品利润分析 ====================
 
-dish_profit_cmd = on_command("菜品利润", aliases={"利润分析"}, priority=5, block=True)
+dish_profit_cmd = on_command("菜品利润", aliases={"利润分析"}, priority=11, block=True)
 
 
 @dish_profit_cmd.handle()
@@ -261,7 +261,7 @@ async def handle_dish_profit(event: MessageEvent):
 
 # ==================== 餐厅相关指令 ====================
 
-create_restaurant_cmd = on_command("创建餐厅", aliases={"开餐厅"}, priority=5, block=True)
+create_restaurant_cmd = on_command("创建餐厅", aliases={"开餐厅"}, priority=11, block=True)
 
 
 @create_restaurant_cmd.handle()
@@ -277,7 +277,7 @@ async def handle_create_restaurant(event: MessageEvent):
         await create_restaurant_cmd.finish(build_markdown(msg + f"\n***\n{cmd('餐厅')} | {cmd('开店')} | {cmd('经营报表')} | {cmd('我的厨师')}"))
 
 
-restaurant_cmd = on_command("餐厅", aliases={"我的餐厅", "餐厅状态"}, priority=5, block=True)
+restaurant_cmd = on_command("餐厅", aliases={"我的餐厅", "餐厅状态"}, priority=11, block=True)
 
 
 @restaurant_cmd.handle()
@@ -293,7 +293,7 @@ async def handle_restaurant(event: MessageEvent):
         await restaurant_cmd.finish(build_markdown(msg + f"\n***\n{cmd('餐厅')} | {cmd('开店')} | {cmd('经营报表')} | {cmd('我的厨师')}"))
 
 
-upgrade_restaurant_cmd = on_command("餐厅升级", aliases={"升级餐厅"}, priority=5, block=True)
+upgrade_restaurant_cmd = on_command("餐厅升级", aliases={"升级餐厅"}, priority=11, block=True)
 
 
 @upgrade_restaurant_cmd.handle()
@@ -309,7 +309,7 @@ async def handle_upgrade_restaurant(event: MessageEvent):
         await upgrade_restaurant_cmd.finish(build_markdown(msg + f"\n***\n{cmd('餐厅')} | {cmd('开店')} | {cmd('经营报表')} | {cmd('我的厨师')}"))
 
 
-expand_restaurant_cmd = on_command("扩张餐厅", aliases={"餐厅扩张", "扩大面积"}, priority=5, block=True)
+expand_restaurant_cmd = on_command("扩张餐厅", aliases={"餐厅扩张", "扩大面积"}, priority=11, block=True)
 
 
 @expand_restaurant_cmd.handle()
@@ -325,7 +325,7 @@ async def handle_expand_restaurant(event: MessageEvent):
         await expand_restaurant_cmd.finish(build_markdown(msg + f"\n***\n{cmd('餐厅')} | {cmd('开店')} | {cmd('经营报表')} | {cmd('我的厨师')}"))
 
 
-upgrade_kitchen_cmd = on_command("升级厨房", aliases={"厨房升级"}, priority=5, block=True)
+upgrade_kitchen_cmd = on_command("升级厨房", aliases={"厨房升级"}, priority=11, block=True)
 
 
 @upgrade_kitchen_cmd.handle()
@@ -341,7 +341,7 @@ async def handle_upgrade_kitchen(event: MessageEvent):
         await upgrade_kitchen_cmd.finish(build_markdown(msg + f"\n***\n{cmd('餐厅')} | {cmd('开店')} | {cmd('经营报表')} | {cmd('我的厨师')}"))
 
 
-open_restaurant_cmd = on_command("开店", aliases={"营业", "开始营业"}, priority=5, block=True)
+open_restaurant_cmd = on_command("开店", aliases={"营业", "开始营业"}, priority=11, block=True)
 
 
 @open_restaurant_cmd.handle()
@@ -357,7 +357,7 @@ async def handle_open_restaurant(event: MessageEvent):
         await open_restaurant_cmd.finish(build_markdown(msg + f"\n***\n{cmd('餐厅')} | {cmd('经营报表')} | {cmd('查菜单')}"))
 
 
-close_restaurant_cmd = on_command("打烊", aliases={"关店", "停止营业"}, priority=5, block=True)
+close_restaurant_cmd = on_command("打烊", aliases={"关店", "停止营业"}, priority=11, block=True)
 
 
 @close_restaurant_cmd.handle()
@@ -375,7 +375,7 @@ async def handle_close_restaurant(event: MessageEvent):
 
 # ==================== 厨师相关指令 ====================
 
-recruit_chef_cmd = on_command("招募厨师", aliases={"招募", "招厨师"}, priority=5, block=True)
+recruit_chef_cmd = on_command("招募厨师", aliases={"招募", "招厨师"}, priority=11, block=True)
 
 
 @recruit_chef_cmd.handle()
@@ -438,7 +438,7 @@ async def handle_recruit_chef(event: MessageEvent):
         await recruit_chef_cmd.finish(build_markdown(final_msg + f"\n***\n{cmd('我的厨师')} | {cmd('招募厨师')} | {cmd('餐厅')}"))
 
 
-hire_chef_cmd = on_command("雇佣", aliases={"雇佣厨师"}, priority=5, block=True)
+hire_chef_cmd = on_command("雇佣", aliases={"雇佣厨师"}, priority=11, block=True)
 
 
 @hire_chef_cmd.handle()
@@ -469,7 +469,7 @@ async def handle_hire_chef(event: MessageEvent, args: Message = CommandArg()):
         await hire_chef_cmd.finish(build_markdown(msg + f"\n***\n{cmd('我的厨师')} | {cmd('招募厨师')} | {cmd('餐厅')}"))
 
 
-fire_chef_cmd = on_command("解雇", aliases={"解雇厨师", "开除"}, priority=5, block=True)
+fire_chef_cmd = on_command("解雇", aliases={"解雇厨师", "开除"}, priority=11, block=True)
 
 
 @fire_chef_cmd.handle()
@@ -495,7 +495,7 @@ async def handle_fire_chef(event: MessageEvent, args: Message = CommandArg()):
         await fire_chef_cmd.finish(build_markdown(msg + f"\n***\n{cmd('我的厨师')} | {cmd('招募厨师')} | {cmd('餐厅')}"))
 
 
-my_chefs_cmd = on_command("我的厨师", aliases={"厨师", "厨师列表"}, priority=5, block=True)
+my_chefs_cmd = on_command("我的厨师", aliases={"厨师", "厨师列表"}, priority=11, block=True)
 
 
 @my_chefs_cmd.handle()
@@ -565,7 +565,7 @@ async def handle_my_chefs(event: MessageEvent):
         await my_chefs_cmd.finish(build_markdown(msg))
 
 
-promote_chef_cmd = on_command("培训厨师", aliases={"厨师培训", "升级厨师"}, priority=5, block=True)
+promote_chef_cmd = on_command("培训厨师", aliases={"厨师培训", "升级厨师"}, priority=11, block=True)
 
 
 @promote_chef_cmd.handle()
@@ -598,7 +598,7 @@ async def handle_promote_chef(event: MessageEvent, args: Message = CommandArg())
 
 # ==================== 经营报表 ====================
 
-report_cmd = on_command("经营报表", aliases={"报表", "餐厅报表"}, priority=5, block=True)
+report_cmd = on_command("经营报表", aliases={"报表", "餐厅报表"}, priority=11, block=True)
 
 
 @report_cmd.handle()
@@ -619,7 +619,7 @@ async def handle_report(event: MessageEvent):
         await report_cmd.finish(build_markdown(msg + f"\n***\n{cmd('餐厅')} | {cmd('经营日志')} | {cmd('菜品利润')}"))
 
 
-log_cmd = on_command("经营日志", aliases={"日志", "餐厅日志"}, priority=5, block=True)
+log_cmd = on_command("经营日志", aliases={"日志", "餐厅日志"}, priority=11, block=True)
 
 
 @log_cmd.handle()
@@ -706,7 +706,7 @@ async def handle_log(event: MessageEvent):
 
 # ==================== 仓库管理 ====================
 
-restock_cmd = on_command("补货", aliases={"餐厅补货", "转移食材"}, priority=5, block=True)
+restock_cmd = on_command("补货", aliases={"餐厅补货", "转移食材"}, priority=11, block=True)
 
 
 @restock_cmd.handle()
@@ -751,7 +751,7 @@ async def handle_restock(event: MessageEvent, args: Message = CommandArg()):
         await restock_cmd.finish(build_markdown(msg + f"\n***\n{cmd('餐厅仓库')} | {cmd('补货 菜名 数量', '补货 ')} | {cmd('餐厅')}"))
 
 
-withdraw_cmd = on_command("取货", aliases={"餐厅取货", "取出食材"}, priority=5, block=True)
+withdraw_cmd = on_command("取货", aliases={"餐厅取货", "取出食材"}, priority=11, block=True)
 
 
 @withdraw_cmd.handle()
@@ -796,7 +796,7 @@ async def handle_withdraw(event: MessageEvent, args: Message = CommandArg()):
         await withdraw_cmd.finish(build_markdown(msg + f"\n***\n{cmd('餐厅仓库')} | {cmd('补货 菜名 数量', '补货 ')} | {cmd('餐厅')}"))
 
 
-storage_cmd = on_command("餐厅仓库", aliases={"仓库", "查看仓库"}, priority=5, block=True)
+storage_cmd = on_command("餐厅仓库", aliases={"仓库", "查看仓库"}, priority=11, block=True)
 
 
 @storage_cmd.handle()
@@ -861,7 +861,7 @@ async def handle_storage(event: MessageEvent):
 
 # ==================== 菜单管理 ====================
 
-set_menu_cmd = on_command("设置菜单", aliases={"菜单设置", "更新菜单"}, priority=5, block=True)
+set_menu_cmd = on_command("设置菜单", aliases={"菜单设置", "更新菜单"}, priority=11, block=True)
 
 
 @set_menu_cmd.handle()
@@ -902,7 +902,7 @@ async def handle_set_menu(event: MessageEvent, args: Message = CommandArg()):
         await set_menu_cmd.finish(build_markdown(msg + f"\n***\n{cmd('查菜单')} | {cmd('设置菜单 菜名', '设置菜单 ')} | {cmd('平衡菜单')} | {cmd('餐厅')}"))
 
 
-view_menu_cmd = on_command("菜单", aliases={"查看菜单", "营业菜单"}, priority=5, block=True)
+view_menu_cmd = on_command("菜单", aliases={"查看菜单", "营业菜单"}, priority=11, block=True)
 
 
 @view_menu_cmd.handle()
@@ -968,7 +968,7 @@ async def handle_view_menu(event: MessageEvent):
 
 # ==================== 仓库升级 ====================
 
-upgrade_storage_cmd = on_command("升级仓库", aliases={"扩建仓库", "仓库升级"}, priority=5, block=True)
+upgrade_storage_cmd = on_command("升级仓库", aliases={"扩建仓库", "仓库升级"}, priority=11, block=True)
 
 
 @upgrade_storage_cmd.handle()
@@ -1010,7 +1010,7 @@ async def handle_upgrade_storage(event: MessageEvent):
 
 # ==================== 招牌菜 ====================
 
-signature_dish_cmd = on_command("设置招牌菜", aliases={"招牌菜设置"}, priority=5, block=True)
+signature_dish_cmd = on_command("设置招牌菜", aliases={"招牌菜设置"}, priority=11, block=True)
 
 
 @signature_dish_cmd.handle()
@@ -1063,7 +1063,7 @@ async def handle_signature_dish(event: MessageEvent, args: Message = CommandArg(
 
 # ==================== 餐厅排行榜 ====================
 
-restaurant_rank_cmd = on_command("餐厅排行", aliases={"餐厅排行榜", "餐厅榜"}, priority=5, block=True)
+restaurant_rank_cmd = on_command("餐厅排行", aliases={"餐厅排行榜", "餐厅榜"}, priority=11, block=True)
 
 
 @restaurant_rank_cmd.handle()

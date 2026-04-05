@@ -46,7 +46,7 @@ def _need_exp_for_level(level: int) -> int:
     else:
         return 1000 * 250 * (level - 5)
 
-create_guild_cmd = on_command("创建公会", block=True, priority=5)
+create_guild_cmd = on_command("创建公会", block=True, priority=11)
 
 @create_guild_cmd.handle()
 async def handle_create_guild(event: MessageEvent, args: Message = CommandArg()):
@@ -124,7 +124,7 @@ async def handle_create_guild(event: MessageEvent, args: Message = CommandArg())
     )
     await create_guild_cmd.finish(message_add_head(msg, event))
 # ==================== 公会信息 ====================
-guild_info_cmd = on_command("公会", aliases={"我的公会", "公会信息"}, block=True, priority=5,force_whitespace=True)
+guild_info_cmd = on_command("公会", aliases={"我的公会", "公会信息"}, block=True, priority=11,force_whitespace=True)
 
 @guild_info_cmd.handle()
 async def handle_guild_info(event: MessageEvent):
@@ -226,7 +226,7 @@ async def handle_guild_info(event: MessageEvent):
     await guild_info_cmd.finish(build_markdown("\n".join(lines)))
 
 # ==================== 公会加成 ====================
-guild_bonuses_cmd = on_command("公会加成", aliases={"加成效果"}, block=True, priority=5)
+guild_bonuses_cmd = on_command("公会加成", aliases={"加成效果"}, block=True, priority=11)
 
 @guild_bonuses_cmd.handle()
 async def handle_guild_bonuses(event: MessageEvent):
@@ -297,7 +297,7 @@ async def handle_guild_bonuses(event: MessageEvent):
         await guild_bonuses_cmd.finish(message_add_head(msg, event))
 
 # ==================== 加入公会 ====================
-join_guild_cmd = on_command("加入公会", block=True, priority=5)
+join_guild_cmd = on_command("加入公会", block=True, priority=11)
 
 @join_guild_cmd.handle()
 async def handle_join_guild(event: MessageEvent, args: Message = CommandArg()):
@@ -348,7 +348,7 @@ async def handle_join_guild(event: MessageEvent, args: Message = CommandArg()):
         await join_guild_cmd.finish(message_add_head(join_msg, event))
 
 # ==================== 退出公会 ====================
-quit_guild_cmd = on_command("退会", aliases={"退出公会"}, block=True, priority=5)
+quit_guild_cmd = on_command("退会", aliases={"退出公会"}, block=True, priority=11)
 
 @quit_guild_cmd.handle()
 async def handle_quit_guild(event: MessageEvent):
@@ -385,7 +385,7 @@ async def handle_quit_guild(event: MessageEvent):
         await quit_guild_cmd.finish(message_add_head(f"🚪 你已退出公会『{guild_name}』，个人积分和贡献已清空", event))
 # ==================== 解散公会 ====================
 
-dissolve_guild_cmd = on_command("解散公会", block=True, priority=5)
+dissolve_guild_cmd = on_command("解散公会", block=True, priority=11)
 
 @dissolve_guild_cmd.handle()
 async def handle_dissolve_guild(event: MessageEvent):
@@ -426,7 +426,7 @@ async def handle_dissolve_guild(event: MessageEvent):
         await dissolve_guild_cmd.finish(message_add_head("⚠️ 公会已解散，江湖再见", event))
 
 # ==================== 公会成员列表 ====================
-member_list_cmd = on_command("公会成员", aliases={"成员列表"}, block=True, priority=5)
+member_list_cmd = on_command("公会成员", aliases={"成员列表"}, block=True, priority=11)
 
 @member_list_cmd.handle()
 async def handle_member_list(event: MessageEvent, args: Message = CommandArg()):
@@ -516,7 +516,7 @@ async def handle_member_list(event: MessageEvent, args: Message = CommandArg()):
     await member_list_cmd.finish(build_markdown("\n".join(lines)))
 
 # ==================== 捐献金币 ====================
-donate_cmd = on_command("捐献金币", aliases={"贡献", "捐献","上供"}, block=True, priority=5)
+donate_cmd = on_command("捐献金币", aliases={"贡献", "捐献","上供"}, block=True, priority=11)
 
 @donate_cmd.handle()
 async def handle_donate(event: MessageEvent, args: Message = CommandArg()):
@@ -599,7 +599,7 @@ async def handle_donate(event: MessageEvent, args: Message = CommandArg()):
         await donate_cmd.finish(message_add_head(msg, event))
 
 # ==================== 公会升级 ====================
-guild_upgrade_cmd = on_command("公会升级", aliases={"升级公会"}, block=True, priority=5)
+guild_upgrade_cmd = on_command("公会升级", aliases={"升级公会"}, block=True, priority=11)
 
 @guild_upgrade_cmd.handle()
 async def handle_guild_upgrade(event: MessageEvent):
@@ -629,7 +629,7 @@ async def handle_guild_upgrade(event: MessageEvent):
         await guild_upgrade_cmd.finish(message_add_head(f"🎉 {message}", event))
 
 # ==================== 转让会长 ====================
-transfer_cmd = on_command("转让会长", block=True, priority=5)
+transfer_cmd = on_command("转让会长", block=True, priority=11)
 
 @transfer_cmd.handle()
 async def handle_transfer(event: MessageEvent, args: Message = CommandArg()):
@@ -682,7 +682,7 @@ async def handle_transfer(event: MessageEvent, args: Message = CommandArg()):
         await transfer_cmd.finish(message_add_head(msg, event))
 
 # ==================== 公会列表 ====================
-list_guilds_cmd = on_command("公会列表", aliases={"查看公会", "所有公会"}, block=True, priority=5)
+list_guilds_cmd = on_command("公会列表", aliases={"查看公会", "所有公会"}, block=True, priority=11)
 
 @list_guilds_cmd.handle()
 async def handle_list_guilds(event: MessageEvent, args: Message = CommandArg()):
@@ -781,7 +781,7 @@ async def handle_list_guilds(event: MessageEvent, args: Message = CommandArg()):
     await list_guilds_cmd.finish(build_markdown("\n".join(lines)))
 
 # ==================== 申请列表 ====================
-application_list_cmd = on_command("申请列表", block=True, priority=5)
+application_list_cmd = on_command("申请列表", block=True, priority=11)
 
 @application_list_cmd.handle()
 async def handle_app_list(event: MessageEvent):
@@ -827,8 +827,8 @@ async def handle_app_list(event: MessageEvent):
         await application_list_cmd.finish(build_markdown("\n".join(lines)))
 
 # ==================== 同意/拒绝申请 ====================
-approve_cmd = on_command("同意入会", block=True, priority=5)
-reject_cmd = on_command("拒绝入会", block=True, priority=5)
+approve_cmd = on_command("同意入会", block=True, priority=11)
+reject_cmd = on_command("拒绝入会", block=True, priority=11)
 
 async def _process_application(event: MessageEvent, args: Message, approve: bool):
     uid_str = args.extract_plain_text().strip()
@@ -916,7 +916,7 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
     await _process_application(event, args, False)
 
 # ==================== 公会公告 ====================
-notice_cmd = on_command("公会公告", aliases={"公告"}, block=True, priority=5)
+notice_cmd = on_command("公会公告", aliases={"公告"}, block=True, priority=11)
 
 @notice_cmd.handle()
 async def handle_notice(event: MessageEvent, args: Message = CommandArg()):
@@ -948,7 +948,7 @@ async def handle_notice(event: MessageEvent, args: Message = CommandArg()):
         await notice_cmd.finish(message_add_head(f"✅ {action_msg}", event))
 
 # ==================== 公会基地管理 ====================
-set_base_cmd = on_command("设置基地", block=True, priority=5)
+set_base_cmd = on_command("设置基地", block=True, priority=11)
 
 @set_base_cmd.handle()
 async def handle_set_base(event: MessageEvent):
@@ -1012,7 +1012,7 @@ async def handle_set_base(event: MessageEvent):
         await set_base_cmd.finish(message_add_head(msg, event))
 
 # ==================== 公会职位管理 ====================
-set_position_cmd = on_command("设置职位", block=True, priority=5)
+set_position_cmd = on_command("设置职位", block=True, priority=11)
 
 @set_position_cmd.handle()
 async def handle_set_position(event: MessageEvent, args: Message = CommandArg()):
@@ -1079,7 +1079,7 @@ async def handle_set_position(event: MessageEvent, args: Message = CommandArg())
         # UoW会在__aexit__中自动commit
         await set_position_cmd.finish(message_add_head(f"✅ {message}", event))
 # ==================== 踢出公会成员 ====================
-kick_member_cmd = on_command("踢出公会", aliases={"踢出成员"}, block=True, priority=5)
+kick_member_cmd = on_command("踢出公会", aliases={"踢出成员"}, block=True, priority=11)
 
 @kick_member_cmd.handle()
 async def handle_kick_member(event: MessageEvent, args: Message = CommandArg()):
@@ -1124,7 +1124,7 @@ async def handle_kick_member(event: MessageEvent, args: Message = CommandArg()):
         # UoW会在__aexit__中自动commit
         await kick_member_cmd.finish(message_add_head(f"🚪 {message}", event))
 # ==================== 公会建筑管理 ====================
-guild_buildings_cmd = on_command("公会建筑", aliases={"建筑列表"}, block=True, priority=5)
+guild_buildings_cmd = on_command("公会建筑", aliases={"建筑列表"}, block=True, priority=11)
 
 @guild_buildings_cmd.handle()
 async def handle_guild_buildings(event: MessageEvent):
@@ -1176,7 +1176,7 @@ async def handle_guild_buildings(event: MessageEvent):
 
         await guild_buildings_cmd.finish(build_markdown("\n".join(lines)))
 
-build_cmd = on_command("建造", aliases={"升级建筑"}, block=True, priority=5)
+build_cmd = on_command("建造", aliases={"升级建筑"}, block=True, priority=11)
 
 @build_cmd.handle()
 async def handle_build(event: MessageEvent, args: Message = CommandArg()):
@@ -1236,7 +1236,7 @@ async def handle_build(event: MessageEvent, args: Message = CommandArg()):
         await build_cmd.send(build_markdown("\n".join(cost_lines)))
 
 # ==================== 确认建造 ====================
-confirm_build_cmd = on_command("确认", block=True, priority=5)
+confirm_build_cmd = on_command("确认", block=True, priority=11)
 
 @confirm_build_cmd.handle()
 async def handle_confirm_build(event: MessageEvent):
@@ -1252,7 +1252,7 @@ async def handle_confirm_build(event: MessageEvent):
         await confirm_build_cmd.finish("⛔ 请使用完整命令格式：确认建造 [建筑名]")
 
 # ==================== 确认建造（带建筑名） ====================
-confirm_build_with_name_cmd = on_command("确认建造", block=True, priority=5)
+confirm_build_with_name_cmd = on_command("确认建造", block=True, priority=11)
 
 @confirm_build_with_name_cmd.handle()
 async def handle_confirm_build_with_name(event: MessageEvent, args: Message = CommandArg()):
@@ -1306,7 +1306,7 @@ async def handle_confirm_build_with_name(event: MessageEvent, args: Message = Co
 
 
 # ==================== 公会传送阵 ====================
-guild_teleport_cmd = on_command("公会传送", aliases={"传送到公会"}, block=True, priority=5)
+guild_teleport_cmd = on_command("公会传送", aliases={"传送到公会"}, block=True, priority=11)
 
 @guild_teleport_cmd.handle()
 async def handle_guild_teleport(event: MessageEvent, args: Message = CommandArg()):
@@ -1403,7 +1403,7 @@ async def handle_guild_teleport(event: MessageEvent, args: Message = CommandArg(
             ))
 
 # ==================== 公会丹房 ====================
-guild_alchemy_cmd = on_command("公会丹房", aliases={"丹房", "丹药兑换"}, block=True, priority=5)
+guild_alchemy_cmd = on_command("公会丹房", aliases={"丹房", "丹药兑换"}, block=True, priority=11)
 
 @guild_alchemy_cmd.handle()
 async def handle_guild_alchemy(event: MessageEvent):
@@ -1469,7 +1469,7 @@ async def handle_guild_alchemy(event: MessageEvent):
         await guild_alchemy_cmd.finish(build_markdown("\n".join(lines)))
 
 # ==================== 兑换丹药 ====================
-exchange_pill_cmd = on_command("兑换丹药", block=True, priority=5)
+exchange_pill_cmd = on_command("兑换丹药", block=True, priority=11)
 
 @exchange_pill_cmd.handle()
 async def handle_exchange_pill(event: MessageEvent, args: Message = CommandArg()):
@@ -1560,7 +1560,7 @@ async def handle_exchange_pill(event: MessageEvent, args: Message = CommandArg()
                 "方式2：兑换丹药 [丹药名称] [数量]")
 
 # ==================== 公会仓库 ====================
-guild_warehouse_cmd = on_command("公会仓库", aliases={"仓库"}, block=True, priority=5)
+guild_warehouse_cmd = on_command("公会仓库", aliases={"仓库"}, block=True, priority=11)
 
 @guild_warehouse_cmd.handle()
 async def handle_guild_warehouse(event: MessageEvent):
@@ -1626,7 +1626,7 @@ async def handle_guild_warehouse(event: MessageEvent):
         await guild_warehouse_cmd.finish(build_markdown("\n".join(lines)))
 
 # ==================== 存入仓库 ====================
-deposit_warehouse_cmd = on_command("存入仓库", block=True, priority=5)
+deposit_warehouse_cmd = on_command("存入仓库", block=True, priority=11)
 
 @deposit_warehouse_cmd.handle()
 async def handle_deposit_warehouse(event: MessageEvent, args: Message = CommandArg()):
@@ -1694,7 +1694,7 @@ async def handle_deposit_warehouse(event: MessageEvent, args: Message = CommandA
             await deposit_warehouse_cmd.finish(message_add_head(f"⛔ {message}", event))
 
 # ==================== 取出仓库 ====================
-withdraw_warehouse_cmd = on_command("取出仓库", block=True, priority=5)
+withdraw_warehouse_cmd = on_command("取出仓库", block=True, priority=11)
 
 @withdraw_warehouse_cmd.handle()
 async def handle_withdraw_warehouse(event: MessageEvent, args: Message = CommandArg()):
@@ -1776,7 +1776,7 @@ async def handle_withdraw_warehouse(event: MessageEvent, args: Message = Command
             await withdraw_warehouse_cmd.finish(message_add_head(f"⛔ {message}", event))
 
 # ==================== 仓库记录 ====================
-warehouse_log_cmd = on_command("仓库记录", block=True, priority=5)
+warehouse_log_cmd = on_command("仓库记录", block=True, priority=11)
 
 @warehouse_log_cmd.handle()
 async def handle_warehouse_log(event: MessageEvent, args: Message = CommandArg()):

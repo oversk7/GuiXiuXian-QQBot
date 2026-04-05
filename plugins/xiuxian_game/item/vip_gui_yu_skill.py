@@ -154,7 +154,7 @@ def _teleport_player_to_anchor(player: Player, anchor: dict):
 
 
 # ==================== 指令：锚点 ====================
-anchor_cmd = on_command("锚点", block=True, priority=5)
+anchor_cmd = on_command("锚点", block=True, priority=9)
 
 
 @anchor_cmd.handle()
@@ -447,8 +447,8 @@ async def _handle_delete_anchor(session, player: Player, parts: list, event: Mes
 
 
 # ==================== 指令：同意传送 / 拒绝传送 ====================
-accept_carry_cmd = on_command("同意传送", block=True, priority=5)
-reject_carry_cmd = on_command("拒绝传送", block=True, priority=5)
+accept_carry_cmd = on_command("同意传送", block=True, priority=9)
+reject_carry_cmd = on_command("拒绝传送", block=True, priority=9)
 
 
 @accept_carry_cmd.handle()
@@ -574,7 +574,7 @@ async def handle_reject_carry(event: MessageEvent):
 
 
 # ==================== 指令：归雨（状态面板） ====================
-gui_yu_panel_cmd = on_command("归雨", block=True, priority=5)
+gui_yu_panel_cmd = on_command("归雨", block=True, priority=9)
 
 
 @gui_yu_panel_cmd.handle()

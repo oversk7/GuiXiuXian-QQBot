@@ -27,8 +27,8 @@ from ..platform_utils import get_unified_player
 
 
 # ==================== 欺骗指令 ====================
-deception_cmd = on_command("欺骗", aliases={"骗人", "欺诈"}, block=True, priority=5)
-deception_help_cmd = on_command("欺骗帮助", aliases={"欺骗说明", "欺诈帮助"}, block=True, priority=5)
+deception_cmd = on_command("欺骗", aliases={"骗人", "欺诈"}, block=True, priority=9)
+deception_help_cmd = on_command("欺骗帮助", aliases={"欺骗说明", "欺诈帮助"}, block=True, priority=9)
 
 
 @deception_help_cmd.handle()

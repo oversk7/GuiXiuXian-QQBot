@@ -76,7 +76,7 @@ def get_equipment_short_id(all_equips: list, target_equip: ItemInstance) -> int:
     return 0
 
 # ---------------- 指令：查看装备栏 ----------------
-list_equipment = on_command("装备栏", aliases={"我的装备"}, block=True, priority=5, force_whitespace=True)
+list_equipment = on_command("装备栏", aliases={"我的装备"}, block=True, priority=9, force_whitespace=True)
 
 @list_equipment.handle()
 async def _(event: MessageEvent, args: Message = CommandArg()):
@@ -180,7 +180,7 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
 
 
 # ---------------- 指令：装备详情 ----------------
-equipment_detail = on_command("装备详情", aliases={"装备信息", "查看装备"}, block=True, priority=5, force_whitespace=True)
+equipment_detail = on_command("装备详情", aliases={"装备信息", "查看装备"}, block=True, priority=9, force_whitespace=True)
 
 @equipment_detail.handle()
 async def _(event: MessageEvent, args: Message = CommandArg()):
@@ -389,7 +389,7 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
 
 
 # ---------------- 指令：穿戴装备 ----------------
-wear_equipment = on_command("装备", aliases={"穿戴", "佩戴"}, block=True, priority=5, force_whitespace=True)
+wear_equipment = on_command("装备", aliases={"穿戴", "佩戴"}, block=True, priority=9, force_whitespace=True)
 
 @wear_equipment.handle()
 async def _(event: MessageEvent, args: Message = CommandArg()):
@@ -576,7 +576,7 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
 
 
 # ---------------- 指令：卸下装备 ----------------
-unwear_equipment = on_command("卸下", block=True, priority=5)
+unwear_equipment = on_command("卸下", block=True, priority=9)
 
 @unwear_equipment.handle()
 async def _(event: MessageEvent, args: Message = CommandArg()):
@@ -692,7 +692,7 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
 
 
 # ---------------- 指令：一键卸下 ----------------
-unwear_all_equipment = on_command("一键卸下", aliases={"卸下全部", "全部卸下"}, block=True, priority=5)
+unwear_all_equipment = on_command("一键卸下", aliases={"卸下全部", "全部卸下"}, block=True, priority=9)
 
 @unwear_all_equipment.handle()
 async def _(event: MessageEvent):
@@ -914,7 +914,7 @@ _VIP_EQUIPMENT_SKILL_MENUS: dict[str, dict] = {
 }
 
 
-equip_menu_cmd = on_command("装备菜单", aliases={"装备技能", "VIP技能"}, block=True, priority=5)
+equip_menu_cmd = on_command("装备菜单", aliases={"装备技能", "VIP技能"}, block=True, priority=9)
 
 
 @equip_menu_cmd.handle()
@@ -955,7 +955,7 @@ async def handle_equip_menu(event: MessageEvent):
 
 # ==================== 铭文列表命令 ====================
 
-inscription_list_cmd = on_command("铭文列表", aliases={"铭文栏", "我的铭文"}, priority=5, block=True)
+inscription_list_cmd = on_command("铭文列表", aliases={"铭文栏", "我的铭文"}, priority=9, block=True)
 
 @inscription_list_cmd.handle()
 async def handle_inscription_list(event: MessageEvent, args: Message = CommandArg()):

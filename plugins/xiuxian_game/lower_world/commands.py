@@ -34,12 +34,12 @@ from ..utils_markdown import cmd, build_markdown
 
 
 # ==================== 命令注册 ====================
-descend_cmd = on_command("降临", block=True, priority=5)
-guard_cmd = on_command("镇守", block=True, priority=5)
-battle_hero_cmd = on_command("迎战", block=True, priority=5)
-calamity_shop_cmd = on_command("天灾商店", block=True, priority=5)
-redeem_cmd = on_command("兑换", block=True, priority=5)
-scout_cmd = on_command("侦查", block=True, priority=5)
+descend_cmd = on_command("降临", block=True, priority=13)
+guard_cmd = on_command("镇守", block=True, priority=13)
+battle_hero_cmd = on_command("迎战", block=True, priority=13)
+calamity_shop_cmd = on_command("天灾商店", block=True, priority=13)
+redeem_cmd = on_command("兑换", block=True, priority=13)
+scout_cmd = on_command("侦查", block=True, priority=13)
 
 
 # ==================== 【降临】 ====================

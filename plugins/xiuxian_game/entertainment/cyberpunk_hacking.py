@@ -17,7 +17,7 @@ from .cyberpunk_hacking_image import generate_game_image
 game_sessions: Dict[str, 'ArrayBreakingGame'] = {}
 
 # 阵法破解游戏命令
-array_breaking = on_command("阵法破解", aliases={"破阵", "阵法"}, priority=5, block=True)
+array_breaking = on_command("阵法破解", aliases={"破阵", "阵法"}, priority=13, block=True)
 
 @dataclass
 class TargetSequence:

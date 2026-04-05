@@ -11,7 +11,7 @@ from ..platform_utils import get_unified_player
 
 
 # ==================== 社交统计 ====================
-social_stats_cmd = on_command("社交统计", aliases={"社交信息"}, block=True, priority=5)
+social_stats_cmd = on_command("社交统计", aliases={"社交信息"}, block=True, priority=11)
 
 @social_stats_cmd.handle()
 async def handle_social_stats(event: MessageEvent):
@@ -38,7 +38,7 @@ async def handle_social_stats(event: MessageEvent):
 
 
 # ==================== 魅力榜 ====================
-charm_ranking_cmd = on_command("魅力榜", aliases={"魅力排行榜"}, block=True, priority=5)
+charm_ranking_cmd = on_command("魅力榜", aliases={"魅力排行榜"}, block=True, priority=11)
 
 @charm_ranking_cmd.handle()
 async def handle_charm_ranking(event: MessageEvent, args: Message = CommandArg()):

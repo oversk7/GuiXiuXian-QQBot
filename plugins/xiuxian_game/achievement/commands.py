@@ -11,7 +11,7 @@ from ..platform_utils import get_unified_player
 from ..utils_markdown import cmd, build_markdown
 from .achievement_service import AchievementService
 
-achievement_cmd = on_command("成就", aliases={"成就列表", "我的成就"}, block=True, priority=5)
+achievement_cmd = on_command("成就", aliases={"成就列表", "我的成就"}, block=True, priority=15)
 
 
 @achievement_cmd.handle()

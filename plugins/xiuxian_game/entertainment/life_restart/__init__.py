@@ -124,7 +124,7 @@ async def _send_life_result(matcher, selected, init_prop, results, summary):
 
 random_life_cmd = on_command(
     "随机人生", aliases={"人生重开", "人生重来", "liferestart", "remake"},
-    priority=5, block=True
+    priority=13, block=True
 )
 
 
@@ -162,7 +162,7 @@ async def handle_random_life(event: MessageEvent, args: Message = CommandArg()):
 
 # ─── 交互模式（手动选天赋+分属性） ──────────────────────
 
-interactive_life_cmd = on_command("人生选择", priority=5, block=True)
+interactive_life_cmd = on_command("人生选择", priority=13, block=True)
 
 
 def _build_talent_list_md(all_talents: list[Talent], selected_indices: list[int], warning: str = ""):

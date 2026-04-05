@@ -16,10 +16,10 @@ from ..platform_utils import get_unified_player
 
 # ---------------- 指令 ----------------
 
-recipe_cmd = on_command("丹方", aliases={"炼丹配方"}, block=True, priority=5)
-start_cmd = on_command("炼丹", block=True, priority=5)
-status_cmd = on_command("炼丹状态", block=True, priority=5)
-claim_cmd = on_command("收获丹药", aliases={"领取丹药"}, block=True, priority=5)
+recipe_cmd = on_command("丹方", aliases={"炼丹配方"}, block=True, priority=13)
+start_cmd = on_command("炼丹", block=True, priority=13)
+status_cmd = on_command("炼丹状态", block=True, priority=13)
+claim_cmd = on_command("收获丹药", aliases={"领取丹药"}, block=True, priority=13)
 
 
 @recipe_cmd.handle()

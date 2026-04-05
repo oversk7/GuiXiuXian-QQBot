@@ -12,7 +12,7 @@ import random
 game_sessions = {}
 
 # 井字棋功能
-tic_tac_toe = on_command("井字棋", priority=5, block=True)
+tic_tac_toe = on_command("井字棋", priority=13, block=True)
 
 class TicTacToeGame:
     def __init__(self):

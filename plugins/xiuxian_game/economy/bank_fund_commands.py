@@ -20,10 +20,10 @@ from ..models.db import AsyncSessionLocal
 
 
 # 理财产品相关命令
-fund_list_cmd = on_command("理财产品", block=True, priority=5)
-fund_buy_cmd = on_command("购买理财", block=True, priority=5)
-fund_sell_cmd = on_command("赎回理财", block=True, priority=5)
-fund_holdings_cmd = on_command("我的理财", block=True, priority=5)
+fund_list_cmd = on_command("理财产品", block=True, priority=7)
+fund_buy_cmd = on_command("购买理财", block=True, priority=7)
+fund_sell_cmd = on_command("赎回理财", block=True, priority=7)
+fund_holdings_cmd = on_command("我的理财", block=True, priority=7)
 
 
 def session_factory():
@@ -269,10 +269,10 @@ async def handle_fund_holdings(event: MessageEvent):
 
 # ==================== 定期理财（七日定存）命令 ====================
 
-fixed_list_cmd = on_command("定期理财", block=True, priority=5)
-fixed_buy_cmd = on_command("购买定期", block=True, priority=5)
-fixed_holdings_cmd = on_command("我的定期", block=True, priority=5)
-fixed_redeem_cmd = on_command("赎回定期", block=True, priority=5)
+fixed_list_cmd = on_command("定期理财", block=True, priority=7)
+fixed_buy_cmd = on_command("购买定期", block=True, priority=7)
+fixed_holdings_cmd = on_command("我的定期", block=True, priority=7)
+fixed_redeem_cmd = on_command("赎回定期", block=True, priority=7)
 
 
 @fixed_list_cmd.handle()

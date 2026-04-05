@@ -39,14 +39,14 @@ token_exchange_cmd = on_command(
     "月卡宝箱兑换",
     aliases={"月卡兑换"},
     block=True,
-    priority=5,
+    priority=7,
 )
 
 exchange_elixir_cmd = on_command(
     "兑换真还魂丹",
     aliases={"兑换还魂丹"},
     block=True,
-    priority=5,
+    priority=7,
 )
 
 # ---------------- 指令处理 ----------------

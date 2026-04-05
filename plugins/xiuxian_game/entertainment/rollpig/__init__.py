@@ -34,7 +34,7 @@ def _get_pig_image_b64(pig: Pigsonality) -> str | None:
 
 today_pig_cmd = on_command(
     "今日小猪", aliases={"今天小猪", "今天是什么小猪", "今日猪猪", "什么小猪"},
-    priority=5, block=True
+    priority=13, block=True
 )
 
 

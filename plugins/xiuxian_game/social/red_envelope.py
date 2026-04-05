@@ -33,7 +33,7 @@ def _format_gold(gold: int) -> str:
 
 # ==================== 发红包 ====================
 
-send_envelope_cmd = on_command("发红包", block=True, priority=5)
+send_envelope_cmd = on_command("发红包", block=True, priority=11)
 
 
 @send_envelope_cmd.handle()
@@ -143,7 +143,7 @@ async def handle_send_envelope(event: MessageEvent, args: Message = CommandArg()
 
 # ==================== 抢红包 ====================
 
-grab_envelope_cmd = on_command("抢红包", block=True, priority=5)
+grab_envelope_cmd = on_command("抢红包", block=True, priority=11)
 
 
 @grab_envelope_cmd.handle()
@@ -210,7 +210,7 @@ async def handle_grab_envelope(event: MessageEvent):
 
 # ==================== 红包记录 ====================
 
-envelope_record_cmd = on_command("红包记录", block=True, priority=5)
+envelope_record_cmd = on_command("红包记录", block=True, priority=11)
 
 
 @envelope_record_cmd.handle()

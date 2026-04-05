@@ -13,7 +13,7 @@ from ..platform_utils import get_unified_player
 
 # Feature Flag（在文件顶部靠近其他常量的位置）
 # ==================== 公会任务 ====================
-guild_task_cmd = on_command("公会任务", aliases={"公会日常", "公会周常"}, block=True, priority=5)
+guild_task_cmd = on_command("公会任务", aliases={"公会日常", "公会周常"}, block=True, priority=11)
 
 @guild_task_cmd.handle()
 async def handle_guild_task(event: MessageEvent):
@@ -91,7 +91,7 @@ async def handle_guild_task(event: MessageEvent):
 
 
 # ==================== 完成公会任务 ====================
-complete_guild_task_cmd = on_command("完成公会任务", aliases={"领取公会任务", "公会任务奖励"}, block=True, priority=5)
+complete_guild_task_cmd = on_command("完成公会任务", aliases={"领取公会任务", "公会任务奖励"}, block=True, priority=11)
 
 @complete_guild_task_cmd.handle()
 async def handle_complete_guild_task(event: MessageEvent):
@@ -139,7 +139,7 @@ async def handle_complete_guild_task(event: MessageEvent):
 
 
 # ==================== 公会任务统计 ====================
-guild_task_stats_cmd = on_command("公会任务统计", aliases={"公会活跃度"}, block=True, priority=5)
+guild_task_stats_cmd = on_command("公会任务统计", aliases={"公会活跃度"}, block=True, priority=11)
 
 @guild_task_stats_cmd.handle()
 async def handle_guild_task_stats(event: MessageEvent):

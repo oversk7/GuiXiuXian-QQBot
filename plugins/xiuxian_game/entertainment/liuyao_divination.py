@@ -560,7 +560,7 @@ def build_ai_prompt(hex_data: dict, question: str) -> list:
 
 DIVINATION_COST = 500  # 起卦消耗金币
 
-liuyao_cmd = on_command("起卦", aliases={"六爻", "卜卦"}, block=True, priority=5)
+liuyao_cmd = on_command("起卦", aliases={"六爻", "卜卦"}, block=True, priority=13)
 
 
 @liuyao_cmd.handle()

@@ -29,7 +29,7 @@ FRAGMENT_ITEM_ID = "inscription_fragment"
 STABILIZER_ITEM_ID = "stabilizer_crystal"
 SUCCESS_RATE = 0.60
 
-synthesize_cmd = on_command("合成铭文", priority=5, block=True)
+synthesize_cmd = on_command("合成铭文", priority=9, block=True)
 
 
 @synthesize_cmd.handle()

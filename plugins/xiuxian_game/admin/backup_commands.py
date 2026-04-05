@@ -21,8 +21,8 @@ BACKUP_DIR = Path(__file__).parent.parent.parent.parent / "backups"
 MAX_BACKUPS = 10
 
 # 命令注册
-backup_cmd = on_command("手动备份", aliases={"数据库备份"}, block=True, priority=5)
-backup_status_cmd = on_command("备份状态", aliases={"备份列表"}, block=True, priority=5)
+backup_cmd = on_command("手动备份", aliases={"数据库备份"}, block=True, priority=15)
+backup_status_cmd = on_command("备份状态", aliases={"备份列表"}, block=True, priority=15)
 
 
 def _get_mysql_config() -> dict:

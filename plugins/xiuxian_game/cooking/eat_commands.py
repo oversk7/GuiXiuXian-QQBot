@@ -21,7 +21,7 @@ from .cooking_service import DishQuality
 
 # ==================== 【吃】指令 ====================
 
-eat_cmd = on_command("吃", aliases={"品尝", "食用", "吃鱼", "吃掉鱼", "品尝鱼"}, priority=5, block=True)
+eat_cmd = on_command("吃", aliases={"品尝", "食用", "吃鱼", "吃掉鱼", "品尝鱼"}, priority=11, block=True)
 
 
 @eat_cmd.handle()

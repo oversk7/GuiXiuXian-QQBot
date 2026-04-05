@@ -11,7 +11,7 @@ from ..ai_guide import is_admin
 logger = logging.getLogger(__name__)
 
 # 启用NPC AI对话
-enable_npc_ai = on_command("启用NPC AI", aliases={"开启NPC AI"}, block=True, priority=5)
+enable_npc_ai = on_command("启用NPC AI", aliases={"开启NPC AI"}, block=True, priority=15)
 
 @enable_npc_ai.handle()
 async def handle_enable_npc_ai(event: MessageEvent, args: Message = CommandArg()):
@@ -66,7 +66,7 @@ async def handle_enable_npc_ai(event: MessageEvent, args: Message = CommandArg()
 
 
 # 禁用NPC AI对话
-disable_npc_ai = on_command("禁用NPC AI", aliases={"关闭NPC AI"}, block=True, priority=5)
+disable_npc_ai = on_command("禁用NPC AI", aliases={"关闭NPC AI"}, block=True, priority=15)
 
 @disable_npc_ai.handle()
 async def handle_disable_npc_ai(event: MessageEvent, args: Message = CommandArg()):
@@ -102,7 +102,7 @@ async def handle_disable_npc_ai(event: MessageEvent, args: Message = CommandArg(
 
 
 # 查看NPC AI状态
-check_npc_ai = on_command("查看NPC AI", aliases={"NPC AI状态"}, block=True, priority=5)
+check_npc_ai = on_command("查看NPC AI", aliases={"NPC AI状态"}, block=True, priority=15)
 
 @check_npc_ai.handle()
 async def handle_check_npc_ai(event: MessageEvent, args: Message = CommandArg()):
@@ -151,7 +151,7 @@ async def handle_check_npc_ai(event: MessageEvent, args: Message = CommandArg())
 
 
 # 批量启用NPC AI对话
-batch_enable_npc_ai = on_command("批量启用NPC AI", aliases={"启用所有NPC AI", "全部启用NPC AI"}, block=True, priority=5)
+batch_enable_npc_ai = on_command("批量启用NPC AI", aliases={"启用所有NPC AI", "全部启用NPC AI"}, block=True, priority=15)
 
 @batch_enable_npc_ai.handle()
 async def handle_batch_enable_npc_ai(event: MessageEvent, args: Message = CommandArg()):
@@ -258,7 +258,7 @@ async def handle_batch_enable_npc_ai(event: MessageEvent, args: Message = Comman
 
 
 # 批量禁用NPC AI对话
-batch_disable_npc_ai = on_command("批量禁用NPC AI", aliases={"禁用所有NPC AI", "全部禁用NPC AI"}, block=True, priority=5)
+batch_disable_npc_ai = on_command("批量禁用NPC AI", aliases={"禁用所有NPC AI", "全部禁用NPC AI"}, block=True, priority=15)
 
 @batch_disable_npc_ai.handle()
 async def handle_batch_disable_npc_ai(event: MessageEvent, args: Message = CommandArg()):

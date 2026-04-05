@@ -37,7 +37,7 @@ beast_manager = GuardianBeastManager()
 
 # ==================== 开辟灵田 ====================
 
-create_field_cmd = on_command("开辟灵田", aliases={"开田"}, priority=5, block=True)
+create_field_cmd = on_command("开辟灵田", aliases={"开田"}, priority=13, block=True)
 
 
 @create_field_cmd.handle()
@@ -54,7 +54,7 @@ async def handle_create_field(event: MessageEvent):
 
 # ==================== 查看灵田 ====================
 
-view_field_cmd = on_command("灵田", aliases={"我的灵田"}, priority=5, block=True)
+view_field_cmd = on_command("灵田", aliases={"我的灵田"}, priority=13, block=True)
 
 
 @view_field_cmd.handle()
@@ -71,7 +71,7 @@ async def handle_view_field(event: MessageEvent):
 
 # ==================== 升级灵田 ====================
 
-upgrade_field_cmd = on_command("灵田升级", aliases={"升级灵田"}, priority=5, block=True)
+upgrade_field_cmd = on_command("灵田升级", aliases={"升级灵田"}, priority=13, block=True)
 
 
 @upgrade_field_cmd.handle()
@@ -88,7 +88,7 @@ async def handle_upgrade_field(event: MessageEvent):
 
 # ==================== 种植 ====================
 
-plant_cmd = on_command("种植", aliases={"种"}, priority=5, block=True)
+plant_cmd = on_command("种植", aliases={"种"}, priority=13, block=True)
 
 
 @plant_cmd.handle()
@@ -121,7 +121,7 @@ async def handle_plant(event: MessageEvent, args: Message = CommandArg()):
 
 # ==================== 一键种植 ====================
 
-plant_all_cmd = on_command("一键种植", aliases={"全种"}, priority=5, block=True)
+plant_all_cmd = on_command("一键种植", aliases={"全种"}, priority=13, block=True)
 
 
 @plant_all_cmd.handle()
@@ -144,7 +144,7 @@ async def handle_plant_all(event: MessageEvent, args: Message = CommandArg()):
 
 # ==================== 灌溉 ====================
 
-water_cmd = on_command("浇水", priority=5, block=True)
+water_cmd = on_command("浇水", priority=13, block=True)
 
 
 @water_cmd.handle()
@@ -172,7 +172,7 @@ async def handle_water(event: MessageEvent, args: Message = CommandArg()):
 
 # ==================== 一键灌溉 ====================
 
-water_all_cmd = on_command("一键浇水", aliases={"全部浇水"}, priority=5, block=True)
+water_all_cmd = on_command("一键浇水", aliases={"全部浇水"}, priority=13, block=True)
 
 
 @water_all_cmd.handle()
@@ -189,7 +189,7 @@ async def handle_water_all(event: MessageEvent):
 
 # ==================== 收菜 ====================
 
-harvest_cmd = on_command("收菜", aliases={"收获"}, priority=5, block=True)
+harvest_cmd = on_command("收菜", aliases={"收获"}, priority=13, block=True)
 
 
 @harvest_cmd.handle()
@@ -206,7 +206,7 @@ async def handle_harvest(event: MessageEvent):
 
 # ==================== 偷菜(偷菜) ====================
 
-steal_cmd = on_command("偷菜", priority=5, block=True)
+steal_cmd = on_command("偷菜", priority=13, block=True)
 
 
 @steal_cmd.handle()
@@ -236,7 +236,7 @@ async def handle_steal(event: MessageEvent, args: Message = CommandArg()):
 
 # ==================== 旧诡兽命令（引导到宠物伙伴系统） ====================
 
-place_guardian_cmd = on_command("放置诡兽", priority=5, block=True)
+place_guardian_cmd = on_command("放置诡兽", priority=13, block=True)
 
 
 @place_guardian_cmd.handle()
@@ -251,7 +251,7 @@ async def handle_place_guardian_redirect(event: MessageEvent):
     await place_guardian_cmd.finish(build_markdown(msg))
 
 
-remove_guardian_cmd = on_command("收回诡兽", aliases={"撤回诡兽"}, priority=5, block=True)
+remove_guardian_cmd = on_command("收回诡兽", aliases={"撤回诡兽"}, priority=13, block=True)
 
 
 @remove_guardian_cmd.handle()
@@ -264,7 +264,7 @@ async def handle_remove_guardian_redirect(event: MessageEvent):
     await remove_guardian_cmd.finish(build_markdown(msg))
 
 
-feed_guardian_cmd = on_command("喂养诡兽", aliases={"喂诡兽"}, priority=5, block=True)
+feed_guardian_cmd = on_command("喂养诡兽", aliases={"喂诡兽"}, priority=13, block=True)
 
 
 @feed_guardian_cmd.handle()
@@ -279,7 +279,7 @@ async def handle_feed_guardian_redirect(event: MessageEvent):
 
 # ==================== 灵种商店 ====================
 
-seed_shop_cmd = on_command("种子商店", aliases={"灵种商店"}, priority=5, block=True)
+seed_shop_cmd = on_command("种子商店", aliases={"灵种商店"}, priority=13, block=True)
 
 
 @seed_shop_cmd.handle()
@@ -337,7 +337,7 @@ async def handle_seed_shop(event: MessageEvent):
 
 # ==================== 购买灵种 ====================
 
-buy_seed_cmd = on_command("买种子", priority=5, block=True)
+buy_seed_cmd = on_command("买种子", priority=13, block=True)
 
 
 @buy_seed_cmd.handle()
@@ -397,7 +397,7 @@ async def handle_buy_seed(event: MessageEvent, args: Message = CommandArg()):
 
 # ==================== 买诡兽 ====================
 
-buy_beast_cmd = on_command("买诡兽", priority=5, block=True)
+buy_beast_cmd = on_command("买诡兽", priority=13, block=True)
 
 
 @buy_beast_cmd.handle()
@@ -455,7 +455,7 @@ async def handle_buy_beast(event: MessageEvent, args: Message = CommandArg()):
 
 # ==================== 拜访灵田 ====================
 
-visit_other_field_cmd = on_command("拜访灵田", aliases={"查看灵田"}, priority=5, block=True)
+visit_other_field_cmd = on_command("拜访灵田", aliases={"查看灵田"}, priority=13, block=True)
 
 
 @visit_other_field_cmd.handle()
@@ -481,7 +481,7 @@ async def handle_visit_other_field(event: MessageEvent, args: Message = CommandA
 
 # ==================== 灵田记录 ====================
 
-field_log_cmd = on_command("偷菜记录", priority=5, block=True)
+field_log_cmd = on_command("偷菜记录", priority=13, block=True)
 
 
 @field_log_cmd.handle()

@@ -27,7 +27,7 @@ from ..platform_utils import get_unified_player
 
 
 # ---------------- 指令：查看装备孔位 ----------------
-gem_slots_cmd = on_command("孔位", aliases={"装备孔位", "宝石孔位"}, block=True, priority=5)
+gem_slots_cmd = on_command("孔位", aliases={"装备孔位", "宝石孔位"}, block=True, priority=9)
 
 @gem_slots_cmd.handle()
 async def _(event: MessageEvent, args: Message = CommandArg()):
@@ -88,7 +88,7 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
 
 
 # ---------------- 指令：镶嵌宝石 ----------------
-socket_gem_cmd = on_command("镶嵌", aliases={"宝石镶嵌"}, block=True, priority=5)
+socket_gem_cmd = on_command("镶嵌", aliases={"宝石镶嵌"}, block=True, priority=9)
 
 @socket_gem_cmd.handle()
 async def _(event: MessageEvent, args: Message = CommandArg()):
@@ -205,7 +205,7 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
 
 
 # ---------------- 指令：拆卸宝石 ----------------
-remove_gem_cmd = on_command("拆卸", aliases={"宝石拆卸"}, block=True, priority=5)
+remove_gem_cmd = on_command("拆卸", aliases={"宝石拆卸"}, block=True, priority=9)
 
 @remove_gem_cmd.handle()
 async def _(event: MessageEvent, args: Message = CommandArg()):
@@ -262,7 +262,7 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
 
 
 # ---------------- 指令：镶嵌物品列表 ----------------
-gem_list_cmd = on_command("镶嵌物品", aliases={"宝石列表", "我的宝石"}, block=True, priority=5)
+gem_list_cmd = on_command("镶嵌物品", aliases={"宝石列表", "我的宝石"}, block=True, priority=9)
 
 @gem_list_cmd.handle()
 async def _(event: MessageEvent):

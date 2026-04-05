@@ -803,7 +803,7 @@ async def handle_admin_database_query(user_message: str, event, matcher=None):
 
 
 # AI引导处理器 - 使用明确的命令前缀避免误触
-ai_guide = on_command("问", aliases={"请问", "我想知道", "怎么"}, priority=5, block=True)
+ai_guide = on_command("问", aliases={"请问", "我想知道", "怎么"}, priority=15, block=True)
 
 @ai_guide.handle()
 async def handle_ai_guide(event: MessageEvent, args: Message = CommandArg()):

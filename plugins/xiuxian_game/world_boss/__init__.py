@@ -37,10 +37,10 @@ from ..platform_utils import get_unified_player
 # =====================================================
 
 
-view_cmd = on_command("世界BOSS", aliases={"世界Boss", "世界boss"}, block=True, priority=5)
-attack_cmd = on_command("讨伐BOSS", aliases={"讨伐boss", "讨伐BOSS"}, block=True, priority=5)
-rank_cmd = on_command("BOSS排行", aliases={"世界BOSS排行", "世界boss排行", "boss排行"}, block=True, priority=5)
-open_chest_cmd = on_command("开启深渊宝箱", aliases={"开启宝箱", "开宝箱"}, block=True, priority=5)
+view_cmd = on_command("世界BOSS", aliases={"世界Boss", "世界boss"}, block=True, priority=13)
+attack_cmd = on_command("讨伐BOSS", aliases={"讨伐boss", "讨伐BOSS"}, block=True, priority=13)
+rank_cmd = on_command("BOSS排行", aliases={"世界BOSS排行", "世界boss排行", "boss排行"}, block=True, priority=13)
+open_chest_cmd = on_command("开启深渊宝箱", aliases={"开启宝箱", "开宝箱"}, block=True, priority=13)
 
 
 @view_cmd.handle()

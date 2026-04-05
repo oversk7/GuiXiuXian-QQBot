@@ -93,7 +93,7 @@ _LOSE_TEXTS = [
 # ──────────────────────────────────────────────
 # 命令注册
 # ──────────────────────────────────────────────
-guess_fist = on_command("猜拳", priority=5, block=True)
+guess_fist = on_command("猜拳", priority=13, block=True)
 
 @guess_fist.handle()
 async def handle_fist_game(event: MessageEvent, args: Message = CommandArg()):

@@ -129,7 +129,7 @@ def _get_trend_arrow(current: int, last: int) -> str:
 
 # ==================== 菜市场指令 ====================
 
-crop_market_cmd = on_command("菜市场", aliases={"灵蔬市场", "卖菜价格"}, priority=5, block=True)
+crop_market_cmd = on_command("菜市场", aliases={"灵蔬市场", "卖菜价格"}, priority=13, block=True)
 
 
 @crop_market_cmd.handle()
@@ -180,7 +180,7 @@ async def handle_crop_market(event: MessageEvent):
 
 # ==================== 卖菜指令 ====================
 
-sell_crop_cmd = on_command("卖菜", aliases={"出售灵蔬"}, priority=5, block=True)
+sell_crop_cmd = on_command("卖菜", aliases={"出售灵蔬"}, priority=13, block=True)
 
 
 @sell_crop_cmd.handle()

@@ -60,14 +60,14 @@ async def _handle_expand_territory(session, player: Player, item_config, quantit
     return True, f"🏰 公会势力范围扩张成功！{old_range} → {guild.territory_range}"
 
 
-inventory_cmd = on_command("背包", block=True, priority=5)
-fish_inventory_cmd = on_command("鱼栏", aliases={"鱼篓", "鱼仓", "鱼库", "我的鱼"}, block=True, priority=5)
-use_item = on_command("使用", block=True, priority=5)
-elixir_tolerance_cmd = on_command("耐药性", aliases={"丹药耐药性"}, block=True, priority=5)
-elixir_bonus_cmd = on_command("丹药加成", aliases={"丹药总加成", "丹药效果"}, block=True, priority=5)
-rename_cmd = on_command("改名", block=True, priority=5)
-drop_item = on_command("丢弃", aliases={"抛弃", "drop"}, block=True, priority=5)
-organize_inventory_cmd = on_command("整理背包", aliases={"整理", "背包整理"}, block=True, priority=5)
+inventory_cmd = on_command("背包", block=True, priority=9)
+fish_inventory_cmd = on_command("鱼栏", aliases={"鱼篓", "鱼仓", "鱼库", "我的鱼"}, block=True, priority=9)
+use_item = on_command("使用", block=True, priority=9)
+elixir_tolerance_cmd = on_command("耐药性", aliases={"丹药耐药性"}, block=True, priority=9)
+elixir_bonus_cmd = on_command("丹药加成", aliases={"丹药总加成", "丹药效果"}, block=True, priority=9)
+rename_cmd = on_command("改名", block=True, priority=9)
+drop_item = on_command("丢弃", aliases={"抛弃", "drop"}, block=True, priority=9)
+organize_inventory_cmd = on_command("整理背包", aliases={"整理", "背包整理"}, block=True, priority=9)
 
 
 # ---------------- 整理背包并发锁 ----------------

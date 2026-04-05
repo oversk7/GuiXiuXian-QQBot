@@ -25,7 +25,7 @@ from .decompose_service import validate_decompose, calculate_decompose_yields, F
 _decompose_selection_state: dict = {}
 SELECTION_TIMEOUT = 120  # 选择超时秒数
 
-decompose_cmd = on_command("分解", priority=5, block=True)
+decompose_cmd = on_command("分解", priority=9, block=True)
 decompose_select_cmd = on_command("分解选择", priority=4, block=True)
 
 

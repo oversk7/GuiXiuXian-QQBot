@@ -95,7 +95,7 @@ def _create_game_action_message(title: str, result: str, buttons: list) -> Messa
 # ==================== 房间管理指令 ====================
 
 # 创建房间
-create_room_cmd = on_command("恶魔轮盘", aliases={"轮盘赌", "俄罗斯轮盘"}, block=True, priority=5)
+create_room_cmd = on_command("恶魔轮盘", aliases={"轮盘赌", "俄罗斯轮盘"}, block=True, priority=13)
 
 @create_room_cmd.handle()
 async def handle_create_room(bot: Bot, event: MessageEvent, args: Message = CommandArg()):
@@ -455,7 +455,7 @@ async def handle_create_room(bot: Bot, event: MessageEvent, args: Message = Comm
 # ==================== 游戏操作指令 ====================
 
 # 开枪指令
-shoot_cmd = on_command("开枪", block=True, priority=5)
+shoot_cmd = on_command("开枪", block=True, priority=13)
 
 @shoot_cmd.handle()
 async def handle_shoot(bot: Bot, event: MessageEvent, args: Message = CommandArg()):
@@ -686,7 +686,7 @@ async def handle_shoot(bot: Bot, event: MessageEvent, args: Message = CommandArg
 
 
 # 使用道具指令
-use_item_cmd = on_command("使用道具", aliases={"道具"}, block=True, priority=5)
+use_item_cmd = on_command("使用道具", aliases={"道具"}, block=True, priority=13)
 
 # 使用肾上腺素指令（带参数）
 use_adrenaline_cmd = on_command("使用道具 肾上腺素", block=True, priority=4)
@@ -1113,7 +1113,7 @@ async def handle_use_item(bot: Bot, event: MessageEvent, args: Message = Command
 
 
 # 查看预知结果（私聊指令）
-check_prediction_cmd = on_command("查看预知", aliases={"预知结果", "预知"}, block=True, priority=5)
+check_prediction_cmd = on_command("查看预知", aliases={"预知结果", "预知"}, block=True, priority=13)
 
 @check_prediction_cmd.handle()
 async def handle_check_prediction(event: MessageEvent):
@@ -1166,7 +1166,7 @@ async def handle_check_prediction(event: MessageEvent):
 
 
 # 查看房间状态
-room_status_cmd = on_command("房间状态", aliases={"轮盘状态"}, block=True, priority=5)
+room_status_cmd = on_command("房间状态", aliases={"轮盘状态"}, block=True, priority=13)
 
 @room_status_cmd.handle()
 async def handle_room_status(event: MessageEvent):
@@ -1267,7 +1267,7 @@ async def handle_room_status(event: MessageEvent):
 
 
 # 退出房间
-leave_room_cmd = on_command("退出房间", aliases={"离开房间"}, block=True, priority=5)
+leave_room_cmd = on_command("退出房间", aliases={"离开房间"}, block=True, priority=13)
 
 @leave_room_cmd.handle()
 async def handle_leave_room(event: MessageEvent):
@@ -1332,7 +1332,7 @@ async def handle_leave_room(event: MessageEvent):
 
 
 # 查看道具列表
-view_items_cmd = on_command("查看道具", aliases={"道具列表", "我的道具"}, block=True, priority=5)
+view_items_cmd = on_command("查看道具", aliases={"道具列表", "我的道具"}, block=True, priority=13)
 
 @view_items_cmd.handle()
 async def handle_view_items(event: MessageEvent):
@@ -1421,7 +1421,7 @@ async def handle_view_items(event: MessageEvent):
 
 
 # 旁观者下注
-bet_cmd = on_command("轮盘下注", aliases={"下注轮盘"}, block=True, priority=5)
+bet_cmd = on_command("轮盘下注", aliases={"下注轮盘"}, block=True, priority=13)
 
 @bet_cmd.handle()
 async def handle_bet(event: MessageEvent, args: Message = CommandArg()):
@@ -1525,7 +1525,7 @@ async def handle_bet(event: MessageEvent, args: Message = CommandArg()):
 
 
 # 查看下注情况
-view_bets_cmd = on_command("查看下注", aliases={"下注情况", "轮盘下注情况"}, block=True, priority=5)
+view_bets_cmd = on_command("查看下注", aliases={"下注情况", "轮盘下注情况"}, block=True, priority=13)
 
 @view_bets_cmd.handle()
 async def handle_view_bets(event: MessageEvent):
@@ -1582,7 +1582,7 @@ async def handle_view_bets(event: MessageEvent):
 
 
 # 手动清理房间（管理员指令）
-cleanup_rooms_cmd = on_command("清理轮盘房间", block=True, priority=5, permission=SUPERUSER)
+cleanup_rooms_cmd = on_command("清理轮盘房间", block=True, priority=13, permission=SUPERUSER)
 
 @cleanup_rooms_cmd.handle()
 async def handle_cleanup_rooms(_event: MessageEvent):

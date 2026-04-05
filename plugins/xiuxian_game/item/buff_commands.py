@@ -16,7 +16,7 @@ from ..utils_markdown import cmd, build_markdown
 from .item_effects import get_player_buff_status
 
 # ---------------- 指令：查看临时buff状态 ----------------
-buff_status_cmd = on_command("增益状态", aliases={"buff状态", "临时增益", "增益", "buff"}, block=True, priority=5)
+buff_status_cmd = on_command("增益状态", aliases={"buff状态", "临时增益", "增益", "buff"}, block=True, priority=9)
 
 @buff_status_cmd.handle()
 async def handle_buff_status(event: MessageEvent):
@@ -39,7 +39,7 @@ async def handle_buff_status(event: MessageEvent):
 
 
 # ---------------- 指令：清理过期buff ----------------
-clear_buffs_cmd = on_command("清理增益", aliases={"清理buff", "清理过期增益"}, block=True, priority=5)
+clear_buffs_cmd = on_command("清理增益", aliases={"清理buff", "清理过期增益"}, block=True, priority=9)
 
 @clear_buffs_cmd.handle()
 async def handle_clear_buffs(event: MessageEvent):
@@ -79,7 +79,7 @@ async def handle_clear_buffs(event: MessageEvent):
 
 
 # ---------------- 指令：详细属性分解 ----------------
-attribute_breakdown_cmd = on_command("属性分解", aliases={"属性详情", "属性来源"}, block=True, priority=5)
+attribute_breakdown_cmd = on_command("属性分解", aliases={"属性详情", "属性来源"}, block=True, priority=9)
 
 @attribute_breakdown_cmd.handle()
 async def handle_attribute_breakdown(event: MessageEvent):
@@ -223,7 +223,7 @@ async def handle_attribute_breakdown(event: MessageEvent):
 
 
 # ---------------- 指令：一键嗑药 ----------------
-auto_use_medicine_cmd = on_command("一键嗑药", aliases={"一键磕药", "自动嗑药"}, block=True, priority=5)
+auto_use_medicine_cmd = on_command("一键嗑药", aliases={"一键磕药", "自动嗑药"}, block=True, priority=9)
 
 @auto_use_medicine_cmd.handle()
 async def handle_auto_use_medicine(event: MessageEvent):

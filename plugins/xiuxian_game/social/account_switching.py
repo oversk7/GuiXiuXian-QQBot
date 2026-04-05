@@ -37,7 +37,7 @@ from ..platform_utils import (
 
 
 # ==================== 我的账号 ====================
-my_accounts_cmd = on_command("我的账号", aliases={"账号列表"}, block=True, priority=5)
+my_accounts_cmd = on_command("我的账号", aliases={"账号列表"}, block=True, priority=11)
 
 @my_accounts_cmd.handle()
 async def handle_my_accounts(event: MessageEvent):
@@ -77,7 +77,7 @@ async def handle_my_accounts(event: MessageEvent):
 
 
 # ==================== 切换账号 ====================
-switch_account_cmd = on_command("切换账号", block=True, priority=5)
+switch_account_cmd = on_command("切换账号", block=True, priority=11)
 
 @switch_account_cmd.handle()
 async def handle_switch_account(event: MessageEvent, args: Message = CommandArg()):
@@ -118,7 +118,7 @@ async def handle_switch_account(event: MessageEvent, args: Message = CommandArg(
 
 
 # ==================== 重命名账号 ====================
-rename_account_cmd = on_command("重命名账号", block=True, priority=5)
+rename_account_cmd = on_command("重命名账号", block=True, priority=11)
 
 @rename_account_cmd.handle()
 async def handle_rename_account(event: MessageEvent, args: Message = CommandArg()):
@@ -165,7 +165,7 @@ async def handle_rename_account(event: MessageEvent, args: Message = CommandArg(
 
 
 # ==================== 生成转让密钥 ====================
-generate_transfer_key_cmd = on_command("生成转让密钥", aliases={"转让账号"}, block=True, priority=5, permission=SUPERUSER)
+generate_transfer_key_cmd = on_command("生成转让密钥", aliases={"转让账号"}, block=True, priority=11, permission=SUPERUSER)
 
 @generate_transfer_key_cmd.handle()
 async def handle_generate_transfer_key(event: MessageEvent, args: Message = CommandArg()):
@@ -218,7 +218,7 @@ async def handle_generate_transfer_key(event: MessageEvent, args: Message = Comm
 
 
 # ==================== 接收账号 ====================
-accept_transfer_cmd = on_command("接收账号", aliases={"使用转让密钥"}, block=True, priority=5)
+accept_transfer_cmd = on_command("接收账号", aliases={"使用转让密钥"}, block=True, priority=11)
 
 @accept_transfer_cmd.handle()
 async def handle_accept_transfer(event: MessageEvent, args: Message = CommandArg()):
@@ -256,7 +256,7 @@ async def handle_accept_transfer(event: MessageEvent, args: Message = CommandArg
 
 
 # ==================== 取消转让 ====================
-cancel_transfer_cmd = on_command("取消转让", block=True, priority=5, permission=SUPERUSER)
+cancel_transfer_cmd = on_command("取消转让", block=True, priority=11, permission=SUPERUSER)
 
 @cancel_transfer_cmd.handle()
 async def handle_cancel_transfer(event: MessageEvent, args: Message = CommandArg()):
@@ -297,7 +297,7 @@ async def handle_cancel_transfer(event: MessageEvent, args: Message = CommandArg
 
 
 # ==================== 转让历史 ====================
-transfer_history_cmd = on_command("转让历史", aliases={"账号交易历史"}, block=True, priority=5)
+transfer_history_cmd = on_command("转让历史", aliases={"账号交易历史"}, block=True, priority=11)
 
 @transfer_history_cmd.handle()
 async def handle_transfer_history(event: MessageEvent):
@@ -355,7 +355,7 @@ async def handle_transfer_history(event: MessageEvent):
 
 
 # ==================== 临时切换（管理员调试功能） ====================
-admin_temp_switch_cmd = on_command("临时切换", aliases={"临时切换账号"}, block=True, priority=5, permission=SUPERUSER)
+admin_temp_switch_cmd = on_command("临时切换", aliases={"临时切换账号"}, block=True, priority=11, permission=SUPERUSER)
 
 @admin_temp_switch_cmd.handle()
 async def handle_admin_temp_switch(event: MessageEvent, args: Message = CommandArg()):
@@ -398,7 +398,7 @@ async def handle_admin_temp_switch(event: MessageEvent, args: Message = CommandA
 
 
 # ==================== 退出临时切换 ====================
-exit_temp_switch_cmd = on_command("退出临时切换", aliases={"取消临时切换"}, block=True, priority=5, permission=SUPERUSER)
+exit_temp_switch_cmd = on_command("退出临时切换", aliases={"取消临时切换"}, block=True, priority=11, permission=SUPERUSER)
 
 @exit_temp_switch_cmd.handle()
 async def handle_exit_temp_switch(event: MessageEvent):
@@ -433,7 +433,7 @@ async def handle_exit_temp_switch(event: MessageEvent):
 
 
 # ==================== 临时切换状态 ====================
-temp_switch_status_cmd = on_command("临时切换状态", block=True, priority=5, permission=SUPERUSER)
+temp_switch_status_cmd = on_command("临时切换状态", block=True, priority=11, permission=SUPERUSER)
 
 @temp_switch_status_cmd.handle()
 async def handle_temp_switch_status(event: MessageEvent):

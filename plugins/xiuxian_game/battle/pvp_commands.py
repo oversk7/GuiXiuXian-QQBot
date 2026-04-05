@@ -19,7 +19,7 @@ import time
 
 
 # ==================== PVP切磋指令 ====================
-pvp_cmd = on_command("切磋", aliases={"pvp", "PVP", "挑战"}, block=True, priority=5)
+pvp_cmd = on_command("切磋", aliases={"pvp", "PVP", "挑战"}, block=True, priority=9)
 
 
 @pvp_cmd.handle()
@@ -130,7 +130,7 @@ async def handle_pvp(event: MessageEvent, args: Message = CommandArg()):
 
 
 # ==================== 模拟战斗指令 ====================
-simulate_cmd = on_command("模拟战斗", aliases={"模拟切磋"}, block=True, priority=5)
+simulate_cmd = on_command("模拟战斗", aliases={"模拟切磋"}, block=True, priority=9)
 
 
 @simulate_cmd.handle()
@@ -218,7 +218,7 @@ async def handle_simulate(event: MessageEvent, args: Message = CommandArg()):
 
 
 # ==================== 战斗日志模式切换 ====================
-log_mode_cmd = on_command("日志模式", aliases={"战斗日志模式", "切换日志模式"}, block=True, priority=5)
+log_mode_cmd = on_command("日志模式", aliases={"战斗日志模式", "切换日志模式"}, block=True, priority=9)
 
 
 @log_mode_cmd.handle()

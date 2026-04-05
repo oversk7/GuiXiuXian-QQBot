@@ -234,7 +234,7 @@ async def handle_create_lottery(event: MessageEvent, args: Message = CommandArg(
 
 
 # ==================== 参与抽奖 ====================
-join_lottery_cmd = on_command("参与抽奖", block=True, priority=5)
+join_lottery_cmd = on_command("参与抽奖", block=True, priority=15)
 
 
 @join_lottery_cmd.handle()
@@ -487,7 +487,7 @@ async def handle_draw_lottery(event: MessageEvent, args: Message = CommandArg())
 
 
 # ==================== 抽奖详情 ====================
-lottery_info_cmd = on_command("抽奖详情", aliases={"查看抽奖"}, block=True, priority=5)
+lottery_info_cmd = on_command("抽奖详情", aliases={"查看抽奖"}, block=True, priority=15)
 
 
 @lottery_info_cmd.handle()
@@ -569,7 +569,7 @@ async def handle_lottery_info(event: MessageEvent, args: Message = CommandArg())
 
 
 # ==================== 我的抽奖 ====================
-my_lottery_cmd = on_command("我的抽奖", aliases={"抽奖记录"}, block=True, priority=5)
+my_lottery_cmd = on_command("我的抽奖", aliases={"抽奖记录"}, block=True, priority=15)
 
 
 @my_lottery_cmd.handle()

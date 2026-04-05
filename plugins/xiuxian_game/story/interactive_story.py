@@ -20,11 +20,11 @@ from pathlib import Path
 story_engine = StoryEngine()
 
 # 命令处理器
-story_list_cmd = on_command("试炼列表", aliases={"试炼"}, block=True, priority=5)
-completed_trials_cmd = on_command("已通关试炼", aliases={"试炼记录", "通关试炼"}, block=True, priority=5)
-start_story_cmd = on_command("开始试炼", block=True, priority=5)
-story_status_cmd = on_command("试炼状态", block=True, priority=5)
-quit_story_cmd = on_command("退出试炼", block=True, priority=5)
+story_list_cmd = on_command("试炼列表", aliases={"试炼"}, block=True, priority=13)
+completed_trials_cmd = on_command("已通关试炼", aliases={"试炼记录", "通关试炼"}, block=True, priority=13)
+start_story_cmd = on_command("开始试炼", block=True, priority=13)
+story_status_cmd = on_command("试炼状态", block=True, priority=13)
+quit_story_cmd = on_command("退出试炼", block=True, priority=13)
 
 # 数字选择处理器 - 自动识别玩家发送的数字作为试炼选择
 choice_handler = on_regex(r"^[1-9]$", block=False, priority=10)

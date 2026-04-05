@@ -22,20 +22,20 @@ from .knocker_event import KnockerEventService
 # ==================== 玩家命令 ====================
 
 event_status_cmd = on_command(
-    "除夕活动", aliases={"叩门活动", "新年活动"}, block=True, priority=5
+    "除夕活动", aliases={"叩门活动", "新年活动"}, block=True, priority=15
 )
 
-refresh_cmd = on_command("刷新诡事", aliases={"刷新鬼怪", "刷新活动"}, block=True, priority=5)
+refresh_cmd = on_command("刷新诡事", aliases={"刷新鬼怪", "刷新活动"}, block=True, priority=15)
 
-teleport_cmd = on_command("鬼域瞬移",aliases={"诡域瞬移"}, block=True, priority=5)
+teleport_cmd = on_command("鬼域瞬移",aliases={"诡域瞬移"}, block=True, priority=15)
 
-ranking_cmd = on_command("叩门排行", block=True, priority=5)
+ranking_cmd = on_command("叩门排行", block=True, priority=15)
 
-shop_cmd = on_command("活动商店", aliases={"叩门商店"}, block=True, priority=5)
+shop_cmd = on_command("活动商店", aliases={"叩门商店"}, block=True, priority=15)
 
-title_switch_cmd = on_command("切换称号", block=True, priority=5)
+title_switch_cmd = on_command("切换称号", block=True, priority=15)
 
-title_remove_cmd = on_command("卸下称号", block=True, priority=5)
+title_remove_cmd = on_command("卸下称号", block=True, priority=15)
 
 
 # ==================== 管理命令 ====================

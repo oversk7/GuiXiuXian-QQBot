@@ -104,8 +104,8 @@ async def _(event: MessageEvent):
 
 
 # ==================== 活动隐私设置 ====================
-hide_activity_cmd = on_command("隐藏活动", aliases={"隐藏动态"}, block=True, priority=5)
-show_activity_cmd = on_command("显示活动", aliases={"显示动态"}, block=True, priority=5)
+hide_activity_cmd = on_command("隐藏活动", aliases={"隐藏动态"}, block=True, priority=13)
+show_activity_cmd = on_command("显示活动", aliases={"显示动态"}, block=True, priority=13)
 
 
 def _get_hidden_uids() -> set:
@@ -166,7 +166,7 @@ async def handle_show_activity(event: MessageEvent):
 
 
 # ==================== 查看全服最近活动记录 ====================
-recent_activity_cmd = on_command("最近活动", aliases={"活动记录", "全服活动"}, block=True, priority=5)
+recent_activity_cmd = on_command("最近活动", aliases={"活动记录", "全服活动"}, block=True, priority=13)
 
 @recent_activity_cmd.handle()
 async def handle_recent_activity(event: MessageEvent, args: Message = CommandArg()):

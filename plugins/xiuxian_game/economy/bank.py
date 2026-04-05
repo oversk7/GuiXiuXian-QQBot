@@ -18,14 +18,14 @@ from ..platform_utils import get_unified_player
 # ======================================================
 
 # 命令
-bank_balance_cmd = on_command("余额", aliases={"冥行账单"}, block=True, priority=5)
-bank_deposit_cmd = on_command("存", aliases={"存款"}, block=True, priority=5)
-bank_withdraw_cmd = on_command("取", aliases={"取款"}, block=True, priority=5)
-bank_transfer_cmd = on_command("转账", aliases={"银行转账"}, block=True, priority=5)
-bank_invest_cmd = on_command("银行投资", aliases={"投资理财"}, block=True, priority=5)
+bank_balance_cmd = on_command("余额", aliases={"冥行账单"}, block=True, priority=7)
+bank_deposit_cmd = on_command("存", aliases={"存款"}, block=True, priority=7)
+bank_withdraw_cmd = on_command("取", aliases={"取款"}, block=True, priority=7)
+bank_transfer_cmd = on_command("转账", aliases={"银行转账"}, block=True, priority=7)
+bank_invest_cmd = on_command("银行投资", aliases={"投资理财"}, block=True, priority=7)
 
 # ==================== 存款排行榜 ====================
-deposit_rank_cmd = on_command("存款榜", aliases={"冥行榜"}, block=True, priority=5)
+deposit_rank_cmd = on_command("存款榜", aliases={"冥行榜"}, block=True, priority=7)
 
 
 @bank_balance_cmd.handle()

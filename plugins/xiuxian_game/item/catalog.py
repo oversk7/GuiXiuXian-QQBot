@@ -294,7 +294,7 @@ async def _get_image_dimensions_with_cache(item_id: str, image_url: str, max_siz
 
 
 # 图鉴命令：查询物品、装备和鬼怪的详细信息
-catalog_cmd = on_command("图鉴", aliases={"查看","查看物品","详情"}, block=True, priority=5)
+catalog_cmd = on_command("图鉴", aliases={"查看","查看物品","详情"}, block=True, priority=9)
 
 
 @catalog_cmd.handle()

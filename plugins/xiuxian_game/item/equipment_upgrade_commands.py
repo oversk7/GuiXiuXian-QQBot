@@ -40,7 +40,7 @@ async def _recalculate_equipment_attributes(session, player: Player):
     )
     await equipment_service.recalc_equipment_attributes(player)
 # ---------------- 指令：查看升阶信息 ----------------
-upgrade_info_cmd = on_command("升阶信息", aliases={"升阶预览"}, block=True, priority=5)
+upgrade_info_cmd = on_command("升阶信息", aliases={"升阶预览"}, block=True, priority=9)
 
 @upgrade_info_cmd.handle()
 async def _(event: MessageEvent, args: Message = CommandArg()):
@@ -163,7 +163,7 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
 
 
 # ---------------- 指令：装备升阶 ----------------
-upgrade_equipment_cmd = on_command("升阶", aliases={"装备升阶"}, block=True, priority=5, force_whitespace=True)
+upgrade_equipment_cmd = on_command("升阶", aliases={"装备升阶"}, block=True, priority=9, force_whitespace=True)
 
 @upgrade_equipment_cmd.handle()
 async def _(event: MessageEvent, args: Message = CommandArg()):
@@ -230,7 +230,7 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
 
 
 # ---------------- 指令：升阶列表 ----------------
-upgrade_list_cmd = on_command("升阶列表", aliases={"可升阶装备"}, block=True, priority=5)
+upgrade_list_cmd = on_command("升阶列表", aliases={"可升阶装备"}, block=True, priority=9)
 
 @upgrade_list_cmd.handle()
 async def _(event: MessageEvent):
@@ -297,7 +297,7 @@ async def _(event: MessageEvent):
         await upgrade_list_cmd.finish(build_markdown("\n".join(lines) + buttons))
 
 # ---------------- 指令：一键升阶 ----------------
-auto_upgrade_cmd = on_command("一键升阶", block=True, priority=5, force_whitespace=True)
+auto_upgrade_cmd = on_command("一键升阶", block=True, priority=9, force_whitespace=True)
 
 @auto_upgrade_cmd.handle()
 async def _(event: MessageEvent, args: Message = CommandArg()):

@@ -17,7 +17,7 @@ from .relationship_service import RelationshipService
 
 
 # ==================== 好感度查询 ====================
-favorability_cmd = on_command("好感度", aliases={"查看好感度"}, priority=5, block=True)
+favorability_cmd = on_command("好感度", aliases={"查看好感度"}, priority=11, block=True)
 
 @favorability_cmd.handle()
 async def handle_favorability(event: MessageEvent, args: Message = CommandArg()):
@@ -139,7 +139,7 @@ async def handle_favorability(event: MessageEvent, args: Message = CommandArg())
 
 
 # ==================== 脱离师门（徒弟叛师，有惩罚） ====================
-betray_cmd = on_command("脱离师门", priority=5, block=True)
+betray_cmd = on_command("脱离师门", priority=11, block=True)
 
 @betray_cmd.handle()
 async def handle_betray_master(event: MessageEvent):
@@ -169,7 +169,7 @@ async def handle_betray_master(event: MessageEvent):
 
 
 # ==================== 逐出师门（师父驱逐徒弟，有冷却） ====================
-expel_cmd = on_command("逐出师门", priority=5, block=True)
+expel_cmd = on_command("逐出师门", priority=11, block=True)
 
 @expel_cmd.handle()
 async def handle_expel_apprentice(event: MessageEvent, args: Message = CommandArg()):
@@ -208,7 +208,7 @@ async def handle_expel_apprentice(event: MessageEvent, args: Message = CommandAr
 
 
 # ==================== 师徒信息查询 ====================
-mentorship_info_cmd = on_command("师徒信息", aliases={"师徒状况", "查看师徒"}, priority=5, block=True)
+mentorship_info_cmd = on_command("师徒信息", aliases={"师徒状况", "查看师徒"}, priority=11, block=True)
 
 @mentorship_info_cmd.handle()
 async def handle_mentorship_info(event: MessageEvent):
@@ -232,7 +232,7 @@ async def handle_mentorship_info(event: MessageEvent):
 
 
 # ==================== 婚姻信息查询 ====================
-marriage_info_cmd = on_command("婚姻信息", aliases={"婚姻状况", "查看婚姻"}, priority=5, block=True)
+marriage_info_cmd = on_command("婚姻信息", aliases={"婚姻状况", "查看婚姻"}, priority=11, block=True)
 
 @marriage_info_cmd.handle()
 async def handle_marriage_info(event: MessageEvent):
@@ -285,7 +285,7 @@ async def handle_marriage_info(event: MessageEvent):
 
 
 # ==================== 结义信息查询 ====================
-sworn_info_cmd = on_command("结义信息", aliases={"结义状况", "查看结义"}, priority=5, block=True)
+sworn_info_cmd = on_command("结义信息", aliases={"结义状况", "查看结义"}, priority=11, block=True)
 
 @sworn_info_cmd.handle()
 async def handle_sworn_info(event: MessageEvent):

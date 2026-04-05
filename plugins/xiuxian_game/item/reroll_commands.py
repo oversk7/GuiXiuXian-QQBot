@@ -29,7 +29,7 @@ from .affix_service import (
 _pending_rerolls: dict = {}
 
 
-reroll_cmd = on_command("洗炼", priority=5, block=True)
+reroll_cmd = on_command("洗炼", priority=9, block=True)
 
 
 @reroll_cmd.handle()
@@ -109,7 +109,7 @@ async def handle_reroll(event: MessageEvent, args: Message = CommandArg()):
     await reroll_cmd.finish(build_markdown(msg))
 
 
-confirm_reroll_cmd = on_command("确认洗炼", priority=5, block=True)
+confirm_reroll_cmd = on_command("确认洗炼", priority=9, block=True)
 
 
 @confirm_reroll_cmd.handle()

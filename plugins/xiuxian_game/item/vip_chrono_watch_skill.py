@@ -139,7 +139,7 @@ async def _deduct_durability(session: AsyncSession, player_id: str, amount: int)
 
 
 # ==================== 指令：拨针 ====================
-dial_cmd = on_command("拨针", block=True, priority=5)
+dial_cmd = on_command("拨针", block=True, priority=9)
 
 
 @dial_cmd.handle()
@@ -490,7 +490,7 @@ async def _handle_dial_task(session: AsyncSession, player: Player, watch: ItemIn
 
 
 # ==================== 指令：折光年（状态面板） ====================
-panel_cmd = on_command("折光年", block=True, priority=5)
+panel_cmd = on_command("折光年", block=True, priority=9)
 
 
 @panel_cmd.handle()

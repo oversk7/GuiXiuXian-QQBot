@@ -8,7 +8,7 @@ import random
 from ..utils import luck_prob
 
 # Feature Flag（在文件顶部靠近其他导入的位置）
-sign = on_command("签到", block=True, priority=5)
+sign = on_command("签到", block=True, priority=13)
 
 @sign.handle()
 async def handle_sign(event: MessageEvent):

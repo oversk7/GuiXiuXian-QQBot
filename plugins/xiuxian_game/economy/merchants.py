@@ -665,23 +665,23 @@ async def _calculate_trade_tax(session, player_id: str, revenue: int) -> tuple[f
 
 
 # ------------------- 指令 -------------------
-market_cmd = on_command("市集", aliases={"商店", "市场"}, block=True, priority=5)
+market_cmd = on_command("市集", aliases={"商店", "市场"}, block=True, priority=7)
 
-list_market_cmd = on_command("市集列表", aliases={"市场列表", "全部市集"}, block=True, priority=5)
+list_market_cmd = on_command("市集列表", aliases={"市场列表", "全部市集"}, block=True, priority=7)
 # 查看指定市集商品
-detail_market_cmd = on_command("市集详情", aliases={"市集价格", "市场报价"}, block=True, priority=5)
+detail_market_cmd = on_command("市集详情", aliases={"市集价格", "市场报价"}, block=True, priority=7)
 
 # 查看某物品在各市集的买/卖价
-price_compare_cmd = on_command("市价", block=True, priority=5)
+price_compare_cmd = on_command("市价", block=True, priority=7)
 
 # 跑商记录：查看玩家的交易历史
-trade_history_cmd = on_command("跑商记录", block=True, priority=5)
+trade_history_cmd = on_command("跑商记录", block=True, priority=7)
 
 # 跑商推荐：列出可获利的买卖路线
-trade_advise_cmd = on_command("跑商推荐", aliases={"套利", "赚差价"}, block=True, priority=5)
+trade_advise_cmd = on_command("跑商推荐", aliases={"套利", "赚差价"}, block=True, priority=7)
 
 # 交易限制查询：查看玩家当前的交易限制情况
-trade_restrictions_cmd = on_command("交易限制", aliases={"限制查询", "交易状态"}, block=True, priority=5)
+trade_restrictions_cmd = on_command("交易限制", aliases={"限制查询", "交易状态"}, block=True, priority=7)
 
 @market_cmd.handle()
 async def _(event: MessageEvent):
@@ -751,7 +751,7 @@ async def _(event: MessageEvent):
         lines.append(f"{cmd('自动出售')} | {cmd('市集列表')} | {cmd('跑商推荐')}")
         await market_cmd.finish(build_markdown("\n".join(lines)))
 
-buy_cmd = on_command("购买", block=True, priority=5)
+buy_cmd = on_command("购买", block=True, priority=7)
 
 @buy_cmd.handle()
 async def _(event: MessageEvent, args: Message = CommandArg()):
@@ -987,10 +987,10 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
                 await buy_cmd.finish("⛔ 此处无法购买该物品")
 
 # -------- 卖出 --------
-sell_cmd = on_command("出售", aliases={"卖"}, block=True, priority=5)
+sell_cmd = on_command("出售", aliases={"卖"}, block=True, priority=7)
 
 # -------- 自动出售 --------
-auto_sell_cmd = on_command("自动出售", aliases={"一键出售", "批量出售"}, block=True, priority=5)
+auto_sell_cmd = on_command("自动出售", aliases={"一键出售", "批量出售"}, block=True, priority=7)
 
 @sell_cmd.handle()
 async def _(event: MessageEvent, args: Message = CommandArg()):
@@ -1758,7 +1758,7 @@ async def _black_market_daily_purchased_qty(session, player_id: str) -> int:
 
 
 # 黑市指令（替代原“系统商店”）
-black_market_cmd = on_command("黑市", aliases={"系统商店", "特殊商店"}, block=True, priority=5)
+black_market_cmd = on_command("黑市", aliases={"系统商店", "特殊商店"}, block=True, priority=7)
 
 @black_market_cmd.handle()
 async def _(event: MessageEvent):
@@ -1812,7 +1812,7 @@ async def _(event: MessageEvent):
 
 
 # 食材铺指令
-ingredient_shop_cmd = on_command("食材铺", aliases={"调料铺", "食材商店", "调料商店"}, block=True, priority=5)
+ingredient_shop_cmd = on_command("食材铺", aliases={"调料铺", "食材商店", "调料商店"}, block=True, priority=7)
 
 @ingredient_shop_cmd.handle()
 async def _(event: MessageEvent):
@@ -1862,7 +1862,7 @@ HEADQUARTERS_ITEMS = {
 }
 
 # 缉邪司总部商店指令
-headquarters_cmd = on_command("缉邪司总部", aliases={"总部商店", "总部"}, block=True, priority=5)
+headquarters_cmd = on_command("缉邪司总部", aliases={"总部商店", "总部"}, block=True, priority=7)
 
 @headquarters_cmd.handle()
 async def _(event: MessageEvent):
@@ -1953,7 +1953,7 @@ async def _(event: MessageEvent):
 
 
 # 缉邪司总部兑换指令
-headquarters_exchange_cmd = on_command("总部兑换", aliases={"缉邪司兑换"}, block=True, priority=5)
+headquarters_exchange_cmd = on_command("总部兑换", aliases={"缉邪司兑换"}, block=True, priority=7)
 
 @headquarters_exchange_cmd.handle()
 async def _(event: MessageEvent, args: Message = CommandArg()):

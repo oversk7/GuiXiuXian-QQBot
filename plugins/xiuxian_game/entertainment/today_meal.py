@@ -81,7 +81,7 @@ async def _get_random_meal() -> tuple[bool, dict, str]:
 
 
 # 今天吃什么指令
-today_meal_cmd = on_command("今天吃什么", aliases={"吃什么", "今日食谱", "推荐菜谱"}, block=True, priority=5)
+today_meal_cmd = on_command("今天吃什么", aliases={"吃什么", "今日食谱", "推荐菜谱"}, block=True, priority=13)
 
 
 @today_meal_cmd.handle()

@@ -31,12 +31,12 @@ from ..platform_utils import get_unified_player
 
 # ==================== 命令定义 ====================
 
-work_cmd = on_command("打工", block=True, priority=5)
-finish_work_cmd = on_command("收工", aliases={"完成工作", "结束工作"}, block=True, priority=5)
-work_status_cmd = on_command("工作状态", aliases={"打工状态"}, block=True, priority=5)
-work_locations_cmd = on_command("工作地点", aliases={"打工地点"}, block=True, priority=5)
-work_history_cmd = on_command("打工记录", aliases={"工作记录"}, block=True, priority=5)
-work_stats_cmd = on_command("打工统计", aliases={"工作统计"}, block=True, priority=5)
+work_cmd = on_command("打工", block=True, priority=7)
+finish_work_cmd = on_command("收工", aliases={"完成工作", "结束工作"}, block=True, priority=7)
+work_status_cmd = on_command("工作状态", aliases={"打工状态"}, block=True, priority=7)
+work_locations_cmd = on_command("工作地点", aliases={"打工地点"}, block=True, priority=7)
+work_history_cmd = on_command("打工记录", aliases={"工作记录"}, block=True, priority=7)
+work_stats_cmd = on_command("打工统计", aliases={"工作统计"}, block=True, priority=7)
 
 
 # ==================== 命令处理器 ====================
@@ -517,7 +517,7 @@ async def handle_work_stats(event: MessageEvent):
 
 
 # 帮助命令
-work_help_cmd = on_command("打工帮助", aliases={"工作帮助"}, block=True, priority=5)
+work_help_cmd = on_command("打工帮助", aliases={"工作帮助"}, block=True, priority=7)
 
 
 @work_help_cmd.handle()

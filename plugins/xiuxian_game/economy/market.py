@@ -281,7 +281,7 @@ async def _get_market_reference(session, item_cfg) -> str | None:
 
 
 # ---------------- 指令：挂牌 ----------------
-list_cmd = on_command("挂牌", block=True, priority=5)
+list_cmd = on_command("挂牌", block=True, priority=7)
 
 @list_cmd.handle()
 async def _(event: MessageEvent, args: Message = CommandArg()):
@@ -618,7 +618,7 @@ async def _(event: MessageEvent):
 
 
 # ---------------- 指令：撤牌 ----------------
-cancel_cmd = on_command("撤牌", block=True, priority=5)
+cancel_cmd = on_command("撤牌", block=True, priority=7)
 
 @cancel_cmd.handle()
 async def _(event: MessageEvent, args: Message = CommandArg()):
@@ -669,7 +669,7 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
     await cancel_cmd.finish(build_markdown(content))
 
 # ---------------- 指令：查牌主（查看订单归属） ----------------
-order_owner_cmd = on_command("挂牌详情", aliases={"查牌主", "牌主", "牌子详情"}, block=True, priority=5)
+order_owner_cmd = on_command("挂牌详情", aliases={"查牌主", "牌主", "牌子详情"}, block=True, priority=7)
 
 @order_owner_cmd.handle()
 async def _(event: MessageEvent, args: Message = CommandArg()):
@@ -792,7 +792,7 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
         await order_owner_cmd.finish(build_markdown("\n".join(lines)))
 
 # ---------------- 指令：查看牌子 ----------------
-view_cmd = on_command("查牌",aliases={"比价"}, block=True, priority=5)
+view_cmd = on_command("查牌",aliases={"比价"}, block=True, priority=7)
 
 @view_cmd.handle()
 async def _(event: MessageEvent, args: Message = CommandArg()):
@@ -875,7 +875,7 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
 
         await view_cmd.finish(build_markdown("\n".join(lines)))
 
-overview_cmd = on_command("交易清单", aliases={"交易市场"}, block=True, priority=5)
+overview_cmd = on_command("交易清单", aliases={"交易市场"}, block=True, priority=7)
 
 @overview_cmd.handle()
 async def _(event: MessageEvent, args: Message = CommandArg()):
@@ -967,7 +967,7 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
         await overview_cmd.finish(build_markdown("\n".join(lines)))
 
 # ---------------- 指令：我的挂牌 ----------------
-my_orders_cmd = on_command("我的挂牌", aliases={"查看我的挂牌", "我的牌子"}, block=True, priority=5)
+my_orders_cmd = on_command("我的挂牌", aliases={"查看我的挂牌", "我的牌子"}, block=True, priority=7)
 
 @my_orders_cmd.handle()
 async def _(event: MessageEvent, args: Message = CommandArg()):
@@ -1046,7 +1046,7 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
         await my_orders_cmd.finish(build_markdown("\n".join(lines)))
 
 # ---------------- 指令：查看税率 ----------------
-tax_info_cmd = on_command("税率", aliases={"交易税率", "查看税率"}, block=True, priority=5)
+tax_info_cmd = on_command("税率", aliases={"交易税率", "查看税率"}, block=True, priority=7)
 
 @tax_info_cmd.handle()
 async def _(event: MessageEvent):
@@ -1069,7 +1069,7 @@ async def _(event: MessageEvent):
 
 
 # ---------------- 指令：装备估价 ----------------
-equipment_appraise_cmd = on_command("估价", aliases={"装备估价"}, block=True, priority=5)
+equipment_appraise_cmd = on_command("估价", aliases={"装备估价"}, block=True, priority=7)
 
 @equipment_appraise_cmd.handle()
 async def _(event: MessageEvent, args: Message = CommandArg()):

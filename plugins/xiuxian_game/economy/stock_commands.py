@@ -29,18 +29,18 @@ import random
 # =====================================================
 
 # 气运投资相关命令
-stock_list_cmd = on_command("气运行情", aliases={"投资行情", "灵石行情"}, block=True, priority=5)
-stock_buy_cmd = on_command("投资气运", aliases={"投资灵石"}, block=True, priority=5)
-stock_sell_cmd = on_command("出售气运", aliases={"出售灵石"}, block=True, priority=5)
-stock_holdings_cmd = on_command("我的投资", aliases={"我的气运"}, block=True, priority=5)
-stock_transactions_cmd = on_command("投资记录", aliases={"气运记录"}, block=True, priority=5)
-stock_refresh_time_cmd = on_command("气运刷新时间", aliases={"投资刷新时间", "价格刷新时间"}, block=True, priority=5)
-stock_history_cmd = on_command("气运历史", aliases={"价格历史"}, block=True, priority=5)
-stock_analysis_cmd = on_command("气运分析", aliases={"投资分析"}, block=True, priority=5)
-stock_init_cmd = on_command("初始化气运", block=True, priority=5, permission=SUPERUSER)
-stock_update_cmd = on_command("更新气运价格", aliases={"刷新气运价格"}, block=True, priority=5, permission=SUPERUSER)
-stock_trigger_black_swan_cmd = on_command("触发黑天鹅", block=True, priority=5, permission=SUPERUSER)  # 新增: 手动触发黑天鹅事件
-stock_events_cmd = on_command("气运事件", aliases={"市场事件", "黑天鹅事件"}, block=True, priority=5)
+stock_list_cmd = on_command("气运行情", aliases={"投资行情", "灵石行情"}, block=True, priority=7)
+stock_buy_cmd = on_command("投资气运", aliases={"投资灵石"}, block=True, priority=7)
+stock_sell_cmd = on_command("出售气运", aliases={"出售灵石"}, block=True, priority=7)
+stock_holdings_cmd = on_command("我的投资", aliases={"我的气运"}, block=True, priority=7)
+stock_transactions_cmd = on_command("投资记录", aliases={"气运记录"}, block=True, priority=7)
+stock_refresh_time_cmd = on_command("气运刷新时间", aliases={"投资刷新时间", "价格刷新时间"}, block=True, priority=7)
+stock_history_cmd = on_command("气运历史", aliases={"价格历史"}, block=True, priority=7)
+stock_analysis_cmd = on_command("气运分析", aliases={"投资分析"}, block=True, priority=7)
+stock_init_cmd = on_command("初始化气运", block=True, priority=7, permission=SUPERUSER)
+stock_update_cmd = on_command("更新气运价格", aliases={"刷新气运价格"}, block=True, priority=7, permission=SUPERUSER)
+stock_trigger_black_swan_cmd = on_command("触发黑天鹅", block=True, priority=7, permission=SUPERUSER)  # 新增: 手动触发黑天鹅事件
+stock_events_cmd = on_command("气运事件", aliases={"市场事件", "黑天鹅事件"}, block=True, priority=7)
 
 
 @stock_list_cmd.handle()
@@ -890,7 +890,7 @@ async def handle_stock_events(event: MessageEvent):
 
 
 # 管理员命令: 重置所有退市股票
-stock_reset_all_cmd = on_command("重置所有股票", block=True, priority=5, permission=SUPERUSER)
+stock_reset_all_cmd = on_command("重置所有股票", block=True, priority=7, permission=SUPERUSER)
 
 
 @stock_reset_all_cmd.handle()
@@ -931,7 +931,7 @@ async def handle_reset_all_stocks(event: MessageEvent):
 
 
 # 管理员命令: 手动触发重新上市检查
-stock_check_relist_cmd = on_command("检查股票重新上市", block=True, priority=5, permission=SUPERUSER)
+stock_check_relist_cmd = on_command("检查股票重新上市", block=True, priority=7, permission=SUPERUSER)
 
 
 @stock_check_relist_cmd.handle()

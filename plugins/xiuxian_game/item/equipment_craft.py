@@ -15,7 +15,7 @@ from ..platform_utils import get_unified_player
 
 # ---------------- 指令：锻造列表 ----------------
 # 列出所有可锻造装备
-list_craft_cmd = on_command("锻造列表", aliases={"装备列表"}, block=True, priority=5, force_whitespace=True)
+list_craft_cmd = on_command("锻造列表", aliases={"装备列表"}, block=True, priority=9, force_whitespace=True)
 
 @list_craft_cmd.handle()
 async def _(event: MessageEvent):
@@ -61,7 +61,7 @@ async def _(event: MessageEvent):
     await list_craft_cmd.finish(message_add_head("\n".join(lines), event))
 
 # ---------------- 指令：工匠配方一览 ----------------
-craftsman_recipes_cmd = on_command("工匠配方一览", aliases={"城市锻造", "城市配方"}, block=True, priority=5)
+craftsman_recipes_cmd = on_command("工匠配方一览", aliases={"城市锻造", "城市配方"}, block=True, priority=9)
 
 @craftsman_recipes_cmd.handle()
 async def _(event: MessageEvent, args: Message = CommandArg()):
@@ -189,7 +189,7 @@ def _get_craftsman_name_by_city(city_name: str) -> str:
     return name_map.get(city_name, f"工匠{city_name}")
 
 # ---------------- 指令：配方查询 ----------------
-recipe_cmd = on_command("配方", aliases={"锻造配方"}, block=True, priority=5)
+recipe_cmd = on_command("配方", aliases={"锻造配方"}, block=True, priority=9)
 
 @recipe_cmd.handle()
 async def _(event: MessageEvent, args: Message = CommandArg()):
@@ -236,7 +236,7 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
     await recipe_cmd.finish(message_add_head("\n".join(lines), event))
 
 # ---------------- 指令：装备锻造 ----------------
-craft_cmd = on_command("锻造", aliases={"装备锻造"}, block=True, priority=5, force_whitespace=True)
+craft_cmd = on_command("锻造", aliases={"装备锻造"}, block=True, priority=9, force_whitespace=True)
 
 @craft_cmd.handle()
 async def _(event: MessageEvent, args: Message = CommandArg()):
@@ -362,7 +362,7 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
 
         await craft_cmd.finish(message_add_head(reply, event))
 
-repair_cmd = on_command("修复", aliases={"修理"}, block=True, priority=5)
+repair_cmd = on_command("修复", aliases={"修理"}, block=True, priority=9)
 
 @repair_cmd.handle()
 async def _(event: MessageEvent, args: Message = CommandArg()):

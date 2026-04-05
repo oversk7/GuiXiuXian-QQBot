@@ -17,7 +17,7 @@ from ..ai_guide import is_admin
 
 
 # ==================== 全面删除公会 ====================
-delete_guild_cmd = on_command("删除公会", block=True, priority=5)
+delete_guild_cmd = on_command("删除公会", block=True, priority=15)
 
 
 @delete_guild_cmd.handle()

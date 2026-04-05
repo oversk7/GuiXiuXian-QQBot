@@ -23,7 +23,7 @@ from ..platform_utils import get_unified_player
 
 
 # ---------------- 指令：查看镶嵌物升级信息 ----------------
-gem_upgrade_info_cmd = on_command("镶嵌物升级", aliases={"宝石升级", "佛珠升级", "升级镶嵌物"}, block=True, priority=5)
+gem_upgrade_info_cmd = on_command("镶嵌物升级", aliases={"宝石升级", "佛珠升级", "升级镶嵌物"}, block=True, priority=9)
 
 @gem_upgrade_info_cmd.handle()
 async def _(event: MessageEvent, args: Message = CommandArg()):
@@ -118,7 +118,7 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
 
 
 # ---------------- 指令：升级镶嵌物 ----------------
-gem_upgrade_cmd = on_command("合成镶嵌物", aliases={"升级宝石", "升级佛珠", "合成宝石", "合成佛珠"}, block=True, priority=5)
+gem_upgrade_cmd = on_command("合成镶嵌物", aliases={"升级宝石", "升级佛珠", "合成宝石", "合成佛珠"}, block=True, priority=9)
 
 @gem_upgrade_cmd.handle()
 async def _(event: MessageEvent, args: Message = CommandArg()):
@@ -175,7 +175,7 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
 
 
 # ---------------- 指令：镶嵌物列表（显示可升级的镶嵌物）----------------
-upgradeable_gems_cmd = on_command("可升级镶嵌物", aliases={"我的镶嵌物", "镶嵌物列表"}, block=True, priority=5)
+upgradeable_gems_cmd = on_command("可升级镶嵌物", aliases={"我的镶嵌物", "镶嵌物列表"}, block=True, priority=9)
 
 @upgradeable_gems_cmd.handle()
 async def _(event: MessageEvent):
