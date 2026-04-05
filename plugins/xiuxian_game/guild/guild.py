@@ -268,20 +268,6 @@ async def handle_guild_bonuses(event: MessageEvent):
         treasury_limit = bonuses.get("treasury_limit", 100000)
         lines.append(f"💰 资金库上限：{GuildEconomyService.format_large_number(treasury_limit)}")
 
-        # 全属性加成
-        all_attributes = bonuses.get("all_attributes", 0.0)
-        if all_attributes > 0:
-            lines.append(f"⚔️ 全属性加成：+{all_attributes*100:.1f}%")
-        else:
-            lines.append(f"⚔️ 全属性加成：无")
-
-        # 防御加成
-        defense_bonus = bonuses.get("defense_bonus", 0.0)
-        if defense_bonus > 0:
-            lines.append(f"🛡️ 防御力加成：+{defense_bonus*100:.1f}%")
-        else:
-            lines.append(f"🛡️ 防御力加成：无")
-
         # 传送阵效果
         teleport_range = bonuses.get("teleport_range", 0)
         daily_teleport_uses = bonuses.get("daily_teleport_uses", 0)

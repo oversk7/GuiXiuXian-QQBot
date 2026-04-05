@@ -409,8 +409,6 @@ class GuildBuildingService:
             "exp_multiplier": 1.0,
             "treasury_limit": 100000,  # 基础资金上限
             "cultivation_bonus": 0.0,
-            "all_attributes": 0.0,
-            "defense_bonus": 0.0,
             "teleport_range": 0,
             "daily_teleport_uses": 0,
             "daily_alchemy_production": 0,
@@ -422,19 +420,15 @@ class GuildBuildingService:
             for effect_type, value in effects.items():
                 if effect_type in bonuses:
                     if effect_type in ["exp_multiplier", "treasury_limit", "teleport_range", "warehouse_capacity"]:
-                        # 这些效果取最大值
                         bonuses[effect_type] = max(bonuses[effect_type], value)
-                    elif effect_type in ["daily_uses", "daily_production"]:
-                        # 特殊处理：传送次数和丹药产出
-                        if effect_type == "daily_uses":
-                            bonuses["daily_teleport_uses"] = max(bonuses["daily_teleport_uses"], value)
-                        elif effect_type == "daily_production":
-                            bonuses["daily_alchemy_production"] = max(bonuses["daily_alchemy_production"], value)
-                    elif effect_type == "storage_slots":
-                        bonuses["warehouse_capacity"] = max(bonuses["warehouse_capacity"], value)
                     else:
-                        # 其他效果累加
                         bonuses[effect_type] += value
+                elif effect_type == "daily_uses":
+                    bonuses["daily_teleport_uses"] = max(bonuses["daily_teleport_uses"], value)
+                elif effect_type == "daily_production":
+                    bonuses["daily_alchemy_production"] = max(bonuses["daily_alchemy_production"], value)
+                elif effect_type == "storage_slots":
+                    bonuses["warehouse_capacity"] = max(bonuses["warehouse_capacity"], value)
 
         return bonuses
 
@@ -460,8 +454,6 @@ class GuildBuildingService:
             "exp_multiplier": "经验倍率",
             "treasury_limit": "资金上限",
             "cultivation_bonus": "修为加成",
-            "all_attributes": "全属性加成",
-            "defense_bonus": "防御加成",
             "daily_production": "日产",
             "pill_quality": "丹药品质",
             "teleport_range": "传送范围",
@@ -485,7 +477,7 @@ class GuildBuildingService:
                 effects_list.append(f"{chinese_name} {v:.1f}x")
             elif k == "treasury_limit":
                 effects_list.append(f"{chinese_name} {v:,}")
-            elif k in ["cultivation_bonus", "all_attributes", "defense_bonus"]:
+            elif k in ["cultivation_bonus"]:
                 effects_list.append(f"{chinese_name} +{v*100:.1f}%")
             elif k == "teleport_range":
                 effects_list.append(f"{chinese_name} {v}格")
