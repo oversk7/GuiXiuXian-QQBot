@@ -391,7 +391,12 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
             lines.append(cmd("卸下 " + tpl.name, f"卸下 {eid}") + " | " + cmd("装备栏") + " | " + cmd("帮助"))
         result_text = "\n".join(lines)
         _logger.info(f"[装备详情] 发送消息 len={len(result_text)} equip_id={equip.id} item={equip.item_id}")
-        await equipment_detail.finish(build_markdown(result_text))
+        _logger.debug(f"[装备详情] 消息内容:\n{result_text}")
+        try:
+            await equipment_detail.finish(build_markdown(result_text))
+        except Exception as e:
+            _logger.error(f"[装备详情] 发送失败: {type(e).__name__}: {e}")
+            raise
 
 
 # ---------------- 指令：穿戴装备 ----------------
