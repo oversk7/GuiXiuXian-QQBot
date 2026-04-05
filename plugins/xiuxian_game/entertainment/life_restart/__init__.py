@@ -90,8 +90,8 @@ async def handle_random_life(event: MessageEvent, args: Message = CommandArg()):
     selected = _random_talents_no_conflict(all_talents, 3)
     life.set_talents(selected)
 
-    # 随机分配属性（天赋可能扣减点数，保底至少4点）
-    total = max(life.total_property(), 4)
+    # 固定20点属性
+    total = 20
     nums = _random_attributes(total)
     prop = {"CHR": nums[0], "INT": nums[1], "STR": nums[2], "MNY": nums[3]}
     life.apply_property(prop)
@@ -189,7 +189,7 @@ async def handle_talent_select(event: MessageEvent, state: T_State):
 
     life.set_talents(selected)
     state["selected_talents"] = selected
-    total = max(life.total_property(), 4)
+    total = 20
     state["total_prop"] = total
 
     talent_names = "、".join(t.name for t in selected)
