@@ -490,7 +490,6 @@ class UnitOfWork:
                     from nonebot.exception import FinishedException, PausedException, RejectedException
                     if exc_type in (FinishedException, PausedException, RejectedException):
                         # 流程控制异常：静默提交事务（不记录日志）
-                        self._update_player_cache()
                         await self._session.commit()
                     else:
                         # 其他异常：回滚事务
@@ -503,7 +502,6 @@ class UnitOfWork:
             else:
                 # 没有异常，提交事务
                 logger.debug(f"✅ [UnitOfWork] 会话 {id(self._session)} 提交")
-                self._update_player_cache()
                 await self._session.commit()
         finally:
             # 无论如何都要关闭会话
