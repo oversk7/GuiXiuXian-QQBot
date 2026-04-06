@@ -668,7 +668,7 @@ class PetService:
         else:
             display_name = beast.name
 
-        # 饰品展示行（分行显示，带slot emoji）
+        # 饰品展示行（分行显示，氪金饰品带emoji，普通饰品纯文字）
         SLOT_EMOJI = {"head": "👑", "neck": "📿", "body": "👗"}
         acc_line = ""
         if pet.accessories:
@@ -676,8 +676,11 @@ class PetService:
             for slot, acc_id in pet.accessories.items():
                 acc = self.config.get_accessory(acc_id)
                 if acc:
-                    emoji = SLOT_EMOJI.get(slot, "✨")
-                    acc_parts.append(f"{emoji}{acc.name}")
+                    if acc.rarity == "orange":
+                        emoji = SLOT_EMOJI.get(slot, "✨")
+                        acc_parts.append(f"{emoji}{acc.name}")
+                    else:
+                        acc_parts.append(acc.name)
             if acc_parts:
                 acc_line = f"  {' · '.join(acc_parts)}\n"
 
