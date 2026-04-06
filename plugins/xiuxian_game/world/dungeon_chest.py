@@ -107,8 +107,8 @@ async def handle_claim_chest(event: MessageEvent):
         # 检查背包容量（使用有效容量，包含月卡加成）
         stmt = select(ItemInstance).where(ItemInstance.player_id == player.id)
         current_items = (await session.execute(stmt)).scalars().all()
-        # 计算已使用的背包格数（装备和鱼类不计入）
-        current_slots = sum(1 for item in current_items if item.quantity > 0 and not item.is_equipment and not item.is_fish)
+        # 计算已使用的背包格数（装备、鱼类、铭文不计入）
+        current_slots = sum(1 for item in current_items if not item.is_equipment and not item.is_fish and not item.is_inscription)
 
         # 获取有效背包容量（包含月卡加成）
         effective_capacity = await player.get_effective_inventory_capacity(session)
