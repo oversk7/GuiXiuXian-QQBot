@@ -21,6 +21,7 @@ from ..models.player import Player
 from ..config import config
 from ..infrastructure.repositories.item_repository import ItemRepository
 from ..infrastructure.repositories.player_repository import PlayerRepository
+from .affix_service import get_affixes_from_equipment
 
 
 class EquipmentUpgradeService:
@@ -83,6 +84,19 @@ class EquipmentUpgradeService:
         """
         self._item_repo = item_repo
         self._player_repo = player_repo
+
+    @staticmethod
+    def _has_affixes(eq: ItemInstance) -> bool:
+        """判断装备是否有词缀"""
+        return bool(get_affixes_from_equipment(eq.extra_attrs))
+
+    @staticmethod
+    def _sort_consume_priority(equipment_list: List[ItemInstance]) -> List[ItemInstance]:
+        """排序装备列表，无词缀的排前面（优先被消耗），有词缀的排后面（优先保留）"""
+        return sorted(equipment_list, key=lambda eq: (
+            1 if get_affixes_from_equipment(eq.extra_attrs) else 0,  # 无词缀=0（前面），有词缀=1（后面）
+            eq.durability or 0,  # 同等条件下按耐久度升序
+        ))
 
     def is_rare_equipment(self, item_id: str) -> bool:
         """判断是否为稀有装备（没有配方的装备）
@@ -313,10 +327,15 @@ class EquipmentUpgradeService:
                 player.id, equipment.item_id, current_level
             )
 
-            # 选择要消耗的装备（排除主装备本身）
-            for eq in available_equipment:
-                if eq.id != equipment.id and len(equipment_to_consume) < required_equipment_count - 1:
-                    equipment_to_consume.append(eq)
+            # 选择要消耗的装备（排除主装备本身和冻结装备，优先消耗无词缀的）
+            candidates = [
+                eq for eq in available_equipment
+                if eq.id != equipment.id
+                and not (eq.extra_attrs or {}).get("_frozen_for_trade")
+                and not (eq.extra_attrs or {}).get("_frozen_for_auction")
+            ]
+            candidates = self._sort_consume_priority(candidates)
+            equipment_to_consume = candidates[:required_equipment_count - 1]
 
             if len(equipment_to_consume) < required_equipment_count - 1:
                 return False, "可用装备数量不足", {}
@@ -410,11 +429,16 @@ class EquipmentUpgradeService:
     async def _get_side_pieces(
         self, player_id: str, item_id: str, level: int, exclude_id: int
     ) -> List[ItemInstance]:
-        """获取指定等级的辅助装备（排除主装备）"""
+        """获取指定等级的辅助装备（排除主装备和冻结装备）"""
         all_pieces = await self._item_repo.get_available_equipment_for_upgrade(
             player_id, item_id, level
         )
-        return [eq for eq in all_pieces if eq.id != exclude_id]
+        return [
+            eq for eq in all_pieces
+            if eq.id != exclude_id
+            and not (eq.extra_attrs or {}).get("_frozen_for_trade")
+            and not (eq.extra_attrs or {}).get("_frozen_for_auction")
+        ]
 
     async def _prepare_one_side_piece(
         self,
@@ -455,8 +479,9 @@ class EquipmentUpgradeService:
         if len(lower_pieces) < needed:
             return False  # 无法凑足素材
 
-        # 挑选候选装备（耐久度最低的，即列表第一个）
-        candidate = lower_pieces[0]
+        # 挑选候选装备（优先选无词缀的，避免有词缀装备被当材料消耗）
+        sorted_pieces = self._sort_consume_priority(lower_pieces)
+        candidate = sorted_pieces[0]
 
         # 检查升阶石/金币是否足够
         can_up, reason = await self.can_upgrade(candidate, player)
