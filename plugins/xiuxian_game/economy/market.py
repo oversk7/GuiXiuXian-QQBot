@@ -7,7 +7,6 @@ from sqlalchemy.orm import selectinload
 from ..models.db import safe_session
 from ..models.market_order import MarketOrder, OrderSide
 from ..models.trade_record import TradeRecord, TradeType
-from ..models.market_trade_log import MarketTradeLog
 from ..models.player import Player
 from ..models.inventory import ItemInstance
 from ..config import config
@@ -1149,77 +1148,6 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
 
         await equipment_appraise_cmd.finish(build_markdown("\n".join(lines)))
 
-# ---------------- 指令：市集记录 ----------------
-trade_log_cmd = on_command("市集记录", aliases={"成交记录", "交易记录"}, block=True, priority=7)
-
-@trade_log_cmd.handle()
-async def _(event: MessageEvent, args: Message = CommandArg()):
-    """查看市集最近成交记录"""
-    arg_text = args.extract_plain_text().strip()
-
-    # 解析页码
-    page = 1
-    if arg_text.isdigit():
-        page = max(1, int(arg_text))
-
-    PAGE_SIZE = 10
-
-    async with safe_session() as session:
-        # 查询最近成交记录总数
-        count_stmt = select(func.count(MarketTradeLog.id))
-        total = (await session.execute(count_stmt)).scalar() or 0
-
-        if total == 0:
-            await trade_log_cmd.finish(build_markdown(
-                "# 📋 市集成交记录\n***\n暂无成交记录\n***\n"
-                f"{cmd('交易清单')} | {cmd('我的挂牌')}"
-            ))
-
-        total_pages = max(1, (total + PAGE_SIZE - 1) // PAGE_SIZE)
-        page = min(page, total_pages)
-
-        # 查询分页数据
-        stmt = (
-            select(MarketTradeLog)
-            .order_by(MarketTradeLog.trade_time.desc())
-            .offset((page - 1) * PAGE_SIZE)
-            .limit(PAGE_SIZE)
-        )
-        logs = (await session.execute(stmt)).scalars().all()
-
-        lines = [
-            f"# 📋 市集成交记录",
-            f"***",
-        ]
-
-        for log in logs:
-            time_str = log.trade_time.strftime("%m-%d %H:%M")
-            if log.is_equipment:
-                item_display = f"⚔️{log.item_name}"
-            else:
-                item_display = f"{log.item_name}×{log.quantity}"
-            lines.append(
-                f"🕐{time_str} "
-                f"**{log.buyer_name}** ← {item_display} ← **{log.seller_name}** "
-                f"💰{log.total_amount:,}"
-            )
-
-        lines.append("***")
-
-        # 翻页导航
-        if total_pages > 1:
-            nav = []
-            if page > 1:
-                nav.append(cmd(f"⬅ 上一页", f"市集记录 {page - 1}"))
-            nav.append(f"第{page}/{total_pages}页")
-            if page < total_pages:
-                nav.append(cmd(f"下一页 ➡", f"市集记录 {page + 1}"))
-            lines.append(" | ".join(nav))
-
-        lines.append(f"{cmd('交易清单')} | {cmd('我的挂牌')}")
-        await trade_log_cmd.finish(build_markdown("\n".join(lines)))
-
-
 # ======= 辅助函数 =======
 async def _try_auto_match(session, new_order: MarketOrder, player: Player, same_price_only: bool = False) -> str:
     """自动撮合逻辑，返回描述信息（可能为空）。"""
@@ -1299,21 +1227,6 @@ async def _try_auto_match(session, new_order: MarketOrder, player: Player, same_
         # 更新财富成就统计
         from ..achievement.achievement_service import AchievementService
         await AchievementService.update_stat(session, seller.id, "gold_earned_total", increment=trade_amount - tax, auto_commit=False)
-
-        # 记录成交日志
-        is_equip_trade = (
-            (new_order.side == OrderSide.SELL and new_order.is_equipment_trade)
-            or (opp.side == OrderSide.SELL and opp.is_equipment_trade)
-        )
-        item_name = item_cfg.name if item_cfg else new_order.item_id
-        session.add(MarketTradeLog(
-            buyer_id=buyer_id, seller_id=seller_id,
-            buyer_name=buyer.nickname, seller_name=seller.nickname,
-            item_id=new_order.item_id, item_name=item_name,
-            quantity=trade_qty, unit_price=trade_price,
-            total_amount=trade_amount, tax=tax,
-            is_equipment=is_equip_trade,
-        ))
 
         # 更新对手单
         opp.quantity -= trade_qty
