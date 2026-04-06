@@ -623,30 +623,19 @@ async def settle_expired_auctions(uow: UnitOfWork) -> int:
 
 async def send_30min_reminders(uow: UnitOfWork) -> int:
     """
-    发送即将结束（30分钟内）的拍卖提醒
+    30分钟提醒（已禁用广播，仅标记reminded状态）
 
     Returns:
-        发送数量
+        标记数量
     """
     session = uow.session
     near_ending = await uow.auction_items.find_near_ending_unreminded()
     count = 0
     for auction in near_ending:
         try:
-            item_display = _make_item_display(auction)
-            end_str = auction.end_at.strftime("%H:%M")
-            buyer_info = f"当前最高：{auction.current_price:,}💰" if auction.has_bidder else "暂无人出价"
-            await _broadcast(
-                session,
-                f"⏳ [拍卖行] 即将结束提醒！\n"
-                f"📦 {item_display}（#{auction.id}）\n"
-                f"💰 {buyer_info}\n"
-                f"⏰ 截止时间：{end_str}\n"
-                f"📣 发送【出价 {auction.id} 金额】参与竞价"
-            )
             auction.reminded_30min = True
             session.add(auction)
             count += 1
         except Exception as e:
-            logger.error(f"[拍卖行] 发送提醒 #{auction.id} 失败: {e}")
+            logger.error(f"[拍卖行] 标记提醒 #{auction.id} 失败: {e}")
     return count
