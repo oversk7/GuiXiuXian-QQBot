@@ -1077,6 +1077,7 @@ async def _monthly_card_box(player: Player, cfg: ItemConfig, qty: int, ctx: str,
         item_id for item_id in all_material_items
         if (item_cfg := config.items_config["by_id"].get(item_id)) is not None
         and "inner_realm_only" not in item_cfg.tags
+        and "no_drop" not in item_cfg.tags
     ]
     if not material_items:
         return False, "⛔ 系统错误：未找到材料配置"
