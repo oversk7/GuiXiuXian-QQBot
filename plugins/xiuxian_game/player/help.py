@@ -2294,6 +2294,7 @@ async def handle_pet_help(event: MessageEvent, args: Message = CommandArg()):
         f"{cmd('宠物')} 查看当前伙伴状态\n"
         f"{cmd('宠物列表')} 查看所有宠物\n"
         f"{cmd('切换伙伴 宠物ID', '切换伙伴 ')} 切换当前伙伴\n"
+        f"{cmd('放生 宠物ID或昵称', '放生 ')} 永久放生宠物（不可撤销）\n"
         "***\n"
         "**💬 互动与对话**\n"
         f"{cmd('摸摸')} {cmd('摸头')} {cmd('玩耍')} {cmd('抱抱')} 互动（+好感/心情）\n"
