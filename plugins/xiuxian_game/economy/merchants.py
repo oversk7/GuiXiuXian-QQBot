@@ -677,6 +677,9 @@ price_compare_cmd = on_command("市价", block=True, priority=7)
 # 跑商记录：查看玩家的交易历史
 trade_history_cmd = on_command("跑商记录", block=True, priority=7)
 
+# 市集记录：查看当前市集最近的交易记录（所有玩家）
+market_log_cmd = on_command("市集记录", aliases={"交易记录", "市集动态"}, block=True, priority=7)
+
 # 跑商推荐：列出可获利的买卖路线
 trade_advise_cmd = on_command("跑商推荐", aliases={"套利", "赚差价"}, block=True, priority=7)
 
@@ -1523,6 +1526,82 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
         lines.append(f"{cmd('市集')} | {cmd('跑商推荐')} | {cmd('交易限制')}")
 
         await trade_history_cmd.finish(build_markdown("\n".join(lines)))
+
+# -------- 市集记录（当前市集所有玩家交易动态） --------
+
+@market_log_cmd.handle()
+async def _(event: MessageEvent):
+    """查看当前市集最近的购买记录（所有玩家）"""
+    async with safe_session() as session:
+        from ..platform_utils import get_unified_player, is_guild_message
+        player: Player | None = await get_unified_player(session, event)
+        if not player:
+            if is_guild_message(event):
+                await market_log_cmd.finish("⛔ 你还没有创建角色或绑定账号\n💡 请先在群聊注册角色，然后使用绑定功能")
+            else:
+                await market_log_cmd.finish("⛔ 请先创建角色")
+
+        if player.region != "大都会":
+            await market_log_cmd.finish("⛔ 只有在大都会才能查看市集记录")
+
+        if player.is_in_dungeon():
+            await market_log_cmd.finish("⛔ 诡域中无法查看市集记录")
+
+        current_x, current_y = player.get_current_coordinates()
+        market = MARKET_BY_COORD.get((current_x, current_y))
+        if not market:
+            await market_log_cmd.finish(
+                build_markdown(
+                    f"⛔ 当前位置没有市集\n"
+                    f"请前往市集坐标后再查看\n"
+                    f"***\n{cmd('市集列表')} | {cmd('导航 城市名', '导航 ')}"
+                )
+            )
+
+        # 查询该市集最近20条交易记录（购买+出售，所有玩家）
+        from sqlalchemy import desc, and_
+        stmt = select(TradeRecord).where(
+            TradeRecord.market_id == market.id
+        ).order_by(desc(TradeRecord.trade_time)).limit(20)
+
+        result = await session.execute(stmt)
+        records = result.scalars().all()
+
+        if not records:
+            await market_log_cmd.finish(build_markdown(
+                f"# {market.name} 市集记录\n***\n暂无交易记录\n***\n{cmd('市集')} | {cmd('跑商推荐')}"))
+
+        # 批量查询涉及的玩家昵称
+        player_ids = list({r.player_id for r in records})
+        from sqlalchemy import func as sa_func
+        stmt_players = select(Player.id, Player.nickname).where(Player.id.in_(player_ids))
+        player_rows = (await session.execute(stmt_players)).all()
+        nickname_map = {pid: nick for pid, nick in player_rows}
+
+        lines = [f"# {market.name} 市集记录", "***"]
+
+        for record in records:
+            item_cfg = config.items_config["by_id"].get(record.item_id)
+            item_name = item_cfg.name if item_cfg else record.item_id
+            nick = nickname_map.get(record.player_id, "???")
+
+            if record.trade_type == TradeType.BUY:
+                action = "购入"
+                icon = "🛒"
+            else:
+                action = "售出"
+                icon = "💰"
+
+            time_str = record.trade_time.strftime("%m-%d %H:%M")
+            lines.append(
+                f"{icon} {nick} {action} **{item_name}**×{record.quantity} "
+                f"| 单价{record.unit_price} | {time_str}"
+            )
+
+        lines.append("***")
+        lines.append(f"{cmd('市集')} | {cmd('市集列表')} | {cmd('跑商推荐')}")
+
+        await market_log_cmd.finish(build_markdown("\n".join(lines)))
 
 # -------- 跑商推荐 --------
 
