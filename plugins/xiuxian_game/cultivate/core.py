@@ -1657,7 +1657,7 @@ _FENJIN_MAX_AMOUNT = 5_000_000  # 单次上限500万
 
 
 def calc_fenjin_decay(charge: float, last_update: datetime, last_charge: datetime, now: datetime = None) -> float:
-    """计算焚金充能衰减后的实际值（惰性计算，分段积分）
+    """计算焚金充能衰减后的实际值（解析式分段积分，无循环）
 
     三档衰减：
     - 距上次充值 0~6h:  2%/h（炉火旺盛）
@@ -1685,36 +1685,29 @@ def calc_fenjin_decay(charge: float, last_update: datetime, last_charge: datetim
     if not last_charge:
         last_charge = last_update  # 兼容旧数据
 
-    # 计算衰减起算时刻相对于上次充值的时间偏移
-    charge_offset_hours = (last_update - last_charge).total_seconds() / 3600
-    if charge_offset_hours < 0:
-        charge_offset_hours = 0
+    # 衰减起算时刻相对于上次充值的时间偏移
+    offset = max(0.0, (last_update - last_charge).total_seconds() / 3600)
 
-    # 分段积分衰减
-    remaining = charge
-    time_left = elapsed_hours
+    # 解析式分段积分：计算 [offset, offset+elapsed] 区间内各段衰减量
+    t_start = offset
+    t_end = offset + elapsed_hours
 
-    while time_left > 0 and remaining > 0:
-        # 当前时刻距上次充值的小时数
-        current_offset = charge_offset_hours + (elapsed_hours - time_left)
+    phases = [
+        (_DECAY_PHASE_1_HOURS, _DECAY_RATE_1),   # 0~6h:  2%/h
+        (_DECAY_PHASE_2_HOURS, _DECAY_RATE_2),    # 6~12h: 5%/h
+        (t_end,                _DECAY_RATE_3),     # 12h+:  10%/h
+    ]
 
-        # 确定当前衰减速率和本段可持续时长
-        if current_offset < _DECAY_PHASE_1_HOURS:
-            rate = _DECAY_RATE_1
-            phase_remaining = _DECAY_PHASE_1_HOURS - current_offset
-        elif current_offset < _DECAY_PHASE_2_HOURS:
-            rate = _DECAY_RATE_2
-            phase_remaining = _DECAY_PHASE_2_HOURS - current_offset
-        else:
-            rate = _DECAY_RATE_3
-            phase_remaining = time_left  # 最后一档，无限持续
+    total_decay = 0.0
+    phase_start = 0.0
+    for phase_end, rate in phases:
+        overlap_start = max(t_start, phase_start)
+        overlap_end = min(t_end, phase_end)
+        if overlap_start < overlap_end:
+            total_decay += rate * (overlap_end - overlap_start)
+        phase_start = phase_end
 
-        # 本段实际持续时间
-        dt = min(time_left, phase_remaining)
-        remaining -= rate * dt
-        time_left -= dt
-
-    return max(0.0, remaining)
+    return max(0.0, charge - total_decay)
 
 
 def calc_fenjin_charge_gain(current_charge: float, gold_amount: int) -> tuple[float, int]:
