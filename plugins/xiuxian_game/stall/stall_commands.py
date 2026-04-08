@@ -9,13 +9,12 @@
 - 【我的摊位】           - 查看自己的摊位
 - 【摊位名 名称】        - 设置摊位名
 - 【吆喝 内容】          - 设置吆喝语
-- 【逛摊 [城镇名]】      - 浏览城镇摊位
-- 【搜摊 物品名】        - 全服搜索物品
-- 【买摊 摊主UID 序号 [数量]】 - 购买
-- 【摊位 UID】           - 查看某人摊位
+- 【买摊 摊主UID 序号 [数量]】 - 购买（需在同一城镇）
+- 【摊位 UID】           - 查看某人摊位（需在同一城镇）
+
+摊位信息通过【观察】命令在城镇中自动显示，无需单独逛摊/搜摊。
 """
 
-import math
 import time
 from datetime import datetime
 
@@ -42,8 +41,6 @@ unlist_item_cmd = on_command("下摊", aliases={"摊位下架"}, block=True, pri
 my_stall_cmd = on_command("我的摊位", block=True, priority=13)
 set_name_cmd = on_command("摊位名", aliases={"摊位改名"}, block=True, priority=13)
 set_shout_cmd = on_command("吆喝", block=True, priority=13)
-browse_cmd = on_command("逛摊", aliases={"逛街"}, block=True, priority=13)
-search_cmd = on_command("搜摊", aliases={"搜索摊位"}, block=True, priority=13)
 buy_cmd = on_command("买摊", aliases={"摊位购买"}, block=True, priority=13)
 view_stall_cmd = on_command("摊位", block=True, priority=13, force_whitespace=True)
 
@@ -413,167 +410,6 @@ async def handle_set_shout(event: MessageEvent, args: Message = CommandArg()):
     await set_shout_cmd.finish(message_add_head(msg, event))
 
 
-# ==================== 逛摊 ====================
-
-@browse_cmd.handle()
-async def handle_browse(event: MessageEvent, args: Message = CommandArg()):
-    """格式：逛摊 [城镇名] [页码]"""
-    raw = args.extract_plain_text().strip()
-    parts = raw.split() if raw else []
-
-    city_name = None
-    page = 1
-
-    if parts:
-        # 最后一个参数如果是数字就是页码
-        if parts[-1].isdigit():
-            page = max(1, int(parts[-1]))
-            city_name = " ".join(parts[:-1]) if len(parts) > 1 else None
-        else:
-            city_name = " ".join(parts)
-
-    page_size = 8
-
-    async with UnitOfWork(AsyncSessionLocal) as uow:
-        player = await get_unified_player(uow.session, event)
-        if not player:
-            await browse_cmd.finish(message_add_head("⛔ 请先创建角色", event))
-
-        if not city_name:
-            # 不指定城镇 → 当前位置城镇，若不在城镇则显示全部
-            region = player.get_current_region() if hasattr(player, 'get_current_region') else "大都会"
-            city_name = stall_service.get_town_name(player.x, player.y, region)
-
-        if city_name:
-            total = await uow.player_stalls.count_active_by_city(city_name)
-            if total == 0:
-                await browse_cmd.finish(build_markdown(
-                    f"# 🏪 {city_name}的摊位\n***\n暂无人摆摊\n"
-                    f"💡 {cmd('摆摊')}在此开摊 | {cmd('逛摊')} 看其他城镇"
-                ))
-
-            total_pages = math.ceil(total / page_size)
-            page = min(page, total_pages)
-            stalls = await uow.player_stalls.find_active_by_city(city_name, page, page_size)
-            title = f"# 🏪 {city_name}的摊位"
-        else:
-            total = await uow.player_stalls.count_all_active()
-            if total == 0:
-                await browse_cmd.finish(build_markdown(
-                    "# 🏪 全服摊位\n***\n暂无人摆摊\n"
-                    f"💡 {cmd('摆摊')}在城镇开摊"
-                ))
-
-            total_pages = math.ceil(total / page_size)
-            page = min(page, total_pages)
-            stalls = await uow.player_stalls.find_all_active(page, page_size)
-            title = "# 🏪 全服摊位"
-
-        lines = [
-            title,
-            f"第**{page}**/{total_pages}页　共**{total}**个摊位",
-            "***",
-        ]
-
-        now = datetime.now()
-        for s in stalls:
-            stall_display = s.stall_name or f"{s.player_name}的摊位"
-            item_count = await uow.stall_items.count_by_stall(s.id)
-            remaining = s.expires_at - now
-            remain_h = max(0, int(remaining.total_seconds() // 3600))
-            remain_m = max(0, int((remaining.total_seconds() % 3600) // 60))
-            remain_str = f"{remain_h}h{remain_m}m" if remain_h > 0 else f"{remain_m}m"
-
-            shout = f"\n   📢 {s.shout_text}" if s.shout_text else ""
-            lines.append(
-                f"**{stall_display}** [UID:{s.player_uid}]\n"
-                f"   📍 {s.city_name}　📦 {item_count}件　⏰ {remain_str}{shout}\n"
-                f"   {cmd('查看', f'摊位 {s.player_uid}')}"
-            )
-            lines.append("")
-
-        lines.append("***")
-        nav = []
-        nav_prefix = f"逛摊 {city_name} " if city_name else "逛摊 "
-        if page > 1:
-            nav.append(cmd("上一页", f"{nav_prefix}{page - 1}"))
-        if page < total_pages:
-            nav.append(cmd("下一页", f"{nav_prefix}{page + 1}"))
-        if nav:
-            lines.append(" | ".join(nav))
-        lines.append(f"{cmd('搜摊 物品名', '搜摊 ')} | {cmd('帮助')}")
-
-    await browse_cmd.finish(build_markdown("\n".join(lines)))
-
-
-# ==================== 搜摊 ====================
-
-@search_cmd.handle()
-async def handle_search(event: MessageEvent, args: Message = CommandArg()):
-    """格式：搜摊 物品名 [页码]"""
-    raw = args.extract_plain_text().strip()
-    if not raw:
-        await search_cmd.finish(message_add_head("📋 格式：【搜摊 物品名】", event))
-
-    parts = raw.split()
-    page = 1
-    if len(parts) >= 2 and parts[-1].isdigit():
-        page = max(1, int(parts[-1]))
-        item_name = " ".join(parts[:-1])
-    else:
-        item_name = raw
-
-    item_cfg = config.items_config["by_name"].get(item_name)
-    if not item_cfg:
-        await search_cmd.finish(message_add_head(f"⛔ 未找到物品「{item_name}」", event))
-
-    page_size = 10
-
-    async with UnitOfWork(AsyncSessionLocal) as uow:
-        total = await uow.stall_items.count_by_item_id(item_cfg.item_id)
-        if total == 0:
-            await search_cmd.finish(build_markdown(
-                f"# 🔍 搜索：{item_cfg.get_display_name()}\n***\n"
-                f"暂无摊位出售该物品"
-            ))
-
-        total_pages = math.ceil(total / page_size)
-        page = min(page, total_pages)
-        results = await uow.stall_items.search_by_item_id(item_cfg.item_id, page, page_size)
-
-        lines = [
-            f"# 🔍 搜索：{item_cfg.get_display_name()}",
-            f"第**{page}**/{total_pages}页　共**{total}**件在售",
-            "***",
-        ]
-
-        for si in results:
-            # 查找摊位信息
-            stall = await uow.player_stalls.get_by_id(si.stall_id)
-            if not stall:
-                continue
-            equip_info = f"（{si.equipment_summary}）" if si.equipment_summary else ""
-            qty_str = f" ×{si.quantity}" if si.quantity > 1 else ""
-
-            lines.append(
-                f"💰 **{si.unit_price:,}**💰{equip_info}{qty_str}\n"
-                f"   📍 {stall.city_name}　👤 {stall.player_name} [UID:{stall.player_uid}]\n"
-                f"   {cmd('查看摊位', f'摊位 {stall.player_uid}')}"
-            )
-            lines.append("")
-
-        lines.append("***")
-        nav = []
-        if page > 1:
-            nav.append(cmd("上一页", f"搜摊 {item_name} {page - 1}"))
-        if page < total_pages:
-            nav.append(cmd("下一页", f"搜摊 {item_name} {page + 1}"))
-        if nav:
-            lines.append(" | ".join(nav))
-
-    await search_cmd.finish(build_markdown("\n".join(lines)))
-
-
 # ==================== 买摊 ====================
 
 @buy_cmd.handle()
@@ -588,7 +424,7 @@ async def handle_buy(event: MessageEvent, args: Message = CommandArg()):
             "【买摊 摊主UID 序号 [数量]】\n"
             "━━━━━━━━━━━━━\n"
             "示例：买摊 123 1\n"
-            "💡 使用【摊位 UID】先查看摊位商品",
+            "💡 在城镇【观察】可查看当地摊位",
             event
         ))
 
@@ -612,6 +448,12 @@ async def handle_buy(event: MessageEvent, args: Message = CommandArg()):
         if not player:
             await buy_cmd.finish(message_add_head("⛔ 请先创建角色", event))
 
+        # 检查买家必须在城镇
+        region = player.get_current_region() if hasattr(player, 'get_current_region') else "大都会"
+        buyer_town = stall_service.get_town_name(player.x, player.y, region)
+        if not buyer_town:
+            await buy_cmd.finish(message_add_head("⛔ 必须在城镇才能购买摊位商品", event))
+
         success, msg = await stall_service.buy_item(uow, player, seller_uid, slot_index, quantity)
         if success:
             await uow.commit()
@@ -623,13 +465,13 @@ async def handle_buy(event: MessageEvent, args: Message = CommandArg()):
 
 @view_stall_cmd.handle()
 async def handle_view_stall(event: MessageEvent, args: Message = CommandArg()):
-    """格式：摊位 UID"""
+    """格式：摊位 UID（需在同一城镇）"""
     raw = args.extract_plain_text().strip()
 
     if not raw:
         await view_stall_cmd.finish(message_add_head(
             "📋 格式：【摊位 UID】\n"
-            "💡 使用【逛摊】浏览所有摊位",
+            "💡 在城镇【观察】可查看当地摊位",
             event
         ))
 
@@ -639,6 +481,16 @@ async def handle_view_stall(event: MessageEvent, args: Message = CommandArg()):
         await view_stall_cmd.finish(message_add_head("⛔ UID必须是整数", event))
 
     async with UnitOfWork(AsyncSessionLocal) as uow:
+        player = await get_unified_player(uow.session, event)
+        if not player:
+            await view_stall_cmd.finish(message_add_head("⛔ 请先创建角色", event))
+
+        # 检查玩家必须在城镇
+        region = player.get_current_region() if hasattr(player, 'get_current_region') else "大都会"
+        my_town = stall_service.get_town_name(player.x, player.y, region)
+        if not my_town:
+            await view_stall_cmd.finish(message_add_head("⛔ 必须在城镇才能查看摊位", event))
+
         # 查找摊主
         from ..models.player import Player
         stmt = select(Player).where(Player.uid == target_uid)
@@ -649,7 +501,14 @@ async def handle_view_stall(event: MessageEvent, args: Message = CommandArg()):
 
         stall = await uow.player_stalls.get_active_by_player(target.id)
         if not stall:
-            await view_stall_cmd.finish(message_add_head(f"⛔ 该玩家没有摆摊", event))
+            await view_stall_cmd.finish(message_add_head("⛔ 该玩家没有摆摊", event))
+
+        # 检查是否同城镇
+        if stall.city_name != my_town:
+            await view_stall_cmd.finish(message_add_head(
+                f"⛔ 该摊位在「{stall.city_name}」，你在「{my_town}」\n"
+                f"💡 请先导航到对应城镇", event
+            ))
 
         items = await uow.stall_items.find_by_stall(stall.id)
 
@@ -685,6 +544,6 @@ async def handle_view_stall(event: MessageEvent, args: Message = CommandArg()):
                 )
 
         lines.append("***")
-        lines.append(f"{cmd('逛摊')} | {cmd('搜摊 物品名', '搜摊 ')} | {cmd('帮助')}")
+        lines.append(f"{cmd('观察')} | {cmd('帮助')}")
 
     await view_stall_cmd.finish(build_markdown("\n".join(lines)))
