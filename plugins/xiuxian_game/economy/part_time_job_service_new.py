@@ -53,6 +53,7 @@ class PartTimeJobService:
         ("life_recovery_elixir", "回生丹", 1, 8, 2),
         ("soul_recovery_elixir", "凝魂丹", 1, 8, 2),
         ("spirit_elixir", "升灵丹", 1, 5, 3),
+        ("stall_permit", "摊位令", 1, 4, 2),
     ]
 
     # 工作类型配置 - 基础报酬已提升50%
