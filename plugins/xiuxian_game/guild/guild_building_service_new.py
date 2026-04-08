@@ -173,11 +173,11 @@ class GuildBuildingService:
         return extrapolated
 
     def _get_building_max_level(self, guild_level: int, building_type: BuildingType) -> int:
-        """建筑等级上限：公会10级以下不限（取建筑配置上限），10级及以上=公会等级"""
+        """建筑等级上限：公会10级以下取配置上限，10级及以上突破至公会等级"""
         config_max = self.BUILDING_CONFIGS[building_type].get("max_level", 10)
         if guild_level < 10:
             return config_max
-        return min(guild_level, config_max)
+        return guild_level
 
     async def can_build(
         self, guild_id: int, building_type: BuildingType
@@ -237,15 +237,35 @@ class GuildBuildingService:
 
         # 计算成本（等级越高成本越高）
         base_cost = config["base_cost"]
-        multiplier = target_level
 
         cost = {
-            "gold": base_cost["gold"] * multiplier,
+            "gold": base_cost["gold"] * target_level,
             "materials": {}
         }
 
         for material, amount in base_cost["materials"].items():
-            cost["materials"][material] = amount * multiplier
+            cost["materials"][material] = amount * target_level
+
+        # 10级以上：金币二次增长 + 额外稀有材料
+        if target_level > 10:
+            cost["gold"] = base_cost["gold"] * target_level * (target_level - 9)
+
+            extra = target_level - 10
+            # 蓝色材料
+            cost["materials"]["魂魄结晶"] = cost["materials"].get("魂魄结晶", 0) + 8 * extra
+            cost["materials"]["诅咒镜片"] = cost["materials"].get("诅咒镜片", 0) + 5 * extra
+            cost["materials"]["幽魂丝线"] = cost["materials"].get("幽魂丝线", 0) + 5 * extra
+            # 紫色材料
+            cost["materials"]["恶魔之心"] = cost["materials"].get("恶魔之心", 0) + 5 * extra
+            cost["materials"]["虚无精华"] = cost["materials"].get("虚无精华", 0) + 3 * extra
+            cost["materials"]["灵石"] = cost["materials"].get("灵石", 0) + 10 * extra
+
+            # 16级以上额外需要橙色材料
+            if target_level > 15:
+                orange_extra = target_level - 15
+                cost["materials"]["神明之泪"] = cost["materials"].get("神明之泪", 0) + 2 * orange_extra
+                cost["materials"]["世界碎片"] = cost["materials"].get("世界碎片", 0) + 1 * orange_extra
+                cost["materials"]["时光尘埃"] = cost["materials"].get("时光尘埃", 0) + 1 * orange_extra
 
         return cost
 
