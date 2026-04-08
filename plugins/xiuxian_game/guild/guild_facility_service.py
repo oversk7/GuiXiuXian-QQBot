@@ -110,8 +110,7 @@ class GuildFacilityService:
             return False, "公会尚未建造传送阵"
         
         # 获取传送阵效果
-        config = GuildBuildingService.BUILDING_CONFIGS[BuildingType.TELEPORT_ARRAY]
-        effects = config["effects"][teleport_building.level]
+        effects = GuildBuildingService.get_effects_for_level(BuildingType.TELEPORT_ARRAY, teleport_building.level)
         teleport_range = effects["teleport_range"]
         daily_uses = effects["daily_uses"]
         
@@ -379,8 +378,7 @@ class GuildFacilityService:
             return 0
 
         # 获取丹房效果
-        config = GuildBuildingService.BUILDING_CONFIGS[BuildingType.ALCHEMY_ROOM]
-        effects = config["effects"][alchemy_building.level]
+        effects = GuildBuildingService.get_effects_for_level(BuildingType.ALCHEMY_ROOM, alchemy_building.level)
         daily_production = effects["daily_production"]
         pill_quality = effects["pill_quality"]
 
@@ -464,8 +462,7 @@ class GuildFacilityService:
         if not warehouse_building:
             return 0
 
-        config = GuildBuildingService.BUILDING_CONFIGS[BuildingType.GUILD_WAREHOUSE]
-        effects = config["effects"][warehouse_building.level]
+        effects = GuildBuildingService.get_effects_for_level(BuildingType.GUILD_WAREHOUSE, warehouse_building.level)
         return effects["storage_slots"]
 
     @staticmethod

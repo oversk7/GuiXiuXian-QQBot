@@ -145,8 +145,7 @@ class GuildFacilityService:
         building_service = GuildBuildingServiceNew(
             self._guild_repo, self._building_repo, self._item_repo
         )
-        config_dict = building_service.BUILDING_CONFIGS[BuildingType.TELEPORT_ARRAY]
-        effects = config_dict["effects"][teleport_building.level]
+        effects = building_service.get_effects_for_level(BuildingType.TELEPORT_ARRAY, teleport_building.level)
         teleport_range = effects["teleport_range"]
         daily_uses = effects["daily_uses"]
 
@@ -394,8 +393,7 @@ class GuildFacilityService:
         building_service = GuildBuildingServiceNew(
             self._guild_repo, self._building_repo, self._item_repo
         )
-        config_dict = building_service.BUILDING_CONFIGS[BuildingType.ALCHEMY_ROOM]
-        effects = config_dict["effects"][alchemy_building.level]
+        effects = building_service.get_effects_for_level(BuildingType.ALCHEMY_ROOM, alchemy_building.level)
         daily_production = effects["daily_production"]
 
         # 存储上限 = 日产量 * 倍数
@@ -465,8 +463,7 @@ class GuildFacilityService:
         building_service = GuildBuildingServiceNew(
             self._guild_repo, self._building_repo, self._item_repo
         )
-        config_dict = building_service.BUILDING_CONFIGS[BuildingType.ALCHEMY_ROOM]
-        effects = config_dict["effects"][alchemy_building.level]
+        effects = building_service.get_effects_for_level(BuildingType.ALCHEMY_ROOM, alchemy_building.level)
         daily_production = effects["daily_production"]
         pill_quality = effects["pill_quality"]
 
@@ -537,8 +534,7 @@ class GuildFacilityService:
         building_service = GuildBuildingServiceNew(
             self._guild_repo, self._building_repo, self._item_repo
         )
-        config_dict = building_service.BUILDING_CONFIGS[BuildingType.GUILD_WAREHOUSE]
-        effects = config_dict["effects"][warehouse_building.level]
+        effects = building_service.get_effects_for_level(BuildingType.GUILD_WAREHOUSE, warehouse_building.level)
         return effects["storage_slots"]
 
     async def get_warehouse_items(self, guild_id: int) -> List[Dict]:
