@@ -8,7 +8,7 @@ from ..models.db import safe_session
 from ..models.market_order import MarketOrder, OrderSide
 from ..models.trade_record import TradeRecord, TradeType
 from ..models.player import Player
-from ..models.inventory import ItemInstance
+from ..models.inventory import ItemInstance, ItemType
 from ..config import config
 from ..utils import message_add_head
 from ..utils_markdown import cmd, build_markdown
@@ -313,6 +313,10 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
     item_cfg = config.items_config["by_name"].get(item_name)
     if not item_cfg:
         await list_cmd.finish(f"⛔ 不存在物品：{item_name}")
+
+    # 禁止挂牌跑商商品
+    if item_cfg.type == ItemType.GOODS:
+        await list_cmd.finish("⛔ 跑商商品不能在市场挂牌，请前往市集交易")
 
     # VIP定制装备禁止交易
     VIP_EQUIPMENT_IDS = {"vip_blade_zhanlongshan", "vip_robe_jingyuanzhiyi", "heaven_retreat_star_blade", "vip_gui_yu", "vip_chrono_watch", "vip_longying_flash", "vip_ghost_dice", "vip_shoes_longren"}

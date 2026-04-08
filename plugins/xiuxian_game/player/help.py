@@ -227,8 +227,11 @@ async def handle_economy_module(event: MessageEvent, args: Message = CommandArg(
         "**🏛️ 拍卖行**\n"
         f"{cmd('拍卖行')} 查看拍卖 | {cmd('出价 拍卖ID 金额', '出价 ')} 竞价\n"
         "***\n"
+        "**🏪 个人摊位(自由定价)**\n"
+        f"{cmd('摆摊')} 在城镇开摊 | {cmd('逛摊')} 浏览 | {cmd('搜摊 物品名', '搜摊 ')} 全服搜索\n"
+        "***\n"
         f"> 💡 新手赚钱：{cmd('打工')}(稳) → {cmd('跑商推荐', '跑商推荐')}(中) → {cmd('投资行情', '投资行情')}(险)\n"
-        f"> {cmd('经济系统')} | {cmd('投资系统')} | {cmd('拍卖行系统')} | {cmd('烹饪系统')} | {cmd('帮助', '帮助')} 返回"
+        f"> {cmd('经济系统')} | {cmd('投资系统')} | {cmd('拍卖行系统')} | {cmd('摊位系统')} | {cmd('烹饪系统')} | {cmd('帮助', '帮助')} 返回"
     )
     await economy_module_cmd.finish(build_markdown(content))
 
@@ -1168,6 +1171,50 @@ async def handle_auction_help(event: MessageEvent, args: Message = CommandArg())
         f"> {cmd('帮助', '帮助')} 返回主菜单"
     )
     await auction_help_cmd.finish(build_markdown(content))
+
+# 摊位系统
+stall_help_cmd = on_command("摊位系统", aliases={"摊位帮助", "摆摊帮助"}, block=True, priority=4)
+
+@stall_help_cmd.handle()
+async def handle_stall_help(event: MessageEvent, args: Message = CommandArg()):
+    content = (
+        "# 个人摊位系统\n"
+        "自由定价，即买即走，你的地盘你做主\n"
+        "***\n"
+        "**🏪 开摊/收摊**\n"
+        f"{cmd('摆摊')} 在当前城镇开摊（消耗摊位令，持续24h）\n"
+        f"{cmd('收摊')} 手动收摊，未售物品退回背包\n"
+        f"{cmd('我的摊位')} 查看摊位状态和商品\n"
+        "***\n"
+        "**📦 上架/下架**\n"
+        f"{cmd('上摊 物品名 单价 数量', '上摊 ')} 上架物品（自由定价）\n"
+        f"{cmd('下摊 序号', '下摊 ')} 下架商品\n"
+        "***\n"
+        "**🛍️ 逛摊/购买**\n"
+        f"{cmd('逛摊')} 浏览当前城镇摊位\n"
+        f"{cmd('逛摊 城镇名', '逛摊 ')} 浏览指定城镇\n"
+        f"{cmd('搜摊 物品名', '搜摊 ')} 全服搜索物品（按价格排序）\n"
+        f"{cmd('摊位 UID', '摊位 ')} 查看某人摊位\n"
+        f"{cmd('买摊 摊主UID 序号 数量', '买摊 ')} 购买\n"
+        "***\n"
+        "**✏️ 摊位装饰**\n"
+        f"{cmd('摊位名 名字', '摊位名 ')} 自定义摊位名（最多16字）\n"
+        f"{cmd('吆喝 一句话', '吆喝 ')} 设置吆喝语（最多32字）\n"
+        "***\n"
+        "**💰 税率说明**\n"
+        "基础税率：成交额×3%\n"
+        "溢价附加税：超系统估价5倍+15%，超20倍+30%\n"
+        "***\n"
+        "**📋 规则**\n"
+        "• 必须在城镇安全区开摊\n"
+        "• 消耗1张摊位令，持续24小时\n"
+        f"• 基础5格 | 基础月卡+2格 | 高级月卡+5格\n"
+        "• 跑商商品不可上摊\n"
+        "• 到期自动收摊，物品退回背包\n"
+        "***\n"
+        f"> {cmd('经济市场')} 更多交易方式 | {cmd('帮助', '帮助')} 返回"
+    )
+    await stall_help_cmd.finish(build_markdown(content))
 
 # 公会系统
 guild_help_cmd = on_command("公会系统", aliases={"公会帮助"}, priority=4, block=True)

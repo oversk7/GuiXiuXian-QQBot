@@ -118,6 +118,10 @@ class UnitOfWork:
         self._auction_items = None
         self._auction_bid_histories = None
 
+        # 摊位系统仓储
+        self._player_stalls = None
+        self._stall_items = None
+
         # 宠物伴侣系统仓储
         self._pets = None
         self._pet_dialogue_histories = None
@@ -441,6 +445,22 @@ class UnitOfWork:
             from ..repositories.auction_repository import AuctionBidHistoryRepository
             self._auction_bid_histories = AuctionBidHistoryRepository(self._session)
         return self._auction_bid_histories
+
+    @property
+    def player_stalls(self):
+        """摊位仓储"""
+        if self._player_stalls is None:
+            from ..repositories.stall_repository import PlayerStallRepository
+            self._player_stalls = PlayerStallRepository(self._session)
+        return self._player_stalls
+
+    @property
+    def stall_items(self):
+        """摊位商品仓储"""
+        if self._stall_items is None:
+            from ..repositories.stall_repository import StallItemRepository
+            self._stall_items = StallItemRepository(self._session)
+        return self._stall_items
 
     @property
     def pets(self):
