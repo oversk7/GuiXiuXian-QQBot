@@ -51,7 +51,7 @@ items:
       name: "摊位令"
       description: "允许在城镇开设个人摊位24小时。使用方法：前往城镇后发送【摆摊】"
       type: "CONSUMABLE"
-      effect_type: "SPECIAL"
+      effect_type: "CHANGE_NAME"
       price: 5000
       rarity: "green"
       no_drop: true
