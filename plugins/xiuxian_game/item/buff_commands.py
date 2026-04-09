@@ -213,9 +213,6 @@ async def handle_attribute_breakdown(event: MessageEvent):
         lines.append("💡 总属性 = 基础 + 装备 + 永久 + 特殊 + 伙伴 + 临时")
         if has_pet:
             lines.append("💡 伙伴加成随心情波动，喂食/互动可提升心情")
-        if not is_tracked:
-            lines.append("💡 使用【洗点】后重新加点可获得更精确的分解")
-
         lines.append(f"***")
         lines.append(f"{cmd('面板')} | {cmd('增益状态')} | {cmd('战力')}")
         await attribute_breakdown_cmd.finish(build_markdown("\n".join(lines)))
