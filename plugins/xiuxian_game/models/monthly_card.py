@@ -1,3 +1,5 @@
+import math
+
 from sqlalchemy import String, Integer, DateTime, ForeignKey, Enum as SQLEnum
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from .db import Base
@@ -34,10 +36,13 @@ class MonthlyCard(Base):
     
     @property
     def remaining_days(self) -> int:
-        """剩余天数"""
+        """剩余天数（不满一天按一天算）"""
         if not self.is_active:
             return 0
-        return max(0, (self.end_time - datetime.now()).days)
+        total_seconds = (self.end_time - datetime.now()).total_seconds()
+        if total_seconds <= 0:
+            return 0
+        return math.ceil(total_seconds / 86400)
     
     @classmethod
     async def get_active_card(cls, session, player_id: str, card_type: CardType = None):

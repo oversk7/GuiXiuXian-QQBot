@@ -11,6 +11,7 @@ from ..models.monthly_card import MonthlyCard, CardType, get_player_card_benefit
 from ..utils import message_add_head
 from ..config import config
 from ..platform_utils import get_unified_player
+import math
 
 
 # ==================== 管理员指令：添加月卡 ====================
@@ -108,7 +109,7 @@ async def handle_check_monthly_card(event: MessageEvent):
                     try:
                         end_time = datetime.fromisoformat(until_str)
                         if end_time > datetime.now():
-                            remaining = (end_time - datetime.now()).days
+                            remaining = math.ceil((end_time - datetime.now()).total_seconds() / 86400)
                             active_privs.append(f"🔮 {name} - 剩余{remaining}天（{end_time.strftime('%m-%d')}到期）")
                     except (ValueError, TypeError):
                         pass
@@ -181,7 +182,7 @@ async def handle_check_monthly_card(event: MessageEvent):
                 try:
                     end_time = datetime.fromisoformat(until_str)
                     if end_time > datetime.now():
-                        remaining = (end_time - datetime.now()).days
+                        remaining = math.ceil((end_time - datetime.now()).total_seconds() / 86400)
                         active_privileges.append(f"🔮 {name} - 剩余{remaining}天（{end_time.strftime('%m-%d')}到期）")
                 except (ValueError, TypeError):
                     pass
