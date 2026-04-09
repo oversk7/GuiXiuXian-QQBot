@@ -43,6 +43,26 @@ class MonthlyCard(Base):
         if total_seconds <= 0:
             return 0
         return math.ceil(total_seconds / 86400)
+
+    @property
+    def remaining_text(self) -> str:
+        """剩余时间的精确文本，如 '29天23小时58分'"""
+        if not self.is_active:
+            return "已过期"
+        delta = self.end_time - datetime.now()
+        total_seconds = int(delta.total_seconds())
+        if total_seconds <= 0:
+            return "已过期"
+        days, remainder = divmod(total_seconds, 86400)
+        hours, remainder = divmod(remainder, 3600)
+        minutes = remainder // 60
+        parts = []
+        if days > 0:
+            parts.append(f"{days}天")
+        if hours > 0:
+            parts.append(f"{hours}小时")
+        parts.append(f"{minutes}分钟")
+        return "".join(parts)
     
     @classmethod
     async def get_active_card(cls, session, player_id: str, card_type: CardType = None):

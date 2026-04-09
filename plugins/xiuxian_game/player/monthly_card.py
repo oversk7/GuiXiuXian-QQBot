@@ -11,7 +11,24 @@ from ..models.monthly_card import MonthlyCard, CardType, get_player_card_benefit
 from ..utils import message_add_head
 from ..config import config
 from ..platform_utils import get_unified_player
-import math
+from datetime import datetime
+
+
+def _format_remaining(end_time: datetime) -> str:
+    """格式化剩余时间，精确到分钟"""
+    total_seconds = int((end_time - datetime.now()).total_seconds())
+    if total_seconds <= 0:
+        return "已过期"
+    days, remainder = divmod(total_seconds, 86400)
+    hours, remainder = divmod(remainder, 3600)
+    minutes = remainder // 60
+    parts = []
+    if days > 0:
+        parts.append(f"{days}天")
+    if hours > 0:
+        parts.append(f"{hours}小时")
+    parts.append(f"{minutes}分钟")
+    return "".join(parts)
 
 
 # ==================== 管理员指令：添加月卡 ====================
@@ -93,7 +110,6 @@ async def handle_check_monthly_card(event: MessageEvent):
         if not active_cards:
             # 没有月卡，但可能有诡烛特权
             from ..sponsor.service import SponsorShopService
-            from datetime import datetime
             privilege_list = [
                 ("premium_seclusion_until", "闭关无上限"),
                 ("premium_warehouse_until", "远程仓库"),
@@ -109,8 +125,7 @@ async def handle_check_monthly_card(event: MessageEvent):
                     try:
                         end_time = datetime.fromisoformat(until_str)
                         if end_time > datetime.now():
-                            remaining = math.ceil((end_time - datetime.now()).total_seconds() / 86400)
-                            active_privs.append(f"🔮 {name} - 剩余{remaining}天（{end_time.strftime('%m-%d')}到期）")
+                            active_privs.append(f"🔮 {name} - 剩余{_format_remaining(end_time)}（{end_time.strftime('%m-%d')}到期）")
                     except (ValueError, TypeError):
                         pass
             if active_privs:
@@ -129,8 +144,7 @@ async def handle_check_monthly_card(event: MessageEvent):
         # 显示每张月卡
         for card in active_cards:
             card_name = card_config[card.card_type]["name"]
-            remaining = card.remaining_days
-            msg_lines.append(f"✨ {card_name} - 剩余{remaining}天")
+            msg_lines.append(f"✨ {card_name} - 剩余{card.remaining_text}")
         
         msg_lines.append("━━━━━━━━━━━━━")
         msg_lines.append("🎁 当前权益：")
@@ -167,7 +181,6 @@ async def handle_check_monthly_card(event: MessageEvent):
 
         # 显示诡烛特权到期时间
         from ..sponsor.service import SponsorShopService
-        from datetime import datetime
         privilege_list = [
             ("premium_seclusion_until", "闭关无上限"),
             ("premium_warehouse_until", "远程仓库"),
@@ -182,8 +195,7 @@ async def handle_check_monthly_card(event: MessageEvent):
                 try:
                     end_time = datetime.fromisoformat(until_str)
                     if end_time > datetime.now():
-                        remaining = math.ceil((end_time - datetime.now()).total_seconds() / 86400)
-                        active_privileges.append(f"🔮 {name} - 剩余{remaining}天（{end_time.strftime('%m-%d')}到期）")
+                        active_privileges.append(f"🔮 {name} - 剩余{_format_remaining(end_time)}（{end_time.strftime('%m-%d')}到期）")
                 except (ValueError, TypeError):
                     pass
 
@@ -243,8 +255,7 @@ async def handle_admin_check_card(event: MessageEvent, args: Message = CommandAr
             status = "✅有效" if card.is_active else "❌过期"
             if card.is_active:
                 active_count += 1
-                remaining = card.remaining_days
-                msg_lines.append(f"{status} {card_name} - 剩余{remaining}天")
+                msg_lines.append(f"{status} {card_name} - 剩余{card.remaining_text}")
             else:
                 msg_lines.append(f"{status} {card_name} - {card.end_time.strftime('%Y-%m-%d')}到期")
         
