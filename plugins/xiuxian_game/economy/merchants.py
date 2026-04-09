@@ -640,18 +640,24 @@ TRADE_TAX_BRACKETS = [
 ]
 
 
-async def _calculate_trade_tax(session, player_id: str, revenue: int) -> tuple[float, int]:
+async def _calculate_trade_tax(session, player_id: str, revenue: int,
+                               daily_revenue_override: int | None = None) -> tuple[float, int]:
     """根据当日累计跑商收入计算本笔交易的税额
 
     Args:
         session: 数据库会话
         player_id: 玩家ID
         revenue: 本次交易收入
+        daily_revenue_override: 预查询的当日累计收入（用于批量出售场景，
+            避免 flush 后重查导致税率虚高）
 
     Returns:
         (适用税率, 税额)
     """
-    daily_revenue = await TradeRecord.get_daily_cross_market_revenue(session, player_id)
+    if daily_revenue_override is not None:
+        daily_revenue = daily_revenue_override
+    else:
+        daily_revenue = await TradeRecord.get_daily_cross_market_revenue(session, player_id)
 
     # 根据累计日收入确定税率档位
     tax_rate = 0.0
@@ -1221,6 +1227,9 @@ async def _(event: MessageEvent):
                 "***\n"
                 f"{cmd('市集')} | {cmd('市集列表')} | {cmd('跑商推荐')}"))
 
+        # 在循环前快照当日已有跨市场收入，避免 flush 后重查导致税率虚高
+        daily_revenue_snapshot = await TradeRecord.get_daily_cross_market_revenue(session, player.id)
+
         # 计算总收益、多元奖励和跑商税
         total_gain = 0
         total_bonus = 0
@@ -1308,8 +1317,11 @@ async def _(event: MessageEvent):
             await auto_sell_cmd.finish(build_markdown(
                 f"# 出售失败\n***\n没有成功出售任何商品\n***\n{cmd('市集')} | {cmd('跑商推荐')}"))
 
-        # 计算跑商税（基于总收入）
-        tax_rate, tax_amount = await _calculate_trade_tax(session, player.id, total_gain)
+        # 计算跑商税（基于总收入，使用循环前的日收入快照避免多算）
+        tax_rate, tax_amount = await _calculate_trade_tax(
+            session, player.id, total_gain,
+            daily_revenue_override=daily_revenue_snapshot
+        )
 
         # 更新玩家金币
         net_gain = total_gain + total_bonus - tax_amount
