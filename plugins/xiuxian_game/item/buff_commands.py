@@ -115,11 +115,10 @@ async def handle_attribute_breakdown(event: MessageEvent):
             "anti_crit_rate": "抗暴率"
         }
 
-        is_tracked = player.allocated_attrs is not None
         lines = [
             f"📊 {player.nickname} 的属性分解",
             "━━━━━━━━━━━━━",
-            "💡 基础 = 初始值 + 加点分配"
+            "💡 基础 = 初始值 + 加点 | 永久 = 丹药加成"
         ]
 
         # 显示主要属性的分解

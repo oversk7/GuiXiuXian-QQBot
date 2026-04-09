@@ -250,13 +250,13 @@ class Player(Base):
     max_apprentice_slots: Mapped[int] = mapped_column(Integer, default=3, server_default='3', comment="最大徒弟位")
     mentor_cooldown_until: Mapped[datetime | None] = mapped_column(DateTime, nullable=True, comment="师徒操作冷却结束时间")
 
-    # 加点分配追踪: {"max_hp": 30, "attack": 15, ...} 记录每个属性从加点获得的增量
-    # None = 未初始化（需要迁移）；{} = 已初始化但无分配（洗点后）
+    # [已废弃] 加点分配追踪 - 永久加成已改为从 ElixirUsageLog 精确累加，
+    # 加点部分通过残差推导，此字段不再使用。保留列定义避免迁移问题。
     allocated_attrs: Mapped[dict | None] = mapped_column(
         MutableDict.as_mutable(JSON),
         nullable=True,
         default=None,
-        comment="加点分配追踪JSON(各属性从加点获得的增量)"
+        comment="[废弃] 加点分配追踪JSON - 已改用ElixirUsageLog"
     )
 
     # 扩展数据(活动、特殊系统等)
@@ -409,24 +409,24 @@ class Player(Base):
 
         返回格式：
         {
-            "base": {...},         # 基础属性（初始值 + 加点）
+            "base": {...},         # 基础属性（初始值 + 加点，残差推导）
             "equipment": {...},    # 装备加成
-            "permanent": {...},    # 永久加成（丹药+洗髓合计）
+            "permanent": {...},    # 永久加成（从 ElixirUsageLog 精确累加）
             "vip_equipment": {...},# VIP装备永久加成
             "pet": {...},          # 宠物伙伴加成
             "temporary": {...},    # 临时buff加成
             "total": {...}         # 最终有效属性
         }
 
-        当 allocated_attrs 已追踪时，base = 初始值 + allocated_attrs（精确）。
-        当 allocated_attrs 为 None（未迁移）时，使用旧版反推计算并进行一次性初始化。
+        permanent 从 ElixirUsageLog 获取（source of truth），
+        base = 存储值 - permanent - equipment - vip（残差，包含 INIT + 加点）。
         """
         from ..config import config as gcfg
         from sqlalchemy import select
 
         INIT = self.INIT_ATTRS
 
-        # ---- 装备加成（始终精确：直接读取 _persist_bonus）----
+        # ---- 装备加成（精确：直接读取 _persist_bonus）----
         equipment_bonus = {k: 0 for k in INIT}
         if session:
             from ..models.inventory import ItemInstance
@@ -440,7 +440,7 @@ class Player(Base):
                     if k in equipment_bonus:
                         equipment_bonus[k] += int(v)
 
-        # ---- VIP装备永久加成（始终精确）----
+        # ---- VIP装备永久加成（精确）----
         vip_equipment_bonus = {k: 0 for k in INIT}
         if session:
             from .vip_equipment_bonus import VIPEquipmentBonus
@@ -451,7 +451,7 @@ class Player(Base):
                     if attr in vip_equipment_bonus:
                         vip_equipment_bonus[attr] = int(value)
 
-        # ---- 临时buff加成（始终精确）----
+        # ---- 临时buff加成（精确）----
         temporary_bonus = {k: 0 for k in INIT}
         if session:
             from .temporary_buff import TemporaryBuff
@@ -460,7 +460,7 @@ class Player(Base):
                 if attr in temporary_bonus:
                     temporary_bonus[attr] = bonus
 
-        # ---- 宠物加成（始终精确）----
+        # ---- 宠物加成（精确）----
         pet_bonus_dict = {k: 0 for k in INIT}
         if session:
             from ..domain.attributes.attribute_calculator_factory import AttributeCalculatorFactory
@@ -472,55 +472,20 @@ class Player(Base):
                     if attr_key in pet_bonus_dict:
                         pet_bonus_dict[attr_key] = val
 
-        # ---- 基础属性 & 永久加成 ----
-        allocated = self.allocated_attrs
+        # ---- 永久加成（从 ElixirUsageLog 精确累加）----
+        permanent_bonus = {k: 0 for k in INIT}
+        if session:
+            from .elixir_usage import ElixirUsageLog
+            permanent_total = await ElixirUsageLog.get_total_attribute_changes(session, self.id)
+            for attr, value in permanent_total.items():
+                if attr in permanent_bonus:
+                    permanent_bonus[attr] = value
 
-        if allocated is not None:
-            # ★ 已追踪：base 从 allocated_attrs 正向计算（精确）
-            base_attrs = {attr: INIT[attr] + allocated.get(attr, 0) for attr in INIT}
-            # 永久加成 = 残差（自动包含 BUFF + BUFF_PERCENT - REFORGE）
-            permanent_bonus = {}
-            for attr in INIT:
-                current = getattr(self, attr, INIT[attr])
-                permanent_bonus[attr] = current - base_attrs[attr] - equipment_bonus[attr] - vip_equipment_bonus[attr]
-        else:
-            # ★ 未追踪（旧玩家一次性迁移）：用旧方法反推 + 惰性初始化
-            from ..models.elixir_usage import ElixirUsageLog
-
-            # 从 ElixirUsageLog 重建已知的 BUFF 类丹药加成
-            elixir_known = {k: 0 for k in INIT}
-            if session:
-                stmt = select(ElixirUsageLog).where(ElixirUsageLog.player_id == self.id)
-                logs = (await session.execute(stmt)).scalars().all()
-                usage_total = {}
-                for log in logs:
-                    usage_total[log.item_id] = usage_total.get(log.item_id, 0) + log.quantity
-                for item_id, total_qty in usage_total.items():
-                    item_cfg = gcfg.items_config["by_id"].get(item_id)
-                    if not item_cfg:
-                        continue
-                    if item_cfg.effect_type.value == "BUFF":
-                        for attr, value in (item_cfg.effect_params or {}).items():
-                            if attr in elixir_known:
-                                elixir_known[attr] += int(value) * total_qty
-
-            # 反推基础 = 存储值 - 装备 - 已知丹药 - VIP
-            base_attrs = {}
-            permanent_bonus = {}
-            init_alloc = {}
-            for attr in INIT:
-                current = getattr(self, attr, INIT[attr])
-                raw_base = current - equipment_bonus[attr] - elixir_known[attr] - vip_equipment_bonus[attr]
-                alloc_est = max(0, raw_base - INIT[attr])
-                base_attrs[attr] = INIT[attr] + alloc_est
-                # 永久加成 = 存储值 - base - 装备 - VIP（自动包含 BUFF + BUFF_PERCENT - REFORGE）
-                permanent_bonus[attr] = current - base_attrs[attr] - equipment_bonus[attr] - vip_equipment_bonus[attr]
-                if alloc_est > 0:
-                    init_alloc[attr] = alloc_est
-
-            # 惰性初始化：保存估算的加点分配，后续使用精确追踪路径
-            if session:
-                self.allocated_attrs = init_alloc if init_alloc else {}
+        # ---- 基础属性（残差 = 存储值 - permanent - equipment - vip）----
+        base_attrs = {}
+        for attr in INIT:
+            current = getattr(self, attr, INIT[attr])
+            base_attrs[attr] = current - permanent_bonus[attr] - equipment_bonus[attr] - vip_equipment_bonus[attr]
 
         # ---- 计算最终属性 ----
         total_attrs = {}

@@ -64,7 +64,8 @@ async def apply_effect(player: Player, item_cfg: ItemConfig, quantity: int = 1, 
     return await handler(player, item_cfg, quantity, ctx, session)
 
 
-async def update_elixir_usage(session, player: Player, item_cfg: ItemConfig, quantity: int = 1):
+async def update_elixir_usage(session, player: Player, item_cfg: ItemConfig, quantity: int = 1,
+                              attribute_changes: dict | None = None):
     """更新丹药使用记录
 
     Args:
@@ -72,11 +73,14 @@ async def update_elixir_usage(session, player: Player, item_cfg: ItemConfig, qua
         player: 玩家对象
         item_cfg: 物品配置
         quantity: 使用数量
+        attribute_changes: 本次实际属性变动 {"attack": 10, "max_hp": -30, ...}
     """
     # 只有丹药才需要记录使用量
     if item_cfg.item_id.endswith("_elixir"):
         log = await ElixirUsageLog.get_or_create_log(session, player.id, item_cfg.item_id)
         log.quantity += quantity
+        if attribute_changes:
+            log.record_changes(attribute_changes)
 
 
 # ---------------- 具体效果实现 ----------------
@@ -207,13 +211,15 @@ async def _buff(player: Player, cfg: ItemConfig, qty: int, ctx: str, session=Non
     }
 
     changed = []
+    actual_changes = {}
     for k, v in attrs.items():
         if not hasattr(player, k):
             continue
+        delta = int(v) * qty
         old = getattr(player, k)
-        new_val = old + int(v) * qty
-        setattr(player, k, new_val)
-        changed.append(f"{ATTRIBUTE_MAP.get(k, k)}+{int(v)*qty}")
+        setattr(player, k, old + delta)
+        actual_changes[k] = delta
+        changed.append(f"{ATTRIBUTE_MAP.get(k, k)}+{delta}")
 
     # 属性发生变化后重新计算装备加成，确保百分比加成基于最新基础值
     if session:
@@ -227,7 +233,7 @@ async def _buff(player: Player, cfg: ItemConfig, qty: int, ctx: str, session=Non
 
     # 更新使用记录
     if session:
-        await update_elixir_usage(session, player, cfg, qty)
+        await update_elixir_usage(session, player, cfg, qty, attribute_changes=actual_changes)
 
     if not changed:
         return False, "⛔ 增益属性无效"
@@ -386,6 +392,7 @@ async def _buff_percent(player: Player, cfg: ItemConfig, qty: int, ctx: str, ses
     }
 
     changed = []
+    actual_changes = {}
     for k, v in attrs.items():
         if k.endswith("_pct") and hasattr(player, k.replace("_pct", "")):
             attr_name = k.replace("_pct", "")
@@ -397,6 +404,7 @@ async def _buff_percent(player: Player, cfg: ItemConfig, qty: int, ctx: str, ses
                 increase = 1  # 至少增加1点
             new_value = old_value + increase
             setattr(player, attr_name, new_value)
+            actual_changes[attr_name] = increase
             changed.append(f"{ATTRIBUTE_MAP.get(attr_name, attr_name)}+{increase}({int(float(v)*qty)}%)")
 
     # 属性发生变化后重新计算装备加成
@@ -409,7 +417,7 @@ async def _buff_percent(player: Player, cfg: ItemConfig, qty: int, ctx: str, ses
         player.mp = player.max_mp
 
     # 更新使用记录
-    await update_elixir_usage(session, player, cfg, qty)
+    await update_elixir_usage(session, player, cfg, qty, attribute_changes=actual_changes)
 
     if not changed:
         return False, "⛔ 增益属性无效"
@@ -594,24 +602,13 @@ async def _reforge_attr(player: Player, cfg: ItemConfig, qty: int, ctx: str, ses
         return False, f"⛔ {attr_name}基础值不足，无法洗髓"
 
     # ---- 保护加点投入：洗髓只允许在永久丹药加成范围内 ----
-    if player.allocated_attrs is None and session:
-        await player.get_attribute_breakdown(session)
-
-    INIT = Player.INIT_ATTRS
-    init_val = INIT.get(source_attr, 0)
-    alloc_val = (player.allocated_attrs or {}).get(source_attr, 0)
-
-    # 获取VIP加成
-    vip_val = 0
+    # 从 ElixirUsageLog 精确获取永久加成，可洗部分 = 丹药永久加成
+    permanent_val = 0
     if session:
-        from ..models.vip_equipment_bonus import VIPEquipmentBonus
-        stmt_vip = select(VIPEquipmentBonus).where(VIPEquipmentBonus.player_id == player.id)
-        vip_record = (await session.execute(stmt_vip)).scalars().first()
-        if vip_record:
-            vip_val = int(vip_record.get_total_bonus().get(source_attr, 0))
+        permanent_total = await ElixirUsageLog.get_total_attribute_changes(session, player.id)
+        permanent_val = permanent_total.get(source_attr, 0)
 
-    # 可洗部分 = 不含装备的值 - 初始值 - 加点分配 - VIP加成
-    washable = base_value_int - init_val - alloc_val - vip_val
+    washable = max(0, permanent_val)
     if washable <= 0:
         return False, (
             f"⛔ {attr_name}的永久加成已用尽，无法继续洗髓\n"
@@ -683,8 +680,9 @@ async def _reforge_attr(player: Player, cfg: ItemConfig, qty: int, ctx: str, ses
     # 重新计算装备加成
     await _recalculate_equipment_bonus(session, player)
 
-    # 更新使用记录
-    await update_elixir_usage(session, player, cfg, qty)
+    # 更新使用记录（洗髓记录为负值）
+    await update_elixir_usage(session, player, cfg, qty,
+                              attribute_changes={source_attr: -convert_amount})
 
     return True, (
         f"🔄 洗髓成功！\n"
@@ -735,21 +733,12 @@ async def _reforge_multi_attr(player: Player, cfg: ItemConfig, qty: int, ctx: st
         else {}
     )
 
-    # 确保 allocated_attrs 已初始化（保护加点投入）
-    if player.allocated_attrs is None:
-        await player.get_attribute_breakdown(session)
-    INIT = Player.INIT_ATTRS
-
-    # 获取VIP加成
-    vip_bonus_map = {}
-    from ..models.vip_equipment_bonus import VIPEquipmentBonus
-    stmt_vip = select(VIPEquipmentBonus).where(VIPEquipmentBonus.player_id == player.id)
-    vip_record = (await session.execute(stmt_vip)).scalars().first()
-    if vip_record:
-        vip_bonus_map = {k: int(v) for k, v in vip_record.get_total_bonus().items()}
+    # 从 ElixirUsageLog 精确获取永久加成，可洗部分 = 丹药永久加成
+    permanent_map = await ElixirUsageLog.get_total_attribute_changes(session, player.id)
 
     total_points = 0
     result_lines = []
+    multi_actual_changes = {}
 
     for source_cfg in sources:
         source_attr = source_cfg.get("source_attr")
@@ -779,10 +768,7 @@ async def _reforge_multi_attr(player: Player, cfg: ItemConfig, qty: int, ctx: st
             continue
 
         # 保护加点投入：只能洗永久丹药加成部分
-        init_val = INIT.get(source_attr, 0)
-        alloc_val = (player.allocated_attrs or {}).get(source_attr, 0)
-        vip_val = vip_bonus_map.get(source_attr, 0)
-        washable = base_value_int - init_val - alloc_val - vip_val
+        washable = max(0, permanent_map.get(source_attr, 0))
         if washable <= 0:
             result_lines.append(f"⚠️ {attr_name}永久加成已用尽，跳过")
             continue
@@ -831,6 +817,7 @@ async def _reforge_multi_attr(player: Player, cfg: ItemConfig, qty: int, ctx: st
 
         setattr(player, source_attr, current_value - convert_amount)
         total_points += points_gain
+        multi_actual_changes[source_attr] = multi_actual_changes.get(source_attr, 0) - convert_amount
 
         if source_attr == "max_hp" and player.hp > player.max_hp:
             player.hp = player.max_hp
@@ -844,7 +831,7 @@ async def _reforge_multi_attr(player: Player, cfg: ItemConfig, qty: int, ctx: st
 
     player.attribute_points += total_points
     await _recalculate_equipment_bonus(session, player)
-    await update_elixir_usage(session, player, cfg, qty)
+    await update_elixir_usage(session, player, cfg, qty, attribute_changes=multi_actual_changes)
 
     detail = "\n".join(result_lines)
     return True, (

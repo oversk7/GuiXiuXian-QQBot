@@ -23,6 +23,9 @@ logger = logging.getLogger(__name__)
 # 定义需要自动添加的字段
 # 格式: {表名: {字段名: 字段定义}}
 REQUIRED_FIELDS: Dict[str, Dict[str, str]] = {
+    "elixir_usage_log": {
+        "attribute_changes": "JSON DEFAULT ('{}') COMMENT '累计实际属性变动JSON'",
+    },
     # 添加新字段时在此处定义，重启 bot 后自动迁移，迁移完成后移入下方注释
     #
     # 已完成迁移的字段（勿删除注释，留作记录）:

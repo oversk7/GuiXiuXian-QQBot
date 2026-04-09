@@ -1280,10 +1280,6 @@ async def handle_assign(event: MessageEvent, args: Message = CommandArg()):
         attr_field = ATTRIBUTE_MAP[attr_name]
         inc_val = points * cfg["attributes_base"][attr_field]
 
-        # -------- 确保 allocated_attrs 已初始化（旧玩家一次性迁移）--------
-        if player.allocated_attrs is None:
-            await player.get_attribute_breakdown(session)
-
         # 记录分配前是否满血满蓝（仅在分配体/智属性时需要）
         was_hp_full = player.hp >= player.max_hp
         was_mp_full = player.mp >= player.max_mp
@@ -1314,11 +1310,6 @@ async def handle_assign(event: MessageEvent, args: Message = CommandArg()):
         # -------- 更新基础属性 --------
         setattr(player, attr_field, getattr(player, attr_field) + inc_val)
         player.attribute_points -= points
-
-        # -------- 追踪加点分配 --------
-        alloc = dict(player.allocated_attrs or {})
-        alloc[attr_field] = alloc.get(attr_field, 0) + inc_val
-        player.allocated_attrs = alloc
 
         # -------- 重新计算装备 bonus 根据新基础 --------
         base_attrs_snapshot = {
@@ -1505,9 +1496,6 @@ async def handle_free_reset_points(event: MessageEvent):
         from .reincarnation_service_new import ReincarnationService
         pts_per_lvl = ReincarnationService.get_attribute_points_per_level(player.reincarnation_level)
         player.attribute_points = (player.level - 1) * pts_per_lvl
-
-        # 清零加点追踪（洗点后重新分配时从零开始精确追踪）
-        player.allocated_attrs = {}
 
         # 重新计算装备加成（基于新的基础属性）
         # 获取所有已装备的装备
