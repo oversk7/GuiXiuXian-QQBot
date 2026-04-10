@@ -77,10 +77,10 @@ class LadderRating(Base):
     daily_first_win_claimed: Mapped[bool] = mapped_column(
         Boolean, default=False, server_default="0", comment="今日首胜奖励是否已领"
     )
-    daily_shop_purchases: Mapped[dict] = mapped_column(
+    daily_shop_purchases: Mapped[dict | None] = mapped_column(
         MutableDict.as_mutable(JSON),
         default=dict,
-        server_default='{}',
+        nullable=True,
         comment="今日商店购买计数 {item_name: count}"
     )
 
