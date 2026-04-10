@@ -185,6 +185,10 @@ async def handle_battle_module(event: MessageEvent, args: Message = CommandArg()
         "**🤝 PVP - 对战**\n"
         f"{cmd('切磋 UID', '切磋 ')} 友好切磋(无损失) | {cmd('攻击 UID', '攻击 ')} 真实战斗(荒野/诡域)\n"
         "***\n"
+        "**🏆 斗法天梯(残魂对决·肉身不损)**\n"
+        f"{cmd('斗法天梯')} 主页 | {cmd('斗法天梯 匹配', '斗法天梯 匹配')} 入场斗法\n"
+        f"{cmd('斗法天梯 排行', '斗法天梯 排行')} 凶名榜 | {cmd('斗法商店')} 魂晶商店\n"
+        "***\n"
         "**🌟 世界BOSS**\n"
         f"{cmd('世界BOSS')} 查看信息 | {cmd('讨伐BOSS')} 攻击(每日3次) | {cmd('BOSS排行')} 排行\n"
         "***\n"
@@ -192,7 +196,7 @@ async def handle_battle_module(event: MessageEvent, args: Message = CommandArg()
         f"{cmd('战力')} 完整属性 | {cmd('战力说明')} 属性作用 | {cmd('死斗日志')} 战斗记录\n"
         "***\n"
         f"> 💡 装备和丹药是提升战力的关键\n"
-        f"> {cmd('战斗系统')} 详细说明 | {cmd('帮助', '帮助')} 返回"
+        f"> {cmd('战斗系统')} | {cmd('斗法天梯帮助')} | {cmd('帮助', '帮助')} 返回"
     )
     await battle_module_cmd.finish(build_markdown(content))
 
@@ -589,6 +593,10 @@ async def handle_battle(event: MessageEvent, args: Message = CommandArg()):
         "城镇安全区: 只能友好切磋\n"
         "荒野/诡域: 真实死斗，死亡掉落\n"
         "***\n"
+        "**斗法天梯(残魂对决)**\n"
+        f"{cmd('斗法天梯')} 主页 | {cmd('斗法天梯 匹配', '斗法天梯 匹配')} 入场斗法(肉身不损)\n"
+        f"{cmd('斗法天梯帮助')} 详细规则\n"
+        "***\n"
         "**世界BOSS**\n"
         f"{cmd('世界BOSS')} 查看BOSS信息和血量\n"
         f"{cmd('讨伐BOSS')} 攻击BOSS（每日3次）\n"
@@ -615,6 +623,54 @@ async def handle_battle(event: MessageEvent, args: Message = CommandArg()):
         f"> {cmd('炼丹系统')} 战斗丹药 | {cmd('装备系统')} 装备强化 | {cmd('帮助', '帮助')} 返回"
     )
     await battle_cmd.finish(build_markdown(content))
+
+# 斗法天梯帮助
+ladder_help_cmd = on_command("斗法天梯帮助", aliases={"天梯帮助", "斗法帮助"}, priority=4, block=True)
+@ladder_help_cmd.handle()
+async def handle_ladder_help(event: MessageEvent, args: Message = CommandArg()):
+    content = (
+        "# 🏆 斗法天梯帮助\n"
+        "残魂相搏，肉身不损，唯以凶名论高下\n"
+        "***\n"
+        "**🎯 玩法核心**\n"
+        "以残魂投影入斗法场，斗法场自动寻凶名相当者配对\n"
+        "胜则凶名大涨 + 魂晶；负亦有参与奖\n"
+        "***\n"
+        "**📋 命令清单**\n"
+        f"{cmd('斗法天梯')} 主页(段位/凶名/战绩)\n"
+        f"{cmd('斗法天梯 匹配', '斗法天梯 匹配')} 入场斗法一次\n"
+        f"{cmd('斗法天梯 排行', '斗法天梯 排行')} 本赛季凶名榜\n"
+        f"{cmd('斗法天梯 历史', '斗法天梯 历史')} 最近 20 场战绩\n"
+        f"{cmd('斗法天梯 开启', '斗法天梯 开启')} / {cmd('斗法天梯 关闭', '斗法天梯 关闭')} 残魂显/隐\n"
+        f"{cmd('斗法商店')} 魂晶商店\n"
+        f"{cmd('斗法兑换 物品名', '斗法兑换 ')} 兑换商品\n"
+        "***\n"
+        "**📊 段位系统(诡道九品)**\n"
+        "散修 → 九品 → 八品 → 七品 → 六品 → 五品\n"
+        "五品 → 四品 → 三品 → 二品 → 一品 → **道君**\n"
+        "***\n"
+        "**⚙️ 限制与避让**\n"
+        "• 境界 30+ 才能入场\n"
+        "• 每日 5 场(高级月卡 +3)\n"
+        "• 同对手 6 小时冷却\n"
+        "• 婚姻/结义/师徒 不互配\n"
+        "• 守方每日被锁定 10 次上限\n"
+        "• 连胜 10 场后凶名收益减半\n"
+        "***\n"
+        "**💎 单场奖励**\n"
+        "胜：涨凶名 + 100 魂晶 | 负：扣凶名 + 30 魂晶\n"
+        "每日首胜额外 +200 魂晶\n"
+        "***\n"
+        "**🏆 赛季奖励(每月底)**\n"
+        "第 1: 称号「诡道煞君」+ 1000香火 + 5稳定水晶\n"
+        "2-3: 「斗煞尊」+ 500香火\n"
+        "4-10: 「煞道名宿」+ 300香火\n"
+        "11-50: 「斗煞新秀」+ 100香火\n"
+        "51-100: 50香火\n"
+        "***\n"
+        f"> {cmd('战斗系统')} | {cmd('斗法天梯')} 进入主页 | {cmd('帮助', '帮助')} 返回"
+    )
+    await ladder_help_cmd.finish(build_markdown(content))
 
 # 打工系统
 part_time_job_cmd = on_command("打工系统", aliases={"打工帮助"}, priority=4, block=True)

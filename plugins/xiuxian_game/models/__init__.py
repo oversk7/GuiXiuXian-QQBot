@@ -69,6 +69,8 @@ from .auction import AuctionItem, AuctionBidHistory
 # 宠物伴侣系统模型
 from .pet_instance import PetInstance
 from .pet_dialogue_history import PetDialogueHistory
+# 斗法天梯系统模型
+from .ladder import LadderRating, LadderMatchLog, LadderSeason
 
 
 __all__ = [
@@ -99,4 +101,5 @@ __all__ = [
     "AuctionItem", "AuctionBidHistory",
     "PetInstance", "PetDialogueHistory",
     "GuildWarehouseLog", "WarehouseLogType",
+    "LadderRating", "LadderMatchLog", "LadderSeason",
 ]
