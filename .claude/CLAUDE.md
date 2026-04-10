@@ -59,6 +59,18 @@ After thorough research, use `AskUserQuestion` to present users with choices rat
 
 - **Server:** root@***REMOVED***, password: ***REMOVED***
 - **Project path:** /home/admin/GuiXiuXian2
-- **Git pull command:** `su - admin -c 'cd /home/admin/GuiXiuXian2 && git pull'`
-- **Restart bot:** 已关闭 `--reload`，每次部署后需手动重启：`ssh root@***REMOVED***` → `screen -r qqbot` → Ctrl+C 停止 → `su - admin -c 'cd /home/admin/GuiXiuXian2 && nb run'`
-- **Workflow:** After every `git push`, SSH to the server, pull the latest code, then在 screen qqbot 中重启 bot。
+- **Screen:** The `qqbot` screen session runs under the `admin` user.
+- **Workflow:** When the user says "部署" (deploy), execute ALL of the following steps automatically:
+  1. `git push`
+  2. `ssh root@***REMOVED*** "su - admin -c 'cd /home/admin/GuiXiuXian2 && git pull'"`
+  3. Kill the old bot process and restart in admin's screen:
+     ```bash
+     ssh root@***REMOVED*** bash -c '
+       su - admin -c "screen -X -S qqbot quit" 2>/dev/null
+       sleep 1
+       pkill -u admin -f "bot\.py" 2>/dev/null
+       sleep 1
+       su - admin -c "screen -dmS qqbot bash -c \"cd /home/admin/GuiXiuXian2 && nb run; exec bash\""
+     '
+     ```
+  4. Verify the process started successfully (`ps aux | grep bot.py`)
