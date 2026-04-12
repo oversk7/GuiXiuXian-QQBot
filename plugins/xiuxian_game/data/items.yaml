@@ -2146,6 +2146,39 @@ items:
           description: "[3] 龙鳞护足：鞋面龙纹暗涌护气，步步皆盾——受到伤害减少3%"
       repair_cost: 5
 
+    - item_id: "vip_pendant_fuze"
+      name: "福泽守心佩"
+      description: "佩上刻有古篆'福泽'二字，戴在心口处，温热如活物。据说此佩曾护主三劫不死，后主人功成飞升，将福泽留于人间。"
+      type: "EQUIPMENT"
+      rarity: "red"
+      durability: 300
+      required_level: 10
+      attr_bonus: {"defense": 2000, "luck": 2000}
+      gem_slots: 5
+      special_effects:
+        - trigger: "on_attacked"
+          chance: 100
+          effect: "damage_reduction"
+          is_percentage: true
+          value: 5
+          duration: 999
+          description: "[1] 守心如壁：佩玉微光流转，替主挡去一分劫难——受到伤害减少5%"
+        - trigger: "on_attacked"
+          chance: 20
+          effect: "buff_defense"
+          is_percentage: true
+          value: 15
+          duration: 2
+          description: "[2] 福泽庇身：被攻击时20%概率触发福泽护体，金光笼身——防御力+15%（持续2回合）"
+        - trigger: "each_turn"
+          chance: 100
+          effect: "regen"
+          is_percentage: true
+          value: 3
+          duration: 999
+          description: "[3] 生生不息：佩玉以灵脉滋养主人，伤口自行愈合——每回合回复3%最大生命值"
+      repair_cost: 5
+
     - item_id: "vip_medal_tiandi"
       name: "天帝残勋"
       description: |
