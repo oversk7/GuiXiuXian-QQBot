@@ -296,7 +296,7 @@ class LadderRatingService:
         self, attacker: Player, attacker_rating: LadderRating
     ) -> Optional[Player]:
         """寻找一名匹配的对手；找不到返回 None"""
-        excluded_ids = await self._get_relationship_excluded(attacker.id)
+        excluded_ids: set[str] = set()
         excluded_ids.add(attacker.id)
         excluded_ids.update(
             await self._get_recent_opponent_ids(attacker.id, hours=SAME_OPPONENT_COOLDOWN_HOURS)
