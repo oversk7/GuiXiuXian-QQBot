@@ -344,7 +344,7 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
             lines.append("✨ 特殊效果：")
 
             # VIP定制装备列表（0阶即全解锁）
-            VIP_EQUIPMENT_IDS = {"vip_blade_zhanlongshan", "vip_robe_jingyuanzhiyi", "heaven_retreat_star_blade", "vip_gui_yu", "vip_chrono_watch", "vip_longying_flash", "vip_ghost_dice", "vip_shoes_longren"}
+            VIP_EQUIPMENT_IDS = {"vip_blade_zhanlongshan", "vip_robe_jingyuanzhiyi", "heaven_retreat_star_blade", "vip_gui_yu", "vip_chrono_watch", "vip_longying_flash", "vip_ghost_dice", "vip_shoes_longren", "vip_pendant_fuze"}
             is_vip_equipment = equip.item_id in VIP_EQUIPMENT_IDS
 
             if is_vip_equipment:
@@ -906,6 +906,16 @@ _VIP_EQUIPMENT_SKILL_MENUS: dict[str, dict] = {
         "icon": "👟",
         "skills": (
             "👟 龙刃鞋 · 踏风流\n"
+            "━━━━━━━━━━━━━\n"
+            "本装备无主动技能\n"
+            "3项被动效果战斗中自动生效"
+        ),
+    },
+    "vip_pendant_fuze": {
+        "name": "福泽守心佩",
+        "icon": "🪬",
+        "skills": (
+            "🪬 福泽守心佩 · 守心流\n"
             "━━━━━━━━━━━━━\n"
             "本装备无主动技能\n"
             "3项被动效果战斗中自动生效"
