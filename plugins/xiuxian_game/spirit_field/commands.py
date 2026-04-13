@@ -385,7 +385,10 @@ async def handle_buy_seed(event: MessageEvent, args: Message = CommandArg()):
         await uow.players.update(player)
 
         from ..models.inventory import ItemInstance
-        await ItemInstance.add_item(uow.session, player.id, crop.seed_id, quantity)
+        try:
+            await ItemInstance.add_item(uow.session, player.id, crop.seed_id, quantity)
+        except ValueError as e:
+            await buy_seed_cmd.finish(f"⚠️ {e}")
 
         await buy_seed_cmd.finish(build_markdown(
             f"购买成功!\n"
@@ -443,7 +446,10 @@ async def handle_buy_beast(event: MessageEvent, args: Message = CommandArg()):
         await uow.players.update(player)
 
         from ..models.inventory import ItemInstance
-        await ItemInstance.add_item(uow.session, player.id, beast.item_id, quantity)
+        try:
+            await ItemInstance.add_item(uow.session, player.id, beast.item_id, quantity)
+        except ValueError as e:
+            await buy_beast_cmd.finish(f"⚠️ {e}")
 
         await buy_beast_cmd.finish(build_markdown(
             f"购买成功!\n"

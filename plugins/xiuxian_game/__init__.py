@@ -1,5 +1,7 @@
 from nonebot.plugin import PluginMetadata
 from nonebot import get_driver
+from nonebot.message import run_postprocessor
+from nonebot.matcher import Matcher
 
 from .config import Config
 from .models.db import init_db
@@ -132,3 +134,21 @@ async def _():
         logger.error(f"[KnowledgeRetriever] AI知识库检索器初始化失败: {e}")
         import traceback
         traceback.print_exc()
+
+
+@run_postprocessor
+async def _handle_db_deadlock(matcher: Matcher, exception: Exception | None):
+    """全局后处理器：数据库死锁时给用户发送友好提示而非沉默失败"""
+    if exception is None:
+        return
+    from sqlalchemy.exc import OperationalError
+    # 递归检查异常链（包括 __cause__）
+    exc = exception
+    while exc is not None:
+        if isinstance(exc, OperationalError) and getattr(exc, 'orig', None) and getattr(exc.orig, 'args', (None,))[0] == 1213:
+            try:
+                await matcher.send("⚠️ 操作冲突，请稍后再试")
+            except Exception:
+                pass
+            return
+        exc = getattr(exc, '__cause__', None)
