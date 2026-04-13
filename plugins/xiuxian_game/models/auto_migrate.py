@@ -23,6 +23,9 @@ logger = logging.getLogger(__name__)
 # 定义需要自动添加的字段
 # 格式: {表名: {字段名: 字段定义}}
 REQUIRED_FIELDS: Dict[str, Dict[str, str]] = {
+    "player": {
+        "exp": "BIGINT NOT NULL DEFAULT 0 COMMENT '经验'",
+    },
     "elixir_usage_log": {
         "attribute_changes": "JSON DEFAULT ('{}') COMMENT '累计实际属性变动JSON'",
     },
