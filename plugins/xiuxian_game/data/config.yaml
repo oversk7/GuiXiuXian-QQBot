@@ -131,7 +131,7 @@ ai_dialogue:
   # 降级策略配置
   fallback:
     enabled: true  # 是否启用降级机制
-    fallback_provider: "zhipu"  # 主provider失败时的备用provider（zhipu | ai302）
+    fallback_provider: "volcengine"  # 主provider失败时的备用provider（volcengine | ai302 | scnet）
     max_retries: 1  # 每个provider的最大重试次数
 
   # 对话历史管理
