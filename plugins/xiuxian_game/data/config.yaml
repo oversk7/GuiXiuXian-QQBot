@@ -94,7 +94,7 @@ admin:
 # AI对话配置
 ai_dialogue:
   # LLM服务商配置
-  provider: "zhipu"  # zhipu | ai302 | openai | claude | local
+  provider: "volcengine"  # zhipu | ai302 | openai | claude | local
 
   # 智谱AI配置
   zhipu:
@@ -131,7 +131,7 @@ ai_dialogue:
   # 降级策略配置
   fallback:
     enabled: true  # 是否启用降级机制
-    fallback_provider: "volcengine"  # 主provider失败时的备用provider（volcengine | ai302 | scnet）
+    fallback_provider: "ai302"  # 主provider失败时的备用provider（volcengine | ai302 | scnet）
     max_retries: 1  # 每个provider的最大重试次数
 
   # 对话历史管理
