@@ -96,7 +96,7 @@ ai_dialogue:
   # LLM服务商配置
   provider: "zhipu"  # zhipu | ai302 | openai | claude | local
 
-  # 智谱AI配置（付费，备用）
+  # 智谱AI配置
   zhipu:
     api_key: "***REMOVED***"  # 智谱AI API密钥
     model: "GLM-4.7"  # 默认模型
@@ -107,7 +107,7 @@ ai_dialogue:
   # 火山引擎配置（豆包，DeepSeek-V3.2）
   volcengine:
     api_key: "***REMOVED***"
-    model: "ep-20260321201048-h78tm"  # endpoint ID 对应 DeepSeek-V3.2
+    model: "ep-20260415224146-xv7db"  # endpoint ID 对应 DeepSeek-V3.2
     max_tokens: 300
     temperature: 0.6
     timeout: 30
