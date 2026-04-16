@@ -160,14 +160,16 @@
 
 ### 3.5 结局设计
 
-四种结局：
+四种结局。**触发机制统一走"选择按钮 goto"**（见 §5 YAML 结构示例）——没有"条件自动匹配"的隐式规则，剧情分支完全由玩家可见的选择决定。
 
-| 结局 ID | 名称 | 触发条件 | 文案基调 |
+| 结局 ID | 名称 | 触发路径 | 文案基调 |
 |---------|------|---------|---------|
-| `ending_return` | 带血归城 | 战斗胜 + 抉择「稳妥返回」 | 希望 / 踏实，"这只是你修仙之路的第一夜" |
-| `ending_fall` | 诡域陨落 | 战斗败 / HP=0 | 悲剧美，"灰雾吞没你最后一丝灵气" |
-| `ending_seek` | 踏雾逐秘 | 战斗胜 + 抉择「深入诡域」 | 未竟，"你的足迹消失在灰雾深处……" |
-| `ending_taint` | 同化诡物 | 隐藏：三条支线都走过(多周目) + courage ≥ 10 + 战斗胜 + 抉择「吞噬诡血」 | 惊悚暗黑，"你已非人非鬼" |
+| `ending_return` | 带血归城 | 战斗胜 → 抉择场景点"稳妥返回" | 希望 / 踏实，"这只是你修仙之路的第一夜" |
+| `ending_fall` | 诡域陨落 | 战斗败（HP ≤ 0 自动 goto） | 悲剧美，"灰雾吞没你最后一丝灵气" |
+| `ending_seek` | 踏雾逐秘 | 战斗胜 → 抉择场景点"深入诡域" | 未竟，"你的足迹消失在灰雾深处……" |
+| `ending_taint` | 同化诡物 | 战斗胜 → 抉择场景出现**隐藏选项**"吞噬诡血" → 点击<br>**隐藏选项出现条件**（跨周目档案）: `branches_visited_all: [main_road, temple, mist]` **且** `stats_gte: courage ≥ 10` | 惊悚暗黑，"你已非人非鬼" |
+
+**跨周目机制**: 玩家需要多次通关 demo、分别走过三条探索分支（主道/古庙/灰雾），累计到 `progress.branches_visited` 里，再加上本局 `courage ≥ 10`，才能在抉择场景看到第四个选项。这个跨周目档案存在 localStorage（见 §4.4 `progress` 对象）。
 
 所有结局都显示**命格结局卡**（§3.6）和 **CTA**。
 
@@ -260,12 +262,16 @@ plugins/xiuxian_game/web_demo/
 ```python
 class WebInviteCode(Base):
     __tablename__ = "web_invite_code"
-    code: Mapped[str] = mapped_column(String(16), primary_key=True)  # 如 GW7X-Q3FB-5K2M
+    code: Mapped[str] = mapped_column(String(12), primary_key=True)
+    # 存库 12 字符纯 A-Z / 0-9 (不含分隔符)
+    # 展示给玩家时每 4 位用 "-" 分隔: GW7X-Q3FB-5K2M
+    # 输入时先 .strip().upper().replace("-","") 再查询
     created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now(), index=True)
     ending_id: Mapped[str] = mapped_column(String(32))  # 记录该码来自哪个结局
     redeemed_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True, index=True)
     redeemed_by_player_id: Mapped[str | None] = mapped_column(String(32), ForeignKey("player.id"), nullable=True)
     ip_created: Mapped[str] = mapped_column(String(64), default="")
+    # 码空间 36^12 ≈ 4.7×10¹⁸,暴力穷举成本远超奖励价值
 
 
 class WebDemoEvent(Base):
@@ -277,9 +283,28 @@ class WebDemoEvent(Base):
     event: Mapped[str] = mapped_column(String(32))  # start / scene / battle / ending / invite_generated / cta_clicked
     detail: Mapped[str] = mapped_column(String(120), default="")  # scene_id / ending_id 等
     ip_masked: Mapped[str] = mapped_column(String(32), default="")  # 脱敏到 /24
+
+
+class InviteRedeemLog(Base):
+    """邀请码兑换审计日志"""
+    __tablename__ = "invite_redeem_log"
+    id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=True)
+    ts: Mapped[datetime] = mapped_column(DateTime, server_default=func.now(), index=True)
+    player_id: Mapped[str] = mapped_column(String(32), ForeignKey("player.id"), index=True)
+    code: Mapped[str] = mapped_column(String(12))  # 即使 WebInviteCode 被清理也保留兑换流水
+    result: Mapped[str] = mapped_column(String(24))  # ok / not_found / expired / already_used / player_limit / cooldown
 ```
 
-两张表都在 90 天清理（`WebDemoEvent` 可更激进,30 天）。
+**三张表清理节奏**:
+- `web_invite_code`: 已兑换的保留 180 天（方便异常事件回查），未兑换且 `created_at < now - 30d` 立即删
+- `web_demo_event`: 30 天清理（量大）
+- `invite_redeem_log`: 90 天清理
+
+**Player 新增字段**（走 `auto_migrate.REQUIRED_FIELDS`）:
+- `breakthrough_protection_count: int DEFAULT 0` — 保护符累加计数，突破失败消耗 1
+- `demo_invite_redeemed_count: int DEFAULT 0` — 该玩家生涯兑换邀请码次数（上限 3）
+
+**明确不加的字段**（别动）: `last_invite_redeem_date` / `first_breakthrough_protection` 均不加，以上两个 int 字段已经够。
 
 ### 4.2 API 端点
 
@@ -289,11 +314,14 @@ class WebDemoEvent(Base):
 |--------|------|------|------|
 | `GET`  | `/play` | 主页面 HTML（CSP nonce 注入，同现有模式） | 30/min/IP |
 | `GET`  | `/api/demo/story` | 返回 `story.yaml` 的 JSON 格式（10 min 缓存） | 30/min/IP |
-| `POST` | `/api/demo/event` | 上报漏斗事件 `{session_id, event, detail}` | 60/min/IP |
+| `POST` | `/api/demo/event` | 上报漏斗事件 `{session_id, event, detail}` | 120/min/IP + 60/min/session |
 | `POST` | `/api/demo/invite` | 生成邀请码（body: `{session_id, ending_id, snapshot_json}`） | 5/min/IP，每 session 最多 1 次 |
-| `POST` | `/api/invite/redeem` | **机器人端内部使用**，不暴露 public endpoint |  — |
 
-**`/api/demo/invite` 返回**: `{code: "GW7X-Q3FB-5K2M"}`；该码记入 `web_invite_code` 表，未核销状态。
+**`/api/demo/invite` 返回**: `{code: "GW7X-Q3FB-5K2M"}`（展示带分隔符）；该码以 12 字符无分隔符形式记入 `web_invite_code` 表，未核销状态。
+
+**邀请码兑换不走 HTTP 端点**: `InviteService.redeem(player, code)` 是纯 Python 方法，**仅通过 QQ 机器人端 `/邀请码` 命令调用**，不注册为 FastAPI 路由——保证所有核销动作都天然绑定一个真实玩家身份，无需额外鉴权。
+
+**事件上报速率** 双维度：既限 IP（防外部打流量），也限 session_id（防单设备异常频发）。教室/公司共享 IP 下多人同时玩也不会撞顶。
 
 ### 4.3 QQ 机器人端：`/邀请码` 命令
 
@@ -328,39 +356,73 @@ async def redeem_invite(event: MessageEvent):
 - 500 金币：直接 `player.gold += 500`
 - 10 灵石：直接 `player.spirit_stone += 10`
 - 3 个 小还魂丹：`InventoryService.add_item(player, "xiaohuanhun_dan", 3)`
-- 突破保护符：在 Player 上加一次性 flag `first_breakthrough_protection: bool`（新字段，走 auto_migrate）
+- 突破保护符：`player.breakthrough_protection_count += 1`（int 计数字段，走 auto_migrate）。突破失败时若 count > 0 则消耗一次保护。**重复兑换累加计数**，不会"静默丢弃"。
 
-**兑换规则**：
-- 每个码一次性，核销后 `redeemed_at / redeemed_by_player_id` 填充，再次兑换返回"此码已使用"
-- 每个玩家最多兑换 **3 次**邀请码（防止同一用户通过多次玩 demo 刷礼包；由 `player.demo_invite_redeemed_count` 字段记录，走 auto_migrate）
-- 每个码 **30 天有效期**；过期码返回"此码已过期"
-- 兑换成功写审计日志（复用 `web_auth_audit` 表概念，或新建 `invite_redeem_log` — 本 spec 倾向于后者，解耦）
+**兑换规则**（重要 — 一次 锁死）：
+- **每个邀请码一次性**：核销后 `redeemed_at / redeemed_by_player_id` 填充，再次兑换该码返回"此码已使用"
+- **每个玩家生涯累计兑换上限 3 次**（非每日，防长期白嫖）：由 `player.demo_invite_redeemed_count` 字段记录（新字段，走 auto_migrate）。达到 3 次后返回"你已兑换过 3 次邀请码，无法再兑换（每个玩家仅限 3 次）"
+- **不做"每日"重置**：规则简单、沟通清晰、也避免玩家薅日上限；不引入 `last_invite_redeem_date` 字段
+- **每个码 30 天有效期**：从 `created_at` 起算；过期返回"此码已过期（30 天有效期）"
+- **兑换失败冷却**：连续 5 次输错码（码不存在/已过期/已使用）后，该玩家 10 分钟内不得再兑换（内存计数或复用速率限制器），防止暴力穷举
+- **审计**：新建独立表 `invite_redeem_log`（见 §4.5），不复用 web_auth_audit（已废弃的概念）
 
 ### 4.4 前端状态机
 
-`play.js` 核心：
+`play.js` 核心维护**两份**状态，分别对应"本局"与"跨周目"：
 
 ```js
-const state = {
+// 1. 本局状态 (localStorage key: guixiuxian_demo_run_v1)
+//    到达任一结局后清空; 允许"继续上次的冒险"弹窗
+const run = {
   current_scene: "scene_01_start",
-  flags: [],                 // ["brave_path", "saw_temple"]
-  items: [],                 // [{id:"灰雾残符", name:"..."}]
+  flags: [],                 // ["brave_path", "saw_temple"] 仅限本周目
+  items: [],
   stats: {hp:40, mp:20, courage:5, fortune:3},
-  choices_history: [],       // ["choice_mist", "choice_fight"]
+  choices_history: [],
   session_id: cryptoRandom(16),
 }
 
-// 单向流程
+// 2. 跨周目档案 (localStorage key: guixiuxian_demo_progress_v1)
+//    结局达成后累加, 永不清空(除非用户清浏览器数据)
+const progress = {
+  endings_seen: [],          // ["ending_return", "ending_fall"]
+  branches_visited: [],      // ["main_road", "temple", "mist"]
+  plays_total: 0,
+}
+```
+
+**流程**:
+```
 render(scene)
   ↓ 用户点击选择
 applyGrants(choice.grants)
 reportEvent("scene", scene.id)
   ↓
   if scene.type === "battle": enterBattle()
+  elif scene.type === "ending": commitProgress() → renderEndingCard()
   else: goto(choice.goto)
 ```
 
-localStorage key: `guixiuxian_demo_state_v1`，保存整个 state obj。加载页面时先尝试 restore，弹窗问"继续上次的冒险吗？"。
+**commitProgress 写入规则**:
+- `progress.endings_seen.push(ending_id)` (去重)
+- `progress.branches_visited = union(progress.branches_visited, run.choices_history ∩ ["main_road","temple","mist"])`
+- `progress.plays_total += 1`
+- 清空 `run`
+
+**隐藏结局 `ending_taint` 的 UI 可见性**: 抉择场景 `scene_final_choice` 的 YAML 里定义一个额外选项：
+
+```yaml
+- id: choice_taint
+  label: "吞噬诡血,融身于诡"
+  goto: ending_taint
+  require_progress:                 # 用跨周目档案判定
+    branches_visited_all: [main_road, temple, mist]
+    stats_gte: {courage: 10}
+```
+
+选项 `require_progress` 未达标时**完全隐藏**（不置灰，避免剧透），满足后才出现。这解决了"三条支线都走过"的多周目需求。
+
+**不**依赖服务端：玩家清 localStorage 就重置进度，这是可接受的，本来目标就是"多次回来玩"的激励，清了也只是自找麻烦。
 
 ### 4.5 前端视觉风格（简述）
 
@@ -447,7 +509,32 @@ scenes:
       - {id: ghost, name: 鬼力, weight: 1}  # 稀有
     goto: scene_final_choice
 
+scenes:
+  # ... 其他场景省略 ...
+
+  scene_final_choice:
+    type: narrative
+    text: |
+      雾散,你站在诡域裂隙边缘,手中诡血脉尚在灼烧……
+    choices:
+      - id: choice_return
+        label: "稳妥返回,带血归城"
+        goto: ending_return
+      - id: choice_seek
+        label: "踏雾逐秘,深入诡域"
+        goto: ending_seek
+      - id: choice_taint              # 隐藏选项,跨周目解锁
+        label: "吞噬诡血,融身于诡"
+        goto: ending_taint
+        require_progress:              # 跨周目档案条件,不满足则此选项不显示
+          branches_visited_all: [main_road, temple, mist]
+          stats_gte: {courage: 10}
+
+# ───────────────────────────────────────────
+
 endings:
+  # 结局没有 require 字段。到达一个结局的唯一路径是 choices[].goto: ending_xxx
+  # (隐藏结局通过 choice 的 require_progress 控制可见性,不走 ending 层的条件匹配)
   ending_return:
     title: "带血归城"
     text: |
@@ -465,9 +552,6 @@ endings:
     mood: unresolved
   ending_taint:
     title: "同化诡物"
-    require:
-      flags_all: [seen_temple, brave_path, main_road]  # 三条支线都走过
-      stats_gte: {courage: 10}
     text: |
       你已非人非鬼……
     mood: horror
@@ -475,7 +559,7 @@ endings:
 
 **撰稿要点**：
 - 每段 120-200 字，半文言，引用 诡修仙2 的"境界/灵气/诡血/咒抗"等词汇
-- 避免直接引用 《我在永夜建造庇护所》的原文句子（版权稳妥）
+- **【版权红线·硬性规则】** 禁止从《我在永夜建造庇护所》原著直接复制任何 **≥ 8 字** 的连续字符串。仅可沿用公共修仙词汇（诡血/灵气/境界/诡石/诡物 等由常见汉字自然组合的词）和"阴冷压抑 + 希望"的基调。任何疑似原文片段必须由撰稿人用自己的话完整重写
 - 三条探索支线长度一致，不让玩家后悔选错
 - 战斗文字变体池至少 5 条，避免重玩时重复感
 
@@ -511,10 +595,13 @@ FROM web_invite_code WHERE created_at > NOW() - INTERVAL 7 DAY;
 
 ### 6.3 隐私原则
 - 不种 tracking cookie
-- 不收集 User-Agent 完整字符串（只存前 120 字用于会话列表，但这里不需要）
+- 不收集 User-Agent 完整字符串
 - IP 脱敏到 /24 段再入库
-- 所有表 90 天内清理（`ts < now - 90d` 硬删）
-- 在 /play 页脚加"本页仅记录匿名漏斗数据,不追踪个人身份"一行小字（合规 + 取信）
+- 所有表按 §4.1 的节奏定期清理
+- **/play 首屏**（不仅页脚）显示一行短小的隐私声明：
+  > 本游戏不收集您的个人信息，仅记录匿名的关卡进度用于改进体验。
+- 首次进入点击"进入荒原"按钮视为知情同意。localStorage 使用也在此提示里一带写明（"进度保存在您的浏览器本地"）
+- 备案审核时，这段文案可直接作为隐私政策页的主体
 
 ---
 
@@ -572,7 +659,14 @@ async def _register_web_routes():
 - 首次部署后：访问 `https://oversky.online/play` 验证页面渲染
 
 ### 9.3 内容热更
-`/admin/demo/reload` POST 端点（需超级管理员身份，以 `.env` 里的 admin token 校验）：读取 YAML 重新缓存。运营同学改完 YAML → push → 手动打这个接口 → 新剧情立即生效，无需重启 bot。
+`POST /admin/demo/reload` 端点读取 YAML 重新缓存。运营同学改完 YAML → push → 手动打这个接口 → 新剧情立即生效，无需重启 bot。
+
+**鉴权**:
+- 从 `.env` 读取 `DEMO_ADMIN_TOKEN` 环境变量（32+ 字符随机串）
+- 请求必须带 HTTP 头 `X-Admin-Token: <value>`，服务端用 `hmac.compare_digest` 比对
+- **`DEMO_ADMIN_TOKEN` 未设置时**，该端点一律返回 `503 Service Unavailable { "error": "admin reload disabled: DEMO_ADMIN_TOKEN not configured" }`（默认安全，避免意外暴露）
+- 速率限制: 5 req/min/IP（防穷举 token）
+- 成功/失败都写入日志（但不记录 token 值）
 
 ### 9.4 监控
 - bot 日志里新增一行每小时输出：`[Demo] 过去 1h: session=N1, ending=N2, invite=N3, redeem=N4`
@@ -590,7 +684,7 @@ async def _register_web_routes():
 - [ ] 部署到 oversky.online → HTTPS + CSP 无警告
 - [ ] QQ 机器人发 `/邀请码 <生成的码>` → 正确发放礼包 + 一次性核销
 - [ ] 再次发同一个码 → 回复"此码已使用"
-- [ ] 同一玩家发第 4 个不同的码 → 回复"今日兑换次数已满"
+- [ ] 同一玩家成功兑换 3 次后发第 4 个不同的码 → 回复"你已兑换过 3 次邀请码，无法再兑换（每个玩家仅限 3 次）"
 - [ ] `web_demo_event` 表里能看到完整漏斗事件
 - [ ] `story.yaml` 改一段文字 → `POST /admin/demo/reload` → 下次访问看到新文字
 - [ ] 单元测试：`invite_service.redeem()` 各分支 ≥ 80% 覆盖
@@ -610,7 +704,7 @@ async def _register_web_routes():
 ### 11.2 新增
 - `plugins/xiuxian_game/web_demo/` 整个包（见 §4.1）
 - 三张新表：`web_invite_code`, `web_demo_event`, `invite_redeem_log`
-- Player 新字段：`first_breakthrough_protection: bool`, `demo_invite_redeemed_count: int`, `last_invite_redeem_date: date`（走 `auto_migrate.REQUIRED_FIELDS`）
+- Player 新字段：`breakthrough_protection_count: int DEFAULT 0`, `demo_invite_redeemed_count: int DEFAULT 0`（走 `auto_migrate.REQUIRED_FIELDS`）
 - `plugins/xiuxian_game/player/help.py` 新增 `/邀请码` 说明
 - `plugins/xiuxian_game/data/knowledge/` 对应的知识库 YAML
 
@@ -651,18 +745,26 @@ async def _register_web_routes():
 
 ## 13. 落地顺序（给 writing-plans 参考）
 
-1. 抽出 `_RateLimiter` / `_secure` 到共用模块，修改 map_api.py / tower_api.py 的 import，跑回归
-2. 新增三张表 + Player 三个字段（走 auto_migrate），启动验证迁移成功
-3. `InviteService` 核心 + 单测
-4. `/邀请码` QQ 命令 + help.py + knowledge YAML
-5. `demo_api.py` 后端路由（/play HTML + /api/demo/*）
-6. `story.yaml` 骨架（§5 结构，12 个场景占位文案）
-7. `play.html / play.css / play.js` 前端最小可玩版
-8. 战斗场景 + 突破场景 + 结局卡
-9. html2canvas 分享卡 + 字体 subset（可 P0 后补）
-10. 漏斗事件埋点全量接入
-11. 内容作者 pass：全量填写 story.yaml 的正式文案
-12. 部署到 oversky.online → 真机测试 → 软上线
+1. 抽出 `_RateLimiter` / `_secure` 到共用模块 (`web/rate_limiter.py`, `web/responses.py`)，修改 `map_api.py` / `tower_api.py` 的 import，访问 /map /tower 回归验证
+2. 新增三张表 (`WebInviteCode`, `WebDemoEvent`, `InviteRedeemLog`) — 在 `models/__init__.py` 导入后靠 `Base.metadata.create_all` 自动建表
+3. Player 新增两个字段 (`breakthrough_protection_count`, `demo_invite_redeemed_count`) **走 `auto_migrate.REQUIRED_FIELDS`**，重启 bot 验证 `ALTER TABLE` 执行成功（肉眼看日志 `[auto_migrate]` 行）
+4. `InviteService` 核心逻辑 (`generate_code` / `redeem`) + 单测覆盖所有分支
+5. `/邀请码` QQ 命令 + 消费冷却 + 同步更新 `player/help.py` + `data/knowledge/` 对应 YAML（项目规则）
+6. 突破保护符消耗逻辑接入现有 `cultivate/core.py` 突破失败处
+7. `demo_api.py` 后端路由（`/play` HTML + `/api/demo/*`）
+8. `story.yaml` 骨架（§5 结构，12 个场景占位文案）+ `story_loader.py`
+9. `play.html / play.css / play.js` 前端最小可玩版（场景渲染 + 选择按钮 + 状态机 + 两份 localStorage）
+10. 战斗场景 + 突破场景 + 结局页
+11. 漏斗事件埋点全量接入（客户端 reportEvent 调用点 + 服务端入库）
+12. 结局页命格卡 HTML 布局 + html2canvas 导出 PNG
+13. `/admin/demo/reload` 端点 + `DEMO_ADMIN_TOKEN` env 接入
+14. 内容作者 pass：全量填写 story.yaml 的正式文案（按版权红线）
+15. 部署到 oversky.online → 真机测试 (iOS Safari / Android Chrome) → 软上线
+
+**P0 后再做**（不在上述 15 步内）:
+- 字体 subset（先系统字体跑；上线后看首屏渲染反馈再决定）
+- Grafana 看板
+- 推荐人奖励
 
 ---
 
