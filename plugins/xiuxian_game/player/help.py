@@ -592,6 +592,7 @@ async def handle_battle(event: MessageEvent, args: Message = CommandArg()):
         f"{cmd('攻击 UID', '攻击 ')} 攻击目标(可攻击NPC)\n"
         "城镇安全区: 只能友好切磋\n"
         "荒野/诡域: 真实死斗，死亡掉落\n"
+        "公会保护: 目标处于自己公会势力范围内时无法被发起死斗\n"
         "***\n"
         "**斗法天梯(残魂对决)**\n"
         f"{cmd('斗法天梯')} 主页 | {cmd('斗法天梯 匹配', '斗法天梯 匹配')} 入场斗法(肉身不损)\n"

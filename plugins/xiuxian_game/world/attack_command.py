@@ -76,6 +76,51 @@ def is_in_town(x: int, y: int, region: str = "大都会") -> bool:
     return False
 
 
+# ==================== 公会保护判断 ====================
+async def is_target_protected_by_guild(session, target: Player) -> bool:
+    """判断目标是否在自己公会的势力范围内，受到公会保护
+
+    公会成员站在自己公会基地势力范围内时，不可被发起死斗。
+    保护只在现实世界（大都会）生效，诡域/副本内的坐标不适用。
+
+    Args:
+        session: 数据库会话
+        target: 被攻击的目标玩家
+
+    Returns:
+        True 表示目标受公会保护；False 表示不受保护
+    """
+    from sqlalchemy import select
+    from ..models.guild import Guild, GuildMember
+
+    # 公会势力范围仅作用于大都会（现实世界）
+    if target.get_current_region() != "大都会":
+        return False
+
+    # 查询目标所在的公会（GuildMember → Guild）
+    stmt = (
+        select(Guild)
+        .join(GuildMember, GuildMember.guild_id == Guild.id)
+        .where(GuildMember.player_id == target.id)
+    )
+    guild = (await session.execute(stmt)).scalars().first()
+    if not guild:
+        return False
+
+    if guild.base_x is None or guild.base_y is None:
+        return False
+
+    # 势力范围是以基地为中心、边长为 territory_range 的正方形
+    target_x, target_y = target.get_current_coordinates()
+    half_range = guild.territory_range // 2
+    min_x = guild.base_x - half_range
+    max_x = guild.base_x + half_range
+    min_y = guild.base_y - half_range
+    max_y = guild.base_y + half_range
+
+    return (min_x <= target_x <= max_x) and (min_y <= target_y <= max_y)
+
+
 # ==================== 荒野掉落处理 ====================
 async def handle_wilderness_drops(session, loser: Player, winner: Player) -> str:
     """处理荒野死斗的物品掉落
@@ -189,6 +234,7 @@ async def handle_attack(event: MessageEvent, args: Message = CommandArg()):
             "🏘️ 城镇 vs 荒野/诡域：\n"
             "• 城镇（市集/总部/打工地点附近5格）：安全切磋，无损失\n"
             "• 荒野/诡域（其他区域）：真实死斗，双方都会受伤，败者掉落物品\n"
+            "• 公会保护：目标处于自己公会势力范围内时，无法被发起死斗\n"
             "━━━━━━━━━━━━━\n"
             "🔍 智能匹配：\n"
             "• 支持部分名称匹配\n"
@@ -503,6 +549,11 @@ async def handle_player_attack(session, attacker: Player, target: Player, event:
         from ..ai_guide import is_sub_admin
         if is_sub_admin(target.id):
             await attack_cmd.finish("⛔ 不允许对子管理员发起荒野死斗")
+
+    # 公会保护：目标站在自己公会势力范围内时，不可被发起死斗
+    if not in_town:
+        if await is_target_protected_by_guild(session, target):
+            await attack_cmd.finish("⛔ 对方正处于其所在公会的势力范围内，受公会保护，无法发起死斗")
 
     # 死斗前镜怨体质（自保）判定：仅在荒野/诡域且为被动防御方触发
     if not in_town:
