@@ -107,7 +107,7 @@ ai_dialogue:
   # 火山引擎配置（豆包，DeepSeek-V3.2）
   volcengine:
     api_key: "***REMOVED***"
-    model: "ep-20260415224146-xv7db"  # endpoint ID 对应 DeepSeek-V3.2
+    model: "ep-20260321201048-h78tm"  # endpoint ID 对应 DeepSeek-V3.2
     max_tokens: 300
     temperature: 0.6
     timeout: 30
