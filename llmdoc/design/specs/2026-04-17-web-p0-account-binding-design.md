@@ -31,6 +31,7 @@
 |--------|------|------|
 | 绑定方式 | 机器人发 6 位数验证码 + 网页输入 UID + 验证码 | 用户体验简洁、无需密码管理、安全性足够、实现复杂度低 |
 | 绑定命令频道 | **仅限私聊** | 避免验证码在群里被他人读到；群聊中发命令回提示「请私聊」 |
+| **绑定主体** | **Session 永久绑定到 `Player.id`（不跟随 QQ 激活号切换）** | 见 §2.1 |
 | 会话模型 | 多设备 × 滑动 30 天 × 最多 5 个并发 × 自助踢人 | 手机+电脑自由切换，30 天免重登；5 个上限防会话列表爆炸 |
 | 会话存储 | 服务端 DB 表（不用 JWT） | 可即时撤销；QQ 机器人能直接查看/踢掉；审计友好 |
 | Cookie 标志 | `HttpOnly; Secure; SameSite=Lax; Path=/` | JS 不可读（防 XSS 盗取）、HTTPS 专属、跨站 POST 过不来 |
@@ -38,6 +39,28 @@
 | 验证码存储 | DB 表 + HMAC 哈希（非明文） | 即便 DB 被拖库也不暴露未使用的验证码 |
 | 前端技术栈 | 原生 HTML + 原生 JS（沿用 `map.html` 风格） | P0 不引入构建链；一个 `<script>` 搞定，快速迭代 |
 | 审计与日志 | 所有登录尝试 + 会话创建/撤销 → DB 审计表 | 可供玩家追溯、管理员排查 |
+
+### 2.1 账号切换语义（关键）
+
+本项目有 `AccountOwnership` 系统：一个 QQ 号（platform_id）可以拥有多个 Player（主号/小号），QQ 侧任意时刻只有一个"激活账号"被命令操作。Web 会话必须在这套机制下给出确定性行为。
+
+**规则**:
+
+1. **Session 绑定到 `Player.id`，一经签发永不改变。**
+   - 当玩家在 QQ 私聊发 `/绑定网页` 时，使用"当时激活的 Player"作为绑定主体
+   - 之后玩家即使在 QQ 里切换主号 ↔ 小号，已有的 Web 会话仍然只能看到/操作原来那个 Player
+   - 想用 Web 控制另一个号？→ 切到对应激活号后**再跑一次** `/绑定网页`，会得到第二个 Web 会话
+
+2. **`/网页会话` 默认只列当前激活 Player 的会话**（与项目其他命令"默认作用于激活账号"的惯例一致）
+   - 附加子命令 `/网页会话 全部` 列出该 platform_id 名下**所有 Player** 的会话（紧急止损场景）
+   - `/踢网页 <n>` 编号在当前列表上下文内有效
+
+3. **为什么不让 Web session 跟随激活号切换**:
+   - 跨号动作会造成不可预测的安全事件（Web 正在操作号 A 时，QQ 切换到号 B，Web 的下一个请求打到 B）
+   - Web 会话作为"对某个角色的授权凭证"语义更干净，也更方便审计
+   - 如果 P1+ 后续需要"Web 内切号"，再开 `POST /api/auth/switch-player`（需二次验证），P0 不做
+
+4. **AccountOwnership 转让场景**: 若账号被转让，`account_ownership.owner_platform_id` 变化时，**主动撤销该 `player_id` 的所有 web_session**（由转让流程调用 `WebAuthService.revoke_all_for_player(player_id, reason="transferred")`），避免前主人继续通过 Web 控制。这条改动加在 P0 范围内的 `account_transfer` 服务钩子里。
 
 ---
 
@@ -96,7 +119,7 @@ class WebLoginCode(Base):
 
     id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=True)
     player_id: Mapped[str] = mapped_column(String(32), ForeignKey("player.id", ondelete="CASCADE"), index=True)
-    code_hash: Mapped[str] = mapped_column(String(64), comment="HMAC-SHA256(code, SECRET) 的 hex")
+    code_hash: Mapped[str] = mapped_column(String(64), comment="HMAC-SHA256(code, SECRET) 的 hex 小写")
     created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now(), index=True)
     expires_at: Mapped[datetime] = mapped_column(DateTime, index=True, comment="5 分钟后")
     consumed_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True, comment="非空表示已使用")
@@ -108,9 +131,10 @@ class WebLoginCode(Base):
 ```
 
 **说明**:
-- `code_hash` 是 HMAC-SHA256(code, 服务器密钥)。这样即使 DB 被拖库，攻击者也无法反推未使用的验证码。
+- `code_hash` 是 HMAC-SHA256(code, 服务器密钥)，hex 统一用**小写**（`.hexdigest()` 默认）。校验时两侧都走同一个函数生成，再用 `hmac.compare_digest` 比对。
 - `failed_attempts` 用于单条验证码级别的尝试限制（同一条验证码错 5 次就失效）。
-- 后台定时任务 (daily) 清理 `expires_at < now - 1 day` 的旧记录；在 P0 里可以简单地在 issue_code 时顺手清理同一 player_id 的过期未消耗记录。
+- `issue_code` 内部先把该 player 所有 pending (consumed_at IS NULL) 的旧码设为 consumed_at=now（标记作废）再插入新的。这样即便并发两次 issue_code 出现短暂两条 pending，后到的那条也会通过再次调用作废前一条；且查询 pending 时总按 `created_at DESC LIMIT 1` 取最新，额外用事务串行化即可彻底避免。P0 并发极低，不强制加 partial unique index。
+- 后台定时任务 (daily) 清理 `expires_at < now - 1 day` 的旧记录。
 
 #### `web_session` — Web 会话
 ```python
@@ -197,8 +221,9 @@ class WebAuthAudit(Base):
 │                              │       │  Set-Cookie: session=<token>; │
 │                              │       │    HttpOnly; Secure;          │
 │                              │       │    SameSite=Lax; Max-Age=30d  │
-│                              │       │  → 302 /home                  │
+│                              │       │  200 JSON {ok:true, player}   │
 │                              │       │                              │
+│                              │       │  前端: location.href='/home' │
 └──────────────────────────────┘       └──────────────────────────────┘
 ```
 
@@ -294,6 +319,7 @@ class WebAuthAudit(Base):
 - `WEB_AUTH_SECRET` (用于 HMAC 验证码) 读取自 `.env`
 - 启动时若未设置则自动生成一个并写入 `.env`（仅开发环境）；生产环境缺密钥直接拒启
 - 密钥轮换时需清空 `web_login_code` 表（未使用的验证码会作废，可接受）
+- **`WebSession.token_hash` 使用纯 SHA-256(token)，不掺密钥**，因此密钥轮换**不影响**已有 Web 会话，无需踢人
 
 ### 7.5 日志
 - **不记录** 验证码明文、token 明文、Cookie 值
@@ -354,7 +380,9 @@ async def handle_bind_web(event: MessageEvent):
   /踢网页 全      踢掉所有设备
 ```
 
-IP 显示脱敏到 /24 段（如 `220.181.x.x`），保护玩家隐私。
+- IP 显示脱敏到 /24 段（如 `220.181.x.x`），保护玩家隐私。
+- 「当前设备」标记只在 Web 端的 `/sessions` 页展示：前端调 `GET /api/auth/sessions` 时，后端根据当前请求 Cookie 的 `sha256(token)` 与列表每行的 `token_hash` 对比，命中则给该行打 `is_current: true` 字段。QQ 机器人侧的 `/网页会话` 没有"当前设备"概念（机器人不是 Web 客户端），不显示此标记。
+- 命令触发场景: `/网页会话` 不要求私聊，群里执行也合理（没有敏感信息泄漏风险，IP 已脱敏）。
 
 ### 8.3 `/踢网页 <n|全>`
 简单校验数字是否在列表范围内；`全` 就全部 revoke；成功后返回剩余会话数。
@@ -458,6 +486,8 @@ plugins/xiuxian_game/web/static/
 - `plugins/xiuxian_game/platform_utils.get_unified_player` (私聊时拿 active player)
 - `plugins/xiuxian_game/web/map_api._RateLimiter` (抽出到 `web/rate_limiter.py` 共用)
 - `plugins/xiuxian_game/web/map_api._secure` (同上，抽出到 `web/responses.py`)
+
+> 抽取重构时**必须**同步把 `map_api.py` 与 `tower_api.py` 里原来的 import 改为新路径（并跑一遍现有地图/爬塔页面验证回归），避免 planning 时遗漏。
 
 ### 12.2 新增
 ```
