@@ -50,6 +50,13 @@ def _format_player_location_cmd(player: Player) -> str:
         real_x, real_y = player.get_current_coordinates()
         location_text = f"{player.get_current_region()} ({real_x},{real_y})"
         return cmd(location_text, f"导航 {real_x} {real_y}")
+
+
+def _format_player_location_public(player: Player) -> str:
+    """查看他人面板时的位置脱敏显示：仅显示区域名，隐藏具体坐标以防追杀。"""
+    if player.is_in_dungeon():
+        return f"{player.get_current_region()}（深入诡域中）"
+    return f"{player.get_current_region()}"
 from ..config import config
 from ..world.message_board import get_unread_message_status
 
@@ -219,7 +226,7 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
         f"💎积分 **{player.gold2}**",
         f"💀怨念 **{player.resentment}**　✨点数 **{player.attribute_points}**",
         f"🕯️诡烛 **{player.gui_zhu}**　🙏香火 **{player.incense}**",
-        f"📍{_format_player_location_cmd(player)}",
+        f"📍{_format_player_location_cmd(player) if target_uid is None else _format_player_location_public(player)}",
         "***",
     ])
 
@@ -813,7 +820,7 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
         f"💎积分 **{player.gold2}**",
         f"💀怨念 **{player.resentment}**　✨点数 **{player.attribute_points}**",
         f"🕯️诡烛 **{player.gui_zhu}**　🙏香火 **{player.incense}**",
-        f"📍{_format_player_location_cmd(player)}",
+        f"📍{_format_player_location_cmd(player) if target_uid is None else _format_player_location_public(player)}",
     ])
 
     # 13. Buff状态
