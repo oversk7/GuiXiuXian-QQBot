@@ -883,6 +883,7 @@ async def handle_player_attack(session, attacker: Player, target: Player, event:
                 result_lines.append(msg_b)
 
             # 击杀与自噬收益
+            from ..item.vip_huihai_xinyuan_skill import apply_kill_max_mp
             if victory:
                 gain_msg = await _apply_blade_kill_mp(attacker)
                 if gain_msg:
@@ -891,6 +892,10 @@ async def handle_player_attack(session, attacker: Player, target: Player, event:
                 gy_msg = await _apply_gui_yu_kill_agility(attacker)
                 if gy_msg:
                     result_lines.append(gy_msg)
+                # 慧海心元珠「胜负归元」：+max_mp
+                hh_msg = await apply_kill_max_mp(session, attacker)
+                if hh_msg:
+                    result_lines.append(hh_msg)
                 # 败者死亡自噬
                 robemsg = await _apply_robe_self_siphon(target)
                 if robemsg:
@@ -903,6 +908,10 @@ async def handle_player_attack(session, attacker: Player, target: Player, event:
                 gy_msg = await _apply_gui_yu_kill_agility(target)
                 if gy_msg:
                     result_lines.append(gy_msg)
+                # 慧海心元珠「胜负归元」：+max_mp
+                hh_msg = await apply_kill_max_mp(session, target)
+                if hh_msg:
+                    result_lines.append(hh_msg)
                 robemsg = await _apply_robe_self_siphon(attacker)
                 if robemsg:
                     result_lines.append(robemsg)
@@ -1242,6 +1251,12 @@ async def handle_npc_attack(session, attacker: Player, target_npc, event: Messag
                         gy_inst.extra_attrs = gy_extra
                         session.add(gy_inst)
                         session.add(attacker)
+
+                # 慧海心元珠「胜负归元」：击杀永久+30理智上限（每日8次）
+                from ..item.vip_huihai_xinyuan_skill import apply_kill_max_mp
+                hh_msg = await apply_kill_max_mp(session, attacker)
+                if hh_msg:
+                    result_lines.append(hh_msg)
 
                 # 折光年「时间掠夺」+「终焉铭刻」：击杀永久+2体质/+2攻击（每日各20次）
                 # 区分折光年(终焉铭刻)和诡面骰(骰相·噬)的gain_attack

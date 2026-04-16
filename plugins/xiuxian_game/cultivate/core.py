@@ -302,6 +302,13 @@ async def handle_cultivate(event: MessageEvent):
         if achievement_msgs:
             msg += "\n\n" + "\n\n".join(achievement_msgs)
 
+        # 慧海心元珠「静修凝神」：修炼永久+50理智上限（每日5次）
+        from ..item.vip_huihai_xinyuan_skill import apply_cultivate_max_mp
+        hh_msg = await apply_cultivate_max_mp(session, player)
+        if hh_msg:
+            msg += f"\n\n{hh_msg}"
+            await session.commit()
+
         # 使用原生 Markdown 发送修炼结果
         full_msg = f"**✨ 修炼完成**\n{msg}"
         await cultivate.finish(build_markdown(full_msg))

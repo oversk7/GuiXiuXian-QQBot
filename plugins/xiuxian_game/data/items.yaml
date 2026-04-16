@@ -2179,6 +2179,48 @@ items:
           description: "[3] 生生不息：佩玉以灵脉滋养主人，伤口自行愈合——每回合回复3%最大生命值"
       repair_cost: 5
 
+    - item_id: "vip_huihai_xinyuan"
+      name: "慧海心元珠"
+      description: "海纳万象，心藏元珠；一念归澄，慧光不灭。\n\n佩者心如澄海，元珠于神海深处缓缓转动，\n每一步、每一念、每一战，皆化作一缕慧光，\n沉入海底，永不散去。"
+      type: "EQUIPMENT"
+      rarity: "red"
+      durability: 360
+      required_level: 10
+      attr_bonus: {"defense": 1000, "luck": 500}
+      gem_slots: 5
+      special_effects:
+        - trigger: "passive"
+          effect: "none"
+          description: "[1] 行路明心：每抵达地图上一处新坐标，心境愈发澄澈——永久+50理智上限（每日5次，共+250）"
+        - trigger: "passive"
+          effect: "none"
+          description: "[2] 静修凝神：每次修炼元珠温润如海，吞吐慧光——永久+50理智上限（每日5次，共+250）"
+        - trigger: "passive"
+          effect: "none"
+          description: "[3] 胜负归元：每次战斗胜利元珠吸纳战意——永久+30理智上限（每日8次，共+240）"
+        - trigger: "first_turn"
+          chance: 100
+          effect: "hp_from_mp"
+          is_percentage: true
+          value: 20
+          duration: 0
+          description: "[4] 心元相生：理智越澄，身躯越坚——以自身最大理智值的20%转化为最大生命值提升（首回合）"
+        - trigger: "each_turn"
+          chance: 100
+          effect: "regen"
+          is_percentage: true
+          value: 3
+          duration: 999
+          description: "[5] 慧海回春：海纳百川而心不动——每回合回复3%最大生命值"
+        - trigger: "each_turn"
+          chance: 100
+          effect: "damage_reduction"
+          is_percentage: true
+          value: 5
+          duration: 999
+          description: "[6] 明心御意：意念化作无形壁垒——受到伤害减少5%"
+      repair_cost: 5
+
     - item_id: "vip_medal_tiandi"
       name: "天帝残勋"
       description: |

@@ -1410,6 +1410,13 @@ async def _handle_personal_monster(session, tile: WorldTile, player: Player) -> 
                         session.add(player)
                         await session.commit()
 
+                # 慧海心元珠「胜负归元」：击杀永久+30理智上限（每日8次）
+                from ..item.vip_huihai_xinyuan_skill import apply_kill_max_mp
+                hh_msg = await apply_kill_max_mp(session, player)
+                if hh_msg:
+                    battle_summary.append(hh_msg)
+                    await session.commit()
+
                 # 折光年「时间掠夺」+「终焉铭刻」：击杀永久+2体质/+2攻击（每日各20次）
                 # 区分折光年(终焉铭刻)和诡面骰(骰相·噬)的gain_attack
                 chrono_effects = [e for e in post_effects if e.get("type") in ("gain_max_hp",) or

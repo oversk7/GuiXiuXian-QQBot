@@ -230,6 +230,13 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
                 if achievement_messages:
                     arrival_msg += "\n\n" + "\n\n".join(achievement_messages)
 
+            # 慧海心元珠「行路明心」：到达新坐标永久+50理智上限（每日5次）
+            from ..item.vip_huihai_xinyuan_skill import apply_visit_max_mp
+            hh_msg = await apply_visit_max_mp(session, player)
+            if hh_msg:
+                arrival_msg += f"\n\n{hh_msg}"
+                await session.commit()
+
             await nav_cmd.finish(build_markdown(arrival_msg))
 
         # 若未提供坐标 && 有导航，则只是查看进度（在诡域时展示现实坐标）
