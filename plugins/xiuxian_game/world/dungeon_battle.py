@@ -68,6 +68,44 @@ DIRECTIONS: Dict[str, Tuple[int, int]] = {
 }
 
 
+# 诡域坐标边界 (-5,-5) 到 (5,5)
+_DUNGEON_MIN = -5
+_DUNGEON_MAX = 5
+
+
+class BattleResult:
+    """诡域战斗结果，主 handler 用以识别并把日志改用 bash 代码块包裹。"""
+
+    __slots__ = ("log_lines", "victory", "monster_display")
+
+    def __init__(self, log_lines: list[str], victory: bool, monster_display: str):
+        self.log_lines = log_lines
+        self.victory = victory
+        self.monster_display = monster_display
+
+
+def _build_dungeon_minimap(x: int, y: int, radius: int = 2) -> str:
+    """生成以 (x,y) 为中心的诡域小地图（默认 5x5）。
+
+    🟨 玩家位置、⬜ 可走格、⬛ 边界（撞墙）
+    """
+    rows = []
+    # 北(y+) 在上，南(y-) 在下
+    for dy in range(radius, -radius - 1, -1):
+        cy = y + dy
+        cells = []
+        for dx in range(-radius, radius + 1):
+            cx = x + dx
+            if cx < _DUNGEON_MIN or cx > _DUNGEON_MAX or cy < _DUNGEON_MIN or cy > _DUNGEON_MAX:
+                cells.append("⬛")
+            elif cx == x and cy == y:
+                cells.append("🟨")
+            else:
+                cells.append("⬜")
+        rows.append("".join(cells))
+    return "\n".join(rows)
+
+
 
 # -------- 材料掉落权重配置 --------
 RARITY_WEIGHTS = {
@@ -1188,7 +1226,7 @@ async def _handle_treasure(session, tile: WorldTile, player: Player) -> str:
     return msg
 
 
-async def _handle_empty(session, tile: WorldTile, player: Player) -> str:
+async def _handle_empty(session, tile: WorldTile, player: Player):
     # 检查玩家是否已经击败过这个小怪
     if player.id in tile.state.get("defeated_by", []):
         return "🪨 这里只剩下诡异的残骸，散发着淡淡的血腥味。"
@@ -1196,7 +1234,7 @@ async def _handle_empty(session, tile: WorldTile, player: Player) -> str:
     return await _handle_personal_monster(session, tile, player)
 
 
-async def _handle_personal_monster(session, tile: WorldTile, player: Player) -> str:
+async def _handle_personal_monster(session, tile: WorldTile, player: Player) -> "BattleResult":
     """诡异属于个人事件，使用新战斗系统进行战斗。"""
     # 获取诡异信息
     monster_stats = {
@@ -1702,16 +1740,14 @@ async def _handle_personal_monster(session, tile: WorldTile, player: Player) -> 
         # 重新计算剩余装备的属性加成（确保百分比加成正确）
         await recalc_equipment_attributes(session, player)
 
-    log = "\n".join(battle_summary)
-
     # ---------------- 检查装备耐久度并提醒 ----------------
     durability_warning = await check_equipment_durability(session, player.id)
     if durability_warning:
-        log += f"\n{durability_warning}"
+        battle_summary.append(durability_warning)
 
     session.add_all([player, tile])
     await session.flush()
-    return log
+    return BattleResult(battle_summary, victory, monster_full_display)
 
 async def _handle_rest(session, tile: WorldTile, player: Player) -> str:
     effective_attrs = await player.get_effective_attributes(session)
@@ -1764,7 +1800,7 @@ async def _handle_merchant(session, tile: WorldTile, player: Player) -> str:
 
     return msg
 
-async def _handle_elite(session, tile: WorldTile, player: Player) -> str:
+async def _handle_elite(session, tile: WorldTile, player: Player):
     """处理精英怪事件"""
     if player.id in tile.state.get("defeated_by", []):
         return "⚰️ 精英诡异的残骸散落一地，散发着不祥的气息。"
@@ -1835,7 +1871,12 @@ async def _(event: MessageEvent):
             # 尝试自动完成任务
             completed_tasks = await task_service.try_auto_complete_tasks(player.id)
             if completed_tasks:
-                log += "\n\n🎉 公会任务完成：\n" + "\n".join(completed_tasks)
+                if isinstance(log, BattleResult):
+                    log.log_lines.append("")
+                    log.log_lines.append("🎉 公会任务完成：")
+                    log.log_lines.extend(completed_tasks)
+                else:
+                    log += "\n\n🎉 公会任务完成：\n" + "\n".join(completed_tasks)
         # 获取含buff/宠物的有效属性，保持与面板一致
         effective_attrs = await player.get_effective_attributes(session)
         eff_max_hp = effective_attrs.get("max_hp", player.max_hp)
@@ -1848,15 +1889,39 @@ async def _(event: MessageEvent):
         f"🧠 **{player.mp}**/{eff_max_mp}"
     )
 
-    lines = [
-        "# 🌀 诡域探索",
-        status_line,
-        "***",
-        log,
-        "***",
-        f"{cmd('↑上', '上')} | {cmd('↓下', '下')} | {cmd('←左', '左')} | {cmd('→右', '右')} | {cmd('🗡️探索', '探索')}",
-        f"{cmd('上一层')} | {cmd('下一层')} | {cmd('一键嗑药')} | {cmd('俯瞰')}",
-    ]
+    nav_row1 = f"{cmd('↑上', '上')} | {cmd('↓下', '下')} | {cmd('←左', '左')} | {cmd('→右', '右')} | {cmd('🗡️探索', '探索')}"
+    nav_row2 = f"{cmd('上一层')} | {cmd('下一层')} | {cmd('一键嗑药')} | {cmd('俯瞰')}"
+
+    if isinstance(log, BattleResult):
+        # 战斗日志用 bash 代码块包裹；小地图放在代码块外面
+        mini_map = _build_dungeon_minimap(current_x, current_y)
+        battle_title = f"⚔️ **击杀 {log.monster_display}**" if log.victory else f"⚔️ **对战 {log.monster_display}**"
+        battle_text = "\n".join(str(l) for l in log.log_lines)
+        lines = [
+            "# 🌀 诡域探索",
+            status_line,
+            "***",
+            "🗺️ **小地图**　🟨你　⬜可走　⬛边界",
+            mini_map,
+            "***",
+            battle_title,
+            "```bash",
+            battle_text,
+            "```",
+            "***",
+            nav_row1,
+            nav_row2,
+        ]
+    else:
+        lines = [
+            "# 🌀 诡域探索",
+            status_line,
+            "***",
+            log,
+            "***",
+            nav_row1,
+            nav_row2,
+        ]
 
     await explore_cmd.finish(build_markdown("\n".join(lines)))
 
