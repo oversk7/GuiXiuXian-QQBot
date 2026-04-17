@@ -1155,6 +1155,13 @@ async def handle_npc_attack(session, attacker: Player, target_npc, event: Messag
                     attacker.gold += gold_gain
                     result_lines.append(f"🎉 击杀鬼怪获得 {exp_gain} EXP，{gold_gain} 金币")
                     npc_reward_hint = f"+{exp_gain}EXP +{gold_gain}金"
+
+            # 慧海心元珠「胜负归元」：击杀永久+30理智上限（每日8次）—— 不依赖 post_effects
+            from ..item.vip_huihai_xinyuan_skill import apply_kill_max_mp as _hh_kill
+            _hh_msg_npc = await _hh_kill(session, attacker)
+            if _hh_msg_npc:
+                result_lines.append(_hh_msg_npc)
+
             # 结算VIP定制装备（斩龙闪）的战后永久加成（如“噬灵者”）
             if victory and post_effects:
                 from sqlalchemy import select as _select
@@ -1251,12 +1258,6 @@ async def handle_npc_attack(session, attacker: Player, target_npc, event: Messag
                         gy_inst.extra_attrs = gy_extra
                         session.add(gy_inst)
                         session.add(attacker)
-
-                # 慧海心元珠「胜负归元」：击杀永久+30理智上限（每日8次）
-                from ..item.vip_huihai_xinyuan_skill import apply_kill_max_mp
-                hh_msg = await apply_kill_max_mp(session, attacker)
-                if hh_msg:
-                    result_lines.append(hh_msg)
 
                 # 折光年「时间掠夺」+「终焉铭刻」：击杀永久+2体质/+2攻击（每日各20次）
                 # 区分折光年(终焉铭刻)和诡面骰(骰相·噬)的gain_attack
