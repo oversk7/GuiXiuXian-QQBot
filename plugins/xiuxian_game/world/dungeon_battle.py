@@ -84,10 +84,31 @@ class BattleResult:
         self.monster_display = monster_display
 
 
-def _build_dungeon_minimap(x: int, y: int, radius: int = 2) -> str:
+async def _query_explored_coords(session, region: str) -> set[tuple[int, int]]:
+    """查询当前诡域 region 今天已生成的所有格子坐标（视为已探索）。"""
+    today = date.today()
+    today_start = datetime.combine(today, datetime.min.time())
+    tomorrow_start = today_start + timedelta(days=1)
+    stmt = select(WorldTile.x, WorldTile.y).where(
+        and_(
+            WorldTile.region == region,
+            WorldTile.refreshed_at >= today_start,
+            WorldTile.refreshed_at < tomorrow_start,
+        )
+    )
+    rows = (await session.execute(stmt)).all()
+    return {(r[0], r[1]) for r in rows}
+
+
+def _build_dungeon_minimap(
+    x: int,
+    y: int,
+    explored: set[tuple[int, int]],
+    radius: int = 2,
+) -> str:
     """生成以 (x,y) 为中心的诡域小地图（默认 5x5）。
 
-    🟨 玩家位置、⬜ 可走格、⬛ 边界（撞墙）
+    🟨 你、🟩 今日已探索、⬜ 未探索、⬛ 边界
     """
     rows = []
     # 北(y+) 在上，南(y-) 在下
@@ -100,6 +121,8 @@ def _build_dungeon_minimap(x: int, y: int, radius: int = 2) -> str:
                 cells.append("⬛")
             elif cx == x and cy == y:
                 cells.append("🟨")
+            elif (cx, cy) in explored:
+                cells.append("🟩")
             else:
                 cells.append("⬜")
         rows.append("".join(cells))
@@ -1881,6 +1904,12 @@ async def _(event: MessageEvent):
         effective_attrs = await player.get_effective_attributes(session)
         eff_max_hp = effective_attrs.get("max_hp", player.max_hp)
         eff_max_mp = effective_attrs.get("max_mp", player.max_mp)
+
+        # 查询已探索坐标（用于战斗后的小地图）
+        explored_coords: set[tuple[int, int]] = set()
+        if isinstance(log, BattleResult):
+            explored_coords = await _query_explored_coords(session, current_region)
+
         await session.commit()
 
     status_line = (
@@ -1894,14 +1923,14 @@ async def _(event: MessageEvent):
 
     if isinstance(log, BattleResult):
         # 战斗日志用 bash 代码块包裹；小地图放在代码块外面
-        mini_map = _build_dungeon_minimap(current_x, current_y)
+        mini_map = _build_dungeon_minimap(current_x, current_y, explored_coords)
         battle_title = f"⚔️ **击杀 {log.monster_display}**" if log.victory else f"⚔️ **对战 {log.monster_display}**"
         battle_text = "\n".join(str(l) for l in log.log_lines)
         lines = [
             "# 🌀 诡域探索",
             status_line,
             "***",
-            "🗺️ **小地图**　🟨你　⬜可走　⬛边界",
+            "🗺️ **小地图**　🟨你　🟩已探索　⬜未探索",
             mini_map,
             "***",
             battle_title,
