@@ -372,6 +372,8 @@ async def handle_battle_hero(event: MessageEvent):
             _combat_buff.is_active = False
             _combat_buff.expires_at = datetime.now()
             uow.session.add(_combat_buff)
+            from ..domain.attributes import invalidate_player_buff_cache
+            invalidate_player_buff_cache(player.id)
 
         # 处理战斗结果
         if victory:
@@ -808,6 +810,8 @@ async def handle_redeem(event: MessageEvent, args: Message = CommandArg()):
                 extra_data={"cultivation_efficiency": 0.5},
             )
             uow.session.add(buff)
+            from ..domain.attributes import invalidate_player_buff_cache
+            invalidate_player_buff_cache(player.id)
             await uow.commit()
             msg = (
                 "✅ 兑换成功！\n"
@@ -857,6 +861,8 @@ async def handle_redeem(event: MessageEvent, args: Message = CommandArg()):
                 extra_data={"single_battle": True},
             )
             uow.session.add(buff)
+            from ..domain.attributes import invalidate_player_buff_cache
+            invalidate_player_buff_cache(player.id)
             await uow.commit()
             msg = (
                 "✅ 兑换成功！\n"

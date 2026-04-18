@@ -42,7 +42,11 @@ class ElixirUsageLog(Base):
 
         # 降级：旧数据无 attribute_changes，用配置 × 次数反推
         item_cfg = config.items_config["by_id"].get(self.item_id)
-        if not item_cfg or item_cfg.effect_type != ItemEffectType.BUFF:
+        if not item_cfg:
+            return {}
+
+        # 仅对永久属性类丹药做旧数据反推，避免将恢复类道具误计入永久属性
+        if item_cfg.effect_type not in {ItemEffectType.BUFF, ItemEffectType.BUFF_PERCENT}:
             return {}
 
         effect_params = item_cfg.effect_params or {}

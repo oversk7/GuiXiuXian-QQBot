@@ -83,6 +83,12 @@ class AttributeCalculatorFactory:
             cls._buff_source.invalidate_cache(player_id)
 
     @classmethod
+    def clear_buff_cache(cls):
+        """清空所有Buff缓存（用于全量状态变更后的兜底一致性）"""
+        if cls._buff_source:
+            cls._buff_source.clear_cache()
+
+    @classmethod
     def invalidate_pet_cache(cls, player_id: str):
         """使指定玩家的宠物属性缓存失效"""
         if cls._pet_source:
