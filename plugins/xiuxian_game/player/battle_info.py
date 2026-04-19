@@ -8,10 +8,7 @@ from nonebot import on_command
 from nonebot.adapters.qq import MessageEvent, Message
 from nonebot.params import CommandArg
 
-from ..models.db import get_session
-from ..models.player import Player
 from ..battle.integration_helper import BattleIntegrationHelper
-from sqlalchemy import select
 
 # 查看战斗属性命令
 battle_info = on_command("战力", aliases={"属性", "我的战力"}, block=True, priority=5)
@@ -119,4 +116,4 @@ async def handle_battle_detail(event: MessageEvent, args: Message = CommandArg()
         "💡 查看当前战斗属性？发送【战力】"
     ]
 
-    await battle_detail.send(event, "\n".join(detail_info))
+    await battle_detail.finish("\n".join(detail_info))

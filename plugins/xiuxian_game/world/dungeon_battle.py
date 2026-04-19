@@ -7,6 +7,7 @@ from __future__ import annotations
 """
 
 from nonebot import on_command, on_regex
+from nonebot.matcher import Matcher
 from nonebot.adapters.qq import MessageEvent, Message, MessageSegment
 from nonebot.adapters.qq.models.common import MessageMarkdown, MessageMarkdownParams
 from nonebot.params import CommandArg
@@ -1958,7 +1959,7 @@ async def _(event: MessageEvent):
 dungeon_buy_cmd = on_command("购买", block=False, priority=5)
 
 @dungeon_buy_cmd.handle()
-async def handle_buy(event: MessageEvent, args: Message = CommandArg()):
+async def handle_buy(matcher: Matcher, event: MessageEvent, args: Message = CommandArg()):
     """从卖货郎处购买商品（仅副本内生效，参数为纯数字序号）"""
     arg_text = args.extract_plain_text().strip()
     # 仅处理纯数字参数（副本卖货郎用序号），其他格式放行给跑商购买
@@ -1974,6 +1975,8 @@ async def handle_buy(event: MessageEvent, args: Message = CommandArg()):
         # 大都会玩家不处理，放行给跑商购买命令
         if player.region == "大都会":
             return
+        # 非大都会且参数为纯数字时，视为诡域卖货郎购买，阻断后续「购买」命令
+        matcher.stop_propagation()
 
         # 获取当前位置的格子 - 使用正确的当前坐标
         current_x, current_y = player.get_current_coordinates()
