@@ -967,10 +967,17 @@ async def handle_equip_menu(event: MessageEvent):
 
 inscription_list_cmd = on_command("铭文列表", aliases={"铭文栏", "我的铭文"}, priority=9, block=True)
 
+_INSCRIPTION_PAGE_SIZE = 30
+
 @inscription_list_cmd.handle()
 async def handle_inscription_list(event: MessageEvent, args: Message = CommandArg()):
     from ..models.db import safe_session
     from .inscription_service import get_inscription_display_from_item
+
+    arg_text = args.extract_plain_text().strip()
+    page = 1
+    if arg_text.isdigit() and int(arg_text) >= 1:
+        page = int(arg_text)
 
     msg = ""
     async with safe_session() as session:
@@ -994,11 +1001,9 @@ async def handle_inscription_list(event: MessageEvent, args: Message = CommandAr
         if not inscriptions:
             msg = f"# 📜 铭文列表\n***\n你还没有铭文物品\n击杀精英怪可掉落铭文，或用铭文碎片合成\n***\n{synth_cmd} | {equip_bar_cmd} | {help_cmd}"
         else:
-            lines = ["# 📜 铭文列表", "***", "```bash"]
             rarity_map = {"white": "⚪", "green": "🟢", "blue": "🔵", "purple": "🟣", "orange": "🟠"}
             rarity_order = {"orange": 0, "purple": 1, "blue": 2, "green": 3, "white": 4}
 
-            # 分离铭文碎片和普通铭文
             fragment_count = 0
             normal_inscriptions = []
             for insc in inscriptions:
@@ -1007,28 +1012,42 @@ async def handle_inscription_list(event: MessageEvent, args: Message = CommandAr
                 else:
                     normal_inscriptions.append(insc)
 
-            # 按品阶排序（橙>紫>蓝>绿>白）
             normal_inscriptions.sort(
                 key=lambda x: rarity_order.get(
                     x.config.rarity if x.config else "white", 99
                 )
             )
 
-            idx = 1
-            for insc in normal_inscriptions:
+            total = len(normal_inscriptions)
+            total_pages = max(1, (total + _INSCRIPTION_PAGE_SIZE - 1) // _INSCRIPTION_PAGE_SIZE)
+            if page > total_pages:
+                page = total_pages
+
+            start = (page - 1) * _INSCRIPTION_PAGE_SIZE
+            end = start + _INSCRIPTION_PAGE_SIZE
+            page_items = normal_inscriptions[start:end]
+
+            lines = [f"# 📜 铭文列表（{page}/{total_pages}页 共{total}个）", "***", "```bash"]
+
+            for i, insc in enumerate(page_items, start=start + 1):
                 display = get_inscription_display_from_item(insc)
                 rarity = insc.config.rarity if insc.config else "unknown"
                 icon = rarity_map.get(rarity, "⚪")
-                lines.append(f"[{idx}] {icon} {display}")
-                idx += 1
+                lines.append(f"[{i}] {icon} {display}")
 
-            # 铭文碎片合并为一行
-            if fragment_count > 0:
-                lines.append(f"[{idx}] 🔵 铭文碎片 ×{fragment_count}（收集5个可【合成铭文】）")
+            if fragment_count > 0 and page == total_pages:
+                lines.append(f"    🔵 铭文碎片 ×{fragment_count}（收集5个可【合成铭文】）")
 
             lines.append("```")
             lines.append("***")
-            lines.append(cmd("合成铭文") + " | " + cmd("装备栏") + " | " + cmd("帮助"))
+
+            nav_parts = []
+            if page > 1:
+                nav_parts.append(cmd(f"上一页", f"铭文列表 {page - 1}"))
+            if page < total_pages:
+                nav_parts.append(cmd(f"下一页", f"铭文列表 {page + 1}"))
+            nav_parts.extend([synth_cmd, equip_bar_cmd, help_cmd])
+            lines.append(" | ".join(nav_parts))
             msg = "\n".join(lines)
 
     await inscription_list_cmd.finish(build_markdown(msg))
