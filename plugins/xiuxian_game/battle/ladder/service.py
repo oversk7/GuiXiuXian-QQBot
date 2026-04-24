@@ -296,15 +296,22 @@ class LadderRatingService:
         self, attacker: Player, attacker_rating: LadderRating
     ) -> Optional[Player]:
         """寻找一名匹配的对手；找不到返回 None"""
-        excluded_ids: set[str] = set()
-        excluded_ids.add(attacker.id)
-        excluded_ids.update(
+        base_excluded_ids: set[str] = {attacker.id}
+
+        strict_excluded_ids = set(base_excluded_ids)
+        strict_excluded_ids.update(
             await self._get_recent_opponent_ids(attacker.id, hours=SAME_OPPONENT_COOLDOWN_HOURS)
         )
+        for rating_range in (RATING_RANGE_PRIMARY, RATING_RANGE_FALLBACK):
+            candidates = await self._query_candidates(
+                attacker_rating.rating, rating_range, strict_excluded_ids
+            )
+            if candidates:
+                return random.choice(candidates)
 
         for rating_range in (RATING_RANGE_PRIMARY, RATING_RANGE_FALLBACK):
             candidates = await self._query_candidates(
-                attacker_rating.rating, rating_range, excluded_ids
+                attacker_rating.rating, rating_range, base_excluded_ids
             )
             if candidates:
                 return random.choice(candidates)
