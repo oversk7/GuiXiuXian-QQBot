@@ -180,24 +180,28 @@ async def _do_match(event: MessageEvent, session, player, service: LadderRatingS
     win_streak = result["win_streak"]
     used = result["daily_matches_used"]
     quota = result["daily_quota"]
+    unchallenged = result.get("unchallenged", False)
 
-    log_mode = get_player_log_mode(player)
-    filtered_log = filter_battle_log(result["battle_log"], log_mode)
-
-    # 标题
-    if victory:
-        title = f"⚔️ 斩败 {defender.nickname} 之残魂！"
+    if unchallenged:
+        title = "👑 独孤求败 · 无人敢应战"
+        filtered_log = ["斗法场中无人胆敢应战，天梯魁首不战而胜。"]
     else:
-        title = f"🛡️ 残魂溃散，败于 {defender.nickname}"
+        log_mode = get_player_log_mode(player)
+        filtered_log = filter_battle_log(result["battle_log"], log_mode)
+        if victory:
+            title = f"⚔️ 斩败 {defender.nickname} 之残魂！"
+        else:
+            title = f"🛡️ 残魂溃散，败于 {defender.nickname}"
 
     # 提示信息
-    sign = "+" if rating_change > 0 else ""
     hint_parts = [
-        f"{sign}{rating_change} 凶名",
         f"凶名 {new_rating}",
         f"段位 {new_rank}",
         f"💎+{soul_earned}",
     ]
+    if not unchallenged:
+        sign = "+" if rating_change > 0 else ""
+        hint_parts.insert(0, f"{sign}{rating_change} 凶名")
     if first_win_bonus:
         hint_parts.append("🎉首胜")
     if victory and win_streak >= 3:

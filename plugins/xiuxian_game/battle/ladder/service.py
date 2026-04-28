@@ -350,10 +350,13 @@ class LadderRatingService:
         # 3) 找对手
         defender = await self.find_opponent(attacker, a_rating)
         if not defender:
-            raise LadderMatchError(
-                "⛔ 斗法场中无凶名相当的残魂（同段位修士或已隐匿/冷却中）\n"
-                "💡 稍后再来，或先去诡域里练练手"
-            )
+            rank = await self.get_player_rank_in_season(attacker.id, season.id)
+            if rank != 1:
+                raise LadderMatchError(
+                    "⛔ 斗法场中无凶名相当的残魂（同段位修士或已隐匿/冷却中）\n"
+                    "💡 稍后再来，或先去诡域里练练手"
+                )
+            return await self._grant_unchallenged_victory(attacker, a_rating, season, daily_quota)
 
         d_rating = await self.get_or_create_rating(defender.id)
         await self.reset_daily_counters_if_needed(d_rating)
@@ -475,6 +478,42 @@ class LadderRatingService:
             "win_streak": a_rating.win_streak,
             "daily_matches_used": a_rating.daily_matches,
             "daily_quota": daily_quota,
+        }
+
+    async def _grant_unchallenged_victory(
+        self,
+        attacker: Player,
+        a_rating: LadderRating,
+        season: LadderSeason,
+        daily_quota: int,
+    ) -> dict:
+        """第一名无人可匹配时，直接发放胜利奖励（不影响 ELO）"""
+        a_rating.daily_matches += 1
+        a_rating.last_match_at = datetime.now()
+
+        first_win_bonus = False
+        soul_earned = SOUL_CRYSTALS_WIN
+        if not a_rating.daily_first_win_claimed:
+            soul_earned += SOUL_CRYSTALS_FIRST_WIN_BONUS
+            a_rating.daily_first_win_claimed = True
+            first_win_bonus = True
+        a_rating.soul_crystals += soul_earned
+
+        return {
+            "victory": True,
+            "battle_log": [],
+            "defender": None,
+            "rating_change": 0,
+            "new_rating": a_rating.rating,
+            "new_rank": a_rating.rank_tier,
+            "soul_earned": soul_earned,
+            "first_win_bonus": first_win_bonus,
+            "season_id": season.id,
+            "match_log_id": None,
+            "win_streak": a_rating.win_streak,
+            "daily_matches_used": a_rating.daily_matches,
+            "daily_quota": daily_quota,
+            "unchallenged": True,
         }
 
     # ========== 排行榜 ==========
