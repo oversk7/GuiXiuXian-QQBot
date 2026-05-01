@@ -28,6 +28,7 @@ from sqlalchemy.orm.attributes import flag_modified
 from ...models.player import Player
 from ...models.inventory import ItemInstance
 from ...models.ladder import LadderRating, LadderSeason
+from ...models.world_message import WorldMessage
 
 logger = logging.getLogger(__name__)
 
@@ -110,6 +111,21 @@ async def distribute_season_rewards(session: AsyncSession, season: LadderSeason)
                     extra["knocker_event"] = pdata
                     player.extra_attrs = extra
                     flag_modified(player, "extra_attrs")
+
+            # 私信通知
+            parts = [f"⚔️ 斗法天梯第{season.season_number}赛季结算 — 排名#{rank}"]
+            if title:
+                parts.append(f"🏅 称号「{title}」")
+            if incense > 0:
+                parts.append(f"🔥 香火+{incense}")
+            if crystal > 0:
+                parts.append(f"💎 稳定水晶×{crystal}")
+            session.add(WorldMessage(
+                player_id="SYSTEM",
+                recipient_id=player.id,
+                scope="private",
+                content=" | ".join(parts),
+            ))
 
             reward_count += 1
         except (SQLAlchemyError, ValueError, AttributeError) as e:  # pragma: no cover
