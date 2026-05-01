@@ -17,13 +17,13 @@
 """
 from __future__ import annotations
 
-import json
 import logging
 from typing import List, Tuple
 
 from sqlalchemy import select
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm.attributes import flag_modified
 
 from ...models.player import Player
 from ...models.inventory import ItemInstance
@@ -84,7 +84,8 @@ async def distribute_season_rewards(session: AsyncSession, season: LadderSeason)
         rating: LadderRating = row.LadderRating
         player: Player = row.Player
 
-        title, incense, crystal = _get_reward_for_rank(rank)
+        base_title, incense, crystal = _get_reward_for_rank(rank)
+        title = f"{base_title}·第{season.season_number}赛季" if base_title else ""
 
         try:
             # 香火奖励（直接加 Player.incense）
@@ -97,17 +98,18 @@ async def distribute_season_rewards(session: AsyncSession, season: LadderSeason)
                 if not ok:
                     errors.append(f"player {player.id} 背包已满，稳定水晶发放失败")
 
-            # 称号（如果 Player 有 titles 字段）
-            if title and hasattr(player, "titles"):
-                titles = player.titles or []
-                if isinstance(titles, str):
-                    try:
-                        titles = json.loads(titles)
-                    except (ValueError, TypeError):
-                        titles = []
-                if title not in titles:
-                    titles.append(title)
-                    player.titles = titles
+            # 称号（写入 extra_attrs.knocker_event.owned_titles）
+            if title:
+                extra = player.extra_attrs if player.extra_attrs else {}
+                pdata = extra.get("knocker_event", {})
+                owned_titles = pdata.get("owned_titles", [])
+                if title not in owned_titles:
+                    owned_titles.append(title)
+                    pdata["owned_titles"] = owned_titles
+                    extra = dict(extra)
+                    extra["knocker_event"] = pdata
+                    player.extra_attrs = extra
+                    flag_modified(player, "extra_attrs")
 
             reward_count += 1
         except (SQLAlchemyError, ValueError, AttributeError) as e:  # pragma: no cover
