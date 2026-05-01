@@ -145,26 +145,12 @@ class TradeRecord(Base):
     @classmethod
     async def get_daily_purchase_quantity(cls, session, player_id: str, market_id: str, item_id: str) -> int:
         """
-        查询玩家当日在指定市场购买指定商品的总数量（使用09:00日切）
-
-        Args:
-            session: 数据库会话
-            player_id: 玩家ID
-            market_id: 市场ID
-            item_id: 商品ID
-
-        Returns:
-            int: 当日已购买总数量
+        查询玩家当日在指定市场购买指定商品的总数量（0点日切）
         """
         from sqlalchemy import select, and_, func as sa_func
-        from datetime import time, timedelta, date
+        from datetime import time
 
-        # 与 _current_seed_day() 一致的 09:00 日切逻辑
-        now = datetime.now()
-        day = now.date()
-        if now.time() < time(hour=9):
-            day -= timedelta(days=1)
-        day_start = datetime.combine(day, time(hour=9))
+        day_start = datetime.combine(datetime.now().date(), time(hour=0))
 
         stmt = select(sa_func.coalesce(sa_func.sum(cls.quantity), 0)).where(
             and_(
@@ -182,24 +168,12 @@ class TradeRecord(Base):
     @classmethod
     async def get_daily_cross_market_sell_count(cls, session, player_id: str) -> int:
         """
-        查询玩家当日跨市场出售笔数（使用09:00日切，排除黑市）
-
-        Args:
-            session: 数据库会话
-            player_id: 玩家ID
-
-        Returns:
-            int: 当日跨市场出售笔数
+        查询玩家当日跨市场出售笔数（0点日切，排除黑市）
         """
         from sqlalchemy import select, and_, func as sa_func
-        from datetime import time, timedelta, date
+        from datetime import time
 
-        # 与 _current_seed_day() 一致的 09:00 日切逻辑
-        now = datetime.now()
-        day = now.date()
-        if now.time() < time(hour=9):
-            day -= timedelta(days=1)
-        day_start = datetime.combine(day, time(hour=9))
+        day_start = datetime.combine(datetime.now().date(), time(hour=0))
 
         stmt = select(sa_func.count(cls.id)).where(
             and_(
@@ -216,15 +190,11 @@ class TradeRecord(Base):
 
     @classmethod
     async def get_daily_cross_market_revenue(cls, session, player_id: str) -> int:
-        """获取玩家当日跨市场出售总收入（使用09:00日切，用于跑商税计算）"""
+        """获取玩家当日跨市场出售总收入（0点日切，用于跑商税计算）"""
         from sqlalchemy import select, and_, func as sa_func
-        from datetime import time, timedelta
+        from datetime import time
 
-        now = datetime.now()
-        day = now.date()
-        if now.time() < time(hour=9):
-            day -= timedelta(days=1)
-        day_start = datetime.combine(day, time(hour=9))
+        day_start = datetime.combine(datetime.now().date(), time(hour=0))
 
         stmt = select(sa_func.coalesce(sa_func.sum(cls.total_amount), 0)).where(
             and_(
@@ -248,14 +218,11 @@ class TradeRecord(Base):
         from sqlalchemy import select, and_
         from datetime import time, timedelta
 
-        now = datetime.now()
-        today = now.date()
-        if now.time() < time(hour=9):
-            today -= timedelta(days=1)
+        today = datetime.now().date()
 
         # 一次查询最近7天的跨市场出售记录
-        week_start = datetime.combine(today - timedelta(days=7), time(hour=9))
-        today_start = datetime.combine(today, time(hour=9))
+        week_start = datetime.combine(today - timedelta(days=7), time(hour=0))
+        today_start = datetime.combine(today, time(hour=0))
 
         stmt = select(cls.trade_time).where(
             and_(
@@ -276,10 +243,7 @@ class TradeRecord(Base):
         # 按seed day分组
         traded_days = set()
         for trade_time in records:
-            trade_day = trade_time.date()
-            if trade_time.time() < time(hour=9):
-                trade_day -= timedelta(days=1)
-            traded_days.add(trade_day)
+            traded_days.add(trade_time.date())
 
         # 从昨天起检查连续天数
         streak = 0

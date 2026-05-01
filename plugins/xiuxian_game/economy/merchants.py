@@ -5,7 +5,7 @@ from __future__ import annotations
 跑商系统规则：
 1. 仅限现实世界（region == "大都会"）。
 2. 市场坐标固定；列表见 MARKETS。
-3. 价格：每天 09:00 刷新，基于日期+市场ID+item_id 生成哈希随机数。
+3. 价格：每天 00:00 刷新，基于日期+市场ID+item_id 生成哈希随机数。
 4. 必须玩家坐标与市场坐标一致才可交易。
 
 缉邪司总部规则：
@@ -469,16 +469,9 @@ def analyze_market_configuration():
 # analyze_market_configuration()
 
 # ------------------- 工具函数 -------------------
-_DEF_TIME = time(hour=9)
-
-
 def _current_seed_day() -> date:
-    """返回当前价格所属日期：若当前时间 <09:00 视为前一天。"""
-    now = datetime.now()
-    day = now.date()
-    if now.time() < _DEF_TIME:
-        day -= timedelta(days=1)
-    return day
+    """返回当前价格所属日期（0点日切）。"""
+    return datetime.now().date()
 
 
 
@@ -1764,15 +1757,13 @@ from datetime import datetime as _dt, time as _time
 
 
 def _black_market_seed_day() -> str:
-    """与市集一致的日切：09:00 前算前一天。返回形如 'YYYY-MM-DD' 的字符串。"""
-    day = _current_seed_day()  # 复用市集的日切逻辑
-    return day.isoformat()
+    """返回当日日期字符串，形如 'YYYY-MM-DD'（0点日切）。"""
+    return _current_seed_day().isoformat()
 
 
 def _black_market_day_start_dt() -> _dt:
-    """返回本'黑市日'的起始时间点(datetime)，用于统计每日限购。"""
-    day = _current_seed_day()
-    return _dt.combine(day, _DEF_TIME)
+    """返回今日起始时间点(datetime)，用于统计每日限购（0点日切）。"""
+    return _dt.combine(_current_seed_day(), _time(hour=0))
 
 
 async def _pick_black_market_today_items(session) -> list[str]:
