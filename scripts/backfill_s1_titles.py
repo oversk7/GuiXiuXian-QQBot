@@ -1,18 +1,12 @@
-"""一次性脚本：补发第1赛季天梯称号"""
+"""一次性脚本：补发第1赛季天梯称号（独立运行，不依赖 NoneBot）"""
 import asyncio
 import json
-import sys
-import os
 
-sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+from sqlalchemy import text
+from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession
+from sqlalchemy.orm import sessionmaker
 
-from sqlalchemy import select, text
-from sqlalchemy.orm.attributes import flag_modified
-
-from plugins.xiuxian_game.models.db import async_engine, async_session_factory
-from plugins.xiuxian_game.models.player import Player
-from plugins.xiuxian_game.models.ladder import LadderRating
-
+DB_URL = "mysql+aiomysql://root:***REMOVED***@localhost:3306/guixiuxian_db?charset=utf8mb4"
 
 SEASON_ID = 1
 SEASON_NUMBER = 1
@@ -33,41 +27,49 @@ def get_title_for_rank(rank: int) -> str:
 
 
 async def main():
-    async with async_session_factory() as session:
-        stmt = (
-            select(LadderRating, Player)
-            .join(Player, Player.id == LadderRating.player_id)
-            .where(LadderRating.season_id == SEASON_ID, LadderRating.best_rating > 0)
-            .order_by(LadderRating.best_rating.desc())
-        )
-        rows = (await session.execute(stmt)).all()
+    engine = create_async_engine(DB_URL)
+    async_session = sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
+
+    async with async_session() as session:
+        result = await session.execute(text("""
+            SELECT lr.player_id, p.nickname, lr.best_rating, p.extra_attrs
+            FROM ladder_rating lr
+            JOIN player p ON p.id = lr.player_id
+            WHERE lr.season_id = :season_id AND lr.best_rating > 0
+            ORDER BY lr.best_rating DESC
+        """), {"season_id": SEASON_ID})
+        rows = result.fetchall()
 
         count = 0
         for rank, row in enumerate(rows, start=1):
-            player = row.Player
+            player_id, nickname, best_rating, extra_attrs_raw = row
             title = get_title_for_rank(rank)
             if not title:
                 continue
 
-            extra = player.extra_attrs if player.extra_attrs else {}
+            extra = json.loads(extra_attrs_raw) if extra_attrs_raw else {}
             pdata = extra.get("knocker_event", {})
             owned_titles = pdata.get("owned_titles", [])
 
             if title in owned_titles:
-                print(f"  #{rank} {player.nickname} — 已有「{title}」，跳过")
+                print(f"  #{rank} {nickname} — 已有「{title}」，跳过")
                 continue
 
             owned_titles.append(title)
             pdata["owned_titles"] = owned_titles
-            extra = dict(extra)
             extra["knocker_event"] = pdata
-            player.extra_attrs = extra
-            flag_modified(player, "extra_attrs")
+
+            await session.execute(text("""
+                UPDATE player SET extra_attrs = :extra WHERE id = :pid
+            """), {"extra": json.dumps(extra, ensure_ascii=False), "pid": player_id})
+
             count += 1
-            print(f"  #{rank} {player.nickname} — 补发「{title}」")
+            print(f"  #{rank} {nickname} — 补发「{title}」")
 
         await session.commit()
         print(f"\n补发完成，共 {count} 人获得称号")
+
+    await engine.dispose()
 
 
 if __name__ == "__main__":
