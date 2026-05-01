@@ -227,7 +227,7 @@ class RelationshipService:
             return False, f"禁止转移跑商商品类物品"
 
         # 5.1 VIP定制装备禁止转移
-        VIP_EQUIPMENT_IDS = {"vip_blade_zhanlongshan", "vip_robe_jingyuanzhiyi", "heaven_retreat_star_blade", "vip_gui_yu", "vip_chrono_watch", "vip_longying_flash", "vip_ghost_dice", "vip_shoes_longren", "vip_pendant_fuze", "vip_huihai_xinyuan"}
+        VIP_EQUIPMENT_IDS = {"vip_blade_zhanlongshan", "vip_robe_jingyuanzhiyi", "vip_robe_jingyuan_legacy", "heaven_retreat_star_blade", "vip_gui_yu", "vip_chrono_watch", "vip_longying_flash", "vip_ghost_dice", "vip_shoes_longren", "vip_pendant_fuze", "vip_huihai_xinyuan"}
         if item_config.item_id in VIP_EQUIPMENT_IDS:
             return False, "VIP定制装备为专属装备，不可转移"
 

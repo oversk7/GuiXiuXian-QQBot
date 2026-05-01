@@ -527,7 +527,7 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
             # 特殊效果信息（显示解锁条件）
             if hasattr(cfg, 'special_effects') and cfg.special_effects:
                 # VIP定制装备列表（0阶即全解锁）
-                VIP_EQUIPMENT_IDS = {"vip_blade_zhanlongshan", "vip_robe_jingyuanzhiyi", "heaven_retreat_star_blade", "vip_gui_yu", "vip_chrono_watch", "vip_longying_flash", "vip_ghost_dice", "vip_shoes_longren", "vip_pendant_fuze", "vip_huihai_xinyuan"}
+                VIP_EQUIPMENT_IDS = {"vip_blade_zhanlongshan", "vip_robe_jingyuanzhiyi", "vip_robe_jingyuan_legacy", "heaven_retreat_star_blade", "vip_gui_yu", "vip_chrono_watch", "vip_longying_flash", "vip_ghost_dice", "vip_shoes_longren", "vip_pendant_fuze", "vip_huihai_xinyuan"}
                 is_vip_equipment = cfg.item_id in VIP_EQUIPMENT_IDS
 
                 if is_vip_equipment and cfg.item_id in _VIP_ACTIVE_SKILL_IDS:
@@ -730,7 +730,7 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
             # 特殊效果信息（显示解锁条件）
             if hasattr(cfg, 'special_effects') and cfg.special_effects:
                 # VIP定制装备列表（0阶即全解锁）
-                VIP_EQUIPMENT_IDS = {"vip_blade_zhanlongshan", "vip_robe_jingyuanzhiyi", "heaven_retreat_star_blade", "vip_gui_yu", "vip_chrono_watch", "vip_longying_flash", "vip_ghost_dice", "vip_shoes_longren", "vip_pendant_fuze", "vip_huihai_xinyuan"}
+                VIP_EQUIPMENT_IDS = {"vip_blade_zhanlongshan", "vip_robe_jingyuanzhiyi", "vip_robe_jingyuan_legacy", "heaven_retreat_star_blade", "vip_gui_yu", "vip_chrono_watch", "vip_longying_flash", "vip_ghost_dice", "vip_shoes_longren", "vip_pendant_fuze", "vip_huihai_xinyuan"}
                 is_vip_equipment = cfg.item_id in VIP_EQUIPMENT_IDS
 
                 if is_vip_equipment and cfg.item_id in _VIP_ACTIVE_SKILL_IDS:

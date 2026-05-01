@@ -21,7 +21,7 @@ from ..battle.battle_effects import TriggerConfig, TriggerType, EffectType
 
 # VIP装备不参与词缀系统
 VIP_EQUIPMENT_IDS = {
-    "vip_blade_zhanlongshan", "vip_robe_jingyuanzhiyi",
+    "vip_blade_zhanlongshan", "vip_robe_jingyuanzhiyi", "vip_robe_jingyuan_legacy",
     "heaven_retreat_star_blade", "vip_gui_yu", "vip_chrono_watch",
     "vip_longying_flash", "vip_ghost_dice", "vip_shoes_longren",
     "vip_pendant_fuze", "vip_huihai_xinyuan",

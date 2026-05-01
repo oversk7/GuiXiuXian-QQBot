@@ -563,7 +563,7 @@ async def handle_player_attack(session, attacker: Player, target: Player, event:
             stmt = select(ItemInstance).where(
                 ItemInstance.player_id == target.id,
                 ItemInstance.equipped == True,
-                ItemInstance.item_id == "vip_robe_jingyuanzhiyi"
+                ItemInstance.item_id.in_(("vip_robe_jingyuanzhiyi", "vip_robe_jingyuan_legacy"))
             )
             target_robe = (await session.execute(stmt)).scalars().first()
         except SQLAlchemyError:
@@ -826,7 +826,7 @@ async def handle_player_attack(session, attacker: Player, target: Player, event:
                 stmt = select(ItemInstance).where(
                     ItemInstance.player_id == dead_player.id,
                     ItemInstance.equipped == True,
-                    ItemInstance.item_id == "vip_robe_jingyuanzhiyi"
+                    ItemInstance.item_id.in_(("vip_robe_jingyuanzhiyi", "vip_robe_jingyuan_legacy"))
                 )
                 inst = (await session.execute(stmt)).scalars().first()
                 if not inst:

@@ -1647,7 +1647,7 @@ async def _handle_personal_monster(session, tile: WorldTile, player: Player) -> 
             stmt = _select(_ItemInstance).where(
                 _ItemInstance.player_id == _dead_player.id,
                 _ItemInstance.equipped == True,
-                _ItemInstance.item_id == "vip_robe_jingyuanzhiyi"
+                _ItemInstance.item_id.in_(("vip_robe_jingyuanzhiyi", "vip_robe_jingyuan_legacy"))
             )
             inst = (await session.execute(stmt)).scalars().first()
             if not inst:

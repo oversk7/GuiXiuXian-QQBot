@@ -1926,7 +1926,7 @@ items:
           description: "[6] 刃之魔灵：斩杀敌人死亡后掠夺随机属性40点增长自身（掠夺每天仅生效一次）"
 
     - item_id: "vip_robe_jingyuanzhiyi"
-      name: "镜怨披风"
+      name: "镜怨披风·怨灵归主"
       description: "有时，你的倒影会比你更早死去。"
       type: "EQUIPMENT"
       rarity: "red"
@@ -1955,6 +1955,34 @@ items:
           description: "[4] 怨灵拾荒：你的倒影会在你不注意时悄悄离开，替你捡些东西回来。\n【怨灵拾荒】派出怨灵（每日1次，2小时后归来带回材料和金币）\n【镜怨披风】查看状态面板"
       repair_cost: 5
       required_level: 10
+      gem_slots: 5
+
+    - item_id: "vip_robe_jingyuan_legacy"
+      name: "镜怨披风·旧影"
+      description: "有时，你的倒影会比你更早死去。"
+      type: "EQUIPMENT"
+      rarity: "red"
+      durability: 300
+      required_level: 10
+      attr_bonus: {"hp": 100, "attack": 80, "agility": 60, "defense": 60}
+      attr_ratio: {"hp": 1.0, "attack": 0.8, "agility": 0.6, "defense": 0.6}
+      special_effects:
+        - trigger: "on_attacked"
+          effect: "reflect_death"
+          is_percentage: false
+          value: 0
+          description: "[1] 镜怨体质：当他人主动攻击你时，其攻击行为被视为“对自身发动”，镜怨会在敌人心智中“映射自身存在”，使攻击者的灵魂瞬间反噬自身——直接死亡。"
+        - trigger: "on_attacked"
+          effect: "heal"
+          is_percentage: true
+          value: 10
+          description: "[2] 怨息环流：每次被攻击后，会吸收敌人残余灵息，使自身生命恢复10%。"
+        - trigger: "on_death"
+          effect: "gain_attack"
+          is_percentage: false
+          value: 2
+          description: "[3] 自噬：每被击杀一次（死亡后复活），自身的力量上限提高2点，直至永恒。（每天最多永久提升20点）"
+      repair_cost: 5
       gem_slots: 5
 
     - item_id: "vip_gui_yu"
