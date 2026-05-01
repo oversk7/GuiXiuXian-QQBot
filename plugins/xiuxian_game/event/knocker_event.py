@@ -1147,28 +1147,34 @@ class KnockerEventService:
             SponsorShopService.switch_custom_title(player, "")
             return True, "已卸下称号"
 
-        # 优先匹配活动称号
-        if title_name in event_titles:
-            if pdata.get("title") == title_name:
-                return False, f"「{title_name}」已经是你的当前称号"
-            pdata["title"] = title_name
-            cls._set_player_data(player, pdata)
-            # 同时清除赞助自定义称号激活状态，保证只展示一个
-            SponsorShopService.switch_custom_title(player, "")
-            return True, f"称号已切换为「{title_name}」"
+        # 关键词匹配：精确 > 包含
+        matched = [t for t in all_titles if t == title_name]
+        if not matched:
+            matched = [t for t in all_titles if title_name in t]
+        if not matched:
+            titles_str = "、".join(f"「{t}」" for t in all_titles)
+            return False, f"你没有称号「{title_name}」\n已拥有: {titles_str}"
+        if len(matched) > 1:
+            options = "、".join(f"「{t}」" for t in matched)
+            return False, f"匹配到多个称号: {options}\n请输入更精确的名称"
 
-        # 匹配赞助自定义称号
-        if title_name in sponsor_titles:
-            if SponsorShopService.get_active_custom_title(player) == title_name:
-                return False, f"「{title_name}」已经是你的当前称号"
-            # 清除活动称号，激活自定义称号
+        target = matched[0]
+
+        if target in event_titles:
+            if pdata.get("title") == target:
+                return False, f"「{target}」已经是你的当前称号"
+            pdata["title"] = target
+            cls._set_player_data(player, pdata)
+            SponsorShopService.switch_custom_title(player, "")
+            return True, f"称号已切换为「{target}」"
+
+        if target in sponsor_titles:
+            if SponsorShopService.get_active_custom_title(player) == target:
+                return False, f"「{target}」已经是你的当前称号"
             pdata["title"] = ""
             cls._set_player_data(player, pdata)
-            SponsorShopService.switch_custom_title(player, title_name)
-            return True, f"称号已切换为「{title_name}」"
-
-        titles_str = "、".join(f"「{t}」" for t in all_titles)
-        return False, f"你没有称号「{title_name}」\n已拥有: {titles_str}"
+            SponsorShopService.switch_custom_title(player, target)
+            return True, f"称号已切换为「{target}」"
 
     @classmethod
     def handle_title_list(cls, player: Player) -> str:
