@@ -34,6 +34,15 @@ async def handle_animal_chess(event: MessageEvent, args: Message = CommandArg())
     args_text = args.extract_plain_text().strip()
     if not args_text or args_text == "帮助":
         await animal_chess_cmd.finish(_animal_markdown(_help_text()))
+    if args_text in ("规则", "游戏规则", "玩法"):
+        await _send_rules_image(animal_chess_cmd)
+        await animal_chess_cmd.finish(
+            _animal_markdown(
+                f"{cmd('创建房间', '斗兽棋 创建')}  "
+                f"{cmd('加入房间', '斗兽棋 加入')}  "
+                f"{cmd('查看棋盘', '斗兽棋 棋盘')}"
+            )
+        )
 
     async with safe_session() as session:
         player = await get_unified_player(session, event)
@@ -55,6 +64,7 @@ async def handle_animal_chess(event: MessageEvent, args: Message = CommandArg())
                     "红方：等待加入\n"
                     "━━━━━━━━━━━━━\n"
                     f"{cmd('加入房间', '斗兽棋 加入')}  "
+                    f"{cmd('查看规则', '斗兽棋 规则')}  "
                     f"{cmd('查看状态', '斗兽棋 状态')}  "
                     f"{cmd('退出房间', '斗兽棋 退出')}\n"
                     "双方入场后设置主押注。",
@@ -75,6 +85,7 @@ async def handle_animal_chess(event: MessageEvent, args: Message = CommandArg())
                     "━━━━━━━━━━━━━\n"
                     f"{_bet_amount_links()}\n"
                     f"{cmd('查看下注', '查看斗兽棋下注')}  "
+                    f"{cmd('查看规则', '斗兽棋 规则')}  "
                     f"{cmd('查看状态', '斗兽棋 状态')}",
                 )
             )
@@ -103,12 +114,13 @@ async def handle_animal_chess(event: MessageEvent, args: Message = CommandArg())
                         f"奖池总额：{details['total_pool']}金币",
                         f"系统税收：{details['tax_amount']}金币（3%）",
                         f"获胜可得：{details['final_reward']}金币起",
-                        f"{cmd('开始棋局', '斗兽棋 开始')}  {cmd('查看下注', '查看斗兽棋下注')}",
+                        f"{cmd('开始棋局', '斗兽棋 开始')}  {cmd('查看规则', '斗兽棋 规则')}  {cmd('查看下注', '查看斗兽棋下注')}",
                     ]
                 )
             else:
                 lines.append("等待对手设置筹码...")
                 lines.append(_bet_amount_links())
+                lines.append(cmd("查看规则", "斗兽棋 规则"))
             await animal_chess_cmd.finish(_animal_markdown("\n".join(lines)))
 
         if args_text == "开始":
@@ -134,7 +146,7 @@ async def handle_animal_chess(event: MessageEvent, args: Message = CommandArg())
                     f"先手：{_player_label(current)}\n"
                     "━━━━━━━━━━━━━\n"
                     f"{_move_links(board, current_side)}\n"
-                    f"{cmd('刷新棋盘', '斗兽棋 棋盘')}  {cmd('查看下注', '查看斗兽棋下注')}  {cmd('投降', '斗兽棋 投降')}"
+                    f"{cmd('刷新棋盘', '斗兽棋 棋盘')}  {cmd('查看规则', '斗兽棋 规则')}  {cmd('查看下注', '查看斗兽棋下注')}  {cmd('投降', '斗兽棋 投降')}"
                 )
             )
 
@@ -177,7 +189,7 @@ async def handle_animal_chess(event: MessageEvent, args: Message = CommandArg())
                     last_move_text,
                 )
                 lines.extend(["━━━━━━━━━━━━━", _move_links(board, current_side)])
-            lines.append(f"{cmd('刷新棋盘', '斗兽棋 棋盘')}  {cmd('查看下注', '查看斗兽棋下注')}  {cmd('投降', '斗兽棋 投降')}")
+            lines.append(f"{cmd('刷新棋盘', '斗兽棋 棋盘')}  {cmd('查看规则', '斗兽棋 规则')}  {cmd('查看下注', '查看斗兽棋下注')}  {cmd('投降', '斗兽棋 投降')}")
             await animal_chess_cmd.finish(_animal_markdown("\n".join(lines)))
 
         if args_text.startswith("走 "):
@@ -211,7 +223,7 @@ async def handle_animal_chess(event: MessageEvent, args: Message = CommandArg())
                         "━━━━━━━━━━━━━\n"
                         f"轮到：{_player_label(current)}\n"
                         f"{_move_links(board, current_side)}\n"
-                        f"{cmd('刷新棋盘', '斗兽棋 棋盘')}  {cmd('投降', '斗兽棋 投降')}"
+                        f"{cmd('刷新棋盘', '斗兽棋 棋盘')}  {cmd('查看规则', '斗兽棋 规则')}  {cmd('投降', '斗兽棋 投降')}"
                     )
                 )
             await animal_chess_cmd.finish(message_add_head(f"✅ {result.message}", event))
@@ -290,7 +302,7 @@ async def handle_animal_chess_bet(event: MessageEvent, args: Message = CommandAr
                 f"支持玩家：{target.nickname}[UID:{target.uid}]\n"
                 f"下注金额：{gold_amount}金币\n"
                 "游戏结束后自动结算\n"
-                f"{cmd('查看下注', '查看斗兽棋下注')}  {cmd('查看棋盘', '斗兽棋 棋盘')}",
+                f"{cmd('查看下注', '查看斗兽棋下注')}  {cmd('查看规则', '斗兽棋 规则')}  {cmd('查看棋盘', '斗兽棋 棋盘')}",
             )
         )
 
@@ -321,7 +333,7 @@ async def handle_animal_chess_view_bets(event: MessageEvent):
                 f"红方 {_player_label(players.get(room.player2_id))}：{p2_count}人，共{p2_total}金币\n"
                 "━━━━━━━━━━━━━\n"
                 "赢家支持者按投入比例瓜分输家支持者与输家主押注的金币\n"
-                f"{cmd('查看棋盘', '斗兽棋 棋盘')}  {cmd('开始棋局', '斗兽棋 开始')}",
+                f"{cmd('查看棋盘', '斗兽棋 棋盘')}  {cmd('查看规则', '斗兽棋 规则')}  {cmd('开始棋局', '斗兽棋 开始')}",
             )
         )
 
@@ -337,7 +349,7 @@ def _help_text() -> str:
         f"房间：{cmd('创建', '斗兽棋 创建')} / {cmd('加入', '斗兽棋 加入')} / {cmd('退出', '斗兽棋 退出')}\n"
         f"筹码：{_bet_amount_links()} / {cmd('开始', '斗兽棋 开始')}\n"
         "行动：斗兽棋 走 虎 上（方向：上/下/左/右）\n"
-        f"查看：{cmd('状态', '斗兽棋 状态')} / {cmd('棋盘', '斗兽棋 棋盘')}\n"
+        f"查看：{cmd('规则', '斗兽棋 规则')} / {cmd('状态', '斗兽棋 状态')} / {cmd('棋盘', '斗兽棋 棋盘')}\n"
         f"认输：{cmd('投降', '斗兽棋 投降')}\n"
         f"旁观：斗兽棋下注 玩家名 金币数 / {cmd('查看下注', '查看斗兽棋下注')}\n"
         "━━━━━━━━━━━━━\n"
@@ -403,6 +415,120 @@ async def _send_board_image(matcher, title: str, board: list[dict], room, player
         return
 
     await matcher.send(message_add_head(text + "\n" + _render_board(board)))
+
+
+async def _send_rules_image(matcher) -> None:
+    image_b64 = await asyncio.to_thread(_render_rules_image_b64)
+    text = (
+        "📖 斗兽棋游戏规则\n"
+        "━━━━━━━━━━━━━\n"
+        "目标：进入对方兽穴，或吃光对方所有棋子。\n"
+        "常用：鼠吃象，象不能吃鼠；狮虎可跳河；敌方进己方陷阱后任意子可吃。"
+    )
+    if image_b64:
+        await matcher.send(Message(text).append(MessageSegment.file_image(image_b64)))
+        return
+
+    await matcher.send(message_add_head(text + "\n" + _rules_fallback_text()))
+
+
+def _render_rules_image_b64() -> str | None:
+    try:
+        from PIL import Image, ImageDraw, ImageFont
+    except ImportError:
+        return None
+
+    img_w, img_h = 1220, 720
+    img = Image.new("RGB", (img_w, img_h), (250, 247, 238))
+    draw = ImageDraw.Draw(img)
+    title_font = _load_font(ImageFont, 30)
+    header_font = _load_font(ImageFont, 20)
+    body_font = _load_font(ImageFont, 16)
+    small_font = _load_font(ImageFont, 13)
+    piece_font = _load_font(ImageFont, 22)
+
+    draw.text((img_w // 2, 30), "📖 斗兽棋游戏规则", fill=(139, 72, 22), font=title_font, anchor="mm")
+
+    left_x, right_x = 18, 625
+    y = 64
+    _draw_rule_card(draw, (left_x, y, 592, 176), "🎯 游戏目标", [
+        "斗兽棋是两人策略棋。目标是让己方棋子进入对方兽穴，",
+        "或者吃掉对方所有棋子。自己的棋子不能进入自己的兽穴。",
+    ], header_font, body_font, (255, 251, 230), (244, 199, 61))
+
+    y = 200
+    _draw_rule_card(draw, (left_x, y, 592, 480), "🦁 动物等级", [
+        "棋子按战力从高到低排列，高等级可吃低等级，同等级可互吃：",
+    ], header_font, body_font, (255, 251, 230), (244, 199, 61))
+    pieces = [("象", 8), ("狮", 7), ("虎", 6), ("豹", 5), ("狼", 4), ("狗", 3), ("猫", 2), ("鼠", 1)]
+    for idx, (animal, rank) in enumerate(pieces):
+        px = left_x + 18 + (idx % 4) * 136
+        py = y + 86 + (idx // 4) * 92
+        draw.rounded_rectangle((px, py, px + 128, py + 78), radius=8, fill=(255, 255, 249), outline=(244, 199, 61), width=1)
+        draw.ellipse((px + 42, py + 9, px + 86, py + 53), fill=(255, 244, 239), outline=(205, 65, 56), width=2)
+        draw.text((px + 64, py + 31), animal, fill=(185, 54, 48), font=piece_font, anchor="mm")
+        draw.text((px + 64, py + 62), f"等级 {rank}", fill=(69, 77, 91), font=small_font, anchor="mm")
+
+    y = 504
+    _draw_rule_card(draw, (left_x, y, 592, 662), "🎮 移动规则", [
+        "• 每次只能上下左右移动一格，不能斜走。",
+        "• 不能移动到已有己方棋子的格子。",
+        "• 除狮虎跳河外，不能越过其他棋子。",
+        "• 进入对方兽穴立即获胜。",
+    ], header_font, body_font, (255, 251, 230), (244, 199, 61))
+
+    _draw_rule_card(draw, (right_x, 64, 1200, 172), "🐭 鼠吃象", [
+        "鼠是唯一可以吃象的棋子，象不能吃鼠。",
+        "注意：河里的鼠不能直接吃陆地上的象。",
+    ], header_font, body_font, (238, 245, 255), (156, 190, 242))
+
+    _draw_rule_card(draw, (right_x, 184, 1200, 272), "💧 河流", [
+        "只有鼠可以进入河流。水中鼠只能吃水中鼠，不能吃岸上的棋子。",
+    ], header_font, body_font, (233, 251, 252), (105, 211, 224))
+
+    _draw_rule_card(draw, (right_x, 284, 1200, 352), "🦁🐯 跳跃", [
+        "狮子和老虎可以横向或纵向跳过整条河。河中有任意鼠时，不能跳过。",
+    ], header_font, body_font, (255, 246, 235), (247, 181, 105))
+
+    _draw_rule_card(draw, (right_x, 364, 1200, 432), "🕳 陷阱", [
+        "进入己方陷阱的敌方棋子战力归零，可被任意己方棋子吃掉。",
+    ], header_font, body_font, (249, 241, 255), (210, 171, 245))
+
+    _draw_rule_card(draw, (right_x, 444, 1200, 512), "🏠 兽穴", [
+        "进入对方兽穴立即获胜；自己的棋子不能进入自己的兽穴。",
+    ], header_font, body_font, (255, 240, 240), (245, 167, 167))
+
+    _draw_rule_card(draw, (right_x, 528, 1200, 662), "🏆 胜负判定", [
+        "• 己方棋子进入对方兽穴，获胜。",
+        "• 吃掉对方所有棋子，获胜。",
+        "• 对方主动投降，己方获胜。",
+        "• 结算沿用恶魔轮盘：输方资金扣 3% 税后按赢方投入比例分配。",
+    ], header_font, body_font, (237, 253, 243), (141, 224, 166))
+
+    buf = io.BytesIO()
+    img.save(buf, format="PNG", optimize=True)
+    return base64.b64encode(buf.getvalue()).decode("utf-8")
+
+
+def _draw_rule_card(draw, box: tuple[int, int, int, int], title: str, lines: list[str], header_font, body_font, fill, outline) -> None:
+    x1, y1, x2, y2 = box
+    draw.rounded_rectangle(box, radius=12, fill=fill, outline=outline, width=1)
+    draw.text((x1 + 18, y1 + 18), title, fill=(124, 68, 24), font=header_font)
+    text_y = y1 + 56
+    for line in lines:
+        draw.text((x1 + 18, text_y), line, fill=(54, 65, 82), font=body_font)
+        text_y += 26
+
+
+def _rules_fallback_text() -> str:
+    return (
+        "游戏目标：进入对方兽穴，或吃光对方棋子。\n"
+        "等级：象>狮>虎>豹>狼>狗>猫>鼠，同级互吃。\n"
+        "鼠：可吃象，象不可吃鼠；鼠可入河，河中鼠不能吃岸上象。\n"
+        "河流：只有鼠能入河；狮虎可跳河，河中有鼠则不能跳。\n"
+        "陷阱：敌方棋子进入己方陷阱后，可被任意己方棋子吃掉。\n"
+        "兽穴：不能进自己的兽穴，进入对方兽穴立即获胜。"
+    )
 
 
 def _render_board_image_b64(board: list[dict], room, players: dict[str, Player], current: Player | None, turn_count: int, note: str | None) -> str | None:
