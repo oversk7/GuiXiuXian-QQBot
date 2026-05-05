@@ -8,6 +8,7 @@
 """
 
 import random
+from collections import Counter
 from typing import Dict, List, Optional, Tuple
 from datetime import datetime
 from nonebot import logger
@@ -202,10 +203,11 @@ class CookingService:
         # 5. 执行烹饪并生成菜肴
         results = []
         total_consumed = {}  # 记录总消耗食材
+        produced_counts = Counter()
+        success_rate = self._calculate_success_rate(chef_skill, recipe.category, chef_specialty)
 
-        for i in range(quantity):
+        for _ in range(quantity):
             # 判定烹饪成功/失败
-            success_rate = self._calculate_success_rate(chef_skill, recipe.category, chef_specialty)
             is_success = random.random() * 100 < success_rate
 
             if is_success:
@@ -220,6 +222,7 @@ class CookingService:
                     "price": dish_price,
                     "buff": recipe.buff if quality == DishQuality.PERFECT else None
                 })
+                produced_counts[quality] += 1
 
                 # 消耗100%食材
                 for item_id, qty in recipe.ingredients.items():
@@ -232,6 +235,7 @@ class CookingService:
                     "price": int(recipe.base_price * 0.1),
                     "buff": None
                 })
+                produced_counts[DishQuality.DARK] += 1
 
                 # 失败只消耗50%食材
                 for item_id, qty in recipe.ingredients.items():
@@ -260,18 +264,20 @@ class CookingService:
                     await uow.items.delete(item.id)
 
         # 7. 添加菜肴到背包(作为DISH类型物品)
-        for dish in results:
+        # 按品质聚合后批量入包，避免一次烹饪多份时反复查询和刷新背包。
+        from ..models.inventory import ItemInstance
+        for quality, produced_qty in produced_counts.items():
             # 动态生成菜肴的item_id: dish_{recipe_id}_{quality}
             # 例如: dish_braised_carp_normal, dish_braised_carp_perfect
-            dish_item_id = self._generate_dish_item_id(recipe.recipe_id, dish["quality"])
+            dish_item_id = self._generate_dish_item_id(recipe.recipe_id, quality)
 
             # 使用ItemInstance.add_item添加到背包
             # 菜肴作为DISH类型,可堆叠
-            from ..models.inventory import ItemInstance
             try:
-                await ItemInstance.add_item(uow.session, player_id, dish_item_id, 1)
+                await ItemInstance.add_item(uow.session, player_id, dish_item_id, produced_qty)
             except ValueError as e:
                 # 如果背包满了,返回错误
+                await uow.rollback()
                 return False, f"⛔ 背包空间不足: {str(e)}", None
 
         # 8. 提交事务
@@ -284,9 +290,20 @@ class CookingService:
         msg = f"🍳 烹饪完成!\n"
         msg += f"📊 成功: {success_count} | 失败: {fail_count}\n\n"
 
-        for dish in results:
-            quality_emoji = self._get_quality_emoji(dish["quality"])
-            msg += f"{quality_emoji} {dish['name']} (售价: {dish['price']}金)\n"
+        quality_order = [
+            DishQuality.PERFECT,
+            DishQuality.FINE,
+            DishQuality.NORMAL,
+            DishQuality.DARK,
+        ]
+        for quality in quality_order:
+            quality_count = produced_counts.get(quality, 0)
+            if quality_count <= 0:
+                continue
+            quality_emoji = self._get_quality_emoji(quality)
+            dish_name = f"黑暗{recipe.name}" if quality == DishQuality.DARK else recipe.name
+            dish_price = int(recipe.base_price * self._get_quality_multiplier(quality))
+            msg += f"{quality_emoji} {dish_name} ×{quality_count} (单价: {dish_price}金)\n"
 
         return True, msg, results
 
