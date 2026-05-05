@@ -16,10 +16,14 @@
   【购买远程仓库】        远程存取阴宅仓库（180诡烛/月）
   【购买鱼竿特权】        每次多钓2条鱼（180诡烛/月）
   【购买全视之眼】        俯瞰显示诡域全图（180诡烛/月）
+  【购买绑定小号 <UID>】  绑定一个小号（200诡烛，需目标小号确认）
+  【确认绑定小号 <验证码>】目标小号拥有者确认绑定
 """
 
+import asyncio
+
 from nonebot import on_command
-from nonebot.adapters.qq import MessageEvent, Message
+from nonebot.adapters.qq import MessageEvent, Message, MessageSegment
 from nonebot.params import CommandArg
 from sqlalchemy import select
 
@@ -27,6 +31,7 @@ from ..models.db import safe_session
 from ..platform_utils import get_unified_player, is_guild_message
 from ..utils_markdown import cmd, build_markdown
 from .service import SponsorShopService
+from .shop_image import generate_sponsor_shop_image
 
 
 # ==================== 命令注册 ====================
@@ -40,6 +45,8 @@ buy_crying_tomb_hat_cmd = on_command("购买哭坟帽", priority=15, block=True)
 buy_reset_talisman_cmd = on_command("购买重启符", aliases={"兑换重启符"}, priority=15, block=True)
 buy_santa_rift_cmd = on_command("购买圣诞裂隙", aliases={"购买裂隙"}, priority=15, block=True)
 expand_inventory_cmd = on_command("背包扩容", aliases={"扩容背包"}, priority=15, block=True)
+bind_alt_account_cmd = on_command("购买绑定小号", aliases={"绑定小号服务"}, priority=15, block=True)
+confirm_alt_account_bind_cmd = on_command("确认绑定小号", priority=15, block=True)
 buy_basic_monthly_card_cmd = on_command("购买初级月卡", aliases={"兑换初级月卡"}, priority=15, block=True)
 buy_premium_monthly_card_cmd = on_command("购买高级月卡", aliases={"兑换高级月卡"}, priority=15, block=True)
 # 赞助特权
@@ -72,8 +79,21 @@ async def handle_sponsor_shop(event: MessageEvent):
     async with safe_session() as session:
         player = await _get_player_or_finish(session, event, sponsor_shop_cmd)
         info = SponsorShopService.get_shop_info(player)
+        balance = player.gui_zhu
+        owned_titles = SponsorShopService.get_owned_custom_titles(player)
+        active_title = SponsorShopService.get_active_custom_title(player)
 
-    buttons = f"\n***\n{cmd('赞助记录')} | {cmd('购买初级月卡')} | {cmd('购买高级月卡')}"
+    img_b64 = await asyncio.to_thread(
+        generate_sponsor_shop_image,
+        balance,
+        owned_titles,
+        active_title,
+    )
+    if img_b64:
+        buttons = f"\n{cmd('赞助记录')} | {cmd('购买初级月卡')} | {cmd('购买高级月卡')} | {cmd('购买绑定小号 UID', '购买绑定小号 ')}"
+        await sponsor_shop_cmd.finish(Message([MessageSegment.file_image(img_b64), build_markdown(buttons)]))
+
+    buttons = f"\n***\n{cmd('赞助记录')} | {cmd('购买初级月卡')} | {cmd('购买高级月卡')} | {cmd('购买绑定小号 UID', '购买绑定小号 ')}"
     await sponsor_shop_cmd.finish(build_markdown(info + buttons))
 
 
@@ -256,6 +276,64 @@ async def handle_expand_inventory(event: MessageEvent, args: Message = CommandAr
 
     buttons = f"\n***\n{cmd('背包')} | {cmd('赞助商店')}"
     await expand_inventory_cmd.finish(build_markdown(msg + buttons))
+
+
+# ==================== 绑定小号 ====================
+
+@bind_alt_account_cmd.handle()
+async def handle_bind_alt_account(event: MessageEvent, args: Message = CommandArg()):
+    """购买绑定小号服务（200诡烛/个，目标账号确认后扣费）"""
+    arg_text = args.extract_plain_text().strip()
+    if not arg_text or not arg_text.isdigit():
+        content = (
+            "# 🔗 购买绑定小号\n"
+            "***\n"
+            f"用法：{cmd('购买绑定小号 目标UID', '购买绑定小号 ')}\n"
+            f"示例：{cmd('购买绑定小号 1002')}\n"
+            "价格：**200** 诡烛/个\n"
+            "流程：主号发起申请，目标小号当前拥有者发送验证码确认后扣费绑定\n"
+            f"***\n{cmd('赞助商店')}"
+        )
+        await bind_alt_account_cmd.finish(build_markdown(content))
+
+    target_uid = int(arg_text)
+    async with safe_session() as session:
+        player = await _get_player_or_finish(session, event, bind_alt_account_cmd)
+        success, msg = await SponsorShopService.request_alt_account_bind(
+            player,
+            target_uid,
+            event.get_user_id(),
+            session,
+        )
+
+    buttons = f"\n***\n{cmd('赞助商店')} | {cmd('我的账号')}"
+    await bind_alt_account_cmd.finish(build_markdown(msg + buttons))
+
+
+@confirm_alt_account_bind_cmd.handle()
+async def handle_confirm_alt_account_bind(event: MessageEvent, args: Message = CommandArg()):
+    """目标小号拥有者确认绑定申请"""
+    code = args.extract_plain_text().strip()
+    if not code:
+        content = (
+            "# 🔗 确认绑定小号\n"
+            "***\n"
+            f"用法：{cmd('确认绑定小号 验证码', '确认绑定小号 ')}\n"
+            f"示例：{cmd('确认绑定小号 123456')}\n"
+            "说明：只有目标小号当前拥有者或老账号原始QQ号可以确认\n"
+            f"***\n{cmd('赞助商店')}"
+        )
+        await confirm_alt_account_bind_cmd.finish(build_markdown(content))
+
+    async with safe_session() as session:
+        success, msg = await SponsorShopService.confirm_alt_account_bind(
+            event.get_user_id(),
+            code,
+            session,
+        )
+
+    buttons = f"\n***\n{cmd('我的账号')} | {cmd('赞助商店')}"
+    await confirm_alt_account_bind_cmd.finish(build_markdown(msg + buttons))
 
 
 # ==================== 购买初级月卡 ====================

@@ -11,7 +11,11 @@
 - 购买初级月卡（88诡烛/月）
 - 购买高级月卡（288诡烛/月）
 """
+from datetime import datetime, timedelta
+import secrets
+import string
 from typing import Optional, List, Tuple
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from ..models.player import Player
 
@@ -29,6 +33,7 @@ INVENTORY_EXPAND_PRICE = 10      # 背包扩容（诡烛/格）
 INVENTORY_EXPAND_MAX = 1000      # 背包容量上限
 RESET_TALISMAN_PRICE = 1000      # 重启符（诡烛/张）
 SANTA_RIFT_PRICE = 30            # 圣诞裂隙（诡烛/个）
+ALT_ACCOUNT_BIND_PRICE = 200     # 绑定小号（诡烛/个）
 
 # ==================== 月卡特权价格 ====================
 PREMIUM_SECLUSION_PRICE = 180     # 闭关无上限特权（诡烛/月）
@@ -51,11 +56,35 @@ _SPONSOR_KEY = "sponsor"
 _CUSTOM_TITLE_KEY = "custom_title"
 _OWNED_TITLES_KEY = "owned_titles"
 
+_ALT_BIND_EXPIRE_MINUTES = 15
+_PENDING_ALT_BINDS: dict[str, dict] = {}
+
 
 class SponsorShopService:
     """赞助商店核心服务（无状态，操作 player.extra_attrs）"""
 
     # ==================== 内部辅助 ====================
+
+    @classmethod
+    def _cleanup_expired_alt_binds(cls) -> None:
+        """清理过期的小号绑定确认单。"""
+        now = datetime.now()
+        expired_codes = [
+            code for code, data in _PENDING_ALT_BINDS.items()
+            if now - data["created_at"] > timedelta(minutes=_ALT_BIND_EXPIRE_MINUTES)
+        ]
+        for code in expired_codes:
+            _PENDING_ALT_BINDS.pop(code, None)
+
+    @classmethod
+    def _generate_alt_bind_code(cls) -> str:
+        """生成不与当前确认单冲突的6位数字验证码。"""
+        cls._cleanup_expired_alt_binds()
+        for _ in range(20):
+            code = "".join(secrets.choice(string.digits) for _ in range(6))
+            if code not in _PENDING_ALT_BINDS:
+                return code
+        return "".join(secrets.choice(string.digits) for _ in range(8))
 
     @classmethod
     def _get_sponsor_data(cls, player: Player) -> dict:
@@ -286,6 +315,169 @@ class SponsorShopService:
             f"✅ 公会改名成功！\n"
             f"📛 {old_name} → {new_name}\n"
             f"🔮 剩余诡烛: {player.gui_zhu}"
+        )
+
+    # ==================== 小号绑定 ====================
+
+    @classmethod
+    async def request_alt_account_bind(
+        cls,
+        player: Player,
+        target_uid: int,
+        payer_owner_platform_id: str,
+        session: AsyncSession,
+    ) -> Tuple[bool, str]:
+        """
+        发起绑定小号申请。
+
+        不立即扣费；目标账号当前拥有者确认后再扣除主号诡烛并转移所有权。
+        """
+        if target_uid <= 0:
+            return False, "⛔ 目标UID必须是正整数"
+        if target_uid == player.uid:
+            return False, "⛔ 不能绑定当前正在使用的账号"
+        if player.gui_zhu < ALT_ACCOUNT_BIND_PRICE:
+            return False, (
+                f"⛔ 诡烛不足\n"
+                f"需要: {ALT_ACCOUNT_BIND_PRICE} 诡烛\n"
+                f"当前: {player.gui_zhu} 诡烛"
+            )
+
+        result = await session.execute(select(Player).where(Player.uid == target_uid))
+        target = result.scalars().first()
+        if not target:
+            return False, f"⛔ 未找到 UID:{target_uid} 的账号"
+
+        from ..models.account_ownership import AccountOwnership
+
+        ownership_result = await session.execute(
+            select(AccountOwnership).where(AccountOwnership.player_id == target.id)
+        )
+        target_ownership = ownership_result.scalars().first()
+        if target_ownership and target_ownership.owner_platform_id == payer_owner_platform_id:
+            return False, f"⛔ UID:{target_uid} 已经在你的账号列表里"
+
+        cls._cleanup_expired_alt_binds()
+        for old_code, data in list(_PENDING_ALT_BINDS.items()):
+            if (
+                data["payer_player_id"] == player.id
+                and data["target_player_id"] == target.id
+            ):
+                _PENDING_ALT_BINDS.pop(old_code, None)
+
+        code = cls._generate_alt_bind_code()
+        _PENDING_ALT_BINDS[code] = {
+            "payer_player_id": player.id,
+            "payer_uid": player.uid,
+            "payer_nickname": player.nickname,
+            "payer_owner_platform_id": payer_owner_platform_id,
+            "target_player_id": target.id,
+            "target_uid": target.uid,
+            "target_nickname": target.nickname,
+            "created_at": datetime.now(),
+        }
+
+        return True, (
+            f"✅ 小号绑定申请已创建\n"
+            f"主号: {player.nickname} UID:{player.uid}\n"
+            f"目标小号: {target.nickname} UID:{target.uid}\n"
+            f"价格: {ALT_ACCOUNT_BIND_PRICE} 诡烛（确认后扣除）\n"
+            f"验证码: {code}\n"
+            f"⏰ {_ALT_BIND_EXPIRE_MINUTES}分钟内有效\n"
+            f"💡 请让目标小号当前拥有者发送【确认绑定小号 {code}】"
+        )
+
+    @classmethod
+    async def confirm_alt_account_bind(
+        cls,
+        confirmer_platform_id: str,
+        code: str,
+        session: AsyncSession,
+    ) -> Tuple[bool, str]:
+        """目标账号拥有者确认绑定小号申请，确认通过后扣费并转移所有权。"""
+        cls._cleanup_expired_alt_binds()
+        code = code.strip()
+        pending = _PENDING_ALT_BINDS.get(code)
+        if not pending:
+            return False, "⛔ 验证码不存在或已过期"
+
+        payer = await session.get(Player, pending["payer_player_id"])
+        target = await session.get(Player, pending["target_player_id"])
+        if not payer or not target:
+            _PENDING_ALT_BINDS.pop(code, None)
+            return False, "⛔ 申请中的账号不存在，已取消本次绑定"
+
+        from ..models.account_ownership import AccountOwnership
+
+        ownership_result = await session.execute(
+            select(AccountOwnership).where(AccountOwnership.player_id == target.id)
+        )
+        target_ownership = ownership_result.scalars().first()
+
+        if target_ownership:
+            if target_ownership.owner_platform_id != confirmer_platform_id:
+                return False, "⛔ 你不是目标小号当前拥有者，无法确认绑定"
+            original_owner = target_ownership.owner_platform_id
+        else:
+            if target.id != confirmer_platform_id:
+                return False, "⛔ 你不是目标小号原始QQ号，无法确认绑定"
+            original_owner = confirmer_platform_id
+
+        payer_owner_platform_id = pending["payer_owner_platform_id"]
+        if target_ownership and original_owner == payer_owner_platform_id:
+            _PENDING_ALT_BINDS.pop(code, None)
+            return False, f"⛔ UID:{target.uid} 已经在主号账号列表里"
+
+        if payer.gui_zhu < ALT_ACCOUNT_BIND_PRICE:
+            return False, (
+                f"⛔ 主号诡烛不足，无法完成绑定\n"
+                f"需要: {ALT_ACCOUNT_BIND_PRICE} 诡烛\n"
+                f"当前: {payer.gui_zhu} 诡烛"
+            )
+
+        now = datetime.now()
+        if target_ownership:
+            target_ownership.owner_platform_id = payer_owner_platform_id
+            target_ownership.is_active = False
+            target_ownership.acquired_type = "purchased"
+            target_ownership.acquired_at = now
+            target_ownership.clear_transfer_key()
+            session.add(target_ownership)
+        else:
+            session.add(AccountOwnership(
+                owner_platform_id=payer_owner_platform_id,
+                player_id=target.id,
+                is_active=False,
+                display_name="小号",
+                acquired_type="purchased",
+                acquired_at=now,
+            ))
+
+        balance_before = payer.gui_zhu
+        payer.gui_zhu -= ALT_ACCOUNT_BIND_PRICE
+
+        from ..models.sponsor_shop_log import SponsorShopLog
+        await SponsorShopLog.add_log(
+            session,
+            payer,
+            "绑定小号",
+            f"UID:{target.uid} {target.nickname}",
+            ALT_ACCOUNT_BIND_PRICE,
+            balance_before,
+        )
+
+        from ..infrastructure.cache import player_identity_cache
+        player_identity_cache.invalidate(original_owner)
+        player_identity_cache.invalidate(payer_owner_platform_id)
+        player_identity_cache.invalidate(confirmer_platform_id)
+
+        _PENDING_ALT_BINDS.pop(code, None)
+        return True, (
+            f"✅ 小号绑定成功！\n"
+            f"主号: {payer.nickname} UID:{payer.uid}\n"
+            f"新增小号: {target.nickname} UID:{target.uid}\n"
+            f"🔮 主号剩余诡烛: {payer.gui_zhu}\n"
+            f"💡 使用【我的账号】查看，使用【切换账号 {target.uid}】切换"
         )
 
     # ==================== 棺材钉购买 ====================
@@ -652,6 +844,9 @@ class SponsorShopService:
             f"📛 自定义称号  [{CUSTOM_TITLE_PRICE} 诡烛]",
             f"  设置专属展示称号 ({TITLE_MIN_LEN}-{TITLE_MAX_LEN}字)",
             "",
+            f"🔗 绑定小号  [{ALT_ACCOUNT_BIND_PRICE} 诡烛/个]",
+            f"  需目标小号当前拥有者确认，确认后转入账号列表",
+            "",
         ]
 
         if owned_titles:
@@ -707,6 +902,8 @@ class SponsorShopService:
             "【购买改名卡】       获得1张改名卡",
             "【购买称号 内容】    购买自定义称号",
             "【公会改名 新名称】  修改公会名称（会长）",
+            "【购买绑定小号 UID】 发起小号绑定申请（需小号确认）",
+            "【确认绑定小号 验证码】 由目标小号当前拥有者确认",
             "【改名 新名字】      使用改名卡改名",
             "【购买闭关特权】     闭关无时间上限（180诡烛/月）",
             "【购买远程仓库】     随地存取阴宅仓库（180诡烛/月）",
