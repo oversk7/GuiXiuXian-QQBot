@@ -539,7 +539,7 @@ def _render_board_image_b64(board: list[dict], room, players: dict[str, Player],
 
     cell = 74
     margin_x = 44
-    margin_top = 132
+    margin_top = 172
     footer_h = 72
     board_w = cell * 7
     board_h = cell * 9
@@ -565,9 +565,11 @@ def _render_board_image_b64(board: list[dict], room, players: dict[str, Player],
 
     blue_name = _player_label(players.get(room.player1_id))
     red_name = _player_label(players.get(room.player2_id))
-    draw.text((margin_x, 116), f"蓝方 {blue_name}", fill=(40, 91, 197), font=small_font)
-    red_text = f"红方 {red_name}"
-    draw.text((img_w - margin_x, 116), red_text, fill=(190, 58, 52), font=small_font, anchor="ra")
+    badge_y1, badge_y2 = 108, 150
+    draw.rounded_rectangle((margin_x, badge_y1, margin_x + 230, badge_y2), radius=10, fill=(232, 240, 255), outline=(153, 183, 244), width=1)
+    draw.rounded_rectangle((img_w - margin_x - 230, badge_y1, img_w - margin_x, badge_y2), radius=10, fill=(255, 237, 234), outline=(242, 162, 154), width=1)
+    draw.text((margin_x + 14, badge_y1 + 21), _fit_text(f"蓝方 {blue_name}", 16), fill=(40, 91, 197), font=small_font, anchor="lm")
+    draw.text((img_w - margin_x - 14, badge_y1 + 21), _fit_text(f"红方 {red_name}", 16), fill=(190, 58, 52), font=small_font, anchor="rm")
 
     # Board cells
     board_x = margin_x
@@ -650,6 +652,12 @@ def _load_font(image_font_module, size: int):
         except OSError:
             continue
     return image_font_module.load_default()
+
+
+def _fit_text(text: str, max_chars: int) -> str:
+    if len(text) <= max_chars:
+        return text
+    return text[: max_chars - 1] + "…"
 
 
 def _render_board(board: list[dict]) -> str:
