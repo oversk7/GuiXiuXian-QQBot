@@ -90,8 +90,18 @@ async def handle_sponsor_shop(event: MessageEvent):
         active_title,
     )
     if img_b64:
-        buttons = f"\n{cmd('赞助记录')} | {cmd('购买初级月卡')} | {cmd('购买高级月卡')} | {cmd('购买绑定小号 UID', '购买绑定小号 ')}"
-        await sponsor_shop_cmd.finish(Message([MessageSegment.file_image(img_b64), build_markdown(buttons)]))
+        text = (
+            "🕯️ 诡修仙赞助商店\n"
+            f"当前诡烛余额：{balance}\n"
+            "━━━━━━━━━━━━━\n"
+            "常用命令：\n"
+            "【赞助记录】 查看兑换记录\n"
+            "【购买初级月卡】 88诡烛/月\n"
+            "【购买高级月卡】 288诡烛/月\n"
+            "【购买绑定小号 UID】 200诡烛/个，需小号确认\n"
+            "【确认绑定小号 验证码】 目标小号拥有者确认"
+        )
+        await sponsor_shop_cmd.finish(Message(text).append(MessageSegment.file_image(img_b64)))
 
     buttons = f"\n***\n{cmd('赞助记录')} | {cmd('购买初级月卡')} | {cmd('购买高级月卡')} | {cmd('购买绑定小号 UID', '购买绑定小号 ')}"
     await sponsor_shop_cmd.finish(build_markdown(info + buttons))
