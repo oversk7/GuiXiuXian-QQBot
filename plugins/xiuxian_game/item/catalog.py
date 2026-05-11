@@ -524,10 +524,14 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
             if hasattr(cfg, 'gem_slots') and cfg.gem_slots > 0:
                 equipment_info.append(f"💎 宝石孔位：{cfg.gem_slots}个")
 
+            slot_bonus = int(getattr(cfg, "equipment_slot_bonus", 0) or 0)
+            if slot_bonus > 0:
+                equipment_info.append(f"🎽 装备槽：+{slot_bonus}（穿戴后净增{slot_bonus - 1}格）")
+
             # 特殊效果信息（显示解锁条件）
             if hasattr(cfg, 'special_effects') and cfg.special_effects:
                 # VIP定制装备列表（0阶即全解锁）
-                VIP_EQUIPMENT_IDS = {"vip_blade_zhanlongshan", "vip_robe_jingyuanzhiyi", "vip_robe_jingyuan_legacy", "heaven_retreat_star_blade", "vip_gui_yu", "vip_chrono_watch", "vip_longying_flash", "vip_ghost_dice", "vip_shoes_longren", "vip_pendant_fuze", "vip_huihai_xinyuan"}
+                VIP_EQUIPMENT_IDS = {"vip_blade_zhanlongshan", "vip_robe_jingyuanzhiyi", "vip_robe_jingyuan_legacy", "heaven_retreat_star_blade", "vip_gui_yu", "vip_chrono_watch", "vip_longying_flash", "vip_ghost_dice", "vip_shoes_longren", "vip_pendant_fuze", "vip_huihai_xinyuan", "vip_jade_xuanxu_shuangyan"}
                 is_vip_equipment = cfg.item_id in VIP_EQUIPMENT_IDS
 
                 if is_vip_equipment and cfg.item_id in _VIP_ACTIVE_SKILL_IDS:
@@ -727,10 +731,14 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
             if hasattr(cfg, 'gem_slots') and cfg.gem_slots > 0:
                 desc_parts.append(f"💎 宝石孔位：{cfg.gem_slots}个")
 
+            slot_bonus = int(getattr(cfg, "equipment_slot_bonus", 0) or 0)
+            if slot_bonus > 0:
+                desc_parts.append(f"🎽 装备槽：+{slot_bonus}（穿戴后净增{slot_bonus - 1}格）")
+
             # 特殊效果信息（显示解锁条件）
             if hasattr(cfg, 'special_effects') and cfg.special_effects:
                 # VIP定制装备列表（0阶即全解锁）
-                VIP_EQUIPMENT_IDS = {"vip_blade_zhanlongshan", "vip_robe_jingyuanzhiyi", "vip_robe_jingyuan_legacy", "heaven_retreat_star_blade", "vip_gui_yu", "vip_chrono_watch", "vip_longying_flash", "vip_ghost_dice", "vip_shoes_longren", "vip_pendant_fuze", "vip_huihai_xinyuan"}
+                VIP_EQUIPMENT_IDS = {"vip_blade_zhanlongshan", "vip_robe_jingyuanzhiyi", "vip_robe_jingyuan_legacy", "heaven_retreat_star_blade", "vip_gui_yu", "vip_chrono_watch", "vip_longying_flash", "vip_ghost_dice", "vip_shoes_longren", "vip_pendant_fuze", "vip_huihai_xinyuan", "vip_jade_xuanxu_shuangyan"}
                 is_vip_equipment = cfg.item_id in VIP_EQUIPMENT_IDS
 
                 if is_vip_equipment and cfg.item_id in _VIP_ACTIVE_SKILL_IDS:

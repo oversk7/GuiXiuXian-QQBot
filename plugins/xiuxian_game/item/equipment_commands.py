@@ -26,6 +26,60 @@ from .equipment_service import recalc_equipment_attributes, EQUIP_ITEM_IDS
 # 设置为True使用新版DI架构的EquipmentService，False使用旧版本
 # =====================================================
 
+BASE_EQUIPMENT_SLOT_LIMIT = 5
+
+
+def get_equipment_slot_bonus(equipment: ItemInstance | None) -> int:
+    """获取装备提供的额外装备槽数量。"""
+    cfg = getattr(equipment, "config", None) if equipment else None
+    if not cfg:
+        return 0
+    try:
+        return max(0, int(getattr(cfg, "equipment_slot_bonus", 0) or 0))
+    except (TypeError, ValueError):
+        return 0
+
+
+def get_equipment_slot_limit(
+    equipped_items: list[ItemInstance],
+    candidate: ItemInstance | None = None,
+) -> int:
+    """计算当前装备槽上限；candidate 用于判断本次即将穿戴的装备。"""
+    limit = BASE_EQUIPMENT_SLOT_LIMIT
+    counted_ids: set[int] = set()
+
+    for eq in equipped_items:
+        if not getattr(eq, "equipped", False):
+            continue
+        limit += get_equipment_slot_bonus(eq)
+        if getattr(eq, "id", None) is not None:
+            counted_ids.add(eq.id)
+
+    if candidate and getattr(candidate, "id", None) not in counted_ids:
+        limit += get_equipment_slot_bonus(candidate)
+
+    return limit
+
+
+def would_unwear_worsen_slot_overflow(
+    equipped_items: list[ItemInstance],
+    target: ItemInstance,
+) -> tuple[bool, int, int]:
+    """判断卸下 target 后是否会让已装备数量超过新槽位上限。"""
+    current_count = len([eq for eq in equipped_items if getattr(eq, "equipped", False)])
+    current_limit = get_equipment_slot_limit(equipped_items)
+
+    remaining_items = [
+        eq for eq in equipped_items
+        if getattr(eq, "equipped", False) and getattr(eq, "id", None) != target.id
+    ]
+    remaining_count = len(remaining_items)
+    remaining_limit = get_equipment_slot_limit(remaining_items)
+
+    current_overflow = max(0, current_count - current_limit)
+    remaining_overflow = max(0, remaining_count - remaining_limit)
+    return remaining_overflow > current_overflow, remaining_count, remaining_limit
+
 
 async def find_equipment_by_input(session, player_id: str, input_arg: str) -> ItemInstance:
     """
@@ -113,7 +167,9 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
             await list_equipment.finish("🎒 你的装备栏空空如也")
 
         # 统计已装备数量
-        equipped_count = sum(1 for eq in equips if eq.equipped)
+        equipped_items = [eq for eq in equips if eq.equipped]
+        equipped_count = len(equipped_items)
+        equipment_slot_limit = get_equipment_slot_limit(equipped_items)
 
         # 分页设置
         page_size = config.game_config["game"]["inventory_page_size"]  # 使用与背包相同的分页大小
@@ -126,7 +182,7 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
 
         lines = [
             "# 🎽 装备栏",
-            f"已装备 **{equipped_count}**/5",
+            f"已装备 **{equipped_count}**/{equipment_slot_limit}",
             "***",
         ]
 
@@ -312,6 +368,13 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
 
             lines.append("")
 
+        # 装备槽扩展信息
+        slot_bonus = get_equipment_slot_bonus(equip)
+        if slot_bonus > 0:
+            lines.append("🎽 装备槽：")
+            lines.append(f"  • 穿戴时装备槽 +{slot_bonus}（实际净增 {slot_bonus - 1} 格）")
+            lines.append("")
+
         # 炼丹炉专属效果展示
         if is_furnace:
             lines.append("🔥 炼丹效果：")
@@ -344,7 +407,7 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
             lines.append("✨ 特殊效果：")
 
             # VIP定制装备列表（0阶即全解锁）
-            VIP_EQUIPMENT_IDS = {"vip_blade_zhanlongshan", "vip_robe_jingyuanzhiyi", "vip_robe_jingyuan_legacy", "heaven_retreat_star_blade", "vip_gui_yu", "vip_chrono_watch", "vip_longying_flash", "vip_ghost_dice", "vip_shoes_longren", "vip_pendant_fuze", "vip_huihai_xinyuan"}
+            VIP_EQUIPMENT_IDS = {"vip_blade_zhanlongshan", "vip_robe_jingyuanzhiyi", "vip_robe_jingyuan_legacy", "heaven_retreat_star_blade", "vip_gui_yu", "vip_chrono_watch", "vip_longying_flash", "vip_ghost_dice", "vip_shoes_longren", "vip_pendant_fuze", "vip_huihai_xinyuan", "vip_jade_xuanxu_shuangyan"}
             is_vip_equipment = equip.item_id in VIP_EQUIPMENT_IDS
 
             if is_vip_equipment:
@@ -451,8 +514,9 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
                 ItemInstance.item_id.in_(EQUIP_ITEM_IDS)
             )
             all_equipped = (await session.execute(all_equipped_stmt)).scalars().all()
-            if len(all_equipped) >= 5:
-                await wear_equipment.finish("⛔ 装备栏已满，最多只能穿戴5件装备，请先卸下其他装备")
+            slot_limit = get_equipment_slot_limit(list(all_equipped), equip)
+            if len(all_equipped) >= slot_limit:
+                await wear_equipment.finish(f"⛔ 装备栏已满，当前最多只能穿戴{slot_limit}件装备，请先卸下其他装备")
 
             equip.equipped = True
             session.add(equip)
@@ -512,10 +576,6 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
             fail_list = []
 
             for single_arg in arg_list:
-                if equipped_count >= 5:
-                    fail_list.append(f"{single_arg}: 装备栏已满")
-                    continue
-
                 equip = await find_equipment_by_input(session, player.id, single_arg)
                 if not equip:
                     fail_list.append(f"{single_arg}: 未找到")
@@ -550,6 +610,11 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
                     fail_list.append(f"{equip.config.name}(#{single_arg}): 已装备同名装备")
                     continue
 
+                slot_limit = get_equipment_slot_limit(currently_equipped, equip)
+                if equipped_count >= slot_limit:
+                    fail_list.append(f"{equip.config.name}(#{single_arg}): 装备栏已满({equipped_count}/{slot_limit})")
+                    continue
+
                 # 标记为已装备，立即重算并提交（与单独执行"装备"指令效果完全一致）
                 equip.equipped = True
                 session.add(equip)
@@ -559,6 +624,7 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
 
                 # 更新本地状态，供后续装备的检查使用
                 equipped_count += 1
+                currently_equipped.append(equip)
                 equipped_item_ids.add(equip.item_id)
                 equipped_instance_ids.add(equip.id)
                 success_list.append(f"{equip.config.name}(ID:{equip.id})")
@@ -616,6 +682,23 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
         # 检查是否已装备
         if not equip.equipped:
             await unwear_equipment.finish("⛔ 该装备未穿戴")
+
+        all_equipped_stmt = select(ItemInstance).where(
+            ItemInstance.player_id == player.id,
+            ItemInstance.equipped == True,
+            ItemInstance.item_id.in_(EQUIP_ITEM_IDS)
+        )
+        all_equipped = list((await session.execute(all_equipped_stmt)).scalars().all())
+        would_overflow, remaining_count, remaining_limit = would_unwear_worsen_slot_overflow(
+            all_equipped,
+            equip,
+        )
+        if would_overflow:
+            await unwear_equipment.finish(
+                f"⛔ 卸下 {equip.config.name} 后装备槽会不足"
+                f"（剩余 {remaining_count}/{remaining_limit}）\n"
+                "💡 请先卸下其他不提供装备槽的装备，再卸下它"
+            )
 
         # 检查是否为炼丹炉，如果是则处理进行中的炼丹任务
         from ..alchemy.service_new import AlchemyService
@@ -919,6 +1002,16 @@ _VIP_EQUIPMENT_SKILL_MENUS: dict[str, dict] = {
             "━━━━━━━━━━━━━\n"
             "本装备无主动技能\n"
             "3项被动效果战斗中自动生效"
+        ),
+    },
+    "vip_jade_xuanxu_shuangyan": {
+        "name": "玄墟双衍玉",
+        "icon": "💠",
+        "skills": (
+            "💠 玄墟双衍玉\n"
+            "━━━━━━━━━━━━━\n"
+            "本装备无主动技能\n"
+            "穿戴时装备槽 +2，实际净增1个可用装备槽"
         ),
     },
 }

@@ -650,7 +650,7 @@ async def handle_auction_detail(event: MessageEvent, args: Message = CommandArg(
                     # 特殊效果
                     if hasattr(tpl, 'special_effects') and tpl.special_effects:
                         lines.append("✨ 特殊效果：")
-                        VIP_EQUIPMENT_IDS = {"vip_blade_zhanlongshan", "vip_robe_jingyuanzhiyi", "vip_robe_jingyuan_legacy", "heaven_retreat_star_blade", "vip_gui_yu", "vip_chrono_watch", "vip_longying_flash", "vip_ghost_dice", "vip_shoes_longren", "vip_pendant_fuze", "vip_huihai_xinyuan"}
+                        VIP_EQUIPMENT_IDS = {"vip_blade_zhanlongshan", "vip_robe_jingyuanzhiyi", "vip_robe_jingyuan_legacy", "heaven_retreat_star_blade", "vip_gui_yu", "vip_chrono_watch", "vip_longying_flash", "vip_ghost_dice", "vip_shoes_longren", "vip_pendant_fuze", "vip_huihai_xinyuan", "vip_jade_xuanxu_shuangyan"}
                         is_vip = equip.item_id in VIP_EQUIPMENT_IDS
                         unlocked_count = equip.upgrade_level // 2
 

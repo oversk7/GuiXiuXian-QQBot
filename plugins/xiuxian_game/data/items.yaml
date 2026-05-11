@@ -2249,6 +2249,17 @@ items:
           description: "[6] 明心御意：意念化作无形壁垒——受到伤害减少5%"
       repair_cost: 5
 
+    - item_id: "vip_jade_xuanxu_shuangyan"
+      name: "玄墟双衍玉"
+      description: "玄墟生玉，一面照身，一面照影。佩之不增锋芒，不添术法，却仿佛让身外余出一道可托器物的幽影。"
+      type: "EQUIPMENT"
+      rarity: "red"
+      durability: 300
+      required_level: 10
+      equipment_slot_bonus: 2
+      repair_cost: 5
+      tags: ["vip_exclusive"]
+
     - item_id: "vip_medal_tiandi"
       name: "天帝残勋"
       description: |

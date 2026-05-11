@@ -89,6 +89,7 @@ class ItemConfig:
         # 装备扩展属性
         self.required_level = data.get("required_level", 1)  # 装备等级要求
         self.gem_slots = data.get("gem_slots", 0)  # 宝石孔位数量
+        self.equipment_slot_bonus = data.get("equipment_slot_bonus", 0)  # 额外装备槽数量
         self.max_upgrade_level = data.get("max_upgrade_level", 10)  # 最大升阶等级
 
         # 特殊效果配置(增强战斗系统)
