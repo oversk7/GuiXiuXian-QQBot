@@ -20,6 +20,13 @@ def cmd(show: str, text: str = "") -> str:
     return f'<qqbot-cmd-input text="{actual}" show="{show_safe}" reference="false"/>'
 
 
+def color_text(text: str, color: str) -> str:
+    """用 QQ Markdown 的 KaTeX 颜色语法渲染彩色文字。"""
+    safe_text = text.replace("\\", "\\\\").replace("{", "\\{").replace("}", "\\}")
+    safe_color = color.replace("{", "").replace("}", "")
+    return f"$\\textcolor{{{safe_color}}}{{\\text{{{safe_text}}}}}$"
+
+
 _MD_MAX_LEN = 3500  # QQ 原生 Markdown 安全长度上限
 
 

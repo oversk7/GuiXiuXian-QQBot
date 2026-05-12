@@ -14,6 +14,7 @@ from . import readonly_session
 from ..models.player import Player
 from ..models.inventory import ItemInstance
 from ..models.guild import Guild
+from ..models.monthly_card import MonthlyCard, CardType
 from ..domain.attributes import get_effective_attributes_v2
 from ..config import config
 
@@ -25,6 +26,7 @@ class PlayerProfileDTO:
     effective_attrs: Dict[str, int | float]
     equipment_bonus: Dict[str, int]
     guild_name: str
+    active_monthly_card_types: list[CardType] = field(default_factory=list)
 
 
 async def query_player_profile(uid: int) -> PlayerProfileDTO | None:
@@ -68,9 +70,14 @@ async def query_player_profile(uid: int) -> PlayerProfileDTO | None:
             if g_obj:
                 guild_name = g_obj.name
 
+        # 5. 获取有效月卡，用于面板展示标识
+        active_cards = await MonthlyCard.get_all_active_cards(session, player.id)
+        active_monthly_card_types = [card.card_type for card in active_cards]
+
     return PlayerProfileDTO(
         player=player,
         effective_attrs=effective_attrs,
         equipment_bonus=dict(bonus),
         guild_name=guild_name,
+        active_monthly_card_types=active_monthly_card_types,
     )

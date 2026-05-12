@@ -7,7 +7,7 @@ from ..models.player import Player
 from sqlalchemy import select, func
 from ..models.player import Gender
 from ..utils import message_add_head, calculate_level_up_exp
-from ..utils_markdown import cmd, build_markdown
+from ..utils_markdown import cmd, build_markdown, color_text
 from datetime import datetime
 from ..models.inventory import ItemInstance, ItemType
 from collections import defaultdict
@@ -24,6 +24,7 @@ from ..domain.attributes import get_effective_attributes_v2
 from ..infrastructure.repositories.account_transfer_log_repository import AccountTransferLogRepository
 from ..models.account_ownership import AccountOwnership
 from ..queries.player_queries import query_player_profile
+from ..models.monthly_card import MonthlyCard, CardType
 
 
 def _format_player_location(player: Player) -> str:
@@ -57,6 +58,15 @@ def _format_player_location_public(player: Player) -> str:
     if player.is_in_dungeon():
         return f"{player.get_current_region()}（深入诡域中）"
     return f"{player.get_current_region()}"
+
+
+def _format_monthly_card_badge(card_types: list[CardType]) -> str:
+    """格式化面板里的月卡彩色标识。"""
+    if CardType.PREMIUM in card_types:
+        return color_text("高级月卡", "#FFB000")
+    if CardType.BASIC in card_types:
+        return color_text("基础月卡", "#35C7FF")
+    return ""
 from ..config import config
 from ..world.message_board import get_unread_message_status
 
@@ -94,6 +104,7 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
         effective_attrs = profile_data.effective_attrs
         bonus = profile_data.equipment_bonus
         guild_name = profile_data.guild_name
+        active_monthly_card_types = profile_data.active_monthly_card_types
     else:
         # ===== 查看自己面板：保留 UoW 路径（含导航更新等写操作） =====
         async with UnitOfWork(AsyncSessionLocal) as uow:
@@ -154,6 +165,9 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
                 if g_obj:
                     guild_name = g_obj.name
 
+            active_cards = await MonthlyCard.get_all_active_cards(uow.session, player.id)
+            active_monthly_card_types = [card.card_type for card in active_cards]
+
             # 新手任务和成就检查（需要活跃的 session）
             from ..quest.novice_quest_service import NoviceQuestService
             quest_completed, quest_msg = await NoviceQuestService.check_and_advance_quest(
@@ -191,6 +205,7 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
     player_title = KnockerEventService.get_player_title(player)
     display_name = player.nickname  # 称号不再拼接到昵称，单独展示
     title_line = f"🏅称号 「{player_title}」" if player_title else ""
+    monthly_card_badge = _format_monthly_card_badge(active_monthly_card_types)
 
     # 构建未读消息通知（蓝字可点击）
     has_world_unread, has_private_unread, has_system_unread, has_guild_unread = await get_unread_message_status(player.id)
@@ -212,6 +227,8 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
     ]
     if title_line:
         lines.append(title_line)
+    if monthly_card_badge:
+        lines.append(f"💳 {monthly_card_badge}")
     lines.extend([
         f"☯ {guild_name}",
         f"Exp {player.exp}/{exp_max}",
@@ -731,6 +748,9 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
             if g_obj:
                 guild_name = g_obj.name
 
+        active_cards = await MonthlyCard.get_all_active_cards(uow.session, player.id)
+        active_monthly_card_types = [card.card_type for card in active_cards]
+
         # 6. 获取战斗属性显示
         from ..battle.integration_helper import BattleIntegrationHelper
         battle_attr_display = await BattleIntegrationHelper.get_battle_attribute_display_async(player, uow.session)
@@ -763,6 +783,7 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
     player_title = KnockerEventService.get_player_title(player)
     display_name_full = player.nickname  # 称号不再拼接到昵称，单独展示
     title_line_full = f"┃ 🏅称号 「{player_title}」\n" if player_title else ""
+    monthly_card_badge_full = _format_monthly_card_badge(active_monthly_card_types)
 
     # 9. 格式化注册时间
     created_at = player.created_at
@@ -794,6 +815,8 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
     ]
     if title_line_full.strip():
         lines.append("🏅称号 「" + player_title + "」")
+    if monthly_card_badge_full:
+        lines.append(f"💳 {monthly_card_badge_full}")
     lines.extend([
         f"☯ {guild_name}",
         f"Exp {player.exp}/{exp_max}",
