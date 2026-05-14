@@ -7,8 +7,16 @@ import logging
 from ..models.db import safe_session
 from ..world.npc_service_new import NPCService
 from ..ai_guide import is_admin
+from ..config import config
 
 logger = logging.getLogger(__name__)
+
+
+def _get_current_ai_model() -> str:
+    """读取当前AI对话provider对应的模型名。"""
+    ai_config = config.game_config.get("ai_dialogue", {})
+    provider = ai_config.get("provider", "deepseek")
+    return ai_config.get(provider, {}).get("model", "deepseek-v4-flash")
 
 # 启用NPC AI对话
 enable_npc_ai = on_command("启用NPC AI", aliases={"开启NPC AI"}, block=True, priority=15)
@@ -37,8 +45,9 @@ async def handle_enable_npc_ai(event: MessageEvent, args: Message = CommandArg()
         # 启用AI对话
         try:
             # 构建AI配置
+            ai_model = _get_current_ai_model()
             ai_config = {
-                "ai_model": "GLM-4-Flash-250414",
+                "ai_model": ai_model,
                 "base_favorability": 50
             }
 
@@ -53,7 +62,7 @@ async def handle_enable_npc_ai(event: MessageEvent, args: Message = CommandArg()
             msg = f"""✅ 已为NPC「{npc.name}」启用AI对话
 
 配置信息:
-- AI模型: GLM-4-Flash-250414
+- AI模型: {ai_model}
 - 初始好感度: 50
 - 启用状态: ✅ 已启用
 
@@ -214,8 +223,9 @@ async def handle_batch_enable_npc_ai(event: MessageEvent, args: Message = Comman
                     continue
 
                 # 启用AI对话
+                ai_model = _get_current_ai_model()
                 ai_config = {
-                    "ai_model": "GLM-4-Flash-250414",
+                    "ai_model": ai_model,
                     "base_favorability": 50
                 }
                 success = await npc_service.enable_ai_for_npc(
@@ -244,7 +254,7 @@ async def handle_batch_enable_npc_ai(event: MessageEvent, args: Message = Comman
 - ❌ 启用失败: {error_count}
 
 配置信息:
-- AI模型: GLM-4-Flash-250414
+- AI模型: {_get_current_ai_model()}
 - 初始好感度: 50
 - 过滤规则: 仅启用非鬼怪类NPC"""
 

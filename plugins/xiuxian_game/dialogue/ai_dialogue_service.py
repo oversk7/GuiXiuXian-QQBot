@@ -7,12 +7,11 @@ from nonebot import logger
 from ..models.npc import NPC
 from ..models.npc_dialogue_history import NPCDialogueHistory
 from ..dialogue.npc_personality import PersonalityTemplate
-from ..ai_guide import call_zhipu_api
 from ..config import config
 
 
 class AIDialogueService:
-    """使用智谱AI生成NPC对话的服务"""
+    """使用配置的AI provider生成NPC对话的服务"""
 
     def __init__(self):
         """初始化AI对话服务"""
@@ -24,10 +23,17 @@ class AIDialogueService:
         self.ai302_config = ai_config.get("ai302", {})
         self.scnet_config = ai_config.get("scnet", {})
         self.volcengine_config = ai_config.get("volcengine", {})
-        self.max_tokens = self.zhipu_config.get("max_tokens", 300)
-        self.temperature = self.zhipu_config.get("temperature", 0.75)
-        provider_configs = {"zhipu": self.zhipu_config, "ai302": self.ai302_config, "scnet": self.scnet_config, "volcengine": self.volcengine_config}
+        self.deepseek_config = ai_config.get("deepseek", {})
+        provider_configs = {
+            "zhipu": self.zhipu_config,
+            "ai302": self.ai302_config,
+            "scnet": self.scnet_config,
+            "volcengine": self.volcengine_config,
+            "deepseek": self.deepseek_config,
+        }
         provider_config = provider_configs.get(self.provider, self.zhipu_config)
+        self.max_tokens = provider_config.get("max_tokens", 300)
+        self.temperature = provider_config.get("temperature", 0.75)
         self.timeout = provider_config.get("timeout", 30)
 
         # 降级策略配置
@@ -235,9 +241,9 @@ class AIDialogueService:
         """
         计算AI调用成本（以分为单位）
 
-        智谱AI GLM-4.5-Flash定价（参考）:
-        - 输入: 0.1元/百万token
-        - 输出: 0.1元/百万token
+        DeepSeek deepseek-v4-flash定价（参考）:
+        - 输入（缓存未命中）: 1元/百万token
+        - 输出: 2元/百万token
 
         Args:
             tokens_used: 使用的token数
@@ -246,8 +252,8 @@ class AIDialogueService:
             成本（以分为单位，人民币）
         """
         # 简化计算：假设输入输出各占一半
-        # 成本 = (tokens_used / 1000000) * 0.1元 * 100分
-        cost_cents = int((tokens_used / 1000000) * 0.1 * 100)
+        # 简化按输入输出各半估算：((1 + 2) / 2) 元/百万token
+        cost_cents = int((tokens_used / 1000000) * 1.5 * 100)
         return max(cost_cents, 1)  # 最少1分
 
     async def _call_ai_with_fallback(self, messages: list, provider: str = None) -> dict:
@@ -264,7 +270,7 @@ class AIDialogueService:
         Raises:
             Exception: 所有provider均失败时抛出异常
         """
-        from ..ai_guide import call_zhipu_api, call_302ai_api, call_scnet_api, call_volcengine_api
+        from ..ai_guide import call_zhipu_api, call_302ai_api, call_scnet_api, call_volcengine_api, call_deepseek_api
 
         # 确定主provider
         primary_provider = provider or self.provider
@@ -315,6 +321,17 @@ class AIDialogueService:
                     temperature=self.temperature
                 )
                 logger.info(f"[AIDialogue] 火山引擎调用成功")
+                return result
+            elif primary_provider == "deepseek":
+                deepseek_model = self.deepseek_config.get("model", "deepseek-v4-flash")
+                logger.info(f"[AIDialogue] 使用DeepSeek调用, model={deepseek_model}")
+                result = await call_deepseek_api(
+                    messages,
+                    model=deepseek_model,
+                    timeout=self.timeout,
+                    temperature=self.temperature
+                )
+                logger.info(f"[AIDialogue] DeepSeek调用成功")
                 return result
             else:
                 raise ValueError(f"不支持的provider: {primary_provider}")
@@ -368,6 +385,15 @@ class AIDialogueService:
                     result = await call_volcengine_api(
                         messages,
                         model=self.volcengine_config.get("model", "ep-20260321201048-h78tm"),
+                        timeout=self.timeout,
+                        temperature=self.temperature
+                    )
+                    logger.info(f"[AIDialogue] 备用provider {fallback} 调用成功")
+                    return result
+                elif fallback == "deepseek":
+                    result = await call_deepseek_api(
+                        messages,
+                        model=self.deepseek_config.get("model", "deepseek-v4-flash"),
                         timeout=self.timeout,
                         temperature=self.temperature
                     )

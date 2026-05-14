@@ -3,6 +3,7 @@ AI引导系统 - 为玩家提供游戏帮助和指令推荐
 """
 import aiohttp
 import asyncio
+import os
 import re
 from typing import List, Dict, Any
 from nonebot import on_message, on_command, logger
@@ -49,9 +50,17 @@ async def call_ai_with_fallback(messages: list) -> dict:
     ai302_config = ai_config.get("ai302", {})
     scnet_config = ai_config.get("scnet", {})
     volcengine_config = ai_config.get("volcengine", {})
-    provider_configs = {"zhipu": zhipu_config, "ai302": ai302_config, "scnet": scnet_config, "volcengine": volcengine_config}
+    deepseek_config = ai_config.get("deepseek", {})
+    provider_configs = {
+        "zhipu": zhipu_config,
+        "ai302": ai302_config,
+        "scnet": scnet_config,
+        "volcengine": volcengine_config,
+        "deepseek": deepseek_config,
+    }
     provider_config = provider_configs.get(provider, zhipu_config)
     timeout = provider_config.get("timeout", 30)
+    temperature = provider_config.get("temperature", 0.75)
 
     # 降级策略配置
     fallback_config = ai_config.get("fallback", {})
@@ -72,6 +81,13 @@ async def call_ai_with_fallback(messages: list) -> dict:
             return await call_scnet_api(messages, model=cfg.get("model", "DeepSeek-V3.2"), timeout=timeout)
         elif name == "volcengine":
             return await call_volcengine_api(messages, model=cfg.get("model", "ep-20260321201048-h78tm"), timeout=timeout)
+        elif name == "deepseek":
+            return await call_deepseek_api(
+                messages,
+                model=cfg.get("model", "deepseek-v4-flash"),
+                timeout=timeout,
+                temperature=temperature,
+            )
         else:
             raise ValueError(f"不支持的provider: {name}")
 
@@ -180,6 +196,69 @@ async def call_zhipu_api(messages, model="GLM-4.5-Flash", timeout=30, temperatur
         raise TimeoutError(f"AI API调用超时（{timeout}秒）")
     except aiohttp.ClientError as e:
         raise aiohttp.ClientError(f"网络请求失败: {str(e)}")
+
+
+async def call_deepseek_api(messages, model="deepseek-v4-flash", timeout=30, temperature=0.75):
+    """调用DeepSeek API（异步版本，OpenAI兼容接口）"""
+    import time as _time
+    from .config import config
+
+    logger.info(f"[AI调用] provider=deepseek | model={model} | timeout={timeout}s")
+    _start = _time.time()
+
+    ai_config = config.game_config.get("ai_dialogue", {})
+    deepseek_config = ai_config.get("deepseek", {})
+    api_key = deepseek_config.get("api_key", "") or os.getenv("DEEPSEEK_API_KEY", "")
+
+    if not api_key:
+        raise ValueError("DeepSeek API密钥未配置，请在config.yaml中配置 ai_dialogue.deepseek.api_key 或设置 DEEPSEEK_API_KEY")
+
+    url = "https://api.deepseek.com/chat/completions"
+
+    headers = {
+        "Authorization": f"Bearer {api_key}",
+        "Content-Type": "application/json",
+    }
+
+    formatted_messages = []
+    for msg in messages:
+        formatted_messages.append({
+            "role": msg.get("role", "user"),
+            "content": msg.get("content", ""),
+        })
+
+    data = {
+        "model": model,
+        "messages": formatted_messages,
+        "temperature": temperature,
+        "thinking": {"type": "disabled"},
+        "stream": False,
+    }
+
+    try:
+        async with aiohttp.ClientSession(timeout=aiohttp.ClientTimeout(total=timeout)) as session:
+            async with session.post(url, headers=headers, json=data) as response:
+                elapsed = _time.time() - _start
+                if response.status == 200:
+                    result = _strip_think_tags(await response.json())
+                    tokens = result.get('usage', {}).get('total_tokens', '?')
+                    logger.info(f"[AI调用] provider=deepseek | 成功 | {elapsed:.1f}秒 | tokens={tokens}")
+                    return result
+                else:
+                    response_text = await response.text()
+                    logger.warning(f"[AI调用] provider=deepseek | 失败 | {elapsed:.1f}秒 | status={response.status}")
+                    raise aiohttp.ClientResponseError(
+                        request_info=response.request_info,
+                        history=response.history,
+                        status=response.status,
+                        message=f"DeepSeek API调用失败: {response.status}, {response_text}"
+                    )
+    except asyncio.TimeoutError:
+        elapsed = _time.time() - _start
+        logger.warning(f"[AI调用] provider=deepseek | 超时 | {elapsed:.1f}秒")
+        raise TimeoutError(f"DeepSeek API调用超时（{timeout}秒）")
+    except aiohttp.ClientError as e:
+        raise aiohttp.ClientError(f"DeepSeek 网络请求失败: {str(e)}")
 
 
 async def call_volcengine_api(messages, model="ep-20260321201048-h78tm", timeout=30, temperature=0.75):
