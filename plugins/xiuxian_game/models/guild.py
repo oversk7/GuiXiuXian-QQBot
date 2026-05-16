@@ -1,4 +1,4 @@
-from sqlalchemy import Integer, BigInteger, String, DateTime, Boolean, func, ForeignKey, Enum as SQLEnum
+from sqlalchemy import Integer, BigInteger, String, DateTime, Boolean, func, ForeignKey, Enum as SQLEnum, UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from .db import Base
 from enum import Enum as PyEnum
