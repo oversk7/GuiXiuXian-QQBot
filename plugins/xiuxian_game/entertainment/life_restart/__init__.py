@@ -113,7 +113,7 @@ async def _send_life_result(matcher, selected, init_prop, results, summary):
     text = _format_life_text(selected, init_prop, results, summary)
     content = (
         "# 🎴 人生重开模拟器\n"
-        f"```bash\n{text}\n```\n"
+        f"```json\n{text}\n```\n"
         "***\n"
         f"> {cmd('随机人生')} 再来一次 | {cmd('人生选择')} 自选天赋 | {cmd('福利娱乐')} 返回"
     )
