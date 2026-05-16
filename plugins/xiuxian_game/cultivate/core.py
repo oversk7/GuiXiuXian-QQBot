@@ -11,10 +11,13 @@ import random
 from sqlalchemy import select as _sel
 from ..models.inventory import ItemInstance as _Equip, ItemType
 from ..models.monthly_card import get_player_card_benefits
-from ..utils_markdown import cmd, build_markdown
+from ..utils_markdown import cmd, build_markdown, color_text
 
 # Feature Flag: 控制是否使用新版MansionService (DI架构)
 cfg = config.game_config["cultivate"]
+
+BREAKTHROUGH_SUCCESS = color_text("突破成功", "#45D483")
+BREAKTHROUGH_FAILURE = color_text("突破失败", "#FF6B7A")
 
 
 def _cultivate_cfg(player: Player) -> dict:
@@ -852,7 +855,7 @@ async def handle_breakthrough(event: MessageEvent, args: Message = CommandArg())
                 reward_msg = "\n" + "\n".join(reward_messages) + "\n"
 
             msg = (
-                f"⛓️‍💥骨裂声回荡，已突破至 **Lv.{player.level}**↑\n\n"
+                f"⛓️‍💥骨裂声回荡，{BREAKTHROUGH_SUCCESS}，已突破至 **Lv.{player.level}**↑\n\n"
                 "**━━ 突破结果 ━━**\n"
                 f"✧ 获得属性点 **+{points_gained}**" + (f" (冥返加成)" if player.reincarnation_level > 0 else "") + "\n"
                 f"✧ 剩余修为 {player.exp}\n"
@@ -905,7 +908,7 @@ async def handle_breakthrough(event: MessageEvent, args: Message = CommandArg())
                     reward_msg = "\n" + "\n".join(reward_messages) + "\n"
 
                 msg = (
-                    f"⛓️‍💥骨裂声回荡，已突破至 **Lv.{player.level}**↑\n\n"
+                    f"⛓️‍💥骨裂声回荡，{BREAKTHROUGH_SUCCESS}，已突破至 **Lv.{player.level}**↑\n\n"
                     "**━━ 突破结果 ━━**\n"
                     f"✧ 获得属性点 **+{points_gained}**" + (f" (冥返加成)" if player.reincarnation_level > 0 else "") + "\n"
                     f"✧ 剩余修为 {player.exp}\n"
@@ -959,7 +962,7 @@ async def handle_breakthrough(event: MessageEvent, args: Message = CommandArg())
                 pity_threshold = cfg_break.get("pity_threshold", 10)
                 pity_reached = player.breakthrough_fail_count >= pity_threshold
 
-                msg_lines = ["💥 镇厄崩散，修为反噬席卷脏腑。", "", "**━━ 失败详情 ━━**"]
+                msg_lines = [f"💥 {BREAKTHROUGH_FAILURE}，镇厄崩散，修为反噬席卷脏腑。", "", "**━━ 失败详情 ━━**"]
                 if protection_msg:
                     msg_lines.append(protection_msg)
                 msg_lines.extend([
@@ -1135,7 +1138,7 @@ async def handle_continuous_breakthrough(event: MessageEvent, args: Message = Co
                     next_bonus = min(next_bonus, max_rate)
 
                 msg = (
-                    "💥 连续突破失败，修为不足以继续！\n\n"
+                    f"💥 连续{BREAKTHROUGH_FAILURE}，修为不足以继续！\n\n"
                     "**━━ 失败详情 ━━**\n"
                     f"✧ 本轮失败 {failed_attempts} 次\n"
                     f"✧ 当前等级 Lv.{player.level}\n"
@@ -1167,7 +1170,7 @@ async def handle_continuous_breakthrough(event: MessageEvent, args: Message = Co
                     next_bonus = min(next_bonus, max_rate)
 
                 msg = (
-                    "💥 连续突破失败，修为耗尽！\n\n"
+                    f"💥 连续{BREAKTHROUGH_FAILURE}，修为耗尽！\n\n"
                     "**━━ 失败详情 ━━**\n"
                     f"✧ 当前等级 Lv.{player.level}\n"
                     f"✧ 失败次数 {failed_attempts} 次\n"
@@ -1190,7 +1193,7 @@ async def handle_continuous_breakthrough(event: MessageEvent, args: Message = Co
                 fail_msg = f"✧ 失败次数 {failed_attempts} 次\n"
 
             msg = (
-                f"⛓️‍💥连续突破完成！骨裂声不绝于耳！\n\n"
+                f"⛓️‍💥连续{BREAKTHROUGH_SUCCESS}！骨裂声不绝于耳！\n\n"
                 "**━━ 突破结果 ━━**\n"
                 f"✧ 突破次数 {breakthrough_count} 次\n"
                 + fail_msg +

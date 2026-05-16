@@ -7,7 +7,7 @@ from typing import Callable, Awaitable
 from ..models.db import safe_session
 from ..utils import message_add_head
 from ..platform_utils import get_event_server_id, get_unified_player
-from ..utils_markdown import cmd, build_markdown
+from ..utils_markdown import cmd, build_markdown, color_text
 from .realm_utils import realm_by_level_and_reincarnation
 from ..queries.ranking_queries import (
     RankedPlayer,
@@ -27,11 +27,11 @@ from ..queries.ranking_queries import (
 
 def _rank_emoji(idx: int) -> str:
     if idx == 1:
-        return "🥇"
+        return f"🥇{color_text('榜首', '#FFB000')}"
     if idx == 2:
-        return "🥈"
+        return f"🥈{color_text('第二', '#C0C7D2')}"
     if idx == 3:
-        return "🥉"
+        return f"🥉{color_text('第三', '#CD7F32')}"
     return f"{idx}."
 
 

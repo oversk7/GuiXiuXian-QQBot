@@ -17,7 +17,7 @@ from ..models.db import safe_session
 from ..models import Player, ItemInstance
 from ..config import config
 from ..utils import message_add_head
-from ..utils_markdown import cmd, build_markdown
+from ..utils_markdown import cmd, build_markdown, color_rarity
 from ..platform_utils import get_unified_player
 # 导入装备服务模块（业务逻辑已移至此处，解决模块耦合）
 from .equipment_service import recalc_equipment_attributes, EQUIP_ITEM_IDS
@@ -190,12 +190,18 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
         for i, eq in enumerate(current_page_equips, start=start_idx + 1):
             tpl = eq.config
             equip_state = "🟢已装备" if eq.equipped else "🔘未装备"
+            rarity_badge = ""
+            if tpl.rarity in {"purple", "orange", "red"}:
+                rarity_badge = color_rarity(
+                    {"purple": "史诗", "orange": "传说", "red": "永恒"}[tpl.rarity],
+                    tpl.rarity,
+                ) + " "
 
             # 构建装备信息
             info_parts = []
 
             # 基础信息 - 编号只追加纯数字（配合底部"装备"按钮组合），装备名可点击查看详情
-            info_parts.append(f"🆔{cmd(str(i), str(i))}│{cmd(tpl.name, f'装备详情 {i}')}")
+            info_parts.append(f"🆔{cmd(str(i), str(i))}│{rarity_badge}{cmd(tpl.name, f'装备详情 {i}')}")
 
             # 升阶等级
             if eq.upgrade_level > 0:
@@ -276,7 +282,7 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
             "red": "永恒"
         }
         rarity_display = tpl.get_rarity_display()
-        rarity_name = rarity_map.get(tpl.rarity, tpl.rarity)
+        rarity_name = color_rarity(rarity_map.get(tpl.rarity, tpl.rarity), tpl.rarity)
 
         # 构建详细信息
         lines = [

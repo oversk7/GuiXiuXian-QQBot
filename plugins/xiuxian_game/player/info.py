@@ -69,6 +69,9 @@ def _format_monthly_card_badge(card_types: list[CardType]) -> str:
     if CardType.BASIC in card_types:
         return color_text("基础月卡", "#35C7FF")
     return ""
+def _format_title_badge(title: str) -> str:
+    """称号是身份标识，允许少量使用颜色突出。"""
+    return color_text(title, "#FFB84D")
 from ..config import config
 from ..world.message_board import get_unread_message_status
 
@@ -208,7 +211,7 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
     from ..event.knocker_event import KnockerEventService
     player_title = KnockerEventService.get_player_title(player)
     display_name = player.nickname  # 称号不再拼接到昵称，单独展示
-    title_line = f"🏅称号 「{player_title}」" if player_title else ""
+    title_line = f"🏅称号 「{_format_title_badge(player_title)}」" if player_title else ""
     monthly_card_badge = _format_monthly_card_badge(active_monthly_card_types)
 
     # 构建未读消息通知（蓝字可点击）
@@ -824,7 +827,7 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
     from ..event.knocker_event import KnockerEventService
     player_title = KnockerEventService.get_player_title(player)
     display_name_full = player.nickname  # 称号不再拼接到昵称，单独展示
-    title_line_full = f"┃ 🏅称号 「{player_title}」\n" if player_title else ""
+    title_line_full = f"🏅称号 「{_format_title_badge(player_title)}」" if player_title else ""
     monthly_card_badge_full = _format_monthly_card_badge(active_monthly_card_types)
 
     # 9. 格式化注册时间
@@ -855,8 +858,8 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
         f"UID:{player.uid}　「{player.sex}」",
         f"Lv.**{player.level}** · {realm_name}",
     ]
-    if title_line_full.strip():
-        lines.append("🏅称号 「" + player_title + "」")
+    if title_line_full:
+        lines.append(title_line_full)
     if monthly_card_badge_full:
         lines.append(f"💳 {monthly_card_badge_full}")
     lines.extend([
