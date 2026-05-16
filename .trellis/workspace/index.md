@@ -27,7 +27,7 @@ workspace/
 
 | Developer | Last Active | Sessions | Active File |
 |-----------|-------------|----------|-------------|
-| (none yet) | - | - | - |
+| oversky | 2026-05-16 | 1 | `journal-1.md` |
 
 ---
 
