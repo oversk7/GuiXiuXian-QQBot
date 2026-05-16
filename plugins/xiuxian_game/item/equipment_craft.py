@@ -52,7 +52,12 @@ async def _(event: MessageEvent):
     # 优先按 required_level 排序（无则视为1），再按名称
     all_equip_tpls.sort(key=lambda t: ((t.required_level or 1), t.name))
 
-    lines = ["🔨 全部装备锻造一览", "━━━━━━━━━━━━━", "💡 用【配方 装备名】查看材料与花费"]
+    lines = [
+        "🔨 全部装备锻造一览",
+        "━━━━━━━━━━━━━",
+        "💡 用【配方 装备名】查看材料与花费",
+        "💡 建有铸器坊的公会基地也可锻造有配方的装备",
+    ]
     for tpl in all_equip_tpls:
         cities = sorted(item_to_cities.get(tpl.item_id, []))
         city_text = "、".join(cities) if cities else "—"
@@ -277,7 +282,8 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
     req_gold: int = int(recipe.get("gold", 0))
 
     # 计算总需求
-    total_gold = req_gold * quantity
+    base_total_gold = req_gold * quantity
+    total_gold = base_total_gold
     total_materials = {item_id: qty * quantity for item_id, qty in req_materials.items()}
 
     async with safe_session() as session:
@@ -287,27 +293,43 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
         # 诡域中禁止锻造
         if player.is_in_dungeon():
             await craft_cmd.finish(message_add_head("⛔ 诡域中无法锻造", event))
-        # 校验是否在工匠工坊附近（≤3格）
+        # 校验是否在工匠工坊附近（≤3格），或位于已建铸器坊的公会基地
         from ..world.location_service import LocationService
+        from ..guild.guild_building_access import get_active_base_building_effects
+        from ..models.guild import BuildingType
         x, y = player.get_current_coordinates()
         near = await LocationService.get_nearby_locations(session, x, y, player.get_current_region(), max_distance=3)
         forge_locs = [loc for loc in (near or []) if loc.has_function("forge")]
-        if not forge_locs:
-            await craft_cmd.finish(message_add_head("⛔ 需要在工匠的工坊附近(≤3格)才能锻造\n💡 使用【观察】【NPC列表】寻找工匠", event))
-
-        # 城市锻造白名单校验
-        nearest = min(forge_locs, key=lambda loc: abs(loc.x - x) + abs(loc.y - y))
-        forge_cfg = nearest.get_function_config("forge") or {}
-        allow_ids: list[str] | None = forge_cfg.get("allow_items")
-
-        # 白名单逻辑：
-        # - None = 未配置，无限制（兼容老数据）
-        # - [] = 空列表，明确禁止锻造所有装备
-        # - [...] = 只能锻造列表中的装备
-        if allow_ids is not None and item_cfg.item_id not in allow_ids:
+        guild_forge_effects, guild_forge_name = await get_active_base_building_effects(
+            session, player, BuildingType.ARTIFACT_FORGE
+        )
+        guild_forge_active = bool(guild_forge_effects.get("forge_enabled"))
+        if not forge_locs and not guild_forge_active:
             await craft_cmd.finish(message_add_head(
-                f"⛔ {nearest.name} 的工匠尚未掌握『{item_cfg.name}』的锻造\n"
-                f"💡 发送【锻造列表】查看可锻造城镇", event))
+                "⛔ 需要在工匠的工坊附近(≤3格)，或在建有铸器坊的公会基地才能锻造\n"
+                "💡 使用【观察】【NPC列表】寻找工匠，或让公会建造【铸器坊】", event))
+
+        forge_source = guild_forge_name if guild_forge_active else "城市工坊"
+        if guild_forge_active:
+            discount = min(0.25, guild_forge_effects.get("forge_gold_discount", 0.0))
+            total_gold = int(base_total_gold * (1 - discount))
+        else:
+            discount = 0.0
+
+        if not guild_forge_active:
+            # 城市锻造白名单校验
+            nearest = min(forge_locs, key=lambda loc: abs(loc.x - x) + abs(loc.y - y))
+            forge_cfg = nearest.get_function_config("forge") or {}
+            allow_ids: list[str] | None = forge_cfg.get("allow_items")
+
+            # 白名单逻辑：
+            # - None = 未配置，无限制（兼容老数据）
+            # - [] = 空列表，明确禁止锻造所有装备
+            # - [...] = 只能锻造列表中的装备
+            if allow_ids is not None and item_cfg.item_id not in allow_ids:
+                await craft_cmd.finish(message_add_head(
+                    f"⛔ {nearest.name} 的工匠尚未掌握『{item_cfg.name}』的锻造\n"
+                    f"💡 发送【锻造列表】查看可锻造城镇", event))
 
         # 金币校验
         if player.gold < total_gold:
@@ -355,8 +377,11 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
         mat_msg = " ".join([f"{config.items_config['by_id'][mid].name}✖️{qty*quantity}" for mid, qty in req_materials.items()])
         reply = (
             f"✅ 成功锻造 {item_cfg.name}✖️{quantity}！\n"
+            f"🔨 来源：{forge_source}\n"
             f"🔨 消耗：{mat_msg} 以及 金币 {total_gold}💰"
         )
+        if discount > 0:
+            reply += f"\n⚒️ 公会铸器坊折扣：-{discount*100:.0f}%金币"
         if quest_completed and quest_msg:
             reply += f"\n\n{quest_msg}"
 

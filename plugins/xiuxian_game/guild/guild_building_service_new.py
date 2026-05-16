@@ -16,6 +16,8 @@ from .guild_permission import GuildPermission
 class GuildBuildingService:
     """公会建筑服务类 - DI架构版本"""
 
+    GRID_SIZE = 3
+
     # 建筑配置（类常量，保持向后兼容）
     BUILDING_CONFIGS = {
         BuildingType.EXPERIENCE_SHRINE: {
@@ -113,8 +115,78 @@ class GuildBuildingService:
                 9: {"storage_slots": 700},
                 10: {"storage_slots": 800}
             }
+        },
+        BuildingType.SPIRIT_TOWER: {
+            "name": "聚灵阵",
+            "description": "强化相邻建筑的灵脉收益",
+            "max_level": 8,
+            "base_cost": {"gold": 90000, "materials": {"墓土": 220, "灵石": 80, "阴煞精华": 50}},
+            "effects": {
+                1: {"adjacency_power": 1},
+                2: {"adjacency_power": 2},
+                3: {"adjacency_power": 3},
+                4: {"adjacency_power": 4},
+                5: {"adjacency_power": 5},
+                6: {"adjacency_power": 6},
+                7: {"adjacency_power": 7},
+                8: {"adjacency_power": 8}
+            }
+        },
+        BuildingType.ARTIFACT_FORGE: {
+            "name": "铸器坊",
+            "description": "允许成员在公会基地锻造装备",
+            "max_level": 8,
+            "base_cost": {"gold": 100000, "materials": {"墓土": 260, "铁锈": 120, "诡异石": 50, "灵石": 40}},
+            "effects": {
+                1: {"forge_enabled": True, "forge_gold_discount": 0.02},
+                2: {"forge_enabled": True, "forge_gold_discount": 0.04},
+                3: {"forge_enabled": True, "forge_gold_discount": 0.06},
+                4: {"forge_enabled": True, "forge_gold_discount": 0.08},
+                5: {"forge_enabled": True, "forge_gold_discount": 0.10},
+                6: {"forge_enabled": True, "forge_gold_discount": 0.12},
+                7: {"forge_enabled": True, "forge_gold_discount": 0.14},
+                8: {"forge_enabled": True, "forge_gold_discount": 0.16}
+            }
+        },
+        BuildingType.REFINING_PAVILION: {
+            "name": "淬灵台",
+            "description": "在公会基地升阶装备时获得加成",
+            "max_level": 8,
+            "base_cost": {"gold": 120000, "materials": {"墓土": 240, "魂魄结晶": 40, "诡异石": 70, "灵石": 60}},
+            "effects": {
+                1: {"upgrade_success_bonus": 0.01, "upgrade_gold_discount": 0.01},
+                2: {"upgrade_success_bonus": 0.02, "upgrade_gold_discount": 0.02},
+                3: {"upgrade_success_bonus": 0.03, "upgrade_gold_discount": 0.03},
+                4: {"upgrade_success_bonus": 0.04, "upgrade_gold_discount": 0.04},
+                5: {"upgrade_success_bonus": 0.05, "upgrade_gold_discount": 0.05},
+                6: {"upgrade_success_bonus": 0.06, "upgrade_gold_discount": 0.06},
+                7: {"upgrade_success_bonus": 0.07, "upgrade_gold_discount": 0.07},
+                8: {"upgrade_success_bonus": 0.08, "upgrade_gold_discount": 0.08}
+            }
+        },
+        BuildingType.DEFENSE_WALL: {
+            "name": "防御城墙",
+            "description": "旧版遗留防御建筑",
+            "max_level": 3,
+            "base_cost": {"gold": 100000, "materials": {"墓土": 300, "诡异石": 60, "诅咒镜片": 25, "虚无精华": 8}},
+            "effects": {
+                1: {"defense_bonus": 0.10},
+                2: {"defense_bonus": 0.15},
+                3: {"defense_bonus": 0.25}
+            }
         }
-        # 注意：灵塔和防御城墙暂时下架，功能还不稳定
+    }
+
+    BUILDING_NAME_TO_TYPE = {
+        "经验神龛": BuildingType.EXPERIENCE_SHRINE,
+        "资金金库": BuildingType.TREASURY_VAULT,
+        "训练场": BuildingType.TRAINING_GROUND,
+        "传送阵": BuildingType.TELEPORT_ARRAY,
+        "丹房": BuildingType.ALCHEMY_ROOM,
+        "公会仓库": BuildingType.GUILD_WAREHOUSE,
+        "聚灵阵": BuildingType.SPIRIT_TOWER,
+        "铸器坊": BuildingType.ARTIFACT_FORGE,
+        "淬灵台": BuildingType.REFINING_PAVILION,
     }
 
     def __init__(
@@ -167,6 +239,16 @@ class GuildBuildingService:
                 extrapolated[key] = "legendary"
             elif key == "storage_slots":
                 extrapolated[key] = value + extra * 100
+            elif key == "forge_enabled":
+                extrapolated[key] = True
+            elif key == "forge_gold_discount":
+                extrapolated[key] = min(0.25, round(value + extra * 0.02, 2))
+            elif key == "upgrade_success_bonus":
+                extrapolated[key] = min(0.15, round(value + extra * 0.01, 2))
+            elif key == "upgrade_gold_discount":
+                extrapolated[key] = min(0.20, round(value + extra * 0.01, 2))
+            elif key == "adjacency_power":
+                extrapolated[key] = value + extra
             else:
                 extrapolated[key] = value
 
@@ -178,6 +260,162 @@ class GuildBuildingService:
         if guild_level < 10:
             return config_max
         return guild_level
+
+    @classmethod
+    def parse_building_name(cls, building_name: str) -> BuildingType | None:
+        """通过中文建筑名获取建筑类型"""
+        return cls.BUILDING_NAME_TO_TYPE.get(building_name)
+
+    @classmethod
+    def get_buildable_names(cls) -> list[str]:
+        """获取当前开放建造的建筑名"""
+        return list(cls.BUILDING_NAME_TO_TYPE.keys())
+
+    @classmethod
+    def is_valid_position(cls, plot_x: int, plot_y: int) -> bool:
+        """检查基地布局坐标是否合法"""
+        return 1 <= plot_x <= cls.GRID_SIZE and 1 <= plot_y <= cls.GRID_SIZE
+
+    @staticmethod
+    def _is_adjacent(a: GuildBuilding, b: GuildBuilding) -> bool:
+        """四向相邻才触发邻接加成"""
+        if a.plot_x is None or a.plot_y is None or b.plot_x is None or b.plot_y is None:
+            return False
+        return abs(a.plot_x - b.plot_x) + abs(a.plot_y - b.plot_y) == 1
+
+    async def _find_empty_position(self, guild_id: int) -> tuple[int, int] | None:
+        """按从左到右、从上到下自动寻找空格"""
+        buildings = await self._building_repo.get_all_by_guild_id(guild_id)
+        occupied = {
+            (b.plot_x, b.plot_y)
+            for b in buildings
+            if b.plot_x is not None and b.plot_y is not None
+        }
+        for plot_y in range(1, self.GRID_SIZE + 1):
+            for plot_x in range(1, self.GRID_SIZE + 1):
+                if (plot_x, plot_y) not in occupied:
+                    return plot_x, plot_y
+        return None
+
+    async def _backfill_missing_positions(self, guild_id: int) -> None:
+        """为旧版本已建造但没有布局坐标的建筑补齐空位。"""
+        buildings = await self._building_repo.get_all_by_guild_id(guild_id)
+        occupied = {
+            (b.plot_x, b.plot_y)
+            for b in buildings
+            if b.plot_x is not None and b.plot_y is not None
+        }
+        empty_positions = [
+            (plot_x, plot_y)
+            for plot_y in range(1, self.GRID_SIZE + 1)
+            for plot_x in range(1, self.GRID_SIZE + 1)
+            if (plot_x, plot_y) not in occupied
+        ]
+
+        changed = False
+        for building in buildings:
+            if building.plot_x is not None and building.plot_y is not None:
+                continue
+            if not empty_positions:
+                break
+            building.plot_x, building.plot_y = empty_positions.pop(0)
+            await self._building_repo.update(building)
+            changed = True
+
+        if changed:
+            await self._guild_repo._session.flush()
+
+    async def _validate_new_position(
+        self, guild_id: int, plot_x: int | None, plot_y: int | None
+    ) -> tuple[bool, str, tuple[int, int] | None]:
+        """校验新建筑或移动建筑的布局坐标"""
+        if plot_x is None and plot_y is None:
+            position = await self._find_empty_position(guild_id)
+            if not position:
+                return False, "公会基地布局已满，请先调整建筑位置", None
+            return True, "可以放置", position
+
+        if plot_x is None or plot_y is None:
+            return False, "布局坐标需要同时提供 x y，例如：建造 铸器坊 2 1", None
+
+        if not self.is_valid_position(plot_x, plot_y):
+            return False, f"布局坐标范围为 1-{self.GRID_SIZE}，例如：建造 铸器坊 2 1", None
+
+        existing = await self._building_repo.get_by_guild_and_position(guild_id, plot_x, plot_y)
+        if existing:
+            existing_name = self.BUILDING_CONFIGS[existing.building_type]["name"]
+            return False, f"坐标({plot_x},{plot_y})已放置{existing_name}", None
+
+        return True, "可以放置", (plot_x, plot_y)
+
+    @classmethod
+    def get_adjacency_bonus_descriptions(cls, buildings: list[GuildBuilding]) -> list[str]:
+        """获取当前布局触发的邻接加成说明"""
+        descriptions = []
+        by_type = {building.building_type: building for building in buildings}
+
+        spirit_tower = by_type.get(BuildingType.SPIRIT_TOWER)
+        if spirit_tower:
+            for building in buildings:
+                if building.id == spirit_tower.id or not cls._is_adjacent(spirit_tower, building):
+                    continue
+                name = cls.BUILDING_CONFIGS[building.building_type]["name"]
+                if building.building_type == BuildingType.ALCHEMY_ROOM:
+                    descriptions.append(f"聚灵阵邻接{name}：丹房日产 +1")
+                elif building.building_type == BuildingType.TRAINING_GROUND:
+                    descriptions.append(f"聚灵阵邻接{name}：修为加成 +2%")
+                elif building.building_type == BuildingType.ARTIFACT_FORGE:
+                    descriptions.append(f"聚灵阵邻接{name}：锻造金币折扣 +2%")
+                elif building.building_type == BuildingType.REFINING_PAVILION:
+                    descriptions.append(f"聚灵阵邻接{name}：升阶成功率 +1%")
+
+        forge = by_type.get(BuildingType.ARTIFACT_FORGE)
+        refining = by_type.get(BuildingType.REFINING_PAVILION)
+        if forge and refining and cls._is_adjacent(forge, refining):
+            descriptions.append("铸器坊邻接淬灵台：锻造折扣 +3%，升阶成功率 +1%")
+
+        warehouse = by_type.get(BuildingType.GUILD_WAREHOUSE)
+        if forge and warehouse and cls._is_adjacent(forge, warehouse):
+            descriptions.append("铸器坊邻接公会仓库：锻造金币折扣 +2%")
+
+        return descriptions
+
+    @classmethod
+    def get_adjacency_bonuses(cls, buildings: list[GuildBuilding]) -> Dict:
+        """根据布局邻接关系计算额外加成"""
+        bonuses = {
+            "daily_alchemy_production": 0,
+            "cultivation_bonus": 0.0,
+            "forge_gold_discount": 0.0,
+            "upgrade_success_bonus": 0.0,
+        }
+        by_type = {building.building_type: building for building in buildings}
+
+        spirit_tower = by_type.get(BuildingType.SPIRIT_TOWER)
+        if spirit_tower:
+            for building in buildings:
+                if building.id == spirit_tower.id or not cls._is_adjacent(spirit_tower, building):
+                    continue
+                if building.building_type == BuildingType.ALCHEMY_ROOM:
+                    bonuses["daily_alchemy_production"] += 1
+                elif building.building_type == BuildingType.TRAINING_GROUND:
+                    bonuses["cultivation_bonus"] += 0.02
+                elif building.building_type == BuildingType.ARTIFACT_FORGE:
+                    bonuses["forge_gold_discount"] += 0.02
+                elif building.building_type == BuildingType.REFINING_PAVILION:
+                    bonuses["upgrade_success_bonus"] += 0.01
+
+        forge = by_type.get(BuildingType.ARTIFACT_FORGE)
+        refining = by_type.get(BuildingType.REFINING_PAVILION)
+        if forge and refining and cls._is_adjacent(forge, refining):
+            bonuses["forge_gold_discount"] += 0.03
+            bonuses["upgrade_success_bonus"] += 0.01
+
+        warehouse = by_type.get(BuildingType.GUILD_WAREHOUSE)
+        if forge and warehouse and cls._is_adjacent(forge, warehouse):
+            bonuses["forge_gold_discount"] += 0.02
+
+        return bonuses
 
     async def can_build(
         self, guild_id: int, building_type: BuildingType
@@ -270,7 +508,12 @@ class GuildBuildingService:
         return cost
 
     async def build_or_upgrade(
-        self, guild_id: int, building_type: BuildingType, player_id: str
+        self,
+        guild_id: int,
+        building_type: BuildingType,
+        player_id: str,
+        plot_x: int | None = None,
+        plot_y: int | None = None,
     ) -> Tuple[bool, str]:
         """
         建造或升级建筑
@@ -279,6 +522,8 @@ class GuildBuildingService:
             guild_id: 公会ID
             building_type: 建筑类型
             player_id: 操作玩家ID
+            plot_x: 新建建筑布局X坐标，不传则自动放置
+            plot_y: 新建建筑布局Y坐标，不传则自动放置
 
         Returns:
             (是否成功, 消息)
@@ -303,6 +548,15 @@ class GuildBuildingService:
         )
         if not can_build_check:
             return False, build_reason
+
+        existing_before_cost = await self._building_repo.get_by_guild_and_type(
+            guild_id, building_type
+        )
+        new_position: tuple[int, int] | None = None
+        if not existing_before_cost:
+            valid_position, position_reason, new_position = await self._validate_new_position(guild_id, plot_x, plot_y)
+            if not valid_position or not new_position:
+                return False, position_reason
 
         # 获取成本
         cost = await self.get_build_cost(guild_id, building_type)
@@ -369,10 +623,48 @@ class GuildBuildingService:
             new_building = GuildBuilding(
                 guild_id=guild_id,
                 building_type=building_type,
-                level=1
+                level=1,
+                plot_x=new_position[0],
+                plot_y=new_position[1],
             )
             await self._building_repo.add(new_building)
-            return True, f"{building_config['name']}建造成功！"
+            return True, f"{building_config['name']}建造成功，已放置在({new_position[0]},{new_position[1]})！"
+
+    async def move_building(
+        self,
+        guild_id: int,
+        building_type: BuildingType,
+        player_id: str,
+        plot_x: int,
+        plot_y: int,
+    ) -> Tuple[bool, str]:
+        """移动已建造建筑到新的布局坐标"""
+        can_build, reason = await GuildPermission.can_build(
+            self._guild_repo._session, player_id, guild_id
+        )
+        if not can_build:
+            return False, reason
+
+        building = await self._building_repo.get_by_guild_and_type(guild_id, building_type)
+        if not building:
+            return False, "公会尚未建造该建筑"
+
+        if building.plot_x == plot_x and building.plot_y == plot_y:
+            return False, "建筑已经在该位置"
+
+        if not self.is_valid_position(plot_x, plot_y):
+            return False, f"布局坐标范围为 1-{self.GRID_SIZE}"
+
+        occupied = await self._building_repo.get_by_guild_and_position(guild_id, plot_x, plot_y)
+        if occupied and occupied.id != building.id:
+            occupied_name = self.BUILDING_CONFIGS[occupied.building_type]["name"]
+            return False, f"坐标({plot_x},{plot_y})已放置{occupied_name}"
+
+        building.plot_x = plot_x
+        building.plot_y = plot_y
+        await self._building_repo.update(building)
+        building_name = self.BUILDING_CONFIGS[building_type]["name"]
+        return True, f"{building_name}已移动到({plot_x},{plot_y})"
 
     async def get_guild_buildings(self, guild_id: int) -> List[Dict]:
         """
@@ -387,6 +679,7 @@ class GuildBuildingService:
         对应原代码:
             guild_building_service.py Line 267-288
         """
+        await self._backfill_missing_positions(guild_id)
         buildings = await self._building_repo.get_all_by_guild_id(guild_id)
 
         guild = await self._guild_repo.get_by_id(guild_id)
@@ -405,10 +698,36 @@ class GuildBuildingService:
                 "max_level": max_level,
                 "description": config["description"],
                 "effects": effects,
-                "built_at": building.built_at
+                "built_at": building.built_at,
+                "plot_x": building.plot_x,
+                "plot_y": building.plot_y,
             })
 
         return result
+
+    @classmethod
+    def format_layout(cls, buildings: List[Dict]) -> List[str]:
+        """格式化3x3公会基地布局"""
+        grid = [["空" for _ in range(cls.GRID_SIZE)] for _ in range(cls.GRID_SIZE)]
+        unplaced = []
+
+        for building in buildings:
+            plot_x = building.get("plot_x")
+            plot_y = building.get("plot_y")
+            short_name = str(building["name"])[:2]
+            if plot_x is None or plot_y is None:
+                unplaced.append(building["name"])
+                continue
+            if cls.is_valid_position(plot_x, plot_y):
+                grid[plot_y - 1][plot_x - 1] = short_name
+
+        lines = ["**基地布局：**"]
+        for idx, row in enumerate(grid, 1):
+            lines.append(f"{idx}　" + " | ".join(f"{cell:^2}" for cell in row))
+        lines.append("　1　 2　 3")
+        if unplaced:
+            lines.append("未布局：" + "、".join(unplaced))
+        return lines
 
     async def get_guild_bonuses(self, guild_id: int) -> Dict:
         """
@@ -432,13 +751,20 @@ class GuildBuildingService:
             "teleport_range": 0,
             "daily_teleport_uses": 0,
             "daily_alchemy_production": 0,
-            "warehouse_capacity": 0
+            "warehouse_capacity": 0,
+            "forge_enabled": False,
+            "forge_gold_discount": 0.0,
+            "upgrade_success_bonus": 0.0,
+            "upgrade_gold_discount": 0.0,
+            "adjacency_descriptions": [],
         }
 
         for building in buildings:
             effects = building["effects"]
             for effect_type, value in effects.items():
-                if effect_type in bonuses:
+                if effect_type == "forge_enabled":
+                    bonuses["forge_enabled"] = bonuses["forge_enabled"] or bool(value)
+                elif effect_type in bonuses:
                     if effect_type in ["exp_multiplier", "treasury_limit", "teleport_range", "warehouse_capacity"]:
                         bonuses[effect_type] = max(bonuses[effect_type], value)
                     else:
@@ -449,6 +775,18 @@ class GuildBuildingService:
                     bonuses["daily_alchemy_production"] = max(bonuses["daily_alchemy_production"], value)
                 elif effect_type == "storage_slots":
                     bonuses["warehouse_capacity"] = max(bonuses["warehouse_capacity"], value)
+
+        raw_buildings = await self._building_repo.get_all_by_guild_id(guild_id)
+        adjacency_bonuses = self.get_adjacency_bonuses(raw_buildings)
+        bonuses["daily_alchemy_production"] += adjacency_bonuses["daily_alchemy_production"]
+        bonuses["cultivation_bonus"] += adjacency_bonuses["cultivation_bonus"]
+        bonuses["forge_gold_discount"] += adjacency_bonuses["forge_gold_discount"]
+        bonuses["upgrade_success_bonus"] += adjacency_bonuses["upgrade_success_bonus"]
+        bonuses["adjacency_descriptions"] = self.get_adjacency_bonus_descriptions(raw_buildings)
+
+        bonuses["forge_gold_discount"] = min(0.25, bonuses["forge_gold_discount"])
+        bonuses["upgrade_success_bonus"] = min(0.15, bonuses["upgrade_success_bonus"])
+        bonuses["upgrade_gold_discount"] = min(0.20, bonuses["upgrade_gold_discount"])
 
         return bonuses
 
@@ -478,7 +816,13 @@ class GuildBuildingService:
             "pill_quality": "丹药品质",
             "teleport_range": "传送范围",
             "daily_uses": "每日次数",
-            "storage_slots": "仓库格子"
+            "storage_slots": "仓库格子",
+            "forge_enabled": "基地锻造",
+            "forge_gold_discount": "锻造金币折扣",
+            "upgrade_success_bonus": "升阶成功率",
+            "upgrade_gold_discount": "升阶金币折扣",
+            "adjacency_power": "灵脉强度",
+            "defense_bonus": "防御加成",
         }
 
         # 丹药品质中文映射
@@ -510,6 +854,14 @@ class GuildBuildingService:
                 effects_list.append(f"{chinese_name} {chinese_quality}")
             elif k == "daily_production":
                 effects_list.append(f"{chinese_name} {v}个")
+            elif k == "forge_enabled":
+                effects_list.append(f"{chinese_name} 开启")
+            elif k in ["forge_gold_discount", "upgrade_success_bonus", "upgrade_gold_discount"]:
+                effects_list.append(f"{chinese_name} +{v*100:.0f}%")
+            elif k == "adjacency_power":
+                effects_list.append(f"{chinese_name} {v}")
+            elif k == "defense_bonus":
+                effects_list.append(f"{chinese_name} +{v*100:.0f}%")
             else:
                 effects_list.append(f"{chinese_name} {v}")
 

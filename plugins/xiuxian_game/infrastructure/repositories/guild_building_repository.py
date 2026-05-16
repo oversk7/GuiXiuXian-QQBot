@@ -63,6 +63,20 @@ class GuildBuildingRepository(IRepository[GuildBuilding]):
         result = await self._session.execute(stmt)
         return result.scalar_one_or_none()
 
+    async def get_by_guild_and_position(
+        self, guild_id: int, plot_x: int, plot_y: int
+    ) -> Optional[GuildBuilding]:
+        """根据公会ID和基地布局坐标获取建筑"""
+        stmt = select(GuildBuilding).where(
+            and_(
+                GuildBuilding.guild_id == guild_id,
+                GuildBuilding.plot_x == plot_x,
+                GuildBuilding.plot_y == plot_y,
+            )
+        )
+        result = await self._session.execute(stmt)
+        return result.scalar_one_or_none()
+
     async def get_all_by_guild_id(self, guild_id: int) -> List[GuildBuilding]:
         """
         获取公会的所有建筑

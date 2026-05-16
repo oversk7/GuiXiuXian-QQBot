@@ -67,6 +67,8 @@ class BuildingType(str, PyEnum):
     TELEPORT_ARRAY = "TELEPORT_ARRAY"       # 传送阵 - 允许成员传送到公会基地
     ALCHEMY_ROOM = "ALCHEMY_ROOM"           # 丹房 - 随机产出低级丹药
     GUILD_WAREHOUSE = "GUILD_WAREHOUSE"     # 公会仓库 - 存放诡异道具
+    ARTIFACT_FORGE = "ARTIFACT_FORGE"       # 铸器坊 - 允许在公会基地锻造装备
+    REFINING_PAVILION = "REFINING_PAVILION" # 淬灵台 - 提升公会基地装备升阶
 
 
 class GuildBuilding(Base):
@@ -77,6 +79,8 @@ class GuildBuilding(Base):
     guild_id: Mapped[int] = mapped_column(Integer, ForeignKey("guild.id"), comment="公会ID")
     building_type: Mapped[BuildingType] = mapped_column(SQLEnum(BuildingType), comment="建筑类型")
     level: Mapped[int] = mapped_column(Integer, default=1, server_default='1', comment="建筑等级")
+    plot_x: Mapped[int | None] = mapped_column(Integer, nullable=True, comment="公会基地布局X坐标")
+    plot_y: Mapped[int | None] = mapped_column(Integer, nullable=True, comment="公会基地布局Y坐标")
     built_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.now, server_default=func.now(), comment="建造时间")
 
     # 关联关系

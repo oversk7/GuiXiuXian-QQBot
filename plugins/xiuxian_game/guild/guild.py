@@ -290,6 +290,25 @@ async def handle_guild_bonuses(event: MessageEvent):
         else:
             lines.append(f"📦 仓库格子：无")
 
+        # 装备设施
+        if bonuses.get("forge_enabled"):
+            forge_discount = bonuses.get("forge_gold_discount", 0.0)
+            lines.append(f"⚒️ 基地锻造：开启，金币折扣+{forge_discount*100:.0f}%")
+        else:
+            lines.append("⚒️ 基地锻造：无")
+
+        upgrade_bonus = bonuses.get("upgrade_success_bonus", 0.0)
+        upgrade_discount = bonuses.get("upgrade_gold_discount", 0.0)
+        if upgrade_bonus > 0 or upgrade_discount > 0:
+            lines.append(f"⭐ 基地升阶：成功率+{upgrade_bonus*100:.0f}%，金币折扣+{upgrade_discount*100:.0f}%")
+        else:
+            lines.append("⭐ 基地升阶：无")
+
+        adjacency_descriptions = bonuses.get("adjacency_descriptions", [])
+        if adjacency_descriptions:
+            lines.append("🌀 邻接加成：")
+            lines.extend([f"• {desc}" for desc in adjacency_descriptions])
+
         lines.append("━━━━━━━━━━")
         lines.append("💡 建造更多建筑可获得更强加成")
 
@@ -1166,15 +1185,30 @@ async def handle_guild_buildings(event: MessageEvent):
             "***",
         ]
 
-        building_emojis = {"经验神龛": "✨", "资金金库": "💰", "训练场": "🏋️", "传送阵": "🔮", "丹房": "🧪", "公会仓库": "📦"}
+        building_emojis = {
+            "经验神龛": "✨",
+            "资金金库": "💰",
+            "训练场": "🏋️",
+            "传送阵": "🔮",
+            "丹房": "🧪",
+            "公会仓库": "📦",
+            "聚灵阵": "🌀",
+            "铸器坊": "⚒️",
+            "淬灵台": "⭐",
+        }
         if not buildings:
             lines.append("暂无建筑，快去建造吧！")
         else:
+            lines.extend(GuildBuildingServiceNew.format_layout(buildings))
+            lines.append("")
             for building in buildings:
                 effects_str = GuildBuildingServiceNew.format_building_effects(building["effects"])
                 bicon = building_emojis.get(building['name'], "🏛️")
+                position = "未布局"
+                if building.get("plot_x") is not None and building.get("plot_y") is not None:
+                    position = f"({building['plot_x']},{building['plot_y']})"
                 lines.append(
-                    f"{bicon} **{building['name']}** Lv.{building['level']}/{building['max_level']}　{effects_str}"
+                    f"{bicon} **{building['name']}** {position} Lv.{building['level']}/{building['max_level']}　{effects_str}"
                 )
                 if building['level'] < building['max_level']:
                     bname = building['name']
@@ -1183,8 +1217,9 @@ async def handle_guild_buildings(event: MessageEvent):
 
         lines.append("***")
         lines.append("**可建造建筑：**")
-        building_names = ["经验神龛", "资金金库", "训练场", "传送阵", "丹房", "公会仓库"]
+        building_names = GuildBuildingServiceNew.get_buildable_names()
         lines.append(" | ".join([f"{building_emojis.get(n, '🏛️')}{cmd(n, f'建造 {n}')}" for n in building_names]))
+        lines.append("💡 可指定布局坐标：建造 铸器坊 2 1；调整位置：移动建筑 铸器坊 2 1")
         lines.append("***")
         lines.append(cmd("公会") + " | " + cmd("公会建筑") + " | " + cmd("帮助"))
 
@@ -1194,27 +1229,29 @@ build_cmd = on_command("建造", aliases={"升级建筑"}, block=True, priority=
 
 @build_cmd.handle()
 async def handle_build(event: MessageEvent, args: Message = CommandArg()):
-    """建造或升级建筑：建造 建筑名"""
-    building_name = args.extract_plain_text().strip()
-    if not building_name:
-        await build_cmd.finish("⛔ 格式错误，正确格式：建造 [建筑名]\n可建造：经验神龛、资金金库、训练场、传送阵、丹房、公会仓库")
+    """建造或升级建筑：建造 建筑名 [x y]"""
+    parts = args.extract_plain_text().strip().split()
+    if not parts:
+        await build_cmd.finish(
+            "⛔ 格式错误，正确格式：建造 [建筑名] [x y]\n"
+            f"可建造：{'、'.join(GuildBuildingServiceNew.get_buildable_names())}"
+        )
 
-    # 建筑名映射（灵塔和防御城墙暂时下架）
-    building_map = {
-        "经验神龛": BuildingType.EXPERIENCE_SHRINE,
-        "资金金库": BuildingType.TREASURY_VAULT,
-        "训练场": BuildingType.TRAINING_GROUND,
-        "传送阵": BuildingType.TELEPORT_ARRAY,
-        "丹房": BuildingType.ALCHEMY_ROOM,
-        "公会仓库": BuildingType.GUILD_WAREHOUSE,
-        # "灵塔": BuildingType.SPIRIT_TOWER,  # 暂时下架
-        # "防御城墙": BuildingType.DEFENSE_WALL  # 暂时下架
-    }
+    building_name = parts[0]
+    plot_x = None
+    plot_y = None
+    if len(parts) >= 3:
+        try:
+            plot_x = int(parts[1])
+            plot_y = int(parts[2])
+        except ValueError:
+            await build_cmd.finish("⛔ 布局坐标必须是数字，例如：建造 铸器坊 2 1")
+    elif len(parts) == 2:
+        await build_cmd.finish("⛔ 布局坐标需要同时提供 x y，例如：建造 铸器坊 2 1")
 
-    if building_name not in building_map:
-        await build_cmd.finish("⛔ 无效的建筑名，可建造：经验神龛、资金金库、训练场、传送阵、丹房、公会仓库")
-
-    building_type = building_map[building_name]
+    building_type = GuildBuildingServiceNew.parse_building_name(building_name)
+    if not building_type:
+        await build_cmd.finish(f"⛔ 无效的建筑名，可建造：{'、'.join(GuildBuildingServiceNew.get_buildable_names())}")
 
     async with safe_session() as session:
         player = await get_unified_player(session, event)
@@ -1240,11 +1277,15 @@ async def handle_build(event: MessageEvent, args: Message = CommandArg()):
         cost_lines = [
             f"# 🏗️ 建造确认",
             f"建筑：**{building_name}**",
+            f"布局：**{f'({plot_x},{plot_y})' if plot_x is not None and plot_y is not None else '自动放置'}**",
             "***",
             f"💰 金币：**{cost['gold']:,}**",
             f"📦 材料：{materials_str}",
             "***",
-            cmd("确认建造 " + building_name, f"确认建造 {building_name}") + " | " + cmd("取消", "公会建筑"),
+            cmd(
+                "确认建造 " + building_name,
+                f"确认建造 {building_name}" + (f" {plot_x} {plot_y}" if plot_x is not None and plot_y is not None else ""),
+            ) + " | " + cmd("取消", "公会建筑"),
         ]
 
         await build_cmd.send(build_markdown("\n".join(cost_lines)))
@@ -1271,26 +1312,25 @@ confirm_build_with_name_cmd = on_command("确认建造", block=True, priority=11
 @confirm_build_with_name_cmd.handle()
 async def handle_confirm_build_with_name(event: MessageEvent, args: Message = CommandArg()):
     """确认建造指定建筑"""
-    building_name = args.extract_plain_text().strip()
-    if not building_name:
-        await confirm_build_with_name_cmd.finish("⛔ 格式错误，正确格式：确认建造 [建筑名]")
+    parts = args.extract_plain_text().strip().split()
+    if not parts:
+        await confirm_build_with_name_cmd.finish("⛔ 格式错误，正确格式：确认建造 [建筑名] [x y]")
 
-    # 建筑名映射（灵塔和防御城墙暂时下架）
-    building_map = {
-        "经验神龛": BuildingType.EXPERIENCE_SHRINE,
-        "资金金库": BuildingType.TREASURY_VAULT,
-        "训练场": BuildingType.TRAINING_GROUND,
-        "传送阵": BuildingType.TELEPORT_ARRAY,
-        "丹房": BuildingType.ALCHEMY_ROOM,
-        "公会仓库": BuildingType.GUILD_WAREHOUSE,
-        # "灵塔": BuildingType.SPIRIT_TOWER,  # 暂时下架
-        # "防御城墙": BuildingType.DEFENSE_WALL  # 暂时下架
-    }
+    building_name = parts[0]
+    plot_x = None
+    plot_y = None
+    if len(parts) >= 3:
+        try:
+            plot_x = int(parts[1])
+            plot_y = int(parts[2])
+        except ValueError:
+            await confirm_build_with_name_cmd.finish("⛔ 布局坐标必须是数字，例如：确认建造 铸器坊 2 1")
+    elif len(parts) == 2:
+        await confirm_build_with_name_cmd.finish("⛔ 布局坐标需要同时提供 x y，例如：确认建造 铸器坊 2 1")
 
-    if building_name not in building_map:
-        await confirm_build_with_name_cmd.finish("⛔ 无效的建筑名，可建造：经验神龛、资金金库、训练场、传送阵、丹房、公会仓库")
-
-    building_type = building_map[building_name]
+    building_type = GuildBuildingServiceNew.parse_building_name(building_name)
+    if not building_type:
+        await confirm_build_with_name_cmd.finish(f"⛔ 无效的建筑名，可建造：{'、'.join(GuildBuildingServiceNew.get_buildable_names())}")
 
     async with safe_session() as session:
         player = await get_unified_player(session, event)
@@ -1309,13 +1349,55 @@ async def handle_confirm_build_with_name(event: MessageEvent, args: Message = Co
             item_repo=ItemRepository(session)  # build_or_upgrade需要item_repo消耗材料
         )
         success, message = await building_service.build_or_upgrade(
-            player.guild_id, building_type, player.id
+            player.guild_id, building_type, player.id, plot_x, plot_y
         )
         if success:
             await session.commit()  # 由调用方控制事务边界
             await confirm_build_with_name_cmd.finish(message_add_head(f"🏗️ {message}", event))
         else:
             await confirm_build_with_name_cmd.finish(message_add_head(f"⛔ {message}", event))
+
+
+move_building_cmd = on_command("移动建筑", aliases={"调整建筑"}, block=True, priority=11)
+
+@move_building_cmd.handle()
+async def handle_move_building(event: MessageEvent, args: Message = CommandArg()):
+    """移动公会建筑：移动建筑 建筑名 x y"""
+    parts = args.extract_plain_text().strip().split()
+    if len(parts) != 3:
+        await move_building_cmd.finish("⛔ 格式错误，正确格式：移动建筑 [建筑名] [x] [y]")
+
+    building_name = parts[0]
+    building_type = GuildBuildingServiceNew.parse_building_name(building_name)
+    if not building_type:
+        await move_building_cmd.finish(f"⛔ 无效的建筑名，可选：{'、'.join(GuildBuildingServiceNew.get_buildable_names())}")
+
+    try:
+        plot_x = int(parts[1])
+        plot_y = int(parts[2])
+    except ValueError:
+        await move_building_cmd.finish("⛔ 布局坐标必须是数字，例如：移动建筑 铸器坊 2 1")
+
+    async with safe_session() as session:
+        player = await get_unified_player(session, event)
+        if not player or not player.guild_id:
+            await move_building_cmd.finish("⛔ 你未加入任何公会")
+
+        from ..infrastructure.repositories.guild_repository import GuildRepository
+        from ..infrastructure.repositories.guild_building_repository import GuildBuildingRepository
+
+        building_service = GuildBuildingServiceNew(
+            guild_repo=GuildRepository(session),
+            building_repo=GuildBuildingRepository(session),
+            item_repo=None,
+        )
+        success, message = await building_service.move_building(
+            player.guild_id, building_type, player.id, plot_x, plot_y
+        )
+        if success:
+            await session.commit()
+            await move_building_cmd.finish(message_add_head(f"✅ {message}", event))
+        await move_building_cmd.finish(message_add_head(f"⛔ {message}", event))
 
 
 

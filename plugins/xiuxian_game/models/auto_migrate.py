@@ -30,6 +30,10 @@ REQUIRED_FIELDS: Dict[str, Dict[str, str]] = {
     "guild": {
         "server_id": "INTEGER NOT NULL DEFAULT 1 COMMENT '所属区服ID'",
     },
+    "guild_building": {
+        "plot_x": "INTEGER DEFAULT NULL COMMENT '公会基地布局X坐标'",
+        "plot_y": "INTEGER DEFAULT NULL COMMENT '公会基地布局Y坐标'",
+    },
     "market_orders": {
         "server_id": "INTEGER NOT NULL DEFAULT 1 COMMENT '所属区服ID'",
     },
@@ -159,9 +163,20 @@ REQUIRED_ENUMS: Dict[str, Dict[str, List[str]]] = {
         # "status": ["AVAILABLE", "ACCEPTED", "COMPLETED", "EXPIRED"],
     },
     # 未来如果有其他表的 ENUM 列需要检查，在这里添加
-    # "other_table": {
-    #     "enum_column": ["value1", "value2", "value3"],
-    # },
+    "guild_building": {
+        "building_type": [
+            "EXPERIENCE_SHRINE",
+            "TREASURY_VAULT",
+            "TRAINING_GROUND",
+            "SPIRIT_TOWER",
+            "DEFENSE_WALL",
+            "TELEPORT_ARRAY",
+            "ALCHEMY_ROOM",
+            "GUILD_WAREHOUSE",
+            "ARTIFACT_FORGE",
+            "REFINING_PAVILION",
+        ],
+    },
 }
 
 

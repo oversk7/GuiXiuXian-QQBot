@@ -78,12 +78,21 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
             player_repo=PlayerRepository(session)
         )
 
+        from ..guild.guild_building_access import get_active_base_building_effects
+        from ..models.guild import BuildingType
+        refining_effects, refining_name = await get_active_base_building_effects(
+            session, player, BuildingType.REFINING_PAVILION
+        )
+        success_rate_bonus = refining_effects.get("upgrade_success_bonus", 0.0)
+        gold_discount = refining_effects.get("upgrade_gold_discount", 0.0)
+
         required_equipment_count = upgrade_service.get_equipment_requirements(current_level, equip.item_id)
         required_materials = upgrade_service.get_upgrade_materials(current_level, equip.item_id)
-        required_gold = upgrade_service.get_upgrade_gold_cost(current_level)
+        base_required_gold = upgrade_service.get_upgrade_gold_cost(current_level)
+        required_gold = upgrade_service.apply_gold_discount(base_required_gold, gold_discount)
         available_equipment = await upgrade_service._item_repo.get_available_equipment_for_upgrade(player.id, equip.item_id, current_level)
-        success_rate = upgrade_service.get_success_rate(current_level, False, player.luck)
-        success_rate_with_protection = upgrade_service.get_success_rate(current_level, True, player.luck)
+        success_rate = upgrade_service.get_success_rate(current_level, False, player.luck, success_rate_bonus)
+        success_rate_with_protection = upgrade_service.get_success_rate(current_level, True, player.luck, success_rate_bonus)
         base_success_rate = upgrade_service.get_success_rate(current_level, False, 0)
         # 构建信息显示
         lines = [
@@ -98,6 +107,10 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
             "",
             "🔧 装备合成需求："
         ]
+        if refining_effects:
+            lines.insert(8, f"⭐ {refining_name}加成：成功率+{success_rate_bonus:.0%}，金币折扣{gold_discount:.0%}")
+            if required_gold != base_required_gold:
+                lines.insert(4, f"💰 原价：{base_required_gold:,}")
 
         # 显示装备需求
         equipment_status = "✅" if len(available_equipment) >= required_equipment_count else "❌"
@@ -196,7 +209,21 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
             item_repo=ItemRepository(session),
             player_repo=PlayerRepository(session)
         )
-        success, message, result_info = await upgrade_service.perform_upgrade(equip, player, use_protection)
+        from ..guild.guild_building_access import get_active_base_building_effects
+        from ..models.guild import BuildingType
+        refining_effects, refining_name = await get_active_base_building_effects(
+            session, player, BuildingType.REFINING_PAVILION
+        )
+        success_rate_bonus = refining_effects.get("upgrade_success_bonus", 0.0)
+        gold_discount = refining_effects.get("upgrade_gold_discount", 0.0)
+
+        success, message, result_info = await upgrade_service.perform_upgrade(
+            equip,
+            player,
+            use_protection,
+            success_rate_bonus=success_rate_bonus,
+            gold_discount=gold_discount,
+        )
         # 如果装备升级成功且装备已穿戴，需要重新计算装备属性加成
         if success and equip.equipped:
             await _recalculate_equipment_attributes(session, player)
@@ -224,6 +251,15 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
             consumed_gold = result_info.get("consumed_gold", 0)
             if consumed_gold > 0:
                 result_lines.append(f"💰 消耗金币：{consumed_gold:,}")
+                if result_info.get("gold_discount", 0) > 0:
+                    result_lines.append(
+                        f"⭐ {refining_name}金币折扣：-{result_info['gold_discount']:.0%}"
+                    )
+
+            if result_info.get("success_rate_bonus", 0) > 0:
+                result_lines.append(
+                    f"⭐ {refining_name}成功率加成：+{result_info['success_rate_bonus']:.0%}"
+                )
 
         buttons = f"\n{cmd('升阶列表')} | {cmd('装备栏')} | {cmd('升阶信息 编号', '升阶信息 ')}"
         await upgrade_equipment_cmd.finish(build_markdown("\n".join(result_lines) + buttons))
@@ -355,6 +391,14 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
             player_repo=PlayerRepository(session)
         )
 
+        from ..guild.guild_building_access import get_active_base_building_effects
+        from ..models.guild import BuildingType
+        refining_effects, refining_name = await get_active_base_building_effects(
+            session, player, BuildingType.REFINING_PAVILION
+        )
+        success_rate_bonus = refining_effects.get("upgrade_success_bonus", 0.0)
+        gold_discount = refining_effects.get("upgrade_gold_discount", 0.0)
+
         # 记录初始状态
         start_level = equip.upgrade_level
         equip_name = equip.config.name
@@ -401,13 +445,19 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
                 break
 
             # --- 阶段二：升阶主装备 ---
-            can_upgrade, reason = await upgrade_service.can_upgrade(equip, player)
+            can_upgrade, reason = await upgrade_service.can_upgrade(equip, player, gold_discount)
             if not can_upgrade:
                 stop_reason = reason
                 break
 
             attempts += 1
-            success, message, result_info = await upgrade_service.perform_upgrade(equip, player, use_protection)
+            success, message, result_info = await upgrade_service.perform_upgrade(
+                equip,
+                player,
+                use_protection,
+                success_rate_bonus=success_rate_bonus,
+                gold_discount=gold_discount,
+            )
             result_type = result_info.get("result", "")
 
             if result_type == "destroyed":
@@ -443,6 +493,8 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
             lines.append(f"🎯 {equip_name}：+{start_level}阶 → +{final_level}阶")
 
         lines.append(f"📊 共尝试 {attempts} 次（成功 {successes} 次 / 失败 {failures} 次）")
+        if refining_effects:
+            lines.append(f"⭐ {refining_name}加成：成功率+{success_rate_bonus:.0%}，金币折扣{gold_discount:.0%}")
 
         # 显示轮次日志（最多显示最后15条）
         if round_logs:

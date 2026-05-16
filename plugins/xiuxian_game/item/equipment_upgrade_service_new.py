@@ -238,7 +238,20 @@ class EquipmentUpgradeService:
 
         return base_cost
 
-    def get_success_rate(self, current_level: int, use_protection: bool = False, player_luck: int = 0) -> float:
+    @staticmethod
+    def apply_gold_discount(gold_cost: int, discount: float = 0.0) -> int:
+        """应用升阶金币折扣"""
+        if discount <= 0:
+            return gold_cost
+        return int(gold_cost * (1 - min(0.20, discount)))
+
+    def get_success_rate(
+        self,
+        current_level: int,
+        use_protection: bool = False,
+        player_luck: int = 0,
+        extra_bonus: float = 0.0,
+    ) -> float:
         """获取升阶成功率"""
         if current_level >= 10:
             return 0.0
@@ -255,9 +268,14 @@ class EquipmentUpgradeService:
         if use_protection:
             base_rate = min(1.0, base_rate + 0.2)
 
+        if extra_bonus > 0:
+            base_rate = min(1.0, base_rate + min(0.15, extra_bonus))
+
         return base_rate
 
-    async def can_upgrade(self, equipment: ItemInstance, player: Player) -> Tuple[bool, str]:
+    async def can_upgrade(
+        self, equipment: ItemInstance, player: Player, gold_discount: float = 0.0
+    ) -> Tuple[bool, str]:
         """检查是否可以升阶（装备合成模式）"""
         if not equipment.is_equipment:
             return False, "该物品不是装备"
@@ -297,16 +315,26 @@ class EquipmentUpgradeService:
                 return False, f"缺少材料：{material_name} x{required_qty}"
 
         # 检查金币
-        required_gold = self.get_upgrade_gold_cost(equipment.upgrade_level)
+        required_gold = self.apply_gold_discount(
+            self.get_upgrade_gold_cost(equipment.upgrade_level),
+            gold_discount,
+        )
         if player.gold < required_gold:
             return False, f"金币不足，需要 {required_gold} 金币"
 
         return True, "可以升阶"
 
-    async def perform_upgrade(self, equipment: ItemInstance, player: Player, use_protection: bool = False) -> Tuple[bool, str, Dict]:
+    async def perform_upgrade(
+        self,
+        equipment: ItemInstance,
+        player: Player,
+        use_protection: bool = False,
+        success_rate_bonus: float = 0.0,
+        gold_discount: float = 0.0,
+    ) -> Tuple[bool, str, Dict]:
         """执行装备升阶（装备合成模式）"""
         # 再次检查是否可以升阶
-        can_upgrade, reason = await self.can_upgrade(equipment, player)
+        can_upgrade, reason = await self.can_upgrade(equipment, player, gold_discount)
         if not can_upgrade:
             return False, reason, {}
 
@@ -314,8 +342,14 @@ class EquipmentUpgradeService:
         current_level = equipment.upgrade_level
         target_level = current_level + 1
         required_materials = self.get_upgrade_materials(current_level, equipment.item_id)
-        required_gold = self.get_upgrade_gold_cost(current_level)
-        success_rate = self.get_success_rate(current_level, use_protection, player.luck)
+        base_required_gold = self.get_upgrade_gold_cost(current_level)
+        required_gold = self.apply_gold_discount(base_required_gold, gold_discount)
+        success_rate = self.get_success_rate(
+            current_level,
+            use_protection,
+            player.luck,
+            success_rate_bonus,
+        )
 
         # 获取需要消耗的装备
         required_equipment_count = self.get_equipment_requirements(current_level, equipment.item_id)
@@ -376,6 +410,9 @@ class EquipmentUpgradeService:
             "consumed_materials": consumed_materials,
             "consumed_equipment": consumed_equipment_names,
             "consumed_gold": required_gold,
+            "base_gold": base_required_gold,
+            "gold_discount": min(0.20, gold_discount),
+            "success_rate_bonus": min(0.15, success_rate_bonus),
             "used_protection": use_protection,
             "recovered_from_consumed": gems_from_consumed,
         }

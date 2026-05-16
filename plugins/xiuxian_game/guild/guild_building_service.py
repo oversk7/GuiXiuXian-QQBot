@@ -109,8 +109,66 @@ class GuildBuildingService:
                 9: {"storage_slots": 700},
                 10: {"storage_slots": 800}
             }
+        },
+        BuildingType.SPIRIT_TOWER: {
+            "name": "聚灵阵",
+            "description": "强化相邻建筑的灵脉收益",
+            "max_level": 8,
+            "base_cost": {"gold": 90000, "materials": {"墓土": 220, "灵石": 80, "阴煞精华": 50}},
+            "effects": {
+                1: {"adjacency_power": 1},
+                2: {"adjacency_power": 2},
+                3: {"adjacency_power": 3},
+                4: {"adjacency_power": 4},
+                5: {"adjacency_power": 5},
+                6: {"adjacency_power": 6},
+                7: {"adjacency_power": 7},
+                8: {"adjacency_power": 8}
+            }
+        },
+        BuildingType.ARTIFACT_FORGE: {
+            "name": "铸器坊",
+            "description": "允许成员在公会基地锻造装备",
+            "max_level": 8,
+            "base_cost": {"gold": 100000, "materials": {"墓土": 260, "铁锈": 120, "诡异石": 50, "灵石": 40}},
+            "effects": {
+                1: {"forge_enabled": True, "forge_gold_discount": 0.02},
+                2: {"forge_enabled": True, "forge_gold_discount": 0.04},
+                3: {"forge_enabled": True, "forge_gold_discount": 0.06},
+                4: {"forge_enabled": True, "forge_gold_discount": 0.08},
+                5: {"forge_enabled": True, "forge_gold_discount": 0.10},
+                6: {"forge_enabled": True, "forge_gold_discount": 0.12},
+                7: {"forge_enabled": True, "forge_gold_discount": 0.14},
+                8: {"forge_enabled": True, "forge_gold_discount": 0.16}
+            }
+        },
+        BuildingType.REFINING_PAVILION: {
+            "name": "淬灵台",
+            "description": "在公会基地升阶装备时获得加成",
+            "max_level": 8,
+            "base_cost": {"gold": 120000, "materials": {"墓土": 240, "魂魄结晶": 40, "诡异石": 70, "灵石": 60}},
+            "effects": {
+                1: {"upgrade_success_bonus": 0.01, "upgrade_gold_discount": 0.01},
+                2: {"upgrade_success_bonus": 0.02, "upgrade_gold_discount": 0.02},
+                3: {"upgrade_success_bonus": 0.03, "upgrade_gold_discount": 0.03},
+                4: {"upgrade_success_bonus": 0.04, "upgrade_gold_discount": 0.04},
+                5: {"upgrade_success_bonus": 0.05, "upgrade_gold_discount": 0.05},
+                6: {"upgrade_success_bonus": 0.06, "upgrade_gold_discount": 0.06},
+                7: {"upgrade_success_bonus": 0.07, "upgrade_gold_discount": 0.07},
+                8: {"upgrade_success_bonus": 0.08, "upgrade_gold_discount": 0.08}
+            }
+        },
+        BuildingType.DEFENSE_WALL: {
+            "name": "防御城墙",
+            "description": "旧版遗留防御建筑",
+            "max_level": 3,
+            "base_cost": {"gold": 100000, "materials": {"墓土": 300, "诡异石": 60, "诅咒镜片": 25, "虚无精华": 8}},
+            "effects": {
+                1: {"defense_bonus": 0.10},
+                2: {"defense_bonus": 0.15},
+                3: {"defense_bonus": 0.25}
+            }
         }
-        # 注意：灵塔和防御城墙暂时下架，功能还不稳定
         # BuildingType.SPIRIT_TOWER: {
         #     "name": "灵塔",
         #     "description": "提升公会整体属性",
@@ -167,6 +225,16 @@ class GuildBuildingService:
                 extrapolated[key] = "legendary"
             elif key == "storage_slots":
                 extrapolated[key] = value + extra * 100
+            elif key == "forge_enabled":
+                extrapolated[key] = True
+            elif key == "forge_gold_discount":
+                extrapolated[key] = min(0.25, round(value + extra * 0.02, 2))
+            elif key == "upgrade_success_bonus":
+                extrapolated[key] = min(0.15, round(value + extra * 0.01, 2))
+            elif key == "upgrade_gold_discount":
+                extrapolated[key] = min(0.20, round(value + extra * 0.01, 2))
+            elif key == "adjacency_power":
+                extrapolated[key] = value + extra
             else:
                 extrapolated[key] = value
 
@@ -375,13 +443,19 @@ class GuildBuildingService:
             "teleport_range": 0,
             "daily_teleport_uses": 0,
             "daily_alchemy_production": 0,
-            "warehouse_capacity": 0
+            "warehouse_capacity": 0,
+            "forge_enabled": False,
+            "forge_gold_discount": 0.0,
+            "upgrade_success_bonus": 0.0,
+            "upgrade_gold_discount": 0.0,
         }
         
         for building in buildings:
             effects = building["effects"]
             for effect_type, value in effects.items():
-                if effect_type in bonuses:
+                if effect_type == "forge_enabled":
+                    bonuses["forge_enabled"] = bonuses["forge_enabled"] or bool(value)
+                elif effect_type in bonuses:
                     if effect_type in ["exp_multiplier", "treasury_limit", "teleport_range", "warehouse_capacity"]:
                         bonuses[effect_type] = max(bonuses[effect_type], value)
                     else:
@@ -407,7 +481,13 @@ class GuildBuildingService:
             "pill_quality": "丹药品质",
             "teleport_range": "传送范围",
             "daily_uses": "每日次数",
-            "storage_slots": "仓库格子"
+            "storage_slots": "仓库格子",
+            "forge_enabled": "基地锻造",
+            "forge_gold_discount": "锻造金币折扣",
+            "upgrade_success_bonus": "升阶成功率",
+            "upgrade_gold_discount": "升阶金币折扣",
+            "adjacency_power": "灵脉强度",
+            "defense_bonus": "防御加成",
         }
 
         # 丹药品质中文映射
@@ -439,6 +519,14 @@ class GuildBuildingService:
                 effects_list.append(f"{chinese_name} {chinese_quality}")
             elif k == "daily_production":
                 effects_list.append(f"{chinese_name} {v}个")
+            elif k == "forge_enabled":
+                effects_list.append(f"{chinese_name} 开启")
+            elif k in ["forge_gold_discount", "upgrade_success_bonus", "upgrade_gold_discount"]:
+                effects_list.append(f"{chinese_name} +{v*100:.0f}%")
+            elif k == "adjacency_power":
+                effects_list.append(f"{chinese_name} {v}")
+            elif k == "defense_bonus":
+                effects_list.append(f"{chinese_name} +{v*100:.0f}%")
             else:
                 effects_list.append(f"{chinese_name} {v}")
 
