@@ -444,6 +444,7 @@ async def handle_pve(bot: Bot, event: MessageEvent, args: Message = CommandArg()
             "▫️【pve道具 肾上腺素 <道具名>】偷取道具\n"
             "▫️【pve状态】查看当前状态和道具详情\n"
             "▫️【pve预知】查看预知结果\n"
+            "▫️【人机轮盘 退出】放弃当前游戏\n"
             "━━━━━━━━━━━━━\n"
             "💰 经济：\n"
             "▫️ 金币作为入场费（消耗不退还）\n"
@@ -464,6 +465,11 @@ async def handle_pve(bot: Bot, event: MessageEvent, args: Message = CommandArg()
     # 收手
     if args_text == "收手":
         await _handle_cash_out(bot, event)
+        return
+
+    # 退出（放弃当前游戏，损失已下注金币）
+    if args_text in ("退出", "放弃"):
+        await _handle_quit(bot, event)
         return
 
     # 开始新游戏（金额参数 + 可选血量参数）
@@ -665,6 +671,38 @@ async def _handle_cash_out(bot: Bot, event: MessageEvent):
             f"🎮 加倍次数：{double_count}\n"
             f"⭐ 小游戏积分 +{score_gain}\n"
             f"🏆 当前恶魔币总计：{player.demon_coins}\n"
+            f"━━━━━━━━━━━━━\n"
+            f"💡 再来一局？发送【人机轮盘 <金额>】"
+        )
+        await pve_cmd.finish(message_add_head(msg, event))
+
+
+async def _handle_quit(bot: Bot, event: MessageEvent):
+    """处理退出（放弃游戏，损失已下注金币）"""
+    async with safe_session() as session:
+        player = await get_unified_player(session, event)
+        if not player:
+            await pve_cmd.finish("⛔ 请先创建角色")
+
+        repo = RussianRoulettePvERepository(session)
+        pve_game = await repo.find_active_by_player_id(player.id)
+        if not pve_game:
+            await pve_cmd.finish("⛔ 你没有进行中的人机轮盘")
+
+        initial_bet = pve_game.initial_bet
+        pot = pve_game.pot
+        status = pve_game.status
+
+        # 赢了之后应该用"收手"，不是"退出"
+        if status == "won" and pot > 0:
+            await pve_cmd.finish("⛔ 你已经赢了，请用【人机轮盘 收手】领取奖励，或【人机轮盘 加倍】继续")
+
+        await repo.delete_entity(pve_game)
+
+        msg = (
+            f"🚪 已退出人机轮盘\n"
+            f"━━━━━━━━━━━━━\n"
+            f"💸 损失入场费 {initial_bet} 金币\n"
             f"━━━━━━━━━━━━━\n"
             f"💡 再来一局？发送【人机轮盘 <金额>】"
         )
