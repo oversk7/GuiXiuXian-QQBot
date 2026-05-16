@@ -343,10 +343,15 @@ class SponsorShopService:
                 f"当前: {player.gui_zhu} 诡烛"
             )
 
-        result = await session.execute(select(Player).where(Player.uid == target_uid))
+        result = await session.execute(
+            select(Player).where(
+                Player.uid == target_uid,
+                Player.server_id == player.server_id,
+            )
+        )
         target = result.scalars().first()
         if not target:
-            return False, f"⛔ 未找到 UID:{target_uid} 的账号"
+            return False, f"⛔ 本区服未找到 UID:{target_uid} 的账号"
 
         from ..models.account_ownership import AccountOwnership
 
@@ -406,6 +411,9 @@ class SponsorShopService:
         if not payer or not target:
             _PENDING_ALT_BINDS.pop(code, None)
             return False, "⛔ 申请中的账号不存在，已取消本次绑定"
+        if payer.server_id != target.server_id:
+            _PENDING_ALT_BINDS.pop(code, None)
+            return False, "⛔ 主号和目标小号不在同一区服，已取消本次绑定"
 
         from ..models.account_ownership import AccountOwnership
 
@@ -422,6 +430,16 @@ class SponsorShopService:
             if target.id != confirmer_platform_id:
                 return False, "⛔ 你不是目标小号原始QQ号，无法确认绑定"
             original_owner = confirmer_platform_id
+
+        from ..server_service import ensure_same_server_binding
+        ok, message = await ensure_same_server_binding(
+            session,
+            confirmer_platform_id,
+            target.server_id,
+            allow_closed=True,
+        )
+        if not ok:
+            return False, message
 
         payer_owner_platform_id = pending["payer_owner_platform_id"]
         if target_ownership and original_owner == payer_owner_platform_id:

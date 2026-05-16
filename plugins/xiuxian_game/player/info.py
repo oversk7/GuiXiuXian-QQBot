@@ -16,9 +16,11 @@ import random
 import uuid
 from ..models.navigation_task import NavigationTask
 from ..world.navigation import _update_nav_position
-from ..platform_utils import get_unified_player, is_guild_message
+from ..platform_utils import get_event_server_id, get_unified_player, is_guild_message
 from ..infrastructure.cache import player_identity_cache
 from ..config import config
+from ..server_config import DEFAULT_SERVER_ID, get_server_name
+from ..server_service import ensure_platform_server_binding, parse_server_id
 from ..infrastructure.uow import UnitOfWork
 from ..domain.attributes import get_effective_attributes_v2
 from ..infrastructure.repositories.account_transfer_log_repository import AccountTransferLogRepository
@@ -97,7 +99,9 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
 
     # ===== 查看他人面板：纯只读路径 =====
     if target_uid is not None:
-        profile_data = await query_player_profile(target_uid)
+        async with safe_session() as session:
+            server_id = await get_event_server_id(session, event)
+        profile_data = await query_player_profile(target_uid, server_id=server_id)
         if not profile_data:
             await profile.finish("⛔ 未找到该 UID")
         player = profile_data.player
@@ -198,7 +202,7 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
     cur_mp = min(player.mp, effective_attrs["max_mp"])
 
     realm_name = realm_by_level_and_reincarnation(player.level, player.reincarnation_level)
-    exp_max = calculate_level_up_exp(player.level)
+    exp_max = calculate_level_up_exp(player.level, player.server_id)
 
     # 获取活动称号（如有）
     from ..event.knocker_event import KnockerEventService
@@ -281,6 +285,29 @@ def _get_qq_username(event: MessageEvent) -> str | None:
     return None
 
 
+def _parse_register_args(arg_text: str) -> tuple[int, Gender | None, bool]:
+    """解析注册参数，支持：注册 男 / 注册 2区 男 / 注册 2区。"""
+    if not arg_text:
+        return DEFAULT_SERVER_ID, None, True
+
+    parts = arg_text.split()
+    if len(parts) == 1:
+        if parts[0] in ["男", "女"]:
+            return DEFAULT_SERVER_ID, Gender.MALE if parts[0] == "男" else Gender.FEMALE, True
+        server_id = parse_server_id(parts[0], default=None)
+        if server_id is not None:
+            return server_id, None, True
+        return DEFAULT_SERVER_ID, None, False
+
+    if len(parts) == 2:
+        server_id = parse_server_id(parts[0], default=None)
+        gender_text = parts[1]
+        if server_id is not None and gender_text in ["男", "女"]:
+            return server_id, Gender.MALE if gender_text == "男" else Gender.FEMALE, True
+
+    return DEFAULT_SERVER_ID, None, False
+
+
 @register.handle()
 async def _(event: MessageEvent, state: T_State, args: Message = CommandArg()):
     # 检查是否已有角色（通过ownership系统判断，支持转让后重新注册）
@@ -305,20 +332,24 @@ async def _(event: MessageEvent, state: T_State, args: Message = CommandArg()):
                 await register.finish("⛔ 你已经创建过角色了")
 
     arg_text = args.extract_plain_text().strip()
-    if arg_text in ["男", "女"]:
-        gender = Gender.MALE if arg_text == "男" else Gender.FEMALE
+    server_id, gender, is_valid = _parse_register_args(arg_text)
+    if not is_valid:
+        await register.finish(
+            "⛔ 格式错误\n💡 用法：【注册 男】或【注册 2区 男】\n"
+            "或发送【注册 2区】按提示选择"
+        )
+
+    state["server_id"] = server_id
+    if gender is not None:
         nickname = _get_qq_username(event)
         if not nickname:
             async with safe_session() as session:
                 nickname = await generate_random_nickname(session)
-        result = await create_player(event, nickname, gender)
+        result = await create_player(event, nickname, gender, server_id)
         await register.finish(result)
 
     if arg_text:
-        await register.finish(
-            "⛔ 格式错误\n💡 用法：【注册 男】或【注册 女】\n"
-            "或直接发送【注册】按提示选择"
-        )
+        state["server_id"] = server_id
     state["user_id"] = event.get_user_id()
 
 
@@ -327,7 +358,7 @@ async def _(event: MessageEvent, state: T_State, args: Message = CommandArg()):
     "──────────────\n"
     "⚧️ 请选择你的性别，回复 【男】 或 【女】："
 ))
-async def _(event: MessageEvent, gender_input: str = ArgPlainText("gender")):
+async def _(event: MessageEvent, state: T_State, gender_input: str = ArgPlainText("gender")):
     gender_input = gender_input.strip()
     if gender_input not in ["男", "女"]:
         await register.reject("⛔ 请回复「男」或「女」")
@@ -336,7 +367,7 @@ async def _(event: MessageEvent, gender_input: str = ArgPlainText("gender")):
     if not nickname:
         async with safe_session() as session:
             nickname = await generate_random_nickname(session)
-    result = await create_player(event, nickname, gender)
+    result = await create_player(event, nickname, gender, state.get("server_id", DEFAULT_SERVER_ID))
     await register.finish(result)
 
 
@@ -406,10 +437,18 @@ async def generate_random_nickname(session) -> str:
     return nickname + str(random.randint(10, 99))  # 兜底：加后缀
 
 
-async def create_player(event: MessageEvent, nickname: str, gender: Gender) -> Message:
+async def create_player(event: MessageEvent, nickname: str, gender: Gender, server_id: int = DEFAULT_SERVER_ID) -> Message:
     """创建新玩家角色，返回Markdown卡片消息"""
     async with safe_session() as session:
         user_id = event.get_user_id()
+
+        ok, bind_msg, bound_server_id = await ensure_platform_server_binding(
+            session,
+            user_id,
+            server_id,
+        )
+        if not ok:
+            return Message(bind_msg)
 
         # 检查是否拥有任何账号（通过ownership系统判断）
         from ..infrastructure.repositories.account_ownership_repository import AccountOwnershipRepository
@@ -451,6 +490,7 @@ async def create_player(event: MessageEvent, nickname: str, gender: Gender) -> M
             sex=gender,
             real_world_x=spawn_market.x,
             real_world_y=spawn_market.y,
+            server_id=bound_server_id or server_id,
             created_at=datetime.now()
         )
 
@@ -486,6 +526,7 @@ async def create_player(event: MessageEvent, nickname: str, gender: Gender) -> M
             f"***\n"
             f"{card_type} **{nickname}**　UID:**{new_player.uid}**　{new_player.sex.value}\n"
             f"📍 你在 **{spawn_market.name}**\n"
+            f"🪧 区服 **{get_server_name(new_player.server_id)}**\n"
             f"***\n"
             f"**🌍 两个世界**\n"
             f"・**现实** — 安全地带，休息恢复、买卖交易\n"
@@ -679,7 +720,8 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
     async with UnitOfWork(AsyncSessionLocal) as uow:
         # 1. 获取玩家
         if target_uid is not None:
-            stmt = select(Player).where(Player.uid == target_uid)
+            server_id = await get_event_server_id(uow.session, event)
+            stmt = select(Player).where(Player.uid == target_uid, Player.server_id == server_id)
             result = await uow.session.execute(stmt)
             player = result.scalars().first()
             if not player:

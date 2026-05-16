@@ -68,7 +68,7 @@ class InviteRewardRepository(IRepository[InviteReward]):
 
     # ==================== 邀请奖励特定方法 ====================
 
-    async def get_by_invitee_uid(self, invitee_uid: int) -> Optional[InviteReward]:
+    async def get_by_invitee_uid(self, invitee_uid: int, server_id: int | None = None) -> Optional[InviteReward]:
         """
         根据被邀请者UID获取邀请记录
 
@@ -79,10 +79,12 @@ class InviteRewardRepository(IRepository[InviteReward]):
             邀请记录，如果不存在则返回None
         """
         stmt = select(InviteReward).where(InviteReward.invitee_uid == invitee_uid)
+        if server_id is not None:
+            stmt = stmt.where(InviteReward.server_id == server_id)
         result = await self._session.execute(stmt)
         return result.scalars().first()
 
-    async def get_by_inviter_uid(self, inviter_uid: int) -> List[InviteReward]:
+    async def get_by_inviter_uid(self, inviter_uid: int, server_id: int | None = None) -> List[InviteReward]:
         """
         根据邀请者UID获取所有邀请记录
 
@@ -93,11 +95,13 @@ class InviteRewardRepository(IRepository[InviteReward]):
             邀请记录列表
         """
         stmt = select(InviteReward).where(InviteReward.inviter_uid == inviter_uid)
+        if server_id is not None:
+            stmt = stmt.where(InviteReward.server_id == server_id)
         result = await self._session.execute(stmt)
         return list(result.scalars().all())
 
     async def get_records_with_invitee_players(
-        self, inviter_uid: int
+        self, inviter_uid: int, server_id: int | None = None
     ) -> List[tuple[InviteReward, Optional[Player]]]:
         """
         获取邀请记录并预加载被邀请者玩家信息（解决N+1查询）
@@ -110,6 +114,8 @@ class InviteRewardRepository(IRepository[InviteReward]):
         """
         # 查询邀请记录
         invite_stmt = select(InviteReward).where(InviteReward.inviter_uid == inviter_uid)
+        if server_id is not None:
+            invite_stmt = invite_stmt.where(InviteReward.server_id == server_id)
         invite_result = await self._session.execute(invite_stmt)
         records = list(invite_result.scalars().all())
 
@@ -119,6 +125,8 @@ class InviteRewardRepository(IRepository[InviteReward]):
         # 批量查询所有被邀请者
         invitee_uids = [r.invitee_uid for r in records]
         player_stmt = select(Player).where(Player.uid.in_(invitee_uids))
+        if server_id is not None:
+            player_stmt = player_stmt.where(Player.server_id == server_id)
         player_result = await self._session.execute(player_stmt)
         players = {p.uid: p for p in player_result.scalars().all()}
 

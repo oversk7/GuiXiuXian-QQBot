@@ -44,7 +44,7 @@ class PlayerRepository(IRepository[Player]):
         result = await self._session.execute(stmt)
         return result.scalar_one_or_none()
 
-    async def get_by_uid(self, uid: int) -> Optional[Player]:
+    async def get_by_uid(self, uid: int, server_id: int | None = None) -> Optional[Player]:
         """
         根据UID获取玩家
 
@@ -55,6 +55,8 @@ class PlayerRepository(IRepository[Player]):
             玩家对象，如果不存在则返回 None
         """
         stmt = select(Player).where(Player.uid == uid)
+        if server_id is not None:
+            stmt = stmt.where(Player.server_id == server_id)
         result = await self._session.execute(stmt)
         return result.scalar_one_or_none()
 
@@ -95,7 +97,8 @@ class PlayerRepository(IRepository[Player]):
         x: int,
         y: int,
         region: str,
-        max_distance: int
+        max_distance: int,
+        server_id: int = 1,
     ) -> List[Player]:
         """
         获取附近的玩家（优化的查询）
@@ -117,6 +120,7 @@ class PlayerRepository(IRepository[Player]):
         stmt = select(Player).where(
             and_(
                 Player.region == region,
+                Player.server_id == server_id,
                 Player.x.between(x - max_distance, x + max_distance),
                 Player.y.between(y - max_distance, y + max_distance)
             )
@@ -272,7 +276,7 @@ class PlayerRepository(IRepository[Player]):
         result = await self._session.execute(stmt)
         return result.scalar_one_or_none()
 
-    async def find_mansion_owner_at_location(self, x: int, y: int) -> Optional[Player]:
+    async def find_mansion_owner_at_location(self, x: int, y: int, server_id: int = 1) -> Optional[Player]:
         """
         查找指定坐标的阴宅主人
 
@@ -287,6 +291,7 @@ class PlayerRepository(IRepository[Player]):
             and_(
                 Player.mansion_x == x,
                 Player.mansion_y == y,
+                Player.server_id == server_id,
                 Player.mansion_level > 0
             )
         )

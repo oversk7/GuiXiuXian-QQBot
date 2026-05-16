@@ -23,6 +23,7 @@ from ..infrastructure.repositories.player_repository import PlayerRepository
 from ..models.account_ownership import AccountOwnership
 from ..models.player import Player
 from ..infrastructure.cache import player_identity_cache
+from ..server_service import ensure_same_server_binding, get_owner_server_id
 
 
 class AccountSwitchingService:
@@ -45,6 +46,7 @@ class AccountSwitchingService:
         self._ownership_repo = ownership_repo
         self._transfer_log_repo = transfer_log_repo
         self._player_repo = player_repo
+        self._session = ownership_repo._session
 
     # ==================== 账号管理 ====================
 
@@ -146,6 +148,13 @@ class AccountSwitchingService:
 
         if ownership.owner_platform_id != owner_platform_id:
             return False, "这不是你的账号"
+
+        player = await self._player_repo.get_by_id(target_player_id)
+        if not player:
+            return False, "账号不存在"
+        owner_server_id = await get_owner_server_id(self._session, owner_platform_id)
+        if player.server_id != owner_server_id:
+            return False, "该账号不属于你的区服，不能切换"
 
         # 2. 执行切换
         success = await self._ownership_repo.activate_account(
@@ -257,6 +266,18 @@ class AccountSwitchingService:
         # 3. 记录原拥有者
         original_owner = ownership.owner_platform_id
         player_id = ownership.player_id
+        player = await self._player_repo.get_by_id(player_id)
+        if not player:
+            return False, "账号不存在"
+
+        ok, message = await ensure_same_server_binding(
+            self._session,
+            recipient_platform_id,
+            player.server_id,
+            allow_closed=True,
+        )
+        if not ok:
+            return False, message
 
         # 4. 更改所有权
         ownership.owner_platform_id = recipient_platform_id
@@ -301,6 +322,17 @@ class AccountSwitchingService:
         ownership = await self._ownership_repo.find_by_player_id(player_id)
         if not ownership:
             return False, "账号不存在"
+        player = await self._player_repo.get_by_id(player_id)
+        if not player:
+            return False, "账号不存在"
+        ok, message = await ensure_same_server_binding(
+            self._session,
+            owner_platform_id,
+            player.server_id,
+            allow_closed=True,
+        )
+        if not ok:
+            return False, message
 
         if ownership.owner_platform_id != owner_platform_id:
             return False, "这不是你的账号"
@@ -413,6 +445,18 @@ class AccountSwitchingService:
 
         # 2. 记录原拥有者
         original_owner = ownership.owner_platform_id
+        player = await self._player_repo.get_by_id(player_id)
+        if not player:
+            return False, "账号不存在"
+
+        ok, message = await ensure_same_server_binding(
+            self._session,
+            to_platform_id,
+            player.server_id,
+            allow_closed=True,
+        )
+        if not ok:
+            return False, message
 
         # 3. 更改所有权
         ownership.owner_platform_id = to_platform_id

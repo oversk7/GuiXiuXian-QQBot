@@ -105,7 +105,7 @@ async def handle_favorability(event: MessageEvent, args: Message = CommandArg())
                 return
 
             # 先查目标玩家，将UID转为player.id
-            target = await uow.players.get_by_uid(target_uid)
+            target = await uow.players.get_by_uid(target_uid, player.server_id)
             if not target:
                 await favorability_cmd.finish(f"未找到UID为{target_uid}的玩家")
                 return

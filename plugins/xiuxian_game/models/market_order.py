@@ -15,6 +15,7 @@ class MarketOrder(Base):
     __tablename__ = "market_orders"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    server_id: Mapped[int] = mapped_column(Integer, default=1, server_default="1", index=True, comment="所属区服ID")
     player_id: Mapped[str] = mapped_column(String(32), ForeignKey("player.id"), index=True)
     side: Mapped[OrderSide] = mapped_column(SAEnum(OrderSide), index=True)
     item_id: Mapped[str] = mapped_column(String(32), index=True)

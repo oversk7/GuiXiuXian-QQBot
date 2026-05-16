@@ -63,12 +63,12 @@ class AuctionRepository(IRepository[AuctionItem]):
 
     # ==================== 业务查询 ====================
 
-    async def find_active_auctions(self, page: int = 1, page_size: int = 10) -> List[AuctionItem]:
+    async def find_active_auctions(self, page: int = 1, page_size: int = 10, server_id: int = 1) -> List[AuctionItem]:
         """分页查询当前进行中的拍卖（按结束时间升序，最快结束的在最前）"""
         offset = (page - 1) * page_size
         stmt = (
             select(AuctionItem)
-            .where(AuctionItem.status == "active")
+            .where(AuctionItem.status == "active", AuctionItem.server_id == server_id)
             .order_by(AuctionItem.end_at.asc())
             .offset(offset)
             .limit(page_size)
@@ -76,13 +76,13 @@ class AuctionRepository(IRepository[AuctionItem]):
         result = await self._session.execute(stmt)
         return result.scalars().all()
 
-    async def count_active_auctions(self) -> int:
+    async def count_active_auctions(self, server_id: int = 1) -> int:
         """统计当前进行中的拍卖总数"""
-        stmt = select(AuctionItem).where(AuctionItem.status == "active")
+        stmt = select(AuctionItem).where(AuctionItem.status == "active", AuctionItem.server_id == server_id)
         result = await self._session.execute(stmt)
         return len(result.scalars().all())
 
-    async def find_seller_active_auctions(self, seller_id: str) -> List[AuctionItem]:
+    async def find_seller_active_auctions(self, seller_id: str, server_id: int | None = None) -> List[AuctionItem]:
         """查询卖家当前活跃的拍卖条目"""
         stmt = (
             select(AuctionItem)
@@ -94,6 +94,8 @@ class AuctionRepository(IRepository[AuctionItem]):
             )
             .order_by(AuctionItem.end_at.asc())
         )
+        if server_id is not None:
+            stmt = stmt.where(AuctionItem.server_id == server_id)
         result = await self._session.execute(stmt)
         return result.scalars().all()
 

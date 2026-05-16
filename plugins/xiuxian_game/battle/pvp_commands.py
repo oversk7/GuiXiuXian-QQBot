@@ -70,7 +70,7 @@ async def handle_pvp(event: MessageEvent, args: Message = CommandArg()):
         # 尝试解析UID
         try:
             target_uid = int(args_text)
-            stmt = select(Player).where(Player.uid == target_uid)
+            stmt = select(Player).where(Player.uid == target_uid, Player.server_id == challenger.server_id)
             target_player = (await session.execute(stmt)).scalars().first()
         except ValueError:
             # 如果不是数字，可能是@某人或其他格式
@@ -169,11 +169,13 @@ async def handle_simulate(event: MessageEvent, args: Message = CommandArg()):
         await simulate_cmd.finish("⛔ 不能模拟同一个玩家的战斗")
 
     async with safe_session() as session:
+        from ..platform_utils import get_event_server_id
+        server_id = await get_event_server_id(session, event)
         # 获取两个玩家
-        stmt1 = select(Player).where(Player.uid == uid1)
+        stmt1 = select(Player).where(Player.uid == uid1, Player.server_id == server_id)
         player1 = (await session.execute(stmt1)).scalars().first()
 
-        stmt2 = select(Player).where(Player.uid == uid2)
+        stmt2 = select(Player).where(Player.uid == uid2, Player.server_id == server_id)
         player2 = (await session.execute(stmt2)).scalars().first()
 
         if not player1:

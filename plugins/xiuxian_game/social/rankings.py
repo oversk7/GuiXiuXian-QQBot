@@ -7,7 +7,7 @@ from ..models.db import safe_session
 from ..models.player import Player
 from ..utils import message_add_head
 from ..utils_markdown import cmd, build_markdown
-from ..platform_utils import get_unified_player
+from ..platform_utils import get_event_server_id, get_unified_player
 
 
 # ==================== 社交统计 ====================
@@ -16,11 +16,14 @@ social_stats_cmd = on_command("社交统计", aliases={"社交信息"}, block=Tr
 @social_stats_cmd.handle()
 async def handle_social_stats(event: MessageEvent):
     async with safe_session() as session:
+        server_id = await get_event_server_id(session, event)
         # 统计玩家总数
-        player_count = (await session.execute(select(func.count(Player.id)))).scalar_one()
+        player_count = (await session.execute(
+            select(func.count(Player.id)).where(Player.server_id == server_id)
+        )).scalar_one()
 
         # 统计最高魅力值
-        max_charm_stmt = select(func.max(Player.charm))
+        max_charm_stmt = select(func.max(Player.charm)).where(Player.server_id == server_id)
         max_charm_value = (await session.execute(max_charm_stmt)).scalar_one() or 0
 
         lines = [
@@ -50,8 +53,9 @@ async def handle_charm_ranking(event: MessageEvent, args: Message = CommandArg()
     player_rank = None
 
     async with safe_session() as session:
+        server_id = await get_event_server_id(session, event)
         total_count = (await session.execute(
-            select(func.count()).select_from(Player).where(Player.charm > 0)
+            select(func.count()).select_from(Player).where(Player.charm > 0, Player.server_id == server_id)
         )).scalar_one()
         if total_count == 0:
             await charm_ranking_cmd.finish(message_add_head("💖 魅力排行榜\n━━━━━━━━━━━━━\n暂无数据", event))
@@ -60,7 +64,10 @@ async def handle_charm_ranking(event: MessageEvent, args: Message = CommandArg()
             player = await get_unified_player(session, event)
             if player and player.charm > 0:
                 players_above = (await session.execute(
-                    select(func.count()).select_from(Player).where(Player.charm > player.charm)
+                    select(func.count()).select_from(Player).where(
+                        Player.charm > player.charm,
+                        Player.server_id == server_id,
+                    )
                 )).scalar_one()
                 player_rank = players_above + 1
                 rank_idx = player_rank - 1
@@ -80,7 +87,7 @@ async def handle_charm_ranking(event: MessageEvent, args: Message = CommandArg()
 
         stmt = (
             select(Player)
-            .where(Player.charm > 0)
+            .where(Player.charm > 0, Player.server_id == server_id)
             .order_by(Player.charm.desc())
             .offset(offset)
             .limit(page_size)

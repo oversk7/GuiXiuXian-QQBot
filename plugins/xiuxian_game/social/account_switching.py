@@ -32,7 +32,8 @@ from ..platform_utils import (
     admin_temp_switch_to,
     admin_exit_temp_switch,
     is_admin_temp_switching,
-    get_admin_temp_switch_target
+    get_admin_temp_switch_target,
+    get_event_server_id,
 )
 
 
@@ -97,7 +98,8 @@ async def handle_switch_account(event: MessageEvent, args: Message = CommandArg(
     async with safe_session() as session:
         # 通过UID查询player_id
         player_repo = PlayerRepository(session)
-        target_player = await player_repo.get_by_uid(target_uid)
+        server_id = await get_event_server_id(session, event)
+        target_player = await player_repo.get_by_uid(target_uid, server_id)
         if not target_player:
             await switch_account_cmd.finish(f"⛔ UID {target_uid} 不存在")
 
@@ -144,7 +146,8 @@ async def handle_rename_account(event: MessageEvent, args: Message = CommandArg(
     async with safe_session() as session:
         # 通过UID查询player_id
         player_repo = PlayerRepository(session)
-        target_player = await player_repo.get_by_uid(target_uid)
+        server_id = await get_event_server_id(session, event)
+        target_player = await player_repo.get_by_uid(target_uid, server_id)
         if not target_player:
             await rename_account_cmd.finish(f"⛔ UID {target_uid} 不存在")
 
@@ -185,7 +188,8 @@ async def handle_generate_transfer_key(event: MessageEvent, args: Message = Comm
     async with safe_session() as session:
         # 通过UID查询player_id
         player_repo = PlayerRepository(session)
-        target_player = await player_repo.get_by_uid(target_uid)
+        server_id = await get_event_server_id(session, event)
+        target_player = await player_repo.get_by_uid(target_uid, server_id)
         if not target_player:
             await generate_transfer_key_cmd.finish(f"⛔ UID {target_uid} 不存在")
 
@@ -276,7 +280,8 @@ async def handle_cancel_transfer(event: MessageEvent, args: Message = CommandArg
     async with safe_session() as session:
         # 通过UID查询player_id
         player_repo = PlayerRepository(session)
-        target_player = await player_repo.get_by_uid(target_uid)
+        server_id = await get_event_server_id(session, event)
+        target_player = await player_repo.get_by_uid(target_uid, server_id)
         if not target_player:
             await cancel_transfer_cmd.finish(f"⛔ UID {target_uid} 不存在")
 
@@ -375,7 +380,8 @@ async def handle_admin_temp_switch(event: MessageEvent, args: Message = CommandA
     async with safe_session() as session:
         # 通过UID查询player_id
         player_repo = PlayerRepository(session)
-        target_player = await player_repo.get_by_uid(target_uid)
+        server_id = await get_event_server_id(session, event)
+        target_player = await player_repo.get_by_uid(target_uid, server_id)
         if not target_player:
             await admin_temp_switch_cmd.finish(f"⛔ UID {target_uid} 不存在")
 

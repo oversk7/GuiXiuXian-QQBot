@@ -32,7 +32,7 @@ class RankedPlayer:
 # ==================== 通用单字段排行查询 ====================
 
 @cached(ttl_seconds=300)
-async def query_level_ranking(limit: int = 30) -> list[RankedPlayer]:
+async def query_level_ranking(limit: int = 30, server_id: int = 1) -> list[RankedPlayer]:
     """修为排行榜：按 reincarnation_level DESC, level DESC, exp DESC"""
     async with readonly_session() as session:
         stmt = (
@@ -46,6 +46,7 @@ async def query_level_ranking(limit: int = 30) -> list[RankedPlayer]:
                 Guild.name.label("guild_name"),
             )
             .outerjoin(Guild, Player.guild_id == Guild.id)
+            .where(Player.server_id == server_id)
             .order_by(
                 Player.reincarnation_level.desc(),
                 Player.level.desc(),
@@ -72,11 +73,12 @@ async def query_level_ranking(limit: int = 30) -> list[RankedPlayer]:
 
 
 @cached(ttl_seconds=300)
-async def query_luck_ranking(limit: int = 30) -> list[RankedPlayer]:
+async def query_luck_ranking(limit: int = 30, server_id: int = 1) -> list[RankedPlayer]:
     """幸运排行榜：按 luck DESC"""
     async with readonly_session() as session:
         stmt = (
             select(Player.id, Player.uid, Player.nickname, Player.luck)
+            .where(Player.server_id == server_id)
             .order_by(Player.luck.desc())
             .limit(limit)
         )
@@ -95,11 +97,12 @@ async def query_luck_ranking(limit: int = 30) -> list[RankedPlayer]:
 
 
 @cached(ttl_seconds=300)
-async def query_exploration_ranking(limit: int = 30) -> list[RankedPlayer]:
+async def query_exploration_ranking(limit: int = 30, server_id: int = 1) -> list[RankedPlayer]:
     """探索排行榜：按 max_dungeon_level DESC"""
     async with readonly_session() as session:
         stmt = (
             select(Player.id, Player.uid, Player.nickname, Player.max_dungeon_level)
+            .where(Player.server_id == server_id)
             .order_by(Player.max_dungeon_level.desc())
             .limit(limit)
         )
@@ -118,11 +121,12 @@ async def query_exploration_ranking(limit: int = 30) -> list[RankedPlayer]:
 
 
 @cached(ttl_seconds=300)
-async def query_agility_ranking(limit: int = 30) -> list[RankedPlayer]:
+async def query_agility_ranking(limit: int = 30, server_id: int = 1) -> list[RankedPlayer]:
     """敏捷排行榜：按 agility DESC"""
     async with readonly_session() as session:
         stmt = (
             select(Player.id, Player.uid, Player.nickname, Player.agility)
+            .where(Player.server_id == server_id)
             .order_by(Player.agility.desc())
             .limit(limit)
         )
@@ -141,11 +145,12 @@ async def query_agility_ranking(limit: int = 30) -> list[RankedPlayer]:
 
 
 @cached(ttl_seconds=300)
-async def query_mini_game_ranking(limit: int = 30) -> list[RankedPlayer]:
+async def query_mini_game_ranking(limit: int = 30, server_id: int = 1) -> list[RankedPlayer]:
     """小游戏排行榜：按 mini_game_score DESC"""
     async with readonly_session() as session:
         stmt = (
             select(Player.id, Player.uid, Player.nickname, Player.mini_game_score)
+            .where(Player.server_id == server_id)
             .order_by(Player.mini_game_score.desc())
             .limit(limit)
         )
@@ -164,12 +169,12 @@ async def query_mini_game_ranking(limit: int = 30) -> list[RankedPlayer]:
 
 
 @cached(ttl_seconds=300)
-async def query_demon_coins_ranking(limit: int = 30) -> list[RankedPlayer]:
+async def query_demon_coins_ranking(limit: int = 30, server_id: int = 1) -> list[RankedPlayer]:
     """恶魔币排行榜：按 demon_coins DESC"""
     async with readonly_session() as session:
         stmt = (
             select(Player.id, Player.uid, Player.nickname, Player.demon_coins)
-            .where(Player.demon_coins > 0)
+            .where(Player.demon_coins > 0, Player.server_id == server_id)
             .order_by(Player.demon_coins.desc())
             .limit(limit)
         )
@@ -190,7 +195,7 @@ async def query_demon_coins_ranking(limit: int = 30) -> list[RankedPlayer]:
 # ==================== 财富榜专用查询 ====================
 
 @cached(ttl_seconds=300)
-async def query_wealth_ranking(limit: int = 50) -> list[RankedPlayer]:
+async def query_wealth_ranking(limit: int = 50, server_id: int = 1) -> list[RankedPlayer]:
     """财富排行：一次查询合并 金币 + 存款 + 投资市值
 
     当前实现 7 次查询 → 优化为 1 次 SQL：
@@ -230,6 +235,7 @@ async def query_wealth_ranking(limit: int = 50) -> list[RankedPlayer]:
             )
             .outerjoin(BankAccount, BankAccount.player_id == Player.id)
             .outerjoin(invest_subq, invest_subq.c.player_id == Player.id)
+            .where(Player.server_id == server_id)
             .order_by(total_wealth.desc())
             .limit(limit)
         )
@@ -258,6 +264,7 @@ async def query_wealth_ranking(limit: int = 50) -> list[RankedPlayer]:
 async def query_player_rank(
     player_id: str,
     ranking_type: str,
+    server_id: int = 1,
 ) -> int | None:
     """从已缓存的排行数据中查找指定玩家的排名
 
@@ -282,7 +289,7 @@ async def query_player_rank(
     if not query_fn:
         return None
 
-    ranked_list = await query_fn()
+    ranked_list = await query_fn(server_id=server_id)
     for entry in ranked_list:
         if entry.player_id == player_id:
             return entry.rank
@@ -292,6 +299,7 @@ async def query_player_rank(
 async def query_player_rank_by_counting(
     player_id: str,
     ranking_type: str,
+    server_id: int = 1,
 ) -> int | None:
     """通过 COUNT 查询获取精确排名（当玩家不在缓存的 TOP N 中时使用）
 
@@ -307,9 +315,12 @@ async def query_player_rank_by_counting(
         player = await session.get(Player, player_id)
         if not player:
             return None
+        if player.server_id != server_id:
+            return None
 
         if ranking_type == "level":
             count_stmt = select(func.count()).select_from(Player).where(
+                Player.server_id == server_id,
                 (Player.reincarnation_level > player.reincarnation_level) |
                 (
                     (Player.reincarnation_level == player.reincarnation_level) &
@@ -323,22 +334,27 @@ async def query_player_rank_by_counting(
             )
         elif ranking_type == "luck":
             count_stmt = select(func.count()).select_from(Player).where(
+                Player.server_id == server_id,
                 Player.luck > player.luck
             )
         elif ranking_type == "exploration":
             count_stmt = select(func.count()).select_from(Player).where(
+                Player.server_id == server_id,
                 Player.max_dungeon_level > player.max_dungeon_level
             )
         elif ranking_type == "agility":
             count_stmt = select(func.count()).select_from(Player).where(
+                Player.server_id == server_id,
                 Player.agility > player.agility
             )
         elif ranking_type == "mini_game":
             count_stmt = select(func.count()).select_from(Player).where(
+                Player.server_id == server_id,
                 Player.mini_game_score > player.mini_game_score
             )
         elif ranking_type == "demon_coins":
             count_stmt = select(func.count()).select_from(Player).where(
+                Player.server_id == server_id,
                 Player.demon_coins > player.demon_coins
             )
         elif ranking_type == "wealth":
@@ -375,7 +391,7 @@ async def query_player_rank_by_counting(
                 .select_from(Player)
                 .outerjoin(BankAccount, BankAccount.player_id == Player.id)
                 .outerjoin(invest_subq, invest_subq.c.player_id == Player.id)
-                .where(wealth_expr > my_wealth)
+                .where(Player.server_id == server_id, wealth_expr > my_wealth)
             )
         else:
             return None

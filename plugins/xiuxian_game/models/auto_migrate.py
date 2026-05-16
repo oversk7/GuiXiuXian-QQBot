@@ -25,6 +25,31 @@ logger = logging.getLogger(__name__)
 REQUIRED_FIELDS: Dict[str, Dict[str, str]] = {
     "player": {
         "exp": "BIGINT NOT NULL DEFAULT 0 COMMENT '经验'",
+        "server_id": "INTEGER NOT NULL DEFAULT 1 COMMENT '所属区服ID'",
+    },
+    "guild": {
+        "server_id": "INTEGER NOT NULL DEFAULT 1 COMMENT '所属区服ID'",
+    },
+    "market_orders": {
+        "server_id": "INTEGER NOT NULL DEFAULT 1 COMMENT '所属区服ID'",
+    },
+    "auction_item": {
+        "server_id": "INTEGER NOT NULL DEFAULT 1 COMMENT '所属区服ID'",
+    },
+    "player_stall": {
+        "server_id": "INTEGER NOT NULL DEFAULT 1 COMMENT '所属区服ID'",
+    },
+    "stall_item": {
+        "server_id": "INTEGER NOT NULL DEFAULT 1 COMMENT '所属区服ID'",
+    },
+    "world_tile": {
+        "server_id": "INTEGER NOT NULL DEFAULT 1 COMMENT '所属区服ID'",
+    },
+    "red_envelope": {
+        "server_id": "INTEGER NOT NULL DEFAULT 1 COMMENT '所属区服ID'",
+    },
+    "invite_reward": {
+        "server_id": "INTEGER NOT NULL DEFAULT 1 COMMENT '所属区服ID'",
     },
     "elixir_usage_log": {
         "attribute_changes": "JSON DEFAULT ('{}') COMMENT '累计实际属性变动JSON'",
@@ -75,10 +100,44 @@ REQUIRED_TABLES: Dict[str, str] = {
 }
 
 
-# 定义需要自动创建的索引
+# 定义需要自动创建的普通索引
 # 格式: [(表名, 索引名, 索引列)]
 REQUIRED_INDEXES: List[Tuple[str, str, str]] = [
     # 添加新索引时在此处定义: (表名, 索引名, 索引列)
+    ("player", "ix_player_server_id", "server_id"),
+    ("guild", "ix_guild_server_id", "server_id"),
+    ("market_orders", "ix_market_orders_server_id", "server_id"),
+    ("auction_item", "ix_auction_item_server_id", "server_id"),
+    ("player_stall", "ix_player_stall_server_id", "server_id"),
+    ("stall_item", "ix_stall_item_server_id", "server_id"),
+    ("world_tile", "ix_world_tile_server_id", "server_id"),
+    ("red_envelope", "ix_red_envelope_server_id", "server_id"),
+    ("invite_reward", "ix_invite_reward_server_id", "server_id"),
+]
+
+
+# 定义需要替换的旧唯一索引/约束
+# 格式: [(表名, 旧索引名, 旧索引列)]
+LEGACY_UNIQUE_INDEXES: List[Tuple[str, str | None, Tuple[str, ...]]] = [
+    # 多区服后，阴宅和地图坐标唯一性需要包含 server_id。
+    ("player", "idx_mansion_location_unique", ("mansion_x", "mansion_y")),
+    ("world_tile", "uq_region_coordinates", ("region", "x", "y")),
+    # 旧公会名全局唯一，多区服后改为同服唯一。
+    ("guild", None, ("name",)),
+]
+
+
+# 定义需要自动创建的唯一索引
+# 格式: [(表名, 索引名, 索引列, SQLite WHERE 条件)]
+REQUIRED_UNIQUE_INDEXES: List[Tuple[str, str, str, str | None]] = [
+    (
+        "player",
+        "idx_mansion_location_unique",
+        "server_id, mansion_x, mansion_y",
+        "mansion_level > 0 AND mansion_x IS NOT NULL AND mansion_y IS NOT NULL",
+    ),
+    ("world_tile", "uq_server_region_coordinates", "server_id, region, x, y", None),
+    ("guild", "uq_guild_server_name", "server_id, name", None),
 ]
 
 
@@ -126,16 +185,21 @@ async def auto_migrate(engine: AsyncEngine, verbose: bool = True):
         # 2. 添加缺失的字段
         fields_added = await _add_missing_fields(conn, verbose)
 
-        # 3. 创建缺失的索引
+        # 3. 替换旧唯一索引/约束
+        unique_indexes_migrated = await _migrate_unique_indexes(conn, verbose)
+
+        # 4. 创建缺失的索引
         indexes_added = await _add_missing_indexes(conn, verbose)
 
-        # 4. 检测并修复 ENUM 列
+        # 5. 检测并修复 ENUM 列
         enums_fixed = await _fix_enum_columns(conn, verbose)
 
         if verbose:
-            if tables_created > 0 or fields_added > 0 or indexes_added > 0 or enums_fixed > 0:
+            if tables_created > 0 or fields_added > 0 or unique_indexes_migrated > 0 or indexes_added > 0 or enums_fixed > 0:
                 print(f"[√] [自动迁移] 完成！创建了 {tables_created} 个表，"
-                      f"添加了 {fields_added} 个字段，{indexes_added} 个索引，"
+                      f"添加了 {fields_added} 个字段，"
+                      f"迁移了 {unique_indexes_migrated} 个唯一索引，"
+                      f"{indexes_added} 个普通索引，"
                       f"修复了 {enums_fixed} 个 ENUM 列")
             else:
                 print("[√] [自动迁移] 数据库结构已是最新")
@@ -161,6 +225,14 @@ async def _create_missing_tables(conn, verbose: bool) -> int:
                 logger.error(f"[X] [自动迁移] 创建表 {table_name} 失败: {e}")
 
     return created_count
+
+
+def _normalize_field_def_for_dialect(field_def: str, dialect_name: str) -> str:
+    """按数据库方言调整字段定义。"""
+    if dialect_name != "sqlite":
+        return field_def
+    # SQLite 的 ALTER TABLE ADD COLUMN 不支持 COMMENT。
+    return re.sub(r"\s+COMMENT\s+'[^']*'", "", field_def)
 
 
 async def _add_missing_fields(conn, verbose: bool) -> int:
@@ -190,13 +262,14 @@ async def _add_missing_fields(conn, verbose: bool) -> int:
 
         # 检查并添加/修改字段
         for field_name, field_def in fields.items():
+            normalized_field_def = _normalize_field_def_for_dialect(field_def, conn.dialect.name)
             # 提取目标类型 (例如: "BIGINT DEFAULT 0" -> "BIGINT")
-            target_type = field_def.split()[0].upper()
+            target_type = normalized_field_def.split()[0].upper()
 
             if field_name not in existing_columns:
                 # 字段不存在,添加新字段
                 try:
-                    sql = f"ALTER TABLE {table_name} ADD COLUMN {field_name} {field_def}"
+                    sql = f"ALTER TABLE {table_name} ADD COLUMN {field_name} {normalized_field_def}"
                     await conn.execute(text(sql))
 
                     if verbose:
@@ -220,7 +293,18 @@ async def _add_missing_fields(conn, verbose: bool) -> int:
 
                 if current_type_normalized != target_type_normalized:
                     try:
-                        sql = f"ALTER TABLE {table_name} MODIFY COLUMN {field_name} {field_def}"
+                        if conn.dialect.name == "sqlite":
+                            if verbose:
+                                logger.warning(
+                                    "[!] [自动迁移] SQLite 不支持在线修改字段类型，跳过 %s.%s: %s -> %s",
+                                    table_name,
+                                    field_name,
+                                    current_type,
+                                    target_type,
+                                )
+                            continue
+
+                        sql = f"ALTER TABLE {table_name} MODIFY COLUMN {field_name} {normalized_field_def}"
                         await conn.execute(text(sql))
 
                         if verbose:
@@ -235,6 +319,108 @@ async def _add_missing_fields(conn, verbose: bool) -> int:
                         logger.debug(f"  [√] 字段 {table_name}.{field_name} 类型正确: {current_type}")
 
     return added_count
+
+
+def _same_columns(actual: list[str] | tuple[str, ...], expected: tuple[str, ...]) -> bool:
+    return tuple(actual) == expected
+
+
+async def _get_index_metadata(conn, table_name: str) -> tuple[list[dict], list[dict]]:
+    """读取表的普通索引和唯一约束元数据。"""
+
+    def inspect_indexes(connection):
+        inspector = inspect(connection)
+        try:
+            indexes = inspector.get_indexes(table_name)
+        except Exception:
+            indexes = []
+        try:
+            unique_constraints = inspector.get_unique_constraints(table_name)
+        except Exception:
+            unique_constraints = []
+        return indexes, unique_constraints
+
+    return await conn.run_sync(inspect_indexes)
+
+
+async def _drop_index_or_constraint(conn, table_name: str, index_name: str, verbose: bool) -> bool:
+    """按当前数据库方言删除索引/唯一约束。"""
+    dialect = conn.dialect.name
+    try:
+        if dialect == "mysql":
+            await conn.execute(text(f"ALTER TABLE {table_name} DROP INDEX {index_name}"))
+        elif dialect == "sqlite":
+            if index_name.startswith("sqlite_autoindex"):
+                if verbose:
+                    logger.warning(
+                        "[!] [自动迁移] SQLite 自动唯一约束 %s.%s 无法在线删除，请新库验证多服地图/公会重复名",
+                        table_name,
+                        index_name,
+                    )
+                return False
+            await conn.execute(text(f"DROP INDEX IF EXISTS {index_name}"))
+        else:
+            await conn.execute(text(f"DROP INDEX IF EXISTS {index_name}"))
+
+        if verbose:
+            print(f"  [-] 删除旧唯一索引: {table_name}.{index_name}")
+        return True
+    except Exception as e:
+        logger.error(f"[X] [自动迁移] 删除旧唯一索引 {table_name}.{index_name} 失败: {e}")
+        return False
+
+
+async def _migrate_unique_indexes(conn, verbose: bool) -> int:
+    """迁移多区服需要调整的唯一索引。"""
+    migrated_count = 0
+
+    # 先删除旧唯一索引/约束。
+    for table_name, legacy_name, legacy_columns in LEGACY_UNIQUE_INDEXES:
+        indexes, unique_constraints = await _get_index_metadata(conn, table_name)
+        candidates: list[str] = []
+
+        for idx in indexes:
+            idx_name = idx.get("name")
+            idx_columns = tuple(idx.get("column_names") or [])
+            if not idx_name:
+                continue
+            if legacy_name and idx_name == legacy_name and _same_columns(idx_columns, legacy_columns):
+                candidates.append(idx_name)
+            elif idx.get("unique") and _same_columns(idx_columns, legacy_columns):
+                candidates.append(idx_name)
+
+        for constraint in unique_constraints:
+            constraint_name = constraint.get("name")
+            constraint_columns = tuple(constraint.get("column_names") or [])
+            if not constraint_name:
+                continue
+            if legacy_name and constraint_name == legacy_name and _same_columns(constraint_columns, legacy_columns):
+                candidates.append(constraint_name)
+            elif _same_columns(constraint_columns, legacy_columns):
+                candidates.append(constraint_name)
+
+        for index_name in sorted(set(candidates)):
+            if await _drop_index_or_constraint(conn, table_name, index_name, verbose):
+                migrated_count += 1
+
+    # 再创建新的唯一索引。
+    for table_name, idx_name, idx_cols, sqlite_where in REQUIRED_UNIQUE_INDEXES:
+        try:
+            dialect = conn.dialect.name
+            where_clause = f" WHERE {sqlite_where}" if dialect == "sqlite" and sqlite_where else ""
+            await conn.execute(text(f"CREATE UNIQUE INDEX {idx_name} ON {table_name}({idx_cols}){where_clause}"))
+            if verbose:
+                print(f"  [+] 创建唯一索引: {idx_name}")
+            migrated_count += 1
+        except Exception as e:
+            error_msg = str(e).lower()
+            if "duplicate" in error_msg or "exists" in error_msg:
+                if verbose:
+                    logger.debug(f"  [√] 唯一索引 {idx_name} 已存在")
+            else:
+                logger.error(f"[X] [自动迁移] 创建唯一索引 {idx_name} 失败: {e}")
+
+    return migrated_count
 
 
 async def _add_missing_indexes(conn, verbose: bool) -> int:

@@ -176,7 +176,9 @@ async def handle_transfer(event: MessageEvent, args: Message = CommandArg()):
 
         # 获取转账接收人
         from sqlalchemy import select
-        receiver = (await session.execute(select(Player).where(Player.uid == target_uid))).scalars().first()
+        receiver = (await session.execute(
+            select(Player).where(Player.uid == target_uid, Player.server_id == sender.server_id)
+        )).scalars().first()
         if not receiver:
             await bank_transfer_cmd.finish("⛔ 未找到目标玩家")
 
@@ -241,14 +243,18 @@ async def handle_deposit_rank(event: MessageEvent, args: Message = CommandArg())
     player_rank = None
 
     async with safe_session() as session:
+        current_player = await get_unified_player(session, event)
+        server_id = current_player.server_id if current_player else 1
         total_count = (await session.execute(
-            select(func.count()).select_from(BankAccount)
+            select(func.count()).select_from(BankAccount).join(Player, BankAccount.player_id == Player.id).where(
+                Player.server_id == server_id
+            )
         )).scalar_one()
         if total_count == 0:
             await deposit_rank_cmd.finish("暂无存款数据")
 
         if not page_text:
-            player = await get_unified_player(session, event)
+            player = current_player
             if player:
                 player_acc = (await session.execute(
                     select(BankAccount).where(BankAccount.player_id == player.id)
@@ -257,6 +263,8 @@ async def handle_deposit_rank(event: MessageEvent, args: Message = CommandArg())
                     players_above = (await session.execute(
                         select(func.count()).select_from(BankAccount).where(
                             BankAccount.balance > player_acc.balance
+                        ).join(Player, BankAccount.player_id == Player.id).where(
+                            Player.server_id == server_id
                         )
                     )).scalar_one()
                     player_rank = players_above + 1
@@ -280,6 +288,8 @@ async def handle_deposit_rank(event: MessageEvent, args: Message = CommandArg())
         stmt = (
             select(BankAccount)
             .options(joinedload(BankAccount.player))
+            .join(Player, BankAccount.player_id == Player.id)
+            .where(Player.server_id == server_id)
             .order_by(BankAccount.balance.desc())
             .offset(offset)
             .limit(page_size)

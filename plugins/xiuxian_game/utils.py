@@ -17,12 +17,16 @@ def message_add_head(content: str, event: Optional[MessageEvent] = None) -> Mess
 
 
 
-def calculate_level_up_exp(current_level: int) -> int:
+def calculate_level_up_exp(current_level: int, server_id: int | None = None) -> int:
     """
     根据配置计算升级所需经验
     使用混合曲线：前期线性增长，后期指数增长
     """
-    cfg = config.game_config["game"]
+    if server_id is not None:
+        from .server_config import get_server_game_config
+        cfg = get_server_game_config(server_id)["game"]
+    else:
+        cfg = config.game_config["game"]
     base = cfg["base_exp"]
     curve = cfg["exp_curve"]
 
@@ -32,7 +36,7 @@ def calculate_level_up_exp(current_level: int) -> int:
     else:
         # 后期：二次函数
         level_diff = current_level - curve["curve_change_level"]
-        return int(calculate_level_up_exp(curve["curve_change_level"]-1) + (level_diff ** 2) * curve["late_multiplier"])
+        return int(calculate_level_up_exp(curve["curve_change_level"] - 1, server_id) + (level_diff ** 2) * curve["late_multiplier"])
 
 
 def generate_progress_bar(current: int, maximum: int, length: int = 8) -> str:

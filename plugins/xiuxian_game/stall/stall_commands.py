@@ -493,7 +493,7 @@ async def handle_view_stall(event: MessageEvent, args: Message = CommandArg()):
 
         # 查找摊主
         from ..models.player import Player
-        stmt = select(Player).where(Player.uid == target_uid)
+        stmt = select(Player).where(Player.uid == target_uid, Player.server_id == player.server_id)
         result = await uow.session.execute(stmt)
         target = result.scalars().first()
         if not target:
@@ -501,6 +501,8 @@ async def handle_view_stall(event: MessageEvent, args: Message = CommandArg()):
 
         stall = await uow.player_stalls.get_active_by_player(target.id)
         if not stall:
+            await view_stall_cmd.finish(message_add_head("⛔ 该玩家没有摆摊", event))
+        if stall.server_id != player.server_id:
             await view_stall_cmd.finish(message_add_head("⛔ 该玩家没有摆摊", event))
 
         # 检查是否同城镇

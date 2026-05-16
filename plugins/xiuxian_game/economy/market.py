@@ -14,7 +14,7 @@ from ..utils import message_add_head
 from ..utils_markdown import cmd, build_markdown
 from .equipment_trade_service import EquipmentTradeService
 from ..item.equipment_commands import find_equipment_by_input
-from ..platform_utils import get_unified_player
+from ..platform_utils import get_event_server_id, get_unified_player
 
 from datetime import date, datetime, timedelta
 
@@ -133,22 +133,27 @@ WEALTH_SMIN = 1.0                # 不低于1，避免低谷期进一步打压�
 WEALTH_SMAX = 3.0                # 限制上限，避免土豪时代通胀
 WEALTH_EMA_ALPHA = 0.15          # 降低敏感度，收敛更平滑
 
-_wealth_cache_day: int | None = None
-_wealth_prev_scale: float = 1.0
+_wealth_cache_day_by_server: dict[int, int] = {}
+_wealth_prev_scale_by_server: dict[int, float] = {}
 
-async def _get_wealth_scale(session) -> float:
+async def _get_wealth_scale(session, server_id: int = 1) -> float:
     """按TopN玩家金币中位数计算当日财富指数S，并进行EMA平滑与上下限夹持。"""
-    global _wealth_cache_day, _wealth_prev_scale
     today_ord = date.today().toordinal()
-    if _wealth_cache_day == today_ord and _wealth_prev_scale:
-        return _wealth_prev_scale
+    prev_scale = _wealth_prev_scale_by_server.get(server_id, 1.0)
+    if _wealth_cache_day_by_server.get(server_id) == today_ord and prev_scale:
+        return prev_scale
 
-    stmt = select(Player.gold).order_by(desc(Player.gold)).limit(WEALTH_TOP_N)
+    stmt = (
+        select(Player.gold)
+        .where(Player.server_id == server_id)
+        .order_by(desc(Player.gold))
+        .limit(WEALTH_TOP_N)
+    )
     rows = (await session.execute(stmt)).all()
     vals = [int(v) for (v,) in rows if v is not None]
     if not vals:
-        _wealth_cache_day = today_ord
-        _wealth_prev_scale = 1.0
+        _wealth_cache_day_by_server[server_id] = today_ord
+        _wealth_prev_scale_by_server[server_id] = 1.0
         return 1.0
 
     vals.sort()
@@ -162,14 +167,14 @@ async def _get_wealth_scale(session) -> float:
     raw = pow(ratio, WEALTH_GAMMA)
     raw = max(WEALTH_SMIN, min(raw, WEALTH_SMAX))
 
-    scale = WEALTH_EMA_ALPHA * raw + (1.0 - WEALTH_EMA_ALPHA) * (_wealth_prev_scale or 1.0)
-    _wealth_prev_scale = scale
-    _wealth_cache_day = today_ord
+    scale = WEALTH_EMA_ALPHA * raw + (1.0 - WEALTH_EMA_ALPHA) * (prev_scale or 1.0)
+    _wealth_prev_scale_by_server[server_id] = scale
+    _wealth_cache_day_by_server[server_id] = today_ord
     return scale
 
 EQUIPMENT_FLOOR_MULT = 6.0   # 降低装备底价放大，缓解高价壁垒
 
-async def _compute_item_floor_price(session, item_cfg) -> int:
+async def _compute_item_floor_price(session, item_cfg, server_id: int = 1) -> int:
     """计算普通物品的底价：综合物品基础价(含经济倍率)与近期市场参考价。
     参考价使用最近若干卖单价格的截尾均值，剔除过低异常值。
     """
@@ -181,7 +186,7 @@ async def _compute_item_floor_price(session, item_cfg) -> int:
     rarity = getattr(item_cfg, "rarity", None) or "white"
     t_mult = ECONOMY_MULT_BY_TYPE.get(str(type_val), 1.0)
     r_mult = ECONOMY_MULT_BY_RARITY.get(str(rarity), ECONOMY_MULT_BY_RARITY["white"])
-    scale = await _get_wealth_scale(session)
+    scale = await _get_wealth_scale(session, server_id)
     econ_base = int(base * t_mult * r_mult * scale)
 
     lookback_since = datetime.now() - timedelta(days=TRADE_REF_LOOKBACK_DAYS)
@@ -217,6 +222,7 @@ async def _compute_item_floor_price(session, item_cfg) -> int:
                 MarketOrder.item_id == item_cfg.item_id,
                 MarketOrder.side == OrderSide.SELL,
                 MarketOrder.is_instance_trade == False,
+                MarketOrder.server_id == server_id,
             )
             .order_by(desc(MarketOrder.created_at))
             .limit(20)
@@ -235,14 +241,14 @@ async def _compute_item_floor_price(session, item_cfg) -> int:
     floor_price = max(econ_base, ref_floor, MIN_UNIT_PRICE)
     return floor_price
 
-async def _compute_equipment_floor_price(session, equipment) -> int:
+async def _compute_equipment_floor_price(session, equipment, server_id: int = 1) -> int:
     """计算装备实例底价：使用装备估价下界，并按财富指数放大。"""
     min_price, _ = EquipmentTradeService.calculate_equipment_value_range(equipment)
-    scale = await _get_wealth_scale(session)
+    scale = await _get_wealth_scale(session, server_id)
     return max(int(min_price * EQUIPMENT_FLOOR_MULT * scale), MIN_UNIT_PRICE)
 
 
-async def _get_market_reference(session, item_cfg) -> str | None:
+async def _get_market_reference(session, item_cfg, server_id: int = 1) -> str | None:
     """查询近7日市场参考数据，返回格式化的信息行。无数据时返回 None。"""
     is_equipment = EquipmentTradeServiceNew.is_instance_trade(item_cfg.item_id)
     lookback_since = datetime.now() - timedelta(days=TRADE_REF_LOOKBACK_DAYS)
@@ -266,7 +272,7 @@ async def _get_market_reference(session, item_cfg) -> str | None:
 
     # 底价（仅非装备物品展示，装备因实例而异）
     if not is_equipment:
-        floor_price = await _compute_item_floor_price(session, item_cfg)
+        floor_price = await _compute_item_floor_price(session, item_cfg, server_id)
         parts.append(f"底价:{floor_price:,}💰")
 
     # 近7日均价和成交量
@@ -352,7 +358,7 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
         snap_hint = ""
         cap_hint = ""
         if not is_instance:
-            floor_price = await _compute_item_floor_price(session, item_cfg)
+            floor_price = await _compute_item_floor_price(session, item_cfg, player.server_id)
             price_cap = max(int(floor_price * PRICE_CAP_MULT), floor_price)
             if price > price_cap:
                 await list_cmd.finish(
@@ -391,6 +397,7 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
 
         # 创建新订单（非装备）
         new_order = MarketOrder(
+            server_id=player.server_id,
             player_id=player.id,
             side=side,
             item_id=item_cfg.item_id,
@@ -499,11 +506,11 @@ async def _create_instance_order(session, player, instance: ItemInstance, price:
     # 底价吸附
     snap_hint = ""
     if instance.is_equipment:
-        floor_price = await _compute_equipment_floor_price(session, instance)
+        floor_price = await _compute_equipment_floor_price(session, instance, player.server_id)
     else:
         # 铭文：使用基础价格 × 财富指数
         base_price = instance.config.price if instance.config else 1000
-        scale = await _get_wealth_scale(session)
+        scale = await _get_wealth_scale(session, player.server_id)
         floor_price = max(int(base_price * scale), MIN_UNIT_PRICE)
     price_cap = max(int(floor_price * PRICE_CAP_MULT), floor_price)
     type_name = "装备" if instance.is_equipment else "铭文"
@@ -523,6 +530,7 @@ async def _create_instance_order(session, player, instance: ItemInstance, price:
 
     # 创建实例订单
     new_order = MarketOrder(
+        server_id=player.server_id,
         player_id=player.id,
         side=OrderSide.SELL,
         item_id=instance.item_id,
@@ -683,8 +691,10 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
     oid = int(oid_str)
 
     async with safe_session() as session:
+        server_id = await get_event_server_id(session, event)
         stmt = select(MarketOrder).options(selectinload(MarketOrder.player)).where(
-            MarketOrder.id == oid
+            MarketOrder.id == oid,
+            MarketOrder.server_id == server_id,
         )
         order: MarketOrder | None = (await session.execute(stmt)).scalar_one_or_none()
         if not order:
@@ -819,19 +829,22 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
         await view_cmd.finish(f"⛔ 不存在物品：{item_name}")
 
     async with safe_session() as session:
+        server_id = await get_event_server_id(session, event)
         stmt_sell = select(MarketOrder).options(selectinload(MarketOrder.player)).where(
             MarketOrder.item_id == item_cfg.item_id,
             MarketOrder.side == OrderSide.SELL,
+            MarketOrder.server_id == server_id,
         ).order_by(asc(MarketOrder.price), asc(MarketOrder.created_at))
         stmt_buy = select(MarketOrder).options(selectinload(MarketOrder.player)).where(
             MarketOrder.item_id == item_cfg.item_id,
             MarketOrder.side == OrderSide.BUY,
+            MarketOrder.server_id == server_id,
         ).order_by(desc(MarketOrder.price), asc(MarketOrder.created_at))
         sells = (await session.execute(stmt_sell)).scalars().all()
         buys = (await session.execute(stmt_buy)).scalars().all()
 
         # ---- 查询近7日市场参考数据 ----
-        ref_info = await _get_market_reference(session, item_cfg)
+        ref_info = await _get_market_reference(session, item_cfg, server_id)
 
         def _fmt(order: MarketOrder):
             oid_cmd = cmd(f"#{order.id}", f"挂牌详情 {order.id}")
@@ -895,6 +908,7 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
             await overview_cmd.finish("⛔ 页数必须为正整数")
 
     async with safe_session() as session:
+        server_id = await get_event_server_id(session, event)
         # 聚合在售（SELL）信息：最低价与总数量
         stmt_sell = (
             select(
@@ -902,7 +916,7 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
                 func.sum(MarketOrder.quantity).label("qty"),
                 func.min(MarketOrder.price).label("min_price"),
             )
-            .where(MarketOrder.side == OrderSide.SELL)
+            .where(MarketOrder.side == OrderSide.SELL, MarketOrder.server_id == server_id)
             .group_by(MarketOrder.item_id)
         )
         # 聚合求购（BUY）信息：最高价与总数量
@@ -912,7 +926,7 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
                 func.sum(MarketOrder.quantity).label("qty"),
                 func.max(MarketOrder.price).label("max_price"),
             )
-            .where(MarketOrder.side == OrderSide.BUY)
+            .where(MarketOrder.side == OrderSide.BUY, MarketOrder.server_id == server_id)
             .group_by(MarketOrder.item_id)
         )
 
@@ -993,7 +1007,8 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
 
         # 查询玩家的所有挂牌订单
         stmt = select(MarketOrder).where(
-            MarketOrder.player_id == player.id
+            MarketOrder.player_id == player.id,
+            MarketOrder.server_id == player.server_id,
         ).order_by(desc(MarketOrder.created_at))
 
         orders = (await session.execute(stmt)).scalars().all()
@@ -1101,7 +1116,8 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
             and_(
                 MarketOrder.item_id == equipment.item_id,
                 MarketOrder.side == OrderSide.SELL,
-                MarketOrder.is_instance_trade == True
+                MarketOrder.is_instance_trade == True,
+                MarketOrder.server_id == player.server_id,
             )
         ).order_by(MarketOrder.price.asc()).limit(5)
 
@@ -1166,6 +1182,7 @@ async def _try_auto_match(session, new_order: MarketOrder, player: Player, same_
         stmt = select(MarketOrder).where(
             MarketOrder.item_id == new_order.item_id,
             MarketOrder.side == OrderSide.SELL,
+            MarketOrder.server_id == new_order.server_id,
             price_cond,
         ).order_by(asc(MarketOrder.price), asc(MarketOrder.created_at))
         opposite_orders = (await session.execute(stmt)).scalars().all()
@@ -1175,6 +1192,7 @@ async def _try_auto_match(session, new_order: MarketOrder, player: Player, same_
         stmt = select(MarketOrder).where(
             MarketOrder.item_id == new_order.item_id,
             MarketOrder.side == OrderSide.BUY,
+            MarketOrder.server_id == new_order.server_id,
             price_cond,
         ).order_by(desc(MarketOrder.price), asc(MarketOrder.created_at))
         opposite_orders = (await session.execute(stmt)).scalars().all()

@@ -29,7 +29,7 @@ class PlayerProfileDTO:
     active_monthly_card_types: list[CardType] = field(default_factory=list)
 
 
-async def query_player_profile(uid: int) -> PlayerProfileDTO | None:
+async def query_player_profile(uid: int, server_id: int = 1) -> PlayerProfileDTO | None:
     """纯只读路径查看他人面板
 
     Args:
@@ -40,7 +40,7 @@ async def query_player_profile(uid: int) -> PlayerProfileDTO | None:
     """
     async with readonly_session() as session:
         # 1. 查找玩家
-        stmt = select(Player).where(Player.uid == uid)
+        stmt = select(Player).where(Player.uid == uid, Player.server_id == server_id)
         result = await session.execute(stmt)
         player = result.scalars().first()
         if not player:

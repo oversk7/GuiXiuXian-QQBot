@@ -81,6 +81,8 @@ class GuildApplicationService:
         guild = await self._guild_repo.get_by_id(guild_id)
         if not guild:
             return False, "未找到该公会"
+        if guild.server_id != player.server_id:
+            return False, "不能申请其他区服的公会"
 
         # 检查是否已有待处理的申请
         existing_app = await self._application_repo.get_pending_application_by_player_and_guild(
@@ -189,6 +191,9 @@ class GuildApplicationService:
         applicant = await self._player_repo.get_by_id(application.applicant_id)
         if not applicant:
             return False, "申请人不存在"
+        if applicant.server_id != guild.server_id:
+            await self._application_repo.reject_application(application)
+            return False, "申请人与公会不在同一区服"
 
         # 检查申请人是否已经加入当前公会（可能在调用此方法前已通过join_guild加入）
         already_joined_current_guild = (applicant.guild_id == guild.id)

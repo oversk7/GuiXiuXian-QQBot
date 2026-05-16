@@ -87,8 +87,8 @@ class RelationshipService:
         if not sender:
             return False, "发送者不存在"
 
-        # 2. 获取接收者
-        receiver = await self._player_repo.get_by_uid(receiver_uid)
+        # 2. 获取同区接收者
+        receiver = await self._player_repo.get_by_uid(receiver_uid, sender.server_id)
         if not receiver:
             return False, f"未找到UID为{receiver_uid}的玩家"
 
@@ -198,8 +198,8 @@ class RelationshipService:
         if not sender:
             return False, "发送者不存在"
 
-        # 2. 获取接收者
-        receiver = await self._player_repo.get_by_uid(receiver_uid)
+        # 2. 获取同区接收者
+        receiver = await self._player_repo.get_by_uid(receiver_uid, sender.server_id)
         if not receiver:
             return False, f"未找到UID为{receiver_uid}的玩家"
 
@@ -303,7 +303,7 @@ class RelationshipService:
         if not sender:
             return False, "发送者不存在"
 
-        receiver = await self._player_repo.get_by_uid(receiver_uid)
+        receiver = await self._player_repo.get_by_uid(receiver_uid, sender.server_id)
         if not receiver:
             return False, f"未找到UID为{receiver_uid}的玩家"
 
@@ -428,8 +428,12 @@ class RelationshipService:
         Returns:
             (是否可以, 提示信息)
         """
-        # 获取目标玩家
-        target = await self._player_repo.get_by_uid(target_uid)
+        player = await self._player_repo.get_by_id(player_id)
+        if not player:
+            return False, "玩家不存在"
+
+        # 获取同区目标玩家
+        target = await self._player_repo.get_by_uid(target_uid, player.server_id)
         if not target:
             return False, f"未找到UID为{target_uid}的玩家"
 
@@ -456,8 +460,6 @@ class RelationshipService:
         if favorability < min_favorability:
             return False, f"好感度不足！{self._get_relationship_name(relationship_type)}需要{min_favorability}好感度,当前{favorability}"
 
-        # 检查地理位置
-        player = await self._player_repo.get_by_id(player_id)
         if player.region != target.region:
             return False, f"必须与对方在同一地点才能建立关系\n当前位置: {player.region}\n对方位置: {target.region}"
 
@@ -485,7 +487,8 @@ class RelationshipService:
         if not can:
             return False, msg
 
-        target = await self._player_repo.get_by_uid(target_uid)
+        player = await self._player_repo.get_by_id(player_id)
+        target = await self._player_repo.get_by_uid(target_uid, player.server_id)
 
         # 建立婚姻关系
         relationship = await self._relationship_repo.get_relationship(
@@ -525,10 +528,10 @@ class RelationshipService:
 
         # 获取求婚者和对方
         proposer = await self._player_repo.get_by_id(proposer_id)
-        target = await self._player_repo.get_by_uid(target_uid)
 
         if not proposer:
             return False, "玩家不存在"
+        target = await self._player_repo.get_by_uid(target_uid, proposer.server_id)
         if not target:
             return False, f"未找到UID为{target_uid}的玩家"
         if proposer.id == target.id:
@@ -643,10 +646,10 @@ class RelationshipService:
 
         # 获取双方
         responder = await self._player_repo.get_by_id(responder_id)
-        proposer = await self._player_repo.get_by_uid(proposer_uid)
 
         if not responder:
             return False, "玩家不存在"
+        proposer = await self._player_repo.get_by_uid(proposer_uid, responder.server_id)
         if not proposer:
             return False, f"未找到UID为{proposer_uid}的玩家"
 
@@ -716,10 +719,10 @@ class RelationshipService:
         """
         # 获取双方
         responder = await self._player_repo.get_by_id(responder_id)
-        proposer = await self._player_repo.get_by_uid(proposer_uid)
 
         if not responder:
             return False, "玩家不存在"
+        proposer = await self._player_repo.get_by_uid(proposer_uid, responder.server_id)
         if not proposer:
             return False, f"未找到UID为{proposer_uid}的玩家"
 
@@ -760,10 +763,10 @@ class RelationshipService:
         """
         # 获取双方
         proposer = await self._player_repo.get_by_id(proposer_id)
-        target = await self._player_repo.get_by_uid(target_uid)
 
         if not proposer:
             return False, "玩家不存在"
+        target = await self._player_repo.get_by_uid(target_uid, proposer.server_id)
         if not target:
             return False, f"未找到UID为{target_uid}的玩家"
 
@@ -809,11 +812,15 @@ class RelationshipService:
             return False, "结义最多支持4人"
 
         # 获取所有玩家
-        players = [await self._player_repo.get_by_id(player_id)]
+        player = await self._player_repo.get_by_id(player_id)
+        if not player:
+            return False, "玩家不存在"
+
+        players = [player]
         player_names = [players[0].nickname]
 
         for uid in target_uids:
-            p = await self._player_repo.get_by_uid(uid)
+            p = await self._player_repo.get_by_uid(uid, player.server_id)
             if not p:
                 return False, f"未找到UID为{uid}的玩家"
             players.append(p)
@@ -880,10 +887,10 @@ class RelationshipService:
 
         # 获取发起者和对方
         proposer = await self._player_repo.get_by_id(proposer_id)
-        target = await self._player_repo.get_by_uid(target_uid)
 
         if not proposer:
             return False, "玩家不存在"
+        target = await self._player_repo.get_by_uid(target_uid, proposer.server_id)
         if not target:
             return False, f"未找到UID为{target_uid}的玩家"
         if proposer.id == target.id:
@@ -999,10 +1006,10 @@ class RelationshipService:
 
         # 获取双方
         responder = await self._player_repo.get_by_id(responder_id)
-        proposer = await self._player_repo.get_by_uid(proposer_uid)
 
         if not responder:
             return False, "玩家不存在"
+        proposer = await self._player_repo.get_by_uid(proposer_uid, responder.server_id)
         if not proposer:
             return False, f"未找到UID为{proposer_uid}的玩家"
 
@@ -1072,10 +1079,10 @@ class RelationshipService:
         """
         # 获取双方
         responder = await self._player_repo.get_by_id(responder_id)
-        proposer = await self._player_repo.get_by_uid(proposer_uid)
 
         if not responder:
             return False, "玩家不存在"
+        proposer = await self._player_repo.get_by_uid(proposer_uid, responder.server_id)
         if not proposer:
             return False, f"未找到UID为{proposer_uid}的玩家"
 
@@ -1116,10 +1123,10 @@ class RelationshipService:
         """
         # 获取双方
         proposer = await self._player_repo.get_by_id(proposer_id)
-        target = await self._player_repo.get_by_uid(target_uid)
 
         if not proposer:
             return False, "玩家不存在"
+        target = await self._player_repo.get_by_uid(target_uid, proposer.server_id)
         if not target:
             return False, f"未找到UID为{target_uid}的玩家"
 
@@ -1166,8 +1173,8 @@ class RelationshipService:
         if not can:
             return False, msg
 
-        target = await self._player_repo.get_by_uid(target_uid)
         player = await self._player_repo.get_by_id(player_id)
+        target = await self._player_repo.get_by_uid(target_uid, player.server_id)
 
         # 建立师徒关系
         relationship = await self._relationship_repo.get_relationship(

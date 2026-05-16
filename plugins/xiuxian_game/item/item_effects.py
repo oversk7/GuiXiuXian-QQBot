@@ -949,7 +949,10 @@ async def _divine_punishment(player: Player, cfg: ItemConfig, qty: int, ctx: obj
 
     from sqlalchemy import select
 
-    target_stmt = select(Player).where(Player.uid == target_uid)
+    target_stmt = select(Player).where(
+        Player.uid == target_uid,
+        Player.server_id == player.server_id
+    )
     target_result = await session.execute(target_stmt)
     target = target_result.scalars().first()
 

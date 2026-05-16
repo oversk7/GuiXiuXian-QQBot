@@ -17,7 +17,8 @@ class Guild(Base):
     __tablename__ = "guild"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
-    name: Mapped[str] = mapped_column(String(32), unique=True, comment="公会名称")
+    server_id: Mapped[int] = mapped_column(Integer, default=1, server_default='1', index=True, comment="所属区服ID")
+    name: Mapped[str] = mapped_column(String(32), comment="公会名称")
     president_id: Mapped[str] = mapped_column(String(32), comment="会长的玩家平台ID")
     level: Mapped[int] = mapped_column(Integer, default=1, server_default='1', comment="公会等级")
     exp: Mapped[int] = mapped_column(BigInteger, default=0, server_default='0', comment="公会经验/活跃度")
@@ -31,6 +32,10 @@ class Guild(Base):
     # 关联关系
     members: Mapped[list["GuildMember"]] = relationship("GuildMember", back_populates="guild", cascade="all, delete-orphan")
     buildings: Mapped[list["GuildBuilding"]] = relationship("GuildBuilding", back_populates="guild", cascade="all, delete-orphan")
+
+    __table_args__ = (
+        UniqueConstraint("server_id", "name", name="uq_guild_server_name"),
+    )
 
 
 class GuildMember(Base):

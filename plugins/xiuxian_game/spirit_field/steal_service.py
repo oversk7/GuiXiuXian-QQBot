@@ -192,8 +192,15 @@ class StealService:
         if steal_count >= STEAL_MAX_PER_DAY:
             return False, f"今日偷菜次数已用完({STEAL_MAX_PER_DAY}次)"
 
+        thief = await uow.players.get_by_id(thief_id)
+        if not thief:
+            return False, "玩家不存在"
+
         # 查找目标
-        stmt = select(Player).where(Player.uid == victim_uid)
+        stmt = select(Player).where(
+            Player.uid == victim_uid,
+            Player.server_id == thief.server_id
+        )
         result = await uow.session.execute(stmt)
         victim = result.scalar_one_or_none()
         if not victim:

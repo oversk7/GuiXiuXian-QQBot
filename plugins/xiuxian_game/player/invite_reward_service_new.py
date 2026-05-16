@@ -58,7 +58,8 @@ class InviteRewardService:
     async def create_invite_record(
         self,
         invitee_uid: int,
-        inviter_uid: int
+        inviter_uid: int,
+        server_id: int
     ) -> InviteReward:
         """
         创建邀请记录
@@ -71,6 +72,7 @@ class InviteRewardService:
             创建的邀请记录
         """
         invite_record = InviteReward(
+            server_id=server_id,
             invitee_uid=invitee_uid,
             inviter_uid=inviter_uid
         )
@@ -97,12 +99,18 @@ class InviteRewardService:
             return []
 
         # 查找该玩家的邀请记录
-        invite_record = await self._invite_reward_repo.get_by_invitee_uid(player.uid)
+        invite_record = await self._invite_reward_repo.get_by_invitee_uid(
+            player.uid,
+            player.server_id
+        )
         if not invite_record:
             return []  # 没有邀请记录
 
         # 获取邀请者信息
-        inviter = await self._player_repo.get_by_uid(invite_record.inviter_uid)
+        inviter = await self._player_repo.get_by_uid(
+            invite_record.inviter_uid,
+            invite_record.server_id
+        )
         if not inviter:
             return []  # 邀请者不存在
 
@@ -164,7 +172,7 @@ class InviteRewardService:
             f"🎁 被邀请者 {invitee.nickname} 获得 🪔{reward_config['invitee_incense']} 香火"
         )
 
-    async def get_invite_status(self, player_uid: int) -> Dict:
+    async def get_invite_status(self, player_uid: int, server_id: int) -> Dict:
         """
         获取邀请状态信息
 
@@ -175,10 +183,16 @@ class InviteRewardService:
             包含邀请统计的字典
         """
         # 查找作为邀请者的记录
-        inviter_records = await self._invite_reward_repo.get_by_inviter_uid(player_uid)
+        inviter_records = await self._invite_reward_repo.get_by_inviter_uid(
+            player_uid,
+            server_id
+        )
 
         # 查找作为被邀请者的记录
-        invitee_record = await self._invite_reward_repo.get_by_invitee_uid(player_uid)
+        invitee_record = await self._invite_reward_repo.get_by_invitee_uid(
+            player_uid,
+            server_id
+        )
 
         return {
             "invited_count": len(inviter_records),
@@ -186,7 +200,7 @@ class InviteRewardService:
             "invitee_record": invitee_record
         }
 
-    async def get_pending_rewards_info(self, inviter_uid: int) -> List[Dict]:
+    async def get_pending_rewards_info(self, inviter_uid: int, server_id: int) -> List[Dict]:
         """
         获取待发放奖励信息（优化版，解决N+1查询）
 
@@ -198,7 +212,8 @@ class InviteRewardService:
         """
         # 使用优化的查询方法，一次性获取所有记录和玩家信息
         records_with_players = await self._invite_reward_repo.get_records_with_invitee_players(
-            inviter_uid
+            inviter_uid,
+            server_id
         )
 
         pending_rewards = []

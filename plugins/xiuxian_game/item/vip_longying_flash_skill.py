@@ -390,7 +390,10 @@ async def _handle_carry(session, player: Player, parts: list, event: MessageEven
         await anchor_cmd.finish(f"⛔ 理智不足，携带穿越需要 {mp_cost}（最大理智的10%），当前 {player.mp}")
 
     # 查找目标玩家
-    stmt = select(Player).where(Player.uid == target_uid)
+    stmt = select(Player).where(
+        Player.uid == target_uid,
+        Player.server_id == player.server_id
+    )
     target = (await session.execute(stmt)).scalar_one_or_none()
     if not target:
         await anchor_cmd.finish(f"⛔ 找不到UID为 {target_uid} 的玩家")

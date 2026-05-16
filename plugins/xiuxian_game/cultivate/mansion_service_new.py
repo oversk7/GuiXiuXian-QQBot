@@ -128,7 +128,7 @@ class MansionService:
         return (current_x == player.mansion_x and
                 current_y == player.mansion_y)
 
-    async def find_mansion_owner_at_location(self, x: int, y: int) -> Optional[Player]:
+    async def find_mansion_owner_at_location(self, x: int, y: int, server_id: int = 1) -> Optional[Player]:
         """
         查找指定位置的阴宅主人
 
@@ -140,7 +140,7 @@ class MansionService:
             阴宅主人玩家对象，如果没有找到则返回None
         """
         # 通过PlayerRepository查询阴宅主人
-        return await self._player_repo.find_mansion_owner_at_location(x, y)
+        return await self._player_repo.find_mansion_owner_at_location(x, y, server_id)
 
     async def can_use_mansion(self, player: Player, mansion_owner: Player) -> tuple[bool, str]:
         """
@@ -462,7 +462,7 @@ class MansionService:
             return False, distance_error
 
         # 检查目标位置是否已有其他玩家的阴宅
-        existing_owner = await self.find_mansion_owner_at_location(target_x, target_y)
+        existing_owner = await self.find_mansion_owner_at_location(target_x, target_y, player.server_id)
         if existing_owner:
             return False, f"位置({target_x}, {target_y})已有玩家{existing_owner.nickname}的阴宅，请选择其他位置"
 
@@ -624,7 +624,7 @@ class MansionService:
             return False, distance_error
 
         # 检查当前位置是否已有其他玩家的阴宅
-        existing_owner = await self.find_mansion_owner_at_location(current_x, current_y)
+        existing_owner = await self.find_mansion_owner_at_location(current_x, current_y, player.server_id)
         if existing_owner:
             return False, f"位置({current_x}, {current_y})已有玩家{existing_owner.nickname}的阴宅，请选择其他位置"
 
@@ -767,7 +767,7 @@ class MansionService:
         current_x, current_y = player.get_current_coordinates()
 
         # 查找当前位置的阴宅主人
-        mansion_owner = await self.find_mansion_owner_at_location(current_x, current_y)
+        mansion_owner = await self.find_mansion_owner_at_location(current_x, current_y, player.server_id)
 
         if not mansion_owner:
             return (

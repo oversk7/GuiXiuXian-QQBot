@@ -11,6 +11,8 @@ from .models.player import Player
 from .models.account_ownership import AccountOwnership
 from .infrastructure.repositories.player_repository import PlayerRepository
 from .infrastructure.cache import player_identity_cache
+from .server_config import DEFAULT_SERVER_ID
+from .server_service import ensure_platform_server_binding, get_bound_server_id
 
 
 # ==================== last_active_at 节流 ====================
@@ -92,12 +94,15 @@ async def get_unified_player(session: AsyncSession, event: MessageEvent) -> Opti
         Player对象或None
     """
     _, user_id = get_platform_info(event)
+    bound_server_id = await get_bound_server_id(session, user_id)
 
     # 1. 优先检查管理员临时切换（绕过缓存）
     if user_id in _admin_temp_switch:
         temp_player_id = _admin_temp_switch[user_id]
         temp_player = await session.get(Player, temp_player_id)
         if temp_player:
+            if bound_server_id and temp_player.server_id != bound_server_id:
+                return None
             await session.refresh(temp_player)
             return temp_player
 
@@ -110,6 +115,9 @@ async def get_unified_player(session: AsyncSession, event: MessageEvent) -> Opti
         # 用 player_id 直接查 DB
         player = await session.get(Player, cached_player_id)
         if player is not None:
+            if bound_server_id and player.server_id != bound_server_id:
+                player_identity_cache.invalidate(user_id)
+                return None
             _touch_last_active(player)
             return player
         # player 被删除了，缓存失效，走下面的完整查询
@@ -131,12 +139,29 @@ async def get_unified_player(session: AsyncSession, event: MessageEvent) -> Opti
             if ownership and ownership.owner_platform_id != user_id:
                 player = None
 
+    if player is not None:
+        if bound_server_id is None:
+            await ensure_platform_server_binding(
+                session,
+                user_id,
+                player.server_id or DEFAULT_SERVER_ID,
+                allow_closed=True,
+            )
+        elif player.server_id != bound_server_id:
+            player = None
+
     # 回填身份缓存
     player_identity_cache.put(user_id, player.id if player else None)
     if player is not None:
         _touch_last_active(player)
 
     return player
+
+
+async def get_event_server_id(session: AsyncSession, event: MessageEvent) -> int:
+    """获取事件所属区服；老账号未绑定时默认为一区。"""
+    _, user_id = get_platform_info(event)
+    return await get_bound_server_id(session, user_id) or DEFAULT_SERVER_ID
 
 
 

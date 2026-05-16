@@ -26,8 +26,8 @@ from ..infrastructure.repositories.player_repository import PlayerRepository
 # 发红包冷却记录: {player_id: timestamp}
 _send_cooldowns: Dict[str, float] = {}
 
-# 全服平均金币缓存: (value, timestamp)
-_avg_gold_cache: Tuple[int, float] = (0, 0.0)
+# 分区平均金币缓存: {server_id: (value, timestamp)}
+_avg_gold_cache: Dict[int, Tuple[int, float]] = {}
 
 # 冷却时间（秒）
 SEND_COOLDOWN_SECONDS = 60
@@ -92,15 +92,16 @@ class RedEnvelopeService:
             remaining = int(SEND_COOLDOWN_SECONDS - (now - last_send))
             return False, f"发红包太频繁，请等待{remaining}秒", None
 
-        # 检查群内是否有活跃红包
-        active = await self._envelope_repo.find_active_by_group(group_id)
-        if active:
-            return False, "本群已有一个活跃红包，请等待抢完或过期后再发", None
-
         # 获取发送者
         sender = await self._player_repo.get_by_id(sender_id)
         if not sender:
             return False, "玩家不存在", None
+        server_id = sender.server_id
+
+        # 检查本区本群是否有活跃红包
+        active = await self._envelope_repo.find_active_by_group(group_id, server_id)
+        if active:
+            return False, "本群本区已有一个活跃红包，请等待抢完或过期后再发", None
 
         # 计算税收
         tax = self._calculate_tax(total_gold)
@@ -116,6 +117,7 @@ class RedEnvelopeService:
 
         # 创建红包
         envelope = RedEnvelope(
+            server_id=server_id,
             group_id=group_id,
             sender_id=sender_id,
             total_gold=total_gold,
@@ -156,10 +158,18 @@ class RedEnvelopeService:
         Returns:
             (成功标志, 消息, 抢红包信息{amount, is_last, envelope})
         """
-        # 查找活跃红包
-        envelope = await self._envelope_repo.find_active_by_group(group_id)
+        # 获取抢红包的玩家
+        player = await self._player_repo.get_by_id(player_id)
+        if not player:
+            return False, "玩家不存在", None
+
+        # 查找同区活跃红包
+        envelope = await self._envelope_repo.find_active_by_group(group_id, player.server_id)
         if not envelope:
-            return False, "当前群没有可抢的红包", None
+            return False, "当前群本区没有可抢的红包", None
+
+        if envelope.server_id != player.server_id:
+            return False, "不能抢其他区服的红包", None
 
         # 检查是否过期
         if datetime.now() > envelope.expires_at:
@@ -177,13 +187,8 @@ class RedEnvelopeService:
             if record["player_id"] == player_id:
                 return False, f"你已经抢过了，获得了{record['amount']}金币", None
 
-        # 获取抢红包的玩家
-        player = await self._player_repo.get_by_id(player_id)
-        if not player:
-            return False, "玩家不存在", None
-
         # 计算份额
-        avg_gold = await self._get_avg_player_gold()
+        avg_gold = await self._get_avg_player_gold(player.server_id)
         amount = self._calculate_share(
             envelope.remaining_gold,
             envelope.remaining_count,
@@ -246,9 +251,9 @@ class RedEnvelopeService:
             count += 1
         return count
 
-    async def get_recent_records(self, group_id: str) -> List[RedEnvelope]:
+    async def get_recent_records(self, group_id: str, server_id: int) -> List[RedEnvelope]:
         """获取群内最近红包记录"""
-        return await self._envelope_repo.find_recent_by_group(group_id, limit=5)
+        return await self._envelope_repo.find_recent_by_group(group_id, server_id, limit=5)
 
     # ==================== 内部方法 ====================
 
@@ -355,21 +360,24 @@ class RedEnvelopeService:
 
         return base_share
 
-    async def _get_avg_player_gold(self) -> int:
-        """获取全服平均金币（带30分钟缓存）"""
+    async def _get_avg_player_gold(self, server_id: int) -> int:
+        """获取本区平均金币（带30分钟缓存）"""
         global _avg_gold_cache
         now = time.time()
-        cached_value, cached_time = _avg_gold_cache
+        cached_value, cached_time = _avg_gold_cache.get(server_id, (0, 0.0))
 
         # 30分钟缓存
         if now - cached_time < 1800 and cached_value > 0:
             return cached_value
 
-        # 查询全服平均金币
-        stmt = select(func.avg(Player.gold)).where(Player.gold > 0)
+        # 查询本区平均金币
+        stmt = select(func.avg(Player.gold)).where(
+            Player.server_id == server_id,
+            Player.gold > 0
+        )
         result = await self._envelope_repo._session.execute(stmt)
         avg_val = result.scalar()
         avg_gold = int(avg_val) if avg_val else 10000  # 默认1万
 
-        _avg_gold_cache = (avg_gold, now)
+        _avg_gold_cache[server_id] = (avg_gold, now)
         return avg_gold

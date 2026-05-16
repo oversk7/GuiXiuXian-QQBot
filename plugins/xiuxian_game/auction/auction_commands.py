@@ -192,7 +192,7 @@ async def _handle_instance_auction_listing(
                 await list_auction_cmd.finish(message_add_head("⛔ 请先创建角色", event))
 
         # 提前检查上架数量限制
-        active_auctions = await uow.auction_items.find_seller_active_auctions(player.id)
+        active_auctions = await uow.auction_items.find_seller_active_auctions(player.id, player.server_id)
         if len(active_auctions) >= auction_service.MAX_AUCTION_LISTINGS:
             await list_auction_cmd.finish(message_add_head(
                 f"⛔ 你已有 {auction_service.MAX_AUCTION_LISTINGS} 件物品正在拍卖，无法继续上架", event
@@ -384,14 +384,16 @@ async def handle_auction_hall(event: MessageEvent, args: Message = CommandArg())
     result_msg = ""
 
     async with UnitOfWork(AsyncSessionLocal) as uow:
-        total = await uow.auction_items.count_active_auctions()
+        from ..platform_utils import get_event_server_id
+        server_id = await get_event_server_id(uow.session, event)
+        total = await uow.auction_items.count_active_auctions(server_id)
         if total == 0:
             result_msg = "🏛️ 拍卖行\n━━━━━━━━━━━━━\n当前暂无任何拍卖，快去上架稀有物品吧！"
         else:
             import math
             total_pages = math.ceil(total / page_size)
             page = min(page, total_pages)
-            auctions = await uow.auction_items.find_active_auctions(page, page_size)
+            auctions = await uow.auction_items.find_active_auctions(page, page_size, server_id)
 
             lines = [
                 "# 🏛️ 拍卖行",
@@ -455,7 +457,7 @@ async def handle_my_auction(event: MessageEvent):
             else:
                 result_msg = "⛔ 请先创建角色"
         else:
-            auctions = await uow.auction_items.find_seller_active_auctions(player.id)
+            auctions = await uow.auction_items.find_seller_active_auctions(player.id, player.server_id)
             if not auctions:
                 result_msg = "📋 你当前没有进行中的拍卖\n💡 使用【上架拍卖 物品名 起拍价 时长】发起拍卖"
             else:
@@ -557,8 +559,12 @@ async def handle_auction_detail(event: MessageEvent, args: Message = CommandArg(
         await auction_detail_cmd.finish(message_add_head("⛔ 拍卖编号必须是整数", event))
 
     async with UnitOfWork(AsyncSessionLocal) as uow:
+        from ..platform_utils import get_event_server_id
+        server_id = await get_event_server_id(uow.session, event)
         auction = await uow.auction_items.get_by_id(auction_id)
         if not auction:
+            result_msg = f"⛔ 拍卖 #{auction_id} 不存在"
+        elif auction.server_id != server_id:
             result_msg = f"⛔ 拍卖 #{auction_id} 不存在"
         else:
             item_cfg = config.items_config["by_id"].get(auction.item_id)

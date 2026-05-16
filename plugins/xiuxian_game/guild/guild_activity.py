@@ -5,7 +5,7 @@
 - 全员超过 INACTIVE_DAYS 天不活跃 → 自动解散公会
 - 公会列表按成员活跃度排序
 """
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, date
 from sqlalchemy import select, func, delete as sql_delete, case
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -22,7 +22,7 @@ logger = logging.getLogger(__name__)
 INACTIVE_DAYS = 30
 
 # 每日只检查一次（进程级缓存）
-_last_check_date = None
+_last_check_date_by_server: dict[int, date] = {}
 
 
 def _player_last_active(player: Player) -> datetime | None:
@@ -31,26 +31,25 @@ def _player_last_active(player: Player) -> datetime | None:
     return max(candidates) if candidates else None
 
 
-async def maybe_run_activity_check(session: AsyncSession) -> list[str]:
+async def maybe_run_activity_check(session: AsyncSession, server_id: int = 1) -> list[str]:
     """每日执行一次公会活跃度检查，返回操作日志列表"""
-    global _last_check_date
     today = datetime.now().date()
-    if _last_check_date == today:
+    if _last_check_date_by_server.get(server_id) == today:
         return []
-    _last_check_date = today
+    _last_check_date_by_server[server_id] = today
     try:
-        return await _do_activity_check(session)
+        return await _do_activity_check(session, server_id)
     except Exception as e:
         logger.exception(f"公会活跃度检查异常: {e}")
         return []
 
 
-async def _do_activity_check(session: AsyncSession) -> list[str]:
+async def _do_activity_check(session: AsyncSession, server_id: int) -> list[str]:
     """核心：遍历所有公会，执行会长继承/僵尸解散"""
     messages = []
     threshold = datetime.now() - timedelta(days=INACTIVE_DAYS)
 
-    guilds = (await session.execute(select(Guild))).scalars().all()
+    guilds = (await session.execute(select(Guild).where(Guild.server_id == server_id))).scalars().all()
 
     for guild in guilds:
         president = await session.get(Player, guild.president_id)
@@ -168,7 +167,7 @@ async def _auto_dissolve_guild(session: AsyncSession, guild: Guild) -> str:
     return msg
 
 
-async def get_guilds_sorted_by_activity(session: AsyncSession):
+async def get_guilds_sorted_by_activity(session: AsyncSession, server_id: int = 1):
     """
     获取公会列表，按活跃度排序。
 
@@ -195,6 +194,7 @@ async def get_guilds_sorted_by_activity(session: AsyncSession):
     stmt = (
         select(Guild, activity_subq.c.latest_active)
         .outerjoin(activity_subq, Guild.id == activity_subq.c.guild_id)
+        .where(Guild.server_id == server_id)
         .order_by(
             # NULL（无成员）排最后
             case((activity_subq.c.latest_active.is_(None), 1), else_=0),

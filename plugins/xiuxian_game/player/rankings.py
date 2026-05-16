@@ -6,7 +6,7 @@ from typing import Callable, Awaitable
 
 from ..models.db import safe_session
 from ..utils import message_add_head
-from ..platform_utils import get_unified_player
+from ..platform_utils import get_event_server_id, get_unified_player
 from ..utils_markdown import cmd, build_markdown
 from .realm_utils import realm_by_level_and_reincarnation
 from ..queries.ranking_queries import (
@@ -96,7 +96,7 @@ async def _resolve_player_and_rank(
     event: MessageEvent,
     ranking_type: str,
     page_text: str,
-) -> tuple[str | None, int | None, int | None]:
+) -> tuple[str | None, int | None, int | None, int]:
     """解析玩家身份和排名
 
     Returns:
@@ -105,6 +105,10 @@ async def _resolve_player_and_rank(
     page = None
     player_id = None
     player_rank = None
+    server_id = 1
+
+    async with safe_session() as session:
+        server_id = await get_event_server_id(session, event)
 
     if page_text:
         try:
@@ -118,12 +122,12 @@ async def _resolve_player_and_rank(
             if player:
                 player_id = player.id
                 # 先从缓存榜单查找
-                player_rank = await query_player_rank(player_id, ranking_type)
+                player_rank = await query_player_rank(player_id, ranking_type, server_id=server_id)
                 # 如果不在 TOP N 缓存中，做一次精确 COUNT 查询
                 if player_rank is None:
-                    player_rank = await query_player_rank_by_counting(player_id, ranking_type)
+                    player_rank = await query_player_rank_by_counting(player_id, ranking_type, server_id=server_id)
 
-    return player_id, player_rank, page
+    return player_id, player_rank, page, server_id
 
 
 def _build_header(
@@ -250,12 +254,12 @@ level_rank_cmd = on_command("修为榜", aliases={"等级榜"}, block=True, prio
 async def _(event: MessageEvent, args: Message = CommandArg()):
     """按等级及经验排序的玩家排行榜"""
     page_text = args.extract_plain_text().strip()
-    player_id, player_rank, page = await _resolve_player_and_rank(event, "level", page_text)
+    player_id, player_rank, page, server_id = await _resolve_player_and_rank(event, "level", page_text)
 
-    ranked_list = await query_level_ranking()
+    ranked_list = await query_level_ranking(server_id=server_id)
     if not ranked_list:
         await level_rank_cmd.finish("暂无排行榜数据")
-    ranked_list = await _ensure_player_in_list(ranked_list, player_rank, query_level_ranking)
+    ranked_list = await _ensure_player_in_list(ranked_list, player_rank, lambda limit: query_level_ranking(limit=limit, server_id=server_id))
 
     page_data, offset = _paginate_ranking(ranked_list, page, player_rank, player_id)
     if not page_data:
@@ -294,12 +298,12 @@ luck_rank_cmd = on_command("幸运榜", aliases={"运气榜", "幸运排行榜"}
 async def _(event: MessageEvent, args: Message = CommandArg()):
     """显示幸运值最高的玩家排行榜"""
     page_text = args.extract_plain_text().strip()
-    player_id, player_rank, page = await _resolve_player_and_rank(event, "luck", page_text)
+    player_id, player_rank, page, server_id = await _resolve_player_and_rank(event, "luck", page_text)
 
-    ranked_list = await query_luck_ranking()
+    ranked_list = await query_luck_ranking(server_id=server_id)
     if not ranked_list:
         await luck_rank_cmd.finish("暂无排行榜数据")
-    ranked_list = await _ensure_player_in_list(ranked_list, player_rank, query_luck_ranking)
+    ranked_list = await _ensure_player_in_list(ranked_list, player_rank, lambda limit: query_luck_ranking(limit=limit, server_id=server_id))
 
     page_data, offset = _paginate_ranking(ranked_list, page, player_rank, player_id)
     if not page_data:
@@ -336,12 +340,12 @@ wealth_rank_cmd = on_command("财富榜", aliases={"财富排行榜"}, block=Tru
 async def _(event: MessageEvent, args: Message = CommandArg()):
     """显示总财富最多的玩家排行榜（金币+存款+投资）"""
     page_text = args.extract_plain_text().strip()
-    player_id, player_rank, page = await _resolve_player_and_rank(event, "wealth", page_text)
+    player_id, player_rank, page, server_id = await _resolve_player_and_rank(event, "wealth", page_text)
 
-    ranked_list = await query_wealth_ranking()
+    ranked_list = await query_wealth_ranking(server_id=server_id)
     if not ranked_list:
         await wealth_rank_cmd.finish("暂无排行榜数据")
-    ranked_list = await _ensure_player_in_list(ranked_list, player_rank, query_wealth_ranking)
+    ranked_list = await _ensure_player_in_list(ranked_list, player_rank, lambda limit: query_wealth_ranking(limit=limit, server_id=server_id))
 
     page_data, offset = _paginate_ranking(ranked_list, page, player_rank, player_id)
     if not page_data:
@@ -374,12 +378,12 @@ exploration_rank_cmd = on_command("探索榜", aliases={"探索排行榜", "诡�
 async def _(event: MessageEvent, args: Message = CommandArg()):
     """显示最高探索层数的玩家排行榜"""
     page_text = args.extract_plain_text().strip()
-    player_id, player_rank, page = await _resolve_player_and_rank(event, "exploration", page_text)
+    player_id, player_rank, page, server_id = await _resolve_player_and_rank(event, "exploration", page_text)
 
-    ranked_list = await query_exploration_ranking()
+    ranked_list = await query_exploration_ranking(server_id=server_id)
     if not ranked_list:
         await exploration_rank_cmd.finish("暂无排行榜数据")
-    ranked_list = await _ensure_player_in_list(ranked_list, player_rank, query_exploration_ranking)
+    ranked_list = await _ensure_player_in_list(ranked_list, player_rank, lambda limit: query_exploration_ranking(limit=limit, server_id=server_id))
 
     page_data, offset = _paginate_ranking(ranked_list, page, player_rank, player_id)
     if not page_data:
@@ -418,12 +422,12 @@ agility_rank_cmd = on_command("敏捷榜", aliases={"速度榜", "敏捷排行�
 async def _(event: MessageEvent, args: Message = CommandArg()):
     """显示敏捷值排行榜"""
     page_text = args.extract_plain_text().strip()
-    player_id, player_rank, page = await _resolve_player_and_rank(event, "agility", page_text)
+    player_id, player_rank, page, server_id = await _resolve_player_and_rank(event, "agility", page_text)
 
-    ranked_list = await query_agility_ranking()
+    ranked_list = await query_agility_ranking(server_id=server_id)
     if not ranked_list:
         await agility_rank_cmd.finish("暂无排行榜数据")
-    ranked_list = await _ensure_player_in_list(ranked_list, player_rank, query_agility_ranking)
+    ranked_list = await _ensure_player_in_list(ranked_list, player_rank, lambda limit: query_agility_ranking(limit=limit, server_id=server_id))
 
     page_data, offset = _paginate_ranking(ranked_list, page, player_rank, player_id)
     if not page_data:
@@ -462,12 +466,12 @@ mini_game_rank_cmd = on_command("小游戏榜", aliases={"游戏榜", "小游戏
 async def _(event: MessageEvent, args: Message = CommandArg()):
     """显示小游戏积分排行榜"""
     page_text = args.extract_plain_text().strip()
-    player_id, player_rank, page = await _resolve_player_and_rank(event, "mini_game", page_text)
+    player_id, player_rank, page, server_id = await _resolve_player_and_rank(event, "mini_game", page_text)
 
-    ranked_list = await query_mini_game_ranking()
+    ranked_list = await query_mini_game_ranking(server_id=server_id)
     if not ranked_list:
         await mini_game_rank_cmd.finish("暂无排行榜数据")
-    ranked_list = await _ensure_player_in_list(ranked_list, player_rank, query_mini_game_ranking)
+    ranked_list = await _ensure_player_in_list(ranked_list, player_rank, lambda limit: query_mini_game_ranking(limit=limit, server_id=server_id))
 
     page_data, offset = _paginate_ranking(ranked_list, page, player_rank, player_id)
     if not page_data:
@@ -531,12 +535,12 @@ demon_coins_rank_cmd = on_command("恶魔币榜", aliases={"恶魔轮盘榜", "�
 async def _(event: MessageEvent, args: Message = CommandArg()):
     """显示恶魔币排行榜"""
     page_text = args.extract_plain_text().strip()
-    player_id, player_rank, page = await _resolve_player_and_rank(event, "demon_coins", page_text)
+    player_id, player_rank, page, server_id = await _resolve_player_and_rank(event, "demon_coins", page_text)
 
-    ranked_list = await query_demon_coins_ranking()
+    ranked_list = await query_demon_coins_ranking(server_id=server_id)
     if not ranked_list:
         await demon_coins_rank_cmd.finish("暂无恶魔币排行数据\n💡 通过【人机轮盘】赢取恶魔币上榜")
-    ranked_list = await _ensure_player_in_list(ranked_list, player_rank, query_demon_coins_ranking)
+    ranked_list = await _ensure_player_in_list(ranked_list, player_rank, lambda limit: query_demon_coins_ranking(limit=limit, server_id=server_id))
 
     page_data, offset = _paginate_ranking(ranked_list, page, player_rank, player_id)
     if not page_data:

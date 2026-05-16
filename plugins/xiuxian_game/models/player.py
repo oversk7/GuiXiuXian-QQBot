@@ -12,9 +12,10 @@ class Gender(str, PyEnum):
 
 class Player(Base):
     __tablename__ = "player"
-    
+
     id: Mapped[str] = mapped_column(String(32), primary_key=True, index=True, comment="平台ID")
     uid: Mapped[int] = mapped_column(Integer, unique=True, comment="自增UID")
+    server_id: Mapped[int] = mapped_column(Integer, default=1, server_default='1', index=True, comment="所属区服ID")
     nickname: Mapped[str] = mapped_column(String(24))
     level: Mapped[int] = mapped_column(Integer, default=1, server_default='1', comment="等级")
     sex: Mapped[Gender] = mapped_column(String(8), default=Gender.MALE, server_default='男', comment="性别")
@@ -288,7 +289,7 @@ class Player(Base):
         # 阴宅位置唯一约束：同一位置只能有一个阴宅
         Index(
             'idx_mansion_location_unique',
-            'mansion_x', 'mansion_y',
+            'server_id', 'mansion_x', 'mansion_y',
             unique=True,
             postgresql_where=text('mansion_level > 0 AND mansion_x IS NOT NULL AND mansion_y IS NOT NULL'),
             sqlite_where=text('mansion_level > 0 AND mansion_x IS NOT NULL AND mansion_y IS NOT NULL')

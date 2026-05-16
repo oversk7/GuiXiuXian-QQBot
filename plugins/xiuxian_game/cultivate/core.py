@@ -16,6 +16,11 @@ from ..utils_markdown import cmd, build_markdown
 # Feature Flag: 控制是否使用新版MansionService (DI架构)
 cfg = config.game_config["cultivate"]
 
+
+def _cultivate_cfg(player: Player) -> dict:
+    from ..server_config import get_server_game_config
+    return get_server_game_config(player.server_id).get("cultivate", cfg)
+
 # 修炼文案池 - 增加修炼时的沉浸感和新鲜感
 CULTIVATE_FLAVOR_TEXTS = [
     "你在黑焰里看见自己的影子喘息。",
@@ -102,8 +107,9 @@ async def handle_cultivate(event: MessageEvent):
                 event))
         
         # 冷却时间检查
-        if player.last_cultivation and (datetime.now() - player.last_cultivation).seconds < cfg["cool_down"]:
-            remaining = cfg["cool_down"] - (datetime.now() - player.last_cultivation).seconds
+        current_cfg = _cultivate_cfg(player)
+        if player.last_cultivation and (datetime.now() - player.last_cultivation).seconds < current_cfg["cool_down"]:
+            remaining = current_cfg["cool_down"] - (datetime.now() - player.last_cultivation).seconds
             await cultivate.finish(message_add_head(
                 f"🕒 血火仍在灼烧…剩余 {remaining//60}分{remaining%60}秒，之后再尝试修炼。",
                 event
@@ -111,7 +117,7 @@ async def handle_cultivate(event: MessageEvent):
         
         k = 7 if player.level <= 10 else 6
         # 基础收益计算
-        base_gain = cfg["base_exp"] * (1 + player.level / k)
+        base_gain = current_cfg["base_exp"] * (1 + player.level / k)
         base_exp_gain = round(base_gain * random.uniform(0.8, 1.2))
 
         # 获取月卡权益
@@ -138,7 +144,7 @@ async def handle_cultivate(event: MessageEvent):
         service = MansionService(
             player_repo=PlayerRepository(session),
         )
-        mansion_owner = await service.find_mansion_owner_at_location(current_x, current_y)
+        mansion_owner = await service.find_mansion_owner_at_location(current_x, current_y, player.server_id)
 
         if mansion_owner:
             can_use, use_msg = await service.can_use_mansion(player, mansion_owner)
@@ -218,7 +224,7 @@ async def handle_cultivate(event: MessageEvent):
         player.exp += exp_gain
         session.add(player)
         await session.commit()
-        exp_max = calculate_level_up_exp(player.level)
+        exp_max = calculate_level_up_exp(player.level, player.server_id)
 
         # 构建简洁版修炼消息（折叠式：主行简洁，加成详情折叠显示）
 
@@ -258,7 +264,7 @@ async def handle_cultivate(event: MessageEvent):
 
         # 计算还需修炼次数
         cultivation_times = calculate_cultivation_times_needed(player.exp, exp_max, exp_gain)
-        hours_needed = (cultivation_times * cfg["cool_down"]) / 3600
+        hours_needed = (cultivation_times * current_cfg["cool_down"]) / 3600
 
         # 智能提示文本
         if player.exp >= exp_max:
@@ -270,7 +276,7 @@ async def handle_cultivate(event: MessageEvent):
                 hint_text = f"💡 还需修炼约{cultivation_times}次可突破"
 
         # 冷却提示（诡异化）
-        cooldown_text = f"⏰ 深渊的低语将在{cfg['cool_down']//60}分钟后再次响起"
+        cooldown_text = f"⏰ 深渊的低语将在{current_cfg['cool_down']//60}分钟后再次响起"
 
         # 焚金充能条
         fenjin_line = generate_fenjin_line(player, _now)
@@ -359,7 +365,7 @@ async def handle_seclusion(event: MessageEvent):
         service = MansionService(
             player_repo=PlayerRepository(session),
         )
-        mansion_owner = await service.find_mansion_owner_at_location(current_x, current_y)
+        mansion_owner = await service.find_mansion_owner_at_location(current_x, current_y, player.server_id)
 
         if mansion_owner:
             # 闭关时只检查是否有阴宅加成，不支付费用
@@ -538,7 +544,7 @@ async def handle_out_seclusion(event: MessageEvent):
         service = MansionService(
             player_repo=PlayerRepository(session),
         )
-        mansion_owner = await service.find_mansion_owner_at_location(current_x, current_y)
+        mansion_owner = await service.find_mansion_owner_at_location(current_x, current_y, player.server_id)
 
         if mansion_owner:
             can_use, _ = await service.can_use_mansion(player, mansion_owner)
@@ -559,7 +565,8 @@ async def handle_out_seclusion(event: MessageEvent):
 
         player.is_secluded = False
         k = 7 if player.level <= 10 else 6
-        base_gain = cfg["base_exp"] * (1 + player.level / k)
+        current_cfg = _cultivate_cfg(player)
+        base_gain = current_cfg["base_exp"] * (1 + player.level / k)
         delta_time = int((datetime.now() - player.seclusion_start_time).total_seconds())
 
         # 检查闭关无上限特权
@@ -572,7 +579,7 @@ async def handle_out_seclusion(event: MessageEvent):
             delta_time = min(delta_time, max_seclusion_time)
 
         # 计算基础经验
-        base_exp_gain = int(delta_time / cfg["cool_down"] * base_gain * 0.5)
+        base_exp_gain = int(delta_time / current_cfg["cool_down"] * base_gain * 0.5)
 
         # 获取师徒惩罚
         from ..infrastructure.repositories.player_relationship_repository import PlayerRelationshipRepository
@@ -635,7 +642,7 @@ async def handle_out_seclusion(event: MessageEvent):
 
         session.add(player)
         await session.commit()
-        exp_max2 = calculate_level_up_exp(player.level)
+        exp_max2 = calculate_level_up_exp(player.level, player.server_id)
 
         # 构建简洁版出关消息（折叠式）
         # 随机选择出关文案
@@ -721,8 +728,9 @@ async def handle_breakthrough(event: MessageEvent, args: Message = CommandArg())
             else:
                 await breakthrough.finish("⛔ 请先使用【注册】命令创建角色")
 
-        cfg_break = cfg["breakthrough"]
-        required_exp = calculate_level_up_exp(player.level)
+        current_cfg = _cultivate_cfg(player)
+        cfg_break = current_cfg["breakthrough"]
+        required_exp = calculate_level_up_exp(player.level, player.server_id)
         
         # 解析参数，若包含"镇厄"则启用保驾护航模式，若包含"棺材钉"则使用棺材钉
         arg_text = args.extract_plain_text().strip().lower() if isinstance(args, Message) else ""
@@ -984,7 +992,8 @@ async def handle_continuous_breakthrough(event: MessageEvent, args: Message = Co
             else:
                 await continuous_breakthrough.finish("⛔ 请先使用【注册】命令创建角色")
 
-        cfg_break = cfg["breakthrough"]
+        current_cfg = _cultivate_cfg(player)
+        cfg_break = current_cfg["breakthrough"]
 
         # 解析参数，若包含"镇厄"则启用保驾护航模式
         arg_text = args.extract_plain_text().strip().lower() if isinstance(args, Message) else ""
@@ -1019,7 +1028,7 @@ async def handle_continuous_breakthrough(event: MessageEvent, args: Message = Co
                 reached_level_cap = True
                 break
 
-            required_exp = calculate_level_up_exp(player.level)
+            required_exp = calculate_level_up_exp(player.level, player.server_id)
 
             # 检查经验是否足够
             if player.exp < required_exp:
@@ -1130,15 +1139,15 @@ async def handle_continuous_breakthrough(event: MessageEvent, args: Message = Co
                     "**━━ 失败详情 ━━**\n"
                     f"✧ 本轮失败 {failed_attempts} 次\n"
                     f"✧ 当前等级 Lv.{player.level}\n"
-                    f"✧ 剩余修为 {player.exp}/{calculate_level_up_exp(player.level)}\n"
+                    f"✧ 剩余修为 {player.exp}/{calculate_level_up_exp(player.level, player.server_id)}\n"
                     f"✧ 连续失败 **{player.breakthrough_fail_count}** 次\n"
                     f"✧ 下次成功率加成 +{int(next_bonus*100)}%\n\n"
                     + cmd("突破 镇厄") + " | " + cmd("修炼") + " | " + cmd("献祭", "献祭 ")
                 )
-            elif player.exp < calculate_level_up_exp(player.level):
+            elif player.exp < calculate_level_up_exp(player.level, player.server_id):
                 msg = (
                     "💢 修为不足，无法进行突破！\n"
-                    f"✧ 当前修为 **{player.exp}**/{calculate_level_up_exp(player.level)}\n\n"
+                    f"✧ 当前修为 **{player.exp}**/{calculate_level_up_exp(player.level, player.server_id)}\n\n"
                     + cmd("修炼") + " | " + cmd("闭关")
                 )
             elif use_guardian and start_resentment < (cfg_break.get("guardian_cost_base", 50) + player.level * cfg_break.get("guardian_cost_per_level", 15)):
@@ -1285,7 +1294,7 @@ async def handle_assign(event: MessageEvent, args: Message = CommandArg()):
             await assign_points.finish(f"💢 属性点不足！当前剩余：{player.attribute_points}✨")
         
         attr_field = ATTRIBUTE_MAP[attr_name]
-        inc_val = points * cfg["attributes_base"][attr_field]
+        inc_val = points * _cultivate_cfg(player)["attributes_base"][attr_field]
 
         # 记录分配前是否满血满蓝（仅在分配体/智属性时需要）
         was_hp_full = player.hp >= player.max_hp

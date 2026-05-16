@@ -9,6 +9,7 @@ class InviteReward(Base):
     __tablename__ = "invite_reward"
     
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    server_id: Mapped[int] = mapped_column(Integer, default=1, index=True, comment="所属区服ID")
     invitee_uid: Mapped[int] = mapped_column(Integer, index=True, comment="被邀请者UID")
     inviter_uid: Mapped[int] = mapped_column(Integer, index=True, comment="邀请者UID")
     

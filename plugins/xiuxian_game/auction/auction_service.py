@@ -109,7 +109,7 @@ async def list_auction(
         return False, "⛔ 跑商商品不能上架拍卖行，请前往市集交易"
 
     # 4. 检查卖家活跃拍卖数量
-    active_auctions = await uow.auction_items.find_seller_active_auctions(seller.id)
+    active_auctions = await uow.auction_items.find_seller_active_auctions(seller.id, seller.server_id)
     if len(active_auctions) >= MAX_AUCTION_LISTINGS:
         return False, f"⛔ 你已有 {MAX_AUCTION_LISTINGS} 件物品正在拍卖，无法继续上架"
 
@@ -194,6 +194,7 @@ async def _list_equipment_auction(
     # 创建拍卖条目
     end_at = datetime.now() + timedelta(hours=duration_hours)
     auction = AuctionItem(
+        server_id=seller.server_id,
         seller_id=seller.id,
         seller_uid=seller.uid,
         seller_name=seller.nickname,
@@ -269,6 +270,7 @@ async def _list_normal_auction(
     # 创建拍卖条目
     end_at = datetime.now() + timedelta(hours=duration_hours)
     auction = AuctionItem(
+        server_id=seller.server_id,
         seller_id=seller.id,
         seller_uid=seller.uid,
         seller_name=seller.nickname,
@@ -337,6 +339,10 @@ async def place_bid(
     auction = await uow.auction_items.get_by_id(auction_id)
     if not auction or not auction.is_active:
         return False, f"⛔ 拍卖 #{auction_id} 不存在或已结束"
+    if auction.server_id != seller.server_id:
+        return False, f"⛔ 拍卖 #{auction_id} 不存在或已结束"
+    if auction.server_id != bidder.server_id:
+        return False, "⛔ 不能参与其他区服的拍卖"
 
     # 2. 检查是否已过期
     if datetime.now() >= auction.end_at:

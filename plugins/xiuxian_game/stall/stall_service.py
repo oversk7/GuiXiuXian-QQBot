@@ -149,6 +149,7 @@ async def open_stall(uow: UnitOfWork, player: Player) -> Tuple[bool, str]:
     # 4. 创建摊位
     now = datetime.now()
     stall = PlayerStall(
+        server_id=player.server_id,
         player_id=player.id,
         player_uid=player.uid,
         player_name=player.nickname,
@@ -270,6 +271,7 @@ async def _list_normal_item(uow, stall, player, item_cfg, unit_price, quantity):
         return False, f"⛔ 背包物品不足：{e}"
 
     si = StallItem(
+        server_id=player.server_id,
         stall_id=stall.id,
         seller_id=player.id,
         item_id=item_cfg.item_id,
@@ -334,6 +336,7 @@ async def _list_equipment_item(uow, stall, player, item_cfg, unit_price, equipme
     summary = ETS_New.generate_instance_summary(equipment)
 
     si = StallItem(
+        server_id=player.server_id,
         stall_id=stall.id,
         seller_id=player.id,
         item_id=item_cfg.item_id,
@@ -401,7 +404,7 @@ async def buy_item(
     session = uow.session
 
     # 1. 查找摊主
-    stmt = select(Player).where(Player.uid == seller_uid)
+    stmt = select(Player).where(Player.uid == seller_uid, Player.server_id == buyer.server_id)
     result = await session.execute(stmt)
     seller = result.scalars().first()
     if not seller:
@@ -413,6 +416,8 @@ async def buy_item(
     # 2. 查找摊位
     stall = await uow.player_stalls.get_active_by_player(seller.id)
     if not stall:
+        return False, "⛔ 该玩家没有摆摊"
+    if stall.server_id != buyer.server_id:
         return False, "⛔ 该玩家没有摆摊"
 
     # 3. 查找商品

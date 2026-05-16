@@ -1008,7 +1008,6 @@ async def handle_transfer_item(event: MessageEvent, args: Message = CommandArg()
     管理员专用：将某玩家背包中的物品转移到另一玩家背包
     用法：转移物品 UID1 UID2 物品名 数量
     """
-    from ..models.player import get_player_by_uid
     from ..models.inventory import ItemInstance
 
     params = args.extract_plain_text().strip().split()
@@ -1017,24 +1016,40 @@ async def handle_transfer_item(event: MessageEvent, args: Message = CommandArg()
 
     uid1, uid2, item_name, qty_str = params
     try:
+        source_uid = int(uid1)
+        target_uid = int(uid2)
         quantity = int(qty_str)
         if quantity <= 0:
             raise ValueError
     except ValueError:
-        await transfer_item_cmd.finish("⛔ 数量必须为正整数")
+        await transfer_item_cmd.finish("⛔ UID和数量必须为正整数")
 
     # 权限校验（仅管理员）
     if not is_admin(event.get_user_id()):
         await transfer_item_cmd.finish("⛔ 只有管理员可以使用此指令")
 
     async with safe_session() as session:
+        from ..platform_utils import get_event_server_id
+
+        server_id = await get_event_server_id(session, event)
+
         # 获取玩家对象
-        player1 = await get_player_by_uid(uid1)
-        player2 = await get_player_by_uid(uid2)
+        player1 = (
+            await session.execute(
+                select(Player).where(Player.uid == source_uid, Player.server_id == server_id)
+            )
+        ).scalars().first()
+        player2 = (
+            await session.execute(
+                select(Player).where(Player.uid == target_uid, Player.server_id == server_id)
+            )
+        ).scalars().first()
         if not player1:
             await transfer_item_cmd.finish(f"⛔ 未找到UID为{uid1}的玩家")
         if not player2:
             await transfer_item_cmd.finish(f"⛔ 未找到UID为{uid2}的玩家")
+        if player1.server_id != player2.server_id:
+            await transfer_item_cmd.finish("⛔ 禁止跨区服转移物品")
 
         # 查找物品模板
         item_cfg = config.items_config["by_name"].get(item_name)

@@ -112,11 +112,11 @@ async def _(event: MessageEvent):
         )
 
         # 获取邀请状态信息 (使用新版本)
-        invite_status = await invite_reward_service.get_invite_status(player.uid)
+        invite_status = await invite_reward_service.get_invite_status(player.uid, player.server_id)
         invite_count = invite_status["invited_count"]
 
         # 获取待发放奖励信息 (使用新版本)
-        pending_rewards = await invite_reward_service.get_pending_rewards_info(player.uid)
+        pending_rewards = await invite_reward_service.get_pending_rewards_info(player.uid, player.server_id)
     msg = (
         f"📮 你的邀请码：{code}\n"
         f"🎉 已成功邀请：{invite_count} 人\n"
@@ -157,7 +157,10 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
             await bind_cmd.finish("⛔ 请先创建角色")
 
         # 判断是否已绑定（检查新的数据库记录）
-        existing_record_stmt = select(InviteReward).where(InviteReward.invitee_uid == player.uid)
+        existing_record_stmt = select(InviteReward).where(
+            InviteReward.invitee_uid == player.uid,
+            InviteReward.server_id == player.server_id
+        )
         existing_record_result = await uow.session.execute(existing_record_stmt)
         existing_record = existing_record_result.scalars().first()
 
@@ -166,7 +169,8 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
 
         # 兼容旧版记录检查
         records = load_records()
-        if str(player.uid) in records:
+        legacy_record_key = f"{player.server_id}:{player.uid}"
+        if legacy_record_key in records or (player.server_id == 1 and str(player.uid) in records):
             await bind_cmd.finish("⛔ 你已绑定过邀请码，无法重复绑定")
 
         inviter_uid = decode_invite_code(code_str)
@@ -176,7 +180,10 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
             await bind_cmd.finish("⛔ 不能绑定自己的邀请码！")
 
         # 检查邀请者是否存在
-        inviter_stmt = select(Player).where(Player.uid == inviter_uid)
+        inviter_stmt = select(Player).where(
+            Player.uid == inviter_uid,
+            Player.server_id == player.server_id
+        )
         inviter = (await uow.session.execute(inviter_stmt)).scalars().first()
         if not inviter:
             await bind_cmd.finish("⛔ 邀请码无效或邀请者不存在")
@@ -189,7 +196,11 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
 
         # ---------------- 创建邀请记录并发放初始奖励 ----------------
         # 创建新的邀请记录 (使用新版本)
-        invite_record = await invite_reward_service.create_invite_record(player.uid, inviter_uid)
+        invite_record = await invite_reward_service.create_invite_record(
+            player.uid,
+            inviter_uid,
+            player.server_id
+        )
 
         # 发放初始绑定奖励（香火）
         player.incense += INITIAL_INVITEE_REWARD
@@ -209,7 +220,7 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
 
         # 兼容性：写入旧版记录文件
         records = load_records()
-        records[str(player.uid)] = inviter_uid
+        records[legacy_record_key] = inviter_uid
         save_records(records)
 
         await bind_cmd.finish(
@@ -245,7 +256,7 @@ async def _(event: MessageEvent):
         )
 
         # 获取邀请状态信息 (使用新版本)
-        invite_status = await invite_reward_service.get_invite_status(player.uid)
+        invite_status = await invite_reward_service.get_invite_status(player.uid, player.server_id)
 
         # 在UnitOfWork内部构建完整消息
         msg = f"📊 {player.nickname} 的邀请状态\n━━━━━━━━━━━━━\n"
@@ -257,7 +268,10 @@ async def _(event: MessageEvent):
             # 显示每个被邀请者的奖励状态
             for record in invite_status["inviter_records"]:
                 # 获取被邀请者信息（在UnitOfWork内部）
-                invitee_stmt = select(Player).where(Player.uid == record.invitee_uid)
+                invitee_stmt = select(Player).where(
+                    Player.uid == record.invitee_uid,
+                    Player.server_id == player.server_id
+                )
                 invitee_result = await uow.session.execute(invitee_stmt)
                 invitee = invitee_result.scalars().first()
 
@@ -289,7 +303,10 @@ async def _(event: MessageEvent):
         # 作为被邀请者的信息
         if invite_status["invitee_record"]:
             record = invite_status["invitee_record"]
-            inviter_stmt = select(Player).where(Player.uid == record.inviter_uid)
+            inviter_stmt = select(Player).where(
+                Player.uid == record.inviter_uid,
+                Player.server_id == player.server_id
+            )
             inviter_result = await uow.session.execute(inviter_stmt)
             inviter = inviter_result.scalars().first()
 

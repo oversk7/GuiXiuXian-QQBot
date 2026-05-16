@@ -26,6 +26,7 @@ async def _(event: MessageEvent):
         # 查询同区域其他玩家
         stmt = select(Player).where(
             Player.region == player.region,
+            Player.server_id == player.server_id,
             Player.id != player.id  # 排除自己
         )
         others = (await session.execute(stmt)).scalars().all()
@@ -58,4 +59,4 @@ async def _(event: MessageEvent):
                 f"{idx}. {p.nickname} {gender_icon} Lv.{p.level} {realm_name}  UID:{p.uid}  距离:{_dist(p)}"
             )
 
-        await nearby_cmd.finish(message_add_head("\n".join(lines), event)) 
+        await nearby_cmd.finish(message_add_head("\n".join(lines), event))

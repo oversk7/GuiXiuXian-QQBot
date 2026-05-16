@@ -57,10 +57,11 @@ class RedEnvelopeRepository(IRepository[RedEnvelope]):
 
     # ==================== 业务查询 ====================
 
-    async def find_active_by_group(self, group_id: str) -> Optional[RedEnvelope]:
+    async def find_active_by_group(self, group_id: str, server_id: int) -> Optional[RedEnvelope]:
         """查找群内活跃红包"""
         stmt = select(RedEnvelope).where(
             and_(
+                RedEnvelope.server_id == server_id,
                 RedEnvelope.group_id == group_id,
                 RedEnvelope.status == RedEnvelopeStatus.ACTIVE.value
             )
@@ -80,11 +81,16 @@ class RedEnvelopeRepository(IRepository[RedEnvelope]):
         result = await self._session.execute(stmt)
         return list(result.scalars().all())
 
-    async def find_recent_by_group(self, group_id: str, limit: int = 5) -> List[RedEnvelope]:
+    async def find_recent_by_group(self, group_id: str, server_id: int, limit: int = 5) -> List[RedEnvelope]:
         """查找群内最近红包记录"""
         stmt = (
             select(RedEnvelope)
-            .where(RedEnvelope.group_id == group_id)
+            .where(
+                and_(
+                    RedEnvelope.group_id == group_id,
+                    RedEnvelope.server_id == server_id
+                )
+            )
             .order_by(RedEnvelope.created_at.desc())
             .limit(limit)
         )

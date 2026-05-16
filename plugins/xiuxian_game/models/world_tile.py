@@ -14,6 +14,7 @@ class WorldTile(Base):
     __tablename__ = "world_tile"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    server_id: Mapped[int] = mapped_column(Integer, default=1, server_default="1", index=True, comment="所属区服ID")
     region: Mapped[str] = mapped_column(String(32), index=True, comment="区域标识(大都会/N层诡域)")
     x: Mapped[int] = mapped_column(Integer, comment="坐标X(现实世界大坐标或诡域小坐标)")
     y: Mapped[int] = mapped_column(Integer, comment="坐标Y(现实世界大坐标或诡域小坐标)")
@@ -23,7 +24,7 @@ class WorldTile(Base):
     state: Mapped[dict] = mapped_column(MutableDict.as_mutable(JSON), default=dict, comment="事件状态JSON")
 
     __table_args__ = (
-        UniqueConstraint('region', 'x', 'y', name='uq_region_coordinates'),
+        UniqueConstraint('server_id', 'region', 'x', 'y', name='uq_server_region_coordinates'),
     )
 
     def __repr__(self) -> str:

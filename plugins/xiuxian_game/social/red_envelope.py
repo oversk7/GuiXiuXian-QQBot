@@ -232,7 +232,7 @@ async def handle_envelope_record(event: MessageEvent):
             player_repo=PlayerRepository(session)
         )
 
-        envelopes = await service.get_recent_records(group_id)
+        envelopes = await service.get_recent_records(group_id, player.server_id)
 
         if not envelopes:
             await envelope_record_cmd.finish(message_add_head("📭 本群暂无红包记录", event))

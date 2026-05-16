@@ -29,11 +29,11 @@ class PlayerStallRepository:
         result = await self._session.execute(stmt)
         return result.scalars().first()
 
-    async def find_active_by_city(self, city_name: str, page: int = 1, page_size: int = 8) -> List[PlayerStall]:
+    async def find_active_by_city(self, city_name: str, page: int = 1, page_size: int = 8, server_id: int = 1) -> List[PlayerStall]:
         """查询某城镇的活跃摊位（分页）"""
         stmt = (
             select(PlayerStall)
-            .where(PlayerStall.status == "active", PlayerStall.city_name == city_name)
+            .where(PlayerStall.status == "active", PlayerStall.city_name == city_name, PlayerStall.server_id == server_id)
             .order_by(PlayerStall.opened_at.desc())
             .offset((page - 1) * page_size)
             .limit(page_size)
@@ -41,18 +41,18 @@ class PlayerStallRepository:
         result = await self._session.execute(stmt)
         return result.scalars().all()
 
-    async def count_active_by_city(self, city_name: str) -> int:
+    async def count_active_by_city(self, city_name: str, server_id: int = 1) -> int:
         stmt = select(func.count()).select_from(PlayerStall).where(
-            PlayerStall.status == "active", PlayerStall.city_name == city_name
+            PlayerStall.status == "active", PlayerStall.city_name == city_name, PlayerStall.server_id == server_id
         )
         result = await self._session.execute(stmt)
         return result.scalar() or 0
 
-    async def find_all_active(self, page: int = 1, page_size: int = 8) -> List[PlayerStall]:
+    async def find_all_active(self, page: int = 1, page_size: int = 8, server_id: int = 1) -> List[PlayerStall]:
         """查询所有活跃摊位（分页）"""
         stmt = (
             select(PlayerStall)
-            .where(PlayerStall.status == "active")
+            .where(PlayerStall.status == "active", PlayerStall.server_id == server_id)
             .order_by(PlayerStall.opened_at.desc())
             .offset((page - 1) * page_size)
             .limit(page_size)
@@ -60,9 +60,9 @@ class PlayerStallRepository:
         result = await self._session.execute(stmt)
         return result.scalars().all()
 
-    async def count_all_active(self) -> int:
+    async def count_all_active(self, server_id: int = 1) -> int:
         stmt = select(func.count()).select_from(PlayerStall).where(
-            PlayerStall.status == "active"
+            PlayerStall.status == "active", PlayerStall.server_id == server_id
         )
         result = await self._session.execute(stmt)
         return result.scalar() or 0
@@ -106,13 +106,14 @@ class StallItemRepository:
         result = await self._session.execute(stmt)
         return result.scalar() or 0
 
-    async def search_by_item_id(self, item_id: str, page: int = 1, page_size: int = 10) -> List[StallItem]:
+    async def search_by_item_id(self, item_id: str, page: int = 1, page_size: int = 10, server_id: int = 1) -> List[StallItem]:
         """跨摊位搜索特定物品（按单价升序），仅搜索active摊位"""
         stmt = (
             select(StallItem)
             .join(PlayerStall, StallItem.stall_id == PlayerStall.id)
             .where(
                 StallItem.item_id == item_id,
+                StallItem.server_id == server_id,
                 PlayerStall.status == "active",
             )
             .order_by(StallItem.unit_price.asc())
@@ -122,13 +123,14 @@ class StallItemRepository:
         result = await self._session.execute(stmt)
         return result.scalars().all()
 
-    async def count_by_item_id(self, item_id: str) -> int:
+    async def count_by_item_id(self, item_id: str, server_id: int = 1) -> int:
         stmt = (
             select(func.count())
             .select_from(StallItem)
             .join(PlayerStall, StallItem.stall_id == PlayerStall.id)
             .where(
                 StallItem.item_id == item_id,
+                StallItem.server_id == server_id,
                 PlayerStall.status == "active",
             )
         )

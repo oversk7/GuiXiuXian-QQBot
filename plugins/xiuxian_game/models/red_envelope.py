@@ -26,6 +26,7 @@ class RedEnvelope(Base):
     __tablename__ = "red_envelope"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    server_id: Mapped[int] = mapped_column(Integer, default=1, index=True, comment="所属区服ID")
     group_id: Mapped[str] = mapped_column(String(32), index=True, comment="群ID")
     sender_id: Mapped[str] = mapped_column(String(32), index=True, comment="发送者玩家ID")
 

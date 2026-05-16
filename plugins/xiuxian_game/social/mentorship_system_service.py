@@ -223,10 +223,10 @@ class MentorshipSystemService:
         """
         # 获取师父和徒弟
         master = await self._player_repo.get_by_id(master_id)
-        apprentice = await self._player_repo.get_by_uid(apprentice_uid)
 
         if not master:
             return False, "师父不存在"
+        apprentice = await self._player_repo.get_by_uid(apprentice_uid, master.server_id)
         if not apprentice:
             return False, f"未找到UID为{apprentice_uid}的玩家"
         if master.id == apprentice.id:
@@ -288,10 +288,10 @@ class MentorshipSystemService:
         """
         # 获取徒弟和师父
         apprentice = await self._player_repo.get_by_id(apprentice_id)
-        master = await self._player_repo.get_by_uid(master_uid)
 
         if not apprentice:
             return False, "玩家不存在"
+        master = await self._player_repo.get_by_uid(master_uid, apprentice.server_id)
         if not master:
             return False, f"未找到UID为{master_uid}的玩家"
         if master.id == apprentice.id:
@@ -405,10 +405,10 @@ class MentorshipSystemService:
         """
         # 获取师父和徒弟
         master = await self._player_repo.get_by_id(master_id)
-        apprentice = await self._player_repo.get_by_uid(apprentice_uid)
 
         if not master:
             return False, "玩家不存在"
+        apprentice = await self._player_repo.get_by_uid(apprentice_uid, master.server_id)
         if not apprentice:
             return False, f"未找到UID为{apprentice_uid}的玩家"
 
@@ -480,10 +480,10 @@ class MentorshipSystemService:
         """
         # 获取师父和徒弟
         master = await self._player_repo.get_by_id(master_id)
-        apprentice = await self._player_repo.get_by_uid(apprentice_uid)
 
         if not master:
             return False, "玩家不存在"
+        apprentice = await self._player_repo.get_by_uid(apprentice_uid, master.server_id)
         if not apprentice:
             return False, f"未找到UID为{apprentice_uid}的玩家"
 
@@ -528,10 +528,10 @@ class MentorshipSystemService:
         """
         # 获取徒弟和师父
         apprentice = await self._player_repo.get_by_id(apprentice_id)
-        master = await self._player_repo.get_by_uid(master_uid)
 
         if not apprentice:
             return False, "玩家不存在"
+        master = await self._player_repo.get_by_uid(master_uid, apprentice.server_id)
         if not master:
             return False, f"未找到UID为{master_uid}的玩家"
 
@@ -645,10 +645,10 @@ class MentorshipSystemService:
         """
         # 获取师父和徒弟
         master = await self._player_repo.get_by_id(master_id)
-        apprentice = await self._player_repo.get_by_uid(apprentice_uid)
 
         if not master:
             return False, "玩家不存在"
+        apprentice = await self._player_repo.get_by_uid(apprentice_uid, master.server_id)
         if not apprentice:
             return False, f"未找到UID为{apprentice_uid}的徒弟"
 
@@ -693,10 +693,10 @@ class MentorshipSystemService:
         """
         # 获取师父和徒弟
         master = await self._player_repo.get_by_id(master_id)
-        apprentice = await self._player_repo.get_by_uid(apprentice_uid)
 
         if not master:
             return False, "玩家不存在"
+        apprentice = await self._player_repo.get_by_uid(apprentice_uid, master.server_id)
         if not apprentice:
             return False, f"未找到UID为{apprentice_uid}的徒弟"
 

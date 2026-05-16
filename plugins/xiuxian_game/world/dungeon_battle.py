@@ -85,7 +85,7 @@ class BattleResult:
         self.monster_display = monster_display
 
 
-async def _query_explored_coords(session, region: str) -> set[tuple[int, int]]:
+async def _query_explored_coords(session, region: str, server_id: int = 1) -> set[tuple[int, int]]:
     """查询当前诡域 region 今天已生成的所有格子坐标（视为已探索）。"""
     today = date.today()
     today_start = datetime.combine(today, datetime.min.time())
@@ -93,6 +93,7 @@ async def _query_explored_coords(session, region: str) -> set[tuple[int, int]]:
     stmt = select(WorldTile.x, WorldTile.y).where(
         and_(
             WorldTile.region == region,
+            WorldTile.server_id == server_id,
             WorldTile.refreshed_at >= today_start,
             WorldTile.refreshed_at < tomorrow_start,
         )
@@ -763,14 +764,14 @@ async def handle_monster_drops(session, player: Player, monster_level: int, regi
         return ""
 
 # ----------------- 工具函数 -----------------
-async def get_or_create_tile(session, region: str, x: int, y: int) -> WorldTile:
+async def get_or_create_tile(session, region: str, x: int, y: int, server_id: int = 1) -> WorldTile:
     """获取或创建今日坐标格，并在创建时生成事件"""
     today = date.today()
 
     # 先尝试简单查询，避免使用 with_for_update() 造成锁定
     result = await session.execute(
         select(WorldTile)
-        .where(WorldTile.region == region, WorldTile.x == x, WorldTile.y == y)
+        .where(WorldTile.server_id == server_id, WorldTile.region == region, WorldTile.x == x, WorldTile.y == y)
     )
     tile = result.scalars().first()
 
@@ -778,7 +779,7 @@ async def get_or_create_tile(session, region: str, x: int, y: int) -> WorldTile:
     if (not tile) or (tile.refreshed_at.date() != today):
         if not tile:
             # 创建新的tile
-            tile = WorldTile(region=region, x=x, y=y)
+            tile = WorldTile(server_id=server_id, region=region, x=x, y=y)
             session.add(tile)
 
         # 更新tile信息
@@ -966,12 +967,12 @@ async def get_or_create_tile(session, region: str, x: int, y: int) -> WorldTile:
             await session.rollback()
             result = await session.execute(
                 select(WorldTile)
-                .where(WorldTile.region == region, WorldTile.x == x, WorldTile.y == y)
+                .where(WorldTile.server_id == server_id, WorldTile.region == region, WorldTile.x == x, WorldTile.y == y)
             )
             tile = result.scalars().first()
             if not tile:
                 # 如果还是没有，说明出现了异常情况，创建一个基本的tile
-                tile = WorldTile(region=region, x=x, y=y, refreshed_at=datetime.now())
+                tile = WorldTile(server_id=server_id, region=region, x=x, y=y, refreshed_at=datetime.now())
                 tile.event_type = "EMPTY"
                 tile.state = {}
                 session.add(tile)
@@ -1030,7 +1031,7 @@ async def _(event: MessageEvent):
             player.hp = 0  # 理智耗尽即"疯狂身亡"
 
         # 获取当前位置事件格
-        tile = await get_or_create_tile(session, player.get_current_region(), new_x, new_y)
+        tile = await get_or_create_tile(session, player.get_current_region(), new_x, new_y, player.server_id)
 
         # 清除全视之眼预览标记（玩家已实际到达此格子）
         if (tile.state or {}).get("preview"):
@@ -1862,7 +1863,7 @@ async def _(event: MessageEvent):
         # 使用新的坐标系统获取当前位置
         current_x, current_y = player.get_current_coordinates()
         current_region = player.get_current_region()
-        tile = await get_or_create_tile(session, current_region, current_x, current_y)
+        tile = await get_or_create_tile(session, current_region, current_x, current_y, player.server_id)
 
         # 清除全视之眼预览标记（玩家已实际探索此格子）
         if (tile.state or {}).get("preview"):
@@ -1909,7 +1910,7 @@ async def _(event: MessageEvent):
         # 查询已探索坐标（用于战斗后的小地图）
         explored_coords: set[tuple[int, int]] = set()
         if isinstance(log, BattleResult):
-            explored_coords = await _query_explored_coords(session, current_region)
+            explored_coords = await _query_explored_coords(session, current_region, player.server_id)
 
         await session.commit()
 
@@ -1980,7 +1981,7 @@ async def handle_buy(matcher: Matcher, event: MessageEvent, args: Message = Comm
 
         # 获取当前位置的格子 - 使用正确的当前坐标
         current_x, current_y = player.get_current_coordinates()
-        tile = await get_or_create_tile(session, player.region, current_x, current_y)
+        tile = await get_or_create_tile(session, player.region, current_x, current_y, player.server_id)
 
         if tile.event_type != "MERCHANT":
             await dungeon_buy_cmd.finish("⛔ 这里没有卖货郎")
@@ -2236,7 +2237,7 @@ def _render_dungeon_overview(tile_data: list[tuple[int, int, str, bool]],
     return img_buffer.getvalue()
 
 
-async def generate_player_centered_overview_image(region: str, session, center_x: int, center_y: int, width: int, height: int, player_x: int = None, player_y: int = None) -> tuple[bytes, tuple[int, int, int, int]]:
+async def generate_player_centered_overview_image(region: str, session, center_x: int, center_y: int, width: int, height: int, player_x: int = None, player_y: int = None, server_id: int = 1) -> tuple[bytes, tuple[int, int, int, int]]:
     """生成以玩家为中心的固定大小俯瞰图片，只显示今日刷新的格子"""
     half_width = width // 2
     half_height = height // 2
@@ -2253,6 +2254,7 @@ async def generate_player_centered_overview_image(region: str, session, center_x
     stmt = select(WorldTile).where(
         and_(
             WorldTile.region == region,
+            WorldTile.server_id == server_id,
             WorldTile.x >= min_x, WorldTile.x <= max_x,
             WorldTile.y >= min_y, WorldTile.y <= max_y,
             WorldTile.refreshed_at >= today_start,
@@ -2275,7 +2277,7 @@ async def generate_player_centered_overview_image(region: str, session, center_x
     return img_bytes, (min_x, max_x, min_y, max_y)
 
 
-async def generate_region_overview_image(region: str, session, player_x: int = None, player_y: int = None) -> tuple[bytes, tuple[int, int, int, int]]:
+async def generate_region_overview_image(region: str, session, player_x: int = None, player_y: int = None, server_id: int = 1) -> tuple[bytes, tuple[int, int, int, int]]:
     """生成指定诡域的今日探索概览图片"""
     today = date.today()
     from sqlalchemy import and_
@@ -2286,6 +2288,7 @@ async def generate_region_overview_image(region: str, session, player_x: int = N
     stmt = select(WorldTile).where(
         and_(
             WorldTile.region == region,
+            WorldTile.server_id == server_id,
             WorldTile.refreshed_at >= today_start,
             WorldTile.refreshed_at < tomorrow_start
         )
@@ -2366,6 +2369,7 @@ async def handle_region_overview(event: MessageEvent, args: Message = CommandArg
                         existing_stmt = select(WorldTile.x, WorldTile.y).where(
                             and_(
                                 WorldTile.region == current_region,
+                                WorldTile.server_id == player.server_id,
                                 WorldTile.refreshed_at >= today_start,
                                 WorldTile.refreshed_at < tomorrow_start
                             )
@@ -2376,7 +2380,7 @@ async def handle_region_overview(event: MessageEvent, args: Message = CommandArg
                         for tx in range(-5, 6):
                             for ty in range(-5, 6):
                                 if (tx, ty) not in existing_coords:
-                                    tile = await get_or_create_tile(session, current_region, tx, ty)
+                                    tile = await get_or_create_tile(session, current_region, tx, ty, player.server_id)
                                     # 标记为预览格子
                                     state = tile.state or {}
                                     state["preview"] = True
@@ -2384,7 +2388,7 @@ async def handle_region_overview(event: MessageEvent, args: Message = CommandArg
                         await session.flush()
                     # 诡域内：生成固定的10x10地图（-5到5的范围），以(0,0)为中心但显示玩家实际位置
                     img_data, (min_x, max_x, min_y, max_y) = await generate_player_centered_overview_image(
-                        current_region, session, 0, 0, 11, 11, current_x, current_y  # 以(0,0)为中心的11x11地图，但显示玩家在(current_x,current_y)的位置
+                        current_region, session, 0, 0, 11, 11, current_x, current_y, player.server_id  # 以(0,0)为中心的11x11地图，但显示玩家在(current_x,current_y)的位置
                     )
                     map_desc = f"🗺️ {current_region} 今日探索情况"
                     coord_desc = f"📍 你的位置：({current_x},{current_y})"
@@ -2392,7 +2396,7 @@ async def handle_region_overview(event: MessageEvent, args: Message = CommandArg
                 else:
                     # 现实世界：生成以玩家为中心的大范围俯瞰图
                     img_data, (min_x, max_x, min_y, max_y) = await generate_player_centered_overview_image(
-                        current_region, session, current_x, current_y, 500, 500, current_x, current_y
+                        current_region, session, current_x, current_y, 500, 500, current_x, current_y, player.server_id
                     )
                     map_desc = f"🗺️ {current_region} 以你为中心的俯瞰图"
                     coord_desc = f"📍 中心位置：({current_x},{current_y})"
@@ -2476,6 +2480,7 @@ async def handle_region_overview(event: MessageEvent, args: Message = CommandArg
                         existing_stmt = select(WorldTile.x, WorldTile.y).where(
                             and_(
                                 WorldTile.region == region,
+                                WorldTile.server_id == player.server_id,
                                 WorldTile.refreshed_at >= today_start,
                                 WorldTile.refreshed_at < tomorrow_start
                             )
@@ -2486,7 +2491,7 @@ async def handle_region_overview(event: MessageEvent, args: Message = CommandArg
                         for tx in range(-5, 6):
                             for ty in range(-5, 6):
                                 if (tx, ty) not in existing_coords:
-                                    tile = await get_or_create_tile(session, region, tx, ty)
+                                    tile = await get_or_create_tile(session, region, tx, ty, player.server_id)
                                     # 标记为预览格子
                                     state = tile.state or {}
                                     state["preview"] = True
@@ -2497,11 +2502,11 @@ async def handle_region_overview(event: MessageEvent, args: Message = CommandArg
                     if current_region == region and player_x is not None and player_y is not None:
                         center_x, center_y = player_x, player_y  # 如果玩家在当前诡域，以玩家位置为中心
                     img_data, (min_x, max_x, min_y, max_y) = await generate_player_centered_overview_image(
-                        region, session, center_x, center_y, 11, 11, player_x, player_y  # 以计算出的中心位置生成11x11地图，显示玩家实际位置
+                        region, session, center_x, center_y, 11, 11, player_x, player_y, player.server_id  # 以计算出的中心位置生成11x11地图，显示玩家实际位置
                     )
                 else:
                     # 其他区域使用原有的今日探索逻辑
-                    img_data, (min_x, max_x, min_y, max_y) = await generate_region_overview_image(region, session, player_x, player_y)
+                    img_data, (min_x, max_x, min_y, max_y) = await generate_region_overview_image(region, session, player_x, player_y, player.server_id)
 
                 # 转换为base64
                 img_b64 = base64.b64encode(img_data).decode('utf-8')

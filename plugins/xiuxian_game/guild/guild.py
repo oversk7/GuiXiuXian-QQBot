@@ -88,7 +88,7 @@ async def handle_create_guild(event: MessageEvent, args: Message = CommandArg())
             await create_guild_cmd.finish("⛔ 你没有会长委任书")
 
         # 3. 检查公会名重复（使用UoW的仓储）
-        existing_guild = await uow.guilds.get_by_name(guild_name)
+        existing_guild = await uow.guilds.get_by_name(guild_name, player.server_id)
         if existing_guild:
             await create_guild_cmd.finish("⛔ 已存在同名公会")
 
@@ -715,10 +715,13 @@ async def handle_list_guilds(event: MessageEvent, args: Message = CommandArg()):
 
     async with UnitOfWork(session_factory) as uow:
         # 每日自动检查：会长继承 / 僵尸公会解散
-        activity_logs = await maybe_run_activity_check(uow.session)
+        viewer = await get_unified_player(uow.session, event)
+        server_id = viewer.server_id if viewer else 1
+
+        activity_logs = await maybe_run_activity_check(uow.session, server_id=server_id)
 
         # 按活跃度排序查询公会
-        guild_rows = await get_guilds_sorted_by_activity(uow.session)
+        guild_rows = await get_guilds_sorted_by_activity(uow.session, server_id=server_id)
 
         if not guild_rows:
             await list_guilds_cmd.finish(message_add_head("📋 当前没有任何公会", event))
@@ -859,7 +862,14 @@ async def _process_application(event: MessageEvent, args: Message, approve: bool
             await (approve_cmd if approve else reject_cmd).finish(f"⛔ {reason}")
 
         guild_obj = await uow.session.get(Guild, player.guild_id)
-        applicant = (await uow.session.execute(select(Player).where(Player.uid == target_uid))).scalars().first()
+        applicant = (
+            await uow.session.execute(
+                select(Player).where(
+                    Player.uid == target_uid,
+                    Player.server_id == player.server_id,
+                )
+            )
+        ).scalars().first()
         if not applicant:
             await (approve_cmd if approve else reject_cmd).finish("⛔ 未找到该 UID")
 
@@ -984,6 +994,7 @@ async def handle_set_base(event: MessageEvent):
         stmt = select(Guild).where(
             Guild.base_x == current_x,
             Guild.base_y == current_y,
+            Guild.server_id == player.server_id,
             Guild.id != guild.id
         )
         existing_guild = (await session.execute(stmt)).scalars().first()
@@ -1053,7 +1064,10 @@ async def handle_set_position(event: MessageEvent, args: Message = CommandArg())
             await set_position_cmd.finish("⛔ 你未加入任何公会")
 
         # 查找目标玩家
-        target_stmt = select(Player).where(Player.uid == int(target_uid))
+        target_stmt = select(Player).where(
+            Player.uid == int(target_uid),
+            Player.server_id == player.server_id,
+        )
         target_player = (await uow.session.execute(target_stmt)).scalars().first()
         if not target_player:
             await set_position_cmd.finish("⛔ 未找到该UID的玩家")

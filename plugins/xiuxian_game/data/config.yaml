@@ -14,6 +14,39 @@ game:
     cultivation_efficiency_bonus: 0.5  # 每转修炼效率加成（50%*转数）
     seclusion_efficiency_bonus: 0.5   # 每转闭关效率 加成（50%*转数）
 
+# 区服配置
+servers:
+  1:
+    name: "一区"
+    config_profile: "legacy"
+    open_registration: true
+  2:
+    name: "二区"
+    config_profile: "new_shard"
+    open_registration: false
+
+# 区服数值配置覆盖。legacy 为空时沿用上方默认配置。
+server_profiles:
+  legacy: {}
+  new_shard:
+    game:
+      base_exp: 20
+      exp_curve:
+        early_multiplier: 12
+        late_multiplier: 8
+        curve_change_level: 10
+    cultivate:
+      base_exp: 35
+      breakthrough:
+        change_level: 25
+        fail_keep_ratio: 0.8
+        guardian_cost: 60
+        guardian_cost_base: 60
+        guardian_cost_per_level: 18
+        base_success_rate: 0.75
+        decay_per_level: 0.006
+        min_success_rate: 0.12
+
 # 资源控制配置
 resource_control:
   # 材料掉落基础概率（会根据等级和稀有度调整）

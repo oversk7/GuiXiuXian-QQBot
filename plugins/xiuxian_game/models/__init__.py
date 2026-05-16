@@ -1,4 +1,5 @@
 from .player import Player
+from .platform_server_binding import PlatformServerBinding
 from .inventory import ItemInstance
 from .navigation_task import NavigationTask
 from .world_tile import WorldTile
@@ -75,7 +76,7 @@ from .ladder import LadderRating, LadderMatchLog, LadderSeason
 
 
 __all__ = [
-    "Player", "Guild", "GuildMember", "GuildBuilding", "GuildPosition", "BuildingType", "WorldMessage", "BankAccount", "ItemInstance", "WorldTile", "NavigationTask", "AlchemyRecord", "MarketOrder",
+    "Player", "PlatformServerBinding", "Guild", "GuildMember", "GuildBuilding", "GuildPosition", "BuildingType", "WorldMessage", "BankAccount", "ItemInstance", "WorldTile", "NavigationTask", "AlchemyRecord", "MarketOrder",
     "SocialApplication", "GiftRecord", "StorySession", "PlayerDonationLog", "ElixirUsageLog", "GuildTeleportLog",
     "MonthlyCard", "MarketState", "RussianRouletteRoom", "RussianRouletteGame", "RussianRouletteBet", "RussianRoulettePvEGame",
     "AnimalChessRoom", "AnimalChessGame", "AnimalChessBet",

@@ -635,7 +635,14 @@ class SpiritFieldService:
 
     async def visit_field(self, uow: UnitOfWork, visitor_id: str, target_uid: int) -> Tuple[bool, str]:
         """查看他人灵田状态（不需要有成熟作物）"""
-        stmt = select(Player).where(Player.uid == target_uid)
+        visitor = await uow.players.get_by_id(visitor_id)
+        if not visitor:
+            return False, "玩家不存在"
+
+        stmt = select(Player).where(
+            Player.uid == target_uid,
+            Player.server_id == visitor.server_id
+        )
         result = await uow.session.execute(stmt)
         target = result.scalar_one_or_none()
         if not target:

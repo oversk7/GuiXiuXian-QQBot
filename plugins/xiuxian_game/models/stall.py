@@ -28,6 +28,9 @@ class PlayerStall(Base):
     id: Mapped[int] = mapped_column(
         Integer, primary_key=True, autoincrement=True
     )
+    server_id: Mapped[int] = mapped_column(
+        Integer, default=1, server_default="1", index=True, comment="所属区服ID"
+    )
 
     # ==================== 摊主信息 ====================
     player_id: Mapped[str] = mapped_column(
@@ -82,6 +85,9 @@ class StallItem(Base):
 
     id: Mapped[int] = mapped_column(
         Integer, primary_key=True, autoincrement=True
+    )
+    server_id: Mapped[int] = mapped_column(
+        Integer, default=1, server_default="1", index=True, comment="所属区服ID"
     )
 
     # ==================== 关联信息 ====================

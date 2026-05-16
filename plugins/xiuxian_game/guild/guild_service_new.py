@@ -56,7 +56,7 @@ class GuildService:
             return False, "你已经加入了公会", None
 
         # 检查公会名是否重复
-        existing_guild = await self._guild_repo.get_by_name(guild_name)
+        existing_guild = await self._guild_repo.get_by_name(guild_name, player.server_id)
         if existing_guild:
             return False, "已存在同名公会", None
 
@@ -64,6 +64,7 @@ class GuildService:
         new_guild = Guild(
             name=guild_name,
             president_id=player_id,
+            server_id=player.server_id,
             created_at=datetime.now()
         )
         await self._guild_repo.add(new_guild)
@@ -95,6 +96,8 @@ class GuildService:
         guild = await self._guild_repo.get_by_id(guild_id)
         if not guild:
             return False, "公会不存在"
+        if guild.server_id != player.server_id:
+            return False, "不能加入其他区服的公会"
 
         # 检查公会容量
         member_count = await self._guild_repo.get_member_count(guild_id)
@@ -248,8 +251,12 @@ class GuildService:
         if not self._uow:
             raise ValueError("kick_member需要UoW以访问GuildPermission")
 
-        # 根据UID查找目标玩家
-        target_player = await self._player_repo.get_by_uid(target_uid)
+        operator = await self._player_repo.get_by_id(operator_id)
+        if not operator:
+            return False, "玩家不存在"
+
+        # 根据UID查找同区目标玩家
+        target_player = await self._player_repo.get_by_uid(target_uid, operator.server_id)
         if not target_player:
             return False, "未找到该UID的玩家"
 

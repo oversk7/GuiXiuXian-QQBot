@@ -311,12 +311,15 @@ async def parse_attack_target(session, target_name: str, x: int, y: int, region:
 
     target_player = None
     target_npc = None
+    server_id = 1
 
     # 【新增】优先检查活动鬼怪（玩家个人鬼怪）
     if player_id:
         player_stmt = select(Player).where(Player.id == player_id)
         player_result = await session.execute(player_stmt)
         player = player_result.scalar_one_or_none()
+        if player:
+            server_id = player.server_id
 
         if player and KnockerEventService.is_active():
             # 查找玩家个人的活动鬼怪
@@ -353,7 +356,7 @@ async def parse_attack_target(session, target_name: str, x: int, y: int, region:
     if target_name.isdigit():
         uid = int(target_name)
         # 查找所有同区域的玩家，然后手动筛选距离
-        stmt = select(Player).where(Player.uid == uid)
+        stmt = select(Player).where(Player.uid == uid, Player.server_id == server_id)
         result = await session.execute(stmt)
         candidate = result.scalar_one_or_none()
 
@@ -372,6 +375,7 @@ async def parse_attack_target(session, target_name: str, x: int, y: int, region:
             stmt = select(Player).where(
                 and_(
                     Player.nickname == target_name,
+                    Player.server_id == server_id,
                     Player.dungeon_level == 0  # 在现实世界
                 )
             )
@@ -383,13 +387,14 @@ async def parse_attack_target(session, target_name: str, x: int, y: int, region:
                     stmt = select(Player).where(
                         and_(
                             Player.nickname == target_name,
+                            Player.server_id == server_id,
                             Player.dungeon_level == dungeon_level
                         )
                     )
                 except ValueError:
-                    stmt = select(Player).where(Player.nickname == target_name)
+                    stmt = select(Player).where(Player.nickname == target_name, Player.server_id == server_id)
             else:
-                stmt = select(Player).where(Player.nickname == target_name)
+                stmt = select(Player).where(Player.nickname == target_name, Player.server_id == server_id)
 
         result = await session.execute(stmt)
         candidates = result.scalars().all()

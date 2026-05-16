@@ -79,7 +79,7 @@ async def show_location_info(session: AsyncSession, player: Player, location, cu
     # 获取附近玩家
     nearby_players = await LocationService.get_nearby_players(
         session, location.x, location.y, location.region,
-        max_distance=0, exclude_player_id=player.id  # 只显示同一坐标的玩家
+        max_distance=0, exclude_player_id=player.id, server_id=player.server_id  # 只显示同一坐标的玩家
     )
 
     # 格式化显示信息 - 使用正确的当前坐标
@@ -119,7 +119,7 @@ async def show_basic_location_info(session: AsyncSession, player: Player, x: int
     """显示基本位置信息（没有特殊地点时）"""
     # 获取附近玩家
     nearby_players = await LocationService.get_nearby_players(
-        session, x, y, region, max_distance=3, exclude_player_id=player.id
+        session, x, y, region, max_distance=3, exclude_player_id=player.id, server_id=player.server_id
     )
     
     # 获取附近地点
@@ -138,6 +138,7 @@ async def show_basic_location_info(session: AsyncSession, player: Player, x: int
             Player.mansion_x.isnot(None),
             Player.mansion_y.isnot(None),
             Player.region == region,
+            Player.server_id == player.server_id,
             func.abs(Player.mansion_x - x) + func.abs(Player.mansion_y - y) <= 50
         )
     )
@@ -248,7 +249,7 @@ async def get_mansion_info_for_location(session: AsyncSession, player: Player, x
 
     # 查找当前位置的阴宅主人
     service = MansionService(player_repo=PlayerRepository(session))
-    mansion_owner = await service.find_mansion_owner_at_location(x, y)
+    mansion_owner = await service.find_mansion_owner_at_location(x, y, player.server_id)
 
     if not mansion_owner:
         return None
@@ -302,7 +303,7 @@ async def get_stall_info_for_location(session: AsyncSession, player: Player, x: 
     stall_repo = PlayerStallRepository(session)
     stall_item_repo = StallItemRepository(session)
 
-    stalls = await stall_repo.find_active_by_city(town, page=1, page_size=10)
+    stalls = await stall_repo.find_active_by_city(town, page=1, page_size=10, server_id=player.server_id)
     if not stalls:
         return None
 

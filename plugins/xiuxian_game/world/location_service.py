@@ -165,10 +165,12 @@ class LocationService:
     @staticmethod
     async def get_nearby_players(session: AsyncSession, x: int, y: int, 
                                region: str = "大都会", max_distance: int = 100,
-                               exclude_player_id: str = None) -> List[Player]:
+                               exclude_player_id: str = None,
+                               server_id: int = 1) -> List[Player]:
         """获取附近的玩家"""
         conditions = [
             Player.region == region,
+            Player.server_id == server_id,
             func.abs(Player.x - x) + func.abs(Player.y - y) <= max_distance
         ]
         

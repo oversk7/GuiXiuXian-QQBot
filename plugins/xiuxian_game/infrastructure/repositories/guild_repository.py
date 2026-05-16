@@ -45,7 +45,7 @@ class GuildRepository(IRepository[Guild]):
         result = await self._session.execute(stmt)
         return result.scalar_one_or_none()
 
-    async def get_by_name(self, name: str) -> Optional[Guild]:
+    async def get_by_name(self, name: str, server_id: int | None = None) -> Optional[Guild]:
         """
         根据名称获取公会
 
@@ -56,6 +56,8 @@ class GuildRepository(IRepository[Guild]):
             公会对象，如果不存在则返回 None
         """
         stmt = select(Guild).where(Guild.name == name)
+        if server_id is not None:
+            stmt = stmt.where(Guild.server_id == server_id)
         result = await self._session.execute(stmt)
         return result.scalar_one_or_none()
 
