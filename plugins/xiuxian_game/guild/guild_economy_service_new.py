@@ -20,7 +20,8 @@ class GuildEconomyService:
     """公会经济服务类 - DI架构版本"""
 
     # 配置常量（类常量，保持向后兼容）
-    DAILY_DONATION_LIMIT = 100000  # 每日捐献上限
+    DAILY_DONATION_POINTS_LIMIT = 100  # 每日通过捐献最多获得的积分
+    GOLD_PER_DONATION_POINT = 1000  # 每1000金币获得1积分
     GOLD_TO_POINTS_RATIO = 0.001  # 金币转积分比率（1000金币=1积分）
     POINTS_TO_EXP_RATIO = 1.0     # 积分转公会经验比率（受建筑影响）
 
@@ -121,15 +122,10 @@ class GuildEconomyService:
         if player.gold < amount:
             return False, "金币不足", {}
 
-        # 检查每日捐献限额
         today = date.today()
         donated_today = await self._donation_log_repo.get_today_donation_amount(
             player_id, today
         )
-
-        if donated_today + amount > self.DAILY_DONATION_LIMIT:
-            remaining = self.DAILY_DONATION_LIMIT - donated_today
-            return False, f"今日还可捐献{remaining}金币（每日上限{self.DAILY_DONATION_LIMIT}）", {}
 
         guild = await self._guild_repo.get_by_id(player.guild_id)
         if not guild:
@@ -149,7 +145,7 @@ class GuildEconomyService:
         player.gold -= amount
 
         # 计算积分和经验
-        points_gained = int(amount * self.GOLD_TO_POINTS_RATIO)
+        points_gained = self.calculate_donation_points(donated_today, amount)
         exp_gained = int(points_gained * self.POINTS_TO_EXP_RATIO * exp_multiplier)
 
         # 更新玩家数据
@@ -186,11 +182,32 @@ class GuildEconomyService:
             "new_contribution": player.guild_contribution,
             "guild_exp": guild.exp,
             "guild_treasury": guild.treasury,
+            "points_limit_reached": self.is_donation_points_limit_reached(
+                donated_today + amount
+            ),
             "can_upgrade": upgrade_info["can_upgrade"],
             "upgrade_cost": upgrade_info["cost"]
         }
 
         return True, "捐献成功", result
+
+    @classmethod
+    def calculate_donation_points(cls, donated_before: int, amount: int) -> int:
+        """按今日累计捐献额计算本次可获得积分，受每日积分上限限制。"""
+        points_before = min(
+            donated_before // cls.GOLD_PER_DONATION_POINT,
+            cls.DAILY_DONATION_POINTS_LIMIT,
+        )
+        points_after = min(
+            (donated_before + amount) // cls.GOLD_PER_DONATION_POINT,
+            cls.DAILY_DONATION_POINTS_LIMIT,
+        )
+        return max(0, points_after - points_before)
+
+    @classmethod
+    def is_donation_points_limit_reached(cls, donated_today: int) -> bool:
+        """判断今日捐献积分是否已达上限。"""
+        return donated_today // cls.GOLD_PER_DONATION_POINT >= cls.DAILY_DONATION_POINTS_LIMIT
 
     @staticmethod
     def check_guild_upgrade(guild: Guild) -> Dict:
@@ -306,13 +323,13 @@ class GuildEconomyService:
 
     async def get_daily_donation_remaining(self, player_id: str) -> int:
         """
-        获取玩家今日剩余捐献额度
+        获取玩家今日还能通过捐献获得多少积分
 
         Args:
             player_id: 玩家ID
 
         Returns:
-            今日剩余捐献额度
+            今日剩余可获得积分
 
         对应原代码:
             guild_economy_service.py Line 178-188
@@ -322,7 +339,11 @@ class GuildEconomyService:
             player_id, today
         )
 
-        return max(0, self.DAILY_DONATION_LIMIT - donated_today)
+        points_gained = min(
+            donated_today // self.GOLD_PER_DONATION_POINT,
+            self.DAILY_DONATION_POINTS_LIMIT,
+        )
+        return max(0, self.DAILY_DONATION_POINTS_LIMIT - points_gained)
 
     @staticmethod
     def format_large_number(num: int) -> str:

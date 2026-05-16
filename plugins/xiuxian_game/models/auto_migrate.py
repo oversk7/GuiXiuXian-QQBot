@@ -30,6 +30,9 @@ REQUIRED_FIELDS: Dict[str, Dict[str, str]] = {
     "guild": {
         "server_id": "INTEGER NOT NULL DEFAULT 1 COMMENT '所属区服ID'",
     },
+    "player_donation_log": {
+        "amount": "BIGINT NOT NULL DEFAULT 0 COMMENT '捐献金币金额'",
+    },
     "guild_building": {
         "plot_x": "INTEGER DEFAULT NULL COMMENT '公会基地布局X坐标'",
         "plot_y": "INTEGER DEFAULT NULL COMMENT '公会基地布局Y坐标'",

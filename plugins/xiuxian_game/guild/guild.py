@@ -599,9 +599,13 @@ async def handle_donate(event: MessageEvent, args: Message = CommandArg()):
         await session.commit()  # 由调用方控制事务边界
 
         # 构建返回消息
+        points_line = f"✨ 获得积分：+{result['points_gained']}"
+        if result["points_limit_reached"]:
+            points_line += "（今日捐献积分已达上限）"
+
         msg_lines = [
             f"💰 捐献成功！金币 -{amt}",
-            f"✨ 获得积分：+{result['points_gained']}",
+            points_line,
             f"🏰 公会经验：+{result['exp_gained']}",
             f"💎 资金库：+{result['treasury_added']}",
             f"▫️ 个人贡献：{GuildEconomyService.format_large_number(result['new_contribution'])}",
