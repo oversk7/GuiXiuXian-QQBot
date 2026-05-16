@@ -118,6 +118,8 @@ class GuildEconomyService:
     @classmethod
     def calculate_donation_points(cls, donated_before: int, amount: int) -> int:
         """按今日累计捐献额计算本次可获得积分，受每日积分上限限制。"""
+        donated_before = int(donated_before or 0)
+        amount = int(amount)
         points_before = min(
             donated_before // cls.GOLD_PER_DONATION_POINT,
             cls.DAILY_DONATION_POINTS_LIMIT,
@@ -131,6 +133,7 @@ class GuildEconomyService:
     @classmethod
     def is_donation_points_limit_reached(cls, donated_today: int) -> bool:
         """判断今日捐献积分是否已达上限。"""
+        donated_today = int(donated_today or 0)
         return donated_today // cls.GOLD_PER_DONATION_POINT >= cls.DAILY_DONATION_POINTS_LIMIT
     
     @staticmethod

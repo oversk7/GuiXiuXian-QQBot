@@ -63,7 +63,7 @@ class PlayerDonationLogRepository(IRepository[PlayerDonationLog]):
             PlayerDonationLog.donate_date == today
         )
         result = await self._session.execute(stmt)
-        return result.scalar_one()
+        return int(result.scalar_one() or 0)
 
     async def count_today_donations(
         self, player_id: str, today: date = None
@@ -89,7 +89,7 @@ class PlayerDonationLogRepository(IRepository[PlayerDonationLog]):
             PlayerDonationLog.donate_date == today
         )
         result = await self._session.execute(stmt)
-        return result.scalar_one()
+        return int(result.scalar_one() or 0)
 
     async def add(self, donation_log: PlayerDonationLog) -> PlayerDonationLog:
         """
