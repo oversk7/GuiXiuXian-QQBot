@@ -308,6 +308,9 @@ async def handle_guild_bonuses(event: MessageEvent):
         if adjacency_descriptions:
             lines.append("🌀 邻接加成：")
             lines.extend([f"• {desc}" for desc in adjacency_descriptions])
+        else:
+            lines.append("🌀 邻接加成：暂无")
+            lines.append("💡 在【公会建筑】查看布局规则，把相关建筑放到上下左右相邻格")
 
         lines.append("━━━━━━━━━━")
         lines.append("💡 建造更多建筑可获得更强加成")
@@ -1200,6 +1203,7 @@ async def handle_guild_buildings(event: MessageEvent):
             lines.append("暂无建筑，快去建造吧！")
         else:
             lines.extend(GuildBuildingServiceNew.format_layout(buildings))
+            lines.append("💡 上下左右相邻触发加成，斜角不触发")
             lines.append("")
             for building in buildings:
                 effects_str = GuildBuildingServiceNew.format_building_effects(building["effects"])
@@ -1216,10 +1220,11 @@ async def handle_guild_buildings(event: MessageEvent):
                 lines.append("")
 
         lines.append("***")
+        lines.extend(GuildBuildingServiceNew.get_player_guide_lines())
+        lines.append("***")
         lines.append("**可建造建筑：**")
         building_names = GuildBuildingServiceNew.get_buildable_names()
         lines.append(" | ".join([f"{building_emojis.get(n, '🏛️')}{cmd(n, f'建造 {n}')}" for n in building_names]))
-        lines.append("💡 可指定布局坐标：建造 铸器坊 2 1；调整位置：移动建筑 铸器坊 2 1")
         lines.append("***")
         lines.append(cmd("公会") + " | " + cmd("公会建筑") + " | " + cmd("帮助"))
 
