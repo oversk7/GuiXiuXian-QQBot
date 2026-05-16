@@ -642,4 +642,75 @@ async def _(event: MessageEvent):
         if loc_count == 0 or npc_count == 0:
             msg += "💡 请执行【初始化地点】命令初始化数据"
 
+
+# ─────────────────────────────────────────────
+# 导航到达主动推送（每 2 分钟轮询）
+# ─────────────────────────────────────────────
+
+from nonebot import logger as _logger
+from nonebot_plugin_apscheduler import scheduler as _scheduler
+from sqlalchemy import select as _select
+
+
+@_scheduler.scheduled_job(
+    "interval", minutes=2, id="nav_arrival_push", max_instances=1, coalesce=True
+)
+async def _check_nav_arrivals():
+    """轮询所有导航任务，到达时主动 C2C 通知玩家。"""
+    from ..models.db import AsyncSessionLocal
+    from ..models.player import Player
+    from ..notification_service import notify_player
+    from .navigation_events import (
+        generate_navigation_events,
+        apply_navigation_events,
+        format_navigation_events,
+    )
+
+    try:
+        async with AsyncSessionLocal() as session:
+            tasks = (await session.execute(_select(NavigationTask))).scalars().all()
+            if not tasks:
+                return
+
+            for task in tasks:
+                try:
+                    player: Player | None = await session.get(Player, task.player_id)
+                    if not player:
+                        await session.delete(task)
+                        continue
+
+                    reached = await _update_nav_position(player, task, session)
+                    session.add(player)
+
+                    if not reached:
+                        continue
+
+                    # 到达：处理随机事件
+                    target_x, target_y = task.target_x, task.target_y
+                    nav_distance = task.initial_distance or 0
+                    nav_events = generate_navigation_events(player, nav_distance, target_x, target_y)
+                    if nav_events:
+                        await apply_navigation_events(session, player, nav_events)
+
+                    await session.delete(task)
+
+                    # 组织通知文本（去掉 Markdown 标记，C2C 只支持纯文本）
+                    rx, ry = player.real_world_x or 0, player.real_world_y or 0
+                    lines = [f"🎯 导航完成！已到达 ({target_x},{target_y})"]
+                    events_text = format_navigation_events(nav_events) if nav_events else ""
+                    if events_text:
+                        lines.append(events_text.replace("**", "").replace("*", ""))
+                    lines.append(f"📍 当前坐标: ({rx},{ry})")
+                    lines.append("发送【导航】可开启新导航")
+
+                    await notify_player(player.id, "\n".join(lines), session)
+
+                except Exception as e:
+                    _logger.warning(f"[Nav] 处理导航任务 {task.player_id} 失败: {e}")
+
+            await session.commit()
+
+    except Exception as e:
+        _logger.error(f"[Nav] 导航到达轮询失败: {e}", exc_info=True)
+
         await check_data_cmd.finish(message_add_head(msg, event))

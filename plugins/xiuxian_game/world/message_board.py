@@ -675,6 +675,11 @@ async def handle_private_message(event: MessageEvent, args: Message = CommandArg
         session.add(msg_rec)
         await session.commit()
 
+    # 主动 C2C 提醒收信人（失败不影响主流程）
+    from ..notification_service import notify_player
+    sender_name = sender.nickname
+    await notify_player(target.id, f"📬 你有一条来自「{sender_name}」的新私信，发送【消息】查看！")
+
     await private_msg_cmd.send(message_add_head("✅ 私信已发送！", event))
 
     total, total_pages, page, records, players = await _get_message_page(

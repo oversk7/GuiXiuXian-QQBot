@@ -504,6 +504,9 @@ async def _settle_auction(
             f"📦 {item_display}（#{auction.id}）\n"
             f"↩️ 物品已退回卖家"
         )
+        if seller:
+            from ..notification_service import notify_player
+            await notify_player(seller.id, f"📋 你的拍卖「{item_display}」流拍，物品已退回背包", session)
         return True, "流拍"
 
     # 有人成交：转移物品给买家
@@ -543,6 +546,19 @@ async def _settle_auction(
         f"💰 成交价：{final_price:,}💰"
         + (f"（税：{tax:,}）" if tax > 0 else "")
         + f"\n💸 卖家到手：{seller_income:,}💰"
+    )
+
+    # 主动 C2C 通知买卖双方
+    from ..notification_service import notify_player
+    await notify_player(
+        buyer.id,
+        f"🎉 你竞得了「{item_display}」！已入背包，成交价 {final_price:,}💰",
+        session,
+    )
+    await notify_player(
+        seller.id,
+        f"💰 你的拍卖「{item_display}」成交，到手 {seller_income:,}💰",
+        session,
     )
 
     return True, "成交"

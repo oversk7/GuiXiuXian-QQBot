@@ -994,6 +994,19 @@ async def handle_use_item(bot: Bot, event: MessageEvent, args: Message = Command
             success, result_msg = RussianRouletteCore.use_cigarette(game_state, player.id, room.max_hp)
         elif item_type == ItemType.MAGNIFIER:
             success, result_msg = RussianRouletteCore.use_magnifier(game_state, player.id)
+            if success:
+                info = json.loads(game_state.get("magnifier_info") or "{}")
+                if info:
+                    bullet_type = info.get("bullet_type", "未知")
+                    bullet_idx = info.get("bullet_index", 0)
+                    try:
+                        await bot.send_to_c2c(
+                            openid=event.get_user_id(),
+                            message=f"🔍 放大镜预知结果\n第 {bullet_idx + 1} 发：{bullet_type}",
+                        )
+                        result_msg = "🔍 放大镜已使用！预知结果已私信发送"
+                    except Exception:
+                        pass  # 降级为旧提示
         elif item_type == ItemType.BEER:
             success, result_msg = RussianRouletteCore.use_beer(game_state)
         elif item_type == ItemType.ADRENALINE:
@@ -1005,6 +1018,19 @@ async def handle_use_item(bot: Bot, event: MessageEvent, args: Message = Command
             success, result_msg = RussianRouletteCore.use_inverter(game_state)
         elif item_type == ItemType.PHONE:
             success, result_msg = RussianRouletteCore.use_phone(game_state, player.id)
+            if success:
+                info = json.loads(game_state.get("phone_info") or "{}")
+                if info:
+                    bullet_type = info.get("bullet_type", "未知")
+                    bullet_idx = info.get("bullet_index", 0)
+                    try:
+                        await bot.send_to_c2c(
+                            openid=event.get_user_id(),
+                            message=f"📱 电话预知结果\n第 {bullet_idx + 1} 发：{bullet_type}",
+                        )
+                        result_msg = "📱 电话已使用！预知结果已私信发送"
+                    except Exception:
+                        pass  # 降级为旧提示
         elif item_type == ItemType.DICE:
             success, result_msg = RussianRouletteCore.use_dice(game_state)
 
