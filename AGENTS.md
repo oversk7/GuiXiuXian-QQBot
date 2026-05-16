@@ -77,3 +77,49 @@ For multi-step tasks, state a brief plan:
 ```
 
 Strong success criteria let you loop independently. Weak criteria ("make it work") require constant clarification.
+
+## 5. Deployment
+
+**Deploy automatically when the user says "部署" / "deploy".**
+
+- Server: `root@***REMOVED***`
+- Project path: `/home/admin/GuiXiuXian2`
+- Runtime: `qqbot` screen session under the `admin` user
+- Do not use `deploy.sh` for bot deployment; it is for the game guide web page.
+- Do not write server passwords or long-lived credentials into repository files.
+
+Deployment workflow:
+
+1. Push the current branch:
+   ```bash
+   git push
+   ```
+
+2. Pull on the server:
+   ```bash
+   ssh root@***REMOVED*** "su - admin -c 'cd /home/admin/GuiXiuXian2 && git pull'"
+   ```
+
+3. Restart the bot:
+   ```bash
+   ssh root@***REMOVED*** bash -c '
+     su - admin -c "screen -X -S qqbot quit" 2>/dev/null
+     sleep 1
+     pkill -u admin -f "bot\.py" 2>/dev/null
+     sleep 1
+     su - admin -c "screen -dmS qqbot bash -c \"cd /home/admin/GuiXiuXian2 && nb run; exec bash\""
+   '
+   ```
+
+   If the local shell mangles nested quotes, run the restart as simpler separate SSH commands instead:
+   ```bash
+   ssh root@***REMOVED*** "su - admin -c 'screen -S qqbot -X quit || true'"
+   ssh root@***REMOVED*** "su - admin -c 'pkill -f bot.py || true'"
+   ssh root@***REMOVED*** "su - admin -c 'cd /home/admin/GuiXiuXian2 && screen -dmS qqbot nb run'"
+   ```
+
+4. Verify:
+   ```bash
+   ssh root@***REMOVED*** "ps aux | grep bot.py"
+   ssh root@***REMOVED*** "su - admin -c 'screen -ls'"
+   ```
