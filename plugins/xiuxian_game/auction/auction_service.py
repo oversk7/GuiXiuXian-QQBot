@@ -339,8 +339,6 @@ async def place_bid(
     auction = await uow.auction_items.get_by_id(auction_id)
     if not auction or not auction.is_active:
         return False, f"⛔ 拍卖 #{auction_id} 不存在或已结束"
-    if auction.server_id != seller.server_id:
-        return False, f"⛔ 拍卖 #{auction_id} 不存在或已结束"
     if auction.server_id != bidder.server_id:
         return False, "⛔ 不能参与其他区服的拍卖"
 
