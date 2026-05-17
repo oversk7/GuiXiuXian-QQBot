@@ -42,7 +42,6 @@ def _remember_group_context(player: Player, event: MessageEvent) -> None:
     ):
         player.last_group_member_id = member_id
 
-    event._xiuxian_nickname = player.nickname  # type: ignore[attr-defined]
 
 
 # ==================== 管理员临时切换功能 ====================
