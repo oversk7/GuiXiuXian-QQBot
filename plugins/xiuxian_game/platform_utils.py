@@ -35,12 +35,20 @@ def _remember_group_context(player: Player, event: MessageEvent) -> None:
 
     author = getattr(event, "author", None)
     member_id = getattr(author, "id", None)
+    username = getattr(author, "username", None)
     if (
         group_openid
         and member_id
         and getattr(player, "last_group_member_id", None) != member_id
     ):
         player.last_group_member_id = member_id
+    if (
+        group_openid
+        and isinstance(username, str)
+        and username.strip()
+        and getattr(player, "last_group_username", None) != username.strip()
+    ):
+        player.last_group_username = username.strip()[:64]
 
 
 

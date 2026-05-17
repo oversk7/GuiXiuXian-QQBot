@@ -22,16 +22,17 @@ def _event_type(event: Any) -> str:
     return str(getattr(event_type, "value", event_type))
 
 
-def _get_sender_member_openid(event: Any) -> str | None:
+def _get_sender_username(event: Any) -> str | None:
     author = getattr(event, "author", None)
-    return getattr(author, "member_openid", None)
+    username = getattr(author, "username", None)
+    return username.strip() if isinstance(username, str) and username.strip() else None
 
 
 def _with_sender_mention(event: Any, message: Any) -> Any:
-    member_openid = _get_sender_member_openid(event)
-    if not member_openid:
+    username = _get_sender_username(event)
+    if not username:
         return message
-    return MessageSegment.mention_user(member_openid) + " " + message
+    return MessageSegment.text(f"@{username} ") + message
 
 
 def patch_full_group_message_send() -> None:

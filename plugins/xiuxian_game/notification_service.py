@@ -14,22 +14,29 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from .models.player import Player
 
 
-async def notify_player(player_id: str, message: str, session: AsyncSession | None = None) -> bool:
-    """向指定玩家最近活跃的 QQ 群发送 @提醒。
-
-    使用 MessageSegment.mention_user 实现真正的 QQ @效果。
+async def notify_player(
+    player_id: str,
+    message: str,
+    session: AsyncSession | None = None,
+    actual_mention: bool = False,
+) -> bool:
+    """向指定玩家最近活跃的 QQ 群发送昵称提醒。
 
     Args:
-        player_id: 游戏玩家 ID（即 member_openid）
+        player_id: 游戏玩家 ID
         message: 通知内容（纯文本）
         session: 可选数据库会话；为 None 时自行创建
+        actual_mention: 是否使用 QQ 真 @ 消息段
 
     Returns:
         发送是否成功
     """
     try:
-        group_openid = await _get_group_openid(player_id, session)
-        msg = MessageSegment.mention_user(player_id) + MessageSegment.text(f" {message}")
+        group_openid, nickname, mention_id = await _get_notification_target(player_id, session)
+        if actual_mention and mention_id:
+            msg = MessageSegment.mention_user(mention_id) + MessageSegment.text(f" {message}")
+        else:
+            msg = MessageSegment.text(f"@{nickname} {message}")
         return await _send_group_text(group_openid, msg)
     except Exception as e:
         logger.warning(f"[Notify] 群提醒失败 player={player_id}: {e}")
@@ -49,17 +56,23 @@ async def _send_group_text(
         return False
 
 
-async def _get_group_openid(
+async def _get_notification_target(
     player_id: str, session: AsyncSession | None
-) -> str:
-    """返回玩家最近活跃的 group_openid。"""
+) -> tuple[str, str, str | None]:
+    """返回玩家最近活跃的 group_openid、昵称和群成员 ID。"""
     if session is None:
         from .models.db import AsyncSessionLocal
         async with AsyncSessionLocal() as s:
-            return await _get_group_openid(player_id, s)
+            return await _get_notification_target(player_id, s)
 
     player = await session.get(Player, player_id)
     group_openid = getattr(player, "last_group_openid", None) if player else None
     if not group_openid:
         raise ValueError("玩家暂无可用的最近群记录")
-    return group_openid
+    mention_id = getattr(player, "last_group_member_id", None) or player_id
+    nickname = (
+        getattr(player, "last_group_username", None)
+        or getattr(player, "nickname", None)
+        or "道友"
+    )
+    return group_openid, nickname, mention_id

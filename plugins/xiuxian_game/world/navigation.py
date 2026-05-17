@@ -702,7 +702,12 @@ async def _check_nav_arrivals():
                     lines.append(f"📍 当前坐标: ({rx},{ry})")
                     lines.append("发送【导航】可开启新导航")
 
-                    await notify_player(player.id, "\n".join(lines), session)
+                    await notify_player(
+                        player.id,
+                        "\n".join(lines),
+                        session,
+                        actual_mention=True,
+                    )
 
                 except Exception as e:
                     _logger.warning(f"[Nav] 处理导航任务 {task.player_id} 失败: {e}")
