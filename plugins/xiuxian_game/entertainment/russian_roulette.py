@@ -53,6 +53,18 @@ def _format_player_items(items_json: str, player_name: str) -> str:
     return "\n".join(item_lines)
 
 
+def _get_group_id(event: MessageEvent) -> str | None:
+    group_openid = getattr(event, "group_openid", None)
+    if group_openid:
+        return str(group_openid)
+
+    session_id = event.get_session_id()
+    if session_id.startswith("group_"):
+        return session_id.split("_", 1)[1]
+
+    return None
+
+
 def _create_game_action_message(title: str, result: str, buttons: list) -> MessageSegment:
     """
     创建带按钮的游戏操作消息
@@ -95,18 +107,15 @@ def _create_game_action_message(title: str, result: str, buttons: list) -> Messa
 # ==================== 房间管理指令 ====================
 
 # 创建房间
-create_room_cmd = on_command("恶魔轮盘", aliases={"轮盘赌", "俄罗斯轮盘"}, block=True, priority=13)
+create_room_cmd = on_command("恶魔轮盘", aliases={"恶魔轮盘帮助", "轮盘赌", "俄罗斯轮盘"}, block=True, priority=13)
 
 @create_room_cmd.handle()
 async def handle_create_room(bot: Bot, event: MessageEvent, args: Message = CommandArg()):
     """创建恶魔轮盘赌房间"""
     # 检查是否为群聊
-    session_id = event.get_session_id()
-    if not session_id.startswith("group_"):
+    group_id = _get_group_id(event)
+    if not group_id:
         await create_room_cmd.finish("⛔ 恶魔轮盘赌只能在群聊中进行")
-    
-    # 提取群ID
-    group_id = session_id.split("_")[1]
     
     args_text = args.extract_plain_text().strip()
     
@@ -461,8 +470,7 @@ shoot_cmd = on_command("开枪", block=True, priority=13)
 async def handle_shoot(bot: Bot, event: MessageEvent, args: Message = CommandArg()):
     """处理开枪指令"""
     # 检查是否为群聊
-    session_id = event.get_session_id()
-    if not session_id.startswith("group_"):
+    if not _get_group_id(event):
         await shoot_cmd.finish("⛔ 游戏指令只能在群聊中使用")
     
     target = args.extract_plain_text().strip()
@@ -695,8 +703,7 @@ use_adrenaline_cmd = on_command("使用道具 肾上腺素", block=True, priorit
 async def handle_use_adrenaline(bot: Bot, event: MessageEvent, args: Message = CommandArg()):
     """处理使用肾上腺素指令"""
     # 检查是否为群聊
-    session_id = event.get_session_id()
-    if not session_id.startswith("group_"):
+    if not _get_group_id(event):
         await use_adrenaline_cmd.finish("⛔ 游戏指令只能在群聊中使用")
 
     target_item_name = args.extract_plain_text().strip()
@@ -879,8 +886,7 @@ async def handle_use_adrenaline(bot: Bot, event: MessageEvent, args: Message = C
 async def handle_use_item(bot: Bot, event: MessageEvent, args: Message = CommandArg()):
     """处理使用道具指令"""
     # 检查是否为群聊
-    session_id = event.get_session_id()
-    if not session_id.startswith("group_"):
+    if not _get_group_id(event):
         await use_item_cmd.finish("⛔ 游戏指令只能在群聊中使用")
 
     item_name = args.extract_plain_text().strip()
@@ -1430,11 +1436,10 @@ bet_cmd = on_command("轮盘下注", aliases={"下注轮盘"}, block=True, prior
 @bet_cmd.handle()
 async def handle_bet(event: MessageEvent, args: Message = CommandArg()):
     """旁观者为轮盘赌玩家下注"""
-    session_id = event.get_session_id()
-    if not session_id.startswith("group_"):
+    group_id = _get_group_id(event)
+    if not group_id:
         await bet_cmd.finish("⛔ 下注指令只能在群聊中使用")
 
-    group_id = session_id.split("_")[1]
     args_text = args.extract_plain_text().strip()
     parts = args_text.split()
 
@@ -1534,11 +1539,9 @@ view_bets_cmd = on_command("查看下注", aliases={"下注情况", "轮盘下�
 @view_bets_cmd.handle()
 async def handle_view_bets(event: MessageEvent):
     """查看当前房间的下注情况"""
-    session_id = event.get_session_id()
-    if not session_id.startswith("group_"):
+    group_id = _get_group_id(event)
+    if not group_id:
         await view_bets_cmd.finish("⛔ 此指令只能在群聊中使用")
-
-    group_id = session_id.split("_")[1]
 
     async with safe_session() as session:
         player = await get_unified_player(session, event)
