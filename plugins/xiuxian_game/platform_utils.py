@@ -33,6 +33,15 @@ def _remember_group_context(player: Player, event: MessageEvent) -> None:
     if group_openid and getattr(player, "last_group_openid", None) != group_openid:
         player.last_group_openid = group_openid
 
+    author = getattr(event, "author", None)
+    member_id = getattr(author, "id", None)
+    if (
+        group_openid
+        and member_id
+        and getattr(player, "last_group_member_id", None) != member_id
+    ):
+        player.last_group_member_id = member_id
+
 
 # ==================== 管理员临时切换功能 ====================
 # 内存中维护管理员临时切换状态，格式: {admin_platform_id: player_id}

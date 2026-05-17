@@ -35,6 +35,11 @@ def _resolve_group_member_openid(event: MessageEvent) -> str | None:
     return getattr(author, "member_openid", None)
 
 
+def _resolve_group_mention_user_id(event: MessageEvent) -> str | None:
+    author = getattr(event, "author", None)
+    return getattr(author, "id", None)
+
+
 @active_message_test.handle()
 async def handle_active_message_test(
     bot: Bot,
@@ -89,11 +94,17 @@ async def handle_group_mention_test(
 
     group_openid = getattr(event, "group_openid", None)
     user_openid = _resolve_group_member_openid(event)
+    mention_user_id = _resolve_group_mention_user_id(event)
     if not group_openid or not user_openid:
         await group_mention_test.finish("此命令只能在群里使用")
 
-    if not await notify_group_member(group_openid, user_openid, content):
+    if not await notify_group_member(
+        group_openid, user_openid, content, mention_user_id=mention_user_id
+    ):
         await group_mention_test.finish("群提醒发送失败")
 
-    logger.info(f"[Admin] 群提醒测试已发送到群: {group_openid}, member={user_openid}")
+    logger.info(
+        f"[Admin] 群提醒测试已发送到群: {group_openid}, "
+        f"member={user_openid}, mention_user_id={mention_user_id}"
+    )
     await group_mention_test.finish("群提醒已发出")

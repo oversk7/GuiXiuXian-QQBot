@@ -5,6 +5,7 @@ from nonebot.matcher import Matcher
 
 from .config import Config
 from .models.db import init_db
+from . import message_normalizer
 from . import message_guard
 
 __plugin_meta__ = PluginMetadata(

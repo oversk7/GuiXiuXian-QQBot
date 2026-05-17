@@ -24,18 +24,30 @@ async def notify_player(player_id: str, message: str, session: AsyncSession | No
         发送是否成功
     """
     try:
-        group_openid, member_openid = await _get_group_notify_target(player_id, session)
-        return await notify_group_member(group_openid, member_openid, message)
+        group_openid, member_openid, mention_user_id = await _get_group_notify_target(
+            player_id, session
+        )
+        return await notify_group_member(
+            group_openid, member_openid, message, mention_user_id=mention_user_id
+        )
     except Exception as e:
         logger.warning(f"[Notify] 群提醒失败 player={player_id}: {e}")
         return False
 
 
-async def notify_group_member(group_openid: str, member_openid: str, message: str) -> bool:
+async def notify_group_member(
+    group_openid: str,
+    member_openid: str,
+    message: str,
+    mention_user_id: str | None = None,
+) -> bool:
     """向指定 QQ 群发送 @ 成员提醒。"""
     try:
         bot: Bot = get_bot()
-        notify_message = MessageSegment.mention_user(member_openid) + MessageSegment.text(f"\n{message}")
+        notify_message = (
+            MessageSegment.mention_user(mention_user_id or member_openid)
+            + MessageSegment.text(f"\n{message}")
+        )
         await bot.send_to_group(group_openid=group_openid, message=notify_message)
         return True
     except Exception as e:
@@ -43,7 +55,9 @@ async def notify_group_member(group_openid: str, member_openid: str, message: st
         return False
 
 
-async def _get_group_notify_target(player_id: str, session: AsyncSession | None) -> tuple[str, str]:
+async def _get_group_notify_target(
+    player_id: str, session: AsyncSession | None
+) -> tuple[str, str, str | None]:
     """查玩家最近群和 AccountOwnership，兜底用 player_id 作为 member_openid。"""
     if session is None:
         from .models.db import AsyncSessionLocal
@@ -52,6 +66,7 @@ async def _get_group_notify_target(player_id: str, session: AsyncSession | None)
 
     player = await session.get(Player, player_id)
     group_openid = getattr(player, "last_group_openid", None) if player else None
+    mention_user_id = getattr(player, "last_group_member_id", None) if player else None
     if not group_openid:
         raise ValueError("玩家暂无可用的最近群记录")
 
@@ -64,4 +79,4 @@ async def _get_group_notify_target(player_id: str, session: AsyncSession | None)
         .limit(1)
     )
     member_openid = ownership_result.scalar() or player_id
-    return group_openid, member_openid
+    return group_openid, member_openid, mention_user_id
