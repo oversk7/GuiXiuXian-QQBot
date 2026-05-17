@@ -121,7 +121,7 @@ async def handle_create_room(bot: Bot, event: MessageEvent, args: Message = Comm
     
     # 显示帮助信息
     if not args_text or args_text == "帮助":
-        help_msg = (
+        help_room_msg = (
             "🎮 恶魔轮盘赌游戏\n"
             "━━━━━━━━━━━━━\n"
             "🎯 游戏规则：\n"
@@ -148,7 +148,10 @@ async def handle_create_room(bot: Bot, event: MessageEvent, args: Message = Comm
             "▫️ 【轮盘下注 玩家名 金币数】 - 支持某玩家\n"
             "▫️ 【查看下注】 - 查看房间下注情况\n"
             "▫️ 赢方（玩家+支持者）按投入比例瓜分输方全部资产（主押注+支持者押注）\n"
-            "▫️ 注意：税收从输方总资产扣除，风险与收益完全对等\n"
+            "▫️ 注意：税收从输方总资产扣除，风险与收益完全对等"
+        )
+        help_battle_msg = (
+            "🎮 恶魔轮盘 · 对局说明\n"
             "━━━━━━━━━━━━━\n"
             "🎲 游戏指令：\n"
             "▫️ 【开枪 <自己/对手>】 - 选择射击目标\n"
@@ -181,7 +184,8 @@ async def handle_create_room(bot: Bot, event: MessageEvent, args: Message = Comm
             "━━━━━━━━━━━━━\n"
             "💡 注意：预知类道具需要私聊机器人查看结果"
         )
-        await create_room_cmd.finish(message_add_head(help_msg, event))
+        await create_room_cmd.send(message_add_head(help_room_msg, event))
+        await create_room_cmd.finish(message_add_head(help_battle_msg, event))
     
     async with safe_session() as session:
         player = await get_unified_player(session, event)
