@@ -236,6 +236,7 @@ class Player(Base):
     last_private_message_check: Mapped[datetime] = mapped_column(DateTime, nullable=True, comment="最后查看私信时间")
     last_system_check: Mapped[datetime] = mapped_column(DateTime, nullable=True, comment="最后查看系统公告时间")
     last_guild_check: Mapped[datetime] = mapped_column(DateTime, nullable=True, comment="最后查看公会消息时间")
+    last_group_openid: Mapped[str | None] = mapped_column(String(64), nullable=True, comment="最近活跃QQ群openid")
     daily_gift_purchases: Mapped[str | None] = mapped_column(Text, nullable=True, comment="每日礼物购买记录(JSON格式)")
 
     # 阴宅系统

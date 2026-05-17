@@ -1,19 +1,19 @@
-"""
-主动 C2C 私信通知工具
+"""主动群提醒工具。
 
 用法: await notify_player(player_id, "消息内容", session)
 所有错误静默处理，不影响调用方主流程。
 """
 from nonebot import get_bot, logger
-from nonebot.adapters.qq import Bot
+from nonebot.adapters.qq import Bot, MessageSegment
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from .models.account_ownership import AccountOwnership
+from .models.player import Player
 
 
 async def notify_player(player_id: str, message: str, session: AsyncSession | None = None) -> bool:
-    """向指定玩家发送 C2C 主动私信。
+    """向指定玩家最近活跃的 QQ 群发送 @ 提醒。
 
     Args:
         player_id: 游戏玩家 ID
@@ -24,23 +24,38 @@ async def notify_player(player_id: str, message: str, session: AsyncSession | No
         发送是否成功
     """
     try:
-        platform_id = await _get_platform_id(player_id, session)
-        bot: Bot = get_bot()
-        await bot.send_to_c2c(openid=platform_id, message=message)
-        return True
+        group_openid, member_openid = await _get_group_notify_target(player_id, session)
+        return await notify_group_member(group_openid, member_openid, message)
     except Exception as e:
-        logger.warning(f"[Notify] C2C 通知失败 player={player_id}: {e}")
+        logger.warning(f"[Notify] 群提醒失败 player={player_id}: {e}")
         return False
 
 
-async def _get_platform_id(player_id: str, session: AsyncSession | None) -> str:
-    """查 AccountOwnership 获取 owner_platform_id，兜底用 player_id。"""
+async def notify_group_member(group_openid: str, member_openid: str, message: str) -> bool:
+    """向指定 QQ 群发送 @ 成员提醒。"""
+    try:
+        bot: Bot = get_bot()
+        notify_message = MessageSegment.mention_user(member_openid) + MessageSegment.text(f"\n{message}")
+        await bot.send_to_group(group_openid=group_openid, message=notify_message)
+        return True
+    except Exception as e:
+        logger.warning(f"[Notify] 群提醒发送失败 group={group_openid} member={member_openid}: {e}")
+        return False
+
+
+async def _get_group_notify_target(player_id: str, session: AsyncSession | None) -> tuple[str, str]:
+    """查玩家最近群和 AccountOwnership，兜底用 player_id 作为 member_openid。"""
     if session is None:
         from .models.db import AsyncSessionLocal
         async with AsyncSessionLocal() as s:
-            return await _get_platform_id(player_id, s)
+            return await _get_group_notify_target(player_id, s)
 
-    result = await session.execute(
+    player = await session.get(Player, player_id)
+    group_openid = getattr(player, "last_group_openid", None) if player else None
+    if not group_openid:
+        raise ValueError("玩家暂无可用的最近群记录")
+
+    ownership_result = await session.execute(
         select(AccountOwnership.owner_platform_id)
         .where(
             AccountOwnership.player_id == player_id,
@@ -48,4 +63,5 @@ async def _get_platform_id(player_id: str, session: AsyncSession | None) -> str:
         )
         .limit(1)
     )
-    return result.scalar() or player_id
+    member_openid = ownership_result.scalar() or player_id
+    return group_openid, member_openid

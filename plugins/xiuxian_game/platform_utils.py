@@ -28,6 +28,12 @@ def _touch_last_active(player: Player) -> None:
         player.last_active_at = now
 
 
+def _remember_group_context(player: Player, event: MessageEvent) -> None:
+    group_openid = getattr(event, "group_openid", None)
+    if group_openid and getattr(player, "last_group_openid", None) != group_openid:
+        player.last_group_openid = group_openid
+
+
 # ==================== 管理员临时切换功能 ====================
 # 内存中维护管理员临时切换状态，格式: {admin_platform_id: player_id}
 _admin_temp_switch: Dict[str, str] = {}
@@ -104,6 +110,7 @@ async def get_unified_player(session: AsyncSession, event: MessageEvent) -> Opti
             if bound_server_id and temp_player.server_id != bound_server_id:
                 return None
             await session.refresh(temp_player)
+            _remember_group_context(temp_player, event)
             return temp_player
 
     # 2. 查缓存：platform_id → player_id
@@ -119,6 +126,7 @@ async def get_unified_player(session: AsyncSession, event: MessageEvent) -> Opti
                 player_identity_cache.invalidate(user_id)
                 return None
             _touch_last_active(player)
+            _remember_group_context(player, event)
             return player
         # player 被删除了，缓存失效，走下面的完整查询
         player_identity_cache.invalidate(user_id)
@@ -154,6 +162,7 @@ async def get_unified_player(session: AsyncSession, event: MessageEvent) -> Opti
     player_identity_cache.put(user_id, player.id if player else None)
     if player is not None:
         _touch_last_active(player)
+        _remember_group_context(player, event)
 
     return player
 

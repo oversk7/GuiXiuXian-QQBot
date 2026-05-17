@@ -548,7 +548,7 @@ async def _settle_auction(
         + f"\n💸 卖家到手：{seller_income:,}💰"
     )
 
-    # 主动 C2C 通知买卖双方
+    # 主动群 @ 通知买卖双方
     from ..notification_service import notify_player
     await notify_player(
         buyer.id,

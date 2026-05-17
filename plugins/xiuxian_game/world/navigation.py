@@ -644,7 +644,7 @@ async def _(event: MessageEvent):
 
 
 # ─────────────────────────────────────────────
-# 导航到达主动推送（每 2 分钟轮询）
+# 导航到达群提醒（每 2 分钟轮询）
 # ─────────────────────────────────────────────
 
 from nonebot import logger as _logger
@@ -656,7 +656,7 @@ from sqlalchemy import select as _select
     "interval", minutes=2, id="nav_arrival_push", max_instances=1, coalesce=True
 )
 async def _check_nav_arrivals():
-    """轮询所有导航任务，到达时主动 C2C 通知玩家。"""
+    """轮询所有导航任务，到达时在最近活跃群 @ 玩家。"""
     from ..models.db import AsyncSessionLocal
     from ..models.player import Player
     from ..notification_service import notify_player
@@ -694,7 +694,7 @@ async def _check_nav_arrivals():
 
                     await session.delete(task)
 
-                    # 组织通知文本（去掉 Markdown 标记，C2C 只支持纯文本）
+                    # 组织通知文本（群提醒只发送纯文本）
                     rx, ry = player.real_world_x or 0, player.real_world_y or 0
                     lines = [f"🎯 导航完成！已到达 ({target_x},{target_y})"]
                     events_text = format_navigation_events(nav_events) if nav_events else ""

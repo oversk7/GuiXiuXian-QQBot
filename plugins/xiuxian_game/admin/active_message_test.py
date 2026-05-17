@@ -1,8 +1,7 @@
-"""管理员命令: 测试 QQ 群主动消息权限（群消息 + C2C 私信）。"""
+"""管理员命令: 测试 QQ 群主动消息权限。"""
 
 from nonebot import logger, on_command
 from nonebot.adapters.qq import Bot, Message, MessageEvent
-from nonebot.adapters.qq.event import GroupAtMessageCreateEvent
 from nonebot.adapters.qq.exception import (
     ActionFailed,
     NetworkError,
@@ -11,6 +10,8 @@ from nonebot.adapters.qq.exception import (
 )
 from nonebot.params import CommandArg
 from nonebot.permission import SUPERUSER
+
+from ..notification_service import notify_group_member
 
 
 active_message_test = on_command(
@@ -27,6 +28,11 @@ def _resolve_target(event: MessageEvent, arg_text: str) -> tuple[str | None, str
     if len(parts) == 2 and len(parts[0]) >= 16:
         return parts[0], parts[1].strip()
     return getattr(event, "group_openid", None), arg_text
+
+
+def _resolve_group_member_openid(event: MessageEvent) -> str | None:
+    author = getattr(event, "author", None)
+    return getattr(author, "member_openid", None)
 
 
 @active_message_test.handle()
@@ -61,36 +67,33 @@ async def handle_active_message_test(
     await active_message_test.finish("主动消息测试已发出")
 
 
-# ==================== C2C 私信测试 ====================
+# ==================== 群 @ 提醒测试 ====================
 
-c2c_message_test = on_command(
-    "测试私信",
-    aliases={"私信测试"},
+group_mention_test = on_command(
+    "测试群提醒",
+    aliases={"群提醒测试"},
     priority=1,
     block=True,
 )
 
 
-@c2c_message_test.handle()
-async def handle_c2c_message_test(
-    bot: Bot,
+@group_mention_test.handle()
+async def handle_group_mention_test(
     event: MessageEvent,
     args: Message = CommandArg(),
 ):
-    """在群里发「测试私信 内容」，bot 会主动私信你。"""
+    """在群里发「测试群提醒 内容」，bot 会主动发群消息并 @ 你。"""
     content = args.extract_plain_text().strip()
     if not content:
-        await c2c_message_test.finish("用法: 测试私信 <内容>")
+        await group_mention_test.finish("用法: 测试群提醒 <内容>")
 
-    if not isinstance(event, GroupAtMessageCreateEvent):
-        await c2c_message_test.finish("此命令只能在群里使用")
+    group_openid = getattr(event, "group_openid", None)
+    user_openid = _resolve_group_member_openid(event)
+    if not group_openid or not user_openid:
+        await group_mention_test.finish("此命令只能在群里使用")
 
-    user_openid = event.author.member_openid
-    try:
-        await bot.send_to_c2c(openid=user_openid, message=content)
-    except (ActionFailed, NetworkError, RateLimitException, UnauthorizedException) as e:
-        logger.error(f"[Admin] C2C 私信测试失败: {e}")
-        await c2c_message_test.finish(f"C2C 私信发送失败: {e}")
+    if not await notify_group_member(group_openid, user_openid, content):
+        await group_mention_test.finish("群提醒发送失败")
 
-    logger.info(f"[Admin] C2C 私信测试已发送到: {user_openid}")
-    await c2c_message_test.finish("C2C 私信已发出，请检查私信")
+    logger.info(f"[Admin] 群提醒测试已发送到群: {group_openid}, member={user_openid}")
+    await group_mention_test.finish("群提醒已发出")
