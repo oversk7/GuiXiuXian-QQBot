@@ -41,7 +41,7 @@ async def notify_group_member(
     message: str,
     mention_user_id: str | None = None,
 ) -> bool:
-    """向指定 QQ 群发送 @ 成员提醒。"""
+    """向指定 QQ 群发送 @ 成员提醒（纯文本，不用 markdown）。"""
     try:
         bot: Bot = get_bot()
         notify_message = (

@@ -201,16 +201,15 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
             await session.commit()
 
             rx, ry = (player.real_world_x or 0), (player.real_world_y or 0)
-            arrival_msg = f"🎯 已到达目标位置 **({target_x},{target_y})**\n\n"
+            arrival_msg = f"🎯 导航完成！已到达 ({target_x},{target_y})\n"
 
             # 展示途中见闻
             events_text = format_navigation_events(nav_events)
             if events_text:
-                arrival_msg += events_text + "\n\n"
+                arrival_msg += events_text + "\n"
 
             arrival_msg += f"📍 当前坐标: ({rx},{ry})\n"
-            arrival_msg += "✅ 导航任务已完成\n\n"
-            arrival_msg += cmd("导航", "导航 ") + " | " + cmd("背包") + " | " + cmd("面板")
+            arrival_msg += "发送【导航】可开启新导航"
 
             # 检查到达位置是否有地点，记录访问并检查成就
             from .location_service import LocationService
@@ -237,7 +236,7 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
                 arrival_msg += f"\n\n{hh_msg}"
                 await session.commit()
 
-            await nav_cmd.finish(build_markdown(arrival_msg))
+            await nav_cmd.finish(arrival_msg)
 
         # 若未提供坐标 && 有导航，则只是查看进度（在诡域时展示现实坐标）
         if not parts:
