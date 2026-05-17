@@ -11,7 +11,7 @@ from nonebot.adapters.qq.exception import (
 from nonebot.params import CommandArg
 from nonebot.permission import SUPERUSER
 
-from ..notification_service import notify_group_member
+from ..notification_service import _send_group_text
 
 
 active_message_test = on_command(
@@ -28,16 +28,6 @@ def _resolve_target(event: MessageEvent, arg_text: str) -> tuple[str | None, str
     if len(parts) == 2 and len(parts[0]) >= 16:
         return parts[0], parts[1].strip()
     return getattr(event, "group_openid", None), arg_text
-
-
-def _resolve_group_member_openid(event: MessageEvent) -> str | None:
-    author = getattr(event, "author", None)
-    return getattr(author, "member_openid", None)
-
-
-def _resolve_group_mention_user_id(event: MessageEvent) -> str | None:
-    author = getattr(event, "author", None)
-    return getattr(author, "id", None)
 
 
 @active_message_test.handle()
@@ -93,18 +83,11 @@ async def handle_group_mention_test(
         await group_mention_test.finish("用法: 测试群提醒 <内容>")
 
     group_openid = getattr(event, "group_openid", None)
-    user_openid = _resolve_group_member_openid(event)
-    mention_user_id = _resolve_group_mention_user_id(event)
-    if not group_openid or not user_openid:
+    if not group_openid:
         await group_mention_test.finish("此命令只能在群里使用")
 
-    if not await notify_group_member(
-        group_openid, user_openid, content, mention_user_id=mention_user_id
-    ):
+    if not await _send_group_text(group_openid, content):
         await group_mention_test.finish("群提醒发送失败")
 
-    logger.info(
-        f"[Admin] 群提醒测试已发送到群: {group_openid}, "
-        f"member={user_openid}, mention_user_id={mention_user_id}"
-    )
+    logger.info(f"[Admin] 群提醒测试已发送到群: {group_openid}")
     await group_mention_test.finish("群提醒已发出")
