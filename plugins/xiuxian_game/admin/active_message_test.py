@@ -66,7 +66,6 @@ async def handle_active_message_test(
 c2c_message_test = on_command(
     "测试私信",
     aliases={"私信测试"},
-    permission=SUPERUSER,
     priority=1,
     block=True,
 )
