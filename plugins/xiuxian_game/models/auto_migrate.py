@@ -27,7 +27,7 @@ REQUIRED_FIELDS: Dict[str, Dict[str, str]] = {
         "exp": "BIGINT NOT NULL DEFAULT 0 COMMENT '经验'",
         "server_id": "INTEGER NOT NULL DEFAULT 1 COMMENT '所属区服ID'",
         "last_group_openid": "VARCHAR(64) DEFAULT NULL COMMENT '最近活跃QQ群openid'",
-        "last_group_member_id": "VARCHAR(64) DEFAULT NULL COMMENT '最近活跃QQ群成员ID(用于@)'",
+        "last_group_member_id": "VARCHAR(64) DEFAULT NULL COMMENT '最近活跃QQ群成员openid(用于@)'",
         "last_group_username": "VARCHAR(64) DEFAULT NULL COMMENT '最近活跃QQ群昵称(用于@展示)'",
     },
     "guild": {

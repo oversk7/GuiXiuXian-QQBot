@@ -86,7 +86,9 @@ async def handle_group_mention_test(
     if not group_openid:
         await group_mention_test.finish("此命令只能在群里使用")
 
-    if not await _send_group_text(group_openid, content):
+    author = getattr(event, "author", None)
+    member_openid = getattr(author, "member_openid", None) or event.get_user_id()
+    if not await _send_group_text(group_openid, f"<@!{member_openid}> {content}"):
         await group_mention_test.finish("群提醒发送失败")
 
     logger.info(f"[Admin] 群提醒测试已发送到群: {group_openid}")

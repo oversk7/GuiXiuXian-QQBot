@@ -34,7 +34,7 @@ def _remember_group_context(player: Player, event: MessageEvent) -> None:
         player.last_group_openid = group_openid
 
     author = getattr(event, "author", None)
-    member_id = getattr(author, "id", None)
+    member_id = getattr(author, "member_openid", None)
     username = getattr(author, "username", None)
     if (
         group_openid
