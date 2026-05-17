@@ -10,7 +10,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from nonebot.adapters.qq import Bot
+from nonebot.adapters.qq import Bot, MessageSegment
 
 
 _PATCH_ATTR = "_xiuxian_full_group_send_patched"
@@ -20,6 +20,19 @@ _ORIGINAL_ATTR = "_xiuxian_original_send"
 def _event_type(event: Any) -> str:
     event_type = getattr(event, "__type__", "")
     return str(getattr(event_type, "value", event_type))
+
+
+def _sender_mention_id(event: Any) -> str | None:
+    author = getattr(event, "author", None)
+    mention_id = getattr(author, "id", None)
+    return str(mention_id) if mention_id else None
+
+
+def _with_sender_mention(event: Any, message: Any) -> Any:
+    mention_id = _sender_mention_id(event)
+    if not mention_id:
+        return message
+    return MessageSegment.mention_user(mention_id) + MessageSegment.text("\n") + message
 
 
 def patch_full_group_message_send() -> None:
@@ -32,7 +45,10 @@ def patch_full_group_message_send() -> None:
         if _event_type(event) == "GROUP_MESSAGE_CREATE":
             group_openid = getattr(event, "group_openid", None)
             if group_openid:
-                return await self.send_to_group(group_openid=group_openid, message=message)
+                return await self.send_to_group(
+                    group_openid=group_openid,
+                    message=_with_sender_mention(event, message),
+                )
 
         return await original_send(self, event, message, **kwargs)
 
