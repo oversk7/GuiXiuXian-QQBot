@@ -22,17 +22,19 @@ def _event_type(event: Any) -> str:
     return str(getattr(event_type, "value", event_type))
 
 
-def _sender_mention_id(event: Any) -> str | None:
+def _get_sender_nickname(event: Any) -> str | None:
+    nickname = getattr(event, "_xiuxian_nickname", None)
+    if nickname:
+        return nickname
     author = getattr(event, "author", None)
-    mention_id = getattr(author, "id", None)
-    return str(mention_id) if mention_id else None
+    return getattr(author, "username", None)
 
 
 def _with_sender_mention(event: Any, message: Any) -> Any:
-    mention_id = _sender_mention_id(event)
-    if not mention_id:
+    nickname = _get_sender_nickname(event)
+    if not nickname:
         return message
-    return MessageSegment.mention_user(mention_id) + MessageSegment.text("\n") + message
+    return MessageSegment.text(f"@{nickname}\n") + message
 
 
 def patch_full_group_message_send() -> None:
