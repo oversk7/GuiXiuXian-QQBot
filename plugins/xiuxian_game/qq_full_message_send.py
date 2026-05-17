@@ -34,7 +34,7 @@ def _with_sender_mention(event: Any, message: Any) -> Any:
     nickname = _get_sender_nickname(event)
     if not nickname:
         return message
-    return MessageSegment.text(f"@{nickname}\n") + message
+    return MessageSegment.text(f"@{nickname} ") + message
 
 
 def patch_full_group_message_send() -> None:

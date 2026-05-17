@@ -23,7 +23,7 @@ async def notify_player(player_id: str, message: str, session: AsyncSession | No
     """
     try:
         group_openid, nickname = await _get_notify_info(player_id, session)
-        text = f"@{nickname}\n{message}" if nickname else message
+        text = f"@{nickname} {message}" if nickname else message
         return await _send_group_text(group_openid, text)
     except Exception as e:
         logger.warning(f"[Notify] 群提醒失败 player={player_id}: {e}")
