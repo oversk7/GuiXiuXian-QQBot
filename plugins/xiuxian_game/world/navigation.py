@@ -706,7 +706,6 @@ async def _check_nav_arrivals():
                         player.id,
                         "\n".join(lines),
                         session,
-                        actual_mention=True,
                     )
 
                 except Exception as e:
