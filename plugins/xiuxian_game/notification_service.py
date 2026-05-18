@@ -34,7 +34,7 @@ async def notify_player(
     try:
         group_openid, nickname, mention_id = await _get_notification_target(player_id, session)
         if actual_mention and mention_id:
-            msg = MessageSegment.text(f"<@!{mention_id}> {message}")
+            msg = MessageSegment.mention_user(mention_id) + MessageSegment.text(f" {message}")
         else:
             msg = MessageSegment.text(f"@{nickname} {message}")
         return await _send_group_text(group_openid, msg)
