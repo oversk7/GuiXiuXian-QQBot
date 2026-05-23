@@ -17,6 +17,15 @@ from nonebot.message import event_preprocessor
 _MENTION_RE = re.compile(r"^\s*<@!?(?P<id>[\w-]+)>\s*|\s*<@!?(?P<tail_id>[\w-]+)>\s*$")
 
 
+def _event_type(event: MessageEvent) -> str:
+    event_type = getattr(event, "__type__", "")
+    return str(getattr(event_type, "value", event_type))
+
+
+def _is_full_group_message(event: MessageEvent) -> bool:
+    return _event_type(event) == "GROUP_MESSAGE_CREATE"
+
+
 def _bot_id(bot: Bot) -> str | None:
     try:
         return str(bot.self_info.id)
@@ -24,7 +33,15 @@ def _bot_id(bot: Bot) -> str | None:
         return str(getattr(bot, "self_id", "")) or None
 
 
-def _is_bot_mention(segment: MessageSegment, bot_id: str | None) -> bool:
+def _is_bot_mention(
+    segment: MessageSegment,
+    bot_id: str | None,
+    *,
+    assume_full_group_leading_mention: bool = False,
+) -> bool:
+    if assume_full_group_leading_mention and segment.type == "mention_user":
+        return True
+
     if segment.type in {"group_mention_user", "mention_user", "mention_robot"}:
         data: dict[str, Any] = segment.data
         mention_id = data.get("id") or data.get("user_id") or data.get("target_id")
@@ -76,10 +93,16 @@ async def normalize_qq_group_command_message(bot: Bot, event: MessageEvent) -> N
     message = event.get_message()
     removed_at_me = False
 
-    while message and _is_bot_mention(message[0], bot_id):
+    first_segment = True
+    while message and _is_bot_mention(
+        message[0],
+        bot_id,
+        assume_full_group_leading_mention=first_segment and _is_full_group_message(event),
+    ):
         del message[0]
         removed_at_me = True
         _lstrip_first_text(message)
+        first_segment = False
 
     while message and _is_bot_mention(message[-1], bot_id):
         del message[-1]

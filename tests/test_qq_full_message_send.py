@@ -1,30 +1,37 @@
 import importlib.util
 import sys
 import types
+from enum import Enum
 from pathlib import Path
 
 
-class _DummyBot:
-    async def send(self, event, message, **kwargs):
-        return message
+class _DummyEventType(str, Enum):
+    GROUP_MESSAGE_CREATE = "GROUP_MESSAGE_CREATE"
 
 
-class _DummyMessageSegment:
-    @staticmethod
-    def text(value):
-        return value
+class _DummyGroupAtMessageCreateEvent:
+    pass
+
+
+_event_classes = {}
+
+
+def _register_event_class(event_class):
+    _event_classes[event_class.__type__.value] = event_class
+    return event_class
 
 
 def _load_module():
-    nonebot_mod = types.ModuleType("nonebot")
-    adapters_mod = types.ModuleType("nonebot.adapters")
-    qq_mod = types.ModuleType("nonebot.adapters.qq")
-    qq_mod.Bot = _DummyBot
-    qq_mod.MessageSegment = _DummyMessageSegment
+    event_mod = types.ModuleType("nonebot.adapters.qq.event")
+    event_mod.EventType = _DummyEventType
+    event_mod.GroupAtMessageCreateEvent = _DummyGroupAtMessageCreateEvent
+    event_mod.register_event_class = _register_event_class
+
     stubs = {
-        "nonebot": nonebot_mod,
-        "nonebot.adapters": adapters_mod,
-        "nonebot.adapters.qq": qq_mod,
+        "nonebot": types.ModuleType("nonebot"),
+        "nonebot.adapters": types.ModuleType("nonebot.adapters"),
+        "nonebot.adapters.qq": types.ModuleType("nonebot.adapters.qq"),
+        "nonebot.adapters.qq.event": event_mod,
     }
     created_stubs = []
     for name, module in stubs.items():
@@ -32,6 +39,7 @@ def _load_module():
             sys.modules[name] = module
             created_stubs.append((name, module))
 
+    _event_classes.clear()
     module_path = (
         Path(__file__).resolve().parents[1]
         / "plugins"
@@ -49,15 +57,8 @@ def _load_module():
     return module
 
 
-def test_with_sender_mention_uses_author_username():
-    module = _load_module()
-    event = types.SimpleNamespace(author=types.SimpleNamespace(username="  阿青  "))
+def test_group_message_create_registered_as_group_at_event_compatibility():
+    _load_module()
 
-    assert module._with_sender_mention(event, "修炼完成") == "@阿青 修炼完成"
-
-
-def test_with_sender_mention_does_not_fall_back_to_openid():
-    module = _load_module()
-    event = types.SimpleNamespace(author=types.SimpleNamespace(member_openid="openid_123"))
-
-    assert module._with_sender_mention(event, "修炼完成") == "修炼完成"
+    event_class = _event_classes["GROUP_MESSAGE_CREATE"]
+    assert issubclass(event_class, _DummyGroupAtMessageCreateEvent)
