@@ -26,6 +26,24 @@ def _is_full_group_message(event: MessageEvent) -> bool:
     return _event_type(event) == "GROUP_MESSAGE_CREATE"
 
 
+def _is_confirmed_other_group_mention(segment: MessageSegment, message) -> bool:
+    if segment.type != "mention_user":
+        return False
+
+    mention_id = segment.data.get("user_id")
+    if not mention_id:
+        return False
+
+    for other in message[1:]:
+        if other.type != "group_mention_user":
+            continue
+        data: dict[str, Any] = other.data
+        if str(data.get("id")) == str(mention_id) and not data.get("is_you"):
+            return True
+
+    return False
+
+
 def _bot_id(bot: Bot) -> str | None:
     try:
         return str(bot.self_info.id)
@@ -93,16 +111,17 @@ async def normalize_qq_group_command_message(bot: Bot, event: MessageEvent) -> N
     message = event.get_message()
     removed_at_me = False
 
-    first_segment = True
     while message and _is_bot_mention(
         message[0],
         bot_id,
-        assume_full_group_leading_mention=first_segment and _is_full_group_message(event),
+        assume_full_group_leading_mention=(
+            _is_full_group_message(event)
+            and not _is_confirmed_other_group_mention(message[0], message)
+        ),
     ):
         del message[0]
         removed_at_me = True
         _lstrip_first_text(message)
-        first_segment = False
 
     while message and _is_bot_mention(message[-1], bot_id):
         del message[-1]

@@ -75,6 +75,20 @@ def _mention_user(user_id="member_openid"):
     return _DummyMessageSegment("mention_user", {"user_id": user_id})
 
 
+def _group_mention_user(user_id="member_openid", is_you=False):
+    return _DummyMessageSegment(
+        "group_mention_user",
+        {
+            "bot": False,
+            "id": user_id,
+            "is_you": is_you,
+            "member_openid": user_id,
+            "scope": "single",
+            "username": "player",
+        },
+    )
+
+
 def test_full_group_leading_mention_user_is_stripped():
     module = _load_module()
     message = [_mention_user("A1188C82191CA5A015D0D68AA843AC29"), _DummyMessageSegment.text(" 喂食 怨念  ")]
@@ -92,6 +106,21 @@ def test_non_full_group_leading_mention_user_is_not_stripped_without_bot_id_matc
     module = _load_module()
     message = [_mention_user("other_member"), _DummyMessageSegment.text(" 喂食 怨念  ")]
     event = _DummyEvent("GROUP_AT_MESSAGE_CREATE", message)
+
+    asyncio.run(module.normalize_qq_group_command_message(_DummyBot(), event))
+
+    assert event.to_me is False
+    assert event.get_message() == message
+
+
+def test_full_group_leading_mention_user_to_other_member_is_not_stripped():
+    module = _load_module()
+    message = [
+        _mention_user("other_member"),
+        _DummyMessageSegment.text(" 帮助"),
+        _group_mention_user("other_member", is_you=False),
+    ]
+    event = _DummyEvent("GROUP_MESSAGE_CREATE", message)
 
     asyncio.run(module.normalize_qq_group_command_message(_DummyBot(), event))
 
