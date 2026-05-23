@@ -25,13 +25,10 @@ def _bot_id(bot: Bot) -> str | None:
 
 
 def _is_bot_mention(segment: MessageSegment, bot_id: str | None) -> bool:
-    if segment.type == "group_mention_user":
+    if segment.type in {"group_mention_user", "mention_user", "mention_robot"}:
         data: dict[str, Any] = segment.data
-        return bool(data.get("is_you")) or bool(bot_id and str(data.get("id")) == bot_id)
-
-    if segment.type == "mention_user":
-        data = segment.data
-        return bool(bot_id and str(data.get("user_id")) == bot_id)
+        mention_id = data.get("id") or data.get("user_id") or data.get("target_id")
+        return bool(data.get("is_you")) or bool(bot_id and mention_id and str(mention_id) == bot_id)
 
     return False
 
