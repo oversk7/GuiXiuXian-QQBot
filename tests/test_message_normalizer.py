@@ -21,11 +21,11 @@ class _DummyBot:
 
 
 class _DummyEvent:
-    def __init__(self, event_type, message):
+    def __init__(self, event_type, message, to_me=False):
         self.__type__ = event_type
         self.group_openid = "group_openid"
         self._message = message
-        self.to_me = False
+        self.to_me = to_me
 
     def get_message(self):
         return self._message
@@ -102,6 +102,19 @@ def test_full_group_leading_mention_user_is_stripped():
     ]
 
 
+def test_empty_full_group_leading_mention_user_to_bot_stays_to_me():
+    module = _load_module()
+    message = [_mention_user("A1188C82191CA5A015D0D68AA843AC29"), _DummyMessageSegment.text(" ")]
+    event = _DummyEvent("GROUP_MESSAGE_CREATE", message)
+
+    asyncio.run(module.normalize_qq_group_command_message(_DummyBot(), event))
+
+    assert event.to_me is True
+    assert [(seg.type, seg.data) for seg in event.get_message()] == [
+        ("text", {"text": ""})
+    ]
+
+
 def test_non_full_group_leading_mention_user_is_not_stripped_without_bot_id_match():
     module = _load_module()
     message = [_mention_user("other_member"), _DummyMessageSegment.text(" 喂食 怨念  ")]
@@ -120,7 +133,22 @@ def test_full_group_leading_mention_user_to_other_member_is_not_stripped():
         _DummyMessageSegment.text(" 帮助"),
         _group_mention_user("other_member", is_you=False),
     ]
-    event = _DummyEvent("GROUP_MESSAGE_CREATE", message)
+    event = _DummyEvent("GROUP_MESSAGE_CREATE", message, to_me=True)
+
+    asyncio.run(module.normalize_qq_group_command_message(_DummyBot(), event))
+
+    assert event.to_me is False
+    assert event.get_message() == message
+
+
+def test_empty_full_group_mention_user_to_other_member_clears_to_me():
+    module = _load_module()
+    message = [
+        _mention_user("other_member"),
+        _DummyMessageSegment.text(" "),
+        _group_mention_user("other_member", is_you=False),
+    ]
+    event = _DummyEvent("GROUP_MESSAGE_CREATE", message, to_me=True)
 
     asyncio.run(module.normalize_qq_group_command_message(_DummyBot(), event))
 

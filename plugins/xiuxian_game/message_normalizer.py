@@ -110,13 +110,18 @@ async def normalize_qq_group_command_message(bot: Bot, event: MessageEvent) -> N
     bot_id = _bot_id(bot)
     message = event.get_message()
     removed_at_me = False
+    mentions_other_user = bool(
+        _is_full_group_message(event)
+        and message
+        and _is_confirmed_other_group_mention(message[0], message)
+    )
 
     while message and _is_bot_mention(
         message[0],
         bot_id,
         assume_full_group_leading_mention=(
             _is_full_group_message(event)
-            and not _is_confirmed_other_group_mention(message[0], message)
+            and not mentions_other_user
         ),
     ):
         del message[0]
@@ -142,3 +147,5 @@ async def normalize_qq_group_command_message(bot: Bot, event: MessageEvent) -> N
     if removed_at_me:
         event.to_me = True
         setattr(event, "_message", message)
+    elif mentions_other_user:
+        event.to_me = False
