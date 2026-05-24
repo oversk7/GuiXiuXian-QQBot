@@ -619,7 +619,7 @@ async def handle_monster_drops(session, player: Player, monster_level: int, regi
     # 装备掉落率配置（按怪物等级匹配装备品阶，精英怪是核心装备来源）
     if is_elite:
         if monster_level > 200:
-            equip_drop_rate = 0.09   # 200+精英 9%
+            equip_drop_rate = 0.10   # 200+精英 10%
             equip_rarities = ["blue", "purple", "purple", "orange"]  # 紫色权重高
         elif monster_level > 100:
             equip_drop_rate = 0.08   # 101-200精英 8%
