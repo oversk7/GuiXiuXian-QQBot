@@ -3,11 +3,12 @@ from nonebot.adapters.qq import MessageEvent, Message
 from nonebot.params import CommandArg
 from nonebot.permission import SUPERUSER
 from pathlib import Path
-from sqlalchemy.exc import SQLAlchemyError
 from datetime import datetime
 import asyncio
 import json
+from sqlalchemy import select
 from .models.db import safe_session
+from .models.account_ownership import AccountOwnership
 from .models.player import Player
 from .utils import message_add_head
 from .platform_utils import get_unified_player
@@ -76,45 +77,27 @@ log_uid_matcher = on_message(priority=1, block=False)
 
 @log_uid_matcher.handle()
 async def _(event: MessageEvent):
-    """记录触发指令的玩家信息，并同步最近活跃时间"""
+    """记录消息活跃信息，不为日志额外查询玩家数据。"""
     global _cache_dirty
     cmd_text_raw = event.get_plaintext().strip()
     if not cmd_text_raw:
         return
-    try:
-        async with safe_session() as session:
-            player = await get_unified_player(session, event)
-        uid = player.uid if player else "未注册"
-        nickname = player.nickname if player else "未注册"
-        command = cmd_text_raw
-        logger.info(f"UID:{uid} 昵称:{nickname} 指令:{command}")
-        # 直接更新内存缓存，无文件 I/O
-        user_id = str(event.get_user_id())
-        old = _active_cache.get(user_id, {})
-        _active_cache[user_id] = {
-            **old,
-            "uid": (player.uid if player else None),
-            "nickname": (player.nickname if player else None),
-            "last_active": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
-            "last_command": command,
-        }
-        _cache_dirty = True
-    except SQLAlchemyError as e:
-        logger.error(f"UID:未知 昵称:未知 指令:未知 状态:失败 错误:{str(e)}")
+    command = cmd_text_raw
+    user_id = str(event.get_user_id())
+    logger.info(f"ID:{user_id} 指令:{command}")
+    # 直接更新内存缓存，无数据库查询、无文件 I/O
+    old = _active_cache.get(user_id, {})
+    _active_cache[user_id] = {
+        **old,
+        "last_active": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+        "last_command": command,
+    }
+    _cache_dirty = True
 
 
 # ==================== 活动隐私设置 ====================
 hide_activity_cmd = on_command("隐藏活动", aliases={"隐藏动态"}, block=True, priority=13)
 show_activity_cmd = on_command("显示活动", aliases={"显示动态"}, block=True, priority=13)
-
-
-def _get_hidden_uids() -> set:
-    """从内存缓存中获取所有设置了隐藏活动的玩家UID集合"""
-    hidden = set()
-    for user_id, record in _active_cache.items():
-        if record.get("hide_activity") and record.get("uid"):
-            hidden.add(record["uid"])
-    return hidden
 
 
 def _set_hide_activity(user_id: str, hide: bool) -> None:
@@ -125,6 +108,39 @@ def _set_hide_activity(user_id: str, hide: bool) -> None:
     else:
         _active_cache[user_id] = {"hide_activity": hide}
     _cache_dirty = True
+
+
+async def _resolve_activity_players(user_ids: list[str]) -> dict[str, dict]:
+    """按平台ID批量解析最近活动展示所需的UID和昵称。"""
+    if not user_ids:
+        return {}
+
+    resolved: dict[str, dict] = {}
+    async with safe_session() as session:
+        stmt = (
+            select(AccountOwnership.owner_platform_id, Player.uid, Player.nickname)
+            .join(Player, Player.id == AccountOwnership.player_id)
+            .where(
+                AccountOwnership.owner_platform_id.in_(user_ids),
+                AccountOwnership.is_active == True,
+            )
+        )
+        for owner_platform_id, uid, nickname in (await session.execute(stmt)).all():
+            resolved[str(owner_platform_id)] = {
+                "uid": uid,
+                "nickname": nickname,
+            }
+
+        missing_ids = [user_id for user_id in user_ids if user_id not in resolved]
+        if missing_ids:
+            legacy_stmt = select(Player.id, Player.uid, Player.nickname).where(Player.id.in_(missing_ids))
+            for player_id, uid, nickname in (await session.execute(legacy_stmt)).all():
+                resolved[str(player_id)] = {
+                    "uid": uid,
+                    "nickname": nickname,
+                }
+
+    return resolved
 
 
 @hide_activity_cmd.handle()
@@ -197,22 +213,42 @@ async def handle_recent_activity(event: MessageEvent, args: Message = CommandArg
         if not data:
             await recent_activity_cmd.finish(message_add_head("❌ 暂无活动记录", event))
 
+        activity_user_ids = [
+            str(user_id)
+            for user_id, record in data.items()
+            if record.get("last_active") and not is_admin(str(user_id))
+        ]
+        player_lookup = await _resolve_activity_players(activity_user_ids + [event.get_user_id()])
+
         # 获取当前查询者的UID，用于判断是否查看自己
         querier_id = event.get_user_id()
-        querier_uid = data.get(querier_id, {}).get("uid")
+        querier_uid = player_lookup.get(querier_id, {}).get("uid") or data.get(querier_id, {}).get("uid")
 
         # 获取隐藏活动的玩家UID集合
-        hidden_uids = _get_hidden_uids()
+        hidden_user_ids = {
+            str(user_id)
+            for user_id, record in data.items()
+            if record.get("hide_activity")
+        }
+        hidden_uids = {
+            info["uid"]
+            for user_id, info in player_lookup.items()
+            if user_id in hidden_user_ids and info.get("uid")
+        }
 
         # 将所有记录转换为列表，并按时间排序
         records = []
         for user_id, record in data.items():
-            if record.get("last_active") and record.get("uid"):
+            if record.get("last_active"):
                 # 过滤掉主管理员的记录，保护管理员隐私
                 if is_admin(str(user_id)):
                     continue
 
-                record_uid = record.get("uid")
+                player_info = player_lookup.get(str(user_id))
+                if not player_info:
+                    continue
+
+                record_uid = player_info["uid"]
 
                 # 如果指定了UID，只收集该玩家的记录
                 if target_uid is not None and record_uid != target_uid:
@@ -231,8 +267,8 @@ async def handle_recent_activity(event: MessageEvent, args: Message = CommandArg
                     # 解析时间字符串
                     active_time = datetime.strptime(record["last_active"], "%Y-%m-%d %H:%M:%S")
                     records.append({
-                        "uid": record["uid"],
-                        "nickname": record.get("nickname", "未知"),
+                        "uid": record_uid,
+                        "nickname": player_info.get("nickname", "未知"),
                         "time": active_time,
                         "command": record.get("last_command", "未知指令"),
                     })

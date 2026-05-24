@@ -8,6 +8,7 @@ from .models.db import init_db
 from . import qq_full_message_send
 from . import message_normalizer
 from . import message_guard
+from . import observability
 
 __plugin_meta__ = PluginMetadata(
     name="诡修仙",
