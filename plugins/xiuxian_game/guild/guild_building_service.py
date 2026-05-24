@@ -434,40 +434,16 @@ class GuildBuildingService:
     @staticmethod
     async def get_guild_bonuses(session: AsyncSession, guild_id: int) -> Dict:
         """获取公会建筑提供的所有加成"""
-        buildings = await GuildBuildingService.get_guild_buildings(session, guild_id)
-        
-        bonuses = {
-            "exp_multiplier": 1.0,
-            "treasury_limit": 100000,  # 基础资金上限
-            "cultivation_bonus": 0.0,
-            "teleport_range": 0,
-            "daily_teleport_uses": 0,
-            "daily_alchemy_production": 0,
-            "warehouse_capacity": 0,
-            "forge_enabled": False,
-            "forge_gold_discount": 0.0,
-            "upgrade_success_bonus": 0.0,
-            "upgrade_gold_discount": 0.0,
-        }
-        
-        for building in buildings:
-            effects = building["effects"]
-            for effect_type, value in effects.items():
-                if effect_type == "forge_enabled":
-                    bonuses["forge_enabled"] = bonuses["forge_enabled"] or bool(value)
-                elif effect_type in bonuses:
-                    if effect_type in ["exp_multiplier", "treasury_limit", "teleport_range", "warehouse_capacity"]:
-                        bonuses[effect_type] = max(bonuses[effect_type], value)
-                    else:
-                        bonuses[effect_type] += value
-                elif effect_type == "daily_uses":
-                    bonuses["daily_teleport_uses"] = max(bonuses["daily_teleport_uses"], value)
-                elif effect_type == "daily_production":
-                    bonuses["daily_alchemy_production"] = max(bonuses["daily_alchemy_production"], value)
-                elif effect_type == "storage_slots":
-                    bonuses["warehouse_capacity"] = max(bonuses["warehouse_capacity"], value)
-        
-        return bonuses
+        from ..infrastructure.repositories.guild_building_repository import GuildBuildingRepository
+        from ..infrastructure.repositories.guild_repository import GuildRepository
+        from .guild_building_service_new import GuildBuildingService as GuildBuildingServiceNew
+
+        building_service = GuildBuildingServiceNew(
+            guild_repo=GuildRepository(session),
+            building_repo=GuildBuildingRepository(session),
+            item_repo=None,
+        )
+        return await building_service.get_guild_bonuses(guild_id)
 
     @staticmethod
     def format_building_effects(effects: Dict) -> str:
