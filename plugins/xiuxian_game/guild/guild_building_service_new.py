@@ -10,6 +10,7 @@ from ..models.inventory import ItemInstance
 from ..infrastructure.repositories.guild_repository import GuildRepository
 from ..infrastructure.repositories.guild_building_repository import GuildBuildingRepository
 from ..infrastructure.repositories.item_repository import ItemRepository
+from ..infrastructure.repositories.guild_warehouse_item_repository import GuildWarehouseItemRepository
 from .guild_permission import GuildPermission
 
 
@@ -194,6 +195,7 @@ class GuildBuildingService:
         guild_repo: GuildRepository,
         building_repo: GuildBuildingRepository,
         item_repo: ItemRepository,
+        warehouse_item_repo: GuildWarehouseItemRepository | None = None,
     ):
         """
         初始化公会建筑服务
@@ -206,6 +208,7 @@ class GuildBuildingService:
         self._guild_repo = guild_repo
         self._building_repo = building_repo
         self._item_repo = item_repo
+        self._warehouse_item_repo = warehouse_item_repo
 
     @staticmethod
     def get_effects_for_level(building_type: BuildingType, level: int) -> Dict:
@@ -353,6 +356,109 @@ class GuildBuildingService:
             return False, f"坐标({plot_x},{plot_y})已放置{existing_name}", None
 
         return True, "可以放置", (plot_x, plot_y)
+
+    async def _get_warehouse_material_quantity(self, guild_id: int, item_id: str) -> int:
+        """获取公会仓库中指定材料总量。"""
+        if not self._warehouse_item_repo:
+            return 0
+        stacks = await self._warehouse_item_repo.get_by_guild_and_item_id(guild_id, item_id)
+        return sum(stack.quantity for stack in stacks)
+
+    async def _consume_warehouse_material(self, guild_id: int, item_id: str, quantity: int) -> int:
+        """从公会仓库消耗材料，返回实际消耗数量。"""
+        if not self._warehouse_item_repo or quantity <= 0:
+            return 0
+
+        consumed = 0
+        stacks = await self._warehouse_item_repo.get_by_guild_and_item_id(guild_id, item_id)
+        for stack in stacks:
+            if consumed >= quantity:
+                break
+            take = min(stack.quantity, quantity - consumed)
+            stack.quantity -= take
+            consumed += take
+            if stack.quantity <= 0:
+                await self._warehouse_item_repo.delete(stack.id)
+            else:
+                await self._warehouse_item_repo.update(stack)
+        return consumed
+
+    async def validate_build_or_upgrade(
+        self,
+        guild_id: int,
+        building_type: BuildingType,
+        player_id: str,
+        plot_x: int | None = None,
+        plot_y: int | None = None,
+    ) -> Tuple[bool, str, Dict]:
+        """校验建造/升级条件，不修改数据。"""
+        can_build, reason = await GuildPermission.can_build(
+            self._guild_repo._session, player_id, guild_id
+        )
+        if not can_build:
+            return False, reason, {}
+
+        can_build_check, build_reason = await self.can_build(guild_id, building_type)
+        if not can_build_check:
+            return False, build_reason, {}
+
+        existing = await self._building_repo.get_by_guild_and_type(guild_id, building_type)
+        new_position: tuple[int, int] | None = None
+        if not existing:
+            valid_position, position_reason, new_position = await self._validate_new_position(
+                guild_id, plot_x, plot_y
+            )
+            if not valid_position or not new_position:
+                return False, position_reason, {}
+
+        cost = await self.get_build_cost(guild_id, building_type)
+        if not cost:
+            return False, "无法计算建造成本", {}
+
+        guild = await self._guild_repo.get_by_id(guild_id)
+        if not guild:
+            return False, "公会不存在", {}
+
+        if guild.treasury < cost["gold"]:
+            return False, f"公会资金不足，需要{cost['gold']}金币", {}
+
+        if not self._item_repo:
+            return False, "物品仓储未初始化，无法检查材料", {}
+
+        from ..config import config
+
+        material_sources = {}
+        for material_name, required_qty in cost["materials"].items():
+            material_config = config.items_config["by_name"].get(material_name)
+            if not material_config:
+                return False, f"材料配置错误：{material_name}", {}
+
+            warehouse_qty = await self._get_warehouse_material_quantity(guild_id, material_config.item_id)
+            material_instances = await self._item_repo.get_by_player_and_item_id(
+                player_id, material_config.item_id
+            )
+            bag_qty = sum(instance.quantity for instance in material_instances)
+            total_qty = warehouse_qty + bag_qty
+
+            material_sources[material_name] = {
+                "item_id": material_config.item_id,
+                "required": required_qty,
+                "warehouse": warehouse_qty,
+                "bag": bag_qty,
+                "total": total_qty,
+            }
+            if total_qty < required_qty:
+                return (
+                    False,
+                    f"材料不足：{material_name} (需要{required_qty}，仓库{warehouse_qty}，背包{bag_qty})",
+                    {},
+                )
+
+        return True, "可以建造", {
+            "cost": cost,
+            "new_position": new_position,
+            "material_sources": material_sources,
+        }
 
     @classmethod
     def get_adjacency_bonus_descriptions(cls, buildings: list[GuildBuilding]) -> list[str]:
@@ -543,76 +649,37 @@ class GuildBuildingService:
             ✅ 原代码无P0问题：未发现内部commit
             新版本移除session参数，通过Repository操作数据
         """
-        # 权限检查（暂时继续使用GuildPermission静态方法）
-        can_build, reason = await GuildPermission.can_build(
-            self._guild_repo._session, player_id, guild_id
+        valid, reason, validation = await self.validate_build_or_upgrade(
+            guild_id, building_type, player_id, plot_x, plot_y
         )
-        if not can_build:
+        if not valid:
             return False, reason
 
-        # 检查是否可以建造
-        can_build_check, build_reason = await self.can_build(
-            guild_id, building_type
-        )
-        if not can_build_check:
-            return False, build_reason
-
-        existing_before_cost = await self._building_repo.get_by_guild_and_type(
-            guild_id, building_type
-        )
-        new_position: tuple[int, int] | None = None
-        if not existing_before_cost:
-            valid_position, position_reason, new_position = await self._validate_new_position(guild_id, plot_x, plot_y)
-            if not valid_position or not new_position:
-                return False, position_reason
-
-        # 获取成本
-        cost = await self.get_build_cost(guild_id, building_type)
-        if not cost:
-            return False, "无法计算建造成本"
-
-        # 检查公会资金
+        cost = validation["cost"]
+        new_position = validation["new_position"]
+        material_sources = validation["material_sources"]
         guild = await self._guild_repo.get_by_id(guild_id)
         if not guild:
             return False, "公会不存在"
-
-        if guild.treasury < cost["gold"]:
-            return False, f"公会资金不足，需要{cost['gold']}金币"
-
-        # 检查材料（从玩家背包中扣除）
-        from ..config import config
-
-        for material_name, required_qty in cost["materials"].items():
-            # 通过名称查找物品配置
-            material_config = config.items_config["by_name"].get(material_name)
-            if not material_config:
-                return False, f"材料配置错误：{material_name}"
-
-            # 检查玩家背包中的材料数量
-            material_instances = await self._item_repo.get_by_player_and_item_id(
-                player_id, material_config.item_id
-            )
-            total_qty = sum(instance.quantity for instance in material_instances)
-
-            if total_qty < required_qty:
-                return False, f"材料不足：{material_name} (需要{required_qty}，拥有{total_qty})"
 
         # 扣除资金
         guild.treasury -= cost["gold"]
         await self._guild_repo.update(guild)
 
         # 扣除材料
-        for material_name, required_qty in cost["materials"].items():
-            material_config = config.items_config["by_name"].get(material_name)
-            try:
-                # 使用ItemRepository的consume_item方法
+        for material_name, source in material_sources.items():
+            required_qty = source["required"]
+            item_id = source["item_id"]
+            warehouse_consumed = await self._consume_warehouse_material(
+                guild_id, item_id, required_qty
+            )
+            bag_required = required_qty - warehouse_consumed
+            if bag_required > 0:
                 success_consume = await self._item_repo.consume_item(
-                    player_id, material_config.item_id, required_qty
+                    player_id, item_id, bag_required
                 )
                 if not success_consume:
                     return False, f"扣除材料失败：{material_name}"
-            except ValueError as e:
-                return False, f"扣除材料失败：{str(e)}"
 
         # 建造或升级建筑
         existing = await self._building_repo.get_by_guild_and_type(

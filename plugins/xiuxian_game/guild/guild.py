@@ -1271,25 +1271,40 @@ async def handle_build(event: MessageEvent, args: Message = CommandArg()):
         # 新版：使用DI架构Service
         from ..infrastructure.repositories.guild_repository import GuildRepository
         from ..infrastructure.repositories.guild_building_repository import GuildBuildingRepository
+        from ..infrastructure.repositories.guild_warehouse_item_repository import GuildWarehouseItemRepository
+        from ..infrastructure.repositories.item_repository import ItemRepository
 
         building_service = GuildBuildingServiceNew(
             guild_repo=GuildRepository(session),
             building_repo=GuildBuildingRepository(session),
-            item_repo=None  # get_build_cost不需要item_repo
+            item_repo=ItemRepository(session),
+            warehouse_item_repo=GuildWarehouseItemRepository(session),
         )
         cost = await building_service.get_build_cost(player.guild_id, building_type)
         if not cost:
             await build_cmd.finish("⛔ 该建筑已达到最高等级")
 
+        valid, reason, validation = await building_service.validate_build_or_upgrade(
+            player.guild_id, building_type, player.id, plot_x, plot_y
+        )
+        if not valid:
+            await build_cmd.finish(message_add_head(f"⛔ {reason}", event))
+
         # 显示成本信息（Markdown格式）
-        materials_str = "、".join([f"{k}×{v}" for k, v in cost["materials"].items()])
+        material_lines = []
+        for material_name, source in validation["material_sources"].items():
+            material_lines.append(
+                f"📦 {material_name}×{source['required']} "
+                f"(仓库{source['warehouse']} / 背包{source['bag']})"
+            )
         cost_lines = [
             f"# 🏗️ 建造确认",
             f"建筑：**{building_name}**",
             f"布局：**{f'({plot_x},{plot_y})' if plot_x is not None and plot_y is not None else '自动放置'}**",
             "***",
             f"💰 金币：**{cost['gold']:,}**",
-            f"📦 材料：{materials_str}",
+            "**材料来源：**",
+            *material_lines,
             "***",
             cmd(
                 "确认建造 " + building_name,
@@ -1351,11 +1366,13 @@ async def handle_confirm_build_with_name(event: MessageEvent, args: Message = Co
         from ..infrastructure.repositories.guild_repository import GuildRepository
         from ..infrastructure.repositories.guild_building_repository import GuildBuildingRepository
         from ..infrastructure.repositories.item_repository import ItemRepository
+        from ..infrastructure.repositories.guild_warehouse_item_repository import GuildWarehouseItemRepository
 
         building_service = GuildBuildingServiceNew(
             guild_repo=GuildRepository(session),
             building_repo=GuildBuildingRepository(session),
-            item_repo=ItemRepository(session)  # build_or_upgrade需要item_repo消耗材料
+            item_repo=ItemRepository(session),
+            warehouse_item_repo=GuildWarehouseItemRepository(session),
         )
         success, message = await building_service.build_or_upgrade(
             player.guild_id, building_type, player.id, plot_x, plot_y
