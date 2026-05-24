@@ -47,6 +47,7 @@ from . import (
     auction,  # 拍卖行系统（稀有物品限时竞价）
     stall,  # 个人摊位系统（玩家自由定价直购交易）
     pet,  # 宠物伴侣系统
+    group_persona,  # 假装群友：白名单群文字闲聊
     web,  # Web 地图可视化
 )
 
