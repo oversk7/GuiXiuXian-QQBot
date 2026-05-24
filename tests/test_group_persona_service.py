@@ -83,8 +83,8 @@ def _cfg(**overrides):
     data = {
         "enabled": True,
         "group_whitelist": frozenset({"g1"}),
-        "persona_name": "阿诡",
-        "aliases": ("阿诡",),
+        "persona_name": "小诡",
+        "aliases": ("小诡",),
         "reply_probability": 0.0,
         "mention_reply_probability": 1.0,
         "min_interval_seconds": 90.0,
@@ -128,7 +128,7 @@ def test_group_persona_ignores_commands_and_empty_text():
 def test_group_persona_mention_triggers_when_probability_allows():
     svc = service.GroupPersonaService()
     decision = svc.decide_trigger(
-        _message("阿诡你怎么看"),
+        _message("小诡你怎么看"),
         _cfg(),
         now=1000.0,
         rng=random.Random(1),

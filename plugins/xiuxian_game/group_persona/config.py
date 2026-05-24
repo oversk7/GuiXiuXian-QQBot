@@ -12,8 +12,8 @@ from ..config import config
 class GroupPersonaConfig:
     enabled: bool = False
     group_whitelist: frozenset[str] = field(default_factory=frozenset)
-    persona_name: str = "阿诡"
-    aliases: tuple[str, ...] = ("阿诡",)
+    persona_name: str = "小诡"
+    aliases: tuple[str, ...] = ("小诡",)
     reply_probability: float = 0.08
     mention_reply_probability: float = 1.0
     min_interval_seconds: float = 90.0
@@ -31,7 +31,7 @@ def _as_str_list(value: Any) -> list[str]:
 
 def load_group_persona_config() -> GroupPersonaConfig:
     raw = config.game_config.get("group_persona", {}) or {}
-    persona_name = str(raw.get("persona_name") or "阿诡").strip() or "阿诡"
+    persona_name = str(raw.get("persona_name") or "小诡").strip() or "小诡"
     aliases = _as_str_list(raw.get("aliases"))
     if persona_name not in aliases:
         aliases.insert(0, persona_name)

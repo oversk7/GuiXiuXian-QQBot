@@ -208,9 +208,9 @@ group_persona:
   enabled: true
   group_whitelist:
     - "A147FA35C340F858A66260FB4ADBB46D"
-  persona_name: "阿诡"
+  persona_name: "小诡"
   aliases:
-    - "阿诡"
+    - "小诡"
   reply_probability: 0.08
   mention_reply_probability: 1.0
   min_interval_seconds: 90
