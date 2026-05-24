@@ -393,8 +393,8 @@ class GuildFacilityService:
         building_service = GuildBuildingServiceNew(
             self._guild_repo, self._building_repo, self._item_repo
         )
-        effects = building_service.get_effects_for_level(BuildingType.ALCHEMY_ROOM, alchemy_building.level)
-        daily_production = effects["daily_production"]
+        bonuses = await building_service.get_guild_bonuses(guild_id)
+        daily_production = bonuses["daily_alchemy_production"]
 
         # 存储上限 = 日产量 * 倍数
         return daily_production * self.STORAGE_CAPACITY_MULTIPLIER
@@ -463,8 +463,11 @@ class GuildFacilityService:
         building_service = GuildBuildingServiceNew(
             self._guild_repo, self._building_repo, self._item_repo
         )
-        effects = building_service.get_effects_for_level(BuildingType.ALCHEMY_ROOM, alchemy_building.level)
-        daily_production = effects["daily_production"]
+        effects = building_service.get_effects_for_level(
+            BuildingType.ALCHEMY_ROOM, alchemy_building.level
+        )
+        bonuses = await building_service.get_guild_bonuses(guild_id)
+        daily_production = bonuses["daily_alchemy_production"]
         pill_quality = effects["pill_quality"]
 
         # 检查存储空间

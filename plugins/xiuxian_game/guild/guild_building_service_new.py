@@ -283,6 +283,12 @@ class GuildBuildingService:
             return False
         return abs(a.plot_x - b.plot_x) + abs(a.plot_y - b.plot_y) == 1
 
+    @classmethod
+    def _get_spirit_tower_power(cls, spirit_tower: GuildBuilding) -> int:
+        """聚灵阵等级决定相邻建筑的额外收益强度。"""
+        effects = cls.get_effects_for_level(BuildingType.SPIRIT_TOWER, spirit_tower.level)
+        return max(1, int(effects.get("adjacency_power", 1)))
+
     async def _find_empty_position(self, guild_id: int) -> tuple[int, int] | None:
         """按从左到右、从上到下自动寻找空格"""
         buildings = await self._building_repo.get_all_by_guild_id(guild_id)
@@ -356,18 +362,19 @@ class GuildBuildingService:
 
         spirit_tower = by_type.get(BuildingType.SPIRIT_TOWER)
         if spirit_tower:
+            power = cls._get_spirit_tower_power(spirit_tower)
             for building in buildings:
                 if building.id == spirit_tower.id or not cls._is_adjacent(spirit_tower, building):
                     continue
                 name = cls.BUILDING_CONFIGS[building.building_type]["name"]
                 if building.building_type == BuildingType.ALCHEMY_ROOM:
-                    descriptions.append(f"聚灵阵邻接{name}：丹房日产 +1")
+                    descriptions.append(f"聚灵阵邻接{name}：丹房日产 +{power}")
                 elif building.building_type == BuildingType.TRAINING_GROUND:
-                    descriptions.append(f"聚灵阵邻接{name}：修为加成 +2%")
+                    descriptions.append(f"聚灵阵邻接{name}：修为加成 +{power * 2}%")
                 elif building.building_type == BuildingType.ARTIFACT_FORGE:
-                    descriptions.append(f"聚灵阵邻接{name}：锻造金币折扣 +2%")
+                    descriptions.append(f"聚灵阵邻接{name}：锻造金币折扣 +{power * 2}%")
                 elif building.building_type == BuildingType.REFINING_PAVILION:
-                    descriptions.append(f"聚灵阵邻接{name}：升阶成功率 +1%")
+                    descriptions.append(f"聚灵阵邻接{name}：升阶成功率 +{power}%")
 
         forge = by_type.get(BuildingType.ARTIFACT_FORGE)
         refining = by_type.get(BuildingType.REFINING_PAVILION)
@@ -393,17 +400,18 @@ class GuildBuildingService:
 
         spirit_tower = by_type.get(BuildingType.SPIRIT_TOWER)
         if spirit_tower:
+            power = cls._get_spirit_tower_power(spirit_tower)
             for building in buildings:
                 if building.id == spirit_tower.id or not cls._is_adjacent(spirit_tower, building):
                     continue
                 if building.building_type == BuildingType.ALCHEMY_ROOM:
-                    bonuses["daily_alchemy_production"] += 1
+                    bonuses["daily_alchemy_production"] += power
                 elif building.building_type == BuildingType.TRAINING_GROUND:
-                    bonuses["cultivation_bonus"] += 0.02
+                    bonuses["cultivation_bonus"] += power * 0.02
                 elif building.building_type == BuildingType.ARTIFACT_FORGE:
-                    bonuses["forge_gold_discount"] += 0.02
+                    bonuses["forge_gold_discount"] += power * 0.02
                 elif building.building_type == BuildingType.REFINING_PAVILION:
-                    bonuses["upgrade_success_bonus"] += 0.01
+                    bonuses["upgrade_success_bonus"] += power * 0.01
 
         forge = by_type.get(BuildingType.ARTIFACT_FORGE)
         refining = by_type.get(BuildingType.REFINING_PAVILION)

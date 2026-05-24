@@ -379,7 +379,8 @@ class GuildFacilityService:
 
         # 获取丹房效果
         effects = GuildBuildingService.get_effects_for_level(BuildingType.ALCHEMY_ROOM, alchemy_building.level)
-        daily_production = effects["daily_production"]
+        bonuses = await GuildBuildingService.get_guild_bonuses(session, guild_id)
+        daily_production = bonuses["daily_alchemy_production"]
         pill_quality = effects["pill_quality"]
 
         # 检查存储空间
