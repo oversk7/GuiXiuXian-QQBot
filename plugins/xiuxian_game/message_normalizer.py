@@ -146,6 +146,7 @@ async def normalize_qq_group_command_message(bot: Bot, event: MessageEvent) -> N
 
     if removed_at_me:
         event.to_me = True
+        setattr(event, "_mentioned_bot", True)
         setattr(event, "_message", message)
     elif mentions_other_user:
         event.to_me = False

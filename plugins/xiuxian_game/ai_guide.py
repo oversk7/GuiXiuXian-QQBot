@@ -881,8 +881,12 @@ async def handle_admin_database_query(user_message: str, event, matcher=None):
 
 
 
-# AI引导处理器 - 使用明确的命令前缀避免误触
-ai_guide = on_command("问", aliases={"请问", "我想知道", "怎么"}, priority=15, block=True)
+# AI引导处理器 - 仅响应@机器人后的明确提问，避免全量群消息误触发大模型
+async def _mentioned_bot_rule(event: MessageEvent) -> bool:
+    return bool(getattr(event, "_mentioned_bot", False))
+
+
+ai_guide = on_command("问", aliases={"请问", "我想知道", "怎么"}, rule=_mentioned_bot_rule, priority=15, block=True)
 
 @ai_guide.handle()
 async def handle_ai_guide(event: MessageEvent, args: Message = CommandArg()):
@@ -895,11 +899,11 @@ async def handle_ai_guide(event: MessageEvent, args: Message = CommandArg()):
             await ai_guide.finish(message_add_head(
                 "💡 助手使用说明\n"
                 "━━━━━━━━━━━━━\n"
-                "使用方式：【问 你的问题】\n"
+                "使用方式：【@机器人 问 你的问题】\n"
                 "示例：\n"
-                "• 【问 如何升级】\n"
-                "• 【请问 怎么赚钱】\n"
-                "• 【提问 装备怎么升阶】\n\n"
+                "• 【@机器人 问 如何升级】\n"
+                "• 【@机器人 请问 怎么赚钱】\n"
+                "• 【@机器人 怎么 装备升阶】\n\n"
                 "💡 也可以直接发送【帮助】查看完整指令列表",
                 event
             ))

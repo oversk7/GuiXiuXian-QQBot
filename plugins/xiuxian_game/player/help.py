@@ -60,7 +60,7 @@ async def handle_help(event: MessageEvent, args: Message = CommandArg()):
         f"{cmd('切换称号')} | {cmd('赞助商店')} | {cmd('月卡')} 月卡权益\n"
         "***\n"
         f"💡 新手？点 {cmd('新手指引')} 看成长路线\n"
-        f"💡 有疑问？点 {cmd('问 你的问题', '问 ')} 询问AI\n"
+        f"💡 有疑问？@机器人发送 {cmd('问 你的问题', '问 ')} 询问AI\n"
         f"💡 {cmd('完整帮助')} 查看所有功能\n"
         f"💡 [加入官群【꧁༺诡修仙༻꧂】]({GROUP_LINK})\n"
         "💡 游戏资料教程👉<HTTPS://GITEE.COM/ling-gtq/TheWestTutorial>"
