@@ -5,7 +5,7 @@
 """
 from typing import Tuple, Optional, List
 from datetime import datetime, date
-from sqlalchemy import select, and_
+from sqlalchemy import select, and_, or_
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from ..infrastructure.repositories.player_repository import PlayerRepository
@@ -444,6 +444,27 @@ class RelationshipService:
         relationship = await self._relationship_repo.get_or_create_relationship(
             player_id, target.id
         )
+
+        if relationship_type == RelationshipType.MARRIAGE:
+            stmt = select(PlayerRelationship).where(
+                and_(
+                    PlayerRelationship.relationship_type == RelationshipType.MARRIAGE.value,
+                    or_(
+                        PlayerRelationship.player_id.in_([player_id, target.id]),
+                        PlayerRelationship.target_id.in_([player_id, target.id]),
+                    ),
+                )
+            )
+            result = await self._uow.session.execute(stmt)
+            existing_marriage = result.scalars().first()
+            if existing_marriage:
+                married_player_id = (
+                    player_id
+                    if existing_marriage.player_id == player_id or existing_marriage.target_id == player_id
+                    else target.id
+                )
+                married_player = player if married_player_id == player_id else target
+                return False, f"{married_player.nickname}已有婚姻关系,无法重复结婚"
 
         # 检查当前关系类型
         if relationship.relationship_type != RelationshipType.NONE.value:
@@ -1214,11 +1235,10 @@ class RelationshipService:
             return False, "玩家不存在"
 
         # 检查金币
-        if player.money < cost:
-            return False, f"金币不足！离婚需要{cost}金币,你当前只有{player.money}金币"
+        if player.gold < cost:
+            return False, f"金币不足！离婚需要{cost}金币,你当前只有{player.gold}金币"
 
         # 查找婚姻关系
-        from sqlalchemy import or_
         stmt = select(PlayerRelationship).where(
             and_(
                 or_(
@@ -1229,23 +1249,24 @@ class RelationshipService:
             )
         )
         result = await self._uow.session.execute(stmt)
-        relationship = result.scalar_one_or_none()
+        relationships = result.scalars().all()
 
-        if not relationship:
+        if not relationships:
             return False, "你当前没有婚姻关系"
 
         # 扣除金币
-        player.money -= cost
-
-        # 解除婚姻关系
-        relationship.relationship_type = RelationshipType.NONE.value
-        relationship.established_at = None
+        player.gold -= cost
 
         # 获取配偶ID
-        spouse_id = relationship.target_id if relationship.player_id == player_id else relationship.player_id
-        spouse = await self._player_repo.get_by_id(spouse_id)
+        spouse_names = []
+        for relationship in relationships:
+            relationship.relationship_type = RelationshipType.NONE.value
+            relationship.established_at = None
+            spouse_id = relationship.target_id if relationship.player_id == player_id else relationship.player_id
+            spouse = await self._player_repo.get_by_id(spouse_id)
+            spouse_names.append(spouse.nickname if spouse else "对方")
 
-        return True, f"你支付了{cost}金币,与{spouse.nickname if spouse else '对方'}离婚了"
+        return True, f"你支付了{cost}金币,与{'、'.join(spouse_names)}离婚了"
 
     async def break_sworn(
         self,
