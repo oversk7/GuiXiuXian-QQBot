@@ -18,6 +18,7 @@ from datetime import date
 from ..models.elixir_usage import ElixirUsageLog
 
 from ..models.guild import Guild
+from .command_guard import should_silence_unknown_inventory_item
 
 # 导入新效果系统（带Feature Flag）
 from ..domain.effects.adapters import apply_effect_with_fallback, USE_NEW_EFFECT_SYSTEM
@@ -60,7 +61,7 @@ async def _handle_expand_territory(session, player: Player, item_config, quantit
     return True, f"🏰 公会势力范围扩张成功！{old_range} → {guild.territory_range}"
 
 
-inventory_cmd = on_command("背包", block=True, priority=9)
+inventory_cmd = on_command("背包", block=True, priority=9, force_whitespace=True)
 fish_inventory_cmd = on_command("鱼栏", aliases={"鱼篓", "鱼仓", "鱼库", "我的鱼"}, block=True, priority=9)
 use_item = on_command("使用", block=True, priority=9)
 elixir_tolerance_cmd = on_command("耐药性", aliases={"丹药耐药性"}, block=True, priority=9)
@@ -581,6 +582,8 @@ async def handle_inventory(event: MessageEvent, args: Message = CommandArg()):
     if query_item_name:
         item_config = config.items_config["by_name"].get(query_item_name)
         if not item_config:
+            if should_silence_unknown_inventory_item(event):
+                return
             await inventory_cmd.finish(f"⛔ 不存在物品：{query_item_name}")
 
         if item_config.type == ItemType.EQUIPMENT:

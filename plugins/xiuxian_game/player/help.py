@@ -69,11 +69,17 @@ async def handle_help(event: MessageEvent, args: Message = CommandArg()):
 
 # 空消息@机器人 → 触发帮助
 empty_at_cmd = on_message(rule=to_me(), priority=99, block=True)
+
+
+def _is_text_only_empty_message(event: MessageEvent) -> bool:
+    message = event.get_message()
+    return all(segment.type == "text" for segment in message) and not event.get_plaintext().strip()
+
+
 @empty_at_cmd.handle()
 async def handle_empty_at(event: MessageEvent):
     """用户仅@机器人不说话时，等同于触发帮助"""
-    text = event.get_plaintext().strip()
-    if text:
+    if not _is_text_only_empty_message(event):
         return
     await handle_help(event, Message())
 

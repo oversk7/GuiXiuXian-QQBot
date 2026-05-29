@@ -44,6 +44,18 @@ def _is_confirmed_other_group_mention(segment: MessageSegment, message) -> bool:
     return False
 
 
+def _has_following_text_segment(message) -> bool:
+    has_text = False
+    has_non_text = False
+    for segment in message[1:]:
+        if segment.type == "text":
+            has_text = True
+        else:
+            has_non_text = True
+
+    return has_text and not has_non_text
+
+
 def _bot_id(bot: Bot) -> str | None:
     try:
         return str(bot.self_info.id)
@@ -115,14 +127,16 @@ async def normalize_qq_group_command_message(bot: Bot, event: MessageEvent) -> N
         and message
         and _is_confirmed_other_group_mention(message[0], message)
     )
+    can_assume_leading_mention = bool(
+        _is_full_group_message(event)
+        and not mentions_other_user
+        and _has_following_text_segment(message)
+    )
 
     while message and _is_bot_mention(
         message[0],
         bot_id,
-        assume_full_group_leading_mention=(
-            _is_full_group_message(event)
-            and not mentions_other_user
-        ),
+        assume_full_group_leading_mention=can_assume_leading_mention,
     ):
         del message[0]
         removed_at_me = True
