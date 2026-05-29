@@ -1932,6 +1932,7 @@ HEADQUARTERS_COORD = (150, 1200)  # 风雪镇
 HEADQUARTERS_ITEMS = {
     "upgrade_stone_low": 300,        # 初级升阶石
     "upgrade_stone_mid": 2000,       # 中级升阶石
+    "upgrade_stone_high": 6000,      # 高级升阶石
     "stabilizer_crystal": 10000,      # 稳定水晶
     "gem_hammer": 300,               # 镶嵌锤
     "gem_chisel": 300,               # 拆卸凿
@@ -1986,7 +1987,7 @@ async def _(event: MessageEvent):
         ]
 
         # 分类显示商品
-        upgrade_items = ["upgrade_stone_low", "upgrade_stone_mid", "stabilizer_crystal"]
+        upgrade_items = ["upgrade_stone_low", "upgrade_stone_mid", "upgrade_stone_high", "stabilizer_crystal"]
         tool_items = ["gem_hammer", "gem_chisel"]
         gem_items = ["accuracy_bead_1"]
         anti_crit_items = ["anti_crit_rune_1", "anti_crit_rune_2", "anti_crit_rune_3",
