@@ -67,7 +67,6 @@ class GroupPersonaService:
     def __init__(self) -> None:
         self._history: dict[str, Deque[PersonaStoredMessage]] = defaultdict(deque)
         self._last_reply_at: dict[str, float] = {}
-        self._ambient_message_counts: dict[str, int] = defaultdict(int)
         self._locks: dict[str, asyncio.Lock] = defaultdict(asyncio.Lock)
 
     def get_config(self) -> GroupPersonaConfig:
@@ -85,12 +84,10 @@ class GroupPersonaService:
         )
         while len(history) > cfg.max_history_messages:
             history.popleft()
-        self._ambient_message_counts[message.group_id] += 1
 
     def clear_group(self, group_id: str) -> None:
         self._history.pop(group_id, None)
         self._last_reply_at.pop(group_id, None)
-        self._ambient_message_counts.pop(group_id, None)
 
     def is_enabled_for_group(self, group_id: str, cfg: GroupPersonaConfig) -> bool:
         return cfg.enabled and group_id in cfg.group_whitelist
@@ -125,7 +122,8 @@ class GroupPersonaService:
 
         if not mention_hit:
             threshold = self._get_ambient_message_threshold(cfg)
-            if self._ambient_message_counts.get(message.group_id, 0) < threshold:
+            recent_count = self._count_recent_messages(message.group_id, cfg, current)
+            if recent_count < threshold:
                 return TriggerDecision(False, "wait_more_messages")
         else:
             sampler = rng or random
@@ -136,7 +134,12 @@ class GroupPersonaService:
 
     def _get_ambient_message_threshold(self, cfg: GroupPersonaConfig) -> int:
         frequency = max(0.01, min(1.0, cfg.reply_probability))
-        return max(1, int(ceil(1.0 / frequency)))
+        derived_threshold = max(1, int(ceil(1.0 / frequency)))
+        return min(derived_threshold, cfg.ambient_max_wait_messages)
+
+    def _count_recent_messages(self, group_id: str, cfg: GroupPersonaConfig, now: float) -> int:
+        cutoff = now - cfg.ambient_window_seconds
+        return sum(1 for item in self._history.get(group_id, ()) if item.created_at >= cutoff)
 
     async def maybe_reply(self, message: PersonaIncomingMessage) -> str | None:
         cfg = self.get_config()
@@ -160,9 +163,7 @@ class GroupPersonaService:
                 return None
             response = await self._generate_reply(message.group_id, fresh_cfg, decision.reason)
             if not response:
-                self._ambient_message_counts[message.group_id] = 0
                 return None
-            self._ambient_message_counts[message.group_id] = 0
             self._last_reply_at[message.group_id] = time.time()
             return response
 
@@ -251,7 +252,7 @@ def build_reply_system_prompt(cfg: GroupPersonaConfig) -> str:
         _identity_prompt(cfg)
         + "你的目标不是回答问题，而是在游戏群里低频冒泡：温和接梗、轻轻收一句、顺手捧场，让气氛轻一点。\n"
         "先判断大家是在彼此聊天、自言自语，还是在跟你说话；不要盲目插话，也不要把每句话都当成提问。\n"
-        "如果对方像是还没说完，或者你接不上，输出 NO_REPLY。\n"
+        "如果对方像是还没说完、你接不上、话题或氛围不适合插话，输出 NO_REPLY。\n"
         "优先根据最近几句做轻柔总结、复读式接梗或一句短短的气氛话；不要抢游戏机器人本职，不要认真讲攻略。\n"
         "说话风格要贴近最近聊天记录：可以顺着群里的语气、短句、口头禅和小圈子黑话自然发挥，但不要解释你在模仿。\n"
         "不做人身攻击，不嘲笑具体玩家，不给人贴负面标签，不评价智商、能力、长相、现实身份或处境，不阴阳怪气。\n"

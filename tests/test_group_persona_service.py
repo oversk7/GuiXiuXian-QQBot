@@ -3,6 +3,8 @@ import asyncio
 import random
 import sys
 import types
+import time
+from collections import deque
 from pathlib import Path
 
 
@@ -88,10 +90,12 @@ def _cfg(**overrides):
         "reply_probability": 0.0,
         "mention_reply_probability": 1.0,
         "min_interval_seconds": 90.0,
+        "ambient_max_wait_messages": 6,
+        "ambient_window_seconds": 120.0,
         "max_history_messages": 30,
         "max_response_length": 120,
         "ignore_commands": True,
-        "timing_gate_enabled": True,
+        "timing_gate_enabled": False,
     }
     data.update(overrides)
     return service.GroupPersonaConfig(**data)
@@ -140,7 +144,7 @@ def test_group_persona_mention_triggers_when_probability_allows():
 
 def test_group_persona_ambient_waits_for_enough_messages():
     svc = service.GroupPersonaService()
-    cfg = _cfg(reply_probability=0.25)
+    cfg = _cfg(reply_probability=0.25, ambient_max_wait_messages=6)
     msg = _message("今天群里挺热闹")
     svc.record_message(msg, cfg)
     first_decision = svc.decide_trigger(msg, cfg, now=1000.0, rng=random.Random(1))
@@ -153,6 +157,46 @@ def test_group_persona_ambient_waits_for_enough_messages():
     assert first_decision.reason == "wait_more_messages"
     assert second_decision.should_reply is True
     assert second_decision.reason == "ambient"
+
+
+def test_group_persona_ambient_caps_low_probability_wait():
+    svc = service.GroupPersonaService()
+    cfg = _cfg(reply_probability=0.08, ambient_max_wait_messages=6)
+    msg = _message("这个话题正在热")
+    now = time.time()
+
+    for _ in range(5):
+        svc.record_message(msg, cfg)
+    first_decision = svc.decide_trigger(msg, cfg, now=now, rng=random.Random(1))
+
+    svc.record_message(msg, cfg)
+    second_decision = svc.decide_trigger(msg, cfg, now=now, rng=random.Random(1))
+
+    assert first_decision.should_reply is False
+    assert first_decision.reason == "wait_more_messages"
+    assert second_decision.should_reply is True
+    assert second_decision.reason == "ambient"
+
+
+def test_group_persona_ambient_ignores_stale_history():
+    svc = service.GroupPersonaService()
+    cfg = _cfg(reply_probability=0.08, ambient_max_wait_messages=6, ambient_window_seconds=120.0)
+    now = time.time()
+    svc._history["g1"] = deque(
+        service.PersonaStoredMessage(
+            user_id="u1",
+            username="群友A",
+            text="刚才那个旧话题",
+            created_at=now - 300.0,
+        )
+        for _ in range(10)
+    )
+    svc.record_message(_message("现在换话题了"), cfg)
+
+    decision = svc.decide_trigger(_message("现在换话题了"), cfg, now=now, rng=random.Random(1))
+
+    assert decision.should_reply is False
+    assert decision.reason == "wait_more_messages"
 
 
 def test_group_persona_cooldown_blocks_reply():
@@ -195,3 +239,28 @@ def test_generate_reply_uses_timing_gate_for_ambient_messages():
         return await svc._generate_reply("g1", cfg, "ambient")
 
     assert asyncio.run(run_case()) == "嗯，这个说法有点东西"
+
+
+def test_generate_reply_skips_timing_gate_when_disabled():
+    async def run_case():
+        calls = []
+
+        async def fake_call_ai_with_fallback(messages):
+            calls.append(messages)
+            return {"choices": [{"message": {"content": "这句来得正好"}}]}
+
+        old_call = service.call_ai_with_fallback
+        service.call_ai_with_fallback = fake_call_ai_with_fallback
+        try:
+            svc = service.GroupPersonaService()
+            cfg = _cfg(timing_gate_enabled=False)
+            result = await svc._generate_reply("g1", cfg, "ambient")
+        finally:
+            service.call_ai_with_fallback = old_call
+
+        return result, calls
+
+    result, calls = asyncio.run(run_case())
+
+    assert result == "这句来得正好"
+    assert len(calls) == 1

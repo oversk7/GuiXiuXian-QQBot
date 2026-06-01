@@ -117,3 +117,21 @@ Committed multi-server shard isolation code, kept server 2 registration closed b
 ### Next Steps
 
 - None - task complete
+
+
+## Session 3: Tune group persona ambient reply latency
+
+**Date**: 2026-06-01
+**Task**: Reduce awkward delayed automatic group persona comments
+**Branch**: `main`
+
+### Summary
+
+Changed ambient group persona triggering from an unbounded accumulated message count to a recent activity window. Low-probability ambient replies now wait at most 6 recent messages within 120 seconds before evaluating, and the extra timing gate is disabled by default so ambient replies avoid a second AI call.
+
+### Testing
+
+- [OK] Directly executed all `tests.test_group_persona_service.test_*` functions
+- [OK] `python -m compileall plugins\xiuxian_game\group_persona tests\test_group_persona_service.py`
+- [OK] `git diff --check`
+- [WARN] `python -m pytest tests\test_group_persona_service.py` could not run because `pytest` is not installed in the active Python environment.

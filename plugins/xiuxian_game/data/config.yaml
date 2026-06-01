@@ -214,8 +214,9 @@ group_persona:
   reply_probability: 0.08
   mention_reply_probability: 1.0
   min_interval_seconds: 90
+  ambient_max_wait_messages: 6
+  ambient_window_seconds: 120
   max_history_messages: 30
   max_response_length: 120
   ignore_commands: true
-  timing_gate_enabled: true
-
+  timing_gate_enabled: false
