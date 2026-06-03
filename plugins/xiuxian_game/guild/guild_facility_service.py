@@ -24,6 +24,7 @@ class GuildFacilityService:
             {"item_id": "spirit_elixir", "weight": 20},  # 升灵丹
             {"item_id": "life_recovery_elixir", "weight": 20},  # 回生丹
             {"item_id": "soul_recovery_elixir", "weight": 20},  # 凝魂丹
+            {"item_id": "berry_shield_elixir", "weight": 10},  # 阴莓护体丹
             {"item_id": "blood_pact", "weight": 15},  # 血契丹
             {"item_id": "revive_potion", "weight": 10},  # 仿制还魂丹
         ],
@@ -33,6 +34,8 @@ class GuildFacilityService:
             {"item_id": "great_soul_recovery_elixir", "weight": 18},  # 大凝魂丹
             {"item_id": "perfect_revive_elixir", "weight": 12},  # 完美还魂丹
             {"item_id": "iron_body_elixir", "weight": 10},  # 金刚体丹
+            {"item_id": "vine_body_elixir", "weight": 8},  # 魂藤淬骨丹
+            {"item_id": "orchid_battle_elixir", "weight": 8},  # 血兰战魄丹
         ],
         "advanced": [
             {"item_id": "night_soul_elixir", "weight": 18},  # 夜魂丹
@@ -42,6 +45,7 @@ class GuildFacilityService:
             {"item_id": "battle_god_elixir", "weight": 10},  # 战神丹
             {"item_id": "fortune_elixir", "weight": 10},  # 鸿运丹
             {"item_id": "wisdom_elixir", "weight": 8},  # 悟道丹
+            {"item_id": "nightmare_break_elixir", "weight": 7},  # 噩梦破境丹
         ],
         "master": [
             {"item_id": "world_power_elixir", "weight": 6},  # 世界之力丹
@@ -58,12 +62,15 @@ class GuildFacilityService:
             {"item_id": "agility_essence_elixir", "weight": 4},  # 敏之精华丹
             {"item_id": "defense_essence_elixir", "weight": 4},  # 防之精华丹
             {"item_id": "vitality_essence_elixir", "weight": 4},  # 体之精华丹
-            {"item_id": "reforge_strength_elixir", "weight": 3},  # 归元破力丹
-            {"item_id": "reforge_agility_elixir", "weight": 3},  # 归元化敏丹
-            {"item_id": "reforge_defense_elixir", "weight": 3},  # 归元散防丹
-            {"item_id": "reforge_vitality_elixir", "weight": 3},  # 归元化体丹
-            {"item_id": "reforge_wisdom_elixir", "weight": 3},  # 归元凝神丹
-            {"item_id": "reforge_luck_elixir", "weight": 3},  # 归元化运丹
+            {"item_id": "fate_contract_elixir", "weight": 4},  # 命运契丹
+            {"item_id": "cursed_essence_elixir", "weight": 3},  # 诅咒精魄丹
+            {"item_id": "reforge_strength_elixir", "weight": 1},  # 归元破力丹
+            {"item_id": "reforge_agility_elixir", "weight": 1},  # 归元化敏丹
+            {"item_id": "reforge_defense_elixir", "weight": 1},  # 归元散防丹
+            {"item_id": "reforge_vitality_elixir", "weight": 1},  # 归元化体丹
+            {"item_id": "reforge_wisdom_elixir", "weight": 1},  # 归元凝神丹
+            {"item_id": "reforge_luck_elixir", "weight": 1},  # 归元化运丹
+            {"item_id": "void_restore_elixir", "weight": 1},  # 虚空归元丹
         ]
     }
 
