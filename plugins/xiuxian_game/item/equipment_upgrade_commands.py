@@ -54,7 +54,7 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
             await upgrade_info_cmd.finish("⛔ 请先创建角色")
 
         # 查找装备
-        equip = await find_equipment_by_input(session, event.get_user_id(), arg)
+        equip = await find_equipment_by_input(session, player.id, arg)
         if not equip:
             await upgrade_info_cmd.finish("⛔ 未找到指定装备，请使用装备栏中显示的编号或装备名称")
 
@@ -126,7 +126,7 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
 
             # 查询拥有数量
             stmt = select(ItemInstance.quantity).where(
-                ItemInstance.player_id == event.get_user_id(),
+                ItemInstance.player_id == player.id,
                 ItemInstance.item_id == material_id
             )
             result = await session.execute(stmt)
@@ -195,7 +195,7 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
             await upgrade_equipment_cmd.finish("⛔ 请先创建角色")
 
         # 查找装备
-        equip = await find_equipment_by_input(session, event.get_user_id(), equipment_arg)
+        equip = await find_equipment_by_input(session, player.id, equipment_arg)
         if not equip:
             await upgrade_equipment_cmd.finish("⛔ 未找到指定装备，请使用装备栏中显示的编号或装备名称")
 
@@ -277,7 +277,7 @@ async def _(event: MessageEvent):
 
         # 查询所有装备
         stmt = select(ItemInstance).where(
-            ItemInstance.player_id == event.get_user_id(),
+            ItemInstance.player_id == player.id,
             ItemInstance.item_id.in_(EQUIP_ITEM_IDS),
             ItemInstance.equipped == False  # 只显示未装备的
         )
@@ -288,7 +288,7 @@ async def _(event: MessageEvent):
 
         # 获取玩家所有装备用于编号映射
         stmt_all = select(ItemInstance).where(
-            ItemInstance.player_id == event.get_user_id(),
+            ItemInstance.player_id == player.id,
             ItemInstance.item_id.in_(EQUIP_ITEM_IDS)
         )
         all_equips = (await session.execute(stmt_all)).scalars().all()
@@ -364,7 +364,7 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
             await auto_upgrade_cmd.finish("⛔ 请先创建角色")
 
         # 查找装备
-        equip = await find_equipment_by_input(session, event.get_user_id(), equipment_arg)
+        equip = await find_equipment_by_input(session, player.id, equipment_arg)
         if not equip:
             await auto_upgrade_cmd.finish("⛔ 未找到指定装备，请使用装备栏中显示的编号或装备名称")
 

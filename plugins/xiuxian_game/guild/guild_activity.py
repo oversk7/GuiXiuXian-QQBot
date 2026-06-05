@@ -81,7 +81,7 @@ async def _do_activity_check(session: AsyncSession, server_id: int) -> list[str]
 async def _find_active_candidate(
     session: AsyncSession, guild: Guild, threshold: datetime
 ) -> tuple[GuildMember, Player] | None:
-    """在公会中找最活跃的非会长成员（需在阈值内有活跃记录）"""
+    """按职位从高到低查找活跃候选人；同职位取最近活跃者。"""
     stmt = (
         select(GuildMember, Player)
         .join(Player, GuildMember.player_id == Player.id)
@@ -90,16 +90,26 @@ async def _find_active_candidate(
     )
     results = (await session.execute(stmt)).all()
 
-    best = None
-    best_time = None
-    for member, player in results:
-        last = _player_last_active(player)
-        if last and last >= threshold:
-            if best_time is None or last > best_time:
-                best = (member, player)
-                best_time = last
+    position_order = (
+        GuildPosition.VICE_PRESIDENT,
+        GuildPosition.CORE_MEMBER,
+        GuildPosition.MEMBER,
+    )
+    for position in position_order:
+        best = None
+        best_time = None
+        for member, player in results:
+            if member.position != position:
+                continue
+            last = _player_last_active(player)
+            if last and last >= threshold:
+                if best_time is None or last > best_time:
+                    best = (member, player)
+                    best_time = last
+        if best:
+            return best
 
-    return best
+    return None
 
 
 async def _auto_transfer_president(
