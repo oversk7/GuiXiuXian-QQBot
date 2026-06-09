@@ -181,16 +181,23 @@ async def handle_feed(event: MessageEvent, args: Message = CommandArg()):
 # ==================== 互动 ====================
 interact_cmd = on_command("摸摸", aliases={"摸头", "玩耍", "抱抱"}, priority=5, block=True)
 
+# 中文别名 → action_key
+_INTERACT_ACTION_MAP = {
+    "摸摸": "pat",
+    "摸头": "headpat",
+    "玩耍": "play",
+    "抱抱": "hug",
+}
+
 
 @interact_cmd.handle()
 async def handle_interact(event: MessageEvent):
-    """【摸摸】/【摸头】/【玩耍】/【抱抱】- 与宠物互动"""
+    """【摸摸】/【摸头】/【玩耍】/【抱抱】- 与宠物互动（4种动作各有偏向）"""
     raw_msg = event.get_plaintext().strip()
-    action_map = {"摸摸": "摸了摸", "摸头": "摸了摸头", "玩耍": "和它玩耍了一会", "抱抱": "抱了抱"}
-    action = "摸了摸"
-    for key, val in action_map.items():
-        if raw_msg.startswith(key):
-            action = val
+    action_key = "pat"
+    for alias, key in _INTERACT_ACTION_MAP.items():
+        if raw_msg.startswith(alias):
+            action_key = key
             break
 
     async with UnitOfWork(AsyncSessionLocal) as uow:
@@ -198,9 +205,16 @@ async def handle_interact(event: MessageEvent):
         if not player:
             await interact_cmd.finish("请先创建角色")
 
-        success, msg = await pet_service.interact(uow, player.id, action)
+        success, msg = await pet_service.interact(uow, player.id, action_key)
         if success and msg:
-            content = f"{msg}\n***\n{cmd('宠物')} | {cmd('喂食')} | {cmd('对话 内容', '对话 ')}"
+            # 推荐另一种互动作为快捷按钮，引导玩家尝试不同动作
+            others = [a for a in ("摸摸", "摸头", "玩耍", "抱抱")
+                      if _INTERACT_ACTION_MAP[a] != action_key]
+            content = (
+                f"{msg}\n***\n"
+                f"{cmd(others[0])} | {cmd(others[1])} | {cmd(others[2])}\n"
+                f"{cmd('宠物')} | {cmd('喂食')} | {cmd('对话 内容', '对话 ')}"
+            )
             await interact_cmd.finish(build_markdown(content))
         await interact_cmd.finish(msg)
 

@@ -245,42 +245,185 @@ class PetService:
 
     # ==================== 互动 ====================
 
+    ACTION_LABEL = {
+        "pat": "摸了摸",
+        "headpat": "拍了拍头",
+        "play": "玩耍了一会",
+        "hug": "抱了抱",
+    }
+
     async def interact(
-        self, uow: UnitOfWork, player_id: str, action: str
+        self, uow: UnitOfWork, player_id: str, action_key: str
     ) -> Tuple[bool, str]:
-        """与宠物互动（摸头、玩耍等）"""
+        """与宠物互动（4种动作差异化 + 随机文案 + 状态调味 + 惊喜掉落）"""
+        import random
+
         pet = await uow.pets.get_active_pet(player_id)
         if not pet:
             return False, "你还没有伙伴诡兽"
 
+        baseline = self.config.get_interaction_baseline(action_key)
+        if not baseline:
+            return False, "未知的互动动作"
+
+        # 统一CD检查
         cd_minutes = self.config.settings["interact_cooldown_minutes"]
         if pet.last_interact_at:
             elapsed = (datetime.now() - pet.last_interact_at).total_seconds() / 60
             if elapsed < cd_minutes:
-                remaining = int(cd_minutes - elapsed)
+                remaining = max(1, int(cd_minutes - elapsed))
                 return False, f"互动冷却中，还需等待{remaining}分钟"
 
-        affection_gain = self.config.settings["interact_affection_gain"]
-        mood_gain = self.config.settings["interact_mood_gain"]
-        exp_gain = 3
+        state_cfg = self.config.interaction_state_modifiers
+        starving = pet.hunger < state_cfg["starving_hunger"]
+        grumpy = pet.mood < state_cfg["grumpy_mood"]
 
-        pet.affection = min(1000, pet.affection + affection_gain)
-        pet.mood = min(100, pet.mood + mood_gain)
+        # 闹脾气有几率直接拒绝互动（不消耗CD）
+        if grumpy and random.random() < state_cfg["grumpy_refuse_chance"]:
+            refuse = self.config.interaction_states.get("grumpy_refuse", {})
+            text = refuse.get("text", "它不想被打扰。").format(
+                nickname=pet.nickname,
+                display=self._display_name(pet),
+            )
+            return False, f"🐾 {pet.nickname}\n━━━━━━━━━━━━━\n{text}"
+
+        # 抽签：选 bucket（normal/special/surprise）
+        weights = self.config.interaction_weights
+        bucket = random.choices(
+            ["normal", "special", "surprise"],
+            weights=[weights["normal"], weights["special"], weights["surprise"]],
+            k=1,
+        )[0]
+
+        # 过滤候选文案（按 condition）
+        candidates = [
+            line for line in self.config.get_interaction_lines(action_key, bucket)
+            if line.matches(pet.mood, pet.affection, pet.hunger, pet.is_transformed)
+        ]
+        # 候选空时退化为 normal，再不行用空 modifier
+        if not candidates and bucket != "normal":
+            bucket = "normal"
+            candidates = [
+                line for line in self.config.get_interaction_lines(action_key, "normal")
+                if line.matches(pet.mood, pet.affection, pet.hunger, pet.is_transformed)
+            ]
+        line = random.choice(candidates) if candidates else None
+
+        # 计算最终数值：baseline + modifier，再按状态打折
+        affection_gain = baseline.affection + int(line.modifier.get("affection", 0) if line else 0)
+        mood_gain = baseline.mood + int(line.modifier.get("mood", 0) if line else 0)
+        exp_gain = baseline.exp + int(line.modifier.get("exp", 0) if line else 0)
+        hunger_cost = baseline.hunger_cost
+
+        # 状态打折（只折正向收益，负向继续生效）
+        if starving:
+            mult = state_cfg["starving_multiplier"]
+            if affection_gain > 0:
+                affection_gain = max(1, int(affection_gain * mult))
+            if mood_gain > 0:
+                mood_gain = max(1, int(mood_gain * mult))
+            if exp_gain > 0:
+                exp_gain = max(1, int(exp_gain * mult))
+        if grumpy:
+            if affection_gain > 0:
+                affection_gain = max(1, affection_gain // 2)
+            if mood_gain > 0:
+                mood_gain = max(1, mood_gain // 2)
+
+        # 应用状态文案前缀（饥饿/闹脾气优先覆盖文案）
+        text = line.text if line else "你和它互动了一会。"
+        state_suggest = ""
+        if starving:
+            override = self.config.interaction_states.get("starving", {})
+            text = override.get("text", text)
+            state_suggest = override.get("suggest", "")
+        elif grumpy:
+            override = self.config.interaction_states.get("grumpy", {})
+            text = override.get("text", text)
+            state_suggest = override.get("suggest", "")
+        text = text.format(nickname=pet.nickname, display=self._display_name(pet))
+
+        # 写入状态
+        pet.affection = max(0, min(1000, pet.affection + affection_gain))
+        pet.mood = max(0, min(100, pet.mood + mood_gain))
+        pet.hunger = max(0, pet.hunger - hunger_cost)
         pet.last_interact_at = datetime.now()
-        level_up_msg = self._add_experience(pet, exp_gain)
+        level_up_msg = self._add_experience(pet, max(0, exp_gain))
+
+        # 惊喜掉落（仅 surprise bucket，且未处于挨饿/闹脾气状态）
+        reward_notice = ""
+        if bucket == "surprise" and not starving and not grumpy:
+            reward_notice = await self._grant_surprise_reward(uow, player_id, pet)
+
         await uow.pets.update(pet)
         AttributeCalculatorFactory.invalidate_pet_cache(player_id)
 
+        # 构建回复
         level_name = self.config.get_affection_level_name(pet.affection)
+        affection_part = f"好感{self._signed(affection_gain)} → {pet.affection}({level_name})"
+        mood_part = f"心情{self._signed(mood_gain)} → {pet.mood}/100"
+        exp_part = f"经验+{exp_gain}" if exp_gain > 0 else ""
+        hunger_part = f"饱食-{hunger_cost} → {pet.hunger}/100" if hunger_cost > 0 else ""
+
+        delta_parts = [p for p in [affection_part, mood_part, exp_part, hunger_part] if p]
         msg = (
-            f"你{action}了【{pet.nickname}】\n"
-            f"好感度+{affection_gain} → {pet.affection}({level_name})\n"
-            f"心情+{mood_gain} → {pet.mood}/100\n"
-            f"经验+{exp_gain}"
+            f"🐾 {pet.nickname}\n"
+            f"━━━━━━━━━━━━━\n"
+            f"{text}\n"
+            f"━━━━━━━━━━━━━\n"
+            + " · ".join(delta_parts)
         )
         if level_up_msg:
-            msg += f"\n{level_up_msg}"
+            msg += f"\n🎉 {level_up_msg}"
+        if reward_notice:
+            msg += f"\n{reward_notice}"
+        if state_suggest:
+            msg += f"\n💡 {state_suggest}"
         return True, msg
+
+    def _display_name(self, pet: PetInstance) -> str:
+        """宠物展示名（化形后取人形名）"""
+        beast = self.config.get_beast(pet.beast_id)
+        if pet.is_transformed:
+            return self.config.get_transform_name(pet.beast_id, pet.transform_gender)
+        return beast.name if beast else pet.nickname
+
+    @staticmethod
+    def _signed(value: int) -> str:
+        return f"+{value}" if value >= 0 else str(value)
+
+    async def _grant_surprise_reward(
+        self, uow: UnitOfWork, player_id: str, pet: PetInstance
+    ) -> str:
+        """惊喜掉落：按权重抽奖励池，给金币/怨念/物品"""
+        import random
+
+        rewards = self.config.get_surprise_rewards()
+        if not rewards:
+            return ""
+        reward = random.choices(rewards, weights=[r.weight for r in rewards], k=1)[0]
+        qty = random.randint(reward.min_qty, reward.max_qty)
+
+        if reward.item_id == "_gold":
+            player = await uow.players.get_by_id(player_id)
+            player.gold += qty
+            await uow.players.update(player)
+            return f"🎁 {pet.nickname} 给了你 金币×{qty}"
+        if reward.item_id == "_resentment":
+            player = await uow.players.get_by_id(player_id)
+            player.resentment += qty
+            await uow.players.update(player)
+            return f"🎁 {pet.nickname} 给了你 怨念×{qty}"
+
+        # 普通物品：背包满则降级为金币
+        ok = await ItemInstance.add_item(uow.session, player_id, reward.item_id, qty)
+        if ok:
+            return f"🎁 {pet.nickname} 给了你 {reward.name}×{qty}"
+        # 背包满，退化为等价金币
+        player = await uow.players.get_by_id(player_id)
+        player.gold += 20
+        await uow.players.update(player)
+        return f"🎁 {pet.nickname} 想给你东西但你背包满了，它只好递来了一些 金币×20"
 
     # ==================== 化形 ====================
 

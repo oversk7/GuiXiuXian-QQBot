@@ -54,6 +54,49 @@ class PetPersonality:
     behavioral_rules: List[str]
 
 
+@dataclass
+class InteractionLine:
+    """单条互动文案"""
+    text: str
+    condition: Dict[str, object]      # 触发条件，全部满足才入候选
+    modifier: Dict[str, int]           # 数值修正（叠加到 baseline 上）
+
+    def matches(self, mood: int, affection: int, hunger: int, is_transformed: bool) -> bool:
+        c = self.condition
+        if "mood_min" in c and mood < c["mood_min"]:
+            return False
+        if "mood_max" in c and mood > c["mood_max"]:
+            return False
+        if "affection_min" in c and affection < c["affection_min"]:
+            return False
+        if "affection_max" in c and affection > c["affection_max"]:
+            return False
+        if "hunger_min" in c and hunger < c["hunger_min"]:
+            return False
+        if "hunger_max" in c and hunger > c["hunger_max"]:
+            return False
+        if "require_transformed" in c and bool(c["require_transformed"]) != is_transformed:
+            return False
+        return True
+
+
+@dataclass
+class SurpriseReward:
+    name: str
+    item_id: str
+    min_qty: int
+    max_qty: int
+    weight: int
+
+
+@dataclass
+class InteractionBaseline:
+    affection: int
+    mood: int
+    exp: int
+    hunger_cost: int
+
+
 # 属性名中英翻译
 ATTR_NAME_CN = {
     "attack": "攻击",
@@ -152,9 +195,41 @@ class PetConfigManager:
                 parsed["human_male"] = PetPersonality(**forms["human_form_male"])
             self._personalities[beast_id] = parsed
 
+        # 加载互动文案/事件库
+        with open(data_dir / "pet_interactions.yaml", "r", encoding="utf-8") as f:
+            inter_config = yaml.safe_load(f)
+
+        self._interaction_baselines: Dict[str, InteractionBaseline] = {
+            key: InteractionBaseline(**data)
+            for key, data in inter_config["baselines"].items()
+        }
+        self.interaction_state_modifiers: dict = inter_config["state_modifiers"]
+        self.interaction_weights: Dict[str, int] = inter_config["weights"]
+        self._surprise_rewards: List[SurpriseReward] = [
+            SurpriseReward(**r) for r in inter_config["surprise_rewards"]
+        ]
+
+        self._interaction_lines: Dict[str, Dict[str, List[InteractionLine]]] = {}
+        for action_key in ("pat", "headpat", "play", "hug"):
+            section = inter_config.get(action_key, {})
+            self._interaction_lines[action_key] = {
+                bucket: [
+                    InteractionLine(
+                        text=line["text"],
+                        condition=line.get("condition", {}) or {},
+                        modifier=line.get("modifier", {}) or {},
+                    )
+                    for line in section.get(bucket, [])
+                ]
+                for bucket in ("normal", "special", "surprise")
+            }
+
+        self.interaction_states: Dict[str, dict] = inter_config.get("states", {})
+
         logger.info(
             f"宠物配置加载完成: {len(self._beasts)}种族, "
-            f"{len(self._accessories)}饰品, {len(self._personalities)}人设"
+            f"{len(self._accessories)}饰品, {len(self._personalities)}人设, "
+            f"4种动作互动文案"
         )
 
     def get_beast(self, beast_id: str) -> Optional[BeastConfig]:
@@ -261,3 +336,14 @@ class PetConfigManager:
         if gender == "male" and beast.transform_description_male:
             return beast.transform_description_male
         return beast.transform_description
+
+    # ==================== 互动文案 ====================
+
+    def get_interaction_baseline(self, action_key: str) -> Optional[InteractionBaseline]:
+        return self._interaction_baselines.get(action_key)
+
+    def get_interaction_lines(self, action_key: str, bucket: str) -> List[InteractionLine]:
+        return self._interaction_lines.get(action_key, {}).get(bucket, [])
+
+    def get_surprise_rewards(self) -> List[SurpriseReward]:
+        return self._surprise_rewards

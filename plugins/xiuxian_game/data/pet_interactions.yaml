@@ -1,0 +1,208 @@
+# ====================================================================
+# 宠物互动文案与事件库
+# ====================================================================
+# 4 种互动动作各有独立基线、独立文案池：
+#   - pat (摸摸)：偏好感
+#   - headpat (摸头)：偏心情
+#   - play (玩耍)：偏经验（消耗饱食）
+#   - hug (抱抱)：偏亲密（好感+心情）
+#
+# 每次互动按概率挑一条文案：
+#   - normal: 普通反应（高权重，默认基线效果）
+#   - special: 特殊事件（中权重，文案带 modifier 修正数值）
+#   - surprise: 惊喜事件（低权重，掉落小奖励，复用 GIFT_WHITELIST）
+#
+# condition 字段可选，全部满足才进抽签：
+#   - mood_min / mood_max
+#   - affection_min / affection_max
+#   - hunger_min / hunger_max
+#   - require_transformed (true/false)
+#
+# 文案占位符：
+#   {nickname} 宠物昵称
+#   {display}  宠物展示名（化形后是人形名）
+# ====================================================================
+
+# 4 种动作的基线效果
+baselines:
+  pat:           # 摸摸 - 偏好感
+    affection: 5
+    mood: 3
+    exp: 2
+    hunger_cost: 0
+  headpat:       # 摸头 - 偏心情
+    affection: 2
+    mood: 8
+    exp: 2
+    hunger_cost: 0
+  play:          # 玩耍 - 偏经验，消耗饱食
+    affection: 3
+    mood: 5
+    exp: 10
+    hunger_cost: 5
+  hug:           # 抱抱 - 偏亲密
+    affection: 7
+    mood: 6
+    exp: 1
+    hunger_cost: 0
+
+# 状态调味系数
+state_modifiers:
+  starving_hunger: 20      # 饱食低于此值，进入饥饿
+  starving_multiplier: 0.5 # 饥饿时所有正向收益减半
+  grumpy_mood: 30          # 心情低于此值，进入闹脾气
+  grumpy_refuse_chance: 0.4  # 闹脾气时直接拒绝互动（不消耗CD）的概率
+  intimate_affection: 500  # 好感高于此值，进入亲密阶段（解锁亲密文案池）
+
+# 概率权重（每种动作各自的事件分布）
+weights:
+  normal: 70
+  special: 22
+  surprise: 8
+
+# 惊喜事件可掉落的奖励池（item_name -> (item_id, max_qty)）
+# _gold 表示直接给金币；_resentment 表示给怨念
+surprise_rewards:
+  - { name: "金币", item_id: "_gold", min_qty: 8, max_qty: 30, weight: 40 }
+  - { name: "怨念", item_id: "_resentment", min_qty: 5, max_qty: 20, weight: 30 }
+  - { name: "回春散", item_id: "heal_potion", min_qty: 1, max_qty: 1, weight: 15 }
+  - { name: "凝神草", item_id: "spirit_herb", min_qty: 1, max_qty: 1, weight: 10 }
+  - { name: "阴冥草", item_id: "yin_grass", min_qty: 1, max_qty: 1, weight: 5 }
+
+# ────────────────────────────────────
+# 摸摸
+# ────────────────────────────────────
+pat:
+  normal:
+    - text: "你轻轻摸了摸{nickname}的头，它眯着眼蹭了蹭你的手。"
+    - text: "{nickname}凑过来要你摸，蹭得手心痒痒的。"
+    - text: "你摸了摸{nickname}的脑袋，它发出舒服的喉音。"
+    - text: "指尖滑过{nickname}的耳尖，它身子微微一颤。"
+    - text: "{nickname}把脑袋塞进你掌心，像是在求多摸两下。"
+    - text: "你顺着毛摸了一下，{nickname}惬意地翻了个身。"
+    - text: "你摸过{nickname}的下颌，它眯起眼像在打瞌睡。"
+  special:
+    - text: "{nickname}突然朝你的手蹭过来，眼睛里全是星星。"
+      condition: { affection_min: 200 }
+      modifier: { affection: 3, mood: 2 }
+    - text: "{nickname}咬住你的指尖小小地磨了一下，没用力。"
+      modifier: { affection: 1, mood: -1 }
+    - text: "{nickname}舔了舔你的手背，像在道谢。"
+      condition: { mood_min: 60 }
+      modifier: { affection: 4, mood: 3 }
+    - text: "{nickname}有些躲闪，你的手伸过去时它退了一步。"
+      condition: { mood_max: 50 }
+      modifier: { affection: -1, mood: -2 }
+    - text: "{display}化形后第一次被这样摸头，脸有些红。"
+      condition: { require_transformed: true }
+      modifier: { affection: 5, mood: 4 }
+    - text: "{nickname}今天格外黏人，你刚收手它就用脑袋顶回来。"
+      condition: { affection_min: 500 }
+      modifier: { affection: 4, mood: 4 }
+  surprise:
+    - text: "{nickname}叼来一样东西放在你脚边，眼神得意。"
+    - text: "{nickname}把藏起来的小宝贝偷偷塞给你。"
+    - text: "{nickname}从角落叼出一个鼓鼓囊囊的小布袋。"
+
+# ────────────────────────────────────
+# 摸头
+# ────────────────────────────────────
+headpat:
+  normal:
+    - text: "你拍了拍{nickname}的头顶，它发出愉快的呼噜声。"
+    - text: "你揉了揉{nickname}的脑袋，毛被你揉得乱糟糟的。"
+    - text: "{nickname}低下头让你摸得更顺手。"
+    - text: "你给{nickname}捋了捋耳后的毛，它眯着眼享受。"
+    - text: "{nickname}的尾巴随着你摸头的节奏轻轻扫地。"
+    - text: "你顺着{nickname}的额角揉了揉，它鼻间哼出小声。"
+  special:
+    - text: "{nickname}抬起头蹭你的下巴，柔软得让人心化。"
+      condition: { mood_min: 60 }
+      modifier: { mood: 4, affection: 2 }
+    - text: "{nickname}罕见地保持安静，让你慢慢摸。"
+      condition: { affection_min: 300 }
+      modifier: { mood: 5, affection: 3 }
+    - text: "{nickname}打了个大大的哈欠，差点睡过去。"
+      modifier: { mood: 2, exp: -1 }
+    - text: "{nickname}用脑袋撞了你一下，闹着要再摸。"
+      modifier: { mood: 3, affection: 1 }
+    - text: "{display}低着头不让你看脸，耳根却是红的。"
+      condition: { require_transformed: true, affection_min: 300 }
+      modifier: { mood: 6, affection: 4 }
+  surprise:
+    - text: "{nickname}从枕下抖出一枚小东西，骄傲地推给你。"
+    - text: "你摸到{nickname}头上挂着一个不知何时缠上的小玩意，它说送你了。"
+
+# ────────────────────────────────────
+# 玩耍
+# ────────────────────────────────────
+play:
+  normal:
+    - text: "你和{nickname}追着一团魂火打了一会，玩得满头汗。"
+    - text: "{nickname}和你扑来扑去，把屋里弄得一团乱。"
+    - text: "你扔出一根布条，{nickname}飞扑过去咬住衔回来。"
+    - text: "你和{nickname}玩起了捉迷藏，它躲得很专业。"
+    - text: "{nickname}追着自己的尾巴转了好几圈，逗得你笑出声。"
+    - text: "你抛起一颗骨头，{nickname}凌空咬住又翻身落地。"
+  special:
+    - text: "{nickname}玩得太兴奋，把你的衣袖咬出一个洞——它自己也愣住了。"
+      modifier: { exp: 5, mood: 4, affection: -1 }
+    - text: "你被{nickname}扑了个满怀，两个一起在地上滚了半圈。"
+      condition: { mood_min: 50 }
+      modifier: { exp: 3, mood: 5, affection: 3 }
+    - text: "{nickname}玩到一半坐下来喘气，舌头吐得老长。"
+      condition: { hunger_max: 50 }
+      modifier: { exp: -2, mood: -1 }
+    - text: "你和{nickname}配合默契，连扑带咬演了一出小猎。"
+      condition: { affection_min: 300 }
+      modifier: { exp: 6, mood: 3, affection: 2 }
+    - text: "{display}玩得很尽兴，发梢还沾着几片叶子。"
+      condition: { require_transformed: true }
+      modifier: { exp: 4, mood: 4, affection: 2 }
+  surprise:
+    - text: "{nickname}在草丛里翻出一样亮晶晶的东西，跑过来献宝。"
+    - text: "玩耍间{nickname}撞翻了一个角落的小坛子，掉出来不少东西。"
+    - text: "{nickname}从洞里刨出一个旧布包，里面装着点零碎。"
+
+# ────────────────────────────────────
+# 抱抱
+# ────────────────────────────────────
+hug:
+  normal:
+    - text: "你把{nickname}抱进怀里，它温温热热地贴着你。"
+    - text: "{nickname}在你怀里找了个最舒服的姿势趴下了。"
+    - text: "你抱住{nickname}，它的心跳慢慢和你的合上节拍。"
+    - text: "{nickname}用脸蹭你的脖颈，嗓音里全是依赖。"
+    - text: "你搂着{nickname}，它的呼吸渐渐变得绵长。"
+  special:
+    - text: "{nickname}在你怀里睡着了，你舍不得动。"
+      condition: { mood_min: 60 }
+      modifier: { mood: 4, affection: 3 }
+    - text: "{nickname}抱了一会突然挣脱，像是被自己的撒娇吓到。"
+      condition: { affection_max: 200 }
+      modifier: { affection: -1, mood: 1 }
+    - text: "{nickname}咬住你的衣领不肯放，像是想再抱一会。"
+      condition: { affection_min: 400 }
+      modifier: { affection: 4, mood: 3 }
+    - text: "{display}把脸埋进你的肩窝，半天没说话。"
+      condition: { require_transformed: true, affection_min: 300 }
+      modifier: { affection: 6, mood: 5 }
+    - text: "{nickname}在你怀里小声哼唱，像在哼一支不知名的调子。"
+      condition: { affection_min: 500 }
+      modifier: { affection: 5, mood: 5, exp: 2 }
+  surprise:
+    - text: "{nickname}把藏在毛里的一个小物件硬塞进你掌心。"
+    - text: "你解开{nickname}颈圈整理时，发现里面卷着一小包东西。"
+
+# ────────────────────────────────────
+# 状态触发文案（命中后直接覆盖普通文案）
+# ────────────────────────────────────
+states:
+  starving:
+    text: "{nickname}虚弱地抬了抬头，肚子叫得很响。"
+    suggest: "饿坏了，先去【喂食】吧"
+  grumpy:
+    text: "{nickname}扭过头不理你，尾巴拍得地面砰砰响。"
+    suggest: "心情不好，喂点菜肴或多陪陪它"
+  grumpy_refuse:
+    text: "{nickname}低声呜了一下，缩到角落里——它现在不想被打扰。"
