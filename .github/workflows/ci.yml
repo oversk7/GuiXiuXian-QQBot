@@ -1,0 +1,45 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  checks:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: requirements-ci.txt
+
+      # 无需依赖的快速检查放最前，秒级失败
+      - name: 语法检查（全量编译）
+        run: python -m compileall -q plugins bot.py
+
+      - name: 帮助文档一致性（新命令必须写帮助）
+        run: python scripts/check_help_consistency.py
+
+      - name: 安装依赖
+        run: pip install -r requirements-ci.txt
+
+      # 绿名单：新公式测试 + 已确认通过的存量测试。
+      # 其余存量测试（19 failed / 9 error）修复后再加入，勿直接 pytest tests/。
+      - name: 单元测试
+        run: >
+          python -m pytest -q
+          tests/test_formulas_breakthrough.py
+          tests/test_formulas_trade_tax.py
+          tests/test_realm_utils.py
+          tests/test_config_sanity.py
+          tests/test_attribute_calculator_simple.py
+          tests/test_group_persona_service.py
+          tests/test_guild_building_legacy_bonus.py
+          tests/test_guild_economy_decimal.py
+          tests/test_message_normalizer.py
+          tests/test_qq_full_message_send.py
+          tests/test_utils_markdown.py
