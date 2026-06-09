@@ -2,7 +2,7 @@
 拍卖行定时任务
 
 任务：
-- 每分钟：结算已到期拍卖 + 发送30分钟提醒
+- 每5分钟：结算已到期拍卖 + 发送30分钟提醒
 """
 
 from nonebot import get_driver, logger
@@ -16,14 +16,14 @@ driver = get_driver()
 
 @scheduler.scheduled_job(
     "interval",
-    minutes=1,
+    minutes=5,
     id="auction_settlement_check",
     max_instances=1,
     coalesce=True,
 )
 async def auction_settlement_check():
     """
-    每分钟执行：
+    每5分钟执行：
     1. 发送即将结束（30分钟内）的拍卖提醒
     2. 结算所有已到期的拍卖
     """
