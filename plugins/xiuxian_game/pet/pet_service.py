@@ -278,15 +278,6 @@ class PetService:
         starving = pet.hunger < state_cfg["starving_hunger"]
         grumpy = pet.mood < state_cfg["grumpy_mood"]
 
-        # 闹脾气有几率直接拒绝互动（不消耗CD）
-        if grumpy and random.random() < state_cfg["grumpy_refuse_chance"]:
-            refuse = self.config.interaction_states.get("grumpy_refuse", {})
-            text = refuse.get("text", "它不想被打扰。").format(
-                nickname=pet.nickname,
-                display=self._display_name(pet),
-            )
-            return False, f"🐾 {pet.nickname}\n━━━━━━━━━━━━━\n{text}"
-
         # 抽签：选 bucket（normal/special/surprise）
         weights = self.config.interaction_weights
         bucket = random.choices(

@@ -45,7 +45,6 @@ state_modifiers:
   starving_hunger: 20
   starving_multiplier: 0.5
   grumpy_mood: 30
-  grumpy_refuse_chance: 0.4
   intimate_affection: 500
 
 weights:
@@ -77,9 +76,9 @@ pat:
     - text: "{nickname}主动往你手里凑了一下。"
       condition: { affection_min: 200 }
       modifier: { affection: 3, mood: 2 }
-    - text: "你刚靠近，{nickname}就微微退了半步。"
+    - text: "{nickname}慢吞吞地接受了你的触碰。"
       condition: { mood_max: 50 }
-      modifier: { affection: -1, mood: -2 }
+      modifier: { affection: 1, mood: 1 }
     - text: "{nickname}发出一声满意的低鸣。"
       condition: { mood_min: 60 }
       modifier: { mood: 3 }
@@ -121,9 +120,9 @@ headpat:
     - text: "{display}低着头没看你，沉默了一会才动。"
       condition: { require_transformed: true, affection_min: 300 }
       modifier: { mood: 5, affection: 3 }
-    - text: "{nickname}对你的手不太适应，挪了挪位置。"
+    - text: "{nickname}还不太熟悉你，但没躲开。"
       condition: { affection_max: 100 }
-      modifier: { affection: 0, mood: -1 }
+      modifier: { affection: 1, mood: 0 }
   surprise:
     - text: "{nickname}从藏处推出一样东西到你面前。"
     - text: "你的手挪开时，发现{nickname}悄悄塞了点什么过来。"
@@ -194,10 +193,8 @@ hug:
 # ────────────────────────────────────
 states:
   starving:
-    text: "{nickname}没什么力气，对你的动作反应很慢。"
-    suggest: "饿了，先去【喂食】"
+    text: "{nickname}没什么力气，对你的动作反应慢了一拍。"
+    suggest: "饿了，先去【喂食】补一下"
   grumpy:
-    text: "{nickname}没有回应你，看上去不太想理人。"
-    suggest: "心情不好，先喂点东西或等等再来"
-  grumpy_refuse:
-    text: "{nickname}转过身去，不让你靠近。"
+    text: "{nickname}今天有些蔫，但还是配合了你。"
+    suggest: "心情低落，多陪陪它或喂点好东西"
