@@ -4,8 +4,11 @@
 再调用大模型进行专业解析。
 """
 import logging
+import re
+import zlib
 import aiohttp
 from datetime import datetime
+from lunar_python import Solar
 from nonebot import on_command
 from nonebot.adapters.qq import MessageEvent, Message, MessageSegment
 from nonebot.adapters.qq.models.common import MessageMarkdown, MessageMarkdownParams
@@ -222,88 +225,8 @@ HEXAGRAM_PALACE = {
 }
 
 
-# ===== 四柱（年月日时柱）简易计算 =====
-TIANGAN = ["甲", "乙", "丙", "丁", "戊", "己", "庚", "辛", "壬", "癸"]
+# 地支序列（用于年支 / 时辰序数：子=0…亥=11，起卦时 +1）
 DIZHI = ["子", "丑", "寅", "卯", "辰", "巳", "午", "未", "申", "酉", "戌", "亥"]
-DIZHI_WUXING = {
-    "子": "水", "丑": "土", "寅": "木", "卯": "木", "辰": "土", "巳": "火",
-    "午": "火", "未": "土", "申": "金", "酉": "金", "戌": "土", "亥": "水"
-}
-
-HOUR_TO_DIZHI_IDX = {
-    23: 0, 0: 0, 1: 1, 2: 1, 3: 2, 4: 2, 5: 3, 6: 3,
-    7: 4, 8: 4, 9: 5, 10: 5, 11: 6, 12: 6, 13: 7, 14: 7,
-    15: 8, 16: 8, 17: 9, 18: 9, 19: 10, 20: 10, 21: 11, 22: 11
-}
-
-
-def _calc_sizhu(now: datetime) -> dict:
-    """
-    计算四柱（年柱、月柱、日柱、时柱）—— 简化算法
-    精确四柱需要万年历，这里用公式近似，足够起卦使用
-    """
-    year = now.year
-    month = now.month
-    day = now.day
-    hour = now.hour
-
-    # 年柱（以立春为界，简化为公历2月4日）
-    y = year if month > 2 or (month == 2 and day >= 4) else year - 1
-    year_tg_idx = (y - 4) % 10
-    year_dz_idx = (y - 4) % 12
-
-    # 月柱天干（年干×2+月数 的规律，简化）
-    # 月柱地支固定：正月寅、二月卯...
-    m = month - 1 if month >= 2 else 11  # 简化调整
-    if month == 1:
-        m = 11  # 丑月
-    elif month == 2:
-        m = 0 if day < 4 else 0  # 寅月
-        m = 2  # 寅
-    else:
-        m = month  # 近似
-    month_dz_idx = (month + 1) % 12  # 简化：正月=寅(2)
-    if month_dz_idx == 0:
-        month_dz_idx = 12
-    month_dz_idx = (month_dz_idx + 1) % 12  # 调整
-
-    # 简化月柱天干
-    month_tg_idx = (year_tg_idx * 2 + month) % 10
-
-    # 日柱（使用简化公式，非精确万年历）
-    # 蔡勒公式近似
-    total_days = (year - 1) * 365 + (year - 1) // 4 - (year - 1) // 100 + (year - 1) // 400
-    month_days = [0, 31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31]
-    if (year % 4 == 0 and year % 100 != 0) or year % 400 == 0:
-        month_days[2] = 29
-    for i in range(1, month):
-        total_days += month_days[i]
-    total_days += day
-    # 基于已知日期推算：2000年1月1日为甲子日的一个近似锚点
-    anchor = (2000 - 1) * 365 + (2000 - 1) // 4 - (2000 - 1) // 100 + (2000 - 1) // 400 + 1
-    day_offset = (total_days - anchor + 12) % 60  # 加偏移校准
-    day_tg_idx = day_offset % 10
-    day_dz_idx = day_offset % 12
-
-    # 时柱
-    hour_dz_idx = HOUR_TO_DIZHI_IDX.get(hour, 0)
-    hour_tg_idx = (day_tg_idx * 2 + hour_dz_idx) % 10
-
-    # 旬空计算（日柱所在旬的空亡地支）
-    xun_start = (day_tg_idx - day_dz_idx) % 12
-    kong1_idx = (10 + xun_start) % 12  # 旬空第一个
-    kong2_idx = (11 + xun_start) % 12  # 旬空第二个
-
-    return {
-        "year": f"{TIANGAN[year_tg_idx]}{DIZHI[year_dz_idx]}",
-        "month": f"{TIANGAN[month_tg_idx]}{DIZHI[month_dz_idx]}",
-        "day": f"{TIANGAN[day_tg_idx]}{DIZHI[day_dz_idx]}",
-        "hour": f"{TIANGAN[hour_tg_idx]}{DIZHI[hour_dz_idx]}",
-        "day_tg": TIANGAN[day_tg_idx],
-        "day_dz": DIZHI[day_dz_idx],
-        "xunkong": f"{DIZHI[kong1_idx]}{DIZHI[kong2_idx]}",
-    }
-
 
 # =====================================================================
 #  起卦与排盘
@@ -321,37 +244,49 @@ def _get_palace_info(upper_num: int, lower_num: int) -> tuple[str, str, int, int
     return BAGUA[upper_num]["name"], BAGUA[upper_num]["element"], 6, 3
 
 
-def generate_hexagram(now: datetime, question: str) -> dict:
+def generate_hexagram(now: datetime, question: str, user_id: str = "") -> dict:
     """
-    时间起卦法 + 问事字数辅助，生成完整排盘
+    梅花易数时间起卦法（含求测者标识扰动）：
+      上卦 = (年支数 + 农历月 + 农历日 + 求测者扰动) mod 8
+      下卦 = (上述 + 时辰数) mod 8
+      动爻 = (上述 + 时辰数) mod 6
+    年支 / 时辰序数：子=1, 丑=2, ..., 亥=12
+    求测者扰动：QQ 用户 ID 的 crc32 散列，等效传统"加求测者姓氏笔画"，
+    用于区分同时刻多人起卦得同一卦的问题（crc32 在 mod 8/6 下分布均匀，
+    避免相邻数字 ID 撞卦）。
 
-    Returns:
-        包含完整排盘信息的字典
+    `question` 仅作 AI 解卦上下文，不参与起卦计算（避免文字噪声左右卦象）。
     """
-    year = now.year
-    month = now.month
-    day = now.day
-    hour = now.hour
-    year_num = year % 100
-    hour_dz_idx = HOUR_TO_DIZHI_IDX.get(hour, 0)
-    dizhi_num = hour_dz_idx + 1  # 子=1, 丑=2, ...
+    del question  # 仅为接口兼容保留参数
+    solar = Solar.fromYmdHms(now.year, now.month, now.day, now.hour, now.minute, now.second)
+    lunar = solar.getLunar()
 
-    # 字数扰动
-    char_sum = sum(ord(c) for c in question) if question else 0
+    year_num = DIZHI.index(lunar.getYearZhi()) + 1
+    lunar_month = abs(lunar.getMonth())  # 闰月按其月份数计
+    lunar_day = lunar.getDay()
+    time_num = DIZHI.index(lunar.getTimeZhi()) + 1
+    user_offset = zlib.crc32(user_id.encode("utf-8")) if user_id else 0
 
-    # 上卦
-    upper_num = (year_num + month + day + char_sum) % 8 or 8
-    # 下卦
-    lower_num = (year_num + month + day + dizhi_num + char_sum) % 8 or 8
-    # 动爻（1-6）
-    dong_yao = (year_num + month + day + dizhi_num + char_sum) % 6 or 6
+    sum_upper = year_num + lunar_month + lunar_day + user_offset
+    sum_lower = sum_upper + time_num
+    upper_num = sum_upper % 8 or 8
+    lower_num = sum_lower % 8 or 8
+    dong_yao = sum_lower % 6 or 6
 
     upper = BAGUA[upper_num]
     lower = BAGUA[lower_num]
     hexagram_name = HEXAGRAM_NAMES.get((upper_num, lower_num), f"{upper['name']}{lower['name']}")
 
-    # 四柱
-    sizhu = _calc_sizhu(now)
+    # 四柱与旬空（按真实节气划分，由 lunar-python 提供）
+    sizhu = {
+        "year": lunar.getYearInGanZhi(),
+        "month": lunar.getMonthInGanZhi(),
+        "day": lunar.getDayInGanZhi(),
+        "hour": lunar.getTimeInGanZhi(),
+        "day_tg": lunar.getDayGan(),
+        "day_dz": lunar.getDayZhi(),
+        "xunkong": lunar.getDayXunKong(),
+    }
 
     # 从八宫归属表获取宫名、宫五行、世应
     palace_name, palace_element, shi, ying = _get_palace_info(upper_num, lower_num)
@@ -501,23 +436,78 @@ def generate_hexagram(now: datetime, question: str) -> dict:
 #  排盘格式化
 # =====================================================================
 
+_INVALID_QUESTION_HINT = (
+    "☯ 占问事由不够清楚\n"
+    "你只描述了对象 / 主题，没说要问它的什么方面。\n"
+    "请补上要问的方向，比如：\n"
+    "  起卦 我的孩子学业如何\n"
+    "  起卦 我和小张感情能不能成\n"
+    "  起卦 今日运势"
+)
+
+# 命中其中任一关键词即视为给出了占问方向：含疑问语气 / 趋势时间 / 标准占问类目 / 具体事件
+_QUESTION_KEYWORDS = (
+    # 疑问语气与句式
+    "?", "？", "吗", "呢",
+    "如何", "怎样", "怎么", "能否", "能不能", "会不会", "是否",
+    "有没有", "可否", "好不好", "行不行", "成不成",
+    # 时间 / 趋势词
+    "今日", "今天", "近期", "最近", "本月", "本周", "本年",
+    "今年", "明年", "下月", "下周", "未来", "下半年", "上半年",
+    "这个月", "这周",
+    # 占问类目
+    "运势", "运程", "运气", "气运", "走向", "趋势", "前景", "前途",
+    "前程", "吉凶", "祸福", "结果", "成败", "得失", "命运",
+    "财运", "事业", "感情", "婚姻", "学业", "健康", "官运", "桃花",
+    "归宿", "考运", "姻缘", "缘分", "贵人",
+    # 常见占问事件
+    "投资", "跳槽", "考试", "出行", "搬家", "结婚", "离婚", "分手",
+    "复合", "创业", "签约", "相亲", "面试", "辞职", "升职", "求职",
+    "考研", "留学", "购房", "卖房", "诉讼", "官司", "怀孕",
+)
+
+
+def _is_meaningful_question(text: str) -> bool:
+    """
+    判断占问内容是否给出了清晰方向。驳回三类：
+    1) 极短：清洗后 < 2 字符
+    2) 纯重复字符："啊啊啊" / "111111"
+    3) 短且无方向：< 6 字符且未命中任何占问关键词
+       区分"今日运势"（含"运势"，放过）与"我的孩子"（只说了对象，驳回）
+    """
+    cleaned = re.sub(r"[\s\W_]+", "", text, flags=re.UNICODE)
+    if len(cleaned) < 2:
+        return False
+    if len(set(cleaned)) == 1:
+        return False
+    if len(cleaned) < 6 and not any(kw in text for kw in _QUESTION_KEYWORDS):
+        return False
+    return True
+
+
 def build_ai_prompt(hex_data: dict, question: str) -> list:
     """构建发送给大模型的消息，包含完整排盘信息"""
-    system_prompt = """你是一位精通《易经》六爻占卜的国学大师，擅长用通俗易懂的方式为普通人解读卦象。
+    system_prompt = """你是一位六爻占卜师，能把专业卦象用大白话讲给完全不懂易经的人。
 
-你将收到一个完整的六爻排盘，包含四柱、六亲、六神、世应、纳甲、动爻和变卦信息。
+<占问语境>
+- 占问者 = 发起这一卦的人，世爻代表他自己。
+- 占问内容里不认识的名字 / 昵称 / 代号，都视为占问者身边的人（亲友、同事、潜在对象等），不要当成成语或事物。
+- 只有一两个关键词（如"运势""婚姻"）时，按占问者本人最近的对应方面理解。
+</占问语境>
 
-解卦格式要求（严格遵守）：
-1.【卦意】一句话说明本卦核心含义，然后用大白话解释"简单说就是……"
-2.【用神分析】找出用神，分析旺衰生克，然后加一句"也就是说……"的通俗翻译
-3.【动爻变化】分析动爻影响，然后加"换句话说……"的白话解释
-4.【综合判断】结合世应、六神给出明确结论，用"对你来说……"开头说人话
-5.【行动建议】针对所问之事给出具体可操作的建议，说清楚该做什么、不该做什么
-6.【忠告】一句简短有力的忠告
+<输出格式>
+按顺序输出 7 段。专业内容后用一句白话补充（【理解】本身已是白话，无需再补）。
+1.【理解】复述这次占问，写明你对名字 / 代号 / 模糊词的假设。
+   示例：「我把'小明'理解成你身边一位关心的朋友，问的是他最近的状况。」
+2.【卦意】本卦核心含义。
+3.【用神分析】用神、旺衰、生克。
+4.【动爻变化】动爻影响及变卦走向。
+5.【综合判断】结合世应、六神给出结论。
+6.【行动建议】具体能做什么、不能做什么。
+7.【忠告】一句话。
 
-重要：每一段专业分析后面都必须跟一句通俗易懂的大白话翻译，让完全不懂易经的人也能看明白。
-字数控制在400-600字。
-不要使用markdown格式，用纯文本。"""
+纯文本，450-650 字。
+</输出格式>"""
 
     # 构建排盘文本
     sz = hex_data["sizhu"]
@@ -585,6 +575,9 @@ async def handle_liuyao(event: MessageEvent, args: Message = CommandArg()):
     if len(question) > 50:
         await liuyao_cmd.finish(message_add_head("⚠️ 问题过长，请控制在50字以内", event))
 
+    if not _is_meaningful_question(question):
+        await liuyao_cmd.finish(message_add_head(_INVALID_QUESTION_HINT, event))
+
     # 检查玩家和扣除金币
     async with safe_session() as session:
         player = await get_unified_player(session, event)
@@ -608,7 +601,7 @@ async def handle_liuyao(event: MessageEvent, args: Message = CommandArg()):
 
     # 起卦
     now = datetime.now()
-    hex_data = generate_hexagram(now, question)
+    hex_data = generate_hexagram(now, question, user_id)
 
     # 调用大模型解卦
     ai_analysis = ""
