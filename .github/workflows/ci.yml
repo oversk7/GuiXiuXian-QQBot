@@ -36,6 +36,7 @@ jobs:
           tests/test_formulas_trade_tax.py
           tests/test_realm_utils.py
           tests/test_config_sanity.py
+          tests/test_story_json.py
           tests/test_attribute_calculator_simple.py
           tests/test_group_persona_service.py
           tests/test_guild_building_legacy_bonus.py
