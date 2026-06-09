@@ -2,9 +2,7 @@ Always answer in 简体中文
 
 ## Coding Standards
 
-Coding conventions are managed by Trellis Spec. Run `/trellis:before-dev` before development to auto-inject relevant specs. Manual reference: `.trellis/spec/backend/`.
-
-Key rules (see spec for details):
+Key rules:
 - **Database Migration:** Only use `auto_migrate.py` `REQUIRED_FIELDS`. Never use Alembic manually.
 - **Exception Handling:** Never use `except Exception:`. NoneBot2's `finish()/send()` relies on raising exceptions for control flow.
 - **Transaction Management:** Always use `safe_session()`.
