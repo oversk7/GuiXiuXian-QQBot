@@ -30,7 +30,7 @@ from ..utils_markdown import build_markdown
 from ..battle.battle_markdown import build_battle_markdown
 from ..battle.battle_log_filter import filter_battle_log, get_player_log_mode
 from .service_new import WorldBossService
-from ..platform_utils import get_unified_player
+from ..platform_utils import require_player
 
 # ==================== Feature Flag ====================
 # 设置为True使用新版DI架构的WorldBossService，False使用旧版本
@@ -46,9 +46,7 @@ open_chest_cmd = on_command("开启深渊宝箱", aliases={"开启宝箱", "开�
 @view_cmd.handle()
 async def handle_view(event: MessageEvent):
     async with safe_session() as session:
-        player = await get_unified_player(session, event)
-        if not player:
-            await view_cmd.finish("⛔ 请先创建角色")
+        player = await require_player(session, event, view_cmd)
 
         from ..infrastructure.repositories.world_boss_cycle_repository import WorldBossCycleRepository
         from ..infrastructure.repositories.world_boss_damage_repository import WorldBossDamageRepository
@@ -74,9 +72,7 @@ async def handle_view(event: MessageEvent):
 @attack_cmd.handle()
 async def handle_attack(event: MessageEvent, args: Message = CommandArg()):
     async with safe_session() as session:
-        player = await get_unified_player(session, event)
-        if not player:
-            await attack_cmd.finish("⛔ 请先创建角色")
+        player = await require_player(session, event, attack_cmd)
 
         from ..infrastructure.repositories.world_boss_cycle_repository import WorldBossCycleRepository
         from ..infrastructure.repositories.world_boss_damage_repository import WorldBossDamageRepository
@@ -146,9 +142,7 @@ async def handle_open_chest(event: MessageEvent, args: Message = CommandArg()):
     from ..config import config
 
     async with safe_session() as session:
-        player = await get_unified_player(session, event)
-        if not player:
-            await open_chest_cmd.finish("⛔ 请先创建角色")
+        player = await require_player(session, event, open_chest_cmd)
 
         # 获取参数
         arg_text = args.extract_plain_text().strip()

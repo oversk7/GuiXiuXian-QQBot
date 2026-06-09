@@ -15,7 +15,7 @@ from ..models.lottery import Lottery, LotteryParticipant, LotteryType, LotterySt
 from ..models.inventory import ItemInstance, ItemType
 from ..config import config
 from ..utils import message_add_head
-from ..platform_utils import get_unified_player
+from ..platform_utils import get_unified_player, require_player
 
 
 # 权限检查函数
@@ -252,9 +252,7 @@ async def handle_join_lottery(event: MessageEvent, args: Message = CommandArg())
     
     async with safe_session() as session:
         # 获取玩家信息
-        player = await get_unified_player(session, event)
-        if not player:
-            await join_lottery_cmd.finish("⛔ 请先创建角色")
+        player = await require_player(session, event, join_lottery_cmd)
         
         # 获取抽奖活动
         lottery = await session.get(Lottery, lottery_id)
@@ -354,9 +352,7 @@ async def handle_draw_lottery(event: MessageEvent, args: Message = CommandArg())
 
     async with safe_session() as session:
         # 获取玩家信息
-        player = await get_unified_player(session, event)
-        if not player:
-            await draw_lottery_cmd.finish("⛔ 请先创建角色")
+        player = await require_player(session, event, draw_lottery_cmd)
 
         # 获取抽奖活动
         lottery = await session.get(Lottery, lottery_id)
@@ -581,9 +577,7 @@ async def handle_my_lottery(event: MessageEvent):
 
     async with safe_session() as session:
         # 获取玩家信息
-        player = await get_unified_player(session, event)
-        if not player:
-            await my_lottery_cmd.finish("⛔ 请先创建角色")
+        player = await require_player(session, event, my_lottery_cmd)
 
         # 获取参与的抽奖
         stmt = select(LotteryParticipant).where(
@@ -637,9 +631,7 @@ async def handle_cancel_lottery(event: MessageEvent, args: Message = CommandArg(
 
     async with safe_session() as session:
         # 获取玩家信息
-        player = await get_unified_player(session, event)
-        if not player:
-            await cancel_lottery_cmd.finish("⛔ 请先创建角色")
+        player = await require_player(session, event, cancel_lottery_cmd)
 
         # 获取抽奖活动
         lottery = await session.get(Lottery, lottery_id)

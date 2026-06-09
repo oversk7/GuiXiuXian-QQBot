@@ -28,7 +28,7 @@ from nonebot.params import CommandArg
 from sqlalchemy import select
 
 from ..models.db import safe_session
-from ..platform_utils import get_unified_player, is_guild_message
+from ..platform_utils import require_player
 from ..utils_markdown import cmd, build_markdown
 from .service import SponsorShopService
 from .shop_image import generate_sponsor_shop_image
@@ -62,12 +62,7 @@ admin_sponsor_log_cmd = on_command("查赞助记录", priority=2, block=True)
 
 async def _get_player_or_finish(session, event, cmd):
     """统一获取玩家，未注册时结束"""
-    player = await get_unified_player(session, event)
-    if not player:
-        if is_guild_message(event):
-            await cmd.finish("⛔ 你还没有创建角色或绑定账号\n💡 请先在群聊注册角色，然后使用绑定功能")
-        else:
-            await cmd.finish("⛔ 请先使用【注册】命令创建角色")
+    player = await require_player(session, event, cmd)
     return player
 
 

@@ -16,7 +16,7 @@ from nonebot.params import CommandArg
 from ..models.db import safe_session
 from ..models.red_envelope import RedEnvelopeStatus
 from ..utils import message_add_head
-from ..platform_utils import get_unified_player
+from ..platform_utils import require_player
 from ..infrastructure.repositories.red_envelope_repository import RedEnvelopeRepository
 from ..infrastructure.repositories.player_repository import PlayerRepository
 from .red_envelope_service import RedEnvelopeService
@@ -92,9 +92,7 @@ async def handle_send_envelope(event: MessageEvent, args: Message = CommandArg()
     msg_text = parts[2] if len(parts) > 2 else None
 
     async with safe_session() as session:
-        player = await get_unified_player(session, event)
-        if not player:
-            await send_envelope_cmd.finish("请先创建角色")
+        player = await require_player(session, event, send_envelope_cmd)
 
         service = RedEnvelopeService(
             envelope_repo=RedEnvelopeRepository(session),
@@ -156,9 +154,7 @@ async def handle_grab_envelope(event: MessageEvent):
     group_id = session_id.split("_")[1]
 
     async with safe_session() as session:
-        player = await get_unified_player(session, event)
-        if not player:
-            await grab_envelope_cmd.finish("请先创建角色")
+        player = await require_player(session, event, grab_envelope_cmd)
 
         service = RedEnvelopeService(
             envelope_repo=RedEnvelopeRepository(session),
@@ -223,9 +219,7 @@ async def handle_envelope_record(event: MessageEvent):
     group_id = session_id.split("_")[1]
 
     async with safe_session() as session:
-        player = await get_unified_player(session, event)
-        if not player:
-            await envelope_record_cmd.finish("请先创建角色")
+        player = await require_player(session, event, envelope_record_cmd)
 
         service = RedEnvelopeService(
             envelope_repo=RedEnvelopeRepository(session),

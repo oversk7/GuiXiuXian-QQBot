@@ -10,7 +10,7 @@ from ..models.inventory import ItemInstance
 from ..models.monthly_card import MonthlyCard, CardType, get_player_card_benefits, get_card_benefits_config
 from ..utils import message_add_head
 from ..config import config
-from ..platform_utils import get_unified_player
+from ..platform_utils import require_player
 from datetime import datetime
 
 
@@ -100,9 +100,7 @@ async def handle_check_monthly_card(event: MessageEvent):
     """查看玩家的月卡状态"""
     async with safe_session() as session:
         # 使用跨平台工具获取玩家数据
-        player = await get_unified_player(session, event)
-        if not player:
-            await check_monthly_card_cmd.finish("⛔ 请先创建角色")
+        player = await require_player(session, event, check_monthly_card_cmd)
         
         # 获取所有有效月卡
         active_cards = await MonthlyCard.get_all_active_cards(session, player.id)
@@ -366,9 +364,7 @@ async def handle_repair_all_equipment(event: MessageEvent, args: Message = Comma
 
     async with safe_session() as session:
         # 使用跨平台工具获取玩家数据
-        player = await get_unified_player(session, event)
-        if not player:
-            await repair_all_equipment_cmd.finish("⛔ 请先创建角色")
+        player = await require_player(session, event, repair_all_equipment_cmd)
 
         # 检查是否有月卡权益
         active_cards = await MonthlyCard.get_all_active_cards(session, player.id)

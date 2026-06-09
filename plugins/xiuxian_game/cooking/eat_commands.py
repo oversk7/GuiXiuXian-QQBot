@@ -15,7 +15,7 @@ from nonebot.adapters.qq import Message
 
 from ..models.db import AsyncSessionLocal
 from ..infrastructure.uow.unit_of_work import UnitOfWork
-from ..platform_utils import get_unified_player
+from ..platform_utils import require_player
 from ..models.inventory import ItemType
 from .cooking_service import DishQuality
 
@@ -47,9 +47,7 @@ async def handle_eat(event: MessageEvent, args: Message = CommandArg()):
             await eat_cmd.finish("⛔ 数量必须是数字")
 
     async with UnitOfWork(AsyncSessionLocal) as uow:
-        player = await get_unified_player(uow.session, event)
-        if not player:
-            await eat_cmd.finish("⛔ 请先创建角色")
+        player = await require_player(uow.session, event, eat_cmd)
 
         # 1. 根据物品名称查找物品配置
         from ..config import config

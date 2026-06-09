@@ -14,7 +14,7 @@ from ..models.player import Player
 from ..models.dungeon_chest_record import DungeonChestRecord
 from ..models.inventory import ItemInstance
 from ..utils import message_add_head
-from ..platform_utils import get_unified_player
+from ..platform_utils import require_player
 
 
 # 深渊探索者宝箱相关指令
@@ -26,9 +26,7 @@ claim_chest_cmd = on_command("领取宝箱", aliases={"领取探索宝箱", "领
 async def handle_dungeon_chest_info(event: MessageEvent):
     """查看深渊探索者宝箱信息"""
     async with safe_session() as session:
-        player = await get_unified_player(session, event)
-        if not player:
-            await dungeon_chest_cmd.finish("⛔ 请先创建角色")
+        player = await require_player(session, event, dungeon_chest_cmd)
         
         # 获取玩家已领取的宝箱记录
         stmt = select(DungeonChestRecord).where(
@@ -84,9 +82,7 @@ async def handle_dungeon_chest_info(event: MessageEvent):
 async def handle_claim_chest(event: MessageEvent):
     """一键领取所有可领取的深渊探索者宝箱"""
     async with safe_session() as session:
-        player = await get_unified_player(session, event)
-        if not player:
-            await claim_chest_cmd.finish("⛔ 请先创建角色")
+        player = await require_player(session, event, claim_chest_cmd)
 
         # 获取玩家已领取的宝箱记录
         stmt = select(DungeonChestRecord).where(

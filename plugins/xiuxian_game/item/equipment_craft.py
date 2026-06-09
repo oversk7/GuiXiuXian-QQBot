@@ -11,7 +11,7 @@ from ..utils import message_add_head
 from .equipment_commands import find_equipment_by_input
 from ..world.location_service import LocationService
 from ..world.npc_service import NPCService
-from ..platform_utils import get_unified_player
+from ..platform_utils import get_unified_player, require_player
 
 # ---------------- 指令：锻造列表 ----------------
 # 列出所有可锻造装备
@@ -426,9 +426,7 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
 
     async with safe_session() as session:
         # 使用跨平台工具获取玩家数据
-        player = await get_unified_player(session, event)
-        if not player:
-            await repair_cmd.finish("⛔ 请先创建角色")
+        player = await require_player(session, event, repair_cmd)
 
         # 查找装备
         equip = await find_equipment_by_input(session, player.id, equipment_arg)

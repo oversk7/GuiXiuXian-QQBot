@@ -26,7 +26,7 @@ from sqlalchemy import select
 from ..infrastructure.uow.unit_of_work import UnitOfWork
 from ..models.db import AsyncSessionLocal
 from ..models.inventory import ItemInstance, ItemType
-from ..platform_utils import get_unified_player, is_guild_message
+from ..platform_utils import get_unified_player, require_player
 from ..utils import message_add_head
 from ..utils_markdown import cmd, build_markdown
 from ..config import config
@@ -69,9 +69,7 @@ stall_equipment_selection_handler = on_message(priority=6, block=False)
 @open_stall_cmd.handle()
 async def handle_open_stall(event: MessageEvent):
     async with UnitOfWork(AsyncSessionLocal) as uow:
-        player = await get_unified_player(uow.session, event)
-        if not player:
-            await open_stall_cmd.finish(message_add_head("⛔ 请先创建角色", event))
+        player = await require_player(uow.session, event, open_stall_cmd)
 
         success, msg = await stall_service.open_stall(uow, player)
         if success:
@@ -85,9 +83,7 @@ async def handle_open_stall(event: MessageEvent):
 @close_stall_cmd.handle()
 async def handle_close_stall(event: MessageEvent):
     async with UnitOfWork(AsyncSessionLocal) as uow:
-        player = await get_unified_player(uow.session, event)
-        if not player:
-            await close_stall_cmd.finish(message_add_head("⛔ 请先创建角色", event))
+        player = await require_player(uow.session, event, close_stall_cmd)
 
         success, msg = await stall_service.close_stall(uow, player)
         if success:
@@ -146,9 +142,7 @@ async def handle_list_item(event: MessageEvent, args: Message = CommandArg()):
 
     # 普通物品直接上架
     async with UnitOfWork(AsyncSessionLocal) as uow:
-        player = await get_unified_player(uow.session, event)
-        if not player:
-            await list_item_cmd.finish(message_add_head("⛔ 请先创建角色", event))
+        player = await require_player(uow.session, event, list_item_cmd)
 
         success, msg = await stall_service.list_item(
             uow, player, item_name, unit_price, quantity
@@ -164,9 +158,7 @@ async def _handle_stall_equipment_listing(event, item_cfg, unit_price):
     is_inscription = item_cfg.type == ItemType.INSCRIPTION
 
     async with UnitOfWork(AsyncSessionLocal) as uow:
-        player = await get_unified_player(uow.session, event)
-        if not player:
-            await list_item_cmd.finish(message_add_head("⛔ 请先创建角色", event))
+        player = await require_player(uow.session, event, list_item_cmd)
 
         # 检查摊位存在
         stall = await uow.player_stalls.get_active_by_player(player.id)
@@ -303,9 +295,7 @@ async def handle_unlist_item(event: MessageEvent, args: Message = CommandArg()):
         await unlist_item_cmd.finish(message_add_head("⛔ 序号必须是整数", event))
 
     async with UnitOfWork(AsyncSessionLocal) as uow:
-        player = await get_unified_player(uow.session, event)
-        if not player:
-            await unlist_item_cmd.finish(message_add_head("⛔ 请先创建角色", event))
+        player = await require_player(uow.session, event, unlist_item_cmd)
 
         success, msg = await stall_service.unlist_item(uow, player, slot_index)
         if success:
@@ -319,9 +309,7 @@ async def handle_unlist_item(event: MessageEvent, args: Message = CommandArg()):
 @my_stall_cmd.handle()
 async def handle_my_stall(event: MessageEvent):
     async with UnitOfWork(AsyncSessionLocal) as uow:
-        player = await get_unified_player(uow.session, event)
-        if not player:
-            await my_stall_cmd.finish(message_add_head("⛔ 请先创建角色", event))
+        player = await require_player(uow.session, event, my_stall_cmd)
 
         stall = await uow.player_stalls.get_active_by_player(player.id)
         if not stall:
@@ -381,9 +369,7 @@ async def handle_set_name(event: MessageEvent, args: Message = CommandArg()):
         await set_name_cmd.finish(message_add_head("📋 格式：【摊位名 名称】", event))
 
     async with UnitOfWork(AsyncSessionLocal) as uow:
-        player = await get_unified_player(uow.session, event)
-        if not player:
-            await set_name_cmd.finish(message_add_head("⛔ 请先创建角色", event))
+        player = await require_player(uow.session, event, set_name_cmd)
 
         success, msg = await stall_service.set_stall_name(uow, player, raw)
         if success:
@@ -399,9 +385,7 @@ async def handle_set_shout(event: MessageEvent, args: Message = CommandArg()):
         await set_shout_cmd.finish(message_add_head("📋 格式：【吆喝 内容】", event))
 
     async with UnitOfWork(AsyncSessionLocal) as uow:
-        player = await get_unified_player(uow.session, event)
-        if not player:
-            await set_shout_cmd.finish(message_add_head("⛔ 请先创建角色", event))
+        player = await require_player(uow.session, event, set_shout_cmd)
 
         success, msg = await stall_service.set_shout(uow, player, raw)
         if success:
@@ -444,9 +428,7 @@ async def handle_buy(event: MessageEvent, args: Message = CommandArg()):
             await buy_cmd.finish(message_add_head("⛔ 数量必须是正整数", event))
 
     async with UnitOfWork(AsyncSessionLocal) as uow:
-        player = await get_unified_player(uow.session, event)
-        if not player:
-            await buy_cmd.finish(message_add_head("⛔ 请先创建角色", event))
+        player = await require_player(uow.session, event, buy_cmd)
 
         # 检查买家必须在城镇
         region = player.get_current_region() if hasattr(player, 'get_current_region') else "大都会"
@@ -481,9 +463,7 @@ async def handle_view_stall(event: MessageEvent, args: Message = CommandArg()):
         await view_stall_cmd.finish(message_add_head("⛔ UID必须是整数", event))
 
     async with UnitOfWork(AsyncSessionLocal) as uow:
-        player = await get_unified_player(uow.session, event)
-        if not player:
-            await view_stall_cmd.finish(message_add_head("⛔ 请先创建角色", event))
+        player = await require_player(uow.session, event, view_stall_cmd)
 
         # 检查玩家必须在城镇
         region = player.get_current_region() if hasattr(player, 'get_current_region') else "大都会"

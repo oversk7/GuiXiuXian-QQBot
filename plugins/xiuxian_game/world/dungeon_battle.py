@@ -30,7 +30,7 @@ from ..models.monthly_card import get_player_card_benefits
 from ..config import config
 from ..utils import message_add_head, luck_prob
 from ..utils_markdown import cmd, build_markdown
-from ..platform_utils import get_unified_player
+from ..platform_utils import get_unified_player, require_player
 from ..item.equipment_service import recalc_equipment_attributes
 from ..battle.battle_log_filter import filter_battle_log, get_player_log_mode
 
@@ -1969,9 +1969,7 @@ async def handle_buy(matcher: Matcher, event: MessageEvent, args: Message = Comm
     item_index = int(arg_text)
 
     async with safe_session() as session:
-        player = await get_unified_player(session, event)
-        if not player:
-            await dungeon_buy_cmd.finish("⛔ 请先创建角色")
+        player = await require_player(session, event, dungeon_buy_cmd)
 
         # 大都会玩家不处理，放行给跑商购买命令
         if player.region == "大都会":
@@ -2042,9 +2040,7 @@ async def handle_teleport_list(event: MessageEvent):
     """显示无限层诡域爬塔进度"""
     async with safe_session() as session:
         # 检查玩家是否存在
-        player = await get_unified_player(session, event)
-        if not player:
-            await teleport_list.finish("⛔ 请先创建角色")
+        player = await require_player(session, event, teleport_list)
 
         # 获取玩家爬塔进度
         max_level = player.max_dungeon_level or 0
@@ -2343,9 +2339,7 @@ async def generate_region_overview_image(region: str, session, player_x: int = N
 async def handle_region_overview(event: MessageEvent, args: Message = CommandArg()):
     """生成诡域探索概览图片"""
     async with safe_session() as session:
-        player = await get_unified_player(session, event)
-        if not player:
-            await region_overview_cmd.finish("⛔ 请先创建角色")
+        player = await require_player(session, event, region_overview_cmd)
 
         # 获取参数
         arg_text = args.extract_plain_text().strip()

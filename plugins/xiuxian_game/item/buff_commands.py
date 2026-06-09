@@ -23,13 +23,8 @@ async def handle_buff_status(event: MessageEvent):
     """查看玩家的临时buff状态"""
     async with safe_session() as session:
         # 使用跨平台工具获取玩家数据
-        from ..platform_utils import get_unified_player, is_guild_message
-        player = await get_unified_player(session, event)
-        if not player:
-            if is_guild_message(event):
-                await buff_status_cmd.finish("⛔ 你还没有创建角色或绑定账号\n💡 请先在群聊注册角色，然后使用绑定功能")
-            else:
-                await buff_status_cmd.finish("⛔ 请先创建角色")
+        from ..platform_utils import require_player
+        player = await require_player(session, event, buff_status_cmd)
         
         status_msg = await get_player_buff_status(session, player)
         await session.commit()  # 提交清理过期buff的操作
@@ -44,12 +39,10 @@ clear_buffs_cmd = on_command("清理增益", aliases={"清理buff", "清理过�
 @clear_buffs_cmd.handle()
 async def handle_clear_buffs(event: MessageEvent):
     """手动清理过期的buff"""
-    from ..platform_utils import get_unified_player
+    from ..platform_utils import require_player
 
     async with safe_session() as session:
-        player = await get_unified_player(session, event)
-        if not player:
-            await clear_buffs_cmd.finish("⛔ 请先创建角色")
+        player = await require_player(session, event, clear_buffs_cmd)
         
         from ..models.temporary_buff import TemporaryBuff
         
@@ -86,13 +79,8 @@ async def handle_attribute_breakdown(event: MessageEvent):
     """显示玩家属性的详细分解信息"""
     async with safe_session() as session:
         # 使用跨平台工具获取玩家数据
-        from ..platform_utils import get_unified_player, is_guild_message
-        player = await get_unified_player(session, event)
-        if not player:
-            if is_guild_message(event):
-                await attribute_breakdown_cmd.finish("⛔ 你还没有创建角色或绑定账号\n💡 请先在群聊注册角色，然后使用绑定功能")
-            else:
-                await attribute_breakdown_cmd.finish("⛔ 请先创建角色")
+        from ..platform_utils import require_player
+        player = await require_player(session, event, attribute_breakdown_cmd)
 
         breakdown = await player.get_attribute_breakdown(session)
 
@@ -230,10 +218,8 @@ async def handle_auto_use_medicine(event: MessageEvent):
     from .item_effects import apply_effect
 
     async with safe_session() as session:
-        from ..platform_utils import get_unified_player
-        player = await get_unified_player(session, event)
-        if not player:
-            await auto_use_medicine_cmd.finish("⛔ 请先创建角色")
+        from ..platform_utils import require_player
+        player = await require_player(session, event, auto_use_medicine_cmd)
 
         if player.hp <= 0:
             await auto_use_medicine_cmd.finish(message_add_head(

@@ -19,7 +19,7 @@ from sqlalchemy.orm.attributes import flag_modified
 from ..models.db import safe_session
 from ..models.player import Player
 from ..models.inventory import ItemInstance
-from ..platform_utils import get_unified_player, is_guild_message
+from ..platform_utils import require_player
 from ..utils import message_add_head
 
 
@@ -131,12 +131,7 @@ scavenge_cmd = on_command("怨灵拾荒", block=True, priority=9)
 @scavenge_cmd.handle()
 async def handle_scavenge(event: MessageEvent):
     async with safe_session() as session:
-        player = await get_unified_player(session, event)
-        if not player:
-            if is_guild_message(event):
-                await scavenge_cmd.finish("⛔ 你还没有创建角色或绑定账号\n💡 请先在群聊注册角色，然后使用绑定功能")
-            else:
-                await scavenge_cmd.finish("⛔ 请先创建角色")
+        player = await require_player(session, event, scavenge_cmd)
 
         # 检查是否装备了镜怨披风
         equipment = await _get_equipment_instance(session, player.id)
@@ -261,12 +256,7 @@ panel_cmd = on_command("镜怨披风", block=True, priority=9)
 @panel_cmd.handle()
 async def handle_panel(event: MessageEvent):
     async with safe_session() as session:
-        player = await get_unified_player(session, event)
-        if not player:
-            if is_guild_message(event):
-                await panel_cmd.finish("⛔ 你还没有创建角色或绑定账号")
-            else:
-                await panel_cmd.finish("⛔ 请先创建角色")
+        player = await require_player(session, event, panel_cmd)
 
         # 检查是否装备了镜怨披风
         equipment = await _get_equipment_instance(session, player.id)

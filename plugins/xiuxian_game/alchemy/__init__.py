@@ -12,7 +12,7 @@ from ..utils import message_add_head
 from .service_new import AlchemyService as AlchemyServiceNew
 from ..infrastructure.repositories.item_repository import ItemRepository
 from ..infrastructure.repositories.alchemy_record_repository import AlchemyRecordRepository
-from ..platform_utils import get_unified_player
+from ..platform_utils import require_player
 
 # ---------------- 指令 ----------------
 
@@ -84,9 +84,7 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
 
         recipe_key, recipe = recipe_result
 
-        player = await get_unified_player(session, event)
-        if not player:
-            await start_cmd.finish("⛔ 请先创建角色")
+        player = await require_player(session, event, start_cmd)
 
         # 自动选择最高阶的炼丹炉
         furnaces = await service.get_player_furnaces(player.id)
@@ -146,9 +144,7 @@ async def _(event: MessageEvent):
 async def _(event: MessageEvent):
     """领取炼丹奖励"""
     async with safe_session() as session:
-        player = await get_unified_player(session, event)
-        if not player:
-            await claim_cmd.finish("⛔ 请先创建角色")
+        player = await require_player(session, event, claim_cmd)
 
         # 新版：使用DI架构Service
         alchemy_record_repo = AlchemyRecordRepository(session)

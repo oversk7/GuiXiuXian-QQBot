@@ -14,7 +14,7 @@ from ..utils import message_add_head
 from ..utils_markdown import cmd, build_markdown
 from .equipment_trade_service import EquipmentTradeService
 from ..item.equipment_commands import find_equipment_by_input
-from ..platform_utils import get_event_server_id, get_unified_player
+from ..platform_utils import get_event_server_id, get_unified_player, require_player
 
 from datetime import date, datetime, timedelta
 
@@ -433,9 +433,7 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
 async def _handle_instance_listing(event: MessageEvent, item_cfg, price: int):
     """处理装备/铭文实例挂牌选择"""
     async with safe_session() as session:
-        player = await get_unified_player(session, event)
-        if not player:
-            await list_cmd.finish("⛔ 请先创建角色")
+        player = await require_player(session, event, list_cmd)
 
         # 获取玩家的实例列表（装备和铭文共用同一查询）
         item_repo = ItemRepository(session)
@@ -641,9 +639,7 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
 
     async with safe_session() as session:
         # 使用跨平台工具获取玩家数据
-        player = await get_unified_player(session, event)
-        if not player:
-            await cancel_cmd.finish("⛔ 请先创建角色")
+        player = await require_player(session, event, cancel_cmd)
 
         order: MarketOrder | None = await session.get(MarketOrder, oid)
         if not order or order.player_id != player.id:
@@ -1098,9 +1094,7 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
         await equipment_appraise_cmd.finish("⛔ 格式：估价 装备编号/名称")
 
     async with safe_session() as session:
-        player = await get_unified_player(session, event)
-        if not player:
-            await equipment_appraise_cmd.finish("⛔ 请先创建角色")
+        player = await require_player(session, event, equipment_appraise_cmd)
 
         # 查找装备
         equipment = await find_equipment_by_input(session, player.id, arg)

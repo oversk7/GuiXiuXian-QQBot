@@ -20,7 +20,7 @@ from sqlalchemy.orm.attributes import flag_modified
 from ..models.db import safe_session
 from ..models.player import Player
 from ..models.inventory import ItemInstance
-from ..platform_utils import get_unified_player, is_guild_message
+from ..platform_utils import require_player
 from ..utils import message_add_head
 
 
@@ -135,12 +135,7 @@ roll_dice_cmd = on_command("掷骰", block=True, priority=9)
 @roll_dice_cmd.handle()
 async def handle_roll_dice(event: MessageEvent):
     async with safe_session() as session:
-        player = await get_unified_player(session, event)
-        if not player:
-            if is_guild_message(event):
-                await roll_dice_cmd.finish("⛔ 你还没有创建角色或绑定账号\n💡 请先在群聊注册角色，然后使用绑定功能")
-            else:
-                await roll_dice_cmd.finish("⛔ 请先创建角色")
+        player = await require_player(session, event, roll_dice_cmd)
 
         # 检查是否装备了诡面骰
         dice_item = await _get_dice_instance(session, player.id)
@@ -215,12 +210,7 @@ dice_panel_cmd = on_command("诡面骰", block=True, priority=9)
 @dice_panel_cmd.handle()
 async def handle_dice_panel(event: MessageEvent):
     async with safe_session() as session:
-        player = await get_unified_player(session, event)
-        if not player:
-            if is_guild_message(event):
-                await dice_panel_cmd.finish("⛔ 你还没有创建角色或绑定账号")
-            else:
-                await dice_panel_cmd.finish("⛔ 请先创建角色")
+        player = await require_player(session, event, dice_panel_cmd)
 
         # 检查是否装备了诡面骰
         dice_item = await _get_dice_instance(session, player.id)

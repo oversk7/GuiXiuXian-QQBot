@@ -17,7 +17,7 @@ from nonebot.adapters.qq import Message
 
 from ..models.db import AsyncSessionLocal
 from ..infrastructure.uow.unit_of_work import UnitOfWork
-from ..platform_utils import get_unified_player
+from ..platform_utils import require_player
 from ..utils_markdown import cmd, build_markdown
 from .cooking_service import CookingService, RecipeManager
 from .chef_service import ChefService
@@ -61,9 +61,7 @@ async def handle_cook(event: MessageEvent, args: Message = CommandArg()):
 
     async with UnitOfWork(AsyncSessionLocal) as uow:
         # 获取玩家
-        player = await get_unified_player(uow.session, event)
-        if not player:
-            await cook_cmd.finish("⛔ 请先创建角色")
+        player = await require_player(uow.session, event, cook_cmd)
 
         # 根据菜名查找食谱
         recipe = recipe_manager.get_recipe_by_name(dish_name)
@@ -86,9 +84,7 @@ async def handle_recipes(event: MessageEvent):
     """【食谱】- 查看已学会的食谱"""
 
     async with UnitOfWork(AsyncSessionLocal) as uow:
-        player = await get_unified_player(uow.session, event)
-        if not player:
-            await recipes_cmd.finish("⛔ 请先创建角色")
+        player = await require_player(uow.session, event, recipes_cmd)
 
         recipes = await cooking_service.get_player_recipes(uow, player.id)
 
@@ -149,9 +145,7 @@ async def handle_recipe_guide(event: MessageEvent):
     """【食谱图鉴】- 查看所有食谱(含未学会)"""
 
     async with UnitOfWork(AsyncSessionLocal) as uow:
-        player = await get_unified_player(uow.session, event)
-        if not player:
-            await recipe_guide_cmd.finish("⛔ 请先创建角色")
+        player = await require_player(uow.session, event, recipe_guide_cmd)
 
         # 获取玩家已学食谱ID
         learned_ids = set(await uow.player_recipes.get_recipe_ids_by_player(player.id))
@@ -210,9 +204,7 @@ async def handle_dish_profit(event: MessageEvent):
     """【菜品利润】- 查看菜品利润分析"""
 
     async with UnitOfWork(AsyncSessionLocal) as uow:
-        player = await get_unified_player(uow.session, event)
-        if not player:
-            await dish_profit_cmd.finish("⛔ 请先创建角色")
+        player = await require_player(uow.session, event, dish_profit_cmd)
 
         recipes = await cooking_service.get_player_recipes(uow, player.id)
 
@@ -269,9 +261,7 @@ async def handle_create_restaurant(event: MessageEvent):
     """【创建餐厅】- 创建你的餐厅"""
 
     async with UnitOfWork(AsyncSessionLocal) as uow:
-        player = await get_unified_player(uow.session, event)
-        if not player:
-            await create_restaurant_cmd.finish("⛔ 请先创建角色")
+        player = await require_player(uow.session, event, create_restaurant_cmd)
 
         success, msg = await restaurant_service.create_restaurant(uow, player.id)
         await create_restaurant_cmd.finish(build_markdown(msg + f"\n***\n{cmd('餐厅')} | {cmd('开店')} | {cmd('经营报表')} | {cmd('我的厨师')}"))
@@ -285,9 +275,7 @@ async def handle_restaurant(event: MessageEvent):
     """【餐厅】- 查看餐厅状态"""
 
     async with UnitOfWork(AsyncSessionLocal) as uow:
-        player = await get_unified_player(uow.session, event)
-        if not player:
-            await restaurant_cmd.finish("⛔ 请先创建角色")
+        player = await require_player(uow.session, event, restaurant_cmd)
 
         success, msg, restaurant = await restaurant_service.get_restaurant_status(uow, player.id)
         await restaurant_cmd.finish(build_markdown(msg + f"\n***\n{cmd('餐厅')} | {cmd('开店')} | {cmd('经营报表')} | {cmd('我的厨师')}"))
@@ -301,9 +289,7 @@ async def handle_upgrade_restaurant(event: MessageEvent):
     """【餐厅升级】- 升级餐厅等级"""
 
     async with UnitOfWork(AsyncSessionLocal) as uow:
-        player = await get_unified_player(uow.session, event)
-        if not player:
-            await upgrade_restaurant_cmd.finish("⛔ 请先创建角色")
+        player = await require_player(uow.session, event, upgrade_restaurant_cmd)
 
         success, msg = await restaurant_service.upgrade_restaurant(uow, player.id)
         await upgrade_restaurant_cmd.finish(build_markdown(msg + f"\n***\n{cmd('餐厅')} | {cmd('开店')} | {cmd('经营报表')} | {cmd('我的厨师')}"))
@@ -317,9 +303,7 @@ async def handle_expand_restaurant(event: MessageEvent):
     """【扩张餐厅】- 扩展餐厅面积"""
 
     async with UnitOfWork(AsyncSessionLocal) as uow:
-        player = await get_unified_player(uow.session, event)
-        if not player:
-            await expand_restaurant_cmd.finish("⛔ 请先创建角色")
+        player = await require_player(uow.session, event, expand_restaurant_cmd)
 
         success, msg = await restaurant_service.expand_area(uow, player.id)
         await expand_restaurant_cmd.finish(build_markdown(msg + f"\n***\n{cmd('餐厅')} | {cmd('开店')} | {cmd('经营报表')} | {cmd('我的厨师')}"))
@@ -333,9 +317,7 @@ async def handle_upgrade_kitchen(event: MessageEvent):
     """【升级厨房】- 升级厨房等级"""
 
     async with UnitOfWork(AsyncSessionLocal) as uow:
-        player = await get_unified_player(uow.session, event)
-        if not player:
-            await upgrade_kitchen_cmd.finish("⛔ 请先创建角色")
+        player = await require_player(uow.session, event, upgrade_kitchen_cmd)
 
         success, msg = await restaurant_service.upgrade_kitchen(uow, player.id)
         await upgrade_kitchen_cmd.finish(build_markdown(msg + f"\n***\n{cmd('餐厅')} | {cmd('开店')} | {cmd('经营报表')} | {cmd('我的厨师')}"))
@@ -349,9 +331,7 @@ async def handle_open_restaurant(event: MessageEvent):
     """【开店】- 开始营业"""
 
     async with UnitOfWork(AsyncSessionLocal) as uow:
-        player = await get_unified_player(uow.session, event)
-        if not player:
-            await open_restaurant_cmd.finish("⛔ 请先创建角色")
+        player = await require_player(uow.session, event, open_restaurant_cmd)
 
         success, msg = await restaurant_service.toggle_open(uow, player.id, True)
         await open_restaurant_cmd.finish(build_markdown(msg + f"\n***\n{cmd('餐厅')} | {cmd('经营报表')} | {cmd('查菜单')}"))
@@ -365,9 +345,7 @@ async def handle_close_restaurant(event: MessageEvent):
     """【打烊】- 暂停营业"""
 
     async with UnitOfWork(AsyncSessionLocal) as uow:
-        player = await get_unified_player(uow.session, event)
-        if not player:
-            await close_restaurant_cmd.finish("⛔ 请先创建角色")
+        player = await require_player(uow.session, event, close_restaurant_cmd)
 
         success, msg = await restaurant_service.toggle_open(uow, player.id, False)
         await close_restaurant_cmd.finish(build_markdown(msg + f"\n***\n{cmd('餐厅')} | {cmd('经营报表')} | {cmd('查菜单')}"))
@@ -383,9 +361,7 @@ async def handle_recruit_chef(event: MessageEvent):
     """【招募厨师】- 生成随机厨师候选"""
 
     async with UnitOfWork(AsyncSessionLocal) as uow:
-        player = await get_unified_player(uow.session, event)
-        if not player:
-            await recruit_chef_cmd.finish("⛔ 请先创建角色")
+        player = await require_player(uow.session, event, recruit_chef_cmd)
 
         # 检查是否有餐厅
         restaurant = await uow.restaurants.get_by_player_id(player.id)
@@ -456,9 +432,7 @@ async def handle_hire_chef(event: MessageEvent, args: Message = CommandArg()):
         await hire_chef_cmd.finish("⛔ 编号必须是数字")
 
     async with UnitOfWork(AsyncSessionLocal) as uow:
-        player = await get_unified_player(uow.session, event)
-        if not player:
-            await hire_chef_cmd.finish("⛔ 请先创建角色")
+        player = await require_player(uow.session, event, hire_chef_cmd)
 
         # 获取餐厅
         restaurant = await uow.restaurants.get_by_player_id(player.id)
@@ -482,9 +456,7 @@ async def handle_fire_chef(event: MessageEvent, args: Message = CommandArg()):
         await fire_chef_cmd.finish("⛔ 用法: 解雇 <厨师名>\n例如: 解雇 小福贵")
 
     async with UnitOfWork(AsyncSessionLocal) as uow:
-        player = await get_unified_player(uow.session, event)
-        if not player:
-            await fire_chef_cmd.finish("⛔ 请先创建角色")
+        player = await require_player(uow.session, event, fire_chef_cmd)
 
         # 获取餐厅
         restaurant = await uow.restaurants.get_by_player_id(player.id)
@@ -503,9 +475,7 @@ async def handle_my_chefs(event: MessageEvent):
     """【我的厨师】- 查看已雇佣的厨师"""
 
     async with UnitOfWork(AsyncSessionLocal) as uow:
-        player = await get_unified_player(uow.session, event)
-        if not player:
-            await my_chefs_cmd.finish("⛔ 请先创建角色")
+        player = await require_player(uow.session, event, my_chefs_cmd)
 
         # 获取餐厅
         restaurant = await uow.restaurants.get_by_player_id(player.id)
@@ -582,9 +552,7 @@ async def handle_promote_chef(event: MessageEvent, args: Message = CommandArg())
         )
 
     async with UnitOfWork(AsyncSessionLocal) as uow:
-        player = await get_unified_player(uow.session, event)
-        if not player:
-            await promote_chef_cmd.finish("⛔ 请先创建角色")
+        player = await require_player(uow.session, event, promote_chef_cmd)
 
         restaurant = await uow.restaurants.get_by_player_id(player.id)
         if not restaurant:
@@ -606,9 +574,7 @@ async def handle_report(event: MessageEvent):
     """【经营报表】- 查看经营统计"""
 
     async with UnitOfWork(AsyncSessionLocal) as uow:
-        player = await get_unified_player(uow.session, event)
-        if not player:
-            await report_cmd.finish("⛔ 请先创建角色")
+        player = await require_player(uow.session, event, report_cmd)
 
         # 获取餐厅
         restaurant = await uow.restaurants.get_by_player_id(player.id)
@@ -628,9 +594,7 @@ async def handle_log(event: MessageEvent):
     import json
 
     async with UnitOfWork(AsyncSessionLocal) as uow:
-        player = await get_unified_player(uow.session, event)
-        if not player:
-            await log_cmd.finish("⛔ 请先创建角色")
+        player = await require_player(uow.session, event, log_cmd)
 
         # 获取餐厅
         restaurant = await uow.restaurants.get_by_player_id(player.id)
@@ -732,9 +696,7 @@ async def handle_restock(event: MessageEvent, args: Message = CommandArg()):
         await restock_cmd.finish("⛔ 数量必须是数字")
 
     async with UnitOfWork(AsyncSessionLocal) as uow:
-        player = await get_unified_player(uow.session, event)
-        if not player:
-            await restock_cmd.finish("⛔ 请先创建角色")
+        player = await require_player(uow.session, event, restock_cmd)
 
         # 根据物品名查找物品ID
         from ..config import config
@@ -777,9 +739,7 @@ async def handle_withdraw(event: MessageEvent, args: Message = CommandArg()):
         await withdraw_cmd.finish("⛔ 数量必须是数字")
 
     async with UnitOfWork(AsyncSessionLocal) as uow:
-        player = await get_unified_player(uow.session, event)
-        if not player:
-            await withdraw_cmd.finish("⛔ 请先创建角色")
+        player = await require_player(uow.session, event, withdraw_cmd)
 
         # 根据物品名查找物品ID
         from ..config import config
@@ -804,9 +764,7 @@ async def handle_storage(event: MessageEvent):
     """【餐厅仓库】- 查看餐厅仓库中的食材"""
 
     async with UnitOfWork(AsyncSessionLocal) as uow:
-        player = await get_unified_player(uow.session, event)
-        if not player:
-            await storage_cmd.finish("⛔ 请先创建角色")
+        player = await require_player(uow.session, event, storage_cmd)
 
         restaurant = await uow.restaurants.get_by_player_id(player.id)
         if not restaurant:
@@ -881,9 +839,7 @@ async def handle_set_menu(event: MessageEvent, args: Message = CommandArg()):
     dish_names = args_text.split()
 
     async with UnitOfWork(AsyncSessionLocal) as uow:
-        player = await get_unified_player(uow.session, event)
-        if not player:
-            await set_menu_cmd.finish("⛔ 请先创建角色")
+        player = await require_player(uow.session, event, set_menu_cmd)
 
         # 根据菜名查找食谱ID
         from ..config import config
@@ -910,9 +866,7 @@ async def handle_view_menu(event: MessageEvent):
     """【菜单】- 查看当前营业菜单"""
 
     async with UnitOfWork(AsyncSessionLocal) as uow:
-        player = await get_unified_player(uow.session, event)
-        if not player:
-            await view_menu_cmd.finish("⛔ 请先创建角色")
+        player = await require_player(uow.session, event, view_menu_cmd)
 
         restaurant = await uow.restaurants.get_by_player_id(player.id)
         if not restaurant:
@@ -976,9 +930,7 @@ async def handle_upgrade_storage(event: MessageEvent):
     """【升级仓库】- 升级仓库等级(Lv.1-5)"""
 
     async with UnitOfWork(AsyncSessionLocal) as uow:
-        player = await get_unified_player(uow.session, event)
-        if not player:
-            await upgrade_storage_cmd.finish("⛔ 请先创建角色")
+        player = await require_player(uow.session, event, upgrade_storage_cmd)
 
         # 先显示当前仓库信息和下级配置
         restaurant = await uow.restaurants.get_by_player_id(player.id)
@@ -1027,9 +979,7 @@ async def handle_signature_dish(event: MessageEvent, args: Message = CommandArg(
         )
 
     async with UnitOfWork(AsyncSessionLocal) as uow:
-        player = await get_unified_player(uow.session, event)
-        if not player:
-            await signature_dish_cmd.finish("⛔ 请先创建角色")
+        player = await require_player(uow.session, event, signature_dish_cmd)
 
         restaurant = await uow.restaurants.get_by_player_id(player.id)
         if not restaurant:
@@ -1071,9 +1021,7 @@ async def handle_restaurant_rank(event: MessageEvent):
     """【餐厅排行】- 查看餐厅排行榜"""
 
     async with UnitOfWork(AsyncSessionLocal) as uow:
-        player = await get_unified_player(uow.session, event)
-        if not player:
-            await restaurant_rank_cmd.finish("⛔ 请先创建角色")
+        player = await require_player(uow.session, event, restaurant_rank_cmd)
 
         # 获取排行数据
         msg = await restaurant_service.get_restaurant_ranking(uow, player.id)

@@ -15,7 +15,7 @@ from ..infrastructure.uow.unit_of_work import UnitOfWork
 from .mentorship_system_service import MentorshipSystemService
 from ..utils import message_add_head
 from ..utils_markdown import cmd, build_markdown
-from ..platform_utils import get_unified_player
+from ..platform_utils import require_player
 
 
 async def handle_mentor_interaction(
@@ -434,9 +434,7 @@ incense_shop_cmd = on_command("香火商店", priority=11, block=True)
 async def handle_incense_shop(event: MessageEvent):
     """【香火商店】- 查看香火兑换列表"""
     async with UnitOfWork(AsyncSessionLocal) as uow:
-        player = await get_unified_player(uow.session, event)
-        if not player:
-            await incense_shop_cmd.finish("⛔ 请先创建角色")
+        player = await require_player(uow.session, event, incense_shop_cmd)
 
         menu = get_incense_shop_menu(player)
         await incense_shop_cmd.finish(build_markdown(menu))
@@ -453,9 +451,7 @@ async def handle_buy_recipe_cmd(event: MessageEvent, args: Message = CommandArg(
         await buy_recipe_cmd.finish("⛔ 用法：买食谱 <食谱名>\n例如：买食谱 食谱·龙鱼宴\n使用【香火商店】查看可购列表")
 
     async with UnitOfWork(AsyncSessionLocal) as uow:
-        player = await get_unified_player(uow.session, event)
-        if not player:
-            await buy_recipe_cmd.finish("⛔ 请先创建角色")
+        player = await require_player(uow.session, event, buy_recipe_cmd)
 
         result = await _buy_recipe(uow, uow.session, player, recipe_name)
         await buy_recipe_cmd.finish(message_add_head(result, event))

@@ -16,7 +16,7 @@ from ..utils import message_add_head
 from ..models.db import safe_session
 from ..models.player import Player
 from ..config import config
-from ..platform_utils import get_unified_player
+from ..platform_utils import require_player
 
 # 命令注册
 mansion_warehouse_cmd = on_command("阴宅仓库", aliases={"查看阴宅仓库"}, priority=4, block=True)
@@ -39,9 +39,7 @@ def _build_service(session):
 async def handle_mansion_warehouse(event: MessageEvent):
     """查看阴宅仓库"""
     async with safe_session() as session:
-        player = await get_unified_player(session, event)
-        if not player:
-            await mansion_warehouse_cmd.finish("⛔ 请先使用【注册】命令创建角色")
+        player = await require_player(session, event, mansion_warehouse_cmd)
 
         if player.mansion_level <= 0:
             await mansion_warehouse_cmd.finish(message_add_head(
@@ -96,9 +94,7 @@ async def handle_deposit_mansion(event: MessageEvent, args: Message = CommandArg
         await deposit_mansion_cmd.finish(message_add_head("⛔ 数量必须大于0", event))
 
     async with safe_session() as session:
-        player = await get_unified_player(session, event)
-        if not player:
-            await deposit_mansion_cmd.finish("⛔ 请先使用【注册】命令创建角色")
+        player = await require_player(session, event, deposit_mansion_cmd)
 
         if player.mansion_level <= 0:
             await deposit_mansion_cmd.finish(message_add_head(
@@ -168,9 +164,7 @@ async def handle_withdraw_mansion(event: MessageEvent, args: Message = CommandAr
         await withdraw_mansion_cmd.finish(message_add_head("⛔ 数量必须大于0", event))
 
     async with safe_session() as session:
-        player = await get_unified_player(session, event)
-        if not player:
-            await withdraw_mansion_cmd.finish("⛔ 请先使用【注册】命令创建角色")
+        player = await require_player(session, event, withdraw_mansion_cmd)
 
         if player.mansion_level <= 0:
             await withdraw_mansion_cmd.finish(message_add_head(

@@ -19,7 +19,7 @@ from nonebot.adapters.qq import Message
 
 from ..models.db import AsyncSessionLocal
 from ..infrastructure.uow.unit_of_work import UnitOfWork
-from ..platform_utils import get_unified_player
+from ..platform_utils import require_player
 from ..utils_markdown import cmd, build_markdown
 from .spirit_field_service import SpiritFieldService
 from .steal_service import StealService
@@ -44,9 +44,7 @@ create_field_cmd = on_command("开辟灵田", aliases={"开田"}, priority=13, b
 async def handle_create_field(event: MessageEvent):
     """【开辟灵田】- 创建灵田"""
     async with UnitOfWork(AsyncSessionLocal) as uow:
-        player = await get_unified_player(uow.session, event)
-        if not player:
-            await create_field_cmd.finish("请先创建角色")
+        player = await require_player(uow.session, event, create_field_cmd)
 
         success, msg = await field_service.create_field(uow, player.id)
         await create_field_cmd.finish(build_markdown(msg + f"\n***\n{cmd('灵田')} | {cmd('种子商店')}"))
@@ -61,9 +59,7 @@ view_field_cmd = on_command("灵田", aliases={"我的灵田"}, priority=13, blo
 async def handle_view_field(event: MessageEvent):
     """【灵田】- 查看灵田状态"""
     async with UnitOfWork(AsyncSessionLocal) as uow:
-        player = await get_unified_player(uow.session, event)
-        if not player:
-            await view_field_cmd.finish("请先创建角色")
+        player = await require_player(uow.session, event, view_field_cmd)
 
         success, msg = await field_service.get_field_status(uow, player.id)
         await view_field_cmd.finish(build_markdown(msg + f"\n***\n{cmd('收菜')} | {cmd('一键浇水')} | {cmd('种子商店')} | {cmd('偷菜')}"))
@@ -78,9 +74,7 @@ upgrade_field_cmd = on_command("灵田升级", aliases={"升级灵田"}, priorit
 async def handle_upgrade_field(event: MessageEvent):
     """【灵田升级】- 升级灵田等级"""
     async with UnitOfWork(AsyncSessionLocal) as uow:
-        player = await get_unified_player(uow.session, event)
-        if not player:
-            await upgrade_field_cmd.finish("请先创建角色")
+        player = await require_player(uow.session, event, upgrade_field_cmd)
 
         success, msg = await field_service.upgrade_field(uow, player.id)
         await upgrade_field_cmd.finish(build_markdown(msg + f"\n***\n{cmd('灵田')} | {cmd('种子商店')}"))
@@ -111,9 +105,7 @@ async def handle_plant(event: MessageEvent, args: Message = CommandArg()):
             await plant_cmd.finish("地块号必须是数字")
 
     async with UnitOfWork(AsyncSessionLocal) as uow:
-        player = await get_unified_player(uow.session, event)
-        if not player:
-            await plant_cmd.finish("请先创建角色")
+        player = await require_player(uow.session, event, plant_cmd)
 
         success, msg = await field_service.plant(uow, player.id, crop_name, plot_index)
         await plant_cmd.finish(build_markdown(msg + f"\n***\n{cmd('灵田')} | {cmd('一键浇水')} | {cmd('收菜')}"))
@@ -134,9 +126,7 @@ async def handle_plant_all(event: MessageEvent, args: Message = CommandArg()):
     crop_name = args_text.split()[0]
 
     async with UnitOfWork(AsyncSessionLocal) as uow:
-        player = await get_unified_player(uow.session, event)
-        if not player:
-            await plant_all_cmd.finish("请先创建角色")
+        player = await require_player(uow.session, event, plant_all_cmd)
 
         success, msg = await field_service.plant_all(uow, player.id, crop_name)
         await plant_all_cmd.finish(build_markdown(msg + f"\n***\n{cmd('灵田')} | {cmd('一键浇水')} | {cmd('收菜')}"))
@@ -162,9 +152,7 @@ async def handle_water(event: MessageEvent, args: Message = CommandArg()):
             await water_cmd.finish("地块号必须是数字")
 
     async with UnitOfWork(AsyncSessionLocal) as uow:
-        player = await get_unified_player(uow.session, event)
-        if not player:
-            await water_cmd.finish("请先创建角色")
+        player = await require_player(uow.session, event, water_cmd)
 
         success, msg = await field_service.water_plot(uow, player.id, plot_index)
         await water_cmd.finish(build_markdown(msg + f"\n***\n{cmd('灵田')} | {cmd('收菜')}"))
@@ -179,9 +167,7 @@ water_all_cmd = on_command("一键浇水", aliases={"全部浇水"}, priority=13
 async def handle_water_all(event: MessageEvent):
     """【一键灌溉】- 灌溉所有已种地块"""
     async with UnitOfWork(AsyncSessionLocal) as uow:
-        player = await get_unified_player(uow.session, event)
-        if not player:
-            await water_all_cmd.finish("请先创建角色")
+        player = await require_player(uow.session, event, water_all_cmd)
 
         success, msg = await field_service.water_all(uow, player.id)
         await water_all_cmd.finish(build_markdown(msg + f"\n***\n{cmd('灵田')} | {cmd('收菜')}"))
@@ -196,9 +182,7 @@ harvest_cmd = on_command("收菜", aliases={"收获"}, priority=13, block=True)
 async def handle_harvest(event: MessageEvent):
     """【收菜】- 收获所有成熟作物"""
     async with UnitOfWork(AsyncSessionLocal) as uow:
-        player = await get_unified_player(uow.session, event)
-        if not player:
-            await harvest_cmd.finish("请先创建角色")
+        player = await require_player(uow.session, event, harvest_cmd)
 
         success, msg = await field_service.harvest(uow, player.id)
         await harvest_cmd.finish(build_markdown(msg + f"\n***\n{cmd('灵田')} | {cmd('一键种植 作物', '一键种植 ')} | {cmd('种子商店')}"))
@@ -215,9 +199,7 @@ async def handle_steal(event: MessageEvent, args: Message = CommandArg()):
     args_text = args.extract_plain_text().strip()
 
     async with UnitOfWork(AsyncSessionLocal) as uow:
-        player = await get_unified_player(uow.session, event)
-        if not player:
-            await steal_cmd.finish("请先创建角色")
+        player = await require_player(uow.session, event, steal_cmd)
 
         if not args_text:
             # 查看可偷目标
@@ -286,9 +268,7 @@ seed_shop_cmd = on_command("种子商店", aliases={"灵种商店"}, priority=13
 async def handle_seed_shop(event: MessageEvent):
     """【灵种商店】- 查看可购买的种子"""
     async with UnitOfWork(AsyncSessionLocal) as uow:
-        player = await get_unified_player(uow.session, event)
-        if not player:
-            await seed_shop_cmd.finish("请先创建角色")
+        player = await require_player(uow.session, event, seed_shop_cmd)
 
         field = await uow.spirit_fields.get_by_player_id(player.id)
         if not field:
@@ -360,9 +340,7 @@ async def handle_buy_seed(event: MessageEvent, args: Message = CommandArg()):
             await buy_seed_cmd.finish("数量必须是数字")
 
     async with UnitOfWork(AsyncSessionLocal) as uow:
-        player = await get_unified_player(uow.session, event)
-        if not player:
-            await buy_seed_cmd.finish("请先创建角色")
+        player = await require_player(uow.session, event, buy_seed_cmd)
 
         field = await uow.spirit_fields.get_by_player_id(player.id)
         if not field:
@@ -423,9 +401,7 @@ async def handle_buy_beast(event: MessageEvent, args: Message = CommandArg()):
             await buy_beast_cmd.finish("数量必须是数字")
 
     async with UnitOfWork(AsyncSessionLocal) as uow:
-        player = await get_unified_player(uow.session, event)
-        if not player:
-            await buy_beast_cmd.finish("请先创建角色")
+        player = await require_player(uow.session, event, buy_beast_cmd)
 
         field = await uow.spirit_fields.get_by_player_id(player.id)
         if not field:
@@ -477,9 +453,7 @@ async def handle_visit_other_field(event: MessageEvent, args: Message = CommandA
         await visit_other_field_cmd.finish("UID必须是数字")
 
     async with UnitOfWork(AsyncSessionLocal) as uow:
-        player = await get_unified_player(uow.session, event)
-        if not player:
-            await visit_other_field_cmd.finish("请先创建角色")
+        player = await require_player(uow.session, event, visit_other_field_cmd)
 
         success, msg = await field_service.visit_field(uow, player.id, target_uid)
         await visit_other_field_cmd.finish(build_markdown(msg + f"\n***\n{cmd('偷菜 UID', '偷菜 ')} | {cmd('灵田')}"))
@@ -504,9 +478,7 @@ async def handle_field_log(event: MessageEvent, args: Message = CommandArg()):
             await field_log_cmd.finish("页码请输入数字，例如：偷菜记录 2")
 
     async with UnitOfWork(AsyncSessionLocal) as uow:
-        player = await get_unified_player(uow.session, event)
-        if not player:
-            await field_log_cmd.finish("请先创建角色")
+        player = await require_player(uow.session, event, field_log_cmd)
 
         success, msg = await steal_service.get_steal_logs(uow, player.id, page)
         await field_log_cmd.finish(build_markdown(msg + f"\n***\n{cmd('灵田')} | {cmd('偷菜')}"))

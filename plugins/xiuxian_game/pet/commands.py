@@ -6,7 +6,7 @@ from nonebot.adapters.qq import MessageEvent, Message
 from ..models.db import AsyncSessionLocal
 from ..models.inventory import ItemInstance
 from ..infrastructure.uow.unit_of_work import UnitOfWork
-from ..platform_utils import get_unified_player
+from ..platform_utils import require_player
 from .pet_service import PetService
 from .pet_dialogue_service import PetDialogueService
 from .config import PetConfigManager, format_bonus
@@ -53,9 +53,7 @@ async def handle_tame(event: MessageEvent, args: Message = CommandArg()):
     beast_item_id = f"guardian_{beast.beast_id}"
 
     async with UnitOfWork(AsyncSessionLocal) as uow:
-        player = await get_unified_player(uow.session, event)
-        if not player:
-            await tame_cmd.finish("请先创建角色")
+        player = await require_player(uow.session, event, tame_cmd)
 
         success, msg = await pet_service.acquire_pet(uow, player.id, beast_item_id, nickname)
         if success and msg:
@@ -72,9 +70,7 @@ pet_info_cmd = on_command("宠物", aliases={"我的宠物", "诡兽伙伴"}, pr
 async def handle_pet_info(event: MessageEvent):
     """【宠物】- 查看当前伙伴状态"""
     async with UnitOfWork(AsyncSessionLocal) as uow:
-        player = await get_unified_player(uow.session, event)
-        if not player:
-            await pet_info_cmd.finish("请先创建角色")
+        player = await require_player(uow.session, event, pet_info_cmd)
 
         success, msg = await pet_service.get_pet_info(uow, player.id)
         if success and msg:
@@ -91,9 +87,7 @@ nest_cmd = on_command("宠物列表", aliases={"诡兽巢穴"}, priority=5, bloc
 async def handle_nest(event: MessageEvent):
     """【宠物列表】- 查看所有宠物"""
     async with UnitOfWork(AsyncSessionLocal) as uow:
-        player = await get_unified_player(uow.session, event)
-        if not player:
-            await nest_cmd.finish("请先创建角色")
+        player = await require_player(uow.session, event, nest_cmd)
 
         success, msg = await pet_service.get_pet_list(uow, player.id)
         if success and msg:
@@ -113,9 +107,7 @@ async def handle_switch(event: MessageEvent, args: Message = CommandArg()):
     if not args_text:
         await switch_cmd.finish("用法: 切换伙伴 <ID或昵称>\n使用【宠物列表】查看")
     async with UnitOfWork(AsyncSessionLocal) as uow:
-        player = await get_unified_player(uow.session, event)
-        if not player:
-            await switch_cmd.finish("请先创建角色")
+        player = await require_player(uow.session, event, switch_cmd)
 
         success, msg = await pet_service.set_active_pet(uow, player.id, args_text)
         if success and msg:
@@ -136,9 +128,7 @@ async def handle_feed(event: MessageEvent, args: Message = CommandArg()):
     if not args_text:
         # 无参数：显示宠物状态 + 用法提示
         async with UnitOfWork(AsyncSessionLocal) as uow:
-            player = await get_unified_player(uow.session, event)
-            if not player:
-                await feed_cmd.finish("请先创建角色")
+            player = await require_player(uow.session, event, feed_cmd)
             pet = await uow.pets.get_active_pet(player.id)
             if not pet:
                 await feed_cmd.finish("你还没有伙伴诡兽\n💡 使用【驯化诡兽 诡兽名 昵称】驯化一只")
@@ -164,9 +154,7 @@ async def handle_feed(event: MessageEvent, args: Message = CommandArg()):
             await feed_cmd.finish("数量必须在1-99之间")
 
     async with UnitOfWork(AsyncSessionLocal) as uow:
-        player = await get_unified_player(uow.session, event)
-        if not player:
-            await feed_cmd.finish("请先创建角色")
+        player = await require_player(uow.session, event, feed_cmd)
 
         if name == "怨念":
             success, msg = await pet_service.feed_with_resentment(uow, player.id, quantity)
@@ -201,9 +189,7 @@ async def handle_interact(event: MessageEvent):
             break
 
     async with UnitOfWork(AsyncSessionLocal) as uow:
-        player = await get_unified_player(uow.session, event)
-        if not player:
-            await interact_cmd.finish("请先创建角色")
+        player = await require_player(uow.session, event, interact_cmd)
 
         success, msg = await pet_service.interact(uow, player.id, action_key)
         if success and msg:
@@ -231,9 +217,7 @@ async def handle_chat(event: MessageEvent, args: Message = CommandArg()):
         await chat_cmd.finish("用法: 对话 <你想说的话>\n例如: 对话 你今天心情怎么样？")
 
     async with UnitOfWork(AsyncSessionLocal) as uow:
-        player = await get_unified_player(uow.session, event)
-        if not player:
-            await chat_cmd.finish("请先创建角色")
+        player = await require_player(uow.session, event, chat_cmd)
 
         success, msg = await dialogue_service.chat(uow, player.id, args_text)
         if success and msg:
@@ -259,9 +243,7 @@ async def handle_transform(event: MessageEvent, args: Message = CommandArg()):
         gender = "female"
 
     async with UnitOfWork(AsyncSessionLocal) as uow:
-        player = await get_unified_player(uow.session, event)
-        if not player:
-            await transform_cmd.finish("请先创建角色")
+        player = await require_player(uow.session, event, transform_cmd)
 
         success, msg = await pet_service.transform(uow, player.id, gender)
         if success and msg:
@@ -281,9 +263,7 @@ async def handle_evolve(event: MessageEvent, args: Message = CommandArg()):
     confirm = args_text == "确认"
 
     async with UnitOfWork(AsyncSessionLocal) as uow:
-        player = await get_unified_player(uow.session, event)
-        if not player:
-            await evolve_cmd.finish("请先创建角色")
+        player = await require_player(uow.session, event, evolve_cmd)
 
         success, msg = await pet_service.evolve_pet(uow, player.id, confirm)
         if success and msg:
@@ -316,9 +296,7 @@ async def handle_equip_accessory(event: MessageEvent, args: Message = CommandArg
         await equip_acc_cmd.finish(build_markdown(msg))
 
     async with UnitOfWork(AsyncSessionLocal) as uow:
-        player = await get_unified_player(uow.session, event)
-        if not player:
-            await equip_acc_cmd.finish("请先创建角色")
+        player = await require_player(uow.session, event, equip_acc_cmd)
 
         success, msg = await pet_service.equip_accessory(uow, player.id, args_text)
         if success and msg:
@@ -346,9 +324,7 @@ async def handle_buy_accessory(event: MessageEvent, args: Message = CommandArg()
     use_gui_zhu = acc.rarity in ("purple", "orange")
 
     async with UnitOfWork(AsyncSessionLocal) as uow:
-        player = await get_unified_player(uow.session, event)
-        if not player:
-            await buy_acc_cmd.finish("请先创建角色")
+        player = await require_player(uow.session, event, buy_acc_cmd)
 
         if use_gui_zhu:
             if player.gui_zhu < acc.price:
@@ -386,9 +362,7 @@ guard_cmd = on_command("派遣守田", aliases={"守田"}, priority=5, block=Tru
 async def handle_guard(event: MessageEvent):
     """【派遣守田】- 派遣当前伙伴去灵田守田"""
     async with UnitOfWork(AsyncSessionLocal) as uow:
-        player = await get_unified_player(uow.session, event)
-        if not player:
-            await guard_cmd.finish("请先创建角色")
+        player = await require_player(uow.session, event, guard_cmd)
 
         success, msg = await pet_service.dispatch_to_guard(uow, player.id)
         if success and msg:
@@ -405,9 +379,7 @@ recall_cmd = on_command("召回宠物", aliases={"召回守田"}, priority=5, bl
 async def handle_recall(event: MessageEvent):
     """【召回宠物】- 召回正在守田的宠物"""
     async with UnitOfWork(AsyncSessionLocal) as uow:
-        player = await get_unified_player(uow.session, event)
-        if not player:
-            await recall_cmd.finish("请先创建角色")
+        player = await require_player(uow.session, event, recall_cmd)
 
         success, msg = await pet_service.recall_from_guard(uow, player.id)
         if success and msg:
@@ -432,9 +404,7 @@ async def handle_customize_personality(event: MessageEvent, args: Message = Comm
         )
 
     async with UnitOfWork(AsyncSessionLocal) as uow:
-        player = await get_unified_player(uow.session, event)
-        if not player:
-            await customize_personality_cmd.finish("请先创建角色")
+        player = await require_player(uow.session, event, customize_personality_cmd)
 
         success, msg = await customize_pet_personality(uow, player.id, description)
         if success and msg:
@@ -466,9 +436,7 @@ async def handle_release_pet(event: MessageEvent, args: Message = CommandArg()):
         await release_pet_cmd.finish("请指定要放生的宠物ID或昵称")
 
     async with UnitOfWork(AsyncSessionLocal) as uow:
-        player = await get_unified_player(uow.session, event)
-        if not player:
-            await release_pet_cmd.finish("请先创建角色")
+        player = await require_player(uow.session, event, release_pet_cmd)
 
         success, msg = await pet_service.release_pet(uow, player.id, pet_name)
         await uow.commit()
@@ -483,9 +451,7 @@ reset_personality_cmd = on_command("重置人设", priority=5, block=True)
 async def handle_reset_personality(event: MessageEvent):
     """【重置人设】- 免费恢复宠物默认人设"""
     async with UnitOfWork(AsyncSessionLocal) as uow:
-        player = await get_unified_player(uow.session, event)
-        if not player:
-            await reset_personality_cmd.finish("请先创建角色")
+        player = await require_player(uow.session, event, reset_personality_cmd)
 
         success, msg = await reset_pet_personality(uow, player.id)
         if success and msg:

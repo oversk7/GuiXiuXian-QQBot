@@ -240,13 +240,8 @@ async def handle_use_item(event: MessageEvent, args: Message = CommandArg()):
 
     async with safe_session() as session:
         # 使用跨平台工具获取玩家数据
-        from ..platform_utils import get_unified_player, is_guild_message
-        player = await get_unified_player(session, event)
-        if not player:
-            if is_guild_message(event):
-                await use_item.finish("⛔ 你还没有创建角色或绑定账号\n💡 请先在群聊注册角色，然后使用绑定功能")
-            else:
-                await use_item.finish("⛔ 请先创建角色")
+        from ..platform_utils import require_player
+        player = await require_player(session, event, use_item)
 
         # 查找物品
         item_config = config.items_config["by_name"].get(item_name)
@@ -379,10 +374,8 @@ async def handle_use_item(event: MessageEvent, args: Message = CommandArg()):
 async def handle_elixir_tolerance(event: MessageEvent, args: Message = CommandArg()):
     """查看丹药使用状态"""
     async with safe_session() as session:
-        from ..platform_utils import get_unified_player
-        player = await get_unified_player(session, event)
-        if not player:
-            await elixir_tolerance_cmd.finish("⛔ 请先创建角色")
+        from ..platform_utils import require_player
+        player = await require_player(session, event, elixir_tolerance_cmd)
 
         # 获取所有丹药的使用记录
         from sqlalchemy import select
@@ -426,10 +419,8 @@ async def handle_elixir_tolerance(event: MessageEvent, args: Message = CommandAr
 async def handle_elixir_bonus(event: MessageEvent):
     """查看丹药总加成"""
     async with safe_session() as session:
-        from ..platform_utils import get_unified_player
-        player = await get_unified_player(session, event)
-        if not player:
-            await elixir_bonus_cmd.finish("⛔ 请先创建角色")
+        from ..platform_utils import require_player
+        player = await require_player(session, event, elixir_bonus_cmd)
 
         # 获取所有丹药使用记录（不限日期，因为丹药效果是永久的）
         from sqlalchemy import select
@@ -567,13 +558,8 @@ async def handle_inventory(event: MessageEvent, args: Message = CommandArg()):
 
     # --- 获取玩家身份 ---
     async with safe_session() as session:
-        from ..platform_utils import get_unified_player, is_guild_message
-        player = await get_unified_player(session, event)
-        if not player:
-            if is_guild_message(event):
-                await inventory_cmd.finish("⛔ 你还没有创建角色或绑定账号\n💡 请先在群聊注册角色，然后使用绑定功能")
-            else:
-                await inventory_cmd.finish("⛔ 请先创建角色")
+        from ..platform_utils import require_player
+        player = await require_player(session, event, inventory_cmd)
         player_id = player.id
         inventory_capacity = player.inventory_capacity
         effective_capacity = await player.get_effective_inventory_capacity(session)
@@ -692,14 +678,9 @@ async def handle_fish_inventory(event: MessageEvent, args: Message = CommandArg(
             await fish_inventory_cmd.finish("⛔ 页码必须为正整数")
 
     async with safe_session() as session:
-        from ..platform_utils import get_unified_player, is_guild_message
+        from ..platform_utils import require_player
 
-        player = await get_unified_player(session, event)
-        if not player:
-            if is_guild_message(event):
-                await fish_inventory_cmd.finish("⛔ 你还没有创建角色或绑定账号\n💡 请先在群聊注册角色，然后使用绑定功能")
-            else:
-                await fish_inventory_cmd.finish("⛔ 请先创建角色")
+        player = await require_player(session, event, fish_inventory_cmd)
 
         result = await session.execute(
             select(ItemInstance)
@@ -780,10 +761,8 @@ async def handle_rename(event: MessageEvent, args: Message = CommandArg()):
 
     async with safe_session() as session:
         # 获取玩家和改名卡信息
-        from ..platform_utils import get_unified_player
-        player = await get_unified_player(session, event)
-        if not player:
-            await rename_cmd.finish("⛔ 请先创建角色")
+        from ..platform_utils import require_player
+        player = await require_player(session, event, rename_cmd)
 
         rename_item = config.items_config["by_name"]["改名卡"]
         inv_result = await session.execute(
@@ -833,10 +812,8 @@ async def handle_drop_item(event: MessageEvent, args: Message = CommandArg()):
 
     async with safe_session() as session:
         # 获取玩家
-        from ..platform_utils import get_unified_player
-        player = await get_unified_player(session, event)
-        if not player:
-            await drop_item.finish("⛔ 请先创建角色")
+        from ..platform_utils import require_player
+        player = await require_player(session, event, drop_item)
 
         # 通过名称查找物品模板
         item_cfg = config.items_config["by_name"].get(item_name)
@@ -880,13 +857,8 @@ async def handle_organize_inventory(event: MessageEvent):
     """整理背包，将同类型可堆叠物品合并"""
     async with safe_session() as session:
         # 使用跨平台工具获取玩家数据
-        from ..platform_utils import get_unified_player, is_guild_message
-        player = await get_unified_player(session, event)
-        if not player:
-            if is_guild_message(event):
-                await organize_inventory_cmd.finish("⛔ 你还没有创建角色或绑定账号\n💡 请先在群聊注册角色，然后使用绑定功能")
-            else:
-                await organize_inventory_cmd.finish("⛔ 请先创建角色")
+        from ..platform_utils import require_player
+        player = await require_player(session, event, organize_inventory_cmd)
 
         player_lock = _get_inventory_lock(player.id)
         try:

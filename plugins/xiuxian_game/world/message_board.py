@@ -17,7 +17,7 @@ from ..models.message_blacklist import MessageBoardBlacklist
 from ..models.guild import Guild
 from ..utils import message_add_head
 from ..utils_markdown import cmd, build_markdown
-from ..platform_utils import get_unified_player
+from ..platform_utils import get_unified_player, require_player
 from ..ai_guide import is_admin
 from ..config import Config
 
@@ -520,9 +520,7 @@ async def handle_send_msg(event: MessageEvent, args: Message = CommandArg()):
     player_guild_name = None
 
     async with safe_session() as session:
-        player = await get_unified_player(session, event)
-        if not player:
-            await send_msg_cmd.finish("⛔ 请先创建角色")
+        player = await require_player(session, event, send_msg_cmd)
 
         # 系统频道：仅管理员
         if scope is MessageScope.SYSTEM:

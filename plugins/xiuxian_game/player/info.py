@@ -16,7 +16,7 @@ import random
 import uuid
 from ..models.navigation_task import NavigationTask
 from ..world.navigation import _update_nav_position
-from ..platform_utils import get_event_server_id, get_unified_player, is_guild_message
+from ..platform_utils import get_event_server_id, get_unified_player, is_guild_message, require_player
 from ..infrastructure.cache import player_identity_cache
 from ..config import config
 from ..server_config import DEFAULT_SERVER_ID, get_server_name
@@ -569,12 +569,7 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
 
     async with safe_session() as session:
         # 使用跨平台工具获取玩家数据
-        player = await get_unified_player(session, event)
-        if not player:
-            if is_guild_message(event):
-                await change_gender.finish("⛔ 你还没有创建角色或绑定账号\n💡 请先在群聊注册角色，然后使用绑定功能")
-            else:
-                await change_gender.finish("⛔ 请先创建角色")
+        player = await require_player(session, event, change_gender)
 
         if player.sex == gender:
             await change_gender.finish(f"⛔ 你的性别已经是{gender.value}了")
@@ -604,12 +599,7 @@ async def _(event: MessageEvent):
     # 检查是否已有角色
     async with safe_session() as session:
         # 使用跨平台工具获取玩家数据
-        player = await get_unified_player(session, event)
-        if not player:
-            if is_guild_message(event):
-                await newbie_guide.finish("⛔ 你还没有创建角色或绑定账号\n💡 请先在群聊注册角色，然后使用绑定功能")
-            else:
-                await newbie_guide.finish("⛔ 请先创建角色，发送【注册】开始游戏")
+        player = await require_player(session, event, newbie_guide)
 
     GROUP_LINK = (
         "https://qun.qq.com/universal-share/share?"
@@ -671,9 +661,7 @@ async def _(event: MessageEvent):
 
     # 检查是否已有角色
     async with safe_session() as session:
-        player = await get_unified_player(session, event)
-        if not player:
-            await attribute_guide.finish("⛔ 请先创建角色，发送【注册】开始游戏")
+        player = await require_player(session, event, attribute_guide)
 
     content = (
         "# 🔮 加点帮助\n"

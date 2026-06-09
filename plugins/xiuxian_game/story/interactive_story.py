@@ -9,7 +9,7 @@ from ..models.db import safe_session
 from ..models.player import Player
 from ..models.story_session import StorySession
 from ..utils import message_add_head
-from ..platform_utils import get_unified_player
+from ..platform_utils import get_unified_player, require_player
 from .engine import StoryEngine
 import re
 import os
@@ -37,9 +37,7 @@ continue_handler = on_regex(r".*", block=False, priority=15)
 async def handle_story_list(event: MessageEvent):
     """显示可用试炼列表"""
     async with safe_session() as session:
-        player = await get_unified_player(session, event)
-        if not player:
-            await story_list_cmd.finish("⛔ 请先创建角色")
+        player = await require_player(session, event, story_list_cmd)
 
         stories = story_engine.get_story_list()
         if not stories:
@@ -66,9 +64,7 @@ async def handle_story_list(event: MessageEvent):
 async def handle_completed_trials(event: MessageEvent):
     """显示玩家已通关的试炼列表"""
     async with safe_session() as session:
-        player = await get_unified_player(session, event)
-        if not player:
-            await completed_trials_cmd.finish("⛔ 请先创建角色")
+        player = await require_player(session, event, completed_trials_cmd)
 
         completed_trials = player.get_completed_trials()
         if not completed_trials:
@@ -85,9 +81,7 @@ async def handle_completed_trials(event: MessageEvent):
 async def handle_start_story(event: MessageEvent, args: Message = CommandArg()):
     """开始试炼"""
     async with safe_session() as session:
-        player = await get_unified_player(session, event)
-        if not player:
-            await start_story_cmd.finish("⛔ 请先创建角色")
+        player = await require_player(session, event, start_story_cmd)
         
         story_id = args.extract_plain_text().strip()
         if not story_id:
@@ -128,9 +122,7 @@ async def handle_start_story(event: MessageEvent, args: Message = CommandArg()):
 async def handle_story_status(event: MessageEvent):
     """查看试炼状态"""
     async with safe_session() as session:
-        player = await get_unified_player(session, event)
-        if not player:
-            await story_status_cmd.finish("⛔ 请先创建角色")
+        player = await require_player(session, event, story_status_cmd)
         
         # 获取活跃试炼会话
         story_session = await StorySession.get_active_session(session, player.id)
@@ -154,9 +146,7 @@ async def handle_story_status(event: MessageEvent):
 async def handle_quit_story(event: MessageEvent):
     """退出试炼"""
     async with safe_session() as session:
-        player = await get_unified_player(session, event)
-        if not player:
-            await quit_story_cmd.finish("⛔ 请先创建角色")
+        player = await require_player(session, event, quit_story_cmd)
         
         # 获取活跃试炼会话
         story_session = await StorySession.get_active_session(session, player.id)

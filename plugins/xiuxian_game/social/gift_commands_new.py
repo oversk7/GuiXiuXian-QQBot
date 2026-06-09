@@ -20,7 +20,7 @@ from ..economy.equipment_trade_service import EquipmentTradeService
 from ..models.player import Player
 from ..models.inventory import ItemInstance
 from ..utils import message_add_head
-from ..platform_utils import get_unified_player
+from ..platform_utils import get_unified_player, require_player
 
 # 创建命令
 gift_command = on_command("赠礼", aliases={"送礼"}, priority=11, block=True)
@@ -76,9 +76,7 @@ async def handle_gift_command(event: MessageEvent, args: Message = CommandArg())
         # 2. 执行送礼
         async with UnitOfWork(AsyncSessionLocal) as uow:
             # 获取玩家（通过ownership系统）
-            player = await get_unified_player(uow.session, event)
-            if not player:
-                await gift_command.finish("⛔ 请先创建角色")
+            player = await require_player(uow.session, event, gift_command)
             player_id = player.id
 
             # 创建服务
@@ -165,9 +163,7 @@ async def handle_transfer_command(event: MessageEvent, args: Message = CommandAr
         # 2. 执行转移
         async with UnitOfWork(AsyncSessionLocal) as uow:
             # 获取玩家（通过ownership系统）
-            player = await get_unified_player(uow.session, event)
-            if not player:
-                await transfer_command.finish("⛔ 请先创建角色")
+            player = await require_player(uow.session, event, transfer_command)
             player_id = player.id
 
             # 创建服务

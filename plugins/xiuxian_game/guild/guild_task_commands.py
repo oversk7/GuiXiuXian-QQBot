@@ -9,7 +9,7 @@ from ..models.player import Player
 from ..utils_markdown import cmd, build_markdown
 from .guild_task_service import GuildTaskService
 from .guild_task_service_new import GuildTaskService as GuildTaskServiceNew  # DI版本
-from ..platform_utils import get_unified_player
+from ..platform_utils import require_player
 
 # Feature Flag（在文件顶部靠近其他常量的位置）
 # ==================== 公会任务 ====================
@@ -19,9 +19,7 @@ guild_task_cmd = on_command("公会任务", aliases={"公会日常", "公会周�
 async def handle_guild_task(event: MessageEvent):
     """查看公会任务列表"""
     async with safe_session() as session:
-        player = await get_unified_player(session, event)
-        if not player:
-            await guild_task_cmd.finish("请先创建角色")
+        player = await require_player(session, event, guild_task_cmd)
 
         if not player.guild_id:
             await guild_task_cmd.finish("你未加入任何公会")
@@ -97,9 +95,7 @@ complete_guild_task_cmd = on_command("完成公会任务", aliases={"领取公�
 async def handle_complete_guild_task(event: MessageEvent):
     """尝试完成所有满足条件的公会任务"""
     async with safe_session() as session:
-        player = await get_unified_player(session, event)
-        if not player:
-            await complete_guild_task_cmd.finish("请先创建角色")
+        player = await require_player(session, event, complete_guild_task_cmd)
 
         if not player.guild_id:
             await complete_guild_task_cmd.finish("你未加入任何公会")
@@ -145,9 +141,7 @@ guild_task_stats_cmd = on_command("公会任务统计", aliases={"公会活跃�
 async def handle_guild_task_stats(event: MessageEvent):
     """查看公会任务完成统计"""
     async with safe_session() as session:
-        player = await get_unified_player(session, event)
-        if not player:
-            await guild_task_stats_cmd.finish("请先创建角色")
+        player = await require_player(session, event, guild_task_stats_cmd)
 
         if not player.guild_id:
             await guild_task_stats_cmd.finish("你未加入任何公会")

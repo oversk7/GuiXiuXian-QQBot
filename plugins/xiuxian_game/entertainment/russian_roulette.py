@@ -3,6 +3,7 @@
 """
 import json
 from nonebot import on_command
+from nonebot.exception import FinishedException
 from nonebot.adapters.qq import Bot, MessageEvent, Message, MessageSegment
 from nonebot.adapters.qq.models.common import MessageMarkdown, MessageMarkdownParams
 from nonebot.params import CommandArg
@@ -15,7 +16,7 @@ from ..models.player import Player
 from ..utils import message_add_head
 from .russian_roulette_core import RussianRouletteCore, ItemType
 from .russian_roulette_cleanup import RussianRouletteCleanup
-from ..platform_utils import get_unified_player
+from ..platform_utils import get_unified_player, require_player
 
 # ==================== Feature Flag ====================
 # 设置为True使用新版DI架构的RussianRouletteService，False使用旧版本
@@ -184,9 +185,7 @@ async def handle_create_room(bot: Bot, event: MessageEvent, args: Message = Comm
         await create_room_cmd.finish(message_add_head(help_battle_msg, event))
     
     async with safe_session() as session:
-        player = await get_unified_player(session, event)
-        if not player:
-            await create_room_cmd.finish("⛔ 请先创建角色")
+        player = await require_player(session, event, create_room_cmd)
         
         if args_text == "创建" or args_text.startswith("创建"):
             # 解析血量参数：恶魔轮盘 创建 [3/4/5/6]
@@ -478,9 +477,7 @@ async def handle_shoot(bot: Bot, event: MessageEvent, args: Message = CommandArg
         await shoot_cmd.finish("⛔ 请指定射击目标：开枪 自己/对手")
     
     async with safe_session() as session:
-        player = await get_unified_player(session, event)
-        if not player:
-            await shoot_cmd.finish("⛔ 请先创建角色")
+        player = await require_player(session, event, shoot_cmd)
         
         # 获取玩家当前房间和游戏
         service = RussianRouletteServiceNew(
@@ -730,9 +727,7 @@ async def handle_use_adrenaline(bot: Bot, event: MessageEvent, args: Message = C
     target_item_type = item_mapping[target_item_name]
 
     async with safe_session() as session:
-        player = await get_unified_player(session, event)
-        if not player:
-            await use_adrenaline_cmd.finish("⛔ 请先创建角色")
+        player = await require_player(session, event, use_adrenaline_cmd)
 
         # 获取玩家当前房间和游戏
         service = RussianRouletteServiceNew(
@@ -914,9 +909,7 @@ async def handle_use_item(bot: Bot, event: MessageEvent, args: Message = Command
     item_type = item_mapping[item_name]
 
     async with safe_session() as session:
-        player = await get_unified_player(session, event)
-        if not player:
-            await use_item_cmd.finish("⛔ 请先创建角色")
+        player = await require_player(session, event, use_item_cmd)
 
         # 获取玩家当前房间和游戏
         service = RussianRouletteServiceNew(
@@ -1134,9 +1127,7 @@ async def handle_check_prediction(event: MessageEvent):
         await check_prediction_cmd.finish("⛔ 预知结果只能私聊查看")
 
     async with safe_session() as session:
-        player = await get_unified_player(session, event)
-        if not player:
-            await check_prediction_cmd.finish("⛔ 请先创建角色")
+        player = await require_player(session, event, check_prediction_cmd)
 
         # 获取玩家当前房间和游戏
         service = RussianRouletteServiceNew(
@@ -1182,9 +1173,7 @@ room_status_cmd = on_command("房间状态", aliases={"轮盘状态"}, block=Tru
 async def handle_room_status(event: MessageEvent):
     """查看当前房间状态"""
     async with safe_session() as session:
-        player = await get_unified_player(session, event)
-        if not player:
-            await room_status_cmd.finish("⛔ 请先创建角色")
+        player = await require_player(session, event, room_status_cmd)
 
         # 获取玩家当前房间
         service = RussianRouletteServiceNew(
@@ -1283,9 +1272,7 @@ leave_room_cmd = on_command("退出房间", aliases={"离开房间"}, block=True
 async def handle_leave_room(event: MessageEvent):
     """退出当前房间"""
     async with safe_session() as session:
-        player = await get_unified_player(session, event)
-        if not player:
-            await leave_room_cmd.finish("⛔ 请先创建角色")
+        player = await require_player(session, event, leave_room_cmd)
 
         # 获取玩家当前房间
         service = RussianRouletteServiceNew(
@@ -1348,9 +1335,7 @@ view_items_cmd = on_command("查看道具", aliases={"道具列表", "我的道�
 async def handle_view_items(event: MessageEvent):
     """查看当前游戏中的道具"""
     async with safe_session() as session:
-        player = await get_unified_player(session, event)
-        if not player:
-            await view_items_cmd.finish("⛔ 请先创建角色")
+        player = await require_player(session, event, view_items_cmd)
 
         # 获取玩家当前房间和游戏
         service = RussianRouletteServiceNew(
@@ -1544,9 +1529,7 @@ async def handle_view_bets(event: MessageEvent):
         await view_bets_cmd.finish("⛔ 此指令只能在群聊中使用")
 
     async with safe_session() as session:
-        player = await get_unified_player(session, event)
-        if not player:
-            await view_bets_cmd.finish("⛔ 请先创建角色")
+        player = await require_player(session, event, view_bets_cmd)
 
         service = RussianRouletteServiceNew(
             room_repo=RussianRouletteRoomRepository(session),
@@ -1597,5 +1580,7 @@ async def handle_cleanup_rooms(_event: MessageEvent):
     try:
         await RussianRouletteCleanup.cleanup_inactive_rooms()
         await cleanup_rooms_cmd.finish("✅ 俄罗斯轮盘房间清理完成")
+    except FinishedException:
+        raise
     except Exception as e:
         await cleanup_rooms_cmd.finish(f"❌ 清理失败: {str(e)}")

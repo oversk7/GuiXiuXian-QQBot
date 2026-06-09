@@ -18,7 +18,7 @@ from ..models import Player, ItemInstance
 from ..config import config
 from ..utils import message_add_head
 from ..utils_markdown import cmd, build_markdown, color_rarity
-from ..platform_utils import get_unified_player
+from ..platform_utils import require_player
 # 导入装备服务模块（业务逻辑已移至此处，解决模块耦合）
 from .equipment_service import recalc_equipment_attributes, EQUIP_ITEM_IDS
 
@@ -147,14 +147,9 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
 
     async with safe_session() as session:
         # 使用跨平台工具获取玩家数据
-        from ..platform_utils import get_unified_player, is_guild_message
+        from ..platform_utils import require_player
         from ..config import config
-        player = await get_unified_player(session, event)
-        if not player:
-            if is_guild_message(event):
-                await list_equipment.finish("⛔ 你还没有创建角色或绑定账号\n💡 请先在群聊注册角色，然后使用绑定功能")
-            else:
-                await list_equipment.finish("⛔ 请先创建角色")
+        player = await require_player(session, event, list_equipment)
 
         # 查询玩家所有装备条目
         stmt = select(ItemInstance).where(
@@ -254,13 +249,8 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
 
     async with safe_session() as session:
         # 使用跨平台工具获取玩家数据
-        from ..platform_utils import get_unified_player, is_guild_message
-        player = await get_unified_player(session, event)
-        if not player:
-            if is_guild_message(event):
-                await equipment_detail.finish("⛔ 你还没有创建角色或绑定账号\n💡 请先在群聊注册角色，然后使用绑定功能")
-            else:
-                await equipment_detail.finish("⛔ 请先创建角色")
+        from ..platform_utils import require_player
+        player = await require_player(session, event, equipment_detail)
 
         # 查找装备
         equip = await find_equipment_by_input(session, player.id, arg)
@@ -470,13 +460,8 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
 
     async with safe_session() as session:
         # 使用跨平台工具获取玩家数据
-        from ..platform_utils import get_unified_player, is_guild_message
-        player = await get_unified_player(session, event)
-        if not player:
-            if is_guild_message(event):
-                await wear_equipment.finish("⛔ 你还没有创建角色或绑定账号\n💡 请先在群聊注册角色，然后使用绑定功能")
-            else:
-                await wear_equipment.finish("⛔ 请先创建角色")
+        from ..platform_utils import require_player
+        player = await require_player(session, event, wear_equipment)
 
         if len(arg_list) == 1:
             # ---- 单件装备：原有逻辑 ----
@@ -658,13 +643,8 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
 
     async with safe_session() as session:
         # 使用跨平台工具获取玩家数据
-        from ..platform_utils import get_unified_player, is_guild_message
-        player = await get_unified_player(session, event)
-        if not player:
-            if is_guild_message(event):
-                await unwear_equipment.finish("⛔ 你还没有创建角色或绑定账号\n💡 请先在群聊注册角色，然后使用绑定功能")
-            else:
-                await unwear_equipment.finish("⛔ 请先创建角色")
+        from ..platform_utils import require_player
+        player = await require_player(session, event, unwear_equipment)
 
         # 查找装备
         equip = await find_equipment_by_input(session, player.id, arg)
@@ -786,9 +766,7 @@ unwear_all_equipment = on_command("一键卸下", aliases={"卸下全部", "全�
 @unwear_all_equipment.handle()
 async def _(event: MessageEvent):
     async with safe_session() as session:
-        player = await get_unified_player(session, event)
-        if not player:
-            await unwear_all_equipment.finish("⛔ 请先创建角色")
+        player = await require_player(session, event, unwear_all_equipment)
 
         # 查找所有已装备的装备
         stmt = select(ItemInstance).where(
@@ -1029,9 +1007,7 @@ equip_menu_cmd = on_command("装备菜单", aliases={"装备技能", "VIP技能"
 @equip_menu_cmd.handle()
 async def handle_equip_menu(event: MessageEvent):
     async with safe_session() as session:
-        player = await get_unified_player(session, event)
-        if not player:
-            await equip_menu_cmd.finish("⛔ 请先创建角色")
+        player = await require_player(session, event, equip_menu_cmd)
 
         # 查询玩家已装备的所有装备
         stmt = select(ItemInstance).where(
@@ -1080,9 +1056,7 @@ async def handle_inscription_list(event: MessageEvent, args: Message = CommandAr
 
     msg = ""
     async with safe_session() as session:
-        player = await get_unified_player(session, event)
-        if not player:
-            await inscription_list_cmd.finish("你还没有创建角色")
+        player = await require_player(session, event, inscription_list_cmd)
 
         from sqlalchemy import or_
         stmt = select(ItemInstance).where(

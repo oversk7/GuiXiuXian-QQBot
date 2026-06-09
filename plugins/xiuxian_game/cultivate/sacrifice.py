@@ -11,7 +11,7 @@ from ..models.inventory import ItemInstance
 from ..models.monthly_card import MonthlyCard
 from ..utils import message_add_head
 from ..config import config
-from ..platform_utils import get_unified_player
+from ..platform_utils import require_player
 from ..utils_markdown import cmd, build_markdown
 
 sacrifice_cmd = on_command("献祭", block=True, priority=5)
@@ -44,9 +44,7 @@ async def handle_sacrifice(event: MessageEvent, args: Message = CommandArg()):
         await sacrifice_cmd.finish("⛔ 该材料未蕴含怨念，无法献祭")
 
     async with safe_session() as session:
-        player = await get_unified_player(session, event)
-        if not player:
-            await sacrifice_cmd.finish("⛔ 请先创建角色")
+        player = await require_player(session, event, sacrifice_cmd)
 
         # 查询背包 (聚合)
         inv_rows = (await session.execute(
@@ -88,9 +86,7 @@ async def handle_batch_sacrifice(event: MessageEvent, args: Message = CommandArg
     """一键献祭指定的材料（月卡用户专属）"""
     # 检查月卡权限
     async with safe_session() as session:
-        player = await get_unified_player(session, event)
-        if not player:
-            await batch_sacrifice_cmd.finish("⛔ 请先创建角色")
+        player = await require_player(session, event, batch_sacrifice_cmd)
 
         # 检查是否有有效月卡
         active_cards = await MonthlyCard.get_all_active_cards(session, player.id)

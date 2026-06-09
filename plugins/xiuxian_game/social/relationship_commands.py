@@ -12,7 +12,7 @@ from ..infrastructure.uow.unit_of_work import UnitOfWork
 from ..models.db import AsyncSessionLocal
 from ..models.player_relationship import PlayerRelationship, RelationshipType
 from ..utils_markdown import cmd, build_markdown
-from ..platform_utils import get_unified_player
+from ..platform_utils import require_player
 from .relationship_service import RelationshipService
 
 
@@ -26,9 +26,7 @@ async def handle_favorability(event: MessageEvent, args: Message = CommandArg())
 
     # 获取玩家
     async with UnitOfWork(AsyncSessionLocal) as uow:
-        player = await get_unified_player(uow.session, event)
-        if not player:
-            await favorability_cmd.finish("请先创建角色")
+        player = await require_player(uow.session, event, favorability_cmd)
 
         if not args_text:
             # 没有参数,显示当前所有关系
@@ -145,9 +143,7 @@ betray_cmd = on_command("脱离师门", priority=11, block=True)
 async def handle_betray_master(event: MessageEvent):
     """徒弟主动脱离师门（扣属性+7天冷却）"""
     async with UnitOfWork(AsyncSessionLocal) as uow:
-        player = await get_unified_player(uow.session, event)
-        if not player:
-            await betray_cmd.finish("请先创建角色")
+        player = await require_player(uow.session, event, betray_cmd)
 
         from .mentorship_system_service import MentorshipSystemService
         from ..infrastructure.repositories.player_repository import PlayerRepository
@@ -184,9 +180,7 @@ async def handle_expel_apprentice(event: MessageEvent, args: Message = CommandAr
         await expel_cmd.finish("UID必须是数字")
 
     async with UnitOfWork(AsyncSessionLocal) as uow:
-        player = await get_unified_player(uow.session, event)
-        if not player:
-            await expel_cmd.finish("请先创建角色")
+        player = await require_player(uow.session, event, expel_cmd)
 
         from .mentorship_system_service import MentorshipSystemService
         from ..infrastructure.repositories.player_repository import PlayerRepository
@@ -214,9 +208,7 @@ mentorship_info_cmd = on_command("师徒信息", aliases={"师徒状况", "查�
 async def handle_mentorship_info(event: MessageEvent):
     """查看师徒信息"""
     async with UnitOfWork(AsyncSessionLocal) as uow:
-        player = await get_unified_player(uow.session, event)
-        if not player:
-            await mentorship_info_cmd.finish("请先创建角色")
+        player = await require_player(uow.session, event, mentorship_info_cmd)
 
         from .mentorship_system_service import MentorshipSystemService
         from ..infrastructure.repositories.player_repository import PlayerRepository
@@ -238,9 +230,7 @@ marriage_info_cmd = on_command("婚姻信息", aliases={"婚姻状况", "查看�
 async def handle_marriage_info(event: MessageEvent):
     """查看婚姻信息"""
     async with UnitOfWork(AsyncSessionLocal) as uow:
-        player = await get_unified_player(uow.session, event)
-        if not player:
-            await marriage_info_cmd.finish("请先创建角色")
+        player = await require_player(uow.session, event, marriage_info_cmd)
 
         # 查询婚姻关系
         stmt = select(PlayerRelationship).where(
@@ -291,9 +281,7 @@ sworn_info_cmd = on_command("结义信息", aliases={"结义状况", "查看结�
 async def handle_sworn_info(event: MessageEvent):
     """查看结义信息"""
     async with UnitOfWork(AsyncSessionLocal) as uow:
-        player = await get_unified_player(uow.session, event)
-        if not player:
-            await sworn_info_cmd.finish("请先创建角色")
+        player = await require_player(uow.session, event, sworn_info_cmd)
 
         # 查询所有结义关系
         stmt = select(PlayerRelationship).where(

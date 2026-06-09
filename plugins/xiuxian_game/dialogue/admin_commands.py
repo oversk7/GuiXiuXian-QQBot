@@ -1,5 +1,6 @@
 """NPC AI对话管理员命令"""
 from nonebot import on_command
+from nonebot.exception import FinishedException
 from nonebot.adapters.qq import MessageEvent, Message
 from nonebot.params import CommandArg
 import logging
@@ -69,6 +70,8 @@ async def handle_enable_npc_ai(event: MessageEvent, args: Message = CommandArg()
 玩家现在可以通过【交互 {npc.name}】与该NPC进行AI对话。"""
             await enable_npc_ai.finish(msg)
 
+        except FinishedException:
+            raise
         except Exception as e:
             logger.error(f"启用NPC AI对话失败: {e}", exc_info=True)
             await enable_npc_ai.finish(f"❌ 启用失败: {str(e)}")
@@ -105,6 +108,8 @@ async def handle_disable_npc_ai(event: MessageEvent, args: Message = CommandArg(
 
             await disable_npc_ai.finish(f"✅ 已为NPC「{npc.name}」禁用AI对话\n\n该NPC将恢复使用预设对话模式。")
 
+        except FinishedException:
+            raise
         except Exception as e:
             logger.error(f"禁用NPC AI对话失败: {e}", exc_info=True)
             await disable_npc_ai.finish(f"❌ 禁用失败: {str(e)}")

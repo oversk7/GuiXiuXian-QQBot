@@ -9,7 +9,7 @@ from nonebot.params import CommandArg
 from ..models.db import safe_session
 from ..models.player import Player
 from ..utils import message_add_head, check_action_limit, record_action
-from ..platform_utils import get_unified_player
+from ..platform_utils import require_player
 from ..ai_guide import call_ai_with_fallback
 import json
 import base64
@@ -38,9 +38,7 @@ async def handle_draw_fortune(event: MessageEvent, args: Message = CommandArg())
 
         # 检查玩家是否存在
         async with safe_session() as session:
-            player = await get_unified_player(session, event)
-            if not player:
-                await draw_fortune.finish("您还没有创建角色,请先注册。")
+            player = await require_player(session, event, draw_fortune)
 
         # 发送等待提示
         if question:
@@ -196,9 +194,7 @@ async def handle_daily_quote(event: MessageEvent):
     try:
         # 检查玩家是否存在
         async with safe_session() as session:
-            player = await get_unified_player(session, event)
-            if not player:
-                await daily_quote.finish("您还没有创建角色,请先注册。")
+            player = await require_player(session, event, daily_quote)
 
         # 请求一言API
         async with aiohttp.ClientSession(timeout=aiohttp.ClientTimeout(total=10)) as http_session:
@@ -263,9 +259,7 @@ async def handle_bite_avatar(event: MessageEvent, args: Message = CommandArg()):
 
     # 检查玩家是否存在
     async with safe_session() as session:
-        player = await get_unified_player(session, event)
-        if not player:
-            await bite_avatar.finish("您还没有创建角色,请先注册。")
+        player = await require_player(session, event, bite_avatar)
 
     # 发送等待提示
     await bite_avatar.send(message_add_head(f"🍽️ 正在准备吃掉 {target_qq} 的头像,请稍候...", event))
@@ -364,9 +358,7 @@ async def handle_answer_book(event: MessageEvent, args: Message = CommandArg()):
 
         # 检查玩家是否存在
         async with safe_session() as session:
-            player = await get_unified_player(session, event)
-            if not player:
-                await answer_book.finish("您还没有创建角色,请先注册。")
+            player = await require_player(session, event, answer_book)
 
         # 发送等待提示
         await answer_book.send(message_add_head(f"📖 正在翻阅答案之书,寻找关于「{question}」的答案...\n🤖 同时邀请智者解读,请稍候...", event))
@@ -507,9 +499,7 @@ async def handle_driving_test(event: MessageEvent, args: Message = CommandArg())
 
         # 检查玩家是否存在
         async with safe_session() as session:
-            player = await get_unified_player(session, event)
-            if not player:
-                await driving_test.finish("您还没有创建角色,请先注册。")
+            player = await require_player(session, event, driving_test)
 
         # 发送等待提示
         await driving_test.send(message_add_head(f"🚗 正在获取{subject_name}随机题目...", event))
@@ -613,9 +603,7 @@ async def handle_weibo_hot(event: MessageEvent):
     try:
         # 检查玩家是否存在
         async with safe_session() as session:
-            player = await get_unified_player(session, event)
-            if not player:
-                await weibo_hot.finish("您还没有创建角色,请先注册。")
+            player = await require_player(session, event, weibo_hot)
 
         # 发送等待提示
         await weibo_hot.send(message_add_head("📱 正在获取微博热搜榜...", event))

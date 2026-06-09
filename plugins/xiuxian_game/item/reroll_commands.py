@@ -16,7 +16,7 @@ from sqlalchemy import select
 from ..models.db import safe_session
 from ..models.player import Player
 from ..models.inventory import ItemInstance
-from ..platform_utils import get_unified_player
+from ..platform_utils import require_player
 from ..utils_markdown import cmd, build_markdown
 from .affix_service import (
     get_affixes_from_equipment, get_affix_display_name,
@@ -49,9 +49,7 @@ async def handle_reroll(event: MessageEvent, args: Message = CommandArg()):
     msg = ""
 
     async with safe_session() as session:
-        player = await get_unified_player(session, event)
-        if not player:
-            await reroll_cmd.finish("你还没有创建角色")
+        player = await require_player(session, event, reroll_cmd)
 
         from .decompose_commands import _find_equipment_by_index, _find_equipments_by_name
         if equip_keyword.isdigit():
@@ -124,9 +122,7 @@ async def handle_confirm_reroll(event: MessageEvent):
     msg = ""
 
     async with safe_session() as session:
-        player = await get_unified_player(session, event)
-        if not player:
-            await confirm_reroll_cmd.finish("你还没有创建角色")
+        player = await require_player(session, event, confirm_reroll_cmd)
 
         equipment = await session.get(ItemInstance, equipment_id)
         if not equipment or equipment.player_id != player.id:

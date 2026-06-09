@@ -17,7 +17,7 @@ from ..models.db import safe_session
 from ..models.player import Player
 from ..models.inventory import ItemInstance
 from ..config import config
-from ..platform_utils import get_unified_player
+from ..platform_utils import require_player
 from ..utils_markdown import build_markdown, cmd
 from .decompose_service import validate_decompose, calculate_decompose_yields, FRAGMENT_ITEM_ID
 
@@ -36,9 +36,7 @@ async def handle_decompose(event: MessageEvent, args: Message = CommandArg()):
         await decompose_cmd.finish("用法：【分解 装备编号/名称】\n分解装备获得洗词石，带T2词缀的装备可获得铭文碎片")
 
     async with safe_session() as session:
-        player = await get_unified_player(session, event)
-        if not player:
-            await decompose_cmd.finish("你还没有创建角色")
+        player = await require_player(session, event, decompose_cmd)
 
         # 按编号精确查找
         if raw_args.isdigit():
@@ -84,9 +82,7 @@ async def handle_decompose_select(event: MessageEvent, args: Message = CommandAr
     raw = args.extract_plain_text().strip()
 
     async with safe_session() as session:
-        player = await get_unified_player(session, event)
-        if not player:
-            await decompose_select_cmd.finish("⛔ 请先创建角色")
+        player = await require_player(session, event, decompose_select_cmd)
 
         state = _decompose_selection_state.get(player.id)
         if not state or time.time() - state["timestamp"] > SELECTION_TIMEOUT:

@@ -21,7 +21,7 @@ from ..models.db import safe_session
 from ..models.player import Player
 from ..models.inventory import ItemInstance
 from ..models.vip_equipment_bonus import VIPEquipmentBonus
-from ..platform_utils import get_unified_player, is_guild_message
+from ..platform_utils import require_player
 from ..utils import message_add_head
 
 # ==================== 常量 ====================
@@ -153,12 +153,7 @@ huihai_panel_cmd = on_command("慧海心元珠", block=True, priority=9)
 @huihai_panel_cmd.handle()
 async def handle_huihai_panel(event: MessageEvent):
     async with safe_session() as session:
-        player = await get_unified_player(session, event)
-        if not player:
-            if is_guild_message(event):
-                await huihai_panel_cmd.finish("⛔ 你还没有创建角色或绑定账号")
-            else:
-                await huihai_panel_cmd.finish("⛔ 请先创建角色")
+        player = await require_player(session, event, huihai_panel_cmd)
 
         inst = await _get_equipped_instance(session, player.id)
         if not inst:

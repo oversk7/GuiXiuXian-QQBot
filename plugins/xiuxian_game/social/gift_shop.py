@@ -17,7 +17,7 @@ from ..models.inventory import ItemType
 from ..utils import message_add_head
 from ..utils_markdown import cmd, build_markdown
 from ..config import config
-from ..platform_utils import get_unified_player
+from ..platform_utils import get_unified_player, require_player
 from ..economy.market import get_shop_adjusted_price
 
 # 创建命令
@@ -214,9 +214,7 @@ async def handle_buy_gift(event: MessageEvent, args: Message = CommandArg()):
         if daily_limit > 0:
             async with UnitOfWork(AsyncSessionLocal) as uow:
                 # 获取玩家（通过ownership系统）
-                player = await get_unified_player(uow.session, event)
-                if not player:
-                    await buy_gift_cmd.finish(message_add_head("⛔ 请先创建角色", event))
+                player = await require_player(uow.session, event, buy_gift_cmd)
 
                 # 获取今日已购买数量
                 purchased_today = get_today_purchase_count(player, item_config.item_id)
@@ -237,9 +235,7 @@ async def handle_buy_gift(event: MessageEvent, args: Message = CommandArg()):
         # 7. 执行购买
         async with UnitOfWork(AsyncSessionLocal) as uow:
             # 获取玩家（通过ownership系统）
-            player = await get_unified_player(uow.session, event)
-            if not player:
-                await buy_gift_cmd.finish(message_add_head("⛔ 请先创建角色", event))
+            player = await require_player(uow.session, event, buy_gift_cmd)
             player_id = player.id
 
             adj_price = await get_shop_adjusted_price(uow.session, item_config.price)

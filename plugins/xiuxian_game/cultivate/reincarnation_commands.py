@@ -7,7 +7,7 @@ from ..models.db import safe_session
 from ..models.player import Player
 from ..utils import message_add_head
 from .reincarnation_service_new import ReincarnationService
-from ..platform_utils import get_unified_player, is_guild_message
+from ..platform_utils import require_player
 
 # Feature Flag: 控制是否使用新版ReincarnationService (DI架构)
 reincarnate_cmd = on_command("冥返", aliases={"轮回", "重生"}, block=True, priority=5)
@@ -19,12 +19,7 @@ async def handle_reincarnate(event: MessageEvent):
     """处理冥返命令"""
     async with safe_session() as session:
         # 使用跨平台工具获取玩家数据
-        player = await get_unified_player(session, event)
-        if not player:
-            if is_guild_message(event):
-                await reincarnate_cmd.finish("⛔ 你还没有创建角色或绑定账号\n💡 请先在群聊注册角色，然后使用绑定功能")
-            else:
-                await reincarnate_cmd.finish("⛔ 请先使用【注册】命令创建角色")
+        player = await require_player(session, event, reincarnate_cmd)
         
         # 检查是否可以冥返 & 执行冥返
         # 使用新版DI架构的ReincarnationService
@@ -65,12 +60,7 @@ async def handle_reincarnation_info(event: MessageEvent):
     """处理冥返信息查询命令"""
     async with safe_session() as session:
         # 使用跨平台工具获取玩家数据
-        player = await get_unified_player(session, event)
-        if not player:
-            if is_guild_message(event):
-                await reincarnation_info_cmd.finish("⛔ 你还没有创建角色或绑定账号\n💡 请先在群聊注册角色，然后使用绑定功能")
-            else:
-                await reincarnation_info_cmd.finish("⛔ 请先使用【注册】命令创建角色")
+        player = await require_player(session, event, reincarnation_info_cmd)
 
         current_level = player.level
         current_reincarnation = player.reincarnation_level

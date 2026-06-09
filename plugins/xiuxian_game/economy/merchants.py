@@ -1161,13 +1161,8 @@ async def _(event: MessageEvent):
     """自动出售背包中所有可出售的商品"""
     async with safe_session() as session:
         # 使用跨平台工具获取玩家数据
-        from ..platform_utils import get_unified_player, is_guild_message
-        player = await get_unified_player(session, event)
-        if not player:
-            if is_guild_message(event):
-                await auto_sell_cmd.finish("⛔ 你还没有创建角色或绑定账号\n💡 请先在群聊注册角色，然后使用绑定功能")
-            else:
-                await auto_sell_cmd.finish("⛔ 请先创建角色")
+        from ..platform_utils import get_unified_player, is_guild_message, require_player
+        player = await require_player(session, event, auto_sell_cmd)
 
         # 获取当前位置的市场
         current_x, current_y = player.get_current_coordinates()

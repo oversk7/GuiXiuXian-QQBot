@@ -23,7 +23,7 @@ from ..infrastructure.uow.unit_of_work import UnitOfWork
 from ..models.db import AsyncSessionLocal
 from ..models.inventory import ItemInstance, ItemType
 from ..economy.equipment_trade_service import EquipmentTradeService
-from ..platform_utils import get_unified_player, is_guild_message
+from ..platform_utils import get_unified_player, is_guild_message, require_player
 from ..utils import message_add_head
 from ..utils_markdown import cmd, build_markdown
 from ..config import config
@@ -184,12 +184,7 @@ async def _handle_instance_auction_listing(
     type_name = "铭文" if is_inscription else "装备"
 
     async with UnitOfWork(AsyncSessionLocal) as uow:
-        player = await get_unified_player(uow.session, event)
-        if not player:
-            if is_guild_message(event):
-                await list_auction_cmd.finish(message_add_head("⛔ 你还没有创建角色或绑定账号", event))
-            else:
-                await list_auction_cmd.finish(message_add_head("⛔ 请先创建角色", event))
+        player = await require_player(uow.session, event, list_auction_cmd)
 
         # 提前检查上架数量限制
         active_auctions = await uow.auction_items.find_seller_active_auctions(player.id, player.server_id)

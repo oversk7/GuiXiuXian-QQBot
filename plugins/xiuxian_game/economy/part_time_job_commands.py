@@ -22,7 +22,7 @@ from ..models.player import Player
 from ..utils import message_add_head, check_action_limit, record_action
 from ..utils_markdown import cmd, build_markdown
 from .part_time_job_service import PartTimeJobService
-from ..platform_utils import get_unified_player
+from ..platform_utils import require_player
 
 # ==================== Feature Flag ====================
 # 设置为True使用新版DI架构的PartTimeJobService，False使用旧版本
@@ -55,9 +55,7 @@ async def handle_work(event: MessageEvent, args: Message = CommandArg()):
         return AsyncSessionLocal()
 
     async with UnitOfWork(session_factory) as uow:
-        player = await get_unified_player(uow.session, event)
-        if not player:
-            await work_cmd.finish("⛔ 请先创建角色")
+        player = await require_player(uow.session, event, work_cmd)
 
         args_text = args.extract_plain_text().strip()
 
@@ -196,9 +194,7 @@ async def handle_finish_work(event: MessageEvent):
         return AsyncSessionLocal()
 
     async with UnitOfWork(session_factory) as uow:
-        player = await get_unified_player(uow.session, event)
-        if not player:
-            await finish_work_cmd.finish("⛔ 请先创建角色")
+        player = await require_player(uow.session, event, finish_work_cmd)
 
         part_time_job_service = PartTimeJobServiceNew(
             player_repo=uow.players,
@@ -295,18 +291,13 @@ async def handle_work_status(event: MessageEvent):
     from ..infrastructure.uow.unit_of_work import UnitOfWork
     from ..models.db import AsyncSessionLocal
     from .part_time_job_service_new import PartTimeJobService as PartTimeJobServiceNew
-    from ..platform_utils import get_unified_player, is_guild_message
+    from ..platform_utils import require_player
 
     def session_factory():
         return AsyncSessionLocal()
 
     async with UnitOfWork(session_factory) as uow:
-        player = await get_unified_player(uow.session, event)
-        if not player:
-            if is_guild_message(event):
-                await work_status_cmd.finish("⛔ 你还没有创建角色或绑定账号\n💡 请先在群聊注册角色，然后使用绑定功能")
-            else:
-                await work_status_cmd.finish("⛔ 请先创建角色")
+        player = await require_player(uow.session, event, work_status_cmd)
 
         part_time_job_service = PartTimeJobServiceNew(
             player_repo=uow.players,
@@ -372,9 +363,7 @@ async def handle_work_locations(event: MessageEvent):
         return AsyncSessionLocal()
 
     async with UnitOfWork(session_factory) as uow:
-        player = await get_unified_player(uow.session, event)
-        if not player:
-            await work_locations_cmd.finish("⛔ 请先创建角色")
+        player = await require_player(uow.session, event, work_locations_cmd)
 
         part_time_job_service = PartTimeJobServiceNew(
             player_repo=uow.players,
@@ -412,9 +401,7 @@ async def handle_work_history(event: MessageEvent):
         return AsyncSessionLocal()
 
     async with UnitOfWork(session_factory) as uow:
-        player = await get_unified_player(uow.session, event)
-        if not player:
-            await work_history_cmd.finish("⛔ 请先创建角色")
+        player = await require_player(uow.session, event, work_history_cmd)
 
         part_time_job_service = PartTimeJobServiceNew(
             player_repo=uow.players,
@@ -462,9 +449,7 @@ async def handle_work_stats(event: MessageEvent):
         return AsyncSessionLocal()
 
     async with UnitOfWork(session_factory) as uow:
-        player = await get_unified_player(uow.session, event)
-        if not player:
-            await work_stats_cmd.finish("⛔ 请先创建角色")
+        player = await require_player(uow.session, event, work_stats_cmd)
 
         part_time_job_service = PartTimeJobServiceNew(
             player_repo=uow.players,

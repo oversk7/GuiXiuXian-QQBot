@@ -6,6 +6,7 @@ from __future__ import annotations
 """
 
 from nonebot import on_command
+from nonebot.exception import FinishedException
 from nonebot.adapters.qq import MessageEvent
 from nonebot.permission import SUPERUSER
 
@@ -73,6 +74,8 @@ async def handle_check_part_time_job(event: MessageEvent):
 
             await check_part_time_job_cmd.finish(message_add_head("\n".join(lines), event))
 
+    except FinishedException:
+        raise
     except Exception as e:
         await check_part_time_job_cmd.finish(f"❌ 查看失败：{str(e)}")
 
@@ -86,13 +89,8 @@ async def handle_test_complete_job(event: MessageEvent):
     """测试命令：立即完成当前工作"""
     async with safe_session() as session:
         # 使用跨平台工具获取玩家数据
-        from ..platform_utils import get_unified_player, is_guild_message
-        player = await get_unified_player(session, event)
-        if not player:
-            if is_guild_message(event):
-                await test_complete_job_cmd.finish("⛔ 你还没有创建角色或绑定账号\n💡 请先在群聊注册角色，然后使用绑定功能")
-            else:
-                await test_complete_job_cmd.finish("⛔ 请先创建角色")
+        from ..platform_utils import require_player
+        player = await require_player(session, event, test_complete_job_cmd)
 
         # 获取当前工作状态
         success, msg, status = await PartTimeJobService.get_current_job_status(session, player)

@@ -18,7 +18,7 @@ from PIL import Image
 from ..config import config
 from ..utils import message_add_head
 from ..models.db import safe_session
-from ..platform_utils import get_unified_player
+from ..platform_utils import require_player
 from ..ai_guide import is_admin
 
 
@@ -393,9 +393,7 @@ async def handle_submit_item_image(event: MessageEvent, args: Message = CommandA
 
     # 获取玩家信息
     async with safe_session() as session:
-        player = await get_unified_player(session, event)
-        if not player:
-            await submit_item_image_cmd.finish("⛔ 请先使用【我的信息】创建角色")
+        player = await require_player(session, event, submit_item_image_cmd)
 
         # 检查等级限制（管理员跳过）
         if not is_admin(event.get_user_id()) and player.level <= 50:

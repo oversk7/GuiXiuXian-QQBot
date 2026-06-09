@@ -185,6 +185,29 @@ async def get_unified_player(session: AsyncSession, event: MessageEvent) -> Opti
     return player
 
 
+def no_character_message(event: MessageEvent) -> str:
+    """未注册/未绑定角色时的统一提示（区分频道与群聊）。"""
+    if is_guild_message(event):
+        return "⛔ 你还没有创建角色或绑定账号\n💡 请先在群聊注册角色，然后使用绑定功能"
+    return "⛔ 请先使用【注册】命令创建角色"
+
+
+async def require_player(session: AsyncSession, event: MessageEvent, matcher) -> Player:
+    """获取当前玩家；未注册则直接 finish 提示注册/绑定。
+
+    用于替代各处重复的「get_unified_player + if not player + 双分支提示」样板。
+    返回的 Player 绑定在传入的 session 上，调用方可直接继续使用。
+
+    matcher 传入当前命令的 matcher（模块级对象或注入的 Matcher 均可）。内部
+    matcher.finish() 抛出的 FinishedException 会被 safe_session 与 UnitOfWork
+    的退出逻辑正确提交并向上传播，故在两者内部均可安全使用。
+    """
+    player = await get_unified_player(session, event)
+    if player is None:
+        await matcher.finish(no_character_message(event))
+    return player
+
+
 async def get_event_server_id(session: AsyncSession, event: MessageEvent) -> int:
     """获取事件所属区服；老账号未绑定时默认为一区。"""
     _, user_id = get_platform_info(event)

@@ -18,7 +18,7 @@ from sqlalchemy import select, func
 from ..models.db import AsyncSessionLocal
 from ..models.inventory import ItemInstance
 from ..infrastructure.uow.unit_of_work import UnitOfWork
-from ..platform_utils import get_unified_player
+from ..platform_utils import require_player
 from .config import CropManager
 
 # ==================== 服务实例 ====================
@@ -217,9 +217,7 @@ async def handle_sell_crop(event: MessageEvent, args: Message = CommandArg()):
     total_gold = unit_price * quantity
 
     async with UnitOfWork(AsyncSessionLocal) as uow:
-        player = await get_unified_player(uow.session, event)
-        if not player:
-            await sell_crop_cmd.finish("请先创建角色")
+        player = await require_player(uow.session, event, sell_crop_cmd)
 
         # 检查背包库存
         result = await uow.session.execute(

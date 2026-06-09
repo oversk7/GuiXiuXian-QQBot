@@ -30,13 +30,8 @@ async def _(event: MessageEvent):
     async with safe_session() as session:
         try:
             # 使用跨平台工具获取玩家数据
-            from ..platform_utils import get_unified_player, is_guild_message
-            player = await get_unified_player(session, event)
-            if not player:
-                if is_guild_message(event):
-                    await fishing_cmd.finish("⛔ 你还没有创建角色或绑定账号\n💡 请先在群聊注册角色，然后使用绑定功能")
-                else:
-                    await fishing_cmd.finish("⛔ 请先创建角色")
+            from ..platform_utils import require_player
+            player = await require_player(session, event, fishing_cmd)
 
             # 执行钓鱼
             from ..infrastructure.repositories.fishing_record_repository import FishingRecordRepository
@@ -234,13 +229,8 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
     """查看钓鱼记录"""
     async with safe_session() as session:
         # 使用跨平台工具获取玩家数据
-        from ..platform_utils import get_unified_player, is_guild_message
-        player = await get_unified_player(session, event)
-        if not player:
-            if is_guild_message(event):
-                await fishing_record_cmd.finish("⛔ 你还没有创建角色或绑定账号\n💡 请先在群聊注册角色，然后使用绑定功能")
-            else:
-                await fishing_record_cmd.finish("⛔ 请先创建角色")
+        from ..platform_utils import require_player
+        player = await require_player(session, event, fishing_record_cmd)
 
         # 获取钓鱼统计
         stats = await FishingRecord.get_player_fishing_stats(session, player.id)
@@ -331,13 +321,8 @@ async def _(event: MessageEvent):
     """查看钓鱼状态"""
     async with safe_session() as session:
         # 使用跨平台工具获取玩家数据
-        from ..platform_utils import get_unified_player, is_guild_message
-        player = await get_unified_player(session, event)
-        if not player:
-            if is_guild_message(event):
-                await fishing_status_cmd.finish("⛔ 你还没有创建角色或绑定账号\n💡 请先在群聊注册角色，然后使用绑定功能")
-            else:
-                await fishing_status_cmd.finish("⛔ 请先创建角色")
+        from ..platform_utils import require_player
+        player = await require_player(session, event, fishing_status_cmd)
 
         # 检查钓鱼状态
         from ..infrastructure.repositories.fishing_record_repository import FishingRecordRepository
@@ -457,18 +442,13 @@ async def _(event: MessageEvent):
     """查看钓鱼概率"""
     async with safe_session() as session:
         # 使用跨平台工具获取玩家数据
-        from ..platform_utils import get_unified_player, is_guild_message
+        from ..platform_utils import require_player
         from ..infrastructure.repositories.fishing_record_repository import FishingRecordRepository
         from ..infrastructure.repositories.fishing_stats_repository import FishingStatsRepository
         from ..infrastructure.repositories.item_repository import ItemRepository
         from .service_new import FishingService as FishingServiceNew
 
-        player = await get_unified_player(session, event)
-        if not player:
-            if is_guild_message(event):
-                await fishing_prob_cmd.finish("⛔ 你还没有创建角色或绑定账号\n💡 请先在群聊注册角色，然后使用绑定功能")
-            else:
-                await fishing_prob_cmd.finish("⛔ 请先创建角色")
+        player = await require_player(session, event, fishing_prob_cmd)
 
         # 计算概率
         probabilities = FishingServiceNew.calculate_fishing_probabilities(player)
@@ -551,13 +531,8 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
 
     async with safe_session() as session:
         # 使用跨平台工具获取玩家数据
-        from ..platform_utils import get_unified_player, is_guild_message
-        player = await get_unified_player(session, event)
-        if not player:
-            if is_guild_message(event):
-                await eat_fish_cmd.finish("⛔ 你还没有创建角色或绑定账号\n💡 请先在群聊注册角色，然后使用绑定功能")
-            else:
-                await eat_fish_cmd.finish("⛔ 请先创建角色")
+        from ..platform_utils import require_player
+        player = await require_player(session, event, eat_fish_cmd)
 
         # 通过名称查找鱼类物品
         fish_config = config.items_config["by_name"].get(fish_name)

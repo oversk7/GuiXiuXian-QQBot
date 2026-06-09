@@ -17,7 +17,7 @@ from ..models.db import safe_session
 from ..models.player import Player
 from ..models.inventory import ItemInstance
 from ..config import config
-from ..platform_utils import get_unified_player
+from ..platform_utils import require_player
 from ..utils_markdown import cmd, build_markdown
 from .inscription_service import (
     generate_synthesis_inscription,
@@ -38,9 +38,7 @@ async def handle_synthesize(event: MessageEvent, args: Message = CommandArg()):
     use_protection = arg_text in ("稳定水晶", "保护")
 
     async with safe_session() as session:
-        player = await get_unified_player(session, event)
-        if not player:
-            await synthesize_cmd.finish("你还没有创建角色")
+        player = await require_player(session, event, synthesize_cmd)
 
         # 检查碎片数量
         stmt = select(ItemInstance).where(

@@ -14,7 +14,7 @@ from nonebot.adapters.qq import MessageEvent, Message, MessageSegment
 from nonebot.adapters.qq.models.common import MessageMarkdown, MessageMarkdownParams
 from nonebot.params import CommandArg
 from ..models.db import safe_session
-from ..platform_utils import get_unified_player
+from ..platform_utils import require_player
 from ..utils import message_add_head, check_action_limit, record_action
 from ..ai_guide import call_ai_with_fallback
 
@@ -574,9 +574,7 @@ async def handle_liuyao(event: MessageEvent, args: Message = CommandArg()):
 
     # 检查玩家和扣除金币
     async with safe_session() as session:
-        player = await get_unified_player(session, event)
-        if not player:
-            await liuyao_cmd.finish("您还没有创建角色，请先注册。")
+        player = await require_player(session, event, liuyao_cmd)
 
         if player.gold < DIVINATION_COST:
             await liuyao_cmd.finish(message_add_head(

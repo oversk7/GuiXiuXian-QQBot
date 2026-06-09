@@ -27,7 +27,7 @@ from .guild_task_service_new import GuildTaskService as GuildTaskServiceNew  # D
 from .guild_facility_service import GuildFacilityService
 from .guild_facility_service_new import GuildFacilityService as GuildFacilityServiceNew  # DI版本
 from .guild_daily_tasks import GuildDailyTasks
-from ..platform_utils import get_unified_player
+from ..platform_utils import get_unified_player, require_player
 
 # 使用DI架构的各种Guild Service
 
@@ -66,9 +66,7 @@ async def handle_create_guild(event: MessageEvent, args: Message = CommandArg())
 
     async with UnitOfWork(session_factory) as uow:
         # 1. 获取玩家（使用UoW的session）
-        player = await get_unified_player(uow.session, event)
-        if not player:
-            await create_guild_cmd.finish("⛔ 请先创建角色")
+        player = await require_player(uow.session, event, create_guild_cmd)
         if player.guild_id is not None:
             await create_guild_cmd.finish("⛔ 你已经加入公会，无法再次创建")
 
@@ -332,9 +330,7 @@ async def handle_join_guild(event: MessageEvent, args: Message = CommandArg()):
         await join_guild_cmd.finish("⛔ 公会 ID 必须是数字")
 
     async with safe_session() as session:
-        player = await get_unified_player(session, event)
-        if not player:
-            await join_guild_cmd.finish("⛔ 请先创建角色")
+        player = await require_player(session, event, join_guild_cmd)
 
         # 新版：使用DI架构Service（修复P0问题：移除内部commit）
         from ..infrastructure.repositories.player_repository import PlayerRepository
@@ -554,13 +550,8 @@ async def handle_donate(event: MessageEvent, args: Message = CommandArg()):
 
     async with safe_session() as session:
         # 使用跨平台工具获取玩家数据（支持多账户）
-        from ..platform_utils import get_unified_player, is_guild_message
-        player = await get_unified_player(session, event)
-        if not player:
-            if is_guild_message(event):
-                await donate_cmd.finish("⛔ 你还没有创建角色或绑定账号\n💡 请先在群聊注册角色，然后使用绑定功能")
-            else:
-                await donate_cmd.finish("⛔ 请先创建角色")
+        from ..platform_utils import get_unified_player, require_player
+        player = await require_player(session, event, donate_cmd)
 
         # 使用经济服务处理捐献
         # 新版：使用DI架构Service

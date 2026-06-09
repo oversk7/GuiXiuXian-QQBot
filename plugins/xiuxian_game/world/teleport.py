@@ -15,7 +15,7 @@ from ..models.navigation_task import NavigationTask
 from ..models.world_tile import WorldTile
 from ..config import config
 from ..utils import message_add_head
-from ..platform_utils import get_unified_player
+from ..platform_utils import require_player
 from sqlalchemy import select
 
 
@@ -193,9 +193,7 @@ async def _handle_teleport_logic(event: MessageEvent, target_region: str, cmd_ha
     STAM_COST = 1  # 咒抗消耗
 
     async with safe_session() as session:
-        player = await get_unified_player(session, event)
-        if not player:
-            await cmd_handler.finish("⛔ 请先创建角色")
+        player = await require_player(session, event, cmd_handler)
 
         # 判断是否已在诡域中（诡域内跳转免咒抗）
         already_in_dungeon = player.is_in_dungeon()
@@ -364,9 +362,7 @@ async def _handle_teleport_logic(event: MessageEvent, target_region: str, cmd_ha
 async def handle_revive(event: MessageEvent):
     """处理返回指令，退出诡域返回现实世界"""
     async with safe_session() as session:
-        player = await get_unified_player(session, event)
-        if not player:
-            await revive_cmd.finish("⛔ 请先创建角色")
+        player = await require_player(session, event, revive_cmd)
 
         if not player.is_in_dungeon():
             await revive_cmd.finish("⛔ 你已经在现实世界了，无法使用返回指令\n💡 请使用【休息】指令恢复状态")
@@ -436,9 +432,7 @@ async def handle_revive(event: MessageEvent):
 async def handle_prev_level(event: MessageEvent):
     """处理上一层指令，切换到上一层诡域"""
     async with safe_session() as session:
-        player = await get_unified_player(session, event)
-        if not player:
-            await prev_level_cmd.finish("⛔ 请先创建角色")
+        player = await require_player(session, event, prev_level_cmd)
 
         # 检查是否在诡域中
         if not player.is_in_dungeon():
@@ -523,9 +517,7 @@ async def handle_prev_level(event: MessageEvent):
 async def handle_next_level(event: MessageEvent):
     """处理下一层指令，切换到下一层诡域"""
     async with safe_session() as session:
-        player = await get_unified_player(session, event)
-        if not player:
-            await next_level_cmd.finish("⛔ 请先创建角色")
+        player = await require_player(session, event, next_level_cmd)
 
         # 检查是否在诡域中
         if not player.is_in_dungeon():
@@ -612,9 +604,7 @@ async def handle_next_level(event: MessageEvent):
 @rest_cmd.handle()
 async def handle_rest(event: MessageEvent):
     async with safe_session() as session:
-        player = await get_unified_player(session, event)
-        if not player:
-            await rest_cmd.finish("⛔ 请先创建角色")
+        player = await require_player(session, event, rest_cmd)
 
         if player.is_in_dungeon():
             await _handle_dungeon_rest(session, player, event, rest_cmd)

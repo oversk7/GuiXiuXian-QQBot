@@ -8,7 +8,7 @@ from nonebot.adapters.qq import MessageEvent, Message
 from nonebot.params import CommandArg
 from datetime import datetime, timedelta
 
-from ..platform_utils import get_unified_player
+from ..platform_utils import require_player
 from ..infrastructure.uow.unit_of_work import UnitOfWork
 from ..models.db import AsyncSessionLocal
 from .service import (
@@ -52,9 +52,7 @@ async def handle_descend(event: MessageEvent):
         return AsyncSessionLocal()
 
     async with UnitOfWork(session_factory) as uow:
-        player = await get_unified_player(uow.session, event)
-        if not player:
-            await descend_cmd.finish("请先【注册】后再使用该功能")
+        player = await require_player(uow.session, event, descend_cmd)
 
         stronghold, is_new = await get_or_create_stronghold(uow, player.id)
 
@@ -245,9 +243,7 @@ async def handle_guard(event: MessageEvent):
         return AsyncSessionLocal()
 
     async with UnitOfWork(session_factory) as uow:
-        player = await get_unified_player(uow.session, event)
-        if not player:
-            await guard_cmd.finish("请先【注册】后再使用该功能")
+        player = await require_player(uow.session, event, guard_cmd)
 
         stronghold = await uow.lower_world_strongholds.get_by_player_id(player.id)
         if not stronghold:
@@ -267,9 +263,7 @@ async def handle_battle_hero(event: MessageEvent):
         return AsyncSessionLocal()
 
     async with UnitOfWork(session_factory) as uow:
-        player = await get_unified_player(uow.session, event)
-        if not player:
-            await battle_hero_cmd.finish("请先【注册】后再使用该功能")
+        player = await require_player(uow.session, event, battle_hero_cmd)
 
         stronghold = await uow.lower_world_strongholds.get_by_player_id(player.id)
         if not stronghold:
@@ -717,9 +711,7 @@ async def handle_calamity_shop(event: MessageEvent):
         return AsyncSessionLocal()
 
     async with UnitOfWork(session_factory) as uow:
-        player = await get_unified_player(uow.session, event)
-        if not player:
-            await calamity_shop_cmd.finish("请先【注册】后再使用该功能")
+        player = await require_player(uow.session, event, calamity_shop_cmd)
 
         stronghold = await uow.lower_world_strongholds.get_by_player_id(player.id)
         if not stronghold:
@@ -747,9 +739,7 @@ async def handle_redeem(event: MessageEvent, args: Message = CommandArg()):
         return AsyncSessionLocal()
 
     async with UnitOfWork(session_factory) as uow:
-        player = await get_unified_player(uow.session, event)
-        if not player:
-            await redeem_cmd.finish("请先【注册】后再使用该功能")
+        player = await require_player(uow.session, event, redeem_cmd)
 
         stronghold = await uow.lower_world_strongholds.get_by_player_id(player.id)
         if not stronghold:
@@ -967,9 +957,7 @@ async def handle_scout(event: MessageEvent):
         return AsyncSessionLocal()
 
     async with UnitOfWork(session_factory) as uow:
-        player = await get_unified_player(uow.session, event)
-        if not player:
-            await scout_cmd.finish("请先【注册】后再使用该功能")
+        player = await require_player(uow.session, event, scout_cmd)
 
         stronghold = await uow.lower_world_strongholds.get_by_player_id(player.id)
         if not stronghold:

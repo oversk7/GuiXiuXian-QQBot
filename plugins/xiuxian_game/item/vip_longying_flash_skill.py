@@ -20,7 +20,7 @@ from sqlalchemy import select
 from ..models.db import safe_session
 from ..models.player import Player
 from ..models.inventory import ItemInstance
-from ..platform_utils import get_unified_player, is_guild_message
+from ..platform_utils import require_player
 from ..utils import message_add_head
 
 # ==================== 常量 ====================
@@ -163,12 +163,7 @@ async def handle_anchor(event: MessageEvent, args: Message = CommandArg()):
     arg = args.extract_plain_text().strip()
 
     async with safe_session() as session:
-        player = await get_unified_player(session, event)
-        if not player:
-            if is_guild_message(event):
-                await anchor_cmd.finish("⛔ 你还没有创建角色或绑定账号\n💡 请先在群聊注册角色，然后使用绑定功能")
-            else:
-                await anchor_cmd.finish("⛔ 请先创建角色")
+        player = await require_player(session, event, anchor_cmd)
 
         # 检查是否装备了龙影闪
         longying = await _get_longying_instance(session, player.id)
@@ -456,9 +451,7 @@ reject_carry_cmd = on_command("拒绝穿越", block=True, priority=9)
 @accept_carry_cmd.handle()
 async def handle_accept_carry(event: MessageEvent):
     async with safe_session() as session:
-        player = await get_unified_player(session, event)
-        if not player:
-            await accept_carry_cmd.finish("⛔ 请先创建角色")
+        player = await require_player(session, event, accept_carry_cmd)
 
         # 查找是否有待处理的携带请求
         request = _pending_carry_requests_longying.get(player.id)
@@ -561,9 +554,7 @@ async def handle_accept_carry(event: MessageEvent):
 @reject_carry_cmd.handle()
 async def handle_reject_carry(event: MessageEvent):
     async with safe_session() as session:
-        player = await get_unified_player(session, event)
-        if not player:
-            await reject_carry_cmd.finish("⛔ 请先创建角色")
+        player = await require_player(session, event, reject_carry_cmd)
 
         request = _pending_carry_requests_longying.pop(player.id, None)
         if not request:
@@ -582,12 +573,7 @@ longying_panel_cmd = on_command("龙影闪", block=True, priority=9)
 @longying_panel_cmd.handle()
 async def handle_longying_panel(event: MessageEvent):
     async with safe_session() as session:
-        player = await get_unified_player(session, event)
-        if not player:
-            if is_guild_message(event):
-                await longying_panel_cmd.finish("⛔ 你还没有创建角色或绑定账号")
-            else:
-                await longying_panel_cmd.finish("⛔ 请先创建角色")
+        player = await require_player(session, event, longying_panel_cmd)
 
         # 检查是否装备了龙影闪
         longying = await _get_longying_instance(session, player.id)

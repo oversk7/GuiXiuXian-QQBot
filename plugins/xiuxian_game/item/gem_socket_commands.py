@@ -19,7 +19,7 @@ from ..utils import message_add_head
 from ..utils_markdown import cmd, build_markdown
 from .gem_socket_service_new import GemSocketService
 from .equipment_commands import find_equipment_by_input
-from ..platform_utils import get_unified_player
+from ..platform_utils import require_player
 
 # ==================== Feature Flag ====================
 # 设置为True使用新版DI架构的GemSocketService，False使用旧版本
@@ -36,9 +36,7 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
         await gem_slots_cmd.finish("⛔ 格式：孔位 装备ID/名称")
 
     async with safe_session() as session:
-        player = await get_unified_player(session, event)
-        if not player:
-            await gem_slots_cmd.finish("⛔ 请先创建角色")
+        player = await require_player(session, event, gem_slots_cmd)
 
         # 查找装备
         equip = await find_equipment_by_input(session, player.id, arg)
@@ -112,13 +110,8 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
 
     async with safe_session() as session:
         # 使用跨平台工具获取玩家数据
-        from ..platform_utils import get_unified_player, is_guild_message
-        player = await get_unified_player(session, event)
-        if not player:
-            if is_guild_message(event):
-                await socket_gem_cmd.finish("⛔ 你还没有创建角色或绑定账号\n💡 请先在群聊注册角色，然后使用绑定功能")
-            else:
-                await socket_gem_cmd.finish("⛔ 请先创建角色")
+        from ..platform_utils import require_player
+        player = await require_player(session, event, socket_gem_cmd)
 
         # 查找装备
         equip = await find_equipment_by_input(session, player.id, equipment_arg)
@@ -229,13 +222,8 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
 
     async with safe_session() as session:
         # 使用跨平台工具获取玩家数据
-        from ..platform_utils import get_unified_player, is_guild_message
-        player = await get_unified_player(session, event)
-        if not player:
-            if is_guild_message(event):
-                await remove_gem_cmd.finish("⛔ 你还没有创建角色或绑定账号\n💡 请先在群聊注册角色，然后使用绑定功能")
-            else:
-                await remove_gem_cmd.finish("⛔ 请先创建角色")
+        from ..platform_utils import require_player
+        player = await require_player(session, event, remove_gem_cmd)
 
         # 查找装备
         equip = await find_equipment_by_input(session, player.id, equipment_arg)
@@ -267,9 +255,7 @@ gem_list_cmd = on_command("镶嵌物品", aliases={"宝石列表", "我的宝石
 @gem_list_cmd.handle()
 async def _(event: MessageEvent):
     async with safe_session() as session:
-        player = await get_unified_player(session, event)
-        if not player:
-            await gem_list_cmd.finish("⛔ 请先创建角色")
+        player = await require_player(session, event, gem_list_cmd)
 
         # 查询所有GEM类型物品
         gem_item_ids = config.items_config["by_type"].get("GEM", [])

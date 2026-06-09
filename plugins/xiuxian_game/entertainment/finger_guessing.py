@@ -9,7 +9,7 @@ from nonebot.params import CommandArg
 from ..models.db import safe_session
 from ..models.player import Player
 from ..utils import message_add_head
-from ..platform_utils import get_unified_player
+from ..platform_utils import require_player
 
 # ──────────────────────────────────────────────
 # 猜拳鬼：镜中的同步者
@@ -106,9 +106,7 @@ async def handle_fist_game(event: MessageEvent, args: Message = CommandArg()):
         await guess_fist.finish("⛔ 猜拳小游戏仅限周六开放，请周六再来玩~")
 
     async with safe_session() as session:
-        player = await get_unified_player(session, event)
-        if not player:
-            await guess_fist.finish("⛔ 请先创建角色")
+        player = await require_player(session, event, guess_fist)
 
         args_text = args.extract_plain_text().strip()
         parts = args_text.split()

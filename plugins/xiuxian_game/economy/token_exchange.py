@@ -14,7 +14,7 @@ from ..models.player import Player
 from ..models.inventory import ItemInstance
 from ..config import config
 from ..utils_markdown import cmd, build_markdown
-from ..platform_utils import get_unified_player
+from ..platform_utils import require_player
 
 __all__ = [
     "token_exchange_cmd",
@@ -55,9 +55,7 @@ exchange_elixir_cmd = on_command(
 async def handle_token_exchange(event: MessageEvent):
     """查看月卡宝箱兑换商店"""
     async with safe_session() as session:
-        player = await get_unified_player(session, event)
-        if not player:
-            await token_exchange_cmd.finish("⛔ 请先创建角色")
+        player = await require_player(session, event, token_exchange_cmd)
 
         # 获取玩家的月卡宝箱数量
         stmt = select(ItemInstance).where(
@@ -108,9 +106,7 @@ async def handle_exchange_elixir(event: MessageEvent, args: Message = CommandArg
         await exchange_elixir_cmd.finish("⛔ 数量必须是正整数")
 
     async with safe_session() as session:
-        player = await get_unified_player(session, event)
-        if not player:
-            await exchange_elixir_cmd.finish("⛔ 请先创建角色")
+        player = await require_player(session, event, exchange_elixir_cmd)
 
         config_data = EXCHANGE_CONFIG["monthly_card_box_to_supreme_revive"]
         exchange_rate = config_data["exchange_rate"]

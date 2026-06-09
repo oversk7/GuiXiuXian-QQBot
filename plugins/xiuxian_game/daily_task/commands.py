@@ -7,7 +7,7 @@ from ..models.db import AsyncSessionLocal
 from ..models.player import Player
 from ..models.daily_task import DailyTask, TaskStatus
 from ..utils_markdown import cmd, build_markdown
-from ..platform_utils import get_unified_player
+from ..platform_utils import require_player
 from .service_new import DailyTaskService
 from ..infrastructure.uow.unit_of_work import UnitOfWork
 from ..world.location_service_new import LocationService
@@ -26,9 +26,7 @@ async def handle_daily_task(event: MessageEvent):
         return AsyncSessionLocal()
 
     async with UnitOfWork(session_factory) as uow:
-        player = await get_unified_player(uow.session, event)
-        if not player:
-            await daily_task_cmd.finish("⛔ 请先创建角色")
+        player = await require_player(uow.session, event, daily_task_cmd)
         if player.level < 30:
             await daily_task_cmd.finish("⛔ 该功能仅对Lv.30以上角色开放")
 
@@ -131,18 +129,13 @@ accept_task_cmd = on_command("接取委托", aliases={"接取任务", "接收委
 @accept_task_cmd.handle()
 async def handle_accept_task(event: MessageEvent, args: Message = CommandArg()):
     # 使用跨平台工具获取玩家数据
-    from ..platform_utils import get_unified_player, is_guild_message
+    from ..platform_utils import require_player
 
     def session_factory():
         return AsyncSessionLocal()
 
     async with UnitOfWork(session_factory) as uow:
-        player = await get_unified_player(uow.session, event)
-        if not player:
-            if is_guild_message(event):
-                await accept_task_cmd.finish("⛔ 你还没有创建角色或绑定账号\n💡 请先在群聊注册角色，然后使用绑定功能")
-            else:
-                await accept_task_cmd.finish("⛔ 请先创建角色")
+        player = await require_player(uow.session, event, accept_task_cmd)
 
         # 解析参数
         args_text = args.extract_plain_text().strip()
@@ -264,9 +257,7 @@ async def handle_complete_task(event: MessageEvent):
         return AsyncSessionLocal()
 
     async with UnitOfWork(session_factory) as uow:
-        player = await get_unified_player(uow.session, event)
-        if not player:
-            await complete_task_cmd.finish("⛔ 请先创建角色")
+        player = await require_player(uow.session, event, complete_task_cmd)
 
         # 实例化依赖Service
         location_service = LocationService(uow.locations)
@@ -378,9 +369,7 @@ async def handle_task_stats(event: MessageEvent):
         return AsyncSessionLocal()
 
     async with UnitOfWork(session_factory) as uow:
-        player = await get_unified_player(uow.session, event)
-        if not player:
-            await task_stats_cmd.finish("⛔ 请先创建角色")
+        player = await require_player(uow.session, event, task_stats_cmd)
 
         # 实例化依赖Service
         location_service = LocationService(uow.locations)
@@ -432,9 +421,7 @@ async def handle_refresh_task(event: MessageEvent):
         return AsyncSessionLocal()
 
     async with UnitOfWork(session_factory) as uow:
-        player = await get_unified_player(uow.session, event)
-        if not player:
-            await refresh_task_cmd.finish("⛔ 请先创建角色")
+        player = await require_player(uow.session, event, refresh_task_cmd)
         if player.level < 30:
             await refresh_task_cmd.finish("⛔ 该功能仅对Lv.30以上角色开放")
 

@@ -23,7 +23,7 @@ from ..models.player import Player
 from ..models.inventory import ItemInstance, ItemConfig
 from ..config import config
 from ..utils import message_add_head
-from ..platform_utils import get_unified_player
+from ..platform_utils import require_player
 
 
 # ==================== 欺骗指令 ====================
@@ -81,9 +81,7 @@ async def handle_deception(event: MessageEvent, args: Message = CommandArg()):
     
     async with safe_session() as session:
         # 获取玩家
-        player = await get_unified_player(session, event)
-        if not player:
-            await deception_cmd.finish("⛔ 请先创建角色")
+        player = await require_player(session, event, deception_cmd)
         
         # 查找目标材料
         target_config = config.items_config["by_name"].get(target_material_name)

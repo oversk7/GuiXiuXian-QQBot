@@ -18,7 +18,7 @@ from nonebot.adapters.qq import MessageEvent, Message
 from nonebot.params import CommandArg
 
 from ...models.db import safe_session
-from ...platform_utils import get_unified_player, is_guild_message
+from ...platform_utils import get_unified_player, is_guild_message, require_player
 from ...utils import message_add_head
 from ...utils_markdown import build_markdown, cmd
 from ..battle_markdown import build_battle_markdown
@@ -395,9 +395,7 @@ async def _append_pending_notifications(lines: list, service: LadderRatingServic
 async def handle_shop(event: MessageEvent, args: Message = CommandArg()):
     """显示魂晶商店"""
     async with safe_session() as session:
-        player = await get_unified_player(session, event)
-        if not player:
-            await shop_cmd.finish("⛔ 请先创建角色")
+        player = await require_player(session, event, shop_cmd)
 
         service = LadderRatingService(session)
         rating = await service.get_or_create_rating(player.id)
@@ -461,9 +459,7 @@ async def handle_redeem(event: MessageEvent, args: Message = CommandArg()):
         )
 
     async with safe_session() as session:
-        player = await get_unified_player(session, event)
-        if not player:
-            await redeem_cmd.finish("⛔ 请先创建角色")
+        player = await require_player(session, event, redeem_cmd)
 
         service = LadderRatingService(session)
         rating = await service.get_or_create_rating(player.id)

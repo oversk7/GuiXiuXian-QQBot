@@ -16,7 +16,7 @@ from ..models.player import Player
 from ..models.russian_roulette import RussianRoulettePvEGame
 from ..infrastructure.repositories.russian_roulette_pve_repository import RussianRoulettePvERepository
 from ..utils import message_add_head
-from ..platform_utils import get_unified_player, is_private_message
+from ..platform_utils import is_private_message, require_player
 from .russian_roulette_core import RussianRouletteCore, ItemType
 from .russian_roulette_ai import execute_ai_turn
 
@@ -492,9 +492,7 @@ async def handle_pve(bot: Bot, event: MessageEvent, args: Message = CommandArg()
         await pve_cmd.finish(f"⛔ 入场费范围：{BET_MIN} ~ {BET_MAX} 金币")
 
     async with safe_session() as session:
-        player = await get_unified_player(session, event)
-        if not player:
-            await pve_cmd.finish("⛔ 请先创建角色")
+        player = await require_player(session, event, pve_cmd)
 
         repo = RussianRoulettePvERepository(session)
 
@@ -576,9 +574,7 @@ async def handle_pve(bot: Bot, event: MessageEvent, args: Message = CommandArg()
 async def _handle_double(bot: Bot, event: MessageEvent):
     """处理加倍"""
     async with safe_session() as session:
-        player = await get_unified_player(session, event)
-        if not player:
-            await pve_cmd.finish("⛔ 请先创建角色")
+        player = await require_player(session, event, pve_cmd)
 
         repo = RussianRoulettePvERepository(session)
         pve_game = await repo.find_active_by_player_id(player.id)
@@ -640,9 +636,7 @@ async def _handle_double(bot: Bot, event: MessageEvent):
 async def _handle_cash_out(bot: Bot, event: MessageEvent):
     """处理收手"""
     async with safe_session() as session:
-        player = await get_unified_player(session, event)
-        if not player:
-            await pve_cmd.finish("⛔ 请先创建角色")
+        player = await require_player(session, event, pve_cmd)
 
         repo = RussianRoulettePvERepository(session)
         pve_game = await repo.find_active_by_player_id(player.id)
@@ -680,9 +674,7 @@ async def _handle_cash_out(bot: Bot, event: MessageEvent):
 async def _handle_quit(bot: Bot, event: MessageEvent):
     """处理退出（放弃游戏，损失已下注金币）"""
     async with safe_session() as session:
-        player = await get_unified_player(session, event)
-        if not player:
-            await pve_cmd.finish("⛔ 请先创建角色")
+        player = await require_player(session, event, pve_cmd)
 
         repo = RussianRoulettePvERepository(session)
         pve_game = await repo.find_active_by_player_id(player.id)
@@ -725,9 +717,7 @@ async def handle_pve_shoot(bot: Bot, event: MessageEvent, args: Message = Comman
         await pve_shoot_cmd.finish("⛔ 请指定目标：pve开枪 自己/对手")
 
     async with safe_session() as session:
-        player = await get_unified_player(session, event)
-        if not player:
-            await pve_shoot_cmd.finish("⛔ 请先创建角色")
+        player = await require_player(session, event, pve_shoot_cmd)
 
         repo = RussianRoulettePvERepository(session)
         pve_game = await repo.find_active_by_player_id(player.id)
@@ -858,9 +848,7 @@ async def handle_pve_item(bot: Bot, event: MessageEvent, args: Message = Command
         await pve_item_cmd.finish("⛔ 请指定道具名称\n📝 示例：pve道具 放大镜")
 
     async with safe_session() as session:
-        player = await get_unified_player(session, event)
-        if not player:
-            await pve_item_cmd.finish("⛔ 请先创建角色")
+        player = await require_player(session, event, pve_item_cmd)
 
         repo = RussianRoulettePvERepository(session)
         pve_game = await repo.find_active_by_player_id(player.id)
@@ -1032,9 +1020,7 @@ async def handle_pve_status(event: MessageEvent):
         await pve_status_cmd.finish("⛔ 人机轮盘指令仅限私聊使用")
 
     async with safe_session() as session:
-        player = await get_unified_player(session, event)
-        if not player:
-            await pve_status_cmd.finish("⛔ 请先创建角色")
+        player = await require_player(session, event, pve_status_cmd)
 
         repo = RussianRoulettePvERepository(session)
         pve_game = await repo.find_active_by_player_id(player.id)
@@ -1090,9 +1076,7 @@ async def handle_pve_predict(event: MessageEvent):
         await pve_predict_cmd.finish("⛔ 人机轮盘指令仅限私聊使用")
 
     async with safe_session() as session:
-        player = await get_unified_player(session, event)
-        if not player:
-            await pve_predict_cmd.finish("⛔ 请先创建角色")
+        player = await require_player(session, event, pve_predict_cmd)
 
         repo = RussianRoulettePvERepository(session)
         pve_game = await repo.find_active_by_player_id(player.id)

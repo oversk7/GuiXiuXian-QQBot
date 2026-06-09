@@ -9,6 +9,7 @@
 """
 
 from nonebot import on_command
+from nonebot.exception import FinishedException
 from nonebot.adapters.qq import MessageEvent, Message
 from nonebot.params import CommandArg
 from sqlalchemy import select
@@ -18,7 +19,7 @@ from ..models.db import safe_session
 from ..models.player import Player
 from ..models.stock import Stock, StockType, StockPriceHistory
 from ..utils_markdown import cmd, build_markdown
-from ..platform_utils import get_unified_player
+from ..platform_utils import get_unified_player, require_player
 from .stock_service_new import StockService
 from .stock_price_engine import StockPriceEngine
 from ..config import config
@@ -186,10 +187,7 @@ async def handle_stock_buy(event: MessageEvent, args: Message = CommandArg()):
 
     async with UnitOfWork(session_factory) as uow:
         # 获取统一账号(支持账号切换)
-        player = await get_unified_player(uow.session, event)
-        if not player:
-            await stock_buy_cmd.finish("⛔ 请先创建角色")
-            return
+        player = await require_player(uow.session, event, stock_buy_cmd)
 
         # 创建StockService实例
         stock_service = StockServiceNew(
@@ -248,10 +246,7 @@ async def handle_stock_sell(event: MessageEvent, args: Message = CommandArg()):
 
     async with UnitOfWork(session_factory) as uow:
         # 获取统一账号(支持账号切换)
-        player = await get_unified_player(uow.session, event)
-        if not player:
-            await stock_sell_cmd.finish("⛔ 请先创建角色")
-            return
+        player = await require_player(uow.session, event, stock_sell_cmd)
 
         # 创建StockService实例
         stock_service = StockServiceNew(
@@ -291,10 +286,7 @@ async def handle_stock_holdings(event: MessageEvent):
 
     async with UnitOfWork(session_factory) as uow:
         # 获取统一账号(支持账号切换)
-        player = await get_unified_player(uow.session, event)
-        if not player:
-            await stock_holdings_cmd.finish("⛔ 请先创建角色")
-            return
+        player = await require_player(uow.session, event, stock_holdings_cmd)
 
         # 创建StockService实例
         stock_service = StockServiceNew(
@@ -411,10 +403,7 @@ async def handle_stock_transactions(event: MessageEvent):
 
     async with UnitOfWork(session_factory) as uow:
         # 获取统一账号(支持账号切换)
-        player = await get_unified_player(uow.session, event)
-        if not player:
-            await stock_transactions_cmd.finish("⛔ 请先创建角色")
-            return
+        player = await require_player(uow.session, event, stock_transactions_cmd)
 
         # 创建StockService实例
         stock_service = StockServiceNew(
@@ -467,6 +456,8 @@ async def handle_stock_init(event: MessageEvent):
             existing_stocks = (await session.execute(select(Stock))).scalars().all()
             if existing_stocks:
                 await stock_init_cmd.finish("⛔ 气运投资数据已存在，无需重复初始化")
+        except FinishedException:
+            raise
         except Exception as e:
             await stock_init_cmd.finish(f"⛔ 检查数据失败：{e}")
 
@@ -545,6 +536,8 @@ async def handle_stock_update(event: MessageEvent):
         else:
             await stock_update_cmd.finish("⛔ 价格更新失败或无需更新")
 
+    except FinishedException:
+        raise
     except Exception as e:
         await stock_update_cmd.finish(f"⛔ 更新气运价格失败：{e}")
 
@@ -554,13 +547,8 @@ async def handle_stock_refresh_time(event: MessageEvent):
     """查看气运价格刷新时间"""
     async with safe_session() as session:
         # 使用跨平台工具获取玩家数据
-        from ..platform_utils import get_unified_player, is_guild_message
-        player = await get_unified_player(session, event)
-        if not player:
-            if is_guild_message(event):
-                await stock_refresh_time_cmd.finish("⛔ 你还没有创建角色或绑定账号\n💡 请先在群聊注册角色，然后使用绑定功能")
-            else:
-                await stock_refresh_time_cmd.finish("⛔ 请先创建角色")
+        from ..platform_utils import get_unified_player, require_player
+        player = await require_player(session, event, stock_refresh_time_cmd)
 
         # 获取最近更新的股票
         stmt = select(Stock).where(Stock.is_active == True).order_by(Stock.updated_at.desc()).limit(1)
@@ -632,13 +620,8 @@ async def handle_stock_history(event: MessageEvent, args: Message = CommandArg()
 
     async with safe_session() as session:
         # 使用跨平台工具获取玩家数据
-        from ..platform_utils import get_unified_player, is_guild_message
-        player = await get_unified_player(session, event)
-        if not player:
-            if is_guild_message(event):
-                await stock_history_cmd.finish("⛔ 你还没有创建角色或绑定账号\n💡 请先在群聊注册角色，然后使用绑定功能")
-            else:
-                await stock_history_cmd.finish("⛔ 请先创建角色")
+        from ..platform_utils import get_unified_player, require_player
+        player = await require_player(session, event, stock_history_cmd)
 
         # 获取股票信息
         stmt = select(Stock).where(Stock.symbol == symbol, Stock.is_active == True)
@@ -697,9 +680,7 @@ async def handle_stock_history(event: MessageEvent, args: Message = CommandArg()
 async def handle_stock_analysis(event: MessageEvent):
     """解释股票价格波动的随机性原理"""
     async with safe_session() as session:
-        player = await get_unified_player(session, event)
-        if not player:
-            await stock_analysis_cmd.finish("⛔ 请先创建角色")
+        player = await require_player(session, event, stock_analysis_cmd)
 
         # 获取所有股票的统计数据
         stmt = select(Stock).where(Stock.is_active == True)
@@ -925,6 +906,8 @@ async def handle_reset_all_stocks(event: MessageEvent):
         result_msg = "\n".join(lines)
         await stock_reset_all_cmd.finish(result_msg)
 
+    except FinishedException:
+        raise
     except Exception as e:
         error_msg = f"❌ 重置股票失败: {str(e)}"
         await stock_reset_all_cmd.finish(error_msg)
@@ -977,6 +960,8 @@ async def handle_check_relist(event: MessageEvent):
         result_msg = "\n".join(lines)
         await stock_check_relist_cmd.finish(result_msg)
 
+    except FinishedException:
+        raise
     except Exception as e:
         error_msg = f"❌ 检查重新上市失败: {str(e)}"
         await stock_check_relist_cmd.finish(error_msg)
@@ -1028,6 +1013,8 @@ async def handle_trigger_black_swan(event: MessageEvent):
         result_msg = "\n".join(lines)
         await stock_trigger_black_swan_cmd.finish(build_markdown(result_msg))
 
+    except FinishedException:
+        raise
     except Exception as e:
         import traceback
         # 移除traceback中的URL信息,避免被QQ拦截

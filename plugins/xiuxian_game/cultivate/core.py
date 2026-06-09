@@ -88,17 +88,12 @@ free_reset_points = on_command("免费洗点", aliases={"新手洗点"}, block=T
 @cultivate.handle()
 async def handle_cultivate(event: MessageEvent):
     """修炼主逻辑"""
-    from ..platform_utils import get_unified_player, is_guild_message
+    from ..platform_utils import require_player
 
     async with safe_session() as session:
-        # 使用跨平台工具获取玩家数据
-        player = await get_unified_player(session, event)
-        if not player:
-            if is_guild_message(event):
-                await cultivate.finish("⛔ 你还没有创建角色或绑定账号\n💡 请先在群聊注册角色，然后使用绑定功能")
-            else:
-                await cultivate.finish("⛔ 请先使用【注册】命令创建角色")
-        
+        # 使用跨平台工具获取玩家数据（未注册自动提示并结束）
+        player = await require_player(session, event, cultivate)
+
         # 闭关状态检查
         if player.is_secluded:
             await cultivate.finish(message_add_head(
@@ -325,16 +320,11 @@ async def handle_cultivate(event: MessageEvent):
 @seclusion.handle()
 async def handle_seclusion(event: MessageEvent):
     """闭关逻辑"""
-    from ..platform_utils import get_unified_player, is_guild_message
+    from ..platform_utils import get_unified_player, require_player
 
     async with safe_session() as session:
         # 使用跨平台工具获取玩家数据
-        player = await get_unified_player(session, event)
-        if not player:
-            if is_guild_message(event):
-                await seclusion.finish("⛔ 你还没有创建角色或绑定账号\n💡 请先在群聊注册角色，然后使用绑定功能")
-            else:
-                await seclusion.finish("⛔ 请先使用【注册】命令创建角色")
+        player = await require_player(session, event, seclusion)
 
         if player.is_secluded:
             await seclusion.finish(message_add_head(
@@ -503,16 +493,11 @@ async def handle_seclusion(event: MessageEvent):
 @out_seclusion.handle()
 async def handle_out_seclusion(event: MessageEvent):
     """出关逻辑"""
-    from ..platform_utils import get_unified_player, is_guild_message
+    from ..platform_utils import get_unified_player, require_player
 
     async with safe_session() as session:
         # 使用跨平台工具获取玩家数据
-        player = await get_unified_player(session, event)
-        if not player:
-            if is_guild_message(event):
-                await out_seclusion.finish("⛔ 你还没有创建角色或绑定账号\n💡 请先在群聊注册角色，然后使用绑定功能")
-            else:
-                await out_seclusion.finish("⛔ 请先使用【注册】命令创建角色")
+        player = await require_player(session, event, out_seclusion)
 
         if not player.is_secluded:
             await out_seclusion.finish(message_add_head(
@@ -720,16 +705,11 @@ async def handle_out_seclusion(event: MessageEvent):
 @breakthrough.handle()
 async def handle_breakthrough(event: MessageEvent, args: Message = CommandArg()):
     """突破境界逻辑"""
-    from ..platform_utils import get_unified_player, is_guild_message
+    from ..platform_utils import get_unified_player, require_player
 
     async with safe_session() as session:
         # 使用跨平台工具获取玩家数据
-        player = await get_unified_player(session, event)
-        if not player:
-            if is_guild_message(event):
-                await breakthrough.finish("⛔ 你还没有创建角色或绑定账号\n💡 请先在群聊注册角色，然后使用绑定功能")
-            else:
-                await breakthrough.finish("⛔ 请先使用【注册】命令创建角色")
+        player = await require_player(session, event, breakthrough)
 
         current_cfg = _cultivate_cfg(player)
         cfg_break = current_cfg["breakthrough"]
@@ -984,16 +964,11 @@ async def handle_breakthrough(event: MessageEvent, args: Message = CommandArg())
 @continuous_breakthrough.handle()
 async def handle_continuous_breakthrough(event: MessageEvent, args: Message = CommandArg()):
     """连续突破逻辑"""
-    from ..platform_utils import get_unified_player, is_guild_message
+    from ..platform_utils import get_unified_player, require_player
 
     async with safe_session() as session:
         # 使用跨平台工具获取玩家数据
-        player = await get_unified_player(session, event)
-        if not player:
-            if is_guild_message(event):
-                await continuous_breakthrough.finish("⛔ 你还没有创建角色或绑定账号\n💡 请先在群聊注册角色，然后使用绑定功能")
-            else:
-                await continuous_breakthrough.finish("⛔ 请先使用【注册】命令创建角色")
+        player = await require_player(session, event, continuous_breakthrough)
 
         current_cfg = _cultivate_cfg(player)
         cfg_break = current_cfg["breakthrough"]
@@ -1269,13 +1244,8 @@ async def handle_assign(event: MessageEvent, args: Message = CommandArg()):
 
     async with safe_session() as session:
         # 使用跨平台工具获取玩家数据
-        from ..platform_utils import get_unified_player, is_guild_message
-        player = await get_unified_player(session, event)
-        if not player:
-            if is_guild_message(event):
-                await assign_points.finish("⛔ 你还没有创建角色或绑定账号\n💡 请先在群聊注册角色，然后使用绑定功能")
-            else:
-                await assign_points.finish("⛔ 请先创建角色")
+        from ..platform_utils import get_unified_player, require_player
+        player = await require_player(session, event, assign_points)
         
         if attr_name not in ATTRIBUTE_MAP:
             # 提供更友好的属性错误提示
@@ -1425,13 +1395,8 @@ async def handle_free_reset_points(event: MessageEvent):
     """免费洗点处理函数 - 仅限30级以下玩家使用，消耗5点咒抗"""
     async with safe_session() as session:
         # 使用跨平台工具获取玩家数据
-        from ..platform_utils import get_unified_player, is_guild_message
-        player = await get_unified_player(session, event)
-        if not player:
-            if is_guild_message(event):
-                await free_reset_points.finish("⛔ 你还没有创建角色或绑定账号\n💡 请先在群聊注册角色，然后使用绑定功能")
-            else:
-                await free_reset_points.finish("⛔ 请先创建角色")
+        from ..platform_utils import get_unified_player, require_player
+        player = await require_player(session, event, free_reset_points)
 
         # 检查等级限制
         if player.level >= 30:

@@ -32,13 +32,8 @@ deposit_rank_cmd = on_command("存款榜", aliases={"冥行榜"}, block=True, pr
 async def handle_balance(event: MessageEvent):
     async with safe_session() as session:
         # 使用跨平台工具获取玩家数据
-        from ..platform_utils import get_unified_player, is_guild_message
-        player = await get_unified_player(session, event)
-        if not player:
-            if is_guild_message(event):
-                await bank_balance_cmd.finish("⛔ 你还没有创建角色或绑定账号\n💡 请先在群聊注册角色，然后使用绑定功能")
-            else:
-                await bank_balance_cmd.finish("⛔ 请先创建角色")
+        from ..platform_utils import get_unified_player, is_guild_message, require_player
+        player = await require_player(session, event, bank_balance_cmd)
         acc = await session.get(BankAccount, player.id)
         if not acc:
             acc = BankAccount(player_id=player.id, balance=0, last_interest=datetime.now())
@@ -74,13 +69,8 @@ async def handle_deposit(event: MessageEvent, args: Message = CommandArg()):
 
     async with safe_session() as session:
         # 使用跨平台工具获取玩家数据
-        from ..platform_utils import get_unified_player, is_guild_message
-        player = await get_unified_player(session, event)
-        if not player:
-            if is_guild_message(event):
-                await bank_deposit_cmd.finish("⛔ 你还没有创建角色或绑定账号\n💡 请先在群聊注册角色，然后使用绑定功能")
-            else:
-                await bank_deposit_cmd.finish("⛔ 请先创建角色")
+        from ..platform_utils import get_unified_player, is_guild_message, require_player
+        player = await require_player(session, event, bank_deposit_cmd)
         if player.gold < amt:
             await bank_deposit_cmd.finish("⛔ 金币不足")
         acc = await session.get(BankAccount, player.id)
@@ -118,13 +108,8 @@ async def handle_withdraw(event: MessageEvent, args: Message = CommandArg()):
 
     async with safe_session() as session:
         # 使用跨平台工具获取玩家数据
-        from ..platform_utils import get_unified_player, is_guild_message
-        player = await get_unified_player(session, event)
-        if not player:
-            if is_guild_message(event):
-                await bank_withdraw_cmd.finish("⛔ 你还没有创建角色或绑定账号\n💡 请先在群聊注册角色，然后使用绑定功能")
-            else:
-                await bank_withdraw_cmd.finish("⛔ 请先创建角色")
+        from ..platform_utils import get_unified_player, is_guild_message, require_player
+        player = await require_player(session, event, bank_withdraw_cmd)
         acc = await session.get(BankAccount, player.id)
         if not acc or acc.balance <= 0:
             await bank_withdraw_cmd.finish("⛔ 你没有任何存款")
@@ -325,13 +310,8 @@ async def handle_bank_invest(event: MessageEvent):
     """银行投资理财"""
     async with safe_session() as session:
         # 使用跨平台工具获取玩家数据
-        from ..platform_utils import get_unified_player, is_guild_message
-        player = await get_unified_player(session, event)
-        if not player:
-            if is_guild_message(event):
-                await bank_invest_cmd.finish("⛔ 你还没有创建角色或绑定账号\n💡 请先在群聊注册角色，然后使用绑定功能")
-            else:
-                await bank_invest_cmd.finish("⛔ 请先创建角色")
+        from ..platform_utils import get_unified_player, is_guild_message, require_player
+        player = await require_player(session, event, bank_invest_cmd)
 
         acc = await session.get(BankAccount, player.id)
         if not acc:

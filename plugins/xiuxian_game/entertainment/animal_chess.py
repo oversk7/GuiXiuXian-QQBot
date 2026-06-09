@@ -13,7 +13,7 @@ from sqlalchemy import select
 from ..models.animal_chess import AnimalChessRoomStatus
 from ..models.db import safe_session
 from ..models.player import Player
-from ..platform_utils import get_unified_player
+from ..platform_utils import get_unified_player, require_player
 from ..utils import message_add_head
 from ..utils_markdown import build_markdown, cmd
 from .animal_chess_service import ANIMAL_ORDER, DEN, DIRECTION_DELTAS, RIVER, TRAPS, AnimalChessService
@@ -45,9 +45,7 @@ async def handle_animal_chess(event: MessageEvent, args: Message = CommandArg())
         )
 
     async with safe_session() as session:
-        player = await get_unified_player(session, event)
-        if not player:
-            await animal_chess_cmd.finish("⛔ 请先创建角色")
+        player = await require_player(session, event, animal_chess_cmd)
 
         service = AnimalChessService(session)
 

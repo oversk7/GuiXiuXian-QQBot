@@ -22,7 +22,7 @@ from .equipment_commands import (
 )
 # 从装备服务模块导入（已解耦）
 from .equipment_service import recalc_equipment_attributes, EQUIP_ITEM_IDS
-from ..platform_utils import get_unified_player
+from ..platform_utils import require_player
 
 # 使用DI架构的EquipmentService和EquipmentUpgradeService
 
@@ -49,9 +49,7 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
         await upgrade_info_cmd.finish("⛔ 格式：升阶信息 装备编号/名称")
 
     async with safe_session() as session:
-        player = await get_unified_player(session, event)
-        if not player:
-            await upgrade_info_cmd.finish("⛔ 请先创建角色")
+        player = await require_player(session, event, upgrade_info_cmd)
 
         # 查找装备
         equip = await find_equipment_by_input(session, player.id, arg)
@@ -190,9 +188,7 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
     use_protection = len(parts) > 1 and ("稳定水晶" in parts[1] or "护身符" in parts[1])
 
     async with safe_session() as session:
-        player = await get_unified_player(session, event)
-        if not player:
-            await upgrade_equipment_cmd.finish("⛔ 请先创建角色")
+        player = await require_player(session, event, upgrade_equipment_cmd)
 
         # 查找装备
         equip = await find_equipment_by_input(session, player.id, equipment_arg)
@@ -271,9 +267,7 @@ upgrade_list_cmd = on_command("升阶列表", aliases={"可升阶装备"}, block
 @upgrade_list_cmd.handle()
 async def _(event: MessageEvent):
     async with safe_session() as session:
-        player = await get_unified_player(session, event)
-        if not player:
-            await upgrade_list_cmd.finish("⛔ 请先创建角色")
+        player = await require_player(session, event, upgrade_list_cmd)
 
         # 查询所有装备
         stmt = select(ItemInstance).where(
@@ -359,9 +353,7 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
         await auto_upgrade_cmd.finish("⛔ 目标阶数范围：1-10")
 
     async with safe_session() as session:
-        player = await get_unified_player(session, event)
-        if not player:
-            await auto_upgrade_cmd.finish("⛔ 请先创建角色")
+        player = await require_player(session, event, auto_upgrade_cmd)
 
         # 查找装备
         equip = await find_equipment_by_input(session, player.id, equipment_arg)

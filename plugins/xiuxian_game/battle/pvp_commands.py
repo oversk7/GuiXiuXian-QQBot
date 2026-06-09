@@ -229,10 +229,8 @@ async def handle_log_mode(event: MessageEvent, args: Message = CommandArg()):
     args_text = args.extract_plain_text().strip()
 
     async with safe_session() as session:
-        from ..platform_utils import get_unified_player
-        player = await get_unified_player(session, event)
-        if not player:
-            await log_mode_cmd.finish("⛔ 请先创建角色")
+        from ..platform_utils import get_unified_player, require_player
+        player = await require_player(session, event, log_mode_cmd)
 
         current_mode = get_player_log_mode(player)
 
