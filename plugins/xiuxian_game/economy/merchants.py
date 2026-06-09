@@ -625,12 +625,8 @@ async def _calculate_trade_bonuses(
 
 
 # ------------------- 跑商税（累进制）-------------------
-TRADE_TAX_BRACKETS = [
-    (300_000,      0.00),   # 日收入 0-30万: 免税
-    (800_000,      0.05),   # 30万-80万: 5%
-    (1_500_000,    0.10),   # 80万-150万: 10%
-    (999_999_999,  0.15),   # 150万+: 15%
-]
+# 档位与选档逻辑提取至 formulas/trade_tax.py（便于单元测试）
+from ..formulas.trade_tax import TRADE_TAX_BRACKETS, pick_trade_tax_rate
 
 
 async def _calculate_trade_tax(session, player_id: str, revenue: int,
@@ -653,11 +649,7 @@ async def _calculate_trade_tax(session, player_id: str, revenue: int,
         daily_revenue = await TradeRecord.get_daily_cross_market_revenue(session, player_id)
 
     # 根据累计日收入确定税率档位
-    tax_rate = 0.0
-    for bracket_limit, rate in TRADE_TAX_BRACKETS:
-        if daily_revenue < bracket_limit:
-            tax_rate = rate
-            break
+    tax_rate = pick_trade_tax_rate(daily_revenue)
 
     tax_amount = int(revenue * tax_rate)
     return tax_rate, tax_amount

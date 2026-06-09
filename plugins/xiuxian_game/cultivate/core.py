@@ -724,35 +724,16 @@ async def handle_breakthrough(event: MessageEvent, args: Message = CommandArg())
         per_level_inc = cfg_break.get("guardian_cost_per_level", 1)
         guardian_cost = base_cost + player.level * per_level_inc
         
-        # 计算成功率
+        # 计算成功率（公式提取至 formulas/breakthrough.py，便于单元测试）
+        from ..formulas.breakthrough import calculate_breakthrough_chance
         luck_break_bonus = 0.0
-        if player.level < cfg_break["change_level"]:
-            success_chance = 1.0
-        else:
-            base_rate = cfg_break.get("base_success_rate", 0.8)
-            decay = cfg_break.get("decay_per_level", 0.005)
-            min_rate = cfg_break.get("min_success_rate", 0.05)
-            success_chance = max(min_rate, base_rate - decay * (player.level - cfg_break["change_level"]))
-
-            # 失败累加机制
-            if cfg_break.get("fail_bonus_enabled", True):
-                fail_bonus_rate = cfg_break.get("fail_bonus_rate", 0.01)
-                fail_bonus = player.breakthrough_fail_count * fail_bonus_rate
-                success_chance += fail_bonus
-
-                # 应用成功率上限
-                max_rate = cfg_break.get("fail_bonus_max_rate", 0.95)
-                success_chance = min(success_chance, max_rate)
-
+        if player.level >= cfg_break["change_level"]:
             # 运气突破加成（S型曲线：midpoint=800, steepness=400, 上限+10%）
             from ..utils import luck_prob
             luck_break_bonus = luck_prob(player.luck, midpoint=800, steepness=400) * 0.10
-            success_chance = min(success_chance + luck_break_bonus, cfg_break.get("fail_bonus_max_rate", 0.95))
-
-            # 保底机制：连续失败达到阈值则必定成功
-            pity_threshold = cfg_break.get("pity_threshold", 10)
-            if player.breakthrough_fail_count >= pity_threshold:
-                success_chance = 1.0
+        success_chance = calculate_breakthrough_chance(
+            player.level, player.breakthrough_fail_count, cfg_break, luck_break_bonus
+        )
 
         # 护航或使用棺材钉则必定成功
         if use_guardian or use_coffin_nail:
@@ -1021,34 +1002,16 @@ async def handle_continuous_breakthrough(event: MessageEvent, args: Message = Co
             if use_guardian and player.resentment < guardian_cost:
                 break
 
-            # 计算成功率
-            if player.level < cfg_break["change_level"]:
-                success_chance = 1.0
-            else:
-                base_rate = cfg_break.get("base_success_rate", 0.8)
-                decay = cfg_break.get("decay_per_level", 0.005)
-                min_rate = cfg_break.get("min_success_rate", 0.05)
-                success_chance = max(min_rate, base_rate - decay * (player.level - cfg_break["change_level"]))
-
-                # 失败累加机制
-                if cfg_break.get("fail_bonus_enabled", True):
-                    fail_bonus_rate = cfg_break.get("fail_bonus_rate", 0.01)
-                    fail_bonus = player.breakthrough_fail_count * fail_bonus_rate
-                    success_chance += fail_bonus
-
-                    # 应用成功率上限
-                    max_rate = cfg_break.get("fail_bonus_max_rate", 0.95)
-                    success_chance = min(success_chance, max_rate)
-
+            # 计算成功率（公式提取至 formulas/breakthrough.py，便于单元测试）
+            from ..formulas.breakthrough import calculate_breakthrough_chance
+            _luck_break_bonus = 0.0
+            if player.level >= cfg_break["change_level"]:
                 # 运气突破加成（S型曲线：midpoint=800, steepness=400, 上限+10%）
                 from ..utils import luck_prob
                 _luck_break_bonus = luck_prob(player.luck, midpoint=800, steepness=400) * 0.10
-                success_chance = min(success_chance + _luck_break_bonus, cfg_break.get("fail_bonus_max_rate", 0.95))
-
-                # 保底机制：连续失败达到阈值则必定成功
-                pity_threshold = cfg_break.get("pity_threshold", 10)
-                if player.breakthrough_fail_count >= pity_threshold:
-                    success_chance = 1.0
+            success_chance = calculate_breakthrough_chance(
+                player.level, player.breakthrough_fail_count, cfg_break, _luck_break_bonus
+            )
 
             # 镇厄则必定成功
             if use_guardian:
