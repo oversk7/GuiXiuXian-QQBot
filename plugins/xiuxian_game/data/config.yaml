@@ -219,4 +219,4 @@ group_persona:
   max_history_messages: 30
   max_response_length: 120
   ignore_commands: true
-  timing_gate_enabled: false
+  timing_gate_enabled: true
