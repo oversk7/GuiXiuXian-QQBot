@@ -177,7 +177,15 @@ class GuildService:
 - **使用auto_migrate**: 在`plugins/xiuxian_game/models/auto_migrate.py`的`REQUIRED_FIELDS`中添加字段定义
 - **重启Bot**: 自动检测并添加缺失字段/表/索引
 
-### 6.3 连接泄漏防护
+### 6.3 永久属性变更（写入收口）
+- **必须规则**: 任何永久改变玩家属性字段的操作（丹药、洗髓、活动奖励等）必须经过
+  `domain/attributes/permanent_change.apply_permanent_change()`,禁止直接 `setattr`
+- 写入口原子完成: 改字段 + 记账(ElixirUsageLog) + 装备重算 + hp/mp 收口
+- **绕过后果**: 账实漂移,且该加成在玩家轮回时被静默吞掉（轮回按 INIT+账本+VIP 重建六维）
+- VIP 永久加成例外: 走 `VIPEquipmentBonus` 专表（轮回同样保留）,不得重复记入 ElixirUsageLog
+- 对账: `scripts/check_attribute_consistency.py`（只读）;存量校准: `scripts/calibrate_attribute_ledger.py`
+
+### 6.4 连接泄漏防护
 - **必须规则**: 在UoW外部调用`cmd.finish()`
 - **错误示例**:
 ```python
