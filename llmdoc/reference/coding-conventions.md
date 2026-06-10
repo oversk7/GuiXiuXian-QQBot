@@ -145,12 +145,6 @@ class GuildService:
 - 每个Source独立计算策略
 - 通过`AttributeCalculator`组合使用
 
-### 4.5 桥接模式
-**应用场景**: 战斗效果桥接 (`plugins/xiuxian_game/domain/effects/adapters/battle_effect_bridge.py:20-80`)
-- 保留现有BattleEffectManager设计
-- 通过Bridge适配到IEffect接口
-- 委托而非转换
-
 ---
 
 ## 5. 异步编程约定

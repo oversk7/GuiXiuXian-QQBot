@@ -58,10 +58,9 @@ driver = get_driver()
 async def _():
     await init_db()
 
-    # 注册效果系统（物品效果适配器 + 战斗效果桥接器）
+    # 注册效果系统（物品效果适配器）
     from .domain.effects.adapters import (
         register_all_item_effect_adapters,
-        register_all_battle_effect_bridges,
         USE_NEW_EFFECT_SYSTEM
     )
     from nonebot import logger
@@ -70,10 +69,6 @@ async def _():
         # 注册物品效果适配器
         adapters = register_all_item_effect_adapters()
         logger.success(f"[EffectSystem] 成功注册 {len(adapters)} 个物品效果适配器")
-
-        # 注册战斗效果桥接器
-        bridges = register_all_battle_effect_bridges()
-        logger.success(f"[EffectSystem] 成功注册 {len(bridges)} 个战斗效果桥接器")
 
         # Feature Flag状态
         if USE_NEW_EFFECT_SYSTEM:

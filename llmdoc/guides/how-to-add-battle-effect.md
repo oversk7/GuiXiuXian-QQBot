@@ -62,18 +62,7 @@ class TriggerType(str, Enum):
     NEW_TRIGGER = "new_trigger"  # 新触发类型的描述
 ```
 
-### 步骤2: 在桥接器中添加映射
-
-在`plugins/xiuxian_game/domain/effects/adapters/battle_effect_bridge.py:22-33`的触发类型映射表中添加映射:
-
-```python
-_TRIGGER_TYPE_MAPPING = {
-    # ... 现有映射
-    TriggerType.NEW_TRIGGER: BattleTriggerType.NEW_TRIGGER,
-}
-```
-
-### 步骤3: 在引擎中触发
+### 步骤2: 在引擎中触发
 
 在`EnhancedBattleEngine`的适当位置调用`check_triggers`:
 
@@ -199,10 +188,7 @@ special_effects:
 
 ### 验证配置生效
 
-1. 重启机器人,检查启动日志中的注册数量:
-```
-[EffectSystem] 成功注册 XXX 个战斗效果桥接器
-```
+1. 重启机器人使装备配置生效(战斗效果在战斗开始时由`enhanced_engine.py`直接从装备配置解析,无独立注册步骤)。
 
 2. 使用`【我的装备】`命令查看装备效果是否正确显示。
 

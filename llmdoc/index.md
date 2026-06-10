@@ -66,7 +66,6 @@
 - **Repository模式** - 数据访问抽象,可测试性,查询集中化
 - **Unit of Work模式** - 事务原子性,会话共享,连接泄漏防护
 - **策略模式** - 属性来源系统(IAttributeSource)
-- **桥接模式** - 战斗效果桥接(BattleEffectBridge)
 
 ---
 

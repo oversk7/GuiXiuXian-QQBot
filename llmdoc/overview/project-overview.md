@@ -505,8 +505,8 @@ nonebot.load_from_toml("pyproject.toml")
 @driver.on_startup
 async def _():
     await init_db()  # 创建表 + auto_migrate
-    # 注册战斗效果桥接器
-    bridges = register_all_battle_effect_bridges()
+    # 注册物品效果适配器
+    adapters = register_all_item_effect_adapters()
 ```
 
 ### 10.2 数据库迁移
