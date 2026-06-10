@@ -85,7 +85,7 @@ def _generate_loot() -> tuple[list[tuple[str, str, int]], int]:
         ([(item_id, display_name, quantity), ...], gold)
     """
     from ..config import config
-    from ..world.dungeon_battle import get_materials_by_rarity
+    from ..world.dungeon_generation_service import get_materials_by_rarity
 
     loot_items = []
 

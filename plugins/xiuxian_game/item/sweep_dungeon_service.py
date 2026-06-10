@@ -20,7 +20,7 @@ from ..models.inventory import ItemConfig, ItemInstance
 from ..config import config
 from ..utils import luck_prob, apply_defense_mitigation
 from ..utils_markdown import cmd
-from ..world.dungeon_battle import calculate_monster_attributes, get_region_materials, get_materials_by_rarity
+from ..world.dungeon_generation_service import calculate_monster_attributes, get_region_materials, get_materials_by_rarity
 from ..infrastructure.repositories.item_repository import ItemRepository
 from ..infrastructure.repositories.player_repository import PlayerRepository
 from ..domain.effects.interfaces import EffectResult

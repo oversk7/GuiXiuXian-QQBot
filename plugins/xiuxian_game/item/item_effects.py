@@ -1140,7 +1140,7 @@ async def _santa_teleport(player: Player, cfg: ItemConfig, qty: int, ctx: dict, 
             )
 
         # 执行传送
-        from ..world.dungeon_battle import get_or_create_tile
+        from ..world.dungeon_generation_service import get_or_create_tile
         player.enter_dungeon(dungeon_level)
 
         # 获取新位置描述

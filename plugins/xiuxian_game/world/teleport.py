@@ -43,7 +43,7 @@ async def get_tile_description(session, player: Player, region: str, x: int, y: 
         格子描述字符串
     """
     # 获取或创建格子
-    from .dungeon_battle import get_or_create_tile
+    from .dungeon_generation_service import get_or_create_tile
     tile = await get_or_create_tile(session, region, x, y)
 
     # 根据格子类型生成描述
@@ -283,7 +283,8 @@ async def _handle_teleport_logic(event: MessageEvent, target_region: str, cmd_ha
         tile_desc = None
         auto_collect_msg = ""
         if dungeon_level:
-            from .dungeon_battle import get_or_create_tile, _handle_material, _handle_treasure
+            from .dungeon_generation_service import get_or_create_tile
+            from .dungeon_battle_service import _handle_material, _handle_treasure
             from ..models.monthly_card import get_player_card_benefits
 
             tile = await get_or_create_tile(session, target_name, player.dungeon_x, player.dungeon_y)
@@ -472,7 +473,8 @@ async def handle_prev_level(event: MessageEvent):
         await session.commit()
 
         # 检查月卡自动采集
-        from .dungeon_battle import get_or_create_tile, _handle_material, _handle_treasure
+        from .dungeon_generation_service import get_or_create_tile
+        from .dungeon_battle_service import _handle_material, _handle_treasure
         from ..models.monthly_card import get_player_card_benefits
 
         region_name = f"{target_level}层诡域"
@@ -560,7 +562,8 @@ async def handle_next_level(event: MessageEvent):
         await session.commit()
 
         # 检查月卡自动采集
-        from .dungeon_battle import get_or_create_tile, _handle_material, _handle_treasure
+        from .dungeon_generation_service import get_or_create_tile
+        from .dungeon_battle_service import _handle_material, _handle_treasure
         from ..models.monthly_card import get_player_card_benefits
 
         region_name = f"{target_level}层诡域"
@@ -613,7 +616,7 @@ async def handle_rest(event: MessageEvent):
 
 
 async def _handle_dungeon_rest(session, player: Player, event: MessageEvent, cmd_handler):
-    from .dungeon_battle import get_or_create_tile
+    from .dungeon_generation_service import get_or_create_tile
 
     region_name = f"{player.dungeon_level}层诡域"
     tile = await get_or_create_tile(session, region_name, player.dungeon_x, player.dungeon_y)

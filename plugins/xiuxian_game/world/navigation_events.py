@@ -111,7 +111,7 @@ def _bad_events(player: Player, rng: random.Random) -> List[dict]:
 def _resolve_random_material(rng: random.Random) -> tuple[Optional[str], str]:
     """解析随机材料，返回 (item_id, item_name)"""
     from ..config import config
-    from .dungeon_battle import get_materials_by_rarity
+    from .dungeon_generation_service import get_materials_by_rarity
 
     # 80%白色，20%绿色
     rarity = "white" if rng.random() < 0.8 else "green"
