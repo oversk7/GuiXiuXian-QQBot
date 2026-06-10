@@ -61,13 +61,13 @@ def _get_material_obtain_methods(item_id: str, rarity: str) -> str:
     methods: list[str] = []
 
     # 检查是否在市集中出售
-    from ..economy.merchants import MARKETS
+    from ..economy.merchant_service import MARKETS
 
     if any(market.can_sell_to_player(item_id) for market in MARKETS):
         methods.append("市集购买")
 
     # 检查是否在万事屋中出售
-    from ..economy.merchants import SHOP_ITEMS
+    from ..economy.merchant_service import SHOP_ITEMS
 
     if item_id in SHOP_ITEMS:
         methods.append("万事屋购买")

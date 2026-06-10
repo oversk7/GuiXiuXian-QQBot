@@ -483,7 +483,7 @@ async def create_player(event: MessageEvent, nickname: str, gender: Gender, serv
 
         # 随机选择一个城市作为出生点
         import random as _rng
-        from ..economy.merchants import MARKETS
+        from ..economy.merchant_service import MARKETS
         spawn_market = _rng.choice(MARKETS)
 
         new_player = Player(

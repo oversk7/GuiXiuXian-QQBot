@@ -46,7 +46,7 @@ def is_in_town(x: int, y: int, region: str = "大都会") -> bool:
         return False
 
     # 市集坐标（安全区域）
-    from ..economy.merchants import MARKETS, HEADQUARTERS_COORD
+    from ..economy.merchant_service import MARKETS, HEADQUARTERS_COORD
 
     # 检查是否在市集附近（5格内算安全区域）
     for market in MARKETS:

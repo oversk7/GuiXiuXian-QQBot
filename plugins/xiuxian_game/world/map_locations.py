@@ -40,7 +40,7 @@ async def _(event: MessageEvent):
         current_x, current_y = player.get_current_coordinates()
 
         # 1. 检查市集
-        from ..economy.merchants import MARKETS
+        from ..economy.merchant_service import MARKETS
         for market in MARKETS:
             distance = calculate_distance(current_x, current_y, market.x, market.y)
             if distance <= 300:  # 300格内（适配大地图）
@@ -52,7 +52,7 @@ async def _(event: MessageEvent):
                 })
         
         # 2. 检查缉邪司总部
-        from ..economy.merchants import HEADQUARTERS_COORD
+        from ..economy.merchant_service import HEADQUARTERS_COORD
         hq_distance = calculate_distance(current_x, current_y, HEADQUARTERS_COORD[0], HEADQUARTERS_COORD[1])
         if hq_distance <= 300:
             nearby_places.append({
@@ -128,7 +128,7 @@ async def _(event: MessageEvent):
         try:
             # 导入地图可视化器
             from .map_visualizer import MapVisualizer
-            from ..economy.merchants import MARKETS, HEADQUARTERS_COORD
+            from ..economy.merchant_service import MARKETS, HEADQUARTERS_COORD
             import base64
 
             # 生成地图

@@ -28,7 +28,7 @@ async def _(event: MessageEvent):
         if player.is_in_dungeon():
             await list_craft_cmd.finish(message_add_head("⛔ 诡域中无法进行锻造相关操作", event))
         # 获取全图所有拥有锻造功能的城镇（不局限当前区域）
-        from ..economy.merchants import MARKETS
+        from ..economy.merchant_service import MARKETS
         location_service = LocationService(LocationRepository(session))
         forge_locs = []
         for m in MARKETS:
@@ -75,12 +75,12 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
     city_name = args.extract_plain_text().strip()
     if not city_name:
         # 显示所有城市列表
-        from ..economy.merchants import MARKETS
+        from ..economy.merchant_service import MARKETS
         city_list = "、".join([m.name for m in MARKETS])
         await craftsman_recipes_cmd.finish(f"⛔ 格式：工匠配方一览 城市名\n💡 可选城市：{city_list}")
 
     # 查找城市对应的市集配置
-    from ..economy.merchants import MARKETS
+    from ..economy.merchant_service import MARKETS
     target_market = None
     for m in MARKETS:
         if m.name == city_name:

@@ -21,7 +21,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from ..models.player import Player
 from ..models.part_time_job import JobLocation
 from ..models.navigation_task import NavigationTask
-from ..economy.merchants import MARKETS, HEADQUARTERS_COORD
+from ..economy.merchant_service import MARKETS, HEADQUARTERS_COORD
 
 
 class MapVisualizer:

@@ -47,7 +47,7 @@ def get_town_name(x: int, y: int, region: str = "大都会") -> Optional[str]:
     if region != "大都会":
         return None
 
-    from ..economy.merchants import MARKETS, HEADQUARTERS_COORD
+    from ..economy.merchant_service import MARKETS, HEADQUARTERS_COORD
 
     # 市集
     for market in MARKETS:

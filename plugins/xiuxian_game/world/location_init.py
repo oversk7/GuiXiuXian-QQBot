@@ -91,7 +91,7 @@ async def handle_init_locations(event: MessageEvent):
 
 async def init_market_locations(session) -> int:
     """初始化/同步市集地点和商人NPC（支持坐标更新和新城市创建）"""
-    from ..economy.merchants import MARKETS
+    from ..economy.merchant_service import MARKETS
 
     location_service = LocationService(LocationRepository(session))
     npc_service = NPCService(session)
@@ -280,7 +280,7 @@ async def init_job_locations(session) -> int:
 async def init_workshop_locations(session) -> int:
     """为每个城市（市集）添加工匠NPC与城市专属锻造列表"""
     # 从市集配置中获取所有城市
-    from ..economy.merchants import MARKETS
+    from ..economy.merchant_service import MARKETS
 
     # 城市专属锻造白名单（按世界观/难度系统细分）
     CITY_FORGE_WHITELIST: dict[str, list[str]] = {
@@ -432,7 +432,7 @@ async def handle_refresh_workshops(event: MessageEvent, args: Message = CommandA
     try:
         async with safe_session() as session:
             # 市集（城市）列表
-            from ..economy.merchants import MARKETS
+            from ..economy.merchant_service import MARKETS
 
             # 与 init_workshop_locations 规则保持一致（含新手村/风雪镇改动）
             CITY_FORGE_WHITELIST: dict[str, list[str]] = {
@@ -537,7 +537,7 @@ async def handle_refresh_workshops(event: MessageEvent, args: Message = CommandA
 async def init_special_locations(session) -> int:
     """在缉邪司总部添加管理员NPC"""
     # 缉邪司总部
-    from ..economy.merchants import HEADQUARTERS_COORD
+    from ..economy.merchant_service import HEADQUARTERS_COORD
 
     location_service = LocationService(LocationRepository(session))
     npc_service = NPCService(session)
@@ -624,7 +624,7 @@ async def init_social_npcs(session) -> int:
     - 8个集群主城各放一个社交代理（提供全部三种社交功能）
     """
     from ..models.npc import NPC, NPCType
-    from ..economy.merchants import MARKETS
+    from ..economy.merchant_service import MARKETS
 
     npc_service = NPCService(session)
     created_count = 0
@@ -757,7 +757,7 @@ async def init_station_masters(session) -> int:
     驿丞提供：本城NPC列表、集群城市导航、附近城市距离
     """
     from ..models.npc import NPC, NPCType
-    from ..economy.merchants import MARKETS
+    from ..economy.merchant_service import MARKETS
 
     npc_service = NPCService(session)
     created_count = 0
@@ -820,7 +820,7 @@ async def init_intelligence_dealers(session) -> int:
     情报贩子提供：当天本集群及临近城市物价对比、跑商利润建议
     """
     from ..models.npc import NPC, NPCType
-    from ..economy.merchants import MARKETS
+    from ..economy.merchant_service import MARKETS
 
     npc_service = NPCService(session)
     created_count = 0

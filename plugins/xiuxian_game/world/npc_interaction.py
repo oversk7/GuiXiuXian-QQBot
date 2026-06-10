@@ -406,8 +406,8 @@ async def handle_social_agent_interaction(session, player: Player, npc, event: M
 
 async def handle_intelligence_dealer_interaction(session, player: Player, npc, event: MessageEvent):
     """处理情报贩子NPC交互 - 显示本集群物价对比和跑商建议"""
-    from ..economy.merchants import MARKETS, CITY_CLUSTERS, CITY_TO_CLUSTER
-    from ..economy.merchants import _price_for, LIMITED_GOODS
+    from ..economy.merchant_service import MARKETS, CITY_CLUSTERS, CITY_TO_CLUSTER
+    from ..economy.merchant_service import _price_for, LIMITED_GOODS
     from ..models.market_state import MarketState
     from ..config import config as game_config
 
@@ -496,7 +496,7 @@ async def handle_intelligence_dealer_interaction(session, player: Player, npc, e
 
 async def handle_station_master_interaction(session, player: Player, npc, event: MessageEvent):
     """处理驿丞NPC交互 - 显示本城信息、NPC列表、集群导航"""
-    from ..economy.merchants import MARKETS, MARKET_BY_COORD, CITY_CLUSTERS, CITY_TO_CLUSTER
+    from ..economy.merchant_service import MARKETS, MARKET_BY_COORD, CITY_CLUSTERS, CITY_TO_CLUSTER
     from ..utils_markdown import cmd
     from sqlalchemy import select as sa_select
 

@@ -574,7 +574,7 @@ class MansionService:
             (是否可以建造, 错误信息)
         """
         # 导入市集和总部坐标
-        from ..economy.merchants import MARKETS, HEADQUARTERS_COORD
+        from ..economy.merchant_service import MARKETS, HEADQUARTERS_COORD
 
         min_distance = 20  # 最小距离限制
 
