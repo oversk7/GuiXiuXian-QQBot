@@ -12,6 +12,7 @@ from ..models.player import Player
 from ..models.inventory import ItemEffectType, ItemConfig, ItemInstance, ItemType
 # 从装备服务模块导入（已解耦，不再依赖命令层）
 from .equipment_service import recalc_equipment_attributes
+from ..domain.attributes.permanent_change import apply_permanent_change
 from ..models.elixir_usage import ElixirUsageLog
 from datetime import date, datetime, timedelta
 
@@ -196,11 +197,13 @@ async def _revive(player: Player, cfg: ItemConfig, qty: int, ctx: str, session=N
 @register(ItemEffectType.BUFF)
 async def _buff(player: Player, cfg: ItemConfig, qty: int, ctx: str, session=None) -> Tuple[bool, str]:
     """给玩家叠加永久属性，即使轮回依旧可以累积"""
+    if not session:
+        return False, "⛔ 系统错误：缺少数据库会话"
+
     attrs = cfg.effect_params or {}
     if not attrs:
         return False, "⛔ 该道具没有任何增益"
 
-    # 简单累加（效果不减弱）
     ATTRIBUTE_MAP = {
         "max_hp": "体",
         "max_mp": "智",
@@ -210,33 +213,14 @@ async def _buff(player: Player, cfg: ItemConfig, qty: int, ctx: str, session=Non
         "defense": "防",
     }
 
-    changed = []
-    actual_changes = {}
-    for k, v in attrs.items():
-        if not hasattr(player, k):
-            continue
-        delta = int(v) * qty
-        old = getattr(player, k)
-        setattr(player, k, old + delta)
-        actual_changes[k] = delta
-        changed.append(f"{ATTRIBUTE_MAP.get(k, k)}+{delta}")
+    deltas = {k: int(v) * qty for k, v in attrs.items() if hasattr(player, k)}
+    actual = await apply_permanent_change(
+        session, player, deltas, ledger_item_id=cfg.item_id, quantity=qty
+    )
 
-    # 属性发生变化后重新计算装备加成，确保百分比加成基于最新基础值
-    if session:
-        await _recalculate_equipment_bonus(session, player)
-
-    # 使用新上限修正当前血量/理智值
-    if player.hp > player.max_hp:
-        player.hp = player.max_hp
-    if player.mp > player.max_mp:
-        player.mp = player.max_mp
-
-    # 更新使用记录
-    if session:
-        await update_elixir_usage(session, player, cfg, qty, attribute_changes=actual_changes)
-
-    if not changed:
+    if not actual:
         return False, "⛔ 增益属性无效"
+    changed = [f"{ATTRIBUTE_MAP.get(k, k)}+{v}" for k, v in actual.items()]
     return True, f"✨ 获得增益：{', '.join(changed)}"
 
 
@@ -392,7 +376,7 @@ async def _buff_percent(player: Player, cfg: ItemConfig, qty: int, ctx: str, ses
     }
 
     changed = []
-    actual_changes = {}
+    deltas = {}
     for k, v in attrs.items():
         if k.endswith("_pct") and hasattr(player, k.replace("_pct", "")):
             attr_name = k.replace("_pct", "")
@@ -402,24 +386,14 @@ async def _buff_percent(player: Player, cfg: ItemConfig, qty: int, ctx: str, ses
             increase = int(old_value * percent * qty)
             if increase == 0 and percent > 0:
                 increase = 1  # 至少增加1点
-            new_value = old_value + increase
-            setattr(player, attr_name, new_value)
-            actual_changes[attr_name] = increase
+            deltas[attr_name] = increase
             changed.append(f"{ATTRIBUTE_MAP.get(attr_name, attr_name)}+{increase}({int(float(v)*qty)}%)")
 
-    # 属性发生变化后重新计算装备加成
-    await _recalculate_equipment_bonus(session, player)
+    actual = await apply_permanent_change(
+        session, player, deltas, ledger_item_id=cfg.item_id, quantity=qty
+    )
 
-    # 使用新上限修正当前血量/理智值
-    if player.hp > player.max_hp:
-        player.hp = player.max_hp
-    if player.mp > player.max_mp:
-        player.mp = player.max_mp
-
-    # 更新使用记录
-    await update_elixir_usage(session, player, cfg, qty, attribute_changes=actual_changes)
-
-    if not changed:
+    if not actual:
         return False, "⛔ 增益属性无效"
     return True, f"✨ 获得永久增益：{', '.join(changed)}"
 
@@ -663,26 +637,16 @@ async def _reforge_attr(player: Player, cfg: ItemConfig, qty: int, ctx: str, ses
     if base_value_int - convert_amount < min_value:
         return False, f"⛔ {attr_name}过低，无法继续洗髓（至少需保留{min_value}点）"
 
-    # 扣除源属性
-    setattr(player, source_attr, current_value - convert_amount)
+    # 扣除源属性（统一写入口：改字段+记负账+装备重算+hp/mp收口）
+    await apply_permanent_change(
+        session, player, {source_attr: -convert_amount},
+        ledger_item_id=cfg.item_id, quantity=qty,
+    )
 
     # 增加可分配属性点
     player.attribute_points += points_gain
 
     gain_display = points_gain
-
-    # 如果是生命或理智上限，需要调整当前值
-    if source_attr == "max_hp" and player.hp > player.max_hp:
-        player.hp = player.max_hp
-    elif source_attr == "max_mp" and player.mp > player.max_mp:
-        player.mp = player.max_mp
-
-    # 重新计算装备加成
-    await _recalculate_equipment_bonus(session, player)
-
-    # 更新使用记录（洗髓记录为负值）
-    await update_elixir_usage(session, player, cfg, qty,
-                              attribute_changes={source_attr: -convert_amount})
 
     return True, (
         f"🔄 洗髓成功！\n"
@@ -815,23 +779,20 @@ async def _reforge_multi_attr(player: Player, cfg: ItemConfig, qty: int, ctx: st
             result_lines.append(f"⚠️ {attr_name}过低，跳过")
             continue
 
-        setattr(player, source_attr, current_value - convert_amount)
         total_points += points_gain
         multi_actual_changes[source_attr] = multi_actual_changes.get(source_attr, 0) - convert_amount
-
-        if source_attr == "max_hp" and player.hp > player.max_hp:
-            player.hp = player.max_hp
-        elif source_attr == "max_mp" and player.mp > player.max_mp:
-            player.mp = player.max_mp
 
         result_lines.append(f"{attr_name} -{convert_amount}（{int(percent * qty)}%）→ 属性点 +{points_gain}")
 
     if total_points == 0:
         return False, "⛔ 无法洗髓：所有属性值均不足"
 
+    # 统一写入口：改字段+记负账+装备重算+hp/mp收口
+    await apply_permanent_change(
+        session, player, multi_actual_changes,
+        ledger_item_id=cfg.item_id, quantity=qty,
+    )
     player.attribute_points += total_points
-    await _recalculate_equipment_bonus(session, player)
-    await update_elixir_usage(session, player, cfg, qty, attribute_changes=multi_actual_changes)
 
     detail = "\n".join(result_lines)
     return True, (
@@ -887,21 +848,6 @@ async def _reset_attr(player: Player, cfg: ItemConfig, qty: int, ctx: str, sessi
     )
     result = await reset_service.execute(player, cfg, qty, str(ctx))
     return result.success, result.message
-async def _recalculate_equipment_bonus(session, player: Player):
-    """重新计算装备持久化加成，确保百分比加成与最新基础属性同步"""
-    if not session:
-        return
-
-    # 新版本: 使用DI架构的EquipmentService
-    from ..infrastructure.repositories.item_repository import ItemRepository
-    from ..infrastructure.repositories.player_repository import PlayerRepository
-    from .equipment_service import EquipmentService
-
-    equipment_service = EquipmentService(
-        item_repo=ItemRepository(session),
-        player_repo=PlayerRepository(session)
-    )
-    await equipment_service.recalc_equipment_attributes(player)
 @register(ItemEffectType.EXPAND_TERRITORY)
 async def _expand_territory(player: Player, cfg: ItemConfig, qty: int, ctx: object, session=None) -> Tuple[bool, str]:
     """扩张公会势力范围 - 这个效果需要特殊处理，因为需要修改Guild对象"""
@@ -1348,5 +1294,12 @@ async def _permanent_attr_vip(player: Player, cfg: ItemConfig, qty: int, ctx: st
         changed.append(f"{cn_name}+{total_add}")
 
     session.add(vip_bonus)
+
+    # 基础属性变化后重算装备加成，并收口 hp/mp（此前缺失）
+    await recalc_equipment_attributes(session, player)
+    if player.hp > player.max_hp:
+        player.hp = player.max_hp
+    if player.mp > player.max_mp:
+        player.mp = player.max_mp
 
     return True, f"✨ 永久属性提升（轮回后保留）：{', '.join(changed)}"

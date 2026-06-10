@@ -182,7 +182,7 @@ async def handle_choice(event: MessageEvent):
             return
         
         # 处理选择
-        success, message, next_node = story_engine.process_choice(story_session, player, choice_id)
+        success, message, next_node = await story_engine.process_choice(story_session, player, choice_id, session=session)
         
         if not success:
             await choice_handler.finish(message_add_head(f"❌ {message}", event))
@@ -250,7 +250,7 @@ async def handle_continue(event: MessageEvent):
         # 应用当前节点的效果
         variables = story_session.get_variables()
         if "effects" in current_node:
-            player, variables = story_engine.apply_effects(current_node["effects"], player, variables)
+            player, variables = await story_engine.apply_effects(current_node["effects"], player, variables, session=session)
             story_session.set_variables(variables)
 
         # 使用条件跳转解析下一个节点

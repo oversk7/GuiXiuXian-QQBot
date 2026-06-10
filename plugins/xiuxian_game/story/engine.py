@@ -192,19 +192,36 @@ class StoryEngine:
         # 无效格式或没有匹配的条件
         return None
     
-    def apply_effects(self, effects: Dict[str, Any], player: Player, variables: Dict[str, Any]) -> Tuple[Player, Dict[str, Any]]:
-        """应用效果到玩家和变量"""
+    async def apply_effects(self, effects: Dict[str, Any], player: Player, variables: Dict[str, Any], session=None) -> Tuple[Player, Dict[str, Any]]:
+        """应用效果到玩家和变量
+
+        永久属性（Player.INIT_ATTRS 内的字段，如 luck）走统一写入口记账，
+        其余字段（hp/gold/exp 等过程量）直接修改。
+        """
         # 应用玩家属性变化
         if "player" in effects:
+            permanent_deltas = {}
             for attr, change in effects["player"].items():
                 current_value = getattr(player, attr, 0)
                 if isinstance(change, str) and change.startswith(("+", "-")):
                     # 相对变化
-                    delta = int(change)
-                    setattr(player, attr, current_value + delta)
+                    new_value = current_value + int(change)
                 else:
                     # 绝对值
-                    setattr(player, attr, change)
+                    new_value = change
+                if session is not None and attr in Player.INIT_ATTRS:
+                    permanent_deltas[attr] = int(new_value) - int(current_value)
+                else:
+                    setattr(player, attr, new_value)
+            if permanent_deltas:
+                from ..domain.attributes.permanent_change import (
+                    LEDGER_STORY_REWARD,
+                    apply_permanent_change,
+                )
+                await apply_permanent_change(
+                    session, player, permanent_deltas,
+                    ledger_item_id=LEDGER_STORY_REWARD,
+                )
         
         # 应用变量变化
         if "variables" in effects:
@@ -332,7 +349,7 @@ class StoryEngine:
         
         return current_node
     
-    def process_choice(self, story_session: StorySession, player: Player, choice_id: int) -> Tuple[bool, str, Optional[Dict[str, Any]]]:
+    async def process_choice(self, story_session: StorySession, player: Player, choice_id: int, session=None) -> Tuple[bool, str, Optional[Dict[str, Any]]]:
         """处理玩家选择"""
         story = self.get_story(story_session.story_id)
         if not story:
@@ -361,7 +378,7 @@ class StoryEngine:
 
         # 应用选项效果
         if "effects" in selected_option:
-            player, variables = self.apply_effects(selected_option["effects"], player, variables)
+            player, variables = await self.apply_effects(selected_option["effects"], player, variables, session=session)
             story_session.set_variables(variables)
 
         # 使用条件跳转解析下一个节点
