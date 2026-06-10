@@ -852,7 +852,7 @@ async def _sweep_dungeon(player: Player, cfg: ItemConfig, qty: int, ctx: str, se
     from ..infrastructure.repositories.player_repository import PlayerRepository
     from ..infrastructure.repositories.item_repository import ItemRepository
     from .sweep_dungeon_service import SweepDungeonService
-    from .equipment_service_new import EquipmentService
+    from .equipment_service import EquipmentService
 
     sweep_service = SweepDungeonService(
         player_repo=PlayerRepository(session),
@@ -895,7 +895,7 @@ async def _recalculate_equipment_bonus(session, player: Player):
     # 新版本: 使用DI架构的EquipmentService
     from ..infrastructure.repositories.item_repository import ItemRepository
     from ..infrastructure.repositories.player_repository import PlayerRepository
-    from .equipment_service_new import EquipmentService
+    from .equipment_service import EquipmentService
 
     equipment_service = EquipmentService(
         item_repo=ItemRepository(session),

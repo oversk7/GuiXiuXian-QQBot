@@ -81,7 +81,7 @@ plugins/xiuxian_game/
 - 实例方法类
 - 通过构造函数注入Repository
 - 不内部commit,由外层UoW控制
-- 示例: `plugins/xiuxian_game/item/equipment_service_new.py:23-40`
+- 示例: `plugins/xiuxian_game/item/equipment_service.py:23-40`
 
 **统一入口**:
 - 顶层模块调用new版本

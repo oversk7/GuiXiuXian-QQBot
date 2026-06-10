@@ -11,6 +11,7 @@ from ..utils import message_add_head
 from .equipment_commands import find_equipment_by_input
 from ..world.location_service import LocationService
 from ..world.npc_service import NPCService
+from ..infrastructure.repositories.location_repository import LocationRepository
 from ..platform_utils import get_unified_player, require_player
 
 # ---------------- 指令：锻造列表 ----------------
@@ -28,9 +29,10 @@ async def _(event: MessageEvent):
             await list_craft_cmd.finish(message_add_head("⛔ 诡域中无法进行锻造相关操作", event))
         # 获取全图所有拥有锻造功能的城镇（不局限当前区域）
         from ..economy.merchants import MARKETS
+        location_service = LocationService(LocationRepository(session))
         forge_locs = []
         for m in MARKETS:
-            loc = await LocationService.get_location_by_coordinates(session, m.x, m.y, "大都会")
+            loc = await location_service.get_location_by_coordinates(m.x, m.y, "大都会")
             if loc and loc.has_function("forge"):
                 forge_locs.append(loc)
         if not forge_locs:
@@ -91,8 +93,8 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
 
     async with safe_session() as session:
         # 查找该城市的地点
-        location = await LocationService.get_location_by_coordinates(
-            session, target_market.x, target_market.y, "大都会"
+        location = await LocationService(LocationRepository(session)).get_location_by_coordinates(
+            target_market.x, target_market.y, "大都会"
         )
 
         if not location or not location.has_function("forge"):
@@ -294,11 +296,10 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
         if player.is_in_dungeon():
             await craft_cmd.finish(message_add_head("⛔ 诡域中无法锻造", event))
         # 校验是否在工匠工坊附近（≤3格），或位于已建铸器坊的公会基地
-        from ..world.location_service import LocationService
         from ..guild.guild_building_access import get_active_base_building_effects
         from ..models.guild import BuildingType
         x, y = player.get_current_coordinates()
-        near = await LocationService.get_nearby_locations(session, x, y, player.get_current_region(), max_distance=3)
+        near = await LocationService(LocationRepository(session)).get_nearby_locations(x, y, player.get_current_region(), max_distance=3)
         forge_locs = [loc for loc in (near or []) if loc.has_function("forge")]
         guild_forge_effects, guild_forge_name = await get_active_base_building_effects(
             session, player, BuildingType.ARTIFACT_FORGE

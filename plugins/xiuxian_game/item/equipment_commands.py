@@ -514,7 +514,7 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
 
             from ..infrastructure.repositories.item_repository import ItemRepository
             from ..infrastructure.repositories.player_repository import PlayerRepository
-            from .equipment_service_new import EquipmentService
+            from .equipment_service import EquipmentService
 
             equipment_service = EquipmentService(
                 item_repo=ItemRepository(session),
@@ -545,7 +545,7 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
             # 初始化装备服务（整个批次共用）
             from ..infrastructure.repositories.item_repository import ItemRepository
             from ..infrastructure.repositories.player_repository import PlayerRepository
-            from .equipment_service_new import EquipmentService
+            from .equipment_service import EquipmentService
 
             equipment_service = EquipmentService(
                 item_repo=ItemRepository(session),
@@ -743,7 +743,7 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
         # 新版本: 使用DI架构的EquipmentService
         from ..infrastructure.repositories.item_repository import ItemRepository
         from ..infrastructure.repositories.player_repository import PlayerRepository
-        from .equipment_service_new import EquipmentService
+        from .equipment_service import EquipmentService
 
         equipment_service = EquipmentService(
             item_repo=ItemRepository(session),
@@ -845,7 +845,7 @@ async def _(event: MessageEvent):
         # 新版本: 使用DI架构的EquipmentService
         from ..infrastructure.repositories.item_repository import ItemRepository
         from ..infrastructure.repositories.player_repository import PlayerRepository
-        from .equipment_service_new import EquipmentService
+        from .equipment_service import EquipmentService
 
         equipment_service = EquipmentService(
             item_repo=ItemRepository(session),

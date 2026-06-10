@@ -145,7 +145,7 @@ async def get_battle_attributes(player):
 
 **mp_from_hp特效** (百分比HP转MP):
 ```python
-from plugins.xiuxian_game.item.equipment_service_new import EquipmentService
+from plugins.xiuxian_game.item.equipment_service import EquipmentService
 
 async with UnitOfWork(session_factory) as uow:
     service = EquipmentService(uow.items, uow.players)

@@ -6,7 +6,7 @@ from nonebot.params import CommandArg
 import logging
 
 from ..models.db import safe_session
-from ..world.npc_service_new import NPCService
+from ..world.npc_service import NPCService
 from ..ai_guide import is_admin
 from ..config import config
 

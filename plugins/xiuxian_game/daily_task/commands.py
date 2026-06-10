@@ -10,8 +10,8 @@ from ..utils_markdown import cmd, build_markdown
 from ..platform_utils import require_player
 from .service import DailyTaskService
 from ..infrastructure.uow.unit_of_work import UnitOfWork
-from ..world.location_service_new import LocationService
-from ..world.npc_service_new import NPCService
+from ..world.location_service import LocationService
+from ..world.npc_service import NPCService
 from ..guild.guild_economy_service_new import GuildEconomyService
 import random
 from datetime import date

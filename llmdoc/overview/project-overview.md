@@ -57,7 +57,7 @@
 **关键文件**:
 - `plugins/xiuxian_game/battle/enhanced_engine.py` - 增强战斗引擎
 - `plugins/xiuxian_game/battle/battle_effects.py` - 战斗效果管理器
-- `plugins/xiuxian_game/item/equipment_service_new.py` - 装备服务
+- `plugins/xiuxian_game/item/equipment_service.py` - 装备服务
 
 ### 3.3 物品与材料系统 (Item & Material System)
 
@@ -235,7 +235,7 @@ plugins/xiuxian_game/
 │   └── battle_attributes.py     # 战斗属性计算
 │
 ├── item/                        # 物品系统
-│   ├── equipment_service_new.py # 装备服务(DI)
+│   ├── equipment_service.py     # 装备服务(DI)
 │   ├── equipment_upgrade_service.py  # 升阶服务
 │   ├── gem_socket_service.py    # 宝石镶嵌
 │   ├── item_effects.py          # 物品效果注册表
@@ -270,7 +270,7 @@ plugins/xiuxian_game/
 │   └── story_debugger.py        # 调试工具
 │
 ├── world/                       # 世界系统
-│   ├── npc_service_new.py       # NPC 服务
+│   ├── npc_service.py           # NPC 服务
 │   ├── dungeon_battle.py        # 诡域战斗
 │   └── weekly_theme.py          # 周主题系统
 │
@@ -302,8 +302,8 @@ plugins/xiuxian_game/
 
 **迁移策略**:
 - 保留旧版本确保稳定性,新版本以 `*_new.py` 命名并存
-- 逐步迁移调用方到 New 版本;旧版删除后把 `*_new.py` 改回正式命名(2026-06-10 已完成 15 个)
-- 仍新旧并存的 9 个(待迁移清单): economy/equipment_trade_service、economy/part_time_job_service、guild/guild_building_service、guild/guild_economy_service、guild/guild_facility_service、guild/guild_task_service、item/equipment_service、world/location_service、world/npc_service
+- 逐步迁移调用方到 New 版本;旧版删除后把 `*_new.py` 改回正式命名(2026-06-10 已完成 15 个 + item/equipment_service、world/location_service、world/npc_service 3 对合并)
+- 仍新旧并存的 6 个(待迁移清单): economy/equipment_trade_service、economy/part_time_job_service、guild/guild_building_service、guild/guild_economy_service、guild/guild_facility_service、guild/guild_task_service
 
 **已迁移模块**:
 - ✅ 公会核心服务

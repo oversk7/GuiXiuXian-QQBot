@@ -24,6 +24,7 @@ from ..battle.battle_markdown import build_battle_markdown
 from ..battle.battle_log_filter import filter_battle_log, get_player_log_mode
 from .location_service import LocationService
 from .npc_service import NPCService
+from ..infrastructure.repositories.location_repository import LocationRepository
 from ..player.realm_utils import realm_by_level_and_reincarnation
 from ..battle.integration_helper import BattleIntegrationHelper
 from ..config import config
@@ -281,7 +282,7 @@ async def handle_attack(event: MessageEvent, args: Message = CommandArg()):
             await handle_npc_attack(session, player, target_npc, event)
         else:
             # 检查是否有多个匹配结果
-            location = await LocationService.get_location_by_coordinates(session, current_x, current_y, current_region)
+            location = await LocationService(LocationRepository(session)).get_location_by_coordinates(current_x, current_y, current_region)
             if location:
                 possible_npcs = await find_npc_by_smart_match(session, args_text, location.id)
                 if len(possible_npcs) > 1:
@@ -411,11 +412,11 @@ async def parse_attack_target(session, target_name: str, x: int, y: int, region:
 
         # 如果没找到玩家，查找NPC
         if not target_player:
-            location = await LocationService.get_location_by_coordinates(session, x, y, region)
+            location = await LocationService(LocationRepository(session)).get_location_by_coordinates(x, y, region)
             if location:
                 # 先尝试精确匹配
                 try:
-                    target_npc = await NPCService.get_npc_by_name(session, target_name, location.id)
+                    target_npc = await NPCService(session).get_npc_by_name(target_name, location.id)
                 except Exception as e:
                     # 捕获MultipleResultsFound异常（多个重名NPC）
                     # 这种情况下直接进入智能匹配逻辑

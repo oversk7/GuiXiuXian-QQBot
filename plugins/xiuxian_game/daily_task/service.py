@@ -10,8 +10,8 @@ from ..models.player import Player
 from ..models.daily_task import DailyTask, TaskType, TaskStatus
 from ..models.npc import NPC, NPCType
 from ..infrastructure.repositories.daily_task_repository import DailyTaskRepository
-from ..world.location_service_new import LocationService
-from ..world.npc_service_new import NPCService
+from ..world.location_service import LocationService
+from ..world.npc_service import NPCService
 from ..guild.guild_economy_service_new import GuildEconomyService
 
 

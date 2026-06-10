@@ -13,6 +13,7 @@ from ..models.player import Player
 from ..utils_markdown import cmd, build_markdown
 from .location_service import LocationService
 from .npc_service import NPCService
+from ..infrastructure.repositories.location_repository import LocationRepository
 from ..cultivate.mansion_service import MansionService
 
 # ==================== Feature Flag ====================
@@ -46,15 +47,16 @@ async def handle_real_world_explore(event: MessageEvent):
             return
         
         # 检查并复活NPC
-        await NPCService.check_and_respawn_npcs(session)
-        
+        await NPCService(session).check_and_respawn_npcs()
+
         # 获取当前位置信息
         current_x, current_y = player.get_current_coordinates()
         current_region = player.get_current_region()
-        
+
         # 查找当前位置的地点
-        location = await LocationService.get_location_by_coordinates(
-            session, current_x, current_y, current_region
+        location_service = LocationService(LocationRepository(session))
+        location = await location_service.get_location_by_coordinates(
+            current_x, current_y, current_region
         )
         
         # 检查新手任务（在显示位置信息之前）
@@ -73,12 +75,14 @@ async def handle_real_world_explore(event: MessageEvent):
 
 async def show_location_info(session: AsyncSession, player: Player, location, current_x: int, current_y: int, event: MessageEvent, quest_msg: str = None):
     """显示地点详细信息"""
+    location_service = LocationService(LocationRepository(session))
+
     # 获取地点摘要
-    location_summary = await LocationService.get_location_summary(session, location)
+    location_summary = await location_service.get_location_summary(location)
 
     # 获取附近玩家
-    nearby_players = await LocationService.get_nearby_players(
-        session, location.x, location.y, location.region,
+    nearby_players = await location_service.get_nearby_players(
+        location.x, location.y, location.region,
         max_distance=0, exclude_player_id=player.id, server_id=player.server_id  # 只显示同一坐标的玩家
     )
 
@@ -117,14 +121,16 @@ async def show_location_info(session: AsyncSession, player: Player, location, cu
 async def show_basic_location_info(session: AsyncSession, player: Player, x: int, y: int,
                                  region: str, event: MessageEvent, quest_msg: str = None):
     """显示基本位置信息（没有特殊地点时）"""
+    location_service = LocationService(LocationRepository(session))
+
     # 获取附近玩家
-    nearby_players = await LocationService.get_nearby_players(
-        session, x, y, region, max_distance=3, exclude_player_id=player.id, server_id=player.server_id
+    nearby_players = await location_service.get_nearby_players(
+        x, y, region, max_distance=3, exclude_player_id=player.id, server_id=player.server_id
     )
-    
+
     # 获取附近地点
-    nearby_locations = await LocationService.get_nearby_locations(
-        session, x, y, region, max_distance=50
+    nearby_locations = await location_service.get_nearby_locations(
+        x, y, region, max_distance=50
     )
 
     # 获取附近的阴宅
@@ -347,15 +353,16 @@ async def handle_location_detail(event: MessageEvent):
         current_x, current_y = player.get_current_coordinates()
         current_region = player.get_current_region()
         
-        location = await LocationService.get_location_by_coordinates(
-            session, current_x, current_y, current_region
+        location_service = LocationService(LocationRepository(session))
+        location = await location_service.get_location_by_coordinates(
+            current_x, current_y, current_region
         )
-        
+
         if not location:
             await location_detail_cmd.finish("⛔ 当前位置没有特殊地点")
-        
+
         # 获取地点详细信息
-        location_summary = await LocationService.get_location_summary(session, location)
+        location_summary = await location_service.get_location_summary(location)
         npcs_by_type = location_summary["npcs_by_type"]
         functions = location_summary["functions"]
         

@@ -16,6 +16,7 @@ from ..models.npc import NPC, NPCType
 from ..utils import message_add_head
 from .location_service import LocationService
 from .npc_service import NPCService
+from ..infrastructure.repositories.location_repository import LocationRepository
 
 # 使用DI架构的NPCService和LocationService
 
@@ -77,17 +78,16 @@ async def handle_npc_interaction(event: MessageEvent, args: Message = CommandArg
             await interact_cmd.finish("⛔ 你在诡域中，无法与现实世界的NPC交互")
 
         # 初始化NPC服务
-        from ..infrastructure.repositories.npc_repository import NPCRepository
-        from .npc_service_new import NPCService as NPCServiceNew
-        npc_service = NPCServiceNew(session=session, npc_repo=NPCRepository(session))
+        npc_service = NPCService(session)
 
         # 获取当前位置
         current_x, current_y = player.get_current_coordinates()
         current_region = player.get_current_region()
 
         # 查找当前位置的地点
-        location = await LocationService.get_location_by_coordinates(
-        session, current_x, current_y, current_region
+        location_service = LocationService(LocationRepository(session))
+        location = await location_service.get_location_by_coordinates(
+            current_x, current_y, current_region
         )
 
         if not location:
@@ -692,15 +692,16 @@ async def handle_npc_list(event: MessageEvent):
         current_region = player.get_current_region()
 
         # 查找当前位置的地点
-        location = await LocationService.get_location_by_coordinates(
-            session, current_x, current_y, current_region
+        location_service = LocationService(LocationRepository(session))
+        location = await location_service.get_location_by_coordinates(
+            current_x, current_y, current_region
         )
 
         if not location:
             await npc_list_cmd.finish("⛔ 当前位置没有NPC")
 
         # 获取地点的NPC
-        npcs = await NPCService.get_npcs_by_location(session, location.id, include_dead=True)
+        npcs = await NPCService(session).get_npcs_by_location(location.id, include_dead=True)
 
         if not npcs:
             await npc_list_cmd.finish("⛔ 当前地点没有NPC")

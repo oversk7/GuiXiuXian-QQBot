@@ -24,8 +24,8 @@ from ..utils_markdown import cmd, build_markdown
 from ..models.navigation_task import NavigationTask
 from ..platform_utils import get_unified_player
 from ..infrastructure.uow.unit_of_work import UnitOfWork
-from .location_service_new import LocationService
-from .npc_service_new import NPCService
+from .location_service import LocationService
+from .npc_service import NPCService
 
 # ----------------- 持久化模型 -----------------
 
@@ -212,11 +212,11 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
             arrival_msg += "发送【导航】可开启新导航"
 
             # 检查到达位置是否有地点，记录访问并检查成就
-            from .location_service import LocationService
+            from ..infrastructure.repositories.location_repository import LocationRepository
             from ..achievement.achievement_service import AchievementService
 
-            location = await LocationService.get_location_by_coordinates(
-                session, target_x, target_y, player.get_current_region()
+            location = await LocationService(LocationRepository(session)).get_location_by_coordinates(
+                target_x, target_y, player.get_current_region()
             )
 
             if location:
@@ -341,7 +341,7 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
                 await nav_cmd.finish("⛔ 请输入地点名称或坐标\n💡 示例：导航 上京 或 导航 100 200")
 
             # 导入LocationService
-            from .location_service_new import LocationService
+            from .location_service import LocationService
             from ..infrastructure.repositories.location_repository import LocationRepository
 
             # 实例化LocationService

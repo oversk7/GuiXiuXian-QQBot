@@ -20,6 +20,7 @@ from ..models.npc import NPC, NPCType
 from ..utils import message_add_head
 from .location_service import LocationService
 from .npc_service import NPCService
+from ..infrastructure.repositories.location_repository import LocationRepository
 
 
 # ==================== 初始化命令 ====================
@@ -92,6 +93,8 @@ async def init_market_locations(session) -> int:
     """初始化/同步市集地点和商人NPC（支持坐标更新和新城市创建）"""
     from ..economy.merchants import MARKETS
 
+    location_service = LocationService(LocationRepository(session))
+    npc_service = NPCService(session)
     created_count = 0
 
     # 收集当前配置的所有城市名
@@ -123,8 +126,8 @@ async def init_market_locations(session) -> int:
             location.add_function("market", market_config)
         else:
             # 再按坐标查找（兜底）
-            existing_by_coord = await LocationService.get_location_by_coordinates(
-                session, market.x, market.y, "大都会"
+            existing_by_coord = await location_service.get_location_by_coordinates(
+                market.x, market.y, "大都会"
             )
             if existing_by_coord:
                 location = existing_by_coord
@@ -153,11 +156,11 @@ async def init_market_locations(session) -> int:
         merchant_name = f"商人{_get_merchant_name(market.name)}"
         merchant_npc_id = f"merchant_{market.id}"
 
-        existing_merchant_by_name = await NPCService.get_npc_by_name(
-            session, merchant_name, location.id
+        existing_merchant_by_name = await npc_service.get_npc_by_name(
+            merchant_name, location.id
         )
-        existing_merchant_by_id = await NPCService.get_npc_by_id(
-            session, merchant_npc_id
+        existing_merchant_by_id = await npc_service.get_npc_by_id(
+            merchant_npc_id
         )
 
         if not existing_merchant_by_name and not existing_merchant_by_id:
@@ -194,6 +197,8 @@ async def init_job_locations(session) -> int:
     """初始化/同步打工地点和雇主NPC（支持坐标更新和新地点创建）"""
     from ..economy.part_time_job_service import PartTimeJobService
 
+    location_service = LocationService(LocationRepository(session))
+    npc_service = NPCService(session)
     created_count = 0
 
     for location_id, location_data in PartTimeJobService.JOB_LOCATIONS.items():
@@ -221,8 +226,8 @@ async def init_job_locations(session) -> int:
             location.add_function("part_time_job", job_config)
         else:
             # 再按坐标查找（兜底）
-            existing_by_coord = await LocationService.get_location_by_coordinates(
-                session, location_data['x'], location_data['y'], "大都会"
+            existing_by_coord = await location_service.get_location_by_coordinates(
+                location_data['x'], location_data['y'], "大都会"
             )
             if existing_by_coord:
                 location = existing_by_coord
@@ -252,11 +257,11 @@ async def init_job_locations(session) -> int:
         employer_name = f"雇主{_get_employer_name(location_data['name'])}"
         employer_npc_id = f"employer_{location_id}"
 
-        existing_employer_by_name = await NPCService.get_npc_by_name(
-            session, employer_name, location.id
+        existing_employer_by_name = await npc_service.get_npc_by_name(
+            employer_name, location.id
         )
-        existing_employer_by_id = await NPCService.get_npc_by_id(
-            session, employer_npc_id
+        existing_employer_by_id = await npc_service.get_npc_by_id(
+            employer_npc_id
         )
 
         if not existing_employer_by_name and not existing_employer_by_id:
@@ -359,12 +364,14 @@ async def init_workshop_locations(session) -> int:
         }
         return name_map.get(city_name, f"工匠{city_name}")
 
+    location_service = LocationService(LocationRepository(session))
+    npc_service = NPCService(session)
     created_count = 0
 
     for m in MARKETS:
         # 查找城市对应地点（市集地点已在 init_market_locations 中创建/补齐）
-        existing_location = await LocationService.get_location_by_coordinates(
-            session, m.x, m.y, "大都会"
+        existing_location = await location_service.get_location_by_coordinates(
+            m.x, m.y, "大都会"
         )
         if not existing_location:
             # 若异常缺失，则跳过该城市
@@ -393,11 +400,11 @@ async def init_workshop_locations(session) -> int:
         craftsman_name = _get_craftsman_name_by_city(m.name)
         craftsman_npc_id = f"craftsman_{m.id}"
 
-        existing_craftsman_by_name = await NPCService.get_npc_by_name(
-            session, craftsman_name, existing_location.id
+        existing_craftsman_by_name = await npc_service.get_npc_by_name(
+            craftsman_name, existing_location.id
         )
-        existing_craftsman_by_id = await NPCService.get_npc_by_id(
-            session, craftsman_npc_id
+        existing_craftsman_by_id = await npc_service.get_npc_by_id(
+            craftsman_npc_id
         )
 
         if not existing_craftsman_by_name and not existing_craftsman_by_id:
@@ -479,12 +486,13 @@ async def handle_refresh_workshops(event: MessageEvent, args: Message = CommandA
 
 
             from ..models.location import Location
+            location_service = LocationService(LocationRepository(session))
             updated = 0
             created_forge = 0
 
             for m in MARKETS:
                 # 查找城市地点
-                loc = await LocationService.get_location_by_coordinates(session, m.x, m.y, "大都会")
+                loc = await location_service.get_location_by_coordinates(m.x, m.y, "大都会")
                 if not loc:
                     continue
 
@@ -531,6 +539,8 @@ async def init_special_locations(session) -> int:
     # 缉邪司总部
     from ..economy.merchants import HEADQUARTERS_COORD
 
+    location_service = LocationService(LocationRepository(session))
+    npc_service = NPCService(session)
     created_count = 0
 
     # 查找缉邪司总部地点（优先按名称匹配）
@@ -543,8 +553,8 @@ async def init_special_locations(session) -> int:
 
     if not existing_by_name:
         # 再按坐标查找
-        existing_by_name = await LocationService.get_location_by_coordinates(
-            session, HEADQUARTERS_COORD[0], HEADQUARTERS_COORD[1], "大都会"
+        existing_by_name = await location_service.get_location_by_coordinates(
+            HEADQUARTERS_COORD[0], HEADQUARTERS_COORD[1], "大都会"
         )
 
     if not existing_by_name:
@@ -580,11 +590,11 @@ async def init_special_locations(session) -> int:
     admin_name = "司长曹延华"
     admin_npc_id = "headquarters_admin"
 
-    existing_admin_by_name = await NPCService.get_npc_by_name(
-        session, admin_name, location.id
+    existing_admin_by_name = await npc_service.get_npc_by_name(
+        admin_name, location.id
     )
-    existing_admin_by_id = await NPCService.get_npc_by_id(
-        session, admin_npc_id
+    existing_admin_by_id = await npc_service.get_npc_by_id(
+        admin_npc_id
     )
 
     if not existing_admin_by_name and not existing_admin_by_id:
@@ -616,12 +626,13 @@ async def init_social_npcs(session) -> int:
     from ..models.npc import NPC, NPCType
     from ..economy.merchants import MARKETS
 
+    npc_service = NPCService(session)
     created_count = 0
 
     # 清理旧版社交NPC（从上京迁出）
     old_npc_ids = ["matchmaker_shangjing", "sworn_envoy_shangjing", "mentor_envoy_shangjing"]
     for old_id in old_npc_ids:
-        old_npc = await NPCService.get_npc_by_id(session, old_id)
+        old_npc = await npc_service.get_npc_by_id(old_id)
         if old_npc:
             await session.delete(old_npc)
 
@@ -641,7 +652,7 @@ async def init_social_npcs(session) -> int:
         if not linan_loc.has_function("social"):
             linan_loc.add_function("social", {"enabled": True})
         matchmaker_id = "matchmaker_linan"
-        existing = await NPCService.get_npc_by_id(session, matchmaker_id)
+        existing = await npc_service.get_npc_by_id(matchmaker_id)
         if not existing:
             npc = NPC(
                 npc_id=matchmaker_id,
@@ -662,7 +673,7 @@ async def init_social_npcs(session) -> int:
         if not changan_loc.has_function("social"):
             changan_loc.add_function("social", {"enabled": True})
         sworn_id = "sworn_envoy_changan"
-        existing = await NPCService.get_npc_by_id(session, sworn_id)
+        existing = await npc_service.get_npc_by_id(sworn_id)
         if not existing:
             npc = NPC(
                 npc_id=sworn_id,
@@ -683,7 +694,7 @@ async def init_social_npcs(session) -> int:
         if not jinling_loc.has_function("social"):
             jinling_loc.add_function("social", {"enabled": True})
         mentor_id = "mentor_envoy_jinling"
-        existing = await NPCService.get_npc_by_id(session, mentor_id)
+        existing = await npc_service.get_npc_by_id(mentor_id)
         if not existing:
             npc = NPC(
                 npc_id=mentor_id,
@@ -718,7 +729,7 @@ async def init_social_npcs(session) -> int:
             loc.add_function("social", {"enabled": True})
 
         agent_npc_id = f"social_agent_{city_name}"
-        existing = await NPCService.get_npc_by_id(session, agent_npc_id)
+        existing = await npc_service.get_npc_by_id(agent_npc_id)
         if not existing:
             npc = NPC(
                 npc_id=agent_npc_id,
@@ -748,6 +759,7 @@ async def init_station_masters(session) -> int:
     from ..models.npc import NPC, NPCType
     from ..economy.merchants import MARKETS
 
+    npc_service = NPCService(session)
     created_count = 0
 
     station_master_names = {
@@ -782,7 +794,7 @@ async def init_station_masters(session) -> int:
             continue
 
         npc_id = f"station_master_{market.name}"
-        existing = await NPCService.get_npc_by_id(session, npc_id)
+        existing = await npc_service.get_npc_by_id(npc_id)
         if not existing:
             npc_name = station_master_names.get(market.name, f"驿丞·{market.name}驿")
             npc = NPC(
@@ -810,6 +822,7 @@ async def init_intelligence_dealers(session) -> int:
     from ..models.npc import NPC, NPCType
     from ..economy.merchants import MARKETS
 
+    npc_service = NPCService(session)
     created_count = 0
 
     # 有情报贩子的城市及其名称
@@ -840,7 +853,7 @@ async def init_intelligence_dealers(session) -> int:
             continue
 
         npc_id = f"intel_dealer_{market.name}"
-        existing = await NPCService.get_npc_by_id(session, npc_id)
+        existing = await npc_service.get_npc_by_id(npc_id)
         if not existing:
             npc = NPC(
                 npc_id=npc_id,
@@ -944,7 +957,8 @@ async def handle_migrate_data(event: MessageEvent):
     try:
         async with safe_session() as session:
             # 迁移打工地点数据
-            migrated_count = await LocationService.migrate_from_job_locations(session)
+            location_service = LocationService(LocationRepository(session))
+            migrated_count = await location_service.migrate_from_job_locations(session)
 
             await session.commit()
 
@@ -971,11 +985,13 @@ async def handle_cleanup_npcs(event: MessageEvent):
     """清理过期的动态NPC"""
     try:
         async with safe_session() as session:
+            npc_service = NPCService(session)
+
             # 检查并复活NPC
-            respawned_count = await NPCService.check_and_respawn_npcs(session)
+            respawned_count = await npc_service.check_and_respawn_npcs()
 
             # 清理过期的动态NPC
-            cleaned_count = await NPCService.cleanup_expired_dynamic_npcs(session, max_age_hours=24)
+            cleaned_count = await npc_service.cleanup_expired_dynamic_npcs(max_age_hours=24)
 
             await session.commit()
 

@@ -29,11 +29,11 @@
 
 ### 3.2 装备穿戴流程
 - **1. 穿戴装备**: `plugins/xiuxian_game/item/equipment_service.py:40-60`处理装备穿戴请求
-- **2. 移除旧加成**: `plugins/xiuxian_game/item/equipment_service_new.py:80-95`的recalc_equipment_attributes()移除旧装备的_persist_bonus
+- **2. 移除旧加成**: `plugins/xiuxian_game/item/equipment_service.py:80-95`的recalc_equipment_attributes()移除旧装备的_persist_bonus
 - **3. 获取基础属性**: 查询当前无装备加成的基础属性
-- **4. 应用新加成**: `plugins/xiuxian_game/item/equipment_service_new.py:100-120`调用apply_attr_bonus()计算delta并累加到player属性
-- **5. 处理特殊效果**: `plugins/xiuxian_game/item/equipment_service_new.py:125-140`的_apply_mp_from_hp_effects()处理mp_from_hp特效(百分比HP转MP)
-- **6. 确保血蓝上限**: `plugins/xiuxian_game/item/equipment_service_new.py:145-150`确保HP/MP不超过新上限
+- **4. 应用新加成**: `plugins/xiuxian_game/item/equipment_service.py:100-120`调用apply_attr_bonus()计算delta并累加到player属性
+- **5. 处理特殊效果**: `plugins/xiuxian_game/item/equipment_service.py:125-140`的_apply_mp_from_hp_effects()处理mp_from_hp特效(百分比HP转MP)
+- **6. 确保血蓝上限**: `plugins/xiuxian_game/item/equipment_service.py:145-150`确保HP/MP不超过新上限
 - **7. 提交事务**: UnitOfWork自动提交
 - **8. 失效缓存**: `plugins/xiuxian_game/domain/attributes/attribute_calculator_factory.py:50-55`的invalidate_buff_cache()使buff缓存失效(属性变化)
 

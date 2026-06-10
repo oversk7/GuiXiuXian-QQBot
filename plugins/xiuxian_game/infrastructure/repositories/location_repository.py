@@ -191,7 +191,8 @@ class LocationRepository(IRepository[Location]):
         y: int,
         region: str,
         max_distance: int,
-        exclude_id: str = None
+        exclude_id: str = None,
+        server_id: int = 1
     ) -> List[Player]:
         """
         获取附近的玩家（SQL排序）
@@ -202,12 +203,14 @@ class LocationRepository(IRepository[Location]):
             region: 所属区域
             max_distance: 最大曼哈顿距离
             exclude_id: 排除的玩家ID（通常是当前玩家）
+            server_id: 分服ID（多服分片隔离）
 
         Returns:
             玩家列表，按距离升序排序
         """
         conditions = [
             Player.region == region,
+            Player.server_id == server_id,
             func.abs(Player.x - x) + func.abs(Player.y - y) <= max_distance
         ]
 

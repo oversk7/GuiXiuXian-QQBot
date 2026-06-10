@@ -192,7 +192,7 @@ class ResetAttrService:
         # 1. 先移除刚刚应用的加成，再重新计算（结果一致）
         # 2. 额外处理 mp_from_hp/hp_from_attack 特效
         # 3. 确保 HP/MP 不超上限
-        from .equipment_service_new import EquipmentService
+        from .equipment_service import EquipmentService
         equipment_service = EquipmentService(
             item_repo=self._item_repo,
             player_repo=self._player_repo
