@@ -14,6 +14,20 @@ from ..models.db import safe_session
 from ..models.player import Player
 from ..utils import message_add_head
 from .part_time_job_service import PartTimeJobService
+from ..infrastructure.repositories.player_repository import PlayerRepository
+from ..infrastructure.repositories.part_time_job_repository import PartTimeJobRepository
+from ..infrastructure.repositories.job_location_repository import JobLocationRepository
+from ..infrastructure.repositories.player_job_stats_repository import PlayerJobStatsRepository
+
+
+def _build_service(session) -> PartTimeJobService:
+    """基于现有会话构建打工服务（复用调用方事务边界）"""
+    return PartTimeJobService(
+        player_repo=PlayerRepository(session),
+        part_time_job_repo=PartTimeJobRepository(session),
+        job_location_repo=JobLocationRepository(session),
+        player_job_stats_repo=PlayerJobStatsRepository(session),
+    )
 
 
 # 管理员命令：初始化打工系统
@@ -26,7 +40,7 @@ async def handle_init_part_time_job(event: MessageEvent):
     try:
         async with safe_session() as session:
             # 初始化工作地点
-            await PartTimeJobService.initialize_job_locations(session)
+            await _build_service(session).initialize_job_locations()
 
             result_msg = (
                 "✅ 打工系统初始化完成！\n"
@@ -52,7 +66,7 @@ async def handle_check_part_time_job(event: MessageEvent):
     """查看打工系统状态"""
     try:
         async with safe_session() as session:
-            locations = await PartTimeJobService.get_job_locations_list(session)
+            locations = await _build_service(session).get_job_locations_list()
 
             if not locations:
                 await check_part_time_job_cmd.finish("❌ 未找到工作地点，请先初始化系统")
@@ -93,7 +107,7 @@ async def handle_test_complete_job(event: MessageEvent):
         player = await require_player(session, event, test_complete_job_cmd)
 
         # 获取当前工作状态
-        success, msg, status = await PartTimeJobService.get_current_job_status(session, player)
+        success, msg, status = await _build_service(session).get_current_job_status(player)
 
         if not success:
             await test_complete_job_cmd.finish(f"❌ {msg}")

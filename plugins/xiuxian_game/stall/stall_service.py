@@ -332,8 +332,8 @@ async def _list_equipment_item(uow, stall, player, item_cfg, unit_price, equipme
     await session.flush()
 
     # 生成摘要
-    from ..economy.equipment_trade_service_new import EquipmentTradeService as ETS_New
-    summary = ETS_New.generate_instance_summary(equipment)
+    from ..economy.equipment_trade_service import EquipmentTradeService
+    summary = EquipmentTradeService.generate_instance_summary(equipment)
 
     si = StallItem(
         server_id=player.server_id,

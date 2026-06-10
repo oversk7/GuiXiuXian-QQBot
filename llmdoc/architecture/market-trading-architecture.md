@@ -8,7 +8,7 @@
 ## 2. 核心组件
 
 - `plugins/xiuxian_game/economy/market.py` (_try_auto_match, calculate_transaction_tax): 自动撮合引擎,执行买单/卖单匹配、物品转移、税收计算
-- `plugins/xiuxian_game/economy/equipment_trade_service_new.py` (EquipmentTradeService): 装备交易服务,处理装备实例的冻结、转移、所有权变更
+- `plugins/xiuxian_game/economy/equipment_trade_service.py` (EquipmentTradeService): 装备交易服务,处理装备实例的冻结、转移、所有权变更
 - `plugins/xiuxian_game/models/market_order.py` (MarketOrder, OrderSide): 统一订单模型,支持普通物品和装备实例交易
 - `plugins/xiuxian_game/infrastructure/repositories/item_repository.py` (ItemRepository): 物品仓储层,提供物品/装备的原子性转移操作
 - `plugins/xiuxian_game/infrastructure/repositories/market_order_repository.py` (MarketOrderRepository): 订单仓储层,管理订单的CRUD操作

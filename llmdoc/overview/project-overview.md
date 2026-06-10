@@ -302,8 +302,8 @@ plugins/xiuxian_game/
 
 **迁移策略**:
 - 保留旧版本确保稳定性,新版本以 `*_new.py` 命名并存
-- 逐步迁移调用方到 New 版本;旧版删除后把 `*_new.py` 改回正式命名(2026-06-10 已完成 15 个 + item/equipment_service、world/location_service、world/npc_service 3 对合并)
-- 仍新旧并存的 6 个(待迁移清单): economy/equipment_trade_service、economy/part_time_job_service、guild/guild_building_service、guild/guild_economy_service、guild/guild_facility_service、guild/guild_task_service
+- 逐步迁移调用方到 New 版本;旧版删除后把 `*_new.py` 改回正式命名(2026-06-10 已完成 15 个 + item/equipment_service、world/location_service、world/npc_service、economy/equipment_trade_service、economy/part_time_job_service 5 对合并)
+- 仍新旧并存的 4 个(待迁移清单): guild/guild_building_service、guild/guild_economy_service、guild/guild_facility_service、guild/guild_task_service
 
 **已迁移模块**:
 - ✅ 公会核心服务

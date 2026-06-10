@@ -57,9 +57,9 @@ async def handle_decompose(event: MessageEvent, args: Message = CommandArg()):
             return
 
         # 多件同名装备，显示选择列表
-        from ..economy.equipment_trade_service_new import EquipmentTradeService as ETSNew
+        from ..economy.equipment_trade_service import EquipmentTradeService
         ids = [eq.id for eq in matches]
-        summaries = [ETSNew.generate_instance_summary(eq) for eq in matches]
+        summaries = [EquipmentTradeService.generate_instance_summary(eq) for eq in matches]
 
         _decompose_selection_state[player.id] = {
             "ids": ids,

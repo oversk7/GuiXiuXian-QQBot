@@ -226,8 +226,7 @@ async def _handle_instance_auction_listing(
             await list_auction_cmd.finish(message_add_head(msg, event))
 
         # 多件：生成摘要，保存选择状态，展示列表
-        from ..economy.equipment_trade_service_new import EquipmentTradeService as ETSNew
-        summaries = [ETSNew.generate_instance_summary(e) for e in available]
+        summaries = [EquipmentTradeService.generate_instance_summary(e) for e in available]
         equipment_ids = [e.id for e in available]
 
         _cleanup_expired_auction_states()

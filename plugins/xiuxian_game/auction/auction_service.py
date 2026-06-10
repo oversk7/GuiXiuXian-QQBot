@@ -188,8 +188,7 @@ async def _list_equipment_auction(
     await session.flush()
 
     # 生成摘要
-    from ..economy.equipment_trade_service_new import EquipmentTradeService as ETS_New
-    summary = ETS_New.generate_instance_summary(equipment)
+    summary = EquipmentTradeService.generate_instance_summary(equipment)
 
     # 创建拍卖条目
     end_at = datetime.now() + timedelta(hours=duration_hours)

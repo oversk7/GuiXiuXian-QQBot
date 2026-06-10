@@ -24,10 +24,6 @@ from ..utils_markdown import cmd, build_markdown
 from .part_time_job_service import PartTimeJobService
 from ..platform_utils import require_player
 
-# ==================== Feature Flag ====================
-# 设置为True使用新版DI架构的PartTimeJobService，False使用旧版本
-# =====================================================
-
 
 # ==================== 命令定义 ====================
 
@@ -44,10 +40,8 @@ work_stats_cmd = on_command("打工统计", aliases={"工作统计"}, block=True
 @work_cmd.handle()
 async def handle_work(event: MessageEvent, args: Message = CommandArg()):
     """处理打工命令"""
-    # 新版本: 使用DI架构
     from ..infrastructure.uow.unit_of_work import UnitOfWork
     from ..models.db import AsyncSessionLocal
-    from .part_time_job_service_new import PartTimeJobService as PartTimeJobServiceNew
 
     quest_completed, quest_msg = False, None
 
@@ -59,7 +53,7 @@ async def handle_work(event: MessageEvent, args: Message = CommandArg()):
 
         args_text = args.extract_plain_text().strip()
 
-        part_time_job_service = PartTimeJobServiceNew(
+        part_time_job_service = PartTimeJobService(
             player_repo=uow.players,
             part_time_job_repo=uow.part_time_jobs,
             job_location_repo=uow.job_locations,
@@ -78,7 +72,7 @@ async def handle_work(event: MessageEvent, args: Message = CommandArg()):
 
             # 先尝试通过工作名称匹配
             job_type = None
-            for jtype, jconfig in PartTimeJobServiceNew.JOB_TYPES.items():
+            for jtype, jconfig in PartTimeJobService.JOB_TYPES.items():
                 if args_text in jconfig["name"] or args_text == jconfig["name"]:
                     job_type = jtype
                     break
@@ -149,9 +143,8 @@ async def handle_work(event: MessageEvent, args: Message = CommandArg()):
         # 记录操作
         record_action(event.get_user_id(), "start_work")
 
-        # 获取job_config（新旧版本都有JOB_TYPES）
-        from .part_time_job_service_new import PartTimeJobService as PartTimeJobServiceNew
-        job_config = PartTimeJobServiceNew.JOB_TYPES[job_type]
+        # 获取job_config
+        job_config = PartTimeJobService.JOB_TYPES[job_type]
         end_time_str = job.end_time.strftime("%H:%M")
 
         # 格式化工作时长显示
@@ -188,7 +181,6 @@ async def handle_finish_work(event: MessageEvent):
     """处理收工命令"""
     from ..infrastructure.uow.unit_of_work import UnitOfWork
     from ..models.db import AsyncSessionLocal
-    from .part_time_job_service_new import PartTimeJobService as PartTimeJobServiceNew
 
     def session_factory():
         return AsyncSessionLocal()
@@ -196,7 +188,7 @@ async def handle_finish_work(event: MessageEvent):
     async with UnitOfWork(session_factory) as uow:
         player = await require_player(uow.session, event, finish_work_cmd)
 
-        part_time_job_service = PartTimeJobServiceNew(
+        part_time_job_service = PartTimeJobService(
             player_repo=uow.players,
             part_time_job_repo=uow.part_time_jobs,
             job_location_repo=uow.job_locations,
@@ -215,13 +207,12 @@ async def handle_finish_work(event: MessageEvent):
     prof_name = prof.get('name', '学徒')
 
     # 从 service 中获取工作配置的原始 base_reward
-    from .part_time_job_service_new import PartTimeJobService as _PTJS
     _job_type_key = None
-    for k, v in _PTJS.JOB_TYPES.items():
+    for k, v in PartTimeJobService.JOB_TYPES.items():
         if v["name"] == result['job_name']:
             _job_type_key = k
             break
-    raw_base = _PTJS.JOB_TYPES[_job_type_key]["base_reward"] if _job_type_key else 0
+    raw_base = PartTimeJobService.JOB_TYPES[_job_type_key]["base_reward"] if _job_type_key else 0
 
     level_bonus = result.get('level_bonus', 0)
     luck_mult = result.get('luck_multiplier', 1.0)
@@ -290,8 +281,6 @@ async def handle_work_status(event: MessageEvent):
     """处理工作状态命令"""
     from ..infrastructure.uow.unit_of_work import UnitOfWork
     from ..models.db import AsyncSessionLocal
-    from .part_time_job_service_new import PartTimeJobService as PartTimeJobServiceNew
-    from ..platform_utils import require_player
 
     def session_factory():
         return AsyncSessionLocal()
@@ -299,7 +288,7 @@ async def handle_work_status(event: MessageEvent):
     async with UnitOfWork(session_factory) as uow:
         player = await require_player(uow.session, event, work_status_cmd)
 
-        part_time_job_service = PartTimeJobServiceNew(
+        part_time_job_service = PartTimeJobService(
             player_repo=uow.players,
             part_time_job_repo=uow.part_time_jobs,
             job_location_repo=uow.job_locations,
@@ -357,7 +346,6 @@ async def handle_work_locations(event: MessageEvent):
     """处理工作地点命令"""
     from ..infrastructure.uow.unit_of_work import UnitOfWork
     from ..models.db import AsyncSessionLocal
-    from .part_time_job_service_new import PartTimeJobService as PartTimeJobServiceNew
 
     def session_factory():
         return AsyncSessionLocal()
@@ -365,7 +353,7 @@ async def handle_work_locations(event: MessageEvent):
     async with UnitOfWork(session_factory) as uow:
         player = await require_player(uow.session, event, work_locations_cmd)
 
-        part_time_job_service = PartTimeJobServiceNew(
+        part_time_job_service = PartTimeJobService(
             player_repo=uow.players,
             part_time_job_repo=uow.part_time_jobs,
             job_location_repo=uow.job_locations,
@@ -395,7 +383,6 @@ async def handle_work_history(event: MessageEvent):
     """处理打工记录命令"""
     from ..infrastructure.uow.unit_of_work import UnitOfWork
     from ..models.db import AsyncSessionLocal
-    from .part_time_job_service_new import PartTimeJobService as PartTimeJobServiceNew
 
     def session_factory():
         return AsyncSessionLocal()
@@ -403,7 +390,7 @@ async def handle_work_history(event: MessageEvent):
     async with UnitOfWork(session_factory) as uow:
         player = await require_player(uow.session, event, work_history_cmd)
 
-        part_time_job_service = PartTimeJobServiceNew(
+        part_time_job_service = PartTimeJobService(
             player_repo=uow.players,
             part_time_job_repo=uow.part_time_jobs,
             job_location_repo=uow.job_locations,
@@ -443,7 +430,6 @@ async def handle_work_stats(event: MessageEvent):
     """处理打工统计命令"""
     from ..infrastructure.uow.unit_of_work import UnitOfWork
     from ..models.db import AsyncSessionLocal
-    from .part_time_job_service_new import PartTimeJobService as PartTimeJobServiceNew
 
     def session_factory():
         return AsyncSessionLocal()
@@ -451,7 +437,7 @@ async def handle_work_stats(event: MessageEvent):
     async with UnitOfWork(session_factory) as uow:
         player = await require_player(uow.session, event, work_stats_cmd)
 
-        part_time_job_service = PartTimeJobServiceNew(
+        part_time_job_service = PartTimeJobService(
             player_repo=uow.players,
             part_time_job_repo=uow.part_time_jobs,
             job_location_repo=uow.job_locations,
@@ -473,9 +459,7 @@ async def handle_work_stats(event: MessageEvent):
         f"🏆 最高连击：**{stats.max_streak}** 天"
     ]
 
-    # 获取JOB_TYPES（新旧版本都有）
-    from .part_time_job_service_new import PartTimeJobService as PartTimeJobServiceNew
-    job_types = PartTimeJobServiceNew.JOB_TYPES
+    job_types = PartTimeJobService.JOB_TYPES
     if stats.favorite_job_type and stats.favorite_job_type in job_types:
         fav_job = job_types[stats.favorite_job_type]
         lines.append(f"❤️ 偏好工作：**{fav_job['name']}**")
@@ -490,7 +474,7 @@ async def handle_work_stats(event: MessageEvent):
         for job_type, prof_data in sorted_profs[:5]:  # 最多显示5个
             if job_type in job_types:
                 count = prof_data.get("count", 0)
-                prof_info = PartTimeJobServiceNew.get_proficiency_level(count)
+                prof_info = PartTimeJobService.get_proficiency_level(count)
                 job_name = job_types[job_type]["name"]
                 job_emoji = job_types[job_type]["emoji"]
                 lines.append(f"  {job_emoji} {job_name}：{prof_info['icon']}{prof_info['name']}({count}次)")

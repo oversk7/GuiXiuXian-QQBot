@@ -15,6 +15,8 @@ from ..economy.market import (
     _compute_equipment_floor_price,
     _compute_item_floor_price,
 )
+from ..infrastructure.repositories.item_repository import ItemRepository
+from ..infrastructure.repositories.market_order_repository import MarketOrderRepository
 from ..models.db import safe_session
 from ..models.inventory import ItemInstance
 from ..models.market_order import MarketOrder, OrderSide
@@ -45,6 +47,9 @@ async def handle_cleanup(event: MessageEvent, args: Message = CommandArg()):
             await cleanup_cmd.finish("⛔ 倍数参数必须是不小于 1 的数字，如：清理异常挂牌 6")
 
     async with safe_session() as session:
+        trade_service = EquipmentTradeService(
+            ItemRepository(session), MarketOrderRepository(session)
+        )
         stmt = select(MarketOrder)
         orders = (await session.execute(stmt)).scalars().all()
 
@@ -119,13 +124,11 @@ async def handle_cleanup(event: MessageEvent, args: Message = CommandArg()):
 
                 if order.side == OrderSide.SELL:
                     if order.is_instance_trade:
-                        equipment = await EquipmentTradeService.get_equipment_by_instance_id(
-                            session, order.item_instance_id
+                        equipment = await trade_service.get_equipment_by_instance_id(
+                            order.item_instance_id
                         )
                         if equipment:
-                            await EquipmentTradeService.unfreeze_equipment(
-                                session, equipment
-                            )
+                            await trade_service.unfreeze_equipment(equipment)
                         else:
                             refund_issues.append("装备实例缺失，未解冻")
                     else:

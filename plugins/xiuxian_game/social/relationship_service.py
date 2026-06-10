@@ -329,16 +329,17 @@ class RelationshipService:
             return False, f"必须和{receiver.nickname}在同一坐标才能当面转移{type_name}\n你的位置: {sender_region}({sender_x},{sender_y})\n对方位置: {receiver_region}({receiver_x},{receiver_y})"
 
         # 4. 转移实例
-        success = await EquipmentTradeService.transfer_equipment(
-            self._uow.session, equipment, receiver.id
+        from ..infrastructure.repositories.market_order_repository import MarketOrderRepository
+        trade_service = EquipmentTradeService(
+            self._item_repo, MarketOrderRepository(self._uow.session)
         )
+        success = await trade_service.transfer_equipment(equipment, receiver.id)
 
         if not success:
             return False, "转移物品失败"
 
         # 5. 返回成功消息
-        from ..economy.equipment_trade_service_new import EquipmentTradeService as ETSNew
-        summary = ETSNew.generate_instance_summary(equipment)
+        summary = EquipmentTradeService.generate_instance_summary(equipment)
         type_name = "装备" if equipment.is_equipment else "铭文"
         return (
             True,

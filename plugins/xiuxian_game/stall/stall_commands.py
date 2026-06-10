@@ -198,8 +198,8 @@ async def _handle_stall_equipment_listing(event, item_cfg, unit_price):
             await list_item_cmd.finish(message_add_head(msg, event))
 
         # 多件：保存选择状态
-        from ..economy.equipment_trade_service_new import EquipmentTradeService as ETSNew
-        summaries = [ETSNew.generate_instance_summary(e) for e in available]
+        from ..economy.equipment_trade_service import EquipmentTradeService
+        summaries = [EquipmentTradeService.generate_instance_summary(e) for e in available]
         equipment_ids = [e.id for e in available]
 
         _cleanup_expired_stall_states()

@@ -18,8 +18,6 @@ from ..platform_utils import get_event_server_id, get_unified_player, require_pl
 
 from datetime import date, datetime, timedelta
 
-# 导入新版DI架构EquipmentTradeService
-from .equipment_trade_service_new import EquipmentTradeService as EquipmentTradeServiceNew
 from ..infrastructure.repositories.item_repository import ItemRepository
 from ..infrastructure.repositories.market_order_repository import MarketOrderRepository
 
@@ -250,7 +248,7 @@ async def _compute_equipment_floor_price(session, equipment, server_id: int = 1)
 
 async def _get_market_reference(session, item_cfg, server_id: int = 1) -> str | None:
     """查询近7日市场参考数据，返回格式化的信息行。无数据时返回 None。"""
-    is_equipment = EquipmentTradeServiceNew.is_instance_trade(item_cfg.item_id)
+    is_equipment = EquipmentTradeService.is_instance_trade(item_cfg.item_id)
     lookback_since = datetime.now() - timedelta(days=TRADE_REF_LOOKBACK_DAYS)
 
     # 查询近7日成交记录（跑商系统的交易数据）
@@ -330,7 +328,7 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
         await list_cmd.finish("⛔ VIP定制装备为专属装备，不可交易")
 
     # 装备/铭文实例交易特殊处理
-    is_instance = EquipmentTradeServiceNew.is_instance_trade(item_cfg.item_id)
+    is_instance = EquipmentTradeService.is_instance_trade(item_cfg.item_id)
     if is_instance and side == OrderSide.SELL:
         if quantity != 1:
             type_name = "装备" if item_cfg.type.value == "EQUIPMENT" else "铭文"
@@ -438,7 +436,7 @@ async def _handle_instance_listing(event: MessageEvent, item_cfg, price: int):
         # 获取玩家的实例列表（装备和铭文共用同一查询）
         item_repo = ItemRepository(session)
         market_order_repo = MarketOrderRepository(session)
-        service = EquipmentTradeServiceNew(item_repo, market_order_repo)
+        service = EquipmentTradeService(item_repo, market_order_repo)
         instance_list = await service.get_player_equipment_list(player.id, item_cfg.item_id)
 
         # 过滤掉已冻结的实例
@@ -461,7 +459,7 @@ async def _handle_instance_listing(event: MessageEvent, item_cfg, price: int):
         import time
 
         instance_ids = [inst.id for inst in instance_list]
-        instance_summaries = [EquipmentTradeServiceNew.generate_instance_summary(inst) for inst in instance_list]
+        instance_summaries = [EquipmentTradeService.generate_instance_summary(inst) for inst in instance_list]
 
         equipment_selection_state[player.id] = {
             "equipment_ids": instance_ids,
@@ -494,12 +492,12 @@ async def _create_instance_order(session, player, instance: ItemInstance, price:
     # 冻结实例
     item_repo = ItemRepository(session)
     market_order_repo = MarketOrderRepository(session)
-    service = EquipmentTradeServiceNew(item_repo, market_order_repo)
+    service = EquipmentTradeService(item_repo, market_order_repo)
     if not await service.freeze_equipment(instance):
         await list_cmd.finish("⛔ 该物品无法挂牌（可能已在交易中或已装备）")
 
     # 生成摘要
-    summary = EquipmentTradeServiceNew.generate_instance_summary(instance)
+    summary = EquipmentTradeService.generate_instance_summary(instance)
 
     # 底价吸附
     snap_hint = ""
@@ -650,7 +648,7 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
                 # 装备交易：解冻装备
                 item_repo = ItemRepository(session)
                 market_order_repo = MarketOrderRepository(session)
-                service = EquipmentTradeServiceNew(item_repo, market_order_repo)
+                service = EquipmentTradeService(item_repo, market_order_repo)
 
                 equipment = await service.get_equipment_by_instance_id(order.item_instance_id)
                 if equipment:
@@ -1168,7 +1166,7 @@ async def _try_auto_match(session, new_order: MarketOrder, player: Player, same_
     # 初始化新版service
     item_repo = ItemRepository(session)
     market_order_repo = MarketOrderRepository(session)
-    equipment_service = EquipmentTradeServiceNew(item_repo, market_order_repo)
+    equipment_service = EquipmentTradeService(item_repo, market_order_repo)
 
     if new_order.side == OrderSide.BUY:
         # 买单 → 查找卖单
