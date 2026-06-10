@@ -1,6 +1,6 @@
 # 重构后的代码使用示例
 
-本文档提供重构后代码的使用示例，展示如何使用DI容器、Repository和UnitOfWork。
+本文档提供重构后代码的使用示例，展示如何使用Repository和UnitOfWork。
 
 ## 示例1: 修复player/info.py的多会话问题
 
@@ -116,50 +116,7 @@ async def handle_deposit_rank_v2():
             # ...
 ```
 
-## 示例3: 使用DI容器注册服务
-
-```python
-# infrastructure/di/service_registration.py
-from ..di import DIContainer
-from ..repositories import PlayerRepository, GuildRepository
-from ..uow import UnitOfWork
-from ...models.db import AsyncSessionLocal
-
-def register_services(container: DIContainer):
-    """注册所有服务到DI容器"""
-
-    # 注册会话工厂（作用域）
-    container.register_scoped(
-        AsyncSession,
-        lambda c: AsyncSessionLocal()
-    )
-
-    # 注册仓储（作用域）
-    container.register_scoped(
-        PlayerRepository,
-        lambda c: PlayerRepository(c.resolve(AsyncSession))
-    )
-
-    container.register_scoped(
-        GuildRepository,
-        lambda c: GuildRepository(c.resolve(AsyncSession))
-    )
-
-    # 注册工作单元（瞬时）
-    container.register_transient(
-        UnitOfWork,
-        lambda c: UnitOfWork(AsyncSessionLocal)
-    )
-
-# 使用示例
-container = DIContainer()
-register_services(container)
-
-# 解析服务
-uow = container.resolve(UnitOfWork)
-```
-
-## 示例4: 自定义Repository方法
+## 示例3: 自定义Repository方法
 
 ```python
 # infrastructure/repositories/player_repository.py

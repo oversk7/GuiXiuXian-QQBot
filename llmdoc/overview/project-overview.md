@@ -7,7 +7,7 @@
 
 ## 2. High-Level Description
 
-诡修仙2 是一个功能完整的异步 QQ 机器人游戏,采用现代 Python 技术栈构建。游戏以暗黑修仙为世界观,融合了传统修仙元素与诡异题材,提供深度养成、战斗、社交、经济等系统。项目采用分层架构设计,正在从传统静态方法架构向依赖注入(DI)架构迁移。
+诡修仙2 是一个功能完整的异步 QQ 机器人游戏,采用现代 Python 技术栈构建。游戏以暗黑修仙为世界观,融合了传统修仙元素与诡异题材,提供深度养成、战斗、社交、经济等系统。项目采用分层架构设计,数据访问通过 Repository 模式抽象,以 safe_session/UnitOfWork 两档模式管理事务边界。
 
 ### 核心玩法循环
 1. **修炼成长** → 修炼获得经验 → 突破提升境界 → 冥返转生获得更强潜力
@@ -16,9 +16,9 @@
 4. **经济经营** → 跑商交易 → 市场买卖 → 气运投资
 
 ### 技术架构特点
-- **双轨架构并存**: Legacy 静态方法服务与 DI 架构服务平滑共存
-- **Repository 模式**: 数据访问层抽象,42 个 Repository 实现覆盖所有领域
-- **Unit of Work**: 统一事务管理,解决连接泄漏和数据一致性问题
+- **渐进式迁移**: 旧式静态方法服务与新式实例服务(`*_new.py`)并存,逐模块迁移
+- **Repository 模式**: 数据访问层抽象,63 个 Repository 实现覆盖所有领域
+- **两档事务管理**: 命令处理器默认 `safe_session()`;跨多表事务使用 UnitOfWork,解决连接泄漏和数据一致性问题
 - **自动数据库迁移**: 启动时自动检测并升级数据库结构,零停机部署
 
 ---
@@ -174,9 +174,9 @@
 - **Alembic**: 数据库迁移工具(保留,实际使用 auto_migrate)
 
 ### 4.3 架构模式
-- **Repository 模式**: 数据访问抽象(42 个实现)
-- **Unit of Work 模式**: 统一事务管理
-- **依赖注入(DI)**: 服务解耦和测试支持
+- **Repository 模式**: 数据访问抽象(63 个实现)
+- **Unit of Work 模式**: 多表事务统一管理
+- **手动构造注入**: 服务通过构造函数显式接收 Repository,便于测试时注入 Mock
 - **策略模式**: 属性来源、效果类型可扩展
 - **工厂模式**: AttributeCalculatorFactory 单例
 - **适配器模式**: 旧代码适配新接口(IEffect)
@@ -217,11 +217,8 @@ plugins/xiuxian_game/
 │   │   ├── player_repository.py
 │   │   ├── guild_repository.py
 │   │   └── ...
-│   ├── uow/                     # Unit of Work
-│   │   └── unit_of_work.py      # 事务管理
-│   └── di/                      # 依赖注入容器
-│       ├── container.py         # DIContainer 实现
-│       └── setup.py             # 启动配置
+│   └── uow/                     # Unit of Work
+│       └── unit_of_work.py      # 事务管理
 │
 ├── player/                      # 玩家系统
 │   ├── info.py                  # 玩家信息命令
@@ -297,17 +294,16 @@ plugins/xiuxian_game/
 - 方法内部执行 SQL 查询
 - 调用方控制事务边界
 
-**New (DI) 特征**:
+**New 特征**:
 - 实例方法类
-- 构造函数注入 Repository
+- 构造函数显式传入 Repository(手动注入,无容器)
 - 通过 Repository 访问数据
 - UnitOfWork 统一事务管理
 
 **迁移策略**:
-- 保留 Legacy 版本确保稳定性
-- New 版本采用 DI 架构,提高可测试性
-- 逐步迁移调用方到 New 版本
-- 文件命名: `*_legacy.py` / `*_new.py` / 统一入口 `*.py`
+- 保留旧版本确保稳定性,新版本以 `*_new.py` 命名并存
+- 逐步迁移调用方到 New 版本;旧版删除后 `*_new.py` 待改回正式命名
+- 注意: 部分模块(如 alchemy、fishing)旧版已删除,但文件仍叫 `service_new.py`
 
 **已迁移模块**:
 - ✅ 公会核心服务
@@ -532,22 +528,7 @@ async def _():
     bridges = register_all_battle_effect_bridges()
 ```
 
-### 10.2 依赖注入容器启动
-
-```python
-# plugins/xiuxian_game/infrastructure/di/setup.py
-def setup_di_container() -> DIContainer:
-    container = DIContainer()
-    # 注册 Session (Scoped)
-    container.register_scoped("AsyncSession", lambda c: AsyncSessionLocal())
-    # 注册 UnitOfWork (Scoped)
-    container.register_scoped(UnitOfWork, lambda c: UnitOfWork(AsyncSessionLocal))
-    # 注册 Repository (Transient)
-    container.register_transient(PlayerRepository, ...)
-    return container
-```
-
-### 10.3 数据库迁移
+### 10.2 数据库迁移
 
 **添加新字段**:
 1. 在 `models/auto_migrate.py` 的 `REQUIRED_FIELDS` 添加字段定义
@@ -557,7 +538,7 @@ def setup_di_container() -> DIContainer:
 1. 在 `models/auto_migrate.py` 的 `REQUIRED_ENUMS` 更新枚举值
 2. 重启 Bot,自动重建 ENUM 列
 
-### 10.4 帮助信息更新
+### 10.3 帮助信息更新
 
 **位置**: `plugins/xiuxian_game/player/help.py`
 
@@ -583,11 +564,13 @@ def setup_di_container() -> DIContainer:
 
 ### 11.2 改进方向
 
-1. **完成架构迁移**: 所有 Service 迁移到 DI 架构
-2. **引入缓存**: Redis 缓存热点数据(如玩家属性)
-3. **CQRS**: 读写分离,查询用轻量级 Query
-4. **事件溯源**: 关键操作记录事件日志
-5. **微服务拆分**: 经济服务、社交服务独立部署
+1. **数据访问模式统一**: 命令处理器统一 `safe_session()`,跨多表事务统一 UnitOfWork
+2. **`*_new.py` 命名收尾**: 旧版已删除的模块改回正式命名,新旧并存的模块列迁移清单逐个关闭旧版
+3. **巨型文件拆分**: `dungeon_battle.py`、`merchants.py`、`guild.py` 等超 1500 行文件按"命令层薄、服务层厚"拆分
+4. **help 单一数据源**: `help.py` 从 `data/knowledge/*.yaml` 生成,消除双份手工维护
+5. **测试债清算**: 修复或删除 CI 绿名单外的存量失败测试,逐步扩大覆盖
+
+> 注: 曾列出的 Redis 缓存、CQRS、事件溯源、微服务拆分等方向已移除——对单进程单机 QQ 机器人属于过度设计。
 
 ---
 
@@ -598,10 +581,9 @@ def setup_di_container() -> DIContainer:
 - **参考手册**: `/llmdoc/reference/` - API 规范、数据模型
 
 **核心架构文档**:
-- `/llmdoc/architecture/data-access-architecture.md` - 数据访问层架构
-- `/llmdoc/architecture/service-di-architecture.md` - DI 架构设计
-- `/llmdoc/architecture/battle-system.md` - 战斗系统架构
+- `/llmdoc/architecture/unit-of-work-and-di.md` - Unit of Work 与数据访问模式
+- `/llmdoc/architecture/repository-pattern-implementation.md` - Repository 模式实现
+- `/llmdoc/architecture/battle-engine-architecture.md` - 战斗引擎架构
 
 **核心指南**:
-- `/llmdoc/guides/deploy-service-di.md` - 如何部署 DI 架构服务
-- `/llmdoc/guides/how-to-add-effect.md` - 如何添加新效果
+- `/llmdoc/guides/how-to-add-battle-effect.md` - 如何添加战斗效果

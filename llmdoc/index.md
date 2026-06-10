@@ -28,7 +28,7 @@
 - **[玩家与属性系统](/llmdoc/overview/player-attributes-overview.md)** - 玩家数据管理、属性计算框架、境界转生机制
 - **[战斗系统](/llmdoc/overview/combat-system-overview.md)** - 回合制战斗引擎、装备驱动效果、PvP/PvE机制
 - **[经济系统](/llmdoc/overview/economy-system-overview.md)** - 双轨货币、交易市场、跑商、气运投资
-- **[数据访问层](/llmdoc/overview/data-access-overview.md)** - Repository模式、Unit of Work、依赖注入、自动迁移
+- **[数据访问层](/llmdoc/overview/data-access-overview.md)** - Repository模式、Unit of Work、自动迁移
 
 ---
 
@@ -59,13 +59,12 @@
 ## 架构设计
 
 ### 数据访问层
-- **[Repository模式实现](/llmdoc/architecture/repository-pattern-implementation.md)** - 42个Repository,泛型接口,领域查询
-- **[Unit of Work和DI](/llmdoc/architecture/unit-of-work-and-di.md)** - 事务边界管理、依赖注入容器、生命周期
+- **[Repository模式实现](/llmdoc/architecture/repository-pattern-implementation.md)** - 63个Repository,泛型接口,领域查询
+- **[Unit of Work与数据访问模式](/llmdoc/architecture/unit-of-work-and-di.md)** - 事务边界管理、safe_session与UoW的使用约定
 
 ### 设计模式
 - **Repository模式** - 数据访问抽象,可测试性,查询集中化
 - **Unit of Work模式** - 事务原子性,会话共享,连接泄漏防护
-- **依赖注入(DI)** - 解耦合,可测试性,生命周期管理
 - **策略模式** - 属性来源系统(IAttributeSource)
 - **桥接模式** - 战斗效果桥接(BattleEffectBridge)
 
@@ -151,6 +150,6 @@
 
 ---
 
-**版本**: 5.0
-**最后更新**: 2026-04-24
-**最近更新**: 清理已完成的实现计划(10)和过时调查报告(9)，移除死链
+**版本**: 5.1
+**最后更新**: 2026-06-10
+**最近更新**: 移除 DI 容器（代码已删除，从未启用），文档统一为 safe_session/UoW 两档数据访问约定
