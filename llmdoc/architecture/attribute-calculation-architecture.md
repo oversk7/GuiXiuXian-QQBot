@@ -37,7 +37,8 @@
 - **1. 入口**: `battle/integration_helper.py` PVP/PVE 开战处、`world_boss/service.py` 讨伐开战处
 - **2. 基础属性**: `player.get_effective_attributes(session)`（attack/defense/max_hp 等缓存到 `_cached_*`）
 - **3. 战斗属性**: `calculate_effective_attributes_async()` = 真源 + T1词缀 + 上限，缓存到 `_cached_battle_attrs`
-- **4. 循环内读取**: 所有同步判定（攻击/反击/闪避/抗暴/理智侵蚀）经 `effective_attrs_in_battle()` 读缓存
+- **4. 循环内读取**: 战斗属性判定（攻击/反击/闪避/抗暴/理智侵蚀）经 `effective_attrs_in_battle()` 读缓存；
+  六维取值（先手敏捷/伤害攻击力/减伤防御力）用 `getattr(player, '_cached_attack', player.attack)` 模式读 `_cached_*`
 - **5. 战斗内修正**: `battle/enhanced_engine.py` 的 `_get_effective_battle_attributes()` 在缓存值上叠加战斗内buff效果，再次应用 ATTRIBUTE_CAPS
 
 ### 3.3 临时buff生效流程

@@ -191,6 +191,9 @@ class GuildService:
 - **战斗循环内同步判定**: 必须走 `BattleAttributeCalculator.effective_attrs_in_battle(player)`（读开战预计算的
   `_cached_battle_attrs` 缓存）,禁止直接调 `calculate_effective_attributes`——后者裸读字段,临时buff/宠物/词缀
   全部丢失（历史 bug,2026-06-11 修复,回归锁: `tests/test_battle_buff_effectiveness.py`）
+- **战斗循环内六维取值**: 攻击/防御/敏捷必须用 `getattr(player, '_cached_attack', player.attack)` 模式读
+  开战缓存（`_cached_attack`/`_cached_defense`/`_cached_agility`,开战入口已预计算）,禁止裸读 `player.attack`
+  等字段——历史上先手判定/怪物伤害减免/反击伤害共 10 处裸读导致六维 buff 在战斗中不生效（2026-06-11 修复）
 - **禁止新增并行属性计算框架**: 旧 AttributeCalculator v2 因 buff 字段名映射错位静默丢失加成,已删除;
   动态加成键名必须用 Player 字段名直通（回归锁: `tests/test_effective_attributes_passthrough.py`）
 - 新增战斗属性时同步补 `ATTRIBUTE_CAPS` 上限
