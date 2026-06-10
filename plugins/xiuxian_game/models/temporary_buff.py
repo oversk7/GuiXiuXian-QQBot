@@ -94,17 +94,7 @@ class TemporaryBuff(Base):
         if player_id:
             stmt = stmt.where(cls.player_id == player_id)
         
-        result = await session.execute(stmt)
-
-        if result.rowcount and result.rowcount > 0:
-            from ..domain.attributes.player_attributes_integration import invalidate_player_buff_cache
-
-            if player_id:
-                invalidate_player_buff_cache(player_id)
-            else:
-                from ..domain.attributes.attribute_calculator_factory import AttributeCalculatorFactory
-
-                AttributeCalculatorFactory.clear_buff_cache()
+        await session.execute(stmt)
 
     @classmethod
     async def create_buff(
@@ -151,9 +141,6 @@ class TemporaryBuff(Base):
                 extra_data=extra_data or {}
             )
             session.add(new_buff)
-            from ..domain.attributes.player_attributes_integration import invalidate_player_buff_cache
-
-            invalidate_player_buff_cache(player_id)
             return new_buff
 
     @classmethod

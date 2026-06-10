@@ -15,7 +15,6 @@ from ..models.player import Player
 from ..models.inventory import ItemInstance
 from ..models.guild import Guild
 from ..models.monthly_card import MonthlyCard, CardType
-from ..domain.attributes import get_effective_attributes_v2
 from ..config import config
 
 
@@ -46,8 +45,8 @@ async def query_player_profile(uid: int, server_id: int = 1) -> PlayerProfileDTO
         if not player:
             return None
 
-        # 2. 获取有效属性
-        effective_attrs = await get_effective_attributes_v2(player, session)
+        # 2. 获取有效属性（含装备/丹药/临时buff/宠物加成）
+        effective_attrs = await player.get_effective_attributes(session)
 
         # 3. 统计装备加成（用于面板显示）
         bonus: Dict[str, int] = defaultdict(int)

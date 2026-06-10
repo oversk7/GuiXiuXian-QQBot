@@ -1,11 +1,8 @@
 """宠物属性来源 - 为玩家提供宠物伴侣的被动战斗加成"""
 import time
-from typing import Dict, Tuple
+from typing import Dict, Optional, Tuple
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
-from nonebot import logger
-
-from ..interfaces import IAttributeSource, AttributeBonus
 
 
 # 饰品bonus key → Player模型属性名的映射
@@ -31,7 +28,7 @@ _ACC_TO_PLAYER = {
 }
 
 
-class PetAttributeSource(IAttributeSource):
+class PetAttributeSource:
     """
     宠物属性来源
 
@@ -41,47 +38,10 @@ class PetAttributeSource(IAttributeSource):
 
     def __init__(self, cache_ttl: float = 60.0):
         self._cache_ttl = cache_ttl
-        self._cache: Dict[str, Tuple[AttributeBonus, float]] = {}
-        # 完整加成缓存（包含AttributeBonus不支持的字段）
         self._full_cache: Dict[str, Tuple[dict, float]] = {}
 
-    @property
-    def source_name(self) -> str:
-        return "pet"
-
-    @property
-    def is_persisted(self) -> bool:
-        return False
-
-    async def calculate_bonus(self, player, session: AsyncSession) -> AttributeBonus:
-        player_id = player.id
-
-        # 检查缓存
-        if player_id in self._cache:
-            bonus, timestamp = self._cache[player_id]
-            if time.time() - timestamp < self._cache_ttl:
-                return bonus
-
-        full_dict = await self._query_pet_full_bonus(player_id, session)
-        bonus = AttributeBonus(
-            attack=full_dict.get("attack", 0),
-            defense=full_dict.get("defense", 0),
-            hp=full_dict.get("max_hp", 0),
-            max_hp=full_dict.get("max_hp", 0),
-            crit_rate=full_dict.get("critical_rate", 0),
-            crit_damage=full_dict.get("critical_power", 0),
-            dodge_rate=full_dict.get("dodge_rate", 0),
-        )
-        now = time.time()
-        self._cache[player_id] = (bonus, now)
-        self._full_cache[player_id] = (full_dict, now)
-        return bonus
-
     async def calculate_full_bonus(self, player, session: AsyncSession) -> dict:
-        """返回完整加成dict（使用Player模型属性名，百分比已转为整数）
-
-        包含AttributeBonus不支持的字段如combo_rate, penetration_rate, counter_rate等。
-        """
+        """返回完整加成dict（使用Player模型属性名，百分比已转为整数）"""
         player_id = player.id
 
         if player_id in self._full_cache:
@@ -148,11 +108,26 @@ class PetAttributeSource(IAttributeSource):
         return out
 
     def invalidate_cache(self, player_id: str):
-        if player_id in self._cache:
-            del self._cache[player_id]
         if player_id in self._full_cache:
             del self._full_cache[player_id]
 
     def clear_cache(self):
-        self._cache.clear()
         self._full_cache.clear()
+
+
+# 全局单例：宠物加成缓存全局共享
+_instance: Optional[PetAttributeSource] = None
+
+
+def get_pet_source() -> PetAttributeSource:
+    """获取宠物属性来源单例"""
+    global _instance
+    if _instance is None:
+        _instance = PetAttributeSource()
+    return _instance
+
+
+def invalidate_pet_cache(player_id: str):
+    """使指定玩家的宠物属性缓存失效（宠物激活/喂食/进化/饰品变更后调用）"""
+    if _instance:
+        _instance.invalidate_cache(player_id)

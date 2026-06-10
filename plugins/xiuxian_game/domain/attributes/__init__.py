@@ -1,25 +1,9 @@
 """
-属性计算领域模块
+属性领域模块
 
-提供统一的属性计算接口和实现
+读取入口（两档，见 llmdoc/reference/coding-conventions.md §6.3）:
+- 全量真源: Player.get_effective_attributes(session)
+- 战斗档: battle.battle_attributes.BattleAttributeCalculator（含 ATTRIBUTE_CAPS 上限）
+
+写入收口: permanent_change.apply_permanent_change（永久属性变更唯一入口）
 """
-
-from .interfaces import IAttributeSource, AttributeBonus, AttributeBreakdown
-from .attribute_calculator import AttributeCalculator
-from .attribute_calculator_factory import AttributeCalculatorFactory
-from .player_attributes_integration import (
-    get_effective_attributes_v2,
-    invalidate_player_buff_cache,
-)
-
-__all__ = [
-    # 核心接口和数据类
-    "IAttributeSource",
-    "AttributeBonus",
-    "AttributeBreakdown",
-    "AttributeCalculator",
-    # 工厂和集成
-    "AttributeCalculatorFactory",
-    "get_effective_attributes_v2",
-    "invalidate_player_buff_cache",
-]

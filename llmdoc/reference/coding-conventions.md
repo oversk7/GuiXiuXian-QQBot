@@ -139,11 +139,11 @@ class GuildService:
         self._uow = uow
 ```
 
-### 4.4 策略模式
-**应用场景**: 属性来源系统 (`plugins/xiuxian_game/domain/attributes/attribute_sources/`)
-- 实现`IAttributeSource`接口
-- 每个Source独立计算策略
-- 通过`AttributeCalculator`组合使用
+### 4.4 动态属性来源
+**应用场景**: 未持久化到 player 字段的加成 (`plugins/xiuxian_game/domain/attributes/attribute_sources/pet_source.py`)
+- 单例 + TTL 缓存 + 失效接口（`get_pet_source()` / `invalidate_pet_cache()`）
+- 在 `Player.get_effective_attributes` 与 `get_attribute_breakdown` 中叠加
+- 字典键必须用 Player 字段名直通，禁止字段名映射层
 
 ---
 
@@ -177,13 +177,20 @@ class GuildService:
 - **使用auto_migrate**: 在`plugins/xiuxian_game/models/auto_migrate.py`的`REQUIRED_FIELDS`中添加字段定义
 - **重启Bot**: 自动检测并添加缺失字段/表/索引
 
-### 6.3 永久属性变更（写入收口）
-- **必须规则**: 任何永久改变玩家属性字段的操作（丹药、洗髓、活动奖励等）必须经过
-  `domain/attributes/permanent_change.apply_permanent_change()`,禁止直接 `setattr`
+### 6.3 属性读写收口
+**写入（必须规则）**: 任何永久改变玩家属性字段的操作（丹药、洗髓、活动奖励等）必须经过
+`domain/attributes/permanent_change.apply_permanent_change()`,禁止直接 `setattr`
 - 写入口原子完成: 改字段 + 记账(ElixirUsageLog) + 装备重算 + hp/mp 收口
 - **绕过后果**: 账实漂移,且该加成在玩家轮回时被静默吞掉（轮回按 INIT+账本+VIP 重建六维）
 - VIP 永久加成例外: 走 `VIPEquipmentBonus` 专表（轮回同样保留）,不得重复记入 ElixirUsageLog
 - 对账: `scripts/check_attribute_consistency.py`（只读）;存量校准: `scripts/calibrate_attribute_ledger.py`
+
+**读取（两档，2026-06-10 收敛）**:
+- 全量真源: `Player.get_effective_attributes(session)` —— 19 项属性,含装备/丹药/临时buff/宠物,面板与业务判定用
+- 战斗档: `BattleAttributeCalculator.calculate_effective_attributes_async` —— 真源 + T1词缀 + `ATTRIBUTE_CAPS` 上限,战斗数值必须走它
+- **禁止新增并行属性计算框架**: 旧 AttributeCalculator v2 因 buff 字段名映射错位静默丢失加成,已删除;
+  动态加成键名必须用 Player 字段名直通（回归锁: `tests/test_effective_attributes_passthrough.py`）
+- 新增战斗属性时同步补 `ATTRIBUTE_CAPS` 上限
 
 ### 6.4 连接泄漏防护
 - **必须规则**: 在UoW外部调用`cmd.finish()`
@@ -266,9 +273,9 @@ if error_msg:
 ## 11. 性能优化约定
 
 ### 11.1 缓存策略
-- **临时buff缓存**: 60秒TTL (`plugins/xiuxian_game/domain/attributes/attribute_sources/buff_source.py:40-50`)
+- **宠物加成缓存**: 60秒TTL (`plugins/xiuxian_game/domain/attributes/attribute_sources/pet_source.py`)
 - **装备属性预计算**: 持久化到player表
-- **单例模式**: 全局共享实例 (如`AttributeCalculatorFactory`)
+- **单例模式**: 全局共享实例 (如`get_pet_source()`)
 
 ### 11.2 数据库优化
 - **索引**: 关键查询字段添加`index=True`

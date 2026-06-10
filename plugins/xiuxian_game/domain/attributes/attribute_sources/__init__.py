@@ -1,13 +1,13 @@
 """
 属性来源实现模块
 
-提供各种属性来源的具体实现：装备、buff、丹药、VIP等
+宠物加成未持久化到 Player 字段，由 Player.get_effective_attributes 动态叠加
 """
 
-from .buff_source import BuffAttributeSource
-from .equipment_source import EquipmentAttributeSource
+from .pet_source import PetAttributeSource, get_pet_source, invalidate_pet_cache
 
 __all__ = [
-    "BuffAttributeSource",
-    "EquipmentAttributeSource",
+    "PetAttributeSource",
+    "get_pet_source",
+    "invalidate_pet_cache",
 ]

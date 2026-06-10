@@ -7,7 +7,7 @@ from sqlalchemy.orm.attributes import flag_modified
 from ..infrastructure.uow.unit_of_work import UnitOfWork
 from ..models.pet_instance import PetInstance
 from ..models.inventory import ItemInstance, ItemType
-from ..domain.attributes.attribute_calculator_factory import AttributeCalculatorFactory
+from ..domain.attributes.attribute_sources.pet_source import invalidate_pet_cache
 from .config import PetConfigManager, format_bonus
 
 
@@ -100,7 +100,7 @@ class PetService:
 
         pet.is_active = True
         await uow.pets.update(pet)
-        AttributeCalculatorFactory.invalidate_pet_cache(player_id)
+        invalidate_pet_cache(player_id)
         return True, f"【{pet.nickname}】现在是你的伙伴了"
 
     # ==================== 喂食 ====================
@@ -179,7 +179,7 @@ class PetService:
         pet.last_fed_at = datetime.now()
         level_up_msg = self._add_experience(pet, total_exp)
         await uow.pets.update(pet)
-        AttributeCalculatorFactory.invalidate_pet_cache(player_id)
+        invalidate_pet_cache(player_id)
 
         qty_text = f"×{quantity}" if quantity > 1 else ""
         msg = (
@@ -230,7 +230,7 @@ class PetService:
         pet.last_fed_at = datetime.now()
         level_up_msg = self._add_experience(pet, total_exp)
         await uow.pets.update(pet)
-        AttributeCalculatorFactory.invalidate_pet_cache(player_id)
+        invalidate_pet_cache(player_id)
 
         qty_text = f"×{quantity}" if quantity > 1 else ""
         msg = (
@@ -347,7 +347,7 @@ class PetService:
             reward_notice = await self._grant_surprise_reward(uow, player_id, pet)
 
         await uow.pets.update(pet)
-        AttributeCalculatorFactory.invalidate_pet_cache(player_id)
+        invalidate_pet_cache(player_id)
 
         # 构建回复
         level_name = self.config.get_affection_level_name(pet.affection)
@@ -485,7 +485,7 @@ class PetService:
         pet.accessories = accessories
         flag_modified(pet, "accessories")
         await uow.pets.update(pet)
-        AttributeCalculatorFactory.invalidate_pet_cache(player_id)
+        invalidate_pet_cache(player_id)
 
         bonus_text = format_bonus(acc.bonus)
         return True, (
@@ -616,7 +616,7 @@ class PetService:
                 remaining[0].is_active = True
                 await uow.pets.update(remaining[0])
 
-        AttributeCalculatorFactory.invalidate_pet_cache(player_id)
+        invalidate_pet_cache(player_id)
         return True, f"【{nickname}】已被放生，消失在了荒野中..."
 
     # ==================== 宠物进化 ====================
@@ -734,8 +734,7 @@ class PetService:
         await uow.pets.update(pet)
 
         # 使宠物属性缓存失效
-        from ..domain.attributes.attribute_calculator_factory import AttributeCalculatorFactory
-        AttributeCalculatorFactory.invalidate_pet_cache(player_id)
+        invalidate_pet_cache(player_id)
 
         # 计算属性变化展示
         total_bonus = self._calculate_total_bonus(pet)

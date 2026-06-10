@@ -177,9 +177,7 @@
 - **Repository 模式**: 数据访问抽象(63 个实现)
 - **Unit of Work 模式**: 多表事务统一管理
 - **手动构造注入**: 服务通过构造函数显式接收 Repository,便于测试时注入 Mock
-- **策略模式**: 属性来源、效果类型可扩展
-- **工厂模式**: AttributeCalculatorFactory 单例
-- **适配器模式**: 旧代码适配新接口(IEffect)
+- **读写收口**: 属性读取两档（真源+战斗档）、永久变更唯一写入口 apply_permanent_change
 
 ### 4.4 AI 集成
 - **智谱 AI (zhipu)**: 主 AI provider,模型 GLM-4-Flash-250414
@@ -204,9 +202,8 @@ plugins/xiuxian_game/
 │   ├── repositories/            # Repository 接口
 │   │   └── base.py              # IRepository 抽象基类
 │   ├── attributes/              # 属性系统
-│   │   ├── attribute_calculator.py  # 属性计算器(组合模式)
-│   │   ├── attribute_calculator_factory.py  # 单例工厂
-│   │   └── attribute_sources/   # 属性来源(策略模式)
+│   │   ├── permanent_change.py  # 永久属性变更唯一写入口
+│   │   └── attribute_sources/   # 动态属性来源(宠物)
 │   └── effects/                 # 效果数据结构
 │       └── interfaces.py        # EffectResult 等接口定义
 │
@@ -369,17 +366,11 @@ REQUIRED_FIELDS = {
 
 ### 6.5 属性计算架构
 
-**AttributeCalculator v2** (组合模式 + 策略模式):
-- **管理多个属性来源**: BuffAttributeSource, EquipmentAttributeSource 等
-- **并发计算**: 各来源独立计算,最后汇总
-- **缓存优化**: BuffAttributeSource 使用 60 秒 TTL 缓存,减少 90% 数据库查询
-- **区分持久化**: 只累加 `is_persisted=False` 的来源(装备和丹药已持久化到 player 属性)
+**读取两档**（详见 architecture/attribute-calculation-architecture.md）:
+- **全量真源**: `Player.get_effective_attributes(session)` —— 存储字段值(含装备+丹药+VIP) + 临时buff + 宠物加成，面板展示与业务判定用
+- **战斗档**: `BattleAttributeCalculator.calculate_effective_attributes_async` —— 真源 + T1词缀 + ATTRIBUTE_CAPS 上限收口，战斗与战力显示用
 
-**计算流程**:
-```
-最终属性 = 基础属性(含装备+丹药+VIP)
-          + 临时 buff(动态查询,60秒缓存)
-```
+**写入单口**: 永久属性变更必须走 `apply_permanent_change`（改字段+记账+装备重算+hp/mp收口），见 reference/coding-conventions.md §6.3
 
 ---
 

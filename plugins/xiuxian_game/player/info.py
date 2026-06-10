@@ -22,7 +22,6 @@ from ..config import config
 from ..server_config import DEFAULT_SERVER_ID, get_server_name
 from ..server_service import ensure_platform_server_binding, parse_server_id
 from ..infrastructure.uow import UnitOfWork
-from ..domain.attributes import get_effective_attributes_v2
 from ..infrastructure.repositories.account_transfer_log_repository import AccountTransferLogRepository
 from ..models.account_ownership import AccountOwnership
 from ..queries.player_queries import query_player_profile
@@ -151,7 +150,7 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
                     player.real_world_x = player_upd.real_world_x
                     player.real_world_y = player_upd.real_world_y
 
-            effective_attrs = await get_effective_attributes_v2(player, uow.session)
+            effective_attrs = await player.get_effective_attributes(uow.session)
 
             bonus = defaultdict(int)
             equip_ids = config.items_config["by_type"]["EQUIPMENT"]
@@ -757,8 +756,8 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
                 player.real_world_x = player_upd.real_world_x
                 player.real_world_y = player_upd.real_world_y
 
-        # 3. 获取有效属性（使用AttributeCalculator v2）
-        effective_attrs = await get_effective_attributes_v2(player, uow.session)
+        # 3. 获取有效属性（含装备/丹药/临时buff/宠物加成）
+        effective_attrs = await player.get_effective_attributes(uow.session)
 
         # 4. 统计装备加成用于显示
         bonus = defaultdict(int)

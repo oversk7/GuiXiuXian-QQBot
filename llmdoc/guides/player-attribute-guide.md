@@ -1,217 +1,100 @@
 # 如何使用和扩展属性系统
 
-## 1. 获取玩家有效属性
+## 1. 获取玩家有效属性（展示/业务判定）
 
-获取包含所有加成(基础+装备+丹药+VIP+临时buff)的有效属性:
+获取包含所有加成（基础+装备+丹药+VIP+临时buff+宠物）的有效属性，**全量真源**：
 
 ```python
-from plugins.xiuxian_game.domain.attributes.player_attributes_integration import get_effective_attributes_v2
-from plugins.xiuxian_game.infrastructure.uow.unit_of_work import UnitOfWork
-
-async with UnitOfWork(session_factory) as uow:
-    player = await uow.players.get_by_id(player_id)
-    attrs = await get_effective_attributes_v2(player)
-    # attrs = {'max_hp': 150, 'max_mp': 120, 'attack': 25, ...}
+attrs = await player.get_effective_attributes(session)
+# attrs = {'max_hp': 150, 'attack': 25, 'critical_rate': 12, ...} 共19项，键名=Player字段名
 ```
 
-## 2. 添加新的属性来源
+- 不传 session 时只返回存储字段值（不查 buff/宠物），仅用于无法拿到 session 的场景
+- 禁止再造并行的属性计算框架（历史上 v2 框架因字段名映射错位丢失 buff 加成，已于 2026-06-10 删除）
 
-如果需要添加新的属性来源(如称号加成、坐骑加成等):
+## 2. 获取战斗属性（含上限收口）
 
-**步骤1**: 创建新的Source类,实现IAttributeSource接口 (`plugins/xiuxian_game/domain/attributes/attribute_sources/your_source.py`):
+战斗与战力面板用**战斗档**，在真源基础上叠加 T1 词缀并应用 `ATTRIBUTE_CAPS`：
+
 ```python
-from plugins.xiuxian_game.domain.attributes.interfaces import IAttributeSource, AttributeBonus
+from plugins.xiuxian_game.battle.battle_attributes import BattleAttributeCalculator
 
-class YourAttributeSource(IAttributeSource):
-    async def calculate_bonus(self, player_id: str) -> AttributeBonus:
-        # 计算属性加成
-        return AttributeBonus(
-            max_hp=10,
-            attack=5,
-            is_persisted=False  # 如果加成已持久化到player属性,设为True
-        )
+# 异步版（推荐，含临时buff/宠物/词缀）
+battle_attrs = await BattleAttributeCalculator.calculate_effective_attributes_async(
+    player, session, equipment_bonus=affix_bonus
+)
+
+# 同步版（无 session 场景：引擎内部、怪物判定；不含临时buff/宠物）
+battle_attrs = BattleAttributeCalculator.calculate_effective_attributes(player)
 ```
 
-**步骤2**: 在AttributeCalculatorFactory中注册 (`plugins/xiuxian_game/domain/attributes/attribute_calculator_factory.py:60-75`):
-```python
-from plugins.xiuxian_game.domain.attributes.attribute_sources.your_source import YourAttributeSource
-
-def _create_calculator() -> AttributeCalculator:
-    sources = [
-        BuffAttributeSource(),
-        EquipmentAttributeSource(),
-        YourAttributeSource(),  # 添加新来源
-    ]
-    return AttributeCalculator(sources)
-```
-
-**步骤3**: 如果新来源需要缓存失效机制,添加invalidate方法 (`plugins/xiuxian_game/domain/attributes/attribute_calculator_factory.py:80-90`):
-```python
-def invalidate_your_source_cache(player_id: str):
-    # 失效缓存逻辑
-    pass
-```
+属性上限单源在 `BattleAttributeCalculator.ATTRIBUTE_CAPS`，新增战斗属性时记得补上限。
 
 ## 3. 修改玩家属性
 
-**直接修改并持久化**:
+**永久变更必须走唯一写入口**（详见 coding-conventions.md §6.3）：
+
 ```python
-from plugins.xiuxian_game.infrastructure.uow.unit_of_work import UnitOfWork
+from plugins.xiuxian_game.domain.attributes.permanent_change import apply_permanent_change
 
-async with UnitOfWork(session_factory) as uow:
-    player = await uow.players.get_by_id(player_id)
-
-    # 修改属性
-    player.max_hp += 10
-    player.attack += 5
-
-    # 自动提交
+await apply_permanent_change(session, player, {"attack": 5, "max_hp": 20},
+                             ledger_item_id=item_id, quantity=1)
+# 原子完成: 改字段 + 记账(ElixirUsageLog) + 装备重算 + hp/mp收口
 ```
 
-**通过装备系统修改** (推荐):
-```python
-from plugins.xiuxian_game.item.equipment_service import EquipmentService
-from plugins.xiuxian_game.infrastructure.uow.unit_of_work import UnitOfWork
+**临时buff**（不改 player 字段，时效性加成）：
 
-async with UnitOfWork(session_factory) as uow:
-    service = EquipmentService(uow.items, uow.players)
-    await service.recalc_equipment_attributes(player_id)
-    # 自动处理装备加成、mp_from_hp特效、血蓝上限
+```python
+from plugins.xiuxian_game.models.temporary_buff import TemporaryBuff
+
+await TemporaryBuff.create_buff(session, player.id, buff_id, buff_name,
+                                attribute_bonuses={"attack": 10},  # 键名=Player字段名
+                                duration_minutes=30)
 ```
 
-**通过物品效果修改**:
-```python
-from plugins.xiuxian_game.item.item_effects import apply_item_effect
-
-# 永久属性加成 (持久化到player属性)
-await apply_item_effect(player, item, effect_type="BUFF")
-
-# 临时buff (创建TemporaryBuff记录)
-await apply_item_effect(player, item, effect_type="TEMP_BUFF")
-```
+**装备加成**：由 `EquipmentService.recalc_equipment_attributes` 统一重算（_persist_bonus 机制），
+不要手工修改装备相关属性。
 
 ## 4. 添加新的属性字段
 
-**步骤1**: 在Player模型中添加字段 (`plugins/xiuxian_game/models/player.py:250-260`):
+**步骤1**: 在 Player 模型中添加字段（`plugins/xiuxian_game/models/player.py`）：
 ```python
-class Player(Base):
-    # ...existing fields...
-    new_attribute: Mapped[int] = mapped_column(
-        default=0,
-        server_default="0",
-        comment="新属性描述"
-    )
+new_attribute: Mapped[int] = mapped_column(default=0, server_default="0", comment="新属性描述")
 ```
 
-**步骤2**: 在auto_migrate中注册 (`plugins/xiuxian_game/models/auto_migrate.py:30-40`):
+**步骤2**: 在 auto_migrate 中注册（`plugins/xiuxian_game/models/auto_migrate.py` REQUIRED_FIELDS）
+
+**步骤3**: 重启 Bot 自动迁移
+
+**步骤4**: 如属于初始属性，补充 `Player.INIT_ATTRS`；如属于战斗属性，
+补充 `BattleAttributeCalculator.ATTRIBUTE_CAPS` 上限并接入 `get_effective_attributes` 返回字典
+
+## 5. 添加新的属性来源（如称号、坐骑加成）
+
+属性来源分两类，按持久化策略选择：
+
+**持久化型**（推荐，类比装备/VIP）：发放时通过 `apply_permanent_change` 写入字段并记账，
+或建专表（参考 `VIPEquipmentBonus`）并接入轮回重建逻辑。
+
+**动态型**（类比宠物）：参考 `domain/attributes/attribute_sources/pet_source.py`——
+单例 + TTL 缓存 + 失效接口，然后在 `Player.get_effective_attributes` 与
+`get_attribute_breakdown` 中叠加。注意键名必须用 Player 字段名直通，禁止中间映射层。
+
+## 6. 调试属性
+
+**来源分解**（增益状态命令同款）：
 ```python
-REQUIRED_FIELDS = {
-    "player": {
-        "new_attribute": "INT DEFAULT 0 COMMENT '新属性描述'"
-    }
-}
+breakdown = await player.get_attribute_breakdown(session)
+# {'base': {...}, 'equipment': {...}, 'permanent': {...}, 'vip_equipment': {...},
+#  'temporary': {...}, 'pet': {...}, 'total': {...}}
 ```
 
-**步骤3**: 重启Bot,自动添加字段到数据库
+**生产对账**：`scripts/check_attribute_consistency.py`（只读），
+漂移核销用 `scripts/calibrate_attribute_ledger.py`（先 dry-run）。
 
-**步骤4**: 在AttributeBonus中添加字段 (`plugins/xiuxian_game/domain/attributes/interfaces.py:20-30`):
-```python
-@dataclass
-class AttributeBonus:
-    # ...existing fields...
-    new_attribute: int = 0
-```
+## 7. 最佳实践
 
-## 5. 使用战斗属性计算器
-
-计算战斗相关属性(暴击率、闪避率等):
-```python
-from plugins.xiuxian_game.battle.battle_attributes import BattleAttributeCalculator
-from plugins.xiuxian_game.domain.attributes.player_attributes_integration import get_effective_attributes_v2
-
-async def get_battle_attributes(player):
-    base_attrs = await get_effective_attributes_v2(player)
-    battle_attrs = BattleAttributeCalculator.calculate_effective_attributes(
-        player, base_attrs
-    )
-    # battle_attrs = {
-    #     'critical_rate': 15.0,  # 暴击率15%
-    #     'dodge_rate': 10.0,     # 闪避率10%
-    #     ...
-    # }
-```
-
-## 6. 处理装备特殊效果
-
-**mp_from_hp特效** (百分比HP转MP):
-```python
-from plugins.xiuxian_game.item.equipment_service import EquipmentService
-
-async with UnitOfWork(session_factory) as uow:
-    service = EquipmentService(uow.items, uow.players)
-    # recalc_equipment_attributes会自动处理mp_from_hp特效
-    await service.recalc_equipment_attributes(player_id)
-```
-
-**其他特效** (吸血、反伤、真伤等):
-```python
-from plugins.xiuxian_game.battle.battle_effects import BattleEffectManager
-
-# 战斗开始时,加载装备特效
-effect_manager = BattleEffectManager()
-await effect_manager.load_equipment_effects(player)
-
-# 战斗中应用特效
-damage = effect_manager.apply_vampiric(damage, player)
-```
-
-## 7. 属性来源持久化策略
-
-**持久化到player属性** (装备、丹药、VIP):
-- 优点: 查询快,无需每次计算
-- 缺点: 修改复杂,需要重新计算
-- 适用: 高频查询、低频修改的属性
-
-**动态计算** (临时buff):
-- 优点: 灵活,支持时效性
-- 缺点: 每次查询数据库
-- 适用: 低频查询、高频变化的属性,配合缓存使用
-
-**混合策略** (推荐):
-- 装备/丹药/VIP: 持久化到player属性
-- 临时buff: 动态计算+60秒缓存
-- 最终属性 = 基础属性(含持久化) + 临时buff
-
-## 8. 调试属性计算
-
-**查看属性来源分解**:
-```python
-from plugins.xiuxian_game.domain.attributes.attribute_calculator import AttributeCalculator
-from plugins.xiuxian_game.domain.attributes.attribute_calculator_factory import AttributeCalculatorFactory
-
-calculator = AttributeCalculatorFactory.get_instance()
-breakdown = await calculator.calculate_with_breakdown(player_id)
-# breakdown = {
-#     'base': {'max_hp': 100, 'attack': 10, ...},
-#     'equipment': {'max_hp': 20, 'attack': 5, ...},
-#     'buff': {'max_hp': 10, 'attack': 0, ...},
-#     'final': {'max_hp': 130, 'attack': 15, ...}
-# }
-```
-
-**查看缓存统计**:
-```python
-from plugins.xiuxian_game.domain.attributes.attribute_calculator_factory import AttributeCalculatorFactory
-
-stats = AttributeCalculatorFactory.get_cache_stats()
-# stats = {'hit_count': 900, 'miss_count': 100, 'hit_rate': 0.9}
-```
-
-## 9. 最佳实践
-
-- **优先使用get_effective_attributes_v2()**: 而非直接读取player属性
-- **装备加成修改后失效缓存**: 确保buff数据一致性
-- **新属性来源实现IAttributeSource**: 保持架构一致性
-- **使用UnitOfWork管理事务**: 避免连接泄漏
-- **测试时Mock Repository**: 而非真实数据库
-- **属性字段添加到REQUIRED_FIELDS**: 确保自动迁移
+- **读属性用真源** `player.get_effective_attributes(session)`，战斗数值用 `BattleAttributeCalculator`
+- **永久变更走 apply_permanent_change**，禁止直接 setattr（账实漂移且轮回时被吞）
+- **键名直通**：buff/宠物等动态加成的字典键必须是 Player 字段名，禁止引入字段名映射层
+- **回归锁**：`tests/test_effective_attributes_passthrough.py` 锁定加成直通行为

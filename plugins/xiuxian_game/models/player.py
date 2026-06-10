@@ -358,45 +358,13 @@ class Player(Base):
                     base_attrs[attr] += bonus
 
             # 添加宠物属性加成（宠物加成未持久化，需动态计算）
-            from ..domain.attributes.attribute_calculator_factory import AttributeCalculatorFactory
-            AttributeCalculatorFactory.get_instance()  # 确保工厂已初始化
-            pet_source = AttributeCalculatorFactory._pet_source
-            if pet_source:
-                pet_full = await pet_source.calculate_full_bonus(self, session)
-                for attr_key, val in pet_full.items():
-                    if attr_key in base_attrs:
-                        base_attrs[attr_key] += val
+            from ..domain.attributes.attribute_sources.pet_source import get_pet_source
+            pet_full = await get_pet_source().calculate_full_bonus(self, session)
+            for attr_key, val in pet_full.items():
+                if attr_key in base_attrs:
+                    base_attrs[attr_key] += val
 
         return base_attrs
-
-    async def get_effective_battle_attributes(self, session=None) -> dict:
-        """获取有效战斗属性（仅包含战斗相关属性）
-
-        返回格式化后的战斗属性字典，用于战斗系统
-        这是get_effective_attributes的子集，只包含战斗相关属性
-        """
-        # 获取完整的有效属性
-        all_attrs = await self.get_effective_attributes(session)
-
-        # 只返回战斗相关属性
-        battle_attrs = {
-            "critical_rate": all_attrs["critical_rate"],
-            "critical_power": all_attrs["critical_power"],
-            "combo_rate": all_attrs["combo_rate"],
-            "counter_rate": all_attrs["counter_rate"],
-            "dodge_rate": all_attrs["dodge_rate"],
-            "accuracy_rate": all_attrs["accuracy_rate"],
-            "skill_crit_rate": all_attrs["skill_crit_rate"],
-            "penetration_rate": all_attrs["penetration_rate"],
-            "anti_crit_rate": all_attrs["anti_crit_rate"],
-            # 增强战斗属性
-            "lifesteal_rate": all_attrs["lifesteal_rate"],
-            "immobilize_rate": all_attrs["immobilize_rate"],
-            "true_damage_rate": all_attrs["true_damage_rate"],
-            "regen_rate": all_attrs["regen_rate"],
-        }
-
-        return battle_attrs
 
     # 角色创建时的初始属性值（与Player模型default一致）
     INIT_ATTRS = {
@@ -467,14 +435,11 @@ class Player(Base):
         # ---- 宠物加成（精确）----
         pet_bonus_dict = {k: 0 for k in INIT}
         if session:
-            from ..domain.attributes.attribute_calculator_factory import AttributeCalculatorFactory
-            AttributeCalculatorFactory.get_instance()
-            pet_source = AttributeCalculatorFactory._pet_source
-            if pet_source:
-                pet_full = await pet_source.calculate_full_bonus(self, session)
-                for attr_key, val in pet_full.items():
-                    if attr_key in pet_bonus_dict:
-                        pet_bonus_dict[attr_key] = val
+            from ..domain.attributes.attribute_sources.pet_source import get_pet_source
+            pet_full = await get_pet_source().calculate_full_bonus(self, session)
+            for attr_key, val in pet_full.items():
+                if attr_key in pet_bonus_dict:
+                    pet_bonus_dict[attr_key] = val
 
         # ---- 永久加成（从 ElixirUsageLog 精确累加）----
         permanent_bonus = {k: 0 for k in INIT}
@@ -512,30 +477,6 @@ class Player(Base):
             "pet": pet_bonus_dict,
             "total": total_attrs
         }
-
-    def format_battle_attributes(self) -> str:
-        """格式化显示战斗属性"""
-        attrs = self.get_effective_battle_attributes()
-
-        # 计算暴击倍数显示（基础1.5倍 + 暴击力*0.1倍）
-        crit_multiplier = 1.5 + (attrs['critical_power'] * 0.1)
-
-        lines = [
-            "⚔️ 战斗属性 ⚔️",
-            f"💥 暴击率: {attrs['critical_rate']}%",
-            f"💢 暴击力: {crit_multiplier:.1f}倍",
-            f"🔄 连击率: {attrs['combo_rate']}%",
-            f"🛡️ 反击率: {attrs['counter_rate']}%",
-            f"⚡ 闪避率: {attrs['dodge_rate']}%",
-            f"🎯 命中率: {attrs['accuracy_rate']}%",
-            f"✨ 灵爆率: {attrs['skill_crit_rate']}%",
-            f"🗡️ 穿透率: {attrs['penetration_rate']}%",
-            f"🛡️ 抗暴率: {attrs['anti_crit_rate']}%"
-        ]
-
-        return "\n".join(lines)
-
-
 
 
 async def get_player_by_uid(uid: str):
