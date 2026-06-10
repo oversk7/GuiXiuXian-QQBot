@@ -33,28 +33,31 @@ def _load_module():
         "nonebot.adapters.qq": types.ModuleType("nonebot.adapters.qq"),
         "nonebot.adapters.qq.event": event_mod,
     }
-    created_stubs = []
+    # 强制替换（真模块可能已被其他测试加载），结束后完整还原，保证与运行顺序无关
+    saved = {}
     for name, module in stubs.items():
-        if name not in sys.modules:
-            sys.modules[name] = module
-            created_stubs.append((name, module))
+        saved[name] = sys.modules.get(name)
+        sys.modules[name] = module
 
-    _event_classes.clear()
-    module_path = (
-        Path(__file__).resolve().parents[1]
-        / "plugins"
-        / "xiuxian_game"
-        / "qq_full_message_send.py"
-    )
-    spec = importlib.util.spec_from_file_location("qq_full_message_send_under_test", module_path)
-    assert spec and spec.loader
-    module = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(module)
-
-    for name, module_stub in created_stubs:
-        if sys.modules.get(name) is module_stub:
-            del sys.modules[name]
-    return module
+    try:
+        _event_classes.clear()
+        module_path = (
+            Path(__file__).resolve().parents[1]
+            / "plugins"
+            / "xiuxian_game"
+            / "qq_full_message_send.py"
+        )
+        spec = importlib.util.spec_from_file_location("qq_full_message_send_under_test", module_path)
+        assert spec and spec.loader
+        module = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(module)
+        return module
+    finally:
+        for name, original in saved.items():
+            if original is None:
+                sys.modules.pop(name, None)
+            else:
+                sys.modules[name] = original
 
 
 def test_group_message_create_registered_as_group_at_event_compatibility():

@@ -48,27 +48,30 @@ def _load_module():
         "nonebot.adapters.qq": qq_mod,
         "nonebot.message": message_mod,
     }
-    created_stubs = []
+    # 强制替换（真模块可能已被其他测试加载），结束后完整还原，保证与运行顺序无关
+    saved = {}
     for name, module in stubs.items():
-        if name not in sys.modules:
-            sys.modules[name] = module
-            created_stubs.append((name, module))
+        saved[name] = sys.modules.get(name)
+        sys.modules[name] = module
 
-    module_path = (
-        Path(__file__).resolve().parents[1]
-        / "plugins"
-        / "xiuxian_game"
-        / "message_normalizer.py"
-    )
-    spec = importlib.util.spec_from_file_location("message_normalizer_under_test", module_path)
-    assert spec and spec.loader
-    module = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(module)
-
-    for name, module_stub in created_stubs:
-        if sys.modules.get(name) is module_stub:
-            del sys.modules[name]
-    return module
+    try:
+        module_path = (
+            Path(__file__).resolve().parents[1]
+            / "plugins"
+            / "xiuxian_game"
+            / "message_normalizer.py"
+        )
+        spec = importlib.util.spec_from_file_location("message_normalizer_under_test", module_path)
+        assert spec and spec.loader
+        module = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(module)
+        return module
+    finally:
+        for name, module_stub in saved.items():
+            if module_stub is None:
+                sys.modules.pop(name, None)
+            else:
+                sys.modules[name] = module_stub
 
 
 def _mention_user(user_id="member_openid"):

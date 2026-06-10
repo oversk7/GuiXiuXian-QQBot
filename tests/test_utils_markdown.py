@@ -29,20 +29,24 @@ _stubs = {
     "nonebot.adapters.qq.models": models_mod,
     "nonebot.adapters.qq.models.common": common_mod,
 }
-_created_stubs = []
+# 强制替换（真模块可能已被其他测试加载），结束后完整还原，保证与运行顺序无关
+_saved = {}
 for _name, _module in _stubs.items():
-    if _name not in sys.modules:
-        sys.modules[_name] = _module
-        _created_stubs.append((_name, _module))
+    _saved[_name] = sys.modules.get(_name)
+    sys.modules[_name] = _module
 
-MODULE_PATH = Path(__file__).resolve().parents[1] / "plugins" / "xiuxian_game" / "utils_markdown.py"
-SPEC = importlib.util.spec_from_file_location("utils_markdown_under_test", MODULE_PATH)
-assert SPEC and SPEC.loader
-utils_markdown = importlib.util.module_from_spec(SPEC)
-SPEC.loader.exec_module(utils_markdown)
-for _name, _module in _created_stubs:
-    if sys.modules.get(_name) is _module:
-        del sys.modules[_name]
+try:
+    MODULE_PATH = Path(__file__).resolve().parents[1] / "plugins" / "xiuxian_game" / "utils_markdown.py"
+    SPEC = importlib.util.spec_from_file_location("utils_markdown_under_test", MODULE_PATH)
+    assert SPEC and SPEC.loader
+    utils_markdown = importlib.util.module_from_spec(SPEC)
+    SPEC.loader.exec_module(utils_markdown)
+finally:
+    for _name, _original in _saved.items():
+        if _original is None:
+            sys.modules.pop(_name, None)
+        else:
+            sys.modules[_name] = _original
 
 cmd = utils_markdown.cmd
 color_text = utils_markdown.color_text

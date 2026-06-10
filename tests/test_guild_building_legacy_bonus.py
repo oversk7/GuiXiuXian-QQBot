@@ -92,29 +92,42 @@ def _load_legacy_guild_building_service():
         ),
     }
 
-    created = []
+    # 强制替换（真模块可能已被其他测试加载），用完通过 restore() 完整还原，
+    # 保证与运行顺序无关。get_guild_bonuses 内部是运行时相对导入，
+    # 因此 stub 必须保留到调用结束后再还原。
+    saved = {}
     for name, module in stubs.items():
-        if name not in sys.modules:
-            sys.modules[name] = module
-            created.append(name)
+        saved[name] = sys.modules.get(name)
+        sys.modules[name] = module
 
-    spec = importlib.util.spec_from_file_location(module_name, module_path)
-    assert spec and spec.loader
-    module = importlib.util.module_from_spec(spec)
-    sys.modules[module_name] = module
-    spec.loader.exec_module(module)
-    return module.GuildBuildingService, [module_name, *reversed(created)]
+    def restore():
+        sys.modules.pop(module_name, None)
+        for name, original in saved.items():
+            if original is None:
+                sys.modules.pop(name, None)
+            else:
+                sys.modules[name] = original
+
+    try:
+        spec = importlib.util.spec_from_file_location(module_name, module_path)
+        assert spec and spec.loader
+        module = importlib.util.module_from_spec(spec)
+        sys.modules[module_name] = module
+        spec.loader.exec_module(module)
+    except BaseException:
+        restore()
+        raise
+    return module.GuildBuildingService, restore
 
 
 def test_legacy_guild_bonuses_delegate_to_new_layout_service():
-    service, cleanup_modules = _load_legacy_guild_building_service()
+    service, restore = _load_legacy_guild_building_service()
     session = object()
 
     try:
         bonuses = asyncio.run(service.get_guild_bonuses(session, 123))
     finally:
-        for name in cleanup_modules:
-            sys.modules.pop(name, None)
+        restore()
 
     assert bonuses["cultivation_bonus"] == 0.07
     assert bonuses["adjacency_descriptions"] == ["聚灵阵邻接训练场：修为加成 +2%"]

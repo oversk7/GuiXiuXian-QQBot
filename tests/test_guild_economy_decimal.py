@@ -66,11 +66,11 @@ def _load_guild_economy_service_new():
         ),
     }
 
-    created = []
+    # 强制替换（真模块可能已被其他测试加载），结束后完整还原，保证与运行顺序无关
+    saved = {}
     for name, module in stubs.items():
-        if name not in sys.modules:
-            sys.modules[name] = module
-            created.append(name)
+        saved[name] = sys.modules.get(name)
+        sys.modules[name] = module
 
     try:
         spec = importlib.util.spec_from_file_location(module_name, module_path)
@@ -81,8 +81,11 @@ def _load_guild_economy_service_new():
         return module.GuildEconomyService
     finally:
         sys.modules.pop(module_name, None)
-        for name in reversed(created):
-            sys.modules.pop(name, None)
+        for name, original in saved.items():
+            if original is None:
+                sys.modules.pop(name, None)
+            else:
+                sys.modules[name] = original
 
 
 def test_decimal_donation_total_still_returns_int_points():

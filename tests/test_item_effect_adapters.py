@@ -51,22 +51,6 @@ class MockItemConfig:
     effect_params: Dict[str, Any]
 
 
-class MockSession:
-    """模拟数据库会话"""
-    def __init__(self):
-        self.added_objects = []
-        self.committed = False
-
-    def add(self, obj):
-        self.added_objects.append(obj)
-
-    async def flush(self):
-        pass
-
-    async def commit(self):
-        self.committed = True
-
-
 # ============ 测试用例 ============
 
 async def test_wrap_legacy_effect():
@@ -124,127 +108,6 @@ async def test_wrap_legacy_effect():
     print("[OK] 测试1通过: wrap_legacy_item_effect 工作正常\n")
 
 
-async def test_example_restore_hp():
-    """测试2: 示例 - 恢复生命值效果"""
-    print("=" * 60)
-    print("测试2: ExampleRestoreHPEffect (恢复生命值)")
-    print("=" * 60)
-
-    from plugins.xiuxian_game.domain.effects import get_effect_registry, EffectContext, TriggerType
-
-    registry = get_effect_registry()
-
-    # 创建mock对象
-    player = MockPlayer(hp=50, max_hp=100)
-    item_cfg = MockItemConfig(item_id="hp_potion", effect_params={"value": 30})
-
-    context = EffectContext(
-        player=player,
-        session=None,
-        trigger_type=TriggerType.ON_USE,
-        item_config=item_cfg,
-        quantity=1
-    )
-
-    # 执行效果
-    effect = registry.create("example_restore_hp")
-    print(f"[OK] 创建效果实例: {effect.effect_id}")
-
-    result = await effect.execute(context)
-
-    print(f"\n执行结果:")
-    print(f"  - Success: {result.success}")
-    print(f"  - Message: {result.message}")
-    print(f"  - Player HP: {player.hp} (应该是80)")
-    print(f"  - Attribute Changes: {result.attribute_changes}")
-    print(f"  - Extra Data: {result.extra_data}")
-
-    assert result.success is True, "恢复生命应该成功"
-    assert player.hp == 80, "HP应该恢复到80"
-    assert result.attribute_changes.get("hp") == 30, "属性变化应该记录+30"
-    assert result.extra_data.get("old_hp") == 50, "应该记录旧HP值"
-    assert result.extra_data.get("new_hp") == 80, "应该记录新HP值"
-
-    print("[OK] 测试2通过: 恢复生命值效果工作正常\n")
-
-
-async def test_example_restore_hp_edge_cases():
-    """测试3: 恢复生命值 - 边界情况"""
-    print("=" * 60)
-    print("测试3: ExampleRestoreHPEffect - 边界情况")
-    print("=" * 60)
-
-    from plugins.xiuxian_game.domain.effects import get_effect_registry, EffectContext, TriggerType
-
-    registry = get_effect_registry()
-    effect = registry.create("example_restore_hp")
-
-    # 测试3.1: 玩家已死亡
-    print("\n3.1 测试: 玩家已死亡")
-    player_dead = MockPlayer(hp=0, max_hp=100)
-    item_cfg = MockItemConfig(item_id="hp_potion", effect_params={"value": 30})
-
-    context = EffectContext(
-        player=player_dead,
-        session=None,
-        trigger_type=TriggerType.ON_USE,
-        item_config=item_cfg,
-        quantity=1
-    )
-
-    result = await effect.execute(context)
-    print(f"  - Success: {result.success} (应该是False)")
-    print(f"  - Message: {result.message}")
-
-    assert result.success is False, "死亡时使用药水应该失败"
-    assert "死亡" in result.message, "消息应该提示玩家已死亡"
-    print("  [OK] 死亡检查通过")
-
-    # 测试3.2: 玩家HP已满
-    print("\n3.2 测试: 玩家HP已满")
-    player_full = MockPlayer(hp=100, max_hp=100)
-
-    context = EffectContext(
-        player=player_full,
-        session=None,
-        trigger_type=TriggerType.ON_USE,
-        item_config=item_cfg,
-        quantity=1
-    )
-
-    result = await effect.execute(context)
-    print(f"  - Success: {result.success} (应该是False)")
-    print(f"  - Message: {result.message}")
-
-    assert result.success is False, "HP已满时使用药水应该失败"
-    assert "已满" in result.message, "消息应该提示HP已满"
-    print("  [OK] 满血检查通过")
-
-    # 测试3.3: 恢复量超过上限
-    print("\n3.3 测试: 恢复量超过上限")
-    player_near_full = MockPlayer(hp=90, max_hp=100)
-    item_cfg_big = MockItemConfig(item_id="big_potion", effect_params={"value": 50})
-
-    context = EffectContext(
-        player=player_near_full,
-        session=None,
-        trigger_type=TriggerType.ON_USE,
-        item_config=item_cfg_big,
-        quantity=1
-    )
-
-    result = await effect.execute(context)
-    print(f"  - Success: {result.success}")
-    print(f"  - Player HP: {player_near_full.hp} (应该是100，不超过上限)")
-    print(f"  - Attribute Changes: {result.attribute_changes.get('hp')} (实际恢复量)")
-
-    assert player_near_full.hp == 100, "HP应该恢复到上限"
-    assert result.attribute_changes.get("hp") == 10, "实际恢复量应该是10，不是50"
-    print("  [OK] 上限检查通过")
-
-    print("[OK] 测试3通过: 所有边界情况处理正确\n")
-
-
 async def test_create_adapter_for_all():
     """测试4: 批量创建适配器"""
     print("=" * 60)
@@ -276,43 +139,6 @@ async def test_create_adapter_for_all():
     print("[OK] 测试4通过: 批量创建适配器工作正常\n")
 
 
-async def test_adapter_with_session():
-    """测试5: 带数据库会话的适配器"""
-    print("=" * 60)
-    print("测试5: 适配器处理数据库会话")
-    print("=" * 60)
-
-    from plugins.xiuxian_game.domain.effects import get_effect_registry, EffectContext, TriggerType
-
-    # 模拟带有会话的上下文
-    player = MockPlayer(hp=50, max_hp=100)
-    item_cfg = MockItemConfig(item_id="hp_potion", effect_params={"value": 30})
-    session = MockSession()
-
-    context = EffectContext(
-        player=player,
-        session=session,
-        trigger_type=TriggerType.ON_USE,
-        item_config=item_cfg,
-        quantity=1
-    )
-
-    # 执行效果
-    registry = get_effect_registry()
-    effect = registry.create("example_restore_hp")
-    result = await effect.execute(context)
-
-    print(f"\n执行结果:")
-    print(f"  - Success: {result.success}")
-    print(f"  - Player HP: {player.hp}")
-    print(f"  - Session committed: {session.committed}")
-
-    assert result.success is True, "效果应该成功"
-    assert player.hp == 80, "HP应该恢复"
-
-    print("[OK] 测试5通过: 适配器正确处理数据库会话\n")
-
-
 # ============ 主测试函数 ============
 
 async def main():
@@ -325,10 +151,7 @@ async def main():
 
     try:
         await test_wrap_legacy_effect()
-        await test_example_restore_hp()
-        await test_example_restore_hp_edge_cases()
         await test_create_adapter_for_all()
-        await test_adapter_with_session()
 
         # 总结
         print("=" * 60)

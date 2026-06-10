@@ -115,6 +115,10 @@ dependencies = [
     "yarl==1.18.3",
 ]
 
+[tool.pytest.ini_options]
+# 自动识别 async def test_*（tests 里大量裸 async 测试函数，无需逐个加 marker）
+asyncio_mode = "auto"
+
 [tool.nonebot]
 adapters = [
     { name = "OneBot V11", module_name = "nonebot.adapters.qq" }

@@ -108,3 +108,4 @@ win32-setctime==1.2.0
 yarg==0.1.9
 yarl==1.18.3
 pytest==9.0.3
+pytest-asyncio==1.4.0
