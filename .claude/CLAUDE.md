@@ -21,21 +21,13 @@ After thorough research, use `AskUserQuestion` to present choices rather than ju
 
 - **Server:** root@***REMOVED***, password: ***REMOVED***
 - **Project path:** /home/admin/GuiXiuXian2
-- **Screen:** `qqbot` screen session (admin user)
+- **Service:** systemd unit `guixiuxian-bot` (User=admin, `/etc/systemd/system/guixiuxian-bot.service`, Restart=always, 开机自启). 自 2026-06-10 起取代旧的 `qqbot` screen 会话。
 - **Workflow:** When user says "部署" (deploy), execute ALL steps automatically:
   1. `git push`
   2. `ssh root@***REMOVED*** "su - admin -c 'cd /home/admin/GuiXiuXian2 && git pull'"`
-  3. Kill old process and restart:
-     ```bash
-     ssh root@***REMOVED*** bash -c '
-       su - admin -c "screen -X -S qqbot quit" 2>/dev/null
-       sleep 1
-       pkill -u admin -f "bot\.py" 2>/dev/null
-       sleep 1
-       su - admin -c "screen -dmS qqbot bash -c \"cd /home/admin/GuiXiuXian2 && nb run; exec bash\""
-     '
-     ```
-  4. Verify: `ps aux | grep bot.py`
+  3. `ssh root@***REMOVED*** "systemctl restart guixiuxian-bot"`
+  4. Verify: `ssh root@***REMOVED*** "systemctl status guixiuxian-bot --no-pager | head -5"`
+- **Logs:** `journalctl -u guixiuxian-bot` 或 `/home/admin/GuiXiuXian2/logs/bot.log`
 
 ## 1. Think Before Coding
 
