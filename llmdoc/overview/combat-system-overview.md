@@ -17,4 +17,4 @@
 - **PvP切磋系统:** 无损战斗,不影响实际状态,支持随机种子实现可重现战斗
 
 **系统集成:**
-装备特殊效果通过YAML定义(`special_effects`字段),战斗开始时由`EnhancedBattleEngine`直接解析为`TriggerConfig`并交给`BattleEffectManager`管理,不经过效果注册中心。
+装备特殊效果通过YAML定义(`special_effects`字段),战斗开始时由`EnhancedBattleEngine`直接解析为`TriggerConfig`并交给`BattleEffectManager`管理。

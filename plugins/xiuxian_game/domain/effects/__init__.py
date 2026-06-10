@@ -13,12 +13,6 @@ from .interfaces import (
     TriggerType,
 )
 
-from .registry import (
-    EffectRegistry,
-    get_effect_registry,
-    register_effect,
-)
-
 __all__ = [
     # 核心接口
     "IEffect",
@@ -29,9 +23,4 @@ __all__ = [
     "EffectContext",
     "EffectResult",
     "TriggerType",
-
-    # 注册中心
-    "EffectRegistry",
-    "get_effect_registry",
-    "register_effect",
 ]

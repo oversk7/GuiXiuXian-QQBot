@@ -207,10 +207,8 @@ plugins/xiuxian_game/
 │   │   ├── attribute_calculator.py  # 属性计算器(组合模式)
 │   │   ├── attribute_calculator_factory.py  # 单例工厂
 │   │   └── attribute_sources/   # 属性来源(策略模式)
-│   └── effects/                 # 效果系统
-│       ├── interfaces.py        # IEffect 统一接口
-│       ├── registry.py          # 效果注册中心
-│       └── adapters/            # 适配器(桥接旧代码)
+│   └── effects/                 # 效果数据结构
+│       └── interfaces.py        # EffectResult 等接口定义
 │
 ├── infrastructure/              # 基础设施层
 │   ├── repositories/            # Repository 实现(42 个)
@@ -463,7 +461,6 @@ database:
 ENVIRONMENT=dev
 DRIVER=~fastapi+~httpx+~websockets
 LOG_LEVEL=DEBUG
-USE_NEW_EFFECT_SYSTEM=true
 QQ_IS_SANDBOX=false
 COMMAND_START=["/",""]
 SUPERUSERS=["10828B7EC666EF1E868F52B96FE5F265"]
@@ -505,8 +502,6 @@ nonebot.load_from_toml("pyproject.toml")
 @driver.on_startup
 async def _():
     await init_db()  # 创建表 + auto_migrate
-    # 注册物品效果适配器
-    adapters = register_all_item_effect_adapters()
 ```
 
 ### 10.2 数据库迁移

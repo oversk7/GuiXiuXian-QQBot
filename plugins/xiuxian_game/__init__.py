@@ -58,28 +58,7 @@ driver = get_driver()
 async def _():
     await init_db()
 
-    # 注册效果系统（物品效果适配器）
-    from .domain.effects.adapters import (
-        register_all_item_effect_adapters,
-        USE_NEW_EFFECT_SYSTEM
-    )
     from nonebot import logger
-
-    try:
-        # 注册物品效果适配器
-        adapters = register_all_item_effect_adapters()
-        logger.success(f"[EffectSystem] 成功注册 {len(adapters)} 个物品效果适配器")
-
-        # Feature Flag状态
-        if USE_NEW_EFFECT_SYSTEM:
-            logger.success("[EffectSystem] 新效果系统已启用")
-        else:
-            logger.info("[EffectSystem] 新效果系统已注册但未启用（Feature Flag关闭）")
-
-    except Exception as e:
-        logger.error(f"[EffectSystem] 注册效果系统失败: {e}")
-        import traceback
-        traceback.print_exc()
 
     # 动态注册菜肴物品配置
     try:

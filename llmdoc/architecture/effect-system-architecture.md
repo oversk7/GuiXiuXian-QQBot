@@ -2,24 +2,21 @@
 
 ## 1. Identity
 
-- **What it is:** 统一的效果管理系统,集成物品效果和战斗效果,提供可扩展的触发机制和效果叠加机制。
-- **Purpose:** 管理所有类型的效果(物品效果、战斗buff/debuff、装备特殊效果),提供统一的注册、触发、应用和生命周期管理。
+- **What it is:** 游戏的两套效果机制总览——物品/丹药效果(`item_effects.py`装饰器注册表)与战斗效果(`BattleEffectManager`触发/叠加机制),二者各自直连、无统一注册中心。
+- **Purpose:** 说明物品效果与战斗buff/debuff、装备特殊效果各自的注册、触发、应用和生命周期管理。
 
 ## 2. Core Components
 
 - **`plugins/xiuxian_game/battle/battle_effects.py` (BattleEffectManager + 数据类):** 战斗效果管理器和数据结构。定义TriggerType(触发类型枚举)、EffectType(效果类型枚举)、BattleEffect(效果数据类)、TriggerConfig(触发配置类)。提供效果注册、触发检查、效果添加、回合结算、属性修正计算等功能。
-- **`plugins/xiuxian_game/domain/effects/interfaces.py` (IEffect接口):** 统一效果接口。定义IEffect抽象基类、EffectContext(效果执行上下文)、EffectResult(效果执行结果)、TriggerType(统一触发类型枚举)、BaseItemEffect(物品效果基类)、BaseBattleEffect(战斗效果基类)。
-- **`plugins/xiuxian_game/domain/effects/registry.py` (EffectRegistry):** 效果注册中心。支持装饰器注册效果类(`@register_effect`),支持按效果ID或触发类型查找,支持效果实例的创建和缓存,单例模式支持。仅服务于物品效果适配器;战斗效果不经过注册中心。
+- **`plugins/xiuxian_game/item/item_effects.py` (物品效果注册表):** 物品/丹药效果的唯一实现。按`ItemEffectType`枚举用`@register`装饰器注册处理函数到模块级`_REGISTRY`,入口为`apply_effect(player, item_cfg, quantity, ctx, session)`(`item_effects.py:39-64`),由`item/inventory.py`的使用命令直接调用。
+- **`plugins/xiuxian_game/domain/effects/interfaces.py` (数据结构):** 定义EffectResult(效果执行结果,被扫荡/洗髓/宝箱服务用作返回值)、EffectContext、IEffect等接口定义。
 
 ## 3. Execution Flow (LLM Retrieval Map)
 
-### 效果注册流程(启动时)
+### 效果注册流程
 
-1. **启动触发:** 在`plugins/xiuxian_game/__init__.py`的启动钩子中调用`register_all_item_effect_adapters`(`domain/effects/adapters/register_all.py`)。
-2. **包装旧效果:** 扫描`item_effects.py`中的旧物品效果,为每个效果创建`ItemEffectAdapter`适配器类(`domain/effects/adapters/item_effect_adapter.py`)。
-3. **注册到中心:** 通过`@register_effect`装饰器注册到`EffectRegistry`(`registry.py`)。
-
-注: 战斗效果(装备`special_effects`)不在启动时注册——战斗开始时由`EnhancedBattleEngine`直接从装备配置解析(见下)。
+- **物品效果:** `item_effects.py`模块导入时通过`@register(ItemEffectType.X)`装饰器注册,无启动注册步骤。
+- **战斗效果:** 装备`special_effects`不注册——战斗开始时由`EnhancedBattleEngine`直接从装备配置解析(见下)。
 
 ### 效果触发流程(战斗时)
 
@@ -56,7 +53,7 @@
 
 ## 4. Design Rationale
 
-**战斗效果直连引擎:** 装备`special_effects`由`EnhancedBattleEngine`在战斗时直接解析,不经过`EffectRegistry`——曾存在的`BattleEffectBridge`桥接层(将`TriggerConfig`包装为`IEffect`)注册后从未被消费,已于2026-06-10删除。
+**两套效果系统各自直连,无注册中心:** 物品效果走`item_effects.py`装饰器注册表,战斗效果由`EnhancedBattleEngine`在战斗时直接解析装备配置。曾存在的"统一效果系统"(EffectRegistry注册中心+ItemEffectAdapter物品适配层+BattleEffectBridge战斗桥接层)只是把调用原样转发回旧实现、无任何独立效果,已于2026-06-10删除。
 
 **触发类型与效果类型分离:** TriggerType定义何时触发(ON_ATTACK, ON_HIT等),EffectType定义触发后产生什么效果(LIFESTEAL, TRUE_DAMAGE等),一个`TriggerConfig`关联一个`TriggerType`和一个`EffectType`,提供最大的灵活性。
 
