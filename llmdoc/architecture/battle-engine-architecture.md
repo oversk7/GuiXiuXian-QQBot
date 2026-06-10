@@ -56,6 +56,15 @@
 5. **防御减伤:** 调用`apply_defense_mitigation`计算最终伤害。
 6. **斩龙闪20%必中拆分:** 20%部分绕过命中判定(必中),80%部分常规判定,最终伤害=20%部分+80%部分。
 
+### PvE怪物攻击判定流程（2026-06-11 起走完整判定）
+
+1. **入口:** `integration_helper.py`的`_monster_attack_player()`——PVE怪物回合统一走此函数,不再必中。
+2. **命中判定:** 怪物命中率来自生成属性`monster_stats["accuracy_rate"]`(默认80),对抗玩家闪避率(含临时buff/宠物/词缀,经`effective_attrs_in_battle`读开战缓存)。
+3. **暴击判定:** 怪物`crit_rate` vs 玩家`anti_crit_rate`(200级以上怪物才有暴击)。
+4. **连击判定:** 怪物`combo_rate`,固定2次,第二击85%伤害。
+5. **穿透/真伤:** 怪物`ignore_defense`削减玩家有效防御;`true_damage_rate`走真伤分支(绝魔体质免疫50%)。
+6. **怪物命中率生成标准:** `dungeon_generation_service.calculate_monster_attributes`——200级以下无字段(默认80);200-999级=85+每100级1.5;1000级以上=95+每100级4;原型加法修正(迅捷+15/穿透+20/噬魂+25/诡诈+10/守卫-10);精英+10;上限普通200/精英250(`MONSTER_SPECIAL_CAPS`)。
+
 ### 胜负判定流程
 
 1. **血量检查:** 一方HP≤0则战斗结束。

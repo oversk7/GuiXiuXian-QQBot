@@ -36,49 +36,49 @@ MONSTER_ARCHETYPES = {
     "balanced": {  # 平衡型：无前缀，属性均衡
         "name": "平衡", "prefix": "", "icon": "",
         "stat_mult": {"hp": 1.0, "attack": 1.0, "agility": 1.0},
-        "special_profile": {"crit_rate": 1.0, "combo_rate": 1.0, "counter_rate": 1.0, "anti_crit_rate": 1.0, "true_damage_rate": 0, "defense_ratio": 0.0},
+        "special_profile": {"crit_rate": 1.0, "combo_rate": 1.0, "counter_rate": 1.0, "anti_crit_rate": 1.0, "true_damage_rate": 0, "defense_ratio": 0.0, "accuracy_bonus": 0},
         "weight": {"low": 50, "mid": 30, "high": 15}, "elite_weight": 3,
     },
     "berserker": {  # 狂暴型：高暴击高攻，脆皮
         "name": "狂暴", "prefix": "狂暴·", "icon": "🔥",
         "stat_mult": {"hp": 0.7, "attack": 1.35, "agility": 1.0},
-        "special_profile": {"crit_rate": 2.5, "combo_rate": 0.5, "counter_rate": 0.3, "anti_crit_rate": 0.0, "true_damage_rate": 0, "defense_ratio": 0.0},
+        "special_profile": {"crit_rate": 2.5, "combo_rate": 0.5, "counter_rate": 0.3, "anti_crit_rate": 0.0, "true_damage_rate": 0, "defense_ratio": 0.0, "accuracy_bonus": 0},
         "weight": {"low": 10, "mid": 20, "high": 20}, "elite_weight": 15,
     },
     "tank": {  # 坚韧型：高HP高防高抗暴，低攻
         "name": "坚韧", "prefix": "坚韧·", "icon": "🛡️",
         "stat_mult": {"hp": 1.5, "attack": 0.65, "agility": 0.7},
-        "special_profile": {"crit_rate": 0.0, "combo_rate": 0.0, "counter_rate": 0.8, "anti_crit_rate": 1.5, "true_damage_rate": 0, "defense_ratio": 0.35},
+        "special_profile": {"crit_rate": 0.0, "combo_rate": 0.0, "counter_rate": 0.8, "anti_crit_rate": 1.5, "true_damage_rate": 0, "defense_ratio": 0.35, "accuracy_bonus": 0},
         "weight": {"low": 10, "mid": 15, "high": 18}, "elite_weight": 15,
     },
     "swift": {  # 迅捷型：高敏捷高连击高反击
         "name": "迅捷", "prefix": "迅捷·", "icon": "💨",
         "stat_mult": {"hp": 0.85, "attack": 0.9, "agility": 1.6},
-        "special_profile": {"crit_rate": 0.5, "combo_rate": 2.5, "counter_rate": 2.0, "anti_crit_rate": 0.3, "true_damage_rate": 0, "defense_ratio": 0.0},
+        "special_profile": {"crit_rate": 0.5, "combo_rate": 2.5, "counter_rate": 2.0, "anti_crit_rate": 0.3, "true_damage_rate": 0, "defense_ratio": 0.0, "accuracy_bonus": 15},
         "weight": {"low": 8, "mid": 18, "high": 18}, "elite_weight": 15,
     },
     "piercer": {  # 穿透型：有真伤，高攻，低HP
         "name": "穿透", "prefix": "穿透·", "icon": "🗡️",
         "stat_mult": {"hp": 0.65, "attack": 1.2, "agility": 0.9},
-        "special_profile": {"crit_rate": 0.8, "combo_rate": 0.3, "counter_rate": 0.5, "anti_crit_rate": 0.3, "true_damage_rate": 15, "defense_ratio": 0.0},
+        "special_profile": {"crit_rate": 0.8, "combo_rate": 0.3, "counter_rate": 0.5, "anti_crit_rate": 0.3, "true_damage_rate": 15, "defense_ratio": 0.0, "accuracy_bonus": 20},
         "weight": {"low": 2, "mid": 8, "high": 12}, "elite_weight": 12,
     },
     "trickster": {  # 诡诈型：高反击高抗暴
         "name": "诡诈", "prefix": "诡诈·", "icon": "🎭",
         "stat_mult": {"hp": 1.0, "attack": 0.95, "agility": 1.1},
-        "special_profile": {"crit_rate": 0.6, "combo_rate": 0.4, "counter_rate": 2.5, "anti_crit_rate": 1.8, "true_damage_rate": 0, "defense_ratio": 0.1},
+        "special_profile": {"crit_rate": 0.6, "combo_rate": 0.4, "counter_rate": 2.5, "anti_crit_rate": 1.8, "true_damage_rate": 0, "defense_ratio": 0.1, "accuracy_bonus": 10},
         "weight": {"low": 5, "mid": 10, "high": 12}, "elite_weight": 12,
     },
     "devourer": {  # 噬魂型：高暴击+真伤，稀有强力型
         "name": "噬魂", "prefix": "噬魂·", "icon": "👁️",
         "stat_mult": {"hp": 0.75, "attack": 1.3, "agility": 1.1},
-        "special_profile": {"crit_rate": 2.0, "combo_rate": 1.0, "counter_rate": 0.5, "anti_crit_rate": 0.5, "true_damage_rate": 10, "defense_ratio": 0.0},
+        "special_profile": {"crit_rate": 2.0, "combo_rate": 1.0, "counter_rate": 0.5, "anti_crit_rate": 0.5, "true_damage_rate": 10, "defense_ratio": 0.0, "accuracy_bonus": 25},
         "weight": {"low": 0, "mid": 2, "high": 5}, "elite_weight": 8,
     },
     "guardian": {  # 守卫型：极高防御和HP，极低攻击
         "name": "守卫", "prefix": "守卫·", "icon": "🏰",
         "stat_mult": {"hp": 1.8, "attack": 0.5, "agility": 0.5},
-        "special_profile": {"crit_rate": 0.0, "combo_rate": 0.0, "counter_rate": 1.2, "anti_crit_rate": 2.0, "true_damage_rate": 0, "defense_ratio": 0.5},
+        "special_profile": {"crit_rate": 0.0, "combo_rate": 0.0, "counter_rate": 1.2, "anti_crit_rate": 2.0, "true_damage_rate": 0, "defense_ratio": 0.5, "accuracy_bonus": -10},
         "weight": {"low": 5, "mid": 7, "high": 10}, "elite_weight": 8,
     },
 }
@@ -90,6 +90,7 @@ MONSTER_SPECIAL_CAPS = {
     "counter_rate": (60, 75),
     "anti_crit_rate": (95, 99),
     "true_damage_rate": (25, 35),
+    "accuracy_rate": (200, 250),   # 命中率随层级提升，对抗玩家闪避堆叠
 }
 
 def get_materials_by_rarity(rarity: str) -> list:
@@ -254,6 +255,7 @@ def calculate_monster_attributes(monster_level: int, is_elite: bool = False, arc
             combo_rate = min(5, 1 + level_factor * 0.5)
             counter_rate = min(10, 3 + level_factor * 1)
             anti_crit_rate = min(40, 15 + level_factor * 3)
+            accuracy_rate = 85 + level_factor * 1.5
         else:
             # 1000级以后：超高特殊属性（200层以后）
             high_level_factor = (monster_level - 1000) / 100
@@ -261,6 +263,7 @@ def calculate_monster_attributes(monster_level: int, is_elite: bool = False, arc
             combo_rate = min(15, 3 + high_level_factor * 1.5)
             counter_rate = min(30, 8 + high_level_factor * 2)
             anti_crit_rate = min(80, 50 + high_level_factor * 5)
+            accuracy_rate = 95 + high_level_factor * 4
 
         if archetype and archetype in MONSTER_ARCHETYPES:
             # ---- 原型系统：应用原型倍率 ----
@@ -272,11 +275,12 @@ def calculate_monster_attributes(monster_level: int, is_elite: bool = False, arc
             attack = int(attack * arch["stat_mult"]["attack"])
             agility = int(agility * arch["stat_mult"]["agility"])
 
-            # 特殊属性应用原型倍率
+            # 特殊属性应用原型倍率（命中为加法修正：迅捷/穿透/噬魂高命中，守卫低命中）
             crit_rate *= profile["crit_rate"]
             combo_rate *= profile["combo_rate"]
             counter_rate *= profile["counter_rate"]
             anti_crit_rate *= profile["anti_crit_rate"]
+            accuracy_rate += profile.get("accuracy_bonus", 0)
 
             # 精英怪原型强化：倍率>1.0的属性额外×1.3
             if is_elite:
@@ -300,6 +304,10 @@ def calculate_monster_attributes(monster_level: int, is_elite: bool = False, arc
             if is_elite and true_damage_rate > 0:
                 true_damage_rate *= 1.3
 
+            # 精英怪命中强化
+            if is_elite:
+                accuracy_rate += 10
+
             # 应用特殊属性上限
             cap_idx = 1 if is_elite else 0
             crit_rate = min(crit_rate, MONSTER_SPECIAL_CAPS["crit_rate"][cap_idx])
@@ -307,6 +315,7 @@ def calculate_monster_attributes(monster_level: int, is_elite: bool = False, arc
             counter_rate = min(counter_rate, MONSTER_SPECIAL_CAPS["counter_rate"][cap_idx])
             anti_crit_rate = min(anti_crit_rate, MONSTER_SPECIAL_CAPS["anti_crit_rate"][cap_idx])
             true_damage_rate = min(true_damage_rate, MONSTER_SPECIAL_CAPS["true_damage_rate"][cap_idx])
+            accuracy_rate = min(accuracy_rate, MONSTER_SPECIAL_CAPS["accuracy_rate"][cap_idx])
         else:
             # ---- 无原型：保持原有精英加成逻辑 ----
             if is_elite:
@@ -320,12 +329,15 @@ def calculate_monster_attributes(monster_level: int, is_elite: bool = False, arc
                     combo_rate = min(20, combo_rate * 1.2)
                     counter_rate = min(40, counter_rate * 1.2)
                     anti_crit_rate = min(95, anti_crit_rate * 1.15)
+                accuracy_rate += 10
+            accuracy_rate = min(accuracy_rate, MONSTER_SPECIAL_CAPS["accuracy_rate"][1 if is_elite else 0])
 
         special_attributes = {
             "crit_rate": round(crit_rate, 1),
             "combo_rate": round(combo_rate, 1),
             "counter_rate": round(counter_rate, 1),
             "anti_crit_rate": round(anti_crit_rate, 1),
+            "accuracy_rate": round(accuracy_rate, 1),
         }
 
     result = {
@@ -752,7 +764,8 @@ async def get_or_create_tile(session, region: str, x: int, y: int, server_id: in
                         "crit_rate": monster_attrs.get("crit_rate", 0),
                         "combo_rate": monster_attrs.get("combo_rate", 0),
                         "counter_rate": monster_attrs.get("counter_rate", 0),
-                        "anti_crit_rate": monster_attrs.get("anti_crit_rate", 0)
+                        "anti_crit_rate": monster_attrs.get("anti_crit_rate", 0),
+                        "accuracy_rate": monster_attrs.get("accuracy_rate", 80)
                     })
                     if monster_attrs.get("true_damage_rate", 0) > 0:
                         tile.state["true_damage_rate"] = monster_attrs["true_damage_rate"]
@@ -824,7 +837,8 @@ async def get_or_create_tile(session, region: str, x: int, y: int, server_id: in
                         "crit_rate": monster_attrs.get("crit_rate", 0),
                         "combo_rate": monster_attrs.get("combo_rate", 0),
                         "counter_rate": monster_attrs.get("counter_rate", 0),
-                        "anti_crit_rate": monster_attrs.get("anti_crit_rate", 0)
+                        "anti_crit_rate": monster_attrs.get("anti_crit_rate", 0),
+                        "accuracy_rate": monster_attrs.get("accuracy_rate", 80)
                     })
                     if monster_attrs.get("true_damage_rate", 0) > 0:
                         tile.state["true_damage_rate"] = monster_attrs["true_damage_rate"]

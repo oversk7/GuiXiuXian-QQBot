@@ -676,51 +676,17 @@ class BattleIntegrationHelper:
                 if monster_is_controlled:
                     battle_log.append(f"😱 {monster_name}被恐惧，无法行动")
                 else:
-                    monster_damage = monster_stats["attack"]
-
-                    # 检查怪物是否有真伤属性（未来可能添加）
-                    monster_true_damage_rate = monster_stats.get("true_damage_rate", 0)
-                    has_true_damage = monster_true_damage_rate > 0
-
-                    # 检查玩家是否有绝魔体质（免疫50%真伤）
+                    # 怪物攻击走完整判定：命中vs玩家闪避、暴击vs抗暴、高级怪连击
                     from ..battle.battle_effects import EffectType
-                    ignore_special_effects = engine.effect_manager.get_active_effects(player.id, EffectType.IGNORE_SPECIAL)
-                    ignore_special_ratio = 0.0
-                    for eff in ignore_special_effects:
-                        val = float(getattr(eff, 'value', 0))
-                        ignore_special_ratio += max(0.0, val) / 100.0
-
-                    # 应用穿透（怪物 ignore_defense 削减玩家有效防御）；防御含临时buff
-                    player_defense = getattr(player, '_cached_defense', player.defense)
-                    effective_player_defense = player_defense
-                    monster_penetration = monster_stats.get("ignore_defense", 0)
-                    if monster_penetration > 0:
-                        effective_player_defense = int(player_defense * (1 - monster_penetration / 100))
-
-                    # 应用防御减伤
-                    from ..utils import apply_defense_mitigation
-
-                    if has_true_damage:
-                        # 怪物有真伤属性
-                        if ignore_special_ratio > 0:
-                            # 玩家有绝魔体质：50%真伤 + 50%普通伤害（受防御减伤）
-                            true_damage_part = int(monster_damage * 0.5)
-                            normal_damage_part = monster_damage - true_damage_part
-                            mitigation = apply_defense_mitigation(normal_damage_part, effective_player_defense)
-                            final_damage = true_damage_part + mitigation["final_damage"]
-                            battle_log.append(f"🔥 {monster_name}的真伤被绝魔体质免疫50%！")
-                        else:
-                            # 完全真伤，无视防御
-                            final_damage = monster_damage
-                            battle_log.append(f"🔥 {monster_name}的真伤无视防御！")
-                    else:
-                        # 普通伤害，正常计算防御减伤
-                        mitigation = apply_defense_mitigation(monster_damage, effective_player_defense)
-                        final_damage = mitigation["final_damage"]
+                    attack_result = BattleIntegrationHelper._monster_attack_player(monster_stats, player, engine)
+                    monster_hit = attack_result["hit"]
+                    final_damage = attack_result["damage"] if monster_hit else 0
+                    if not monster_hit:
+                        battle_log.append(f"💨 {player.nickname}闪避了{monster_name}的攻击！")
 
                     # 检查玩家是否有刚气-心效果（减少受到的伤害）
                     rigid_qi_effects = engine.effect_manager.get_active_effects(player.id, EffectType.RIGID_QI_HEART)
-                    if rigid_qi_effects:
+                    if monster_hit and rigid_qi_effects:
                         for rigid_effect in rigid_qi_effects:
                             damage_reduction = int(final_damage * rigid_effect.value / 100)
                             final_damage -= damage_reduction
@@ -728,7 +694,7 @@ class BattleIntegrationHelper:
 
                     # 检查玩家是否有猛虎标弹效果（减少受到的伤害）
                     fierce_tiger_effects = engine.effect_manager.get_active_effects(player.id, EffectType.FIERCE_TIGER_BULLET)
-                    if fierce_tiger_effects:
+                    if monster_hit and fierce_tiger_effects:
                         for fierce_effect in fierce_tiger_effects:
                             # 猛虎标弹：受到伤害降低30%
                             damage_reduction = int(final_damage * 30 / 100)
@@ -736,8 +702,10 @@ class BattleIntegrationHelper:
                             battle_log.append(f"🐅 猛虎标弹！受到伤害降低30% (-{damage_reduction})")
 
                     # 先扣血
-                    player_hp = max(0, player_hp - final_damage)
-                    battle_log.append(f"👹 {monster_name}攻击{player.nickname}，造成{final_damage}伤害")
+                    if monster_hit:
+                        player_hp = max(0, player_hp - final_damage)
+                        effect_suffix = f"（{' '.join(attack_result['effects'])}）" if attack_result["effects"] else ""
+                        battle_log.append(f"👹 {monster_name}攻击{player.nickname}，造成{final_damage}伤害{effect_suffix}")
 
                     # 怪物吸血
                     monster_lifesteal = monster_stats.get("lifesteal", 0)
@@ -747,8 +715,8 @@ class BattleIntegrationHelper:
                         battle_log.append(f"🧡 {monster_name}吸血恢复{heal_amount}HP")
 
                     # 被攻击方（玩家）受击触发：如镜怨披风·怨息环流（恢复10%）
-                    # 只有在玩家还活着时才能回血，避免死人复活
-                    if player_hp > 0:
+                    # 只有被命中且玩家还活着时才能回血，避免死人复活
+                    if monster_hit and player_hp > 0:
                         try:
                             from ..battle.battle_effects import TriggerType, EffectType
                             # 环境上下文（与引擎一致的最小集合）
@@ -781,8 +749,8 @@ class BattleIntegrationHelper:
                     if player_hp <= 0:
                         break
 
-                    # 检查玩家反击（只有怪物攻击成功后才能反击）
-                    if player_hp > 0 and monster_hp > 0:
+                    # 检查玩家反击（只有怪物攻击命中后才能反击）
+                    if monster_hit and player_hp > 0 and monster_hp > 0:
                         from .battle_attributes import BattleEffectProcessor
                         if BattleEffectProcessor.check_counter_attack(player, engine.rng):
                             # 玩家反击（使用增强引擎执行反击攻击）
@@ -1346,8 +1314,8 @@ class BattleIntegrationHelper:
             "effects": []
         }
 
-        # 命中判定（怪物命中率固定80%，玩家闪避率来自装备）
-        monster_accuracy = 80.0
+        # 命中判定（怪物命中率来自生成属性，默认80%；玩家闪避含buff/宠物/词缀）
+        monster_accuracy = float(monster_stats.get("accuracy_rate", 80.0))
         hit_chance = BattleAttributeCalculator.calculate_hit_chance(
             monster_accuracy, player_attrs["dodge_rate"]
         )
@@ -1397,7 +1365,11 @@ class BattleIntegrationHelper:
         # 防御减伤计算（数值减伤 + 比例减伤）
         from ..utils import apply_defense_mitigation
 
+        # 防御含临时buff；怪物 ignore_defense 穿透削减有效防御
         player_defense = getattr(player, '_cached_defense', player.defense)
+        monster_pen = monster_stats.get("ignore_defense", 0)
+        if monster_pen > 0:
+            player_defense = int(player_defense * (1 - monster_pen / 100))
         if has_true_damage:
             # 怪物有真伤属性
             if ignore_special_ratio > 0:

@@ -330,7 +330,7 @@ async def handle_battle_hero(event: MessageEvent):
             "agility": hero["agility"],
         }
         # 添加特殊属性
-        for key in ("crit_rate", "combo_rate", "counter_rate", "lifesteal", "ignore_defense"):
+        for key in ("crit_rate", "combo_rate", "counter_rate", "lifesteal", "ignore_defense", "accuracy_rate"):
             if key in hero:
                 monster_stats[key] = hero[key]
 

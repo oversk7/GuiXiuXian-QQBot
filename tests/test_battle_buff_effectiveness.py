@@ -60,3 +60,35 @@ def test_monster_attack_path_uses_cached_attrs():
     result = engine._process_monster_attack(player, {"defense": 0}, 100, is_skill=False)
     assert result["hit"] is True
     assert result["is_critical"] is True  # 暴击率100%（怪物无抗暴）必暴击
+
+
+def test_monster_attack_player_uses_monster_accuracy():
+    # 怪物攻击玩家：命中率来自 monster_stats.accuracy_rate，与玩家闪避（含buff）对抗
+    from plugins.xiuxian_game.battle.integration_helper import BattleIntegrationHelper
+
+    engine = EnhancedBattleEngine(seed="test-seed")
+    player = SimpleNamespace(
+        id="P1", defense=0, _cached_defense=0,
+        _cached_battle_attrs=_cached_attrs(dodge_rate=100),
+    )
+    # 高命中怪（200 vs 闪避100 → hit_chance=1.0 必中）
+    result = BattleIntegrationHelper._monster_attack_player(
+        {"attack": 50, "accuracy_rate": 200}, player, engine
+    )
+    assert result["hit"] is True
+    # 命中-闪避公式：默认命中80 vs 闪避100 → 触底 0.1
+    assert BattleAttributeCalculator.calculate_hit_chance(80, 100) == 0.1
+
+
+def test_monster_generation_includes_accuracy_rate():
+    from plugins.xiuxian_game.world.dungeon_generation_service import calculate_monster_attributes
+
+    # 200级以下：无命中字段（战斗侧默认80）
+    low = calculate_monster_attributes(150)
+    assert "accuracy_rate" not in low
+    # 300级穿透型：85 + 1*1.5 + 原型加成20 = 106.5
+    piercer = calculate_monster_attributes(300, archetype="piercer")
+    assert piercer["accuracy_rate"] == 106.5
+    # 2000级：95 + 10*4 = 135
+    high = calculate_monster_attributes(2000)
+    assert high["accuracy_rate"] == 135.0

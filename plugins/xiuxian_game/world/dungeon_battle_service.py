@@ -219,6 +219,7 @@ async def _handle_personal_monster(session, tile: WorldTile, player: Player) -> 
             "counter_rate": tile.state.get("counter_rate", 0),
             "anti_crit_rate": tile.state.get("anti_crit_rate", 0),
             "true_damage_rate": tile.state.get("true_damage_rate", 0),
+            "accuracy_rate": tile.state.get("accuracy_rate", 80),
         })
 
     monster_name = tile.state.get("name", "未知诡影")
