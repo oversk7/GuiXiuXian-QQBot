@@ -202,10 +202,10 @@ class BattleIntegrationHelper:
         initial_player1_hp = player1_hp
         initial_player2_hp = player2_hp
 
-        # 判定先后手（基于敏捷）
+        # 判定先后手（基于敏捷，含临时buff/宠物加成）
         from .battle_attributes import BattleAttributeCalculator
         player1_first = BattleAttributeCalculator.determine_turn_order(
-            player1.agility, player2.agility, engine.rng
+            player1._cached_agility, player2._cached_agility, engine.rng
         )
 
         for round_num in range(1, max_rounds + 1):
@@ -560,10 +560,10 @@ class BattleIntegrationHelper:
         player_hp = min(player.hp, _get_cached_max_hp(player))
         initial_player_hp = player_hp
 
-        # 判定先后手（基于敏捷）
+        # 判定先后手（基于敏捷，含临时buff/宠物加成）
         from .battle_attributes import BattleAttributeCalculator
         player_first = BattleAttributeCalculator.determine_turn_order(
-            player.agility, monster_stats.get("agility", 10), engine.rng
+            player._cached_agility, monster_stats.get("agility", 10), engine.rng
         )
 
         for round_num in range(1, max_rounds + 1):
@@ -633,11 +633,12 @@ class BattleIntegrationHelper:
 
                         from ..utils import apply_defense_mitigation
 
-                        # 怪物反击时应用穿透（ignore_defense）
-                        effective_def = player.defense
+                        # 怪物反击时应用穿透（ignore_defense）；防御含临时buff
+                        player_defense = getattr(player, '_cached_defense', player.defense)
+                        effective_def = player_defense
                         monster_pen = monster_stats.get("ignore_defense", 0)
                         if monster_pen > 0:
-                            effective_def = int(player.defense * (1 - monster_pen / 100))
+                            effective_def = int(player_defense * (1 - monster_pen / 100))
 
                         if has_true_damage and ignore_special_ratio > 0:
                             # 50%真伤 + 50%普通伤害
@@ -689,11 +690,12 @@ class BattleIntegrationHelper:
                         val = float(getattr(eff, 'value', 0))
                         ignore_special_ratio += max(0.0, val) / 100.0
 
-                    # 应用穿透（怪物 ignore_defense 削减玩家有效防御）
-                    effective_player_defense = player.defense
+                    # 应用穿透（怪物 ignore_defense 削减玩家有效防御）；防御含临时buff
+                    player_defense = getattr(player, '_cached_defense', player.defense)
+                    effective_player_defense = player_defense
                     monster_penetration = monster_stats.get("ignore_defense", 0)
                     if monster_penetration > 0:
-                        effective_player_defense = int(player.defense * (1 - monster_penetration / 100))
+                        effective_player_defense = int(player_defense * (1 - monster_penetration / 100))
 
                     # 应用防御减伤
                     from ..utils import apply_defense_mitigation
@@ -887,18 +889,19 @@ class BattleIntegrationHelper:
 
                         from ..utils import apply_defense_mitigation
 
+                        player_defense = getattr(player, '_cached_defense', player.defense)
                         if has_true_damage and ignore_special_ratio > 0:
                             # 50%真伤 + 50%普通伤害
                             true_damage_part = int(counter_damage * 0.5)
                             normal_damage_part = counter_damage - true_damage_part
-                            mitigation = apply_defense_mitigation(normal_damage_part, player.defense)
+                            mitigation = apply_defense_mitigation(normal_damage_part, player_defense)
                             final_counter_damage = true_damage_part + mitigation["final_damage"]
                         elif has_true_damage:
                             # 完全真伤
                             final_counter_damage = counter_damage
                         else:
                             # 普通伤害
-                            mitigation = apply_defense_mitigation(counter_damage, player.defense)
+                            mitigation = apply_defense_mitigation(counter_damage, player_defense)
                             final_counter_damage = mitigation["final_damage"]
 
                         player_hp = max(0, player_hp - final_counter_damage)
@@ -1085,10 +1088,10 @@ class BattleIntegrationHelper:
             return 0
 
 
-        # 判定先后手（基于敏捷）
+        # 判定先后手（基于敏捷，含临时buff/宠物加成）
         from .battle_attributes import BattleAttributeCalculator
         player1_first = BattleAttributeCalculator.determine_turn_order(
-            player1.agility, player2.agility, engine.rng
+            player1._cached_agility, player2._cached_agility, engine.rng
         )
 
         for round_num in range(1, max_rounds + 1):
@@ -1394,13 +1397,14 @@ class BattleIntegrationHelper:
         # 防御减伤计算（数值减伤 + 比例减伤）
         from ..utils import apply_defense_mitigation
 
+        player_defense = getattr(player, '_cached_defense', player.defense)
         if has_true_damage:
             # 怪物有真伤属性
             if ignore_special_ratio > 0:
                 # 玩家有绝魔体质：50%真伤 + 50%普通伤害（受防御减伤）
                 true_damage_part = int(current_damage * 0.5)
                 normal_damage_part = current_damage - true_damage_part
-                mitigation = apply_defense_mitigation(normal_damage_part, player.defense)
+                mitigation = apply_defense_mitigation(normal_damage_part, player_defense)
                 final_damage = true_damage_part + mitigation["final_damage"]
                 blocked_damage = mitigation["blocked"]
                 result["effects"].append("🔥真伤(绝魔免疫50%)")
@@ -1411,7 +1415,7 @@ class BattleIntegrationHelper:
                 result["effects"].append("🔥真伤")
         else:
             # 普通伤害，正常计算防御减伤
-            mitigation = apply_defense_mitigation(current_damage, player.defense)
+            mitigation = apply_defense_mitigation(current_damage, player_defense)
             final_damage = mitigation["final_damage"]
             blocked_damage = mitigation["blocked"]
 

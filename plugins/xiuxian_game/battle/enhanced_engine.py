@@ -1786,8 +1786,8 @@ class EnhancedBattleEngine:
             return None
 
         # 触发反击，执行一次简化的攻击
-        # 反击伤害为防御者攻击力的50%
-        counter_attack = int(defender.attack * 0.5)
+        # 反击伤害为防御者攻击力的50%（含临时buff）
+        counter_attack = int(getattr(defender, '_cached_attack', defender.attack) * 0.5)
 
         # 获取攻击者的有效属性(优先使用缓存的战斗属性,包含临时buff)
         attacker_base_attrs = BattleAttributeCalculator.effective_attrs_in_battle(attacker)
