@@ -188,6 +188,9 @@ class GuildService:
 **读取（两档，2026-06-10 收敛）**:
 - 全量真源: `Player.get_effective_attributes(session)` —— 19 项属性,含装备/丹药/临时buff/宠物,面板与业务判定用
 - 战斗档: `BattleAttributeCalculator.calculate_effective_attributes_async` —— 真源 + T1词缀 + `ATTRIBUTE_CAPS` 上限,战斗数值必须走它
+- **战斗循环内同步判定**: 必须走 `BattleAttributeCalculator.effective_attrs_in_battle(player)`（读开战预计算的
+  `_cached_battle_attrs` 缓存）,禁止直接调 `calculate_effective_attributes`——后者裸读字段,临时buff/宠物/词缀
+  全部丢失（历史 bug,2026-06-11 修复,回归锁: `tests/test_battle_buff_effectiveness.py`）
 - **禁止新增并行属性计算框架**: 旧 AttributeCalculator v2 因 buff 字段名映射错位静默丢失加成,已删除;
   动态加成键名必须用 Player 字段名直通（回归锁: `tests/test_effective_attributes_passthrough.py`）
 - 新增战斗属性时同步补 `ATTRIBUTE_CAPS` 上限

@@ -1329,9 +1329,9 @@ class BattleIntegrationHelper:
         # 使用固定的怪物基础伤害，不再有随机波动
         base_damage = monster_stats["attack"]
 
-        # 获取玩家战斗属性
+        # 获取玩家战斗属性（优先使用开战预计算缓存，含临时buff/宠物/词缀）
         from .battle_attributes import BattleAttributeCalculator
-        player_attrs = BattleAttributeCalculator.calculate_effective_attributes(player)
+        player_attrs = BattleAttributeCalculator.effective_attrs_in_battle(player)
 
         result = {
             "hit": False,

@@ -535,6 +535,20 @@ class WorldBossService:
         )
         equipped_items = (await self._session.execute(stmt)).scalars().all()
 
+        # 预计算含临时buff/宠物/T1词缀的属性（与PVE开战一致），战斗循环内同步判定走缓存
+        from ..item.affix_service import get_affixes_from_equipment, get_t1_battle_bonuses
+        affix_bonus = {}
+        for eq in equipped_items:
+            affixes = get_affixes_from_equipment(getattr(eq, 'extra_attrs', None))
+            for attr, val in get_t1_battle_bonuses(affixes).items():
+                affix_bonus[attr] = affix_bonus.get(attr, 0) + val
+        player_base_attrs = await player.get_effective_attributes(self._session)
+        player._cached_attack = player_base_attrs.get('attack', player.attack)
+        player._cached_defense = player_base_attrs.get('defense', player.defense)
+        player._cached_battle_attrs = await BattleAttributeCalculator.calculate_effective_attributes_async(
+            player, self._session, equipment_bonus=affix_bonus
+        )
+
         engine = EnhancedBattleEngine(seed)
         engine.start_battle(player, boss_stats, equipped_items)
 
@@ -554,8 +568,9 @@ class WorldBossService:
 
             battle_log.append(f"━━━ 第{round_num}回合 ━━━")
 
-            # 玩家攻击BOSS（完整属性系统：暴击/连击/穿透/吸血均生效）
-            attack_result = engine.execute_player_turn(player, boss_stats, player.attack, False)
+            # 玩家攻击BOSS（完整属性系统：暴击/连击/穿透/吸血均生效，攻击力含临时buff）
+            player_attack = getattr(player, '_cached_attack', player.attack)
+            attack_result = engine.execute_player_turn(player, boss_stats, player_attack, False)
 
             if attack_result["hit"]:
                 damage = attack_result.get("total_damage", attack_result.get("damage", 0))
@@ -648,14 +663,14 @@ class WorldBossService:
         if base_attack <= 0:
             return 0
 
-        # 闪避判定
-        player_attrs = BattleAttributeCalculator.calculate_effective_attributes(player)
+        # 闪避判定（优先使用开战预计算缓存，含临时buff/宠物/词缀）
+        player_attrs = BattleAttributeCalculator.effective_attrs_in_battle(player)
         dodge_rate = player_attrs.get("dodge_rate", 0)
         if engine.rng.random() * 100 < dodge_rate:
             return 0  # 闪避成功，本回合无理智损失
 
         # 防御减伤（只有15%效益体现在理智防护上，体现出"精神防御难以依赖肉体"）
-        effective_defense = int(player.defense * 0.15)
+        effective_defense = int(getattr(player, '_cached_defense', player.defense) * 0.15)
         variation = engine.rng.uniform(0.85, 1.15)
         raw = max(1, int(base_attack * variation))
         mitigation = apply_defense_mitigation(raw, effective_defense)

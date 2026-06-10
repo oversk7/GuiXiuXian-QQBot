@@ -842,14 +842,8 @@ class EnhancedBattleEngine:
         if hasattr(defender, 'defense'):
             # 对玩家 - 需要应用双方的战斗buff
             # 获取双方基础属性(优先使用缓存的战斗属性,包含临时buff)
-            attacker_base_attrs = BattleAttributeCalculator.calculate_effective_attributes(attacker)
-            defender_base_attrs = BattleAttributeCalculator.calculate_effective_attributes(defender)
-
-            # 如果有缓存的战斗属性,使用缓存值覆盖基础战斗属性
-            if hasattr(attacker, '_cached_battle_attrs'):
-                attacker_base_attrs.update(attacker._cached_battle_attrs)
-            if hasattr(defender, '_cached_battle_attrs'):
-                defender_base_attrs.update(defender._cached_battle_attrs)
+            attacker_base_attrs = BattleAttributeCalculator.effective_attrs_in_battle(attacker)
+            defender_base_attrs = BattleAttributeCalculator.effective_attrs_in_battle(defender)
 
             # 应用战斗buff
             attacker_attrs = self._get_effective_battle_attributes(attacker_id, attacker_base_attrs)
@@ -1398,9 +1392,9 @@ class EnhancedBattleEngine:
 
         # 执行基础攻击
         if hasattr(defender, 'defense'):
-            # 获取双方基础属性
-            attacker_base_attrs = BattleAttributeCalculator.calculate_effective_attributes(attacker)
-            defender_base_attrs = BattleAttributeCalculator.calculate_effective_attributes(defender)
+            # 获取双方基础属性(优先使用缓存的战斗属性,包含临时buff)
+            attacker_base_attrs = BattleAttributeCalculator.effective_attrs_in_battle(attacker)
+            defender_base_attrs = BattleAttributeCalculator.effective_attrs_in_battle(defender)
 
             # 应用战斗buff
             attacker_attrs = self._get_effective_battle_attributes(attacker_id, attacker_base_attrs)
@@ -1671,8 +1665,8 @@ class EnhancedBattleEngine:
         简化的对怪攻击判定，支持固定比例伤害必中（直接结算最终伤害，不参与命中/暴击/穿透/减伤），
         其余部分走常规判定。
         """
-        # 基础与buff
-        base_attrs = BattleAttributeCalculator.calculate_effective_attributes(attacker)
+        # 基础与buff（优先使用开战预计算缓存，含临时buff/宠物/词缀）
+        base_attrs = BattleAttributeCalculator.effective_attrs_in_battle(attacker)
         attacker_id = attacker.id
         attacker_attrs = self._get_effective_battle_attributes(attacker_id, base_attrs)
 
@@ -1778,8 +1772,8 @@ class EnhancedBattleEngine:
             反击结果字典，如果未触发反击则返回None
             包含字段: hit, damage, is_critical
         """
-        # 获取防御者的有效属性
-        defender_base_attrs = BattleAttributeCalculator.calculate_effective_attributes(defender)
+        # 获取防御者的有效属性(优先使用缓存的战斗属性,包含临时buff)
+        defender_base_attrs = BattleAttributeCalculator.effective_attrs_in_battle(defender)
         defender_id = defender.id
         defender_attrs = self._get_effective_battle_attributes(defender_id, defender_base_attrs)
 
@@ -1795,8 +1789,8 @@ class EnhancedBattleEngine:
         # 反击伤害为防御者攻击力的50%
         counter_attack = int(defender.attack * 0.5)
 
-        # 获取攻击者的有效属性
-        attacker_base_attrs = BattleAttributeCalculator.calculate_effective_attributes(attacker)
+        # 获取攻击者的有效属性(优先使用缓存的战斗属性,包含临时buff)
+        attacker_base_attrs = BattleAttributeCalculator.effective_attrs_in_battle(attacker)
         attacker_id = attacker.id if hasattr(attacker, 'id') else "enemy"
         attacker_attrs = self._get_effective_battle_attributes(attacker_id, attacker_base_attrs)
 

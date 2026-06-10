@@ -85,6 +85,19 @@ class BattleAttributeCalculator:
         return attributes
 
     @classmethod
+    def effective_attrs_in_battle(cls, player: "Player") -> Dict[str, float]:
+        """战斗内获取玩家战斗属性：优先使用开战时预计算的缓存
+
+        _cached_battle_attrs 由开战入口用 calculate_effective_attributes_async
+        预计算（含临时buff/宠物/T1词缀，已应用上限）。战斗循环内的同步判定
+        必须走本方法而非 calculate_effective_attributes，否则吃不到这些加成。
+        """
+        cached = getattr(player, "_cached_battle_attrs", None)
+        if cached is not None:
+            return dict(cached)
+        return cls.calculate_effective_attributes(player)
+
+    @classmethod
     async def calculate_effective_attributes_async(cls, player: "Player", session=None, equipment_bonus: Optional[Dict] = None) -> Dict[str, float]:
         """计算玩家的有效战斗属性（异步版本，包含临时buff）
 
@@ -390,7 +403,7 @@ class BattleEffectProcessor:
         Returns:
             是否触发反击
         """
-        defender_attrs = BattleAttributeCalculator.calculate_effective_attributes(defender)
+        defender_attrs = BattleAttributeCalculator.effective_attrs_in_battle(defender)
         return BattleAttributeCalculator.roll_counter_attack(
             defender_attrs["counter_rate"], rng
         )

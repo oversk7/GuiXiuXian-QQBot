@@ -11,7 +11,8 @@
 - `plugins/xiuxian_game/models/player.py` (Player.get_effective_attributes): **全量真源**。返回 19 项属性（六维 + 13 项战斗属性），= 存储字段值（已含装备 _persist_bonus / 永久丹药 / VIP）+ 临时buff + 宠物加成。所有展示面板（角色/战力/查看面板）直接用它
 - `plugins/xiuxian_game/battle/battle_attributes.py` (BattleAttributeCalculator): **战斗档**。
   - `calculate_effective_attributes_async(player, session, equipment_bonus)`: 真源 + T1词缀加成 + ATTRIBUTE_CAPS 上限收口，开战预计算与战力面板战斗属性显示用它
-  - `calculate_effective_attributes(player)`(同步): 直读 player 存储字段 + 上限，用于无 session 场景（引擎内部、怪物攻击判定、世界boss理智侵蚀）。注意：不含临时buff/宠物加成
+  - `effective_attrs_in_battle(player)`(同步): **战斗循环内取玩家战斗属性的唯一正确方式**——优先返回开战时预计算的 `_cached_battle_attrs`（含临时buff/宠物/词缀），无缓存时回退裸字段计算
+  - `calculate_effective_attributes(player)`(同步): 直读 player 存储字段 + 上限，不含临时buff/宠物。战斗循环内禁止直接调用（历史 bug：6 处判定裸读导致 buff 在怪物战/PVP连击/反击中不生效，2026-06-11 修复）
 - `plugins/xiuxian_game/models/player.py` (Player.get_attribute_breakdown): 来源分解展示（base/equipment/permanent/vip/temporary/pet），增益状态命令用
 
 **属性上限（单源）:**
@@ -33,10 +34,11 @@
 - **5. 战斗属性子面板**: `battle/integration_helper.py` 的 get_battle_attribute_display_async() 走战斗档（含词缀与上限）
 
 ### 3.2 战斗开场预计算流程
-- **1. 入口**: `battle/integration_helper.py` PVP/PVE 开战处
+- **1. 入口**: `battle/integration_helper.py` PVP/PVE 开战处、`world_boss/service.py` 讨伐开战处
 - **2. 基础属性**: `player.get_effective_attributes(session)`（attack/defense/max_hp 等缓存到 `_cached_*`）
 - **3. 战斗属性**: `calculate_effective_attributes_async()` = 真源 + T1词缀 + 上限，缓存到 `_cached_battle_attrs`
-- **4. 战斗内修正**: `battle/enhanced_engine.py` 的 `_get_effective_battle_attributes()` 在缓存值上叠加战斗内buff效果，再次应用 ATTRIBUTE_CAPS
+- **4. 循环内读取**: 所有同步判定（攻击/反击/闪避/抗暴/理智侵蚀）经 `effective_attrs_in_battle()` 读缓存
+- **5. 战斗内修正**: `battle/enhanced_engine.py` 的 `_get_effective_battle_attributes()` 在缓存值上叠加战斗内buff效果，再次应用 ATTRIBUTE_CAPS
 
 ### 3.3 临时buff生效流程
 - **1. 创建**: `item/item_effects.py` TEMP_BUFF 处理器创建 TemporaryBuff 记录
@@ -47,7 +49,7 @@
 
 **为什么收敛为两档而不是统一一个入口?**
 - 战斗档需要"词缀加成 + 上限收口"，展示档需要"原始有效值"；强行合一会让面板显示被上限截断、或战斗绕过上限
-- 同步版战斗档保留是因为引擎内部多处无 session（怪物判定、反击判定），其"不含buff"是已知行为差异
+- 引擎内部多处无 session（怪物判定、反击判定），靠"开战预计算 + `effective_attrs_in_battle` 读缓存"模式让 buff 在同步路径生效（回归锁: `tests/test_battle_buff_effectiveness.py`）
 
 **为什么删除 AttributeCalculator v2 框架?（2026-06-10）**
 - 双轨计算：v2 与真源各算一套，字段名错位（critical_rate vs crit_rate）导致 buff 战斗属性在 v2 中被静默丢弃
