@@ -23,7 +23,7 @@ servers:
   2:
     name: "二区"
     config_profile: "new_shard"
-    open_registration: false
+    open_registration: true
 
 # 区服数值配置覆盖。legacy 为空时沿用上方默认配置。
 server_profiles:
