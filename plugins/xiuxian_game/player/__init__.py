@@ -1,1 +1,1 @@
-from . import info, help, rankings, invite, monthly_card, battle_info
+from . import info, help, help_topics, rankings, invite, monthly_card, battle_info

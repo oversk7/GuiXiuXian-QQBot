@@ -6,7 +6,7 @@ Key rules:
 - **Database Migration:** Only use `auto_migrate.py` `REQUIRED_FIELDS`. Never use Alembic manually.
 - **Exception Handling:** Never use `except Exception:`. NoneBot2's `finish()/send()` relies on raising exceptions for control flow.
 - **Transaction Management:** Always use `safe_session()`.
-- **Command Sync:** When adding/modifying commands, always update `player/help.py` AND `data/knowledge/*.yaml`.
+- **Command Sync:** Help content single source = `data/knowledge/*.yaml` (bodies auto-render as in-game help pages via `player/help_topics.py`; add `help_command`/`help_aliases` for new topics). When adding/modifying commands, update the topic's yaml only. `player/help.py` holds only the main menu and module navigation pages.
 
 ## Project Documentation
 

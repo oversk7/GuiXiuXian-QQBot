@@ -540,17 +540,18 @@ async def _():
 
 ### 10.3 帮助信息更新
 
-**位置**: `plugins/xiuxian_game/player/help.py`
+**单一数据源**: `data/knowledge/*.yaml`(2026-06-10 起)。yaml 的 `body` 同时作为 AI 检索语料和游戏内帮助页内容,由 `player/help_topics.py` 在启动时渲染并注册命令。
 
-**格式**:
-```python
-# 添加新命令帮助
-"命令名": {
-    "usage": "命令语法",
-    "description": "命令描述",
-    "examples": ["示例1", "示例2"]
-}
+**修改已有系统的帮助**: 直接编辑对应 yaml 的 `body`(【命令】会渲染成可点击按钮,整行 ━ 渲染成分隔线)。
+
+**新增帮助主题**: 在 yaml 中添加:
+```yaml
+help_command: "钓鱼系统"      # 注册的帮助命令名
+help_aliases:                 # 别名(可选)
+  - 钓鱼帮助
 ```
+
+`player/help.py` 仅保留主菜单(帮助)和 8 个模块导航页。CI 的 `check_help_consistency.py` 会拦截"新增命令但没写帮助"。
 
 ---
 

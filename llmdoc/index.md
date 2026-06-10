@@ -144,7 +144,7 @@
 
 | 任务 | 步骤 |
 |------|------|
-| 添加新功能 | 创建Model → Repository → 添加到UoW → 创建Service → 更新help.py |
+| 添加新功能 | 创建Model → Repository → 添加到UoW → 创建Service → 更新 data/knowledge/*.yaml 帮助 |
 | 数据库迁移 | 在auto_migrate.py的REQUIRED_FIELDS添加字段 → 重启Bot |
 | 添加战斗效果 | 参考 [how-to-add-battle-effect](/llmdoc/guides/how-to-add-battle-effect.md) |
 
