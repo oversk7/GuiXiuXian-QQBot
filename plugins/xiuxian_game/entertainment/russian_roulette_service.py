@@ -123,6 +123,11 @@ class RussianRouletteService:
         if room.player1_id == player_id:
             return False, "你已经在这个房间中了"
 
+        # 区服隔离：加入者必须与房主同区
+        same_server, server_msg = await self._check_same_server(player_id, room.player1_id)
+        if not same_server:
+            return False, server_msg
+
         # 加入房间
         room.player2_id = player_id
         room.status = RoomStatus.BETTING.value
@@ -130,6 +135,16 @@ class RussianRouletteService:
         await self._room_repo.update(room)
 
         return True, "成功加入房间！现在可以设置筹码"
+
+    async def _check_same_server(self, player_id: str, other_player_id: str) -> Tuple[bool, str]:
+        """校验两名玩家是否同区服（区服隔离）"""
+        player = await self._player_repo.get_by_id(player_id)
+        other = await self._player_repo.get_by_id(other_player_id)
+        if not player or not other:
+            return False, "玩家不存在"
+        if (player.server_id or 1) != (other.server_id or 1):
+            return False, "⛔ 不能与其他区服的玩家同场游戏"
+        return True, ""
 
     async def join_room(
         self, player_id: str, room_id: str, group_id: str
@@ -162,6 +177,11 @@ class RussianRouletteService:
 
         if room.player1_id == player_id:
             return False, "你已经在这个房间中了"
+
+        # 区服隔离：加入者必须与房主同区
+        same_server, server_msg = await self._check_same_server(player_id, room.player1_id)
+        if not same_server:
+            return False, server_msg
 
         # 加入房间
         room.player2_id = player_id
@@ -523,6 +543,11 @@ class RussianRouletteService:
         # 被支持的玩家必须是游戏参与者
         if target_player_id not in (room.player1_id, room.player2_id):
             return False, "只能支持游戏内的玩家"
+
+        # 区服隔离：下注者必须与房间玩家同区
+        same_server, server_msg = await self._check_same_server(bettor_id, room.player1_id)
+        if not same_server:
+            return False, server_msg
 
         # 检查下注者资金
         bettor = await self._player_repo.get_by_id(bettor_id)

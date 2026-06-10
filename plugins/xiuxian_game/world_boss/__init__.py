@@ -113,6 +113,8 @@ async def handle_attack(event: MessageEvent, args: Message = CommandArg()):
 @rank_cmd.handle()
 async def handle_rank(event: MessageEvent):
     async with safe_session() as session:
+        player = await require_player(session, event, rank_cmd)
+
         from ..infrastructure.repositories.world_boss_cycle_repository import WorldBossCycleRepository
         from ..infrastructure.repositories.world_boss_damage_repository import WorldBossDamageRepository
         from ..infrastructure.repositories.player_repository import PlayerRepository
@@ -127,7 +129,7 @@ async def handle_rank(event: MessageEvent):
             item_repo=ItemRepository(session)
         )
         cycle, tip = await service.check_and_refresh_cycle()
-        msg = await service.build_ranking_view(cycle)
+        msg = await service.build_ranking_view(cycle, player.server_id)
         if tip:
             msg = tip + "\n" + msg
         await rank_cmd.finish(build_markdown(msg))

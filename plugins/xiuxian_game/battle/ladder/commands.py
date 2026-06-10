@@ -107,7 +107,7 @@ async def _show_home(event: MessageEvent, session, player, service: LadderRating
         win_rate = "—"
 
     # 排名
-    rank = await service.get_player_rank_in_season(player.id, season.id)
+    rank = await service.get_player_rank_in_season(player.id, season.id, player.server_id)
     rank_str = f"#{rank}" if rank else "未上榜"
 
     # 连胜提示
@@ -224,7 +224,7 @@ async def _do_match(event: MessageEvent, session, player, service: LadderRatingS
 async def _show_ranking(event: MessageEvent, session, player, service: LadderRatingService):
     """显示赛季排行榜（TOP 30）"""
     season = await service.get_or_create_active_season()
-    top = await service.get_top_rankings(season.id, limit=30)
+    top = await service.get_top_rankings(season.id, player.server_id, limit=30)
 
     if not top:
         await ladder_main_cmd.finish(message_add_head("📭 本赛季暂无玩家上榜", event))
@@ -245,7 +245,7 @@ async def _show_ranking(event: MessageEvent, session, player, service: LadderRat
 
     # 显示自己的排名
     lines.append("***\n")
-    my_rank = await service.get_player_rank_in_season(player.id, season.id)
+    my_rank = await service.get_player_rank_in_season(player.id, season.id, player.server_id)
     my_rating = await service.get_or_create_rating(player.id)
     if my_rank:
         lines.append(f"📍 你的排名: **#{my_rank}** [{my_rating.rank_tier}] {my_rating.rating} 凶名\n")

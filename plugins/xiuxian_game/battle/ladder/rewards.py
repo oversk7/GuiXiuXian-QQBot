@@ -81,7 +81,18 @@ async def distribute_season_rewards(session: AsyncSession, season: LadderSeason)
     reward_count = 0
     errors: List[str] = []
 
-    for rank, row in enumerate(rows, start=1):
+    # 按区服分组，各区独立排名发奖（rows 已按积分降序，组内顺序不变）
+    server_groups: dict = {}
+    for row in rows:
+        server_groups.setdefault(row.Player.server_id or 1, []).append(row)
+
+    ranked_rows = [
+        (rank, row)
+        for group in server_groups.values()
+        for rank, row in enumerate(group, start=1)
+    ]
+
+    for rank, row in ranked_rows:
         rating: LadderRating = row.LadderRating
         player: Player = row.Player
 

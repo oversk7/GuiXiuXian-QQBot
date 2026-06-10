@@ -150,7 +150,10 @@ async def handle_teleport(event: MessageEvent, args: Message = CommandArg()):
 async def handle_ranking(event: MessageEvent):
     """查看叩门排行榜"""
     async with safe_session() as session:
-        result = await KnockerEventService.get_ranking(session)
+        player = await get_unified_player(session, event)
+        if not player:
+            await ranking_cmd.finish("请先创建角色")
+        result = await KnockerEventService.get_ranking(session, server_id=player.server_id)
 
     await ranking_cmd.finish(message_add_head(result, event))
 

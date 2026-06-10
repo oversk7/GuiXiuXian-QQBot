@@ -263,8 +263,9 @@ class LadderRatingService:
         attacker_rating_value: int,
         rating_range: int,
         excluded_ids: set[str],
+        server_id: int,
     ) -> List[Player]:
-        """查询符合评分范围的候选守方玩家"""
+        """查询符合评分范围的候选守方玩家（限同区服）"""
         rating_low = attacker_rating_value - rating_range
         rating_high = attacker_rating_value + rating_range
         active_cutoff = datetime.now() - timedelta(days=30)
@@ -276,6 +277,7 @@ class LadderRatingService:
                 LadderRating.matchmaking_enabled.is_(True),
                 LadderRating.daily_defense_count < DAILY_DEFENSE_LIMIT,
                 LadderRating.rating.between(rating_low, rating_high),
+                Player.server_id == server_id,
                 Player.level >= MIN_LEVEL,
                 Player.hp > 0,
                 or_(
@@ -304,14 +306,14 @@ class LadderRatingService:
         )
         for rating_range in (RATING_RANGE_PRIMARY, RATING_RANGE_FALLBACK):
             candidates = await self._query_candidates(
-                attacker_rating.rating, rating_range, strict_excluded_ids
+                attacker_rating.rating, rating_range, strict_excluded_ids, attacker.server_id
             )
             if candidates:
                 return random.choice(candidates)
 
         for rating_range in (RATING_RANGE_PRIMARY, RATING_RANGE_FALLBACK):
             candidates = await self._query_candidates(
-                attacker_rating.rating, rating_range, base_excluded_ids
+                attacker_rating.rating, rating_range, base_excluded_ids, attacker.server_id
             )
             if candidates:
                 return random.choice(candidates)
@@ -350,7 +352,7 @@ class LadderRatingService:
         # 3) 找对手
         defender = await self.find_opponent(attacker, a_rating)
         if not defender:
-            rank = await self.get_player_rank_in_season(attacker.id, season.id)
+            rank = await self.get_player_rank_in_season(attacker.id, season.id, attacker.server_id)
             if rank != 1:
                 raise LadderMatchError(
                     "⛔ 斗法场中无凶名相当的残魂（同段位修士或已隐匿/冷却中）\n"
@@ -518,20 +520,24 @@ class LadderRatingService:
 
     # ========== 排行榜 ==========
 
-    async def get_top_rankings(self, season_id: int, limit: int = 50) -> List[Tuple[LadderRating, Player]]:
-        """获取本赛季 TOP N 排行榜"""
+    async def get_top_rankings(self, season_id: int, server_id: int, limit: int = 50) -> List[Tuple[LadderRating, Player]]:
+        """获取本赛季 TOP N 排行榜（限同区服）"""
         stmt = (
             select(LadderRating, Player)
             .join(Player, Player.id == LadderRating.player_id)
-            .where(LadderRating.season_id == season_id, LadderRating.matches_played > 0)
+            .where(
+                LadderRating.season_id == season_id,
+                LadderRating.matches_played > 0,
+                Player.server_id == server_id,
+            )
             .order_by(LadderRating.rating.desc())
             .limit(limit)
         )
         rows = (await self.session.execute(stmt)).all()
         return [(r.LadderRating, r.Player) for r in rows]
 
-    async def get_player_rank_in_season(self, player_id: str, season_id: int) -> Optional[int]:
-        """获取玩家在本赛季的排名（1-based），返回 None 表示无排名"""
+    async def get_player_rank_in_season(self, player_id: str, season_id: int, server_id: int) -> Optional[int]:
+        """获取玩家在本赛季的排名（1-based，限同区服），返回 None 表示无排名"""
         # 玩家必须在本赛季有战绩才计入排行
         stmt = select(LadderRating).where(
             LadderRating.player_id == player_id,
@@ -542,11 +548,17 @@ class LadderRatingService:
         if not rating:
             return None
 
-        # 计算本赛季比自己积分高的玩家数量
-        count_stmt = select(sql_func.count(LadderRating.player_id)).where(
-            LadderRating.season_id == season_id,
-            LadderRating.matches_played > 0,
-            LadderRating.rating > rating.rating,
+        # 计算本赛季同区比自己积分高的玩家数量
+        count_stmt = (
+            select(sql_func.count(LadderRating.player_id))
+            .select_from(LadderRating)
+            .join(Player, Player.id == LadderRating.player_id)
+            .where(
+                LadderRating.season_id == season_id,
+                LadderRating.matches_played > 0,
+                LadderRating.rating > rating.rating,
+                Player.server_id == server_id,
+            )
         )
         count = (await self.session.execute(count_stmt)).scalar_one()
         return count + 1

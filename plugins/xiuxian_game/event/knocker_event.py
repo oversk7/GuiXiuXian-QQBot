@@ -747,13 +747,13 @@ class KnockerEventService:
     # ==================== 排行榜 ====================
 
     @classmethod
-    async def get_ranking(cls, session, top_n: int = 20) -> str:
-        """获取叩门排行榜"""
+    async def get_ranking(cls, session, top_n: int = 20, server_id: int = 1) -> str:
+        """获取叩门排行榜（限同区服）"""
         if not cls.is_active():
             return "━━━━━━━━━━━━━\n除夕叩门活动当前未开启\n━━━━━━━━━━━━━"
 
-        # 查询所有玩家, 筛选有活动数据的
-        stmt = select(Player).where(Player.level > 0)
+        # 查询同区所有玩家, 筛选有活动数据的
+        stmt = select(Player).where(Player.level > 0, Player.server_id == server_id)
         result = await session.execute(stmt)
         players = result.scalars().all()
 

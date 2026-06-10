@@ -116,10 +116,10 @@ class WorldBossDamageRepository(IRepository[WorldBossDamage]):
         return list(result.scalars().all())
 
     async def get_ranking(
-        self, cycle_id: int, limit: int = 50
+        self, cycle_id: int, limit: int = 50, server_id: int | None = None
     ) -> List[Tuple[WorldBossDamage, str, int, int]]:
         """
-        获取排行榜（按伤害降序，预加载玩家信息）
+        获取排行榜（按伤害降序，预加载玩家信息；server_id 限定区服）
 
         Returns:
             排行榜列表 [(WorldBossDamage, nickname, uid, reincarnation_level), ...]
@@ -128,9 +128,10 @@ class WorldBossDamageRepository(IRepository[WorldBossDamage]):
             select(WorldBossDamage, Player.nickname, Player.uid, Player.reincarnation_level)
             .join(Player, WorldBossDamage.player_id == Player.id)
             .where(WorldBossDamage.cycle_id == cycle_id)
-            .order_by(WorldBossDamage.total_damage.desc())
-            .limit(limit)
         )
+        if server_id is not None:
+            stmt = stmt.where(Player.server_id == server_id)
+        stmt = stmt.order_by(WorldBossDamage.total_damage.desc()).limit(limit)
         result = await self._session.execute(stmt)
         return [(damage, nickname, uid, reincarnation_level) for damage, nickname, uid, reincarnation_level in result]
 

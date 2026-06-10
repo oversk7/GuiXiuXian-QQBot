@@ -34,6 +34,7 @@ from ..infrastructure.repositories.player_repository import PlayerRepository
 from ..infrastructure.repositories.item_repository import ItemRepository
 # 事件系统
 from ..domain.events import event_bus, WorldBossDamageEvent
+from ..server_config import get_servers_config
 from ..utils_markdown import cmd
 
 
@@ -237,28 +238,9 @@ class WorldBossService:
         return current_cycle, None
 
     async def _settle_cycle(self, cycle: WorldBossCycle) -> str:
-        """结算周期奖励（按段位分组，各段独立排名）"""
-        results = await self._damage_repo.get_ranking(cycle.id, limit=999999)
-
-        if not results:
-            cycle.settled = True
-            await self._cycle_repo.update(cycle)
-            return f"⚰️ {cycle.boss_name} 消散在虚空中，无人获得其力量..."
-
-        # 按段位分组
+        """结算周期奖励（各区服独立，区内按段位分组、各段独立排名）"""
         from collections import defaultdict
-        tier_groups: dict = defaultdict(list)
-        for damage_record, nickname, uid, player_reincarnation in results:
-            if damage_record.total_damage <= 0:
-                continue
-            snapshot = damage_record.reincarnation_snapshot
-            # 快照为-1说明是旧数据，回退到玩家当前转数
-            effective_reincarnation = snapshot if snapshot != -1 else player_reincarnation
-            tier = WorldBossService.get_reincarnation_tier(effective_reincarnation)
-            tier_groups[tier].append((damage_record, nickname, uid))
 
-        # 每个段位独立排名发奖
-        reward_count = 0
         chest_item_id_map = {
             "深渊霸主宝箱": "abyss_overlord_chest",
             "深渊王者宝箱": "abyss_king_chest",
@@ -268,30 +250,50 @@ class WorldBossService:
             "深渊参与者宝箱": "abyss_participant_chest"
         }
 
-        for tier, group in tier_groups.items():
-            # 组内已按伤害降序（来自get_ranking），直接遍历
-            for rank, (damage_record, nickname, uid) in enumerate(group, 1):
-                chest_type = None
-                for reward_tier in WorldBossService.REWARD_TIERS:
-                    if reward_tier["rank_range"][0] <= rank <= reward_tier["rank_range"][1]:
-                        chest_type = reward_tier["chest"]
-                        break
+        reward_count = 0
+        for server_id in get_servers_config():
+            results = await self._damage_repo.get_ranking(cycle.id, limit=999999, server_id=server_id)
+            if not results:
+                continue
 
-                if chest_type:
-                    chest_item_id = chest_item_id_map.get(chest_type)
-                    if chest_item_id:
-                        chest_item = ItemInstance(
-                            player_id=damage_record.player_id,
-                            item_id=chest_item_id,
-                            quantity=1,
-                            created_at=datetime.now()
-                        )
-                        await self._item_repo.add(chest_item)
-                        reward_count += 1
+            # 按段位分组
+            tier_groups: dict = defaultdict(list)
+            for damage_record, nickname, uid, player_reincarnation in results:
+                if damage_record.total_damage <= 0:
+                    continue
+                snapshot = damage_record.reincarnation_snapshot
+                # 快照为-1说明是旧数据，回退到玩家当前转数
+                effective_reincarnation = snapshot if snapshot != -1 else player_reincarnation
+                tier = WorldBossService.get_reincarnation_tier(effective_reincarnation)
+                tier_groups[tier].append((damage_record, nickname, uid))
+
+            # 每个段位独立排名发奖
+            for tier, group in tier_groups.items():
+                # 组内已按伤害降序（来自get_ranking），直接遍历
+                for rank, (damage_record, nickname, uid) in enumerate(group, 1):
+                    chest_type = None
+                    for reward_tier in WorldBossService.REWARD_TIERS:
+                        if reward_tier["rank_range"][0] <= rank <= reward_tier["rank_range"][1]:
+                            chest_type = reward_tier["chest"]
+                            break
+
+                    if chest_type:
+                        chest_item_id = chest_item_id_map.get(chest_type)
+                        if chest_item_id:
+                            chest_item = ItemInstance(
+                                player_id=damage_record.player_id,
+                                item_id=chest_item_id,
+                                quantity=1,
+                                created_at=datetime.now()
+                            )
+                            await self._item_repo.add(chest_item)
+                            reward_count += 1
 
         cycle.settled = True
         await self._cycle_repo.mark_as_settled(cycle)
 
+        if reward_count == 0:
+            return f"⚰️ {cycle.boss_name} 消散在虚空中，无人获得其力量..."
         return f"⚔️ {cycle.boss_name} 的威胁已结束！共有 {reward_count} 名勇士获得了深渊宝箱奖励！"
 
     async def build_boss_view(self, cycle: WorldBossCycle, player: Player) -> str:
@@ -677,9 +679,12 @@ class WorldBossService:
         return max(1, int(mitigation["final_damage"]))
 
     async def _calculate_boss_stats(self, cycle: WorldBossCycle, player: Player = None) -> Dict:
-        """计算BOSS属性（C: 按玩家段位分级，基准来自全服最高玩家）"""
-        # 获取最高等级玩家（基准参考）
-        stmt = select(Player).order_by(desc(Player.level)).limit(1)
+        """计算BOSS属性（C: 按玩家段位分级，基准来自同区最高玩家）"""
+        # 获取最高等级玩家（基准参考，限玩家所在区服）
+        stmt = select(Player)
+        if player is not None:
+            stmt = stmt.where(Player.server_id == player.server_id)
+        stmt = stmt.order_by(desc(Player.level)).limit(1)
         top_player = (await self._session.execute(stmt)).scalars().first()
 
         if not top_player:
@@ -706,9 +711,9 @@ class WorldBossService:
 
 
 
-    async def build_ranking_view(self, cycle: WorldBossCycle) -> str:
-        """构建分段排行榜视图"""
-        results = await self._damage_repo.get_ranking(cycle.id, limit=999999)
+    async def build_ranking_view(self, cycle: WorldBossCycle, server_id: int) -> str:
+        """构建分段排行榜视图（限同区服）"""
+        results = await self._damage_repo.get_ranking(cycle.id, limit=999999, server_id=server_id)
 
         header = [
             f"🌟 世界BOSS：{cycle.boss_name}",
