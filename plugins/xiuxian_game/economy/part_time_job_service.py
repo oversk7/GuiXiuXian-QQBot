@@ -568,7 +568,12 @@ class PartTimeJobService:
         proficiency = stats.job_proficiency or {}
 
         available_jobs = []
-        for job_type, job_config in location.available_jobs.items():
+        for job_type in location.available_jobs:
+            # DB 的 available_jobs 是建点时的常量快照，只用其键；
+            # 配置数值以 JOB_TYPES 常量为准，保证列表显示与收工结算一致
+            job_config = self.JOB_TYPES.get(job_type)
+            if not job_config:
+                continue
             if player.level >= job_config.get("required_level", 1):
                 job_prof = proficiency.get(job_type, {"count": 0, "level": 0})
                 prof_info = self.get_proficiency_level(job_prof.get("count", 0))
