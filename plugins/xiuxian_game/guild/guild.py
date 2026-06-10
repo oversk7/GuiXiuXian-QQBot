@@ -15,17 +15,13 @@ from ..utils_markdown import cmd, build_markdown
 from ..models.social_application import SocialApplication, ApplicationType, ApplicationStatus
 from ..models.donation_log import PlayerDonationLog
 from ..models.navigation_task import NavigationTask
-from .guild_application_service import GuildApplicationService as GuildApplicationServiceNew  # DI版本
-from .guild_service import GuildService as GuildServiceNew  # DI版本
+from .guild_application_service import GuildApplicationService  # DI版本
+from .guild_service import GuildService  # DI版本
 from .guild_permission import GuildPermission
 from .guild_economy_service import GuildEconomyService
-from .guild_economy_service_new import GuildEconomyService as GuildEconomyServiceNew  # DI版本
 from .guild_building_service import GuildBuildingService
-from .guild_building_service_new import GuildBuildingService as GuildBuildingServiceNew  # DI版本
 from .guild_task_service import GuildTaskService
-from .guild_task_service_new import GuildTaskService as GuildTaskServiceNew  # DI版本
 from .guild_facility_service import GuildFacilityService
-from .guild_facility_service_new import GuildFacilityService as GuildFacilityServiceNew  # DI版本
 from .guild_daily_tasks import GuildDailyTasks
 from ..platform_utils import get_unified_player, require_player
 
@@ -91,7 +87,7 @@ async def handle_create_guild(event: MessageEvent, args: Message = CommandArg())
             await create_guild_cmd.finish("⛔ 已存在同名公会")
 
         # 4. 使用UoW的仓储创建Service
-        guild_service = GuildServiceNew(
+        guild_service = GuildService(
             player_repo=uow.players,
             guild_repo=uow.guilds,
             uow=uow
@@ -129,7 +125,7 @@ async def handle_guild_info(event: MessageEvent):
     # 新版本: 使用DI架构
     from ..infrastructure.uow.unit_of_work import UnitOfWork
     from ..models.db import AsyncSessionLocal
-    from .guild_service import GuildService as GuildServiceNew
+    from .guild_service import GuildService
 
     def session_factory():
         return AsyncSessionLocal()
@@ -158,7 +154,7 @@ async def handle_guild_info(event: MessageEvent):
         president = await uow.session.get(Player, guild_obj.president_id)
 
         # 创建GuildService实例
-        guild_service = GuildServiceNew(
+        guild_service = GuildService(
             player_repo=uow.players,
             guild_repo=uow.guilds,
             uow=uow
@@ -177,7 +173,7 @@ async def handle_guild_info(event: MessageEvent):
         treasury = GuildEconomyService.format_large_number(guild_obj.treasury)
 
         # 建筑加成信息（在UnitOfWork内部使用uow的Repository）
-        building_service = GuildBuildingServiceNew(
+        building_service = GuildBuildingService(
             guild_repo=uow.guilds,
             building_repo=uow.guild_buildings,
             item_repo=None  # get_guild_bonuses不需要item_repo
@@ -240,7 +236,7 @@ async def handle_guild_bonuses(event: MessageEvent):
         from ..infrastructure.repositories.guild_repository import GuildRepository
         from ..infrastructure.repositories.guild_building_repository import GuildBuildingRepository
 
-        building_service = GuildBuildingServiceNew(
+        building_service = GuildBuildingService(
             guild_repo=GuildRepository(session),
             building_repo=GuildBuildingRepository(session),
             item_repo=None  # get_guild_bonuses不需要item_repo
@@ -337,7 +333,7 @@ async def handle_join_guild(event: MessageEvent, args: Message = CommandArg()):
         from ..infrastructure.repositories.guild_repository import GuildRepository
         from ..infrastructure.repositories.social_application_repository import SocialApplicationRepository
 
-        service = GuildApplicationServiceNew(
+        service = GuildApplicationService(
             player_repo=PlayerRepository(session),
             guild_repo=GuildRepository(session),
             application_repo=SocialApplicationRepository(session)
@@ -373,7 +369,7 @@ async def handle_quit_guild(event: MessageEvent):
     # 新版本: 使用DI架构
     from ..infrastructure.uow.unit_of_work import UnitOfWork
     from ..models.db import AsyncSessionLocal
-    from .guild_service import GuildService as GuildServiceNew
+    from .guild_service import GuildService
 
     def session_factory():
         return AsyncSessionLocal()
@@ -387,7 +383,7 @@ async def handle_quit_guild(event: MessageEvent):
         guild_name = guild_obj.name if guild_obj else "未知公会"
 
         # 创建GuildService实例
-        guild_service = GuildServiceNew(
+        guild_service = GuildService(
             player_repo=uow.players,
             guild_repo=uow.guilds,
             uow=uow
@@ -459,7 +455,7 @@ async def handle_member_list(event: MessageEvent, args: Message = CommandArg()):
     # 新版本: 使用DI架构
     from ..infrastructure.uow.unit_of_work import UnitOfWork
     from ..models.db import AsyncSessionLocal
-    from .guild_service import GuildService as GuildServiceNew
+    from .guild_service import GuildService
 
     def session_factory():
         return AsyncSessionLocal()
@@ -473,7 +469,7 @@ async def handle_member_list(event: MessageEvent, args: Message = CommandArg()):
             await member_list_cmd.finish("⚠️ 公会数据异常")
 
         # 创建GuildService实例
-        guild_service = GuildServiceNew(
+        guild_service = GuildService(
             player_repo=uow.players,
             guild_repo=uow.guilds,
             uow=uow
@@ -560,7 +556,7 @@ async def handle_donate(event: MessageEvent, args: Message = CommandArg()):
         from ..infrastructure.repositories.guild_building_repository import GuildBuildingRepository
         from ..infrastructure.repositories.player_donation_log_repository import PlayerDonationLogRepository
 
-        economy_service = GuildEconomyServiceNew(
+        economy_service = GuildEconomyService(
             guild_repo=GuildRepository(session),
             player_repo=PlayerRepository(session),
             donation_log_repo=PlayerDonationLogRepository(session),
@@ -578,7 +574,7 @@ async def handle_donate(event: MessageEvent, args: Message = CommandArg()):
         from ..infrastructure.repositories.player_donation_log_repository import PlayerDonationLogRepository
         from ..infrastructure.repositories.guild_building_repository import GuildBuildingRepository
 
-        task_service = GuildTaskServiceNew(
+        task_service = GuildTaskService(
             player_repo=PlayerRepository(session),
             guild_repo=GuildRepository(session),
             player_task_stats_repo=PlayerTaskStatsRepository(session),
@@ -632,7 +628,7 @@ async def handle_guild_upgrade(event: MessageEvent):
         from ..infrastructure.repositories.guild_building_repository import GuildBuildingRepository
         from ..infrastructure.repositories.player_donation_log_repository import PlayerDonationLogRepository
 
-        economy_service = GuildEconomyServiceNew(
+        economy_service = GuildEconomyService(
             guild_repo=GuildRepository(session),
             player_repo=PlayerRepository(session),
             donation_log_repo=PlayerDonationLogRepository(session),
@@ -820,7 +816,7 @@ async def handle_app_list(event: MessageEvent):
         from ..infrastructure.repositories.player_repository import PlayerRepository
         from ..infrastructure.repositories.guild_repository import GuildRepository
         from ..infrastructure.repositories.social_application_repository import SocialApplicationRepository
-        service = GuildApplicationServiceNew(
+        service = GuildApplicationService(
             player_repo=PlayerRepository(session),
             guild_repo=GuildRepository(session),
             application_repo=SocialApplicationRepository(session)
@@ -862,7 +858,7 @@ async def _process_application(event: MessageEvent, args: Message, approve: bool
     # 新版本: 使用DI架构
     from ..infrastructure.uow.unit_of_work import UnitOfWork
     from ..models.db import AsyncSessionLocal
-    from .guild_service import GuildService as GuildServiceNew
+    from .guild_service import GuildService
 
     def session_factory():
         return AsyncSessionLocal()
@@ -891,7 +887,7 @@ async def _process_application(event: MessageEvent, args: Message, approve: bool
             await (approve_cmd if approve else reject_cmd).finish("⛔ 未找到该 UID")
 
         # 使用DI架构GuildApplicationService
-        app_service = GuildApplicationServiceNew(
+        app_service = GuildApplicationService(
             player_repo=uow.players,
             guild_repo=uow.guilds,
             application_repo=uow.social_applications
@@ -903,7 +899,7 @@ async def _process_application(event: MessageEvent, args: Message, approve: bool
 
         if approve:
             # 创建GuildService实例
-            guild_service = GuildServiceNew(
+            guild_service = GuildService(
                 player_repo=uow.players,
                 guild_repo=uow.guilds,
                 uow=uow
@@ -1070,7 +1066,7 @@ async def handle_set_position(event: MessageEvent, args: Message = CommandArg())
     # 新版本: 使用DI架构
     from ..infrastructure.uow.unit_of_work import UnitOfWork
     from ..models.db import AsyncSessionLocal
-    from .guild_service import GuildService as GuildServiceNew
+    from .guild_service import GuildService
 
     def session_factory():
         return AsyncSessionLocal()
@@ -1093,7 +1089,7 @@ async def handle_set_position(event: MessageEvent, args: Message = CommandArg())
             await set_position_cmd.finish("⛔ 该玩家不在你的公会中")
 
         # 创建GuildService实例
-        guild_service = GuildServiceNew(
+        guild_service = GuildService(
             player_repo=uow.players,
             guild_repo=uow.guilds,
             uow=uow
@@ -1127,7 +1123,7 @@ async def handle_kick_member(event: MessageEvent, args: Message = CommandArg()):
     # 新版本: 使用DI架构
     from ..infrastructure.uow.unit_of_work import UnitOfWork
     from ..models.db import AsyncSessionLocal
-    from .guild_service import GuildService as GuildServiceNew
+    from .guild_service import GuildService
 
     def session_factory():
         return AsyncSessionLocal()
@@ -1138,7 +1134,7 @@ async def handle_kick_member(event: MessageEvent, args: Message = CommandArg()):
             await kick_member_cmd.finish("⛔ 你未加入任何公会")
 
         # 创建GuildService实例
-        guild_service = GuildServiceNew(
+        guild_service = GuildService(
             player_repo=uow.players,
             guild_repo=uow.guilds,
             uow=uow
@@ -1171,7 +1167,7 @@ async def handle_guild_buildings(event: MessageEvent):
         from ..infrastructure.repositories.guild_repository import GuildRepository
         from ..infrastructure.repositories.guild_building_repository import GuildBuildingRepository
 
-        building_service = GuildBuildingServiceNew(
+        building_service = GuildBuildingService(
             guild_repo=GuildRepository(session),
             building_repo=GuildBuildingRepository(session),
             item_repo=None  # get_guild_buildings不需要item_repo
@@ -1197,11 +1193,11 @@ async def handle_guild_buildings(event: MessageEvent):
         if not buildings:
             lines.append("暂无建筑，快去建造吧！")
         else:
-            lines.extend(GuildBuildingServiceNew.format_layout(buildings))
+            lines.extend(GuildBuildingService.format_layout(buildings))
             lines.append("💡 上下左右相邻触发加成，斜角不触发")
             lines.append("")
             for building in buildings:
-                effects_str = GuildBuildingServiceNew.format_building_effects(building["effects"])
+                effects_str = GuildBuildingService.format_building_effects(building["effects"])
                 bicon = building_emojis.get(building['name'], "🏛️")
                 position = "未布局"
                 if building.get("plot_x") is not None and building.get("plot_y") is not None:
@@ -1215,10 +1211,10 @@ async def handle_guild_buildings(event: MessageEvent):
                 lines.append("")
 
         lines.append("***")
-        lines.extend(GuildBuildingServiceNew.get_player_guide_lines())
+        lines.extend(GuildBuildingService.get_player_guide_lines())
         lines.append("***")
         lines.append("**可建造建筑：**")
-        building_names = GuildBuildingServiceNew.get_buildable_names()
+        building_names = GuildBuildingService.get_buildable_names()
         lines.append(" | ".join([f"{building_emojis.get(n, '🏛️')}{cmd(n, f'建造 {n}')}" for n in building_names]))
         lines.append("***")
         lines.append(cmd("公会") + " | " + cmd("公会建筑") + " | " + cmd("帮助"))
@@ -1234,7 +1230,7 @@ async def handle_build(event: MessageEvent, args: Message = CommandArg()):
     if not parts:
         await build_cmd.finish(
             "⛔ 格式错误，正确格式：建造 [建筑名] [x y]\n"
-            f"可建造：{'、'.join(GuildBuildingServiceNew.get_buildable_names())}"
+            f"可建造：{'、'.join(GuildBuildingService.get_buildable_names())}"
         )
 
     building_name = parts[0]
@@ -1249,9 +1245,9 @@ async def handle_build(event: MessageEvent, args: Message = CommandArg()):
     elif len(parts) == 2:
         await build_cmd.finish("⛔ 布局坐标需要同时提供 x y，例如：建造 铸器坊 2 1")
 
-    building_type = GuildBuildingServiceNew.parse_building_name(building_name)
+    building_type = GuildBuildingService.parse_building_name(building_name)
     if not building_type:
-        await build_cmd.finish(f"⛔ 无效的建筑名，可建造：{'、'.join(GuildBuildingServiceNew.get_buildable_names())}")
+        await build_cmd.finish(f"⛔ 无效的建筑名，可建造：{'、'.join(GuildBuildingService.get_buildable_names())}")
 
     async with safe_session() as session:
         player = await get_unified_player(session, event)
@@ -1265,7 +1261,7 @@ async def handle_build(event: MessageEvent, args: Message = CommandArg()):
         from ..infrastructure.repositories.guild_warehouse_item_repository import GuildWarehouseItemRepository
         from ..infrastructure.repositories.item_repository import ItemRepository
 
-        building_service = GuildBuildingServiceNew(
+        building_service = GuildBuildingService(
             guild_repo=GuildRepository(session),
             building_repo=GuildBuildingRepository(session),
             item_repo=ItemRepository(session),
@@ -1343,9 +1339,9 @@ async def handle_confirm_build_with_name(event: MessageEvent, args: Message = Co
     elif len(parts) == 2:
         await confirm_build_with_name_cmd.finish("⛔ 布局坐标需要同时提供 x y，例如：确认建造 铸器坊 2 1")
 
-    building_type = GuildBuildingServiceNew.parse_building_name(building_name)
+    building_type = GuildBuildingService.parse_building_name(building_name)
     if not building_type:
-        await confirm_build_with_name_cmd.finish(f"⛔ 无效的建筑名，可建造：{'、'.join(GuildBuildingServiceNew.get_buildable_names())}")
+        await confirm_build_with_name_cmd.finish(f"⛔ 无效的建筑名，可建造：{'、'.join(GuildBuildingService.get_buildable_names())}")
 
     async with safe_session() as session:
         player = await get_unified_player(session, event)
@@ -1359,7 +1355,7 @@ async def handle_confirm_build_with_name(event: MessageEvent, args: Message = Co
         from ..infrastructure.repositories.item_repository import ItemRepository
         from ..infrastructure.repositories.guild_warehouse_item_repository import GuildWarehouseItemRepository
 
-        building_service = GuildBuildingServiceNew(
+        building_service = GuildBuildingService(
             guild_repo=GuildRepository(session),
             building_repo=GuildBuildingRepository(session),
             item_repo=ItemRepository(session),
@@ -1385,9 +1381,9 @@ async def handle_move_building(event: MessageEvent, args: Message = CommandArg()
         await move_building_cmd.finish("⛔ 格式错误，正确格式：移动建筑 [建筑名] [x] [y]")
 
     building_name = parts[0]
-    building_type = GuildBuildingServiceNew.parse_building_name(building_name)
+    building_type = GuildBuildingService.parse_building_name(building_name)
     if not building_type:
-        await move_building_cmd.finish(f"⛔ 无效的建筑名，可选：{'、'.join(GuildBuildingServiceNew.get_buildable_names())}")
+        await move_building_cmd.finish(f"⛔ 无效的建筑名，可选：{'、'.join(GuildBuildingService.get_buildable_names())}")
 
     try:
         plot_x = int(parts[1])
@@ -1403,7 +1399,7 @@ async def handle_move_building(event: MessageEvent, args: Message = CommandArg()
         from ..infrastructure.repositories.guild_repository import GuildRepository
         from ..infrastructure.repositories.guild_building_repository import GuildBuildingRepository
 
-        building_service = GuildBuildingServiceNew(
+        building_service = GuildBuildingService(
             guild_repo=GuildRepository(session),
             building_repo=GuildBuildingRepository(session),
             item_repo=None,
@@ -1449,7 +1445,7 @@ async def handle_guild_teleport(event: MessageEvent, args: Message = CommandArg(
             from ..infrastructure.repositories.guild_alchemy_production_repository import GuildAlchemyProductionRepository
             from ..infrastructure.repositories.guild_warehouse_item_repository import GuildWarehouseItemRepository
 
-            facility_service = GuildFacilityServiceNew(
+            facility_service = GuildFacilityService(
                 guild_repo=GuildRepository(session),
                 building_repo=GuildBuildingRepository(session),
                 player_repo=PlayerRepository(session),
@@ -1539,7 +1535,7 @@ async def handle_guild_alchemy(event: MessageEvent):
         from ..infrastructure.repositories.guild_alchemy_production_repository import GuildAlchemyProductionRepository
         from ..infrastructure.repositories.guild_warehouse_item_repository import GuildWarehouseItemRepository
 
-        facility_service = GuildFacilityServiceNew(
+        facility_service = GuildFacilityService(
             guild_repo=GuildRepository(session),
             building_repo=GuildBuildingRepository(session),
             player_repo=PlayerRepository(session),
@@ -1608,7 +1604,7 @@ async def handle_exchange_pill(event: MessageEvent, args: Message = CommandArg()
         from ..infrastructure.repositories.guild_alchemy_production_repository import GuildAlchemyProductionRepository
         from ..infrastructure.repositories.guild_warehouse_item_repository import GuildWarehouseItemRepository
 
-        facility_service = GuildFacilityServiceNew(
+        facility_service = GuildFacilityService(
             guild_repo=GuildRepository(session),
             building_repo=GuildBuildingRepository(session),
             player_repo=PlayerRepository(session),
@@ -1699,7 +1695,7 @@ async def handle_guild_warehouse(event: MessageEvent):
         from ..infrastructure.repositories.guild_alchemy_production_repository import GuildAlchemyProductionRepository
         from ..infrastructure.repositories.guild_warehouse_item_repository import GuildWarehouseItemRepository
 
-        facility_service = GuildFacilityServiceNew(
+        facility_service = GuildFacilityService(
             guild_repo=GuildRepository(session),
             building_repo=GuildBuildingRepository(session),
             player_repo=PlayerRepository(session),
@@ -1787,7 +1783,7 @@ async def handle_deposit_warehouse(event: MessageEvent, args: Message = CommandA
         from ..infrastructure.repositories.guild_warehouse_item_repository import GuildWarehouseItemRepository
         from ..infrastructure.repositories.guild_warehouse_log_repository import GuildWarehouseLogRepository
 
-        facility_service = GuildFacilityServiceNew(
+        facility_service = GuildFacilityService(
             guild_repo=GuildRepository(session),
             building_repo=GuildBuildingRepository(session),
             player_repo=PlayerRepository(session),
@@ -1861,7 +1857,7 @@ async def handle_withdraw_warehouse(event: MessageEvent, args: Message = Command
         from ..infrastructure.repositories.guild_warehouse_item_repository import GuildWarehouseItemRepository
         from ..infrastructure.repositories.guild_warehouse_log_repository import GuildWarehouseLogRepository
 
-        facility_service = GuildFacilityServiceNew(
+        facility_service = GuildFacilityService(
             guild_repo=GuildRepository(session),
             building_repo=GuildBuildingRepository(session),
             player_repo=PlayerRepository(session),
@@ -1910,7 +1906,7 @@ async def handle_warehouse_log(event: MessageEvent, args: Message = CommandArg()
         from ..infrastructure.repositories.guild_warehouse_item_repository import GuildWarehouseItemRepository
         from ..infrastructure.repositories.guild_warehouse_log_repository import GuildWarehouseLogRepository
 
-        facility_service = GuildFacilityServiceNew(
+        facility_service = GuildFacilityService(
             guild_repo=GuildRepository(session),
             building_repo=GuildBuildingRepository(session),
             player_repo=PlayerRepository(session),

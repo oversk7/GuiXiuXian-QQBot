@@ -12,7 +12,7 @@ from .service import DailyTaskService
 from ..infrastructure.uow.unit_of_work import UnitOfWork
 from ..world.location_service import LocationService
 from ..world.npc_service import NPCService
-from ..guild.guild_economy_service_new import GuildEconomyService
+from ..guild.guild_economy_service import GuildEconomyService
 import random
 from datetime import date
 
@@ -310,9 +310,9 @@ async def handle_complete_task(event: MessageEvent):
         if success:
             # 更新委托完成统计（用于公会任务）
             if player.guild_id:
-                from ..guild.guild_task_service_new import GuildTaskService as GuildTaskServiceNew
+                from ..guild.guild_task_service import GuildTaskService
 
-                guild_task_service = GuildTaskServiceNew(
+                guild_task_service = GuildTaskService(
                     player_repo=uow.players,
                     guild_repo=uow.guilds,
                     player_task_stats_repo=uow.player_task_stats,

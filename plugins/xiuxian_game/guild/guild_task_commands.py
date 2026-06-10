@@ -8,10 +8,8 @@ from ..models.db import safe_session
 from ..models.player import Player
 from ..utils_markdown import cmd, build_markdown
 from .guild_task_service import GuildTaskService
-from .guild_task_service_new import GuildTaskService as GuildTaskServiceNew  # DI版本
 from ..platform_utils import require_player
 
-# Feature Flag（在文件顶部靠近其他常量的位置）
 # ==================== 公会任务 ====================
 guild_task_cmd = on_command("公会任务", aliases={"公会日常", "公会周常"}, block=True, priority=11)
 
@@ -32,7 +30,7 @@ async def handle_guild_task(event: MessageEvent):
         from ..infrastructure.repositories.player_donation_log_repository import PlayerDonationLogRepository
         from ..infrastructure.repositories.guild_building_repository import GuildBuildingRepository
 
-        task_service = GuildTaskServiceNew(
+        task_service = GuildTaskService(
             player_repo=PlayerRepository(session),
             guild_repo=GuildRepository(session),
             player_task_stats_repo=PlayerTaskStatsRepository(session),
@@ -108,7 +106,7 @@ async def handle_complete_guild_task(event: MessageEvent):
         from ..infrastructure.repositories.player_donation_log_repository import PlayerDonationLogRepository
         from ..infrastructure.repositories.guild_building_repository import GuildBuildingRepository
 
-        task_service = GuildTaskServiceNew(
+        task_service = GuildTaskService(
             player_repo=PlayerRepository(session),
             guild_repo=GuildRepository(session),
             player_task_stats_repo=PlayerTaskStatsRepository(session),
@@ -154,7 +152,7 @@ async def handle_guild_task_stats(event: MessageEvent):
         from ..infrastructure.repositories.player_donation_log_repository import PlayerDonationLogRepository
         from ..infrastructure.repositories.guild_building_repository import GuildBuildingRepository
 
-        task_service = GuildTaskServiceNew(
+        task_service = GuildTaskService(
             player_repo=PlayerRepository(session),
             guild_repo=GuildRepository(session),
             player_task_stats_repo=PlayerTaskStatsRepository(session),

@@ -180,9 +180,9 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
         # 执行镶嵌
         from ..infrastructure.repositories.item_repository import ItemRepository
         from ..infrastructure.repositories.player_repository import PlayerRepository
-        from .gem_socket_service import GemSocketService as GemSocketServiceNew
+        from .gem_socket_service import GemSocketService
 
-        service = GemSocketServiceNew(
+        service = GemSocketService(
             item_repo=ItemRepository(session),
             player_repo=PlayerRepository(session),
         )
@@ -233,9 +233,9 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
         # 执行拆卸
         from ..infrastructure.repositories.item_repository import ItemRepository
         from ..infrastructure.repositories.player_repository import PlayerRepository
-        from .gem_socket_service import GemSocketService as GemSocketServiceNew
+        from .gem_socket_service import GemSocketService
 
-        service = GemSocketServiceNew(
+        service = GemSocketService(
             item_repo=ItemRepository(session),
             player_repo=PlayerRepository(session),
         )

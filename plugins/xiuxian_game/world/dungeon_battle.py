@@ -1344,7 +1344,7 @@ async def _handle_personal_monster(session, tile: WorldTile, player: Player) -> 
 
         # 更新战斗胜利统计（用于公会任务）
         if player.guild_id:
-            from ..guild.guild_task_service_new import GuildTaskService as GuildTaskServiceNew
+            from ..guild.guild_task_service import GuildTaskService
             from ..infrastructure.repositories.player_repository import PlayerRepository
             from ..infrastructure.repositories.guild_repository import GuildRepository
             from ..infrastructure.repositories.player_task_stats_repository import PlayerTaskStatsRepository
@@ -1352,7 +1352,7 @@ async def _handle_personal_monster(session, tile: WorldTile, player: Player) -> 
             from ..infrastructure.repositories.player_donation_log_repository import PlayerDonationLogRepository
             from ..infrastructure.repositories.guild_building_repository import GuildBuildingRepository
 
-            task_service = GuildTaskServiceNew(
+            task_service = GuildTaskService(
                 player_repo=PlayerRepository(session),
                 guild_repo=GuildRepository(session),
                 player_task_stats_repo=PlayerTaskStatsRepository(session),
@@ -1875,7 +1875,7 @@ async def _(event: MessageEvent):
 
         # 更新探索统计（用于公会任务）
         if player.guild_id:
-            from ..guild.guild_task_service_new import GuildTaskService as GuildTaskServiceNew
+            from ..guild.guild_task_service import GuildTaskService
             from ..infrastructure.repositories.player_repository import PlayerRepository
             from ..infrastructure.repositories.guild_repository import GuildRepository
             from ..infrastructure.repositories.player_task_stats_repository import PlayerTaskStatsRepository
@@ -1883,7 +1883,7 @@ async def _(event: MessageEvent):
             from ..infrastructure.repositories.player_donation_log_repository import PlayerDonationLogRepository
             from ..infrastructure.repositories.guild_building_repository import GuildBuildingRepository
 
-            task_service = GuildTaskServiceNew(
+            task_service = GuildTaskService(
                 player_repo=PlayerRepository(session),
                 guild_repo=GuildRepository(session),
                 player_task_stats_repo=PlayerTaskStatsRepository(session),

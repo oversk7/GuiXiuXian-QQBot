@@ -24,15 +24,15 @@ class _DummyGuildBuildingService:
         return {"exp_multiplier": 1.0, "treasury_limit": 100000}
 
 
-def _load_guild_economy_service_new():
-    module_name = "plugins.xiuxian_game.guild.guild_economy_service_new"
+def _load_guild_economy_service():
+    module_name = "plugins.xiuxian_game.guild.guild_economy_service"
     project_root = Path(__file__).resolve().parents[1]
     module_path = (
         project_root
         / "plugins"
         / "xiuxian_game"
         / "guild"
-        / "guild_economy_service_new.py"
+        / "guild_economy_service.py"
     )
 
     stubs = {
@@ -61,7 +61,7 @@ def _load_guild_economy_service_new():
         "plugins.xiuxian_game.infrastructure.repositories.player_donation_log_repository": types.SimpleNamespace(
             PlayerDonationLogRepository=object
         ),
-        "plugins.xiuxian_game.guild.guild_building_service_new": types.SimpleNamespace(
+        "plugins.xiuxian_game.guild.guild_building_service": types.SimpleNamespace(
             GuildBuildingService=_DummyGuildBuildingService
         ),
     }
@@ -89,7 +89,7 @@ def _load_guild_economy_service_new():
 
 
 def test_decimal_donation_total_still_returns_int_points():
-    service = _load_guild_economy_service_new()
+    service = _load_guild_economy_service()
 
     points = service.calculate_donation_points(Decimal("99000"), 1000)
 
@@ -98,6 +98,6 @@ def test_decimal_donation_total_still_returns_int_points():
 
 
 def test_decimal_donation_limit_check():
-    service = _load_guild_economy_service_new()
+    service = _load_guild_economy_service()
 
     assert service.is_donation_points_limit_reached(Decimal("100000"))

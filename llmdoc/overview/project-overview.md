@@ -118,7 +118,7 @@
 
 **关键文件**:
 - `plugins/xiuxian_game/guild/guild_service.py` - 公会核心服务
-- `plugins/xiuxian_game/guild/guild_building_service_new.py` - 建筑服务
+- `plugins/xiuxian_game/guild/guild_building_service.py` - 建筑服务
 - `plugins/xiuxian_game/guild/guild.py` - 公会命令处理器(1613 行)
 
 ### 3.6 社交系统 (Social System)
@@ -138,7 +138,7 @@
 **关键文件**:
 - `plugins/xiuxian_game/dialogue/ai_dialogue_service.py` - AI 对话服务
 - `plugins/xiuxian_game/dialogue/npc_favorability_service.py` - 好感度服务
-- `plugins/xiuxian_game/social/mentorship_service_new.py` - 师徒服务
+- `plugins/xiuxian_game/social/mentorship_system_service.py` - 师徒服务
 
 ### 3.7 故事引擎系统 (Story Engine)
 
@@ -249,12 +249,12 @@ plugins/xiuxian_game/
 │
 ├── guild/                       # 公会系统
 │   ├── guild_service.py         # 公会核心服务
-│   ├── guild_building_service_new.py  # 建筑服务
+│   ├── guild_building_service.py  # 建筑服务
 │   ├── guild_economy_service_new.py   # 经济服务
 │   └── guild.py                 # 公会命令处理器
 │
 ├── social/                      # 社交系统
-│   ├── mentorship_service_new.py # 师徒服务
+│   ├── mentorship_system_service.py # 师徒服务
 │   ├── marriage_service.py      # 婚姻服务
 │   └── gift_service_new.py      # 送礼服务
 │
@@ -286,33 +286,14 @@ plugins/xiuxian_game/
 
 ## 6. 架构设计特点
 
-### 6.1 Legacy vs New 架构并存
+### 6.1 服务架构统一(历史说明)
 
-**Legacy 特征**:
-- 静态方法类
-- 直接接受 `session` 参数
-- 方法内部执行 SQL 查询
-- 调用方控制事务边界
+项目曾长期存在"旧静态方法服务 + `*_new.py` DI 风格服务"双轨并存。**2026-06-10 迁移全部完成**:15 个仅剩单实现的 `*_new.py` 已改回正式命名,9 对平行实现已逐对合并(保留功能超集方,数值语义对齐生产实际生效版本)。
 
-**New 特征**:
-- 实例方法类
-- 构造函数显式传入 Repository(手动注入,无容器)
-- 通过 Repository 访问数据
-- UnitOfWork 统一事务管理
-
-**迁移策略**:
-- 保留旧版本确保稳定性,新版本以 `*_new.py` 命名并存
-- 逐步迁移调用方到 New 版本;旧版删除后把 `*_new.py` 改回正式命名(2026-06-10 已完成 15 个 + item/equipment_service、world/location_service、world/npc_service、economy/equipment_trade_service、economy/part_time_job_service 5 对合并)
-- 仍新旧并存的 4 个(待迁移清单): guild/guild_building_service、guild/guild_economy_service、guild/guild_facility_service、guild/guild_task_service
-
-**已迁移模块**:
-- ✅ 公会核心服务
-- ✅ 公会建筑服务
-- ✅ 公会经济服务
-- ✅ 师徒系统服务
-- ✅ NPC 管理服务
-- ✅ 世界 BOSS 服务
-- 🚧 股票系统(进行中)
+当前统一标准:
+- 服务为实例方法类,构造函数显式传入 Repository(手动注入,无容器)
+- 不在服务内部 commit,事务由外层 `safe_session()`/UnitOfWork 控制
+- 历史静态调用面保留为模块级兼容函数(如 `guild_building_service.get_guild_bonuses(session, ...)`),内部委托唯一实现
 
 ### 6.2 Repository 模式
 

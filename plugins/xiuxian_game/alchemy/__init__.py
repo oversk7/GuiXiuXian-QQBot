@@ -9,7 +9,7 @@ from ..models.player import Player
 from ..utils import message_add_head
 
 # 使用新版DI架构AlchemyService
-from .service import AlchemyService as AlchemyServiceNew
+from .service import AlchemyService
 from ..infrastructure.repositories.item_repository import ItemRepository
 from ..infrastructure.repositories.alchemy_record_repository import AlchemyRecordRepository
 from ..platform_utils import require_player
@@ -29,7 +29,7 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
     # 新版：使用DI架构Service（无需Repository的纯配置操作）
     # 创建临时实例用于配置查询（不涉及数据库操作）
     async with safe_session() as session:
-        service = AlchemyServiceNew(
+        service = AlchemyService(
             item_repo=ItemRepository(session),
             alchemy_record_repo=AlchemyRecordRepository(session)
         )
@@ -72,7 +72,7 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
         # 创建Repository和Service实例
         item_repo = ItemRepository(session)
         alchemy_record_repo = AlchemyRecordRepository(session)
-        service = AlchemyServiceNew(
+        service = AlchemyService(
             item_repo=item_repo,
             alchemy_record_repo=alchemy_record_repo
         )
@@ -112,7 +112,7 @@ async def _(event: MessageEvent):
     async with safe_session() as session:
         # 新版：使用DI架构Service
         alchemy_record_repo = AlchemyRecordRepository(session)
-        service = AlchemyServiceNew(
+        service = AlchemyService(
             item_repo=ItemRepository(session),
             alchemy_record_repo=alchemy_record_repo
         )
@@ -148,7 +148,7 @@ async def _(event: MessageEvent):
 
         # 新版：使用DI架构Service
         alchemy_record_repo = AlchemyRecordRepository(session)
-        service = AlchemyServiceNew(
+        service = AlchemyService(
             item_repo=ItemRepository(session),
             alchemy_record_repo=alchemy_record_repo
         )

@@ -1,10 +1,6 @@
 """
 公会每日任务 - 基于玩家触发的丹房产出生成
 """
-from datetime import datetime, date
-from sqlalchemy import select
-from ..models.db import safe_session
-from ..models.guild import Guild, GuildBuilding, BuildingType
 from .guild_facility_service import GuildFacilityService
 
 
@@ -14,7 +10,24 @@ class GuildDailyTasks:
     @staticmethod
     async def check_and_generate_alchemy_production(session, guild_id: int) -> int:
         """检查并生成指定公会的丹房产出（如果需要的话）"""
-        return await GuildFacilityService.generate_daily_alchemy_production(session, guild_id)
+        from ..infrastructure.repositories.guild_repository import GuildRepository
+        from ..infrastructure.repositories.guild_building_repository import GuildBuildingRepository
+        from ..infrastructure.repositories.player_repository import PlayerRepository
+        from ..infrastructure.repositories.item_repository import ItemRepository
+        from ..infrastructure.repositories.guild_teleport_log_repository import GuildTeleportLogRepository
+        from ..infrastructure.repositories.guild_alchemy_production_repository import GuildAlchemyProductionRepository
+        from ..infrastructure.repositories.guild_warehouse_item_repository import GuildWarehouseItemRepository
+
+        facility_service = GuildFacilityService(
+            guild_repo=GuildRepository(session),
+            building_repo=GuildBuildingRepository(session),
+            player_repo=PlayerRepository(session),
+            item_repo=ItemRepository(session),
+            teleport_log_repo=GuildTeleportLogRepository(session),
+            alchemy_production_repo=GuildAlchemyProductionRepository(session),
+            warehouse_item_repo=GuildWarehouseItemRepository(session),
+        )
+        return await facility_service.generate_daily_alchemy_production(guild_id)
 
     @staticmethod
     async def trigger_guild_daily_refresh(session, guild_id: int) -> dict:

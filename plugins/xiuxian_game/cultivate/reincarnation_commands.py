@@ -27,9 +27,9 @@ async def handle_reincarnate(event: MessageEvent):
         from ..infrastructure.repositories.elixir_usage_repository import ElixirUsageRepository
         from ..infrastructure.repositories.vip_equipment_bonus_repository import VIPEquipmentBonusRepository
         from ..infrastructure.repositories.item_repository import ItemRepository
-        from .reincarnation_service import ReincarnationService as ReincarnationServiceNew
+        from .reincarnation_service import ReincarnationService
 
-        service = ReincarnationServiceNew(
+        service = ReincarnationService(
             player_repo=PlayerRepository(session),
             elixir_usage_repo=ElixirUsageRepository(session),
             vip_equipment_bonus_repo=VIPEquipmentBonusRepository(session),

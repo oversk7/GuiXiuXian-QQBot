@@ -52,9 +52,9 @@ async def handle_view(event: MessageEvent):
         from ..infrastructure.repositories.world_boss_damage_repository import WorldBossDamageRepository
         from ..infrastructure.repositories.player_repository import PlayerRepository
         from ..infrastructure.repositories.item_repository import ItemRepository
-        from .service import WorldBossService as WorldBossServiceNew
+        from .service import WorldBossService
 
-        service = WorldBossServiceNew(
+        service = WorldBossService(
             session=session,
             cycle_repo=WorldBossCycleRepository(session),
             damage_repo=WorldBossDamageRepository(session),
@@ -78,9 +78,9 @@ async def handle_attack(event: MessageEvent, args: Message = CommandArg()):
         from ..infrastructure.repositories.world_boss_damage_repository import WorldBossDamageRepository
         from ..infrastructure.repositories.player_repository import PlayerRepository
         from ..infrastructure.repositories.item_repository import ItemRepository
-        from .service import WorldBossService as WorldBossServiceNew
+        from .service import WorldBossService
 
-        service = WorldBossServiceNew(
+        service = WorldBossService(
             session=session,
             cycle_repo=WorldBossCycleRepository(session),
             damage_repo=WorldBossDamageRepository(session),
@@ -117,9 +117,9 @@ async def handle_rank(event: MessageEvent):
         from ..infrastructure.repositories.world_boss_damage_repository import WorldBossDamageRepository
         from ..infrastructure.repositories.player_repository import PlayerRepository
         from ..infrastructure.repositories.item_repository import ItemRepository
-        from .service import WorldBossService as WorldBossServiceNew
+        from .service import WorldBossService
 
-        service = WorldBossServiceNew(
+        service = WorldBossService(
             session=session,
             cycle_repo=WorldBossCycleRepository(session),
             damage_repo=WorldBossDamageRepository(session),

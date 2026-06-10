@@ -125,8 +125,8 @@ async def handle_cultivate(event: MessageEvent):
         # 获取公会修为加成
         guild_cultivation_bonus = 0.0
         if player.guild_id:
-            from ..guild.guild_building_service import GuildBuildingService
-            guild_bonuses = await GuildBuildingService.get_guild_bonuses(session, player.guild_id)
+            from ..guild.guild_building_service import get_guild_bonuses
+            guild_bonuses = await get_guild_bonuses(session, player.guild_id)
             guild_cultivation_bonus = guild_bonuses.get("cultivation_bonus", 0.0)
 
         # 获取阴宅修为加成（支持使用其他玩家的阴宅）
@@ -342,8 +342,8 @@ async def handle_seclusion(event: MessageEvent):
         # 获取公会修为加成
         guild_cultivation_bonus = 0.0
         if player.guild_id:
-            from ..guild.guild_building_service import GuildBuildingService
-            guild_bonuses = await GuildBuildingService.get_guild_bonuses(session, player.guild_id)
+            from ..guild.guild_building_service import get_guild_bonuses
+            guild_bonuses = await get_guild_bonuses(session, player.guild_id)
             guild_cultivation_bonus = guild_bonuses.get("cultivation_bonus", 0.0)
 
         # 获取阴宅修为加成（闭关时只检查是否有阴宅，不支付费用）
@@ -515,8 +515,8 @@ async def handle_out_seclusion(event: MessageEvent):
         # 获取公会修为加成
         guild_cultivation_bonus = 0.0
         if player.guild_id:
-            from ..guild.guild_building_service import GuildBuildingService
-            guild_bonuses = await GuildBuildingService.get_guild_bonuses(session, player.guild_id)
+            from ..guild.guild_building_service import get_guild_bonuses
+            guild_bonuses = await get_guild_bonuses(session, player.guild_id)
             guild_cultivation_bonus = guild_bonuses.get("cultivation_bonus", 0.0)
 
         # 获取阴宅修为加成（出关时支付使用费用并获得加成）

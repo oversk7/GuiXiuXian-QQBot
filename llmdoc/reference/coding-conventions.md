@@ -62,7 +62,6 @@ plugins/xiuxian_game/
 │   └── attributes/      # 属性系统
 ├── infrastructure/      # 基础设施层
 │   ├── repositories/    # 仓储实现
-│   ├── di/             # 依赖注入容器
 │   └── uow/            # Unit of Work
 ├── guild/              # 公会领域 (业务逻辑)
 ├── battle/             # 战斗领域
@@ -70,23 +69,15 @@ plugins/xiuxian_game/
 └── utils.py            # 全局工具函数
 ```
 
-### 3.2 Legacy vs New架构
-**Legacy模式** (`*_legacy.py`):
-- 静态方法类
-- 直接传递`AsyncSession`参数
-- 内部调用`session.commit()`
-- 示例: `plugins/xiuxian_game/item/equipment_service_legacy.py:20-30`
-
-**New模式** (`*_new.py`):
-- 实例方法类
-- 通过构造函数注入Repository
-- 不内部commit,由外层UoW控制
-- 示例: `plugins/xiuxian_game/item/equipment_service.py:23-40`
-
-**统一入口**:
-- 顶层模块调用new版本
-- 保持向后兼容
+### 3.2 服务编写规范
+**标准模式**(2026-06-10 起全库统一,新旧双轨已合并完毕):
+- 实例方法类,通过构造函数注入 Repository
+- 不内部 commit,由外层 safe_session/UoW 控制事务
 - 示例: `plugins/xiuxian_game/item/equipment_service.py`
+
+**兼容入口**:
+- 历史静态调用面保留为模块级函数,内部委托唯一的 Service 实现
+- 示例: `equipment_service.recalc_equipment_attributes(session, ...)`、`guild_building_service.get_guild_bonuses(session, ...)`
 
 ---
 

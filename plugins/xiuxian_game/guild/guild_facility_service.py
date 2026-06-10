@@ -1,23 +1,32 @@
 """
-公会设施服务 - 处理传送阵、丹房、仓库等功能
+公会设施服务 - DI架构版本
+
+将GuildFacilityService改造为依赖注入架构，处理传送阵、丹房、仓库等功能
 """
+
 from typing import Dict, List, Tuple, Optional
-from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, and_, func, delete
 from datetime import datetime, date, timedelta
 import random
 import math
 
-from ..models.guild import Guild, GuildBuilding, BuildingType, GuildWarehouseItem, GuildAlchemyProduction, GuildTeleportLog
+from ..models.guild import Guild, GuildBuilding, BuildingType, GuildWarehouseItem, GuildAlchemyProduction, GuildTeleportLog, GuildWarehouseLog, WarehouseLogType
 from ..models.player import Player
-from ..models.inventory import ItemInstance
+from ..models.inventory import ItemInstance, STACK_SIZE
 from ..config import config
+from ..infrastructure.repositories.guild_repository import GuildRepository
+from ..infrastructure.repositories.guild_building_repository import GuildBuildingRepository
+from ..infrastructure.repositories.player_repository import PlayerRepository
+from ..infrastructure.repositories.item_repository import ItemRepository
+from ..infrastructure.repositories.guild_teleport_log_repository import GuildTeleportLogRepository
+from ..infrastructure.repositories.guild_alchemy_production_repository import GuildAlchemyProductionRepository
+from ..infrastructure.repositories.guild_warehouse_item_repository import GuildWarehouseItemRepository
+from ..infrastructure.repositories.guild_warehouse_log_repository import GuildWarehouseLogRepository
 from .guild_building_service import GuildBuildingService
 
 
 class GuildFacilityService:
-    """公会设施服务类"""
-    
+    """公会设施服务类 - DI架构版本"""
+
     # 丹房产出的丹药配置（按品质分类）
     ALCHEMY_PILLS = {
         "basic": [
@@ -92,6 +101,26 @@ class GuildFacilityService:
     # 丹房存储上限配置（按日产量倍数）
     STORAGE_CAPACITY_MULTIPLIER = 3  # 存储上限 = 日产量 * 3
 
+    def __init__(
+        self,
+        guild_repo: GuildRepository,
+        building_repo: GuildBuildingRepository,
+        player_repo: PlayerRepository,
+        item_repo: ItemRepository,
+        teleport_log_repo: GuildTeleportLogRepository,
+        alchemy_production_repo: GuildAlchemyProductionRepository,
+        warehouse_item_repo: GuildWarehouseItemRepository,
+        warehouse_log_repo: GuildWarehouseLogRepository = None,
+    ):
+        self._guild_repo = guild_repo
+        self._building_repo = building_repo
+        self._player_repo = player_repo
+        self._item_repo = item_repo
+        self._teleport_log_repo = teleport_log_repo
+        self._alchemy_production_repo = alchemy_production_repo
+        self._warehouse_item_repo = warehouse_item_repo
+        self._warehouse_log_repo = warehouse_log_repo
+
     @staticmethod
     def get_pill_quality_chinese(quality: str) -> str:
         """获取丹药品质的中文名称"""
@@ -104,66 +133,67 @@ class GuildFacilityService:
         }
         return quality_map.get(quality, quality)
 
-    @staticmethod
-    async def can_use_teleport(session: AsyncSession, player_id: str, guild_id: int) -> Tuple[bool, str]:
-        """检查玩家是否可以使用传送阵"""
+    async def can_use_teleport(self, player_id: str, guild_id: int) -> Tuple[bool, str]:
+        """
+        检查玩家是否可以使用传送阵
+
+        对应原代码:
+            guild_facility_service.py Line 82-131
+        """
         # 检查公会是否有传送阵
-        stmt = select(GuildBuilding).where(
-            and_(GuildBuilding.guild_id == guild_id, GuildBuilding.building_type == BuildingType.TELEPORT_ARRAY)
+        teleport_building = await self._building_repo.get_by_guild_and_type(
+            guild_id, BuildingType.TELEPORT_ARRAY
         )
-        teleport_building = (await session.execute(stmt)).scalars().first()
-        
+
         if not teleport_building:
             return False, "公会尚未建造传送阵"
-        
+
         # 获取传送阵效果
-        effects = GuildBuildingService.get_effects_for_level(BuildingType.TELEPORT_ARRAY, teleport_building.level)
+        building_service = GuildBuildingService(
+            self._guild_repo, self._building_repo, self._item_repo
+        )
+        effects = building_service.get_effects_for_level(BuildingType.TELEPORT_ARRAY, teleport_building.level)
         teleport_range = effects["teleport_range"]
         daily_uses = effects["daily_uses"]
-        
+
         # 检查玩家位置是否在传送范围内
-        player = await session.get(Player, player_id)
-        guild = await session.get(Guild, guild_id)
-        
+        player = await self._player_repo.get_by_id(player_id)
+        guild = await self._guild_repo.get_by_id(guild_id)
+
         if guild.base_x is None or guild.base_y is None:
             return False, "公会尚未设置基地坐标"
-        
+
         # 计算距离 - 使用正确的当前坐标
         current_x, current_y = player.get_current_coordinates()
         distance = math.sqrt((current_x - guild.base_x) ** 2 + (current_y - guild.base_y) ** 2)
         if distance > teleport_range:
             return False, f"距离公会基地太远，传送阵范围为{teleport_range}格（当前距离{distance:.1f}格）"
-        
+
         # 检查今日使用次数
         today = date.today()
-        today_start = datetime.combine(today, datetime.min.time())
-        today_end = datetime.combine(today, datetime.max.time())
-        
-        stmt = select(func.count(GuildTeleportLog.id)).where(
-            and_(
-                GuildTeleportLog.player_id == player_id,
-                GuildTeleportLog.guild_id == guild_id,
-                GuildTeleportLog.teleported_at >= today_start,
-                GuildTeleportLog.teleported_at <= today_end
-            )
+        used_count = await self._teleport_log_repo.get_today_teleport_count(
+            player_id, guild_id, today
         )
-        used_count = (await session.execute(stmt)).scalar_one()
-        
+
         if used_count >= daily_uses:
             return False, f"今日传送次数已用完（{used_count}/{daily_uses}）"
-        
+
         return True, "可以传送"
-    
-    @staticmethod
-    async def teleport_to_guild(session: AsyncSession, player_id: str, guild_id: int) -> Tuple[bool, str]:
-        """传送玩家到公会基地"""
-        can_teleport, reason = await GuildFacilityService.can_use_teleport(session, player_id, guild_id)
+
+    async def teleport_to_guild(self, player_id: str, guild_id: int) -> Tuple[bool, str]:
+        """
+        传送玩家到公会基地
+
+        对应原代码:
+            guild_facility_service.py Line 133-168
+        """
+        can_teleport, reason = await self.can_use_teleport(player_id, guild_id)
         if not can_teleport:
             return False, reason
-        
-        player = await session.get(Player, player_id)
-        guild = await session.get(Guild, guild_id)
-        
+
+        player = await self._player_repo.get_by_id(player_id)
+        guild = await self._guild_repo.get_by_id(guild_id)
+
         # 记录传送前位置（使用当前活跃坐标）
         from_x, from_y = player.get_current_coordinates()
 
@@ -176,8 +206,8 @@ class GuildFacilityService:
         player.real_world_y = guild.base_y
         player.x = guild.base_x
         player.y = guild.base_y
-        session.add(player)
-        
+        await self._player_repo.update(player)
+
         # 记录传送日志
         teleport_log = GuildTeleportLog(
             guild_id=guild_id,
@@ -187,18 +217,18 @@ class GuildFacilityService:
             to_x=guild.base_x,
             to_y=guild.base_y
         )
-        session.add(teleport_log)
-        
-        return True, f"传送成功！从({from_x}, {from_y})传送到公会基地({guild.base_x}, {guild.base_y})"
-    
-    @staticmethod
-    async def get_alchemy_production(session: AsyncSession, guild_id: int) -> List[Dict]:
-        """获取丹房产出列表"""
-        stmt = select(GuildAlchemyProduction).where(
-            and_(GuildAlchemyProduction.guild_id == guild_id, GuildAlchemyProduction.claimed == False)
-        ).order_by(GuildAlchemyProduction.produced_at.desc())
+        await self._teleport_log_repo.add(teleport_log)
 
-        productions = (await session.execute(stmt)).scalars().all()
+        return True, f"传送成功！从({from_x}, {from_y})传送到公会基地({guild.base_x}, {guild.base_y})"
+
+    async def get_alchemy_production(self, guild_id: int) -> List[Dict]:
+        """
+        获取丹房产出列表
+
+        对应原代码:
+            guild_facility_service.py Line 170-191
+        """
+        productions = await self._alchemy_production_repo.get_unclaimed_productions(guild_id)
 
         result = []
         for prod in productions:
@@ -214,14 +244,14 @@ class GuildFacilityService:
 
         return result
 
-    @staticmethod
-    async def get_alchemy_production_grouped(session: AsyncSession, guild_id: int) -> List[Dict]:
-        """获取丹房产出列表（按物品类型分组）"""
-        stmt = select(GuildAlchemyProduction).where(
-            and_(GuildAlchemyProduction.guild_id == guild_id, GuildAlchemyProduction.claimed == False)
-        ).order_by(GuildAlchemyProduction.produced_at.desc())
+    async def get_alchemy_production_grouped(self, guild_id: int) -> List[Dict]:
+        """
+        获取丹房产出列表（按物品类型分组）
 
-        productions = (await session.execute(stmt)).scalars().all()
+        对应原代码:
+            guild_facility_service.py Line 193-229
+        """
+        productions = await self._alchemy_production_repo.get_unclaimed_productions(guild_id)
 
         # 按物品ID分组统计
         grouped = {}
@@ -251,12 +281,16 @@ class GuildFacilityService:
         # 按物品名称排序
         result.sort(key=lambda x: x["item_name"])
         return result
-    
-    @staticmethod
-    async def claim_alchemy_item(session: AsyncSession, player_id: str, guild_id: int, production_id: int, points_cost: int) -> Tuple[bool, str]:
-        """用积分兑换丹房产出的丹药"""
+
+    async def claim_alchemy_item(self, player_id: str, guild_id: int, production_id: int, points_cost: int) -> Tuple[bool, str]:
+        """
+        用积分兑换丹房产出的丹药
+
+        对应原代码:
+            guild_facility_service.py Line 231-266
+        """
         # 检查产出记录
-        production = await session.get(GuildAlchemyProduction, production_id)
+        production = await self._alchemy_production_repo.get_by_id(production_id)
         if not production or production.guild_id != guild_id:
             return False, "产出记录不存在"
 
@@ -264,36 +298,37 @@ class GuildFacilityService:
             return False, "该物品已被领取"
 
         # 检查玩家积分
-        player = await session.get(Player, player_id)
+        player = await self._player_repo.get_by_id(player_id)
         if player.gold2 < points_cost:
             return False, f"积分不足，需要{points_cost}积分"
 
         # 扣除积分
         player.gold2 -= points_cost
-        session.add(player)
+        await self._player_repo.update(player)
 
         # 添加物品到玩家背包
         try:
-            await ItemInstance.add_item(session, player_id, production.item_id, production.quantity)
+            await ItemInstance.add_item(self._item_repo._session, player_id, production.item_id, production.quantity)
         except ValueError as e:
             return False, f"背包空间不足：{str(e)}"
 
         # 标记为已领取
-        production.claimed = True
-        production.claimed_by = player_id
-        production.claimed_at = datetime.now()
-        session.add(production)
+        production = await self._alchemy_production_repo.mark_as_claimed(production, player_id)
 
         item_config = config.items_config["by_id"].get(production.item_id)
         item_name = item_config.name if item_config else production.item_id
 
         return True, f"成功兑换{item_name}×{production.quantity}，消耗{points_cost}积分"
 
-    @staticmethod
-    async def claim_alchemy_item_by_name(session: AsyncSession, player_id: str, guild_id: int, item_name: str, quantity: int) -> Tuple[bool, str]:
-        """按名称和数量兑换丹房产出的丹药"""
+    async def claim_alchemy_item_by_name(self, player_id: str, guild_id: int, item_name: str, quantity: int) -> Tuple[bool, str]:
+        """
+        按名称和数量兑换丹房产出的丹药
+
+        对应原代码:
+            guild_facility_service.py Line 268-322
+        """
         # 获取分组后的产出列表
-        grouped_productions = await GuildFacilityService.get_alchemy_production_grouped(session, guild_id)
+        grouped_productions = await self.get_alchemy_production_grouped(guild_id)
 
         # 查找指定名称的丹药
         target_item = None
@@ -315,17 +350,17 @@ class GuildFacilityService:
         total_points_cost = target_item["points_cost"] * quantity
 
         # 检查玩家积分
-        player = await session.get(Player, player_id)
+        player = await self._player_repo.get_by_id(player_id)
         if player.gold2 < total_points_cost:
             return False, f"积分不足，需要{total_points_cost}积分，当前拥有{player.gold2}积分"
 
         # 扣除积分
         player.gold2 -= total_points_cost
-        session.add(player)
+        await self._player_repo.update(player)
 
         # 添加物品到玩家背包
         try:
-            await ItemInstance.add_item(session, player_id, target_item["item_id"], quantity)
+            await ItemInstance.add_item(self._item_repo._session, player_id, target_item["item_id"], quantity)
         except ValueError as e:
             return False, f"背包空间不足：{str(e)}"
 
@@ -335,29 +370,73 @@ class GuildFacilityService:
             if claimed_count >= quantity:
                 break
 
-            production = await session.get(GuildAlchemyProduction, production_id)
+            production = await self._alchemy_production_repo.get_by_id(production_id)
             if production and not production.claimed:
-                production.claimed = True
-                production.claimed_by = player_id
-                production.claimed_at = datetime.now()
-                session.add(production)
+                production = await self._alchemy_production_repo.mark_as_claimed(production, player_id)
                 claimed_count += production.quantity
 
         return True, f"成功兑换{item_name}×{quantity}，消耗{total_points_cost}积分"
-    
-    @staticmethod
-    def _select_pill_pool_static(primary_quality: str) -> str:
+
+    async def get_alchemy_storage_capacity(self, guild_id: int) -> int:
         """
-        根据跨池配置选择实际使用的丹药池(静态方法版本)
+        获取丹房存储上限
+
+        Args:
+            guild_id: 公会ID
+
+        Returns:
+            存储上限数量
+
+        对应原代码:
+            新增功能
+        """
+        alchemy_building = await self._building_repo.get_by_guild_and_type(
+            guild_id, BuildingType.ALCHEMY_ROOM
+        )
+
+        if not alchemy_building:
+            return 0
+
+        building_service = GuildBuildingService(
+            self._guild_repo, self._building_repo, self._item_repo
+        )
+        bonuses = await building_service.get_guild_bonuses(guild_id)
+        daily_production = bonuses["daily_alchemy_production"]
+
+        # 存储上限 = 日产量 * 倍数
+        return daily_production * self.STORAGE_CAPACITY_MULTIPLIER
+
+    async def get_alchemy_storage_used(self, guild_id: int) -> int:
+        """
+        获取丹房当前已使用的存储空间
+
+        Args:
+            guild_id: 公会ID
+
+        Returns:
+            已使用的存储数量
+
+        对应原代码:
+            新增功能
+        """
+        unclaimed_productions = await self._alchemy_production_repo.get_unclaimed_productions(guild_id)
+        return len(unclaimed_productions)
+
+    def _select_pill_pool(self, primary_quality: str) -> str:
+        """
+        根据跨池配置选择实际使用的丹药池
 
         Args:
             primary_quality: 主要品质(如"master", "legendary")
 
         Returns:
             实际使用的丹药池品质
+
+        对应原代码:
+            新增功能
         """
         # 检查是否有跨池配置
-        cross_pool_config = GuildFacilityService.CROSS_POOL_CONFIG.get(primary_quality)
+        cross_pool_config = self.CROSS_POOL_CONFIG.get(primary_quality)
         if not cross_pool_config:
             return primary_quality
 
@@ -372,53 +451,42 @@ class GuildFacilityService:
 
         return primary_quality
 
-    @staticmethod
-    async def generate_daily_alchemy_production(session: AsyncSession, guild_id: int) -> int:
-        """生成每日丹房产出"""
+    async def generate_daily_alchemy_production(self, guild_id: int) -> int:
+        """
+        生成每日丹房产出
+
+        对应原代码:
+            guild_facility_service.py Line 324-390
+        """
         # 检查是否有丹房
-        stmt = select(GuildBuilding).where(
-            and_(GuildBuilding.guild_id == guild_id, GuildBuilding.building_type == BuildingType.ALCHEMY_ROOM)
+        alchemy_building = await self._building_repo.get_by_guild_and_type(
+            guild_id, BuildingType.ALCHEMY_ROOM
         )
-        alchemy_building = (await session.execute(stmt)).scalars().first()
 
         if not alchemy_building:
             return 0
 
         # 获取丹房效果
-        effects = GuildBuildingService.get_effects_for_level(BuildingType.ALCHEMY_ROOM, alchemy_building.level)
-        bonuses = await GuildBuildingService.get_guild_bonuses(session, guild_id)
+        building_service = GuildBuildingService(
+            self._guild_repo, self._building_repo, self._item_repo
+        )
+        effects = building_service.get_effects_for_level(
+            BuildingType.ALCHEMY_ROOM, alchemy_building.level
+        )
+        bonuses = await building_service.get_guild_bonuses(guild_id)
         daily_production = bonuses["daily_alchemy_production"]
         pill_quality = effects["pill_quality"]
 
         # 检查存储空间
-        storage_capacity = daily_production * GuildFacilityService.STORAGE_CAPACITY_MULTIPLIER
+        storage_capacity = await self.get_alchemy_storage_capacity(guild_id)
+        storage_used = await self.get_alchemy_storage_used(guild_id)
 
-        stmt = select(func.count(GuildAlchemyProduction.id)).where(
-            and_(
-                GuildAlchemyProduction.guild_id == guild_id,
-                GuildAlchemyProduction.claimed == False
-            )
-        )
-        storage_used = (await session.execute(stmt)).scalar_one()
-
-        # 存储已满时的友好提示
         if storage_used >= storage_capacity:
-            # 不生成丹药,但允许玩家查看时看到提示
-            return -1  # 特殊返回值表示存储已满
+            return -1  # 存储已满,返回特殊值
 
         # 检查今日是否已生成
         today = date.today()
-        today_start = datetime.combine(today, datetime.min.time())
-        today_end = datetime.combine(today, datetime.max.time())
-
-        stmt = select(func.count(GuildAlchemyProduction.id)).where(
-            and_(
-                GuildAlchemyProduction.guild_id == guild_id,
-                GuildAlchemyProduction.produced_at >= today_start,
-                GuildAlchemyProduction.produced_at <= today_end
-            )
-        )
-        today_count = (await session.execute(stmt)).scalar_one()
+        today_count = await self._alchemy_production_repo.get_today_production_count(guild_id, today)
 
         if today_count >= daily_production:
             return 0  # 今日已生成足够数量
@@ -429,10 +497,10 @@ class GuildFacilityService:
 
         for _ in range(pills_to_generate):
             # 根据跨池配置选择实际使用的丹药池
-            actual_pill_quality = GuildFacilityService._select_pill_pool_static(pill_quality)
+            actual_pill_quality = self._select_pill_pool(pill_quality)
 
             # 根据品质随机选择丹药
-            pill_pool = GuildFacilityService.ALCHEMY_PILLS.get(actual_pill_quality, [])
+            pill_pool = self.ALCHEMY_PILLS.get(actual_pill_quality, [])
             if not pill_pool:
                 continue
 
@@ -454,30 +522,39 @@ class GuildFacilityService:
                     item_id=selected_pill["item_id"],
                     quantity=1
                 )
-                session.add(production)
+                await self._alchemy_production_repo.add(production)
                 generated_count += 1
 
         return generated_count
 
-    @staticmethod
-    async def get_warehouse_capacity(session: AsyncSession, guild_id: int) -> int:
-        """获取公会仓库容量"""
-        stmt = select(GuildBuilding).where(
-            and_(GuildBuilding.guild_id == guild_id, GuildBuilding.building_type == BuildingType.GUILD_WAREHOUSE)
+    async def get_warehouse_capacity(self, guild_id: int) -> int:
+        """
+        获取公会仓库容量
+
+        对应原代码:
+            guild_facility_service.py Line 392-405
+        """
+        warehouse_building = await self._building_repo.get_by_guild_and_type(
+            guild_id, BuildingType.GUILD_WAREHOUSE
         )
-        warehouse_building = (await session.execute(stmt)).scalars().first()
 
         if not warehouse_building:
             return 0
 
-        effects = GuildBuildingService.get_effects_for_level(BuildingType.GUILD_WAREHOUSE, warehouse_building.level)
+        building_service = GuildBuildingService(
+            self._guild_repo, self._building_repo, self._item_repo
+        )
+        effects = building_service.get_effects_for_level(BuildingType.GUILD_WAREHOUSE, warehouse_building.level)
         return effects["storage_slots"]
 
-    @staticmethod
-    async def get_warehouse_items(session: AsyncSession, guild_id: int) -> List[Dict]:
-        """获取公会仓库物品列表，合并显示相同物品的多个堆叠"""
-        stmt = select(GuildWarehouseItem).where(GuildWarehouseItem.guild_id == guild_id).order_by(GuildWarehouseItem.deposited_at.desc())
-        items = (await session.execute(stmt)).scalars().all()
+    async def get_warehouse_items(self, guild_id: int) -> List[Dict]:
+        """
+        获取公会仓库物品列表，合并显示相同物品的多个堆叠
+
+        对应原代码:
+            guild_facility_service.py Line 407-440
+        """
+        items = await self._warehouse_item_repo.get_all_by_guild_id(guild_id)
 
         # 按物品ID分组合并
         item_groups = {}
@@ -486,7 +563,7 @@ class GuildFacilityService:
             if item_config:
                 if item.item_id not in item_groups:
                     # 找到最新的存入者作为代表（因为items已按deposited_at降序排列，第一个就是最新的）
-                    depositor = await session.get(Player, item.deposited_by)
+                    depositor = await self._player_repo.get_by_id(item.deposited_by)
                     item_groups[item.item_id] = {
                         "item_id": item.item_id,
                         "item_name": item_config.name,
@@ -508,14 +585,15 @@ class GuildFacilityService:
 
         return result
 
-    @staticmethod
-    async def deposit_to_warehouse(session: AsyncSession, player_id: str, guild_id: int, item_id: str, quantity: int) -> Tuple[bool, str]:
-        """存入物品到公会仓库"""
-        from math import ceil
-        from ..models.inventory import STACK_SIZE
+    async def deposit_to_warehouse(self, player_id: str, guild_id: int, item_id: str, quantity: int) -> Tuple[bool, str]:
+        """
+        存入物品到公会仓库
 
+        对应原代码:
+            guild_facility_service.py Line 442-524
+        """
         # 检查是否有仓库
-        capacity = await GuildFacilityService.get_warehouse_capacity(session, guild_id)
+        capacity = await self.get_warehouse_capacity(guild_id)
         if capacity == 0:
             return False, "公会尚未建造仓库"
 
@@ -525,40 +603,41 @@ class GuildFacilityService:
             return False, "只能存入诡异道具（材料类型）"
 
         # 检查玩家是否有该物品（需要统计所有堆叠的总数量）
-        stmt = select(ItemInstance).where(
-            and_(ItemInstance.player_id == player_id, ItemInstance.item_id == item_id)
-        )
-        player_items = (await session.execute(stmt)).scalars().all()
+        player_items = await self._item_repo.get_by_player_and_item_id(player_id, item_id)
         total_quantity = sum(item.quantity for item in player_items)
 
         if total_quantity < quantity:
             return False, f"你没有足够的该物品（拥有{total_quantity}，需要{quantity}）"
 
         # 获取仓库中该物品的现有堆叠
-        stmt = select(GuildWarehouseItem).where(
-            and_(GuildWarehouseItem.guild_id == guild_id, GuildWarehouseItem.item_id == item_id)
-        ).order_by(GuildWarehouseItem.id)
-        existing_stacks = (await session.execute(stmt)).scalars().all()
+        existing_stacks = await self._warehouse_item_repo.get_by_guild_and_item_id(guild_id, item_id)
 
         # 计算现有数量和格子数
         existing_quantity = sum(stack.quantity for stack in existing_stacks)
         new_total_quantity = existing_quantity + quantity
 
-        # 计算需要的格子数（按照玩家背包的堆叠规则）
+        # 计算需要的格子数（每格最多堆叠100个）
+        from math import ceil
         new_slots_needed = ceil(new_total_quantity / STACK_SIZE)
         current_slots_for_this_item = len(existing_stacks)
         additional_slots_needed = new_slots_needed - current_slots_for_this_item
 
         # 检查仓库总格子数
-        stmt = select(func.count(GuildWarehouseItem.id)).where(GuildWarehouseItem.guild_id == guild_id)
-        current_total_slots = (await session.execute(stmt)).scalar_one() or 0
+        current_total_slots = await self._warehouse_item_repo.get_total_slots_count(guild_id)
 
         if current_total_slots + additional_slots_needed > capacity:
-            return False, f"仓库格子不足，当前{current_total_slots}/{capacity}格，存入{quantity}个需要额外{additional_slots_needed}格"
+            # 计算当前最多能存入多少（现有堆叠剩余空间 + 空闲格子可容纳的数量）
+            existing_space = sum(STACK_SIZE - s.quantity for s in existing_stacks)
+            free_slots = capacity - current_total_slots
+            max_deposit = existing_space + free_slots * STACK_SIZE
+            return False, (
+                f"仓库格子不足（当前{current_total_slots}/{capacity}格），"
+                f"该物品最多还能存入{max_deposit}个"
+            )
 
         # 扣除玩家物品（使用统一的消耗方法处理多个堆叠）
         try:
-            success_consume = await ItemInstance.consume_item(session, player_id, item_id, quantity)
+            success_consume = await ItemInstance.consume_item(self._item_repo._session, player_id, item_id, quantity)
             if not success_consume:
                 return False, "扣除物品失败"
         except ValueError as e:
@@ -576,7 +655,7 @@ class GuildFacilityService:
                 add_to_stack = min(available_space, remaining_quantity)
                 stack.quantity += add_to_stack
                 remaining_quantity -= add_to_stack
-                session.add(stack)
+                await self._warehouse_item_repo.update(stack)
 
         # 剩余数量创建新堆叠
         while remaining_quantity > 0:
@@ -587,37 +666,29 @@ class GuildFacilityService:
                 quantity=stack_quantity,
                 deposited_by=player_id
             )
-            session.add(warehouse_item)
+            await self._warehouse_item_repo.add(warehouse_item)
             remaining_quantity -= stack_quantity
+
+        # 写入仓库操作日志
+        await self._write_warehouse_log(
+            guild_id, player_id, WarehouseLogType.DEPOSIT,
+            item_id, item_config.name, quantity
+        )
 
         return True, f"成功存入{item_config.name}×{quantity}"
 
-    @staticmethod
-    async def withdraw_from_warehouse(session: AsyncSession, player_id: str, guild_id: int, item_index: int, quantity: int) -> Tuple[bool, str]:
-        """从公会仓库取出物品"""
-        # 获取仓库物品列表（合并显示的）
-        items = await GuildFacilityService.get_warehouse_items(session, guild_id)
-
-        if item_index < 1 or item_index > len(items):
-            return False, "无效的物品序号"
-
-        selected_item = items[item_index - 1]
-
-        if selected_item["quantity"] < quantity:
-            return False, f"仓库中该物品数量不足（仅有{selected_item['quantity']}个）"
-
+    async def _do_withdraw(self, player_id: str, guild_id: int, item_id: str, item_name: str, quantity: int) -> Tuple[bool, str]:
+        """执行仓库取出的核心逻辑"""
         # 检查玩家背包容量
         try:
-            await ItemInstance.add_item(session, player_id, selected_item["item_id"], quantity)
+            await ItemInstance.add_item(self._item_repo._session, player_id, item_id, quantity)
         except ValueError as e:
             return False, f"背包空间不足：{str(e)}"
 
         # 从实际的堆叠中扣除物品（按照存入时间降序，优先取出最新的）
-        stmt = select(GuildWarehouseItem).where(
-            and_(GuildWarehouseItem.guild_id == guild_id, GuildWarehouseItem.item_id == selected_item["item_id"])
-        ).order_by(GuildWarehouseItem.deposited_at.desc())  # 按存入时间降序，优先取出最新的
-
-        warehouse_stacks = (await session.execute(stmt)).scalars().all()
+        warehouse_stacks = await self._warehouse_item_repo.get_by_guild_and_item_id_desc(
+            guild_id, item_id
+        )
 
         remaining_to_withdraw = quantity
         for stack in warehouse_stacks:
@@ -629,11 +700,104 @@ class GuildFacilityService:
             remaining_to_withdraw -= withdraw_from_stack
 
             if stack.quantity <= 0:
-                await session.delete(stack)
+                await self._warehouse_item_repo.delete(stack.id)
             else:
-                session.add(stack)
+                await self._warehouse_item_repo.update(stack)
 
-        item_config = config.items_config["by_id"].get(selected_item["item_id"])
-        item_name = item_config.name if item_config else selected_item["item_id"]
+        # 写入仓库操作日志
+        await self._write_warehouse_log(
+            guild_id, player_id, WarehouseLogType.WITHDRAW,
+            item_id, item_name, quantity
+        )
 
         return True, f"成功取出{item_name}×{quantity}"
+
+    async def withdraw_from_warehouse(self, player_id: str, guild_id: int, item_index: int, quantity: int) -> Tuple[bool, str]:
+        """从公会仓库按序号取出物品"""
+        # 获取仓库物品列表（合并显示的）
+        items = await self.get_warehouse_items(guild_id)
+
+        if item_index < 1 or item_index > len(items):
+            return False, "无效的物品序号"
+
+        selected_item = items[item_index - 1]
+
+        if selected_item["quantity"] < quantity:
+            return False, f"仓库中该物品数量不足（仅有{selected_item['quantity']}个）"
+
+        item_config = config.items_config["by_id"].get(selected_item["item_id"])
+        display_name = item_config.name if item_config else selected_item["item_id"]
+
+        return await self._do_withdraw(player_id, guild_id, selected_item["item_id"], display_name, quantity)
+
+    async def withdraw_from_warehouse_by_name(self, player_id: str, guild_id: int, item_name: str, quantity: int) -> Tuple[bool, str]:
+        """从公会仓库按物品名取出物品"""
+        # 通过物品名查找 item_id
+        item_config = config.items_config["by_name"].get(item_name)
+        if not item_config:
+            return False, f"未找到名为【{item_name}】的物品"
+
+        # 检查仓库中是否有该物品
+        warehouse_stacks = await self._warehouse_item_repo.get_by_guild_and_item_id_desc(
+            guild_id, item_config.item_id
+        )
+        total_quantity = sum(s.quantity for s in warehouse_stacks)
+        if total_quantity == 0:
+            return False, f"仓库中没有【{item_name}】"
+        if total_quantity < quantity:
+            return False, f"仓库中该物品数量不足（仅有{total_quantity}个）"
+
+        return await self._do_withdraw(player_id, guild_id, item_config.item_id, item_name, quantity)
+
+    async def _write_warehouse_log(
+        self, guild_id: int, player_id: str,
+        operation: WarehouseLogType, item_id: str, item_name: str, quantity: int
+    ):
+        """写入仓库操作日志，并自动清理超出上限的旧记录"""
+        if not self._warehouse_log_repo:
+            return
+
+        # 获取玩家昵称
+        player = await self._player_repo.get_by_id(player_id)
+        player_name = player.nickname if player else "未知"
+
+        log = GuildWarehouseLog(
+            guild_id=guild_id,
+            player_id=player_id,
+            player_name=player_name,
+            operation=operation,
+            item_id=item_id,
+            item_name=item_name,
+            quantity=quantity,
+        )
+        await self._warehouse_log_repo.add(log)
+
+        # 自动清理超出上限的旧日志
+        await self._warehouse_log_repo.cleanup_old_logs(guild_id)
+
+    async def get_warehouse_logs(self, guild_id: int, limit: int = 20) -> List[Dict]:
+        """
+        获取公会仓库操作日志
+
+        Args:
+            guild_id: 公会ID
+            limit: 返回条数
+
+        Returns:
+            日志列表
+        """
+        if not self._warehouse_log_repo:
+            return []
+
+        logs = await self._warehouse_log_repo.get_recent_by_guild(guild_id, limit)
+
+        result = []
+        for log in logs:
+            result.append({
+                "player_name": log.player_name,
+                "operation": "存入" if log.operation == WarehouseLogType.DEPOSIT else "取出",
+                "item_name": log.item_name,
+                "quantity": log.quantity,
+                "operated_at": log.operated_at,
+            })
+        return result

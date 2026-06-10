@@ -22,7 +22,7 @@ from ..platform_utils import get_unified_player, require_player
 # 设置为True使用新版DI架构的RussianRouletteService，False使用旧版本
 # =====================================================
 
-from .russian_roulette_service import RussianRouletteService as RussianRouletteServiceNew
+from .russian_roulette_service import RussianRouletteService
 from ..infrastructure.repositories.russian_roulette_room_repository import RussianRouletteRoomRepository
 from ..infrastructure.repositories.russian_roulette_game_repository import RussianRouletteGameRepository
 from ..infrastructure.repositories.player_repository import PlayerRepository
@@ -198,7 +198,7 @@ async def handle_create_room(bot: Bot, event: MessageEvent, args: Message = Comm
                 else:
                     await create_room_cmd.finish("⛔ 血量参数无效，请填入 3/4/5/6\n例如：恶魔轮盘 创建 4（四命房）")
 
-            service = RussianRouletteServiceNew(
+            service = RussianRouletteService(
                 room_repo=RussianRouletteRoomRepository(session),
                 game_repo=RussianRouletteGameRepository(session),
                 player_repo=PlayerRepository(session)
@@ -227,7 +227,7 @@ async def handle_create_room(bot: Bot, event: MessageEvent, args: Message = Comm
             # 1. 【恶魔轮盘 加入】- 自动加入当前群的活跃房间
             # 2. 【恶魔轮盘 加入 房间ID】- 加入指定房间（跨群加入）
 
-            service = RussianRouletteServiceNew(
+            service = RussianRouletteService(
                 room_repo=RussianRouletteRoomRepository(session),
                 game_repo=RussianRouletteGameRepository(session),
                 player_repo=PlayerRepository(session)
@@ -287,7 +287,7 @@ async def handle_create_room(bot: Bot, event: MessageEvent, args: Message = Comm
                 await create_room_cmd.finish("⛔ 金币数必须为数字")
 
             # 获取玩家当前房间
-            service = RussianRouletteServiceNew(
+            service = RussianRouletteService(
                 room_repo=RussianRouletteRoomRepository(session),
                 game_repo=RussianRouletteGameRepository(session),
                 player_repo=PlayerRepository(session)
@@ -296,7 +296,7 @@ async def handle_create_room(bot: Bot, event: MessageEvent, args: Message = Comm
             if not room:
                 await create_room_cmd.finish("⛔ 你不在任何房间中")
 
-            service = RussianRouletteServiceNew(
+            service = RussianRouletteService(
                 room_repo=RussianRouletteRoomRepository(session),
                 game_repo=RussianRouletteGameRepository(session),
                 player_repo=PlayerRepository(session)
@@ -356,7 +356,7 @@ async def handle_create_room(bot: Bot, event: MessageEvent, args: Message = Comm
         
         elif args_text == "开始":
             # 获取玩家当前房间
-            service = RussianRouletteServiceNew(
+            service = RussianRouletteService(
                 room_repo=RussianRouletteRoomRepository(session),
                 game_repo=RussianRouletteGameRepository(session),
                 player_repo=PlayerRepository(session)
@@ -365,7 +365,7 @@ async def handle_create_room(bot: Bot, event: MessageEvent, args: Message = Comm
             if not room:
                 await create_room_cmd.finish("⛔ 你不在任何房间中")
 
-            service = RussianRouletteServiceNew(
+            service = RussianRouletteService(
                 room_repo=RussianRouletteRoomRepository(session),
                 game_repo=RussianRouletteGameRepository(session),
                 player_repo=PlayerRepository(session)
@@ -480,7 +480,7 @@ async def handle_shoot(bot: Bot, event: MessageEvent, args: Message = CommandArg
         player = await require_player(session, event, shoot_cmd)
         
         # 获取玩家当前房间和游戏
-        service = RussianRouletteServiceNew(
+        service = RussianRouletteService(
             room_repo=RussianRouletteRoomRepository(session),
             game_repo=RussianRouletteGameRepository(session),
             player_repo=PlayerRepository(session)
@@ -592,7 +592,7 @@ async def handle_shoot(bot: Bot, event: MessageEvent, args: Message = CommandArg
             winner_id = game_state[f"{room.player1_id}_hp"] > 0 and room.player1_id or room.player2_id
             winner = await session.get(Player, winner_id)
 
-            service = RussianRouletteServiceNew(
+            service = RussianRouletteService(
                 room_repo=RussianRouletteRoomRepository(session),
                 game_repo=RussianRouletteGameRepository(session),
                 player_repo=PlayerRepository(session)
@@ -730,7 +730,7 @@ async def handle_use_adrenaline(bot: Bot, event: MessageEvent, args: Message = C
         player = await require_player(session, event, use_adrenaline_cmd)
 
         # 获取玩家当前房间和游戏
-        service = RussianRouletteServiceNew(
+        service = RussianRouletteService(
             room_repo=RussianRouletteRoomRepository(session),
             game_repo=RussianRouletteGameRepository(session),
             player_repo=PlayerRepository(session)
@@ -840,7 +840,7 @@ async def handle_use_adrenaline(bot: Bot, event: MessageEvent, args: Message = C
         # 如果游戏结束，处理胜负
         if game_over:
             winner = await session.get(Player, winner_id)
-            service = RussianRouletteServiceNew(
+            service = RussianRouletteService(
                 room_repo=RussianRouletteRoomRepository(session),
                 game_repo=RussianRouletteGameRepository(session),
                 player_repo=PlayerRepository(session)
@@ -912,7 +912,7 @@ async def handle_use_item(bot: Bot, event: MessageEvent, args: Message = Command
         player = await require_player(session, event, use_item_cmd)
 
         # 获取玩家当前房间和游戏
-        service = RussianRouletteServiceNew(
+        service = RussianRouletteService(
             room_repo=RussianRouletteRoomRepository(session),
             game_repo=RussianRouletteGameRepository(session),
             player_repo=PlayerRepository(session)
@@ -1075,7 +1075,7 @@ async def handle_use_item(bot: Bot, event: MessageEvent, args: Message = Command
         # 如果游戏结束，处理胜负
         if game_over:
             winner = await session.get(Player, winner_id)
-            service = RussianRouletteServiceNew(
+            service = RussianRouletteService(
                 room_repo=RussianRouletteRoomRepository(session),
                 game_repo=RussianRouletteGameRepository(session),
                 player_repo=PlayerRepository(session)
@@ -1130,7 +1130,7 @@ async def handle_check_prediction(event: MessageEvent):
         player = await require_player(session, event, check_prediction_cmd)
 
         # 获取玩家当前房间和游戏
-        service = RussianRouletteServiceNew(
+        service = RussianRouletteService(
             room_repo=RussianRouletteRoomRepository(session),
             game_repo=RussianRouletteGameRepository(session),
             player_repo=PlayerRepository(session)
@@ -1176,7 +1176,7 @@ async def handle_room_status(event: MessageEvent):
         player = await require_player(session, event, room_status_cmd)
 
         # 获取玩家当前房间
-        service = RussianRouletteServiceNew(
+        service = RussianRouletteService(
             room_repo=RussianRouletteRoomRepository(session),
             game_repo=RussianRouletteGameRepository(session),
             player_repo=PlayerRepository(session)
@@ -1230,7 +1230,7 @@ async def handle_room_status(event: MessageEvent):
 
         # 显示游戏状态
         if room.status == "playing":
-            service = RussianRouletteServiceNew(
+            service = RussianRouletteService(
                 room_repo=RussianRouletteRoomRepository(session),
                 game_repo=RussianRouletteGameRepository(session),
                 player_repo=PlayerRepository(session)
@@ -1275,7 +1275,7 @@ async def handle_leave_room(event: MessageEvent):
         player = await require_player(session, event, leave_room_cmd)
 
         # 获取玩家当前房间
-        service = RussianRouletteServiceNew(
+        service = RussianRouletteService(
             room_repo=RussianRouletteRoomRepository(session),
             game_repo=RussianRouletteGameRepository(session),
             player_repo=PlayerRepository(session)
@@ -1338,7 +1338,7 @@ async def handle_view_items(event: MessageEvent):
         player = await require_player(session, event, view_items_cmd)
 
         # 获取玩家当前房间和游戏
-        service = RussianRouletteServiceNew(
+        service = RussianRouletteService(
             room_repo=RussianRouletteRoomRepository(session),
             game_repo=RussianRouletteGameRepository(session),
             player_repo=PlayerRepository(session)
@@ -1431,7 +1431,7 @@ async def handle_bet(event: MessageEvent, args: Message = CommandArg()):
     if len(parts) < 2:
         # 查询房间信息，展示可下注的玩家
         async with safe_session() as session:
-            service = RussianRouletteServiceNew(
+            service = RussianRouletteService(
                 room_repo=RussianRouletteRoomRepository(session),
                 game_repo=RussianRouletteGameRepository(session),
                 player_repo=PlayerRepository(session)
@@ -1474,7 +1474,7 @@ async def handle_bet(event: MessageEvent, args: Message = CommandArg()):
             await bet_cmd.finish("⛔ 请先创建角色")
 
         # 查找当前群的活跃房间
-        service = RussianRouletteServiceNew(
+        service = RussianRouletteService(
             room_repo=RussianRouletteRoomRepository(session),
             game_repo=RussianRouletteGameRepository(session),
             player_repo=PlayerRepository(session)
@@ -1531,7 +1531,7 @@ async def handle_view_bets(event: MessageEvent):
     async with safe_session() as session:
         player = await require_player(session, event, view_bets_cmd)
 
-        service = RussianRouletteServiceNew(
+        service = RussianRouletteService(
             room_repo=RussianRouletteRoomRepository(session),
             game_repo=RussianRouletteGameRepository(session),
             player_repo=PlayerRepository(session)

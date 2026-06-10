@@ -179,8 +179,8 @@ async def handle_sign(event: MessageEvent):
             # 导入公会相关服务
             from ..models.guild_task_record import GuildTaskType
 
-            from ..guild.guild_task_service_new import GuildTaskService as GuildTaskServiceNew
-            from ..guild.guild_economy_service_new import GuildEconomyService as GuildEconomyServiceNew
+            from ..guild.guild_task_service import GuildTaskService
+            from ..guild.guild_economy_service import GuildEconomyService
             from ..infrastructure.repositories.player_repository import PlayerRepository
             from ..infrastructure.repositories.guild_repository import GuildRepository
             from ..infrastructure.repositories.player_task_stats_repository import PlayerTaskStatsRepository
@@ -189,7 +189,7 @@ async def handle_sign(event: MessageEvent):
             from ..infrastructure.repositories.guild_building_repository import GuildBuildingRepository
 
             # 获取公会签到任务配置
-            task_config = GuildTaskServiceNew.DAILY_TASKS["daily_sign"]
+            task_config = GuildTaskService.DAILY_TASKS["daily_sign"]
             points_reward = task_config["points_reward"]
             base_exp = task_config["base_exp"]
 
@@ -198,7 +198,7 @@ async def handle_sign(event: MessageEvent):
             player.guild_contribution += points_reward
 
             # 添加公会经验（会根据公会建筑倍率动态计算）
-            guild_economy_service = GuildEconomyServiceNew(
+            guild_economy_service = GuildEconomyService(
                 guild_repo=GuildRepository(session),
                 player_repo=PlayerRepository(session),
                 donation_log_repo=PlayerDonationLogRepository(session),
@@ -209,7 +209,7 @@ async def handle_sign(event: MessageEvent):
             )
 
             # 记录签到任务完成
-            task_service = GuildTaskServiceNew(
+            task_service = GuildTaskService(
                 player_repo=PlayerRepository(session),
                 guild_repo=GuildRepository(session),
                 player_task_stats_repo=PlayerTaskStatsRepository(session),

@@ -29,7 +29,7 @@ class _DummyModel:
     pass
 
 
-class _DummyNewBuildingService:
+class _DummyBuildingService:
     created_with = None
 
     def __init__(self, **kwargs):
@@ -42,7 +42,7 @@ class _DummyNewBuildingService:
         }
 
 
-def _load_legacy_guild_building_service():
+def _load_guild_building_service_module():
     module_name = "plugins.xiuxian_game.guild.guild_building_service"
     project_root = Path(__file__).resolve().parents[1]
     module_path = (
@@ -87,14 +87,17 @@ def _load_legacy_guild_building_service():
         "plugins.xiuxian_game.infrastructure.repositories.guild_building_repository": types.SimpleNamespace(
             GuildBuildingRepository=lambda session: ("building_repo", session)
         ),
-        "plugins.xiuxian_game.guild.guild_building_service_new": types.SimpleNamespace(
-            GuildBuildingService=_DummyNewBuildingService
+        # 必须是真正的类：被测模块的签名里有 `ItemRepository | None` 联合类型注解
+        "plugins.xiuxian_game.infrastructure.repositories.item_repository": types.SimpleNamespace(
+            ItemRepository=type("ItemRepository", (), {})
+        ),
+        "plugins.xiuxian_game.infrastructure.repositories.guild_warehouse_item_repository": types.SimpleNamespace(
+            GuildWarehouseItemRepository=type("GuildWarehouseItemRepository", (), {})
         ),
     }
 
     # 强制替换（真模块可能已被其他测试加载），用完通过 restore() 完整还原，
-    # 保证与运行顺序无关。get_guild_bonuses 内部是运行时相对导入，
-    # 因此 stub 必须保留到调用结束后再还原。
+    # 保证与运行顺序无关。
     saved = {}
     for name, module in stubs.items():
         saved[name] = sys.modules.get(name)
@@ -117,21 +120,24 @@ def _load_legacy_guild_building_service():
     except BaseException:
         restore()
         raise
-    return module.GuildBuildingService, restore
+    return module, restore
 
 
-def test_legacy_guild_bonuses_delegate_to_new_layout_service():
-    service, restore = _load_legacy_guild_building_service()
+def test_module_entry_delegates_to_single_service_implementation():
+    """模块级 get_guild_bonuses(session, ...) 兼容入口必须委托唯一的 Service 实现"""
+    module, restore = _load_guild_building_service_module()
     session = object()
 
     try:
-        bonuses = asyncio.run(service.get_guild_bonuses(session, 123))
+        # 替换模块全局的 Service 类，验证入口的构造与转发逻辑
+        module.GuildBuildingService = _DummyBuildingService
+        bonuses = asyncio.run(module.get_guild_bonuses(session, 123))
     finally:
         restore()
 
     assert bonuses["cultivation_bonus"] == 0.07
     assert bonuses["adjacency_descriptions"] == ["聚灵阵邻接训练场：修为加成 +2%"]
-    assert _DummyNewBuildingService.created_with == {
+    assert _DummyBuildingService.created_with == {
         "guild_repo": ("guild_repo", session),
         "building_repo": ("building_repo", session),
         "item_repo": None,

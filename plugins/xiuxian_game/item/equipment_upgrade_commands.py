@@ -69,9 +69,9 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
         # 新版本: 使用DI架构的EquipmentUpgradeService
         from ..infrastructure.repositories.item_repository import ItemRepository
         from ..infrastructure.repositories.player_repository import PlayerRepository
-        from .equipment_upgrade_service import EquipmentUpgradeService as EquipmentUpgradeServiceNew
+        from .equipment_upgrade_service import EquipmentUpgradeService
 
-        upgrade_service = EquipmentUpgradeServiceNew(
+        upgrade_service = EquipmentUpgradeService(
             item_repo=ItemRepository(session),
             player_repo=PlayerRepository(session)
         )
@@ -199,9 +199,9 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
         # 新版本: 使用DI架构的EquipmentUpgradeService
         from ..infrastructure.repositories.item_repository import ItemRepository
         from ..infrastructure.repositories.player_repository import PlayerRepository
-        from .equipment_upgrade_service import EquipmentUpgradeService as EquipmentUpgradeServiceNew
+        from .equipment_upgrade_service import EquipmentUpgradeService
 
-        upgrade_service = EquipmentUpgradeServiceNew(
+        upgrade_service = EquipmentUpgradeService(
             item_repo=ItemRepository(session),
             player_repo=PlayerRepository(session)
         )
@@ -292,9 +292,9 @@ async def _(event: MessageEvent):
         # 新版本: 使用DI架构的EquipmentUpgradeService
         from ..infrastructure.repositories.item_repository import ItemRepository
         from ..infrastructure.repositories.player_repository import PlayerRepository
-        from .equipment_upgrade_service import EquipmentUpgradeService as EquipmentUpgradeServiceNew
+        from .equipment_upgrade_service import EquipmentUpgradeService
 
-        upgrade_service = EquipmentUpgradeServiceNew(
+        upgrade_service = EquipmentUpgradeService(
             item_repo=ItemRepository(session),
             player_repo=PlayerRepository(session)
         )

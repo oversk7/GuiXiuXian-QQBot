@@ -5,7 +5,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from ..models.guild import BuildingType, Guild, GuildBuilding
 from ..models.player import Player
-from .guild_building_service_new import GuildBuildingService
+from .guild_building_service import GuildBuildingService
 
 
 async def _backfill_missing_positions(session: AsyncSession, guild_id: int) -> None:

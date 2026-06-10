@@ -37,9 +37,9 @@ async def _(event: MessageEvent):
             from ..infrastructure.repositories.fishing_record_repository import FishingRecordRepository
             from ..infrastructure.repositories.fishing_stats_repository import FishingStatsRepository
             from ..infrastructure.repositories.item_repository import ItemRepository
-            from .service import FishingService as FishingServiceNew
+            from .service import FishingService
 
-            service = FishingServiceNew(
+            service = FishingService(
                 fishing_record_repo=FishingRecordRepository(session),
                 fishing_stats_repo=FishingStatsRepository(session),
                 item_repo=ItemRepository(session),
@@ -274,9 +274,9 @@ async def _(event: MessageEvent):
         from ..infrastructure.repositories.fishing_record_repository import FishingRecordRepository
         from ..infrastructure.repositories.fishing_stats_repository import FishingStatsRepository
         from ..infrastructure.repositories.item_repository import ItemRepository
-        from .service import FishingService as FishingServiceNew
+        from .service import FishingService
 
-        service = FishingServiceNew(
+        service = FishingService(
             fishing_record_repo=FishingRecordRepository(session),
             fishing_stats_repo=FishingStatsRepository(session),
             item_repo=ItemRepository(session),
@@ -328,9 +328,9 @@ async def _(event: MessageEvent):
         from ..infrastructure.repositories.fishing_record_repository import FishingRecordRepository
         from ..infrastructure.repositories.fishing_stats_repository import FishingStatsRepository
         from ..infrastructure.repositories.item_repository import ItemRepository
-        from .service import FishingService as FishingServiceNew
+        from .service import FishingService
 
-        service = FishingServiceNew(
+        service = FishingService(
             fishing_record_repo=FishingRecordRepository(session),
             fishing_stats_repo=FishingStatsRepository(session),
             item_repo=ItemRepository(session),
@@ -446,12 +446,12 @@ async def _(event: MessageEvent):
         from ..infrastructure.repositories.fishing_record_repository import FishingRecordRepository
         from ..infrastructure.repositories.fishing_stats_repository import FishingStatsRepository
         from ..infrastructure.repositories.item_repository import ItemRepository
-        from .service import FishingService as FishingServiceNew
+        from .service import FishingService
 
         player = await require_player(session, event, fishing_prob_cmd)
 
         # 计算概率
-        probabilities = FishingServiceNew.calculate_fishing_probabilities(player)
+        probabilities = FishingService.calculate_fishing_probabilities(player)
 
         # 稀有度显示映射
         rarity_display = {

@@ -142,9 +142,9 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
         # 执行升级
         from ..infrastructure.repositories.item_repository import ItemRepository
         from ..infrastructure.repositories.player_repository import PlayerRepository
-        from .gem_upgrade_service import GemUpgradeService as GemUpgradeServiceNew
+        from .gem_upgrade_service import GemUpgradeService
 
-        service = GemUpgradeServiceNew(
+        service = GemUpgradeService(
             item_repo=ItemRepository(session),
             player_repo=PlayerRepository(session),
         )
