@@ -1,3 +1,5 @@
+import re
+
 from nonebot import on_command
 from nonebot.params import CommandArg, ArgPlainText
 from nonebot.adapters.qq import MessageEvent, Message, MessageSegment
@@ -19,7 +21,7 @@ from ..world.navigation import _update_nav_position
 from ..platform_utils import get_event_server_id, get_unified_player, is_guild_message, require_player
 from ..infrastructure.cache import player_identity_cache
 from ..config import config
-from ..server_config import DEFAULT_SERVER_ID, get_server_name
+from ..server_config import DEFAULT_SERVER_ID, get_server_name, get_servers_config
 from ..server_service import ensure_platform_server_binding, parse_server_id
 from ..infrastructure.uow import UnitOfWork
 from ..infrastructure.repositories.account_transfer_log_repository import AccountTransferLogRepository
@@ -287,27 +289,55 @@ def _get_qq_username(event: MessageEvent) -> str | None:
     return None
 
 
-def _parse_register_args(arg_text: str) -> tuple[int, Gender | None, bool]:
-    """解析注册参数，支持：注册 男 / 注册 2区 男 / 注册 2区。"""
-    if not arg_text:
-        return DEFAULT_SERVER_ID, None, True
+_SERVER_PATTERN = re.compile(r"([0-9一二三四五六七八九十]+)\s*[区服]")
+_GENDER_PICK = f"{cmd('⚔️ 男修', '男')}　{cmd('🌸 女修', '女')}"
 
-    parts = arg_text.split()
-    if len(parts) == 1:
-        if parts[0] in ["男", "女"]:
-            return DEFAULT_SERVER_ID, Gender.MALE if parts[0] == "男" else Gender.FEMALE, True
-        server_id = parse_server_id(parts[0], default=None)
-        if server_id is not None:
-            return server_id, None, True
-        return DEFAULT_SERVER_ID, None, False
 
-    if len(parts) == 2:
-        server_id = parse_server_id(parts[0], default=None)
-        gender_text = parts[1]
-        if server_id is not None and gender_text in ["男", "女"]:
-            return server_id, Gender.MALE if gender_text == "男" else Gender.FEMALE, True
+def _extract_gender(text: str) -> Gender | None:
+    """从任意文本中提取性别：兼容 男/男生/男孩/女修 等说法，男女同时出现视为无效。"""
+    has_male = "男" in text
+    has_female = "女" in text
+    if has_male and not has_female:
+        return Gender.MALE
+    if has_female and not has_male:
+        return Gender.FEMALE
+    return None
 
-    return DEFAULT_SERVER_ID, None, False
+
+def _extract_server_id(text: str) -> int | None:
+    """从任意文本中提取区服：支持 2区/二区/2服，兼容旧格式的纯数字。"""
+    match = _SERVER_PATTERN.search(text)
+    if match:
+        return parse_server_id(match.group(1))
+    for token in text.split():
+        if token.isdigit() and int(token) in get_servers_config():
+            return int(token)
+    return None
+
+
+def _parse_register_args(arg_text: str) -> tuple[int | None, Gender | None]:
+    """宽容解析注册参数：顺序、空格、多余文字都不影响，提取不到的项返回 None。"""
+    text = arg_text.replace("　", " ").strip()
+    return _extract_server_id(text), _extract_gender(text)
+
+
+def _build_register_guide(headline: str = "🀄️ 欢迎来到诡修仙世界！") -> MessageSegment:
+    """构建注册引导卡片：每个开放区服一行，点蓝字即完成注册。"""
+    lines = [headline, "──────────────", "👇 点击下面的蓝字，马上开始：", ""]
+    open_servers = [
+        (sid, meta) for sid, meta in sorted(get_servers_config().items())
+        if meta.get("open_registration", True)
+    ]
+    for sid, meta in open_servers:
+        name = meta.get("name", f"{sid}区")
+        male = cmd("⚔️ 男修", f"注册 {sid}区 男")
+        female = cmd("🌸 女修", f"注册 {sid}区 女")
+        lines.append(f"【{name}】 {male}　{female}")
+    if len(open_servers) > 1:
+        newest_name = open_servers[-1][1].get("name", f"{open_servers[-1][0]}区")
+        lines.append("")
+        lines.append(f"💡 新道友推荐{newest_name}；想和朋友一起玩，就选朋友在的区")
+    return build_markdown("\n".join(lines))
 
 
 @register.handle()
@@ -334,37 +364,37 @@ async def _(event: MessageEvent, state: T_State, args: Message = CommandArg()):
                 await register.finish("⛔ 你已经创建过角色了")
 
     arg_text = args.extract_plain_text().strip()
-    server_id, gender, is_valid = _parse_register_args(arg_text)
-    if not is_valid:
-        await register.finish(
-            "⛔ 格式错误\n💡 用法：【注册 男】或【注册 2区 男】\n"
-            "或发送【注册 2区】按提示选择"
-        )
+    server_id, gender = _parse_register_args(arg_text)
 
-    state["server_id"] = server_id
+    # 区服号无效（如 5区）：不报错，直接给开放区服的引导卡
+    if server_id is not None and server_id not in get_servers_config():
+        await register.finish(_build_register_guide("🀄️ 目前开放的区服在下面～"))
+
     if gender is not None:
         nickname = _get_qq_username(event)
         if not nickname:
             async with safe_session() as session:
                 nickname = await generate_random_nickname(session)
-        result = await create_player(event, nickname, gender, server_id)
+        result = await create_player(event, nickname, gender, server_id or DEFAULT_SERVER_ID)
         await register.finish(result)
 
-    if arg_text:
-        state["server_id"] = server_id
-    state["user_id"] = event.get_user_id()
+    # 没提取到任何有效信息（含无参数）：发引导卡，点蓝字一步完成
+    if server_id is None:
+        await register.finish(_build_register_guide())
+
+    # 只选了区服：进入性别选择
+    state["server_id"] = server_id
 
 
-@register.got("gender", prompt=(
+@register.got("gender", prompt=build_markdown(
     "🀄️ 欢迎来到诡修仙世界！\n"
     "──────────────\n"
-    "⚧️ 请选择你的性别，回复 【男】 或 【女】："
+    f"⚧️ 最后一步，点击选择性别：\n{_GENDER_PICK}"
 ))
 async def _(event: MessageEvent, state: T_State, gender_input: str = ArgPlainText("gender")):
-    gender_input = gender_input.strip()
-    if gender_input not in ["男", "女"]:
-        await register.reject("⛔ 请回复「男」或「女」")
-    gender = Gender.MALE if gender_input == "男" else Gender.FEMALE
+    gender = _extract_gender(gender_input.strip())
+    if gender is None:
+        await register.reject(build_markdown(f"⚧️ 点一下蓝字就可以啦：\n{_GENDER_PICK}"))
     nickname = _get_qq_username(event)
     if not nickname:
         async with safe_session() as session:
