@@ -505,7 +505,7 @@ async def handle_pve(bot: Bot, event: MessageEvent, args: Message = CommandArg()
                 await pve_cmd.finish("⛔ 你还有未结算的人机轮盘\n📝 请先选择【人机轮盘 加倍】或【人机轮盘 收手】")
 
         # 检查是否在 PvP 房间中
-        from .russian_roulette_service_new import RussianRouletteService as RussianRouletteServiceNew
+        from .russian_roulette_service import RussianRouletteService as RussianRouletteServiceNew
         from ..infrastructure.repositories.russian_roulette_room_repository import RussianRouletteRoomRepository
         from ..infrastructure.repositories.russian_roulette_game_repository import RussianRouletteGameRepository
         from ..infrastructure.repositories.player_repository import PlayerRepository

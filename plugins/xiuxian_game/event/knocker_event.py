@@ -20,7 +20,7 @@ from ..models.player import Player
 from ..models.npc import NPC, NPCType
 from ..models.inventory import ItemInstance
 from ..models.world_message import WorldMessage
-from ..daily_task.service_new import DailyTaskService
+from ..daily_task.service import DailyTaskService
 
 from .knocker_config import (
     GHOST_EVENT_TYPES, GhostEventType,

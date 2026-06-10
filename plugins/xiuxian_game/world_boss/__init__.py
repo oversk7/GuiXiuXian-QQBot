@@ -29,7 +29,7 @@ from ..utils import message_add_head
 from ..utils_markdown import build_markdown
 from ..battle.battle_markdown import build_battle_markdown
 from ..battle.battle_log_filter import filter_battle_log, get_player_log_mode
-from .service_new import WorldBossService
+from .service import WorldBossService
 from ..platform_utils import require_player
 
 # ==================== Feature Flag ====================
@@ -52,7 +52,7 @@ async def handle_view(event: MessageEvent):
         from ..infrastructure.repositories.world_boss_damage_repository import WorldBossDamageRepository
         from ..infrastructure.repositories.player_repository import PlayerRepository
         from ..infrastructure.repositories.item_repository import ItemRepository
-        from .service_new import WorldBossService as WorldBossServiceNew
+        from .service import WorldBossService as WorldBossServiceNew
 
         service = WorldBossServiceNew(
             session=session,
@@ -78,7 +78,7 @@ async def handle_attack(event: MessageEvent, args: Message = CommandArg()):
         from ..infrastructure.repositories.world_boss_damage_repository import WorldBossDamageRepository
         from ..infrastructure.repositories.player_repository import PlayerRepository
         from ..infrastructure.repositories.item_repository import ItemRepository
-        from .service_new import WorldBossService as WorldBossServiceNew
+        from .service import WorldBossService as WorldBossServiceNew
 
         service = WorldBossServiceNew(
             session=session,
@@ -117,7 +117,7 @@ async def handle_rank(event: MessageEvent):
         from ..infrastructure.repositories.world_boss_damage_repository import WorldBossDamageRepository
         from ..infrastructure.repositories.player_repository import PlayerRepository
         from ..infrastructure.repositories.item_repository import ItemRepository
-        from .service_new import WorldBossService as WorldBossServiceNew
+        from .service import WorldBossService as WorldBossServiceNew
 
         service = WorldBossServiceNew(
             session=session,

@@ -2,7 +2,7 @@
 升级钩子系统 - 在玩家升级时触发社交系统相关更新
 """
 from sqlalchemy.ext.asyncio import AsyncSession
-from ..player.invite_reward_service_new import InviteRewardService
+from ..player.invite_reward_service import InviteRewardService
 from ..player.feature_unlock import get_breakthrough_unlock_message
 
 

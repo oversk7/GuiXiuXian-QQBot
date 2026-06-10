@@ -6,7 +6,7 @@ from nonebot.adapters.qq import MessageEvent
 from ..models.db import safe_session
 from ..models.player import Player
 from ..utils import message_add_head
-from .reincarnation_service_new import ReincarnationService
+from .reincarnation_service import ReincarnationService
 from ..platform_utils import require_player
 
 # Feature Flag: 控制是否使用新版ReincarnationService (DI架构)
@@ -27,7 +27,7 @@ async def handle_reincarnate(event: MessageEvent):
         from ..infrastructure.repositories.elixir_usage_repository import ElixirUsageRepository
         from ..infrastructure.repositories.vip_equipment_bonus_repository import VIPEquipmentBonusRepository
         from ..infrastructure.repositories.item_repository import ItemRepository
-        from .reincarnation_service_new import ReincarnationService as ReincarnationServiceNew
+        from .reincarnation_service import ReincarnationService as ReincarnationServiceNew
 
         service = ReincarnationServiceNew(
             player_repo=PlayerRepository(session),

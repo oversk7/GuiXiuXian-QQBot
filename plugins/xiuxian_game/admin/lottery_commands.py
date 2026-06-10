@@ -270,7 +270,7 @@ async def handle_join_lottery(event: MessageEvent, args: Message = CommandArg())
         # 检查等级要求（考虑轮回：用历史最高等级判断）
         effective_level = player.level
         if player.reincarnation_level > 0:
-            from ..cultivate.reincarnation_service_new import ReincarnationService
+            from ..cultivate.reincarnation_service import ReincarnationService
             # 玩家完成第N次轮回，说明曾达到对应要求等级
             historical_max = ReincarnationService.get_required_level_for_reincarnation(
                 player.reincarnation_level - 1

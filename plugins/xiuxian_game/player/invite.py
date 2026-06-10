@@ -9,7 +9,7 @@ from ..models.db import safe_session
 from ..models.player import Player
 from ..models.invite_reward import InviteReward
 from ..utils import message_add_head
-from .invite_reward_service_new import InviteRewardService
+from .invite_reward_service import InviteRewardService
 from sqlalchemy import select
 from ..platform_utils import require_player
 

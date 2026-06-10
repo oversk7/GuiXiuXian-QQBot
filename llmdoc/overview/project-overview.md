@@ -97,7 +97,7 @@
 **关键文件**:
 - `plugins/xiuxian_game/economy/market.py` - 交易市场系统
 - `plugins/xiuxian_game/economy/merchants.py` - 跑商系统
-- `plugins/xiuxian_game/economy/stock_service_new.py` - 气运投资
+- `plugins/xiuxian_game/economy/stock_service.py` - 气运投资
 
 ### 3.5 公会(宗门)系统 (Guild System)
 
@@ -117,7 +117,7 @@
 **容量计算**: `10 + (level-1)*5` (Lv1: 10 人,Lv2: 15 人...)
 
 **关键文件**:
-- `plugins/xiuxian_game/guild/guild_service_new.py` - 公会核心服务(DI 版本)
+- `plugins/xiuxian_game/guild/guild_service.py` - 公会核心服务
 - `plugins/xiuxian_game/guild/guild_building_service_new.py` - 建筑服务
 - `plugins/xiuxian_game/guild/guild.py` - 公会命令处理器(1613 行)
 
@@ -236,19 +236,19 @@ plugins/xiuxian_game/
 │
 ├── item/                        # 物品系统
 │   ├── equipment_service_new.py # 装备服务(DI)
-│   ├── equipment_upgrade_service_new.py  # 升阶服务
-│   ├── gem_socket_service_new.py # 宝石镶嵌
+│   ├── equipment_upgrade_service.py  # 升阶服务
+│   ├── gem_socket_service.py    # 宝石镶嵌
 │   ├── item_effects.py          # 物品效果注册表
 │   └── catalog.py               # 物品图鉴
 │
 ├── economy/                     # 经济系统
 │   ├── market.py                # 交易市场
 │   ├── merchants.py             # 跑商系统
-│   ├── stock_service_new.py     # 气运投资
+│   ├── stock_service.py         # 气运投资
 │   └── part_time_job_commands.py # 打工系统
 │
 ├── guild/                       # 公会系统
-│   ├── guild_service_new.py     # 公会核心服务(DI)
+│   ├── guild_service.py         # 公会核心服务
 │   ├── guild_building_service_new.py  # 建筑服务
 │   ├── guild_economy_service_new.py   # 经济服务
 │   └── guild.py                 # 公会命令处理器
@@ -302,8 +302,8 @@ plugins/xiuxian_game/
 
 **迁移策略**:
 - 保留旧版本确保稳定性,新版本以 `*_new.py` 命名并存
-- 逐步迁移调用方到 New 版本;旧版删除后 `*_new.py` 待改回正式命名
-- 注意: 部分模块(如 alchemy、fishing)旧版已删除,但文件仍叫 `service_new.py`
+- 逐步迁移调用方到 New 版本;旧版删除后把 `*_new.py` 改回正式命名(2026-06-10 已完成 15 个)
+- 仍新旧并存的 9 个(待迁移清单): economy/equipment_trade_service、economy/part_time_job_service、guild/guild_building_service、guild/guild_economy_service、guild/guild_facility_service、guild/guild_task_service、item/equipment_service、world/location_service、world/npc_service
 
 **已迁移模块**:
 - ✅ 公会核心服务

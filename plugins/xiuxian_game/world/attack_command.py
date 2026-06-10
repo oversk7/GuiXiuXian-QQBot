@@ -543,7 +543,7 @@ async def handle_player_attack(session, attacker: Player, target: Player, event:
     in_town = is_in_town(current_x, current_y, current_region)
     # 阴宅作为安全区
     try:
-        from ..cultivate.mansion_service_new import MansionService
+        from ..cultivate.mansion_service import MansionService
         if MansionService.is_at_mansion(attacker) or MansionService.is_at_mansion(target):
             in_town = True
     except ImportError:

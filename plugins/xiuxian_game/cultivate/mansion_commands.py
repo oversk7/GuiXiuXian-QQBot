@@ -22,7 +22,7 @@ migrate_mansion_cmd = on_command("迁移阴宅", aliases={"阴宅迁移"}, prior
 @mansion_status_cmd.handle()
 async def handle_mansion_status(event: MessageEvent):
     """查看阴宅状态"""
-    from .mansion_service_new import MansionService
+    from .mansion_service import MansionService
     from ..platform_utils import get_unified_player, require_player
 
     async with safe_session() as session:
@@ -46,7 +46,7 @@ async def handle_purchase_mansion(event: MessageEvent):
         
         # 尝试购买阴宅
         from ..infrastructure.repositories.player_repository import PlayerRepository
-        from .mansion_service_new import MansionService
+        from .mansion_service import MansionService
 
         service = MansionService(
             player_repo=PlayerRepository(session),
@@ -79,7 +79,7 @@ async def handle_upgrade_mansion(event: MessageEvent):
         
         # 尝试升级阴宅
         from ..infrastructure.repositories.player_repository import PlayerRepository
-        from .mansion_service_new import MansionService
+        from .mansion_service import MansionService
 
         service = MansionService(
             player_repo=PlayerRepository(session),
@@ -138,7 +138,7 @@ async def handle_set_mansion_fee(event: MessageEvent, args: Message = CommandArg
 
         # 设置阴宅使用费用
         from ..infrastructure.repositories.player_repository import PlayerRepository
-        from .mansion_service_new import MansionService
+        from .mansion_service import MansionService
 
         service = MansionService(
             player_repo=PlayerRepository(session),
@@ -162,7 +162,7 @@ async def handle_toggle_mansion_access(event: MessageEvent):
 
         # 切换阴宅访问权限
         from ..infrastructure.repositories.player_repository import PlayerRepository
-        from .mansion_service_new import MansionService
+        from .mansion_service import MansionService
 
         service = MansionService(
             player_repo=PlayerRepository(session),
@@ -186,7 +186,7 @@ async def handle_toggle_mansion_payment(event: MessageEvent):
 
         # 切换阴宅付费使用意愿
         from ..infrastructure.repositories.player_repository import PlayerRepository
-        from .mansion_service_new import MansionService
+        from .mansion_service import MansionService
 
         service = MansionService(
             player_repo=PlayerRepository(session),
@@ -205,7 +205,7 @@ async def handle_migrate_mansion(event: MessageEvent, args: Message = CommandArg
     """迁移阴宅"""
     from ..infrastructure.repositories.player_repository import PlayerRepository
     from ..platform_utils import get_unified_player, require_player
-    from .mansion_service_new import MansionService
+    from .mansion_service import MansionService
 
     # 解析参数
     arg_text = args.extract_plain_text().strip()

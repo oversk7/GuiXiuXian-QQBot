@@ -137,7 +137,7 @@ async def handle_cultivate(event: MessageEvent):
         current_x, current_y = player.get_current_coordinates()
 
         from ..infrastructure.repositories.player_repository import PlayerRepository
-        from .mansion_service_new import MansionService
+        from .mansion_service import MansionService
 
         service = MansionService(
             player_repo=PlayerRepository(session),
@@ -173,7 +173,7 @@ async def handle_cultivate(event: MessageEvent):
         base_exp_gain_after_penalty = base_exp_gain - mentorship_penalty
 
         # 分别计算各种加成（都基于惩罚后的基础经验）
-        from .reincarnation_service_new import ReincarnationService
+        from .reincarnation_service import ReincarnationService
         reincarnation_bonus_rate = ReincarnationService.get_cultivation_efficiency_bonus(player.reincarnation_level)
 
         # 月卡加成
@@ -353,7 +353,7 @@ async def handle_seclusion(event: MessageEvent):
         current_x, current_y = player.get_current_coordinates()
 
         from ..infrastructure.repositories.player_repository import PlayerRepository
-        from .mansion_service_new import MansionService
+        from .mansion_service import MansionService
 
         service = MansionService(
             player_repo=PlayerRepository(session),
@@ -376,7 +376,7 @@ async def handle_seclusion(event: MessageEvent):
         efficiency_bonus = effective_coffin_nail_count * 0.5  # 每个棺材钉提升0.5%效率
 
         # 获取转数闭关效率加成
-        from .reincarnation_service_new import ReincarnationService
+        from .reincarnation_service import ReincarnationService
         reincarnation_seclusion_bonus = ReincarnationService.get_seclusion_efficiency_bonus(player.reincarnation_level)
 
         # 获取师徒惩罚
@@ -527,7 +527,7 @@ async def handle_out_seclusion(event: MessageEvent):
         current_x, current_y = player.get_current_coordinates()
 
         from ..infrastructure.repositories.player_repository import PlayerRepository
-        from .mansion_service_new import MansionService
+        from .mansion_service import MansionService
 
         service = MansionService(
             player_repo=PlayerRepository(session),
@@ -593,7 +593,7 @@ async def handle_out_seclusion(event: MessageEvent):
         card_bonus = int(base_exp_gain_after_penalty * benefits["seclusion_efficiency"])
 
         # 转数闭关效率加成
-        from .reincarnation_service_new import ReincarnationService
+        from .reincarnation_service import ReincarnationService
         reincarnation_bonus_rate = ReincarnationService.get_seclusion_efficiency_bonus(player.reincarnation_level)
         reincarnation_exp_bonus = int(base_exp_gain_after_penalty * reincarnation_bonus_rate)
 
@@ -740,7 +740,7 @@ async def handle_breakthrough(event: MessageEvent, args: Message = CommandArg())
             success_chance = 1.0
 
         # 检查是否达到冥返要求等级，如果达到则提示冥返
-        from .reincarnation_service_new import ReincarnationService
+        from .reincarnation_service import ReincarnationService
         required_level = ReincarnationService.get_required_level_for_reincarnation(player.reincarnation_level)
         if player.level >= required_level:
             reincarnation_count = player.reincarnation_level + 1
@@ -796,7 +796,7 @@ async def handle_breakthrough(event: MessageEvent, args: Message = CommandArg())
             player.level += 1
 
             # 根据转数计算属性点获得
-            from .reincarnation_service_new import ReincarnationService
+            from .reincarnation_service import ReincarnationService
             points_gained = ReincarnationService.get_attribute_points_per_level(player.reincarnation_level)
             player.attribute_points += points_gained
 
@@ -849,7 +849,7 @@ async def handle_breakthrough(event: MessageEvent, args: Message = CommandArg())
                 player.breakthrough_fail_count = 0
 
                 # 根据转数计算属性点获得
-                from .reincarnation_service_new import ReincarnationService
+                from .reincarnation_service import ReincarnationService
                 points_gained = ReincarnationService.get_attribute_points_per_level(player.reincarnation_level)
                 player.attribute_points += points_gained
 
@@ -959,7 +959,7 @@ async def handle_continuous_breakthrough(event: MessageEvent, args: Message = Co
         use_guardian = arg_text in {"护", "镇厄", "镇", "怨念"}
 
         # 检查是否达到冥返要求等级
-        from .reincarnation_service_new import ReincarnationService
+        from .reincarnation_service import ReincarnationService
         required_level = ReincarnationService.get_required_level_for_reincarnation(player.reincarnation_level)
         if player.level >= required_level:
             reincarnation_count = player.reincarnation_level + 1
@@ -1440,7 +1440,7 @@ async def handle_free_reset_points(event: MessageEvent):
             setattr(player, k, base_v + total_bonus)
 
         # 重新计算可分配点（考虑转数加成）
-        from .reincarnation_service_new import ReincarnationService
+        from .reincarnation_service import ReincarnationService
         pts_per_lvl = ReincarnationService.get_attribute_points_per_level(player.reincarnation_level)
         player.attribute_points = (player.level - 1) * pts_per_lvl
 

@@ -13,7 +13,7 @@ from ..models.player import Player
 from ..utils_markdown import cmd, build_markdown
 from .location_service import LocationService
 from .npc_service import NPCService
-from ..cultivate.mansion_service_new import MansionService
+from ..cultivate.mansion_service import MansionService
 
 # ==================== Feature Flag ====================
 # 设置为True使用新版DI架构的LocationService，False使用旧版本

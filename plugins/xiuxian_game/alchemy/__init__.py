@@ -9,7 +9,7 @@ from ..models.player import Player
 from ..utils import message_add_head
 
 # 使用新版DI架构AlchemyService
-from .service_new import AlchemyService as AlchemyServiceNew
+from .service import AlchemyService as AlchemyServiceNew
 from ..infrastructure.repositories.item_repository import ItemRepository
 from ..infrastructure.repositories.alchemy_record_repository import AlchemyRecordRepository
 from ..platform_utils import require_player

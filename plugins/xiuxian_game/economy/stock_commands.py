@@ -20,7 +20,7 @@ from ..models.player import Player
 from ..models.stock import Stock, StockType, StockPriceHistory
 from ..utils_markdown import cmd, build_markdown
 from ..platform_utils import get_unified_player, require_player
-from .stock_service_new import StockService
+from .stock_service import StockService
 from .stock_price_engine import StockPriceEngine
 from ..config import config
 import random
@@ -50,7 +50,7 @@ async def handle_stock_list(event: MessageEvent):
     # 新版本: 使用DI架构
     from ..infrastructure.uow.unit_of_work import UnitOfWork
     from ..models.db import AsyncSessionLocal
-    from .stock_service_new import StockService as StockServiceNew
+    from .stock_service import StockService as StockServiceNew
 
     def session_factory():
         return AsyncSessionLocal()
@@ -180,7 +180,7 @@ async def handle_stock_buy(event: MessageEvent, args: Message = CommandArg()):
     # 新版本: 使用DI架构
     from ..infrastructure.uow.unit_of_work import UnitOfWork
     from ..models.db import AsyncSessionLocal
-    from .stock_service_new import StockService as StockServiceNew
+    from .stock_service import StockService as StockServiceNew
 
     def session_factory():
         return AsyncSessionLocal()
@@ -239,7 +239,7 @@ async def handle_stock_sell(event: MessageEvent, args: Message = CommandArg()):
     # 新版本: 使用DI架构
     from ..infrastructure.uow.unit_of_work import UnitOfWork
     from ..models.db import AsyncSessionLocal
-    from .stock_service_new import StockService as StockServiceNew
+    from .stock_service import StockService as StockServiceNew
 
     def session_factory():
         return AsyncSessionLocal()
@@ -279,7 +279,7 @@ async def handle_stock_holdings(event: MessageEvent):
     # 新版本: 使用DI架构
     from ..infrastructure.uow.unit_of_work import UnitOfWork
     from ..models.db import AsyncSessionLocal
-    from .stock_service_new import StockService as StockServiceNew
+    from .stock_service import StockService as StockServiceNew
 
     def session_factory():
         return AsyncSessionLocal()
@@ -396,7 +396,7 @@ async def handle_stock_transactions(event: MessageEvent):
     # 新版本: 使用DI架构
     from ..infrastructure.uow.unit_of_work import UnitOfWork
     from ..models.db import AsyncSessionLocal
-    from .stock_service_new import StockService as StockServiceNew
+    from .stock_service import StockService as StockServiceNew
 
     def session_factory():
         return AsyncSessionLocal()
@@ -508,7 +508,7 @@ async def handle_stock_update(event: MessageEvent):
         # 新版本: 使用DI架构
         from ..infrastructure.uow.unit_of_work import UnitOfWork
         from ..models.db import AsyncSessionLocal
-        from .stock_service_new import StockService as StockServiceNew
+        from .stock_service import StockService as StockServiceNew
 
         def session_factory():
             return AsyncSessionLocal()

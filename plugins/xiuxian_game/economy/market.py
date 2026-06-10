@@ -757,7 +757,7 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
                     lines.append("💎 镶嵌孔位：")
                     lines.append(f"  • 孔位：{equip.used_gem_slots}/{equip.available_gem_slots}")
                     if equip.used_gem_slots > 0:
-                        from ..item.gem_socket_service_new import GemSocketService
+                        from ..item.gem_socket_service import GemSocketService
                         from ..item.inscription_service import get_inscription_display
                         gem_info = GemSocketService.get_equipment_gem_info(equip)
                         for slot_info in gem_info:

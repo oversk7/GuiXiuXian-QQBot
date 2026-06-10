@@ -14,7 +14,7 @@ from ..models.db import safe_session
 from ..models import Player, ItemInstance
 from ..config import config
 from ..utils_markdown import cmd, build_markdown
-from .gem_upgrade_service_new import GemUpgradeService
+from .gem_upgrade_service import GemUpgradeService
 from ..platform_utils import require_player
 
 # ==================== Feature Flag ====================
@@ -142,7 +142,7 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
         # 执行升级
         from ..infrastructure.repositories.item_repository import ItemRepository
         from ..infrastructure.repositories.player_repository import PlayerRepository
-        from .gem_upgrade_service_new import GemUpgradeService as GemUpgradeServiceNew
+        from .gem_upgrade_service import GemUpgradeService as GemUpgradeServiceNew
 
         service = GemUpgradeServiceNew(
             item_repo=ItemRepository(session),

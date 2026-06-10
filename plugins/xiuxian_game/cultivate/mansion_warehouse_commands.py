@@ -50,7 +50,7 @@ async def handle_mansion_warehouse(event: MessageEvent):
         from ..sponsor.service import SponsorShopService
         has_remote_warehouse = SponsorShopService.is_privilege_active(player, "premium_warehouse_until")
 
-        from .mansion_service_new import MansionService
+        from .mansion_service import MansionService
         if not has_remote_warehouse and not MansionService.is_at_mansion(player):
             await mansion_warehouse_cmd.finish(message_add_head(
                 f"⛔ 你不在自己的阴宅位置\n"
@@ -104,7 +104,7 @@ async def handle_deposit_mansion(event: MessageEvent, args: Message = CommandArg
         from ..sponsor.service import SponsorShopService
         has_remote_warehouse = SponsorShopService.is_privilege_active(player, "premium_warehouse_until")
 
-        from .mansion_service_new import MansionService
+        from .mansion_service import MansionService
         if not has_remote_warehouse and not MansionService.is_at_mansion(player):
             await deposit_mansion_cmd.finish(message_add_head(
                 f"⛔ 你不在自己的阴宅位置\n"
@@ -174,7 +174,7 @@ async def handle_withdraw_mansion(event: MessageEvent, args: Message = CommandAr
         from ..sponsor.service import SponsorShopService
         has_remote_warehouse = SponsorShopService.is_privilege_active(player, "premium_warehouse_until")
 
-        from .mansion_service_new import MansionService
+        from .mansion_service import MansionService
         if not has_remote_warehouse and not MansionService.is_at_mansion(player):
             await withdraw_mansion_cmd.finish(message_add_head(
                 f"⛔ 你不在自己的阴宅位置\n"

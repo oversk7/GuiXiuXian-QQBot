@@ -146,7 +146,7 @@ async def perform_daily_holding_fee():
 
         from ..infrastructure.uow.unit_of_work import UnitOfWork
         from ..models.db import AsyncSessionLocal
-        from .stock_service_new import StockService
+        from .stock_service import StockService
 
         def session_factory():
             return AsyncSessionLocal()

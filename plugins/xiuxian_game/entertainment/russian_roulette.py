@@ -22,7 +22,7 @@ from ..platform_utils import get_unified_player, require_player
 # 设置为True使用新版DI架构的RussianRouletteService，False使用旧版本
 # =====================================================
 
-from .russian_roulette_service_new import RussianRouletteService as RussianRouletteServiceNew
+from .russian_roulette_service import RussianRouletteService as RussianRouletteServiceNew
 from ..infrastructure.repositories.russian_roulette_room_repository import RussianRouletteRoomRepository
 from ..infrastructure.repositories.russian_roulette_game_repository import RussianRouletteGameRepository
 from ..infrastructure.repositories.player_repository import PlayerRepository

@@ -241,7 +241,7 @@ equipment_detail = on_command("装备详情", aliases={"装备信息", "查看�
 
 @equipment_detail.handle()
 async def _(event: MessageEvent, args: Message = CommandArg()):
-    from ..alchemy.service_new import AlchemyService
+    from ..alchemy.service import AlchemyService
 
     arg = args.extract_plain_text().strip()
     if not arg:
@@ -348,7 +348,7 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
             lines.append(f"  • 孔位：{equip.used_gem_slots}/{equip.available_gem_slots}")
 
             if equip.used_gem_slots > 0:
-                from .gem_socket_service_new import GemSocketService
+                from .gem_socket_service import GemSocketService
                 from .inscription_service import get_inscription_display
                 gem_info = GemSocketService.get_equipment_gem_info(equip)
                 for slot_info in gem_info:
@@ -687,7 +687,7 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
             )
 
         # 检查是否为炼丹炉，如果是则处理进行中的炼丹任务
-        from ..alchemy.service_new import AlchemyService
+        from ..alchemy.service import AlchemyService
         from ..models.alchemy_task import AlchemyRecord
 
         failed_tasks = []
@@ -780,7 +780,7 @@ async def _(event: MessageEvent):
             await unwear_all_equipment.finish("⛔ 你没有穿戴任何装备")
 
         # 处理炼丹炉相关的任务
-        from ..alchemy.service_new import AlchemyService
+        from ..alchemy.service import AlchemyService
         from ..models.alchemy_task import AlchemyRecord
 
         all_failed_tasks = []  # 所有失败的炼丹任务

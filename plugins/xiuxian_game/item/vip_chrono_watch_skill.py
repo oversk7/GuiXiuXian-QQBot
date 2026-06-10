@@ -336,7 +336,7 @@ async def _handle_dial_boss(session: AsyncSession, player: Player, watch: ItemIn
         damage_record.attacks_reset_date = today_str
 
     # 检查是否已有剩余次数（如果还没用完就不需要拨针）
-    from ..world_boss.service_new import WorldBossService
+    from ..world_boss.service import WorldBossService
     if damage_record.attacks_today < WorldBossService.DAILY_ATTACK_LIMIT:
         remaining = WorldBossService.DAILY_ATTACK_LIMIT - damage_record.attacks_today
         await dial_cmd.finish(
@@ -395,7 +395,7 @@ async def _handle_dial_task(session: AsyncSession, player: Player, watch: ItemIn
 
     # 强制生成新任务（无视上限，VIP特权）
     from ..infrastructure.repositories.daily_task_repository import DailyTaskRepository
-    from ..daily_task.service_new import DailyTaskService
+    from ..daily_task.service import DailyTaskService
 
     task_repo = DailyTaskRepository(session)
 

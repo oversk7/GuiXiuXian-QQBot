@@ -17,7 +17,7 @@ from ..models import Player, ItemInstance
 from ..config import config
 from ..utils import message_add_head
 from ..utils_markdown import cmd, build_markdown
-from .gem_socket_service_new import GemSocketService
+from .gem_socket_service import GemSocketService
 from .equipment_commands import find_equipment_by_input
 from ..platform_utils import require_player
 
@@ -180,7 +180,7 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
         # 执行镶嵌
         from ..infrastructure.repositories.item_repository import ItemRepository
         from ..infrastructure.repositories.player_repository import PlayerRepository
-        from .gem_socket_service_new import GemSocketService as GemSocketServiceNew
+        from .gem_socket_service import GemSocketService as GemSocketServiceNew
 
         service = GemSocketServiceNew(
             item_repo=ItemRepository(session),
@@ -233,7 +233,7 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
         # 执行拆卸
         from ..infrastructure.repositories.item_repository import ItemRepository
         from ..infrastructure.repositories.player_repository import PlayerRepository
-        from .gem_socket_service_new import GemSocketService as GemSocketServiceNew
+        from .gem_socket_service import GemSocketService as GemSocketServiceNew
 
         service = GemSocketServiceNew(
             item_repo=ItemRepository(session),

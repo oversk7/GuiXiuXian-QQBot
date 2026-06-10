@@ -15,8 +15,8 @@ from ..utils_markdown import cmd, build_markdown
 from ..models.social_application import SocialApplication, ApplicationType, ApplicationStatus
 from ..models.donation_log import PlayerDonationLog
 from ..models.navigation_task import NavigationTask
-from .guild_application_service_new import GuildApplicationService as GuildApplicationServiceNew  # DI版本
-from .guild_service_new import GuildService as GuildServiceNew  # DI版本
+from .guild_application_service import GuildApplicationService as GuildApplicationServiceNew  # DI版本
+from .guild_service import GuildService as GuildServiceNew  # DI版本
 from .guild_permission import GuildPermission
 from .guild_economy_service import GuildEconomyService
 from .guild_economy_service_new import GuildEconomyService as GuildEconomyServiceNew  # DI版本
@@ -129,7 +129,7 @@ async def handle_guild_info(event: MessageEvent):
     # 新版本: 使用DI架构
     from ..infrastructure.uow.unit_of_work import UnitOfWork
     from ..models.db import AsyncSessionLocal
-    from .guild_service_new import GuildService as GuildServiceNew
+    from .guild_service import GuildService as GuildServiceNew
 
     def session_factory():
         return AsyncSessionLocal()
@@ -373,7 +373,7 @@ async def handle_quit_guild(event: MessageEvent):
     # 新版本: 使用DI架构
     from ..infrastructure.uow.unit_of_work import UnitOfWork
     from ..models.db import AsyncSessionLocal
-    from .guild_service_new import GuildService as GuildServiceNew
+    from .guild_service import GuildService as GuildServiceNew
 
     def session_factory():
         return AsyncSessionLocal()
@@ -459,7 +459,7 @@ async def handle_member_list(event: MessageEvent, args: Message = CommandArg()):
     # 新版本: 使用DI架构
     from ..infrastructure.uow.unit_of_work import UnitOfWork
     from ..models.db import AsyncSessionLocal
-    from .guild_service_new import GuildService as GuildServiceNew
+    from .guild_service import GuildService as GuildServiceNew
 
     def session_factory():
         return AsyncSessionLocal()
@@ -862,7 +862,7 @@ async def _process_application(event: MessageEvent, args: Message, approve: bool
     # 新版本: 使用DI架构
     from ..infrastructure.uow.unit_of_work import UnitOfWork
     from ..models.db import AsyncSessionLocal
-    from .guild_service_new import GuildService as GuildServiceNew
+    from .guild_service import GuildService as GuildServiceNew
 
     def session_factory():
         return AsyncSessionLocal()
@@ -1070,7 +1070,7 @@ async def handle_set_position(event: MessageEvent, args: Message = CommandArg())
     # 新版本: 使用DI架构
     from ..infrastructure.uow.unit_of_work import UnitOfWork
     from ..models.db import AsyncSessionLocal
-    from .guild_service_new import GuildService as GuildServiceNew
+    from .guild_service import GuildService as GuildServiceNew
 
     def session_factory():
         return AsyncSessionLocal()
@@ -1127,7 +1127,7 @@ async def handle_kick_member(event: MessageEvent, args: Message = CommandArg()):
     # 新版本: 使用DI架构
     from ..infrastructure.uow.unit_of_work import UnitOfWork
     from ..models.db import AsyncSessionLocal
-    from .guild_service_new import GuildService as GuildServiceNew
+    from .guild_service import GuildService as GuildServiceNew
 
     def session_factory():
         return AsyncSessionLocal()

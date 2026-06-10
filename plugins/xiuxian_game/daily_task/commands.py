@@ -8,7 +8,7 @@ from ..models.player import Player
 from ..models.daily_task import DailyTask, TaskStatus
 from ..utils_markdown import cmd, build_markdown
 from ..platform_utils import require_player
-from .service_new import DailyTaskService
+from .service import DailyTaskService
 from ..infrastructure.uow.unit_of_work import UnitOfWork
 from ..world.location_service_new import LocationService
 from ..world.npc_service_new import NPCService

@@ -14,7 +14,7 @@ from ..models.fishing_record import FishingRecord, FishingStats
 from ..models.inventory import ItemInstance
 from ..utils_markdown import cmd, build_markdown
 from ..config import config
-from .service_new import FishingService
+from .service import FishingService
 
 # ==================== Feature Flag ====================
 # 设置为True使用新版DI架构的FishingService，False使用旧版本
@@ -37,7 +37,7 @@ async def _(event: MessageEvent):
             from ..infrastructure.repositories.fishing_record_repository import FishingRecordRepository
             from ..infrastructure.repositories.fishing_stats_repository import FishingStatsRepository
             from ..infrastructure.repositories.item_repository import ItemRepository
-            from .service_new import FishingService as FishingServiceNew
+            from .service import FishingService as FishingServiceNew
 
             service = FishingServiceNew(
                 fishing_record_repo=FishingRecordRepository(session),
@@ -274,7 +274,7 @@ async def _(event: MessageEvent):
         from ..infrastructure.repositories.fishing_record_repository import FishingRecordRepository
         from ..infrastructure.repositories.fishing_stats_repository import FishingStatsRepository
         from ..infrastructure.repositories.item_repository import ItemRepository
-        from .service_new import FishingService as FishingServiceNew
+        from .service import FishingService as FishingServiceNew
 
         service = FishingServiceNew(
             fishing_record_repo=FishingRecordRepository(session),
@@ -328,7 +328,7 @@ async def _(event: MessageEvent):
         from ..infrastructure.repositories.fishing_record_repository import FishingRecordRepository
         from ..infrastructure.repositories.fishing_stats_repository import FishingStatsRepository
         from ..infrastructure.repositories.item_repository import ItemRepository
-        from .service_new import FishingService as FishingServiceNew
+        from .service import FishingService as FishingServiceNew
 
         service = FishingServiceNew(
             fishing_record_repo=FishingRecordRepository(session),
@@ -446,7 +446,7 @@ async def _(event: MessageEvent):
         from ..infrastructure.repositories.fishing_record_repository import FishingRecordRepository
         from ..infrastructure.repositories.fishing_stats_repository import FishingStatsRepository
         from ..infrastructure.repositories.item_repository import ItemRepository
-        from .service_new import FishingService as FishingServiceNew
+        from .service import FishingService as FishingServiceNew
 
         player = await require_player(session, event, fishing_prob_cmd)
 
@@ -541,7 +541,7 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
 
         # 检查是否为鱼类物品（通过item_id判断）
         # 所有鱼类物品都在钓鱼系统的鱼类列表中
-        from .service_new import FishingService
+        from .service import FishingService
         all_fish_ids = []
         for rarity_config in FishingService.FISH_RARITY_CONFIG.values():
             all_fish_ids.extend(rarity_config["fish_list"])

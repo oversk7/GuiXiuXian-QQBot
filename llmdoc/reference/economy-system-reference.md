@@ -79,7 +79,7 @@
   - 不可透支: 余额检查
   - 记录转账日志
 
-- **气运投资**: `plugins/xiuxian_game/economy/stock_service_new.py`
+- **气运投资**: `plugins/xiuxian_game/economy/stock_service.py`
   - 手续费: 3%(Line 617), 最低30金币,最高30000金币
   - 持仓管理费: 每日持仓价值的0.1%(Line 624)
   - 价格保护: 基础价格的0.2-3.0倍(Line 610)

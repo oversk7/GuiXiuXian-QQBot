@@ -9,7 +9,7 @@
 
 - `plugins/xiuxian_game/economy/market.py` (MarketOrder, calculate_transaction_tax, _get_wealth_scale): 交易市场核心逻辑,包括订单挂牌、自动撮合、阶梯税收、财富指数计算
 - `plugins/xiuxian_game/economy/merchants.py` (MarketConfig, _price_for, MARKETS): 跑商系统实现,包含13个市集配置、动态定价、供需因子更新
-- `plugins/xiuxian_game/economy/stock_service_new.py` (StockService): 气运投资系统,实现股票交易、价格波动、手续费计算
+- `plugins/xiuxian_game/economy/stock_service.py` (StockService): 气运投资系统,实现股票交易、价格波动、手续费计算
 - `plugins/xiuxian_game/economy/equipment_trade_service_new.py` (EquipmentTradeService): 装备交易专用服务,处理装备估价、冻结、转移
 - `plugins/xiuxian_game/models/market_order.py` (MarketOrder, OrderSide): 市场订单数据模型,支持买单/卖单、装备实例交易
 - `plugins/xiuxian_game/models/market_state.py` (MarketState): 市场状态模型,存储库存、供需因子、价格倍率

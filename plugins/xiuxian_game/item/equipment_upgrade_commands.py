@@ -15,7 +15,7 @@ from ..models.db import safe_session
 from ..models import Player, ItemInstance
 from ..config import config
 from ..utils_markdown import cmd, build_markdown
-from .equipment_upgrade_service_new import EquipmentUpgradeService
+from .equipment_upgrade_service import EquipmentUpgradeService
 from .equipment_commands import (
     find_equipment_by_input,
     get_equipment_short_id,
@@ -69,7 +69,7 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
         # 新版本: 使用DI架构的EquipmentUpgradeService
         from ..infrastructure.repositories.item_repository import ItemRepository
         from ..infrastructure.repositories.player_repository import PlayerRepository
-        from .equipment_upgrade_service_new import EquipmentUpgradeService as EquipmentUpgradeServiceNew
+        from .equipment_upgrade_service import EquipmentUpgradeService as EquipmentUpgradeServiceNew
 
         upgrade_service = EquipmentUpgradeServiceNew(
             item_repo=ItemRepository(session),
@@ -199,7 +199,7 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
         # 新版本: 使用DI架构的EquipmentUpgradeService
         from ..infrastructure.repositories.item_repository import ItemRepository
         from ..infrastructure.repositories.player_repository import PlayerRepository
-        from .equipment_upgrade_service_new import EquipmentUpgradeService as EquipmentUpgradeServiceNew
+        from .equipment_upgrade_service import EquipmentUpgradeService as EquipmentUpgradeServiceNew
 
         upgrade_service = EquipmentUpgradeServiceNew(
             item_repo=ItemRepository(session),
@@ -292,7 +292,7 @@ async def _(event: MessageEvent):
         # 新版本: 使用DI架构的EquipmentUpgradeService
         from ..infrastructure.repositories.item_repository import ItemRepository
         from ..infrastructure.repositories.player_repository import PlayerRepository
-        from .equipment_upgrade_service_new import EquipmentUpgradeService as EquipmentUpgradeServiceNew
+        from .equipment_upgrade_service import EquipmentUpgradeService as EquipmentUpgradeServiceNew
 
         upgrade_service = EquipmentUpgradeServiceNew(
             item_repo=ItemRepository(session),

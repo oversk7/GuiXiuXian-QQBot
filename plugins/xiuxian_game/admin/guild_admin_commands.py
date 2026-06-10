@@ -11,7 +11,7 @@ from ..models.db import AsyncSessionLocal
 from ..models.player import Player
 from ..models.guild import Guild
 from ..infrastructure.uow.unit_of_work import UnitOfWork
-from ..guild.guild_service_new import GuildService
+from ..guild.guild_service import GuildService
 from ..utils import message_add_head
 from ..ai_guide import is_admin
 

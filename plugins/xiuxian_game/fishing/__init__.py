@@ -3,7 +3,7 @@
 提供钓鱼玩法相关的所有功能
 """
 
-from .service_new import FishingService
+from .service import FishingService
 from . import commands
 
 __all__ = ["FishingService", "commands"]
