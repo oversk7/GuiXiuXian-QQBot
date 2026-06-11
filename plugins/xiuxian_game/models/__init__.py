@@ -8,6 +8,7 @@ from .world_message import WorldMessage
 from .bank_account import BankAccount
 from .alchemy_task import AlchemyRecord
 from .market_order import MarketOrder
+from .market_trade_log import MarketTradeLog
 from .social_application import SocialApplication
 from .gift_record import GiftRecord
 from .story_session import StorySession
@@ -76,7 +77,7 @@ from .ladder import LadderRating, LadderMatchLog, LadderSeason
 
 
 __all__ = [
-    "Player", "PlatformServerBinding", "Guild", "GuildMember", "GuildBuilding", "GuildPosition", "BuildingType", "WorldMessage", "BankAccount", "ItemInstance", "WorldTile", "NavigationTask", "AlchemyRecord", "MarketOrder",
+    "Player", "PlatformServerBinding", "Guild", "GuildMember", "GuildBuilding", "GuildPosition", "BuildingType", "WorldMessage", "BankAccount", "ItemInstance", "WorldTile", "NavigationTask", "AlchemyRecord", "MarketOrder", "MarketTradeLog",
     "SocialApplication", "GiftRecord", "StorySession", "PlayerDonationLog", "ElixirUsageLog", "GuildTeleportLog",
     "MonthlyCard", "MarketState", "RussianRouletteRoom", "RussianRouletteGame", "RussianRouletteBet", "RussianRoulettePvEGame",
     "AnimalChessRoom", "AnimalChessGame", "AnimalChessBet",

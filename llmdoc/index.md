@@ -102,7 +102,7 @@
 - **[餐厅经济平衡重设计](/llmdoc/design/specs/2026-03-27-restaurant-economy-balance-design.md)** (2026-03-27)
 
 ### 进行中的实现计划 (plans)
-- **[个人摊位系统](/llmdoc/design/plans/2026-04-08-personal-stall-system.md)** (2026-04-08)
+- ~~[个人摊位系统](/llmdoc/design/plans/2026-04-08-personal-stall-system.md)~~ (2026-04-08，已于 2026-06-11 下线：上线两个月仅 2 次开摊，直购需求由挂牌市场【买牌】承接)
 - **[斗法天梯系统](/llmdoc/design/plans/2026-04-10-dharma-ladder-impl.md)** (2026-04-10)
 - **[世界地图扩展](/llmdoc/design/plans/2026-04-04-world-map-expansion-impl.md)** (2026-04-04)
 

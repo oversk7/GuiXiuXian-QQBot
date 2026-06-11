@@ -6,6 +6,7 @@ from sqlalchemy import select, func, asc, desc, and_
 from sqlalchemy.orm import selectinload
 from ..models.db import safe_session
 from ..models.market_order import MarketOrder, OrderSide
+from ..models.market_trade_log import MarketTradeLog
 from ..models.trade_record import TradeRecord, TradeType
 from ..models.player import Player
 from ..models.inventory import ItemInstance, ItemType
@@ -22,10 +23,8 @@ from ..infrastructure.repositories.item_repository import ItemRepository
 from ..infrastructure.repositories.market_order_repository import MarketOrderRepository
 
 MAX_LISTINGS = 6  # 每位玩家最大挂牌数
-AUTO_MATCH = True
 # === 输出格式辅助 ===
 EMOJI_SELL = "📤"  # 出售标识
-EMOJI_BUY = "📥"   # 求购标识
 
 # === 装备选择状态管理 ===
 equipment_selection_state = {}  # {user_id: {"equipment_list": [...], "item_cfg": ..., "price": ...}}
@@ -289,18 +288,18 @@ list_cmd = on_command("挂牌", block=True, priority=7)
 
 @list_cmd.handle()
 async def _(event: MessageEvent, args: Message = CommandArg()):
-    """挂牌 出售/收购 物品名 单价 [数量]"""
+    """挂牌 出售 物品名 单价 [数量]"""
     params = args.extract_plain_text().strip().split()
     if len(params) < 3:
-        await list_cmd.finish("⛔ 格式错误：挂牌 出售/收购 物品名 单价 [数量]")
+        await list_cmd.finish("⛔ 格式错误：挂牌 出售 物品名 单价 [数量]")
 
     mode_str, item_name, price_str = params[:3]
     qty_str = params[3] if len(params) > 3 else "1"
 
-    if mode_str not in ("出售","购买", "收购", "求购"):
-        await list_cmd.finish("⛔ 挂牌类型必须为 出售 或 收购")
-
-    side = OrderSide.SELL if mode_str == "出售" else OrderSide.BUY
+    if mode_str in ("购买", "收购", "求购"):
+        await list_cmd.finish("⛔ 求购挂牌已下线\n💡 想买东西请用【查牌 物品名】找到牌子后【买牌 牌子ID】直接购买")
+    if mode_str != "出售":
+        await list_cmd.finish("⛔ 挂牌类型必须为 出售")
 
     # 参数校验
     try:
@@ -329,7 +328,7 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
 
     # 装备/铭文实例交易特殊处理
     is_instance = EquipmentTradeService.is_instance_trade(item_cfg.item_id)
-    if is_instance and side == OrderSide.SELL:
+    if is_instance:
         if quantity != 1:
             type_name = "装备" if item_cfg.type.value == "EQUIPMENT" else "铭文"
             await list_cmd.finish(f"⛔ {type_name}只能单件出售")
@@ -368,36 +367,28 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
                         event,
                     )
                 )
-            if side == OrderSide.SELL and price < floor_price:
+            if price < floor_price:
                 price = floor_price
                 snap_hint = f"（已自动吸附到底价{floor_price}💰）"
             cap_hint = f"💡 建议底价{floor_price}💰，挂牌上限{price_cap}💰（{PRICE_CAP_MULT}倍）"
 
-        # 资源冻结
-        if side == OrderSide.SELL:
-            # 检查是否可以挂牌（8小时内购买的商品不能挂牌）
-            from ..models.trade_record import TradeRecord
-            can_list, error_msg = await TradeRecord.can_list_item(session, player.id, item_cfg.item_id, hours=8)
-            if not can_list:
-                await list_cmd.finish(error_msg)
+        # 检查是否可以挂牌（8小时内购买的商品不能挂牌）
+        from ..models.trade_record import TradeRecord
+        can_list, error_msg = await TradeRecord.can_list_item(session, player.id, item_cfg.item_id, hours=8)
+        if not can_list:
+            await list_cmd.finish(error_msg)
 
-            # 非装备物品按原有逻辑处理
-            try:
-                await ItemInstance.consume_item(session, player.id, item_cfg.item_id, quantity)
-            except ValueError as e:
-                await list_cmd.finish(f"⛔ 挂牌失败：{e}")
-        else:  # BUY: 冻结金币
-            cost = price * quantity
-            if player.gold < cost:
-                await list_cmd.finish("⛔ 金币不足")
-            player.gold -= cost
-            session.add(player)
+        # 冻结货物
+        try:
+            await ItemInstance.consume_item(session, player.id, item_cfg.item_id, quantity)
+        except ValueError as e:
+            await list_cmd.finish(f"⛔ 挂牌失败：{e}")
 
         # 创建新订单（非装备）
         new_order = MarketOrder(
             server_id=player.server_id,
             player_id=player.id,
-            side=side,
+            side=OrderSide.SELL,
             item_id=item_cfg.item_id,
             price=price,
             quantity=quantity,
@@ -406,10 +397,6 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
         session.add(new_order)
 
         await session.flush()  # 获取 new_order.id
-
-        # 自动撮合（规则取决于 auto_match 配置）
-        fill_msg = await _try_auto_match(session, new_order, player, same_price_only=not AUTO_MATCH)
-
         await session.commit()
 
     lines = [
@@ -421,8 +408,6 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
         lines.append(snap_hint)
     if cap_hint:
         lines.append(cap_hint)
-    if fill_msg:
-        lines.append(fill_msg)
     lines.append("***")
     lines.append(f"{cmd('我的挂牌')} | {cmd('撤牌 ' + str(new_order.id), '撤牌 ' + str(new_order.id))} | {cmd('查牌 ' + item_cfg.name, '查牌 ' + item_cfg.name)}")
     await list_cmd.finish(build_markdown("\n".join(lines)))
@@ -539,10 +524,6 @@ async def _create_instance_order(session, player, instance: ItemInstance, price:
     session.add(new_order)
 
     await session.flush()  # 获取订单ID
-
-    # 自动撮合
-    fill_msg = await _try_auto_match(session, new_order, player, same_price_only=not AUTO_MATCH)
-
     await session.commit()
 
     lines = [
@@ -552,8 +533,6 @@ async def _create_instance_order(session, player, instance: ItemInstance, price:
     ]
     if snap_hint:
         lines.append(snap_hint)
-    if fill_msg:
-        lines.append(fill_msg)
     lines.append("***")
     lines.append(f"{cmd('我的挂牌')} | {cmd('撤牌 ' + str(new_order.id), '撤牌 ' + str(new_order.id))}")
     await list_cmd.finish(build_markdown("\n".join(lines)))
@@ -673,6 +652,114 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
         f"{cmd('我的挂牌')} | {cmd('交易清单')}"
     )
     await cancel_cmd.finish(build_markdown(content))
+
+# ---------------- 指令：买牌（直接购买在售牌子） ----------------
+buy_order_cmd = on_command("买牌", aliases={"购牌"}, block=True, priority=7)
+
+@buy_order_cmd.handle()
+async def _(event: MessageEvent, args: Message = CommandArg()):
+    """买牌 牌子ID [数量] - 直接购买在售牌子，数量缺省为全部"""
+    params = args.extract_plain_text().strip().split()
+    if not params or not params[0].isdigit():
+        await buy_order_cmd.finish("⛔ 格式：买牌 牌子ID [数量]\n💡 用【查牌 物品名】查看在售牌子")
+    oid = int(params[0])
+
+    req_qty: int | None = None
+    if len(params) > 1:
+        try:
+            req_qty = int(params[1])
+            if req_qty <= 0:
+                raise ValueError
+        except ValueError:
+            await buy_order_cmd.finish("⛔ 数量必须为正整数")
+
+    async with safe_session() as session:
+        player = await require_player(session, event, buy_order_cmd)
+
+        order: MarketOrder | None = await session.get(MarketOrder, oid)
+        if (
+            not order
+            or order.side != OrderSide.SELL
+            or order.server_id != player.server_id
+        ):
+            await buy_order_cmd.finish("⛔ 未找到该在售牌子，可能已撤牌或售出")
+        if order.player_id == player.id:
+            await buy_order_cmd.finish(f"⛔ 不能购买自己的牌子，可用【撤牌 {oid}】收回")
+
+        item_cfg = config.items_config["by_id"].get(order.item_id)
+        if not item_cfg:
+            await buy_order_cmd.finish("⛔ 物品配置缺失，请联系管理员")
+
+        qty = 1 if order.is_equipment_trade else (order.quantity if req_qty is None else min(req_qty, order.quantity))
+        total = order.price * qty
+        if player.gold < total:
+            await buy_order_cmd.finish(f"⛔ 金币不足：需要 {total:,}💰，当前 {player.gold:,}💰")
+
+        seller: Player | None = await session.get(Player, order.player_id)
+        if not seller:
+            await buy_order_cmd.finish("⛔ 卖家数据异常，请联系管理员")
+
+        # 物品交付
+        if order.is_equipment_trade:
+            item_repo = ItemRepository(session)
+            market_order_repo = MarketOrderRepository(session)
+            service = EquipmentTradeService(item_repo, market_order_repo)
+            equipment = await service.get_equipment_by_instance_id(order.item_instance_id)
+            if not equipment:
+                await buy_order_cmd.finish("⛔ 装备数据异常，请联系管理员")
+            if not await service.transfer_equipment(equipment, player.id):
+                # transfer 失败时可能已解冻装备，回滚避免半途变更随 finish 提交
+                await session.rollback()
+                await buy_order_cmd.finish("⛔ 装备转移失败，请联系管理员")
+        else:
+            try:
+                await ItemInstance.add_item(session, player.id, order.item_id, qty)
+            except ValueError:
+                await buy_order_cmd.finish("⛔ 你的背包空间不足")
+
+        # 金币结算（阶梯税向卖家征收）
+        tax = calculate_transaction_tax(total)
+        player.gold -= total
+        seller.gold += total - tax
+        from ..achievement.achievement_service import AchievementService
+        await AchievementService.update_stat(
+            session, seller.id, "gold_earned_total", increment=total - tax, auto_commit=False
+        )
+
+        # 成交日志
+        display_name = order.equipment_summary if order.is_equipment_trade else item_cfg.name
+        session.add(MarketTradeLog(
+            server_id=player.server_id,
+            buyer_id=player.id,
+            seller_id=seller.id,
+            buyer_name=player.nickname,
+            seller_name=seller.nickname,
+            item_id=order.item_id,
+            item_name=(display_name or item_cfg.name)[:64],
+            quantity=qty,
+            unit_price=order.price,
+            total_amount=total,
+            tax=tax,
+            is_equipment=1 if order.is_equipment_trade else 0,
+        ))
+
+        # 扣减/删除订单
+        order.quantity -= qty
+        if order.quantity <= 0 or order.is_equipment_trade:
+            await session.delete(order)
+
+        await session.commit()
+
+    lines = [
+        "# ✅ 购买成功",
+        "***",
+        f"📦 {display_name} x{qty}",
+        f"💰 花费 **{total:,}**（含税 {tax:,} 由卖家承担）",
+        f"👤 卖家：{seller.nickname}",
+        "***",
+        f"{cmd('背包')} | {cmd('查牌 ' + item_cfg.name, '查牌 ' + item_cfg.name)} | {cmd('交易清单')}",
+    ]
+    await buy_order_cmd.finish(build_markdown("\n".join(lines)))
 
 # ---------------- 指令：查牌主（查看订单归属） ----------------
 order_owner_cmd = on_command("挂牌详情", aliases={"查牌主", "牌主", "牌子详情"}, block=True, priority=7)
@@ -829,23 +916,18 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
             MarketOrder.side == OrderSide.SELL,
             MarketOrder.server_id == server_id,
         ).order_by(asc(MarketOrder.price), asc(MarketOrder.created_at))
-        stmt_buy = select(MarketOrder).options(selectinload(MarketOrder.player)).where(
-            MarketOrder.item_id == item_cfg.item_id,
-            MarketOrder.side == OrderSide.BUY,
-            MarketOrder.server_id == server_id,
-        ).order_by(desc(MarketOrder.price), asc(MarketOrder.created_at))
         sells = (await session.execute(stmt_sell)).scalars().all()
-        buys = (await session.execute(stmt_buy)).scalars().all()
 
         # ---- 查询近7日市场参考数据 ----
         ref_info = await _get_market_reference(session, item_cfg, server_id)
 
         def _fmt(order: MarketOrder):
             oid_cmd = cmd(f"#{order.id}", f"挂牌详情 {order.id}")
+            buy_cmd_btn = cmd("买牌", f"买牌 {order.id}")
             if order.is_equipment_trade:
-                return f"{oid_cmd} 💰**{order.price:,}** | {order.equipment_summary}"
+                return f"{oid_cmd} 💰**{order.price:,}** | {order.equipment_summary} | {buy_cmd_btn}"
             else:
-                return f"{oid_cmd} 💰**{order.price:,}** 📦**{order.quantity}**"
+                return f"{oid_cmd} 💰**{order.price:,}** 📦**{order.quantity}** | {buy_cmd_btn}"
 
         PAGE_SIZE = 10
         def _paginate(lst: list[MarketOrder]):
@@ -856,7 +938,6 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
             return lst[start:end], total_pages, p
 
         sell_page, sell_total, cur_page = _paginate(sells)
-        buy_page, _, _ = _paginate(buys)
 
         lines = [f"# 📋 {cmd(item_cfg.name, '查牌 ' + item_cfg.name)} 市场牌子 第{cur_page}/{sell_total}页"]
         # 插入市场参考信息行
@@ -868,13 +949,8 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
             lines.extend(_fmt(o) for o in sell_page)
         else:
             lines.append("(空)")
-        lines.append(f"***")
-        lines.append(f"{EMOJI_BUY} **求购**")
-        if buy_page:
-            lines.extend(_fmt(o) for o in buy_page)
-        else:
-            lines.append("(空)")
         lines.append("***")
+        lines.append(f"💡 点击【买牌】或发送「买牌 牌子ID [数量]」直接购买")
         if sell_total > 1:
             nav = []
             if cur_page > 1:
@@ -882,7 +958,7 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
             if cur_page < sell_total:
                 nav.append(cmd(f'下一页', f'查牌 {item_cfg.name} {cur_page + 1}'))
             lines.append(" | ".join(nav))
-        lines.append(f"{cmd('挂牌 出售 ' + item_cfg.name, '挂牌 出售 ' + item_cfg.name + ' ')} | {cmd('挂牌 收购 ' + item_cfg.name, '挂牌 收购 ' + item_cfg.name + ' ')} | {cmd('交易清单')}")
+        lines.append(f"{cmd('挂牌 出售 ' + item_cfg.name, '挂牌 出售 ' + item_cfg.name + ' ')} | {cmd('交易清单')}")
 
         await view_cmd.finish(build_markdown("\n".join(lines)))
 
@@ -913,19 +989,8 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
             .where(MarketOrder.side == OrderSide.SELL, MarketOrder.server_id == server_id)
             .group_by(MarketOrder.item_id)
         )
-        # 聚合求购（BUY）信息：最高价与总数量
-        stmt_buy = (
-            select(
-                MarketOrder.item_id,
-                func.sum(MarketOrder.quantity).label("qty"),
-                func.max(MarketOrder.price).label("max_price"),
-            )
-            .where(MarketOrder.side == OrderSide.BUY, MarketOrder.server_id == server_id)
-            .group_by(MarketOrder.item_id)
-        )
 
         sells = (await session.execute(stmt_sell)).all()
-        buys = (await session.execute(stmt_buy)).all()
 
         def _fmt_sell(row):
             item_cfg = config.items_config["by_id"].get(row.item_id)
@@ -933,26 +998,16 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
                 return None
             return f"{EMOJI_SELL} {cmd(item_cfg.name, '查牌 ' + item_cfg.name)} 💰**{row.min_price}** 📦**{row.qty}**"
 
-        def _fmt_buy(row):
-            item_cfg = config.items_config["by_id"].get(row.item_id)
-            if not item_cfg:
-                return None
-            return f"{EMOJI_BUY} {cmd(item_cfg.name, '查牌 ' + item_cfg.name)} 💰**{row.max_price}** 📦**{row.qty}**"
-
         sell_lines_raw: list[str] = list(filter(None, (_fmt_sell(r) for r in sells)))
-        buy_lines_raw: list[str] = list(filter(None, (_fmt_buy(r) for r in buys)))
 
         PAGE_SIZE = 10
 
-        total_pages_sell = (len(sell_lines_raw) - 1) // PAGE_SIZE + 1 if sell_lines_raw else 1
-        total_pages_buy = (len(buy_lines_raw) - 1) // PAGE_SIZE + 1 if buy_lines_raw else 1
-        total_pages = max(total_pages_sell, total_pages_buy)
+        total_pages = (len(sell_lines_raw) - 1) // PAGE_SIZE + 1 if sell_lines_raw else 1
         cur_page = max(1, min(page, total_pages))
 
         start = (cur_page - 1) * PAGE_SIZE
         end = start + PAGE_SIZE
         sell_page = sell_lines_raw[start:end]
-        buy_page = buy_lines_raw[start:end]
 
         lines: list[str] = [f"# 📊 市场总览 第{cur_page}/{total_pages}页"]
         lines.append("***")
@@ -962,12 +1017,7 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
         else:
             lines.append("(空)")
         lines.append("***")
-        lines.append(f"{EMOJI_BUY} **收购**")
-        if buy_page:
-            lines.extend(buy_page)
-        else:
-            lines.append("(空)")
-        lines.append("***")
+        lines.append(f"💡 点击物品名查牌，再用【买牌 牌子ID】直接购买")
         if total_pages > 1:
             nav = []
             if cur_page > 1:
@@ -1029,18 +1079,6 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
         sell_orders = [o for o in page_orders if o.side == OrderSide.SELL]
         if sell_orders:
             for order in sell_orders:
-                item_cfg = config.items_config["by_id"].get(order.item_id)
-                if item_cfg:
-                    lines.append(f"🆔**{order.id}** | {cmd(item_cfg.name, '查牌 ' + item_cfg.name)} | 💰**{order.price}** 📦**{order.quantity}** | {cmd('撤牌', '撤牌 ' + str(order.id))}")
-        else:
-            lines.append("(空)")
-
-        lines.append("***")
-        lines.append(f"📥 **求购订单**")
-
-        buy_orders = [o for o in page_orders if o.side == OrderSide.BUY]
-        if buy_orders:
-            for order in buy_orders:
                 item_cfg = config.items_config["by_id"].get(order.item_id)
                 if item_cfg:
                     lines.append(f"🆔**{order.id}** | {cmd(item_cfg.name, '查牌 ' + item_cfg.name)} | 💰**{order.price}** 📦**{order.quantity}** | {cmd('撤牌', '撤牌 ' + str(order.id))}")
@@ -1160,116 +1198,3 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
 
         await equipment_appraise_cmd.finish(build_markdown("\n".join(lines)))
 
-# ======= 辅助函数 =======
-async def _try_auto_match(session, new_order: MarketOrder, player: Player, same_price_only: bool = False) -> str:
-    """自动撮合逻辑，返回描述信息（可能为空）。"""
-    # 初始化新版service
-    item_repo = ItemRepository(session)
-    market_order_repo = MarketOrderRepository(session)
-    equipment_service = EquipmentTradeService(item_repo, market_order_repo)
-
-    if new_order.side == OrderSide.BUY:
-        # 买单 → 查找卖单
-        price_cond = (MarketOrder.price == new_order.price) if same_price_only else (MarketOrder.price <= new_order.price)
-        stmt = select(MarketOrder).where(
-            MarketOrder.item_id == new_order.item_id,
-            MarketOrder.side == OrderSide.SELL,
-            MarketOrder.server_id == new_order.server_id,
-            price_cond,
-        ).order_by(asc(MarketOrder.price), asc(MarketOrder.created_at))
-        opposite_orders = (await session.execute(stmt)).scalars().all()
-    else:
-        # 卖单 → 查找买单
-        price_cond = (MarketOrder.price == new_order.price) if same_price_only else (MarketOrder.price >= new_order.price)
-        stmt = select(MarketOrder).where(
-            MarketOrder.item_id == new_order.item_id,
-            MarketOrder.side == OrderSide.BUY,
-            MarketOrder.server_id == new_order.server_id,
-            price_cond,
-        ).order_by(desc(MarketOrder.price), asc(MarketOrder.created_at))
-        opposite_orders = (await session.execute(stmt)).scalars().all()
-
-    remaining = new_order.quantity
-    trade_lines: list[str] = []
-    original_qty = new_order.quantity
-    total_spent = 0  # BUY 单实际花费
-
-    halt_reason: str | None = None
-
-    for opp in opposite_orders:
-        if remaining == 0:
-            break
-        trade_qty = min(remaining, opp.quantity)
-        trade_price = opp.price  # 成交价按对手价
-        buyer_id = new_order.player_id if new_order.side == OrderSide.BUY else opp.player_id
-        seller_id = opp.player_id if new_order.side == OrderSide.BUY else new_order.player_id
-
-        # 资金与物品处理
-        buyer: Player = await session.get(Player, buyer_id)
-        seller: Player = await session.get(Player, seller_id)
-        item_cfg = new_order.item
-
-        # 处理物品转移
-        if new_order.side == OrderSide.SELL and new_order.is_equipment_trade:
-            # 卖方是装备，转移装备实例
-            equipment = await equipment_service.get_equipment_by_instance_id(new_order.item_instance_id)
-            if not equipment or not await equipment_service.transfer_equipment(equipment, buyer.id):
-                break  # 装备转移失败，停止撮合
-        elif opp.side == OrderSide.SELL and opp.is_equipment_trade:
-            # 对手方是装备，转移装备实例
-            equipment = await equipment_service.get_equipment_by_instance_id(opp.item_instance_id)
-            if not equipment or not await equipment_service.transfer_equipment(equipment, buyer.id):
-                break  # 装备转移失败，停止撮合
-        else:
-            # 普通物品交易，检查背包空间
-            try:
-                await ItemInstance.add_item(session, buyer.id, item_cfg.item_id, trade_qty)
-            except ValueError:
-                # 买家背包空间不足，停止撮合
-                if buyer_id == player.id:
-                    halt_reason = "⚠️ 成交中断：你的背包空间不足，未能继续自动撮合"
-                else:
-                    halt_reason = "⚠️ 成交中断：买家背包空间不足，未能继续自动撮合"
-                break
-
-        # 计算交易金额和阶梯税收
-        trade_amount = trade_price * trade_qty
-        tax = calculate_transaction_tax(trade_amount)
-
-        # 金币给卖家（扣除税收）
-        seller.gold += trade_amount - tax
-        # 更新财富成就统计
-        from ..achievement.achievement_service import AchievementService
-        await AchievementService.update_stat(session, seller.id, "gold_earned_total", increment=trade_amount - tax, auto_commit=False)
-
-        # 更新对手单
-        opp.quantity -= trade_qty
-        if opp.quantity == 0:
-            await session.delete(opp)
-
-        remaining -= trade_qty
-        if new_order.side == OrderSide.BUY:
-            total_spent += trade_price * trade_qty
-
-        # 生成交易消息（包含税收信息）
-        trade_msg = f"✅ 成交 📦{trade_qty} @{trade_price}💰"
-        if tax > 0:
-            trade_msg += f"（税收：{tax}💰）"
-        trade_lines.append(trade_msg)
-
-    # 更新当前单剩余
-    new_order.quantity = remaining
-    if remaining == 0:
-        await session.delete(new_order)
-
-    # 退款处理（仅买单）
-    if new_order.side == OrderSide.BUY:
-        frozen_total = original_qty * new_order.price
-        refund = frozen_total - total_spent - remaining * new_order.price
-        if refund > 0:
-            player.gold += refund
-
-    if halt_reason:
-        trade_lines.append(halt_reason)
-
-    return "\n".join(trade_lines)

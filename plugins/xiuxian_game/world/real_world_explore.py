@@ -96,11 +96,6 @@ async def show_location_info(session: AsyncSession, player: Player, location, cu
     if mansion_info:
         info_text += "\n\n" + mansion_info
 
-    # 添加摊位信息
-    stall_info = await get_stall_info_for_location(session, player, current_x, current_y)
-    if stall_info:
-        info_text += "\n\n" + stall_info
-
     # 添加新手任务完成消息
     if quest_msg:
         info_text += "\n\n" + quest_msg
@@ -237,11 +232,6 @@ async def show_basic_location_info(session: AsyncSession, player: Player, x: int
     if mansion_info:
         info_text += "\n\n" + mansion_info
 
-    # 添加摊位信息
-    stall_info = await get_stall_info_for_location(session, player, x, y)
-    if stall_info:
-        info_text += "\n\n" + stall_info
-
     # 添加新手任务完成消息
     if quest_msg:
         info_text += "\n\n" + quest_msg
@@ -289,45 +279,6 @@ async def get_mansion_info_for_location(session: AsyncSession, player: Player, x
 
     if usage_info:
         lines.append(f"✧ {usage_info}")
-
-    return "\n".join(lines)
-
-
-async def get_stall_info_for_location(session: AsyncSession, player: Player, x: int, y: int) -> str | None:
-    """获取当前城镇的摊位信息，用于在观察指令中显示"""
-    from ..stall.stall_service import get_town_name
-
-    region = player.get_current_region() if hasattr(player, 'get_current_region') else "大都会"
-    town = get_town_name(x, y, region)
-    if not town:
-        return None
-
-    from ..infrastructure.repositories.stall_repository import PlayerStallRepository, StallItemRepository
-    from ..models.stall import PlayerStall
-    from datetime import datetime
-
-    stall_repo = PlayerStallRepository(session)
-    stall_item_repo = StallItemRepository(session)
-
-    stalls = await stall_repo.find_active_by_city(town, page=1, page_size=10, server_id=player.server_id)
-    if not stalls:
-        return None
-
-    now = datetime.now()
-    lines = [f"**🏪 {town}的摊位({len(stalls)}个)**"]
-
-    for s in stalls:
-        stall_display = s.stall_name or f"{s.player_name}的摊位"
-        item_count = await stall_item_repo.count_by_stall(s.id)
-        remaining = s.expires_at - now
-        remain_h = max(0, int(remaining.total_seconds() // 3600))
-        remain_m = max(0, int((remaining.total_seconds() % 3600) // 60))
-        remain_str = f"{remain_h}h{remain_m}m" if remain_h > 0 else f"{remain_m}m"
-
-        shout = f" 📢{s.shout_text}" if s.shout_text else ""
-        lines.append(
-            f"{cmd(stall_display, f'摊位 {s.player_uid}')} 📦{item_count}件 ⏰{remain_str}{shout}"
-        )
 
     return "\n".join(lines)
 

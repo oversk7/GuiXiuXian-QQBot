@@ -639,7 +639,6 @@ async def _calculate_trade_tax(session, player_id: str, revenue: int,
 # 系统商店基础物品（价格 = 基础价 × SHOP_BASE_MULT × 财富指数）
 SHOP_ITEMS = [
     "revive_potion", "president_letter", "territory_expansion_scroll", "heal_potion", "spirit_herb",
-    "stall_permit",
 ]
 
 # 食材铺：基础调料（烹饪系统，与黑市分开）

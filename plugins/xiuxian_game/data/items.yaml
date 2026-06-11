@@ -47,15 +47,6 @@ items:
       effect_type: "CHANGE_NAME"
       price: 100000
 
-    - item_id: "stall_permit"
-      name: "摊位令"
-      description: "允许在城镇开设个人摊位24小时。使用方法：前往城镇后发送【摆摊】"
-      type: "CONSUMABLE"
-      effect_type: "CHANGE_NAME"
-      price: 5000
-      rarity: "green"
-      no_drop: true
-
     - item_id: "president_letter"
       name: "会长委任书"
       description: "当我走在黑夜当中，那我就是这座城市最恐怖的怪谈。"
