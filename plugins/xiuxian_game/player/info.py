@@ -872,7 +872,7 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
     # 11. 组装完整面板（原生 Markdown，保持原版逐行排版）
     lines = [
         f"# 👤 {display_name_full}",
-        f"UID:{player.uid}　「{player.sex}」",
+        f"UID:{player.uid}　「{player.sex}」　🪧{get_server_name(player.server_id)}",
         f"Lv.**{player.level}** · {realm_name}",
     ]
     if title_line_full:
