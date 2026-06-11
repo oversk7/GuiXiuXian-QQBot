@@ -1,12 +1,9 @@
 """
 里界系统命令处理器 -- 场景节点版
-
-⚠️ 测试阶段：仅管理员可用，测试完成后移除 permission=SUPERUSER
 """
 from nonebot import on_command
 from nonebot.adapters.qq import MessageEvent, Message
 from nonebot.params import CommandArg
-from nonebot.permission import SUPERUSER
 
 from ..platform_utils import get_unified_player
 from ..infrastructure.uow.unit_of_work import UnitOfWork
@@ -52,13 +49,13 @@ async def in_inner_realm_rule(event: MessageEvent) -> bool:
 
 # ==================== 命令注册 ====================
 
-realms_list_cmd = on_command("里界", aliases={"里界列表"}, block=True, priority=5, permission=SUPERUSER)
+realms_list_cmd = on_command("里界", aliases={"里界列表"}, block=True, priority=5)
 
 # 里界传送命令优先级为4（高于诡域的5），使用智能识别
 # block=False 允许在不匹配里界时继续传递给诡域系统
-enter_realm_cmd = on_command("传送", aliases={"进入里界"}, block=False, priority=4, permission=SUPERUSER)
+enter_realm_cmd = on_command("传送", aliases={"进入里界"}, block=False, priority=4)
 
-realm_info_cmd = on_command("里界信息", block=True, priority=5, permission=SUPERUSER)
+realm_info_cmd = on_command("里界信息", block=True, priority=5)
 
 # 里界的返回命令优先级更高（4），在诡域返回命令（5）之前处理
 # 使用 Rule 确保只有在里界时才匹配此命令
@@ -68,30 +65,31 @@ exit_realm_cmd = on_command(
     rule=in_inner_realm_rule,
     block=True,
     priority=4,
-    permission=SUPERUSER,
 )
 
 # 场景移动
-goto_cmd = on_command("前往", rule=in_inner_realm_rule, block=True, priority=4, permission=SUPERUSER)
+goto_cmd = on_command("前往", rule=in_inner_realm_rule, block=True, priority=4)
 
-# 交互命令
-search_cmd = on_command("搜刮", block=True, priority=4, permission=SUPERUSER)
-intimidate_cmd = on_command("威吓", block=True, priority=4, permission=SUPERUSER)
-assassination_cmd = on_command("处决", block=True, priority=4, permission=SUPERUSER)
-talk_cmd = on_command("交谈", block=True, priority=4, permission=SUPERUSER)
+# 交互命令（挂 in_inner_realm_rule：COMMAND_START 含空前缀，
+# 不挂规则会拦截群内以这些词开头的日常聊天）
+search_cmd = on_command("搜刮", rule=in_inner_realm_rule, block=True, priority=4)
+intimidate_cmd = on_command("威吓", rule=in_inner_realm_rule, block=True, priority=4)
+assassination_cmd = on_command("处决", rule=in_inner_realm_rule, block=True, priority=4)
+talk_cmd = on_command("交谈", rule=in_inner_realm_rule, block=True, priority=4)
 observe_cmd = on_command("观察", aliases={"环顾", "查看环境"},
-                         rule=in_inner_realm_rule, block=True, priority=4, permission=SUPERUSER)
+                         rule=in_inner_realm_rule, block=True, priority=4)
 
 # 道具
-use_item_cmd = on_command("使用", rule=in_inner_realm_rule, block=True, priority=4, permission=SUPERUSER)
-inventory_cmd = on_command("道具", rule=in_inner_realm_rule, block=True, priority=4, permission=SUPERUSER)
+use_item_cmd = on_command("使用", rule=in_inner_realm_rule, block=True, priority=4)
+inventory_cmd = on_command("道具", rule=in_inner_realm_rule, block=True, priority=4)
 
 # 休息
-rest_cmd = on_command("休息", rule=in_inner_realm_rule, block=True, priority=4, permission=SUPERUSER)
+rest_cmd = on_command("休息", rule=in_inner_realm_rule, block=True, priority=4)
 
 # 线索 & 事件
-view_clues_cmd = on_command("查看线索", aliases={"线索列表", "已收集线索"}, block=True, priority=4, permission=SUPERUSER)
-choose_cmd = on_command("选择", rule=in_inner_realm_rule, block=True, priority=4, permission=SUPERUSER)
+view_clues_cmd = on_command("查看线索", aliases={"线索列表", "已收集线索"},
+                            rule=in_inner_realm_rule, block=True, priority=4)
+choose_cmd = on_command("选择", rule=in_inner_realm_rule, block=True, priority=4)
 
 
 # ==================== 【里界】查看列表 ====================
