@@ -43,9 +43,6 @@ REQUIRED_FIELDS: Dict[str, Dict[str, str]] = {
     "market_orders": {
         "server_id": "INTEGER NOT NULL DEFAULT 1 COMMENT '所属区服ID'",
     },
-    "market_trade_log": {
-        "server_id": "INTEGER NOT NULL DEFAULT 1 COMMENT '所属区服ID'",
-    },
     "auction_item": {
         "server_id": "INTEGER NOT NULL DEFAULT 1 COMMENT '所属区服ID'",
     },
@@ -114,7 +111,6 @@ REQUIRED_INDEXES: List[Tuple[str, str, str]] = [
     ("player", "ix_player_server_id", "server_id"),
     ("guild", "ix_guild_server_id", "server_id"),
     ("market_orders", "ix_market_orders_server_id", "server_id"),
-    ("market_trade_log", "ix_market_trade_log_server_id", "server_id"),
     ("auction_item", "ix_auction_item_server_id", "server_id"),
     ("world_tile", "ix_world_tile_server_id", "server_id"),
     ("red_envelope", "ix_red_envelope_server_id", "server_id"),
