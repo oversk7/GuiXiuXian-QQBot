@@ -708,5 +708,3 @@ async def _check_nav_arrivals():
 
     except Exception as e:
         _logger.error(f"[Nav] 导航到达轮询失败: {e}", exc_info=True)
-
-        await check_data_cmd.finish(message_add_head(msg, event))
