@@ -1254,11 +1254,10 @@ class InnerRealmService:
             reward_desc = await self._deliver_rewards(player, session, multiplier)
 
             # 额外奖励
-            from ..models.inventory import ItemInstance
             for bonus in chosen_ending.get("bonus_items", []):
                 item_id = bonus.get("id", "")
                 qty = bonus.get("qty", 1)
-                added = await ItemInstance.add_item(self.uow.session, player.id, item_id, qty)
+                added = await self._safe_add_reward_item(player.id, item_id, qty)
                 from ..config import config as game_config
                 item_config = game_config.items_config["by_id"].get(item_id)
                 item_name = item_config.name if item_config else item_id
@@ -1277,7 +1276,7 @@ class InnerRealmService:
                 for fc_item in fc_bonus.get("items", []):
                     item_id = fc_item.get("id", "")
                     qty = fc_item.get("qty", 1)
-                    added = await ItemInstance.add_item(self.uow.session, player.id, item_id, qty)
+                    added = await self._safe_add_reward_item(player.id, item_id, qty)
                     from ..config import config as game_config
                     item_config = game_config.items_config["by_id"].get(item_id)
                     item_name = item_config.name if item_config else item_id
@@ -1451,6 +1450,16 @@ class InnerRealmService:
         state["pending_rewards"] = pending
         session.state = json.dumps(state, ensure_ascii=False)
 
+    async def _safe_add_reward_item(self, player_id: str, item_id: str, qty: int) -> bool:
+        """发放奖励物品：背包满时返回 False（物品遗落裂隙），不抛异常中断结算事务。"""
+        from ..models.inventory import ItemInstance
+        try:
+            return await ItemInstance.add_item(self.uow.session, player_id, item_id, qty)
+        except ValueError as e:
+            if "背包空间不足" in str(e):
+                return False
+            raise
+
     async def _deliver_rewards(self, player: Player, session: InnerRealmSession, multiplier: float) -> str:
         """存活结算时发放奖励"""
         state = json.loads(session.state) if session.state else {}
@@ -1465,7 +1474,6 @@ class InnerRealmService:
             lines.append(f"💰 金币: {gold} (x{multiplier})")
 
         # 发放物品
-        from ..models.inventory import ItemInstance
         from ..config import config as game_config
 
         for item_info in pending.get("items", []):
@@ -1473,7 +1481,7 @@ class InnerRealmService:
             qty = int(item_info.get("qty", 0) * multiplier)
             if qty <= 0:
                 continue
-            added = await ItemInstance.add_item(self.uow.session, player.id, item_id, qty)
+            added = await self._safe_add_reward_item(player.id, item_id, qty)
             item_config = game_config.items_config["by_id"].get(item_id)
             item_name = item_config.name if item_config else item_id
             if added:

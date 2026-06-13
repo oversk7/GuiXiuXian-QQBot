@@ -340,8 +340,6 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
             if not location_name:
                 await nav_cmd.finish("⛔ 请输入地点名称或坐标\n💡 示例：导航 上京 或 导航 100 200")
 
-            # 导入LocationService
-            from .location_service import LocationService
             from ..infrastructure.repositories.location_repository import LocationRepository
 
             # 实例化LocationService
