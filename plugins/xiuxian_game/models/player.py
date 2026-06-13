@@ -35,6 +35,7 @@ class Player(Base):
 
     # 里界系统字段
     inner_realm: Mapped[str | None] = mapped_column(String(64), nullable=True, comment="当前所在里界(None=不在里界)")
+    inner_realm_clears: Mapped[str | None] = mapped_column(Text, nullable=True, comment="里界通关与线索全局记录(JSON)")
 
     hp: Mapped[int] = mapped_column(Integer, default=20, server_default='20', comment="生命值")
     max_hp: Mapped[int] = mapped_column(Integer, default=20, server_default='20', comment="最大生命值")

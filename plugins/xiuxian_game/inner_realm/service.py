@@ -692,12 +692,13 @@ class InnerRealmService:
         else:  # critical_failure
             loot = loot_table.get("failure", {})
 
-        # 标记已搜刮
-        if scene.id not in scene_states:
-            scene_states[scene.id] = {}
-        scene_states[scene.id]["searched"] = True
-        state["scene_states"] = scene_states
-        session.state = json.dumps(state, ensure_ascii=False)
+        # 标记已搜刮（失败不标记，付出代价后可再搜，避免关键道具被锁死）
+        if result.result_level not in ("failure", "critical_failure"):
+            if scene.id not in scene_states:
+                scene_states[scene.id] = {}
+            scene_states[scene.id]["searched"] = True
+            state["scene_states"] = scene_states
+            session.state = json.dumps(state, ensure_ascii=False)
 
         await self.update_action_cooldown(session, "search")
 
@@ -763,6 +764,8 @@ class InnerRealmService:
                 result_text = "什么也没找到..."
             if sanity_loss < 0:
                 result_text += f"\n🧠 理智 {sanity_loss}"
+            if death_result != "death":
+                result_text += "\n💡 这里似乎还有遗漏，稍后可以再搜一次"
         else:
             if reward_lines:
                 result_text = "\n".join(reward_lines)
@@ -1081,9 +1084,25 @@ class InnerRealmService:
             return False, f"⛔ 你没有「{key_items[target_id]['name']}」"
 
         item_config = key_items[target_id]
-
-        # 处理使用效果
         use_effect = item_config.get("use_effect", {})
+
+        # 查找当前场景匹配的 on_use_item 事件（如楼道针线引诱、密室喂牙齿）
+        scene = engine.get_current_scene(session)
+        state = json.loads(session.state) if session.state else {}
+        triggered = state.get("events_triggered", [])
+        matching_event = None
+        if scene:
+            for event in scene.events:
+                if (event.get("trigger") == "on_use_item"
+                        and event.get("required_item") == target_id
+                        and event.get("id", "") not in triggered):
+                    matching_event = event
+                    break
+
+        # 既无使用效果也无场景事件 -- 不消耗，避免关键道具被浪费
+        if not use_effect and not matching_event:
+            return False, f"⛔ 「{item_config['name']}」在这里似乎派不上用场"
+
         lines = [
             f"🎒 使用「{item_config['name']}」",
             "━━━━━━━━━━━━━",
@@ -1117,26 +1136,17 @@ class InnerRealmService:
         if inventory[target_id] <= 0:
             del inventory[target_id]
         session.inventory = json.dumps(inventory, ensure_ascii=False)
-
-        # 检查场景特殊事件（如楼道使用针线引诱厂服男）
-        scene = engine.get_current_scene(session)
-        if scene:
-            for event in scene.events:
-                if event.get("trigger") == "on_use_item" and event.get("required_item") == target_id:
-                    lines.append("")
-                    lines.append(event.get("description", ""))
-                    if event.get("result_text"):
-                        lines.append(event["result_text"])
-                    if event.get("unlock_search"):
-                        state = json.loads(session.state) if session.state else {}
-                        scene_states = state.get("scene_states", {})
-                        if scene.id not in scene_states:
-                            scene_states[scene.id] = {}
-                        scene_states[scene.id]["event_unlocked"] = True
-                        state["scene_states"] = scene_states
-                        session.state = json.dumps(state, ensure_ascii=False)
-
         await self.uow.commit()
+
+        # 触发场景事件（支持选择分支、自动移动、道具发放等）
+        if matching_event:
+            evt_text, _died = await self._process_scene_event(
+                player, session, matching_event, engine
+            )
+            if evt_text:
+                lines.append("")
+                lines.append(evt_text)
+
         return True, "\n".join(lines)
 
     # ==================== 道具查看 ====================
@@ -1218,7 +1228,7 @@ class InnerRealmService:
                     not npc_states.get(npc_id, {}).get("alive", True)
                     for npc_id in required_kills
                 )
-                if all_killed and session.killed_count >= len(required_kills):
+                if all_killed:
                     chosen_ending = ending_config
                     break
 
@@ -1227,9 +1237,14 @@ class InnerRealmService:
                     chosen_ending = ending_config
                     break
 
-        # 默认结局
+            elif condition == "left_early":
+                # 兜底：存活但未达成任何更高结局（中途撤离）
+                chosen_ending = ending_config
+                break
+
+        # 默认结局（正常配置下 left_early 必中，此处仅为保险）
         if not chosen_ending:
-            chosen_ending = endings.get("dawn_survivor", list(endings.values())[0])
+            chosen_ending = endings.get("early_leave", list(endings.values())[0])
 
         # 发放奖励
         multiplier = chosen_ending.get("reward_multiplier", 1.0)
@@ -1239,15 +1254,18 @@ class InnerRealmService:
             reward_desc = await self._deliver_rewards(player, session, multiplier)
 
             # 额外奖励
+            from ..models.inventory import ItemInstance
             for bonus in chosen_ending.get("bonus_items", []):
                 item_id = bonus.get("id", "")
                 qty = bonus.get("qty", 1)
-                from ..item.inventory import add_item_to_inventory
-                await add_item_to_inventory(self.uow.session, player, item_id, qty)
+                added = await ItemInstance.add_item(self.uow.session, player.id, item_id, qty)
                 from ..config import config as game_config
                 item_config = game_config.items_config["by_id"].get(item_id)
                 item_name = item_config.name if item_config else item_id
-                reward_desc += f"\n🎁 额外：{item_name} x{qty}"
+                if added:
+                    reward_desc += f"\n🎁 额外：{item_name} x{qty}"
+                else:
+                    reward_desc += f"\n⚠️ 背包已满，{item_name} x{qty} 遗落在了裂隙中"
 
             # 首次通关额外奖励
             if is_first and chosen_ending.get("first_clear_bonus"):
@@ -1259,12 +1277,14 @@ class InnerRealmService:
                 for fc_item in fc_bonus.get("items", []):
                     item_id = fc_item.get("id", "")
                     qty = fc_item.get("qty", 1)
-                    from ..item.inventory import add_item_to_inventory
-                    await add_item_to_inventory(self.uow.session, player, item_id, qty)
+                    added = await ItemInstance.add_item(self.uow.session, player.id, item_id, qty)
                     from ..config import config as game_config
                     item_config = game_config.items_config["by_id"].get(item_id)
                     item_name = item_config.name if item_config else item_id
-                    reward_desc += f"\n🏆 首通：{item_name} x{qty}"
+                    if added:
+                        reward_desc += f"\n🏆 首通：{item_name} x{qty}"
+                    else:
+                        reward_desc += f"\n⚠️ 背包已满，{item_name} x{qty} 遗落在了裂隙中"
 
                 # 标记已通关
                 clears = {}
@@ -1333,42 +1353,41 @@ class InnerRealmService:
             await self._handle_death(player, session, "event_choice")
             lines.append("\n💀 试炼失败")
 
-        # 自动移动（并处理新场景的 auto_on_enter 事件）
-        auto_move = chosen.get("auto_move_to")
-        if auto_move:
-            scene_text = engine.enter_scene(session, auto_move, state.get("is_first_playthrough", False))
-            lines.append(f"\n{scene_text}")
-
-            # 保存状态后处理新场景的自动事件
-            state.pop("pending_event", None)
-            session.state = json.dumps(state, ensure_ascii=False)
-            await self.uow.commit()
-
-            auto_text, auto_died = await self._process_auto_enter_events(
-                player, session, engine
-            )
-            if auto_text:
-                lines.append(f"\n{auto_text}")
-            if auto_died:
-                # 发放道具逻辑跳过，直接返回
-                return True, "\n".join(lines)
-
-        # 发放道具
+        # 发放道具（须在自动移动前入账，黎明自动结算时才能带上）
         grant_item = chosen.get("grant_item")
         if grant_item:
             item_id = grant_item.get("id", "")
             qty = grant_item.get("qty", 1)
-            await self._add_pending_reward(session, item_id=item_id, qty=qty)
+            pending = state.get("pending_rewards", {"items": [], "gold": 0})
+            for item in pending["items"]:
+                if item["id"] == item_id:
+                    item["qty"] += qty
+                    break
+            else:
+                pending["items"].append({"id": item_id, "qty": qty})
+            state["pending_rewards"] = pending
             from ..config import config as game_config
             item_config = game_config.items_config["by_id"].get(item_id)
             item_name = item_config.name if item_config else item_id
             lines.append(f"\n📦 获得：{item_name} x{qty}")
 
-        # 清除待处理事件（auto_move 路径可能已经清除过，重新读取 state）
-        final_state = json.loads(session.state) if session.state else {}
-        final_state.pop("pending_event", None)
-        session.state = json.dumps(final_state, ensure_ascii=False)
+        # 清除待处理事件并保存状态
+        state.pop("pending_event", None)
+        session.state = json.dumps(state, ensure_ascii=False)
         await self.uow.commit()
+
+        # 自动移动（并处理新场景的 auto_on_enter 事件，如黎明自动结算）
+        auto_move = chosen.get("auto_move_to")
+        if auto_move and chosen.get("result") != "death":
+            scene_text = engine.enter_scene(session, auto_move, state.get("is_first_playthrough", False))
+            lines.append(f"\n{scene_text}")
+            await self.uow.commit()
+
+            auto_text, _auto_died = await self._process_auto_enter_events(
+                player, session, engine
+            )
+            if auto_text:
+                lines.append(f"\n{auto_text}")
 
         return True, "\n".join(lines)
 
@@ -1446,7 +1465,7 @@ class InnerRealmService:
             lines.append(f"💰 金币: {gold} (x{multiplier})")
 
         # 发放物品
-        from ..item.inventory import add_item_to_inventory
+        from ..models.inventory import ItemInstance
         from ..config import config as game_config
 
         for item_info in pending.get("items", []):
@@ -1454,10 +1473,13 @@ class InnerRealmService:
             qty = int(item_info.get("qty", 0) * multiplier)
             if qty <= 0:
                 continue
-            await add_item_to_inventory(self.uow.session, player, item_id, qty)
+            added = await ItemInstance.add_item(self.uow.session, player.id, item_id, qty)
             item_config = game_config.items_config["by_id"].get(item_id)
             item_name = item_config.name if item_config else item_id
-            lines.append(f"📦 {item_name} x{qty}")
+            if added:
+                lines.append(f"📦 {item_name} x{qty}")
+            else:
+                lines.append(f"⚠️ 背包已满，{item_name} x{qty} 遗落在了裂隙中")
 
         return "\n".join(lines) if lines else "无"
 
@@ -1596,6 +1618,49 @@ class InnerRealmService:
                 died = True
                 lines.append("\n💀 试炼失败")
 
+        # ---- 事件直接发放道具（如针线引诱后搜尸得房卡）----
+        grant = event.get("grant_item")
+        if grant and not died and "choices" not in event:
+            item_id = grant.get("id", "")
+            qty = grant.get("qty", 1)
+            if grant.get("is_key_item"):
+                inventory = engine.get_session_inventory(session)
+                inventory[item_id] = inventory.get(item_id, 0) + qty
+                session.inventory = json.dumps(inventory, ensure_ascii=False)
+                realm_config = InnerRealmConfig.get_realm_config(session.realm_name)
+                key_items = realm_config.get("key_items", {})
+                item_name = key_items.get(item_id, {}).get("name", item_id)
+                lines.append(f"🔑 获得关键道具：{item_name} x{qty}")
+
+                if item_id == "room_card_4":
+                    collected = json.loads(session.clue_collected) if session.clue_collected else []
+                    if "clue_2" not in collected:
+                        collected.append("clue_2")
+                        session.clue_collected = json.dumps(collected)
+                        await self._save_clue_globally(player, session.realm_name, "clue_2")
+                        lines.append("📖 发现线索：房卡上的字")
+            else:
+                # 直接操作本地 state 的 pending_rewards，避免覆盖丢失
+                pending = state.get("pending_rewards", {"items": [], "gold": 0})
+                for item in pending["items"]:
+                    if item["id"] == item_id:
+                        item["qty"] += qty
+                        break
+                else:
+                    pending["items"].append({"id": item_id, "qty": qty})
+                state["pending_rewards"] = pending
+                from ..config import config as game_config
+                item_config = game_config.items_config["by_id"].get(item_id)
+                item_name = item_config.name if item_config else item_id
+                lines.append(f"📦 获得：{item_name} x{qty}")
+
+        # ---- 事件击杀NPC（非玩家击杀，如厂服男杀死雨衣男）----
+        npc_kill = event.get("npc_kill")
+        if npc_kill:
+            npc_states = state.get("npc_states", {})
+            npc_states[npc_kill] = {"alive": False}
+            state["npc_states"] = npc_states
+
         # ---- 自动移动（仅在存活且无待选择时执行）----
         if event.get("auto_move_to") and not died and "choices" not in event:
             is_first = state.get("is_first_playthrough", False)
@@ -1618,6 +1683,20 @@ class InnerRealmService:
         else:
             session.state = json.dumps(state, ensure_ascii=False)
             await self.uow.commit()
+
+        # ---- 到达结算点自动结算（如镇口·黎明）----
+        if event.get("settle") and not died:
+            realm_config = InnerRealmConfig.get_realm_config(session.realm_name)
+            ending = await self.settle_ending(player, session, realm_config)
+            lines.append("━━━━━━━━━━━━━")
+            lines.append(f"🎬 结局: {ending['display_name']}")
+            lines.append("")
+            lines.append(ending["description"])
+            reward_desc = ending.get("reward_desc", "")
+            if reward_desc and reward_desc != "无":
+                lines.append("━━━━━━━━━━━━━")
+                lines.append("🎁 获得奖励:")
+                lines.append(reward_desc)
 
         return "\n".join(lines), died
 

@@ -360,7 +360,7 @@ async def handle_goto(event: MessageEvent, args: Message = CommandArg()):
                         scene = engine.get_current_scene(active_session)
                         dests = engine.get_available_destinations(active_session)
                         if not dests:
-                            result_msg = "⛔ 当前没有可前往的地点"
+                            result_msg = "⛔ 当前没有可前往的地点\n💡 若已无路可走，可使用【返回】撤离里界"
                         else:
                             current_name = scene.display_name if scene else ""
                             result_msg = build_destination_buttons(dests, current_name)

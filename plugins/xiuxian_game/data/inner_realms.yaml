@@ -229,7 +229,7 @@ realms:
       clinic:
         display_name: "废弃诊所"
         type: "branch"
-        outdoor: true
+        outdoor: false  # 建筑物，入夜后可躲避
         description: "一栋两层小楼，褪色的招牌写着「荔湾社区诊所」。玻璃门碎了一半，里面传来孩子的笑声。几个孩子在走廊里跑来跑去，但他们的脚没有接触地面。"
         first_visit_text: "「来玩啊！」一个扎着双马尾的小女孩朝你招手，她的笑容天真无邪——但她的影子比她高两倍。"
         connections: ["town_entrance_dusk"]
@@ -263,7 +263,7 @@ realms:
       convenience_store:
         display_name: "便利店"
         type: "branch"
-        outdoor: true
+        outdoor: false  # 建筑物，入夜后可躲避
         description: "一家街角便利店，卷帘门半开着。货架东倒西歪，食物大多已经腐烂。收银台后面坐着一具干尸，手里还攥着找零的硬币。它的嘴巴大张着，像是死前在尖叫。"
         first_visit_text: "收银台上的计算器还亮着，显示屏上跳动着一串数字。你仔细看——那是今天的日期。"
         connections: ["town_entrance_dusk"]
@@ -375,9 +375,9 @@ realms:
             trigger: "on_use_item"
             required_item: "needle_thread"
             description: "你把一卷针线从窗户扔了下去。楼下厂服男被吸引了注意力，他目光上移，数着你的楼层。不一会儿，门外传来激烈的打斗声——厂服男和雨衣男厮打起来。声音渐行渐远。"
-            result_text: "门前留下大量血迹。雨衣男的尸体倒在走廊里，厂服男似乎受了重伤离开了。你可以搜刮雨衣男的尸体获得房卡。"
-            consume_item: true
-            unlock_search: true
+            text: "门前留下大量血迹。雨衣男的尸体倒在走廊里，厂服男似乎受了重伤离开了。你在雨衣男被血浸湿的口袋里摸到了一张房卡。"
+            grant_item: {id: "room_card_4", qty: 1, is_key_item: true}
+            npc_kill: "raincoat_man"
         npcs: ["raincoat_man"]
         clue_on_observe: "clue_2_trigger"
         danger_level: "high"
@@ -424,7 +424,7 @@ realms:
         display_name: "四号房"
         type: "main"
         outdoor: false
-        description: "一间简陋但干净的房间。单人床、床头柜、一盏台灯。窗户对着后巷，能看到旅馆的后门。你刚坐下，就听到了猎枪走火的声音——从走廊方向传来。"
+        description: "一间简陋但干净的房间。单人床、床头柜、一盏台灯。窗户对着后巷，能看到旅馆的后门。你刚坐下，就听到了猎枪走火的声音——从走廊方向传来。\n墙上的挂钟已逼近午夜。你有种预感：只要在这里【观察】片刻、或在走廊里停留太久，那场『宵夜』就会降临——到那时，便再没有机会回去探索其他房间了。"
         first_visit_text: "床头柜的抽屉里有一本旅馆住客登记簿。最近一周的住客名字都被用墨水涂掉了，只剩下日期。每天都有人登记入住，但没有人退房。"
         connections: ["hotel_corridor"]
         searchable: false
@@ -442,8 +442,9 @@ realms:
         display_name: "旅馆走廊"
         type: "main"
         outdoor: false
-        description: "昏暗的走廊，墙上的壁灯忽明忽灭。两侧各有几扇房门，门牌号依次排列。走廊尽头永远看不到墙壁，像是延伸到了无穷远处。"
+        description: "昏暗的走廊，墙上的壁灯忽明忽灭。两侧各有几扇房门，门牌号依次排列（二号房、三号房、五号房），走廊尽头永远看不到墙壁，像是延伸到了无穷远处。\n各扇房门虚掩着，等着你去探索。而当你停下脚步、在走廊里【观察】片刻，午夜的『宵夜』便会拉开帷幕——记得先看完想看的房间。"
         first_visit_text: "你经过电梯门时，里面传来「叮」一声。门开了，电梯里站着一个人，背对着你，一动不动。门关上了。你没有进去。"
+        observe_text: "你停下脚步，竖起耳朵。楼下大厅传来碗碟碰撞声，还有人在哼着不成调的曲子。墙上的挂钟，正缓缓指向十二点。"
         connections: ["room_2", "room_3", "room_5", "room_4"]
         searchable: false
         events:
@@ -455,6 +456,11 @@ realms:
             success_text: "走廊的灯闪了一下。你加快脚步，什么也没发生。"
             failure_text: "电梯门又开了。这次里面的人转过了身——它没有脸。你狂奔回走廊尽头。"
             failure_sanity: -10
+          - id: "corridor_midnight_trigger"
+            name: "宵夜时间"
+            trigger: "on_observe_or_wait"
+            description: "广播系统突然响起厨师的声音：「各位客人，宵夜准备好了，请到大厅就座。」走廊尽头的灯一盏盏熄灭，只剩通往大厅的方向还亮着。"
+            auto_move_to: "lobby_midnight"
         danger_level: "medium"
 
       room_2:
@@ -587,13 +593,12 @@ realms:
         clue_on_observe: "clue_6"
         observe_text: "你打开日记本。字迹从工整渐渐变得潦草。最后几页写着：「好饿好饿好饿好饿好饿好饿好饿好饿好饿好饿好饿好饿好饿好饿好饿好饿好饿好饿好饿好饿好饿好饿好饿好饿好饿好饿好饿好饿好饿......」你合上了日记本。"
         events:
+          # 理智损失与线索由 old_diary 的 use_effect 处理，此处仅叙事
           - id: "read_diary"
             name: "阅读日记"
             trigger: "on_use_item"
             required_item: "old_diary"
             text: "三月一日，我丈夫疯了，他将我囚禁在厨房冰箱后面的密室里。四月二日，那个疯子拔掉了我的一颗牙齿。六月六日，他竟然想要拔掉我所有的牙齿。十一月一日，我恐怕再也吃不了肉了..."
-            sanity_change: -5
-            grant_clue: "clue_6"
         danger_level: "medium"
 
       kitchen_secret:
@@ -612,7 +617,7 @@ realms:
             name: "喂牙齿"
             trigger: "on_use_item"
             required_item: "teeth_key_item"
-            description: "你将牙齿丢进怪物的嘴里。"
+            description: "你掏出那些牙齿。怪物似乎嗅到了什么，喉咙里发出嗬嗬的吞咽声，朝你的方向张大了嘴。"
             choices:
               - id: "feed_now"
                 label: "立刻喂"
@@ -637,7 +642,7 @@ realms:
           - id: "auto_settle"
             name: "自动结算"
             trigger: "auto_on_enter"
-            description: "到达黎明即触发结局结算"
+            settle: true
         danger_level: "safe"
 
     # ==================== NPC配置 ====================
@@ -854,6 +859,15 @@ realms:
           items:
             - {id: "human_tooth_collection", qty: 5}
             - {id: "headless_ghost_nail", qty: 5}
+
+      early_leave:
+        display_name: "中途撤离"
+        icon: "🏃"
+        priority: 9
+        condition: "left_early"
+        description: "你在黎明到来之前撤出了凝固时空。修为恢复的瞬间，那些黑暗中的视线仍未从你身上移开——荔湾镇的夜晚还在继续，而你知道，那扇门还在等你回来"
+        reward_multiplier: 1.0
+        bonus_items: []
 
       prey:
         display_name: "猎物"
