@@ -175,7 +175,7 @@ class GroupPersonaService:
 
         messages = [
             {"role": "system", "content": build_reply_system_prompt(cfg)},
-            {"role": "user", "content": self._build_reply_user_prompt(group_id, cfg, trigger_reason)},
+            {"role": "user", "content": self._build_reply_user_prompt(group_id, cfg, trigger_reason, time.time())},
         ]
 
         try:
@@ -190,7 +190,7 @@ class GroupPersonaService:
     async def _run_timing_gate(self, group_id: str, cfg: GroupPersonaConfig) -> str:
         messages = [
             {"role": "system", "content": build_timing_gate_system_prompt(cfg)},
-            {"role": "user", "content": self._build_timing_gate_user_prompt(group_id, cfg)},
+            {"role": "user", "content": self._build_timing_gate_user_prompt(group_id, cfg, time.time())},
         ]
 
         try:
@@ -202,29 +202,44 @@ class GroupPersonaService:
 
         return parse_timing_gate_decision(str(content))
 
-    def _format_recent_history(self, group_id: str, cfg: GroupPersonaConfig) -> str:
-        history = list(self._history.get(group_id, ()))
+    def _format_recent_history(self, group_id: str, cfg: GroupPersonaConfig, now: float) -> str:
+        cutoff = now - cfg.history_freshness_seconds
+        fresh = [
+            item
+            for item in self._history.get(group_id, ())
+            if item.text.strip() and item.created_at >= cutoff
+        ]
         lines = [
-            f"{item.username}：{item.text}"
-            for item in history[-cfg.max_history_messages :]
-            if item.text.strip()
+            f"[{_relative_time_label(now - item.created_at)}] {item.username}：{item.text}"
+            for item in fresh[-cfg.max_history_messages :]
         ]
         return "\n".join(lines)
 
-    def _build_timing_gate_user_prompt(self, group_id: str, cfg: GroupPersonaConfig) -> str:
+    def _build_timing_gate_user_prompt(self, group_id: str, cfg: GroupPersonaConfig, now: float) -> str:
         return (
-            "最近群聊：\n"
-            + self._format_recent_history(group_id, cfg)
-            + "\n\n只判断现在是否适合开口。"
+            "最近群聊（每条前的[时间]是距现在多久）：\n"
+            + self._format_recent_history(group_id, cfg, now)
+            + "\n\n只判断现在是否适合开口；最近一句已经过了很久、没人接话就说明话题凉了，别当成正在聊。"
         )
 
-    def _build_reply_user_prompt(self, group_id: str, cfg: GroupPersonaConfig, trigger_reason: str) -> str:
+    def _build_reply_user_prompt(
+        self, group_id: str, cfg: GroupPersonaConfig, trigger_reason: str, now: float
+    ) -> str:
         return (
             f"触发原因：{trigger_reason}\n"
-            "最近群聊：\n"
-            + self._format_recent_history(group_id, cfg)
-            + "\n\n先判断现在是不是适合插话；如果不自然，只输出 NO_REPLY。"
+            "最近群聊（每条前的[时间]是距现在多久）：\n"
+            + self._format_recent_history(group_id, cfg, now)
+            + "\n\n先判断现在是不是适合插话；只接最近还热乎的话题，别把早就凉了的旧事翻出来重提。接不上或氛围不对就只输出 NO_REPLY。"
         )
+
+
+def _relative_time_label(delta_seconds: float) -> str:
+    seconds = max(0.0, delta_seconds)
+    if seconds < 60:
+        return "刚刚"
+    if seconds < 3600:
+        return f"{int(seconds // 60)}分钟前"
+    return f"{int(seconds // 3600)}小时前"
 
 
 def _identity_prompt(cfg: GroupPersonaConfig) -> str:
@@ -257,6 +272,7 @@ def build_timing_gate_system_prompt(cfg: GroupPersonaConfig) -> str:
         + "\n【本轮任务】\n"
         "现在不要生成回复，只判断这一刻该不该开口。\n"
         "看看大家是在彼此聊天、自言自语、连续补充，还是在跑游戏指令/看面板/查数据/报战报。\n"
+        "消息前的[时间]表示距现在多久；如果最近一句已经过了很久、没人接话，说明话题早凉了，这时别开口。\n"
         "别人还没说完、正在跑指令、话题和你接不上、插话会打断节奏——这些都该闭嘴。\n"
         "只有在你能像真实修仙群友一样自然冒一句、不抢话不抢答时，才放行。\n"
         "只输出一个词：CONTINUE 或 NO_REPLY。不要解释。"
@@ -268,6 +284,7 @@ def build_reply_system_prompt(cfg: GroupPersonaConfig) -> str:
         _identity_prompt(cfg)
         + "\n【本轮任务】\n"
         "顺着最近几句群聊冒一句话。优先轻柔接梗、复读式吐槽、一句短短的气氛话或自嘲，能短就短。\n"
+        "消息前的[时间]表示距现在多久；只接还热乎的话题，已经凉很久的别主动翻出来重提。\n"
         "先看清楚大家是在彼此聊还是在跟你说话；如果接不上、氛围不对、对方明显还没说完，直接输出 NO_REPLY。\n"
         "顺着群里的语气、口头禅、修仙黑话发挥；不要解释你在模仿，不要总结别人在说什么。"
     )

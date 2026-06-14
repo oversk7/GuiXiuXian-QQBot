@@ -199,6 +199,33 @@ def test_group_persona_ambient_ignores_stale_history():
     assert decision.reason == "wait_more_messages"
 
 
+def test_relative_time_label_buckets():
+    assert service._relative_time_label(10) == "刚刚"
+    assert service._relative_time_label(125) == "2分钟前"
+    assert service._relative_time_label(7200) == "2小时前"
+
+
+def test_format_recent_history_labels_time_and_drops_stale():
+    svc = service.GroupPersonaService()
+    cfg = _cfg(history_freshness_seconds=600.0)
+    now = 10_000.0
+    svc._history["g1"] = deque(
+        [
+            service.PersonaStoredMessage(
+                user_id="u1", username="群友A", text="早就凉的老话题", created_at=now - 1800.0
+            ),
+            service.PersonaStoredMessage(
+                user_id="u2", username="群友B", text="刚发的新消息", created_at=now - 30.0
+            ),
+        ]
+    )
+
+    rendered = svc._format_recent_history("g1", cfg, now)
+
+    assert "早就凉的老话题" not in rendered
+    assert rendered == "[刚刚] 群友B：刚发的新消息"
+
+
 def test_group_persona_cooldown_blocks_reply():
     svc = service.GroupPersonaService()
     svc._last_reply_at["g1"] = 990.0

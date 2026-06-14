@@ -216,6 +216,7 @@ group_persona:
   min_interval_seconds: 90
   ambient_max_wait_messages: 6
   ambient_window_seconds: 120
+  history_freshness_seconds: 100
   max_history_messages: 30
   max_response_length: 120
   ignore_commands: true

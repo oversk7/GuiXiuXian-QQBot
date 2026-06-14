@@ -19,6 +19,7 @@ class GroupPersonaConfig:
     min_interval_seconds: float = 90.0
     ambient_max_wait_messages: int = 6
     ambient_window_seconds: float = 120.0
+    history_freshness_seconds: float = 600.0
     max_history_messages: int = 30
     max_response_length: int = 120
     ignore_commands: bool = True
@@ -48,6 +49,7 @@ def load_group_persona_config() -> GroupPersonaConfig:
         min_interval_seconds=max(0.0, float(raw.get("min_interval_seconds", 90.0))),
         ambient_max_wait_messages=max(1, int(raw.get("ambient_max_wait_messages", 6))),
         ambient_window_seconds=max(15.0, float(raw.get("ambient_window_seconds", 120.0))),
+        history_freshness_seconds=max(60.0, float(raw.get("history_freshness_seconds", 600.0))),
         max_history_messages=max(5, int(raw.get("max_history_messages", 30))),
         max_response_length=max(20, int(raw.get("max_response_length", 120))),
         ignore_commands=bool(raw.get("ignore_commands", True)),
