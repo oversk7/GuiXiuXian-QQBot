@@ -58,12 +58,14 @@ class RedEnvelopeRepository(IRepository[RedEnvelope]):
     # ==================== 业务查询 ====================
 
     async def find_active_by_group(self, group_id: str, server_id: int) -> Optional[RedEnvelope]:
-        """查找群内活跃红包"""
+        """查找群内活跃红包（排除已过期但状态未及时更新的僵尸红包）"""
+        now = datetime.now()
         stmt = select(RedEnvelope).where(
             and_(
                 RedEnvelope.server_id == server_id,
                 RedEnvelope.group_id == group_id,
-                RedEnvelope.status == RedEnvelopeStatus.ACTIVE.value
+                RedEnvelope.status == RedEnvelopeStatus.ACTIVE.value,
+                RedEnvelope.expires_at > now
             )
         )
         result = await self._session.execute(stmt)

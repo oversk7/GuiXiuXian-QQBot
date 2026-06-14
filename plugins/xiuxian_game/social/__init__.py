@@ -12,6 +12,7 @@ from . import relationship_commands  # 关系管理命令(好感度/离婚/断�
 from . import rankings
 from . import account_switching
 from . import red_envelope  # 红包系统
+from . import red_envelope_cleanup  # 红包过期自动清理定时任务
 from . import npc_mentor  # 师徒系统（香火商店、买食谱独立指令）
 
-__all__ = ["gift_commands", "gift_shop", "relationship_commands", "rankings", "account_switching", "red_envelope", "npc_mentor"]
+__all__ = ["gift_commands", "gift_shop", "relationship_commands", "rankings", "account_switching", "red_envelope", "red_envelope_cleanup", "npc_mentor"]
