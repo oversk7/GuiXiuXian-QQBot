@@ -205,7 +205,7 @@ ai_dialogue:
 
 # 假装群友：仅白名单群启用的文字闲聊
 group_persona:
-  enabled: true
+  enabled: false
   group_whitelist:
     - "A147FA35C340F858A66260FB4ADBB46D"
   persona_name: "小诡"
