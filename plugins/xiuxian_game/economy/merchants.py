@@ -562,6 +562,8 @@ async def _(event: MessageEvent):
         for item in all_items:
             if item.is_equipment:
                 continue  # 跳过装备
+            if item.is_fish:
+                continue  # 跳过鱼类，避免误卖鱼栏物品
 
             if not market.can_buy_from_player(item.item_id):
                 continue
