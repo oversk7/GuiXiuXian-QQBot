@@ -12,7 +12,7 @@ from ..utils import message_add_head
 from ..utils_markdown import cmd, build_markdown
 from sqlalchemy import select, func
 from ..config import config
-from ..queries.inventory_queries import query_inventory_page, query_inventory_usage
+from ..queries.inventory_queries import query_inventory_page, query_inventory_usage, AggregatedItem
 from .item_effects import apply_effect
 from datetime import date
 from ..models.elixir_usage import ElixirUsageLog
@@ -637,26 +637,31 @@ async def handle_inventory(event: MessageEvent, args: Message = CommandArg()):
     if not inventory_items:
         await inventory_cmd.finish("🎒 你的背包空无一物")
 
-    def _is_elixir(inst: ItemInstance) -> bool:
-        return inst.config.item_id.endswith("_elixir")
+    used_slots = len(inventory_items)
 
-    def _category_id(inst: ItemInstance) -> str:
-        if inst.config.type == ItemType.CONSUMABLE:
-            return "ELIXIR" if _is_elixir(inst) else "CONSUMABLE_NON_ELIXIR"
-        return inst.config.type.value
+    # 按 item_id 聚合数量
+    aggregated: dict[str, int] = defaultdict(int)
+    for inst in inventory_items:
+        aggregated[inst.item_id] += inst.quantity
+    agg_items = [AggregatedItem(item_id=iid, quantity=qty) for iid, qty in aggregated.items()]
+
+    def _category_id(it) -> str:
+        cfg = it.config
+        if cfg.type == ItemType.CONSUMABLE:
+            return "ELIXIR" if cfg.item_id.endswith("_elixir") else "CONSUMABLE_NON_ELIXIR"
+        return cfg.type.value
 
     order_map = {k: i for i, k in enumerate(CATEGORY_ORDER)}
-    inventory_items.sort(key=lambda it: (order_map.get(_category_id(it), 99), it.config.name))
+    agg_items.sort(key=lambda it: (order_map.get(_category_id(it), 99), it.config.name))
 
-    total_pages = (len(inventory_items) - 1) // page_size + 1
+    total_pages = (len(agg_items) - 1) // page_size + 1
     page = max(1, min(page, total_pages))
 
-    used_slots = len(inventory_items)
     capacity_info = f"📦 容量：{used_slots}/{effective_capacity}"
     if effective_capacity > inventory_capacity:
         capacity_info += f" (💳+{effective_capacity - inventory_capacity})"
 
-    await inventory_cmd.finish(_format_inventory_md(inventory_items, page, page_size, capacity_info))
+    await inventory_cmd.finish(_format_inventory_md(agg_items, page, page_size, capacity_info))
 
 
 @fish_inventory_cmd.handle()

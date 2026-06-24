@@ -15,6 +15,19 @@ from ..models.inventory import ItemInstance, ItemType
 from ..config import config
 
 
+class AggregatedItem:
+    """聚合后的物品条目（同 item_id 合并数量），与 ItemInstance 展示接口兼容"""
+    __slots__ = ("item_id", "quantity")
+
+    def __init__(self, item_id: str, quantity: int):
+        self.item_id = item_id
+        self.quantity = quantity
+
+    @property
+    def config(self):
+        return config.items_config["by_id"].get(self.item_id)
+
+
 def _get_item_ids_by_category(category_key: str) -> list[str] | None:
     """根据分类标识获取对应的 item_id 列表
 
@@ -115,25 +128,27 @@ async def query_inventory_page(
             if category_ids is not None:
                 conditions.append(ItemInstance.item_id.in_(category_ids))
 
-        # 查询总数
-        count_stmt = select(func.count()).select_from(ItemInstance).where(*conditions)
+        # 查询去重后的物品种类数
+        count_stmt = select(func.count(func.distinct(ItemInstance.item_id))).where(*conditions)
         total = (await session.execute(count_stmt)).scalar_one()
 
         if total == 0:
             return [], 0
 
-        # 分页查询
+        # 按 item_id 聚合数量并分页
         offset = (max(1, page) - 1) * page_size
         items_stmt = (
-            select(ItemInstance)
+            select(ItemInstance.item_id, func.sum(ItemInstance.quantity).label("total_qty"))
             .where(*conditions)
+            .group_by(ItemInstance.item_id)
             .order_by(ItemInstance.item_id)
             .offset(offset)
             .limit(page_size)
         )
-        items = (await session.execute(items_stmt)).scalars().all()
+        rows = (await session.execute(items_stmt)).all()
+        items = [AggregatedItem(item_id=row[0], quantity=row[1]) for row in rows]
 
-        return list(items), total
+        return items, total
 
 
 async def query_inventory_usage(player_id: str) -> tuple[int, int]:
