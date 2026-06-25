@@ -100,21 +100,9 @@ async def query_inventory_page(
     exclude_equipment: bool = True,
     exclude_fish: bool = True,
     exclude_inscription: bool = True,
-) -> tuple[list[ItemInstance], int]:
-    """在 DB 层完成过滤和分页
-
-    Args:
-        player_id: 玩家 ID
-        category: 内部分类标识（如 "MATERIAL", "ELIXIR"），None 表示全部
-        page: 页码（1-indexed）
-        page_size: 每页大小
-        exclude_equipment: 是否排除装备
-        exclude_fish: 是否排除鱼类
-        exclude_inscription: 是否排除铭文（铭文为独立实例，通过铭文列表查看）
-
-    Returns:
-        (当前页的 ItemInstance 列表, 过滤后的总数)
-    """
+    compact: bool = False,
+) -> tuple[list[AggregatedItem], int]:
+    """在 DB 层聚合 + Python 分页"""
     async with readonly_session() as session:
         # 构建基础条件
         conditions = [
@@ -152,13 +140,12 @@ async def query_inventory_page(
         if not rows:
             return [], 0
 
-        # 聚合后按 STACK_SIZE 拆分展示行，再 Python 分页
         agg = [AggregatedItem(item_id=r[0], quantity=r[1]) for r in rows]
-        expanded = _expand_to_stacks(agg)
+        display = agg if compact else _expand_to_stacks(agg)
 
-        total = len(expanded)
+        total = len(display)
         offset = (max(1, page) - 1) * page_size
-        return expanded[offset:offset + page_size], total
+        return display[offset:offset + page_size], total
 
 
 async def query_inventory_usage(player_id: str) -> tuple[int, int]:

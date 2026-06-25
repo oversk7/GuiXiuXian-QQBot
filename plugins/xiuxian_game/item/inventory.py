@@ -62,6 +62,7 @@ async def _handle_expand_territory(session, player: Player, item_config, quantit
 
 
 inventory_cmd = on_command("背包", block=True, priority=9, force_whitespace=True)
+inventory_mode_cmd = on_command("背包模式", block=True, priority=9)
 fish_inventory_cmd = on_command("鱼栏", aliases={"鱼篓", "鱼仓", "鱼库", "我的鱼"}, block=True, priority=9)
 use_item = on_command("使用", block=True, priority=9)
 elixir_tolerance_cmd = on_command("耐药性", aliases={"丹药耐药性"}, block=True, priority=9)
@@ -190,6 +191,7 @@ def _format_inventory_md(
     capacity_info: str,
     total_items: int | None = None,
     category_cn: str = "",
+    compact: bool = False,
 ) -> str:
     """格式化背包为原生Markdown，物品名称为可点击蓝字"""
     if total_items is not None:
@@ -203,7 +205,8 @@ def _format_inventory_md(
 
     total_pages = max(1, (count - 1) // page_size + 1)
 
-    title = f"# 🎒 背包{'·' + category_cn if category_cn else ''}"
+    mode_label = "精简" if compact else "充实"
+    title = f"# 🎒 背包{'·' + category_cn if category_cn else ''}（{mode_label}）"
     lines = [title, capacity_info, "***"]
 
     for offset, inst in enumerate(current_page_items, start=1):
@@ -223,7 +226,8 @@ def _format_inventory_md(
         page_nav.append(cmd("下一页▶", f"{nav_cmd_base} {page + 1}"))
     lines.append("　".join(page_nav))
 
-    lines.append(cmd("背包") + " | " + cmd("整理背包") + " | " + cmd("帮助"))
+    toggle_label = "切换充实" if compact else "切换精简"
+    lines.append(cmd(toggle_label, "背包模式") + " | " + cmd("背包") + " | " + cmd("整理背包") + " | " + cmd("帮助"))
 
     return build_markdown("\n".join(lines))
 
@@ -560,6 +564,7 @@ async def handle_inventory(event: MessageEvent, args: Message = CommandArg()):
         player_id = player.id
         inventory_capacity = player.inventory_capacity
         effective_capacity = await player.get_effective_inventory_capacity(session)
+        compact = player.inventory_compact
 
     # --- 处理查询特定物品（SQL SUM） ---
     if query_item_name:
@@ -611,6 +616,7 @@ async def handle_inventory(event: MessageEvent, args: Message = CommandArg()):
             category=category_key,
             page=page,
             page_size=page_size,
+            compact=compact,
         )
         if not items:
             await inventory_cmd.finish("🎒 该分类下暂无物品")
@@ -620,9 +626,8 @@ async def handle_inventory(event: MessageEvent, args: Message = CommandArg()):
         if effective_capacity > inventory_capacity:
             capacity_info += f" (💳+{effective_capacity - inventory_capacity})"
 
-        # query_inventory_page 已完成 DB 层分页，使用原生Markdown渲染
         cat_cn = CATEGORY_CN_DISPLAY.get(category_key, "")
-        await inventory_cmd.finish(_format_inventory_md(items, page, page_size, capacity_info, total_items=total, category_cn=cat_cn))
+        await inventory_cmd.finish(_format_inventory_md(items, page, page_size, capacity_info, total_items=total, category_cn=cat_cn, compact=compact))
 
     # --- 全背包视图：Python 端跨分类排序 ---
     from ..queries import readonly_session as _readonly_session
@@ -654,8 +659,8 @@ async def handle_inventory(event: MessageEvent, args: Message = CommandArg()):
     order_map = {k: i for i, k in enumerate(CATEGORY_ORDER)}
     agg_items.sort(key=lambda it: (order_map.get(_category_id(it), 99), it.config.name))
 
-    # 按每行最多 100 拆分展示
-    agg_items = _expand_to_stacks(agg_items)
+    if not compact:
+        agg_items = _expand_to_stacks(agg_items)
 
     total_pages = (len(agg_items) - 1) // page_size + 1
     page = max(1, min(page, total_pages))
@@ -664,7 +669,17 @@ async def handle_inventory(event: MessageEvent, args: Message = CommandArg()):
     if effective_capacity > inventory_capacity:
         capacity_info += f" (💳+{effective_capacity - inventory_capacity})"
 
-    await inventory_cmd.finish(_format_inventory_md(agg_items, page, page_size, capacity_info))
+    await inventory_cmd.finish(_format_inventory_md(agg_items, page, page_size, capacity_info, compact=compact))
+
+
+@inventory_mode_cmd.handle()
+async def handle_inventory_mode(event: MessageEvent):
+    async with safe_session() as session:
+        from ..platform_utils import require_player
+        player = await require_player(session, event, inventory_mode_cmd)
+        player.inventory_compact = not player.inventory_compact
+        mode = "精简" if player.inventory_compact else "充实"
+    await inventory_mode_cmd.finish(f"🎒 背包已切换为**{mode}**模式")
 
 
 @fish_inventory_cmd.handle()
