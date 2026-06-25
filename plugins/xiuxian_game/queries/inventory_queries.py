@@ -11,7 +11,7 @@ from sqlalchemy import select, func, and_
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from . import readonly_session
-from ..models.inventory import ItemInstance, ItemType
+from ..models.inventory import ItemInstance, ItemType, STACK_SIZE
 from ..config import config
 
 
@@ -26,6 +26,18 @@ class AggregatedItem:
     @property
     def config(self):
         return config.items_config["by_id"].get(self.item_id)
+
+
+def _expand_to_stacks(items: list[AggregatedItem]) -> list[AggregatedItem]:
+    """将聚合结果按 STACK_SIZE 拆分为展示行（每行最多 100）"""
+    result = []
+    for item in items:
+        remaining = item.quantity
+        while remaining > 0:
+            chunk = min(remaining, STACK_SIZE)
+            result.append(AggregatedItem(item_id=item.item_id, quantity=chunk))
+            remaining -= chunk
+    return result
 
 
 def _get_item_ids_by_category(category_key: str) -> list[str] | None:
@@ -128,27 +140,25 @@ async def query_inventory_page(
             if category_ids is not None:
                 conditions.append(ItemInstance.item_id.in_(category_ids))
 
-        # 查询去重后的物品种类数
-        count_stmt = select(func.count(func.distinct(ItemInstance.item_id))).where(*conditions)
-        total = (await session.execute(count_stmt)).scalar_one()
-
-        if total == 0:
-            return [], 0
-
-        # 按 item_id 聚合数量并分页
-        offset = (max(1, page) - 1) * page_size
+        # 按 item_id 聚合总量
         items_stmt = (
             select(ItemInstance.item_id, func.sum(ItemInstance.quantity).label("total_qty"))
             .where(*conditions)
             .group_by(ItemInstance.item_id)
             .order_by(ItemInstance.item_id)
-            .offset(offset)
-            .limit(page_size)
         )
         rows = (await session.execute(items_stmt)).all()
-        items = [AggregatedItem(item_id=row[0], quantity=row[1]) for row in rows]
 
-        return items, total
+        if not rows:
+            return [], 0
+
+        # 聚合后按 STACK_SIZE 拆分展示行，再 Python 分页
+        agg = [AggregatedItem(item_id=r[0], quantity=r[1]) for r in rows]
+        expanded = _expand_to_stacks(agg)
+
+        total = len(expanded)
+        offset = (max(1, page) - 1) * page_size
+        return expanded[offset:offset + page_size], total
 
 
 async def query_inventory_usage(player_id: str) -> tuple[int, int]:

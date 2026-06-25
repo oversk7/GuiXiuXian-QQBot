@@ -12,7 +12,7 @@ from ..utils import message_add_head
 from ..utils_markdown import cmd, build_markdown
 from sqlalchemy import select, func
 from ..config import config
-from ..queries.inventory_queries import query_inventory_page, query_inventory_usage, AggregatedItem
+from ..queries.inventory_queries import query_inventory_page, query_inventory_usage, AggregatedItem, _expand_to_stacks
 from .item_effects import apply_effect
 from datetime import date
 from ..models.elixir_usage import ElixirUsageLog
@@ -653,6 +653,9 @@ async def handle_inventory(event: MessageEvent, args: Message = CommandArg()):
 
     order_map = {k: i for i, k in enumerate(CATEGORY_ORDER)}
     agg_items.sort(key=lambda it: (order_map.get(_category_id(it), 99), it.config.name))
+
+    # 按每行最多 100 拆分展示
+    agg_items = _expand_to_stacks(agg_items)
 
     total_pages = (len(agg_items) - 1) // page_size + 1
     page = max(1, min(page, total_pages))
