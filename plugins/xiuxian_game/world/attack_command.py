@@ -157,7 +157,10 @@ async def handle_wilderness_drops(session, loser: Player, winner: Player) -> str
         if item_config.type in [ItemType.CONSUMABLE, ItemType.MATERIAL, ItemType.GOODS, ItemType.GHOST_FRAGMENT]:
             # 进一步过滤：不掉落珍贵材料（紫色及以上稀有度）
             if hasattr(item_config, 'rarity') and item_config.rarity in ['purple', 'orange', 'red']:
-                continue  # 跳过珍贵材料
+                continue
+            # 不掉落标记了 no_drop 的物品（氪金道具等）
+            if hasattr(item_config, 'tags') and item_config.tags and 'no_drop' in item_config.tags:
+                continue
             droppable_items.append(item)
 
     if not droppable_items:

@@ -46,6 +46,7 @@ items:
       type: "CONSUMABLE"
       effect_type: "CHANGE_NAME"
       price: 100000
+      tags: ["no_drop"]
 
     - item_id: "president_letter"
       name: "会长委任书"
@@ -68,6 +69,7 @@ items:
       type: "CONSUMABLE"
       effect_type: "RESET_ATTR"
       price: 500000
+      tags: ["no_drop"]
 
     - item_id: "sweep_token"
       name: "扫荡令"
@@ -82,6 +84,7 @@ items:
       type: "CONSUMABLE"
       effect_type: "MONTHLY_CARD_BOX"
       price: 50000
+      tags: ["no_drop"]
 
     - item_id: "coffin_nail"
       name: "棺材钉"
@@ -89,6 +92,7 @@ items:
       type: "CONSUMABLE"
       price: 100000
       grudge_value: 1
+      tags: ["no_drop"]
 
     - item_id: "resentment_crystal"
       name: "哭坟帽"
@@ -97,6 +101,7 @@ items:
       effect_type: "GAIN_RESENTMENT"
       effect_params: {"value": 10000}
       price: 500000
+      tags: ["no_drop"]
       grudge_value: 10000
 
     - item_id: "divine_punishment_talisman"
@@ -112,6 +117,7 @@ items:
       type: "CONSUMABLE"
       effect_type: "SANTA_TELEPORT"
       price: 888888
+      tags: ["no_drop"]
 
   materials:  # 材料类
     # ========== 白色（普通）材料 ==========
@@ -2357,6 +2363,7 @@ items:
       price: 500000
       effect_type: "REVIVE"
       effect_params: {"rate": 1.0}
+      tags: ["no_drop"]
       daily_limit: 10
 
     # ========== 永久属性丹药 - 固定值增益（避免数值爆炸）==========
