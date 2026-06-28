@@ -732,14 +732,21 @@ class GuildBuildingService:
             return False, f"布局坐标范围为 1-{self.GRID_SIZE}"
 
         occupied = await self._building_repo.get_by_guild_and_position(guild_id, plot_x, plot_y)
+        building_name = self.BUILDING_CONFIGS[building_type]["name"]
+
         if occupied and occupied.id != building.id:
             occupied_name = self.BUILDING_CONFIGS[occupied.building_type]["name"]
-            return False, f"坐标({plot_x},{plot_y})已放置{occupied_name}"
+            occupied.plot_x = building.plot_x
+            occupied.plot_y = building.plot_y
+            await self._building_repo.update(occupied)
+            building.plot_x = plot_x
+            building.plot_y = plot_y
+            await self._building_repo.update(building)
+            return True, f"{building_name}与{occupied_name}交换了位置"
 
         building.plot_x = plot_x
         building.plot_y = plot_y
         await self._building_repo.update(building)
-        building_name = self.BUILDING_CONFIGS[building_type]["name"]
         return True, f"{building_name}已移动到({plot_x},{plot_y})"
 
     async def get_guild_buildings(self, guild_id: int) -> List[Dict]:
