@@ -45,6 +45,8 @@ def validate_decompose(equipment) -> Tuple[bool, str]:
     extra = equipment.extra_attrs or {}
     if extra.get("_frozen_for_trade") or extra.get("_frozen_for_auction"):
         return False, "正在交易/拍卖中的装备不可分解"
+    if extra.get("_player_locked"):
+        return False, "该装备已锁定，请先【解锁装备】再分解"
     return True, ""
 
 

@@ -124,6 +124,13 @@ class BattleIntegrationHelper:
             for attr, val in get_t1_battle_bonuses(affixes).items():
                 affix_bonus_p2[attr] = affix_bonus_p2.get(attr, 0) + val
 
+        # 2b. 叠加套装T1加成
+        from ..item.set_bonus_service import get_set_t1_bonuses as _get_set_t1
+        for attr, val in _get_set_t1([getattr(eq, 'item_id', '') for eq in player1_equipped_items]).items():
+            affix_bonus_p1[attr] = affix_bonus_p1.get(attr, 0) + val
+        for attr, val in _get_set_t1([getattr(eq, 'item_id', '') for eq in player2_equipped_items]).items():
+            affix_bonus_p2[attr] = affix_bonus_p2.get(attr, 0) + val
+
         # 3. 战斗属性(critical_rate, dodge_rate等) — 含T1词缀加成
         from .battle_attributes import BattleAttributeCalculator
         player1_battle_attrs = await BattleAttributeCalculator.calculate_effective_attributes_async(player1, session, equipment_bonus=affix_bonus_p1)
@@ -511,6 +518,11 @@ class BattleIntegrationHelper:
             affixes = get_affixes_from_equipment(getattr(eq, 'extra_attrs', None))
             for attr, val in get_t1_battle_bonuses(affixes).items():
                 affix_bonus[attr] = affix_bonus.get(attr, 0) + val
+
+        # 2b. 叠加套装T1加成
+        from ..item.set_bonus_service import get_set_t1_bonuses as _get_set_t1_pve
+        for attr, val in _get_set_t1_pve([getattr(eq, 'item_id', '') for eq in equipped_items]).items():
+            affix_bonus[attr] = affix_bonus.get(attr, 0) + val
 
         # 3. 战斗属性(critical_rate, dodge_rate等) — 含T1词缀加成
         from .battle_attributes import BattleAttributeCalculator
@@ -976,6 +988,13 @@ class BattleIntegrationHelper:
             affixes = get_affixes_from_equipment(getattr(eq, 'extra_attrs', None))
             for attr, val in get_t1_battle_bonuses(affixes).items():
                 affix_bonus_p2[attr] = affix_bonus_p2.get(attr, 0) + val
+
+        # 2b. 叠加套装T1加成
+        from ..item.set_bonus_service import get_set_t1_bonuses as _get_set_t1
+        for attr, val in _get_set_t1([getattr(eq, 'item_id', '') for eq in player1_equipped_items]).items():
+            affix_bonus_p1[attr] = affix_bonus_p1.get(attr, 0) + val
+        for attr, val in _get_set_t1([getattr(eq, 'item_id', '') for eq in player2_equipped_items]).items():
+            affix_bonus_p2[attr] = affix_bonus_p2.get(attr, 0) + val
 
         # 3. 战斗属性(critical_rate, dodge_rate等) — 含T1词缀加成
         from .battle_attributes import BattleAttributeCalculator
@@ -1509,6 +1528,10 @@ class BattleIntegrationHelper:
                     affixes = get_affixes_from_equipment(getattr(eq, 'extra_attrs', None))
                     for attr, val in get_t1_battle_bonuses(affixes).items():
                         affix_bonus[attr] = affix_bonus.get(attr, 0) + val
+                # 叠加套装T1加成
+                from ..item.set_bonus_service import get_set_t1_bonuses as _panel_set_t1
+                for attr, val in _panel_set_t1([getattr(eq, 'item_id', '') for eq in equipped]).items():
+                    affix_bonus[attr] = affix_bonus.get(attr, 0) + val
         except ImportError:
             pass
 

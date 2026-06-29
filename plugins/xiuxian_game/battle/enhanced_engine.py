@@ -446,6 +446,12 @@ class EnhancedBattleEngine:
                 if triggers:
                     self.effect_manager.register_triggers(unit_id, triggers)
 
+        # 注册套装触发效果
+        from ..item.set_bonus_service import get_set_trigger_configs
+        set_triggers = get_set_trigger_configs([getattr(item, 'item_id', '') for item in equipped_items])
+        if set_triggers:
+            self.effect_manager.register_triggers(unit_id, set_triggers)
+
     def execute_turn(self, attacker: Player, defender: Any, is_player_turn: bool = True) -> Dict:
         """执行一个回合，包含效果处理
 

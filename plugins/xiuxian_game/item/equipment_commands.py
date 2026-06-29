@@ -29,6 +29,7 @@ from .equipment_service import (
 from .affix_service import get_affixes_from_equipment, format_affixes_display
 from .gem_socket_service import GemSocketService
 from .inscription_service import get_inscription_display, get_inscription_display_from_item
+from .set_bonus_service import get_equipment_set_info, get_active_set_bonuses
 
 # ==================== Feature Flag ====================
 # 设置为True使用新版DI架构的EquipmentService，False使用旧版本
@@ -219,6 +220,10 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
             if affix_list:
                 info_parts.append(f"🔮{len(affix_list)}词缀")
 
+            # 锁定标记
+            if (eq.extra_attrs or {}).get("_player_locked"):
+                info_parts.append("🔒")
+
             # 装备状态
             info_parts.append(equip_state)
 
@@ -275,11 +280,13 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
         }
         rarity_display = tpl.get_rarity_display()
         rarity_name = color_rarity(rarity_map.get(tpl.rarity, tpl.rarity), tpl.rarity)
+        is_locked = (equip.extra_attrs or {}).get("_player_locked", False)
 
         # 构建详细信息
+        lock_badge = "　🔒已锁定" if is_locked else ""
         lines = [
             f"# ⚔️ {tpl.name}",
-            f"ID:{equip.id}　{rarity_display}**{rarity_name}**　{'🟢已装备' if equip.equipped else '🔘未装备'}",
+            f"ID:{equip.id}　{rarity_display}**{rarity_name}**　{'🟢已装备' if equip.equipped else '🔘未装备'}{lock_badge}",
             "***",
             f"📊 等级要求：Lv.{tpl.required_level}　⭐ 升阶：+{equip.upgrade_level}",
             f"🛠️ 耐久：{equip.durability}/{tpl.durability}　💰 价值：{tpl.price:,}",
@@ -422,6 +429,21 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
 
             lines.append("")
 
+        # 套装信息
+        set_info = get_equipment_set_info(equip.item_id)
+        if set_info:
+            from ..config import config as _cfg
+            lines.append("🧩 套装：")
+            lines.append(f"  • {set_info['name']}套装")
+            piece_names = []
+            for pid in set_info["pieces"]:
+                pcfg = _cfg.items_config["by_id"].get(pid)
+                piece_names.append(pcfg.name if pcfg else pid)
+            lines.append(f"  • 部件：{'、'.join(piece_names)}")
+            for threshold, desc in set_info["bonuses"].items():
+                lines.append(f"  • {threshold}件：{desc}")
+            lines.append("")
+
         # 描述
         lines.append("📝 描述：")
         lines.append(f"  {tpl.description}")
@@ -429,9 +451,9 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
         lines.append("***")
         eid = str(equip.id)
         if not equip.equipped:
-            lines.append(cmd("穿戴", f"装备 {eid}") + " | " + cmd("装备栏") + " | " + cmd("帮助"))
+            lines.append(cmd("穿戴", f"装备 {eid}") + " | " + cmd("装备栏") + " | " + cmd("套装信息") + " | " + cmd("帮助"))
         else:
-            lines.append(cmd("卸下 " + tpl.name, f"卸下 {eid}") + " | " + cmd("装备栏") + " | " + cmd("帮助"))
+            lines.append(cmd("卸下 " + tpl.name, f"卸下 {eid}") + " | " + cmd("装备栏") + " | " + cmd("套装信息") + " | " + cmd("帮助"))
         await equipment_detail.finish(build_markdown("\n".join(lines)))
 
 
@@ -801,6 +823,62 @@ async def _(event: MessageEvent):
                 result_msg += f"\n🔄 {task_info}"
 
         await unwear_all_equipment.finish(result_msg)
+
+
+# ==================== 套装信息 ====================
+set_info_cmd = on_command("套装信息", aliases={"套装", "套装列表"}, block=True, priority=9)
+
+
+@set_info_cmd.handle()
+async def _(event: MessageEvent):
+    async with safe_session() as session:
+        player = await require_player(session, event, set_info_cmd)
+
+        stmt = select(ItemInstance).where(
+            ItemInstance.player_id == player.id,
+            ItemInstance.equipped == True,
+            ItemInstance.item_id.in_(EQUIP_ITEM_IDS)
+        )
+        equipped = (await session.execute(stmt)).scalars().all()
+        equipped_ids = [eq.item_id for eq in equipped]
+
+        from .set_bonus_service import get_active_set_bonuses, _load_config
+        all_sets = _load_config().get("sets", {})
+        active = get_active_set_bonuses(equipped_ids)
+
+        from ..config import config as _cfg
+        lines = ["# 🧩 套装系统", "***"]
+
+        for set_id, set_def in all_sets.items():
+            name = set_def["name"]
+            pieces = set_def["pieces"]
+            count = sum(1 for p in pieces if p in set(equipped_ids))
+            is_active = set_id in active
+
+            lines.append(f"**{name}套装** （{count}/{len(pieces)}件已装备）")
+
+            piece_names = []
+            for pid in pieces:
+                pcfg = _cfg.items_config["by_id"].get(pid)
+                pname = pcfg.name if pcfg else pid
+                marker = "✅" if pid in set(equipped_ids) else "⬜"
+                piece_names.append(f"{marker}{pname}")
+            lines.append(f"  部件：{'、'.join(piece_names)}")
+
+            for threshold, bonus in sorted(set_def.get("bonuses", {}).items()):
+                desc = bonus.get("description", "")
+                activated = count >= int(threshold)
+                status = "🟢" if activated else "🔘"
+                lines.append(f"  {status} {threshold}件：{desc}")
+
+            lines.append("")
+
+        if not all_sets:
+            lines.append("暂无套装数据")
+
+        lines.append("***")
+        lines.append(cmd("装备栏") + " | " + cmd("帮助"))
+        await set_info_cmd.finish(build_markdown("\n".join(lines)))
 
 
 # ==================== 装备菜单（VIP定制装备专属技能） ====================

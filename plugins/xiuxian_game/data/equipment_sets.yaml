@@ -1,0 +1,33 @@
+# 装备套装配置
+# 穿戴同套装多件装备可激活额外加成
+
+sets:
+  fog_hunter:
+    name: "雾都猎手"
+    pieces: ["fog_coat", "lucky_scissors", "black_envelope"]
+    bonuses:
+      2:
+        description: "猎手直觉：暴击率+5%、闪避率+3%"
+        t1_bonuses:
+          critical_rate: 5.0
+          dodge_rate: 3.0
+      3:
+        description: "雾中杀机：攻击时15%概率造成额外真实伤害"
+        t1_bonuses:
+          penetration_rate: 3.0
+        triggers:
+          - trigger: on_attack
+            effect: true_damage
+            chance: 15.0
+            value: 20.0
+            description: "套装·雾中杀机"
+
+  shadow_slayer:
+    name: "灭法之影"
+    pieces: ["vip_blade_zhanlongshan", "vip_longying_flash"]
+    bonuses:
+      2:
+        description: "灭法共鸣：穿透率+8%、技能暴击率+6%"
+        t1_bonuses:
+          penetration_rate: 8.0
+          skill_crit_rate: 6.0

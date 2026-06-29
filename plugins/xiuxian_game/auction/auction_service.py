@@ -146,6 +146,8 @@ async def _list_equipment_auction(
         extra = equipment.extra_attrs or {}
         if extra.get("_frozen_for_trade") or extra.get("_frozen_for_auction"):
             return False, "⛔ 该物品已在交易中，无法上架"
+        if extra.get("_player_locked"):
+            return False, "⛔ 该装备已锁定，请先【解锁装备】再上架"
     else:
         # 兜底：自动选择第一件可用实例
         conditions = [
@@ -161,6 +163,7 @@ async def _list_equipment_auction(
             e for e in candidates
             if not (e.extra_attrs or {}).get("_frozen_for_trade")
             and not (e.extra_attrs or {}).get("_frozen_for_auction")
+            and not (e.extra_attrs or {}).get("_player_locked")
         ]
         if not available:
             type_name = "铭文" if is_inscription else "装备"

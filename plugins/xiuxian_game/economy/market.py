@@ -444,6 +444,7 @@ async def _handle_instance_listing(event: MessageEvent, item_cfg, price: int):
             inst for inst in instance_list
             if not (inst.extra_attrs or {}).get("_frozen_for_trade")
             and not (inst.extra_attrs or {}).get("_frozen_for_auction")
+            and not (inst.extra_attrs or {}).get("_player_locked")
         ]
 
         type_name = "装备" if item_cfg.type.value == "EQUIPMENT" else "铭文"

@@ -208,6 +208,7 @@ async def _handle_instance_auction_listing(
             e for e in candidates
             if not (e.extra_attrs or {}).get("_frozen_for_trade")
             and not (e.extra_attrs or {}).get("_frozen_for_auction")
+            and not (e.extra_attrs or {}).get("_player_locked")
         ]
 
         if not available:

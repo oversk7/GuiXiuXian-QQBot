@@ -3,9 +3,12 @@
 
 指令：
 - 【洗炼 装备编号/名称 词缀序号】 — 预览洗炼信息
-- 【确认洗炼】 — 执行洗炼
+- 【确认洗炼】 — 消耗洗词石，掷出新值并展示对比
+- 【选择新值】 — 采用新词缀
+- 【保留旧值】 — 放弃新词缀，保留原值
 """
 
+import time
 import random
 
 from nonebot import on_command
@@ -27,6 +30,9 @@ from .affix_service import (
 
 # 洗炼待确认缓存: {user_id: {"equipment_id": int, "affix_index": int}}
 _pending_rerolls: dict = {}
+# 择优待选择缓存: {user_id: {"equipment_id", "affix_index", "old_affix", "new_affix", "timestamp"}}
+_pending_choices: dict = {}
+_CHOICE_TIMEOUT = 120
 
 
 reroll_cmd = on_command("洗炼", priority=9, block=True)
@@ -70,7 +76,6 @@ async def handle_reroll(event: MessageEvent, args: Message = CommandArg()):
         if affix_index < 0 or affix_index >= len(affixes):
             await reroll_cmd.finish(f"词缀序号无效，该装备有 {len(affixes)} 条词缀")
 
-        # 检查洗词石
         stmt = select(ItemInstance).where(
             ItemInstance.player_id == player.id,
             ItemInstance.item_id == "affix_reroll_stone",
@@ -97,8 +102,7 @@ async def handle_reroll(event: MessageEvent, args: Message = CommandArg()):
             f"  {range_display}",
             f"  消耗：洗词石×1（当前持有：{stone_count}）",
             "",
-            "⚠️ 洗炼后数值直接覆盖，不可保留旧值",
-            "发送【确认洗炼】执行",
+            "发送【确认洗炼】掷出新值（可择优选择）",
         ]
         lines.append("")
         lines.append(f"{cmd('确认洗炼')} | {cmd('装备栏')}")
@@ -128,7 +132,6 @@ async def handle_confirm_reroll(event: MessageEvent):
         if not equipment or equipment.player_id != player.id:
             await confirm_reroll_cmd.finish("装备不存在或已不属于你")
 
-        # 消耗洗词石
         stmt = select(ItemInstance).where(
             ItemInstance.player_id == player.id,
             ItemInstance.item_id == "affix_reroll_stone",
@@ -155,14 +158,6 @@ async def handle_confirm_reroll(event: MessageEvent):
 
         rng = random.Random()
         new_affix = reroll_single_affix(old_affix, rarity, rng)
-
-        # 写入
-        extra = dict(equipment.extra_attrs or {})
-        affix_list = list(extra.get("_affixes", []))
-        affix_list[affix_index] = new_affix
-        extra["_affixes"] = affix_list
-        equipment.extra_attrs = extra
-
         new_display = get_affix_display_name(new_affix)
 
         old_val = old_affix.get("value", 0)
@@ -174,15 +169,74 @@ async def handle_confirm_reroll(event: MessageEvent):
         else:
             trend = "➡️ 不变"
 
+        await session.commit()
+
+        _pending_choices[user_id] = {
+            "equipment_id": equipment_id,
+            "affix_index": affix_index,
+            "old_affix": old_affix,
+            "new_affix": new_affix,
+            "timestamp": time.time(),
+        }
+
         equip_name = equipment.config.name if equipment.config else equipment.item_id
         lines = [
-            f"# 🔄 洗炼完成 — {equip_name}",
+            f"# 🔄 洗炼掷骰 — {equip_name}",
             f"旧词缀：{old_display}",
             f"新词缀：**{new_display}**",
             f"变化：{trend}",
-            f"***",
-            f"{cmd('装备栏')} | {cmd(f'装备详情 {equip_name}', f'装备详情 {equip_name}')}",
+            "***",
+            "请选择保留哪个（超时2分钟自动保留旧值）：",
+            f"{cmd('选择新值')} | {cmd('保留旧值')}",
         ]
         msg = "\n".join(lines)
 
     await confirm_reroll_cmd.finish(build_markdown(msg))
+
+
+choose_new_cmd = on_command("选择新值", priority=9, block=True)
+
+
+@choose_new_cmd.handle()
+async def handle_choose_new(event: MessageEvent):
+    user_id = event.get_user_id()
+    choice = _pending_choices.pop(user_id, None)
+    if not choice:
+        await choose_new_cmd.finish("没有待选择的洗炼结果")
+
+    if time.time() - choice["timestamp"] > _CHOICE_TIMEOUT:
+        await choose_new_cmd.finish("⛔ 选择已超时，旧值已自动保留")
+
+    async with safe_session() as session:
+        player = await require_player(session, event, choose_new_cmd)
+        equipment = await session.get(ItemInstance, choice["equipment_id"])
+        if not equipment or equipment.player_id != player.id:
+            await choose_new_cmd.finish("装备不存在或已不属于你")
+
+        extra = dict(equipment.extra_attrs or {})
+        affix_list = list(extra.get("_affixes", []))
+        if choice["affix_index"] >= len(affix_list):
+            await choose_new_cmd.finish("词缀序号已失效")
+
+        affix_list[choice["affix_index"]] = choice["new_affix"]
+        extra["_affixes"] = affix_list
+        equipment.extra_attrs = extra
+        await session.commit()
+
+        new_display = get_affix_display_name(choice["new_affix"])
+        equip_name = equipment.config.name if equipment.config else equipment.item_id
+        await choose_new_cmd.finish(f"✅ 已选择新值：{new_display}")
+
+
+choose_old_cmd = on_command("保留旧值", priority=9, block=True)
+
+
+@choose_old_cmd.handle()
+async def handle_choose_old(event: MessageEvent):
+    user_id = event.get_user_id()
+    choice = _pending_choices.pop(user_id, None)
+    if not choice:
+        await choose_old_cmd.finish("没有待选择的洗炼结果")
+
+    old_display = get_affix_display_name(choice["old_affix"])
+    await choose_old_cmd.finish(f"✅ 已保留旧值：{old_display}")

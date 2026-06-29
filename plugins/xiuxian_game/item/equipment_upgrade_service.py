@@ -185,8 +185,10 @@ class EquipmentUpgradeService:
 
         # 检查装备是否在市场中挂牌（被冻结）
         extra_attrs = equipment.extra_attrs or {}
-        if extra_attrs.get("_frozen_for_trade"):
-            return False, "该装备正在市场中挂牌，请先撤牌再进行升阶"
+        if extra_attrs.get("_frozen_for_trade") or extra_attrs.get("_frozen_for_auction"):
+            return False, "该装备正在交易/拍卖中，请先撤牌再进行升阶"
+        if extra_attrs.get("_player_locked"):
+            return False, "该装备已锁定，请先【解锁装备】再进行升阶"
 
         # 检查相同装备数量
         required_equipment_count = self.get_equipment_requirements(equipment.upgrade_level, equipment.item_id)
@@ -264,6 +266,7 @@ class EquipmentUpgradeService:
                 if eq.id != equipment.id
                 and not (eq.extra_attrs or {}).get("_frozen_for_trade")
                 and not (eq.extra_attrs or {}).get("_frozen_for_auction")
+                and not (eq.extra_attrs or {}).get("_player_locked")
             ]
             candidates = self._sort_consume_priority(candidates)
             equipment_to_consume = candidates[:required_equipment_count - 1]
@@ -372,6 +375,7 @@ class EquipmentUpgradeService:
             if eq.id != exclude_id
             and not (eq.extra_attrs or {}).get("_frozen_for_trade")
             and not (eq.extra_attrs or {}).get("_frozen_for_auction")
+            and not (eq.extra_attrs or {}).get("_player_locked")
         ]
 
     async def _prepare_one_side_piece(
