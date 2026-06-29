@@ -339,42 +339,36 @@ async def handle_add_inventory(event: MessageEvent, args: Message = CommandArg()
 
 
 
-# ==================== 月卡权益：一键修复装备 ====================
-repair_all_equipment_cmd = on_command("一键修复", aliases={"一键修理", "全部修复"}, block=True, priority=5)
+# ==================== 一键修理（统一命令，月卡免手续费） ====================
+_REPAIR_SURCHARGE = 1.2
+
+repair_all_equipment_cmd = on_command(
+    "一键修复", aliases={"一键修理", "全部修复", "修理全部", "全部修理"}, block=True, priority=5
+)
 
 @repair_all_equipment_cmd.handle()
 async def handle_repair_all_equipment(event: MessageEvent, args: Message = CommandArg()):
-    """月卡权益：一键修复 [金币:怨念] - 修复所有装备，可指定比例，不指定默认全部金币支付"""
-    # 解析比例参数
+    """一键修理所有装备。月卡用户免手续费，非月卡用户加收20%手续费。"""
     ratio_str = args.extract_plain_text().strip()
     if not ratio_str:
-        # 默认全部使用金币
         gold_ratio, grudge_ratio = 1, 0
     else:
         try:
-            if ":" in ratio_str:
-                gold_ratio, grudge_ratio = map(int, ratio_str.split(":"))
+            normalized = ratio_str.replace("：", ":")
+            if ":" in normalized:
+                gold_ratio, grudge_ratio = map(int, normalized.split(":"))
             else:
-                gold_ratio, grudge_ratio = int(ratio_str), 0
-
+                gold_ratio, grudge_ratio = int(normalized), 0
             if gold_ratio < 0 or grudge_ratio < 0 or (gold_ratio + grudge_ratio) == 0:
                 raise ValueError
         except ValueError:
             await repair_all_equipment_cmd.finish("⛔ 比例格式错误，例如：1:0 (纯金币) 或 1:1 (金币:怨念)")
 
     async with safe_session() as session:
-        # 使用跨平台工具获取玩家数据
         player = await require_player(session, event, repair_all_equipment_cmd)
 
-        # 检查是否有月卡权益
-        active_cards = await MonthlyCard.get_all_active_cards(session, player.id)
-        if not active_cards:
-            await repair_all_equipment_cmd.finish(message_add_head(
-                "⛔ 一键修复是月卡专属功能，请先购买月卡",
-                event
-            ))
+        has_card = bool(await MonthlyCard.get_all_active_cards(session, player.id))
 
-        # 获取所有需要修复的装备
         equipment_ids = config.items_config["by_type"]["EQUIPMENT"]
         stmt = select(ItemInstance).where(
             ItemInstance.player_id == player.id,
@@ -382,64 +376,42 @@ async def handle_repair_all_equipment(event: MessageEvent, args: Message = Comma
         )
         all_equipment = (await session.execute(stmt)).scalars().all()
 
-        # 筛选出需要修复的装备（耐久度未满的）
-        damaged_equipment = []
-        for equip in all_equipment:
-            if equip.durability < equip.config.durability:
-                damaged_equipment.append(equip)
-
+        damaged_equipment = [eq for eq in all_equipment if eq.durability < eq.config.durability]
         if not damaged_equipment:
             await repair_all_equipment_cmd.finish(message_add_head(
-                "✅ 所有装备都处于完好状态，无需修复",
-                event
+                "✅ 所有装备都处于完好状态，无需修复", event
             ))
 
-        # 计算总修理费用
         total_cost = 0
-        repair_details = []
-
         for equip in damaged_equipment:
             repair_needed = equip.config.durability - equip.durability
-            # 使用装备配置中的修理费用，如果没有则按价格的10%计算
             if equip.config.repair_cost is not None:
                 cost_per_point = equip.config.repair_cost
             else:
                 cost_per_point = max(1, int(equip.config.price * 0.1 / equip.config.durability))
+            total_cost += cost_per_point * repair_needed
 
-            equip_cost = cost_per_point * repair_needed
-            total_cost += equip_cost
+        if not has_card:
+            total_cost = int(total_cost * _REPAIR_SURCHARGE)
 
-            repair_details.append({
-                "equipment": equip,
-                "repair_needed": repair_needed,
-                "cost": equip_cost
-            })
-
-        # 根据比例计算金币和怨念消耗
         total_ratio = gold_ratio + grudge_ratio
         gold_cost = int(total_cost * gold_ratio / total_ratio)
-        grudge_cost = int(total_cost * grudge_ratio / total_ratio)
+        grudge_cost = total_cost - gold_cost
 
-        # 检查资源是否足够
         if player.gold < gold_cost:
             await repair_all_equipment_cmd.finish(message_add_head(
-                f"⛔ 金币不足，需要 {gold_cost} 金币，当前 {player.gold} 金币",
-                event
+                f"⛔ 金币不足，需要 {gold_cost}💰，当前 {player.gold}💰", event
             ))
-
         if player.resentment < grudge_cost:
             await repair_all_equipment_cmd.finish(message_add_head(
-                f"⛔ 怨念不足，需要 {grudge_cost} 怨念，当前 {player.resentment} 怨念",
-                event
+                f"⛔ 怨念不足，需要 {grudge_cost}👻，当前 {player.resentment}👻", event
             ))
 
-        # 执行修理
         player.gold -= gold_cost
         player.resentment -= grudge_cost
 
         repaired_equipment = []
-        for detail in repair_details:
-            equip = detail["equipment"]
+        for equip in damaged_equipment:
             equip.durability = equip.config.durability
             session.add(equip)
             repaired_equipment.append(f"{equip.config.name}(ID:{equip.id})")
@@ -447,29 +419,22 @@ async def handle_repair_all_equipment(event: MessageEvent, args: Message = Comma
         session.add(player)
         await session.commit()
 
-        # 构建结果消息
-        cost_info = []
+        cost_parts = []
         if gold_cost > 0:
-            cost_info.append(f"{gold_cost} 金币")
+            cost_parts.append(f"{gold_cost}💰")
         if grudge_cost > 0:
-            cost_info.append(f"{grudge_cost} 怨念")
+            cost_parts.append(f"{grudge_cost}👻")
+        cost_str = " + ".join(cost_parts)
 
-        cost_str = " + ".join(cost_info)
-
-        # 显示比例信息
-        ratio_info = ""
-        if grudge_cost > 0:
-            ratio_info = f"（按比例 {gold_ratio}:{grudge_ratio}）"
-        else:
-            ratio_info = "（默认使用金币）"
+        ratio_info = f"（按比例 {gold_ratio}:{grudge_ratio}）" if grudge_cost > 0 else "（默认使用金币）"
+        surcharge_info = "" if has_card else "\n📋 含20%手续费（月卡用户免手续费）"
 
         result_msg = (
             f"🔧 一键修复完成！\n"
             f"━━━━━━━━━━━━━\n"
             f"✅ 修复装备：{len(repaired_equipment)} 件\n"
-            f"💰 消耗：{cost_str}{ratio_info}\n"
+            f"💰 消耗：{cost_str}{ratio_info}{surcharge_info}\n"
             f"━━━━━━━━━━━━━\n"
             f"📋 修复清单：\n{chr(10).join(repaired_equipment)}"
         )
-
         await repair_all_equipment_cmd.finish(message_add_head(result_msg, event))

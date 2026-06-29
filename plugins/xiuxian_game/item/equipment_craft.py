@@ -8,7 +8,7 @@ from ..models import Player, ItemInstance
 from ..models.npc import NPCType
 from ..config import config
 from ..utils import message_add_head
-from .equipment_commands import find_equipment_by_input, EQUIP_ITEM_IDS
+from .equipment_commands import find_equipment_by_input
 from ..world.location_service import LocationService
 from ..world.npc_service import NPCService
 from ..infrastructure.repositories.location_repository import LocationRepository
@@ -514,99 +514,6 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
             cost_info += "（默认使用金币）"
 
         await repair_cmd.finish(message_add_head(f"🔧 已修复 {tpl.name}{durability_info}，{cost_info}", event))
-
-
-# ==================== 批量修理（所有玩家可用） ====================
-repair_all_public_cmd = on_command("修理全部", aliases={"全部修理"}, block=True, priority=9)
-
-BATCH_REPAIR_SURCHARGE = 1.2
-
-
-def _parse_ratio(text: str):
-    normalized = text.replace("：", ":")
-    if ":" not in normalized:
-        return None, None
-    parts = normalized.split(":")
-    if len(parts) != 2:
-        return None, None
-    try:
-        g, r = int(parts[0]), int(parts[1])
-        if g < 0 or r < 0 or (g + r) == 0:
-            return None, None
-        return g, r
-    except ValueError:
-        return None, None
-
-
-@repair_all_public_cmd.handle()
-async def _(event: MessageEvent, args: Message = CommandArg()):
-    ratio_str = args.extract_plain_text().strip()
-    gold_ratio, grudge_ratio = 1, 0
-    if ratio_str:
-        gold_ratio, grudge_ratio = _parse_ratio(ratio_str)
-        if gold_ratio is None:
-            await repair_all_public_cmd.finish("⛔ 比例格式错误，例如：修理全部 1:1（金币:怨念）")
-
-    async with safe_session() as session:
-        player = await require_player(session, event, repair_all_public_cmd)
-
-        stmt = select(ItemInstance).where(
-            ItemInstance.player_id == player.id,
-            ItemInstance.item_id.in_(EQUIP_ITEM_IDS)
-        )
-        all_equipment = (await session.execute(stmt)).scalars().all()
-
-        damaged = [eq for eq in all_equipment if eq.durability < eq.config.durability]
-        if not damaged:
-            await repair_all_public_cmd.finish("✅ 所有装备耐久完好，无需修理")
-
-        total_cost = 0
-        for eq in damaged:
-            missing = eq.config.durability - eq.durability
-            cost_per = eq.config.repair_cost if eq.config.repair_cost is not None else max(1, int(eq.config.price / max(1, eq.config.durability)))
-            total_cost += cost_per * missing
-
-        total_cost = int(total_cost * BATCH_REPAIR_SURCHARGE)
-
-        total_ratio = gold_ratio + grudge_ratio
-        gold_cost = int(total_cost * gold_ratio / total_ratio)
-        grudge_cost = total_cost - gold_cost
-
-        if player.gold < gold_cost:
-            await repair_all_public_cmd.finish(f"⛔ 金币不足，需要 {gold_cost}💰，当前 {player.gold}💰")
-        if player.resentment < grudge_cost:
-            await repair_all_public_cmd.finish(f"⛔ 怨念不足，需要 {grudge_cost}👻，当前 {player.resentment}👻")
-
-        player.gold -= gold_cost
-        player.resentment -= grudge_cost
-
-        repaired = []
-        for eq in damaged:
-            old_dur = eq.durability
-            eq.durability = eq.config.durability
-            repaired.append(f"{eq.config.name}(ID:{eq.id}) {old_dur}→{eq.durability}")
-
-        await session.commit()
-
-        cost_parts = []
-        if gold_cost > 0:
-            cost_parts.append(f"{gold_cost}💰")
-        if grudge_cost > 0:
-            cost_parts.append(f"{grudge_cost}👻")
-        cost_str = " + ".join(cost_parts)
-
-        ratio_info = f"（按比例 {gold_ratio}:{grudge_ratio}）" if grudge_cost > 0 else "（默认使用金币）"
-
-        result = (
-            f"🔧 批量修理完成！\n"
-            f"━━━━━━━━━━━━━\n"
-            f"✅ 修复 {len(repaired)} 件装备\n"
-            f"💰 消耗：{cost_str}{ratio_info}\n"
-            f"📋 含20%手续费（月卡用户使用【一键修复】免手续费）\n"
-            f"━━━━━━━━━━━━━\n"
-            + "\n".join(repaired)
-        )
-        await repair_all_public_cmd.finish(message_add_head(result, event))
 
 
 # ==================== 装备锁定 / 解锁 ====================
