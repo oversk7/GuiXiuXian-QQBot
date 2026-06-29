@@ -22,12 +22,3 @@ sets:
             value: 20.0
             description: "套装·雾中杀机"
 
-  shadow_slayer:
-    name: "灭法之影"
-    pieces: ["vip_blade_zhanlongshan", "vip_longying_flash"]
-    bonuses:
-      2:
-        description: "灭法共鸣：穿透率+8%、技能暴击率+6%"
-        t1_bonuses:
-          penetration_rate: 8.0
-          skill_crit_rate: 6.0

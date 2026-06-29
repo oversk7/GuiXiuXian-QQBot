@@ -1882,7 +1882,7 @@ items:
 
     - item_id: "vip_blade_zhanlongshan"
       name: "斩龙闪"
-      description: "弑神伐恶，斩魂戮邪，封魔于刃，斩尽不死不灭！\n🌟灭法之影套装之一"
+      description: "弑神伐恶，斩魂戮邪，封魔于刃，斩尽不死不灭！"
       type: "EQUIPMENT"
       rarity: "red"
       durability: 380
@@ -2113,7 +2113,7 @@ items:
 
     - item_id: "vip_longying_flash"
       name: "龙影闪"
-      description: "你踏出的那一步，已经不在这个世界了。\n🌟灭法之影套装之二"
+      description: "你踏出的那一步，已经不在这个世界了。"
       type: "EQUIPMENT"
       rarity: "red"
       durability: 360
