@@ -197,6 +197,7 @@ async def get_achievement_detail(session, player, achievement_name: str) -> str:
         "world_boss_count": "讨伐世界BOSS",
         "alchemy_count": "完成炼丹",
         "restaurant_level": "餐厅等级",
+        "mansion_level": "阴宅等级",
     }
     lines.append(f"  类型: {condition_map.get(condition_type, condition_type)}")
     lines.append(f"  目标: **{target}**")

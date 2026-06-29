@@ -415,6 +415,8 @@ class AchievementService:
                 )
                 restaurant = restaurant_result.scalar_one_or_none()
                 is_unlocked = restaurant is not None and restaurant.level >= condition_value
+            elif condition_type == "mansion_level":
+                is_unlocked = (player.mansion_level or 0) >= condition_value
 
             # 如果达成条件，解锁成就
             if is_unlocked:
@@ -697,6 +699,8 @@ class AchievementService:
                         )
                         restaurant = restaurant_result.scalar_one_or_none()
                         current_progress = restaurant.level if restaurant else 0
+                    elif condition_type == "mansion_level":
+                        current_progress = (player.mansion_level or 0) if player else 0
 
                     progress_data[achievement_id] = current_progress
 

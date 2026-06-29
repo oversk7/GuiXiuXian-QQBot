@@ -909,6 +909,66 @@ advanced_achievements:
     flavor_text: "你用实力证明了：修仙的尽头是餐饮业。"
     hidden: false
 
+  # 阴宅系列
+  first_mansion:
+    id: "first_mansion"
+    title: "安居乐业"
+    description: "拥有自己的阴宅（购买阴宅）"
+    icon: "🏚️"
+    condition_type: "mansion_level"
+    condition_target: "level"
+    condition_value: 1
+    rewards:
+      gold: 3000
+      exp: 800
+    flavor_text: "终于不用睡大街了。虽然这房子阴气重了点。"
+    hidden: false
+
+  mansion_cozy:
+    id: "mansion_cozy"
+    title: "小窝初成"
+    description: "阴宅开始像个样子了（阴宅达到5级）"
+    icon: "🏠"
+    condition_type: "mansion_level"
+    condition_target: "level"
+    condition_value: 5
+    rewards:
+      gold: 20000
+      exp: 6000
+      attribute_points: 15
+    flavor_text: "五级阴宅，客厅终于能放下一张沙发了。一张鬼坐的。"
+    hidden: false
+
+  mansion_luxury:
+    id: "mansion_luxury"
+    title: "豪宅大亨"
+    description: "阴宅已是豪华府邸（阴宅达到15级）"
+    icon: "🏰"
+    condition_type: "mansion_level"
+    condition_target: "level"
+    condition_value: 15
+    rewards:
+      gold: 100000
+      exp: 30000
+      attribute_points: 60
+    flavor_text: "十五级豪宅。房产中介想给你打电话，但你没有电话。"
+    hidden: false
+
+  mansion_palace:
+    id: "mansion_palace"
+    title: "地下皇宫"
+    description: "阴宅登峰造极（阴宅达到30级）"
+    icon: "👑"
+    condition_type: "mansion_level"
+    condition_target: "level"
+    condition_value: 30
+    rewards:
+      gold: 500000
+      exp: 100000
+      attribute_points: 200
+    flavor_text: "满级皇宫。阎王来了都得脱鞋。"
+    hidden: false
+
 # 成就分类
 categories:
   cultivation: ["first_cultivation", "cultivation_adept", "cultivation_master", "ascetic_monk", "cultivation_grandmaster", "cultivation_immortal"]
@@ -926,3 +986,4 @@ categories:
   pvp_streak: ["streak_novice", "streak_master", "streak_king", "streak_god"]
   world_boss: ["first_boss_fight", "boss_hunter", "boss_slayer", "boss_nemesis"]
   alchemy: ["first_alchemy", "alchemy_apprentice", "alchemy_adept", "alchemy_master_tier", "alchemy_grandmaster"]
+  mansion: ["first_mansion", "mansion_cozy", "mansion_luxury", "mansion_palace"]
