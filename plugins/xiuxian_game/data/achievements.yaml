@@ -1,12 +1,10 @@
 # 微成就系统配置文件
-# 定义10个基础微成就，帮助新手获得成就感和引导
 
 basic_achievements:
-  # 1. 修炼系列
   first_cultivation:
     id: "first_cultivation"
     title: "初窥门径"
-    description: "完成第一次修炼，开始感知体内怨炁的流动"
+    description: "开始驭鬼之旅（修炼1次）"
     icon: "🌟"
     condition_type: "command_count"
     condition_target: "修炼"
@@ -14,13 +12,13 @@ basic_achievements:
     rewards:
       gold: 500
       exp: 100
-    flavor_text: "千里之行，始于足下。驭鬼之路，从此开启。"
+    flavor_text: "你刚才是在打坐还是在打盹？反正看起来差不多。"
     hidden: false
 
   cultivation_adept:
     id: "cultivation_adept"
     title: "勤修不辍"
-    description: "累计修炼10次，逐渐掌握怨炁运行的诀窍"
+    description: "已经是修炼常客了（修炼10次）"
     icon: "✨"
     condition_type: "command_count"
     condition_target: "修炼"
@@ -28,14 +26,13 @@ basic_achievements:
     rewards:
       gold: 2000
       exp: 500
-    flavor_text: "修行无捷径，唯勤能补拙。"
+    flavor_text: "你的蒲团已经有你的形状了。"
     hidden: false
 
-  # 2. 成长系列
   first_breakthrough:
     id: "first_breakthrough"
     title: "破茧成蝶"
-    description: "突破至2级境界，体验蜕变带来的力量提升"
+    description: "完成第一次蜕变（达到2级）"
     icon: "🦋"
     condition_type: "level_up"
     condition_target: "level"
@@ -44,13 +41,13 @@ basic_achievements:
       gold: 1000
       exp: 300
       attribute_points: 5
-    flavor_text: "破茧之痛，化蝶之美。境界突破，实力飞跃。"
+    flavor_text: "恭喜升级！虽然你还是会被路边的小鬼吓一跳。"
     hidden: false
 
   level_ten_warrior:
     id: "level_ten_warrior"
     title: "十级驭鬼者"
-    description: "达到10级，正式踏入驭鬼者的行列"
+    description: "正式踏入驭鬼者行列（达到10级）"
     icon: "⚔️"
     condition_type: "level_reached"
     condition_target: "level"
@@ -59,14 +56,13 @@ basic_achievements:
       gold: 5000
       exp: 1000
       attribute_points: 10
-    flavor_text: "十级之境，已非凡人。驭鬼之道，渐入佳境。"
+    flavor_text: "十级了！终于可以瞧不起九级的人了。"
     hidden: false
 
-  # 3. 战斗系列
   first_victory:
     id: "first_victory"
     title: "初战告捷"
-    description: "取得第一场战斗的胜利，品尝胜利的滋味"
+    description: "品尝胜利的滋味（胜利1场）"
     icon: "🏆"
     condition_type: "battle_win"
     condition_target: "total_wins"
@@ -74,13 +70,13 @@ basic_achievements:
     rewards:
       gold: 1000
       exp: 300
-    flavor_text: "首胜之战，意义非凡。"
+    flavor_text: "打赢了！对方可能在挂机。"
     hidden: false
 
   veteran_fighter:
     id: "veteran_fighter"
     title: "初入战场"
-    description: "击败10个敌人，开始积累实战经验"
+    description: "开始积累实战经验（击杀10个敌人）"
     icon: "🛡️"
     condition_type: "kill_count"
     condition_target: "total_kills"
@@ -88,14 +84,13 @@ basic_achievements:
     rewards:
       gold: 3000
       exp: 800
-    flavor_text: "十场战斗，初窥战场之残酷。"
+    flavor_text: "十个敌人倒下了。其中至少三个是迷路的。"
     hidden: false
 
-  # 4. 装备系列
   first_equipment:
     id: "first_equipment"
     title: "装备加身"
-    description: "获得第一件装备，感受装备带来的实力提升"
+    description: "感受装备的力量（获得1件装备）"
     icon: "⚙️"
     condition_type: "equipment_obtained"
     condition_target: "any_equipment"
@@ -103,14 +98,13 @@ basic_achievements:
     rewards:
       gold: 1500
       exp: 400
-    flavor_text: "工欲善其事，必先利其器。"
+    flavor_text: "穿上装备后你看起来酷多了。至少你自己这么觉得。"
     hidden: false
 
-  # 5. 财富系列
   small_fortune:
     id: "small_fortune"
     title: "小有积蓄"
-    description: "累计获得1万金币，开始积累财富"
+    description: "开始积累财富（累计获得1万金币）"
     icon: "💰"
     condition_type: "gold_total"
     condition_target: "gold_earned"
@@ -118,14 +112,13 @@ basic_achievements:
     rewards:
       gold: 5000
       exp: 500
-    flavor_text: "一万金币，不算富裕，但也算是小有积蓄了。"
+    flavor_text: "一万金币！差不多能在城里买半个烧饼了。"
     hidden: false
 
-  # 6. 探索系列
   world_explorer:
     id: "world_explorer"
     title: "初探天地"
-    description: "探索3个不同的地点，开始了解这个诡异世界的广阔"
+    description: "开始了解这个世界（探索3个地点）"
     icon: "🗺️"
     condition_type: "locations_visited"
     condition_target: "unique_locations"
@@ -133,14 +126,13 @@ basic_achievements:
     rewards:
       gold: 2000
       exp: 600
-    flavor_text: "世界那么大，值得去看看。"
+    flavor_text: "探索了三个地方。其中两个你再也不想去了。"
     hidden: false
 
-  # 7. 忠诚系列
   loyal_believer:
     id: "loyal_believer"
     title: "持之以恒"
-    description: "连续登录3天，展现坚持修炼的决心"
+    description: "展现坚持修炼的决心（连续登录3天）"
     icon: "📅"
     condition_type: "login_streak"
     condition_target: "consecutive_days"
@@ -149,32 +141,30 @@ basic_achievements:
       gold: 3000
       exp: 1000
       attribute_points: 5
-    flavor_text: "日复一日的坚持，终将成就非凡。"
+    flavor_text: "连续三天上线。你的手机已经认识你了。"
     hidden: false
 
-  # 8. 周年特别系列
   first_anniversary:
     id: "first_anniversary"
     title: "元老见证者"
-    description: "自诡修仙诞生之初便追随至今，见证了一年的风雨历程"
+    description: "自开服便追随至今（2025-10-07前创建）"
     icon: "🎂"
     condition_type: "account_age"
     condition_target: "created_before"
-    condition_value: "2025-10-07"  # 2025年10月7日及之前创建的账号
+    condition_value: "2025-10-07"
     rewards:
       gold: 50000
       exp: 10000
       attribute_points: 30
-    flavor_text: "一年相伴，感谢有你同行"
+    flavor_text: "一年了，你居然还在玩。说实话我们也挺惊讶的。"
     hidden: false
 
-# 高难度成就（挑战性内容）
+# 高难度成就
 advanced_achievements:
-  # 战斗系列 - 高难度
   hundred_battles:
     id: "hundred_battles"
     title: "百战不殆"
-    description: "击败100个敌人，真正的百战老兵"
+    description: "真正的百战老兵（击杀100个敌人）"
     icon: "⚔️"
     condition_type: "kill_count"
     condition_target: "total_kills"
@@ -183,13 +173,13 @@ advanced_achievements:
       gold: 20000
       exp: 5000
       attribute_points: 15
-    flavor_text: "百战之躯，铸就不败之威。"
+    flavor_text: "一百场战斗。你的键盘还好吗？"
     hidden: false
 
   thousand_slayer:
     id: "thousand_slayer"
     title: "千人斩"
-    description: "击败1000个敌人，成为令人闻风丧胆的杀神"
+    description: "令人闻风丧胆的杀手（击杀1000个敌人）"
     icon: "💀"
     condition_type: "kill_count"
     condition_target: "total_kills"
@@ -198,13 +188,13 @@ advanced_achievements:
       gold: 100000
       exp: 30000
       attribute_points: 50
-    flavor_text: "千人斩之名，威震四方。"
+    flavor_text: "一千个敌人倒在你手下。保洁阿姨对你很有意见。"
     hidden: false
 
   winning_streak:
     id: "winning_streak"
     title: "连胜之王"
-    description: "累计取得50场战斗胜利"
+    description: "胜利已成习惯（累计胜利50场）"
     icon: "👑"
     condition_type: "battle_win"
     condition_target: "total_wins"
@@ -213,14 +203,13 @@ advanced_achievements:
       gold: 15000
       exp: 4000
       attribute_points: 12
-    flavor_text: "胜者为王，五十场不败，已可称王。"
+    flavor_text: "五十场胜利。建议顺便去买个彩票。"
     hidden: false
 
-  # 成长系列 - 高难度
   level_thirty_master:
     id: "level_thirty_master"
     title: "境界大成"
-    description: "达到30级，踏入高手行列"
+    description: "踏入高手行列（达到30级）"
     icon: "🌠"
     condition_type: "level_reached"
     condition_target: "level"
@@ -229,13 +218,13 @@ advanced_achievements:
       gold: 30000
       exp: 8000
       attribute_points: 25
-    flavor_text: "三十级境界，已入高手之流。"
+    flavor_text: "三十级了！在新手面前终于可以装一下了。"
     hidden: false
 
   level_fifty_expert:
     id: "level_fifty_expert"
     title: "半步天人"
-    description: "达到50级，距离传说只有一步之遥"
+    description: "距离传说一步之遥（达到50级）"
     icon: "✨"
     condition_type: "level_reached"
     condition_target: "level"
@@ -244,13 +233,13 @@ advanced_achievements:
       gold: 80000
       exp: 20000
       attribute_points: 50
-    flavor_text: "五十级之境，半步天人，俯瞰众生。"
+    flavor_text: "半步天人。另外半步你可能还要走很久。"
     hidden: false
 
   level_hundred_legend:
     id: "level_hundred_legend"
     title: "通天彻地"
-    description: "达到100级，成为传说中的存在"
+    description: "成为传说中的存在（达到100级）"
     icon: "🌌"
     condition_type: "level_reached"
     condition_target: "level"
@@ -259,14 +248,13 @@ advanced_achievements:
       gold: 500000
       exp: 100000
       attribute_points: 200
-    flavor_text: "百级之境，通天彻地，已入传说。"
+    flavor_text: "一百级！游戏温馨提示：外面的太阳还在。"
     hidden: false
 
-  # 修炼系列 - 高难度
   cultivation_master:
     id: "cultivation_master"
     title: "修炼大师"
-    description: "累计修炼100次，深谙修炼之道"
+    description: "深谙修炼之道（修炼100次）"
     icon: "🔮"
     condition_type: "command_count"
     condition_target: "修炼"
@@ -275,13 +263,13 @@ advanced_achievements:
       gold: 25000
       exp: 6000
       attribute_points: 20
-    flavor_text: "百次修炼，已悟真谛。"
+    flavor_text: "一百次修炼。你的角色坐得腿都麻了。"
     hidden: false
 
   ascetic_monk:
     id: "ascetic_monk"
     title: "苦修者"
-    description: "累计修炼1000次，视修炼为生命"
+    description: "视修炼为生命（修炼1000次）"
     icon: "🧘"
     condition_type: "command_count"
     condition_target: "修炼"
@@ -290,14 +278,13 @@ advanced_achievements:
       gold: 150000
       exp: 40000
       attribute_points: 80
-    flavor_text: "千次修炼，苦修成道，心如磐石。"
+    flavor_text: "一千次修炼。你确定不是在用脚本？"
     hidden: false
 
-  # 装备系列 - 高难度
   equipment_collector:
     id: "equipment_collector"
     title: "装备收藏家"
-    description: "拥有10件装备，建立自己的武器库"
+    description: "建立自己的武器库（拥有10件装备）"
     icon: "🗡️"
     condition_type: "equipment_obtained"
     condition_target: "any_equipment"
@@ -306,13 +293,13 @@ advanced_achievements:
       gold: 20000
       exp: 5000
       attribute_points: 15
-    flavor_text: "十件神兵，各有千秋。"
+    flavor_text: "十件装备。你的背包比你的人生还充实。"
     hidden: false
 
   legendary_weapon:
     id: "legendary_weapon"
     title: "神兵在手"
-    description: "拥有一件+10级的满级装备"
+    description: "打造终极神兵（拥有+10装备）"
     icon: "⚡"
     condition_type: "equipment_max_upgrade"
     condition_target: "upgrade_level"
@@ -321,14 +308,13 @@ advanced_achievements:
       gold: 50000
       exp: 15000
       attribute_points: 30
-    flavor_text: "神兵既成，天下我有。"
+    flavor_text: "满级装备！锻造师傅看到你来就想关门。"
     hidden: false
 
-  # 财富系列 - 高难度
   wealthy_magnate:
     id: "wealthy_magnate"
     title: "富甲一方"
-    description: "累计获得10万金币，成为富豪"
+    description: "成为一方富豪（累计获得10万金币）"
     icon: "💎"
     condition_type: "gold_total"
     condition_target: "gold_earned"
@@ -336,13 +322,13 @@ advanced_achievements:
     rewards:
       gold: 30000
       exp: 8000
-    flavor_text: "十万金币，已是富甲一方。"
+    flavor_text: "十万金币！你已经比大多数NPC有钱了。他们很嫉妒。"
     hidden: false
 
   financial_freedom:
     id: "financial_freedom"
     title: "财富自由"
-    description: "累计获得100万金币，实现财富自由"
+    description: "实现财富自由（累计获得100万金币）"
     icon: "🏆"
     condition_type: "gold_total"
     condition_target: "gold_earned"
@@ -351,14 +337,13 @@ advanced_achievements:
       gold: 200000
       exp: 50000
       attribute_points: 100
-    flavor_text: "百万金币，财富自由，无忧无虑。"
+    flavor_text: "一百万金币。你可以考虑在游戏里退休了。"
     hidden: false
 
-  # 探索系列 - 高难度
   seasoned_explorer:
     id: "seasoned_explorer"
     title: "游遍天下"
-    description: "探索10个不同的地点，足迹遍布各地"
+    description: "足迹遍布各地（探索10个地点）"
     icon: "🧭"
     condition_type: "locations_visited"
     condition_target: "unique_locations"
@@ -367,13 +352,13 @@ advanced_achievements:
       gold: 15000
       exp: 4000
       attribute_points: 10
-    flavor_text: "十处险地，皆留足迹。"
+    flavor_text: "你的角色走的路比你本人这周走的还多。"
     hidden: false
 
   master_explorer:
     id: "master_explorer"
     title: "足迹遍布"
-    description: "探索30个不同的地点，成为探索大师"
+    description: "成为探索大师（探索30个地点）"
     icon: "🌍"
     condition_type: "locations_visited"
     condition_target: "unique_locations"
@@ -382,14 +367,13 @@ advanced_achievements:
       gold: 60000
       exp: 20000
       attribute_points: 40
-    flavor_text: "三十险地，无一不至，天下之大，尽在脚下。"
+    flavor_text: "三十个地点都去了。你是在探险还是在找厕所？"
     hidden: false
 
-  # 忠诚系列 - 高难度
   weekly_devotee:
     id: "weekly_devotee"
     title: "坚持不懈"
-    description: "连续登录7天，展现坚定的意志"
+    description: "展现坚定的意志（连续登录7天）"
     icon: "📆"
     condition_type: "login_streak"
     condition_target: "consecutive_days"
@@ -398,13 +382,13 @@ advanced_achievements:
       gold: 10000
       exp: 3000
       attribute_points: 8
-    flavor_text: "七日不断，意志坚定。"
+    flavor_text: "连续七天！你的老板可能想跟你谈谈。"
     hidden: false
 
   monthly_devotee:
     id: "monthly_devotee"
     title: "铁杆玩家"
-    description: "连续登录30天，成为铁杆玩家"
+    description: "铁杆之名实至名归（连续登录30天）"
     icon: "🎖️"
     condition_type: "login_streak"
     condition_target: "consecutive_days"
@@ -413,13 +397,13 @@ advanced_achievements:
       gold: 50000
       exp: 15000
       attribute_points: 35
-    flavor_text: "三十日连续，铁杆之名，实至名归。"
+    flavor_text: "连续三十天！你的椅子已经对你产生感情了。"
     hidden: false
 
   lifetime_achievement:
     id: "lifetime_achievement"
     title: "终身成就"
-    description: "累计登录100天，见证游戏的点点滴滴"
+    description: "见证游戏的点点滴滴（累计登录100天）"
     icon: "🏅"
     condition_type: "total_login_days"
     condition_target: "total_days"
@@ -428,14 +412,13 @@ advanced_achievements:
       gold: 100000
       exp: 30000
       attribute_points: 60
-    flavor_text: "百日相伴，终身成就，感谢有你。"
+    flavor_text: "这个成就本身就是一种生活方式。"
     hidden: false
 
-  # 社交系列
   npc_gift_beggar:
     id: "npc_gift_beggar"
     title: "化缘大师"
-    description: "成功从NPC那里讨到金币或药品"
+    description: "成功向NPC讨到东西（NPC赠礼1次）"
     icon: "🤲"
     condition_type: "npc_gifts_received"
     condition_target: "npc_gifts"
@@ -443,13 +426,13 @@ advanced_achievements:
     rewards:
       gold: 3000
       exp: 800
-    flavor_text: "脸皮够厚，天下我有。"
+    flavor_text: "NPC给你东西了！可能只是为了让你别再来烦他。"
     hidden: false
 
   tied_the_knot:
     id: "tied_the_knot"
     title: "执子之手"
-    description: "与另一位修士结为道侣"
+    description: "在诡异世界找到真爱（结为道侣）"
     icon: "💍"
     condition_type: "has_marriage"
     condition_target: "marriage"
@@ -458,13 +441,13 @@ advanced_achievements:
       gold: 5000
       exp: 1500
       attribute_points: 5
-    flavor_text: "与子偕老，生死相依。连鬼都要羡慕你们。"
+    flavor_text: "结婚了！属性点都涨了。现实中要是也这么简单就好了。"
     hidden: false
 
   joined_guild:
     id: "joined_guild"
     title: "归属感"
-    description: "加入一个公会，不再是孤身一人"
+    description: "不再是孤身一人（加入公会）"
     icon: "🏰"
     condition_type: "has_guild"
     condition_target: "guild"
@@ -472,14 +455,13 @@ advanced_achievements:
     rewards:
       gold: 2000
       exp: 500
-    flavor_text: "独行快，众行远。有了组织就是不一样。"
+    flavor_text: "终于有人在你死的时候帮你收尸了。"
     hidden: false
 
-  # 战斗冒险系列
   first_reincarnation:
     id: "first_reincarnation"
     title: "涅槃重生"
-    description: "完成第一次冥返转生，浴火重生"
+    description: "浴火重生从头再来（转生1次）"
     icon: "🔄"
     condition_type: "reincarnation_reached"
     condition_target: "reincarnation_level"
@@ -488,13 +470,13 @@ advanced_achievements:
       gold: 50000
       exp: 10000
       attribute_points: 30
-    flavor_text: "大死大活，方知天道。转生之后，世界焕然一新。"
+    flavor_text: "转生成功！等级清零的感觉怎么样？疼吗？"
     hidden: false
 
   abyss_walker:
     id: "abyss_walker"
     title: "深渊行者"
-    description: "深入诡域第10层，在疯狂边缘行走"
+    description: "在疯狂边缘行走（诡域达到10层）"
     icon: "🌀"
     condition_type: "dungeon_depth_reached"
     condition_target: "max_dungeon_level"
@@ -503,14 +485,13 @@ advanced_achievements:
       gold: 15000
       exp: 4000
       attribute_points: 10
-    flavor_text: "凝视深渊太久，深渊也开始对你点头哈腰。"
+    flavor_text: "那里的怪物已经开始跟你打招呼了。"
     hidden: false
 
-  # 经济大亨系列
   first_trade:
     id: "first_trade"
     title: "商道初开"
-    description: "完成第一笔跑商交易"
+    description: "踏上经商之路（跑商1次）"
     icon: "🏪"
     condition_type: "trade_count"
     condition_target: "trade_record"
@@ -518,14 +499,13 @@ advanced_achievements:
     rewards:
       gold: 2000
       exp: 500
-    flavor_text: "万贯家财，始于一笔买卖。"
+    flavor_text: "恭喜你发现了低买高卖的奥义。欢迎来到资本主义。"
     hidden: false
 
-  # 生活休闲系列
   fishing_enthusiast:
     id: "fishing_enthusiast"
     title: "愿者上钩"
-    description: "累计钓到50条鱼，成为钓鱼老手"
+    description: "成为钓鱼老手（钓鱼50条）"
     icon: "🎣"
     condition_type: "fish_caught"
     condition_target: "total_fish"
@@ -534,13 +514,13 @@ advanced_achievements:
       gold: 10000
       exp: 3000
       attribute_points: 8
-    flavor_text: "姜太公钓鱼，愿者上钩。你比他强，五十条鱼都咬了。"
+    flavor_text: "鱼塘已经贴出了你的通缉令。"
     hidden: false
 
   first_restaurant:
     id: "first_restaurant"
     title: "掌勺人"
-    description: "开设自己的餐厅，当上老板"
+    description: "当上老板（开设餐厅）"
     icon: "🍳"
     condition_type: "has_restaurant"
     condition_target: "restaurant"
@@ -548,20 +528,401 @@ advanced_achievements:
     rewards:
       gold: 3000
       exp: 800
-    flavor_text: "修仙修到最后，还是开饭馆最靠谱。"
+    flavor_text: "修仙不如开饭馆，至少收入稳定。"
+    hidden: false
+
+  # ==================== 纵向扩展 ====================
+
+  cultivation_grandmaster:
+    id: "cultivation_grandmaster"
+    title: "修炼宗师"
+    description: "修炼之道已臻化境（修炼5000次）"
+    icon: "🌌"
+    condition_type: "command_count"
+    condition_target: "修炼"
+    condition_value: 5000
+    rewards:
+      gold: 300000
+      exp: 80000
+      attribute_points: 150
+    flavor_text: "你的角色已经在蒲团上长出了根。"
+    hidden: false
+
+  cultivation_immortal:
+    id: "cultivation_immortal"
+    title: "万修成仙"
+    description: "修行之极，羽化飞仙（修炼10000次）"
+    icon: "🏮"
+    condition_type: "command_count"
+    condition_target: "修炼"
+    condition_value: 10000
+    rewards:
+      gold: 800000
+      exp: 200000
+      attribute_points: 400
+    flavor_text: "恭喜解锁'人形打坐机器'称号。哦等等，没这个称号。"
+    hidden: false
+
+  five_thousand_slayer:
+    id: "five_thousand_slayer"
+    title: "修罗战将"
+    description: "已踏入修罗之道（击杀5000个敌人）"
+    icon: "☠️"
+    condition_type: "kill_count"
+    condition_target: "total_kills"
+    condition_value: 5000
+    rewards:
+      gold: 250000
+      exp: 60000
+      attribute_points: 120
+    flavor_text: "你的武器该保养了，上面全是缺口。"
+    hidden: false
+
+  myriad_slayer:
+    id: "myriad_slayer"
+    title: "万人斩"
+    description: "血海铸就不朽杀名（击杀10000个敌人）"
+    icon: "🩸"
+    condition_type: "kill_count"
+    condition_target: "total_kills"
+    condition_value: 10000
+    rewards:
+      gold: 500000
+      exp: 150000
+      attribute_points: 300
+    flavor_text: "再杀下去怪物就要成立工会维权了。"
+    hidden: false
+
+  tycoon:
+    id: "tycoon"
+    title: "金币大亨"
+    description: "坐拥天下财富（累计获得1000万金币）"
+    icon: "👑"
+    condition_type: "gold_total"
+    condition_target: "gold_earned"
+    condition_value: 10000000
+    rewards:
+      gold: 500000
+      exp: 100000
+      attribute_points: 200
+    flavor_text: "你在游戏里的财务状况比现实好太多了。"
+    hidden: false
+
+  billionaire:
+    id: "billionaire"
+    title: "富可敌国"
+    description: "财力可与国同辉（累计获得1亿金币）"
+    icon: "💵"
+    condition_type: "gold_total"
+    condition_target: "gold_earned"
+    condition_value: 100000000
+    rewards:
+      gold: 2000000
+      exp: 500000
+      attribute_points: 500
+    flavor_text: "一亿金币。你确定你不是在洗钱？"
+    hidden: false
+
+  deep_abyss:
+    id: "deep_abyss"
+    title: "深渊探险家"
+    description: "在黑暗深处探寻真相（诡域达到30层）"
+    icon: "🕳️"
+    condition_type: "dungeon_depth_reached"
+    condition_target: "max_dungeon_level"
+    condition_value: 30
+    rewards:
+      gold: 50000
+      exp: 15000
+      attribute_points: 30
+    flavor_text: "你身上的黑暗气息已经让NPC不愿跟你说话了。"
+    hidden: false
+
+  abyss_conqueror:
+    id: "abyss_conqueror"
+    title: "深渊征服者"
+    description: "征服深渊的意志不可动摇（诡域达到50层）"
+    icon: "🌑"
+    condition_type: "dungeon_depth_reached"
+    condition_target: "max_dungeon_level"
+    condition_value: 50
+    rewards:
+      gold: 150000
+      exp: 40000
+      attribute_points: 80
+    flavor_text: "你的手电筒电池费比装备修理费还贵。"
+    hidden: false
+
+  abyss_overlord:
+    id: "abyss_overlord"
+    title: "深渊霸主"
+    description: "深渊之下唯你独尊（诡域达到100层）"
+    icon: "🔱"
+    condition_type: "dungeon_depth_reached"
+    condition_target: "max_dungeon_level"
+    condition_value: 100
+    rewards:
+      gold: 500000
+      exp: 150000
+      attribute_points: 300
+    flavor_text: "连深渊都开始怕你了。它正在考虑申请调岗。"
+    hidden: false
+
+  # ==================== 横向扩展 ====================
+
+  streak_novice:
+    id: "streak_novice"
+    title: "连胜新星"
+    description: "初露锋芒（天梯5连胜）"
+    icon: "🔥"
+    condition_type: "ladder_win_streak"
+    condition_target: "win_streak"
+    condition_value: 5
+    rewards:
+      gold: 5000
+      exp: 1500
+      attribute_points: 5
+    flavor_text: "你的对手们正在群里讨论怎么避开你。"
+    hidden: false
+
+  streak_master:
+    id: "streak_master"
+    title: "连胜高手"
+    description: "无人敢轻视（天梯10连胜）"
+    icon: "🔥"
+    condition_type: "ladder_win_streak"
+    condition_target: "win_streak"
+    condition_value: 10
+    rewards:
+      gold: 20000
+      exp: 6000
+      attribute_points: 15
+    flavor_text: "匹配系统已经开始怀疑人生了。"
+    hidden: false
+
+  streak_king:
+    id: "streak_king"
+    title: "所向披靡"
+    description: "天梯震动（天梯20连胜）"
+    icon: "💥"
+    condition_type: "ladder_win_streak"
+    condition_target: "win_streak"
+    condition_value: 20
+    rewards:
+      gold: 80000
+      exp: 25000
+      attribute_points: 50
+    flavor_text: "建议排行榜直接刻你的名字，省得改来改去。"
+    hidden: false
+
+  streak_god:
+    id: "streak_god"
+    title: "不败战神"
+    description: "战神之名无可撼动（天梯50连胜）"
+    icon: "⚡"
+    condition_type: "ladder_win_streak"
+    condition_target: "win_streak"
+    condition_value: 50
+    rewards:
+      gold: 300000
+      exp: 80000
+      attribute_points: 150
+    flavor_text: "这不科学。我们正在检查你的账号。开玩笑的。也许吧。"
+    hidden: false
+
+  first_boss_fight:
+    id: "first_boss_fight"
+    title: "初战降临"
+    description: "踏入BOSS战场（讨伐世界BOSS 1次）"
+    icon: "👹"
+    condition_type: "world_boss_count"
+    condition_target: "boss_participations"
+    condition_value: 1
+    rewards:
+      gold: 5000
+      exp: 1500
+      attribute_points: 5
+    flavor_text: "虽然你的伤害可能还没BOSS的回血快。但重在参与！"
+    hidden: false
+
+  boss_hunter:
+    id: "boss_hunter"
+    title: "BOSS猎人"
+    description: "BOSS讨伐常客（讨伐世界BOSS 10次）"
+    icon: "🗡️"
+    condition_type: "world_boss_count"
+    condition_target: "boss_participations"
+    condition_value: 10
+    rewards:
+      gold: 20000
+      exp: 6000
+      attribute_points: 15
+    flavor_text: "BOSS已经把你加入它的黑名单了。"
+    hidden: false
+
+  boss_slayer:
+    id: "boss_slayer"
+    title: "BOSS克星"
+    description: "BOSS的噩梦（讨伐世界BOSS 50次）"
+    icon: "⚔️"
+    condition_type: "world_boss_count"
+    condition_target: "boss_participations"
+    condition_value: 50
+    rewards:
+      gold: 80000
+      exp: 25000
+      attribute_points: 50
+    flavor_text: "BOSS一看到你上线就想请病假。"
+    hidden: false
+
+  boss_nemesis:
+    id: "boss_nemesis"
+    title: "BOSS终结者"
+    description: "世间再无BOSS敢称雄（讨伐世界BOSS 200次）"
+    icon: "💀"
+    condition_type: "world_boss_count"
+    condition_target: "boss_participations"
+    condition_value: 200
+    rewards:
+      gold: 300000
+      exp: 80000
+      attribute_points: 150
+    flavor_text: "BOSS已经向管理层提交了三次辞职信。全被驳回了。"
+    hidden: false
+
+  first_alchemy:
+    id: "first_alchemy"
+    title: "初涉丹道"
+    description: "踏上炼丹之路（炼丹1次）"
+    icon: "🧪"
+    condition_type: "alchemy_count"
+    condition_target: "alchemy_sessions"
+    condition_value: 1
+    rewards:
+      gold: 2000
+      exp: 500
+    flavor_text: "第一炉丹药！闻起来像……嗯……还是别闻了。"
+    hidden: false
+
+  alchemy_apprentice:
+    id: "alchemy_apprentice"
+    title: "丹道入门"
+    description: "已识药性（炼丹10次）"
+    icon: "⚗️"
+    condition_type: "alchemy_count"
+    condition_target: "alchemy_sessions"
+    condition_value: 10
+    rewards:
+      gold: 8000
+      exp: 2000
+      attribute_points: 5
+    flavor_text: "十炉丹药。你的邻居投诉说烟太大了。"
+    hidden: false
+
+  alchemy_adept:
+    id: "alchemy_adept"
+    title: "丹道小成"
+    description: "火候已至纯青（炼丹50次）"
+    icon: "🔥"
+    condition_type: "alchemy_count"
+    condition_target: "alchemy_sessions"
+    condition_value: 50
+    rewards:
+      gold: 25000
+      exp: 8000
+      attribute_points: 15
+    flavor_text: "你的丹炉比你家厨房还忙。"
+    hidden: false
+
+  alchemy_master_tier:
+    id: "alchemy_master_tier"
+    title: "丹道大师"
+    description: "丹成天下知（炼丹200次）"
+    icon: "💫"
+    condition_type: "alchemy_count"
+    condition_target: "alchemy_sessions"
+    condition_value: 200
+    rewards:
+      gold: 80000
+      exp: 25000
+      attribute_points: 40
+    flavor_text: "两百炉。你的丹炉比你更懂炼丹了。"
+    hidden: false
+
+  alchemy_grandmaster:
+    id: "alchemy_grandmaster"
+    title: "丹道宗师"
+    description: "丹道已臻极致（炼丹500次）"
+    icon: "🌟"
+    condition_type: "alchemy_count"
+    condition_target: "alchemy_sessions"
+    condition_value: 500
+    rewards:
+      gold: 200000
+      exp: 60000
+      attribute_points: 100
+    flavor_text: "药材商看到你来就自动打八折。因为怕你把店买空。"
+    hidden: false
+
+  restaurant_growth:
+    id: "restaurant_growth"
+    title: "小有规模"
+    description: "回头客越来越多（餐厅达到3级）"
+    icon: "🍜"
+    condition_type: "restaurant_level"
+    condition_target: "level"
+    condition_value: 3
+    rewards:
+      gold: 10000
+      exp: 3000
+      attribute_points: 8
+    flavor_text: "差评从'难吃'进化到'还行'了。这就是进步！"
+    hidden: false
+
+  restaurant_famous:
+    id: "restaurant_famous"
+    title: "远近闻名"
+    description: "方圆百里无人不知（餐厅达到5级）"
+    icon: "🍽️"
+    condition_type: "restaurant_level"
+    condition_target: "level"
+    condition_value: 5
+    rewards:
+      gold: 30000
+      exp: 10000
+      attribute_points: 20
+    flavor_text: "隔壁NPC的餐厅已经被你挤倒闭了。"
+    hidden: false
+
+  restaurant_legendary:
+    id: "restaurant_legendary"
+    title: "传说食府"
+    description: "登峰造极的餐饮帝国（餐厅达到10级）"
+    icon: "🏯"
+    condition_type: "restaurant_level"
+    condition_target: "level"
+    condition_value: 10
+    rewards:
+      gold: 100000
+      exp: 30000
+      attribute_points: 60
+    flavor_text: "你用实力证明了：修仙的尽头是餐饮业。"
     hidden: false
 
 # 成就分类
 categories:
-  cultivation: ["first_cultivation", "cultivation_adept", "cultivation_master", "ascetic_monk"]
+  cultivation: ["first_cultivation", "cultivation_adept", "cultivation_master", "ascetic_monk", "cultivation_grandmaster", "cultivation_immortal"]
   growth: ["first_breakthrough", "level_ten_warrior", "level_thirty_master", "level_fifty_expert", "level_hundred_legend"]
-  battle: ["first_victory", "veteran_fighter", "winning_streak", "hundred_battles", "thousand_slayer"]
+  battle: ["first_victory", "veteran_fighter", "winning_streak", "hundred_battles", "thousand_slayer", "five_thousand_slayer", "myriad_slayer"]
   equipment: ["first_equipment", "equipment_collector", "legendary_weapon"]
-  wealth: ["small_fortune", "wealthy_magnate", "financial_freedom"]
+  wealth: ["small_fortune", "wealthy_magnate", "financial_freedom", "tycoon", "billionaire"]
   exploration: ["world_explorer", "seasoned_explorer", "master_explorer"]
   loyalty: ["loyal_believer", "weekly_devotee", "monthly_devotee", "lifetime_achievement"]
   social: ["npc_gift_beggar", "tied_the_knot", "joined_guild"]
-  adventure: ["first_reincarnation", "abyss_walker"]
+  adventure: ["first_reincarnation", "abyss_walker", "deep_abyss", "abyss_conqueror", "abyss_overlord"]
   economy: ["first_trade"]
-  lifestyle: ["fishing_enthusiast", "first_restaurant"]
+  lifestyle: ["fishing_enthusiast", "first_restaurant", "restaurant_growth", "restaurant_famous", "restaurant_legendary"]
   anniversary: ["first_anniversary"]
+  pvp_streak: ["streak_novice", "streak_master", "streak_king", "streak_god"]
+  world_boss: ["first_boss_fight", "boss_hunter", "boss_slayer", "boss_nemesis"]
+  alchemy: ["first_alchemy", "alchemy_apprentice", "alchemy_adept", "alchemy_master_tier", "alchemy_grandmaster"]

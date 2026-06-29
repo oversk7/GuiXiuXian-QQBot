@@ -378,6 +378,43 @@ class AchievementService:
                     # condition_value 格式: "2025-10-04"
                     cutoff_date = datetime.strptime(condition_value, "%Y-%m-%d")
                     is_unlocked = player.created_at < cutoff_date
+            elif condition_type == "ladder_win_streak":
+                from ..models.ladder import LadderRating
+                ladder_result = await session.execute(
+                    select(LadderRating).where(LadderRating.player_id == player.id)
+                )
+                ladder_rating = ladder_result.scalar_one_or_none()
+                is_unlocked = ladder_rating is not None and ladder_rating.win_streak >= condition_value
+            elif condition_type == "world_boss_count":
+                from ..models.world_boss import WorldBossDamage
+                from sqlalchemy import func as sql_func
+                boss_result = await session.execute(
+                    select(sql_func.count()).select_from(WorldBossDamage).where(
+                        WorldBossDamage.player_id == player.id
+                    )
+                )
+                boss_count = boss_result.scalar() or 0
+                is_unlocked = boss_count >= condition_value
+            elif condition_type == "alchemy_count":
+                from ..models.alchemy_task import AlchemyRecord
+                from sqlalchemy import func as sql_func
+                alchemy_result = await session.execute(
+                    select(sql_func.count()).select_from(AlchemyRecord).where(
+                        and_(
+                            AlchemyRecord.player_id == player.id,
+                            AlchemyRecord.claimed == True
+                        )
+                    )
+                )
+                alchemy_total = alchemy_result.scalar() or 0
+                is_unlocked = alchemy_total >= condition_value
+            elif condition_type == "restaurant_level":
+                from ..models.restaurant import Restaurant
+                restaurant_result = await session.execute(
+                    select(Restaurant).where(Restaurant.player_id == player.id).limit(1)
+                )
+                restaurant = restaurant_result.scalar_one_or_none()
+                is_unlocked = restaurant is not None and restaurant.level >= condition_value
 
             # 如果达成条件，解锁成就
             if is_unlocked:
@@ -625,6 +662,41 @@ class AchievementService:
                         if player and player.created_at and achievement_data.get("condition_value"):
                             cutoff_date = datetime.strptime(achievement_data.get("condition_value"), "%Y-%m-%d")
                             current_progress = 1 if player.created_at < cutoff_date else 0
+                    elif condition_type == "ladder_win_streak":
+                        from ..models.ladder import LadderRating
+                        ladder_result = await session.execute(
+                            select(LadderRating).where(LadderRating.player_id == player.id)
+                        )
+                        ladder_rating = ladder_result.scalar_one_or_none()
+                        current_progress = ladder_rating.win_streak if ladder_rating else 0
+                    elif condition_type == "world_boss_count":
+                        from ..models.world_boss import WorldBossDamage
+                        from sqlalchemy import func as sql_func
+                        boss_result = await session.execute(
+                            select(sql_func.count()).select_from(WorldBossDamage).where(
+                                WorldBossDamage.player_id == player.id
+                            )
+                        )
+                        current_progress = boss_result.scalar() or 0
+                    elif condition_type == "alchemy_count":
+                        from ..models.alchemy_task import AlchemyRecord
+                        from sqlalchemy import func as sql_func
+                        alchemy_result = await session.execute(
+                            select(sql_func.count()).select_from(AlchemyRecord).where(
+                                and_(
+                                    AlchemyRecord.player_id == player.id,
+                                    AlchemyRecord.claimed == True
+                                )
+                            )
+                        )
+                        current_progress = alchemy_result.scalar() or 0
+                    elif condition_type == "restaurant_level":
+                        from ..models.restaurant import Restaurant
+                        restaurant_result = await session.execute(
+                            select(Restaurant).where(Restaurant.player_id == player.id).limit(1)
+                        )
+                        restaurant = restaurant_result.scalar_one_or_none()
+                        current_progress = restaurant.level if restaurant else 0
 
                     progress_data[achievement_id] = current_progress
 

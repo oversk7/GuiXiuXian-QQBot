@@ -192,7 +192,11 @@ async def get_achievement_detail(session, player, achievement_name: str) -> str:
         "locations_visited": "探索地点",
         "login_streak": "连续登录",
         "total_login_days": "累计登录天数",
-        "account_age": "账号创建时间"
+        "account_age": "账号创建时间",
+        "ladder_win_streak": "天梯连胜",
+        "world_boss_count": "讨伐世界BOSS",
+        "alchemy_count": "完成炼丹",
+        "restaurant_level": "餐厅等级",
     }
     lines.append(f"  类型: {condition_map.get(condition_type, condition_type)}")
     lines.append(f"  目标: **{target}**")

@@ -209,6 +209,14 @@ async def _do_match(event: MessageEvent, session, player, service: LadderRatingS
     hint_parts.append(f"今日 {used}/{quota}")
     hint = " | ".join(hint_parts)
 
+    # 检查成就（连胜等）
+    from ...achievement.achievement_service import AchievementService
+    achievement_msgs = await AchievementService.check_achievements(session, player)
+    if achievement_msgs:
+        for msg in achievement_msgs:
+            if msg:
+                await ladder_main_cmd.send(message_add_head(msg, event))
+
     await ladder_main_cmd.finish(build_battle_markdown(
         title=title,
         battle_log=filtered_log,
