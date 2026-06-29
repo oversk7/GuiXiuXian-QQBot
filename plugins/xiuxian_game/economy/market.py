@@ -14,6 +14,7 @@ from ..utils import message_add_head
 from ..utils_markdown import cmd, build_markdown
 from .equipment_trade_service import EquipmentTradeService
 from ..item.equipment_commands import find_equipment_by_input
+from ..item.equipment_service import VIP_EQUIPMENT_IDS
 from ..platform_utils import get_event_server_id, get_unified_player, require_player
 
 from datetime import date, datetime, timedelta
@@ -323,7 +324,6 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
         await list_cmd.finish("⛔ 跑商商品不能在市场挂牌，请前往市集交易")
 
     # VIP定制装备禁止交易
-    VIP_EQUIPMENT_IDS = {"vip_blade_zhanlongshan", "vip_robe_jingyuanzhiyi", "vip_robe_jingyuan_legacy", "heaven_retreat_star_blade", "vip_gui_yu", "vip_chrono_watch", "vip_longying_flash", "vip_ghost_dice", "vip_shoes_longren", "vip_pendant_fuze", "vip_huihai_xinyuan", "vip_jade_xuanxu_shuangyan"}
     if item_cfg.item_id in VIP_EQUIPMENT_IDS:
         await list_cmd.finish("⛔ VIP定制装备为专属装备，不可交易")
 
@@ -727,11 +727,7 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
                 upgrade_multiplier = equip.get_upgrade_bonus_multiplier()
                 if tpl.attr_bonus or tpl.attr_ratio:
                     lines.append("📈 基础属性：")
-                    attr_name_map = {
-                        "attack": "攻击力", "defense": "防御力", "agility": "敏捷",
-                        "luck": "运气", "hp": "生命值", "mp": "理智值",
-                        "max_hp": "最大生命值", "max_mp": "最大理智值"
-                    }
+                    from ..item.equipment_service import ATTR_NAME_MAP as attr_name_map
                     if tpl.attr_bonus:
                         for k, v in tpl.attr_bonus.items():
                             current_value = int(v * upgrade_multiplier)
@@ -773,7 +769,6 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
                 # 特殊效果
                 if hasattr(tpl, 'special_effects') and tpl.special_effects:
                     lines.append("✨ 特殊效果：")
-                    VIP_EQUIPMENT_IDS = {"vip_blade_zhanlongshan", "vip_robe_jingyuanzhiyi", "vip_robe_jingyuan_legacy", "heaven_retreat_star_blade", "vip_gui_yu", "vip_chrono_watch", "vip_longying_flash", "vip_ghost_dice", "vip_shoes_longren", "vip_pendant_fuze", "vip_huihai_xinyuan", "vip_jade_xuanxu_shuangyan"}
                     is_vip = equip.item_id in VIP_EQUIPMENT_IDS
                     unlocked_count = equip.upgrade_level // 2
 

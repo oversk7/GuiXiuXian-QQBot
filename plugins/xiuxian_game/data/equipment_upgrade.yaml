@@ -1,0 +1,112 @@
+# 装备升阶配置
+# 策划调数值只需编辑此文件，无需修改 Python 代码
+
+# 升阶成功率（target_level -> 基础成功率）
+success_rates:
+  1: 0.95
+  2: 0.90
+  3: 0.85
+  4: 0.80
+  5: 0.75
+  6: 0.70
+  7: 0.60
+  8: 0.50
+  9: 0.40
+  10: 0.25
+
+# 升阶失败后果（target_level -> {downgrade: 降级阶数, destroy: 损坏概率}）
+failure_consequences:
+  1: {downgrade: 0, destroy: 0.0}
+  2: {downgrade: 0, destroy: 0.0}
+  3: {downgrade: 0, destroy: 0.0}
+  4: {downgrade: 1, destroy: 0.0}
+  5: {downgrade: 1, destroy: 0.0}
+  6: {downgrade: 1, destroy: 0.0}
+  7: {downgrade: 1, destroy: 0.02}
+  8: {downgrade: 1, destroy: 0.03}
+  9: {downgrade: 2, destroy: 0.05}
+  10: {downgrade: 2, destroy: 0.08}
+
+# 升阶金币费用（target_level -> 金币数）
+gold_costs:
+  1: 15000
+  2: 45000
+  3: 135000
+  4: 405000
+  5: 1215000
+  6: 3645000
+  7: 11035000
+  8: 33005000
+  9: 98715000
+  10: 295645000
+
+# 合成所需同阶装备数量（稀有装备固定为 1）
+equipment_count: 2
+
+# ============================================================
+# 升阶材料配置
+# normal     = 有配方的普通装备
+# rare_*     = 无配方的稀有/VIP/BOSS装备，按装备稀有度区分
+# target_level -> {material_id: quantity}
+# ============================================================
+materials:
+  normal:
+    1:  {upgrade_stone_low: 1}
+    2:  {upgrade_stone_low: 2}
+    3:  {upgrade_stone_low: 3}
+    4:  {upgrade_stone_mid: 1}
+    5:  {upgrade_stone_mid: 2}
+    6:  {upgrade_stone_mid: 3}
+    7:  {upgrade_stone_high: 1}
+    8:  {upgrade_stone_high: 2}
+    9:  {upgrade_stone_high: 3}
+    10: {upgrade_stone_supreme: 1}
+
+  rare_orange:
+    1:  {upgrade_stone_low: 1, void_essence: 1}
+    2:  {upgrade_stone_low: 2, void_essence: 2}
+    3:  {upgrade_stone_low: 3, void_essence: 3}
+    4:  {upgrade_stone_mid: 1, demon_heart: 1}
+    5:  {upgrade_stone_mid: 2, demon_heart: 1}
+    6:  {upgrade_stone_mid: 3, demon_heart: 1}
+    7:  {upgrade_stone_high: 1, time_dust: 1}
+    8:  {upgrade_stone_high: 2, time_dust: 2}
+    9:  {upgrade_stone_high: 3, time_dust: 3}
+    10: {upgrade_stone_supreme: 1, world_fragment: 1}
+
+  rare_purple:
+    1:  {upgrade_stone_low: 1, soul_crystal: 1}
+    2:  {upgrade_stone_low: 2, soul_crystal: 2}
+    3:  {upgrade_stone_low: 3, soul_crystal: 3}
+    4:  {upgrade_stone_mid: 1, cursed_mirror_shard: 1}
+    5:  {upgrade_stone_mid: 2, cursed_mirror_shard: 2}
+    6:  {upgrade_stone_mid: 3, cursed_mirror_shard: 3}
+    7:  {upgrade_stone_high: 1, demon_heart: 1}
+    8:  {upgrade_stone_high: 2, demon_heart: 1}
+    9:  {upgrade_stone_high: 3, demon_heart: 1}
+    10: {upgrade_stone_supreme: 1, void_essence: 2}
+
+  rare_blue:
+    1:  {upgrade_stone_low: 1, phantom_thread: 2}
+    2:  {upgrade_stone_low: 2, phantom_thread: 4}
+    3:  {upgrade_stone_low: 3, phantom_thread: 6}
+    4:  {upgrade_stone_mid: 1, soul_crystal: 1}
+    5:  {upgrade_stone_mid: 2, soul_crystal: 2}
+    6:  {upgrade_stone_mid: 3, soul_crystal: 3}
+    7:  {upgrade_stone_high: 1, cursed_mirror_shard: 1}
+    8:  {upgrade_stone_high: 2, cursed_mirror_shard: 2}
+    9:  {upgrade_stone_high: 3, cursed_mirror_shard: 3}
+    10: {upgrade_stone_supreme: 1, demon_heart: 1}
+
+  # 绿色/白色稀有装备，与普通装备相同
+  rare_default:
+    1:  {upgrade_stone_low: 1}
+    2:  {upgrade_stone_low: 2}
+    3:  {upgrade_stone_low: 3}
+    4:  {upgrade_stone_mid: 1}
+    5:  {upgrade_stone_mid: 2}
+    6:  {upgrade_stone_mid: 3}
+    7:  {upgrade_stone_high: 1}
+    8:  {upgrade_stone_high: 2}
+    9:  {upgrade_stone_high: 3}
+    10: {upgrade_stone_supreme: 1}

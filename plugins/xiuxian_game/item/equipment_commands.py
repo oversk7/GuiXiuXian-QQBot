@@ -20,7 +20,15 @@ from ..utils import message_add_head
 from ..utils_markdown import cmd, build_markdown, color_rarity
 from ..platform_utils import require_player
 # 导入装备服务模块（业务逻辑已移至此处，解决模块耦合）
-from .equipment_service import recalc_equipment_attributes, EQUIP_ITEM_IDS
+from ..infrastructure.repositories.item_repository import ItemRepository
+from ..infrastructure.repositories.player_repository import PlayerRepository
+from .equipment_service import (
+    recalc_equipment_attributes, EQUIP_ITEM_IDS, VIP_EQUIPMENT_IDS,
+    ATTR_NAME_MAP, EquipmentService,
+)
+from .affix_service import get_affixes_from_equipment, format_affixes_display
+from .gem_socket_service import GemSocketService
+from .inscription_service import get_inscription_display, get_inscription_display_from_item
 
 # ==================== Feature Flag ====================
 # 设置为True使用新版DI架构的EquipmentService，False使用旧版本
@@ -146,9 +154,6 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
             await list_equipment.finish("⛔ 页码必须是正整数")
 
     async with safe_session() as session:
-        # 使用跨平台工具获取玩家数据
-        from ..platform_utils import require_player
-        from ..config import config
         player = await require_player(session, event, list_equipment)
 
         # 查询玩家所有装备条目
@@ -210,7 +215,6 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
                 info_parts.append(f"💎{eq.used_gem_slots}/{eq.available_gem_slots}")
 
             # 词缀标记
-            from .affix_service import get_affixes_from_equipment
             affix_list = get_affixes_from_equipment(eq.extra_attrs)
             if affix_list:
                 info_parts.append(f"🔮{len(affix_list)}词缀")
@@ -248,8 +252,6 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
         await equipment_detail.finish("⛔ 格式：装备详情 装备编号/名称")
 
     async with safe_session() as session:
-        # 使用跨平台工具获取玩家数据
-        from ..platform_utils import require_player
         player = await require_player(session, event, equipment_detail)
 
         # 查找装备
@@ -302,11 +304,7 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
                     current_value = int(v * upgrade_multiplier)
                     bonus = current_value - base_value
 
-                    attr_name = {
-                        "attack": "攻击力", "defense": "防御力", "agility": "敏捷",
-                        "luck": "运气", "hp": "生命值", "mp": "理智值",
-                        "max_hp": "最大生命值", "max_mp": "最大理智值"
-                    }.get(k, k)
+                    attr_name = ATTR_NAME_MAP.get(k, k)
 
                     if bonus > 0:
                         lines.append(f"  • {attr_name}：{base_value} → {current_value} (+{bonus})")
@@ -320,11 +318,7 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
                     current_ratio = float(r) * upgrade_multiplier * 100
                     bonus_ratio = current_ratio - base_ratio
 
-                    attr_name = {
-                        "attack": "攻击力", "defense": "防御力", "agility": "敏捷",
-                        "luck": "运气", "hp": "生命值", "mp": "理智值",
-                        "max_hp": "最大生命值", "max_mp": "最大理智值"
-                    }.get(k, k)
+                    attr_name = ATTR_NAME_MAP.get(k, k)
 
                     if bonus_ratio > 0:
                         lines.append(f"  • {attr_name}：{base_ratio:.1f}% → 现在{current_ratio:.1f}% (+{bonus_ratio:.1f}%)")
@@ -334,8 +328,6 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
             lines.append("")
 
         # 词缀展示
-        from .affix_service import get_affixes_from_equipment, format_affixes_display
-
         affixes = get_affixes_from_equipment(equip.extra_attrs)
         if affixes:
             lines.append("🔮 词缀：")
@@ -348,8 +340,6 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
             lines.append(f"  • 孔位：{equip.used_gem_slots}/{equip.available_gem_slots}")
 
             if equip.used_gem_slots > 0:
-                from .gem_socket_service import GemSocketService
-                from .inscription_service import get_inscription_display
                 gem_info = GemSocketService.get_equipment_gem_info(equip)
                 for slot_info in gem_info:
                     if not slot_info["is_empty"]:
@@ -402,8 +392,6 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
         if hasattr(tpl, 'special_effects') and tpl.special_effects:
             lines.append("✨ 特殊效果：")
 
-            # VIP定制装备列表（0阶即全解锁）
-            VIP_EQUIPMENT_IDS = {"vip_blade_zhanlongshan", "vip_robe_jingyuanzhiyi", "vip_robe_jingyuan_legacy", "heaven_retreat_star_blade", "vip_gui_yu", "vip_chrono_watch", "vip_longying_flash", "vip_ghost_dice", "vip_shoes_longren", "vip_pendant_fuze", "vip_huihai_xinyuan", "vip_jade_xuanxu_shuangyan"}
             is_vip_equipment = equip.item_id in VIP_EQUIPMENT_IDS
 
             if is_vip_equipment:
@@ -459,8 +447,6 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
     arg_list = arg.split()
 
     async with safe_session() as session:
-        # 使用跨平台工具获取玩家数据
-        from ..platform_utils import require_player
         player = await require_player(session, event, wear_equipment)
 
         if len(arg_list) == 1:
@@ -512,10 +498,6 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
             equip.equipped = True
             session.add(equip)
 
-            from ..infrastructure.repositories.item_repository import ItemRepository
-            from ..infrastructure.repositories.player_repository import PlayerRepository
-            from .equipment_service import EquipmentService
-
             equipment_service = EquipmentService(
                 item_repo=ItemRepository(session),
                 player_repo=PlayerRepository(session)
@@ -543,10 +525,6 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
         else:
             # ---- 批量装备：依次装备，每件完成后立即重算属性并提交 ----
             # 初始化装备服务（整个批次共用）
-            from ..infrastructure.repositories.item_repository import ItemRepository
-            from ..infrastructure.repositories.player_repository import PlayerRepository
-            from .equipment_service import EquipmentService
-
             equipment_service = EquipmentService(
                 item_repo=ItemRepository(session),
                 player_repo=PlayerRepository(session)
@@ -606,12 +584,8 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
                     fail_list.append(f"{equip.config.name}(#{single_arg}): 装备栏已满({equipped_count}/{slot_limit})")
                     continue
 
-                # 标记为已装备，立即重算并提交（与单独执行"装备"指令效果完全一致）
                 equip.equipped = True
                 session.add(equip)
-                await equipment_service.recalc_equipment_attributes(player)
-                session.add(player)
-                await session.commit()
 
                 # 更新本地状态，供后续装备的检查使用
                 equipped_count += 1
@@ -619,6 +593,12 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
                 equipped_item_ids.add(equip.item_id)
                 equipped_instance_ids.add(equip.id)
                 success_list.append(f"{equip.config.name}(ID:{equip.id})")
+
+            # 批量穿戴完成后统一重算属性并提交
+            if success_list:
+                await equipment_service.recalc_equipment_attributes(player)
+                session.add(player)
+                await session.commit()
 
             lines = []
             if success_list:
@@ -632,6 +612,41 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
             await wear_equipment.finish(message_add_head("\n".join(lines), event))
 
 
+async def _handle_furnace_unequip(session, player: Player, equip: ItemInstance) -> list[str]:
+    """卸下炼丹炉时处理进行中的炼丹任务，返回失败信息列表。"""
+    from ..alchemy.service import AlchemyService
+    from ..models.alchemy_task import AlchemyRecord
+
+    if equip.item_id != AlchemyService.FURNACE_ITEM_ID:
+        return []
+
+    stmt = select(AlchemyRecord).where(
+        and_(
+            AlchemyRecord.player_id == player.id,
+            AlchemyRecord.furnace_id == equip.id,
+            AlchemyRecord.claimed == False
+        )
+    )
+    alchemy_records = (await session.execute(stmt)).scalars().all()
+
+    failed_tasks = []
+    for record in alchemy_records:
+        if not record.is_finished():
+            failed_tasks.append(f"{equip.config.name}(ID:{equip.id}) 炼丹任务失败，返还材料")
+            for material_id, quantity in record.materials.items():
+                try:
+                    await ItemInstance.add_item(session, player.id, material_id, quantity)
+                except ValueError:
+                    material_config = config.items_config["by_id"].get(material_id)
+                    if material_config:
+                        gold_value = material_config.price * quantity
+                        player.gold += gold_value
+                        failed_tasks.append(f"背包已满，{material_config.name}×{quantity} 转为 {gold_value} 金币")
+        await session.delete(record)
+
+    return failed_tasks
+
+
 # ---------------- 指令：卸下装备 ----------------
 unwear_equipment = on_command("卸下", block=True, priority=9)
 
@@ -642,8 +657,6 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
         await unwear_equipment.finish("⛔ 格式：卸下 装备编号/名称")
 
     async with safe_session() as session:
-        # 使用跨平台工具获取玩家数据
-        from ..platform_utils import require_player
         player = await require_player(session, event, unwear_equipment)
 
         # 查找装备
@@ -686,42 +699,7 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
                 "💡 请先卸下其他不提供装备槽的装备，再卸下它"
             )
 
-        # 检查是否为炼丹炉，如果是则处理进行中的炼丹任务
-        from ..alchemy.service import AlchemyService
-        from ..models.alchemy_task import AlchemyRecord
-
-        failed_tasks = []
-        if equip.item_id == AlchemyService.FURNACE_ITEM_ID:
-            # 查找使用该炼丹炉的进行中任务
-            stmt = select(AlchemyRecord).where(
-                and_(
-                    AlchemyRecord.player_id == player.id,
-                    AlchemyRecord.furnace_id == equip.id,
-                    AlchemyRecord.claimed == False
-                )
-            )
-            alchemy_records = (await session.execute(stmt)).scalars().all()
-
-            # 处理进行中的炼丹任务
-            for record in alchemy_records:
-                if not record.is_finished():
-                    # 任务未完成，按失败处理，返还材料
-                    failed_tasks.append(f"炼丹任务失败，返还材料")
-
-                    # 返还材料
-                    for material_id, quantity in record.materials.items():
-                        try:
-                            await ItemInstance.add_item(session, player.id, material_id, quantity)
-                        except ValueError:
-                            # 背包满了，转换为金币
-                            material_config = config.items_config["by_id"].get(material_id)
-                            if material_config:
-                                gold_value = material_config.price * quantity
-                                player.gold += gold_value
-                                failed_tasks.append(f"背包已满，{material_config.name}×{quantity} 转为 {gold_value} 金币")
-
-                # 删除炼丹记录
-                await session.delete(record)
+        failed_tasks = await _handle_furnace_unequip(session, player, equip)
 
         # 卸下装备
         equip.equipped = False
@@ -741,10 +719,6 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
 
         # 重新计算剩余装备的属性加成，确保 mp_from_hp 等全局被动同步
         # 新版本: 使用DI架构的EquipmentService
-        from ..infrastructure.repositories.item_repository import ItemRepository
-        from ..infrastructure.repositories.player_repository import PlayerRepository
-        from .equipment_service import EquipmentService
-
         equipment_service = EquipmentService(
             item_repo=ItemRepository(session),
             player_repo=PlayerRepository(session)
@@ -779,49 +753,11 @@ async def _(event: MessageEvent):
         if not equipped_items:
             await unwear_all_equipment.finish("⛔ 你没有穿戴任何装备")
 
-        # 处理炼丹炉相关的任务
-        from ..alchemy.service import AlchemyService
-        from ..models.alchemy_task import AlchemyRecord
+        all_failed_tasks = []
+        unworn_equipment = []
 
-        all_failed_tasks = []  # 所有失败的炼丹任务
-
-        unworn_equipment = []  # 记录卸下的装备信息
-
-        # 逐个卸下装备
         for equip in equipped_items:
-            # 检查是否为炼丹炉，如果是则处理进行中的炼丹任务
-            failed_tasks = []
-            if equip.item_id == AlchemyService.FURNACE_ITEM_ID:
-                # 查找使用该炼丹炉的进行中任务
-                stmt = select(AlchemyRecord).where(
-                    and_(
-                        AlchemyRecord.player_id == player.id,
-                        AlchemyRecord.furnace_id == equip.id,
-                        AlchemyRecord.claimed == False
-                    )
-                )
-                alchemy_records = (await session.execute(stmt)).scalars().all()
-
-                # 处理进行中的炼丹任务
-                for record in alchemy_records:
-                    if not record.is_finished():
-                        # 任务未完成，按失败处理，返还材料
-                        failed_tasks.append(f"{equip.config.name}(ID:{equip.id}) 炼丹任务失败，返还材料")
-
-                        # 返还材料
-                        for material_id, quantity in record.materials.items():
-                            try:
-                                await ItemInstance.add_item(session, player.id, material_id, quantity)
-                            except ValueError:
-                                # 背包满了，转换为金币
-                                material_config = config.items_config["by_id"].get(material_id)
-                                if material_config:
-                                    gold_value = material_config.price * quantity
-                                    player.gold += gold_value
-                                    failed_tasks.append(f"背包已满，{material_config.name}×{quantity} 转为 {gold_value} 金币")
-
-                    # 删除炼丹记录
-                    await session.delete(record)
+            all_failed_tasks.extend(await _handle_furnace_unequip(session, player, equip))
 
             # 卸下装备
             equip.equipped = False
@@ -843,10 +779,6 @@ async def _(event: MessageEvent):
 
         # 重新计算剩余装备的属性加成，确保属性正确恢复
         # 新版本: 使用DI架构的EquipmentService
-        from ..infrastructure.repositories.item_repository import ItemRepository
-        from ..infrastructure.repositories.player_repository import PlayerRepository
-        from .equipment_service import EquipmentService
-
         equipment_service = EquipmentService(
             item_repo=ItemRepository(session),
             player_repo=PlayerRepository(session)
@@ -1046,9 +978,6 @@ _INSCRIPTION_PAGE_SIZE = 30
 
 @inscription_list_cmd.handle()
 async def handle_inscription_list(event: MessageEvent, args: Message = CommandArg()):
-    from ..models.db import safe_session
-    from .inscription_service import get_inscription_display_from_item
-
     arg_text = args.extract_plain_text().strip()
     page = 1
     if arg_text.isdigit() and int(arg_text) >= 1:

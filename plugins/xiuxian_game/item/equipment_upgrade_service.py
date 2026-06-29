@@ -16,6 +16,10 @@
 
 import random
 from typing import Dict, Tuple, Optional, List
+from pathlib import Path
+
+import yaml
+
 from ..models.inventory import ItemInstance
 from ..models.player import Player
 from ..config import config
@@ -23,52 +27,22 @@ from ..infrastructure.repositories.item_repository import ItemRepository
 from ..infrastructure.repositories.player_repository import PlayerRepository
 from .affix_service import get_affixes_from_equipment
 
+# -------- 从 YAML 加载升阶配置（模块级缓存） --------
+_upgrade_config: Optional[dict] = None
+
+
+def _load_upgrade_config() -> dict:
+    global _upgrade_config
+    if _upgrade_config is not None:
+        return _upgrade_config
+    cfg_path = Path(__file__).parent.parent / "data" / "equipment_upgrade.yaml"
+    with open(cfg_path, "r", encoding="utf-8") as f:
+        _upgrade_config = yaml.safe_load(f)
+    return _upgrade_config
+
 
 class EquipmentUpgradeService:
     """装备升阶服务类（装备合成模式） - DI架构版本"""
-
-    # 升阶成功率配置（已优化，提高玩家体验）
-    SUCCESS_RATES = {
-        1: 0.95, 2: 0.90, 3: 0.85,  # 1-3阶：高成功率
-        4: 0.80, 5: 0.75, 6: 0.70,  # 4-6阶：中等成功率
-        7: 0.60, 8: 0.50, 9: 0.40,  # 7-9阶：中低成功率
-        10: 0.25                     # 10阶：低成功率
-    }
-
-    # 升阶失败后果配置（已优化，减轻惩罚）
-    FAILURE_CONSEQUENCES = {
-        # 1-3阶：只消耗材料，装备不变
-        1: {"downgrade": 0, "destroy": 0.0},
-        2: {"downgrade": 0, "destroy": 0.0},
-        3: {"downgrade": 0, "destroy": 0.0},
-
-        # 4-6阶：可能降1阶
-        4: {"downgrade": 1, "destroy": 0.0},
-        5: {"downgrade": 1, "destroy": 0.0},
-        6: {"downgrade": 1, "destroy": 0.0},
-
-        # 7-9阶：可能降1阶或少量损坏风险
-        7: {"downgrade": 1, "destroy": 0.02},
-        8: {"downgrade": 1, "destroy": 0.03},
-        9: {"downgrade": 2, "destroy": 0.05},
-
-        # 10阶：可能降2阶或损坏
-        10: {"downgrade": 2, "destroy": 0.08}
-    }
-
-    # 装备合成需求配置（需要的相同装备数量）
-    EQUIPMENT_REQUIREMENTS = {
-        1: 2,   # 1阶需要2个0阶装备
-        2: 2,   # 2阶需要2个1阶装备
-        3: 2,   # 3阶需要2个2阶装备
-        4: 2,   # 4阶需要2个3阶装备
-        5: 2,   # 5阶需要2个4阶装备
-        6: 2,   # 6阶需要2个5阶装备
-        7: 2,   # 7阶需要2个6阶装备
-        8: 2,   # 8阶需要2个7阶装备
-        9: 2,   # 9阶需要2个8阶装备
-        10: 2   # 10阶需要2个9阶装备
-    }
 
     def __init__(
         self,
@@ -117,126 +91,49 @@ class EquipmentUpgradeService:
         return not hasattr(item_config, 'recipe') or not item_config.recipe
 
     def get_equipment_requirements(self, current_level: int, item_id: str = None) -> int:
-        """获取升阶所需的相同装备数量
-
-        Args:
-            current_level: 当前升阶等级
-            item_id: 装备ID（用于判断是否为稀有装备）
-        """
-        if current_level >= 10:
-            return 0  # 已达最高等级
-
-        # 稀有装备（没有配方的装备）不需要消耗多个装备
-        if item_id and self.is_rare_equipment(item_id):
-            return 1  # 只需要装备本身
-
-        target_level = current_level + 1
-        return self.EQUIPMENT_REQUIREMENTS.get(target_level, 2)
-
-    def get_upgrade_materials(self, current_level: int, item_id: str = None) -> Dict[str, int]:
-        """获取升阶所需升阶石材料
-
-        Args:
-            current_level: 当前升阶等级
-            item_id: 装备ID（用于判断是否为稀有装备）
-        """
-        if current_level >= 10:
-            return {}  # 已达最高等级
-
-        target_level = current_level + 1
-        materials = {}
-
-        # 稀有装备（没有配方的装备）使用特殊材料
-        if item_id and self.is_rare_equipment(item_id):
-            # 根据装备稀有度和等级要求，使用不同的材料组合
-            item_config = config.items_config["by_id"].get(item_id)
-
-            if item_config:
-                rarity = getattr(item_config, 'rarity', 'white')
-                required_level = getattr(item_config, 'required_level', 1)
-
-                # 根据稀有度和等级确定材料
-                if rarity == 'orange' or required_level >= 150:
-                    # 传说级装备：使用高级材料
-                    if target_level <= 3:
-                        materials["upgrade_stone_low"] = target_level
-                        materials["void_essence"] = target_level
-                    elif target_level <= 6:
-                        materials["upgrade_stone_mid"] = target_level - 3
-                        materials["demon_heart"] = 1
-                    elif target_level <= 9:
-                        materials["upgrade_stone_high"] = target_level - 6
-                        materials["time_dust"] = target_level - 6
-                    else:  # target_level == 10
-                        materials["upgrade_stone_supreme"] = 1
-                        materials["world_fragment"] = 1
-
-                elif rarity == 'purple' or required_level >= 100:
-                    # 紫色装备：使用中级材料
-                    if target_level <= 3:
-                        materials["upgrade_stone_low"] = target_level
-                        materials["soul_crystal"] = target_level
-                    elif target_level <= 6:
-                        materials["upgrade_stone_mid"] = target_level - 3
-                        materials["cursed_mirror_shard"] = target_level - 3
-                    elif target_level <= 9:
-                        materials["upgrade_stone_high"] = target_level - 6
-                        materials["demon_heart"] = 1
-                    else:  # target_level == 10
-                        materials["upgrade_stone_supreme"] = 1
-                        materials["void_essence"] = 2
-
-                elif rarity == 'blue' or required_level >= 60:
-                    # 蓝色装备：使用低级材料
-                    if target_level <= 3:
-                        materials["upgrade_stone_low"] = target_level
-                        materials["phantom_thread"] = target_level * 2
-                    elif target_level <= 6:
-                        materials["upgrade_stone_mid"] = target_level - 3
-                        materials["soul_crystal"] = target_level - 3
-                    elif target_level <= 9:
-                        materials["upgrade_stone_high"] = target_level - 6
-                        materials["cursed_mirror_shard"] = target_level - 6
-                    else:  # target_level == 10
-                        materials["upgrade_stone_supreme"] = 1
-                        materials["demon_heart"] = 1
-                else:
-                    # 绿色/白色装备：只需要升阶石
-                    if target_level <= 3:
-                        materials["upgrade_stone_low"] = target_level
-                    elif target_level <= 6:
-                        materials["upgrade_stone_mid"] = target_level - 3
-                    elif target_level <= 9:
-                        materials["upgrade_stone_high"] = target_level - 6
-                    else:  # target_level == 10
-                        materials["upgrade_stone_supreme"] = 1
-        else:
-            # 普通装备（有配方的装备）只需要升阶石
-            if target_level <= 3:
-                materials["upgrade_stone_low"] = target_level
-            elif target_level <= 6:
-                materials["upgrade_stone_mid"] = target_level - 3
-            elif target_level <= 9:
-                materials["upgrade_stone_high"] = target_level - 6
-            else:  # target_level == 10
-                materials["upgrade_stone_supreme"] = 1
-
-        return materials
-
-    def get_upgrade_gold_cost(self, current_level: int) -> int:
-        """获取升阶所需金币"""
+        """获取升阶所需的相同装备数量"""
         if current_level >= 10:
             return 0
+        if item_id and self.is_rare_equipment(item_id):
+            return 1
+        return _load_upgrade_config().get("equipment_count", 2)
+
+    @staticmethod
+    def _get_rare_material_tier(item_config) -> str:
+        """根据稀有装备的稀有度/等级返回材料表键名。"""
+        if not item_config:
+            return "rare_default"
+        rarity = getattr(item_config, "rarity", "white")
+        req_lv = getattr(item_config, "required_level", 1)
+        if rarity == "orange" or req_lv >= 150:
+            return "rare_orange"
+        if rarity == "purple" or req_lv >= 100:
+            return "rare_purple"
+        if rarity == "blue" or req_lv >= 60:
+            return "rare_blue"
+        return "rare_default"
+
+    def get_upgrade_materials(self, current_level: int, item_id: str = None) -> Dict[str, int]:
+        """获取升阶所需材料（从 equipment_upgrade.yaml 查表）"""
+        if current_level >= 10:
+            return {}
 
         target_level = current_level + 1
-        # 金币需求大幅增加，更高的投入要求
-        base_cost = 5000 * (3 ** target_level)  # 基础成本提升
+        cfg = _load_upgrade_config()
+        mat_tables = cfg["materials"]
 
-        # 高阶装备额外增加成本
-        if target_level >= 7:
-            base_cost += 100000 * (target_level - 6)  # 7阶以上每阶额外增加10万+
+        if item_id and self.is_rare_equipment(item_id):
+            tier = self._get_rare_material_tier(config.items_config["by_id"].get(item_id))
+        else:
+            tier = "normal"
 
-        return base_cost
+        return dict(mat_tables.get(tier, mat_tables["normal"]).get(target_level, {}))
+
+    def get_upgrade_gold_cost(self, current_level: int) -> int:
+        """获取升阶所需金币（从 equipment_upgrade.yaml 查表）"""
+        if current_level >= 10:
+            return 0
+        return _load_upgrade_config()["gold_costs"].get(current_level + 1, 0)
 
     @staticmethod
     def apply_gold_discount(gold_cost: int, discount: float = 0.0) -> int:
@@ -257,7 +154,7 @@ class EquipmentUpgradeService:
             return 0.0
 
         target_level = current_level + 1
-        base_rate = self.SUCCESS_RATES.get(target_level, 0.0)
+        base_rate = _load_upgrade_config()["success_rates"].get(target_level, 0.0)
 
         # 运气加成（最多20%）
         from ..utils import luck_prob
@@ -426,7 +323,7 @@ class EquipmentUpgradeService:
             return True, f"升阶成功！装备升级到 +{target_level} 阶{gems_suffix}", result_info
         else:
             # 升阶失败
-            consequence = self.FAILURE_CONSEQUENCES.get(target_level, {"downgrade": 0, "destroy": 0.0})
+            consequence = _load_upgrade_config()["failure_consequences"].get(target_level, {"downgrade": 0, "destroy": 0.0})
 
             # 稳定水晶保护
             if use_protection:

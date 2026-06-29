@@ -17,6 +17,7 @@ from ..models.db import safe_session
 from ..models.player import Player
 from ..models.elixir_usage import ElixirUsageLog
 from ..models.inventory import ItemInstance
+from .equipment_service import VIP_EQUIPMENT_IDS
 
 # 具有主动技能的VIP装备ID集合（图鉴中不显示技能详情，仅对持有者提示）
 _VIP_ACTIVE_SKILL_IDS: set[str] = {
@@ -530,8 +531,6 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
 
             # 特殊效果信息（显示解锁条件）
             if hasattr(cfg, 'special_effects') and cfg.special_effects:
-                # VIP定制装备列表（0阶即全解锁）
-                VIP_EQUIPMENT_IDS = {"vip_blade_zhanlongshan", "vip_robe_jingyuanzhiyi", "vip_robe_jingyuan_legacy", "heaven_retreat_star_blade", "vip_gui_yu", "vip_chrono_watch", "vip_longying_flash", "vip_ghost_dice", "vip_shoes_longren", "vip_pendant_fuze", "vip_huihai_xinyuan", "vip_jade_xuanxu_shuangyan"}
                 is_vip_equipment = cfg.item_id in VIP_EQUIPMENT_IDS
 
                 if is_vip_equipment and cfg.item_id in _VIP_ACTIVE_SKILL_IDS:
@@ -737,8 +736,6 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
 
             # 特殊效果信息（显示解锁条件）
             if hasattr(cfg, 'special_effects') and cfg.special_effects:
-                # VIP定制装备列表（0阶即全解锁）
-                VIP_EQUIPMENT_IDS = {"vip_blade_zhanlongshan", "vip_robe_jingyuanzhiyi", "vip_robe_jingyuan_legacy", "heaven_retreat_star_blade", "vip_gui_yu", "vip_chrono_watch", "vip_longying_flash", "vip_ghost_dice", "vip_shoes_longren", "vip_pendant_fuze", "vip_huihai_xinyuan", "vip_jade_xuanxu_shuangyan"}
                 is_vip_equipment = cfg.item_id in VIP_EQUIPMENT_IDS
 
                 if is_vip_equipment and cfg.item_id in _VIP_ACTIVE_SKILL_IDS:

@@ -11,6 +11,7 @@ from .battle_effects import (
     BattleEffectManager, TriggerType, EffectType, BattleEffect,
     TriggerConfig, parse_triggers_from_yaml, format_effect_message
 )
+from ..item.equipment_service import VIP_EQUIPMENT_IDS
 
 
 class EnhancedBattleEngine:
@@ -366,9 +367,6 @@ class EnhancedBattleEngine:
         - 普通装备：+2阶解锁第1个效果，+4阶解锁第2个效果，依此类推
         - VIP定制装备（斩龙闪、镜怨之衣、天退星刀、归雨、折光年）：0阶即解锁全部效果
         """
-        # VIP定制装备列表（0阶即全解锁）
-        VIP_EQUIPMENT_IDS = {"vip_blade_zhanlongshan", "vip_robe_jingyuanzhiyi", "vip_robe_jingyuan_legacy", "heaven_retreat_star_blade", "vip_gui_yu", "vip_chrono_watch", "vip_longying_flash", "vip_ghost_dice", "vip_shoes_longren", "vip_pendant_fuze", "vip_huihai_xinyuan", "vip_jade_xuanxu_shuangyan"}
-
         for item in equipped_items:
             # 从装备配置中获取special_effects
             config = item.config if hasattr(item, 'config') else None

@@ -18,6 +18,17 @@ from ..infrastructure.repositories.player_repository import PlayerRepository
 # 获取所有装备物品ID
 EQUIP_ITEM_IDS = config.items_config["by_type"]["EQUIPMENT"]
 
+ATTR_NAME_MAP = {
+    "attack": "攻击力", "defense": "防御力", "agility": "敏捷",
+    "luck": "运气", "hp": "生命值", "mp": "理智值",
+    "max_hp": "最大生命值", "max_mp": "最大理智值",
+}
+
+VIP_EQUIPMENT_IDS = frozenset(
+    item_id for item_id in EQUIP_ITEM_IDS
+    if getattr(config.items_config["by_id"].get(item_id), "rarity", None) == "red"
+)
+
 
 class EquipmentService:
     """装备服务（DI架构）"""
