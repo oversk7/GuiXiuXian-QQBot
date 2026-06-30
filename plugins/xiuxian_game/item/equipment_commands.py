@@ -797,7 +797,6 @@ async def _(event: MessageEvent):
 
             session.add(equip)
             unworn_equipment.append(f"{equip.config.name}(ID:{equip.id})")
-            all_failed_tasks.extend(failed_tasks)
 
         # 重新计算剩余装备的属性加成，确保属性正确恢复
         # 新版本: 使用DI架构的EquipmentService
