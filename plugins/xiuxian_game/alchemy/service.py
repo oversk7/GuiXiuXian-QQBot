@@ -418,9 +418,6 @@ class AlchemyService:
         if returned_materials:
             msg += f"\n🔄 失败返还：{', '.join(returned_materials)}"
 
-        # 领取成功后删除记录，避免记录一直保留
-        await self._alchemy_record_repo.delete(record)
-
         return True, msg
 
     def format_recipes(self, page: int = 1, page_size: int = 5) -> str:

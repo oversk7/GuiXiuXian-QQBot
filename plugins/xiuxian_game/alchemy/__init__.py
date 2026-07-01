@@ -174,6 +174,10 @@ async def _(event: MessageEvent):
                 messages.append(msg)
 
         if messages:
+            from ..achievement.achievement_service import AchievementService
+            achievement_msgs = await AchievementService.check_achievements(session, player)
+            if achievement_msgs:
+                messages.extend(achievement_msgs)
             await session.commit()
             await claim_cmd.finish(message_add_head("\n".join(messages), event))
         else:
