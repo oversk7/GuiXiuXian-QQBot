@@ -872,7 +872,8 @@ class EnhancedBattleEngine:
 
         # 格式化基础攻击消息
         if not attack_result["hit"]:
-            result["messages"].append(f"⚡ {attacker_name}攻击{defender_name}，但被闪避了")
+            _miss_hit_pct = attack_result.get("hit_chance", 0)
+            result["messages"].append(f"⚡ {attacker_name}攻击{defender_name}，但被闪避了(命中率{_miss_hit_pct * 100:.0f}%)")
 
             # 触发闪避效果(防御方)
             dodge_effects = self.effect_manager.check_triggers(defender_id, TriggerType.ON_DODGE, {
@@ -1129,10 +1130,11 @@ class EnhancedBattleEngine:
         if tags:
             sub_lines.insert(0, f"  └ {' | '.join(tags)}")
 
-        # 斩龙闪拆分信息改为子行
+        # 拆分信息改为子行（显示必中/常规拆分及等效命中率）
         if has_guaranteed:
+            _hit_pct = attack_result.get("hit_chance", 0)
             _nd_text = "被闪避" if _normal_missed else str(normal_after_mod)
-            sub_lines.append(f"  └ 📊 必中:{guaranteed_damage} + 常规:{_nd_text}")
+            sub_lines.append(f"  └ 📊 必中:{guaranteed_damage} + 常规:{_nd_text} (命中率{_hit_pct * 100:.0f}%)")
 
         # 消息组装：攻击主消息在前，子效果行紧随，状态变更最后
         result["messages"].append(attack_msg)
@@ -1553,9 +1555,10 @@ class EnhancedBattleEngine:
         normal_base = max(0, base_damage - guaranteed_base)
 
         # 1) 命中判定（仅对 normal 部分生效）
+        # 闪避率已由 apply_ignore_special_debuff 在开战时按 IGNORE_SPECIAL 比例削减，
+        # 此处仅额外应用 DEFENSE_PENETRATION 的闪避穿透。
         adjusted_dodge = defender_attrs.get("dodge_rate", 0)
         adjusted_dodge = adjusted_dodge * (1 - max(0.0, min(1.0, ignore_defense_ratio)))
-        adjusted_dodge = adjusted_dodge * (1 - max(0.0, min(1.0, ignore_special_ratio)))
         hit_chance = BattleAttributeCalculator.calculate_hit_chance(
             attacker_attrs.get("accuracy_rate", 0), adjusted_dodge
         )
@@ -1564,9 +1567,10 @@ class EnhancedBattleEngine:
             normal_hit = False
             result["effects"].append("被闪避(80%)")
 
-        # 如果 guaranteed 部分存在，则整体视为命中
         if guaranteed_base > 0 or normal_hit:
             result["hit"] = True
+
+        result["hit_chance"] = hit_chance
 
         # 2) 穿透判定（仅对 normal 部分，真伤跳过）
         penetration_ratio = 0.0
@@ -1586,6 +1590,12 @@ class EnhancedBattleEngine:
             effective_crit_rate = max(0, crit_rate - defender_anti_crit_rate)
             is_critical = BattleAttributeCalculator.roll_critical_hit(effective_crit_rate, self.rng)
             result["is_critical"] = is_critical
+
+        # 3.5) 连击判定（仅普攻且 normal 命中时）
+        if not is_skill and normal_hit and normal_base > 0:
+            result["combo_count"] = BattleAttributeCalculator.roll_combo_attack(
+                attacker_attrs.get("combo_rate", 0), self.rng
+            )
 
         # 4) 计算防御修正(优先使用缓存属性,包含临时buff)
         defender_id = defender.id if hasattr(defender, 'id') else "enemy"
@@ -1700,6 +1710,8 @@ class EnhancedBattleEngine:
         if guaranteed_base > 0 or normal_hit:
             result["hit"] = True
 
+        result["hit_chance"] = hit_chance
+
         # 穿透（仅 normal 部分；真伤跳过）
         penetration_ratio = 0.0
         if normal_hit and normal_base > 0 and not has_true_damage:
@@ -1718,6 +1730,12 @@ class EnhancedBattleEngine:
             effective_crit_rate = max(0, crit_rate - monster_anti_crit_rate)
             is_critical = BattleAttributeCalculator.roll_critical_hit(effective_crit_rate, self.rng)
             result["is_critical"] = is_critical
+
+        # 连击判定（仅普攻且 normal 命中时）
+        if not is_skill and normal_hit and normal_base > 0:
+            result["combo_count"] = BattleAttributeCalculator.roll_combo_attack(
+                attacker_attrs.get("combo_rate", 0), self.rng
+            )
 
         from ..utils import apply_defense_mitigation
         monster_defense = monster_stats.get("defense", 0)
@@ -1851,7 +1869,7 @@ class EnhancedBattleEngine:
             if is_dict:
                 target[attr] = new_val
             else:
-                setattr(target, attr, new_val)
+                self._sync_unit_attr(target, attr, new_val)
             originals[attr] = old_val
 
         if originals:
@@ -1917,7 +1935,7 @@ class EnhancedBattleEngine:
                 if is_dict:
                     unit[attr] = original_value
                 elif hasattr(unit, attr):
-                    setattr(unit, attr, original_value)
+                    self._sync_unit_attr(unit, attr, original_value)
         # 回退骰子buff临时属性（诡面骰·骰相·乱）- 独立异常保护，确保一定执行
         # 最后还原，保证骰子buff的原始值（应用前的真实DB值）是最终写入的值
         try:
