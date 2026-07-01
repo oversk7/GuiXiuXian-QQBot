@@ -3,12 +3,17 @@
 
 将 5 种排行榜统一为通用查询函数，并加入进程内缓存。
 财富榜从 7 次查询优化为 1 次 SQL。
+
+所有 ORDER BY 都附加 Player.uid 作为 tiebreaker，确保排序确定性。
+query_player_rank_by_counting 的 COUNT 条件与 ORDER BY 保持一致，
+使 COUNT 结果 = 玩家在 ORDER BY 列表中的确切位置，避免大量并列值
+时 LIMIT 结果不包含目标玩家的问题。
 """
 
 from dataclasses import dataclass, field
 from typing import Any, Callable, Sequence
 
-from sqlalchemy import select, func, case
+from sqlalchemy import select, func, case, or_, and_
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from . import readonly_session, cached
@@ -29,11 +34,16 @@ class RankedPlayer:
     extra: dict = field(default_factory=dict)  # 额外展示数据
 
 
+def _sort_before(col, my_val, my_uid):
+    """ORDER BY col DESC, uid ASC 下排在 (my_val, my_uid) 前面的条件"""
+    return or_(col > my_val, and_(col == my_val, Player.uid < my_uid))
+
+
 # ==================== 通用单字段排行查询 ====================
 
 @cached(ttl_seconds=300)
 async def query_level_ranking(limit: int = 30, server_id: int = 1) -> list[RankedPlayer]:
-    """修为排行榜：按 reincarnation_level DESC, level DESC, exp DESC"""
+    """修为排行榜：按 reincarnation_level DESC, level DESC, exp DESC, uid ASC"""
     async with readonly_session() as session:
         stmt = (
             select(
@@ -51,6 +61,7 @@ async def query_level_ranking(limit: int = 30, server_id: int = 1) -> list[Ranke
                 Player.reincarnation_level.desc(),
                 Player.level.desc(),
                 Player.exp.desc(),
+                Player.uid,
             )
             .limit(limit)
         )
@@ -74,11 +85,11 @@ async def query_level_ranking(limit: int = 30, server_id: int = 1) -> list[Ranke
 
 @cached(ttl_seconds=300)
 async def query_luck_ranking(limit: int = 30, server_id: int | None = None) -> list[RankedPlayer]:
-    """幸运排行榜：按 luck DESC。server_id=None 为全服榜。"""
+    """幸运排行榜：按 luck DESC, uid ASC。server_id=None 为全服榜。"""
     async with readonly_session() as session:
         stmt = (
             select(Player.id, Player.uid, Player.nickname, Player.luck, Player.server_id)
-            .order_by(Player.luck.desc())
+            .order_by(Player.luck.desc(), Player.uid)
             .limit(limit)
         )
         if server_id is not None:
@@ -100,11 +111,11 @@ async def query_luck_ranking(limit: int = 30, server_id: int | None = None) -> l
 
 @cached(ttl_seconds=300)
 async def query_exploration_ranking(limit: int = 30, server_id: int | None = None) -> list[RankedPlayer]:
-    """探索排行榜：按 max_dungeon_level DESC。server_id=None 为全服榜。"""
+    """探索排行榜：按 max_dungeon_level DESC, uid ASC。server_id=None 为全服榜。"""
     async with readonly_session() as session:
         stmt = (
             select(Player.id, Player.uid, Player.nickname, Player.max_dungeon_level, Player.server_id)
-            .order_by(Player.max_dungeon_level.desc())
+            .order_by(Player.max_dungeon_level.desc(), Player.uid)
             .limit(limit)
         )
         if server_id is not None:
@@ -126,11 +137,11 @@ async def query_exploration_ranking(limit: int = 30, server_id: int | None = Non
 
 @cached(ttl_seconds=300)
 async def query_agility_ranking(limit: int = 30, server_id: int | None = None) -> list[RankedPlayer]:
-    """敏捷排行榜：按 agility DESC。server_id=None 为全服榜。"""
+    """敏捷排行榜：按 agility DESC, uid ASC。server_id=None 为全服榜。"""
     async with readonly_session() as session:
         stmt = (
             select(Player.id, Player.uid, Player.nickname, Player.agility, Player.server_id)
-            .order_by(Player.agility.desc())
+            .order_by(Player.agility.desc(), Player.uid)
             .limit(limit)
         )
         if server_id is not None:
@@ -152,11 +163,11 @@ async def query_agility_ranking(limit: int = 30, server_id: int | None = None) -
 
 @cached(ttl_seconds=300)
 async def query_mini_game_ranking(limit: int = 30, server_id: int | None = None) -> list[RankedPlayer]:
-    """小游戏排行榜：按 mini_game_score DESC。server_id=None 为全服榜。"""
+    """小游戏排行榜：按 mini_game_score DESC, uid ASC。server_id=None 为全服榜。"""
     async with readonly_session() as session:
         stmt = (
             select(Player.id, Player.uid, Player.nickname, Player.mini_game_score, Player.server_id)
-            .order_by(Player.mini_game_score.desc())
+            .order_by(Player.mini_game_score.desc(), Player.uid)
             .limit(limit)
         )
         if server_id is not None:
@@ -178,12 +189,12 @@ async def query_mini_game_ranking(limit: int = 30, server_id: int | None = None)
 
 @cached(ttl_seconds=300)
 async def query_demon_coins_ranking(limit: int = 30, server_id: int | None = None) -> list[RankedPlayer]:
-    """恶魔币排行榜：按 demon_coins DESC。server_id=None 为全服榜。"""
+    """恶魔币排行榜：按 demon_coins DESC, uid ASC。server_id=None 为全服榜。"""
     async with readonly_session() as session:
         stmt = (
             select(Player.id, Player.uid, Player.nickname, Player.demon_coins, Player.server_id)
             .where(Player.demon_coins > 0)
-            .order_by(Player.demon_coins.desc())
+            .order_by(Player.demon_coins.desc(), Player.uid)
             .limit(limit)
         )
         if server_id is not None:
@@ -207,15 +218,8 @@ async def query_demon_coins_ranking(limit: int = 30, server_id: int | None = Non
 
 @cached(ttl_seconds=300)
 async def query_wealth_ranking(limit: int = 50, server_id: int = 1) -> list[RankedPlayer]:
-    """财富排行：一次查询合并 金币 + 存款 + 投资市值
-
-    当前实现 7 次查询 → 优化为 1 次 SQL：
-    - LEFT JOIN BankAccount 获取存款
-    - LEFT JOIN (子查询) 获取投资市值
-    - ORDER BY 总财富 DESC
-    """
+    """财富排行：一次查询合并 金币 + 存款 + 投资市值"""
     async with readonly_session() as session:
-        # 子查询：每个玩家的投资市值
         invest_subq = (
             select(
                 StockHolding.player_id,
@@ -227,7 +231,6 @@ async def query_wealth_ranking(limit: int = 50, server_id: int = 1) -> list[Rank
             .subquery()
         )
 
-        # 主查询：金币 + 存款 + 投资
         total_wealth = (
             Player.gold
             + func.coalesce(BankAccount.balance, 0)
@@ -247,7 +250,7 @@ async def query_wealth_ranking(limit: int = 50, server_id: int = 1) -> list[Rank
             .outerjoin(BankAccount, BankAccount.player_id == Player.id)
             .outerjoin(invest_subq, invest_subq.c.player_id == Player.id)
             .where(Player.server_id == server_id)
-            .order_by(total_wealth.desc())
+            .order_by(total_wealth.desc(), Player.uid)
             .limit(limit)
         )
 
@@ -315,13 +318,8 @@ async def query_player_rank_by_counting(
 ) -> int | None:
     """通过 COUNT 查询获取精确排名（当玩家不在缓存的 TOP N 中时使用）
 
-    Args:
-        player_id: 玩家 ID
-        ranking_type: 排行类型
-        server_id: 区服ID，None 为全服榜
-
-    Returns:
-        排名（1-indexed），如果玩家不存在返回 None
+    COUNT 条件与 ORDER BY 完全一致（含 uid tiebreaker），
+    确保返回的 rank = 玩家在有序列表中的确切位置。
     """
     async with readonly_session() as session:
         player = await session.get(Player, player_id)
@@ -331,7 +329,6 @@ async def query_player_rank_by_counting(
             return None
 
         def _server_filter():
-            """返回区服过滤条件列表，全服榜时为空。"""
             if server_id is not None:
                 return [Player.server_id == server_id]
             return []
@@ -339,41 +336,43 @@ async def query_player_rank_by_counting(
         if ranking_type == "level":
             count_stmt = select(func.count()).select_from(Player).where(
                 *_server_filter(),
-                (Player.reincarnation_level > player.reincarnation_level) |
-                (
-                    (Player.reincarnation_level == player.reincarnation_level) &
-                    (Player.level > player.level)
-                ) |
-                (
-                    (Player.reincarnation_level == player.reincarnation_level) &
-                    (Player.level == player.level) &
-                    (Player.exp > player.exp)
+                or_(
+                    Player.reincarnation_level > player.reincarnation_level,
+                    and_(Player.reincarnation_level == player.reincarnation_level,
+                         Player.level > player.level),
+                    and_(Player.reincarnation_level == player.reincarnation_level,
+                         Player.level == player.level,
+                         Player.exp > player.exp),
+                    and_(Player.reincarnation_level == player.reincarnation_level,
+                         Player.level == player.level,
+                         Player.exp == player.exp,
+                         Player.uid < player.uid),
                 )
             )
         elif ranking_type == "luck":
             count_stmt = select(func.count()).select_from(Player).where(
                 *_server_filter(),
-                Player.luck > player.luck
+                _sort_before(Player.luck, player.luck, player.uid),
             )
         elif ranking_type == "exploration":
             count_stmt = select(func.count()).select_from(Player).where(
                 *_server_filter(),
-                Player.max_dungeon_level > player.max_dungeon_level
+                _sort_before(Player.max_dungeon_level, player.max_dungeon_level, player.uid),
             )
         elif ranking_type == "agility":
             count_stmt = select(func.count()).select_from(Player).where(
                 *_server_filter(),
-                Player.agility > player.agility
+                _sort_before(Player.agility, player.agility, player.uid),
             )
         elif ranking_type == "mini_game":
             count_stmt = select(func.count()).select_from(Player).where(
                 *_server_filter(),
-                Player.mini_game_score > player.mini_game_score
+                _sort_before(Player.mini_game_score, player.mini_game_score, player.uid),
             )
         elif ranking_type == "demon_coins":
             count_stmt = select(func.count()).select_from(Player).where(
                 *_server_filter(),
-                Player.demon_coins > player.demon_coins
+                _sort_before(Player.demon_coins, player.demon_coins, player.uid),
             )
         elif ranking_type == "wealth":
             bank_row = await session.get(BankAccount, player_id)
@@ -407,7 +406,11 @@ async def query_player_rank_by_counting(
                 .select_from(Player)
                 .outerjoin(BankAccount, BankAccount.player_id == Player.id)
                 .outerjoin(invest_subq, invest_subq.c.player_id == Player.id)
-                .where(*_server_filter(), wealth_expr > my_wealth)
+                .where(
+                    *_server_filter(),
+                    or_(wealth_expr > my_wealth,
+                        and_(wealth_expr == my_wealth, Player.uid < player.uid)),
+                )
             )
         else:
             return None
