@@ -36,6 +36,7 @@ def test_effective_attrs_falls_back_to_fields():
         level=1, critical_rate=5, critical_power=0, combo_rate=0,
         counter_rate=0, dodge_rate=0, accuracy_rate=80,
         skill_crit_rate=0, penetration_rate=0, anti_crit_rate=0,
+        anti_combo_rate=0, anti_counter_rate=0,
     )
     attrs = BattleAttributeCalculator.effective_attrs_in_battle(player)
     assert attrs["accuracy_rate"] == 80
