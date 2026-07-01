@@ -759,12 +759,6 @@ HEADQUARTERS_ITEMS = {
     "gem_hammer": 300,               # 镶嵌锤
     "gem_chisel": 300,               # 拆卸凿
     "accuracy_bead_1": 500,          # 一级命中佛珠
-    # 抗暴符文系列
-    "anti_crit_rune_1": 600,         # 一级抗暴符文
-    "anti_crit_rune_2": 1200,        # 二级抗暴符文
-    "anti_crit_rune_3": 2400,        # 三级抗暴符文
-    "anti_crit_rune_4": 4800,        # 四级抗暴符文
-    "anti_crit_rune_5": 9600,        # 五级抗暴符文
     # 抗连护符系列
     "anti_combo_talisman_1": 600,    # 一级抗连护符
     "anti_combo_talisman_2": 1200,   # 二级抗连护符

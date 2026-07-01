@@ -373,10 +373,11 @@ class BattleEffectProcessor:
         # 5. 伤害计算
         final_damage = base_damage
         
-        # 应用暴击
+        # 应用暴击（暴击力受防御方抗暴率等量削减）
         if is_critical:
+            effective_crit_power = max(0, attacker_attrs["critical_power"] - defender_attrs.get("anti_crit_rate", 0))
             final_damage = BattleAttributeCalculator.calculate_critical_damage(
-                final_damage, attacker_attrs["critical_power"]
+                final_damage, effective_crit_power
             )
             result["effects"].append("CRITICAL")
         

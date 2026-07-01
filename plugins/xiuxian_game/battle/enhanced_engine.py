@@ -1618,7 +1618,7 @@ class EnhancedBattleEngine:
         if normal_hit and normal_base > 0:
             dmg = normal_base
             if is_critical:
-                crit_power = attacker_attrs["critical_power"]
+                crit_power = max(0, attacker_attrs["critical_power"] - defender_attrs.get("anti_crit_rate", 0))
                 crit_multiplier = 1.5 + (crit_power * 0.1)
                 dmg = BattleAttributeCalculator.calculate_critical_damage(dmg, crit_power)
                 result["crit_multiplier"] = crit_multiplier
@@ -1754,7 +1754,7 @@ class EnhancedBattleEngine:
         if normal_hit and normal_base > 0:
             dmg = normal_base
             if is_critical:
-                crit_power = attacker_attrs["critical_power"]
+                crit_power = max(0, attacker_attrs["critical_power"] - monster_stats.get("anti_crit_rate", 0))
                 crit_multiplier = 1.5 + (crit_power * 0.1)
                 dmg = BattleAttributeCalculator.calculate_critical_damage(dmg, crit_power)
                 result["crit_multiplier"] = crit_multiplier
