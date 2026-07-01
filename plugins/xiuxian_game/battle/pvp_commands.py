@@ -67,10 +67,10 @@ async def handle_pvp(event: MessageEvent, args: Message = CommandArg()):
         # 解析目标玩家
         target_player = None
 
-        # 尝试解析UID
+        # 尝试解析UID（跨区可切磋）
         try:
             target_uid = int(args_text)
-            stmt = select(Player).where(Player.uid == target_uid, Player.server_id == challenger.server_id)
+            stmt = select(Player).where(Player.uid == target_uid)
             target_player = (await session.execute(stmt)).scalars().first()
         except ValueError:
             # 如果不是数字，可能是@某人或其他格式
@@ -107,12 +107,15 @@ async def handle_pvp(event: MessageEvent, args: Message = CommandArg()):
 
             winner = challenger if victory else target_player
             mode_hint = "详细模式" if log_mode == "detailed" else "简洁模式"
+            cross_shard = (challenger.server_id or 1) != (target_player.server_id or 1)
 
             # 新手任务钩子
             from ..quest.novice_quest_service import NoviceQuestService
             quest_completed, quest_msg = await NoviceQuestService.check_and_advance_quest(session, challenger, "command", {"command": "切磋"})
 
             hint_text = f"切磋不影响数据 | {mode_hint}"
+            if cross_shard:
+                hint_text = f"[跨区] {hint_text}"
             if quest_completed and quest_msg:
                 hint_text += f"\n{quest_msg}"
 
@@ -169,13 +172,11 @@ async def handle_simulate(event: MessageEvent, args: Message = CommandArg()):
         await simulate_cmd.finish("⛔ 不能模拟同一个玩家的战斗")
 
     async with safe_session() as session:
-        from ..platform_utils import get_event_server_id
-        server_id = await get_event_server_id(session, event)
-        # 获取两个玩家
-        stmt1 = select(Player).where(Player.uid == uid1, Player.server_id == server_id)
+        # 跨区可模拟战斗
+        stmt1 = select(Player).where(Player.uid == uid1)
         player1 = (await session.execute(stmt1)).scalars().first()
 
-        stmt2 = select(Player).where(Player.uid == uid2, Player.server_id == server_id)
+        stmt2 = select(Player).where(Player.uid == uid2)
         player2 = (await session.execute(stmt2)).scalars().first()
 
         if not player1:
@@ -206,10 +207,14 @@ async def handle_simulate(event: MessageEvent, args: Message = CommandArg()):
 
             winner = player1 if victory else player2
             mode_hint = "详细模式" if log_mode == "detailed" else "简洁模式"
+            cross_shard = (player1.server_id or 1) != (player2.server_id or 1)
+            hint = f"模拟 不影响数据 | {mode_hint}"
+            if cross_shard:
+                hint = f"[跨区] {hint}"
             await simulate_cmd.finish(build_battle_markdown(
                 title=f"🎮 {winner.nickname} 胜！",
                 battle_log=filtered_log,
-                hint=f"模拟 不影响数据 | {mode_hint}",
+                hint=hint,
                 btn1="切磋",
                 btn2="日志模式",
                 btn3="战力",

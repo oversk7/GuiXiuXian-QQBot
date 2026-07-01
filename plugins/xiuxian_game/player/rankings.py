@@ -8,7 +8,11 @@ from ..models.db import safe_session
 from ..utils import message_add_head
 from ..platform_utils import get_event_server_id, get_unified_player
 from ..utils_markdown import cmd, build_markdown, color_text
+from ..server_service import format_server, parse_server_id
 from .realm_utils import realm_by_level_and_reincarnation
+
+# 全服合并榜 — 与数值曲线无关的排行
+_GLOBAL_RANKINGS = {"luck", "exploration", "agility", "mini_game", "demon_coins"}
 from ..queries.ranking_queries import (
     RankedPlayer,
     query_level_ranking,
@@ -92,42 +96,81 @@ def _paginate_ranking(
     return ranked_list[offset:offset + page_size], offset
 
 
+def _parse_ranking_args(page_text: str) -> tuple[int | None, int | None]:
+    """从排行榜参数中解析页码和跨区查看的 server_id。
+
+    支持格式：空/数字页码/「二区」/「一区 2」
+    Returns:
+        (page, explicit_server_id)  explicit_server_id 非 None 表示用户指定了区服
+    """
+    if not page_text:
+        return None, None
+    parts = page_text.split()
+    page = None
+    explicit_server = None
+    for part in parts:
+        sid = parse_server_id(part, default=None)
+        if sid is not None and not part.isdigit():
+            explicit_server = sid
+        else:
+            try:
+                page = int(part)
+            except ValueError:
+                sid_fallback = parse_server_id(part, default=None)
+                if sid_fallback is not None:
+                    explicit_server = sid_fallback
+    if page is not None:
+        page = max(1, min(page, 3))
+    return page, explicit_server
+
+
 async def _resolve_player_and_rank(
     event: MessageEvent,
     ranking_type: str,
     page_text: str,
-) -> tuple[str | None, int | None, int | None, int]:
+) -> tuple[str | None, int | None, int | None, int | None]:
     """解析玩家身份和排名
 
     Returns:
-        (player_id, player_rank, page)
+        (player_id, player_rank, page, server_id)
+        全服榜 server_id=None；分区榜 server_id 为具体区服
     """
-    page = None
+    is_global = ranking_type in _GLOBAL_RANKINGS
+    page, explicit_server = _parse_ranking_args(page_text)
+
     player_id = None
     player_rank = None
-    server_id = 1
 
     async with safe_session() as session:
-        server_id = await get_event_server_id(session, event)
+        own_server_id = await get_event_server_id(session, event)
 
-    if page_text:
-        try:
-            page = int(page_text)
-        except ValueError:
-            page = 1
-        page = max(1, min(page, 3))
+    if is_global:
+        query_server_id = None
+    elif explicit_server is not None:
+        query_server_id = explicit_server
     else:
+        query_server_id = own_server_id
+
+    viewing_own_server = (query_server_id is None) or (query_server_id == own_server_id)
+
+    if page is None and viewing_own_server:
         async with safe_session() as session:
             player = await get_unified_player(session, event)
             if player:
                 player_id = player.id
-                # 先从缓存榜单查找
-                player_rank = await query_player_rank(player_id, ranking_type, server_id=server_id)
-                # 如果不在 TOP N 缓存中，做一次精确 COUNT 查询
+                player_rank = await query_player_rank(player_id, ranking_type, server_id=query_server_id)
                 if player_rank is None:
-                    player_rank = await query_player_rank_by_counting(player_id, ranking_type, server_id=server_id)
+                    player_rank = await query_player_rank_by_counting(player_id, ranking_type, server_id=query_server_id)
 
-    return player_id, player_rank, page, server_id
+    return player_id, player_rank, page, query_server_id
+
+
+def _server_badge(entry: RankedPlayer) -> str:
+    """全服榜条目的区服标识"""
+    sid = entry.extra.get("server_id")
+    if sid is not None:
+        return f"[{format_server(sid)}]"
+    return ""
 
 
 def _build_header(
@@ -265,7 +308,8 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
     if not page_data:
         await level_rank_cmd.finish("暂无排行榜数据")
 
-    lines = _build_header("📈", "修为排行榜", player_rank, page)
+    title_suffix = f" [{format_server(server_id)}]" if server_id else ""
+    lines = _build_header("📈", f"修为排行榜{title_suffix}", player_rank, page)
 
     for entry in page_data:
         realm_name = realm_by_level_and_reincarnation(
@@ -314,12 +358,13 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
         "这份加点，不是侥幸，是宣言：你相信，那1%的闪光，足以点亮100%的征程。",
         "凡俗眼中的偶然，是你掌中的必然。",
     ])
-    lines = _build_header("🍀", "幸运排行榜", player_rank, page, quote)
+    lines = _build_header("🍀", "全服幸运排行榜", player_rank, page, quote)
 
     for entry in page_data:
         title = _luck_title(entry.value)
         marker = " **◀你**" if player_id and entry.player_id == player_id else ""
-        lines.append(f"{_rank_emoji(entry.rank)} {cmd(entry.nickname, f'面板 {entry.uid}')} - {title} 🍀{entry.value}{marker}")
+        badge = _server_badge(entry)
+        lines.append(f"{_rank_emoji(entry.rank)} {cmd(entry.nickname, f'面板 {entry.uid}')}{badge} - {title} 🍀{entry.value}{marker}")
 
     lines.append("***")
     nav = []
@@ -351,7 +396,8 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
     if not page_data:
         await wealth_rank_cmd.finish("暂无排行榜数据")
 
-    lines = _build_header("💰", "财富排行榜", player_rank, page)
+    title_suffix = f" [{format_server(server_id)}]" if server_id else ""
+    lines = _build_header("💰", f"财富排行榜{title_suffix}", player_rank, page)
 
     for entry in page_data:
         formatted_wealth = _format_wealth(entry.value)
@@ -396,12 +442,13 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
         "每一层诡域，都是对意志的考验。",
         "探索者的足迹，是通往真理的阶梯。"
     ])
-    lines = _build_header("🌀", "探索排行榜", player_rank, page, quote)
+    lines = _build_header("🌀", "全服探索排行榜", player_rank, page, quote)
 
     for entry in page_data:
         title = _exploration_title(entry.value)
         marker = " **◀你**" if player_id and entry.player_id == player_id else ""
-        lines.append(f"{_rank_emoji(entry.rank)} {cmd(entry.nickname, f'面板 {entry.uid}')} - {title} 第{entry.value}层{marker}")
+        badge = _server_badge(entry)
+        lines.append(f"{_rank_emoji(entry.rank)} {cmd(entry.nickname, f'面板 {entry.uid}')}{badge} - {title} 第{entry.value}层{marker}")
 
     lines.append("***")
     nav = []
@@ -440,12 +487,13 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
         "身如闪电，心如止水，这便是敏捷的真谛。",
         "快者为王，慢者为寇。"
     ])
-    lines = _build_header("⚡", "敏捷排行榜", player_rank, page, quote)
+    lines = _build_header("⚡", "全服敏捷排行榜", player_rank, page, quote)
 
     for entry in page_data:
         title = _agility_title(entry.value)
         marker = " **◀你**" if player_id and entry.player_id == player_id else ""
-        lines.append(f"{_rank_emoji(entry.rank)} {cmd(entry.nickname, f'面板 {entry.uid}')} - {title} ⚡{entry.value}{marker}")
+        badge = _server_badge(entry)
+        lines.append(f"{_rank_emoji(entry.rank)} {cmd(entry.nickname, f'面板 {entry.uid}')}{badge} - {title} ⚡{entry.value}{marker}")
 
     lines.append("***")
     nav = []
@@ -484,12 +532,13 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
         "胜负乃兵家常事，重要的是享受游戏的过程。",
         "小游戏，大智慧，方寸之间见真章。"
     ])
-    lines = _build_header("🎮", "小游戏排行榜", player_rank, page, quote)
+    lines = _build_header("🎮", "全服小游戏排行榜", player_rank, page, quote)
 
     for entry in page_data:
         title = _mini_game_title(entry.value)
         marker = " **◀你**" if player_id and entry.player_id == player_id else ""
-        lines.append(f"{_rank_emoji(entry.rank)} {cmd(entry.nickname, f'面板 {entry.uid}')} - {title} 🎮{entry.value}分{marker}")
+        badge = _server_badge(entry)
+        lines.append(f"{_rank_emoji(entry.rank)} {cmd(entry.nickname, f'面板 {entry.uid}')}{badge} - {title} 🎮{entry.value}分{marker}")
 
     lines.append("***")
     nav = []
@@ -553,12 +602,13 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
         "真正的赌徒不畏惧失去，因为他们早已将一切押上。",
         "恶魔的游戏，只有最狡猾的灵魂才能胜出。",
     ])
-    lines = _build_header("🎰", "恶魔币排行榜", player_rank, page, quote)
+    lines = _build_header("🎰", "全服恶魔币排行榜", player_rank, page, quote)
 
     for entry in page_data:
         title = _demon_coins_title(entry.value)
         marker = " **◀你**" if player_id and entry.player_id == player_id else ""
-        lines.append(f"{_rank_emoji(entry.rank)} {cmd(entry.nickname, f'面板 {entry.uid}')} - {title} 🎰{entry.value}{marker}")
+        badge = _server_badge(entry)
+        lines.append(f"{_rank_emoji(entry.rank)} {cmd(entry.nickname, f'面板 {entry.uid}')}{badge} - {title} 🎰{entry.value}{marker}")
 
     lines.append("***")
     lines.append(f"*通过 {cmd('人机轮盘')} 赢取恶魔币上榜*")
@@ -582,18 +632,21 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
     lines = [
         "# 🏆 排行榜总览",
         "***",
-        f"📈 {cmd('修为榜')} — 修为排行",
+        "**全服榜**（一区+二区混合排名）",
         f"🍀 {cmd('幸运榜')} — 幸运排行",
-        f"💰 {cmd('财富榜')} — 财富排行（含现金+存款+投资）",
         f"🌀 {cmd('探索榜')} — 探索排行",
         f"⚡ {cmd('敏捷榜')} — 敏捷排行",
         f"🎮 {cmd('小游戏榜')} — 小游戏排行",
         f"🎰 {cmd('恶魔币榜')} — 恶魔轮盘排行",
-        f"🎣 {cmd('钓鱼排行')} — 钓鱼排行",
-        f"🏦 {cmd('存款榜')} — 存款排行",
         f"💕 {cmd('魅力榜')} — 谁最受欢迎",
+        "***",
+        "**分区榜**（支持 修为榜 二区 跨区查看）",
+        f"📈 {cmd('修为榜')} — 修为排行",
+        f"💰 {cmd('财富榜')} — 财富排行（含现金+存款+投资）",
+        f"🏦 {cmd('存款榜')} — 存款排行",
         f"👹 {cmd('BOSS排行')} — 世界BOSS伤害排行",
         f"🏰 {cmd('公会列表')} — 公会排行",
+        f"🎣 {cmd('钓鱼排行')} — 钓鱼排行",
         "***",
         cmd("排行榜") + " | " + cmd("帮助"),
     ]

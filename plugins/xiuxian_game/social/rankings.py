@@ -8,6 +8,7 @@ from ..models.player import Player
 from ..utils import message_add_head
 from ..utils_markdown import cmd, build_markdown
 from ..platform_utils import get_event_server_id, get_unified_player
+from ..server_service import format_server
 
 
 # ==================== 社交统计 ====================
@@ -40,12 +41,12 @@ async def handle_social_stats(event: MessageEvent):
         await social_stats_cmd.finish(message_add_head("\n".join(lines), event))
 
 
-# ==================== 魅力榜 ====================
+# ==================== 魅力榜（全服榜） ====================
 charm_ranking_cmd = on_command("魅力榜", aliases={"魅力排行榜"}, block=True, priority=11)
 
 @charm_ranking_cmd.handle()
 async def handle_charm_ranking(event: MessageEvent, args: Message = CommandArg()):
-    """显示魅力值排行榜，无参数时以自己为中心展示"""
+    """显示魅力值排行榜（全服），无参数时以自己为中心展示"""
     page_text = args.extract_plain_text().strip()
     page_size = 10
     page = None
@@ -53,12 +54,11 @@ async def handle_charm_ranking(event: MessageEvent, args: Message = CommandArg()
     player_rank = None
 
     async with safe_session() as session:
-        server_id = await get_event_server_id(session, event)
         total_count = (await session.execute(
-            select(func.count()).select_from(Player).where(Player.charm > 0, Player.server_id == server_id)
+            select(func.count()).select_from(Player).where(Player.charm > 0)
         )).scalar_one()
         if total_count == 0:
-            await charm_ranking_cmd.finish(message_add_head("💖 魅力排行榜\n━━━━━━━━━━━━━\n暂无数据", event))
+            await charm_ranking_cmd.finish(message_add_head("💖 全服魅力排行榜\n━━━━━━━━━━━━━\n暂无数据", event))
 
         if not page_text:
             player = await get_unified_player(session, event)
@@ -66,7 +66,6 @@ async def handle_charm_ranking(event: MessageEvent, args: Message = CommandArg()
                 players_above = (await session.execute(
                     select(func.count()).select_from(Player).where(
                         Player.charm > player.charm,
-                        Player.server_id == server_id,
                     )
                 )).scalar_one()
                 player_rank = players_above + 1
@@ -87,7 +86,7 @@ async def handle_charm_ranking(event: MessageEvent, args: Message = CommandArg()
 
         stmt = (
             select(Player)
-            .where(Player.charm > 0, Player.server_id == server_id)
+            .where(Player.charm > 0)
             .order_by(Player.charm.desc())
             .offset(offset)
             .limit(page_size)
@@ -95,19 +94,20 @@ async def handle_charm_ranking(event: MessageEvent, args: Message = CommandArg()
         players = (await session.execute(stmt)).scalars().all()
 
     if not players:
-        await charm_ranking_cmd.finish(build_markdown("💖 魅力排行榜\n***\n暂无数据"))
+        await charm_ranking_cmd.finish(build_markdown("💖 全服魅力排行榜\n***\n暂无数据"))
 
     if player_rank is not None:
-        lines = [f"# 💖 魅力排行榜", f"你的排名: 第**{player_rank}**名", "***"]
+        lines = [f"# 💖 全服魅力排行榜", f"你的排名: 第**{player_rank}**名", "***"]
     elif page is not None:
-        lines = [f"# 💖 魅力排行榜 (第{page}/3页)", "***"]
+        lines = [f"# 💖 全服魅力排行榜 (第{page}/3页)", "***"]
     else:
-        lines = ["# 💖 魅力排行榜", "***"]
+        lines = ["# 💖 全服魅力排行榜", "***"]
 
     for idx, p in enumerate(players, start=offset + 1):
         rank_emoji = "🥇" if idx == 1 else "🥈" if idx == 2 else "🥉" if idx == 3 else f"{idx}."
         marker = " **◀你**" if player and p.id == player.id else ""
-        lines.append(f"{rank_emoji} {cmd(p.nickname, f'面板 {p.uid}')} - {p.charm} 🍫{marker}")
+        badge = f"[{format_server(p.server_id)}]" if p.server_id else ""
+        lines.append(f"{rank_emoji} {cmd(p.nickname, f'面板 {p.uid}')}{badge} - {p.charm} 🍫{marker}")
 
     lines.append("***")
     lines.append("💡 收到好感度礼物可增加魅力值")

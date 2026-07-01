@@ -28,18 +28,21 @@ class PlayerProfileDTO:
     active_monthly_card_types: list[CardType] = field(default_factory=list)
 
 
-async def query_player_profile(uid: int, server_id: int = 1) -> PlayerProfileDTO | None:
+async def query_player_profile(uid: int, server_id: int | None = None) -> PlayerProfileDTO | None:
     """纯只读路径查看他人面板
 
     Args:
         uid: 玩家 UID
+        server_id: 区服ID，None 时不限区服（跨区查看）
 
     Returns:
         PlayerProfileDTO，未找到返回 None
     """
     async with readonly_session() as session:
         # 1. 查找玩家
-        stmt = select(Player).where(Player.uid == uid, Player.server_id == server_id)
+        stmt = select(Player).where(Player.uid == uid)
+        if server_id is not None:
+            stmt = stmt.where(Player.server_id == server_id)
         result = await session.execute(stmt)
         player = result.scalars().first()
         if not player:

@@ -22,7 +22,7 @@ from ..platform_utils import get_event_server_id, get_unified_player, is_guild_m
 from ..infrastructure.cache import player_identity_cache
 from ..config import config
 from ..server_config import DEFAULT_SERVER_ID, get_server_name, get_servers_config
-from ..server_service import ensure_platform_server_binding, parse_server_id
+from ..server_service import ensure_platform_server_binding, format_server, parse_server_id
 from ..infrastructure.uow import UnitOfWork
 from ..infrastructure.repositories.account_transfer_log_repository import AccountTransferLogRepository
 from ..models.account_ownership import AccountOwnership
@@ -101,11 +101,9 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
 
     quest_extra = ""  # 存储任务/成就检查结果
 
-    # ===== 查看他人面板：纯只读路径 =====
+    # ===== 查看他人面板：纯只读路径（跨区可见） =====
     if target_uid is not None:
-        async with safe_session() as session:
-            server_id = await get_event_server_id(session, event)
-        profile_data = await query_player_profile(target_uid, server_id=server_id)
+        profile_data = await query_player_profile(target_uid)
         if not profile_data:
             await profile.finish("⛔ 未找到该 UID")
         player = profile_data.player
@@ -230,7 +228,7 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
     # 组装原生 Markdown 面板（保持原版逐行排版）
     lines = [
         f"# 👤 {display_name}",
-        f"UID:{player.uid}　「{player.sex}」",
+        f"UID:{player.uid}　{format_server(player.server_id)}　「{player.sex}」",
         f"Lv.**{player.level}** · {realm_name}",
     ]
     if title_line:
