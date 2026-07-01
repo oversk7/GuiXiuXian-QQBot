@@ -128,12 +128,13 @@ async def _resolve_player_and_rank(
     event: MessageEvent,
     ranking_type: str,
     page_text: str,
-) -> tuple[str | None, int | None, int | None, int | None]:
+) -> tuple[str | None, int | None, int | None, int | None, str]:
     """解析玩家身份和排名
 
     Returns:
-        (player_id, player_rank, page, server_id)
+        (player_id, player_rank, page, server_id, nav_shard_suffix)
         全服榜 server_id=None；分区榜 server_id 为具体区服
+        nav_shard_suffix: 分页按钮需要追加的区服参数（如 " 二区"），用户未指定区时为空
     """
     is_global = ranking_type in _GLOBAL_RANKINGS
     page, explicit_server = _parse_ranking_args(page_text)
@@ -151,6 +152,8 @@ async def _resolve_player_and_rank(
     else:
         query_server_id = own_server_id
 
+    nav_shard_suffix = f" {format_server(explicit_server)}" if explicit_server is not None else ""
+
     viewing_own_server = (query_server_id is None) or (query_server_id == own_server_id)
 
     if page is None and viewing_own_server:
@@ -162,7 +165,7 @@ async def _resolve_player_and_rank(
                 if player_rank is None:
                     player_rank = await query_player_rank_by_counting(player_id, ranking_type, server_id=query_server_id)
 
-    return player_id, player_rank, page, query_server_id
+    return player_id, player_rank, page, query_server_id, nav_shard_suffix
 
 
 def _server_badge(entry: RankedPlayer) -> str:
@@ -297,7 +300,7 @@ level_rank_cmd = on_command("修为榜", aliases={"等级榜"}, block=True, prio
 async def _(event: MessageEvent, args: Message = CommandArg()):
     """按等级及经验排序的玩家排行榜"""
     page_text = args.extract_plain_text().strip()
-    player_id, player_rank, page, server_id = await _resolve_player_and_rank(event, "level", page_text)
+    player_id, player_rank, page, server_id, nav_suffix = await _resolve_player_and_rank(event, "level", page_text)
 
     ranked_list = await query_level_ranking(server_id=server_id)
     if not ranked_list:
@@ -326,9 +329,9 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
     lines.append("***")
     nav = []
     if (page or 1) > 1:
-        nav.append(cmd("上一页", f"修为榜 {(page or 1) - 1}"))
+        nav.append(cmd("上一页", f"修为榜{nav_suffix} {(page or 1) - 1}"))
     if (page or 1) < 3:
-        nav.append(cmd("下一页", f"修为榜 {(page or 1) + 1}"))
+        nav.append(cmd("下一页", f"修为榜{nav_suffix} {(page or 1) + 1}"))
     if nav:
         lines.append(" | ".join(nav))
     lines.append(cmd("修为榜") + " | " + cmd("帮助"))
@@ -342,7 +345,7 @@ luck_rank_cmd = on_command("幸运榜", aliases={"运气榜", "幸运排行榜"}
 async def _(event: MessageEvent, args: Message = CommandArg()):
     """显示幸运值最高的玩家排行榜"""
     page_text = args.extract_plain_text().strip()
-    player_id, player_rank, page, server_id = await _resolve_player_and_rank(event, "luck", page_text)
+    player_id, player_rank, page, server_id, nav_suffix = await _resolve_player_and_rank(event, "luck", page_text)
 
     ranked_list = await query_luck_ranking(server_id=server_id)
     if not ranked_list:
@@ -369,9 +372,9 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
     lines.append("***")
     nav = []
     if (page or 1) > 1:
-        nav.append(cmd("上一页", f"幸运榜 {(page or 1) - 1}"))
+        nav.append(cmd("上一页", f"幸运榜{nav_suffix} {(page or 1) - 1}"))
     if (page or 1) < 3:
-        nav.append(cmd("下一页", f"幸运榜 {(page or 1) + 1}"))
+        nav.append(cmd("下一页", f"幸运榜{nav_suffix} {(page or 1) + 1}"))
     if nav:
         lines.append(" | ".join(nav))
     lines.append(cmd("幸运榜") + " | " + cmd("帮助"))
@@ -385,7 +388,7 @@ wealth_rank_cmd = on_command("财富榜", aliases={"财富排行榜"}, block=Tru
 async def _(event: MessageEvent, args: Message = CommandArg()):
     """显示总财富最多的玩家排行榜（金币+存款+投资）"""
     page_text = args.extract_plain_text().strip()
-    player_id, player_rank, page, server_id = await _resolve_player_and_rank(event, "wealth", page_text)
+    player_id, player_rank, page, server_id, nav_suffix = await _resolve_player_and_rank(event, "wealth", page_text)
 
     ranked_list = await query_wealth_ranking(server_id=server_id)
     if not ranked_list:
@@ -408,9 +411,9 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
     lines.append("*总财富 = 面板金币 + 银行余额 + 投资价值*")
     nav = []
     if (page or 1) > 1:
-        nav.append(cmd("上一页", f"财富榜 {(page or 1) - 1}"))
+        nav.append(cmd("上一页", f"财富榜{nav_suffix} {(page or 1) - 1}"))
     if (page or 1) < 3:
-        nav.append(cmd("下一页", f"财富榜 {(page or 1) + 1}"))
+        nav.append(cmd("下一页", f"财富榜{nav_suffix} {(page or 1) + 1}"))
     if nav:
         lines.append(" | ".join(nav))
     lines.append(cmd("财富榜") + " | " + cmd("帮助"))
@@ -424,7 +427,7 @@ exploration_rank_cmd = on_command("探索榜", aliases={"探索排行榜", "诡�
 async def _(event: MessageEvent, args: Message = CommandArg()):
     """显示最高探索层数的玩家排行榜"""
     page_text = args.extract_plain_text().strip()
-    player_id, player_rank, page, server_id = await _resolve_player_and_rank(event, "exploration", page_text)
+    player_id, player_rank, page, server_id, nav_suffix = await _resolve_player_and_rank(event, "exploration", page_text)
 
     ranked_list = await query_exploration_ranking(server_id=server_id)
     if not ranked_list:
@@ -453,9 +456,9 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
     lines.append("***")
     nav = []
     if (page or 1) > 1:
-        nav.append(cmd("上一页", f"探索榜 {(page or 1) - 1}"))
+        nav.append(cmd("上一页", f"探索榜{nav_suffix} {(page or 1) - 1}"))
     if (page or 1) < 3:
-        nav.append(cmd("下一页", f"探索榜 {(page or 1) + 1}"))
+        nav.append(cmd("下一页", f"探索榜{nav_suffix} {(page or 1) + 1}"))
     if nav:
         lines.append(" | ".join(nav))
     lines.append(cmd("探索榜") + " | " + cmd("帮助"))
@@ -469,7 +472,7 @@ agility_rank_cmd = on_command("敏捷榜", aliases={"速度榜", "敏捷排行�
 async def _(event: MessageEvent, args: Message = CommandArg()):
     """显示敏捷值排行榜"""
     page_text = args.extract_plain_text().strip()
-    player_id, player_rank, page, server_id = await _resolve_player_and_rank(event, "agility", page_text)
+    player_id, player_rank, page, server_id, nav_suffix = await _resolve_player_and_rank(event, "agility", page_text)
 
     ranked_list = await query_agility_ranking(server_id=server_id)
     if not ranked_list:
@@ -498,9 +501,9 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
     lines.append("***")
     nav = []
     if (page or 1) > 1:
-        nav.append(cmd("上一页", f"敏捷榜 {(page or 1) - 1}"))
+        nav.append(cmd("上一页", f"敏捷榜{nav_suffix} {(page or 1) - 1}"))
     if (page or 1) < 3:
-        nav.append(cmd("下一页", f"敏捷榜 {(page or 1) + 1}"))
+        nav.append(cmd("下一页", f"敏捷榜{nav_suffix} {(page or 1) + 1}"))
     if nav:
         lines.append(" | ".join(nav))
     lines.append(cmd("敏捷榜") + " | " + cmd("帮助"))
@@ -514,7 +517,7 @@ mini_game_rank_cmd = on_command("小游戏榜", aliases={"游戏榜", "小游戏
 async def _(event: MessageEvent, args: Message = CommandArg()):
     """显示小游戏积分排行榜"""
     page_text = args.extract_plain_text().strip()
-    player_id, player_rank, page, server_id = await _resolve_player_and_rank(event, "mini_game", page_text)
+    player_id, player_rank, page, server_id, nav_suffix = await _resolve_player_and_rank(event, "mini_game", page_text)
 
     ranked_list = await query_mini_game_ranking(server_id=server_id)
     if not ranked_list:
@@ -543,9 +546,9 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
     lines.append("***")
     nav = []
     if (page or 1) > 1:
-        nav.append(cmd("上一页", f"小游戏榜 {(page or 1) - 1}"))
+        nav.append(cmd("上一页", f"小游戏榜{nav_suffix} {(page or 1) - 1}"))
     if (page or 1) < 3:
-        nav.append(cmd("下一页", f"小游戏榜 {(page or 1) + 1}"))
+        nav.append(cmd("下一页", f"小游戏榜{nav_suffix} {(page or 1) + 1}"))
     if nav:
         lines.append(" | ".join(nav))
     lines.append(cmd("小游戏榜") + " | " + cmd("帮助"))
@@ -584,7 +587,7 @@ demon_coins_rank_cmd = on_command("恶魔币榜", aliases={"恶魔轮盘榜", "�
 async def _(event: MessageEvent, args: Message = CommandArg()):
     """显示恶魔币排行榜"""
     page_text = args.extract_plain_text().strip()
-    player_id, player_rank, page, server_id = await _resolve_player_and_rank(event, "demon_coins", page_text)
+    player_id, player_rank, page, server_id, nav_suffix = await _resolve_player_and_rank(event, "demon_coins", page_text)
 
     ranked_list = await query_demon_coins_ranking(server_id=server_id)
     if not ranked_list:
@@ -614,9 +617,9 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
     lines.append(f"*通过 {cmd('人机轮盘')} 赢取恶魔币上榜*")
     nav = []
     if (page or 1) > 1:
-        nav.append(cmd("上一页", f"恶魔币榜 {(page or 1) - 1}"))
+        nav.append(cmd("上一页", f"恶魔币榜{nav_suffix} {(page or 1) - 1}"))
     if (page or 1) < 3:
-        nav.append(cmd("下一页", f"恶魔币榜 {(page or 1) + 1}"))
+        nav.append(cmd("下一页", f"恶魔币榜{nav_suffix} {(page or 1) + 1}"))
     if nav:
         lines.append(" | ".join(nav))
     lines.append(cmd("恶魔币榜") + " | " + cmd("帮助"))
